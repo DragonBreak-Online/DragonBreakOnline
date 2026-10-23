@@ -241,18 +241,65 @@ experiment, not a step toward removing CEF.
 
 ## Status of the in-game pass
 
-Still outstanding, and now largely superseded. Attempted 2026-10-16: the launcher gates Play behind
-a completed update, and the update needs two mods this PC lacks (King of the Murkmire - Main,
-717 MB, Nexus 190459; Murkmire Official Housing Pack, 145 KB, Nexus 194072), both required by the
-live 140-entry server load order. The Main archive was downloaded and verified; the 145 KB Housing
-Pack was not, and the installer aborted twice on its 15-minute idle timeout. Non-Premium Nexus needs
-a manual "Slow download" click per file.
+**Partly done, 2026-10-23.** The game ran (launcher 2.1.53, client v0.3.108b, all 155 mods enabled,
+the two Murkmire mods that blocked this on 10-16 are now installed) and the UI was observed at the
+character-select screen. The world was not entered, and the interactive behaviours could not be
+driven — see "what could not be measured" below.
 
-Of the four behaviours the pass was meant to measure, **three are now answered from code** (sections
-5 and 6): the cursor mechanism is identified to the line, the keyboard gate is identified to the
-`if` block, and controller is both absent in `skymp5-front` and masked by `bGamepadEnable=0`. What a
-live session would add is confirmation, plus panel-over-panel focus behaviour — worth doing, no
-longer decisive.
+### Observed in game
+
+- **The overlay renders correctly.** The `characterSelect` widget draws over the main menu, and the
+  vanilla menu options are absent — confirming the hand-authored 30-byte `Data/Interface/startmenu.swf`
+  blanking works as described in section 3.
+- **The install runs at 1920x1080** (`profiles/DragonBreak/skyrimprefs.ini`: `iSize W=1920`,
+  `iSize H=1080`, `bBorderless=1`). This is the live confirmation of why the cursor hotspot bug was
+  never noticed: the error term `24 * (m_width/1920 - 1)` is **exactly zero at this resolution**.
+- **`bGamepadEnable=0`** confirmed in the live profile, so the controller gap is latent, not observed.
+- A **black frame** was captured during a window re-focus, consistent with the "no frames rendered
+  behind another window" complaint. One observation, not a measurement.
+
+### What could not be measured, and why it matters
+
+Synthetic mouse input never reached the overlay: moving the pointer over a character row produced
+neither the hover state (`features/characterSelect/styles.scss:123` - background, border-colour and a
+1px lift, so a null result would have been visible) nor the cursor sprite.
+
+The cause is structural, and it is the most useful thing this pass produced. **The overlay does not
+use the OS cursor.** It integrates its own pointer from DirectInput deltas - `ProcessMouseData` reads
+`DIMOUSESTATE2.lX/lY` (`DInputHook.cpp:254-263`) and the position is held in `m_cursorX`/`m_cursorY`
+(`MyRenderHandler.h:20`, drawn at `DX11RenderHandler.cpp:102-108`). Synthetic `SendInput` does not
+produce raw HID deltas, so no automated harness can drive this UI. A human at the keyboard is
+required, and that is a property of the design, not of the harness.
+
+That same code carries a documented bug of exactly this shape - `DInputHook.cpp:159`:
+
+> "The mouse's twin of CheckDeafKeyboard (2026-09-28: a dead mouse at character select until an
+> alt-tab)."
+
+`CheckDeafMouse` compares Windows' view of the mouse (`GetCursorPos`, `GetAsyncKeyState`) against the
+device's own report and re-acquires the device after 300 ms of disagreement. Its comment notes the
+heal deliberately cannot be triggered by a programmatic cursor move - which is why the behaviour
+observed here is not distinguishable from the known bug.
+
+### Correction this forces to section 5
+
+Section 5 says the cursor defect is "a hardcoded `1920` plus an unscaled two-element hotspot,
+fixable in ~5 lines". That is true but incomplete, and it understated the case for native. There are
+**two** cursor defects:
+
+1. **Hotspot scaling** - the offset at non-1920 widths. Genuinely ~5 lines; fixed in `60c65c55`.
+2. **An independently integrated pointer** - the overlay runs its own cursor off raw DirectInput
+   deltas, with its own deafness detection and device re-acquire path, and a documented
+   dead-mouse-at-character-select bug. Drift, acceleration mismatch and dropped deltas are inherent
+   to integrating a pointer rather than reading one.
+
+The second is structural to the CEF overlay design, and a native menu would inherit none of it - it
+would receive the game's own cursor. So the "none of the four defects is structural" claim in
+section 5 is **too strong on the cursor**: the hotspot half is trivial, the pointer-integration half
+is not. This is a real point in favour of native that the earlier passes dismissed.
+
+Still unmeasured: panel-over-panel focus behaviour, and keyboard deafness with a panel focused.
+Both need real HID input.
 
 ## How the numbers were taken
 
