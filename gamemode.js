@@ -298,7 +298,14 @@ const isTrialStaff = (actorId) => trialFrom(profileOf(actorId), rolesOf(actorId)
 // (fork TRIAL_GM_MODES), not a gameplay command. realnames: /realnames, every player by their own name on the staff
 // member's own screen (playermenu.js; Jake, 14 Oct: every staff rank, Trial GMs included)
 const TRIAL_CAN = new Set(['rename', 'chargen', 'gmcall', 'tp', 'invis', 'playerinfo', 'bugs', 'adminchat', 'unstuck', 'realnames']);
-const staffCan = (actorId, what) => isAdmin(actorId) || (TRIAL_CAN.has(what) && isTrialStaff(actorId));
+const staffCanByRank = (actorId, what) => isAdmin(actorId) || (TRIAL_CAN.has(what) && isTrialStaff(actorId));
+// The staff rules (staffguard.js): rights tied to a staff character are refused on any other one
+const staffGuard = () => { const g = globalThis.__dboStaffGuard; return g && typeof g === 'object' ? g : null; };
+const staffCan = (actorId, what) => {
+  if (!staffCanByRank(actorId, what)) return false;
+  try { const g = staffGuard(); return !g || g.rightOk(actorId, what) !== false; } catch (e) { return true; }
+};
+
 // The tier for logs and the role sync: an admin tier, 'trialgm', or null
 const staffTierFrom = (profile, roles) => tierFrom(profile, roles) || (trialFrom(profile, roles) ? 'trialgm' : null);
 const staffTierOf = (actorId) => staffTierFrom(profileOf(actorId), rolesOf(actorId));
@@ -913,6 +920,7 @@ const registerChatCommand = (name, fn, opts) => commands.set(name.toLowerCase(),
 globalThis.__dboRunCommand = (a, name, args, quiet) => {
   const c = commands.get(String(name || '').toLowerCase());
   if (!c || (c.admin && !isAdmin(a))) return null;
+  try { const g = staffGuard(); const lower = String(name || '').toLowerCase(); const r = g ? g.command(a, lower, `${lower} ${(String(args || '').trim().split(/\s+/)[0] || '').toLowerCase()}`, String(args || '')) : null; if (r && r.refuse) return [r.refuse]; } catch (e) { /* the rules are optional */ }
   const cap = { a: a >>> 0, lines: [], quiet: !!quiet };
   const prev = globalThis.__dboTellCapture;
   globalThis.__dboTellCapture = cap;
@@ -1040,7 +1048,9 @@ const helpLine = (n) => { const c = commands.get(n); return `/${n}${c && c.help 
 // power inside a player command. An entry shows only while its command exists; an admin-only command missing here is
 // listed under Other staff tools.
 const STAFF_HELP = [
-  { key: 'players', title: 'Players', items: ['players', 'kick', 'discipline', 'tp', 'fixloc', 'chargen', 'grantappearance', 'rename', 'sethunger', 'wipechars',
+  { key: 'players', title: 'Players', items: ['players', 'kick', 'discipline', 'tp', 'fixloc', 'chargen', 'grantappearance',
+    ['rename', '<player|#TAG> <new name> [call:<n>|ticket:<id>]: for a typo or a name against the rules. A new identity is a new character, never a rename'],
+    'staffchar', 'staffref', 'sethunger', 'wipechars',
     ['tokens', '<player|#TAG>: someone\'s Patreon tier and identity rerolls left'], 'rerollrefund', 'stats', 'charstats', 'bugs', 'realnames', 'chars',
     'appearancecancel', 'vaults', 'acstate', 'anticheat'] },
   { key: 'calls', title: 'GM calls from players', items: [['gm list', '[all]: the open calls (all: and the last ten closed)'],
@@ -1088,8 +1098,8 @@ const staffTopics = () => {
 // A Trial GM has no admin tab, so their list comes as private lines; every entry is a TRIAL_CAN right
 const TRIAL_HELP = [
   ['gm', 'list [all] | take <n> | goto <n> | release <n> | close <n> [note] | quiet [on|off]: answer GM calls'],
-  ['tp', '<player|#TAG>: go to a player'],
-  ['rename', '<player|#TAG> <new name>: rename a character'],
+  ['tp', '<player|#TAG>: go to a player whose GM call you hold'],
+  ['rename', '<player|#TAG> <new name> [call:<n>|ticket:<id>]: fix a typo or a name against the rules. A new identity is a new character, never a rename'],
   ['chargen', '<player|#TAG>: reopen character creation for someone'],
   ['charstats', '<player|#TAG>: a character\'s journal statistics'],
   ['bugs', '[n]: the newest /bug reports (5, up to 15)'],
@@ -1097,7 +1107,9 @@ const TRIAL_HELP = [
 ];
 const trialHelp = (a) => {
   personal(a, 'Trial GM tools (every use is logged to staff):');
-  for (const [n, text] of TRIAL_HELP) if (commands.has(n)) personal(a, `  /${n} ${text}`);
+  // A tool the staff rules close to them (staffguard.js: /chargen, and everything on a character that is not a staff one) is left out
+  const closed = (n) => { try { const g = staffGuard(); const r = g ? g.command(a, n, n, '') : null; return !!(r && r.refuse); } catch (e) { return false; } };
+  for (const [n, text] of TRIAL_HELP) if (commands.has(n) && !closed(n)) personal(a, `  /${n} ${text}`);
   personal(a, '  F7 panel: the Players tab (who is online, TP to, Rename) and the Modes tab (Invisible).');
 };
 const staffHelp = (a, want) => {
@@ -1220,6 +1232,7 @@ registerChatCommand('chargen', (a, args) => {
   const trialOnly = staffTierOf(a) === 'trialgm';
   const t = args.trim() ? findByName(args.trim()) : a; if (!t) return personal(a, 'No such player. Use their name or #TAG.');
   if (trialOnly && (t >>> 0) !== (a >>> 0)) return personal(a, 'As a Trial GM you can open character creation for your own character only: /chargen');
+  const no = (() => { try { const g = globalThis.__dboStaffGuard; return g ? String(g.target(a, t, 'appearance') || '') : ''; } catch (e) { return ''; } })(); if (no) return personal(a, no);
   try {
     mp.setRaceMenuOpen(t, true);
     markEditorOpen(t);
@@ -1242,6 +1255,7 @@ const offlineByTag = (q) => {
 // A staff rename, for /rename and the F7 panel's Rename (fork adminSystem.ts calls __dboAdminRename): { ok, text }
 const renameCharacter = (a, t, rawName) => {
   const newName = String(rawName || '').trim().replace(/\s+/g, ' ');
+  const no = (() => { try { const g = globalThis.__dboStaffGuard; return g ? String(g.target(a, t, 'rename') || '') : ''; } catch (e) { return ''; } })(); if (no) return { ok: false, text: no };
   if (!NAME_RE.test(newName)) return { ok: false, text: 'Names: 2-31 letters, spaces, apostrophes or hyphens, starting with a letter.' };
   // One character to a name, as at creation (naming.js): a rename moves the name index too, so the old name is free
   // again and the new one is held (#bugs 1554934638882066532: a renamed character kept its old name taken)
@@ -1678,10 +1692,22 @@ const handleLine = (a, text, userId, opts) => {
     try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('gate', a, 'lead_only', cmd); } catch (e) { /* the player log is optional */ }
     personal(a, 'That is for a Lead GM and above.'); return 'refused';
   }
+  // The staff rules (staffguard.js): a power on a character that is not a staff one, a Trial GM's limits, and the call or
+  // ticket words (call:<n>, ticket:<id>) taken out of the line and kept for the action
+  let staffRef = null;
+  try {
+    const g = staffGuard(); const r = g ? g.command(a, cmd, sub, body) : null;
+    if (r && r.refuse) {
+      if (!dry && (isAdmin(a) || trial)) staffLog(display(a), staffTierOf(a), `/${cmd} (refused)`, `${staffWho(a)} (${TIER_LABEL[staffTierOf(a)] || 'staff'}): /${cmd} ${body.slice(0, 300)} REFUSED (${r.refuse})${remoteTag}`);
+      personal(a, r.refuse); return 'refused';
+    }
+    if (r && typeof r.body === 'string') { body = r.body; staffRef = r.ref || null; }
+  } catch (e) { log('staff rules failed', e.message); }
   // A dry run (the remote console's dry-run switch) has passed the real gate: nothing reaches #staff-commands or the command
   if (dry) return 'dry';
   if (staffCmd && (isAdmin(a) || trial)) staffLog(display(a), staffTierOf(a), `/${cmd}`, `${staffWho(a)} (${TIER_LABEL[staffTierOf(a)] || 'staff'}): /${cmd} ${body.slice(0, 300)}${remoteTag}`);
-  try { c.fn(a, body, userId); } catch (e) { log('command', cmd, 'failed', e); personal(a, 'That command failed.'); return 'failed'; }
+  const staffRefEnd = staffRef ? staffGuard().enter(a, staffRef) : null;
+  try { c.fn(a, body, userId); } catch (e) { log('command', cmd, 'failed', e); personal(a, 'That command failed.'); return 'failed'; } finally { if (staffRefEnd) staffRefEnd(); }
   return 'ran';
 };
 
@@ -3256,7 +3282,8 @@ const onCharacterReady = (userId, a) => {
     if (cfg.welcome) system(a, cfg.welcome);
     audit(`JOIN ${who(a)}${staffTierOf(a) ? ' as ' + staffTierOf(a) : ''}${staffCharOf(a) ? ' (staff character)' : ''}`);
     startLoginGrace(a);
-    if (staffCharOf(a)) personal(a, 'This is your GM character, made in your Trial GM slot: for staff work only, not for play.');
+    if (staffCharOf(a)) personal(a, 'This is your GM character: for staff work only, not for play.');
+    else if (staffTierOf(a)) { try { const g = staffGuard(); if (g && !g.powersOn(a)) personal(a, `This is not your staff character, so staff powers are off here. ${g.NOT_HERE.replace(/^Staff powers work only on your staff character\. /, '')}`); } catch (e) { /* the rules are optional */ } }
     sendDriftConfig(a);
     sendConsoleRights(a, true);
     if (creationPending(a)) startCreationInHub(a);
@@ -4691,6 +4718,7 @@ const unseatOfficial = (a, z, tg) => {
   for (const r of Object.keys(o[z.id] || {})) { if ((o[z.id][r] || []).map(Number).includes(tg.pid)) had = r; o[z.id][r] = (o[z.id][r] || []).filter((x) => Number(x) !== tg.pid); }
   if (!had) return { error: `${tg.label} holds no rank in ${z.name}.` };
   if (!appointCap(a, z, had)) return { error: `You cannot dismiss a ${rankTitle(had, z.id)} of ${z.name}.` };
+  if (isAdmin(a)) { const no = (() => { try { const g = globalThis.__dboStaffGuard; return g ? String(g.target(a, { profile: tg.pid }, 'office') || '') : ''; } catch (e) { return ''; } })(); if (no) return { error: no }; }
   try { writeOfficials(o); } catch (e) { return { error: 'Could not write officials.json: ' + e.message }; }
   if (typeof bindSeat === 'function') bindSeat(z.id, null, tg.pid, 0);
   if (tg.online) system(tg.online, `You are no longer ${rankTitle(had, z.id)} of ${z.name}.`);
@@ -4715,6 +4743,7 @@ const unseatOfficialBy = (z, tg, byWho) => {
 const appointFrom = (a, z, rank, tg, override) => {
   const chk = appointCheck(a, z, rank, tg, override);
   if (chk.error) return chk;
+  if (isLeadStaff(a)) { const no = (() => { try { const g = globalThis.__dboStaffGuard; return g ? String(g.target(a, { profile: tg.pid }, 'office') || '') : ''; } catch (e) { return ''; } })(); if (no) return { error: no }; }
   if (!isLeadStaff(a) && typeof globalThis.__dboCourtOffer === 'function') return globalThis.__dboCourtOffer(a, z, rank, tg, chk);
   return seatOfficial(z, rank, tg, { who: who(a), staff: isLeadStaff(a), overridden: chk.overridden });
 };
@@ -8629,6 +8658,18 @@ try {
   require(STAFFENCHANT_JS)({ mp, log, personal, audit, staffNote, who, display, onlineActors, registerChatCommand, staffTierOf, findByName,
     onUi, openWidget, closeWidget, sendPacket, itemName: (id) => globalThis.__alduinakItemName(id), cfg });
 } catch (e) { log('staffenchant.js failed to load:', e.stack || e.message); }
+
+// ---- the staff rules: staff characters, own account, call or ticket, Trial GM limits (server\staffguard.js, config
+// "staffPowers"). Its gates are read through globalThis at each use, so a failed load leaves every rule off
+try {
+  const STAFFGUARD_JS = path.resolve('staffguard.js');
+  delete require.cache[STAFFGUARD_JS];
+  require(STAFFGUARD_JS)({ mp, log, audit, who, display, personal, profileOf, tierOf, staffTierOf, isLeadStaff, staffCharOf, accountRankOf,
+    findByName, offlineByTag, registerChatCommand, onlineActors, cfg });
+} catch (e) {
+  log('staffguard.js failed to load:', e.stack || e.message);
+  for (const k of ['__dboStaffGuard', '__dboAdminGate', '__dboStaffCharSet', '__dboIsStaffCharacter']) delete globalThis[k];
+}
 
 // ---- /event and /chars: quick staff tools (server\stafftools.js, config "events") ------------------------------------
 try {

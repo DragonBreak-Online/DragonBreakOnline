@@ -503,6 +503,7 @@ module.exports = (api) => {
       const m = findManual(words[1]); if (!m) return personal(a, `No manual "${words[1] || ''}". /manual list.`);
       if (!m.ready) return personal(a, `${m.name}'s book is not in the plugin yet.`);
       const t = findByName(words.slice(2).join(' ')); if (!t) return personal(a, 'Nobody online answers to that.');
+      try { const g = globalThis.__dboStaffGuard; const no = g ? String(g.target(a, t, 'items') || '') : ''; if (no) return personal(a, no); } catch (e) { /* the staff rules are optional */ }
       if (!giveItem(t, m.bookId, 1)) return personal(a, 'The book could not be given.');
       audit(`MANUAL ${who(a)} granted ${m.name} (T${m.tier}) to ${who(t)}`);
       personal(a, `${display(t)} has been given ${m.title}.`);
