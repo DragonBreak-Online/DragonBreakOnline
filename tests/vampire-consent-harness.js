@@ -9,7 +9,7 @@
 'use strict';
 const path = require('path');
 const store = new Map();
-const said = [], packets = [], widgets = [], closed = [], anims = [];
+const said = [], packets = [], widgets = [], closed = [], anims = [], audits = [];
 const timers = {}, cmds = {}, ui = {};
 let online = [];
 const noop = () => {};
@@ -32,7 +32,7 @@ const mp = {
   lookupEspmRecordById: () => null,
 };
 const makeApi = (cfg) => ({
-  mp, log: noop, audit: noop, personal: (a, t) => said.push({ a, t }), registerChatCommand: (n, f) => { cmds[n] = f; },
+  mp, log: noop, audit: (t) => audits.push(t), personal: (a, t) => said.push({ a, t }), registerChatCommand: (n, f) => { cmds[n] = f; },
   onUi: (n, f) => { (ui[n] = ui[n] || []).push(f); }, openWidget: (a, w) => widgets.push([a, w]), closeWidget: (a, id) => closed.push([a, id]),
   display: String, who: String, sendPacket: (a, p) => { packets.push([a, p]); return true; },
   isAdmin: () => true, findByName: () => null, onlineActors: () => online, every: (n, ms, fn) => { timers[n] = fn; }, profileOf: (a) => (a < 100 ? a : -1),
@@ -270,6 +270,84 @@ globalThis.__dboSuperLogin(V);
 ok(packets.filter(([a, p]) => a === V && p.customPacketType === 'dboBloody' && p.on === true).length >= 1, 'logging in bloody has the client watch for water again');
 cmds.curse(V, 'me cure');
 ok(!state(V).blood && store.get(`${V}|appearance`).tints[0].argb === 0, 'the cure washes the blood with the curse');
+
+// ---- Vampiric Seduction (Onny, 22 Oct: a seduced bite never counted as feeding) ----------------------------------------
+// Every Skyrim.esm id resolves to 0x1234 in this stub, so 0x1234 is Seduction's id here
+store.set(`${V}|private.supernatural`, { kind: 'vampire', stage: 3, lastFed: -1, pure: false });
+now += 3 * GAME_DAY_MS; feedTick(30000); said.length = 0; widgets.length = 0;
+ok(globalThis.__dboSuperActivate(T, V) === false, 'E on a living player nobody seduced is not a feed');
+globalThis.__dboSuperSpellHit(V, T, 0x1234);
+const sres = globalThis.__dboSuperActivate(T, V);
+ok(sres === true && heard(T, /sinks their teeth into your neck/) && !widgets.some(([a]) => a === T), 'Seduced, E on them feeds at once, with no asking (and they hear the bite plainly, review R2)');
+feedTick(30000);
+said.length = 0;
+globalThis.__dboSuperSpellHit(V, B, 0x1234);
+// W2 was last a bound mortal (the captive check above): a vampire again, free, so the check means what it says
+store.set(`${W2}|private.restrained`, null); store.set(`${W2}|private.supernatural`, { kind: 'vampire', stage: 2, lastFed: 0 });
+ok(globalThis.__dboSuperActivate(B, W2) === false, 'another vampire cannot feed on the one V seduced');
+now += 31000;
+ok(globalThis.__dboSuperActivate(B, V) === false, 'and the calm wears off after 30 s');
+
+// ---- review R1/F1 (23 Oct): Seduction skips the asking, never who may be fed on (askable) --------------------------------
+// Not a vampire (their blood is dead), not a beast, not a player in a rite; and a feeder in beast form does not feed.
+// Each case casts its own Seduction and clears any feed it started, so one case's result never decides the next
+now += 3 * GAME_DAY_MS; feedTick(30000); said.length = 0; widgets.length = 0;
+const FEEDS = globalThis.__dboSuperFeeds;
+const fedOn = (t) => { const f = FEEDS.get(V); const r = !!f && f.t === t; FEEDS.delete(V); return r; };
+const seduce = (t) => globalThis.__dboSuperSpellHit(V, t, 0x1234);
+// E on t: true when E was taken as a feed or a feed on t began (either is the bypass)
+const eFeeds = (t) => { const r = globalThis.__dboSuperActivate(t, V); return fedOn(t) || r !== false; };
+seduce(W2);
+ok(!eFeeds(W2), 'Seduced, another vampire is not fed on with E (dead blood)');
+seduce(W2); said.length = 0;
+globalThis.__dboSuperMenuAction(V, 'super:feed', W2, nameFor);
+ok(!fedOn(W2) && heard(V, /cannot be asked now/), '...nor with a Feed sent for them (the menu offers none)');
+store.set(`${B}|private.beast`, { form: 'werewolf', until: now + 600000 });
+seduce(B);
+ok(!eFeeds(B), 'Seduced, a werewolf in beast form is not fed on with E');
+seduce(B); said.length = 0;
+globalThis.__dboSuperMenuAction(V, 'super:feed', B, nameFor);
+ok(!fedOn(B) && heard(V, /cannot be asked now/), '...nor with a Feed sent for them');
+store.set(`${B}|private.beast`, null);
+globalThis.__dboRites.set(T, { kind: 'test' });
+seduce(T);
+ok(!eFeeds(T), 'Seduced, a player in a rite is not fed on with E');
+seduce(T); said.length = 0;
+globalThis.__dboSuperMenuAction(V, 'super:feed', T, nameFor);
+ok(!fedOn(T) && heard(V, /cannot be asked now/), '...nor with a Feed sent for them');
+globalThis.__dboRites.delete(T);
+store.set(`${V}|private.beast`, { form: 'vampirelord', until: now + 600000 });
+seduce(T);
+ok(!eFeeds(T), 'a vampire who took the Vampire Lord form after the Seduction does not feed with E (the menu hides Feed in beast form)');
+store.set(`${V}|private.beast`, null);
+seduce(T); said.length = 0;
+ok(globalThis.__dboSuperActivate(T, V) === true && FEEDS.has(V) && FEEDS.get(V).t === T && heard(T, /your neck/), 'the control: in their own form, a seduced mortal free of any rite is still fed on with E');
+feedTick(30000);
+
+// ---- review R2 (23 Oct): Seduction skips the panel, not a refusal ------------------------------------------------------
+// A player who refused this vampire within refusedMinutes, or broke off a seduced feed, is not fed on by Seduction either;
+// the victim is told plainly they are bitten (not the willing line), and the feed is audited. E on a refuser is answered
+// (the vampire is told why), so these look at the feed, not at E's return
+const eFed = (t) => { globalThis.__dboSuperActivate(t, V); return fedOn(t); };
+now += 3 * GAME_DAY_MS + 61000; feedTick(30000); said.length = 0; widgets.length = 0; audits.length = 0;
+globalThis.__dboSuperMenuAction(V, 'super:feed', T, nameFor);
+fire('feedAnswer', T, [widgets.find(([a]) => a === T)[1].nonce, 'resist']);
+now += 1000; seduce(T); said.length = 0;
+ok(!eFed(T) && heard(V, /refused you not long ago/), 'a player who pressed Resist a second ago is not fed on with E after a Seduction');
+seduce(T); said.length = 0;
+globalThis.__dboSuperMenuAction(V, 'super:feed', T, nameFor);
+ok(!fedOn(T) && heard(V, /refused you not long ago/), '...nor with the Feed entry');
+now += 5 * 60000; seduce(T); said.length = 0; audits.length = 0;
+ok(globalThis.__dboSuperActivate(T, V) === true && FEEDS.has(V) && FEEDS.get(V).t === T, 'once the refusal has passed (5 minutes), a seduced player is fed on with E');
+ok(heard(T, /sinks their teeth into your neck/) && !heard(T, /drinks from your neck/), 'they are told plainly they are bitten, not given the willing line');
+ok(audits.some((t) => /^FEED 7 began to feed on 8 under Seduction$/.test(t)), 'the seduced feed is audited, as an asked one is', audits);
+at(T, 5000); feedTick(1000); at(T, 0);
+ok(!FEEDS.has(V) && heard(V, /feeding is broken: you moved away/), 'the victim walks away and the feed breaks');
+seduce(T); said.length = 0;
+ok(!eFed(T) && heard(V, /refused you not long ago/), 'a seduced feed the victim broke off holds as a refusal: no second Seduction feed at once');
+now += 5 * 60000 + 61000; seduce(T);
+ok(globalThis.__dboSuperActivate(T, V) === true && FEEDS.get(V) && FEEDS.get(V).t === T, '...until refusedMinutes have passed');
+feedTick(30000);
 
 Math.random = realRandom;
 console.log(fail ? `${fail} failed` : 'all checks passed');

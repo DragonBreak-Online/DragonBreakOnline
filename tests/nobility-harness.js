@@ -294,6 +294,25 @@ ok('a noble sees his title, fief, its properties and its treasury', mine && mine
 ok('the holder sees his own fief\'s treasury only', brumaOf(vE).fiefs.filter((f) => f.treasury !== null).map((f) => f.id).join() === 'mountain-watch');
 ok('the ruler of Bruma opens on Bruma; the Jarl rules the Rift there and not Bruma', vC.selected === 'bruma' && SEC.view(JARL).holds.find((h) => h.id === 'riften').isRuler && !brumaOf(SEC.view(JARL)).isRuler);
 ok('a hold with titles shows its roll to everyone', vOut.holds.find((h) => h.id === 'riften').roll.map((n) => n.label).join() === 'Thane of the Rift');
+// A ruler's own hold with no fiefs or nobles yet (Jarl of Falkreath, #bugs 22 Oct), and only a ruler's (review R3, 23 Oct):
+// Solstheim has only guards and a stronghold's first office is its chieftain, neither of whom grants titles (DESIGN.md 4)
+const EXTRA_ZONES = [
+  { id: 'falkreath', name: 'Falkreath Hold', officials: ['jarl', 'steward', 'commander', 'courtmage', 'guardcaptain', 'guard'] },
+  { id: 'solstheim', name: 'Solstheim', officials: ['guard'] },
+  { id: 'dushnikh', name: 'Dushnikh Yal', officials: ['chieftain', 'shaman'] },
+];
+const FJARL = 0x30, FSTEW = 0x31, SGUARD = 0x32, CHIEF = 0x33;
+zones.push(...EXTRA_ZONES);
+Object.assign(officials, { falkreath: { jarl: [30], steward: [31] }, solstheim: { guard: [32] }, dushnikh: { chieftain: [33] } });
+for (const [id, pid, n] of [[FJARL, 30, 'Siddgeir'], [FSTEW, 31, 'Nenya'], [SGUARD, 32, 'Gjalund'], [CHIEF, 33, 'Burguk']]) chars.set(id, { pid, name: n, female: false, online: true });
+const holdOf = (a, zid) => SEC.view(a).holds.find((h) => h.id === zid);
+ok('the Jarl of Falkreath sees his hold, with no fiefs or nobles yet, as its ruler', !!holdOf(FJARL, 'falkreath') && holdOf(FJARL, 'falkreath').isRuler, SEC.view(FJARL).holds.map((h) => h.id));
+ok('...but his Steward and everyone else do not', !holdOf(FSTEW, 'falkreath') && !holdOf(OUT, 'falkreath'));
+ok('a guard of Solstheim (its only office) is not shown Solstheim as a hold he rules', !holdOf(SGUARD, 'solstheim'), holdOf(SGUARD, 'solstheim'));
+ok('nor an orc chieftain his stronghold', !holdOf(CHIEF, 'dushnikh'), holdOf(CHIEF, 'dushnikh'));
+zones.splice(zones.length - EXTRA_ZONES.length, EXTRA_ZONES.length);
+for (const z of EXTRA_ZONES) delete officials[z.id];
+for (const id of [FJARL, FSTEW, SGUARD, CHIEF]) chars.delete(id);
 
 // ---- the tax share ------------------------------------------------------------------------------------------------------------
 const FT = globalThis.__dboFiefTreasury;
