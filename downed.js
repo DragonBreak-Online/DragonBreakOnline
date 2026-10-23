@@ -700,6 +700,16 @@ module.exports = (api) => {
     banner(t, `${nameTo(t, by)} finished you. You wake at the temple.`, 5);
     toTemple(t);
   };
+  // An ordinary death for a fallen player: no bleed-out and no war-to-the-death rule, the temple and Death's Chill (frenzy.js)
+  globalThis.__dboDownedKill = (t, by, why) => {
+    t = Number(t) >>> 0; by = Number(by) >>> 0;
+    if (!S.downed.has(t) || !isDead(t) || mp.get(t, 'private.permaDead') === true) return false;
+    try { if (globalThis.__dboStatsAdd && by && by !== t && isPlayer(by)) { globalThis.__dboStatsAdd(t, 'killedByPlayers'); globalThis.__dboStatsAdd(by, 'playerKills'); } } catch (e) { /* stats only */ }
+    audit(`KILLED ${who(t)} by ${who(by)}${why ? ` (${why})` : ''}`);
+    banner(t, `${nameTo(t, by)} killed you. You wake at the temple.`, 5);
+    toTemple(t);
+    return true;
+  };
   registerChatCommand('respawn', (a) => {
     if (!S.downed.has(a) || !isDead(a)) return personal(a, 'You are not down.');
     if (giveUpLeft(S.downed.get(a)) > 0) return personal(a, `You can give up in ${giveUpLeft(S.downed.get(a))} seconds. Someone may yet come for you.`);

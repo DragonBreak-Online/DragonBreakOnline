@@ -103,8 +103,8 @@ const wolf = () => setProp(W, 'private.beast', { form: 'werewolf', original: {} 
   ok(refreshed.includes(W), 'the needs system is asked to apply it at once');
   downedSet.clear(); reset();
 
-  // ---- non-lethal: no finishing, excluded players spared, NPCs and valid players pass to the normal checks
-  load({ enabled: true });
+  // ---- hits: no blows on the fallen, excluded players spared, NPCs and valid players pass to the normal checks
+  load({ enabled: true, killDelaySeconds: 0 });
   setProp(PET, 'ff_companionOf', 0);
   cmds.get('frenzy')(STAFF, 'wolf start');
   globalThis.__dboFrenzyReport(W, { phase: 'on' });
@@ -118,20 +118,48 @@ const wolf = () => setProp(W, 'private.beast', { form: 'werewolf', original: {} 
   ok(mp.onHitDamageAttempt(W, MATE, 0, 10) === false, 'a party member is spared (sparePartyMembers)');
   ok(mp.onHitDamageAttempt(P1, W, 0, 10) === true, 'others hitting the werewolf are untouched');
 
-  // ---- bounty: a player downed by the frenzied werewolf; exposure.js decides when loaded
+  // ---- lethal (default): a player brought down is killed, an ordinary death through downed.js, never a permadeath
+  const kills = [], permas = [];
+  globalThis.__dboDownedKill = (t, by, why) => { kills.push([t, by, why]); downedSet.delete(t); return true; };
+  globalThis.__dboPermaKill = (t, why) => permas.push([t, why]);
   outlawCalls.length = 0;
+  downedSet.add(P1);
   mp.onDeath(P1, W);
-  ok(outlawCalls.length === 1 && outlawCalls[0][0] === 'bruma' && outlawCalls[0][1] === 1 && outlawCalls[0][2] === 150 && outlawCalls[0][4] === 'Wolfie', 'no exposure.js: bounty 100 added to the 50 already set in the hold (outlaws.js)', outlawCalls);
+  ok(kills.length === 1 && kills[0][0] === P1 && kills[0][1] === W && permas.length === 0, 'lethalToPlayers: the fallen player is killed, an ordinary death (downed.js), no permadeath', kills);
+  ok(outlawCalls.length === 1 && outlawCalls[0][0] === 'bruma' && outlawCalls[0][1] === 1 && outlawCalls[0][2] === 150 && outlawCalls[0][4] === 'Wolfie' && /killed someone/.test(outlawCalls[0][3]), 'no exposure.js: bounty 100 added to the 50 already set in the hold (outlaws.js)', outlawCalls);
   mp.onDeath(P1, W);
-  ok(outlawCalls.length === 1, 'the same victim counts once per frenzy');
+  ok(outlawCalls.length === 1 && kills.length === 1, 'the same death reported twice counts once');
+  globalThis.__dboFrenzy.active.get(W).downed.set(P1, Date.now() - 11000);
+  downedSet.add(P1); mp.onDeath(P1, W);
+  ok(outlawCalls.length === 2 && kills.length === 2, 'a second kill of the same player in one frenzy: a second bounty');
+  downedSet.delete(P1);
   const exp = [];
   globalThis.__dboExposureBounty = (w, v, why) => { exp.push([w, v, why]); return false; };
   mp.onDeath(MATE, W);
-  ok(exp.length === 1 && exp[0][0] === W && exp[0][1] === MATE && outlawCalls.length === 1, 'exposure.js loaded: it decides, and a false is never overridden by the fallback');
+  ok(exp.length === 1 && exp[0][0] === W && exp[0][1] === MATE && outlawCalls.length === 2, 'exposure.js loaded: it decides, and a false is never overridden by the fallback');
   delete globalThis.__dboExposureBounty;
   mp.onDeath(N1, W);
-  ok(outlawCalls.length === 1, 'an NPC kill sets no bounty');
+  ok(outlawCalls.length === 2, 'an NPC kill sets no bounty');
   ok(deathsSeen >= 4, 'the inner death hook still runs');
+
+  // ---- lethal off: the player stays down; permadeath on: supernatural.js permaKill; a raise before the delay saves them
+  load({ enabled: true, killDelaySeconds: 0, lethalToPlayers: false });
+  cmds.get('frenzy')(STAFF, 'wolf start'); kills.length = 0; permas.length = 0;
+  downedSet.add(P1); mp.onDeath(P1, W);
+  ok(kills.length === 0 && permas.length === 0, 'lethalToPlayers false: the player is only downed');
+  load({ enabled: true, killDelaySeconds: 0, permadeath: true });
+  cmds.get('frenzy')(STAFF, 'wolf start');
+  mp.onDeath(P1, W);
+  ok(permas.length === 1 && permas[0][0] === P1 && kills.length === 0, 'permadeath true: the frenzy kill is a permadeath', permas);
+  load({ enabled: true, killDelaySeconds: 0.05 });
+  cmds.get('frenzy')(STAFF, 'wolf start'); permas.length = 0;
+  mp.onDeath(P1, W); downedSet.delete(P1);
+  await new Promise((r) => setTimeout(r, 100));
+  ok(kills.length === 0, 'raised before killDelaySeconds: no kill');
+  ok(fs.readFileSync(path.join(SERVER, 'downed.js'), 'utf8').match(/__dboDownedKill = [\s\S]*?toTemple\(t\)/) && !/__dboWarFinish/.test(fs.readFileSync(path.join(SERVER, 'downed.js'), 'utf8').match(/__dboDownedKill = [\s\S]*?return true;\n  \};/)[0]),
+    "downed.js's kill wakes at the temple and never asks the war-to-the-death rule");
+  load({ enabled: true, killDelaySeconds: 0 });
+  cmds.get('frenzy')(STAFF, 'wolf start'); globalThis.__dboFrenzyReport(W, { phase: 'on' });
 
   // ---- end conditions
   mp.onDeath(W, N2);
@@ -186,7 +214,7 @@ const wolf = () => setProp(W, 'private.beast', { form: 'werewolf', original: {} 
   ok(gm.indexOf("path.resolve('frenzy.js')") > gm.indexOf("path.resolve('duel.js')") && gm.indexOf("path.resolve('duel.js')") > 0, 'gamemode.js loads frenzy.js after duel.js (its hit and death hooks wrap the rest)');
   ok(/__dboFrenzyRateMult\(a, NEEDS_AV\[key\]\)/.test(gm) && /__dboFrenzyLeave\(a\)/.test(gm) && /'dboFrenzyReport'[\s\S]{0,200}__dboFrenzyReport\(a, content\)/.test(gm), 'gamemode.js: the needs rate, the logout and the client report reach frenzy.js');
   const conf = JSON.parse(fs.readFileSync(path.join(SERVER, 'gamemode-config.json'), 'utf8'));
-  ok(conf.werewolfFrenzy && conf.werewolfFrenzy.enabled === false, 'gamemode-config.json ships werewolfFrenzy switched off');
+  ok(conf.werewolfFrenzy && conf.werewolfFrenzy.enabled === false && conf.werewolfFrenzy.lethalToPlayers === true && conf.werewolfFrenzy.permadeath === false, 'gamemode-config.json ships werewolfFrenzy switched off, lethal, no permadeath');
 
   console.log(fails ? `${fails} FAILED` : 'all passed');
   process.exit(fails ? 1 : 0);

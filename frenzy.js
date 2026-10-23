@@ -5,12 +5,14 @@
 // controls off) and fights the target this file picks: the nearest valid one within rangeMeters, the next one when it
 // falls, flees out of range or the client cannot find it. Valid: living NPCs; players only with hitsPlayers, and never
 // staff, a player in the character editor, being made, just logged in, in a duel, in a safeZones circle, already down,
-// or (sparePartyMembers) the werewolf's party. A frenzied werewolf downs players and never finishes one: its blows on a
-// fallen player do nothing. Every other blow goes through the normal hit checks.
+// or (sparePartyMembers) the werewolf's party. Every blow goes through the normal hit checks. A player it brings down is
+// killed (lethalToPlayers, Nate 23 Oct: "the ai control can kill players"): killDelaySeconds later an ordinary death,
+// the temple and Death's Chill through downed.js, never a death duel's or a war's permadeath; permadeath true makes it
+// one (supernatural.js permaKill). lethalToPlayers false leaves them down. Its blows on a fallen player do nothing.
 // Ends: the time, no target left, the werewolf down, dead or out of the beast, the logout, a staff /frenzy end, or the
 // client's own failsafe. Then exhaustedMinutes of slow stamina (exhaustedStaminaMult, through the needs system) and
-// cooldownMinutes before the next. A player the frenzied werewolf downs puts a bounty on it: exposure.js decides when it
-// is loaded (__dboExposureBounty), else bountyGold in the hold through outlaws.js (bountyFallback).
+// cooldownMinutes before the next. Each player the frenzied werewolf kills or downs puts a bounty on it: exposure.js
+// decides when it is loaded (__dboExposureBounty), else bountyGold in the hold through outlaws.js (bountyFallback).
 // Rollback: enabled false (hot reload); a running frenzy still ends on its own clock.
 //   Server -> client: { customPacketType: 'dboFrenzy', on: true, target, seconds, disable } | { ..., on: false }
 //   Client -> server: { customPacketType: 'dboFrenzyReport', phase: 'on' | 'miss' | 'off', target?, why? }
@@ -22,6 +24,7 @@ module.exports = (api) => {
   const C = Object.assign({
     enabled: false, chance: 0.3, minSeconds: 20, maxSeconds: 30, startDelaySeconds: 4, rangeMeters: 40,
     hitsPlayers: true, sparePartyMembers: true, cooldownMinutes: 30,
+    lethalToPlayers: true, killDelaySeconds: 3, permadeath: false,
     exhaustedMinutes: 5, exhaustedStaminaMult: 0.3,
     bountyGold: 100, bountyFallback: true,
     // The client must answer within ackSeconds or the frenzy is dropped (an older client has no FrenzyService)
@@ -113,7 +116,7 @@ module.exports = (api) => {
     if (dead(w) || downed(w)) return 'down or dead';
     const lo = Math.max(1, Number(C.minSeconds) || 20), hi = Math.max(lo, Number(C.maxSeconds) || lo);
     const secs = Math.round(lo + Math.random() * (hi - lo));
-    const f = { at: Date.now(), until: Date.now() + secs * 1000, target: 0, skip: new Set(), targets: new Set(), acked: false, by: by || 'the beast', downed: new Set() };
+    const f = { at: Date.now(), until: Date.now() + secs * 1000, target: 0, skip: new Set(), targets: new Set(), acked: false, by: by || 'the beast', downed: new Map(), falls: 0 };
     const t = pickTarget(w, f.skip);
     if (!t) { log(`frenzy: ${display(w)} would frenzy but nothing is in reach`); return 'nothing in reach'; }
     f.target = t; f.targets.add(t);
@@ -137,7 +140,7 @@ module.exports = (api) => {
       try { if (typeof globalThis.__dboNeedsRefresh === 'function') globalThis.__dboNeedsRefresh(w); } catch (e) { /* no needs */ }
       personal(w, 'The frenzy drains out of you. Your limbs are heavy, and your breath will be slow to come back.');
     }
-    audit(`FRENZY end ${who(w)}: ${why} after ${Math.round((Date.now() - f.at) / 1000)} s, ${f.targets.size} target(s), ${f.downed.size} player(s) downed`);
+    audit(`FRENZY end ${who(w)}: ${why} after ${Math.round((Date.now() - f.at) / 1000)} s, ${f.targets.size} target(s), ${f.falls} player(s) brought down`);
     return true;
   };
 
@@ -212,7 +215,7 @@ module.exports = (api) => {
   }
   // ---- a player the frenzied werewolf downs puts a bounty on it ------------------------------------------------------
   const bounty = (w, victim) => {
-    const reason = 'downed someone in a werewolf frenzy';
+    const reason = C.lethalToPlayers === false ? 'downed someone in a werewolf frenzy' : 'killed someone in a werewolf frenzy';
     if (typeof globalThis.__dboExposureBounty === 'function') {
       let set = false; try { set = !!globalThis.__dboExposureBounty(w, victim, reason); } catch (e) { log('frenzy: exposure bounty failed', e.message); }
       if (set) audit(`FRENZY bounty: ${who(w)} for downing ${who(victim)} (exposure.js)`);
@@ -227,6 +230,26 @@ module.exports = (api) => {
     if (set) audit(`FRENZY bounty: ${who(w)} for downing ${who(victim)} in ${zid} (outlaws.js)`);
     return set;
   };
+  // The frenzy's kill: an ordinary death unless permadeath says so, and only if they are still down (not raised meanwhile)
+  const kill = (w, x) => {
+    if (!downed(x) && !dead(x)) return false;
+    if (C.permadeath === true && typeof globalThis.__dboPermaKill === 'function') {
+      audit(`FRENZY permadeath: ${who(x)} killed by ${who(w)}`);
+      globalThis.__dboPermaKill(x, 'killed in a werewolf frenzy');
+      return true;
+    }
+    const k = globalThis.__dboDownedKill;
+    if (typeof k !== 'function') return false;
+    const done = !!k(x, w, 'werewolf frenzy');
+    if (done) log(`frenzy: ${display(w)} killed ${display(x)}`);
+    return done;
+  };
+  const killLater = (w, x) => {
+    const ms = Math.max(0, Number(C.killDelaySeconds) || 0) * 1000;
+    if (!ms) return kill(w, x);
+    setTimeout(() => { try { kill(w, x); } catch (e) { log('frenzy: kill failed', e.message); } }, ms);
+    return true;
+  };
   {
     const inner = mp.onDeath;
     if (typeof inner === 'function') {
@@ -234,7 +257,12 @@ module.exports = (api) => {
         const out = inner.call(this, actorId, killerId, ...rest);
         try {
           const x = Number(actorId) >>> 0, w = sideOf(Number(killerId) >>> 0), f = S.active.get(w);
-          if (f && w !== x && isPlayer(x) && !f.downed.has(x)) { f.downed.add(x); bounty(w, x); }
+          // one bounty per fall: the same death reported twice within 10 s counts once
+          if (f && w !== x && isPlayer(x) && Date.now() - (f.downed.get(x) || 0) > 10000) {
+            f.downed.set(x, Date.now()); f.falls++;
+            bounty(w, x);
+            if (C.lethalToPlayers !== false) killLater(w, x);
+          }
           if (S.active.has(x)) end(x, 'the werewolf fell');
         } catch (e) { log('frenzy: death hook failed', e.message); }
         return out;
@@ -258,5 +286,5 @@ module.exports = (api) => {
       + `${cd > Date.now() ? `, cooldown ${Math.ceil((cd - Date.now()) / 60000)} min` : ''}${ex > Date.now() ? `, exhausted ${Math.ceil((ex - Date.now()) / 60000)} min` : ''}. Auto frenzy ${C.enabled === true ? 'ON' : 'off'}.`);
   }, { admin: true, help: '<player|me> start|end|status: a werewolf frenzy (lead staff)' });
 
-  log(`frenzy ${C.enabled === true ? 'ON' : 'off'}: chance ${C.chance} per forced change, ${C.minSeconds}-${C.maxSeconds} s, range ${C.rangeMeters} m, players ${C.hitsPlayers ? 'downed, never finished' : 'spared'}, party ${C.sparePartyMembers ? 'spared' : 'fair game'}, cooldown ${C.cooldownMinutes} min, exhausted ${C.exhaustedMinutes} min x${C.exhaustedStaminaMult} stamina`);
+  log(`frenzy ${C.enabled === true ? 'ON' : 'off'}: chance ${C.chance} per forced change, ${C.minSeconds}-${C.maxSeconds} s, range ${C.rangeMeters} m, players ${!C.hitsPlayers ? 'spared' : C.lethalToPlayers === false ? 'downed' : C.permadeath === true ? 'killed for good' : 'killed (ordinary death)'}, party ${C.sparePartyMembers ? 'spared' : 'fair game'}, cooldown ${C.cooldownMinutes} min, exhausted ${C.exhaustedMinutes} min x${C.exhaustedStaminaMult} stamina`);
 };
