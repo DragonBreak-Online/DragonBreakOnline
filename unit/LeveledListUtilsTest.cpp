@@ -20,7 +20,7 @@ TEST_CASE("Bug", "[espm]")
 
   std::atomic<bool> finished = false;
 
-  std::thread([&] {
+  std::thread watchdog([&] {
     auto was = std::chrono::system_clock::now();
 
     while (finished.load() == false) {
@@ -34,7 +34,19 @@ TEST_CASE("Bug", "[espm]")
         std::abort();
       }
     }
-  }).detach();
+  });
+
+  // Join the watchdog on every exit so it never outlives this stack frame
+  struct WatchdogStop
+  {
+    std::atomic<bool>& finished;
+    std::thread& watchdog;
+    ~WatchdogStop()
+    {
+      finished = true;
+      watchdog.join();
+    }
+  } watchdogStop{ finished, watchdog };
 
   auto chest = espm::Convert<espm::CONT>(
     GetEspmLoader().GetBrowser().LookupById(chestId).rec);
@@ -51,7 +63,6 @@ TEST_CASE("Bug", "[espm]")
         GetEspmLoader().GetBrowser(), lvli, count, pcLevel, nullptr);
     }
   }
-  finished = true;
 }
 
 TEST_CASE("Evaluate LItemFoodCabbage75", "[espm]")
