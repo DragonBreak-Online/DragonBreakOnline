@@ -104,7 +104,7 @@
    "99ccc8:summersetisles.esp", "99ccc3:summersetisles.esp", "99ccc2:summersetisles.esp", "68572b:summersetisles.esp",
    "a188e:summersetisles.esp", "867:YokuWeapons.esp"],
   "_suspendedSpells": "Held back for a while: kept in the spellbook, taken off the prepared list and out of the engine, never prepared, read, taught or given until taken off this list (spells.js suspendedSpells).",
-  "suspendedSpells": ["da746:Skyrim.esm", "8dcec:Druadach.esm", "94fca:Druadach.esm",
+  "suspendedSpells": ["27eb6:Skyrim.esm", "da746:Skyrim.esm", "8dcec:Druadach.esm", "94fca:Druadach.esm",
    "a11ae:Druadach.esm", "933e3:Druadach.esm", "c600:Dawnguard.esm",
    "5e31:Summer Druid Armor Set.esp",
    "8313c:arnima.esm", "8bebb:arnima.esm", "8bebc:arnima.esm", "8bec9:arnima.esm",

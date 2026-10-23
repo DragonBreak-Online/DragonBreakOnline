@@ -154,10 +154,10 @@ const snapshot = (edids) => Object.fromEntries(edids.map((e) => [e, count(pid(e)
   }
   tierOf(A, 2); stockAll();
   msg = craft([INVIS_A, INVIS_B]);
-  check('an Apprentice cannot brew Invisibility (PvP gate: Adept, 50)', count(pid('Invisibility01')) === 0 && count(pid('Invisibility02')) === 0 && /Invisibility needs an Alchemist of Adept rank \(level 50\)/.test(msg), msg);
-  tierOf(A, 3); stockAll();
-  craft([INVIS_A, INVIS_B]);
-  check('...an Adept can (Invisibility02)', count(pid('Invisibility02')) === 1);
+  check('nobody brews Invisibility while it is dropped (Nate, 23 Oct: watchers keep it long after it ends)', count(pid('Invisibility01')) === 0 && count(pid('Invisibility02')) === 0 && /Invisibility is not brewed here/.test(msg), msg);
+  tierOf(A, 5); stockAll();
+  msg = craft([INVIS_A, INVIS_B]);
+  check('...a Master neither', count(pid('Invisibility04')) === 0 && /Invisibility is not brewed here/.test(msg), msg);
 
   // ---- combinations (config; the shipped list is empty) ----
   tierOf(A, 4); stockAll();
@@ -184,7 +184,7 @@ const snapshot = (edids) => Object.fromEntries(edids.map((e) => [e, count(pid(e)
   const panel = out.widgets.filter((w) => w.id === 71).pop() || { lines: [] };
   check('the lab panel names the tier and its strength', /You can brew \(\d+\), Apprentice: Draught strength/.test(panel.targetName || ''), panel.targetName);
   check('...each potion by the design name and what it does', panel.lines.some((l) => /^Draught of Healing \(30% health\): /.test(l)), panel.lines);
-  check('...and what opens later', panel.lines.some((l) => /^Later: .*Fortify Archery at Adept \(50\)/.test(l) && /Invisibility at Adept \(50\)/.test(l) && !/Smithing/.test(l)), panel.lines);
+  check('...and what opens later', panel.lines.some((l) => /^Later: .*Fortify Archery at Adept \(50\)/.test(l) && !/Invisibility/.test(l) && !/Smithing/.test(l)), panel.lines);
   check('...never a locked potion as brewable', !panel.lines.some((l) => /Fortify Smithing.*:.*\+/.test(l) || /Fortify Archery \(/.test(l)), panel.lines);
 
   // ---- drinking: a share of the drinker's own pool ----
