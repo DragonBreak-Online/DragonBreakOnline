@@ -28,6 +28,26 @@ module.exports = (api) => {
   const SPAWNS_FILE = path.resolve('NPC-Spawns.json');
   const POSTS_FILE = path.resolve('guard-posts.json');
   const id = (a) => Number(a) >>> 0;
+  // The hold a player stands in, over all of its land (Nate, 23 Oct: "a hold should encompass all of its land, i tried to
+  // place guards in the prison"): a jail or prison cell of hold-jails.json is its hold's; otherwise the realm.js territory
+  // of the place, or for an interior of the last place outside (as exposure.js reads it); else the hold zone around them
+  const JAIL_HOLD = (() => {
+    const m = new Map();
+    try { const h = JSON.parse(fs.readFileSync(path.resolve('hold-jails.json'), 'utf8')).holds || {}; for (const [hold, cells] of Object.entries(h)) for (const c of cells) m.set(String(c.cell).toLowerCase(), hold); } catch (e) { /* no jail data */ }
+    return m;
+  })();
+  const normDesc = (d) => { const s = String(d || ''); const i = s.indexOf(':'); if (i < 0) return s.toLowerCase(); const n = parseInt(s.slice(0, i), 16); return `${Number.isFinite(n) ? n.toString(16) : s.slice(0, i)}:${s.slice(i + 1)}`.toLowerCase(); };
+  const territoryHold = (world, pos) => {
+    try { const t = typeof globalThis.__dboRealmTerritoryAt === 'function' ? globalThis.__dboRealmTerritoryAt(world, pos) : null; return t && t.zone && (!api.zoneById || api.zoneById(t.zone)) ? String(t.zone) : ''; } catch (e) { return ''; }
+  };
+  const holdHere = (a) => {
+    let world = '', pos = null; try { world = String(mp.get(id(a), 'worldOrCellDesc') || ''); pos = mp.get(id(a), 'pos'); } catch (e) { /* gone */ }
+    const jail = JAIL_HOLD.get(normDesc(world)); if (jail) return jail;
+    let hold = territoryHold(world, pos);
+    if (!hold) { try { const last = mp.get(id(a), 'private.lastOutside'); if (last && last.world) hold = territoryHold(String(last.world), last.pos); } catch (e) { /* none kept */ } }
+    if (!hold) { try { const z = zoneOfActor(a); hold = (z && z.id) || ''; } catch (e) { hold = ''; } }
+    return hold;
+  };
 
   const readPosts = () => { try { const v = JSON.parse(fs.readFileSync(POSTS_FILE, 'utf8')); return Array.isArray(v.posts) ? v.posts : []; } catch (e) { return []; } };
   const savePosts = (posts) => { try { fs.writeFileSync(POSTS_FILE + '.tmp', JSON.stringify({ posts }, null, 1)); fs.renameSync(POSTS_FILE + '.tmp', POSTS_FILE); return true; } catch (e) { log('guards: guard-posts.json write failed', e.message); return false; } };
@@ -117,8 +137,7 @@ module.exports = (api) => {
       return personal(a, `Guard posts (${posts.length}): ${posts.map((p) => `${p.hold} #${p.n}`).join(', ')}`);
     }
     if (what === 'add') {
-      let z = null; try { z = zoneOfActor(a); } catch (e) { z = null; }
-      const hold = z && z.id; if (!hold) return personal(a, 'Stand inside a hold to place its guard.');
+      const hold = holdHere(a); if (!hold) return personal(a, 'No hold claims this place. Stand on a hold\'s land, or inside one of its buildings.');
       const npc = rest[0] || C.npcByHold[hold];
       if (!npc) return personal(a, `There is no guard set for ${hold}: /guardpost add <npc desc>, or add it to guards.npcByHold.`);
       let world = '', pos = null, rot = null;
@@ -141,9 +160,8 @@ module.exports = (api) => {
     }
     if (what === 'jailtest') {
       // Staff: be sent to this hold's jail by the watch for one minute, to check where its cells put a prisoner
-      let z = null; try { z = zoneOfActor(a); } catch (e) { z = null; }
-      const hold = z && z.id;
-      if (!hold || typeof globalThis.__dboJailByWatch !== 'function') return personal(a, 'Stand inside a hold.');
+      const hold = holdHere(a);
+      if (!hold || typeof globalThis.__dboJailByWatch !== 'function') return personal(a, 'No hold claims this place.');
       const r = globalThis.__dboJailByWatch(a, hold, 1, `a jail test (${display(a)})`);
       if (!r) return personal(a, `${hold} has no free cell for the watch.`);
       try { mp.set(id(a), 'locationalData', { cellOrWorldDesc: r.cellDesc, pos: r.pos, rot: [0, 0, 0] }); } catch (e) { return personal(a, 'The move failed.'); }

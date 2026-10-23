@@ -1881,6 +1881,7 @@
   "_comment": "The hold's watch (guards.js; Jake and Nate, 23 Oct): NPC guards at posts staff place with /guardpost add (guard-posts.json), spawned as guard:<hold>:<n> zones. They give nothing: no loot from a dead one, no Wheel work from fighting them. A player one brings down wakes in that hold's jail, its prison when the jail is full (hold-jails.json), for jailMinutes. npcByHold: the hold's own guard, never a Legion NPC. Hot reload. ROLLBACK: enabled false (removes every guard zone).",
   "enabled": true,
   "jailMinutes": 10,
-  "npcByHold": { "bruma": "6daba:BSHeartland.esm" }
+  "npcByHold": { "bruma": "6daba:BSHeartland.esm", "whiterun": "abe18:Skyrim.esm", "solitude": "853c4:Skyrim.esm", "riften": "45853:Skyrim.esm", "windhelm": "45c31:Skyrim.esm", "winterhold": "24b49:Skyrim.esm", "falkreath": "10107b:Skyrim.esm", "markarth": "ac9ca:Skyrim.esm", "dawnstar": "87578:Skyrim.esm", "morthal": "2c81b:Skyrim.esm" },
+  "_npcByHold": "Each hold's own generic guard (23 Oct): GuardWhiterunHoldImperialGeneric, GuardSolitudeImperialBase, GuardRiftenImperialBase, GuardWindhelmSons, GuardWinterholdImperial, GuardFalkreathImperial, GuardMarkarthImperialExterior, GuardDawnstarImperialNoShift, GuardHjaalmarchImperial; Bruma CYRGuardBrumaTemplate. Chosen for no or one AI package, so a guard stays near its post."
  }
 }
