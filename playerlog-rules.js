@@ -100,7 +100,7 @@ const TIER = E('senior', 'developer', 'leadgm', 'gm', 'trialgm', 'none');
 const SIDE = O({ hits: 'int', dmg: 'num', by: A(NAME, 8) });
 const REFUSAL_REASONS = ['god', 'ethereal', 'offline_body', 'login_grace', 'bound', 'paralysed', 'armour_change', 'damage_cap',
   'spell_rate', 'dungeon_ally', 'warband', 'companion_pvp', 'silver', 'recovering', 'downed', 'shout_not_given',
-  'friendly_lethal', 'duel_pause', 'duel_rules', 'duel_beaten', 'duel_scaled', 'duel_outsider', 'anticheat', 'asylum', 'in_editor', 'silver_test', 'unknown'];
+  'friendly_lethal', 'duel_pause', 'duel_rules', 'duel_beaten', 'duel_scaled', 'duel_outsider', 'anticheat', 'asylum', 'in_editor', 'silver_test', 'frenzy_downed', 'frenzy_spared', 'unknown'];
 
 // The anticheat kinds a sec.signal may carry (anticheat.js acFlag and the fork's onAnticheat through it; ANTI-CHEAT DESIGN
 // 17 Oct). playerlog-taps.js's anticheat hook writes these and no other kind.
@@ -443,6 +443,9 @@ AUDIT_VERBS.CONCORDAT.cut = (text) => text.replace(/^(CONCORDAT ARREST (?:[^\s#(
 AUDIT_VERBS.CHAMPION.display = true;
 AUDIT_VERBS.JAIL.roles = R_BY([[/ imprisoned $/, 'target'], [/ to $/, 'target']]);
 AUDIT_VERBS.BEAST.roles = R_BY([[/ (?:to|from) $/, 'target']]);
+// FRENZY <werewolf> for N s, first on <target> (frenzy.js): ids, numbers and fixed reasons only
+clean_('FRENZY');
+AUDIT_VERBS.FRENZY.roles = R_BY([[/ killed by $/, 'by'], [/ first on $/, 'target'], [/ for bringing down $/, 'target'], [/ \(GM $/, 'staff'], [/: staff $/, 'staff']]);
 AUDIT_VERBS.FEED.roles = R_BY([[/ asked $/, 'target'], [/ let $/, 'target'], [/ refused $/, 'target']]);
 AUDIT_VERBS.ROPE.roles = R_BY([[/ cut $/, 'target'], [/ of $/, 'captor']]);
 AUDIT_VERBS.STRUGGLE.roles = R_BY([[/ of $/, 'captor']]);
@@ -1392,6 +1395,7 @@ downed.js CRASH-DOWN c74add50 clean
 downed.js CRASH-DOWN 263c623a clean
 downed.js CRASH-DOWN 3000ad8e clean
 downed.js FINISHED 4794f063 parsed
+downed.js FINISHED f87a1d05 parsed
 downed.js RECIPE 83b08366 clean
 downed.js BREW 53c051c5 clean
 duel.js DUEL dd8f1e8f clean
@@ -1425,6 +1429,11 @@ execution.js EXECUTION 151542a7 clean
 execution.js EXECUTION 10d27374 clean
 execution.js EXECUTION 76ea358d clean
 factiongear.js FACTIONGEAR 79b8dc7c clean
+frenzy.js FRENZY 317ea9b7 clean
+frenzy.js FRENZY b5c35900 clean
+frenzy.js FRENZY d855ce67 clean
+frenzy.js FRENZY 1d2c9d85 clean
+frenzy.js FRENZY d7ec59ad clean
 gamemode.js STAFF 636d572c clean
 gamemode.js STAFF 6fcfd67a clean
 gamemode.js GM b82067a4 parsed

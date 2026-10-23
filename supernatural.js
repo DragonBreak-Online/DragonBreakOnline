@@ -2854,6 +2854,8 @@ module.exports = (api) => {
       change();
       log(logLine);
       if (typeof globalThis.__dboBeastTransform === 'function') globalThis.__dboBeastTransform(a, 'werewolf', true);
+      // A forced change may tip into a frenzy (frenzy.js, config werewolfFrenzy)
+      try { if (typeof globalThis.__dboFrenzyForced === 'function') globalThis.__dboFrenzyForced(a); } catch (e) { log(`supernatural: frenzy check failed: ${e.message}`); }
     };
     if (!lead) return go();
     if (FERAL_DUE.has(a)) return;
