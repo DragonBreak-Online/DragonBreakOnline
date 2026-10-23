@@ -441,6 +441,8 @@ export class EmoteService extends ClientListener {
   private playEmote(anim: string): void {
     const previous = this.activeEmote;
     this.activeEmote = anim;
+    // Drift is measured from the new emote's own spot, taken when it is sent; a self-ending idle or a load leaves the last one
+    this.emoteStartPos = null;
     // Not sent yet: a stop before sendEmote runs must not be timed from the previous emote's send
     this.diagSentAt = 0;
     // Offset overlays live on their own graph layer: crossing between an

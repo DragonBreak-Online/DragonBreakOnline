@@ -241,6 +241,44 @@ const scenario = (name, fn) => {
     return [G.collision.length === 0, G.collision];
   });
 
+  // ---- the start spot an emote ended without stopActiveEmote leaves behind ---------------------------------------------------
+  const sentBeforeDrift = (anim) => G.anims.includes(anim) && !G.notes.some((n) => /before sent by the body moved/.test(n));
+  scenario('after a drink (a self-ending idle), the next wheel emote 600 u away plays', () => {
+    inUpdate(() => svc.playIdle('IdleDrink', 7, true)); run(7.5);
+    if (!G.anims.includes('IdleDrink')) return [false, G.anims];
+    player.x = 600; G.anims.length = 0; G.notes.length = 0;
+    wheelPlay('IdleWave'); run(1);
+    return [sentBeforeDrift('IdleWave'), { anims: G.anims, notes: G.notes }];
+  });
+  scenario('a second drink 400 u from the first plays its animation', () => {
+    inUpdate(() => svc.playIdle('IdleDrink', 7, true)); run(7.5);
+    player.y = 400; G.anims.length = 0; G.notes.length = 0;
+    inUpdate(() => svc.playIdle('IdleDrink', 7, true)); run(1);
+    return [sentBeforeDrift('IdleDrink'), { anims: G.anims, notes: G.notes }];
+  });
+  scenario("after a self-ending dboIdle (a trade's IdleTake), the next wheel emote 300 u away plays", () => {
+    c.packet({ customPacketType: 'dboIdle', anim: 'IdleTake', seconds: 2, endsItself: true }); run(3);
+    if (!G.anims.includes('IdleTake')) return [false, G.anims];
+    player.x = 300; G.anims.length = 0; G.notes.length = 0;
+    wheelPlay('IdleSalute'); run(1);
+    return [sentBeforeDrift('IdleSalute'), { anims: G.anims, notes: G.notes }];
+  });
+  scenario('after a load during an emote, the first emote away from the old spot plays', () => {
+    wheelPlay('IdleKneelingEnter'); run(0.5);
+    c.emitter.emit('gameLoad', {});
+    player.x = 4000; G.anims.length = 0; G.notes.length = 0;
+    wheelPlay('IdleWave'); run(1);
+    return [sentBeforeDrift('IdleWave'), { anims: G.anims, notes: G.notes }];
+  });
+  scenario('a ground pose settling 90 u keeps the emote, 110 u ends it', () => {
+    wheelPlay('IdleSitCrossLeggedEnter'); run(0.5);
+    G.anims.length = 0;
+    player.x += 90; run(0.2);
+    const kept = !G.anims.includes('IdleForceDefaultState');
+    player.x += 20; run(0.2);
+    return [kept && G.anims.includes('IdleForceDefaultState') && G.notes.some((n) => /by the body moved/.test(n)), { kept, anims: G.anims }];
+  });
+
   console.log(failures ? `${failures} FAIL` : 'all ok');
   process.exit(failures ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(2); });
