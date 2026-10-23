@@ -269,6 +269,14 @@ module.exports = (api) => {
   const POOLS_KEEP = new Set(POOLS.keep || []);   // curation, Starts Dead, quest alias and set-piece refs, never swapped
   // DragonBreak's own placements stay as placed even if dungeons.json gained them after the pools were built
   const CURATED_REF = /:DragonBreak( Online Edits)?\.esp$/i;
+  // Named bosses of ordinary dungeons by placement ref (#bugs 1563013068529864804, two Vokuns): one, always there, the master's roll
+  // Here, not in dungeons.json (dungeons_build.py rebuilds it); the name feeds the trophy tables. Config dungeons.bossRefs adds, false removes
+  const BOSS_REFS = new Map();
+  for (const [ref, name] of Object.entries(Object.assign({
+    '327c1:Skyrim.esm': 'Vokun, dragon priest',   // High Gate Ruins
+  }, C.bossRefs && typeof C.bossRefs === 'object' ? C.bossRefs : {}))) {
+    if (name === false || name === null) BOSS_REFS.delete(normDesc(ref)); else BOSS_REFS.set(normDesc(ref), String(name || ''));
+  }
   // option desc -> is an NPC_; a record lookup copies every subrecord and plugins never change while the process runs
   const NPC_OPTION = globalThis.__dboNpcOptionOk instanceof Map ? globalThis.__dboNpcOptionOk : (globalThis.__dboNpcOptionOk = new Map());
   {
@@ -383,6 +391,7 @@ module.exports = (api) => {
   const zonesFor = (d, diff, scale = { lvl: 1, n: 1 }) => {
     const out = [];
     out.bosses = [];   // zone names of the claim's bosses (not written to NPC-Spawns.json: a property of the array)
+    out.bossNames = {};   // zone name -> a named boss's name (BOSS_REFS)
     let n = 0;
     let ambushed = 0;
     const province = (POOLS.provinces || {})[d.id] || provinceOfDungeon(d);
@@ -404,7 +413,8 @@ module.exports = (api) => {
         let kind = edid;
         // A generic placement cycles through its own faction's archetypes; anything unlisted stays vanilla
         const ref = String(npc.ref || '');
-        const entry = POOLS_KEEP.has(ref) || CURATED_REF.test(ref) ? null : (POOLS.placements || {})[`${province}|${edid}`];
+        const named = BOSS_REFS.get(normDesc(ref));
+        const entry = POOLS_KEEP.has(ref) || CURATED_REF.test(ref) || named !== undefined ? null : (POOLS.placements || {})[`${province}|${edid}`];
         const family = entry ? (POOLS.families || {})[entry.family] : null;
         const archetypes = family ? ((entry.boss ? family.boss : family.archetypes) || []).filter((a) => a.options.length) : [];
         if (archetypes.length) {
@@ -421,8 +431,8 @@ module.exports = (api) => {
           if (safe.length !== opts.length) log(`dungeon ${d.id}: ${opts.length - safe.length} option(s) of ${edid} left out (crashyCreatures)`);
           opts = safe;
         }
-        // A boss: marked in the data (expeditions.json boss: true) or a boss placement in the pools
-        const boss = npc.boss === true || !!(entry && entry.boss);
+        // A boss: marked in the data (expeditions.json boss: true), a named boss (BOSS_REFS) or a boss placement in the pools
+        const boss = npc.boss === true || named !== undefined || !!(entry && entry.boss);
         const id = pickScaled(opts, scale.lvl, diff, boss, raid);
         if (!id || !Array.isArray(npc.pos)) continue;
         if (!boss) escortsFrom.push({ cell: z.cell, pos: npc.pos, opts, kind });
@@ -442,6 +452,7 @@ module.exports = (api) => {
         if (npc.ref) zone.Placed = npc.ref;
         if (npc.ref && anchorExists(npc.ref)) zone.Anchor = npc.ref;
         if (boss) out.bosses.push(zone.Name);
+        if (named) out.bossNames[zone.Name] = named;
         out.push(zone);
       }
     }
@@ -882,6 +893,7 @@ module.exports = (api) => {
     lease.kinds = {}; for (const z of zones) lease.kinds[z.Name] = z.Kind || '';
     // Bosses (Nate, 2026-09-28): their zones, the live ids seen in them, and when the last one fell
     lease.bossZones = new Set(zones.bosses || []); lease.bossIds = new Set(); lease.bossDownAt = 0; lease.bossWarned = false;
+    lease.bossNames = Object.assign({}, zones.bossNames);
     lease.armed = new Set();
     ST.leases.set(d.id, lease);
     // A raid ruin lifts the raid's halved skill gain while the lease lasts
@@ -2138,7 +2150,8 @@ module.exports = (api) => {
   function isMasterTag(tag) {
     const l = leaseOfTag(tag); const d = l ? byId.get(l.id) : null;
     if (!l || !d) return false;
-    if (d.expedition && l.bossZones && l.bossZones.has(tag)) return true;
+    // A boss zone in an ordinary dungeon too (a named boss in BOSS_REFS, a pools boss), unless ordinaryBosses is off
+    if (l.bossZones && l.bossZones.has(tag) && (d.expedition || TROPHY.ordinaryBosses !== false)) return true;
     // An ordinary dungeon's boss (its kind says boss) or any dragon priest: the boss roll too (Nate, 19 Oct: "better loot pool for
     // boss creatures"; Rahgot was skinned for Bone Meal, his kind matched neither humanoid nor undead)
     return TROPHY.ordinaryBosses !== false && (/boss/i.test(String((l.kinds || {})[tag] || '')) || /dragon ?priest/i.test(String((l.kinds || {})[tag] || '')));
@@ -2228,7 +2241,8 @@ module.exports = (api) => {
     scholarGift(casterId, SCHOLAR_BODY, 'in their pack');
     if (master) {
       ebonyGift(casterId, lease, 'master');
-      for (const t of bossTrophies(String(((lease && lease.kinds) || {})[tag] || ''), diff.id)) {
+      // the tables match the kind and a named boss's name (Vokun's kind is Ianusu)
+      for (const t of bossTrophies(`${((lease && lease.kinds) || {})[tag] || ''} ${((lease && lease.bossNames) || {})[tag] || ''}`.trim(), diff.id)) {
         // a unique trophy is written down before it is given, so a second body can never hand out the same mask
         if (t.unique && (droppedTrophies()[t.desc.toLowerCase()] || !markDropped(t.desc, who(casterId), lease ? lease.name : '?'))) continue;
         if (!giveItem(casterId, t.baseId, t.count)) { if (t.unique) unmarkDropped(t.desc); continue; }
