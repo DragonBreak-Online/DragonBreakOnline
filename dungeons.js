@@ -274,6 +274,7 @@ module.exports = (api) => {
   const BOSS_REFS = new Map();
   for (const [ref, name] of Object.entries(Object.assign({
     '327c1:Skyrim.esm': 'Vokun, dragon priest',   // High Gate Ruins
+    '304f1:Skyrim.esm': 'the hagraven of Darklight Tower',   // /bug 1563109248869859368: her body gave feathers
   }, C.bossRefs && typeof C.bossRefs === 'object' ? C.bossRefs : {}))) {
     if (name === false || name === null) BOSS_REFS.delete(normDesc(ref)); else BOSS_REFS.set(normDesc(ref), String(name || ''));
   }
