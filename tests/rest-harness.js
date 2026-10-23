@@ -417,6 +417,23 @@ globalThis.__dboPvpAt = new Map();
 commands.get('rest')(ME);
 check('/rest reports time left', /Well Rested: 2h 0m left\. Well Fed: 2h 0m left\./.test(lastPersonal(ME)), lastPersonal(ME));
 
+// ---- a fever gives no rest (supernatural.js feverDebuffs, Nate 23 Oct) ----
+{
+  const rested = props.get(ME + '|private.dboRested');
+  globalThis.__dboFeverRestless = (a) => a === ME;
+  props.set(ME + '|percentages', { health: 0.5, magicka: 1, stamina: 1 });
+  timers.get('rest')();
+  check('a fever takes a running Well Rested away, with no extra heal', props.get(ME + '|private.dboRested') === null && props.get(ME + '|percentages').health === 0.5 && /fever leaves you no rest/.test(lastPersonal(ME)), lastPersonal(ME));
+  activate(INN_BED, ME); ui('restChoose', ME, ['sleep']);
+  wallClock += 31 * MIN;
+  globalThis.__dboRestLogin(ME);
+  check('a feverish sleeper wakes Well Fed but not Well Rested, and is told why', !props.get(ME + '|private.dboRested') && props.get(ME + '|private.dboWellFed').until === wallClock + 2 * HOUR && out.systems.some(([a, t]) => a === ME && /restless/.test(t)));
+  wallClock -= 31 * MIN;
+  globalThis.__dboFeverRestless = null;
+  props.set(ME + '|private.dboRested', rested);
+  props.set(ME + '|private.dboWellFed', { until: rested.until });
+}
+
 // ---- running out ----
 wallClock += 2 * HOUR + MIN;
 timers.get('rest')();

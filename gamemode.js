@@ -3609,12 +3609,12 @@ const onEat = (a, baseId) => {
   const kind = foodKindOf(baseId);
   let restore = Number((NEEDS.restore || {})[kind]) || 0;
   if (!restore) return;
-  // Food does little for a vampire (supernatural.js; Onny's suggestion, Nate 2026-09-30)
+  // Food does little for a vampire (supernatural.js; Onny's suggestion, Nate 2026-09-30); a fever carrier's stage may cut it too (__dboSuperFoodLine names why)
   let foodMult = 1;
-  try { if (typeof globalThis.__dboSuperFoodMult === 'function') foodMult = Number(globalThis.__dboSuperFoodMult(a)); } catch (e) { foodMult = 1; }
+  try { if (typeof globalThis.__dboSuperFoodMult === 'function') foodMult = Number(globalThis.__dboSuperFoodMult(a, baseId)); } catch (e) { foodMult = 1; }
   if (foodMult >= 0 && foodMult < 1) {
     restore *= foodMult;
-    if (Date.now() - (vampireAteAt.get(a) || 0) > 600000) { vampireAteAt.set(a, Date.now()); system(a, 'Food sits like ash on your tongue. It barely touches your hunger.'); }
+    if (Date.now() - (vampireAteAt.get(a) || 0) > 600000) { vampireAteAt.set(a, Date.now()); let line = ''; try { line = typeof globalThis.__dboSuperFoodLine === 'function' ? String(globalThis.__dboSuperFoodLine(a, baseId) || '') : ''; } catch (e) { line = ''; } system(a, line || 'Food sits like ash on your tongue. It barely touches your hunger.'); }
   }
   // Y'ffre's blessing (faiths.json meatBoon): meat restores twice the hunger
   try { const m = globalThis.__dboBlessingValue ? Number(globalThis.__dboBlessingValue(a, 'meatBoon')) : 0; if (m > 1 && isMeat(baseId)) restore *= m; } catch (e) { /* no prayer */ }
@@ -9093,7 +9093,7 @@ try {
   // Feeding counts as a meal for the hunger meter
   const needsFeed = (a) => { if (!NEEDS.enabled) return; const n = needsOf(a); n.hunger = Math.max(0, n.hunger - (Number((NEEDS.restore || {}).meal) || 0)); saveNeeds(a, n); applyNeedsStage(a, n, false); };
   require(SUPERNATURAL_JS)({ mp, log, personal, registerChatCommand, onUi, openWidget, closeWidget, sendPacket, display, who, audit, isAdmin, findByName, onlineActors, every, profileOf, nameOf, isWorldspace, needsFeed, hungerOf: (a) => needsOf(a).hunger, cfg, hasUiCap, sourceResistsOf });
-} catch (e) { log('supernatural.js failed to load:', e.stack || e.message); for (const k of ['__dboSuperDamageMult', '__dboSuperHit', '__dboSuperEat', '__dboSuperPrayed', '__dboSuperPrayWarning', '__dboSuperDeath', '__dboSuperActivate', '__dboSuperMenuEntries', '__dboSuperMenuAction', '__dboSuperAdminInfect', '__dboBeastAllow', '__dboBeastChanged', '__dboSuperKind', '__dboSuperIsSilverWeapon', '__dboSuperLogin', '__dboSuperLeave', '__dboSuperProgress', '__dboSuperProgressSend', '__dboSuperRateMult', '__dboSuperFoodMult', '__dboTellsRetake', '__dboVampHealCast', '__dboVampHealRefusal', '__dboVampHealBlocks', '__dboSuperBloodPotion']) globalThis[k] = null; }
+} catch (e) { log('supernatural.js failed to load:', e.stack || e.message); for (const k of ['__dboSuperDamageMult', '__dboSuperHit', '__dboSuperEat', '__dboSuperPrayed', '__dboSuperPrayWarning', '__dboSuperDeath', '__dboSuperActivate', '__dboSuperMenuEntries', '__dboSuperMenuAction', '__dboSuperAdminInfect', '__dboBeastAllow', '__dboBeastChanged', '__dboSuperKind', '__dboSuperIsSilverWeapon', '__dboSuperLogin', '__dboSuperLeave', '__dboSuperProgress', '__dboSuperProgressSend', '__dboSuperRateMult', '__dboSuperFoodMult', '__dboSuperFoodLine', '__dboFeverRateMult', '__dboFeverRestless', '__dboFeverEnded', '__dboTellsRetake', '__dboVampHealCast', '__dboVampHealRefusal', '__dboVampHealBlocks', '__dboSuperBloodPotion']) globalThis[k] = null; }
 
 // ---- friendly fire and the down state (server\downed.js): after supernatural.js, whose hooks it wraps -------
 try {
