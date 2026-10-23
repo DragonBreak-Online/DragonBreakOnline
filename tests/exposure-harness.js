@@ -92,7 +92,7 @@ territory = { id: 'bruma', name: 'Bruma', zone: 'bruma', kind: 'capital', marker
 
 // ---- court view -----------------------------------------------------------------------------------------------------------
 const cv = globalThis.__dboExposureCourtView(JARL, 'bruma');
-ok('Court tab: the Count sees the case, unnamed', Array.isArray(cv) && cv.length === 1 && cv[0].name === 'Unknown' && cv[0].bounty === 500 && cv[0].wanted === true && !cv[0].hunters, cv);
+ok('Court tab: the Count sees the case, unnamed', Array.isArray(cv) && cv.length === 1 && cv[0].name === '' && cv[0].bounty === 500 && cv[0].wanted === true && !cv[0].hunters, cv);
 ok('Court tab: staff see who', globalThis.__dboExposureCourtView(GM, 'bruma')[0].name === 'Ulf');
 ok('Court tab: a townsperson gets nothing', globalThis.__dboExposureCourtView(W1, 'bruma') === null);
 

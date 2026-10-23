@@ -288,7 +288,7 @@ module.exports = (api) => {
       const h = c.holds[zid]; if (!live(h)) continue;
       const staff = safe(() => isAdmin(viewer), false);
       // Staff see who; the court sees who only when it is one of its own seats (court-powers rule); otherwise unnamed
-      const name = staff ? c.name : seatedIn(c.actor, zid) && seatedIn(id(viewer), zid) ? nameTo(viewer, c.actor) : 'Unknown';
+      const name = staff ? c.name : seatedIn(c.actor, zid) && seatedIn(id(viewer), zid) ? nameTo(viewer, c.actor) : '';
       out.push(Object.assign({ name, what: formOf(h).noun, place: h.place, at: h.at, until: h.until, bounty: Number(h.bounty) || 0, hurt: !!h.hurt,
         wanted: bountyIn(zid, c.pid) }, staff ? { seen: Number(h.seen) || 0, hunters: (h.hunters || []).map((x) => `${x.who} (${orderName(x.order)})`) } : {}));
     }
