@@ -443,7 +443,7 @@ AUDIT_VERBS.CONCORDAT.cut = (text) => text.replace(/^(CONCORDAT ARREST (?:[^\s#(
 AUDIT_VERBS.CHAMPION.display = true;
 AUDIT_VERBS.JAIL.roles = R_BY([[/ imprisoned $/, 'target'], [/ to $/, 'target']]);
 AUDIT_VERBS.BEAST.roles = R_BY([[/ (?:to|from) $/, 'target']]);
-AUDIT_VERBS.FEED.roles = R_BY([[/ asked $/, 'target'], [/ let $/, 'target'], [/ refused $/, 'target']]);
+AUDIT_VERBS.FEED.roles = R_BY([[/ asked $/, 'target'], [/ let $/, 'target'], [/ refused $/, 'target'], [/ feed on $/, 'target']]);
 AUDIT_VERBS.ROPE.roles = R_BY([[/ cut $/, 'target'], [/ of $/, 'captor']]);
 AUDIT_VERBS.STRUGGLE.roles = R_BY([[/ of $/, 'captor']]);
 // SCHOOLS <giver> granted <target> N <school> level(s): a to b (<role>); <reason> (schools.js grant): the giver is a gift's "by"
@@ -1789,6 +1789,7 @@ supernatural.js GM 4eae7552 parsed
 supernatural.js FEED c6171020 clean
 supernatural.js FEED 70f09eb9 clean
 supernatural.js FEED 9de7df49 clean
+supernatural.js FEED aeb2f1ce clean
 supernatural.js SUPERNATURAL bae7ad8d parsed
 supernatural.js SUPERNATURAL 8ac6ad0d parsed
 supernatural.js SUPERNATURAL 2462dde7 parsed

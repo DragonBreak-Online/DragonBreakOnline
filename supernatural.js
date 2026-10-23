@@ -1943,12 +1943,13 @@ module.exports = (api) => {
     const standing = !beast && !o.onCorpse;
     const ev = beast ? C.feedAnims.werewolf : o.onCorpse ? (lying ? C.feedAnims.lying : C.feedAnims.corpse) : '';
     const p = health(a);
-    feeds.set(a, { t, onCorpse: !!o.onCorpse, long: !!o.long, willing: !!o.willing, lying, beast, ev, hp: p ? p.health : null, at: Date.now(), until: Date.now() + seconds * 1000 });
+    feeds.set(a, { t, onCorpse: !!o.onCorpse, long: !!o.long, willing: !!o.willing, seduced: !!o.seduced, lying, beast, ev, hp: p ? p.health : null, at: Date.now(), until: Date.now() + seconds * 1000 });
     if (standing && feedPairOn()) sendFeedPair(a, t);
     if (o.onCorpse) { fedOn.add(t); if (fedOn.size > 2048) fedOn.clear(); }
     playAnim(a, ev);
     try { sendPacket(a, { customPacketType: 'dboBanner', text: o.long ? 'Feeding deeply...' : 'Feeding...', seconds: Math.ceil(seconds) }); } catch (e) { /* old client */ }
-    if (!o.onCorpse) personal(t, o.willing ? `${nameTo(t, a)} drinks from your neck.` : `${nameTo(t, a)} sinks their teeth into your neck.`);
+    // A seduced victim offered nothing: they hear the bite plainly, not the willing line (review R2, 23 Oct)
+    if (!o.onCorpse) personal(t, o.willing && !o.seduced ? `${nameTo(t, a)} drinks from your neck.` : `${nameTo(t, a)} sinks their teeth into your neck.`);
     else if (lying) personal(t, `${nameTo(t, a)} bends over you and drinks.`);
     quietNear(a, (v) => (v === t ? '' : o.onCorpse ? `You see ${nameTo(v, a)} feed on the fallen.` : `You see ${nameTo(v, a)} feed on ${nameTo(v, t)}.`), 1500);
     log(`supernatural: ${display(a)} started ${o.long ? 'a deep feed' : 'feeding'} on ${display(t)} (${seconds} s${ev ? `, ${ev}` : ''})`);
@@ -2018,6 +2019,9 @@ module.exports = (api) => {
   const stopFeedAnim = (a, f) => { if (f.ev && !f.beast) { playAnim(a, C.feedAnims.stop); setTimeout(() => reequipHands(a), 500); } };
   const cancelFeed = (a, f, why) => {
     feeds.delete(a);
+    // A seduced feed that breaks (the victim walked off, fought back, logged out) holds as a refusal of this vampire for
+    // refusedMinutes, so a second Seduction does not start it again at once (review R2, 23 Oct)
+    if (f.seduced) ASK.refused.set(`${a >>> 0}:${f.t >>> 0}`, Date.now());
     stopFeedAnim(a, f);
     if (f.onCorpse) fedOn.delete(f.t);
     personal(a, `Your feeding is broken: ${why}.`);
@@ -2103,13 +2107,20 @@ module.exports = (api) => {
     if (beastForm(a) || !askable(a, t)) return false;
     const last = livingFedAt.get(t >>> 0);
     if (last !== undefined && gameDays() - last < Number(C.feedLivingEveryDays)) { personal(a, 'They have no blood left to give. Let them recover.'); return true; }
-    seduced.delete(t >>> 0);
-    startFeed(a, t, { onCorpse: false, willing: true });
+    if (refusedRecently(a, t)) { personal(a, 'They refused you not long ago.'); return true; }
+    startSeducedFeed(a, t, false);
     return true;
+  };
+  // Seduction skips the panel, not a refusal (review R2, 23 Oct): willing (a seduced victim does not slip free), marked seduced
+  // (the plain line, and a broken feed holds as a refusal), and audited as an asked feed is
+  const startSeducedFeed = (a, t, long) => {
+    seduced.delete(t >>> 0);
+    if (startFeed(a, t, { onCorpse: false, long: !!long, willing: true, seduced: true })) audit(`FEED ${who(a)} began to feed on ${who(t)} under Seduction${long ? ' (deeply)' : ''}`);
   };
   const FEED_PROMPT_ID = 51;
   // Kept across hot reloads: requests by victim, each vampire's last ask, refusals by vampire:victim, each UI's panels
   const ASK = globalThis.__dboSuperAsk || (globalThis.__dboSuperAsk = { pending: new Map(), askedAt: new Map(), refused: new Map(), caps: new Map() });
+  const refusedRecently = (a, t) => Date.now() - (ASK.refused.get(`${a >>> 0}:${t >>> 0}`) || 0) < Number(C.ask.refusedMinutes) * 60000;
   onUi('uiCaps', (a, args) => { ASK.caps.set(a >>> 0, new Set((args || []).map(String))); });
   const canAnswer = (t) => { const c = ASK.caps.get(t >>> 0); return !!c && c.has('feedPrompt'); };
   const canWash = (a) => canAnswer(a);
@@ -2232,7 +2243,11 @@ module.exports = (api) => {
     const last = livingFedAt.get(t >>> 0);
     if (last !== undefined && gameDays() - last < Number(C.feedLivingEveryDays)) { personal(a, `${name(a, t)} has no blood left to give. Let them recover.`); return true; }
     if (boundCaptive(t)) { startFeed(a, t, { onCorpse: false, long }); return true; }
-    if (seducedBy(t, a) && askable(a, t)) { seduced.delete(t >>> 0); startFeed(a, t, { onCorpse: false, long, willing: true }); return true; }
+    if (seducedBy(t, a) && askable(a, t)) {
+      if (refusedRecently(a, t)) { personal(a, `${name(a, t)} refused you not long ago.`); return true; }
+      startSeducedFeed(a, t, long);
+      return true;
+    }
     if (!askable(a, t)) { personal(a, `${name(a, t)} cannot be asked now.`); return true; }
     askFeed(a, t, long, name);
     return true;
