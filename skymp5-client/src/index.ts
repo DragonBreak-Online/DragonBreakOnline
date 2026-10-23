@@ -125,6 +125,7 @@ import { FavoritesService } from "./services/services/favoritesService";
 import { FovService } from "./services/services/fovService";
 import { LearnedEnchantmentsService } from "./services/services/learnedEnchantmentsService";
 import { CameraShakeService } from "./services/services/cameraShakeService";
+import { FrenzyService } from "./services/services/frenzyService";
 import { ClientDiagService } from "./services/services/clientDiagService";
 
 // Gold weighs 0.02 a coin (Nate, 2026-09-26), so a fortune is worth taking to the bank: 1,000 gold weighs 20.
@@ -271,7 +272,8 @@ const main = () => {
       new FavoritesService(sp, controller),
       new FovService(sp, controller),
       new LearnedEnchantmentsService(sp, controller),
-      new CameraShakeService(sp, controller)
+      new CameraShakeService(sp, controller),
+      new FrenzyService(sp, controller)
     ];
     SpApiInteractor.setup(listeners);
   } catch (e) {
