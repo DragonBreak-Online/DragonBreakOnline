@@ -169,7 +169,9 @@ module.exports = (api) => {
     if (t && Number.isFinite(Number(t.rate))) return clamp(Number(t.rate));
     return clamp(Number.isFinite(Number(dflt)) ? Number(dflt) : (Number.isFinite(DEFAULT_TAX) ? DEFAULT_TAX : 0.1));
   };
-  const canTax = (a, zone) => isAdmin(a) || ranksOf(profileOf(a), a).some((r) => r.zone && r.zone.id === zone && C.taxRanks.includes(r.rank));
+  // An official seen as a beast in the hold (exposure.js) sets no tax there until cleared
+  const exposedHere = (a, zone) => { try { return typeof globalThis.__dboExposureBarred === 'function' && !!globalThis.__dboExposureBarred(a, zone); } catch (e) { return false; } };
+  const canTax = (a, zone) => isAdmin(a) || (ranksOf(profileOf(a), a).some((r) => r.zone && r.zone.id === zone && C.taxRanks.includes(r.rank)) && !exposedHere(a, zone));
   const zoneName = (zone) => { const z = zoneById(zone); return (z && (z.name || z.label)) || zone || 'no hold'; };
   // What the owner took, kept for 31 days so the ledger can show the week's and the month's takings
   const earned = (b, gold) => {

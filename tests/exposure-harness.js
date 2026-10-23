@@ -1,0 +1,183 @@
+// Exposure (server\exposure.js, bundle 1023): a werewolf or Vampire Lord seen changing by 3+ players is known in the hold for
+// 7 days, with a bounty through outlaws.js (500 city / 200 wilds, doubled when they hurt someone in that shape), guards set
+// on them while it stands, officials and hunter orders told, the Court tab view, an exposed ruler's court powers gone there,
+// the Companions' Circle spared in Whiterun Hold, and cleared by a cure, a GM or time. Run from server/:
+//   node tests/exposure-harness.js
+'use strict';
+const fs = require('fs'); const os = require('os'); const path = require('path');
+const ROOT = path.resolve(__dirname, '..');
+const dir = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), 'claude-nate-exposure-'));
+process.chdir(dir);
+let fails = 0; const ok = (l, c, g) => { console.log(`${c ? 'ok  ' : 'FAIL'} ${l}${!c && g !== undefined ? `: got ${JSON.stringify(g)}` : ''}`); if (!c) fails++; };
+
+// Characters: [profile id, name]
+const WOLF = 0x20, JARL = 0x21, W1 = 0x22, W2 = 0x23, W3 = 0x24, GM = 0x25, PGUARD = 0x26, VIGIL = 0x27, HAND = 0x28, DAWN = 0x29, HARB = 0x2a, VAMP = 0x2b, LEAD = 0x2c, NPC = 0x30;
+const chars = { [WOLF]: [10, 'Ulf'], [JARL]: [11, 'Frigga'], [W1]: [12, 'Ann'], [W2]: [13, 'Bo'], [W3]: [14, 'Cy'], [GM]: [15, 'Gemma'], [PGUARD]: [16, 'Gard'],
+  [VIGIL]: [17, 'Vera'], [HAND]: [18, 'Hilde'], [DAWN]: [19, 'Dane'], [HARB]: [20, 'Kodlak'], [VAMP]: [21, 'Serana'], [LEAD]: [2, 'Nate'] };
+const props = new Map(); const sys = []; const said = []; const audits = []; const cmds = {};
+const mp = {
+  get: (a, k) => props.get(`${a}|${k}`), set: (a, k, v) => props.set(`${a}|${k}`, v), makeProperty: () => {},
+  lookupEspmRecordById: (id) => ({ 0x500: { record: { type: 'NPC_', fields: [{ type: 'RNAM', data: new Uint8Array([0x01, 0x05, 0, 0]) }] }, toGlobalRecordId: (x) => x },
+    0x501: { record: { type: 'RACE', editorId: 'NordRace' } } })[id] || null,
+};
+const ZONES = { bruma: { id: 'bruma', name: 'Bruma', officials: ['count', 'steward', 'guard'] }, whiterun: { id: 'whiterun', name: 'Whiterun', officials: ['jarl', 'steward'] } };
+let online = Object.keys(chars).map(Number);
+let territory = { id: 'bruma', name: 'Bruma', zone: 'bruma', kind: 'capital', marker: { world: 'w', pos: [0, 0, 0] } };
+const guilds = { [VIGIL]: [{ id: 'vigil-of-stendarr', title: 'Vigilant', role: 'member' }], [HAND]: [{ id: 'silver-hand', title: 'Member', role: 'member' }],
+  [DAWN]: [{ id: 'dawnguard', title: 'Member', role: 'member' }], [HARB]: [{ id: 'companions', title: 'Harbinger', role: 'leader' }],
+  [PGUARD]: [{ id: 'county-bruma', title: 'Guard', role: 'member' }] };
+let staff = new Set([GM]);
+globalThis.__dboGuildsOf = (a) => guilds[a] || [];
+globalThis.__dboGuildInfo = (fid) => ({ 'vigil-of-stendarr': { name: 'the Vigil of Stendarr' }, 'silver-hand': { name: 'the Silver Hand' }, dawnguard: { name: 'the Dawnguard' } })[fid] || null;
+globalThis.__dboHoldFactionOf = (z) => (z === 'bruma' ? 'county-bruma' : 'hold-' + z);
+globalThis.__dboIsStaff = (a) => staff.has(a >>> 0);
+globalThis.__dboNameFor = (viewer, a) => (viewer === JARL ? chars[a][1] : 'Stranger');
+globalThis.__dboRealmTerritoryAt = () => territory;
+globalThis.__dboSeatHolder = () => 0;
+for (const a of Object.keys(chars).map(Number)) { props.set(`${a}|worldOrCellDesc`, 'w'); props.set(`${a}|pos`, [0, 0, 0]); }
+props.set(`${WOLF}|private.supernatural`, { kind: 'werewolf' });
+props.set(`${JARL}|private.supernatural`, { kind: 'werewolf' });
+props.set(`${HARB}|private.supernatural`, { kind: 'werewolf' });
+props.set(`${VAMP}|private.supernatural`, { kind: 'vampire' });
+
+const api = (cfg) => ({
+  mp, log: () => {}, personal: (a, t) => said.push([a, t]), system: (a, t) => sys.push([a, t]), audit: (t) => audits.push(t),
+  who: (a) => (chars[a] ? `${chars[a][1]} #${a.toString(16)}` : String(a)), display: (a) => (chars[a] ? chars[a][1] : String(a)), cfg,
+  registerChatCommand: (n, f) => { cmds[n] = f; }, zoneOfActor: () => territory.zone, zoneById: (id) => ZONES[String(id).toLowerCase()] || null,
+  readOfficials: () => ({ bruma: { count: [11], guard: [] }, whiterun: { jarl: [] } }), profileOf: (a) => (chars[a] ? chars[a][0] : -1),
+  officialTarget: (q) => { const e = Object.entries(chars).find(([, c]) => c[1].toLowerCase() === String(q).toLowerCase()); return e ? { pid: e[1][0], actor: Number(e[0]), online: Number(e[0]), label: e[1][1], who: e[1][1] } : { error: `No character called ${q}.` }; },
+  onlineActors: () => online.slice(), isAdmin: (a) => a === GM || a === LEAD, isLeadStaff: (a) => a === LEAD, every: () => {}, giveItem: () => {}, onUi: () => {},
+});
+const load = (file, cfg) => { const p = path.join(ROOT, file); delete require.cache[p]; return require(p)(api(cfg || {})); };
+load('outlaws.js');
+let X = load('exposure.js');
+const bounty = (zid, a) => { const l = ((globalThis.__dboOutlaws.data || {}).zones || {})[zid] || {}; const b = l[String(chars[a][0])]; return b ? b.amount : 0; };
+const clearBounties = () => { globalThis.__dboOutlaws.data.zones = {}; };
+const reset = () => { try { fs.unlinkSync('exposure.json'); } catch (e) { /* none */ } globalThis.__dboExposure = null; X = load('exposure.js'); clearBounties(); sys.length = 0; audits.length = 0; };
+const beast = (a, form) => props.set(`${a}|private.beast`, form ? { form, at: 1000 + a } : null);
+const see = (a, form, seers, phase) => { if (phase === 'in') beast(a, form); const r = globalThis.__dboBeastWitnessed(a, form, seers, phase); if (phase === 'out') beast(a, null); return r; };
+
+// ---- threshold ------------------------------------------------------------------------------------------------------------
+ok('two witnesses are not enough', see(WOLF, 'werewolf', [W1, W2], 'in') === false && bounty('bruma', WOLF) === 0 && !globalThis.__dboExposedIn(WOLF, 'bruma'));
+ok('staff in an admin mode do not count', (props.set(`${GM}|ff_adminModes`, { god: true }), see(WOLF, 'werewolf', [W1, W2, GM], 'in')) === false);
+ok('the invisible do not count', (props.set(`${W3}|ff_adminModes`, { invis: true }), see(WOLF, 'werewolf', [W1, W2, W3], 'in')) === false);
+props.set(`${W3}|ff_adminModes`, {});
+ok('staff out of any mode count as anyone', (props.set(`${GM}|ff_adminModes`, {}), see(WOLF, 'werewolf', [W1, W2, GM], 'in')) === true);
+reset();
+ok('three player witnesses expose them in the hold', see(WOLF, 'werewolf', [W1, W2, W3], 'in') === true && globalThis.__dboExposedIn(WOLF, 'bruma'));
+ok('...in a city: 500 gold bounty in Bruma', bounty('bruma', WOLF) === 500, bounty('bruma', WOLF));
+ok('...the werewolf is told', sys.some(([a, t]) => a === WOLF && /bounty of 500 gold/.test(t)));
+ok('...and it is audited', audits.some((t) => /EXPOSURE Ulf .* seen changing into a werewolf by 3/.test(t)));
+ok('...known for 7 days', (() => { const h = JSON.parse(fs.readFileSync('exposure.json', 'utf8')).cases[String(WOLF)].holds.bruma; return Math.round((h.until - h.at) / 86400000) === 7; })());
+
+// ---- notices, waiting for the mortal shape -------------------------------------------------------------------------------
+ok('no notice while still in beast form (they would be named "Werewolf")', !sys.some(([a]) => a === JARL));
+beast(WOLF, null); X.tick();
+ok('the Count (an official) is told, naming them as he knows them', sys.some(([a, t]) => a === JARL && /court of Bruma: Ulf was seen changing into a werewolf/.test(t)));
+ok('a player guard of the hold is told, a stranger unnamed', sys.some(([a, t]) => a === PGUARD && /someone whose name you do not know/.test(t)));
+ok('the Vigil and the Silver Hand hear of a werewolf', sys.some(([a, t]) => a === VIGIL && /the Vigil of Stendarr/.test(t)) && sys.some(([a, t]) => a === HAND && /the Silver Hand/.test(t)));
+ok('the Dawnguard does not (a werewolf is not theirs)', !sys.some(([a]) => a === DAWN));
+ok('a plain townsperson is not told', !sys.some(([a]) => a === W1));
+const n = sys.length; X.tick();
+ok('each is told once', sys.length === n);
+online = online.filter((a) => a !== DAWN && a !== VIGIL);
+
+// ---- guards ---------------------------------------------------------------------------------------------------------------
+ok('guards hunt them in the hold while the bounty stands (ff_huntedIn)', props.get(`${WOLF}|ff_huntedIn`) === 'bruma');
+territory = { id: 'whiterun', name: 'Whiterun', zone: 'whiterun', kind: 'capital', marker: { world: 'w', pos: [0, 0, 0] } }; X.tick();
+ok('...but not in another hold', props.get(`${WOLF}|ff_huntedIn`) === null);
+territory = { id: 'bruma', name: 'Bruma', zone: 'bruma', kind: 'capital', marker: { world: 'w', pos: [0, 0, 0] } };
+
+// ---- court view -----------------------------------------------------------------------------------------------------------
+const cv = globalThis.__dboExposureCourtView(JARL, 'bruma');
+ok('Court tab: the Count sees the case', Array.isArray(cv) && cv.length === 1 && cv[0].name === 'Ulf' && cv[0].bounty === 500 && cv[0].wanted === true, cv);
+ok('Court tab: a townsperson gets nothing', globalThis.__dboExposureCourtView(W1, 'bruma') === null);
+
+// ---- hurt doubles ---------------------------------------------------------------------------------------------------------
+see(WOLF, 'werewolf', [], 'in');
+globalThis.__dboExposureHit(WOLF, NPC);
+ok('a blow on a creature does not double it', bounty('bruma', WOLF) === 500);
+props.set(`${NPC}|baseId`, 0x500);
+globalThis.__dboExposureHit(WOLF, NPC);
+ok('a blow on a person in beast form doubles it to 1000', bounty('bruma', WOLF) === 1000, bounty('bruma', WOLF));
+reset();
+see(WOLF, 'werewolf', [W1], 'in'); globalThis.__dboExposureHit(WOLF, W1);
+territory = { id: 'aleswell', name: 'Aleswell', zone: 'bruma', kind: 'town', marker: { world: 'w', pos: [0, 0, 0] } };
+ok('seen changing back after hurting someone, in the wilds: 200 x 2 = 400', see(WOLF, 'werewolf', [W1, W2, W3], 'out') === true && bounty('bruma', WOLF) === 400, bounty('bruma', WOLF));
+reset();
+see(WOLF, 'werewolf', [W1, W2, W3], 'in');
+ok('in the wilds unhurt: 200', bounty('bruma', WOLF) === 200, bounty('bruma', WOLF));
+ok('frenzy hook (__dboExposureBounty) raises it and says so', globalThis.__dboExposureBounty(WOLF, W1) === true && bounty('bruma', WOLF) === 400);
+beast(WOLF, null);
+ok('...but not out of beast form', globalThis.__dboExposureBounty(WOLF, W1) === false);
+territory = { id: 'bruma', name: 'Bruma', zone: 'bruma', kind: 'capital', marker: { world: 'w', pos: [0, 0, 0] } };
+
+// ---- an exposed Jarl loses court powers ------------------------------------------------------------------------------------
+reset();
+let barred = globalThis.__dboExposureBarred(JARL, 'bruma');
+ok('before: the Count is not barred', barred === '');
+see(JARL, 'werewolf', [W1, W2, W3], 'in'); beast(JARL, null);
+barred = globalThis.__dboExposureBarred(JARL, 'bruma');
+ok('an exposed Count is barred from court powers in Bruma', /will not take your word/.test(barred), barred);
+ok('...but not in another hold', globalThis.__dboExposureBarred(JARL, 'whiterun') === '');
+said.length = 0; cmds.bounty(JARL, 'set Ann 100 theft');
+ok('...and cannot set a bounty (outlaws.js)', /will not take your word/.test((said.at(-1) || [])[1]) && bounty('bruma', W1) === 0, said.at(-1));
+said.length = 0; cmds.bounty(JARL, 'clear Frigga');
+ok('...nor lift his own', /will not take your word/.test((said.at(-1) || [])[1]) && bounty('bruma', JARL) === 500);
+ok('staff are never barred', globalThis.__dboExposureBarred(GM, 'bruma') === '');
+const src = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+ok('appointments, tax, books and property sales ask the same hook', /__dboExposureBarred\(a, z\.id\)/.test(src('gamemode.js')) && /exposedHere\(a, zone\)/.test(src('business.js'))
+  && /__dboExposureBarred'\)\(a, z\)/.test(src('economy.js')) && /__dboExposureBarred\(x\)/.test(src('tenancy.js')));
+ok('beastform.js reports its witnesses through the one hook', /__dboBeastWitnessed\(a, form, seers, phase\)/.test(src('beastform.js')));
+
+// ---- clearing -------------------------------------------------------------------------------------------------------------
+props.set(`${WOLF}|private.inventory`, null);
+globalThis.__dboOutlawJailed(PGUARD, JARL);
+ok('serving the jail clears the bounty', bounty('bruma', JARL) === 0);
+X.tick();
+ok('...the guards stop hunting once it is gone', props.get(`${JARL}|ff_huntedIn`) === null);
+ok('...but he is still known (exposure stands until cured)', globalThis.__dboExposedIn(JARL, 'bruma'));
+props.set(`${JARL}|private.supernatural`, { kind: null }); X.tick();
+ok('a cure clears the exposure', !globalThis.__dboExposedIn(JARL, 'bruma') && globalThis.__dboExposureBarred(JARL, 'bruma') === '' && audits.some((t) => /no longer a werewolf \(cured\)/.test(t)));
+see(WOLF, 'werewolf', [W1, W2, W3], 'in'); beast(WOLF, null);
+said.length = 0; cmds.exposure(GM, 'clear Ulf mistaken');
+ok('a GM below Lead may not clear', /Lead GM/.test(said.at(-1)[1]));
+said.length = 0; cmds.exposure(LEAD, 'clear Ulf');
+ok('a clear needs a reason', /Usage/.test(said.at(-1)[1]));
+said.length = 0; cmds.exposure(LEAD, 'clear Ulf the witnesses lied');
+ok('a Lead GM clears it with a reason, audited', /no longer known/.test(said.at(-1)[1]) && !globalThis.__dboExposedIn(WOLF, 'bruma') && audits.some((t) => /EXPOSURE GM Nate .* cleared Ulf .*: the witnesses lied/.test(t)));
+see(WOLF, 'werewolf', [W1, W2, W3], 'in');
+const until = JSON.parse(fs.readFileSync('exposure.json', 'utf8')).cases[String(WOLF)].holds.bruma;
+until.until = Date.now() - 1; globalThis.__dboExposure.data.cases[String(WOLF)].holds.bruma.until = Date.now() - 1; X.tick();
+ok('it ends after its days', !globalThis.__dboExposedIn(WOLF, 'bruma'));
+
+// ---- the Companions' Circle in Whiterun ---------------------------------------------------------------------------------
+reset();
+territory = { id: 'whiterun', name: 'Whiterun', zone: 'whiterun', kind: 'capital', marker: { world: 'w', pos: [0, 0, 0] } };
+ok('the Harbinger is spared in Whiterun Hold', see(HARB, 'werewolf', [W1, W2, W3], 'in') === false && bounty('whiterun', HARB) === 0 && audits.some((t) => /exempt/.test(t)));
+beast(HARB, null);
+territory = { id: 'bruma', name: 'Bruma', zone: 'bruma', kind: 'capital', marker: { world: 'w', pos: [0, 0, 0] } };
+ok('...but not in Bruma', see(HARB, 'werewolf', [W1, W2, W3], 'in') === true && bounty('bruma', HARB) === 500);
+beast(HARB, null);
+
+// ---- a Vampire Lord: the same rules, the Dawnguard and the Vigil told, hunters among witnesses recorded ------------------
+reset(); online = Object.keys(chars).map(Number);
+ok('a Vampire Lord seen rising by three (a Dawnguard among them) is exposed', see(VAMP, 'vampirelord', [W1, W2, DAWN], 'in') === true && bounty('bruma', VAMP) === 500);
+beast(VAMP, null); X.tick();
+ok('...the Dawnguard and the Vigil are told, the Silver Hand is not', sys.some(([a, t]) => a === DAWN && /the Dawnguard: .*Vampire Lord/.test(t)) && sys.some(([a]) => a === VIGIL) && !sys.some(([a]) => a === HAND));
+ok('...the hunter witness is recorded for staff', (() => { const v = globalThis.__dboExposureCourtView(GM, 'bruma'); return v && v[0].hunters && v[0].hunters.some((h) => /Dane .*the Dawnguard/.test(h)); })());
+said.length = 0; cmds.exposure(LEAD, 'list');
+ok('.../exposure list shows it', /Serana .*a Vampire Lord.*hunters: Dane .* of the Dawnguard/.test(said.at(-1)[1]), said.at(-1));
+props.set(`${VAMP}|private.supernatural`, { kind: null }); X.tick();
+ok('...and a cure of vampirism clears it', !globalThis.__dboExposedIn(VAMP, 'bruma'));
+
+// ---- enabled false --------------------------------------------------------------------------------------------------------
+reset();
+X = load('exposure.js', { exposure: { enabled: false } });
+ok('off: three witnesses do nothing', see(WOLF, 'werewolf', [W1, W2, W3], 'in') === false && bounty('bruma', WOLF) === 0);
+ok('off: nobody is barred', globalThis.__dboExposureBarred(JARL, 'bruma') === '' && globalThis.__dboExposureCourtView(JARL, 'bruma') === null);
+ok('off: no frenzy bounty', globalThis.__dboExposureBounty(WOLF, W1) === false);
+
+try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* scratch */ }
+console.log(fails ? `${fails} FAILED` : 'all ok');
+process.exit(fails ? 1 : 0);
