@@ -1881,6 +1881,8 @@
   "_comment": "The hold's watch (guards.js; Jake and Nate, 23 Oct): NPC guards at posts staff place with /guardpost add (guard-posts.json), spawned as guard:<hold>:<n> zones. They give nothing: no loot from a dead one, no Wheel work from fighting them. A player one brings down wakes in that hold's jail, its prison when the jail is full (hold-jails.json), for jailMinutes. npcByHold: the hold's own guard, never a Legion NPC. Hot reload. ROLLBACK: enabled false (removes every guard zone).",
   "enabled": true,
   "jailMinutes": 10,
+  "radius": 4000,
+  "_radius": "How near (units) a player must come for a post's guard to spawn. 600 was too small: a guard 20 m away never appeared (Nate, 23 Oct).",
   "patrolsByHold": { "whiterun": ["d314c:Skyrim.esm", "d314f:Skyrim.esm"], "windhelm": ["a24df:Skyrim.esm", "a24e3:Skyrim.esm", "480c9:Skyrim.esm"], "winterhold": ["fcee5:Skyrim.esm", "fcee9:Skyrim.esm"], "riften": ["10d155:Skyrim.esm", "45888:Skyrim.esm"], "morthal": ["604ff:Skyrim.esm"] },
   "_patrolsByHold": "A hold's first posts (by number) take these patrol guards in order; their own AI walks the base game's routes (GuardWhiterunImperialPatrolDay1/2, GuardWindhelmSonsPatrol6a/6c/1d, GuardWinterholdTownImperialPatrol/2, GuardRiftenImperialTowerGuardRoving and RovingC, GuardMorthalImperialPatrolDay). Whiterun's and Morthal's also sleep at night. Remove a hold to stop its patrols.",
   "autoHolds": ["solitude", "riften", "windhelm", "winterhold", "falkreath", "markarth", "dawnstar", "morthal"],

@@ -19,7 +19,7 @@ const path = require('path');
 module.exports = (api) => {
   const { mp, log, personal, audit, who, display, cfg, registerChatCommand, zoneOfActor } = api;
   const C = Object.assign({
-    enabled: true, jailMinutes: 10, radius: 600, despawnSeconds: 300, respawnSeconds: 900,
+    enabled: true, jailMinutes: 10, radius: 4000, despawnSeconds: 300, respawnSeconds: 900,
     // The hold's own guard (never a Legion NPC); a post may name another with /guardpost add <npc desc>
     npcByHold: { bruma: '6daba:BSHeartland.esm' },
     jailDelayMs: 2500,
