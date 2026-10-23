@@ -168,6 +168,10 @@ interface PropertyRecord {
   keyBase?: number;
   // With housingKeyRing: who holds each issued key, by key name (actor id and name at the time)
   holders?: Record<string, { a: number; w: string }>;
+  // When the lock last changed hands (a new owner, or for a room of a place a new tenant or none), and when each key item
+  // was cut by name: a key item cut before the change stops opening (housingStaleItemKeys)
+  changedAt?: number;
+  cutAt?: Record<string, number>;
 }
 
 // What the migration does with one planned house (refinePlaces), written into the plan for review
@@ -253,6 +257,8 @@ export class HousingSystem implements System {
     const ownerMode = String(all?.["housingOwnerMigration"] ?? "dryrun");
     this.ownerMigration = ownerMode === "off" ? "off" : ownerMode === "apply" ? "apply" : "dryrun";
     this.keyRing = all?.["housingKeyRing"] === true;
+    // Key items cut before a property's last change of owner or tenant stop opening it (Nate, 23 Oct); false turns it off
+    this.staleItemKeys = all?.["housingStaleItemKeys"] !== false;
     this.initAtMs = Date.now();
 
     this.roleCfg = readAdminRoleConfig(all);
@@ -684,6 +690,7 @@ export class HousingSystem implements System {
     const issued = (rec.issued || []).filter((n) => n !== keyName);
     issued.push(keyName);
     rec.issued = issued.slice(-MAX_ISSUED_KEY_NAMES);
+    this.stampCut(rec, keyName);
     // Recorded first, so a failed write never leaves a key nothing answers to
     const keyBase = this.keyBaseFor(ctx, primary, rec);
     if (!this.commit(ctx, userId, primary, rec)) return;
@@ -912,6 +919,7 @@ export class HousingSystem implements System {
       return;
     }
     const hex = room.ref.toString(16);
+    const before = rec.assigned && rec.assigned[hex] ? `${rec.assigned[hex].profile}:${rec.assigned[hex].char || 0}` : "";
     const assigned = Object.assign({}, rec.assigned || {});
     let shared = (rec.shared || []).filter((h) => h !== hex);
     let said = "";
@@ -936,6 +944,12 @@ export class HousingSystem implements System {
     if (Object.keys(assigned).length) rec.assigned = assigned; else delete rec.assigned;
     if (shared.length) rec.shared = shared; else delete rec.shared;
     if (!this.commit(ctx, userId, primary, rec)) return;
+    // A room with a new tenant (or none): key items cut for it before stop opening it
+    const after = rec.assigned && rec.assigned[hex] ? `${rec.assigned[hex].profile}:${rec.assigned[hex].char || 0}` : "";
+    if (after !== before && room.ref !== primary) {
+      const m = this.read(ctx, room.ref);
+      if (m) { this.changedHands(m); this.write(ctx, room.ref, m); }
+    }
     this.notice(ctx, userId, said);
     if (action === "assign" && room.ref && rec.assigned && rec.assigned[hex]) {
       const to = this.userOf(ctx, toFormId(rawRecipient));
@@ -987,9 +1001,44 @@ export class HousingSystem implements System {
   private keyOpensWith(ctx: SystemContext, primary: number, rec: PropertyRecord, v: ViewerAccess): boolean {
     const credential = this.keyCredential(primary, rec);
     const names = this.acceptedKeyNames(ctx, primary, rec);
-    if (Array.from(v.keys).some((n) => this.isKeyFor(n, credential, names))) return true;
+    if (Array.from(v.keys).some((n) => this.isKeyFor(n, credential, names) && this.itemKeyFresh(ctx, primary, rec, n))) return true;
     if (v.ring && Array.from(v.ring).some((n) => names.indexOf(n) !== -1 || (this.placesOn() && !!rec.keyAliases && rec.keyAliases.indexOf(n) !== -1))) return true;
-    return this.placesOn() && !!rec.keyAliases && Array.from(v.keys).some((n) => rec.keyAliases!.some((a) => this.aliasOpens(n, a)));
+    return this.placesOn() && !!rec.keyAliases && Array.from(v.keys).some((n) => rec.keyAliases!.some((a) => this.aliasOpens(n, a)) && this.itemKeyFresh(ctx, primary, rec, n));
+  }
+
+  // ── Stale key items (housingStaleItemKeys) ─────────────────────────────────
+  // A key item carries no date, so each lock keeps when it last changed hands and when each item was cut by name; an item
+  // with no cut date is from before (every key cut before 23 Oct) and opens only a lock that has not changed hands since.
+  // A ring key is the owner's to see and take back, so it is not judged here. A claim of an ownerless lock is no change of
+  // hands: giving it up re-keyed it already.
+  private changedHands(rec: PropertyRecord): void {
+    rec.changedAt = Date.now();
+  }
+
+  private stampCut(rec: PropertyRecord, name: string): void {
+    const issued = new Set(rec.issued || []);
+    const kept: Record<string, number> = {};
+    for (const [n, t] of Object.entries(rec.cutAt || {})) if (issued.has(n)) kept[n] = Number(t) || 0;
+    kept[name] = Date.now();
+    rec.cutAt = kept;
+  }
+
+  // When this lock last changed hands: its own record, its place's root, and its room's assignment there
+  private handsChangedAt(ctx: SystemContext, primary: number, rec: PropertyRecord): number {
+    let t = Number(rec.changedAt) || 0;
+    if (this.placesOn() && rec.memberOf && rec.memberOf !== primary) {
+      const root = this.read(ctx, rec.memberOf);
+      if (root) t = Math.max(t, Number(root.changedAt) || 0);
+    }
+    return t;
+  }
+
+  private itemKeyFresh(ctx: SystemContext, primary: number, rec: PropertyRecord, name: string): boolean {
+    if (!this.staleItemKeys) return true;
+    const changed = this.handsChangedAt(ctx, primary, rec);
+    if (!changed) return true;
+    const cut = rec.cutAt ? Number(rec.cutAt[name]) || 0 : 0;
+    return cut > changed;
   }
 
   // The owner, staff (Lead GM and above) and the managers of the hold: never a key holder
@@ -1918,8 +1967,8 @@ export class HousingSystem implements System {
     for (const primary of this.claimed) {
       const rec = this.read(ctx, primary);
       if (!rec || rec.owner === 0) continue;
-      if (this.isKeyFor(name, this.keyCredential(primary, rec), this.acceptedKeyNames(ctx, primary, rec))
-        || (rec.keyAliases || []).some((a) => this.aliasOpens(name, a))) return { primary, rec };
+      if ((this.isKeyFor(name, this.keyCredential(primary, rec), this.acceptedKeyNames(ctx, primary, rec))
+        || (rec.keyAliases || []).some((a) => this.aliasOpens(name, a))) && this.itemKeyFresh(ctx, primary, rec, name)) return { primary, rec };
     }
     return null;
   }
@@ -2300,6 +2349,8 @@ export class HousingSystem implements System {
         ...(r.ownerOnly === true ? { ownerOnly: true } : {}),
         ...(Number(r.keyBase) ? { keyBase: Number(r.keyBase) >>> 0 } : {}),
         ...(r.holders && typeof r.holders === "object" ? { holders: r.holders } : {}),
+        ...(Number(r.changedAt) ? { changedAt: Number(r.changedAt) } : {}),
+        ...(r.cutAt && typeof r.cutAt === "object" ? { cutAt: r.cutAt } : {}),
       };
     } catch (e) {
       this.rememberGone(primary, e);
@@ -2558,7 +2609,7 @@ export class HousingSystem implements System {
       let root = this.read(ctx, p.root);
       // A granted way in: the owner's from now, on a serial no key was ever cut at (an unreadable stub's is unknown)
       if (granted.has(p.root) && (!root || root.owner !== p.owner)) {
-        root = { ...(root || emptyRecord()), owner: p.owner, ownerName: p.ownerName, name: null, locked: false, partner: this.partnerOf(ctx, p.root), issued: [], serial: root ? root.serial + 1 : GRANT_SERIAL };
+        root = { ...(root || emptyRecord()), owner: p.owner, ownerName: p.ownerName, name: null, locked: false, partner: this.partnerOf(ctx, p.root), issued: [], serial: root ? root.serial + 1 : GRANT_SERIAL, changedAt: Date.now() };
         this.log(`[housing] place migration: ${hex(p.root)} granted to ${p.ownerName} (${p.owner})`);
       }
       if (!root) { failed++; continue; }
@@ -2804,12 +2855,14 @@ export class HousingSystem implements System {
   }
 
   private setOwner(ctx: SystemContext, rec: PropertyRecord, actorId: number, profileId: number): void {
+    if (rec.owner !== 0 && (rec.owner !== profileId || (actorId && (rec.ownerChar || 0) !== (actorId >>> 0)))) this.changedHands(rec);
     rec.owner = profileId;
     if (actorId) rec.ownerChar = actorId >>> 0; else delete rec.ownerChar;
     rec.ownerName = this.nameOf(ctx, actorId);
   }
 
   private copyOwner(to: PropertyRecord, from: PropertyRecord): void {
+    if (to.owner !== 0 && (to.owner !== from.owner || (to.ownerChar || 0) !== (from.ownerChar || 0))) this.changedHands(to);
     to.owner = from.owner;
     if (from.ownerChar) to.ownerChar = from.ownerChar; else delete to.ownerChar;
     to.ownerName = from.ownerName;
@@ -3037,6 +3090,7 @@ export class HousingSystem implements System {
   private lastRequestMs = new Map<number, number>();
   private lastDenyMs = new Map<number, number>();
   private keyRing = false;
+  private staleItemKeys = true;
   private keyOffers = new Map<number, { from: number; key: string; until: number }>();
   private roleCfg: AdminRoleConfig = readAdminRoleConfig(null);
   private zones!: Zones;
