@@ -8857,6 +8857,12 @@ try {
   delete require.cache[MAPPROGRESS_JS];
   require(MAPPROGRESS_JS)({ mp, log, sendPacket, cfg });
 } catch (e) { log('mapprogress.js failed to load:', e.stack || e.message); globalThis.__dboMapSync = null; globalThis.__dboMapMarkersOf = null; }
+// ---- who is really invisible, mirrored for watchers (server\spellinvis.js, config "spellInvis"; Nate, 23 Oct) ----------
+try {
+  const SPELLINVIS_JS = path.resolve('spellinvis.js');
+  delete require.cache[SPELLINVIS_JS];
+  require(SPELLINVIS_JS)({ mp, log, onUi, cfg });
+} catch (e) { log('spellinvis.js failed to load:', e.stack || e.message); }
 // ---- execution at the chopping block, a GM-approved PK (server\execution.js, config "execution"; Nate, 12 Oct) ----
 try {
   const EXECUTION_JS = path.resolve('execution.js');
