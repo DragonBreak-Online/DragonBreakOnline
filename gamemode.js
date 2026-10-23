@@ -4615,6 +4615,9 @@ const raceEdidOf = (actor) => {
 // "DarkElfRaceVampire" -> "a Dark Elf"
 const raceLabel = (edid) => { const n = String(edid).replace(/Race(Vampire)?$/, '').replace(/([a-z])([A-Z])/g, '$1 $2'); return n ? `${/^[AEIOU]/.test(n) ? 'an' : 'a'} ${n}` : 'of no known race'; };
 // The rules of /appoint, shared with the Court tab (court.js): { error } or { cap, overridden }. tg is officialTarget's.
+// A court office that is a leadership seat (leadership.js: the rulers and, with leadership.officers, the court's officers)
+const leadershipOffice = (rank) => (typeof globalThis.__dboLeadershipOffice === 'function' ? !!globalThis.__dboLeadershipOffice(rank)
+  : ((((cfg.leadership || {}).rulerRanks) || ['jarl', 'count', 'chieftain']).map(String).includes(String(rank))));
 const STAFF_MAY_HOLD = new Set(['guard', 'strongholdguard', 'courtmage', 'shaman', 'wisewoman']);
 const appointCheck = (a, z, rank, tg, override) => {
   if (!(z.officials || []).includes(rank)) return { error: `${z.name} has the ranks: ${(z.officials || []).map((r) => rankTitle(r, z.id)).join(', ')}.` };
@@ -4632,12 +4635,11 @@ const appointCheck = (a, z, rank, tg, override) => {
       overridden = raceLabel(race);
     }
   }
-  // One leadership seat per character (leadership.js; Nate, 21 Oct): a ruler seat is refused to whoever already leads a
-  // faction or another hold. The seat being replaced in THIS zone is skipped, so a re-seat or a move inside a court is
+  // One leadership seat per character (leadership.js; Nate, 21 and 23 Oct): a ruler or court officer seat is refused to
+  // whoever already leads, or is an officer of, a faction or another court. The seat being replaced in THIS zone is skipped, so a re-seat or a move inside a court is
   // untouched. It binds staff appointments too unless leadership.staffOverride is on.
   if (typeof globalThis.__dboLeadershipRefusal === 'function') {
-    const rulers = ((cfg.leadership || {}).rulerRanks) || ['jarl', 'count', 'chieftain'];
-    if (rulers.map(String).includes(String(rank))) {
+    if (leadershipOffice(rank)) {
       const no = globalThis.__dboLeadershipRefusal(tg.actor, { kind: 'hold', id: z.id }, a);
       if (no) return { error: no };
     }
@@ -4662,8 +4664,7 @@ const seatOfficial = (z, rank, tg, by) => {
   // The backstop for every caller that does not come through appointCheck: court.js's accepted offer and its move inside
   // a court, and citizenship.js's election. The same rule, skipping this zone's own seat (leadership.js)
   if (typeof globalThis.__dboLeadershipRefusal === 'function') {
-    const rulers = ((cfg.leadership || {}).rulerRanks) || ['jarl', 'count', 'chieftain'];
-    if (rulers.map(String).includes(String(rank))) {
+    if (leadershipOffice(rank)) {
       const no = globalThis.__dboLeadershipRefusal(tg.actor, { kind: 'hold', id: z.id });
       if (no) return { error: no };
     }
@@ -9203,8 +9204,8 @@ try {
     return out;
   };
   require(LEADERSHIP_JS)({ mp, log, personal, audit, who, display, nameOf, profileOf, onlineActors, accountActors,
-    registerChatCommand, isAdmin, isLeadStaff, ranksOf, rankTitle, rulerSeats, cfg });
-} catch (e) { log('leadership.js failed to load:', e.stack || e.message); globalThis.__dboLeadershipRefusal = null; }
+    registerChatCommand, isAdmin, isLeadStaff, ranksOf, rankTitle, rulerSeats, staffNote, cfg });
+} catch (e) { log('leadership.js failed to load:', e.stack || e.message); globalThis.__dboLeadershipRefusal = null; globalThis.__dboLeadershipRole = null; globalThis.__dboLeadershipOffice = null; }
 
 // ---- thievery and burglary: thief factions, break-ins, the Fence Chest, guard raids (server\thievery.js, config "thievery") ----
 try {

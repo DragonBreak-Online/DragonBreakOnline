@@ -356,6 +356,11 @@ module.exports = (api) => {
     if (c.founders.length + 1 >= C.maxFounders) return `${c.name} already has its ${C.maxFounders} founders.`;
     const inv = c.invited[String(a >>> 0)];
     const role = COFOUNDER_ROLES.includes(inv && inv.role) ? inv.role : 'member';
+    // An officer co-founder holds a leadership seat once it is founded (leadership.js): refused here, not at approval
+    if (typeof globalThis.__dboLeadershipRole === 'function' && globalThis.__dboLeadershipRole(role) && typeof globalThis.__dboLeadershipRefusal === 'function') {
+      const busy = globalThis.__dboLeadershipRefusal(a >>> 0, null);
+      if (busy) return `${busy} Or ask the founder to invite you in another role.`;
+    }
     delete c.invited[String(a >>> 0)];
     c.founders.push({ actor: a >>> 0, profile: prof, name: ownNameOf(a), role, at: Date.now() });
     save();

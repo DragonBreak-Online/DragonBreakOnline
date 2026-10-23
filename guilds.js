@@ -288,7 +288,8 @@ module.exports = (api) => {
   // The factions this character holds that a guild cannot sit beside
   const bandBlockers = (a) => membershipsOf(a >>> 0).filter((m) => !isBand(m.fid) && !bandCompatible(m.fid))
     .map((m) => ({ fid: m.fid, name: FACTIONS.get(m.fid).name }));
-  const setMember = (fid, a, rank, by) => {
+  // opts.alpha: a pack challenge, which seats the Alpha as it always has (Nate, 23 Oct: "Keep pack alphas the same")
+  const setMember = (fid, a, rank, by, opts) => {
     const f = FACTIONS.get(fid);
     if (f && f.kind === BAND_KIND && !entryOf(fid, a)) {
       if (bandFull(fid)) return `${f.name} is full: a guild holds ${Math.max(1, Number(BAND.maxMembers) || 10)}, its Guildmaster included.`;
@@ -309,6 +310,10 @@ module.exports = (api) => {
     const cap = Number(CAPS[role]) || 0;
     const had = entryOf(fid, a);
     if (cap && (!had || (f.ranks[had.rank] || {}).role !== role) && roleCount(fid, role) >= cap) return `${f.name} already has ${cap} ${shownAt(f, rank)}${cap === 1 ? '' : 's'}.`;
+    // One leadership seat (leadership.js): a leader or officer rank newly held is refused to whoever holds one elsewhere
+    if (!(opts && opts.alpha) && f && leadRole(role) && !(had && leadRole((f.ranks[had.rank] || {}).role)) && f.kind !== 'hold' && f.kind !== 'stronghold' && f.kind !== BAND_KIND) {
+      const no = leadershipNo(a, fid, by); if (no) return no;
+    }
     const lim = limitProblem(a, fid, rank, by === undefined ? a : by);
     if (lim && !useOverride(a, fid, lim)) return lim.text;
     rosterOf(fid)[String(a >>> 0)] = { rank, name: ownNameOf(a), tag: tagOf(a), since: had ? had.since : Date.now() };
@@ -328,6 +333,8 @@ module.exports = (api) => {
     const skip = f && (f.kind === 'hold' || f.kind === 'stronghold') && f.zone ? { kind: 'hold', id: String(f.zone) } : { kind: 'faction', id: String(fid) };
     try { return globalThis.__dboLeadershipRefusal(t >>> 0, skip, by) || ''; } catch (e) { return ''; }
   };
+  // A rank role that is a leadership seat: the leader, and the officer roles while leadership.officers is on
+  const leadRole = (role) => { try { return typeof globalThis.__dboLeadershipRole === 'function' ? !!globalThis.__dboLeadershipRole(role) : role === 'leader'; } catch (e) { return role === 'leader'; } };
   const outranks = (fid, a, b) => { const ea = entryOf(fid, a), eb = entryOf(fid, b); return !!ea && (!eb || ea.rank < eb.rank); };
 
   // A clan or pack with requires takes only that kind (supernatural.js); admins are not bound by it
@@ -929,6 +936,14 @@ module.exports = (api) => {
     // The Founder becomes the Leader, so the same rule holds for an approved charter
     const no = leadershipNo(founder, fid, null);
     if (no) { FACTIONS.delete(fid); delete ST.members[fid]; save(); return no; }
+    // A co-founder taking an officer rank holds a leadership seat by it: the same rule, before anything is made
+    for (const c of cofounders || []) {
+      const at = typeof c === 'object' && c ? f.ranks.findIndex((r) => r.role === c.role) : -1;
+      const role = (f.ranks[at > lead ? at : Math.min(lead + 1, lowestRank(fid))] || {}).role;
+      if (!leadRole(role)) continue;
+      const busy = leadershipNo(typeof c === 'object' && c ? c.actor : c, fid, null);
+      if (busy) { FACTIONS.delete(fid); delete ST.members[fid]; save(); return busy; }
+    }
     const err = setMember(fid, founder, lead);
     if (err) { FACTIONS.delete(fid); delete ST.members[fid]; save(); return err; }
     for (const c of cofounders || []) {
@@ -1193,6 +1208,14 @@ module.exports = (api) => {
       const n = Object.values(roster).filter((e) => (next[newIndex(e.rank)] || {}).role === role).length;
       if (Number(cap) && n > Number(cap)) return { error: `${f.name} may have only ${cap} with the ${role} role, and ${n} would hold it.` };
     }
+    // A rank whose role becomes a leadership one makes its holders leaders or officers: the same rule as a promotion
+    if (!courtKind(fid) && !isBand(fid)) {
+      for (const [id, e] of Object.entries(roster)) {
+        if (!leadRole((next[newIndex(e.rank)] || {}).role) || leadRole((f.ranks[e.rank] || {}).role)) continue;
+        const no = leadershipNo(Number(id) >>> 0, fid, a);
+        if (no) return { error: `${no} The ranks were not changed.` };
+      }
+    }
     const prose = typeof globalThis.__dboProseProblem === 'function' ? globalThis.__dboProseProblem : null;
     const word = prose ? next.map((r) => prose(r.title)).find(Boolean) : null;
     if (word) return { error: `The word "${word}" will not do in a rank title.` };
@@ -1434,16 +1457,17 @@ module.exports = (api) => {
   const packs = () => [...FACTIONS.values()].filter((f) => f.kind === 'pack');
   const leaderRankOf = (f) => f.ranks.findIndex((r) => r.role === 'leader');
   // leadership.js's audit: every faction leader as a character, with their account
-  globalThis.__dboGuildLeaders = () => {
+  // opts.roles: every holder of a rank with one of those roles instead (its officers too), each with its role
+  globalThis.__dboGuildLeaders = (opts) => {
     const out = [];
+    const roles = opts && Array.isArray(opts.roles) ? new Set(opts.roles.map(String)) : new Set(['leader']);
     for (const f of FACTIONS.values()) {
       if (f.kind === BAND_KIND) continue;   // a Guildmaster is not a leadership seat (Nate, 21 Oct)
-      const lead = f.ranks.findIndex((r) => r.role === 'leader');
-      if (lead < 0) continue;
       for (const [id, m] of Object.entries(rosterOf(f.id))) {
-        if (m.rank !== lead) continue;
+        const r = f.ranks[m.rank];
+        if (!r || !roles.has(String(r.role))) continue;
         const actor = Number(id) >>> 0;
-        out.push({ id: f.id, name: f.name, kind: f.kind || '', title: shownAt(f, lead), actor, pid: Number(profileOf(actor)) });
+        out.push({ id: f.id, name: f.name, kind: f.kind || '', title: shownAt(f, m.rank), role: r.role, actor, pid: Number(profileOf(actor)), who: m.name || '' });
       }
     }
     return out;
@@ -1454,7 +1478,7 @@ module.exports = (api) => {
       const lead = leaderRankOf(f); const ev = entryOf(f.id, victim), ek = entryOf(f.id, killer);
       if (!ev || !ek || ev.rank !== lead) continue;
       ev.rank = Math.min(lead + 1, lowestRank(f.id));
-      const err = setMember(f.id, killer, lead); if (err) { log(`pack challenge: ${err}`); continue; }
+      const err = setMember(f.id, killer, lead, undefined, { alpha: true }); if (err) { log(`pack challenge: ${err}`); continue; }
       for (const m of Object.keys(rosterOf(f.id)).map(Number)) if (isOnline(m)) personal(m, `${ownNameOf(killer)} has brought down ${ownNameOf(victim)} and leads ${f.name} now.`);
       audit(`FACTION ${who(killer)} took ${f.name} from ${who(victim)} by challenge`);
     }
