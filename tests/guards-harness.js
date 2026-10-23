@@ -22,6 +22,7 @@ fs.writeFileSync('hold-jails.json', JSON.stringify({ holds: { bruma: [
   { kind: 'jail', cellEdid: 'CYRBrumaCastleDungeon', cell: JAIL, door: D2, spot: [4, 5, 6] },
   { kind: 'prison', cellEdid: 'WhiterunPrison', cell: PRISON, door: D3, spot: [7, 8, 9] }],
   markarth: [{ kind: 'jail', cellEdid: 'CidhnaMine01', cell: '16203:Skyrim.esm', door: 'bf4d4:Skyrim.esm', spot: [-960, -1480, 305], shared: true }] } }));
+fs.writeFileSync('guard-post-spots.json', JSON.stringify({ holds: { bruma: [{ world: '3c:Skyrim.esm', pos: [10, 20, 30], heading: 90, from: 'A' }, { world: '3c:Skyrim.esm', pos: [40, 50, 60], heading: 0, from: 'B' }] } }));
 fs.writeFileSync('jail-cells.json', JSON.stringify({ cells: [JAIL, PRISON] }));
 fs.writeFileSync('doors.json', JSON.stringify({ doors: {} }));
 fs.writeFileSync('NPC-Spawns.json', JSON.stringify({ zones: [{ Name: 'wild:wolf:0', ID: '3c:Skyrim.esm', POS: [0, 0, 0], NPC: [] }] }));
@@ -94,6 +95,14 @@ ok(audits.some((t) => /^JAIL .* jailed by the watch of bruma for 10 min/.test(t)
 // Cidhna Mine: one shared yard, any number of prisoners, its gate never locked
 for (const pid of [11, 12]) { const a = 0xff000100 + pid; put(a, 'profileId', pid); ok(globalThis.__dboJailByWatch(a, 'markarth', 10, 'the watch of Markarth') !== null, `Markarth: prisoner ${pid - 10} goes to Cidhna Mine`); }
 ok(mp.get(idOf('bf4d4:Skyrim.esm'), 'private.dboCell') === undefined && mp.get(idOf('bf4d4:Skyrim.esm'), 'isOpen') === undefined, '...whose gate is neither locked nor claimed');
+cmds.guardpost.f(STAFF, 'auto bruma');
+let posts = JSON.parse(fs.readFileSync('guard-posts.json', 'utf8'));
+ok(posts.posts.filter((p) => p.hold === 'bruma' && p.auto).length === 2 && posts.autoDone.includes('bruma') && JSON.parse(fs.readFileSync('NPC-Spawns.json', 'utf8')).zones.some((x) => x.Name === 'guard:bruma:3' && x.POS[0] === 40),
+  '/guardpost auto bruma places its two spots after the hand-placed #1, as #2 and #3, and marks the hold done', posts);
+cmds.guardpost.f(STAFF, 'remove bruma 3');
+posts = JSON.parse(fs.readFileSync('guard-posts.json', 'utf8'));
+ok(!posts.posts.some((p) => p.n === 3) && posts.autoDone.includes('bruma'), 'removing a pre-placed post keeps the hold marked done, so a reload never puts it back');
+cmds.guardpost.f(STAFF, 'remove bruma 2');
 cmds.guardpost.f(STAFF, 'remove bruma 1');
 ok(!JSON.parse(fs.readFileSync('NPC-Spawns.json', 'utf8')).zones.some((x) => x.Name.startsWith('guard:')), '/guardpost remove takes its zone out');
 console.log(fails ? `${fails} FAILED` : 'all passed');

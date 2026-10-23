@@ -1,0 +1,553 @@
+{
+ "_comment": "Guard post spots per hold, from where the base game's own guards stood outdoors in each city (23 Oct; guardspots.py over Skyrim.esm): the walled city's worldspace, or within 5000 units of a town's centre; gates and posts first, then spread out, at most 6. guards.js places them once per hold listed in guards.autoHolds, or on /guardpost auto <hold>. Bruma has none (its guards start inside the castle).",
+ "holds": {
+  "riften": [
+   {
+    "world": "16bb4:Skyrim.esm",
+    "pos": [
+     176152,
+     -99724,
+     11212
+    ],
+    "heading": 316,
+    "from": "GuardRiftenImperialNorthGatePostIntNight"
+   },
+   {
+    "world": "16bb4:Skyrim.esm",
+    "pos": [
+     177089,
+     -98980,
+     11202
+    ],
+    "heading": 330,
+    "from": "GuardRiftenSonsRovingANight"
+   },
+   {
+    "world": "16bb4:Skyrim.esm",
+    "pos": [
+     176419,
+     -99166,
+     11189
+    ],
+    "heading": 330,
+    "from": "GuardRiftenSonsDockGatePostExt"
+   },
+   {
+    "world": "16bb4:Skyrim.esm",
+    "pos": [
+     175682,
+     -99925,
+     11216
+    ],
+    "heading": 316,
+    "from": "GuardRiftenImperialDockGatePostExt"
+   },
+   {
+    "world": "16bb4:Skyrim.esm",
+    "pos": [
+     176722,
+     -99303,
+     11200
+    ],
+    "heading": 330,
+    "from": "GuardRiftenSonsRovingC"
+   },
+   {
+    "world": "16bb4:Skyrim.esm",
+    "pos": [
+     175999,
+     -99981,
+     11229
+    ],
+    "heading": 316,
+    "from": "GuardRiftenImperialRovingC"
+   }
+  ],
+  "whiterun": [
+   {
+    "world": "1a26f:Skyrim.esm",
+    "pos": [
+     28225,
+     106,
+     -1312
+    ],
+    "heading": 229,
+    "from": "GuardWhiterunSonsGate"
+   },
+   {
+    "world": "1a26f:Skyrim.esm",
+    "pos": [
+     26442,
+     2134,
+     -1372
+    ],
+    "heading": 226,
+    "from": "GuardWhiterunImperialPatrolNight1"
+   },
+   {
+    "world": "1a26f:Skyrim.esm",
+    "pos": [
+     27182,
+     1655,
+     -1325
+    ],
+    "heading": 226,
+    "from": "GuardWhiterunImperialTemplate"
+   },
+   {
+    "world": "1a26f:Skyrim.esm",
+    "pos": [
+     28599,
+     -600,
+     -1361
+    ],
+    "heading": 226,
+    "from": "GuardWhiterunSonsTemplate"
+   },
+   {
+    "world": "1a26f:Skyrim.esm",
+    "pos": [
+     26559,
+     1467,
+     -1437
+    ],
+    "heading": 226,
+    "from": "GuardWhiterunImperialGuardhouseSleep"
+   },
+   {
+    "world": "1a26f:Skyrim.esm",
+    "pos": [
+     28793,
+     -5,
+     -1381
+    ],
+    "heading": 225,
+    "from": "GuardWhiterunSonsPatrolDay2"
+   }
+  ],
+  "dawnstar": [
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     32389,
+     105507,
+     -13811
+    ],
+    "heading": 182,
+    "from": "GuardDawnstarSonsNight20x12"
+   },
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     32896,
+     105470,
+     -14000
+    ],
+    "heading": 182,
+    "from": "GuardDawnstarSonsNight20x12"
+   },
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     32068,
+     105921,
+     -13904
+    ],
+    "heading": 182,
+    "from": "GuardDawnstarImperialNoShift"
+   },
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     32026,
+     105525,
+     -13898
+    ],
+    "heading": 182,
+    "from": "GuardDawnstarSonsNoShift"
+   },
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     32422,
+     105902,
+     -13827
+    ],
+    "heading": 182,
+    "from": "GuardDawnstarImperialDay8x12"
+   },
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     32285,
+     105797,
+     -13856
+    ],
+    "heading": 182,
+    "from": "GuardDawnstarImperialNight18x12"
+   }
+  ],
+  "winterhold": [
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     110290,
+     100463,
+     -9032
+    ],
+    "heading": 153,
+    "from": "GuardWinterholdTownSonsPost"
+   },
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     110035,
+     100450,
+     -9032
+    ],
+    "heading": 156,
+    "from": "GuardWinterholdTownImperialPost"
+   },
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     110471,
+     100546,
+     -9032
+    ],
+    "heading": 154,
+    "from": "GuardWinterholdTownSonsPatrol2"
+   },
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     110170,
+     100384,
+     -9032
+    ],
+    "heading": 155,
+    "from": "GuardWinterholdTownImperialPatrol2"
+   },
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     110079,
+     100343,
+     -9032
+    ],
+    "heading": 152,
+    "from": "GuardWinterholdTownImperialPatrol"
+   },
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     110383,
+     100508,
+     -9032
+    ],
+    "heading": 155,
+    "from": "GuardWinterholdTownSonsPatrol"
+   }
+  ],
+  "solitude": [
+   {
+    "world": "37edf:Skyrim.esm",
+    "pos": [
+     -61202,
+     109353,
+     -7936
+    ],
+    "heading": 137,
+    "from": "GuardSolitudeImperialTrainingBow"
+   },
+   {
+    "world": "37edf:Skyrim.esm",
+    "pos": [
+     -60258,
+     109708,
+     -7936
+    ],
+    "heading": 136,
+    "from": "GuardSolitudeSonsDay"
+   },
+   {
+    "world": "37edf:Skyrim.esm",
+    "pos": [
+     -60429,
+     109100,
+     -7912
+    ],
+    "heading": 136,
+    "from": "GuardSolitudeSonsDayOpening"
+   },
+   {
+    "world": "37edf:Skyrim.esm",
+    "pos": [
+     -61550,
+     109028,
+     -7936
+    ],
+    "heading": 137,
+    "from": "GuardSolitudeImperialNight"
+   },
+   {
+    "world": "37edf:Skyrim.esm",
+    "pos": [
+     -60691,
+     109464,
+     -7936
+    ],
+    "heading": 136,
+    "from": "GuardSolitudeSonsDayExterior"
+   },
+   {
+    "world": "37edf:Skyrim.esm",
+    "pos": [
+     -60749,
+     109117,
+     -7936
+    ],
+    "heading": 136,
+    "from": "GuardSolitudeSonsNight"
+   }
+  ],
+  "morthal": [
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     -37726,
+     62598,
+     -13867
+    ],
+    "heading": 208,
+    "from": "GuardMorthalSonsPostDay"
+   },
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     -38149,
+     63113,
+     -13921
+    ],
+    "heading": 197,
+    "from": "GuardMorthalImperialPostNight"
+   },
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     -38032,
+     62783,
+     -13893
+    ],
+    "heading": 200,
+    "from": "GuardMorthalImperialPostDay"
+   },
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     -37695,
+     62877,
+     -13884
+    ],
+    "heading": 207,
+    "from": "GuardMorthalSonsPostNight"
+   },
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     -37930,
+     63025,
+     -13902
+    ],
+    "heading": 200,
+    "from": "GuardMorthalImperialPatrolNight"
+   },
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     -37856,
+     62782,
+     -13885
+    ],
+    "heading": 207,
+    "from": "GuardMorthalSonsPatrolDay"
+   }
+  ],
+  "falkreath": [
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     -33936,
+     -89301,
+     -3055
+    ],
+    "heading": 239,
+    "from": "GuardFalkreathImperial"
+   },
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     -33635,
+     -89360,
+     -3063
+    ],
+    "heading": 239,
+    "from": "GuardFalkreathImperial"
+   },
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     -33780,
+     -89321,
+     -3057
+    ],
+    "heading": 239,
+    "from": "GuardFalkreathImperial"
+   },
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     -33839,
+     -89215,
+     -3059
+    ],
+    "heading": 239,
+    "from": "GuardFalkreathImperial"
+   },
+   {
+    "world": "3c:Skyrim.esm",
+    "pos": [
+     -33730,
+     -89403,
+     -3056
+    ],
+    "heading": 239,
+    "from": "GuardFalkreathImperial"
+   }
+  ],
+  "windhelm": [
+   {
+    "world": "1691d:Skyrim.esm",
+    "pos": [
+     135246,
+     42262,
+     -11875
+    ],
+    "heading": 0,
+    "from": "GuardWindhelmSonsGatePatrol"
+   },
+   {
+    "world": "1691d:Skyrim.esm",
+    "pos": [
+     134834,
+     38895,
+     -11938
+    ],
+    "heading": 0,
+    "from": "GuardWindhelmImperialNightShift2"
+   },
+   {
+    "world": "1691d:Skyrim.esm",
+    "pos": [
+     134743,
+     41731,
+     -11875
+    ],
+    "heading": 0,
+    "from": "GuardWindhelmSonsNightShift2"
+   },
+   {
+    "world": "1691d:Skyrim.esm",
+    "pos": [
+     135342,
+     39192,
+     -11930
+    ],
+    "heading": 0,
+    "from": "GuardWindhelmImperial"
+   },
+   {
+    "world": "1691d:Skyrim.esm",
+    "pos": [
+     134728,
+     42263,
+     -11867
+    ],
+    "heading": 0,
+    "from": "GuardWindhelmSons"
+   },
+   {
+    "world": "1691d:Skyrim.esm",
+    "pos": [
+     134832,
+     39403,
+     -11930
+    ],
+    "heading": 0,
+    "from": "GuardWindhelmImperial"
+   }
+  ],
+  "markarth": [
+   {
+    "world": "16d71:Skyrim.esm",
+    "pos": [
+     -178583,
+     5299,
+     -2170
+    ],
+    "heading": 130,
+    "from": "GuardMarkarthSonsExterior"
+   },
+   {
+    "world": "16d71:Skyrim.esm",
+    "pos": [
+     -177553,
+     3730,
+     -2571
+    ],
+    "heading": 73,
+    "from": "GuardMarkarthImperialDayShift03"
+   },
+   {
+    "world": "16d71:Skyrim.esm",
+    "pos": [
+     -179031,
+     4514,
+     -2175
+    ],
+    "heading": 130,
+    "from": "GuardMarkarthSonsDayShift01"
+   },
+   {
+    "world": "16d71:Skyrim.esm",
+    "pos": [
+     -178254,
+     3729,
+     -2183
+    ],
+    "heading": 73,
+    "from": "GuardMarkarthImperialNightShift02"
+   },
+   {
+    "world": "16d71:Skyrim.esm",
+    "pos": [
+     -177913,
+     3745,
+     -2399
+    ],
+    "heading": 73,
+    "from": "GuardMarkarthImperialExterior"
+   },
+   {
+    "world": "16d71:Skyrim.esm",
+    "pos": [
+     -178534,
+     4911,
+     -2173
+    ],
+    "heading": 136,
+    "from": "GuardMarkarthSonsNightShift03"
+   }
+  ]
+ }
+}

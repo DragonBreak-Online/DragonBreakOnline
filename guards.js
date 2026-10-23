@@ -50,7 +50,7 @@ module.exports = (api) => {
   };
 
   const readPosts = () => { try { const v = JSON.parse(fs.readFileSync(POSTS_FILE, 'utf8')); return Array.isArray(v.posts) ? v.posts : []; } catch (e) { return []; } };
-  const savePosts = (posts) => { try { fs.writeFileSync(POSTS_FILE + '.tmp', JSON.stringify({ posts }, null, 1)); fs.renameSync(POSTS_FILE + '.tmp', POSTS_FILE); return true; } catch (e) { log('guards: guard-posts.json write failed', e.message); return false; } };
+  const savePosts = (posts) => { try { let autoDone = []; try { const v = JSON.parse(fs.readFileSync(POSTS_FILE, 'utf8')); autoDone = Array.isArray(v.autoDone) ? v.autoDone : []; } catch (e) { /* none yet */ } fs.writeFileSync(POSTS_FILE + '.tmp', JSON.stringify({ posts, autoDone }, null, 1)); fs.renameSync(POSTS_FILE + '.tmp', POSTS_FILE); return true; } catch (e) { log('guards: guard-posts.json write failed', e.message); return false; } };
 
   // The watch's zones in NPC-Spawns.json, rewritten like wildlife.js's wild:* (other writers' zones are kept)
   const writeZones = () => {
@@ -158,6 +158,15 @@ module.exports = (api) => {
       audit(`GUARDS ${who(a)} removed guard post ${m[1].toLowerCase()} #${m[2]}`);
       return personal(a, `Guard post ${m[1].toLowerCase()} #${m[2]} removed.`);
     }
+    if (what === 'auto') {
+      const hold = String(rest[0] || '').toLowerCase();
+      if (!SPOTS[hold]) return personal(a, `Usage: /guardpost auto <hold> (${Object.keys(SPOTS).join(', ')})`);
+      const k = globalThis.__dboGuardsPlaceSpots(hold, who(a));
+      if (!k) return personal(a, `No guard is set for ${hold} (guards.npcByHold).`);
+      writeZones();
+      audit(`GUARDS ${who(a)} pre-placed ${k} guard posts in ${hold}`);
+      return personal(a, `${k} guard posts placed in ${hold}, where its guards stood in the old days. /guardpost list shows them; remove any you don't want.`);
+    }
     if (what === 'jailtest') {
       // Staff: be sent to this hold's jail by the watch for one minute, to check where its cells put a prisoner
       const hold = holdHere(a);
@@ -168,9 +177,32 @@ module.exports = (api) => {
       audit(`GUARDS ${who(a)} ran a jail test in ${r.name}`);
       return personal(a, `Sent to ${r.name} (${r.kind}) for one minute.`);
     }
-    return personal(a, 'Usage: /guardpost add [npc desc] | list | remove <hold> <n> | jailtest');
-  }, { admin: true, help: 'add [npc] | list | remove <hold> <n> | jailtest: the hold watch\'s NPC guard posts' });
+    return personal(a, 'Usage: /guardpost add [npc desc] | auto <hold> | list | remove <hold> <n> | jailtest');
+  }, { admin: true, help: 'add [npc] | auto <hold> | list | remove <hold> <n> | jailtest: the hold watch\'s NPC guard posts' });
 
+  // Pre-placed posts (Nate, 23 Oct: "can you pre place guards? by hand is annoying"): guard-post-spots.json, where the base
+  // game's guards stood in each city. Each hold in autoHolds is placed once (autoDone in guard-posts.json), so a post staff
+  // remove afterwards stays removed; /guardpost auto <hold> places a hold's spots on demand
+  const SPOTS = (() => { try { return JSON.parse(fs.readFileSync(path.resolve('guard-post-spots.json'), 'utf8')).holds || {}; } catch (e) { return {}; } })();
+  const readDone = () => { try { const v = JSON.parse(fs.readFileSync(POSTS_FILE, 'utf8')); return Array.isArray(v.autoDone) ? v.autoDone : []; } catch (e) { return []; } };
+  const placeSpots = (hold, by) => {
+    const npc = C.npcByHold[hold]; const spots = SPOTS[hold] || [];
+    if (!npc || !spots.length) return 0;
+    const posts = readPosts(); let n = posts.reduce((m, p) => (p.hold === hold ? Math.max(m, Number(p.n) || 0) : m), 0);
+    for (const sp of spots) posts.push({ hold, n: ++n, world: sp.world, pos: sp.pos, heading: sp.heading, npc, by, at: Date.now(), auto: true });
+    const done = [...new Set(readDone().concat(hold))];
+    try { fs.writeFileSync(POSTS_FILE + '.tmp', JSON.stringify({ posts, autoDone: done }, null, 1)); fs.renameSync(POSTS_FILE + '.tmp', POSTS_FILE); } catch (e) { log('guards: guard-posts.json write failed', e.message); return 0; }
+    return spots.length;
+  };
+  globalThis.__dboGuardsPlaceSpots = placeSpots;
+  if (C.enabled) {
+    const done = new Set(readDone());
+    for (const hold of C.autoHolds || []) {
+      if (done.has(hold)) continue;
+      const k = placeSpots(hold, 'auto');
+      if (k) { log(`guards: ${k} post(s) pre-placed in ${hold}`); audit(`GUARDS server pre-placed ${k} guard posts in ${hold}`); }
+    }
+  }
   const n = writeZones();
   log(`guards ${C.enabled ? 'on' : 'off'}: ${n} guard post(s), jail ${C.jailMinutes} min`);
 };
