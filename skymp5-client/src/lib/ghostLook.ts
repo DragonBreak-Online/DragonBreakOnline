@@ -11,3 +11,5 @@ export const INVIS_ABILITY_IDS = [0x000d61e3, 0x000f23c6];
 // DA02ArmorShadow, Boethiah's smoke): stopped wherever the abilities are on, so an Invisible admin has no shimmer
 // (Nate, 11 Oct: "more of a potion effect, so there's a shimmer"); the abilities themselves stay for NPC detection
 export const INVIS_ABILITY_SHADER_IDS = [0x0002df92, 0x00081180];
+// InvisFXShader alone: the Invisibility potion's and spell's own shimmer
+export const INVIS_SHIMMER_SHADER_ID = INVIS_ABILITY_SHADER_IDS[0];
