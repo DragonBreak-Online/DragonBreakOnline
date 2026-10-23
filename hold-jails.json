@@ -1,5 +1,5 @@
 {
- "_comment": "Each hold's jail cells for the watch's NPC guards (guards.js, jail.js __dboJailByWatch), city jail first, then its prison as overflow (Nate, 23 Oct). Generated 23 Oct from the load order: every non-load door in the hold's jail and prison cells with a bed within 450 units, spot = 60% of the way from the door to that bed. Windhelm, Markarth and Winterhold's town jail have none yet.",
+ "_comment": "Each hold's jail cells for the watch's NPC guards (guards.js, jail.js __dboJailByWatch), city jail first, then its prison as overflow (Nate, 23 Oct). Generated 23 Oct from the load order: every non-load door in the hold's jail and prison cells with a bed within 450 units, spot = 60% of the way from the door to that bed. Windhelm's prison is WindhelmPrison01 (the abandoned-prison layout, Nate 23 Oct). Markarth is Cidhna Mine, one shared yard by the prisoners' beds (shared: no cell door is locked or counted). Winterhold's town jail has none (its prison takes them).",
  "holds": {
   "whiterun": [
    {
@@ -1060,8 +1060,121 @@
     ]
    }
   ],
-  "windhelm": [],
-  "markarth": [],
+  "windhelm": [
+   {
+    "kind": "prison",
+    "cellEdid": "WindhelmPrison01",
+    "cell": "21594:Skyrim.esm",
+    "door": "e9477:Skyrim.esm",
+    "spot": [
+     4791,
+     923,
+     401
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WindhelmPrison01",
+    "cell": "21594:Skyrim.esm",
+    "door": "e9476:Skyrim.esm",
+    "spot": [
+     4286,
+     892,
+     394
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WindhelmPrison01",
+    "cell": "21594:Skyrim.esm",
+    "door": "e9475:Skyrim.esm",
+    "spot": [
+     3796,
+     894,
+     400
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WindhelmPrison01",
+    "cell": "21594:Skyrim.esm",
+    "door": "e9498:Skyrim.esm",
+    "spot": [
+     3704,
+     1915,
+     396
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WindhelmPrison01",
+    "cell": "21594:Skyrim.esm",
+    "door": "e9488:Skyrim.esm",
+    "spot": [
+     4354,
+     1896,
+     397
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WindhelmPrison01",
+    "cell": "21594:Skyrim.esm",
+    "door": "e9489:Skyrim.esm",
+    "spot": [
+     3983,
+     1870,
+     397
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WindhelmPrison01",
+    "cell": "21594:Skyrim.esm",
+    "door": "e9499:Skyrim.esm",
+    "spot": [
+     4469,
+     2705,
+     403
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WindhelmPrison01",
+    "cell": "21594:Skyrim.esm",
+    "door": "e9478:Skyrim.esm",
+    "spot": [
+     4316,
+     2705,
+     403
+    ]
+   },
+   {
+    "kind": "prison",
+    "cellEdid": "WindhelmPrison01",
+    "cell": "21594:Skyrim.esm",
+    "door": "e9479:Skyrim.esm",
+    "spot": [
+     3824,
+     2706,
+     400
+    ]
+   }
+  ],
+  "markarth": [
+   {
+    "kind": "jail",
+    "cellEdid": "CidhnaMine01",
+    "cell": "16203:Skyrim.esm",
+    "door": "bf4d4:Skyrim.esm",
+    "spot": [
+     -960,
+     -1480,
+     305
+    ],
+    "shared": true
+   }
+  ],
   "bruma": [
    {
     "kind": "jail",

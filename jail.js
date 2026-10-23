@@ -252,11 +252,11 @@ module.exports = (api) => {
     prisoner = prisoner >>> 0;
     if (sentenceOf(prisoner)) return null;
     for (const c of HOLD_JAILS[String(hold)] || []) {
-      const door = idOf(c.door); if (!door || occupantOf(door)) continue;
+      // shared: one yard for every prisoner (Cidhna Mine), its gate neither locked nor counted
+      const door = idOf(c.door); if (!door || (!c.shared && occupantOf(door))) continue;
       const cell = norm(c.cell);
       set(prisoner, 'private.dboSentence', { door, cell, totalMs: mins * MIN, servedMs: 0, by: String(byLabel || 'the watch'), at: Date.now(), arrester: 0, watch: String(hold) });
-      set(door, 'private.dboCell', { prisoner, name: display(prisoner), picked: false });
-      set(door, 'isOpen', false);
+      if (!c.shared) { set(door, 'private.dboCell', { prisoner, name: display(prisoner), picked: false }); set(door, 'isOpen', false); }
       lastSeen.delete(prisoner);
       audit(`JAIL ${who(prisoner)} jailed by the watch of ${hold} for ${mins} min in ${jailName(cell)} (${c.kind})`);
       return { cellDesc: String(c.cell), pos: c.spot, kind: c.kind, name: jailName(cell) };
