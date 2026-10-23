@@ -9,12 +9,13 @@
 //            hurtMultiplier (2) when the beast hurt someone in that shape; paid or served in the jail like any other.
 //   guards   while a bounty from it stands, ff_huntedIn names the hold to every client as the character walks in it: the client
 //            that hosts the hold's guard NPCs sets them on the character (client part). Player guards and every official of
-//            the hold get a notice naming the character as theirs knows them (__dboNameFor), and the F3 Court tab lists it.
+//            the hold get a notice of what was seen and where, naming nobody (Nate, 23 Oct), and the F3 Court tab lists it;
+//            only when the beast holds a seat of that court are its fellow office holders told who (the court-powers rule).
 //   court    an exposed character holding office in that hold loses its powers there until cleared (__dboExposureBarred:
 //            bounties, appointments, property sales, tax and wages).
 //   hunters  the orders that hunt each kind (config hunters: werewolf the Vigil of Stendarr and the Silver Hand, vampireLord the
-//            Dawnguard and the Vigil) are told, each member when next online; a witness of such an order is recorded on the
-//            case. No contract is posted: contracts.js posts only kill contracts on spawned NPCs, and commissions.js needs a
+//            Dawnguard and the Vigil) are told what and where, never who, each member when next online; a witness of such an
+//            order is recorded on the case for staff (/exposure, the Court tab, the audit). No contract is posted: contracts.js posts only kill contracts on spawned NPCs, and commissions.js needs a
 //            poster's gold held, so neither can carry a hunt for a player.
 //   exempt   the Companions' Circle (Harbinger, Elders of Jorrvaskr) in Whiterun Hold, by config.
 // Cleared by a cure of the curse (the character is no longer of that kind, checked on the tick), by time, or by a Lead GM with
@@ -201,29 +202,43 @@ module.exports = (api) => {
 
   // ---- notices ------------------------------------------------------------------------------------------------------------
   // The hold's own: anyone seated in one of its offices (the character, leadership.js), and its faction's guards by title
-  const servesHold = (x, zid) => {
+  const seatedIn = (x, zid) => {
     const pid = Number(profileOf(x)); if (!(pid >= 0)) return false;
     const seats = (readOfficials() || {})[zid] || {};
     const sh = g('__dboSeatHolder');
-    if (Object.entries(seats).some(([r, l]) => Array.isArray(l) && l.map(Number).includes(pid) && (() => { const held = sh ? Number(safe(() => sh(zid, r, pid), 0)) >>> 0 : 0; return !held || held === id(x); })())) return true;
+    return Object.entries(seats).some(([r, l]) => Array.isArray(l) && l.map(Number).includes(pid) && (() => { const held = sh ? Number(safe(() => sh(zid, r, pid), 0)) >>> 0 : 0; return !held || held === id(x); })());
+  };
+  const servesHold = (x, zid) => {
+    if (seatedIn(x, zid)) return true;
     const fid = safe(() => (g('__dboHoldFactionOf') ? g('__dboHoldFactionOf')(zid) : null), null);
     return !!fid && guildsOf(x).some((gm) => gm.id === fid && (C.guardTitles || []).includes(gm.title));
   };
+  // Nobody is named (Nate, 23 Oct): a notice says what was seen and where. The one exception is the court-powers rule: when
+  // the beast holds office in the hold, its court is told which of its own lost them, named as each reader knows them.
+  const timeOfDay = (at) => { const hr = new Date(at).getUTCHours(); return hr < 5 ? 'in the night' : hr < 12 ? 'in the morning' : hr < 18 ? 'in the afternoon' : 'in the evening'; };
   const notify = (c, zid, h, online) => {
     const a = c.actor;
+    const ofCourt = seatedIn(a, zid);
     // Named as the reader's own character knows them, never by a beast's name: wait for the mortal shape
-    if (online.includes(a) && beastForm(a)) return false;
+    if (ofCourt && online.includes(a) && beastForm(a)) return false;
+    const f = formOf(h);
+    const what = `${f.noun.charAt(0).toUpperCase()}${f.noun.slice(1)} was seen near ${h.place}, in ${holdName(zid)}, ${timeOfDay(h.at)}`;
     let changed = false;
     for (const x of online) {
       if (x === a || h.told.includes(x)) continue;
       const official = servesHold(x, zid); const order = orderOf(x, h.form || 'werewolf');
       if (!official && !order) continue;
       h.told.push(x); changed = true;
-      const n = nameTo(x, a);
-      const named = /^(stranger|someone|masked person)$/i.test(n) ? 'someone whose name you do not know' : n;
-      const f = formOf(h);
-      if (official) system(x, `A notice from the court of ${holdName(zid)}: ${named} was ${f.crime} near ${h.place}.${h.bounty ? ` The hold has put a bounty of ${h.bounty} gold on them.` : ''} See the Court tab of your journal (F3).`);
-      if (order) system(x, `Word reaches ${orderName(order)}: ${named} was ${f.crime} near ${h.place}, in ${holdName(zid)}. There is a beast to hunt.`);
+      if (official) {
+        let line = `A notice from the court of ${holdName(zid)}: ${what.charAt(0).toLowerCase()}${what.slice(1)}.${h.bounty ? ' The hold has put a bounty on the beast.' : ''}`;
+        if (ofCourt && seatedIn(x, zid)) {
+          const n = nameTo(x, a);
+          const named = /^(stranger|someone|masked person)$/i.test(n) ? 'one of this court' : `${n}, of this court,`;
+          line += ` It was ${named} and they hold no court powers in ${holdName(zid)} until cleared.`;
+        }
+        system(x, `${line} See the Court tab of your journal (F3).`);
+      }
+      if (order) system(x, `Word reaches ${orderName(order)}: ${what.charAt(0).toLowerCase()}${what.slice(1)}.`);
     }
     return changed;
   };
@@ -272,7 +287,9 @@ module.exports = (api) => {
     for (const c of Object.values(data().cases)) {
       const h = c.holds[zid]; if (!live(h)) continue;
       const staff = safe(() => isAdmin(viewer), false);
-      out.push(Object.assign({ name: nameTo(viewer, c.actor), what: formOf(h).noun, place: h.place, at: h.at, until: h.until, bounty: Number(h.bounty) || 0, hurt: !!h.hurt,
+      // Staff see who; the court sees who only when it is one of its own seats (court-powers rule); otherwise unnamed
+      const name = staff ? c.name : seatedIn(c.actor, zid) && seatedIn(id(viewer), zid) ? nameTo(viewer, c.actor) : 'Unknown';
+      out.push(Object.assign({ name, what: formOf(h).noun, place: h.place, at: h.at, until: h.until, bounty: Number(h.bounty) || 0, hurt: !!h.hurt,
         wanted: bountyIn(zid, c.pid) }, staff ? { seen: Number(h.seen) || 0, hunters: (h.hunters || []).map((x) => `${x.who} (${orderName(x.order)})`) } : {}));
     }
     return out.sort((x, y) => y.at - x.at);

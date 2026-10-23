@@ -11,9 +11,11 @@ process.chdir(dir);
 let fails = 0; const ok = (l, c, g) => { console.log(`${c ? 'ok  ' : 'FAIL'} ${l}${!c && g !== undefined ? `: got ${JSON.stringify(g)}` : ''}`); if (!c) fails++; };
 
 // Characters: [profile id, name]
-const WOLF = 0x20, JARL = 0x21, W1 = 0x22, W2 = 0x23, W3 = 0x24, GM = 0x25, PGUARD = 0x26, VIGIL = 0x27, HAND = 0x28, DAWN = 0x29, HARB = 0x2a, VAMP = 0x2b, LEAD = 0x2c, NPC = 0x30;
+const STEW = 0x2d, WOLF = 0x20, JARL = 0x21, W1 = 0x22, W2 = 0x23, W3 = 0x24, GM = 0x25, PGUARD = 0x26, VIGIL = 0x27, HAND = 0x28, DAWN = 0x29, HARB = 0x2a, VAMP = 0x2b, LEAD = 0x2c, NPC = 0x30;
 const chars = { [WOLF]: [10, 'Ulf'], [JARL]: [11, 'Frigga'], [W1]: [12, 'Ann'], [W2]: [13, 'Bo'], [W3]: [14, 'Cy'], [GM]: [15, 'Gemma'], [PGUARD]: [16, 'Gard'],
-  [VIGIL]: [17, 'Vera'], [HAND]: [18, 'Hilde'], [DAWN]: [19, 'Dane'], [HARB]: [20, 'Kodlak'], [VAMP]: [21, 'Serana'], [LEAD]: [2, 'Nate'] };
+  [VIGIL]: [17, 'Vera'], [HAND]: [18, 'Hilde'], [DAWN]: [19, 'Dane'], [HARB]: [20, 'Kodlak'], [VAMP]: [21, 'Serana'], [LEAD]: [2, 'Nate'], [STEW]: [22, 'Stewart'] };
+// Every player-facing notice must name nobody (Nate, 23 Oct), but for the court-powers rule (checked apart below)
+const NAMES = /Ulf|Frigga|Kodlak|Serana/;
 const props = new Map(); const sys = []; const said = []; const audits = []; const cmds = {};
 const mp = {
   get: (a, k) => props.get(`${a}|${k}`), set: (a, k, v) => props.set(`${a}|${k}`, v), makeProperty: () => {},
@@ -31,7 +33,7 @@ globalThis.__dboGuildsOf = (a) => guilds[a] || [];
 globalThis.__dboGuildInfo = (fid) => ({ 'vigil-of-stendarr': { name: 'the Vigil of Stendarr' }, 'silver-hand': { name: 'the Silver Hand' }, dawnguard: { name: 'the Dawnguard' } })[fid] || null;
 globalThis.__dboHoldFactionOf = (z) => (z === 'bruma' ? 'county-bruma' : 'hold-' + z);
 globalThis.__dboIsStaff = (a) => staff.has(a >>> 0);
-globalThis.__dboNameFor = (viewer, a) => (viewer === JARL ? chars[a][1] : 'Stranger');
+globalThis.__dboNameFor = (viewer, a) => (viewer === JARL || viewer === STEW ? chars[a][1] : 'Stranger');
 globalThis.__dboRealmTerritoryAt = () => territory;
 globalThis.__dboSeatHolder = () => 0;
 for (const a of Object.keys(chars).map(Number)) { props.set(`${a}|worldOrCellDesc`, 'w'); props.set(`${a}|pos`, [0, 0, 0]); }
@@ -44,7 +46,7 @@ const api = (cfg) => ({
   mp, log: () => {}, personal: (a, t) => said.push([a, t]), system: (a, t) => sys.push([a, t]), audit: (t) => audits.push(t),
   who: (a) => (chars[a] ? `${chars[a][1]} #${a.toString(16)}` : String(a)), display: (a) => (chars[a] ? chars[a][1] : String(a)), cfg,
   registerChatCommand: (n, f) => { cmds[n] = f; }, zoneOfActor: () => territory.zone, zoneById: (id) => ZONES[String(id).toLowerCase()] || null,
-  readOfficials: () => ({ bruma: { count: [11], guard: [] }, whiterun: { jarl: [] } }), profileOf: (a) => (chars[a] ? chars[a][0] : -1),
+  readOfficials: () => ({ bruma: { count: [11], steward: [22], guard: [] }, whiterun: { jarl: [] } }), profileOf: (a) => (chars[a] ? chars[a][0] : -1),
   officialTarget: (q) => { const e = Object.entries(chars).find(([, c]) => c[1].toLowerCase() === String(q).toLowerCase()); return e ? { pid: e[1][0], actor: Number(e[0]), online: Number(e[0]), label: e[1][1], who: e[1][1] } : { error: `No character called ${q}.` }; },
   onlineActors: () => online.slice(), isAdmin: (a) => a === GM || a === LEAD, isLeadStaff: (a) => a === LEAD, every: () => {}, giveItem: () => {}, onUi: () => {},
 });
@@ -71,11 +73,11 @@ ok('...and it is audited', audits.some((t) => /EXPOSURE Ulf .* seen changing int
 ok('...known for 7 days', (() => { const h = JSON.parse(fs.readFileSync('exposure.json', 'utf8')).cases[String(WOLF)].holds.bruma; return Math.round((h.until - h.at) / 86400000) === 7; })());
 
 // ---- notices, waiting for the mortal shape -------------------------------------------------------------------------------
-ok('no notice while still in beast form (they would be named "Werewolf")', !sys.some(([a]) => a === JARL));
-beast(WOLF, null); X.tick();
-ok('the Count (an official) is told, naming them as he knows them', sys.some(([a, t]) => a === JARL && /court of Bruma: Ulf was seen changing into a werewolf/.test(t)));
-ok('a player guard of the hold is told, a stranger unnamed', sys.some(([a, t]) => a === PGUARD && /someone whose name you do not know/.test(t)));
-ok('the Vigil and the Silver Hand hear of a werewolf', sys.some(([a, t]) => a === VIGIL && /the Vigil of Stendarr/.test(t)) && sys.some(([a, t]) => a === HAND && /the Silver Hand/.test(t)));
+X.tick();
+ok('the Count (an official) is told what and where, at once', sys.some(([a, t]) => a === JARL && /court of Bruma: a werewolf was seen near Bruma, in Bruma, in the \w+/.test(t)));
+ok('a player guard of the hold is told too', sys.some(([a, t]) => a === PGUARD && /court of Bruma: a werewolf was seen/.test(t)));
+ok('the Vigil and the Silver Hand hear of a werewolf', sys.some(([a, t]) => a === VIGIL && /^Word reaches the Vigil of Stendarr: a werewolf was seen near Bruma, in Bruma/.test(t)) && sys.some(([a, t]) => a === HAND && /the Silver Hand/.test(t)));
+ok('no notice to anyone but the werewolf names the werewolf', !sys.some(([a, t]) => a !== WOLF && NAMES.test(t)), sys.filter(([a, t]) => a !== WOLF && NAMES.test(t)));
 ok('the Dawnguard does not (a werewolf is not theirs)', !sys.some(([a]) => a === DAWN));
 ok('a plain townsperson is not told', !sys.some(([a]) => a === W1));
 const n = sys.length; X.tick();
@@ -90,7 +92,8 @@ territory = { id: 'bruma', name: 'Bruma', zone: 'bruma', kind: 'capital', marker
 
 // ---- court view -----------------------------------------------------------------------------------------------------------
 const cv = globalThis.__dboExposureCourtView(JARL, 'bruma');
-ok('Court tab: the Count sees the case', Array.isArray(cv) && cv.length === 1 && cv[0].name === 'Ulf' && cv[0].bounty === 500 && cv[0].wanted === true, cv);
+ok('Court tab: the Count sees the case, unnamed', Array.isArray(cv) && cv.length === 1 && cv[0].name === 'Unknown' && cv[0].bounty === 500 && cv[0].wanted === true && !cv[0].hunters, cv);
+ok('Court tab: staff see who', globalThis.__dboExposureCourtView(GM, 'bruma')[0].name === 'Ulf');
 ok('Court tab: a townsperson gets nothing', globalThis.__dboExposureCourtView(W1, 'bruma') === null);
 
 // ---- hurt doubles ---------------------------------------------------------------------------------------------------------
@@ -116,7 +119,12 @@ territory = { id: 'bruma', name: 'Bruma', zone: 'bruma', kind: 'capital', marker
 reset();
 let barred = globalThis.__dboExposureBarred(JARL, 'bruma');
 ok('before: the Count is not barred', barred === '');
-see(JARL, 'werewolf', [W1, W2, W3], 'in'); beast(JARL, null);
+see(JARL, 'werewolf', [W1, W2, W3], 'in'); X.tick();
+ok('the court waits for the Count\'s mortal shape to name him', !sys.some(([a]) => a === STEW));
+beast(JARL, null); X.tick();
+ok('court-powers rule: the Steward (same court) is told it was the Count', sys.some(([a, t]) => a === STEW && /It was Frigga, of this court, and they hold no court powers in Bruma/.test(t)), sys.filter(([a]) => a === STEW));
+ok('...the player guard (no seat) is not told who', sys.some(([a]) => a === PGUARD) && !sys.some(([a, t]) => a === PGUARD && NAMES.test(t)));
+ok('...nor the hunter orders', !sys.some(([a, t]) => (a === VIGIL || a === HAND) && NAMES.test(t)));
 barred = globalThis.__dboExposureBarred(JARL, 'bruma');
 ok('an exposed Count is barred from court powers in Bruma', /will not take your word/.test(barred), barred);
 ok('...but not in another hold', globalThis.__dboExposureBarred(JARL, 'whiterun') === '');
@@ -164,7 +172,8 @@ beast(HARB, null);
 reset(); online = Object.keys(chars).map(Number);
 ok('a Vampire Lord seen rising by three (a Dawnguard among them) is exposed', see(VAMP, 'vampirelord', [W1, W2, DAWN], 'in') === true && bounty('bruma', VAMP) === 500);
 beast(VAMP, null); X.tick();
-ok('...the Dawnguard and the Vigil are told, the Silver Hand is not', sys.some(([a, t]) => a === DAWN && /the Dawnguard: .*Vampire Lord/.test(t)) && sys.some(([a]) => a === VIGIL) && !sys.some(([a]) => a === HAND));
+ok('...no notice names her', !sys.some(([a, t]) => a !== VAMP && NAMES.test(t)));
+ok('...the Dawnguard and the Vigil are told, the Silver Hand is not', sys.some(([a, t]) => a === DAWN && /the Dawnguard: a Vampire Lord was seen near Bruma/.test(t)) && sys.some(([a]) => a === VIGIL) && !sys.some(([a]) => a === HAND));
 ok('...the hunter witness is recorded for staff', (() => { const v = globalThis.__dboExposureCourtView(GM, 'bruma'); return v && v[0].hunters && v[0].hunters.some((h) => /Dane .*the Dawnguard/.test(h)); })());
 said.length = 0; cmds.exposure(LEAD, 'list');
 ok('.../exposure list shows it', /Serana .*a Vampire Lord.*hunters: Dane .* of the Dawnguard/.test(said.at(-1)[1]), said.at(-1));
