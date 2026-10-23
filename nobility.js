@@ -152,6 +152,8 @@ module.exports = (api) => {
   };
 
   // ---- the ruler ---------------------------------------------------------------------------------------------------------
+  // The court offices that rule a hold or a county and grant its titles (DESIGN.md 4)
+  const RULER_SEATS = new Set(['jarl', 'count']);
   // The hold faction's leader (a character, guilds.js), or the account seated in the court's first office (officials.json)
   const rules = (a, zid) => {
     const z = zoneById(zid); if (!z) return false;
@@ -292,8 +294,10 @@ module.exports = (api) => {
     const ids = new Set(Object.keys(C.realms || {}));
     for (const f of FIEFS) ids.add(f.hold);
     for (const n of living()) ids.add(n.hold);
-    // A ruler's own hold, though it has no fiefs or nobles yet (Jarl of Falkreath, 22 Oct: only Haafingar and Bruma showed)
-    try { for (const m of ranksOf(profileOf(a), a) || []) if (m && m.zone && m.zone.id) ids.add(m.zone.id); } catch (e) { /* no ranks */ }
+    // A ruler's own hold, though it has no fiefs or nobles yet (Jarl of Falkreath, 22 Oct: only Haafingar and Bruma showed).
+    // Only a ruler's seat (DESIGN.md 4: count or jarl; review R3, 23 Oct): Solstheim's only office is guard and a
+    // stronghold's first is its chieftain, and rules() would take either for the ruler
+    try { for (const m of ranksOf(profileOf(a), a) || []) if (m && m.zone && m.zone.id && RULER_SEATS.has(m.rank)) ids.add(m.zone.id); } catch (e) { /* no ranks */ }
     return [...ids].filter((id) => zoneById(id)).filter((id) => FIEFS.some((f) => f.hold === id) || living().some((n) => n.hold === id) || rules(a, id));
   };
   const holdView = (a, zid) => {
