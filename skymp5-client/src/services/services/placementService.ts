@@ -1,9 +1,10 @@
-import { Actor, Debug, Form, FormType, Game, Input, ObjectReference, Utility } from "skyrimPlatform";
+import { Actor, createText, Debug, destroyText, Form, FormType, Game, Input, ObjectReference, setTextPos, setTextSize, setTextString, Utility, worldPointToScreenPoint } from "skyrimPlatform";
 import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { BrowserMessageEvent } from "skyrimPlatform";
 import { sendCustomPacket, parseCustomPacket } from "./customPacketUtil";
 import { WorldCleanerService } from "./worldCleanerService";
 import { localIdToRemoteId } from "../../view/worldViewMisc";
+import { getScreenResolution } from "../../view/formView";
 import { noteCopyPlaced, safeDelete } from "../../view/npcLifetimeRuntime";
 import { logError, logTrace } from "../../logging";
 import { ConnectionMessage } from "../events/connectionMessage";
@@ -75,6 +76,13 @@ const GHOST_TURN_EPS = 0.5;
 const PICK_TYPES = [FormType.Static, FormType.MovableStatic, FormType.Furniture, FormType.Activator, FormType.Container, FormType.Flora, FormType.Tree, FormType.Light];
 const PICK = { range: 1500, cone: 12, maxRefs: 6000 };
 const angleOff = (a: number, b: number): number => { const d = norm(a - b); return Math.min(d, 360 - d); };
+
+// The outline over the copy (Nate, 21 Oct): an activator, a trigger or a marker has no mesh, so its copy cannot be seen
+// at all. "[+]" at its base and its name OUTLINE.nameAbove units over it, drawn with createText like the downed timer
+// (downedTimerService.ts). Placed from the pose this service set, not from the reference: a meshless copy may never
+// count as 3D-loaded. The font draws only ASCII and Cyrillic, so anything else in a name becomes "?".
+const OUTLINE = { nameAbove: 40, size: 0.5, nameSize: 0.45, nameChars: 48, mark: "[+]", color: [0.91, 0.84, 0.63, 0.95] };
+const outlineName = (name: string): string => name.replace(/[^\x20-\x7e\u0400-\u04ff]/g, "?").slice(0, OUTLINE.nameChars);
 
 // -180..180, for showing a tilt
 const signed = (deg: number): number => { const d = norm(deg); return d > 180 ? d - 360 : d; };
@@ -200,6 +208,7 @@ export class PlacementService extends ClientListener {
       const ghost = ObjectReference.from(Game.getFormEx(id));
       if (ghost) safeDelete(ghost, { urgent: true });
     }
+    this.hideOutline();
     if (announce && this.active) Debug.notification("Placement mode off.");
     if (this.hudText !== null) {
       this.hudText = null;
@@ -229,6 +238,8 @@ export class PlacementService extends ClientListener {
       this.startEdit(raw);
     }
     if (!this.active) return;
+    // Every frame, so the outline keeps up with the camera; the copy itself moves on the 40 ms tick
+    this.drawOutline();
     const now = Date.now();
     if (now - this.lastTick < TICK_MS) return;
     this.lastTick = now;
@@ -365,6 +376,41 @@ export class PlacementService extends ClientListener {
     ghost.setAngle(rot[0], rot[1], rot[2]);
   }
 
+  // "[+]" at the copy's base and its name above it, while there is a copy; hidden behind the camera and in menus
+  private drawOutline(): void {
+    const at = this.ghostAt;
+    if (!this.pick || !this.ghostId || !at || Utility.isInMenuMode()) return this.hideOutline();
+    const res = getScreenResolution();
+    const [base, top] = worldPointToScreenPoint([at[0], at[1], at[2]], [at[0], at[1], at[2] + OUTLINE.nameAbove]);
+    // Behind the camera the third value is not above 0 (downedTimerService, boardMailService)
+    if (!base || !top || base[2] <= 0 || top[2] <= 0) return this.hideOutline();
+    const screen = (p: number[]): [number, number] => [Math.round(p[0] * res.width), Math.round((1 - p[1]) * res.height)];
+    const [bx, by] = screen(base);
+    const [tx, ty] = screen(top);
+    const name = outlineName(this.pick.name);
+    if (!this.outlineMarkId) {
+      this.outlineMarkId = createText(bx, by, OUTLINE.mark, OUTLINE.color);
+      setTextSize(this.outlineMarkId, OUTLINE.size);
+    } else {
+      setTextPos(this.outlineMarkId, bx, by);
+    }
+    if (!this.outlineNameId) {
+      this.outlineNameId = createText(tx, ty, name, OUTLINE.color);
+      setTextSize(this.outlineNameId, OUTLINE.nameSize);
+      this.outlineNameShown = name;
+    } else {
+      setTextPos(this.outlineNameId, tx, ty);
+      if (this.outlineNameShown !== name) { setTextString(this.outlineNameId, name); this.outlineNameShown = name; }
+    }
+  }
+
+  private hideOutline(): void {
+    for (const id of [this.outlineMarkId, this.outlineNameId]) if (id) { try { destroyText(id); } catch { /* gone */ } }
+    this.outlineMarkId = 0;
+    this.outlineNameId = 0;
+    this.outlineNameShown = "";
+  }
+
   // The remote id of the reference under the crosshair (or the plugin object straight ahead), or null with the reason shown
   private aimedRemote(): number | null {
     const aimed = Game.getCurrentCrosshairRef();
@@ -448,4 +494,7 @@ export class PlacementService extends ClientListener {
   private hudText: string | null = null;
   private flashText = "";
   private flashUntil = 0;
+  private outlineMarkId = 0;
+  private outlineNameId = 0;
+  private outlineNameShown = "";
 }
