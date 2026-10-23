@@ -73,16 +73,20 @@ try {
   ok(close === 0, `no two dangerous predators within ${D.dangerSpacing} units in Skyrim (placed ones that cannot step down aside)`, close);
 
   // 5. respawn and lore
-  ok(danger.every((z) => z.Respawn === D.dangerRespawnSeconds) && after.filter((z) => z.ID === SKY && levelOf(z) < D.dangerLevel).every((z) => z.Respawn === CFG.wildlife.respawnSeconds), 'dangerous predators respawn after dangerRespawnSeconds, everything else as before');
+  // A kind's own respawn wins for its bases (density.kinds; sabre cats 23 Oct, tests/sabrecat-curb-harness.js)
+  const kindRespawn = (z) => { for (const k of Object.values(D.kinds || {})) if ((k.bases || []).some((d) => d.toLowerCase() === String(z.NPC[0].id).toLowerCase())) return Number(k.respawnSeconds) || 0; return 0; };
+  ok(danger.every((z) => z.Respawn === (kindRespawn(z) || D.dangerRespawnSeconds)) && after.filter((z) => z.ID === SKY && levelOf(z) < D.dangerLevel).every((z) => z.Respawn === CFG.wildlife.respawnSeconds), 'dangerous predators respawn after dangerRespawnSeconds, everything else as before');
   const inRift = (z) => z.ID === SKY && Math.hypot(z.POS[0] - RIFTEN[0], z.POS[1] - RIFTEN[1]) < 50000;
   const riftBears = after.filter((z) => inRift(z) && BEAR.test(nameOf(z.NPC[0].id))).length;
   ok(riftBears >= 5, 'the Rift still has bears (lore)', riftBears);
 
   // 7. Pelagia Farm (Moss-Pocket #8G8Z, 20 Oct): the one plains predator spot west of the farm that rolled a sabre cat takes
   // its weakest creature; no other zone changes
-  const noFarm = Object.assign({}, CFG.wildlife, { safeZones: (CFG.wildlife.safeZones || []).filter((z) => !/Pelagia/.test(z._comment || '')) });
+  // Both without density.kinds: a kept sabre cat claims ground for its kind, so the safe zone's spot would move a neighbour too
+  const noKinds = Object.assign({}, CFG.wildlife, { density: Object.assign({}, D, { kinds: undefined }) });
+  const noFarm = Object.assign({}, noKinds, { safeZones: (CFG.wildlife.safeZones || []).filter((z) => !/Pelagia/.test(z._comment || '')) });
   const withoutFarm = loadWild(noFarm);
-  const farmDiff = after.filter((z, i) => z.NPC[0].id !== withoutFarm[i].NPC[0].id);
+  const farmDiff = loadWild(noKinds).filter((z, i) => z.NPC[0].id !== withoutFarm[i].NPC[0].id);
   ok(withoutFarm.find((z) => z.Name === 'wild:skeever:697')?.NPC[0].id === '23ab5:Skyrim.esm', 'without the farm safe zone the spot by Pelagia Farm is a sabre cat (the report)');
   ok(farmDiff.length === 1 && farmDiff[0].Name === 'wild:skeever:697' && farmDiff[0].NPC[0].id === '23ab7:Skyrim.esm', 'with it that one spot is a skeever and no other zone changes', farmDiff.map((z) => [z.Name, z.NPC[0].id]));
 

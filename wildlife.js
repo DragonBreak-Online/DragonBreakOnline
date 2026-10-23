@@ -127,6 +127,12 @@ module.exports = (api) => {
   const DEN = Object.assign({ worlds: [], rollEdids: 'Predator', rollLevel: 12, dangerLevel: 6, dangerSpacing: 0, dangerRespawnSeconds: 0 }, C.density || {});
   const DEN_WORLDS = new Set((Array.isArray(DEN.worlds) ? DEN.worlds : []).map(normWorld));
   const DEN_RE = (() => { try { return new RegExp(String(DEN.rollEdids || '^$')); } catch (e) { log('wildlife.density.rollEdids is not a pattern', e.message); return /^$/; } })();
+  // density.kinds { <name>: { bases, spacing, respawnSeconds } } (Jake, 23 Oct: the sabre cat population needs curbing): a pick of
+  // a kind's base keeps spacing from the next of its kind, or takes the next creature below it in its list that is not of the kind
+  const KINDS = Object.entries(DEN.kinds && typeof DEN.kinds === 'object' ? DEN.kinds : {}).map(([name, k]) => ({ name,
+    bases: new Set((Array.isArray(k && k.bases) ? k.bases : []).map((d) => String(d).toLowerCase())), spacing: Number(k && k.spacing) || 0,
+    respawn: Number(k && k.respawnSeconds) || 0 })).filter((k) => k.bases.size && k.spacing > 0);
+  const kindOf = (desc) => KINDS.find((k) => k.bases.has(String(desc).toLowerCase())) || null;
   const hashFrac = (s) => parseInt(crypto.createHash('sha1').update(String(s)).digest('hex').slice(0, 8), 16) / 0x100000000;
   const sortedOpts = (options) => (options || []).filter((o) => Array.isArray(o) && o[1]).slice().sort((x, y) => x[0] - y[0]);
   // placement -> { opt: [level, desc], danger } for the spots the density rules decide; the others keep pickFor
@@ -146,10 +152,25 @@ module.exports = (api) => {
         const list = up.length ? up : [sorted[0]];
         opt = list[Math.min(list.length - 1, Math.floor(hashFrac(`roll:${pl.src}`) * list.length))];
       } else opt = sorted[Math.floor(sorted.length / 2)];   // what 'mid' takes, so a single-creature spot keeps its creature
-      const danger = Number(opt[0]) >= dangerAt;
-      plan.set(pl, { opt, danger, weakest: sorted[0] });
-      if (danger) cands.push({ pl, fixed: Number(sorted[0][0]) >= dangerAt, h: hashFrac(`space:${pl.src}`) });
+      plan.set(pl, { opt, danger: Number(opt[0]) >= dangerAt, weakest: sorted[0], low: Number(sorted[0][0]) });
     }
+    // Kinds kept apart: dens whose every option is of the kind stand, then the rest by their own id
+    for (const k of KINDS) {
+      const of = (o) => k.bases.has(String(o[1]).toLowerCase());
+      const items = [];
+      for (const [pl, e] of plan) if (of(e.opt)) items.push({ pl, e, den: sortedOpts(pl.options).every(of), h: hashFrac(`${k.name}:${pl.src}`) });
+      items.sort((a, b) => (b.den - a.den) || (a.h - b.h));
+      const kept = [];
+      for (const it of items) {
+        const w = normWorld(it.pl.world);
+        const near = !it.den && kept.some((p) => p.w === w && Math.hypot(p.pos[0] - it.pl.pos[0], p.pos[1] - it.pl.pos[1]) < k.spacing);
+        const sorted = sortedOpts(it.pl.options);
+        const below = near ? sorted.slice(0, Math.max(0, sorted.indexOf(it.e.opt))).reverse().find((o) => !of(o)) || sorted.find((o) => !of(o)) : null;
+        if (!below) { kept.push({ w, pos: it.pl.pos }); continue; }
+        it.e.opt = below; it.e.danger = Number(below[0]) >= dangerAt; it.e.kindThinned = k.name;
+      }
+    }
+    for (const [pl, e] of plan) if (e.danger) cands.push({ pl, fixed: e.low >= dangerAt, h: hashFrac(`space:${pl.src}`) });
     if (spacing > 0) {
       // Spots that cannot step down (a placed sabre cat, a troll) claim their ground first, then the rest by their own id,
       // so the kept set never depends on the order of wildlife.json
@@ -192,7 +213,7 @@ module.exports = (api) => {
       const { id, left } = fromPlan ? { id: fromPlan.opt[1], left: false } : safePick(pl.options, pickFor(pl));
       // Left out by the guard: still counted, so every later wild:* zone keeps its name (as a no-navmesh one is)
       if (!id) { if (left) n++; continue; }
-      out.push({ Name: `${PREFIX}${pl.kind}:${n++}`, ID: pl.world, POS: pl.pos, Size: C.radius, Anchor: pl.ref, NPC: [{ id, count: 1 }], Despawn: C.despawnSeconds, Respawn: fromPlan && fromPlan.danger ? dangerRespawn : C.respawnSeconds });
+      out.push({ Name: `${PREFIX}${pl.kind}:${n++}`, ID: pl.world, POS: pl.pos, Size: C.radius, Anchor: pl.ref, NPC: [{ id, count: 1 }], Despawn: C.despawnSeconds, Respawn: (fromPlan && (kindOf(id) || {}).respawn) || (fromPlan && fromPlan.danger ? dangerRespawn : C.respawnSeconds) });
     }
     for (const raw of OWNED.spawns || []) {
       if (out.length >= C.maxZones) break;
