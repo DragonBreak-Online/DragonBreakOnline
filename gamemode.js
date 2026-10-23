@@ -8901,7 +8901,7 @@ try {
 try {
   const REBELLION_JS = path.resolve('rebellion.js');
   delete require.cache[REBELLION_JS];
-  require(REBELLION_JS)({ mp, log, personal, system, audit, who, display, cfg, registerChatCommand, isAdmin, isLeadStaff, onlineActors, every, sendPacket,
+  require(REBELLION_JS)({ mp, log, personal, system, audit, who, display, cfg, registerChatCommand, isAdmin, isLeadStaff, onlineActors, every, sendPacket, onUi,
     profileOf, zoneById, zoneOfActor, readOfficials, rankTitle, officialTarget, seatOfficial, unseatOfficialBy, accountActors, ownNameOf, staffNote,
     // Who may take a won throne: the same rules as an appointment (appointCheck): no staff in a leading office, the Jarl's race
     rulerFit: (actor, z, office) => {
@@ -9185,7 +9185,7 @@ try {
   const PLAYERGUILDS_JS = path.resolve('playerguilds.js');
   delete require.cache[PLAYERGUILDS_JS];
   require(PLAYERGUILDS_JS)({ mp, log, personal, system, audit, staffNote, who, display, nameOf, cfg, registerChatCommand,
-    findByName, onlineActors, isAdmin });
+    findByName, onlineActors, isAdmin, onUi });
 } catch (e) { log('playerguilds.js failed to load:', e.stack || e.message); }
 
 // ---- one leadership seat per character (server\leadership.js, config "leadership"; Nate, 21 Oct) ------------------------
