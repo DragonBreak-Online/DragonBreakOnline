@@ -1879,7 +1879,7 @@
  "guards": {
   "_comment": "The hold's watch (guards.js; Jake and Nate, 23 Oct): NPC guards at posts staff place with /guardpost add (guard-posts.json), spawned as guard:<hold>:<n> zones. They give nothing: no loot from a dead one, no Wheel work from fighting them. A player one brings down wakes in that hold's jail, its prison when the jail is full (hold-jails.json), for jailMinutes. npcByHold: the hold's own guard, never a Legion NPC. Hot reload. ROLLBACK: enabled false (removes every guard zone).",
   "enabled": true,
-  "jailMinutes": 30,
+  "jailMinutes": 10,
   "npcByHold": { "bruma": "6daba:BSHeartland.esm" }
  }
 }

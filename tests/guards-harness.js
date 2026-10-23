@@ -1,5 +1,5 @@
 // The hold's watch (guards.js, Jake and Nate 23 Oct) with the real jail.js: /guardpost writes a guard:<hold>:<n> zone, the
-// watch gives no Wheel work and no loot, and a player one of its guards brings down wakes in the hold's jail for 30 minutes,
+// watch gives no Wheel work and no loot, and a player one of its guards brings down wakes in the hold's jail for 10 minutes,
 // the city jail's cells first and its prison when they are full (hold-jails.json); a full hold leaves the down alone.
 //   node tests/guards-harness.js   (from server/)
 'use strict';
@@ -76,8 +76,8 @@ const down = (a, killer) => { downed.add(a); mp.onDeath(a, killer); flush(); };
 down(P1, GUARD);
 let w = woke.find((x) => x[0] === P1);
 let s = mp.get(P1, 'private.dboSentence');
-ok(w && w[1].cellOrWorldDesc === JAIL && JSON.stringify(w[1].pos) === '[1,2,3]' && s && s.totalMs === 30 * 60000 && s.watch === 'bruma' && /30 minutes/.test(w[2]),
-  'a player a guard brought down wakes in the first free jail cell for 30 minutes', { w, s });
+ok(w && w[1].cellOrWorldDesc === JAIL && JSON.stringify(w[1].pos) === '[1,2,3]' && s && s.totalMs === 10 * 60000 && s.watch === 'bruma' && /10 minutes/.test(w[2]),
+  'a player a guard brought down wakes in the first free jail cell for 10 minutes', { w, s });
 down(P2, GUARD);
 w = woke.find((x) => x[0] === P2);
 ok(w && JSON.stringify(w[1].pos) === '[4,5,6]', 'the next goes to the second cell');
@@ -89,7 +89,7 @@ down(P4, GUARD);
 ok(!woke.some((x) => x[0] === P4) && downed.has(P4), 'with every cell taken, the down stands');
 down(STAFF, WOLF);
 ok(!woke.some((x) => x[0] === STAFF), 'a wolf\'s down is no jail');
-ok(audits.some((t) => /^JAIL .* jailed by the watch of bruma for 30 min/.test(t)) && audits.some((t) => /^GUARDS .* brought down by the watch of bruma/.test(t)), 'audited');
+ok(audits.some((t) => /^JAIL .* jailed by the watch of bruma for 10 min/.test(t)) && audits.some((t) => /^GUARDS .* brought down by the watch of bruma/.test(t)), 'audited');
 cmds.guardpost.f(STAFF, 'remove bruma 1');
 ok(!JSON.parse(fs.readFileSync('NPC-Spawns.json', 'utf8')).zones.some((x) => x.Name.startsWith('guard:')), '/guardpost remove takes its zone out');
 console.log(fails ? `${fails} FAILED` : 'all passed');

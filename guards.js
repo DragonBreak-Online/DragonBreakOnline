@@ -1,6 +1,6 @@
 // DragonBreak Online: the hold's watch, NPC guards at posts the staff place (Jake and Nate, 23 Oct: "enabling NPC guards
 // ... limited to only guards, no legion NPCs, and guards are not lootable and give no xp"; Nate: "no benefits to fighting
-// guards. They can send you to jail too", "Jail by an NPC guard will be 30 minutes", "use the prisons as overflow for each
+// guards. They can send you to jail too", "Jail by an NPC guard will be 30 minutes", then "10 minutes not 30", "use the prisons as overflow for each
 // respective hold"). Loaded by gamemode.js after downed.js and jail.js; config "guards".
 //
 // Posts: guard-posts.json beside the server (runtime data), written by /guardpost add at the staff member's own spot, in the
@@ -19,7 +19,7 @@ const path = require('path');
 module.exports = (api) => {
   const { mp, log, personal, audit, who, display, cfg, registerChatCommand, zoneOfActor } = api;
   const C = Object.assign({
-    enabled: true, jailMinutes: 30, radius: 600, despawnSeconds: 300, respawnSeconds: 900,
+    enabled: true, jailMinutes: 10, radius: 600, despawnSeconds: 300, respawnSeconds: 900,
     // The hold's own guard (never a Legion NPC); a post may name another with /guardpost add <npc desc>
     npcByHold: { bruma: '6daba:BSHeartland.esm' },
     jailDelayMs: 2500,

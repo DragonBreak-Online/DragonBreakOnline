@@ -10,7 +10,7 @@
         "items": [
           "City guards are returning: the watch takes up its posts in Bruma first, then the other cities.",
           "Fighting the watch gains you nothing: a guard's body can't be searched, and hitting or killing a guard (or being hit by one) trains no skill.",
-          "A guard who brings you down drags you to the hold's jail for 30 minutes instead of the temple. When the city jail is full, you go to the hold's prison."
+          "A guard who brings you down drags you to the hold's jail for 10 minutes instead of the temple. When the city jail is full, you go to the hold's prison."
         ]
       }
     ]
