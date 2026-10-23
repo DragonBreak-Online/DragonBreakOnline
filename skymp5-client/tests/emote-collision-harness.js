@@ -305,6 +305,34 @@ const scenario = (name, fn) => {
     return [moved !== null && moved > 96 && moved <= 96 + 370 * FRAME_S + 1, restoredNote()];
   });
 
+  // ---- the note names the exit the graph took and the sit state, for the walls report -------------------------------------
+  scenario('W on Sit Crossed: the note names the forced exit the graph took (IdleForceDefaultState)', () => {
+    wheelPlay('IdleSitCrossLeggedEnter'); run(1);
+    key(DxScanCode.W); run(3);
+    return [/forced exit IdleForceDefaultState/.test(restoredNote()), restoredNote()];
+  });
+  scenario("the wheel's Stop on Sit Crossed: the note names the pose's own exit (IdleChairExitStart)", () => {
+    wheelPlay('IdleSitCrossLeggedEnter'); run(1);
+    wheelStop(); run(3);
+    return [/graceful exit IdleChairExitStart/.test(restoredNote()), restoredNote()];
+  });
+  scenario('an exit the graph refuses is never named as the one taken', () => {
+    G.refuse.add('IdleForceDefaultState');
+    wheelPlay('IdleSitCrossLeggedEnter'); run(1);
+    key(DxScanCode.W); run(3);
+    const note = restoredNote();
+    return [/forced exit (IdleSitCrossLeggedExitStart|pending)/.test(note) && !/exit IdleForceDefaultState/.test(note), note];
+  });
+  scenario('the note carries the sit state while the emote ran and at the check', () => {
+    wheelPlay('IdleSitCrossLeggedEnter'); run(0.3);
+    player.sitState = 3; run(0.7);
+    key(DxScanCode.W); player.sitState = 0; run(3);
+    return [/sit state 3 at the stop and 0 at the check/.test(restoredNote()), restoredNote()];
+  });
+  fresh('registration'); G.refuse.add('IdleForceDefaultState');
+  wheelPlay('IdleSitCrossLeggedEnter'); run(1); key(DxScanCode.W); run(3);
+  console.log(`info the note, IdleForceDefaultState refused: ${restoredNote()}`);
+
   console.log(failures ? `${failures} FAIL` : 'all ok');
   process.exit(failures ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(2); });

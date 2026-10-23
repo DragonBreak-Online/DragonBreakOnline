@@ -478,6 +478,7 @@ export class EmoteService extends ClientListener {
       this.sp.Debug.sendAnimationEvent(player, anim);
       this.emoteStartPos = [player.getPositionX(), player.getPositionY(), player.getPositionZ()];
       this.emoteMoved = 0;
+      this.emoteSitState = player.getSitState();
       logTrace(this, `Playing emote`, anim);
     });
   }
@@ -489,16 +490,16 @@ export class EmoteService extends ClientListener {
     if (anim && this.diagSentAt === 0) emoteNote(`stopped ${anim} before sent by ${why}`);
     else if (anim && Date.now() - this.diagSentAt < 2000) emoteNote(`stopped ${anim} after ${Date.now() - this.diagSentAt} ms by ${why}`);
     if (anim) this.exitEmote(anim, undefined, graceful);
-    if (anim) this.restoreCollisionAfter(anim, why);
+    if (anim) this.restoreCollisionAfter(anim, why, graceful);
   }
 
-  // Players walked through walls after an emote, standing or sitting (Onny and Nate, 22-23 Oct: "any emote can do it").
-  // An emote holds the body in place, so the player's own collision is switched back on (setCollision is a set, not a
-  // toggle) as the exit plays out and twice after it; the note says how far the body went while the emote ran
-  private restoreCollisionAfter(anim: string, why: string): void {
+  // A safety net for walking through walls after an emote (22-23 Oct): no cause is proven yet, the note measures it
+  private restoreCollisionAfter(anim: string, why: string, graceful: boolean): void {
     // Taken while it ran (watchEmoteDrift): read after the stop it would count the walk away from it
     const sent = this.emoteStartPos !== null;
     const moved = this.emoteMoved;
+    const sitAtStop = this.emoteSitState;
+    const chain = this.chainId;
     this.emoteStartPos = null;
     let noted = false;
     // Also reached from tick context (the wheel's Stop, a dboIdleStop), where Utility.wait throws: the waits start on an update
@@ -515,7 +516,9 @@ export class EmoteService extends ClientListener {
             try { setCollision(player.getFormID(), true); } catch (e) { return; }
             if (noted || !sent) return;
             noted = true;
-            emoteNote(`collision restored after ${anim} (${why}), body moved ${moved} u while it ran`);
+            const exit = chain === this.chainId ? this.exitAccepted || "pending" : "superseded";
+            emoteNote(`collision restored after ${anim} (${why}), ${graceful ? "graceful" : "forced"} exit ${exit}, body moved ${moved} u while it ran, ` +
+              `sit state ${sitAtStop} at the stop and ${player.getSitState()} at the check`);
           });
         });
       }
@@ -531,6 +534,7 @@ export class EmoteService extends ClientListener {
     const s = this.emoteStartPos;
     const dx = player.getPositionX() - s[0], dy = player.getPositionY() - s[1];
     this.emoteMoved = Math.round(Math.hypot(dx, dy, player.getPositionZ() - s[2]));
+    this.emoteSitState = player.getSitState();
     if (Math.hypot(dx, dy) > EMOTE_DRIFT_UNITS) this.stopActiveEmote(false, "the body moved");
   }
 
@@ -539,10 +543,12 @@ export class EmoteService extends ClientListener {
   // A graceful exit tries the idle's own exit clip first.
   private exitEmote(anim: string, onDone?: () => void, graceful = false): void {
     const chain = ++this.chainId;
+    this.exitAccepted = "";
     if (anim.indexOf("Offset") === 0) {
       this.controller.once("update", () => {
         const player = this.sp.Game.getPlayer();
         if (player) this.sp.Debug.sendAnimationEvent(player, "OffsetStop");
+        if (chain === this.chainId) this.exitAccepted = "OffsetStop";
         // Let the sync poll relay OffsetStop before any follow-up event.
         this.sp.Utility.wait(0.1).then(() => {
           if (chain === this.chainId && onDone) onDone();
@@ -580,6 +586,7 @@ export class EmoteService extends ClientListener {
   private tryExitChain(attempts: string[], index: number, chain: number, onDone?: () => void): void {
     if (chain !== this.chainId) return;
     if (index >= attempts.length) {
+      this.exitAccepted = "none";
       if (onDone) onDone();
       return;
     }
@@ -589,6 +596,7 @@ export class EmoteService extends ClientListener {
       if (!player) return;
       // Drawing, sitting, swimming or mounting already left the idle
       if (!this.canPlayIdle()) {
+        this.exitAccepted = "skipped";
         if (onDone) onDone();
         return;
       }
@@ -601,9 +609,10 @@ export class EmoteService extends ClientListener {
         this.probeAnim = "";
         if (!ok) {
           this.tryExitChain(attempts, index + 1, chain, onDone);
-        } else if (onDone) {
-          onDone();
+          return;
         }
+        this.exitAccepted = attempts[index];
+        if (onDone) onDone();
       });
     });
   }
@@ -670,8 +679,9 @@ export class EmoteService extends ClientListener {
   private serverIdle = "";
   private activeEmote = "";
   private emoteStartPos: [number, number, number] | null = null;
-  // How far the body had gone from that spot at the last update while the emote ran
+  // How far the body had gone from that spot, and its Actor.GetSitState, at the last update while the emote ran
   private emoteMoved = 0;
+  private emoteSitState = -1;
   private allowedAnims: Set<string>;
   private propAnims: Set<string>;
   private exitEvents = new Map<string, string>();
@@ -680,6 +690,8 @@ export class EmoteService extends ClientListener {
   private diagAnim = "";
   private diagSentAt = 0;
   private probeSucceeded = false;
+  // The exit event the graph took in the latest exit chain, for the collision note
+  private exitAccepted = "";
   // Generation counter: bumping it abandons any pending exit chain.
   private chainId = 0;
   // The same for a seated idle's IdleStop
