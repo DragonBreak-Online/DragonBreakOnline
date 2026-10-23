@@ -279,6 +279,24 @@ out = run(`CITIZEN STAFF ${ROWAN} revoked the citizenship of Bruma from Selene (
 ok(out.length === 1 && out[0].ev === 'act.CITIZEN' && out[0].c === 'PGDB' && out[0].f.text === 'STAFF Rowan #PGDB revoked the citizenship of Bruma from Selene (character ff000015)', '...a Lead GM\'s revoke (who() names them, as on every staff line) is not cut: it stays in their post', out);
 out = run(`CITIZEN ${ROWAN} granted Selene (character ff000015) the citizenship of Bruma`);
 ok(out.length === 1 && out[0].c === 'PGDB' && out[0].f.text === 'granted Selene (character ff000015) the citizenship of Bruma', '...nor are the other CITIZEN lines', out);
+// CITIZEN <name> (character <hex>) is an outlaw of <hold>[: citizenship taken], barred until <date> (<why>)[; still a citizen
+// through a faction or court based there] (citizenship.js __dboCitizenOutlaw): the why its one caller gives is rebellion.js's
+// "the failed rising <name>", a rising's name a player chose, so it goes as the ELECTION void line's faction names do; the
+// character, the hold, the date and both flags stay. The line names no party today, so the cut is read directly
+{
+  const site = sites.find((s) => s.file === 'citizenship.js' && s.t.includes(' is an outlaw of '));
+  const rsrc = fs.readFileSync(path.join(ROOT, 'rebellion.js'), 'utf8');
+  const whyT = (rsrc.match(/__dboCitizenOutlaw', [^`\n]*`([^`]*)`/) || [])[1] || '';
+  const line = (had, auto, why) => (site ? site.t : '').replace('${e.name || k}', 'Selene').replace('${k}', 'ff000015').replace('${z.name}', 'The Rift')
+    .replace(/\$\{had \? '([^']*)' : ''\}/, (m, a) => (had ? a : '')).replace('${dateText(until)}', '2026-11-06 21:00 UTC')
+    .replace("${why || 'a failed rising'}", why).replace(/\$\{auto \? '([^']*)' : ''\}/, (m, a) => (auto ? a : ''));
+  const OUTLAW = 'CITIZEN Selene (character ff000015) is an outlaw of The Rift: citizenship taken, barred until 2026-11-06 21:00 UTC';
+  const full = line(true, true, whyT.replace('${r.name}', `${CANARY} Rising`)), bare = line(false, false, 'a failed rising');
+  ok(whyT.startsWith('the failed rising ') && site && !full.includes('${') && citizenCut(full) === `${OUTLAW} (a failed rising); still a citizen through a faction or court based there` && citizenCut(bare) === bare,
+    'CITIZEN outlaw (the line and its why read from citizenship.js and rebellion.js): the rising\'s name (a player\'s words) is cut; the character, the hold, the date and both flags stay', [full, citizenCut(full), citizenCut(bare)]);
+  got = citizenCut(line(true, false, `${CANARY} (x) ${CANARY}`));
+  ok(got === OUTLAW, '...a why of any other shape keeps the head only', got);
+}
 // every sentence setTerms can write (read from contracts.js, numbers filled in) passes the cut whole: a reworded sentence
 // fails here instead of quietly leaving the player log with "set <hold> <term>" only
 {
