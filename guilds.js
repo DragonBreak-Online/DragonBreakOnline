@@ -581,6 +581,8 @@ module.exports = (api) => {
   // nonce the front already holds
   const CHARTER_HINT = 'To found a faction or a cult of your own, use Found a faction (or /charter found <name>). Your co-founders confirm it, then a GM approves it.';
   // readOnly: a staff member reading `a`'s journal; no nonce is made or kept for `a`, so nothing in it can act for them
+  // A view another module adds to the panel: one that throws costs its own tab, never the panel
+  const safeView = (n, a) => { try { return globalThis[n](a >>> 0) || null; } catch (e) { log(`guilds: ${n} failed`, e.message); return null; } };
   const menuPayload = (a, result, resultKind, focusFid, keepNonce, readOnly) => {
     const nonce = readOnly ? '' : keepNonce && ST.nonces.get(a >>> 0) ? ST.nonces.get(a >>> 0) : `${(a >>> 0).toString(16)}-${Date.now().toString(36)}`;
     if (!readOnly) ST.nonces.set(a >>> 0, nonce);
@@ -597,6 +599,9 @@ module.exports = (api) => {
       // The Realm and War tabs (realm.js): territories and their owners, wars, and what this character leads
       realm: typeof globalThis.__dboRealmView === 'function' ? globalThis.__dboRealmView(a >>> 0) : null,
       economy: typeof globalThis.__dboEconomyView === 'function' ? globalThis.__dboEconomyView(a >>> 0) : null,
+      // The Guild tab (playerguilds.js) and the Rebellion tab (rebellion.js; null while risings are off, so the tab is hidden)
+      band: typeof globalThis.__dboGuildTabView === 'function' && !readOnly ? safeView('__dboGuildTabView', a) : null,
+      rebellion: typeof globalThis.__dboRebellionView === 'function' && !readOnly ? safeView('__dboRebellionView', a) : null,
       // Charters open: the panel's Found a faction button opens /charter in the panel (U); with nothing else to say it says how
       charters: !!(cfg.charters || {}).enabled,
       ...(result || !((cfg.charters || {}).enabled) ? { result: result || '', resultKind: resultKind || '' } : { result: CHARTER_HINT, resultKind: 'info' }),

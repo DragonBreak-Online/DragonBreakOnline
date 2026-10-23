@@ -377,7 +377,8 @@
   },
   "03eb3d": {
    "label": "Invisibility",
-   "kind": "special",
+   "kind": "dropped",
+   "why": "it hides you from others long after it ends for you, which lets a player watch others unseen (Nate, 23 Oct); back once the client is fixed",
    "minTier": 3,
    "byTier": [null, null, "Invisibility02", "Invisibility03", "Invisibility04"],
    "fallback": [null, null, null, null, null],

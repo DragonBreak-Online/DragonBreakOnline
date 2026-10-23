@@ -207,7 +207,12 @@ module.exports = (api) => {
   };
   // The petition this character carries (its starter or leader)
   const carried = (a) => Object.keys(data().petitions).map(petitionOf).filter(Boolean).find((p) => (p.leader.actor >>> 0) === (a >>> 0) || (p.starter.actor >>> 0) === (a >>> 0)) || null;
+  // q: a name or #TAG (chat), or { actor } (the panel's signer list, which names the very signer)
   const signerByQuery = (p, q) => {
+    if (q && typeof q === 'object') {
+      const s = p.signers.find((x) => (x.actor >>> 0) === (Number(q.actor) >>> 0));
+      return s ? { s } : { error: 'They have not signed the petition.' };
+    }
     const tg = officialTarget(q); if (tg.error) return { error: tg.error };
     const s = p.signers.find((x) => (x.actor >>> 0) === (tg.actor >>> 0));
     return s ? { s } : { error: `${tg.label} has not signed the petition.` };
@@ -512,6 +517,80 @@ module.exports = (api) => {
     } catch (e) { log('rebellion: command failed', e.stack || e.message); r = { error: 'That cannot be done just now.' }; }
     personal(a, r.error || r.text);
   }, { help: 'risings against a hold\'s ruler: petition, sign, declare, join, raid (staff: list | show | cancel | end)' });
+
+  // ---- the Rebellion tab of the F3 Faction panel (front features/faction/rebellion.tsx) --------------------------------
+  // null while rebellion.enabled is off: the tab is hidden entirely. Signer names follow status(): only the petition's
+  // starter and leader (and Lead GMs, in staffPetitions) see them; a signer sees the count. Declared risings are public.
+  const stamp = (x) => (x ? { actor: x.actor >>> 0, name: x.name } : null);
+  const petitionView = (p, a, staffView) => {
+    const t = thresholdMet(p);
+    const me = a >>> 0;
+    const starter = (p.starter.actor >>> 0) === me, leader = (p.leader.actor >>> 0) === me;
+    const sees = starter || leader || staffView;
+    return {
+      id: p.id, zone: p.zone, holdName: holdName(p.zone), code: p.code, startedAt: p.startedAt, expiresAt: p.expiresAt,
+      count: t.n, needMin: t.need.min, needShare: t.need.share, citizens: t.need.citizens, mode: C.thresholdMode === 'any' ? 'any' : 'both',
+      needed: C.thresholdMode === 'any' ? Math.min(t.need.min, t.need.share) : Math.max(t.need.min, t.need.share), met: t.met, needText: needText(t),
+      starter: starter, leader: leader, starterName: sees ? p.starter.name : '', leaderName: sees ? p.leader.name : '',
+      claimant: sees ? stamp(p.claimant || p.leader) : null, name: p.name || defaultName(p.zone), named: !!p.name,
+      signers: sees ? p.signers.map((x) => ({ actor: x.actor >>> 0, name: x.name, starter: (x.actor >>> 0) === (p.starter.actor >>> 0), leader: (x.actor >>> 0) === (p.leader.actor >>> 0) })) : [],
+    };
+  };
+  const risingView = (r, a) => {
+    const w = call('__dboRealmWar', r.warId) || null;
+    const terr = (tid) => (call('__dboRealmTerritory', tid) || { name: tid }).name;
+    const leads = !!call('__dboRealmLeads', a, r.faction), rules = !!call('__dboRealmLeads', a, r.holdFaction);
+    const rebel = r.rebels.some((x) => (x.actor >>> 0) === (a >>> 0));
+    return {
+      id: r.id, name: r.name, zone: r.zone, holdName: holdName(r.zone), status: r.status, declaredAt: r.declaredAt, startsAt: r.startsAt,
+      leaderName: r.leader.name, claimantName: r.claimant ? r.claimant.name : '', capital: terr(r.capital), rebels: r.rebels.map((x) => x.name),
+      rebel, leads, rules,
+      canJoin: !!C.joinAfterDeclare && !rebel && citizenOf(a, r.zone) && !signRefusal(a, r.zone),
+      war: w ? { status: w.status, startsAt: w.startsAt, windows: (w.windows || []).map((x) => ({ start: x.start, end: x.end })), death: w.death || null,
+        captures: (w.captures || []).map((c) => ({ territory: terr(c.territory), at: c.at, byRebels: c.by === r.faction })) } : null,
+      // The ruler answers a proposed war to the death before the first battle
+      canAnswerDeath: rules && !!w && w.death === 'proposed' && Date.now() < Number(w.startsAt),
+    };
+  };
+  globalThis.__dboRebellionView = (a) => {
+    if (!C.enabled) return null;
+    a >>>= 0;
+    const mine = petitionSignedBy(a);
+    const lead = isLeadStaff(a);
+    const holds = citizenHolds(a).filter(isHold).map((zid) => ({ id: zid, name: holdName(zid), open: !signRefusal(a, zid) && !holdCooldown(zid) && !risingOf(zid) && !petitionOf(zid) }));
+    return {
+      rules: { noticeDays: C.noticeDays, windowsPerWar: C.windowsPerWar, windowHours: C.windowHours, deathWar: !!C.deathWar, petitionDays: C.petitionDays,
+        outlawDays: C.outlawDays, outlawBounty: C.outlawBounty, joinAfterDeclare: !!C.joinAfterDeclare },
+      petition: mine ? petitionView(mine, a, false) : null,
+      holds: mine ? [] : holds,
+      cooldownUntil: cooldownOf(a),
+      risings: data().risings.filter((r) => LIVE.has(r.status)).map((r) => risingView(r, a)),
+      staffPetitions: lead ? Object.keys(data().petitions).map(petitionOf).filter(Boolean).map((p) => petitionView(p, a, true)) : null,
+    };
+  };
+  // Each button is the /rebellion command's own function; the panel is redrawn with its answer (guilds.js)
+  if (typeof api.onUi === 'function') {
+    const nonceOk = (a, args) => typeof globalThis.__dboFactionNonceOk === 'function' && globalThis.__dboFactionNonceOk(a, (args || [])[0]);
+    const clean = (v) => String(v == null ? '' : v).replace(/[\r\n\t]+/g, ' ').trim().slice(0, 80);
+    const tab = (event, act) => api.onUi(event, (a, args) => {
+      if (!nonceOk(a, args)) return;
+      let r;
+      try { r = C.enabled ? act(a >>> 0, (args || []).slice(1)) : { error: 'Risings are not in force.' }; }
+      catch (e) { log('rebellion: panel action failed', e.stack || e.message); r = { error: 'That cannot be done just now.' }; }
+      r = r || { error: 'That cannot be done just now.' };
+      if (typeof globalThis.__dboFactionRefresh !== 'function' || !globalThis.__dboFactionRefresh(a, r.error || r.text, !r.error)) personal(a, r.error || r.text);
+    });
+    tab('rebellionTabPetition', (a, [zid]) => startPetition(a, clean(zid).toLowerCase() || zoneOfActor(a)));
+    tab('rebellionTabSign', (a, [code]) => sign(a, clean(code)));
+    tab('rebellionTabUnsign', (a) => unsign(a));
+    tab('rebellionTabLeader', (a, [actor]) => setLeader(a, { actor: Number(actor) >>> 0 }));
+    tab('rebellionTabClaimant', (a, [actor]) => setClaimant(a, { actor: Number(actor) >>> 0 }));
+    tab('rebellionTabName', (a, [name]) => setName(a, clean(name)));
+    tab('rebellionTabAbandon', (a) => abandon(a));
+    tab('rebellionTabDeclare', (a, [death]) => declare(a, death === true || death === 'death'));
+    tab('rebellionTabJoin', (a, [zid]) => join(a, clean(zid).toLowerCase() || null));
+    tab('rebellionTabDeath', (a, [accept]) => answerDeath(a, accept === true || accept === 'accept'));
+  }
 
   // ---- the tick: lapsed petitions, a war that began, and a war that ended without telling us (a reload between) ----------
   const tick = () => {

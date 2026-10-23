@@ -18,7 +18,13 @@
 'use strict';
 
 module.exports = (api) => {
-  const { log, personal, system, audit, who, display, nameOf, cfg, registerChatCommand, findByName, onlineActors, isAdmin } = api;
+  const { log, system, audit, who, display, nameOf, cfg, registerChatCommand, findByName, onlineActors, isAdmin } = api;
+  const onUi = typeof api.onUi === 'function' ? api.onUi : null;
+  // The F3 Faction panel's Guild tab runs the same commands: while one runs, what the command says to the one who used it
+  // is caught (CAP) and shown in the panel instead of chat; done() marks a line that says the thing was done
+  let CAP = null;
+  const personal = (a, t) => { if (CAP && CAP.a === (a >>> 0)) { CAP.lines.push(String(t)); return undefined; } return api.personal(a, t); };
+  const done = (a, t) => { if (CAP && CAP.a === (a >>> 0)) CAP.ok = true; return personal(a, t); };
   const staffNote = typeof api.staffNote === 'function' ? api.staffNote : () => {};
   const C = Object.assign({ enabled: true, maxMembers: 10, inviteMinutes: 10 }, (cfg && cfg.playerGuilds) || {});
   const fn = (n) => (typeof globalThis[n] === 'function' ? globalThis[n] : null);
@@ -50,7 +56,7 @@ module.exports = (api) => {
     if (made.error) return personal(a, made.error);
     audit(`GUILD ${who(a)} founded the guild ${made.name} (${made.id})`);
     note(a, '/guild create', `founded the guild ${made.name} (${made.id})`);
-    personal(a, `${made.name} is founded, and you are its Guildmaster. /guild invite <player> brings someone in; a guild holds ${maxMembers()}.`);
+    done(a, `${made.name} is founded, and you are its Guildmaster. /guild invite <player> brings someone in; a guild holds ${maxMembers()}.`);
     return personal(a, 'It shows on your Faction tab. A guild has no hall, no uniform, no treasury and no lands: it is a group of players, nothing more.');
   };
 
@@ -71,11 +77,13 @@ module.exports = (api) => {
     S.invites.set(t >>> 0, list);
     audit(`GUILD ${who(a)} invited ${who(t)} to ${b.name}`);
     system(t, `${nameOf(a)} invites you into the guild ${b.name}. /guild accept, or /guild decline.`);
-    return personal(a, `You invited ${nameOf(t)} to ${b.name}.`);
+    return done(a, `You invited ${nameOf(t)} to ${b.name}.`);
   };
 
-  const accept = (a) => {
-    const i = invitesOf(a)[0];
+  // fid: the panel names which invitation; chat takes the first
+  const pick = (a, fid) => invitesOf(a).find((x) => !fid || x.fid === String(fid));
+  const accept = (a, fid) => {
+    const i = pick(a, fid);
     if (!i) return personal(a, 'Nobody has invited you to a guild.');
     S.invites.delete(a >>> 0);
     if (!fn('__dboGuildInvite')) return personal(a, 'Guilds are not available right now.');
@@ -83,9 +91,15 @@ module.exports = (api) => {
     const r = fn('__dboBandJoin') ? fn('__dboBandJoin')(a, i.fid) : { error: 'Guilds are not available right now.' };
     if (r.error) return personal(a, r.error);
     audit(`GUILD ${who(a)} joined ${i.name}`);
-    return personal(a, `You are a Member of ${i.name}.`);
+    return done(a, `You are a Member of ${i.name}.`);
   };
-  const decline = (a) => { const i = invitesOf(a)[0]; S.invites.delete(a >>> 0); return personal(a, i ? `You declined ${i.name}.` : 'Nobody has invited you to a guild.'); };
+  const decline = (a, fid) => {
+    const i = pick(a, fid);
+    if (!i) return personal(a, 'Nobody has invited you to a guild.');
+    const rest = invitesOf(a).filter((x) => x.fid !== i.fid);
+    if (rest.length && fid) S.invites.set(a >>> 0, rest); else S.invites.delete(a >>> 0);
+    return done(a, `You declined ${i.name}.`);
+  };
 
   const show = (a) => {
     const b = bandOf(a);
@@ -103,16 +117,17 @@ module.exports = (api) => {
     return undefined;
   };
 
-  registerChatCommand('guild', (a, args) => {
+  const run = (a, args) => {
     const [sub, ...rest] = String(args || '').trim().split(/\s+/);
     const s = (sub || '').toLowerCase();
     const body = rest.join(' ').trim();
     if (C.enabled === false && s !== 'list') return personal(a, 'Guilds are closed right now.');
     if (!s || s === 'show') return show(a);
     if (s === 'create') return create(a, body);
-    if (s === 'invite') return invite(a, rest[0]);
-    if (s === 'accept') return accept(a);
-    if (s === 'decline') return decline(a);
+    // the whole rest, so a name with a space in it is found
+    if (s === 'invite') return invite(a, body);
+    if (s === 'accept') return accept(a, rest[0]);
+    if (s === 'decline') return decline(a, rest[0]);
     if (s === 'list') return list(a);
     if (s === 'dissolve') {
       if (!isAdmin(a)) return personal(a, 'Staff only.');
@@ -123,7 +138,7 @@ module.exports = (api) => {
       audit(`GUILD GM ${who(a)} dissolved ${r.name} (${id}): ${why}`);
       note(a, '/guild dissolve', `dissolved the guild ${r.name} (${id}): ${why}`);
       for (const m of r.members) if (onlineActors().includes(m)) system(m, `${r.name} has been dissolved by staff: ${why}`);
-      return personal(a, `${r.name} is dissolved.`);
+      return done(a, `${r.name} is dissolved.`);
     }
     const b = bandOf(a);
     if (!b) return personal(a, 'You are in no guild. /guild create <name> makes one.');
@@ -137,9 +152,9 @@ module.exports = (api) => {
       if (((bands().find((x) => x.id === b.id) || {}).members || 0) === 0 && fn('__dboBandDissolve')) {
         fn('__dboBandDissolve')(b.id);
         audit(`GUILD ${b.name} closed: its last member left`);
-        return personal(a, `You left ${b.name}, and with nobody in it the guild is closed.`);
+        return done(a, `You left ${b.name}, and with nobody in it the guild is closed.`);
       }
-      return personal(a, typeof r === 'string' ? r : `You left ${b.name}.`);
+      return typeof r === 'string' ? personal(a, r) : done(a, `You left ${b.name}.`);
     }
     if (s === 'kick' || s === 'promote' || s === 'demote') {
       const t = findByName(rest[0] || '');
@@ -151,7 +166,7 @@ module.exports = (api) => {
         const r = fn('__dboGuildKick') ? fn('__dboGuildKick')(a, b.id, t) : { error: 'Guilds are not available right now.' };
         if (r.error) return personal(a, r.error);
         audit(`GUILD ${who(a)} removed ${who(t)} from ${b.name}`);
-        return personal(a, r.text || `${nameOf(t)} is out of ${b.name}.`);
+        return done(a, r.text || `${nameOf(t)} is out of ${b.name}.`);
       }
       if (!isMaster(a)) return personal(a, `Only ${b.name}'s Guildmaster sets its ranks.`);
       const want = s === 'promote' ? Math.max(0, tb.rank - 1) : Math.min(2, tb.rank + 1);
@@ -159,7 +174,7 @@ module.exports = (api) => {
       const r = fn('__dboGuildSetRank') ? fn('__dboGuildSetRank')(a, b.id, t, want, false) : { error: 'Guilds are not available right now.' };
       if (r.error) return personal(a, r.error);
       audit(`GUILD ${who(a)} made ${who(t)} rank ${want} of ${b.name}`);
-      return personal(a, r.text || `${nameOf(t)} is set.`);
+      return done(a, r.text || `${nameOf(t)} is set.`);
     }
     if (s === 'rename') {
       if (!isMaster(a)) return personal(a, `Only ${b.name}'s Guildmaster renames it.`);
@@ -171,7 +186,7 @@ module.exports = (api) => {
       if (r.error) return personal(a, r.error);
       audit(`GUILD ${who(a)} renamed ${r.was} to ${r.name}`);
       note(a, '/guild rename', `renamed the guild ${r.was} to ${r.name}`);
-      return personal(a, `${r.was} is called ${r.name} now.`);
+      return done(a, `${r.was} is called ${r.name} now.`);
     }
     if (s === 'disband') {
       if (!isMaster(a)) return personal(a, `Only ${b.name}'s Guildmaster closes it.`);
@@ -180,12 +195,60 @@ module.exports = (api) => {
       audit(`GUILD ${who(a)} disbanded ${r.name}`);
       note(a, '/guild disband', `disbanded the guild ${r.name} (${b.id})`);
       for (const m of r.members) if (m !== (a >>> 0) && onlineActors().includes(m)) system(m, `${r.name} has been disbanded by its Guildmaster.`);
-      return personal(a, `${r.name} is closed.`);
+      return done(a, `${r.name} is closed.`);
     }
     return personal(a, 'Guilds: /guild create <name> | invite <player> | accept | decline | show | list | leave | kick <player> | promote <player> | demote <player> | rename <name> | disband'
       + (isAdmin(a) ? ' | dissolve <id> <reason> (staff)' : ''));
-  }, { help: '<create|invite|accept|show|list|leave|kick|promote|demote|rename|disband>: an informal player guild, up to ' + (Number(C.maxMembers) || 10) });
+  };
+  registerChatCommand('guild', run, { help: '<create|invite|accept|show|list|leave|kick|promote|demote|rename|disband>: an informal player guild, up to ' + (Number(C.maxMembers) || 10) });
+
+  // ---- the Guild tab of the F3 Faction panel (front features/faction/guild.tsx) -------------------------------------------
+  // What the tab draws, inside guilds.js's faction payload (band): the rules, this character's guild or why they may have
+  // none, and the guild invitations waiting for them. The roster itself is the Members tab's (a band is a faction there).
+  const RULES = () => [
+    `Up to ${maxMembers()} members, the Guildmaster included.`,
+    'One guild per character.',
+    'No other faction: a member of any faction cannot found or join a guild. A faith or a magic college may stand beside it.',
+    'No wars, no territory, no hall, no uniform, no treasury: a guild is a group of players, nothing more.',
+  ];
+  globalThis.__dboGuildTabView = (a) => {
+    a >>>= 0;
+    const b = bandOf(a);
+    const g = b ? bands().find((x) => x.id === b.id) || {} : null;
+    return {
+      enabled: C.enabled !== false && !!fn('__dboBandCreate'),
+      maxMembers: maxMembers(),
+      rules: RULES(),
+      // Why this character may not be in a guild ('' when they may); only shown while they are in none
+      blocked: b ? '' : (fn('__dboBandBlocked') ? fn('__dboBandBlocked')(a) : '') || '',
+      mine: b ? { id: b.id, name: b.name, rank: b.rank, title: b.title, master: b.rank === 0, officer: b.rank <= 1, members: g.members || 1, guildmaster: g.master || '' } : null,
+      invites: invitesOf(a).map((i) => ({ id: i.fid, name: i.name, from: i.by })),
+    };
+  };
+  // Each button is the /guild command of the same name, through run(): the same checks, audits and staff notes. The panel
+  // is redrawn with what the command said (guilds.js __dboFactionRefresh), green when it was done, red when refused.
+  if (onUi) {
+    const nonceOk = (a, args) => typeof globalThis.__dboFactionNonceOk === 'function' && globalThis.__dboFactionNonceOk(a, (args || [])[0]);
+    const clean = (v) => String(v == null ? '' : v).replace(/[\r\n\t]+/g, ' ').trim().slice(0, 80);
+    const tab = (event, line) => onUi(event, (a, args) => {
+      if (!nonceOk(a, args)) return;
+      const cmd = line((args || []).slice(1));
+      if (cmd === null) return;
+      const cap = { a: a >>> 0, lines: [], ok: false };
+      CAP = cap;
+      try { run(a, cmd); } catch (e) { log('playerguilds: panel action failed', e.stack || e.message); cap.lines.push('That cannot be done just now.'); cap.ok = false; } finally { CAP = null; }
+      const text = cap.lines.join(' ') || (cap.ok ? 'Done.' : 'Nothing happened.');
+      if (typeof globalThis.__dboFactionRefresh !== 'function' || !globalThis.__dboFactionRefresh(a, text, cap.ok)) api.personal(a, text);
+    });
+    tab('guildTabCreate', ([name]) => `create ${clean(name)}`);
+    tab('guildTabRename', ([name]) => `rename ${clean(name)}`);
+    tab('guildTabDisband', () => 'disband');
+    tab('guildTabInvite', ([q]) => `invite ${clean(q)}`);
+    tab('guildTabAccept', ([fid]) => `accept ${clean(fid).replace(/\s+/g, '')}`);
+    tab('guildTabDecline', ([fid]) => `decline ${clean(fid).replace(/\s+/g, '')}`);
+    tab('guildTabLeave', () => 'leave');
+  }
 
   log(`player guilds: ${C.enabled === false ? 'OFF' : `on, up to ${maxMembers()} members`}, ${bands().length} guild(s)`);
-  return { create, invite, accept, show, list };
+  return { create, invite, accept, decline, show, list, run };
 };
