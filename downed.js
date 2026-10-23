@@ -54,6 +54,8 @@ module.exports = (api) => {
     priestTier: 4,
     hostileMs: 60000,
     reviveRange: 1500, reviveConeDeg: 25, reviveFallbackMs: 1200, groupReviveRange: 400,
+    // A body this close counts whatever the aim (23 Oct: a Priest standing over a body cast Heal Other 11 times, raised nobody)
+    reviveCloseRange: 210,
     // The Draught is poured by hand from as far as the gamemode lets anyone activate an actor: 6.5 m, 70 units each
     pourReach: 455,
     // A player who falls in beast form gets the panel again this long after, once their client has turned them back:
@@ -733,11 +735,25 @@ module.exports = (api) => {
         if (!isDead(t) || mp.get(t, 'worldOrCellDesc') !== here) continue;
         const p = mp.get(t, 'pos'); const dx = p[0] - cp[0], dy = p[1] - cp[1]; const dist = Math.hypot(dx, dy, p[2] - cp[2]);
         if (dist > range) continue;
-        if (coneDeg) { const bearing = Math.atan2(dx, dy) * 180 / Math.PI; const off = Math.abs(((bearing - ang + 540) % 360) - 180); if (off > coneDeg) continue; }
+        if (coneDeg && dist > C.reviveCloseRange) { const bearing = Math.atan2(dx, dy) * 180 / Math.PI; const off = Math.abs(((bearing - ang + 540) % 360) - 180); if (off > coneDeg) continue; }
         out.push([t, dist]);
       } catch (e) { /* gone */ }
     }
     return out.sort((x, y) => x[1] - y[1]).map((x) => x[0]);
+  };
+  // Measure only: where each fallen player stands from a caster whose heal found no body (cell, dead, distance, angle off aim)
+  const downedSeen = (caster) => {
+    let cp = null, ang = 0, here = null;
+    try { cp = mp.get(caster, 'pos'); ang = Number(mp.get(caster, 'angle')[2]) || 0; here = mp.get(caster, 'worldOrCellDesc'); } catch (e) { return 'caster unreadable'; }
+    const out = [];
+    for (const [t] of S.downed) {
+      try {
+        const p = mp.get(t, 'pos'); const dx = p[0] - cp[0], dy = p[1] - cp[1];
+        const off = Math.abs(((Math.atan2(dx, dy) * 180 / Math.PI - ang + 540) % 360) - 180);
+        out.push(`${display(t)} cell ${mp.get(t, 'worldOrCellDesc') === here ? 'same' : 'other'} dead ${isDead(t)} dist ${Math.round(Math.hypot(dx, dy, p[2] - cp[2]))} off ${Math.round(off)}`);
+      } catch (e) { out.push(`${t.toString(16)} unreadable`); }
+    }
+    return out.join('; ') || 'nobody down';
   };
   const chilledNear = (caster, range) => {
     let cp = null, here = null;
@@ -804,6 +820,7 @@ module.exports = (api) => {
               castStop.delete(caster);
               const t = downedNear(caster, Math.min(C.reviveRange, stop), C.reviveConeDeg)[0];
               if (t && canRaise(caster) && !undeadHeal(caster, t, spell)) { log(`downed: ${display(caster)} healing reached ${display(t)} without a hit, by aim`); revive(t, caster, 'healing'); }
+              else if (!t) log(`downed: ${display(caster)} healing found no body (stop ${Number.isFinite(stop) ? Math.round(stop) : '-'}): ${downedSeen(caster)}`);
             }, C.reviveFallbackMs));
           }
         } catch (e) { log(`downed: spell cast revive failed: ${e.message}`); }
