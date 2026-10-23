@@ -275,6 +275,7 @@ module.exports = (api) => {
   for (const [ref, name] of Object.entries(Object.assign({
     '327c1:Skyrim.esm': 'Vokun, dragon priest',   // High Gate Ruins
     '304f1:Skyrim.esm': 'the hagraven of Darklight Tower',   // /bug 1563109248869859368: her body gave feathers
+    '2335a:Skyrim.esm': 'Lu\'ah Al-Skaven',   // Ansilvund, /bug 1563132160985010210: neutral until hit (zone Hostile below)
   }, C.bossRefs && typeof C.bossRefs === 'object' ? C.bossRefs : {}))) {
     if (name === false || name === null) BOSS_REFS.delete(normDesc(ref)); else BOSS_REFS.set(normDesc(ref), String(name || ''));
   }
@@ -452,6 +453,8 @@ module.exports = (api) => {
         // Placed: Bethesda's placement, for its template's factions (factionCheck) whether or not the server loads it
         if (npc.ref) zone.Placed = npc.ref;
         if (npc.ref && anchorExists(npc.ref)) zone.Anchor = npc.ref;
+        // A named boss attacks on sight (as wildlife.js's Hostile zones): Lu'ah's own AI is Unaggressive, her vanilla quest made her hostile
+        if (named !== undefined) zone.Hostile = true;
         if (boss) out.bosses.push(zone.Name);
         if (named) out.bossNames[zone.Name] = named;
         out.push(zone);
