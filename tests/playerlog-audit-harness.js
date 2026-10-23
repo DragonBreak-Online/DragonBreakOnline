@@ -271,6 +271,98 @@ out = run('COURIER #12 robbed from Selene #K2QX (profile 2) by Rowan #PGDB (prof
 ok(out[0].ev === 'item.theft' && out[0].c === 'PGDB' && roleOf(out[0], 'K2QX') === 'victim' && out[0].f.items.length === 2 && out[0].f.items[0].i === 'Iron Ingot', 'COURIER robbed: the robber acts, the victim is the victim, the record-named list kept', out[0]);
 out = run('WAR w3: Rowan #PGDB (profile 1) killed Selene #K2QX (profile 2) in a war to the death');
 ok(out[0].f.op === 'war_kill' && out[0].c === 'PGDB' && roleOf(out[0], 'K2QX') === 'victim', 'WAR kill: killer and victim', out[0]);
+// ---- the verbs and sites of 23 Oct (elections, leadership doubles, staffguard) ------------------------------------------------
+// one act.<verb> in Rowan's post with n other parties (Selene the target when there is one), checked as the flush validates it;
+// its text, or what went wrong
+const actOf = (line, verb, n) => {
+  const o = run(line);
+  const v = o.length === 1 ? R.validate(o[0], new Map(), new Map()) : null;
+  const fine = v && v.ev === `act.${verb}` && v.c === 'PGDB' && (o[0].o || []).length === n && (n === 0 || roleOf(o[0], 'K2QX') === 'target') && !JSON.stringify([o, v]).includes(CANARY);
+  return fine ? v.f.text : JSON.stringify(o);
+};
+// ELECTION STAFF <staff> struck the vote of <voter> in <hold> (round N): <reason> (citizenship.js strikeVote): the reason is
+// what the Lead GM typed after the voter in /strikevote, so it goes, and a character it names never becomes a party; who
+// struck whose vote, where and in which round stay
+got = actOf(`ELECTION STAFF ${ROWAN} struck the vote of Selene #K2QX in Whiterun (round 1): ${CANARY} same PC as Dar #U6T6 (profile 4, <@44>)`, 'ELECTION', 0);
+ok(got === 'STAFF Rowan #PGDB struck the vote of Selene #K2QX in Whiterun (round 1)', 'ELECTION strike: the Lead GM\'s typed reason is cut (a character it names is no party); who struck whose vote, where and in which round stay', got);
+got = actOf(`ELECTION STAFF ${ROWAN} struck the vote of profile 7 in The Rift (round 2): ${CANARY} in Riften (round 9): "${CANARY} quoted" ${CANARY}`, 'ELECTION', 0);
+ok(got === 'STAFF Rowan #PGDB struck the vote of profile 7 in The Rift (round 2)', '...a voter known by profile only, a reason with a fake hold, round and a quote', got);
+out = run(`ELECTION STAFF A B C D E F G #PGDB (profile 1, <@337337773973569537>) struck the vote of Selene #K2QX in Whiterun (round 1): ${CANARY}`);
+ok(out.length === 0, '...a strike line the cut cannot read (a name of seven words) keeps nothing', out);
+got = actOf(`ELECTION STAFF ${ROWAN} undid the struck vote of Selene #K2QX in Whiterun`, 'ELECTION', 0);
+ok(got === 'STAFF Rowan #PGDB undid the struck vote of Selene #K2QX in Whiterun', '...the strike undone, and the other ELECTION lines, are not cut', got);
+// ELECTION <hold>: the vote of <name> (profile N, round N) is void|was already counted; staff review it: left <faction> <t>
+// before voting and joined <faction> <t> after (citizenship.js voidRejoin): a faction's name can be one a player chose (a
+// charter's or a rising's), so both go and the two times stay. The line names no party today, so it gives no event; the cut
+// is read directly, for the day the voter is named with who()
+const electionCut = (l) => { const d = R.AUDIT_VERBS.ELECTION; return d && typeof d.cut === 'function' ? d.cut(R.unquote(l), l) : R.unquote(l); };
+const VOID = (end) => `ELECTION Whiterun: the vote of Selene (profile 2, round 1) ${end}`;
+got = electionCut(VOID(`is void: left ${CANARY} Order 0 h 1 m before voting and joined ${CANARY} Rising 0 h 2 m after`));
+ok(got === VOID('is void: left a faction 0 h 1 m before voting and joined one 0 h 2 m after'), 'ELECTION vote void: both faction names (a charter\'s or a rising\'s can be a player\'s words) are cut, the times stay', got);
+got = electionCut(VOID(`was already counted; staff review it: left ${CANARY} 1 h 5 m before voting and joined ${CANARY} 2 h 0 m after ${CANARY}`));
+ok(got === VOID('was already counted; staff review it'), '...an end of any other shape keeps the head only', got);
+got = electionCut(VOID(`is void: left ${CANARY}" 0 h 1 m before voting and joined ${CANARY} 0 h 2 m after`));
+ok(got === VOID('is void'), '...and so does an end a quote took', got);
+out = run(VOID(`is void: left ${CANARY} 0 h 1 m before voting and joined Dar #U6T6 (profile 4, <@44>) 0 h 2 m after`));
+ok(out.length === 0, '...a faction name shaped like a character is never a party', out);
+// the line voidRejoin writes, built from citizenship.js itself (its audit template and its `why`, names filled with the
+// canary): the times are kept word for word and no name passes, so a reworded `why` fails here, not quietly in the log
+{
+  const csrc = fs.readFileSync(path.join(ROOT, 'citizenship.js'), 'utf8');
+  const vr = csrc.slice(csrc.indexOf('const voidRejoin = '), csrc.indexOf('const courtNotice = '));
+  const whyT = (vr.match(/const why = `([^`]*)`;/) || [])[1] || '';
+  const why = whyT.replace('${w.leftName}', `${CANARY} Order`).replace('${joined}', `${CANARY} Rising`).replace(/\$\{hm\([^}]*\)\}/g, '3 h 4 m');
+  const site = sites.find((s) => s.file === 'citizenship.js' && s.t.includes(': the vote of ${w.name} '));
+  const line = (open) => (site ? site.t : '').replace('${z.name}', 'Whiterun').replace('${w.name}', 'Selene').replace('${pid}', '2').replace('${w.round}', '1')
+    .replace(/\$\{open \? '([^']*)' : '([^']*)'\}/, (m, a, b) => (open ? a : b)).replace('${why}', why);
+  const want = (end) => VOID(`${end}: left a faction 3 h 4 m before voting and joined one 3 h 4 m after`);
+  const lines = [line(true), line(false)];
+  ok(whyT && site && !lines.some((l) => l.includes('${')) && electionCut(lines[0]) === want('is void') && electionCut(lines[1]) === want('was already counted; staff review it'),
+    '...the line voidRejoin writes (its template and `why` read from citizenship.js) keeps the times and no faction name', lines.map(electionCut));
+}
+// LEADERSHIP <double> (account N) still holds N leadership seats, N days after being told to step down: <seats> (leadership.js
+// sweep): a notice to staff, not something the player did, and its seats are rank titles a faction's leader or a Lead GM
+// renames, player-named charters and risings: staff only, never read
+{
+  const n0 = K.S.auditUnknown.get('LEADERSHIP') || 0;
+  out = run(`LEADERSHIP Selene #K2QX (account 2) still holds 2 leadership seats, 7 days after being told to step down: ${CANARY} Captain of ${CANARY} Rising and Jarl of Whiterun. Nothing has been taken away; /leadership audit lists every double.`);
+  ok((R.AUDIT_VERBS.LEADERSHIP || {}).cls === 'excluded' && out.length === 0 && (K.S.auditUnknown.get('LEADERSHIP') || 0) === n0, 'LEADERSHIP double: classed excluded (staff only), no event and no unknown-verb count', { cls: (R.AUDIT_VERBS.LEADERSHIP || {}).cls, out, unknown: K.S.auditUnknown.get('LEADERSHIP') });
+}
+// STAFFREF <staff> <kind> on <target|profile N> under <ref> and STAFFREF <staff> works on <target> under <ref> for N minutes
+// (staffguard.js): a ticket's id is whatever the staff member typed (parseRef, never checked), so it goes and "a ticket"
+// stands for it; a GM call's number (an open call), "(held)", the kind, the parties and the minutes stay. The staff member
+// acts and the character worked on is the target
+got = actOf(`STAFFREF ${ROWAN} rename on ${SELENE} under ticket ${CANARY}-griefer.alt/of#K2QX`, 'STAFFREF', 1);
+ok(got === 'rename on Selene #K2QX under a ticket', 'STAFFREF: a ticket\'s typed id is cut ("a ticket" stands for it); who, the kind and whom stay, the target in their post', got);
+got = actOf(`STAFFREF ${ROWAN} faction on ${SELENE} under GM call #5 (held)`, 'STAFFREF', 1);
+ok(got === 'faction on Selene #K2QX under GM call #5 (held)', '...a GM call held is kept', got);
+got = actOf(`STAFFREF ${ROWAN} office on profile 2 under ticket ##K2QX${CANARY}`, 'STAFFREF', 0);
+ok(got === 'office on profile 2 under a ticket', '...a target named by profile only (no party), with a ticket shaped like a #TAG', got);
+got = actOf(`STAFFREF ${ROWAN} works on ${SELENE} under ticket ${CANARY} for 60 minutes`, 'STAFFREF', 1);
+ok(got === 'works on Selene #K2QX under a ticket for 60 minutes', '...a /staffref bind on a ticket: the minutes stay, the id never', got);
+got = actOf(`STAFFREF ${ROWAN} works on ${SELENE} under GM call #12 for 60 minutes ${CANARY} Dar #U6T6 (profile 4, <@44>)`, 'STAFFREF', 1);
+ok(got === 'works on Selene #K2QX', '...an end of any other shape keeps who worked on whom only (a character in it is no party)', got);
+out = run(`STAFFREF A B C D E F G #PGDB (profile 1, <@337337773973569537>) rename on ${SELENE} under ticket ${CANARY}`);
+ok(out.length === 0, '...a line the cut cannot read (a name of seven words) keeps nothing', out);
+// every reference staffguard.js writes (refText and the held call, read from the file) passes the cut as it should: a call
+// word for word, a ticket's id never, so a reworded reference fails here
+{
+  const ssrc = fs.readFileSync(path.join(ROOT, 'staffguard.js'), 'utf8');
+  const rt = ssrc.match(/const refText = \(r\) => \(r\.kind === 'call' \? `([^`]*)` : `([^`]*)`\);/);
+  const hd = ssrc.match(/return held \? \{ text: `([^`]*)` \} : null;/);
+  const refs = rt && hd ? [[rt[1].replace('${r.n}', '12'), true], [hd[1].replace('${held.n}', '5'), true], [rt[2].replace('${r.id}', `${CANARY}-x`), false]] : [];
+  const bad = refs.filter(([ref, keep]) => actOf(`STAFFREF ${ROWAN} works on ${SELENE} under ${ref} for 60 minutes`, 'STAFFREF', 1) !== `works on Selene #K2QX under ${keep ? ref : 'a ticket'} for 60 minutes`
+    || actOf(`STAFFREF ${ROWAN} citizenship on ${SELENE} under ${ref}`, 'STAFFREF', 1) !== `citizenship on Selene #K2QX under ${keep ? ref : 'a ticket'}`);
+  ok(refs.length === 3 && !refs.some(([r]) => r.includes('${')) && bad.length === 0, `...each reference staffguard.js writes (${refs.length} of 3) passes the cut: a call word for word, a ticket's id never`, bad);
+}
+// STAFFGUARD <staff> used a staff tool (<kind>) on the staff account of <target>, STAFFCHAR <staff> marked|unmarked <target> as
+// a staff character (staffguard.js): identities and the code's own words; the staff member acts, the other is the target
+got = actOf(`STAFFGUARD ${ROWAN} used a staff tool (skills) on the staff account of ${SELENE}`, 'STAFFGUARD', 1);
+ok(got === 'used a staff tool (skills) on the staff account of Selene #K2QX', 'STAFFGUARD: who used which kind of tool on whose staff account, the target in their post', got);
+got = actOf(`STAFFCHAR ${ROWAN} marked ${SELENE} as a staff character`, 'STAFFCHAR', 1);
+ok(got === 'marked Selene #K2QX as a staff character', 'STAFFCHAR: who marked whom, the character marked in their post', got);
+got = actOf(`STAFFCHAR ${ROWAN} unmarked ${SELENE} as a staff character`, 'STAFFCHAR', 1);
+ok(got === 'unmarked Selene #K2QX as a staff character', '...and unmarked', got);
 // ---- reclassified and list-keeping verbs --------------------------------------------------------------------------------------
 out = run(`THEFT Rowan #PGDB (profile 1) picked ${CANARY} from Selene #K2QX (profile 2) (32%)`);
 ok(out[0] && out[0].ev === 'item.theft' && out[0].f.kind === 'pickpocket' && !JSON.stringify(out).includes(CANARY), 'THEFT with a custom-named item: the parties and the outcome, never the label', out);
