@@ -42,9 +42,12 @@ module.exports = (api) => {
   const pidOf = (a) => Number(profileOf(a));
 
   // The ruler is the hold's first office; the Steward its 'steward'
+  // A ruler or Steward seen as a beast in this hold (exposure.js) sets and lifts no bounty there until cleared
+  const barred = (a, zid) => { try { return typeof globalThis.__dboExposureBarred === 'function' ? String(globalThis.__dboExposureBarred(a, zid) || '') : ''; } catch (e) { return ''; } };
   const mayDeclare = (a, zid) => {
     if (isLeadStaff(a)) return true;
     const z = zoneById(zid); if (!z) return false;
+    if (barred(a, zid)) return false;
     const seats = (readOfficials() || {})[zid] || {};
     const pid = pidOf(a);
     const ruler = (z.officials || [])[0];
@@ -172,6 +175,7 @@ module.exports = (api) => {
   };
   const setBounty = (a, zid, rest) => {
     if (!zid) return 'Stand in the hold whose bounty you set.';
+    if (!isLeadStaff(a) && barred(a, zid)) return barred(a, zid);
     if (!mayDeclare(a, zid)) return `Only the ruler or the Steward of ${holdName(zid)} sets a bounty there.`;
     const m = /^(.+?)\s+(\d+)\s+(.+)$/.exec(String(rest || '').trim());
     if (!m) return `Usage: /bounty set <name or #TAG> <gold, up to ${C.max}> <reason>`;
@@ -189,6 +193,7 @@ module.exports = (api) => {
   };
   const clearBounty = (a, zid, rest) => {
     if (!zid) return 'Stand in the hold whose bounty you clear.';
+    if (!isLeadStaff(a) && barred(a, zid)) return barred(a, zid);
     if (!mayDeclare(a, zid)) return `Only the ruler or the Steward of ${holdName(zid)} clears a bounty there.`;
     const tg = officialTarget(String(rest || '').trim()); if (tg.error) return tg.error;
     const list = data().zones[zid] || {};
@@ -216,6 +221,7 @@ module.exports = (api) => {
   // A bounty lifted from the journal names its outlaw by profile id, not by a name to look up again
   const clearByPid = (a, zid, pid) => {
     if (!zid) return 'Stand in the hold whose bounty you clear.';
+    if (!isLeadStaff(a) && barred(a, zid)) return barred(a, zid);
     if (!mayDeclare(a, zid)) return `Only the ruler or the Steward of ${holdName(zid)} clears a bounty there.`;
     const list = data().zones[zid] || {}; const b = list[String(Number(pid))];
     if (!b) return 'That bounty is already gone.';

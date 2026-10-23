@@ -393,7 +393,7 @@ const TIER_LABEL = { senior: 'Senior', developer: 'Developer', leadgm: 'Lead GM'
 // out of the hold treasury, so a GM who could appoint himself could pay himself (claude-jake's review, A1-1).
 // /chargen is open to every GM (Nate, 12 Oct), and to a Trial GM through TRIAL_COMMANDS
 const LEAD_ONLY = new Set(['rerollrefund', 'beastform', 'polymorph', 'vlremote', 'wwremote', 'feedpair', 'sethunger', 'wipechars', 'driftspawn', 'driftrepair', 'driftset',
-  'jail', 'placeexport', 'staffstats', 'war', 'curse', 'schedule', 'warband', 'raid', 'settime', 'timescale', 'setweather', 'npc remove', 'dungeon end',
+  'jail', 'placeexport', 'staffstats', 'war', 'exposure', 'curse', 'schedule', 'warband', 'raid', 'settime', 'timescale', 'setweather', 'npc remove', 'dungeon end',
   'appoint', 'dismiss',
   // Handing out a smithing manual is handing out an item (the T5 ones are given in roleplay, like artifacts)
   'manual grant',
@@ -1051,7 +1051,8 @@ const STAFF_HELP = [
   { key: 'announce', title: 'Announcements and restarts', items: [['admin', '<text>: talk in this admin tab'], 'announce', 'schedule', 'update'] },
   { key: 'factions', title: 'Factions', items: [['faction leader', '<player|#TAG> <faction id>: name the first leader of a faction'],
     ['faction remove', '<name|#TAG> <faction id>: take someone out of a faction'], ['faction hallmark', "<faction id>, at a building's door: its faction's hall (hallunmark undoes it)"], ['faction list', 'every faction id, secret ones included'], 'ledgerpoint',
-    ['rolename', 'list <court|faction> | <court> <office> <new title> | <faction> <rank number> <new title> | reset <court> <office> | reset <faction> <rank number>: rename an office or rank for everyone who holds it, at once (Lead GM; F3 Court and the Faction tab\'s rank editor do it too)'], 'war'] },
+    ['rolename', 'list <court|faction> | <court> <office> <new title> | <faction> <rank number> <new title> | reset <court> <office> | reset <faction> <rank number>: rename an office or rank for everyone who holds it, at once (Lead GM; F3 Court and the Faction tab\'s rank editor do it too)'], 'war',
+    ['exposure', '[list] | clear <name|#TAG|profile id> [hold] <reason>: werewolves and Vampire Lords seen changing, by hold, with the hunters who saw it; clear one (audited)']] },
   { key: 'appoint', title: 'Appointments and property', items: [
     ['appoint', '<player|#TAG|profile id> <zone> <rank> [override]: make someone an official, online or offline. A Jarl must be a Breton, a Nord or an Imperial; only the Owners may add override. /appoint alone lists the zone ids; a wrong rank lists that zone\'s ranks. Rulers name 5 Stewards, 2 Court Mages, a Guard Captain and any number of Guards; Chieftains 5 Banes, a Shaman, a Wise-Woman, a Guard Commander and any number of Guards; captains name Guards'],
     ['dismiss', '<player|#TAG|profile id> <zone>: remove an official, online or offline (told if online). Officials may dismiss the ranks they may appoint'],
@@ -4625,6 +4626,8 @@ const appointCheck = (a, z, rank, tg, override) => {
   const cap = appointCap(a, z, rank);
   if (!cap) return { error: `Only a Lead GM or above, or a seat that may name a ${rankTitle(rank, z.id)}, can appoint one in ${z.name}.` };
   if (override && tierOf(a) !== 'senior') return { error: 'Only the Owners can override the Jarl rule.' };
+  // An official seen as a beast in this hold appoints nobody there until cleared (exposure.js)
+  if (!isLeadStaff(a) && typeof globalThis.__dboExposureBarred === 'function') { const no = globalThis.__dboExposureBarred(a, z.id); if (no) return { error: no }; }
   // Plain guards and the court's advisers are no leadership; every other office is
   if (!STAFF_MAY_HOLD.has(rank) && typeof globalThis.__dboIsStaff === 'function' && globalThis.__dboIsStaff(tg.actor)) return { error: `${tg.label} is on the staff. Staff hold no leading office in a court.` };
   let overridden = '';
@@ -6526,6 +6529,7 @@ const hitDamageHook = (aggressorId, targetId, sourceId, damage, ...rest) => {
   try { if (globalThis.__dboBlackreachHit && dealt > 0) globalThis.__dboBlackreachHit(agg, tgt); } catch (e) { log('blackreach hit failed', e.message); }
   try { dealt += superBonusDamage(agg, tgt, Number(sourceId) >>> 0, dealt); } catch (e) { log('supernatural damage failed', e.message); }
   try { if (globalThis.__dboSuperHit && dealt > 0) globalThis.__dboSuperHit(agg, tgt); } catch (e) { log('supernatural hit failed', e.message); }
+  try { if (globalThis.__dboExposureHit && dealt > 0) globalThis.__dboExposureHit(agg, tgt); } catch (e) { log('exposure hit failed', e.message); }
   try { if (globalThis.__dboAggroHit && dealt > 0) globalThis.__dboAggroHit(agg, tgt); } catch (e) { log('aggro hit failed', e.message); }
   try { if (globalThis.__dboCompanionHitLanded) globalThis.__dboCompanionHitLanded(agg, tgt); } catch (e) { log('companion hit log failed', e.message); }
   try { if (globalThis.__dboNpcMoodHit) globalThis.__dboNpcMoodHit(agg, tgt, Number(sourceId) >>> 0); } catch (e) { log('npc mood hit failed', e.message); }
@@ -8984,6 +8988,13 @@ try {
   require(OUTLAWS_JS)({ mp, log, personal, system, audit, who, display, cfg, registerChatCommand, zoneOfActor, zoneById, readOfficials,
     profileOf, officialTarget, onlineActors, giveItem, isLeadStaff, onUi });
 } catch (e) { log('outlaws.js failed to load:', e.stack || e.message); globalThis.__dboOutlawJailed = null; }
+// ---- a werewolf or Vampire Lord seen changing: known in the hold, a bounty, guards and hunters told (server\exposure.js) --
+try {
+  const EXPOSURE_JS = path.resolve('exposure.js');
+  delete require.cache[EXPOSURE_JS];
+  require(EXPOSURE_JS)({ mp, log, personal, system, audit, who, display, cfg, registerChatCommand, zoneOfActor, zoneById, readOfficials,
+    profileOf, officialTarget, onlineActors, isAdmin, isLeadStaff, every });
+} catch (e) { log('exposure.js failed to load:', e.stack || e.message); for (const k of ['__dboBeastWitnessed', '__dboExposureHit', '__dboExposureBounty', '__dboExposureBarred', '__dboExposedIn', '__dboExposureCourtView']) globalThis[k] = null; }
 // ---- the Green Pact: the wood elves' taboo on plants and the Partaking of the slain (server\greenpact.js) ----------------
 try {
   const GREENPACT_JS = path.resolve('greenpact.js');

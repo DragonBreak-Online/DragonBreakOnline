@@ -220,7 +220,10 @@ module.exports = (api) => {
     // The hold's terms for its standing hunting contracts (contracts.js __dboContractTerms), only where a treasury pays them
     let contracts = null;
     try { if (z.treasury && globalThis.__dboContractTerms) contracts = globalThis.__dboContractTerms.view(a, z.id) || null; } catch (e) { contracts = null; }
-    return { id: z.id, name: z.name, kind: z.center ? 'stronghold' : z.capital ? 'hold' : 'region', mine: !!mine, offices, outgoing, household, treasury, tax, keepsBooks, contracts,
+    // Beasts seen changing in the hold (exposure.js), for its officials and staff
+    let exposed = null;
+    try { if (typeof globalThis.__dboExposureCourtView === 'function') exposed = globalThis.__dboExposureCourtView(a, z.id); } catch (e) { exposed = null; }
+    return { id: z.id, name: z.name, kind: z.center ? 'stronghold' : z.capital ? 'hold' : 'region', mine: !!mine, offices, outgoing, household, treasury, tax, keepsBooks, contracts, exposed,
       appointable: offices.filter((o) => o.canAppoint).map((o) => ({ rank: o.rank, title: o.title })), canName };
   };
   const visible = (a) => {

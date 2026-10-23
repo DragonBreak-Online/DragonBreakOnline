@@ -264,7 +264,7 @@ module.exports = (api) => {
     personal(a, key === 'werewolf' ? `The beast takes you for ${seconds} seconds.${hold ? ` You cannot turn back for the first ${hold}.` : ''}` : 'You take the form of a Vampire Lord. Press 9, then your Shout key, to revert.');
     for (const line of legend(key)) personal(a, line);
     audit(`BEAST ${who(a)} took ${f.name}`);
-    witness(a, key === 'werewolf' ? 'twist into a beast' : 'rise into a Vampire Lord');
+    witness(a, key === 'werewolf' ? 'twist into a beast' : 'rise into a Vampire Lord', key, 'in');
     sendBeastBodies();
     try { if (globalThis.__dboBeastChanged) globalThis.__dboBeastChanged(a, key, true); } catch (e) { log('beast change hook failed', e.message); }
     return '';
@@ -278,10 +278,10 @@ module.exports = (api) => {
   };
   // Anyone close enough sees the change
   const WITNESS_RADIUS = 3000;
-  const witness = (a, what) => {
+  const witness = (a, what, form, phase) => {
     let here = null, pos = null;
     try { here = mp.get(a, 'worldOrCellDesc'); pos = mp.get(a, 'pos'); } catch (e) { log(`beastform: no place to witness ${what}: ${e.message}`); return; }
-    let n = 0, near = 0;
+    let n = 0, near = 0; const seers = [];
     for (const o of api.onlineActors()) {
       if (o === a) continue;
       try {
@@ -289,10 +289,12 @@ module.exports = (api) => {
         if (mp.get(o, 'worldOrCellDesc') !== here || Math.hypot(p[0] - pos[0], p[1] - pos[1], p[2] - pos[2]) > WITNESS_RADIUS) continue;
         near++;
         personal(o, `You see ${nameTo(o, a)} ${what}.`);
-        n++;
+        n++; seers.push(o);
       } catch (e) { log(`beastform: witness skipped ${o.toString(16)}: ${e.message}`); }
     }
     log(`beastform: ${display(a)} ${what}, ${n} of ${near} near saw it`);
+    // exposure.js: enough witnesses make the beast known in the hold
+    try { if (form && typeof globalThis.__dboBeastWitnessed === 'function') globalThis.__dboBeastWitnessed(a, form, seers, phase); } catch (e) { log('beastform: exposure hook failed', e.message); }
   };
 
   // Beast Form is a Greater Power (Skyrim.esm 92c48, SPIT type 2): the player's own game lets it be cast once a game day,
@@ -351,7 +353,7 @@ module.exports = (api) => {
     if (s.form === 'werewolf' && (why === 'asked to revert' || why === 'time up')) tellChangeAgain(a);
     // A staff polymorph ends in silence, whatever ended it (Jake, 22 Oct): no line to anyone near, only the staff audit
     if (isCreatureState(s)) polymorphEnded(a, s, why);
-    else witness(a, s.form === 'werewolf' ? 'shed the beast and stand as a mortal again' : 'sink back into mortal form');
+    else witness(a, s.form === 'werewolf' ? 'shed the beast and stand as a mortal again' : 'sink back into mortal form', s.form, 'out');
     sendBeastBodies();
     try { if (globalThis.__dboBeastChanged) globalThis.__dboBeastChanged(a, s.form, false); } catch (e) { log('beast change hook failed', e.message); }
     return true;

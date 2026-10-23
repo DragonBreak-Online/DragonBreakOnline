@@ -1848,5 +1848,12 @@
   "stamina": { "enabled": true, "sprintSpeed": 500, "sprintSeconds": 20, "windowSeconds": 30, "fullAt": 0.95, "dropBy": 0.02 },
   "fork": {},
   "bridge": { "pushClasses": false }
+ },
+ "exposure": {
+  "_comment": "exposure.js (bundle 1023): a werewolf or Vampire Lord seen changing by at least `witnesses` players (staff in an admin mode and the invisible not counted) is known in that hold for `days`: a bounty through outlaws.js (cityBounty in a city, wildsBounty in the wilds, x hurtMultiplier if they hurt someone in that shape), the hold's guard NPCs set on them while the bounty stands (ff_huntedIn, client part), its officials and guards and the hunter orders told, the Court tab lists it, and an exposed official loses court powers there. A cure or /exposure clear (Lead GM, with a reason) clears it. enabled false + hot reload switches it all off.",
+  "enabled": true, "witnesses": 3, "days": 7, "cityBounty": 500, "wildsBounty": 200, "hurtMultiplier": 2, "cityRadius": 5000,
+  "guardsHostile": true, "courtPowers": true, "notices": true,
+  "hunters": { "werewolf": ["vigil-of-stendarr", "silver-hand"], "vampireLord": ["dawnguard", "vigil-of-stendarr"] },
+  "exempt": [{ "faction": "companions", "zone": "whiterun", "titles": ["Harbinger", "Elder of Jorrvaskr"], "roles": ["leader", "officer"] }]
  }
 }

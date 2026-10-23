@@ -528,6 +528,7 @@ excluded('WRITTEN', 'a written work\'s title, quoted');
 excluded('EVENT', 'the event announcement\'s text');
 excluded('GUILD', 'player guild names, a GM\'s reason');
 excluded('BOUNTY', 'the reason a ruler gave for a bounty');
+excluded('EXPOSURE', 'staff only: who was seen changing into a beast, its witnesses and a GM\'s reason');
 excluded('REBELLION', 'player-named risings and a secret petition\'s code');
 excluded('REFERRAL', 'staff only: profiles by number, staff reasons, PC sharing');
 excluded('SHOP', 'business names and the failure reasons');
@@ -1553,6 +1554,11 @@ naming.js NAME d8ef2ef4 parsed
 nobility.js NOBILITY 97cfe241 parsed
 nobility.js NOBILITY 2022e40c parsed
 orphans.js ORPHAN 79ab9d5e excluded
+exposure.js EXPOSURE 14e39400 excluded
+exposure.js EXPOSURE 5f33fd21 excluded
+exposure.js EXPOSURE 7d6e979d excluded
+exposure.js EXPOSURE 9d89712e excluded
+exposure.js EXPOSURE a498daa8 excluded
 outlaws.js BOUNTY 30a8bfe5 excluded
 outlaws.js BOUNTY 16cb8c4f excluded
 outlaws.js BOUNTY 2eaae5ee excluded

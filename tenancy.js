@@ -139,6 +139,8 @@ module.exports = (api) => {
     let hallOf = ''; try { hallOf = typeof globalThis.__dboForeignHall === 'function' ? globalThis.__dboForeignHall([primary, d]) : ''; } catch (e) { hallOf = ''; }
     if (hallOf) return { err: `This is the hall of ${hallOf}. The hold does not rent or sell it.` };
     return { door: primary, key: hex(primary), L: data().listings[hex(primary)], rec: H.recordOf(primary) || { owner: 0 }, manager: (x) => {
+      // An official seen as a beast in the hold they stand in (exposure.js) sells and lets nothing there until cleared
+      try { if (typeof globalThis.__dboExposureBarred === 'function' && globalThis.__dboExposureBarred(x)) return false; } catch (e) { /* exposure not loaded */ }
       if (H.isManager(x, primary)) return true;
       if (!fiefHolderAt(x, primary)) return false;
       audit(`PROPERTY ${who(x)} acts as the fief holder at ${hex(primary)}`);

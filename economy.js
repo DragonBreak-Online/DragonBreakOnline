@@ -94,7 +94,8 @@ module.exports = (api) => {
   const fn = (name) => (typeof globalThis[name] === 'function' ? globalThis[name] : null);
   const info = (fid) => (fn('__dboGuildInfo') ? fn('__dboGuildInfo')(fid) : null);
   const nameOfFaction = (fid) => (info(fid) || {}).name || fid;
-  const leads = (a, fid) => (fn('__dboRealmLeads') ? !!fn('__dboRealmLeads')(a, fid) : false);
+  // A hold's ruler seen as a beast there (exposure.js) keeps no books for it until cleared
+  const leads = (a, fid) => (fn('__dboRealmLeads') ? !!fn('__dboRealmLeads')(a, fid) : false) && !(() => { const z = holdZoneOf(fid); try { return !!z && !!fn('__dboExposureBarred') && !!fn('__dboExposureBarred')(a, z); } catch (e) { return false; } })();
   const treasury = () => globalThis.__dboTreasury || null;
   const accountActors = (pid) => { try { return (mp.getActorsByProfileId(pid) || []).map((x) => Number(x) >>> 0); } catch (e) { return []; } };
   const balanceOf = (a) => { try { const v = Number(mp.get(a, BALANCE)); return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0; } catch (e) { return 0; } };
