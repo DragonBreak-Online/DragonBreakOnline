@@ -328,7 +328,7 @@ module.exports = (api) => {
       if (!s || s === 'list') return personal(a, `Werewolf exposure is ${C.enabled ? 'on' : 'off'}. ${listText()}`);
       if (s === 'clear') return personal(a, clearCase(a, rest.join(' ')));
       personal(a, 'Usage: /exposure [list] | clear <name|#TAG|profile id> [hold] <reason>');
-    }, { help: '[list|clear <who> [hold] <reason>] werewolves and Vampire Lords known in a hold after being seen changing (Lead GM)' });
+    }, { admin: true, help: '[list|clear <who> [hold] <reason>] werewolves and Vampire Lords known in a hold after being seen changing (Lead GM)' });
   }
 
   log(`exposure ${C.enabled ? 'on' : 'off'}: ${Object.keys(data().cases).length} known beasts, ${C.witnesses} witnesses, ${C.days} days, ${C.cityBounty}/${C.wildsBounty} gold x${C.hurtMultiplier} when hurt`);

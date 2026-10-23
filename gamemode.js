@@ -393,7 +393,7 @@ const TIER_LABEL = { senior: 'Senior', developer: 'Developer', leadgm: 'Lead GM'
 // out of the hold treasury, so a GM who could appoint himself could pay himself (claude-jake's review, A1-1).
 // /chargen is open to every GM (Nate, 12 Oct), and to a Trial GM through TRIAL_COMMANDS
 const LEAD_ONLY = new Set(['rerollrefund', 'beastform', 'polymorph', 'vlremote', 'wwremote', 'feedpair', 'sethunger', 'wipechars', 'driftspawn', 'driftrepair', 'driftset',
-  'jail', 'placeexport', 'staffstats', 'war', 'curse', 'schedule', 'warband', 'raid', 'settime', 'timescale', 'setweather', 'npc remove', 'dungeon end',
+  'jail', 'placeexport', 'staffstats', 'war', 'exposure', 'curse', 'schedule', 'warband', 'raid', 'settime', 'timescale', 'setweather', 'npc remove', 'dungeon end',
   'appoint', 'dismiss',
   // Handing out a smithing manual is handing out an item (the T5 ones are given in roleplay, like artifacts)
   'manual grant',
@@ -1051,7 +1051,8 @@ const STAFF_HELP = [
   { key: 'announce', title: 'Announcements and restarts', items: [['admin', '<text>: talk in this admin tab'], 'announce', 'schedule', 'update'] },
   { key: 'factions', title: 'Factions', items: [['faction leader', '<player|#TAG> <faction id>: name the first leader of a faction'],
     ['faction remove', '<name|#TAG> <faction id>: take someone out of a faction'], ['faction hallmark', "<faction id>, at a building's door: its faction's hall (hallunmark undoes it)"], ['faction list', 'every faction id, secret ones included'], 'ledgerpoint',
-    ['rolename', 'list <court|faction> | <court> <office> <new title> | <faction> <rank number> <new title> | reset <court> <office> | reset <faction> <rank number>: rename an office or rank for everyone who holds it, at once (Lead GM; F3 Court and the Faction tab\'s rank editor do it too)'], 'war'] },
+    ['rolename', 'list <court|faction> | <court> <office> <new title> | <faction> <rank number> <new title> | reset <court> <office> | reset <faction> <rank number>: rename an office or rank for everyone who holds it, at once (Lead GM; F3 Court and the Faction tab\'s rank editor do it too)'], 'war',
+    ['exposure', '[list] | clear <name|#TAG|profile id> [hold] <reason>: werewolves and Vampire Lords seen changing, by hold, with the hunters who saw it; clear one (audited)']] },
   { key: 'appoint', title: 'Appointments and property', items: [
     ['appoint', '<player|#TAG|profile id> <zone> <rank> [override]: make someone an official, online or offline. A Jarl must be a Breton, a Nord or an Imperial; only the Owners may add override. /appoint alone lists the zone ids; a wrong rank lists that zone\'s ranks. Rulers name 5 Stewards, 2 Court Mages, a Guard Captain and any number of Guards; Chieftains 5 Banes, a Shaman, a Wise-Woman, a Guard Commander and any number of Guards; captains name Guards'],
     ['dismiss', '<player|#TAG|profile id> <zone>: remove an official, online or offline (told if online). Officials may dismiss the ranks they may appoint'],
