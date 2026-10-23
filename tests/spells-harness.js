@@ -152,7 +152,8 @@ const read = async (a, tome) => {
 (async () => {
 
 // ---- boot ----
-check('boot line counts the tomes and both study points', out.logs.some((l) => /spells on: \d+ tomes known, 2 study point\(s\), \d+ tomes in the Synod shop, 3 prepared, changed in 11 college cell\(s\)/.test(l)), out.logs);
+// 4 = the 2 older mage points (the activators are not in this load order yet) and the 2 permanent chapels (23 Oct)
+check('boot line counts the tomes and the study points', out.logs.some((l) => /spells on: \d+ tomes known, 4 study point\(s\), \d+ tomes in the Synod shop, 3 prepared, changed in 11 college cell\(s\)/.test(l)), out.logs);
 check('the read hook wraps the handler that was there', mp.onReadBook.__dboSpellsInner === original);
 load();
 check('a reload unwraps its own wrapper instead of stacking', mp.onReadBook.__dboSpellsInner === original);
@@ -509,15 +510,22 @@ check('closing the panel closes widget 44', out.closed.some((c) => c[0] === OTHE
   const FROST_CRAG = '6ff7d:BSHeartland.esm';
   const points = JSON.parse(fs.readFileSync('skills.json', 'utf8')).spellStudyPoints;
   const gen = points.filter((p) => p.requires === STUDY_MAGIC);
-  check('skills.json holds the generated Study Magic places, and the older points give way to them', gen.length >= 2 && gen.every((p) => p.places.length && p.radiusMeters)
-    && points.filter((p) => !p.requires).every((p) => p.until === STUDY_MAGIC), points.map((p) => [p.name, p.requires, p.until]));
+  // Three kinds of point now: generated from the activators (requires), the older mage points that give way to them
+  // (until), and PERMANENT ones that are neither - the chapels, added 23 Oct, where no activator stands and the Priest's
+  // own schools are studied (skills.json, Nate: the levelling in the chapels). A permanent point survives the activators,
+  // which is the whole reason it carries neither key (spells.js STUDY_POINTS).
+  const perm = points.filter((p) => !p.requires && !p.until);
+  check('skills.json holds the generated Study Magic places, and the older mage points give way to them', gen.length >= 2 && gen.every((p) => p.places.length && p.radiusMeters)
+    && points.filter((p) => !p.requires && p !== perm.find((q) => q === p)).every((p) => p.until === STUDY_MAGIC), points.map((p) => [p.name, p.requires, p.until]));
+  check('the permanent points are the chapels, for Restoration and Alteration only', perm.length === 2
+    && perm.every((p) => (p.schools || []).join() === 'Restoration,Alteration' && (p.cells || []).length && !p.places), perm.map((p) => [p.name, p.schools]));
   const synod = gen.find((p) => p.cell === SYNOD), crag = gen.find((p) => p.cell === FROST_CRAG);
   const spot = synod.places[0].pos;
   const R = synod.radiusMeters * 70;
   RECORDS[idOf(STUDY_MAGIC)] = { type: 'ACTI', editorId: 'StudyMagic', fields: [] };
   out.logs.length = 0;
   load();
-  check('with the activators in the load order only they count', out.logs.some((l) => new RegExp(`spells on: \\d+ tomes known, ${gen.length} study point\\(s\\)`).test(l)), out.logs);
+  check('with the activators in the load order they and the permanent points count', out.logs.some((l) => new RegExp(`spells on: \\d+ tomes known, ${gen.length + perm.length} study point\\(s\\)`).test(l)), out.logs);
   const SM = 0x19; online.push(SM); mastery(SM, { arcane: 1, priest: 1 });
   at(SM, SYNOD, [spot[0] + R + 70, spot[1], spot[2]]);
   check('the Synod Conclave away from any activator is no longer a study point', (await read(SM, T.frostbite)) === false
@@ -562,7 +570,8 @@ check('closing the panel closes widget 44', out.closed.some((c) => c[0] === OTHE
   delete RECORDS[idOf(STUDY_MAGIC)];
   out.logs.length = 0;
   load();
-  check('without the plugin the older points hold again', out.logs.some((l) => /spells on: \d+ tomes known, 2 study point\(s\)/.test(l)), out.logs);
+  // 2 older mage points + the permanent chapels
+  check('without the plugin the older points hold again, beside the permanent ones', out.logs.some((l) => new RegExp(`spells on: \\d+ tomes known, ${2 + perm.length} study point\\(s\\)`).test(l)), out.logs);
 }
 
 // ---- removed spells (Nate, 11 Oct: Transmute Mineral Ore breaks the economy) ----

@@ -637,10 +637,14 @@ ui('lecternCancel', TEACHER, [lastWidget(TEACHER, 'classLectern').nonce]);
   check('the Cathedral\'s shop is titled and signed by the Great Faiths, not the Synod (#bugs 12 Oct)', /^The Great Faiths: Spell Tomes/.test(w.title) && w.seller === 'The Great Faiths', [w.title, w.seller]);
   at(PRIESTLY, SYNOD);
   check('the Acolyte at the Synod is refused: the Great Faiths buy only at their Cathedral', shop(PRIESTLY).canBuy === false && /court mage sells tomes only to members of the Synod or a College/.test(shop(PRIESTLY).whyNot), shop(PRIESTLY).whyNot);
+  // The chapels are OPEN since 23 Oct (spells.js shopPlaces open: true; Nate: "make sure you dont need to be in a
+  // specific faith to use the faith ledgers"). A chapel asks no faction and no rank of whoever stands in it; the Synod's
+  // own ledger is unchanged, and so is which schools and ranks a chapel stocks.
   member(MAGE, 'synod', 'Associate'); skillAt(MAGE, 'priest', 40); skillAt(MAGE, 'arcane', 40); gold(MAGE, 5000); at(MAGE, CATHEDRAL);
-  check('a Synod Associate in the Cathedral is refused: the Great Faiths sell to their own', shop(MAGE).canBuy === false && /The Great Faiths sells its tomes only to its own/.test(shop(MAGE).whyNot), shop(MAGE).whyNot);
+  check('a Synod Associate in the Cathedral may buy: a chapel asks no faction', shop(MAGE).canBuy === true, shop(MAGE).whyNot);
+  check('...and is still offered only the chapel\'s own schools', shop(MAGE).tomes.every((t) => t.school === 'Restoration' || t.school === 'Alteration'), shop(MAGE).tomes.map((t) => t.school));
   member(PRIESTLY, 'great-faiths', 'Novice'); at(PRIESTLY, CATHEDRAL);
-  check('a Great Faiths Novice (the joining rank) buys none', shop(PRIESTLY).canBuy === false, shop(PRIESTLY).whyNot);
+  check('a Great Faiths Novice buys at a chapel too: the joining rank is no bar there', shop(PRIESTLY).canBuy === true, shop(PRIESTLY).whyNot);
   member(PRIESTLY, 'great-faiths', 'Priest'); skillAt(PRIESTLY, 'priest', 60); skillAt(PRIESTLY, 'arcane', 60);
   w = shop(PRIESTLY);
   check('a Great Faiths Priest is a Senior: Adept tomes of its schools too', w.tomes.some((t) => t.rank === 2) && w.tomes.every((t) => t.school === 'Restoration' || t.school === 'Alteration'), w.tomes.map((t) => t.school + ' ' + t.rankName));

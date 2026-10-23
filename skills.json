@@ -901,6 +901,18 @@
  },
  "spellStudyPoints": [
   {
+   "name": "The Cathedral of St Martin, Bruma",
+   "cells": ["12cb:BSHeartland.esm", "5f78c:BSHeartland.esm", "5f78d:BSHeartland.esm"],
+   "schools": ["Restoration", "Alteration"],
+   "_comment": "A chapel is a study point for the priestly schools (Nate, 23 Oct: the faith ledgers and the levelling in the chapels). Whole cells, as the Conclave's entry is: the cathedral, its undercroft and its chapel hall. Restoration and Alteration only, the Priest skill's own schools (its vanillaSkills above); a Destruction mage still studies at a college."
+  },
+  {
+   "name": "The Temple of the Divines, Solitude",
+   "cells": ["16a02:Skyrim.esm"],
+   "schools": ["Restoration", "Alteration"],
+   "_comment": "The other chapel the Great Faiths' ledger stands in (spells.js shopPlaces)."
+  },
+  {
    "name": "The well in the Hall of the Elements",
    "cell": "1380e:Skyrim.esm",
    "refr": "108d6f:Skyrim.esm",
