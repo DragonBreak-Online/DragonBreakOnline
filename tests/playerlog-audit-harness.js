@@ -229,6 +229,56 @@ out = run(`STAFF ENCHANT A B C D E F G #PGDB (profile 1, <@337337773973569537>) 
 ok(!JSON.stringify(out).includes(CANARY), '...a line the cut cannot read (a name of seven words) keeps nothing', out);
 out = run(`STAFF ${ROWAN}: Discord roles now give gm (was helper); logged out so it takes effect`);
 ok(out.length === 1 && out[0].f.text === 'Rowan #PGDB: Discord roles now give gm (was helper); logged out so it takes effect', '...other STAFF lines are not cut', out);
+// CITIZEN STAFF <by> released|withdrew|could not release ... (... staff release <id>[: <why>]) and CITIZEN STAFF <by>: staff
+// release <id>[: <why>] found no citizenship of profile N to release (citizenship.js releaseTell): the by, the id and the why
+// are what staff wrote in a config entry (citizenship.staffReleases), not an identity from who(), so a by or a why shaped like
+// a character made that character a party and carried both into their post (PRIV-2, 23 Oct). The by becomes "staff" and "a
+// staff release" stands for the id and the why; the character, the hold, the character id and the profile stay. Once cut the
+// line names no party, so the cut is also read directly
+const citizenCut = (l) => { const d = R.AUDIT_VERBS.CITIZEN; return d && typeof d.cut === 'function' ? d.cut(R.unquote(l), l) : R.unquote(l); };
+const DAR = 'Dar #U6T6 (profile 4)';
+const REL = (by, end) => `CITIZEN STAFF ${by} released Selene from the citizenship of the Rift (character ff000015; ${end})`;
+out = run(REL(`${DAR} ${CANARY}`, `staff release ${CANARY}-1: ${CANARY} why`));
+ok(out.length === 0, 'CITIZEN STAFF release: a staff-written by shaped like a character is no party (the line reaches nobody\'s post)', out);
+out = run(REL('Jake (owner) via claude-jake', `staff release ${CANARY}-1: same PC as ${DAR} ${CANARY}`));
+ok(out.length === 0, '...nor is a why shaped like one', out);
+got = citizenCut(REL(`${DAR} ${CANARY}`, `staff release ${CANARY}-1: ${CANARY} why`));
+ok(got === REL('staff', 'a staff release'), '...the by becomes "staff", "a staff release" stands for the id and the why; the character, the hold and the character id stay', got);
+got = citizenCut(`CITIZEN STAFF ${CANARY}: staff release ${CANARY}-2 found no citizenship of profile 58 to release`);
+ok(got === 'CITIZEN STAFF staff: a staff release found no citizenship of profile 58 to release', '...an entry that found nothing, with no why: the profile stays', got);
+// the four lines releaseTell writes, built from citizenship.js itself (its audit templates and its tag; the by, the id and the
+// why filled with the canary and a character): each keeps its facts and nothing staff wrote, so a reworded line fails here
+{
+  const csrc = fs.readFileSync(path.join(ROOT, 'citizenship.js'), 'utf8');
+  const rt = csrc.slice(csrc.indexOf('const releaseTell = '), csrc.indexOf('const staffReleases = '));
+  const at = rt.indexOf('const tag = `');
+  const tagT = at >= 0 ? (readLiteral(rt, at + 'const tag = '.length) || [''])[0] : '';
+  const tag = tagT.replace('${rec.id}', `${CANARY}-7`).replace(/\$\{rec\.why \? `([^`]*)` : ''\}/, (m, w) => w.replace('${rec.why}', `${CANARY} same PC as ${DAR}`));
+  const fill = (t) => t.split('${rec.by}').join(`${DAR} ${CANARY}`).split("${x.name || 'a character'}").join('Selene').split('${holdName(x.zone)}').join('the Rift')
+    .split('${x.actor}').join('ff000015').split('${tag}').join(tag).split('${rec.pid}').join('55');
+  const lines = sites.filter((s) => s.file === 'citizenship.js' && s.t.startsWith('CITIZEN STAFF ${rec.by}')).map((s) => fill(s.t));
+  const want = [REL('staff', 'a staff release'),
+    "CITIZEN STAFF staff withdrew Selene's request for the citizenship of the Rift (character ff000015; a staff release)",
+    'CITIZEN STAFF staff could not release Selene from the citizenship of the Rift (character ff000015): it comes from a faction or court based there and lasts while that membership does (a staff release)',
+    'CITIZEN STAFF staff: a staff release found no citizenship of profile 55 to release'];
+  const cut4 = lines.map(citizenCut);
+  ok(tag.startsWith(`staff release ${CANARY}-7: `) && lines.length === 4 && !lines.some((l) => l.includes('${')) && want.every((w, i) => cut4[i] === w) && lines.every((l) => !run(l).length),
+    '...the four lines releaseTell writes (templates and tag read from citizenship.js): each keeps its facts, never the by, the id or the why, and reaches nobody\'s post', [lines, cut4]);
+}
+got = citizenCut(REL(`${CANARY} released Mike from the citizenship of Bruma (character ff000016; staff release x:`, `staff release ${CANARY}-1`));
+ok(got === 'CITIZEN STAFF', '...a by that copies the line\'s own words (the line then reads two ways) keeps nothing', got);
+got = citizenCut(REL('Jake', `staff release ${CANARY}-1: ${CANARY}) released Mike from the citizenship of Bruma (character ff000016; staff release x`));
+ok(got === 'CITIZEN STAFF', '...and so does a why that copies them', got);
+got = citizenCut(REL('Jake', `staff release ${CANARY}-1: ${CANARY}) and withdrew Mike's request for the citizenship of Bruma (character ff000016; staff release x`));
+ok(got === 'CITIZEN STAFF', '...or copies another release line\'s words', got);
+got = citizenCut(REL('Jake', `staff release ${CANARY}-1: ${CANARY} "unmatched ${DAR}`));
+ok(got === 'CITIZEN STAFF', '...a why with a quote left unmatched (it takes the end of the line) keeps nothing', got);
+out = run(`CITIZEN STAFF ${CANARY} " released Selene from the citizenship of the Rift (character ff000015; staff release r1: " Rowan #PGDB (profile 1) revoked the citizenship of Bruma from Selene (character ff000015)`);
+ok(out.length === 0, '...a by and a why quoted together never pass as a Lead GM\'s revoke (a fake party)', out);
+out = run(`CITIZEN STAFF ${ROWAN} revoked the citizenship of Bruma from Selene (character ff000015)`);
+ok(out.length === 1 && out[0].ev === 'act.CITIZEN' && out[0].c === 'PGDB' && out[0].f.text === 'STAFF Rowan #PGDB revoked the citizenship of Bruma from Selene (character ff000015)', '...a Lead GM\'s revoke (who() names them, as on every staff line) is not cut: it stays in their post', out);
+out = run(`CITIZEN ${ROWAN} granted Selene (character ff000015) the citizenship of Bruma`);
+ok(out.length === 1 && out[0].c === 'PGDB' && out[0].f.text === 'granted Selene (character ff000015) the citizenship of Bruma', '...nor are the other CITIZEN lines', out);
 // every sentence setTerms can write (read from contracts.js, numbers filled in) passes the cut whole: a reworded sentence
 // fails here instead of quietly leaving the player log with "set <hold> <term>" only
 {
