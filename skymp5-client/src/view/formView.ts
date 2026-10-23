@@ -38,6 +38,7 @@ import { WorldCleanerService } from "../services/services/worldCleanerService";
 import { GamemodeUpdateService } from "../services/services/gamemodeUpdateService";
 import { isOwnCompanion, isAnyCompanion } from "../services/services/companionService";
 import { sendCustomPacket } from "../services/services/customPacketUtil";
+import { HUNT_CHECK_MS, huntedPlayers, huntTarget } from "./huntedGuards";
 import { apply as applyAggroWindow, CHECK_EVERY_MS, combatStartLine, decide as decideAggroWindow, distance, nearestPlayer, newWindowState, playerCopies, Vec, WindowState } from "./aggroWindow";
 
 export interface ScreenResolution {
@@ -575,6 +576,7 @@ export class FormView {
       ac.enableAI(flyer.ai);
     }
     if (ac && !model.appearance) this.updateAggroWindow(ac, model, alreadyHosted);
+    if (ac && !model.appearance && alreadyHosted && huntedPlayers.spots.length) this.updateHuntedGuard(ac, model);
     if (refr.is3DLoaded()) {
       if (!this.movState.havokSeated) {
         this.movState.havokSeated = true;
@@ -1082,6 +1084,23 @@ export class FormView {
     });
   }
 
+  // A guard this client hosts goes for a known beast near it (huntedGuards.ts, server exposure.js ff_huntedIn)
+  private updateHuntedGuard(ac: Actor, model: FormModel): void {
+    const now = Date.now();
+    if (now - this.huntCheckAt < HUNT_CHECK_MS) return;
+    this.huntCheckAt = now;
+    if (!ac.isGuard() || ac.isDead() || ac.isInCombat()) return;
+    const spot = huntTarget([ac.getPositionX(), ac.getPositionY(), ac.getPositionZ()], model.movement?.worldOrCell ?? 0, huntedPlayers.spots);
+    if (!spot) return;
+    const target = spot.own ? Game.getPlayer() : spot.localRefrId ? Actor.from(Game.getFormEx(spot.localRefrId)) : null;
+    if (!target || target.isDead()) return;
+    ac.startCombat(target);
+    if (this.huntReported) return;
+    this.huntReported = true;
+    sendCustomPacket(SpApiInteractor.getControllerInstance(), { customPacketType: "dbo", event: "npcDrift",
+      args: [{ kind: "huntedGuard", remoteId: (this.remoteRefrId ?? 0).toString(16), own: spot.own }] });
+  }
+
   // The dungeon aggro window (aggroWindow.ts): passive until a player is near; the first moment of combat is reported once
   private updateAggroWindow(ac: Actor, model: FormModel, hosted: boolean): void {
     const inCombat = hosted && ac.isInCombat();
@@ -1501,6 +1520,8 @@ export class FormView {
   }
   private hostilityApplied = false;
   private hostileFlagSeen: unknown = undefined;
+  private huntCheckAt = 0;
+  private huntReported = false;
   private factionsSeen = "";
   private outfitSeen = "";
   private aggressionBeforeRaise: number | undefined = undefined;

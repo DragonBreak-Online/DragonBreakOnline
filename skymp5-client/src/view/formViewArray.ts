@@ -1,4 +1,5 @@
 import { playerCopies, PlayerSpot } from "./aggroWindow";
+import { huntedHold, huntedPlayers, HuntedSpot } from "./huntedGuards";
 import { FormView } from "./formView";
 import { FormModel, WorldModel } from "./model";
 import { NiPoint3 } from "../sync/movement";
@@ -47,9 +48,16 @@ export class FormViewArray {
     const forms = model.forms;
     const n = forms.length;
     const spots: PlayerSpot[] = [];
+    const hunted: HuntedSpot[] = [];
     for (let i = 0; i < n; ++i) {
       const form = forms[i];
       if (form && form.appearance && form.movement) spots.push({ pos: [form.movement.pos[0], form.movement.pos[1], form.movement.pos[2]], cell: form.movement.worldOrCell || 0 });
+      // Players the hold's guards hunt (server exposure.js ff_huntedIn): this client's own character, or a copy it shows
+      if (!isCloneView && form && form.appearance && form.movement && huntedHold(form as unknown as Record<string, unknown>)) {
+        const own = model.playerCharacterFormIdx === i;
+        const view = this.formViews[i];
+        hunted.push({ pos: [form.movement.pos[0], form.movement.pos[1], form.movement.pos[2]], cell: form.movement.worldOrCell || 0, own, localRefrId: own || !view ? 0 : view.getLocalRefrId() });
+      }
 
       if (!form || (model.playerCharacterFormIdx === i && !showMe)) {
         this.destroyForm(i);
@@ -86,7 +94,7 @@ export class FormViewArray {
         form.movement.pos = realPos;
       }
     }
-    if (!isCloneView) playerCopies.spots = spots;
+    if (!isCloneView) { playerCopies.spots = spots; huntedPlayers.spots = hunted; }
   }
 
   syncFormView(model: WorldModel, showMe: boolean,) {
