@@ -1485,7 +1485,16 @@ export class HousingSystem implements System {
   private isHoldManager(ctx: SystemContext, actorId: number, primary: number): boolean {
     const hold = this.holdOf(ctx, primary);
     if (!hold) return false;
-    return this.holdRanks(ctx, actorId).some((r) => r.hold === hold && MANAGER_RANKS.indexOf(r.rank) !== -1);
+    if (!this.holdRanks(ctx, actorId).some((r) => r.hold === hold && MANAGER_RANKS.indexOf(r.rank) !== -1)) return false;
+    // A faction's hall is never the hold's to manage (Nate, 21 Oct: "make sure the castle isn't controlled by Solitude"):
+    // the gameplay's guilds.js names the non-court faction whose hall either half of the door is. tenancy.js already refused
+    // the hold's list, offer and sale there; Solitude's officials still had the menu's lock, open and assign at Castle
+    // Volkihar's doors (24 Oct)
+    const foreign = (globalThis as any).__dboForeignHall;
+    if (typeof foreign === "function") {
+      try { if (foreign([primary, this.partnerOf(ctx, primary)])) return false; } catch (e) { this.log(`[housing] foreign hall check failed: ${e}`); }
+    }
+    return true;
   }
 
   // Staff who override housing claims: Lead GM and above (TIER_CAPS.spawn). A GM observes; opening, transferring, revoking
