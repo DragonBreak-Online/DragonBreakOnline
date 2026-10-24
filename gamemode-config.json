@@ -1891,8 +1891,8 @@
  "guards": {
   "_comment": "The hold's watch (guards.js; Jake and Nate, 23 Oct): NPC guards at posts staff place with /guardpost add (guard-posts.json), spawned as guard:<hold>:<n> zones. They give nothing: no loot from a dead one, no Wheel work from fighting them. A player one brings down wakes in that hold's jail, its prison when the jail is full (hold-jails.json), for jailMinutes. npcByHold: the hold's own guard, never a Legion NPC. Hot reload. ROLLBACK: enabled false (removes every guard zone).",
   "enabled": true,
-  "onlyHolds": ["bruma"],
-  "_onlyHolds": "Only these holds' posts spawn (23 Oct). Skyrim's guards are off after a crash: a Solitude Guard (civil-war faction) fought a Stormcloak NPC and crashed Nate's client in detection. They come back once their civil-war factions are removed on the PC (Nexus Patches).",
+  "onlyHolds": ["bruma", "solitude"],
+  "_onlyHolds": "24 Oct: Solitude back on after the civil-war factions went neutral in DLE b64dc41d (Nat: one city first, watch an hour). Only these holds' posts spawn (23 Oct). Skyrim's guards are off after a crash: a Solitude Guard (civil-war faction) fought a Stormcloak NPC and crashed Nate's client in detection. They come back once their civil-war factions are removed on the PC (Nexus Patches).",
   "jailMinutes": 10,
   "radius": 4000,
   "_radius": "How near (units) a player must come for a post's guard to spawn. 600 was too small: a guard 20 m away never appeared (Nate, 23 Oct).",
