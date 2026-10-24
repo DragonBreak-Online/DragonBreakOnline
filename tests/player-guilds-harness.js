@@ -210,6 +210,10 @@ ok('player-guilds.json is gitignored (runtime)', fs.readFileSync(path.join(ROOT,
   globalThis.__dboGuildState.members[PACK] = Object.assign({}, st.members[PACK]);
   const st2 = globalThis.__dboGuildState; told.length = 0; st2.nonces.set(GM, 'pk2'); (handlers.factionAdd || []).forEach((f) => f(GM, ['pk2', PACK, 'Mage']));
   ok('packs.maxMembers sets the size', !!(st2.members[PACK] || {})[String(MAGE)], Object.keys(st2.members[PACK] || {}).length);
+  // One pack per werewolf (pack control, Nate 23 Oct): Mage runs with the Jerall pack, so Falkreath's refuses them
+  const FALK = 'pack-of-falkreath';
+  st2.members[FALK] = {}; drawn.length = 0; told.length = 0; st2.nonces.set(GM, 'pk3'); (handlers.factionAdd || []).forEach((f) => f(GM, ['pk3', FALK, 'Mage']));
+  ok('a werewolf already in a pack is refused a second one', !(st2.members[FALK] || {})[String(MAGE)] && /one pack at a time/.test(JSON.stringify(drawn.slice(-1).concat(told))), drawn.slice(-1).concat(told));
   delete globalThis.__dboSuperKind;
 }
 

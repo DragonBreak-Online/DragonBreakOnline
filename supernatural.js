@@ -881,8 +881,16 @@ module.exports = (api) => {
   const isAlpha = (a) => { try { return typeof globalThis.__dboGuildIsPackLeader === 'function' && !!globalThis.__dboGuildIsPackLeader(a); } catch (e) { return false; } };
   // The old Hircine blessing belongs to a pack's Alpha now; an admin can still set it (/curse ... blessedwerewolf)
   const spared = (a, s) => isAlpha(a) || !!(s && s.blessed);
+  // Pack control (Nate, 23 Oct): a member of a pack (guild-defs kind "pack") who is not its Alpha or blessed sits between a Lone
+  // Wolf and the Alpha: forced only by the full moon (never by hunger, and never into a frenzy), and may call the beast
+  // packChangesPerDay times a game day. packControl false turns it off
+  const packMember = (a, s) => {
+    if (C.packControl === false || spared(a, s)) return false;
+    try { return typeof globalThis.__dboGuildsOf === 'function' && globalThis.__dboGuildsOf(a).some((g) => g.kind === 'pack'); } catch (e) { return false; }
+  };
+  const packChanges = () => Math.max(1, Number(C.packChangesPerDay) || 1);
   // Whether this werewolf may call the beast themselves (voluntaryWerewolf)
-  const callsBeast = (a, s) => C.voluntaryWerewolf === true || (C.voluntaryWhenSpared !== false && spared(a, s));
+  const callsBeast = (a, s) => C.voluntaryWerewolf === true || (C.voluntaryWhenSpared !== false && spared(a, s)) || packMember(a, s);
 
   // ---- silver: a werewolf or vampire can neither wear it nor strike with it (Nat) --------------------------
   // Silver is the silver weapon keyword or "silver" in the editor id, which also catches rings, amulets and circlets.
@@ -2360,7 +2368,7 @@ module.exports = (api) => {
       if (now !== null) {
         const day = Math.floor(now);
         const used = s.beastDay === day ? (Number(s.beastDayUses) || 0) : 0;
-        const perDay = typeof globalThis.__dboHuntChangesPerDay === 'function' ? Number(globalThis.__dboHuntChangesPerDay(a)) || C.beastChangesPerDay : C.beastChangesPerDay;
+        const perDay = packMember(a, s) ? packChanges() : typeof globalThis.__dboHuntChangesPerDay === 'function' ? Number(globalThis.__dboHuntChangesPerDay(a)) || C.beastChangesPerDay : C.beastChangesPerDay;
         if (used >= perDay) {
           let scale = 6; try { scale = Number(clock.summary().timeScale) || 6; } catch (e) { /* default */ }
           const mins = Math.max(1, Math.ceil((1 - (now - day)) * 1440 / scale));
@@ -2385,7 +2393,7 @@ module.exports = (api) => {
     if (now === null) return null;
     const day = Math.floor(now);
     const used = s.beastDay === day ? (Number(s.beastDayUses) || 0) : 0;
-    const perDay = typeof globalThis.__dboHuntChangesPerDay === 'function' ? Number(globalThis.__dboHuntChangesPerDay(a)) || C.beastChangesPerDay : C.beastChangesPerDay;
+    const perDay = packMember(a, s) ? packChanges() : typeof globalThis.__dboHuntChangesPerDay === 'function' ? Number(globalThis.__dboHuntChangesPerDay(a)) || C.beastChangesPerDay : C.beastChangesPerDay;
     return Math.max(0, perDay - used);
   };
   // Pack leaders run with the pale spirit coat; every client in the world is told
@@ -2440,7 +2448,7 @@ module.exports = (api) => {
     else if (spared(a, s)) rows.push({ label: 'Beast form', value: 'At will', hint: alpha ? 'A Pack Leader is not held to a daily change.' : "Hircine's blessing frees you from the daily change." });
     else {
       const now = gameDays(); const day = Math.floor(now);
-      const perDay = typeof globalThis.__dboHuntChangesPerDay === 'function' ? Number(globalThis.__dboHuntChangesPerDay(a)) || C.beastChangesPerDay : C.beastChangesPerDay;
+      const perDay = packMember(a, s) ? packChanges() : typeof globalThis.__dboHuntChangesPerDay === 'function' ? Number(globalThis.__dboHuntChangesPerDay(a)) || C.beastChangesPerDay : C.beastChangesPerDay;
       const used = Math.min(perDay, s.beastDay === day ? Number(s.beastDayUses) || 0 : 0);
       rows.push({ label: 'Beast form today', value: `${used} of ${perDay} used`, hint: used >= perDay ? `The beast stirs again when the day turns, in about ${inWords(realMinutes(day + 1 - now))}.` : 'Use the Beast Form power to change.' });
     }
@@ -2451,6 +2459,7 @@ module.exports = (api) => {
       rows.push({ label: 'In the beast', value: left ? `${left} s left` : 'Now', hint: `${hold > 0 ? `You cannot turn back for another ${hold} s. ` : ''}Feed on a fresh body to stay longer.` });
     }
     if (spared(a, s)) rows.push({ label: 'The beast within', value: 'Held', hint: 'It never takes you unprepared, and the full moon does not force it out.' });
+    else if (packMember(a, s)) rows.push({ label: 'The beast within', value: 'Held by the pack', hint: 'Your pack keeps it from taking you when you hunger, and from the frenzy. Only the full moon still forces it out.' });
     else {
       const hunger = typeof hungerOf === 'function' ? Math.max(0, Math.min(100, Number(hungerOf(a)) || 0)) : 50;
       let full = false; try { full = !!clock().isFullMoon(); } catch (e) { /* no clock */ }
@@ -2915,7 +2924,8 @@ module.exports = (api) => {
       markMoonTaken(a);
       if (typeof globalThis.__dboBeastTransform === 'function') globalThis.__dboBeastTransform(a, 'werewolf', true);
       // A forced change may tip into a frenzy (frenzy.js, config werewolfFrenzy)
-      try { if (typeof globalThis.__dboFrenzyForced === 'function') globalThis.__dboFrenzyForced(a); } catch (e) { log(`supernatural: frenzy check failed: ${e.message}`); }
+      // A pack keeps its own from the frenzy (pack control)
+      try { if (!packMember(a, stateOf(a)) && typeof globalThis.__dboFrenzyForced === 'function') globalThis.__dboFrenzyForced(a); } catch (e) { log(`supernatural: frenzy check failed: ${e.message}`); }
     };
     if (!lead) return go();
     if (FERAL_DUE.has(a)) return;
@@ -2970,6 +2980,8 @@ module.exports = (api) => {
     const c = clock();
     for (const a of onlineActors()) {
       const s = stateOf(a); if (!s || s.kind !== 'werewolf' || spared(a, s) || beastForm(a) || rites.has(a) || FERAL_DUE.has(a) || inLoginGrace(a)) continue;
+      // A pack member's hunger never forces the change: only the full moon does (pack control)
+      if (packMember(a, s)) continue;
       try { if (mp.get(a, 'isDead')) continue; } catch (e) { continue; }
       const hunger = typeof hungerOf === 'function' ? Math.max(0, Math.min(100, Number(hungerOf(a)) || 0)) : 50;
       let p = C.feralPerMinute.sated + (C.feralPerMinute.starving - C.feralPerMinute.sated) * hunger / 100;

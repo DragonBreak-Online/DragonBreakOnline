@@ -302,6 +302,11 @@ module.exports = (api) => {
   const setMember = (fid, a, rank, by, opts) => {
     const f = FACTIONS.get(fid);
     if (f && f.kind === 'pack' && !entryOf(fid, a) && packFull(fid)) return `${f.name} is full: a pack runs ${Math.max(1, Number(PACKS.maxMembers) || 5)} strong, its Alpha included.`;
+    // One pack per werewolf (Nate, 23 Oct: pack control): a member of another pack is refused until they leave it
+    if (f && f.kind === 'pack' && !entryOf(fid, a)) {
+      const other = membershipsOf(a >>> 0).find((m) => m.fid !== fid && (FACTIONS.get(m.fid) || {}).kind === 'pack');
+      if (other) return `${display(a)} already runs with ${FACTIONS.get(other.fid).name}. A werewolf belongs to one pack at a time.`;
+    }
     if (f && f.kind === BAND_KIND && !entryOf(fid, a)) {
       if (bandFull(fid)) return `${f.name} is full: a guild holds ${Math.max(1, Number(BAND.maxMembers) || 10)}, its Guildmaster included.`;
       const had = bandOf(a);

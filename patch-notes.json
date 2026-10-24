@@ -66,7 +66,7 @@
       {
         "heading": "Werewolves and vampires",
         "items": [
-          "Werewolves can no longer change at will (Pack Alphas and those blessed by Hircine still can). The beast lasts longer and won't let go early.",
+          "Werewolves can no longer change at will: a pack member may call the beast once a day, and Pack Alphas and those blessed by Hircine at will. The beast lasts longer and won't let go early.",
           "A forced change now gives two and a half minutes' warning instead of 45 seconds, with the beast making itself known four more times on the way.",
           "Every cursed werewolf now changes once under each full moon, wherever they are, with the usual warning first.",
           "Sanguinare Vampiris and Sanies Lupinus now weigh on you as they grow: tiredness, slow wounds, sun or sleep troubles and more by stage. Nobody with a fever wakes Well Rested, and a cure ends it all at once. Your Character Journal's fever tab and /status show what it has done to you.",
@@ -86,7 +86,8 @@
           "A faction's hall is no longer the hold's to rent or sell (Castle Volkihar belongs to the vampires).",
           "Chapel faith ledgers serve everyone whatever their faith, and priests can study Restoration and Alteration at the Cathedral of St Martin and the Temple of the Divines.",
           "House Ravenwatch joins the vampire houses, and the Penitus Oculatus is now a secret order, like the Blades.",
-          "Werewolf packs now run at most five strong, their Alpha included."
+          "Werewolf packs now run at most five strong, their Alpha included.",
+          "A pack holds its own: its members are never driven to change by hunger and never fall into a frenzy. Only the full moon still takes them. A werewolf runs with one pack at a time."
         ]
       },
       {
