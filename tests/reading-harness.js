@@ -72,7 +72,10 @@ READ.clientJudged = false;
 let failures = 0, checks = 0;
 const check = (name, ok, detail) => { checks++; if (!ok) { failures++; console.log(`FAIL ${name}${detail !== undefined ? ': ' + JSON.stringify(detail) : ''}`); } else console.log(`ok   ${name}`); };
 const ui = (ev, args) => (handlers.get(ev) || []).forEach((fn) => fn(READER, args, 30));
-const last = () => out.widgets[out.widgets.length - 1].w;
+// No widget opened means the book was refused. Fail the check that asked for it and carry on, instead of throwing a
+// TypeError here and taking every check after it with us (review of defc9a2cc, F5).
+const NO_WIDGET = { words: [], answer: '', result: null, resultKind: null, nonce: null, seconds: 0, refused: true };
+const last = () => { const w = out.widgets[out.widgets.length - 1]; if (w) return w.w; check('a widget opened for the reading', false, out.personals.slice(-2)); return NO_WIDGET; };
 // The order of cards (indices into the shuffled words) that spells out `sentence`, honouring duplicates.
 const solve = (w, sentence) => { const used = new Set(); return sentence.map((s) => { const i = w.words.findIndex((x, k) => x === s && !used.has(k)); used.add(i); return i; }); };
 const open = (book) => { ui('readingCancel', []); out.widgets.length = 0; props.delete(READER + '|private.scholarReads'); globalThis.__dboReadBook(book, READER); return last(); };
@@ -532,6 +535,28 @@ console.log('client-judged:');
   atLocked(30, { day: today, spentToday: 9999 });
   g = readAt(bandStart(30, 'scroll', 1) + eps);
   check('Scholar at the day\'s limit: still reads, and the scroll band gives a scroll', g.scrolls.length === 1 && !g.tomes.length, g);
+  // A reading that can never raise Scholar no longer charges the Wheel for the gain it cannot make (review of defc9a2cc,
+  // F3): applyGain takes the hourly bucket and the daily budgets before the structural cap refuses, so a reader at the
+  // peak or on Hold was spending the character's 720 units a day on nothing, and the other skills went without. The
+  // budget states themselves (the hour's bucket, the day's limit) still count the round: that is the skill system's own
+  // accounting, and it recovers on its own.
+  at(50);
+  out.events.length = 0;
+  readAt(bandStart(50, 'tome', 2) + eps);
+  check('a reader with room on the Wheel counts the round against it', out.events.filter((k) => k === 'read').length === 1, out.events);
+  at(100);
+  out.events.length = 0;
+  readAt(bandStart(100, 'tome', 4) + eps);
+  check('a reader at the peak reads, but no longer charges the Wheel', !out.events.includes('read'), out.events);
+  atLocked(30, { lock: 'hold' });
+  out.events.length = 0;
+  readAt(bandStart(30, 'tome', 1) + eps);
+  check('...nor does a Scholar on Hold', !out.events.includes('read'), out.events);
+  atLocked(30, { day: today, spentToday: 9999 });
+  out.events.length = 0;
+  readAt(bandStart(30, 'scroll', 1) + eps);
+  check('...but one at the day\'s limit still does: that budget is the skill system\'s own and comes back', out.events.filter((k) => k === 'read').length === 1, out.events);
+
   at(90);
   globalThis.__dboSpellsReadRankCap = () => 2;
   g = readAt(bandStart(90, 'tome', 3) + eps);

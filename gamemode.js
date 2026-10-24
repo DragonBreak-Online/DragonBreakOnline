@@ -5115,6 +5115,14 @@ const scholarNoGainLine = (a, now = Date.now()) => {
     : `your other skills hold the higher places on the Wheel (Scholar stops at ${f.cap})`;
   return `Scholar will not rise from this reading: ${why}. You can still find tomes and scrolls between the pages.`;
 };
+// A reading that can never pay still charged the Wheel (review of defc9a2cc, F3): applyGain takes the hourly bucket and
+// the skill's and the character's daily budgets before the structural cap refuses the gain (skillPoints.ts steps 1-3), so
+// a reader who cannot climb spent up to 40 of the character's 720 units a day on nothing, and other skills went without.
+// The standing ceilings are the ones where no reading can ever pay: at the peak, held under another skill's place on the
+// Wheel, on Hold, or marked to fall. The budget states (bucket, daily, character) still charge as they always did - those
+// are the skill system's own accounting, and they recover on their own.
+const SCHOLAR_NO_CLIMB = new Set(['peak', 'cap', 'lower', 'hold']);
+const scholarCannotClimb = (a, now = Date.now()) => { const f = wheelRoom(a, 'scholar', now); return !!f && SCHOLAR_NO_CLIMB.has(f.why); };
 const tellScholarNoGain = (a) => {
   const line = scholarNoGainLine(a); if (!line) return;
   const now = Date.now();
@@ -5345,10 +5353,11 @@ onUi('reading', (a, args) => {
     const tier = ses.tier;
     // 'read', not 'activate': a finished reading round is worth 1.0 units against 0.5 for opening a
     // book. Same correction as the mining/chopping rounds in labour.js.
-    try { if (typeof globalThis.__alduinakMasteryEvent === 'function') globalThis.__alduinakMasteryEvent('read', a, { refrId: ses.refId }); } catch (e) { /* no skill system */ }
+    const canClimb = !scholarCannotClimb(a);
+    if (canClimb) try { if (typeof globalThis.__alduinakMasteryEvent === 'function') globalThis.__alduinakMasteryEvent('read', a, { refrId: ses.refId }); } catch (e) { /* no skill system */ }
     // Hermaeus Mora's blessing: what you read teaches you more, so the round counts twice (the skill's caps still hold)
     // Xarxes' (faiths.json scholarBoon 0.5) counts twice half the time
-    try { const sb = globalThis.__dboBlessingValue ? Number(globalThis.__dboBlessingValue(a, 'scholarBoon')) : (globalThis.__dboBlessedWith && globalThis.__dboBlessedWith(a, 'scholarBoon') ? 1 : 0); if (sb > 0 && Math.random() < sb && typeof globalThis.__alduinakMasteryEvent === 'function') globalThis.__alduinakMasteryEvent('read', a, { refrId: ses.refId }); } catch (e) { /* no skill system */ }
+    if (canClimb) try { const sb = globalThis.__dboBlessingValue ? Number(globalThis.__dboBlessingValue(a, 'scholarBoon')) : (globalThis.__dboBlessedWith && globalThis.__dboBlessedWith(a, 'scholarBoon') ? 1 : 0); if (sb > 0 && Math.random() < sb && typeof globalThis.__alduinakMasteryEvent === 'function') globalThis.__alduinakMasteryEvent('read', a, { refrId: ses.refId }); } catch (e) { /* no skill system */ }
     // A smithing skill book is Blacksmith work too, once a book; a manual on a shelf is learned (manuals.js)
     try { const line = globalThis.__dboManualsReadWon ? globalThis.__dboManualsReadWon(a, ses.baseId) : ''; if (line) results.push(line); } catch (e) { log('manuals read failed', e.message); }
     // A smithing schematic, now and then (manuals.js, config smithing.discovery; Nate, 11 Oct): the rarer, the rarer
@@ -5394,7 +5403,9 @@ onUi('reading', (a, args) => {
       .filter(([kind, k, cap]) => Number(cap) > 0 && !toldKinds.includes(kind) && dayCount(k) >= Number(cap));
     if (reached.length) {
       try { mp.set(a, 'private.scholarCapTold', { day: today, kinds: toldKinds.concat(reached.map(([kind]) => kind)) }); } catch (e) { /* told again next read */ }
-      capNotes.push(`You have found all the ${reached.map((x) => x[3]).join(' and ')} one day allows; they come back after midnight UTC. Reading still trains Scholar.`);
+      // "Reading still trains Scholar" is wrong for a reader who cannot climb (review F3): they read for what is between
+      // the pages, and scholarNoGainLine has already said why it will not rise
+      capNotes.push(`You have found all the ${reached.map((x) => x[3]).join(' and ')} one day allows; they come back after midnight UTC.${scholarCannotClimb(a) ? '' : ' Reading still trains Scholar.'}`);
     }
     reads[ses.refId.toString(16)] = Date.now() + READ.cooldownMinutes * 60000;
     say('win');
