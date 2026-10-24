@@ -9,7 +9,7 @@
 'use strict';
 
 module.exports = (api) => {
-  const { mp, log, personal, audit, display, who, cfg, giveItem, registerChatCommand, zones, ranksOf, profileOf, saveSoon, discordOf, onUi, zoneOfActor } = api;
+  const { mp, log, personal, audit, display, who, cfg, giveItem, registerChatCommand, zones, ranksOf, profileOf, saveSoon, discordOf, onUi, zoneOfActor, every } = api;
   const fs = require('fs');
   const path = require('path');
 
@@ -774,7 +774,17 @@ module.exports = (api) => {
     }
     if (moved) saveNow();
   }
-  refresh();
-  const posted = state.contracts.length;
-  log(`contracts ${CFG.enabled ? 'on' : 'off'}: ${posted} posted across ${Object.keys(kindsByZone).length} zone(s) with known fauna, ${perZone} per zone, rewards held from the zone treasury`);
+  // refresh() reads each zone's treasury inventory, which cost 4.2 s of the boot block at module load
+  // (CAPACITY_PLAN, 24 Oct). The first one runs just after boot instead, off the require path, and the
+  // summary goes with it so it still counts what the refresh posted.
+  const firstRefresh = () => {
+    try { refresh(); } catch (e) { log('contracts: the first refresh failed', e.message); }
+    log(`contracts ${CFG.enabled ? 'on' : 'off'}: ${state.contracts.length} posted across ${Object.keys(kindsByZone).length} zone(s) with known fauna, ${perZone} per zone, rewards held from the zone treasury`);
+  };
+  // Deferred on the server, where there is a timer; inline anywhere there is not, so a harness with a
+  // plain api object still loads the module and sees the same state it always did.
+  if (typeof every === 'function') {
+    let firstRefreshDone = false;
+    every('contracts.firstRefresh', 2000, () => { if (firstRefreshDone) return; firstRefreshDone = true; firstRefresh(); });
+  } else firstRefresh();
 };

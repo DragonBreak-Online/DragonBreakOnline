@@ -22,6 +22,11 @@
 const fs = require('fs');
 const path = require('path');
 
+// The door census runs after boot, one door a tick. A time budget is no use here: the first lookup for a base
+// loads from the espm layer and can take a second on its own, so a budget checked before the call overshoots
+// it. One door a tick makes the worst tick one lookup, and 351 doors take a couple of minutes to count.
+const DOOR_CENSUS_EVERY_MS = 250;
+
 module.exports = (api) => {
   const { mp, log, personal, system, registerChatCommand, onUi, openWidget, closeWidget, sendPacket, findByName, display, who, audit, profileOf, nameOf, onlineActors, isAdmin, giveItem, cfg, every } = api;
   // The party's roster names its members by their own name, never a beast's, and a mask's only while
@@ -1683,8 +1688,19 @@ module.exports = (api) => {
     if (!entrance || !Array.isArray(entrance.pos) || !(entrance.world || entrance.cell)) return;
     if (teleport(a, entrance.world || entrance.cell, entrance.pos, entrance.rot)) log(`dungeon: ${who(a)} stepped back from the automatic door of ${entrance.outsideDesc || 'an entrance'}`);
   };
-  try { let n = 0; for (const id of outsideDoors.keys()) if (isAutomaticDoor(id)) n++; log(`dungeons: ${n} of ${outsideDoors.size} entrance doors are automatic (a refusal there steps the player back)`); }
-  catch (e) { log('dungeons: automatic door census failed', e.message); }
+  // One espm lookup per entrance door, and at module load that was 13.5 s of a 25 s boot block with the loop
+  // blocked throughout (CAPACITY_PLAN, 24 Oct). isAutomaticDoor caches by base and the activation path is
+  // already lazy, so the count is gathered in time-boxed slices after boot instead of all of it before the
+  // server runs. The line still appears, a little later.
+  const censusLeft = [...outsideDoors.keys()];
+  let censusAuto = 0;
+  every('dungeons.doorCensus', DOOR_CENSUS_EVERY_MS, () => {
+    if (!censusLeft.length) return;
+    try {
+      if (isAutomaticDoor(censusLeft.pop())) censusAuto++;
+      if (!censusLeft.length) log(`dungeons: ${censusAuto} of ${outsideDoors.size} entrance doors are automatic (a refusal there steps the player back)`);
+    } catch (e) { censusLeft.length = 0; log('dungeons: automatic door census failed', e.message); }
+  });
   // Claims at an outside door or an expedition from the Synod: the party and difficulty panel. For a door, true lets
   // the engine carry a member of the live claim inside; an expedition carries them there itself.
   const offerGate = (casterId, d, entrance) => {
