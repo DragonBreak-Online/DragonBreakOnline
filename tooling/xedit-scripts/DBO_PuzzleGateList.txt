@@ -351,9 +351,9 @@ skyrim.esm|07F720|NorSecRmSmDoorSm01
 # skyrim.esm|026568|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 # skyrim.esm|02656A|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 # skyrim.esm|026AF1|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
-skyrim.esm|0347D9|NorHallExSmPortcullis01
-skyrim.esm|0347D8|NorHallExSmPortcullis01
-skyrim.esm|034746|NorHallExSmPortcullis01
+# skyrim.esm|0347D9|NorHallExSmPortcullis01   <- 24 Oct: floor restored, the hall piece has no bars; second build b64dc41d, live 24 Oct
+# skyrim.esm|0347D8|NorHallExSmPortcullis01   <- 24 Oct: floor restored, the hall piece has no bars; second build b64dc41d, live 24 Oct
+# skyrim.esm|034746|NorHallExSmPortcullis01   <- 24 Oct: floor restored, the hall piece has no bars; second build b64dc41d, live 24 Oct
 skyrim.esm|0AA71E|NorPortcullisStatic
 # skyrim.esm|02B3DA|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
 # skyrim.esm|02B3CA|NorHallExSmPortcullis01   <- 20 Oct: floor restored, the hall piece has no bars; Nat via the Local Leader; DLE child DragonBreak Map Fixes.esp
