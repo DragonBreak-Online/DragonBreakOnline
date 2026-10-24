@@ -1,5 +1,34 @@
 [
   {
+    "title": "Server restart: soul gems, gates and strongholds",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Fixes",
+        "items": [
+          "Partly filled soul gems no longer get stuck in your bags after a Soul Trap.",
+          "Claiming a city gate no longer hands its owner every unclaimed chest and door in the wilds.",
+          "A hold's Jarl and Steward no longer manage a faction's hall such as Castle Volkihar.",
+          "Frost no longer stacks with icy ground to freeze you in place.",
+          "The road outside Riften no longer floats over the dip.",
+          "Mor Khazgur's stairs and walkways are back, and Largashbur's mine entrance has moved.",
+          "The server now finishes starting up sooner after a restart."
+        ]
+      },
+      {
+        "heading": "World",
+        "items": [
+          "The Imperials and Stormcloaks no longer fight each other on sight.",
+          "Rannveig's Fast is open again as a dungeon.",
+          "Missing floors in several dungeons (where the old portcullis gates were) are back, along with Reachwater Rock's wall, Dustman's Cairn and Morthal's houses.",
+          "Chitin plate: two Chaurus chitin at the tanning rack."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Castle Volkihar",
     "date": "2026-10-24",
     "version": "Server update",
