@@ -5098,6 +5098,30 @@ const scholarAtPeak = (a) => {
   } catch (e) { return false; }
 };
 globalThis.__dboScholarNoRoom = scholarNoRoom;
+// A reading that cannot raise Scholar still goes ahead, for the tomes and scrolls between the pages (24 Oct, #bugs "Can't use
+// Scholar when it's on hold": a Scholar on Hold, at the hour's or day's limit, or held at Expert by the Wheel could not read
+// at all). Nate's 9 Oct point stands, that nobody should spend a reading thinking it trains Scholar: the reader is told
+// why it will not rise, once in ten minutes, and the Wheel's own limits keep the points from moving (wheelRoom, applyGain).
+const scholarNoGainTold = globalThis.__dboScholarNoGainTold instanceof Map ? globalThis.__dboScholarNoGainTold : (globalThis.__dboScholarNoGainTold = new Map());
+const scholarNoGainLine = (a, now = Date.now()) => {
+  const f = wheelRoom(a, 'scholar', now);
+  if (!f || f.why === 'peak') return null;
+  const why = f.why === 'lower' ? 'it is marked to fall on your Wheel (K)'
+    : f.why === 'hold' ? 'it is set to Hold on your Wheel (K)'
+    : f.why === 'bucket' ? `you have studied all you can take in for now (about ${f.minutes} minutes)`
+    : f.why === 'daily' ? 'you have learned all you can from books today'
+    : f.why === 'character' ? 'you have trained as much as one day allows'
+    : `your other skills hold the higher places on the Wheel (Scholar stops at ${f.cap})`;
+  return `Scholar will not rise from this reading: ${why}. You can still find tomes and scrolls between the pages.`;
+};
+const tellScholarNoGain = (a) => {
+  const line = scholarNoGainLine(a); if (!line) return;
+  const now = Date.now();
+  if (now - (scholarNoGainTold.get(a >>> 0) || 0) < 10 * 60000) return;
+  scholarNoGainTold.set(a >>> 0, now);
+  if (scholarNoGainTold.size > 500) scholarNoGainTold.delete(scholarNoGainTold.keys().next().value);
+  personal(a, line);
+};
 // The tome a reading presses between the pages, of the rank the reading's roll chose (Nate and Swag, 17 Oct):
 // - no college rank gate on the rank (Nate, 17 Oct: "remove the college gate for reading drops"); the restricted arts
 //   still only for Senior ranks (__dboSpellsReadRestricted);
@@ -5191,11 +5215,12 @@ globalThis.__dboReadBook = (targetId, casterId) => {
   const key = targetId.toString(16); const reads = readsOf(casterId);
   const until = Number(reads[key]) || 0;
   if (until > Date.now()) return deny(`You read this not long ago. Come back in ${Math.ceil((until - Date.now()) / 60000)} minutes.`);
-  // A smithing schematic is read to learn its technique (manuals.js), not for Scholar points, so the cap never stops it
-  // A Master Scholar (the skill at its peak) still reads for the tomes and scrolls between the pages, though it earns no more
-  // Scholar (Nate, 23 Oct: "when players hit master scholar people cant read more books for tomes"); every other limit holds
+  // A smithing schematic is read to learn its technique (manuals.js), not for Scholar points, so the cap never stops it.
+  // A reader whose Scholar cannot rise right now (on Hold, at a limit, held by the Wheel) still reads for the tomes and scrolls
+  // between the pages and is told it will not rise (24 Oct); a Master (the peak) reads as before (Nate, 23 Oct: "when players
+  // hit master scholar people cant read more books for tomes"). The 30 min per book and the day's copy cap still hold.
   if (!(globalThis.__dboManualsIsManual && globalThis.__dboManualsIsManual(baseId))) {
-    if (!scholarAtPeak(casterId)) { const noRoom = scholarNoRoom(casterId); if (noRoom) return deny(noRoom); }
+    if (!scholarAtPeak(casterId)) tellScholarNoGain(casterId);
   }
   const cyrodiil = CYRODIIL_PLUGINS.has(String(mp.get(targetId, 'baseDesc')).split(':')[1].toLowerCase());
   const line = readLine(tier, cyrodiil); const original = line.split(' ');

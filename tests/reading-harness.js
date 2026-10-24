@@ -521,6 +521,17 @@ console.log('client-judged:');
   at(100);
   g = readAt(bandStart(100, 'tome', 4) + eps);
   check('Scholar 100 (Master, the peak): still reads, and the Master tome band gives a Master tome', g.tomes.join() === '4' && !g.scrolls.length, g);
+  // 24 Oct, #bugs "Can't use Scholar when it's on hold": a Scholar on Hold, or at the day's limit, still reads for tomes
+  const atLocked = (level, extra) => props.set(READER + '|private.mastery', { order: ['scholar'], skills: { scholar: Object.assign({ rank: Math.min(4, Math.floor(level / 25)), level }, extra) } });
+  atLocked(30, { lock: 'hold' });
+  delete globalThis.__dboScholarNoGainTold; out.personals.length = 0;
+  g = readAt(bandStart(30, 'tome', 1) + eps);
+  check('Scholar on Hold: still reads, and the Apprentice tome band gives an Apprentice tome', g.tomes.join() === '1' && !g.scrolls.length, g);
+  check('...and is told Scholar will not rise from it', out.personals.some((t) => /Scholar will not rise from this reading: it is set to Hold/.test(t)), out.personals);
+  const today = new Date(wallClock).toISOString().slice(0, 10);
+  atLocked(30, { day: today, spentToday: 9999 });
+  g = readAt(bandStart(30, 'scroll', 1) + eps);
+  check('Scholar at the day\'s limit: still reads, and the scroll band gives a scroll', g.scrolls.length === 1 && !g.tomes.length, g);
   at(90);
   globalThis.__dboSpellsReadRankCap = () => 2;
   g = readAt(bandStart(90, 'tome', 3) + eps);

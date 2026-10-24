@@ -1,5 +1,20 @@
 [
   {
+    "title": "Reading on Hold",
+    "date": "2026-10-24",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Reading for tomes when Scholar cannot rise",
+        "items": [
+          "You can read books again while Scholar is on Hold, at its hourly or daily limit, or held back by your other skills on the Wheel.",
+          "Scholar does not rise from those readings (you are told why), but tomes and scrolls are still found between the pages."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Half-Giant health",
     "date": "2026-10-24",
     "version": "Server update",
