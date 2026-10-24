@@ -62,7 +62,10 @@ module.exports = (api) => {
       if (Array.isArray(parsed)) list = parsed; else if (parsed && typeof parsed === 'object') { root = parsed; key = Object.keys(parsed).find((k) => k.toLowerCase() === 'zones') || 'zones'; list = Array.isArray(parsed[key]) ? parsed[key] : []; }
     } catch (e) { /* no file yet */ }
     // A post saved with something that is no NPC desc ("/guardpost add 3", 23 Oct) gets its hold's guard
-    const npcOrDefault = (p) => (/^[0-9a-f]+:.+\.es[mpl]$/i.test(String(p.npc || '')) ? p.npc : C.npcByHold[p.hold]);
+    // npcSwap: a post's guard swapped for another before it spawns (24 Oct: Solitude's Stormcloak-held variants -> their
+    // Imperial-held twins, which wear the Haafingar uniform)
+    const swapped = (npc) => (C.npcSwap && typeof C.npcSwap[npc] === 'string' ? C.npcSwap[npc] : npc);
+    const npcOrDefault = (p) => swapped(/^[0-9a-f]+:.+\.es[mpl]$/i.test(String(p.npc || '')) ? p.npc : C.npcByHold[p.hold]);
     // Patrols (Nate, 23 Oct: "yes patrols would be good"): a hold's first posts take its patrolsByHold guards in order, whose
     // own AI walks the base game's patrol routes; the server cannot move an NPC itself
     const patrolOf = new Map();
