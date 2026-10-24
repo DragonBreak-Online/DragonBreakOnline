@@ -1480,12 +1480,17 @@
           "748e:Dawnguard.esm",
           "8d7:JK's Castle Volkihar.esp",
           "3dc:JK's Castle Volkihar.esp",
-          "97d:JK's Castle Volkihar.esp"
+          "97d:JK's Castle Volkihar.esp",
+          "10f:JK's Castle Volkihar.esp",
+          "341:JK's Castle Volkihar.esp",
+          "34f:JK's Castle Volkihar.esp",
+          "4c:JK's Castle Volkihar.esp",
+          "40b:JK's Castle Volkihar.esp"
         ],
         "cells": [
           "803:Dawnguard.esm"
         ],
-        "note": "on its island in the Sea of Ghosts, north-west of Solitude"
+        "note": "on its island in the Sea of Ghosts, north-west of Solitude. 24 Oct (fac-0336): the island's front gate 10f and the two tower gates 341/34f (Skyrim gate base 94101), the tower door 4c beside them and the door 40b into the side wing (DLC1VampireCastleZCell1) are the hall's too; they were nobody's, so the clan could not hold them"
       }
     },
     {
