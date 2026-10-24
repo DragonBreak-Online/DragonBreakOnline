@@ -1,5 +1,20 @@
 [
   {
+    "title": "Forge fixes",
+    "date": "2026-10-24",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Schematics you know, at the forge",
+        "items": [
+          "Nordic carved weapons and armour can now be forged in Skyrim as well as on Solstheim. Their schematic is found in Skyrim's barrows, so smiths who learned it were wrongly told it was a Solstheim design.",
+          "Glass, Glacial Crystal, Steel Plate and Ayleid recipes now show at the forge from 50 Blacksmith, before you can make them at 60. They used to stay hidden until 75. You still need the schematic and the tier to make them."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Reading on Hold",
     "date": "2026-10-24",
     "version": "Server update",
