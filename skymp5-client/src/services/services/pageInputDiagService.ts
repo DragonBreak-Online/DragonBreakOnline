@@ -37,7 +37,8 @@ const EVENT_MAX_LINES = 40;
 // doorway that arms ten zones and moves eight hosts in two ticks cannot flood the relay
 const EVENT_FULL_PER_KIND = 6;
 // Kinds relayed under an allowance of their own, so host-change lines cannot spend it (as gamemode.js DIAG_KIND_MAX)
-const EVENT_KIND_MAX: Record<string, number> = { emote: 40 };
+// Voice link and deaf watchdog lines too, so a long evening's reconnects are all counted
+const EVENT_KIND_MAX: Record<string, number> = { emote: 40, voice: 40 };
 // Summary lines relayed past such a kind's allowance: 40 + 10 a launch, a quarter of the server's emote 200 a player a run
 const EVENT_KIND_SUMMARY_MAX = 10;
 const ownAllowance = (kind: string): number | null => (Object.prototype.hasOwnProperty.call(EVENT_KIND_MAX, kind) ? EVENT_KIND_MAX[kind] : null);
