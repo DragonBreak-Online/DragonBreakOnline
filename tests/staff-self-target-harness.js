@@ -57,6 +57,9 @@ check('panel teleports and kicks are not target-limited by this rule', gate(LEAD
 {
   const off = load({ selfTarget: { enabled: false }, callRef: { enabled: false } }).G;
   check('selfTarget.enabled false: own characters pass again', off.target(LEAD, LEAD_RP, 'items') === '' && off.target(GM, GM2, 'items') === '');
+  const own = load({ selfTarget: { ownAccount: false } }).G;
+  check('selfTarget.ownAccount false: own characters pass, another staff account still takes a Lead GM',
+    own.target(LEAD, LEAD_RP, 'items') === '' && own.target(GM, GM, 'items') === '' && /^Only a Lead GM/.test(own.target(GM, GM2, 'items')));
   const any = load({ selfTarget: { staffNeedsLead: false } }).G;
   check('staffNeedsLead false: a GM acts on another staff account, own still refused', any.target(GM, GM2, 'items') === '' && SELF.test(any.target(GM, GM_RP, 'items')));
 }

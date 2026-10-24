@@ -1820,7 +1820,8 @@
   "seedMissing": [{"profile": 51, "name": "Choom"}, {"profile": 97, "name": "Neem"}],
   "_staffCharOnly": "Off (Nate, 23 Oct: \"we shouldnt limit gm stuff per character\"): staff powers work on every character of a staff account again. The other three rules stay on. ROLLBACK: enabled true, hot reload.",
   "staffCharOnly": { "enabled": false, "clearModes": true },
-  "selfTarget": { "enabled": true, "staffNeedsLead": true },
+  "_selfTarget": "ownAccount off (Nate, 24 Oct: remove \"staff tools never act on your own characters\"; Lead GM Aussiepie was refused every grant to his own characters). Another staff member's account still takes a Lead GM, audited. ROLLBACK: ownAccount true, hot reload.",
+  "selfTarget": { "enabled": true, "ownAccount": false, "staffNeedsLead": true },
   "callRef": { "enabled": true, "bindMinutes": 60 },
   "trialLimits": { "enabled": true }
  },

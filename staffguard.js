@@ -8,6 +8,7 @@
 //                  cleared when the profile comes in on another character, or on a character that is not a staff one.
 //   selfTarget     staff tools never act on the acting staff member's own account; on another staff member's account only
 //                  a Lead GM or above acts, and each such use is audited.
+//                  ownAccount false lifts the first half only: staff may use the tools on their own characters.
 //   callRef        faction and rank changes, offices, renames and citizenship changes done by staff on another player need an
 //                  open GM call or a ticket: call:<n> or ticket:<id> in the command, /staffref <call n|ticket id> <player>
 //                  for the panels, or the player's own open call taken by the staff member. The reference goes in the audit.
@@ -39,7 +40,7 @@ module.exports = (api) => {
     // staff tool kinds (target below) that are grants, refused on any other character
     kinds: ['items', 'skills', 'powers'],
   });
-  const SELF = part('selfTarget', { enabled: true, staffNeedsLead: true });
+  const SELF = part('selfTarget', { enabled: true, ownAccount: true, staffNeedsLead: true });
   const REF = part('callRef', {
     enabled: true, bindMinutes: 60,
     // commands whose call:<n> / ticket:<id> words are taken out and kept for the action they run
@@ -107,9 +108,9 @@ module.exports = (api) => {
     const pt = typeof t === 'object' && t ? Number(t.profile) : pidOf(Number(t) >>> 0);
     const tActor = typeof t === 'object' && t ? 0 : Number(t) >>> 0;
     if (!Number.isSafeInteger(pt) || pt < 0) return '';
-    if (SELF.enabled && pt === pa) return SELF_NO;
+    if (SELF.enabled && SELF.ownAccount !== false && pt === pa) return SELF_NO;
     let staffAccount = false;
-    if (SELF.enabled && SELF.staffNeedsLead && typeof accountRankOf === 'function') {
+    if (SELF.enabled && SELF.staffNeedsLead && pt !== pa && typeof accountRankOf === 'function') {
       const rank = accountRankOf(pt, null, tActor || undefined);
       if (rank < 0) return 'That account\'s rank cannot be read, so the staff tool is refused.';
       staffAccount = rank > 0;
