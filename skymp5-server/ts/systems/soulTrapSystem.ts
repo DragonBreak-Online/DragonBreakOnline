@@ -13,6 +13,10 @@ const TRAPPED_PROP = "private.soulTrapped";
 const NOTICE_PACKET = "notification";
 // getUserByActor reports failure with Networking::InvalidUserId, not -1.
 const INVALID_USER_ID = 65535;
+// craftedExtrasService.ts takes the server's copies of these base ids, dropping local extras the server never recorded
+const RESYNC_PACKET = "craftedExtrasRefused";
+// After a soul trap death: once the caster's own game has filled its gem, and again for a slow client
+const RESYNC_AFTER_MS = [1500, 6000];
 // Only marked actors are polled, and a respawn takes seconds.
 const DEATH_POLL_MS = 100;
 
@@ -171,6 +175,7 @@ export class SoulTrapSystem implements System {
 
   private capture(ctx: SystemContext, targetId: number, casterId: number): void {
     const mp = ctx.svr as Mp;
+    this.resyncGems(ctx, casterId);
     const player = this.isPlayer(mp, targetId);
     const soul = this.soulOf(ctx, targetId, player);
     const gemId = this.fillGem(ctx, casterId, soul);
@@ -188,6 +193,25 @@ export class SoulTrapSystem implements System {
     this.log(`[soultrap] ${hex(casterId)} trapped the ${kind} soul of ${hex(targetId)} in gem ${hex(gemId)}`);
     // The gameplay credits the capture as Enchanter work (alchemy.js); size 0 is a black soul
     try { (globalThis as any).__dboSoulCaptured?.(casterId, targetId, soul.black ? 0 : soul.size, player); } catch (e) { this.log(`[soultrap] capture hook failed: ${e}`); }
+  }
+
+  // The caster's own game runs Soul Trap too and fills a gem the server never records (24 Oct: 301 server refusals, 31 gems
+  // that could not be stored or traded since). Its soul gems go back to the server's copies once the local fill has landed.
+  private resyncGems(ctx: SystemContext, casterId: number): void {
+    const send = () => {
+      try {
+        const userId = ctx.svr.getUserByActor(casterId);
+        if (userId < 0 || userId >= INVALID_USER_ID) return;
+        const inv = (ctx.svr as Mp).get(casterId, "inventory");
+        const ids = new Set<number>([...FILLED_GEMS.keys(), ...FILLED_GEMS.values()]);
+        for (const e of (inv && Array.isArray(inv.entries) ? inv.entries : [])) {
+          const id = Number(e.baseId) >>> 0;
+          if (this.gemOf(ctx, id)) ids.add(id);
+        }
+        ctx.svr.sendCustomPacket(userId, JSON.stringify({ customPacketType: RESYNC_PACKET, baseIds: Array.from(ids) }));
+      } catch { /* offline */ }
+    };
+    for (const ms of RESYNC_AFTER_MS) setTimeout(send, ms);
   }
 
   // The engine reads the respawn point right after this hook, so the Soul Cairn stands in for this one respawn only

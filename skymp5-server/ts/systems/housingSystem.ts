@@ -1157,7 +1157,9 @@ export class HousingSystem implements System {
     for (const primary of this.claimed) {
       const rec = this.read(ctx, primary);
       if (!rec || rec.owner === 0 || !rec.place) continue;
-      for (const cell of rec.place.cells) if (!index.has(cell)) index.set(cell, primary);
+      // Never a worldspace: a place indexed under one would own every unclaimed door and chest in it (a record the 21 Oct
+      // migration wrote with Tamriel as its cell is read as if that cell were not there)
+      for (const cell of rec.place.cells) if (!index.has(cell) && !this.isWorldDesc(ctx, cell)) index.set(cell, primary);
     }
     this.placeCells = index;
     this.placeCellsDirty = false;
@@ -1485,7 +1487,16 @@ export class HousingSystem implements System {
   private isHoldManager(ctx: SystemContext, actorId: number, primary: number): boolean {
     const hold = this.holdOf(ctx, primary);
     if (!hold) return false;
-    return this.holdRanks(ctx, actorId).some((r) => r.hold === hold && MANAGER_RANKS.indexOf(r.rank) !== -1);
+    if (!this.holdRanks(ctx, actorId).some((r) => r.hold === hold && MANAGER_RANKS.indexOf(r.rank) !== -1)) return false;
+    // A faction's hall is never the hold's to manage (Nate, 21 Oct: "make sure the castle isn't controlled by Solitude"):
+    // the gameplay's guilds.js names the non-court faction whose hall either half of the door is. tenancy.js already refused
+    // the hold's list, offer and sale there; Solitude's officials still had the menu's lock, open and assign at Castle
+    // Volkihar's doors (24 Oct)
+    const foreign = (globalThis as any).__dboForeignHall;
+    if (typeof foreign === "function") {
+      try { if (foreign([primary, this.partnerOf(ctx, primary)])) return false; } catch (e) { this.log(`[housing] foreign hall check failed: ${e}`); }
+    }
+    return true;
   }
 
   // Staff who override housing claims: Lead GM and above (TIER_CAPS.spawn). A GM observes; opening, transferring, revoking
@@ -2521,7 +2532,8 @@ export class HousingSystem implements System {
     const walks = new Map<number, string[]>();
     for (const p of houses) {
       const c = byRef.get(p.root);
-      const inner = c ? (c.cell && !this.isWorldDesc(ctx, c.cell) ? c.cell : c.partnerCell) : "";
+      // The side that is not a worldspace; a door with a worldspace on both sides has no interior (housingPlaces.ts, the gate)
+      const inner = !c ? "" : c.cell && !this.isWorldDesc(ctx, c.cell) ? c.cell : c.partnerCell && !this.isWorldDesc(ctx, c.partnerCell) ? c.partnerCell : "";
       inners.set(p.root, inner);
       const listed = cellsOf.get(p.root);
       const cells = !inner ? [] : listed ? [inner, ...listed.filter((c) => c !== inner)] : this.placeCellsFrom(ctx, inner, { owner: p.owner });
