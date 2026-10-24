@@ -1157,7 +1157,9 @@ export class HousingSystem implements System {
     for (const primary of this.claimed) {
       const rec = this.read(ctx, primary);
       if (!rec || rec.owner === 0 || !rec.place) continue;
-      for (const cell of rec.place.cells) if (!index.has(cell)) index.set(cell, primary);
+      // Never a worldspace: a place indexed under one would own every unclaimed door and chest in it (a record the 21 Oct
+      // migration wrote with Tamriel as its cell is read as if that cell were not there)
+      for (const cell of rec.place.cells) if (!index.has(cell) && !this.isWorldDesc(ctx, cell)) index.set(cell, primary);
     }
     this.placeCells = index;
     this.placeCellsDirty = false;
@@ -2521,7 +2523,8 @@ export class HousingSystem implements System {
     const walks = new Map<number, string[]>();
     for (const p of houses) {
       const c = byRef.get(p.root);
-      const inner = c ? (c.cell && !this.isWorldDesc(ctx, c.cell) ? c.cell : c.partnerCell) : "";
+      // The side that is not a worldspace; a door with a worldspace on both sides has no interior (housingPlaces.ts, the gate)
+      const inner = !c ? "" : c.cell && !this.isWorldDesc(ctx, c.cell) ? c.cell : c.partnerCell && !this.isWorldDesc(ctx, c.partnerCell) ? c.partnerCell : "";
       inners.set(p.root, inner);
       const listed = cellsOf.get(p.root);
       const cells = !inner ? [] : listed ? [inner, ...listed.filter((c) => c !== inner)] : this.placeCellsFrom(ctx, inner, { owner: p.owner });

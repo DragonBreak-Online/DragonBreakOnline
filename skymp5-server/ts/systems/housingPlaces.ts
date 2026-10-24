@@ -68,7 +68,13 @@ export const planPlaces = (claims: PlaceClaim[], isWorld: (cell: string) => bool
     }
     for (const g of groups) {
       const doors = g.members.filter((m) => m.door);
-      const toWorld = doors.filter((m) => (m.cell && isWorld(m.cell)) || (m.partnerCell && isWorld(m.partnerCell)));
+      // A way between an interior and a worldspace. A door with a worldspace on both sides (a city gate: SolitudeWorld to
+      // Tamriel) leads into no building: on 21 Oct the migration took Solitude's gate for a house whose interior was
+      // Tamriel, and every unclaimed door and chest in the open world became its owner's
+      const toWorld = doors.filter((m) => {
+        const near = !!m.cell && isWorld(m.cell), far = !!m.partnerCell && isWorld(m.partnerCell);
+        return (near || far) && !(near && far);
+      });
       const pick = (toWorld.length ? toWorld : doors.length ? doors : g.members).slice().sort((a, b) => (a.name ? 0 : 1) - (b.name ? 0 : 1) || a.ref - b.ref);
       const root = pick[0];
       const kind: PlannedPlace["kind"] = root.door ? (toWorld.length ? "house" : "interior door") : isWorld(root.cell) ? "outdoor chest" : "interior chest";
