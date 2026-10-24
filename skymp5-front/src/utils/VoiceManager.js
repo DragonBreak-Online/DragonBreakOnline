@@ -18,7 +18,8 @@
 //                             256 + the button for a mouse button)
 //   startDiag(seconds)        /voicediag: report the mix every 5 s for that long ('voice::diag' <json>)
 // Events back to the game (window.skyrimPlatform.sendMessage):
-//   'voice::ready', 'voice::micDenied', 'voice::error' <text>,
+//   'voice::ready', 'voice::micDenied', 'voice::error' <text>, 'voice::link' <reconnect state>,
+//   'voice::deaf' <"missing talking refused seconds"> before the watchdog rejoins,
 //   'voice::speaking' <json array of {id, level}: own voice plus audible speakers, every 150 ms while anyone talks, [] once when quiet>
 
 import { effectiveActivation, vadBlocked, BLOCKED_NOTICE } from './voiceEchoGate';
@@ -43,6 +44,9 @@ const OUTPUT_MAX = 3;
 const PEERS_KEY = 'dboVoicePeers';
 const DEFAULT_PREFS = { inputLabel: '', outputLabel: '', micGain: 1, outputVolume: 1, activation: 'ptt', vadThreshold: 0.06 };
 
+const DEAF_REJOIN_MS = 20000;    // voices in range allowed but never delivered this long: rejoin the room
+const DEAF_COOLDOWN_MS = 120000; // at most one such rejoin this often
+const DEAF_TICK_MS = 1000;
 const LOADING_SETTLE_MS = 2000;  // after a loading screen, before the mic state is read again
 const DIAG_SAMPLE_MS = 250;      // voice trace (/voicediag): level sampling cadence
 const DIAG_REPORT_MS = 5000;
@@ -683,7 +687,7 @@ class VoiceManager {
           }
         } catch (e) { /* not ours */ }
       });
-      room.on(RoomEvent.Disconnected, () => {
+      room.on(RoomEvent.Disconnected, (reason) => {
         Array.from(this.audioEls.keys()).forEach((id) => this.detachPeer(id));
         this.peerRanges = {};
         this.emitSpeaking();
@@ -691,9 +695,13 @@ class VoiceManager {
         if (this.room === room) {
           this.room = null;
           this.lastToken = null;
+          sendToGame('voice::link', `disconnected ${Number(reason) || 0}`);
           sendToGame('voice::error', 'disconnected');
         }
       });
+      room.on(RoomEvent.SignalReconnecting, () => { if (this.room === room) sendToGame('voice::link', 'signal reconnecting'); });
+      room.on(RoomEvent.Reconnecting, () => { if (this.room === room) sendToGame('voice::link', 'reconnecting'); });
+      room.on(RoomEvent.Reconnected, () => { if (this.room === room) this.onReconnected(room); });
       room.on(RoomEvent.ActiveSpeakersChanged, () => this.emitSpeaking());
 
       // Set before joining: livekit-client sends it as the connection opens, ahead of any track I publish
@@ -728,6 +736,42 @@ class VoiceManager {
     } finally {
       this.connecting = false;
     }
+  }
+
+  // A full reconnect republishes my mic under a new publication; the hearing list and my range go out again too
+  onReconnected(room) {
+    sendToGame('voice::link', 'reconnected');
+    const pub = room.localParticipant.getTrackPublication(Track.Source.Microphone);
+    if (this.mic && pub && pub.track && pub.track.mediaStreamTrack === this.mic.track) this.mic.pub = pub;
+    this.transmitting = !this.wantTransmit();
+    this.updateTransmit();
+    this.applyHearers(room, true);
+    this.publishRange();
+    this.deafSince = 0;
+  }
+
+  // Voices in range that LiveKit lets me hear but never delivers: after DEAF_REJOIN_MS with none heard, leave and rejoin
+  deafTick() {
+    const room = this.room;
+    const now = Date.now();
+    if (!room || this.connecting || room.state !== 'connected' || !this.lastPeersAt || now - this.lastPeersAt > 5000) { this.deafSince = 0; return; }
+    let missing = 0, heard = 0, talking = 0, refused = 0;
+    room.remoteParticipants.forEach((p) => {
+      const d = this.distances[p.identity];
+      if (d === undefined || d > this.rangeFor(p.identity)) return;
+      p.audioTrackPublications.forEach((pub) => {
+        if (this.peerNodes.has(p.identity) || this.audioEls.has(p.identity)) heard++;
+        else if (pub.permissionStatus === 'not_allowed') refused++;
+        else { missing++; if (p.isSpeaking) talking++; }
+      });
+    });
+    if (!missing || heard) { this.deafSince = 0; return; }
+    if (!this.deafSince) this.deafSince = now;
+    if (now - this.deafSince < DEAF_REJOIN_MS || now - (this.deafRejoinAt || 0) < DEAF_COOLDOWN_MS) return;
+    this.deafRejoinAt = now;
+    this.deafSince = 0;
+    sendToGame('voice::deaf', `${missing} ${talking} ${refused} ${Math.round(DEAF_REJOIN_MS / 1000)}`);
+    this.disconnect().finally(() => sendToGame('voice::error', 'rejoin'));
   }
 
   async disconnect() {
@@ -1060,5 +1104,6 @@ setInterval(() => {
 setInterval(() => window.__alduinakVoice.emitSpeaking(), SPEAKING_TICK_MS);
 setInterval(() => window.__alduinakVoice.vadTick(), VAD_TICK_MS);
 setInterval(() => window.__alduinakVoice.guardTick(), GUARD_TICK_MS);
+setInterval(() => window.__alduinakVoice.deafTick(), DEAF_TICK_MS);
 
 export default window.__alduinakVoice;
