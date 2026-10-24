@@ -1476,7 +1476,7 @@
   "firstCraft": { "enabled": true, "rate": 3, "fullFor": 25, "skills": ["cook", "blacksmith", "alchemist", "tailor"] }
  },
  "craftPerkTiers": {
-  "_comment": "Forge recipes that ask for a vanilla Smithing perk (HasPerk): the fork's masterySystem counts the perk as held when the crafter's tier in this skill (1 Novice .. 5 Master) reaches the tier listed here. Keys are perk editor ids; a perk not listed stays locked (ArcaneBlacksmith only gates tempering enchanted gear and a few enchanted Immersive Armors sets, so it is left out). Re-read when this file changes; an empty perks turns it off. The same table is sent to each player (dboCraftPerks) so their own crafting menu shows the recipes; ArcaneBlacksmith is never granted. Each perk opens at the first rank whose points reach the earliest smithing.json family that needs it (Steel T2 15 pts, Orcish and Scaled T3 30, Glass T5 60; Barush #C9TM, an Orc at 34, saw no Orcish, 13 Oct), so the menu never hides what smithing.js allows; smithing.js still refuses a craft its tier or technique does not allow, materials kept. Needs fork craft-perk-tiers (C++ onCraftPerkRequired, masterySystem) and the client-craft-perks client.",
+  "_comment": "EbonySmithing at 3, not 4 (24 Oct, /bug #R4XE 'cant see the glacial crystal armor in the forge'): Glass, Glacial Crystal, Steel Plate and Ayleid (smithing.json tier 5, made from 60 points) ask for it, and rank 4 opens at 75, so a smith who could make them could not see them. The perk only shows a recipe; smithing.js still refuses a family above the smith's tier or without its technique. Forge recipes that ask for a vanilla Smithing perk (HasPerk): the fork's masterySystem counts the perk as held when the crafter's tier in this skill (1 Novice .. 5 Master) reaches the tier listed here. Keys are perk editor ids; a perk not listed stays locked (ArcaneBlacksmith only gates tempering enchanted gear and a few enchanted Immersive Armors sets, so it is left out). Re-read when this file changes; an empty perks turns it off. The same table is sent to each player (dboCraftPerks) so their own crafting menu shows the recipes; ArcaneBlacksmith is never granted. Each perk opens at the first rank whose points reach the earliest smithing.json family that needs it (Steel T2 15 pts, Orcish and Scaled T3 30, Glass T5 60; Barush #C9TM, an Orc at 34, saw no Orcish, 13 Oct), so the menu never hides what smithing.js allows; smithing.js still refuses a craft its tier or technique does not allow, materials kept. Needs fork craft-perk-tiers (C++ onCraftPerkRequired, masterySystem) and the client-craft-perks client.",
   "skill": "blacksmith",
   "perks": {
    "SteelSmithing": 1,
@@ -1485,7 +1485,7 @@
    "AdvancedArmors": 2,
    "OrcishSmithing": 2,
    "GlassSmithing": 3,
-   "EbonySmithing": 4,
+   "EbonySmithing": 3,
    "DaedricSmithing": 5,
    "DragonArmor": 5
   }

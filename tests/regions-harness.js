@@ -273,6 +273,11 @@ props.delete(SMITH + '|appearance');
 regionsCfg = Object.assign({}, regionsCfg, { raceStyles: undefined }); load();
 at(ADMIN, BRUMA_WORLD);
 check('...while an admin may still forge one', R().recipeOk(ADMIN, idOf(FALCHION[1]), idOf(FALCHION[0])).ok);
+// Nordic carved gear: its schematic is found in Skyrim's barrows, so it is forged in Skyrim as well as Solstheim (/bug #BGJN,
+// 24 Oct: "Nordic mace is a solstheim design"); still not in Cyrodiil
+const NORDIC_MACE = ['2b082:Dragonborn.esm', '1cdb0:Dragonborn.esm']; // DLC2RecipeWeaponNordicMace
+check('the Nordic Mace is forged in Skyrim and on Solstheim', [TAMRIEL_WORLD, SOLSTHEIM_WORLD].every((w) => (at(SMITH, w), R().recipeOk(SMITH, idOf(NORDIC_MACE[1]), idOf(NORDIC_MACE[0])).ok)), (at(SMITH, TAMRIEL_WORLD), R().recipeOk(SMITH, idOf(NORDIC_MACE[1]), idOf(NORDIC_MACE[0]))));
+check('...and not in Bruma', (at(SMITH, BRUMA_WORLD), !R().recipeOk(SMITH, idOf(NORDIC_MACE[1]), idOf(NORDIC_MACE[0])).ok));
 
 // ---- admins ----
 at(ADMIN, BRUMA_WORLD); stock(ADMIN, DWARVEN);

@@ -16,7 +16,10 @@ const RANK_POINTS = [0, 25, 50, 75, 90];   // craftPerkTiers tier 1 Novice .. 5 
 const rankAt = (points) => RANK_POINTS.reduce((r, p, i) => (points >= p ? i + 1 : r), 1);
 // The families whose vanilla forge recipes ask for each perk
 const PERK_FAMILIES = { SteelSmithing: ['steel'], OrcishSmithing: ['orcish'], AdvancedArmors: ['scaled', 'steelplate'], DwarvenSmithing: ['dwarven'],
-  ElvenSmithing: ['elven'], GlassSmithing: ['glass'], EbonySmithing: ['EBONY'], DaedricSmithing: ['DAEDRIC'], DragonArmor: ['DRAGON'] };
+  ElvenSmithing: ['elven'], GlassSmithing: ['glass', 'amber'],
+  // Glass, Glacial Crystal, Steel Plate and Ayleid recipes ask for EbonySmithing too (24 Oct census of the live order; /bug #R4XE
+  // could not see Glacial Crystal at the forge)
+  EbonySmithing: ['EBONY', 'glass', 'glacial_crystal', 'steelplate', 'ayleid'], DaedricSmithing: ['DAEDRIC'], DragonArmor: ['DRAGON'] };
 const fam = new Map(SMITH.families.map((f) => [f.id, f]));
 const perks = CONFIG.craftPerkTiers.perks;
 for (const [perk, ids] of Object.entries(PERK_FAMILIES)) {
