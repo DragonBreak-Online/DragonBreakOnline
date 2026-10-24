@@ -65,10 +65,16 @@ module.exports = (api) => {
     mp.set(a, 'private.dboLevel', st);
     mp.set(a, 'private.dboAvBonus', avBonus(a, st.spent));
   };
-  // A race's bonus follows the race (a new character, a race change), written when it differs
+  // A race's bonus follows the race (a new character, a race change), written when it differs. The client's bars were built
+  // from the old bonus, so a gain is sent as a level spend's is (a Half-Giant's +50 waited for the next login, 21 Oct); a
+  // loss shows at the next login, as a refund's does
   const syncBonus = (a, st) => {
     const want = avBonus(a, st.spent); const have = get(a, 'private.dboAvBonus', null) || {};
-    if (['health', 'magicka', 'stamina'].some((k) => (Number(have[k]) || 0) !== want[k])) mp.set(a, 'private.dboAvBonus', want);
+    if (!['health', 'magicka', 'stamina'].some((k) => (Number(have[k]) || 0) !== want[k])) return;
+    mp.set(a, 'private.dboAvBonus', want);
+    const gain = {};
+    for (const k of Object.keys(VITALS)) { const d = want[k] - (Number(have[k]) || 0); if (d > 0) gain[k] = d; }
+    if (Object.keys(gain).length) sendPacket(a, Object.assign({ customPacketType: 'dboAvGain' }, gain));
   };
   // Points bought at another rate are re-priced at today's, and the client is told the difference
   const rescale = (a, st) => {
@@ -120,8 +126,9 @@ module.exports = (api) => {
   const check = (a) => {
     if (!CFG.enabled) return false;
     const st = stateOf(a);
-    rescale(a, st);
+    // The race's bonus first: rescale and a level-up save it too, silently
     syncBonus(a, st);
+    rescale(a, st);
     const earned = levelOfUnits(unitsOf(a));
     if (earned <= st.level) return false;
     const gained = earned - st.level;

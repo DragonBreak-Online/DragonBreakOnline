@@ -1,5 +1,20 @@
 [
   {
+    "title": "Half-Giant health",
+    "date": "2026-10-24",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "The Half-Giant's +50 health",
+        "items": [
+          "A new Half-Giant now gets their +50 health in their first session. Until now it only showed after logging out and back in.",
+          "A Half-Giant who still lacks it gets it at their next login."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The Watch: city guards in Bruma",
     "date": "2026-10-23",
     "version": "Server update",

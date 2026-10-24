@@ -71,5 +71,20 @@ ok(api.mp.get(2, 'private.dboAvBonus').health === 25 && packets.length === 1, 't
   cmds.level(9, 'reset one');
   ok(api.mp.get(1, 'private.dboAvBonus').magicka === 0 && api.mp.get(1, 'private.dboLevel').pending === after.pending, 'staff /level reset <player> refunds');
 }
+// A race's flat bonus (the Half-Giant's +50 health) reaches the client when it is first written, not at the next login
+{
+  packets.length = 0;
+  api.mp.set(3, 'private.mastery', { v: 2, skills: { smithing: skill(10) }, order: ['smithing'] });
+  globalThis.__dboRaceVitalBonus = (a) => ({ health: a === 3 ? 50 : 0 });
+  globalThis.__dboCharLevelLogin(3);
+  ok(api.mp.get(3, 'private.dboAvBonus').health === 50, 'the race bonus is written');
+  ok(packets.length === 1 && packets[0].customPacketType === 'dboAvGain' && packets[0].health === 50 && packets[0].magicka === undefined, '...and the client is told the +50 at once');
+  globalThis.__dboCharLevelLogin(3);
+  ok(packets.length === 1, '...once');
+  globalThis.__dboRaceVitalBonus = () => ({ health: 0 });
+  globalThis.__dboCharLevelLogin(3);
+  ok(api.mp.get(3, 'private.dboAvBonus').health === 0 && packets.length === 1, 'losing the race (a reroll) lowers the bonus and sends no negative gain');
+  delete globalThis.__dboRaceVitalBonus;
+}
 console.log(fails ? `${fails} FAILURES` : 'all passed');
 process.exit(fails ? 1 : 0);
