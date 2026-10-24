@@ -1,5 +1,20 @@
 [
   {
+    "title": "Castle Volkihar",
+    "date": "2026-10-24",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "The castle's coffins and the Bloodstone Chalice",
+        "items": [
+          "The vampire coffins are beds now. In a coffin of your own house or your faction's hall, choose Sleep to log out and wake Well Rested, as in a bed. A coffin no longer gets stuck when you try to use it.",
+          "A vampire can drink from the Bloodstone Chalice on the shrine of Molag Bal in the great hall, once a night. It slakes the thirst like a meal. It is not for the living."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Forge fixes",
     "date": "2026-10-24",
     "version": "Server update",

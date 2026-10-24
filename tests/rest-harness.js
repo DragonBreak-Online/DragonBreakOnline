@@ -166,7 +166,7 @@ check("the innkeeper Erlus's bed is for rent too", activate(KEEPER_BED, ME) === 
 ui('restChoose', ME, ['cancel']);
 check("Jerall View's upstairs bed, the innkeepers', is for rent to anyone but the owner", activate(JERALL_BED, ME) === true && actionIds().join() === 'rent' && lastWidget().w.targetName === 'A bed for rent at Jerall View Inn', lastWidget());
 ui('restChoose', ME, ['cancel']);
-check('boot line counts bed types, inns and the Bruma ones', out.logs.some((l) => /3 bed types, 7 inn cells \(3 with a door in bruma\), every adult bed in them to rent/.test(l)), out.logs);
+check('boot line counts bed types, inns and the Bruma ones', out.logs.some((l) => /3 bed types and 5 coffins, 7 inn cells \(3 with a door in bruma\), every adult bed in them to rent/.test(l)), out.logs);
 
 // ---- renting at an inn nobody owns ----
 check('a free inn bed opens the rent prompt', activate(INN_BED, ME) === true && actionIds().join() === 'rent', lastWidget());
@@ -326,6 +326,14 @@ check('a bed in your own house offers sleep, no rent', activate(HOME_BED, ME) ==
 check("someone else's house bed is left to the engine", activate(HOME_BED, OTHER) === false);
 check('my other character owns the house too: the claim is the profile', activate(HOME_BED, ME2) === true && lastWidget().w.targetName === 'Your bed');
 ui('restChoose', ME2, ['cancel']);
+// Dawnguard's vampire coffins rest as beds (Nate, 24 Oct, Castle Volkihar): Sleep only, and never handed to the engine, which
+// cannot open one (its script lays the sleeper in; SkyMP runs no Papyrus)
+const COFFIN = 0x3007;
+place(COFFIN, 'ccf2:Dawnguard.esm', HOME_CELL);
+check('a coffin in your own house offers Sleep, and no Lie down', activate(COFFIN, ME) === true && actionIds().join() === 'sleep', lastWidget().w.actions);
+ui('restChoose', ME, ['cancel']);
+out.personals.length = 0;
+check("someone else's coffin is not given to the engine either, and says why", activate(COFFIN, THIRD) === true && out.personals.some(([a, t]) => a === THIRD && /coffin is not yours/.test(t)), out.personals);
 ui('restChoose', ME, ['cancel']);
 // A building with rooms of its own (fork housing places, with apply): every interior cell of the place is the owner's (Nate, 4 Oct)
 const UPSTAIRS = '13a5e:Skyrim.esm', UP_BED = 0x3007;

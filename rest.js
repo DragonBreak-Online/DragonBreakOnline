@@ -75,6 +75,12 @@ module.exports = (api) => {
     // Sleep takes the body out of the world at once, skipping the 5 minutes spawn.ts keeps a logged-out body in it
     // (logoutGraceMs), so it waits as long after any fight, NPCs included (2026-09-29 review, R5)
     combatSeconds: 300,
+    // Dawnguard's vampire coffins rest as beds (Nate, 24 Oct, fac-0336: "make them work"). Their own script
+    // (DLC1CoffinActivateInUseScript) opens the lid and lays the sleeper in, and SkyMP runs no Papyrus: the server seated
+    // the player, their game never sat (apr wb nosit), and the coffin stayed taken. beds.py names beds by editor id and
+    // never matched them. A coffin offers Sleep only: Lie down would hand it back to the engine and stick the same way.
+    // DLC1VampireCoffinHoriz01/02, Vert01/02 and VampireCoffinVertical.
+    coffins: ['ccf0:Dawnguard.esm', 'ccf1:Dawnguard.esm', 'ccf2:Dawnguard.esm', 'ccf3:Dawnguard.esm', 'b64e:Dawnguard.esm'],
   }, cfg.rest || {});
 
   const WIDGET_ID = 41;
@@ -95,6 +101,8 @@ module.exports = (api) => {
       INNS.set(id, { name: String((v && v.name) || 'the inn'), hold: (v && v.hold) || null, group: idOf(v && v.group) || id, door: !v || v.entrance !== false });
     }
   } catch (e) { log('rest: beds.json unreadable:', e.message); }
+  const COFFINS = new Set((Array.isArray(CFG.coffins) ? CFG.coffins : []).map(idOf).filter(Boolean));
+  for (const id of COFFINS) BEDS.add(id);
   const groupOf = (cell) => (INNS.has(cell) ? INNS.get(cell).group : cell);
   globalThis.__dboInnGroupOf = groupOf; // business.js finds an inn's ledger from any of its rooms
   const innName = (cell) => { const i = INNS.get(cell); if (!i) return ''; const g = INNS.get(i.group); return g ? g.name : i.name; };
@@ -274,7 +282,7 @@ module.exports = (api) => {
     // The price rides in the button's id too, so a click can only ever pay what its own button said
     const actions = kind === 'inn' ? [{ id: `rent:${price}`, label: `Rent this bed: ${price} gold for ${forText()}` }]
       : kind === 'keep' ? [{ id: 'keep', label: 'Make this my bed' }]
-        : [{ id: 'sleep', label: 'Sleep (log out)' }, { id: 'lie', label: 'Lie down (use the bed again)' }]
+        : [{ id: 'sleep', label: 'Sleep (log out)' }].concat(COFFINS.has(baseOf(bed)) ? [] : [{ id: 'lie', label: 'Lie down (use the bed again)' }])
           .concat(kind === 'own' && inInn ? [{ id: 'unkeep', label: 'This is no longer my bed' }] : []);
     pending.set(a >>> 0, bed >>> 0);
     if (kind === 'inn') quoted.set(a >>> 0, { bed: bed >>> 0, price }); else quoted.delete(a >>> 0);
@@ -306,7 +314,12 @@ module.exports = (api) => {
       if (l.bed === (target >>> 0) && l.until > Date.now()) { const k = standing(caster, target); if (k === 'own' || k === 'rented') return false; }
     }
     const kind = standing(caster, target);
-    if (!kind) { sayBed(caster, 'This bed is not yours. You rest well in a bed of your own home, or one you rent at an inn.'); return false; }
+    if (!kind) {
+      // A coffin never goes to the engine, which cannot open it (CFG.coffins)
+      if (COFFINS.has(baseOf(target))) { sayBed(caster, 'This coffin is not yours to rest in. Its castle\'s own may sleep here.'); return true; }
+      sayBed(caster, 'This bed is not yours. You rest well in a bed of your own home, or one you rent at an inn.');
+      return false;
+    }
     if (kind === 'taken') {
       const r = rentOf(target);
       personal(caster, `This bed is rented${r && r.renter ? ` by ${nameTo(caster, r.renter)}` : ''} until ${r ? clock(r.until) : 'later'}.`);
@@ -554,5 +567,5 @@ module.exports = (api) => {
     personal(a, lines.join(' '));
   }, { help: 'How long Well Rested and Well Fed have left' });
 
-  log(`rest ${CFG.enabled ? 'on' : 'off'}: ${BEDS.size} bed types, ${INNS.size} inn cells (${[...INNS.values()].filter((i) => i.hold === 'bruma' && i.door).length} with a door in bruma), every adult bed in them to rent; sleep ${CFG.minOfflineMinutes} min for ${CFG.restedHours} h rested (+${CFG.extraHealPercentPerSecond}%/s health) and ${CFG.wellFedHours} h fed (hunger x${CFG.wellFedHungerMult}); rent ${CFG.rentGold} gold for ${CFG.rentHours} h, ${Math.round(CFG.holdShare * 100)}% to the hold`);
+  log(`rest ${CFG.enabled ? 'on' : 'off'}: ${BEDS.size - [...COFFINS].filter((id) => BEDS.has(id)).length} bed types${COFFINS.size ? ` and ${COFFINS.size} coffins` : ''}, ${INNS.size} inn cells (${[...INNS.values()].filter((i) => i.hold === 'bruma' && i.door).length} with a door in bruma), every adult bed in them to rent; sleep ${CFG.minOfflineMinutes} min for ${CFG.restedHours} h rested (+${CFG.extraHealPercentPerSecond}%/s health) and ${CFG.wellFedHours} h fed (hunger x${CFG.wellFedHungerMult}); rent ${CFG.rentGold} gold for ${CFG.rentHours} h, ${Math.round(CFG.holdShare * 100)}% to the hold`);
 };

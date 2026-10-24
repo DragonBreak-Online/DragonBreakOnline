@@ -1828,7 +1828,8 @@ module.exports = (api) => {
   // A Blood Potion (alchemy.js: Dawnguard's bottled blood or the Master's brew, Nate 14 Oct) is a meal for a vampire: the
   // thirst resets as a feed's does, the gifts of a first meal wake, but no blood rank and no smear (nobody was bitten).
   // false for anyone else, who has only the potion's restore.
-  globalThis.__dboSuperBloodPotion = (a) => {
+  // lines: [the first meal's, any other's]; the bottle's by default
+  const bloodMeal = (a, lines) => {
     const s = stateOf(a >>> 0);
     if (!s || s.kind !== 'vampire') return false;
     const wasUnfed = !!s.unfed, wasStage = Number(s.stage) || 1;
@@ -1837,7 +1838,28 @@ module.exports = (api) => {
     if (wasUnfed || wasStage > 1) { syncVampSpells(a >>> 0, s); flushStageSpells(a >>> 0, s, wasUnfed ? 'first meal' : 'fed'); }
     if (wasUnfed) refreshRates(a >>> 0);
     if (needsFeed) try { needsFeed(a >>> 0); } catch (e) { /* hunger off */ }
-    personal(a >>> 0, wasUnfed ? 'Blood, at last, if only from a bottle. The withering lifts, and your gifts wake in you.' : 'The bottled blood is thin, but the thirst recedes.');
+    personal(a >>> 0, wasUnfed ? lines[0] : lines[1]);
+    return true;
+  };
+  globalThis.__dboSuperBloodPotion = (a) => bloodMeal(a, ['Blood, at last, if only from a bottle. The withering lifts, and your gifts wake in you.', 'The bottled blood is thin, but the thirst recedes.']);
+  // The Bloodstone Chalice on the shrine of Molag Bal in Castle Volkihar's great hall (Dawnguard's
+  // DLC1BloodChaliceActivatorEmpty 141a1, on JK's shrine base 6d6; Nate, 24 Oct, fac-0336: "make them work"). Its vanilla use
+  // belongs to a quest's script, which SkyMP never runs, so a press did nothing. A vampire drinks from it once a game day:
+  // a meal like a Blood Potion's, nobody bitten; anyone else is turned from it.
+  // Matched on the reference's own desc, read from its id (getDescFromId reads nothing from the object: nothing activated
+  // may have a property read here, super-activate-harness), and compared as written, so a desc that does not resolve
+  // matches nothing. Config supernatural.chalices: reference descs (Castle Volkihar's is the only one in use).
+  const normDesc = (d) => { const s = String(d || '').toLowerCase(); const i = s.indexOf(':'); return i > 0 ? `${(parseInt(s.slice(0, i), 16) || 0).toString(16)}:${s.slice(i + 1)}` : ''; };
+  const CHALICES = new Set((Array.isArray(C.chalices) ? C.chalices : ['141a1:Dawnguard.esm']).map(normDesc).filter(Boolean));
+  const isChalice = (t) => { let d = ''; try { d = normDesc(mp.getDescFromId(t >>> 0)); } catch (e) { return false; } return !!d && CHALICES.has(d); };
+  const drinkChalice = (t, a) => {
+    if (kindOf(a) !== 'vampire') { personal(a, 'The chalice holds blood, thick and dark. It is not meant for the living.'); return true; }
+    const day = Math.floor(gameDays());
+    let last = null; try { last = mp.get(a >>> 0, 'private.dboChaliceDay'); } catch (e) { last = null; }
+    if (Number(last) === day) { personal(a, 'You have drunk from the chalice tonight. It will not fill for you again until tomorrow.'); return true; }
+    if (!bloodMeal(a, ['The blood of the chalice is old and strong. The withering lifts, and your gifts wake in you.', 'You drink from the Bloodstone Chalice. The thirst recedes.'])) return true;
+    try { mp.set(a >>> 0, 'private.dboChaliceDay', day); } catch (e) { log('supernatural: chalice day save failed', e.message); }
+    audit(`FEED ${who(a)} drank from the Bloodstone Chalice (${(t >>> 0).toString(16)})`);
     return true;
   };
   // A captive standing with bound hands, drained by a deep feed, sinks to the ground for a while (the bleed-out pose
@@ -2080,6 +2102,7 @@ module.exports = (api) => {
   });
   globalThis.__dboSuperActivate = (t, a) => {
     if (!isPlayer(a)) return false;
+    if (CHALICES.size && isChalice(t)) return drinkChalice(t, a);
     // E on a player the vampire has Seduced feeds on them, as vanilla's bite does
     if (seducedBy(t, a)) return feedSeduced(a, t);
     const s = stateOf(a); if (!s || (!s.kind && beastForm(a) !== 'werewolf')) return false;

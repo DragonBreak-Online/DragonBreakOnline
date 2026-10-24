@@ -396,7 +396,7 @@ const ticks = (n) => { for (let i = 0; i < n; i++) globalThis.__dboAlchemyRunTic
   await drink(DBO('a40'), { health: 1, magicka: 1, stamina: 1 });
   check('drinking the sap: 25% less damage taken for 45 s', near(globalThis.__dboPotionBonus(A, 'taken'), 0.25) && (!potionTakenMult || near(potionTakenMult(A, { targetMaxHealth: 150 }), 0.75)));
   load({ records: MAPPED });
-  check('supernatural.js counts a Blood Potion as a vampire\'s meal, nobody else\'s', /globalThis\.__dboSuperBloodPotion = \(a\) => \{[\s\S]{0,200}s\.kind !== 'vampire'\) return false;[\s\S]{0,200}lastFed: gameDays\(\), stage: 1, unfed: null/.test(fs.readFileSync('supernatural.js', 'utf8')));
+  check('supernatural.js counts a Blood Potion as a vampire\'s meal, nobody else\'s', ((src) => /const bloodMeal = \(a, lines\) => \{[\s\S]{0,200}s\.kind !== 'vampire'\) return false;[\s\S]{0,200}lastFed: gameDays\(\), stage: 1, unfed: null/.test(src) && /globalThis\.__dboSuperBloodPotion = \(a\) => bloodMeal\(a, /.test(src))(fs.readFileSync('supernatural.js', 'utf8')));
 
   // ---- the bucket said out loud ----
   {
