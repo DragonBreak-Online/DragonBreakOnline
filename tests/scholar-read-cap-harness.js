@@ -32,8 +32,12 @@ rec = make({ spentToday: ps.dailyCaps.low }); ok('skill daily cap reached: refus
 rec = make({ spentToday: ps.dailyCaps.low, day: '2026-10-08' }); ok('...yesterday\'s spending does not count today', fn(1, NOW) === null);
 rec = make({ level: 80, spentToday: ps.dailyCaps.expert }); ok('expert skill uses the expert daily cap', /after midnight/.test(fn(1, NOW) || ''));
 rec = make({}, { spentToday: ps.characterDaily }); ok('character daily cap reached: refused', /one day allows/.test(fn(1, NOW) || ''));
-rec = make({ level: ps.expertAbove }, {}, { a: { level: 80 }, b: { level: 80 }, c: { level: 80 } }); ok('three other skills above 75: Scholar held at 75, refused', /rise no further than 75/.test(fn(1, NOW) || ''), fn(1, NOW));
+rec = make({ level: ps.expertAbove }, {}, { a: { level: 80 }, b: { level: 80 }, c: { level: 80 } }); ok('three other skills above 75: scholarNoRoom holds Scholar at 75', /rise no further than 75/.test(fn(1, NOW) || ''), fn(1, NOW));
 rec = make({ level: 74 }, {}, { a: { level: 80 }, b: { level: 80 }, c: { level: 80 } }); ok('...below the hold it still reads', fn(1, NOW) === null);
-rec = make({ level: ps.capPerSkill }); ok('Scholar at 100: refused', /at its peak/.test(fn(1, NOW) || ''));
+// These name what scholarNoRoom itself answers, not what a reader is allowed to do. Since 452c138e4 the read path asks
+// it only to explain why Scholar will not rise: a reader at the peak, on Hold or under another skill's place still reads
+// for the tomes and scrolls between the pages (tests/reading-harness.js covers that side). Kept as the one test of the
+// function's own verdicts (review of defc9a2cc, F5).
+rec = make({ level: ps.capPerSkill }); ok('Scholar at 100: scholarNoRoom says no room (the read path lets them read anyway)', /at its peak/.test(fn(1, NOW) || ''));
 console.log(fails ? `${fails} FAILED` : 'all checks passed');
 process.exit(fails ? 1 : 0);
