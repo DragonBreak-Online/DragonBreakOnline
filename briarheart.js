@@ -83,7 +83,7 @@ module.exports = (api) => {
     tearSeconds: 10, tearRange: 250, tearPermadeath: false, tearGivesHeart: true,
     noDivineBlessings: true, faithLocked: true,
     cureDeities: ['arkay', 'stendarr'], cureItem: '2e504:Skyrim.esm',  // a filled black soul gem
-    visual: { enabled: false, armor: '5d008:Skyrim.esm', emptyArmor: '5d009:Skyrim.esm', women: false, retrySeconds: 10, maxTries: 5 },
+    visual: { enabled: false, armor: '5d008:Skyrim.esm', emptyArmor: '5d009:Skyrim.esm', body: '90d63:unofficial skyrim special edition patch.esp', women: false, retrySeconds: 10, maxTries: 5 },
     briarSkin: { enabled: false, armorFrom: 'd8d50:Skyrim.esm', staminaRegen: 1.25, diseaseResist: 50 },
   }, (cfg && cfg.briarheart) || {});
   const PROP = 'private.dboBriarheart', FAILED = 'private.dboBriarheartFailedAt';
@@ -152,7 +152,12 @@ module.exports = (api) => {
   const waitText = (ms) => { const h = Math.floor(ms / HOUR), m = Math.ceil((ms % HOUR) / MIN); return `${h ? `${h}h ` : ''}${m}m`; };
 
   // ---- the look: the briar body on a bare chest -------------------------------------------------------------------------
-  const V = () => Object.assign({ enabled: false, armor: '', emptyArmor: '', women: false, retrySeconds: 10, maxTries: 5 }, C.visual || {});
+  const V = () => Object.assign({ enabled: false, armor: '', emptyArmor: '', body: '', women: false, retrySeconds: 10, maxTries: 5 }, C.visual || {});
+  // The wound itself (dev, 25 Oct): ArmorBriarHeart is only the heart and its briars (slot 35). The open chest is USSEP's
+  // USKPArmorBriarHeartBody (90D63, slot 32; its ARMA covers body, forearms and calves with the wound texture
+  // SkinBodyMaleBriarHeart), worn by every vanilla Briarheart through the SkinBriarHeart outfit. Both go on a bare chest.
+  // The ARMO's slot mask is the body alone (0x4), so it takes no slot from bracers (34) or greaves (38): they stay worn
+  const mineOf = (v) => new Set([idOf(v.armor), idOf(v.emptyArmor), idOf(v.body)].filter(Boolean));
   const isFemale = (a) => { try { const app = mp.get(a >>> 0, 'appearance'); return !!(app && app.isFemale === true); } catch (e) { return false; } };
   // An ARMO's biped slots (BOD2's first u32, or BODT's; 0x4 = slot 32, the body), read once per base
   const BODY = 0x4;
@@ -182,15 +187,17 @@ module.exports = (api) => {
   // of the pack. Not a Briarheart (cured, revoked, never): no briar body or empty chest left anywhere but on a dead one
   const lookApply = (a, equipment, why) => {
     a = Number(a) >>> 0;
-    const v = V(); const full = idOf(v.armor), empty = idOf(v.emptyArmor);
+    const v = V(); const full = idOf(v.armor), empty = idOf(v.emptyArmor), body = idOf(v.body), mine = mineOf(v);
     if (!C.enabled || !v.enabled || !full) return;
     const eq = equipment || get(a, 'equipment', null);
     const worn = wornIds(eq);
     if (!isBriar(a)) {
-      // The full briar body goes at once; the empty chest a torn-out heart left is the body's own wound, cleared only at
-      // login and only when not worn (the swap's equipment report can still show the old body for a moment)
-      const n = takeAll(a, full) + (why === 'login' && !worn.includes(empty) ? takeAll(a, empty) : 0);
-      if (n) log(`briarheart: look cleared on ${display(a)} (${why}): ${n} briar bod${n === 1 ? 'y' : 'ies'} taken, not a Briarheart`);
+      // The heart goes at once, and the wound body with it unless an empty chest is held (a torn-out heart: the body keeps
+      // its wound; held, not worn, because the swap's equipment report can lag the end). At login everything briar goes:
+      // the character is alive again
+      const n = takeAll(a, full) + ((why === 'login' || !hasOne(a, empty)) ? takeAll(a, body) : 0)
+        + (why === 'login' ? takeAll(a, empty) : 0);
+      if (n) log(`briarheart: look cleared on ${display(a)} (${why}): ${n} briar piece${n === 1 ? '' : 's'} taken, not a Briarheart`);
       return;
     }
     if (!lookOn(a)) {
@@ -198,18 +205,19 @@ module.exports = (api) => {
       if (isFemale(a) && !L.womanTold) { L.womanTold = true; S.looks.set(a, L); log(`briarheart: look skipped on ${display(a)}: the vanilla briar body has no female model (visual.women false)`); }
       return;
     }
-    const own = worn.filter((id) => id !== full && id !== empty && coversBody(id));
+    const own = worn.filter((id) => !mine.has(id) && coversBody(id));
     if (own.length) {
-      // Their own armour is on: the briar body leaves the pack (it would be stealable there)
-      const n = takeAll(a, full);
-      if (n) log(`briarheart: look off on ${display(a)} (${why}): own body armour ${own[0].toString(16)} on, briar body taken from the pack`);
+      // Their own armour is on: the heart and the wound body leave the pack (they would be stealable there). Nothing of
+      // theirs is touched: their armour is what the engine just put on
+      const n = takeAll(a, full) + takeAll(a, body);
+      if (n) log(`briarheart: look off on ${display(a)} (${why}): own body armour ${own[0].toString(16)} on, ${n} briar piece${n === 1 ? '' : 's'} taken from the pack`);
       S.looks.delete(a);
       return;
     }
     // Bare chest: the briar chest wins its slot (35 at the live order). Anything else worn there (an amulet) comes off and
     // stays in the pack; the player is told (and it is logged) at most once a minute, however often they put it back on
     const fullMask = maskOf(full);
-    const clash = fullMask ? worn.filter((id) => id !== full && id !== empty && (maskOf(id) & fullMask)) : [];
+    const clash = fullMask ? worn.filter((id) => !mine.has(id) && (maskOf(id) & fullMask)) : [];
     if (clash.length) {
       for (const id of clash) papyrus(a, 'UnequipItem', [form(mp.getDescFromId(id)), false, true]);
       const told = Number(S.amuletTold.get(a)) || 0;
@@ -219,7 +227,7 @@ module.exports = (api) => {
         log(`briarheart: amulet refused on ${display(a)} (${why}): ${clash.map((id) => id.toString(16)).join(', ')} unequipped, kept in the pack (bare chest, the briar chest wins its slot)`);
       }
     }
-    if (worn.includes(full)) { S.looks.delete(a); return; }
+    if (worn.includes(full) && (!body || worn.includes(body))) { S.looks.delete(a); return; }
     // The login's first reports are naked until gamemode.js redresses the character: no briar body then (the login hook
     // looks again once that has settled)
     const conn = globalThis.__dboConnectedAt instanceof Map ? Number(globalThis.__dboConnectedAt.get(a)) || 0 : 0;
@@ -229,14 +237,20 @@ module.exports = (api) => {
     if (Date.now() - L.at < v.retrySeconds * 1000) return;
     if (L.tries >= v.maxTries) { if (!L.gaveUp) { L.gaveUp = true; S.looks.set(a, L); log(`briarheart: look gave up on ${display(a)}: ${L.tries} equips of the briar body did not show in the equipment`); } return; }
     L.at = Date.now(); L.tries += 1; S.looks.set(a, L);
-    if (!hasOne(a, full) && giveItem) giveItem(a, full, 1);
-    const equipped = papyrus(a, 'EquipItem', [form(v.armor), false, true]);
-    log(equipped ? `briarheart: look on ${display(a)} (${why}): bare chest, briar body ${v.armor} equipped (try ${L.tries})`
-      : `briarheart: look FAILED on ${display(a)} (${why}): EquipItem of ${v.armor} refused by the server (try ${L.tries}; see the line above)`);
+    // The wound body first (slot 32), then the heart over it (slot 35); each result is logged as it came back
+    const results = [];
+    for (const [id, desc] of [[body, v.body], [full, v.armor]]) {
+      if (!id || worn.includes(id)) continue;
+      if (!hasOne(a, id) && giveItem) giveItem(a, id, 1);
+      results.push([desc, papyrus(a, 'EquipItem', [form(desc), false, true])]);
+    }
+    const bad = results.filter(([, ok]) => !ok).map(([d]) => d);
+    log(!bad.length ? `briarheart: look on ${display(a)} (${why}): bare chest, ${results.map(([d]) => d).join(' + ')} equipped (try ${L.tries})`
+      : `briarheart: look FAILED on ${display(a)} (${why}): EquipItem of ${bad.join(', ')} refused by the server (try ${L.tries}; see the line above)`);
   };
   // ---- the briar skin: armour, stamina and DiseaseResist while the briar chest shows ---------------------------------------
   const K = () => Object.assign({ enabled: false, armorFrom: '', staminaRegen: 1, diseaseResist: 0 }, C.briarSkin || {});
-  const skinShown = (worn) => { const full = idOf(V().armor); return !!(full && worn.includes(full) && !worn.some((id) => id !== full && coversBody(id))); };
+  const skinShown = (worn) => { const v = V(), full = idOf(v.armor), mine = mineOf(v); return !!(full && worn.includes(full) && !worn.some((id) => !mine.has(id) && coversBody(id))); };
   const skinCheck = (a, equipment, why) => {
     a = Number(a) >>> 0;
     const k = K();
@@ -258,8 +272,10 @@ module.exports = (api) => {
     takeAll(a, full);
     if (!hadOn) return;   // under their own armour nothing shows; nothing to swap
     if (!hasOne(a, empty) && giveItem) giveItem(a, empty, 1);
-    papyrus(a, 'EquipItem', [form(v.emptyArmor), false, true]);
-    log(`briarheart: look swap on ${display(a)}: heart torn out, ${v.armor} -> ${v.emptyArmor}`);
+    const ok = papyrus(a, 'EquipItem', [form(v.emptyArmor), false, true]);
+    // The wound body stays on: the empty chest sits in the same open wound
+    log(ok ? `briarheart: look swap on ${display(a)}: heart torn out, ${v.armor} -> ${v.emptyArmor}${v.body ? `, the wound body ${v.body} kept` : ''}`
+      : `briarheart: look swap FAILED on ${display(a)}: EquipItem of ${v.emptyArmor} refused by the server`);
   };
 
   // ---- the gifts on and off ---------------------------------------------------------------------------------------------
@@ -431,7 +447,7 @@ module.exports = (api) => {
   globalThis.__dboBriarSkinArmor = (a) => {
     a = Number(a) >>> 0; const k = K();
     if (!C.enabled || !k.enabled || !S.skin.has(a) || !isBriar(a)) return null;
-    const from = idOf(k.armorFrom); return from ? { from, shown: idOf(V().armor) } : null;
+    const from = idOf(k.armorFrom); return from ? { from, shown: idOf(V().armor), body: idOf(V().body) } : null;
   };
   // racial.js regenFactor: stamina regeneration while the briar skin is on
   globalThis.__dboBriarRegenMult = (a, stat) => {
