@@ -1,7 +1,7 @@
 // Harness for the Dunmer-only Spider Imbuing Chamber gate (server\spidermancy.js).
 //
 // It loads the real module against a stub `mp`, so it exercises the shipped code rather than a copy, and it needs no
-// server: run it from the server folder with `node tools\spidermancy-gate-harness.js`.
+// server: run it from the server folder with `node tests\spidermancy-gate-harness.js`.
 //
 // Cases: Dunmer allowed, Dunmer vampire allowed, Nord refused, plus a Nord in a beast form (still refused, because
 // beastform.js reports the character's own race) and a Dunmer in a beast form (still allowed), and an activate of
