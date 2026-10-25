@@ -2,7 +2,7 @@
 // explosion places an NPC_ (DLC2AshGuardianRune -> DLC2AshGuardianProjectile02 -> DLC2ExplosionAshGuardian ->
 // DLC2SummonAshGuardian) places that NPC as the caster's summon through companions.spawn: where the explosion hit an actor,
 // or in front of the caster when no hit arrives; one per cast, guarding its spot, until killed by default. A spell with no
-// such explosion, or a scroll's (Dragonborn's spider scrolls), places nothing, and "explosionSummonEnabled": false switches
+// such explosion places nothing, and "explosionSummonEnabled": false switches
 // it off. Real espmMagic on fake records, real companionSystem; settings and placement stubbed. Run it from skymp5-server
 // with node_modules present:
 //
@@ -25,6 +25,10 @@ const PLAYER_BASE = 0x7;
 const RUNE = 0x04017782, MGEF = 0x0401777e, PROJ = 0x04017783, EXPL = 0x04017781, GUARDIAN = 0x040177b6;
 const FIRE = 0x12fcd, FIRE_MGEF = 0x12fce, FIRE_PROJ = 0x12fcf, FIRE_EXPL = 0x12fd0, FIRE_LIGHT = 0x12fd1;
 // DLC2ExpSpiderFireCloakScroll: a scroll whose explosion places its spider (DLC2ExpSpiderFireCloakingFriend)
+// conjurationSystem's SPIDER_SCROLL_SEC default
+const SCROLL_SEC = 60;
+// DLC2ExpSpiderOilScroll: its MGEF names the explosion outright at 0x4c, with no projectile in between
+const OIL_SCROLL = 0x0402749d, OIL_MGEF = 0x0402749e, OIL_EXPL = 0x0402749f, OIL_SPIDER = 0x04027495;
 const SCROLL = 0x0401952c, SP_MGEF = 0x0401952d, SP_PROJ = 0x04019530, SP_EXPL = 0x04019531, SPIDER = 0x04019529;
 const ATRONACH = 0x204c0;
 
@@ -37,6 +41,8 @@ const STUBS = {
 const u32 = (n, at, v) => { const b = Buffer.alloc(n); b.writeUInt32LE(v >>> 0, at); return new Uint8Array(b); };
 const field = (type, data) => ({ type, data });
 const spel = (mgef) => [field('EFID', u32(4, 0, mgef)), field('EFIT', (() => { const b = Buffer.alloc(12); b.writeFloatLE(0, 0); b.writeUInt32LE(2, 8); return new Uint8Array(b); })())];
+// The real DLC2 spider scrolls name their explosion at MGEF 0x4c with no projectile, so the resolver takes that route too
+const mgefDataDirect = (expl) => { const b = Buffer.from(u32(152, 0x4c, expl)); b.writeUInt32LE(1, 0x40); return new Uint8Array(b); };
 const mgefData = (proj) => { const b = Buffer.from(u32(152, 0x48, proj)); b.writeUInt32LE(1, 0x40); return new Uint8Array(b); };
 const RECORDS = {
   [RUNE]: ['SPEL', spel(MGEF)],
@@ -50,6 +56,10 @@ const RECORDS = {
   [FIRE_PROJ]: ['PROJ', [field('DATA', u32(0x80, 0x24, FIRE_EXPL))]],
   [FIRE_EXPL]: ['EXPL', [field('DATA', u32(52, 0x10, FIRE_LIGHT))]],
   [FIRE_LIGHT]: ['LIGH', []],
+  [OIL_SCROLL]: ['SCRL', spel(OIL_MGEF)],
+  [OIL_MGEF]: ['MGEF', [field('DATA', mgefDataDirect(OIL_EXPL))]],
+  [OIL_EXPL]: ['EXPL', [field('DATA', u32(52, 0x10, OIL_SPIDER))]],
+  [OIL_SPIDER]: ['NPC_', []],
   [SCROLL]: ['SCRL', spel(SP_MGEF)],
   [SP_MGEF]: ['MGEF', [field('DATA', mgefData(SP_PROJ))]],
   [SP_PROJ]: ['PROJ', [field('DATA', u32(0x80, 0x24, SP_EXPL))]],
@@ -182,15 +192,37 @@ const RECORDS = {
   let own = companions.spawn(A, ATRONACH, { kind: 'summon', durationSec: 600 });
   conj.onSpellCast(A, SCROLL);
   advance(2000);
-  check('a spider scroll\'s cast places no spider, even with no hit', !placed.some((x) => x.base === SPIDER), placed);
+  check('a spider scroll\'s cast places its spider', placed.some((x) => x.base === SPIDER), placed);
   check('...and the caster keeps their own summon', companions.info(own)?.ownerId === A, companions.info(own));
+  const spider = placed.find((x) => x.base === SPIDER);
+  check('...the spider is a "placed" companion, so it claims no slot', companions.info(spider?.id)?.kind === 'placed', companions.info(spider?.id));
+  check('...and spiderScrollSeconds gives it a lifetime, so it is temporary', companions.info(spider?.id)?.expiresAt === now + SCROLL_SEC * 1000, companions.info(spider?.id));
   ({ companions, conj } = await boot());
   now += 5000;
   own = companions.spawn(A, ATRONACH, { kind: 'summon', durationSec: 600 });
   conj.onSpellHit(A, WOLF, SCROLL);
   advance(2000);
-  check('a spider scroll\'s hit places no spider', !placed.some((x) => x.base === SPIDER), placed);
+  check('a spider scroll\'s hit places its spider', placed.some((x) => x.base === SPIDER), placed);
   check('...and the caster keeps their own summon', companions.info(own)?.ownerId === A, companions.info(own));
+
+  // The other route: an MGEF naming its explosion at 0x4c with no projectile. Without this the 0x4c path is untested
+  // and a green run proves nothing (Worker 4, 25 Oct).
+  ({ companions, conj } = await boot());
+  now += 5000;
+  own = companions.spawn(A, ATRONACH, { kind: 'summon', durationSec: 600 });
+  conj.onSpellCast(A, OIL_SCROLL);
+  advance(2000);
+  check('a scroll whose MGEF names its explosion directly places its spider', placed.some((x) => x.base === OIL_SPIDER), placed);
+  check('...and that caster keeps their own summon too', companions.info(own)?.ownerId === A, companions.info(own));
+
+  // The rune is untouched: still a summon, still until killed
+  ({ companions, conj } = await boot());
+  now += 5000;
+  conj.onSpellCast(A, RUNE);
+  advance(2000);
+  const guardian = placed.find((x) => x.base === GUARDIAN);
+  check('the rune still places a "summon"', companions.info(guardian?.id)?.kind === 'summon', companions.info(guardian?.id));
+  check('...and the rune\'s guardian is still until killed', companions.info(guardian?.id)?.expiresAt === 0, companions.info(guardian?.id));
 
   global.setTimeout = realTimeout; global.clearTimeout = realClear;
   Date.now = realNow;
