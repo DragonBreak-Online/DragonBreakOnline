@@ -554,7 +554,11 @@ module.exports = (api) => {
     if (n <= 0) return true;
     const income = kind || 'vault fees';
     if (depositToTreasury(zone.id, n, { income }) === n) return true;
-    if (zoneAdd(zone, n, { income })) { audit(`${kind ? `BANK ${n} gold of ${income}` : `BANK VAULT ${n} gold`} kept for ${zone.id} in bank.json (the hold has no treasury yet)`); return true; }
+    if (zoneAdd(zone, n, { income })) {
+      if (kind) audit(`BANK ${n} gold of ${income} kept for ${zone.id} in bank.json (the hold has no treasury yet)`);
+      else audit(`BANK VAULT ${n} gold kept for ${zone.id} in bank.json (the hold has no treasury yet)`);
+      return true;
+    }
     return false;
   };
   const feeFor = (a, zone, n, why) => {

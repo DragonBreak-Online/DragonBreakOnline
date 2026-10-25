@@ -734,6 +734,15 @@ parsed('BANK', {
       return [ev('item.bank', 0, { op: 'vault_seize', zone: m[1], tier: m[2], gold: Number(m[3]) })];
     if ((m = text.match(/ STAFF took (\d{1,9})x ([0-9a-f]{1,8}) from the vaults of /))) return [ev('item.bank', 0, { op: 'vault_staff_take', n: Number(m[1]), b: m[2] })];
     if ((m = text.match(new RegExp(` RESTORED .* ${Z}: seizure `)))) return [ev('item.bank', 0, { op: 'vault_restore', zone: m[1] })];
+    // The gem counter and the gem fee of big deeds (bank.js, Nat 25 Oct): gem names come from the game's records; a deed's reason is never read
+    if (/^BANK GEMS /.test(text)) {
+      if ((m = text.match(new RegExp(` sold (\\d{1,9})x (.{1,64}?) \\(([0-9a-f]{1,8})\\) to ${Z} for (\\d{1,12}) gold from its treasury`))))
+        return [ev('item.bank', 0, { op: 'gem_sell', n: Number(m[1]), i: m[2], b: m[3], zone: m[4], gold: Number(m[5]) })];
+      if ((m = text.match(new RegExp(` bought (\\d{1,9})x (.{1,64}?) \\(([0-9a-f]{1,8})\\) from ${Z} for (\\d{1,12}) gold `))))
+        return [ev('item.bank', 0, { op: 'gem_buy', n: Number(m[1]), i: m[2], b: m[3], zone: m[4], gold: Number(m[5]) })];
+      if (/ paid \d{1,9}x /.test(text)) return [ev('item.bank', 0, { op: 'gem_fee' })];
+      return [];
+    }
     return [];
   },
 });
@@ -1354,6 +1363,11 @@ bank.js BANK 92dd9b73 parsed
 bank.js BANK ddbac33b parsed
 bank.js BANK 3958b0d9 parsed
 bank.js BANK 8ff19655 parsed
+bank.js BANK 71d34c61 parsed
+bank.js BANK ade0885b parsed
+bank.js BANK f7927cf8 parsed
+bank.js BANK b29e7db8 parsed
+bank.js BANK 1a72f529 parsed
 bank.js BANK d4d119df parsed
 bank.js BANK 167dae12 parsed
 bank.js BANK 1609b3b0 parsed
@@ -1947,6 +1961,7 @@ tenancy.js PROPERTY ba2e199b parsed
 tenancy.js PROPERTY e0424aa5 parsed
 tenancy.js PROPERTY a49d27a0 parsed
 tenancy.js PROPERTY 3aac3a2d parsed
+tenancy.js PROPERTY abe74dbd parsed
 thalmor.js CONCORDAT 230eceba clean
 thalmor.js CONCORDAT 66fa43c2 clean
 thalmor.js CONCORDAT f62ed9cc clean
