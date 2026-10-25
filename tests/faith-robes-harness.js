@@ -28,9 +28,9 @@ check('each comes with its own robes-plugin recipe', robes.every(([, v]) => v.re
 const vaer = gear['e739b:Skyrim.esm'];
 check("the vanilla Vaermina Robes, which the robes plugin's recipe makes, belong to the Cult of Vaermina", !!vaer && vaer.name === 'Vaermina Robes' && JSON.stringify(vaer.factions) === '["cult-vaermina"]' && vaer.role === 'tailor' && vaer.recipes[0].endsWith(':' + ROBES), vaer);
 const of = (name) => (gear[named(name)] || {}).factions || [];
-check('the Eight: the Great Faiths and the Imperial Cult', ['Akatosh', 'Arkay', 'Dibella', 'Julianos', 'Kynareth', 'Mara', 'Zenithar']
-  .every((g) => JSON.stringify(of(`${g} Robes`)) === '["great-faiths","imperial-cult"]' && JSON.stringify(of(`${g} Hood`)) === '["great-faiths","imperial-cult"]'));
-check("Stendarr's also the Vigil's", JSON.stringify(of('Stendarr Robes')) === '["great-faiths","imperial-cult","vigil-of-stendarr"]');
+check('the Eight: the Imperial Cult (the Great Faiths joined it, 25 Oct)', ['Akatosh', 'Arkay', 'Dibella', 'Julianos', 'Kynareth', 'Mara', 'Zenithar']
+  .every((g) => JSON.stringify(of(`${g} Robes`)) === '["imperial-cult"]' && JSON.stringify(of(`${g} Hood`)) === '["imperial-cult"]'));
+check("Stendarr's also the Vigil's", JSON.stringify(of('Stendarr Robes')) === '["imperial-cult","vigil-of-stendarr"]');
 check("Talos's the Knights of the Nine's and the Stormcloaks'", JSON.stringify(of('Talos Robes')) === '["knights-of-the-nine","stormcloaks"]');
 check("Malacath's the six Orc clans'", of('Malacath Robes').length === 6 && of('Malacath Robes').every((f) => f.startsWith('clan-')));
 const cults = { Azura: 'azura', Boethiah: 'boethiah', 'Clavicus Vile': 'clavicus-vile', 'Hermaeous Mora': 'hermaeus-mora', Hircine: 'hircine',
@@ -47,10 +47,10 @@ const templates = JSON.parse(fs.readFileSync(path.join(SERVER, 'guild-defs.json'
 const ranksOf = (fid) => { const f = defs.find((x) => x.id === fid); return f ? (f.ranks || templates[f.template] || []) : []; };
 const tailors = [...new Set(robes.flatMap(([, v]) => v.factions))];
 check('every faction a robe names has a leader, at least, to make it', tailors.every((fid) => ranksOf(fid).some((r) => r.role === 'tailor' || r.role === 'leader')));
-// The two churches have no tailor rank, so until they get one only their High Priest and Primate make the Eight's robes
+// The Imperial Cult has no tailor rank, so until it gets one only its Primate makes the Eight's robes
 const noTailor = tailors.filter((fid) => !ranksOf(fid).some((r) => r.role === 'tailor'));
-console.log(`${JSON.stringify(noTailor) === '["great-faiths","imperial-cult"]' ? 'NOTE' : 'FAIL'}  factions with no tailor rank, so only their leader makes their robes: ${JSON.stringify(noTailor)}`);
-if (JSON.stringify(noTailor) !== '["great-faiths","imperial-cult"]') failures++;
+console.log(`${JSON.stringify(noTailor) === '["imperial-cult"]' ? 'NOTE' : 'FAIL'}  factions with no tailor rank, so only their leader makes their robes: ${JSON.stringify(noTailor)}`);
+if (JSON.stringify(noTailor) !== '["imperial-cult"]') failures++;
 
 // ---- in play ----
 const ids = new Map(); const descs = new Map(); let next = 0x100;
@@ -58,7 +58,7 @@ const idOf = (desc) => { const k = String(desc).toLowerCase(); if (!ids.has(k)) 
 const A = { OUT: 1, PRIEST: 2, CULT_TAILOR: 3, CULT_MEMBER: 4, CULT_LEADER: 5, OTHER_CULT_TAILOR: 6, CHURCH_TAILOR: 7, STORM_TAILOR: 8, ORC_TAILOR: 9,
   KOTN_SMITH: 10, KOTN_TAILOR: 11, KOTN_PILGRIM: 12 };
 const ranks = {
-  [A.PRIEST]: [{ id: 'great-faiths', role: 'member' }], [A.CULT_TAILOR]: [{ id: 'cult-azura', role: 'tailor' }], [A.CULT_MEMBER]: [{ id: 'cult-azura', role: 'member' }],
+  [A.PRIEST]: [{ id: 'imperial-cult', role: 'member' }], [A.CULT_TAILOR]: [{ id: 'cult-azura', role: 'tailor' }], [A.CULT_MEMBER]: [{ id: 'cult-azura', role: 'member' }],
   [A.CULT_LEADER]: [{ id: 'cult-azura', role: 'leader' }], [A.OTHER_CULT_TAILOR]: [{ id: 'cult-boethiah', role: 'tailor' }],
   [A.CHURCH_TAILOR]: [{ id: 'imperial-cult', role: 'tailor' }], [A.STORM_TAILOR]: [{ id: 'stormcloaks', role: 'tailor' }],
   [A.ORC_TAILOR]: [{ id: 'clan-narzulbur', role: 'tailor' }],
@@ -79,7 +79,7 @@ const lastTo = (a) => { for (let i = said.length - 1; i >= 0; i--) if (said[i][0
 const AZURA = idOf(named('Azura Robes')), MARA = idOf(named('Mara Robes')), TALOS = idOf(named('Talos Hood')), MALA = idOf(named('Malacath Robes'));
 
 fresh(); check('an outsider at the tanning rack cannot make Azura Robes, and is told whose they are', craft(A.OUT, AZURA) === false && lastTo(A.OUT).includes(defs.find((f) => f.id === 'cult-azura').name), lastTo(A.OUT));
-fresh(); check('nor a priest of the Great Faiths', craft(A.PRIEST, AZURA) === false);
+fresh(); check('nor an Imperial Cult acolyte', craft(A.PRIEST, AZURA) === false);
 fresh(); check("nor a plain member of Azura's cult (it takes the tailor rank)", craft(A.CULT_MEMBER, AZURA) === false && /Tailor rank or their leader/.test(lastTo(A.CULT_MEMBER)), lastTo(A.CULT_MEMBER));
 fresh(); check("nor another cult's tailor", craft(A.OTHER_CULT_TAILOR, AZURA) === false);
 fresh(); check("Azura's cult's tailor makes them", craft(A.CULT_TAILOR, AZURA) === true);

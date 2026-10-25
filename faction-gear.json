@@ -291,7 +291,6 @@
    "name": "Akatosh Hood",
    "set": "Robes of Akatosh",
    "factions": [
-    "great-faiths",
     "imperial-cult"
    ],
    "role": "tailor",
@@ -303,7 +302,6 @@
    "name": "Arkay Hood",
    "set": "Robes of Arkay",
    "factions": [
-    "great-faiths",
     "imperial-cult"
    ],
    "role": "tailor",
@@ -348,7 +346,6 @@
    "name": "Dibella Hood",
    "set": "Robes of Dibella",
    "factions": [
-    "great-faiths",
     "imperial-cult"
    ],
    "role": "tailor",
@@ -382,7 +379,6 @@
    "name": "Julianos Hood",
    "set": "Robes of Julianos",
    "factions": [
-    "great-faiths",
     "imperial-cult"
    ],
    "role": "tailor",
@@ -394,7 +390,6 @@
    "name": "Kynareth Hood",
    "set": "Robes of Kynareth",
    "factions": [
-    "great-faiths",
     "imperial-cult"
    ],
    "role": "tailor",
@@ -422,7 +417,6 @@
    "name": "Mara Hood",
    "set": "Robes of Mara",
    "factions": [
-    "great-faiths",
     "imperial-cult"
    ],
    "role": "tailor",
@@ -533,7 +527,6 @@
    "name": "Stendarr Hood",
    "set": "Robes of Stendarr",
    "factions": [
-    "great-faiths",
     "imperial-cult",
     "vigil-of-stendarr"
    ],
@@ -569,7 +562,6 @@
    "name": "Zenithar Hood",
    "set": "Robes of Zenithar",
    "factions": [
-    "great-faiths",
     "imperial-cult"
    ],
    "role": "tailor",
@@ -581,7 +573,6 @@
    "name": "Akatosh Robes",
    "set": "Robes of Akatosh",
    "factions": [
-    "great-faiths",
     "imperial-cult"
    ],
    "role": "tailor",
@@ -593,7 +584,6 @@
    "name": "Arkay Robes",
    "set": "Robes of Arkay",
    "factions": [
-    "great-faiths",
     "imperial-cult"
    ],
    "role": "tailor",
@@ -638,7 +628,6 @@
    "name": "Dibella Robes",
    "set": "Robes of Dibella",
    "factions": [
-    "great-faiths",
     "imperial-cult"
    ],
    "role": "tailor",
@@ -672,7 +661,6 @@
    "name": "Julianos Robes",
    "set": "Robes of Julianos",
    "factions": [
-    "great-faiths",
     "imperial-cult"
    ],
    "role": "tailor",
@@ -684,7 +672,6 @@
    "name": "Kynareth Robes",
    "set": "Robes of Kynareth",
    "factions": [
-    "great-faiths",
     "imperial-cult"
    ],
    "role": "tailor",
@@ -712,7 +699,6 @@
    "name": "Mara Robes",
    "set": "Robes of Mara",
    "factions": [
-    "great-faiths",
     "imperial-cult"
    ],
    "role": "tailor",
@@ -823,7 +809,6 @@
    "name": "Stendarr Robes",
    "set": "Robes of Stendarr",
    "factions": [
-    "great-faiths",
     "imperial-cult",
     "vigil-of-stendarr"
    ],
@@ -859,7 +844,6 @@
    "name": "Zenithar Robes",
    "set": "Robes of Zenithar",
    "factions": [
-    "great-faiths",
     "imperial-cult"
    ],
    "role": "tailor",
