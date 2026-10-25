@@ -5,7 +5,7 @@
    "kind": "study",
    "name": "Study Bookshelf",
    "edid": "DBOStudyBookshelf",
-   "desc": null,
+   "desc": "1d2235:DragonBreak Online Edits.esp",
    "group": "study",
    "radius": 45,
    "costA": {
@@ -22,7 +22,7 @@
    "kind": "planter",
    "name": "Planter",
    "edid": "DBOPlanter",
-   "desc": null,
+   "desc": "1d2236:DragonBreak Online Edits.esp",
    "group": "garden",
    "radius": 130,
    "costA": {
@@ -39,231 +39,231 @@
  ],
  "soil": {
   "edid": "DBOPlanterSoil",
-  "desc": null
+  "desc": "1d2237:DragonBreak Online Edits.esp"
  },
  "_crops": "Hearthfire's own planter list (flPlanterPlantableItem, in order) and its grown plants (flPlanterPlantedFlora) as DLE statics (DBOPlanted...). 'item' is what is planted and what a pick gives; 'rare' grows for planter.rareHours.",
  "crops": [
   {
    "item": "64b3f:Skyrim.esm",
    "edid": "DBOPlantedFoodCabbage",
-   "desc": null,
+   "desc": "1d2238:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "FoodCabbage"
   },
   {
    "item": "64b40:Skyrim.esm",
    "edid": "DBOPlantedFoodCarrot",
-   "desc": null,
+   "desc": "1d2239:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "FoodCarrot"
   },
   {
    "item": "10d666:Skyrim.esm",
    "edid": "DBOPlantedFoodGourd",
-   "desc": null,
+   "desc": "1d223a:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "FoodGourd"
   },
   {
    "item": "669a5:Skyrim.esm",
    "edid": "DBOPlantedFoodLeek",
-   "desc": null,
+   "desc": "1d223b:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "FoodLeek"
   },
   {
    "item": "64b41:Skyrim.esm",
    "edid": "DBOPlantedFoodPotato",
-   "desc": null,
+   "desc": "1d223c:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "FoodPotato"
   },
   {
    "item": "6abcb:Skyrim.esm",
    "edid": "DBOPlantedCanisRoot01",
-   "desc": null,
+   "desc": "1d223d:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "CanisRoot01"
   },
   {
    "item": "3f7f8:Skyrim.esm",
    "edid": "DBOPlantedTundraCotton",
-   "desc": null,
+   "desc": "1d223e:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "TundraCotton"
   },
   {
    "item": "b2183:Skyrim.esm",
    "edid": "DBOPlantedCreepClusterRoot",
-   "desc": null,
+   "desc": "1d223f:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "CreepClusterRoot"
   },
   {
    "item": "516c8:Skyrim.esm",
    "edid": "DBOPlantedDeathBell",
-   "desc": null,
+   "desc": "1d2240:DragonBreak Online Edits.esp",
    "rare": true,
    "of": "deathBell"
   },
   {
    "item": "889a2:Skyrim.esm",
    "edid": "DBOPlantedDragonsTongue",
-   "desc": null,
+   "desc": "1d2241:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "DragonsTongue"
   },
   {
    "item": "7e8b7:Skyrim.esm",
    "edid": "DBOPlantedSwampFungalPod01",
-   "desc": null,
+   "desc": "1d2242:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "SwampFungalPod01"
   },
   {
    "item": "7e8c1:Skyrim.esm",
    "edid": "DBOPlantedGiantLichen",
-   "desc": null,
+   "desc": "1d2243:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "GiantLichen"
   },
   {
    "item": "7ee01:Skyrim.esm",
    "edid": "DBOPlantedGlowingMushroom",
-   "desc": null,
+   "desc": "1d2244:DragonBreak Online Edits.esp",
    "rare": true,
    "of": "GlowingMushroom"
   },
   {
    "item": "6ac4a:Skyrim.esm",
    "edid": "DBOPlantedJazBay",
-   "desc": null,
+   "desc": "1d2245:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "JazBay"
   },
   {
    "item": "5076e:Skyrim.esm",
    "edid": "DBOPlantedJuniperBerries",
-   "desc": null,
+   "desc": "1d2246:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "JuniperBerries"
   },
   {
    "item": "45c28:Skyrim.esm",
    "edid": "DBOPlantedLavender",
-   "desc": null,
+   "desc": "1d2247:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "Lavender"
   },
   {
    "item": "ec870:Skyrim.esm",
    "edid": "DBOPlantedMoraTapinellaBits",
-   "desc": null,
+   "desc": "1d2248:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "MoraTapinellaBits"
   },
   {
    "item": "77e1c:Skyrim.esm",
    "edid": "DBOPlantedMountainFlower01Blue",
-   "desc": null,
+   "desc": "1d2249:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "MountainFlower01Blue"
   },
   {
    "item": "77e1e:Skyrim.esm",
    "edid": "DBOPlantedMountainFlower01Purple",
-   "desc": null,
+   "desc": "1d224a:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "MountainFlower01Purple"
   },
   {
    "item": "77e1d:Skyrim.esm",
    "edid": "DBOPlantedMountainFlower01Red",
-   "desc": null,
+   "desc": "1d224b:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "MountainFlower01Red"
   },
   {
    "item": "4da00:Skyrim.esm",
    "edid": "DBOPlantedMushroom01",
-   "desc": null,
+   "desc": "1d224c:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "Mushroom01"
   },
   {
    "item": "4da20:Skyrim.esm",
    "edid": "DBOPlantedMushroom02",
-   "desc": null,
+   "desc": "1d224d:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "Mushroom02"
   },
   {
    "item": "4da22:Skyrim.esm",
    "edid": "DBOPlantedMushroom03",
-   "desc": null,
+   "desc": "1d224e:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "Mushroom03"
   },
   {
    "item": "4da23:Skyrim.esm",
    "edid": "DBOPlantedMushroom04",
-   "desc": null,
+   "desc": "1d224f:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "Mushroom04"
   },
   {
    "item": "4da24:Skyrim.esm",
    "edid": "DBOPlantedMushroom05",
-   "desc": null,
+   "desc": "1d2250:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "Mushroom05"
   },
   {
    "item": "4da25:Skyrim.esm",
    "edid": "DBOPlantedMushroom06",
-   "desc": null,
+   "desc": "1d2251:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "Mushroom06"
   },
   {
    "item": "2f44c:Skyrim.esm",
    "edid": "DBOPlantedNightshade",
-   "desc": null,
+   "desc": "1d2252:DragonBreak Online Edits.esp",
    "rare": true,
    "of": "Nightshade"
   },
   {
    "item": "6f950:Skyrim.esm",
    "edid": "DBOPlantedScalyPholiotaBits",
-   "desc": null,
+   "desc": "1d2253:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "ScalyPholiotaBits"
   },
   {
    "item": "1b3bd:Skyrim.esm",
    "edid": "DBOPlantedSnowberry",
-   "desc": null,
+   "desc": "1d2254:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "Snowberry"
   },
   {
    "item": "83e64:Skyrim.esm",
    "edid": "DBOPlantedSpikyGrass01",
-   "desc": null,
+   "desc": "1d2255:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "SpikyGrass01"
   },
   {
    "item": "134aa:Skyrim.esm",
    "edid": "DBOPlantedThistle01",
-   "desc": null,
+   "desc": "1d2256:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "Thistle01"
   },
   {
    "item": "4b0ba:Skyrim.esm",
    "edid": "DBOPlantedWheat",
-   "desc": null,
+   "desc": "1d2257:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "Wheat"
   }

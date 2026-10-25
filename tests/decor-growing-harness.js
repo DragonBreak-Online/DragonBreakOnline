@@ -93,7 +93,7 @@ const placeAt = (a, n) => { cmd(a, 'find ' + n); cmd(a, 'place 1'); const e = la
 const use = (ref, a) => globalThis.__dboDecorActivate(parseInt(ref, 16) >>> 0, a);
 
 // ---- the tracked file: nothing offered until the merged DLE's ids are filled in -------------------------------------------
-ok(tracked.pieces.every((p) => p.desc === null) && tracked.crops.length === 32 && tracked.crops.every((c) => c.desc === null && /^DBOPlanted/.test(c.edid)), 'decor-growing.json as tracked: 2 pieces and 32 crops by editor id, no descs yet', tracked.crops.length);
+ok(tracked.pieces.every((p) => /^[0-9a-f]+:DragonBreak Online Edits\.esp$/.test(p.desc)) && tracked.crops.length === 32 && tracked.crops.every((c) => /^[0-9a-f]+:DragonBreak Online Edits\.esp$/.test(c.desc) && /^DBOPlanted/.test(c.edid)), 'decor-growing.json as tracked: 2 pieces and 32 crops, descs filled from the merged DLE (fill_growing_ids.py)', tracked.crops.length);
 ok(tracked.pieces.every((p) => p.costA && p.costB), 'both pieces carry costA (Hearthfire) and costB (today\'s resources) as the catalogue does');
 ok((SKILLS.skills.find((k) => k.id === 'harvesting').counts.activatePrefixes || []).includes('DBOPlanter'), 'skills.json: Harvesting counts a planter pick (activatePrefixes DBOPlanter)');
 
