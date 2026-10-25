@@ -1,0 +1,454 @@
+{
+ "_comment": "Wave 1 of the Forsworn camps (Nat, 25 Oct): Lost Valley with Bard's Leap, Red Eagle with its boss group, Bleakwind Bluff, Cradle Stone Tower. The placed Forsworn and hagravens (all disabled: the server spawns every actor) and their camp chests, taken from the PC census of 25 Oct (LocTypeForswornCamp / LocTypeHagravenNest locations, 140-plugin order). Input of tools/forsworn/forsworn_camps_build.py, which reads every base and position from the plugins.",
+ "camps": [
+  {
+   "id": "lostvalley",
+   "name": "Lost Valley Redoubt",
+   "areas": [
+    {
+     "location": "19268:Skyrim.esm",
+     "world": "3c:Skyrim.esm",
+     "worldEdid": "Tamriel",
+     "centre": [
+      -89950,
+      -36677,
+      1868
+     ],
+     "centreSrc": "map marker 16274:Skyrim.esm"
+    },
+    {
+     "location": "18ee7:Skyrim.esm",
+     "world": "3c:Skyrim.esm",
+     "worldEdid": "Tamriel",
+     "centre": [
+      -91689,
+      -35972,
+      1956
+     ],
+     "centreSrc": "map marker 1620e:Skyrim.esm"
+    }
+   ],
+   "actors": [
+    {
+     "ref": "340e2:Skyrim.esm",
+     "role": "melee",
+     "base": "LvlForswornMeleeGuard",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "b3ba2:Skyrim.esm",
+     "role": "melee",
+     "base": "dunLostValleyRedoubForswornBerserker",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "340e4:Skyrim.esm",
+     "role": "boss",
+     "base": "LvlForswornBossShaman",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "20509:Skyrim.esm",
+     "role": "archer",
+     "base": "LvlForswornMissilePoisoner",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "3412a:Skyrim.esm",
+     "role": "hagraven",
+     "base": "dunLostValleyRedoubtHagraven",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "34129:Skyrim.esm",
+     "role": "boss",
+     "base": "dunLostValley_LvlForswornBossAmbush",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "340d4:Skyrim.esm",
+     "role": "melee",
+     "base": "LvlForswornMeleeBerserker",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "340d5:Skyrim.esm",
+     "role": "hagraven",
+     "base": "dunLostValleyRedoubtHagraven",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "33d18:Skyrim.esm",
+     "role": "archer",
+     "base": "LvlForswornMissilePoisoner",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "33d19:Skyrim.esm",
+     "role": "archer",
+     "base": "LvlForswornMissilePoisoner",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "b0f5a:Skyrim.esm",
+     "role": "melee",
+     "base": "dunLostValleyRedoubForswornBerserker",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "340d8:Skyrim.esm",
+     "role": "melee",
+     "base": "dunLostValleyRedoubForswornBerserker",
+     "world": "3c:Skyrim.esm"
+    }
+   ],
+   "chests": [
+    {
+     "ref": "1ad60:Skyrim.esm",
+     "base": "TreasForswornChest",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "20288:Skyrim.esm",
+     "base": "TreasForswornChest",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "b3c39:Skyrim.esm",
+     "base": "TreasForswornChest",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "b3bef:Skyrim.esm",
+     "base": "TreasHagravenChestBoss",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "b0f60:Skyrim.esm",
+     "base": "TreasForswornChest",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "b3c6b:Skyrim.esm",
+     "base": "TreasForswornChest",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "b3c35:Skyrim.esm",
+     "base": "TreasForswornChest",
+     "world": "3c:Skyrim.esm"
+    }
+   ]
+  },
+  {
+   "id": "redeagle",
+   "name": "Red Eagle Redoubt",
+   "areas": [
+    {
+     "location": "19170:Skyrim.esm",
+     "world": "3c:Skyrim.esm",
+     "worldEdid": "Tamriel",
+     "centre": [
+      -125628,
+      15532,
+      -4911
+     ],
+     "centreSrc": "MNAM world location marker 1623d:Skyrim.esm"
+    },
+    {
+     "location": "19170:Skyrim.esm",
+     "world": "2b101:Skyrim.esm",
+     "worldEdid": "RedEagleRedoubtWorld",
+     "centre": [
+      -124656,
+      17664,
+      -1360
+     ],
+     "centreSrc": "INFERRED: destination of load door 15db7:Skyrim.esm from Tamriel"
+    }
+   ],
+   "actors": [
+    {
+     "ref": "9ff80:Skyrim.esm",
+     "role": "melee",
+     "base": "dunRedEagle_LvlForswornMeleeBerserkerAmbushRush",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "9ff82:Skyrim.esm",
+     "role": "melee",
+     "base": "dunRedEagle_LvlForswornMeleeBerserkerAmbushRush",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "9fc64:Skyrim.esm",
+     "role": "archer",
+     "base": "LvlForswornMissileHoldPosition64UntilReleased",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "9fc65:Skyrim.esm",
+     "role": "melee",
+     "base": "LvlForswornMeleeBerserker",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "9ff8b:Skyrim.esm",
+     "role": "melee",
+     "base": "LvlForswornMeleeAmbush",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "9ff8d:Skyrim.esm",
+     "role": "archer",
+     "base": "LvlForswornMissileAmbush",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "9ff8f:Skyrim.esm",
+     "role": "archer",
+     "base": "dunRedEagle_LvlForswornMissileAmbushHoldPositionRunner",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "2c9b2:Skyrim.esm",
+     "role": "archer",
+     "base": "LvlForswornMissile",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "9ff76:Skyrim.esm",
+     "role": "melee",
+     "base": "dunRedEagle_LvlForswornMeleeBerserkerAmbushRush",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "9ff77:Skyrim.esm",
+     "role": "melee",
+     "base": "dunRedEagle_LvlForswornMeleeBerserkerAmbushRush",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "9ff7e:Skyrim.esm",
+     "role": "magic",
+     "base": "LvlForswornShamanAmbush",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "2c9ba:Skyrim.esm",
+     "role": "archer",
+     "base": "LvlForswornMissileHoldPosition64UntilReleased",
+     "world": "2b101:Skyrim.esm"
+    },
+    {
+     "ref": "a16fe:Skyrim.esm",
+     "role": "melee",
+     "base": "LvlForswornMeleeFemale",
+     "world": "2b101:Skyrim.esm"
+    },
+    {
+     "ref": "2c9a0:Skyrim.esm",
+     "role": "boss",
+     "base": "dunRedEagle_LvlForswornBossAmbush",
+     "world": "3c:Skyrim.esm",
+     "group": "boss"
+    },
+    {
+     "ref": "9ff73:Skyrim.esm",
+     "role": "archer",
+     "base": "LvlForswornMissileAmbushHoldPosition64UntilReleased",
+     "world": "3c:Skyrim.esm",
+     "group": "boss"
+    },
+    {
+     "ref": "9ff7f:Skyrim.esm",
+     "role": "archer",
+     "base": "LvlForswornMissileAmbush",
+     "world": "3c:Skyrim.esm",
+     "group": "boss"
+    }
+   ],
+   "chests": [
+    {
+     "ref": "9ff3b:Skyrim.esm",
+     "base": "TreasForswornChest",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "3e1cc:Skyrim.esm",
+     "base": "TreasForswornChestBoss",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "9fe68:Skyrim.esm",
+     "base": "TreasForswornChest",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "3e155:Skyrim.esm",
+     "base": "TreasForswornChest",
+     "world": "2b101:Skyrim.esm"
+    }
+   ]
+  },
+  {
+   "id": "bleakwind",
+   "name": "Bleakwind Bluff",
+   "areas": [
+    {
+     "location": "18eec:Skyrim.esm",
+     "world": "3c:Skyrim.esm",
+     "worldEdid": "Tamriel",
+     "centre": [
+      -105117,
+      14677,
+      967
+     ],
+     "centreSrc": "INFERRED: mean of 5 member actor positions"
+    }
+   ],
+   "actors": [
+    {
+     "ref": "bdf8c:Skyrim.esm",
+     "role": "hagraven",
+     "base": "EncHagravenHoldPosition256",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "bdf90:Skyrim.esm",
+     "role": "melee",
+     "base": "LvlForswornMeleeBerserkerAggro1024",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "bdf94:Skyrim.esm",
+     "role": "magic",
+     "base": "LvlForswornShaman_Hold256",
+     "world": "3c:Skyrim.esm"
+    },
+    {
+     "ref": "bdf95:Skyrim.esm",
+     "role": "melee",
+     "base": "LvlForswornMelee_Hold256",
+     "world": "3c:Skyrim.esm"
+    }
+   ],
+   "chests": [
+    {
+     "ref": "bdf72:Skyrim.esm",
+     "base": "TreasHagravenChestBoss",
+     "world": "3c:Skyrim.esm"
+    }
+   ]
+  },
+  {
+   "id": "cradlestone",
+   "name": "Cradle Stone Tower",
+   "areas": [
+    {
+     "location": "b239f:Skyrim.esm",
+     "world": "3c:Skyrim.esm",
+     "worldEdid": "Tamriel",
+     "centre": [
+      -99713,
+      -33861,
+      2535
+     ],
+     "centreSrc": "map marker b23a1:Skyrim.esm"
+    }
+   ],
+   "actors": [
+    {
+     "ref": "32bf5:Skyrim.esm",
+     "role": "hagraven",
+     "base": "EncHagravenHoldPosition512",
+     "world": "3c:Skyrim.esm"
+    }
+   ],
+   "chests": [
+    {
+     "ref": "31884:Skyrim.esm",
+     "base": "TreasHagravenChest",
+     "world": "3c:Skyrim.esm"
+    }
+   ]
+  }
+ ],
+ "exclude": [
+  {
+   "name": "Karthspire and Sky Haven Temple (the Blades' base; Nat, 25 Oct: no hostile camp there or on its approach)",
+   "world": "3c:Skyrim.esm",
+   "pos": [
+    -132337,
+    6656
+   ],
+   "radius": 12000
+  }
+ ],
+ "towns": {
+  "Soljund's Sinkhole": {
+   "pos": [
+    -117661,
+    6257,
+    -5419
+   ],
+   "src": "MNAM 162bb:Skyrim.esm"
+  },
+  "Salvius Farm": {
+   "pos": [
+    -163823,
+    5755,
+    -4523
+   ],
+   "src": "MNAM 20521:Skyrim.esm"
+  },
+  "Left Hand Mine": {
+   "pos": [
+    -165486,
+    -314,
+    -4357
+   ],
+   "src": "MNAM 16364:Skyrim.esm"
+  },
+  "Kolskeggr Mine": {
+   "pos": [
+    -147681,
+    12807,
+    -6934
+   ],
+   "src": "MNAM 2051e:Skyrim.esm"
+  },
+  "Markarth": {
+   "pos": [
+    -171097,
+    6922,
+    0
+   ],
+   "src": "given capital coordinates (Markarth city is its own worldspace MarkarthWorld)"
+  },
+  "Old Hroldan": {
+   "pos": [
+    -114906,
+    -7748,
+    -5452
+   ],
+   "src": "MNAM 2051c:Skyrim.esm"
+  },
+  "Karthwasten": {
+   "pos": [
+    -132748,
+    38549,
+    -6194
+   ],
+   "src": "map marker 1779a:Skyrim.esm"
+  },
+  "Dragon Bridge": {
+   "pos": [
+    -101407,
+    84423,
+    -12003
+   ],
+   "src": "MNAM 29db8:Skyrim.esm"
+  }
+ }
+}
