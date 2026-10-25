@@ -77,8 +77,14 @@ module.exports = (api) => {
   // key reaches the beast powers: /beastform grant|remove, the admin panel's grant and revoke, holdsPower, byPower and the daily
   // limit all look in FORMS alone. Each race is its Skyrim.esm RACE record, read from /opt/skyrim-data/Skyrim.esm (22 Oct):
   // ChickenRace a919d, HareRace 6dc99, GoatDomesticsRace 6fc4a, FoxRace 109c7c, DogRace 131ee, SkeeverRace 13201, MudcrabRace
-  // ba545, DeerRace cf89b. None is timed. Wolf and horse are left out: today's clients make a player wolf's copy hostile
-  // (formView ambushRaces), and a horse's copy can be ridden. Entries are never taken out while someone may be in one.
+  // ba545, DeerRace cf89b, and ten more from 25 Oct listed below. None is timed. Entries are never taken out while
+  // someone may be in one.
+  // GIANT is deliberately NOT here (Nat asked for it): creature scale is not in the RACE record at all, so the clipping
+  // and doorway risk cannot be ranked from the data and wants a dev test first. HORSE stays out because its copy can be
+  // ridden. WOLF stays out too, but note its stated reason may be stale: it was excluded because today's clients make a
+  // player wolf's copy hostile (formView ambushRaces), and formView.attacksEveryone now returns false on
+  // model.appearance BEFORE the race test, so a player's copy in a polymorph body is already exempt. Left excluded
+  // pending Nat's word rather than quietly re-enabled.
   const CREATURES = {
     chicken: { name: 'Chicken', race: idOf('a919d:Skyrim.esm') },
     hare: { name: 'Hare', race: idOf('6dc99:Skyrim.esm') },
@@ -88,6 +94,23 @@ module.exports = (api) => {
     skeever: { name: 'Skeever', race: idOf('13201:Skyrim.esm') },
     mudcrab: { name: 'Mudcrab', race: idOf('ba545:Skyrim.esm') },
     deer: { name: 'Deer', race: idOf('cf89b:Skyrim.esm') },
+    // Added 25 Oct on Nat's ask for "draugr, giant etc". Each one was measured first
+    // (_work/polymorph-more-forms-1025.md): a creature behaviour graph, already in the client's
+    // NON_HUMANOID_RACES so no caster variables are relayed for it, and no castable race spell. Whether a
+    // player can ATTACK in any of them is unknown and only answerable in game: the werewolf fights while
+    // sharing NO attack event names with the humanoid set, so name overlap predicts nothing. Draugr and
+    // Skeleton are the most promising (they share AttackStartH2HLeft/Right and bashStart) and are the first
+    // to test. Until that test they are walk-around shapes, like the eight above.
+    hagraven: { name: 'Hagraven', race: idOf('131fb:Skyrim.esm') },
+    bear: { name: 'Bear', race: idOf('131e8:Skyrim.esm') },
+    snowbear: { name: 'Snow Bear', race: idOf('131e9:Skyrim.esm') },
+    sabrecat: { name: 'Sabre Cat', race: idOf('13200:Skyrim.esm') },
+    snowsabrecat: { name: 'Snowy Sabre Cat', race: idOf('13202:Skyrim.esm') },
+    troll: { name: 'Troll', race: idOf('13205:Skyrim.esm') },
+    draugr: { name: 'Draugr', race: idOf('d53:Skyrim.esm') },
+    skeleton: { name: 'Skeleton', race: idOf('b7998:Skyrim.esm') },
+    spriggan: { name: 'Spriggan', race: idOf('13204:Skyrim.esm') },
+    falmer: { name: 'Falmer', race: idOf('131f4:Skyrim.esm') },
   };
   const CREATURE_WORDS = { rabbit: 'hare' };
   const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -904,7 +927,8 @@ module.exports = (api) => {
     if (!isLeadStaff(a)) return personal(a, 'That is for a Lead GM and above.');
     const words = String(args || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
     const w = words[0] || '';
-    const usage = `Usage: /polymorph <${animals().join('|')}> | revert | list${isOwner(a) ? ' | on | off' : ''}. It works on yourself alone.`;
+    // The animals are no longer named here: there are eighteen, and /polymorph with no argument lists them
+    const usage = `Usage: /polymorph <animal> | revert | list${isOwner(a) ? ' | on | off' : ''}. It works on yourself alone; /polymorph on its own names the animals.`;
     if (w === 'on' || w === 'off') {
       if (!isOwner(a)) return personal(a, 'Only an Owner switches polymorph on or off.');
       if (words.length > 1) return personal(a, usage);
@@ -939,7 +963,7 @@ module.exports = (api) => {
     const why = polymorphTo(a, key);
     if (why) { log(`beastform: ${display(a)} could not polymorph into ${key}: ${why}`); return personal(a, why); }
     personal(a, `You are a ${CREATURES[key].name}. Nobody near you is told. /polymorph revert turns you back; so do a death, a logout, going indoors or into water, and a player coming near whose game cannot show the animal.`);
-  }, { admin: true, help: 'chicken|hare|goat|fox|dog|skeever|mudcrab|deer|revert|list|on|off: take an animal shape yourself (never anyone else) or end it; on and off: the Owners\' switch for everyone' });
+  }, { admin: true, help: '<animal>|revert|list|on|off: take an animal shape yourself (never anyone else) or end it; /polymorph on its own names the animals; on and off: the Owners\' switch for everyone' });
 
   // Admins: grant or take the power, or force a form for testing
   registerChatCommand('beastform', (a, args) => {

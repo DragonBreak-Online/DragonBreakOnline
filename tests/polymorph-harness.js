@@ -477,7 +477,10 @@ r = run(LEAD, '');
 ok(/Polymorph is on/.test(r) && /chicken, hare, goat, fox, dog, skeever, mudcrab, deer/.test(r) && !/on\|off/.test(r), '11. /polymorph alone: the state and the animals (the switch named to Owners only)', r);
 ok(/on\|off/.test(run(OWNER, '')), '11. ...an Owner is shown the switch');
 r = run(LEAD, 'wolf');
-ok(/^Usage: \/polymorph <chicken\|hare\|goat\|fox\|dog\|skeever\|mudcrab\|deer> \| revert \| list\./.test(r) && !beast(LEAD), '11. wolf and horse are not animals here', r);
+// The usage line stopped naming the animals once there were eighteen; what matters is that the wolf, the
+// horse and the giant are not among them, so this asks the form list rather than the sentence
+ok(/^Usage: \/polymorph <animal> \| revert \| list\./.test(r) && !beast(LEAD), '11. an unknown animal gets the usage line', r);
+ok(!globalThis.__dboPolymorphPanel().forms.some((f) => /wolf|horse|giant/.test(f.key)), '11. wolf, horse and giant are not animals here', globalThis.__dboPolymorphPanel().forms.map((f) => f.key));
 ok(/^Usage/.test(run(LEAD, 'horse')) && !beast(LEAD), '11. ...nor the horse');
 
 // ---- 12. what the admin panel is fed -------------------------------------------------------------------------------
@@ -486,8 +489,10 @@ ok(/^Usage/.test(run(LEAD, 'horse')) && !beast(LEAD), '11. ...nor the horse');
 // server refuses.
 restart({ beastform: {} });
 let P = globalThis.__dboPolymorphPanel();
-ok(P.on === true && Array.isArray(P.forms) && P.forms.length === 8, '12. __dboPolymorphPanel: the switch and all eight animals', P);
-ok(P.forms.map((f) => f.key).join(',') === 'chicken,hare,goat,fox,dog,skeever,mudcrab,deer', '12. ...in the table\'s order, by key', P.forms.map((f) => f.key));
+ok(P.on === true && Array.isArray(P.forms) && P.forms.length === 18, '12. __dboPolymorphPanel: the switch and all eighteen animals', P.forms.length);
+ok(P.forms.map((f) => f.key).join(',') === 'chicken,hare,goat,fox,dog,skeever,mudcrab,deer,hagraven,bear,snowbear,sabrecat,snowsabrecat,troll,draugr,skeleton,spriggan,falmer', '12. ...in the table order, by key', P.forms.map((f) => f.key));
+// The ten added on 25 Oct must each resolve in this load order, or the panel offers a shape the server refuses
+ok(['hagraven', 'bear', 'snowbear', 'sabrecat', 'snowsabrecat', 'troll', 'draugr', 'skeleton', 'spriggan', 'falmer'].every((k) => P.forms.some((f) => f.key === k)), '12. every form added on 25 Oct resolves in the load order');
 ok(P.forms.every((f) => f.name && f.name !== f.key) && P.forms.find((f) => f.key === 'mudcrab').name === 'Mudcrab', '12. ...each with the name the panel shows', P.forms);
 ok(!P.forms.some((f) => /wolf|horse/.test(f.key)), '12. ...and never the wolf or the horse');
 
