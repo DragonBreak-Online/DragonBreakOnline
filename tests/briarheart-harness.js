@@ -25,14 +25,22 @@ const ARMOS = { [BRIAR]: 0x20, [BRIAR_EMPTY]: 0x20, [CUIRASS]: 0x4, [HELMET]: 0x
 const props = new Map();   // `${actor}|${prop}` -> value
 const P = (a, k) => props.get(`${a >>> 0}|${k}`);
 const setP = (a, k, v) => props.set(`${a >>> 0}|${k}`, v);
-const papyrusCalls = [];
+const papyrusCalls = []; const papyrusThrows = new Set();
 const mp = {
   get: (a, k) => { const v = P(a, k); if (v === undefined && k === 'type') throw new Error('no actor'); return v === undefined ? null : JSON.parse(JSON.stringify(v)); },
   set: (a, k, v) => setP(a, k, v === null ? null : JSON.parse(JSON.stringify(v))),
   getIdFromDesc: (d) => ID[d] || 0,
   getDescFromId: (id) => `${(id >>> 0).toString(16)}:Skyrim.esm`,
   lookupEspmRecordById: (id) => (RACES[id] ? { record: { editorId: RACES[id] } } : ARMOS[id >>> 0] ? { record: { type: 'ARMO', editorId: 'armo', fields: [{ type: 'BOD2', data: new Uint8Array(new Uint32Array([ARMOS[id >>> 0], 2]).buffer) }] } } : { record: null }),
-  callPapyrusFunction: (kind, cls, method, self, args) => { papyrusCalls.push({ method, self: self.desc, args: args.map((x) => x.desc !== undefined ? x.desc : x) }); return method === 'IsInFaction' ? true : undefined; },
+  // As the server does: a 'form' argument is looked up among world forms only, so a base record passed that way throws
+  // "Form with id ... doesn't exist" (dev, 25 Oct: every spell, faction and armour call failed so). papyrusThrows names a
+  // method the server refuses outright, for the failure-reporting checks
+  callPapyrusFunction: (kind, cls, method, self, args) => {
+    for (const x of args) if (x && x.type === 'form') throw new Error(`Form with id 0x${String(x.desc).split(':')[0]} doesn't exist`);
+    if (papyrusThrows.has(method)) throw new Error(`${method} refused (test)`);
+    papyrusCalls.push({ method, self: self.desc, args: args.map((x) => x.desc !== undefined ? x.desc : x), types: args.map((x) => (x && x.type) || typeof x) });
+    return method === 'IsInFaction' ? true : undefined;
+  },
 };
 const actor = (id, race, faith, pos, inv) => {
   setP(id, 'appearance', { raceId: race });
@@ -408,6 +416,31 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   // the arithmetic gamemode.js does: a bare-chested Briarheart's hit lands as a Forsworn cuirass wearer's would
   const scale = 0.12, cap = 80, kept = (r) => 1 - Math.min(r * scale, cap) / 100;
   ok(Math.abs(kept(5) * (kept(5 + 21) / kept(5)) - kept(26)) < 1e-12, 'the skin\'s factor on top of the engine\'s briar-body 5 equals a worn Forsworn cuirass (26)');
+}
+// ---- the server's Papyrus takes base records as 'espm', and a refused call is reported as refused (dev, 25 Oct) ------------
+{
+  const logLines = [];
+  delete require.cache[MODULE]; delete globalThis.__dboBriarheart;
+  const MP = require(MODULE)({
+    mp, log: (...x) => logLines.push(x.join(' ')), personal: (a, t) => said.push([a >>> 0, t]), audit: (t) => audits.push(t), who: (a) => `who${(a >>> 0).toString(16)}`,
+    display: (a) => `char${(a >>> 0).toString(16)}`, cfg: { briarheart: { enabled: true, forswornFriendly: true, visual: { enabled: true, armor: '5d008:Skyrim.esm', emptyArmor: '5d009:Skyrim.esm' } } },
+    registerChatCommand: (n, f) => commands.set(n, f), onlineActors: () => online.slice(), isLeadStaff: (a) => (a >>> 0) === LEAD, findByName: () => 0, every: (n, ms, f) => { ticker = f; },
+    giveItem: (a, id, n) => { const e = ((P(a, 'inventory') || {}).entries || []).slice(); e.push({ baseId: id, count: n }); setP(a, 'inventory', { entries: e }); return true; }, sourceResistsOf: () => new Set(),
+  });
+  const PB = actor(0x70, 1, 'reach', [0, 0, 0], []); online.push(PB); setP(PB, 'equipment', { inv: { entries: [] } });
+  papyrusCalls.length = 0; logLines.length = 0;
+  MP.become(PB, 'staff', 'espm test');
+  const byMethod = (m) => papyrusCalls.filter((c) => c.method === m);
+  ok(byMethod('AddSpell').length === 2 && byMethod('AddSpell').every((c) => c.types[0] === 'espm'), 'the spells go to AddSpell as espm records (a form argument would throw, as live)', papyrusCalls);
+  ok(byMethod('AddToFaction').length === 1 && byMethod('AddToFaction')[0].types[0] === 'espm' && byMethod('IsInFaction')[0].types[0] === 'espm', 'the faction goes as an espm record');
+  ok(!logLines.some((l) => /failed/.test(l)), 'no Papyrus call failed', logLines.filter((l) => /failed/.test(l)));
+  globalThis.__dboBriarheartEquip(PB, { inv: { entries: [] } });
+  ok(byMethod('EquipItem').length === 1 && byMethod('EquipItem')[0].types[0] === 'espm' && logLines.some((l) => /look on char70 \(equipment\): bare chest, briar body 5d008:Skyrim\.esm equipped/.test(l)), 'the briar body goes to EquipItem as an espm record, and the look says equipped', logLines);
+  // the server refuses the equip: the look says so, never "equipped"
+  papyrusThrows.add('EquipItem'); globalThis.__dboBriarheart.looks.delete(PB); logLines.length = 0;
+  globalThis.__dboBriarheartEquip(PB, { inv: { entries: [] } });
+  ok(logLines.some((l) => /look FAILED on char70 \(equipment\): EquipItem of 5d008:Skyrim\.esm refused by the server/.test(l)) && !logLines.some((l) => /equipped \(try/.test(l)), 'a refused EquipItem is logged as FAILED, never as equipped', logLines);
+  papyrusThrows.clear(); MP.end(PB, 'espm test done');
 }
 // ---- the hooks in the other modules ---------------------------------------------------------------------------------------
 const src = (f) => fs.readFileSync(path.resolve(__dirname, '..', f), 'utf8');

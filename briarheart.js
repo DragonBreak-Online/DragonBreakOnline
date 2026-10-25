@@ -116,7 +116,9 @@ module.exports = (api) => {
   const set = (a, p, v) => { try { mp.set(a >>> 0, p, v); return true; } catch (e) { log(`briarheart: writing ${p} failed`, e.message); return false; } };
   const isOnline = (a) => onlineActors().includes(a >>> 0);
   const papyrus = (a, method, args) => { try { mp.callPapyrusFunction('method', 'Actor', method, { type: 'form', desc: mp.getDescFromId(a >>> 0) }, args); return true; } catch (e) { log(`briarheart: ${method} failed`, e.message); return false; } };
-  const form = (desc) => ({ type: 'form', desc: String(desc) });
+  // A base record (spell, faction, armour) goes to the server's Papyrus as 'espm': a 'form' argument is looked up among
+  // world forms only, and every base record there failed with "Form with id ... doesn't exist" (dev, 25 Oct)
+  const form = (desc) => ({ type: 'espm', desc: String(desc) });
   // The server's Papyrus answer (IsInFaction), for the in-game check of forswornFriendly
   const papyrusValue = (a, method, args) => { try { return mp.callPapyrusFunction('method', 'Actor', method, { type: 'form', desc: mp.getDescFromId(a >>> 0) }, args); } catch (e) { return `error: ${e.message}`; } };
   const faction = (a, on, why) => {
@@ -228,8 +230,9 @@ module.exports = (api) => {
     if (L.tries >= v.maxTries) { if (!L.gaveUp) { L.gaveUp = true; S.looks.set(a, L); log(`briarheart: look gave up on ${display(a)}: ${L.tries} equips of the briar body did not show in the equipment`); } return; }
     L.at = Date.now(); L.tries += 1; S.looks.set(a, L);
     if (!hasOne(a, full) && giveItem) giveItem(a, full, 1);
-    papyrus(a, 'EquipItem', [form(v.armor), false, true]);
-    log(`briarheart: look on ${display(a)} (${why}): bare chest, briar body ${v.armor} equipped (try ${L.tries})`);
+    const equipped = papyrus(a, 'EquipItem', [form(v.armor), false, true]);
+    log(equipped ? `briarheart: look on ${display(a)} (${why}): bare chest, briar body ${v.armor} equipped (try ${L.tries})`
+      : `briarheart: look FAILED on ${display(a)} (${why}): EquipItem of ${v.armor} refused by the server (try ${L.tries}; see the line above)`);
   };
   // ---- the briar skin: armour, stamina and DiseaseResist while the briar chest shows ---------------------------------------
   const K = () => Object.assign({ enabled: false, armorFrom: '', staminaRegen: 1, diseaseResist: 0 }, C.briarSkin || {});
