@@ -5,10 +5,10 @@ records of DragonBreak Online Edits (21 Sep: empty effects added to all 90 DBO_S
 the two files record by record, decompressed, subrecord by subrecord, and prints every record added, removed or
 changed, with its editor id. Ship a save only when that list is exactly what the script meant to change.
 
-usage: py tools/plugin_record_diff.py <before.esp> <after.esp> [--allow-edid-prefix DBO_Alch,DBO_Harvest] [--allow-changed EDID,...]
+usage: py tools/plugin_record_diff.py <before.esp|live> <after.esp> [--allow-edid-prefix DBO_Alch,DBO_Harvest] [--allow-changed EDID,...]
 Exit code 0 when nothing outside the allowed sets changed, 1 otherwise. Standalone (no ck-mcp import), Python 3.
 """
-import struct, sys, zlib
+import os, struct, sys, zlib
 
 def records(path):
     buf = open(path, 'rb').read()
@@ -39,10 +39,18 @@ def records(path):
     walk(24 + hsize, len(buf))
     return out
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+
 def main(argv):
     if len(argv) < 3:
         print(__doc__); return 2
-    before, after = records(argv[1]), records(argv[2])
+    first = argv[1]
+    if first == 'live':
+        from live_baseline import resolve as resolve_live
+        first, _sha, _note = resolve_live()
+        print('live baseline: %s' % _note)
+    before, after = records(first), records(argv[2])
     prefixes, allowed = [], set()
     for i, a in enumerate(argv):
         if a == '--allow-edid-prefix' and i + 1 < len(argv): prefixes = [p for p in argv[i + 1].split(',') if p]

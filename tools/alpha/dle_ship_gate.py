@@ -3,7 +3,8 @@
 
     python3 tools/alpha/dle_ship_gate.py <new esp> [--live <esp>] [--spawns owned-spawns.json]
 
---live defaults to the installed /opt/skyrim-data copy. Exit 0 with "ok" lines, or 1 with one line per failure.
+--live is resolved and hash-verified by tools/live_baseline.py when it is not given, so a check cannot
+quietly measure against the wrong build; it refuses rather than guess. Exit 0 with "ok" lines, or 1 with one line per failure.
 The PC's source esp has repeatedly come without patches made on CT 115 (memory pc-dle-builds-drop-server-side-patches),
 so each check is one of those, or an anchor a player in Bruma cannot do without (docs/alpha/bruma-anchors.md):
   border      the border REGN 0B0CBCDD override is there at 230 bytes (20 points, border A+B of 7 Oct) and the live polygon (the same points
@@ -25,6 +26,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SERVER = os.path.abspath(os.path.join(HERE, '..', '..'))
 sys.path.insert(0, os.environ.get('ESPLIB_DIR', os.path.expanduser('~nate/dragonbreak/ck-mcp')))
 import esplib  # noqa: E402
+sys.path.insert(0, os.path.join(HERE, '..'))
+from live_baseline import resolve as resolve_live  # noqa: E402
 
 BORDER = ('bsheartland.esm', 0xCBCDD)
 BORDER_SIZE = 230
@@ -129,9 +132,12 @@ class Esp:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('esp')
-    ap.add_argument('--live', default='/opt/skyrim-data/DragonBreak Online Edits.esp')
+    ap.add_argument('--live', default=None)
     ap.add_argument('--spawns', default=os.path.join(SERVER, 'owned-spawns.json'))
     a = ap.parse_args()
+    if not a.live:
+        a.live, _sha, _note = resolve_live()
+        print('live baseline: %s' % _note)
     fails, oks = [], []
     try:
         new, live = Esp(a.esp), Esp(a.live)
