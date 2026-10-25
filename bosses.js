@@ -165,6 +165,9 @@ module.exports = (api) => {
     }
     for (const id of live) {
       if (G.byActor.has(id)) continue;
+      // A felled boss lies in the live list until its body despawns; its fight is over, so it would be taken for a new one
+      // rising (dev, 25 Oct: the Centurion "rose" 0.6 s after his kill, announced and glowing, until the body went)
+      if (get(id, 'isDead') === true) continue;
       const r = roleOf(get(id, 'private.npcSpawner'));
       if (!r) continue;
       const f = fightOf(r.boss);

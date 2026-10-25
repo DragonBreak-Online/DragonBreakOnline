@@ -128,6 +128,11 @@ ok(!gotBy(FAR).length, 'a fighter under 10% of the damage gets nothing');
 ok(!gotBy(BRIAR).length && /of your own blood/.test(toldTo(BRIAR)), 'a Briarheart gets nothing for the King');
 ok(!zones().some((x) => x.Name.startsWith('boss:') && x.Name.includes(':w')) && /fallen/.test(toldTo(P1)), 'the waves go with the fight; the hold hears he has fallen', [zones().filter((x) => x.Name.includes(':w')).map((x) => x.Name), toldTo(P1)]);
 ok(audits.some((t) => /^BOSS briarheartking killed at LV \(enraged\) by /.test(t)), 'audited, enraged', audits.slice(-1));
+// His body lies in the live list until it despawns: it is not a new King rising (dev, 25 Oct: the Centurion "rose" again)
+put(K, 'isDead', true); audits.length = 0; said.length = 0; glows.length = 0;
+tick([K]); tick([K]);
+ok(!audits.some((t) => /^BOSS briarheartking rose/.test(t)) && !said.some(([, t]) => /stirs|rises|wakes/.test(t)) && !glows.length, 'his body, still in the live list, is no new King: no rising, no announcement, no glow', audits);
+put(K, 'isDead', false);
 // The lockout: the next King inside 20 h pays nothing
 put(K, 'percentages', { health: 1, magicka: 1, stamina: 1 });
 now += 7200000; tick([K]);
