@@ -5,7 +5,7 @@
    "id": "icecap",
    "name": "the Wraith of the Ice Cap",
    "enabled": false,
-   "waitingOn": "Nat's choice of spot (S1-S4) and the Glacial Crystal Shard's form id (Worker 2, Nexus Patches)",
+   "waitingOn": "Nat's choice of spot (S1-S4), and the restart DLE 743a8952 that carries the shard",
    "hold": "winterhold",
    "world": "3c:Skyrim.esm",
    "spots": [
@@ -27,7 +27,7 @@
    "announce": { "spawn": "Something cold stirs on the ice above Winterhold.", "death": "The cold above Winterhold breaks." },
    "drops": {
     "always": [["3ad5f:Skyrim.esm", 2]],
-    "shards": { "desc": "", "count": 3, "top": 4 },
+    "shards": { "desc": "1d2201:DragonBreak Online Edits.esp", "count": 5, "top": 7, "confirmedBy": "DBO_OreGlacialCrystal, the Glacial Crystal Shard (Worker 2's DragonBreak Glacial.esp, merged by Worker 3 into the restart DLE 743a8952 and read back from it, 25 Oct); 4 shards + 1 Frost Salts -> 2 ingots at the smelter" },
     "schematic": { "family": "glacial_crystal", "chance": 0.03, "knownBonus": 2 }
    }
   },

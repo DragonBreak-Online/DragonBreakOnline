@@ -131,8 +131,8 @@ known = new Set([`${P2}:glacial_crystal`]);
 given.length = 0; rnd = 0.02;
 globalThis.__dboBossDeath(W, P1);
 const shards = (a) => given.filter((g) => g[0] === a && g[1] === idOf(SHARD)).reduce((n, g) => n + g[2], 0);
-ok(shards(P1) === 4 + 2 && gotBy(P1).some((g) => g[1] === 0x7000 && g[2] === 1), 'the top damager: 4 shards + 2 Frost Salts, and at a 2% roll the Glacial schematic', gotBy(P1));
-ok(shards(P2) === 3 + 2 + 2 && !gotBy(P2).some((g) => g[1] === 0x7000), 'a smith who knows Glacial Crystal: 3 shards, 2 more instead of the schematic (+2 Frost Salts)', gotBy(P2));
+ok(shards(P1) === 7 + 2 && gotBy(P1).some((g) => g[1] === 0x7000 && g[2] === 1), 'the top damager: 7 shards + 2 Frost Salts, and at a 2% roll the Glacial schematic', gotBy(P1));
+ok(shards(P2) === 5 + 2 + 2 && !gotBy(P2).some((g) => g[1] === 0x7000), 'a smith who knows Glacial Crystal: 5 shards, 2 more instead of the schematic (+2 Frost Salts)', gotBy(P2));
 
 // ---- the roaming Warlord moves on after a kill ----
 const B = 0xff400001;
@@ -144,6 +144,17 @@ globalThis.__dboBossDeath(B, P3);
 const after = zones().find((x) => x.Name === 'boss:palewarlord:boss').POS.join();
 ok(before !== after && after === copy.bosses.find((b) => b.id === 'palewarlord').spots[1].pos.join(), 'the Warlord of the Pale Pass rises at his next camp', [before, after]);
 ok(JSON.parse(fs.readFileSync(path.join(dir, 'bosses-state.json'), 'utf8')).spot.palewarlord === 1, '...kept in bosses-state.json');
+
+// ---- each boss's own config block (Nat, 25 Oct: they go live one by one) ----
+fs.writeFileSync(path.join(dir, 'bosses.json'), JSON.stringify(REAL));
+load({ bosses: { icecap: { enabled: true, spot: 'S2' }, briarheartking: { enabled: false } } });
+const cz = zones().filter((x) => x.Name.startsWith('boss:'));
+const wraith = cz.find((x) => x.Name === 'boss:icecap:boss');
+ok(wraith && wraith.POS.join() === def('icecap').spots[1].pos.join(), 'bosses.icecap { enabled, spot: S2 } turns the Wraith on at its second candidate, whatever bosses.json says', wraith);
+ok(!cz.some((x) => x.Name.startsWith('boss:briarheartking:')) && cz.some((x) => x.Name === 'boss:centurion:boss') && !cz.some((x) => x.Name.startsWith('boss:palewarlord:')),
+  'bosses.briarheartking.enabled false takes the King off; the Centurion stays on and the Warlord off as the data says');
+ok(def('icecap').drops.shards.desc === '1d2201:DragonBreak Online Edits.esp' && def('icecap').drops.shards.count === 5 && def('icecap').drops.shards.top === 7,
+  'the Wraith drops the Glacial Crystal Shard (DLE 1D2201): 5 a fighter, 7 for the top damager (a 36-shard set in 5-7 days)');
 
 // ---- manuals.js: the boss-only schematic hook ----
 const msrc = fs.readFileSync(path.join(ROOT, 'manuals.js'), 'utf8');

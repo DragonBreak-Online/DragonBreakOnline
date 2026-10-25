@@ -115,11 +115,17 @@ def build(lo, defs):
             return None
         return {'edid': lo.edid(k), 'desc': lo.desc(k), 'options': [[lvl, lo.desc(o), lo.edid(o)] for lvl, o in opts]}
 
-    def item(desc, who):
+    warn = []
+
+    def item(desc, who, confirmed=''):
         if not desc:
             return None
         k = key_of(desc)
         if k not in lo.types:
+            # An item another worker built and read back from a plugin this machine does not have yet: kept, and said
+            if confirmed:
+                warn.append(f"{who}: item {desc} is not in this load order; kept on its confirmation ({confirmed[:80]})")
+                return desc
             bad.append(f"{who}: item {desc} is not in this load order")
             return None
         return lo.desc(k)
@@ -161,7 +167,7 @@ def build(lo, defs):
         dr = b.get('drops', {})
         drops = {'always': [[item(d, who), n] for d, n in dr.get('always', []) if item(d, who)]}
         if 'shards' in dr:
-            drops['shards'] = dict(dr['shards'], desc=item(dr['shards'].get('desc'), who) or '')
+            drops['shards'] = dict(dr['shards'], desc=item(dr['shards'].get('desc'), who, dr['shards'].get('confirmedBy', '')) or '')
         for key in ('schematic', 'extraSchematic'):
             if key in dr:
                 drops[key] = dr[key]
@@ -174,6 +180,8 @@ def build(lo, defs):
                     'Do not edit by hand: change boss-defs.json and rerun the generator.',
         'bosses': bosses,
     }
+    for line in warn:
+        print('  NOTE', line)
     return out, bad
 
 

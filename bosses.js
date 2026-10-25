@@ -20,7 +20,8 @@
 // drops.extraSchematic. One reward per account per boss every lockoutHours (20); a kill inside it pays nothing. A boss that
 // excludes Briarhearts pays none to one (briarheart.js __dboIsBriarheart). The hold hears when the boss rises and falls.
 // State in bosses-state.json: { lockouts: { <boss>: { <profile>: until } }, spot: { <boss>: index }, kills: { <boss>: at } }.
-// gamemode-config.json "bosses": { enabled, creditShare, lockoutHours, pollSeconds, only: [ids], off: [ids] }
+// gamemode-config.json "bosses": { enabled, creditShare, lockoutHours, pollSeconds, only: [ids], off: [ids], <boss id>: { enabled, spot } }:
+// each boss goes live on its own (its block's enabled over bosses.json's), and spot names the candidate it stands at (Nat's pick)
 'use strict';
 
 const fs = require('fs');
@@ -35,7 +36,8 @@ module.exports = (api) => {
   const STATE_FILE = path.resolve('bosses-state.json');
   const readJson = (file, fallback) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return fallback; } };
   const DEFS = (readJson(path.resolve('bosses.json'), { bosses: [] }).bosses || []).filter((b) => b && b.id && b.boss && Array.isArray(b.spots) && b.spots.length);
-  const on = (b) => C.enabled && b.enabled !== false && (!Array.isArray(C.only) || C.only.includes(b.id)) && !(C.off || []).includes(b.id);
+  const own = (b) => (C[b.id] && typeof C[b.id] === 'object' ? C[b.id] : {});
+  const on = (b) => C.enabled && (own(b).enabled !== undefined ? own(b).enabled === true : b.enabled !== false) && (!Array.isArray(C.only) || C.only.includes(b.id)) && !(C.off || []).includes(b.id);
   const BOSSES = DEFS.filter(on);
   const byId = new Map(BOSSES.map((b) => [b.id, b]));
   const idOf = (desc) => { try { return mp.getIdFromDesc(String(desc)) >>> 0; } catch (e) { return 0; } };
@@ -60,7 +62,12 @@ module.exports = (api) => {
   // ---- zones --------------------------------------------------------------------------------------------------------
   const pickHigh = (options) => { const s = (options || []).slice().sort((x, y) => x[0] - y[0]); return s.length ? s[s.length - 1][1] : null; };
   const pickMid = (options) => { const s = (options || []).slice().sort((x, y) => x[0] - y[0]); return s.length ? s[Math.floor(s.length / 2)][1] : null; };
-  const spotOf = (b) => b.spots[(Number(state().spot[b.id]) || 0) % b.spots.length];
+  // A config spot (an id or an index) fixes where a boss stands; a roaming boss otherwise moves on after each kill
+  const spotOf = (b) => {
+    const pin = own(b).spot;
+    if (pin !== undefined && pin !== null) { const byName = b.spots.find((sp) => sp.id === String(pin)); if (byName) return byName; if (b.spots[Number(pin)]) return b.spots[Number(pin)]; }
+    return b.spots[(Number(state().spot[b.id]) || 0) % b.spots.length];
+  };
   const ring = (pos, i, n, r) => { const t = (2 * Math.PI * i) / Math.max(1, n); return [pos[0] + Math.cos(t) * r, pos[1] + Math.sin(t) * r, pos[2]]; };
   const zone = (b, role, pos, npc, respawn, heading) => ({ Name: `${PREFIX}${b.id}:${role}`, ID: b.world, POS: pos.map((v) => Math.round(v * 100) / 100), Size: Number(b.radius) || 6000,
     Anchor: spotOf(b).ref, Heading: Number(heading) || 0, NPC: [{ id: npc, count: 1 }], Despawn: 240, Respawn: respawn, Hostile: true });
