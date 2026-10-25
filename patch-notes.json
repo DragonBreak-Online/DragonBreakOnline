@@ -1,5 +1,20 @@
 [
   {
+    "title": "The bank gem counters close",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Banks",
+        "items": [
+          "The banks no longer buy gemstones for gold, and so no longer sell them either: the counter only ever resold what players had sold it.",
+          "Hold treasuries were still being emptied through it, even with the daily limits."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Coin purses pay the holds a share",
     "date": "2026-10-25",
     "version": "Server update",

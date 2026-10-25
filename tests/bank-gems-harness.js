@@ -203,9 +203,9 @@ check('gold paid in later is spendable, but the reserve stays where the morning 
 mod = load({ dailyPerCharacter: 1e9, dailyPerAccount: 1e9, reserveMin: 1e9 }, true);
 at(P2, BANK_SOL);
 check('reserveMin: a hold below it buys nothing', /The Haafingar treasury keeps a reserve/.test(cmd(P2, 'gems sell ruby 1')));
-check('the shipped config: the counter is on (Nat OK, 25 Oct), with the retuned numbers', (() => {
+check('the shipped config: the counter is closed again (Nat, 25 Oct 22:40Z: holds were still being drained), the retune kept for a reopening', (() => {
   const c = JSON.parse(fs.readFileSync(path.join(SERVER, 'gamemode-config.json'), 'utf8')).bank.gemCounter;
-  return c.enabled === true && c.buyShare === 0.15 && c.dailyPerCharacter === 500 && c.dailyPerAccount === 500 && c.reserveShare === 0.5 && c.reserveMin === 5000;
+  return c.enabled === false && c.buyShare === 0.15 && c.dailyPerCharacter === 500 && c.dailyPerAccount === 500 && c.reserveShare === 0.5 && c.reserveMin === 5000;
 })());
 Date.now = realNow;
 
