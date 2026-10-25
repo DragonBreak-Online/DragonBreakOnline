@@ -61,7 +61,7 @@ const T1 = WOODCUTTER.millFirewoodByTier[0];
 const SAWNLOG = 0x300e;
 const L1 = (WOODCUTTER.millSawnLogsByTier || [])[0];
 const paid = (id) => out.items.filter(([i]) => i === id).reduce((n, [, c]) => n + c, 0);
-check('skills.json saws logs too: 6 to 18 Sawn Logs by tier', JSON.stringify(WOODCUTTER.millSawnLogsByTier) === '[6,9,12,15,18]', JSON.stringify(WOODCUTTER.millSawnLogsByTier));
+check('skills.json saws logs too: 4 to 8 Sawn Logs by tier', JSON.stringify(WOODCUTTER.millSawnLogsByTier) === '[4,5,6,7,8]', JSON.stringify(WOODCUTTER.millSawnLogsByTier));
 
 check('skills.json still holds the design: firewood for 5 tiers and a 30-minute rest',
   Array.isArray(WOODCUTTER.millFirewoodByTier) && WOODCUTTER.millFirewoodByTier.length === 5 && WOODCUTTER.millCooldownMinutes === 30, JSON.stringify(WOODCUTTER.millFirewoodByTier));

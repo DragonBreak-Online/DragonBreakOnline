@@ -444,13 +444,13 @@
     60
    ],
    "millSawnLogsByTier": [
+    4,
+    5,
     6,
-    9,
-    12,
-    15,
-    18
+    7,
+    8
    ],
-   "_millSawnLogs": "Hearthfire Sawn Logs (300e:HearthFires.esm) per run of a saw mill, by Woodcutter tier, with the firewood (labour.js mill; Nat, 25 Oct). Hearthfire's own house recipes take 2 at the median and 16 for a wall framing, about 256 for a whole house with every wing, so a Novice builds one in some 43 runs. The mill takes nothing in: Skyrim has no raw log.",
+   "_millSawnLogs": "Hearthfire Sawn Logs (300e:HearthFires.esm) per run of a saw mill, by Woodcutter tier, with the firewood (labour.js mill; Nat, 25 Oct). 4 at Novice times the usual tier multiplier (1, 1.2, 1.4, 1.7, 2): a furnished one-cell home's decor takes about 22 (Worker 1's decor-catalog.json, 25 Oct), some 5 or 6 runs, and the firewood keeps a run near the decor's price of 4 firewood a log. A whole Hearthfire house with every wing is about 256. The mill takes nothing in: Skyrim has no raw log.",
    "millCooldownMinutes": 30,
    "tiers": [
     "4 strikes, rough charcoal",
