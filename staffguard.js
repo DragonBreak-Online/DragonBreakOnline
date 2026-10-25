@@ -3,7 +3,8 @@
 // A staff tier comes from Discord roles per profile, so every character of a staff member carried GM powers. This file
 // decides, for gamemode.js, the gameplay modules and the fork's AdminSystem / HousingSystem (globalThis.__dboAdminGate):
 //   staffCharOnly  staff powers only on a staff character (private.dboStaffChar): invisibility, ghost, noclip, freecam,
-//                  teleports, /realnames, the housing and key-ring staff override, the admin panel's world-changing actions
+//                  teleports, /realnames, the housing and key-ring staff override, a GM's lock fixes ('housingLockFix': also
+//                  the selfTarget rule below against the property's owner), the admin panel's world-changing actions
 //                  and the item, skill and power grants. GM calls, the admin chat and /bugs still work. The panel's modes are
 //                  cleared when the profile comes in on another character, or on a character that is not a staff one.
 //   selfTarget     staff tools never act on the acting staff member's own account; on another staff member's account only
@@ -167,6 +168,13 @@ module.exports = (api) => {
     a = Number(a) >>> 0; info = info || {};
     if (action === 'assign') return CHAR.enabled && CHAR.clearModes && !exempt(a) && (!isStaffChar(a) || info.changed === true) ? 'clear' : '';
     if (action === 'housing') return CHAR.enabled && !powersOn(a) ? NOT_HERE : '';
+    // A GM fixing the lock of someone's property (fork HousingSystem isLockFixer; Nat, 25 Oct): on a staff character, under
+    // the selfTarget rule against the property's owner, and callRef where its kinds name 'lockfix'
+    if (action === 'housingLockFix') {
+      if (CHAR.enabled && !powersOn(a)) return NOT_HERE;
+      const pt = Number(info.ownerProfile);
+      return Number.isSafeInteger(pt) && pt > 0 ? target(a, { profile: pt }, 'lockfix') : '';
+    }
     if (CHAR.enabled && !powersOn(a) && !(Array.isArray(CHAR.panelAllowed) && CHAR.panelAllowed.includes(action))) return NOT_HERE;
     if (TRIAL.enabled && (info.trial === true || trialOf(a)) && !exempt(a)) {
       if (action === 'teleportLoc') return 'A Trial GM goes to players on their GM calls, not to places.';

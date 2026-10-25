@@ -62,10 +62,15 @@ ok(sys.isManager(ctx, LEAD, PROPERTY) && sys.isManager(ctx, JARL, PROPERTY), 'a 
 request(GM, 'revoke');
 ok(rec().owner === 11, 'a GM\'s revoke is refused: the owner keeps the house', rec());
 request(GM, 'createkey');
-ok((rec().issued || []).length === 0, 'a GM cannot cut a key to it', rec().issued);
-request(GM, 'unlock');
-ok(rec().locked === true, 'a GM cannot unlock it through the menu', rec());
+ok((rec().issued || []).length === 0, 'a GM cannot cut a key to it for themselves', rec().issued);
 ok(adminLog.length === 0, 'nothing refused is logged as a staff override', adminLog);
+// Nat, 25 Oct: a GM fixes locks (unlock, lock, re-key, take back a copy, a key for the owner), logged as a GM lock fix
+request(GM, 'unlock');
+ok(rec().locked === false && adminLog.length === 1 && /HOUSING gm lock fix: actor ff000021 .* unlock on 100, owner profile 11/.test(adminLog[0]), 'a GM can unlock it now, logged as a GM lock fix', { rec: rec(), adminLog });
+request(GM, 'lock');
+ok(rec().locked === true && adminLog.length === 2, 'and lock it again', adminLog);
+ok(sys.hasAccess(ctx, PROPERTY, rec(), GM) === false, '...but still does not walk through its lock', rec());
+adminLog.length = 0;
 request(LEAD, 'createkey');
 ok((rec().issued || []).length === 1, 'a Lead GM can cut a key', rec().issued);
 ok(adminLog.length === 1 && /HOUSING staff override: actor ff000031 .* createkey on 100, owner profile 11/.test(adminLog[0]), 'and the override goes to the admin log', adminLog);
