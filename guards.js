@@ -65,7 +65,17 @@ module.exports = (api) => {
     // npcSwap: a post's guard swapped for another before it spawns (24 Oct: Solitude's Stormcloak-held variants -> their
     // Imperial-held twins, which wear the Haafingar uniform)
     const swapped = (npc) => (C.npcSwap && typeof C.npcSwap[npc] === 'string' ? C.npcSwap[npc] : npc);
-    const npcOrDefault = (p) => swapped(/^[0-9a-f]+:.+\.es[mpl]$/i.test(String(p.npc || '')) ? p.npc : C.npcByHold[p.hold]);
+    // holdNpcOnly (25 Oct): true for every hold, or a list of holds. A listed hold's posts spawn that
+    // hold's own guard instead of the vanilla base the post was scraped from. Those bases inherit
+    // CWPatrolAndGuardWhileHoldContested, whose target is a linked reference a spawned copy has not
+    // got. Bruma is deliberately NOT listed: its per-post bases each aim at their own world marker
+    const npcOrDefault = (p) => {
+      const own = /^[0-9a-f]+:.+\.es[mpl]$/i.test(String(p.npc || '')) ? p.npc : null;
+      const hold = C.npcByHold[p.hold];
+      const only = C.holdNpcOnly === true ||
+        (Array.isArray(C.holdNpcOnly) && C.holdNpcOnly.includes(p.hold));
+      return swapped(only && hold ? hold : (own || hold));
+    };
     // Patrols (Nate, 23 Oct: "yes patrols would be good"): a hold's first posts take its patrolsByHold guards in order, whose
     // own AI walks the base game's patrol routes; the server cannot move an NPC itself
     const patrolOf = new Map();

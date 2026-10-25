@@ -113,5 +113,25 @@ delete require.cache[path.join(SERVER, 'guards.js')]; globalThis.__dboGuardsSig 
 require(path.join(SERVER, 'guards.js'))(Object.assign({}, api, { cfg: { guards: { patrolsByHold: { bruma: ['d314c:Skyrim.esm'] } } } }));
 const gz = JSON.parse(fs.readFileSync('NPC-Spawns.json', 'utf8')).zones.filter((x) => x.Name.startsWith('guard:bruma:')).sort((x, y) => x.Name.localeCompare(y.Name));
 ok(gz.length === 2 && gz[0].NPC[0].id === 'd314c:Skyrim.esm' && gz[1].NPC[0].id === '6daba:BSHeartland.esm', 'the first post takes the patrol guard, the next keeps the hold\'s guard', gz.map((x) => [x.Name, x.NPC[0].id]));
+// holdNpcOnly: a listed hold's posts take the hold's own guard whatever the post was scraped with,
+// and a hold left off the list keeps its per-post bases. Bruma is off the list on purpose: its own
+// bases each aim at their own world marker and work, while the Skyrim ones aim at a linked
+// reference a server-spawned copy has not got.
+const reload = (guards) => {
+  delete require.cache[path.join(SERVER, 'guards.js')]; globalThis.__dboGuardsSig = null;
+  require(path.join(SERVER, 'guards.js'))(Object.assign({}, api, { cfg: { guards } }));
+  return JSON.parse(fs.readFileSync('NPC-Spawns.json', 'utf8')).zones
+    .filter((x) => x.Name.startsWith('guard:bruma:')).sort((x, y) => x.Name.localeCompare(y.Name));
+};
+const held = reload({ npcByHold: { bruma: 'd314c:Skyrim.esm' }, holdNpcOnly: ['bruma'] });
+ok(held.length === 2 && held.every((x) => x.NPC[0].id === 'd314c:Skyrim.esm'),
+  'holdNpcOnly listing a hold makes every one of its posts take the hold guard', held.map((x) => [x.Name, x.NPC[0].id]));
+const free = reload({ npcByHold: { bruma: 'd314c:Skyrim.esm' }, holdNpcOnly: ['solitude'] });
+ok(free.length === 2 && free.every((x) => x.NPC[0].id !== 'd314c:Skyrim.esm'),
+  'a hold left off holdNpcOnly keeps its own per-post bases', free.map((x) => [x.Name, x.NPC[0].id]));
+const all = reload({ npcByHold: { bruma: 'd314c:Skyrim.esm' }, holdNpcOnly: true });
+ok(all.length === 2 && all.every((x) => x.NPC[0].id === 'd314c:Skyrim.esm'),
+  'holdNpcOnly true covers every hold', all.map((x) => [x.Name, x.NPC[0].id]));
+
 console.log(fails ? `${fails} FAILED` : 'all passed');
 process.exit(fails ? 1 : 0);
