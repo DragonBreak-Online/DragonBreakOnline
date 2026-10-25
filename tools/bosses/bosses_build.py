@@ -36,6 +36,8 @@ def main():
     ap.add_argument('--data', default='/opt/skyrim-data')
     ap.add_argument('--order', default=os.path.join(HERE, '..', '..', 'plugins.server.txt'))
     ap.add_argument('--out', default=os.path.join(HERE, '..', '..', 'bosses.json'))
+    ap.add_argument('--locations', default=os.path.join(HERE, '..', '..', 'admin-locations.json'),
+                    help="the F7 teleport list: every boss spot as 'Boss: <name> ...', rewritten each run ('' leaves it)")
     a = ap.parse_args()
     lo = LoadOrder(a.data, a.order, {})
     defs = json.load(open(a.defs, encoding='utf-8'))
@@ -44,6 +46,8 @@ def main():
         json.dump(out, f, indent=1, ensure_ascii=False)
         f.write('\n')
     print(f"bosses: {len(out['bosses'])} bosses ({sum(1 for b in out['bosses'] if b['enabled'])} on) -> {a.out}")
+    if a.locations:
+        print(f"admin-locations: {teleports(out, a.locations)} boss spots -> {a.locations}")
     for line in bad:
         print('  BAD', line)
     return 1 if bad else 0
@@ -183,6 +187,32 @@ def build(lo, defs):
     for line in warn:
         print('  NOTE', line)
     return out, bad
+
+
+REGION_BY_WORLD = {'a764b:bsheartland.esm': 'Cyrodiil'}
+
+
+def teleports(out, path):
+    """Nat's standing rule (25 Oct: "always make sure Location teleports and all items are always updated"): every boss spot is an
+    F7 teleport, named 'Boss: <name>, <spot> (<hold>)' in its province, 64 units above the spot as admin_catalog.py places a
+    marker's. Earlier 'Boss: ' entries are replaced; nothing else in the file changes."""
+    loc = json.load(open(path, encoding='utf-8'))
+    rows = [r for r in loc['locations'] if not str(r.get('name', '')).startswith('Boss: ')]
+    world_names = {str(r['world']).lower(): r.get('worldName', '') for r in loc['locations']}
+    n = 0
+    for b in out['bosses']:
+        for sp in b['spots']:
+            where = ', '.join(x for x in [sp['id'] if len(b['spots']) > 1 else '', (sp.get('note') or '').split(',')[0] if len(b['spots']) == 1 else ''] if x)
+            hold = b.get('hold') or ''
+            name = f"Boss: {b['name']}{', ' + where if where else ''}{' (' + hold.capitalize() + ')' if hold else ''}"
+            rows.append({'name': name, 'region': REGION_BY_WORLD.get(b['world'].lower(), 'Skyrim'), 'world': b['world'],
+                         'worldName': world_names.get(b['world'].lower(), ''), 'pos': [sp['pos'][0], sp['pos'][1], sp['pos'][2] + 64],
+                         'rot': [0, 0, float(sp.get('heading', 0))]})
+            n += 1
+    loc['locations'] = rows
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(loc, f, indent=1, ensure_ascii=False)
+    return n
 
 
 if __name__ == '__main__':

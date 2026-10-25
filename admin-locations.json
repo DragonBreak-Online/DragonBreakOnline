@@ -19792,6 +19792,150 @@
     0,
     80.21412
    ]
+  },
+  {
+   "name": "Boss: the Wraith of the Ice Cap, S1 (Winterhold)",
+   "region": "Skyrim",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    116555,
+    112027,
+    -7345
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: the Wraith of the Ice Cap, S2 (Winterhold)",
+   "region": "Skyrim",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    119754,
+    112980,
+    -8818
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: the Wraith of the Ice Cap, S3 (Winterhold)",
+   "region": "Skyrim",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    121379,
+    121316,
+    -10654
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: the Wraith of the Ice Cap, S4 (Winterhold)",
+   "region": "Skyrim",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    115771,
+    141550,
+    -14257
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: the Briarheart King, Lost Valley Redoubt's upper platform (Markarth)",
+   "region": "Skyrim",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    -92100,
+    -41500,
+    1850.79
+   ],
+   "rot": [
+    0,
+    0,
+    352.8
+   ]
+  },
+  {
+   "name": "Boss: the Centurion Master, Blackreach's pump station",
+   "region": "Skyrim",
+   "world": "1ee62:Skyrim.esm",
+   "worldName": "Blackreach",
+   "pos": [
+    15456.31,
+    13746.16,
+    1125.07
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: the Warlord of the Pale Pass, SR (Bruma)",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    60719,
+    249420,
+    15468
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: the Warlord of the Pale Pass, ST (Bruma)",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    58987,
+    242571,
+    14140
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: the Warlord of the Pale Pass, SE (Bruma)",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    64214,
+    232252,
+    11423
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
   }
  ]
 }
