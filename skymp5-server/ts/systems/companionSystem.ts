@@ -12,7 +12,9 @@ type Mp = any;
 // Companion library: NPC allies owned by a player (summons, reanimated corpses, later pets such as dogs).
 // API, protocol and lifecycle are documented in docs/docs_roleplay_companions.md; the owner's client side is companionService.ts.
 
-export type CompanionKind = "summon" | "reanimated" | "companion";
+// "placed": an actor an explosion puts down, as the DLC2 spider scrolls do. A summon in every way except that it is
+// not commanded, so it takes no summon slot and never evicts one (Nat, 25 Oct).
+export type CompanionKind = "summon" | "reanimated" | "companion" | "placed";
 
 export interface CompanionOptions {
   kind?: CompanionKind;
@@ -69,6 +71,7 @@ const KIND_RULES: Record<CompanionKind, { commanded: boolean; dieOnEnd: boolean;
   summon: { commanded: true, dieOnEnd: false, corpseSec: 3, lootable: false },
   reanimated: { commanded: true, dieOnEnd: true, corpseSec: null, lootable: true },
   companion: { commanded: false, dieOnEnd: false, corpseSec: 120, lootable: true },
+  placed: { commanded: false, dieOnEnd: false, corpseSec: 3, lootable: false },
 };
 
 // NPC corpses and ash piles last this long; overridable via "npcCorpseSeconds", the zone NPC setting
@@ -105,7 +108,8 @@ const PVP_HOSTILE_MS = 60000;
 const PVP_RULE_HOOK = "__dboCompanionMayFight";
 // The kinds these rules cover: a player's summons and raised corpses. Other kinds (GM warbands, server/warband.js, and later
 // pets) target players as before, and are no player's side when another companion picks a target.
-const PVP_KINDS: ReadonlySet<CompanionKind> = new Set<CompanionKind>(["summon", "reanimated"]);
+// "placed" is here because a scroll's spider fights like a summon; only its slot and its lifetime differ
+const PVP_KINDS: ReadonlySet<CompanionKind> = new Set<CompanionKind>(["summon", "reanimated", "placed"]);
 // A summon's extra weapon, carried but not worn: its host's engine switches to it in close combat (Nate, 11 Oct)
 const SUMMON_SIDEARMS: Record<string, string> = {
   "45b9:Dawnguard.esm": "2c66f:Skyrim.esm", // DLC1SoulCairnBonemanSummon: DraugrSword, Ancient Nord Sword
