@@ -137,6 +137,39 @@ module.exports = (api) => {
     return String(get(a, 'worldOrCellDesc') || '').toLowerCase() === String(b.world).toLowerCase();
   });
   const tell = (b, text) => { if (text) for (const a of hearers(b)) personal(a, text); };
+  // Boss nameplates (Nat, 25 Oct: "can bosses have names over their head so we know what's a boss"): each player within a
+  // boss's radius is sent the names of the boss and its guardian standing near them, { customPacketType: 'dboActorLabels',
+  // list: [{ id, text, color }] }, which the client's ActorLabelService draws over their heads. A player's list is sent
+  // again only when it changes, so a rise, walking in or out and a kill each send it once; an empty list clears it. A client
+  // without the service ignores the packet.
+  const LABEL_COLOR = { boss: [1, 0.84, 0.35, 0.95], guardian: [0.85, 0.75, 0.55, 0.9] };
+  if (!(G.labelSig instanceof Map)) G.labelSig = new Map();
+  const within = (a, id, radius) => {
+    const w = String(get(a, 'worldOrCellDesc') || '').toLowerCase();
+    if (!w || w !== String(get(id, 'worldOrCellDesc') || '').toLowerCase()) return false;
+    const p = get(a, 'pos'), q = get(id, 'pos');
+    return Array.isArray(p) && Array.isArray(q) && Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]) <= radius;
+  };
+  const sendLabels = () => {
+    const online = onlineActors().map((a) => Number(a) >>> 0);
+    for (const a of online) {
+      const list = [];
+      for (const b of BOSSES) {
+        const f = G.fights.get(b.id);
+        if (!f) continue;
+        const r = Number(b.radius) || 5000;
+        if (f.boss && get(f.boss, 'isDead') !== true && within(a, f.boss, r)) list.push({ id: f.boss >>> 0, text: titled(b.name), color: LABEL_COLOR.boss });
+        if (f.guardian && b.guardian && get(f.guardian, 'isDead') !== true && within(a, f.guardian, r)) {
+          list.push({ id: f.guardian >>> 0, text: titled(b.guardian.name || 'the guardian'), color: LABEL_COLOR.guardian });
+        }
+      }
+      const sig = JSON.stringify(list.map((x) => [x.id, x.text]));
+      if (sig === (G.labelSig.get(a) || '[]')) continue;
+      G.labelSig.set(a, sig);
+      try { sendPacket(a, { customPacketType: 'dboActorLabels', list }); } catch (e) { /* gone */ }
+    }
+    for (const k of [...G.labelSig.keys()]) if (!online.includes(k)) G.labelSig.delete(k);
+  };
   const fightOf = (b) => { let f = G.fights.get(b.id); if (!f) { f = { boss: 0, guardian: 0, health: 1, damage: new Map(), startedAt: 0, enraged: false, waves: 0, waveZones: [] }; G.fights.set(b.id, f); } return f; };
   const toughnessOf = (b, f) => {
     if (f.enraged && b.enrage) return Number(b.enrage.toughness) || 0;
@@ -359,6 +392,7 @@ module.exports = (api) => {
     saveState();
     endFight(b, 'killed');
     writeZones();
+    try { sendLabels(); } catch (e) { log('bosses: labels failed', e.message); }
   };
 
   registerChatCommand('bossevent', (a, args) => {
@@ -388,7 +422,7 @@ module.exports = (api) => {
   }, { help: 'the bosses, and when each can reward you again' });
 
   const zonesWritten = writeZones();
-  if (BOSSES.length) every('bosses', Math.max(1, Number(C.pollSeconds) || 2) * 1000, () => { try { sweep(); } catch (e) { log('bosses: sweep failed', e.message); } });
+  if (BOSSES.length) every('bosses', Math.max(1, Number(C.pollSeconds) || 2) * 1000, () => { try { sweep(); } catch (e) { log('bosses: sweep failed', e.message); } try { sendLabels(); } catch (e) { log('bosses: labels failed', e.message); } });
   else if (typeof stopTimer === 'function') stopTimer('bosses');
   log(`bosses ${C.enabled ? 'on' : 'off'}: ${BOSSES.length} of ${DEFS.length} (${BOSSES.map((b) => b.id).join(', ') || 'none'}), ${zonesWritten} zones, lockout ${C.lockoutHours} h${DEFS.filter((b) => b.enabled === false).map((b) => `; ${b.id} waits on ${b.waitingOn || 'Nat'}`).join('')}`);
 };
