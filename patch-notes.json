@@ -1,5 +1,21 @@
 [
   {
+    "title": "The bank gem counter reopens",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Banks",
+        "items": [
+          "Banks buy gems again at 15% of their value, and sell them at three times it.",
+          "At most 500 gold a day from gem sales, per character and per account.",
+          "A hold keeps a reserve and stops buying gems for the day once its treasury reaches it."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Gemstones are rarer, and worth more",
     "date": "2026-10-25",
     "version": "Server update",
