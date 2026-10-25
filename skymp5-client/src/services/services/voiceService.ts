@@ -18,6 +18,9 @@ const GAMEPAD_PTT_DELAY_S = 0.25;
 const PTT_STUCK_MS = 300;
 // The page's guard notes (VoiceManager.js guardTick); any other text is not forwarded
 const GUARD_SHAPE = /^(open mic muted|fallback mic muted|second mic unpublished|muted mic still enabled)$/;
+// The page's LiveKit link states and its deaf watchdog's counts (missing, talking, refused, seconds)
+const LINK_SHAPE = /^(signal reconnecting|reconnecting|reconnected|disconnected \d{1,2})$/;
+const DEAF_SHAPE = /^(\d{1,3}) (\d{1,3}) (\d{1,3}) (\d{1,3})$/;
 
 // The page's mic summary, e.g. "mics 1, aec on, cap live, ctx running, mix running, loop connected"; nothing else passes
 const MIC_SHAPE = /^mics \d{1,2}(, [a-z]{2,4} [a-z?]{1,12}){1,6}$/;
@@ -282,26 +285,25 @@ export class VoiceService extends ClientListener {
       const raw = String(e.arguments[1] ?? "");
       const echo = /^(none|pending|on|off|failed|elements)( \([A-Za-z0-9 /,]{0,80}\))?$/.test(raw) ? raw : (raw.match(/^[a-z]{1,12}/) || ["?"])[0];
       const mic = String(e.arguments[4] ?? "");
-      const line = `echo loop ${echo}; activation ${chosen || "?"}${used && used !== chosen ? ` (using ${used})` : ""}${MIC_SHAPE.test(mic) ? `; ${mic}` : ""}`;
-      logTrace(this, `voice ${line}`);
-      const note = (globalThis as any).__dboDiagNote;
-      if (typeof note === "function") note("voice", line);
+      this.voiceNote(`echo loop ${echo}; activation ${chosen || "?"}${used && used !== chosen ? ` (using ${used})` : ""}${MIC_SHAPE.test(mic) ? `; ${mic}` : ""}`);
     } else if (kind === "voice::guard") {
       // The page closed a mic that was open with nothing pressed (VoiceManager.js guardTick)
       const what = String(e.arguments[1] ?? "");
       if (!GUARD_SHAPE.test(what)) return;
-      logTrace(this, `voice guard: ${what}`);
-      const note = (globalThis as any).__dboDiagNote;
-      if (typeof note === "function") note("voice", `guard: ${what}`);
+      this.voiceNote(`guard: ${what}`);
     } else if (kind === "voice::loading") {
       // The mic state before and after a loading screen, sent when it changed and once a session
       const before = String(e.arguments[1] ?? "");
       const after = String(e.arguments[2] ?? "");
       if (!MIC_SHAPE.test(before) || !MIC_SHAPE.test(after)) return;
-      const line = `loading screen: ${before === after ? `unchanged, ${after}` : `before ${before}; after ${after}`}`;
-      logTrace(this, `voice ${line}`);
-      const note = (globalThis as any).__dboDiagNote;
-      if (typeof note === "function") note("voice", line);
+      this.voiceNote(`loading screen: ${before === after ? `unchanged, ${after}` : `before ${before}; after ${after}`}`);
+    } else if (kind === "voice::link") {
+      const what = String(e.arguments[1] ?? "");
+      if (LINK_SHAPE.test(what)) this.voiceNote(`link ${what}`);
+    } else if (kind === "voice::deaf") {
+      // The page's watchdog is about to rejoin (VoiceManager.js deafTick)
+      const m = DEAF_SHAPE.exec(String(e.arguments[1] ?? ""));
+      if (m) this.voiceNote(`deaf rejoin: ${m[1]} voice(s) in range not delivered for ${m[4]} s, ${m[2]} talking, ${m[3]} not allowed`);
     } else if (kind === "voice::diag") {
       const raw = String(e.arguments[1] ?? "");
       const now = Date.now();
@@ -317,6 +319,13 @@ export class VoiceService extends ClientListener {
       this.nextTokenAttemptAt = Date.now() + TOKEN_RETRY_MS;
       logTrace(this, `voice error from front: ${e.arguments[1]}`);
     }
+  }
+
+  // A voice line in the client log and, through the diag relay, in the server's
+  private voiceNote(line: string) {
+    logTrace(this, `voice ${line}`);
+    const note = (globalThis as any).__dboDiagNote;
+    if (typeof note === "function") note("voice", line);
   }
 
   private resetSession() {
