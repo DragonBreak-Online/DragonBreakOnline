@@ -1,5 +1,21 @@
 [
   {
+    "title": "Briarhearts bare the briar",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Briarhearts",
+        "items": [
+          "A Briarheart's chest is always bare, showing the briar heart: cuirasses and robes cannot be worn over it, and come off into your pack.",
+          "In return, Briar Skin now protects like a light faction cuirass.",
+          "Gauntlets, boots, helmets and shields are worn as before. Briar Skin still quickens your stamina and resists disease."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Hagravens can take the Hagraven body",
     "date": "2026-10-25",
     "version": "Server update",

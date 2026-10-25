@@ -22,7 +22,8 @@ const HEART = 0x3ad61, GEM = 0x2e504;
 // the body (0x4), a helmet the head (0x1), an amulet slot 35 (0x20)
 const BRIAR = 0x5d008, BRIAR_EMPTY = 0x5d009, CUIRASS = 0x13ed9, HELMET = 0x12e4d, AMULET = 0xc8911;
 const WOUND = 0x7090d63, BRACERS = 0x13ec1, GREAVES = 0x6f398;   // USSEP's wound body (slot 32); a player's slot 34 and 38 pieces
-const ARMOS = { [BRIAR]: 0x20, [BRIAR_EMPTY]: 0x20, [CUIRASS]: 0x4, [HELMET]: 0x1, [AMULET]: 0x20, [WOUND]: 0x4, [BRACERS]: 0x10, [GREAVES]: 0x100 };
+const ROBE = 0x10cee5;   // a robe: clothing in the body slot (32)
+const ARMOS = { [BRIAR]: 0x20, [BRIAR_EMPTY]: 0x20, [CUIRASS]: 0x4, [HELMET]: 0x1, [AMULET]: 0x20, [WOUND]: 0x4, [BRACERS]: 0x10, [GREAVES]: 0x100, [ROBE]: 0x4 };
 const props = new Map();   // `${actor}|${prop}` -> value
 const P = (a, k) => props.get(`${a >>> 0}|${k}`);
 const setP = (a, k, v) => props.set(`${a >>> 0}|${k}`, v);
@@ -281,14 +282,17 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   const eq = (...worn) => ({ inv: { entries: worn.map((id) => ({ baseId: id, count: 1, worn: true })) } });
   const look = globalThis.__dboBriarheartEquip;
   const lookCalls = () => papyrusCalls.filter((c) => c.method === 'EquipItem');
-  // the rite with their own cuirass on: nothing shows
-  setP(MAN, 'equipment', eq(CUIRASS)); papyrusCalls.length = 0; given.length = 0; logLines.length = 0;
+  const unequips = () => papyrusCalls.filter((c) => c.method === 'UnequipItem');
+  // the grant with their own cuirass on (Nat, 25 Oct: "Briarhearts can't use chest armour"): it comes off into the pack
+  setP(MAN, 'equipment', eq(CUIRASS)); papyrusCalls.length = 0; given.length = 0; logLines.length = 0; said.length = 0;
   ML.become(MAN, 'staff', 'test');
-  ok(!lookCalls().length && !given.some(([a, id]) => a === MAN && id === BRIAR), 'their own cuirass on: no briar body given or worn');
-  // the cuirass comes off: a bare chest gets the briar body
-  setP(MAN, 'equipment', eq());
+  ok(unequips().length === 1 && unequips()[0].args[0] === '13ed9:Skyrim.esm' && inv(MAN, CUIRASS) === 1, 'their own cuirass on at the grant: it is unequipped and stays in the pack', unequips());
+  ok(said.some(([a, t]) => a === MAN && t === 'The briar in your chest will not be covered.'), '...they are told', said);
+  ok(logLines.some((l) => /briarheart: chest cover refused on char50 \(staff\): 13ed9 unequipped, kept in the pack/.test(l)), '...logged', logLines);
+  // the cuirass off: a bare chest gets the briar body
+  setP(MAN, 'equipment', eq()); globalThis.__dboBriarheart.looks.delete(MAN); papyrusCalls.length = 0; given.length = 0; logLines.length = 0;
   look(MAN, eq());
-  ok(lookCalls().some((c) => c.args[0] === '5d008:Skyrim.esm') && given.some(([a, id]) => a === MAN && id === BRIAR), 'a bare chest: the briar body is given and equipped');
+  ok(lookCalls().some((c) => c.args[0] === '5d008:Skyrim.esm') && inv(MAN, BRIAR) === 1, 'a bare chest: the briar body (given at the grant) is equipped');
   ok(logLines.some((l) => /briarheart: look on char50 \(equipment\): bare chest, 5d008:Skyrim\.esm equipped \(try 1\)/.test(l)), '...and logged', logLines);
   papyrusCalls.length = 0; look(MAN, eq());
   ok(!lookCalls().length, 'a second report within retrySeconds does not equip again');
@@ -299,10 +303,19 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   // the briar body shows in the equipment: done
   papyrusCalls.length = 0; look(MAN, eq(BRIAR, HELMET));
   ok(!lookCalls().length && !globalThis.__dboBriarheart.looks.has(MAN), 'the briar body worn: nothing more to do');
-  // their own armour back on: the briar body leaves the pack
-  logLines.length = 0; look(MAN, eq(CUIRASS));
-  ok(inv(MAN, BRIAR) === 0 && inv(MAN, CUIRASS) === 1, 'their cuirass back on: the briar body leaves the pack (nothing to steal)');
-  ok(logLines.some((l) => /look off on char50 \(equipment\): own body armour 13ed9 on, 1 briar piece taken from the pack/.test(l)), '...and logged', logLines);
+  // the cuirass put back on: it comes off again, the briar body stays theirs; within the minute nobody is told twice
+  logLines.length = 0; papyrusCalls.length = 0; said.length = 0; look(MAN, eq(CUIRASS));
+  ok(unequips().length === 1 && inv(MAN, CUIRASS) === 1 && inv(MAN, BRIAR) === 1, 'the cuirass put back on: unequipped again; the briar body is not taken');
+  ok(!said.some(([a]) => a === MAN) && !logLines.some((l) => /chest cover refused/.test(l)), '...not told again within the minute');
+  globalThis.__dboBriarheart.coverTold.set(MAN, Date.now() - 61000); said.length = 0; look(MAN, eq(CUIRASS));
+  ok(said.filter(([a, t]) => a === MAN && /will not be covered/.test(t)).length === 1, '...a minute on: told again');
+  // a robe in the body slot is refused the same way
+  papyrusCalls.length = 0; look(MAN, eq(ROBE));
+  ok(unequips().some((c) => c.args[0] === `${ROBE.toString(16)}:Skyrim.esm`), 'a robe (body slot) comes off too', unequips());
+  // in a beast form the look is left alone (the race swap dresses the beast)
+  setP(MAN, 'private.beast', { form: 'werewolf', original: { raceId: 1 } }); papyrusCalls.length = 0; look(MAN, eq(CUIRASS));
+  ok(!papyrusCalls.length, 'in a beast form: nothing unequipped or equipped');
+  setP(MAN, 'private.beast', null); globalThis.__dboBriarheart.looks.delete(MAN);
   // equips that never show stop after maxTries
   logLines.length = 0;
   for (let k = 0; k < 5; k++) { const L = globalThis.__dboBriarheart.looks.get(MAN); if (L) L.at = 0; look(MAN, eq()); }
@@ -346,11 +359,10 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   // stays in the pack, the player is told once a minute at most, and the briar body goes on
   ML.become(MAN, 'staff', 'amulet test'); globalThis.__dboBriarheart.looks.delete(MAN);
   setP(MAN, 'inventory', { entries: [{ baseId: AMULET, count: 1 }] }); papyrusCalls.length = 0; logLines.length = 0; said.length = 0;
-  const unequips = () => papyrusCalls.filter((c) => c.method === 'UnequipItem');
   look(MAN, eq(AMULET));
   ok(unequips().length === 1 && unequips()[0].args[0] === 'c8911:Skyrim.esm' && unequips()[0].args[1] === false, 'a bare chest with an amulet: the amulet is unequipped', unequips());
   ok(inv(MAN, AMULET) === 1, '...and stays in the pack');
-  ok(said.some(([a, t]) => a === MAN && /Your briar heart leaves no room for an amulet\. It stays in your pack: wear body armour over the briar, and you may wear one\./.test(t)), '...the player is told, with the body armour way out', said);
+  ok(said.some(([a, t]) => a === MAN && t === 'Your briar heart leaves no room for an amulet. It stays in your pack.'), '...the player is told', said);
   ok(logLines.some((l) => /briarheart: amulet refused on char50 \(equipment\): c8911 unequipped, kept in the pack/.test(l)), '...logged', logLines);
   ok(lookCalls().some((c) => c.args[0] === '5d008:Skyrim.esm'), '...and the briar chest goes on in its slot');
   // put back on at once, five times: unequipped each time, told and logged once
@@ -359,9 +371,9 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   ok(unequips().length === 5 && !said.some(([a]) => a === MAN) && !logLines.some((l) => /amulet refused/.test(l)), 'put back five times within the minute: unequipped each time, no second message or log line');
   globalThis.__dboBriarheart.amuletTold.set(MAN, Date.now() - 61000); look(MAN, eq(AMULET));
   ok(said.filter(([a]) => a === MAN).length === 1, 'a minute on: told again');
-  // body armour on: no briar chest, and the amulet is allowed
+  // body armour no longer opens the amulet: both come off
   papyrusCalls.length = 0; said.length = 0; look(MAN, eq(CUIRASS, AMULET));
-  ok(!unequips().length && !said.some(([a]) => a === MAN), 'body armour on: the amulet is allowed, nothing unequipped, nothing said');
+  ok(unequips().map((c) => c.args[0]).sort().join() === '13ed9:Skyrim.esm,c8911:Skyrim.esm', 'a cuirass and an amulet: both come off (the chest is never covered)', unequips());
   ML.end(MAN, 'amulet test done');
 }
 
@@ -377,9 +389,9 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
       giveItem: (a, id, n) => { const e = ((P(a, 'inventory') || {}).entries || []).slice(); e.push({ baseId: id, count: n }); setP(a, 'inventory', { entries: e }); return true; }, sourceResistsOf: () => new Set(),
     });
   };
-  const SKIN = { enabled: true, armorFrom: 'd8d50:Skyrim.esm', staminaRegen: 1.25, diseaseResist: 50 };
+  const SKIN = { enabled: true, armor: 38, staminaRegen: 1.25, diseaseResist: 50 };
   const MS = loadSkin(SKIN);
-  globalThis.__dboBriarSkinRating = () => 21;   // gamemode.js's: ForswornCuirass 26 less the briar body's 5, no multipliers
+  globalThis.__dboBriarSkinRating = () => 33;   // gamemode.js's: the light faction cuirass 38 less the briar body's 5, no multipliers
   const BH = actor(0x60, 1, 'reach', [0, 0, 0], []); online.push(BH);
   const eq = (...worn) => ({ inv: { entries: worn.map((id) => ({ baseId: id, count: 1, worn: true })) } });
   const report = globalThis.__dboBriarheartEquip;
@@ -389,19 +401,19 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   papyrusCalls.length = 0; logLines.length = 0;
   report(BH, eq(BRIAR, HELMET));
   const s = globalThis.__dboBriarSkinArmor(BH);
-  ok(s && s.from === 0xd8d50 && s.shown === BRIAR, 'the briar chest shows: the skin counts as the Forsworn cuirass, over the briar body', s);
+  ok(s && s.rating === 38 && !s.from && s.shown === BRIAR, 'the briar chest shows: the skin counts as a light faction cuirass (38), over the briar body', s);
   ok(globalThis.__dboBriarRegenMult(BH, 'stamina') === 1.25 && globalThis.__dboBriarRegenMult(BH, 'magicka') === 1 && globalThis.__dboBriarRegenMult(BH, 'health') === 1, 'stamina regeneration x1.25, and nothing else');
   ok(avCalls().length === 1 && avCalls()[0].args[0] === 'DiseaseResist' && avCalls()[0].args[1] === 50, 'DiseaseResist 50 is sent through the server Papyrus', avCalls());
-  ok(logLines.some((l) => /briarheart: skin on char60 \(equipment\): armour as d8d50:Skyrim\.esm \(\+21\.0 over the briar body\), stamina regeneration x1\.25, DiseaseResist 50/.test(l)), '...and logged', logLines);
+  ok(logLines.some((l) => /briarheart: skin on char60 \(equipment\): armour as a faction cuirass \(38\) \(\+33\.0 over the briar pieces\), stamina regeneration x1\.25, DiseaseResist 50/.test(l)), '...and logged', logLines);
   papyrusCalls.length = 0; logLines.length = 0; report(BH, eq(BRIAR));
   ok(!avCalls().length && !logLines.some((l) => /skin/.test(l)), 'a second report: no repeat, no second SetActorValue');
+  // a cuirass reported worn (being taken off) never stacks with the skin: off until the bare chest is reported again
   report(BH, eq(BRIAR, CUIRASS));
-  ok(globalThis.__dboBriarSkinArmor(BH) === null && globalThis.__dboBriarRegenMult(BH, 'stamina') === 1, 'body armour on: the skin is off, the cuirass counts instead');
+  ok(globalThis.__dboBriarSkinArmor(BH) === null && globalThis.__dboBriarRegenMult(BH, 'stamina') === 1, 'a cuirass reported worn: the skin is off meanwhile (never both)');
+  ok(papyrusCalls.some((c) => c.method === 'UnequipItem' && c.args[0] === '13ed9:Skyrim.esm'), '...and the cuirass is unequipped');
   ok(avCalls().length === 1 && avCalls()[0].args[1] === 0 && logLines.some((l) => /briarheart: skin off char60 \(equipment\), DiseaseResist 0/.test(l)), '...DiseaseResist back to 0, logged', logLines);
-  logLines.length = 0; report(BH, eq(CUIRASS));
-  ok(!logLines.some((l) => /skin/.test(l)), 'still armoured: no repeat');
   report(BH, eq(BRIAR));
-  ok(!!globalThis.__dboBriarSkinArmor(BH), 'the armour off and the briar chest back: the skin is on again');
+  ok(!!globalThis.__dboBriarSkinArmor(BH), 'the cuirass gone and the briar chest reported: the skin is on again');
   // a new client: the skin turns on afresh at login, so DiseaseResist reaches the new engine
   papyrusCalls.length = 0; setP(BH, 'equipment', eq(BRIAR)); globalThis.__dboBriarheartLogin(BH);
   ok(avCalls().some((c) => c.args[1] === 50), 'login: DiseaseResist is sent again to the new client', avCalls());
@@ -411,12 +423,16 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   const BW = actor(0x61, 1, 'reach', [0, 0, 0], []); online.push(BW); setP(BW, 'appearance', { raceId: 1, isFemale: true });
   MS.become(BW, 'staff', 'woman'); report(BW, eq(BRIAR));
   ok(globalThis.__dboBriarSkinArmor(BW) === null, 'a woman (no briar chest shown): no skin');
-  loadSkin(Object.assign({}, SKIN, { enabled: false })); MS.become(BH, 'staff', 'off test'); report(BH, eq(BRIAR));
+  loadSkin(Object.assign({}, SKIN, { enabled: false })); MS.become(BH, 'staff', 'off test'); globalThis.__dboBriarheartEquip(BH, eq(BRIAR));
   ok(globalThis.__dboBriarSkinArmor(BH) === null && globalThis.__dboBriarRegenMult(BH, 'stamina') === 1, 'briarSkin off: nothing');
+  // no rating of its own: the cuirass armorFrom names is counted instead (the earlier setting)
+  loadSkin({ enabled: true, armor: 0, armorFrom: 'd8d50:Skyrim.esm', staminaRegen: 1.25, diseaseResist: 0 }); globalThis.__dboBriarheartEquip(BH, eq(BRIAR));
+  const old = globalThis.__dboBriarSkinArmor(BH);
+  ok(old && old.from === 0xd8d50 && !old.rating, 'armor 0 with armorFrom: the named cuirass counts', old);
   delete globalThis.__dboBriarSkinRating;
-  // the arithmetic gamemode.js does: a bare-chested Briarheart's hit lands as a Forsworn cuirass wearer's would
+  // the arithmetic gamemode.js does: a bare-chested Briarheart's hit lands as a light faction cuirass wearer's would
   const scale = 0.12, cap = 80, kept = (r) => 1 - Math.min(r * scale, cap) / 100;
-  ok(Math.abs(kept(5) * (kept(5 + 21) / kept(5)) - kept(26)) < 1e-12, 'the skin\'s factor on top of the engine\'s briar-body 5 equals a worn Forsworn cuirass (26)');
+  ok(Math.abs(kept(5) * (kept(5 + 33) / kept(5)) - kept(38)) < 1e-12, 'the skin\'s factor on top of the engine\'s briar-body 5 equals a worn light faction cuirass (38)');
 }
 // ---- the server's Papyrus takes base records as 'espm', and a refused call is reported as refused (dev, 25 Oct) ------------
 {
@@ -471,12 +487,12 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   // only the heart worn (the wound slipped): the wound body goes back on, the heart is not equipped twice
   globalThis.__dboBriarheart.looks.delete(BW); papyrusCalls.length = 0; look(BW, eq(BRIAR, BRACERS, GREAVES));
   ok(equips().join() === '90d63:unofficial skyrim special edition patch.esp', 'the heart worn but not the wound: only the wound body is equipped', equips());
-  // own body armour on: both briar pieces leave the pack, the player's armour, bracers and greaves are untouched
+  // own body armour put on: only the cuirass comes off; the bracers and greaves stay worn, the briar pieces stay theirs
   setP(BW, 'inventory', { entries: [{ baseId: BRACERS, count: 1 }, { baseId: GREAVES, count: 1 }, { baseId: CUIRASS, count: 1 }, { baseId: WOUND, count: 1 }, { baseId: BRIAR, count: 1 }] });
   papyrusCalls.length = 0; logLines.length = 0; look(BW, eq(CUIRASS, BRACERS, GREAVES));
-  ok(inv(BW, WOUND) === 0 && inv(BW, BRIAR) === 0 && inv(BW, CUIRASS) === 1 && inv(BW, BRACERS) === 1 && inv(BW, GREAVES) === 1, 'own body armour on: the heart and the wound body leave the pack; the cuirass, bracers and greaves stay');
-  ok(!papyrusCalls.some((c) => c.method === 'UnequipItem') && logLines.some((l) => /look off on char80 \(equipment\): own body armour 13ed9 on, 2 briar pieces taken from the pack/.test(l)), '...nothing of theirs unequipped, and logged', logLines);
-  ok(!globalThis.__dboBriarSkinArmor(BW), '...and the briar skin is off');
+  const offs = papyrusCalls.filter((c) => c.method === 'UnequipItem').map((c) => c.args[0]);
+  ok(offs.join() === '13ed9:Skyrim.esm' && inv(BW, WOUND) === 1 && inv(BW, BRIAR) === 1 && inv(BW, CUIRASS) === 1, 'a cuirass on: it alone is unequipped (kept in the pack); bracers and greaves stay on, the briar pieces stay', offs);
+  ok(!globalThis.__dboBriarSkinArmor(BW), '...and the briar skin is off while the cuirass is reported worn');
   // the heart torn out: the empty chest replaces the heart, the wound body stays
   setP(BW, 'inventory', { entries: [{ baseId: WOUND, count: 1 }, { baseId: BRIAR, count: 1 }] }); setP(BW, 'equipment', eq(WOUND, BRIAR));
   downed.add(BW); globalThis.__dboIsDowned = (a) => downed.has(a >>> 0);
@@ -504,7 +520,8 @@ ok(gcfg.briarheart && gcfg.briarheart.enabled === false, 'the shipped config has
 ok(/const extra = fleshArmorOf\(targetId\) \+ briarSkinArmorOf\(targetId\)/.test(src('gamemode.js')) && /__dboBriarSkinArmor\(targetId >>> 0\)/.test(src('gamemode.js')) && /__dboBriarSkinRating = briarSkinArmorOf/.test(src('gamemode.js')), 'gamemode.js counts the skin on the hit, with the Flesh spells');
 ok(/__dboBriarRegenMult\(a, stat\)/.test(src('racial.js')), 'racial.js multiplies the regeneration by the skin');
 const bs = gcfg.briarheart.briarSkin || {};
-ok(bs.enabled === true && bs.armorFrom === 'd8d50:Skyrim.esm' && bs.staminaRegen === 1.25 && bs.diseaseResist === 50, 'the shipped briarSkin: on (with the module), Forsworn cuirass, stamina x1.25, DiseaseResist 50', bs);
+ok(bs.enabled === true && bs.armor === 38 && !bs.armorFrom && bs.staminaRegen === 1.25 && bs.diseaseResist === 50, 'the shipped briarSkin: on (with the module), a light faction cuirass (38), stamina x1.25, DiseaseResist 50', bs);
+ok(/Number\(s\.rating\) > 0 \? \{ rating: Number\(s\.rating\), counted: Number\(s\.rating\), heavy: false \}/.test(src('gamemode.js')), 'gamemode.js counts a rating of its own as a light piece');
 
 Math.random = realRandom;
 process.chdir(cwd);
