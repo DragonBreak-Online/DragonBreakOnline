@@ -602,7 +602,12 @@ module.exports = (api) => {
   // A deity with no spell can name its regeneration in skills.json (blessingRegen: { HealRateMult: 50 }, same units).
   // Nothing is added to the dead or the downed, to a bar already full, or past what Death's Chill allows (its rate factor
   // for that bar, 0 at its cap: downed.js). Steps under minStep wait in regenOwed, so a slow boon is not a packet a second.
-  const REGEN = Object.assign({ enabled: true, tickSeconds: 1, minStep: 0.002 }, CFG.blessingRegen || {});
+  // A write replaces the client's bar, and the server's bar is the client's last report (at most one a second), so a write
+  // from an old report takes back the client's own regen since then: Akatosh's 0.003 a second, written from a report most
+  // of a second old, left magicka refilling at about a fifth of its speed (Marcus, 24 Oct). So, as racial.js has done since
+  // 10 Oct, the tick runs every 0.25 s, pays a bar only on the tick a fresh report of it arrives, and pays at least
+  // payoutSeconds of the bar's own regen at once, so the gift outweighs what a write takes back.
+  const REGEN = Object.assign({ enabled: true, tickSeconds: 0.25, minStep: 0.002, payoutSeconds: 1 }, CFG.blessingRegen || {});
   const REGEN_TICK_MS = Math.max(250, Math.round((Number(REGEN.tickSeconds) || 1) * 1000));
   const REGEN_MIN_STEP = Math.max(0, Number(REGEN.minStep) || 0);
   // libespm ActorValue.h: index -> [the bar, a rate or a Mult]
@@ -714,21 +719,32 @@ module.exports = (api) => {
       let downed = false; try { downed = typeof globalThis.__dboIsDowned === 'function' && !!globalThis.__dboIsDowned(a); } catch (e) { downed = false; }
       if (!pc || !(Number(pc.health) > 0) || downed || !(secs > 0)) { owed.health = owed.magicka = owed.stamina = 0; continue; }
       const next = { health: Number(pc.health), magicka: Number(pc.magicka), stamina: Number(pc.stamina) };
-      let changed = false;
+      // A bar is fresh when its stored float32 moved since this tick last saw it (a report, or another module's write)
+      const seen = owed.seen && typeof owed.seen === 'object' ? owed.seen : (owed.seen = {});
+      const paid = [];
       for (const stat of ['health', 'magicka', 'stamina']) {
-        let add = 0, gear = 0;
-        for (const e of list) if (e.stat === stat) { if (e.gear) gear += regenPerSecond(a, e); else add += regenPerSecond(a, e) * secs; }
+        const v = Math.fround(next[stat]);
+        const fresh = seen[stat] !== v;
+        seen[stat] = v;
+        let per = 0, gear = 0;
+        for (const e of list) if (e.stat === stat) { if (e.gear) gear += regenPerSecond(a, e); else per += regenPerSecond(a, e); }
         // Worn gear adds to a blessing, its own share at most gearRegenCap of the bar's base rate
-        if (gear > 0) add += Math.min(gear, gearRegenCapOf() * raceRateOf(a, stat) / 100 * REGEN_MULT) * secs;
-        add *= chillOf(a, stat);
-        if (!(next[stat] < 1) || !(add > 0)) { owed[stat] = 0; continue; }
-        owed[stat] += add;
-        if (owed[stat] < REGEN_MIN_STEP) continue;
+        if (gear > 0) per += Math.min(gear, gearRegenCapOf() * raceRateOf(a, stat) / 100 * REGEN_MULT);
+        const chill = chillOf(a, stat);
+        per *= chill;
+        if (!(next[stat] < 1) || !(per > 0)) { owed[stat] = 0; continue; }
+        const own = raceRateOf(a, stat) / 100 * REGEN_MULT * chill; // the bar's own regen a second
+        const step = Math.max(REGEN_MIN_STEP, own * Math.max(0, Number(REGEN.payoutSeconds) || 0));
+        // Owed stops at a step plus 1.5 s of gift: a pause (a menu, a held spell) is not paid as one jump
+        owed[stat] = Math.min(owed[stat] + per * secs, step + per * 1.5);
+        if (!fresh) continue;
+        const fillsFirst = next[stat] + own >= 1 && owed[stat] >= own * 0.5;
+        if (owed[stat] < step && !fillsFirst) continue;
         next[stat] = Math.min(1, next[stat] + owed[stat]);
         owed[stat] = 0;
-        changed = true;
+        paid.push(stat);
       }
-      if (changed) { try { mp.set(a, 'percentages', next); } catch (e) { regenOwed.delete(a); } }
+      if (paid.length) { try { mp.set(a, 'percentages', next); for (const stat of paid) seen[stat] = Math.fround(next[stat]); } catch (e) { regenOwed.delete(a); } }
     }
     for (const a of [...regenOwed.keys()]) if (!here.has(a)) regenOwed.delete(a);
   });
