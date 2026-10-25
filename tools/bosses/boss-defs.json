@@ -1,0 +1,1028 @@
+{
+ "_comment": "The bosses' definitions (Nat, 25 Oct: \"other than the dragon priest we should develop other bosses people could grind for special drops/schematics\"; design _work/boss-roster-design-1025.md on the PC). Read by tools/bosses/bosses_build.py, which resolves every editor id and desc against the load order, picks each spot's anchor and writes bosses.json for bosses.js. spots: candidates, the first is used; a boss with enabled false waits on Nat (his eye on the spot, or an item still being built). bossEdid / addEdids: NPC_ or LVLN editor ids. drops: always [[desc, count]] or alwaysEdid [[editor id, count]] (looked up and checked), shards { desc, count, top } (an item made for this boss, filled in once it exists), schematic { family, chance } (smithing.json family; a smith who knows it gets knownBonus of the shards instead), extra [[desc, chance, count]]. waves: at a share of the boss's health, n adds of addEdids. night: true writes its zones only at night (worldclock.js), a fight in progress running on; event { minutes, waveEverySeconds, waveSize } writes them only while a staff-started event lasts (/bossevent <id>), with a wave every waveEverySeconds. Seconds throughout.",
+ "bosses": [
+  {
+   "id": "icecap",
+   "name": "the Wraith of the Ice Cap",
+   "enabled": false,
+   "waitingOn": "Nat's choice of spot (S1-S4), and the restart DLE 743a8952 that carries the shard",
+   "hold": "winterhold",
+   "world": "3c:Skyrim.esm",
+   "spots": [
+    {
+     "id": "S1",
+     "pos": [
+      116555,
+      112027,
+      -7409
+     ],
+     "note": "the open snowfield NE of Winterhold, 41 flat drifts, cell (28, 27); its anchor is from Obscure's College of Winterhold, so check the College's grounds"
+    },
+    {
+     "id": "S2",
+     "pos": [
+      119754,
+      112980,
+      -8882
+     ],
+     "note": "the glacier's edge, cell (29, 27)"
+    },
+    {
+     "id": "S3",
+     "pos": [
+      121379,
+      121316,
+      -10718
+     ],
+     "note": "drifts on an iceberg beyond the cliffs, cell (29, 29)"
+    },
+    {
+     "id": "S4",
+     "pos": [
+      115771,
+      141550,
+      -14321
+     ],
+     "note": "iceberg ledges at sea level, the Sea of Ghosts, cell (28, 34)"
+    }
+   ],
+   "bossEdid": "EncIceWraith",
+   "addEdids": [
+    "EncIceWraith"
+   ],
+   "openingAdds": 3,
+   "waves": [
+    [
+     0.66,
+     3
+    ],
+    [
+     0.33,
+     3
+    ]
+   ],
+   "toughness": 0.9,
+   "damageMult": 4,
+   "enrageSeconds": 480,
+   "enrage": {
+    "toughness": 0.5,
+    "damageMult": 6
+   },
+   "respawnSeconds": 10800,
+   "radius": 6000,
+   "announce": {
+    "spawn": "Something cold stirs on the ice above Winterhold.",
+    "death": "The cold above Winterhold breaks."
+   },
+   "drops": {
+    "always": [
+     [
+      "3ad5f:Skyrim.esm",
+      2
+     ]
+    ],
+    "shards": {
+     "desc": "1d2201:DragonBreak Online Edits.esp",
+     "count": 5,
+     "top": 7,
+     "confirmedBy": "DBO_OreGlacialCrystal, the Glacial Crystal Shard (Worker 2's DragonBreak Glacial.esp, merged by Worker 3 into the restart DLE 743a8952 and read back from it, 25 Oct); 4 shards + 1 Frost Salts -> 2 ingots at the smelter"
+    },
+    "schematic": {
+     "family": "glacial_crystal",
+     "chance": 0.03,
+     "knownBonus": 2
+    }
+   }
+  },
+  {
+   "id": "briarheartking",
+   "name": "the Briarheart King",
+   "enabled": true,
+   "hold": "markarth",
+   "world": "3c:Skyrim.esm",
+   "spots": [
+    {
+     "id": "LV",
+     "pos": [
+      -92100,
+      -41500,
+      1786.79
+     ],
+     "heading": 352.8,
+     "note": "Lost Valley Redoubt's upper platform, by its hagravens (camp boss spot 34129:Skyrim.esm)"
+    }
+   ],
+   "bossEdid": "LvlForswornBossShaman",
+   "guardian": {
+    "edid": "EncHagraven",
+    "offset": [
+     200,
+     120,
+     -60
+    ],
+    "name": "the King's Hagraven",
+    "bossToughnessWhileAlive": 0.85
+   },
+   "addEdids": [
+    "LvlForswornMelee",
+    "LvlForswornMissile"
+   ],
+   "openingAdds": 0,
+   "waves": [
+    [
+     0.66,
+     2
+    ],
+    [
+     0.33,
+     3
+    ]
+   ],
+   "toughness": 0.4,
+   "damageMult": 1.5,
+   "enrageSeconds": 480,
+   "enrage": {
+    "toughness": 0.2,
+    "damageMult": 2.5
+   },
+   "respawnSeconds": 7200,
+   "radius": 6000,
+   "excludeBriarhearts": true,
+   "announce": {
+    "spawn": "The Forsworn of Lost Valley have crowned a Briarheart King.",
+    "death": "The Briarheart King of Lost Valley has fallen."
+   },
+   "drops": {
+    "always": [
+     [
+      "3ad61:Skyrim.esm",
+      1
+     ]
+    ],
+    "schematic": {
+     "family": "silver",
+     "chance": 0.05,
+     "knownBonus": 0
+    }
+   }
+  },
+  {
+   "id": "centurion",
+   "name": "the Centurion Master",
+   "enabled": true,
+   "hold": "",
+   "world": "1ee62:Skyrim.esm",
+   "spots": [
+    {
+     "id": "PS",
+     "pos": [
+      15456.31,
+      13746.16,
+      1061.07
+     ],
+     "note": "Blackreach's pump station, beside its centurion spot (b10e11b)"
+    }
+   ],
+   "bossEdid": "EncDwarvenCenturion03",
+   "addEdids": [
+    "EncDwarvenSphere03",
+    "EncDwarvenSpider03"
+   ],
+   "openingAdds": 0,
+   "waves": [
+    [
+     0.66,
+     2
+    ],
+    [
+     0.33,
+     3
+    ]
+   ],
+   "toughness": 0.6,
+   "damageMult": 1.5,
+   "enrageSeconds": 360,
+   "enrage": {
+    "toughness": 0.3,
+    "damageMult": 2.5
+   },
+   "respawnSeconds": 14400,
+   "radius": 4000,
+   "announce": {
+    "spawn": "Steam hisses through Blackreach: the Centurion Master wakes.",
+    "death": "The Centurion Master of Blackreach is still."
+   },
+   "drops": {
+    "always": [],
+    "schematic": {
+     "family": "dwarven",
+     "chance": 0.08,
+     "knownBonus": 0
+    },
+    "extraSchematic": {
+     "family": "mithril",
+     "chance": 0.01
+    },
+    "extraEdid": [
+     [
+      "DLC2HeartStone",
+      0.05,
+      1
+     ]
+    ],
+    "_extra": "A Heart Stone, rare (Nat, 25 Oct: the Dwemer tapped the Heart of Lorkhan; Heart Stones feed the staff crafting Nat is opening)"
+   }
+  },
+  {
+   "id": "palewarlord",
+   "name": "the Warlord of the Pale Pass",
+   "enabled": false,
+   "waitingOn": "Nat's eye on the three spots on the Bruma side of the Pale Pass road",
+   "hold": "bruma",
+   "world": "a764b:BSHeartland.esm",
+   "spots": [
+    {
+     "id": "SR",
+     "pos": [
+      60719,
+      249420,
+      15404
+     ],
+     "note": "by Snowstone Rest"
+    },
+    {
+     "id": "ST",
+     "pos": [
+      58987,
+      242571,
+      14076
+     ],
+     "note": "on Serpent's Trail (14, 59)"
+    },
+    {
+     "id": "SE",
+     "pos": [
+      64214,
+      232252,
+      11359
+     ],
+     "note": "below The Sentinel (16,000 units from Cloud Ruler Temple)"
+    }
+   ],
+   "roam": true,
+   "bossEdid": "CYRLvlBanditBoss",
+   "addEdids": [
+    "CYRLvlBanditMeleeAny",
+    "CYRLvlBanditMissile"
+   ],
+   "openingAdds": 2,
+   "waves": [
+    [
+     0.5,
+     3
+    ]
+   ],
+   "toughness": 0.5,
+   "damageMult": 1.25,
+   "enrageSeconds": 360,
+   "enrage": {
+    "toughness": 0.25,
+    "damageMult": 2
+   },
+   "respawnSeconds": 7200,
+   "radius": 6000,
+   "announce": {
+    "spawn": "A warlord's horn sounds on the Pale Pass road.",
+    "death": "The Warlord of the Pale Pass is dead."
+   },
+   "drops": {
+    "always": [
+     [
+      "f:Skyrim.esm",
+      150
+     ]
+    ],
+    "schematic": {
+     "family": "scaled",
+     "chance": 0.05,
+     "knownBonus": 0
+    },
+    "extraSchematic": {
+     "family": "steelplate",
+     "chance": 0.03
+    }
+   }
+  },
+  {
+   "id": "falmerwarmonger",
+   "name": "the Falmer Warmonger",
+   "enabled": true,
+   "hold": "",
+   "world": "1ee62:Skyrim.esm",
+   "spots": [
+    {
+     "id": "BC",
+     "pos": [
+      6894.26,
+      7152.59,
+      1374.45
+     ],
+     "note": "Blackreach's Falmer city, beside its heavy Falmer spot (b1d1f5f)"
+    }
+   ],
+   "bossEdid": "EncFalmer05MeleeBoss",
+   "guardian": {
+    "edid": "LvlFalmerShaman",
+    "offset": [
+     220,
+     -140,
+     0
+    ],
+    "name": "the Warmonger's shaman",
+    "bossToughnessWhileAlive": 0.75
+   },
+   "addEdids": [
+    "LvlChaurus",
+    "LvlFalmerMelee"
+   ],
+   "openingAdds": 2,
+   "waves": [
+    [
+     0.66,
+     2
+    ],
+    [
+     0.33,
+     3
+    ]
+   ],
+   "toughness": 0.5,
+   "damageMult": 1.5,
+   "enrageSeconds": 420,
+   "enrage": {
+    "toughness": 0.25,
+    "damageMult": 2.5
+   },
+   "respawnSeconds": 10800,
+   "radius": 4000,
+   "announce": {
+    "spawn": "War drums beat in the Falmer city of Blackreach.",
+    "death": "The Falmer Warmonger of Blackreach is dead."
+   },
+   "drops": {
+    "alwaysEdid": [
+     [
+      "ChaurusChitin",
+      3
+     ]
+    ],
+    "schematic": {
+     "family": "falmer_honed",
+     "chance": 0.06,
+     "knownBonus": 0
+    }
+   }
+  },
+  {
+   "id": "movarth",
+   "name": "the Master of Movarth's Lair",
+   "enabled": true,
+   "hold": "morthal",
+   "world": "3c:Skyrim.esm",
+   "night": true,
+   "spots": [
+    {
+     "id": "ML",
+     "pos": [
+      -31704,
+      77495,
+      -13444
+     ],
+     "note": "the marsh at the mouth of Movarth's Lair, Hjaalmarch"
+    }
+   ],
+   "bossEdid": "dunMovarthVampireBoss",
+   "addEdids": [
+    "LvlVampire"
+   ],
+   "openingAdds": 2,
+   "waves": [
+    [
+     0.5,
+     3
+    ]
+   ],
+   "toughness": 0.5,
+   "damageMult": 1.5,
+   "enrageSeconds": 420,
+   "enrage": {
+    "toughness": 0.25,
+    "damageMult": 2.5
+   },
+   "respawnSeconds": 10800,
+   "radius": 5000,
+   "announce": {
+    "spawn": "Night falls on Hjaalmarch, and something old wakes in Movarth's Lair.",
+    "death": "The Master of Movarth's Lair is ash."
+   },
+   "drops": {
+    "alwaysEdid": [
+     [
+      "VampireDust",
+      3
+     ]
+    ],
+    "schematic": {
+     "family": "steelplate",
+     "chance": 0.06,
+     "knownBonus": 0
+    },
+    "extraSchematic": {
+     "family": "glass",
+     "chance": 0.01
+    }
+   }
+  },
+  {
+   "id": "duskthorn",
+   "name": "the Warchief of Dusk Thorn",
+   "enabled": true,
+   "hold": "bruma",
+   "world": "a764b:BSHeartland.esm",
+   "spots": [
+    {
+     "id": "DT",
+     "pos": [
+      70061.82,
+      179794.61,
+      -4048.07
+     ],
+     "note": "Dusk Thorn Camp, by its boss chest"
+    }
+   ],
+   "bossEdid": "CYREncGoblinDeepRoot03BossMelee",
+   "guardian": {
+    "edid": "CYREncGoblinDeepRoot02BossMagic",
+    "offset": [
+     180,
+     160,
+     0
+    ],
+    "name": "the Warchief's shaman",
+    "bossToughnessWhileAlive": 0.8
+   },
+   "addEdids": [
+    "CYRLvlGoblinMelee",
+    "CYRLvlGoblinMissile"
+   ],
+   "openingAdds": 2,
+   "waves": [
+    [
+     0.5,
+     3
+    ]
+   ],
+   "toughness": 0.35,
+   "damageMult": 1.2,
+   "enrageSeconds": 360,
+   "enrage": {
+    "toughness": 0.15,
+    "damageMult": 2
+   },
+   "respawnSeconds": 5400,
+   "radius": 5000,
+   "announce": {
+    "spawn": "The goblins of Dusk Thorn have a Warchief again.",
+    "death": "The Warchief of Dusk Thorn is dead."
+   },
+   "drops": {
+    "always": [
+     [
+      "f:Skyrim.esm",
+      60
+     ]
+    ],
+    "schematic": {
+     "family": "elven",
+     "chance": 0.05,
+     "knownBonus": 0
+    }
+   }
+  },
+  {
+   "id": "valkynaz",
+   "name": "the Valkynaz of the Great Gate",
+   "enabled": true,
+   "hold": "",
+   "world": "3c:Skyrim.esm",
+   "event": {
+    "minutes": 30,
+    "waveEverySeconds": 300,
+    "waveSize": 3
+   },
+   "spots": [
+    {
+     "id": "GG",
+     "pos": [
+      -231,
+      43919,
+      2640
+     ],
+     "note": "The Great Oblivion Gate (its map marker)"
+    }
+   ],
+   "bossEdid": "EncDremoraMelee06",
+   "addEdids": [
+    "EncDremoraWarlock06",
+    "EncDremoraMelee05"
+   ],
+   "openingAdds": 3,
+   "waves": [
+    [
+     0.5,
+     3
+    ]
+   ],
+   "toughness": 0.6,
+   "damageMult": 1.5,
+   "enrageSeconds": 600,
+   "enrage": {
+    "toughness": 0.3,
+    "damageMult": 2.5
+   },
+   "respawnSeconds": 1000000000,
+   "radius": 6000,
+   "announce": {
+    "spawn": "The Great Oblivion Gate burns open: a Valkynaz steps through.",
+    "death": "The Valkynaz of the Great Gate is banished."
+   },
+   "drops": {
+    "alwaysEdid": [
+     [
+      "DaedraHeart",
+      1
+     ]
+    ],
+    "schematic": {
+     "family": "glass",
+     "chance": 0.03,
+     "knownBonus": 0
+    },
+    "always": [
+     [
+      "f:Skyrim.esm",
+      200
+     ]
+    ],
+    "_note": "No Ebony: it is never loot (dungeons.js BANNED_LOOT; its schematic only from a Master Scholar's reading)"
+   }
+  },
+  {
+   "id": "karstaag",
+   "name": "Karstaag",
+   "enabled": false,
+   "waitingOn": "Solstheim, closed by the region lock (playtest.closedPlugins, Nate 14-15 Oct): turn it on when Solstheim opens (bosses.karstaag.enabled true)",
+   "hold": "",
+   "world": "800:Dragonborn.esm",
+   "spots": [
+    {
+     "id": "CK",
+     "pos": [
+      33312,
+      89920,
+      6294
+     ],
+     "note": "Castle Karstaag Ruins (its map marker), Solstheim"
+    }
+   ],
+   "bossEdid": "DLC2dunKarstaag",
+   "addEdids": [
+    "EncIceWraith"
+   ],
+   "openingAdds": 2,
+   "waves": [
+    [
+     0.66,
+     3
+    ],
+    [
+     0.33,
+     3
+    ]
+   ],
+   "toughness": 0.5,
+   "damageMult": 1.25,
+   "enrageSeconds": 600,
+   "enrage": {
+    "toughness": 0.25,
+    "damageMult": 2
+   },
+   "respawnSeconds": 14400,
+   "radius": 6000,
+   "announce": {
+    "spawn": "The throne of Castle Karstaag is no longer empty.",
+    "death": "Karstaag falls, for now."
+   },
+   "drops": {
+    "alwaysEdid": [
+     [
+      "DLC2OreStalhrim",
+      3
+     ]
+    ],
+    "always": [
+     [
+      "3ad5f:Skyrim.esm",
+      2
+     ]
+    ],
+    "_note": "The Stalhrim schematic stays reading-only (Nate: the Skaal keep it close); Nat decides if Karstaag may drop it"
+   }
+  },
+  {
+   "id": "risenlegate",
+   "name": "the Risen Legate of Sancre Tor",
+   "enabled": true,
+   "hold": "bruma",
+   "world": "a764b:BSHeartland.esm",
+   "spots": [
+    {
+     "id": "ST",
+     "pos": [
+      -247.05,
+      195799.08,
+      5860.0
+     ],
+     "heading": 51.6,
+     "note": "Sancre Tor Ruins, the Minotaur Lord's spot"
+    }
+   ],
+   "bossEdid": "BSKEncZombie03",
+   "addEdids": [
+    "CYREncSkeleton01Melee1H",
+    "CYREncSkeleton01Melee1Hshield",
+    "CYREncSkeleton01Melee2H",
+    "CYREncSkeleton01Missile",
+    "BSKEncZombie02"
+   ],
+   "openingAdds": 3,
+   "waves": [
+    [
+     0.66,
+     3
+    ],
+    [
+     0.33,
+     4
+    ]
+   ],
+   "toughness": 0.6,
+   "damageMult": 1.5,
+   "enrageSeconds": 600,
+   "enrage": {
+    "toughness": 0.3,
+    "damageMult": 2.5
+   },
+   "respawnSeconds": 14400,
+   "radius": 5000,
+   "announce": {
+    "spawn": "The undead legion of Sancre Tor forms up around its Legate.",
+    "death": "The Risen Legate of Sancre Tor lies still, and his legion with him."
+   },
+   "drops": {
+    "schematic": {
+     "family": "adamantium",
+     "chance": 0.03,
+     "knownBonus": 0
+    }
+   },
+   "_note": "Nat, 25 Oct: Sancre Tor stays undead (an Imperial fort town; no Ayleid undead, Nate 9 Oct): an undead legion from Sancre Tor's own pools (gamemode-config ownedSpawns.replace minotaur: CYREncSkeleton01 lines and BSKEncZombie02). Adamantium's home, so its schematic stays here"
+  },
+  {
+   "id": "minotaurlord",
+   "name": "the Minotaur Lord of Minotaur's Rest",
+   "enabled": false,
+   "traceEquipment": false,
+   "hold": "bruma",
+   "world": "a764b:BSHeartland.esm",
+   "spots": [
+    {
+     "id": "MR",
+     "pos": [
+      124198.92,
+      172698.27,
+      -7021.45
+     ],
+     "heading": 28.6,
+     "note": "Minotaur's Rest, the DLE's Minotaur Lord spot (178580:DragonBreak Online Edits.esp)"
+    }
+   ],
+   "bossEdid": "CYREncMinotaur02Lord",
+   "addEdids": [
+    "CYREncMinotaur"
+   ],
+   "openingAdds": 0,
+   "waves": [
+    [
+     0.66,
+     2
+    ],
+    [
+     0.33,
+     2
+    ]
+   ],
+   "toughness": 0.5,
+   "damageMult": 1.25,
+   "enrageSeconds": 600,
+   "enrage": {
+    "toughness": 0.25,
+    "damageMult": 2
+   },
+   "respawnSeconds": 10800,
+   "radius": 5000,
+   "announce": {
+    "spawn": "Something heavy stirs in Minotaur's Rest.",
+    "death": "The Minotaur Lord of Minotaur's Rest is dead."
+   },
+   "drops": {
+    "alwaysEdid": [
+     [
+      "CYRMinotaurHorn",
+      2
+     ],
+     [
+      "CYRMinotaurHide",
+      1
+     ]
+    ],
+    "always": [
+     [
+      "f:Skyrim.esm",
+      100
+     ]
+    ],
+    "schematic": {
+     "family": "steelplate",
+     "chance": 0.05,
+     "knownBonus": 0
+    }
+   },
+   "waitingOn": "the dev test of the Minotaur Lord's axe (minotaurtest1/2): set rearmEdid to match the test that kept it, then enable",
+   "_note": "Drops (proposed, 25 Oct): Minotaur Horn x2 and Minotaur Hide (BSAssets, the beast's own), gold, Steel Plate 5%. Minotaur's Rest's own spawns are undead today (ownedSpawns.replace minotaur); if the Lord fights, Nat may want its minotaurs back as his adds",
+   "rearmAddsEdid": "BSKMinotaurWarAxe",
+   "_adds": "Nat, 25 Oct: the minotaurs come back at Minotaur's Rest as his adds; each gets its war axe back in its inventory (rearmAdds), as the Lord's test 2 does"
+  },
+  {
+   "id": "minotaurtest1",
+   "name": "the Minotaur Lord of Minotaur's Rest",
+   "enabled": true,
+   "devOnly": true,
+   "traceEquipment": true,
+   "hold": "bruma",
+   "world": "a764b:BSHeartland.esm",
+   "spots": [
+    {
+     "id": "MR",
+     "pos": [
+      124198.92,
+      172698.27,
+      -7021.45
+     ],
+     "heading": 28.6,
+     "note": "Minotaur's Rest, the DLE's Minotaur Lord spot (178580:DragonBreak Online Edits.esp)"
+    }
+   ],
+   "bossEdid": "CYREncMinotaur02Lord",
+   "addEdids": [
+    "CYREncMinotaur"
+   ],
+   "openingAdds": 0,
+   "waves": [
+    [
+     0.66,
+     2
+    ],
+    [
+     0.33,
+     2
+    ]
+   ],
+   "toughness": 0.5,
+   "damageMult": 1.25,
+   "enrageSeconds": 600,
+   "enrage": {
+    "toughness": 0.25,
+    "damageMult": 2
+   },
+   "respawnSeconds": 600,
+   "radius": 5000,
+   "announce": {
+    "spawn": "",
+    "death": ""
+   },
+   "drops": {
+    "alwaysEdid": [
+     [
+      "CYRMinotaurHorn",
+      2
+     ],
+     [
+      "CYRMinotaurHide",
+      1
+     ]
+    ],
+    "always": [
+     [
+      "f:Skyrim.esm",
+      100
+     ]
+    ],
+    "schematic": {
+     "family": "steelplate",
+     "chance": 0.05,
+     "knownBonus": 0
+    }
+   },
+   "_test": "B9 test 1 (Nat, 25 Oct: the Minotaur Lord moves to Minotaur's Rest): CYREncMinotaur02Lord as is, hostile. Does BSKMinotaurLordAxe stay worn through a host change? traceEquipment logs every change",
+   "_adds": "Test 1 as is: the Lord and his minotaurs keep only what their records give them"
+  },
+  {
+   "id": "minotaurtest2",
+   "name": "the Minotaur Lord of Minotaur's Rest",
+   "enabled": true,
+   "devOnly": true,
+   "traceEquipment": true,
+   "rearmEdid": "BSKMinotaurLordAxe",
+   "hold": "bruma",
+   "world": "a764b:BSHeartland.esm",
+   "spots": [
+    {
+     "id": "MR2",
+     "pos": [
+      124825.28,
+      173249.66,
+      -7136.22
+     ],
+     "heading": 80.2,
+     "note": "Minotaur's Rest, a minotaur spot (178581:DragonBreak Online Edits.esp)"
+    }
+   ],
+   "bossEdid": "CYREncMinotaur02Lord",
+   "addEdids": [
+    "CYREncMinotaur"
+   ],
+   "openingAdds": 0,
+   "waves": [
+    [
+     0.66,
+     2
+    ],
+    [
+     0.33,
+     2
+    ]
+   ],
+   "toughness": 0.5,
+   "damageMult": 1.25,
+   "enrageSeconds": 600,
+   "enrage": {
+    "toughness": 0.25,
+    "damageMult": 2
+   },
+   "respawnSeconds": 600,
+   "radius": 5000,
+   "announce": {
+    "spawn": "",
+    "death": ""
+   },
+   "drops": {
+    "alwaysEdid": [
+     [
+      "CYRMinotaurHorn",
+      2
+     ],
+     [
+      "CYRMinotaurHide",
+      1
+     ]
+    ],
+    "always": [
+     [
+      "f:Skyrim.esm",
+      100
+     ]
+    ],
+    "schematic": {
+     "family": "steelplate",
+     "chance": 0.05,
+     "knownBonus": 0
+    }
+   },
+   "_test": "B9 test 2: the same, its axe put back in its inventory after spawn (dungeons.js's arming), worn at the next host grant",
+   "rearmAddsEdid": "BSKMinotaurWarAxe",
+   "_adds": "Nat, 25 Oct: the minotaurs come back at Minotaur's Rest as his adds; each gets its war axe back in its inventory (rearmAdds), as the Lord's test 2 does"
+  },
+  {
+   "id": "werewolfbehemoth",
+   "name": "the Behemoth of Hircine's Hunt",
+   "enabled": true,
+   "devOnly": true,
+   "hold": "falkreath",
+   "world": "3c:Skyrim.esm",
+   "night": true,
+   "fullMoon": false,
+   "spots": [
+    {
+     "id": "BMG",
+     "pos": [
+      -37646.53,
+      -36967.41,
+      -3523.07
+     ],
+     "heading": 179.9,
+     "note": "Falkreath: before Bloated Man's Grotto, where Hircine's hunt for Sinding ends (the admin teleport spot)"
+    },
+    {
+     "id": "GC",
+     "pos": [
+      -78689.48,
+      -55425.25,
+      4301.62
+     ],
+     "heading": 0,
+     "note": "Falkreath: Glenmoril Coven's door, the witches who bargain with Hircine for the Companions' cure"
+    },
+    {
+     "id": "HM",
+     "pos": [
+      -42817.49,
+      -58192.09,
+      1018.63
+     ],
+     "heading": 16.9,
+     "note": "Falkreath: Half-Moon Mill's lakeside woods"
+    }
+   ],
+   "bossEdid": "EncWerewolf06Boss",
+   "addEdids": [
+    "EncWerewolf03",
+    "EncWolf",
+    "EncWolf"
+   ],
+   "openingAdds": 3,
+   "waves": [
+    [
+     0.66,
+     3
+    ],
+    [
+     0.33,
+     4
+    ]
+   ],
+   "toughness": 0.5,
+   "damageMult": 1.5,
+   "enrageSeconds": 480,
+   "enrage": {
+    "toughness": 0.25,
+    "damageMult": 2.25
+   },
+   "respawnSeconds": 10800,
+   "radius": 5000,
+   "announce": {
+    "spawn": "A howl rolls down from the Falkreath pines. Hircine's hunt is abroad tonight.",
+    "death": "The Behemoth of Hircine's Hunt is dead, and the pack scatters."
+   },
+   "drops": {
+    "alwaysEdid": [
+     [
+      "WerewolfPelt",
+      1
+     ],
+     [
+      "WolfPelt",
+      3
+     ]
+    ],
+    "always": [
+     [
+      "f:Skyrim.esm",
+      150
+     ]
+    ],
+    "schematic": {
+     "family": "silver",
+     "chance": 0.05,
+     "knownBonus": 0
+    },
+    "extraSchematic": {
+     "family": "glass",
+     "chance": 0.01
+    }
+   },
+   "waitingOn": "the dev test (bosses.devOnly on the dev server): a werewolf pack streamed to several watchers at once. One werewolf NPC has been hosted live (Werewolf Beastmaster a092e, Driftshade, 20 Oct, no crash), never a pack; then Nat picks the spot and night or full moon",
+   "_note": "Proposed 25 Oct (the Leader for Nat): vanilla's top werewolf boss (EncWerewolf06Boss, Dawnguard's ladder) named and rim-lit; the server's SetScale is a stub, so a body 1.3x would need an NPC_ on the Behemoth race 1d1f9e in the DLE (a plugin edit, not made). Pack: a werewolf and two wolves at the start, then 3 and 4 more (werewolf, wolf, wolf in turn). Drops: a Werewolf Pelt (Hothtrooper's werewolf fur and leather recipes take it) and three wolf pelts, gold, Silver 5% (the hunter's metal, Hircine's joke), Glass 1%. Every zone is hostile, player werewolves included. fullMoon true (here or in its config block) keeps it to full-moon nights"
+  }
+ ]
+}

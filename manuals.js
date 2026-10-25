@@ -301,6 +301,15 @@ module.exports = (api) => {
     return { id: pick.book, name: pick.title };
   };
 
+  // A family's schematic for a boss's own drop (bosses.js, Nat 25 Oct), whatever smithing.drops says, never a staff-only or
+  // withheld one: { bookId, name } or null. And whether this smith already knows the family
+  globalThis.__dboSchematicBook = (family) => {
+    if (!C.enabled || !SMITH) return null;
+    const m = READY.find((x) => x.key === String(family) && !x.staffOnly && !x.withheld && x.bookId);
+    return m ? { bookId: m.bookId, name: m.title } : null;
+  };
+  globalThis.__dboKnowsFamily = (a, family) => { const m = MANUALS.find((x) => x.key === String(family)); return !!m && knows(a >>> 0, m); };
+
   // A technique book for this find (smithing.drops.<where> = { chance, families: [...] }, or per difficulty
   // { <difficulty>: { chance, families } }): { id, name } or null. Empty by default: no drop until the books exist and the
   // rates are set. Staff-only and noLoot families (Dragon, Daedric, Ebony...: found only by reading) never drop.
