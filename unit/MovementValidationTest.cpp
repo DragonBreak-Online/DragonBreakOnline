@@ -5,6 +5,8 @@
 #include "NiPoint3.h"
 #include "TestUtils.hpp"
 #include <limits>
+#include <thread>
+#include <chrono>
 #include <vector>
 
 extern PartOne& GetPartOne();
@@ -426,4 +428,80 @@ TEST_CASE("Drops a hosted NPC's in-flight packet after a server teleport",
     FormDesc::FromString("ffffff:Skyrim.esm"), 0, &npc, { "Skyrim.esm" },
     &tracker));
   REQUIRE(partOne.Messages().empty());
+}
+
+// The same cell 4096 u refusal had no give-in, so one bad packet froze a hosted actor for life and
+// every hit on it was refused. npcInsistMs is shortened here so the tests need not wait 3 s.
+
+TEST_CASE("Refuses a hosted NPC's far packet in one cell until the hoster insists",
+          "[MovementValidation]")
+{
+  PartOne& partOne = GetPartOne();
+  DoConnect(partOne, 0);
+  partOne.CreateActor(0xff000000, { 0, 0, 0 }, 0, 0x3c);
+  partOne.SetUserActor(0, 0xff000000);
+  partOne.CreateActor(0xff000001, { 0, 0, 0 }, 0, 0x3c);
+  auto& npc = partOne.worldState.GetFormAt<MpActor>(0xff000001);
+  MovementValidation::Tracker tracker;
+  partOne.worldState.movementLimits.npcInsistMs = 120;
+
+  partOne.Messages().clear();
+  REQUIRE(!MovementValidation::Validate(
+    partOne, { 0, 0, 0 }, { 0, 0, 0 }, FormDesc::Tamriel(), { 9000, 0, 0 },
+    FormDesc::Tamriel(), 0, &npc, { "Skyrim.esm" }, &tracker));
+  REQUIRE(partOne.Messages().empty());
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(150));
+
+  REQUIRE(MovementValidation::Validate(
+    partOne, { 0, 0, 0 }, { 0, 0, 0 }, FormDesc::Tamriel(), { 9000, 0, 0 },
+    FormDesc::Tamriel(), 0, &npc, { "Skyrim.esm" }, &tracker));
+  REQUIRE(partOne.Messages().empty());
+}
+
+TEST_CASE("An accepted packet restarts a hosted NPC's give-in timer",
+          "[MovementValidation]")
+{
+  PartOne& partOne = GetPartOne();
+  DoConnect(partOne, 0);
+  partOne.CreateActor(0xff000000, { 0, 0, 0 }, 0, 0x3c);
+  partOne.SetUserActor(0, 0xff000000);
+  partOne.CreateActor(0xff000001, { 0, 0, 0 }, 0, 0x3c);
+  auto& npc = partOne.worldState.GetFormAt<MpActor>(0xff000001);
+  MovementValidation::Tracker tracker;
+  partOne.worldState.movementLimits.npcInsistMs = 120;
+
+  REQUIRE(!MovementValidation::Validate(
+    partOne, { 0, 0, 0 }, { 0, 0, 0 }, FormDesc::Tamriel(), { 9000, 0, 0 },
+    FormDesc::Tamriel(), 0, &npc, { "Skyrim.esm" }, &tracker));
+  REQUIRE(MovementValidation::Validate(
+    partOne, { 0, 0, 0 }, { 0, 0, 0 }, FormDesc::Tamriel(), { 100, 0, 0 },
+    FormDesc::Tamriel(), 0, &npc, { "Skyrim.esm" }, &tracker));
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(150));
+
+  REQUIRE(!MovementValidation::Validate(
+    partOne, { 0, 0, 0 }, { 0, 0, 0 }, FormDesc::Tamriel(), { 9000, 0, 0 },
+    FormDesc::Tamriel(), 0, &npc, { "Skyrim.esm" }, &tracker));
+}
+
+TEST_CASE("A player is never given in to, however long they insist",
+          "[MovementValidation]")
+{
+  PartOne& partOne = GetPartOne();
+  DoConnect(partOne, 0);
+  partOne.CreateActor(0xff000000, { 0, 0, 0 }, 0, 0x3c);
+  partOne.SetUserActor(0, 0xff000000);
+  auto& actor = partOne.worldState.GetFormAt<MpActor>(0xff000000);
+  MovementValidation::Tracker tracker;
+  partOne.worldState.movementLimits.npcInsistMs = 120;
+
+  for (int i = 0; i < 3; ++i) {
+    partOne.Messages().clear();
+    REQUIRE(!MovementValidation::Validate(
+      partOne, { 0, 0, 0 }, { 0, 0, 0 }, FormDesc::Tamriel(), { 9000, 0, 0 },
+      FormDesc::Tamriel(), 0, &actor, { "Skyrim.esm" }, &tracker));
+    REQUIRE(partOne.Messages().size() == 1);
+    std::this_thread::sleep_for(std::chrono::milliseconds(60));
+  }
 }

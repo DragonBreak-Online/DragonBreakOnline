@@ -90,6 +90,30 @@ const LoadDoorArrivals& ArrivalsFrom(WorldState& worldState, uint32_t cellId)
   return byCell.emplace(cellId, std::move(arrivals)).first->second;
 }
 
+// The same cell 4096 u refusal has no correction path for a hosted actor, so refusing for ever
+// freezes it and every hit on it is refused. RefuseNpcJump solves the same problem by giving in
+// after 3 s; this is that rule, on this check. True once the hoster has held the disagreement.
+bool HosterHasInsisted(MovementValidation::Tracker* tracker, MpActor* actor,
+                       uint32_t insistMs)
+{
+  if (!tracker || !actor) {
+    return false;
+  }
+  auto& st = tracker->states[actor->GetFormId()];
+  const auto now = std::chrono::steady_clock::now();
+  if (!st.insisting) {
+    st.insisting = true;
+    st.insistSince = now;
+    st.lastTime = now;
+    return false;
+  }
+  if (now - st.insistSince < std::chrono::milliseconds(insistMs)) {
+    return false;
+  }
+  st.insisting = false;
+  return true;
+}
+
 float HorizontalDistance(const NiPoint3& a, const NiPoint3& b)
 {
   const float dx = a.x - b.x, dy = a.y - b.y;
@@ -186,7 +210,9 @@ bool Validate(PartOne& partOne, const NiPoint3& currentPos,
     // NPCs walk between the cells of one dungeon, which is ordinary
     // Interior cells each have their own coordinate space, so a cross cell distance measures nothing
     if (!cellChanged) {
-      return false;
+      // Taking the hoster's position after it insists, so one bad packet cannot freeze it for life
+      return HosterHasInsisted(tracker, actor,
+                               partOne.worldState.movementLimits.npcInsistMs);
     }
 
     // Only between cells of one location, which is what the parts of a dungeon share
@@ -208,6 +234,10 @@ bool Validate(PartOne& partOne, const NiPoint3& currentPos,
           })) {
       return false;
     }
+  }
+
+  if (!isMe && tracker && actor) {
+    tracker->states[actor->GetFormId()].insisting = false;
   }
 
   const auto& limits = partOne.worldState.movementLimits;

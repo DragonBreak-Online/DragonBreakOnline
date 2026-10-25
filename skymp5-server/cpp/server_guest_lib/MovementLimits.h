@@ -21,6 +21,10 @@ struct MovementLimits
   // without a snap back for this long
   uint32_t teleportGraceMs = 5000;
   uint32_t snapBackIntervalMs = 250;
+  // A hosted actor gets no snap back, so a same cell refusal would last for
+  // ever. After this long holding the same position the hoster's copy is taken
+  // instead, the way RefuseNpcJump already gives in
+  uint32_t npcInsistMs = 3000;
   uint32_t logIntervalMs = 5000;
   // Logs a peak line once per logIntervalMs above this share of the ceiling
   float peakLogFraction = 0.75f;
