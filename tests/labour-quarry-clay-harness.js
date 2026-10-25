@@ -19,12 +19,12 @@ const ACTOR = 0x14;
 const STONE = '306c:HearthFires.esm', CLAY = '3043:HearthFires.esm';
 // Real base records from the live order: Hearthfire's own, King of the Murkmire's and Beyond Skyrim's copies
 const VEINS = {
-  quarry: { ref: 0x2001, base: '306b:HearthFires.esm', edid: 'BYOHMineStone01', ore: STONE, title: 'Stone Quarry', word: /You cut 3 Quarried Stone\./ },
-  clay: { ref: 0x2002, base: 'a511:HearthFires.esm', edid: 'BYOHMineClay01Dirt01', ore: CLAY, title: 'Clay Deposit', word: /You dig out 3 Clay\./ },
-  riverMud: { ref: 0x2003, base: 'a14:HearthFires.esm', edid: 'BYOHMineClay01RiverMud01', ore: CLAY, title: 'Clay Deposit', word: /Clay/ },
-  murkmire: { ref: 0x2004, base: '560c5a:King of the Murkmire.esp', edid: 'BYOHMineClay01Mud', ore: CLAY, title: 'Clay Deposit', word: /Clay/ },
-  bsQuarry: { ref: 0x2005, base: '602b14:BSAssets.esm', edid: 'BSKBYOHMineStone01_PROXY_HF', ore: STONE, title: 'Stone Quarry', word: /Quarried Stone/ },
-  bsClay: { ref: 0x2006, base: '602b16:BSAssets.esm', edid: 'BSKBYOHMineClay01Dirt01_PROXY_HF', ore: CLAY, title: 'Clay Deposit', word: /Clay/ },
+  quarry: { ref: 0x2001, base: '306b:HearthFires.esm', edid: 'BYOHMineStone01', ore: STONE, title: 'Stone Quarry', word: /You cut 4 Quarried Stone\./, rank: 2, pays: 4 },
+  clay: { ref: 0x2002, base: 'a511:HearthFires.esm', edid: 'BYOHMineClay01Dirt01', ore: CLAY, title: 'Clay Deposit', word: /You dig out 3 Clay\./, rank: 0, pays: 3 },
+  riverMud: { ref: 0x2003, base: 'a14:HearthFires.esm', edid: 'BYOHMineClay01RiverMud01', ore: CLAY, title: 'Clay Deposit', word: /Clay/, rank: 0, pays: 3 },
+  murkmire: { ref: 0x2004, base: '560c5a:King of the Murkmire.esp', edid: 'BYOHMineClay01Mud', ore: CLAY, title: 'Clay Deposit', word: /Clay/, rank: 0, pays: 3 },
+  bsQuarry: { ref: 0x2005, base: '602b14:BSAssets.esm', edid: 'BSKBYOHMineStone01_PROXY_HF', ore: STONE, title: 'Stone Quarry', word: /Quarried Stone/, rank: 2, pays: 4 },
+  bsClay: { ref: 0x2006, base: '602b16:BSAssets.esm', edid: 'BSKBYOHMineClay01Dirt01_PROXY_HF', ore: CLAY, title: 'Clay Deposit', word: /Clay/, rank: 0, pays: 3 },
 };
 const props = new Map();
 const records = new Map();
@@ -81,13 +81,21 @@ for (const [name, v] of Object.entries(VEINS)) {
   props.delete(ACTOR + '|private.mastery');
   out.widgets.length = 0;
   ok(globalThis.__dboLabour(v.ref, ACTOR) === false && !out.widgets.length, `${name}: someone with no Miner skill is passed on to first touch`);
-  // A Novice miner: a round named for the deposit, and a win pays its material
+  // Quarried stone takes an Adept miner (skills.json miner stoneMinTier, Nat 25 Oct): below it, refused and told why
+  for (let r = 0; r < v.rank; r++) {
+    out.widgets.length = 0; out.personals.length = 0;
+    props.set(ACTOR + '|private.mastery', { order: ['miner'], skills: { miner: { rank: r } } });
+    virtual += 600000;
+    globalThis.__dboLabour(v.ref, ACTOR);
+    ok(!out.widgets.length && out.personals.some((t) => /Cutting building stone takes an Adept miner/.test(t)), `${name}: a miner of rank ${r} is refused stone, told it takes an Adept`, out.personals.join(' | '));
+  }
+  // At the deposit's rank (clay: Novice): a round named for the deposit, and a win pays its material
   out.widgets.length = 0; out.personals.length = 0; out.items.length = 0;
-  props.set(ACTOR + '|private.mastery', { order: ['miner'], skills: { miner: { rank: 0 } } });
+  props.set(ACTOR + '|private.mastery', { order: ['miner'], skills: { miner: { rank: v.rank } } });
   props.delete(v.ref + '|private.dboWorkedUntil'); props.delete(ACTOR + '|private.minedVeins');
   virtual += 600000;
   const start = virtual;
-  ok(globalThis.__dboLabour(v.ref, ACTOR) === true, `${name}: a Novice miner's activation is labour's`);
+  ok(globalThis.__dboLabour(v.ref, ACTOR) === true, `${name}: a rank ${v.rank} miner's activation is labour's`);
   const w = out.widgets[out.widgets.length - 1];
   ok(!!w && w.title === v.title, `${name}: the round is titled ${v.title}`, w ? w.title : out.personals.join(' | '));
   if (!w) continue;
@@ -95,7 +103,7 @@ for (const [name, v] of Object.entries(VEINS)) {
   virtual = start + p.at + 120;
   fire('labour', [w.nonce, JSON.stringify(p.strikes), p.at]);
   const paid = out.items.filter(([id]) => id === (parseInt(v.ore.split(':')[0], 16) >>> 0));
-  ok(paid.length === 1 && paid[0][1] === 3, `${name}: the win pays 3 of ${v.ore}`, JSON.stringify(out.items));
+  ok(paid.length === 1 && paid[0][1] === v.pays, `${name}: the win pays ${v.pays} of ${v.ore}`, JSON.stringify(out.items));
   const told = out.widgets.concat(out.personals).map((x) => (typeof x === 'string' ? x : x.result || '')).join(' | ');
   ok(v.word.test(told), `${name}: the player is told what came out`, told);
   // Worked out: the next try waits out the rest
@@ -103,6 +111,20 @@ for (const [name, v] of Object.entries(VEINS)) {
   virtual += 1000;
   globalThis.__dboLabour(v.ref, ACTOR);
   ok(!out.widgets.length && out.personals.some((t) => /This deposit is worked out for now/.test(t)), `${name}: straight after, the deposit rests`, out.personals.join(' | '));
+}
+// Above the tier: a Master quarries more, 3 x the Master multiplier 2
+{
+  const v = VEINS.quarry;
+  out.widgets.length = 0; out.personals.length = 0; out.items.length = 0;
+  props.set(ACTOR + '|private.mastery', { order: ['miner'], skills: { miner: { rank: 4 } } });
+  props.delete(v.ref + '|private.dboWorkedUntil'); props.delete(ACTOR + '|private.minedVeins');
+  virtual += 600000;
+  const start = virtual;
+  globalThis.__dboLabour(v.ref, ACTOR);
+  const w = out.widgets[out.widgets.length - 1];
+  if (w) { const p = play(w); virtual = start + p.at + 120; fire('labour', [w.nonce, JSON.stringify(p.strikes), p.at]); }
+  const paid = out.items.filter(([id]) => id === 0x306c);
+  ok(!!w && paid.length === 1 && paid[0][1] === 6, 'quarry: a Master miner cuts 6 Quarried Stone', JSON.stringify(out.items));
 }
 console.log(fails ? `${fails} failed` : 'all passed');
 process.exit(fails ? 1 : 0);

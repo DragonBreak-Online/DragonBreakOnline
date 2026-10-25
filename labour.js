@@ -187,6 +187,9 @@ module.exports = (api) => {
 
   const MINER = (skills.skills || []).find((k) => k.id === 'miner') || {};
   const WOODCUTTER = (skills.skills || []).find((k) => k.id === 'woodcutter') || {};
+  // Quarried stone takes an Adept miner, clay any (Nat, 25 Oct): skills.json miner stoneMinTier (0 based) replaces the
+  // stone's extraOreTier, so Nat moves it there without a code change; the band also weighs the round's skill credit
+  if (Number.isFinite(Number(MINER.stoneMinTier))) CFG.extraOreTier = Object.assign({}, CFG.extraOreTier, { stone: Number(MINER.stoneMinTier) });
 
   // Rounds and spent nonces outlive a gamemode reload, or every save would strand a round in flight
   const sessions = globalThis.__dboLabourRounds || (globalThis.__dboLabourRounds = new Map()); // actorId -> round
@@ -463,7 +466,10 @@ module.exports = (api) => {
     if (tier < 0) return false;
     { const live = liveRound(casterId); if (live) return reshow(casterId, live); }
     if (ore !== 'geode' && !ITEMS[ore]) return deny(casterId, 'You do not know what to do with this seam.');
-    if (oresUpTo(tier).indexOf(ore) === -1) return deny(casterId, beyondSkill(ore, own));
+    if (oresUpTo(tier).indexOf(ore) === -1) {
+      if (ore === 'stone') { const rank = (skills.tierNames || [])[oreBand(ore)] || 'Adept'; return deny(casterId, `Cutting building stone takes ${an(rank)} ${rank} miner. Clay is dug at any rank.`); }
+      return deny(casterId, beyondSkill(ore, own));
+    }
     // An owned mine's access rules (mines.js): its owner may keep its seams to a faction, named people or themselves
     { const gate = typeof globalThis.__dboMineGate === 'function' ? globalThis.__dboMineGate(targetId, casterId) : ''; if (gate) return deny(casterId, gate); }
     const rests = restsOf(casterId, 'private.minedVeins');

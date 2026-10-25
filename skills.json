@@ -523,6 +523,8 @@
     1.7,
     2
    ],
+   "stoneMinTier": 2,
+   "_stoneMinTier": "Quarried stone from a Stone Quarry takes this Miner tier, 0 based (2 = Adept; Nat, 25 Oct). Clay Deposits stay open to every rank (labour.js extraOreTier). Read at boot.",
    "tiers": [
     "Copper, iron, corundum",
     "Silver, quicksilver",
