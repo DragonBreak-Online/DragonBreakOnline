@@ -6,6 +6,10 @@
 // what its officials set per danger tier (/contract price), and commit at most a weekly budget (/contract budget, UTC
 // week from Monday); /contract standing on|off stops them. Work an official posts by hand is open to all and outside the
 // budget. Anyone reads the terms with /contract status.
+// Nat, 25 Oct (ticket 0414, Bruma's treasurer: "add Ogres ... there is only a single bear within the county"): every creature
+// a hold's spots really put down is work, undead and goblins included; officials post from the Court tab too, under a weekly
+// posting budget and a daily cap each; and commissions buy goods for the hold (N of an item at a price each), handed in at
+// the board, the goods into the hold's treasury chest.
 'use strict';
 
 module.exports = (api) => {
@@ -43,16 +47,40 @@ module.exports = (api) => {
     // contract kill and sells them on, so holdShare of their value goes back into its treasury. A creature with no pelt
     // (skeevers, mudcrabs) pays as before. 0 turns it off
     holdShare: 0.75,
+    // A kind needs this many spawn spots in a hold before work is posted for it (config 3, so a lone ice wraith is no contract)
+    minSpots: 1,
+    // At most this many standing notices of a danger tier on a hold's board (config { 3: 2 }, so ogres and trolls do not
+    // crowd out the rest)
+    tierLimit: {},
+    // Gold a hold's hand-posted work and commissions may commit in one UTC week (config 2000); its tax-setters change it
+    postBudget: 100000,
+    // Notices and commissions one official may post in a day, UTC (config 3); 0: no cap
+    postsPerDay: 0,
+    // Commissions: hours up, the most a hold pays for an item against its base value, and what may be asked for
+    commissionHours: 48,
+    commissionValueMult: 1.5,
+    commissionMaxCount: 200,
+    commissionCategories: ['Weapons', 'Armor', 'Clothing', 'Arrows', 'Potions', 'Food', 'Ingredients', 'Misc'],
   }, cfg.contracts || {});
 
   // How dangerous each creature kind is: tier 3 is worth real money and real risk
   const DANGER = {
     chicken: 0, cow: 0, hare: 0, dog: 0, deer: 0, elk: 0, goat: 0, fox: 0,
-    mudcrab: 1, skeever: 1, slaughterfish: 1, horker: 1,
-    wolf: 1, frostbitespider: 2, sabrecat: 2, bear: 2, riekling: 2, netch: 2, werebear: 3,
-    troll: 3, giant: 3, mammoth: 3, lurker: 3,
+    mudcrab: 1, skeever: 1, slaughterfish: 1, horker: 1, rat: 1, boar: 1, skeleton: 1, zombie: 1, goblin: 1,
+    wolf: 1, frostbitespider: 2, sabrecat: 2, bear: 2, riekling: 2, netch: 2, mountainlion: 2, icewraith: 2, chaurus: 2, draugr: 2,
+    werebear: 3, troll: 3, giant: 3, mammoth: 3, lurker: 3, ogre: 3, minotaur: 3,
   };
-  const PLURAL = { wolf: 'wolves', fox: 'foxes', sabrecat: 'sabre cats', frostbitespider: 'frostbite spiders', mudcrab: 'mudcrabs', skeever: 'skeevers', troll: 'trolls', bear: 'bears', giant: 'giants', mammoth: 'mammoths', riekling: 'rieklings', netch: 'netches', horker: 'horkers', slaughterfish: 'slaughterfish', lurker: 'lurkers', werebear: 'werebears' };
+  const PLURAL = { wolf: 'wolves', fox: 'foxes', sabrecat: 'sabre cats', frostbitespider: 'frostbite spiders', mudcrab: 'mudcrabs', skeever: 'skeevers', troll: 'trolls', bear: 'bears', giant: 'giants', mammoth: 'mammoths', riekling: 'rieklings', netch: 'netches', horker: 'horkers', slaughterfish: 'slaughterfish', lurker: 'lurkers', werebear: 'werebears',
+    mountainlion: 'mountain lions', icewraith: 'ice wraiths', chaurus: 'chaurus', draugr: 'draugr' };
+  const SINGULAR = { mountainlion: 'mountain lion', icewraith: 'ice wraith', sabrecat: 'sabre cat', frostbitespider: 'frostbite spider' };
+  const single = (kind) => SINGULAR[kind] || kind;
+  const aOrAn = (word) => (/^[aeiou]/i.test(word) ? `an ${word}` : `a ${word}`);
+  // What an official types for a kind: its key, its name or its plural, spaces or not ("mountain lions" is mountainlion)
+  const kindFromWords = (text) => {
+    const t = String(text || '').toLowerCase().replace(/[^a-z]/g, '');
+    if (!t) return '';
+    return Object.keys(DANGER).find((k) => k === t || single(k).replace(/[^a-z]/g, '') === t || plural(k).replace(/[^a-z]/g, '') === t) || t;
+  };
   const GOLD_BASE = 0x0000000f;
   const FILE = path.resolve('contracts.json');
   const SPAWNS = path.resolve('NPC-Spawns.json');
@@ -103,7 +131,9 @@ module.exports = (api) => {
   // and EncIceWraith name no kind at all.
   // Case-sensitive: every spawn edid is CamelCase, and /Crab/i matched CYREncRabbit ('EncRabbit'), so rabbits counted for
   // mudcrab contracts and fox spots were read as mudcrab fauna (sunk_turtle, 9 Oct)
-  const CREATURE_WORD = /(Werewolf|Werebear|FrostbiteSpider|SabreCat|Slaughterfish|Skeever|Mudcrab|Crab|Horker|Mammoth|Giant|Troll|Riekling|Netch|Lurker|Wolf|Bear|Chicken|Cow|Hare|Dog|Deer|Elk|Goat|Fox)/;
+  // Nat, 25 Oct: Bruma's 356 spots put down 41 ogres, 13 boars, 9 rats and its undead and goblins, none of them work until
+  // these words were added. A rat (BSKEncRat) is its own kind, not a skeever: a hold's notice names what its spots put down.
+  const CREATURE_WORD = /(Werewolf|Werebear|FrostbiteSpider|SabreCat|MountainLion|IceWraith|Slaughterfish|Skeever|Mudcrab|Crab|Horker|Mammoth|Giant|Troll|Riekling|Netch|Lurker|Minotaur|Ogre|Chaurus|Draugr|Skeleton|Zombie|Goblin|Boar|Rat|Wolf|Bear|Chicken|Cow|Hare|Dog|Deer|Elk|Goat|Fox)/;
   const kindOfEdid = (edid) => { const m = CREATURE_WORD.exec(String(edid || '')); if (!m) return ''; const k = m[1].toLowerCase(); return k === 'crab' ? 'mudcrab' : k; };
   // undefined when the record cannot be read: the caller then goes by the spawn tag, as before
   const kindOfBase = (desc) => {
@@ -225,7 +255,7 @@ module.exports = (api) => {
   const holdState = (zid) => {
     const h = state.holds[zid] || (state.holds[zid] = {});
     const wk = weekKey();
-    if (h.week !== wk) { h.week = wk; h.spent = 0; }
+    if (h.week !== wk) { h.week = wk; h.spent = 0; h.postSpent = 0; }
     return h;
   };
   const priceOf = (zid, tier) => {
@@ -237,13 +267,22 @@ module.exports = (api) => {
   const budgetOf = (zid) => { const b = (state.holds[zid] || {}).budget; return Math.min(budgetMax(), Number.isFinite(Number(b)) ? Math.max(0, Math.floor(Number(b))) : defaultBudget()); };
   const standingOn = (zid) => (state.holds[zid] || {}).standing !== false;
   const budgetLeft = (zid) => Math.max(0, budgetOf(zid) - (Number(holdState(zid).spent) || 0));
-  // Charged when a hunter takes a standing notice; given back when that copy is given up or runs out in the same week
-  const charge = (w, zid, amount) => { const h = holdState(zid); h.spent = (Number(h.spent) || 0) + amount; w.standing = true; w.charged = amount; w.week = h.week; };
-  const uncharge = (w) => {
+  // Hand-posted work and commissions have their own weekly pool (Nat, 25 Oct), set by the same tax-setters
+  const postBudgetOf = (zid) => { const b = (state.holds[zid] || {}).postBudget; return Math.min(budgetMax(), Number.isFinite(Number(b)) ? Math.max(0, Math.floor(Number(b))) : Math.max(0, Math.floor(num(CFG.postBudget, 100000)))); };
+  const postLeft = (zid) => Math.max(0, postBudgetOf(zid) - (Number(holdState(zid).postSpent) || 0));
+  // Charged when a hunter takes a notice (standing work to the standing budget, posted work to the posting one) or when a
+  // commission goes up; given back when it is given up, withdrawn or runs out in the same week
+  const POOL_FIELD = { standing: 'spent', posted: 'postSpent' };
+  const charge = (w, zid, amount, pool = 'standing') => {
+    const h = holdState(zid); const f = POOL_FIELD[pool] || 'spent';
+    h[f] = (Number(h[f]) || 0) + amount; if (pool === 'standing') w.standing = true; w.pool = pool; w.charged = amount; w.week = h.week;
+  };
+  const uncharge = (w, amount) => {
     if (!w || !(Number(w.charged) > 0)) return;
-    const h = holdState(w.zone);
-    if (w.week === h.week) h.spent = Math.max(0, (Number(h.spent) || 0) - Number(w.charged));
-    w.charged = 0;
+    const back = Math.min(Number(w.charged), amount === undefined ? Number(w.charged) : Math.max(0, Number(amount)));
+    const h = holdState(w.zone); const f = POOL_FIELD[w.pool] || 'spent';
+    if (w.week === h.week) h[f] = Math.max(0, (Number(h[f]) || 0) - back);
+    w.charged = Number(w.charged) - back;
   };
   // Citizens only: only where citizenship.js runs and this hold grants it (__dboCitizenGates); elsewhere open to all
   const citizensOnly = (zid) => {
@@ -258,12 +297,20 @@ module.exports = (api) => {
   const refused = (reason, a, zid) => { refusals[reason] = (refusals[reason] || 0) + 1; log(`contracts: refused ${reason} for ${who(a)} in ${zid} (${refusals[reason]} since start)`); };
   const citizensText = (zone) => `Standing contracts of ${zone.name} are for citizens of ${zone.name} only. Become a citizen there to take them; work an official posts by hand is open to all.`;
   const budgetText = (zone) => `${zone.name} has spent this week's budget for standing contracts (${budgetOf(zone.id)} gold). It resets ${RESET_TEXT()}.`;
+  const postBudgetText = (zone) => `${zone.name} has spent this week's budget for posted work (${postBudgetOf(zone.id)} gold). It resets ${RESET_TEXT()}.`;
 
   const nextId = () => `${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`;
 
+  // The kinds a hold posts standing work for: dangerous, and roaming at enough of its spots to be found
+  const minSpots = () => Math.max(1, Math.floor(num(CFG.minSpots, 1)));
+  const workKinds = (zid) => Object.keys(kindsByZone[zid] || {}).filter((k) => (DANGER[k] || 0) > 0 && kindsByZone[zid][k] >= minSpots());
+  const tierLimit = (t) => { const v = Number((CFG.tierLimit || {})[t]); return Number.isFinite(v) && v >= 0 ? v : Infinity; };
+
   const makeContract = (zone) => {
-    const posted = zoneContracts(zone.id).map((c) => c.kind);
-    const kinds = Object.keys(kindsByZone[zone.id] || {}).filter((k) => (DANGER[k] || 0) > 0 && posted.indexOf(k) === -1);
+    const up = zoneContracts(zone.id).filter((c) => c.type !== 'commission' && isStanding(c));
+    const posted = up.map((c) => c.kind);
+    const ofTier = (t) => up.filter((c) => (DANGER[c.kind] || 1) === t).length;
+    const kinds = workKinds(zone.id).filter((k) => posted.indexOf(k) === -1 && ofTier(DANGER[k]) < tierLimit(DANGER[k]));
     if (!kinds.length) return null;
     const kind = kinds[Math.floor(Math.random() * kinds.length)];
     const danger = DANGER[kind] || 1;
@@ -292,6 +339,8 @@ module.exports = (api) => {
     // A hold whose officials switched standing work off takes its standing notices down; copies already taken run on
     for (const c of state.contracts) (c.expiresAt > Date.now() && !(isStanding(c) && !standingOn(c.zone)) ? kept : expired).push(c);
     state.contracts = kept;
+    // An unfilled commission's gold left over goes back to the week's posting budget as well as the treasury
+    for (const c of expired) if (c.type === 'commission') uncharge(c, Number(c.held) || 0);
     // A hunter's own copy that ran out gives its share back to the hold; the hunter is told when next they look (closeIfOver)
     for (const key of Object.keys(state.taken)) {
       for (const w of [].concat(state.taken[key] || [])) {
@@ -410,6 +459,7 @@ module.exports = (api) => {
 
   const describe = (c, progress) => {
     const zone = zoneById(c.zone);
+    if (c.type === 'commission') return `${c.count - (Number(c.delivered) || 0)} ${c.itemName} wanted by ${zone ? zone.name : c.zone} at ${c.price} gold each`;
     const done = progress === undefined ? '' : ` [${progress}/${c.count}]`;
     return `${c.count} ${plural(c.kind)} in ${zone ? zone.name : c.zone} for ${c.reward} gold${done}`;
   };
@@ -474,7 +524,7 @@ module.exports = (api) => {
     if (!sameKind.length) {
       // A spot named for the quarry that put down something else (a rat at a "wolf" spot) is said, not silently skipped
       const named = work.find((w) => w.kind === m[1]);
-      if (named) personal(killerId, `That was ${own ? `a ${own}` : 'some other creature'}, not one of your ${plural(named.kind)}: it does not count for the contract.`);
+      if (named) personal(killerId, `That was ${own ? aOrAn(single(own)) : 'some other creature'}, not one of your ${plural(named.kind)}: it does not count for the contract.`);
       return;
     }
     let counted = 0;
@@ -524,16 +574,19 @@ module.exports = (api) => {
     const work = copiesOf(a);
     if (work.length >= maxActive()) return `You already hold ${maxActive()} contracts. Finish or give one up first.`;
     if (!c || c.zone !== zone.id || !(c.expiresAt > Date.now())) return 'That contract is no longer posted here.';
+    if (c.type === 'commission') return 'That is a commission: bring the goods to the board and hand them in.';
     if (work.some((w) => w.id === c.id)) return 'You already hold that contract.';
     if (postedBy(c, a)) return 'You posted that notice yourself. Someone else does the hunting.';
     if (doneBy(c, a)) return 'You have already done the work on that notice. Take another.';
     const standing = isStanding(c);
     if (standing && !mayTakeStanding(a, zone.id)) { refused('not a citizen', a, zone.id); return citizensText(zone); }
     if (standing && (Number(c.reward) || 0) > budgetLeft(zone.id)) { refused('budget spent', a, zone.id); return budgetText(zone); }
+    // A posted notice pays every hunter who takes it, each copy out of the week's posting budget (it held one share only)
+    if (!standing && (Number(c.reward) || 0) > postLeft(zone.id)) { refused('post budget spent', a, zone.id); return postBudgetText(zone); }
     const w = copyFor(c);
     w.held = shareFor(c);
     if (!(w.held > 0)) return TREASURY_TEXT;
-    if (standing) charge(w, zone.id, w.held);
+    charge(w, zone.id, w.held, standing ? 'standing' : 'posted');
     putList(keyOf(a), work.concat([w]));
     saveNow();
     audit(`CONTRACT ${who(a)} took ${c.count} ${plural(c.kind)} for ${zone.name}`);
@@ -583,7 +636,15 @@ module.exports = (api) => {
     const citizen = zone ? mayTakeStanding(a, zone.id) : true;
     const left = zone ? budgetLeft(zone.id) : 0;
     const budgetNote = zone ? (standingOn(zone.id) ? ` Standing work this week: ${left} of ${budgetOf(zone.id)} gold left, renewed ${RESET_TEXT()}.` : ` ${zone.name}'s officials have stopped its standing work.`) : '';
-    const standingState = (c) => (!isStanding(c) ? 'open' : !citizen ? 'Citizens only' : (Number(c.reward) || 0) > left ? 'Budget spent' : 'open');
+    const standingState = (c) => (!isStanding(c) ? ((Number(c.reward) || 0) > (zone ? postLeft(zone.id) : 0) ? 'Budget spent' : 'open')
+      : !citizen ? 'Citizens only' : (Number(c.reward) || 0) > left ? 'Budget spent' : 'open');
+    // A commission is handed in, never taken: the board of client 0.3.108b and older shows its state as the stamp
+    const commissionRow = (c) => {
+      const wanted = c.count - (Number(c.delivered) || 0);
+      return { id: c.id, type: 'commission', what: `${wanted} ${c.itemName} at ${c.price} gold each`, item: c.itemName, count: wanted, price: c.price,
+        reward: wanted * c.price, danger: 0, hoursLeft: hours(c), standing: false, have: plainCount(a, idOf(c.item)),
+        state: postedBy(c, a) ? 'posted' : 'Hand in: /contract deliver' };
+    };
     return {
       enabled: !!CFG.enabled,
       zone: zone ? zone.name : '',
@@ -596,10 +657,11 @@ module.exports = (api) => {
       heldAll: work.map((w) => ({ id: w.id, what: `${w.count} ${plural(w.kind)}`, zone: zoneName(w.zone), progress: Math.min(w.count, Number(w.progress) || 0), count: w.count, reward: w.reward, hoursLeft: hours(w) })),
       maxActive: maxActive(),
       held: hc ? { id: hc.id, what: `${hc.count} ${plural(hc.kind)}`, zone: zoneName(hc.zone), progress: Math.min(hc.count, Number(held.progress) || 0), count: hc.count, reward: hc.reward, hoursLeft: hours(hc) } : null,
-      list: list.map((c) => ({ id: c.id, what: `${c.count} ${plural(c.kind)}${isStanding(c) && restricted ? ` (citizens of ${zone.name} only)` : ''}`, count: c.count, reward: c.reward, danger: DANGER[c.kind] || 1, hoursLeft: hours(c),
-        standing: isStanding(c),
+      list: list.map((c) => (c.type === 'commission' ? commissionRow(c) : { id: c.id, what: `${c.count} ${plural(c.kind)}${isStanding(c) && restricted ? ` (citizens of ${zone.name} only)` : ''}`, count: c.count, reward: c.reward, danger: DANGER[c.kind] || 1, hoursLeft: hours(c),
+        standing: isStanding(c), postedBy: isStanding(c) ? '' : String(c.byName || ''),
         state: work.some((w) => w.id === c.id) ? 'yours' : postedBy(c, a) ? 'posted' : standingState(c) })),
       canPost: !!(zone && isOfficial(a, zone.id)),
+      postLeft: zone ? postLeft(zone.id) : 0,
     };
   };
   globalThis.__dboContractsBoard = { view: boardView };
@@ -614,7 +676,178 @@ module.exports = (api) => {
       reopen(a);
     });
     onUi('contractAbandon', (a, args) => { if (!boardOpen(a)) return; personal(a, abandonContract(a, (args || [])[0])); reopen(a); });
+    // contractDeliver [id, count?]: hand in goods for a commission of the hold the board stands in
+    onUi('contractDeliver', (a, args) => {
+      if (!boardOpen(a)) return;
+      const zone = playerZone(a);
+      const c = contractById(String((args || [])[0] || ''));
+      const r = zone && c && c.zone === zone.id ? deliver(a, c, (args || [])[1]) : { error: 'That commission is not posted on this board.' };
+      personal(a, r.error || r.text);
+      reopen(a);
+    });
   }
+
+  // ---- posting by hand, and commissions (Nat, 25 Oct) -----------------------------------------------------------------
+  // Each returns { text } or { error }, shared by /contract and the Court tab (court.js courtContractPost and the rest)
+  if (!state.posters || typeof state.posters !== 'object') state.posters = {};
+  const DAY_MS = 86400000;
+  const postsPerDay = () => Math.max(0, Math.floor(num(CFG.postsPerDay, 0)));
+  const postsToday = (a) => { const k = keyOf(a); const since = Date.now() - DAY_MS; return [].concat(state.posters[k] || []).filter((t) => Number(t) > since); };
+  const notePost = (a) => { const k = keyOf(a); state.posters[k] = postsToday(a).concat(Date.now()); };
+  // The usual gates for an official posting in a hold's name; null when they may
+  const postGate = (a, zone, gold) => {
+    if (!CFG.enabled) return OFF_TEXT;
+    if (!zone || !zone.treasury) return 'That hold has no treasury to pay for work.';
+    if (!isOfficial(a, zone.id)) { refused('not an official (post)', a, zone.id); return `Only an official of ${zone.name} posts work in its name.`; }
+    if (postsPerDay() && postsToday(a).length >= postsPerDay()) return `You have posted ${postsPerDay()} notices in the last day. Post again tomorrow.`;
+    if (gold > postLeft(zone.id)) { refused('post budget spent', a, zone.id); return `That would pass ${zone.name}'s budget for posted work: ${postLeft(zone.id)} of ${postBudgetOf(zone.id)} gold left this week, renewed ${RESET_TEXT()}.`; }
+    // An official's own post needs only its reward (escrow); the floor guards each further hunter's share (shareFor)
+    return null;
+  };
+  const postContract = (a, zone, kindText, countIn, rewardIn) => {
+    const kind = kindFromWords(kindText);
+    const count = Math.floor(Number(countIn)), reward = Math.floor(Number(rewardIn));
+    if (!kind || !(count >= 1) || !(reward >= 1)) return { error: 'Use: /contract post <creature> <count> <reward>' };
+    if (count > 50) return { error: 'Fifty at most on one notice.' };
+    if (!(kindsByZone[zone.id] || {})[kind]) return { error: `No ${plural(kind)} are known to roam ${zone.name}.` };
+    // A hold pays for danger. Harmless quarry is not work, and no reward may run past what the risk is worth:
+    // without this an official could post one chicken at 10,000 gold and empty the treasury into his own purse.
+    const danger = DANGER[kind] || 0;
+    if (danger <= 0) return { error: `${plural(kind)[0].toUpperCase()}${plural(kind).slice(1)} are no danger to anyone. ${zone.name} pays for dangerous work.` };
+    // At most the hold's own pay per kill for that danger (its officials' /contract price), not the default
+    const most = count * priceOf(zone.id, danger);
+    if (reward > most) return { error: `${count} ${plural(kind)} is worth at most ${most} gold at ${zone.name}'s pay of ${priceOf(zone.id, danger)} a kill. Post it for that or less.` };
+    const gate = postGate(a, zone, reward); if (gate) return { error: gate };
+    if (!escrow(zone, reward)) return { error: `The ${zone.name} treasury holds ${treasuryGold(zone)} gold, less than the reward.` };
+    const c = { id: nextId(), zone: zone.id, kind, count, reward, held: reward, standing: false, by: profileOf(a), byAccount: accountOf(a), byName: ownName(a),
+      postedAt: Date.now(), expiresAt: Date.now() + (Number(CFG.expiryHours) || 12) * 3600000 };
+    state.contracts.push(c);
+    notePost(a);
+    saveNow();
+    audit(`CONTRACT ${who(a)} posted ${c.count} ${plural(c.kind)} for ${zone.name} at ${c.reward} gold`);
+    return { text: `Posted: ${describe(c)}. The reward is set aside from the treasury; each hunter who takes it is paid from this week's budget for posted work.` };
+  };
+
+  // Commissions: the goods a hold buys, from the item catalog's categories (admin-items.json, plain items only)
+  const GOODS = (() => {
+    const out = [];
+    try {
+      const cats = new Set([].concat(CFG.commissionCategories || []));
+      for (const c of JSON.parse(fs.readFileSync(path.resolve('admin-items.json'), 'utf8')).categories || []) {
+        if (!cats.has(c.id)) continue;
+        for (const it of c.items || []) out.push({ desc: String(it[0]), name: String(it[1]), lower: String(it[1]).toLowerCase(), cat: c.id });
+      }
+    } catch (e) { log('contracts: admin-items.json unreadable, no commissions', e.message); }
+    return out;
+  })();
+  const idOf = (desc) => { try { return mp.getIdFromDesc(String(desc)) >>> 0; } catch (e) { return 0; } };
+  const baseValue = (id) => { try { return typeof globalThis.__dboBaseValue === 'function' ? Math.max(0, Number(globalThis.__dboBaseValue(id >>> 0)) || 0) : 0; } catch (e) { return 0; } };
+  const maxPriceOf = (id) => Math.max(1, Math.ceil(baseValue(id) * Math.max(0, num(CFG.commissionValueMult, 1.5))));
+  // By catalog id, exact name, or every word given; the first few for a list
+  const findGoods = (query, max = 12) => {
+    const q = String(query || '').trim().toLowerCase();
+    if (!q) return [];
+    const byDesc = GOODS.filter((g) => g.desc.toLowerCase() === q);
+    if (byDesc.length) return byDesc.slice(0, 1);
+    const exact = GOODS.filter((g) => g.lower === q);
+    const words = q.split(/\s+/);
+    return (exact.length ? exact : GOODS.filter((g) => words.every((w) => g.lower.includes(w)))).slice(0, max);
+  };
+  const goodsRow = (g) => { const id = idOf(g.desc); return { desc: g.desc, name: g.name, value: baseValue(id), maxPrice: maxPriceOf(id) }; };
+  const postCommission = (a, zone, itemText, countIn, priceIn) => {
+    const count = Math.floor(Number(countIn)), price = Math.floor(Number(priceIn));
+    const hits = findGoods(itemText, 9);
+    if (!hits.length) return { error: `No goods a hold buys match "${String(itemText || '').trim()}".` };
+    const names = new Set(hits.map((g) => g.lower));
+    if (hits.length > 1 && names.size > 1) return { error: `${hits.length} goods match. Be more exact: ${hits.slice(0, 8).map((g) => g.name).join(', ')}.` };
+    const g = hits[0]; const id = idOf(g.desc);
+    if (!id) return { error: `${g.name} is not in this world's load order.` };
+    if (!(count >= 1) || count > Math.floor(num(CFG.commissionMaxCount, 200))) return { error: `Ask for 1 to ${Math.floor(num(CFG.commissionMaxCount, 200))}.` };
+    if (!baseValue(id)) return { error: `${g.name} has no worth to buy it by.` };
+    if (!(price >= 1) || price > maxPriceOf(id)) return { error: `${zone.name} pays at most ${maxPriceOf(id)} gold each for ${g.name} (worth ${baseValue(id)}).` };
+    const reward = count * price;
+    const gate = postGate(a, zone, reward); if (gate) return { error: gate };
+    if (!escrow(zone, reward)) return { error: `The ${zone.name} treasury holds ${treasuryGold(zone)} gold, less than ${reward}.` };
+    const c = { id: nextId(), type: 'commission', zone: zone.id, item: g.desc, itemName: g.name, count, delivered: 0, price, reward, held: reward,
+      standing: false, by: profileOf(a), byAccount: accountOf(a), byName: ownName(a), postedAt: Date.now(),
+      expiresAt: Date.now() + Math.max(1, num(CFG.commissionHours, 48)) * 3600000 };
+    charge(c, zone.id, reward, 'posted');
+    state.contracts.push(c);
+    notePost(a);
+    saveNow();
+    audit(`CONTRACT ${who(a)} commissioned ${count} ${g.name} (${g.desc}) for ${zone.name} at ${price} gold each (${reward} held)`);
+    return { text: `Commission posted: ${count} ${g.name} at ${price} gold each for ${zone.name}. ${reward} gold is set aside; hunters and crafters hand them in at the board.` };
+  };
+  // A plain stack only (no name, enchantment, tempering or worn state) is taken: a commission buys the goods, not keepsakes
+  const plainOf = (e) => Object.keys(e).every((k) => k === 'baseId' || k === 'count' || e[k] === undefined || e[k] === null || ((k === 'worn' || k === 'wornLeft') && !e[k]));
+  const plainCount = (a, id) => { try { const inv = mp.get(a, 'inventory'); return ((inv && inv.entries) || []).reduce((n, e) => n + ((Number(e.baseId) >>> 0) === id && plainOf(e) ? Number(e.count) || 0 : 0), 0); } catch (e) { return 0; } };
+  const takePlain = (a, id, n) => {
+    const inv = mp.get(a, 'inventory');
+    const entries = ((inv && inv.entries) || []).map((e) => Object.assign({}, e));
+    let left = n;
+    for (const e of entries) { if (left <= 0) break; if ((Number(e.baseId) >>> 0) !== id || !plainOf(e)) continue; const t = Math.min(left, Number(e.count) || 0); e.count = Number(e.count) - t; left -= t; }
+    if (left > 0) return false;
+    mp.set(a, 'inventory', { entries: entries.filter((e) => (Number(e.count) || 0) > 0) });
+    return true;
+  };
+  const toChest = (zone, id, n) => {
+    try {
+      const chestId = mp.getIdFromDesc(zone.treasury) >>> 0;
+      const inv = mp.get(chestId, 'inventory');
+      const entries = (inv && Array.isArray(inv.entries) ? inv.entries : []).map((e) => Object.assign({}, e));
+      const hit = entries.find((e) => (Number(e.baseId) >>> 0) === id && plainOf(e));
+      if (hit) hit.count = (Number(hit.count) || 0) + n; else entries.push({ baseId: id, count: n });
+      mp.set(chestId, 'inventory', { entries });
+      return true;
+    } catch (e) { log('contracts: commission goods to the chest failed', e.message); return false; }
+  };
+  const deliver = (a, c, want) => {
+    if (!CFG.enabled) return { error: OFF_TEXT };
+    const zone = c ? zoneById(c.zone) : null;
+    if (!c || c.type !== 'commission' || !(c.expiresAt > Date.now()) || !zone) return { error: 'That commission is no longer posted here.' };
+    if (postedBy(c, a)) return { error: 'You posted that commission yourself. Someone else fills it.' };
+    const id = idOf(c.item);
+    const left = c.count - (Number(c.delivered) || 0);
+    const have = plainCount(a, id);
+    if (!have) return { error: `You carry no plain ${c.itemName} to hand in (named, enchanted or tempered ones are kept back).` };
+    const n = Math.max(1, Math.min(left, have, Number.isFinite(Number(want)) && Number(want) > 0 ? Math.floor(Number(want)) : have));
+    const pay = Math.min(n * c.price, Number(c.held) || 0);
+    if (pay < n * c.price) return { error: `The commission's gold has run short. Speak to ${zone.name}'s officials.` };
+    if (!takePlain(a, id, n)) return { error: 'Those goods could not be taken from your pack. Try again.' };
+    // Written before the gold changes hands, so no crash can pay twice
+    c.delivered = (Number(c.delivered) || 0) + n;
+    c.held = Number(c.held) - pay;
+    const done = c.delivered >= c.count;
+    if (done) state.contracts = state.contracts.filter((x) => x !== c);
+    saveNow();
+    if (!toChest(zone, id, n)) log(`contracts: ${n} ${c.itemName} of commission ${c.id} did not reach ${zone.id}'s treasury chest`);
+    giveItem(a, GOLD_BASE, pay);
+    audit(`CONTRACT ${who(a)} delivered ${n} ${c.itemName} to ${zone.name}'s commission ${c.id} for ${pay} gold (${c.delivered}/${c.count})`);
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('contract', 'deliver', a, c.itemName, n, c.zone, pay); } catch (e) { /* the player log is optional */ }
+    return { text: `Handed in ${n} ${c.itemName}: ${pay} gold from the ${zone.name} treasury.${done ? ' The commission is filled.' : ` ${c.count - c.delivered} still wanted.`}` };
+  };
+  // The poster, a tax-setter of the hold, or staff takes down a hand-posted notice or a commission; what it still holds goes back
+  const withdraw = (a, zone, id) => {
+    const c = state.contracts.find((x) => x.id === String(id) && x.zone === zone.id && !isStanding(x));
+    if (!c) return { error: 'No such posted notice in that hold.' };
+    if (!postedBy(c, a) && !setsTerms(a, zone.id)) return { error: 'Only whoever posted it, or those who set the hold\'s tax, take it down.' };
+    state.contracts = state.contracts.filter((x) => x !== c);
+    const back = Number(c.held) || 0;
+    if (c.type === 'commission') uncharge(c, back);
+    c.held = 0;
+    saveNow();
+    if (back > 0 && !refundToTreasury(zone, back)) log(`contracts: ${back} gold of withdrawn ${c.id} could not go back to ${zone.id}`);
+    audit(`CONTRACT ${who(a)} withdrew ${c.type === 'commission' ? `commission ${c.count} ${c.itemName}` : `${c.count} ${plural(c.kind)}`} in ${zone.name} (${back} gold back)`);
+    return { text: `Taken down; ${back} gold goes back to the ${zone.name} treasury. Hunters already holding it keep their copy.` };
+  };
+  // The Court tab's commission search, kept per viewer until their next one
+  const searches = globalThis.__dboContractSearches instanceof Map ? globalThis.__dboContractSearches : (globalThis.__dboContractSearches = new Map());
+  const search = (a, q) => {
+    const rows = findGoods(q, 12).map(goodsRow);
+    searches.set(a >>> 0, { query: String(q || '').slice(0, 60), items: rows });
+    if (searches.size > 200) searches.delete(searches.keys().next().value);
+    return { text: rows.length ? `${rows.length} goods match.` : 'Nothing a hold buys matches that.' };
+  };
 
   // ---- /contract status, price, budget, standing ----------------------------------------------------------------------
   const TIER_WORD = { 1: 'pests', 2: 'dangerous beasts', 3: 'deadly beasts' };
@@ -625,9 +858,11 @@ module.exports = (api) => {
     out.push(`  Pay per kill: ${[1, 2, 3].map((t) => `tier ${t} (${TIER_WORD[t]}) ${priceOf(zone.id, t)} gold`).join(', ')}.`);
     out.push(`  This week's budget: ${budgetLeft(zone.id)} of ${budgetOf(zone.id)} gold left; it renews ${RESET_TEXT()}.`);
     out.push(`  ${citizensOnly(zone.id) ? `Only citizens of ${zone.name} take its standing contracts${mayTakeStanding(a, zone.id) ? ' (you are one)' : ' (you are not one)'}.` : 'Its standing contracts are open to every hunter.'} Work an official posts by hand is open to all.`);
+    out.push(`  Posted work and commissions this week: ${postLeft(zone.id)} of ${postBudgetOf(zone.id)} gold left${postsPerDay() ? `; each official posts at most ${postsPerDay()} a day` : ''}.`);
     const h = state.holds[zone.id] || {};
     if (h.by) out.push(`  Last set by ${h.by} on ${new Date(Number(h.at) || 0).toISOString().slice(0, 16).replace('T', ' ')} UTC.`);
-    if (setsTerms(a, zone.id)) { const { min, max } = bounds(); out.push(`  As an official: /contract price <1|2|3> <gold> (${min} to ${max}), /contract budget <gold a week> (0 to ${budgetMax()}), /contract standing on|off.`); }
+    if (isOfficial(a, zone.id)) out.push('  As an official: /contract post <creature> <count> <reward>, /contract commission <goods> <count> <gold each>, /contract withdraw <number>, or the Court tab.');
+    if (setsTerms(a, zone.id)) { const { min, max } = bounds(); out.push(`  As a tax-setter: /contract price <1|2|3> <gold> (${min} to ${max}), /contract budget <gold a week> (0 to ${budgetMax()}), /contract postbudget <gold a week>, /contract standing on|off.`); }
     return out;
   };
   // An official's change to the hold's terms: { text } or { error }. Shared by the chat and any later panel
@@ -654,6 +889,12 @@ module.exports = (api) => {
       const was = budgetOf(zone.id);
       h.budget = gold;
       text = `${zone.name}'s standing contracts may now commit ${gold} gold a week (was ${was}); ${budgetLeft(zone.id)} is left this week.`;
+    } else if (what === 'postbudget') {
+      const gold = Number(args[0]);
+      if (!Number.isInteger(gold) || gold < 0 || gold > budgetMax()) return { error: `Use: /contract postbudget <gold a week>, from 0 to ${budgetMax()}. 0 lets no work be posted by hand.` };
+      const was = postBudgetOf(zone.id);
+      h.postBudget = gold;
+      text = `${zone.name}'s posted work and commissions may now commit ${gold} gold a week (was ${was}); ${postLeft(zone.id)} is left this week.`;
     } else {
       const v = String(args[0] || '').toLowerCase();
       if (v !== 'on' && v !== 'off') return { error: 'Use: /contract standing on|off' };
@@ -677,8 +918,19 @@ module.exports = (api) => {
         citizensOnly: citizensOnly(z.id), resetsAt: resetsAt(), canSet: setsTerms(a, z.id), bounds: bounds(), budgetMax: budgetMax(),
         spent: Math.max(0, Math.floor(Number(holdState(z.id).spent) || 0)), enabled: CFG.enabled !== false,
         tiers: [1, 2, 3].map((t) => ({ tier: t, name: TIER_WORD[t], price: priceOf(z.id, t), kinds: kindsOfTier(t) })),
-        by: h.by ? String(h.by) : '', at: Number(h.at) || 0 }; },
+        by: h.by ? String(h.by) : '', at: Number(h.at) || 0,
+        // Posting by hand and commissions (Nat, 25 Oct): the hold's own fauna with its cap per kill, the week's pool, what is up
+        canPost: isOfficial(a, z.id), postBudget: postBudgetOf(z.id), postLeft: postLeft(z.id), postsPerDay: postsPerDay(), postsLeftToday: postsPerDay() ? Math.max(0, postsPerDay() - postsToday(a).length) : null,
+        fauna: Object.keys(kindsByZone[z.id] || {}).filter((k) => (DANGER[k] || 0) > 0).map((k) => ({ kind: k, name: plural(k), tier: DANGER[k], perKill: priceOf(z.id, DANGER[k]), spots: kindsByZone[z.id][k] })).sort((x, y) => x.tier - y.tier || y.spots - x.spots),
+        posted: zoneContracts(z.id).filter((c) => !isStanding(c)).map((c) => ({ id: c.id, type: c.type === 'commission' ? 'commission' : 'hunt', what: describe(c), by: String(c.byName || ''),
+          held: Number(c.held) || 0, hoursLeft: Math.max(0, Math.ceil((c.expiresAt - Date.now()) / 3600000)), mine: postedBy(c, a), canWithdraw: postedBy(c, a) || setsTerms(a, z.id) })),
+        search: searches.get(a >>> 0) || null,
+        commissionMaxCount: Math.floor(num(CFG.commissionMaxCount, 200)) }; },
     set: (a, zid, what, args) => { const z = zoneById(zid); return z ? setTerms(a, z, String(what), [].concat(args || []).map(String)) : { error: 'There is no such hold.' }; },
+    post: (a, zid, kind, count, reward) => { const z = zoneById(zid); return z ? postContract(a, z, kind, count, reward) : { error: 'There is no such hold.' }; },
+    commission: (a, zid, item, count, price) => { const z = zoneById(zid); return z ? postCommission(a, z, item, count, price) : { error: 'There is no such hold.' }; },
+    withdraw: (a, zid, id) => { const z = zoneById(zid); return z ? withdraw(a, z, id) : { error: 'There is no such hold.' }; },
+    search: (a, zid, q) => search(a, q),
   };
 
   // The list is its own function so /contract with no words can show it, and /contracts survives as an alias
@@ -690,7 +942,7 @@ module.exports = (api) => {
     if (!list.length) return personal(a, `${zone.name} has no work posted. Its coffers may be empty.`);
     personal(a, `Work posted in ${zone.name} (treasury ${treasuryGold(zone)} gold; standing work ${budgetLeft(zone.id)} of ${budgetOf(zone.id)} gold left this week):`);
     const restricted = citizensOnly(zone.id);
-    list.forEach((c, i) => personal(a, `  ${i + 1}. ${describe(c)}${isStanding(c) ? (restricted ? `, standing, citizens of ${zone.name} only` : ', standing') : ', posted by an official, open to all'}`));
+    list.forEach((c, i) => personal(a, `  ${i + 1}. ${describe(c)}${c.type === 'commission' ? ', a commission: /contract deliver ' + (i + 1) : isStanding(c) ? (restricted ? `, standing, citizens of ${zone.name} only` : ', standing') : ', posted by an official, open to all'}`));
     personal(a, CFG.enabled ? 'Take one on the Contracts tab of the expedition board, or with /contract take <number>.' : OFF_TEXT);
   };
 
@@ -720,29 +972,34 @@ module.exports = (api) => {
 
     if (verb === 'abandon') return personal(a, abandonContract(a, parts[1]));
 
-    if (verb === 'post') {
+    // post <creature words> <count> <reward> and commission <goods words> <count> <gold each>: the last two words are numbers
+    if (verb === 'post' || verb === 'commission') {
       if (!CFG.enabled) return personal(a, OFF_TEXT);
       const zone = playerZone(a);
       if (!zone) return personal(a, 'You stand outside any hold.');
-      if (!isOfficial(a, zone.id)) return personal(a, `Only an official of ${zone.name} posts work in its name.`);
-      const kind = String(parts[1] || '').toLowerCase();
-      const count = Math.max(1, Math.min(50, Number(parts[2]) || 0));
-      const reward = Math.max(1, Math.min(10000, Number(parts[3]) || 0));
-      if (!kind || !count || !reward) return personal(a, 'Use: /contract post <creature> <count> <reward>');
-      if (!(kindsByZone[zone.id] || {})[kind]) return personal(a, `No ${plural(kind)} are known to roam ${zone.name}.`);
-      // A hold pays for danger. Harmless quarry is not work, and no reward may run past what the risk is worth:
-      // without this an official could post one chicken at 10,000 gold and empty the treasury into his own purse.
-      const danger = DANGER[kind] || 0;
-      if (danger <= 0) return personal(a, `${plural(kind)[0].toUpperCase()}${plural(kind).slice(1)} are no danger to anyone. ${zone.name} pays for dangerous work.`);
-      const most = count * (Number(CFG.rewardPerKill[danger]) || 12);
-      if (reward > most) return personal(a, `${count} ${plural(kind)} is worth at most ${most} gold. Post it for that or less.`);
-      if (!escrow(zone, reward)) return personal(a, `The ${zone.name} treasury holds ${treasuryGold(zone)} gold, less than the reward.`);
-      const c = { id: nextId(), zone: zone.id, kind, count, reward, held: reward, standing: false, by: profileOf(a), byAccount: accountOf(a),
-        postedAt: Date.now(), expiresAt: Date.now() + (Number(CFG.expiryHours) || 12) * 3600000 };
-      state.contracts.push(c);
-      saveNow();
-      personal(a, `Posted: ${describe(c)}. The reward is set aside from the treasury until it is claimed.`);
-      return audit(`CONTRACT ${who(a)} posted ${c.count} ${plural(c.kind)} for ${zone.name} at ${c.reward} gold`);
+      const nums = parts.slice(-2), words = parts.slice(1, -2).join(' ');
+      if (parts.length < 4 || !nums.every((n) => /^\d+$/.test(n))) return personal(a, verb === 'post' ? 'Use: /contract post <creature> <count> <reward>' : 'Use: /contract commission <goods> <count> <gold each>');
+      const r = verb === 'post' ? postContract(a, zone, words, nums[0], nums[1]) : postCommission(a, zone, words, nums[0], nums[1]);
+      return personal(a, r.error || r.text);
+    }
+
+    // deliver <number on the list> [count]: hand in goods for a commission posted here
+    if (verb === 'deliver') {
+      const zone = playerZone(a);
+      if (!zone) return personal(a, 'There is no work posted on this ground.');
+      const c = zoneContracts(zone.id)[Math.max(1, Number(parts[1]) || 1) - 1];
+      if (!c || c.type !== 'commission') return personal(a, 'That is not a commission. /contract lists the work posted here.');
+      const r = deliver(a, c, parts[2]);
+      return personal(a, r.error || r.text);
+    }
+
+    if (verb === 'withdraw') {
+      const zone = playerZone(a);
+      if (!zone) return personal(a, 'You stand outside any hold.');
+      const c = zoneContracts(zone.id)[Math.max(1, Number(parts[1]) || 0) - 1];
+      if (!c) return personal(a, 'No such notice. /contract lists them.');
+      const r = withdraw(a, zone, c.id);
+      return personal(a, r.error || r.text);
     }
 
     if (verb === 'status') {
@@ -753,15 +1010,15 @@ module.exports = (api) => {
       return;
     }
 
-    if (verb === 'price' || verb === 'budget' || verb === 'standing') {
+    if (verb === 'price' || verb === 'budget' || verb === 'standing' || verb === 'postbudget') {
       const zone = playerZone(a);
       if (!zone) return personal(a, 'You stand outside any hold.');
       const r = setTerms(a, zone, verb, parts.slice(1));
       return personal(a, r.error || r.text);
     }
 
-    return personal(a, 'Use: /contract, /contract take <n>, /contract abandon [n], /contract status [hold], /contract post <creature> <count> <reward>; officials: /contract price <1|2|3> <gold>, /contract budget <gold>, /contract standing on|off.');
-  }, { help: 'take or post hunting work; /contract status shows a hold\'s pay, budget and who may take its standing work' });
+    return personal(a, 'Use: /contract, /contract take <n>, /contract abandon [n], /contract deliver <n> [count], /contract status [hold]; officials: /contract post <creature> <count> <reward>, /contract commission <goods> <count> <gold each>, /contract withdraw <n>; tax-setters: /contract price <1|2|3> <gold>, /contract budget <gold>, /contract postbudget <gold>, /contract standing on|off.');
+  }, { help: 'take, post or hand in work; /contract status shows a hold\'s pay, budgets and who may take its standing work' });
 
   // Contracts taken under the one-notice rule keep working, as copies with their progress
   {
