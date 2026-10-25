@@ -1,5 +1,20 @@
 [
   {
+    "title": "Giants shrug off magic",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Creatures",
+        "items": [
+          "Giants shrug off magic. Spells, staves and scrolls now do half damage to a giant, frost giants and stone giants included.",
+          "Weapons and fists hit giants as hard as before, and so do shouts. Mammoths are unchanged."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The curse spreads less easily",
     "date": "2026-10-25",
     "version": "Server update",
