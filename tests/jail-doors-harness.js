@@ -112,6 +112,24 @@ check('the arming runs out after 60 s', (() => { cmd(JARL); ui('jailDoorChoose',
 check('another hold\'s Jarl cannot take it over or unassign it', (() => { cmd(JARL_F); return /Only staff or Falkreath's ruler/.test(said(JARL_F)) || (ui('jailDoorChoose', JARL_F, ['arm']), act(INN_DOOR, JARL_F) === true && /Only staff or Whiterun's ruler/.test(said(JARL_F))); })(), said(JARL_F));
 check('a GM may assign in any hold', (() => { at(GM, PLAIN_CELL, [3050, 0, 0]); assign(GM, INN_DOOR2); at(GM, PLAIN_CELL, [80, 0, 0]); const f = file(); return f.length === 2 && f[1].door === '7002:Skyrim.esm' && f[1].by === 'W28'; })(), file());
 
+// ---- someone's property is never a jail door (the fork's housing recordOf, which resolves a door to its building) ----
+const OWNED_DOOR = 0x7003;
+at(OWNED_DOOR, PLAIN_CELL, [0, 40, 0]); put(OWNED_DOOR, 'baseDesc', DOOR_BASE);
+const claims = new Map([[OWNED_DOOR, { owner: 77, ownerName: 'Aela' }]]);
+globalThis.__dboHousing = { recordOf: (ref) => claims.get(ref >>> 0) || null };
+check('a door of someone\'s property is refused, saying whose and what to do', (() => {
+  cmd(JARL); ui('jailDoorChoose', JARL, ['arm']); out.widgets.length = 0;
+  const r = act(OWNED_DOOR, JARL);
+  return r === true && out.widgets.length === 0 && /part of Aela's property, so it cannot be a jail door/.test(said(JARL)) && file().length === 2;
+})(), said(JARL));
+check('a jail door claimed after it was assigned is passed over by the watch', (() => {
+  claims.set(INN_DOOR, { owner: 78, ownerName: 'Ysolda' });
+  const w = globalThis.__dboJailByWatch(PRISONER, 'whiterun', 10, 'x');
+  const ok = w && w.kind === 'jail door' && (props.get(PRISONER + '|private.dboSentence').door >>> 0) === INN_DOOR2;
+  claims.delete(INN_DOOR); props.set(PRISONER + '|private.dboSentence', null); props.set(INN_DOOR2 + '|private.dboCell', null);
+  return ok;
+})());
+
 // ---- a jail door in use ----
 out.widgets.length = 0;
 check('the hold\'s guard at the jail door with a player near gets the cell menu', act(INN_DOOR, GUARD) === true && ids().includes('who:25'), last() && last().w);

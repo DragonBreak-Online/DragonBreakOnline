@@ -117,6 +117,15 @@ module.exports = (api) => {
     try { return (ranksOf(profileOf(a), a >>> 0) || []).some((m) => m && String((m.zone && m.zone.id) || m.zone) === hold && (JD.officialRanks || []).includes(String(m.rank))); } catch (e) { return false; }
   };
   const mayAssign = (a, hold) => !!hold && (isAdmin(a) || holdOfficial(a, hold));
+  // The owner's name when the door is someone's claimed property, its building's included (the fork's housing recordOf
+  // resolves a door to its place), else '': a jail never clashes with a house's own lock (Nate via the Leader, 25 Oct)
+  const claimedBy = (door) => {
+    try {
+      const h = globalThis.__dboHousing;
+      const r = h && typeof h.recordOf === 'function' ? h.recordOf(door >>> 0) : null;
+      return r && Number(r.owner) > 0 ? String(r.ownerName || 'someone') : '';
+    } catch (e) { return ''; }
+  };
 
   const isCellDoor = (ref) => ref < 0xff000000 && !LOAD_DOORS.has(ref >>> 0) && (!!jailDoorOf(ref) || isJail(cellOf(ref))) && isDoor(ref);
 
@@ -297,7 +306,8 @@ module.exports = (api) => {
     const here = cellOf(prisoner);
     let pos = null; try { pos = mp.get(prisoner, 'pos'); } catch (e) { pos = null; }
     const dist = (d) => (Array.isArray(pos) && Array.isArray(d.spot) && norm(d.cell) === here ? Math.hypot(pos[0] - d.spot[0], pos[1] - d.spot[1], pos[2] - d.spot[2]) : Infinity);
-    return jailDoors.filter((d) => d.hold === String(hold) && Array.isArray(d.spot) && idOf(d.door) && !occupantOf(idOf(d.door)))
+    // A jail door claimed as property since it was assigned is passed over: its house's lock is not the jail's
+    return jailDoors.filter((d) => d.hold === String(hold) && Array.isArray(d.spot) && idOf(d.door) && !occupantOf(idOf(d.door)) && !claimedBy(idOf(d.door)))
       .map((d, i) => ({ d, i, k: dist(d) })).sort((x, y) => x.k - y.k || x.i - y.i).map((x) => x.d);
   };
   globalThis.__dboJailByWatch = (prisoner, hold, mins, byLabel) => {
@@ -418,6 +428,8 @@ module.exports = (api) => {
     const jd = jailDoorOf(door);
     const hold = jd ? jd.hold : holdHere(a);
     if (!mayAssign(a, hold)) { personal(a, notTheirs(hold)); return true; }
+    const owner = jd ? '' : claimedBy(door);
+    if (owner) { personal(a, `This door is part of ${owner}'s property, so it cannot be a jail door. Choose a door nobody owns, or have the hold take the property back first.`); return true; }
     let spot = null; try { const p = mp.get(a, 'pos'); spot = Array.isArray(p) ? p.slice(0, 3).map(Math.round) : null; } catch (e) { spot = null; }
     doorPending.set(a >>> 0, { door: door >>> 0, spot, hold });
     const actions = jd ? [{ id: 'unassign', label: `Unassign this jail door of ${holdLabel(hold)}` }]
@@ -462,6 +474,7 @@ module.exports = (api) => {
     if (choice === 'unassign') { const d = jailDoorOf(p.door); if (d) unassign(a, d); return; }
     if (choice === 'assign') {
       if (jailDoorOf(p.door)) return personal(a, 'That door is a jail door already.');
+      { const owner = claimedBy(p.door); if (owner) return personal(a, `This door is part of ${owner}'s property, so it cannot be a jail door. Choose a door nobody owns, or have the hold take the property back first.`); }
       if (!p.spot) return personal(a, 'Your position could not be read. Try again.');
       const desc = mp.getDescFromId(p.door >>> 0);
       const cell = String(get(p.door, 'worldOrCellDesc', ''));
