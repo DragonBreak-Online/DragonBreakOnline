@@ -738,5 +738,57 @@ globalThis.__dboBeastRevert(NEWP, 'test');
 restart({ beastform: {} });
 
 
+// ---- 16. the Hagraven's two powers (DLE records, Nat 25 Oct) --------------------------------------------------------
+// Scream reuses the howl's sweep with her own kind spared; Summon Spriggan has NO POWERS entry on purpose, because
+// the fork's ConjurationSystem already spawns any SummonCreature a player casts.
+restart({ beastform: {} });
+revertToOwn();
+place(LEAD, 900000, OTHER_WORLD);
+place(NEWP, 0);
+
+const SCREAM = 0x1d2233, SUMMON_SPRIGGAN = 0x1d2234;
+
+polyAs(NEWP, 'hagraven', { by: 'hagraven' });
+let pk16 = lastBeastPacket(NEWP);
+const voice16 = ((pk16 && pk16.abilities && pk16.abilities.voice) || []).map((x) => x.id);
+ok(voice16.indexOf(SCREAM) >= 0, '16. the Hagraven is granted her Scream', voice16);
+ok(voice16.indexOf(SUMMON_SPRIGGAN) >= 0, '16. ...and Summon Spriggan', voice16);
+ok(voice16[voice16.length - 1] === 0xcd5c, '16. ...with Revert Form LAST, so the default shout-key power never ends the form', voice16);
+
+// A victim who can be frightened: same place, alive, with percentages to write
+place(PLAYER, 100);
+props.set(`${PLAYER}|percentages`, { health: 1, magicka: 1, stamina: 1 });
+props.set(`${PLAYER}|isDead`, false);
+
+let n16 = packets.length;
+globalThis.__dboBeastPower(NEWP, SCREAM);
+const terrors = packets.slice(n16).filter((x) => x.p && x.p.customPacketType === 'dboStatus' && x.p.kind === 'terror');
+ok(terrors.length === 1 && terrors[0].a === PLAYER, '16. the Scream terrifies a player nearby', terrors.map((t) => t.a));
+ok(terrors.length === 1 && /shriek/i.test(terrors[0].p.text), '16. ...and it is a shriek, not a howl, in her mouth', terrors[0] && terrors[0].p.text);
+
+// The negative that matters: no POWERS entry for the summon, so nothing here runs it twice
+n16 = packets.length;
+globalThis.__dboBeastPower(NEWP, SUMMON_SPRIGGAN);
+const after16 = packets.slice(n16).filter((x) => x.p && x.p.customPacketType === 'dboStatus' && x.p.kind === 'terror');
+ok(after16.length === 0, '16. Summon Spriggan runs NOTHING here: ConjurationSystem owns the spawn', after16.length);
+
+// Her kind is spared, where a werewolf would not be
+props.set(`${PLAYER}|percentages`, { health: 1, magicka: 1, stamina: 1 });
+polyAs(PLAYER, 'hagraven', { by: 'hagraven' });
+n16 = packets.length;
+globalThis.__dboBeastPower(NEWP, SCREAM);
+const kinSpared = packets.slice(n16).filter((x) => x.p && x.p.customPacketType === 'dboStatus' && x.p.kind === 'terror');
+ok(kinSpared.length === 0, '16. another Hagraven is kin and is not frightened', kinSpared.length);
+globalThis.__dboBeastRevert(PLAYER, 'test');
+
+// And the form gate still holds: her power does nothing in somebody else's body
+globalThis.__dboBeastRevert(NEWP, 'test');
+props.set(`${PLAYER}|percentages`, { health: 1, magicka: 1, stamina: 1 });
+n16 = packets.length;
+globalThis.__dboBeastPower(NEWP, SCREAM);
+ok(packets.slice(n16).filter((x) => x.p && x.p.kind === 'terror').length === 0,
+  '16. the Scream does nothing when she is not in the body', packets.slice(n16).length);
+
+
 console.log(fail ? `\n${fail} FAILED, ${pass} passed` : `\nall ${pass} checks passed`);
 process.exit(fail ? 1 : 0);

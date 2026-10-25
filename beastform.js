@@ -178,7 +178,14 @@ module.exports = (api) => {
     hagraven: {
       right: [spell('7d98f:Skyrim.esm', 'Firebolt'), spell('7d997:Skyrim.esm', 'Fireball')],
       left: [spell('7231c:Skyrim.esm', 'Fast Healing'), spell('f95eb:Skyrim.esm', 'Close Wounds')],
-      voice: [spell('cd5c:Dawnguard.esm', 'Revert Form')],
+      // The two powers Nat approved on 25 Oct, built as DLE records (_notes-to-server\staged-20261025-hagraven-powers).
+      // ids from Worker 3's merge; that DLE is a CANDIDATE, so if a child ahead of ours is rebuilt these move and are
+      // the only lines to change. A desc that does not resolve gives id 0 and allSpells filters it out, so an older
+      // load order simply grants nothing rather than failing.
+      // Revert Form last, so the default power on the Shout key is never the one that ends the form.
+      voice: [spell('1d2233:DragonBreak Online Edits.esp', 'Hagraven Scream'),   // verify-formids: ignore - in Worker 3's DLE candidate (staged-20261026), not the live load order yet; the desc resolves to 0 and is filtered until it ships
+        spell('1d2234:DragonBreak Online Edits.esp', 'Summon Spriggan'),   // verify-formids: ignore - in Worker 3's DLE candidate (staged-20261026), not the live load order yet; the desc resolves to 0 and is filtered until it ships
+        spell('cd5c:Dawnguard.esm', 'Revert Form')],
       passive: [], hidden: [],
     },
     werewolf: {
@@ -419,7 +426,12 @@ module.exports = (api) => {
   const DRAIN_HEAL = 15 / 450;   // Drain05Alt absorbs 15 health; a Vampire Lord has 450 (race 300 + Player 150)
   const ST = globalThis.__dboBeastPowers = globalThis.__dboBeastPowers || { cooldown: new Map(), ethereal: new Map() };
   const ethereal = (a, seconds) => { ST.ethereal.set(a, Date.now() + seconds * 1000); personal(a, `You cannot be touched for ${seconds} seconds.`); return true; };
-  const terror = (a, spellId) => {
+  // opts: { kinForm, powerName, victimText, casterText } - a Hagraven screams rather than howls and spares
+  // her own kind, not wolves. Called with no opts the werewolf's wording and kin rule are exactly as before.
+  const terror = (a, spellId, opts) => {
+    const o = opts || {};
+    const kinForm = o.kinForm || 'werewolf';
+    const powerName = o.powerName || 'Howl of Terror';
     let here = null, pos = null; try { here = mp.get(a, 'worldOrCellDesc'); pos = mp.get(a, 'pos'); } catch (e) { return false; }
     let n = 0, kin = 0;
     for (const t of api.onlineActors()) {
@@ -429,18 +441,20 @@ module.exports = (api) => {
         if (mp.get(t, 'worldOrCellDesc') !== here || Math.hypot(p[0] - pos[0], p[1] - pos[1], p[2] - pos[2]) > TERROR_RADIUS || mp.get(t, 'isDead')) continue;
         // The beast does not frighten its own kind
         const ts = stateOf(t);
-        if (ts && ts.form === 'werewolf') { kin++; continue; }
+        if (ts && ts.form === kinForm) { kin++; continue; }
         // The hit chain decides who can be touched at all (god mode refuses)
         if (typeof mp.onHitDamageAttempt === 'function' && mp.onHitDamageAttempt(a, t, spellId, 0) === false) continue;
         const pc = mp.get(t, 'percentages');
         mp.set(t, 'percentages', { health: pc.health, magicka: pc.magicka, stamina: 0 });
-        sendPacket(t, { customPacketType: 'dboStatus', kind: 'terror', seconds: TERROR_SECONDS, speedMult: -50, text: `A howl freezes your blood. You are terrified for ${TERROR_SECONDS} seconds.` });
+        sendPacket(t, { customPacketType: 'dboStatus', kind: 'terror', seconds: TERROR_SECONDS, speedMult: -50,
+          text: o.victimText ? `${o.victimText} You are terrified for ${TERROR_SECONDS} seconds.` : `A howl freezes your blood. You are terrified for ${TERROR_SECONDS} seconds.` });
         n++;
       } catch (e) { /* elsewhere */ }
     }
     const pack = kin ? ` ${kin} of your own kind ${kin === 1 ? 'stands' : 'stand'} unmoved.` : '';
-    personal(a, (n ? `Your howl terrifies ${n} ${n === 1 ? 'soul' : 'souls'}.` : 'Your howl echoes, but no one is near enough to fear it.') + pack);
-    log(`beastform: ${display(a)} Howl of Terror, ${n} terrified, ${kin} werewolf kin spared`);
+    const what = o.casterText || 'howl';
+    personal(a, (n ? `Your ${what} terrifies ${n} ${n === 1 ? 'soul' : 'souls'}.` : `Your ${what} echoes, but no one is near enough to fear it.`) + pack);
+    log(`beastform: ${display(a)} ${powerName}, ${n} terrified, ${kin} ${kinForm} kin spared`);
     return true;
   };
   const POWERS = new Map([
@@ -448,6 +462,14 @@ module.exports = (api) => {
     [idOf('38ba:Dawnguard.esm'), { name: 'Mist Form', form: 'vampirelord', cooldown: 20, run: (a) => ethereal(a, 15) }],
     // Bats had a 3 s cooldown on 3 s of ethereal, so pressing the key kept a Vampire Lord untouchable for good
     [idOf('38b9:Dawnguard.esm'), { name: 'Bats', form: 'vampirelord', cooldown: 12, run: (a) => ethereal(a, 3) }],
+    // The Hagraven's scream: the same sweep as the howl, her own kind spared instead of wolves.
+    // There is deliberately NO entry for Summon Spriggan: the fork's ConjurationSystem already spawns any
+    // SummonCreature effect a player casts (conjurationSystem.ts onSpellCast -> companions.spawn), so a run here
+    // would summon a second Spriggan. __dboBeastPower is a notification from gamemode.js whose answer is discarded,
+    // so an entry could not gate the cast either - it would buy nothing and cost a double summon.
+    [idOf('1d2233:DragonBreak Online Edits.esp'), { name: 'Hagraven Scream', form: 'hagraven', cooldown: 30,   // verify-formids: ignore - in Worker 3's DLE candidate (staged-20261026), not the live load order yet; the desc resolves to 0 and is filtered until it ships
+      run: (a, id) => terror(a, id, { kinForm: 'hagraven', powerName: 'Hagraven Scream',
+        victimText: 'A shriek splits the air.', casterText: 'scream' }) }],
   ]);
   globalThis.__dboBeastPower = (a, spellId) => {
     a = Number(a) >>> 0; spellId = Number(spellId) >>> 0;
