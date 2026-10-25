@@ -8179,9 +8179,11 @@ globalThis.__dboSummonDurationMult = (owner, kind) => {
 };
 // A spell hit a summon would not live through but the scaled hit would: the snapshot OnSpellHit writes back makes a raise
 // before the hit useless, so the hit is refused and the scaled damage taken off just after. Returns true when it did.
-const summonSpellGuard = (agg, tgt, dmg, mult, flags) => {
+// resisted: the target is of a kind that shrugs off magic (npcToughness magicTaken), which needs the same guard, or a spell
+// that would kill a giant outright kills it although half of it would not.
+const summonSpellGuard = (agg, tgt, dmg, mult, flags, resisted) => {
   const f = flags && typeof flags === 'object' ? flags : {};
-  if (!f.spell || !(mult > 0 && mult < 1) || !(dmg > 0) || !playerSummonOf(tgt)) return false;
+  if (!f.spell || !(mult > 0 && mult < 1) || !(dmg > 0) || !(resisted || playerSummonOf(tgt))) return false;
   const max = Number(f.targetMaxHealth); if (!(max > 0)) return false;
   let p = null; try { p = mp.get(tgt, 'percentages'); } catch (e) { return false; }
   if (!p || !(p.health > 0)) return false;
@@ -8341,10 +8343,15 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     if (toughness) { try { mult *= toughness.dealtMult(agg, tgt, dmg); } catch (e) { log('toughness dealt failed', e.message); } }
     // A player's summon takes less by its owner's Conjuration rank (summonBuff.takenByTier)
     mult *= summonTakenMult(agg, tgt, dmg);
+    // A family of creatures that shrugs off magic (npcToughness.kinds.<kind>.magicTaken; the giants, Nat 25 Oct): spells,
+    // staves, scrolls and enchantments, never weapon blows or fists
+    let magicTaken = 1;
+    if (toughness) { try { magicTaken = toughness.magicTakenMult(agg, tgt, dmg, flags, src); } catch (e) { log('toughness magic failed', e.message); } }
+    mult *= magicTaken;
     // Restoration's sun on the undead (config elements.sun)
     mult *= sunDamageMult(agg, tgt, src);
     try { npcHitLog(agg, tgt, src, dmg, mult, flags); } catch (e) { log('npc hit log failed', e.message); }
-    if (summonSpellGuard(agg, tgt, dmg, mult, flags)) return false;
+    if (summonSpellGuard(agg, tgt, dmg, mult, flags, magicTaken < 1)) return false;
     // Would the engine's full hit down a player the scaled hit would not? Then it lands scaled from the start, and what a
     // capped raise could not hold back is given back after it like any scaled hit
     const guard = npcLethalGuard(agg, tgt, dmg, mult, flags);

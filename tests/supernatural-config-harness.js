@@ -32,7 +32,8 @@ for (const key of Object.keys(cfg)) {
 ok(known.has('infectWerewolf') && known.has('infectVampire'), 'the infection chances are among them');
 
 // The value Nate set, and the shape of it: a probability per bite, not a percentage.
-ok(cfg.infectWerewolf === 0.01, 'a werewolf bite infects at 1% (Nate, 13 Oct)', cfg.infectWerewolf);
+ok(cfg.infectWerewolf === 0.005, 'a werewolf bite infects at 0.5% (Nat, 25 Oct; 1% from 13 Oct)', cfg.infectWerewolf);
+ok(cfg.infectVampire === 0.01, "a vampire's hit infects at 1% (Nat, 25 Oct; the 3% code default before)", cfg.infectVampire);
 for (const k of ['infectWerewolf', 'infectVampire', 'infectFeed', 'huntMarkChance']) {
   if (cfg[k] === undefined) continue;
   ok(typeof cfg[k] === 'number' && cfg[k] > 0 && cfg[k] <= 1, `${k} is a chance between 0 and 1, not a percentage`, cfg[k]);

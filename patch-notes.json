@@ -30,6 +30,107 @@
     ]
   },
   {
+    "title": "The Spider Imbuing Chamber answers only to Dunmer",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Spidermancy",
+        "items": [
+          "Working the Spider Imbuing Chamber is now a Dunmer craft. Anyone else who tries it is told the chamber does not stir for them, and nothing opens. It is your character's own race that counts, so a Dunmer under a beast form or a staff's polymorph can still use it, and a Nord wearing someone else's shape still cannot."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "The bank gem counter reopens",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Banks",
+        "items": [
+          "Banks buy gems again at 15% of their value, and sell them at three times it.",
+          "At most 500 gold a day from gem sales, per character and per account.",
+          "A hold keeps a reserve and stops buying gems for the day once its treasury reaches it."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Gemstones are rarer, and worth more",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Finding gems",
+        "items": [
+          "Gemstones are now much harder to find. Dungeon chests and boss chests hold them less often, bosses drop flawless gems about half as often, and champions carry them less often.",
+          "A gem geode now gives one gem each time you work it, at every Miner tier, and takes twice as long to come back."
+        ]
+      },
+      {
+        "heading": "Enchanting",
+        "items": [
+          "Gems now matter when you enchant. An effect tied to a gem is at full strength if you carry a flawless one of that gem, at 80% with a regular one, and at 60% with none. The gem is used up.",
+          "Rubies go with fire and Destruction; sapphires with frost and magicka; garnets with shock and magicka damage; emeralds with health, healing, Restoration and resisting poison and disease; amethysts with Conjuration, Illusion, paralysis, soul trap, banish and turn undead; diamonds with Alteration, stamina and resist magic. Effects tied to no gem, such as Fortify Archery or Carry Weight, are unchanged.",
+          "Nothing else about enchanting changes: armour type and soul size work as before."
+        ]
+      },
+      {
+        "heading": "The bank gem counter",
+        "items": [
+          "Every hold's bank now buys and sells gemstones. Say /bank gems at a bank to see the prices and what that hold has in stock.",
+          "The bank buys a gem for half its value, paid by the hold's treasury into your account. It sells gems for three times their value, and that gold goes to the hold.",
+          "A bank only sells gems that players have sold to it, so stock is limited. A hold whose treasury is short cannot buy."
+        ]
+      },
+      {
+        "heading": "Gems for great deeds",
+        "items": [
+          "Declaring war now also costs the declarer two flawless gems of any kind, as well as the 10,000 gold from the treasury.",
+          "A ruler granting or changing a noble title pays one flawless gem, which goes to the hold's gem counter.",
+          "Buying a building from a hold costs one flawless gem for every 5,000 gold of its price, which also goes to the hold's gem counter. Houses under 5,000 gold, and houses bought from another player, need none."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Giants shrug off magic",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Creatures",
+        "items": [
+          "Giants shrug off magic. Spells, staves and scrolls now do half damage to a giant, frost giants and stone giants included.",
+          "Weapons and fists hit giants as hard as before, and so do shouts. Mammoths are unchanged."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "The curse spreads less easily",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Vampires and werewolves",
+        "items": [
+          "A vampire's hit now passes on Sanguinare Vampiris 1 time in 100 (it was 3 in 100), and a werewolf's bite passes on Sanies Lupinus 1 time in 200 (it was 1 in 100).",
+          "When the fever peaks, its rite opens again: the Blood Fever for a vampire's fever, Hircine's Hunt for a werewolf's. It has 7 rounds and you must get 5 of them right. Survive it and you turn.",
+          "Fail it and the fever breaks: the disease is gone from your blood, you live, and there is no second try. Closing the rite after a round, or leaving while you are behind, counts as failing. A rite you never touched comes again later.",
+          "Molag Bal's Embrace and the Great Hunt now have 7 rounds and need 6 (they needed 4 of 5), and the last two rounds of every rite are a little harder to read."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The Great Faiths have joined the Imperial Cult",
     "date": "2026-10-25",
     "version": "Server update",
@@ -86,20 +187,6 @@
           "The Knights of the Nine are a faction: the holy order of the Nine Divines, from Pilgrim and Knight Errant up to Knight Commander and the Divine Crusader.",
           "Only a follower of one of the Nine Divines, Talos included, may join: choose your god at a shrine first. A Knight may not serve a Daedric cult.",
           "Their Armorers alone forge the Knight-Errant armour."
-        ]
-      }
-    ]
-  },
-  {
-    "title": "The Spider Imbuing Chamber answers only to Dunmer",
-    "date": "2026-10-25",
-    "version": "Server update",
-    "tag": "Change",
-    "sections": [
-      {
-        "heading": "Spidermancy",
-        "items": [
-          "Working the Spider Imbuing Chamber is now a Dunmer craft. Anyone else who tries it is told the chamber does not stir for them, and nothing opens. It is your character's own race that counts, so a Dunmer under a beast form or a staff's polymorph can still use it, and a Nord wearing someone else's shape still cannot."
         ]
       }
     ]

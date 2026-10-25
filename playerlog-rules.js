@@ -750,6 +750,18 @@ parsed('BANK', {
       return [ev('item.bank', 0, { op: 'vault_seize', zone: m[1], tier: m[2], gold: Number(m[3]) })];
     if ((m = text.match(/ STAFF took (\d{1,9})x ([0-9a-f]{1,8}) from the vaults of /))) return [ev('item.bank', 0, { op: 'vault_staff_take', n: Number(m[1]), b: m[2] })];
     if ((m = text.match(new RegExp(` RESTORED .* ${Z}: seizure `)))) return [ev('item.bank', 0, { op: 'vault_restore', zone: m[1] })];
+    // The gem counter and the gem fee of big deeds (bank.js, Nat 25 Oct): gem names come from the game's records; a deed's reason is never read
+    if (/^BANK GEMS /.test(text)) {
+      if ((m = text.match(new RegExp(` sold (\\d{1,9})x (.{1,64}?) \\(([0-9a-f]{1,8})\\) to ${Z} for (\\d{1,12}) gold from its treasury`))))
+        return [ev('item.bank', 0, { op: 'gem_sell', n: Number(m[1]), i: m[2], b: m[3], zone: m[4], gold: Number(m[5]) })];
+      if ((m = text.match(new RegExp(` bought (\\d{1,9})x (.{1,64}?) \\(([0-9a-f]{1,8})\\) from ${Z} for (\\d{1,12}) gold `))))
+        return [ev('item.bank', 0, { op: 'gem_buy', n: Number(m[1]), i: m[2], b: m[3], zone: m[4], gold: Number(m[5]) })];
+      if (/ paid \d{1,9}x /.test(text)) return [ev('item.bank', 0, { op: 'gem_fee' })];
+      // The retune's limits (Nat, 25 Oct): a sale refused by the daily cap (character or account) or the hold's reserve
+      if ((m = text.match(new RegExp(` refused at ${Z}: (the daily cap|the account's daily cap|the treasury reserve) `))))
+        return [ev('item.bank', 0, { op: 'gem_refused', zone: m[1], why: m[2] === 'the treasury reserve' ? 'reserve' : m[2] === 'the daily cap' ? 'cap' : 'account_cap' })];
+      return [];
+    }
     return [];
   },
 });
@@ -1370,6 +1382,12 @@ bank.js BANK 92dd9b73 parsed
 bank.js BANK ddbac33b parsed
 bank.js BANK 3958b0d9 parsed
 bank.js BANK 8ff19655 parsed
+bank.js BANK 71d34c61 parsed
+bank.js BANK ade0885b parsed
+bank.js BANK f7927cf8 parsed
+bank.js BANK b29e7db8 parsed
+bank.js BANK 1a72f529 parsed
+bank.js BANK 07a5b4f9 parsed
 bank.js BANK b26ffbd5 parsed
 bank.js BANK d4d119df parsed
 bank.js BANK 167dae12 parsed
@@ -1932,7 +1950,7 @@ supernatural.js SUPERNATURAL 20a78766 parsed
 supernatural.js PERMADEATH d8f3928d parsed
 supernatural.js SUPERNATURAL b0a3c71f parsed
 supernatural.js RITE 994d3da4 clean
-supernatural.js RITE 365c890b clean
+supernatural.js RITE 11804524 clean
 supernatural.js RITE-MISMATCH a93b97ba clean
 supernatural.js RITE 1f3ba523 clean
 supernatural.js RITE 5975fe44 clean
@@ -1978,6 +1996,7 @@ tenancy.js PROPERTY ba2e199b parsed
 tenancy.js PROPERTY e0424aa5 parsed
 tenancy.js PROPERTY a49d27a0 parsed
 tenancy.js PROPERTY 3aac3a2d parsed
+tenancy.js PROPERTY abe74dbd parsed
 thalmor.js CONCORDAT 230eceba clean
 thalmor.js CONCORDAT 66fa43c2 clean
 thalmor.js CONCORDAT f62ed9cc clean

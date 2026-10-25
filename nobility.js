@@ -17,6 +17,8 @@
 // its buildings as a steward does (grant, take back, assign rooms and chests) and their own buildings there do not count
 // against the one-building cap. They also assess and rent out property there (economy.js, tenancy.js, by
 // __dboHousing.isFiefHolder). They are no court member: no tax rate, arrests or posts.
+// A title costs the ruler who grants or changes it grantGems (1) flawless gem of any kind from their pack, into the hold's
+// gem counter (bank.js __dboGemFee; Nat, 25 Oct: gems pay for big deeds); a revocation and the migration cost none.
 // Tax (economy.js, through __dboNobilityFiefCut): fiefShare of the weekly property tax on a building in a fief goes to that
 // fief's treasury (bank.js __dboFiefTreasury: deposits only, nobody withdraws), the rest to the hold as before.
 //
@@ -45,7 +47,7 @@ module.exports = (api) => {
   // title by the #TAG drawn under it stays the mask there; the roll and the decree follow rosterPrivacy.masks
   const publicNameOf = typeof api.publicNameOf === 'function' ? api.publicNameOf : nameOf;
   const C = Object.assign({
-    enabled: false, fiefShare: 0.25, maxEstateName: 40,
+    enabled: false, fiefShare: 0.25, maxEstateName: 40, grantGems: 1,
     // zone id -> 'cyrodiil' | 'skyrim': which titles its ruler grants; a zone not listed is a Skyrim hold
     realms: { bruma: 'cyrodiil' },
     // One-time grants made when the switch is on (the migration: Lord Elion, Baron of Mountain Watch): { fief | hold, title,
@@ -221,6 +223,14 @@ module.exports = (api) => {
       fief: fief || undefined, estate: estate || undefined, at: Date.now(), by: by ? who(by) : String(how || 'migration') };
     const asked = String(publicNameOf(actor) || entry.name);
     if (before && labelOf(entry) === was) return { error: `${asked} is already ${was}.` };
+    // Without bank.js's gem fee (a load that failed) a title costs no gem rather than being refused
+    const fee = globalThis.__dboGemFee;
+    const gems = by && fee ? Math.max(0, Math.floor(Number(C.grantGems) || 0)) : 0;
+    if (gems) {
+      const need = fee.need(by, gems);
+      if (need) return { error: `A title costs the crown a flawless gem. ${need}` };
+      if (!fee.take(by, gems, z.id, `${asked} made ${labelOf(entry)} (${z.name})`)) return { error: 'Your flawless gem could not be taken. Nothing was granted.' };
+    }
     data().nobles = data().nobles.filter((n) => n !== before).concat([entry]);
     save();
     const label = labelOf(entry);

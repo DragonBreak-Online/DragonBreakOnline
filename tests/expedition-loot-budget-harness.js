@@ -198,8 +198,10 @@ for (const d of ORD) {
   const now = DIFFS.reduce((n, diff) => n + goods(rows.find((r) => r.d === d && r.diff === diff).m), 0);
   const was = DIFFS.reduce((n, diff) => n + goods(BEFORE[`${d.raw.id}|${diff}`] || {}), 0);
   // Untrimmed again (Nate, 2026-09-30): about the old value, more where bodies outnumber containers (a bandit mine of 15
-  // containers gains about 1.9x from its bodies' gear), a little less in torches; the whole set is held tighter below
-  if (was > 0) check(`${d.name} (ordinary, ${(d.raw.chests || []).length} containers), all difficulties: ${f0(now)} of ${f0(was)} (${(now / was).toFixed(2)})`, now > was * 0.8 && now < was * 2.5);
+  // containers gains about 1.9x from its bodies' gear), a little less in torches; the whole set is held tighter below.
+  // Gems were cut on purpose on 25 Oct (Nat: "gems are a grind to get"; a chest 5%, was 15%, a boss chest 35%, was 60%), and
+  // in a dungeon of many containers they were a fifth of the goods (Frostfire Glade 0.77, Beasts Maw 0.72), so the floor is 0.65
+  if (was > 0) check(`${d.name} (ordinary, ${(d.raw.chests || []).length} containers), all difficulties: ${f0(now)} of ${f0(was)} (${(now / was).toFixed(2)})`, now > was * 0.65 && now < was * 2.5);
 }
 for (const diff of DIFFS) {
   const now = ORD.reduce((n, d) => n + goods(rows.find((r) => r.d === d && r.diff === diff).m), 0);

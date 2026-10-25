@@ -35,6 +35,12 @@ globalThis.__dboGuildInfo = (id) => ({ 'county-bruma': { id, name: 'County of Br
 globalThis.__dboGuildsOf = (a) => (fighters.includes(a) ? [{ id: 'fighters-guild', role: a === GM ? 'leader' : 'member' }] : []);
 globalThis.__dboHoldFactionOf = (z) => (z === 'bruma' ? 'county-bruma' : null);
 const treasury = { 'county-bruma': 10000, 'fighters-guild': 25000 };
+// bank.js's gem fee, by count of flawless gems carried (Nat, 25 Oct: 2 to declare a war)
+const gemsOf = new Map(); const gemTaken = [];
+globalThis.__dboGemFee = {
+  need: (a, n) => ((gemsOf.get(a) || 0) >= n ? '' : `It also costs ${n} flawless gems of any kind, carried (you carry ${gemsOf.get(a) || 0}).`),
+  take: (a, n, zoneId, why) => { if ((gemsOf.get(a) || 0) < n) return false; gemsOf.set(a, gemsOf.get(a) - n); gemTaken.push({ a, n, zoneId, why }); return true; },
+};
 globalThis.__dboTreasury = {
   balance: (f) => treasury[f] || 0,
   spend: (f, n) => { if ((treasury[f] || 0) < n) return false; treasury[f] -= n; return true; },
@@ -118,9 +124,14 @@ treasury['fighters-guild'] = 9999;
 check('the 10,000 gold fee', /costs 10000 gold/.test(decl(GM, ['applewatch']).text));
 treasury['fighters-guild'] = 25000;
 muster(fighters);
+gemsOf.set(GM, 1);
+check('two flawless gems from the declarer as well (Nat, 25 Oct)', /Declaring war: It also costs 2 flawless gems of any kind, carried \(you carry 1\)/.test(decl(GM, ['applewatch', 'bruma'], { death: true }).text) && treasury['fighters-guild'] === 25000);
+gemsOf.set(GM, 3);
 let r = decl(GM, ['applewatch', 'bruma'], { death: true });
 check('a valid declaration', r.ok, r.text);
 check('the fee is paid from the treasury', treasury['fighters-guild'] === 15000);
+check('...and two gems from the declarer, spent (no hold)', gemsOf.get(GM) === 1 && gemTaken.length === 1 && gemTaken[0].n === 2 && !gemTaken[0].zoneId);
+gemsOf.set(GM, 100);
 const w = r.war;
 check('a week of notice before the first window', w.startsAt >= now + 7 * DAY && w.startsAt < now + 8 * DAY, new Date(w.startsAt).toISOString());
 check('three evening windows of two hours, on separate evenings', w.windows.length === 3 && w.windows.every((x) => x.end - x.start === 2 * 3600000 && new Date(x.start).getUTCHours() === 0) && new Set(w.windows.map((x) => new Date(x.start).getUTCDate())).size === 3);
@@ -258,8 +269,8 @@ const caps = realm.realmView(GM).capitals;
 check('the view lists the hold\'s capital territory and the guild\'s seat with its map spot', caps.some((c) => c.faction === 'county-bruma' && c.territory === 'greenwood') && caps.some((c) => c.faction === 'fighters-guild' && c.territory === null && c.x === 70000 && c.y === 190000), JSON.stringify(caps));
 const mine = realm.realmView(COUNT).leads[0];
 check('the Count\'s panel offers the hold\'s territories (not the Legion\'s forts), no spot, and says when the next move is allowed', mine.capital === 'greenwood' && mine.capitalChoices.map((c) => c.id).sort().join() === 'bruma,greenwood' && mine.canSetHere === false && mine.capitalChangeAt > now);
-world.set(GM, '1234:BSHeartland.esm'); now += 8 * DAY;
-check('indoors the seat is the room itself', realm.setCapital(GM, 'fighters-guild', 'here').ok && realm.seatOf('fighters-guild').cells[0] === '1234:BSHeartland.esm' && realm.seatOf('fighters-guild').name === 'Fighters Guild\'s hall');
+world.set(GM, '1234:BSHeartland.esm'); now += 8 * DAY;   // verify-formids: ignore - a made-up interior cell
+check('indoors the seat is the room itself', realm.setCapital(GM, 'fighters-guild', 'here').ok && realm.seatOf('fighters-guild').cells[0] === '1234:BSHeartland.esm' && realm.seatOf('fighters-guild').name === 'Fighters Guild\'s hall');   // verify-formids: ignore - the made-up interior cell
 check('an indoor seat has no spot on the map', realm.realmView(GM).capitals.find((c) => c.faction === 'fighters-guild').x === null);
 world.set(GM, W);
 officials = { bruma: { count: [1] } };

@@ -595,6 +595,8 @@ module.exports = (api) => {
   // kept every potion it carried. strongWeight: a potion of rank r is drawn with weight 1/r^strongWeight, so the strong
   // ones come up far less than the weak. Config dungeons.potions.
   const POT = Object.assign({ chest: 0.2, boss: 0.6, container: 0.05, body: 0.1, corpseKeep: 0.25, strongWeight: 2 }, C.potions || {});
+  // A gemstone in a chest (not story difficulty): a grind to get (Nat, 25 Oct; was 0.15 and 0.6). Config dungeons.gems
+  const GEMS = Object.assign({ chest: 0.05, boss: 0.35 }, C.gems || {});
   const potionPick = (tier, ok) => {
     const list = potionPool(tier, ok); if (!list.length) return null;
     const w = list.map((it) => Math.pow(rankOf(it.name) || 1, -Math.max(0, Number(POT.strongWeight) || 0)));
@@ -701,7 +703,7 @@ module.exports = (api) => {
     if (p(Number(boss ? POT.boss : POT.chest))) addEntry(entries, potionPick(diff.potionTier, ok), 1);
     if (p(0.4)) addEntry(entries, pickFrom(lootIngredients(ok)), rnd(1, k.single ? 2 : 3));
     if (p(0.25)) addEntry(entries, pickFrom(pool('materials', 0, ok)), rnd(1, 2));
-    if (diff.id !== 'story' && p(boss ? 0.6 : 0.15)) addEntry(entries, pickFrom(pool('gems', diff.gear, ok)), 1);
+    if (diff.id !== 'story' && p(Number(boss ? GEMS.boss : GEMS.chest))) addEntry(entries, pickFrom(pool('gems', diff.gear, ok)), 1);
     if (p(0.3 * ARROW_CHANCE)) addEntry(entries, pickFrom(pool('arrows', 0, ok)), rnd(k.arrows[0], k.arrows[1]));
     if (p(0.2)) addEntry(entries, pickFrom(pool('lockpicks', 0, ok)), rnd(1, k.single ? 2 : 3));
     if (LINEN.item && p(chanceOr(boss ? LINEN.boss : LINEN.chest, 0) * (Number.isFinite(k.linen) ? k.linen : 1))) addEntry(entries, { id: String(LINEN.item) }, rnd(LINEN_STACK[0], LINEN_STACK[1]));
@@ -2106,7 +2108,8 @@ module.exports = (api) => {
       { id: 'dragonPriest', match: 'dragon ?priest',
         always: { story: [[SOUL.common, 1]], normal: [[SOUL.greater, 1]], hard: [[SOUL.grand, 1]], nightmare: [[SOUL.grand, 1]] },
         rolls: [
-          { chance: { story: 0.25, normal: 0.4, hard: 0.6, nightmare: 0.8 }, items: FLAWLESS },
+          // Flawless gems halved (Nat, 25 Oct; was 0.25 / 0.4 / 0.6 / 0.8)
+          { chance: { story: 0.125, normal: 0.2, hard: 0.3, nightmare: 0.4 }, items: FLAWLESS },
           { chance: { story: 0.02, normal: 0.05, hard: 0.08, nightmare: 0.12 }, rare: true,
             items: [['1c1fe:Skyrim.esm', 3], ['7e5bb:Skyrim.esm', 1], ['4de5b:Skyrim.esm', 1]] },
           // A dragon priest's mask (Nate, 19 Oct: "1% Master, 0.5% Expert, one each"): an artifact allowed from this roll only,
@@ -2115,7 +2118,7 @@ module.exports = (api) => {
             items: [['61cc9:Skyrim.esm', 1], ['61cc2:Skyrim.esm', 1], ['61cc1:Skyrim.esm', 1], ['61cc0:Skyrim.esm', 1],
               ['61cb9:Skyrim.esm', 1], ['61cab:Skyrim.esm', 1], ['61ca5:Skyrim.esm', 1], ['61c8b:Skyrim.esm', 1]] },
         ] },
-      { id: 'anyBoss', match: '.', exceptMatch: 'dragon ?priest', rolls: [{ chance: { story: 0.1, normal: 0.2, hard: 0.3, nightmare: 0.4 }, items: FLAWLESS }] },
+      { id: 'anyBoss', match: '.', exceptMatch: 'dragon ?priest', rolls: [{ chance: { story: 0.05, normal: 0.1, hard: 0.15, nightmare: 0.2 }, items: FLAWLESS }] },
     ],
   }, C.bossTrophies || {});
   const trophyRe = (src) => { try { return new RegExp(String(src), 'i'); } catch (e) { return /$^/; } };

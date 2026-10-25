@@ -6,7 +6,7 @@
 // fixed offsets, keep all of theirs: a Wight (level 13-15) 200-370, a Scourge (level 21-24) 500-700, a Deathlord (level
 // 30-40) 710-960, where a bandit, a Falmer or a vampire of the same level has 140-330 (records of the 140-plugin order, 17 Oct).
 //
-// kinds { <name>: { races, knee, slope, dealt } }:
+// kinds { <name>: { races, knee, slope, dealt, weakTo, magicTaken, magicShouts } }:
 //   races  RACE descs; an NPC_ is judged by its race after its template chain (ACBS Use Traits), a LVLN by any entry
 //   knee, slope  a player's (or their summon's or companion's) hit on one lands as if its health were
 //          knee + (health - knee) * slope above the knee, as it is below: hits scale by health / that, so a 960-health
@@ -17,6 +17,10 @@
 //          reaches this server's damage (hitService drops it), so silver has done nothing to the undead here; the
 //          keyword is read off the weapon record instead (WeapMaterialSilver, 10aa1a:Skyrim.esm). The largest matching
 //          weakness counts, never the product of several
+//   magicTaken  scales the magic that lands on one, from anyone: a spell, a staff's or a scroll's cast, an enchantment's
+//          hit when one reaches the server (a SPEL, ENCH or SCRL source, or the engine's spell flag on any source that is
+//          not a weapon or a fist); weapon blows and fists stay as they are (Nat, 25 Oct: "buff giants against magic").
+//          Shouts only with magicShouts true: a shout is a SPEL of type Voice (SPIT 11), and the Thu'um is not magic
 // log    one line per scaled hit
 // enabled false turns it all off. Read at load; gamemode.js reloads this module with the config.
 'use strict';
@@ -33,13 +37,14 @@ module.exports = (deps) => {
   const KINDS = {};
   for (const [name, k] of Object.entries(C.kinds && typeof C.kinds === 'object' ? C.kinds : {})) {
     if (name.startsWith('_') || !k || typeof k !== 'object') continue;
-    const knee = Number(k.knee), slope = Number(k.slope), dealt = Number(k.dealt);
+    const knee = Number(k.knee), slope = Number(k.slope), dealt = Number(k.dealt), magicTaken = Number(k.magicTaken);
     const weakTo = new Map();
     for (const [kw, mult] of Object.entries(k.weakTo && typeof k.weakTo === 'object' ? k.weakTo : {})) {
       const id = idOf(kw); const m = Number(mult);
       if (id && m > 0) weakTo.set(id, m);
     }
-    KINDS[name] = { knee: knee > 0 ? knee : 0, slope: slope > 0 && slope <= 1 ? slope : 1, dealt: dealt > 0 ? dealt : 1, weakTo };
+    KINDS[name] = { knee: knee > 0 ? knee : 0, slope: slope > 0 && slope <= 1 ? slope : 1, dealt: dealt > 0 ? dealt : 1, weakTo,
+      magicTaken: magicTaken > 0 ? magicTaken : 1, magicShouts: k.magicShouts === true };
     for (const r of Array.isArray(k.races) ? k.races : []) { const id = idOf(r); if (id) KIND_OF_RACE.set(id, name); }
   }
   // base id -> kind ('' for none); the plugins never change while the process runs
@@ -131,6 +136,35 @@ module.exports = (deps) => {
       + `${weak > 1 ? `, weak to ${(src >>> 0).toString(16)} x${weak}` : ''}: x${m.toFixed(2)}`);
     return m > 1 ? m : 1;
   };
+  // What a hit's source is: 'physical' (the fist 0x1f4, a WEAP), 'magic' (a SPEL, ENCH or SCRL), 'voice' (a SPEL of type
+  // Voice, SPIT 11, as combat.js tells shouts apart) or 'none' (anything else). Records never change; cached per source
+  const SOURCE_OF = globalThis.__dboToughnessSource instanceof Map ? globalThis.__dboToughnessSource : (globalThis.__dboToughnessSource = new Map());
+  const sourceKindOf = (src) => {
+    const id = Number(src) >>> 0;
+    let m = SOURCE_OF.get(id);
+    if (m) return m;
+    const res = id && id !== 0x1f4 ? recordOf(id) : null;
+    const type = res ? String(res.record.type) : '';
+    if (id === 0x1f4 || type === 'WEAP') m = 'physical';
+    else if (type === 'ENCH' || type === 'SCRL') m = 'magic';
+    else if (type === 'SPEL') { const spit = fieldsOf(res, 'SPIT')[0]; m = spit && spit.data.byteLength >= 12 && viewOf(spit.data).getUint32(8, true) === 11 ? 'voice' : 'magic'; }
+    else m = 'none';
+    SOURCE_OF.set(id, m);
+    return m;
+  };
+  // Magic landing on an NPC of a kind with magicTaken, from anyone but itself: that factor, else 1
+  const magicTakenMult = (agg, tgt, dmg, flags, src) => {
+    if (!(dmg > 0) || agg === tgt) return 1;
+    const kind = kindOf(tgt);
+    const k = kind ? KINDS[kind] : null;
+    if (!k || k.magicTaken === 1) return 1;
+    const what = sourceKindOf(src);
+    const spellFlag = !!(flags && typeof flags === 'object' && flags.spell === true);
+    const magic = what === 'magic' || (what === 'none' && spellFlag) || (what === 'voice' && k.magicShouts);
+    if (!magic) return 1;
+    note(`magic ${kind} ${tgt.toString(16)} from ${(src >>> 0).toString(16)} (${what}${spellFlag ? ', spell flag' : ''}): x${k.magicTaken}`);
+    return k.magicTaken;
+  };
   // An NPC of a kind hitting a player: the kind's dealt factor
   const dealtMult = (agg, tgt, dmg) => {
     if (!(dmg > 0) || agg === tgt) return 1;
@@ -141,5 +175,5 @@ module.exports = (deps) => {
     note(`dealt ${kind} ${agg.toString(16)}: x${k.dealt}`);
     return k.dealt;
   };
-  return { enabled: C.enabled === true, kindOf, kindOfBase, effectiveHealth: (kind, h) => (KINDS[kind] ? effectiveHealth(KINDS[kind], h) : h), takenMult, dealtMult };
+  return { enabled: C.enabled === true, kindOf, kindOfBase, effectiveHealth: (kind, h) => (KINDS[kind] ? effectiveHealth(KINDS[kind], h) : h), takenMult, dealtMult, magicTakenMult };
 };
