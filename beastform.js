@@ -1000,9 +1000,26 @@ module.exports = (api) => {
     const why = tryTransform(a, k, true);
     return why ? `${display(a)} could not change: ${why}.` : `${display(a)} took ${FORMS[k].name}.`;
   };
-  globalThis.__dboBeastHolds = (a) => ({
-    werewolf: holdsPower(a, 'werewolf'), vampirelord: holdsPower(a, 'vampirelord'),
-    form: (stateOf(a) || {}).form || null,
+  globalThis.__dboBeastHolds = (a) => {
+    const s = stateOf(a) || {};
+    return {
+      werewolf: holdsPower(a, 'werewolf'), vampirelord: holdsPower(a, 'vampirelord'),
+      form: s.form || null,
+      // The admin panel tells an animal shape from a beast one by this, not by a list of its own, so a form the
+      // panel's build never heard of is still shown and still revertible
+      creature: isCreatureState(s),
+      // When the shape was taken, for the panel's "for N min" (what /polymorph list prints); null in no shape
+      since: s.form ? Number(s.at) || null : null,
+    };
+  };
+  // Panel-wide polymorph state (fork adminSystem.ts -> adminMenuService panelData -> front): the Owners' switch
+  // and the animals that may be taken RIGHT NOW, which is CREATURES narrowed by what resolves in this load order
+  // and by config beastform.polymorph.forms. The front must not keep a list of its own: it would offer an animal
+  // the server refuses. Flat and small, since it rides every panel refresh.
+  globalThis.__dboPolymorphPanel = () => ({
+    on: polymorphOn(),
+    setBy: String(globalThis.__dboPolymorphSetBy || ''),
+    forms: animals().map((k) => ({ key: k, name: CREATURES[k].name })),
   });
   registerChatCommand('beast', (a, args) => {
     const w = String(args || '').trim().toLowerCase();

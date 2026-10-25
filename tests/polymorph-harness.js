@@ -32,7 +32,7 @@ const LEAD = 0x14, OWNER = 0x15, GM = 0x16, PLAYER = 0x17, NEWP = 0x18, WOLF = 0
 const HUMAN = 0x13746, WEREWOLF_RACE = 0xcdd84, VL_RACE = 0x283a;
 const ANIMALS = { chicken: 0xa919d, hare: 0x6dc99, goat: 0x6fc4a, fox: 0x109c7c, dog: 0x131ee, skeever: 0x13201, mudcrab: 0xba545, deer: 0xcf89b };
 const CREATURE_RACES = new Set(Object.values(ANIMALS));
-const WORLD = '3c:Skyrim.esm', OTHER_WORLD = '9f:Skyrim.esm', INSIDE = '1691:Skyrim.esm';
+const WORLD = '3c:Skyrim.esm', OTHER_WORLD = '9f:Skyrim.esm', INSIDE = '1691:Skyrim.esm'; // verify-formids: ignore - mock descs for a second worldspace and an interior; RECORDS below supplies their type, nothing looks them up in the load order
 const RECORDS = { 0x3c: 'WRLD', 0x9f: 'WRLD', 0x1691: 'CELL' };
 const TIER = { [LEAD]: 'leadgm', [OWNER]: 'senior', [GM]: 'gm' };
 let props, commands, timersByName, said, audits, logs, packets, papyrus, appearanceWrites;
@@ -479,6 +479,47 @@ ok(/on\|off/.test(run(OWNER, '')), '11. ...an Owner is shown the switch');
 r = run(LEAD, 'wolf');
 ok(/^Usage: \/polymorph <chicken\|hare\|goat\|fox\|dog\|skeever\|mudcrab\|deer> \| revert \| list\./.test(r) && !beast(LEAD), '11. wolf and horse are not animals here', r);
 ok(/^Usage/.test(run(LEAD, 'horse')) && !beast(LEAD), '11. ...nor the horse');
+
+// ---- 12. what the admin panel is fed -------------------------------------------------------------------------------
+// The panel's two hops are the fork's adminSystem.ts payload and adminMenuService's panelData mirror; everything the
+// gameplay layer has to say rides these two hooks. The front must keep NO list of its own, or it offers an animal the
+// server refuses.
+restart({ beastform: {} });
+let P = globalThis.__dboPolymorphPanel();
+ok(P.on === true && Array.isArray(P.forms) && P.forms.length === 8, '12. __dboPolymorphPanel: the switch and all eight animals', P);
+ok(P.forms.map((f) => f.key).join(',') === 'chicken,hare,goat,fox,dog,skeever,mudcrab,deer', '12. ...in the table\'s order, by key', P.forms.map((f) => f.key));
+ok(P.forms.every((f) => f.name && f.name !== f.key) && P.forms.find((f) => f.key === 'mudcrab').name === 'Mudcrab', '12. ...each with the name the panel shows', P.forms);
+ok(!P.forms.some((f) => /wolf|horse/.test(f.key)), '12. ...and never the wolf or the horse');
+
+// A narrowed config must narrow the panel too, or the picker offers what /polymorph will refuse
+restart({ beastform: { polymorph: { forms: ['fox', 'deer'] } } });
+P = globalThis.__dboPolymorphPanel();
+ok(P.forms.length === 2 && P.forms.map((f) => f.key).join(',') === 'fox,deer', '12. polymorph.forms narrows the panel\'s picker as well as the command', P.forms);
+ok(/not open for polymorph/.test(run(LEAD, 'goat')), '12. ...and the command still refuses what the picker no longer offers');
+
+restart({ beastform: {} });
+run(OWNER, 'off');
+P = globalThis.__dboPolymorphPanel();
+ok(P.on === false && P.setBy === 'admin', '12. the panel sees the Owners\' switch and who set it', P);
+run(OWNER, 'on');
+ok(globalThis.__dboPolymorphPanel().on === true, '12. ...and sees it come back on');
+
+// creature and since: the panel tells an animal from a beast without a list, and can print "for N min"
+revertToOwn();
+let H = globalThis.__dboBeastHolds(LEAD);
+ok(H.form === null && H.creature === false && H.since === null, '12. __dboBeastHolds in one\'s own shape: no form, no creature, no since', H);
+run(LEAD, 'skeever');
+H = globalThis.__dboBeastHolds(LEAD);
+ok(H.form === 'skeever' && H.creature === true && typeof H.since === 'number' && H.since > 0, '12. ...a skeever: creature true, since set', H);
+revertToOwn();
+props.set(`${LEAD}|private.werewolfGrant`, true);
+globalThis.__dboBeastTransform(LEAD, 'werewolf', true);
+H = globalThis.__dboBeastHolds(LEAD);
+ok(H.form === 'werewolf' && H.creature === false && typeof H.since === 'number', '12. ...a werewolf: a form with a since, but NOT a creature', H);
+revertToOwn();
+props.set(`${LEAD}|private.werewolfGrant`, undefined);
+
+ok(!/\u2014/.test(src), '12. still no em dash in beastform.js');
 
 console.log(fail ? `\n${fail} FAILED, ${pass} passed` : `\nall ${pass} checks passed`);
 process.exit(fail ? 1 : 0);
