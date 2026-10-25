@@ -1947,7 +1947,7 @@ module.exports = (api) => {
     openWidget(a, { type: 'expeditionBoard', id: EXPEDITION_WIDGET_ID, hall: st.name,
       expeditions: list.map((d) => ({ id: d.id, name: d.name, county: d.county || '', kind: kindLabel(d), status: expeditionStatus(a, d), state: statusState(a, d), masters: mastersOf(d) })),
       bossReturnMinutes: C.bossReturnMinutes, leaseMinutes: C.leaseMinutes, contracts, tab: tab === 'contracts' ? 'contracts' : 'expeditions',
-      events: { pick: 'dbo:expeditionPick', close: 'dbo:expeditionClose', contractTake: 'dbo:contractTake', contractAbandon: 'dbo:contractAbandon' } }, true);
+      events: { pick: 'dbo:expeditionPick', close: 'dbo:expeditionClose', contractTake: 'dbo:contractTake', contractAbandon: 'dbo:contractAbandon', contractDeliver: 'dbo:contractDeliver' } }, true);
   };
   // contracts.js redraws the board on the Contracts tab after a take or a give-up, if that player still has it open
   globalThis.__dboExpeditionBoardRefresh = (a, tab) => {
