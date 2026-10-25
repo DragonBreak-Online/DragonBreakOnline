@@ -61,6 +61,13 @@ ok(rz.length === 3 && rz.every((x) => kindOfZone(x) === 'minotaur' && x.Hostile 
 ok(rz.some((x) => x.NPC[0].id === LORD) && rz.filter((x) => x.NPC[0].id === MINO).length === 2, '...the Minotaur Lord on his spot and two minotaurs, one each');
 ok(sancreZones(z).length && sancreZones(z).every((x) => kindOfZone(x) === 'undead'), 'Sancre Tor keeps its undead');
 
+// ---- one Lord: the camp's own Lord spot left out while the boss stands there ----
+const oneLord = JSON.parse(JSON.stringify(withRest));
+oneLord.leaveOut = ['178580:DragonBreak Online Edits.esp'];
+const lz = restZones(load(oneLord));
+ok(lz.length === 2 && lz.every((x) => x.NPC[0].id === MINO && kindOfZone(x) === 'minotaur'), 'ownedSpawns.leaveOut [178580]: the camp\'s own Minotaur Lord spot spawns nothing, its two minotaurs stay (one Lord: the boss)', lz.map((x) => x.Name));
+z = load(withRest);
+
 // ---- 2. the arming and the trace ----
 const ids = rz.map((x, i) => 0xff800000 + i);
 rz.forEach((x, i) => { props.set(`${ids[i]}|private.npcSpawner`, x.Name); props.set(`${ids[i]}|baseDesc`, x.NPC[0].id); props.set(`${ids[i]}|inventory`, { entries: [] }); props.set(`${ids[i]}|equipment`, { inv: { entries: [] } }); });

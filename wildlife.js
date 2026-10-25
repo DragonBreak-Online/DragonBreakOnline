@@ -218,9 +218,13 @@ module.exports = (api) => {
       if (!id) { if (left) n++; continue; }
       out.push({ Name: `${PREFIX}${pl.kind}:${n++}`, ID: pl.world, POS: pl.pos, Size: C.radius, Anchor: pl.ref, NPC: [{ id, count: 1 }], Despawn: C.despawnSeconds, Respawn: (fromPlan && (kindOf(id) || {}).respawn) || (fromPlan && fromPlan.danger ? dangerRespawn : C.respawnSeconds) });
     }
+    // ownedSpawns.leaveOut [src]: owned spots that spawn nothing (Nat, 25 Oct: Minotaur's Rest's own Minotaur Lord, 178580, while
+    // the boss stands there; its two minotaurs stay)
+    const leaveOut = new Set((((cfg.ownedSpawns || {}).leaveOut) || []).map((x) => String(x).toLowerCase()));
     for (const raw of OWNED.spawns || []) {
       if (out.length >= C.maxZones) break;
       if (!raw || !raw.src || !raw.kind || !raw.ref || !raw.world || !Array.isArray(raw.pos)) continue;
+      if (leaveOut.has(String(raw.src).toLowerCase())) continue;
       const sp = replacedSpawn(raw);
       const { id } = safePick(sp.options, pickFor(sp));
       if (!id) continue;
