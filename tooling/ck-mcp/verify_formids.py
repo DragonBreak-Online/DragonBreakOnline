@@ -63,6 +63,14 @@ WORD_TYPES = {
     "door": PLACED | {"DOOR"},
     "item": INVENTORY,
 }
+# What the F7 Place tab can put down: a base of any type with a world presence. admin-placeables.json lists them under
+# categories[].items, a name that would otherwise read as inventory items (44,064 false errors, 25 Oct)
+PLACEABLE = INVENTORY | {"STAT", "MSTT", "ACTI", "TACT", "FURN", "CONT", "DOOR", "LIGH", "NPC_", "FLOR", "TREE", "GRAS",
+                         "IDLM", "ADDN"}
+FILE_TYPES = {"admin-placeables.json": (PLACEABLE, "admin-placeables.json")}
+# Keys whose desc may be any record: a study point's requires / until name the record whose presence switches it
+# ({ requires: '1636c2:...' }, an ACTI under spellStudyPoints, not a spell)
+ANY_KEYS = {"requires", "until"}
 
 def words(name):
     out = []
@@ -84,9 +92,29 @@ def types_of_name(name):
 GENERIC = {"id", "desc", "form", "formid", "base", "value", "list", "entry", "pool", "option", "default", "data",
            "all", "extra", "custom", "known", "of", "or", "and", "by", "to", "for"}
 
+def types_before_by(name):
+    # 'maskItemByRace': the words before 'by' name the values, the rest names the keys ({ ArgonianRace: <mask> })
+    ws = words(name)
+    if "by" not in ws:
+        return set()
+    got = set()
+    for w in ws[:ws.index("by")]:
+        got |= WORD_TYPES.get(w, set())
+    return got
+
 def expected(occ):
     """(allowed record types, the name that decided it) or (None, None)"""
+    ft = FILE_TYPES.get(os.path.basename(occ.path or "").lower())
+    if ft:
+        return ft
+    if occ.key in ANY_KEYS:
+        return None, None
     fr = occ.frame
+    if fr is not None:
+        for n in fr.labels:
+            t = types_before_by(n)
+            if t:
+                return t, n
     # [level, desc, ...] inside a list named options: a leveled resolution, always a concrete NPC_
     if fr is not None and fr.kind == "[" and fr.first_is_number and occ.elem == 1:
         parent = fr.parent
