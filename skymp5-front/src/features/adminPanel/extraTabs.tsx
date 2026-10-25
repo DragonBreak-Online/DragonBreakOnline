@@ -626,6 +626,18 @@ export const PowersTab = ({ events, who, beast, canSpawn, polymorph, polymorphed
             ) : null}
           </div>
         ))}
+        {/* Give all spells and Give all shouts, back after 8d07b6c3 removed them on 17 Oct. The server batches the
+            spells a few a tick and caps both, and replies when the batch finishes, so these are Confirm rather than
+            plain buttons: 252 spells is not something to hand out by a mis-click on the wrong target. */}
+        {canSpawn ? (
+          <div className="admin-panel__power">
+            <span className="admin-panel__label">Everything <span className="admin-panel__hint">every tome spell, every shout a player can learn</span></span>
+            <div className="admin-panel__actions">
+              <Confirm text="Give all spells" width={180} onConfirm={() => adminAction(events, 'giveSpells', fields())} />
+              <Confirm text="Give all shouts" width={180} onConfirm={() => adminAction(events, 'giveShouts', fields())} />
+            </div>
+          </div>
+        ) : null}
         <span className="admin-panel__hint">
           {canSpawn
             ? 'To make a player a vampire or a werewolf in play, give the disease on the Players tab. Grant gives the vanilla power so it can be cast in game; Transform now changes shape from here, which does not need the cast to reach the server. Revoke takes the power back and reverts the shape. Polymorph changes your own shape only, never anyone else\'s, and the server ends it if you go indoors or into water, die, log out, or a player comes near whose game cannot show the animal. You can still revert anyone else from the list above.'
