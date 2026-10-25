@@ -1,5 +1,20 @@
 [
   {
+    "title": "Stone quarries and clay deposits",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Mining",
+        "items": [
+          "Stone Quarries and Clay Deposits can be worked now. They are mined like an ore vein, open to any Novice Miner, and give 4 Quarried Stone or 4 Clay (more at higher tiers). A worked deposit rests for 30 minutes.",
+          "There are about 150 across Skyrim, by the homestead plots, villages and mines."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Server restart: soul gems, gates and strongholds",
     "date": "2026-10-25",
     "version": "Server update",
