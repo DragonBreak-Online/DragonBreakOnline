@@ -606,9 +606,10 @@ module.exports = (api) => {
   // from an old report takes back the client's own regen since then: Akatosh's 0.003 a second, written from a report most
   // of a second old, left magicka refilling at about a fifth of its speed (Marcus, 24 Oct). So, as racial.js does, a bar is
   // paid only on the tick a fresh report of it arrives, and at least payoutSeconds of the bar's own regen at once: a write
-  // takes back up to a tick of the bar's own regen, and a larger step outweighs it. A 1 s tick with 3 s steps delivers
-  // 82-87% of the gift at a quarter of a 0.25 s tick's reads (88-93%; blessing-regen-fresh-harness, 24 Oct)
-  const REGEN = Object.assign({ enabled: true, tickSeconds: 1, minStep: 0.002, payoutSeconds: 3 }, CFG.blessingRegen || {});
+  // takes back the bar's own regen since the report it was built from, and a larger step outweighs it. A coarser tick only
+  // makes that report staler: with latency and the server's crop of the next report (OnChangeValues), a 1 s tick with 3 s
+  // steps pulled the bar back at every latency, and 0.25 s with 1 s steps never did (Worker 4, blessing-delivery-harness, 25 Oct)
+  const REGEN = Object.assign({ enabled: true, tickSeconds: 0.25, minStep: 0.002, payoutSeconds: 1 }, CFG.blessingRegen || {});
   const REGEN_TICK_MS = Math.max(250, Math.round((Number(REGEN.tickSeconds) || 1) * 1000));
   const REGEN_MIN_STEP = Math.max(0, Number(REGEN.minStep) || 0);
   // libespm ActorValue.h: index -> [the bar, a rate or a Mult]

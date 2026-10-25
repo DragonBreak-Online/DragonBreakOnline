@@ -2,7 +2,7 @@
 // makin my magicka not regen"). The server's bar is the client's last report (at most one a second) and a write replaces the
 // client's bar, so the 1 s blessing tick wrote a report most of a second old plus Akatosh's 0.003 and took back the client's
 // own regen since that report: magicka refilled at about a fifth of its speed. prayer.js now pays as racial.js does (10 Oct):
-// a bar only on a fresh report, at least payoutSeconds (3) of the bar's own regen at once, on a 1 s tick.
+// a bar only on a fresh report, at least payoutSeconds (1) of the bar's own regen at once, on a 0.25 s tick (blessing-delivery-harness adds latency and the crop).
 //
 // A simulated client regenerates its own bar at the Nord's 3% a second, reports once a second, and takes every server write
 // as its bar; the real prayer.js runs with a mock gamemode api. Run it from this folder's parent with
