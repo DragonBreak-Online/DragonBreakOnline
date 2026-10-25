@@ -42,8 +42,13 @@ export const vanillaBeastRaceOf = (raceId: number | undefined | null): number =>
 
 export const isBeastRaceId = (raceId: number | undefined | null): boolean => vanillaBeastRaceOf(raceId) !== 0;
 
-// Staff polymorph creatures (server beastform.js): kept apart from BEAST_RACE_IDS so world NPC copies of these races are unchanged
-// All Skyrim.esm (runtime id = local id), no FaceGen head, all in NON_HUMANOID_RACES; wolf and horse are left out
+// Staff polymorph creatures (server beastform.js CREATURES): kept apart from BEAST_RACE_IDS so world NPC copies of these
+// races are unchanged. All Skyrim.esm (runtime id = local id), no FaceGen head, all in NON_HUMANOID_RACES.
+// This map and the server's table must agree: a race the server offers but this map omits is shown as a stripped human,
+// which is why the server refuses the change while such a watcher is near (beastform.js unseeingNear).
+// Wolf, horse and giant are left out - the horse because its copy can be ridden, the giant because creature scale is not
+// in the RACE record so its clipping risk is untested, and the wolf because clients make a player wolf's copy hostile,
+// though that reason may now be stale since attacksEveryone returns false on model.appearance before the race test.
 export const POLYMORPH_RACES: ReadonlyMap<number, string> = new Map([
   [0x000a919d, "ChickenRace"],
   [0x0006dc99, "HareRace"],
@@ -53,6 +58,19 @@ export const POLYMORPH_RACES: ReadonlyMap<number, string> = new Map([
   [0x00013201, "SkeeverRace"],
   [0x000ba545, "MudcrabRace"],
   [0x000cf89b, "DeerRace"],
+  // Added 25 Oct with the server's ten (_work/polymorph-more-forms-1025.md). Walk-around shapes: whether a player can
+  // attack in any of them is an in-game question, because the werewolf fights while sharing no attack event names with
+  // the humanoid set, so name overlap predicts nothing. Draugr and Skeleton are the first two to test.
+  [0x000131fb, "HagravenRace"],
+  [0x000131e8, "BearBlackRace"],
+  [0x000131e9, "BearSnowRace"],
+  [0x00013200, "SabreCatRace"],
+  [0x00013202, "SabreCatSnowyRace"],
+  [0x00013205, "TrollRace"],
+  [0x00000d53, "DraugrRace"],
+  [0x000b7998, "SkeletonRace"],
+  [0x00013204, "SprigganRace"],
+  [0x000131f4, "FalmerRace"],
 ]);
 
 export const isPolymorphRaceId = (raceId: number | undefined | null): boolean => POLYMORPH_RACES.has(Number(raceId) >>> 0);

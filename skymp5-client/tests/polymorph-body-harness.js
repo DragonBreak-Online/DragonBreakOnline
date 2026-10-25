@@ -63,9 +63,13 @@ const methodBody = (text, head) => {
 };
 
 const WEREWOLF = 0x000cdd84, VAMPIRE_LORD = 0x0200283a, NORD = 0x00013746, DRAUGR = 0x00000d53;
-const WOLF_RACE = 0x0001320a, HORSE_RACE = 0x000131fd, ELK_RACE = 0x000131ed, SABRE_CAT = 0x00013200;
+const WOLF_RACE = 0x0001320a, HORSE_RACE = 0x000131fd, ELK_RACE = 0x000131ed, GIANT_RACE = 0x000131f9;
 const CREATURES = { ChickenRace: 0x000a919d, HareRace: 0x0006dc99, GoatDomesticsRace: 0x0006fc4a, FoxRace: 0x00109c7c,
-  DogRace: 0x000131ee, SkeeverRace: 0x00013201, MudcrabRace: 0x000ba545, DeerRace: 0x000cf89b };
+  DogRace: 0x000131ee, SkeeverRace: 0x00013201, MudcrabRace: 0x000ba545, DeerRace: 0x000cf89b,
+  // the ten added 25 Oct, beside the eight of wave 1
+  HagravenRace: 0x000131fb, BearBlackRace: 0x000131e8, BearSnowRace: 0x000131e9, SabreCatRace: 0x00013200,
+  SabreCatSnowyRace: 0x00013202, TrollRace: 0x00013205, DraugrRace: 0x00000d53, SkeletonRace: 0x000b7998,
+  SprigganRace: 0x00013204, FalmerRace: 0x000131f4 };
 const CHICKEN = CREATURES.ChickenRace, DEER = CREATURES.DeerRace;
 const JAKE = 0xff000b01, WOLFPLAYER = 0xff000b02, OTHER = 0xff000b03;
 
@@ -77,22 +81,24 @@ check('beastRaceIds exports POLYMORPH_RACES, isPolymorphRaceId and isBeastOrPoly
 const P = ids.POLYMORPH_RACES instanceof Map ? ids.POLYMORPH_RACES : new Map();
 const isPolymorph = typeof ids.isPolymorphRaceId === 'function' ? ids.isPolymorphRaceId : () => false;
 const isBeastOrPolymorph = typeof ids.isBeastOrPolymorphRaceId === 'function' ? ids.isBeastOrPolymorphRaceId : ids.isBeastRaceId;
-check('exactly the eight wave-1 animals: chicken, hare, domestic goat, fox, dog, skeever, mudcrab, deer', P.size === 8 &&
+check('exactly the eighteen animals the server offers: the eight of wave 1 and the ten of 25 Oct', P.size === 18 &&
   Object.entries(CREATURES).every(([edid, id]) => P.get(id) === edid), [...P.entries()].map(([k, v]) => `${k.toString(16)} ${v}`));
 const nh = read('sync/nonHumanoidRaceList.ts');
 const listed = Object.entries(CREATURES).filter(([edid, id]) =>
   new RegExp(`\\["Skyrim\\.esm", 0x0*${id.toString(16)}, "${edid}"\\]`).test(nh));
-check('each id and editor id is the Skyrim.esm record the generated non-humanoid race list names', listed.length === 8,
+check('each id and editor id is the Skyrim.esm record the generated non-humanoid race list names', listed.length === 18,
   Object.keys(CREATURES).filter((e) => !listed.some(([l]) => l === e)));
 check('every one is a polymorph race, signed ids too', Object.values(CREATURES).every((id) => isPolymorph(id) && isPolymorph(id | 0)));
-check('wolf, horse, elk, sabre cat, a Nord, a draugr, the beasts and no race are not', [WOLF_RACE, HORSE_RACE, ELK_RACE, SABRE_CAT, NORD, DRAUGR,
+// The sabre cat and the draugr moved into the table on 25 Oct, so the negatives are what is still left out:
+// the wolf (its copy turns hostile), the horse (its copy can be ridden) and the giant (scale untested)
+check('wolf, horse, elk, giant, a Nord, the beasts and no race are not', [WOLF_RACE, HORSE_RACE, ELK_RACE, GIANT_RACE, NORD,
   WEREWOLF, VAMPIRE_LORD, 0, null, undefined].every((id) => !isPolymorph(id)));
 check('kept apart: no animal is a beast race, and the beast set is still the werewolf and the Vampire Lord',
   Object.values(CREATURES).every((id) => !ids.isBeastRaceId(id) && ids.vanillaBeastRaceOf(id) === 0) &&
   ids.BEAST_RACE_IDS.size === 2 && ids.BEAST_RACE_IDS.has(WEREWOLF) && ids.BEAST_RACE_IDS.has(VAMPIRE_LORD));
-check('a beast or polymorph body: both beasts and all eight animals, nothing else',
+check('a beast or polymorph body: both beasts and all eighteen animals, nothing else',
   [WEREWOLF, VAMPIRE_LORD, ...Object.values(CREATURES)].every((id) => isBeastOrPolymorph(id)) &&
-  [NORD, DRAUGR, WOLF_RACE, HORSE_RACE, 0].every((id) => !isBeastOrPolymorph(id)));
+  [NORD, GIANT_RACE, WOLF_RACE, HORSE_RACE, 0].every((id) => !isBeastOrPolymorph(id)));
 const snap = () => ({ booleans: new Uint8Array(4), floats: new Uint8Array(8), integers: new Uint8Array(8) });
 ids.setNonHumanoidRaceIds([]);
 check('an animal copy takes no caster variables even before the non-humanoid list resolves', Object.values(CREATURES).every((id) =>
@@ -101,8 +107,22 @@ check('...and a Nord copy still takes them (the guard did not widen past the ani
 const fv = read('view/formView.ts');
 const ambush = (fv.match(/private static readonly ambushRaces = \[([^\]]*)\]/) || [])[1] || '';
 const ambushIds = ambush.split(',').map((s) => Number(s.trim()) >>> 0);
-check('no animal is one of formView\'s ambush races (wolf 1320a is, so it stays out)', ambushIds.length > 5 && ambushIds.includes(WOLF_RACE) &&
-  Object.values(CREATURES).every((id) => !ambushIds.includes(id)), ambush);
+// Three forms added on 25 Oct ARE ambush races - draugr d53, falmer 131f4, spriggan 13204 - and that is safe only
+// because attacksEveryone returns false on model.appearance BEFORE it consults the list, so a player's copy in a
+// polymorph body is exempt by construction. The old check said no animal may be an ambush race; the useful check now
+// is that the exemption still comes first, because if that early return ever moves below the race test those three
+// forms would turn a polymorphed staff member hostile to everyone.
+const AMBUSH_FORMS = { DraugrRace: 0x00000d53, FalmerRace: 0x000131f4, SprigganRace: 0x00013204 };
+check('the ambush list is real and still holds the wolf, which is why the wolf stays out', ambushIds.length > 5 &&
+  ambushIds.includes(WOLF_RACE), ambush);
+check('every form that is not an ambush race stays off that list', Object.entries(CREATURES)
+  .filter(([edid]) => !(edid in AMBUSH_FORMS)).every(([, id]) => !ambushIds.includes(id)),
+  Object.entries(CREATURES).filter(([edid, id]) => !(edid in AMBUSH_FORMS) && ambushIds.includes(id)).map(([e]) => e));
+check('...and the three that are are exempted by the appearance test coming FIRST in attacksEveryone',
+  Object.values(AMBUSH_FORMS).every((id) => ambushIds.includes(id)) &&
+  fv.indexOf('if (model.appearance) {') > 0 &&
+  fv.indexOf('if (model.appearance) {') < fv.indexOf('FormView.ambushRaces.includes'),
+  [fv.indexOf('if (model.appearance) {'), fv.indexOf('FormView.ambushRaces.includes')]);
 const lips = read('services/services/lipSyncService.ts');
 check('world NPCs unchanged: lip sync still asks isBeastRaceId (every animal race lacks a FaceGen head, so it skips them already)',
   /return race \? isBeastRaceId\(race\.getFormID\(\)\) : null;/.test(lips) && !/Polymorph/.test(lips));
@@ -122,8 +142,8 @@ check('a race off the list (wolf, horse, a Nord) or an entry with no id is dropp
 body.setBeastBodies([]);
 const pkt = (bodies) => ({ customPacketType: 'dboBeastBody', bodies });
 const parsed = attempt(() => body.parseBeastBodies(pkt([{ id: JAKE, race: CHICKEN }, { id: WOLFPLAYER, race: WEREWOLF }, { id: OTHER, race: WOLF_RACE },
-  { id: String(0xff000b04), race: String(DEER) }, { id: 0xff000b05, race: SABRE_CAT }])));
-check('the packet keeps the animals and the werewolf, and drops the wolf and the sabre cat', JSON.stringify(parsed) ===
+  { id: String(0xff000b04), race: String(DEER) }, { id: 0xff000b05, race: GIANT_RACE }])));
+check('the packet keeps the animals and the werewolf, and drops the wolf and the giant', JSON.stringify(parsed) ===
   JSON.stringify([{ id: JAKE, race: CHICKEN }, { id: WOLFPLAYER, race: WEREWOLF }, { id: 0xff000b04, race: DEER }]), parsed);
 const look = body.beastBodyAppearance({ isFemale: false, raceId: NORD, weight: 40, headpartIds: [1, 2], tints: [{}], options: [1], presets: [2],
   headTextureSetId: 9, name: 'Chicken' }, CHICKEN);
