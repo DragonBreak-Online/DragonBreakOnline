@@ -26,6 +26,8 @@ const REFUSAL_NOTICE_MS = 3000;
 const INVALID_USER_ID = 65535;
 // A cast whose explosion hits no actor places its summon in front of the caster after this long
 const PLACE_FALLBACK_MS = 1500;
+// A scroll-placed spider lasts this long unless server-settings "spiderScrollSeconds" says otherwise
+const SPIDER_SCROLL_SEC = 60;
 const PLACE_HIT_FIRST_MS = 1000;
 const PLACE_LIFT = 16;
 
@@ -33,6 +35,8 @@ interface PendingPlace {
   spellId: number;
   baseId: number;
   timer: ReturnType<typeof setTimeout>;
+  // A scroll's spider is temporary and takes no summon slot; the rune's guardian is unchanged
+  scroll: boolean;
 }
 
 interface PendingReanimate {
@@ -54,6 +58,9 @@ export class ConjurationSystem implements System {
   // server-settings "explosionSummonEnabled", and "explosionSummonSeconds" (0: until killed, as vanilla's Ash Guardian)
   private explosionSummonOn = true;
   private explosionSummonSec = 0;
+  // server-settings "spiderScrollSeconds": how long a scroll-placed spider lasts. The scrolls' own records say 0,
+  // which in this system means until killed, so a temporary spider has to come from here (Nat, 25 Oct).
+  private spiderScrollSec = SPIDER_SCROLL_SEC;
   // server-settings "summonRaceVariants": Summon Skeleton conjures the caster race's own skeleton. Off by default: the
   // Khajiit, Argonian, Elf and Orc skeletons (ISS_BeastSkeletonRace) use Issgard\actors\BeastSkeletons meshes that no
   // launcher archive ships, so they never load on a client (#bugs 15 Oct "Summon Skeleton is not working": 5 of 5 Elf
@@ -70,6 +77,8 @@ export class ConjurationSystem implements System {
     this.summonRaceVariants = all?.["summonRaceVariants"] === true;
     const placeSec = Number(all?.["explosionSummonSeconds"]);
     if (Number.isFinite(placeSec) && placeSec > 0) this.explosionSummonSec = placeSec;
+    const scrollSec = Number(all?.["spiderScrollSeconds"]);
+    if (Number.isFinite(scrollSec) && scrollSec > 0) this.spiderScrollSec = scrollSec;
     this.hook("onSpellCast", (casterId, spellId) => this.onSpellCast(casterId, spellId));
     this.hook("onSpellHit", (aggressorId, targetId, spellId) => this.onSpellHit(aggressorId, targetId, spellId));
   }
@@ -122,7 +131,7 @@ export class ConjurationSystem implements System {
       if (Date.now() - (this.lastPlaceHit.get(casterId) ?? 0) <= PLACE_HIT_FIRST_MS) return;
       this.clearPlace(casterId);
       const timer = setTimeout(() => this.placeFallback(casterId), PLACE_FALLBACK_MS);
-      this.pendingPlace.set(casterId, { spellId, baseId: placed, timer });
+      this.pendingPlace.set(casterId, { spellId, baseId: placed, timer, scroll: !this.isSpell(spellId) });
       return;
     }
     const reanimate = effects.find((e) => e.archetype === MgefArchetype.Reanimate);
@@ -135,7 +144,7 @@ export class ConjurationSystem implements System {
 
   private onSpellHit(aggressorId: number, targetId: number, spellId: number): void {
     const placed = this.placedNpc(spellId, spellEffects(this.mp, spellId));
-    if (placed && isPlayerActor(this.mp, aggressorId)) this.placeAtHit(aggressorId, targetId, spellId, placed);
+    if (placed && isPlayerActor(this.mp, aggressorId)) this.placeAtHit(aggressorId, targetId, spellId, placed, !this.isSpell(spellId));
     for (const effect of spellEffects(this.mp, spellId)) {
       if (effect.archetype === MgefArchetype.Banish) {
         this.banish(aggressorId, targetId, spellId, effect);
@@ -298,8 +307,9 @@ export class ConjurationSystem implements System {
     if (!this.explosionSummonOn) return 0;
     for (const e of effects) {
       const id = explosionPlacedNpc(this.mp, e.mgefId);
-      // A spell's only: Dragonborn's spider scrolls place their spiders through the same chain
-      if (id) return this.isSpell(spellId) ? id : 0;
+      // Spells and scrolls both: a scroll's spider is placed as a "placed" companion, so it takes no summon slot
+      // and lasts spiderScrollSeconds, while a spell's guardian keeps the rune's own behaviour (Nat, 25 Oct)
+      if (id) return id;
     }
     return 0;
   }
@@ -316,7 +326,7 @@ export class ConjurationSystem implements System {
   }
 
   // The first actor the explosion hits marks where it went off; the rest of the same blast place nothing
-  private placeAtHit(casterId: number, targetId: number, spellId: number, baseId: number): void {
+  private placeAtHit(casterId: number, targetId: number, spellId: number, baseId: number, scroll: boolean): void {
     const now = Date.now();
     const pending = this.pendingPlace.has(casterId);
     if (!pending && now - (this.lastPlaceHit.get(casterId) ?? 0) <= PLACE_HIT_FIRST_MS) return;
@@ -327,19 +337,21 @@ export class ConjurationSystem implements System {
       const p = this.mp.getActorPos(targetId);
       if (Array.isArray(p) && isNear(this.mp, casterId, targetId, REANIMATE_RANGE)) pos = [p[0], p[1], p[2] + PLACE_LIFT];
     } catch { }
-    this.placeSummon(casterId, baseId, spellId, pos);
+    this.placeSummon(casterId, baseId, spellId, scroll, pos);
   }
 
   private placeFallback(casterId: number): void {
     const p = this.pendingPlace.get(casterId);
     if (!p) return;
     this.pendingPlace.delete(casterId);
-    this.placeSummon(casterId, p.baseId, p.spellId);
+    this.placeSummon(casterId, p.baseId, p.spellId, p.scroll);
   }
 
   // It guards where it was placed until ordered to follow
-  private placeSummon(casterId: number, baseId: number, spellId: number, pos?: number[]): void {
-    const id = this.companions.spawn(casterId, baseId, { kind: "summon", pos, durationSec: this.explosionSummonSec, source: spellId });
+  private placeSummon(casterId: number, baseId: number, spellId: number, scroll: boolean, pos?: number[]): void {
+    const kind = scroll ? "placed" as const : "summon" as const;
+    const durationSec = scroll ? this.spiderScrollSec : this.explosionSummonSec;
+    const id = this.companions.spawn(casterId, baseId, { kind, pos, durationSec, source: spellId });
     if (id === null) return;
     this.companions.orderStay(id);
     this.log(`ConjurationSystem: ${hex(casterId)} placed ${hex(id)} with ${hex(spellId)}${pos ? " where it hit" : " in front of them"}`);
