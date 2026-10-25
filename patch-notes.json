@@ -1,5 +1,19 @@
 [
   {
+    "title": "Senior mages take more apprentices",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Magic colleges",
+        "items": [
+          "A Senior Wizard, Senior Magister or Senior Whisperer may now take up to three apprentices, as a college's leader and officers can. Teaching still takes Arcane Arts at 75."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Fighting the guard no longer trains your skills",
     "date": "2026-10-25",
     "version": "Server update",
