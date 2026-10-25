@@ -50,6 +50,7 @@ const actor = (formId, dead = false, base = BONEMAN_SUMMON) => ({
   getFormID: () => formId, isDead: () => dead, removeAllItems() {}, unequipAll() {},
   getBaseObject: () => ({ getFormID: () => base }),
   getEquippedSpell: () => null, unequipSpell() {}, equipSpell() {},
+  getWornForm: () => null, getEquippedObject: () => null, unequipItem() {},
 });
 const eqOf = (...entries) => ({ inv: { entries }, numChanges: 2 });
 
