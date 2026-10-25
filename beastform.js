@@ -152,9 +152,9 @@ module.exports = (api) => {
   // the equipment the client reports and refuses its casts and hits, which is why no beast spell ever reached anyone.
   // right/left/voice are what the client equips and binds to keys 1-9 (beastFormService.ts); passive are abilities,
   // hidden are the spells those abilities cast (bat bites, talon poison, grip damage). Ids read out of the load order.
-  const spell = (desc, name) => ({ id: idOf(desc), name });
+  const spell = (desc, name) => ({ id: idOf(desc), name, desc });
   // A werewolf howl is a shout (SHOU + word of power) in vanilla; the voice slot will not cast the bare spell
-  const howl = (spellDesc, shoutDesc, wordDesc, name) => ({ id: idOf(spellDesc), shout: idOf(shoutDesc), word: idOf(wordDesc), name });
+  const howl = (spellDesc, shoutDesc, wordDesc, name) => ({ id: idOf(spellDesc), shout: idOf(shoutDesc), word: idOf(wordDesc), name, desc: spellDesc });
   const ABILITIES = {
     vampirelord: {
       // Drain05Alt: 15 health/magicka/stamina absorbed + 50 damage a hit. 09Alt (vanilla's level 41+) dealt 175,
@@ -199,6 +199,25 @@ module.exports = (api) => {
       // What the body casts by itself: the power attack's knockback and the feeding victim's hold (both were refused)
       passive: [], hidden: [spell('f3f0a:Skyrim.esm', 'Knockback'), spell('106396:Skyrim.esm', 'Feeding hold')],
     },
+  };
+  // A desc that stops resolving gives id 0 and allSpells filters it, so a form silently grants nothing: the DLE id
+  // table is an interface with no failure signal (Worker 3, 26 Oct, after our Hagraven ids landed in a candidate).
+  // One line per missing record at boot turns that into something a log search finds. Once per process, because the
+  // load order cannot change without a restart and a hot reload would only repeat it.
+  const reportUnresolvedAbilities = () => {
+    if (globalThis.__dboBeastAbilitiesChecked) return;
+    globalThis.__dboBeastAbilitiesChecked = true;
+    let missing = 0;
+    for (const key of Object.keys(ABILITIES)) {
+      for (const slot of ['right', 'left', 'voice', 'passive', 'hidden']) {
+        for (const sp of (ABILITIES[key] && ABILITIES[key][slot]) || []) {
+          if (sp.id) continue;
+          missing++;
+          log(`beastform: ${key} ${slot} "${sp.name}" (${sp.desc}) is not in this load order, so the form grants it to nobody`);
+        }
+      }
+    }
+    if (missing) log(`beastform: ${missing} ability record(s) missing from the load order`);
   };
   const allSpells = (key) => { const x = ABILITIES[key]; return x ? [...x.right, ...x.left, ...x.voice, ...x.passive, ...x.hidden].filter((sp) => sp.id) : []; };
   const learn = (a, key, on) => { for (const sp of allSpells(key)) papyrus(a, on ? 'AddSpell' : 'RemoveSpell', on ? [spellArg(sp.id), false] : [spellArg(sp.id)]); };
@@ -763,6 +782,7 @@ module.exports = (api) => {
   // guardUnits, combatSeconds, forms (a list narrowing which animals may be taken; a shape already taken still ends as usual) }
   const PCFG = Object.assign({ enabled: true, guardUnits: 6000, combatSeconds: 30, forms: null },
     CFG.polymorph && typeof CFG.polymorph === 'object' ? CFG.polymorph : {});
+  reportUnresolvedAbilities();
   if (globalThis.__dboPolymorphSetBy === undefined) {
     const saved = readState();
     if (saved && typeof saved.polymorphOn === 'boolean') {

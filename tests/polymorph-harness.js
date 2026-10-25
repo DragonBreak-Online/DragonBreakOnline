@@ -790,5 +790,44 @@ ok(packets.slice(n16).filter((x) => x.p && x.p.kind === 'terror').length === 0,
   '16. the Scream does nothing when she is not in the body', packets.slice(n16).length);
 
 
+// ---- 17. a missing ability record says so, instead of granting nothing in silence ----------------------------------
+// The DLE id table is an interface with no failure signal (Worker 3, 26 Oct): a desc that stops resolving gives id 0
+// and allSpells filters it, so a shifted id would leave the Hagraven with no powers and no complaint. These check the
+// complaint exists, because a safety net nobody triggers is not one.
+
+// the normal case first: everything resolves, so nothing is said
+restart({ beastform: {} });
+ok(logs.filter((l) => /not in this load order/.test(l)).length === 0,
+  '17. a load order that has every record says nothing', logs.filter((l) => /not in this load order/.test(l)));
+
+// now a load order where the DLE records are absent, as an older client or a shifted candidate would be
+logs = [];
+delete require.cache[BEASTFORM];
+delete globalThis.__dboBeastAbilitiesChecked;
+const api17 = api({ beastform: {} });
+const realDesc17 = api17.mp.getIdFromDesc;
+api17.mp.getIdFromDesc = (d) => (/DragonBreak Online Edits/.test(String(d)) ? 0 : realDesc17(d));
+require(BEASTFORM)(api17);
+
+const gone17 = logs.filter((l) => /not in this load order/.test(l));
+ok(gone17.length === 2, '17. both missing DLE records are named, one line each', gone17);
+ok(gone17.some((l) => /Hagraven Scream/.test(l) && /1d2233/.test(l)),
+  '17. ...the Scream, with the desc that failed, so a log search finds it', gone17);
+ok(gone17.some((l) => /Summon Spriggan/.test(l) && /1d2234/.test(l)), '17. ...and Summon Spriggan', gone17);
+ok(gone17.every((l) => /grants it to nobody/.test(l)), '17. ...and each says what the consequence is', gone17);
+ok(logs.some((l) => /2 ability record\(s\) missing/.test(l)), '17. ...with a count to notice at a glance',
+  logs.filter((l) => /missing from the load order/.test(l)));
+
+// and it is once per process: a hot reload must not repeat it on every save
+logs = [];
+delete require.cache[BEASTFORM];
+require(BEASTFORM)(api17);
+ok(logs.filter((l) => /not in this load order/.test(l)).length === 0,
+  '17. a hot reload does not say it again: the load order cannot change without a restart',
+  logs.filter((l) => /not in this load order/.test(l)));
+
+restart({ beastform: {} });
+
+
 console.log(fail ? `\n${fail} FAILED, ${pass} passed` : `\nall ${pass} checks passed`);
 process.exit(fail ? 1 : 0);
