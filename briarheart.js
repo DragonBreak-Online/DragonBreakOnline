@@ -38,6 +38,8 @@
 //   no MOD3), worn by DefaultRace (the Reachman race's armor race): a woman gets no briar body unless visual.women is set
 //   (what the engine shows a woman then is to be seen in game). Every give, equip, removal and swap is logged
 //   ("briarheart: look ..."). Equips are tried at most once per visual.retrySeconds and visual.maxTries times in a row.
+//   Keep the bare-chest rule: both records sit in slot 32 (mask 0x4), the cuirass slot itself, not a free overlay slot,
+//   so showing them "always" or "under armour" would strip or fight the player's own cuirass (Worker 3 checked, 25 Oct).
 //
 // Chat: /briarheart [status] | rite | confirm [forever] | cure; staff: grant <name> <reason> | revoke <name> <reason> | list |
 //   altar add [radius] | altar list | altar remove <n>.
