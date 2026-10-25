@@ -551,41 +551,25 @@
    "world": "a764b:BSHeartland.esm",
    "worldName": "Heartland",
    "pos": [
-    208203,
-    147595,
-    -5405
+    208421.94,
+    146169.95,
+    -5627.01
    ],
    "rot": [
     0,
     0,
-    0
+    78.2
    ]
   },
   {
-   "name": "Cheydinhal (draft) - Abandoned House",
+   "name": "Cheydinhal (draft) - Bank of Cheydinhal",
    "region": "Cyrodiil",
-   "world": "1007b6:DBO_Cheydinhal.esp",
+   "world": "101a8a:DBO_Cheydinhal.esp",
    "worldName": "Cheydinhal interior",
    "pos": [
-    62.68,
-    -119.83,
-    -67.66
-   ],
-   "rot": [
-    0,
-    0,
-    0.0
-   ]
-  },
-  {
-   "name": "Cheydinhal (draft) - Aldos Othran's House",
-   "region": "Cyrodiil",
-   "world": "1008d7:DBO_Cheydinhal.esp",
-   "worldName": "Cheydinhal interior",
-   "pos": [
-    62.5,
-    -131.35,
-    -56.0
+    72.75,
+    -113.61,
+    -49.57
    ],
    "rot": [
     0,
@@ -671,22 +655,6 @@
     0,
     0,
     180.0
-   ]
-  },
-  {
-   "name": "Cheydinhal (draft) - Ganredhel's House",
-   "region": "Cyrodiil",
-   "world": "10088f:DBO_Cheydinhal.esp",
-   "worldName": "Cheydinhal interior",
-   "pos": [
-    -18.03,
-    -193.84,
-    47.71
-   ],
-   "rot": [
-    0,
-    0,
-    0.0
    ]
   },
   {
@@ -794,22 +762,6 @@
     -278.73,
     -319.65,
     -158.68
-   ],
-   "rot": [
-    0,
-    0,
-    0.0
-   ]
-  },
-  {
-   "name": "Cheydinhal (draft) - Rythe Lythandas's House",
-   "region": "Cyrodiil",
-   "world": "10064b:DBO_Cheydinhal.esp",
-   "worldName": "Cheydinhal interior",
-   "pos": [
-    195.49,
-    -436.78,
-    13.27
    ],
    "rot": [
     0,
