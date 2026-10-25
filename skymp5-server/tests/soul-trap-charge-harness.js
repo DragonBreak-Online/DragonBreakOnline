@@ -54,7 +54,9 @@ rec(FIERY_SWORD, 'WEAP', [{ type: 'EITM', data: u32s(ENCH_FIERY_SOULS) }, { type
 rec(STAFF_OF_SOULS, 'WEAP', [{ type: 'EITM', data: u32s(ENCH_TRAP_01) }, { type: 'DNAM', data: dnam(8) }]);
 rec(MANUAL_AXE, 'WEAP', [{ type: 'EITM', data: u32s(ENCH_MANUAL) }, { type: 'DNAM', data: dnam(3) }]);
 const PETTY = 0x0002e4e2, PETTY_FILLED = 0x0002e4e3, WOLF_BASE = 0x00023aba;
-rec(PETTY, 'SLGM', [{ type: 'SLCP', data: new Uint8Array([1]) }]);
+rec(PETTY, 'SLGM', [{ type: 'SLCP', data: new Uint8Array([1]) },
+  // NAM0 is the engine's link to the filled form; USSEP adds it to the four gems Skyrim.esm omits
+  { type: 'NAM0', data: u32s(PETTY_FILLED) }]);
 rec(PETTY_FILLED, 'SLGM', [{ type: 'SLCP', data: new Uint8Array([1]) }, { type: 'SOUL', data: new Uint8Array([1]) }]);
 rec(WOLF_BASE, 'NPC_', [{ type: 'ACBS', data: acbs(1) }]);
 

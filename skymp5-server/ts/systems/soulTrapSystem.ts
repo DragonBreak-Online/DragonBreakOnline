@@ -42,15 +42,17 @@ const MIN_HIT_COST = 1;
 // GMST iLesserSoulActorLevel, iCommonSoulActorLevel, iGreaterSoulActorLevel, iGrandSoulActorLevel.
 const SOUL_ACTOR_LEVELS = [4, 16, 28, 38];
 const SOUL_GRAND = 5;
-// Empty vanilla gems and their filled forms; the stars and a smaller soul keep the soul as entry extra data.
-const FILLED_GEMS = new Map<number, number>([
-  [0x0002e4e2, 0x0002e4e3], // Petty
-  [0x0002e4e4, 0x0002e4e5], // Lesser
-  [0x0002e4e6, 0x0002e4f3], // Common
-  [0x0002e4f4, 0x0002e4fb], // Greater
-  [0x0002e4fc, 0x0002e4ff], // Grand
-  [0x0002e500, 0x0002e504], // Black
-]);
+// SLGM "Linked Soul Gem" (NAM0): the filled form the engine swaps an empty gem for. Read from the winning override
+// rather than hardcoded, because a hardcoded table desyncs the moment a plugin adds a gem pair: SoulGemAppleSSI
+// (summersetisles.esp 339f2dd) is an empty NPC-capable grand gem whose filled form 339f2de a six-pair table never knew,
+// so the server recorded a soul extra while the engine swapped the base, and the gem could never be stored or traded.
+// USSEP supplies the links vanilla omits - Skyrim.esm carries NAM0 only on Grand and Black, USSEP adds Petty, Lesser,
+// Common and Greater. A gem with NO NAM0 has no filled form and keeps its soul as entry extra data, which is right for
+// Azura's Star and the Black Star and is what the engine does with them too.
+const NAM0_FIELD = "NAM0";
+// Quest soul gems that must never be chosen. FFRiften14SoulGem is capacity 5 in Skyrim.esm and 0 in USSEP, so the live
+// winner already excludes it; it is listed so a load-order change cannot quietly make it fillable again.
+const QUEST_GEMS = new Set<number>([0x00094e40, 0x0006a0c2, 0x00043e26]);
 // Where the Castle Volkihar portal (Dawnguard.esm door 0200289B) sets the player down in DLC01SoulCairn.
 const SOUL_CAIRN_ARRIVAL = {
   cellOrWorldDesc: "1408:Dawnguard.esm",
@@ -72,6 +74,8 @@ interface Gem {
   capacity: number;
   empty: boolean;
   black: boolean;
+  // The filled form NAM0 links to, 0 when the gem has none (the stars)
+  filled: number;
 }
 
 interface RecordEffect {
@@ -203,7 +207,7 @@ export class SoulTrapSystem implements System {
         const userId = ctx.svr.getUserByActor(casterId);
         if (userId < 0 || userId >= INVALID_USER_ID) return;
         const inv = (ctx.svr as Mp).get(casterId, "inventory");
-        const ids = new Set<number>([...FILLED_GEMS.keys(), ...FILLED_GEMS.values()]);
+        const ids = new Set<number>(this.allGemIds(ctx));
         for (const e of (inv && Array.isArray(inv.entries) ? inv.entries : [])) {
           const id = Number(e.baseId) >>> 0;
           if (this.gemOf(ctx, id)) ids.add(id);
@@ -245,10 +249,11 @@ export class SoulTrapSystem implements System {
     let bestRank = Infinity;
     for (const e of entries) {
       if ((Number(e.count) || 0) <= 0 || e.soul) continue;
+      if (QUEST_GEMS.has(Number(e.baseId) >>> 0)) continue;
       const gem = this.gemOf(ctx, Number(e.baseId) >>> 0);
       if (!gem || !gem.empty || gem.black !== soul.black || gem.capacity < soul.size) continue;
-      // Ties go to a regular gem so the reusable stars stay free
-      const rank = gem.capacity * 2 + (FILLED_GEMS.has(Number(e.baseId) >>> 0) ? 0 : 1);
+      // Ties go to a gem with a filled form, so the reusable stars (which have no NAM0) stay free
+      const rank = gem.capacity * 2 + (gem.filled ? 0 : 1);
       if (rank < bestRank) {
         best = e;
         bestRank = rank;
@@ -258,7 +263,9 @@ export class SoulTrapSystem implements System {
 
     const baseId = Number(best.baseId) >>> 0;
     best.count -= 1;
-    const filledId = soul.size === this.gemOf(ctx, baseId)?.capacity ? FILLED_GEMS.get(baseId) : undefined;
+    const chosen = this.gemOf(ctx, baseId);
+    // Only a soul that fills the gem swaps the base, and only when the record names a filled form
+    const filledId = chosen && soul.size === chosen.capacity ? chosen.filled : 0;
     const filled: GemEntry = filledId ? { baseId: filledId, count: 1 } : { baseId, count: 1, soul: soul.size };
     const stack = entries.find((e) => (Number(e.baseId) >>> 0) === filled.baseId && (e.soul || 0) === (filled.soul || 0) &&
       e.count > 0 && !e.worn && !e.wornLeft);
@@ -451,6 +458,23 @@ export class SoulTrapSystem implements System {
     return result;
   }
 
+  // Every SLGM in the load order, so a resync names the gem a player actually carries whatever plugin it came from.
+  // Cached: plugin data never changes at runtime. An older native without the enumeration falls back to the inventory.
+  private allGemIds(ctx: SystemContext): number[] {
+    if (this.gemIds) return this.gemIds;
+    let ids: number[] = [];
+    try {
+      const svr = ctx.svr as Mp;
+      if (typeof svr.getEspmRecordIdsByType === "function") {
+        ids = (svr.getEspmRecordIdsByType("SLGM") as number[]).map((x) => Number(x) >>> 0).filter((id) => this.gemOf(ctx, id));
+      }
+    } catch (e) {
+      this.log(`[soultrap] could not list soul gems: ${e}`);
+    }
+    this.gemIds = ids;
+    return ids;
+  }
+
   private gemOf(ctx: SystemContext, baseId: number): Gem | null {
     const hit = this.gemCache.get(baseId);
     if (hit !== undefined) return hit;
@@ -459,10 +483,17 @@ export class SoulTrapSystem implements System {
     if (res && res.record.type === "SLGM") {
       const soul = this.fieldData(res, "SOUL");
       const capacity = this.fieldData(res, "SLCP");
+      const nam0 = this.fieldData(res, NAM0_FIELD);
+      let filled = 0;
+      if (nam0 && nam0.byteLength >= 4 && typeof res.toGlobalRecordId === "function") {
+        const local = new DataView(nam0.buffer, nam0.byteOffset, nam0.byteLength).getUint32(0, true);
+        try { filled = local ? res.toGlobalRecordId(local) >>> 0 : 0; } catch { filled = 0; }
+      }
       gem = {
         capacity: capacity && capacity.byteLength ? capacity[0] : 0,
         empty: !(soul && soul.byteLength && soul[0]),
         black: !!(Number(res.record.flags) & FLAG_CAN_HOLD_NPC_SOUL),
+        filled,
       };
     }
     this.gemCache.set(baseId, gem);
@@ -527,5 +558,6 @@ export class SoulTrapSystem implements System {
   private costCache = new Map<number, number>();
   private effectCache = new Map<number, boolean>();
   private gemCache = new Map<number, Gem | null>();
+  private gemIds: number[] | null = null;
   private keywordCache = new Map<number, number[]>();
 }

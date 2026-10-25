@@ -33,7 +33,9 @@ rec(ENCH_FIRE, 'ENCH', [{ type: 'EFID', data: u32s(FIRE_CONTACT) }, { type: 'EFI
 rec(IRON_SWORD, 'WEAP', []);
 rec(STEEL_SWORD, 'WEAP', []);
 rec(SWORD_OF_SOULS, 'WEAP', [{ type: 'EITM', data: u32s(ENCH_SOUL_TRAP) }]);
-rec(PETTY, 'SLGM', [{ type: 'SLCP', data: new Uint8Array([1]) }]);
+rec(PETTY, 'SLGM', [{ type: 'SLCP', data: new Uint8Array([1]) },
+  // NAM0 is the engine's link to the filled form; USSEP adds it to the four gems Skyrim.esm omits
+  { type: 'NAM0', data: u32s(PETTY_FILLED) }]);
 rec(PETTY_FILLED, 'SLGM', [{ type: 'SLCP', data: new Uint8Array([1]) }, { type: 'SOUL', data: new Uint8Array([1]) }]);
 rec(WOLF_BASE, 'NPC_', [{ type: 'ACBS', data: acbs(1) }]);
 

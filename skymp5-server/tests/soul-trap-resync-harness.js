@@ -33,9 +33,31 @@ rec(ENCH_FIRE, 'ENCH', [{ type: 'EFID', data: u32s(FIRE_CONTACT) }, { type: 'EFI
 rec(IRON_SWORD, 'WEAP', []);
 rec(STEEL_SWORD, 'WEAP', []);
 rec(SWORD_OF_SOULS, 'WEAP', [{ type: 'EITM', data: u32s(ENCH_SOUL_TRAP) }]);
-rec(PETTY, 'SLGM', [{ type: 'SLCP', data: new Uint8Array([1]) }]);
+rec(PETTY, 'SLGM', [{ type: 'SLCP', data: new Uint8Array([1]) },
+  // NAM0 is the engine's link to the filled form; USSEP adds it to the four gems Skyrim.esm omits
+  { type: 'NAM0', data: u32s(PETTY_FILLED) }]);
 rec(PETTY_FILLED, 'SLGM', [{ type: 'SLCP', data: new Uint8Array([1]) }, { type: 'SOUL', data: new Uint8Array([1]) }]);
 rec(WOLF_BASE, 'NPC_', [{ type: 'ACBS', data: acbs(1) }]);
+
+// A black gem carries the SLGM record flag "Can Hold NPC Soul" (0x20000), which rec() cannot set
+const recF = (id, type, fields, flags) => records.set(id >>> 0, { record: { type, fields, flags }, toGlobalRecordId: (x) => x >>> 0 });
+const CAN_HOLD_NPC = 0x20000, KEYWORD_ACTOR_TYPE_NPC = 0x00013794;
+// A humanoid target: ActorTypeNPC makes the soul black and grand, so only a black gem takes it
+const MAN_BASE = 0x000007eb;
+rec(MAN_BASE, 'NPC_', [{ type: 'ACBS', data: acbs(1) }, { type: 'KWDA', data: u32s(KEYWORD_ACTOR_TYPE_NPC) }]);
+const BLACK = 0x0002e500, BLACK_FILLED = 0x0002e504;
+recF(BLACK, 'SLGM', [{ type: 'SLCP', data: new Uint8Array([5]) }, { type: 'NAM0', data: u32s(BLACK_FILLED) }], CAN_HOLD_NPC);
+recF(BLACK_FILLED, 'SLGM', [{ type: 'SLCP', data: new Uint8Array([5]) }, { type: 'SOUL', data: new Uint8Array([5]) }], CAN_HOLD_NPC);
+// summersetisles.esp: an empty NPC-capable grand gem whose filled form a hardcoded six-pair table never knew
+const APPLE = 0x0339f2dd, APPLE_FILLED = 0x0339f2de;
+recF(APPLE, 'SLGM', [{ type: 'SLCP', data: new Uint8Array([5]) }, { type: 'NAM0', data: u32s(APPLE_FILLED) }], CAN_HOLD_NPC);
+recF(APPLE_FILLED, 'SLGM', [{ type: 'SLCP', data: new Uint8Array([5]) }, { type: 'SOUL', data: new Uint8Array([5]) }], CAN_HOLD_NPC);
+// The Black Star: NPC-capable, grand, and NO NAM0 - it has no filled form and keeps its soul as extra data
+const BLACK_STAR = 0x00063b29;
+recF(BLACK_STAR, 'SLGM', [{ type: 'SLCP', data: new Uint8Array([5]) }], CAN_HOLD_NPC);
+// A quest gem that must never be chosen even though its capacity fits
+const WHITERUN_GEM = 0x00094e40;
+rec(WHITERUN_GEM, 'SLGM', [{ type: 'SLCP', data: new Uint8Array([2]) }]);
 
 (async () => {
   await esbuild.build({
@@ -53,6 +75,10 @@ rec(WOLF_BASE, 'NPC_', [{ type: 'ACBS', data: acbs(1) }]);
     set: (id, k, v) => props.set(`${id >>> 0}|${k}`, v),
     getIdFromDesc: (d) => { if (!descs.has(d)) throw new Error('no desc'); return descs.get(d); },
     lookupEspmRecordById: (id) => records.get(id >>> 0) || null,
+    // The server lists every SLGM in the order so a resync names a gem from any plugin, not six hardcoded pairs
+    getEspmRecordIdsByType: (t) => (t === 'SLGM'
+      ? [...records.entries()].filter(([, r]) => r.record.type === 'SLGM').map(([id]) => id)
+      : []),
     getUserByActor: (id) => ((id >>> 0) === 0xff000014 ? 7 : 65535),
     sendCustomPacket: (u, s) => sent.push({ u, p: JSON.parse(s) }),
   };
@@ -101,6 +127,53 @@ rec(WOLF_BASE, 'NPC_', [{ type: 'ACBS', data: acbs(1) }]);
   sent.length = 0;
   check('a hit with no soul trap fills nothing', !(await fight(IRON_SWORD, [{ baseId: IRON_SWORD, count: 1, worn: true }, { baseId: PETTY, count: 1 }])));
   check('...and sends nothing', resyncs().length === 0);
+
+  // The filled form comes from the record's NAM0, so a modded gem pair works without being hardcoded
+  const trapInv = async (entries, targetBase) => {
+    const sys = new SoulTrapSystem((...x) => logs.push(x.join(' ')));
+    await sys.initAsync(ctx);
+    props.clear();
+    props.set(`${A}|inventory`, { entries });
+    props.set(`${A}|profileId`, 3);
+    props.set(`${T}|type`, 'MpActor');
+    props.set(`${T}|isDead`, false);
+    props.set(`${T}|templateChain`, [targetBase]);
+    mp['onPapyrusEvent:OnHit'](T, desc(A), desc(SWORD_OF_SOULS), null, false, false, false, false);
+    now += 1000;
+    await sys.updateAsync(ctx);
+    now += 200;
+    props.set(`${T}|isDead`, true);
+    await sys.updateAsync(ctx);
+    return props.get(`${A}|inventory`).entries.filter((e) => e.count > 0);
+  };
+  const held = (inv, baseId) => inv.find((e) => (e.baseId >>> 0) === baseId) || null;
+
+  sent.length = 0;
+  let inv = await trapInv([sword, { baseId: BLACK, count: 1 }], MAN_BASE);
+  check('a humanoid soul fills a black gem, swapping to the form NAM0 names', !!held(inv, BLACK_FILLED) && !held(inv, BLACK));
+  check('...and the filled gem carries no soul extra, as the base swap already says it', !!held(inv, BLACK_FILLED) && !held(inv, BLACK_FILLED).soul);
+
+  sent.length = 0;
+  inv = await trapInv([sword, { baseId: APPLE, count: 1 }], MAN_BASE);
+  check('a MODDED gem pair swaps too: the Summerset apple gem becomes its own filled form', !!held(inv, APPLE_FILLED) && !held(inv, APPLE));
+  check('...which a hardcoded six-pair table could never do, so it is no longer desynced', !!held(inv, APPLE_FILLED) && !held(inv, APPLE_FILLED).soul);
+
+  sent.length = 0;
+  inv = await trapInv([sword, { baseId: BLACK_STAR, count: 1 }], MAN_BASE);
+  check('a gem with NO NAM0 keeps its soul as extra data: the Black Star stays the Black Star', !!held(inv, BLACK_STAR));
+  check('...holding the soul it caught', held(inv, BLACK_STAR) && held(inv, BLACK_STAR).soul === 5);
+
+  sent.length = 0;
+  inv = await trapInv([sword, { baseId: BLACK, count: 1 }, { baseId: BLACK_STAR, count: 1 }], MAN_BASE);
+  check('the reusable star stays free while a gem with a filled form is there', !!held(inv, BLACK_FILLED) && !!held(inv, BLACK_STAR) && !held(inv, BLACK_STAR).soul);
+
+  sent.length = 0;
+  inv = await trapInv([sword, { baseId: WHITERUN_GEM, count: 1 }], WOLF_BASE);
+  check('a quest gem is never chosen, though its capacity fits', !!held(inv, WHITERUN_GEM) && !held(inv, WHITERUN_GEM).soul);
+
+  sent.length = 0;
+  inv = await trapInv([sword, { baseId: PETTY, count: 1 }], MAN_BASE);
+  check('a white gem never takes a humanoid soul', !held(inv, PETTY_FILLED) && !!held(inv, PETTY) && !held(inv, PETTY).soul);
 
   global.setTimeout = realTimeout;
   Date.now = realNow;
