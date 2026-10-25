@@ -1,5 +1,19 @@
 [
   {
+    "title": "The Spider Imbuing Chamber answers only to Dunmer",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Spidermancy",
+        "items": [
+          "Working the Spider Imbuing Chamber is now a Dunmer craft. Anyone else who tries it is told the chamber does not stir for them, and nothing opens. It is your character's own race that counts, so a Dunmer under a beast form or a staff's polymorph can still use it, and a Nord wearing someone else's shape still cannot."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Server restart: soul gems, gates and strongholds",
     "date": "2026-10-25",
     "version": "Server update",
