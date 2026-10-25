@@ -457,6 +457,8 @@ module.exports = (api) => {
     try { if (typeof globalThis.__dboCourierEntries === 'function') entries.push(...globalThis.__dboCourierEntries(a, t)); } catch (e) { /* couriers not loaded */ }
     try { if (typeof globalThis.__dboConcordatEntries === 'function') entries.push(...globalThis.__dboConcordatEntries(a, t)); } catch (e) { /* thalmor.js not loaded */ }
     try { if (typeof globalThis.__dboSuperMenuEntries === 'function') entries.push(...globalThis.__dboSuperMenuEntries(a, t)); } catch (e) { /* no curses */ }
+    // Over a fallen Briarheart: tear out the heart (briarheart.js)
+    try { if (typeof globalThis.__dboBriarheartMenuEntries === 'function') entries.push(...globalThis.__dboBriarheartMenuEntries(a, t)); } catch (e) { /* briarheart.js not loaded */ }
     try { if (typeof globalThis.__dboSilverTestEntries === 'function') entries.push(...globalThis.__dboSilverTestEntries(a, t)); } catch (e) { /* silvertest.js not loaded */ }
     try { if (typeof globalThis.__dboFactionMenuEntries === 'function') entries.push(...globalThis.__dboFactionMenuEntries(a, t)); } catch (e) { /* factions not loaded */ }
     try { if (typeof globalThis.__dboSchoolsMenuEntries === 'function') entries.push(...globalThis.__dboSchoolsMenuEntries(a, t)); } catch (e) { /* schools not loaded */ }
@@ -538,6 +540,7 @@ module.exports = (api) => {
     if (typeof globalThis.__dboCourierAction === 'function' && globalThis.__dboCourierAction(a, id, t, nameFor)) return;
     if (typeof globalThis.__dboConcordatAction === 'function' && globalThis.__dboConcordatAction(a, id, t, nameFor)) return;
     if (typeof globalThis.__dboSuperMenuAction === 'function' && globalThis.__dboSuperMenuAction(a, id, t, nameFor)) return;
+    if (typeof globalThis.__dboBriarheartMenuAction === 'function' && globalThis.__dboBriarheartMenuAction(a, id, t)) return;
     if (typeof globalThis.__dboSilverTestAction === 'function' && globalThis.__dboSilverTestAction(a, id, t)) return;
     if (typeof globalThis.__dboFactionMenuAction === 'function' && globalThis.__dboFactionMenuAction(a, id, t)) return;
     if (typeof globalThis.__dboSchoolsMenuAction === 'function' && globalThis.__dboSchoolsMenuAction(a, id, t, nameFor)) return;

@@ -1,0 +1,223 @@
+// Scripted test for briarheart.js (Nat, 25 Oct: Briarhearts, design A1-A4). Loads the real module against stubs: characters
+// with races, faiths, inventories and places; the rite (every refusal, success, a death under the knife, the cooldown, a
+// death for good), the gifts (spells, health, resistances), the price (no Divine, the faith lock, fire, the heart torn out
+// of a fallen Briarheart), the cure, staff grant / revoke, the login, the X menu, and the hooks the other modules carry.
+// Run it from this folder's parent with
+//
+//   node tests\briarheart-harness.js
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+let fails = 0;
+const ok = (c, what, got) => { console.log(`${c ? 'ok  ' : 'FAIL'}  ${what}${!c && got !== undefined ? '   ' + JSON.stringify(got).slice(0, 300) : ''}`); if (!c) fails++; };
+
+// ---- the world ---------------------------------------------------------------------------------------------------------
+const WORLD = '3c:Skyrim.esm', ELSE = '1a26f:Skyrim.esm';
+const RACES = { 1: 'DBOReachmanRace', 2: 'NordRace', 3: 'DBOReachmanRaceVampire' };
+const ID = { '3ad61:Skyrim.esm': 0x3ad61, '2e504:Skyrim.esm': 0x2e504, '72317:Skyrim.esm': 0x72317, '400ad:Skyrim.esm': 0x400ad, '43599:Skyrim.esm': 0x43599, '5d008:Skyrim.esm': 0x5d008 };
+const HEART = 0x3ad61, GEM = 0x2e504;
+const props = new Map();   // `${actor}|${prop}` -> value
+const P = (a, k) => props.get(`${a >>> 0}|${k}`);
+const setP = (a, k, v) => props.set(`${a >>> 0}|${k}`, v);
+const papyrusCalls = [];
+const mp = {
+  get: (a, k) => { const v = P(a, k); if (v === undefined && k === 'type') throw new Error('no actor'); return v === undefined ? null : JSON.parse(JSON.stringify(v)); },
+  set: (a, k, v) => setP(a, k, v === null ? null : JSON.parse(JSON.stringify(v))),
+  getIdFromDesc: (d) => ID[d] || 0,
+  getDescFromId: (id) => `${(id >>> 0).toString(16)}:Skyrim.esm`,
+  lookupEspmRecordById: (id) => (RACES[id] ? { record: { editorId: RACES[id] } } : { record: null }),
+  callPapyrusFunction: (kind, cls, method, self, args) => { papyrusCalls.push({ method, self: self.desc, args: args.map((x) => x.desc !== undefined ? x.desc : x) }); },
+};
+const actor = (id, race, faith, pos, inv) => {
+  setP(id, 'appearance', { raceId: race });
+  setP(id, 'locationalData', { cellOrWorldDesc: WORLD, pos: pos || [0, 0, 0], rot: [0, 0, 0] });
+  setP(id, 'inventory', { entries: inv || [] });
+  faiths.set(id >>> 0, faith);
+  return id >>> 0;
+};
+const faiths = new Map();
+const TARRARE = 0x14, NORD = 0x15, HUNTER = 0x16, LEAD = 0x17, STAFFER = 0x18, VAMP = 0x19, CARRIER = 0x1a, ROLLED = 0x1b;
+actor(TARRARE, 1, 'reach', [10, 0, 0], [{ baseId: HEART, count: 2 }]);
+actor(NORD, 2, 'reach', [10, 0, 0], [{ baseId: HEART, count: 1 }]);
+actor(HUNTER, 2, 'imperial', [10, 50, 0], []);
+actor(LEAD, 2, 'imperial', [0, 0, 0], []);
+actor(STAFFER, 1, 'reach', [0, 0, 0], [{ baseId: HEART, count: 1 }]);
+actor(VAMP, 3, 'reach', [0, 0, 0], [{ baseId: HEART, count: 1 }]);
+actor(CARRIER, 1, 'reach', [0, 0, 0], [{ baseId: HEART, count: 1 }]);
+actor(ROLLED, 1, 'reach', [0, 0, 0], [{ baseId: HEART, count: 1 }]);
+setP(VAMP, 'private.supernatural', { kind: 'vampire' });
+setP(CARRIER, 'private.supernatural', { kind: null, disease: { kind: 'werewolf' } });
+const online = [TARRARE, NORD, HUNTER, LEAD, STAFFER, VAMP, CARRIER, ROLLED];
+const said = []; const audits = []; const given = []; const commands = new Map(); let ticker = null;
+const downed = new Set(); const kills = []; const permas = []; const syncs = []; let duelers = new Set();
+const shrines = new Map();
+globalThis.__dboFaithIdOf = (a) => faiths.get(a >>> 0) || '';
+globalThis.__dboSuperKind = (a) => (P(a, 'private.supernatural') || {}).kind || null;
+globalThis.__dboIsStaff = (a) => (a >>> 0) === STAFFER;
+globalThis.__dboIsDowned = (a) => downed.has(a >>> 0);
+globalThis.__dboDownedKill = (t, by, why) => { kills.push({ t, by, why }); return true; };
+globalThis.__dboPermaKill = (a, why) => { permas.push({ a, why }); setP(a, 'private.permaDead', true); };
+globalThis.__dboCharLevelSyncBonus = (a) => syncs.push(a);
+globalThis.__dboInDuel = (a) => duelers.has(a >>> 0);
+globalThis.__dboPrayerLastShrine = shrines;
+const RESIST = { 0x500: new Set([40]), 0x501: new Set([43]), 0x502: new Set([41]), 0x503: new Set() };
+
+// The module writes briarheart.json beside the server (cwd): a scratch folder
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'briarheart-'));
+const cwd = process.cwd(); process.chdir(scratch);
+const MODULE = path.resolve(__dirname, '..', 'briarheart.js');
+const load = (cfg) => {
+  delete require.cache[MODULE]; delete globalThis.__dboBriarheart;
+  return require(MODULE)({
+    mp, log: () => {}, personal: (a, t) => said.push([a >>> 0, t]), audit: (t) => audits.push(t), who: (a) => `who${(a >>> 0).toString(16)}`,
+    display: (a) => `char${(a >>> 0).toString(16)}`, cfg, registerChatCommand: (n, f) => commands.set(n, f), onlineActors: () => online.slice(),
+    isLeadStaff: (a) => (a >>> 0) === LEAD, findByName: (q) => ({ tarrare: TARRARE, nord: NORD, hunter: HUNTER })[String(q).trim().toLowerCase()] || 0,
+    every: (n, ms, f) => { ticker = f; }, giveItem: (a, id, n) => given.push([a >>> 0, id, n]), sourceResistsOf: (id) => RESIST[id] || new Set(),
+  });
+};
+const run = (a, args) => { said.length = 0; commands.get('briarheart')(a, args); return said.map(([, t]) => t).join(' | '); };
+const inv = (a, id) => ((P(a, 'inventory') || {}).entries || []).filter((e) => e.baseId === id).reduce((n, e) => n + e.count, 0);
+const realRandom = Math.random;
+const setRandom = (v) => { Math.random = () => v; };
+
+// ---- off ---------------------------------------------------------------------------------------------------------------
+let M = load({});
+ok(/not taking hearts/.test(run(TARRARE, 'rite')), 'off by default: the rite is refused');
+ok(globalThis.__dboBriarheartTargetMult(HUNTER, TARRARE, 0x502) === 1 && !globalThis.__dboIsBriarheart(TARRARE), 'off: no hook does anything');
+
+// ---- on: the altar, then every refusal ---------------------------------------------------------------------------------
+const CFG = { briarheart: { enabled: true } };
+M = load(CFG);
+ok(/Usage/.test(run(TARRARE, 'altar add')), 'a player cannot place an altar');
+ok(/The rite is made at a Hagraven altar/.test(run(TARRARE, 'rite')), 'no altar placed: refused');
+ok(/altar 1 added here/.test(run(LEAD, 'altar add 300')), 'a Lead GM places an altar where they stand');
+ok(M.data().altars.length === 1 && M.data().altars[0].radius === 300 && JSON.parse(fs.readFileSync('briarheart.json', 'utf8')).altars.length === 1, 'the altar is saved to briarheart.json');
+ok(/only to the Reachfolk/.test(run(NORD, 'rite')), 'a Nord is refused (races)');
+faiths.set(TARRARE, 'imperial');
+ok(/Old Gods of the Reach/.test(run(TARRARE, 'rite')), 'a Reachman of another faith is refused (faiths)');
+faiths.set(TARRARE, 'reach');
+ok(/The dead have no heart/.test(run(VAMP, 'rite')), 'a vampire is refused');
+ok(/A fever holds you/.test(run(CARRIER, 'rite')), 'a carrier of a fever is refused');
+ok(/Staff take no rite/.test(run(STAFFER, 'rite')), 'a staff character is refused');
+setP(TARRARE, 'locationalData', { cellOrWorldDesc: WORLD, pos: [1000, 0, 0], rot: [0, 0, 0] });
+ok(/at a Hagraven altar/.test(run(TARRARE, 'rite')), 'outside the altar\'s radius: refused');
+setP(TARRARE, 'locationalData', { cellOrWorldDesc: ELSE, pos: [10, 0, 0], rot: [0, 0, 0] });
+ok(/at a Hagraven altar/.test(run(TARRARE, 'rite')), 'the same spot in another world: refused');
+setP(TARRARE, 'locationalData', { cellOrWorldDesc: WORLD, pos: [10, 0, 0], rot: [0, 0, 0] });
+ok(/Say \/briarheart confirm within 5 minutes/.test(run(TARRARE, 'rite')), 'a Reachman of the Old Gods at the altar with a heart is offered the rite');
+ok(/nothing to confirm/.test(run(NORD, 'confirm')), 'confirm with nothing pending says so');
+
+// ---- the rite works ------------------------------------------------------------------------------------------------------
+papyrusCalls.length = 0; syncs.length = 0;
+setRandom(0.99);
+ok(/takes root/.test(run(TARRARE, 'confirm')), 'the rite: the briar takes');
+ok(M.isBriar(TARRARE) && P(TARRARE, 'private.dboBriarheart').how === 'rite', 'the record is on the character');
+ok(inv(TARRARE, HEART) === 1, 'one Briar Heart is spent');
+ok(papyrusCalls.filter((c) => c.method === 'AddSpell').map((c) => c.args[0]).join() === '72317:Skyrim.esm,400ad:Skyrim.esm', 'Ironflesh and Lightning Cloak are given', papyrusCalls);
+ok(!papyrusCalls.some((c) => c.method === 'AddToFaction'), 'forswornFriendly is off: no faction');
+ok(!papyrusCalls.some((c) => c.method === 'EquipItem') && !given.length, 'the visual is off: nothing worn or given');
+ok(syncs.includes(TARRARE) && globalThis.__dboBriarheartVitalBonus(TARRARE).health === 50 && globalThis.__dboBriarheartVitalBonus(NORD).health === 0, '+50 health, sent at once');
+ok(/already beats/.test(run(TARRARE, 'rite')), 'a second rite is refused');
+ok(/has beaten in your chest since/.test(run(TARRARE, 'status')), '/briarheart says so');
+ok(audits.some((t) => /took the briar heart/.test(t)), 'the rite is audited');
+
+// ---- the gifts and the price -------------------------------------------------------------------------------------------
+const tm = globalThis.__dboBriarheartTargetMult;
+ok(Math.abs(tm(HUNTER, TARRARE, 0x500) - 0.85) < 1e-9, 'a poison spell hit: 15% less');
+ok(Math.abs(tm(HUNTER, TARRARE, 0x501) - 0.85) < 1e-9, 'a frost spell hit: 15% less');
+ok(Math.abs(tm(HUNTER, TARRARE, 0x502) - 1.25) < 1e-9, 'a fire spell hit: 25% more');
+ok(tm(HUNTER, TARRARE, 0x503) === 1 && tm(TARRARE, TARRARE, 0x502) === 1 && tm(TARRARE, HUNTER, 0x502) === 1, 'a weapon, their own fire, and others: unchanged');
+ok(/No Divine's blessing/.test(globalThis.__dboBriarheartRefusesDivine(TARRARE)) && globalThis.__dboBriarheartRefusesDivine(NORD) === '', 'no Divine blessing for a Briarheart only');
+ok(/turn to no other/.test(globalThis.__dboBriarheartFaithLock(TARRARE)) && globalThis.__dboBriarheartFaithLock(NORD) === '', 'the faith is locked for a Briarheart only');
+
+// ---- the knife, a cooldown, and death for good ----------------------------------------------------------------------------
+setRandom(0.01);
+setP(ROLLED, 'locationalData', { cellOrWorldDesc: WORLD, pos: [0, 0, 0], rot: [0, 0, 0] });
+run(ROLLED, 'rite');
+ok(/die on the altar, and wake again/.test(run(ROLLED, 'confirm')) && P(ROLLED, 'isDead') === true && !M.isBriar(ROLLED), 'under the knife at failChance: an ordinary death, no briar');
+ok(inv(ROLLED, HEART) === 0, 'the heart is spent anyway');
+setP(ROLLED, 'inventory', { entries: [{ baseId: HEART, count: 1 }] });
+ok(/altar is cold to you/.test(run(ROLLED, 'rite')), 'the altar is cold for failCooldownHours');
+M = load({ briarheart: { enabled: true, failPermadeath: true } }); M.data();
+const DOOMED = actor(0x30, 1, 'reach', [0, 0, 0], [{ baseId: HEART, count: 1 }]); online.push(DOOMED);
+run(DOOMED, 'rite');
+ok(/This life is over/.test(run(DOOMED, 'confirm')) && permas.some((p) => p.a === DOOMED), 'failPermadeath: the death is for good');
+setRandom(0.99);
+M = load(CFG);
+
+// ---- the heart torn out -------------------------------------------------------------------------------------------------
+ok(globalThis.__dboBriarheartMenuEntries(HUNTER, TARRARE).length === 0, 'no X entry over a standing Briarheart');
+said.length = 0; globalThis.__dboBriarheartMenuAction(HUNTER, 'briartear', TARRARE);
+ok(/fallen Briarheart/.test(said.map(([, t]) => t).join()), 'tearing a standing Briarheart is refused');
+downed.add(TARRARE);
+ok(globalThis.__dboBriarheartMenuEntries(HUNTER, TARRARE).map((e) => e.label).join() === 'Tear out the heart', 'over a fallen Briarheart: "Tear out the heart"');
+ok(globalThis.__dboBriarheartMenuEntries(STAFFER, TARRARE).length === 0, 'never offered to staff');
+ok(globalThis.__dboBriarheartMenuEntries(HUNTER, NORD).length === 0, 'not over a mortal');
+duelers = new Set([HUNTER]);
+said.length = 0; globalThis.__dboBriarheartMenuAction(HUNTER, 'briartear', TARRARE);
+ok(/Not in a duel/.test(said.map(([, t]) => t).join()), 'not in a duel');
+duelers = new Set();
+said.length = 0; globalThis.__dboBriarheartMenuAction(HUNTER, 'briartear', TARRARE);
+ok(/Stay over them for 10 seconds/.test(said.map(([, t]) => t).join()) && said.some(([a, t]) => a === TARRARE && /reaches for the briar/.test(t)), 'the tear starts, and the Briarheart is told');
+ticker();
+ok(M.isBriar(TARRARE) && !kills.length, 'nothing happens before tearSeconds');
+const tearAt = globalThis.__dboBriarheart.tears.get(HUNTER).at;
+setP(HUNTER, 'locationalData', { cellOrWorldDesc: WORLD, pos: [900, 0, 0], rot: [0, 0, 0] });
+ticker();
+ok(!globalThis.__dboBriarheart.tears.has(HUNTER) && M.isBriar(TARRARE), 'the taker walks off: the tear is dropped');
+setP(HUNTER, 'locationalData', { cellOrWorldDesc: WORLD, pos: [10, 50, 0], rot: [0, 0, 0] });
+globalThis.__dboBriarheartMenuAction(HUNTER, 'briartear', TARRARE);
+globalThis.__dboBriarheart.tears.get(HUNTER).at = Date.now() - 11000;
+papyrusCalls.length = 0; given.length = 0;
+ticker();
+ok(!M.isBriar(TARRARE) && P(TARRARE, 'private.dboBriarheart') === null, 'after tearSeconds the Briarheart is one no more');
+ok(kills.some((k) => k.t === TARRARE && k.by === HUNTER && /torn out/.test(k.why)), 'and dies at once (downed.js __dboDownedKill)');
+ok(given.some(([a, id]) => a === HUNTER && id === HEART), 'the taker gets the Briar Heart');
+ok(papyrusCalls.filter((c) => c.method === 'RemoveSpell').length === 2 && globalThis.__dboBriarheartVitalBonus(TARRARE).health === 0, 'the spells and the health go with it');
+ok(audits.some((t) => /tore the briar heart out of/.test(t)), 'audited');
+ok(tearAt > 0, '(the tear kept its start time)');
+downed.delete(TARRARE);
+
+// ---- staff grant / revoke, login, the cure --------------------------------------------------------------------------------
+ok(/Usage/.test(run(HUNTER, 'grant tarrare event')), 'a player cannot grant');
+ok(/Give a reason/.test(run(LEAD, 'grant tarrare')), 'a grant needs a reason');
+ok(/is a Briarheart\./.test(run(LEAD, 'grant tarrare Lore Master event')) && P(TARRARE, 'private.dboBriarheart').how === 'staff', 'a Lead GM makes a Briarheart, with a reason');
+ok(audits.some((t) => /made who14 a Briarheart: Lore Master event/.test(t)), 'the grant and its reason are audited');
+papyrusCalls.length = 0;
+globalThis.__dboBriarheartLogin(TARRARE);
+ok(papyrusCalls.filter((c) => c.method === 'AddSpell').length === 2, 'at login the spells come back');
+ok(/touch one/.test(run(TARRARE, 'cure')), 'the cure needs a shrine of Arkay or Stendarr touched');
+shrines.set(TARRARE, { deityId: 'talos', at: Date.now() });
+ok(/touch one/.test(run(TARRARE, 'cure')), 'not at Talos');
+shrines.set(TARRARE, { deityId: 'arkay', at: Date.now() });
+ok(/filled black soul gem/.test(run(TARRARE, 'cure')), 'and a filled black soul gem');
+setP(TARRARE, 'inventory', { entries: [{ baseId: GEM, count: 1 }] });
+ok(/mortal again/.test(run(TARRARE, 'cure')) && !M.isBriar(TARRARE) && inv(TARRARE, GEM) === 0, 'cured at Arkay: the gem is spent, the briar withers');
+run(LEAD, 'grant tarrare test');
+ok(/no more/.test(run(LEAD, 'revoke tarrare test over')) && !M.isBriar(TARRARE), 'a Lead GM takes it away, with a reason');
+
+// ---- the visual and the Forsworn, when switched on ----------------------------------------------------------------------
+M = load({ briarheart: { enabled: true, forswornFriendly: true, visual: { enabled: true, armor: '5d008:Skyrim.esm' } } });
+papyrusCalls.length = 0; given.length = 0;
+M.become(NORD, 'staff', 'test');
+ok(papyrusCalls.some((c) => c.method === 'AddToFaction' && c.args[0] === '43599:Skyrim.esm'), 'forswornFriendly: ForswornFaction through AddToFaction');
+ok(given.some(([a, id]) => a === NORD && id === 0x5d008) && papyrusCalls.some((c) => c.method === 'EquipItem' && c.args[0] === '5d008:Skyrim.esm'), 'visual: the configured armour is given and worn');
+M.end(NORD, 'test');
+ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction goes at the end');
+
+// ---- the hooks in the other modules ---------------------------------------------------------------------------------------
+const src = (f) => fs.readFileSync(path.resolve(__dirname, '..', f), 'utf8');
+ok(/__dboBriarheartTargetMult\(agg, tgt, src\)/.test(src('gamemode.js')) && /require\(BRIARHEART_JS\)/.test(src('gamemode.js')) && /__dboBriarheartLogin\(a\)/.test(src('gamemode.js')), 'gamemode.js loads it, asks the target side, and calls the login');
+ok(/__dboBriarheartVitalBonus/.test(src('charlevel.js')) && /__dboCharLevelSyncBonus = /.test(src('charlevel.js')), 'charlevel.js adds the health and syncs it');
+ok(/d\.kind === 'divine' && typeof globalThis\.__dboBriarheartRefusesDivine/.test(src('prayer.js')) && /__dboBriarheartFaithLock/.test(src('prayer.js')) && /__dboFaithIdOf = /.test(src('prayer.js')), 'prayer.js refuses the Divines, locks the faith, and names the faith');
+ok(/isBriarheart\(t\)/.test(src('supernatural.js')) && /deity === 'hircine'\) && isBriarheart\(a\)/.test(src('supernatural.js')), 'supernatural.js keeps fevers and its rites off a Briarheart');
+ok(/__dboBriarheartMenuEntries/.test(src('playermenu.js')) && /__dboBriarheartMenuAction/.test(src('playermenu.js')), 'playermenu.js offers the tear');
+const gcfg = JSON.parse(src('gamemode-config.json'));
+ok(gcfg.briarheart && gcfg.briarheart.enabled === false, 'the shipped config has it OFF');
+
+Math.random = realRandom;
+process.chdir(cwd);
+console.log(fails ? `\n${fails} FAILED` : '\nall passed');
+process.exit(fails ? 1 : 0);
