@@ -56,6 +56,9 @@ const api = {
   skills: require(path.join(SERVER, 'skills.json')),
   hasUiCap: () => false,
 };
+// The rounds below test clay and stone alone; Quartz has its own section, which reads what skills.json ships
+const SHIPPED_QUARTZ = Object.assign({}, api.skills.skills.find((k) => k.id === 'miner').clayQuartz);
+api.skills.skills.find((k) => k.id === 'miner').clayQuartz.item = '';
 delete require.cache[require.resolve(LABOUR)];
 require(LABOUR)(api);
 const fire = (ev, args) => (handlers.get(ev) || []).forEach((f) => f(ACTOR, args, 33));
@@ -142,7 +145,8 @@ const round = (v, rank) => {
   const told = out.widgets.map((x) => x.result || '').join(' | ');
   return { quartz: out.items.filter(([id]) => id === QUARTZ).reduce((s, [, c]) => s + c, 0), told };
 };
-ok(!MINER.clayQuartz.item, 'skills.json ships clayQuartz off (no Quartz record yet)', JSON.stringify(MINER.clayQuartz));
+// Off until the restart DLE (d0831dd6) is loaded, then the DLE's Quartz MISC: either is right, anything else is not
+ok(!SHIPPED_QUARTZ.item || SHIPPED_QUARTZ.item === '1d2208:DragonBreak Online Edits.esp', 'skills.json ships clayQuartz off, or on with the DLE\'s Quartz (1D2208)', JSON.stringify(SHIPPED_QUARTZ));  // verify-formids: ignore - 1D2208 is in the restart DLE d0831dd6, not yet in the PC's Data
 ok(round(VEINS.clay, 0).quartz === 0, 'clay: no Quartz while clayQuartz.item is empty');
 MINER.clayQuartz = { item: '1d2201:DragonBreak Online Edits.esp', name: 'Quartz', chance: 1, count: 1 };
 let r = round(VEINS.clay, 0);
