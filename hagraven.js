@@ -102,7 +102,7 @@ module.exports = (api) => {
     }
     if (st >= 2) lapseCitizenship(a, why);
     const look = C.visual && C.visual.enabled && C.visual.stages ? String(C.visual.stages[st] || '') : '';
-    if (look) { const id = idOf(look); if (id && !hasOne(a, id) && giveItem) giveItem(a >>> 0, id, 1); if (id) papyrus(a, 'EquipItem', [{ type: 'form', desc: look }, false, true]); }
+    if (look) { const id = idOf(look); if (id && !hasOne(a, id) && giveItem) giveItem(a >>> 0, id, 1); if (id) papyrus(a, 'EquipItem', [{ type: 'espm', desc: look }, false, true]); }
   };
   const undoStage = (a, stageWas) => {
     if (isOnline(a) && stageWas >= 2 && Number(C.speedMult) > 0 && Number(C.speedMult) !== 100) papyrus(a, 'SetActorValue', ['SpeedMult', 100]);
