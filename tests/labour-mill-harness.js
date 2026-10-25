@@ -56,6 +56,7 @@ const setTier = (rank) => props.set(ACTOR + '|private.mastery', { order: ['woodc
 const use = (ref, actor = ACTOR) => { for (const k of Object.keys(out)) out[k].length = 0; return globalThis.__dboLabour(ref, actor); };
 const FIREWOOD = 0x6f993;
 const said = () => out.personals.join(' | ');
+const T1 = WOODCUTTER.millFirewoodByTier[0];
 
 check('skills.json still holds the design: firewood for 5 tiers and a 30-minute rest',
   Array.isArray(WOODCUTTER.millFirewoodByTier) && WOODCUTTER.millFirewoodByTier.length === 5 && WOODCUTTER.millCooldownMinutes === 30, JSON.stringify(WOODCUTTER.millFirewoodByTier));
@@ -64,13 +65,15 @@ check('skills.json still holds the design: firewood for 5 tiers and a 30-minute 
 // the mill still pays, a non-Woodcutter is seated as before and the mill's chop event earns no skill credit
 const gated = WOODCUTTER.gates.stations.includes('ResourceObjectSawmill') && WOODCUTTER.counts.activatePrefixes.includes('ResourceObjectSawmill');
 console.log(`${gated ? 'PASS' : 'NOTE'}  the saw is the Woodcutter's gate and counts as woodcutting in skills.json${gated ? '' : ': not yet (the skills.json patch is pending)'}`);
+// Nat, 25 Oct: "the middle, 20-60", in the same patch
+if (gated) check('...and the mill pays Nat\'s 20 to 60 by tier', JSON.stringify(WOODCUTTER.millFirewoodByTier) === '[20,30,40,50,60]', JSON.stringify(WOODCUTTER.millFirewoodByTier));
 
 setTier(0);
 let r = use(MILL);
 check('a Novice Woodcutter runs the mill: the activation is the server\'s (nobody is seated)', r === true);
 check(`...and gets ${WOODCUTTER.millFirewoodByTier[0]} Firewood`, out.items.length === 1 && out.items[0][0] === FIREWOOD && out.items[0][1] === WOODCUTTER.millFirewoodByTier[0], JSON.stringify(out.items));
-check('...told so, with when to come back', /10 Firewood/.test(said()) && /30 minutes/.test(said()), said());
-check('...audited as a MILL line naming the mill', out.audits.length === 1 && /^MILL Tester #ABCD \(profile 1\) ran a saw mill at 5565c:Skyrim\.esm \(tier 1\) -> 10 firewood$/.test(out.audits[0]), out.audits[0]);
+check('...told so, with when to come back', new RegExp(`${T1} Firewood`).test(said()) && /30 minutes/.test(said()), said());
+check('...audited as a MILL line naming the mill', out.audits.length === 1 && out.audits[0] === `MILL Tester #ABCD (profile 1) ran a saw mill at 5565c:Skyrim.esm (tier 1) -> ${T1} firewood`, out.audits[0]);
 check('...and credited as woodcutting (a chop event on the mill)', out.events.length === 1 && out.events[0].kind === 'chop' && out.events[0].detail.refrId === MILL);
 
 r = use(MILL);
@@ -79,10 +82,10 @@ wallClock += 20 * 60000;
 r = use(MILL);
 check('...20 minutes later still resting: 10 minutes to go', out.items.length === 0 && /Come back in 10 minutes/.test(said()), said());
 r = use(MILL2);
-check('another mill pays at once: the rest is per mill', out.items.length === 1 && out.items[0][1] === 10);
+check('another mill pays at once: the rest is per mill', out.items.length === 1 && out.items[0][1] === T1);
 wallClock += 11 * 60000;
 r = use(MILL);
-check('the first mill pays again once its 30 minutes are up', out.items.length === 1 && out.items[0][1] === 10);
+check('the first mill pays again once its 30 minutes are up', out.items.length === 1 && out.items[0][1] === T1);
 
 setTier(4);
 wallClock += 31 * 60000;
