@@ -68,6 +68,7 @@ module.exports = (api) => {
 
   const S = globalThis.__dboHagraven || (globalThis.__dboHagraven = { pending: new Map(), seenAt: new Map() });
   if (!(S.formAt instanceof Map)) S.formAt = new Map();
+  if (!(S.inBody instanceof Set)) S.inBody = new Set();   // who took the body here, to notice beastform ending it
   if (!(S.pending instanceof Map)) S.pending = new Map();
   if (!(S.seenAt instanceof Map)) S.seenAt = new Map();
 
@@ -253,7 +254,7 @@ module.exports = (api) => {
     const no = formRefusal(a); if (no) return no;
     let why; try { why = globalThis.__dboPolymorphAs(a >>> 0, 'hagraven', { by: 'hagraven' }); } catch (e) { log('hagraven: __dboPolymorphAs failed', e.message); return 'That failed; see the server log.'; }
     if (why) return String(why);
-    S.formAt.set(a >>> 0, Date.now());
+    S.formAt.set(a >>> 0, Date.now()); S.inBody.add(a >>> 0);
     audit(`HAGRAVEN ${who(a)} took the Hagraven body`);
     S.seenAt.delete(a >>> 0); witnessed(a);
     return '';
@@ -262,7 +263,7 @@ module.exports = (api) => {
     if (!inForm(a)) return false;
     const ok = call('__dboBeastRevert', a >>> 0, why);
     if (!ok) return false;
-    S.formAt.set(a >>> 0, Date.now());
+    S.formAt.set(a >>> 0, Date.now()); S.inBody.delete(a >>> 0);
     audit(`HAGRAVEN ${who(a)} left the Hagraven body (${why})`);
     // The race swap back may reset what the stage set on her (SpeedMult): put it back once the client has her own body again
     setTimeout(() => { try { if (stageOf(a) && isOnline(a) && !inForm(a)) applyStage(a, 'left the body'); } catch (e) { log('hagraven: stage after the body failed', e.message); } }, 2500);
@@ -278,10 +279,21 @@ module.exports = (api) => {
   };
   const FORM_END_TELL = { downed: 'struck down, you fall back into your own body', jailed: 'the gaol takes you as you are, in your own body', bound: 'bound, you are pressed back into your own body', 'no longer a Hagraven': 'the pact no longer holds you whole' };
   const formTick = () => {
-    for (const a of onlineActors()) {
+    const online = onlineActors().map((a) => a >>> 0);
+    for (const a of online) {
       if (!inForm(a)) continue;
       const why = formBreak(a); if (!why) continue;
-      if (leaveForm(a, why) && FORM_END_TELL[why]) personal(a >>> 0, `You are yourself again: ${FORM_END_TELL[why]}.`);
+      if (leaveForm(a, why) && FORM_END_TELL[why]) personal(a, `You are yourself again: ${FORM_END_TELL[why]}.`);
+    }
+    // beastform ended the body itself (down, jail, bound, indoors, water, the guard, death): it leaves the words to us
+    for (const a of [...S.inBody]) {
+      if (!online.includes(a)) { S.inBody.delete(a); continue; }
+      if (inForm(a)) continue;
+      S.inBody.delete(a); S.formAt.set(a, Date.now());
+      if (get(a, 'isDead', false) === true) continue;
+      const why = formBreak(a);
+      personal(a, `You are yourself again${FORM_END_TELL[why] ? `: ${FORM_END_TELL[why]}` : ''}.`);
+      if (stageOf(a)) applyStage(a, 'the body ended');
     }
   };
   if (typeof every === 'function') every('hagraven-form', 5000, () => { try { formTick(); } catch (e) { log('hagraven: form tick failed', e.message); } });

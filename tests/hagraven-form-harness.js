@@ -148,6 +148,19 @@ ok(again(), '(stage 3 again: she takes it)');
 run(STAFF, 'revoke witch done');
 ok(!beast(WITCH) && revertCalls.some((r) => r.why === 'pact ended') && globalThis.__dboHagravenStage(WITCH) === 0, 'the pact revoked: the body ends first, then the pact');
 
+// ---- beastform ends the body by itself (its polymorphBreak): she is still told, her stage put back -----------------------------------
+makeStage(WITCH, 3);
+ok(again(), '(she takes the body)');
+downed.add(WITCH); setP(WITCH, 'private.beast', null); setP(WITCH, 'appearance', { raceId: 1, isFemale: true, name: 'char20' });
+said.length = 0; papyrusCalls.length = 0; formTick.f(); downed.clear();
+ok(said.some(([a, t]) => a === WITCH && /You are yourself again: struck down/.test(t)), 'beastform reverted her on a down: hagraven.js tells her why', said);
+ok(papyrusCalls.some((c) => c.method === 'SetActorValue' && c.args[1] === 90), '...and puts her stage back');
+said.length = 0; formTick.f();
+ok(!said.some(([a]) => a === WITCH), '...once only');
+ok(again(), '(she takes it again)');
+setP(WITCH, 'private.beast', null); setP(WITCH, 'isDead', true); said.length = 0; formTick.f(); setP(WITCH, 'isDead', false);
+ok(!said.some(([a]) => a === WITCH), 'the body ended by a death: no line from hagraven.js');
+
 // ---- a staff member's own Hagraven polymorph is not hers ----------------------------------------------------------------------------
 setP(STAFF, 'private.beast', { form: 'hagraven', original: P(STAFF, 'appearance'), at: Date.now(), until: 0, race: 0x131fb, creature: true, by: 'staff' });
 const r0 = revertCalls.length; downed.add(STAFF); formTick.f(); downed.clear();
