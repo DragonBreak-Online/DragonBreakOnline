@@ -469,14 +469,16 @@
    "description": "Only a Miner may work ore veins. Tiers decide which ores you can mine and how much a vein gives.",
    "vanillaSkills": [],
    "gates": {
-    "hint": "an ore vein",
+    "hint": "an ore vein, a stone quarry or a clay deposit",
     "stations": [
      "MineOre",
      "CYRMineOre",
      "PickaxeMining",
      "12SeaSalt",
      "CYRMineGem",
-     "BSKMineGem"
+     "BSKMineGem",
+     "BYOHMine",
+     "BSKBYOHMine"
     ]
    },
    "counts": {
@@ -486,7 +488,9 @@
      "CYRMineOre",
      "12SeaSalt",
      "CYRMineGem",
-     "BSKMineGem"
+     "BSKMineGem",
+     "BYOHMine",
+     "BSKBYOHMine"
     ]
    },
    "oreByTier": [
