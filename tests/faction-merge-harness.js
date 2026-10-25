@@ -105,5 +105,45 @@ loadBank();
 b = JSON.parse(fs.readFileSync('bank.json', 'utf8'));
 ok('gold the Cult already held is kept and added to', b.factions['imperial-cult'] === 140 && !('great-faiths' in b.factions), b.factions);
 
+// ---- the Vestment Keeper (Nat, 25 Oct): a tailor rank, so the Cult can make the Eight's robes ----
+const vk = ic.ranks.findIndex((r) => r.title === 'Vestment Keeper');
+ok('guild-defs gives the Cult a Vestment Keeper, a tailor, after the Disciple, marked as added', vk > 0 && ic.ranks[vk].role === 'tailor' && ic.ranks[vk - 1].title === 'Disciple' && !!ic.ranks[vk].added);
+ok('config asks for it too, for a Cult whose ranks were rewritten in game', JSON.stringify(CFG.factions.addRanks['imperial-cult']) === '[{"title":"Vestment Keeper","role":"tailor","after":"Disciple"}]');
+// Live: GM Swag rewrote the Cult's ranks (guild-overrides.json), which replace guild-defs' list
+const SWAG = ['Primate:leader', 'Prelate:officer', 'Theurgist:officer', 'Invoker:officer', 'Oracle:sergeant', 'Disciple:mage', 'Adept:member', 'Acolyte:member', 'Initiate:member', 'Worshipper:member']
+  .map((s) => ({ title: s.split(':')[0], role: s.split(':')[1] }));
+const ORA = 0x30, WOR = 0x31, PRE = 0x32;
+Object.assign(names, { [ORA]: 'Ora', [WOR]: 'Wor', [PRE]: 'Pre' }); for (const k of [ORA, WOR, PRE]) chars.set(k, names[k]);
+fs.writeFileSync('guild-overrides.json', JSON.stringify({ 'imperial-cult': { ranks: SWAG, by: 'Gm Swag', at: 1 } }));
+fs.writeFileSync('guilds.json', JSON.stringify({ 'imperial-cult': {
+  [PRIMATE]: { rank: 0, name: 'Vrag', tag: 'T15', since: 1, title: 'Primate' }, [PRE]: { rank: 1, name: 'Pre', tag: 'T32', since: 1, title: 'Prelate' },
+  [ORA]: { rank: 4, name: 'Ora', tag: 'T30', since: 1, title: 'Oracle' }, [WOR]: { rank: 9, name: 'Wor', tag: 'T31', since: 1, title: 'Worshipper' } } }));
+audits.length = 0;
+load();
+const live = globalThis.__dboGuildRankList('imperial-cult').map((r) => r.title);
+ok("the Cult's rewritten ranks gain the Vestment Keeper after the Disciple", JSON.stringify(live) === JSON.stringify(['Primate', 'Prelate', 'Theurgist', 'Invoker', 'Oracle', 'Disciple', 'Vestment Keeper', 'Adept', 'Acolyte', 'Initiate', 'Worshipper']), live);
+ok('...in guild-overrides.json too, so it survives the next load', JSON.parse(fs.readFileSync('guild-overrides.json', 'utf8'))['imperial-cult'].ranks.map((r) => r.title).includes('Vestment Keeper'));
+ok('...audited', audits.some((t) => /^FACTION-RANK The Imperial Cult gains Vestment Keeper \(tailor\)/.test(t)), audits);
+const t2 = (a) => live[M()['imperial-cult'][String(a)].rank];
+ok('every member keeps their own title (the Worshipper below the new rank moves down one index)', t2(PRIMATE) === 'Primate' && t2(PRE) === 'Prelate' && t2(ORA) === 'Oracle' && t2(WOR) === 'Worshipper' && M()['imperial-cult'][String(WOR)].rank === 10,
+  [t2(PRIMATE), t2(PRE), t2(ORA), t2(WOR)]);
+const ranksNow = JSON.stringify(globalThis.__dboGuildRankList('imperial-cult')), nA = audits.length;
+load();
+ok('loading again adds nothing (idempotent)', JSON.stringify(globalThis.__dboGuildRankList('imperial-cult')) === ranksNow && audits.length === nA &&
+  JSON.parse(fs.readFileSync('guild-overrides.json', 'utf8'))['imperial-cult'].ranks.filter((r) => r.title === 'Vestment Keeper').length === 1);
+// ...and a Vestment Keeper may make the Eight's robes (factiongear.js: a robe is tailor work), an Acolyte may not
+fs.writeFileSync('faction-gear.json', JSON.stringify({ items: { '88b:DivineAndDaedricRobes.esp': { name: 'Mara Robes', set: 'Robes of Mara', factions: ['imperial-cult'], role: 'tailor', recipes: ['8bd:DivineAndDaedricRobes.esp'] } } }));
+const KEEPER = 0x40, ACO = 0x41, ROBE = 0x500;
+const fg = { [KEEPER]: [{ id: 'imperial-cult', role: 'tailor' }], [ACO]: [{ id: 'imperial-cult', role: 'member' }] };
+globalThis.__dboGuildsOf = (a) => fg[a] || [];
+globalThis.__dboGuildInfo = (fid) => (fid === 'imperial-cult' ? { id: fid, name: 'The Imperial Cult' } : null);
+const gapi = { mp: { getDescFromId: (id) => (id === ROBE ? '88b:DivineAndDaedricRobes.esp' : ''), getIdFromDesc: () => ROBE, lookupEspmRecordById: () => ({ record: null }), get: () => undefined },
+  log: () => {}, personal: () => {}, audit: () => {}, who: String, cfg: { factionGear: { enabled: true } }, registerChatCommand: () => {}, isAdmin: () => false, sendPacket: () => {} };
+delete require.cache[path.join(ROOT, 'factiongear.js')]; globalThis.__dboFactionGearState = undefined;
+require(path.join(ROOT, 'factiongear.js'))(gapi);
+ok("a Vestment Keeper may make Mara's robes", globalThis.__dboFactionCraft(KEEPER, ROBE) === true);
+globalThis.__dboFactionGearState.toldAt.clear();
+ok('an Acolyte of the Cult may not', globalThis.__dboFactionCraft(ACO, ROBE) === false);
+
 console.log(fails ? `\n${fails} FAILED` : '\nall ok');
 process.exit(fails ? 1 : 0);
