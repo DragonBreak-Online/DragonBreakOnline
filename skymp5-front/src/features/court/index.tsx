@@ -41,6 +41,12 @@ export interface CourtContractTier { tier: number; name: string; price: number; 
 export interface CourtContracts {
   tiers: CourtContractTier[]; bounds: { min: number; max: number }; budget: number; budgetMax: number; spent: number; left: number;
   resetsAt: number; standing: boolean; citizensOnly: boolean; canSet: boolean; by: string; at: number; enabled?: boolean;
+  // Posting by hand and commissions (server contracts.js, 25 Oct); missing from older servers
+  canPost?: boolean; postBudget?: number; postLeft?: number; postsPerDay?: number; postsLeftToday?: number | null;
+  fauna?: Array<{ kind: string; name: string; tier: number; perKill: number; spots: number }>;
+  posted?: Array<{ id: string; type: 'hunt' | 'commission'; what: string; by: string; held: number; hoursLeft: number; mine: boolean; canWithdraw: boolean }>;
+  search?: { query: string; items: Array<{ desc: string; name: string; value: number; maxPrice: number }> } | null;
+  commissionMaxCount?: number;
 }
 export interface CourtSection { staff: boolean; outright: boolean; courts: CourtView[]; selected: string; offers: CourtOfferIn[] }
 
@@ -150,8 +156,86 @@ const ContractTerms = ({ court, terms, busy, act }: { court: CourtView; terms: C
     <p className="court__muted court__term-line">This week: {terms.spent} gold spent, {terms.left} left. It renews Monday 00:00 UTC, in {untilText(terms.resetsAt)}.</p>
     <p className="court__muted court__term-line">{terms.citizensOnly ? `Citizens of ${court.name} only.` : 'Open to every hunter.'} Work an official posts by hand is open to all.</p>
     <p className="court__muted court__term-line">{terms.by ? `Last set by ${terms.by}, ${dateText(terms.at)}.` : 'Never changed: the realm\'s defaults.'}</p>
+    {terms.postBudget !== undefined ? (
+      <div className="court__term">
+        <span className="court__term-label">Posted work a week</span>
+        {terms.canSet
+          ? <NumberSet value={terms.postBudget} max={terms.budgetMax} suffix="gold" busy={busy} onSet={(n) => act('dbo:courtContractPostBudget', court.id, n)} />
+          : <span>{terms.postBudget} gold</span>}
+        <span className="court__muted">{terms.postLeft} left this week</span>
+      </div>
+    ) : null}
   </div>
 );
+
+// A plain whole-number box for the posting forms
+const Count = ({ value, onChange, max, placeholder }: { value: string; onChange: (v: string) => void; max?: number; placeholder: string }) => (
+  <input className="court__input court__input--number" inputMode="numeric" value={value} maxLength={max && max > 9999 ? 6 : 5} placeholder={placeholder}
+    onChange={(e) => onChange(e.target.value.replace(/[^0-9]/g, ''))} onKeyDown={(e) => e.stopPropagation()} />
+);
+
+// An official posts hunting work for the hold's own beasts, or commissions goods, out of the week's posting budget; what is
+// up shows below with Take down for its poster and the tax-setters (contracts.js postContract, postCommission, withdraw)
+const PostWork = ({ court, terms, busy, act }: { court: CourtView; terms: CourtContracts; busy: boolean; act: JournalTabProps['act'] }) => {
+  const fauna = terms.fauna || [];
+  const [kind, setKind] = useState(fauna[0] ? fauna[0].kind : '');
+  const [count, setCount] = useState('');
+  const [reward, setReward] = useState('');
+  const [query, setQuery] = useState('');
+  const [item, setItem] = useState('');
+  const [want, setWant] = useState('');
+  const [price, setPrice] = useState('');
+  useEffect(() => { setCount(''); setReward(''); setWant(''); setPrice(''); }, [court.id, (terms.posted || []).length]);
+  const beast = fauna.find((f) => f.kind === kind) || null;
+  const most = beast && Number(count) > 0 ? Number(count) * beast.perKill : 0;
+  const goods = (terms.search && terms.search.items) || [];
+  const picked = goods.find((g) => g.desc === item) || null;
+  const out = (terms.posted || []);
+  return (
+    <div className="court__contracts">
+      <h3 className="court__heading">Post work</h3>
+      {terms.canPost ? (
+        <>
+          <p className="court__muted court__term-line">
+            Paid from the treasury, out of this week's posting budget ({terms.postLeft} of {terms.postBudget} gold left)
+            {terms.postsLeftToday !== null && terms.postsLeftToday !== undefined ? `; you may post ${terms.postsLeftToday} more today` : ''}.
+          </p>
+          {fauna.length ? (
+            <div className="court__appoint">
+              <Picker className="court__move" value={kind} disabled={busy} onChange={(v) => setKind(String(v))}
+                options={fauna.map((f) => ({ value: f.kind, label: `${f.name} (${f.perKill} a kill)` }))} />
+              <Count value={count} onChange={setCount} placeholder="How many" />
+              <Count value={reward} onChange={setReward} placeholder={most ? `Reward, up to ${most}` : 'Reward'} />
+              <button type="button" className="journal__button" disabled={busy || !beast || !(Number(count) > 0) || !(Number(reward) > 0) || (most > 0 && Number(reward) > most)}
+                onClick={() => act('dbo:courtContractPost', court.id, kind, Number(count), Number(reward))}>Post hunt</button>
+            </div>
+          ) : <p className="court__muted">No dangerous beasts are known to roam {court.name}.</p>}
+          <div className="court__appoint">
+            <input className="court__input" value={query} placeholder="Commission goods: search (pelt, iron ingot, firewood...)" onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && query.trim()) act('dbo:courtCommissionSearch', court.id, query.trim()); }} />
+            <button type="button" className="journal__button journal__button--small" disabled={busy || !query.trim()} onClick={() => act('dbo:courtCommissionSearch', court.id, query.trim())}>Search</button>
+          </div>
+          {goods.length ? (
+            <div className="court__appoint">
+              <Picker className="court__move" value={item} disabled={busy} onChange={(v) => setItem(String(v))}
+                options={[{ value: '', label: 'Pick the goods' }].concat(goods.map((g) => ({ value: g.desc, label: `${g.name} (worth ${g.value}, up to ${g.maxPrice} each)` })))} />
+              <Count value={want} onChange={setWant} max={terms.commissionMaxCount} placeholder="How many" />
+              <Count value={price} onChange={setPrice} placeholder={picked ? `Each, up to ${picked.maxPrice}` : 'Gold each'} />
+              <button type="button" className="journal__button" disabled={busy || !picked || !(Number(want) > 0) || !(Number(price) > 0) || (!!picked && Number(price) > picked.maxPrice)}
+                onClick={() => act('dbo:courtCommissionPost', court.id, item, Number(want), Number(price))}>Commission</button>
+            </div>
+          ) : terms.search ? <p className="court__muted">Nothing a hold buys matches "{terms.search.query}".</p> : null}
+        </>
+      ) : <p className="court__muted">Officials of {court.name} post hunting work and commissions here.</p>}
+      {out.length ? out.map((p) => (
+        <div key={p.id} className="court__holder">
+          <span className="court__holder-name">{p.type === 'commission' ? 'Commission: ' : ''}{p.what} <span className="court__muted">(by {p.by || 'an official'}, {p.held} gold held, {p.hoursLeft}h left)</span></span>
+          {p.canWithdraw ? <button type="button" className="journal__button journal__button--small" disabled={busy} onClick={() => act('dbo:courtContractWithdraw', court.id, p.id)}>Take down</button> : null}
+        </div>
+      )) : <p className="court__muted">Nothing posted by hand right now.</p>}
+    </div>
+  );
+};
 
 const OfficeRow = ({ court, office, outright, busy, act }: { court: CourtView; office: CourtOffice; outright: boolean; busy: boolean; act: JournalTabProps['act'] }) => {
   const [name, setName] = useState('');
@@ -293,6 +377,7 @@ export const CourtTab = ({ section, busy, act }: JournalTabProps<CourtSection>) 
               </div>
             ) : null}
             {court.contracts ? <ContractTerms court={court} terms={court.contracts} busy={busy} act={act} /> : null}
+            {court.contracts && court.contracts.fauna ? <PostWork court={court} terms={court.contracts} busy={busy} act={act} /> : null}
             {court.exposed && court.exposed.length ? (
               <div className="court__outgoing">
                 <h3 className="court__heading">Seen as beasts</h3>
