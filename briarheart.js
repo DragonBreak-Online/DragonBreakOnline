@@ -57,6 +57,9 @@ module.exports = (api) => {
     noDivineBlessings: true, faithLocked: true,
     cureDeities: ['arkay', 'stendarr'], cureItem: '2e504:Skyrim.esm',  // a filled black soul gem
     visual: { enabled: false, armor: '5d008:Skyrim.esm' },
+    // A full Hagraven (hagraven.js, stage 3) at the altar performs the rite and is named in the audit; true: the rite
+    // waits for one
+    hagravenRequired: false,
   }, (cfg && cfg.briarheart) || {});
   const PROP = 'private.dboBriarheart', FAILED = 'private.dboBriarheartFailedAt';
   const FILE = path.resolve('briarheart.json');
@@ -164,7 +167,10 @@ module.exports = (api) => {
     if (!(C.faiths || []).includes(faithId(a))) return 'The briar is for those who keep the Old Gods of the Reach. Take them as your faith first.';
     const failed = Number(get(a, FAILED, 0)) || 0, wait = failed + C.failCooldownHours * HOUR - Date.now();
     if (wait > 0) return `The altar is cold to you since the briar would not take. Try again in ${waitText(wait)}.`;
+    if (call('__dboHagravenStage', a >>> 0) > 0) return 'You have made the Hagravens\' pact yourself. The briar is for others.';
     if (!altarNear(a)) return 'The rite is made at a Hagraven altar in the Reach.';
+    // A Hagraven (hagraven.js) at the altar presses the briar in; with hagravenRequired the rite waits for one
+    if (C.hagravenRequired && !call('__dboHagravenRiteAt', altarNear(a), a >>> 0)) return 'No Hagraven tends this altar. The rite waits for one.';
     if (!hasOne(a, idOf(C.heartItem))) return 'The rite needs a Briar Heart to set in your chest.';
     return '';
   };
@@ -198,9 +204,11 @@ module.exports = (api) => {
       set(a, 'isDead', true);
       return 'The briar does not take, and your own heart is gone. You die on the altar, and wake again.';
     }
-    become(a, 'rite', '');
-    audit(`BRIARHEART ${who(a)} took the briar heart at a Hagraven altar`);
-    return 'The Hagraven presses the briar into your chest. It takes root. You feel the Reach in your blood, and nothing of the Divines.';
+    const hag = call('__dboHagravenRiteAt', altarNear(a), a >>> 0) || 0;
+    become(a, 'rite', hag ? who(hag) : '');
+    audit(`BRIARHEART ${who(a)} took the briar heart at a Hagraven altar${hag ? `, from the Hagraven ${who(hag)}` : ''}`);
+    if (hag && isOnline(hag)) personal(hag >>> 0, `You press the briar into ${display(a)}'s chest. It takes root.`);
+    return `${hag ? `${display(hag)} presses` : 'The Hagraven presses'} the briar into your chest. It takes root. You feel the Reach in your blood, and nothing of the Divines.`;
   };
 
   // ---- the cure ---------------------------------------------------------------------------------------------------------
@@ -259,6 +267,8 @@ module.exports = (api) => {
 
   // ---- hooks for the other modules ----------------------------------------------------------------------------------------
   globalThis.__dboIsBriarheart = (a) => C.enabled && isBriar(Number(a) >>> 0);
+  // hagraven.js: the pact is made at the same altars (the altar the character stands at, or null)
+  globalThis.__dboBriarheartAltarNear = (a) => altarNear(Number(a) >>> 0);
   // charlevel.js: added to the maximum, as the race's flat bonus is
   globalThis.__dboBriarheartVitalBonus = (a) => ({ health: C.enabled && isBriar(Number(a) >>> 0) ? Math.max(0, Number(C.healthBonus) || 0) : 0 });
   // gamemode.js onHitDamageAttempt, the target side: resist below 1 (capped with the race's under reductionCap), fire above 1

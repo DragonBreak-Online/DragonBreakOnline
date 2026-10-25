@@ -440,11 +440,13 @@ module.exports = (api) => {
   globalThis.__dboCastHeld = castHeld;
   // The race's factor on one bar's regeneration now (1 = none), capped by the rule for its kind
   const regenFactor = (a, stat) => {
-    const race = raceOf(a); if (!race) return 1;
+    // A Hagraven's magicka (hagraven.js) is hers whatever her race, and joins the race's gift
+    let hag = 1; try { if (typeof globalThis.__dboHagravenRegenMult === 'function') hag = Math.max(1, Number(globalThis.__dboHagravenRegenMult(a, stat)) || 1); } catch (e) { hag = 1; }
+    const race = raceOf(a); if (!race) return hag;
     const passive = passiveRegen(race, a, stat);
     // A power's factor is timed (conditionalRegenCap) and stands in for the gift's while it runs, never on top of it
     const p = buff(a, `${stat}Regen`);
-    return p > 1 ? Math.max(passive, capOf(p, true)) : passive;
+    return (p > 1 ? Math.max(passive, capOf(p, true)) : passive) * hag;
   };
   const passiveRegen = (race, a, stat) => {
     const R = C[race];

@@ -378,6 +378,11 @@ module.exports = (api) => {
       let no = ''; try { no = String(globalThis.__dboBriarheartRefusesDivine(a) || ''); } catch (e) { no = ''; }
       if (no) { personal(a, no); return false; }
     }
+    // A Hagraven's pact: no Divine but Kynareth (hagraven.js)
+    if (typeof globalThis.__dboHagravenRefusesDeity === 'function') {
+      let no = ''; try { no = String(globalThis.__dboHagravenRefusesDeity(a, d) || ''); } catch (e) { no = ''; }
+      if (no) { personal(a, no); return false; }
+    }
     if (d.capricious) {
       const other = capriceOf(d);
       if (!other) { personal(a, `${d.name} laughs, and gives you nothing. He may have meant to.`); return false; }
