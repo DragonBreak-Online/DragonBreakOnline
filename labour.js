@@ -487,7 +487,8 @@ module.exports = (api) => {
   // only plays its workers' animations and hands a player nothing, and no handler existed here, so activating one just sat
   // the player down. The design (skills.json minigames.lumberMill): no mini-game, a rest per player per mill, firewood by
   // Woodcutter tier (woodcutter millFirewoodByTier, millCooldownMinutes). The activation is ours, so nobody is seated.
-  // It saws Hearthfire's Sawn Logs as well, by tier (millSawnLogsByTier, Nat 25 Oct), the timber a house is built from.
+  // It saws Hearthfire's Sawn Logs as well, by tier (millSawnLogsByTier, Nat 25 Oct), the timber a house is built from,
+  // from Adept up (woodcutter sawnLogMinTier, 0 based); below it the mill pays its firewood and says when logs come.
   const MILL = /^ResourceObjectSawmill/i;
   const MILL_RESTS = 'private.milledLogs';
   const millRestMinutes = () => Math.max(1, Number(WOODCUTTER.millCooldownMinutes) || 30);
@@ -500,7 +501,8 @@ module.exports = (api) => {
     const until = Number(rests[key]) || 0;
     if (until > Date.now()) return deny(casterId, `The mill has no more logs sawn for you yet. Come back in ${Math.ceil((until - Date.now()) / 60000)} minutes.`);
     const count = Math.max(1, Math.round(tierValue(WOODCUTTER.millFirewoodByTier, tier, 10)));
-    const logs = Math.max(0, Math.round(tierValue(WOODCUTTER.millSawnLogsByTier, tier, 0)));
+    const logTier = Number.isFinite(Number(WOODCUTTER.sawnLogMinTier)) ? Number(WOODCUTTER.sawnLogMinTier) : 2;
+    const logs = tier >= logTier ? Math.max(0, Math.round(tierValue(WOODCUTTER.millSawnLogsByTier, tier, 0))) : 0;
     // The logs first: a pack too full for them takes nothing and the mill does not rest
     if (logs && !giveItem(casterId, idOf(ITEMS.sawnlog), logs)) return deny(casterId, 'The saw runs, but you cannot carry any more.');
     if (!giveItem(casterId, idOf(ITEMS.firewood), count) && !logs) return deny(casterId, 'The saw runs, but you cannot carry any more.');
@@ -509,7 +511,7 @@ module.exports = (api) => {
     try { if (typeof globalThis.__alduinakMasteryEvent === 'function') globalThis.__alduinakMasteryEvent('chop', casterId, { refrId: targetId }); } catch (e) { /* no skill system */ }
     let at = targetId.toString(16); try { at = String(mp.getDescFromId(targetId) || at); } catch (e) { /* the id */ }
     audit(`MILL ${who(casterId)} ran a saw mill at ${at} (tier ${tier + 1}) -> ${logs ? `${logs} sawn logs, ` : ''}${count} firewood`);
-    personal(casterId, `The saw bites through the logs: ${logs ? `${logs} Sawn Log${logs === 1 ? '' : 's'} and ` : ''}${count} Firewood. The mill will have more for you in ${millRestMinutes()} minutes.`);
+    personal(casterId, `The saw bites through the logs: ${logs ? `${logs} Sawn Log${logs === 1 ? '' : 's'} and ` : ''}${count} Firewood. The mill will have more for you in ${millRestMinutes()} minutes.${logs || tier >= logTier ? '' : ` Sawn logs for building come at ${an((skills.tierNames || [])[logTier] || 'Adept')} ${(skills.tierNames || [])[logTier] || 'Adept'} Woodcutter.`}`);
     return true;
   };
 
