@@ -1427,6 +1427,8 @@
    },
    {
     "id": "azura",
+    "prayNear": [{"ref": "33dcb:Skyrim.esm", "world": "3c:Skyrim.esm", "pos": [110514, 79564, 2286], "meters": 30, "name": "the Shrine of Azura"}],
+    "_prayNear": "Nat, 25 Oct (Skyrim shrines): a Skyrim lore statue that cannot be activated, prayed at with /pray within its meters (prayer.js prayNear), as Meridia's in Bruma. Vanilla or man_DaedricShrines.esp (in the live order). Census in _work/skyrim-shrines-1025.",
     "name": "Azura",
     "kind": "daedra",
     "shrines": ["2125e9:Journey to Baan Malur.esp", "77f35d:summersetisles.esp", 
@@ -1466,6 +1468,8 @@
    },
    {
     "id": "mephala",
+    "prayNear": [{"ref": "87b:man_DaedricShrines.esp", "world": "3c:Skyrim.esm", "pos": [-37585, 81031, -13279], "meters": 10, "name": "the Shrine of Mephala"}],
+    "_prayNear": "Nat, 25 Oct (Skyrim shrines): a Skyrim lore statue that cannot be activated, prayed at with /pray within its meters (prayer.js prayNear), as Meridia's in Bruma. Vanilla or man_DaedricShrines.esp (in the live order). Census in _work/skyrim-shrines-1025.",
     "name": "Mephala",
     "kind": "daedra",
     "shrines": ["291aa2:Journey to Baan Malur.esp", 
@@ -1487,6 +1491,8 @@
    },
    {
     "id": "mehrunes",
+    "prayNear": [{"ref": "c599a:Skyrim.esm", "world": "3c:Skyrim.esm", "pos": [-683, 51546, 340], "meters": 15, "name": "the Shrine of Mehrunes Dagon"}],
+    "_prayNear": "Nat, 25 Oct (Skyrim shrines): a Skyrim lore statue that cannot be activated, prayed at with /pray within its meters (prayer.js prayNear), as Meridia's in Bruma. Vanilla or man_DaedricShrines.esp (in the live order). Census in _work/skyrim-shrines-1025.",
     "name": "Mehrunes Dagon",
     "kind": "daedra",
     "shrines": [
@@ -1527,6 +1533,8 @@
    },
    {
     "id": "nocturnal",
+    "prayNear": [{"ref": "5a97:man_DaedricShrines.esp", "world": "5b91b:Skyrim.esm", "pos": [-1566, -4077, -213], "meters": 10, "name": "the statue of Nocturnal in the Twilight Sepulcher"}],
+    "_prayNear": "Nat, 25 Oct (Skyrim shrines): a Skyrim lore statue that cannot be activated, prayed at with /pray within its meters (prayer.js prayNear), as Meridia's in Bruma. Vanilla or man_DaedricShrines.esp (in the live order). Census in _work/skyrim-shrines-1025.",
     "name": "Nocturnal",
     "kind": "daedra",
     "shrines": ["190350:arnima.esm", "5a98:man_DaedricShrines.esp", 
@@ -1578,9 +1586,7 @@
     "inPlaytest": 1,
     "inBruma": 1,
     "isReference": true,
-    "prayNear": [
-     { "ref": "125bf8:DragonBreak Online Edits.esp", "world": "a764b:BSHeartland.esm", "pos": [94912, 193057, 2220], "meters": 8, "name": "the Statue of Meridia" }
-    ],
+    "prayNear": [{"ref": "125bf8:DragonBreak Online Edits.esp", "world": "a764b:BSHeartland.esm", "pos": [94912, 193057, 2220], "meters": 8, "name": "the Statue of Meridia"}, {"ref": "4e4d6:Skyrim.esm", "world": "3c:Skyrim.esm", "pos": [-93779, 98670, -7025], "meters": 12, "name": "the Statue to Meridia at Mount Kilkreath"}],
     "_prayNear": "6 Oct (Nate: Meridia's shrine isn't working): the statue is the vanilla DA09MeridiaStatue, an ACTI with no FULL name, which the game does not offer to activate - 0 touches of Meridia in the logs since 27 Sep, against touches for every other Bruma deity. Until a named DBO_ShrineOfMeridia is placed (a plugin edit on the PC), /pray within 8 m of the statue (DLE REFR 125bf8 in CYRNamirasShrineExterior, BSHeartland) counts as touching it (prayer.js prayNear).",
     "sphere": "The energies of living things, and a hatred of the undead so total that she is counted a Daedric Prince mostly by process of elimination.",
     "boon": "Health regenerates 25% faster.",
@@ -1656,6 +1662,8 @@
    },
    {
     "id": "hermaeusmora",
+    "prayNear": [{"ref": "867:man_DaedricShrines.esp", "world": "3c:Skyrim.esm", "pos": [126176, 152044, -13237], "meters": 12, "name": "the statue of Hermaeus Mora by Septimus Signus' outpost"}],
+    "_prayNear": "Nat, 25 Oct (Skyrim shrines): a Skyrim lore statue that cannot be activated, prayed at with /pray within its meters (prayer.js prayNear), as Meridia's in Bruma. Vanilla or man_DaedricShrines.esp (in the live order). Census in _work/skyrim-shrines-1025.",
     "blessingDisplay": "1ac97b:DragonBreak Online Edits.esp",
     "name": "Hermaeus Mora",
     "kind": "daedra",
@@ -1696,6 +1704,8 @@
    },
    {
     "id": "peryite",
+    "prayNear": [{"ref": "d63:man_DaedricShrines.esp", "world": "3c:Skyrim.esm", "pos": [-145036, 39088, 59], "meters": 12, "name": "the Shrine to Peryite"}],
+    "_prayNear": "Nat, 25 Oct (Skyrim shrines): a Skyrim lore statue that cannot be activated, prayed at with /pray within its meters (prayer.js prayNear), as Meridia's in Bruma. Vanilla or man_DaedricShrines.esp (in the live order). Census in _work/skyrim-shrines-1025.",
     "name": "Peryite",
     "kind": "daedra",
     "shrines": [
@@ -1715,6 +1725,8 @@
    },
    {
     "id": "vaermina",
+    "prayNear": [{"ref": "8e8:man_DaedricShrines.esp", "world": "9aa4a:Skyrim.esm", "pos": [13143, 1954, -1223], "meters": 10, "name": "the statue of Vaermina in the Nightcaller Temple"}, {"ref": "8ea:man_DaedricShrines.esp", "world": "9aa4a:Skyrim.esm", "pos": [2397, 1645, -1222], "meters": 10, "name": "the statue of Vaermina in the Nightcaller Temple"}],
+    "_prayNear": "Nat, 25 Oct (Skyrim shrines): a Skyrim lore statue that cannot be activated, prayed at with /pray within its meters (prayer.js prayNear), as Meridia's in Bruma. Vanilla or man_DaedricShrines.esp (in the live order). Census in _work/skyrim-shrines-1025.",
     "name": "Vaermina",
     "kind": "daedra",
     "shrines": [
