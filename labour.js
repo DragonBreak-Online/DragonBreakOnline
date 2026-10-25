@@ -3,6 +3,7 @@
 // belongs to the Miner skill, a chopping block to the
 // Woodcutter. Both use the same front widget: a marker sweeps a bar and the worker strikes while it
 // sits in the band. The server sends the round, judges the report and hands out the yield.
+// A saw mill (ResourceObjectSawmill) is the Woodcutter's too, with no mini-game: see mill() below.
 //
 // The round is the server's, not the widget's (SERVER_AUTHORITY.md migration 7, the reading game in
 // gamemode.js is the same pattern): the server rolls a seed, derives the band centre for every
@@ -182,6 +183,9 @@ module.exports = (api) => {
     stone: '306c:HearthFires.esm',   // BYOHMaterialStoneBlock, "Quarried Stone"
     clay: '3043:HearthFires.esm',    // BYOHMaterialClay, "Clay"
     firewood: '6f993:Skyrim.esm',
+    // Hearthfire's building timber, BYOHMaterialLog "Sawn Log": the saw mill cuts it (Nat, 25 Oct: "make the saw machine for
+    // sawn logs work"). Skyrim has no raw log to feed it, so the mill takes nothing in
+    sawnlog: '300e:HearthFires.esm',
     charcoal: '33760:Skyrim.esm',
   }, CFG.gemOre || {}, CFG.items || {});
 
@@ -500,6 +504,38 @@ module.exports = (api) => {
     return started;
   };
 
+  // A saw mill (Nat, 25 Oct: "make the saw mill work as intended for wood cutters"). The vanilla ResourceObjectSawMillScript
+  // only plays its workers' animations and hands a player nothing, and no handler existed here, so activating one just sat
+  // the player down. The design (skills.json minigames.lumberMill): no mini-game, a rest per player per mill, firewood by
+  // Woodcutter tier (woodcutter millFirewoodByTier, millCooldownMinutes). The activation is ours, so nobody is seated.
+  // It saws Hearthfire's Sawn Logs as well, by tier (millSawnLogsByTier, Nat 25 Oct), the timber a house is built from,
+  // from Adept up (woodcutter sawnLogMinTier, 0 based); below it the mill pays its firewood and says when logs come.
+  const MILL = /^ResourceObjectSawmill/i;
+  const MILL_RESTS = 'private.milledLogs';
+  const millRestMinutes = () => Math.max(1, Number(WOODCUTTER.millCooldownMinutes) || 30);
+  const mill = (targetId, casterId) => {
+    const tier = tierOf(casterId, 'woodcutter');
+    if (tier < 0) return false;   // same first-touch fall-through as mine()
+    { const live = liveRound(casterId); if (live) return reshow(casterId, live); }
+    const rests = restsOf(casterId, MILL_RESTS);
+    const key = restKey(targetId);
+    const until = Number(rests[key]) || 0;
+    if (until > Date.now()) return deny(casterId, `The mill has no more logs sawn for you yet. Come back in ${Math.ceil((until - Date.now()) / 60000)} minutes.`);
+    const count = Math.max(1, Math.round(tierValue(WOODCUTTER.millFirewoodByTier, tier, 10)));
+    const logTier = Number.isFinite(Number(WOODCUTTER.sawnLogMinTier)) ? Number(WOODCUTTER.sawnLogMinTier) : 2;
+    const logs = tier >= logTier ? Math.max(0, Math.round(tierValue(WOODCUTTER.millSawnLogsByTier, tier, 0))) : 0;
+    // The logs first: a pack too full for them takes nothing and the mill does not rest
+    if (logs && !giveItem(casterId, idOf(ITEMS.sawnlog), logs)) return deny(casterId, 'The saw runs, but you cannot carry any more.');
+    if (!giveItem(casterId, idOf(ITEMS.firewood), count) && !logs) return deny(casterId, 'The saw runs, but you cannot carry any more.');
+    rests[key] = Date.now() + millRestMinutes() * 60000;
+    saveRests(casterId, MILL_RESTS, rests);
+    try { if (typeof globalThis.__alduinakMasteryEvent === 'function') globalThis.__alduinakMasteryEvent('chop', casterId, { refrId: targetId }); } catch (e) { /* no skill system */ }
+    let at = targetId.toString(16); try { at = String(mp.getDescFromId(targetId) || at); } catch (e) { /* the id */ }
+    audit(`MILL ${who(casterId)} ran a saw mill at ${at} (tier ${tier + 1}) -> ${logs ? `${logs} sawn logs, ` : ''}${count} firewood`);
+    personal(casterId, `The saw bites through the logs: ${logs ? `${logs} Sawn Log${logs === 1 ? '' : 's'} and ` : ''}${count} Firewood. The mill will have more for you in ${millRestMinutes()} minutes.${logs || tier >= logTier ? '' : ` Sawn logs for building come at ${an((skills.tierNames || [])[logTier] || 'Adept')} ${(skills.tierNames || [])[logTier] || 'Adept'} Woodcutter.`}`);
+    return true;
+  };
+
   // The fork's gatheringSystem.ts pays a seated chopper firewood every 5 s, unaudited (8 Oct); until its own fix is live, its
   // sessions at a chopping block are ended through its seat-close hook before the first strike, whatever labour decides
   const GATHER_CLOSE = 'onPapyrusEvent:SkympOnActivateClose';
@@ -522,6 +558,11 @@ module.exports = (api) => {
       const pact = typeof globalThis.__dboGreenPactRefusal === 'function' ? globalThis.__dboGreenPactRefusal(casterId, 'chop') : '';
       if (pact) return deny(casterId, pact);
       return chop(targetId, casterId);
+    }
+    if (type === 'FURN' && MILL.test(edid) && isPlayer(casterId)) {
+      const pact = typeof globalThis.__dboGreenPactRefusal === 'function' ? globalThis.__dboGreenPactRefusal(casterId, 'chop') : '';
+      if (pact) return deny(casterId, pact);
+      return mill(targetId, casterId);
     }
     // A seam's pickaxe marker pays out through the vanilla mining script: no round, no skill, no rest (Nate on Falcius,
     // 2026-09-28: refused at a gold seam, then mined it from its PickaxeMiningFloorMarker). The round on the seam

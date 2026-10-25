@@ -419,16 +419,14 @@
      "WoodChoppingBlock",
      "DLC2WoodChoppingBlock",
      "CharcoalKiln",
-     "LumberMill",
-     "FarmLumbermill"
+     "ResourceObjectSawmill"
     ]
    },
    "counts": {
     "activatePrefixes": [
      "WoodChoppingBlock",
      "DLC2WoodChoppingBlock",
-     "LumberMill",
-     "FarmLumbermill"
+     "ResourceObjectSawmill"
     ]
    },
    "chopStrikesByTier": [
@@ -439,12 +437,22 @@
     20
    ],
    "millFirewoodByTier": [
-    10,
-    14,
-    18,
-    22,
-    26
+    20,
+    30,
+    40,
+    50,
+    60
    ],
+   "millSawnLogsByTier": [
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   "_millSawnLogs": "Hearthfire Sawn Logs (300e:HearthFires.esm) per run of a saw mill, by Woodcutter tier, with the firewood (labour.js mill; Nat, 25 Oct). 4 at Novice times the usual tier multiplier (1, 1.2, 1.4, 1.7, 2): a furnished one-cell home's decor takes about 22 (Worker 1's decor-catalog.json, 25 Oct), some 5 or 6 runs, and the firewood keeps a run near the decor's price of 4 firewood a log. A whole Hearthfire house with every wing is about 256. The mill takes nothing in: Skyrim has no raw log.",
+   "sawnLogMinTier": 2,
+   "_sawnLogMinTier": "The Woodcutter tier, 0 based, from which a saw mill run also pays millSawnLogsByTier Sawn Logs (2 = Adept; Nat, 25 Oct). Below it the run pays its firewood only. Read at boot.",
    "millCooldownMinutes": 30,
    "tiers": [
     "4 strikes, rough charcoal",
