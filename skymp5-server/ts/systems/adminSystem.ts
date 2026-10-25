@@ -94,7 +94,7 @@ const ADMIN_MODES: Array<{ id: string; label: string }> = [
 
 // Lead GM and above only (TIER_CAPS.spawn); a GM keeps teleports, kick, observing modes and the roster
 const SPAWN_ACTIONS = new Set(["kill", "deleteCharacter", "masteryGrant", "masteryReset", "masterySetTier", "masteryDrop",
-  "giveItem", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm", "npcZoneAdd", "npcZoneDelete", "npcZoneReset"]);
+  "giveItem", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm", "polymorphSelf", "npcZoneAdd", "npcZoneDelete", "npcZoneReset"]);
 const SPAWN_MODES = new Set(["smite", "healhit"]);
 // Panel actions whose missing target means the staff member themself (resolveTarget)
 const SELF_TARGETED = new Set(["masterySetTier", "masteryDrop", "giveItem", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm"]);
@@ -350,11 +350,23 @@ export class AdminSystem implements System {
     try { return String(mp.get(actorId, "ff_charTag") || "").toUpperCase(); } catch { return ""; }
   }
 
-  // Which beast powers a character holds and what shape they are in, from server\beastform.js
-  private beastOf(actorId: number): { werewolf: boolean; vampirelord: boolean; form: string | null } | undefined {
+  // Which beast powers a character holds and what shape they are in, from server\beastform.js.
+  // creature and since come from a newer beastform.js and are optional here: creature says the shape is an
+  // animal rather than a beast form, so the front needs no list of its own to tell them apart, and since is
+  // when it was taken, for "for N min". An older beastform.js simply leaves them undefined
+  private beastOf(actorId: number): { werewolf: boolean; vampirelord: boolean; form: string | null; creature?: boolean; since?: number | null } | undefined {
     const holds = (globalThis as any).__dboBeastHolds;
     if (typeof holds !== "function") return undefined;
     try { return holds(actorId); } catch { return undefined; }
+  }
+
+  // Panel-wide polymorph state from server\beastform.js (__dboPolymorphPanel): the Owners' switch and the
+  // animals that may be taken right now, which is its table narrowed by the load order and by config. undefined
+  // on a beastform.js without the hook, and the front then hides the picker rather than guessing a list
+  private polymorphOf(): { on: boolean; setBy: string; forms: Array<{ key: string; name: string }> } | undefined {
+    const info = (globalThis as any).__dboPolymorphPanel;
+    if (typeof info !== "function") return undefined;
+    try { return info(); } catch { return undefined; }
   }
 
   private modesFor(adminProfile: number): Array<{ id: string; label: string; active: boolean }> {
@@ -499,6 +511,7 @@ export class AdminSystem implements System {
             mastery: this.mastery.summaryOf(ctx, myActorId),
             bans: this.bans.list(),
             me: { a: myActorId.toString(16), b: this.beastOf(myActorId) },
+            polymorph: this.polymorphOf(),
           }));
         } catch (e) {
           this.log(`AdminSystem: adminMenu reply failed: ${e}`);
@@ -575,6 +588,22 @@ export class AdminSystem implements System {
       const lifted = this.bans.remove(String(content["target"] ?? ""));
       if (lifted) this.adminLog(`profile ${adminProfile} lifted the ban on ${lifted.name || "profile " + lifted.profileId}${lifted.ip ? " / ip " + lifted.ip : ""}`);
       this.reply(mp, userId, !!lifted, lifted ? `Ban on ${lifted.name || lifted.ip} lifted` : "No such ban");
+      return;
+    }
+    // The panel's polymorph picker. Nat's call, 25 Oct: polymorph is self only, so this action takes NO target -
+    // it never calls resolveTarget and passes myActorId, which makes polymorphing somebody else impossible from
+    // here rather than merely unoffered. beastform.js checks the Lead GM rank again on its side.
+    if (action === "polymorphSelf") {
+      const form = String(content["form"] ?? "");
+      const run = (globalThis as any).__dboPolymorphSelf;
+      if (typeof run !== "function") { this.reply(mp, userId, false, "This server's beastform.js has no panel polymorph"); return; }
+      let said = "";
+      try { said = String(run(myActorId, form) ?? ""); }
+      catch (e) { this.log(`AdminSystem: polymorphSelf ${form} failed: ${e}`); this.reply(mp, userId, false, "Polymorph failed, see server log"); return; }
+      // beastform.js returns '' when the shape was taken, else the sentence saying why not
+      if (said) { this.reply(mp, userId, false, said); return; }
+      this.adminLog(`profile ${adminProfile} took the ${form} shape from the panel (own character)`);
+      this.reply(mp, userId, true, "Done");
       return;
     }
     if (["masterySetTier", "masteryDrop", "giveItem", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm"].indexOf(action) !== -1) {
