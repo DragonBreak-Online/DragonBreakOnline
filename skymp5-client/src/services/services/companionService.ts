@@ -2,7 +2,7 @@ import { Actor, HitEvent, ObjectReference, Quest, ReferenceAlias, storage } from
 import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { companionFightState } from "./companionFightState";
 import { FightStall, fightStallStep } from "./companionFightStall";
-import { flankSlot, formationGap, formationOffset, formationPoint, formationWorldOffset, isRangedHands, leashStep, memberJitter, staggerDelayMs } from "./companionFormation";
+import { flankSlot, formationGap, formationOffset, formationPoint, formationWorldOffset, glancing, isRangedHands, leashStep, memberConfidence, memberJitter, staggerDelayMs } from "./companionFormation";
 import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { sendCustomPacket, parseCustomPacket } from "./customPacketUtil";
@@ -90,6 +90,10 @@ interface LocalState {
   leashed: boolean;
   ranged: boolean;
   rangedAt: number;
+  // Step 3: an alias member told to hold waits through the vanilla follower package (WaitingForPlayer 1); a glance at the
+  // owner is under way
+  waiting: boolean;
+  glancing: boolean;
   // The ordered fight's progress window (companionFightStall.ts)
   stall: FightStall | null;
 }
@@ -300,7 +304,7 @@ export class CompanionService extends ClientListener {
         state.unstuckAt = 0;
         this.follow(actor, player, state);
       } else if (c.staying) {
-        this.stay(actor, state);
+        this.stay(actor, state, player);
       } else if (state.driven) {
         // applyMovement throws on a cell mismatch; a throw here would break every companion this tick
         try { this.drive(actor, player, state); } catch (e) { state.followResult = "drive failed"; }
@@ -477,9 +481,10 @@ export class CompanionService extends ClientListener {
     let state = this.local.get(remoteId);
     if (!state || state.localId !== actor.getFormID()) {
       state = { localId: actor.getFormID(), following: false, followAngle: 0, followResult: "none", aliasSlot: "", aliasAt: 0, aliasFailed: false, reportAt: 0, fightingTarget: 0, leashSentAt: 0, stuckSince: 0, unstuckAt: 0, driven: false, slot: 0, followSlot: -1, stall: null,
-        appliedTarget: 0, appliedStaying: false, appliedKey: "", pendingKey: "", pendingSince: 0, leashed: false, ranged: false, rangedAt: 0 };
+        appliedTarget: 0, appliedStaying: false, appliedKey: "", pendingKey: "", pendingSince: 0, leashed: false, ranged: false, rangedAt: 0,
+        waiting: false, glancing: false };
       this.local.set(remoteId, state);
-      this.prepare(actor);
+      this.prepare(actor, remoteId);
       if (!this.announced.has(remoteId)) {
         this.announced.add(remoteId);
         this.summonFx(actor);
@@ -489,7 +494,7 @@ export class CompanionService extends ClientListener {
   }
 
   // A teammate in the player faction instead of its own factions, so it is never hostile to the owner and only attacks enemies unprovoked
-  private prepare(actor: Actor): void {
+  private prepare(actor: Actor, remoteId: number): void {
     actor.removeFromAllFactions();
     const faction = this.sp.Faction.from(this.sp.Game.getFormEx(PLAYER_FACTION));
     if (faction) {
@@ -498,6 +503,8 @@ export class CompanionService extends ClientListener {
     actor.setPlayerTeammate(true, false);
     actor.ignoreFriendlyHits(true);
     actor.setActorValue("Aggression", 1);
+    // Each its own boldness (companionFormation memberConfidence: Average, Brave or Foolhardy)
+    actor.setActorValue("Confidence", memberConfidence(remoteId));
     // A spawned copy can carry a zero speed, which leaves it inching along instead of walking
     if (actor.getActorValue("SpeedMult") < 50) actor.setActorValue("SpeedMult", 100);
     actor.setDontMove(false);
@@ -562,6 +569,7 @@ export class CompanionService extends ClientListener {
   }
 
   private follow(actor: Actor, player: Actor, state: LocalState): void {
+    this.endHold(actor, state);
     // The order ended (target dead, gone or recalled): leave that fight, not one the engine picked itself
     if (state.fightingTarget) {
       if (actor.getCombatTarget()?.getFormID() === state.fightingTarget) {
@@ -687,15 +695,44 @@ export class CompanionService extends ClientListener {
     return quest ? ReferenceAlias.from(quest.getAliasByName(name)) : null;
   }
 
-  // Ordered to stay: holds its ground, still fights what attacks it or its owner
-  private stay(actor: Actor, state: LocalState): void {
-    this.releaseAlias(state);
+  // Ordered to hold: holds its ground, still fights what attacks it or its owner. A member in a DialogueFollower alias keeps
+  // it and waits through the alias's own package: FollowerPackageTemplate (Skyrim.esm 0D530D, under PlayerFollowerPackage
+  // 05C84B) runs Follow while GetActorValue WaitingForPlayer (av 95) is 0 and Wait while it is 1, which is what vanilla's
+  // DialogueFollowerScript FollowerWait() sets. Any other member stands where it is and glances at its owner now and then
+  // (companionFormation glancing) instead of staring ahead (warband rework step 3, Nat 25 Oct).
+  private stay(actor: Actor, state: LocalState, player?: Actor): void {
     if (state.following) {
       actor.clearKeepOffsetFromActor();
       state.following = false;
       state.followResult = "staying";
     }
+    if (state.aliasSlot) {
+      if (!state.waiting) {
+        actor.setActorValue("WaitingForPlayer", 1);
+        actor.evaluatePackage();
+        state.waiting = true;
+        state.followResult = "waiting (alias " + state.aliasSlot + ")";
+      }
+    } else if (player) {
+      const glance = glancing(localIdToRemoteId(actor.getFormID()), Date.now());
+      if (glance && !state.glancing) actor.setLookAt(player, false);
+      if (!glance && state.glancing) actor.clearLookAt();
+      state.glancing = glance;
+    }
     if (state.fightingTarget && !actor.isInCombat()) state.fightingTarget = 0;
+  }
+
+  // Leaving a hold: an alias member follows again (WaitingForPlayer 0), a glance ends
+  private endHold(actor: Actor, state: LocalState): void {
+    if (state.waiting) {
+      actor.setActorValue("WaitingForPlayer", 0);
+      actor.evaluatePackage();
+      state.waiting = false;
+    }
+    if (state.glancing) {
+      actor.clearLookAt();
+      state.glancing = false;
+    }
   }
 
   // Summons join fights the owner is already in: anything nearby in combat with the owner or one of the owner's companions
@@ -789,7 +826,7 @@ export class CompanionService extends ClientListener {
         cell: whereOf(actor), ownerCell: whereOf(player),
         localId: actor.getFormID().toString(16), at: here.map(Math.round), owner: [player.getPositionX(), player.getPositionY(), player.getPositionZ()].map(Math.round),
         package: (actor.getCurrentPackage()?.getFormID() ?? 0).toString(16), aliasSlot: state.aliasSlot,
-        slot: state.slot, ranged: state.ranged, leashed: state.leashed, waiting: state.pendingKey ? 1 : 0,
+        slot: state.slot, ranged: state.ranged, leashed: state.leashed, pending: state.pendingKey ? 1 : 0, holdWait: state.waiting,
         fight: companionFightState(actor, state.fightingTarget ? Actor.from(this.sp.Game.getFormEx(state.fightingTarget)) : null),
         stall: state.stall ? { kicks: state.stall.kicks, forMs: Date.now() - state.stall.since } : null,
         toTarget: this.distanceTo(actor, state.fightingTarget),

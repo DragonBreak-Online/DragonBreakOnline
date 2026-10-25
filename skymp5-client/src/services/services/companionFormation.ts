@@ -87,3 +87,22 @@ export const leashStep = (leashed: boolean, distance: number): boolean => (leash
 // A bow, crossbow, staff or spell in either hand (skyrimPlatform EquippedItemType: Bow 7, Staff 8, Spell 9, Crossbow 12)
 export const RANGED_ITEM_TYPES = [7, 8, 9, 12];
 export const isRangedHands = (right: number, left: number): boolean => RANGED_ITEM_TYPES.includes(right) || RANGED_ITEM_TYPES.includes(left);
+
+// ---- holding and fighting, each in its own way (warband rework step 3, Nat 25 Oct) -------------------------------------
+// A member holding its ground glances at its owner now and then instead of staring ahead: for GLANCE_MS out of every
+// GLANCE_EVERY_MS..+GLANCE_SPREAD_MS (its own period, and its own phase, from its server id)
+export const GLANCE_MS = 2500;
+export const GLANCE_EVERY_MS = 8000;
+export const GLANCE_SPREAD_MS = 6000;
+export const glancing = (id: number, now: number): boolean => {
+  const period = GLANCE_EVERY_MS + Math.floor(unitHash(id, 5) * GLANCE_SPREAD_MS);
+  const phase = Math.floor(unitHash(id, 6) * period);
+  return ((Number(now) + phase) % period) < GLANCE_MS;
+};
+// How bold each member is in a fight: the engine's Confidence actor value (0 Cowardly, 1 Cautious, 2 Average, 3 Brave,
+// 4 Foolhardy). Half are Average, a third Brave, the rest Foolhardy; never Cowardly or Cautious, which flee a fight the
+// owner ordered.
+export const memberConfidence = (id: number): number => {
+  const u = unitHash(id, 7);
+  return u < 0.5 ? 2 : u < 0.85 ? 3 : 4;
+};

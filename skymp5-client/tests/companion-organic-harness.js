@@ -1,6 +1,7 @@
 // Scripted test for step 2 of the warband rework (Nat, 25 Oct: "the AI more fluid and organic"), the pure part in
 // companionFormation.ts: ranged members on the flanks, each member's small stable jitter, the ripple an order travels
-// through the band in (staggerDelayMs), the leash with a gap (1800 out, 1200 back), and which hands count as ranged.
+// through the band in (staggerDelayMs), the leash with a gap (1800 out, 1200 back), which hands count as ranged, and step 3's
+// glances while holding, boldness (Confidence) and the alias members' vanilla wait.
 // Run from skymp5-client:
 //
 //   node tests/companion-organic-harness.js [path to esbuild's package dir]
@@ -77,6 +78,23 @@ check('...acts on the staggered order, and reports the server\'s', /const c = th
 check('...keeps its jittered offset with its own radii', /keepOffsetFromActor\(player, ox \+ j\.dx, oy \+ j\.dy, 0, 0, 0, angle,\n\s+CompanionService\.catchUpRadius \* j\.radiusMult, CompanionService\.followRadius \* j\.radiusMult\)/.test(svc));
 check('...leashes both ordered and engine-picked fights with leashStep', (svc.match(/state\.leashed = leashStep\(state\.leashed, /g) || []).length === 2);
 check('...and no longer uses the single 1500 cutoff', !/combatLeashDistance/.test(svc));
+
+// ---- step 3: holding with glances, boldness -------------------------------------------------------------------------
+const id0 = ids[0];
+const share = Array.from({ length: 2000 }, (_, i) => m.glancing(id0, 1e9 + i * 50)).filter(Boolean).length / 2000;
+check('a holding member glances at its owner about 2.5 s in every 8-14 s (between 15% and 32% of the time)', share > 0.15 && share < 0.32, share);
+const glanceStarts = (id) => { let n = 0, was = false; for (let t = 0; t < 60000; t += 250) { const g = m.glancing(id, 1e9 + t); if (g && !was) n++; was = g; } return n; };
+check('...4 to 8 glances a minute', [ids[0], ids[1], ids[2]].every((id) => { const n = glanceStarts(id); return n >= 4 && n <= 8; }), [ids[0], ids[1], ids[2]].map(glanceStarts));
+check('two members do not glance in step (their windows differ)', ids.slice(0, 10).some((id) => Array.from({ length: 200 }, (_, i) => m.glancing(id, 1e9 + i * 300) !== m.glancing(ids[0], 1e9 + i * 300)).some(Boolean)));
+const conf = ids.map((id) => m.memberConfidence(id));
+check('boldness is Average, Brave or Foolhardy, never Cowardly or Cautious', conf.every((c) => c >= 2 && c <= 4), conf);
+check('...all three appear in a band of 50', [2, 3, 4].every((c) => conf.includes(c)), conf);
+check('...and a member keeps its own', m.memberConfidence(ids[7]) === conf[7]);
+check('companionService sets each member\'s Confidence in prepare()', /actor\.setActorValue\("Confidence", memberConfidence\(remoteId\)\);/.test(svc));
+check('an alias member on hold waits through the follower package (WaitingForPlayer 1), and follows again on 0',
+  /actor\.setActorValue\("WaitingForPlayer", 1\);/.test(svc) && /actor\.setActorValue\("WaitingForPlayer", 0\);/.test(svc));
+check('a hold no longer releases the alias (stay keeps it)', !/private stay\([^)]*\): void \{\n\s+this\.releaseAlias\(state\);/.test(svc));
+check('the other members glance at the owner with setLookAt and clearLookAt', /actor\.setLookAt\(player, false\);/.test(svc) && /actor\.clearLookAt\(\);/.test(svc));
 
 console.log(failures ? `${failures} FAILED` : 'all passed');
 process.exit(failures ? 1 : 0);
