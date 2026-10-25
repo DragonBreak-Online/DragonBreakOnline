@@ -169,6 +169,11 @@ export class AdminMenuService extends ClientListener {
         // The admin's own standing; absent on older servers
         mastery: content["mastery"] && typeof content["mastery"] === "object" ? content["mastery"] : null,
         bans: Array.isArray(content["bans"]) ? content["bans"] : [],
+        // The admin's own row, which the roster leaves out: the front reads it for the target list's "You" and for
+        // the shape you are in yourself. This mirror keeps only the keys it names, and it did not name this one, so
+        // every panel saw data.me as undefined: acting on yourself showed "Refresh to read their state" and a staff
+        // member who had polymorphed themselves was offered no Revert. Absent on an older server, which the front allows
+        me: content["me"] && typeof content["me"] === "object" ? content["me"] : null,
         // The big catalogs live in the browser (window.__dboAdminItems / __dboAdminLocations); only their version travels here
         itemsVersion: panelData.itemsVersion || 0,
         locationsVersion: panelData.locationsVersion || 0,
