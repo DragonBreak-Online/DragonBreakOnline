@@ -30,8 +30,10 @@ const chars = new Map([[ADMIN, { pid: 1, name: 'Admin', tag: 'AAAA', online: tru
   [BLANK, { pid: 19, name: 'Blank', tag: 'NONE', online: true }],
   [GM, { pid: 20, name: 'Gm', tag: 'GMGM', online: true }], [TRIAL, { pid: 21, name: 'Trial', tag: 'TRIA', online: true }],
   [LEAD, { pid: 22, name: 'Lead', tag: 'LEAD', online: true }], [GMRULER, { pid: 23, name: 'Ruling Gm', tag: 'RGMR', online: true }]]);
-const RACES = { 1: 'NordRace', 2: 'ImperialRace', 3: 'BretonRace', 4: 'NordRaceVampire', 5: 'WerewolfBeastRace', 6: 'KhajiitRace' };
-const raceOf = new Map([[ADMIN, 1], [OWNER, 1], [CORVUS, 3], [MARCUS, 2], [LYDIA1, 1], [LYDIA2, 1], [SERANA, 4], [ULF, 5], [JZAR, 6]]);
+const REACHM = 0xff000500;
+chars.set(REACHM, { pid: 24, name: 'Tarrare', tag: 'RCHM', online: false });
+const RACES = { 7: 'DBOReachmanRace', 1: 'NordRace', 2: 'ImperialRace', 3: 'BretonRace', 4: 'NordRaceVampire', 5: 'WerewolfBeastRace', 6: 'KhajiitRace' };
+const raceOf = new Map([[ADMIN, 1], [OWNER, 1], [CORVUS, 3], [MARCUS, 2], [LYDIA1, 1], [LYDIA2, 1], [SERANA, 4], [ULF, 5], [JZAR, 6], [REACHM, 7]]);
 globalThis.__dboBeastOriginalRace = (a) => (a === ULF ? 1 : 0);
 const byName = (q) => [...chars.entries()].filter(([, c]) => c.name.toLowerCase() === q.toLowerCase()).map(([id]) => id);
 const byTag = (q) => [...chars.entries()].filter(([, c]) => c.tag.toLowerCase() === q.toLowerCase()).map(([id]) => id);
@@ -43,9 +45,10 @@ const findAnyByName = (q) => {
   const r = byName(s); return r.length === 1 ? r[0] : r.length > 1 ? -r.length : 0;
 };
 let officials = {};
-const zones = [{ id: 'bruma', name: 'Bruma', officials: ['ruler', 'steward', 'guard'] }, { id: 'whiterun', name: 'Whiterun', officials: ['jarl', 'steward'] }];
+const zones = [{ id: 'bruma', name: 'Bruma', officials: ['ruler', 'steward', 'guard'] }, { id: 'whiterun', name: 'Whiterun', officials: ['jarl', 'steward'] }, { id: 'markarth', name: 'The Reach', officials: ['jarl', 'steward'] }];
 const told = []; const said = []; const audits = [];
 const stubs = {
+  cfg: { jarlRaces: JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'gamemode-config.json'), 'utf8')).jarlRaces },
   mp: { getActorsByProfileId: (pid) => [...chars.entries()].filter(([, c]) => c.pid === pid).map(([id]) => id),
     get: (a, prop) => (prop === 'appearance' && raceOf.has(a) ? { raceId: raceOf.get(a) } : null),
     lookupEspmRecordById: (id) => (RACES[id] ? { record: { editorId: RACES[id] } } : { record: null }) },
@@ -133,6 +136,15 @@ check('a Breton can be made Jarl now', (officials.whiterun.jarl || []).includes(
 officials = {};
 out = run('appoint', ADMIN, 'Marcus Aurelius whiterun jarl');
 check('an Imperial can be Jarl, offline too', (officials.whiterun.jarl || []).includes(12), out);
+// Per hold (Nat, 25 Oct; config jarlRaces): a Reachman may be Jarl of the Reach, and of no other hold
+officials = {};
+out = run('appoint', ADMIN, 'Tarrare whiterun jarl');
+check('a Reachman cannot be made Jarl of Whiterun', !(officials.whiterun && officials.whiterun.jarl) && /is a Reachman\. By Skyrim's law only a Breton, a Nord or an Imperial may sit as Jarl\.$/.test(out), out);
+out = run('appoint', ADMIN, 'Tarrare markarth jarl');
+check('a Reachman can be made Jarl of the Reach', ((officials.markarth || {}).jarl || []).includes(24), out);
+officials = {};
+out = run('appoint', ADMIN, 'J\'zar markarth jarl');
+check('the Reach still refuses a Khajiit, naming its own law', !(officials.markarth && officials.markarth.jarl) && /only a Breton, a Nord, an Imperial or a Reachman may sit as Jarl\.$/.test(out), out);
 out = run('appoint', ADMIN, 'Serana whiterun jarl');
 check('a Nord vampire is still a Nord', (officials.whiterun.jarl || []).includes(16), out);
 out = run('appoint', ADMIN, 'Ulf whiterun jarl');
