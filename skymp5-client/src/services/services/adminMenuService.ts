@@ -249,11 +249,14 @@ export class AdminMenuService extends ClientListener {
       const list = (k: string) => (Array.isArray(content[k]) ? content[k] : []);
       const plan = content["plan"] && typeof content["plan"] === "object" ? content["plan"] : { calm: 0, kept: "", unread: "" };
       const last = content["last"] && typeof content["last"] === "object" ? content["last"] : null;
+      // Step 1 of the rework (Nat, 25 Oct): the GM's target, the foes near, the last NPC preview (warband.js targetOf, foesOf, infoOf)
+      const obj = (k: string) => (content[k] && typeof content[k] === "object" && !Array.isArray(content[k]) ? content[k] : null);
       panelData.warband = {
         members: list("members"), counts: list("counts"), placed: list("placed"), players: list("players"), npcs: list("npcs"),
         stance: String(content["stance"] ?? "follow"), side: String(content["side"] ?? ""), enemies: list("enemies"),
         plan, presets: list("presets"), onLogout: String(content["onLogout"] ?? "dismiss"),
         maxBand: Number(content["maxBand"]) || 25, maxRaise: Number(content["maxRaise"]) || 10, last, at: Date.now(),
+        target: obj("target"), foes: list("foes"), info: obj("info"),
       };
       this.pushData();
     } else if (content["customPacketType"] === "adminPlaceMeta") {
