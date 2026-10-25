@@ -51,6 +51,26 @@ export interface BeastState {
   werewolf: boolean;
   vampirelord: boolean;
   form: string | null;
+  // From a newer server\beastform.js. creature says the shape is an animal rather than a beast form, so this
+  // file needs no list of its own to tell them apart; since is when it was taken. Both absent on an older server
+  creature?: boolean;
+  since?: number | null;
+}
+
+// server\beastform.js __dboPolymorphPanel, through adminSystem.ts and adminMenuService's panelData
+export interface PolymorphInfo {
+  on: boolean;          // the Owners' switch
+  setBy: string;        // 'admin', 'file', or '' when it has never been set
+  forms: Array<{ key: string; name: string }>;   // the animals that may be taken right now
+}
+
+// One line of "who is an animal", built in index.tsx from the roster and the admin's own row
+export interface PolymorphedRow {
+  id: string;           // actor id hex, '' for the admin themselves
+  label: string;
+  form: string;
+  name: string;         // what to call the shape: the server's name where it sent one
+  minutes: number | null;
 }
 
 export const targetFields = (id: string): Record<string, unknown> => (id ? { target: id } : {});
@@ -486,36 +506,106 @@ const BEASTS: Array<{ key: 'werewolf' | 'vampirelord'; label: string; give: stri
   { key: 'vampirelord', label: 'Vampire Lord', give: 'giveVampireLord' },
 ];
 
-// Staff polymorph animals (server beastform.js, /polymorph): shown and reverted here, never given from this panel
+// Names for the staff polymorph animals, used ONLY when the server sent none (an older beastform.js with no
+// __dboPolymorphPanel). The live list comes from the server, because it is the animal table narrowed by what
+// resolves in the load order and by config beastform.polymorph.forms: a list kept here would offer a shape the
+// server refuses. 'rabbit' is a command alias rather than a form of its own and is kept for the same reason.
 export const CREATURE_FORMS: Record<string, string> = {
   chicken: 'Chicken', rabbit: 'Rabbit', hare: 'Hare', goat: 'Goat', fox: 'Fox', dog: 'Dog', skeever: 'Skeever', mudcrab: 'Mudcrab', deer: 'Deer',
 };
 
-export const creatureLabel = (form: string): string => CREATURE_FORMS[form] || humanize(form);
+// A form's name: the server's where it sent one, else the fallback table, else the editor id read as words
+export const creatureLabel = (form: string, forms?: Array<{ key: string; name: string }> | null): string => {
+  const sent = forms && forms.find((f) => f.key === form);
+  return (sent && sent.name) || CREATURE_FORMS[form] || humanize(form);
+};
 
-export const currentShape = (form: string): string => {
-  const name = form === 'vampirelord' ? 'Vampire Lord' : form === 'werewolf' ? 'werewolf' : creatureLabel(form).toLowerCase();
+export const currentShape = (form: string, forms?: Array<{ key: string; name: string }> | null): string => {
+  const name = form === 'vampirelord' ? 'Vampire Lord' : form === 'werewolf' ? 'werewolf' : creatureLabel(form, forms).toLowerCase();
   return 'Currently ' + (/^[aeiou]/i.test(name) ? 'an ' : 'a ') + name;
 };
 
-export const PowersTab = ({ events, who, beast, canSpawn }: { events: Record<string, string>; who: string; beast?: BeastState; canSpawn: boolean }) => {
+// "for 3 min", or nothing when the server sent no 'since' (an older beastform.js)
+export const forMinutes = (minutes: number | null): string =>
+  minutes === null || !(minutes >= 0) ? '' : ` for ${minutes} min`;
+
+export const PowersTab = ({ events, who, beast, canSpawn, polymorph, polymorphed, selfBeast }: {
+  events: Record<string, string>; who: string; beast?: BeastState; canSpawn: boolean;
+  polymorph?: PolymorphInfo | null; polymorphed?: PolymorphedRow[]; selfBeast?: BeastState;
+}) => {
   const fields = (extra?: Record<string, unknown>): Record<string, unknown> => Object.assign({}, targetFields(who), extra || {});
   const state = (key: 'werewolf' | 'vampirelord'): string => {
     if (!beast) return 'state unknown';
     if (beast.form === key) return 'transformed now';
     return beast[key] ? 'power held' : 'not granted';
   };
+  const forms = polymorph ? polymorph.forms : null;
+  // An animal shape is one the server marked as a creature; on an older server fall back to "a form that is
+  // neither beast power", which is what this file used to decide by its own list
+  const isAnimal = (b?: BeastState): boolean =>
+    !!b && !!b.form && (b.creature === true || (b.creature === undefined && !BEASTS.some((x) => x.key === b.form)));
+  // Polymorph changes only your own shape, so the picker ignores the target selector entirely (the server's
+  // polymorphSelf action takes no target at all). It is closed while you are already in a shape.
+  const myForm = selfBeast && selfBeast.form ? selfBeast.form : null;
+  const pickable = !!polymorph && polymorph.on && canSpawn && !myForm;
   return (
     <div className="admin-panel__body">
       <div className="admin-panel__filters">
         <span className="admin-panel__hint">
-          {beast ? (beast.form ? currentShape(beast.form) : 'In their own shape') : 'Refresh to read their state'}
+          {beast ? (beast.form ? currentShape(beast.form, forms) : 'In their own shape') : 'Refresh to read their state'}
         </span>
       </div>
       <div className="admin-panel__powers">
-        {beast && beast.form && !BEASTS.some((b) => b.key === beast.form) ? (
+        {/* Your own shape and the Owners' switch, which no chat command shows before you try */}
+        {polymorph ? (
           <div className="admin-panel__power">
-            <span className="admin-panel__label">{creatureLabel(beast.form)} <span className="admin-panel__hint">transformed now</span></span>
+            <span className="admin-panel__label">
+              Polymorph <span className="admin-panel__hint">
+                {polymorph.on ? 'on' : 'off'}
+                {polymorph.setBy ? ` (${polymorph.setBy === 'admin' ? 'set by an Owner' : `from ${polymorph.setBy}`})` : ''}
+                {myForm ? `, you are ${/^[aeiou]/i.test(creatureLabel(myForm, forms)) ? 'an' : 'a'} ${creatureLabel(myForm, forms).toLowerCase()}` : ', you are in your own shape'}
+              </span>
+            </span>
+            {canSpawn && myForm && isAnimal(selfBeast) ? (
+              <div className="admin-panel__actions">
+                <Button text="Revert me" width={118} height={32} onClick={() => adminAction(events, 'beastForm', { form: myForm, op: 'revert' })} />
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {/* The picker, fed by the server. Hidden entirely when the server sent no list rather than guessing one */}
+        {polymorph && canSpawn ? (
+          <div className="admin-panel__power">
+            <span className="admin-panel__label">Take an animal shape <span className="admin-panel__hint">yourself only</span></span>
+            <div className="admin-panel__actions">
+              {forms && forms.length
+                ? forms.map((f) => (
+                  <Button key={f.key} text={f.name} width={110} height={32} disabled={!pickable}
+                          onClick={() => adminAction(events, 'polymorphSelf', { form: f.key })} />
+                ))
+                : <span className="admin-panel__hint">No animal is open for polymorph on this server.</span>}
+            </div>
+          </div>
+        ) : null}
+        {/* Who is an animal right now, with a Revert for each. The server already accepts a creature key for
+            op revert, so this needs no action of its own */}
+        {canSpawn && polymorphed && polymorphed.length ? (
+          <div className="admin-panel__power">
+            <span className="admin-panel__label">In an animal shape now</span>
+            <div className="admin-panel__actions">
+              {polymorphed.map((r) => (
+                <span key={r.id || 'me'} className="admin-panel__hint">
+                  {r.label}: {r.name}{forMinutes(r.minutes)}
+                  <Button text="Revert" width={96} height={28}
+                          onClick={() => adminAction(events, 'beastForm', Object.assign({}, targetFields(r.id), { form: r.form, op: 'revert' }))} />
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {beast && isAnimal(beast) ? (
+          <div className="admin-panel__power">
+            <span className="admin-panel__label">{creatureLabel(beast.form as string, forms)} <span className="admin-panel__hint">transformed now</span></span>
             {canSpawn ? (
               <div className="admin-panel__actions">
                 <Button text="Revert" width={96} height={32} onClick={() => adminAction(events, 'beastForm', fields({ form: beast.form, op: 'revert' }))} />
@@ -538,7 +628,7 @@ export const PowersTab = ({ events, who, beast, canSpawn }: { events: Record<str
         ))}
         <span className="admin-panel__hint">
           {canSpawn
-            ? 'To make a player a vampire or a werewolf in play, give the disease on the Players tab. Grant gives the vanilla power so it can be cast in game; Transform now changes shape from here, which does not need the cast to reach the server. Revoke takes the power back and reverts the shape. An animal shape from /polymorph shows at the top with its own Revert.'
+            ? 'To make a player a vampire or a werewolf in play, give the disease on the Players tab. Grant gives the vanilla power so it can be cast in game; Transform now changes shape from here, which does not need the cast to reach the server. Revoke takes the power back and reverts the shape. Polymorph changes your own shape only, never anyone else\'s, and the server ends it if you go indoors or into water, die, log out, or a player comes near whose game cannot show the animal. You can still revert anyone else from the list above.'
             : 'Powers are for a Lead GM and above. You can see who holds what.'}
         </span>
       </div>

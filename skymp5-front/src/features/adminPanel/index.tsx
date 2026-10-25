@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 import Button from '../../constructorComponents/button';
 import './styles.scss';
-import { PlayerPunish, DeityReset, SkillsTab, ItemsTab, PowersTab, TeleportTab, PlaceTab, PlayerCare, TargetPicker, PanelBan, MasteryTarget, TargetOption, BeastState, PanelPlacements, PlaceMeta, PlaceResults, PlaceSet } from './extraTabs';
+import { PlayerPunish, DeityReset, SkillsTab, ItemsTab, PowersTab, TeleportTab, PlaceTab, PlayerCare, TargetPicker, PanelBan, MasteryTarget, TargetOption, BeastState, creatureLabel, PolymorphInfo, PolymorphedRow, PanelPlacements, PlaceMeta, PlaceResults, PlaceSet } from './extraTabs';
 import { SearchBar, fuzzyFilter } from '../../components/SearchBar/SearchBar';
 import { GmCallsTab, EnchantTab } from './staffTabs';
 import { ThieveryTab } from './thieveryTab';
@@ -104,6 +104,7 @@ export interface AdminPanelData {
   placeSets?: PlaceSet[] | null; // the Place tab's saved sets, after adminPlaceSets
   masteryTarget?: MasteryTarget | null; // the Skills tab's player, arrives after adminMasteryRequest
   me?: { a: string; b?: BeastState }; // the admin's own row, which the roster leaves out
+  polymorph?: PolymorphInfo | null; // the Owners' switch and the animals open right now (server beastform.js)
 }
 
 const send = (key: string, ...args: unknown[]): void => {
@@ -344,6 +345,25 @@ const AdminPanel = ({ data }: { data: AdminPanelData }) => {
   // Picking an online row in Players makes it the one acted on everywhere
   const pickRow = (pl: PanelPlayer): void => { setSelected(pl.p); if (pl.online && pl.a) setActingOn(pl.a); };
   const selfId = (data.me && data.me.a) || (debug && debug.actorId) || '';
+  // Who is in an animal shape right now, for the Powers tab's list: the same thing /polymorph list prints.
+  // The server marks an animal with b.creature, so this does not depend on a list of forms kept in the front
+  const polymorph = data.polymorph || null;
+  const polyForms = polymorph ? polymorph.forms : null;
+  const polyNow = Date.now();
+  const polymorphed: PolymorphedRow[] = targets
+    .filter((t) => t.beast && t.beast.form && t.beast.creature === true)
+    .map((t) => {
+      const b = t.beast as BeastState;
+      const form = b.form as string;
+      const since = typeof b.since === 'number' && b.since > 0 ? b.since : null;
+      return {
+        id: t.id,
+        label: t.label,
+        form,
+        name: creatureLabel(form, polyForms),
+        minutes: since === null ? null : Math.max(0, Math.round((polyNow - since) / 60000)),
+      };
+    });
   const shownZones = fuzzyFilter(npcZones, zoneSearch, (z) => z.name);
 
   const openTab = (id: Tab): void => {
@@ -588,7 +608,7 @@ const AdminPanel = ({ data }: { data: AdminPanelData }) => {
         {tab === 'thievery' ? <ThieveryTab /> : null}
         {tab === 'enchant' ? <EnchantTab who={actingOn} /> : null}
         {tab === 'items' ? <ItemsTab events={ev} itemsVersion={data.itemsVersion || 0} who={actingOn} canSpawn={canSpawn} /> : null}
-        {tab === 'powers' ? <PowersTab events={ev} who={actingOn} beast={acting ? acting.beast : undefined} canSpawn={canSpawn} /> : null}
+        {tab === 'powers' ? <PowersTab events={ev} who={actingOn} beast={acting ? acting.beast : undefined} canSpawn={canSpawn} polymorph={polymorph} polymorphed={polymorphed} selfBeast={data.me ? data.me.b : undefined} /> : null}
 
         {tab === 'teleport' ? <TeleportTab events={ev} locationsVersion={data.locationsVersion || 0} /> : null}
         {tab === 'place' ? <PlaceTab events={ev} placements={data.placements || null} meta={data.placeMeta || null} results={data.placeResults || null} sets={data.placeSets || null} /> : null}
