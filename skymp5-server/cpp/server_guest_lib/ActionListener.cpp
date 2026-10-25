@@ -1954,7 +1954,20 @@ void ActionListener::OnDropItem(const RawMessageData& rawMsgData,
     static_cast<const Inventory::ExtraData&>(msg);
   entry.SetWorn(Inventory::Worn::None);
 
-  const auto owned = ac->GetInventory().FindEntriesFor(entry);
+  // The shipped DropItemMessage carries baseId and count ALONE, so `entry` is
+  // bare, and none of FindEntriesFor's extras-aware draws matches a held
+  // enchanted or tempered item: owned came back empty, the code dropped a bare
+  // entry, and MpActor::DropItem's RemoveItems({entry}) threw "Source
+  // inventory doesn't have enough". So dropping ordinary enchanted gear failed
+  // for every real client, while the unit test that sends the extras passed.
+  // anyExtras adds a draw that matches on baseId alone, which is what a report
+  // with no extras means; the container path above already reads its inventory
+  // that way. Found by a test of mine failing on clang (Worker 5, 25 Oct).
+  // This is almost certainly a share of the 173 "(more than owned)" refusals
+  // in ticket #0409.
+  const bool reportedExtras =
+    entry.HasIdentityExtras() || (entry.name && !entry.name->empty());
+  const auto owned = ac->GetInventory().FindEntriesFor(entry, !reportedExtras);
 
   // The ground deletes a dropped item after two minutes (MpActor::DropItem),
   // so anything a player made does not go there at all (Nat, 25 Oct).
