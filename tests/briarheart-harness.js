@@ -212,7 +212,7 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
 {
   const shipped = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'gamemode-config.json'), 'utf8')).briarheart;
   ok(shipped.failPermadeath === true && shipped.tearPermadeath === true && shipped.forswornFriendly === true, 'the shipped config: failPermadeath, tearPermadeath and forswornFriendly on');
-  ok(shipped.visual && shipped.visual.enabled === false && shipped.visual.armor === '', 'the shipped config: the visual off and its armour empty (Worker 1 fills it)');
+  ok(shipped.visual && shipped.visual.enabled === false && shipped.visual.armor === '1d21f8:DragonBreak Online Edits.esp', 'the shipped config: the visual off until the DLE ships, its armour the overlay DBO_BriarheartOverlay 1d21f8');
   const logLines = [];
   delete require.cache[MODULE]; delete globalThis.__dboBriarheart;
   const M2 = require(MODULE)({
@@ -236,7 +236,7 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   ok(audits.some((t) => /accepted the rite's risks \(rite death for good, heart torn out for good\)/.test(t)), 'staff see the acceptance in the audit');
   ok(papyrusCalls.some((c) => c.method === 'AddToFaction' && c.args[0] === '43599:Skyrim.esm') && papyrusCalls.some((c) => c.method === 'IsInFaction'), 'forswornFriendly: AddToFaction, then IsInFaction read back');
   ok(logLines.some((l) => /briarheart: faction AddToFaction 43599:Skyrim\.esm on char40 \(rite\); IsInFaction now true/.test(l)), 'the faction call is logged with the read-back, for the in-game check', logLines);
-  ok(!papyrusCalls.some((c) => c.method === 'EquipItem') && !given.some(([a]) => a === NEWB), 'the empty visual equips nothing');
+  ok(!papyrusCalls.some((c) => c.method === 'EquipItem') && !given.some(([a]) => a === NEWB), 'the visual, off, equips nothing');
   ok(/dies for good/.test(run(NEWB, 'status')), '/briarheart reminds a Briarheart what tearing means');
   logLines.length = 0;
   globalThis.__dboBriarheartLogin(NEWB);
