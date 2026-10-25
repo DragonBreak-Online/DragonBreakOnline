@@ -30,11 +30,19 @@ const load = (conf) => {
 };
 const ask = (info) => globalThis.__dboEnchantScale(0xff000014, Object.assign({ baseId: 1, weapon: false, armorType: 2, soul: 5, effects: [ARCHERY], spare: [] }, info));
 
-// ---- shipped config: off by default, and every entry resolves ----
-load(SHIPPED);
-ok(SHIPPED && SHIPPED.enabled === false, 'the shipped block is off until Nate switches it on');
+// ---- shipped config: on with gems only (Nat, 25 Oct), and every entry resolves ----
+load(Object.assign({}, SHIPPED, { enabled: false }));
 ok(ask({}) === null, 'off: no verdict, so vanilla strength stands');
-const on = Object.assign({}, SHIPPED, { enabled: true });
+load(SHIPPED);
+ok(SHIPPED && SHIPPED.enabled === true, 'the shipped block is on (gems only, Nat 25 Oct)');
+ok(logs.some((l) => /enchanting\.js: on; items clothing 1, light 1, heavy 1; \d+ effects in 6 gem families/.test(l)), 'shipped: the load line names neutral armour shares and six families', logs.slice(-1));
+let s = ask({ armorType: 1, soul: 4 });
+ok(s && near(s.mults[0], 1) && s.note === undefined, 'shipped: heavy armor and a Greater soul change nothing, as in vanilla', s);
+s = ask({ armorType: 0, soul: 1 });
+ok(s && near(s.mults[0], 1) && s.note === undefined, 'shipped: light armor and a Petty soul change nothing', s);
+// The 20 Oct rebalance (armour type and soul shares), which the mechanism below is tested with: the code still supports it
+const on = Object.assign({}, SHIPPED, { enabled: true, itemShare: { clothing: 1, light: 0.66, heavy: 0.33, unknown: 1 },
+  soulShare: { apparel: [0.0833, 0.1667, 0.3333, 1, 1], weapon: [1, 1, 1, 1, 1] } });
 load(on);
 ok(logs.some((l) => /enchanting\.js: on; items clothing 1, light 0\.66, heavy 0\.33; \d+ effects in 6 gem families/.test(l)), 'the load line names the shares and six families', logs.slice(-1));
 const descs = Object.entries(SHIPPED.gemFamilies).filter(([k]) => !k.startsWith('_')).flatMap(([, f]) => [...f.regular, ...f.flawless]);

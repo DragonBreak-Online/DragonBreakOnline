@@ -32,7 +32,10 @@ module.exports = (api) => {
   const ownDisplay = typeof api.ownDisplay === 'function' ? api.ownDisplay : display;
   const openWidget = api.openWidget || (() => false), closeWidget = api.closeWidget || (() => false), onUi = api.onUi || (() => {});
 
-  const C = Object.assign({ reach: 400, maxDeposit: 20000, maxWeekly: 5000, offerHours: 48, maxPrice: 1000000 }, cfg.tenancy || {});
+  // gemPer: a building bought from the hold also costs a flawless gem of any kind per gemPer gold of its price, into the hold's
+  // gem counter (bank.js __dboGemFee; Nat, 25 Oct: gems pay for big deeds). A house under gemPer needs none, nor a resale
+  const C = Object.assign({ reach: 400, maxDeposit: 20000, maxWeekly: 5000, offerHours: 48, maxPrice: 1000000, gemPer: 5000 }, cfg.tenancy || {});
+  const gemsFor = (price) => (Number(C.gemPer) > 0 ? Math.floor(price / Number(C.gemPer)) : 0);
   const FILE = path.resolve('tenancy.json');
   const WEEK = 7 * 86400000;
   const S = globalThis.__dboTenancy || (globalThis.__dboTenancy = { data: null, doors: null });
@@ -303,9 +306,17 @@ module.exports = (api) => {
     }
     if (!hasTreasury(L.zone)) return `${zoneName(L.zone)} keeps no treasury for the price, so this property cannot be sold.`;
     const gate = citizenGate(a, L.zone); if (gate) return gate;
+    // Without bank.js's gem fee (a load that failed) the sale costs no gems rather than being refused
+    const gems = globalThis.__dboGemFee ? gemsFor(price) : 0;
+    if (gems) {
+      const need = globalThis.__dboGemFee.need(a, gems);
+      if (need) return `A property at ${price} gold costs a flawless gem for every ${C.gemPer} gold. ${need}`;
+    }
     if (!takeGold(a, price)) return `It costs ${price} gold, and you do not have it.`;
     const err = housing().grant(h.door, a);
     if (err) { giveGold(a, price); return err; }
+    // Checked above in the same tick, so the gems are there; a failure is audited for staff and the sale stands
+    if (gems && !globalThis.__dboGemFee.take(a, gems, L.zone, `buying ${h.key} from ${L.zone}`)) audit(`PROPERTY ${who(a)} bought ${h.key} but the ${gems} flawless gem(s) owed could not be taken`);
     const paidIn = depositToTreasury(L.zone, price, { income: 'house sales' });
     if (paidIn !== price) { log(`tenancy: the treasury of ${L.zone} took ${paidIn} of a ${price} gold sale (${h.key})`); audit(`PROPERTY the treasury of ${L.zone} took ${paidIn} of the ${price} gold paid for ${h.key}`); }
     const p = me(a);
@@ -315,7 +326,7 @@ module.exports = (api) => {
     tell(L.listedBy, `${p.name} has bought the property you put up for sale in ${zoneName(L.zone)}, for ${price} gold.`);
     for (const m of managersOnline(h.door)) if (tagOf(m) !== L.listedBy.tag) personal(m, `${p.name} has bought property ${h.key} in ${zoneName(L.zone)} for ${price} gold.`);
     audit(`PROPERTY ${who(a)} bought ${h.key} for ${price} gold, paid to ${L.zone}`);
-    return `It is yours: bought for ${price} gold, paid to ${zoneName(L.zone)}. It pays the hold's property tax each week on that value. Cut keys from the door's property menu.`;
+    return `It is yours: bought for ${price} gold${gems ? ` and ${gems} flawless gem${gems === 1 ? '' : 's'}` : ''}, paid to ${zoneName(L.zone)}. It pays the hold's property tax each week on that value. Cut keys from the door's property menu.`;
   };
 
   // ---- resale: an owner sells their own house to another player (Nate, 14 Oct) ----------------------------------------------

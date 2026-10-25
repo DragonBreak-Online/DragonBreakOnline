@@ -17,8 +17,8 @@ Date.now = () => now;
 globalThis.setTimeout = () => 0;
 
 const DOOR = 0x5000, OTHER_DOOR = 0x5001;
-fs.writeFileSync('doors.json', JSON.stringify({ doors: { '5000:Skyrim.esm': 'A house', '5001:Skyrim.esm': 'Another' } }));
-fs.writeFileSync('doors-pos.json', JSON.stringify({ doors: { '5000:Skyrim.esm': [0, 0, 0, 'bruma'], '5001:Skyrim.esm': [3000, 0, 0, 'bruma'] } }));
+fs.writeFileSync('doors.json', JSON.stringify({ doors: { '5000:Skyrim.esm': 'A house', '5001:Skyrim.esm': 'Another' } }));   // verify-formids: ignore - made-up test doors
+fs.writeFileSync('doors-pos.json', JSON.stringify({ doors: { '5000:Skyrim.esm': [0, 0, 0, 'bruma'], '5001:Skyrim.esm': [3000, 0, 0, 'bruma'] } }));   // verify-formids: ignore - made-up test doors
 const STEWARD = 1, BUYER = 2, LATE = 3, POOR = 4;
 const chars = {
   [STEWARD]: { profile: 10, tag: 'STEW', name: 'Steward', gold: 0, pos: [0, 0, 0] },
@@ -90,8 +90,19 @@ grantErr = 'You already own a place.';
 act(BUYER, 'buy');
 ok(panelOf(BUYER).result === 'You already own a place.' && chars[BUYER].gold === 6000 && !treasury.bruma, 'a refused grant gives the gold back', [panelOf(BUYER).result, chars[BUYER].gold]);
 grantErr = '';
+// bank.js's gem fee (Nat, 25 Oct): a flawless gem per 5,000 of the hold's price, into the hold's counter
+let gemsCarried = 0; const gemTaken = [];
+globalThis.__dboGemFee = {
+  need: (a, n) => (gemsCarried >= n ? '' : `It also costs ${n} flawless gem of any kind, carried (you carry ${gemsCarried}).`),
+  take: (a, n, zoneId) => { if (gemsCarried < n) return false; gemsCarried -= n; gemTaken.push({ n, zoneId }); return true; },
+};
+act(BUYER, 'buy');
+ok(/costs a flawless gem for every 5000 gold\. It also costs 1 flawless gem/.test(panelOf(BUYER).result) && chars[BUYER].gold === 6000 && houses[DOOR].owner === 0, 'without a flawless gem nothing changes', panelOf(BUYER).result);
+gemsCarried = 1;
 act(BUYER, 'buy');
 ok(houses[DOOR].owner === 20 && chars[BUYER].gold === 1000 && treasury.bruma === 5000, 'the buyer pays 5,000 to Bruma and owns it', [houses[DOOR], chars[BUYER].gold, treasury]);
+ok(gemsCarried === 0 && gemTaken.length === 1 && gemTaken[0].zoneId === 'bruma' && /and 1 flawless gem/.test(panelOf(BUYER).result), '...and one flawless gem, into the Bruma counter', [gemTaken, panelOf(BUYER).result]);
+delete globalThis.__dboGemFee;
 ok(values[DOOR] && values[DOOR].gold === 5000 && values[DOOR].by === 'Buyer', 'the price becomes its tax value', values);
 ok(panelOf(BUYER).state === 'none' && panelOf(BUYER).yours === true && /bought for 5000 gold/.test(panelOf(BUYER).result), 'the panel shows it is the buyer\'s', panelOf(BUYER));
 ok(said.some(([a, t]) => a === STEWARD && /Buyer has bought the property/.test(t)), 'the steward who listed it is told');

@@ -34,6 +34,8 @@
 // Vaults are used only in the bank panel (Nate, 16 Oct); a client without it is told it needs the update. storage.enabled
 // false closes them: no fee, no arrears, no seizure, no letter, and on reopening every vault's paid week and seizure date
 // move on by the time they were closed (bank.json vaultClock); holders with the panel can still pay and take out.
+// The gem counter (Nat, 25 Oct; config bank.gemCounter): a hold's banks buy gemstones at half their value from the hold's
+// treasury and sell them at three times it into the treasury, from a stock only players' sales fill. /bank gems.
 // Staff: globalThis.__dboVaultHas / __dboVaultTake (restitution.js, gearstrip.js, sprstrip.js), /vaults <name|#TAG> (Lead GM+).
 
 const fs = require('fs');
@@ -373,6 +375,122 @@ module.exports = (api) => {
     return { ok: true, text: `Paid ${n} gold into the ${t.name}. No one can take it out; the realm spends it.` };
   };
 
+  // ---- the gem counter (Nat, 25 Oct: "gems are a grind to get and cost a lot to buy from the bank") --------------------
+  // Each hold's banks buy gemstones at buyShare of their value, paid by the hold's treasury into the seller's account, and
+  // sell them at sellShare, the price going to the treasury as income. A hold sells only what players sold it (bank.json
+  // gemStock), so the counter never creates a gem, and a treasury that cannot pay buys none
+  const G = Object.assign({
+    enabled: true, buyShare: 0.5, sellShare: 3,
+    gems: ['63b45:Skyrim.esm', '68521:Skyrim.esm', '63b46:Skyrim.esm', '6851e:Skyrim.esm', '602427:BSAssets.esm', '602428:BSAssets.esm',
+      '63b42:Skyrim.esm', '68522:Skyrim.esm', '63b44:Skyrim.esm', '68523:Skyrim.esm', '63b43:Skyrim.esm', '68520:Skyrim.esm',
+      '63b47:Skyrim.esm', '6851f:Skyrim.esm'],
+  }, (cfg.bank || {}).gemCounter || {});
+  const gemStock = () => { const d = data(); if (!d.gemStock || typeof d.gemStock !== 'object') d.gemStock = {}; return d.gemStock; };
+  const gemList = () => {
+    const out = [];
+    for (const desc of Array.isArray(G.gems) ? G.gems : []) {
+      let id = 0; try { id = mp.getIdFromDesc(desc) >>> 0; } catch (e) { id = 0; }
+      if (!id) continue;
+      const each = valueOf(id); if (!(each > 0)) continue;
+      const p = P(); const name = p ? p.nameOfItem(id) : desc;
+      out.push({ id, key: id.toString(16), name, buy: Math.max(1, Math.floor(each * Number(G.buyShare))), sell: Math.ceil(each * Number(G.sellShare)) });
+    }
+    return out;
+  };
+  // By name, longest first, so "flawless ruby" is never read as "ruby"
+  const gemNamed = (raw) => {
+    const s = String(raw || '').trim().toLowerCase(); if (!s) return null;
+    const list = gemList().sort((x, y) => y.name.length - x.name.length);
+    return list.find((g) => g.name.toLowerCase() === s) || list.find((g) => g.name.toLowerCase().startsWith(s)) || null;
+  };
+  const stockOf = (zone, g) => Math.max(0, Math.floor(Number((gemStock()[zone.id] || {})[g.key]) || 0));
+  const setStock = (zone, g, n) => { const z = gemStock()[zone.id] = gemStock()[zone.id] || {}; if (n > 0) z[g.key] = n; else delete z[g.key]; };
+  const gemOff = 'The gem counter is closed for now.';
+  const gemPrices = (a) => {
+    if (!G.enabled) return { ok: false, text: gemOff };
+    if (!atBank(a)) return { ok: false, text: notAtBank };
+    const zone = zoneOfBank(a); if (!zone) return { ok: false, text: 'This bank keeps no gem counter: it answers to no hold.' };
+    const rows = gemList().map((g) => `${g.name}: buys at ${g.buy}, sells at ${g.sell} (${stockOf(zone, g)} in stock)`);
+    return { ok: true, text: `The Bank of ${zone.name} gem counter. ${rows.join('; ')}. /bank gems sell <gem> [count|all], /bank gems buy <gem> [count].` };
+  };
+  const gemSell = (a, nameRaw, countRaw) => {
+    if (!G.enabled) return { ok: false, text: gemOff };
+    if (!atBank(a)) return { ok: false, text: notAtBank };
+    const zone = zoneOfBank(a); if (!zone) return { ok: false, text: 'This bank keeps no gem counter: it answers to no hold.' };
+    const p = P(); if (!p || typeof p.takeItems !== 'function') return { ok: false, text: 'The gem clerk is away. Try again later.' };
+    const g = gemNamed(nameRaw); if (!g) return { ok: false, text: 'The counter buys only gemstones. /bank gems lists them.' };
+    const have = p.looseCount(a, g.id); const n = countOf(countRaw, have);
+    if (!(n >= 1) || n > have) return { ok: false, text: have ? `Sell between 1 and the ${have} ${g.name} you carry.` : `You carry no ${g.name}.` };
+    const why = STORE_VETO(a, g.id, n); if (why) return { ok: false, text: why };
+    const price = g.buy * n;
+    if (zoneGold(zone) < price) return { ok: false, text: `The ${zone.name} treasury cannot pay ${price} gold for that today.` };
+    const taken = p.takeItems(a, g.id, n); if (!taken) return { ok: false, text: 'The clerk could not take that. Nothing was changed.' };
+    if (!zoneTake(zone, price)) { p.giveEntries(a, taken); return { ok: false, text: `The ${zone.name} treasury cannot pay for that. Your gems are returned.` }; }
+    const had = stockOf(zone, g); setStock(zone, g, had + n);
+    try { save(); } catch (e) {
+      setStock(zone, g, had); zoneAdd(zone, price); p.giveEntries(a, taken);
+      log('bank: bank.json write failed', e.message);
+      return { ok: false, text: 'The counter ledger could not be written. Your gems are returned.' };
+    }
+    setBalance(a, balanceOf(a) + price);
+    note(a, 'gems sold', price, zone.name);
+    audit(`BANK GEMS ${who(a)} sold ${n}x ${g.name} (${g.key}) to ${zone.id} for ${price} gold from its treasury (stock ${had + n}, balance ${balanceOf(a)})`);
+    return { ok: true, text: `Sold ${n} ${g.name} for ${price} gold, paid into your account. Your balance is ${balanceOf(a)} gold.` };
+  };
+  const gemBuy = (a, nameRaw, countRaw) => {
+    if (!G.enabled) return { ok: false, text: gemOff };
+    if (!atBank(a)) return { ok: false, text: notAtBank };
+    const zone = zoneOfBank(a); if (!zone) return { ok: false, text: 'This bank keeps no gem counter: it answers to no hold.' };
+    const g = gemNamed(nameRaw); if (!g) return { ok: false, text: 'No such gemstone. /bank gems lists them.' };
+    const stock = stockOf(zone, g); const n = countRaw === undefined || countRaw === '' ? 1 : countOf(countRaw, stock);
+    if (!stock) return { ok: false, text: `The Bank of ${zone.name} has no ${g.name} to sell. Its stock is only what others sold it.` };
+    if (!(n >= 1) || n > stock) return { ok: false, text: `Buy between 1 and the ${stock} ${g.name} in stock.` };
+    const price = g.sell * n;
+    const paid = charge(a, price); if (!paid) return { ok: false, text: `${n} ${g.name} cost ${price} gold, and you have ${balanceOf(a)} banked and ${goldOf(a)} carried.` };
+    setStock(zone, g, stock - n);
+    try { save(); } catch (e) { setStock(zone, g, stock); refund(a, paid); log('bank: bank.json write failed', e.message); return { ok: false, text: 'The counter ledger could not be written. Nothing was changed.' }; }
+    if (!giveItem(a, g.id, n)) {
+      setStock(zone, g, stock); try { save(); } catch (e) { log('bank: bank.json write failed', e.message); }
+      refund(a, paid); return { ok: false, text: 'The clerk could not hand that over. Your gold is returned.' };
+    }
+    if (!payHold(zone, price, 'gem sales')) audit(`BANK GEMS ${price} gold for ${zone.id} could not be credited`);
+    note(a, 'gems bought', price, zone.name);
+    audit(`BANK GEMS ${who(a)} bought ${n}x ${g.name} (${g.key}) from ${zone.id} for ${price} gold (${paid.bank} banked, ${paid.carried} carried; stock ${stock - n})`);
+    return { ok: true, text: `Bought ${n} ${g.name} for ${price} gold.` };
+  };
+
+  // Gems in the price of big deeds (Nat, 25 Oct: declaring war, a noble title, a building from the hold): n flawless gems
+  // of any kind from the pack of the character doing it, the cheapest first. Given a hold, they go into its counter's stock
+  // (sold on at three times their value); without one they are spent. need(a, n) is '' or the refusal; take(a, n, zoneId,
+  // why) is true once all n are taken, and nothing is taken otherwise
+  const flawlessIds = () => gemList().filter((g) => /^flawless /i.test(g.name)).sort((x, y) => x.buy - y.buy);
+  const carriedFlawless = (a) => { const p = P(); return p ? flawlessIds().map((g) => ({ g, n: p.looseCount(a, g.id) })).filter((x) => x.n > 0) : []; };
+  const gemNeed = (a, n) => {
+    n = Math.max(0, Math.floor(Number(n) || 0)); if (!n) return '';
+    const have = carriedFlawless(a).reduce((s, x) => s + x.n, 0);
+    return have >= n ? '' : `It also costs ${n} flawless gem${n === 1 ? '' : 's'} of any kind, carried (you carry ${have}).`;
+  };
+  const gemTake = (a, n, zoneId, why) => {
+    n = Math.max(0, Math.floor(Number(n) || 0)); if (!n) return true;
+    const p = P(); if (!p || gemNeed(a, n)) return false;
+    const taken = []; let left = n;
+    for (const { g, n: has } of carriedFlawless(a)) {
+      if (!left) break;
+      const k = Math.min(has, left); const t = p.takeItems(a, g.id, k);
+      if (!t) { for (const x of taken) p.giveEntries(a, x.t); return false; }
+      taken.push({ g, k, t }); left -= k;
+    }
+    const zone = zoneId ? zoneById(zoneId) : null;
+    if (zone) {
+      const before = JSON.parse(JSON.stringify(gemStock()[zone.id] || {}));
+      for (const x of taken) setStock(zone, x.g, stockOf(zone, x.g) + x.k);
+      try { save(); } catch (e) { gemStock()[zone.id] = before; log('bank: bank.json write failed; the gems stay spent', e.message); }
+    }
+    audit(`BANK GEMS ${who(a)} paid ${taken.map((x) => `${x.k}x ${x.g.name}`).join(', ')} for ${why || 'a deed'}${zone ? `, into the ${zone.id} counter's stock` : ''}`);
+    return true;
+  };
+  globalThis.__dboGemFee = { need: (a, n) => { try { return gemNeed(a >>> 0, n); } catch (e) { return 'The gem clerk is away.'; } }, take: (a, n, zoneId, why) => { try { return gemTake(a >>> 0, n, zoneId, why); } catch (e) { log('bank: a gem fee failed', e.message); return false; } } };
+
   // ---- vaults: goods stored by weight, one per hold ------------------------------------------------------------------
   const P = () => globalThis.__dboPostApi || null;
   const tierById = (id) => (Array.isArray(V.tiers) ? V.tiers : []).find((t) => t && t.id === String(id || '').toLowerCase()) || null;
@@ -432,10 +550,15 @@ module.exports = (api) => {
   };
   const refund = (a, paid) => { if (paid.bank) setBalance(a, balanceOf(a) + paid.bank); if (paid.carried) giveItem(a, GOLD, paid.carried); };
   // The fee goes to the hold's treasury; a hold without one keeps it in its bank.json balance
-  const payHold = (zone, n) => {
+  const payHold = (zone, n, kind) => {
     if (n <= 0) return true;
-    if (depositToTreasury(zone.id, n, { income: 'vault fees' }) === n) return true;
-    if (zoneAdd(zone, n, { income: 'vault fees' })) { audit(`BANK VAULT ${n} gold kept for ${zone.id} in bank.json (the hold has no treasury yet)`); return true; }
+    const income = kind || 'vault fees';
+    if (depositToTreasury(zone.id, n, { income }) === n) return true;
+    if (zoneAdd(zone, n, { income })) {
+      if (kind) audit(`BANK ${n} gold of ${income} kept for ${zone.id} in bank.json (the hold has no treasury yet)`);
+      else audit(`BANK VAULT ${n} gold kept for ${zone.id} in bank.json (the hold has no treasury yet)`);
+      return true;
+    }
     return false;
   };
   const feeFor = (a, zone, n, why) => {
@@ -993,10 +1116,15 @@ module.exports = (api) => {
     if (s === 'deposit') return personal(a, deposit(a, x).text);
     if (s === 'withdraw') return personal(a, withdraw(a, x).text);
     if (s === 'treasury') return personal(a, payIn(a, x, y).text);
+    if (s === 'gems' || s === 'gem') {
+      const m = String(args || '').trim().match(/^\S+\s+(sell|buy)\s+(.+?)(?:\s+(\d+|all))?$/i);
+      if (!m) return personal(a, gemPrices(a).text);
+      return personal(a, (m[1].toLowerCase() === 'sell' ? gemSell : gemBuy)(a, m[2], m[3]).text);
+    }
     if (['vault', 'rent', 'pay', 'store', 'take'].includes(s)) return personal(a, V.enabled ? vaultPanelOnly : closedText);
-    personal(a, 'Usage at a bank: /bank, /bank deposit <gold|all>, /bank withdraw <gold|all>, /bank treasury <name> <gold|all>');
-  }, { help: 'at a bank: your account (the same in every town); deposit, withdraw, or pay into a treasury you answer for' });
+    personal(a, 'Usage at a bank: /bank, /bank deposit <gold|all>, /bank withdraw <gold|all>, /bank treasury <name> <gold|all>, /bank gems');
+  }, { help: 'at a bank: your account (the same in every town); deposit, withdraw, pay into a treasury you answer for, or buy and sell gems (/bank gems)' });
 
   log(`bank loaded: ${bankBases().size} bank activator base(s), ${Object.keys(data().factions).length} faction treasury balance(s), vaults ${V.enabled ? tierList().map((t) => `${t.weight}/${t.weekly}g`).join(' ') : 'closed'}${zoneOfCell ? '' : ' (no zoneOfCell: no bank keeps vaults)'}`);
-  return { balanceOf, treasuriesOf, deposit, withdraw, payIn, vaultRent, vaultPay, vaultEnd, vaultStore, vaultTake, vaultView, settle, weightOf, vaultHas, vaultTakeStaff, vaultLines, restoreSeizure, saleOf };
+  return { balanceOf, treasuriesOf, deposit, withdraw, payIn, gemPrices, gemSell, gemBuy, gemList, vaultRent, vaultPay, vaultEnd, vaultStore, vaultTake, vaultView, settle, weightOf, vaultHas, vaultTakeStaff, vaultLines, restoreSeizure, saleOf };
 };

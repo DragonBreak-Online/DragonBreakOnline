@@ -34,7 +34,8 @@ const rareS = ['1c1fe:skyrim.esm', '7e5bb:skyrim.esm', '4de5b:skyrim.esm'].reduc
 ok(rareS < 4000 * 0.04, '...and a dragon priest item about 2% of the time', rareS);
 const boss = run('dunBossDraugrDeathlord', 'hard', 4000);
 const gems = [...boss.values()].reduce((a, b) => a + b, 0);
-ok(gems > 4000 * 0.25 && gems < 4000 * 0.35 && !boss.has('1c1fe:skyrim.esm'), 'any other boss: a flawless gem about 30% at Expert, no dragon priest items', gems);
+// Halved on 25 Oct (Nat: gems are a grind to get): 30% at Expert before
+ok(gems > 4000 * 0.11 && gems < 4000 * 0.19 && !boss.has('1c1fe:skyrim.esm'), 'any other boss: a flawless gem about 15% at Expert, no dragon priest items', gems);
 const masked = make({ bossTrophies: { tables: [{ id: 't', match: '.', always: { normal: [['61cd6:Skyrim.esm', 1]] } }] } });
 names['61cd6:skyrim.esm'] = 'ArmorDragonPriestMaskUltraHelmet';
 ok(masked.bossTrophies('x', 'normal').length === 0, 'an artifact (a dragon priest mask) is never handed out, whatever the config says');

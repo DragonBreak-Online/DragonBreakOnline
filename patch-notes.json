@@ -1,5 +1,44 @@
 [
   {
+    "title": "Gemstones are rarer, and worth more",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Finding gems",
+        "items": [
+          "Gemstones are now much harder to find. Dungeon chests and boss chests hold them less often, bosses drop flawless gems about half as often, and champions carry them less often.",
+          "A gem geode now gives one gem each time you work it, at every Miner tier, and takes twice as long to come back."
+        ]
+      },
+      {
+        "heading": "Enchanting",
+        "items": [
+          "Gems now matter when you enchant. An effect tied to a gem is at full strength if you carry a flawless one of that gem, at 80% with a regular one, and at 60% with none. The gem is used up.",
+          "Rubies go with fire and Destruction; sapphires with frost and magicka; garnets with shock and magicka damage; emeralds with health, healing, Restoration and resisting poison and disease; amethysts with Conjuration, Illusion, paralysis, soul trap, banish and turn undead; diamonds with Alteration, stamina and resist magic. Effects tied to no gem, such as Fortify Archery or Carry Weight, are unchanged.",
+          "Nothing else about enchanting changes: armour type and soul size work as before."
+        ]
+      },
+      {
+        "heading": "The bank gem counter",
+        "items": [
+          "Every hold's bank now buys and sells gemstones. Say /bank gems at a bank to see the prices and what that hold has in stock.",
+          "The bank buys a gem for half its value, paid by the hold's treasury into your account. It sells gems for three times their value, and that gold goes to the hold.",
+          "A bank only sells gems that players have sold to it, so stock is limited. A hold whose treasury is short cannot buy."
+        ]
+      },
+      {
+        "heading": "Gems for great deeds",
+        "items": [
+          "Declaring war now also costs the declarer two flawless gems of any kind, as well as the 10,000 gold from the treasury.",
+          "A ruler granting or changing a noble title pays one flawless gem, which goes to the hold's gem counter.",
+          "Buying a building from a hold costs one flawless gem for every 5,000 gold of its price, which also goes to the hold's gem counter. Houses under 5,000 gold, and houses bought from another player, need none."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Giants shrug off magic",
     "date": "2026-10-25",
     "version": "Server update",

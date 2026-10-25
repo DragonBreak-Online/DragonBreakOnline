@@ -17,7 +17,8 @@
 //   treaty    two leaders not at war may swear peace for 1 to 8 weeks; while it holds neither may declare on the other.
 //   declare   a faction's leader, or a hold's ruler for the hold's faction, names a defending faction and the territories
 //             it wants (the defender must own them). Both sides need minOnline (10) members online, the declarer pays
-//             declareFee (10,000 gold) from its treasury, a faction younger than protectDays (7) cannot be declared on,
+//             declareFee (10,000 gold) from its treasury and declareGems (2) flawless gems of any kind from the declarer's
+//             own pack, spent (Nat, 25 Oct), a faction younger than protectDays (7) cannot be declared on,
 //             the same declarer waits redeclareDays (14) after its last war with that target, and a faction fights one
 //             offensive war at a time. The declarer picks three battle windows from the staff's evening slots.
 //   notice    noticeDays (7) before the first battle window. Announced to everyone online and in the audit log.
@@ -48,7 +49,7 @@ module.exports = (api) => {
   const { mp, log, personal, system, audit, who, display, cfg, onUi, registerChatCommand, isAdmin, onlineActors, every,
     sendPacket, ranksOf, profileOf, zoneById, readOfficials, writeOfficials } = api;
   const C = Object.assign({
-    minOnline: 10, declareFee: 10000, protectDays: 7, redeclareDays: 14, noticeDays: 7,
+    minOnline: 10, declareFee: 10000, declareGems: 2, protectDays: 7, redeclareDays: 14, noticeDays: 7,
     windowsPerWar: 3, windowHours: 2,
     // Staff-set evening slots, UTC: { day: 0-6 (Sunday 0), hour, minute }. The defaults are 19:00 US Central (00:00 UTC).
     windowSlots: [0, 1, 2, 3, 4, 5, 6].map((day) => ({ day, hour: 0, minute: 0 })),
@@ -371,6 +372,11 @@ module.exports = (api) => {
     const treasury = globalThis.__dboTreasury;
     if (!treasury) return 'The treasuries are closed.';
     if (treasury.balance(attacker) < C.declareFee) return `Declaring war costs ${C.declareFee} gold from ${nameOfFaction(attacker)}'s treasury.`;
+    // Without bank.js's gem fee (a load that failed) the declaration costs no gems rather than being refused
+    const gems = globalThis.__dboGemFee ? Math.max(0, Math.floor(Number(C.declareGems) || 0)) : 0;
+    if (gems) {
+      const need = globalThis.__dboGemFee.need(a, gems); if (need) return `Declaring war: ${need}`;
+    }
     return '';
   };
 
@@ -420,6 +426,11 @@ module.exports = (api) => {
     chosen.sort((x, y) => x - y);
     if (chosen.length < C.windowsPerWar) return { ok: false, text: 'There are not enough battle windows after the notice; staff must set more evening slots.' };
     if (!globalThis.__dboTreasury.spend(attacker, C.declareFee, `war declared on ${defender}`)) return { ok: false, text: 'The treasury could not pay the declaration.' };
+    const gems = globalThis.__dboGemFee ? Math.max(0, Math.floor(Number(C.declareGems) || 0)) : 0;
+    if (gems && !globalThis.__dboGemFee.take(a, gems, '', `war declared on ${defender}`)) {
+      globalThis.__dboTreasury.deposit(attacker, C.declareFee, 'the war fee returned: the gems could not be taken');
+      return { ok: false, text: 'Your flawless gems could not be taken. Nothing was paid.' };
+    }
     const w = makeWar({ attacker, defender, goal, by: profileOf(a), now, starts: chosen, windowHours: C.windowHours, death: toDeath && C.deathWar });
     const land = goal.map((g) => territory(g).name).join(', ');
     audit(`WAR ${w.id} declared by ${who(a)}: ${nameOfFaction(attacker)} on ${nameOfFaction(defender)} for ${land}; windows ${w.windows.map((x) => whenText(x.start)).join(', ')}${w.death ? '; proposed to the death' : ''}`);
@@ -623,7 +634,7 @@ module.exports = (api) => {
       wars: live().filter((w) => memberOf(a, w.attacker) || memberOf(a, w.defender) || isAdmin(a)).map(warView),
       leads: led.map((fid) => { const seat = seatOf(fid); const on = onlineOf(fid); return { id: fid, name: nameOfFaction(fid), treasury: globalThis.__dboTreasury ? globalThis.__dboTreasury.balance(fid) : 0, online: on.length, seat: seat ? seat.name : '', atSeat: seat ? on.filter((x) => atSeat(x, seat)).length : 0,
         capital: seat ? seat.territory || '' : '', capitalChoices: capitalChoices(fid).map((t) => ({ id: t.id, name: t.name })), canSetHere: !isHold(fid), capitalChangeAt: nextCapitalChange(fid), atWar: warOf(fid).length > 0 }; }),
-      rules: { capitalChangeDays: C.capitalChangeDays, enabled: !!C.enabled, minOnline: C.minOnline, declareFee: C.declareFee, noticeDays: C.noticeDays, windowsPerWar: C.windowsPerWar, windowHours: C.windowHours, deathWar: C.deathWar, treatyMinWeeks: C.treatyMinWeeks, treatyMaxWeeks: C.treatyMaxWeeks },
+      rules: { capitalChangeDays: C.capitalChangeDays, enabled: !!C.enabled, minOnline: C.minOnline, declareFee: C.declareFee, declareGems: C.declareGems, noticeDays: C.noticeDays, windowsPerWar: C.windowsPerWar, windowHours: C.windowHours, deathWar: C.deathWar, treatyMinWeeks: C.treatyMinWeeks, treatyMaxWeeks: C.treatyMaxWeeks },
       treaties: treaties().filter((t) => isAdmin(a) || memberOf(a, t.a) || memberOf(a, t.b)).map((t) => ({ a: t.a, aName: nameOfFaction(t.a), b: t.b, bName: nameOfFaction(t.b), until: t.until })),
       offers: (wars().offers || []).filter((o) => led.includes(o.to) || led.includes(o.from)).map((o) => ({ id: o.id, from: o.from, fromName: nameOfFaction(o.from), to: o.to, toName: nameOfFaction(o.to), weeks: o.weeks, mine: led.includes(o.to) })),
       // The factions a leader may offer a treaty to: every one that is not secret, and the land's owners

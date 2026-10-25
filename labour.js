@@ -121,7 +121,8 @@ module.exports = (api) => {
     },
     // How long a won seam rests for everyone, by ore, where it differs from veinRestMinutes: meteoric iron is the rarest
     // seam in Bruma, three veins in the province
-    veinRestByOre: { meteoriciron: 60, adamantium: 60 },
+    // Gem geodes rest twice the ordinary seam's time (Nat, 25 Oct: gems are a grind to get)
+    veinRestByOre: { meteoriciron: 60, adamantium: 60, amethyst: 60, topaz: 60, ruby: 60, sapphire: 60, emerald: 60, diamond: 60 },
     // Sea Salt Deposits (Saltdeposits.esp, copied into DragonBreak.esp) and the geodes of Whistling Mine: the Miner tier (0 based)
     // that opens them, the chance of a rarer salt with the salt, and the cells whose geodes give soul gems. Tin at 0 with copper,
     // for Bronze (no tin vein stands in the world yet: BSAssets' BSKMineOreTin veins are only in its test cell)
@@ -728,7 +729,8 @@ module.exports = (api) => {
     if (round.kind === 'mining') {
       const base = Number((CFG.oreYieldByOre || {})[round.ore]) || 1;
       const mult = tierValue(MINER.yieldMultiplierByTier, round.tier, 1);
-      const count = round.ore === 'geode' ? 1 : Math.max(1, Math.round(base * mult));
+      // A geode, soul gem or gemstone, gives one a round at every tier (Nat, 25 Oct: gems are a grind to get)
+      const count = round.ore === 'geode' || (CFG.gemOre || {})[round.ore] ? 1 : Math.max(1, Math.round(base * mult));
       // A geode holds one soul gem; salt sometimes comes with a rarer salt
       const gem = round.ore === 'geode' ? weighted(CFG.geodeGems) : '';
       const bonus = round.ore === 'salt' && Math.random() < (Number(CFG.saltBonusChance) || 0) ? weighted(CFG.saltBonus) : '';
