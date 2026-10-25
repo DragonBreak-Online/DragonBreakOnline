@@ -39,9 +39,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "ck-mcp"))
 import core, esplib
 
-DATA = os.path.join(ROOT, "Skyrim Special Edition - dev", "Data")
+# DBO_VERIFY_DATA / DBO_VERIFY_PLUGINS check against a planned order instead (a staging Data folder and its plugin list),
+# for data that names plugins the dev order does not have yet (Knights of the Nine SE, 25 Oct)
+DATA = os.environ.get("DBO_VERIFY_DATA") or os.path.join(ROOT, "Skyrim Special Edition - dev", "Data")
 SERVER = os.path.join(ROOT, "server")
-PLUGINS_TXT = os.path.join(SERVER, "plugins.server.txt")
+PLUGINS_TXT = os.environ.get("DBO_VERIFY_PLUGINS") or os.path.join(SERVER, "plugins.server.txt")
 LARGE_JSON = 400 * 1024
 IGNORE_MARK = "verify-formids: ignore"
 
