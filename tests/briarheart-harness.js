@@ -28,7 +28,7 @@ const mp = {
   getIdFromDesc: (d) => ID[d] || 0,
   getDescFromId: (id) => `${(id >>> 0).toString(16)}:Skyrim.esm`,
   lookupEspmRecordById: (id) => (RACES[id] ? { record: { editorId: RACES[id] } } : { record: null }),
-  callPapyrusFunction: (kind, cls, method, self, args) => { papyrusCalls.push({ method, self: self.desc, args: args.map((x) => x.desc !== undefined ? x.desc : x) }); },
+  callPapyrusFunction: (kind, cls, method, self, args) => { papyrusCalls.push({ method, self: self.desc, args: args.map((x) => x.desc !== undefined ? x.desc : x) }); return method === 'IsInFaction' ? true : undefined; },
 };
 const actor = (id, race, faith, pos, inv) => {
   setP(id, 'appearance', { raceId: race });
@@ -143,7 +143,7 @@ ok(/altar is cold to you/.test(run(ROLLED, 'rite')), 'the altar is cold for fail
 M = load({ briarheart: { enabled: true, failPermadeath: true } }); M.data();
 const DOOMED = actor(0x30, 1, 'reach', [0, 0, 0], [{ baseId: HEART, count: 1 }]); online.push(DOOMED);
 run(DOOMED, 'rite');
-ok(/This life is over/.test(run(DOOMED, 'confirm')) && permas.some((p) => p.a === DOOMED), 'failPermadeath: the death is for good');
+ok(/This life is over/.test(run(DOOMED, 'confirm forever')) && permas.some((p) => p.a === DOOMED), 'failPermadeath: the death is for good');
 setRandom(0.99);
 M = load(CFG);
 
@@ -207,6 +207,51 @@ ok(given.some(([a, id]) => a === NORD && id === 0x5d008) && papyrusCalls.some((c
 M.end(NORD, 'test');
 ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction goes at the end');
 
+
+// ---- Nat's settings (25 Oct): both deaths for good, the Forsworn friendly, the visual empty -------------------------------
+{
+  const shipped = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'gamemode-config.json'), 'utf8')).briarheart;
+  ok(shipped.failPermadeath === true && shipped.tearPermadeath === true && shipped.forswornFriendly === true, 'the shipped config: failPermadeath, tearPermadeath and forswornFriendly on');
+  ok(shipped.visual && shipped.visual.enabled === false && shipped.visual.armor === '', 'the shipped config: the visual off and its armour empty (Worker 1 fills it)');
+  const logLines = [];
+  delete require.cache[MODULE]; delete globalThis.__dboBriarheart;
+  const M2 = require(MODULE)({
+    mp, log: (...x) => logLines.push(x.join(' ')), personal: (a, t) => said.push([a >>> 0, t]), audit: (t) => audits.push(t), who: (a) => `who${(a >>> 0).toString(16)}`,
+    display: (a) => `char${(a >>> 0).toString(16)}`, cfg: { briarheart: Object.assign({}, shipped, { enabled: true }) }, registerChatCommand: (n, f) => commands.set(n, f), onlineActors: () => online.slice(),
+    isLeadStaff: (a) => (a >>> 0) === LEAD, findByName: () => 0, every: (n, ms, f) => { ticker = f; }, giveItem: (a, id, n) => given.push([a >>> 0, id, n]), sourceResistsOf: (id) => RESIST[id] || new Set(),
+  });
+  M2.data().altars.push({ world: WORLD, pos: [0, 0, 0], radius: 400 });
+  const NEWB = actor(0x40, 1, 'reach', [0, 0, 0], [{ baseId: HEART, count: 1 }]); online.push(NEWB);
+  audits.length = 0;
+  const offer = run(NEWB, 'rite');
+  ok((offer.match(/PERMANENT DEATH/g) || []).length === 2, 'the rite names both permanent deaths in capitals', offer);
+  ok(/die under the knife, and this character is gone for good/.test(offer) && /tears the briar out of you while you are down, this character is gone for good/.test(offer), '...the knife and the torn heart, each in plain words', offer);
+  ok(/Say \/briarheart confirm forever within 5 minutes/.test(offer), '...and asks for /briarheart confirm forever', offer);
+  ok(audits.some((t) => /asked for the rite and was warned \(rite death for good, heart torn out for good\)/.test(t)), 'staff see the warning in the audit', audits);
+  const plain = run(NEWB, 'confirm');
+  ok(/can end this character for good/.test(plain) && /PERMANENT DEATH/.test(plain) && /confirm forever/.test(plain), 'a plain confirm repeats the warning', plain);
+  ok(globalThis.__dboBriarheart.pending.has(NEWB) && !M2.isBriar(NEWB) && inv(NEWB, HEART) === 1, '...and changes nothing: the rite still pending, the heart kept');
+  setRandom(0.99); logLines.length = 0; papyrusCalls.length = 0;
+  ok(/takes root/.test(run(NEWB, 'confirm forever')) && M2.isBriar(NEWB), '/briarheart confirm forever takes the rite');
+  ok(audits.some((t) => /accepted the rite's risks \(rite death for good, heart torn out for good\)/.test(t)), 'staff see the acceptance in the audit');
+  ok(papyrusCalls.some((c) => c.method === 'AddToFaction' && c.args[0] === '43599:Skyrim.esm') && papyrusCalls.some((c) => c.method === 'IsInFaction'), 'forswornFriendly: AddToFaction, then IsInFaction read back');
+  ok(logLines.some((l) => /briarheart: faction AddToFaction 43599:Skyrim\.esm on char40 \(rite\); IsInFaction now true/.test(l)), 'the faction call is logged with the read-back, for the in-game check', logLines);
+  ok(!papyrusCalls.some((c) => c.method === 'EquipItem') && !given.some(([a]) => a === NEWB), 'the empty visual equips nothing');
+  ok(/dies for good/.test(run(NEWB, 'status')), '/briarheart reminds a Briarheart what tearing means');
+  logLines.length = 0;
+  globalThis.__dboBriarheartLogin(NEWB);
+  ok(logLines.some((l) => /faction AddToFaction .*\(login\)/.test(l)), 'at login the faction is applied again, and logged');
+  downed.add(NEWB); said.length = 0; audits.length = 0; permas.length = 0; kills.length = 0;
+  globalThis.__dboBriarheartMenuAction(HUNTER, 'briartear', NEWB);
+  ok(said.some(([a, t]) => a === NEWB && /dies for good/.test(t)) && said.some(([a, t]) => a === HUNTER && /ends them for good/.test(t)), 'the tear warns both sides that it is for good', said);
+  ok(audits.some((t) => /began to tear the briar heart out of who40 \(permadeath if it finishes\)/.test(t)), 'staff see the tear begin in the audit', audits);
+  globalThis.__dboBriarheart.tears.get(HUNTER).at = Date.now() - 11000; logLines.length = 0;
+  ticker();
+  ok(permas.some((x) => x.a === NEWB && /torn out/.test(x.why)) && !kills.length && !M2.isBriar(NEWB), 'tearPermadeath: the heart torn out ends the character for good (no ordinary death)');
+  ok(audits.some((t) => /tore the briar heart out of who40 \(for good\)/.test(t)), 'audited as for good');
+  ok(logLines.some((l) => /faction RemoveFromFaction .*IsInFaction now true/.test(l)), 'the faction removal is logged too (the stub always answers true)');
+  downed.delete(NEWB);
+}
 // ---- the hooks in the other modules ---------------------------------------------------------------------------------------
 const src = (f) => fs.readFileSync(path.resolve(__dirname, '..', f), 'utf8');
 ok(/__dboBriarheartTargetMult\(agg, tgt, src\)/.test(src('gamemode.js')) && /require\(BRIARHEART_JS\)/.test(src('gamemode.js')) && /__dboBriarheartLogin\(a\)/.test(src('gamemode.js')), 'gamemode.js loads it, asks the target side, and calls the login');

@@ -10,26 +10,29 @@
 // The rite (A1): /briarheart rite at a Hagraven altar (staff place them where they stand: /briarheart altar add) by a
 //   character of config races (the DLE's DBOReachmanRace) whose faith (prayer.js) is in config faiths (The Reach Old Gods),
 //   carrying a Briar Heart (heartItem), confirmed with /briarheart confirm within 5 minutes. The heart is spent. At
-//   failChance the briar does not take: the character dies (an ordinary death, as a failed curse rite) or, with
-//   failPermadeath, for good; either way the altar is cold to them for failCooldownHours. Staff make one without the rite:
+//   failChance the briar does not take: the character dies, for good with failPermadeath (Nat, 25 Oct: on), else an
+//   ordinary death; either way the altar is cold to them for failCooldownHours. While either permadeath setting is on,
+//   /briarheart rite says so plainly and the confirm must be /briarheart confirm forever (a plain confirm repeats the
+//   warning); the warning and the acceptance are both audited. Staff make one without the rite:
 //   /briarheart grant <name> <reason> (Lead GM and above), and take it away: /briarheart revoke <name> <reason>.
 // The gifts (A2): healthBonus more health (charlevel.js adds __dboBriarheartVitalBonus to the maximum), resist of each
 //   element's spell hits (poison and frost: the hit's source effects are resisted by that resistance, as racial.js reads
 //   it), the Hagraven's spells (config spells, vanilla: Ironflesh and Lightning Cloak) given with AddSpell and taken back at
-//   the end. forswornFriendly (off): the character joins ForswornFaction (server Papyrus AddToFaction); whether the Forsworn
-//   then spare them is the clients' AI and is measured in game before it is switched on.
+//   the end. forswornFriendly (Nat, 25 Oct: on): the character joins ForswornFaction (server Papyrus AddToFaction); whether
+//   the Forsworn then spare them is the clients' AI, so each AddToFaction / RemoveFromFaction is logged with the
+//   server's IsInFaction read back ("briarheart: faction ...") for the in-game check.
 // The price (A3): fire spell hits harder (fireWeakness). No Divine's blessing (prayer.js asks __dboBriarheartRefusesDivine)
 //   and no turning from the faith (prayer.js asks __dboBriarheartFaithLock). The heart can be torn out: another player stands
 //   over a DOWNED Briarheart and chooses "Tear out the heart" in the player menu (X), and after tearSeconds still beside
-//   them the Briarheart dies at once (downed.js __dboDownedKill; tearPermadeath: for good) and is a Briarheart no more; the
+//   them the Briarheart dies at once (downed.js __dboDownedKill; tearPermadeath, Nat 25 Oct: on, for good) and is a Briarheart no more; the
 //   heart goes to the one who took it (a Briar Heart). Never a staff member, nor in a duel, and the taker must not be down.
 // The cure: /briarheart cure at a shrine of Arkay or Stendarr touched in the last 10 minutes (prayer.js
 //   __dboPrayerLastShrine), spending a filled black soul gem: the heart withers and the character lives on as a mortal.
 // The look (A5): config visual { enabled, armor } puts an armour on the character at the rite and takes it at the end.
-//   Off: the vanilla ArmorBriarHeart (Skyrim 05D008) is a body-slot item and would take the place of the character's
-//   armour; a model on a free slot (a plugin: Nexus Patches or a new one) is set here when Nat has one.
+//   Off and empty until Worker 1's plugin delivers the overlay ARMO/ARMA with the heart-only mesh: the vanilla
+//   ArmorBriarHeart (Skyrim 05D008) is a body-slot item and would take the place of the character's armour.
 //
-// Chat: /briarheart [status] | rite | confirm | cure; staff: grant <name> <reason> | revoke <name> <reason> | list |
+// Chat: /briarheart [status] | rite | confirm [forever] | cure; staff: grant <name> <reason> | revoke <name> <reason> | list |
 //   altar add [radius] | altar list | altar remove <n>.
 // State: private.dboBriarheart = { since, how: 'rite'|'staff', by } on the character; briarheart.json beside the server
 //   (runtime, gitignored) = { altars: [{ world, pos: [x, y, z], radius, by, at }] }.
@@ -83,6 +86,13 @@ module.exports = (api) => {
   const isOnline = (a) => onlineActors().includes(a >>> 0);
   const papyrus = (a, method, args) => { try { mp.callPapyrusFunction('method', 'Actor', method, { type: 'form', desc: mp.getDescFromId(a >>> 0) }, args); return true; } catch (e) { log(`briarheart: ${method} failed`, e.message); return false; } };
   const form = (desc) => ({ type: 'form', desc: String(desc) });
+  // The server's Papyrus answer (IsInFaction), for the in-game check of forswornFriendly
+  const papyrusValue = (a, method, args) => { try { return mp.callPapyrusFunction('method', 'Actor', method, { type: 'form', desc: mp.getDescFromId(a >>> 0) }, args); } catch (e) { return `error: ${e.message}`; } };
+  const faction = (a, on, why) => {
+    papyrus(a, on ? 'AddToFaction' : 'RemoveFromFaction', [form(C.forswornFaction)]);
+    const inIt = papyrusValue(a, 'IsInFaction', [form(C.forswornFaction)]);
+    log(`briarheart: faction ${on ? 'AddToFaction' : 'RemoveFromFaction'} ${C.forswornFaction} on ${display(a)} (${why}); IsInFaction now ${JSON.stringify(inIt === undefined ? null : inIt)}`);
+  };
   const fn = (n) => (typeof globalThis[n] === 'function' ? globalThis[n] : null);
   const call = (n, ...args) => { const f = fn(n); if (!f) return undefined; try { return f(...args); } catch (e) { log(`briarheart: ${n} failed`, e.message); return undefined; } };
   const recOf = (a) => { const r = get(a, PROP, null); return r && typeof r === 'object' && r.since ? r : null; };
@@ -110,10 +120,10 @@ module.exports = (api) => {
 
   // ---- the gifts on and off ---------------------------------------------------------------------------------------------
   // Spells, the faction and the look follow the record: applied at the rite and at each login, taken at the end
-  const applyGifts = (a) => {
+  const applyGifts = (a, why) => {
     if (!isOnline(a)) return;
     for (const d of C.spells || []) papyrus(a, 'AddSpell', [form(d), false]);
-    if (C.forswornFriendly) papyrus(a, 'AddToFaction', [form(C.forswornFaction)]);
+    if (C.forswornFriendly) faction(a, true, why || 'gifts');
     if (C.visual && C.visual.enabled && C.visual.armor) {
       const id = idOf(C.visual.armor);
       if (id && !hasOne(a, id) && giveItem) giveItem(a >>> 0, id, 1);
@@ -121,22 +131,22 @@ module.exports = (api) => {
     }
     call('__dboCharLevelSyncBonus', a >>> 0);
   };
-  const removeGifts = (a) => {
+  const removeGifts = (a, why) => {
     if (isOnline(a)) {
       for (const d of C.spells || []) papyrus(a, 'RemoveSpell', [form(d)]);
-      if (C.forswornFriendly) papyrus(a, 'RemoveFromFaction', [form(C.forswornFaction)]);
+      if (C.forswornFriendly) faction(a, false, why || 'end');
     }
     if (C.visual && C.visual.enabled && C.visual.armor) { const id = idOf(C.visual.armor); if (id) takeOne(a, id); }
     call('__dboCharLevelSyncBonus', a >>> 0);
   };
   const become = (a, how, by) => {
     set(a, PROP, { since: Date.now(), how, by: String(by || '') });
-    applyGifts(a);
+    applyGifts(a, how);
   };
   const end = (a, why) => {
     if (!isBriar(a)) return false;
     set(a, PROP, null);
-    removeGifts(a);
+    removeGifts(a, why);
     audit(`BRIARHEART ${who(a)} is a Briarheart no more (${why})`);
     return true;
   };
@@ -158,15 +168,28 @@ module.exports = (api) => {
     if (!hasOne(a, idOf(C.heartItem))) return 'The rite needs a Briar Heart to set in your chest.';
     return '';
   };
+  // The rite's permanent risks, said plainly (Nat, 25 Oct: both on)
+  const forever = () => !!(C.failPermadeath || C.tearPermadeath);
+  const risks = () => [
+    C.failPermadeath ? `PERMANENT DEATH: ${Math.round(C.failChance * 100)} in 100 die under the knife, and this character is gone for good` : `${Math.round(C.failChance * 100)} in 100 die under the knife (an ordinary death)`,
+    C.tearPermadeath ? 'PERMANENT DEATH: if anyone tears the briar out of you while you are down, this character is gone for good' : 'if anyone tears the briar out of you while you are down, you die and the briar is lost',
+  ];
+  const riskAudit = () => `rite death ${C.failPermadeath ? 'for good' : 'ordinary'}, heart torn out ${C.tearPermadeath ? 'for good' : 'ordinary'}`;
+  const confirmWord = () => (forever() ? '/briarheart confirm forever' : '/briarheart confirm');
   const rite = (a) => {
     const no = riteRefusal(a); if (no) return no;
     S.pending.set(a >>> 0, Date.now());
-    return `A Hagraven will cut out your heart and set the briar in its place. It makes you hard to kill, until someone tears the briar out, and it binds you to the Old Gods: no Divine will bless you. ${Math.round(C.failChance * 100)} in 100 die under the knife${C.failPermadeath ? ', and do not wake' : ''}. Say /briarheart confirm within ${C.confirmMinutes} minutes to kneel.`;
+    audit(`BRIARHEART ${who(a)} asked for the rite and was warned (${riskAudit()})`);
+    return `A Hagraven will cut out your heart and set the briar in its place. It makes you hard to kill and binds you to the Old Gods: no Divine will bless you. ${risks().join('. ')}. Say ${confirmWord()} within ${C.confirmMinutes} minutes to kneel.`;
   };
-  const confirm = (a) => {
-    const at = S.pending.get(a >>> 0); S.pending.delete(a >>> 0);
-    if (!at || Date.now() - at > C.confirmMinutes * MIN) return 'There is nothing to confirm. Kneel at the altar and say /briarheart rite.';
+  const confirm = (a, word) => {
+    const at = S.pending.get(a >>> 0);
+    if (!at || Date.now() - at > C.confirmMinutes * MIN) { S.pending.delete(a >>> 0); return 'There is nothing to confirm. Kneel at the altar and say /briarheart rite.'; }
+    // A permanent rite is not taken with the plain word: the warning again, the rite still pending
+    if (forever() && String(word || '').toLowerCase() !== 'forever') return `This rite can end this character for good. ${risks().join('. ')}. If you accept that, say /briarheart confirm forever.`;
+    S.pending.delete(a >>> 0);
     const no = riteRefusal(a); if (no) return no;
+    audit(`BRIARHEART ${who(a)} accepted the rite's risks (${riskAudit()})`);
     if (!takeOne(a, idOf(C.heartItem))) return 'The rite needs a Briar Heart to set in your chest.';
     if (Math.random() < C.failChance) {
       set(a, FAILED, Date.now());
@@ -209,8 +232,9 @@ module.exports = (api) => {
   const startTear = (a, t) => {
     const no = tearRefusal(a, t); if (no) return no;
     S.tears.set(a >>> 0, { t: t >>> 0, at: Date.now() });
-    if (isOnline(t)) personal(t >>> 0, `${display(a)} kneels over you and reaches for the briar in your chest.`);
-    return `You reach into the briar. Stay over them for ${C.tearSeconds} seconds.`;
+    if (isOnline(t)) personal(t >>> 0, `${display(a)} kneels over you and reaches for the briar in your chest.${C.tearPermadeath ? ' If they tear it out, this character dies for good.' : ''}`);
+    audit(`BRIARHEART ${who(a)} began to tear the briar heart out of ${who(t)}${C.tearPermadeath ? ' (permadeath if it finishes)' : ''}`);
+    return `You reach into the briar. Stay over them for ${C.tearSeconds} seconds.${C.tearPermadeath ? ' Tearing it out ends them for good.' : ''}`;
   };
   const finishTear = (a, j) => {
     const t = j.t;
@@ -253,7 +277,7 @@ module.exports = (api) => {
   globalThis.__dboBriarheartRefusesDivine = (a) => (C.enabled && C.noDivineBlessings && isBriar(Number(a) >>> 0) ? 'The briar in your chest belongs to the Hagravens. No Divine\'s blessing reaches it.' : '');
   globalThis.__dboBriarheartFaithLock = (a) => (C.enabled && C.faithLocked && isBriar(Number(a) >>> 0) ? 'The briar binds you to the Old Gods of the Reach. While it beats, you turn to no other.' : '');
   // gamemode.js at login: the spells, faction and look come back with the character
-  globalThis.__dboBriarheartLogin = (a) => { if (C.enabled && isBriar(Number(a) >>> 0)) applyGifts(Number(a) >>> 0); };
+  globalThis.__dboBriarheartLogin = (a) => { if (C.enabled && isBriar(Number(a) >>> 0)) applyGifts(Number(a) >>> 0, 'login'); };
   // playermenu.js (X): the entry over a fallen Briarheart
   globalThis.__dboBriarheartMenuEntries = (a, t) => (C.enabled && isBriar(t >>> 0) && isDowned(t >>> 0) && !isStaff(a) ? [{ id: 'briartear', label: 'Tear out the heart' }] : []);
   globalThis.__dboBriarheartMenuAction = (a, id, t) => { if (id !== 'briartear') return false; personal(a >>> 0, startTear(a >>> 0, t >>> 0)); return true; };
@@ -265,10 +289,10 @@ module.exports = (api) => {
     const sub = (words.shift() || 'status').toLowerCase();
     if (sub === 'status') {
       const r = recOf(a);
-      return personal(a, r ? `A briar heart has beaten in your chest since ${new Date(r.since).toISOString().slice(0, 10)}.` : 'Your heart is your own.');
+      return personal(a, r ? `A briar heart has beaten in your chest since ${new Date(r.since).toISOString().slice(0, 10)}.${C.tearPermadeath ? ' If it is torn out of you while you are down, this character dies for good.' : ''}` : 'Your heart is your own.');
     }
     if (sub === 'rite') return personal(a, rite(a));
-    if (sub === 'confirm') return personal(a, confirm(a));
+    if (sub === 'confirm') return personal(a, confirm(a, words[0]));
     if (sub === 'cure') return personal(a, cure(a));
     if (!isLeadStaff(a)) return personal(a, 'Usage: /briarheart [status] | rite | confirm | cure');
     if (sub === 'grant' || sub === 'revoke') {
