@@ -54,6 +54,8 @@ const G = new Function('mp', 'recordOf', 'cfg', gm.slice(a0, b0) + '\nreturn { s
 const given = [], told = [], audits = [], widgets = [], closed = [];
 const ui = new Map();
 let staffLead = new Set(), guardNo = '', widgetOk = true;
+// 'actor:cap' pairs the client's UI named (gamemode.js hasUiCap); capThrows: a cap read that fails
+const caps = new Set(); let capThrows = false;
 const make = (racialCfg) => require(path.join(SERVER, 'racial.js'))({
   mp, log: () => {}, personal: (a, t) => told.push([a, t]), display: (a) => String(a), recordOf,
   giveItem: (a, base, n) => { given.push([a, base, n]); return true; }, profileOf: (a) => (a < 1000 ? a : -1),
@@ -68,7 +70,7 @@ const loadSigns = (bsCfg) => { delete require.cache[BS_JS]; globalThis.__dboBirt
   cfg: { birthsigns: bsCfg }, openWidget: (a, w, f) => { if (!widgetOk) return false; widgets.push([a, w, f]); return true; }, closeWidget: (a, id) => closed.push([a, id]),
   onUi: (ev, fn) => ui.set(ev, fn), registerChatCommand: (n, fn) => commands.set(n, fn), onlineActors: () => Object.keys(state).map(Number).filter((a) => a < 1000 && (state[a].props || {}).isOnline !== false),
   every: (name, ms, fn) => tickers.set(name, fn), isLeadStaff: (a) => staffLead.has(a), findByName: (q) => { const n = Number(String(q).replace(/^p/i, '')); return state[n] && (state[n].props || {}).isOnline !== false ? n : 0; },
-  profileOf: (a) => (a < 1000 ? a : -1),
+  profileOf: (a) => (a < 1000 ? a : -1), hasUiCap: (a, cap) => { if (capThrows) throw new Error('caps'); return caps.has(`${a}:${cap}`); },
 }); };
 globalThis.__dboStaffGuard = { target: () => guardNo };
 
@@ -323,6 +325,57 @@ check('a staff set during the creation step ends it, as a choice does', (() => {
 })());
 check('/birthsign status line', (() => { const st = commands; return typeof st.get('birthsign') === 'function'; })());
 
+// ---- 5b. the front's picker (Nat 25 Oct: Worker 2's mock), for a client whose UI names birthsignPicker ----
+B = loadSigns({});
+const PK = 90; race(PK, 'nord'); caps.add(`${PK}:birthsignPicker`);
+stepDone.length = 0; widgets.length = 0; audits.length = 0;
+check('a client with the cap: the creation step opens the picker, focused, id 163', globalThis.__dboBirthsignCreationOpen(PK) === true && widgets.length === 1
+  && last()[1].type === 'birthsignPicker' && last()[1].id === 163 && last()[2] === true && typeof last()[1].nonce === 'string' && last()[1].nonce.length > 0, last());
+const pk = last()[1];
+check('...thirteen cards, each Guardian then its charges, the Serpent last', pk.signs.map((x) => x.id).join() === 'warrior,lady,steed,lord,mage,apprentice,atronach,ritual,thief,lover,shadow,tower,serpent');
+check('...the Guardians marked \'\', their charges by Guardian, the Serpent \'none\'', pk.signs.map((x) => x.guardian).join() === ',warrior,warrior,warrior,,mage,mage,mage,,thief,thief,thief,none');
+const lord = pk.signs.find((x) => x.id === 'lord');
+check('...a card: name, the mock\'s lore line, the effect from the numbers', lord.name === 'The Lord' && lord.lore === 'The blood of the North runs strong, and fire bites deeper.' && lord.effect === 'Health regenerates 10% faster; fire hurts 5% more', lord);
+check('...the mock\'s title and line', pk.title === 'Choose your birthsign' && pk.sub === 'The stars you were born under. Yours for life; only staff can change it later.');
+check('...every emblem is stars on the 40 x 40 grid and lines between real stars', pk.signs.every((x) => x.emblem && x.emblem.stars.length >= 4
+  && x.emblem.stars.every(([px, py]) => px >= 0 && px <= 40 && py >= 0 && py <= 40)
+  && x.emblem.lines.length > 0 && x.emblem.lines.every(([i, j]) => i !== j && x.emblem.stars[i] && x.emblem.stars[j])));
+check('...every card has lore and an effect', pk.signs.every((x) => x.lore.length > 10 && x.effect.length > 10 && x.effect !== 'No gift'));
+fire('birthsignChoose', PK, 'lord'); fire('birthsignChoose', PK, 'confirm');
+check('the contextMenu\'s events do nothing to an open picker', !state[PK].props['private.dboBirthsign'] && widgets.length === 1);
+fire('birthsignPick', PK, 'wrong', 'lord');
+check('a pick with another nonce is dropped', !state[PK].props['private.dboBirthsign']);
+fire('birthsignPick', PK, pk.nonce, 'dragon');
+check('a pick of no such sign is dropped', !state[PK].props['private.dboBirthsign']);
+fire('birthsignClose', PK, 'stale');
+check('a close from another panel (stale nonce) is not this one\'s: still open, no wait set', B.waitReason(PK) === '' && (() => { const n = widgets.length; B.tick(Date.now() + 999999); return widgets.length === n; })());
+told.length = 0;
+fire('birthsignClose', PK, pk.nonce);
+check('its own close: told, and the step\'s quicker come-back is set (15 s)', told.some(([a, t]) => a === PK && /comes back in 15 seconds/.test(t)));
+B.tick(Date.now() + 16000);
+const pk2 = last()[1];
+check('...it comes back as the picker, with a new nonce', widgets.length === 2 && pk2.type === 'birthsignPicker' && pk2.nonce !== pk.nonce);
+fire('birthsignPick', PK, pk.nonce, 'lord');
+check('...the old panel\'s answer is refused', !state[PK].props['private.dboBirthsign']);
+fire('birthsignPick', PK, pk2.nonce, 'lord');
+check('the picker\'s confirmed pick: written, audited, the creation step goes on', state[PK].props['private.dboBirthsign'].id === 'lord' && state[PK].props['private.dboBirthsign'].by === 'self'
+  && audits.includes('BIRTHSIGN P90 #T90 (profile 90) was born under The Lord') && JSON.stringify(stepDone) === '[90]' && closed.some(([a, id]) => a === PK && id === 163));
+fire('birthsignPick', PK, pk2.nonce, 'tower');
+check('...and a second pick changes nothing', state[PK].props['private.dboBirthsign'].id === 'lord');
+const NOCAP = 91; race(NOCAP, 'nord'); widgets.length = 0;
+globalThis.__dboBirthsignCreationOpen(NOCAP);
+check('a client without the cap gets the contextMenu, as before', last()[1].type === 'contextMenu' && last()[1].actions.length === 13);
+const THROWS = 92; race(THROWS, 'nord'); capThrows = true; widgets.length = 0;
+globalThis.__dboBirthsignCreationOpen(THROWS); capThrows = false;
+check('a cap read that fails falls back to the contextMenu', last()[1].type === 'contextMenu');
+const PK3 = 93; race(PK3, 'nord'); caps.add(`${PK3}:birthsignPicker`); widgets.length = 0;
+commands.get('birthsign')(PK3, '');
+check('/birthsign opens the picker for a client with the cap', last()[1].type === 'birthsignPicker' && last()[0] === PK3);
+commands.get('birthsign')(PK3, 'shadow');
+check('...and /birthsign <sign> still chooses by text', state[PK3].props['private.dboBirthsign'].id === 'shadow');
+check('a sign\'s lore and emblem come from config like its numbers', (() => {
+  const Bx = loadSigns({ signs: { lord: { lore: 'Changed.' } } }); const c = Bx.card(Bx.config.signs.lord); B = loadSigns({}); return c.lore === 'Changed.' && c.emblem && c.emblem.stars.length === 6; })());
+
 // ---- 6. the wiring ----
 const hook = gm.slice(gm.indexOf('const hitDamageAttemptHook'), gm.indexOf('hitDamageAttemptHook.__dbo = true;'));
 check('gamemode: the hit passes its flags to racial.attackMult (the Shadow)', /raceAtk = racial\.attackMult\(agg, tgt, src, dmg, flags\)/.test(hook));
@@ -335,6 +388,7 @@ check('gamemode: the gate check comes after the creation one and before the gate
 const lr = gm.slice(gm.indexOf('const leaveRealm = (a) => {'), gm.indexOf('const startChoose = '));
 check('gamemode: leaveRealm moves nobody without a sign, and puts the choice back up (not during creation)', /^const leaveRealm = \(a\) => \{\n  try \{\n    if \(birthsignHeld\(a\)\) \{ if \(!creationPending\(a\)\) endCreation\(a\); return; \}/.test(lr));
 check('gamemode: the hold is the hub only, and the god waits for it', /const birthsignHeld = \(a\) => \{ try \{ return typeof globalThis\.__dboBirthsignHold === 'function' && inHub\(a\) && /.test(gm) && /globalThis\.__dboAtCreationEnd = \(a\) => inHub\(a\) && !creationPending\(a\) && !birthsignHeld\(a\);/.test(gm));
+check('gamemode: birthsigns.js gets hasUiCap, for the picker\'s cap', /require\(BIRTHSIGNS_JS\)\(\{[^}]*\bhasUiCap \}\);/.test(gm));
 check('gamemode: login and logout reach birthsigns.js', /globalThis\.__dboBirthsignLogin\(a\)/.test(gm) && /'__dboStartLeave', '__dboBirthsignLeave'\]/.test(gm));
 const cl = fs.readFileSync(path.join(SERVER, 'charlevel.js'), 'utf8');
 check('charlevel.js: the bonus adds the race\'s and sign\'s magicka and stamina, and syncs on demand', /magicka: \(Number\(spent\.magicka\) \|\| 0\) \+ \(Number\(r\.magicka\) \|\| 0\), stamina: \(Number\(spent\.stamina\) \|\| 0\) \+ \(Number\(r\.stamina\) \|\| 0\)/.test(cl) && /globalThis\.__dboCharLevelSyncBonus = \(a\) => \{ if \(CFG\.enabled\) syncBonus\(a, stateOf\(a\)\); \};/.test(cl));

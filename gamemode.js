@@ -7715,7 +7715,7 @@ try {
 try {
   const BIRTHSIGNS_JS = path.resolve('birthsigns.js');
   delete require.cache[BIRTHSIGNS_JS];
-  require(BIRTHSIGNS_JS)({ mp, log, personal, audit, who, display, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors, every, isLeadStaff, findByName, profileOf });
+  require(BIRTHSIGNS_JS)({ mp, log, personal, audit, who, display, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors, every, isLeadStaff, findByName, profileOf, hasUiCap });
 } catch (e) {
   log('birthsigns.js failed to load:', e.stack || e.message);
   for (const k of ['__dboBirthsignOf', '__dboBirthsignHold', '__dboBirthsignCreationOpen', '__dboBirthsignLogin', '__dboBirthsignLeave']) globalThis[k] = null;
