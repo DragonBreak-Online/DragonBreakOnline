@@ -24,6 +24,7 @@ function world(opts = {}) {
     display: () => 'P', system: (a, t) => sent.push('system:' + t), log: (t) => logs.push(t),
     openWidget: (a, w, focus) => sent.push(`open:${w.id}:${focus ? 'focus' : ''}`), closeWidget: (a, id) => sent.push('close:' + id),
     setTimeout: (f, ms) => timers.push({ f, ms }), endCreation: () => sent.push('endCreation'),
+    birthsignHeld: () => !!opts.noSign,
   };
   globalThis.__dboStartPending = undefined; globalThis.__dboNameHold = null;
   const fn = new Function(...Object.keys(env), block + '\nreturn { leaveRealm, startChoose, startClose, startLogin, gateAnswersStart, askCyrodiil, setStartChoice };');
@@ -90,10 +91,15 @@ ok(/if \(madeNow && askCyrodiil\(\)\) setStartChoice\(actorId >>> 0, 'asking'\)/
 ok(/__dboNamed = \(a\) => \{ if \(inHubForName\(a\)\) leaveRealm\(a\); \}/.test(src), 'a character named at last leaves the Realm through the same question');
 ok(!/setTimeout\(\(\) => sendToArrival\(a\), (wait|DEITY_STEP_MAX_MS)\)/.test(src), 'the deity step and its timeout no longer send straight to the arrival');
 ok(/else startLogin\(a\); return; \}/.test(src), 'the client\'s arrival report in the Realm runs startLogin');
-ok(/'__dboRacialLeave', '__dboStartLeave'\]/.test(src), 'every logout runs __dboStartLeave');
+ok(/'__dboRacialLeave', '__dboStartLeave'[,\]]/.test(src), 'every logout runs __dboStartLeave');
 ok(src.indexOf("onUi('startChoose'") > src.indexOf('const onUi = '), 'the answers are registered below onUi (a top-level call above it fails the whole load)');
 const gate = src.slice(src.indexOf('const g = gateOf(targetId >>> 0);'), src.indexOf('const prev = globalThis.__dboPrevActivate;'));
 ok(/if \(g && creationPending\(casterId >>> 0\)\) \{ gateCreationTold\(casterId >>> 0\); return false; \}/.test(gate), 'a gate refuses a character still being made, and tells them why');
 ok(gate.indexOf('gateAnswersStart') > 0 && /pos: gateSpotFor\(g, casterId >>> 0\)/.test(gate), 'a gate answers the question and lands on one of its spread spots');
 ok(/Cyrodiil or Skyrim\?/.test(block) && /Pale Pass/.test(block) && /gate of a hold/.test(block), 'the question names both lands and where each answer leads');
+// No birthsign yet (birthsigns.js): no question and no move, the choice is put back up instead (endCreation)
+w = world(Object.assign({ noSign: true }, asking)); w.leaveRealm(A);
+ok(JSON.stringify(w.sent) === '["endCreation"]' && w.choice() === 'asking', 'a character with no birthsign is neither asked nor moved; endCreation puts the sign back up', w.sent);
+w = world({ noSign: true, props: { 'private.dboStartChoice': 'cyrodiil' } }); w.leaveRealm(A);
+ok(!w.sent.includes('arrival'), '...even one who answered Cyrodiil before is not sent to the arrival', w.sent);
 console.log(fails ? `${fails} failure(s)` : 'all checks passed'); process.exit(fails ? 1 : 0);
