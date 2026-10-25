@@ -1218,7 +1218,11 @@ registerChatCommand('grantproperty', (a, args) => {
     let own = null; try { own = mp.get(id, 'private.housing'); } catch (e) { own = null; }
     // ...or it holds only a pointer to that key ({ primary: <gone> }, what the place rules wrote: d97a2 -> 80d9643)
     const pointsAtGone = keyGone && own && typeof own === 'object' && (Number(own.primary) >>> 0) === key;
-    if (keyGone && (!own || pointsAtGone)) { mp.set(id, 'private.housing', { owner: 0, ownerName: '', name: null, locked: false, serial: 1, partner: 0, containers: [], issued: [] }); seeded = true; }
+    if (keyGone && (!own || pointsAtGone)) {
+      mp.set(id, 'private.housing', { owner: 0, ownerName: '', name: null, locked: false, serial: 1, partner: 0, containers: [], issued: [] }); seeded = true;
+      // The one write to a claim outside housingSystem.ts, in the same AUDIT form as its own (Telvanni house, 24 Oct)
+      log(`[housing] AUDIT seed ${id.toString(16)} by ${who(a)} (profile ${profileOf(a)}, /grantproperty for ${who(t)}): record ${own ? JSON.stringify(own) : 'none'} -> an empty claim keyed on itself, its pair key ${key.toString(16)} no longer exists`);
+    }
   } catch (e) { log(`grantproperty: could not prepare ${id.toString(16)}: ${e.message}`); }
   let err = ''; try { err = String(H.grant(id, t) || ''); } catch (e) { err = e.message || 'failed'; }
   if (err) { log(`grantproperty: ${who(a)} -> ${who(t)} at ${id.toString(16)} refused: ${err}${seeded ? ' (after seeding its own record)' : ''}`); return personal(a, `Not granted: ${err}`); }
