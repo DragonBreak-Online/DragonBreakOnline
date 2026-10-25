@@ -214,7 +214,7 @@ const wolf = () => setProp(W, 'private.beast', { form: 'werewolf', original: {} 
   ok(gm.indexOf("path.resolve('frenzy.js')") > gm.indexOf("path.resolve('duel.js')") && gm.indexOf("path.resolve('duel.js')") > 0, 'gamemode.js loads frenzy.js after duel.js (its hit and death hooks wrap the rest)');
   ok(/__dboFrenzyRateMult\(a, NEEDS_AV\[key\]\)/.test(gm) && /__dboFrenzyLeave\(a\)/.test(gm) && /'dboFrenzyReport'[\s\S]{0,200}__dboFrenzyReport\(a, content\)/.test(gm), 'gamemode.js: the needs rate, the logout and the client report reach frenzy.js');
   const conf = JSON.parse(fs.readFileSync(path.join(SERVER, 'gamemode-config.json'), 'utf8'));
-  ok(conf.werewolfFrenzy && conf.werewolfFrenzy.enabled === false && conf.werewolfFrenzy.lethalToPlayers === true && conf.werewolfFrenzy.permadeath === false, 'gamemode-config.json ships werewolfFrenzy switched off, lethal, no permadeath');
+  ok(conf.werewolfFrenzy && conf.werewolfFrenzy.enabled === true && conf.werewolfFrenzy.lethalToPlayers === true && conf.werewolfFrenzy.permadeath === false, 'gamemode-config.json ships werewolfFrenzy switched on (Nat, 25 Oct), lethal, no permadeath');
 
   console.log(fails ? `${fails} FAILED` : 'all passed');
   process.exit(fails ? 1 : 0);
