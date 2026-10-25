@@ -159,11 +159,11 @@ revertToOwn(); delete globalThis.__dboCombatAt; props.set(`${LEAD}|lastAnimEvent
 // ---- 4. the visibility guard -------------------------------------------------------------------------------------------------
 place(PLAYER, 3000);
 r = run(LEAD, 'chicken');
-ok(/^1 player nearby would see a stripped human/.test(r) && !beast(LEAD), '4. a player on a client with only beastBody 3000 units away: refused', r);
+ok(/^A player nearby cannot see this form yet/.test(r) && !beast(LEAD), '4. a player on a client with only beastBody 3000 units away: refused', r);
 caps.set(PLAYER, new Set());
 place(FARP, 5900);
 r = run(LEAD, 'chicken');
-ok(/^2 players nearby would see/.test(r) && !beast(LEAD), '4. two such players (one with no capability at all, at 5900): refused, counted, never named', r);
+ok(/^2 players nearby cannot see this form yet/.test(r) && !beast(LEAD), '4. two such players (one with no capability at all, at 5900): refused, counted, never named', r);
 place(PLAYER, 3000, OTHER_WORLD); place(FARP, 13000);
 r = run(LEAD, 'chicken');
 ok(beast(LEAD) && beast(LEAD).form === 'chicken', '4. the same spot in another worldspace, and 13000 units (three grid squares off): allowed', r);
@@ -217,7 +217,7 @@ const streamed = [
 for (const [label, lp, pp] of streamed) {
   at(LEAD, lp); at(PLAYER, pp);
   const r4 = run(LEAD, 'chicken');
-  ok(/^1 player nearby would see a stripped human/.test(r4) && !beast(LEAD), `4b. a 0.3.106 player ${label}: refused`, r4);
+  ok(/^A player nearby cannot see this form yet/.test(r4) && !beast(LEAD), `4b. a 0.3.106 player ${label}: refused`, r4);
   revertToOwn();
 }
 at(LEAD, [4200, 0, 0]); at(PLAYER, [16400, 0, 0]);
@@ -250,12 +250,12 @@ ok(!beast(LEAD) && told(n0, LEAD).some((t) => /a player came near whose game can
   '4b. tick: the fork lists a 0.3.106 player as a neighbour (their place says another worldspace): reverted, told, silently', told(n0, LEAD));
 revertToOwn();
 r = run(LEAD, 'chicken');
-ok(/^1 player nearby would see a stripped human/.test(r) && !beast(LEAD), '4b. ...and refused while the fork lists them', r);
+ok(/^A player nearby cannot see this form yet/.test(r) && !beast(LEAD), '4b. ...and refused while the fork lists them', r);
 revertToOwn();
 props.delete(`${LEAD}|actorNeighbors`);
 at(PLAYER, [NaN, 0, 0]);
 r = run(LEAD, 'chicken');
-ok(/^1 player nearby would see a stripped human/.test(r) && !beast(LEAD), '4b. a player in the same worldspace whose place is not a number counts as near (fails closed)', r);
+ok(/^A player nearby cannot see this form yet/.test(r) && !beast(LEAD), '4b. a player in the same worldspace whose place is not a number counts as near (fails closed)', r);
 revertToOwn();
 for (const [a, c, p] of kept4b) { props.set(`${a}|worldOrCellDesc`, c); props.set(`${a}|pos`, p); }
 caps.set(PLAYER, capsPlayer4b);

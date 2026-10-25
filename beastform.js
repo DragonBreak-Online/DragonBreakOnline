@@ -811,7 +811,9 @@ module.exports = (api) => {
     }
     return n;
   };
-  const unseeingText = (n) => `${n} ${n === 1 ? 'player' : 'players'} nearby would see a stripped human instead of the animal: their game cannot show it yet. Polymorph with nobody else within about 250 m.`;
+  // Nat's wording, 25 Oct: once 0.3.109 is live every client has creatureBody, so this should read as a temporary
+  // nuisance rather than a rule of the world
+  const unseeingText = (n) => `${n === 1 ? 'A player' : `${n} players`} nearby cannot see this form yet: move away from others, or ask them to update.`;
   // Why a cannot take an animal shape now, or ''
   const polymorphRefusal = (a) => {
     if (globalThis.__dboPolymorphOn !== true) return 'Polymorph is switched off for now.';
