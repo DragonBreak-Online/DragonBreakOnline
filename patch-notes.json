@@ -1,5 +1,27 @@
 [
   {
+    "title": "Crusader armour and the robes of the gods",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Knights of the Nine",
+        "items": [
+          "The Knights of the Nine forge the Crusader's armour and swords. Their Armorers make the set at the forge; their Clothiers make the cape at the tanning rack.",
+          "The Divine set is the plain set raised with an amulet of a Divine at the forge (the cuirass also takes the Book of Talos and Stendarr's amulet), and carries a blessing."
+        ]
+      },
+      {
+        "heading": "Robes of the gods",
+        "items": [
+          "Each of the Nine Divines and sixteen Daedric Princes has a robe and hood, made at the tanning rack by their faithful's tailors.",
+          "The Eight's are made by the Great Faiths and the Imperial Cult (Stendarr's by the Vigil too), Talos's by the Knights of the Nine and the Stormcloaks, Malacath's by the Orc clans, and each Prince's by his cult."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The Knights of the Nine are recruiting",
     "date": "2026-10-25",
     "version": "Server update",

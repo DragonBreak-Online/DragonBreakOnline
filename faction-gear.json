@@ -111,6 +111,762 @@
     "d7d:knighterrant.esp"
    ]
   },
+  "d7c:matys knights of the nine armor 2.1.esp": {
+   "name": "Shield of the Crusader",
+   "set": "Knights of the Nine Crusader",
+   "factions": [
+    "knights-of-the-nine"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d80:matys knights of the nine armor 2.1.esp"
+   ]
+  },
+  "d6c:matys knights of the nine armor 2.1.esp": {
+   "name": "Boots of the Crusader",
+   "set": "Knights of the Nine Crusader",
+   "factions": [
+    "knights-of-the-nine"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d74:matys knights of the nine armor 2.1.esp"
+   ]
+  },
+  "4e56:matys knights of the nine armor 2.1.esp": {
+   "name": "Knights Of The Nine Divine Sword",
+   "set": "Knights of the Nine Crusader",
+   "factions": [
+    "knights-of-the-nine"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "4e54:matys knights of the nine armor 2.1.esp"
+   ]
+  },
+  "4e55:matys knights of the nine armor 2.1.esp": {
+   "name": "Knights Of The Nine Divine Greatsword",
+   "set": "Knights of the Nine Crusader",
+   "factions": [
+    "knights-of-the-nine"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "4e53:matys knights of the nine armor 2.1.esp"
+   ]
+  },
+  "4e3f:matys knights of the nine armor 2.1.esp": {
+   "name": "Divine Cape of the Crusader",
+   "set": "Knights of the Nine Crusader",
+   "factions": [
+    "knights-of-the-nine"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "4e50:matys knights of the nine armor 2.1.esp"
+   ]
+  },
+  "4e3e:matys knights of the nine armor 2.1.esp": {
+   "name": "Divine Shield of the Crusader",
+   "set": "Knights of the Nine Crusader",
+   "factions": [
+    "knights-of-the-nine"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "4e4f:matys knights of the nine armor 2.1.esp"
+   ]
+  },
+  "12e5:matys knights of the nine armor 2.1.esp": {
+   "name": "Helm of the Crusader",
+   "set": "Knights of the Nine Crusader",
+   "factions": [
+    "knights-of-the-nine"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "12e8:matys knights of the nine armor 2.1.esp"
+   ]
+  },
+  "d68:matys knights of the nine armor 2.1.esp": {
+   "name": "Gauntlets of the Crusader",
+   "set": "Knights of the Nine Crusader",
+   "factions": [
+    "knights-of-the-nine"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d72:matys knights of the nine armor 2.1.esp"
+   ]
+  },
+  "d63:matys knights of the nine armor 2.1.esp": {
+   "name": "Cuirass of the Crusader",
+   "set": "Knights of the Nine Crusader",
+   "factions": [
+    "knights-of-the-nine"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d70:matys knights of the nine armor 2.1.esp"
+   ]
+  },
+  "4e3d:matys knights of the nine armor 2.1.esp": {
+   "name": "Divine Helm of the Crusader",
+   "set": "Knights of the Nine Crusader",
+   "factions": [
+    "knights-of-the-nine"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "4e49:matys knights of the nine armor 2.1.esp"
+   ]
+  },
+  "4e3c:matys knights of the nine armor 2.1.esp": {
+   "name": "Divine Gauntlets of the Crusader",
+   "set": "Knights of the Nine Crusader",
+   "factions": [
+    "knights-of-the-nine"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "4e48:matys knights of the nine armor 2.1.esp"
+   ]
+  },
+  "4e3b:matys knights of the nine armor 2.1.esp": {
+   "name": "Divine Boots of the Crusader",
+   "set": "Knights of the Nine Crusader",
+   "factions": [
+    "knights-of-the-nine"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "4e46:matys knights of the nine armor 2.1.esp"
+   ]
+  },
+  "4e3a:matys knights of the nine armor 2.1.esp": {
+   "name": "Divine Cuirass of the Crusader",
+   "set": "Knights of the Nine Crusader",
+   "factions": [
+    "knights-of-the-nine"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "4e47:matys knights of the nine armor 2.1.esp"
+   ]
+  },
+  "48d0:matys knights of the nine armor 2.1.esp": {
+   "name": "Knights Of The Nine Sword",
+   "set": "Knights of the Nine Crusader",
+   "factions": [
+    "knights-of-the-nine"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "800:DragonBreak KotN Patch.esp"
+   ]
+  },
+  "48cf:matys knights of the nine armor 2.1.esp": {
+   "name": "Knights Of The Nine Greatsword",
+   "set": "Knights of the Nine Crusader",
+   "factions": [
+    "knights-of-the-nine"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "801:DragonBreak KotN Patch.esp"
+   ]
+  },
+  "3e09:matys knights of the nine armor 2.1.esp": {
+   "name": "Cape of the Crusader",
+   "set": "Knights of the Nine Crusader",
+   "factions": [
+    "knights-of-the-nine"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "802:DragonBreak KotN Patch.esp"
+   ]
+  },
+  "865:DivineAndDaedricRobes.esp": {
+   "name": "Akatosh Hood",
+   "set": "Robes of Akatosh",
+   "factions": [
+    "great-faiths",
+    "imperial-cult"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "899:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "866:DivineAndDaedricRobes.esp": {
+   "name": "Arkay Hood",
+   "set": "Robes of Arkay",
+   "factions": [
+    "great-faiths",
+    "imperial-cult"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "89a:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "868:DivineAndDaedricRobes.esp": {
+   "name": "Azura Hood",
+   "set": "Robes of Azura",
+   "factions": [
+    "cult-azura"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "89b:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "869:DivineAndDaedricRobes.esp": {
+   "name": "Boethiah Hood",
+   "set": "Robes of Boethiah",
+   "factions": [
+    "cult-boethiah"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "89c:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "86a:DivineAndDaedricRobes.esp": {
+   "name": "Clavicus Vile Hood",
+   "set": "Robes of Clavicus Vile",
+   "factions": [
+    "cult-clavicus-vile"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "89d:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "86b:DivineAndDaedricRobes.esp": {
+   "name": "Dibella Hood",
+   "set": "Robes of Dibella",
+   "factions": [
+    "great-faiths",
+    "imperial-cult"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "89e:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "86c:DivineAndDaedricRobes.esp": {
+   "name": "Hermaeous Mora Hood",
+   "set": "Robes of Hermaeus Mora",
+   "factions": [
+    "cult-hermaeus-mora"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "89f:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "86d:DivineAndDaedricRobes.esp": {
+   "name": "Hircine Hood",
+   "set": "Robes of Hircine",
+   "factions": [
+    "cult-hircine"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8a0:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "86e:DivineAndDaedricRobes.esp": {
+   "name": "Julianos Hood",
+   "set": "Robes of Julianos",
+   "factions": [
+    "great-faiths",
+    "imperial-cult"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8a1:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "86f:DivineAndDaedricRobes.esp": {
+   "name": "Kynareth Hood",
+   "set": "Robes of Kynareth",
+   "factions": [
+    "great-faiths",
+    "imperial-cult"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8a2:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "870:DivineAndDaedricRobes.esp": {
+   "name": "Malacath Hood",
+   "set": "Robes of Malacath",
+   "factions": [
+    "clan-gol-kharzum",
+    "clan-mor-khazgur",
+    "clan-dushnikh-yal",
+    "clan-largashbur",
+    "clan-narzulbur",
+    "clan-cracked-tusk"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8a3:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "871:DivineAndDaedricRobes.esp": {
+   "name": "Mara Hood",
+   "set": "Robes of Mara",
+   "factions": [
+    "great-faiths",
+    "imperial-cult"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8a4:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "872:DivineAndDaedricRobes.esp": {
+   "name": "Mehrunes Dagon Hood",
+   "set": "Robes of Mehrunes Dagon",
+   "factions": [
+    "cult-mehrunes-dagon"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8a5:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "873:DivineAndDaedricRobes.esp": {
+   "name": "Mephala Hood",
+   "set": "Robes of Mephala",
+   "factions": [
+    "cult-mephala"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8a6:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "874:DivineAndDaedricRobes.esp": {
+   "name": "Meridia Hood",
+   "set": "Robes of Meridia",
+   "factions": [
+    "cult-meridia"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8a7:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "875:DivineAndDaedricRobes.esp": {
+   "name": "Molag Bal Hood",
+   "set": "Robes of Molag Bal",
+   "factions": [
+    "cult-molag-bal"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8a8:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "877:DivineAndDaedricRobes.esp": {
+   "name": "Namira Hood",
+   "set": "Robes of Namira",
+   "factions": [
+    "cult-namira"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8a9:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "878:DivineAndDaedricRobes.esp": {
+   "name": "Nocturnal Hood",
+   "set": "Robes of Nocturnal",
+   "factions": [
+    "cult-nocturnal"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8aa:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "879:DivineAndDaedricRobes.esp": {
+   "name": "Peryite Hood",
+   "set": "Robes of Peryite",
+   "factions": [
+    "cult-peryite"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8ab:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "87a:DivineAndDaedricRobes.esp": {
+   "name": "Sanguine Hood",
+   "set": "Robes of Sanguine",
+   "factions": [
+    "cult-sanguine"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8ac:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "87b:DivineAndDaedricRobes.esp": {
+   "name": "Sheogorath Hood",
+   "set": "Robes of Sheogorath",
+   "factions": [
+    "cult-sheogorath"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8ad:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "87c:DivineAndDaedricRobes.esp": {
+   "name": "Stendarr Hood",
+   "set": "Robes of Stendarr",
+   "factions": [
+    "great-faiths",
+    "imperial-cult",
+    "vigil-of-stendarr"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8ae:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "87d:DivineAndDaedricRobes.esp": {
+   "name": "Talos Hood",
+   "set": "Robes of Talos",
+   "factions": [
+    "knights-of-the-nine",
+    "stormcloaks"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8af:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "87e:DivineAndDaedricRobes.esp": {
+   "name": "Vaermina Hood",
+   "set": "Robes of Vaermina",
+   "factions": [
+    "cult-vaermina"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8b0:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "87f:DivineAndDaedricRobes.esp": {
+   "name": "Zenithar Hood",
+   "set": "Robes of Zenithar",
+   "factions": [
+    "great-faiths",
+    "imperial-cult"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8b1:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "880:DivineAndDaedricRobes.esp": {
+   "name": "Akatosh Robes",
+   "set": "Robes of Akatosh",
+   "factions": [
+    "great-faiths",
+    "imperial-cult"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8b2:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "881:DivineAndDaedricRobes.esp": {
+   "name": "Arkay Robes",
+   "set": "Robes of Arkay",
+   "factions": [
+    "great-faiths",
+    "imperial-cult"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8b3:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "882:DivineAndDaedricRobes.esp": {
+   "name": "Azura Robes",
+   "set": "Robes of Azura",
+   "factions": [
+    "cult-azura"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8b4:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "883:DivineAndDaedricRobes.esp": {
+   "name": "Boethiah Robes",
+   "set": "Robes of Boethiah",
+   "factions": [
+    "cult-boethiah"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8b5:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "884:DivineAndDaedricRobes.esp": {
+   "name": "Clavicus Vile Robes",
+   "set": "Robes of Clavicus Vile",
+   "factions": [
+    "cult-clavicus-vile"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8b6:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "885:DivineAndDaedricRobes.esp": {
+   "name": "Dibella Robes",
+   "set": "Robes of Dibella",
+   "factions": [
+    "great-faiths",
+    "imperial-cult"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8b7:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "886:DivineAndDaedricRobes.esp": {
+   "name": "Hermaeous Mora Robes",
+   "set": "Robes of Hermaeus Mora",
+   "factions": [
+    "cult-hermaeus-mora"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8b8:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "887:DivineAndDaedricRobes.esp": {
+   "name": "Hircine Robes",
+   "set": "Robes of Hircine",
+   "factions": [
+    "cult-hircine"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8b9:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "888:DivineAndDaedricRobes.esp": {
+   "name": "Julianos Robes",
+   "set": "Robes of Julianos",
+   "factions": [
+    "great-faiths",
+    "imperial-cult"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8ba:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "889:DivineAndDaedricRobes.esp": {
+   "name": "Kynareth Robes",
+   "set": "Robes of Kynareth",
+   "factions": [
+    "great-faiths",
+    "imperial-cult"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8bb:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "88a:DivineAndDaedricRobes.esp": {
+   "name": "Malacath Robes",
+   "set": "Robes of Malacath",
+   "factions": [
+    "clan-gol-kharzum",
+    "clan-mor-khazgur",
+    "clan-dushnikh-yal",
+    "clan-largashbur",
+    "clan-narzulbur",
+    "clan-cracked-tusk"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8bc:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "88b:DivineAndDaedricRobes.esp": {
+   "name": "Mara Robes",
+   "set": "Robes of Mara",
+   "factions": [
+    "great-faiths",
+    "imperial-cult"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8bd:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "88c:DivineAndDaedricRobes.esp": {
+   "name": "Mehrunes Dagon Robes",
+   "set": "Robes of Mehrunes Dagon",
+   "factions": [
+    "cult-mehrunes-dagon"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8be:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "88d:DivineAndDaedricRobes.esp": {
+   "name": "Mephala Robes",
+   "set": "Robes of Mephala",
+   "factions": [
+    "cult-mephala"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8bf:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "88e:DivineAndDaedricRobes.esp": {
+   "name": "Meridia Robes",
+   "set": "Robes of Meridia",
+   "factions": [
+    "cult-meridia"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8c0:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "88f:DivineAndDaedricRobes.esp": {
+   "name": "Molag Bal Robes",
+   "set": "Robes of Molag Bal",
+   "factions": [
+    "cult-molag-bal"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8c1:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "890:DivineAndDaedricRobes.esp": {
+   "name": "Namira Robes",
+   "set": "Robes of Namira",
+   "factions": [
+    "cult-namira"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8c2:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "891:DivineAndDaedricRobes.esp": {
+   "name": "Nocturnal Robes",
+   "set": "Robes of Nocturnal",
+   "factions": [
+    "cult-nocturnal"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8c3:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "892:DivineAndDaedricRobes.esp": {
+   "name": "Peryite Robes",
+   "set": "Robes of Peryite",
+   "factions": [
+    "cult-peryite"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8c4:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "893:DivineAndDaedricRobes.esp": {
+   "name": "Sanguine Robes",
+   "set": "Robes of Sanguine",
+   "factions": [
+    "cult-sanguine"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8c5:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "895:DivineAndDaedricRobes.esp": {
+   "name": "Sheogorath Robes",
+   "set": "Robes of Sheogorath",
+   "factions": [
+    "cult-sheogorath"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8c6:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "896:DivineAndDaedricRobes.esp": {
+   "name": "Stendarr Robes",
+   "set": "Robes of Stendarr",
+   "factions": [
+    "great-faiths",
+    "imperial-cult",
+    "vigil-of-stendarr"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8c7:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "897:DivineAndDaedricRobes.esp": {
+   "name": "Talos Robes",
+   "set": "Robes of Talos",
+   "factions": [
+    "knights-of-the-nine",
+    "stormcloaks"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8c8:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "e739b:Skyrim.esm": {
+   "name": "Vaermina Robes",
+   "set": "Robes of Vaermina",
+   "factions": [
+    "cult-vaermina"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8c9:DivineAndDaedricRobes.esp"
+   ]
+  },
+  "898:DivineAndDaedricRobes.esp": {
+   "name": "Zenithar Robes",
+   "set": "Robes of Zenithar",
+   "factions": [
+    "great-faiths",
+    "imperial-cult"
+   ],
+   "role": "tailor",
+   "recipes": [
+    "8ca:DivineAndDaedricRobes.esp"
+   ]
+  },
   "a6d7f:Skyrim.esm": {
    "name": "Fur Boots",
    "set": "Stormcloaks",
