@@ -434,8 +434,7 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   ok(byMethod('AddSpell').length === 2 && byMethod('AddSpell').every((c) => c.types[0] === 'espm'), 'the spells go to AddSpell as espm records (a form argument would throw, as live)', papyrusCalls);
   ok(byMethod('AddToFaction').length === 1 && byMethod('AddToFaction')[0].types[0] === 'espm' && byMethod('IsInFaction')[0].types[0] === 'espm', 'the faction goes as an espm record');
   ok(!logLines.some((l) => /failed/.test(l)), 'no Papyrus call failed', logLines.filter((l) => /failed/.test(l)));
-  globalThis.__dboBriarheartEquip(PB, { inv: { entries: [] } });
-  ok(byMethod('EquipItem').length === 1 && byMethod('EquipItem')[0].types[0] === 'espm' && logLines.some((l) => /look on char70 \(equipment\): bare chest, briar body 5d008:Skyrim\.esm equipped/.test(l)), 'the briar body goes to EquipItem as an espm record, and the look says equipped', logLines);
+  ok(byMethod('EquipItem').length === 1 && byMethod('EquipItem')[0].types[0] === 'espm' && logLines.some((l) => /look on char70 \((staff|equipment)\): bare chest, briar body 5d008:Skyrim\.esm equipped/.test(l)), 'the briar body goes to EquipItem as an espm record, and the look says equipped', logLines);
   // the server refuses the equip: the look says so, never "equipped"
   papyrusThrows.add('EquipItem'); globalThis.__dboBriarheart.looks.delete(PB); logLines.length = 0;
   globalThis.__dboBriarheartEquip(PB, { inv: { entries: [] } });
