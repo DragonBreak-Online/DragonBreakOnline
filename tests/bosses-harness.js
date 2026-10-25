@@ -199,6 +199,8 @@ ok(ww && ww.devOnly === true && ww.night === true && ww.hold === 'falkreath' && 
   'the Behemoth of Hircine\'s Hunt: dev only, a night boss of Falkreath, three spots, a werewolf and two wolves for its pack');
 ok(ww.drops.always.some((x) => x[2] === 'WerewolfPelt') && ww.drops.always.some((x) => x[2] === 'WolfPelt') && ww.drops.schematic.family === 'silver' && ww.drops.extraSchematic.family === 'glass',
   '...it drops a Werewolf Pelt and wolf pelts, Silver 5%, Glass 1%');
+ok(ww.boss.options.length === 1 && ww.boss.options[0][1] === '1d2207:DragonBreak Online Edits.esp' && ww.boss.edid === 'DBO_EncWerewolfBehemothBoss' && ww.boss.options[0][0] === 42,
+  '...the boss is its own NPC on the Behemoth race, DLE 1D2207 (Worker 3's merge, 1.3x the pack), level 42 as its template');
 let moonUp = false;
 globalThis.__dboClock = { isNight: () => night, isFullMoon: () => moonUp };
 night = true; load({ bosses: { devOnly: true } });

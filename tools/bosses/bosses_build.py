@@ -169,7 +169,8 @@ def build(lo, defs):
     for b in defs['bosses']:
         who = b['id']
         w = key_of(b['world'])
-        o = {k: v for k, v in b.items() if k not in ('bossEdid', 'addEdids', 'guardian', 'drops', 'spots', 'rearmEdid', 'rearmAddsEdid')}
+        o = {k: v for k, v in b.items() if k not in ('bossEdid', 'addEdids', 'guardian', 'drops', 'spots', 'rearmEdid', 'rearmAddsEdid',
+                                                     'bossDesc', 'bossLevel', 'bossConfirmedBy')}
         for src, dst in (('rearmEdid', 'rearm'), ('rearmAddsEdid', 'rearmAdds')):
             if not b.get(src):
                 continue
@@ -179,7 +180,20 @@ def build(lo, defs):
             else:
                 bad.append(f"{who}: no weapon '{b[src]}' to rearm with")
         o['world'] = lo.desc(w)
-        o['boss'] = actor(b['bossEdid'], who)
+        if b.get('bossDesc'):
+            # A boss NPC another worker merged and read back from a plugin this machine does not have yet (the Behemoth, DLE
+            # 1D2207): its own record when this load order has it under that editor id, else the confirmed desc as it stands
+            k = key_of(b['bossDesc'])
+            if k in lo.types and str(lo.edid(k)).lower() == str(b['bossEdid']).lower():
+                o['boss'] = actor(b['bossEdid'], who)
+            elif b.get('bossConfirmedBy'):
+                o['boss'] = {'edid': b['bossEdid'], 'desc': b['bossDesc'], 'options': [[int(b.get('bossLevel') or 1), b['bossDesc'], b['bossEdid']]]}
+                warn.append(f"{who}: boss {b['bossDesc']} ({b['bossEdid']}) is not in this load order; kept on its confirmation ({b['bossConfirmedBy'][:80]})")
+            else:
+                bad.append(f"{who}: boss {b['bossDesc']} is not {b['bossEdid']} in this load order and has no bossConfirmedBy")
+                o['boss'] = None
+        else:
+            o['boss'] = actor(b['bossEdid'], who)
         o['adds'] = [x for x in (actor(e, who + ' add') for e in b.get('addEdids', [])) if x]
         if b.get('guardian'):
             g = actor(b['guardian']['edid'], who + ' guardian')

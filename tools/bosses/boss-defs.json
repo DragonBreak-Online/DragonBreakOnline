@@ -964,7 +964,7 @@
      "note": "Falkreath: Half-Moon Mill's lakeside woods"
     }
    ],
-   "bossEdid": "EncWerewolf06Boss",
+   "bossEdid": "DBO_EncWerewolfBehemothBoss",
    "addEdids": [
     "EncWerewolf03",
     "EncWolf",
@@ -1021,8 +1021,11 @@
      "chance": 0.01
     }
    },
-   "waitingOn": "the dev test (bosses.devOnly on the dev server): a werewolf pack streamed to several watchers at once. One werewolf NPC has been hosted live (Werewolf Beastmaster a092e, Driftshade, 20 Oct, no crash), never a pack; then Nat picks the spot and night or full moon",
-   "_note": "Proposed 25 Oct (the Leader for Nat): vanilla's top werewolf boss (EncWerewolf06Boss, Dawnguard's ladder) named and rim-lit; the server's SetScale is a stub, so a body 1.3x would need an NPC_ on the Behemoth race 1d1f9e in the DLE (a plugin edit, not made). Pack: a werewolf and two wolves at the start, then 3 and 4 more (werewolf, wolf, wolf in turn). Drops: a Werewolf Pelt (Hothtrooper's werewolf fur and leather recipes take it) and three wolf pelts, gold, Silver 5% (the hunter's metal, Hircine's joke), Glass 1%. Every zone is hostile, player werewolves included. fullMoon true (here or in its config block) keeps it to full-moon nights"
+   "waitingOn": "the dev test (bosses.devOnly on the dev server, with the restart DLE d0831dd6 that carries 1D2207): a werewolf pack streamed to several watchers, and the Behemoth about a third taller than its Werewolf Brute adds",
+   "_note": "Proposed 25 Oct (the Leader for Nat): vanilla's top werewolf boss (EncWerewolf06Boss, Dawnguard's ladder) named and rim-lit; the server's SetScale is a stub, so the boss is its own NPC_ on the Behemoth race (DLE 1D2207, Nat 25 Oct: 1.3x the pack: race 1.30 x NAM6 1.13 = 1.47 against the adds' 1.13). Pack: a werewolf and two wolves at the start, then 3 and 4 more (werewolf, wolf, wolf in turn). Drops: a Werewolf Pelt (Hothtrooper's werewolf fur and leather recipes take it) and three wolf pelts, gold, Silver 5% (the hunter's metal, Hircine's joke), Glass 1%. Every zone is hostile, player werewolves included. fullMoon true (here or in its config block) keeps it to full-moon nights",
+   "bossDesc": "1d2207:DragonBreak Online Edits.esp",
+   "bossLevel": 42,
+   "bossConfirmedBy": "Worker 3, 25 Oct: merged into the restart DLE d0831dd6 as 491D2207, read back: TPLT EncWerewolf06Boss (level 42), race DBO_WerewolfBehemothRace 1D1F9E, NAM6 1.13, FULL 'Werewolf Behemoth'"
   }
  ]
 }
