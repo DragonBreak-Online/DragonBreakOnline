@@ -52,7 +52,7 @@ const events = {
 // Requests the front may send through admin::request; everything else is refused here
 const PANEL_REQUESTS = new Set(["adminItemsRequest", "adminMasteryRequest", "adminLocationsRequest", "adminPlaceablesRequest",
   "adminPlacementsRequest", "adminPlacementRemove", "adminPlacementGoto", "adminPlaceMeta", "adminPlaceSearch", "adminPlaceUndo",
-  "adminPlaceSets", "adminPlaceSetSave", "adminPlaceSetPlace", "adminPlaceSetDelete", "adminPlaceGroupClear", "adminWarband", "adminRaid"]);
+  "adminPlaceSets", "adminPlaceSetSave", "adminPlaceSetPlace", "adminPlaceSetDelete", "adminPlaceGroupClear", "adminWarband", "adminRaid", "adminWarbandView"]);
 
 interface DebugServer {
   name: string;
@@ -177,6 +177,7 @@ export class AdminMenuService extends ClientListener {
         placeMeta: panelData.placeMeta || null,
         placeResults: panelData.placeResults || null,
         placeSets: panelData.placeSets || null,
+        warband: panelData.warband || null,
         masteryTarget: panelData.masteryTarget || null,
         events,
       };
@@ -233,6 +234,18 @@ export class AdminMenuService extends ClientListener {
       this.pushData();
     } else if (content["customPacketType"] === "adminPlaceSets") {
       panelData.placeSets = Array.isArray(content["sets"]) ? content["sets"] : [];
+      this.pushData();
+    } else if (content["customPacketType"] === "adminWarbandView") {
+      // The Place tab's Warband view (server warband.js viewOf): small, so it travels in panelData; lists stay lists
+      const list = (k: string) => (Array.isArray(content[k]) ? content[k] : []);
+      const plan = content["plan"] && typeof content["plan"] === "object" ? content["plan"] : { calm: 0, kept: "", unread: "" };
+      const last = content["last"] && typeof content["last"] === "object" ? content["last"] : null;
+      panelData.warband = {
+        members: list("members"), counts: list("counts"), placed: list("placed"), players: list("players"), npcs: list("npcs"),
+        stance: String(content["stance"] ?? "follow"), side: String(content["side"] ?? ""), enemies: list("enemies"),
+        plan, presets: list("presets"), onLogout: String(content["onLogout"] ?? "dismiss"),
+        maxBand: Number(content["maxBand"]) || 25, maxRaise: Number(content["maxRaise"]) || 10, last, at: Date.now(),
+      };
       this.pushData();
     } else if (content["customPacketType"] === "adminPlaceMeta") {
       panelData.placeMeta = {
@@ -428,6 +441,7 @@ export class AdminMenuService extends ClientListener {
         adminPlaceGroupClear: ["placeGroupClear", ["id"]],
         adminWarband: ["warband", ["text"]],
         adminRaid: ["raid", ["text"]],
+        adminWarbandView: ["warbandView", []],
       };
       if (PLACE_EVENTS[type]) {
         let f: Record<string, unknown> = {};
