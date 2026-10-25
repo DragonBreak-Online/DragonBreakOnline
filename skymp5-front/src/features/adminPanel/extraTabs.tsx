@@ -147,8 +147,8 @@ export const DeityReset = ({ actor, name, profile, canSpawn }: { actor: string |
 };
 
 // Extra buttons for the selected online player, plus the ban list
-export const PlayerPunish = ({ events, target, name, canBan, canSpawn, bans }: {
-  events: Record<string, string>; target: string | null; name: string; canBan: boolean; canSpawn: boolean; bans: PanelBan[];
+export const PlayerPunish = ({ events, target, name, canBan, canDelete, canSpawn, bans }: {
+  events: Record<string, string>; target: string | null; name: string; canBan: boolean; canDelete: boolean; canSpawn: boolean; bans: PanelBan[];
 }) => {
   const [hours, setHours] = useState('24');
   const hoursOk = Number(hours) > 0 && Number(hours) <= 8760;
@@ -156,7 +156,7 @@ export const PlayerPunish = ({ events, target, name, canBan, canSpawn, bans }: {
     <div className="admin-panel__punish">
       <div className="admin-panel__actions">
         {canSpawn ? <Button text="Kill" width={96} height={32} disabled={!target} onClick={() => target && adminAction(events, 'kill', { target })} /> : null}
-        {canBan ? <Confirm text="Delete character" width={170} disabled={!target} onConfirm={() => target && adminAction(events, 'deleteCharacter', { target })} /> : null}
+        {canDelete ? <Confirm text="Delete character" width={170} disabled={!target} onConfirm={() => target && adminAction(events, 'deleteCharacter', { target })} /> : null}
         {canBan ? <Confirm text="IP ban" width={110} disabled={!target} onConfirm={() => target && adminAction(events, 'ipBan', { target })} /> : null}
       </div>
       {canBan ? (

@@ -91,7 +91,7 @@ export interface AdminPanelData {
   npcZonesAt?: number; // Date.now() when npcZones arrived, the countdown base
   // server-resolved tier capabilities, absent on older servers. A Trial GM's carry trial, tabs (the tabs they may open)
   // and actions (the Players tab actions they may use); the server refuses everything else either way
-  caps?: { ban?: boolean; spawn?: boolean; trial?: boolean; tabs?: string[]; actions?: string[] };
+  caps?: { ban?: boolean; del?: boolean; spawn?: boolean; trial?: boolean; tabs?: string[]; actions?: string[] };
   tier?: string; // "senior" | "developer" | "leadgm" | "gm" | "trialgm", absent on older servers
   mastery?: PanelMastery | null; // the admin's own standing, absent on older servers
   bans?: PanelBan[]; // admin-bans.json entries (temp and ip bans)
@@ -313,6 +313,9 @@ const AdminPanel = ({ data }: { data: AdminPanelData }) => {
   const actionsEnabled = !!(selectedPlayer && selectedPlayer.online && selectedPlayer.a);
   // Hidden rather than greyed so a tier without ban never sees a dead button; the server enforces it anyway
   const canBan = !data.caps || data.caps.ban !== false;
+  // Deleting a character is its own capability (server TIER_CAPS.del): a Lead GM bans but never deletes. A server that
+  // sends no del is older than that split, where deletion went by ban, so fall back to ban rather than hiding it there.
+  const canDelete = !data.caps || (data.caps.del !== undefined ? data.caps.del : data.caps.ban !== false);
   // A Trial GM's actions (caps.actions: TP to and Rename); everyone else sees every button
   const allowedActions = data.caps && Array.isArray(data.caps.actions) ? data.caps.actions : null;
   const canDo = (action: string): boolean => !allowedActions || allowedActions.indexOf(action) !== -1;
@@ -510,6 +513,7 @@ const AdminPanel = ({ data }: { data: AdminPanelData }) => {
                 target={actionsEnabled && selectedPlayer && selectedPlayer.a ? selectedPlayer.a : null}
                 name={selectedPlayer ? selectedPlayer.n : ''}
                 canBan={canBan}
+                canDelete={canDelete}
                 canSpawn={canSpawn}
                 bans={data.bans || []}
               />
