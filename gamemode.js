@@ -1076,7 +1076,7 @@ const STAFF_HELP = [
     ['dossier', 'list | read <name|#TAG> | reports | add <name|#TAG> <text> | strike <name|#TAG> <n>: the Thalmor dossiers and informant reports (add and strike: Lead GM)']] },
   { key: 'world', title: 'World', items: ['settime', 'setweather', 'timescale', 'region', ['dungeon end', '<dungeon id|name>: end a dungeon claim now'],
     'placed', 'placeundo', 'placeexport', 'worldedits', 'worldhide', 'worldshow', 'masktest', 'couriers', 'traps', 'leverpuzzle',
-    ['guardpost', 'add [npc desc] | list | remove <hold> <n> | auto <hold>: stand where a guard should be and add places that hold\'s own guard there (an id like abe18:Skyrim.esm picks another). auto fills a hold with the posts its guards held in the old days']] },
+    ['guardpost', 'add [npc desc] | list | remove <hold> <n> | auto <hold>: stand where a guard should be and add places that hold\'s own guard there (an id like abe18:Skyrim.esm picks another). auto fills a hold with the posts its guards held in the old days']] }, // verify-formids: ignore (an example id in the help text)
   { key: 'debug', title: 'Server and debugging', items: ['monitor', 'load', 'selftest', 'npc', 'mv', 'driftset', 'driftspawn', 'driftrepair',
     'staffdiag', 'voicediag', 'staffstats', 'gearswap', 'factiongear'] },
 ];
@@ -6609,6 +6609,7 @@ const deathHook = (actorId, killerId, ...rest) => {
   if ((Number(actorId) >>> 0) >= 0xff000000 && (() => { try { return !!mp.get(Number(actorId) >>> 0, 'private.npcSpawner'); } catch (e) { return false; } })()) { peltPending.set(Number(actorId) >>> 0, Date.now()); if (peltPending.size > 2048) for (const [k, t] of peltPending) if (Date.now() - t > PELT_PENDING_MS) peltPending.delete(k); }
   setTimeout(() => { try { stashPelts(Number(actorId) >>> 0); } catch (e) { log('pelt stash failed', e.message); } }, 50);
   try { if (globalThis.__dboChampionDeath) globalThis.__dboChampionDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('champion death failed', e.message); }
+  try { if (globalThis.__dboBossDeath) globalThis.__dboBossDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('boss death failed', e.message); }
   try { if (globalThis.__dboSuperDeath) globalThis.__dboSuperDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('supernatural death failed', e.message); }
   try { if (globalThis.__dboContractKill && killerId) globalThis.__dboContractKill(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('contract kill failed', e.message); }
   try { if (globalThis.__dboBlackreachDeath) globalThis.__dboBlackreachDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('blackreach death failed', e.message); }
@@ -6632,6 +6633,7 @@ const hitDamageHook = (aggressorId, targetId, sourceId, damage, ...rest) => {
   // so the tier's share has to be on the target by the time it looks.
   try { dealt += masteryBonusDamage(agg, tgt, dealt); } catch (e) { log('mastery damage failed', e.message); }
   try { if (globalThis.__dboChampionHit) globalThis.__dboChampionHit(agg, tgt, dealt); } catch (e) { log('champion hit failed', e.message); }
+  try { if (globalThis.__dboBossHit) globalThis.__dboBossHit(agg, tgt, dealt); } catch (e) { log('boss hit failed', e.message); }
   try { if (globalThis.__dboBlackreachHit && dealt > 0) globalThis.__dboBlackreachHit(agg, tgt); } catch (e) { log('blackreach hit failed', e.message); }
   try { dealt += superBonusDamage(agg, tgt, Number(sourceId) >>> 0, dealt); } catch (e) { log('supernatural damage failed', e.message); }
   try { if (globalThis.__dboSuperHit && dealt > 0) globalThis.__dboSuperHit(agg, tgt); } catch (e) { log('supernatural hit failed', e.message); }
@@ -8254,6 +8256,8 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     mult *= npcPowerHitMult(agg, tgt, flags, dmg);
     // A kind of creature's or NPC's hits on a player (npcDamage.byKind)
     mult *= npcKindDamageMult(agg, tgt, dmg);
+    // A boss's hits on a player, more once it is enraged (bosses.js)
+    try { if (globalThis.__dboBossDamageMult) mult *= Number(globalThis.__dboBossDamageMult(agg, tgt)) || 1; } catch (e) { log('boss damage failed', e.message); }
     // An enemy of a claimed dungeon by the lease's difficulty, and any NPC's spell (npcDamage.byDifficulty, spellMult)
     mult *= npcDifficultyDamageMult(agg, tgt, dmg, flags);
     // A family of creatures by race, on a player (npcToughness.kinds.<kind>.dealt; the draugr, 17 Oct)
@@ -8509,6 +8513,13 @@ try {
   delete require.cache[CHAMPIONS_JS];
   require(CHAMPIONS_JS)({ mp, log, personal, audit, display, cfg, giveItem, registerChatCommand, sendPacket, onlineActors, every, stopTimer, loot: (() => { try { return JSON.parse(fs.readFileSync(path.resolve('loot.json'), 'utf8')); } catch (e) { return { pools: {} }; } })() });
 } catch (e) { log('champions.js failed to load:', e.stack || e.message); globalThis.__dboChampionHit = null; globalThis.__dboChampionDeath = null; }
+
+// ---- bosses worth grinding: the Wraith of the Ice Cap, the Briarheart King, the Centurion Master... (serverosses.js) --
+try {
+  const BOSSES_JS = path.resolve('bosses.js');
+  delete require.cache[BOSSES_JS];
+  require(BOSSES_JS)({ mp, log, personal, audit, display, who, cfg, giveItem, registerChatCommand, sendPacket, onlineActors, every, stopTimer, profileOf, zoneOfActor });
+} catch (e) { log('bosses.js failed to load:', e.stack || e.message); globalThis.__dboBossHit = null; globalThis.__dboBossDeath = null; globalThis.__dboBossDamageMult = null; }
 
 // ---- mining and woodcutting mini-games (server\labour.js, config "labour") ---------------------
 try {

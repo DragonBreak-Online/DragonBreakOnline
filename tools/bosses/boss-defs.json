@@ -1,0 +1,118 @@
+{
+ "_comment": "The bosses' definitions (Nat, 25 Oct: \"other than the dragon priest we should develop other bosses people could grind for special drops/schematics\"; design _work/boss-roster-design-1025.md on the PC). Read by tools/bosses/bosses_build.py, which resolves every editor id and desc against the load order, picks each spot's anchor and writes bosses.json for bosses.js. spots: candidates, the first is used; a boss with enabled false waits on Nat (his eye on the spot, or an item still being built). bossEdid / addEdids: NPC_ or LVLN editor ids. drops: always [[desc, count]], shards { desc, count, top } (an item made for this boss, filled in once it exists), schematic { family, chance } (smithing.json family; a smith who knows it gets knownBonus of the shards instead), extra [[desc, chance, count]]. waves: at a share of the boss's health, n adds of addEdids. Seconds throughout.",
+ "bosses": [
+  {
+   "id": "icecap",
+   "name": "the Wraith of the Ice Cap",
+   "enabled": false,
+   "waitingOn": "Nat's choice of spot (S1-S4) and the Glacial Crystal Shard's form id (Worker 2, Nexus Patches)",
+   "hold": "winterhold",
+   "world": "3c:Skyrim.esm",
+   "spots": [
+    { "id": "S1", "pos": [116555, 112027, -7409], "note": "the open snowfield NE of Winterhold, 41 flat drifts, cell (28, 27); its anchor is from Obscure's College of Winterhold, so check the College's grounds" },
+    { "id": "S2", "pos": [119754, 112980, -8882], "note": "the glacier's edge, cell (29, 27)" },
+    { "id": "S3", "pos": [121379, 121316, -10718], "note": "drifts on an iceberg beyond the cliffs, cell (29, 29)" },
+    { "id": "S4", "pos": [115771, 141550, -14321], "note": "iceberg ledges at sea level, the Sea of Ghosts, cell (28, 34)" }
+   ],
+   "bossEdid": "EncIceWraith",
+   "addEdids": ["EncIceWraith"],
+   "openingAdds": 3,
+   "waves": [[0.66, 3], [0.33, 3]],
+   "toughness": 0.9,
+   "damageMult": 4,
+   "enrageSeconds": 480,
+   "enrage": { "toughness": 0.5, "damageMult": 6 },
+   "respawnSeconds": 10800,
+   "radius": 6000,
+   "announce": { "spawn": "Something cold stirs on the ice above Winterhold.", "death": "The cold above Winterhold breaks." },
+   "drops": {
+    "always": [["3ad5f:Skyrim.esm", 2]],
+    "shards": { "desc": "", "count": 3, "top": 4 },
+    "schematic": { "family": "glacial_crystal", "chance": 0.03, "knownBonus": 2 }
+   }
+  },
+  {
+   "id": "briarheartking",
+   "name": "the Briarheart King",
+   "enabled": true,
+   "hold": "markarth",
+   "world": "3c:Skyrim.esm",
+   "spots": [
+    { "id": "LV", "pos": [-92100, -41500, 1786.79], "heading": 352.8, "note": "Lost Valley Redoubt's upper platform, by its hagravens (camp boss spot 34129:Skyrim.esm)" }
+   ],
+   "bossEdid": "LvlForswornBossShaman",
+   "guardian": { "edid": "EncHagraven", "offset": [200, 120, -60], "name": "the King's Hagraven", "bossToughnessWhileAlive": 0.85 },
+   "addEdids": ["LvlForswornMelee", "LvlForswornMissile"],
+   "openingAdds": 0,
+   "waves": [[0.66, 2], [0.33, 3]],
+   "toughness": 0.4,
+   "damageMult": 1.5,
+   "enrageSeconds": 480,
+   "enrage": { "toughness": 0.2, "damageMult": 2.5 },
+   "respawnSeconds": 7200,
+   "radius": 6000,
+   "excludeBriarhearts": true,
+   "announce": { "spawn": "The Forsworn of Lost Valley have crowned a Briarheart King.", "death": "The Briarheart King of Lost Valley has fallen." },
+   "drops": {
+    "always": [["3ad61:Skyrim.esm", 1]],
+    "schematic": { "family": "silver", "chance": 0.05, "knownBonus": 0 }
+   }
+  },
+  {
+   "id": "centurion",
+   "name": "the Centurion Master",
+   "enabled": true,
+   "hold": "",
+   "world": "1ee62:Skyrim.esm",
+   "spots": [
+    { "id": "PS", "pos": [15456.31, 13746.16, 1061.07], "note": "Blackreach's pump station, beside its centurion spot (b10e11b)" }
+   ],
+   "bossEdid": "EncDwarvenCenturion03",
+   "addEdids": ["EncDwarvenSphere03", "EncDwarvenSpider03"],
+   "openingAdds": 0,
+   "waves": [[0.66, 2], [0.33, 3]],
+   "toughness": 0.6,
+   "damageMult": 1.5,
+   "enrageSeconds": 360,
+   "enrage": { "toughness": 0.3, "damageMult": 2.5 },
+   "respawnSeconds": 14400,
+   "radius": 4000,
+   "announce": { "spawn": "Steam hisses through Blackreach: the Centurion Master wakes.", "death": "The Centurion Master of Blackreach is still." },
+   "drops": {
+    "always": [],
+    "schematic": { "family": "dwarven", "chance": 0.08, "knownBonus": 0 },
+    "extraSchematic": { "family": "mithril", "chance": 0.01 }
+   }
+  },
+  {
+   "id": "palewarlord",
+   "name": "the Warlord of the Pale Pass",
+   "enabled": false,
+   "waitingOn": "Nat's eye on the three spots on the Bruma side of the Pale Pass road",
+   "hold": "bruma",
+   "world": "a764b:BSHeartland.esm",
+   "spots": [
+    { "id": "SR", "pos": [60719, 249420, 15404], "note": "by Snowstone Rest" },
+    { "id": "ST", "pos": [58987, 242571, 14076], "note": "on Serpent's Trail (14, 59)" },
+    { "id": "SE", "pos": [64214, 232252, 11359], "note": "below The Sentinel (16,000 units from Cloud Ruler Temple)" }
+   ],
+   "roam": true,
+   "bossEdid": "CYRLvlBanditBoss",
+   "addEdids": ["CYRLvlBanditMeleeAny", "CYRLvlBanditMissile"],
+   "openingAdds": 2,
+   "waves": [[0.5, 3]],
+   "toughness": 0.5,
+   "damageMult": 1.25,
+   "enrageSeconds": 360,
+   "enrage": { "toughness": 0.25, "damageMult": 2 },
+   "respawnSeconds": 7200,
+   "radius": 6000,
+   "announce": { "spawn": "A warlord's horn sounds on the Pale Pass road.", "death": "The Warlord of the Pale Pass is dead." },
+   "drops": {
+    "always": [["f:Skyrim.esm", 150]],
+    "schematic": { "family": "scaled", "chance": 0.05, "knownBonus": 0 },
+    "extraSchematic": { "family": "steelplate", "chance": 0.03 }
+   }
+  }
+ ]
+}
