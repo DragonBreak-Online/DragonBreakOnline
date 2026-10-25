@@ -96,5 +96,17 @@ check('an alias member on hold waits through the follower package (WaitingForPla
 check('a hold no longer releases the alias (stay keeps it)', !/private stay\([^)]*\): void \{\n\s+this\.releaseAlias\(state\);/.test(svc));
 check('the other members glance at the owner with setLookAt and clearLookAt', /actor\.setLookAt\(player, false\);/.test(svc) && /actor\.clearLookAt\(\);/.test(svc));
 
+// ---- step 3: the quick orders --------------------------------------------------------------------------------------
+const kb = fs.readFileSync(path.resolve(__dirname, '../src/services/services/keybindsService.ts'), 'utf8');
+const rows = fs.readFileSync(path.resolve(__dirname, '../../skymp5-front/src/features/journal/tabs/SettingsKeys.tsx'), 'utf8');
+const KEYS = ['warbandFollowKeyCode', 'warbandHoldKeyCode', 'warbandAttackKeyCode', 'warbandNearestKeyCode'];
+check('the four quick-order keys are in the central registry (MENU_KEYS), on Num1-Num4', /warbandFollowKeyCode: DxScanCode\.Num1, warbandHoldKeyCode: DxScanCode\.Num2, warbandAttackKeyCode: DxScanCode\.Num3, warbandNearestKeyCode: DxScanCode\.Num4/.test(kb));
+check('...each may be unbound (OPTIONAL_KEYS)', KEYS.every((k) => { const line = (kb.match(/const OPTIONAL_KEYS = new Set\(\[[^\]]*\]\)/) || [''])[0]; return line.includes(`"${k}"`); }));
+check('...and each has a staff-only, optional row on the F3 Settings page', KEYS.every((k) => rows.includes(`names: ['${k}'], staff: true, optional: true`)));
+check('a press sends the same order the Warband view sends (dbo warband <order>)', /sendCustomPacket\(this\.controller, \{ customPacketType: "dbo", event: "warband", args: \[order\] \}\);/.test(svc));
+check('...only while the player leads a warband, never into the chat, at most one in 400 ms',
+  /!this\.companions\.some\(\(c\) => c\.kind === "companion"\)\) return;/.test(svc) && /isMenuKeyPressBlocked\(this\.sp, this\.controller, e\)\) return;/.test(svc) && /orderKeyRepeatMs = 400/.test(svc));
+check('...and the orders are follow, stay, attacktarget, attacknearest', /"follow"\][\s\S]*"stay"\][\s\S]*"attacktarget"\][\s\S]*"attacknearest"\]/.test(svc));
+
 console.log(failures ? `${failures} FAILED` : 'all passed');
 process.exit(failures ? 1 : 0);

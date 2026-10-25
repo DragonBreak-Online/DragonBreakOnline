@@ -1,4 +1,4 @@
-import { Actor, HitEvent, ObjectReference, Quest, ReferenceAlias, storage } from "skyrimPlatform";
+import { Actor, ButtonEvent, DxScanCode, HitEvent, ObjectReference, Quest, ReferenceAlias, storage } from "skyrimPlatform";
 import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { companionFightState } from "./companionFightState";
 import { FightStall, fightStallStep } from "./companionFightStall";
@@ -7,6 +7,8 @@ import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { sendCustomPacket, parseCustomPacket } from "./customPacketUtil";
 import { WorldCleanerService } from "./worldCleanerService";
+import { buttonKeyCode } from "./mouseKeys";
+import { isMenuKeyPressBlocked, readMenuKeyCode } from "./widgetMenuUtil";
 import { getViewFromStorage, isRemoteHostedByMe, isRemotePlayerCharacter, localIdToRemoteId, remoteIdToLocalId } from "../../view/worldViewMisc";
 import { leavesPlayerFight, orderedTarget } from "./companionPvp";
 import { COMPANION_IDS_KEY, isOwnCompanion, isAnyCompanion } from "../../sync/ownCompanions";
@@ -105,7 +107,35 @@ export class CompanionService extends ClientListener {
     this.controller.emitter.on("connectionAccepted", () => this.onConnectionAccepted());
     this.controller.on("hit", (e) => this.onHit(e));
     this.controller.on("update", () => this.onUpdate());
+    // The warband's quick orders (warband rework step 3, Nat 25 Oct): keys from keybindsService, rebindable in F3
+    // Settings, staff-only and optional there; a key reads 0 when it is unbound
+    for (const [name, fallback, order] of CompanionService.orderKeyNames) {
+      const code = readMenuKeyCode(this.sp, name, fallback);
+      if (code) this.orderKeys.set(code, order);
+    }
+    this.controller.on("buttonEvent", (e) => this.onOrderKey(e));
   }
+
+  // One press, one order, the same one the Warband view sends (dbo warband <order>): the server checks the sender is
+  // staff, answers in chat and redraws the panel. Only while this player leads a warband, and never into the chat
+  private onOrderKey(e: ButtonEvent): void {
+    if (!e.isDown) return;
+    const code = buttonKeyCode(e);
+    const order = code === null ? undefined : this.orderKeys.get(code);
+    if (!order || !this.companions.some((c) => c.kind === "companion")) return;
+    if (isMenuKeyPressBlocked(this.sp, this.controller, e)) return;
+    const now = Date.now();
+    if (now - this.lastOrderKeyMs < CompanionService.orderKeyRepeatMs) return;
+    this.lastOrderKeyMs = now;
+    sendCustomPacket(this.controller, { customPacketType: "dbo", event: "warband", args: [order] });
+  }
+  private orderKeys = new Map<number, string>();
+  private lastOrderKeyMs = 0;
+  private static readonly orderKeyRepeatMs = 400;
+  private static readonly orderKeyNames: Array<[string, DxScanCode, string]> = [
+    ["warbandFollowKeyCode", DxScanCode.Num1, "follow"], ["warbandHoldKeyCode", DxScanCode.Num2, "stay"],
+    ["warbandAttackKeyCode", DxScanCode.Num3, "attacktarget"], ["warbandNearestKeyCode", DxScanCode.Num4, "attacknearest"],
+  ];
 
   private onConnectionAccepted(): void {
     this.setCompanions([]);

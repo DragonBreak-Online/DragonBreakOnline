@@ -33,6 +33,7 @@ const STUBS = {
     module.exports = {
       Actor: { from: (f) => (f && f.isActor ? f : null) }, ObjectReference: { from: (f) => f || null },
       Quest: { from: () => null }, ReferenceAlias: { from: () => null },
+      DxScanCode: { Num1: 79, Num2: 80, Num3: 81, Num4: 75 },
       get storage() { return W().storage; },
     };`,
   clientListener: 'class ClientListener {} module.exports = { ClientListener };',
@@ -57,12 +58,16 @@ const STUBS = {
   objectReferenceEx: 'module.exports = { ObjectReferenceEx: { getWorldOrCell: () => 0x3c } };',
   hostAttempts: 'module.exports = { lastTryHost: {}, tryHost() {} };',
   empty: 'module.exports = {};',
+  // The warband's quick-order keys (step 3): the fallback key, never blocked
+  mouseKeys: 'module.exports = { buttonKeyCode: (e) => (typeof e.code === "number" ? e.code : null) };',
+  widgetMenuUtil: 'module.exports = { readMenuKeyCode: (_sp, _n, f) => f, isMenuKeyPressBlocked: () => false };',
 };
 const STUB_OF = {
   skyrimPlatform: 'skyrimPlatform', './clientListener': 'clientListener', './customPacketUtil': 'customPacketUtil',
   './worldCleanerService': 'worldCleaner', '../../view/worldViewMisc': 'worldViewMisc', '../../sync/ownCompanions': 'ownCompanions',
   '../../sync/movementApply': 'movementApply', '../../extensions/objectReferenceEx': 'objectReferenceEx',
   '../../view/hostAttempts': 'hostAttempts', '../events/connectionMessage': 'empty', '../messages/customPacketMessage': 'empty',
+  './mouseKeys': 'mouseKeys', './widgetMenuUtil': 'widgetMenuUtil',
 };
 
 // A fake actor: every call is recorded; position, combat target and distance are plain fields

@@ -20,10 +20,12 @@ export const MENU_KEYS: Record<string, number> = {
   personalMenuKeyCode: DxScanCode.U, factionMenuKeyCode: DxScanCode.F3, masteryMenuKeyCode: DxScanCode.K, emoteWheelKeyCode: DxScanCode.B,
   nametagKeyCode: DxScanCode.F1, hideUiKeyCode: DxScanCode.F2, voicePushToTalkKeyCode: DxScanCode.V, voiceModeKeyCode: DxScanCode.LeftAlt,
   maskToggleKeyCode: DxScanCode.H, adminMenuKeyCode: DxScanCode.F7, hideChatKeyCode: 0,
+  warbandFollowKeyCode: DxScanCode.Num1, warbandHoldKeyCode: DxScanCode.Num2, warbandAttackKeyCode: DxScanCode.Num3, warbandNearestKeyCode: DxScanCode.Num4,
 };
 
 const RESERVED_KEYS: number[] = [DxScanCode.Escape, DxScanCode.Backspace, DxScanCode.Enter];
-const OPTIONAL_KEYS = new Set(["hideChatKeyCode"]);
+// The warband's quick orders (companionService) may be unbound too
+const OPTIONAL_KEYS = new Set(["hideChatKeyCode", "warbandFollowKeyCode", "warbandHoldKeyCode", "warbandAttackKeyCode", "warbandNearestKeyCode"]);
 
 export class KeybindsService extends ClientListener {
   constructor(private sp: Sp, private controller: CombinedController) {

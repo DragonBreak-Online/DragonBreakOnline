@@ -27,6 +27,11 @@ export const KEY_ROWS: KeyRow[] = [
   { id: 'range', group: 'view', label: 'Voice range', names: ['voiceModeKeyCode'] },
   { id: 'mask', group: 'view', label: 'Mask', names: ['maskToggleKeyCode'] },
   { id: 'admin', group: 'menus', label: 'Admin panel', names: ['adminMenuKeyCode'], staff: true },
+  // The warband's quick orders (companionService), for a GM leading one
+  { id: 'wbFollow', group: 'menus', label: 'Warband: follow', names: ['warbandFollowKeyCode'], staff: true, optional: true },
+  { id: 'wbHold', group: 'menus', label: 'Warband: hold', names: ['warbandHoldKeyCode'], staff: true, optional: true },
+  { id: 'wbAttack', group: 'menus', label: 'Warband: attack my target', names: ['warbandAttackKeyCode'], staff: true, optional: true, hint: 'What you last struck, or whoever last struck you or your band.' },
+  { id: 'wbNearest', group: 'menus', label: 'Warband: attack nearest foe', names: ['warbandNearestKeyCode'], staff: true, optional: true },
 ];
 type MouseSink = (code: number) => void;
 const noMouse: MouseSink = () => undefined;
