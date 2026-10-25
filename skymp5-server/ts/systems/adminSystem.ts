@@ -1142,7 +1142,13 @@ export class AdminSystem implements System {
   private gate(actorId: number, action: string, info: Record<string, unknown>): string {
     const g = (globalThis as any).__dboAdminGate;
     if (typeof g !== "function") return "";
-    try { return String(g(actorId, action, info) || ""); } catch (e) { this.log(`AdminSystem: __dboAdminGate failed: ${e}`); return ""; }
+    try { return String(g(actorId, action, info) || ""); } catch (e) {
+      this.log(`AdminSystem: __dboAdminGate failed: ${e}`);
+      // staffguard is the rank rule for a ban at EVERY tier, so a gate that throws has to refuse: '' here would let the
+      // ban through with no rank check at all, which is the one thing the missing-gate guard above exists to prevent
+      if (BAN_ACTIONS.has(action)) return "The staff rules could not be read, so the ban is refused. Try again in a minute.";
+      return "";
+    }
   }
 
   // What the gate is told: the mode, and the online character the action is aimed at (0 when it names none, or a place)
