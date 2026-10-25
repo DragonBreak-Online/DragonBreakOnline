@@ -29,6 +29,7 @@ import Labour from './features/labour';
 import Lockpick from './features/lockpick';
 import Prayer from './features/prayer';
 import DeityPicker from './features/deityPicker';
+import BirthsignPicker from './features/birthsignPicker';
 import Pigeon from './features/pigeon';
 import Faction from './features/faction';
 import MailMarkers from './features/mailMarkers';
@@ -285,6 +286,8 @@ const Constructor = props => {
       return <Prayer data={rend} />;
     case 'deityPicker':
       return <DeityPicker data={rend} />;
+    case 'birthsignPicker':
+      return <BirthsignPicker data={rend} />;
     case 'pigeon':
       return <Pigeon data={rend} />;
     case 'faction':
@@ -353,7 +356,7 @@ const Constructor = props => {
 
 // Which part of the world each widget belongs to; anything unlisted keeps the aqua glow (dbo-theme.scss)
 const DOMAINS = {
-  prayer: 'aedric', deityPicker: 'aedric', shrinePanel: 'aedric',
+  prayer: 'aedric', deityPicker: 'aedric', shrinePanel: 'aedric', birthsignPicker: 'aedric',
   rite: 'lorkhan', bountyBoard: 'lorkhan', expeditionBoard: 'lorkhan', dungeonGate: 'lorkhan', death: 'lorkhan', robPrompt: 'lorkhan', feedPrompt: 'lorkhan', downed: 'lorkhan',
   mastery: 'dragonbreak', journal: 'dragonbreak', namePrompt: 'dragonbreak', reading: 'dragonbreak', tomeShop: 'dragonbreak', spellbook: 'dragonbreak', studyMagic: 'dragonbreak', classLectern: 'dragonbreak',
   labour: 'bronze', skinning: 'bronze', housing: 'bronze', pigeon: 'bronze', courierHandover: 'bronze', mailMarkers: 'bronze', trade: 'bronze', bank: 'bronze',

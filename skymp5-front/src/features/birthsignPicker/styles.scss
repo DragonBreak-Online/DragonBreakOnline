@@ -1,0 +1,193 @@
+// The birthsign picker in the DragonBreak palette (src/dbo-theme.scss), aedric domain as the deity picker: the Guardians'
+// columns, the Serpent below, a gold confirm over the grid. Sized from Worker 2's mock to fit 1080p with no scrolling.
+@import '../../dbo-theme.scss';
+
+.birthsign {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 55;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  font-family: $dbo-ui-font;
+  color: $dbo-text;
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  &__fade {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, rgba(4, 12, 14, 0.55), rgba(2, 6, 8, 0.85));
+  }
+
+  &__panel {
+    position: relative;
+    pointer-events: auto;
+    width: min(1160px, calc(96 * var(--dbo-vw)));
+    padding: 22px 30px 18px;
+    @include dbo-panel;
+    @include dbo-panel-cap(96);
+  }
+
+  &__title {
+    margin: 0;
+    @include dbo-title;
+    font-size: clamp(20px, calc(2.2 * var(--dbo-vw)), 30px);
+    text-align: center;
+  }
+
+  &__sub {
+    margin: 6px 0 0;
+    color: $dbo-text-dim;
+    font-size: 16px;
+    text-align: center;
+  }
+
+  &__rule { @include dbo-rule; margin: 14px 0; }
+
+  &__notice {
+    margin: 0 0 12px;
+    padding: 8px 14px;
+    font-size: 14px;
+    text-align: center;
+    border-left: 2px solid $dbo-stone-dark;
+    background: rgba(0, 0, 0, 0.26);
+  }
+
+  &__cols { display: grid; gap: 16px; }
+  &__col { display: flex; flex-direction: column; gap: 8px; }
+
+  // Signs under no Guardian, one column wide, centred under the middle column
+  &__below {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 12px;
+
+    .birthsign__card { width: calc((100% - (var(--birthsign-cols) - 1) * 16px) / var(--birthsign-cols)); }
+  }
+
+  &__card {
+    display: grid;
+    grid-template-columns: 54px 1fr;
+    gap: 4px 12px;
+    align-items: start;
+    width: 100%;
+    padding: 10px 12px;
+    text-align: left;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+    background: linear-gradient(180deg, rgba(22, 56, 61, 0.55), rgba(8, 25, 28, 0.55));
+    border: 1px solid dbo-accent(0.22);
+    transition: border-color $dbo-fast, background $dbo-fast, box-shadow $dbo-fast;
+
+    &:hover {
+      border-color: dbo-accent(0.6);
+      background: linear-gradient(180deg, rgba(22, 56, 61, 0.85), rgba(8, 25, 28, 0.7));
+      .birthsign__line { stroke: dbo-accent(1); }
+    }
+
+    &--guardian {
+      border-color: dbo-accent(0.42);
+      background: linear-gradient(180deg, dbo-accent-deep(0.35), rgba(8, 25, 28, 0.6));
+    }
+
+    &--on {
+      border-color: dbo-accent(0.95);
+      box-shadow: 0 0 14px dbo-accent(0.35), inset 0 0 18px dbo-accent(0.12);
+      .birthsign__line { stroke: dbo-accent(1); }
+    }
+  }
+
+  &__emblem {
+    grid-row: span 3;
+    width: 54px;
+    height: 54px;
+
+    svg { width: 54px; height: 54px; display: block; }
+  }
+
+  &__ring { fill: none; stroke: dbo-accent(0.35); stroke-width: 1; }
+  &__line { stroke: dbo-accent(0.7); stroke-width: 1.3; stroke-linecap: round; fill: none; }
+  &__star { fill: #f3e6bd; filter: drop-shadow(0 0 2px rgba(255, 230, 160, 0.9)); }
+
+  &__name {
+    font-family: $dbo-title-font;
+    font-size: 17px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: $dbo-silver;
+  }
+
+  &__kicker {
+    margin-left: 8px;
+    font-family: $dbo-ui-font;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: dbo-accent(0.85);
+  }
+
+  &__lore {
+    font-family: $dbo-book-font;
+    font-style: italic;
+    font-size: 13px;
+    line-height: 1.3;
+    color: $dbo-text-dim;
+  }
+
+  &__effect { font-size: 14px; line-height: 1.3; color: $dbo-gold; }
+
+  &__foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-top: 14px;
+    color: $dbo-text-dim;
+    font-size: 14px;
+  }
+
+  &__button { @include dbo-button; }
+
+  // The confirm, over the grid
+  &__confirm {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(2, 8, 10, 0.72);
+  }
+
+  &__confirm-box {
+    width: min(560px, 90%);
+    padding: 24px 30px 20px;
+    text-align: center;
+    background:
+      linear-gradient(90deg, transparent 4%, dbo-accent(0.85) 30%, $dbo-aedric-gold 50%, dbo-accent(0.85) 70%, transparent 96%) top / 100% 2px no-repeat,
+      linear-gradient(180deg, $dbo-ground-3, $dbo-ground);
+    border: 1px solid dbo-accent(0.75);
+    box-shadow: 0 0 24px dbo-accent(0.3), 0 24px 48px rgba(0, 0, 0, 0.8);
+  }
+
+  &__confirm-emblem svg { width: 96px; height: 96px; }
+
+  &__confirm-q {
+    margin: 8px 0 4px;
+    font-family: $dbo-title-font;
+    font-size: 24px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: $dbo-silver;
+  }
+
+  &__confirm-lore { margin: 6px 0; font-family: $dbo-book-font; font-style: italic; color: $dbo-text-dim; }
+  &__confirm-effect { margin: 8px 0 4px; font-size: 16px; color: $dbo-gold; }
+  &__confirm-note { margin: 4px 0 16px; font-size: 14px; color: $dbo-text-dim; }
+  &__confirm-btns { display: flex; justify-content: center; gap: 14px; }
+}
