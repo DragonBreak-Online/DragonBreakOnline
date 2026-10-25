@@ -315,6 +315,7 @@ export class HousingSystem implements System {
           const full = this.overCap(ctx, profileId, actor, false, this.isBuilding(ctx, p, { ...rec, partner: this.partnerOf(ctx, p) }), p);
           if (full) return full;
         }
+        const before = { ...rec };
         if (rec.owner !== 0) this.reKey(ctx, p, rec);
         if (rec.place) { delete rec.assigned; delete rec.shared; }
         this.setOwner(ctx, rec, actor, profileId);
@@ -322,12 +323,16 @@ export class HousingSystem implements System {
         if (rec.issued === null) rec.issued = [];
         if (!this.write(ctx, p, rec)) return CHANGE_FAILED;
         if (rec.place && this.placesOn()) this.carryPlace(ctx, p, rec); else this.ensurePlace(ctx, p, rec);
+        this.audit(ctx, "grant", p, before, `the gameplay, to ${this.nameOf(ctx, actor)} (actor ${actor.toString(16)}, profile ${profileId})`);
         return "";
       },
       release: (ref: unknown): boolean => {
         const p = primary(ref); if (!p) return false;
         const rec = this.read(ctx, p); if (!rec || rec.owner === 0) return true;
-        return this.release(ctx, p, rec);
+        const before = { ...rec };
+        const done = this.release(ctx, p, rec);
+        this.audit(ctx, "release", p, before, "the gameplay");
+        return done;
       },
       // Property per character (Nate, 10 Oct): the gameplay asks these instead of comparing rec.owner with a profile
       perCharacter: (): boolean => this.perCharacter,
@@ -547,6 +552,13 @@ export class HousingSystem implements System {
       try { (globalThis as any).__alduinakAdminLog?.(`HOUSING ${fief ? "fief holder" : "staff override"}: actor ${actorId.toString(16)} (profile ${this.profileOf(ctx, actorId)}) ${action} on ${primary.toString(16)}, owner profile ${rec.owner}${rec.ownerChar ? ` character ${rec.ownerChar.toString(16)}` : ""}`); } catch { /* no log */ }
     }
 
+    const before = { ...rec };
+    const role = isOwner ? "owner" : this.isAdmin(ctx, actorId) ? "staff" : this.isHoldManager(ctx, actorId, primary) ? "official"
+      : this.isFiefHolder(ctx, actorId, primary) ? "fief holder" : rec.owner !== 0 && this.hasAccess(ctx, primary, rec, actorId) ? "member" : "other";
+    const extra = [["recipient", content["recipient"]], ["ref", content["ref"]], ["name", content["name"]]]
+      .filter(([, v]) => v !== undefined && v !== null && v !== "").map(([k, v]) => `${k} ${JSON.stringify(v)}`);
+    const by = `${this.nameOf(ctx, actorId)} (actor ${actorId.toString(16)}, profile ${this.profileOf(ctx, actorId)}, ${role})`
+      + `${target !== primary ? ` at ${target.toString(16)}` : ""}${extra.length ? `, ${extra.join(", ")}` : ""}`;
     this.aimedAt = target;
     try {
       switch (action) {
@@ -567,7 +579,27 @@ export class HousingSystem implements System {
         case "unshare": this.doRoom(ctx, userId, actorId, primary, rec, isOwner || isManager, action, content["ref"], content["recipient"]); break;
         default: break;
       }
-    } finally { this.aimedAt = 0; }
+    } finally {
+      this.aimedAt = 0;
+      this.audit(ctx, action, primary, before, by);
+    }
+  }
+
+  // One line for every property request and every gameplay grant or release, whoever asks: owner, member, official or staff
+  // (Telvanni house, 24 Oct: a Steward's release and rename of a player's house left nothing in the log)
+  private audit(ctx: SystemContext, action: string, primary: number, before: PropertyRecord | null, by: string): void {
+    try {
+      const after = this.read(ctx, primary);
+      const owner = (r: PropertyRecord | null) => (!r || r.owner === 0 ? "nobody"
+        : `profile ${r.owner}${r.ownerChar ? ` character ${(r.ownerChar >>> 0).toString(16)}` : ""} "${r.ownerName || ""}"`);
+      const name = (r: PropertyRecord | null) => (r && r.name ? JSON.stringify(r.name) : "none");
+      const locked = (r: PropertyRecord | null) => !!(r && r.owner !== 0 && r.locked);
+      const serial = (r: PropertyRecord | null) => (r ? Number(r.serial) || 0 : 0);
+      const changed = owner(before) !== owner(after) || name(before) !== name(after) || locked(before) !== locked(after) || serial(before) !== serial(after);
+      this.log(`[housing] AUDIT ${action} ${primary.toString(16)} by ${by}: owner ${owner(before)} -> ${owner(after)}, name ${name(before)} -> ${name(after)}`
+        + `${locked(before) !== locked(after) ? `, ${locked(after) ? "locked" : "unlocked"}` : ""}`
+        + `${serial(before) !== serial(after) ? `, key serial ${serial(before)} -> ${serial(after)}` : ""}; ${changed ? "changed" : "no change"}`);
+    } catch (e) { this.log(`[housing] audit failed for ${action} ${primary.toString(16)}: ${e}`); }
   }
 
   private doClaim(ctx: SystemContext, userId: number, actorId: number, primary: number, rec: PropertyRecord, isManager: boolean): void {
