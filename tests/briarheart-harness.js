@@ -16,12 +16,13 @@ const ok = (c, what, got) => { console.log(`${c ? 'ok  ' : 'FAIL'}  ${what}${!c 
 // ---- the world ---------------------------------------------------------------------------------------------------------
 const WORLD = '3c:Skyrim.esm', ELSE = '1a26f:Skyrim.esm';
 const RACES = { 1: 'DBOReachmanRace', 2: 'NordRace', 3: 'DBOReachmanRaceVampire' };
-const ID = { '5d009:Skyrim.esm': 0x5d009, '3ad61:Skyrim.esm': 0x3ad61, '2e504:Skyrim.esm': 0x2e504, '72317:Skyrim.esm': 0x72317, '400ad:Skyrim.esm': 0x400ad, '43599:Skyrim.esm': 0x43599, '5d008:Skyrim.esm': 0x5d008, 'd8d50:Skyrim.esm': 0xd8d50 };
+const ID = { '5d009:Skyrim.esm': 0x5d009, '3ad61:Skyrim.esm': 0x3ad61, '2e504:Skyrim.esm': 0x2e504, '72317:Skyrim.esm': 0x72317, '400ad:Skyrim.esm': 0x400ad, '43599:Skyrim.esm': 0x43599, '5d008:Skyrim.esm': 0x5d008, 'd8d50:Skyrim.esm': 0xd8d50, '90d63:unofficial skyrim special edition patch.esp': 0x7090d63 };
 const HEART = 0x3ad61, GEM = 0x2e504;
 // ARMO biped slots for the look, as the live load order has them: the two briar bodies in slot 35 (0x20, USSEP's), a cuirass
 // the body (0x4), a helmet the head (0x1), an amulet slot 35 (0x20)
 const BRIAR = 0x5d008, BRIAR_EMPTY = 0x5d009, CUIRASS = 0x13ed9, HELMET = 0x12e4d, AMULET = 0xc8911;
-const ARMOS = { [BRIAR]: 0x20, [BRIAR_EMPTY]: 0x20, [CUIRASS]: 0x4, [HELMET]: 0x1, [AMULET]: 0x20 };
+const WOUND = 0x7090d63, BRACERS = 0x13ec1, GREAVES = 0x6f398;   // USSEP's wound body (slot 32); a player's slot 34 and 38 pieces
+const ARMOS = { [BRIAR]: 0x20, [BRIAR_EMPTY]: 0x20, [CUIRASS]: 0x4, [HELMET]: 0x1, [AMULET]: 0x20, [WOUND]: 0x4, [BRACERS]: 0x10, [GREAVES]: 0x100 };
 const props = new Map();   // `${actor}|${prop}` -> value
 const P = (a, k) => props.get(`${a >>> 0}|${k}`);
 const setP = (a, k, v) => props.set(`${a >>> 0}|${k}`, v);
@@ -288,7 +289,7 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   setP(MAN, 'equipment', eq());
   look(MAN, eq());
   ok(lookCalls().some((c) => c.args[0] === '5d008:Skyrim.esm') && given.some(([a, id]) => a === MAN && id === BRIAR), 'a bare chest: the briar body is given and equipped');
-  ok(logLines.some((l) => /briarheart: look on char50 \(equipment\): bare chest, briar body 5d008:Skyrim\.esm equipped \(try 1\)/.test(l)), '...and logged', logLines);
+  ok(logLines.some((l) => /briarheart: look on char50 \(equipment\): bare chest, 5d008:Skyrim\.esm equipped \(try 1\)/.test(l)), '...and logged', logLines);
   papyrusCalls.length = 0; look(MAN, eq());
   ok(!lookCalls().length, 'a second report within retrySeconds does not equip again');
   // a helmet alone is still a bare chest
@@ -301,7 +302,7 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   // their own armour back on: the briar body leaves the pack
   logLines.length = 0; look(MAN, eq(CUIRASS));
   ok(inv(MAN, BRIAR) === 0 && inv(MAN, CUIRASS) === 1, 'their cuirass back on: the briar body leaves the pack (nothing to steal)');
-  ok(logLines.some((l) => /look off on char50 \(equipment\): own body armour 13ed9 on, briar body taken from the pack/.test(l)), '...and logged', logLines);
+  ok(logLines.some((l) => /look off on char50 \(equipment\): own body armour 13ed9 on, 1 briar piece taken from the pack/.test(l)), '...and logged', logLines);
   // equips that never show stop after maxTries
   logLines.length = 0;
   for (let k = 0; k < 5; k++) { const L = globalThis.__dboBriarheart.looks.get(MAN); if (L) L.at = 0; look(MAN, eq()); }
@@ -325,7 +326,7 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   ok(inv(MAN, BRIAR_EMPTY) === 1, 'the worn empty chest is left on the body');
   setP(MAN, 'equipment', eq(CUIRASS)); setP(MAN, 'inventory', { entries: [{ baseId: CUIRASS, count: 1 }, { baseId: BRIAR_EMPTY, count: 1 }, { baseId: BRIAR, count: 1 }] });
   globalThis.__dboBriarheartLogin(MAN);
-  ok(inv(MAN, BRIAR) === 0 && inv(MAN, BRIAR_EMPTY) === 0 && logLines.some((l) => /look cleared on char50 \(login\): 2 briar bodies taken, not a Briarheart/.test(l)), 'not a Briarheart at login: leftover briar bodies are taken', logLines);
+  ok(inv(MAN, BRIAR) === 0 && inv(MAN, BRIAR_EMPTY) === 0 && logLines.some((l) => /look cleared on char50 \(login\): 2 briar pieces taken, not a Briarheart/.test(l)), 'not a Briarheart at login: leftover briar bodies are taken', logLines);
   // the cure takes the briar body
   ML.become(MAN, 'staff', 'again'); setP(MAN, 'equipment', eq()); globalThis.__dboBriarheart.looks.delete(MAN); look(MAN, eq());
   ok(inv(MAN, BRIAR) === 1, '(a Briarheart again, bare chest: briar body given)');
@@ -434,12 +435,62 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   ok(byMethod('AddSpell').length === 2 && byMethod('AddSpell').every((c) => c.types[0] === 'espm'), 'the spells go to AddSpell as espm records (a form argument would throw, as live)', papyrusCalls);
   ok(byMethod('AddToFaction').length === 1 && byMethod('AddToFaction')[0].types[0] === 'espm' && byMethod('IsInFaction')[0].types[0] === 'espm', 'the faction goes as an espm record');
   ok(!logLines.some((l) => /failed/.test(l)), 'no Papyrus call failed', logLines.filter((l) => /failed/.test(l)));
-  ok(byMethod('EquipItem').length === 1 && byMethod('EquipItem')[0].types[0] === 'espm' && logLines.some((l) => /look on char70 \((staff|equipment)\): bare chest, briar body 5d008:Skyrim\.esm equipped/.test(l)), 'the briar body goes to EquipItem as an espm record, and the look says equipped', logLines);
+  ok(byMethod('EquipItem').length === 1 && byMethod('EquipItem')[0].types[0] === 'espm' && logLines.some((l) => /look on char70 \((staff|equipment)\): bare chest, 5d008:Skyrim\.esm equipped/.test(l)), 'the briar body goes to EquipItem as an espm record, and the look says equipped', logLines);
   // the server refuses the equip: the look says so, never "equipped"
   papyrusThrows.add('EquipItem'); globalThis.__dboBriarheart.looks.delete(PB); logLines.length = 0;
   globalThis.__dboBriarheartEquip(PB, { inv: { entries: [] } });
   ok(logLines.some((l) => /look FAILED on char70 \(equipment\): EquipItem of 5d008:Skyrim\.esm refused by the server/.test(l)) && !logLines.some((l) => /equipped \(try/.test(l)), 'a refused EquipItem is logged as FAILED, never as equipped', logLines);
   papyrusThrows.clear(); MP.end(PB, 'espm test done');
+}
+// ---- the wound body (dev, 25 Oct): the heart alone shows nothing; USSEP's wound body goes on with it ----------------------
+{
+  const logLines = [];
+  delete require.cache[MODULE]; delete globalThis.__dboBriarheart;
+  const MW = require(MODULE)({
+    mp, log: (...x) => logLines.push(x.join(' ')), personal: (a, t) => said.push([a >>> 0, t]), audit: (t) => audits.push(t), who: (a) => `who${(a >>> 0).toString(16)}`,
+    display: (a) => `char${(a >>> 0).toString(16)}`, cfg: { briarheart: { enabled: true, visual: { enabled: true, armor: '5d008:Skyrim.esm', emptyArmor: '5d009:Skyrim.esm', body: '90d63:unofficial skyrim special edition patch.esp', retrySeconds: 10, maxTries: 3 }, briarSkin: { enabled: true, armorFrom: 'd8d50:Skyrim.esm', staminaRegen: 1.25, diseaseResist: 0 } } },
+    registerChatCommand: (n, f) => commands.set(n, f), onlineActors: () => online.slice(), isLeadStaff: (a) => (a >>> 0) === LEAD, findByName: () => 0, every: (n, ms, f) => { ticker = f; },
+    giveItem: (a, id, n) => { const e = ((P(a, 'inventory') || {}).entries || []).slice(); e.push({ baseId: id, count: n }); setP(a, 'inventory', { entries: e }); return true; }, sourceResistsOf: () => new Set(),
+  });
+  const eq = (...worn) => ({ inv: { entries: worn.map((id) => ({ baseId: id, count: 1, worn: true })) } });
+  const look = globalThis.__dboBriarheartEquip;
+  const equips = () => papyrusCalls.filter((c) => c.method === 'EquipItem').map((c) => c.args[0]);
+  const BW = actor(0x80, 1, 'reach', [0, 0, 0], [{ baseId: BRACERS, count: 1 }, { baseId: GREAVES, count: 1 }]); online.push(BW);
+  setP(BW, 'equipment', eq(BRACERS, GREAVES)); papyrusCalls.length = 0; logLines.length = 0;
+  MW.become(BW, 'staff', 'wound test');
+  ok(equips().join() === '90d63:unofficial skyrim special edition patch.esp,5d008:Skyrim.esm', 'a bare chest: the wound body goes on, then the heart', equips());
+  ok(inv(BW, WOUND) === 1 && inv(BW, BRIAR) === 1, '...both given');
+  ok(logLines.some((l) => /look on char80 \(staff\): bare chest, 90d63:unofficial skyrim special edition patch\.esp \+ 5d008:Skyrim\.esm equipped/.test(l)), '...and logged as both equipped', logLines);
+  // bracers (34) and greaves (38) share no ARMO slot with the wound body (32): nothing of the player's is unequipped or taken
+  ok(!papyrusCalls.some((c) => c.method === 'UnequipItem') && inv(BW, BRACERS) === 1 && inv(BW, GREAVES) === 1, 'the player\'s bracers and greaves (slots 34, 38) are neither unequipped nor taken', papyrusCalls);
+  // both worn: done, and the skin is on (the wound body is ours, not body armour)
+  papyrusCalls.length = 0; look(BW, eq(WOUND, BRIAR, BRACERS, GREAVES));
+  ok(!equips().length && !!globalThis.__dboBriarSkinArmor(BW), 'both worn: nothing more to equip, and the briar skin counts the wound body as the briar chest, not as own armour');
+  const sk = globalThis.__dboBriarSkinArmor(BW);
+  ok(sk.body === WOUND && sk.shown === BRIAR, 'the skin tells gamemode.js both pieces the engine already counts (heart 5 + wound 5)', sk);
+  // only the heart worn (the wound slipped): the wound body goes back on, the heart is not equipped twice
+  globalThis.__dboBriarheart.looks.delete(BW); papyrusCalls.length = 0; look(BW, eq(BRIAR, BRACERS, GREAVES));
+  ok(equips().join() === '90d63:unofficial skyrim special edition patch.esp', 'the heart worn but not the wound: only the wound body is equipped', equips());
+  // own body armour on: both briar pieces leave the pack, the player's armour, bracers and greaves are untouched
+  setP(BW, 'inventory', { entries: [{ baseId: BRACERS, count: 1 }, { baseId: GREAVES, count: 1 }, { baseId: CUIRASS, count: 1 }, { baseId: WOUND, count: 1 }, { baseId: BRIAR, count: 1 }] });
+  papyrusCalls.length = 0; logLines.length = 0; look(BW, eq(CUIRASS, BRACERS, GREAVES));
+  ok(inv(BW, WOUND) === 0 && inv(BW, BRIAR) === 0 && inv(BW, CUIRASS) === 1 && inv(BW, BRACERS) === 1 && inv(BW, GREAVES) === 1, 'own body armour on: the heart and the wound body leave the pack; the cuirass, bracers and greaves stay');
+  ok(!papyrusCalls.some((c) => c.method === 'UnequipItem') && logLines.some((l) => /look off on char80 \(equipment\): own body armour 13ed9 on, 2 briar pieces taken from the pack/.test(l)), '...nothing of theirs unequipped, and logged', logLines);
+  ok(!globalThis.__dboBriarSkinArmor(BW), '...and the briar skin is off');
+  // the heart torn out: the empty chest replaces the heart, the wound body stays
+  setP(BW, 'inventory', { entries: [{ baseId: WOUND, count: 1 }, { baseId: BRIAR, count: 1 }] }); setP(BW, 'equipment', eq(WOUND, BRIAR));
+  downed.add(BW); globalThis.__dboIsDowned = (a) => downed.has(a >>> 0);
+  papyrusCalls.length = 0; logLines.length = 0; said.length = 0;
+  commands.get('briarheart')(HUNTER, ''); // keep the command map warm
+  MW.startTear(HUNTER, BW); MW.tick();
+  globalThis.__dboBriarheart.tears.forEach((j) => { j.at = 0; }); MW.tick();
+  ok(inv(BW, BRIAR) === 0 && inv(BW, BRIAR_EMPTY) === 1 && inv(BW, WOUND) === 1 && equips().includes('5d009:Skyrim.esm'), 'the heart torn out: the empty chest goes on and the wound body is kept', { inv: P(BW, 'inventory'), eq: equips() });
+  ok(logLines.some((l) => /look swap on char80: heart torn out, 5d008:Skyrim\.esm -> 5d009:Skyrim\.esm, the wound body 90d63:unofficial skyrim special edition patch\.esp kept/.test(l)), '...and logged', logLines);
+  downed.delete(BW);
+  // cured or revoked while alive (no empty chest worn): the wound body goes with the heart
+  MW.become(BW, 'staff', 'cure test'); setP(BW, 'inventory', { entries: [{ baseId: WOUND, count: 1 }, { baseId: BRIAR, count: 1 }] }); setP(BW, 'equipment', eq(WOUND, BRIAR));
+  MW.end(BW, 'cure test');
+  ok(inv(BW, WOUND) === 0 && inv(BW, BRIAR) === 0, 'no longer a Briarheart, alive: the heart and the wound body both go', P(BW, 'inventory'));
 }
 // ---- the hooks in the other modules ---------------------------------------------------------------------------------------
 const src = (f) => fs.readFileSync(path.resolve(__dirname, '..', f), 'utf8');

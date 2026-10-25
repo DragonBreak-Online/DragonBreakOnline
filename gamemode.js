@@ -7832,10 +7832,11 @@ const briarSkinArmorOf = (targetId) => {
   let s = null; try { s = typeof globalThis.__dboBriarSkinArmor === 'function' ? globalThis.__dboBriarSkinArmor(targetId >>> 0) : null; } catch (e) { s = null; }
   if (!s) return 0;
   const from = armorPieceOf(Number(s.from) >>> 0), shown = s.shown ? armorPieceOf(Number(s.shown) >>> 0) : null;
+  const body = s.body ? armorPieceOf(Number(s.body) >>> 0) : null;   // the wound body (USSEP 90D63, rated 5) the engine counts too
   if (!from) return 0;
   const pm = defensePieceMult(targetId), gm = gearArmorMult(targetId);
   const as = (p) => (p ? (p.counted || p.rating) * (p.heavy ? pm.heavy * gm.heavy : pm.light * gm.light) : 0);
-  return Math.max(0, as(from) - as(shown));
+  return Math.max(0, as(from) - as(shown) - as(body));
 };
 globalThis.__dboBriarSkinRating = briarSkinArmorOf;
 // Below 1 when a Flesh spell (or a briar skin) holds on the target and the hit is a weapon's or a fist's: the rating
