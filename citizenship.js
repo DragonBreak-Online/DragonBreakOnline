@@ -16,7 +16,7 @@
 // The vote (Nate's election rules, 14 Oct): in a hold not in noElection (Bruma has a Count), an election starts by itself
 // once election.threshold (15) accounts have a citizen character there. registrationHours (24) for candidates to enter a
 // complete court (Jarl, Steward, Lord Commander, Housecarl; every member a citizen in no faction, each one accepting; the
-// Jarl a Breton, Nord or Imperial), then votingHours (24) of voting by citizens in no faction, one ballot per account. No
+// Jarl of a race the hold seats: config jarlRaces, Breton, Nord or Imperial, the Reach also Reachman), then votingHours (24) of voting by citizens in no faction, one ballot per account. No
 // count is shown to anyone until the vote ends. No complete court at the close: registration runs again while the hold
 // still has its 15, else the election is cancelled until it does. A tie: a revote between the tied courts only, as often as
 // it takes. A single court takes office with at least one vote. Eligibility is judged at each close: in registration a court
@@ -730,14 +730,26 @@ module.exports = (api) => {
     list.push({ at: Date.now(), text }); d.courtNotices[z.id] = list.slice(-20); save();
   };
   const struckCount = (E) => Object.keys((E && E.struckVotes) || {}).length;
-  const isJarlRace = (a) => { const r = String(raceEdidOf(a) || ''); return (EL.jarlRaces || []).some((p) => new RegExp(`^${p}(Vampire)?$`).test(r)); };
+  // Who may stand for Jarl in z: gamemode.js's per-hold rule (config jarlRaces; Nat, 25 Oct: a Reachman in the Reach only),
+  // the same one /appoint and a rising's claimant use; election.jarlRaces when it is not passed in (the harnesses)
+  const jarlRacesOf = (z) => (typeof api.jarlRacesFor === 'function' ? api.jarlRacesFor(z && z.id) : (EL.jarlRaces || []));
+  const isJarlRace = (a, z) => {
+    const r = String(raceEdidOf(a) || '');
+    if (typeof api.jarlRaceFits === 'function') return !!api.jarlRaceFits(z && z.id, r);
+    return (EL.jarlRaces || []).some((p) => new RegExp(`^${p}(Vampire)?$`).test(r));
+  };
+  // "Breton, Nord or Imperial" (DBOReachmanRace -> Reachman)
+  const jarlRaceNames = (z) => {
+    const n = jarlRacesOf(z).map((p) => String(p).replace(/^DBO/, '').replace(/Race$/, '').replace(/([a-z])([A-Z])/g, '$1 $2')).filter(Boolean);
+    return n.length > 1 ? `${n.slice(0, -1).join(', ')} or ${n[n.length - 1]}` : (n[0] || 'nobody');
+  };
   // Why a character cannot stand for a seat of z's ballot, or ''
   const unfit = (a, z, seat) => {
     if (!exists(a)) return 'no longer exists';
     if (typeof globalThis.__dboIsStaff === 'function' && globalThis.__dboIsStaff(a)) return 'is on the staff: staff take no seat in a court';
     if (!citizenOf(a, z.id)) return `is no citizen of ${ofPlace(z.name)}`;
     if (!factionFree(a)) return 'serves a faction';
-    if (seat === 'jarl' && !isJarlRace(a)) return 'is no Breton, Nord or Imperial: only they may be Jarl';
+    if (seat === 'jarl' && !isJarlRace(a, z)) return `is no ${jarlRaceNames(z)}: only they may be Jarl of ${ofPlace(z.name)}`;
     return '';
   };
   const courtById = (E, id) => (E.courts || []).find((c) => c.id === String(id || '')) || null;

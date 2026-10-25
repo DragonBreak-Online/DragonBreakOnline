@@ -1064,7 +1064,7 @@ const STAFF_HELP = [
     ['rolename', 'list <court|faction> | <court> <office> <new title> | <faction> <rank number> <new title> | reset <court> <office> | reset <faction> <rank number>: rename an office or rank for everyone who holds it, at once (Lead GM; F3 Court and the Faction tab\'s rank editor do it too)'], 'war',
     ['exposure', '[list] | clear <name|#TAG|profile id> [hold] <reason> | confess <name|#TAG|profile id> <hold> <reason>: werewolves and Vampire Lords seen changing, by hold, with the hunters who saw it; clear one, or mark a new confession (audited)']] },
   { key: 'appoint', title: 'Appointments and property', items: [
-    ['appoint', '<player|#TAG|profile id> <zone> <rank> [override]: make someone an official, online or offline. A Jarl must be a Breton, a Nord or an Imperial; only the Owners may add override. /appoint alone lists the zone ids; a wrong rank lists that zone\'s ranks. Rulers name 5 Stewards, 2 Court Mages, a Guard Captain and any number of Guards; Chieftains 5 Banes, a Shaman, a Wise-Woman, a Guard Commander and any number of Guards; captains name Guards'],
+    ['appoint', '<player|#TAG|profile id> <zone> <rank> [override]: make someone an official, online or offline. A Jarl must be of a race the hold seats (config jarlRaces: a Breton, a Nord or an Imperial; the Reach also a Reachman); only the Owners may add override. /appoint alone lists the zone ids; a wrong rank lists that zone\'s ranks. Rulers name 5 Stewards, 2 Court Mages, a Guard Captain and any number of Guards; Chieftains 5 Banes, a Shaman, a Wise-Woman, a Guard Commander and any number of Guards; captains name Guards'],
     ['dismiss', '<player|#TAG|profile id> <zone>: remove an official, online or offline (told if online). Officials may dismiss the ranks they may appoint'],
     ['officials', '[zone]: who holds which rank where'],
     ['property', 'at a door, as an official: sell <price> | list <deposit> <weekly> | unlist | offer <name> | remind | grace | evict'],
@@ -4659,7 +4659,17 @@ const officialName = (pid) => {
 // citizenship design (14 Oct) admits the Bretons too, the same rule the election uses (citizenship.js). The
 // Owners may seat anyone else by adding "override" (Nate, 2026-09-27). The race is the character's own, under any beast
 // form; officials are kept per account, so the rule reads the character named (or, for a profile id, the one found).
-const JARL_RACE = /^(Breton|Nord|Imperial)Race(Vampire)?$/;
+// Per hold (Nat, 25 Oct: a Reachman may be Jarl of the Reach, and only there): config jarlRaces { default: [race EditorID],
+// byHold: { <zone id>: [race EditorID] } }, each race also with its vampire ("<id>Vampire"). One rule for the election
+// (citizenship.js asks jarlRaceFits), /appoint (appointCheck) and a rising's claimant (rebellion.js rulerFit).
+const JARL_RACES0 = ['BretonRace', 'NordRace', 'ImperialRace'];
+const jarlRacesFor = (zid) => {
+  const J = (typeof cfg !== 'undefined' && cfg && cfg.jarlRaces) || {};
+  const by = J.byHold && typeof J.byHold === 'object' ? J.byHold[String(zid || '')] : null;
+  const list = Array.isArray(by) ? by : (Array.isArray(J.default) ? J.default : JARL_RACES0);
+  return list.map((r) => String(r || '').trim()).filter(Boolean);
+};
+const jarlRaceFits = (zid, edid) => { const r = String(edid || ''); return !!r && jarlRacesFor(zid).some((p) => r === p || r === `${p}Vampire`); };
 const raceEdidOf = (actor) => {
   let race = 0;
   try { race = typeof globalThis.__dboBeastOriginalRace === 'function' ? Number(globalThis.__dboBeastOriginalRace(actor)) >>> 0 : 0; } catch (e) { race = 0; }
@@ -4668,7 +4678,9 @@ const raceEdidOf = (actor) => {
   try { const r = mp.lookupEspmRecordById(race); return String((r && r.record && r.record.editorId) || ''); } catch (e) { return ''; }
 };
 // "DarkElfRaceVampire" -> "a Dark Elf"
-const raceLabel = (edid) => { const n = String(edid).replace(/Race(Vampire)?$/, '').replace(/([a-z])([A-Z])/g, '$1 $2'); return n ? `${/^[AEIOU]/.test(n) ? 'an' : 'a'} ${n}` : 'of no known race'; };
+const raceLabel = (edid) => { const n = String(edid).replace(/^DBO/, '').replace(/Race(Vampire)?$/, '').replace(/([a-z])([A-Z])/g, '$1 $2'); return n ? `${/^[AEIOU]/.test(n) ? 'an' : 'a'} ${n}` : 'of no known race'; };
+// The races a hold seats as Jarl, as a sentence: "a Breton, a Nord or an Imperial"
+const jarlRacesText = (zid) => { const n = jarlRacesFor(zid).map(raceLabel); return n.length > 1 ? `${n.slice(0, -1).join(', ')} or ${n[n.length - 1]}` : (n[0] || 'nobody'); };
 // The rules of /appoint, shared with the Court tab (court.js): { error } or { cap, overridden }. tg is officialTarget's.
 // A court office that is a leadership seat (leadership.js: the rulers and, with leadership.officers, the court's officers)
 const leadershipOffice = (rank) => (typeof globalThis.__dboLeadershipOffice === 'function' ? !!globalThis.__dboLeadershipOffice(rank)
@@ -4687,8 +4699,8 @@ const appointCheck = (a, z, rank, tg, override) => {
   let overridden = '';
   if (rank === 'jarl') {
     const race = raceEdidOf(tg.actor);
-    if (!JARL_RACE.test(race)) {
-      if (!override) return { error: `${tg.label} is ${raceLabel(race)}. By Skyrim's law only a Breton, a Nord or an Imperial may sit as Jarl.${tierOf(a) === 'senior' ? ' As an Owner you may add "override" to seat them anyway.' : ''}` };
+    if (!jarlRaceFits(z.id, race)) {
+      if (!override) return { error: `${tg.label} is ${raceLabel(race)}. By Skyrim's law only ${jarlRacesText(z.id)} may sit as Jarl.${tierOf(a) === 'senior' ? ' As an Owner you may add "override" to seat them anyway.' : ''}` };
       overridden = raceLabel(race);
     }
   }
@@ -9050,7 +9062,7 @@ try {
     rulerFit: (actor, z, office) => {
       const label = ownNameOf(actor);
       if (typeof globalThis.__dboIsStaff === 'function' && globalThis.__dboIsStaff(actor)) return `${label} is on the staff. Staff hold no leading office in a court.`;
-      if (office === 'jarl' && !JARL_RACE.test(raceEdidOf(actor))) return `${label} is ${raceLabel(raceEdidOf(actor))}. By Skyrim's law only a Breton, a Nord or an Imperial may sit as Jarl.`;
+      if (office === 'jarl' && !jarlRaceFits(z && z.id, raceEdidOf(actor))) return `${label} is ${raceLabel(raceEdidOf(actor))}. By Skyrim's law only ${jarlRacesText(z && z.id)} may sit as Jarl.`;
       try { const no = typeof globalThis.__dboCitizenSeatCheck === 'function' ? globalThis.__dboCitizenSeatCheck(z.id, office, '', actor, label) : ''; if (no) return no; } catch (e) { /* no citizenship */ }
       return '';
     } });
@@ -9163,7 +9175,7 @@ try {
   delete require.cache[CITIZENSHIP_JS];
   require(CITIZENSHIP_JS)({ mp, log, ownNameOf, ownDisplay, personal, system, audit, who, display, nameOf, tagOf, onUi, onlineActors, isAdmin, isLeadStaff, profileOf, cfg, every,
     zoneList, zoneById, readOfficials, rankTitle, officialTarget, accountActors, seatOfficial, unseatOfficialBy, takeGold, depositToTreasury, openWidget, closeWidget,
-    boardZoneNear, raceEdidOf, discordOf, registerChatCommand });
+    boardZoneNear, raceEdidOf, jarlRaceFits, jarlRacesFor, discordOf, registerChatCommand });
 } catch (e) {
   log('citizenship.js failed to load:', e.stack || e.message);
   for (const k of ['__dboCitizenMenuEntries', '__dboCitizenMenuAction', '__dboCitizenLogin', '__dboCitizenOf', '__dboCitizenGates', '__dboCitizenHolds', '__dboCitizenRoleIds', '__dboCitizenManagedRoleIds']) globalThis[k] = null;

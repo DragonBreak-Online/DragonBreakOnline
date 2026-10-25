@@ -500,5 +500,29 @@ ok(M.votingView(V1, WR).seats.find((s) => s.id === 'commander').label === 'Lord 
   delete globalThis.__dboIsStaff;
 }
 
+// ---- per-hold Jarl races (Nat, 25 Oct): gamemode.js's jarlRaceFits, cut out and fed the shipped config ------------------
+{
+  const gsrc = fs.readFileSync(path.resolve(__dirname, '..', 'gamemode.js'), 'utf8');
+  const g0 = gsrc.indexOf('const JARL_RACES0 = '), g1 = gsrc.indexOf('const raceEdidOf = ');
+  const gcfg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'gamemode-config.json'), 'utf8'));
+  const J = new Function('cfg', `${gsrc.slice(g0, g1)}\nreturn { jarlRaceFits, jarlRacesFor };`)(gcfg);
+  const REACH_Z = { id: 'markarth', name: 'The Reach', treasury: 'r', officials: ['jarl', 'steward', 'commander', 'courtmage', 'guardcaptain', 'guard'] };
+  if (!ZONES.find((z) => z.id === 'markarth')) ZONES.push(REACH_Z);
+  const WR_Z = ZONES.find((z) => z.id === 'whiterun');
+  const REACH = add(0x90, 90, 'Tarrare Test', 'DBOReachmanRace'); online.push(REACH);
+  const REACHV = add(0x91, 91, 'Madanach Test', 'DBOReachmanRaceVampire'); online.push(REACHV);
+  const NORDR = add(0x92, 92, 'Thongvor Test', 'NordRace'); online.push(NORDR);
+  delete globalThis.__dboCitizen; delete require.cache[MODULE];
+  const MR = require(MODULE)(Object.assign(api(), J));
+  for (const a of [REACH, REACHV, NORDR]) { MR.join(a, 'markarth'); MR.join(a, 'whiterun'); }
+  ok(MR.unfit(REACH, REACH_Z, 'jarl') === '', 'Reach rule: a Reachman may stand for Jarl of the Reach', MR.unfit(REACH, REACH_Z, 'jarl'));
+  ok(MR.unfit(REACHV, REACH_Z, 'jarl') === '', 'Reach rule: ...a Reachman vampire too', MR.unfit(REACHV, REACH_Z, 'jarl'));
+  ok(MR.unfit(NORDR, REACH_Z, 'jarl') === '', 'Reach rule: ...and a Nord still may', MR.unfit(NORDR, REACH_Z, 'jarl'));
+  const no = MR.unfit(REACH, WR_Z, 'jarl');
+  ok(/^is no Breton, Nord or Imperial: only they may be Jarl of Whiterun$/.test(no), 'Reach rule: a Reachman may not stand for Jarl of Whiterun', no);
+  ok(MR.unfit(REACH, WR_Z, 'steward') === '', 'Reach rule: ...but may stand as Whiterun\'s Steward', MR.unfit(REACH, WR_Z, 'steward'));
+  delete globalThis.__dboCitizen; M = load();
+}
+
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
 process.exit(fails ? 1 : 0);
