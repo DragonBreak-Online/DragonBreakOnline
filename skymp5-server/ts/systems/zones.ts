@@ -5,8 +5,9 @@ import * as path from "path";
 //
 // zones.json (next to the server, same lookup as skills.json) lists the nine holds
 // with their capitals, the six sovereign orc strongholds with a centre and radius,
-// and optional regions keyed by worldspace (Solstheim). A Tamriel position resolves
-// to a stronghold when inside its radius, otherwise to the nearest hold capital.
+// and optional regions keyed by worldspace (Solstheim); regions sharing a worldspace split
+// it by area polygon. A Tamriel position resolves to a stronghold when inside its radius,
+// otherwise to the nearest hold capital.
 // Interiors have no zone unless a region claims their worldspace.
 //
 // officials.json (same place) says who holds a rank in a zone, by profile id:
@@ -26,6 +27,8 @@ export interface Zone {
   treasury?: string;
   // The great city in the zone, if it has one; boards inside it charge city rates, the rest of the zone town rates
   majorCity?: { center: number[]; radius: number };
+  // A region's land inside a shared worldspace, as a polygon of [x, y] in world units; a region without one takes the rest
+  area?: number[][];
 }
 
 const ZONES_FILE = "zones.json";
@@ -42,6 +45,18 @@ const cityOf = (v: any): Zone["majorCity"] => {
   const center = numList(v && v.center);
   const radius = Number(v && v.radius);
   return center.length >= 2 && radius > 0 ? { center, radius } : undefined;
+};
+const areaOf = (v: unknown): number[][] | undefined => {
+  const pts = Array.isArray(v) ? v.map(numList).filter((p) => p.length >= 2) : [];
+  return pts.length >= 3 ? pts : undefined;
+};
+const inPolygon = (pts: number[][], x: number, y: number): boolean => {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i], [xj, yj] = pts[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
 };
 
 // "0x1A26F:Skyrim.esm", "1a26f:Skyrim.esm" and "01A26F:skyrim.esm" are one worldspace.
@@ -76,7 +91,7 @@ export class Zones {
       }
       for (const r of Array.isArray(raw.regions) ? raw.regions : []) {
         if (!r || typeof r.id !== "string") continue;
-        this.zones.push({ id: r.id, name: String(r.name || r.id), kind: "region", officials: strList(r.officials), worldspaces: strList(r.worldspaces).map(normDesc), treasury: optStr(r.treasury), majorCity: cityOf(r.majorCity) });
+        this.zones.push({ id: r.id, name: String(r.name || r.id), kind: "region", officials: strList(r.officials), worldspaces: strList(r.worldspaces).map(normDesc), treasury: optStr(r.treasury), majorCity: cityOf(r.majorCity), area: areaOf(r.area) });
       }
       this.rankTitles = raw.rankTitles && typeof raw.rankTitles === "object" ? raw.rankTitles : {};
       this.strongholdsOverride = !(raw.sovereignty && raw.sovereignty.strongholdsOverrideHolds === false);
@@ -113,10 +128,13 @@ export class Zones {
   // The zone a world position belongs to; null for interiors and unknown worldspaces.
   zoneAt(worldDesc: unknown, pos: unknown): Zone | null {
     const w = normDesc(worldDesc);
-    for (const z of this.zones) if (z.kind === "region" && z.worldspaces && z.worldspaces.indexOf(w) !== -1) return z;
+    const x = Array.isArray(pos) ? Number(pos[0]) : NaN, y = Array.isArray(pos) ? Number(pos[1]) : NaN;
+    const regions = this.zones.filter((z) => z.kind === "region" && z.worldspaces && z.worldspaces.indexOf(w) !== -1);
+    if (regions.length) {
+      const known = Number.isFinite(x) && Number.isFinite(y);
+      return regions.find((z) => z.area && known && inPolygon(z.area, x, y)) || regions.find((z) => !z.area) || null;
+    }
     if (TAMRIEL_DESCS.indexOf(w) === -1 && CITY_WORLD_DESCS.indexOf(w) === -1) return null;
-    if (!Array.isArray(pos) || pos.length < 2) return null;
-    const x = Number(pos[0]), y = Number(pos[1]);
     if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
     if (this.strongholdsOverride) {
       for (const z of this.zones) {
