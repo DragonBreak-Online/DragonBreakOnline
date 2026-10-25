@@ -76,19 +76,19 @@ const hit = (agg, tgt) => globalThis.__dboWarbandRefusesHit(agg, tgt);
 try {
   // ---- the preview -------------------------------------------------------------------------------------------------------
   panel('info a01:Test.esp');   // verify-formids: ignore (mock catalog)
-  let i = last('adminWarbandInfo');
+  let i = view().info;
   ok(i && i.kind === 'creature' && i.level === '32' && i.race === 'GiantRace' && i.aggression === 'unaggressive' && i.settles === true,
     'a giant: creature, level 32, GiantRace, unaggressive (it would settle)', i);
   ok(i && i.types.join(',') === 'Creature,Giant', '...its kind tags come from the race\'s ActorType keywords', i && i.types);
   panel('info a02:Test.esp');   // verify-formids: ignore (mock catalog)
-  i = last('adminWarbandInfo');
+  i = view().info;
   ok(i && i.kind === 'humanoid' && i.level === '9' && i.race === 'NordRace' && i.aggression === 'aggressive' && i.settles === true,
     'a bandit through its template: level, race and AI data all from the template (Use Stats, Use Traits, Use AI Data); aggressive still settles (it attacks enemies only)', i);
   panel('info a03:Test.esp');   // verify-formids: ignore (mock catalog)
-  i = last('adminWarbandInfo');
+  i = view().info;
   ok(i && /^x1\.50 of the player's level \(10-30\)$/.test(i.level), 'a jarl at PC Level Mult: x1.50 of the player\'s level (10-30)', i && i.level);
   panel('info a04:Test.esp');   // verify-formids: ignore (mock catalog)
-  i = last('adminWarbandInfo');
+  i = view().info;
   ok(i && i.kind === 'leveled list' && i.entries === 2, 'a leveled list says so, with its entry count', i);
   ok(/Giant|Bandit|Jarl|Leveled/.test(view().last.text), 'the preview is also said in chat and shown as the last line', view().last);
 

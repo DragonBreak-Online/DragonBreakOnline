@@ -61,6 +61,8 @@ module.exports = (api) => {
   // struck: GM actor -> { id, at }; attackers: NPC id -> { gm, at }
   if (!(S.struck instanceof Map)) S.struck = new Map();
   if (!(S.attackers instanceof Map)) S.attackers = new Map();
+  // info: GM actor -> the last NPC preview asked for (/warband info), carried in the view so the panel keeps showing it
+  if (!(S.info instanceof Map)) S.info = new Map();
   if (!(S.onLogout instanceof Map)) S.onLogout = new Map();
   const comp = () => globalThis.__dboCompanions || null;
   // Vanilla PlayerFaction, as companionService.ts prepare() puts the GM's own followers in on the GM's screen
@@ -506,7 +508,7 @@ module.exports = (api) => {
     const found = findNpc(rest);
     if (found.err) return tell(a, found.err);
     const i = infoOf(found.n.desc);
-    try { if (typeof api.sendPacket === 'function') api.sendPacket(a, Object.assign({ customPacketType: 'adminWarbandInfo' }, i)); } catch (e) { log('warband: info packet failed', e.message); }
+    S.info.set(a >>> 0, i);
     return tell(a, `${i.name} (${i.desc}): ${i.error || [i.kind, i.level ? `level ${i.level}` : '', i.race, i.aggression, i.refused ? `REFUSED: ${i.refused}` : ''].filter(Boolean).join(', ')}.`);
   };
 
@@ -589,7 +591,7 @@ module.exports = (api) => {
     const plan = settlePlan(a);
     const side = sideOf(profile);
     return {
-      members, counts: [...counts].map(([name, n]) => ({ name, count: n })), placed, players, npcs, target, foes,
+      members, counts: [...counts].map(([name, n]) => ({ name, count: n })), placed, players, npcs, target, foes, info: S.info.get(a >>> 0) || null,
       stance,
       side, enemies: [...new Set([...S.sides].filter(([p, s]) => p !== profile && side && s.toLowerCase() !== side.toLowerCase()).map(([, s]) => s))],
       plan: { calm: plan.calm.length, kept: names(plan.kept), unread: names(plan.unread) },
