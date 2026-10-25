@@ -55,10 +55,11 @@ module.exports = (api) => {
       per: Number(s && s.per) || 10,
     };
   };
-  // The bonus the server adds to the maximum: the spent points plus the race's flat bonus (racial.js, the Half-Giant's +50 health)
+  // The bonus the server adds to the maximum: the spent points plus the race's and the sign's flat bonus (racial.js, the
+  // Half-Giant's +50 health, the Atronach's +25 magicka)
   const avBonus = (a, spent) => {
     let r = { health: 0 }; try { if (typeof globalThis.__dboRaceVitalBonus === 'function') r = globalThis.__dboRaceVitalBonus(a) || r; } catch (e) { /* none */ }
-    return { health: (Number(spent.health) || 0) + (Number(r.health) || 0), magicka: Number(spent.magicka) || 0, stamina: Number(spent.stamina) || 0 };
+    return { health: (Number(spent.health) || 0) + (Number(r.health) || 0), magicka: (Number(spent.magicka) || 0) + (Number(r.magicka) || 0), stamina: (Number(spent.stamina) || 0) + (Number(r.stamina) || 0) };
   };
   const save = (a, st) => {
     st.per = CFG.perLevel;
@@ -200,6 +201,8 @@ module.exports = (api) => {
   }, { help: 'your character level and progress; /level <health|magicka|stamina> [n] spends points; staff: /level reset <player>' });
 
   globalThis.__dboCharLevel = (a) => stateOf(a).level;
+  // A birthsign chosen or changed (birthsigns.js): its bonus now, not at the next check
+  globalThis.__dboCharLevelSyncBonus = (a) => { if (CFG.enabled) syncBonus(a, stateOf(a)); };
   globalThis.__dboCharLevelPending = (a) => Number(stateOf(a).pending) || 0;
   // Never focused at login: a focused panel held the keyboard and the player could not move until it was closed
   globalThis.__dboCharLevelLogin = (a) => {
