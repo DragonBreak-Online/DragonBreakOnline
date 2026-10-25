@@ -114,7 +114,10 @@ ok(on(), '...and to the tracked config (on)');
 // ---- wiring --------------------------------------------------------------------------------------------------------
 const gm = fs.readFileSync(path.join(ROOT, 'gamemode.js'), 'utf8');
 ok(/const LEAD_ONLY = new Set\(\[[^\]]*'wwremote'/.test(gm), '/wwremote is Lead GM and above (gamemode.js LEAD_ONLY)');
-ok(/items: \[[^\]]*'wwremote'/.test(gm), 'and listed in the staff help beside /vlremote');
+// the beasts topic now holds [name, text] pairs too (/hunt setrank, hunt-setrank-1025), so read up to the next topic, not the first ]
+const beastsAt = gm.indexOf("key: 'beasts'");
+const beastsTopic = beastsAt < 0 ? '' : gm.slice(beastsAt, gm.indexOf('{ key: ', beastsAt + 1));
+ok(beastsTopic.includes("'vlremote', 'wwremote'"), 'and listed in the staff help beside /vlremote');
 
 const pm = fs.readFileSync(path.join(ROOT, 'playermenu.js'), 'utf8');
 // A staff member with real names on (Jake, 14 Oct) reads "Bryn (Werewolf form)" instead; that branch is keyed on the viewer's
