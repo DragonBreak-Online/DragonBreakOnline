@@ -1,4 +1,8 @@
 {
+  DO NOT REGENERATE: bootstrap of 23 Sep; the live file holds ~3,100 records this list cannot produce (25 Oct, 3,925 vs 783).
+  The live DragonBreak Nexus Patches.esp is the source of truth; every change is a delta script on the hash-checked live base.
+  The glacial recipe Update.esm:DA0C03 is owned by the DLE now; never patch it here.
+
   DBO - build DragonBreak Nexus Patches.esp from the server's edited copies of six Nexus plugins.
   The server used to run edited copies of Armors of the Velothi I/II, Immersive Armors, Immersive Weapons,
   TGCotN Winterhold and notice board while players ran the Nexus files. This copies each edited record

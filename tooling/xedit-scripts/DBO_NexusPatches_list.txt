@@ -1,3 +1,5 @@
+# DO NOT REGENERATE: bootstrap of 23 Sep; the live file holds ~3,100 records this list cannot produce. Every change is a delta script on the hash-checked live base. This line also stops DBO_NexusPatches.pas, which reads every line as data.
+# The glacial recipe Update.esm:DA0C03 is owned by the DLE now; never add it here.
 Armors of the Velothi.esp|armors of the velothi.esp|00080A|COBJ
 Armors of the Velothi.esp|armors of the velothi.esp|00080D|COBJ
 Armors of the Velothi.esp|armors of the velothi.esp|00080E|COBJ
