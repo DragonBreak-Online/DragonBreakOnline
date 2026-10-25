@@ -761,15 +761,22 @@ module.exports = (api) => {
       const ok = count - cut > 0 ? giveItem(a, idOf(item), count - cut) : true;
       if (ok && cut) { try { share.commit(); } catch (e) { log('labour: the mine share failed', e.message); } }
       if (ok && bonus) giveItem(a, idOf(bonus), 1);
+      // Quartz comes up with the clay, for the smelter's Glass (Nat, 25 Oct), at every rank as clay is: skills.json miner
+      // clayQuartz { item, name, chance, count }, the count times the Miner multiplier. Off while item is empty
+      const QZ = MINER.clayQuartz || {};
+      const quartzChance = Number.isFinite(Number(QZ.chance)) ? Number(QZ.chance) : 1;
+      const quartz = ok && round.ore === 'clay' && QZ.item && Math.random() < quartzChance ? Math.max(1, Math.round((Number(QZ.count) || 1) * mult)) : 0;
+      const quartzOk = quartz > 0 && giveItem(a, idOf(QZ.item), quartz);
+      const quartzName = String(QZ.name || 'Quartz');
       const kept = count - cut;
       text = !ok ? 'The seam gives way, but you cannot carry any more.'
         : round.ore === 'geode' ? (cut ? `The geode cracks open: ${itemName(gem)}, the mine's share for ${share.to}.` : `The geode cracks open: ${itemName(gem)}.`)
         : round.ore === 'salt' ? `You scrape out ${kept} Salt Pile${kept === 1 ? '' : 's'}${bonus ? ` and some ${itemName(bonus)}` : ''}.`
-        : BUILD[round.ore] ? `${BUILD[round.ore]} ${kept} ${oreName(round.ore)}.`
+        : BUILD[round.ore] ? `${BUILD[round.ore]} ${kept} ${oreName(round.ore)}${quartzOk ? ` and ${quartz} ${quartzName}` : ''}.`
         : (CFG.gemOre || {})[round.ore] ? `The geode cracks open: ${kept} ${titleCase(round.ore)}${kept === 1 ? '' : 's'}.`
         : `The seam gives way: ${kept} ${oreName(round.ore)} Ore.`;
       if (ok && cut && round.ore !== 'geode') text += ` ${cut} more go${cut === 1 ? 'es' : ''} to ${share.to}, the mine's share.`;
-      if (ok) audit(`MINE ${who(a)} worked a ${round.ore} seam (tier ${round.tier + 1}) -> ${count} ${gem ? itemName(gem) : 'ore'}${bonus ? ` + ${itemName(bonus)}` : ''}${cut ? ` (${cut} to ${share.to}, the share of ${share.mine})` : ''}`);
+      if (ok) audit(`MINE ${who(a)} worked a ${round.ore} seam (tier ${round.tier + 1}) -> ${count} ${gem ? itemName(gem) : 'ore'}${bonus ? ` + ${itemName(bonus)}` : ''}${quartzOk ? ` + ${quartz} ${quartzName}` : ''}${cut ? ` (${cut} to ${share.to}, the share of ${share.mine})` : ''}`);
     } else {
       const count = Math.max(1, Math.round(tierValue(CFG.firewoodByTier, round.tier, 3)));
       const ok = giveItem(a, idOf(ITEMS.firewood), count);

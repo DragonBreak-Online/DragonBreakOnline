@@ -126,5 +126,32 @@ for (const [name, v] of Object.entries(VEINS)) {
   const paid = out.items.filter(([id]) => id === 0x306c);
   ok(!!w && paid.length === 1 && paid[0][1] === 6, 'quarry: a Master miner cuts 6 Quarried Stone', JSON.stringify(out.items));
 }
+// Quartz with the clay (skills.json miner clayQuartz, Nat 25 Oct): off while its item is empty, then count x the multiplier
+const MINER = api.skills.skills.find((k) => k.id === 'miner');
+// A stand-in: any real MISC will do until the Quartz record exists (the Glacial Crystal Shard)
+const QUARTZ = 0x1d2201;
+const round = (v, rank) => {
+  out.widgets.length = 0; out.personals.length = 0; out.items.length = 0;
+  props.set(ACTOR + '|private.mastery', { order: ['miner'], skills: { miner: { rank } } });
+  props.delete(v.ref + '|private.dboWorkedUntil'); props.delete(ACTOR + '|private.minedVeins');
+  virtual += 600000;
+  const start = virtual;
+  globalThis.__dboLabour(v.ref, ACTOR);
+  const w = out.widgets[out.widgets.length - 1];
+  if (w) { const p = play(w); virtual = start + p.at + 120; fire('labour', [w.nonce, JSON.stringify(p.strikes), p.at]); }
+  const told = out.widgets.map((x) => x.result || '').join(' | ');
+  return { quartz: out.items.filter(([id]) => id === QUARTZ).reduce((s, [, c]) => s + c, 0), told };
+};
+ok(!MINER.clayQuartz.item, 'skills.json ships clayQuartz off (no Quartz record yet)', JSON.stringify(MINER.clayQuartz));
+ok(round(VEINS.clay, 0).quartz === 0, 'clay: no Quartz while clayQuartz.item is empty');
+MINER.clayQuartz = { item: '1d2201:DragonBreak Online Edits.esp', name: 'Quartz', chance: 1, count: 1 };
+let r = round(VEINS.clay, 0);
+ok(r.quartz === 1 && /You dig out 3 Clay and 1 Quartz\./.test(r.told), 'clay, Novice: 1 Quartz with the clay, and told so', r.told);
+r = round(VEINS.clay, 4);
+ok(r.quartz === 2 && /and 2 Quartz/.test(r.told), 'clay, Master: 2 Quartz (count x the multiplier 2)', r.told);
+r = round(VEINS.quarry, 4);
+ok(r.quartz === 0, 'quarried stone never gives Quartz', r.told);
+MINER.clayQuartz.chance = 0;
+ok(round(VEINS.clay, 0).quartz === 0, 'clay: chance 0 gives none');
 console.log(fails ? `${fails} failed` : 'all passed');
 process.exit(fails ? 1 : 0);
