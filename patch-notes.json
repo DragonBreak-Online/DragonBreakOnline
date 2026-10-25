@@ -1,5 +1,22 @@
 [
   {
+    "title": "Hagravens can take the Hagraven body",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Hagravens",
+        "items": [
+          "A full Hagraven can now take the true Hagraven body with /hagraven form, and leave it the same way. There is a short wait between changes.",
+          "The body casts no spells: leave it to cast. Your Hagraven gifts stay with you either way.",
+          "It cannot be taken indoors, in water, in the middle of a fight, while mounted or seated, or while bound, jailed or down.",
+          "Being struck down, jailed or bound ends it, and so does dying or logging out."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Server restart: soul gems, gates and strongholds",
     "date": "2026-10-25",
     "version": "Server update",

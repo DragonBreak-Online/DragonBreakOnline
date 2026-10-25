@@ -29,7 +29,13 @@
 //   last 10 minutes (prayer.js __dboPrayerLastShrine), offering a filled grand soul gem (cureItem): she is mortal again,
 //   her speed restored; the citizenship bar runs out by itself. Staff can cure: /hagraven revoke <name> <reason>.
 //
-// Chat: /hagraven [status] | pact | confirm | cure; staff: grant <name> <reason> | revoke <name> <reason> |
+// The body (Nat, 25 Oct, the Leader's brief): a Hagraven (stage 3) takes the real Hagraven creature with /hagraven form and
+//   leaves it the same way, at will, form.cooldownSeconds between changes. It is beastform.js's polymorph (__dboPolymorphAs,
+//   by 'hagraven'), so its guards all apply: the Owners' switch, dead, down, bound, jailed, duelling, in a fight, mounted,
+//   seated, in water, indoors, and the creatureBody distance guard; death, logout and login revert it as any form. The
+//   creature casts nothing, so she leaves the body to cast; her stage stays on her, its SpeedMult is put back after the body.
+//   Down, jail, bound or carried, the pact ended or her stage lowered end the body (formTick, every 5 s).
+// Chat: /hagraven [status] | pact | confirm | form | cure; staff: grant <name> <reason> | revoke <name> <reason> |
 //   stage <name> <1-3> <reason> | list.
 // State: private.dboHagraven = { since, played (ms), stage, how, by, barredAt } on the character.
 'use strict';
@@ -55,11 +61,13 @@ module.exports = (api) => {
     cureDeities: ['kynareth'], cureItem: '2e4ff:Skyrim.esm',  // a filled grand soul gem
     visual: { enabled: false, stages: { 1: '', 2: '', 3: '' } },
   }, (cfg && cfg.hagraven) || {});
+  C.form = Object.assign({ enabled: true, cooldownSeconds: 60 }, (cfg && cfg.hagraven && cfg.hagraven.form) || {});
   const PROP = 'private.dboHagraven';
   const MIN = 60000, HOUR = 3600000, DAY = 86400000;
   const NAMES = ['', 'Crone-touched', 'Feathered', 'Hagraven'];
 
   const S = globalThis.__dboHagraven || (globalThis.__dboHagraven = { pending: new Map(), seenAt: new Map() });
+  if (!(S.formAt instanceof Map)) S.formAt = new Map();
   if (!(S.pending instanceof Map)) S.pending = new Map();
   if (!(S.seenAt instanceof Map)) S.seenAt = new Map();
 
@@ -128,6 +136,7 @@ module.exports = (api) => {
   };
   const end = (a, why) => {
     const st = stageOf(a); if (!st) return false;
+    leaveForm(a, 'pact ended');
     set(a, PROP, null);
     undoStage(a, st);
     audit(`HAGRAVEN ${who(a)} is a Hagraven no more (${why})`);
@@ -224,6 +233,64 @@ module.exports = (api) => {
   };
   globalThis.__dboHagravenLogin = (a) => { if (C.enabled && stageOf(Number(a) >>> 0)) applyStage(Number(a) >>> 0, 'login'); };
 
+  // ---- the body: the Hagraven creature, through beastform.js's polymorph ----------------------------------------------------------
+  // Hers when beastform marked the shape by 'hagraven'; a beastform without that field: a Hagraven shape on a full Hagraven
+  const inForm = (a) => {
+    const s = get(a, 'private.beast', null);
+    if (!s || typeof s !== 'object' || s.form !== 'hagraven' || !s.original) return false;
+    return s.by === 'hagraven' || (s.by === undefined && stageOf(a) >= 3);
+  };
+  const cooldownLeft = (a) => Math.max(0, Math.ceil(((S.formAt.get(a >>> 0) || 0) + Number(C.form.cooldownSeconds || 0) * 1000 - Date.now()) / 1000));
+  const formRefusal = (a) => {
+    if (!C.enabled || C.form.enabled === false) return 'The Hagraven body does not answer yet.';
+    if (stageOf(a) < 3) return 'Only a full Hagraven can take the Hagraven body.';
+    if (!fn('__dboPolymorphAs')) return 'The Hagraven body is not available on this server yet.';
+    const left = cooldownLeft(a); if (left) return `Your body has only just changed. Wait ${left} more second${left === 1 ? '' : 's'}.`;
+    return '';
+  };
+  // '' when she took it, else why not (beastform's own sentence for its guards)
+  const takeForm = (a) => {
+    const no = formRefusal(a); if (no) return no;
+    let why; try { why = globalThis.__dboPolymorphAs(a >>> 0, 'hagraven', { by: 'hagraven' }); } catch (e) { log('hagraven: __dboPolymorphAs failed', e.message); return 'That failed; see the server log.'; }
+    if (why) return String(why);
+    S.formAt.set(a >>> 0, Date.now());
+    audit(`HAGRAVEN ${who(a)} took the Hagraven body`);
+    S.seenAt.delete(a >>> 0); witnessed(a);
+    return '';
+  };
+  const leaveForm = (a, why) => {
+    if (!inForm(a)) return false;
+    const ok = call('__dboBeastRevert', a >>> 0, why);
+    if (!ok) return false;
+    S.formAt.set(a >>> 0, Date.now());
+    audit(`HAGRAVEN ${who(a)} left the Hagraven body (${why})`);
+    // The race swap back may reset what the stage set on her (SpeedMult): put it back once the client has her own body again
+    setTimeout(() => { try { if (stageOf(a) && isOnline(a) && !inForm(a)) applyStage(a, 'left the body'); } catch (e) { log('hagraven: stage after the body failed', e.message); } }, 2500);
+    return true;
+  };
+  // What ends the body that beastform's polymorph tick does not: down, jail, bound or carried, the pact gone or her stage lowered
+  const formBreak = (a) => {
+    if (stageOf(a) < 3) return 'no longer a Hagraven';
+    if (call('__dboIsDowned', a >>> 0)) return 'downed';
+    const j = get(a, 'private.dboSentence', null); if (j && Number(j.totalMs) > (Number(j.servedMs) || 0)) return 'jailed';
+    const r = get(a, 'private.restrained', null); if (r && (r.boundHands || r.carried || r.captorActorId)) return 'bound';
+    return '';
+  };
+  const FORM_END_TELL = { downed: 'struck down, you fall back into your own body', jailed: 'the gaol takes you as you are, in your own body', bound: 'bound, you are pressed back into your own body', 'no longer a Hagraven': 'the pact no longer holds you whole' };
+  const formTick = () => {
+    for (const a of onlineActors()) {
+      if (!inForm(a)) continue;
+      const why = formBreak(a); if (!why) continue;
+      if (leaveForm(a, why) && FORM_END_TELL[why]) personal(a >>> 0, `You are yourself again: ${FORM_END_TELL[why]}.`);
+    }
+  };
+  if (typeof every === 'function') every('hagraven-form', 5000, () => { try { formTick(); } catch (e) { log('hagraven: form tick failed', e.message); } });
+  const form = (a) => {
+    if (inForm(a)) return leaveForm(a, 'asked to revert') ? 'You let the body go and stand as yourself again, your spells back in your hands.' : 'That failed; see the server log.';
+    const no = takeForm(a); if (no) return no;
+    return 'You let the pact take you whole: the hunched body, the feathers, the talons. It casts nothing; say /hagraven form again to stand as yourself and cast.';
+  };
+
   // ---- chat ---------------------------------------------------------------------------------------------------------------------
   const target = (q) => { const id = typeof findByName === 'function' ? findByName(String(q || '').trim()) : 0; return id > 0 ? id >>> 0 : 0; };
   // The longest leading run of words that names an online character; the rest after it
@@ -238,8 +305,9 @@ module.exports = (api) => {
     }
     if (sub === 'pact') return personal(a, pact(a));
     if (sub === 'confirm') return personal(a, confirm(a));
+    if (sub === 'form') return personal(a, form(a));
     if (sub === 'cure') return personal(a, cure(a));
-    if (!isLeadStaff(a)) return personal(a, 'Usage: /hagraven [status] | pact | confirm | cure');
+    if (!isLeadStaff(a)) return personal(a, 'Usage: /hagraven [status] | pact | confirm | form | cure');
     if (sub === 'list') { const on = onlineActors().filter((x) => stageOf(x)); return personal(a, on.length ? on.map((x) => `${display(x)} (${NAMES[stageOf(x)]})`).join(', ') : 'No Hagraven is online.'); }
     if (sub === 'grant' || sub === 'revoke' || sub === 'stage') {
       const { t, rest } = splitTarget(words);
@@ -256,6 +324,7 @@ module.exports = (api) => {
       if (sub === 'stage') {
         if (!stageOf(t)) return personal(a, `${display(t)} has made no pact.`);
         const r = recOf(t); r.stage = st; r.played = st >= 3 ? Number(C.stageHours[1]) * HOUR : st === 2 ? Number(C.stageHours[0]) * HOUR : 0; set(t, PROP, r);
+        if (st < 3) leaveForm(t, 'no longer a Hagraven');
         undoStage(t, 3); applyStage(t, `staff stage ${st}`);
         audit(`HAGRAVEN ${who(a)} set ${who(t)} to stage ${st} (${NAMES[st]}): ${why}`);
         return personal(a, `${display(t)} is ${NAMES[st]}.`);
@@ -264,9 +333,9 @@ module.exports = (api) => {
       if (isOnline(t)) personal(t, 'The pact is broken. You are a woman of the Reach again.');
       return personal(a, `${display(t)} is a Hagraven no more.`);
     }
-    return personal(a, 'Usage: /hagraven [status] | pact | confirm | cure; staff: grant|revoke <name> <reason> | stage <name> <1-3> <reason> | list');
-  }, { help: 'the Hagraven pact: [status] | pact (at a Hagraven altar) | confirm | cure (at Kynareth); staff: grant | revoke | stage | list' });
+    return personal(a, 'Usage: /hagraven [status] | pact | confirm | form | cure; staff: grant|revoke <name> <reason> | stage <name> <1-3> <reason> | list');
+  }, { help: 'the Hagraven pact: [status] | pact (at a Hagraven altar) | confirm | form (a Hagraven: the body, and back) | cure (at Kynareth); staff: grant | revoke | stage | list' });
 
-  log(`hagraven: ${C.enabled ? 'on' : 'off'}, stages at ${(C.stageHours || []).join('/')} h, exempt from known-on-sight: ${(C.knownOnSightExemptHolds || []).join(', ') || 'none'}`);
-  return { pactRefusal, pact, confirm, cure, tick, advance, witnessed, become, end, stageOf, C };
+  log(`hagraven: ${C.enabled ? 'on' : 'off'}, stages at ${(C.stageHours || []).join('/')} h, exempt from known-on-sight: ${(C.knownOnSightExemptHolds || []).join(', ') || 'none'}; the body ${C.form.enabled === false ? 'off' : `on (${C.form.cooldownSeconds} s between changes, polymorph hook ${fn('__dboPolymorphAs') ? 'present' : 'absent'})`}`);
+  return { pactRefusal, pact, confirm, cure, tick, advance, witnessed, become, end, stageOf, form, takeForm, leaveForm, inForm, formTick, formBreak, C };
 };
