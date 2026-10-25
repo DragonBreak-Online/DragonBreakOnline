@@ -7804,13 +7804,15 @@ const fleshArmorOf = (a) => {
 };
 globalThis.__dboFleshArmor = fleshArmorOf;
 globalThis.__dboFleshCast = fleshCast;
-// A Briarheart's briar skin (briarheart.js) while the briar chest shows on a bare chest: the light cuirass it names counts,
+// A Briarheart's briar skin (briarheart.js) while the briar chest shows on a bare chest: the faction cuirass it stands for counts,
 // at that piece's counted rating under the target's light-armour multipliers, in place of the briar body's own rating the
 // engine already took. 0 when off
 const briarSkinArmorOf = (targetId) => {
   let s = null; try { s = typeof globalThis.__dboBriarSkinArmor === 'function' ? globalThis.__dboBriarSkinArmor(targetId >>> 0) : null; } catch (e) { s = null; }
   if (!s) return 0;
-  const from = armorPieceOf(Number(s.from) >>> 0), shown = s.shown ? armorPieceOf(Number(s.shown) >>> 0) : null;
+  // A rating of its own (the faction cuirass's, briarSkin.armor) counts as a light piece of that rating; else the piece s.from names
+  const from = Number(s.rating) > 0 ? { rating: Number(s.rating), counted: Number(s.rating), heavy: false } : armorPieceOf(Number(s.from) >>> 0);
+  const shown = s.shown ? armorPieceOf(Number(s.shown) >>> 0) : null;
   const body = s.body ? armorPieceOf(Number(s.body) >>> 0) : null;   // the wound body (USSEP 90D63, rated 5) the engine counts too
   if (!from) return 0;
   const pm = defensePieceMult(targetId), gm = gearArmorMult(targetId);

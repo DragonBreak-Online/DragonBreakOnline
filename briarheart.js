@@ -29,10 +29,12 @@
 // The cure: /briarheart cure at a shrine of Arkay or Stendarr touched in the last 10 minutes (prayer.js
 //   __dboPrayerLastShrine), spending a filled black soul gem: the heart withers and the character lives on as a mortal.
 // The look (A5; Nat, 25 Oct: "vanilla wound, bare chest only"): config visual { enabled, armor, emptyArmor, women }.
-//   While a Briarheart's BODY slot (32) is empty, the server gives and equips the vanilla ArmorBriarHeart (Skyrim 05D008,
-//   the open chest with the briar); their own body armour simply takes its place, and the briar body leaves the pack
-//   then (so it is never there to steal: robbery.js and pickpocket.js take only unworn copies), to come back the next
-//   time the chest is bare (gamemode.js equipHook asks __dboBriarheartEquip). The moment the heart is torn out it becomes
+//   A Briarheart's chest is always bare (Nat, 25 Oct: "Briarhearts can't use chest armour"): anything of theirs worn in the
+//   BODY slot (32), cuirass or robe, is unequipped at once (UnequipItem; it stays in the pack) with "The briar in your
+//   chest will not be covered.", at every equipment report and so at the grant and at login. The server gives and equips
+//   the vanilla ArmorBriarHeart (Skyrim 05D008, the open chest with the briar) on that bare chest (gamemode.js equipHook
+//   asks __dboBriarheartEquip). In a beast form the look is left alone: the race swap dresses the beast. Gauntlets,
+//   boots, helmets, shields and the forearm and calf slots stay theirs. The moment the heart is torn out it becomes
 //   ArmorBriarHeartEmpty (05D009), mostly for the corpse. Both are Non-Playable (record flag 0x4): itemguards.js refuses
 //   their drop, put and take. Their ARMAs (05D00C, 05D00D) carry a MALE model only (MOD2 Armor\BriarHeart\BriarHeart_1.nif,
 //   no MOD3), worn by DefaultRace (the Reachman race's armor race): a woman gets no briar body unless visual.women is set
@@ -42,15 +44,15 @@
 //   them and their ARMAs to slot 35 (mask 0x20, the amulet slot), so in game the briar chest draws over whatever is worn.
 //   Bare chest only is Nat's rule, not the engine's. An amulet shares slot 35, and the briar chest wins (Nat, 25 Oct: "the
 //   heart is their charm"): on a bare chest anything worn in the briar body's slots is unequipped (UnequipItem, the item
-//   stays in the pack, never moved or deleted) and the player told, at most once per AMULET_TELL_MS, with the way out:
-//   body armour hides the briar chest, and then an amulet is allowed.
-// Briar skin (Nat, 25 Oct; config briarSkin { enabled, armorFrom, staminaRegen, diseaseResist }), only while the briar
-//   chest shows (the briar body worn, no body armour):
-//   - armour: counts as the light cuirass armorFrom names (ForswornCuirass 0D8D50, rating 26 at the live order) through the
-//     hit's own armour path: gamemode.js takes that piece's counted rating under the target's light multipliers (Defense
-//     tier, Fortify Light Armor), less the briar body's own 5 the engine already counted, and scales the hit by
+//   stays in the pack, never moved or deleted) and the player told, at most once per AMULET_TELL_MS.
+// Briar skin (Nat, 25 Oct; config briarSkin { enabled, armor, armorFrom, staminaRegen, diseaseResist }), while the briar
+//   chest shows (the briar body worn):
+//   - armour: a faction cuirass's (Nat, 25 Oct: "the same armour as faction armour"): armor, the light faction cuirass's
+//     rating (38, faction-gear.json's light tier), or failing that the counted rating of the cuirass armorFrom names,
+//     through the hit's own armour path: gamemode.js takes it under the target's light multipliers (Defense tier, Fortify
+//     Light Armor), less the briar pieces' own ratings the engine already counted, and scales the hit by
 //     fArmorScalingFactor capped at fMaxArmorRating, as the Flesh spells do. Weapon and fist hits only (spell damage reads
-//     no armour). With body armour on the look is off and nothing extra counts: that armour counts instead.
+//     no armour).
 //   - staminaRegen: racial.js regenFactor multiplies stamina regeneration by it (__dboBriarRegenMult).
 //   - diseaseResist: the server runs no mundane disease (its only diseases are the vampire and werewolf fevers, which a
 //     Briarheart already refuses, supernatural.js). The value goes to the DiseaseResist actor value through the server's
@@ -84,7 +86,7 @@ module.exports = (api) => {
     noDivineBlessings: true, faithLocked: true,
     cureDeities: ['arkay', 'stendarr'], cureItem: '2e504:Skyrim.esm',  // a filled black soul gem
     visual: { enabled: false, armor: '5d008:Skyrim.esm', emptyArmor: '5d009:Skyrim.esm', body: '90d63:unofficial skyrim special edition patch.esp', women: false, retrySeconds: 10, maxTries: 5 },
-    briarSkin: { enabled: false, armorFrom: 'd8d50:Skyrim.esm', staminaRegen: 1.25, diseaseResist: 50 },
+    briarSkin: { enabled: false, armor: 38, armorFrom: '', staminaRegen: 1.25, diseaseResist: 50 },
   }, (cfg && cfg.briarheart) || {});
   const PROP = 'private.dboBriarheart', FAILED = 'private.dboBriarheartFailedAt';
   const FILE = path.resolve('briarheart.json');
@@ -98,6 +100,7 @@ module.exports = (api) => {
   if (!(S.looks instanceof Map)) S.looks = new Map();   // actor -> { at, tries, womanTold }: the bare-chest equip's throttle
   if (!(S.skin instanceof Set)) S.skin = new Set();     // actors whose briar skin is on
   if (!(S.amuletTold instanceof Map)) S.amuletTold = new Map();   // actor -> when the amulet refusal was last told
+  if (!(S.coverTold instanceof Map)) S.coverTold = new Map();     // actor -> when the covered-chest refusal was last told
   const data = () => {
     if (S.data) return S.data;
     let d = null; try { d = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch (e) { d = null; }
@@ -205,25 +208,30 @@ module.exports = (api) => {
       if (isFemale(a) && !L.womanTold) { L.womanTold = true; S.looks.set(a, L); log(`briarheart: look skipped on ${display(a)}: the vanilla briar body has no female model (visual.women false)`); }
       return;
     }
+    // A beast form's race swap dresses the beast; the look waits for the revert's re-dress
+    const beast = get(a, 'private.beast', null); if (beast && beast.form) return;
+    // The chest is never covered: their own body-slot piece (cuirass or robe) comes off and stays in the pack, told at most
+    // once a minute however often it is put back on
     const own = worn.filter((id) => !mine.has(id) && coversBody(id));
     if (own.length) {
-      // Their own armour is on: the heart and the wound body leave the pack (they would be stealable there). Nothing of
-      // theirs is touched: their armour is what the engine just put on
-      const n = takeAll(a, full) + takeAll(a, body);
-      if (n) log(`briarheart: look off on ${display(a)} (${why}): own body armour ${own[0].toString(16)} on, ${n} briar piece${n === 1 ? '' : 's'} taken from the pack`);
-      S.looks.delete(a);
-      return;
+      for (const id of own) papyrus(a, 'UnequipItem', [form(mp.getDescFromId(id)), false, true]);
+      const told = Number(S.coverTold.get(a)) || 0;
+      if (Date.now() - told >= AMULET_TELL_MS) {
+        S.coverTold.set(a, Date.now());
+        if (isOnline(a)) personal(a, 'The briar in your chest will not be covered.');
+        log(`briarheart: chest cover refused on ${display(a)} (${why}): ${own.map((id) => id.toString(16)).join(', ')} unequipped, kept in the pack`);
+      }
     }
-    // Bare chest: the briar chest wins its slot (35 at the live order). Anything else worn there (an amulet) comes off and
-    // stays in the pack; the player is told (and it is logged) at most once a minute, however often they put it back on
+    // The briar chest wins its slot (35 at the live order). Anything else worn there (an amulet) comes off and stays in the
+    // pack; the player is told (and it is logged) at most once a minute, however often they put it back on
     const fullMask = maskOf(full);
-    const clash = fullMask ? worn.filter((id) => !mine.has(id) && (maskOf(id) & fullMask)) : [];
+    const clash = fullMask ? worn.filter((id) => !mine.has(id) && !own.includes(id) && (maskOf(id) & fullMask)) : [];
     if (clash.length) {
       for (const id of clash) papyrus(a, 'UnequipItem', [form(mp.getDescFromId(id)), false, true]);
       const told = Number(S.amuletTold.get(a)) || 0;
       if (Date.now() - told >= AMULET_TELL_MS) {
         S.amuletTold.set(a, Date.now());
-        if (isOnline(a)) personal(a, 'Your briar heart leaves no room for an amulet. It stays in your pack: wear body armour over the briar, and you may wear one.');
+        if (isOnline(a)) personal(a, 'Your briar heart leaves no room for an amulet. It stays in your pack.');
         log(`briarheart: amulet refused on ${display(a)} (${why}): ${clash.map((id) => id.toString(16)).join(', ')} unequipped, kept in the pack (bare chest, the briar chest wins its slot)`);
       }
     }
@@ -249,7 +257,8 @@ module.exports = (api) => {
       : `briarheart: look FAILED on ${display(a)} (${why}): EquipItem of ${bad.join(', ')} refused by the server (try ${L.tries}; see the line above)`);
   };
   // ---- the briar skin: armour, stamina and DiseaseResist while the briar chest shows ---------------------------------------
-  const K = () => Object.assign({ enabled: false, armorFrom: '', staminaRegen: 1, diseaseResist: 0 }, C.briarSkin || {});
+  const K = () => Object.assign({ enabled: false, armor: 0, armorFrom: '', staminaRegen: 1, diseaseResist: 0 }, C.briarSkin || {});
+  const skinRating = (k) => Math.max(0, Number(k.armor) || 0);
   const skinShown = (worn) => { const v = V(), full = idOf(v.armor), mine = mineOf(v); return !!(full && worn.includes(full) && !worn.some((id) => !mine.has(id) && coversBody(id))); };
   const skinCheck = (a, equipment, why) => {
     a = Number(a) >>> 0;
@@ -261,7 +270,7 @@ module.exports = (api) => {
     if (dr > 0 && isOnline(a)) papyrus(a, 'SetActorValue', ['DiseaseResist', on ? dr : 0]);
     if (!on) { log(`briarheart: skin off ${display(a)} (${why})${dr > 0 ? ', DiseaseResist 0' : ''}`); return; }
     const extra = Number(call('__dboBriarSkinRating', a)) || 0;
-    log(`briarheart: skin on ${display(a)} (${why}): armour as ${k.armorFrom} (+${extra.toFixed(1)} over the briar body), stamina regeneration x${Math.max(1, Number(k.staminaRegen) || 1)}, DiseaseResist ${dr}`);
+    log(`briarheart: skin on ${display(a)} (${why}): armour as ${skinRating(k) ? `a faction cuirass (${skinRating(k)})` : k.armorFrom} (+${extra.toFixed(1)} over the briar pieces), stamina regeneration x${Math.max(1, Number(k.staminaRegen) || 1)}, DiseaseResist ${dr}`);
   };
   const lookCheck = (a, equipment, why) => { lookApply(a, equipment, why); skinCheck(a, equipment, why); };
   // The heart torn out: the open chest becomes the empty one
@@ -447,7 +456,8 @@ module.exports = (api) => {
   globalThis.__dboBriarSkinArmor = (a) => {
     a = Number(a) >>> 0; const k = K();
     if (!C.enabled || !k.enabled || !S.skin.has(a) || !isBriar(a)) return null;
-    const from = idOf(k.armorFrom); return from ? { from, shown: idOf(V().armor), body: idOf(V().body) } : null;
+    const rating = skinRating(k), from = rating ? 0 : idOf(k.armorFrom);
+    return rating || from ? Object.assign(rating ? { rating } : { from }, { shown: idOf(V().armor), body: idOf(V().body) }) : null;
   };
   // racial.js regenFactor: stamina regeneration while the briar skin is on
   globalThis.__dboBriarRegenMult = (a, stat) => {
