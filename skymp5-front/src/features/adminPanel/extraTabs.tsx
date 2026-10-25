@@ -572,18 +572,34 @@ const SEARCH_DELAY_MS = 250;
 // Rows per search page, as placement.js sends them
 const SEARCH_PAGE = 100;
 const SET_RADII = [10, 20, 40, 60];
-const WARBAND_COUNTS = [1, 2, 3, 5, 8, 10];
+// The Warband view (server warband.js viewOf, packet adminWarbandView; Nat 25 Oct, W1-W10)
+export interface WarbandView {
+  members: Array<{ id: string; name: string; alive: boolean; dist: number | null; fighting: boolean }>;
+  counts: Array<{ name: string; count: number }>;
+  placed: Array<{ id: string; name: string; hostile: boolean; alive: boolean; dist: number | null }>;
+  players: Array<{ id: string; name: string; dist: number | null }>;
+  npcs: Array<{ id: string; name: string; gm: string; foe: boolean; dist: number | null }>;
+  stance: string; side: string; enemies: string[];
+  plan: { calm: number; kept: string; unread: string };
+  presets: Array<{ name: string; count: number; what: string }>;
+  onLogout: string; maxBand: number; maxRaise: number;
+  last: { text: string; at: number } | null; at?: number;
+}
+const WARBAND_COUNTS = [1, 2, 3, 5, 8, 10, 15, 20, 25];
 type PlaceView = 'catalog' | 'placed' | 'sets' | 'warband';
 const VIEWS: Array<[PlaceView, string]> = [['catalog', 'Catalog'], ['placed', 'Placed near me'], ['sets', 'Sets'], ['warband', 'Warband']];
 
-export const PlaceTab = ({ events, placements, meta, results, sets }: { events: Record<string, string>; placements: PanelPlacements | null; meta: PlaceMeta | null; results: PlaceResults | null; sets: PlaceSet[] | null }) => {
+export const PlaceTab = ({ events, placements, meta, results, sets, warband: band }: { events: Record<string, string>; placements: PanelPlacements | null; meta: PlaceMeta | null; results: PlaceResults | null; sets: PlaceSet[] | null; warband?: WarbandView | null }) => {
   const [view, setView] = useState<PlaceView>('catalog');
   const [placedPick, setPlacedPick] = useState<string | null>(null);
   const [setPick, setSetPick] = useState<string | null>(null);
   const [setNameInput, setSetNameInput] = useState('');
   const [setRadius, setSetRadius] = useState(20);
   const [bandCount, setBandCount] = useState(1);
-  const [attackName, setAttackName] = useState('');
+  const [sideInput, setSideInput] = useState('');
+  const [presetName, setPresetName] = useState('');
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const [settling, setSettling] = useState(false);
   const [cat, setCat] = useState('');
   const [search, setSearch] = useState('');
   const [mod, setMod] = useState('');
@@ -639,6 +655,7 @@ export const PlaceTab = ({ events, placements, meta, results, sets }: { events: 
     setView(v);
     if (v === 'placed') adminRequest(events, 'adminPlacementsRequest', {});
     if (v === 'sets') adminRequest(events, 'adminPlaceSets', {});
+    if (v === 'warband') adminRequest(events, 'adminWarbandView', {});
   };
   const viewBar = (
     <div className="admin-panel__filters">
@@ -711,31 +728,126 @@ export const PlaceTab = ({ events, placements, meta, results, sets }: { events: 
       </div>
     );
   } else if (view === 'warband') {
+    // One screen (Nat, 25 Oct): search and raise here, the band with its counts, orders, a settle plan before settling,
+    // targets near the GM, sides, the raiders and garrison with removal, saved bands and what happens at logout. Every
+    // step is answered with the server's view (adminWarbandView) and its last line shows at the top
+    const wb = band || null;
+    const counts = WARBAND_COUNTS.filter((n) => !wb || n <= Math.min(wb.maxRaise, wb.maxBand));
+    const npcRows = rows.filter((r) => r.kind === 'npc');
+    const ask = (text: string): void => { setConfirm(null); setSettling(false); warband(text); };
+    const meters = (d: number | null): string => (d === null ? 'elsewhere' : `${d} m`);
     pane = (
       <div className="admin-panel__itempane">
         {viewBar}
-        <div className="admin-panel__empty">
-          NPCs that follow you, fight what you fight, and can be turned loose as a raid or left as a garrison. Pick an NPC in the Catalog first.
+        {wb && wb.last ? <div className="admin-panel__label admin-panel__warband-last">{wb.last.text}</div> : null}
+        <SearchBar value={search} onChange={setSearch} placeholder="Search NPCs to raise"
+          chips={(meta ? meta.categories : []).map((c) => ({ id: c.id, label: c.label, count: c.count }))} chip={q ? '' : cat} onChip={(id) => { setCat(id); setSearch(''); }}
+          plugins={meta ? meta.plugins : []} plugin={mod} onPlugin={setMod} onMove={cursor.move}
+          onEnter={() => { const r = npcRows[0]; if (r) setPicked(r); }} recent={recent.items} favourites={favs.items} onPick={pickSaved} />
+        <div className="admin-panel__list admin-panel__list--items">
+          {!current ? <div className="admin-panel__empty">{meta ? 'Searching' : 'Loading the catalog'}</div> : npcRows.length === 0 ? <div className="admin-panel__empty">No NPC matches</div> : (
+            npcRows.map((r) => (
+              <div key={r.desc} className={'admin-panel__row admin-panel__row--clickable' + (bandNpc && bandNpc.desc === r.desc ? ' admin-panel__row--selected' : '')} onClick={() => setPicked(r)}>
+                <span className="admin-panel__cell admin-panel__cell--name">{r.name}</span>
+                <span className="admin-panel__cell admin-panel__cell--discord">{r.plugin.replace(/\.(esp|esm|esl)$/i, '')}</span>
+              </div>
+            ))
+          )}
         </div>
         <div className="admin-panel__actions">
-          <span className="admin-panel__label">{bandNpc ? bandNpc.name : 'No NPC picked in the Catalog'}</span>
-          <Picker className="admin-panel__select" value={bandCount} onChange={setBandCount}
-            options={WARBAND_COUNTS.map((n) => ({ value: n, label: String(n) }))} />
-          <Button text="Raise" width={96} height={32} disabled={!bandNpc || !mayPlace} onClick={() => bandNpc && warband(`raise ${bandNpc.desc} ${bandCount}`)} />
-          <Button text="Show band" width={120} height={32} onClick={() => warband('')} />
+          <span className="admin-panel__label">{bandNpc ? bandNpc.name : 'Pick an NPC above'}</span>
+          <Picker className="admin-panel__select" value={bandCount} onChange={setBandCount} options={counts.map((n) => ({ value: n, label: String(n) }))} />
+          <Button text="Raise" width={96} height={32} disabled={!bandNpc || !mayPlace} onClick={() => bandNpc && ask(`raise ${bandNpc.desc} ${bandCount}`)} />
+          <Button text="Refresh" width={104} height={32} onClick={() => adminRequest(events, 'adminWarbandView', {})} />
+        </div>
+        <div className="admin-panel__list admin-panel__list--items">
+          {!wb ? <div className="admin-panel__empty">Loading your warband</div> : wb.members.length === 0 ? <div className="admin-panel__empty">You lead no warband. Raise one above, or a saved band below.</div> : (
+            wb.members.map((m) => (
+              <div key={m.id} className="admin-panel__row">
+                <span className="admin-panel__cell admin-panel__cell--name">{m.name}{m.alive ? '' : ' (dead)'}{m.fighting ? ' (fighting)' : ''}</span>
+                <span className="admin-panel__cell admin-panel__cell--discord">{meters(m.dist)}</span>
+                <Button text="Dismiss" width={96} height={26} onClick={() => ask(`dismiss ${m.id}`)} />
+              </div>
+            ))
+          )}
+        </div>
+        {wb && wb.members.length ? (
+          <div className="admin-panel__actions">
+            <span className="admin-panel__label">{wb.counts.map((c) => `${c.count} ${c.name}`).join(', ')} &middot; {wb.members.length}/{wb.maxBand} &middot; {wb.stance === 'charging' ? 'charging' : wb.stance === 'stay' ? 'holding' : 'following'}</span>
+            <Button text="Follow" width={96} height={32} disabled={wb.stance === 'follow'} onClick={() => ask('follow')} />
+            <Button text="Stay" width={90} height={32} disabled={wb.stance === 'stay'} onClick={() => ask('stay')} />
+            <Button text="Unleash (raid)" width={150} height={32} disabled={!mayHostile} onClick={() => ask('unleash')} />
+            <Button text="Settle (garrison)" width={170} height={32} onClick={() => setSettling(true)} />
+            <Button text="Dismiss all" width={120} height={32} onClick={() => setConfirm('dismiss')} />
+          </div>
+        ) : null}
+        {settling && wb ? (
+          <div className="admin-panel__actions">
+            <span className="admin-panel__label">
+              {wb.plan.calm} will stay as a garrison.{wb.plan.kept ? ` Aggressive by nature, not settled: ${wb.plan.kept}.` : ''}{wb.plan.unread ? ` Cannot be checked, not settled: ${wb.plan.unread}.` : ''}
+            </span>
+            <Button text="Settle the calm ones" width={190} height={32} disabled={!wb.plan.calm} onClick={() => ask('settle calm')} />
+            {wb.plan.kept || wb.plan.unread ? <Button text="...and unleash the rest" width={200} height={32} disabled={!mayHostile} onClick={() => ask('settle unleashrest')} /> : null}
+            {wb.plan.kept || wb.plan.unread ? <Button text="...and dismiss the rest" width={200} height={32} onClick={() => ask('settle dismissrest')} /> : null}
+            <Button text="Cancel" width={96} height={32} onClick={() => setSettling(false)} />
+          </div>
+        ) : null}
+        {confirm === 'dismiss' ? (
+          <div className="admin-panel__actions">
+            <span className="admin-panel__label">Dismiss your whole warband?</span>
+            <Button text="Dismiss all" width={120} height={32} onClick={() => ask('dismiss')} />
+            <Button text="Cancel" width={96} height={32} onClick={() => setConfirm(null)} />
+          </div>
+        ) : null}
+        {wb && wb.members.length ? (
+          <div className="admin-panel__actions">
+            <span className="admin-panel__label">Targets near you{wb.players.length || wb.npcs.length ? '' : ': none'}</span>
+            {wb.players.map((p) => <Button key={p.id} text={`${p.name} ${meters(p.dist)}`} width={180} height={28} onClick={() => ask(`attack ${p.name}`)} />)}
+            {wb.npcs.map((n) => <Button key={n.id} text={`${n.foe ? 'Enemy: ' : ''}${n.name} (${n.gm}) ${meters(n.dist)}`} width={240} height={28} onClick={() => ask(`attacknpc ${n.id}`)} />)}
+          </div>
+        ) : null}
+        <div className="admin-panel__actions">
+          <input className="admin-panel__search" placeholder={wb && wb.side ? `Side: ${wb.side}` : 'Side (for a staged battle)'} value={sideInput} maxLength={24}
+            onChange={(e) => setSideInput(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
+          <Button text="Set side" width={110} height={32} disabled={!sideInput.trim()} onClick={() => { ask(`side ${sideInput.trim()}`); setSideInput(''); }} />
+          <Button text="No side" width={100} height={32} disabled={!wb || !wb.side} onClick={() => ask('side none')} />
+          <Button text={wb && wb.stance === 'charging' ? 'Charging' : 'Charge'} width={110} height={32} disabled={!wb || !wb.side || !wb.members.length} onClick={() => ask('charge')} />
+          <span className="admin-panel__label">{wb && wb.side ? (wb.enemies.length ? `Enemies: ${wb.enemies.join(', ')}` : 'No GM on another side yet') : 'No side: every GM’s band is a friend'}</span>
+        </div>
+        <div className="admin-panel__list admin-panel__list--items">
+          {wb && wb.placed.length ? wb.placed.map((r) => (
+            <div key={r.id} className="admin-panel__row">
+              <span className="admin-panel__cell admin-panel__cell--name">{r.name}{r.alive ? '' : ' (dead)'}</span>
+              <span className="admin-panel__cell admin-panel__cell--discord">{r.hostile ? 'raider' : 'garrison'} &middot; {meters(r.dist)}</span>
+              <Button text="Remove" width={96} height={26} onClick={() => adminRequest(events, 'adminRaid', { text: `clear ${r.id}` })} />
+            </div>
+          )) : <div className="admin-panel__empty">No raiders or garrison of yours stand.</div>}
         </div>
         <div className="admin-panel__actions">
-          <Button text="Follow" width={96} height={32} onClick={() => warband('follow')} />
-          <Button text="Stay" width={90} height={32} onClick={() => warband('stay')} />
-          <Button text="Unleash (raid)" width={150} height={32} disabled={!mayHostile} onClick={() => warband('unleash')} />
-          <Button text="Settle (garrison)" width={170} height={32} onClick={() => warband('settle')} />
-          <Button text="Dismiss" width={104} height={32} onClick={() => warband('dismiss')} />
+          <Button text="Clear raiders" width={140} height={32} disabled={!wb || !wb.placed.some((r) => r.hostile)} onClick={() => setConfirm('raiders')} />
+          <Button text="Clear garrison" width={150} height={32} disabled={!wb || !wb.placed.some((r) => !r.hostile)} onClick={() => setConfirm('garrison')} />
+          {confirm === 'raiders' || confirm === 'garrison' ? (
+            <>
+              <span className="admin-panel__label">Remove every {confirm === 'raiders' ? 'raider' : 'garrison NPC'} of yours, and their dead?</span>
+              <Button text="Remove" width={100} height={32} onClick={() => { adminRequest(events, 'adminRaid', { text: `clear ${confirm}` }); setConfirm(null); }} />
+              <Button text="Cancel" width={96} height={32} onClick={() => setConfirm(null)} />
+            </>
+          ) : null}
         </div>
         <div className="admin-panel__actions">
-          <input className="admin-panel__search" placeholder="Player to attack" value={attackName} onChange={(e) => setAttackName(e.target.value)} />
-          <Button text="Attack" width={96} height={32} disabled={!attackName.trim()} onClick={() => warband(`attack ${attackName.trim()}`)} />
-          <Button text="Raid status" width={130} height={32} onClick={() => adminRequest(events, 'adminRaid', { text: '' })} />
-          <Button text="Clear raid" width={120} height={32} onClick={() => adminRequest(events, 'adminRaid', { text: 'clear' })} />
+          <span className="admin-panel__label">Saved bands</span>
+          {wb && wb.presets.length ? wb.presets.map((p) => (
+            <span key={p.name} title={p.what}>
+              <Button text={`Raise ${p.name} (${p.count})`} width={200} height={28} disabled={!mayPlace} onClick={() => ask(`preset raise ${p.name}`)} />
+              <Button text="Delete" width={80} height={28} onClick={() => ask(`preset delete ${p.name}`)} />
+            </span>
+          )) : <span className="admin-panel__label">none yet</span>}
+          <input className="admin-panel__search" placeholder="Save this band as..." value={presetName} maxLength={32} onChange={(e) => setPresetName(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
+          <Button text="Save" width={90} height={32} disabled={!presetName.trim() || !wb || !wb.members.length} onClick={() => { ask(`preset save ${presetName.trim()}`); setPresetName(''); }} />
+        </div>
+        <div className="admin-panel__actions">
+          <span className="admin-panel__label">When you log out, your followers {wb && wb.onLogout === 'settle' ? 'settle where they stand (the calm ones)' : 'are dismissed'}.</span>
+          <Button text={wb && wb.onLogout === 'settle' ? 'Dismiss them instead' : 'Settle the calm ones instead'} width={240} height={32} disabled={!wb} onClick={() => ask(`onlogout ${wb && wb.onLogout === 'settle' ? 'dismiss' : 'settle'}`)} />
         </div>
       </div>
     );
