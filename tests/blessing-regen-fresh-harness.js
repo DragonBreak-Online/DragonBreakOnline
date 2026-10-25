@@ -2,7 +2,7 @@
 // makin my magicka not regen"). The server's bar is the client's last report (at most one a second) and a write replaces the
 // client's bar, so the 1 s blessing tick wrote a report most of a second old plus Akatosh's 0.003 and took back the client's
 // own regen since that report: magicka refilled at about a fifth of its speed. prayer.js now pays as racial.js does (10 Oct):
-// a 0.25 s tick, a bar only on a fresh report, at least payoutSeconds of the bar's own regen at once.
+// a bar only on a fresh report, at least payoutSeconds (3) of the bar's own regen at once, on a 1 s tick.
 //
 // A simulated client regenerates its own bar at the Nord's 3% a second, reports once a second, and takes every server write
 // as its bar; the real prayer.js runs with a mock gamemode api. Run it from this folder's parent with
@@ -50,9 +50,10 @@ const records = new Map([
   [idOf(choiceOf('akatosh').blessing), spel([[0xfb989, 10, 28800]])],
   [idOf(choiceOf('hircine').blessing), spel([[0xfb98b, 10, 28800]])],
   [NORD, race(0.7, 3, 5)],
+  [0x13748, race(0.7, 1, 5)],   // a race with a third of the Nord's magicka rate, so a long run never fills the bar
 ]);
 
-const OWN = { health: 0.007, magicka: 0.03, stamina: 0.05 }; // the Nord's own regen a second, as the client runs it
+const OWN = { health: 0.007, magicka: 0.03, stamina: 0.05 }; // the race's own regen a second, as the client runs it
 const props = new Map();
 const client = { health: 1, magicka: 1, stamina: 1 };
 let writes = 0;
@@ -69,7 +70,8 @@ const api = {
     getServerSettings: () => ({}),
   },
   log: () => {}, personal: () => {}, audit: () => {}, display: () => 'Tester', who: () => 'Tester (profile 1)',
-  cfg: {}, openWidget: () => true, closeWidget: () => true, onUi: () => {}, registerChatCommand: () => {},
+  // BLESSING_REGEN_CFG='{"tickSeconds":1}' tries other prayer.blessingRegen settings
+  cfg: { prayer: { blessingRegen: JSON.parse(process.env.BLESSING_REGEN_CFG || '{}') } }, openWidget: () => true, closeWidget: () => true, onUi: () => {}, registerChatCommand: () => {},
   onlineActors: () => [ACTOR], every: (name, ms, fn) => timers.set(name, { ms, fn }),
   skills: SKILLS, takeGold: () => true, treasuryHere: (a, n) => n, sendPacket: () => {},
 };
@@ -84,7 +86,7 @@ const bless = (deity) => props.set(ACTOR + '|private.dboBlessing', { deity, spel
 const play = (stat, secs, { start = 0.1, reportMs = 1000, phase = 100, silent = false } = {}) => {
   Object.assign(client, { health: 1, magicka: 1, stamina: 1 }, { [stat]: start });
   props.set(ACTOR + '|percentages', Object.assign({}, client));
-  writes = 0;
+  writes = 0; globalThis.__dboBlessingRegenOwed.delete(ACTOR);
   const tick = timers.get('prayerBlessingRegen');
   for (let t = 10; t <= secs * 1000; t += 10) {
     wallClock += 10;
@@ -104,26 +106,30 @@ props.delete(ACTOR + '|private.dboBlessing');
 const plain = play('magicka', 20);
 check('without a blessing a Nord\'s magicka refills 3% a second: +0.60 in 20 s', Math.abs(plain - 0.6) < 0.005, plain.toFixed(4));
 
-bless('akatosh');
-const rows = [];
-for (const phase of [100, 350, 600, 850]) {
-  const got = play('magicka', 20, { phase });
-  rows.push(`${phase} ms: +${got.toFixed(4)}`);
-  check(`Akatosh never slows magicka, the report ${phase} ms after a tick: at least +0.60 in 20 s`, got >= 0.6 - 1e-9, got.toFixed(4));
-  // 0.003 a second is paid in 10 s steps (a second of the bar's own 3%), less what a write takes back (at most a tick)
-  check(`...and speeds it up: at least one whole step, +0.62`, got >= 0.62, got.toFixed(4));
-}
-console.log('  Akatosh, magicka in 20 s from 0.1 (ideal +0.66): ' + rows.join(', '));
-const hircine = (() => { bless('hircine'); return play('stamina', 6, { start: 0.1 }); })();
-check('Hircine (StaminaRate +10, three times the stamina regeneration): at least +0.75 in 6 s, against +0.30 without it', hircine >= 0.75, hircine.toFixed(4));
-
+// The gift delivered, averaged over where the report lands in the tick (33 runs), against the same play with no blessing
+const share = (deity, stat, gift, secs) => {
+  props.delete(ACTOR + '|private.dboBlessing');
+  const base = play(stat, secs, { start: 0, phase: 100 });
+  bless(deity);
+  let tot = 0, n = 0, worst = Infinity;
+  for (let phase = 10; phase < 1000; phase += 30) { const g = play(stat, secs, { start: 0, phase }) - base; tot += g; n++; worst = Math.min(worst, g); }
+  return { share: tot / n / (gift * secs), worst };
+};
+props.set(ACTOR + '|appearance', { raceId: 0x13748 }); OWN.magicka = 0.01;
+const ak = share('akatosh', 'magicka', 0.001, 90);
+props.set(ACTOR + '|appearance', { raceId: NORD }); OWN.magicka = 0.03;
+check(`Akatosh (a tenth of a 1%/s race's magicka rate) delivers at least 75% of its gift over 90 s`, ak.share >= 0.75, `${(ak.share * 100).toFixed(0)}%`);
+check('...and never slows the bar, wherever the report lands', ak.worst >= -1e-9, ak.worst.toFixed(4));
+const hi = share('hircine', 'stamina', 0.10, 6);
+check(`Hircine (0.10 a second) delivers at least 75% of its gift to stamina over 6 s`, hi.share >= 0.75, `${(hi.share * 100).toFixed(0)}%`);
+check('...and never slows the bar either', hi.worst >= -1e-9, hi.worst.toFixed(4));
 bless('akatosh');
 const silentGain = play('magicka', 10, { silent: true });
 check('a silent client (a menu, a held spell) is never written to from its old report', writes === 0 && Math.abs(silentGain - 0.3) < 0.005, `${writes} writes, +${silentGain.toFixed(4)}`);
 const slow = play('magicka', 20, { reportMs: 2000 });
 check('reports two seconds apart still never slow it', slow >= 0.6 - 1e-9, slow.toFixed(4));
 const fewer = (() => { play('magicka', 20); return writes; })();
-check('a slow boon is paid in steps of at least a second of the bar\'s own regen: at most one write in 9 s', fewer <= 3, `${fewer} writes in 20 s`);
+check('a slow boon is paid in steps of payoutSeconds of the bar\'s own regen: Akatosh on a Nord at most once in 20 s', fewer <= 1, `${fewer} writes in 20 s`);
 
 Date.now = realNow;
 console.log('');

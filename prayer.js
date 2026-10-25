@@ -604,10 +604,11 @@ module.exports = (api) => {
   // for that bar, 0 at its cap: downed.js). Steps under minStep wait in regenOwed, so a slow boon is not a packet a second.
   // A write replaces the client's bar, and the server's bar is the client's last report (at most one a second), so a write
   // from an old report takes back the client's own regen since then: Akatosh's 0.003 a second, written from a report most
-  // of a second old, left magicka refilling at about a fifth of its speed (Marcus, 24 Oct). So, as racial.js has done since
-  // 10 Oct, the tick runs every 0.25 s, pays a bar only on the tick a fresh report of it arrives, and pays at least
-  // payoutSeconds of the bar's own regen at once, so the gift outweighs what a write takes back.
-  const REGEN = Object.assign({ enabled: true, tickSeconds: 0.25, minStep: 0.002, payoutSeconds: 1 }, CFG.blessingRegen || {});
+  // of a second old, left magicka refilling at about a fifth of its speed (Marcus, 24 Oct). So, as racial.js does, a bar is
+  // paid only on the tick a fresh report of it arrives, and at least payoutSeconds of the bar's own regen at once: a write
+  // takes back up to a tick of the bar's own regen, and a larger step outweighs it. A 1 s tick with 3 s steps delivers
+  // 82-87% of the gift at a quarter of a 0.25 s tick's reads (88-93%; blessing-regen-fresh-harness, 24 Oct)
+  const REGEN = Object.assign({ enabled: true, tickSeconds: 1, minStep: 0.002, payoutSeconds: 3 }, CFG.blessingRegen || {});
   const REGEN_TICK_MS = Math.max(250, Math.round((Number(REGEN.tickSeconds) || 1) * 1000));
   const REGEN_MIN_STEP = Math.max(0, Number(REGEN.minStep) || 0);
   // libespm ActorValue.h: index -> [the bar, a rate or a Mult]
