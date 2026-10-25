@@ -114,6 +114,9 @@ const MAX_ROOMS_LISTED = 48;
 const MAX_PLACE_CELLS = 4;
 // Housing actions whose use by staff on someone else's property is logged
 const STAFF_LOGGED = ["claim", "abandon", "revoke", "lock", "unlock", "rename", "createkey", "revokekeys", "transfer", "grantcontainer"];
+// What a GM below Lead GM may do to someone else's property (Nat, 25 Oct: "give regular GMs the ability to fix locks"):
+// lock or unlock it, re-key it, take back one copy, and cut a key for its owner. Never claim, hand over, name or share it
+const LOCK_FIX_ACTIONS = ["lock", "unlock", "revokekeys", "takekey", "createkey"];
 
 // Interior cells that belong to a hold, kept as a fallback for interiors whose exterior
 // door the server cannot place (old HoldClaims table, slugs mapped to zones.json ids).
@@ -532,6 +535,12 @@ export class HousingSystem implements System {
     }
     const isOwner = this.ownsAs(rec, this.profileOf(ctx, actorId), actorId) || this.leadsHall(ctx, primary, rec, actorId);
     const isManager = this.isManager(ctx, actorId, primary) && !this.sharesByOffice(ctx, primary, rec, actorId);
+    const lockFix = !isOwner && !isManager && rec.owner !== 0 && LOCK_FIX_ACTIONS.indexOf(action) !== -1 && this.isLockFixer(ctx, actorId, rec);
+    // A GM's key goes to the owner only: onto their ring (housingKeyRing), or not at all; refused before anything is logged
+    if (lockFix && action === "createkey" && !this.keyForOwner(ctx, userId, rec, content["recipient"])) return;
+    if (lockFix) {
+      try { (globalThis as any).__alduinakAdminLog?.(`HOUSING gm lock fix: actor ${actorId.toString(16)} (profile ${this.profileOf(ctx, actorId)}) ${action} on ${primary.toString(16)}, owner profile ${rec.owner}${rec.ownerChar ? ` character ${rec.ownerChar.toString(16)}` : ""}`); } catch { /* no log */ }
+    }
     // Every staff override of someone else's property goes to the admin log (review A3-1)
     if (!isOwner && rec.owner !== 0 && isManager && !this.isHoldManager(ctx, actorId, primary) && STAFF_LOGGED.indexOf(String(action)) !== -1) {
       const fief = !this.isAdmin(ctx, actorId);
@@ -544,12 +553,12 @@ export class HousingSystem implements System {
         case "claim": this.doClaim(ctx, userId, actorId, primary, rec, isManager); break;
         case "abandon": this.doAbandon(ctx, userId, actorId, primary, rec, isOwner, isManager); break;
         case "revoke": this.doRevoke(ctx, userId, actorId, primary, rec, isManager); break;
-        case "lock": this.doLock(ctx, userId, actorId, primary, rec, true); break;
-        case "unlock": this.doLock(ctx, userId, actorId, primary, rec, false); break;
+        case "lock": this.doLock(ctx, userId, actorId, primary, rec, true, lockFix); break;
+        case "unlock": this.doLock(ctx, userId, actorId, primary, rec, false, lockFix); break;
         case "rename": this.doRename(ctx, userId, primary, rec, isOwner, isManager, content["name"]); break;
-        case "createkey": this.doCreateKey(ctx, userId, actorId, primary, rec, isOwner || isManager, content["recipient"]); break;
-        case "takekey": this.doTakeKey(ctx, userId, actorId, primary, rec, isOwner || isManager, content["name"]); break;
-        case "revokekeys": this.doRevokeKeys(ctx, userId, primary, rec, isOwner, isManager); break;
+        case "createkey": this.doCreateKey(ctx, userId, actorId, primary, rec, isOwner || isManager || lockFix, content["recipient"]); break;
+        case "takekey": this.doTakeKey(ctx, userId, actorId, primary, rec, isOwner || isManager || lockFix, content["name"]); break;
+        case "revokekeys": this.doRevokeKeys(ctx, userId, primary, rec, isOwner, isManager || lockFix); break;
         case "transfer": this.doTransfer(ctx, userId, primary, rec, isOwner, isManager, content["recipient"]); break;
         case "grantcontainer": this.doGrantContainer(ctx, userId, primary, rec, isOwner, isManager, content["recipient"]); break;
         case "assign":
@@ -631,12 +640,12 @@ export class HousingSystem implements System {
     this.sendMenu(ctx, userId, actorId, primary);
   }
 
-  private doLock(ctx: SystemContext, userId: number, actorId: number, primary: number, rec: PropertyRecord, locked: boolean): void {
+  private doLock(ctx: SystemContext, userId: number, actorId: number, primary: number, rec: PropertyRecord, locked: boolean, lockFix = false): void {
     if (rec.owner === 0) {
       this.notice(ctx, userId, "Claim it first.");
       return;
     }
-    if (!this.hasAccess(ctx, primary, rec, actorId)) {
+    if (!lockFix && !this.hasAccess(ctx, primary, rec, actorId)) {
       this.notice(ctx, userId, "You have no key to this.");
       return;
     }
@@ -801,9 +810,10 @@ export class HousingSystem implements System {
 
     const holdsKey = owned && !isOwner && !isManager && this.hasAccess(ctx, primary, rec!, actorId);
 
+    const lockFixer = owned && !isOwner && !isManager && this.isLockFixer(ctx, actorId, rec!);
     let view: string;
     if (isOwner) view = "owner";
-    else if (isManager) view = "manager";
+    else if (isManager || lockFixer) view = "manager";
     else if (holdsKey) view = "keyholder";
     else if (primary && !owned && this.openClaims) view = "claimable";
     else view = "denied";
@@ -819,7 +829,10 @@ export class HousingSystem implements System {
       canGrantContainers: (isOwner || isManager) && owned && this.baseTypeOf(ctx, primary) === "CONT" && !(this.placesOn() && rec!.memberOf),
       ownerName: owned ? (rec!.ownerName || "Someone") : null,
       keyRing: this.keyRing,
-      copies: this.keyRing && owned && (isOwner || isManager) ? this.copiesOf(rec!) : undefined,
+      copies: this.keyRing && owned && (isOwner || isManager || lockFixer) ? this.copiesOf(rec!) : undefined,
+      // A GM fixing a lock: only lock, unlock, re-key, take back a copy and a key for the owner are answered (clients that
+      // know the flag hide the rest)
+      lockFixOnly: lockFixer || undefined,
       ...(owned && this.placesOn() ? this.placeMenu(ctx, primary, rec!, isOwner || isManager, profileId, here, actorId) : {}),
     });
   }
@@ -1502,6 +1515,23 @@ export class HousingSystem implements System {
   // Staff who override housing claims: Lead GM and above (TIER_CAPS.spawn). A GM observes; opening, transferring, revoking
   // or cutting keys for someone else's property is not theirs (claude-jake's review A3-1, 2026-09-28). Only on a staff
   // character: the gameplay's staff rules (staffguard.js __dboAdminGate 'housing') refuse the override on any other one
+  // A GM (any admin tier; a Trial GM has none) fixing someone else's lock (LOCK_FIX_ACTIONS), on a staff character and
+  // never on their own account where the staff rules say so (staffguard.js __dboAdminGate 'housingLockFix')
+  private isLockFixer(ctx: SystemContext, actorId: number, rec: PropertyRecord): boolean {
+    if (adminTierOf(ctx.svr as Mp, actorId, this.roleCfg) === null) return false;
+    const gate = (globalThis as any).__dboAdminGate;
+    if (typeof gate !== "function") return true;
+    try { return !gate(actorId, "housingLockFix", { ownerProfile: rec.owner }); } catch { return true; }
+  }
+
+  // A GM's createkey names the owner as the recipient; anyone else is refused, and the GM is told
+  private keyForOwner(ctx: SystemContext, userId: number, rec: PropertyRecord, rawRecipient: unknown): boolean {
+    const to = rawRecipient ? toFormId(rawRecipient) : 0;
+    if (this.keyRing && to && this.ownsAs(rec, this.profileOf(ctx, to), to)) return true;
+    this.notice(ctx, userId, this.keyRing ? "A GM cuts a key for the owner only: choose the owner." : "A GM cuts keys only on the key ring, for the owner.");
+    return false;
+  }
+
   private isAdmin(ctx: SystemContext, actorId: number): boolean {
     const tier = adminTierOf(ctx.svr as Mp, actorId, this.roleCfg);
     if (tier === null || !TIER_CAPS[tier].spawn) return false;
