@@ -162,9 +162,37 @@ module.exports = (api) => {
     masteryGrant: 'skills', masteryReset: 'skills', masterySetTier: 'skills', masteryDrop: 'skills', setSchool: 'skills',
     giveItem: 'items', giveWerewolf: 'powers', giveVampireLord: 'powers', giveDisease: 'powers', giveCurse: 'powers', beastForm: 'powers',
   };
+  // Panel bans (Nat, 25 Oct: Lead GMs ban from the F7 panel too). The rank rule /discipline and /kick use (gamemode.js
+  // rankRefusalOf, passed as rankRefusal): never the caller's own account nor a staff account of the caller's rank or higher,
+  // and refused when that cannot be read or the rule is missing (fails closed). A GM's panel temp ban is held to discipline.js
+  // gmMaxSuspendDays (3 days), and a GM never bans for good. A punishment rule, not a staff power: it runs before every
+  // staffPowers switch and for the Owners too, as /discipline does. The fork logs each refusal (adminLog); nothing is audited here
+  const BAN_ACTIONS = new Set(['ban', 'tempBan', 'ipBan']);
+  const disc = (cfg && typeof cfg.discipline === 'object' && cfg.discipline) || {};
+  const GM_BAN_HOURS = 24 * Math.min(Number(disc.gmMaxSuspendDays) > 0 ? Number(disc.gmMaxSuspendDays) : 3,
+    Number(disc.maxSuspendDays) > 0 ? Number(disc.maxSuspendDays) : 30);
+  const banRefusal = (a, action, info) => {
+    const t = Number(info.target) >>> 0;
+    let no = 'unknown';
+    try { no = t && typeof api.rankRefusal === 'function' ? api.rankRefusal(a, t) : 'unknown'; } catch (e) { log('staffguard: rank rule failed', e.message); no = 'unknown'; }
+    if (no === 'own') return 'You cannot ban your own account.';
+    if (no === 'rank') return `${display(t)} is on a staff account of your rank or higher, so you cannot ban it. Take it to someone above that rank, or to the Owners.`;
+    if (no) return 'The staff rank of that account could not be read, so nothing was banned. Try again, or ask an Owner.';
+    let tier = null; try { tier = tierOf(a); } catch (e) { tier = null; }
+    if (tier === null) return 'Only staff ban players.';
+    if (tier === 'gm') {
+      if (action !== 'tempBan') return `Bans are for Lead GMs and above. A GM can temp ban for up to ${GM_BAN_HOURS} hours.`;
+      const hours = Number(info.hours);
+      if (!(Number.isFinite(hours) && hours > 0)) return 'The panel did not say how long the temp ban is, so it was not given. Use /tempban #TAG <12h|3d> <reason>.';
+      if (hours > GM_BAN_HOURS) return `A GM can temp ban for at most ${GM_BAN_HOURS} hours (${GM_BAN_HOURS / 24} days). For longer, ask a Lead GM.`;
+    }
+    return '';
+  };
   const adminGate = (a, action, info) => {
-    if (!ON) return '';
     a = Number(a) >>> 0; info = info || {};
+    // The fork lets an action through when this throws, so the ban rule answers for itself
+    if (BAN_ACTIONS.has(action)) { let no = ''; try { no = banRefusal(a, action, info); } catch (e) { no = 'The ban could not be checked, so it was not given.'; } if (no) return no; }
+    if (!ON) return '';
     if (action === 'assign') return CHAR.enabled && CHAR.clearModes && !exempt(a) && (!isStaffChar(a) || info.changed === true) ? 'clear' : '';
     if (action === 'housing') return CHAR.enabled && !powersOn(a) ? NOT_HERE : '';
     if (CHAR.enabled && !powersOn(a) && !(Array.isArray(CHAR.panelAllowed) && CHAR.panelAllowed.includes(action))) return NOT_HERE;

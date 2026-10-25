@@ -8741,7 +8741,7 @@ try {
 try {
   const STAFFGUARD_JS = path.resolve('staffguard.js');
   delete require.cache[STAFFGUARD_JS];
-  require(STAFFGUARD_JS)({ mp, log, audit, who, display, personal, profileOf, tierOf, staffTierOf, isLeadStaff, staffCharOf, accountRankOf,
+  require(STAFFGUARD_JS)({ mp, log, audit, who, display, personal, profileOf, tierOf, staffTierOf, isLeadStaff, staffCharOf, accountRankOf, rankRefusal: rankRefusalOf,
     findByName, offlineByTag, registerChatCommand, onlineActors, cfg });
 } catch (e) {
   log('staffguard.js failed to load:', e.stack || e.message);
