@@ -6761,6 +6761,12 @@ try {
   delete require.cache[ITEMGUARDS_JS];
   require(ITEMGUARDS_JS)({ mp, log, who, recordOf, cfg, personal });
 } catch (e) { log('itemguards.js failed to load:', e.stack || e.message); }
+// ---- the Spider Imbuing Chamber is Dunmer only (server\spidermancy.js; Nat, 25 Oct 2026) --------------------------
+try {
+  const SPIDERMANCY_JS = path.resolve('spidermancy.js');
+  delete require.cache[SPIDERMANCY_JS];
+  require(SPIDERMANCY_JS)({ mp, log, personal });
+} catch (e) { log('spidermancy.js failed to load:', e.stack || e.message); }
 // ---- gear above the steel loot cap swapped for steel, once per character (server\gearswap.js; Nate, 1 Oct 2026) ----
 try {
   const GEARSWAP_JS = path.resolve('gearswap.js');
