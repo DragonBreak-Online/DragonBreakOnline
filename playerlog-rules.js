@@ -415,7 +415,7 @@ clean_(`SCHOOLS MANUAL SKILLBOOK SCHEMATIC READ CONTRACT CHAMPION CHILL REVIVE F
   HUNT RITE SILVER DUNGEON CHESTGOLD MINE CHOP ALCHEMY SMELT TAILOR REGION FORGENEVER ARTIFACT ORCISH RACECRAFT FACTIONGEAR DRAGON LOCK
   UNSTUCK JAIL CONCORDAT EXECUTION OFFERING PRAYER REST WELL CAMP PLAYTIME PLAYTEST REROLL TICKET CRASH-DOWN CRASHLOOP
   RUINBUTTON TAX SUPPLY BOOST STAFF APPEARANCE RECIPE BREW TREASURY ENCH-RESTORE ENCH-LEARNED-REPAIR CLOCK SPELL
-  CITIZEN ELECTION BLACKREACH PURSE`);
+  CITIZEN ELECTION BLACKREACH PURSE BIRTHSIGN`);
 // Name #TAG parties with no profile (display()): resolved by name and tag, never by the tag alone
 clean_('LEVEL ROPE STRUGGLE', { display: true });
 // The client-judged minigame mismatches: clean, and a security signal
@@ -1254,6 +1254,7 @@ const COMMAND_SCHEMA = {
   schools: { subs: S_('set reset view') },
   classteacher: {}, preacher: {},
   deity: { subs: S_('reset') }, pray: {}, offer: { nums: [0] },
+  birthsign: { subs: S_('set clear warrior mage thief lady lord steed apprentice atronach ritual lover shadow serpent tower') },
   bank: { subs: S_('deposit withdraw pay'), nums: [0] },
   business: { subs: S_('open close rent collect ledger staff list') },
   tax: { nums: [0] },
@@ -1350,6 +1351,8 @@ appearance.js APPEARANCE 8a7cc30f clean
 appearance.js APPEARANCE fa5ed0fc clean
 appearance.js APPEARANCE b80ac1f1 clean
 appearance.js APPEARANCE b0525394 clean
+birthsigns.js BIRTHSIGN b05aa6cf clean
+birthsigns.js BIRTHSIGN 4171b66d clean
 bank.js BANK 462e889d parsed
 bank.js BANK f4890f79 parsed
 bank.js BANK 5efd151e parsed

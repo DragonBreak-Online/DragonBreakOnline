@@ -1766,12 +1766,12 @@ const GATE_CREATION_TELL_MS = 10000;
 // /unstuck refuses an unfinished character with the same line (review GC-2: it sent Stranger #MSFB from the Realm to Bruma)
 const GATE_CREATION_LINE = 'Your character is not finished yet, so the gates cannot take you. If the race menu already closed and you are still here, your game did not send your new look: quit Skyrim completely, start it again and log in, and the race menu opens again.';
 const gateCreationToldAt = globalThis.__dboGateCreationToldAt instanceof Map ? globalThis.__dboGateCreationToldAt : (globalThis.__dboGateCreationToldAt = new Map());
-const gateCreationTold = (a) => {
+const gateCreationTold = (a, line) => {
   const id = a >>> 0, now = Date.now();
   if (now - (gateCreationToldAt.get(id) || 0) < GATE_CREATION_TELL_MS) return;
   gateCreationToldAt.set(id, now);
   if (gateCreationToldAt.size > 500) for (const [k, t] of gateCreationToldAt) if (now - t > GATE_CREATION_TELL_MS) gateCreationToldAt.delete(k);
-  personal(id, GATE_CREATION_LINE);
+  personal(id, line || GATE_CREATION_LINE);
 };
 // One spot picker per gate; holds live on globalThis so a reload keeps the promises already made
 const gateSpotHolds = globalThis.__dboGateSpotHolds instanceof Map ? globalThis.__dboGateSpotHolds : (globalThis.__dboGateSpotHolds = new Map());
@@ -2102,6 +2102,8 @@ mp.onActivate = (targetId, casterId) => {
   // A character still being made goes nowhere (the race menu and the god come first; never a move with RaceMenu open),
   // and is told why
   if (g && creationPending(casterId >>> 0)) { gateCreationTold(casterId >>> 0); return false; }
+  // ...nor without a birthsign (birthsigns.js), which comes before the god
+  if (g && birthsignHeld(casterId >>> 0)) { gateCreationTold(casterId >>> 0, globalThis.__dboBirthsignGateLine); return false; }
   if (g && globalThis.__dboPlaytestGate && globalThis.__dboPlaytestGate(casterId >>> 0)) return false;
   if (g) {
     try {
@@ -2958,6 +2960,7 @@ const startQuestion = () => {
 // and a login in the Realm with the question still open
 const leaveRealm = (a) => {
   try {
+    if (birthsignHeld(a)) { if (!creationPending(a)) endCreation(a); return; }
     const choice = startChoiceOf(a);
     if (!askCyrodiil() || (choice !== 'asking' && choice !== 'skyrim')) return sendToArrival(a);
     if (mp.get(a, 'isOnline') === false || creationPending(a)) return;
@@ -3036,7 +3039,10 @@ function inHubForName(a) { try { return String(mp.get(a, 'worldOrCellDesc') || '
 // gates lead to the arrival, and with Skyrim open (leaveRealm above) the gates lead to the holds.
 const DEITY_STEP_MAX_MS = 5 * 60000;
 const inHub = (a) => { try { return String(mp.get(a, 'worldOrCellDesc') || '').toLowerCase() === String(HUB.cellOrWorldDesc).toLowerCase(); } catch (e) { return false; } };
-globalThis.__dboAtCreationEnd = (a) => inHub(a) && !creationPending(a);
+// A character in the hub with no birthsign stays until they choose one (birthsigns.js), unless its menu could not be sent
+const birthsignHeld = (a) => { try { return typeof globalThis.__dboBirthsignHold === 'function' && inHub(a) && !!globalThis.__dboBirthsignHold(a >>> 0); } catch (e) { return false; } };
+// The god's step waits for the birthsign's
+globalThis.__dboAtCreationEnd = (a) => inHub(a) && !creationPending(a) && !birthsignHeld(a);
 // Nobody making a character sees anyone else doing it, nor is seen (Nate, 4 Oct: people saw each other in the creator).
 // The live client already hides an actor whose neighbour-visible ff_adminModes says invis: formView draws the body at
 // alpha 0 with no nametag, and shows it to staff as a ghost. AdminSystem keeps the real modes per profile and only mirrors
@@ -3097,7 +3103,16 @@ globalThis.__dboCreationEndDone = (a) => {
   const wait = Math.max(2500, CREATION_MOVE_MS - (Date.now() - (creatorClosedAt.get(a) || 0)));
   setTimeout(() => leaveRealm(a), wait);
 };
+// The birthsign first (birthsigns.js), then the god; the sign's choice comes back through __dboBirthsignStepDone
 const endCreation = (a) => {
+  let signing = false;
+  try { signing = typeof globalThis.__dboBirthsignCreationOpen === 'function' && inHub(a) && !!globalThis.__dboBirthsignCreationOpen(a >>> 0); }
+  catch (e) { log('birthsign step failed', e.message); }
+  if (signing) return;
+  chooseGod(a);
+};
+globalThis.__dboBirthsignStepDone = (a) => chooseGod(a);
+const chooseGod = (a) => {
   let opened = false;
   try { opened = typeof globalThis.__dboDeityCreationOpen === 'function' && inHub(a) && globalThis.__dboDeityCreationOpen(a); }
   catch (e) { log('deity step failed', e.message); }
@@ -3332,6 +3347,8 @@ const onCharacterReady = (userId, a) => {
     try { if (globalThis.__dboPartyLogin) globalThis.__dboPartyLogin(a); } catch (e) { log('party login failed', e.message); }
     sendFavorites(a);
     try { if (globalThis.__dboCharLevelLogin) globalThis.__dboCharLevelLogin(a); } catch (e) { log('level login failed', e.message); }
+    // No birthsign yet: the choice comes up a moment after login (birthsigns.js)
+    try { if (globalThis.__dboBirthsignLogin) globalThis.__dboBirthsignLogin(a); } catch (e) { log('birthsign login failed', e.message); }
     try { if (globalThis.__dboBoostLogin) globalThis.__dboBoostLogin(a); } catch (e) { log('boost login failed', e.message); }
     try { if (globalThis.__dboEnchLearnedLogin) globalThis.__dboEnchLearnedLogin(a); } catch (e) { log('learned enchantments login failed', e.message); }
     // A shrine blessing still running is cast on the player again: the client's effect did not survive the logout (prayer.js)
@@ -3433,7 +3450,7 @@ globalThis.__dboHandlers.disconnect = (userId) => {
   if (a && globalThis.__dboDungeonLeave) { try { globalThis.__dboDungeonLeave(a); } catch (e) { log('dungeon logout move failed', e.message); } }
   if (a && globalThis.__dboPartyLogout) { try { globalThis.__dboPartyLogout(a); } catch (e) { log('party logout failed', e.message); } }
   // What a UI said it can draw, and a deity offer already made, belong to this session (review C6, PRAY-1)
-  for (const k of ['__dboItemLeave', '__dboBankLeave', '__dboRobLeave', '__dboSilverTestLeave', '__dboDeityForget', '__dboPanelLeave', '__dboManualsLeave', '__dboLabourLeave', '__dboPrayerLeave', '__dboSkinLeave', '__dboSchoolsLeave', '__dboKeyRingLeave', '__dboRacialLeave', '__dboStartLeave']) { if (a && typeof globalThis[k] === 'function') { try { globalThis[k](a); } catch (e) { log(`${k} failed`, e.message); } } }
+  for (const k of ['__dboItemLeave', '__dboBankLeave', '__dboRobLeave', '__dboSilverTestLeave', '__dboDeityForget', '__dboPanelLeave', '__dboManualsLeave', '__dboLabourLeave', '__dboPrayerLeave', '__dboSkinLeave', '__dboSchoolsLeave', '__dboKeyRingLeave', '__dboRacialLeave', '__dboStartLeave', '__dboBirthsignLeave']) { if (a && typeof globalThis[k] === 'function') { try { globalThis[k](a); } catch (e) { log(`${k} failed`, e.message); } } }
   // A duel ends with its duellist's logout (duel.js)
   if (a && typeof globalThis.__dboDuelLeave === 'function') { try { globalThis.__dboDuelLeave(a); } catch (e) { log('duel leave failed', e.message); } }
   if (a && typeof globalThis.__dboFrenzyLeave === 'function') { try { globalThis.__dboFrenzyLeave(a); } catch (e) { log('frenzy leave failed', e.message); } }
@@ -7709,6 +7726,15 @@ try {
   delete require.cache[RACIAL_JS];
   racial = require(RACIAL_JS)({ mp, log, personal, giveItem, profileOf, display, recordOf, every, onlineActors, weaponHandsOf, sourceResistsOf, gmstFloat, cfg, sendPacket, hasUiCap });
 } catch (e) { log('racial.js failed to load:', e.stack || e.message); racial = null; globalThis.__dboRaceGold = null; globalThis.__dboRaceOf = null; }
+// ---- the thirteen birthsigns: chosen once, small gifts for life through racial.js (server\birthsigns.js, config "birthsigns")
+try {
+  const BIRTHSIGNS_JS = path.resolve('birthsigns.js');
+  delete require.cache[BIRTHSIGNS_JS];
+  require(BIRTHSIGNS_JS)({ mp, log, personal, audit, who, display, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors, every, isLeadStaff, findByName, profileOf });
+} catch (e) {
+  log('birthsigns.js failed to load:', e.stack || e.message);
+  for (const k of ['__dboBirthsignOf', '__dboBirthsignHold', '__dboBirthsignCreationOpen', '__dboBirthsignLogin', '__dboBirthsignLeave']) globalThis[k] = null;
+}
 // ---- enchantments the server judges: weapon hits, worn resistances and fortifies (server\gearench.js, config "gearEnchantments")
 try {
   const GEARENCH_JS = path.resolve('gearench.js');
@@ -8258,7 +8284,7 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     try { if (gearEnch) targetSide *= gearEnch.spellbreakerMult(agg, tgt, src, dmg, flags); } catch (e) { log('spellbreaker failed', e.message); }
     if (racial) { try { targetSide = racial.capTargetSide(targetSide * racial.targetMult(agg, tgt, src, dmg)); } catch (e) { log('racial target failed', e.message); } }
     let raceAtk = 1;
-    if (racial && !beastAgg) { try { raceAtk = racial.attackMult(agg, tgt, src, dmg); } catch (e) { log('racial attack failed', e.message); } }
+    if (racial && !beastAgg) { try { raceAtk = racial.attackMult(agg, tgt, src, dmg, flags); } catch (e) { log('racial attack failed', e.message); } }
     let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * potionTakenMult(tgt, flags) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp;
     if (!beastAgg) mult *= gearAttackMult(agg, src);
     // The Shrouded Gloves double a one-handed sneak attack (gearench.js backstabMult)
@@ -8881,7 +8907,7 @@ try {
   const CHARLEVEL_JS = path.resolve('charlevel.js');
   delete require.cache[CHARLEVEL_JS];
   require(CHARLEVEL_JS)({ mp, log, personal, system, audit, display, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors, every, sendPacket, isAdmin, findByName });
-} catch (e) { log('charlevel.js failed to load:', e.stack || e.message); globalThis.__dboCharLevel = null; globalThis.__dboCharLevelLogin = null; globalThis.__dboCharLevelRefund = null; }
+} catch (e) { log('charlevel.js failed to load:', e.stack || e.message); globalThis.__dboCharLevel = null; globalThis.__dboCharLevelLogin = null; globalThis.__dboCharLevelRefund = null; globalThis.__dboCharLevelSyncBonus = null; }
 
 // ---- interaction animations: a notice board, an introduction, rope (server\idles.js) -----------------------------
 try {
