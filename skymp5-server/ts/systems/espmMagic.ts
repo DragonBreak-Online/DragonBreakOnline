@@ -58,6 +58,9 @@ const MAX_TEMPLATE_DEPTH = 16;
 const MGEF_PROJECTILE = 0x48;
 const PROJ_EXPLOSION = 0x24;
 const EXPL_PLACED = 0x10;
+// An MGEF can also name its explosion outright, without a projectile in between: the DLC2 spider scrolls do,
+// which is why they reach the same placed NPC_ as Conjure Ash Guardian by a shorter route.
+const MGEF_EXPLOSION = 0x4c;
 
 const effectCache = new Map<number, SpellEffect[]>();
 const conditionCache = new Map<number, KeywordCondition[]>();
@@ -202,7 +205,10 @@ export const explosionPlacedNpc = (mp: Mp, mgefId: number): number => {
     const data = rec?.record?.type === type ? fieldData(rec, "DATA") : null;
     return data && data.byteLength >= offset + 4 ? toGlobal(rec, view(data).getUint32(offset, true)) : 0;
   };
-  const explosion = lookup(mp, linked(lookup(mp, linked(lookup(mp, mgefId), "MGEF", MGEF_PROJECTILE)), "PROJ", PROJ_EXPLOSION));
+  const mgef = lookup(mp, mgefId);
+  // Through the projectile first, so a record carrying both resolves exactly as it did before
+  const viaProjectile = linked(lookup(mp, linked(mgef, "MGEF", MGEF_PROJECTILE)), "PROJ", PROJ_EXPLOSION);
+  const explosion = lookup(mp, viaProjectile || linked(mgef, "MGEF", MGEF_EXPLOSION));
   const placedId = linked(explosion, "EXPL", EXPL_PLACED);
   const result = lookup(mp, placedId)?.record?.type === "NPC_" ? placedId : 0;
   placedCache.set(mgefId, result);
