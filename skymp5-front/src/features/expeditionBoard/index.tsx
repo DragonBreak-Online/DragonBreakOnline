@@ -11,6 +11,7 @@ import './styles.scss';
 //
 //   Browser -> client -> server: sendMessage(events.pick, expeditionId)
 //                                sendMessage(events.contractTake, contractId), sendMessage(events.contractAbandon, contractId)
+//                                sendMessage(events.contractDeliver, contractId, count)  a commission's goods, handed in
 //   Escape / Close:              sendMessage(events.close)
 interface Expedition {
   id: string;
@@ -29,7 +30,14 @@ interface Contract {
   reward: number;
   danger: number;           // 1..3
   hoursLeft: number;
-  state: 'open' | 'yours' | 'posted';
+  // An open notice may carry the reason it cannot be taken as its state ('Citizens only', 'Budget spent'): drawn as the stamp
+  state: 'open' | 'yours' | 'posted' | string;
+  // A commission (server contracts.js, 25 Oct): goods the hold buys, handed in here; have is what the reader carries
+  type?: 'commission';
+  item?: string;
+  price?: number;
+  have?: number;
+  postedBy?: string;       // the official who posted it by hand, '' for standing work
 }
 
 interface HeldContract {
@@ -64,7 +72,7 @@ export interface ExpeditionBoardData {
   leaseMinutes: number;
   contracts?: ContractsTab;
   tab?: TabId;
-  events: { pick: string; close: string; contractTake?: string; contractAbandon?: string };
+  events: { pick: string; close: string; contractTake?: string; contractAbandon?: string; contractDeliver?: string };
 }
 
 const send = (key: string, ...args: unknown[]): void => {
@@ -84,11 +92,14 @@ const STAMP: Record<Expedition['state'], string> = {
   resting: 'Resting',
 };
 
-const CONTRACT_STAMP: Record<Contract['state'], string> = {
+const CONTRACT_STAMP: Record<string, string> = {
   open: 'Wanted',
   yours: 'Yours',
   posted: 'Your notice',
 };
+const isCommission = (c: Contract): boolean => c.type === 'commission';
+const stampOf = (c: Contract): string => (isCommission(c) && c.state !== 'posted' ? 'Buying' : CONTRACT_STAMP[c.state] || c.state);
+const paperState = (c: Contract): string => (c.state === 'yours' ? 'yours' : c.state === 'posted' ? 'taken' : 'open');
 
 const DANGER_WORD = ['', 'A pest', 'Dangerous', 'Deadly'];
 
@@ -184,12 +195,12 @@ const ExpeditionBoard = ({ data }: { data: ExpeditionBoardData }) => {
                   {work.map((c) => (
                     <button
                       key={c.id}
-                      className={'bountyBoard__paper expeditionBoard__paper expeditionBoard__paper--' + (c.state === 'yours' ? 'yours' : c.state === 'posted' ? 'taken' : 'open')}
+                      className={'bountyBoard__paper expeditionBoard__paper expeditionBoard__paper--' + paperState(c)}
                       onClick={() => setSelectedId(c.id)}
                     >
-                      <span className={'expeditionBoard__stamp expeditionBoard__stamp--' + (c.state === 'yours' ? 'yours' : c.state === 'posted' ? 'taken' : 'open')}>{CONTRACT_STAMP[c.state] || c.state}</span>
+                      <span className={'expeditionBoard__stamp expeditionBoard__stamp--' + paperState(c)}>{stampOf(c)}</span>
                       <span className="expeditionBoard__name">{c.what}</span>
-                      <span className="expeditionBoard__where">{DANGER_WORD[c.danger] || 'Dangerous'}</span>
+                      <span className="expeditionBoard__where">{isCommission(c) ? (c.have ? `You carry ${c.have}` : 'Goods wanted') : DANGER_WORD[c.danger] || 'Dangerous'}</span>
                       <span className="bountyBoard__paper-author">{c.reward} gold &middot; {hoursLabel(c.hoursLeft)}</span>
                     </button>
                   ))}
@@ -222,7 +233,8 @@ const ExpeditionBoard = ({ data }: { data: ExpeditionBoardData }) => {
           {tab === 'contracts' ? (
             <span className="bountyBoard__hint">
               You may hold {maxActive === 1 ? 'one contract' : `up to ${maxActive} contracts`} at a time and are paid the moment each one's last beast falls. Kills count only in {contracts && contracts.zone ? contracts.zone : 'the hold'}&apos;s wilds.
-              {contracts && contracts.canPost ? ' As an official you post work with /contract post <creature> <count> <reward>.' : ''}
+              {' Commissions buy goods: hand them in here.'}
+              {contracts && contracts.canPost ? ' As an official you post work and commissions in the Court tab of your journal (F3), or with /contract post <creature> <count> <reward>.' : ''}
             </span>
           ) : (
             <span className="bountyBoard__hint">
@@ -259,7 +271,35 @@ const ExpeditionBoard = ({ data }: { data: ExpeditionBoardData }) => {
           </div>
         ) : null}
 
-        {selectedContract ? (
+        {selectedContract && isCommission(selectedContract) ? (
+          <div className="bountyBoard__shade" onClick={() => setSelectedId(null)}>
+            <div className="bountyBoard__read expeditionBoard__read" onClick={(e) => e.stopPropagation()}>
+              <p className="expeditionBoard__read-name">{selectedContract.what}</p>
+              <p className="bountyBoard__read-age">A commission &middot; {hoursLabel(selectedContract.hoursLeft)}</p>
+              <p className="bountyBoard__read-text">
+                The hold of {contracts && contracts.zone ? contracts.zone : 'Bruma'} buys {selectedContract.count} {selectedContract.item} at {selectedContract.price} gold each, paid from its treasury the moment you hand them in.
+                {' '}Only plain goods count: named, enchanted or tempered ones stay in your pack.
+              </p>
+              <p className="bountyBoard__read-author">
+                {selectedContract.state === 'posted' ? 'You posted this commission; someone else must fill it.' : `You carry ${selectedContract.have || 0}.`}
+                {selectedContract.postedBy ? ` Posted by ${selectedContract.postedBy}.` : ''}
+              </p>
+              <div className="bountyBoard__actions bountyBoard__read-actions">
+                {selectedContract.state !== 'posted' && (selectedContract.have || 0) > 0 && contracts && contracts.enabled && ev.contractDeliver ? (
+                  <button
+                    className="bountyBoard__button bountyBoard__button--primary"
+                    onClick={() => { send(ev.contractDeliver as string, selectedContract.id, Math.min(selectedContract.have || 0, selectedContract.count)); setSelectedId(null); }}
+                  >
+                    Hand in {Math.min(selectedContract.have || 0, selectedContract.count)} for {Math.min(selectedContract.have || 0, selectedContract.count) * (selectedContract.price || 0)} gold
+                  </button>
+                ) : null}
+                <button className="bountyBoard__button" onClick={() => setSelectedId(null)}>Back</button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {selectedContract && !isCommission(selectedContract) ? (
           <div className="bountyBoard__shade" onClick={() => setSelectedId(null)}>
             <div className="bountyBoard__read expeditionBoard__read" onClick={(e) => e.stopPropagation()}>
               <p className="expeditionBoard__read-name">{selectedContract.what}</p>
@@ -270,6 +310,7 @@ const ExpeditionBoard = ({ data }: { data: ExpeditionBoardData }) => {
               </p>
               <p className="bountyBoard__read-author">
                 {selectedContract.state === 'yours' ? 'You hold this contract.' : selectedContract.state === 'posted' ? 'You posted this notice; someone else must do the hunting.' : held ? 'You already hold a contract.' : 'Open to any hunter.'}
+                {selectedContract.postedBy ? ` Posted by ${selectedContract.postedBy}.` : ''}
               </p>
               <div className="bountyBoard__actions bountyBoard__read-actions">
                 {selectedContract.state === 'open' && !held && contracts && contracts.enabled && ev.contractTake ? (
