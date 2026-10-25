@@ -16,7 +16,7 @@ const REAL = JSON.parse(fs.readFileSync(path.join(ROOT, 'bosses.json'), 'utf8'))
 const def = (id) => REAL.bosses.find((b) => b.id === id);
 
 // ---- the shipped data ----
-ok(REAL.bosses.map((b) => b.id).join() === 'icecap,briarheartking,centurion,palewarlord,falmerwarmonger,movarth,duskthorn,valkynaz,karstaag,risenlegate,minotaurlord,minotaurtest1,minotaurtest2',
+ok(REAL.bosses.map((b) => b.id).join() === 'icecap,briarheartking,centurion,palewarlord,falmerwarmonger,movarth,duskthorn,valkynaz,karstaag,risenlegate,minotaurlord,minotaurtest1,minotaurtest2,werewolfbehemoth',
   'eight bosses: the Ice Cap Wraith, the Briarheart King, the Centurion Master, the Warlord of the Pale Pass, the Falmer Warmonger, the Master of Movarth\'s Lair, the Warchief of Dusk Thorn, the Valkynaz');
 ok(def('movarth').night === true && def('valkynaz').event && def('valkynaz').event.minutes === 30 && def('falmerwarmonger').guardian.options.length && def('duskthorn').guardian.options.length,
   'Movarth\'s master walks at night, the Valkynaz is a 30-minute event, the Warmonger and the Warchief have their shamans');
@@ -188,6 +188,22 @@ tick([M]); hit(P1, M, 50, 0.8);
 night = false; tick([M]);
 ok(hasZone('boss:movarth:boss'), 'a fight in progress runs on past dawn');
 ok(!hasZone('boss:valkynaz:boss'), 'the Valkynaz stands nowhere until an event');
+// ---- the Werewolf Behemoth: dev only, at night; fullMoon keeps it to full-moon nights ----
+const ww = def('werewolfbehemoth');
+ok(ww && ww.devOnly === true && ww.night === true && ww.hold === 'falkreath' && ww.spots.length === 3 && ww.boss.options.length && ww.adds.length === 3,
+  'the Behemoth of Hircine\'s Hunt: dev only, a night boss of Falkreath, three spots, a werewolf and two wolves for its pack');
+ok(ww.drops.always.some((x) => x[2] === 'WerewolfPelt') && ww.drops.always.some((x) => x[2] === 'WolfPelt') && ww.drops.schematic.family === 'silver' && ww.drops.extraSchematic.family === 'glass',
+  '...it drops a Werewolf Pelt and wolf pelts, Silver 5%, Glass 1%');
+let moonUp = false;
+globalThis.__dboClock = { isNight: () => night, isFullMoon: () => moonUp };
+night = true; load({ bosses: { devOnly: true } });
+ok(hasZone('boss:werewolfbehemoth:boss') && zones().filter((x) => /^boss:werewolfbehemoth:open\d$/.test(x.Name)).length === 3, 'on the dev server at night it stands with its pack of three');
+load({ bosses: { devOnly: true, werewolfbehemoth: { fullMoon: true } } });
+ok(!hasZone('boss:werewolfbehemoth:boss'), 'fullMoon true: not on an ordinary night');
+moonUp = true; tick([]);
+ok(hasZone('boss:werewolfbehemoth:boss'), '...but on a full-moon night it rises');
+moonUp = false; night = false; load({});
+ok(!hasZone('boss:werewolfbehemoth:boss'), 'off the dev server it writes nothing');
 said.length = 0;
 commands.get('bossevent')(P1, ['valkynaz']);
 ok(!hasZone('boss:valkynaz:boss') && /Only a Lead GM/.test(toldTo(P1)), 'a player cannot start the event');

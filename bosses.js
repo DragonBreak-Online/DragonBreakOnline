@@ -21,7 +21,9 @@
 // excludes Briarhearts pays none to one (briarheart.js __dboIsBriarheart). The hold hears when the boss rises and falls.
 // When:  a boss with night true stands only at night (worldclock.js __dboClock.isNight), its fight running on past dawn; a
 //         boss with event { minutes, waveEverySeconds, waveSize } stands only while an event a Lead GM starts lasts
-//         (/bossevent <id>), and a wave of waveSize adds comes every waveEverySeconds until it ends, felled or not.
+//         (/bossevent <id>), and a wave of waveSize adds comes every waveEverySeconds until it ends, felled or not. A boss
+//         with fullMoon true (or its config block's fullMoon) stands only on a full-moon night (__dboClock.isFullMoon), its
+//         fight running on past dawn as a night boss's does (the Werewolf Behemoth, 25 Oct).
 // Rare extras: drops.extra [[desc, chance, count]] rolled for each rewarded fighter (the Centurion's Heart Stone).
 // Tests: a boss with devOnly true runs only where bosses.devOnly is true (the dev server); rearm names a weapon put back in
 // a spawned boss's inventory when it lacks it (dungeons.js's arming: the server's EquipBestWeapon wears it at the next host
@@ -98,8 +100,11 @@ module.exports = (api) => {
   };
   // Whether a boss stands now: an event boss while its event lasts, a night boss at night or while its fight goes on
   const isNight = () => { try { return !!(globalThis.__dboClock && typeof globalThis.__dboClock.isNight === 'function' && globalThis.__dboClock.isNight()); } catch (e) { return false; } };
+  const isFullMoon = () => { try { return !!(globalThis.__dboClock && typeof globalThis.__dboClock.isFullMoon === 'function' && globalThis.__dboClock.isFullMoon()); } catch (e) { return false; } };
   function standing(b) {
     if (b.event) { const ev = G.events.get(b.id); return !!ev && ev.until > Date.now(); }
+    const moon = own(b).fullMoon !== undefined ? own(b).fullMoon === true : b.fullMoon === true;
+    if (moon) { const f = G.fights.get(b.id); return (isNight() && isFullMoon()) || !!(f && f.boss && f.startedAt); }
     if (b.night) { const f = G.fights.get(b.id); return isNight() || !!(f && f.boss && f.startedAt); }
     return true;
   }

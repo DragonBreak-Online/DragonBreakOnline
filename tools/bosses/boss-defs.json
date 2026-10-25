@@ -922,6 +922,107 @@
    "_test": "B9 test 2: the same, its axe put back in its inventory after spawn (dungeons.js's arming), worn at the next host grant",
    "rearmAddsEdid": "BSKMinotaurWarAxe",
    "_adds": "Nat, 25 Oct: the minotaurs come back at Minotaur's Rest as his adds; each gets its war axe back in its inventory (rearmAdds), as the Lord's test 2 does"
+  },
+  {
+   "id": "werewolfbehemoth",
+   "name": "the Behemoth of Hircine's Hunt",
+   "enabled": true,
+   "devOnly": true,
+   "hold": "falkreath",
+   "world": "3c:Skyrim.esm",
+   "night": true,
+   "fullMoon": false,
+   "spots": [
+    {
+     "id": "BMG",
+     "pos": [
+      -37646.53,
+      -36967.41,
+      -3523.07
+     ],
+     "heading": 179.9,
+     "note": "Falkreath: before Bloated Man's Grotto, where Hircine's hunt for Sinding ends (the admin teleport spot)"
+    },
+    {
+     "id": "GC",
+     "pos": [
+      -78689.48,
+      -55425.25,
+      4301.62
+     ],
+     "heading": 0,
+     "note": "Falkreath: Glenmoril Coven's door, the witches who bargain with Hircine for the Companions' cure"
+    },
+    {
+     "id": "HM",
+     "pos": [
+      -42817.49,
+      -58192.09,
+      1018.63
+     ],
+     "heading": 16.9,
+     "note": "Falkreath: Half-Moon Mill's lakeside woods"
+    }
+   ],
+   "bossEdid": "EncWerewolf06Boss",
+   "addEdids": [
+    "EncWerewolf03",
+    "EncWolf",
+    "EncWolf"
+   ],
+   "openingAdds": 3,
+   "waves": [
+    [
+     0.66,
+     3
+    ],
+    [
+     0.33,
+     4
+    ]
+   ],
+   "toughness": 0.5,
+   "damageMult": 1.5,
+   "enrageSeconds": 480,
+   "enrage": {
+    "toughness": 0.25,
+    "damageMult": 2.25
+   },
+   "respawnSeconds": 10800,
+   "radius": 5000,
+   "announce": {
+    "spawn": "A howl rolls down from the Falkreath pines. Hircine's hunt is abroad tonight.",
+    "death": "The Behemoth of Hircine's Hunt is dead, and the pack scatters."
+   },
+   "drops": {
+    "alwaysEdid": [
+     [
+      "WerewolfPelt",
+      1
+     ],
+     [
+      "WolfPelt",
+      3
+     ]
+    ],
+    "always": [
+     [
+      "f:Skyrim.esm",
+      150
+     ]
+    ],
+    "schematic": {
+     "family": "silver",
+     "chance": 0.05,
+     "knownBonus": 0
+    },
+    "extraSchematic": {
+     "family": "glass",
+     "chance": 0.01
+    }
+   },
+   "waitingOn": "the dev test (bosses.devOnly on the dev server): a werewolf pack streamed to several watchers at once. One werewolf NPC has been hosted live (Werewolf Beastmaster a092e, Driftshade, 20 Oct, no crash), never a pack; then Nat picks the spot and night or full moon",
+   "_note": "Proposed 25 Oct (the Leader for Nat): vanilla's top werewolf boss (EncWerewolf06Boss, Dawnguard's ladder) named and rim-lit; the server's SetScale is a stub, so a body 1.3x would need an NPC_ on the Behemoth race 1d1f9e in the DLE (a plugin edit, not made). Pack: a werewolf and two wolves at the start, then 3 and 4 more (werewolf, wolf, wolf in turn). Drops: a Werewolf Pelt (Hothtrooper's werewolf fur and leather recipes take it) and three wolf pelts, gold, Silver 5% (the hunter's metal, Hircine's joke), Glass 1%. Every zone is hostile, player werewolves included. fullMoon true (here or in its config block) keeps it to full-moon nights"
   }
  ]
 }
