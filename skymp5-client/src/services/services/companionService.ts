@@ -2,7 +2,7 @@ import { Actor, HitEvent, ObjectReference, Quest, ReferenceAlias, storage } from
 import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { companionFightState } from "./companionFightState";
 import { FightStall, fightStallStep } from "./companionFightStall";
-import { formationGap, formationOffset, formationPoint, formationWorldOffset } from "./companionFormation";
+import { flankSlot, formationGap, formationOffset, formationPoint, formationWorldOffset, isRangedHands, leashStep, memberJitter, staggerDelayMs } from "./companionFormation";
 import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { sendCustomPacket, parseCustomPacket } from "./customPacketUtil";
@@ -79,6 +79,17 @@ interface LocalState {
   // keep-offset was last given for
   slot: number;
   followSlot: number;
+  // Step 2 of the warband rework (Nat, 25 Oct): the order this member acts on, the newer one it is waiting its turn for
+  // (staggerDelayMs), whether it is leashed back to its owner (leashStep), and whether it fights from range (re-read every
+  // rangedCheckMs)
+  appliedTarget: number;
+  appliedStaying: boolean;
+  appliedKey: string;
+  pendingKey: string;
+  pendingSince: number;
+  leashed: boolean;
+  ranged: boolean;
+  rangedAt: number;
   // The ordered fight's progress window (companionFightStall.ts)
   stall: FightStall | null;
 }
@@ -219,17 +230,21 @@ export class CompanionService extends ClientListener {
     this.recordTrail(player);
     this.assist(player, now);
     this.publishHud(now);
-    // Places in the formation go to the loaded, living companions in list order, so a dead or unloaded one leaves no hole
+    // Places in the formation go to the loaded, living companions in list order, so a dead or unloaded one leaves no hole;
+    // ranged ones take the flank places
     let slot = 0;
-    for (const c of this.companions) {
-      const actor = this.sp.Actor.from(this.sp.Game.getFormEx(remoteIdToLocalId(c.id)));
+    let flank = 0;
+    for (const server of this.companions) {
+      const actor = this.sp.Actor.from(this.sp.Game.getFormEx(remoteIdToLocalId(server.id)));
       if (!actor || actor.isDead() || !actor.is3DLoaded()) {
-        if (!actor || !actor.isDead()) this.reportAway(c.id, actor, player, now);
+        if (!actor || !actor.isDead()) this.reportAway(server.id, actor, player, now);
         continue;
       }
       // Set up as an ally at once: the summon's own AI runs before our host grant and would pick a fight with its caster
-      const state = this.stateFor(c.id, actor);
-      state.slot = slot++;
+      const state = this.stateFor(server.id, actor);
+      state.slot = this.isRanged(actor, state, now) ? flankSlot(flank++) : slot++;
+      // The order as this member acts on it: a new one waits its turn in the ripple
+      const c = this.staggered(server, state, now);
       this.lastPos.set(c.id, [actor.getPositionX(), actor.getPositionY(), actor.getPositionZ()]);
       if (actor.getCombatTarget()?.getFormID() === PLAYER_ID) {
         actor.stopCombat();
@@ -253,8 +268,10 @@ export class CompanionService extends ClientListener {
       // A player target counts only with the server's pvp mark
       const orderId = orderedTarget(c, isRemotePlayerCharacter);
       let target = orderId ? this.sp.Actor.from(this.sp.Game.getFormEx(remoteIdToLocalId(orderId))) : null;
-      // An attack order it cannot carry out used to strand the summon where it stood: past the leash it drops the order
-      if (target && !target.isDead() && actor.getDistance(player) > CompanionService.combatLeashDistance) {
+      // An attack order it cannot carry out used to strand the summon where it stood: past the leash it drops the order,
+      // and it stays leashed until it is back near its owner (leashStep)
+      state.leashed = leashStep(state.leashed, actor.getDistance(player));
+      if (target && !target.isDead() && state.leashed) {
         actor.stopCombat();
         state.fightingTarget = 0;
         state.followResult = "left an order " + Math.round(actor.getDistance(player)) + " away";
@@ -292,8 +309,43 @@ export class CompanionService extends ClientListener {
       }
       // A throw here would break every companion this tick, so the driven path is contained
       try { if (!c.staying && !state.driven && !actor.isInCombat()) this.unstick(actor, player, state, now); } catch (e) { state.followResult = "unstick failed"; }
-      this.report(c, actor, player, state);
+      this.report(server, actor, player, state);
     }
+  }
+
+  // The order this member acts on now. A changed order (another target, stay or follow) is taken up after the member's
+  // turn in the ripple (staggerDelayMs from its place in the band), so a band starts, stops and charges one by one instead
+  // of on the same tick. The first order a member sees is taken at once.
+  private staggered(c: CompanionEntry, state: LocalState, now: number): CompanionEntry {
+    const key = c.target + "|" + (c.staying ? 1 : 0);
+    if (!state.appliedKey || key === state.appliedKey) {
+      state.appliedKey = key;
+      state.appliedTarget = c.target;
+      state.appliedStaying = c.staying;
+      state.pendingKey = "";
+      return c;
+    }
+    if (state.pendingKey !== key) {
+      state.pendingKey = key;
+      state.pendingSince = now;
+    }
+    const order = state.slot >= flankSlot(0) ? state.slot - flankSlot(0) : state.slot;
+    if (now - state.pendingSince >= staggerDelayMs(order, c.id)) {
+      state.appliedKey = key;
+      state.appliedTarget = c.target;
+      state.appliedStaying = c.staying;
+      state.pendingKey = "";
+      return c;
+    }
+    return { ...c, target: state.appliedTarget, staying: state.appliedStaying };
+  }
+
+  // A bow, crossbow, staff or spell in either hand, re-read every rangedCheckMs (an NPC may draw a spell only in a fight)
+  private isRanged(actor: Actor, state: LocalState, now: number): boolean {
+    if (now - state.rangedAt < CompanionService.rangedCheckMs) return state.ranged;
+    state.rangedAt = now;
+    try { state.ranged = isRangedHands(actor.getEquippedItemType(1), actor.getEquippedItemType(0)); } catch { state.ranged = false; }
+    return state.ranged;
   }
 
   // A companion born inside geometry cannot walk anywhere, whatever order it holds, so it is lifted to the owner
@@ -424,7 +476,8 @@ export class CompanionService extends ClientListener {
   private stateFor(remoteId: number, actor: Actor): LocalState {
     let state = this.local.get(remoteId);
     if (!state || state.localId !== actor.getFormID()) {
-      state = { localId: actor.getFormID(), following: false, followAngle: 0, followResult: "none", aliasSlot: "", aliasAt: 0, aliasFailed: false, reportAt: 0, fightingTarget: 0, leashSentAt: 0, stuckSince: 0, unstuckAt: 0, driven: false, slot: 0, followSlot: -1, stall: null };
+      state = { localId: actor.getFormID(), following: false, followAngle: 0, followResult: "none", aliasSlot: "", aliasAt: 0, aliasFailed: false, reportAt: 0, fightingTarget: 0, leashSentAt: 0, stuckSince: 0, unstuckAt: 0, driven: false, slot: 0, followSlot: -1, stall: null,
+        appliedTarget: 0, appliedStaying: false, appliedKey: "", pendingKey: "", pendingSince: 0, leashed: false, ranged: false, rangedAt: 0 };
       this.local.set(remoteId, state);
       this.prepare(actor);
       if (!this.announced.has(remoteId)) {
@@ -519,7 +572,8 @@ export class CompanionService extends ClientListener {
     // A fight the engine picked itself used to strand the companion: no follow order, no leash either
     if (actor.isInCombat()) {
       const distance = actor.getDistance(player);
-      if (distance < CompanionService.combatLeashDistance) {
+      state.leashed = leashStep(state.leashed, distance);
+      if (!state.leashed) {
         if (state.following) {
           actor.clearKeepOffsetFromActor();
           state.following = false;
@@ -552,8 +606,10 @@ export class CompanionService extends ClientListener {
     // Each companion keeps its own place in the formation, so a band does not push for one spot behind the owner
     if (!state.following || state.followSlot !== state.slot || (distance > CompanionService.followRadius && turn > CompanionService.followTurnDeg)) {
       const [ox, oy] = formationOffset(state.slot);
-      actor.keepOffsetFromActor(player, ox, oy, 0, 0, 0, angle,
-        CompanionService.catchUpRadius, CompanionService.followRadius);
+      // Its own small difference: a few units off the grid point, and its own radii (memberJitter)
+      const j = memberJitter(localIdToRemoteId(actor.getFormID()));
+      actor.keepOffsetFromActor(player, ox + j.dx, oy + j.dy, 0, 0, 0, angle,
+        CompanionService.catchUpRadius * j.radiusMult, CompanionService.followRadius * j.radiusMult);
       // An offset alone leaves the current package running, so the AI never acts on it
       actor.evaluatePackage();
       state.following = true;
@@ -733,6 +789,7 @@ export class CompanionService extends ClientListener {
         cell: whereOf(actor), ownerCell: whereOf(player),
         localId: actor.getFormID().toString(16), at: here.map(Math.round), owner: [player.getPositionX(), player.getPositionY(), player.getPositionZ()].map(Math.round),
         package: (actor.getCurrentPackage()?.getFormID() ?? 0).toString(16), aliasSlot: state.aliasSlot,
+        slot: state.slot, ranged: state.ranged, leashed: state.leashed, waiting: state.pendingKey ? 1 : 0,
         fight: companionFightState(actor, state.fightingTarget ? Actor.from(this.sp.Game.getFormEx(state.fightingTarget)) : null),
         stall: state.stall ? { kicks: state.stall.kicks, forMs: Date.now() - state.stall.since } : null,
         toTarget: this.distanceTo(actor, state.fightingTarget),
@@ -807,8 +864,8 @@ export class CompanionService extends ClientListener {
   private static readonly followRadius = 128;
   private static readonly followTurnDeg = 25;
   private static readonly teleportDistance = 2048;
-  // Past this the companion breaks off its own fight and comes back, so it cannot be left behind
-  private static readonly combatLeashDistance = 1500;
+  // The fight leash is companionFormation's leashStep (1800 out, 1200 back) since step 2 of the warband rework
+  private static readonly rangedCheckMs = 5000;
   // Moving less than this far while this far from the owner, for this long, counts as stuck
   private static readonly stuckUnits = 8;
   private static readonly stuckDistance = 800;
