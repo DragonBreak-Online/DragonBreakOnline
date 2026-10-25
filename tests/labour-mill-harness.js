@@ -57,6 +57,11 @@ const use = (ref, actor = ACTOR) => { for (const k of Object.keys(out)) out[k].l
 const FIREWOOD = 0x6f993;
 const said = () => out.personals.join(' | ');
 const T1 = WOODCUTTER.millFirewoodByTier[0];
+// Hearthfire's Sawn Log (BYOHMaterialLog), sawn with the firewood (Nat, 25 Oct: "make the saw machine for sawn logs work")
+const SAWNLOG = 0x300e;
+const L1 = (WOODCUTTER.millSawnLogsByTier || [])[0];
+const paid = (id) => out.items.filter(([i]) => i === id).reduce((n, [, c]) => n + c, 0);
+check('skills.json saws logs too: 6 to 18 Sawn Logs by tier', JSON.stringify(WOODCUTTER.millSawnLogsByTier) === '[6,9,12,15,18]', JSON.stringify(WOODCUTTER.millSawnLogsByTier));
 
 check('skills.json still holds the design: firewood for 5 tiers and a 30-minute rest',
   Array.isArray(WOODCUTTER.millFirewoodByTier) && WOODCUTTER.millFirewoodByTier.length === 5 && WOODCUTTER.millCooldownMinutes === 30, JSON.stringify(WOODCUTTER.millFirewoodByTier));
@@ -71,9 +76,9 @@ if (gated) check('...and the mill pays Nat\'s 20 to 60 by tier', JSON.stringify(
 setTier(0);
 let r = use(MILL);
 check('a Novice Woodcutter runs the mill: the activation is the server\'s (nobody is seated)', r === true);
-check(`...and gets ${WOODCUTTER.millFirewoodByTier[0]} Firewood`, out.items.length === 1 && out.items[0][0] === FIREWOOD && out.items[0][1] === WOODCUTTER.millFirewoodByTier[0], JSON.stringify(out.items));
-check('...told so, with when to come back', new RegExp(`${T1} Firewood`).test(said()) && /30 minutes/.test(said()), said());
-check('...audited as a MILL line naming the mill', out.audits.length === 1 && out.audits[0] === `MILL Tester #ABCD (profile 1) ran a saw mill at 5565c:Skyrim.esm (tier 1) -> ${T1} firewood`, out.audits[0]);
+check(`...and gets ${L1} Sawn Logs and ${T1} Firewood, nothing else`, out.items.length === 2 && paid(SAWNLOG) === L1 && paid(FIREWOOD) === T1, JSON.stringify(out.items));
+check('...told so, with when to come back', new RegExp(`${L1} Sawn Logs and ${T1} Firewood`).test(said()) && /30 minutes/.test(said()), said());
+check('...audited as a MILL line naming the mill', out.audits.length === 1 && out.audits[0] === `MILL Tester #ABCD (profile 1) ran a saw mill at 5565c:Skyrim.esm (tier 1) -> ${L1} sawn logs, ${T1} firewood`, out.audits[0]);
 check('...and credited as woodcutting (a chop event on the mill)', out.events.length === 1 && out.events[0].kind === 'chop' && out.events[0].detail.refrId === MILL);
 
 r = use(MILL);
@@ -82,15 +87,15 @@ wallClock += 20 * 60000;
 r = use(MILL);
 check('...20 minutes later still resting: 10 minutes to go', out.items.length === 0 && /Come back in 10 minutes/.test(said()), said());
 r = use(MILL2);
-check('another mill pays at once: the rest is per mill', out.items.length === 1 && out.items[0][1] === T1);
+check('another mill pays at once: the rest is per mill', paid(SAWNLOG) === L1 && paid(FIREWOOD) === T1);
 wallClock += 11 * 60000;
 r = use(MILL);
-check('the first mill pays again once its 30 minutes are up', out.items.length === 1 && out.items[0][1] === T1);
+check('the first mill pays again once its 30 minutes are up', paid(SAWNLOG) === L1 && paid(FIREWOOD) === T1);
 
 setTier(4);
 wallClock += 31 * 60000;
 r = use(MILL);
-check(`a Master Woodcutter gets ${WOODCUTTER.millFirewoodByTier[4]}`, out.items.length === 1 && out.items[0][1] === WOODCUTTER.millFirewoodByTier[4], JSON.stringify(out.items));
+check(`a Master Woodcutter gets ${WOODCUTTER.millSawnLogsByTier[4]} Sawn Logs and ${WOODCUTTER.millFirewoodByTier[4]} Firewood`, paid(SAWNLOG) === WOODCUTTER.millSawnLogsByTier[4] && paid(FIREWOOD) === WOODCUTTER.millFirewoodByTier[4], JSON.stringify(out.items));
 
 wallClock += 31 * 60000;
 carry = false;
@@ -98,7 +103,7 @@ r = use(MILL);
 check('a full pack: told, and the mill does not rest', r === true && out.items.length === 0 && /cannot carry/.test(said()) && out.audits.length === 0, said());
 carry = true;
 r = use(MILL);
-check('...so emptying the pack and trying again pays', out.items.length === 1);
+check('...so emptying the pack and trying again pays', paid(SAWNLOG) > 0 && paid(FIREWOOD) > 0);
 
 globalThis.__dboGreenPactRefusal = (a, what) => (what === 'chop' ? 'You swore the Green Pact.' : '');
 wallClock += 31 * 60000;

@@ -419,16 +419,14 @@
      "WoodChoppingBlock",
      "DLC2WoodChoppingBlock",
      "CharcoalKiln",
-     "LumberMill",
-     "FarmLumbermill"
+     "ResourceObjectSawmill"
     ]
    },
    "counts": {
     "activatePrefixes": [
      "WoodChoppingBlock",
      "DLC2WoodChoppingBlock",
-     "LumberMill",
-     "FarmLumbermill"
+     "ResourceObjectSawmill"
     ]
    },
    "chopStrikesByTier": [
@@ -439,12 +437,20 @@
     20
    ],
    "millFirewoodByTier": [
-    10,
-    14,
-    18,
-    22,
-    26
+    20,
+    30,
+    40,
+    50,
+    60
    ],
+   "millSawnLogsByTier": [
+    6,
+    9,
+    12,
+    15,
+    18
+   ],
+   "_millSawnLogs": "Hearthfire Sawn Logs (300e:HearthFires.esm) per run of a saw mill, by Woodcutter tier, with the firewood (labour.js mill; Nat, 25 Oct). Hearthfire's own house recipes take 2 at the median and 16 for a wall framing, about 256 for a whole house with every wing, so a Novice builds one in some 43 runs. The mill takes nothing in: Skyrim has no raw log.",
    "millCooldownMinutes": 30,
    "tiers": [
     "4 strikes, rough charcoal",
