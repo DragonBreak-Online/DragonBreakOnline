@@ -569,5 +569,114 @@ revertToOwn();
 // the fork calls it with an actor and a form and nothing else: there is no target to aim at anybody
 ok(globalThis.__dboPolymorphSelf.length === 2, '13. the hook takes an actor and a form alone, so the panel cannot target anyone else');
 
+
+// ---- 14. __dboPolymorphAs, the entry for a module that has decided eligibility itself ------------------------------
+// hagraven.js (Worker 5) turns a stage-3 Hagraven into the creature and back. It must reuse this path so every guard
+// applies, but it cannot use __dboPolymorphSelf, which gates on Lead GM. 'fox' throughout: these check the hook, not
+// the form table. LEAD has no creatureBody cap, so it is kept outside the guard radius; NEWP has one.
+restart({ beastform: {} });
+revertToOwn();
+place(LEAD, 900000, OTHER_WORLD);
+place(NEWP, 0);
+
+const hasAs = typeof globalThis.__dboPolymorphAs === 'function';
+// Through a wrapper so a missing hook FAILS every check below instead of throwing and ending the run early, which
+// would report far fewer failures than there are
+const polyAs = (a, k, o) => (hasAs ? globalThis.__dboPolymorphAs(a, k, o) : 'no __dboPolymorphAs hook');
+ok(hasAs, '14. beastform.js defines __dboPolymorphAs for gameplay modules');
+ok(hasAs && globalThis.__dboPolymorphAs.length === 3, '14. it takes an actor, a form and an opts, so the caller can name itself');
+
+let r14 = globalThis.__dboPolymorphSelf(NEWP, 'fox');
+ok(/Lead GM/.test(r14) && !beast(NEWP), '14. a plain player is still refused by the staff hook', r14);
+r14 = polyAs(NEWP, 'fox', { by: 'hagraven' });
+ok(r14 === '' && beast(NEWP) && beast(NEWP).form === 'fox', '14. ...and allowed by __dboPolymorphAs, which does not check rank', [r14, beast(NEWP) && beast(NEWP).form]);
+ok(beast(NEWP) && beast(NEWP).by === 'hagraven', '14. private.beast.by names the module, so others can tell whose shape it is', beast(NEWP));
+ok(audits.some((t) => /took the Fox shape \(polymorph, hagraven\)$/.test(t)), '14. the audit names the caller instead of staff', audits.slice(-1));
+
+// These three ended only the START before: a shape taken a moment earlier survived them
+// Each of these asserts the shape was ON first: without that, a run where no shape is ever taken passes them all
+let on14 = !!beast(NEWP);
+globalThis.__dboIsDowned = (a) => a === NEWP;
+tick();
+ok(on14 && !beast(NEWP), '14. tick: a player who goes down while in a shape is reverted', on14);
+delete globalThis.__dboIsDowned;
+
+polyAs(NEWP, 'fox', { by: 'hagraven' });
+on14 = !!beast(NEWP);
+props.set(NEWP + '|private.dboSentence', { totalMs: 60000, servedMs: 0 });
+tick();
+ok(on14 && !beast(NEWP), '14. tick: a player taken to jail while in a shape is reverted', on14);
+props.set(NEWP + '|private.dboSentence', null);
+
+polyAs(NEWP, 'fox', { by: 'hagraven' });
+on14 = !!beast(NEWP);
+props.set(NEWP + '|private.restrained', { boundHands: true });
+tick();
+ok(on14 && !beast(NEWP), '14. tick: a player bound while in a shape is reverted', on14);
+props.set(NEWP + '|private.restrained', null);
+
+// The module says its own ending, so the animal wording is not put in a Hagraven's mouth
+polyAs(NEWP, 'fox', { by: 'hagraven' });
+let n14 = said.length;
+on14 = !!beast(NEWP);
+place(NEWP, 0, INSIDE);
+tick();
+ok(on14 && !beast(NEWP), '14. tick: indoors still ends a module shape', on14);
+ok(!told(n14, NEWP).some((t) => /cannot open doors/.test(t)), '14. ...and the player is NOT told the animal line, so the module can say its own', told(n14, NEWP));
+ok(audits.some((t) => /left the Fox shape \(polymorph, hagraven\): went indoors$/.test(t)), '14. ...while the audit still names the caller and the reason', audits.slice(-1));
+place(NEWP, 0);
+
+// A staff shape keeps the animal wording it always had
+place(NEWP, 900000, OTHER_WORLD);
+place(LEAD, 0);
+globalThis.__dboPolymorphSelf(LEAD, 'fox');
+n14 = said.length;
+place(LEAD, 0, INSIDE);
+tick();
+ok(told(n14, LEAD).some((t) => /cannot open doors/.test(t)), '14. a staff shape is still told the animal line', told(n14, LEAD));
+place(LEAD, 0);
+
+// The same three for a STAFF shape, taken through the hook that already existed. This isolates the polymorphBreak
+// change from the new entry point, and covers Worker 5's point that it should apply to staff too.
+place(NEWP, 900000, OTHER_WORLD);
+place(LEAD, 0);
+globalThis.__dboPolymorphSelf(LEAD, 'fox');
+on14 = !!beast(LEAD);
+globalThis.__dboIsDowned = (a) => a === LEAD;
+tick();
+ok(on14 && !beast(LEAD), '14. tick: a STAFF shape also ends on a down', on14);
+delete globalThis.__dboIsDowned;
+
+globalThis.__dboPolymorphSelf(LEAD, 'fox');
+on14 = !!beast(LEAD);
+props.set(LEAD + '|private.dboSentence', { totalMs: 60000, servedMs: 0 });
+tick();
+ok(on14 && !beast(LEAD), '14. tick: a STAFF shape also ends on a jail sentence', on14);
+props.set(LEAD + '|private.dboSentence', null);
+
+globalThis.__dboPolymorphSelf(LEAD, 'fox');
+on14 = !!beast(LEAD);
+props.set(LEAD + '|private.restrained', { carried: true });
+tick();
+ok(on14 && !beast(LEAD), '14. tick: a STAFF shape also ends on being carried', on14);
+props.set(LEAD + '|private.restrained', null);
+revertToOwn();
+
+// Every other refusal is unchanged
+place(LEAD, 900000, OTHER_WORLD);
+place(NEWP, 0);
+run(OWNER, 'off');
+ok(/switched off/i.test(polyAs(NEWP, 'fox', { by: 'hagraven' })) && !beast(NEWP), '14. the Owners\' switch refuses a module shape too');
+run(OWNER, 'on');
+ok(/no such animal/i.test(polyAs(NEWP, 'dragon', { by: 'hagraven' })) && !beast(NEWP), '14. an animal not in the table is refused');
+props.set(NEWP + '|isDead', true);
+ok(/dead/i.test(polyAs(NEWP, 'fox', { by: 'hagraven' })) && !beast(NEWP), '14. polymorphRefusal still applies: not while dead');
+props.set(NEWP + '|isDead', false);
+restart({ beastform: { polymorph: { forms: ['chicken'] } } });
+place(LEAD, 900000, OTHER_WORLD);
+place(NEWP, 0);
+ok(/not open for polymorph/i.test(polyAs(NEWP, 'fox', { by: 'hagraven' })) && !beast(NEWP), '14. ...and so does the allow-list');
+restart({ beastform: {} });
+
 console.log(fail ? `\n${fail} FAILED, ${pass} passed` : `\nall ${pass} checks passed`);
 process.exit(fail ? 1 : 0);

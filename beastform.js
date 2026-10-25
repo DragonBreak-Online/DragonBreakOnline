@@ -845,6 +845,14 @@ module.exports = (api) => {
     if (globalThis.__dboPolymorphOn !== true) return 'polymorph off';
     if (isIndoors(a)) return 'polymorph indoors';
     if (animShape(a) === 'water') return 'polymorph water';
+    // polymorphRefusal refuses these at the START; without them here a shape taken a moment before a down, a jail
+    // transfer or a binding simply survived it (Worker 5, 25 Oct). They end the shape for everyone, staff included.
+    let downed = false; try { downed = typeof globalThis.__dboIsDowned === 'function' && !!globalThis.__dboIsDowned(a); } catch (e) { downed = false; }
+    if (downed) return 'polymorph downed';
+    const jail = getp(a, 'private.dboSentence');
+    if (jail && Number(jail.totalMs) > (Number(jail.servedMs) || 0)) return 'polymorph jailed';
+    const r = getp(a, 'private.restrained');
+    if (r && (r.boundHands || r.carried || r.captorActorId)) return 'polymorph bound';
     if (unseeingNear(a) > 0) return 'polymorph guard';
     return '';
   };
@@ -859,16 +867,20 @@ module.exports = (api) => {
   // The staff audit line (who, which animal, why it ended: a fixed word, never typed text) and the staff member's own line
   const POLY_END = { 'asked to revert': 'asked', death: 'died', logout: 'logged out', login: 'logged in', 'time up': 'time up',
     'polymorph off': 'switched off', 'polymorph guard': 'a player who cannot see it came near', 'polymorph indoors': 'went indoors',
+    'polymorph downed': 'went down', 'polymorph jailed': 'was jailed', 'polymorph bound': 'was bound or carried',
     'polymorph water': 'went into water', 'reverted from the admin panel': 'staff panel', 'revert power': 'revert power' };
   const POLY_TELL = { 'polymorph off': 'polymorph was switched off', 'polymorph guard': 'a player came near whose game cannot show the animal yet',
     'polymorph indoors': 'these animals cannot open doors, so it ends indoors', 'polymorph water': 'most of these animals cannot swim, so it ends in water',
+    'polymorph downed': 'you went down', 'polymorph jailed': 'you were taken to jail', 'polymorph bound': 'you were bound or carried',
     death: 'the animal died', login: 'you were still an animal when you left' };
   const polymorphEnded = (a, s, why) => {
     const w = String(why || '');
     const end = own(POLY_END, w) ? POLY_END[w] : /^reverted by /.test(w) ? 'staff command' : 'other';
     const name = isCreature(s.form) ? CREATURES[s.form].name : 'animal';
-    audit(`BEAST ${who(a)} left the ${name} shape (polymorph): ${end}`);
-    if (own(POLY_TELL, w)) personal(a, `You are yourself again: ${POLY_TELL[w]}.`);
+    const by = String(s.by || '');
+    audit(`BEAST ${who(a)} left the ${name} shape (polymorph${by ? ', ' + by : ''}): ${end}`);
+    // A module that asked for the shape says its own ending in its own words; the animal wording suits staff polymorph
+    if (!by && own(POLY_TELL, w)) personal(a, `You are yourself again: ${POLY_TELL[w]}.`);
   };
   // A creature's body for a 'creatureBody' viewer: the race kept in private.beast at the change, else the creature table's
   const creatureBodyOf = (a) => {
@@ -879,7 +891,9 @@ module.exports = (api) => {
   };
   const polymorphOn = () => globalThis.__dboPolymorphOn === true;
   // Returns '' when the change happened, else the sentence that says why not
-  const polymorphTo = (a, key) => {
+  // opts.by names the module that decided this change (hagraven.js passes 'hagraven'); '' is a staff change of their own
+  const polymorphTo = (a, key, opts) => {
+    const by = String((opts && opts.by) || '');
     const c = isCreature(key) ? CREATURES[key] : null;
     if (!c) return 'There is no such animal.';
     if (!c.race) return `The ${c.name} is not in this load order.`;
@@ -890,7 +904,9 @@ module.exports = (api) => {
     if (!original || !original.raceId) return 'This character has no appearance yet.';
     const race = c.race >>> 0;
     try {
-      mp.set(a, 'private.beast', { form: key, original, at: Date.now(), until: 0, race, creature: true });
+      const state = { form: key, original, at: Date.now(), until: 0, race, creature: true };
+      if (by) state.by = by;
+      mp.set(a, 'private.beast', state);
       // The mortal race stays in the appearance for every client, as a beast's does; only the name changes
       mp.set(a, 'appearance', Object.assign({}, original, { name: String((own(NAMES, key) && NAMES[key]) || c.name) }));
     } catch (e) {
@@ -899,7 +915,7 @@ module.exports = (api) => {
       return 'That failed; see the server log.';
     }
     sendPacket(a, { customPacketType: 'dboBeast', race, beast: true, form: key, wear: [], abilities: null });
-    audit(`BEAST ${who(a)} took the ${c.name} shape (polymorph, staff, own character)`);
+    audit(`BEAST ${who(a)} took the ${c.name} shape (polymorph, ${by || 'staff, own character'})`);
     log(`beastform: ${display(a)} polymorphed into ${c.name} (race ${race.toString(16)})`);
     sendBeastBodies();
     try { if (globalThis.__dboBeastChanged) globalThis.__dboBeastChanged(a, key, true); } catch (e) { log('beast change hook failed', e.message); }
@@ -921,6 +937,17 @@ module.exports = (api) => {
     const k = own(CREATURE_WORDS, w) ? CREATURE_WORDS[w] : w;
     if (!isCreature(k)) return 'There is no such animal.';
     return polymorphTo(me, k);
+  };
+  // The same path for a module that has already decided the player may change - a stage-3 Hagraven, say. It skips the
+  // rank gate and NOTHING else: polymorphRefusal, the PCFG.forms allow-list, the Owners' switch and the creatureBody
+  // distance guard all still apply, and the caller is named in private.beast.by and in the audit line.
+  // It is reachable only from our own modules in this process, same trust as every other __dbo hook.
+  globalThis.__dboPolymorphAs = (a, key, opts) => {
+    const me = Number(a) >>> 0;
+    const w = String(key == null ? '' : key).trim().toLowerCase();
+    const k = own(CREATURE_WORDS, w) ? CREATURE_WORDS[w] : w;
+    if (!isCreature(k)) return 'There is no such animal.';
+    return polymorphTo(me, k, opts);
   };
   registerChatCommand('polymorph', (a, args) => {
     a = a >>> 0;
