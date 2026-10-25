@@ -30,7 +30,12 @@ ID_KEYS = {'baseId', 'raceId', 'headpartIds', 'headTextureSetId', 'learnedSpells
            # dboEnchLearned[] (ENCH ids), dboBlessing.spell / .display (prayer.js abilities). In the live data these generic
            # names ('id', 'p', 'spell', 'display') occur only at those paths with load-order ids; the dry run lists every path
            # that would move, so read it before --write.
-           'granted', 'maskItemId', 'maskLost', 'keyBase', 'p', 'id', 'prevEye', 'dboEnchLearned', 'spell', 'display'}
+           'granted', 'maskItemId', 'maskLost', 'keyBase', 'p', 'id', 'prevEye', 'dboEnchLearned', 'spell', 'display',
+           # PC, 25 Oct (Rigmor roll-out dry run on a copy of world-20261025T050205Z): four more "not remapped" paths, each
+           # read in the gameplay code: inv.entries[].poisonId (the applied poison, e.g. a DLE id), private.dboSleep.bed (the
+           # bed ref, rest.js), mastery skills.*.ring[].h (recent spell ids, schools.js) and supernatural.ownEye (an eye head
+           # part, supernatural.js). With them only colour fields (skinColor, tints[].argb, blood.prev[].argb) stay unmapped.
+           'poisonId', 'bed', 'h', 'ownEye'}
 ID_KEY_DICTS = {'starterKitAt'}
 # Dicts whose keys are form ids written as lowercase hex without 0x (`(ref >>> 0).toString(16)`): the per-player rests and
 # cooldowns (labour.js minedVeins / choppedBlocks, wildlife.js campLoot, prayer.js prayedShrines, gamemode.js scholarReads)
