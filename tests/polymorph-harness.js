@@ -521,5 +521,48 @@ props.set(`${LEAD}|private.werewolfGrant`, undefined);
 
 ok(!/\u2014/.test(src), '12. still no em dash in beastform.js');
 
+// ---- 13. __dboPolymorphSelf, the hook the F7 panel calls ------------------------------------------------------------
+// The fork's adminSystem.ts 'polymorphSelf' action calls globalThis.__dboPolymorphSelf(actorId, form) and shows its
+// return value. It was missing: I wrote the fork side and never the gameplay side, so the panel answered "This
+// server's beastform.js has no panel polymorph" and Nat hit it on dev (25 Oct). Section 12 checked the panel's DATA
+// and never the panel's ACTION, which is the gap that let it through. These call it exactly as adminSystem does.
+restart({ beastform: {} });
+ok(typeof globalThis.__dboPolymorphSelf === 'function', '13. beastform.js defines __dboPolymorphSelf for the panel');
+revertToOwn();
+let r13 = globalThis.__dboPolymorphSelf(LEAD, 'fox');
+ok(r13 === '' && beast(LEAD) && beast(LEAD).form === 'fox', '13. a Lead GM takes a fox from the panel: \'\' and the shape is on', [r13, beast(LEAD) && beast(LEAD).form]);
+revertToOwn();
+
+// the rank is re-checked here, so the gate never depends on the caller
+r13 = globalThis.__dboPolymorphSelf(GM, 'fox');
+ok(/Lead GM/.test(r13) && !beast(GM), '13. a GM is refused by the hook itself, whatever the caller gated', r13);
+
+// the command's alias works, and an unknown word is refused rather than thrown
+revertToOwn();
+r13 = globalThis.__dboPolymorphSelf(LEAD, 'rabbit');
+ok(r13 === '' && beast(LEAD) && beast(LEAD).form === 'hare', '13. the rabbit alias reaches the hare, as /polymorph does', [r13, beast(LEAD) && beast(LEAD).form]);
+revertToOwn();
+ok(/no such animal/i.test(globalThis.__dboPolymorphSelf(LEAD, 'dragon')) && !beast(LEAD), '13. an animal that is not in the table is refused');
+ok(/no such animal/i.test(globalThis.__dboPolymorphSelf(LEAD, '')) && !beast(LEAD), '13. ...and so is an empty form');
+ok(/no such animal/i.test(globalThis.__dboPolymorphSelf(LEAD, undefined)) && !beast(LEAD), '13. ...and undefined, which a packet with no form gives');
+
+// every refusal of the chat command applies, because it is the same path: the Owners' switch
+run(OWNER, 'off');
+r13 = globalThis.__dboPolymorphSelf(LEAD, 'fox');
+ok(/switched off/i.test(r13) && !beast(LEAD), '13. the Owners\' switch refuses the panel too', r13);
+run(OWNER, 'on');
+
+// and the config allow-list
+restart({ beastform: { polymorph: { forms: ['fox'] } } });
+revertToOwn();
+ok(globalThis.__dboPolymorphSelf(LEAD, 'fox') === '', '13. a narrowed allow-list still lets its own form through');
+revertToOwn();
+ok(/not open for polymorph/i.test(globalThis.__dboPolymorphSelf(LEAD, 'goat')) && !beast(LEAD), '13. ...and refuses one it leaves out');
+restart({ beastform: {} });
+revertToOwn();
+
+// the fork calls it with an actor and a form and nothing else: there is no target to aim at anybody
+ok(globalThis.__dboPolymorphSelf.length === 2, '13. the hook takes an actor and a form alone, so the panel cannot target anyone else');
+
 console.log(fail ? `\n${fail} FAILED, ${pass} passed` : `\nall ${pass} checks passed`);
 process.exit(fail ? 1 : 0);

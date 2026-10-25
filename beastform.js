@@ -883,6 +883,22 @@ module.exports = (api) => {
     return '';
   };
   const animals = () => Object.keys(CREATURES).filter((k) => CREATURES[k].race && !(Array.isArray(PCFG.forms) && !PCFG.forms.map(String).includes(k)));
+  // The F7 panel's picker, called by the fork's adminSystem.ts 'polymorphSelf' action. It is the SAME path
+  // /polymorph uses, so every refusal comes from polymorphTo and polymorphRefusal: the Owners' switch, the
+  // form allow-list, dead, down, bound, jailed, duelling, in a fight, mounted, seated, in water, indoors,
+  // and the creatureBody distance guard. '' means the shape was taken, anything else is the sentence to show.
+  // The rank is re-checked here rather than trusted to the caller: adminSystem gates it to a Lead GM through
+  // SPAWN_ACTIONS, and this makes the gameplay layer's own answer independent of that.
+  // It takes an actor and a form and nothing else, so there is no target to aim at somebody - Nat's call,
+  // 25 Oct: polymorph works on your own character alone.
+  globalThis.__dboPolymorphSelf = (a, key) => {
+    const me = Number(a) >>> 0;
+    if (!isLeadStaff(me)) return 'That is for a Lead GM and above.';
+    const w = String(key == null ? '' : key).trim().toLowerCase();
+    const k = own(CREATURE_WORDS, w) ? CREATURE_WORDS[w] : w;
+    if (!isCreature(k)) return 'There is no such animal.';
+    return polymorphTo(me, k);
+  };
   registerChatCommand('polymorph', (a, args) => {
     a = a >>> 0;
     if (!isLeadStaff(a)) return personal(a, 'That is for a Lead GM and above.');
