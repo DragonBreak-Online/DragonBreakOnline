@@ -68,7 +68,7 @@ const load = (contracts) => {
     audit: (t) => out.audits.push(t),
     display: (a) => `P${a.toString(16)}`,
     who: (a) => `P${a.toString(16)}`,
-    cfg: { contracts },
+    cfg: { contracts: Object.assign({ minSpots: 1, postsPerDay: 99 }, contracts) },
     giveItem: (a, base, n) => { inv(a, goldOf(a) + n); return true; },
     registerChatCommand: (n, fn) => commands.set(n, fn),
     zones,
@@ -125,7 +125,8 @@ check('budget 0: no standing notice goes up', live().length === 0, `${live().len
 check('an official posts by hand', said(run(COUNT, 'post wolf 5 60'), /^Posted/), out.personal.map((p) => p.t).join(' | '));
 const posted = run(OUT, 'take 1');
 check('a non-citizen takes a posted notice, budget 0 or not', said(posted, /^Taken/), posted.join(' | '));
-check('...and it is not charged to the budget', !(hold().spent > 0) && !copies('14')[0].charged, JSON.stringify(hold()));
+check('...and it is not charged to the standing budget', !(hold().spent > 0), JSON.stringify(hold()));
+check('...but to the week\'s posting budget (Nat, 25 Oct)', hold().postSpent === 60 && copies('14')[0].pool === 'posted', JSON.stringify(hold()));
 check('the board shows a posted notice open to the outsider', board(GUARD).list[0].state === 'open' && !/citizens/.test(board(GUARD).list[0].what));
 
 // ---- prices --------------------------------------------------------------------------------------------------------

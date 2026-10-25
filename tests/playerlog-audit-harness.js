@@ -323,10 +323,10 @@ ok(out.length === 1 && out[0].c === 'PGDB' && out[0].f.text === 'granted Selene 
   const said = [...st.matchAll(/`([^`]*)`/g)].map((m) => m[1]).filter((t) => t.startsWith('${zone.name}'))
     .map((t) => t.replace(/\$\{zone\.name\}/g, 'Bruma').replace(/\$\{TIER_WORD\[tier\]\}/g, 'pests').replace(/\$\{tier\}/g, '1').replace(/\$\{[^}]*\}/g, '12'));
   const bad = said.filter((s) => {
-    const term = / now pays /.test(s) ? 'price 1 12' : /'s standing contracts may now commit /.test(s) ? 'budget 12' : / again\.$/.test(s) ? 'standing on' : 'standing off';
+    const term = / now pays /.test(s) ? 'price 1 12' : /'s standing contracts may now commit /.test(s) ? 'budget 12' : /'s posted work and commissions may now commit /.test(s) ? 'postbudget 12' : / again\.$/.test(s) ? 'standing on' : 'standing off';
     return contractText(`CONTRACT ${ROWAN} set Bruma ${term} ${CANARY}: ${s}`) !== `set Bruma ${term.split(' ')[0]}: ${s}`;
   });
-  ok(said.length === 4 && bad.length === 0, `...each of setTerms' ${said.length} sentences (of 4) is kept word for word`, bad);
+  ok(said.length === 5 && bad.length === 0, `...each of setTerms' ${said.length} sentences (of 5) is kept word for word`, bad);
 }
 out = run('LABOUR-MISMATCH Rowan #PGDB (profile 1) chop widget=win/3 replay=1/5 seed=ab');
 ok(out.some((r) => r.ev === 'sec.signal' && r.f.kind === 'mismatch' && r.f.game === 'labour'), 'a *-MISMATCH line is also a security signal', out.map((r) => r.ev));

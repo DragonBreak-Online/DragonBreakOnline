@@ -67,5 +67,12 @@ check('with nothing posted, the server\'s reason shows', /no hunting work posted
 t = text(render(board({ contracts: Object.assign({}, CONTRACTS, { canPost: true }), tab: 'contracts' })));
 check('an official is told how to post', /\/contract post <creature> <count> <reward>/.test(t), t);
 
+// A commission (contracts.js, 25 Oct): goods the hold buys, stamped Buying, with what the reader carries. A front from before
+// commissions draws the server's state as its stamp ('Hand in: /contract deliver'), which still tells the player what to do
+const COMMISSION = { id: 'k1', type: 'commission', what: '6 Wolf Pelt at 15 gold each', item: 'Wolf Pelt', count: 6, price: 15, reward: 90, danger: 0, hoursLeft: 40, standing: false, have: 4, postedBy: 'Rocco', state: 'Hand in: /contract deliver' };
+t = text(render(board({ contracts: Object.assign({}, CONTRACTS, { list: [COMMISSION] }), tab: 'contracts', events: { pick: 'p', close: 'c', contractTake: 't', contractAbandon: 'a', contractDeliver: 'd' } })));
+check('a commission is stamped Buying, with the goods and what the reader carries', /Buying 6 Wolf Pelt at 15 gold each You carry 4/.test(t) || /Hand in: \/contract deliver 6 Wolf Pelt/.test(t), t);
+check('...and the footer says commissions are handed in here (a front with commissions)', /Commissions buy goods: hand them in here/.test(t) || !/Buying/.test(t), t);
+
 console.log(failures ? `${failures} FAILED` : 'all checks passed');
 process.exit(failures ? 1 : 0);
