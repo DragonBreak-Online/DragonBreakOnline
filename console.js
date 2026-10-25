@@ -41,7 +41,9 @@ const LOG_EVERY_MS = 60 * 1000;
 const CODE_FLOOR = 'leadgm';
 // Below this tier (the lower of fresh and stamped) the console runs only PUNISH_ONLY (Jake, 22 Oct: "Punishments only")
 const FULL_TIER = 'developer';
-const PUNISH_ONLY = Object.freeze(['discipline', 'kick']);
+// /ban, /tempban and /unban are /discipline's ban, suspend and lift under other words (discipline.js; Nat, 25 Oct), so they sit
+// with it
+const PUNISH_ONLY = Object.freeze(['discipline', 'kick', 'ban', 'tempban', 'unban']);
 const FLOOR_LABEL = Object.freeze({ leadgm: 'Lead GM', developer: 'Developer', senior: 'Senior' });
 
 const ID_RE = /^(w-[0-9a-f-]{36}|d-\d{17,20})$/;
@@ -79,7 +81,14 @@ const REASON_MIN = 5, REASON_MAX = 300;
 // and the one word each takes before its reason, as discipline.js reads them: none; a length, whole hours or days
 // (discipline.js also takes '1.5d' and '0.01h', the console does not), at most the config's maxSuspendDays; a record
 // number, digits only (discipline.js also takes '#3', the console does not). Not the record view (/discipline #TAG) or list
-const KIND_ARGS = Object.freeze({ warn: 'none', strike: 'none', suspend: 'length', lift: 'none', overturn: 'record' });
+// ban (25 Oct): a suspension with no end, Lead GM and above in discipline.js
+const KIND_ARGS = Object.freeze({ warn: 'none', strike: 'none', suspend: 'length', ban: 'none', lift: 'none', overturn: 'record' });
+// The kinds the backend's copy of these rules (skymp5-backend sources/console/allowlist.js KIND_ARGS) knows today. Its
+// parseAllow refuses the whole of allow.json for one kind it does not know (and the page then lists nothing), and it knows no
+// alias entry, so allow.json carries only these and no alias until the backend learns them: set BACKEND_KNOWS_BANS (or drop
+// both) in the change that teaches it. The game's own checks below take every kind either way
+const BACKEND_KINDS = Object.freeze(['warn', 'strike', 'suspend', 'lift', 'overturn']);
+const BACKEND_KNOWS_BANS = false;
 const LENGTH_RE = /^(?:([1-9][0-9]{0,2})h|([1-9][0-9]?)d)$/;
 const RECORD_RE = /^[1-9][0-9]{0,4}$/;
 const MAX_SUSPEND_DAYS = 30; // discipline.js DEFAULTS.maxSuspendDays
@@ -113,7 +122,17 @@ const ALLOW = Object.freeze({
   // record view and /discipline list stay in game
   // (its usage is written out from the kinds left after the config's deny, usageOf below)
   discipline: { usage: '/discipline #TAG <kind> <reason>', rule: 'tagKindReason', kinds: Object.freeze(Object.keys(KIND_ARGS)), offline: true, rank: true,
-    help: "A warning, strike, suspension, lift or overturn on the player's account record, as in game; the player is told. The record view and list stay in game." },
+    help: "A warning, strike, suspension, ban, lift or overturn on the player's account record, as in game; the player is told. The record view and list stay in game." },
+  // The in-game aliases of three /discipline kinds (Nat, 25 Oct: "create discord commands that correlate so lead GMs can use
+  // it"). alias: the command whose kind this is, kind: the kind it always is (the line reads as /discipline #TAG <kind> ...,
+  // under every rule above: the #TAG, the kind's word, the reason, the rank check, the suspension cap). The config's deny of
+  // 'discipline' or 'discipline <kind>' denies the alias too. The line runs as typed, through the alias in game
+  ban: { usage: '/ban #TAG <reason>', rule: 'tagKindReason', alias: 'discipline', kind: 'ban', kinds: Object.freeze(['ban']), offline: true, rank: true,
+    help: 'Bans the account with no end, as /discipline #TAG ban in game: logged out and refused at login until /unban. Lead GM and above.' },
+  tempban: { usage: '/tempban #TAG <length> <reason>', rule: 'tagKindReason', alias: 'discipline', kind: 'suspend', kinds: Object.freeze(['suspend']), offline: true, rank: true,
+    help: 'Suspends the account for a time, as /discipline #TAG suspend in game: logged out and refused at login until it ends.' },
+  unban: { usage: '/unban #TAG <reason>', rule: 'tagKindReason', alias: 'discipline', kind: 'lift', kinds: Object.freeze(['lift']), offline: true, rank: true,
+    help: 'Ends a ban or a suspension early, as /discipline #TAG lift in game. Lead GM and above, and of a rank at least that of who gave it.' },
 });
 // Why the rest are refused, by class (DESIGN 8.2). Built-ins that are not registry commands are notChat; any other
 // registry command is notYet
@@ -160,7 +179,7 @@ const TEXT = {
   noChar: () => 'The console acts as your own character. Make one in game first.',
   suspended: () => 'Your account is suspended, so the console cannot act as you: a suspended account cannot act in game either.',
   tier: (floor) => `The console is for ${floor || 'Lead GM'} and above in game.`,
-  punishOnly: () => 'A Lead GM can run only /discipline and /kick from the console. Run anything else in game.',
+  punishOnly: () => 'A Lead GM can run only /discipline, /ban, /tempban, /unban and /kick from the console. Run anything else in game.',
   rolesChanged: () => 'Your Discord roles changed since you last logged in (or your character has not been stamped with them yet). Log in once.',
   notPinned: () => "This Discord account is not on the game's console list.",
   tooMany: () => 'Too many console commands. Wait a minute.',
@@ -225,14 +244,17 @@ const reasonWhy = (reason) => {
   return reason.length > REASON_MAX ? 'reasonLong' : '';
 };
 // The kinds a tagKindReason command takes here: its own, less those the config denies ('discipline suspend'), and suspend
-// only while the config allows a length at all
+// only while the config allows a length at all. An alias takes its one kind while its command takes it (and it is not denied)
 const kindsOf = (cmd, deny, maxDays) => {
   const a = Object.prototype.hasOwnProperty.call(ALLOW, cmd) ? ALLOW[cmd] : null;
   if (!a || a.rule !== 'tagKindReason' || deny.has(cmd)) return [];
+  if (a.alias) return kindsOf(a.alias, deny, maxDays).includes(a.kind) ? [a.kind] : [];
   return a.kinds.filter((k) => !deny.has(`${cmd} ${k}`) && !(KIND_ARGS[k] === 'length' && !(maxDays > 0)));
 };
 // The usage the page, Discord and the refusals show, for the kinds that are left
 const usageOf = (cmd, kinds, maxDays) => {
+  const a = Object.prototype.hasOwnProperty.call(ALLOW, cmd) ? ALLOW[cmd] : null;
+  if (a && a.alias) return `/${cmd} #TAG ${KIND_ARGS[a.kind] === 'length' ? `<${lengthShort(maxDays)}> ` : ''}<reason>`;
   const plain = kinds.filter((k) => KIND_ARGS[k] === 'none');
   const parts = plain.length ? [`${plain.join('|')} <reason>`] : [];
   for (const k of kinds) {
@@ -287,11 +309,13 @@ const checkLine = (text, has, deny, opts) => {
       const kinds = kindsOf(cmd, deny, maxDays);
       if (!kinds.length) return { cmd, why: 'denied' };
       const usage = usageOf(cmd, kinds, maxDays);
+      // An alias reads as its command: its kind goes in after the #TAG, and every check below is the command's
+      if (rule.alias && words.length && TAG_RE.test(words[0])) words.splice(1, 0, rule.kind);
       // No #TAG first: the bare command and 'list' are the record views (they stay in game); anything else is a name
       if (!words.length || !TAG_RE.test(words[0])) return words.length && words[0].toLowerCase() !== 'list' ? { cmd, why: 'needTag' } : { cmd, why: 'badKind', subject: usage };
       const kind = (words[1] || '').toLowerCase();
       if (!Object.prototype.hasOwnProperty.call(KIND_ARGS, kind) || !rule.kinds.includes(kind)) return { cmd, why: 'badKind', subject: usage };
-      if (!kinds.includes(kind)) return { cmd, why: 'denied', subject: `${cmd} ${kind}` };
+      if (!kinds.includes(kind)) return { cmd, why: 'denied', subject: rule.alias ? cmd : `${cmd} ${kind}` };
       const arg = KIND_ARGS[kind];
       if (arg === 'length' && !lengthHours(words[2], maxDays)) return { cmd, why: 'badLength', subject: maxDays };
       if (arg === 'record' && !RECORD_RE.test(words[2] || '')) return { cmd, why: 'badRecord' };
@@ -488,6 +512,7 @@ module.exports = (api) => {
     const list = [];
     for (const [name, a] of Object.entries(ALLOW)) {
       if (deny.has(name)) continue;
+      if (a.alias && !BACKEND_KNOWS_BANS) continue;
       const c = commands.get(name);
       if (!c) { logOnce(`allow:${name}`, `/${name} is on the allowlist but not registered; left out`); continue; }
       const entry = { name, usage: a.usage, rule: a.rule, help: String(a.help || c.help || '').slice(0, 200) };
@@ -498,7 +523,7 @@ module.exports = (api) => {
       // A tagKindReason command lists the kinds the console takes here, and the longest suspension, so the backend's
       // pre-check and the page know them; with every kind denied it is left out
       if (a.rule === 'tagKindReason') {
-        const kinds = kindsOf(name, deny, MAX_DAYS);
+        const kinds = kindsOf(name, deny, MAX_DAYS).filter((k) => BACKEND_KNOWS_BANS || BACKEND_KINDS.includes(k));
         if (!kinds.length) continue;
         Object.assign(entry, { usage: usageOf(name, kinds, MAX_DAYS), kinds }, kinds.some((k) => KIND_ARGS[k] === 'length') ? { maxSuspendDays: MAX_DAYS } : {});
       }
@@ -605,7 +630,8 @@ module.exports = (api) => {
         if (theirs < 0) return at('rankUnknown');
         if (theirs >= Math.min(rank(fresh), rank(stamped))) return at('rank');
       }
-      if (line.kind === 'suspend' && suspendCapped(pid, !dry)) return at('suspendCap');
+      // A ban counts with the suspensions (/discipline ban, /ban, /tempban alike)
+      if ((line.kind === 'suspend' || line.kind === 'ban') && suspendCapped(pid, !dry)) return at('suspendCap');
     }
     const targetName = target ? display(target) : '';
     audit(`REMOTE ${r.src} req ${id8(r.id)} ${r.user} <@${r.discordId}> as ${who(a)}${targetName ? ` on ${targetName}` : ''}${pagePid !== undefined ? ` (page profile ${pagePid})` : ''}${dry ? ' (dry run)' : ''}: ${r.text}`);
@@ -683,4 +709,4 @@ module.exports = (api) => {
 
 // Shared pure helpers, for the harness and the backend's copy of the same rules
 module.exports.rules = { cleanCommand, parseSwitch, checkLine, checkShape, reqPayload, repPayload, replyLines, plainLine, id8, ALLOW, TEXT,
-  KIND_ARGS, REASON_RE, maxDaysOf, lengthHours, reasonWhy, kindsOf, usageOf, TARGET_KEYS, SUSPEND_CAP, FULL_TIER, PUNISH_ONLY };
+  KIND_ARGS, BACKEND_KINDS, REASON_RE, maxDaysOf, lengthHours, reasonWhy, kindsOf, usageOf, TARGET_KEYS, SUSPEND_CAP, FULL_TIER, PUNISH_ONLY };
