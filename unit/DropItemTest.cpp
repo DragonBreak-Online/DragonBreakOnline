@@ -52,6 +52,46 @@ TEST_CASE("Dropping an item", "[DropItemTest]")
   REQUIRE(ac.GetInventory().GetItemCount(ironSword) == 0);
 }
 
+// The ground deletes a dropped item after two minutes, so a made item is
+// refused (Nat, 25 Oct). A NAME is the test: temper, charge, soul and poison
+// describe an item's condition, and ordinary enchanted loot carries
+// enchantmentId and maxCharge, so testing "any extras" made every looted sword
+// of flames undroppable. The case below this one is what caught that.
+TEST_CASE("A named item is not dropped, an unnamed one is", "[DropItemTest]")
+{
+  auto& partOne = GetPartOne();
+  constexpr uint32_t ironSword = 0x00012EB7;
+  DoConnect(partOne, 6);
+  partOne.CreateActor(0xff0b0000, { 1, 2, 3 }, 0, 0x3c);
+  partOne.SetUserActor(6, 0xff0b0000);
+  MpActor& ac = partOne.worldState.GetFormAt<MpActor>(0xff0b0000);
+
+  auto tryDrop = [&]() {
+    DoMessage(partOne, 6,
+              nlohmann::json{ { "t", MsgType::DropItem },
+                              { "baseId", ironSword },
+                              { "count", 1 } });
+    partOne.Tick();
+    return ac.GetInventory().GetItemCount(ironSword);
+  };
+
+  // named at an enchanting or crafting table: it stays in the pack
+  Inventory::ExtraData named;
+  named.name = "Sylvia's Greatsword";
+  ac.RemoveAllItems();
+  ac.AddItems({ Inventory::Entry(ironSword, 1, named) });
+  REQUIRE(tryDrop() == 1);
+
+  // tempered and enchanted but unnamed: ordinary gear, and it drops
+  Inventory::ExtraData gear;
+  gear.health = 1.3f;
+  gear.enchantmentId = 0x0004605A;
+  gear.maxCharge = 500.f;
+  ac.RemoveAllItems();
+  ac.AddItems({ Inventory::Entry(ironSword, 1, gear) });
+  REQUIRE(tryDrop() == 0);
+}
+
 TEST_CASE("A dropped enchanted weapon keeps the charge it was dropped with",
           "[DropItemTest]")
 {

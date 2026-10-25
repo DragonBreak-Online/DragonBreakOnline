@@ -1957,32 +1957,50 @@ void ActionListener::OnDropItem(const RawMessageData& rawMsgData,
   const auto owned = ac->GetInventory().FindEntriesFor(entry);
 
   // The ground deletes a dropped item after two minutes (MpActor::DropItem),
-  // so anything a player made does not go there at all (Nat, 25 Oct). The test
-  // is the one DropItem uses to decide whether extras are worth keeping, so
-  // exactly the items that would carry extras onto the ground are the ones
-  // refused. HasIdentityExtras is not the test: SameItemAs ignores names and
-  // charge, which is most of what a player makes.
-  auto carriesExtras = [](const Inventory::Entry& e) {
-    Inventory::Entry probe = e;
-    probe.SetWorn(Inventory::Worn::None);
-    return !probe.EqualExceptCount(Inventory::Entry(e.baseId, e.count));
+  // so anything a player made does not go there at all (Nat, 25 Oct).
+  //
+  // A NAME is the test, and nothing else. It was "any extras at all" first,
+  // which was too broad: an entry carries enchantmentId, maxCharge and
+  // chargePercent for ordinary enchanted gear too, so every looted sword of
+  // flames became undroppable and DropItemTest's charge case failed with the
+  // sword still in the pack. Temper, charge, soul and poison all describe an
+  // item's condition, not whether anyone made it; only the crafting and
+  // enchanting tables put a name on one. That is also exactly what the ticket
+  // was about - Sylvia's Greatsword, named, lost to the two-minute ground.
+  auto isNamed = [](const Inventory::Entry& e) {
+    return e.name && !e.name->empty();
   };
-  // Either side is enough: a client that reports no extras must not strip a
-  // made item, and one that invents them only ever refuses its own drop
-  const bool madeItem = carriesExtras(entry) ||
-    std::any_of(owned.begin(), owned.end(), carriesExtras);
+  // Either side is enough: a client that reports no name must not strip a made
+  // item, and one that invents a name only ever refuses its own drop. The
+  // shipped DropItemMessage carries baseId and count alone, so in practice the
+  // owned entry is what answers this.
+  const bool madeItem =
+    isNamed(entry) || std::any_of(owned.begin(), owned.end(), isNamed);
   if (madeItem) {
-    spdlog::info("MpActor::DropItem - refused for {:x}: base {:x} x{} carries "
-                 "extras, a made item stays in the pack",
-                 ac->GetFormId(), baseId, msg.count);
+    // The name comes from whichever side had it; the client sends none, so it
+    // is almost always the owned entry's
+    std::string named;
+    if (entry.name && !entry.name->empty()) {
+      named = *entry.name;
+    } else {
+      for (const auto& e : owned) {
+        if (e.name && !e.name->empty()) {
+          named = *e.name;
+          break;
+        }
+      }
+    }
+    spdlog::info(
+      "MpActor::DropItem - refused for {:x}: base {:x} x{} is named "
+      "'{}', a made item stays in the pack",
+      ac->GetFormId(), baseId, msg.count, named);
     // The client has already taken it out of its own pack, so the server's
     // inventory goes back or the two desync
     ac->SetInventory(ac->GetInventory());
     const auto userId = partOne.serverState.UserByActor(ac);
     if (userId != Networking::InvalidUserId) {
-      const std::string what = entry.name && !entry.name->empty()
-        ? *entry.name
-        : std::string("a made item");
+      const std::string what =
+        named.empty() ? std::string("a made item") : named;
       nlohmann::json notice{
         { "customPacketType", "notification" },
         { "text",
