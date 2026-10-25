@@ -450,9 +450,6 @@ AUDIT_VERBS.FRENZY.roles = R_BY([[/ killed by $/, 'by'], [/ first on $/, 'target
 clean_('GUARDS');
 // APIARY <who> harvested <kind> <ref>: <items> (apiaries.js): ids and item names
 clean_('APIARY');
-// BOSS <boss id> rose at|killed at <spot id> by <killers>; event started by <staff> for N min (bosses.js): ids, numbers, identities
-clean_('BOSS');
-AUDIT_VERBS.BOSS.roles = R_BY([[/ event started by $/, 'staff']]);
 // MILL <who> ran a saw mill at <desc> (tier n) -> n sawn logs, n firewood (labour.js): ids and numbers
 clean_('MILL');
 // Off until Nat switches each on: their staff grant, revoke and stage lines carry a staff-written reason, and decor's carry
@@ -2013,10 +2010,6 @@ worldclock.js CLOCK 976f9d7b clean
 worldclock.js CLOCK 91485c97 clean
 worldclock.js CLOCK ccc4cdd1 clean
 worldedit.js WORLDEDIT 197a6260 clean
-bosses.js BOSS 08618658 clean
-bosses.js BOSS dfe2f533 clean
-bosses.js BOSS 1f42f464 clean
-bosses.js BOSS 7e20c26d clean
 briarheart.js BRIARHEART 3a054391 excluded
 briarheart.js BRIARHEART 3f114ea4 excluded
 briarheart.js BRIARHEART b46479a3 excluded
