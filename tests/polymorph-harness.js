@@ -678,5 +678,65 @@ place(NEWP, 0);
 ok(/not open for polymorph/i.test(polyAs(NEWP, 'fox', { by: 'hagraven' })) && !beast(NEWP), '14. ...and so does the allow-list');
 restart({ beastform: {} });
 
+// ---- 15. a creature form with a loadout: the Hagraven ---------------------------------------------------------------
+// The four spells are exactly what EncHagraven (023ab0) carries, read off the record: HagravenRace has no SPLO at all.
+// Whether a player can CAST them in the body is an in-game question; these checks are that they are granted, announced
+// and removed, which is the part a harness can settle.
+restart({ beastform: {} });
+revertToOwn();
+place(LEAD, 900000, OTHER_WORLD);
+place(NEWP, 0);
+
+const FIREBOLT = 0x7d98f, FIREBALL = 0x7d997, FASTHEAL = 0x7231c, CLOSEWOUNDS = 0xf95eb, REVERT = 0xcd5c;
+
+let r15 = polyAs(NEWP, 'chicken', { by: 'test' });
+let pk15 = lastBeastPacket(NEWP);
+ok(r15 === '' && pk15 && pk15.abilities === null, '15. a form with no loadout still sends abilities null', pk15 && pk15.abilities);
+ok(pk15 && (pk15.camera === null || pk15.camera === undefined), '15. ...and no camera offsets when the config names none', pk15 && pk15.camera);
+globalThis.__dboBeastRevert(NEWP, 'test');
+
+const papyrus15 = papyrus.length;
+r15 = polyAs(NEWP, 'hagraven', { by: 'hagraven' });
+pk15 = lastBeastPacket(NEWP);
+ok(r15 === '' && !!pk15 && !!pk15.abilities, '15. the Hagraven sends a real loadout rather than null', r15 || (pk15 && pk15.abilities));
+// Null-safe on purpose: without it a run where abilities come back null throws here and the later checks never
+// report at all, which reads as fewer failures than there are
+const ab15 = (slot) => (pk15 && pk15.abilities && pk15.abilities[slot]) || [];
+const ids15 = (list) => (list || []).map((x) => x.id);
+ok(ids15(ab15('right')).includes(FIREBOLT) && ids15(ab15('right')).includes(FIREBALL),
+  '15. ...Firebolt and Fireball in the right hand, the ids EncHagraven carries', ids15(ab15('right')));
+ok(ids15(ab15('left')).includes(FASTHEAL) && ids15(ab15('left')).includes(CLOSEWOUNDS),
+  '15. ...Fast Healing and Close Wounds in the left', ids15(ab15('left')));
+ok(ids15(ab15('voice')).includes(REVERT), '15. ...and Revert Form on the shout key, so the form can be ended there', ids15(ab15('voice')));
+// self() wraps the actor in an espm/form object, so the method is what to filter on; the window holds only this change
+const added15 = papyrus.slice(papyrus15).filter((x) => x.method === 'AddSpell');
+ok(added15.length >= 4, '15. the server grants them too (AddSpell), as the beast path does', added15.length);
+
+const papyrusRevert15 = papyrus.length;
+globalThis.__dboBeastRevert(NEWP, 'test');
+const removed15 = papyrus.slice(papyrusRevert15).filter((x) => x.method === 'RemoveSpell');
+ok(removed15.length >= 4, '15. and the shared revert takes them away again (RemoveSpell)', removed15.length);
+
+// ---- the camera offsets the client service reads --------------------------------------------------------------------
+restart({ beastform: { polymorph: { camera: { hagraven: { z: 50, combatZ: 40 } } } } });
+place(LEAD, 900000, OTHER_WORLD);
+place(NEWP, 0);
+polyAs(NEWP, 'hagraven', { by: 'hagraven' });
+pk15 = lastBeastPacket(NEWP);
+ok(pk15 && pk15.camera && pk15.camera.z === 50 && pk15.camera.combatZ === 40,
+  '15. the camera offsets come from the config, so they can be tuned without a client build', pk15 && pk15.camera);
+ok(pk15 && pk15.camera && pk15.camera.x === undefined, '15. ...and only the keys the config names are sent', pk15 && pk15.camera);
+globalThis.__dboBeastRevert(NEWP, 'test');
+
+restart({ beastform: { polymorph: { camera: { hagraven: { z: 'high', combatX: null } } } } });
+place(LEAD, 900000, OTHER_WORLD);
+place(NEWP, 0);
+polyAs(NEWP, 'hagraven', { by: 'hagraven' });
+pk15 = lastBeastPacket(NEWP);
+ok(pk15 && pk15.camera === null, '15. a camera value that is not a number is dropped rather than sent to an ini', pk15 && pk15.camera);
+globalThis.__dboBeastRevert(NEWP, 'test');
+restart({ beastform: {} });
+
+
 console.log(fail ? `\n${fail} FAILED, ${pass} passed` : `\nall ${pass} checks passed`);
 process.exit(fail ? 1 : 0);

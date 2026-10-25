@@ -168,6 +168,19 @@ module.exports = (api) => {
       passive: [spell('126b8:Dawnguard.esm', 'Night Cloak')],
       hidden: [spell('126b7:Dawnguard.esm', 'Night Cloak bite'), spell('59a1:Dawnguard.esm', 'Poison Talons'), spell('e7da:Dawnguard.esm', 'Grip damage')],
     },
+    // A creature form's loadout. The Hagraven's four are exactly what EncHagraven (023ab0) carries, read from the
+    // record: the race itself grants nothing (HagravenRace has no SPLO at all). They are the NPC left-hand variants,
+    // which is what the creature casts; the player-facing duplicates would look tidier in the magic menu but would no
+    // longer be "what a Hagraven has".
+    // Whether a player can cast ANY of them in a creature body is still an in-game question - the creature graph has no
+    // cast states, and Spell.cast is the route if the hands refuse - so these are granted and ready rather than proven.
+    // Revert Form last, so the default power on the Shout key is never the one that ends the form.
+    hagraven: {
+      right: [spell('7d98f:Skyrim.esm', 'Firebolt'), spell('7d997:Skyrim.esm', 'Fireball')],
+      left: [spell('7231c:Skyrim.esm', 'Fast Healing'), spell('f95eb:Skyrim.esm', 'Close Wounds')],
+      voice: [spell('cd5c:Dawnguard.esm', 'Revert Form')],
+      passive: [], hidden: [],
+    },
     werewolf: {
       // Summon Wolves is left out: its wolves are placed by a Papyrus script that never runs here
       right: [], left: [],
@@ -891,6 +904,20 @@ module.exports = (api) => {
     const race = (Number(s.race) >>> 0) || (isCreature(s.form) ? CREATURES[s.form].race >>> 0 : 0);
     return race ? { id: a >>> 0, race } : null;
   };
+  // The third-person camera offsets for a form, sent to the client (creatureCameraService). The client applies them
+  // only when the skeleton really carries a "Camera3rd [Cam3]" node, so a form whose skeleton has none is unaffected.
+  // Config, not code: the numbers cannot be derived (creature scale is not in the RACE record) and want tuning by eye.
+  const cameraFor = (key) => {
+    const all = PCFG.camera;
+    const c = all && own(all, String(key)) ? all[String(key)] : null;
+    if (!c || typeof c !== 'object') return null;
+    const out = {};
+    for (const k of ['x', 'z', 'combatX', 'combatZ']) {
+      const v = Number(c[k]);
+      if (c[k] !== undefined && c[k] !== null && Number.isFinite(v)) out[k] = v;
+    }
+    return Object.keys(out).length ? out : null;
+  };
   const polymorphOn = () => globalThis.__dboPolymorphOn === true;
   // Returns '' when the change happened, else the sentence that says why not
   // opts.by names the module that decided this change (hagraven.js passes 'hagraven'); '' is a staff change of their own
@@ -916,7 +943,10 @@ module.exports = (api) => {
       try { mp.set(a, 'appearance', original); mp.set(a, 'private.beast', null); } catch (e2) { /* as it was */ }
       return 'That failed; see the server log.';
     }
-    sendPacket(a, { customPacketType: 'dboBeast', race, beast: true, form: key, wear: [], abilities: null });
+    // packetAbilities is null for a form with no entry, so the other seventeen are unchanged; learn() is the server
+    // half, as the beast path does both. The shared revert already calls learn(..., false), so removal is free.
+    learn(a, key, true);
+    sendPacket(a, { customPacketType: 'dboBeast', race, beast: true, form: key, wear: [], abilities: packetAbilities(key), camera: cameraFor(key) });
     audit(`BEAST ${who(a)} took the ${c.name} shape (polymorph, ${by || 'staff, own character'})`);
     log(`beastform: ${display(a)} polymorphed into ${c.name} (race ${race.toString(16)})`);
     sendBeastBodies();
