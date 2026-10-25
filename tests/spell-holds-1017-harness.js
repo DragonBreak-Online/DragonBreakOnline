@@ -24,9 +24,7 @@ const reasons = Object.fromEntries(Object.entries(S.suspendedReasons || {}).filt
 check('every held and removed desc is well formed', [...held, ...removed, ...Object.keys(reasons)].every((d) => DESC.test(d)), [...held, ...removed].filter((d) => !DESC.test(d)));
 check('no spell is both removed and held', !held.some((d) => removed.includes(d)), held.filter((d) => removed.includes(d)));
 check('every reason belongs to a held spell', Object.keys(reasons).every((d) => held.includes(d)), Object.keys(reasons).filter((d) => !held.includes(d)));
-check('the earlier holds stay (two Druadach spells)', ['8dcec:Druadach.esm', '94fca:Druadach.esm'].every((d) => held.includes(d)));
-// Equilibrium comes back at the 1026 restart, with the fork's self-cost fix (d9e1de30) and the DLE's fairer trade (Restore Magicka 15)
-check('Equilibrium is no longer held', !held.includes('da746:Skyrim.esm'));
+check('the earlier holds stay (Equilibrium, two Druadach spells)', ['da746:Skyrim.esm', '8dcec:Druadach.esm', '94fca:Druadach.esm'].every((d) => held.includes(d)));
 check('Transmute Mineral Ore stays removed', removed.includes('109111:Skyrim.esm'));
 
 // The summoned mounts: every SPEL whose SummonCreature actor is on Actors\Horse\HorseProject.hkx

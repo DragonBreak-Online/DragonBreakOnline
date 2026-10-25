@@ -148,11 +148,7 @@ const GIVE = new Set([].concat(POWERS.spells || [], POWERS.spellsGiveAllOff || [
 ok(GIVE.size === 254, 'the Give all spells list holds its 254 tome spells', GIVE.size);
 ok(TRIMS7.every((e) => e.removeSpells.every((d) => GIVE.has(d))), 'every removal is on the Give all spells list', TRIMS7.flatMap((e) => e.removeSpells.filter((d) => !GIVE.has(d))));
 const SUSP = new Set(LIVE.suspendedSpells || []);
-// Equilibrium's hold ends at the 1026 restart (the self-cost fix and the DLE's fairer trade); a trim drops a removed spell
-// from the held list, so it is never given back when its suspension ends
-const LIFTED = new Set(['da746:Skyrim.esm']);
-ok(Object.values(SHIPPED).every((x) => x[3].every((d) => SUSP.has(d) || LIFTED.has(d))), 'the removals held, not learned, are suspended spells (spells.hold holds them), or Equilibrium, lifted at 1026');
-ok(/a removed spell is not given back when its suspension ends\n\s*const gone = new Set\(r\.remove\.filter/.test(fs.readFileSync(path.join(SERVER, 'spells.js'), 'utf8')), '...and a trim drops a removed spell from the held list, so a lifted hold never gives it back');
+ok(Object.values(SHIPPED).every((x) => x[3].every((d) => SUSP.has(d))), 'the removals held, not learned, are suspended spells (spells.hold holds them)');
 
 // The server's load order and the plugins, read from the record headers only: the TES4 header for the masters, the top
 // groups, and in the SPEL group each record's type and form id (a record the plugin itself defines has the masters' count
@@ -433,8 +429,8 @@ clearOut();
 load({ staffTrims: [
   'not an object', { id: 'no actor', removeSpells: [S(1)], keepSpells: [] }, entry({ id: 'npc', actor: '0001a2b3' }),
   entry({ id: 'no-profile', actor: 'ff00a004', profile: undefined }),
-  entry({ id: 'bad-keep', actor: 'ff00a004', profile: 11, keepSpells: ['12:NotLoaded.esp'] }),   // verify-formids: ignore - a plugin deliberately not loaded
-  entry({ id: 'bad-remove', actor: 'ff00a004', profile: 11, removeSpells: ['12:NotLoaded.esp'] }),   // verify-formids: ignore - a plugin deliberately not loaded
+  entry({ id: 'bad-keep', actor: 'ff00a004', profile: 11, keepSpells: ['12:NotLoaded.esp'] }),
+  entry({ id: 'bad-remove', actor: 'ff00a004', profile: 11, removeSpells: ['12:NotLoaded.esp'] }),
   entry({ id: 'not-spell', actor: 'ff00a004', profile: 11, removeSpells: [S(40, 'Book.esm')] }),
   entry({ id: 'empty-remove', actor: 'ff00a004', profile: 11, removeSpells: [] }),
   entry({ id: 'bad-offline', actor: 'ff00a004', profile: 11, offline: 'later' }),
