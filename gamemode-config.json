@@ -406,6 +406,10 @@
   "cooldownMinutes": 30, "exhaustedMinutes": 5, "exhaustedStaminaMult": 0.3, "bountyGold": 100, "bountyFallback": true,
   "disable": [true, false, false, false, true, true, true, true], "safeZones": []
  },
+ "werewolfDefend": {
+  "_comment": "supernatural.js (Nat, 25 Oct): the beast defends its own. A werewolf in mortal form at defendAtHealth or under (a fraction of max health), with a blow given or taken in the last combatSeconds, who has not changed yet this world-clock day, may change at once: one roll of chance (Nat, 25 Oct: random, not certain) each time health falls through defendAtHealth; a failed roll costs nothing and waits until health has been back above it, and every roll is audited (BEAST ... defensive roll). A change spends the day's change (it counts as the full moon's change too). Never in a duel, dead or down, bound, carried or jailed, on a horse, in a staff polymorph or another beast form, in the character editor, during a rite, a forced change's warning or the login grace. indoors false keeps it outdoors. Spared werewolves (an Alpha, Hircine's blessed) are left to call the beast themselves; packMembers false leaves pack members out. frenzy true lets the change roll frenzy.js's chance like a forced change. Lead staff test: /curse me werewolf, take damage to 25% in a fight. ROLLBACK: enabled false (hot reload).",
+  "enabled": false, "chance": 0.35, "defendAtHealth": 0.25, "combatSeconds": 10, "indoors": true, "packMembers": true, "frenzy": false
+ },
  "pvp": {
   "_comment": "damageMult scales every player-on-player hit after skills and armor (1 = unchanged). 1.25 from 2026-09-25 (Nat: PvP damage buffed a bit).",
   "damageMult": 1.25
