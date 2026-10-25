@@ -21,19 +21,22 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'birthsign-picker-'));
 let fails = 0;
 const ok = (cond, msg, got) => { if (cond) console.log('ok   ' + msg); else { fails++; console.log('FAIL ' + msg + (got !== undefined ? '   ' + String(got).slice(0, 300) : '')); } };
 
-// The payload as birthsigns.js sends it (the mock's thirteen, in the server's ORDER)
+// The payload as the server sends it: birthsign-picker-payload.json, captured from server birthsigns-1025 9bb1d4f61's own
+// harness (the creation step's picker for a client with the cap). Re-capture it when the server's payload changes
+const REAL = JSON.parse(fs.readFileSync(path.join(__dirname, 'birthsign-picker-payload.json'), 'utf8'));
+// The same signs out of display order, with test lore and gifts, to prove the columns come from guardian, not position
 const SIGNS = [
   ['warrior', 'The Warrior', ''], ['mage', 'The Mage', ''], ['thief', 'The Thief', ''], ['lady', 'The Lady', 'warrior'], ['lord', 'The Lord', 'warrior'],
   ['steed', 'The Steed', 'warrior'], ['apprentice', 'The Apprentice', 'mage'], ['atronach', 'The Atronach', 'mage'], ['ritual', 'The Ritual', 'mage'],
   ['lover', 'The Lover', 'thief'], ['shadow', 'The Shadow', 'thief'], ['serpent', 'The Serpent', 'none'], ['tower', 'The Tower', 'thief'],
-].map(([id, name, guardian]) => ({ id, name, guardian, lore: `Lore of ${name}.`, effect: `Gift of ${name}` }));
+].map(([id, name, guardian]) => ({ id, name, guardian, lore: `Lore of ${name}.`, effect: `Gift of ${name}`, emblem: REAL.signs.find((s) => s.id === id).emblem }));
 
 fs.writeFileSync(path.join(TMP, 'entry.jsx'), `
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import BirthsignPicker, { layout, EMBLEMS } from ${JSON.stringify(path.join(FRONT, 'src/features/birthsignPicker/index.tsx'))};
+import BirthsignPicker, { layout, EMBLEMS, emblemOf } from ${JSON.stringify(path.join(FRONT, 'src/features/birthsignPicker/index.tsx'))};
 export const render = (data) => renderToStaticMarkup(React.createElement(BirthsignPicker, { data }));
-export { layout, EMBLEMS };
+export { layout, EMBLEMS, emblemOf };
 `);
 
 (async () => {
@@ -42,8 +45,28 @@ export { layout, EMBLEMS };
     logLevel: 'error', nodePaths: [NM], jsx: 'transform',
     loader: { '.js': 'jsx', '.scss': 'empty', '.sass': 'empty', '.css': 'empty', '.png': 'dataurl', '.jpg': 'dataurl', '.gif': 'dataurl', '.svg': 'dataurl', '.ttf': 'empty', '.otf': 'empty', '.mp3': 'empty', '.wav': 'empty' },
   });
-  const { render, layout, EMBLEMS } = require(path.join(TMP, 'out.js'));
+  const { render, layout, EMBLEMS, emblemOf } = require(path.join(TMP, 'out.js'));
   const texts = (html) => html.replace(/<[^>]*>/g, '\n').split('\n').map((s) => s.trim()).filter(Boolean);
+  const starsIn = (html) => (html.match(/birthsign__star/g) || []).length;
+
+  // ---- the server's own payload (9bb1d4f61) ----
+  const real = render(REAL);
+  const rt = texts(real);
+  ok(REAL.type === 'birthsignPicker' && REAL.id === 163 && REAL.signs.length === 13, 'the captured payload is the server\'s picker: type, id 163, thirteen signs');
+  ok(rt.includes(REAL.title) && rt.includes(REAL.sub), 'the title and the line under it come from the payload', [REAL.title, REAL.sub]);
+  ok(layout(REAL.signs).columns.map((c) => c.map((s) => s.id).join(',')).join(' | ') === 'warrior,lady,steed,lord | mage,apprentice,atronach,ritual | thief,lover,shadow,tower'
+    && layout(REAL.signs).below.map((s) => s.id).join() === 'serpent', 'the server\'s order gives the mock\'s columns, the Serpent below');
+  ok(REAL.signs.every((s) => rt.includes(s.lore) && rt.includes(s.effect)), 'every sign\'s lore and gift, as the server words them');
+  ok(starsIn(real) === REAL.signs.reduce((n, s) => n + s.emblem.stars.length, 0), 'every emblem drawn from the payload, star for star', starsIn(real));
+  ok(REAL.signs.every((s) => JSON.stringify(EMBLEMS[s.id] && EMBLEMS[s.id].s) === JSON.stringify(s.emblem.stars) && JSON.stringify(EMBLEMS[s.id].l) === JSON.stringify(s.emblem.lines)),
+    'the front\'s fallback copy of the art is the server\'s, line for line');
+  // The payload's emblem wins, null leaves the slot empty, a missing field falls back by id, a bad line is skipped
+  const moved = REAL.signs.map((s) => (s.id === 'lord' ? Object.assign({}, s, { emblem: { stars: [[1, 1], [2, 2]], lines: [[0, 1], [0, 9]] } }) : s));
+  const mv = render(Object.assign({}, REAL, { signs: moved }));
+  ok(/cx="1" cy="1"/.test(mv) && (mv.match(/<line /g) || []).length === REAL.signs.reduce((n, s) => n + (s.id === 'lord' ? 1 : s.emblem.lines.length), 0), 'the payload\'s emblem is drawn; a line to a star that is not there is skipped');
+  const none = render(Object.assign({}, REAL, { signs: REAL.signs.map((s) => (s.id === 'lord' ? Object.assign({}, s, { emblem: null }) : s)) }));
+  ok((none.match(/<svg/g) || []).length === 12 && emblemOf({ id: 'lord', emblem: null }) === null, 'emblem null leaves the slot empty');
+  ok(emblemOf({ id: 'lord' }).stars.length === 6 && emblemOf({ id: 'nobody' }) === null && emblemOf({ id: 'x', emblem: { stars: [] } }) === null, 'no field: the front\'s copy by id; an unknown sign or no stars: empty');
 
   // ---- the layout ----
   const L = layout(SIGNS);

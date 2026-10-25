@@ -10,17 +10,23 @@ import './styles.scss';
 //
 //   Confirm:  sendMessage('dbo:birthsignPick', nonce, signId)
 //   Escape:   sendMessage('dbo:birthsignClose', nonce)
+// Worker 2's contract: _work\birthsigns-picker-front-spec-1025.md (server birthsigns-1025)
+export interface BirthsignEmblem { stars: Array<[number, number]>; lines: Array<[number, number]> }
+
 export interface BirthsignChoice {
   id: string;
   name: string;
   guardian: string;      // '' for a Guardian, a Guardian's id for its charge, 'none' for a sign under no Guardian
   lore: string;
   effect: string;        // birthsigns.js describe()
+  emblem?: BirthsignEmblem | null;  // 40 x 40 grid, lines index into stars; null leaves the slot empty
 }
 
 export interface BirthsignPickerData {
   id: number;
   nonce?: string;
+  title?: string;
+  sub?: string;
   signs: BirthsignChoice[];
   notice?: string;
 }
@@ -53,16 +59,26 @@ export const EMBLEMS: Record<string, Emblem> = {
   serpent: { s: [[6, 30], [12, 22], [20, 26], [26, 16], [32, 20], [34, 8]], l: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5]] },
 };
 
-// A sign with no emblem (a sign added in config) gets the ring alone
-const EmblemSvg = ({ id }: { id: string }) => {
-  const e = EMBLEMS[id];
+// The sign's emblem: the payload's (the server's), or for a payload without the field this front's copy of the same art by
+// id. null, or one that is not a list of stars, leaves the slot empty; a line naming a star that is not there is skipped
+export const emblemOf = (s: BirthsignChoice): BirthsignEmblem | null => {
+  if (s.emblem === null) return null;
+  const e = s.emblem !== undefined ? s.emblem : (EMBLEMS[s.id] ? { stars: EMBLEMS[s.id].s, lines: EMBLEMS[s.id].l } : null);
+  return e && Array.isArray(e.stars) && e.stars.length ? { stars: e.stars, lines: Array.isArray(e.lines) ? e.lines : [] } : null;
+};
+
+const EmblemSvg = ({ sign }: { sign: BirthsignChoice }) => {
+  const e = emblemOf(sign);
+  if (!e) return null;
+  const at = (i: number) => (Array.isArray(e.stars[i]) ? e.stars[i] : null);
   return (
     <svg viewBox="0 0 40 40" aria-hidden="true">
       <circle className="birthsign__ring" cx="20" cy="20" r="19" />
-      {e ? e.l.map(([a, b], i) => (
-        <line key={'l' + i} className="birthsign__line" x1={e.s[a][0]} y1={e.s[a][1]} x2={e.s[b][0]} y2={e.s[b][1]} />
-      )) : null}
-      {e ? e.s.map(([x, y], i) => <circle key={'s' + i} className="birthsign__star" cx={x} cy={y} r={i === 0 ? 1.9 : 1.5} />) : null}
+      {e.lines.map(([a, b], i) => {
+        const p = at(a), q = at(b);
+        return p && q ? <line key={'l' + i} className="birthsign__line" x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]} /> : null;
+      })}
+      {e.stars.map(([x, y], i) => <circle key={'s' + i} className="birthsign__star" cx={x} cy={y} r={i === 0 ? 1.9 : 1.5} />)}
     </svg>
   );
 };
@@ -110,7 +126,7 @@ const BirthsignPicker = ({ data }: { data: BirthsignPickerData }) => {
         onClick={() => setSelected(s.id)}
         onDoubleClick={() => { setSelected(s.id); setConfirming(true); }}
       >
-        <span className="birthsign__emblem"><EmblemSvg id={s.id} /></span>
+        <span className="birthsign__emblem"><EmblemSvg sign={s} /></span>
         <span className="birthsign__name">{s.name}{kicker ? <span className="birthsign__kicker">{kicker}</span> : null}</span>
         <span className="birthsign__lore">{s.lore}</span>
         <span className="birthsign__effect">{s.effect}</span>
@@ -122,8 +138,8 @@ const BirthsignPicker = ({ data }: { data: BirthsignPickerData }) => {
     <div className="birthsign">
       <div className="birthsign__fade" />
       <div className="birthsign__panel">
-        <h1 className="birthsign__title">Choose your birthsign</h1>
-        <p className="birthsign__sub">The stars you were born under. Yours for life; only staff can change it later.</p>
+        <h1 className="birthsign__title">{data.title || 'Choose your birthsign'}</h1>
+        <p className="birthsign__sub">{data.sub || 'The stars you were born under. Yours for life; only staff can change it later.'}</p>
         <div className="birthsign__rule" />
         {data.notice ? <p className="birthsign__notice">{data.notice}</p> : null}
         <div className="birthsign__cols" style={{ gridTemplateColumns: `repeat(${Math.max(1, columns.length)}, minmax(0, 1fr))` }}>
@@ -141,7 +157,7 @@ const BirthsignPicker = ({ data }: { data: BirthsignPickerData }) => {
         {confirming && shown ? (
           <div className="birthsign__confirm">
             <div className="birthsign__confirm-box">
-              <div className="birthsign__confirm-emblem"><EmblemSvg id={shown.id} /></div>
+              <div className="birthsign__confirm-emblem"><EmblemSvg sign={shown} /></div>
               <div className="birthsign__confirm-q">Born under {shown.name}, for life?</div>
               <div className="birthsign__confirm-lore">{shown.lore}</div>
               <div className="birthsign__confirm-effect">{shown.effect}</div>
