@@ -8,6 +8,7 @@
 // Skyrim.esm would shift every id (see memory load-order-shift-breaks-saved-ids), and the desc does not move.
 module.exports = ({ mp, log, personal }) => {
   const CHAMBER = /^0*1705f:dragonborn\.esm$/;                    // ACTI DLC2ExpSpiderCraftingLever
+  const PLACED_TAG = 'private.dboPlaced';                          // placement.js records the base it placed from
   const DUNMER_DESCS = ['13742:Skyrim.esm', '8883d:Skyrim.esm'];  // DarkElfRace, DarkElfRaceVampire
   const REFUSED = 'The chamber does not stir for you. Only Dunmer hands can work it.';
 
@@ -37,13 +38,28 @@ module.exports = ({ mp, log, personal }) => {
 
   const mayImbue = (raceId) => dunmerRaces().has(Number(raceId) >>> 0);
 
+  // The chamber is a player-placed decor item as well as Tel Mithryn's own lever, so the gate keys on the base. A
+  // placed reference is made by placement.js through server-side PlaceAtMe and should report a baseDesc like any
+  // other, but that is unmeasured for a decor copy; if it ever reads empty the gate would match nothing and allow
+  // everyone. So it falls back to the base placement.js recorded on the reference itself, and fails closed.
+  const baseDescOf = (refId) => {
+    let desc = '';
+    try { desc = String(mp.get(refId, 'baseDesc') || ''); } catch (e) { desc = ''; }
+    if (!desc) {
+      try {
+        const tag = mp.get(refId, PLACED_TAG);
+        if (tag && tag.base) desc = String(tag.base);
+      } catch (e) { /* not a placed reference */ }
+    }
+    return desc.toLowerCase();
+  };
+
   // gamemode.js rebuilds its activate chain on every reload before it loads this file, so this never stacks
   const inner = typeof mp.onActivate === 'function' ? mp.onActivate : null;
   mp.onActivate = function (targetId, casterId, ...rest) {
     try {
       const t = Number(targetId) >>> 0, a = Number(casterId) >>> 0;
-      let desc = '';
-      try { desc = String(mp.get(t, 'baseDesc') || '').toLowerCase(); } catch (e) { desc = ''; }
+      const desc = baseDescOf(t);
       if (desc && CHAMBER.test(desc) && Number(mp.get(a, 'profileId')) >= 0 && !mayImbue(ownRace(a))) {
         try { personal(a, REFUSED); } catch (e) { /* offline */ }
         log(`spidermancy: refused the chamber to ${a.toString(16)} (race ${ownRace(a).toString(16)})`);

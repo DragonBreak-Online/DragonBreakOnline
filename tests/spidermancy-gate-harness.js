@@ -1,7 +1,7 @@
 // Harness for the Dunmer-only Spider Imbuing Chamber gate (server\spidermancy.js).
 //
 // It loads the real module against a stub `mp`, so it exercises the shipped code rather than a copy, and it needs no
-// server: run it from the server folder with `node tests\spidermancy-gate-harness.js`.
+// server: run it from the server folder with `node tools\spidermancy-gate-harness.js`.
 //
 // Cases: Dunmer allowed, Dunmer vampire allowed, Nord refused, plus a Nord in a beast form (still refused, because
 // beastform.js reports the character's own race) and a Dunmer in a beast form (still allowed), and an activate of
@@ -24,6 +24,10 @@ let beastOriginal = 0;
 // A baseDesc is the LOCAL id plus the plugin name, which is what makes it load-order independent: the server's own
 // audit lines read "9a9:DragonBreak.esp" and "1445e:Dragonborn.esm".
 let baseDescOf = { [CHAMBER_REF]: '1705f:Dragonborn.esm', [OTHER_REF]: '3ad5f:Skyrim.esm' };
+// A player-placed chamber whose baseDesc comes back empty: placement.js's private.dboPlaced tag is all there is.
+// Unmeasured in game, so the gate must fail closed rather than match nothing and let everyone through.
+const PLACED_REF = 0xff00abcd;
+let placedTagOf = { [PLACED_REF]: { base: '1705f:Dragonborn.esm', kind: 'decor' } };
 
 const mp = {
   getIdFromDesc: (desc) => {
@@ -34,6 +38,7 @@ const mp = {
   },
   get: (id, prop) => {
     if (prop === 'baseDesc') return baseDescOf[id >>> 0] || '';
+    if (prop === 'private.dboPlaced') return placedTagOf[id >>> 0] || null;
     if (prop === 'appearance') return { raceId, name: 'Test' };
     if (prop === 'profileId') return 1;
     return null;
@@ -67,6 +72,8 @@ check('Nord is refused', { race: NORD, expectAllowed: false });
 check('Nord in a beast form is still refused', { race: WEREWOLF, beast: NORD, expectAllowed: false });
 check('Dunmer in a beast form is still allowed', { race: WEREWOLF, beast: DARK_ELF, expectAllowed: true });
 check('a Nord activating something else is untouched', { race: NORD, ref: OTHER_REF, expectAllowed: true });
+check('a placed chamber with no baseDesc still refuses a Nord', { race: NORD, ref: PLACED_REF, expectAllowed: false });
+check('...and still allows a Dunmer', { race: DARK_ELF, ref: PLACED_REF, expectAllowed: true });
 
 console.log('\n%s', failures ? `FAILED: ${failures} case(s)` : 'all cases passed');
 process.exit(failures ? 1 : 0);
