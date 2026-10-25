@@ -146,6 +146,12 @@ module.exports = (api) => {
     for (const v of Object.values(S.doors)) if (Array.isArray(v) && v.length >= 4 && idOf(v[3]) === cell) out.push(v);
     return out;
   };
+  // A station with races (the Spider Imbuing Chamber: Dunmer only, Nat 25 Oct) is for the character's own race, as racial.js reads it
+  const raceOk = (a, st) => {
+    if (!st || !Array.isArray(st.races) || !st.races.length) return true;
+    const app = get(a, 'appearance', null), race = app && app.raceId ? Number(app.raceId) >>> 0 : 0;
+    return !!race && st.races.some((d) => idOf(d) === race);
+  };
   const skillRank = (a, skill) => {
     const r = get(a, 'private.mastery', null);
     if (!skill) return 4;
@@ -273,6 +279,7 @@ module.exports = (api) => {
       if (u.stations.has(st.keyword)) return `This home has a ${piece.name} already.`;
       if (u.stations.size >= b.stations) return `This home has its ${b.stations} workbench${b.stations === 1 ? '' : 'es'} already.`;
       if (pl.cells.length < (Number(st.minCells) || 1)) return `A ${piece.name} needs a home of ${st.minCells} rooms or more.`;
+      if (a && !raceOk(a, st)) return `The ${piece.name} is for Dunmer alone.`;
       if (a && st.skill && skillRank(a, st.skill) < (Number(st.tier) || 0)) return `Setting up a ${piece.name} is for ${st.skill}s of rank ${Number(st.tier) + 1} and above.`;
     }
     const cell = a ? idOf(get(a, 'worldOrCellDesc', '')) : 0;
@@ -429,7 +436,7 @@ module.exports = (api) => {
       const terms = rest.toLowerCase().split(/\s+/).filter(Boolean);
       const page = Math.max(0, (Number((terms.find((t) => /^p\d+$/.test(t)) || 'p1').slice(1)) || 1) - 1);
       const want = terms.filter((t) => !/^p\d+$/.test(t));
-      const hits = S.catalog.filter((p) => want.every((t) => p.hay.includes(t)));
+      const hits = S.catalog.filter((p) => want.every((t) => p.hay.includes(t)) && raceOk(a, p.station));
       S.found.set(a >>> 0, hits);
       if (!hits.length) return personal(a, 'Nothing matches. Try /decor groups.');
       const shown = hits.slice(page * 10, page * 10 + 10).map((p, i) => `${page * 10 + i + 1}. ${p.name} [${p.group}]: ${costText(costOf(p))}`);

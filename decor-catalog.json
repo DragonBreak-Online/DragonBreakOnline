@@ -42,14 +42,17 @@
   "BYOHMaterialNails": "300f:HearthFires.esm",
   "BYOHMaterialStoneBlock": "306c:HearthFires.esm",
   "BYOHMaterialStraw": "5a68:HearthFires.esm",
+  "Firewood01": "6f993:Skyrim.esm",
   "GemAmethyst": "63b46:Skyrim.esm",
   "GemGarnet": "63b45:Skyrim.esm",
+  "IngotDwarven": "db8a2:Skyrim.esm",
   "IngotGold": "5ad9e:Skyrim.esm",
   "IngotIMoonstone": "5ad9f:Skyrim.esm",
   "IngotIron": "5ace4:Skyrim.esm",
   "IngotQuicksilver": "5ada0:Skyrim.esm",
   "LeatherStrips": "800e4:Skyrim.esm",
   "RuinsLinenPile01": "34cd6:Skyrim.esm",
+  "SoulGemCommonFilled": "2e4f3:Skyrim.esm",
   "SoulGemGreaterFilled": "2e4fb:Skyrim.esm",
   "SoulGemPettyFilled": "2e4e3:Skyrim.esm",
   "ingotSilver": "5ace3:Skyrim.esm"
@@ -10508,16 +10511,18 @@
      "group": "workbenches",
      "type": "FURN",
      "costA": {
-      "BYOHMaterialLog": 3,
-      "BYOHMaterialNails": 1,
-      "BYOHMaterialGlass": 2,
-      "ingotSilver": 1
+      "BYOHMaterialLog": 4,
+      "BYOHMaterialGlass": 4,
+      "IngotIron": 2,
+      "ingotSilver": 1,
+      "BYOHMaterialStoneBlock": 2
      },
      "costB": {
-      "6f993:Skyrim.esm": 16,
-      "5ace4:Skyrim.esm": 1,
-      "34cdf:Skyrim.esm": 2,
-      "5ace3:Skyrim.esm": 1
+      "6f993:Skyrim.esm": 24,
+      "34cdf:Skyrim.esm": 4,
+      "5ace4:Skyrim.esm": 2,
+      "5ace3:Skyrim.esm": 1,
+      "71cf3:Skyrim.esm": 4
      },
      "bounds": [
       -32,
@@ -10542,16 +10547,18 @@
      "group": "workbenches",
      "type": "FURN",
      "costA": {
-      "BYOHMaterialLog": 3,
-      "BYOHMaterialNails": 1,
-      "BYOHMaterialGlass": 2,
-      "ingotSilver": 1
+      "BYOHMaterialLog": 4,
+      "BYOHMaterialGlass": 4,
+      "IngotIron": 2,
+      "ingotSilver": 1,
+      "BYOHMaterialStoneBlock": 2
      },
      "costB": {
-      "6f993:Skyrim.esm": 16,
-      "5ace4:Skyrim.esm": 1,
-      "34cdf:Skyrim.esm": 2,
-      "5ace3:Skyrim.esm": 1
+      "6f993:Skyrim.esm": 24,
+      "34cdf:Skyrim.esm": 4,
+      "5ace4:Skyrim.esm": 2,
+      "5ace3:Skyrim.esm": 1,
+      "71cf3:Skyrim.esm": 4
      },
      "bounds": [
       -60,
@@ -10576,20 +10583,20 @@
      "group": "workbenches",
      "type": "FURN",
      "costA": {
-      "BYOHMaterialLog": 1,
-      "BYOHMaterialNails": 1,
-      "SoulGemPettyFilled": 1,
-      "BYOHMaterialStoneBlock": 2,
+      "BYOHMaterialStoneBlock": 10,
+      "BYOHMaterialLog": 2,
+      "BYOHMaterialGlass": 2,
       "IngotGold": 1,
+      "SoulGemPettyFilled": 2,
       "GemAmethyst": 1,
       "GemGarnet": 1
      },
      "costB": {
-      "6f993:Skyrim.esm": 4,
-      "5ace4:Skyrim.esm": 1,
-      "2e4e3:Skyrim.esm": 1,
-      "71cf3:Skyrim.esm": 4,
+      "71cf3:Skyrim.esm": 20,
+      "6f993:Skyrim.esm": 12,
+      "34cdf:Skyrim.esm": 2,
       "5ad9e:Skyrim.esm": 1,
+      "2e4e3:Skyrim.esm": 2,
       "63b46:Skyrim.esm": 1,
       "63b45:Skyrim.esm": 1
      },
@@ -10616,20 +10623,20 @@
      "group": "workbenches",
      "type": "FURN",
      "costA": {
-      "BYOHMaterialLog": 1,
-      "BYOHMaterialNails": 1,
-      "SoulGemPettyFilled": 1,
-      "BYOHMaterialStoneBlock": 2,
+      "BYOHMaterialStoneBlock": 10,
+      "BYOHMaterialLog": 2,
+      "BYOHMaterialGlass": 2,
       "IngotGold": 1,
+      "SoulGemPettyFilled": 2,
       "GemAmethyst": 1,
       "GemGarnet": 1
      },
      "costB": {
-      "6f993:Skyrim.esm": 4,
-      "5ace4:Skyrim.esm": 1,
-      "2e4e3:Skyrim.esm": 1,
-      "71cf3:Skyrim.esm": 4,
+      "71cf3:Skyrim.esm": 20,
+      "6f993:Skyrim.esm": 12,
+      "34cdf:Skyrim.esm": 2,
       "5ad9e:Skyrim.esm": 1,
+      "2e4e3:Skyrim.esm": 2,
       "63b46:Skyrim.esm": 1,
       "63b45:Skyrim.esm": 1
      },
@@ -10656,13 +10663,12 @@
      "group": "workbenches",
      "type": "FURN",
      "costA": {
-      "BYOHMaterialLog": 2,
-      "BYOHMaterialNails": 4,
-      "IngotIron": 1
+      "IngotIron": 3,
+      "Firewood01": 2
      },
      "costB": {
-      "6f993:Skyrim.esm": 8,
-      "5ace4:Skyrim.esm": 2
+      "5ace4:Skyrim.esm": 3,
+      "6f993:Skyrim.esm": 2
      },
      "bounds": [
       -32,
@@ -10677,7 +10683,6 @@
       "skill": null,
       "tier": 0,
       "minCells": 1,
-      "needsHearth": 300,
       "keyword": "isSmallCookingPot"
      }
     },
@@ -10688,13 +10693,12 @@
      "group": "workbenches",
      "type": "FURN",
      "costA": {
-      "BYOHMaterialLog": 2,
-      "BYOHMaterialNails": 4,
-      "IngotIron": 1
+      "IngotIron": 3,
+      "Firewood01": 2
      },
      "costB": {
-      "6f993:Skyrim.esm": 8,
-      "5ace4:Skyrim.esm": 2
+      "5ace4:Skyrim.esm": 3,
+      "6f993:Skyrim.esm": 2
      },
      "bounds": [
       -32,
@@ -10709,7 +10713,6 @@
       "skill": null,
       "tier": 0,
       "minCells": 1,
-      "needsHearth": 300,
       "keyword": "isSmallCookingPot"
      }
     },
@@ -10720,13 +10723,12 @@
      "group": "workbenches",
      "type": "FURN",
      "costA": {
-      "BYOHMaterialLog": 2,
-      "BYOHMaterialNails": 4,
-      "IngotIron": 1
+      "IngotIron": 3,
+      "Firewood01": 2
      },
      "costB": {
-      "6f993:Skyrim.esm": 8,
-      "5ace4:Skyrim.esm": 2
+      "5ace4:Skyrim.esm": 3,
+      "6f993:Skyrim.esm": 2
      },
      "bounds": [
       -32,
@@ -10741,8 +10743,71 @@
       "skill": null,
       "tier": 0,
       "minCells": 1,
-      "needsHearth": 300,
       "keyword": "isSmallCookingPot"
+     }
+    },
+    {
+     "desc": "68adb:Skyrim.esm",
+     "edid": "CraftingCookingFireSpit",
+     "name": "Cooking Spit",
+     "group": "workbenches",
+     "type": "FURN",
+     "costA": {
+      "IngotIron": 1,
+      "Firewood01": 4,
+      "BYOHMaterialLog": 1
+     },
+     "costB": {
+      "5ace4:Skyrim.esm": 1,
+      "6f993:Skyrim.esm": 8
+     },
+     "bounds": [
+      -129,
+      -55,
+      -34,
+      123,
+      31,
+      109
+     ],
+     "radius": 133,
+     "station": {
+      "skill": null,
+      "tier": 0,
+      "minCells": 1,
+      "keyword": "isCookingSpit"
+     }
+    },
+    {
+     "desc": "9c6df:Skyrim.esm",
+     "edid": "GrainMill",
+     "name": "Grain Mill",
+     "group": "workbenches",
+     "type": "FURN",
+     "costA": {
+      "BYOHMaterialStoneBlock": 8,
+      "BYOHMaterialLog": 4,
+      "IngotIron": 2,
+      "Firewood01": 2
+     },
+     "costB": {
+      "71cf3:Skyrim.esm": 16,
+      "6f993:Skyrim.esm": 18,
+      "5ace4:Skyrim.esm": 2
+     },
+     "bounds": [
+      -95,
+      -95,
+      -34,
+      186,
+      95,
+      222
+     ],
+     "radius": 169,
+     "station": {
+      "skill": null,
+      "tier": 0,
+      "minCells": 1,
+      "keyword": "isGrainMill"
      }
     },
     {
@@ -10752,15 +10817,15 @@
      "group": "workbenches",
      "type": "FURN",
      "costA": {
-      "BYOHMaterialLog": 2,
-      "BYOHMaterialNails": 4,
-      "BYOHMaterialStoneBlock": 1,
-      "IngotIron": 1
+      "BYOHMaterialStoneBlock": 8,
+      "IngotIron": 3,
+      "Firewood01": 2,
+      "BYOHMaterialLog": 2
      },
      "costB": {
-      "6f993:Skyrim.esm": 8,
-      "5ace4:Skyrim.esm": 2,
-      "71cf3:Skyrim.esm": 2
+      "71cf3:Skyrim.esm": 16,
+      "5ace4:Skyrim.esm": 3,
+      "6f993:Skyrim.esm": 10
      },
      "bounds": [
       -31,
@@ -10779,23 +10844,60 @@
      }
     },
     {
+     "desc": "1705f:Dragonborn.esm",
+     "edid": "DLC2ExpSpiderCraftingLever",
+     "name": "Imbuing Switch",
+     "group": "workbenches",
+     "type": "ACTI",
+     "costA": {
+      "IngotDwarven": 10,
+      "BYOHMaterialStoneBlock": 10,
+      "IngotIron": 4,
+      "SoulGemCommonFilled": 1
+     },
+     "costB": {
+      "db8a2:Skyrim.esm": 10,
+      "71cf3:Skyrim.esm": 20,
+      "5ace4:Skyrim.esm": 4,
+      "2e4f3:Skyrim.esm": 1
+     },
+     "bounds": [
+      -13,
+      -8,
+      -13,
+      13,
+      8,
+      13
+     ],
+     "radius": 15,
+     "station": {
+      "skill": null,
+      "tier": 0,
+      "minCells": 1,
+      "races": [
+       "13742:Skyrim.esm",
+       "8883d:Skyrim.esm"
+      ],
+      "keyword": "DLC2ExpSpiderCraftingLever"
+     }
+    },
+    {
      "desc": "283f:HearthFires.esm",
      "edid": "CraftingOvenMarker",
      "name": "Oven",
      "group": "workbenches",
      "type": "FURN",
      "costA": {
-      "BYOHMaterialLog": 2,
-      "BYOHMaterialNails": 4,
-      "BYOHMaterialStoneBlock": 6,
-      "BYOHMaterialClay": 2,
-      "BYOHMaterialFittingsIron": 1
+      "BYOHMaterialStoneBlock": 12,
+      "BYOHMaterialClay": 6,
+      "IngotIron": 2,
+      "Firewood01": 4
      },
      "costB": {
-      "6f993:Skyrim.esm": 8,
+      "71cf3:Skyrim.esm": 24,
+      "34cdf:Skyrim.esm": 6,
       "5ace4:Skyrim.esm": 2,
-      "71cf3:Skyrim.esm": 12,
-      "34cdf:Skyrim.esm": 2
+      "6f993:Skyrim.esm": 4
      },
      "bounds": [
       -43,
@@ -10820,15 +10922,17 @@
      "group": "workbenches",
      "type": "FURN",
      "costA": {
-      "BYOHMaterialLog": 1,
-      "BYOHMaterialNails": 1,
+      "BYOHMaterialStoneBlock": 10,
+      "BYOHMaterialLog": 2,
+      "BYOHMaterialGlass": 2,
       "SoulGemGreaterFilled": 1,
       "IngotIMoonstone": 1,
       "IngotQuicksilver": 1
      },
      "costB": {
-      "6f993:Skyrim.esm": 4,
-      "5ace4:Skyrim.esm": 1,
+      "71cf3:Skyrim.esm": 20,
+      "6f993:Skyrim.esm": 12,
+      "34cdf:Skyrim.esm": 2,
       "2e4fb:Skyrim.esm": 1,
       "5ad9f:Skyrim.esm": 1,
       "5ada0:Skyrim.esm": 1
@@ -10850,20 +10954,54 @@
      }
     },
     {
+     "desc": "306b:HearthFires.esm",
+     "edid": "BYOHMineStone01",
+     "name": "Stone Quarry",
+     "group": "workbenches",
+     "type": "ACTI",
+     "costA": {
+      "BYOHMaterialStoneBlock": 10,
+      "Firewood01": 4,
+      "IngotIron": 2
+     },
+     "costB": {
+      "71cf3:Skyrim.esm": 20,
+      "6f993:Skyrim.esm": 4,
+      "5ace4:Skyrim.esm": 2
+     },
+     "bounds": [
+      -42,
+      -129,
+      -24,
+      235,
+      245,
+      157
+     ],
+     "radius": 232,
+     "station": {
+      "skill": "miner",
+      "tier": 2,
+      "minCells": 1,
+      "source": true,
+      "keyword": "BYOHMineStone01"
+     }
+    },
+    {
      "desc": "727a1:Skyrim.esm",
      "edid": "CraftingTanningRackMarker",
      "name": "Tanning Rack",
      "group": "workbenches",
      "type": "FURN",
      "costA": {
-      "BYOHMaterialLog": 5,
-      "BYOHMaterialNails": 4,
-      "LeatherStrips": 2
+      "BYOHMaterialLog": 4,
+      "LeatherStrips": 4,
+      "IngotIron": 1,
+      "Firewood01": 2
      },
      "costB": {
-      "6f993:Skyrim.esm": 20,
-      "5ace4:Skyrim.esm": 1,
-      "800e4:Skyrim.esm": 2
+      "6f993:Skyrim.esm": 18,
+      "800e4:Skyrim.esm": 4,
+      "5ace4:Skyrim.esm": 1
      },
      "bounds": [
       -56,
@@ -10888,13 +11026,13 @@
      "group": "workbenches",
      "type": "FURN",
      "costA": {
-      "BYOHMaterialLog": 6,
-      "BYOHMaterialNails": 14,
+      "BYOHMaterialLog": 4,
+      "BYOHMaterialNails": 10,
       "RuinsLinenPile01": 4
      },
      "costB": {
-      "6f993:Skyrim.esm": 24,
-      "5ace4:Skyrim.esm": 2,
+      "6f993:Skyrim.esm": 16,
+      "5ace4:Skyrim.esm": 1,
       "34cd6:Skyrim.esm": 4
      },
      "bounds": [
@@ -10914,19 +11052,51 @@
      }
     },
     {
+     "desc": "7022e:Skyrim.esm",
+     "edid": "WoodChoppingBlock",
+     "name": "Wood Chopping Block",
+     "group": "workbenches",
+     "type": "FURN",
+     "costA": {
+      "Firewood01": 2,
+      "BYOHMaterialLog": 1
+     },
+     "costB": {
+      "6f993:Skyrim.esm": 6
+     },
+     "bounds": [
+      -125,
+      -28,
+      -34,
+      112,
+      162,
+      64
+     ],
+     "radius": 151,
+     "station": {
+      "skill": null,
+      "tier": 0,
+      "minCells": 1,
+      "source": true,
+      "keyword": "WoodChoppingBlock"
+     }
+    },
+    {
      "desc": "d932f:Skyrim.esm",
      "edid": "CraftingBlacksmithArmorWorkbench",
      "name": "Workbench",
      "group": "workbenches",
      "type": "FURN",
      "costA": {
-      "BYOHMaterialLog": 4,
-      "BYOHMaterialNails": 1,
-      "IngotIron": 2
+      "BYOHMaterialLog": 6,
+      "IngotIron": 5,
+      "Firewood01": 2,
+      "LeatherStrips": 2
      },
      "costB": {
-      "6f993:Skyrim.esm": 16,
-      "5ace4:Skyrim.esm": 3
+      "6f993:Skyrim.esm": 26,
+      "5ace4:Skyrim.esm": 5,
+      "800e4:Skyrim.esm": 2
      },
      "bounds": [
       -71,
