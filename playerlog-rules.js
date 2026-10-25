@@ -645,6 +645,7 @@ excluded('REBELLION', 'player-named risings and a secret petition\'s code');
 excluded('REFERRAL', 'staff only: profiles by number, staff reasons, PC sharing');
 excluded('SHOP', 'business names and the failure reasons');
 excluded('BURGLARY FENCE', 'home labels, raid evidence and reasons');
+excluded('FACTION-RANK FACTION-MERGE', 'config-driven roster migrations (factions.addRanks, factions.merged), run once at a load: members as their roster entries name them, with no profile or tag party');
 
 // S: parsed. Only anchored groups survive: parties (resolved in the game), ops from fixed tables, numbers, hex refs.
 // The court, said by staff or an official: office titles are never kept (rolenames can make them staff-written), nor
@@ -1369,6 +1370,7 @@ bank.js BANK 92dd9b73 parsed
 bank.js BANK ddbac33b parsed
 bank.js BANK 3958b0d9 parsed
 bank.js BANK 8ff19655 parsed
+bank.js BANK b26ffbd5 parsed
 bank.js BANK d4d119df parsed
 bank.js BANK 167dae12 parsed
 bank.js BANK 1609b3b0 parsed
@@ -1635,6 +1637,9 @@ greenpact.js PARTAKE 934342b4 clean
 greenpact.js PARTAKE 6dd41892 clean
 guilds.js FACTION-LIMIT 80aca6c8 parsed
 guilds.js FACTION-LIMIT ae8015bc parsed
+guilds.js FACTION-RANK 77565f59 excluded
+guilds.js FACTION-MERGE 03cc2a6a excluded
+guilds.js FACTION-MERGE 2062ec33 excluded
 guilds.js FACTION f8d4e175 parsed
 guilds.js FACTION 6c77ee5e parsed
 guilds.js FACTION 9196331b parsed
