@@ -29,9 +29,9 @@ const check = (label, ok, got) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${labe
 // Holds: Bruma (Cyrodiil, the County), Whiterun (Skyrim), Fort Caractacus (Cyrodiil, the Legion's own)
 const CYR = 'a764b:BSHeartland.esm', TAM = '3c:Skyrim.esm';
 const zones = {
-  bruma: { id: 'bruma', name: 'Bruma', treasury: '1:Chest.esp' },
-  whiterun: { id: 'whiterun', name: 'Whiterun', treasury: '2:Chest.esp' },
-  caractacus: { id: 'caractacus', name: 'Fort Caractacus', treasury: '3:Chest.esp' },
+  bruma: { id: 'bruma', name: 'Bruma', treasury: '1:Chest.esp' },   // verify-formids: ignore - made-up treasury chests
+  whiterun: { id: 'whiterun', name: 'Whiterun', treasury: '2:Chest.esp' },   // verify-formids: ignore - made-up treasury chests
+  caractacus: { id: 'caractacus', name: 'Fort Caractacus', treasury: '3:Chest.esp' },   // verify-formids: ignore - made-up treasury chests
 };
 const FACTIONS = {
   'county-bruma': { id: 'county-bruma', name: 'County of Bruma', kind: 'hold', zone: 'bruma', world: CYR },
@@ -54,7 +54,7 @@ const mp = {
     return props.get(`${id >>> 0}|${p}`);
   },
   set: (id, p, v) => props.set(`${id >>> 0}|${p}`, v),
-  getIdFromDesc: (d) => ({ '1:Chest.esp': 0x9001, '2:Chest.esp': 0x9002, '3:Chest.esp': 0x9003 }[d] || 0),
+  getIdFromDesc: (d) => ({ '1:Chest.esp': 0x9001, '2:Chest.esp': 0x9002, '3:Chest.esp': 0x9003 }[d] || 0),   // verify-formids: ignore - the made-up treasury chests
   getActorsByProfileId: (pid) => (pid === 11 ? [0x21] : []),
 };
 props.set(`${0x21}|profileId`, 11); props.set(`${0x21}|private.bankGold`, 1000000);
@@ -118,7 +118,8 @@ const MARKED = [
   ['outlaws.js', /__dboTreasuryZone\.deposit\(zid, paid, \{ income: 'bounties' \}\)/, 'bounty paid'],
   ['gamemode.js', /depositToTreasury\(zoneId, taxed, \{ income: 'postage' \}\)/g, 'pigeon postage', 2],
   ['gamemode.js', /depositToTreasury\(z && typeof z === 'object' \? z\.id : z, gold, \{ income: 'temple offerings' \}\)/, 'temple offering'],
-  ['bank.js', /depositToTreasury\(zone\.id, n, \{ income: 'vault fees' \}\)/, 'vault fees'],
+  ['bank.js', /const income = kind \|\| 'vault fees';\n\s*if \(depositToTreasury\(zone\.id, n, \{ income \}\)/, 'vault fees'],
+  ['bank.js', /payHold\(zone, price, 'gem sales'\)/, 'gem sales'],
 ];
 for (const [f, rx, what, count] of MARKED) check(`${f}: ${what} is marked income`, (src(f).match(rx.global ? rx : new RegExp(rx.source, 'g')) || []).length === (count || 1));
 check('contracts.js: a contract reward returned is not income', /bankTreasury\(\)\.deposit\(zone\.id, amount\);/.test(src('contracts.js')));

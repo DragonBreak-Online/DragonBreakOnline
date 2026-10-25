@@ -459,6 +459,38 @@ module.exports = (api) => {
     return { ok: true, text: `Bought ${n} ${g.name} for ${price} gold.` };
   };
 
+  // Gems in the price of big deeds (Nat, 25 Oct: declaring war, a noble title, a building from the hold): n flawless gems
+  // of any kind from the pack of the character doing it, the cheapest first. Given a hold, they go into its counter's stock
+  // (sold on at three times their value); without one they are spent. need(a, n) is '' or the refusal; take(a, n, zoneId,
+  // why) is true once all n are taken, and nothing is taken otherwise
+  const flawlessIds = () => gemList().filter((g) => /^flawless /i.test(g.name)).sort((x, y) => x.buy - y.buy);
+  const carriedFlawless = (a) => { const p = P(); return p ? flawlessIds().map((g) => ({ g, n: p.looseCount(a, g.id) })).filter((x) => x.n > 0) : []; };
+  const gemNeed = (a, n) => {
+    n = Math.max(0, Math.floor(Number(n) || 0)); if (!n) return '';
+    const have = carriedFlawless(a).reduce((s, x) => s + x.n, 0);
+    return have >= n ? '' : `It also costs ${n} flawless gem${n === 1 ? '' : 's'} of any kind, carried (you carry ${have}).`;
+  };
+  const gemTake = (a, n, zoneId, why) => {
+    n = Math.max(0, Math.floor(Number(n) || 0)); if (!n) return true;
+    const p = P(); if (!p || gemNeed(a, n)) return false;
+    const taken = []; let left = n;
+    for (const { g, n: has } of carriedFlawless(a)) {
+      if (!left) break;
+      const k = Math.min(has, left); const t = p.takeItems(a, g.id, k);
+      if (!t) { for (const x of taken) p.giveEntries(a, x.t); return false; }
+      taken.push({ g, k, t }); left -= k;
+    }
+    const zone = zoneId ? zoneById(zoneId) : null;
+    if (zone) {
+      const before = JSON.parse(JSON.stringify(gemStock()[zone.id] || {}));
+      for (const x of taken) setStock(zone, x.g, stockOf(zone, x.g) + x.k);
+      try { save(); } catch (e) { gemStock()[zone.id] = before; log('bank: bank.json write failed; the gems stay spent', e.message); }
+    }
+    audit(`BANK GEMS ${who(a)} paid ${taken.map((x) => `${x.k}x ${x.g.name}`).join(', ')} for ${why || 'a deed'}${zone ? `, into the ${zone.id} counter's stock` : ''}`);
+    return true;
+  };
+  globalThis.__dboGemFee = { need: (a, n) => { try { return gemNeed(a >>> 0, n); } catch (e) { return 'The gem clerk is away.'; } }, take: (a, n, zoneId, why) => { try { return gemTake(a >>> 0, n, zoneId, why); } catch (e) { log('bank: a gem fee failed', e.message); return false; } } };
+
   // ---- vaults: goods stored by weight, one per hold ------------------------------------------------------------------
   const P = () => globalThis.__dboPostApi || null;
   const tierById = (id) => (Array.isArray(V.tiers) ? V.tiers : []).find((t) => t && t.id === String(id || '').toLowerCase()) || null;

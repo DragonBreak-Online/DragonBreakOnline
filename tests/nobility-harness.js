@@ -193,8 +193,19 @@ ok('an unknown title is refused, listing the county\'s', /Baron\/Baroness, Lord\
 ok('a fief title needs a fief of this hold', /Choose one of the fiefs of Bruma/.test(ui('nobilityGrant', COUNTESS, 'bruma', 'Kesta', 'baron', 'riverwood').text));
 ok('a fief has one holder', /Mountain Watch is held by Lord Elion/.test(ui('nobilityGrant', COUNTESS, 'bruma', 'Kesta', 'baron', 'mountain-watch').text));
 
+// bank.js's gem fee (Nat, 25 Oct): a flawless gem from the ruler for every grant or change, into the hold's counter
+const gemsOf = new Map([[COUNTESS, 0]]); const gemTaken = [];
+const GEM_FEE = globalThis.__dboGemFee = {
+  need: (a, n) => ((gemsOf.has(a) ? gemsOf.get(a) : 99) >= n ? '' : `It also costs ${n} flawless gem of any kind, carried (you carry ${gemsOf.get(a)}).`),
+  take: (a, n, zoneId) => { const has = gemsOf.has(a) ? gemsOf.get(a) : 99; if (has < n) return false; gemsOf.set(a, has - n); gemTaken.push({ a, n, zoneId }); return true; },
+};
+announced.length = 0;
+ok('a title costs the ruler a flawless gem: none carried, none granted', /A title costs the crown a flawless gem\. It also costs 1 flawless gem/.test(ui('nobilityGrant', COUNTESS, 'bruma', 'Kesta', 'knight').text) && announced.length === 0);
+gemsOf.set(COUNTESS, 1);
 announced.length = 0;
 const r1 = ui('nobilityGrant', COUNTESS, 'bruma', 'Kesta', 'knight');
+ok('...with one, granted, and the gem goes to the Bruma counter', gemsOf.get(COUNTESS) === 0 && gemTaken.length === 1 && gemTaken[0].zoneId === 'bruma');
+gemsOf.delete(COUNTESS);
 ok('a woman is made a Dame, of the county', r1.kind === 'ok' && announced[0] === 'By decree of the Countess of Bruma, Kesta is made a Dame of Bruma.', [r1, announced]);
 ok('she is told', told.some((x) => x.a === DAME && /Dame of Bruma/.test(x.t)));
 ok('the same title again is refused', /already Dame of Bruma/.test(ui('nobilityGrant', COUNTESS, 'bruma', 'Kesta', 'knight').text));
@@ -368,8 +379,10 @@ ok('...but not one outside it', econReplies[0] && !econReplies[0].ok && /Only th
 
 // ---- a deleted character's title lapses -------------------------------------------------------------------------------------
 announced.length = 0;
-ui('nobilityGrant', COUNTESS, 'bruma', 'Brief', 'baron', 'aleswell');
-ok('granted to a character offline', N.holderOf('aleswell') && N.holderOf('aleswell').actor === GONE);
+// bank.js, loaded for the fief treasury, put the real gem fee in place: the mock again
+globalThis.__dboGemFee = GEM_FEE;
+const rGone = ui('nobilityGrant', COUNTESS, 'bruma', 'Brief', 'baron', 'aleswell');
+ok('granted to a character offline', N.holderOf('aleswell') && N.holderOf('aleswell').actor === GONE, rGone);
 deleted.add(GONE);
 ok('once the character is deleted the fief is vacant and the roll forgets him', N.holderOf('aleswell') === null && !brumaOf(SEC.view(OUT)).roll.some((n) => n.name === 'Brief'));
 

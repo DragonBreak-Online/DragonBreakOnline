@@ -127,6 +127,17 @@ const g0 = zoneGold('whiterun');
 check('a gem that cannot be handed over: gold back, stock back, treasury unpaid', /could not hand that over/.test(cmd(P2, 'gems buy ruby')) && get(P2, 'private.bankGold') === 5000 && stock('whiterun', RUBY) === 3 && zoneGold('whiterun') === g0);
 giveFails = false;
 
+// The gem fee of big deeds (realm.js, nobility.js, tenancy.js): flawless gems only, from the pack
+const fee = globalThis.__dboGemFee;
+api.giveItem(P2, RUBY_FLAWLESS, 1);
+check('a deed asking 2 flawless gems of one who carries 1 (and plain rubies) is refused', /costs 2 flawless gems of any kind, carried \(you carry 1\)/.test(fee.need(P2, 2)) && fee.take(P2, 2, 'whiterun', 'x') === false && count(P2, RUBY_FLAWLESS) === 1);
+check('a fee of none asks nothing', fee.need(P2, 0) === '' && fee.take(P2, 0) === true);
+const fs0 = stock('whiterun', RUBY_FLAWLESS);
+check('one flawless gem taken into the hold\'s counter stock', fee.need(P2, 1) === '' && fee.take(P2, 1, 'whiterun', 'a title') === true && count(P2, RUBY_FLAWLESS) === 0 && count(P2, RUBY) === 2 && stock('whiterun', RUBY_FLAWLESS) === fs0 + 1);
+api.giveItem(P2, RUBY_FLAWLESS, 2);
+check('without a hold the gems are spent', fee.take(P2, 2, '', 'a war') === true && count(P2, RUBY_FLAWLESS) === 0 && stock('whiterun', RUBY_FLAWLESS) === fs0 + 1
+  && out.audits.some((t) => /BANK GEMS Pff000202 paid 2x Flawless Ruby for a war$/.test(t)));
+
 // No hold, and the off switch
 at(P1, BANK_NOWHERE);
 check('a bank that answers to no hold keeps no counter', /keeps no gem counter/.test(cmd(P1, 'gems')));
