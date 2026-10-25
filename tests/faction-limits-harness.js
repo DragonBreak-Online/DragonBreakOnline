@@ -87,7 +87,7 @@ put('imperial-legion', LEG); put('imperial-legion', BOSS, 0); put('county-bruma'
 put('synod', SYN, 0); put('college-of-whispers', WHIS, 0); put('thieves-guild', THIEF); put('dark-brotherhood', DB, 0);
 put('cult-boethiah', CULT); put('vigil-of-stendarr', VIG, 0); put('dawnguard', DG, 0); put('clan-volkihar', VOLK, 0); put('fighters-guild', FG, 0);
 put('clan-largashbur', CHIEF, 0); put('clan-largashbur', ORC);
-put('imperial-cult', PRIMATE, 0); put('great-faiths', PRIOR, 0);
+put('imperial-cult', PRIMATE, 0);
 
 // ---- allegiance ----------------------------------------------------------------------------------------------------
 // The Orc stronghold clans are an allegiance, any member (Nate, 19 Oct)
@@ -99,8 +99,8 @@ ro = invite(CHIEF, LEG, 'clan-largashbur');
 ok('nor a Legion soldier to a clan', ro.error && /already serves the Imperial Legion/.test(ro.error), ro);
 ok('the Imperial Civil Commission is an allegiance (Nate, 19 Oct); the Penitus Oculatus is secret, like the Blades (Nate, 22 Oct)', L.categories.allegiance.ids.includes('imperial-civil-commission') && !L.categories.allegiance.ids.includes('penitus-oculatus') && L.categories.secret.ids.includes('penitus-oculatus'), L.categories);
 // A faith of its own beside a guild, one at a time, and only for a follower of the Eight (Nate, 19 Oct)
-ok('the churches are a faith, not a guild; the Vigil stays a guild', L.categories.faith.ids.join() === 'imperial-cult,great-faiths' && L.categories.guild.ids.includes('vigil-of-stendarr')
-  && !L.categories.guild.ids.includes('imperial-cult') && !L.categories.guild.ids.includes('great-faiths'));
+ok('the churches are a faith, not a guild; the Vigil stays a guild', L.categories.faith.ids.join() === 'imperial-cult' && L.categories.guild.ids.includes('vigil-of-stendarr')
+  && !L.categories.guild.ids.includes('imperial-cult'));
 props.delete(`${FG}|private.dboDeity`);
 ro = invite(PRIMATE, FG, 'imperial-cult');
 ok('a Fighter who follows no god is refused by the Imperial Cult, told why', ro.error && /does not follow the Eight Divines/.test(ro.error), ro);
@@ -111,8 +111,10 @@ props.set(`${FG}|private.dboDeity`, { id: 'akatosh', kind: 'divine' });
 ro = invite(PRIMATE, FG, 'imperial-cult');
 ok('a Fighter who follows Akatosh may join the Imperial Cult beside the Fighters Guild', !ro.error, ro);
 ok('...and accepts', /You are now/.test(accept(FG, 'imperial-cult')) && inF('imperial-cult', FG) && inF('fighters-guild', FG));
+// The Great Faiths joined the Imperial Cult (Nat, 25 Oct): the faction is gone, so nobody can be invited to it
 ro = invite(PRIOR, FG, 'great-faiths');
-ok('one faith at a time: the Great Faiths refuse an Imperial Cult member', ro.error && /already serves the Imperial Cult/.test(ro.error), ro);
+ok('the Great Faiths are gone: an invite to them names no faction', ro.error && /No such faction/.test(ro.error), ro);
+ok('the merge is recorded in config: great-faiths into imperial-cult', ((CFG.factions || {}).merged || {})['great-faiths'] && CFG.factions.merged['great-faiths'].into === 'imperial-cult');
 ro = invite(FG, ORC, 'fighters-guild');
 ok('a clan member may still join a guild', !ro.error, ro);
 let r = invite(STORM, LEG, 'stormcloaks');

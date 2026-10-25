@@ -1,5 +1,5 @@
 // Hall cells (guilds.js __dboHallFactionAt, the REAL one, no stand-in): a faction's Scholars' Ledger and Class Lectern
-// teach and sell under its own name where the plugins place them. The Great Faiths teach at the Cathedral of St Martin's
+// teach and sell under its own name where the plugins place them. The Imperial Cult teach at the Cathedral of St Martin's
 // Scholars' Ledger and its tome sales pay their treasury (guild-defs' hall doors stand in Bruma's street, so the cell map
 // never reached the Cathedral); the Synod teaches at its Conclave's ledger and Class Lectern (its hall doors stand in the
 // basement, the ledger and lecterns in the main hall); and the map is built at all: doors-pos.json keeps cells in lower
@@ -80,7 +80,7 @@ const REFS = {
 // ---- people -----------------------------------------------------------------------------------------------------------
 const PRIEST = 0x14, ACOLYTE = 0x15, MAGISTER = 0x16, ASSOC = 0x17, WSENIOR = 0x18, BUYER = 0x19;
 const NAMES = { [PRIEST]: 'Priest', [ACOLYTE]: 'Acolyte', [MAGISTER]: 'Magister', [ASSOC]: 'Assoc', [WSENIOR]: 'Wsenior', [BUYER]: 'Buyer' };
-const ROSTER = [[PRIEST, 'great-faiths', 'Priest'], [ACOLYTE, 'great-faiths', 'Acolyte'], [BUYER, 'great-faiths', 'Acolyte'],
+const ROSTER = [[PRIEST, 'imperial-cult', 'Oracle'], [ACOLYTE, 'imperial-cult', 'Acolyte'], [BUYER, 'imperial-cult', 'Acolyte'],
   [MAGISTER, 'synod', 'Senior Magister'], [ASSOC, 'synod', 'Associate'], [WSENIOR, 'college-of-whispers', 'Senior Whisperer']];
 const guildsJson = {};
 for (const [a, fid, title] of ROSTER) {
@@ -186,17 +186,17 @@ const hallOfDefs = (fid) => (DEFS.factions.find((f) => f.id === fid) || {}).hall
 const buildingOf = (door) => BUILDINGS.find((b) => (b.entrances || []).some((e) => keyOf(e.door) === keyOf(door)) || (b.innerDoors || []).map(keyOf).includes(keyOf(door)));
 const sameSet = (x, y) => JSON.stringify([...new Set((x || []).map(keyOf))].sort()) === JSON.stringify([...new Set((y || []).map(keyOf))].sort());
 const cathedral = buildingOf('7a815:BSHeartland.esm'), conclave = buildingOf('6ca59:BSHeartland.esm');
-check('data: the Great Faiths\' hall doors stand in Bruma\'s worldspace (doors-pos.json), so no door names the Cathedral',
+check('data: the Imperial Cult\' hall doors stand in Bruma\'s worldspace (doors-pos.json), so no door names the Cathedral',
   ['7a815:BSHeartland.esm', '7a816:BSHeartland.esm'].every((d) => WORLDS.has(keyOf(DOORS_POS[d][3]))), ['7a815', '7a816'].map((d) => DOORS_POS[`${d}:BSHeartland.esm`]));
 check('data: the Synod\'s hall doors stand only in its basement (6c152), not the main hall (20ff) where its ledger and lecterns are',
   ['6ca59:BSHeartland.esm', '6ca75:BSHeartland.esm'].every((d) => keyOf(DOORS_POS[d][3]) === keyOf(BASEMENT)));
-// Solitude's Temple of the Divines (16a02:Skyrim.esm) is the Great Faiths' too since 19 Oct (Nate)
-check('data: guild-defs lists the Cathedral building\'s cells (buildings.json CYRBrumaCathedralofStMartin) and Solitude\'s Temple of the Divines as the Great Faiths\' hall',
-  !!cathedral && cathedral.name === 'CYRBrumaCathedralofStMartin' && sameSet(hallOfDefs('great-faiths').cells, cathedral.cells.concat(['16a02:Skyrim.esm'])), [hallOfDefs('great-faiths').cells, cathedral && cathedral.cells]);
+// Solitude's Temple of the Divines (16a02:Skyrim.esm) is the Imperial Cult's too since 19 Oct (Nate)
+check('data: guild-defs lists the Cathedral building\'s cells (buildings.json CYRBrumaCathedralofStMartin) and Solitude\'s Temple of the Divines as the Imperial Cult\' hall',
+  !!cathedral && cathedral.name === 'CYRBrumaCathedralofStMartin' && sameSet(hallOfDefs('imperial-cult').cells, cathedral.cells.concat(['16a02:Skyrim.esm'])), [hallOfDefs('imperial-cult').cells, cathedral && cathedral.cells]);
 check('data: guild-defs lists the Conclave building\'s cells (buildings.json CYRBrumaSynodConclave) as the Synod\'s hall',
   !!conclave && conclave.name === 'CYRBrumaSynodConclave' && sameSet(hallOfDefs('synod').cells, conclave.cells), [hallOfDefs('synod').cells, conclave && conclave.cells]);
-check('data: gamemode-config ledgerSale.hallCells pays the Great Faiths for all three Cathedral cells, the Synod for its two',
-  [CATHEDRAL, UNDERCROFT, CHAPEL].every((c) => (CONFIG.ledgerSale.hallCells || {})[c] === 'great-faiths') && [CONCLAVE, BASEMENT].every((c) => (CONFIG.ledgerSale.hallCells || {})[c] === 'synod'), CONFIG.ledgerSale.hallCells);
+check('data: gamemode-config ledgerSale.hallCells pays the Imperial Cult for all three Cathedral cells, the Synod for its two',
+  [CATHEDRAL, UNDERCROFT, CHAPEL].every((c) => (CONFIG.ledgerSale.hallCells || {})[c] === 'imperial-cult') && [CONCLAVE, BASEMENT].every((c) => (CONFIG.ledgerSale.hallCells || {})[c] === 'synod'), CONFIG.ledgerSale.hallCells);
 
 for (const mode of ['strict', 'lenient']) {
   strict = mode === 'strict';
@@ -220,14 +220,14 @@ for (const mode of ['strict', 'lenient']) {
   console.log(`-- ${mode} engine: ${out.logs.filter((l) => /hall cell/.test(l)).join(' | ') || '(no hall-cell line logged)'}`);
 
   // ---- 1. the cell map itself ---------------------------------------------------------------------------------------
-  check(T('the Cathedral of St Martin (12cb), its undercroft (5f78c) and chapel hall (5f78d) are the Great Faiths\' hall'),
-    [CATHEDRAL, UNDERCROFT, CHAPEL].every((c) => hall(c) === 'great-faiths'), [CATHEDRAL, UNDERCROFT, CHAPEL].map(hall));
+  check(T('the Cathedral of St Martin (12cb), its undercroft (5f78c) and chapel hall (5f78d) are the Imperial Cult\' hall'),
+    [CATHEDRAL, UNDERCROFT, CHAPEL].every((c) => hall(c) === 'imperial-cult'), [CATHEDRAL, UNDERCROFT, CHAPEL].map(hall));
   check(T('the Synod Conclave\'s main hall (20ff) and its basement (6c152) are the Synod\'s'), hall(CONCLAVE) === 'synod' && hall(BASEMENT) === 'synod', [hall(CONCLAVE), hall(BASEMENT)]);
   check(T('Frostcrag Spire (6ff7d) is the College of Whispers\' (its hall door stands there)'), hall(FROSTCRAG) === 'college-of-whispers', hall(FROSTCRAG));
   check(T('the cell as the engine reports it and in lower case answer the same'), hall(CATHEDRAL.toLowerCase()) === hall(CATHEDRAL) && hall(FROSTCRAG.toLowerCase()) === hall(FROSTCRAG));
   check(T('Bruma\'s streets are no faction\'s hall, though hall doors stand there'), hall(BRUMA) === null, hall(BRUMA));
 
-  // ---- 2. teaching at the Cathedral's Scholars' Ledger (a Priest of the Great Faiths, an Acolyte) ----------------------
+  // ---- 2. teaching at the Cathedral's Scholars' Ledger (a Priest of the Imperial Cult, an Acolyte) ----------------------
   const cath = refId(REFS.cathLedger);
   at(PRIEST, CATHEDRAL, near(REFS.cathLedger)); at(ACOLYTE, CATHEDRAL, near(REFS.cathLedger, 280));
   check(T('a Priest at the Cathedral\'s Scholars\' Ledger is offered "Teach a spell to a student"'), teachRows(PRIEST, cath).join() === 'teach', teachRows(PRIEST, cath));
@@ -236,14 +236,14 @@ for (const mode of ['strict', 'lenient']) {
   check(T('...the ledger\'s own menu lists it'), actionIds(ledgerMenu).includes('teach'), actionIds(ledgerMenu));
   ui('salvageChoose', PRIEST, ['teach'], 66);
   let w = lastWidget(PRIEST, 'contextMenu');
-  check(T('...choosing it lists the Acolyte as a student of The Great Faiths'), !!w && w.id === 45 && actionIds(w).includes(`cstudent:${ACOLYTE.toString(16)}`) && /The Great Faiths/.test(w.targetName), w && [w.targetName, actionIds(w)]);
+  check(T('...choosing it lists the Acolyte as a student of The Imperial Cult'), !!w && w.id === 45 && actionIds(w).includes(`cstudent:${ACOLYTE.toString(16)}`) && /The Imperial Cult/.test(w.targetName), w && [w.targetName, actionIds(w)]);
   ui('spellsChoose', PRIEST, [`cstudent:${ACOLYTE.toString(16)}`], 45);
   ui('spellsChoose', PRIEST, [`clesson:${ACOLYTE.toString(16)}:${FAST_HEALING.spell}`], 45);
   const offer = lastWidget(ACOLYTE, 'contextMenu');
   check(T('...Fast Healing is offered to the Acolyte'), !!offer && /Priest offers to teach you Fast Healing/.test(offer.targetName), offer && offer.targetName);
   ui('spellsOffer', ACOLYTE, ['accept'], 45);
-  check(T('...who learns it: audited TEACH at the Cathedral\'s ledger for great-faiths'),
-    studiedAll(ACOLYTE).includes(FAST_HEALING.spell) && new RegExp(`^TEACH P14 taught ${FAST_HEALING.spell} Fast Healing to P15 at 1a7764:DragonBreak Online Edits.esp for great-faiths `).test(lastAudit(/^TEACH/)),
+  check(T('...who learns it: audited TEACH at the Cathedral\'s ledger for imperial-cult'),
+    studiedAll(ACOLYTE).includes(FAST_HEALING.spell) && new RegExp(`^TEACH P14 taught ${FAST_HEALING.spell} Fast Healing to P15 at 1a7764:DragonBreak Online Edits.esp for imperial-cult `).test(lastAudit(/^TEACH/)),
     [studiedAll(ACOLYTE), lastAudit(/^TEACH/), said(PRIEST)]);
 
   // ---- 3. teaching at the Synod's ledger and Class Lectern (a Senior Magister, an Associate) ---------------------------
@@ -280,14 +280,14 @@ for (const mode of ['strict', 'lenient']) {
   check(T('the Cathedral\'s ledger shows the Acolyte "Buy spell tomes"'), actionIds(lastWidget(BUYER, 'contextMenu')).includes('tomes'), actionIds(lastWidget(BUYER, 'contextMenu')));
   ui('salvageChoose', BUYER, ['tomes'], 66);
   const shop = lastWidget(BUYER, 'tomeShop');
-  check(T('...the shop is titled the Great Faiths\', not the Synod\'s'), !!shop && /^The Great Faiths: Spell Tomes/.test(shop.title), shop && shop.title);
+  check(T('...the shop is titled the Imperial Cult\', not the Synod\'s'), !!shop && /^The Imperial Cult: Spell Tomes/.test(shop.title), shop && shop.title);
   if (shop) ui('tomeBuy', BUYER, [shop.nonce, HEALING_HANDS.book], 44);
   const sale = lastAudit(/^LEDGERSALE/);
   const owner = Number(((sale.match(/owner (\d+)\/(\d+) to /) || [])[1]) || 0);
   check(T('...Healing Hands is bought there'), count(BUYER, idOf(HEALING_HANDS.book)) === 1, [said(BUYER), (lastWidget(BUYER, 'tomeShop') || {}).result]);
-  check(T('...and the owner\'s share goes to the treasury of The Great Faiths'), /^LEDGERSALE P19 paid 89 gold for Spell Tome: Healing Hands: .* owner \d+\/\d+ to the treasury of The Great Faiths$/.test(sale) && owner > 0, sale);
-  check(T('...where bank.js keeps it: bank.json factions["great-faiths"] holds that share, audited BANK'),
-    owner > 0 && Number((bankJson().factions || {})['great-faiths']) === owner && /^BANK treasury of great-faiths received \d+ gold \(ledger sale: Spell Tome: Healing Hands\)/.test(lastAudit(/^BANK treasury of great-faiths/)),
+  check(T('...and the owner\'s share goes to the treasury of The Imperial Cult'), /^LEDGERSALE P19 paid 89 gold for Spell Tome: Healing Hands: .* owner \d+\/\d+ to the treasury of The Imperial Cult$/.test(sale) && owner > 0, sale);
+  check(T('...where bank.js keeps it: bank.json factions["imperial-cult"] holds that share, audited BANK'),
+    owner > 0 && Number((bankJson().factions || {})['imperial-cult']) === owner && /^BANK treasury of imperial-cult received \d+ gold \(ledger sale: Spell Tome: Healing Hands\)/.test(lastAudit(/^BANK treasury of imperial-cult/)),
     [bankJson().factions, lastAudit(/^BANK/)]);
 
   // ---- 7. sales elsewhere ------------------------------------------------------------------------------------------------

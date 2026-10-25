@@ -154,7 +154,7 @@
   "teachAtStudyPoint": false,
   "offerSeconds": 60,
   "shopCells": ["20ff:BSHeartland.esm", "6c152:BSHeartland.esm"],
-  "shopFactions": ["synod", "college-of-winterhold", "college-of-whispers", "great-faiths", "house-telvanni"],
+  "shopFactions": ["synod", "college-of-winterhold", "college-of-whispers", "imperial-cult", "house-telvanni"],
   "shopMinTier": 1,
   "shopMaxRank": 3,
   "shopPriceMultiplier": 1,
@@ -412,7 +412,7 @@
  },
  "npcToughness": {"_comment": "npctoughness.js (Nate, 17 Oct: \"draugr, they're too strong\"). The server gives an NPC its race's health plus its own offset and no health by level, so draugr keep vanilla's fixed offsets while their peers stand near level-1 numbers: a Wight (level 13-15) 200-370 health against 140-200 for a bandit, Falmer or vampire of its level, a Scourge (21-24) 500-700 against 200-250, a Deathlord (30-40) 710-960 against 225-330; and their blows landed about a third harder than a bandit's of the same tier (median 9.6-10.5 one-handed against 7-8, a Deathlord's 24 against 8; npc hit log 16-17 Oct). kinds.<kind>: races (RACE descs, after the template chain); a player's side hits one as if its health were knee + (health - knee) * slope above the knee (200 and 0.4: a Wight 268, a Scourge 320-400, a Deathlord 404-504, still the toughest of their level; 200 and below unchanged); dealt scales every hit one lands on a player, shouts included (0.75: one-handed 7.5, two-handed 15-17, a bandit's of the same tier). enabled false undoes it all; log writes a line per scaled hit. Read when gamemode.js loads (a deploy stamps it).", "enabled": true, "log": false, "kinds": {"draugr": {"races": ["d53:Skyrim.esm", "f71dc:Skyrim.esm", "2a6fd:Dragonborn.esm", "6d4e0:Druadach.esm", "a0f55:Druadach.esm"], "_races": "DraugrRace, DraugrMagicRace, DLC2HulkingDraugrRace, Druadach's DrV_DraugrRace_SwampZombie and DrV_draugrcavalryrace", "knee": 200, "slope": 0.4, "dealt": 0.75, "_weakTo": "WeapMaterialSilver (10aa1a): a silver weapon hits the undead half again as hard. Vanilla's silver bonus is an enchantment on the weapon and an enchantment-source hit never reaches this server's damage, so silver has done nothing here (otome and lorvanack, #suggestions 19 Oct).", "weakTo": {"10aa1a:Skyrim.esm": 1.5}}}},
  "packs": { "_comment": "Werewolf packs (guilds.js kind pack): at most maxMembers, the Alpha included (Nate, 23 Oct). Hot reload.", "maxMembers": 5 },
- "playerGuilds": {"_comment": "Player guilds (playerguilds.js; Nate, 21 Oct): the third tier under the lore factions and the chartered ones. An informal group any player founds on the spot, no GM approval, at most maxMembers including the Guildmaster, one guild per character. A guild is a faction of kind 'band' in guilds.js, so the F3 Faction tab and the rosters show it, and __dboGuildsOf leaves bands out, which is how it gets NONE of the faction powers: no gear or uniform, no hall, no treasury, no business ledger, no court sync, no college, no leadership seat, no war declaration and no territory. EXCLUSIVE WITH FACTIONS: a member of any faction cannot found or join one, and a guild member cannot take a faction rank, except for the factions named here - compatibleKinds (kind 'cult', the 15 Daedric cults), compatibleIds (the Imperial Cult, the Great Faiths and the Vigil of Stendarr, which are kind 'guild' in the defs, not 'cult') and every college (the college flag: Winterhold, the Synod, the College of Whispers). Guilds live in player-guilds.json, runtime and gitignored.", "enabled": true, "maxMembers": 10, "inviteMinutes": 10, "compatibleKinds": ["cult"], "compatibleIds": ["imperial-cult", "great-faiths", "vigil-of-stendarr", "knights-of-the-nine"], "collegesCompatible": true},
+ "playerGuilds": {"_comment": "Player guilds (playerguilds.js; Nate, 21 Oct): the third tier under the lore factions and the chartered ones. An informal group any player founds on the spot, no GM approval, at most maxMembers including the Guildmaster, one guild per character. A guild is a faction of kind 'band' in guilds.js, so the F3 Faction tab and the rosters show it, and __dboGuildsOf leaves bands out, which is how it gets NONE of the faction powers: no gear or uniform, no hall, no treasury, no business ledger, no court sync, no college, no leadership seat, no war declaration and no territory. EXCLUSIVE WITH FACTIONS: a member of any faction cannot found or join one, and a guild member cannot take a faction rank, except for the factions named here - compatibleKinds (kind 'cult', the 15 Daedric cults), compatibleIds (the Imperial Cult and the Vigil of Stendarr, which are kind 'guild' in the defs, not 'cult') and every college (the college flag: Winterhold, the Synod, the College of Whispers). Guilds live in player-guilds.json, runtime and gitignored.", "enabled": true, "maxMembers": 10, "inviteMinutes": 10, "compatibleKinds": ["cult"], "compatibleIds": ["imperial-cult", "vigil-of-stendarr", "knights-of-the-nine"], "collegesCompatible": true},
  "leadership": {"_comment": "One leadership seat per character (leadership.js; Nate, 21 Oct, extended 23 Oct: \"people cant be leadership in more than one faction regardless if it's secret, college, or hold/allegiance\"). A seat is the leader rank of any faction (guild, college, secret, allegiance, faith, cult, house, pack, clan, charter, rising), an officer rank of one (officerRoles, guild-defs.json role names), or a court office in courtSeats or rulerRanks. Sergeants, members, guards, court mages and a player guild's Guildmaster or officers are not leadership. A hold's own faction is never counted: its office is the seat. A pack's Alpha counts as a leader seat, as before. officers false goes back to leaders and rulers only. perAccount true holds the rule across all characters of one account. Every seating, promotion and court appointment asks __dboLeadershipRefusal (appointCheck and seatOfficial in gamemode.js; setMember, setRankOf, /faction leader, charters, rank edits in guilds.js). Nothing is ever taken away; /leadership audit lists doubles, and doublesNotice tells a double to step down (every everyHours while online) and the staff after staffAfterDays (0 = never). staffOverride true lets a Lead GM seat a double anyway.", "enabled": true, "rulerRanks": ["jarl", "count", "chieftain"], "staffOverride": false, "officers": true, "officerRoles": ["officer"], "courtSeats": ["steward", "captain", "guardcaptain", "commander", "bane", "strongholdcommander"], "perAccount": false, "doublesNotice": {"enabled": true, "everyHours": 24, "staffAfterDays": 7, "sweepMinutes": 5}},
  "business": {
   "_comment": "Business ledgers (business.js). An owner opens a property as a business; owner and staff set the inn's bed rent (minRent..maxRent), keep a logbook and put chests up for rent (up to maxChestPrice a day; chestGraceHours to empty after the rent ends). Each hold's rent tax is set by taxRanks, 0..maxTax; until then rest.holdShare stands.",
@@ -477,11 +477,11 @@
   "armSeconds": 0
  },
  "ledgerSale": {
-  "_comment": "Where a ledger sale's gold goes (ledgersale.js; Nate 10 Oct): the hold's tax (its /tax rate, else rest.holdShare, else defaultTax) to the hold's treasury, sinkShare of the price removed from the game, the rest to the treasury of the faction whose hall the ledger stands in (hallCells, then guild-defs' halls; Nate 10 Oct: Frostcrag to the College of Whispers, the Synod to the Synod; 12 Oct: the Cathedral of St Martin to the Great Faiths), else to the bank account of the building's owner, else (no owner) to the hold's treasury. Used by the blacksmith's ledger and the tome shop (spells.shopSplit). Hot reload. ROLLBACK (the Cathedral, 12 Oct): remove 12cb, 5f78c and 5f78d from both hallCells here and guild-defs.json's great-faiths hall.cells, since either one alone still pays the Great Faiths (this also ends teaching at the Cathedral's ledger), and ship both files (a release or a gameplay hotfix; a live-only edit lasts only until the next deploy); or revert fix/hall-cells-1012.",
+  "_comment": "Where a ledger sale's gold goes (ledgersale.js; Nate 10 Oct): the hold's tax (its /tax rate, else rest.holdShare, else defaultTax) to the hold's treasury, sinkShare of the price removed from the game, the rest to the treasury of the faction whose hall the ledger stands in (hallCells, then guild-defs' halls; Nate 10 Oct: Frostcrag to the College of Whispers, the Synod to the Synod; 12 Oct: the Cathedral of St Martin to the Great Faiths, the Imperial Cult since they joined it on 25 Oct), else to the bank account of the building's owner, else (no owner) to the hold's treasury. Used by the blacksmith's ledger and the tome shop (spells.shopSplit). Hot reload. ROLLBACK (the Cathedral, 12 Oct): remove 12cb, 5f78c and 5f78d from both hallCells here and guild-defs.json's imperial-cult hall.cells, since either one alone still pays the Imperial Cult (this also ends teaching at the Cathedral's ledger), and ship both files (a release or a gameplay hotfix; a live-only edit lasts only until the next deploy); or revert fix/hall-cells-1012.",
   "enabled": true,
   "sinkShare": 0.1,
   "defaultTax": 0.1,
-  "hallCells": { "20ff:BSHeartland.esm": "synod", "6c152:BSHeartland.esm": "synod", "12cb:BSHeartland.esm": "great-faiths", "5f78c:BSHeartland.esm": "great-faiths", "5f78d:BSHeartland.esm": "great-faiths" }
+  "hallCells": { "20ff:BSHeartland.esm": "synod", "6c152:BSHeartland.esm": "synod", "12cb:BSHeartland.esm": "imperial-cult", "5f78c:BSHeartland.esm": "imperial-cult", "5f78d:BSHeartland.esm": "imperial-cult" }
  },
  "salvage": {
   "_comment": "Breaking gear and books down into materials (salvage.js, salvage.json from tooling/make_salvage.py). Using a smelter (Blacksmith), tanning rack (Skinner), loom (Tailor) or writing desk (Scholar) offers what the player carries that it can take apart. A share of the item's recipe comes back by the player's tier in that skill (shareByTier, Novice..Master), rounded down, at least one of the main material (by the share as a chance when the main cost exactly one, 8 Oct: a craft-and-break-down loop); a Blacksmith needs the tier that works the main metal. Books: a bound book gives bookPaper paper (the paper item) and bookStrips leather strips, a note notePaper paper. pageSize rows per page; the first row works the station, arming one pass for useWindowSeconds.",
@@ -1547,13 +1547,14 @@
      }
     }
    },
+   "_merged": "A faction folded into another (Nat, 25 Oct: \"Great faith dissolved, it is now The Imperial Cult\"; ticket 1563044184854765698, the players with Swag): once, at load and idempotently, guilds.js moves any member still on the old roster to the faction it joined (a rank of the same role, a leader to the first officer rank) and bank.js moves its treasury. The old id is gone from guild-defs, so nobody can join it. Hot reload.",
+   "merged": { "great-faiths": { "into": "imperial-cult", "at": "2026-10-25" } },
    "limits": {
     "_comment": "Faction membership limits (server\\guilds.js, Nate 6 Oct): at most one faction per category, per character; ids listed by name, never from guild-defs kind. allegiance counts a hold's or county's court officials only (officialsOnly + exemptRoles: a Citizen or Guard takes no slot), so a Legion soldier may live in a hold but not sit in its court. conflicts: refused whatever the category (supernatural: refused for that kind too, supernatural.js). The six Orc stronghold clans, the Imperial Civil Commission and the Penitus Oculatus are allegiances (Nate, 19 Oct), any member. Unplaced, so unlimited: the Silver Hand, the four vampire clans, the two Hircine packs, charter factions. Checked on a new membership or a rank that newly takes a slot; nobody is removed. A Lead GM lifts it once with /faction override <player> <id> (audited).",
     "enabled": true,
     "requiresFaith": {
      "_comment": "A church takes only a follower of one of its gods, checked when they join (guilds.js; prayer.js private.dboDeity). Both honour the Eight: under the White-Gold Concordat, not Talos (Nate, 19 Oct).",
      "imperial-cult": { "label": "the Eight Divines", "deities": ["akatosh", "arkay", "dibella", "julianos", "kynareth", "mara", "stendarr", "zenithar"] },
-     "great-faiths": { "label": "the Eight Divines", "deities": ["akatosh", "arkay", "dibella", "julianos", "kynareth", "mara", "stendarr", "zenithar"] },
      "knights-of-the-nine": { "_comment": "The holy order of the Nine (Nat, 25 Oct: followers of the Nine only): the Eight and Talos, by their prayer.js ids (skills.json deities.choices). Auriel, the elves' Akatosh, is not one of the Nine.", "label": "the Nine Divines", "deities": ["akatosh", "arkay", "dibella", "julianos", "kynareth", "mara", "stendarr", "talos", "zenithar"] }
     },
     "categories": {
@@ -1617,7 +1618,7 @@
      },
      "faith": {
       "_comment": "One organized religion (Nate, 19 Oct): the churches of the Eight Divines, beside a guild. The Vigil of Stendarr is a militant order and stays a guild.",
-      "ids": ["imperial-cult", "great-faiths"]
+      "ids": ["imperial-cult"]
      },
      "secret": {
       "ids": [
@@ -1677,8 +1678,7 @@
       "a": [
        "vigil-of-stendarr",
        "knights-of-the-nine",
-       "imperial-cult",
-       "great-faiths"
+       "imperial-cult"
       ],
       "b": [
        "cult-azura",

@@ -939,6 +939,20 @@
       "id": "imperial-cult",
       "name": "The Imperial Cult",
       "kind": "guild",
+      "hall": {
+        "name": "the Cathedral of St Martin",
+        "zone": "bruma",
+        "doors": [
+          "7a815:BSHeartland.esm",
+          "7a816:BSHeartland.esm"
+        ],
+        "cells": [
+          "12cb:BSHeartland.esm",
+          "5f78c:BSHeartland.esm",
+          "5f78d:BSHeartland.esm",
+          "16a02:Skyrim.esm"
+        ]
+      },
       "ranks": [
         {
           "title": "Primate",
@@ -973,57 +987,7 @@
           "role": "member"
         }
       ],
-      "note": "Nate 11 Oct 2026: the Empire's official worship of the Divines, its religious arm. No hall yet: the Cathedral of St Martin belongs to the Great Faiths, a neutral order (Aldemar, 11 Oct). Titles are the Imperial Cult's own ladder (Morrowind: Initiate, Acolyte, Adept, Disciple, Oracle, Invoker, Theurgist, Primate; a chapel is led by a Primate in Oblivion). The Eight Divines: Talos worship is outlawed under the White-Gold Concordat (4E 211). Staff seat the Primate. Its tome shop and teaching wait for a chapel of its own."
-    },
-    {
-      "id": "great-faiths",
-      "name": "The Great Faiths",
-      "kind": "guild",
-      "ranks": [
-        {
-          "title": "High Priest",
-          "role": "leader"
-        },
-        {
-          "title": "Prior",
-          "role": "officer"
-        },
-        {
-          "title": "Knight-Captain",
-          "role": "officer"
-        },
-        {
-          "title": "Priest",
-          "role": "sergeant"
-        },
-        {
-          "title": "Knight",
-          "role": "member"
-        },
-        {
-          "title": "Acolyte",
-          "role": "member"
-        },
-        {
-          "title": "Novice",
-          "role": "member"
-        }
-      ],
-      "hall": {
-        "name": "the Cathedral of St Martin",
-        "zone": "bruma",
-        "doors": [
-          "7a815:BSHeartland.esm",
-          "7a816:BSHeartland.esm"
-        ],
-        "cells": [
-          "12cb:BSHeartland.esm",
-          "5f78c:BSHeartland.esm",
-          "5f78d:BSHeartland.esm",
-          "16a02:Skyrim.esm"
-        ]
-      },
-      "note": "Nate 11 Oct 2026 (option A): the players' order of the Eight Divines that runs the Cathedral of St Martin in Bruma (and, since 19 Oct, Solitude's Temple of the Divines), led by Sylvia Dawnveil (its notice: 'Priests and Knights of all Eight Divines'). Neutral: not the Empire's Imperial Cult. At the Cathedral it sells Restoration and Alteration tomes to its own by rank as the colleges do, its Senior ranks (Priest and up) teach those schools, and its sermons offer their spell. The leader may rename the ranks. Staff seat the High Priest."
+      "note": "Nate 11 Oct 2026: the Empire's official worship of the Divines, its religious arm. Since 25 Oct (Nat: \"Great faith dissolved, it is now The Imperial Cult\") it holds the Great Faiths' hall, the Cathedral of St Martin in Bruma and Solitude's Temple of the Divines, with their Scholars' Ledgers, tome shop and teaching: the Great Faiths, the players' order that ran it, joined the Cult (gamemode-config factions.merged). Titles are the Imperial Cult's own ladder (Morrowind: Initiate, Acolyte, Adept, Disciple, Oracle, Invoker, Theurgist, Primate; a chapel is led by a Primate in Oblivion). The Eight Divines: Talos worship is outlawed under the White-Gold Concordat (4E 211). Staff seat the Primate."
     },
     {
       "id": "stormcloaks",

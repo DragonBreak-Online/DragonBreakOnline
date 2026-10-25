@@ -981,7 +981,7 @@ const HELP_GROUPS = [
       'Your skills: press K (the Skills tab of your journal).', 'Spending a level: /status tells you when you have a point.',
       'Magic begins with Arcane Arts: study at a Study Magic shelf, such as the Synod Conclave\'s bookcases.',
       'At Arcane Arts 25 you choose a school; at 25 in a school, its first spell, no tome needed. Restoration\'s comes at Priest 25.',
-      'Your spells: /spells, or F3 Magic. Prepared spells are changed at a Scholars\' Ledger, a magic college or a temple of the Great Faiths.',
+      'Your spells: /spells, or F3 Magic. Prepared spells are changed at a Scholars\' Ledger, a magic college or a temple of the Imperial Cult.',
       'Changing a school of magic: a Scholars\' Ledger or a Study Magic shelf, once every 7 days.',
       'Spell tomes: bought in the Synod Conclave, read at a study spot there or in Frost Crag Spire.',
       `Classes: a Class Lectern. At ${TEACH_TIER_NAME} in Arcane Arts or Priest you can /teach a spell to someone beside you.`] },
