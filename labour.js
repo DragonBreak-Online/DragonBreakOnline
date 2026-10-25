@@ -67,7 +67,9 @@ module.exports = (api) => {
     // Iron 5 (was 3) and corundum 3 (was 2): more iron (Nate, 4 Oct). The config's labour block is merged shallowly, so a
     // config oreYieldByOre would replace this whole map: the defaults are changed here.
     // Meteoric iron 2, as orichalcum and moonstone (Nate, 4 Oct: three Bleak-Frost Mine veins; see oreByRef)
-    oreYieldByOre: { copper: 3, tin: 3, iron: 5, corundum: 3, silver: 2, quicksilver: 2, orichalcum: 2, moonstone: 2, gold: 1, ebony: 1, malachite: 1, stalhrim: 1, salt: 4, stone: 4, clay: 4, meteoriciron: 2, adamantium: 1, zinc: 2, mithril: 1, amber: 1 },
+    // Stone and clay 3: a furnished home's decor takes about 2 stone and 4 clay (8 and 6 with an oven), so one or two
+    // rounds cover it (Worker 1's decor-catalog.json, 25 Oct)
+    oreYieldByOre: { copper: 3, tin: 3, iron: 5, corundum: 3, silver: 2, quicksilver: 2, orichalcum: 2, moonstone: 2, gold: 1, ebony: 1, malachite: 1, stalhrim: 1, salt: 4, stone: 3, clay: 3, meteoriciron: 2, adamantium: 1, zinc: 2, mithril: 1, amber: 1 },
     // A placed vein that gives another ore than its base says, keyed by the reference's desc (never the base: the same
     // MineOreIron04 is placed all over Cyrodiil). No vein activator for meteoric iron exists in the load order, so three
     // iron veins of the Bleak-Frost Mine (CYRBleakFrostMine01, DLE v13), the three furthest from its door by the cell's

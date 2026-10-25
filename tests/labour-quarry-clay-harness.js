@@ -19,8 +19,8 @@ const ACTOR = 0x14;
 const STONE = '306c:HearthFires.esm', CLAY = '3043:HearthFires.esm';
 // Real base records from the live order: Hearthfire's own, King of the Murkmire's and Beyond Skyrim's copies
 const VEINS = {
-  quarry: { ref: 0x2001, base: '306b:HearthFires.esm', edid: 'BYOHMineStone01', ore: STONE, title: 'Stone Quarry', word: /You cut 4 Quarried Stone\./ },
-  clay: { ref: 0x2002, base: 'a511:HearthFires.esm', edid: 'BYOHMineClay01Dirt01', ore: CLAY, title: 'Clay Deposit', word: /You dig out 4 Clay\./ },
+  quarry: { ref: 0x2001, base: '306b:HearthFires.esm', edid: 'BYOHMineStone01', ore: STONE, title: 'Stone Quarry', word: /You cut 3 Quarried Stone\./ },
+  clay: { ref: 0x2002, base: 'a511:HearthFires.esm', edid: 'BYOHMineClay01Dirt01', ore: CLAY, title: 'Clay Deposit', word: /You dig out 3 Clay\./ },
   riverMud: { ref: 0x2003, base: 'a14:HearthFires.esm', edid: 'BYOHMineClay01RiverMud01', ore: CLAY, title: 'Clay Deposit', word: /Clay/ },
   murkmire: { ref: 0x2004, base: '560c5a:King of the Murkmire.esp', edid: 'BYOHMineClay01Mud', ore: CLAY, title: 'Clay Deposit', word: /Clay/ },
   bsQuarry: { ref: 0x2005, base: '602b14:BSAssets.esm', edid: 'BSKBYOHMineStone01_PROXY_HF', ore: STONE, title: 'Stone Quarry', word: /Quarried Stone/ },
@@ -95,7 +95,7 @@ for (const [name, v] of Object.entries(VEINS)) {
   virtual = start + p.at + 120;
   fire('labour', [w.nonce, JSON.stringify(p.strikes), p.at]);
   const paid = out.items.filter(([id]) => id === (parseInt(v.ore.split(':')[0], 16) >>> 0));
-  ok(paid.length === 1 && paid[0][1] === 4, `${name}: the win pays 4 of ${v.ore}`, JSON.stringify(out.items));
+  ok(paid.length === 1 && paid[0][1] === 3, `${name}: the win pays 3 of ${v.ore}`, JSON.stringify(out.items));
   const told = out.widgets.concat(out.personals).map((x) => (typeof x === 'string' ? x : x.result || '')).join(' | ');
   ok(v.word.test(told), `${name}: the player is told what came out`, told);
   // Worked out: the next try waits out the rest
