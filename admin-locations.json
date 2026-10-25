@@ -19792,6 +19792,70 @@
     0,
     80.21412
    ]
+  },
+  {
+   "name": "Forsworn camp: Lost Valley Redoubt (Falkreath)",
+   "region": "Skyrim",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    -89950,
+    -36677,
+    1932
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Forsworn camp: Red Eagle Redoubt (Markarth)",
+   "region": "Skyrim",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    -125628,
+    15532,
+    -4847
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Forsworn camp: Bleakwind Bluff (Markarth)",
+   "region": "Skyrim",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    -105117,
+    14677,
+    1031
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Forsworn camp: Cradle Stone Tower (Markarth)",
+   "region": "Skyrim",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    -99713,
+    -33861,
+    2599
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
   }
  ]
 }

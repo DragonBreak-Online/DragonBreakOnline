@@ -71,6 +71,17 @@ module.exports = (api) => {
   // respawnSeconds, bossRespawnSeconds, pick, countMult, vanilla, vanillaCountMult, ... }
   const BR = readJson('blackreach.json', { spots: [] });
   const BRC = Object.assign({ enabled: true, radius: 3000, despawnSeconds: 240, respawnSeconds: 1200, bossRespawnSeconds: 1800, pick: 'high', countMult: 1.6, vanilla: true, vanillaCountMult: 1 }, cfg.blackreach || {});
+  // The Forsworn camps, overworld dungeons like the giants' camps (Nat, 25 Oct; wave 1: Lost Valley with Bard's Leap, Red Eagle,
+  // Bleakwind Bluff, Cradle Stone Tower). forsworn-camps.json (tools/forsworn/forsworn_camps_build.py) lists each camp's placed
+  // Forsworn and hagravens, all disabled in the plugins, as spots of their own base at their own place (wild:fw<role>:<camp>-
+  // <local id>-<plugin>), every one hostile, and its chests as camp loot nodes. Karthspire and Sky Haven Temple (the Blades'
+  // base) and anything within 8000 units of a guard post or a town are left out by the generator. Camp-mates are allies
+  // (ForswornFaction and HagravenFaction, as Blackreach's one list), which also spares a player Briarheart (briarheart.js joins
+  // them to ForswornFaction; the clients' AI decides). gamemode-config.json "forswornCamps": { enabled, radius, despawnSeconds,
+  // respawnSeconds, bossRespawnSeconds, hagravenRespawnSeconds, pick, bossPick }
+  const FW = readJson('forsworn-camps.json', { camps: [] });
+  const FWC = Object.assign({ enabled: true, radius: 6000, despawnSeconds: 240, respawnSeconds: 1200, bossRespawnSeconds: 2700, hagravenRespawnSeconds: 3600, pick: 'mid', bossPick: 'high' }, cfg.forswornCamps || {});
+  const fwRespawn = (sp) => (sp.role === 'boss' ? FWC.bossRespawnSeconds : sp.role === 'hagraven' ? FWC.hagravenRespawnSeconds : FWC.respawnSeconds);
   const brCount = (sp) => {
     if (sp.boss) return 1;
     const m = Math.max(1, Math.min(4, Number(sp.nate ? BRC.countMult : BRC.vanillaCountMult) || 1));
@@ -243,6 +254,14 @@ module.exports = (api) => {
       if (!id) continue;
       out.push({ Name: sp.zone, ID: sp.world, POS: sp.pos, Size: BRC.radius, Anchor: sp.ref, Heading: Number(sp.heading) || 0, NPC: [{ id, count: brCount(sp) }], Despawn: BRC.despawnSeconds, Respawn: sp.boss ? BRC.bossRespawnSeconds : BRC.respawnSeconds, Hostile: true });
     }
+    // The Forsworn camps: every spot hostile, one of its own kind each; a Briarheart boss takes the strongest of its line
+    if (FWC.enabled) for (const camp of FW.camps || []) for (const sp of camp.spots || []) {
+      if (out.length >= C.maxZones) break;
+      if (!sp || !/^wild:fw[a-z]+:[a-z0-9]+-[0-9a-f]+-[a-z0-9]+$/.test(String(sp.zone || '')) || !sp.ref || !sp.world || !Array.isArray(sp.pos)) continue;
+      const { id } = safePick(sp.options, sp.role === 'boss' ? FWC.bossPick : FWC.pick);
+      if (!id) continue;
+      out.push({ Name: sp.zone, ID: sp.world, POS: sp.pos, Size: FWC.radius, Anchor: sp.ref, Heading: Number(sp.heading) || 0, NPC: [{ id, count: 1 }], Despawn: FWC.despawnSeconds, Respawn: fwRespawn(sp), Hostile: true });
+    }
     return out;
   };
   const writeZones = () => {
@@ -254,7 +273,7 @@ module.exports = (api) => {
     const kept = list.filter((z) => !String((z && (z.Name || z.name)) || '').startsWith(PREFIX));
     const mine = C.enabled ? buildZones() : [];
     // The zones themselves are in the signature, so a moved spot reaches NPC-Spawns.json on a hot reload
-    const signature = JSON.stringify([C.radius, C.despawnSeconds, C.respawnSeconds, C.pick, SAFE, BRC, mine.length, crypto.createHash('sha1').update(JSON.stringify(mine)).digest('hex')]);
+    const signature = JSON.stringify([C.radius, C.despawnSeconds, C.respawnSeconds, C.pick, SAFE, BRC, FWC, mine.length, crypto.createHash('sha1').update(JSON.stringify(mine)).digest('hex')]);
     const before = list.filter((z) => String((z && (z.Name || z.name)) || '').startsWith(PREFIX)).length;
     if (before === mine.length && globalThis.__dboWildSig === signature) return mine.length;
     globalThis.__dboWildSig = signature;
@@ -267,6 +286,8 @@ module.exports = (api) => {
   // ---- giant camp chests: loot nodes ----------------------------------------------------------
   const campChests = new Map(); // refId -> { camp, chest }
   for (const camp of (DATA.giantCamps || []).concat(OWNED.camps || [])) for (const ch of camp.chests || []) { const id = idOf(ch.ref); if (id) campChests.set(id, { camp, chest: ch }); }
+  // A Forsworn camp's chests, while the camps are on
+  if (FWC.enabled) for (const fc of FW.camps || []) for (const ch of fc.chests || []) { const id = idOf(ch.ref); if (id) campChests.set(id, { camp: { name: fc.name, owners: 'Forsworn' }, chest: ch }); }
   const lootsOf = (a) => { try { const r = mp.get(a, 'private.campLoot'); return r && typeof r === 'object' ? r : {}; } catch (e) { return {}; } };
   // No Ebony, Daedric or Dragon gear either, nor the ebony ingot (dungeons.js BANNED_LOOT, shared through
   // globalThis.__dboBannedLoot); without that pattern the chest gives no weapon and no material at all. Weapons also pass
@@ -357,6 +378,7 @@ module.exports = (api) => {
   const OWNED_FACTIONS = Object.assign({
     goblin: ['13:Skyrim.esm', '877f5:BSHeartland.esm'],   // CreatureFaction, CYRGoblinFaction (allied to itself)
     blackreach: ['13:Skyrim.esm', '2997e:Skyrim.esm'],    // CreatureFaction, FalmerFaction (allied to itself)
+    forsworn: ['43599:Skyrim.esm', '4359e:Skyrim.esm'],   // ForswornFaction, HagravenFaction: a camp's Forsworn and hagravens
   }, ((cfg.ownedSpawns || {}).factions) || {});
   // All or nothing per kind: CreatureFaction alone (a list that only partly resolves) would bring the infighting back
   const factionIds = {};
@@ -388,7 +410,7 @@ module.exports = (api) => {
       if (factioned.has(id)) continue;
       let tag = ''; try { tag = String(mp.get(id, 'private.npcSpawner') || ''); } catch (e) { continue; }
       const m = /^wild:([^:]+):p/.exec(tag);
-      const kind = m ? m[1] : /^wild:br[a-z]+:b[0-9a-f]+-/.test(tag) ? 'blackreach' : '';
+      const kind = m ? m[1] : /^wild:br[a-z]+:b[0-9a-f]+-/.test(tag) ? 'blackreach' : /^wild:fw[a-z]+:[a-z0-9]+-/.test(tag) ? 'forsworn' : '';
       const want = kind && factionIds[kind];
       if (!want) { factioned.set(id, ''); continue; }
       // Recorded only once applied: a failed apply is tried again on the next tick
@@ -416,8 +438,10 @@ module.exports = (api) => {
     campGlow(casterId);
     const got = campLoot(provinceOf(casterId)).filter((it) => giveItem(casterId, it.id, it.count));
     // A technique book in a goblin camp's chest (manuals.js __dboTechniqueDrop, config smithing.drops; empty: none)
-    if (hit.camp.owners === 'goblins' && typeof globalThis.__dboTechniqueDrop === 'function') {
-      try { const b = globalThis.__dboTechniqueDrop('goblinCamp'); const id = b ? mp.getIdFromDesc(b.id) >>> 0 : 0; if (id && giveItem(casterId, id, 1)) got.push({ id, count: 1, name: b.name }); } catch (e) { log('technique drop failed', e.message); }
+    // A Forsworn camp's boss chest rolls the boss chests' schematics at Adept (smithing.drops.boss), as a dungeon's does
+    const dropAt = hit.camp.owners === 'goblins' ? ['goblinCamp'] : hit.camp.owners === 'Forsworn' && hit.chest && hit.chest.boss ? ['boss', 'normal'] : null;
+    if (dropAt && typeof globalThis.__dboTechniqueDrop === 'function') {
+      try { const b = globalThis.__dboTechniqueDrop(...dropAt); const id = b ? mp.getIdFromDesc(b.id) >>> 0 : 0; if (id && giveItem(casterId, id, 1)) got.push({ id, count: 1, name: b.name }); } catch (e) { log('technique drop failed', e.message); }
     }
     // Imperial Luck (racial.js) on the camp's coin; the chest's own cooldown keeps it to once a visit
     for (const it of got) if (it.id === GOLD_BASE) { try { if (typeof globalThis.__dboRaceGold === 'function') globalThis.__dboRaceGold(casterId, it.count, 'a camp chest'); } catch (e) { log('racial gold failed', e.message); } }
@@ -453,5 +477,5 @@ module.exports = (api) => {
   }
 
   const zones = writeZones();
-  log(`wildlife ${C.enabled ? 'on' : 'off'}: ${(DATA.placements || []).length} placements -> ${zones} zones (${(DATA.placements || []).filter((p) => p.noNavmesh).length} skipped, no navmesh), ${(OWNED.spawns || []).length} owned-plugin creature spots, ${BRC.enabled ? (BR.spots || []).filter((sp) => sp && (sp.nate || BRC.vanilla !== false)).length : 0} Blackreach spots, ${campChests.size} camp chests, radius ${C.radius}, despawn ${C.despawnSeconds}s, respawn ${C.respawnSeconds}s${globalThis.__dboWildFactionAudit || ''}`);
+  log(`wildlife ${C.enabled ? 'on' : 'off'}: ${(DATA.placements || []).length} placements -> ${zones} zones (${(DATA.placements || []).filter((p) => p.noNavmesh).length} skipped, no navmesh), ${(OWNED.spawns || []).length} owned-plugin creature spots, ${BRC.enabled ? (BR.spots || []).filter((sp) => sp && (sp.nate || BRC.vanilla !== false)).length : 0} Blackreach spots, ${FWC.enabled ? (FW.camps || []).reduce((n, c) => n + (c.spots || []).length, 0) : 0} Forsworn camp spots, ${campChests.size} camp chests, radius ${C.radius}, despawn ${C.despawnSeconds}s, respawn ${C.respawnSeconds}s${globalThis.__dboWildFactionAudit || ''}`);
 };

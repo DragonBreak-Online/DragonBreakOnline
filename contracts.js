@@ -69,9 +69,11 @@ module.exports = (api) => {
     mudcrab: 1, skeever: 1, slaughterfish: 1, horker: 1, rat: 1, boar: 1, skeleton: 1, zombie: 1, goblin: 1,
     wolf: 1, frostbitespider: 2, sabrecat: 2, bear: 2, riekling: 2, netch: 2, mountainlion: 2, icewraith: 2, chaurus: 2, draugr: 2,
     werebear: 3, troll: 3, giant: 3, mammoth: 3, lurker: 3, ogre: 3, minotaur: 3,
+    // The Forsworn camps (wildlife.js wild:fw* spots, Nat 25 Oct): their warriors, archers, shamans and Briarhearts, and their hagravens
+    forsworn: 2, hagraven: 3,
   };
   const PLURAL = { wolf: 'wolves', fox: 'foxes', sabrecat: 'sabre cats', frostbitespider: 'frostbite spiders', mudcrab: 'mudcrabs', skeever: 'skeevers', troll: 'trolls', bear: 'bears', giant: 'giants', mammoth: 'mammoths', riekling: 'rieklings', netch: 'netches', horker: 'horkers', slaughterfish: 'slaughterfish', lurker: 'lurkers', werebear: 'werebears',
-    mountainlion: 'mountain lions', icewraith: 'ice wraiths', chaurus: 'chaurus', draugr: 'draugr' };
+    mountainlion: 'mountain lions', icewraith: 'ice wraiths', chaurus: 'chaurus', draugr: 'draugr', forsworn: 'Forsworn', hagraven: 'hagravens' };
   const SINGULAR = { mountainlion: 'mountain lion', icewraith: 'ice wraith', sabrecat: 'sabre cat', frostbitespider: 'frostbite spider' };
   const single = (kind) => SINGULAR[kind] || kind;
   const aOrAn = (word) => (/^[aeiou]/i.test(word) ? `an ${word}` : `a ${word}`);
@@ -133,7 +135,7 @@ module.exports = (api) => {
   // mudcrab contracts and fox spots were read as mudcrab fauna (sunk_turtle, 9 Oct)
   // Nat, 25 Oct: Bruma's 356 spots put down 41 ogres, 13 boars, 9 rats and its undead and goblins, none of them work until
   // these words were added. A rat (BSKEncRat) is its own kind, not a skeever: a hold's notice names what its spots put down.
-  const CREATURE_WORD = /(Werewolf|Werebear|FrostbiteSpider|SabreCat|MountainLion|IceWraith|Slaughterfish|Skeever|Mudcrab|Crab|Horker|Mammoth|Giant|Troll|Riekling|Netch|Lurker|Minotaur|Ogre|Chaurus|Draugr|Skeleton|Zombie|Goblin|Boar|Rat|Wolf|Bear|Chicken|Cow|Hare|Dog|Deer|Elk|Goat|Fox)/;
+  const CREATURE_WORD = /(Forsworn|Hagraven|Werewolf|Werebear|FrostbiteSpider|SabreCat|MountainLion|IceWraith|Slaughterfish|Skeever|Mudcrab|Crab|Horker|Mammoth|Giant|Troll|Riekling|Netch|Lurker|Minotaur|Ogre|Chaurus|Draugr|Skeleton|Zombie|Goblin|Boar|Rat|Wolf|Bear|Chicken|Cow|Hare|Dog|Deer|Elk|Goat|Fox)/;
   const kindOfEdid = (edid) => { const m = CREATURE_WORD.exec(String(edid || '')); if (!m) return ''; const k = m[1].toLowerCase(); return k === 'crab' ? 'mudcrab' : k; };
   // undefined when the record cannot be read: the caller then goes by the spawn tag, as before
   const kindOfBase = (desc) => {
