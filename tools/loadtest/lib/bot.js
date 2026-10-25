@@ -424,6 +424,32 @@ class Bot {
       this.lastNpcQuery = now;
       if (this.id === 0) this.pool.send(this.id, P.chat('/npc'), true);
     }
+    // --drop-probe: a plain drop, one carrying extras, then eleven plain ones, to exercise the whole drop
+    // path on demand (ticket #0409). Nothing sent a DropItem before this, so the path had no test at all.
+    if (this.cfg.dropProbe && this.id === 0 && this.state === 'playing') {
+      const base = Number(this.cfg.dropProbeBase) || 0xe3c16;
+      if (!this.dropProbeAt) this.dropProbeAt = now;
+      if (!this.dropProbePlain && now - this.dropProbeAt > 8000) {
+        this.dropProbePlain = true;
+        this.pool.send(this.id, P.drop(base, 1), true);
+        this.log('bot ' + this.id + ' drop probe: plain ' + base.toString(16));
+      }
+      if (this.dropProbePlain && !this.dropProbeExtras && now - this.dropProbeAt > 20000) {
+        this.dropProbeExtras = true;
+        this.pool.send(this.id, P.drop(base, 1, { name: 'Probe Blade', health: 1.3 }), true);
+        this.log('bot ' + this.id + ' drop probe: with extras (name + health) ' + base.toString(16));
+      }
+      // Eleven in a row, because the dropped-items queue holds ten and evicts the oldest
+      if (this.dropProbeExtras && now - this.dropProbeAt > 30000) {
+        this.dropProbeFlood = this.dropProbeFlood || 0;
+        if (this.dropProbeFlood < 11 && now - (this.dropProbeFloodAt || 0) > 600) {
+          this.dropProbeFloodAt = now;
+          this.dropProbeFlood++;
+          this.pool.send(this.id, P.drop(base, 1), true);
+          if (this.dropProbeFlood === 11) this.log('bot ' + this.id + ' drop probe: sent 11 plain drops');
+        }
+      }
+    }
     if (this.dungeon) this.tickDungeon(now);
   }
 

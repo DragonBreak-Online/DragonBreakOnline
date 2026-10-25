@@ -129,6 +129,11 @@ const finishSpSnippet = (snippetIdx) => ({ t: MsgType.FinishSpSnippet, snippetId
 // HostMessage: asks to host an actor. ActionListener grants it to whoever asks when nobody holds it.
 const host = (remoteId) => ({ t: MsgType.Host, remoteId });
 
+// DropItemMessage carries ExtraData flat beside baseId and count, so extras go in at the top level:
+//   drop(0xe3c16, 1, { name: 'Test Blade', health: 1.3 })
+const drop = (baseId, count, extras) =>
+  Object.assign({ t: MsgType.DropItem, baseId: baseId >>> 0, count: count || 1 }, extras || {});
+
 // A plausible fresh-character appearance. raceId must be a real RACE record: the ids below are verified
 // against the load order by lib/formid.js at startup, and the name is what chat and nameplates show.
 const nordAppearance = (name, isFemale, raceId) => ({
@@ -149,4 +154,5 @@ module.exports = {
   MsgType, MsgName, FORWARDED,
   customPacket, login, characterSelect, chat, uiEvent,
   movement, changeValues, appearance, activate, finishSpSnippet, host, nordAppearance, PLAYER_CASTER,
+  drop,
 };

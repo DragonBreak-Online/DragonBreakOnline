@@ -248,6 +248,8 @@ class Runner {
       driftHosted: !!args.driftHosted,
       driftAxis: args.driftAxis || 'z',
       captureChat: !!args.driftHosted || !!args.captureChat,
+      dropProbe: !!args.dropProbe,
+      dropProbeBase: args.dropProbeBase,
       driftSeconds: Number(args.driftSeconds || 20),
       driftUnitsPerSec: Number(args.driftUnits || 4),
     };
