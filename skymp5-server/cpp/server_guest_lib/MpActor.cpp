@@ -2016,7 +2016,13 @@ void MpActor::AddLevelBonus(BaseActorValues& values) const
 
 void MpActor::DropItem(const uint32_t baseId, const Inventory::Entry& entry)
 {
-  constexpr float kDeletionTimeSeconds = 2 * 60;
+  // static: the timed-deletion log line below reads kDeletionTimeSeconds inside a lambda that lists its
+  // captures explicitly. A local constexpr has no storage, so clang-15 refuses to capture it implicitly
+  // ("cannot be implicitly captured in a lambda with no capture-default specified") while MSVC accepts
+  // it - so the Windows CI passed and the native Linux build the updater runs on CT115 did not, which
+  // would have left production on the old server (Worker 5, 25 Oct). static gives it storage duration and
+  // needs no capture.
+  static constexpr float kDeletionTimeSeconds = 2 * 60;
   constexpr size_t kDroppedItemsQueueMax = 10;
 
   static std::atomic<bool> g_dropItemDisabledGlobally = false;
