@@ -15,6 +15,9 @@
 // The forced menu never gets in anyone's way: it waits while the character is in creation or any editor (RaceMenu), being
 // arrested or jailed, downed, or fighting, and it never moves anyone. If the menu cannot be sent, nothing holds the
 // character; /birthsign <sign> chooses by text.
+// The menu (Nat, 25 Oct: Worker 2's mock _work\birthsigns-widget-mock-1025.html): a client whose UI names the cap
+// birthsignPicker gets the front's picker (widget 'birthsignPicker': the signs as cards under their Guardians, its own confirm,
+// then dbo:birthsignPick <nonce> <sign>); any other client the generic contextMenu with a confirm step, as before.
 // Config "birthsigns": { enabled, requireAtCreation, loginDelaySeconds, reshowSeconds, creationReshowSeconds, fightSeconds,
 // signs: { <id>: {...} } } (a sign's fields merge onto its default)
 'use strict';
@@ -24,22 +27,53 @@ const PROP = 'private.dboBirthsign';
 const ORDER = ['warrior', 'mage', 'thief', 'lady', 'lord', 'steed', 'apprentice', 'atronach', 'ritual', 'lover', 'shadow', 'serpent', 'tower'];
 // xp: skill -> rate; xpAll: every skill; regen: stat -> factor (below 1 slows it); lowHealth/lowHealthRegen: a conditional
 // health factor below that share of health; taken: fire/frost/shock/poison/magic -> share more (below 0: less);
-// sneakDamage: a share more on a sneak attack; goldBonus: a share of loot and pay; vital: flat health/magicka/stamina
+// sneakDamage: a share more on a sneak attack; goldBonus: a share of loot and pay; vital: flat health/magicka/stamina.
+// For the picker: guardian ('' a Guardian, 'none' the Serpent, else its Guardian's id), lore (one line, Nat approved the
+// mock's), emblem (original line-art: stars [x, y] on a 40 x 40 grid, then lines between them by index; never game art)
 const SIGNS = {
-  warrior: { name: 'The Warrior', xp: { blade: 1.1, blunt: 1.1, unarmed: 1.1, defense: 1.1 } },
-  mage: { name: 'The Mage', xp: { arcane: 1.1, enchanter: 1.1 } },
-  thief: { name: 'The Thief', xp: { archery: 1.1 }, goldBonus: 0.05 },
-  lady: { name: 'The Lady', regen: { health: 1.1, stamina: 1.1 } },
-  lord: { name: 'The Lord', regen: { health: 1.1 }, taken: { fire: 0.05 } },
-  steed: { name: 'The Steed', regen: { stamina: 1.1 } },
-  apprentice: { name: 'The Apprentice', regen: { magicka: 1.15 }, taken: { magic: 0.05 } },
-  atronach: { name: 'The Atronach', vital: { magicka: 25 }, regen: { magicka: 0.9 }, taken: { magic: -0.05 } },
-  ritual: { name: 'The Ritual', xp: { priest: 1.1 }, lowHealth: 0.3, lowHealthRegen: 1.15 },
-  lover: { name: 'The Lover', xpAll: 1.05 },
-  shadow: { name: 'The Shadow', sneakDamage: 0.15 },
-  serpent: { name: 'The Serpent', xp: { alchemist: 1.1 }, taken: { poison: -0.15 } },
-  tower: { name: 'The Tower', xp: { lockpicking: 1.15 } },
+  warrior: { name: 'The Warrior', guardian: '', lore: 'First of the Guardians. Those born under it are made for the fight.',
+    emblem: { stars: [[20, 5], [20, 35], [11, 13], [29, 13], [20, 13]], lines: [[0, 4], [4, 1], [2, 4], [4, 3]] },
+    xp: { blade: 1.1, blunt: 1.1, unarmed: 1.1, defense: 1.1 } },
+  mage: { name: 'The Mage', guardian: '', lore: 'Guardian of the learned. Its children are drawn to magic.',
+    emblem: { stars: [[20, 4], [14, 10], [26, 10], [20, 16], [20, 36]], lines: [[0, 1], [1, 3], [3, 2], [2, 0], [3, 4]] },
+    xp: { arcane: 1.1, enchanter: 1.1 } },
+  thief: { name: 'The Thief', guardian: '', lore: 'Guardian of the bold. Its children seldom meet a bad end.',
+    emblem: { stars: [[10, 8], [18, 16], [22, 24], [30, 32], [30, 10], [10, 30]], lines: [[0, 1], [1, 2], [2, 3], [4, 2], [2, 5]] },
+    xp: { archery: 1.1 }, goldBonus: 0.05 },
+  lady: { name: 'The Lady', guardian: 'warrior', lore: 'Kind and patient, and slow to tire.',
+    emblem: { stars: [[20, 6], [13, 15], [27, 15], [15, 33], [25, 33], [20, 22]], lines: [[0, 1], [0, 2], [1, 5], [2, 5], [5, 3], [5, 4]] },
+    regen: { health: 1.1, stamina: 1.1 } },
+  lord: { name: 'The Lord', guardian: 'warrior', lore: 'The blood of the North runs strong, and fire bites deeper.',
+    emblem: { stars: [[20, 4], [12, 12], [28, 12], [20, 20], [13, 34], [27, 34]], lines: [[0, 1], [0, 2], [1, 3], [2, 3], [3, 4], [3, 5]] },
+    regen: { health: 1.1 }, taken: { fire: 0.05 } },
+  steed: { name: 'The Steed', guardian: 'warrior', lore: 'Restless, and always on the move.',
+    emblem: { stars: [[8, 26], [15, 18], [24, 16], [32, 10], [31, 22], [16, 31]], lines: [[0, 1], [1, 2], [2, 3], [2, 4], [1, 5]] },
+    regen: { stamina: 1.1 } },
+  apprentice: { name: 'The Apprentice', guardian: 'mage', lore: 'Quick with magic, and open to it as well.',
+    emblem: { stars: [[10, 30], [17, 22], [24, 16], [31, 8], [27, 27]], lines: [[0, 1], [1, 2], [2, 3], [2, 4]] },
+    regen: { magicka: 1.15 }, taken: { magic: 0.05 } },
+  atronach: { name: 'The Atronach', guardian: 'mage', lore: 'A deep well of magicka that is slow to fill.',
+    emblem: { stars: [[20, 5], [32, 14], [28, 31], [12, 31], [8, 14], [20, 20]], lines: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 0], [5, 0], [5, 2], [5, 3]] },
+    vital: { magicka: 25 }, regen: { magicka: 0.9 }, taken: { magic: -0.05 } },
+  ritual: { name: 'The Ritual', guardian: 'mage', lore: 'Mercy for those brought low.',
+    emblem: { stars: [[20, 6], [30, 14], [30, 28], [20, 34], [10, 28], [10, 14]], lines: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 0], [0, 3]] },
+    xp: { priest: 1.1 }, lowHealth: 0.3, lowHealthRegen: 1.15 },
+  lover: { name: 'The Lover', guardian: 'thief', lore: 'Graceful, passionate, and quick to learn.',
+    emblem: { stars: [[20, 34], [8, 18], [14, 8], [20, 14], [26, 8], [32, 18]], lines: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 0]] },
+    xpAll: 1.05 },
+  shadow: { name: 'The Shadow', guardian: 'thief', lore: 'Unseen until the blow lands.',
+    emblem: { stars: [[14, 6], [26, 10], [30, 22], [22, 34], [12, 26]], lines: [[0, 1], [1, 2], [2, 3], [3, 4]] },
+    sneakDamage: 0.15 },
+  serpent: { name: 'The Serpent', guardian: 'none', lore: 'It wanders the sky and answers to no Guardian.',
+    emblem: { stars: [[6, 30], [12, 22], [20, 26], [26, 16], [32, 20], [34, 8]], lines: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5]] },
+    xp: { alchemist: 1.1 }, taken: { poison: -0.15 } },
+  tower: { name: 'The Tower', guardian: 'thief', lore: 'No lock stays shut for long.',
+    emblem: { stars: [[14, 36], [26, 36], [15, 18], [25, 18], [20, 5]], lines: [[0, 2], [1, 3], [2, 3], [2, 4], [3, 4]] },
+    xp: { lockpicking: 1.15 } },
 };
+// The picker's cards: each Guardian, then its charges; the Serpent last
+const PICKER_ORDER = ['warrior', 'lady', 'steed', 'lord', 'mage', 'apprentice', 'atronach', 'ritual', 'thief', 'lover', 'shadow', 'tower', 'serpent'];
+const PICKER_CAP = 'birthsignPicker';
 const DEFAULTS = { enabled: true, requireAtCreation: true, loginDelaySeconds: 20, reshowSeconds: 90, creationReshowSeconds: 15, fightSeconds: 30 };
 const SKILL = { blade: 'Blade', blunt: 'Blunt', archery: 'Archery', defense: 'Defense', arcane: 'Arcane Arts', unarmed: 'Martial Arts',
   blacksmith: 'Blacksmith', alchemist: 'Alchemist', woodcutter: 'Woodcutter', miner: 'Miner', tailor: 'Tailor', skinner: 'Skinner',
@@ -82,10 +116,10 @@ const describe = (s) => {
 };
 
 module.exports = (api) => {
-  const { mp, log, personal, audit, who, display, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors, every, isLeadStaff, findByName, profileOf } = api;
+  const { mp, log, personal, audit, who, display, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors, every, isLeadStaff, findByName, profileOf, hasUiCap } = api;
   const C = merge(cfg && cfg.birthsigns);
   const on = () => C.enabled === true;
-  // open: actor -> { mode 'pick'|'confirm', sign?, at }; nextAt: actor -> when the menu may come back; step: in the creation step
+  // open: actor -> { mode 'pick'|'confirm'|'picker', sign?, nonce?, at }; nextAt: actor -> when the menu may come back; step: in the creation step
   const S = globalThis.__dboBirthsignState || (globalThis.__dboBirthsignState = { open: new Map(), nextAt: new Map(), step: new Set(), failed: new Set() });
 
   const get = (a, k) => { try { return mp.get(a >>> 0, k); } catch (e) { return undefined; } };
@@ -124,9 +158,21 @@ module.exports = (api) => {
   // ---- the menu ---------------------------------------------------------------------------------------------------------
   const send = (a, targetName, actions) => openWidget(a >>> 0, { type: 'contextMenu', id: WIDGET_ID, mode: 'menu', targetName, actions,
     events: { action: 'dbo:birthsignChoose', close: 'dbo:birthsignClose' } }, true);
+  const picker = (a) => { try { return typeof hasUiCap === 'function' && !!hasUiCap(a >>> 0, PICKER_CAP); } catch (e) { return false; } };
+  const card = (s) => ({ id: s.id, name: s.name, guardian: String(s.guardian || ''), lore: String(s.lore || ''), effect: describe(s),
+    emblem: s.emblem && Array.isArray(s.emblem.stars) ? { stars: s.emblem.stars, lines: Array.isArray(s.emblem.lines) ? s.emblem.lines : [] } : null });
+  // The front's picker: its own confirm, then dbo:birthsignPick <nonce> <sign>. A new nonce each time, so a stale panel's answer is dropped
+  const sendPicker = (a) => {
+    const nonce = Math.floor(Math.random() * 0x7fffffff).toString(36);
+    const ok = openWidget(a >>> 0, { type: 'birthsignPicker', id: WIDGET_ID, nonce, title: 'Choose your birthsign',
+      sub: 'The stars you were born under. Yours for life; only staff can change it later.',
+      signs: PICKER_ORDER.filter((id) => C.signs[id]).map((id) => card(C.signs[id])) }, true);
+    return ok ? nonce : '';
+  };
   const openPick = (a) => {
-    const ok = send(a, 'Choose your birthsign. It is yours for life.', ORDER.map((id) => row(C.signs[id])));
-    if (ok) { S.open.set(a >>> 0, { mode: 'pick', at: Date.now() }); S.failed.delete(a >>> 0); } else S.failed.add(a >>> 0);
+    const nonce = picker(a) ? sendPicker(a) : '';
+    const ok = nonce || send(a, 'Choose your birthsign. It is yours for life.', ORDER.map((id) => row(C.signs[id])));
+    if (ok) { S.open.set(a >>> 0, nonce ? { mode: 'picker', nonce, at: Date.now() } : { mode: 'pick', at: Date.now() }); S.failed.delete(a >>> 0); } else S.failed.add(a >>> 0);
     return !!ok;
   };
   const openConfirm = (a, s) => {
@@ -160,11 +206,24 @@ module.exports = (api) => {
     const st = S.open.get(a >>> 0);
     if (!st || recordOf(a)) { try { closeWidget(a >>> 0, WIDGET_ID); } catch (e) { /* not open */ } S.open.delete(a >>> 0); return; }
     const choice = String((args && args[0]) || '');
+    if (st.mode === 'picker') return;
     if (st.mode === 'pick') { const s = C.signs[choice]; if (s && ORDER.includes(choice)) openConfirm(a, s); return; }
     if (choice === 'back') { openPick(a); return; }
     if (choice === 'confirm' && C.signs[st.sign]) choose(a, C.signs[st.sign]);
   });
-  onUi('birthsignClose', (a) => {
+  // The picker's answer, confirmed in the front: [nonce, sign]
+  onUi('birthsignPick', (a, args) => {
+    const st = S.open.get(a >>> 0);
+    const nonce = String((args && args[0]) || ''), choice = String((args && args[1]) || '');
+    if (!st || st.mode !== 'picker' || st.nonce !== nonce) return;
+    if (recordOf(a)) { S.open.delete(a >>> 0); try { closeWidget(a >>> 0, WIDGET_ID); } catch (e) { /* not open */ } return; }
+    const s = ORDER.includes(choice) ? C.signs[choice] : null;
+    if (s) choose(a, s);
+  });
+  onUi('birthsignClose', (a, args) => {
+    const st = S.open.get(a >>> 0);
+    // A picker's close names its nonce: one from a panel the server has since replaced is not this one's
+    if (st && st.mode === 'picker' && args && args.length && String(args[0]) !== st.nonce) return;
     if (!S.open.delete(a >>> 0)) return;
     try { closeWidget(a >>> 0, WIDGET_ID); } catch (e) { /* not open */ }
     if (recordOf(a)) return;
@@ -258,9 +317,10 @@ module.exports = (api) => {
   // racial.js: the sign whose gifts apply to this character, or null
   globalThis.__dboBirthsignOf = (a) => (on() ? signOf(a) : null);
   log(`birthsigns ${on() ? 'on' : 'off'}: ${ORDER.length} signs, ${C.requireAtCreation === false ? 'optional' : 'required'} at creation`);
-  return { config: C, signOf, describe, waitReason, tick, choose, staffSet, findCharacter, WIDGET_ID };
+  return { config: C, signOf, describe, waitReason, tick, choose, staffSet, findCharacter, card, WIDGET_ID };
 };
 module.exports.SIGNS = SIGNS;
 module.exports.ORDER = ORDER;
+module.exports.PICKER_ORDER = PICKER_ORDER;
 module.exports.describe = describe;
 module.exports.merge = merge;
