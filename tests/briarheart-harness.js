@@ -333,12 +333,26 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   look(MAN, eq());
   ok(lookCalls().length === 1, 'after it: a bare chest gets it');
   delete globalThis.__dboConnectedAt; ML.end(MAN, 'login test done');
-  // an amulet shares the briar body's slot 35: it wins, the briar body leaves the pack, nothing is equipped over it
+  // an amulet shares the briar body's slot 35 and the briar chest wins (Nat, 25 Oct): on a bare chest the amulet comes off,
+  // stays in the pack, the player is told once a minute at most, and the briar body goes on
   ML.become(MAN, 'staff', 'amulet test'); globalThis.__dboBriarheart.looks.delete(MAN);
-  setP(MAN, 'inventory', { entries: [{ baseId: AMULET, count: 1 }, { baseId: BRIAR, count: 1 }] }); papyrusCalls.length = 0; logLines.length = 0;
+  setP(MAN, 'inventory', { entries: [{ baseId: AMULET, count: 1 }] }); papyrusCalls.length = 0; logLines.length = 0; said.length = 0;
+  const unequips = () => papyrusCalls.filter((c) => c.method === 'UnequipItem');
   look(MAN, eq(AMULET));
-  ok(!lookCalls().length && inv(MAN, BRIAR) === 0, 'an amulet worn (slot 35, the briar body\'s at the live order): no briar body equipped over it, and none left in the pack');
-  ok(logLines.some((l) => /look off on char50 \(equipment\): c8911 in the briar body's slot on, briar body taken from the pack/.test(l)), '...and logged', logLines);
+  ok(unequips().length === 1 && unequips()[0].args[0] === 'c8911:Skyrim.esm' && unequips()[0].args[1] === false, 'a bare chest with an amulet: the amulet is unequipped', unequips());
+  ok(inv(MAN, AMULET) === 1, '...and stays in the pack');
+  ok(said.some(([a, t]) => a === MAN && /Your briar heart leaves no room for an amulet\. It stays in your pack: wear body armour over the briar, and you may wear one\./.test(t)), '...the player is told, with the body armour way out', said);
+  ok(logLines.some((l) => /briarheart: amulet refused on char50 \(equipment\): c8911 unequipped, kept in the pack/.test(l)), '...logged', logLines);
+  ok(lookCalls().some((c) => c.args[0] === '5d008:Skyrim.esm'), '...and the briar chest goes on in its slot');
+  // put back on at once, five times: unequipped each time, told and logged once
+  said.length = 0; logLines.length = 0; papyrusCalls.length = 0;
+  for (let k = 0; k < 5; k++) { const L = globalThis.__dboBriarheart.looks.get(MAN); if (L) L.at = 0; look(MAN, eq(AMULET)); }
+  ok(unequips().length === 5 && !said.some(([a]) => a === MAN) && !logLines.some((l) => /amulet refused/.test(l)), 'put back five times within the minute: unequipped each time, no second message or log line');
+  globalThis.__dboBriarheart.amuletTold.set(MAN, Date.now() - 61000); look(MAN, eq(AMULET));
+  ok(said.filter(([a]) => a === MAN).length === 1, 'a minute on: told again');
+  // body armour on: no briar chest, and the amulet is allowed
+  papyrusCalls.length = 0; said.length = 0; look(MAN, eq(CUIRASS, AMULET));
+  ok(!unequips().length && !said.some(([a]) => a === MAN), 'body armour on: the amulet is allowed, nothing unequipped, nothing said');
   ML.end(MAN, 'amulet test done');
 }
 

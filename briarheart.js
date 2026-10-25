@@ -40,8 +40,10 @@
 //   ("briarheart: look ..."). Equips are tried at most once per visual.retrySeconds and visual.maxTries times in a row.
 //   Slots, read at the live load order (25 Oct): Skyrim.esm puts both in the body slot (32), but USSEP, which wins, moves
 //   them and their ARMAs to slot 35 (mask 0x20, the amulet slot), so in game the briar chest draws over whatever is worn.
-//   Bare chest only is Nat's rule, not the engine's. An amulet shares slot 35 and equipping the briar body would knock it
-//   off, so anything worn that shares the briar body's slots (an amulet) wins and keeps the look off, as body armour does.
+//   Bare chest only is Nat's rule, not the engine's. An amulet shares slot 35, and the briar chest wins (Nat, 25 Oct: "the
+//   heart is their charm"): on a bare chest anything worn in the briar body's slots is unequipped (UnequipItem, the item
+//   stays in the pack, never moved or deleted) and the player told, at most once per AMULET_TELL_MS, with the way out:
+//   body armour hides the briar chest, and then an amulet is allowed.
 // Briar skin (Nat, 25 Oct; config briarSkin { enabled, armorFrom, staminaRegen, diseaseResist }), only while the briar
 //   chest shows (the briar body worn, no body armour):
 //   - armour: counts as the light cuirass armorFrom names (ForswornCuirass 0D8D50, rating 26 at the live order) through the
@@ -98,6 +100,7 @@ module.exports = (api) => {
   if (!(S.tears instanceof Map)) S.tears = new Map();
   if (!(S.looks instanceof Map)) S.looks = new Map();   // actor -> { at, tries, womanTold }: the bare-chest equip's throttle
   if (!(S.skin instanceof Set)) S.skin = new Set();     // actors whose briar skin is on
+  if (!(S.amuletTold instanceof Map)) S.amuletTold = new Map();   // actor -> when the amulet refusal was last told
   const data = () => {
     if (S.data) return S.data;
     let d = null; try { d = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch (e) { d = null; }
@@ -155,6 +158,7 @@ module.exports = (api) => {
   // An ARMO's biped slots (BOD2's first u32, or BODT's; 0x4 = slot 32, the body), read once per base
   const BODY = 0x4;
   const LOGIN_SETTLE_MS = 15000;   // gamemode.js WORN_GRACE_MS: the login re-dress happens inside it
+  const AMULET_TELL_MS = 60000;    // the refusal message and its log line, at most once a minute per character
   const maskCache = new Map();
   const maskOf = (id) => {
     id = Number(id) >>> 0; if (maskCache.has(id)) return maskCache.get(id);
@@ -196,15 +200,25 @@ module.exports = (api) => {
       return;
     }
     const own = worn.filter((id) => id !== full && id !== empty && coversBody(id));
-    // Anything else in the briar body's own slots (slot 35 at the live order: an amulet) wins too, rather than be knocked off
-    const fullMask = maskOf(full);
-    const clash = fullMask ? worn.filter((id) => id !== full && id !== empty && !coversBody(id) && (maskOf(id) & fullMask)) : [];
-    if (own.length || clash.length) {
-      // Their own armour (or amulet) is on: the briar body leaves the pack (it would be stealable there)
+    if (own.length) {
+      // Their own armour is on: the briar body leaves the pack (it would be stealable there)
       const n = takeAll(a, full);
-      if (n) log(`briarheart: look off on ${display(a)} (${why}): ${own.length ? `own body armour ${own[0].toString(16)}` : `${clash[0].toString(16)} in the briar body's slot`} on, briar body taken from the pack`);
+      if (n) log(`briarheart: look off on ${display(a)} (${why}): own body armour ${own[0].toString(16)} on, briar body taken from the pack`);
       S.looks.delete(a);
       return;
+    }
+    // Bare chest: the briar chest wins its slot (35 at the live order). Anything else worn there (an amulet) comes off and
+    // stays in the pack; the player is told (and it is logged) at most once a minute, however often they put it back on
+    const fullMask = maskOf(full);
+    const clash = fullMask ? worn.filter((id) => id !== full && id !== empty && (maskOf(id) & fullMask)) : [];
+    if (clash.length) {
+      for (const id of clash) papyrus(a, 'UnequipItem', [form(mp.getDescFromId(id)), false, true]);
+      const told = Number(S.amuletTold.get(a)) || 0;
+      if (Date.now() - told >= AMULET_TELL_MS) {
+        S.amuletTold.set(a, Date.now());
+        if (isOnline(a)) personal(a, 'Your briar heart leaves no room for an amulet. It stays in your pack: wear body armour over the briar, and you may wear one.');
+        log(`briarheart: amulet refused on ${display(a)} (${why}): ${clash.map((id) => id.toString(16)).join(', ')} unequipped, kept in the pack (bare chest, the briar chest wins its slot)`);
+      }
     }
     if (worn.includes(full)) { S.looks.delete(a); return; }
     // The login's first reports are naked until gamemode.js redresses the character: no briar body then (the login hook
