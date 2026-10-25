@@ -16,7 +16,11 @@ const REAL = JSON.parse(fs.readFileSync(path.join(ROOT, 'bosses.json'), 'utf8'))
 const def = (id) => REAL.bosses.find((b) => b.id === id);
 
 // ---- the shipped data ----
-ok(REAL.bosses.map((b) => b.id).join() === 'icecap,briarheartking,centurion,palewarlord', 'four bosses: the Ice Cap Wraith, the Briarheart King, the Centurion Master, the Warlord of the Pale Pass');
+ok(REAL.bosses.map((b) => b.id).join() === 'icecap,briarheartking,centurion,palewarlord,falmerwarmonger,movarth,duskthorn,valkynaz',
+  'eight bosses: the Ice Cap Wraith, the Briarheart King, the Centurion Master, the Warlord of the Pale Pass, the Falmer Warmonger, the Master of Movarth\'s Lair, the Warchief of Dusk Thorn, the Valkynaz');
+ok(def('movarth').night === true && def('valkynaz').event && def('valkynaz').event.minutes === 30 && def('falmerwarmonger').guardian.options.length && def('duskthorn').guardian.options.length,
+  'Movarth\'s master walks at night, the Valkynaz is a 30-minute event, the Warmonger and the Warchief have their shamans');
+ok(!JSON.stringify(def('valkynaz').drops).includes('IngotEbony') && def('valkynaz').drops.always.some((x) => x[2] === 'DaedraHeart'), 'the Valkynaz drops a daedra heart and no Ebony (never loot)');
 ok(def('icecap').enabled === false && def('palewarlord').enabled === false && def('briarheartking').enabled && def('centurion').enabled, 'the Wraith and the Warlord wait on Nat (spot, shard); the King and the Centurion are on');
 ok(def('icecap').boss.options[0][2] === 'EncIceWraith' && def('icecap').spots.length === 4 && def('icecap').drops.schematic.family === 'glacial_crystal', 'the Wraith: a vanilla ice wraith, four candidate spots, the Glacial Crystal schematic');
 ok(def('briarheartking').boss.options.slice(-1)[0][2] === 'EncForsworn06BossMagicBretonM03' && def('briarheartking').guardian.options[0][2] === 'EncHagraven', 'the King: the strongest Forsworn boss shaman, his Hagraven beside him');
@@ -53,13 +57,15 @@ let known = new Set();
 globalThis.__dboKnowsFamily = (a, fam) => known.has(`${a}:${fam}`);
 globalThis.__dboIsBriarheart = (a) => a === BRIAR;
 const timers = new Map();
+const commands = new Map();
+const LEAD = 0xff000107;
 const cwd = process.cwd();
 const load = (cfg) => {
   process.chdir(dir);
   try {
     delete require.cache[path.join(ROOT, 'bosses.js')];
     require(path.join(ROOT, 'bosses.js'))({ mp, log: () => {}, personal: (a, t) => said.push([a, t]), audit: (t) => audits.push(t), display: (a) => `P${(a >>> 0).toString(16)}`, who: String,
-      cfg: cfg || {}, giveItem: (a, id, n) => { given.push([a, id, n]); return true; }, registerChatCommand: () => {}, sendPacket: (a, p) => glows.push([a, p]),
+      cfg: cfg || {}, giveItem: (a, id, n) => { given.push([a, id, n]); return true; }, registerChatCommand: (n, fn) => commands.set(n, fn), sendPacket: (a, p) => glows.push([a, p]), isLeadStaff: (a) => a === LEAD,
       onlineActors: () => [P1, P2, P3, BRIAR, FAR], every: (n, ms, fn) => timers.set(n, fn), stopTimer: () => {}, profileOf: (a) => (PROFILE[a] !== undefined ? PROFILE[a] : -1), zoneOfActor: (a) => HOLD[a] || null });
   } finally { process.chdir(cwd); }
 };
@@ -155,6 +161,34 @@ ok(!cz.some((x) => x.Name.startsWith('boss:briarheartking:')) && cz.some((x) => 
   'bosses.briarheartking.enabled false takes the King off; the Centurion stays on and the Warlord off as the data says');
 ok(def('icecap').drops.shards.desc === '1d2201:DragonBreak Online Edits.esp' && def('icecap').drops.shards.count === 5 && def('icecap').drops.shards.top === 7,
   'the Wraith drops the Glacial Crystal Shard (DLE 1D2201): 5 a fighter, 7 for the top damager (a 36-shard set in 5-7 days)');
+
+// ---- the night boss and the event boss ----
+fs.writeFileSync(path.join(dir, 'bosses.json'), JSON.stringify(REAL));
+let night = false;
+globalThis.__dboClock = { isNight: () => night };
+load({});
+const hasZone = (name) => zones().some((x) => x.Name === name);
+ok(!hasZone('boss:movarth:boss') && hasZone('boss:falmerwarmonger:boss') && hasZone('boss:duskthorn:guardian'), 'by day the Master of Movarth\'s Lair is nowhere; the Warmonger and the Warchief stand with their shamans');
+night = true; tick([]);
+ok(hasZone('boss:movarth:boss') && zones().filter((x) => /^boss:movarth:open\d$/.test(x.Name)).length === 2, 'at nightfall he rises at the mouth of his lair with two thralls');
+night = false; tick([]);
+ok(!hasZone('boss:movarth:boss'), '...and is gone at dawn when nobody is fighting him');
+const M = 0xff500001;
+night = true; tick([]);
+put(M, 'private.npcSpawner', 'boss:movarth:boss'); put(M, 'percentages', { health: 1, magicka: 1, stamina: 1 });
+tick([M]); hit(P1, M, 50, 0.8);
+night = false; tick([M]);
+ok(hasZone('boss:movarth:boss'), 'a fight in progress runs on past dawn');
+ok(!hasZone('boss:valkynaz:boss'), 'the Valkynaz stands nowhere until an event');
+said.length = 0;
+commands.get('bossevent')(P1, ['valkynaz']);
+ok(!hasZone('boss:valkynaz:boss') && /Only a Lead GM/.test(toldTo(P1)), 'a player cannot start the event');
+commands.get('bossevent')(LEAD, ['valkynaz']);
+ok(hasZone('boss:valkynaz:boss') && zones().filter((x) => /^boss:valkynaz:open\d$/.test(x.Name)).length === 3 && audits.some((t) => /^BOSS valkynaz event started by .* for 30 min$/.test(t)), 'a Lead GM opens the gate: the Valkynaz and three Dremora, audited');
+now += 301000; tick([]);
+ok(zones().filter((x) => /^boss:valkynaz:e0-\d$/.test(x.Name)).length === 3, 'five minutes in, a wave of three more comes through');
+now += 30 * 60000; tick([]);
+ok(!hasZone('boss:valkynaz:boss') && !zones().some((x) => x.Name.startsWith('boss:valkynaz:')) && audits.some((t) => /^BOSS valkynaz event ended$/.test(t)), 'after thirty minutes the gate closes and every zone of it goes, felled or not');
 
 // ---- manuals.js: the boss-only schematic hook ----
 const msrc = fs.readFileSync(path.join(ROOT, 'manuals.js'), 'utf8');

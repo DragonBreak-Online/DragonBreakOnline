@@ -23,6 +23,7 @@ from owned_spawns import LoadOrder, OK_TYPES, subs  # noqa: E402
 
 DISABLED, DELETED = 0x800, 0x20
 CELL = 4096
+ITEM_TYPES = {'MISC', 'INGR', 'ALCH', 'WEAP', 'ARMO', 'AMMO', 'BOOK', 'SLGM', 'SCRL', 'KEYM'}
 
 
 def key_of(text):
@@ -134,6 +135,21 @@ def build(lo, defs):
             return None
         return lo.desc(k)
 
+    # Drops named by editor id (drops.alwaysEdid): one pass over the item records of every plugin, the last one winning
+    wanted = {str(e).lower() for b in defs['bosses'] for e, _ in (b.get('drops') or {}).get('alwaysEdid', [])}
+    item_by_edid = {}
+    if wanted:
+        for p in lo.plugins:
+            for t, fid, fl, off, sz, ctx in p.index:
+                if t not in ITEM_TYPES:
+                    continue
+                d = dict(subs(p.data_at(p.fh, off, sz, fl)))
+                e = d.get(b'EDID', b'').rstrip(b'\0').decode('cp1252', 'replace')
+                if e.lower() in wanted:
+                    k = lo.source(p, fid)
+                    if k:
+                        item_by_edid[e.lower()] = (k, t, e)
+
     worlds = {key_of(b['world']) for b in defs['bosses']}
     anchors = {}
     for k, (p, off, sz, fl, ctx) in lo.refs_in(worlds).items():
@@ -170,6 +186,12 @@ def build(lo, defs):
         o['spots'] = spots
         dr = b.get('drops', {})
         drops = {'always': [[item(d, who), n] for d, n in dr.get('always', []) if item(d, who)]}
+        for e, n in dr.get('alwaysEdid', []):
+            hit = item_by_edid.get(str(e).lower())
+            if not hit:
+                bad.append(f"{who}: no item '{e}' in this load order")
+                continue
+            drops['always'].append([lo.desc(hit[0]), n, hit[2]])
         if 'shards' in dr:
             drops['shards'] = dict(dr['shards'], desc=item(dr['shards'].get('desc'), who, dr['shards'].get('confirmedBy', '')) or '')
         for key in ('schematic', 'extraSchematic'):

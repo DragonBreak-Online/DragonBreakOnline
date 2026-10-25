@@ -8518,7 +8518,7 @@ try {
 try {
   const BOSSES_JS = path.resolve('bosses.js');
   delete require.cache[BOSSES_JS];
-  require(BOSSES_JS)({ mp, log, personal, audit, display, who, cfg, giveItem, registerChatCommand, sendPacket, onlineActors, every, stopTimer, profileOf, zoneOfActor });
+  require(BOSSES_JS)({ mp, log, personal, audit, display, who, cfg, giveItem, registerChatCommand, sendPacket, onlineActors, every, stopTimer, profileOf, zoneOfActor, isLeadStaff });
 } catch (e) { log('bosses.js failed to load:', e.stack || e.message); globalThis.__dboBossHit = null; globalThis.__dboBossDeath = null; globalThis.__dboBossDamageMult = null; }
 
 // ---- mining and woodcutting mini-games (server\labour.js, config "labour") ---------------------

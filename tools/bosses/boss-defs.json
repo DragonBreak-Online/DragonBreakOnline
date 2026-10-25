@@ -1,5 +1,5 @@
 {
- "_comment": "The bosses' definitions (Nat, 25 Oct: \"other than the dragon priest we should develop other bosses people could grind for special drops/schematics\"; design _work/boss-roster-design-1025.md on the PC). Read by tools/bosses/bosses_build.py, which resolves every editor id and desc against the load order, picks each spot's anchor and writes bosses.json for bosses.js. spots: candidates, the first is used; a boss with enabled false waits on Nat (his eye on the spot, or an item still being built). bossEdid / addEdids: NPC_ or LVLN editor ids. drops: always [[desc, count]], shards { desc, count, top } (an item made for this boss, filled in once it exists), schematic { family, chance } (smithing.json family; a smith who knows it gets knownBonus of the shards instead), extra [[desc, chance, count]]. waves: at a share of the boss's health, n adds of addEdids. Seconds throughout.",
+ "_comment": "The bosses' definitions (Nat, 25 Oct: \"other than the dragon priest we should develop other bosses people could grind for special drops/schematics\"; design _work/boss-roster-design-1025.md on the PC). Read by tools/bosses/bosses_build.py, which resolves every editor id and desc against the load order, picks each spot's anchor and writes bosses.json for bosses.js. spots: candidates, the first is used; a boss with enabled false waits on Nat (his eye on the spot, or an item still being built). bossEdid / addEdids: NPC_ or LVLN editor ids. drops: always [[desc, count]] or alwaysEdid [[editor id, count]] (looked up and checked), shards { desc, count, top } (an item made for this boss, filled in once it exists), schematic { family, chance } (smithing.json family; a smith who knows it gets knownBonus of the shards instead), extra [[desc, chance, count]]. waves: at a share of the boss's health, n adds of addEdids. night: true writes its zones only at night (worldclock.js), a fight in progress running on; event { minutes, waveEverySeconds, waveSize } writes them only while a staff-started event lasts (/bossevent <id>), with a wave every waveEverySeconds. Seconds throughout.",
  "bosses": [
   {
    "id": "icecap",
@@ -9,26 +9,89 @@
    "hold": "winterhold",
    "world": "3c:Skyrim.esm",
    "spots": [
-    { "id": "S1", "pos": [116555, 112027, -7409], "note": "the open snowfield NE of Winterhold, 41 flat drifts, cell (28, 27); its anchor is from Obscure's College of Winterhold, so check the College's grounds" },
-    { "id": "S2", "pos": [119754, 112980, -8882], "note": "the glacier's edge, cell (29, 27)" },
-    { "id": "S3", "pos": [121379, 121316, -10718], "note": "drifts on an iceberg beyond the cliffs, cell (29, 29)" },
-    { "id": "S4", "pos": [115771, 141550, -14321], "note": "iceberg ledges at sea level, the Sea of Ghosts, cell (28, 34)" }
+    {
+     "id": "S1",
+     "pos": [
+      116555,
+      112027,
+      -7409
+     ],
+     "note": "the open snowfield NE of Winterhold, 41 flat drifts, cell (28, 27); its anchor is from Obscure's College of Winterhold, so check the College's grounds"
+    },
+    {
+     "id": "S2",
+     "pos": [
+      119754,
+      112980,
+      -8882
+     ],
+     "note": "the glacier's edge, cell (29, 27)"
+    },
+    {
+     "id": "S3",
+     "pos": [
+      121379,
+      121316,
+      -10718
+     ],
+     "note": "drifts on an iceberg beyond the cliffs, cell (29, 29)"
+    },
+    {
+     "id": "S4",
+     "pos": [
+      115771,
+      141550,
+      -14321
+     ],
+     "note": "iceberg ledges at sea level, the Sea of Ghosts, cell (28, 34)"
+    }
    ],
    "bossEdid": "EncIceWraith",
-   "addEdids": ["EncIceWraith"],
+   "addEdids": [
+    "EncIceWraith"
+   ],
    "openingAdds": 3,
-   "waves": [[0.66, 3], [0.33, 3]],
+   "waves": [
+    [
+     0.66,
+     3
+    ],
+    [
+     0.33,
+     3
+    ]
+   ],
    "toughness": 0.9,
    "damageMult": 4,
    "enrageSeconds": 480,
-   "enrage": { "toughness": 0.5, "damageMult": 6 },
+   "enrage": {
+    "toughness": 0.5,
+    "damageMult": 6
+   },
    "respawnSeconds": 10800,
    "radius": 6000,
-   "announce": { "spawn": "Something cold stirs on the ice above Winterhold.", "death": "The cold above Winterhold breaks." },
+   "announce": {
+    "spawn": "Something cold stirs on the ice above Winterhold.",
+    "death": "The cold above Winterhold breaks."
+   },
    "drops": {
-    "always": [["3ad5f:Skyrim.esm", 2]],
-    "shards": { "desc": "1d2201:DragonBreak Online Edits.esp", "count": 5, "top": 7, "confirmedBy": "DBO_OreGlacialCrystal, the Glacial Crystal Shard (Worker 2's DragonBreak Glacial.esp, merged by Worker 3 into the restart DLE 743a8952 and read back from it, 25 Oct); 4 shards + 1 Frost Salts -> 2 ingots at the smelter" },
-    "schematic": { "family": "glacial_crystal", "chance": 0.03, "knownBonus": 2 }
+    "always": [
+     [
+      "3ad5f:Skyrim.esm",
+      2
+     ]
+    ],
+    "shards": {
+     "desc": "1d2201:DragonBreak Online Edits.esp",
+     "count": 5,
+     "top": 7,
+     "confirmedBy": "DBO_OreGlacialCrystal, the Glacial Crystal Shard (Worker 2's DragonBreak Glacial.esp, merged by Worker 3 into the restart DLE 743a8952 and read back from it, 25 Oct); 4 shards + 1 Frost Salts -> 2 ingots at the smelter"
+    },
+    "schematic": {
+     "family": "glacial_crystal",
+     "chance": 0.03,
+     "knownBonus": 2
+    }
    }
   },
   {
@@ -38,24 +101,69 @@
    "hold": "markarth",
    "world": "3c:Skyrim.esm",
    "spots": [
-    { "id": "LV", "pos": [-92100, -41500, 1786.79], "heading": 352.8, "note": "Lost Valley Redoubt's upper platform, by its hagravens (camp boss spot 34129:Skyrim.esm)" }
+    {
+     "id": "LV",
+     "pos": [
+      -92100,
+      -41500,
+      1786.79
+     ],
+     "heading": 352.8,
+     "note": "Lost Valley Redoubt's upper platform, by its hagravens (camp boss spot 34129:Skyrim.esm)"
+    }
    ],
    "bossEdid": "LvlForswornBossShaman",
-   "guardian": { "edid": "EncHagraven", "offset": [200, 120, -60], "name": "the King's Hagraven", "bossToughnessWhileAlive": 0.85 },
-   "addEdids": ["LvlForswornMelee", "LvlForswornMissile"],
+   "guardian": {
+    "edid": "EncHagraven",
+    "offset": [
+     200,
+     120,
+     -60
+    ],
+    "name": "the King's Hagraven",
+    "bossToughnessWhileAlive": 0.85
+   },
+   "addEdids": [
+    "LvlForswornMelee",
+    "LvlForswornMissile"
+   ],
    "openingAdds": 0,
-   "waves": [[0.66, 2], [0.33, 3]],
+   "waves": [
+    [
+     0.66,
+     2
+    ],
+    [
+     0.33,
+     3
+    ]
+   ],
    "toughness": 0.4,
    "damageMult": 1.5,
    "enrageSeconds": 480,
-   "enrage": { "toughness": 0.2, "damageMult": 2.5 },
+   "enrage": {
+    "toughness": 0.2,
+    "damageMult": 2.5
+   },
    "respawnSeconds": 7200,
    "radius": 6000,
    "excludeBriarhearts": true,
-   "announce": { "spawn": "The Forsworn of Lost Valley have crowned a Briarheart King.", "death": "The Briarheart King of Lost Valley has fallen." },
+   "announce": {
+    "spawn": "The Forsworn of Lost Valley have crowned a Briarheart King.",
+    "death": "The Briarheart King of Lost Valley has fallen."
+   },
    "drops": {
-    "always": [["3ad61:Skyrim.esm", 1]],
-    "schematic": { "family": "silver", "chance": 0.05, "knownBonus": 0 }
+    "always": [
+     [
+      "3ad61:Skyrim.esm",
+      1
+     ]
+    ],
+    "schematic": {
+     "family": "silver",
+     "chance": 0.05,
+     "knownBonus": 0
+    }
    }
   },
   {
@@ -65,23 +173,56 @@
    "hold": "",
    "world": "1ee62:Skyrim.esm",
    "spots": [
-    { "id": "PS", "pos": [15456.31, 13746.16, 1061.07], "note": "Blackreach's pump station, beside its centurion spot (b10e11b)" }
+    {
+     "id": "PS",
+     "pos": [
+      15456.31,
+      13746.16,
+      1061.07
+     ],
+     "note": "Blackreach's pump station, beside its centurion spot (b10e11b)"
+    }
    ],
    "bossEdid": "EncDwarvenCenturion03",
-   "addEdids": ["EncDwarvenSphere03", "EncDwarvenSpider03"],
+   "addEdids": [
+    "EncDwarvenSphere03",
+    "EncDwarvenSpider03"
+   ],
    "openingAdds": 0,
-   "waves": [[0.66, 2], [0.33, 3]],
+   "waves": [
+    [
+     0.66,
+     2
+    ],
+    [
+     0.33,
+     3
+    ]
+   ],
    "toughness": 0.6,
    "damageMult": 1.5,
    "enrageSeconds": 360,
-   "enrage": { "toughness": 0.3, "damageMult": 2.5 },
+   "enrage": {
+    "toughness": 0.3,
+    "damageMult": 2.5
+   },
    "respawnSeconds": 14400,
    "radius": 4000,
-   "announce": { "spawn": "Steam hisses through Blackreach: the Centurion Master wakes.", "death": "The Centurion Master of Blackreach is still." },
+   "announce": {
+    "spawn": "Steam hisses through Blackreach: the Centurion Master wakes.",
+    "death": "The Centurion Master of Blackreach is still."
+   },
    "drops": {
     "always": [],
-    "schematic": { "family": "dwarven", "chance": 0.08, "knownBonus": 0 },
-    "extraSchematic": { "family": "mithril", "chance": 0.01 }
+    "schematic": {
+     "family": "dwarven",
+     "chance": 0.08,
+     "knownBonus": 0
+    },
+    "extraSchematic": {
+     "family": "mithril",
+     "chance": 0.01
+    }
    }
   },
   {
@@ -92,26 +233,340 @@
    "hold": "bruma",
    "world": "a764b:BSHeartland.esm",
    "spots": [
-    { "id": "SR", "pos": [60719, 249420, 15404], "note": "by Snowstone Rest" },
-    { "id": "ST", "pos": [58987, 242571, 14076], "note": "on Serpent's Trail (14, 59)" },
-    { "id": "SE", "pos": [64214, 232252, 11359], "note": "below The Sentinel (16,000 units from Cloud Ruler Temple)" }
+    {
+     "id": "SR",
+     "pos": [
+      60719,
+      249420,
+      15404
+     ],
+     "note": "by Snowstone Rest"
+    },
+    {
+     "id": "ST",
+     "pos": [
+      58987,
+      242571,
+      14076
+     ],
+     "note": "on Serpent's Trail (14, 59)"
+    },
+    {
+     "id": "SE",
+     "pos": [
+      64214,
+      232252,
+      11359
+     ],
+     "note": "below The Sentinel (16,000 units from Cloud Ruler Temple)"
+    }
    ],
    "roam": true,
    "bossEdid": "CYRLvlBanditBoss",
-   "addEdids": ["CYRLvlBanditMeleeAny", "CYRLvlBanditMissile"],
+   "addEdids": [
+    "CYRLvlBanditMeleeAny",
+    "CYRLvlBanditMissile"
+   ],
    "openingAdds": 2,
-   "waves": [[0.5, 3]],
+   "waves": [
+    [
+     0.5,
+     3
+    ]
+   ],
    "toughness": 0.5,
    "damageMult": 1.25,
    "enrageSeconds": 360,
-   "enrage": { "toughness": 0.25, "damageMult": 2 },
+   "enrage": {
+    "toughness": 0.25,
+    "damageMult": 2
+   },
    "respawnSeconds": 7200,
    "radius": 6000,
-   "announce": { "spawn": "A warlord's horn sounds on the Pale Pass road.", "death": "The Warlord of the Pale Pass is dead." },
+   "announce": {
+    "spawn": "A warlord's horn sounds on the Pale Pass road.",
+    "death": "The Warlord of the Pale Pass is dead."
+   },
    "drops": {
-    "always": [["f:Skyrim.esm", 150]],
-    "schematic": { "family": "scaled", "chance": 0.05, "knownBonus": 0 },
-    "extraSchematic": { "family": "steelplate", "chance": 0.03 }
+    "always": [
+     [
+      "f:Skyrim.esm",
+      150
+     ]
+    ],
+    "schematic": {
+     "family": "scaled",
+     "chance": 0.05,
+     "knownBonus": 0
+    },
+    "extraSchematic": {
+     "family": "steelplate",
+     "chance": 0.03
+    }
+   }
+  },
+  {
+   "id": "falmerwarmonger",
+   "name": "the Falmer Warmonger",
+   "enabled": true,
+   "hold": "",
+   "world": "1ee62:Skyrim.esm",
+   "spots": [
+    {
+     "id": "BC",
+     "pos": [
+      6894.26,
+      7152.59,
+      1374.45
+     ],
+     "note": "Blackreach's Falmer city, beside its heavy Falmer spot (b1d1f5f)"
+    }
+   ],
+   "bossEdid": "EncFalmer05MeleeBoss",
+   "guardian": {
+    "edid": "LvlFalmerShaman",
+    "offset": [
+     220,
+     -140,
+     0
+    ],
+    "name": "the Warmonger's shaman",
+    "bossToughnessWhileAlive": 0.75
+   },
+   "addEdids": [
+    "LvlChaurus",
+    "LvlFalmerMelee"
+   ],
+   "openingAdds": 2,
+   "waves": [
+    [
+     0.66,
+     2
+    ],
+    [
+     0.33,
+     3
+    ]
+   ],
+   "toughness": 0.5,
+   "damageMult": 1.5,
+   "enrageSeconds": 420,
+   "enrage": {
+    "toughness": 0.25,
+    "damageMult": 2.5
+   },
+   "respawnSeconds": 10800,
+   "radius": 4000,
+   "announce": {
+    "spawn": "War drums beat in the Falmer city of Blackreach.",
+    "death": "The Falmer Warmonger of Blackreach is dead."
+   },
+   "drops": {
+    "alwaysEdid": [
+     [
+      "ChaurusChitin",
+      3
+     ]
+    ],
+    "schematic": {
+     "family": "falmer_honed",
+     "chance": 0.06,
+     "knownBonus": 0
+    }
+   }
+  },
+  {
+   "id": "movarth",
+   "name": "the Master of Movarth's Lair",
+   "enabled": true,
+   "hold": "morthal",
+   "world": "3c:Skyrim.esm",
+   "night": true,
+   "spots": [
+    {
+     "id": "ML",
+     "pos": [
+      -31704,
+      77495,
+      -13444
+     ],
+     "note": "the marsh at the mouth of Movarth's Lair, Hjaalmarch"
+    }
+   ],
+   "bossEdid": "dunMovarthVampireBoss",
+   "addEdids": [
+    "LvlVampire"
+   ],
+   "openingAdds": 2,
+   "waves": [
+    [
+     0.5,
+     3
+    ]
+   ],
+   "toughness": 0.5,
+   "damageMult": 1.5,
+   "enrageSeconds": 420,
+   "enrage": {
+    "toughness": 0.25,
+    "damageMult": 2.5
+   },
+   "respawnSeconds": 10800,
+   "radius": 5000,
+   "announce": {
+    "spawn": "Night falls on Hjaalmarch, and something old wakes in Movarth's Lair.",
+    "death": "The Master of Movarth's Lair is ash."
+   },
+   "drops": {
+    "alwaysEdid": [
+     [
+      "VampireDust",
+      3
+     ]
+    ],
+    "schematic": {
+     "family": "steelplate",
+     "chance": 0.06,
+     "knownBonus": 0
+    },
+    "extraSchematic": {
+     "family": "glass",
+     "chance": 0.01
+    }
+   }
+  },
+  {
+   "id": "duskthorn",
+   "name": "the Warchief of Dusk Thorn",
+   "enabled": true,
+   "hold": "bruma",
+   "world": "a764b:BSHeartland.esm",
+   "spots": [
+    {
+     "id": "DT",
+     "pos": [
+      70061.82,
+      179794.61,
+      -4048.07
+     ],
+     "note": "Dusk Thorn Camp, by its boss chest"
+    }
+   ],
+   "bossEdid": "CYREncGoblinDeepRoot03BossMelee",
+   "guardian": {
+    "edid": "CYREncGoblinDeepRoot02BossMagic",
+    "offset": [
+     180,
+     160,
+     0
+    ],
+    "name": "the Warchief's shaman",
+    "bossToughnessWhileAlive": 0.8
+   },
+   "addEdids": [
+    "CYRLvlGoblinMelee",
+    "CYRLvlGoblinMissile"
+   ],
+   "openingAdds": 2,
+   "waves": [
+    [
+     0.5,
+     3
+    ]
+   ],
+   "toughness": 0.35,
+   "damageMult": 1.2,
+   "enrageSeconds": 360,
+   "enrage": {
+    "toughness": 0.15,
+    "damageMult": 2
+   },
+   "respawnSeconds": 5400,
+   "radius": 5000,
+   "announce": {
+    "spawn": "The goblins of Dusk Thorn have a Warchief again.",
+    "death": "The Warchief of Dusk Thorn is dead."
+   },
+   "drops": {
+    "always": [
+     [
+      "f:Skyrim.esm",
+      60
+     ]
+    ],
+    "schematic": {
+     "family": "elven",
+     "chance": 0.05,
+     "knownBonus": 0
+    }
+   }
+  },
+  {
+   "id": "valkynaz",
+   "name": "the Valkynaz of the Great Gate",
+   "enabled": true,
+   "hold": "",
+   "world": "3c:Skyrim.esm",
+   "event": {
+    "minutes": 30,
+    "waveEverySeconds": 300,
+    "waveSize": 3
+   },
+   "spots": [
+    {
+     "id": "GG",
+     "pos": [
+      -231,
+      43919,
+      2640
+     ],
+     "note": "The Great Oblivion Gate (its map marker)"
+    }
+   ],
+   "bossEdid": "EncDremoraMelee06",
+   "addEdids": [
+    "EncDremoraWarlock06",
+    "EncDremoraMelee05"
+   ],
+   "openingAdds": 3,
+   "waves": [
+    [
+     0.5,
+     3
+    ]
+   ],
+   "toughness": 0.6,
+   "damageMult": 1.5,
+   "enrageSeconds": 600,
+   "enrage": {
+    "toughness": 0.3,
+    "damageMult": 2.5
+   },
+   "respawnSeconds": 1000000000,
+   "radius": 6000,
+   "announce": {
+    "spawn": "The Great Oblivion Gate burns open: a Valkynaz steps through.",
+    "death": "The Valkynaz of the Great Gate is banished."
+   },
+   "drops": {
+    "alwaysEdid": [
+     [
+      "DaedraHeart",
+      1
+     ]
+    ],
+    "schematic": {
+     "family": "glass",
+     "chance": 0.03,
+     "knownBonus": 0
+    },
+    "always": [
+     [
+      "f:Skyrim.esm",
+      200
+     ]
+    ],
+    "_note": "No Ebony: it is never loot (dungeons.js BANNED_LOOT; its schematic only from a Master Scholar's reading)"
    }
   }
  ]

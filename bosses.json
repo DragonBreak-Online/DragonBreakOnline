@@ -1764,6 +1764,1018 @@
      "chance": 0.03
     }
    }
+  },
+  {
+   "id": "falmerwarmonger",
+   "name": "the Falmer Warmonger",
+   "enabled": true,
+   "hold": "",
+   "world": "1ee62:Skyrim.esm",
+   "openingAdds": 2,
+   "waves": [
+    [
+     0.66,
+     2
+    ],
+    [
+     0.33,
+     3
+    ]
+   ],
+   "toughness": 0.5,
+   "damageMult": 1.5,
+   "enrageSeconds": 420,
+   "enrage": {
+    "toughness": 0.25,
+    "damageMult": 2.5
+   },
+   "respawnSeconds": 10800,
+   "radius": 4000,
+   "announce": {
+    "spawn": "War drums beat in the Falmer city of Blackreach.",
+    "death": "The Falmer Warmonger of Blackreach is dead."
+   },
+   "boss": {
+    "edid": "EncFalmer05MeleeBoss",
+    "desc": "5238e:Skyrim.esm",
+    "options": [
+     [
+      44,
+      "5238e:Skyrim.esm",
+      "EncFalmer05MeleeBoss"
+     ]
+    ]
+   },
+   "adds": [
+    {
+     "edid": "LvlChaurus",
+     "desc": "1fa28:Skyrim.esm",
+     "options": [
+      [
+       1,
+       "a5600:Skyrim.esm",
+       "EncChaurus"
+      ],
+      [
+       16,
+       "29a1:Dawnguard.esm",
+       "DLC1EncChaurusHunterFledgling"
+      ],
+      [
+       20,
+       "23a8f:Skyrim.esm",
+       "EncChaurusReaper"
+      ],
+      [
+       32,
+       "5204:Dawnguard.esm",
+       "DLC1EncChaurusHunter"
+      ]
+     ]
+    },
+    {
+     "edid": "LvlFalmerMelee",
+     "desc": "1e7b2:Skyrim.esm",
+     "options": [
+      [
+       1,
+       "23a99:Skyrim.esm",
+       "EncFalmer01MeleeA"
+      ],
+      [
+       1,
+       "52382:Skyrim.esm",
+       "EncFalmer01MeleeB"
+      ],
+      [
+       15,
+       "e8e4:Dawnguard.esm",
+       "DLC1EncFalmer02MeleeHeavy"
+      ],
+      [
+       15,
+       "23a9a:Skyrim.esm",
+       "EncFalmer02Melee"
+      ],
+      [
+       22,
+       "e8e8:Dawnguard.esm",
+       "DLC1EncFalmer03MeleeHeavy"
+      ],
+      [
+       22,
+       "23a9b:Skyrim.esm",
+       "EncFalmer03Melee"
+      ],
+      [
+       30,
+       "e8ee:Dawnguard.esm",
+       "DLC1EncFalmer04MeleeHeavy"
+      ],
+      [
+       30,
+       "23a9c:Skyrim.esm",
+       "EncFalmer04Melee"
+      ],
+      [
+       38,
+       "e8ef:Dawnguard.esm",
+       "DLC1EncFalmer05MeleeHeavy"
+      ],
+      [
+       38,
+       "23a9d:Skyrim.esm",
+       "EncFalmer05Melee"
+      ],
+      [
+       48,
+       "15caa:Dawnguard.esm",
+       "DLC1EncFalmer06Melee"
+      ]
+     ]
+    }
+   ],
+   "guardian": {
+    "edid": "LvlFalmerShaman",
+    "offset": [
+     220,
+     -140,
+     0
+    ],
+    "name": "the Warmonger's shaman",
+    "bossToughnessWhileAlive": 0.75,
+    "options": [
+     [
+      1,
+      "25d36:Skyrim.esm",
+      "EncFalmer01Shaman"
+     ],
+     [
+      15,
+      "25d34:Skyrim.esm",
+      "EncFalmer02Shaman"
+     ],
+     [
+      22,
+      "25d2e:Skyrim.esm",
+      "EncFalmer03Shaman"
+     ],
+     [
+      30,
+      "25d30:Skyrim.esm",
+      "EncFalmer04Shaman"
+     ],
+     [
+      38,
+      "25d32:Skyrim.esm",
+      "EncFalmer05Shaman"
+     ],
+     [
+      48,
+      "15cb0:Dawnguard.esm",
+      "DLC1EncFalmer06Shaman"
+     ]
+    ],
+    "desc": "1e7b4:Skyrim.esm"
+   },
+   "spots": [
+    {
+     "id": "BC",
+     "pos": [
+      6894.26,
+      7152.59,
+      1374.45
+     ],
+     "note": "Blackreach's Falmer city, beside its heavy Falmer spot (b1d1f5f)",
+     "ref": "f3b51:Skyrim.esm",
+     "anchorDist": 421,
+     "anchorSameCell": true
+    }
+   ],
+   "drops": {
+    "always": [
+     [
+      "3ad57:Skyrim.esm",
+      3,
+      "ChaurusChitin"
+     ]
+    ],
+    "schematic": {
+     "family": "falmer_honed",
+     "chance": 0.06,
+     "knownBonus": 0
+    }
+   }
+  },
+  {
+   "id": "movarth",
+   "name": "the Master of Movarth's Lair",
+   "enabled": true,
+   "hold": "morthal",
+   "world": "3c:Skyrim.esm",
+   "night": true,
+   "openingAdds": 2,
+   "waves": [
+    [
+     0.5,
+     3
+    ]
+   ],
+   "toughness": 0.5,
+   "damageMult": 1.5,
+   "enrageSeconds": 420,
+   "enrage": {
+    "toughness": 0.25,
+    "damageMult": 2.5
+   },
+   "respawnSeconds": 10800,
+   "radius": 5000,
+   "announce": {
+    "spawn": "Night falls on Hjaalmarch, and something old wakes in Movarth's Lair.",
+    "death": "The Master of Movarth's Lair is ash."
+   },
+   "boss": {
+    "edid": "dunMovarthVampireBoss",
+    "desc": "8bb91:Skyrim.esm",
+    "options": [
+     [
+      1,
+      "2e1dc:Skyrim.esm",
+      "EncVampire02BossBretonM"
+     ],
+     [
+      1,
+      "2e1dd:Skyrim.esm",
+      "EncVampire02BossDarkElfM"
+     ],
+     [
+      1,
+      "2e1e1:Skyrim.esm",
+      "EncVampire02BossHighElfM"
+     ],
+     [
+      1,
+      "2e1e2:Skyrim.esm",
+      "EncVampire02BossNordM"
+     ],
+     [
+      1,
+      "3377b:Skyrim.esm",
+      "EncVampire02BossImperialM"
+     ],
+     [
+      28,
+      "2e1f1:Skyrim.esm",
+      "EncVampire03BossBretonM"
+     ],
+     [
+      28,
+      "2e1f8:Skyrim.esm",
+      "EncVampire03BossDarkElfM"
+     ],
+     [
+      28,
+      "2e1f9:Skyrim.esm",
+      "EncVampire03BossHighElfM"
+     ],
+     [
+      28,
+      "2e1fc:Skyrim.esm",
+      "EncVampire03BossNordM"
+     ],
+     [
+      28,
+      "3377c:Skyrim.esm",
+      "EncVampire03BossImperialM"
+     ],
+     [
+      38,
+      "2e509:Skyrim.esm",
+      "EncVampire04BossBretonM"
+     ],
+     [
+      38,
+      "2e50a:Skyrim.esm",
+      "EncVampire04BossDarkElfM"
+     ],
+     [
+      38,
+      "2e511:Skyrim.esm",
+      "EncVampire04BossHighElfM"
+     ],
+     [
+      38,
+      "2e519:Skyrim.esm",
+      "EncVampire04BossNordM"
+     ],
+     [
+      38,
+      "33828:Skyrim.esm",
+      "EncVampire04BossImperialM"
+     ],
+     [
+      48,
+      "2ea9b:Skyrim.esm",
+      "EncVampire05BossBretonM"
+     ],
+     [
+      48,
+      "2ea9c:Skyrim.esm",
+      "EncVampire05BossHighElfM"
+     ],
+     [
+      48,
+      "2ea9d:Skyrim.esm",
+      "EncVampire05BossDarkElfM"
+     ],
+     [
+      48,
+      "2ea9e:Skyrim.esm",
+      "EncVampire05BossNordM"
+     ],
+     [
+      48,
+      "3383e:Skyrim.esm",
+      "EncVampire05BossImperialM"
+     ],
+     [
+      58,
+      "2eabe:Skyrim.esm",
+      "EncVampire06BossBretonM"
+     ],
+     [
+      58,
+      "2eabf:Skyrim.esm",
+      "EncVampire06BossDarkElfM"
+     ],
+     [
+      58,
+      "2eac0:Skyrim.esm",
+      "EncVampire06BossHighElfM"
+     ],
+     [
+      58,
+      "2eac1:Skyrim.esm",
+      "EncVampire06BossNordM"
+     ],
+     [
+      58,
+      "3383f:Skyrim.esm",
+      "EncVampire06BossImperialM"
+     ],
+     [
+      60,
+      "2831:Dawnguard.esm",
+      "DLC1EncVampire07BossBretonM"
+     ],
+     [
+      60,
+      "2832:Dawnguard.esm",
+      "DLC1EncVampire07BossDarkElfM"
+     ],
+     [
+      60,
+      "2833:Dawnguard.esm",
+      "DLC1EncVampire07BossHighElfM"
+     ],
+     [
+      60,
+      "2834:Dawnguard.esm",
+      "DLC1EncVampire07BossImperialM"
+     ],
+     [
+      60,
+      "2835:Dawnguard.esm",
+      "DLC1EncVampire07BossNordM"
+     ]
+    ]
+   },
+   "adds": [
+    {
+     "edid": "LvlVampire",
+     "desc": "2f9e1:Skyrim.esm",
+     "options": [
+      [
+       1,
+       "176f9:Dawnguard.esm",
+       "DLC1EncVampire00NordF"
+      ],
+      [
+       1,
+       "176fa:Dawnguard.esm",
+       "DLC1EncVampire00DarkElfF"
+      ],
+      [
+       1,
+       "176fb:Dawnguard.esm",
+       "DLC1EncVampire00BretonF"
+      ],
+      [
+       1,
+       "107a9b:Skyrim.esm",
+       "EncVampire00BretonF"
+      ],
+      [
+       1,
+       "107a9c:Skyrim.esm",
+       "EncVampire00DarkElfF"
+      ],
+      [
+       1,
+       "107a9d:Skyrim.esm",
+       "EncVampire00HighElfF"
+      ],
+      [
+       1,
+       "107a9e:Skyrim.esm",
+       "EncVampire00ImperialF"
+      ],
+      [
+       1,
+       "107a9f:Skyrim.esm",
+       "EncVampire00NordF"
+      ],
+      [
+       6,
+       "176fc:Dawnguard.esm",
+       "DLC1EncVampire01BretonF"
+      ],
+      [
+       6,
+       "176fd:Dawnguard.esm",
+       "DLC1EncVampire01DarkElfF"
+      ],
+      [
+       6,
+       "176fe:Dawnguard.esm",
+       "DLC1EncVampire01NordF"
+      ],
+      [
+       6,
+       "3300e:Skyrim.esm",
+       "EncVampire01BretonF"
+      ],
+      [
+       6,
+       "3315a:Skyrim.esm",
+       "EncVampire01DarkElfF"
+      ],
+      [
+       6,
+       "332c1:Skyrim.esm",
+       "EncVampire01HighElfF"
+      ],
+      [
+       6,
+       "332c4:Skyrim.esm",
+       "EncVampire01ImperialF"
+      ],
+      [
+       6,
+       "33424:Skyrim.esm",
+       "EncVampire01NordF"
+      ],
+      [
+       12,
+       "176ff:Dawnguard.esm",
+       "DLC1EncVampire02BretonF"
+      ],
+      [
+       12,
+       "17700:Dawnguard.esm",
+       "DLC1EncVampire02DarkElfF"
+      ],
+      [
+       12,
+       "17701:Dawnguard.esm",
+       "DLC1EncVampire02NordF"
+      ],
+      [
+       12,
+       "33853:Skyrim.esm",
+       "EncVampire02BretonF"
+      ],
+      [
+       12,
+       "33854:Skyrim.esm",
+       "EncVampire02DarkElfF"
+      ],
+      [
+       12,
+       "33855:Skyrim.esm",
+       "EncVampire02HighElfF"
+      ],
+      [
+       12,
+       "3386e:Skyrim.esm",
+       "EncVampire02ImperialF"
+      ],
+      [
+       12,
+       "3386f:Skyrim.esm",
+       "EncVampire02NordF"
+      ],
+      [
+       20,
+       "17f84:Dawnguard.esm",
+       "DLC1EncVampire03BretonF"
+      ],
+      [
+       20,
+       "17f85:Dawnguard.esm",
+       "DLC1EncVampire03DarkElfF"
+      ],
+      [
+       20,
+       "17f86:Dawnguard.esm",
+       "DLC1EncVampire03NordF"
+      ],
+      [
+       20,
+       "33870:Skyrim.esm",
+       "EncVampire03BretonF"
+      ],
+      [
+       20,
+       "33875:Skyrim.esm",
+       "EncVampire03DarkElfF"
+      ],
+      [
+       20,
+       "3387b:Skyrim.esm",
+       "EncVampire03HighElfF"
+      ],
+      [
+       20,
+       "3387c:Skyrim.esm",
+       "EncVampire03ImperialF"
+      ],
+      [
+       20,
+       "3387d:Skyrim.esm",
+       "EncVampire03NordF"
+      ],
+      [
+       28,
+       "17f87:Dawnguard.esm",
+       "DLC1EncVampire04BretonF"
+      ],
+      [
+       28,
+       "17f88:Dawnguard.esm",
+       "DLC1EncVampire04DarkElfF"
+      ],
+      [
+       28,
+       "17f89:Dawnguard.esm",
+       "DLC1EncVampire04NordF"
+      ],
+      [
+       28,
+       "3387e:Skyrim.esm",
+       "EncVampire04BretonF"
+      ],
+      [
+       28,
+       "3387f:Skyrim.esm",
+       "EncVampire04DarkElfF"
+      ],
+      [
+       28,
+       "33880:Skyrim.esm",
+       "EncVampire04HighElfF"
+      ],
+      [
+       28,
+       "33881:Skyrim.esm",
+       "EncVampire04ImperialF"
+      ],
+      [
+       28,
+       "33882:Skyrim.esm",
+       "EncVampire04NordF"
+      ],
+      [
+       38,
+       "17f8a:Dawnguard.esm",
+       "DLC1EncVampire05BretonF"
+      ],
+      [
+       38,
+       "17f8b:Dawnguard.esm",
+       "DLC1EncVampire05DarkElfF"
+      ],
+      [
+       38,
+       "17f8c:Dawnguard.esm",
+       "DLC1EncVampire05NordF"
+      ],
+      [
+       38,
+       "33883:Skyrim.esm",
+       "EncVampire05BretonF"
+      ],
+      [
+       38,
+       "33884:Skyrim.esm",
+       "EncVampire05DarkElfF"
+      ],
+      [
+       38,
+       "33885:Skyrim.esm",
+       "EncVampire05HighElfF"
+      ],
+      [
+       38,
+       "33886:Skyrim.esm",
+       "EncVampire05ImperialF"
+      ],
+      [
+       38,
+       "33887:Skyrim.esm",
+       "EncVampire05NordF"
+      ],
+      [
+       48,
+       "17f8d:Dawnguard.esm",
+       "DLC1EncVampire06BretonF"
+      ],
+      [
+       48,
+       "17f8e:Dawnguard.esm",
+       "DLC1EncVampire06DarkElfF"
+      ],
+      [
+       48,
+       "17f8f:Dawnguard.esm",
+       "DLC1EncVampire06NordF"
+      ],
+      [
+       48,
+       "33888:Skyrim.esm",
+       "EncVampire06BretonF"
+      ],
+      [
+       48,
+       "33929:Skyrim.esm",
+       "EncVampire06DarkElfF"
+      ],
+      [
+       48,
+       "3392d:Skyrim.esm",
+       "EncVampire06HighElfF"
+      ],
+      [
+       48,
+       "3392e:Skyrim.esm",
+       "EncVampire06ImperialF"
+      ],
+      [
+       48,
+       "3392f:Skyrim.esm",
+       "EncVampire06NordF"
+      ],
+      [
+       60,
+       "282c:Dawnguard.esm",
+       "DLC1EncVampire07BretonF"
+      ],
+      [
+       60,
+       "282d:Dawnguard.esm",
+       "DLC1EncVampire07DarkElfF"
+      ],
+      [
+       60,
+       "282e:Dawnguard.esm",
+       "DLC1EncVampire07HighElfF"
+      ],
+      [
+       60,
+       "282f:Dawnguard.esm",
+       "DLC1EncVampire07ImperialF"
+      ],
+      [
+       60,
+       "2830:Dawnguard.esm",
+       "DLC1EncVampire07NordF"
+      ],
+      [
+       60,
+       "17f90:Dawnguard.esm",
+       "DLC1EncVampire07BretonFAlt"
+      ],
+      [
+       60,
+       "17f91:Dawnguard.esm",
+       "DLC1EncVampire07DarkElfFAlt"
+      ],
+      [
+       60,
+       "17f92:Dawnguard.esm",
+       "DLC1EncVampire07NordFAlt"
+      ]
+     ]
+    }
+   ],
+   "spots": [
+    {
+     "id": "ML",
+     "pos": [
+      -31704,
+      77495,
+      -13444
+     ],
+     "note": "the marsh at the mouth of Movarth's Lair, Hjaalmarch",
+     "ref": "f77de:Skyrim.esm",
+     "anchorDist": 199,
+     "anchorSameCell": true
+    }
+   ],
+   "drops": {
+    "always": [
+     [
+      "3ad76:Skyrim.esm",
+      3,
+      "vampireDust"
+     ]
+    ],
+    "schematic": {
+     "family": "steelplate",
+     "chance": 0.06,
+     "knownBonus": 0
+    },
+    "extraSchematic": {
+     "family": "glass",
+     "chance": 0.01
+    }
+   }
+  },
+  {
+   "id": "duskthorn",
+   "name": "the Warchief of Dusk Thorn",
+   "enabled": true,
+   "hold": "bruma",
+   "world": "a764b:BSHeartland.esm",
+   "openingAdds": 2,
+   "waves": [
+    [
+     0.5,
+     3
+    ]
+   ],
+   "toughness": 0.35,
+   "damageMult": 1.2,
+   "enrageSeconds": 360,
+   "enrage": {
+    "toughness": 0.15,
+    "damageMult": 2
+   },
+   "respawnSeconds": 5400,
+   "radius": 5000,
+   "announce": {
+    "spawn": "The goblins of Dusk Thorn have a Warchief again.",
+    "death": "The Warchief of Dusk Thorn is dead."
+   },
+   "boss": {
+    "edid": "CYREncGoblinDeepRoot03BossMelee",
+    "desc": "e9de2:BSHeartland.esm",
+    "options": [
+     [
+      24,
+      "e9de2:BSHeartland.esm",
+      "CYREncGoblinDeepRoot03BossMelee"
+     ]
+    ]
+   },
+   "adds": [
+    {
+     "edid": "CYRLvlGoblinMelee",
+     "desc": "882a2:BSHeartland.esm",
+     "options": [
+      [
+       1,
+       "882af:BSHeartland.esm",
+       "CYREncGoblin01Melee"
+      ],
+      [
+       1,
+       "d6d82:BSHeartland.esm",
+       "CYREncGoblin01aMelee"
+      ],
+      [
+       15,
+       "882b4:BSHeartland.esm",
+       "CYREncGoblin02Melee"
+      ],
+      [
+       22,
+       "882b7:BSHeartland.esm",
+       "CYREncGoblin03Melee"
+      ],
+      [
+       30,
+       "882bd:BSHeartland.esm",
+       "CYREncGoblin04Melee"
+      ],
+      [
+       38,
+       "882c1:BSHeartland.esm",
+       "CYREncGoblin05Melee"
+      ],
+      [
+       46,
+       "87df5:BSHeartland.esm",
+       "CYREncGoblin06Melee"
+      ]
+     ]
+    },
+    {
+     "edid": "CYRLvlGoblinMissile",
+     "desc": "882a6:BSHeartland.esm",
+     "options": [
+      [
+       1,
+       "882b0:BSHeartland.esm",
+       "CYREncGoblin01Missile"
+      ],
+      [
+       1,
+       "d6d83:BSHeartland.esm",
+       "CYREncGoblin01aMissile"
+      ],
+      [
+       15,
+       "882b5:BSHeartland.esm",
+       "CYREncGoblin02Missile"
+      ],
+      [
+       22,
+       "882b9:BSHeartland.esm",
+       "CYREncGoblin03Missile"
+      ],
+      [
+       30,
+       "882be:BSHeartland.esm",
+       "CYREncGoblin04Missile"
+      ],
+      [
+       38,
+       "882c2:BSHeartland.esm",
+       "CYREncGoblin05Missile"
+      ],
+      [
+       46,
+       "87df6:BSHeartland.esm",
+       "CYREncGoblin06Missile"
+      ]
+     ]
+    }
+   ],
+   "guardian": {
+    "edid": "CYREncGoblinDeepRoot02BossMagic",
+    "offset": [
+     180,
+     160,
+     0
+    ],
+    "name": "the Warchief's shaman",
+    "bossToughnessWhileAlive": 0.8,
+    "options": [
+     [
+      15,
+      "e9de8:BSHeartland.esm",
+      "CYREncGoblinDeepRoot02BossMagic"
+     ]
+    ],
+    "desc": "e9de8:BSHeartland.esm"
+   },
+   "spots": [
+    {
+     "id": "DT",
+     "pos": [
+      70061.82,
+      179794.61,
+      -4048.07
+     ],
+     "note": "Dusk Thorn Camp, by its boss chest",
+     "ref": "b5a59:BSHeartland.esm",
+     "anchorDist": 353,
+     "anchorSameCell": true
+    }
+   ],
+   "drops": {
+    "always": [
+     [
+      "f:Skyrim.esm",
+      60
+     ]
+    ],
+    "schematic": {
+     "family": "elven",
+     "chance": 0.05,
+     "knownBonus": 0
+    }
+   }
+  },
+  {
+   "id": "valkynaz",
+   "name": "the Valkynaz of the Great Gate",
+   "enabled": true,
+   "hold": "",
+   "world": "3c:Skyrim.esm",
+   "event": {
+    "minutes": 30,
+    "waveEverySeconds": 300,
+    "waveSize": 3
+   },
+   "openingAdds": 3,
+   "waves": [
+    [
+     0.5,
+     3
+    ]
+   ],
+   "toughness": 0.6,
+   "damageMult": 1.5,
+   "enrageSeconds": 600,
+   "enrage": {
+    "toughness": 0.3,
+    "damageMult": 2.5
+   },
+   "respawnSeconds": 1000000000,
+   "radius": 6000,
+   "announce": {
+    "spawn": "The Great Oblivion Gate burns open: a Valkynaz steps through.",
+    "death": "The Valkynaz of the Great Gate is banished."
+   },
+   "boss": {
+    "edid": "EncDremoraMelee06",
+    "desc": "16ff8:Skyrim.esm",
+    "options": [
+     [
+      46,
+      "16ff8:Skyrim.esm",
+      "EncDremoraMelee06"
+     ]
+    ]
+   },
+   "adds": [
+    {
+     "edid": "EncDremoraWarlock06",
+     "desc": "16ffa:Skyrim.esm",
+     "options": [
+      [
+       46,
+       "16ffa:Skyrim.esm",
+       "EncDremoraWarlock06"
+      ]
+     ]
+    },
+    {
+     "edid": "EncDremoraMelee05",
+     "desc": "16ff4:Skyrim.esm",
+     "options": [
+      [
+       36,
+       "16ff4:Skyrim.esm",
+       "EncDremoraMelee05"
+      ]
+     ]
+    }
+   ],
+   "spots": [
+    {
+     "id": "GG",
+     "pos": [
+      -231,
+      43919,
+      2640
+     ],
+     "note": "The Great Oblivion Gate (its map marker)",
+     "ref": "107431:Skyrim.esm",
+     "anchorDist": 1698,
+     "anchorSameCell": false
+    }
+   ],
+   "drops": {
+    "always": [
+     [
+      "f:Skyrim.esm",
+      200
+     ],
+     [
+      "3ad5b:Skyrim.esm",
+      1,
+      "DaedraHeart"
+     ]
+    ],
+    "schematic": {
+     "family": "glass",
+     "chance": 0.03,
+     "knownBonus": 0
+    }
+   }
   }
  ]
 }

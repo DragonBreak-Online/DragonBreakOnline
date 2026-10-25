@@ -19,6 +19,9 @@
 // schematic of drops.schematic.family at its chance (a smith who knows it gets knownBonus more shards instead), and
 // drops.extraSchematic. One reward per account per boss every lockoutHours (20); a kill inside it pays nothing. A boss that
 // excludes Briarhearts pays none to one (briarheart.js __dboIsBriarheart). The hold hears when the boss rises and falls.
+// When:  a boss with night true stands only at night (worldclock.js __dboClock.isNight), its fight running on past dawn; a
+//         boss with event { minutes, waveEverySeconds, waveSize } stands only while an event a Lead GM starts lasts
+//         (/bossevent <id>), and a wave of waveSize adds comes every waveEverySeconds until it ends, felled or not.
 // State in bosses-state.json: { lockouts: { <boss>: { <profile>: until } }, spot: { <boss>: index }, kills: { <boss>: at } }.
 // gamemode-config.json "bosses": { enabled, creditShare, lockoutHours, pollSeconds, only: [ids], off: [ids], <boss id>: { enabled, spot } }:
 // each boss goes live on its own (its block's enabled over bosses.json's), and spot names the candidate it stands at (Nat's pick)
@@ -29,6 +32,8 @@ const path = require('path');
 
 module.exports = (api) => {
   const { mp, log, personal, audit, display, who, cfg, giveItem, registerChatCommand, sendPacket, onlineActors, every, stopTimer, profileOf, zoneOfActor } = api;
+  // Starting an event boss is a spawn: Lead GM and above (TIER_CAPS.spawn), as /spawn is
+  const isLeadStaff = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
   const C = Object.assign({ enabled: true, creditShare: 0.1, lockoutHours: 20, pollSeconds: 2, only: null, off: [] }, cfg.bosses || {});
   const PREFIX = 'boss:';
   const SPAWNS_FILE = path.resolve('NPC-Spawns.json');
@@ -50,6 +55,7 @@ module.exports = (api) => {
   // Kept across hot reloads: a reload mid-fight keeps the damage, the waves spent and the enrage
   const G = globalThis.__dboBosses || (globalThis.__dboBosses = { fights: new Map(), byActor: new Map(), state: null });
   if (!(G.fights instanceof Map)) G.fights = new Map();
+  if (!(G.events instanceof Map)) G.events = new Map(); // boss id -> { until, nextWave, waves: [zone], by }
   if (!(G.byActor instanceof Map)) G.byActor = new Map();
   const state = () => {
     if (G.state) return G.state;
@@ -82,8 +88,18 @@ module.exports = (api) => {
     for (let i = 0; i < (Number(b.openingAdds) || 0); i++) { const id = addOf(b, i); if (id) out.push(zone(b, `open${i}`, ring(sp.pos, i, b.openingAdds, 350), id, Number(b.respawnSeconds) || 10800, sp.heading)); }
     const f = G.fights.get(b.id);
     for (const w of (f && f.waveZones) || []) out.push(w);
+    const ev = G.events.get(b.id);
+    for (const w of (ev && ev.waves) || []) out.push(w);
     return out;
   };
+  // Whether a boss stands now: an event boss while its event lasts, a night boss at night or while its fight goes on
+  const isNight = () => { try { return !!(globalThis.__dboClock && typeof globalThis.__dboClock.isNight === 'function' && globalThis.__dboClock.isNight()); } catch (e) { return false; } };
+  function standing(b) {
+    if (b.event) { const ev = G.events.get(b.id); return !!ev && ev.until > Date.now(); }
+    if (b.night) { const f = G.fights.get(b.id); return isNight() || !!(f && f.boss && f.startedAt); }
+    return true;
+  }
+  const standingSig = () => BOSSES.map((b) => (standing(b) ? '1' : '0')).join('');
   const writeZones = () => {
     let root = null, list = [], key = 'zones';
     try {
@@ -91,7 +107,7 @@ module.exports = (api) => {
       if (Array.isArray(parsed)) list = parsed; else if (parsed && typeof parsed === 'object') { root = parsed; key = Object.keys(parsed).find((k) => k.toLowerCase() === 'zones') || 'zones'; list = Array.isArray(parsed[key]) ? parsed[key] : []; }
     } catch (e) { /* no file yet */ }
     const kept = list.filter((z) => !String((z && (z.Name || z.name)) || '').startsWith(PREFIX));
-    const mine = [].concat(...BOSSES.map(zonesOf)).filter((z) => z.NPC[0].id);
+    const mine = [].concat(...BOSSES.filter(standing).map(zonesOf)).filter((z) => z.NPC[0].id);
     const sig = JSON.stringify(mine);
     if (G.zoneSig === sig && list.length - kept.length === mine.length) return mine.length;
     G.zoneSig = sig;
@@ -156,8 +172,31 @@ module.exports = (api) => {
         if (r.boss.guardian && r.boss.guardian.name) name(id, titled(r.boss.guardian.name));
       }
     }
-    // Enrage
     const now = Date.now();
+    // Events: a wave every waveEverySeconds, and the end
+    for (const b of BOSSES) {
+      const ev = G.events.get(b.id);
+      if (!ev || !b.event) continue;
+      if (ev.until <= now) {
+        G.events.delete(b.id);
+        endFight(b, 'event over');
+        tell(b, `The ${b.name.replace(/^the /, '')} withdraws. The gate falls quiet.`);
+        audit(`BOSS ${b.id} event ended`);
+        continue;
+      }
+      if (now >= ev.nextWave) {
+        const sp = spotOf(b);
+        const n = Math.max(1, Number(b.event.waveSize) || 3);
+        for (let i = 0; i < n; i++) { const id = addOf(b, ev.count + i); if (id) ev.waves.push(zone(b, `e${ev.count}-${i}`, ring(sp.pos, i, n, 600), id, 1e9, sp.heading)); }
+        ev.count += n;
+        ev.nextWave = now + Math.max(30, Number(b.event.waveEverySeconds) || 300) * 1000;
+        G.zoneSig = '';
+      }
+    }
+    // A night boss rises at dusk and goes at dawn; an event's zones come and go with it
+    const sig = standingSig();
+    if (sig !== G.standingSig || G.zoneSig === '') { G.standingSig = sig; writeZones(); }
+    // Enrage
     for (const b of BOSSES) {
       const f = G.fights.get(b.id);
       if (!f || !f.boss || !f.startedAt || f.enraged || !(Number(b.enrageSeconds) > 0)) continue;
@@ -279,6 +318,21 @@ module.exports = (api) => {
     endFight(b, 'killed');
     writeZones();
   };
+
+  registerChatCommand('bossevent', (a, args) => {
+    if (!isLeadStaff(a)) return personal(a, 'Only a Lead GM or above starts a boss event.');
+    const id = String((Array.isArray(args) ? args[0] : String(args || '').split(/\s+/)[0]) || '').toLowerCase();
+    const b = byId.get(id);
+    const events = BOSSES.filter((x) => x.event).map((x) => x.id);
+    if (!b || !b.event) return personal(a, `Usage: /bossevent <${events.join('|') || 'no event boss is on'}>`);
+    if (G.events.has(b.id)) return personal(a, `${titled(b.name)} is already abroad.`);
+    const now = Date.now();
+    G.events.set(b.id, { until: now + Math.max(1, Number(b.event.minutes) || 30) * 60000, nextWave: now + Math.max(30, Number(b.event.waveEverySeconds) || 300) * 1000, waves: [], count: 0, by: who(a) });
+    G.standingSig = ''; G.zoneSig = '';
+    writeZones();
+    audit(`BOSS ${b.id} event started by ${who(a)} for ${b.event.minutes} min`);
+    personal(a, `${titled(b.name)} is coming, for ${b.event.minutes} minutes.`);
+  }, { admin: true, help: '<boss> start an event boss (Lead GM): the Valkynaz of the Great Gate' });
 
   registerChatCommand('bosses', (a) => {
     if (!BOSSES.length) return personal(a, 'No bosses walk the world right now.');

@@ -19936,6 +19936,70 @@
     0,
     0.0
    ]
+  },
+  {
+   "name": "Boss: the Falmer Warmonger, Blackreach's Falmer city",
+   "region": "Skyrim",
+   "world": "1ee62:Skyrim.esm",
+   "worldName": "Blackreach",
+   "pos": [
+    6894.26,
+    7152.59,
+    1438.45
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: the Master of Movarth's Lair, the marsh at the mouth of Movarth's Lair (Morthal)",
+   "region": "Skyrim",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    -31704,
+    77495,
+    -13380
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: the Warchief of Dusk Thorn, Dusk Thorn Camp (Bruma)",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    70061.82,
+    179794.61,
+    -3984.07
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: the Valkynaz of the Great Gate, The Great Oblivion Gate (its map marker)",
+   "region": "Skyrim",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    -231,
+    43919,
+    2704
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
   }
  ]
 }
