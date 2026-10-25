@@ -6862,6 +6862,8 @@ const asylumHit = (agg, tgt) => {
 const castHook = (casterId, spellId, ...rest) => {
   try { if (racial) racial.onCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('racial cast failed', e.message); }
   try { if (globalThis.__dboBeastCast) globalThis.__dboBeastCast(casterId, spellId); } catch (e) { log('beast cast failed', e.message); }
+  // hagraven.js: the Hagraven Form power, cast from the Powers menu, takes or leaves the Hagraven body
+  try { if (typeof globalThis.__dboHagravenCast === 'function') globalThis.__dboHagravenCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('hagraven cast failed', e.message); }
   // A vampire's Restoration healing (supernatural.js vampireRestoration) is refused for the gameplay: no skill or school
   // credit, no chain. The C++ applies the heal after this hook whatever it returns, so supernatural.js takes it back
   try { if (typeof globalThis.__dboVampHealCast === 'function' && globalThis.__dboVampHealCast(Number(casterId) >>> 0, Number(spellId) >>> 0)) return false; } catch (e) { log('vampire healing cast failed', e.message); }

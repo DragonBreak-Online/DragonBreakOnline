@@ -25,7 +25,7 @@ const papyrusCalls = [];
 const mp = {
   get: (a, k) => { const v = P(a, k); return v === undefined ? null : JSON.parse(JSON.stringify(v)); },
   set: (a, k, v) => setP(a, k, v === null ? null : JSON.parse(JSON.stringify(v))),
-  getIdFromDesc: () => 0,
+  getIdFromDesc: (d) => ({ '803:DBO SD.esp': 0xb4000803, '805:DBO SD.esp': 0xb4000805, '807:DBO SD.esp': 0xb4000807, '809:DBO SD.esp': 0xb4000809 })[d] || 0,
   getDescFromId: (id) => `${(id >>> 0).toString(16)}:Skyrim.esm`,
   lookupEspmRecordById: () => ({ record: { editorId: 'DBOReachmanRace' } }),
   callPapyrusFunction: (kind, cls, method, self, args) => { papyrusCalls.push({ method, args: args.map((x) => (x && x.desc !== undefined ? x.desc : x)) }); },
@@ -167,6 +167,30 @@ const r0 = revertCalls.length; downed.add(STAFF); formTick.f(); downed.clear();
 ok(beast(STAFF) && revertCalls.length === r0 && !H.inForm(STAFF), 'a staff /polymorph hagraven is left to beastform\'s own rules');
 setP(STAFF, 'private.beast', null);
 
+// ---- what she is, in Active Effects, and the Hagraven Form power ----------------------------------------------------------------------
+{
+  const DCFG = { hagraven: { enabled: true, display: { 1: '803:DBO SD.esp', 2: '805:DBO SD.esp', 3: '807:DBO SD.esp' }, powerSpell: '809:DBO SD.esp' } };
+  const HD = loadH(DCFG);
+  const calls = (m, d) => papyrusCalls.filter((c) => c.method === m && c.args[0] === d);
+  makeStage(YOUNG, 1); papyrusCalls.length = 0; globalThis.__dboHagravenLogin(YOUNG);
+  ok(calls('AddSpell', '803:DBO SD.esp').length === 1 && calls('RemoveSpell', '805:DBO SD.esp').length === 1 && calls('RemoveSpell', '807:DBO SD.esp').length === 1 && calls('RemoveSpell', '809:DBO SD.esp').length === 1, 'stage 1 at login: Crone-touched shown, the other stages and the power taken', papyrusCalls);
+  run(STAFF, 'stage young 3 test'); 
+  ok(calls('AddSpell', '807:DBO SD.esp').length === 1 && calls('AddSpell', '809:DBO SD.esp').length === 1, 'staff set stage 3: the Hagraven display and the power are given');
+  papyrusCalls.length = 0; run(STAFF, 'stage young 2 test');
+  ok(calls('AddSpell', '805:DBO SD.esp').length === 1 && calls('RemoveSpell', '807:DBO SD.esp').length >= 1 && calls('RemoveSpell', '809:DBO SD.esp').length >= 1, 'stage 2: Feathered shown, the Hagraven display and the power taken');
+  papyrusCalls.length = 0; run(STAFF, 'revoke young test');
+  ok(['803', '805', '807', '809'].every((k) => calls('RemoveSpell', k + ':DBO SD.esp').length >= 1) && !papyrusCalls.some((c) => c.method === 'AddSpell'), 'the pact revoked: every display and the power taken, nothing given');
+  // the power cast is /hagraven form
+  makeStage(WITCH, 3); globalThis.__dboHagraven.formAt.set(WITCH, 0); setP(WITCH, 'private.beast', null); said.length = 0;
+  ok(globalThis.__dboHagravenCast(WITCH, 0xb4000809) === true && beast(WITCH) && beast(WITCH).form === 'hagraven', 'casting Hagraven Form takes the body');
+  ok(said.some(([a, t]) => a === WITCH && /the hunched body/.test(t)), '...and says so');
+  globalThis.__dboHagraven.formAt.set(WITCH, 0); said.length = 0;
+  ok(globalThis.__dboHagravenCast(WITCH, 0xb4000809) === true && !beast(WITCH) && said.some(([a, t]) => a === WITCH && /stand as yourself/.test(t)), 'cast again: back to herself');
+  ok(globalThis.__dboHagravenCast(WITCH, 0x12345) === false, 'any other spell is not ours');
+  loadH(CFG);
+  ok(globalThis.__dboHagravenCast(WITCH, 0xb4000809) === false, 'no powerSpell configured: no cast is taken as the power');
+}
+
 // ---- the pieces in the other files -------------------------------------------------------------------------------------------------
 const src = (f) => fs.readFileSync(path.resolve(__dirname, '..', f), 'utf8');
 const bf = src('beastform.js');
@@ -174,6 +198,7 @@ if (/__dboPolymorphAs\s*=/.test(bf)) {
   ok(/hagraven: \{ name: 'Hagraven', race: idOf\('131fb:Skyrim\.esm'\) \}/.test(bf), 'beastform.js has the Hagraven creature (131fb)');
 } else console.log('skip  beastform.js has no __dboPolymorphAs here (worker4-polymorph-panel-1025 brings it)');
 ok(/\/hagraven form again/.test(src('hagraven.js')) && /\| form \|/.test(src('hagraven.js')), 'the usage names /hagraven form');
+ok(/globalThis\.__dboHagravenCast\(Number\(casterId\) >>> 0, Number\(spellId\) >>> 0\)/.test(src('gamemode.js')), 'gamemode.js castHook asks hagraven.js about the power');
 
 process.chdir(cwd);
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');

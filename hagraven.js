@@ -62,6 +62,12 @@ module.exports = (api) => {
     visual: { enabled: false, stages: { 1: '', 2: '', 3: '' } },
   }, (cfg && cfg.hagraven) || {});
   C.form = Object.assign({ enabled: true, cooldownSeconds: 60 }, (cfg && cfg.hagraven && cfg.hagraven.form) || {});
+  // What she is, in Magic > Active Effects (Nat, 25 Oct): one display ability per stage (a DLE SPEL, type Ability, whose
+  // one effect carries the stage's text and changes nothing; prayer.js's blessing displays are the same records), and the
+  // Hagraven Form power (a Lesser Power whose cast the client relays; gamemode.js castHook asks __dboHagravenCast).
+  // Descs, empty until the records are in the load order: display { 1, 2, 3 }, powerSpell
+  C.display = Object.assign({ 1: '', 2: '', 3: '' }, (cfg && cfg.hagraven && cfg.hagraven.display) || {});
+  C.powerSpell = String((cfg && cfg.hagraven && cfg.hagraven.powerSpell) || '');
   const PROP = 'private.dboHagraven';
   const MIN = 60000, HOUR = 3600000, DAY = 86400000;
   const NAMES = ['', 'Crone-touched', 'Feathered', 'Hagraven'];
@@ -103,8 +109,16 @@ module.exports = (api) => {
 
   // ---- what each stage does ---------------------------------------------------------------------------------------------
   // Applied on entering a stage, at login, and undone at the end
+  // The stage's display ability on, the others off; the power at stage 3 only. A known spell added again changes nothing
+  const spellArg = (desc) => ({ type: 'espm', desc: String(desc) });
+  const showStage = (a, st) => {
+    if (!isOnline(a)) return;
+    for (const k of [1, 2, 3]) { const d = String(C.display[k] || ''); if (d && idOf(d)) papyrus(a, k === st ? 'AddSpell' : 'RemoveSpell', k === st ? [spellArg(d), false] : [spellArg(d)]); }
+    const p = C.powerSpell; if (p && idOf(p)) papyrus(a, st >= 3 && C.form.enabled !== false ? 'AddSpell' : 'RemoveSpell', st >= 3 && C.form.enabled !== false ? [spellArg(p), false] : [spellArg(p)]);
+  };
   const applyStage = (a, why) => {
     const st = stageOf(a); if (!st || !isOnline(a)) return;
+    showStage(a, st);
     if (st >= 2 && Number(C.speedMult) > 0 && Number(C.speedMult) !== 100) {
       papyrus(a, 'SetActorValue', ['SpeedMult', Number(C.speedMult)]);
       log(`hagraven: SpeedMult ${C.speedMult} on ${display(a)} (${why}, stage ${st})`);
@@ -115,6 +129,7 @@ module.exports = (api) => {
   };
   const undoStage = (a, stageWas) => {
     if (isOnline(a) && stageWas >= 2 && Number(C.speedMult) > 0 && Number(C.speedMult) !== 100) papyrus(a, 'SetActorValue', ['SpeedMult', 100]);
+    showStage(a, 0);
   };
   // Stage 2+: every citizenship but keepHolds is taken and barred for barDays, once a day while she is one
   const lapseCitizenship = (a, why) => {
@@ -301,6 +316,15 @@ module.exports = (api) => {
     if (inForm(a)) return leaveForm(a, 'asked to revert') ? 'You let the body go and stand as yourself again, your spells back in your hands.' : 'That failed; see the server log.';
     const no = takeForm(a); if (no) return no;
     return 'You let the pact take you whole: the hunched body, the feathers, the talons. It casts nothing; say /hagraven form again to stand as yourself and cast.';
+  };
+  // gamemode.js castHook: the Hagraven Form power, cast from the Powers menu, is /hagraven form; true when it was ours
+  globalThis.__dboHagravenCast = (caster, spellId) => {
+    const p = C.powerSpell ? idOf(C.powerSpell) : 0;
+    if (!p || (Number(spellId) >>> 0) !== p) return false;
+    const a = Number(caster) >>> 0;
+    log(`hagraven: ${display(a)} cast Hagraven Form`);
+    personal(a, form(a));
+    return true;
   };
 
   // ---- chat ---------------------------------------------------------------------------------------------------------------------
