@@ -441,6 +441,9 @@ AUDIT_VERBS.CONCORDAT.roles = R_BY([[/-> $/, 'target'], [/ arrested $/, 'target'
 AUDIT_VERBS.CONCORDAT.cut = (text) => text.replace(/^(CONCORDAT ARREST (?:[^\s#()]+ ){0,5}?[^\s#()]+ #[A-Z0-9?]{4} \(profile -?\d{1,9}(?:, <@\d{1,22}>)?\)) \([^()]*\)/, '$1');
 // CHAMPION <champion> in <zone> killed by <display(), ...>: Name #TAG parties with no profile (review C, recommended)
 AUDIT_VERBS.CHAMPION.display = true;
+// BOSS <id> rose at <spot> | event ended | killed at <spot> by <display() [drops]; ...> | event started by <staff> for N min
+// (bosses.js): boss and spot ids, numbers, item and schematic names; the killers as Name #TAG, as CHAMPION's
+clean_('BOSS', { display: true, roles: R_BY([[/ started by $/, 'staff']]) });
 AUDIT_VERBS.JAIL.roles = R_BY([[/ imprisoned $/, 'target'], [/ to $/, 'target']]);
 AUDIT_VERBS.BEAST.roles = R_BY([[/ (?:to|from) $/, 'target']]);
 // FRENZY <werewolf> for N s, first on <target> (frenzy.js): ids, numbers and fixed reasons only
@@ -1366,6 +1369,10 @@ beastform.js BEAST eadfbd8f clean
 beastform.js BEAST 168eca78 clean
 beastform.js BEAST d2c5f579 clean
 beastform.js BEAST 4b982cb7 clean
+bosses.js BOSS 08618658 clean
+bosses.js BOSS dfe2f533 clean
+bosses.js BOSS 1f42f464 clean
+bosses.js BOSS 7e20c26d clean
 bloodranks.js BLOOD 2e7d8b09 clean
 business.js BUSINESS b0f9df0b parsed
 business.js BUSINESS 7485beff parsed
