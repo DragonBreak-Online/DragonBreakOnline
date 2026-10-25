@@ -2869,138 +2869,20 @@
    }
   },
   {
-   "id": "minotaurtest1",
-   "name": "the Minotaur Lord of Sancre Tor",
-   "enabled": true,
-   "devOnly": true,
-   "traceEquipment": true,
-   "hold": "bruma",
-   "world": "a764b:BSHeartland.esm",
-   "openingAdds": 0,
-   "waves": [],
-   "toughness": 0.5,
-   "damageMult": 1.25,
-   "enrageSeconds": 600,
-   "enrage": {
-    "toughness": 0.25,
-    "damageMult": 2
-   },
-   "respawnSeconds": 600,
-   "radius": 5000,
-   "announce": {
-    "spawn": "",
-    "death": ""
-   },
-   "_test": "B9 test 1 (25 Oct): the Minotaur Lord as is, hostile. Does BSKMinotaurLordAxe stay worn through a host change? traceEquipment logs every change of what it wears",
-   "boss": {
-    "edid": "CYREncMinotaur02Lord",
-    "desc": "d6fe5:BSHeartland.esm",
-    "options": [
-     [
-      44,
-      "d6fe5:BSHeartland.esm",
-      "CYREncMinotaur02Lord"
-     ]
-    ]
-   },
-   "adds": [],
-   "spots": [
-    {
-     "id": "ST",
-     "pos": [
-      -147.05,
-      195899.08,
-      5860.0
-     ],
-     "heading": 51.6,
-     "note": "Sancre Tor Ruins, the Minotaur Lord's spot (183380:DragonBreak Online Edits.esp)",
-     "ref": "e254a:BSHeartland.esm",
-     "anchorDist": 2626,
-     "anchorSameCell": false
-    }
-   ],
-   "drops": {
-    "always": [],
-    "schematic": {
-     "family": "adamantium",
-     "chance": 0.03,
-     "knownBonus": 0
-    }
-   }
-  },
-  {
-   "id": "minotaurtest2",
-   "name": "the Minotaur Lord of Sancre Tor",
-   "enabled": true,
-   "devOnly": true,
-   "traceEquipment": true,
-   "hold": "bruma",
-   "world": "a764b:BSHeartland.esm",
-   "openingAdds": 0,
-   "waves": [],
-   "toughness": 0.5,
-   "damageMult": 1.25,
-   "enrageSeconds": 600,
-   "enrage": {
-    "toughness": 0.25,
-    "damageMult": 2
-   },
-   "respawnSeconds": 600,
-   "radius": 5000,
-   "announce": {
-    "spawn": "",
-    "death": ""
-   },
-   "_test": "B9 test 2: the same, with its axe put back in its inventory after spawn (dungeons.js's arming), so the next host grant wears it",
-   "rearm": "6026df:BSAssets.esm",
-   "boss": {
-    "edid": "CYREncMinotaur02Lord",
-    "desc": "d6fe5:BSHeartland.esm",
-    "options": [
-     [
-      44,
-      "d6fe5:BSHeartland.esm",
-      "CYREncMinotaur02Lord"
-     ]
-    ]
-   },
-   "adds": [],
-   "spots": [
-    {
-     "id": "ST2",
-     "pos": [
-      -547.05,
-      195599.08,
-      5860.0
-     ],
-     "heading": 51.6,
-     "note": "Sancre Tor Ruins, 500 units from test 1's spot",
-     "ref": "e254a:BSHeartland.esm",
-     "anchorDist": 2525,
-     "anchorSameCell": false
-    }
-   ],
-   "drops": {
-    "always": [],
-    "schematic": {
-     "family": "adamantium",
-     "chance": 0.03,
-     "knownBonus": 0
-    }
-   }
-  },
-  {
    "id": "risenlegate",
    "name": "the Risen Legate of Sancre Tor",
    "enabled": true,
-   "devOnly": true,
    "hold": "bruma",
    "world": "a764b:BSHeartland.esm",
-   "openingAdds": 2,
+   "openingAdds": 3,
    "waves": [
     [
-     0.5,
+     0.66,
      3
+    ],
+    [
+     0.33,
+     4
     ]
    ],
    "toughness": 0.6,
@@ -3013,10 +2895,10 @@
    "respawnSeconds": 14400,
    "radius": 5000,
    "announce": {
-    "spawn": "The dead of Sancre Tor stir around their Legate.",
-    "death": "The Risen Legate of Sancre Tor lies still."
+    "spawn": "The undead legion of Sancre Tor forms up around its Legate.",
+    "death": "The Risen Legate of Sancre Tor lies still, and his legion with him."
    },
-   "_test": "B9 fallback if no minotaur works: the undead Nate put in the Minotaur Lords' spots (9 Oct; no Ayleid undead at Sancre Tor)",
+   "_note": "Nat, 25 Oct: Sancre Tor stays undead (an Imperial fort town; no Ayleid undead, Nate 9 Oct): an undead legion from Sancre Tor's own pools (gamemode-config ownedSpawns.replace minotaur: CYREncSkeleton01 lines and BSKEncZombie02). Adamantium's home, so its schematic stays here",
    "boss": {
     "edid": "BSKEncZombie03",
     "desc": "60292c:BSAssets.esm",
@@ -3029,6 +2911,50 @@
     ]
    },
    "adds": [
+    {
+     "edid": "CYREncSkeleton01Melee1H",
+     "desc": "5bc2e:BSHeartland.esm",
+     "options": [
+      [
+       1,
+       "5bc2e:BSHeartland.esm",
+       "CYREncSkeleton01Melee1H"
+      ]
+     ]
+    },
+    {
+     "edid": "CYREncSkeleton01Melee1Hshield",
+     "desc": "5bc60:BSHeartland.esm",
+     "options": [
+      [
+       1,
+       "5bc60:BSHeartland.esm",
+       "CYREncSkeleton01Melee1Hshield"
+      ]
+     ]
+    },
+    {
+     "edid": "CYREncSkeleton01Melee2H",
+     "desc": "5bc61:BSHeartland.esm",
+     "options": [
+      [
+       1,
+       "5bc61:BSHeartland.esm",
+       "CYREncSkeleton01Melee2H"
+      ]
+     ]
+    },
+    {
+     "edid": "CYREncSkeleton01Missile",
+     "desc": "5bc62:BSHeartland.esm",
+     "options": [
+      [
+       1,
+       "5bc62:BSHeartland.esm",
+       "CYREncSkeleton01Missile"
+      ]
+     ]
+    },
     {
      "edid": "BSKEncZombie02",
      "desc": "60292b:BSAssets.esm",
@@ -3061,6 +2987,232 @@
     "schematic": {
      "family": "adamantium",
      "chance": 0.03,
+     "knownBonus": 0
+    }
+   }
+  },
+  {
+   "id": "minotaurlord",
+   "name": "the Minotaur Lord of Minotaur's Rest",
+   "enabled": false,
+   "traceEquipment": false,
+   "hold": "bruma",
+   "world": "a764b:BSHeartland.esm",
+   "openingAdds": 0,
+   "waves": [],
+   "toughness": 0.5,
+   "damageMult": 1.25,
+   "enrageSeconds": 600,
+   "enrage": {
+    "toughness": 0.25,
+    "damageMult": 2
+   },
+   "respawnSeconds": 10800,
+   "radius": 5000,
+   "announce": {
+    "spawn": "Something heavy stirs in Minotaur's Rest.",
+    "death": "The Minotaur Lord of Minotaur's Rest is dead."
+   },
+   "waitingOn": "the dev test of the Minotaur Lord's axe (minotaurtest1/2): set rearmEdid to match the test that kept it, then enable",
+   "_note": "Drops (proposed, 25 Oct): Minotaur Horn x2 and Minotaur Hide (BSAssets, the beast's own), gold, Steel Plate 5%. Minotaur's Rest's own spawns are undead today (ownedSpawns.replace minotaur); if the Lord fights, Nat may want its minotaurs back as his adds",
+   "boss": {
+    "edid": "CYREncMinotaur02Lord",
+    "desc": "d6fe5:BSHeartland.esm",
+    "options": [
+     [
+      44,
+      "d6fe5:BSHeartland.esm",
+      "CYREncMinotaur02Lord"
+     ]
+    ]
+   },
+   "adds": [],
+   "spots": [
+    {
+     "id": "MR",
+     "pos": [
+      124198.92,
+      172698.27,
+      -7021.45
+     ],
+     "heading": 28.6,
+     "note": "Minotaur's Rest, the DLE's Minotaur Lord spot (178580:DragonBreak Online Edits.esp)",
+     "ref": "ea6ef:BSHeartland.esm",
+     "anchorDist": 3577,
+     "anchorSameCell": false
+    }
+   ],
+   "drops": {
+    "always": [
+     [
+      "f:Skyrim.esm",
+      100
+     ],
+     [
+      "6026e4:BSAssets.esm",
+      2,
+      "CYRMinotaurHorn"
+     ],
+     [
+      "6026e2:BSAssets.esm",
+      1,
+      "CYRMinotaurHide"
+     ]
+    ],
+    "schematic": {
+     "family": "steelplate",
+     "chance": 0.05,
+     "knownBonus": 0
+    }
+   }
+  },
+  {
+   "id": "minotaurtest1",
+   "name": "the Minotaur Lord of Minotaur's Rest",
+   "enabled": true,
+   "devOnly": true,
+   "traceEquipment": true,
+   "hold": "bruma",
+   "world": "a764b:BSHeartland.esm",
+   "openingAdds": 0,
+   "waves": [],
+   "toughness": 0.5,
+   "damageMult": 1.25,
+   "enrageSeconds": 600,
+   "enrage": {
+    "toughness": 0.25,
+    "damageMult": 2
+   },
+   "respawnSeconds": 600,
+   "radius": 5000,
+   "announce": {
+    "spawn": "",
+    "death": ""
+   },
+   "_test": "B9 test 1 (Nat, 25 Oct: the Minotaur Lord moves to Minotaur's Rest): CYREncMinotaur02Lord as is, hostile. Does BSKMinotaurLordAxe stay worn through a host change? traceEquipment logs every change",
+   "boss": {
+    "edid": "CYREncMinotaur02Lord",
+    "desc": "d6fe5:BSHeartland.esm",
+    "options": [
+     [
+      44,
+      "d6fe5:BSHeartland.esm",
+      "CYREncMinotaur02Lord"
+     ]
+    ]
+   },
+   "adds": [],
+   "spots": [
+    {
+     "id": "MR",
+     "pos": [
+      124198.92,
+      172698.27,
+      -7021.45
+     ],
+     "heading": 28.6,
+     "note": "Minotaur's Rest, the DLE's Minotaur Lord spot (178580:DragonBreak Online Edits.esp)",
+     "ref": "ea6ef:BSHeartland.esm",
+     "anchorDist": 3577,
+     "anchorSameCell": false
+    }
+   ],
+   "drops": {
+    "always": [
+     [
+      "f:Skyrim.esm",
+      100
+     ],
+     [
+      "6026e4:BSAssets.esm",
+      2,
+      "CYRMinotaurHorn"
+     ],
+     [
+      "6026e2:BSAssets.esm",
+      1,
+      "CYRMinotaurHide"
+     ]
+    ],
+    "schematic": {
+     "family": "steelplate",
+     "chance": 0.05,
+     "knownBonus": 0
+    }
+   }
+  },
+  {
+   "id": "minotaurtest2",
+   "name": "the Minotaur Lord of Minotaur's Rest",
+   "enabled": true,
+   "devOnly": true,
+   "traceEquipment": true,
+   "hold": "bruma",
+   "world": "a764b:BSHeartland.esm",
+   "openingAdds": 0,
+   "waves": [],
+   "toughness": 0.5,
+   "damageMult": 1.25,
+   "enrageSeconds": 600,
+   "enrage": {
+    "toughness": 0.25,
+    "damageMult": 2
+   },
+   "respawnSeconds": 600,
+   "radius": 5000,
+   "announce": {
+    "spawn": "",
+    "death": ""
+   },
+   "_test": "B9 test 2: the same, its axe put back in its inventory after spawn (dungeons.js's arming), worn at the next host grant",
+   "rearm": "6026df:BSAssets.esm",
+   "boss": {
+    "edid": "CYREncMinotaur02Lord",
+    "desc": "d6fe5:BSHeartland.esm",
+    "options": [
+     [
+      44,
+      "d6fe5:BSHeartland.esm",
+      "CYREncMinotaur02Lord"
+     ]
+    ]
+   },
+   "adds": [],
+   "spots": [
+    {
+     "id": "MR2",
+     "pos": [
+      124825.28,
+      173249.66,
+      -7136.22
+     ],
+     "heading": 80.2,
+     "note": "Minotaur's Rest, a minotaur spot (178581:DragonBreak Online Edits.esp)",
+     "ref": "ea6ef:BSHeartland.esm",
+     "anchorDist": 4363,
+     "anchorSameCell": false
+    }
+   ],
+   "drops": {
+    "always": [
+     [
+      "f:Skyrim.esm",
+      100
+     ],
+     [
+      "6026e4:BSAssets.esm",
+      2,
+      "CYRMinotaurHorn"
+     ],
+     [
+      "6026e2:BSAssets.esm",
+      1,
+      "CYRMinotaurHide"
+     ]
+    ],
+    "schematic": {
+     "family": "steelplate",
+     "chance": 0.05,
      "knownBonus": 0
     }
    }

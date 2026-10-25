@@ -16,7 +16,7 @@ const REAL = JSON.parse(fs.readFileSync(path.join(ROOT, 'bosses.json'), 'utf8'))
 const def = (id) => REAL.bosses.find((b) => b.id === id);
 
 // ---- the shipped data ----
-ok(REAL.bosses.map((b) => b.id).join() === 'icecap,briarheartking,centurion,palewarlord,falmerwarmonger,movarth,duskthorn,valkynaz,karstaag,minotaurtest1,minotaurtest2,risenlegate',
+ok(REAL.bosses.map((b) => b.id).join() === 'icecap,briarheartking,centurion,palewarlord,falmerwarmonger,movarth,duskthorn,valkynaz,karstaag,risenlegate,minotaurlord,minotaurtest1,minotaurtest2',
   'eight bosses: the Ice Cap Wraith, the Briarheart King, the Centurion Master, the Warlord of the Pale Pass, the Falmer Warmonger, the Master of Movarth\'s Lair, the Warchief of Dusk Thorn, the Valkynaz');
 ok(def('movarth').night === true && def('valkynaz').event && def('valkynaz').event.minutes === 30 && def('falmerwarmonger').guardian.options.length && def('duskthorn').guardian.options.length,
   'Movarth\'s master walks at night, the Valkynaz is a 30-minute event, the Warmonger and the Warchief have their shamans');
@@ -24,10 +24,13 @@ ok(!JSON.stringify(def('valkynaz').drops).includes('IngotEbony') && def('valkyna
 ok(def('icecap').enabled === false && def('palewarlord').enabled === false && def('briarheartking').enabled && def('centurion').enabled, 'the Wraith and the Warlord wait on Nat (spot, shard); the King and the Centurion are on');
 ok(def('icecap').boss.options[0][2] === 'EncIceWraith' && def('icecap').spots.length === 4 && def('icecap').drops.schematic.family === 'glacial_crystal', 'the Wraith: a vanilla ice wraith, four candidate spots, the Glacial Crystal schematic');
 ok(def('briarheartking').boss.options.slice(-1)[0][2] === 'EncForsworn06BossMagicBretonM03' && def('briarheartking').guardian.options[0][2] === 'EncHagraven', 'the King: the strongest Forsworn boss shaman, his Hagraven beside him');
-ok(REAL.bosses.every((b) => b.spots.every((s) => s.ref && s.anchorDist < 3000)), 'every spot has an anchor within 3000 units (Sancre Tor\'s, 2600 out, is the one Nate\'s minotaur zone uses)');
+ok(REAL.bosses.every((b) => b.spots.every((s) => s.ref && s.anchorDist < 5000)), 'every spot has an anchor within 5000 units (Sancre Tor\'s and Minotaur\'s Rest\'s are the ones Nate\'s own zones there use)');
 ok(def('karstaag').enabled === false && /Solstheim/.test(def('karstaag').waitingOn) && def('karstaag').boss.options[0][2] === 'DLC2dunKarstaag', 'Karstaag is defined and off until Solstheim opens');
-ok(['minotaurtest1', 'minotaurtest2', 'risenlegate'].every((id) => def(id).devOnly === true) && def('minotaurtest2').rearm === '6026df:BSAssets.esm' && def('risenlegate').boss.options[0][2] === 'BSKEncZombie03',
-  'the Minotaur Lord\'s two tests and the Risen Legate are dev-only; test 2 re-arms BSKMinotaurLordAxe');
+ok(['minotaurtest1', 'minotaurtest2'].every((id) => def(id).devOnly === true && /Minotaur's Rest/.test(def(id).spots[0].note)) && def('minotaurtest2').rearm === '6026df:BSAssets.esm',
+  'the Minotaur Lord\'s two tests are dev-only, at Minotaur\'s Rest; test 2 re-arms BSKMinotaurLordAxe');
+ok(def('minotaurlord').enabled === false && !def('minotaurlord').devOnly && def('minotaurlord').drops.always.some((x) => x[2] === 'CYRMinotaurHorn'), 'the live Minotaur Lord waits on the test, his drop the beast\'s own horn and hide');
+ok(def('risenlegate').enabled === true && !def('risenlegate').devOnly && def('risenlegate').boss.options[0][2] === 'BSKEncZombie03' && def('risenlegate').adds.length === 5 && def('risenlegate').drops.schematic.family === 'adamantium',
+  'Sancre Tor stays undead: the Risen Legate is a full boss with an undead legion of Sancre Tor\'s own pools, Adamantium 3%');
 ok(def('centurion').drops.extra.some((x) => x[0] === '17749:Dragonborn.esm' && x[1] === 0.05 && x[3] === 'DLC2HeartStone'), 'the Centurion Master drops a Heart Stone at 5%');
 
 // ---- a scratch folder and a test copy where every boss is on ----
@@ -197,9 +200,9 @@ ok(!hasZone('boss:valkynaz:boss') && !zones().some((x) => x.Name.startsWith('bos
 
 // ---- the dev-only tests: the Minotaur Lord's axe, the Risen Legate ----
 load({});
-ok(!zones().some((x) => /^boss:(minotaurtest1|minotaurtest2|risenlegate):/.test(x.Name)), 'off the dev server the test bosses write nothing');
+ok(!zones().some((x) => /^boss:(minotaurtest1|minotaurtest2):/.test(x.Name)) && hasZone('boss:risenlegate:boss'), 'off the dev server the test bosses write nothing; the Legate stands');
 load({ bosses: { devOnly: true } });
-ok(hasZone('boss:minotaurtest1:boss') && hasZone('boss:minotaurtest2:boss') && hasZone('boss:risenlegate:boss') && !hasZone('boss:karstaag:boss'), 'bosses.devOnly true: both Minotaur Lord tests and the Legate stand; Karstaag stays off');
+ok(hasZone('boss:minotaurtest1:boss') && hasZone('boss:minotaurtest2:boss') && !hasZone('boss:karstaag:boss') && !hasZone('boss:minotaurlord:boss'), 'bosses.devOnly true: both Minotaur Lord tests stand; Karstaag and the live Lord stay off');
 const MT = 0xff600001, AXE = idOf('6026df:BSAssets.esm');
 put(MT, 'private.npcSpawner', 'boss:minotaurtest2:boss'); put(MT, 'percentages', { health: 1, magicka: 1, stamina: 1 });
 put(MT, 'inventory', { entries: [{ baseId: 0x123, count: 1 }] });

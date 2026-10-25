@@ -20016,6 +20016,38 @@
     0,
     0.0
    ]
+  },
+  {
+   "name": "Boss: the Risen Legate of Sancre Tor, Sancre Tor Ruins (Bruma)",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    -247.05,
+    195799.08,
+    5924.0
+   ],
+   "rot": [
+    0,
+    0,
+    51.6
+   ]
+  },
+  {
+   "name": "Boss: the Minotaur Lord of Minotaur's Rest, Minotaur's Rest (Bruma)",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    124198.92,
+    172698.27,
+    -6957.45
+   ],
+   "rot": [
+    0,
+    0,
+    28.6
+   ]
   }
  ]
 }
