@@ -34,13 +34,13 @@ async function main() {
     check('...whatever the high byte of the ids', needsFreshBase(0x00000007, 7 >>> 0) === true);
     check('a base that is gone (no form) is rebuilt', needsFreshBase(null, 7) === true && needsFreshBase(0, 7) === true);
     check('a copy\'s own base (a createNpc id) is kept', needsFreshBase(0xff012345, 7) === false);
-    const fv = fs.readFileSync(path.resolve(__dirname, '../src/view/formView.ts'), 'utf8');
+    const fv = fs.readFileSync(path.resolve(__dirname, '../src/view/formView.ts'), 'utf8').replace(/\r\n/g, '\n');
     const getter = (fv.match(/private getAppearanceBasedBase\(\): number \{[\s\S]*?\n  \}/) || [''])[0];
     // 0.3.95 asked needsFreshBase here and respawned every player copy every frame (the 13 Oct clone storm): the getter
     // rebuilds only a missing base (tests/clonestorm-harness.js runs it)
     check('formView\'s base getter does not rebuild an aliased base while the copy stands on it', !/needsFreshBase\(/.test(getter), getter);
     const tag = (fv.match(/const isVisibleByPlayer = [\s\S]*?;\n/) || [''])[0];
-    check('a name tag stays off someone under an Invisibility spell (#bugs 1 Oct)', /!this\.spellInvisible\(refr\)/.test(tag), tag);
+    check('a name tag stays off someone under an Invisibility spell (#bugs 1 Oct)', /!this\.spellInvisible\(refr(, model)?\)/.test(tag), tag);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

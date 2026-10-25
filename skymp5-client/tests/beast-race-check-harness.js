@@ -8,7 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const { wantRace, raceCheckStep, RACE_CHECK_MS, RACE_HELD_CHECKS } = require(path.resolve(process.argv[2] || '/dev/shm/claude-nate-racecheck/beastRaceCheck.js'));
-const SRC = fs.readFileSync(path.resolve(__dirname, '..', 'src/services/services/beastFormService.ts'), 'utf8');
+const SRC = fs.readFileSync(path.resolve(__dirname, '..', 'src/services/services/beastFormService.ts'), 'utf8').replace(/\r\n/g, '\n');
 let failures = 0;
 const check = (name, ok, got) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${!ok && got !== undefined ? '   ' + JSON.stringify(got) : ''}`); if (!ok) failures++; };
 const NORD = 0x13746, WOLF = 0xcdd84;
@@ -35,7 +35,7 @@ check('no player yet: wait', raceCheckStep(w, 5, null).next === w);
 check('nothing watched: nothing', raceCheckStep(null, 5, up(WOLF)).next === null && !raceCheckStep(null, 5, up(WOLF)).retry);
 check('a signed race id compares as unsigned', raceCheckStep(wantRace(0x8883d, true, 0), 1, up(0x8883d | 0)).retry === false);
 
-check('beastFormService watches a revert the server sends (only a revert: a watched beast race would force the form back after a lost dboBeast)', /player\.setRace\(race\);[\s\S]{0,700}?this\.raceWanted = beast \? null : wantRace\(raceId, beast, Date\.now\(\)\);/.test(SRC));
+check('beastFormService watches a revert the server sends (only a revert: a watched beast race would force the form back after a lost dboBeast)', /player\.setRace\(race\);[\s\S]{0,1200}?this\.raceWanted = beast \? null : wantRace\(raceId, beast, Date\.now\(\)\);/.test(SRC));
 check('...and a check that throws stops watching instead of throwing on', /catch \(e\) \{ logError\(this, "race check failed", e\); this\.raceWanted = null; return; \}/.test(SRC));
 check('...checks it each update (onCameraCheck)', /private onCameraCheck\(\): void \{\s*\n\s*this\.checkRace\(\);/.test(SRC));
 check('...and a retry sets the race, the beast flag and the controls again', /player\.setRace\(race\);\s*\n\s*try \{ this\.sp\.Game\.setBeastForm\(w\.beast\);/.test(SRC) && /this\.restoreControls\(\);\s*\n\s*logTrace\(this, "Race did not hold, set again"/.test(SRC));

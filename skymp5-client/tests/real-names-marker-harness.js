@@ -11,7 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const { revealMarkerOf, revealLabelFor, revealTagText } = require(path.resolve(process.argv[2] || 'realNamesMarker.js'));
 const SRC = path.resolve(__dirname, '..', 'src');
-const read = (f) => fs.readFileSync(path.join(SRC, f), 'utf8');
+const read = (f) => fs.readFileSync(path.join(SRC, f), 'utf8').replace(/\r\n/g, '\n');
 
 let failures = 0;
 const check = (name, ok, got) => {
@@ -47,7 +47,7 @@ const vis = fv.slice(fv.indexOf('const isVisibleByPlayer = '), fv.indexOf('if (i
 check('the nametag: a hood and a beast are drawn only for a viewer with the marker, a beast only with its label', /\(revealing \|\| !this\.isSweetHidePerson\(refr\)\)/.test(vis)
   && /\(!this\.isBeastCopy\(model\) \|\| \(revealing && revealLabelFor\(known, this\.getRemoteRefrId\(\)\) !== ""\)\)/.test(vis), vis);
 check('...and every visibility rule stays for staff too: sneaking, distance, sight, hidden admins, Invisibility', /!model\.movement\?\.isSneaking/.test(vis) && /getDistance\(refr\) <= maxNicknameDrawDistance/.test(vis)
-  && /hasLOS\(refr\)/.test(vis) && /adminViewOf\(model\) !== "hidden"/.test(vis) && /!this\.spellInvisible\(refr\)/.test(vis));
+  && /hasLOS\(refr\)/.test(vis) && /adminViewOf\(model\) !== "hidden"/.test(vis) && /!this\.spellInvisible\(refr(, model)?\)/.test(vis));
 const ip = read('services/services/interactionPromptService.ts');
 const ap = ip.slice(ip.indexOf('private actorPromptFor('), ip.indexOf('private knowsTarget('));
 check('the crosshair prompt: "Interact <label>" / "Search <label>" for a labelled player, after the vanilla and NPC cases', /if \(!isRemotePlayerCharacter\(remoteId\)\)[\s\S]*const staffLabel = revealLabelFor\(this\.ownerKnownIds\(\), remoteId\);\s*if \(staffLabel\) return \{ verb: dead \? "Search" : "Interact", label: staffLabel \};/.test(ap), ap);
