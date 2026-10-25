@@ -1532,7 +1532,7 @@
  },
  "heldClosedDoors": ["14df:BSHeartland.esm", "656df:BSHeartland.esm"],
  "_heldClosedDoors": "Load doors kept shut (gamemode.js): the two Pale Pass border gates (HelgenGate01), which looked wide open and were run through (Nate, 17 Oct). Hot reload; [] to stop.",
- "coinPurses": {
+ "coinPurses": {"_holdShare": "Nat, 25 Oct (\"diversify how holds get more income\"): this share of each purse goes to the treasury of the hold it stands in, as that hold's income; the opener keeps the rest, and the whole where the purse is in no hold or one without a treasury. 0 turns it off.", "holdShare": 0.1, 
   "_comment": "Coin purses (gamemode.js PURSE): goldMin..goldMax per purse before the Harvesting multiplier, a purse rests restMinutes for everyone (in a claimed dungeon it is full again for the next claim). Gold cut (Nate, 4 Oct; gold-cut-1004): was 8-30. Only coin purses pay (Nate, 18 Oct: 'harvest gold purses again, no looting gold piles'): gold piles, stacks and loose coins stay refused whatever this says; enabled false refuses the purses too. Hot reload.",
   "enabled": true,
   "goldMin": 3,

@@ -1,5 +1,21 @@
 [
   {
+    "title": "Coin purses pay the holds a share",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Holds",
+        "items": [
+          "A tenth of the gold in every coin purse you open now goes to the treasury of the hold it is in, and you keep the rest. The game tells you how much went where.",
+          "A purse outside any hold, or in a hold with no treasury, is still all yours.",
+          "It gives every hold a steady income from the people working its land, without anyone paying a new fee."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The bank gem counter reopens",
     "date": "2026-10-25",
     "version": "Server update",
