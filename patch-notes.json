@@ -1,5 +1,23 @@
 [
   {
+    "title": "Birthsigns",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Characters",
+        "items": [
+          "Every character is born under one of the thirteen signs, chosen once and kept for life. A new character chooses in the Realm before the god, and before leaving.",
+          "Each sign gives a small lasting gift in the spirit of its lore: the Warrior learns weapons faster, the Lady recovers health and stamina faster, the Atronach holds more magicka but refills it slowly, the Shadow strikes harder from hiding, and so on. The menu shows each sign's gift before you choose.",
+          "A sign's gift adds to your race's and stays within the same limits, and it rests while you are in a beast form.",
+          "Characters who have no sign yet choose one when they next log in. Closing the menu only puts it off: it comes back a little later, and never while you are fighting, downed, jailed or in the race menu. Type /birthsign to see yours, or to choose by name.",
+          "Only staff can change a sign once it is chosen. The standing stones in the world are unchanged for now."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The Great Faiths have joined the Imperial Cult",
     "date": "2026-10-25",
     "version": "Server update",

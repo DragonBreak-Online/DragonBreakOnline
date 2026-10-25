@@ -20,7 +20,7 @@ const helper = h0 > 0 && h1 > h0 ? src.slice(h0, h1) : 'const gateCreationTold =
 
 let now = 1792510953000;
 const told = [], moved = [], said = [];
-const pending = new Set();
+const pending = new Set(), noSign = new Set();
 const GATE = ['Whiterun', [[18313, -10665, -4588.5]], 90];
 const sandbox = {
   Date: { now: () => now },
@@ -31,6 +31,7 @@ const sandbox = {
   display: (a) => `Stranger #${a.toString(16)}`,
   gateOf: (t) => (t === 0x174f4 || t === 0x174e5 ? GATE : null),
   creationPending: (a) => pending.has(a),
+  birthsignHeld: (a) => noSign.has(a),
   gateAnswersStart: () => {},
   gateSpotFor: (g) => g[1][0],
   TAMRIEL: '3c:Skyrim.esm',
@@ -57,6 +58,17 @@ now += 500;
 const r = gateStep(0x174f4, DONE);
 check('a finished character is moved through the gate', r === false && moved.length === 1 && moved[0][0] === DONE && moved[0][1].cellOrWorldDesc === '3c:Skyrim.esm', moved);
 check('...told it stepped through, and never told it is unfinished', said.some(([a, t]) => a === DONE && /step through the gate to Whiterun/.test(t)) && !told.some(([a]) => a === DONE));
+// A finished character with no birthsign yet (birthsigns.js) is refused too, with the birthsign's own line
+const NOSIGN = 0xff000043; noSign.add(NOSIGN);
+sandbox.globalThis.__dboBirthsignGateLine = 'Choose your birthsign before you leave the Realm.';
+now += 20000;
+const m0 = moved.length;
+const rs = [gateStep(0x174f4, NOSIGN), gateStep(0x174f4, NOSIGN)];
+check('a character with no birthsign is refused at the gate and not moved', rs.every((x) => x === false) && moved.length === m0, rs);
+check('...told the birthsign line once, not the unfinished-character one', told.filter(([a]) => a === NOSIGN).length === 1 && told.find(([a]) => a === NOSIGN)[1] === 'Choose your birthsign before you leave the Realm.', told);
+noSign.delete(NOSIGN); now += 500;
+gateStep(0x174f4, NOSIGN);
+check('...and goes through once it has one', moved.length === m0 + 1 && moved[moved.length - 1][0] === NOSIGN);
 // Anything that is no gate falls through to the rest of the chain, in creation or not
 const toldBefore = told.length;
 check('a door that is no gate falls through for a character in creation', gateStep(0x12345, NEW) === 'through');
