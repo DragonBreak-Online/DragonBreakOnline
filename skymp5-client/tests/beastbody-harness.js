@@ -22,7 +22,8 @@ const check = (name, ok, got) => {
   if (!ok) failures++;
 };
 
-const WEREWOLF = 0x000cdd84, VAMPIRE_LORD = 0x0200283a, NORD = 0x00013746, DRAUGR = 0x00000d53;
+// HorseRace (Skyrim.esm 0131FD, nonHumanoidRaceList.ts) is never a beast or a polymorph form; DraugrRace became a polymorph form
+const WEREWOLF = 0x000cdd84, VAMPIRE_LORD = 0x0200283a, NORD = 0x00013746, HORSE = 0x000131fd;
 const WOLF = 0xff000010, LORD = 0xff000020, OTHER = 0xff000030;
 const snap0 = () => ({ booleans: new Uint8Array(4), floats: new Uint8Array(8), integers: new Uint8Array(8) });
 
@@ -34,7 +35,7 @@ check('anyone else keeps the appearance the server sent', beastBodyOf(OTHER) ===
 check('a signed id is the same player', beastBodyOf(WOLF | 0) === WEREWOLF);
 setBeastBodies([{ id: LORD, race: VAMPIRE_LORD }]);
 check('a new list replaces the old: a werewolf left out of it is mortal again', beastBodyOf(WOLF) === 0 && beastBodyOf(LORD) === VAMPIRE_LORD);
-setBeastBodies([{ id: WOLF, race: NORD }, { id: OTHER, race: DRAUGR }, { id: 0, race: WEREWOLF }]);
+setBeastBodies([{ id: WOLF, race: NORD }, { id: OTHER, race: HORSE }, { id: 0, race: WEREWOLF }]);
 check('only the two beast races are taken: a list cannot give a player any other race', beastBodyOf(WOLF) === 0 && beastBodyOf(OTHER) === 0);
 setBeastBodies([]);
 check('an empty list (a new connection) shows nobody as a beast', beastBodyOf(LORD) === 0);
