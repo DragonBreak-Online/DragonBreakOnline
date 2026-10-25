@@ -25,7 +25,7 @@
     "CraftingSmithingSkyforge": ["skyrim"],
     "DLC1CraftingDawnguard": ["skyrim"],
     "DLC1LD_CraftingForgeAetherium": ["skyrim"],
-    "DLC2StaffEnchanter": ["solstheim"],
+    "DLC2StaffEnchanter": ["skyrim", "solstheim"],
     "CYRCraftingAyleidWell": ["cyrodiil"]
   },
   "items": {
@@ -35,6 +35,12 @@
     "BYOHFoodMilk": "common"
   },
   "recipes": {
+    "_staffblanks": "Staves in Skyrim (Nat, 25 Oct): the Staff Enchanter is open in Skyrim as well as Solstheim (benches.DLC2StaffEnchanter; the benches standing in Skyrim are Windhelm's Grey Quarter merchant and a Whiterun player home), and the five unenchanted staves its recipes consume are made there too (DBO_RecipeStaffBlank*, DragonBreak Staff Blanks.esp merged into the DLE; _work/staff-crafting-1025.md). Heart Stones stay rare: the Centurion Master's drop (bosses.js).",
+    "DBO_RecipeStaffBlankDestruction": ["skyrim", "solstheim"],
+    "DBO_RecipeStaffBlankConjuration": ["skyrim", "solstheim"],
+    "DBO_RecipeStaffBlankIllusion": ["skyrim", "solstheim"],
+    "DBO_RecipeStaffBlankRestoration": ["skyrim", "solstheim"],
+    "DBO_RecipeStaffBlankAlteration": ["skyrim", "solstheim"],
     "_nordic": "Nordic carved gear (smithing.json family nordic: Dragonborn's recipes and the server's Nord1/Nord2 sets) is forged in Skyrim as well as Solstheim, as Dwarven and Dragon are: its schematic is found in Skyrim's Nordic barrows and by reading, so a smith who learned it in Skyrim was refused there as \"a Solstheim design\" (/bug #BGJN, 24 Oct). regions.json marks Dragonborn's recipes Solstheim by the plugin.",
     "DLC2RecipeArmorNordicShield": ["skyrim", "solstheim"],
     "DLC2RecipeArmorNordicHeavyBoots": ["skyrim", "solstheim"],
