@@ -360,7 +360,8 @@ const hp = (a) => S.get(a).percentages.health;
   check('onHitDamage hands the landed hit to gearench', /gearEnch\.landed\(agg, tgt, Number\(sourceId\) >>> 0, dealt\)/.test(gm));
   check('sourceResistsOf takes a magic effect as its own source', /ownData = r && String\(r\.record\.type\) === 'MGEF'/.test(gm));
   check('racial.js counts a magic effect as magic', /\['SPEL', 'ENCH', 'SCRL', 'MGEF'\]/.test(read('racial.js')));
-  check('item 2: worn resistances join the target side, before racial.js caps it', /potionResistMult\(tgt, src\) \* gearResistMult\(tgt, src\);[\s\S]{0,300}if \(racial\) \{ try \{ targetSide = racial\.capTargetSide/.test(gm));
+  // briarheart.js's target multiplier also sits before the cap (hagraven-1025), so the window between them is wider
+  check('item 2: worn resistances join the target side, before racial.js caps it', /potionResistMult\(tgt, src\) \* gearResistMult\(tgt, src\);[\s\S]{0,700}if \(racial\) \{ try \{ targetSide = racial\.capTargetSide/.test(gm));
   // item 3: potionTakenMult, lifted out of gamemode.js with a worn Fortify Health 50 and no potion
   {
     const from = gm.indexOf('// Worn Fortify Health counts the same way'), to = gm.indexOf('const potionAttackMult =');
@@ -376,7 +377,7 @@ const hp = (a) => S.get(a).percentages.health;
   check('...Fortify Block adds to the block potion in combat.js', /1 - Math\.min\(1, blockPotion \+ blockGear\)/.test(read('combat.js')));
   check('...Fortify Pickpocket adds to the thief\'s chance in pickpocket.js', /chanceFor\(tier, g, drawn, a\)/.test(read('pickpocket.js')) && /b\(thief, 'pickpocket'\)/.test(read('pickpocket.js')));
   check('...Fortify Unarmed shares gearFortify (AV 35)', /35: 'unarmed'/.test(gm));
-  check('item 8: Spellbreaker joins the target side before the cap', /targetSide \*= gearEnch\.spellbreakerMult\(agg, tgt, src, dmg, flags\);[\s\S]{0,200}racial\.capTargetSide/.test(gm));
+  check('item 8: Spellbreaker joins the target side before the cap', /targetSide \*= gearEnch\.spellbreakerMult\(agg, tgt, src, dmg, flags\);[\s\S]{0,600}racial\.capTargetSide/.test(gm));
   check('...the Shrouded Gloves multiply the blow, never a beast\'s', /if \(gearEnch && !beastAgg\) mult \*= gearEnch\.backstabMult\(agg, src, flags\)/.test(gm));
   console.log(failed ? `${failed} failed` : 'all checks passed');
   process.exit(failed ? 1 : 0);

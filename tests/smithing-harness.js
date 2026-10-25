@@ -19,10 +19,10 @@ process.on('exit', () => { try { fs.rmSync(dir, { recursive: true, force: true }
 { const t = JSON.parse(fs.readFileSync(path.join(SERVER, 'smithing.json'), 'utf8')); t.families.forEach((f) => { if (f.id === 'steel') delete f.free; }); fs.writeFileSync(path.join(dir, 'smithing.json'), JSON.stringify(t)); }
 fs.writeFileSync(path.join(dir, 'manuals.json'), JSON.stringify({ manuals: [] }));
 // The Legion's helm is faction gear (factiongear.js decides who makes it); the Imperial family leaves it alone (factionExempt)
-fs.writeFileSync(path.join(dir, 'faction-gear.json'), JSON.stringify({ items: { '7a3:Skyrim.esm': { name: 'Imperial Helmet', set: 'Imperial Legion', factions: ['imperial-legion'], role: 'blacksmith' } } }));
+fs.writeFileSync(path.join(dir, 'faction-gear.json'), JSON.stringify({ items: { '7a3:Skyrim.esm': { name: 'Imperial Helmet', set: 'Imperial Legion', factions: ['imperial-legion'], role: 'blacksmith' } } }));  // verify-formids: ignore - fixture ids standing in for armour records; the harness never loads a plugin
 // Items: an iron sword (T1), a steel sword (T2), orcish (T3), dwarven (T4), glass (T5), an unclassified one
 const IRON = 0x12eb7, STEEL = 0x13989, ORC = 0x13991, DWARF = 0x139b4, GLASS = 0x139a5, ODD = 0x777777, INGOT = 0x5ace5, LEATHER = 0x800e4;
-fs.writeFileSync(path.join(dir, 'loot-materials.json'), JSON.stringify({ items: { '12eb7:skyrim.esm': 'iron', '13989:skyrim.esm': 'steel', '13991:skyrim.esm': 'orcish', '139b4:skyrim.esm': 'dwarven', '139a5:skyrim.esm': 'glass', '7c1:skyrim.esm': 'bonemold', '7a1:skyrim.esm': 'ancient_imperial', '7a2:skyrim.esm': 'ancient_imperial', '7a3:skyrim.esm': 'imperial', '7a6:skyrim.esm': 'imperial', '7b1:skyrim.esm': 'brass', '7b2:skyrim.esm': 'adamantium' } }));
+fs.writeFileSync(path.join(dir, 'loot-materials.json'), JSON.stringify({ items: { '12eb7:skyrim.esm': 'iron', '13989:skyrim.esm': 'steel', '13991:skyrim.esm': 'orcish', '139b4:skyrim.esm': 'dwarven', '139a5:skyrim.esm': 'glass', '7c1:skyrim.esm': 'bonemold', '7a1:skyrim.esm': 'ancient_imperial', '7a2:skyrim.esm': 'ancient_imperial', '7a3:skyrim.esm': 'imperial', '7a6:skyrim.esm': 'imperial', '7b1:skyrim.esm': 'brass', '7b2:skyrim.esm': 'adamantium' } }));  // verify-formids: ignore - fixture ids standing in for armour records; the harness never loads a plugin
 process.chdir(dir);
 
 const u32 = (x) => { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, x, true); return b; };
@@ -71,7 +71,7 @@ const load = (smithing) => {
   const cfg = { smithing, manuals: { shop: { enabled: true, cells: ['cell'] } } };
   const common = { mp, log: () => {}, personal: (a, t) => told.push([a, t]), audit: (t) => audits.push(t), who: (a) => `#${(a >>> 0).toString(16)}`, display: (a) => `#${(a >>> 0).toString(16)}`, cfg,
     registerChatCommand: (n, fn) => cmds.set(n, fn), onlineActors: () => ONLINE.slice(), findByName: (q) => ({ a: A, sup: SUP }[q] || 0), isAdmin: (a) => a === STAFF,
-    sendPacket: () => true, itemName: (d) => ({ '13989:Skyrim.esm': 'Steel Sword', '12eb7:Skyrim.esm': 'Iron Sword', '13991:Skyrim.esm': 'Orcish Sword', '139b4:Skyrim.esm': 'Dwarven Sword', '7a2:Skyrim.esm': 'Ancient Imperial Shield', '7a3:Skyrim.esm': 'Imperial Helmet' }[d] || ''), every: (n, ms, fn) => timers.set(n, fn), giveItem: (a, id, n) => { given.push([a, id, n]); return true; }, takeGold: () => true, depositToTreasury: () => 0, notify: () => {} };
+    sendPacket: () => true, itemName: (d) => ({ '13989:Skyrim.esm': 'Steel Sword', '12eb7:Skyrim.esm': 'Iron Sword', '13991:Skyrim.esm': 'Orcish Sword', '139b4:Skyrim.esm': 'Dwarven Sword', '7a2:Skyrim.esm': 'Ancient Imperial Shield', '7a3:Skyrim.esm': 'Imperial Helmet' }[d] || ''), every: (n, ms, fn) => timers.set(n, fn), giveItem: (a, id, n) => { given.push([a, id, n]); return true; }, takeGold: () => true, depositToTreasury: () => 0, notify: () => {} };  // verify-formids: ignore - fixture ids standing in for armour records; the harness never loads a plugin
   delete require.cache[path.join(SERVER, 'manuals.js')]; delete require.cache[path.join(SERVER, 'smithing.js')];
   require(path.join(SERVER, 'manuals.js'))(common);
   require(path.join(SERVER, 'smithing.js'))(common);
@@ -81,12 +81,12 @@ const craft = (a, item, recipe, laterRefused) => { globalThis.__dboSmithState.to
 const lastTold = (a) => (told.filter(([x]) => x === a).pop() || [])[1] || '';
 
 // ---- off: nothing changes ----
-load({ enabled: false, books: { steel: 'b0001:Skyrim.esm' } });
+load({ enabled: false, books: { steel: 'b0001:Skyrim.esm' } });  // verify-formids: ignore - placeholder technique-book ids; the harness never loads a plugin
 smith(A, 0);
 ok(craft(A, STEEL, R_STEEL) === true && globalThis.__dboTemperCap(A, GLASS) === 16 && globalThis.__dboSmithView(A) === null, 'flag off: no gate, no temper rule, no view');
 
 // ---- on ----
-const ON = { enabled: true, books: { steel: 'b0001:Skyrim.esm', glass: 'b0002:Skyrim.esm', DRAGON: 'b0003:Skyrim.esm' }, drops: {} };
+const ON = { enabled: true, books: { steel: 'b0001:Skyrim.esm', glass: 'b0002:Skyrim.esm', DRAGON: 'b0003:Skyrim.esm' }, drops: {} };  // verify-formids: ignore - placeholder technique-book ids; the harness never loads a plugin
 load(ON);
 ok(globalThis.__dboSmithCraftTier(A) === 1, 'Blacksmith with 0 points: craft tier 1');
 smith(A, 15); ok(globalThis.__dboSmithCraftTier(A) === 2, '15 points: tier 2');
@@ -172,8 +172,8 @@ ok(shop.includes(BOOK_STEEL) && !shop.includes(BOOK_GLASS) && !shop.includes(BOO
 ok(!(cmds.get('manual') && false) && globalThis.__dboTechniqueDrop('boss', 'nightmare') === null && globalThis.__dboManualsBossLoot('nightmare', '') === null, 'no drop without a rule (off until the books exist and rates are set)');
 load(Object.assign({}, ON, { drops: { goblinCamp: { chance: 1, families: ['steel', 'DRAGON'] } } }));
 const d = globalThis.__dboTechniqueDrop('goblinCamp');
-ok(d && d.id === 'b0001:Skyrim.esm', 'a drop rule hands out a listed book, never Dragon (noLoot: dragon materials only from dragons; found only by reading)', d);
-{ let dragon = 0; for (let i = 0; i < 200; i++) { const x = globalThis.__dboTechniqueDrop('goblinCamp'); if (!x || x.id !== 'b0001:Skyrim.esm') dragon++; } ok(dragon === 0, '...in 200 rolls', dragon); }
+ok(d && d.id === 'b0001:Skyrim.esm', 'a drop rule hands out a listed book, never Dragon (noLoot: dragon materials only from dragons; found only by reading)', d);  // verify-formids: ignore - placeholder technique-book ids; the harness never loads a plugin
+{ let dragon = 0; for (let i = 0; i < 200; i++) { const x = globalThis.__dboTechniqueDrop('goblinCamp'); if (!x || x.id !== 'b0001:Skyrim.esm') dragon++; } ok(dragon === 0, '...in 200 rolls', dragon); }  // verify-formids: ignore - placeholder technique-book ids; the harness never loads a plugin
 
 // Ancient Imperial (Nate, 9 Oct): its own T2 family with a book, split from the Legion's "imperial"
 load(ON); smith(A, 20); props.set(`${A}|private.dboManuals`, {}); props.set(`${SUP}|private.dboManuals`, {});
@@ -186,8 +186,8 @@ ok(craft(A, ANC_HELM, R_ANC) !== false && globalThis.__dboTemperCap(A, ANC_HELM)
 const ai = globalThis.__dboSmithView(A).families.find((f) => f.id === 'ancient_imperial');
 ok(ai && ai.tier === 2 && ai.recipes.includes('Ancient Imperial Shield') && !ai.recipes.includes('Imperial Helmet'), 'the view lists Ancient Imperial at T2 with its own recipes', ai);
 rec(0xb0004, 'BOOK', 'DBO_SchematicsAncientImperial', [{ type: 'DATA', data: bookData() }]);
-load(Object.assign({}, ON, { books: Object.assign({}, ON.books, { ancient_imperial: 'b0004:Skyrim.esm' }), drops: { ruin: { chance: 1, families: ['ancient_imperial'] } } }));
-ok(globalThis.__dboManualsShop(A).some((x) => /^Schematics: Ancient Imperial \(T2\)/.test(x.label)) && globalThis.__dboTechniqueDrop('ruin').id === 'b0004:Skyrim.esm', 'its book "Schematics: Ancient Imperial" is sold and dropped like the other T2 books', globalThis.__dboManualsShop(A));
+load(Object.assign({}, ON, { books: Object.assign({}, ON.books, { ancient_imperial: 'b0004:Skyrim.esm' }), drops: { ruin: { chance: 1, families: ['ancient_imperial'] } } }));  // verify-formids: ignore - placeholder technique-book ids; the harness never loads a plugin
+ok(globalThis.__dboManualsShop(A).some((x) => /^Schematics: Ancient Imperial \(T2\)/.test(x.label)) && globalThis.__dboTechniqueDrop('ruin').id === 'b0004:Skyrim.esm', 'its book "Schematics: Ancient Imperial" is sold and dropped like the other T2 books', globalThis.__dboManualsShop(A));  // verify-formids: ignore - placeholder technique-book ids; the harness never loads a plugin
 
 // The PC's books (9 Oct): smithing.json carries each family's bookId; config smithing.books overrides it
 const REAL = JSON.parse(fs.readFileSync(path.join(SERVER, 'smithing.json'), 'utf8')).families;
@@ -385,7 +385,7 @@ ok(/Staff only/.test(lastTold(A)), 'players cannot use /smithing');
 const src = fs.readFileSync(path.join(SERVER, 'regions.js'), 'utf8');
 ok(/verdict !== false && typeof globalThis\.__dboSmithCrafted === 'function'/.test(src), 'regions.js counts the apprenticeship only after the final verdict');
 const dsrc = fs.readFileSync(path.join(SERVER, 'dungeons.js'), 'utf8'), wsrc = fs.readFileSync(path.join(SERVER, 'wildlife.js'), 'utf8');
-ok(/'ayleidRuin'/.test(dsrc) && /'dwemerRuin'/.test(dsrc) && /'falmerRuin'/.test(dsrc) && /isCyrodiilFort\(d\) \? 'fort'/.test(dsrc) && /__dboTechniqueDrop\(techniqueRuin\(d\), diff\.id\)/.test(dsrc) && /__dboTechniqueDrop\('goblinCamp'\)/.test(wsrc), 'ruin chests (Ayleid, Dwemer, Falmer, Cyrodiil forts) and goblin camps ask for a technique drop');
+ok(/'ayleidRuin'/.test(dsrc) && /'dwemerRuin'/.test(dsrc) && /'falmerRuin'/.test(dsrc) && /isCyrodiilFort\(d\) \? 'fort'/.test(dsrc) && /__dboTechniqueDrop\(techniqueRuin\(d\), diff\.id\)/.test(dsrc) && /__dboTechniqueDrop\('goblinCamp'\)|owners === 'goblins' \? \['goblinCamp'\]/.test(wsrc), 'ruin chests (Ayleid, Dwemer, Falmer, Cyrodiil forts) and goblin camps ask for a technique drop');
 const gsrc = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
 ok(/__dboSchematicFind\(a, tier \+ 1, where\)/.test(gsrc) && /globalThis\.__dboTechniqueRuinAt = \(a\) => \{\n    const d = dungeonAround\(a\), kind = techniqueRuin\(d\);/.test(dsrc) && /LocTypeDragonPriestLair'\) \? \[kind, 'priestLair'\]/.test(dsrc), 'a won reading rolls for a schematic with the Scholar tier (1-5) and the ruin it is read in');
 ok(/__dboSmithCraft\(actorId, itemId, recipeId\) === false\) return false;\n(?:[^\n]*\n){0,2}    \/\/ Faction gear first/.test(src), 'regions.js asks the smithing gate (then the tailor gate) before faction gear');

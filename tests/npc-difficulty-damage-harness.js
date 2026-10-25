@@ -78,7 +78,8 @@ cfg.npcDamage.log = false;
 
 // ---- the hook wiring ----------------------------------------------------------------------------------------------------
 const hook = GM.slice(GM.indexOf(END), GM.indexOf('hitDamageAttemptHook.__dbo = true'));
-ok(/mult \*= npcKindDamageMult\(agg, tgt, dmg\);\s*\n\s*\/\/[^\n]*\n\s*mult \*= npcDifficultyDamageMult\(agg, tgt, dmg, flags\);/.test(hook), 'the hit hook multiplies it in after byKind, before the lethal guard');
+// bosses.js's own multiplier may sit between the two (bosses-1025); the order byKind, then byDifficulty, is what counts
+ok(/mult \*= npcKindDamageMult\(agg, tgt, dmg\);(?:\s*\n\s*\/\/[^\n]*\n\s*try \{ if \(globalThis\.__dboBossDamageMult\)[^\n]*)?\s*\n\s*\/\/[^\n]*\n\s*mult \*= npcDifficultyDamageMult\(agg, tgt, dmg, flags\);/.test(hook), 'the hit hook multiplies it in after byKind, before the lethal guard');
 ok(hook.indexOf('npcDifficultyDamageMult') < hook.indexOf('npcLethalGuard(agg'), '...so a scaled-down weapon hit that would have been lethal is guarded like the others');
 const conf = JSON.parse(fs.readFileSync(path.join(SERVER, 'gamemode-config.json'), 'utf8')).npcDamage || {};
 ok(JSON.stringify(conf.byDifficulty) === JSON.stringify({ story: 0.5, normal: 0.65, hard: 0.8, nightmare: 1 }) && conf.spellMult === undefined && conf.log === true,
