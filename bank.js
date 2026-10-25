@@ -47,7 +47,9 @@ module.exports = (api) => {
   const zoneOfCell = optFn(api.zoneOfCell), zoneAtPlace = optFn(api.zoneAtPlace), isWorldspace = optFn(api.isWorldspace);
 
   const C = Object.assign({
-    activators: ['5:DragonBreak.esp'], reachMeters: 8, sessionMinutes: 15, maxTransaction: 10000000,
+    // the tellers: the DLE's TheBank in every town's bank, and Cheydinhal's own copy of it (Nat, 25 Oct: "also add a bank";
+    // DBO_Cheydinhal.esp has no DragonBreak.esp master). A desc whose plugin is not loaded is skipped (bankBases)
+    activators: ['5:DragonBreak.esp', '1ff100:DBO_Cheydinhal.esp'], reachMeters: 8, sessionMinutes: 15, maxTransaction: 10000000, // verify-formids: ignore (dev only until the town ships)
     rulerRanks: ['jarl', 'count', 'chieftain'], historyKept: 20,
   }, cfg.bank || {});
   // Vault tiers by carry weight, a gold per weight a week (Nate, 16 Oct). The fee owed stops growing after arrearsCapWeeks
