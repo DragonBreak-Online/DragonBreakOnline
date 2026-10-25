@@ -450,6 +450,15 @@ AUDIT_VERBS.FRENZY.roles = R_BY([[/ killed by $/, 'by'], [/ first on $/, 'target
 clean_('GUARDS');
 // APIARY <who> harvested <kind> <ref>: <items> (apiaries.js): ids and item names
 clean_('APIARY');
+// BOSS <boss id> rose at|killed at <spot id> by <killers>; event started by <staff> for N min (bosses.js): ids, numbers, identities
+clean_('BOSS');
+AUDIT_VERBS.BOSS.roles = R_BY([[/ event started by $/, 'staff']]);
+// MILL <who> ran a saw mill at <desc> (tier n) -> n sawn logs, n firewood (labour.js): ids and numbers
+clean_('MILL');
+// Off until Nat switches each on: their staff grant, revoke and stage lines carry a staff-written reason, and decor's carry
+// cost JSON; review each for clean (with a cut for the reason) when it goes live
+excluded('BRIARHEART HAGRAVEN', 'staff-written reasons; off until Nat switches them on');
+excluded('DECOR', 'cost JSON; off until Nat switches it on');
 AUDIT_VERBS.FEED.roles = R_BY([[/ asked $/, 'target'], [/ let $/, 'target'], [/ refused $/, 'target'], [/ feed on $/, 'target']]);
 AUDIT_VERBS.ROPE.roles = R_BY([[/ cut $/, 'target'], [/ of $/, 'captor']]);
 AUDIT_VERBS.STRUGGLE.roles = R_BY([[/ of $/, 'captor']]);
@@ -1639,7 +1648,7 @@ keyring.js KEYRING 0b8be016 parsed
 keyring.js KEYRING 0b8be016 parsed
 keyring.js KEYRING f333bd5d parsed
 labour.js LABOUR-MISMATCH d7791950 clean
-labour.js MINE 915776d9 clean
+labour.js MINE 2ec504cf clean
 labour.js CHOP 6d22c150 clean
 leadership.js LEADERSHIP 803e7d3b excluded
 ledger.js LEDGER ba4ac58e excluded
@@ -2004,6 +2013,39 @@ worldclock.js CLOCK 976f9d7b clean
 worldclock.js CLOCK 91485c97 clean
 worldclock.js CLOCK ccc4cdd1 clean
 worldedit.js WORLDEDIT 197a6260 clean
+bosses.js BOSS 08618658 clean
+bosses.js BOSS dfe2f533 clean
+bosses.js BOSS 1f42f464 clean
+bosses.js BOSS 7e20c26d clean
+briarheart.js BRIARHEART 3a054391 excluded
+briarheart.js BRIARHEART 3f114ea4 excluded
+briarheart.js BRIARHEART b46479a3 excluded
+briarheart.js BRIARHEART e7b4144f excluded
+briarheart.js BRIARHEART 56814f5c excluded
+briarheart.js BRIARHEART 06672576 excluded
+briarheart.js BRIARHEART 170469e8 excluded
+briarheart.js BRIARHEART 6e5a4fdc excluded
+briarheart.js BRIARHEART 05129113 excluded
+briarheart.js BRIARHEART 1cedb469 excluded
+decor.js DECOR b3fa102b excluded
+decor.js DECOR 34ab17fc excluded
+decor.js DECOR f0797531 excluded
+decor.js DECOR e716fb8f excluded
+decor.js DECOR c4970c1e excluded
+decor.js DECOR 44e37985 excluded
+decor.js DECOR 24015003 excluded
+decor.js DECOR 78b19505 excluded
+hagraven.js HAGRAVEN 145e24b9 excluded
+hagraven.js HAGRAVEN fd10af1b excluded
+hagraven.js HAGRAVEN d397150f excluded
+hagraven.js HAGRAVEN 0660b547 excluded
+hagraven.js HAGRAVEN 4c68d96d excluded
+hagraven.js HAGRAVEN d5b0e848 excluded
+jail.js JAIL 30daab92 clean
+jail.js JAIL 8d55381d clean
+jail.js JAIL 23dd5d8e clean
+labour.js MILL 861ed5b1 clean
+supernatural.js FEED 54466fd0 clean
 `.trim().split('\n').filter(Boolean).map((l) => { const [file, verb, hash, cls] = l.trim().split(/\s+/); return { file, verb, hash, cls }; });
 
 module.exports = {
