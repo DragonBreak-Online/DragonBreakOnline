@@ -152,7 +152,8 @@
     "0_RecipeBADOArmaGreen": "common"
   },
   "recipePlugins": {
-    "_comment": "Province and culture for the creation recipes of a plugin regions.json does not list yet (regions.js pluginRule): { \"<recipe's plugin>\": { p, c, edid?, notEdid?, why } or a list of them, the first whose edid / notEdid regexes match wins }. Empty since the 140-order regions.json (PC, 15 Oct) lists every Skyrim-release plugin; the few recipes it tags too narrowly are common under recipes (_skyrim140). Applied on save."
+    "_comment": "Province and culture for the creation recipes of a plugin regions.json does not list yet (regions.js pluginRule): { \"<recipe's plugin>\": { p, c, edid?, notEdid?, why } or a list of them, the first whose edid / notEdid regexes match wins }. Empty since the 140-order regions.json (PC, 15 Oct) lists every Skyrim-release plugin; the few recipes it tags too narrowly are common under recipes (_skyrim140). Applied on save.",
+    "DragonBreak Online Edits.esp": { "p": ["skyrim", "solstheim"], "c": "common", "edid": "^DBO_RecipeStaffBlank", "why": "the unenchanted staves made at the Staff Enchanter (Nat, 25 Oct), until regions.json is regenerated with them" }
   },
   "tomes": {
     "ISS_SpellTomeConjureSkeleton": ["skyrim"],
