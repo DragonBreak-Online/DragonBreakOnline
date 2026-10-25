@@ -63,8 +63,11 @@ try {
   const z2 = JSON.parse(fs.readFileSync(path.join(dir, 'NPC-Spawns.json'), 'utf8')).zones.filter((z) => /^wild:[^:]+:p[0-9a-f]+-/.test(z.Name));
   const rep = cfg.ownedSpawns.replace.minotaur;
   const undead = z2.filter((z) => z.Name.startsWith('wild:undead:'));
-  ok(z2.length === 45 && !z2.some((z) => z.Name.startsWith('wild:minotaur:')) && undead.length === minoSrc.length && minoSrc.length > 0,
-    'every minotaur spot becomes an undead zone, the rest unchanged', { all: z2.length, undead: undead.length, mino: minoSrc.length });
+  // exceptGroups (Nat, 25 Oct): Minotaur's Rest keeps its own minotaurs; every other minotaur spot still turns undead
+  const except = new Set((rep.exceptGroups || []).map((g) => String(g).toLowerCase()));
+  const kept = minoSrc.filter((s) => except.has(String(s.group || '').toLowerCase()));
+  ok(z2.length === 45 && z2.filter((z) => z.Name.startsWith('wild:minotaur:')).length === kept.length && undead.length === minoSrc.length - kept.length && minoSrc.length > 0,
+    'every minotaur spot becomes an undead zone except at the excepted camp, the rest unchanged', { all: z2.length, undead: undead.length, mino: minoSrc.length, kept: kept.length });
   const kinds = new Set(undead.map((z) => z.NPC[0].id));
   ok(kinds.size >= 3, 'the spots get a mix of undead, not one base', [...kinds]);
   ok(undead.every((z) => { const sp = minoSrc.find((x) => z.Name.endsWith(`:p${x.src.split(':')[0]}-dragonbreakonlineedits`)); return sp && rep.bases[sp.base].some(([, d]) => d === z.NPC[0].id) && z.Hostile === true && z.NPC[0].count === rep.count; }),
