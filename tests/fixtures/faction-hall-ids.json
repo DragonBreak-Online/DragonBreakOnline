@@ -1,6 +1,9 @@
 {
   "_comment": "Hall doors and cells in guild-defs.json, each checked against the live load order (/opt/skyrim-data, 140 plugins) on 2026-10-16: the door is a REFR with a teleport, the cell a CELL; neither deleted. by = the plugin whose record wins. Built by the faction-halls-1016 worker; tests/faction-hall-ids-harness.js reads it. The cults' shrine halls (cults-territories-1016 worker, same day, same checks) were added from one mmap pass over the same 140 plugins; their doors also have no enable parent that starts them disabled (Reachcliff Cave's dae8e and Kilkreath's DA09FrontDoor 27eef open only through their quests, so they are left out).",
   "doors": {
+    "1a712:Skyrim.esm": {"by": "Skyrim.esm"},
+    "bccb4:Skyrim.esm": {"by": "Skyrim.esm"},
+    "a021e:Skyrim.esm": {"by": "Skyrim.esm"},
     "107f00:Skyrim.esm": {"by": "OCW_Obscure's_CollegeofWinterhold.esp"},
     "107f01:Skyrim.esm": {"by": "OCW_Obscure's_CollegeofWinterhold.esp"},
     "107f02:Skyrim.esm": {"by": "OCW_Obscure's_CollegeofWinterhold.esp"},
@@ -108,6 +111,10 @@
     "ff0:BSHeartland.esm": {"by": "BSHeartland.esm"}
   },
   "cells": {
+    "161ff:Skyrim.esm": {"edid": "GoldenglowEstate01", "by": "DragonBreak Online Edits.esp"},
+    "2d3e7:Skyrim.esm": {"edid": "GoldenglowEstate03", "by": "DragonBreak Online Edits.esp"},
+    "2d3e8:Skyrim.esm": {"edid": "GoldenglowEstate02", "by": "DragonBreak Online Edits.esp"},
+    "a013b:Skyrim.esm": {"edid": "GoldenglowEstate04", "by": "DragonBreak Online Edits.esp"},
     "12ba88:COTN - Winterhold.esp": {"edid": "WinterholdJarlsLonghouseUpstairs", "by": "DragonBreak Online Edits.esp"},
     "12cb:BSHeartland.esm": {"edid": "CYRBrumaCathedralofStMartin", "by": "DragonBreak Online Edits.esp"},
     "1380e:Skyrim.esm": {"edid": "WinterholdCollegeHallofTheElements", "by": "DragonBreak Online Edits.esp"},

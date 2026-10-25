@@ -83,6 +83,7 @@ module.exports = (api) => {
       // the Cathedral of St Martin, Bruma, and Solitude's Temple of the Divines (Nate, 19 Oct)
       { name: 'The Great Faiths', open: true, cells: ['12cb:BSHeartland.esm', '5f78c:BSHeartland.esm', '5f78d:BSHeartland.esm', '16a02:Skyrim.esm'], factions: ['great-faiths'], schools: ['Restoration', 'Alteration'], exclusive: true },
       { name: 'The College of Whispers', cells: ['781ad:BSHeartland.esm', '6ff7d:BSHeartland.esm'], factions: ['college-of-whispers'] },  // Frostcrag Spire
+      { name: 'House Telvanni', cells: ['161ff:Skyrim.esm', '2d3e7:Skyrim.esm', '2d3e8:Skyrim.esm', 'a013b:Skyrim.esm'], factions: ['house-telvanni'] },  // Golden Glow Estate (Nate, 25 Oct)
     ],
     shopMinTier: 1,
     shopMaxRank: 3,

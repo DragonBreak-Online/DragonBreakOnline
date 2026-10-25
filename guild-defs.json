@@ -2607,7 +2607,23 @@
           "role": "member"
         }
       ],
-      "_ranks": "The ranks a member of the house could hold in Morrowind (3E 427), highest first; Armorer and Clothier are the server's crafting seats, as in the County of Bruma."
+      "_ranks": "The ranks a member of the house could hold in Morrowind (3E 427), highest first; Armorer and Clothier are the server's crafting seats, as in the County of Bruma.",
+      "hall": {
+        "name": "Golden Glow Estate",
+        "zone": "riften",
+        "doors": [
+          "1a712:Skyrim.esm",
+          "bccb4:Skyrim.esm",
+          "a021e:Skyrim.esm"
+        ],
+        "cells": [
+          "161ff:Skyrim.esm",
+          "2d3e7:Skyrim.esm",
+          "2d3e8:Skyrim.esm",
+          "a013b:Skyrim.esm"
+        ],
+        "note": "Golden Glow Estate on its island in Lake Honrich, by Riften: House Telvanni's seat since the house moved to Skyrim (Nate, 25 Oct). Doors are its ways in from Tamriel (buildings.json 1a712) but the sewer grate a021f, TG02SewerDoorRef, which has a quest enable parent; cells the house and its sewers"
+      }
     },
     {
       "id": "house-indoril",
