@@ -90,6 +90,10 @@ module.exports = (api) => {
     // waits for one
     hagravenRequired: false,
     briarSkin: { enabled: false, armor: 38, armorFrom: '', staminaRegen: 1.25, diseaseResist: 50 },
+    // What a Briarheart is, in Magic > Active Effects (Nat, 25 Oct): a display ability (a DLE SPEL, type Ability, whose
+    // one effect carries the text and changes nothing; prayer.js's blessing displays are the same records), learned with
+    // the gifts and taken with them. A desc; empty until the record is in the load order
+    display: '',
   }, (cfg && cfg.briarheart) || {});
   const PROP = 'private.dboBriarheart', FAILED = 'private.dboBriarheartFailedAt';
   const FILE = path.resolve('briarheart.json');
@@ -295,6 +299,7 @@ module.exports = (api) => {
   const applyGifts = (a, why) => {
     if (!isOnline(a)) return;
     for (const d of C.spells || []) papyrus(a, 'AddSpell', [form(d), false]);
+    if (C.display && idOf(C.display)) papyrus(a, 'AddSpell', [form(C.display), false]);
     if (C.forswornFriendly) faction(a, true, why || 'gifts');
     S.looks.delete(a >>> 0); lookCheck(a, null, why || 'gifts');
     call('__dboCharLevelSyncBonus', a >>> 0);
@@ -302,6 +307,7 @@ module.exports = (api) => {
   const removeGifts = (a, why) => {
     if (isOnline(a)) {
       for (const d of C.spells || []) papyrus(a, 'RemoveSpell', [form(d)]);
+      if (C.display && idOf(C.display)) papyrus(a, 'RemoveSpell', [form(C.display)]);
       if (C.forswornFriendly) faction(a, false, why || 'end');
     }
     // The briar body goes (a torn-out heart has already left the empty chest on the body)

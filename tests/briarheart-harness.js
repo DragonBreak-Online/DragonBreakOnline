@@ -508,6 +508,28 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   MW.end(BW, 'cure test');
   ok(inv(BW, WOUND) === 0 && inv(BW, BRIAR) === 0, 'no longer a Briarheart, alive: the heart and the wound body both go', P(BW, 'inventory'));
 }
+// ---- what a Briarheart is, in Active Effects: the display ability goes and comes with the gifts ---------------------------
+{
+  ID['801:DragonBreak Supernatural Displays.esp'] = 0xb4000801;
+  const load = (display) => {
+    delete require.cache[MODULE]; delete globalThis.__dboBriarheart;
+    return require(MODULE)({
+      mp, log: () => {}, personal: (a, t) => said.push([a >>> 0, t]), audit: (t) => audits.push(t), who: (a) => `who${(a >>> 0).toString(16)}`,
+      display: (a) => `char${(a >>> 0).toString(16)}`, cfg: { briarheart: { enabled: true, display } },
+      registerChatCommand: (n, f) => commands.set(n, f), onlineActors: () => online.slice(), isLeadStaff: (a) => (a >>> 0) === LEAD, findByName: () => 0, every: (n, ms, f) => { ticker = f; },
+      giveItem: () => true, sourceResistsOf: () => new Set(),
+    });
+  };
+  const BD = actor(0x90, 1, 'reach', [0, 0, 0], []); online.push(BD);
+  const shows = (method) => papyrusCalls.filter((c) => c.method === method && c.args[0] === '801:DragonBreak Supernatural Displays.esp');
+  let MD = load('801:DragonBreak Supernatural Displays.esp');
+  papyrusCalls.length = 0; MD.become(BD, 'staff', 'display test');
+  ok(shows('AddSpell').length === 1 && shows('AddSpell')[0].types[0] === 'espm', 'the grant: the display ability is learned (an espm record)', papyrusCalls.filter((c) => c.method === 'AddSpell'));
+  papyrusCalls.length = 0; MD.end(BD, 'display test done');
+  ok(shows('RemoveSpell').length === 1, 'the end: it is taken back');
+  MD = load(''); papyrusCalls.length = 0; MD.become(BD, 'staff', 'no display'); MD.end(BD, 'no display done');
+  ok(!papyrusCalls.some((c) => /Supernatural Displays/.test(String(c.args[0]))), 'display empty: nothing is given');
+}
 // ---- the hooks in the other modules ---------------------------------------------------------------------------------------
 const src = (f) => fs.readFileSync(path.resolve(__dirname, '..', f), 'utf8');
 ok(/__dboBriarheartTargetMult\(agg, tgt, src\)/.test(src('gamemode.js')) && /require\(BRIARHEART_JS\)/.test(src('gamemode.js')) && /__dboBriarheartLogin\(a\)/.test(src('gamemode.js')), 'gamemode.js loads it, asks the target side, and calls the login');
