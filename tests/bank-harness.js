@@ -22,7 +22,7 @@ const set = (id, p, v) => props.set(id + '|' + p, v);
 const inv = (id, gold) => set(id, 'inventory', { entries: gold ? [{ baseId: GOLD, count: gold }] : [] });
 const goldOf = (id) => ((get(id, 'inventory') || {}).entries || []).filter((e) => e.baseId === GOLD).reduce((s, e) => s + e.count, 0);
 inv(COUNT, 5000); inv(GUILDMASTER, 3000); inv(PEASANT, 100); inv(CHEST, 10000);
-set(BANK_BRUMA, 'baseDesc', '5:DragonBreak.esp'); set(BANK_FALK, 'baseDesc', '5:DragonBreak.esp'); set(TABLE, 'baseDesc', '1234:Skyrim.esm');
+set(BANK_BRUMA, 'baseDesc', '5:DragonBreak.esp'); set(BANK_FALK, 'baseDesc', '5:DragonBreak.esp'); set(TABLE, 'baseDesc', '1234:Skyrim.esm');   // verify-formids: ignore - a made-up table base, not a bank
 let near = new Set([`${COUNT}|${BANK_BRUMA}`, `${GUILDMASTER}|${BANK_BRUMA}`, `${PEASANT}|${BANK_BRUMA}`]);
 
 const out = { personal: [], widgets: [], closed: 0, audits: [] };
@@ -33,7 +33,7 @@ globalThis.__dboGuildsOf = (a) => (a === GUILDMASTER ? [{ id: 'fighters-guild', 
 const api = {
   mp: {
     get, set,
-    getIdFromDesc: (d) => ({ '5:DragonBreak.esp': BANK_BASE, '79b22:BSHeartland.esm': CHEST, '1234:Skyrim.esm': 0x1234 }[d] || 0),
+    getIdFromDesc: (d) => ({ '5:DragonBreak.esp': BANK_BASE, '79b22:BSHeartland.esm': CHEST, '1234:Skyrim.esm': 0x1234 }[d] || 0),   // verify-formids: ignore - the made-up table base
   },
   log: () => {}, personal: (a, t) => out.personal.push({ a, t }), audit: (t) => out.audits.push(t), who: (a) => `P${a.toString(16)}`, cfg: {},
   openWidget: (a, w) => out.widgets.push({ a, w }), closeWidget: () => { out.closed++; },
@@ -114,8 +114,8 @@ check('there is no way to take gold out of a treasury: withdraw uses only your o
   treasury() === chestBefore && JSON.parse(fs.readFileSync('bank.json', 'utf8')).factions['fighters-guild'] === 1000 && goldOf(GUILDMASTER) === gmGold);
 check('the panel has no treasury withdrawal event, and the module exports none',
   [...handlers.keys()].sort().join(',') === '/bank,/vaults,bankClose,bankDeposit,bankRent,bankStore,bankTake,bankTreasury,bankVaultEnd,bankVaultPay,bankWithdraw,uiCaps'
-  // every export named (bank review: no prefix filter); none of them moves gold out of a treasury
-  && Object.keys(mod).sort().join(',') === 'balanceOf,deposit,payIn,restoreSeizure,saleOf,settle,treasuriesOf,vaultEnd,vaultHas,vaultLines,vaultPay,vaultRent,vaultStore,vaultTake,vaultTakeStaff,vaultView,weightOf,withdraw');
+  // every export named (bank review: no prefix filter); none of them moves gold out of a treasury except gemSell, the hold buying a gem at half its value (Nat, 25 Oct)
+  && Object.keys(mod).sort().join(',') === 'balanceOf,deposit,gemBuy,gemList,gemPrices,gemSell,payIn,restoreSeizure,saleOf,settle,treasuriesOf,vaultEnd,vaultHas,vaultLines,vaultPay,vaultRent,vaultStore,vaultTake,vaultTakeStaff,vaultView,weightOf,withdraw');
 
 // The panel, for a UI that has it
 handlers.get('uiCaps')(COUNT, ['bank']);
