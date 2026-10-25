@@ -1076,7 +1076,7 @@ const STAFF_HELP = [
     ['dossier', 'list | read <name|#TAG> | reports | add <name|#TAG> <text> | strike <name|#TAG> <n>: the Thalmor dossiers and informant reports (add and strike: Lead GM)']] },
   { key: 'world', title: 'World', items: ['settime', 'setweather', 'timescale', 'region', ['dungeon end', '<dungeon id|name>: end a dungeon claim now'],
     'placed', 'placeundo', 'placeexport', 'worldedits', 'worldhide', 'worldshow', 'masktest', 'couriers', 'traps', 'leverpuzzle',
-    ['guardpost', 'add [npc desc] | list | remove <hold> <n> | auto <hold>: stand where a guard should be and add places that hold\'s own guard there (an id like abe18:Skyrim.esm picks another). auto fills a hold with the posts its guards held in the old days']] },
+    ['guardpost', 'add [npc desc] | list | remove <hold> <n> | auto <hold>: stand where a guard should be and add places that hold\'s own guard there (an id like abe18:Skyrim.esm picks another). auto fills a hold with the posts its guards held in the old days']] },  // verify-formids: ignore, the desc is an example in help text and 'items' here is the command list
   { key: 'debug', title: 'Server and debugging', items: ['monitor', 'load', 'selftest', 'npc', 'mv', 'driftset', 'driftspawn', 'driftrepair',
     'staffdiag', 'voicediag', 'staffstats', 'gearswap', 'factiongear'] },
 ];
