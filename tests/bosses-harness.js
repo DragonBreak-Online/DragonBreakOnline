@@ -21,7 +21,9 @@ ok(REAL.bosses.map((b) => b.id).join() === 'icecap,briarheartking,centurion,pale
 ok(def('movarth').night === true && def('valkynaz').event && def('valkynaz').event.minutes === 30 && def('falmerwarmonger').guardian.options.length && def('duskthorn').guardian.options.length,
   'Movarth\'s master walks at night, the Valkynaz is a 30-minute event, the Warmonger and the Warchief have their shamans');
 ok(!JSON.stringify(def('valkynaz').drops).includes('IngotEbony') && def('valkynaz').drops.always.some((x) => x[2] === 'DaedraHeart'), 'the Valkynaz drops a daedra heart and no Ebony (never loot)');
-ok(def('icecap').enabled === false && def('palewarlord').enabled === false && def('briarheartking').enabled && def('centurion').enabled, 'the Wraith and the Warlord wait on Nat (spot, shard); the King and the Centurion are on');
+ok(def('palewarlord').devOnly === true && def('palewarlord').spots.map((s) => s.id).join() === 'SE,ST' && def('palewarlord').roam === true,
+  'the Warlord of the Pale Pass: dev only, at SE (under the Sentinel) roaming to ST (Serpent’s Trail), SR dropped (Nat, 25 Oct)');
+ok(def('icecap').enabled === false && def('briarheartking').enabled && def('centurion').enabled, 'the Wraith and the Warlord wait on Nat (spot, shard); the King and the Centurion are on');
 ok(def('icecap').boss.options[0][2] === 'EncIceWraith' && def('icecap').spots.length === 4 && def('icecap').drops.schematic.family === 'glacial_crystal', 'the Wraith: a vanilla ice wraith, four candidate spots, the Glacial Crystal schematic');
 ok(def('briarheartking').boss.options.slice(-1)[0][2] === 'EncForsworn06BossMagicBretonM03' && def('briarheartking').guardian.options[0][2] === 'EncHagraven', 'the King: the strongest Forsworn boss shaman, his Hagraven beside him');
 ok(REAL.bosses.every((b) => b.spots.every((s) => s.ref && s.anchorDist < 5000)), 'every spot has an anchor within 5000 units (Sancre Tor\'s and Minotaur\'s Rest\'s are the ones Nate\'s own zones there use)');
@@ -38,7 +40,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-nate-bosses-'));
 process.on('exit', () => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* left for the OS */ } });
 const SHARD = '3ad5f:Skyrim.esm';   // a stand-in for the Glacial Crystal Shard until Worker 2's id exists
 const copy = JSON.parse(JSON.stringify(REAL));
-for (const b of copy.bosses) b.enabled = true;
+for (const b of copy.bosses) { b.enabled = true; if (b.id === 'palewarlord') delete b.devOnly; }   // the Warlord's roaming is tested off the dev flag
 copy.bosses.find((b) => b.id === 'icecap').drops.shards.desc = SHARD;
 fs.writeFileSync(path.join(dir, 'bosses.json'), JSON.stringify(copy));
 fs.writeFileSync(path.join(dir, 'NPC-Spawns.json'), JSON.stringify({ zones: [{ Name: 'wild:wolf:1', NPC: [{ id: 'x', count: 1 }] }, { Name: 'dungeon:X:1', NPC: [] }] }));
@@ -200,7 +202,7 @@ ok(ww && ww.devOnly === true && ww.night === true && ww.hold === 'falkreath' && 
 ok(ww.drops.always.some((x) => x[2] === 'WerewolfPelt') && ww.drops.always.some((x) => x[2] === 'WolfPelt') && ww.drops.schematic.family === 'silver' && ww.drops.extraSchematic.family === 'glass',
   '...it drops a Werewolf Pelt and wolf pelts, Silver 5%, Glass 1%');
 ok(ww.boss.options.length === 1 && ww.boss.options[0][1] === '1d2207:DragonBreak Online Edits.esp' && ww.boss.edid === 'DBO_EncWerewolfBehemothBoss' && ww.boss.options[0][0] === 42,
-  '...the boss is its own NPC on the Behemoth race, DLE 1D2207 (Worker 3's merge, 1.3x the pack), level 42 as its template');
+  '...the boss is its own NPC on the Behemoth race, DLE 1D2207 (the merge by Worker 3, 1.3x the pack), level 42 as its template');
 let moonUp = false;
 globalThis.__dboClock = { isNight: () => night, isFullMoon: () => moonUp };
 night = true; load({ bosses: { devOnly: true } });

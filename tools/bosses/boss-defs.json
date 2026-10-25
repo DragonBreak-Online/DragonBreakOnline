@@ -236,19 +236,19 @@
   {
    "id": "palewarlord",
    "name": "the Warlord of the Pale Pass",
-   "enabled": false,
-   "waitingOn": "Nat's eye on the three spots on the Bruma side of the Pale Pass road",
+   "enabled": true,
+   "waitingOn": "the dev test (bosses.devOnly on the dev server): Nat picked SE (the perch under the Sentinel statue) with ST (Serpent's Trail) as the roaming alternative, SR dropped (25 Oct)",
    "hold": "bruma",
    "world": "a764b:BSHeartland.esm",
    "spots": [
     {
-     "id": "SR",
+     "id": "SE",
      "pos": [
-      60719,
-      249420,
-      15404
+      64214,
+      232252,
+      11359
      ],
-     "note": "by Snowstone Rest"
+     "note": "below The Sentinel (16,000 units from Cloud Ruler Temple)"
     },
     {
      "id": "ST",
@@ -258,15 +258,6 @@
       14076
      ],
      "note": "on Serpent's Trail (14, 59)"
-    },
-    {
-     "id": "SE",
-     "pos": [
-      64214,
-      232252,
-      11359
-     ],
-     "note": "below The Sentinel (16,000 units from Cloud Ruler Temple)"
     }
    ],
    "roam": true,
@@ -311,7 +302,9 @@
      "family": "steelplate",
      "chance": 0.03
     }
-   }
+   },
+   "devOnly": true,
+   "_spots": "Nat, 25 Oct, from the CK shots in _work/palewarlord-spots-1025: SE first, ST the roaming alternative (roam: the next spot after each kill); SR at Snowstone Rest's door dropped"
   },
   {
    "id": "falmerwarmonger",

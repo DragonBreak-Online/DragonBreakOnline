@@ -19890,54 +19890,6 @@
    ]
   },
   {
-   "name": "Boss: the Warlord of the Pale Pass, SR (Bruma)",
-   "region": "Cyrodiil",
-   "world": "a764b:BSHeartland.esm",
-   "worldName": "Heartland",
-   "pos": [
-    60719,
-    249420,
-    15468
-   ],
-   "rot": [
-    0,
-    0,
-    0.0
-   ]
-  },
-  {
-   "name": "Boss: the Warlord of the Pale Pass, ST (Bruma)",
-   "region": "Cyrodiil",
-   "world": "a764b:BSHeartland.esm",
-   "worldName": "Heartland",
-   "pos": [
-    58987,
-    242571,
-    14140
-   ],
-   "rot": [
-    0,
-    0,
-    0.0
-   ]
-  },
-  {
-   "name": "Boss: the Warlord of the Pale Pass, SE (Bruma)",
-   "region": "Cyrodiil",
-   "world": "a764b:BSHeartland.esm",
-   "worldName": "Heartland",
-   "pos": [
-    64214,
-    232252,
-    11423
-   ],
-   "rot": [
-    0,
-    0,
-    0.0
-   ]
-  },
-  {
    "name": "Boss: the Falmer Warmonger, Blackreach's Falmer city",
    "region": "Skyrim",
    "world": "1ee62:Skyrim.esm",
