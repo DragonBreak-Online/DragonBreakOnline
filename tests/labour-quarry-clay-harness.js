@@ -142,7 +142,8 @@ const round = (v, rank) => {
   const told = out.widgets.map((x) => x.result || '').join(' | ');
   return { quartz: out.items.filter(([id]) => id === QUARTZ).reduce((s, [, c]) => s + c, 0), told };
 };
-ok(!MINER.clayQuartz.item, 'skills.json ships clayQuartz off (no Quartz record yet)', JSON.stringify(MINER.clayQuartz));
+ok(MINER.clayQuartz.item === '1d2208:DragonBreak Online Edits.esp' && MINER.clayQuartz.count === 1 && MINER.clayQuartz.chance === 1, 'skills.json gives DBO_Quartz (1D2208), 1 a round, always', JSON.stringify(MINER.clayQuartz));
+const SHIPPED = MINER.clayQuartz; MINER.clayQuartz = Object.assign({}, SHIPPED, { item: '' });
 ok(round(VEINS.clay, 0).quartz === 0, 'clay: no Quartz while clayQuartz.item is empty');
 MINER.clayQuartz = { item: '1d2201:DragonBreak Online Edits.esp', name: 'Quartz', chance: 1, count: 1 };
 let r = round(VEINS.clay, 0);
