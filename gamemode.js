@@ -1072,7 +1072,9 @@ const STAFF_HELP = [
     ['property', 'at a door, as an official: sell <price> | list <deposit> <weekly> | unlist | offer <name> | remind | grace | evict'],
     'grantproperty', 'leadership'] },
   { key: 'elections', title: 'Hold elections', items: ['electionreview', 'strikevote', 'unstrikevote'] },
-  { key: 'beasts', title: 'Beasts and the supernatural', items: ['beastform', 'frenzy', 'polymorph', 'curse', 'makesuper', 'vlremote', 'wwremote', 'feedpair', 'raid', 'warband', 'vampeyes'] },
+  { key: 'beasts', title: 'Beasts and the supernatural', items: ['beastform', 'frenzy', 'polymorph', 'curse',
+    ['hunt setrank', '<name> <rank name|number> <reason>: put an online werewolf at a Great Hunt rank (Fledgling 0 .. Elder 4); lead staff, audited'],
+    ['hunt reset', '<name> <reason>: back to Fledgling, no renown; lead staff, audited'], 'makesuper', 'vlremote', 'wwremote', 'feedpair', 'raid', 'warband', 'vampeyes'] },
   { key: 'magic', title: 'Magic and crafts', items: ['schools', 'shoutclean', 'classteacher', 'preacher', 'manual', 'smithing', 'tailoring', 'enchant'] },
   { key: 'law', title: 'Law', items: ['jail', ['jaildoors', 'a menu: assign the next door you use as a jail door of this hold, or unassign one (GM+, and the hold\'s ruler, Steward, Commander or Captain of the Guard)'], ['concordat', '[races]: Concordat arrests standing, or the Thalmor outside the race rule'],
     ['dossier', 'list | read <name|#TAG> | reports | add <name|#TAG> <text> | strike <name|#TAG> <n>: the Thalmor dossiers and informant reports (add and strike: Lead GM)']] },
@@ -9267,7 +9269,7 @@ try {
 try {
   const GREATHUNT_JS = path.resolve('greathunt.js');
   delete require.cache[GREATHUNT_JS];
-  require(GREATHUNT_JS)({ mp, log, personal, audit, who, sendPacket, onlineActors, profileOf, registerChatCommand, zoneOfActor, zoneById, isWorldspace, cfg });
+  require(GREATHUNT_JS)({ mp, log, personal, audit, who, sendPacket, onlineActors, profileOf, registerChatCommand, zoneOfActor, zoneById, isWorldspace, cfg, isLeadStaff, findByName });
 } catch (e) { log('greathunt.js failed to load:', e.stack || e.message); for (const k of ['__dboHuntFed', '__dboHuntKill', '__dboHuntChanged', '__dboHuntBeastSeconds', '__dboHuntFeedSeconds', '__dboHuntChangesPerDay', '__dboHuntForcedMult', '__dboHuntDamageMult', '__dboHuntReset', '__dboHuntHowled', '__dboHuntView']) globalThis[k] = null; }
 
 // ---- vampire ranks: blood from feeding on people (server\bloodranks.js) -----------------------------------------------
