@@ -73,5 +73,16 @@ check('...and a mortal\'s', /The Great Hunt is for those who carry the beast/.te
 hunt(LEAD, ['setrank', 'wolfy', 'Elder', 'array', 'args']);
 check('the arguments as an array work as a line does', renown(WOLF) === 1500 && /: array args$/.test(audits[audits.length - 1]));
 
+// The player log (playerlog-rules.js): the staff's reason is cut, the one set is the target
+const R = require(path.resolve(__dirname, '..', 'playerlog-rules.js'));
+const line = 'HUNT Nat Pierce #AB12 (profile 3, <@123456789>) set Wolfy Grey #CD34 (profile 7) to Elder: secret "staff" note about why';
+const pa = R.parseAudit(line);
+check('player log: HUNT setrank is clean, the reason gone, Nat the actor and Wolfy the target', pa.cls === 'clean' && pa.events.length === 1
+  && pa.events[0].f.text === 'Nat Pierce #AB12 set Wolfy Grey #CD34 to Elder' && pa.roles.join() === 'actor,target', pa);
+const pr = R.parseAudit('HUNT Nat Pierce #AB12 (profile 3) reset Wolfy Grey #CD34 (profile 7) to Fledgling: done testing');
+check('...and reset the same', pr.events[0].f.text === 'Nat Pierce #AB12 reset Wolfy Grey #CD34 to Fledgling' && pr.roles.join() === 'actor,target', pr);
+const old = R.parseAudit('HUNT Wolfy Grey #CD34 (profile 7) rose to Hunter (300 renown, feed: an animal)');
+check('...a rank-up line is untouched by the cut', /rose to Hunter \(300 renown, feed: an animal\)/.test(old.events[0].f.text), old);
+
 console.log(failures ? `${failures} FAILED` : 'all passed');
 process.exit(failures ? 1 : 0);

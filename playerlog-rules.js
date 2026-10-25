@@ -458,6 +458,11 @@ AUDIT_VERBS.STRUGGLE.roles = R_BY([[/ of $/, 'captor']]);
 const WHO_RX = '(?:[^\\s#]+ ){0,5}[^\\s#]+ #[A-Z0-9?]{4} \\(profile -?\\d{1,9}(?:, <@\\d{1,22}>)?\\)';
 const SCHOOLS_GRANT = new RegExp(`^SCHOOLS [\\s\\S]{1,200}? granted (${WHO_RX} \\d+ [^:]{1,60} levels?: \\d+ to \\d+ \\([^()]*\\));[\\s\\S]*$`);
 AUDIT_VERBS.SCHOOLS.cut = (text) => text.replace(SCHOOLS_GRANT, 'SCHOOLS staff granted $1');
+// HUNT <staff> set <who> to <rank>: <reason> | HUNT <staff> reset <who> to Fledgling: <reason> (greathunt.js /hunt setrank,
+// /hunt reset, lead staff): the reason is text staff wrote, so it goes, as SCHOOLS's does; the one set is the target
+const HUNT_SET = new RegExp(`^(HUNT [\\s\\S]{1,200}? (?:set|reset) ${WHO_RX} to [A-Za-z-]{1,40}): [\\s\\S]*$`);
+AUDIT_VERBS.HUNT.cut = (text) => text.replace(HUNT_SET, '$1');
+AUDIT_VERBS.HUNT.roles = R_BY([[/ (?:set|reset) $/, 'target']]);
 // SPELL TRIM ... shouts: <state>; by <by>: <why> (spells.js staff trim): by and why are written by staff in config, so they go
 AUDIT_VERBS.SPELL.cut = (text) => text.replace(/^(SPELL TRIM [\s\S]*?, shouts: (?:untouched|none granted|grant kept \(it cannot be kept in part\)|grant taken off|grant could not be taken off)); by [\s\S]*$/, '$1');
 // true when unquote(raw) lost the end of the line (a quote left unmatched takes the rest with it), or parseAudit's cap did:
@@ -1602,6 +1607,8 @@ gmcall.js GMCALL a9eaaca2 parsed
 gmcall.js GMCALL 4d962b08 parsed
 greathunt.js HUNT 08c91559 clean
 greathunt.js HUNT 4610cddc clean
+greathunt.js HUNT 6122811a clean
+greathunt.js HUNT e621517b clean
 greenpact.js PARTAKE 4cd5c56f clean
 greenpact.js PARTAKE 934342b4 clean
 greenpact.js PARTAKE 6dd41892 clean
