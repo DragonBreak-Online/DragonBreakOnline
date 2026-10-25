@@ -254,5 +254,29 @@ const gsrc = fs.readFileSync(path.join(ROOT, 'gamemode.js'), 'utf8');
 ok(/__dboBossDeath\(Number\(actorId\)/.test(gsrc) && /__dboBossHit\(agg, tgt, dealt\)/.test(gsrc) && /__dboBossDamageMult\(agg, tgt\)/.test(gsrc) && /require\(BOSSES_JS\)/.test(gsrc), 'gamemode.js loads bosses.js and calls its death, hit and damage hooks');
 
 Date.now = realNow; Math.random = realRandom;
+// ---- boss nameplates: the names go to the players near a boss, once, and are cleared at its death ----
+{
+  const labelsTo = (a) => glows.filter(([to, p]) => to === a && p.customPacketType === 'dboActorLabels').map(([, p]) => p.list);
+  const LB = 0xff250001;
+  put(LB, 'private.npcSpawner', 'boss:centurion:boss'); put(LB, 'percentages', { health: 1, magicka: 1, stamina: 1 });
+  put(LB, 'worldOrCellDesc', '3c:Skyrim.esm'); put(LB, 'pos', [0, 0, 0]);
+  put(P1, 'pos', [300, 0, 0]); put(FAR, 'pos', [90000, 0, 0]);
+  glows.length = 0;
+  tick([LB]);
+  const p1 = labelsTo(P1), far = labelsTo(FAR);
+  ok(p1.length === 1 && p1[0].length === 1 && p1[0][0].id === LB && p1[0][0].text === 'The Centurion Master' && Array.isArray(p1[0][0].color),
+    'a player beside the risen boss is sent its name to draw over its head (dboActorLabels)', p1);
+  ok(far.length === 0, 'a player outside its radius is sent nothing', far);
+  tick([LB]);
+  ok(labelsTo(P1).length === 1, 'the same list is not sent again on the next tick');
+  put(FAR, 'pos', [200, 100, 0]); tick([LB]);
+  ok(labelsTo(FAR).length === 1 && labelsTo(FAR)[0][0].id === LB, 'a player who walks into the radius is sent it then');
+  put(LB, 'isDead', true); globalThis.__dboBossDeath(LB, P1);
+  const after = labelsTo(P1);
+  ok(after.length === 2 && after[1].length === 0, 'at its death the name is cleared (an empty list)', after);
+  put(FAR, 'pos', [90000, 0, 0]); put(P1, 'pos', undefined); props.delete(`${P1}|pos`); props.delete(`${FAR}|pos`);
+  const bsrc = fs.readFileSync(path.join(ROOT, 'bosses.js'), 'utf8');
+  ok(/sweep\(\); \} catch[\s\S]{0,80}sendLabels\(\)/.test(bsrc), 'the boss timer sends the labels after each sweep');
+}
 console.log(fails ? `${fails} FAILED` : 'all checks passed');
 process.exit(fails ? 1 : 0);
