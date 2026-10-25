@@ -114,14 +114,15 @@ module.exports = (api) => {
     // Restoration) takes another player as apprentice from the X menu and picks a spell they know; the apprentice accepts.
     // Inside radiusMeters of the teacher the apprentice holds the spell (learned server-side for the while, as beastform.js
     // does); each cast of it there is xpPerCast, at most dailyXp a day (UTC), and dailyXp x daysByRank[spell rank] learns it
-    // for good. One apprentice at a time (max), seniorMax for the leader or an officer of a seniorGuilds faction, or of any
+    // for good. One apprentice at a time (max), seniorMax for the leader, an officer or a senior rank (role sergeant: Senior
+    // Wizard, Senior Magister, Senior Whisperer; Nat, 25 Oct) of a seniorGuilds faction, or of any
     // faction guild-defs.json marks "college": true (Swag, 17 Oct: "any future magical colleges and current"). The
     // apprentice's school rank (Priest's for Restoration) must be at least the spell's.
     apprenticeship: {
       enabled: true, teacherArcaneLevel: 75, teacherPriestLevel: 75, radiusMeters: 60, xpPerCast: 1, castGapSeconds: 2, dailyXp: 20,
       daysByRank: [1, 2, 3, 5, 15], max: 1, seniorMax: 3, seniorGuilds: ['synod', 'college-of-winterhold', 'college-of-whispers'],
       collegeGuilds: true,
-      seniorRoles: ['leader', 'officer'], offerMinutes: 5, tickSeconds: 3,
+      seniorRoles: ['leader', 'officer', 'sergeant'], offerMinutes: 5, tickSeconds: 3,
     },
     swap: { enabled: true, cooldownDays: 7, startShare: 0.5 },
     // A third of the first pace (Nate, 3 Oct): 25 to 50 takes about 12 days at the daily cap
