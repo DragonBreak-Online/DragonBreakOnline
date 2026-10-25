@@ -20,7 +20,7 @@ const STONE = '306c:HearthFires.esm', CLAY = '3043:HearthFires.esm';
 // Real base records from the live order: Hearthfire's own, King of the Murkmire's and Beyond Skyrim's copies
 const VEINS = {
   quarry: { ref: 0x2001, base: '306b:HearthFires.esm', edid: 'BYOHMineStone01', ore: STONE, title: 'Stone Quarry', word: /You cut 4 Quarried Stone\./, rank: 2, pays: 4 },
-  clay: { ref: 0x2002, base: 'a511:HearthFires.esm', edid: 'BYOHMineClay01Dirt01', ore: CLAY, title: 'Clay Deposit', word: /You dig out 3 Clay\./, rank: 0, pays: 3 },
+  clay: { ref: 0x2002, base: 'a511:HearthFires.esm', edid: 'BYOHMineClay01Dirt01', ore: CLAY, title: 'Clay Deposit', word: /You dig out 3 Clay and 1 Quartz\./, rank: 0, pays: 3 },
   riverMud: { ref: 0x2003, base: 'a14:HearthFires.esm', edid: 'BYOHMineClay01RiverMud01', ore: CLAY, title: 'Clay Deposit', word: /Clay/, rank: 0, pays: 3 },
   murkmire: { ref: 0x2004, base: '560c5a:King of the Murkmire.esp', edid: 'BYOHMineClay01Mud', ore: CLAY, title: 'Clay Deposit', word: /Clay/, rank: 0, pays: 3 },
   bsQuarry: { ref: 0x2005, base: '602b14:BSAssets.esm', edid: 'BSKBYOHMineStone01_PROXY_HF', ore: STONE, title: 'Stone Quarry', word: /Quarried Stone/, rank: 2, pays: 4 },
