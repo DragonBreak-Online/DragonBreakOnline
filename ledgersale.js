@@ -36,7 +36,7 @@ module.exports = (api) => {
   // kept here too, so a sale there still pays the faction if guilds.js has not loaded.
   const C = Object.assign({ enabled: true, sinkShare: 0.1, defaultTax: 0.1,
     hallCells: { '20ff:BSHeartland.esm': 'synod', '6c152:BSHeartland.esm': 'synod',
-      '12cb:BSHeartland.esm': 'great-faiths', '5f78c:BSHeartland.esm': 'great-faiths', '5f78d:BSHeartland.esm': 'great-faiths' } }, cfg.ledgerSale || {});
+      '12cb:BSHeartland.esm': 'imperial-cult', '5f78c:BSHeartland.esm': 'imperial-cult', '5f78d:BSHeartland.esm': 'imperial-cult' } }, cfg.ledgerSale || {});
   const HALL_CELLS = new Map(Object.entries(C.hallCells || {}).filter(([k]) => k !== '_comment').map(([k, v]) => [String(k).toLowerCase(), String(v)]));
   const HOLD_SHARE = Number((cfg.rest || {}).holdShare);
   const BALANCE = 'private.bankGold';

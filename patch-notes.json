@@ -1,5 +1,21 @@
 [
   {
+    "title": "The Great Faiths have joined the Imperial Cult",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Factions",
+        "items": [
+          "The Great Faiths have joined the Imperial Cult. The Cathedral of St Martin in Bruma and Solitude's Temple of the Divines are the Cult's now, with their Scholars' Ledgers.",
+          "Imperial Cult members can buy Restoration and Alteration tomes at those ledgers again, by rank as before, and its Seniors teach there.",
+          "Tome sales at the Cathedral pay the Cult's treasury, which now holds the Great Faiths' gold too."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Senior mages take more apprentices",
     "date": "2026-10-25",
     "version": "Server update",

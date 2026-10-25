@@ -97,6 +97,25 @@ module.exports = (api) => {
     fs.writeFileSync(tmp, JSON.stringify(data(), null, 1));
     fs.renameSync(tmp, FILE);
   };
+  // A faction folded into another (config factions.merged { from: { into } }; Nat, 25 Oct: the Great Faiths joined the
+  // Imperial Cult): its treasury moves to the one it joined, audited. Runs at every load and is idempotent: the old key is
+  // gone once moved. A write that fails puts both balances back and is tried again at the next load.
+  const mergeTreasuries = () => {
+    const d = data();
+    for (const [from, m] of Object.entries(((cfg.factions || {}).merged) || {})) {
+      const into = String((m && m.into) || '');
+      if (!into || into === from || !Object.prototype.hasOwnProperty.call(d.factions, from)) continue;
+      const n = Math.max(0, Math.floor(Number(d.factions[from]) || 0));
+      const hadInto = Object.prototype.hasOwnProperty.call(d.factions, into), had = Math.floor(Number(d.factions[into]) || 0);
+      d.factions[into] = had + n; delete d.factions[from];
+      try { save(); } catch (e) {
+        d.factions[from] = n; if (hadInto) d.factions[into] = had; else delete d.factions[into];
+        log(`bank: merging the treasury of ${from} into ${into} failed`, e.message); continue;
+      }
+      audit(`BANK treasury of ${from} merged into ${into}: ${n} gold moved (${into} ${had} -> ${had + n})`);
+    }
+  };
+  mergeTreasuries();
 
   // ---- accounts --------------------------------------------------------------------------------------------------
   const balanceOf = (a) => { try { const v = Number(mp.get(a, BALANCE)); return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0; } catch (e) { return 0; } };
