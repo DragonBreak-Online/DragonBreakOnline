@@ -125,6 +125,7 @@ import { LipSyncService } from "./services/services/lipSyncService";
 import { RacemenuPresetService } from "./services/services/racemenuPresetService";
 import { FavoritesService } from "./services/services/favoritesService";
 import { FovService } from "./services/services/fovService";
+import { CreatureCameraService } from "./services/services/creatureCameraService";
 import { LearnedEnchantmentsService } from "./services/services/learnedEnchantmentsService";
 import { CameraShakeService } from "./services/services/cameraShakeService";
 import { FrenzyService } from "./services/services/frenzyService";
@@ -275,6 +276,7 @@ const main = () => {
       new RaceSpellsService(sp, controller),
       new FavoritesService(sp, controller),
       new FovService(sp, controller),
+      new CreatureCameraService(sp, controller),
       new LearnedEnchantmentsService(sp, controller),
       new CameraShakeService(sp, controller),
       new FrenzyService(sp, controller)
