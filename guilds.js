@@ -159,6 +159,28 @@ module.exports = (api) => {
     BEFORE_STAMPS.set(fid, ranks.map((r) => r.title));
   }
   const saveOverrides = () => { fs.writeFileSync(OVR_PATH + '.tmp', JSON.stringify(OVR, null, 1)); fs.renameSync(OVR_PATH + '.tmp', OVR_PATH); };
+  // A rank added to a faction by config (factions.addRanks { fid: [{ title, role, after }] }; Nat, 25 Oct: the Imperial
+  // Cult's Vestment Keeper, a tailor who makes the Eight's robes). guild-defs carries it for a faction whose ranks come from
+  // there; a faction whose leader or staff rewrote its ranks (guild-overrides.json) gets it inserted into that list too,
+  // after the rank it names (else before the joining rank), audited. Idempotent: a list that has the title is left alone.
+  // Members keep their own titles: remapByTitle below moves the stamped entries to the new indexes.
+  const lc = (s) => String(s || '').toLowerCase();
+  for (const [fid, adds] of Object.entries(((cfg.factions || {}).addRanks) || {})) {
+    const f = FACTIONS.get(fid);
+    if (!f || !Array.isArray(adds)) continue;
+    for (const a of adds) {
+      const title = cleanTitle(a && a.title), role = String((a && a.role) || '');
+      if (!title || !ROLES[role] || role === 'leader') continue;
+      const has = (ranks) => ranks.some((r) => lc(r.title) === lc(title));
+      const place = (ranks) => { const i = ranks.findIndex((r) => lc(r.title) === lc(a.after)); return i >= 0 ? i + 1 : Math.max(1, ranks.length - 1); };
+      if (!has(f.ranks) && f.ranks.length < RANKS_MAX) { f.ranks.splice(place(f.ranks), 0, { title, role }); audit(`FACTION-RANK ${f.name} gains ${title} (${role}), from config factions.addRanks`); }
+      const o = OVR[fid];
+      if (o && Array.isArray(o.ranks) && !has(o.ranks) && o.ranks.length < RANKS_MAX) {
+        o.ranks.splice(place(o.ranks), 0, { title, role });
+        try { saveOverrides(); } catch (e) { log('guild-overrides.json write failed', e.message); }
+      }
+    }
+  }
 
   // ---- membership state -------------------------------------------------------------------------
   // { factionId: { actorId: { rank, name, tag, since } } }
