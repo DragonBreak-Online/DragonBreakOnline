@@ -121,6 +121,54 @@ module.exports = (api) => {
   const BOUNCE_MS = 3000;
   if (!(S.trace instanceof Map)) S.trace = new Map();
   if (!S.traceHour) S.traceHour = { since: 0, n: 0, left: 0 };
+  // A minute whose lines were left out still says what moved: per container, the items taken and put and their kinds
+  // (Telvanni house, 24 Oct: 556 lines left out in the minute a house was emptied, so nothing showed where 5,522 items went)
+  const SUMMARY_KINDS = 8;
+  const fmt = (n) => Number(n).toLocaleString('en-US');
+  const summaryOf = (b) => {
+    const parts = [];
+    for (const [c, m] of b.moved || []) {
+      for (const kind of ['took', 'put']) {
+        const bases = m[kind];
+        if (!bases || !bases.size) continue;
+        let total = 0; for (const n of bases.values()) total += n;
+        const top = [...bases].sort((x, y) => y[1] - x[1]);
+        const list = top.slice(0, SUMMARY_KINDS).map(([id, n]) => `${id.toString(16)} x${fmt(n)}`).join(', ');
+        parts.push(`${kind} ${fmt(total)} item(s) of ${bases.size} kind(s) ${kind === 'took' ? 'from' : 'into'} ${c.toString(16)}: ${list}`
+          + `${top.length > SUMMARY_KINDS ? `, and ${top.length - SUMMARY_KINDS} more kind(s)` : ''}`);
+      }
+    }
+    return parts.join('; ');
+  };
+  const rollBucket = (a, b) => {
+    if (!b.left) return;
+    log(`ITEMGUARD trace: ${b.left} line(s) for ${nameOf(a)} left out in the last minute (perMinute ${TRACE.perMinute})`);
+    const s = summaryOf(b);
+    if (s) log(`ITEMGUARD summary for ${nameOf(a)}, the minute from ${new Date(b.since).toISOString().slice(11, 19)} UTC: ${s}`);
+  };
+  const bucketOf = (a, now) => {
+    let b = S.trace.get(a);
+    if (!b || now - b.since >= 60000) {
+      if (b) rollBucket(a, b);
+      if (S.trace.size > 2000) { for (const [x, old] of S.trace) rollBucket(x, old); S.trace.clear(); }
+      b = { since: now, n: 0, left: 0, moved: new Map() }; S.trace.set(a, b);
+    }
+    if (!(b.moved instanceof Map)) b.moved = new Map();
+    return b;
+  };
+  // A minute that ended with no later line from that actor is summed up by the timer; one timer per process, each load's flush
+  S.flushTrace = () => { const now = Date.now(); for (const [a, b] of S.trace) if (now - b.since >= 60000) { rollBucket(a, b); S.trace.delete(a); } };
+  if (!S.flushTimer) {
+    S.flushTimer = setInterval(() => { try { if (S.flushTrace) S.flushTrace(); } catch (e) { /* the next tick */ } }, 15000);
+    if (typeof S.flushTimer.unref === 'function') S.flushTimer.unref();
+  }
+  const tally = (actor, kind, container, baseId, n) => {
+    if (!LOG_MOVES || !(n > 0)) return;
+    const b = bucketOf(Number(actor) >>> 0, Date.now()), c = Number(container) >>> 0, id = Number(baseId) >>> 0;
+    const m = b.moved.get(c) || { took: new Map(), put: new Map() };
+    b.moved.set(c, m);
+    m[kind === 'take' ? 'took' : 'put'].set(id, (m[kind === 'take' ? 'took' : 'put'].get(id) || 0) + n);
+  };
   const trace = (actor, text) => {
     if (!LOG_MOVES) return;
     const now = Date.now(), a = Number(actor) >>> 0;
@@ -128,15 +176,30 @@ module.exports = (api) => {
       if (S.traceHour.left) log(`ITEMGUARD trace: ${S.traceHour.left} line(s) left out in the last hour (perHour ${TRACE.perHour})`);
       S.traceHour = { since: now, n: 0, left: 0 };
     }
-    let b = S.trace.get(a);
-    if (!b || now - b.since >= 60000) {
-      if (b && b.left) log(`ITEMGUARD trace: ${b.left} line(s) for ${nameOf(a)} left out in the last minute (perMinute ${TRACE.perMinute})`);
-      if (S.trace.size > 2000) S.trace.clear();
-      b = { since: now, n: 0, left: 0 }; S.trace.set(a, b);
-    }
+    const b = bucketOf(a, now);
     if (b.n >= Number(TRACE.perMinute) || S.traceHour.n >= Number(TRACE.perHour)) { b.left++; S.traceHour.left++; return; }
     b.n++; S.traceHour.n++;
     log(text);
+  };
+  // A take out of a claimed property's container by anyone but its owner is logged in full and never capped (Telvanni house,
+  // 24 Oct: a Steward emptied a player's house). The housing system resolves a chest to its house (housingSystem.ts
+  // __dboHousing); each container's record is kept 15 s, since a property's door may be an unloaded ref, slow to read.
+  if (!(S.propertyOf instanceof Map)) S.propertyOf = new Map();
+  const foreignProperty = (actor, container) => {
+    const H = globalThis.__dboHousing;
+    if (!H || typeof H.recordOf !== 'function' || typeof H.ownsRecord !== 'function') return '';
+    const c = Number(container) >>> 0, now = Date.now();
+    let hit = S.propertyOf.get(c);
+    if (!hit || now - hit.at >= 15000) {
+      let rec = null, p = 0;
+      try { rec = H.recordOf(c); p = typeof H.primaryOf === 'function' ? Number(H.primaryOf(c)) >>> 0 : 0; } catch (e) { rec = null; }
+      if (S.propertyOf.size > 5000) S.propertyOf.clear();
+      hit = { at: now, rec, p }; S.propertyOf.set(c, hit);
+    }
+    const rec = hit.rec;
+    if (!rec || !(Number(rec.owner) > 0)) return '';
+    try { if (H.ownsRecord(rec, Number(actor) >>> 0)) return ''; } catch (e) { /* unknown: logged */ }
+    return `property ${hit.p ? hit.p.toString(16) : '?'}${rec.name ? ` ${JSON.stringify(String(rec.name))}` : ''} of profile ${rec.owner} ${JSON.stringify(String(rec.ownerName || ''))}`;
   };
   if (!(S.touched instanceof Map)) S.touched = new Map();   // actor -> containers it moved items with this session
   // actor -> when it last put or took anything (supernatural.js holds a vampire's silver mail while they are at a chest)
@@ -156,7 +219,10 @@ module.exports = (api) => {
       const made = (after[0] + after[1]) - (before[0] + before[1]);
       const moved = kind === 'put' ? before[0] - after[0] : after[0] - before[0];
       const line = `${kind} by ${nameOf(a)} at ${c.toString(16)}: ${id.toString(16)} x${count} (pack ${before[0]} -> ${after[0]}, container ${before[1]} -> ${after[1]})`;
+      tally(a, kind, c, id, Math.abs(moved));
+      const property = kind === 'take' && moved > 0 ? foreignProperty(a, c) : '';
       if (made !== 0) log(`ITEMGUARD move changed the total by ${made > 0 ? '+' : ''}${made}: ${line}`);
+      else if (property) log(`ITEMGUARD property take ${line}, from ${property}`);
       else if (LOG_MOVES && moved !== 0) trace(a, `ITEMGUARD move ${line}`);
       else if (LOG_MOVES && kind === 'put') trace(a, `ITEMGUARD trace put moved nothing: ${line}`);
       // A bounce: the items left the pack and are back in it a moment later

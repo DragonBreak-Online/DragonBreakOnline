@@ -1,0 +1,16 @@
+{
+  "title": "Property and item logs for staff",
+  "date": "",
+  "version": "Server update",
+  "tag": "Staff",
+  "sections": [
+    {
+      "heading": "Staff",
+      "items": [
+        "Every change to a property is now in the server log, whoever makes it: the owner, a household member, a Jarl, Steward or Count, a fief holder or staff. Each line names who did it, the house, the owner and name before and after, and whether a refused attempt changed nothing.",
+        "When someone moves a lot of items in a minute, the log now sums up what they took from and put into each container, so a house emptied at speed can be traced.",
+        "Anything taken from a player's house chest by someone other than its owner is logged in full, item by item."
+      ]
+    }
+  ]
+}
