@@ -228,14 +228,14 @@ check('the second day\'s 20 complete it: Firebolt is learned for good, in the sp
 check('...the teacher is told and is free again', !(rec(TCH).apprentices || []).length && saidAny(TCH, /has learned Firebolt/) && out.audits.some((l) => /learned 12fd0:Skyrim\.esm Firebolt as apprentice/.test(l)));
 at(STU, BRUMA, [0, 0, 0]); tick('schools.apprentice');
 check('...and keeps it away from the teacher', known(STU).has(idOf(T.firebolt[1])) || studied(STU).includes(T.firebolt[1]));
-// a college officer takes more than one
-put(TCH, 'private.dboGuilds', [{ id: 'synod', role: 'officer' }]);
+// a college's senior rank takes more than one (role sergeant: Senior Magister here; Nat, 25 Oct: the senior college roles too)
+put(TCH, 'private.dboGuilds', [{ id: 'synod', role: 'sergeant' }]);
 at(STU, SYNOD, [0, 0, 0]);
 known(TCH).add(idOf(T.frostbite[1])); known(TCH).add(idOf(T.flames[1]));
 act(TCH, 'schools:apprentice', STU2); ui('apprenticeTeach', TCH, [lastWidget(TCH, 'studyMagic').nonce, 'Firebolt']);
 ui('apprenticeOffer', STU2, [lastWidget(STU2, 'contextMenu').actions[0].id]);
 act(TCH, 'schools:apprentice', LOW);
-check('a Synod officer may take a second apprentice', rec(TCH).apprentices.length === 1 && lastWidget(TCH, 'studyMagic').title === 'Take an Apprentice', [rec(TCH).apprentices, said(TCH)]);
+check('a Senior Magister (sergeant) may take a second apprentice', rec(TCH).apprentices.length === 1 && lastWidget(TCH, 'studyMagic').title === 'Take an Apprentice', [rec(TCH).apprentices, said(TCH)]);
 // declining, releasing, leaving
 const before = rec(TCH).apprentices.length;
 ui('apprenticeOfferClose', LOW);
@@ -362,6 +362,7 @@ out.logs.length = 0;
 load({ apprenticeship: { dailyXp: 'lots', radiusMeters: -5, daysByRank: [1, 2], seniorGuilds: 'synod' } });
 check('config: a bad dailyXp, radiusMeters, daysByRank and seniorGuilds each fall back and are logged', ['dailyXp "lots"', 'radiusMeters -5', 'daysByRank [1,2]', 'seniorGuilds "synod"'].every((k) => out.logs.some((l) => l.includes(k))), out.logs.filter((l) => /config/.test(l)));
 load();
+check('leaders, officers and the senior ranks (sergeant) count as senior', /seniorRoles: \['leader', 'officer', 'sergeant'\]/.test(fs.readFileSync(SCHOOLS, 'utf8')));
 check('the senior guilds are the four colleges, no mages-guild', !/mages-guild/.test(fs.readFileSync(SCHOOLS, 'utf8')));
 // No mp.on of its own
 check('schools.js and spells.js register no mp.on handler', !/\bmp\.on\s*\(/.test(fs.readFileSync(SCHOOLS, 'utf8')) && !/\bmp\.on\s*\(/.test(fs.readFileSync(SPELLS, 'utf8')));

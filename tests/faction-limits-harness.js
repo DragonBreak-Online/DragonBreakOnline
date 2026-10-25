@@ -87,7 +87,7 @@ put('imperial-legion', LEG); put('imperial-legion', BOSS, 0); put('county-bruma'
 put('synod', SYN, 0); put('college-of-whispers', WHIS, 0); put('thieves-guild', THIEF); put('dark-brotherhood', DB, 0);
 put('cult-boethiah', CULT); put('vigil-of-stendarr', VIG, 0); put('dawnguard', DG, 0); put('clan-volkihar', VOLK, 0); put('fighters-guild', FG, 0);
 put('clan-largashbur', CHIEF, 0); put('clan-largashbur', ORC);
-put('imperial-cult', PRIMATE, 0); put('great-faiths', PRIOR, 0);
+put('imperial-cult', PRIMATE, 0);
 
 // ---- allegiance ----------------------------------------------------------------------------------------------------
 // The Orc stronghold clans are an allegiance, any member (Nate, 19 Oct)
@@ -99,8 +99,8 @@ ro = invite(CHIEF, LEG, 'clan-largashbur');
 ok('nor a Legion soldier to a clan', ro.error && /already serves the Imperial Legion/.test(ro.error), ro);
 ok('the Imperial Civil Commission is an allegiance (Nate, 19 Oct); the Penitus Oculatus is secret, like the Blades (Nate, 22 Oct)', L.categories.allegiance.ids.includes('imperial-civil-commission') && !L.categories.allegiance.ids.includes('penitus-oculatus') && L.categories.secret.ids.includes('penitus-oculatus'), L.categories);
 // A faith of its own beside a guild, one at a time, and only for a follower of the Eight (Nate, 19 Oct)
-ok('the churches are a faith, not a guild; the Vigil stays a guild', L.categories.faith.ids.join() === 'imperial-cult,great-faiths' && L.categories.guild.ids.includes('vigil-of-stendarr')
-  && !L.categories.guild.ids.includes('imperial-cult') && !L.categories.guild.ids.includes('great-faiths'));
+ok('the churches are a faith, not a guild; the Vigil stays a guild', L.categories.faith.ids.join() === 'imperial-cult' && L.categories.guild.ids.includes('vigil-of-stendarr')
+  && !L.categories.guild.ids.includes('imperial-cult'));
 props.delete(`${FG}|private.dboDeity`);
 ro = invite(PRIMATE, FG, 'imperial-cult');
 ok('a Fighter who follows no god is refused by the Imperial Cult, told why', ro.error && /does not follow the Eight Divines/.test(ro.error), ro);
@@ -111,8 +111,10 @@ props.set(`${FG}|private.dboDeity`, { id: 'akatosh', kind: 'divine' });
 ro = invite(PRIMATE, FG, 'imperial-cult');
 ok('a Fighter who follows Akatosh may join the Imperial Cult beside the Fighters Guild', !ro.error, ro);
 ok('...and accepts', /You are now/.test(accept(FG, 'imperial-cult')) && inF('imperial-cult', FG) && inF('fighters-guild', FG));
+// The Great Faiths joined the Imperial Cult (Nat, 25 Oct): the faction is gone, so nobody can be invited to it
 ro = invite(PRIOR, FG, 'great-faiths');
-ok('one faith at a time: the Great Faiths refuse an Imperial Cult member', ro.error && /already serves the Imperial Cult/.test(ro.error), ro);
+ok('the Great Faiths are gone: an invite to them names no faction', ro.error && /No such faction/.test(ro.error), ro);
+ok('the merge is recorded in config: great-faiths into imperial-cult', ((CFG.factions || {}).merged || {})['great-faiths'] && CFG.factions.merged['great-faiths'].into === 'imperial-cult');
 ro = invite(FG, ORC, 'fighters-guild');
 ok('a clan member may still join a guild', !ro.error, ro);
 let r = invite(STORM, LEG, 'stormcloaks');
@@ -179,6 +181,52 @@ add('companions', 'Synodic');
 ok('the override is spent: the next one is refused', !inF('companions', SYN));
 t = chat(LEAD, 'leader Fighter synod');
 ok('/faction leader is refused for a Fighters Guild leader to the Synod, nobody stepped down', /already serves the Fighters Guild/.test(t) && M().synod[String(SYN)].rank === 0, t);
+
+// ---- the Knights of the Nine: followers of the Nine only (Nat, 25 Oct) -------------------------------------------------
+// The Nine are nine prayer.js deity ids, the Eight and Talos; there is no separate "Eight" faith to choose, so a follower of
+// one of the Eight is a follower of the Nine. Auriel, the elves' Akatosh, is a Divine but not one of the Nine.
+const KOTN = 'knights-of-the-nine';
+const CRUSADER = 0x40, P1 = 0x41, P2 = 0x42, P3 = 0x43, P4 = 0x44, P5 = 0x45, P6 = 0x46;
+for (const [id, n] of [[CRUSADER, 'Crusader'], [P1, 'Faithless'], [P2, 'Taloite'], [P3, 'Azurite'], [P4, 'Aurielite'], [P5, 'Arkayan'], [P6, 'Candidate']]) { chars.set(id, n); names[id] = n; }
+const godOf = (a, id) => (id ? props.set(`${a}|private.dboDeity`, { id, kind: 'divine' }) : props.delete(`${a}|private.dboDeity`));
+ok('the Knights of the Nine take the Nine: the Eight and Talos, by their prayer.js ids', JSON.stringify(L.requiresFaith[KOTN].deities) === JSON.stringify(['akatosh', 'arkay', 'dibella', 'julianos', 'kynareth', 'mara', 'stendarr', 'talos', 'zenithar']), L.requiresFaith[KOTN]);
+godOf(CRUSADER, 'talos'); put(KOTN, CRUSADER, 0);
+godOf(P1, null);
+ro = invite(CRUSADER, P1, KOTN);
+ok('a character who follows no god is refused, told why', ro.error && /does not follow the Nine Divines; The Knights of the Nine takes? only those who do/.test(ro.error), ro);
+godOf(P2, 'talos');
+ro = invite(CRUSADER, P2, KOTN);
+ok('a follower of Talos may join', !ro.error, ro);
+ok('...and accepts as a Pilgrim', /You are now/.test(accept(P2, KOTN)) && inF(KOTN, P2) && globalThis.__dboGuildRankList(KOTN)[M()[KOTN][String(P2)].rank].title === 'Pilgrim');
+godOf(P3, 'azura');
+ro = invite(CRUSADER, P3, KOTN);
+ok('a worshipper of Azura (Daedric) is refused', ro.error && /does not follow the Nine Divines/.test(ro.error), ro);
+godOf(P4, 'auriel');
+ro = invite(CRUSADER, P4, KOTN);
+ok('a follower of Auriel is refused: not one of the Nine', ro.error && /does not follow the Nine Divines/.test(ro.error), ro);
+godOf(P5, 'arkay');
+ro = invite(CRUSADER, P5, KOTN);
+ok('a follower of Arkay, one of the Eight, is one of the Nine: allowed', !ro.error, ro);
+// Staff go through the same check: a Lead GM's Add member and /faction leader are refused alike, and the Lead GM override
+// (once, audited) is the only way past it
+godOf(P6, null);
+add(KOTN, 'Candidate');
+ok("a Lead GM's Add member of a faithless character is refused as joining is", !inF(KOTN, P6));
+t = chat(LEAD, `leader Candidate ${KOTN}`);
+ok('/faction leader is refused for a faithless character, told why', /does not follow the Nine Divines/.test(t) && !inF(KOTN, P6), t);
+godOf(P6, 'mara');
+add(KOTN, 'Candidate');
+ok('once they follow Mara, the Add member goes through', inF(KOTN, P6));
+// No hall until the Priory's part of Cyrodiil opens (Nat, 25 Oct): the F3 panel, the roster and the hall lookups must all
+// work without one
+let pay = null, threw = '';
+try { pay = globalThis.__dboFactionPayload(P2, true, true); } catch (e) { threw = e.message; }
+ok("a Pilgrim's F3 panel builds with no hall, naming the order", !threw && !!pay && JSON.stringify(pay).includes('Knights of the Nine'), threw || JSON.stringify(pay).slice(0, 200));
+try { pay = globalThis.__dboFactionPayload(CRUSADER, true, true); threw = ''; } catch (e) { threw = e.message; }
+ok("the Divine Crusader's panel too, with the roster", !threw && !!pay && JSON.stringify(pay).includes('Taloite'), threw);
+const info = globalThis.__dboGuildInfo(KOTN);
+ok('its info has no hall and no zone, and is not secret', !!info && !info.zone && !info.secret && !info.hall, info);
+ok('no cell names it as a hall', typeof globalThis.__dboHallFactionAt !== 'function' || ![...['161ff:Skyrim.esm', '20ff:BSHeartland.esm']].some((c) => (globalThis.__dboHallFactionAt(c) || {}).id === KOTN));
 
 // ---- off --------------------------------------------------------------------------------------------------------
 const off = JSON.parse(JSON.stringify(CFG)); off.factions.limits.enabled = false;

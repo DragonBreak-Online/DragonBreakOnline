@@ -100,13 +100,13 @@ module.exports = (api) => {
   const BAND_PATH = path.resolve('player-guilds.json');
   // compatibleKinds / compatibleIds / colleges: what a guild member MAY also belong to (Nate, 21 Oct: "a leader or member
   // of any faction cannot create or join a guild", except religious factions and the magic colleges). The defs carry no
-  // "religious" flag: kind 'cult' is the 15 Daedric cults, while the Imperial Cult, the Great Faiths and the Vigil of
+  // "religious" flag: kind 'cult' is the 15 Daedric cults, while the Imperial Cult and the Vigil of
   // Stendarr are kind 'guild', so they are named by id. A college is the college flag (Winterhold, the Synod, Whispers,
   // and any later one), not a kind.
   const BAND = Object.assign({
     enabled: true, maxMembers: 10,
     compatibleKinds: ['cult'],
-    compatibleIds: ['imperial-cult', 'great-faiths', 'vigil-of-stendarr'],
+    compatibleIds: ['imperial-cult', 'vigil-of-stendarr'],
     collegesCompatible: true,
   }, (cfg.playerGuilds || {}));
   // A werewolf pack holds at most packs.maxMembers, its Alpha included (Nate, 23 Oct: "5 werewolves per pack")
@@ -159,6 +159,28 @@ module.exports = (api) => {
     BEFORE_STAMPS.set(fid, ranks.map((r) => r.title));
   }
   const saveOverrides = () => { fs.writeFileSync(OVR_PATH + '.tmp', JSON.stringify(OVR, null, 1)); fs.renameSync(OVR_PATH + '.tmp', OVR_PATH); };
+  // A rank added to a faction by config (factions.addRanks { fid: [{ title, role, after }] }; Nat, 25 Oct: the Imperial
+  // Cult's Vestment Keeper, a tailor who makes the Eight's robes). guild-defs carries it for a faction whose ranks come from
+  // there; a faction whose leader or staff rewrote its ranks (guild-overrides.json) gets it inserted into that list too,
+  // after the rank it names (else before the joining rank), audited. Idempotent: a list that has the title is left alone.
+  // Members keep their own titles: remapByTitle below moves the stamped entries to the new indexes.
+  const lc = (s) => String(s || '').toLowerCase();
+  for (const [fid, adds] of Object.entries(((cfg.factions || {}).addRanks) || {})) {
+    const f = FACTIONS.get(fid);
+    if (!f || !Array.isArray(adds)) continue;
+    for (const a of adds) {
+      const title = cleanTitle(a && a.title), role = String((a && a.role) || '');
+      if (!title || !ROLES[role] || role === 'leader') continue;
+      const has = (ranks) => ranks.some((r) => lc(r.title) === lc(title));
+      const place = (ranks) => { const i = ranks.findIndex((r) => lc(r.title) === lc(a.after)); return i >= 0 ? i + 1 : Math.max(1, ranks.length - 1); };
+      if (!has(f.ranks) && f.ranks.length < RANKS_MAX) { f.ranks.splice(place(f.ranks), 0, { title, role }); audit(`FACTION-RANK ${f.name} gains ${title} (${role}), from config factions.addRanks`); }
+      const o = OVR[fid];
+      if (o && Array.isArray(o.ranks) && !has(o.ranks) && o.ranks.length < RANKS_MAX) {
+        o.ranks.splice(place(o.ranks), 0, { title, role });
+        try { saveOverrides(); } catch (e) { log('guild-overrides.json write failed', e.message); }
+      }
+    }
+  }
 
   // ---- membership state -------------------------------------------------------------------------
   // { factionId: { actorId: { rank, name, tag, since } } }
@@ -281,7 +303,38 @@ module.exports = (api) => {
   const can = (fid, a, perm) => { const r = rankOf(fid, a); return !!(r && (ROLES[r.role] || {})[perm]); };
   const roleCount = (fid, role) => Object.values(rosterOf(fid)).filter((e) => (FACTIONS.get(fid).ranks[e.rank] || {}).role === role).length;
   const mirror = (a) => { try { mp.set(a, MIRROR_PROP, membershipsOf(a).map((m) => ({ id: m.fid, role: (FACTIONS.get(m.fid).ranks[m.e.rank] || {}).role }))); } catch (e) { /* offline */ } };
+  // A faction folded into another (config factions.merged { from: { into } }; Nat, 25 Oct: "Great faith dissolved, it is
+  // now The Imperial Cult"). Its id is gone from guild-defs, so nobody can join it; anyone still on its roster moves to the
+  // faction it joined at a rank of the same role (its leader to the first officer rank, else the joining rank), audited,
+  // and the old roster goes. Runs at every load and is idempotent: once moved there is nothing left to move.
+  const mergeRosters = () => {
+    for (const [from, m] of Object.entries(((cfg.factions || {}).merged) || {})) {
+      const into = FACTIONS.get(String((m && m.into) || ''));
+      const roster = ST.members[from];
+      if (!into || FACTIONS.has(from) || !roster) continue;
+      const oldRanks = OVR[from] && Array.isArray(OVR[from].ranks) ? OVR[from].ranks : [];
+      const rankFor = (role) => { const want = role === 'leader' ? 'officer' : role; const i = into.ranks.findIndex((r) => r.role === want); return i >= 0 ? i : into.ranks.length - 1; };
+      let moved = 0;
+      for (const [k, e] of Object.entries(roster)) {
+        if (!e) continue;
+        const was = e.title || (oldRanks[e.rank] || {}).title || `rank ${e.rank}`;
+        if (entryOf(into.id, Number(k))) { audit(`FACTION-MERGE ${e.name || k} left ${from} (${was}); already in ${into.name}, kept as they were`); continue; }
+        // the same title where the faction joined has it (an Acolyte stays an Acolyte), else a rank of the same role
+        const same = into.ranks.findIndex((r) => r.title.toLowerCase() === String(was).toLowerCase());
+        const rank = same >= 0 && into.ranks[same].role !== 'leader' ? same : rankFor(String((oldRanks[e.rank] || {}).role || 'member'));
+        const ne = { rank, name: e.name, tag: e.tag, since: e.since || Date.now() };
+        stamp(into, ne); rosterOf(into.id)[k] = ne; moved++;
+        audit(`FACTION-MERGE ${e.name || k} moved from ${from} (${was}) to ${into.name} as ${into.ranks[rank].title}`);
+        try { if (isOnline(Number(k))) mirror(Number(k)); } catch (err) { /* offline */ }
+      }
+      delete ST.members[from];
+      save();
+      log(`guilds: ${from} merged into ${into.id}: ${moved} member(s) moved, the old roster removed`);
+    }
+  };
+
   const isOnline = (a) => onlineActors().includes(a >>> 0);
+  mergeRosters();
 
   // by: the character who makes the change (null for the court's own office sync), for the wording of a limit refusal
   // A band's own rules: at most maxMembers including the Guildmaster, and one band per CHARACTER on top of any factions

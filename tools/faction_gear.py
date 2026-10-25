@@ -54,6 +54,9 @@ SETS = [
     # The Tribunal Temple's robes, mantles, hoods and masks (Immersive Armors; Nate, 18 Oct: "locked behind faction"):
     # House Indoril is the Temple's own house, its Ordinators drawn from it
     ('Tribunal Temple', ['house-indoril'], r"^Tribunal ", lambda n, e, p: p == 'Hothtrooper44_ArmorCompilation.esp'),
+    # The Knights of the Nine's kit (Nat, 25 Oct: a lore faction on the live server): no Knights of the Nine or Crusader
+    # gear is in the load order, so the order wears the Knight-Errant set (knighterrant.esp), which no faction held
+    ('Knights of the Nine', ['knights-of-the-nine'], r"^Knight-Errant ", lambda n, e, p: p == 'knighterrant.esp'),
     # Modded silver only: Immersive Weapons' silver weapons and Immersive Armors' mantles, not the base game's
     ('Silver Hand', ['silver-hand'], r"(Silver (Longsword|Battle Staff|War Axe|Battleaxe|Scimitar|Nodachi|Katana|Wakizashi|Tanto|Hawk Bow|Sword)|Mantle of the Silver Hand)$",
      lambda n, e, p: p in ('Immersive Weapons.esp', 'Hothtrooper44_ArmorCompilation.esp')),

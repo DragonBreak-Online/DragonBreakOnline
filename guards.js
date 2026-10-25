@@ -8,7 +8,8 @@
 // the hold's guard there and its spawn tag (private.npcSpawner) marks it as the watch's.
 // No benefit in fighting them:
 //   loot    a dead guard of the watch cannot be searched (the activate chain refuses it)
-//   skill   no Wheel work for hitting or killing one, nor for being hit by one (skillrates.js asks __dboWatchNoSkill)
+//   skill   no Wheel work for hitting or killing one, nor for being hit by one (skillrates.js asks __dboWatchNoSkill);
+//           since 25 Oct the same for every NPC guard, the watch's or not (isNpcGuard below)
 // Jail: a player one of them brings down is raised in a cell of that hold's jail, its prison when the jail is full
 // (hold-jails.json; jail.js __dboJailByWatch), for jailMinutes, instead of bleeding out. A hold with no cell to hand, or a
 // full one, leaves the down as it is. Guards set on a known beast or an outlaw stay exposure.js's (ff_huntedIn).
@@ -106,13 +107,58 @@ module.exports = (api) => {
   };
   globalThis.__dboIsWatchGuard = (a) => !!watchHoldOf(a);
 
-  // skillrates.js: no Wheel work from a hit on a guard, a guard killed, or a guard's blow taken
+  // Any NPC guard, not only the watch's (Nat, 25 Oct: "no xp from hitting or killing guards"): a city guard of a plugin,
+  // another zone or another system is known by its base's editor id. "guard" in it, once the words that only contain it
+  // (Redguard, Dawnguard, Guardian, Vanguard, Bodyguard...) are taken out, unless it also names an enemy that merely
+  // guards something in a dungeon (LvlBanditMeleeGuard, LvlDraugrMissileGuardMale, CYRLvlGoblinMeleeGuard...). Measured
+  // 25 Oct over the dev Data load order: 1,116 NPC_/LVLN bases kept (every hold's Guard*, CYRGuardBruma*, EncGuard*,
+  // DRV_Guard_*, SOMRBaanGuard*...), 49 enemy "guards" left out. noSkillBases adds bases the rule misses (the Skyrim
+  // border gate's four sentries), noSkillExclude takes bases out; each entry is a desc ("c9b18:BSHeartland.esm") or an
+  // editor id. Players are never matched: a player guard's fights stay PvP's
+  const DEFAULT_GUARD_BASES = ['c9b18:BSHeartland.esm', 'c9b1f:BSHeartland.esm', 'c9b21:BSHeartland.esm', 'c9b26:BSHeartland.esm'];
+  const GUARD_WORD = /guard/i;
+  const NOT_GUARD_WORDS = /redguard|dawnguard|guardian|vanguard|rearguard|bodyguard|safeguard/gi;
+  const rxOf = (s, fallback) => { try { return s ? new RegExp(String(s), 'i') : fallback; } catch (e) { return fallback; } };
+  const ENEMY = rxOf(C.noSkillEnemyWords, /bandit|draugr|forsworn|vampire|thrall|falmer|necro|skele|warlock|conjur|hagraven|spriggan|ogre|dremora|daedr|cultist|dwarven|dwemer|marauder|pirate|smuggler|outlaw|brigand|reaver|thug|alikr|goblin|dog|hound/i);
+  const listOf = (v) => new Set((Array.isArray(v) ? v : []).map((x) => (String(x).includes(':') ? normDesc(x) : String(x).toLowerCase())));
+  const ADD = listOf(DEFAULT_GUARD_BASES.concat(Array.isArray(C.noSkillBases) ? C.noSkillBases : []));
+  const EXCLUDE = listOf(C.noSkillExclude);
+  const editorIdIsGuard = (ed) => { const s = String(ed || ''); return GUARD_WORD.test(s.replace(NOT_GUARD_WORDS, '')) && !ENEMY.test(s); };
+  // Per base, never per reference: an editor id lookup is a record read, and a base's answer never changes in a run
+  // (a reload of this module starts a fresh cache, so a config change applies at once)
+  const baseCache = new Map();
+  const baseIsGuard = (desc) => {
+    const key = normDesc(desc);
+    if (!key) return false;
+    if (baseCache.has(key)) return baseCache.get(key);
+    let ed = '';
+    try { const r = mp.lookupEspmRecordById(mp.getIdFromDesc(String(desc)) >>> 0); ed = String((r && r.record && r.record.editorId) || ''); } catch (e) { ed = ''; }
+    const lc = ed.toLowerCase();
+    const yes = !EXCLUDE.has(key) && !(lc && EXCLUDE.has(lc)) && (ADD.has(key) || (!!lc && ADD.has(lc)) || editorIdIsGuard(ed));
+    if (baseCache.size > 5000) baseCache.clear();
+    baseCache.set(key, yes);
+    return yes;
+  };
+  const isNpcGuard = (a) => {
+    if (!a) return false;
+    if (C.enabled && watchHoldOf(a)) return true;
+    if (C.noSkillAnyGuard === false) return false;
+    let player = false; try { player = Number(mp.get(id(a), 'profileId')) >= 0; } catch (e) { return false; }
+    if (player) return false;
+    let base = ''; try { base = String(mp.get(id(a), 'baseDesc') || ''); } catch (e) { return false; }
+    return !!base && baseIsGuard(base);
+  };
+  globalThis.__dboIsNpcGuard = (a) => { try { return isNpcGuard(a); } catch (e) { return false; } };
+
+  // skillrates.js: no Wheel work from a hit on a guard, a guard killed, or a guard's blow taken; never throws
   globalThis.__dboWatchNoSkill = (kind, detail) => {
-    if (!C.enabled || !detail) return false;
-    if (kind === 'hit') return !!watchHoldOf(detail.targetId);
-    if (kind === 'kill') return !!watchHoldOf(detail.victimId);
-    if (kind === 'hurt') return !!watchHoldOf(detail.aggressorId);
-    return false;
+    try {
+      if (!detail) return false;
+      if (kind === 'hit') return isNpcGuard(detail.targetId);
+      if (kind === 'kill') return isNpcGuard(detail.victimId);
+      if (kind === 'hurt') return isNpcGuard(detail.aggressorId);
+      return false;
+    } catch (e) { return false; }
   };
 
   // The activate chain: a dead guard of the watch is never searched

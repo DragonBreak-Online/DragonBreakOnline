@@ -348,6 +348,13 @@ out = run(`DISCIPLINE strike #4 on Selene #K2QX (profile 2) (profile 2) by Dar #
 ok(out[0].ev === 'session.ban' && out[0].c === 'K2QX' && out[0].f.kind === 'strike' && roleOf(out[0], 'U6T6') === 'staff' && !JSON.stringify(out).includes(CANARY), 'DISCIPLINE "<kind> #n on <target> ... by <staff>: <reason>": the target\'s post, the staff party, no reason', out[0]);
 const byStaff = out.filter((r) => r.c === 'U6T6');
 ok(byStaff.length === 0, '...the staff member is never the actor of it (--who on them finds only what they did)');
+// a ban typed in game (discipline.js /discipline ban, /ban; Nat, 25 Oct): a suspension with no end, "permanently" for its date
+out = run(`DISCIPLINE ban #5 on Selene #K2QX (profile 2) permanently by Dar #U6T6 (profile 4): ${CANARY} threats`);
+ok(out.length === 1 && out[0].ev === 'session.ban' && out[0].c === 'K2QX' && out[0].f.kind === 'ban' && out[0].f.entry === 5 && roleOf(out[0], 'U6T6') === 'staff' && !JSON.stringify(out).includes(CANARY), 'DISCIPLINE ban #n on <target> ... permanently by <staff>: the target\'s post, kind ban, the staff party, no reason', out);
+out = run('DISCIPLINE refused Selene #K2QX (profile 2): banned permanently (#5)');
+ok(out.length === 1 && out[0].ev === 'session.ban' && out[0].f.kind === 'refused' && out[0].f.entry === 5, 'DISCIPLINE refused <target>: banned permanently (#n): the login refusal keeps its entry number', out);
+out = run('DISCIPLINE lift #6 on Selene #K2QX (profile 2) by Dar #U6T6 (profile 4): appeal accepted');
+ok(out.length === 1 && out[0].f.kind === 'lift' && roleOf(out[0], 'U6T6') === 'staff', '...and /unban is the lift line it always was', out);
 // a ban issued on Discord (gamemode.js __dboDiscordBan, security audit L4-2)
 out = run(`BAN Discord ban (guild ban) on Selene #K2QX (profile 2), 1 more character by Dar #U6T6 (profile 4): ${CANARY} threats`);
 ok(out.length === 1 && out[0].ev === 'session.ban' && out[0].c === 'K2QX' && out[0].f.kind === 'ban' && roleOf(out[0], 'U6T6') === 'staff' && !JSON.stringify(out).includes(CANARY), 'BAN "Discord <ban|unban> (<via>) on <target> ... by <moderator>: <reason>": the target\'s post, the staff party, no reason', out);

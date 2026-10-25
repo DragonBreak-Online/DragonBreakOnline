@@ -9,7 +9,7 @@
 // unlearning/forgetting a spell"): every spell studied or taught stays in the character's spellbook, with no limit, and
 // at most `prepared` (3) of them, whatever their school, are on the character at a time (Actor.AddSpell / RemoveSpell).
 // The spellbook panel (/spells, front widget "spellbook") shows them all; the prepared ones are changed only at a magic
-// college or a temple of the Great Faiths (prepareCells: the Synod Conclave, the College of Winterhold, the Cathedral of
+// college or a temple of the Imperial Cult (prepareCells: the Synod Conclave, the College of Winterhold, the Cathedral of
 // St Martin, Solitude's Temple of the Divines) or beside a Scholars' Ledger. The College of
 // Whispers' hall, Frostcrag Spire, is not a prepareCells college: its mages change them at its ledger (Nate, 4 Oct).
 // Spells the engine holds outside the book (granted outright, never studied) take no place. /forget is retired.
@@ -71,7 +71,7 @@ module.exports = (api) => {
     // How long a class's spell stays offered to its students after the class (schools.js classes.offerSpell)
     classOfferSeconds: 180,
     shopCells: ['20ff:BSHeartland.esm', '6c152:BSHeartland.esm'],
-    shopFactions: ['synod', 'college-of-winterhold', 'college-of-whispers', 'great-faiths'],
+    shopFactions: ['synod', 'college-of-winterhold', 'college-of-whispers', 'imperial-cult'],
     // A faith's temple or a college's own hall sells like the Synod's ledger (Nate, 11 Oct: "Priests in the temples ... the
     // same/similar abilities as the Colleges"; the College of Whispers at its own Frostcrag Spire). schools: what it stocks
     // and teaches (none: every school); exclusive: its factions buy only there, not at the Synod. A cell not listed in a
@@ -81,7 +81,8 @@ module.exports = (api) => {
     // while the Synod's own ledger still sells to the Synod and the colleges alone.
     shopPlaces: [
       // the Cathedral of St Martin, Bruma, and Solitude's Temple of the Divines (Nate, 19 Oct)
-      { name: 'The Great Faiths', open: true, cells: ['12cb:BSHeartland.esm', '5f78c:BSHeartland.esm', '5f78d:BSHeartland.esm', '16a02:Skyrim.esm'], factions: ['great-faiths'], schools: ['Restoration', 'Alteration'], exclusive: true },
+      // the Imperial Cult's since the Great Faiths joined it (Nat, 25 Oct)
+      { name: 'The Imperial Cult', open: true, cells: ['12cb:BSHeartland.esm', '5f78c:BSHeartland.esm', '5f78d:BSHeartland.esm', '16a02:Skyrim.esm'], factions: ['imperial-cult'], schools: ['Restoration', 'Alteration'], exclusive: true },
       { name: 'The College of Whispers', cells: ['781ad:BSHeartland.esm', '6ff7d:BSHeartland.esm'], factions: ['college-of-whispers'] },  // Frostcrag Spire
       { name: 'House Telvanni', cells: ['161ff:Skyrim.esm', '2d3e7:Skyrim.esm', '2d3e8:Skyrim.esm', 'a013b:Skyrim.esm'], factions: ['house-telvanni'] },  // Golden Glow Estate (Nate, 25 Oct)
     ],
@@ -419,7 +420,7 @@ module.exports = (api) => {
   // named the two colleges alone, so a Priest was sent to a college (Jorik Hamrikson #TW2F, 17 Oct: Fast Healing chosen at
   // Priest 25 with 3 spells prepared, "didnt learn Fast Healing when it says Known Spells")
   const COLLEGES_TEXT = 'a magic college (the Synod Conclave in Bruma or the College of Winterhold)';
-  const TEMPLES_TEXT = "a temple of the Great Faiths (the Cathedral of St Martin in Bruma or Solitude's Temple of the Divines)";
+  const TEMPLES_TEXT = "a temple of the Imperial Cult (the Cathedral of St Martin in Bruma or Solitude's Temple of the Divines)";
   const PREPARE_PLACES = `${COLLEGES_TEXT}, ${TEMPLES_TEXT} or a Scholars' Ledger`;
   const COLLEGE_HINT = `Prepared spells are changed at ${PREPARE_PLACES}.`;
   // How to get there for a spell that waits: /spells in a prepare cell, but beside a ledger its own Open your Spell Book,
@@ -585,7 +586,7 @@ module.exports = (api) => {
     }, true);
   };
   // Nothing is forgotten now (Nate, 2026-09-28): /spells forget and the hidden /forget (Worker B's aliases) open the book
-  const RETIRED = 'Spells are no longer forgotten: put one away in your spellbook instead, at a magic college, a temple of the Great Faiths or a Scholars\' Ledger.';
+  const RETIRED = 'Spells are no longer forgotten: put one away in your spellbook instead, at a magic college, a temple of the Imperial Cult or a Scholars\' Ledger.';
   // The panel opens only for a client whose UI said it draws it (dbo:uiCaps 'spellbook' from the HUD): an unknown
   // widget opened with focus would leave an invisible panel holding the keys. An older client gets the book in chat.
   const caps = globalThis.__dboSpellbookCaps instanceof Map ? globalThis.__dboSpellbookCaps : (globalThis.__dboSpellbookCaps = new Map());
@@ -607,7 +608,7 @@ module.exports = (api) => {
     bookLedger.delete(a >>> 0);
     const first = String(Array.isArray(args) ? args[0] : args || '').trim();
     openFromCommand(a, /^forget\b/i.test(first) ? RETIRED : '');
-  }, { help: 'your spellbook: every spell you have studied, and the prepared ones (changed at a Scholars\' Ledger, a magic college or a temple of the Great Faiths)' });
+  }, { help: 'your spellbook: every spell you have studied, and the prepared ones (changed at a Scholars\' Ledger, a magic college or a temple of the Imperial Cult)' });
   registerChatCommand('forget', (a) => openFromCommand(a, RETIRED), { hidden: true, help: 'retired; /spells opens your spellbook' });
 
   // { ok, text } of preparing or putting away one spell

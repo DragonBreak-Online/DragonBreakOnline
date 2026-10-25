@@ -934,7 +934,7 @@
    "name": "The Temple of the Divines, Solitude",
    "cells": ["16a02:Skyrim.esm"],
    "schools": ["Restoration", "Alteration"],
-   "_comment": "The other chapel the Great Faiths' ledger stands in (spells.js shopPlaces)."
+   "_comment": "The other chapel the Imperial Cult's ledger stands in (spells.js shopPlaces)."
   },
   {
    "name": "The well in the Hall of the Elements",

@@ -298,7 +298,7 @@ reset();
   // Jake, 22 Oct: "Punishments only". A pinned Lead GM passes the floor, then runs /discipline and /kick only
   rep = send('/whoami', { discordId: ID.lead, profileId: 9, roles: [ROLE.lead] }).rep;
   check('4. a pinned Lead GM passes the floor (Leda, offline, tier leadgm), but /whoami is refused (punishOnly), with no #staff-commands line', rep.state === 'refused' && rep.why === 'punishOnly'
-    && rep.tier === 'leadgm' && rep.online === false && header(rep) === 'A Lead GM can run only /discipline and /kick from the console. Run anything else in game.' && !staffLines.length, rep);
+    && rep.tier === 'leadgm' && rep.online === false && header(rep) === 'A Lead GM can run only /discipline, /ban, /tempban, /unban and /kick from the console. Run anything else in game.' && !staffLines.length, rep);
   rep = send('/kick #8KWH', { discordId: ID.lead, profileId: 9, roles: [ROLE.lead] }).rep;
   check('4. ...and /kick #8KWH runs for her, with a #staff-commands line naming her Lead GM tier and the remote tag', rep.state === 'ran' && kicked.includes(store.get(A.bob).__user)
     && staffLines.some((l) => /^Leda #LEAD <@200000000000000008> \(Lead GM\): \/kick #8KWH +\[remote web [0-9a-f]{8}\]$/.test(l.detail)), [rep, staffLines]);
@@ -379,7 +379,7 @@ reset();
   logs.length = 0;
   loadConsole(repoCfg);
   // Eleven since /discipline came onto the allowlist (Jake, 21 Oct; tests/console-punish-harness.js holds its rule)
-  check('5b. console.js loads the repo config as a game pin of 8, floor leadgm, all eleven commands', logs.some((l) => /console: reader on .*, 11 commands, floor leadgm, game pin 8$/.test(l)), logs);
+  check('5b. console.js loads the repo config as a game pin of 8, floor leadgm, all fourteen commands (eleven, and the ban aliases of 25 Oct)', logs.some((l) => /console: reader on .*, 14 commands, floor leadgm, game pin 8$/.test(l)), logs);
   const owner = actor(0xff000d01, { name: 'Jacob', tag: 'JKOW', profile: 21, discord: D1[0], roles: [ROLE.owner] });
   const leadOnly = actor(0xff000d02, { name: 'Icara', tag: 'ICED', profile: 22, discord: D1[2], roles: [ROLE.lead] });
   let rep = send('/whoami', { discordId: D1[0], profileId: 21, user: 'jake', roles: [ROLE.owner] }).rep;
@@ -438,7 +438,9 @@ reset();
   // The one free-text rule since 21 Oct is /discipline's reason (tagKindReason), held to REASON_RE: plain words, 5 to 300
   // (tests/console-punish-harness.js); there is still no 'any' rule
   check('6. no rule in the allowlist passes free text (there is no "any" rule left; the reason rule is /discipline\'s alone)', Object.values(rules.ALLOW).every((a) => ['switch', 'tag', 'tagName', 'load', 'none', 'tagKindReason'].includes(a.rule))
-    && Object.entries(rules.ALLOW).filter(([, a]) => a.rule === 'tagKindReason').map(([n]) => n).join() === 'discipline'
+    // (25 Oct: /ban, /tempban and /unban read as /discipline's ban, suspend and lift, alias 'discipline', under the same rule)
+    && Object.entries(rules.ALLOW).filter(([, a]) => a.rule === 'tagKindReason').map(([n]) => n).join() === 'discipline,ban,tempban,unban'
+    && ['ban', 'tempban', 'unban'].every((n) => rules.ALLOW[n].alias === 'discipline')
     && !/case 'any'/.test(fs.readFileSync(CONSOLE_JS, 'utf8')), Object.values(rules.ALLOW).map((a) => a.rule));
   loadConsole({ remoteConsole: Object.assign({}, PINNED.remoteConsole, { deny: ['kick'] }) });
   check('6. gamemode-config deny narrows it: /kick is denied', send('/kick #8KWH').rep.why === 'denied' && !kicked.length);

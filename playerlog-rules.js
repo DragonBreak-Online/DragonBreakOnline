@@ -833,12 +833,13 @@ parsed('CHARTER', {
 });
 parsed('DISCIPLINE', {
   // DISCIPLINE <kind> #n on <target> (profile N)... by <staff>: <reason>; the reason is cut
-  cut: /: (?!suspended until).*$| \(config .*$/,
+  // a refusal keeps its end, 'suspended until <date> (#n)' or (from 25 Oct) 'banned permanently (#n)': nobody's words are in it
+  cut: /: (?!suspended until|banned permanently).*$| \(config .*$/,
   roles: R_BY([[/ on $/, 'target'], [/ by $/, 'staff'], [/^DISCIPLINE refused $/, 'target'], [/^DISCIPLINE $/, 'target']]),
   parse: (text, P, raw, roles) => {
     if (/^DISCIPLINE refused /.test(text)) return P.length ? [ev('session.ban', 0, { kind: 'refused', entry: num((text.match(/\(#(\d{1,9})\)/) || [])[1]) })] : [];
     if (/ has \d+ strikes in \d+ days/.test(text)) return P.length ? [ev('session.ban', 0, { kind: 'review' })] : [];
-    const m = text.match(/^DISCIPLINE (warn|strike|suspend|lift|overturn)\b \S*#(\d{1,9}) on /);
+    const m = text.match(/^DISCIPLINE (warn|strike|suspend|ban|lift|overturn)\b \S*#(\d{1,9}) on /);
     if (!m) return [];
     const t = roles.indexOf('target'), s = roles.indexOf('staff');
     if (t < 0) return [];
@@ -1235,6 +1236,9 @@ const COMMAND_SCHEMA = {
   curse: { target: { from: 0, to: 1, lookup: 'online' } },
   beastform: { target: { from: 0, to: 1, lookup: 'online' } },
   discipline: { target: { from: 0, to: 1, lookup: 'any' } },
+  // /discipline's ban, suspend and lift under other words (discipline.js, 25 Oct): the #TAG first, as there; /bans is its list
+  ban: { target: { from: 0, to: 1, lookup: 'any' } }, tempban: { target: { from: 0, to: 1, lookup: 'any' } }, unban: { target: { from: 0, to: 1, lookup: 'any' } },
+  bans: { info: true },
   jail: { subs: S_('zone unzone list release extend'), target: { from: 0, to: 1, lookup: 'online' }, nums: [1] },
   smithing: { subs: S_('teach forget list test'), target: { from: 0, to: 1, lookup: 'online' } },
   // mirrored to the target's post (DESIGN.md 2.2.3): party invite/kick, teach, faction invite/kick, appoint/dismiss
@@ -1496,7 +1500,7 @@ couriers.js COURIER 4806f214 parsed
 court.js <expr> 9d97c8d1 parsed
 court.js OFFICIAL 86dad6bd parsed
 court.js <expr> a74e62f0 parsed
-discipline.js DISCIPLINE d74e7242 parsed
+discipline.js DISCIPLINE c313c33e parsed
 discipline.js DISCIPLINE e5c533ad parsed
 discipline.js DISCIPLINE e8c0f96e parsed
 discipline.js DISCIPLINE eaf7762e parsed

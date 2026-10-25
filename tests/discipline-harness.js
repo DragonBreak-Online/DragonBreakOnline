@@ -55,7 +55,8 @@ cmd(3, '#AAAA warn spamming'); ok(/Only staff/.test(last(3)), 'a player cannot u
 cmd(1, '#AAAA warn hi'); ok(/Give a reason/.test(last(1)), 'a reason is required');
 cmd(1, '#AAAA warn spamming the market chat'); ok(/Recorded: warn #1/.test(last(1)) && /A warning from staff: spamming/.test(last(3)), 'a GM warns; the player is told at once');
 cmd(1, '#GMGM strike abuse'); ok(/^c5 is on a staff account of your rank or higher, so you cannot discipline it\./.test(last(1)), 'a GM cannot discipline another GM (the rank rule)', last(1));
-cmd(1, '#AAAA suspend 3d theft'); ok(/Suspensions are for Lead GMs/.test(last(1)), 'a GM cannot suspend');
+// Nat, 25 Oct: a GM suspends (temp bans) up to gmMaxSuspendDays, 3 days; longer is a Lead GM's (tests/bans-harness.js has the rest)
+cmd(1, '#AAAA suspend 4d theft'); ok(/^A GM can suspend for at most 3 days \(3d or 72h\)/.test(last(1)), 'a GM cannot suspend for more than 3 days', last(1));
 cmd(1, '#AAAA strike griefing one'); cmd(1, '#AAAA strike griefing two'); cmd(1, '#AAAA strike griefing three');
 ok(/3 strikes in 90 days/.test(last(1)) && audits.some((l) => /a Lead GM should review/.test(l)), 'the third strike asks for a Lead GM review');
 cmd(2, '#BBBB suspend 2d stole from a barrel'); 

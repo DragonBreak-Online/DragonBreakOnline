@@ -30,6 +30,67 @@
     ]
   },
   {
+    "title": "The Great Faiths have joined the Imperial Cult",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Factions",
+        "items": [
+          "The Great Faiths have joined the Imperial Cult. The Cathedral of St Martin in Bruma and Solitude's Temple of the Divines are the Cult's now, with their Scholars' Ledgers.",
+          "Imperial Cult members can buy Restoration and Alteration tomes at those ledgers again, by rank as before, and its Seniors teach there.",
+          "Tome sales at the Cathedral pay the Cult's treasury, which now holds the Great Faiths' gold too."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Senior mages take more apprentices",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Magic colleges",
+        "items": [
+          "A Senior Wizard, Senior Magister or Senior Whisperer may now take up to three apprentices, as a college's leader and officers can. Teaching still takes Arcane Arts at 75."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Fighting the guard no longer trains your skills",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Guards",
+        "items": [
+          "Hitting or killing a city guard, or being hit by one, no longer trains any skill. This now covers every guard in the world, not only the watch at its posts: Bruma's guards, every hold's guards and the guards of the other cities and towns.",
+          "Bandits, draugr and other enemies standing guard in a dungeon still train your skills as before."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "The Knights of the Nine are recruiting",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Factions",
+        "items": [
+          "The Knights of the Nine are a faction: the holy order of the Nine Divines, from Pilgrim and Knight Errant up to Knight Commander and the Divine Crusader.",
+          "Only a follower of one of the Nine Divines, Talos included, may join: choose your god at a shrine first. A Knight may not serve a Daedric cult.",
+          "Their Armorers alone forge the Knight-Errant armour."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Server restart: soul gems, gates and strongholds",
     "date": "2026-10-25",
     "version": "Server update",

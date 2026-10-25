@@ -981,7 +981,7 @@ const HELP_GROUPS = [
       'Your skills: press K (the Skills tab of your journal).', 'Spending a level: /status tells you when you have a point.',
       'Magic begins with Arcane Arts: study at a Study Magic shelf, such as the Synod Conclave\'s bookcases.',
       'At Arcane Arts 25 you choose a school; at 25 in a school, its first spell, no tome needed. Restoration\'s comes at Priest 25.',
-      'Your spells: /spells, or F3 Magic. Prepared spells are changed at a Scholars\' Ledger, a magic college or a temple of the Great Faiths.',
+      'Your spells: /spells, or F3 Magic. Prepared spells are changed at a Scholars\' Ledger, a magic college or a temple of the Imperial Cult.',
       'Changing a school of magic: a Scholars\' Ledger or a Study Magic shelf, once every 7 days.',
       'Spell tomes: bought in the Synod Conclave, read at a study spot there or in Frost Crag Spire.',
       `Classes: a Class Lectern. At ${TEACH_TIER_NAME} in Arcane Arts or Priest you can /teach a spell to someone beside you.`] },
@@ -1050,7 +1050,7 @@ const helpLine = (n) => { const c = commands.get(n); return `/${n}${c && c.help 
 // power inside a player command. An entry shows only while its command exists; an admin-only command missing here is
 // listed under Other staff tools.
 const STAFF_HELP = [
-  { key: 'players', title: 'Players', items: ['players', 'kick', 'discipline', 'tp', 'fixloc', 'chargen', 'grantappearance',
+  { key: 'players', title: 'Players', items: ['players', 'kick', 'discipline', 'ban', 'tempban', 'unban', 'bans', 'tp', 'fixloc', 'chargen', 'grantappearance',
     ['rename', '<player|#TAG> <new name> [call:<n>|ticket:<id>]: for a typo or a name against the rules. A new identity is a new character, never a rename'],
     'staffchar', 'staffref', 'sethunger', 'wipechars',
     ['tokens', '<player|#TAG>: someone\'s Patreon tier and identity rerolls left'], 'rerollrefund', 'stats', 'charstats', 'bugs', 'realnames', 'chars',
@@ -8824,7 +8824,7 @@ try {
 try {
   const STAFFGUARD_JS = path.resolve('staffguard.js');
   delete require.cache[STAFFGUARD_JS];
-  require(STAFFGUARD_JS)({ mp, log, audit, who, display, personal, profileOf, tierOf, staffTierOf, isLeadStaff, staffCharOf, accountRankOf,
+  require(STAFFGUARD_JS)({ mp, log, audit, who, display, personal, profileOf, tierOf, staffTierOf, isLeadStaff, staffCharOf, accountRankOf, rankRefusal: rankRefusalOf, authorRefusal: authorRefusalOf,
     findByName, offlineByTag, registerChatCommand, onlineActors, cfg });
 } catch (e) {
   log('staffguard.js failed to load:', e.stack || e.message);

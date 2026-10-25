@@ -5,22 +5,32 @@
 //   /discipline #TAG                          the account's record (staff)
 //   /discipline #TAG warn <reason>            a warning: the player is told, nothing else happens
 //   /discipline #TAG strike <reason>          a strike: told; strikes count for strikeDays, and staff are told at strikesForReview
-//   /discipline #TAG suspend <n>h|<n>d <reason>   Lead GM and above: logged out now and refused at login until it ends
-//   /discipline #TAG lift <reason>            Lead GM and above: ends a suspension early
-//   /discipline list                          every suspension still running
+//   /discipline #TAG suspend <n>h|<n>d <reason>   logged out now and refused at login until it ends: a GM up to gmMaxSuspendDays
+//                                             (3), a Lead GM and above up to maxSuspendDays (Nat, 25 Oct: "Let regular GMs temp
+//                                             ban up to 3 days only")
+//   /discipline #TAG ban <reason>             Lead GM and above: a suspension with no end (Nat, 25 Oct: "allow Lead GMs to ban,
+//                                             temp ban etc in game"), held out the same way until it is lifted
+//   /discipline #TAG lift <reason>            Lead GM and above: ends a suspension or a ban early
+//   /discipline list                          every suspension and ban still running
+// Aliases for the same code path (nothing of their own but the words): /ban #TAG <reason> = ban, /tempban #TAG <12h|3d>
+// <reason> = suspend, /unban #TAG <reason> = lift, /bans = list. The console (console.js) takes /ban, /tempban, /unban too.
 // The record is the account's (profile), so it follows every character on it. Every kind is refused on an account of the
 // caller's own rank or higher (gamemode.js rankRefusalOf: the account's highest staff tier over all its characters, so an alt
 // with no roles stamped counts as its owner), and when that rank cannot be read. Lift and overturn also need the caller's rank
 // to be at least that of the account that gave the record (gamemode.js authorRefusalOf; a config record is the Owners').
 // Every action goes to the audit log with who did it and why. A player offline is told at their next login.
 // Records (discipline.json beside world/, never in git): { profiles: { <profile>: [{ n, kind, reason, by, at, char, until?, seen, lifted? }] } }
-// Config "discipline" in gamemode-config.json: { enabled, strikeDays, strikesForReview, maxSuspendDays, record, discordFile }.
+// Config "discipline" in gamemode-config.json: { enabled, strikeDays, strikesForReview, maxSuspendDays, gmMaxSuspendDays, record,
+// discordFile }.
 // record lists actions decided outside the game, each added once, matched by key:
 //   { key, tag, kind: warn|strike, reason, by }
 //   { key, profile and/or tag, kind: 'suspend', from, until or length ('38h'), reason, by }   (ticket rep-0305, Jake 21 Oct)
 //       the end is fixed by from/until (ISO), whenever the reload that adds it runs; a length needs its from; over
 //       maxSuspendDays, or already over, is refused. The account is logged out at once and refused at login until it ends.
-//   { key, kind: 'lift', of: <suspension key>, reason, by }   ends that suspension early, the undo that needs no Lead GM in game
+//   { key, profile and/or tag, kind: 'ban', reason, by }   a ban (no end), as typed; Discord accounts are held out alike
+//   { key, kind: 'lift', of: <suspension or ban key>, reason, by }   ends it early, the undo that needs no Lead GM in game
+// A ban is a record { kind: 'ban' } with no until: it holds the account out like a suspension that never ends, and every
+// line that names an end says "permanently" (endText), so no date is ever made from it.
 // A suspension can also hold out Discord accounts, a second account that has never played (no profile) included: their ids
 // sit only in discordFile (default discipline-discord.json beside discipline.json, root only, never in git, never written or
 // logged here): { "<record key>": ["<discord id>", ...] }, read at every load. A character whose session's Discord id
@@ -28,8 +38,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const DEFAULTS = { enabled: true, strikeDays: 90, strikesForReview: 3, maxSuspendDays: 30, file: '' };
-const KINDS = ['warn', 'strike', 'suspend', 'lift', 'overturn'];
+const DEFAULTS = { enabled: true, strikeDays: 90, strikesForReview: 3, maxSuspendDays: 30, gmMaxSuspendDays: 3, file: '' };
+const KINDS = ['warn', 'strike', 'suspend', 'ban', 'lift', 'overturn'];
 
 // Pure: '12h' or '3d' -> ms, else 0
 const lengthMs = (s, maxDays) => {
@@ -38,8 +48,12 @@ const lengthMs = (s, maxDays) => {
   const ms = Number(m[1]) * (m[2].toLowerCase() === 'd' ? 86400000 : 3600000);
   return ms > 0 && ms <= maxDays * 86400000 ? Math.round(ms) : 0;
 };
-// Pure: the suspension running at `now`, or null (one decided outside the game may start at its own `from`)
-const activeSuspension = (entries, now) => (entries || []).filter((e) => e.kind === 'suspend' && !e.lifted && !e.overturned && e.until > now && !(e.from > now)).sort((a, b) => b.until - a.until)[0] || null;
+// Pure: when a hold (a suspension or a ban) ends; a ban never does
+const endOf = (e) => (e.kind === 'ban' ? Infinity : Number(e.until) || 0);
+// Pure: the suspension or ban running at `now`, the one ending last (a ban first), or null (one decided outside the game may
+// start at its own `from`)
+const activeSuspension = (entries, now) => (entries || []).filter((e) => (e.kind === 'suspend' || e.kind === 'ban') && !e.lifted && !e.overturned && endOf(e) > now && !(e.from > now))
+  .sort((a, b) => (endOf(a) === endOf(b) ? 0 : endOf(a) > endOf(b) ? -1 : 1))[0] || null;
 // Pure: a suspension decided outside the game -> { from, until } in ms, or { error }. The end never depends on when it is read.
 const configWindow = (r, maxDays, now) => {
   const max = maxDays * 86400000;
@@ -59,7 +73,12 @@ const configWindow = (r, maxDays, now) => {
 // An overturned record is kept for the history and counts for nothing: a strike given for something the game allowed
 // had to be cut out of discipline.json by hand before this existed (ticket #0141, 12 Oct).
 const activeStrikes = (entries, now, days) => (entries || []).filter((e) => e.kind === 'strike' && !e.overturned && now - Date.parse(e.at) < days * 86400000).length;
-const stamp = (ms) => new Date(ms).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+// A date that cannot be one (a ban's end) reads as permanently rather than throw
+const stamp = (ms) => { const d = new Date(ms); return Number.isFinite(d.getTime()) ? d.toISOString().replace('T', ' ').slice(0, 16) + ' UTC' : 'permanently'; };
+// Pure: the end of a hold as every line names it: 'until <date>', or 'permanently' for a ban
+const endText = (e) => (e.kind === 'ban' ? 'permanently' : `until ${stamp(e.until)}`);
+// Pure: what the hold is, with its end: 'suspended until <date>' or 'banned permanently'
+const heldText = (e) => `${e.kind === 'ban' ? 'banned' : 'suspended'} ${endText(e)}`;
 
 module.exports = (api) => {
   const { mp, log, personal, audit, who, display, profileOf, onlineActors, registerChatCommand, isAdmin, isLeadStaff, findAnyByName,
@@ -77,6 +96,8 @@ module.exports = (api) => {
     return `Who gave ${what} cannot be read, so it was not ${verb === 'lift' ? 'lifted' : 'overturned'}. Ask an Owner.`;
   };
   const C = Object.assign({}, DEFAULTS, (api.cfg || {}).discipline || {});
+  // A GM's longest suspension: the config's, never above maxSuspendDays; a value that is no number of days falls back to 3
+  const GM_DAYS = Math.min(Number(C.gmMaxSuspendDays) > 0 ? Number(C.gmMaxSuspendDays) : DEFAULTS.gmMaxSuspendDays, C.maxSuspendDays);
   if (C.enabled === false) { globalThis.__dboDisciplineLogin = null; globalThis.__dboVoiceRefused = null; log('discipline: off'); return; }
   const stateDir = () => { try { return path.dirname(fs.realpathSync(path.resolve('world'))); } catch (e) { return path.resolve('.'); } };
   const FILE = C.file ? path.resolve(C.file) : path.join(stateDir(), 'discipline.json');
@@ -134,10 +155,10 @@ module.exports = (api) => {
     try { sendPacket(a, { customPacketType: 'kicked', reason }); } catch (e) { /* gone */ }
     setTimeout(() => { try { const u = userOf(a); if (u >= 0) mp.kick(u); } catch (e) { log('discipline: kick failed', e.message); } }, 1500);
   };
-  const suspendedText = (s) => `Your account is suspended until ${stamp(s.until)}. Reason: ${s.reason}`;
+  const suspendedText = (s) => `Your account is ${heldText(s)}. Reason: ${s.reason}`;
   const tell = (a, e) => personal(a, e.kind === 'warn' ? `A warning from staff: ${e.reason}`
     : e.kind === 'strike' ? `A strike from staff: ${e.reason}. Strikes count against your account for ${C.strikeDays} days.`
-      : e.kind === 'lift' ? `Your suspension was lifted: ${e.reason}`
+      : e.kind === 'lift' ? `Your ${e.liftsKind === 'ban' ? 'ban' : 'suspension'} was lifted: ${e.reason}`
         : e.kind === 'overturn' ? `A staff decision against you was overturned: ${e.reason}` : e.reason);
 
   // Unseen warnings and strikes are shown at login; a suspended account is logged out
@@ -147,7 +168,7 @@ module.exports = (api) => {
     const s = own || (DISCORD.size ? heldByDiscord(discordOf(a), now) : null);
     if (s) {
       kickWithReason(a, suspendedText(s));
-      audit(`DISCIPLINE refused ${who(a)}: suspended until ${stamp(s.until)} (${own ? `#${s.n}` : `config ${s.key}, held out by Discord account`})`);
+      audit(`DISCIPLINE refused ${who(a)}: ${heldText(s)} (${own ? `#${s.n}` : `config ${s.key}, held out by Discord account`})`);
       return true;
     }
     const unseen = list.filter((e) => !e.seen && (e.kind === 'warn' || e.kind === 'strike' || e.kind === 'lift' || e.kind === 'overturn'));
@@ -178,18 +199,19 @@ module.exports = (api) => {
     const p = profileOf(target); const list = recordOf(p); const now = Date.now();
     if (!list.length) return personal(a, `${display(target)} (profile ${p}): no record.`);
     const s = activeSuspension(list, now);
-    personal(a, `${display(target)} (profile ${p}): ${list.length} entr${list.length === 1 ? 'y' : 'ies'}, ${activeStrikes(list, now, C.strikeDays)} strike(s) in ${C.strikeDays} days${s ? `, suspended until ${stamp(s.until)}` : ''}.`);
-    for (const e of list.slice(-10)) personal(a, `#${e.n} ${e.at.slice(0, 10)} ${e.kind}${e.from ? ` from ${stamp(e.from)}` : ''}${e.until ? ` until ${stamp(e.until)}` : ''}${discordNote(e)}${e.lifted ? ' (lifted)' : ''}${e.overturned ? ` (overturned by ${e.overturned.by})` : ''} by ${e.by}: ${e.reason}`);
+    personal(a, `${display(target)} (profile ${p}): ${list.length} entr${list.length === 1 ? 'y' : 'ies'}, ${activeStrikes(list, now, C.strikeDays)} strike(s) in ${C.strikeDays} days${s ? `, ${heldText(s)}` : ''}.`);
+    for (const e of list.slice(-10)) personal(a, `#${e.n} ${e.at.slice(0, 10)} ${e.kind}${e.from ? ` from ${stamp(e.from)}` : ''}${e.until ? ` until ${stamp(e.until)}` : ''}${e.kind === 'ban' ? ' permanently' : ''}${discordNote(e)}${e.lifted ? ' (lifted)' : ''}${e.overturned ? ` (overturned by ${e.overturned.by})` : ''} by ${e.by}: ${e.reason}`);
   };
 
-  const command = (a, args) => {
-    if (!isAdmin(a)) return personal(a, 'Only staff can use /discipline.');
+  // via: the command typed (discipline, or an alias below), for the staff-only answer
+  const command = (a, args, via) => {
+    if (!isAdmin(a)) return personal(a, `Only staff can use /${typeof via === 'string' ? via : 'discipline'}.`);
     const parts = String(args || '').trim().split(/\s+/).filter(Boolean);
-    if (!parts.length) return personal(a, 'Use: /discipline #TAG [warn|strike|suspend <12h|3d>|lift|overturn <n>] <reason>, or /discipline list');
+    if (!parts.length) return personal(a, 'Use: /discipline #TAG [warn|strike|suspend <12h|3d>|ban|lift|overturn <n>] <reason>, or /discipline list');
     if (parts[0].toLowerCase() === 'list') {
       const now = Date.now(); let n = 0;
-      for (const [p, list] of Object.entries(D.profiles)) { const s = activeSuspension(list, now); if (s) { n++; personal(a, `profile ${p} ${s.char}: until ${stamp(s.until)}${discordNote(s)} by ${s.by}: ${s.reason}`); } }
-      return n || personal(a, 'No suspension is running.');
+      for (const [p, list] of Object.entries(D.profiles)) { const s = activeSuspension(list, now); if (s) { n++; personal(a, `profile ${p} ${s.char}: ${s.kind === 'ban' ? heldText(s) : endText(s)}${discordNote(s)} by ${s.by}: ${s.reason}`); } }
+      return n || personal(a, 'No ban or suspension is running.');
     }
     const target = findAnyByName(parts[0]);
     if (target < 0) return personal(a, `"${parts[0]}" matches more than one character; use their #TAG.`);
@@ -197,28 +219,35 @@ module.exports = (api) => {
     if (profileOf(target) === profileOf(a)) return personal(a, 'You cannot discipline your own account.');
     const kind = (parts[1] || '').toLowerCase();
     if (!kind) return show(a, target);
-    if (!KINDS.includes(kind)) return personal(a, `Unknown action "${kind}": warn, strike, suspend, lift or overturn.`);
+    if (!KINDS.includes(kind)) return personal(a, `Unknown action "${kind}": warn, strike, suspend, ban, lift or overturn.`);
     // The rank rule replaces "a Lead GM or above can discipline staff", which went by the named character alone (21 Oct review:
     // a GM struck an Owner through an alt with no roles stamped) and let a Lead GM act on an Owner's or a Developer's account
     let no = 'unknown'; try { no = rankRefusal(a, target); } catch (e) { log('discipline: rank rule failed', e.message); }
     if (no === 'own') return personal(a, 'You cannot discipline your own account.');
     if (no === 'rank') return personal(a, `${display(target)} is on a staff account of your rank or higher, so you cannot discipline it. Take it to someone above that rank, or to the Owners: reports about staff go through the Report a GM ticket.`);
     if (no) return personal(a, `The staff rank of ${display(target)}'s account could not be read, so nothing was recorded. Try again, or ask an Owner.`);
-    if ((kind === 'suspend' || kind === 'lift') && !isLeadStaff(a)) return personal(a, 'Suspensions are for Lead GMs and above. Give a strike and tell a Lead GM.');
+    // A GM suspends (a temp ban) for up to gmMaxSuspendDays; a ban, and the lift that ends either, are a Lead GM's
+    const lead = isLeadStaff(a);
+    const capDays = lead ? C.maxSuspendDays : GM_DAYS;
+    if (kind === 'ban' && !lead) return personal(a, `Bans are for Lead GMs and above. A GM can suspend (/tempban) for up to ${capDays} days; tell a Lead GM if it needs more.`);
+    if (kind === 'lift' && !lead) return personal(a, 'Only a Lead GM or above can lift a suspension or a ban. Ask one, with what you found.');
     // Overturning undoes another staff member's decision, so it sits with suspensions rather than with warnings
     if (kind === 'overturn' && !isLeadStaff(a)) return personal(a, 'Only a Lead GM or above can overturn a record. Ask one, with what you found.');
     const ms = kind === 'suspend' ? lengthMs(parts[2], C.maxSuspendDays) : 0;
-    if (kind === 'suspend' && !ms) return personal(a, `Give a length from 1h to ${C.maxSuspendDays}d, like 12h or 3d.`);
+    if (kind === 'suspend' && ms > capDays * 86400000) return personal(a, `A GM can suspend for at most ${capDays} days (${capDays}d or ${capDays * 24}h). For longer, or a ban, ask a Lead GM.`);
+    if (kind === 'suspend' && !ms) return personal(a, `Give a length from 1h to ${capDays}d, like 12h or 3d.`);
     const nth = kind === 'overturn' ? Number(String(parts[2] || '').replace(/^#/, '')) : 0;
     if (kind === 'overturn' && !(nth > 0)) return personal(a, 'Which record? /discipline #TAG overturn <n> <reason>, with the number from their record.');
     const reason = parts.slice(kind === 'suspend' || kind === 'overturn' ? 3 : 2).join(' ').slice(0, 300);
     if (reason.length < 5) return personal(a, 'Give a reason; the player is shown it.');
+    let lifted = null;
     if (kind === 'lift') {
       const s = activeSuspension(recordOf(profileOf(target)), Date.now());
-      if (!s) return personal(a, `${display(target)} is not suspended.`);
-      const notYours = authorNo(a, s, `Suspension #${s.n}`, 'lift');
+      if (!s) return personal(a, `${display(target)} is not suspended or banned.`);
+      const notYours = authorNo(a, s, `${s.kind === 'ban' ? 'Ban' : 'Suspension'} #${s.n}`, 'lift');
       if (notYours) return personal(a, notYours);
       s.lifted = true;
+      lifted = s;
     }
     // The record is marked, never deleted: staff keep the history of what was decided and of its being undone.
     let undone = null;
@@ -236,13 +265,16 @@ module.exports = (api) => {
     const e = add(a, target, kind, reason, ms ? Date.now() + ms : 0);
     if (!e) {
       if (undone) { delete undone.overturned; save(); }
+      if (lifted) { delete lifted.lifted; save(); }
       return personal(a, 'The record could not be saved; nothing was done.');
     }
     if (undone) e.undid = nth;
-    const extra = kind === 'suspend' ? ` until ${stamp(e.until)}` : undone ? ` of #${nth} (${undone.kind} by ${undone.by})` : '';
+    if (lifted) { e.lifts = lifted.n; e.liftsKind = lifted.kind; save(); }
+    const hold = kind === 'suspend' || kind === 'ban';
+    const extra = hold ? ` ${endText(e)}` : undone ? ` of #${nth} (${undone.kind} by ${undone.by})` : '';
     audit(`DISCIPLINE ${kind} #${e.n} on ${who(target)} (profile ${profileOf(target)})${extra} by ${who(a)}: ${reason}`);
-    personal(a, `Recorded: ${kind} #${e.n} on ${display(target)}${extra}.${online(target) || kind === 'suspend' ? '' : ' They are told at their next login.'}`);
-    if (kind === 'suspend') { for (const x of onlineActors()) if (profileOf(x) === profileOf(target)) kickWithReason(x, suspendedText(e)); }
+    personal(a, `Recorded: ${kind} #${e.n} on ${display(target)}${extra}.${online(target) || hold ? '' : ' They are told at their next login.'}`);
+    if (hold) { for (const x of onlineActors()) if (profileOf(x) === profileOf(target)) kickWithReason(x, suspendedText(e)); }
     else if (online(target)) { tell(target, e); e.seen = true; save(); }
     if (kind === 'strike') {
       const n = activeStrikes(recordOf(profileOf(target)), Date.now(), C.strikeDays);
@@ -252,24 +284,37 @@ module.exports = (api) => {
       }
     }
   };
-  registerChatCommand('discipline', command, { admin: true, help: '#TAG [warn|strike|suspend <12h|3d>|lift|overturn <n>] <reason>: a player\'s record, or list' });
+  registerChatCommand('discipline', (a, args) => command(a, args), { admin: true, help: '#TAG [warn|strike|suspend <12h|3d>|ban|lift|overturn <n>] <reason>: a player\'s record, or list' });
+  // The aliases (Nat, 25 Oct): the words of /discipline in another order, run by command() above, so every rule (who may, the
+  // rank rule, a GM's 3 days, the reason, the audit) is the one /discipline runs
+  const alias = (name, kind, takes, help) => registerChatCommand(name, (a, args) => {
+    if (!isAdmin(a)) return personal(a, `Only staff can use /${name}.`);
+    const w = String(args || '').trim().split(/\s+/).filter(Boolean);
+    if (!w.length || w[0].toLowerCase() === 'list') return personal(a, `Use: /${name} #TAG ${takes}`);
+    return command(a, [w[0], kind].concat(w.slice(1)).join(' '), name);
+  }, { admin: true, help });
+  alias('ban', 'ban', '<reason>', '#TAG <reason>: ban the account with no end; logged out and refused at login until /unban (Lead GM+)');
+  // (a plain string: the menu's scan reads only those; the numbers are the defaults, gmMaxSuspendDays and maxSuspendDays)
+  alias('tempban', 'suspend', '<12h|3d> <reason>', '#TAG <12h|3d> <reason>: suspend the account for a time; logged out and refused at login until it ends (GM up to 3d, Lead GM+ up to 30d)');
+  alias('unban', 'lift', '<reason>', '#TAG <reason>: end a ban or a suspension early (Lead GM+)');
+  registerChatCommand('bans', (a) => command(a, 'list', 'bans'), { admin: true, help: 'every ban and suspension still running' });
 
   // Actions decided outside the game (config record, see the head of this file), each added once by its key
   const byKey = (k) => { for (const [p, list] of Object.entries(D.profiles)) { const e = list.find((x) => x.key === k); if (e) return { p: Number(p), e }; } return null; };
   const onProfile = (p) => onlineActors().filter((x) => profileOf(x) === p);
   for (const r of Array.isArray(C.record) ? C.record : []) {
-    if (!r || !r.key || !['warn', 'strike', 'suspend', 'lift'].includes(r.kind) || String(r.reason || '').length < 5) { log(`discipline: record entry ${r && r.key} refused`); continue; }
+    if (!r || !r.key || !['warn', 'strike', 'suspend', 'ban', 'lift'].includes(r.kind) || String(r.reason || '').length < 5) { log(`discipline: record entry ${r && r.key} refused`); continue; }
     if (byKey(String(r.key))) continue;
     const by = String(r.by || 'staff').slice(0, 40);
     const reason = String(r.reason).slice(0, 300);
     if (r.kind === 'lift') {
       const hit = r.of ? byKey(String(r.of)) : null;
-      if (!hit || hit.e.kind !== 'suspend') { log(`discipline: record ${r.key}: no suspension ${r.of} on record to lift`); continue; }
+      if (!hit || (hit.e.kind !== 'suspend' && hit.e.kind !== 'ban')) { log(`discipline: record ${r.key}: no suspension or ban ${r.of} on record to lift`); continue; }
       if (hit.e.lifted || hit.e.overturned) { log(`discipline: record ${r.key}: ${r.of} was already ${hit.e.lifted ? 'lifted' : 'overturned'}`); continue; }
       hit.e.lifted = true;
       const e = add(0, 0, 'lift', reason, 0, { key: String(r.key), by, profile: hit.p, char: hit.e.char });
       if (!e) { delete hit.e.lifted; log(`discipline: record ${r.key}: not saved, ${r.of} still runs`); continue; }
-      e.lifts = hit.e.n;
+      e.lifts = hit.e.n; e.liftsKind = hit.e.kind;
       save();
       audit(`DISCIPLINE lift #${e.n} on ${hit.e.char} (profile ${hit.p}) of #${hit.e.n} (config ${r.of})${discordNote(hit.e)} by ${by} (config ${r.key}): ${reason}`);
       const here = onProfile(hit.p);
@@ -299,9 +344,9 @@ module.exports = (api) => {
     if (win && r.from) from.start = win.from;
     const e = add(0, target, r.kind, reason, win ? win.until : 0, from);
     if (!e) { log(`discipline: record ${r.key}: not saved`); continue; }
-    const extra = win ? `${e.from ? ` from ${stamp(e.from)}` : ''} until ${stamp(e.until)}${discordNote(e)}` : '';
+    const extra = win ? `${e.from ? ` from ${stamp(e.from)}` : ''} until ${stamp(e.until)}${discordNote(e)}` : r.kind === 'ban' ? ` permanently${discordNote(e)}` : '';
     audit(`DISCIPLINE ${r.kind} #${e.n} on ${target ? who(target) : e.char} (profile ${p})${extra} by ${by} (config ${r.key}): ${e.reason}`);
-    if (r.kind === 'suspend') {
+    if (r.kind === 'suspend' || r.kind === 'ban') {
       // Logged out at once, every character of the account and any held out by a listed Discord account
       const now = Date.now();
       for (const x of onlineActors()) { const s = suspensionOf(x, now); if (s) kickWithReason(x, suspendedText(s)); }
@@ -321,5 +366,7 @@ module.exports = (api) => {
 };
 module.exports.lengthMs = lengthMs;
 module.exports.activeSuspension = activeSuspension;
+module.exports.endText = endText;
+module.exports.stamp = stamp;
 module.exports.activeStrikes = activeStrikes;
 module.exports.configWindow = configWindow;
