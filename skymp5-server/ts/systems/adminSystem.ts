@@ -94,6 +94,7 @@ const ADMIN_MODES: Array<{ id: string; label: string }> = [
 ];
 
 // Lead GM and above only (TIER_CAPS.spawn); a GM keeps teleports, kick, observing modes and the roster
+const BAN_ACTIONS = new Set(["ban", "tempBan", "ipBan", "unban"]);
 const SPAWN_ACTIONS = new Set(["kill", "deleteCharacter", "masteryGrant", "masteryReset", "masterySetTier", "masteryDrop",
   "giveItem", "giveSpells", "giveShouts", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm", "polymorphSelf", "npcZoneAdd", "npcZoneDelete", "npcZoneReset"]);
 const SPAWN_MODES = new Set(["smite", "healhit"]);
@@ -526,7 +527,7 @@ export class AdminSystem implements System {
     }
     // A Trial GM goes on as a GM with no ban and no spawn; only what trialMay let through reaches the code below
     const tier = (trial ? "gm" : this.tierOf(mp, myActorId)) as AdminTier;
-    const caps = trial ? { ban: false, spawn: false } : TIER_CAPS[tier];
+    const caps = trial ? { ban: false, spawn: false, del: false } : TIER_CAPS[tier];
 
     let adminProfile = 0;
     try { adminProfile = Number(mp.get(myActorId, "profileId")) || 0; } catch { }
@@ -588,6 +589,11 @@ export class AdminSystem implements System {
     if (!caps.spawn && (SPAWN_ACTIONS.has(action) || (action === "toggleMode" && SPAWN_MODES.has(mode)))) {
       this.adminLog(`profile ${adminProfile} (${tier}) was refused ${action === "toggleMode" ? `the ${mode} mode` : action} (Lead GM and above)`);
       this.reply(mp, userId, false, "That is for a Lead GM and above");
+      return;
+    }
+    // A Lead GM's bans lean on the gameplay's rank rule (staffguard.js): without it they are refused, never let through
+    if (BAN_ACTIONS.has(action) && tier === "leadgm" && typeof (globalThis as any).__dboAdminGate !== "function") {
+      this.reply(mp, userId, false, "The staff rules are not loaded, so a Lead GM's ban is refused. Try again in a minute.");
       return;
     }
     const refused = this.gate(myActorId, action, this.gateInfo(mp, myActorId, action, content, trial));
@@ -689,7 +695,7 @@ export class AdminSystem implements System {
         this.adminLog(`profile ${adminProfile} killed ${target.name} (profile ${target.profileId})`);
         this.reply(mp, userId, true, `Killed ${target.name}`);
       } else if (action === "deleteCharacter") {
-        if (!caps.ban) { this.reply(mp, userId, false, "Your rank cannot delete characters"); return; }
+        if (!caps.del) { this.reply(mp, userId, false, "Your rank cannot delete characters"); return; }
         if (target.actorId === myActorId) { this.reply(mp, userId, false, "Delete your own character from character select"); return; }
         try { kickWithReason(mp, target.userId, "Your character was deleted by an admin."); } catch { }
         const doomed = target.actorId;
@@ -1136,7 +1142,13 @@ export class AdminSystem implements System {
   private gate(actorId: number, action: string, info: Record<string, unknown>): string {
     const g = (globalThis as any).__dboAdminGate;
     if (typeof g !== "function") return "";
-    try { return String(g(actorId, action, info) || ""); } catch (e) { this.log(`AdminSystem: __dboAdminGate failed: ${e}`); return ""; }
+    try { return String(g(actorId, action, info) || ""); } catch (e) {
+      this.log(`AdminSystem: __dboAdminGate failed: ${e}`);
+      // staffguard is the rank rule for a ban at EVERY tier, so a gate that throws has to refuse: '' here would let the
+      // ban through with no rank check at all, which is the one thing the missing-gate guard above exists to prevent
+      if (BAN_ACTIONS.has(action)) return "The staff rules could not be read, so the ban is refused. Try again in a minute.";
+      return "";
+    }
   }
 
   // What the gate is told: the mode, and the online character the action is aimed at (0 when it names none, or a place)
@@ -1147,7 +1159,14 @@ export class AdminSystem implements System {
       const named = String(content["targetName"] ?? "").trim();
       if (hex || named || SELF_TARGETED.has(action)) target = this.resolveTarget(mp, myActorId, content)?.actorId ?? 0;
     }
-    return { mode: String(content["mode"] ?? ""), target, trial, location: action === "teleportLoc" ? String(content["target"] ?? "") : "" };
+    const info: Record<string, unknown> = { mode: String(content["mode"] ?? ""), target, trial, location: action === "teleportLoc" ? String(content["target"] ?? "") : "" };
+    if (action === "tempBan") info["hours"] = Number(content["hours"]);
+    // An unban names a ban, not a character: the gate is told whose ban it is and who gave it
+    if (action === "unban" && this.bans) {
+      const ban = this.bans.list().find((b) => String(b.id) === String(content["target"] ?? ""));
+      if (ban) { info["banProfile"] = Number(ban.profileId); info["banBy"] = String(ban.by ?? ""); }
+    }
+    return info;
   }
 
   // Every mode of the profile off, on the client too (NoClip and Freecam live there alone)

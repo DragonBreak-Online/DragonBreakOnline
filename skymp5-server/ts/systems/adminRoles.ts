@@ -7,11 +7,13 @@ const TIER_ORDER: AdminTier[] = ["senior", "developer", "leadgm", "gm"];
 
 // spawn: anything that creates or changes the world or the economy (items, spells, beast forms, mastery, NPC zones,
 // kill, the Smite and Heal on Hit modes) and the server console. Jake and Nate, 2026-09-27: a GM observes and reports.
-export const TIER_CAPS: Record<AdminTier, { ban: boolean; spawn: boolean }> = {
-  senior: { ban: true, spawn: true },
-  developer: { ban: true, spawn: true },
-  leadgm: { ban: false, spawn: true },
-  gm: { ban: false, spawn: false },
+// ban: the panel's bans, temp bans and unbans (Nat, 25 Oct: Lead GMs ban too; the gameplay's staffguard refuses a staff
+// account of the caller's rank or higher). del: deleting a character, kept to Senior and Developer.
+export const TIER_CAPS: Record<AdminTier, { ban: boolean; spawn: boolean; del: boolean }> = {
+  senior: { ban: true, spawn: true, del: true },
+  developer: { ban: true, spawn: true, del: true },
+  leadgm: { ban: true, spawn: true, del: false },
+  gm: { ban: false, spawn: false, del: false },
 };
 
 export interface AdminRoleConfig {
