@@ -378,9 +378,15 @@ module.exports = (api) => {
   // ---- the gem counter (Nat, 25 Oct: "gems are a grind to get and cost a lot to buy from the bank") --------------------
   // Each hold's banks buy gemstones at buyShare of their value, paid by the hold's treasury into the seller's account, and
   // sell them at sellShare, the price going to the treasury as income. A hold sells only what players sold it (bank.json
-  // gemStock), so the counter never creates a gem, and a treasury that cannot pay buys none
+  // gemStock), so the counter never creates a gem, and a treasury that cannot pay buys none.
+  // Retuned after release (Nat, 25 Oct: players stockpiled gems before the drop cut, and buying at half value would drain the
+  // holds and flood coin): it buys at buyShare 0.15; a character is paid at most dailyPerCharacter gold a day for gems and an
+  // account (every character of a profile) at most dailyPerAccount, so alts do not multiply it; and a hold never pays below
+  // its reserve, the higher of reserveMin and reserveShare of what its treasury held at its first gem sale that day (taken
+  // per sale it would only halve what is left each time). A sale that crosses a limit buys as many as fit, else none. The day
+  // is the UTC day; the counts are in bank.json gemSales
   const G = Object.assign({
-    enabled: true, buyShare: 0.5, sellShare: 3,
+    enabled: true, buyShare: 0.15, sellShare: 3, dailyPerCharacter: 500, dailyPerAccount: 500, reserveShare: 0.5, reserveMin: 5000,
     gems: ['63b45:Skyrim.esm', '68521:Skyrim.esm', '63b46:Skyrim.esm', '6851e:Skyrim.esm', '602427:BSAssets.esm', '602428:BSAssets.esm',
       '63b42:Skyrim.esm', '68522:Skyrim.esm', '63b44:Skyrim.esm', '68523:Skyrim.esm', '63b43:Skyrim.esm', '68520:Skyrim.esm',
       '63b47:Skyrim.esm', '6851f:Skyrim.esm'],
@@ -406,12 +412,39 @@ module.exports = (api) => {
   const stockOf = (zone, g) => Math.max(0, Math.floor(Number((gemStock()[zone.id] || {})[g.key]) || 0));
   const setStock = (zone, g, n) => { const z = gemStock()[zone.id] = gemStock()[zone.id] || {}; if (n > 0) z[g.key] = n; else delete z[g.key]; };
   const gemOff = 'The gem counter is closed for now.';
+  // The day's counts: gold paid per character and per account, and each hold's treasury at its first sale. A new UTC day
+  // starts them again
+  const dayKey = () => new Date(Date.now()).toISOString().slice(0, 10);
+  const gemDay = () => {
+    const d = data();
+    if (!d.gemSales || typeof d.gemSales !== 'object' || d.gemSales.day !== dayKey()) d.gemSales = { day: dayKey(), chars: {}, accounts: {}, start: {} };
+    return d.gemSales;
+  };
+  const accountOf = (a) => { try { const pid = Number(profileOf(a)); return Number.isFinite(pid) && pid >= 0 ? String(pid) : ''; } catch (e) { return ''; } };
+  const capLeft = (a) => {
+    const day = gemDay(); const k = (a >>> 0).toString(16); const acc = accountOf(a);
+    const byChar = Math.max(0, Math.floor(Number(G.dailyPerCharacter)) - Math.floor(Number(day.chars[k]) || 0));
+    const byAcc = acc ? Math.max(0, Math.floor(Number(G.dailyPerAccount)) - Math.floor(Number(day.accounts[acc]) || 0)) : byChar;
+    return { left: Math.min(byChar, byAcc), byAccount: byAcc < byChar };
+  };
+  // What the hold may still pay today above its reserve
+  const reserveOf = (zone) => {
+    const day = gemDay();
+    const start = Object.prototype.hasOwnProperty.call(day.start, zone.id) ? Math.floor(Number(day.start[zone.id]) || 0) : zoneGold(zone);
+    return Math.max(Math.floor(Number(G.reserveMin) || 0), Math.floor(start * Math.max(0, Math.min(1, Number(G.reserveShare) || 0))));
+  };
+  const canPay = (zone) => Math.max(0, zoneGold(zone) - reserveOf(zone));
+  const capText = (c) => (c.byAccount
+    ? `Your characters have been paid the ${Math.floor(Number(G.dailyPerAccount))} gold a day the counter pays an account for gems. It buys again after midnight UTC.`
+    : `You have been paid the ${Math.floor(Number(G.dailyPerCharacter))} gold a day the counter pays anyone for gems. It buys again after midnight UTC.`);
   const gemPrices = (a) => {
     if (!G.enabled) return { ok: false, text: gemOff };
     if (!atBank(a)) return { ok: false, text: notAtBank };
     const zone = zoneOfBank(a); if (!zone) return { ok: false, text: 'This bank keeps no gem counter: it answers to no hold.' };
     const rows = gemList().map((g) => `${g.name}: buys at ${g.buy}, sells at ${g.sell} (${stockOf(zone, g)} in stock)`);
-    return { ok: true, text: `The Bank of ${zone.name} gem counter. ${rows.join('; ')}. /bank gems sell <gem> [count|all], /bank gems buy <gem> [count].` };
+    const left = capLeft(a).left; const room = canPay(zone);
+    const today = `It pays you up to ${left} more gold for gems today${room < left ? `, and the ${zone.name} treasury can spare ${room}` : ''}.`;
+    return { ok: true, text: `The Bank of ${zone.name} gem counter. ${rows.join('; ')}. ${today} /bank gems sell <gem> [count|all], /bank gems buy <gem> [count].` };
   };
   const gemSell = (a, nameRaw, countRaw) => {
     if (!G.enabled) return { ok: false, text: gemOff };
@@ -419,23 +452,40 @@ module.exports = (api) => {
     const zone = zoneOfBank(a); if (!zone) return { ok: false, text: 'This bank keeps no gem counter: it answers to no hold.' };
     const p = P(); if (!p || typeof p.takeItems !== 'function') return { ok: false, text: 'The gem clerk is away. Try again later.' };
     const g = gemNamed(nameRaw); if (!g) return { ok: false, text: 'The counter buys only gemstones. /bank gems lists them.' };
-    const have = p.looseCount(a, g.id); const n = countOf(countRaw, have);
-    if (!(n >= 1) || n > have) return { ok: false, text: have ? `Sell between 1 and the ${have} ${g.name} you carry.` : `You carry no ${g.name}.` };
-    const why = STORE_VETO(a, g.id, n); if (why) return { ok: false, text: why };
+    const have = p.looseCount(a, g.id); const asked = countOf(countRaw, have);
+    if (!(asked >= 1) || asked > have) return { ok: false, text: have ? `Sell between 1 and the ${have} ${g.name} you carry.` : `You carry no ${g.name}.` };
+    const why = STORE_VETO(a, g.id, asked); if (why) return { ok: false, text: why };
+    // The limits: the seller's daily cap (character and account), then the hold's reserve. As many as fit, else none
+    const cap = capLeft(a); const room = canPay(zone);
+    const n = Math.min(asked, Math.floor(cap.left / g.buy), Math.floor(room / g.buy));
+    if (!(n >= 1)) {
+      const byCap = Math.floor(cap.left / g.buy) < 1;
+      audit(`BANK GEMS ${who(a)} refused at ${zone.id}: ${byCap ? (cap.byAccount ? 'the account\'s daily cap' : 'the daily cap') : 'the treasury reserve'} (${asked}x ${g.key} at ${g.buy})`);
+      return { ok: false, text: byCap ? capText(cap) : `The ${zone.name} treasury keeps a reserve and is buying no more gems today.` };
+    }
     const price = g.buy * n;
-    if (zoneGold(zone) < price) return { ok: false, text: `The ${zone.name} treasury cannot pay ${price} gold for that today.` };
     const taken = p.takeItems(a, g.id, n); if (!taken) return { ok: false, text: 'The clerk could not take that. Nothing was changed.' };
-    if (!zoneTake(zone, price)) { p.giveEntries(a, taken); return { ok: false, text: `The ${zone.name} treasury cannot pay for that. Your gems are returned.` }; }
+    const day = gemDay(); const startHad = Object.prototype.hasOwnProperty.call(day.start, zone.id);
+    if (!startHad) day.start[zone.id] = zoneGold(zone);
+    if (!zoneTake(zone, price)) { if (!startHad) delete day.start[zone.id]; p.giveEntries(a, taken); return { ok: false, text: `The ${zone.name} treasury cannot pay for that. Your gems are returned.` }; }
+    const k = (a >>> 0).toString(16); const acc = accountOf(a);
+    const was = { char: day.chars[k], acc: acc ? day.accounts[acc] : undefined };
+    day.chars[k] = Math.floor(Number(was.char) || 0) + price;
+    if (acc) day.accounts[acc] = Math.floor(Number(was.acc) || 0) + price;
     const had = stockOf(zone, g); setStock(zone, g, had + n);
     try { save(); } catch (e) {
       setStock(zone, g, had); zoneAdd(zone, price); p.giveEntries(a, taken);
+      if (was.char === undefined) delete day.chars[k]; else day.chars[k] = was.char;
+      if (acc) { if (was.acc === undefined) delete day.accounts[acc]; else day.accounts[acc] = was.acc; }
+      if (!startHad) delete day.start[zone.id];
       log('bank: bank.json write failed', e.message);
       return { ok: false, text: 'The counter ledger could not be written. Your gems are returned.' };
     }
     setBalance(a, balanceOf(a) + price);
     note(a, 'gems sold', price, zone.name);
     audit(`BANK GEMS ${who(a)} sold ${n}x ${g.name} (${g.key}) to ${zone.id} for ${price} gold from its treasury (stock ${had + n}, balance ${balanceOf(a)})`);
-    return { ok: true, text: `Sold ${n} ${g.name} for ${price} gold, paid into your account. Your balance is ${balanceOf(a)} gold.` };
+    const short = n < asked ? ` The counter took only ${n} of ${asked}: ${Math.floor(capLeft(a).left / g.buy) < 1 ? 'that is all it pays you today' : `the ${zone.name} treasury keeps a reserve`}.` : '';
+    return { ok: true, text: `Sold ${n} ${g.name} for ${price} gold, paid into your account. Your balance is ${balanceOf(a)} gold.${short}` };
   };
   const gemBuy = (a, nameRaw, countRaw) => {
     if (!G.enabled) return { ok: false, text: gemOff };

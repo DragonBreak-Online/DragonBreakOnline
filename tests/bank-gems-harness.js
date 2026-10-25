@@ -78,7 +78,10 @@ require(path.join(SERVER, 'post.js'))(Object.assign({}, api, {
   lettersOf: (a) => get(a, 'private.pigeons') || [], saveLetters: (a, list) => set(a, 'private.pigeons', list), sendMailState: () => {},
   itemName: (desc) => NAMES[parseInt(desc, 16)] || '',
 }));
-const load = (gemCounter) => { api.cfg = { bank: gemCounter ? { gemCounter } : {} }; handlers.clear(); delete require.cache[BANK]; return require(BANK)(api); };
+// The counter's mechanics are checked first with its limits opened (the release's numbers: half value, no cap, no reserve);
+// the retune's limits (Nat, 25 Oct) are checked at the end with the shipped defaults (load(x, true))
+const OPEN = { buyShare: 0.5, dailyPerCharacter: 1e9, dailyPerAccount: 1e9, reserveMin: 0, reserveShare: 0 };
+const load = (gemCounter, real) => { api.cfg = { bank: { gemCounter: Object.assign({}, real ? {} : OPEN, gemCounter || {}) } }; handlers.clear(); delete require.cache[BANK]; return require(BANK)(api); };
 let mod = load();
 const cmd = (a, args) => { out.told.length = 0; handlers.get('/bank')(a, args); return out.told.map((x) => x.t).join(' | '); };
 const at = (a, bank) => { standing.set(a, bank); out.told.length = 0; return globalThis.__dboBankActivate(bank, a); };
@@ -99,7 +102,7 @@ check('a configured gem with no value is left off the list', !/Diamond|Garnet|To
 check('the usage line names the counter', /\/bank gems/.test(cmd(P1, 'nonsense')));
 
 // Selling: the treasury pays, and must be able to
-check('an empty treasury buys nothing, nothing taken', /Whiterun treasury cannot pay 200 gold/.test(cmd(P1, 'gems sell ruby 2')) && count(P1, RUBY) === 5);
+check('an empty treasury buys nothing, nothing taken', /Whiterun treasury keeps a reserve and is buying no more gems today/.test(cmd(P1, 'gems sell ruby 2')) && count(P1, RUBY) === 5);
 globalThis.__dboTreasuryZone.deposit('whiterun', 1000);
 check('a sword is no gem', /buys only gemstones/.test(cmd(P1, 'gems sell iron sword')) && count(P1, SWORD) === 1);
 check('more than carried is refused', /between 1 and the 5 Ruby you carry/.test(cmd(P1, 'gems sell ruby 6')) && count(P1, RUBY) === 5);
@@ -147,6 +150,64 @@ check('enabled false closes the counter', /gem counter is closed/.test(cmd(P1, '
 mod = load({ buyShare: 0.25, sellShare: 4 });
 at(P1, BANK_WR);
 check('the shares come from config bank.gemCounter', /Ruby: buys at 50, sells at 800 \(3 in stock\)/.test(cmd(P1, 'gems')));
+
+// ---- the retune (Nat, 25 Oct): 15% of value, a daily cap per character and per account, a treasury reserve ----
+const realNow = Date.now; let clock = Date.UTC(2026, 9, 26, 9, 0, 0); Date.now = () => clock;
+const P3 = 0xff001101;   // another character of P1's account (profileOf: a & 0xfff)
+const ruby = (a, n) => { set(a, 'inventory', { entries: [{ baseId: RUBY, count: n }] }); set(a, 'private.bankGold', 0); };
+mod = load({}, true);
+globalThis.__dboTreasuryZone.deposit('solitude', 100000);
+ruby(P1, 40); at(P1, BANK_SOL);
+const rl = cmd(P1, 'gems');
+check('the shipped price: a ruby (200) buys at 30, 15% of its value', /Ruby: buys at 30, sells at 600/.test(rl) && /Flawless Ruby: buys at 52,/.test(rl), rl);
+check('the list says what the counter will still pay you today', /It pays you up to 500 more gold for gems today\./.test(rl), rl);
+// The character's cap: 500 a day buys 16 rubies at 30 (480), and a 17th would cross it
+let r = cmd(P1, 'gems sell ruby 20');
+check('20 asked, 16 bought (480 of the 500 a day), and the seller is told why', /Sold 16 Ruby for 480 gold/.test(r) && /took only 16 of 20: that is all it pays you today/.test(r)
+  && count(P1, RUBY) === 24 && get(P1, 'private.bankGold') === 480, r);
+r = cmd(P1, 'gems sell ruby 1');
+check('the next one is refused: the daily cap, nothing taken', /You have been paid the 500 gold a day the counter pays anyone for gems\. It buys again after midnight UTC\./.test(r) && count(P1, RUBY) === 24, r);
+check('...and the refusal is audited', out.audits.some((t) => /^BANK GEMS Pff000101 refused at solitude: the daily cap \(1x 63b42 at 30\)$/.test(t)));
+// The account's cap: an alt of the same profile cannot sell on, another account can
+ruby(P3, 5); at(P3, BANK_SOL);
+r = cmd(P3, 'gems sell ruby 1');
+check('an alt of the same account is refused: the account has had its 500', /Your characters have been paid the 500 gold a day the counter pays an account/.test(r) && count(P3, RUBY) === 5, r);
+check('...audited as the account\'s cap', out.audits.some((t) => /^BANK GEMS Pff001101 refused at solitude: the account's daily cap/.test(t)));
+ruby(P2, 3); at(P2, BANK_SOL);
+check('another account sells as usual', /Sold 3 Ruby for 90 gold/.test(cmd(P2, 'gems sell ruby 3')));
+mod = load({ dailyPerCharacter: 300, dailyPerAccount: 500 }, true);
+at(P3, BANK_SOL);
+check('the caps come from config: the account has 20 of its 500 left, too little for one ruby at 30, so the alt sells none',
+  /Your characters have been paid the 500 gold a day/.test(cmd(P3, 'gems sell ruby 5')) && count(P3, RUBY) === 5);
+mod = load({ dailyPerCharacter: 300, dailyPerAccount: 560 }, true);
+at(P3, BANK_SOL);
+r = cmd(P3, 'gems sell ruby 5');
+check('...raise the account cap to 560 and the alt sells the 2 that fit (60 of 80 left)', /Sold 2 Ruby for 60 gold/.test(r) && /took only 2 of 5/.test(r) && count(P3, RUBY) === 3, r);
+// A new UTC day starts the counts again
+clock += 86400000; mod = load({}, true);
+at(P1, BANK_SOL);
+check('the next UTC day the character may sell again', /Sold 5 Ruby for 150 gold/.test(cmd(P1, 'gems sell ruby 5')));
+check('the day\'s counts are in bank.json gemSales', ledger().gemSales.day === '2026-10-27' && ledger().gemSales.chars.ff000101 === 150 && ledger().gemSales.accounts['257'] === 150, ledger().gemSales);
+// The treasury reserve: half of what the hold held at its first sale today, and never below reserveMin
+clock += 86400000; mod = load({ dailyPerCharacter: 1e9, dailyPerAccount: 1e9, reserveMin: 0 }, true);
+const W = zoneGold('whiterun'); const spare = W - Math.floor(W * 0.5); const fit = Math.floor(spare / 30);
+ruby(P2, fit + 20); at(P2, BANK_WR);
+r = cmd(P2, `gems sell ruby ${fit + 20}`);
+check(`the hold pays down to half its morning treasury: ${fit} of ${fit + 20} bought, then the reserve`, new RegExp(`Sold ${fit} Ruby for ${fit * 30} gold`).test(r) && /the Whiterun treasury keeps a reserve/.test(r)
+  && zoneGold('whiterun') >= Math.floor(W * 0.5), { r, W, now: zoneGold('whiterun') });
+r = cmd(P2, 'gems sell ruby 1');
+check('then it buys none, with a clear line, and the refusal is audited', /The Whiterun treasury keeps a reserve and is buying no more gems today/.test(r)
+  && out.audits.some((t) => /^BANK GEMS Pff000202 refused at whiterun: the treasury reserve/.test(t)), r);
+globalThis.__dboTreasuryZone.deposit('whiterun', 300);
+check('gold paid in later is spendable, but the reserve stays where the morning set it', /Sold 10 Ruby for 300 gold/.test(cmd(P2, 'gems sell ruby 12')) && /keeps a reserve/.test(cmd(P2, 'gems sell ruby 1')));
+mod = load({ dailyPerCharacter: 1e9, dailyPerAccount: 1e9, reserveMin: 1e9 }, true);
+at(P2, BANK_SOL);
+check('reserveMin: a hold below it buys nothing', /The Haafingar treasury keeps a reserve/.test(cmd(P2, 'gems sell ruby 1')));
+check('the shipped config: the counter is still off, with the retuned numbers for Nat', (() => {
+  const c = JSON.parse(fs.readFileSync(path.join(SERVER, 'gamemode-config.json'), 'utf8')).bank.gemCounter;
+  return c.enabled === false && c.buyShare === 0.15 && c.dailyPerCharacter === 500 && c.dailyPerAccount === 500 && c.reserveShare === 0.5 && c.reserveMin === 5000;
+})());
+Date.now = realNow;
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');
 process.exit(failures ? 1 : 0);

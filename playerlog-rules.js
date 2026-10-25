@@ -741,6 +741,9 @@ parsed('BANK', {
       if ((m = text.match(new RegExp(` bought (\\d{1,9})x (.{1,64}?) \\(([0-9a-f]{1,8})\\) from ${Z} for (\\d{1,12}) gold `))))
         return [ev('item.bank', 0, { op: 'gem_buy', n: Number(m[1]), i: m[2], b: m[3], zone: m[4], gold: Number(m[5]) })];
       if (/ paid \d{1,9}x /.test(text)) return [ev('item.bank', 0, { op: 'gem_fee' })];
+      // The retune's limits (Nat, 25 Oct): a sale refused by the daily cap (character or account) or the hold's reserve
+      if ((m = text.match(new RegExp(` refused at ${Z}: (the daily cap|the account's daily cap|the treasury reserve) `))))
+        return [ev('item.bank', 0, { op: 'gem_refused', zone: m[1], why: m[2] === 'the treasury reserve' ? 'reserve' : m[2] === 'the daily cap' ? 'cap' : 'account_cap' })];
       return [];
     }
     return [];
@@ -1368,6 +1371,7 @@ bank.js BANK ade0885b parsed
 bank.js BANK f7927cf8 parsed
 bank.js BANK b29e7db8 parsed
 bank.js BANK 1a72f529 parsed
+bank.js BANK 07a5b4f9 parsed
 bank.js BANK d4d119df parsed
 bank.js BANK 167dae12 parsed
 bank.js BANK 1609b3b0 parsed
