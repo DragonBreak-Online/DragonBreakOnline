@@ -5,7 +5,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const src = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'services', 'services', 'placementService.ts'), 'utf8');
+const src = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'services', 'services', 'placementService.ts'), 'utf8').replace(/\r\n/g, '\n');
 
 let failures = 0;
 const check = (name, ok, got) => {

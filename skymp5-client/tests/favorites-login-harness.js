@@ -20,7 +20,7 @@ if (!esbuildDir) { console.log('SKIP favorites-login (no esbuild)'); process.exi
 const esbuild = require(esbuildDir);
 
 const SRC = path.resolve(__dirname, '../src');
-const read = (rel) => { try { return fs.readFileSync(path.join(SRC, rel), 'utf8'); } catch (e) { return ''; } };
+const read = (rel) => { try { return fs.readFileSync(path.join(SRC, rel), 'utf8').replace(/\r\n/g, '\n'); } catch (e) { return ''; } };
 const HAS_CLOCK = fs.existsSync(path.join(SRC, 'sync/loginClock.ts'));
 
 let failures = 0;

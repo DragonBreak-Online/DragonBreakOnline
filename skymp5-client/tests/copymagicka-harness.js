@@ -43,7 +43,7 @@ function run({ COPY_MAGICKA, realBaseMagicka, copyMagicka }) {
   check('hosted but no real base: 1,000,000', copyMagicka(undefined, true) === COPY_MAGICKA);
 
   // Walk the formView flow on a fake actor: place, host, lose the host, destroy
-  const fv = fs.readFileSync(path.resolve(__dirname, '../src/view/formView.ts'), 'utf8');
+  const fv = fs.readFileSync(path.resolve(__dirname, '../src/view/formView.ts'), 'utf8').replace(/\r\n/g, '\n');
   check('formView reads the base before the 1,000,000 write, NPC copies only',
     /this\.realMagicka = model\.appearance \? undefined : this\.readBaseMagicka\(actor\);\s*actor\.setActorValue\("magicka", COPY_MAGICKA\);/.test(fv));
   check('formView syncs the hosted magicka every update', /if \(actor\) this\.syncHostedMagicka\(actor\);/.test(fv));

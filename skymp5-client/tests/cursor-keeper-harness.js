@@ -256,7 +256,7 @@ function makeGame() {
     if (has) wmu.releaseFocusBeforeVanillaMenu(w.sp, w.controller);
     check('...and releasing with nothing focused does nothing', w.g.focusCalls === calls);
   }
-  const src = (f) => fs.readFileSync(path.join(services, f), 'utf8');
+  const src = (f) => fs.readFileSync(path.join(services, f), 'utf8').replace(/\r\n/g, '\n');
   const rs = src('remoteServer.ts');
   check('the server\'s container answer releases the focus right before it activates the container',
     /if \(baseType === FormType\.Container\) releaseFocusBeforeVanillaMenu\(this\.sp, this\.controller\);\n\s*refr\.activate\(Game\.getPlayer\(\), true\);/.test(rs));

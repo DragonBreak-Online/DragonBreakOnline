@@ -53,7 +53,7 @@ function run({ FOOLHARDY, keepsOwnConfidence }) {
   check('a player\'s copy: Foolhardy', !keepsOwnConfidence(animal(0, 0, { playerCopy: true })));
   check('an unreadable confidence (NaN): Foolhardy', !keepsOwnConfidence(animal(0, NaN)));
 
-  const fv = fs.readFileSync(path.resolve(__dirname, '../src/view/formView.ts'), 'utf8');
+  const fv = fs.readFileSync(path.resolve(__dirname, '../src/view/formView.ts'), 'utf8').replace(/\r\n/g, '\n');
   check('formView writes Foolhardy unless the copy is prey, in the localImmortal block',
     /actor\.setActorValue\("magicka", COPY_MAGICKA\);[\s\S]{0,400}if \(!FormView\.isPrey\(actor, model\)\) actor\.setActorValue\("Confidence", FOOLHARDY\);\s*this\.localImmortal = true;/.test(fv));
   check('isPrey reads the copy\'s own Aggression and Confidence', /aggression: actor\.getActorValue\("Aggression"\), confidence: actor\.getActorValue\("Confidence"\)/.test(fv));

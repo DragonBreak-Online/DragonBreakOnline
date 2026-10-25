@@ -106,8 +106,8 @@ async function main() {
   }
 
   // remoteServer's handler and BeastFormService's dboBeast handler, taken from the source
-  const rs = fs.readFileSync(path.join(SRC, 'services/services/remoteServer.ts'), 'utf8');
-  const bf = fs.readFileSync(path.join(SRC, 'services/services/beastFormService.ts'), 'utf8');
+  const rs = fs.readFileSync(path.join(SRC, 'services/services/remoteServer.ts'), 'utf8').replace(/\r\n/g, '\n');
+  const bf = fs.readFileSync(path.join(SRC, 'services/services/beastFormService.ts'), 'utf8').replace(/\r\n/g, '\n');
   const settleMs = (rs.match(/const RACE_MENU_SETTLE_MS = \d+;/) || [''])[0];
   const settling = (rs.match(/const isRaceMenuSettling = [\s\S]*?;\n/) || [''])[0];
   const handler = (rs.match(/private onUpdateAppearanceMessage\(event: ConnectionMessage<UpdateAppearanceMessage>\): void \{[\s\S]*?\n  \}/) || [''])[0];
@@ -356,7 +356,7 @@ async function main() {
 
   // 14. The gamemode's switch, the quick undo with no client build: npcDriftConfig ownLook (HostedDriftService hands every
   // npcDriftConfig to applyDriftConfig), read each time a look would go on, so a packet mid-session takes effect at once
-  const hd = fs.readFileSync(path.join(SRC, 'services/services/hostedDriftService.ts'), 'utf8');
+  const hd = fs.readFileSync(path.join(SRC, 'services/services/hostedDriftService.ts'), 'utf8').replace(/\r\n/g, '\n');
   check('every npcDriftConfig packet goes to applyDriftConfig (HostedDriftService)', /content\["customPacketType"\] !== "npcDriftConfig"\) return;[\s\S]{0,400}applyDriftConfig\(content\);/.test(hd));
   // The echo confirms an undo in the server log, so the handler's one echo comes straight after applyDriftConfig
   const onConfig = (hd.match(/private onCustomPacketMessage\([^)]*\): void \{[\s\S]*?\n  \}/) || [''])[0];

@@ -3,7 +3,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'services', 'characterProgressService.ts'), 'utf8');
+const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'services', 'characterProgressService.ts'), 'utf8').replace(/\r\n/g, '\n');
 let failures = 0;
 const check = (name, ok) => { if (!ok) failures++; console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}`); };
 const fn = (name) => { const i = src.indexOf(`private ${name}(`); return i < 0 ? '' : src.slice(i, src.indexOf('\n  }\n', i)); };
