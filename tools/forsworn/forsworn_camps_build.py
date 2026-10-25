@@ -44,6 +44,8 @@ def main():
     ap.add_argument('--guard-posts', default='', help="the server's guard-posts.json (guards.js), for the buffer")
     ap.add_argument('--buffer', type=float, default=8000)
     ap.add_argument('--out', default=os.path.join(HERE, '..', '..', 'forsworn-camps.json'))
+    ap.add_argument('--locations', default=os.path.join(HERE, '..', '..', 'admin-locations.json'),
+                    help="the F7 teleport list: every camp as 'Forsworn camp: <name> (<hold>)', rewritten each run ('' leaves it)")
     a = ap.parse_args()
     lo = LoadOrder(a.data, a.order, {})
     src = json.load(open(a.placements, encoding='utf-8'))
@@ -57,9 +59,40 @@ def main():
     n = sum(len(c['spots']) for c in out['camps'])
     print(f"forsworn camps: {len(out['camps'])} camps, {n} spots, {sum(len(c['chests']) for c in out['camps'])} chests, "
           f"{sum(len(c['excluded']) for c in out['camps'])} excluded -> {a.out}")
+    if a.locations:
+        print(f"admin-locations: {teleports(out, a.locations)} camps -> {a.locations}")
     for line in bad:
         print('  BAD', line)
     return 1 if bad else 0
+
+
+# The hold capitals of zones.json, for a camp's hold in its teleport's name
+CAPITALS = {'whiterun': (18313, -10665), 'riften': (173137, -90912), 'solitude': (-74344, 96470), 'windhelm': (135039, 33143),
+            'markarth': (-171097, 6922), 'falkreath': (-30296, -86284), 'morthal': (-38640, 66734), 'dawnstar': (30808, 106138),
+            'winterhold': (109208, 102864)}
+
+
+def teleports(out, path):
+    """Nat's standing rule (25 Oct: "always make sure Location teleports and all items are always updated"): every camp is an
+    F7 teleport at its centre (its map marker), 64 units up, named 'Forsworn camp: <name> (<hold>)'. Earlier 'Forsworn camp: '
+    entries are replaced; nothing else in the file changes."""
+    loc = json.load(open(path, encoding='utf-8'))
+    rows = [r for r in loc['locations'] if not str(r.get('name', '')).startswith('Forsworn camp: ')]
+    names = {str(r['world']).lower(): r.get('worldName', '') for r in loc['locations']}
+    n = 0
+    for c in out['camps']:
+        area = next((ar for ar in c['areas'] if ar['world'].lower() == '3c:skyrim.esm'), c['areas'][0] if c['areas'] else None)
+        if not area:
+            continue
+        pos = area['centre']
+        hold = min(CAPITALS, key=lambda h: math.dist(pos[:2], CAPITALS[h]))
+        rows.append({'name': f"Forsworn camp: {c['name']} ({hold.capitalize()})", 'region': 'Skyrim', 'world': area['world'],
+                     'worldName': names.get(area['world'].lower(), ''), 'pos': [pos[0], pos[1], pos[2] + 64], 'rot': [0, 0, 0.0]})
+        n += 1
+    loc['locations'] = rows
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(loc, f, indent=1, ensure_ascii=False)
+    return n
 
 
 def build(lo, src, posts, buffer):
