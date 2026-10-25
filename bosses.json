@@ -772,8 +772,8 @@
   {
    "id": "palewarlord",
    "name": "the Warlord of the Pale Pass",
-   "enabled": false,
-   "waitingOn": "Nat's eye on the three spots on the Bruma side of the Pale Pass road",
+   "enabled": true,
+   "waitingOn": "the dev test (bosses.devOnly on the dev server): Nat picked SE (the perch under the Sentinel statue) with ST (Serpent's Trail) as the roaming alternative, SR dropped (25 Oct)",
    "hold": "bruma",
    "world": "a764b:BSHeartland.esm",
    "roam": true,
@@ -797,6 +797,8 @@
     "spawn": "A warlord's horn sounds on the Pale Pass road.",
     "death": "The Warlord of the Pale Pass is dead."
    },
+   "devOnly": true,
+   "_spots": "Nat, 25 Oct, from the CK shots in _work/palewarlord-spots-1025: SE first, ST the roaming alternative (roam: the next spot after each kill); SR at Snowstone Rest's door dropped",
    "boss": {
     "edid": "CYRLvlBanditBoss",
     "desc": "2dad4:BSHeartland.esm",
@@ -1719,15 +1721,15 @@
    ],
    "spots": [
     {
-     "id": "SR",
+     "id": "SE",
      "pos": [
-      60719,
-      249420,
-      15404
+      64214,
+      232252,
+      11359
      ],
-     "note": "by Snowstone Rest",
-     "ref": "3b26:BSHeartland.esm",
-     "anchorDist": 272,
+     "note": "below The Sentinel (16,000 units from Cloud Ruler Temple)",
+     "ref": "8c064:BSHeartland.esm",
+     "anchorDist": 312,
      "anchorSameCell": true
     },
     {
@@ -1740,18 +1742,6 @@
      "note": "on Serpent's Trail (14, 59)",
      "ref": "d6e82:BSHeartland.esm",
      "anchorDist": 255,
-     "anchorSameCell": true
-    },
-    {
-     "id": "SE",
-     "pos": [
-      64214,
-      232252,
-      11359
-     ],
-     "note": "below The Sentinel (16,000 units from Cloud Ruler Temple)",
-     "ref": "8c064:BSHeartland.esm",
-     "anchorDist": 312,
      "anchorSameCell": true
     }
    ],
@@ -3318,16 +3308,16 @@
     "spawn": "A howl rolls down from the Falkreath pines. Hircine's hunt is abroad tonight.",
     "death": "The Behemoth of Hircine's Hunt is dead, and the pack scatters."
    },
-   "waitingOn": "the dev test (bosses.devOnly on the dev server): a werewolf pack streamed to several watchers at once. One werewolf NPC has been hosted live (Werewolf Beastmaster a092e, Driftshade, 20 Oct, no crash), never a pack; then Nat picks the spot and night or full moon",
-   "_note": "Proposed 25 Oct (the Leader for Nat): vanilla's top werewolf boss (EncWerewolf06Boss, Dawnguard's ladder) named and rim-lit; the server's SetScale is a stub, so a body 1.3x would need an NPC_ on the Behemoth race 1d1f9e in the DLE (a plugin edit, not made). Pack: a werewolf and two wolves at the start, then 3 and 4 more (werewolf, wolf, wolf in turn). Drops: a Werewolf Pelt (Hothtrooper's werewolf fur and leather recipes take it) and three wolf pelts, gold, Silver 5% (the hunter's metal, Hircine's joke), Glass 1%. Every zone is hostile, player werewolves included. fullMoon true (here or in its config block) keeps it to full-moon nights",
+   "waitingOn": "the dev test (bosses.devOnly on the dev server, with the restart DLE d0831dd6 that carries 1D2207): a werewolf pack streamed to several watchers, and the Behemoth about a third taller than its Werewolf Brute adds",
+   "_note": "Proposed 25 Oct (the Leader for Nat): vanilla's top werewolf boss (EncWerewolf06Boss, Dawnguard's ladder) named and rim-lit; the server's SetScale is a stub, so the boss is its own NPC_ on the Behemoth race (DLE 1D2207, Nat 25 Oct: 1.3x the pack: race 1.30 x NAM6 1.13 = 1.47 against the adds' 1.13). Pack: a werewolf and two wolves at the start, then 3 and 4 more (werewolf, wolf, wolf in turn). Drops: a Werewolf Pelt (Hothtrooper's werewolf fur and leather recipes take it) and three wolf pelts, gold, Silver 5% (the hunter's metal, Hircine's joke), Glass 1%. Every zone is hostile, player werewolves included. fullMoon true (here or in its config block) keeps it to full-moon nights",
    "boss": {
-    "edid": "EncWerewolf06Boss",
-    "desc": "a1976:Skyrim.esm",
+    "edid": "DBO_EncWerewolfBehemothBoss",
+    "desc": "1d2207:DragonBreak Online Edits.esp",
     "options": [
      [
       42,
-      "a1976:Skyrim.esm",
-      "EncWerewolf06Boss"
+      "1d2207:DragonBreak Online Edits.esp",
+      "DBO_EncWerewolfBehemothBoss"
      ]
     ]
    },
