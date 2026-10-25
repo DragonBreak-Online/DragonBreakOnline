@@ -20,7 +20,7 @@ const STONE = '306c:HearthFires.esm', CLAY = '3043:HearthFires.esm';
 // Real base records from the live order: Hearthfire's own, King of the Murkmire's and Beyond Skyrim's copies
 const VEINS = {
   quarry: { ref: 0x2001, base: '306b:HearthFires.esm', edid: 'BYOHMineStone01', ore: STONE, title: 'Stone Quarry', word: /You cut 4 Quarried Stone\./, rank: 2, pays: 4 },
-  clay: { ref: 0x2002, base: 'a511:HearthFires.esm', edid: 'BYOHMineClay01Dirt01', ore: CLAY, title: 'Clay Deposit', word: /You dig out 3 Clay\./, rank: 0, pays: 3 },
+  clay: { ref: 0x2002, base: 'a511:HearthFires.esm', edid: 'BYOHMineClay01Dirt01', ore: CLAY, title: 'Clay Deposit', word: /You dig out 3 Clay and 1 Quartz\./, rank: 0, pays: 3 },
   riverMud: { ref: 0x2003, base: 'a14:HearthFires.esm', edid: 'BYOHMineClay01RiverMud01', ore: CLAY, title: 'Clay Deposit', word: /Clay/, rank: 0, pays: 3 },
   murkmire: { ref: 0x2004, base: '560c5a:King of the Murkmire.esp', edid: 'BYOHMineClay01Mud', ore: CLAY, title: 'Clay Deposit', word: /Clay/, rank: 0, pays: 3 },
   bsQuarry: { ref: 0x2005, base: '602b14:BSAssets.esm', edid: 'BSKBYOHMineStone01_PROXY_HF', ore: STONE, title: 'Stone Quarry', word: /Quarried Stone/, rank: 2, pays: 4 },
@@ -56,9 +56,6 @@ const api = {
   skills: require(path.join(SERVER, 'skills.json')),
   hasUiCap: () => false,
 };
-// The rounds below test clay and stone alone; Quartz has its own section, which reads what skills.json ships
-const SHIPPED_QUARTZ = Object.assign({}, api.skills.skills.find((k) => k.id === 'miner').clayQuartz);
-api.skills.skills.find((k) => k.id === 'miner').clayQuartz.item = '';
 delete require.cache[require.resolve(LABOUR)];
 require(LABOUR)(api);
 const fire = (ev, args) => (handlers.get(ev) || []).forEach((f) => f(ACTOR, args, 33));
@@ -145,8 +142,8 @@ const round = (v, rank) => {
   const told = out.widgets.map((x) => x.result || '').join(' | ');
   return { quartz: out.items.filter(([id]) => id === QUARTZ).reduce((s, [, c]) => s + c, 0), told };
 };
-// Off until the restart DLE (d0831dd6) is loaded, then the DLE's Quartz MISC: either is right, anything else is not
-ok(!SHIPPED_QUARTZ.item || SHIPPED_QUARTZ.item === '1d2208:DragonBreak Online Edits.esp', 'skills.json ships clayQuartz off, or on with the DLE\'s Quartz (1D2208)', JSON.stringify(SHIPPED_QUARTZ));  // verify-formids: ignore - 1D2208 is in the restart DLE d0831dd6, not yet in the PC's Data
+ok(MINER.clayQuartz.item === '1d2208:DragonBreak Online Edits.esp' && MINER.clayQuartz.count === 1 && MINER.clayQuartz.chance === 1, 'skills.json gives DBO_Quartz (1D2208), 1 a round, always', JSON.stringify(MINER.clayQuartz));
+const SHIPPED = MINER.clayQuartz; MINER.clayQuartz = Object.assign({}, SHIPPED, { item: '' });
 ok(round(VEINS.clay, 0).quartz === 0, 'clay: no Quartz while clayQuartz.item is empty');
 MINER.clayQuartz = { item: '1d2201:DragonBreak Online Edits.esp', name: 'Quartz', chance: 1, count: 1 };
 let r = round(VEINS.clay, 0);

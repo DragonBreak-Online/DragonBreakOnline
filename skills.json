@@ -541,7 +541,7 @@
    ],
    "stoneMinTier": 2,
    "clayQuartz": { "item": "1d2208:DragonBreak Online Edits.esp", "name": "Quartz", "chance": 1, "count": 1 },
-   "_clayQuartz": "Quartz with every won Clay Deposit round, at every rank as clay is, for the smelter's Glass (Nat, 25 Oct): count times the Miner multiplier (1 at Novice, 2 at Expert and Master) with the chance given. Off while item is empty: no Quartz record exists in the load order yet. Read at boot.",
+   "_clayQuartz": "Quartz with every won Clay Deposit round, at every rank as clay is, for the smelter's Glass (Nat, 25 Oct): count times the Miner multiplier (1 at Novice, 2 at Expert and Master) with the chance given. item: DBO_Quartz, DragonBreak Online Edits.esp:1D2208 (Worker 1's decor materials, merged 25 Oct); chance 1 and count 1 are Worker 1's numbers, sized so a home's ~8 glass takes 4-8 clay rounds. Read at boot.",
    "_stoneMinTier": "Quarried stone from a Stone Quarry takes this Miner tier, 0 based (2 = Adept; Nat, 25 Oct). Clay Deposits stay open to every rank (labour.js extraOreTier). Read at boot.",
    "tiers": [
     "Copper, iron, corundum",
