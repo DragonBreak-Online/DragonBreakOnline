@@ -1,5 +1,22 @@
 [
   {
+    "title": "The curse spreads less easily",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Vampires and werewolves",
+        "items": [
+          "A vampire's hit now passes on Sanguinare Vampiris 1 time in 100 (it was 3 in 100), and a werewolf's bite passes on Sanies Lupinus 1 time in 200 (it was 1 in 100).",
+          "When the fever peaks, its rite opens again: the Blood Fever for a vampire's fever, Hircine's Hunt for a werewolf's. It has 7 rounds and you must get 5 of them right. Survive it and you turn.",
+          "Fail it and the fever breaks: the disease is gone from your blood, you live, and there is no second try. Closing the rite after a round, or leaving while you are behind, counts as failing. A rite you never touched comes again later.",
+          "Molag Bal's Embrace and the Great Hunt now have 7 rounds and need 6 (they needed 4 of 5), and the last two rounds of every rite are a little harder to read."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The Great Faiths have joined the Imperial Cult",
     "date": "2026-10-25",
     "version": "Server update",

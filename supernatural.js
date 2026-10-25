@@ -1,11 +1,14 @@
 // DragonBreak Online: vampirism and lycanthropy. Loaded by gamemode.js on every hot reload.
 //
 // Lore basis (UESP; design page "Vampires and Werewolves"):
-//   Infection  a vampire's hit (3%) carries Sanguinare Vampiris, a werewolf's bite (0.5%, Nate 2026-10-03) Sanies Lupinus; both incubate
+//   Infection  a vampire's hit carries Sanguinare Vampiris, a werewolf's bite Sanies Lupinus (gamemode-config.json
+//              supernatural.infectVampire / infectWerewolf: 1% and 0.5% from Nat, 25 Oct); both incubate
 //              three game days of the carrier's own play (Nate 2026-09-29: time offline does not count) and are cured by a
 //              Cure Disease potion, an ingredient whose first effect cures, or a prayer at a Divine shrine.
-//   Turning    when the fever peaks the carrier turns, with no trial (Nate, 18 Oct; it was the Blood Fever / Hircine's
-//              Hunt rite, whose failure killed). Molag Bal's Embrace and Hircine's rite are chosen at their shrines (/rite)
+//   Turning    when the fever peaks the Blood Fever / Hircine's Hunt rite opens (rite.feverTrial, Nat 25 Oct: "make it
+//              harder"); surviving it turns the carrier, failing it breaks the fever and cures them, with no death and
+//              no second try. A client that cannot judge its own strikes, or feverTrial false, turns with no trial
+//              (Nate, 18 Oct), so lag never decides it. Molag Bal's Embrace and Hircine's rite are chosen at their shrines (/rite)
 //              and failing those can end the character for good (private.permaDead). Surviving Hircine's rite gives Sanies
 //              Lupinus at huntMarkChance (the turning follows its fever), else the survivor waits riteFailCooldownHours to
 //              run again; surviving Molag Bal's makes a pure-blood at once. The waits are per account (markRiteWait).
@@ -49,7 +52,8 @@ module.exports = (api) => {
   // a client without riteJudge is never put through a rite whose loss kills on such a judgement. Molag Bal's Embrace and
   // the Great Hunt are declined with a line about the update; a fever rite still runs, but losing it breaks the fever
   // without killing (the carrier lives and is not turned). 'allow': the arrival-judged rite kills as before.
-  const RITE_DEFAULTS = { rounds: 5, needFever: 3, needVoluntary: 4, leadMs: 700, timeoutMs: 7000, latencyMs: 120, slackMs: 160,
+  // feverTrial: the fever's peak opens its rite instead of turning the carrier at once (finishRite: a loss cures).
+  const RITE_DEFAULTS = { feverTrial: false, rounds: 5, needFever: 3, needVoluntary: 4, leadMs: 700, timeoutMs: 7000, latencyMs: 120, slackMs: 160,
     clientJudged: true, lateWindowMs: 250, earlyWindowMs: 160, legacyExtraMs: 2500, graceMs: 100, silentMs: 120000, replayCheck: 'log',
     legacyDeadly: 'safe' };
   const C = Object.assign({
@@ -1189,7 +1193,10 @@ module.exports = (api) => {
   const markerAt = (round, t) => { const ph = (((t % round.period) + round.period) % round.period) / round.period; return ph < 0.5 ? ph * 2 : 2 - ph * 2; };
   const newRound = (r) => {
     const i = r.round;
-    return { period: Math.round(1700 - i * 150 + Math.random() * 200), center: 0.2 + Math.random() * 0.6, width: Math.max(0.1, 0.24 - i * 0.03), startsAt: Date.now() + C.rite.leadMs,
+    // The marker's speed and the zone stop at the fifth round's: more rounds make a rite longer, not a reflex test (the
+    // pick rite's marks stop at their lists' last entries the same way, MG.byTier)
+    const t = Math.min(i, 4);
+    return { period: Math.round(1700 - t * 150 + Math.random() * 200), center: 0.2 + Math.random() * 0.6, width: Math.max(0.1, 0.24 - t * 0.03), startsAt: Date.now() + C.rite.leadMs,
       // One per round, for a client that judges itself: its report names it, so a round is reported once (the rite's own
       // nonce covers the whole rite). sentAt: the server's monotonic clock when the round went out, for the lower bound.
       rnonce: Math.floor(Math.random() * 0x7fffffff).toString(36), sentAt: performance.now(),
@@ -1200,6 +1207,10 @@ module.exports = (api) => {
   // deadly rite for it, and a fever rite it loses does not kill. Rollback (clientJudged false) is today's rite for all.
   const riteLegacySafe = (a) => riteClientJudged() && String(C.rite.legacyDeadly || 'safe').toLowerCase() !== 'allow'
     && !(typeof hasUiCap === 'function' && hasUiCap(a, 'riteJudge'));
+  // The fever's peak opens its rite only for a client that judges its own strikes: one judged by when they arrive could
+  // lose the curse, or keep it, to lag (Jake's _clientJudged note), so it turns with no trial as before
+  const feverTrialFor = (a) => C.rite.feverTrial === true && riteClientJudged() && typeof hasUiCap === 'function' && hasUiCap(a, 'riteJudge');
+  const FEVER_RITE_FAILED = 'The fever breaks. Whatever was in your blood is gone.';
   const legacyDeclined = (title) => `${title} needs the latest game client. Close and reopen your launcher to update your game, then come back to the shrine.`;
   const showRite = (a, r, result) => {
     const def = RITES[r.type]; const rd = r.current;
@@ -1285,15 +1296,22 @@ module.exports = (api) => {
     closeWidget(a, RITE_ID);
     const def = RITES[r.type];
     log(`supernatural: ${display(a)} ${won ? 'survived' : 'failed'} ${def.title} (${r.hits}/${C.rite.rounds})`);
-    // A fever rite judged by when its strikes arrived (legacyDeadly 'safe'): the fever breaks, and the carrier lives
-    if (!won && r.legacySafe && (r.type === 'fever_vampire' || r.type === 'fever_werewolf')) {
-      cureDisease(a, `the ${r.type === 'fever_vampire' ? 'fever' : 'hunt'} broke, judged by arrival: not lethal`);
-      audit(`RITE ${who(a)} lost ${def.title} judged by arrival (no riteJudge): the fever broke, no death`);
-      // cureDisease has said "The fever breaks."
-      return personal(a, r.type === 'fever_vampire' ? 'You live through it, and the curse does not take you.' : 'The Huntsman loses your trail, and the beast does not come out.');
+    // A fever rite (Nat, 25 Oct): survived, the carrier turns as at the end of an incubation; failed, however it was lost
+    // (the rounds, closing the window, a disconnect while behind), the fever breaks through the same cure a potion or a
+    // prayer gives (cureDisease: the disease, Sanguinare, every fever debuff), the carrier lives, and there is no second
+    // try. It used to kill and burn the disease out.
+    if (r.type === 'fever_vampire' || r.type === 'fever_werewolf') {
+      // Cured while the rite was open (a potion drunk mid-rite): nothing is left to turn or to cure
+      const st = stateOf(a);
+      if (!st || !st.disease) return log(`supernatural: ${display(a)} ${def.title} ended with the fever already gone`);
+      if (won) {
+        if (r.type === 'fever_vampire') becomeVampire(a, false, true); else becomeWerewolf(a, false, true);
+        return feverEnded(a);
+      }
+      cureDisease(a, `failed ${def.title} (${r.hits}/${C.rite.rounds})`, FEVER_RITE_FAILED);
+      audit(`RITE ${who(a)} failed ${def.title} at ${r.hits} of ${def.need} needed in ${C.rite.rounds}: the fever broke, cured, no death`);
+      return;
     }
-    if (r.type === 'fever_vampire') return won ? becomeVampire(a, false) : (cureDisease(a, 'the fever took them'), personal(a, 'The fever takes you, and burns itself out with your life.'), mp.set(a, 'isDead', true));
-    if (r.type === 'fever_werewolf') return won ? becomeWerewolf(a, false) : (cureDisease(a, 'the hunt took them'), personal(a, 'The Huntsman catches you. The beast dies with you.'), mp.set(a, 'isDead', true));
     // Nat: the blessing belongs to a pack's Alpha, not to anyone who survives the Hunt. Nat 2026-09-26: surviving the Hunt
     // gives Sanies Lupinus, not the beast; the fever runs its days and Hircine's Hunt decides, as after a bite.
     // Nate 2026-09-26: and only at huntMarkChance; an unmarked survivor waits as long as one who failed before running again.
@@ -2594,11 +2612,12 @@ module.exports = (api) => {
         {
           label: 'The fever', value: `${Math.round((played / C.incubationDays) * 100)}% grown`,
           hint: left > 0 ? `It grows only while you play: about ${inWords(realMinutes(left))} more. Time away from the game does not count.`
-            : 'It has peaked. You turn as soon as you are settled in the world.',
+            : feverTrialFor(a) ? 'It has peaked. Its rite opens as soon as you are settled in the world.' : 'It has peaked. You turn as soon as you are settled in the world.',
         },
         {
           label: 'When it peaks', value: wolf ? 'You become a werewolf' : 'You become a vampire',
-          hint: 'There is no trial: when the fever has run its course, the curse takes you wherever you are (unless it is cured first).',
+          hint: feverTrialFor(a) ? `${wolf ? "Hircine's Hunt" : 'The Blood Fever'} opens: ${C.rite.rounds} rounds, and you must read ${C.rite.needFever} of them true. Survive it and you turn; fail it and the fever breaks, and the curse is gone from your blood.`
+            : 'There is no trial: when the fever has run its course, the curse takes you wherever you are (unless it is cured first).',
         },
         ...feverRows(s),
         { label: 'A cure', value: 'Still possible', hint: 'A held prayer at a shrine of the Divines, a Cure Disease potion, or food or a potion that cures disease breaks the fever (an ingredient only when curing disease is its first effect). Prayers to the Daedric Princes or the older faiths, or away from a shrine, do not.' },
@@ -2735,8 +2754,14 @@ module.exports = (api) => {
           log(`supernatural: ${display(a)} fever peaked ${Math.round(since / 1000)} s after joining; holding the turning until they have settled`);
           continue;
         }
-        // The incubation done, the carrier turns: no trial (Nate, 18 Oct)
-        log(`supernatural: ${display(a)} fever peaked; they turn`);
+        // The incubation done: its rite (Nat, 25 Oct), or for a client that cannot judge it, the turning (Nate, 18 Oct)
+        if (feverTrialFor(a)) {
+          log(`supernatural: ${display(a)} fever peaked; ${s.disease.kind === 'vampire' ? 'the Blood Fever' : "Hircine's Hunt"} opens`);
+          startRite(a, s.disease.kind === 'vampire' ? 'fever_vampire' : 'fever_werewolf');
+          if (rites.has(a)) personal(a, `The fever peaks. Get ${C.rite.needFever} of ${C.rite.rounds} rounds true and you turn; fail, and the fever breaks and the curse is gone from your blood.`);
+          continue;
+        }
+        log(`supernatural: ${display(a)} fever peaked; they turn${C.rite.feverTrial === true ? ' (no trial: the client cannot judge its own strikes)' : ''}`);
         if (s.disease.kind === 'vampire') becomeVampire(a, false, true); else becomeWerewolf(a, false, true);
         feverEnded(a);
         continue;

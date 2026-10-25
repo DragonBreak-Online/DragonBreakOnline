@@ -1903,7 +1903,7 @@ supernatural.js SUPERNATURAL 20a78766 parsed
 supernatural.js PERMADEATH d8f3928d parsed
 supernatural.js SUPERNATURAL b0a3c71f parsed
 supernatural.js RITE 994d3da4 clean
-supernatural.js RITE 365c890b clean
+supernatural.js RITE 11804524 clean
 supernatural.js RITE-MISMATCH a93b97ba clean
 supernatural.js RITE 1f3ba523 clean
 supernatural.js RITE 5975fe44 clean
