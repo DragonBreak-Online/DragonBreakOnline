@@ -45,7 +45,8 @@ export class AdminModeService extends ClientListener {
   }
 
   // Admin panel "all shouts": the server has no shout storage, so it sends the list at the grant and at every login.
-  // desc is "hex:Plugin.esm"; every word is learned and unlocked, then the shout is added.
+  // desc is "hex:Plugin.esm". Only a word not yet unlocked is taught and unlocked, and only a shout not yet held is added:
+  // each call shows its own popup, so re-teaching the whole list made a wall of them at every login (Nat, 25 Oct).
   private teachShouts(shouts: Array<{ shout: string; words: string[] }>): void {
     const player = this.sp.Game.getPlayer();
     if (!player) return;
@@ -54,17 +55,24 @@ export class AdminModeService extends ClientListener {
       if (i < 0) return null;
       try { return this.sp.Game.getFormFromFile(parseInt(desc.slice(0, i), 16), desc.slice(i + 1)); } catch { return null; }
     };
-    let taught = 0;
+    let shoutsAdded = 0;
+    let wordsUnlocked = 0;
     for (const entry of shouts) {
       for (const w of entry.words || []) {
         const word = this.sp.WordOfPower.from(formOf(w));
         if (!word) continue;
-        try { this.sp.Game.teachWord(word); this.sp.Game.unlockWord(word); } catch { /* not a word in this load order */ }
+        try {
+          if (this.sp.Game.isWordUnlocked(word)) continue;
+          this.sp.Game.teachWord(word);
+          this.sp.Game.unlockWord(word);
+          wordsUnlocked++;
+        } catch { /* not a word in this load order */ }
       }
       const shout = this.sp.Shout.from(formOf(entry.shout));
-      if (shout) { try { player.addShout(shout); taught++; } catch { /* already known */ } }
+      // Actor.psc: HasSpell checks "the given Spell or Shout"; AddShout "returns true on success"
+      if (shout) { try { if (!player.hasSpell(shout) && player.addShout(shout)) shoutsAdded++; } catch { /* not a shout in this load order */ } }
     }
-    showSystemNotification(this.sp, `You know ${taught} shouts.`);
+    if (shoutsAdded || wordsUnlocked) showSystemNotification(this.sp, `Learned ${shoutsAdded} shouts (${wordsUnlocked} words).`);
   }
 
   private apply(mode: string, on: boolean): void {
