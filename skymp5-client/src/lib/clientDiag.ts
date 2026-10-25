@@ -9,7 +9,9 @@
 // No imports, so a harness loads it on its own (tests/client-diag-harness.js). Nothing here ever throws.
 
 // The client build these lines come from (the launcher package version)
-export const DBO_CLIENT_VERSION = "0.3.110";
+// TEST CLIENT, not a release: the suffix is here so a diagnostic line says which build it came from. Nothing
+// gates on this string - it is only the header of a diag line - and the launcher reads its own manifest version.
+export const DBO_CLIENT_VERSION = "0.3.110-hagtest1";
 // gamemode.js keeps the first 500 characters of a line
 export const DIAG_LINE_MAX = 480;
 export const ERROR_LINES_PER_MINUTE = 10;
