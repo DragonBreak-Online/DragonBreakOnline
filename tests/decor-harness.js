@@ -26,7 +26,8 @@ fs.writeFileSync('decor-catalog.json', JSON.stringify({ groups: [
   { id: 'beds', label: 'Beds', pieces: [{ desc: d(0x9001), edid: 'CommonBed01', name: 'Bed', group: 'beds', type: 'FURN', radius: 100, costB: { [d(WOOD)]: 4, [d(IRON)]: 1 } }] },
   { id: 'storage', label: 'Storage', pieces: [{ desc: d(0x9002), edid: 'CommonWardrobe01', name: 'Wardrobe', group: 'storage', type: 'CONT', radius: 60, container: true, costB: { [d(WOOD)]: 4 } }] },
   { id: 'lights', label: 'Lights', pieces: [{ desc: d(0x9003), edid: 'Candle01', name: 'Candle', group: 'lights', type: 'STAT', radius: 20, light: { base: d(0x88238), radius: 256 }, costB: { [d(IRON)]: 1 } }] },
-  { id: 'workbenches', label: 'Workbenches', pieces: [{ desc: d(0x9004), edid: 'CraftingAlchemyWorkbench', name: 'Alchemy Lab', group: 'workbenches', type: 'FURN', radius: 100, station: { keyword: 'isAlchemy', skill: 'alchemist', tier: 1, minCells: 1 }, costB: { [d(SALT)]: 2 } }] },
+  { id: 'workbenches', label: 'Workbenches', pieces: [{ desc: d(0x9004), edid: 'CraftingAlchemyWorkbench', name: 'Alchemy Lab', group: 'workbenches', type: 'FURN', radius: 100, station: { keyword: 'isAlchemy', skill: 'alchemist', tier: 1, minCells: 1 }, costB: { [d(SALT)]: 2 } },
+    { desc: d(0x9005), edid: 'DLC2ExpSpiderCraftingLever', name: 'Spider Imbuing Chamber', group: 'workbenches', type: 'ACTI', radius: 100, station: { keyword: 'DLC2ExpSpiderCraftingLever', skill: null, tier: 0, minCells: 1, races: [d(0x13742), d(0x8883d)] }, costB: { [d(IRON)]: 1 } }] },
 ] }));
 const props = new Map();
 const setp = (id, k, v) => props.set(`${id}|${k}`, v);
@@ -84,6 +85,17 @@ ok(/1\. Bed \[beds\]/.test(last(OWNER)), '/decor find lists the bed with its gro
 cmd(OWNER, 'place 1');
 ok(/Short: 4 /.test(last(OWNER)) && !lastEdit(OWNER), 'without the materials: told what is short, no preview', last(OWNER));
 giveItem(OWNER, WOOD, 10); giveItem(OWNER, IRON, 5); giveItem(OWNER, SALT, 4);
+
+// ---- the Spider Imbuing Chamber is Dunmer only (Nat 25 Oct): not offered, and refused, to anyone else -------------------
+setp(OWNER, 'appearance', { raceId: 0x13746 });
+cmd(OWNER, 'find spider');
+ok(/Nothing matches/.test(last(OWNER)), 'a Nord is not offered the spider chamber', last(OWNER));
+cmd(OWNER, 'place ' + d(0x9005));
+ok(/for Dunmer alone/.test(last(OWNER)) && !lastEdit(OWNER), 'a Nord placing it by its desc is refused', last(OWNER));
+setp(OWNER, 'appearance', { raceId: 0x8883d });
+cmd(OWNER, 'find spider');
+ok(/1\. Spider Imbuing Chamber/.test(last(OWNER)), 'a Dunmer vampire is offered it', last(OWNER));
+setp(OWNER, 'appearance', { raceId: 0x13746 });
 
 // ---- place: paid in one write, then created ----------------------------------------------------------------------------
 const e1 = placeAt(OWNER, 'bed');

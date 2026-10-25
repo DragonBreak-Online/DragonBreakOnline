@@ -54,17 +54,27 @@ EXCLUDE = re.compile(r'marker|dummy|placeholder|test|player|ruin|dwe|ayl|akavir|
 # containers: generic household furniture only (quest, guild and boss chests share the words)
 GENERIC_CONT = re.compile(r'^(BYOHHouse)?(CYR)?(Common|Noble|Upper|Lower|Middle|Orc|DarkElf|Misc|Barrel|Sack|Knapsack|Cupboard|Dresser|EndTable|NightTable|Wardrobe|ChestOfDrawers)', re.I)
 NEVER_STATION = re.compile(r'carpenter|drafting|trophybase|interiorworkbench|invisible|notcrafting|poison|player|test|aetherium|console|^dun|^dwe', re.I)
-STATIONS = {   # keyword editor id -> rules (design section 6; D8/D9 approved at the recommended values)
-    # specific keywords first: MCE's loom also carries isTanning, Hearthfire's oven and the staff bench their own
-    'DLC2StaffEnchanter': {'skill': 'enchanter', 'tier': 3, 'minCells': 3, 'extra': {'SoulGemGreaterFilled': 1, 'IngotIMoonstone': 1, 'IngotQuicksilver': 1}},
-    'MCE_CraftingLoom': {'skill': 'tailor', 'tier': 0, 'minCells': 1, 'extra': {'BYOHMaterialLog': 4, 'BYOHMaterialNails': 10, 'RuinsLinenPile01': 4}},
-    'BYOHCraftingOven': {'skill': 'cook', 'tier': 0, 'minCells': 1, 'extra': {'BYOHMaterialStoneBlock': 6, 'BYOHMaterialClay': 2, 'BYOHMaterialFittingsIron': 1}},
-    'isAlchemy': {'skill': 'alchemist', 'tier': 1, 'minCells': 1, 'extra': {'BYOHMaterialGlass': 2, 'ingotSilver': 1, 'BYOHMaterialLog': 2}},
-    'isEnchanting': {'skill': 'enchanter', 'tier': 1, 'minCells': 2, 'extra': {'SoulGemPettyFilled': 1, 'BYOHMaterialStoneBlock': 2, 'IngotGold': 1, 'GemAmethyst': 1, 'GemGarnet': 1}},
-    'isTanning': {'skill': 'skinner', 'tier': 0, 'minCells': 1, 'extra': {'BYOHMaterialLog': 3, 'LeatherStrips': 2}},
-    'isBlacksmithWorkbench': {'skill': 'blacksmith', 'tier': 1, 'minCells': 2, 'extra': {'BYOHMaterialLog': 3, 'IngotIron': 2}},
-    'CraftingSmithingSharpeningWheel': {'skill': 'blacksmith', 'tier': 1, 'minCells': 2, 'extra': {'BYOHMaterialStoneBlock': 1, 'IngotIron': 1}},
-    'isCookingSpit': None, 'isSmallCookingPot': {'skill': None, 'tier': 0, 'minCells': 1, 'needsHearth': 300, 'extra': {'IngotIron': 1}},
+STATIONS = {   # keyword or editor id -> rules and full cost (Hearthfire-material terms, as costA)
+    # Costs: AussiePie's list (Lead GM) with Worker 1's proposals for its placeholders, approved by Nat via the Leader 25 Oct
+    # (_work\home-decorating\workbench-costs-proposal.md). Forge, anvil and smelter stay outdoors (Nat); Hearthfire's
+    # carpenter's bench and drafting table are left out (NEVER_STATION). Specific keywords first: MCE's loom also carries
+    # isTanning, Hearthfire's oven and the staff bench their own.
+    'DLC2StaffEnchanter': {'skill': 'enchanter', 'tier': 3, 'minCells': 3, 'cost': {'BYOHMaterialStoneBlock': 10, 'BYOHMaterialLog': 2, 'BYOHMaterialGlass': 2, 'SoulGemGreaterFilled': 1, 'IngotIMoonstone': 1, 'IngotQuicksilver': 1}},
+    # Dunmer only (Nat 25 Oct): placing is offered to and allowed for a Dark Elf character (vampire too); Worker 3 gates its use
+    'DLC2ExpSpiderCraftingLever': {'skill': None, 'tier': 0, 'minCells': 1, 'races': ['DarkElfRace', 'DarkElfRaceVampire'], 'cost': {'IngotDwarven': 10, 'BYOHMaterialStoneBlock': 10, 'IngotIron': 4, 'SoulGemCommonFilled': 1}},
+    'MCE_CraftingLoom': {'skill': 'tailor', 'tier': 0, 'minCells': 1, 'cost': {'BYOHMaterialLog': 4, 'BYOHMaterialNails': 10, 'RuinsLinenPile01': 4}},
+    'BYOHCraftingOven': {'skill': 'cook', 'tier': 0, 'minCells': 1, 'cost': {'BYOHMaterialStoneBlock': 12, 'BYOHMaterialClay': 6, 'IngotIron': 2, 'Firewood01': 4}},
+    'isAlchemy': {'skill': 'alchemist', 'tier': 1, 'minCells': 1, 'cost': {'BYOHMaterialLog': 4, 'BYOHMaterialGlass': 4, 'IngotIron': 2, 'ingotSilver': 1, 'BYOHMaterialStoneBlock': 2}},
+    'isEnchanting': {'skill': 'enchanter', 'tier': 1, 'minCells': 2, 'cost': {'BYOHMaterialStoneBlock': 10, 'BYOHMaterialLog': 2, 'BYOHMaterialGlass': 2, 'IngotGold': 1, 'SoulGemPettyFilled': 2, 'GemAmethyst': 1, 'GemGarnet': 1}},
+    'isTanning': {'skill': 'skinner', 'tier': 0, 'minCells': 1, 'cost': {'BYOHMaterialLog': 4, 'LeatherStrips': 4, 'IngotIron': 1, 'Firewood01': 2}},
+    'isBlacksmithWorkbench': {'skill': 'blacksmith', 'tier': 1, 'minCells': 2, 'cost': {'BYOHMaterialLog': 6, 'IngotIron': 5, 'Firewood01': 2, 'LeatherStrips': 2}},
+    'CraftingSmithingSharpeningWheel': {'skill': 'blacksmith', 'tier': 1, 'minCells': 2, 'cost': {'BYOHMaterialStoneBlock': 8, 'IngotIron': 3, 'Firewood01': 2, 'BYOHMaterialLog': 2}},
+    'isSmallCookingPot': {'skill': None, 'tier': 0, 'minCells': 1, 'cost': {'IngotIron': 3, 'Firewood01': 2}},
+    'isCookingSpit': {'skill': None, 'tier': 0, 'minCells': 1, 'cost': {'IngotIron': 1, 'Firewood01': 4, 'BYOHMaterialLog': 1}},
+    'isGrainMill': {'skill': None, 'tier': 0, 'minCells': 1, 'cost': {'BYOHMaterialStoneBlock': 8, 'BYOHMaterialLog': 4, 'IngotIron': 2, 'Firewood01': 2}},
+    # resource sources: labour.js runs a placed copy as a normal round, with the same per-player rest (by position) and rules
+    'WoodChoppingBlock': {'skill': None, 'tier': 0, 'minCells': 1, 'source': True, 'cost': {'Firewood01': 2, 'BYOHMaterialLog': 1}},
+    'BYOHMineStone01': {'skill': 'miner', 'tier': 2, 'minCells': 1, 'source': True, 'cost': {'BYOHMaterialStoneBlock': 10, 'Firewood01': 4, 'IngotIron': 2}},
 }
 # Hearthfire material -> what players gather today, per unit (design 5, Option B). Fractions sum per piece and round up.
 RAW = {'BYOHMaterialLog': {'Firewood01': 4}, 'BYOHMaterialNails': {'IngotIron': 0.1}, 'BYOHMaterialHinge': {'IngotIron': 0.5},
@@ -108,11 +118,11 @@ def recs(pn):
     P, fh, selfi, hf, ms = plugins[pn]
     for t, f, fl, o, z, cx in P.index:
         t = t if isinstance(t, str) else t.decode()
-        yield t, f, fl, [(k.decode(), bytes(v)) for k, v in esplib.subrecords(P.data_at(fh, o, z, fl))] if t in ('STAT', 'FURN', 'CONT', 'LIGH', 'KYWD', 'MISC', 'INGR', 'COBJ', 'SLGM', 'ALCH', 'AMMO', 'WEAP', 'ARMO') else None
+        yield t, f, fl, [(k.decode(), bytes(v)) for k, v in esplib.subrecords(P.data_at(fh, o, z, fl))] if t in ('STAT', 'FURN', 'CONT', 'LIGH', 'ACTI', 'RACE', 'KYWD', 'MISC', 'INGR', 'COBJ', 'SLGM', 'ALCH', 'AMMO', 'WEAP', 'ARMO') else None
 edid_of = lambda sub: dict(sub).get('EDID', b'').rstrip(b'\0').decode(errors='replace')
 
 # editor id -> desc for items and keywords, first plugin that owns it (vanilla first)
-by_edid, kw_edid = {}, {}
+by_edid, kw_edid, race_desc = {}, {}, {}
 for pn in plugins:
     selfi = plugins[pn][2]
     for t, f, fl, sub in recs(pn):
@@ -120,6 +130,7 @@ for pn in plugins:
         e = edid_of(sub)
         if t == 'KYWD': kw_edid[(pn, f & 0xFFFFFF)] = e
         elif t in ('MISC', 'INGR', 'SLGM', 'ALCH', 'AMMO', 'WEAP', 'ARMO'): by_edid.setdefault(e, '%x:%s' % (f & 0xFFFFFF, pn))
+        elif t == 'RACE': race_desc.setdefault(e, '%x:%s' % (f & 0xFFFFFF, pn))
 
 # Hearthfire recipes of interior pieces -> kind -> most common bill of materials
 def item_edid(fid, owner_masters, owner):
@@ -199,7 +210,7 @@ items, dropped, seen_models = [], collections.Counter(), set()
 for pn in plugins:
     P, fh, selfi, hf, ms_ = plugins[pn]
     for t, f, fl, sub in recs(pn):
-        if sub is None or t not in ('STAT', 'FURN', 'CONT', 'LIGH') or (f >> 24) != selfi or fl & 0x20: continue
+        if sub is None or t not in ('STAT', 'FURN', 'CONT', 'LIGH', 'ACTI') or (f >> 24) != selfi or fl & 0x20: continue
         d = dict(sub); e = edid_of(sub)
         if not e or 'MODL' not in d: continue
         kws = set()
@@ -210,11 +221,11 @@ for pn in plugins:
         station = next((k for k in STATIONS if k in kws or k == e), None)
         if e == 'DLC2CraftingStaffWorkbench': station = 'DLC2StaffEnchanter'
         # the real tanning rack, loom and oven are named ...Marker, so a station answers only to NEVER_STATION
-        if (NEVER_STATION if station and t == 'FURN' else EXCLUDE).search(e): continue
+        if (NEVER_STATION if station and t in ('FURN', 'ACTI') else EXCLUDE).search(e): continue
         if t == 'CONT' and not GENERIC_CONT.search(e): continue
         group = None
         if station:
-            if STATIONS.get(station) is None or t != 'FURN': continue
+            if STATIONS.get(station) is None or t not in ('FURN', 'ACTI'): continue
             group = 'workbenches'
         else:
             for gid, label, types, rx in GROUPS:
@@ -238,8 +249,8 @@ for pn in plugins:
         costA = dict(TEMPLATE.get(k) or DEFAULT[group])
         rule = None
         if station:
-            rule = dict(STATIONS[station]); extra = rule.pop('extra')
-            for m, n in extra.items(): costA[m] = costA.get(m, 0) + n
+            rule = dict(STATIONS[station]); costA = dict(rule.pop('cost'))
+            if rule.get('races'): rule['races'] = [race_desc[r] for r in rule['races']]
             rule['keyword'] = station
         ob = list(struct.unpack('<6h', d.get('OBND', b'\0' * 12)[:12]))
         row = {'desc': '%x:%s' % (f & 0xFFFFFF, pn), 'edid': e, 'name': name_of(pn, sub) or human(e), 'group': group, 'type': t,
@@ -264,6 +275,6 @@ out = {'_comment': 'Generated by tools/decor/decor_catalog.py (home decorating, 
                    'costB: what players gather today, by desc (phase 1 pays costB). Pieces are checked against the launcher lists: mesh and textures.',
        'version': 1, 'raw': RAW, 'materials': {m: by_edid.get(m) for m in mats},
        'groups': [{'id': g, 'label': labels[g], 'pieces': v} for g, v in cats.items() if v]}   # not 'items': the id check reads that as inventory
-json.dump(out, open(A.out, 'w', encoding='utf-8'), indent=1)
+json.dump(out, open(A.out, 'w', encoding='utf-8', newline='\n'), indent=1)   # LF on Windows too, as the repo keeps it
 print('pieces', len(items), {g: len(v) for g, v in cats.items()}, '| dropped', dict(dropped))
 print('Hearthfire recipe kinds', sorted(TEMPLATE)); print('materials without a desc', [m for m in mats if not by_edid.get(m)])
