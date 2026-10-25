@@ -1,5 +1,6 @@
 // Mining and woodcutting as timing mini-games, loaded by gamemode.js like dungeons.js and wildlife.js.
-// An ore vein (MineOre / CYRMineOre activators) belongs to the Miner skill, a chopping block to the
+// An ore vein (MineOre / CYRMineOre activators), a Hearthfire Stone Quarry or Clay Deposit (BYOHMineStone / BYOHMineClay)
+// belongs to the Miner skill, a chopping block to the
 // Woodcutter. Both use the same front widget: a marker sweeps a bar and the worker strikes while it
 // sits in the band. The server sends the round, judges the report and hands out the yield.
 //
@@ -66,7 +67,9 @@ module.exports = (api) => {
     // Iron 5 (was 3) and corundum 3 (was 2): more iron (Nate, 4 Oct). The config's labour block is merged shallowly, so a
     // config oreYieldByOre would replace this whole map: the defaults are changed here.
     // Meteoric iron 2, as orichalcum and moonstone (Nate, 4 Oct: three Bleak-Frost Mine veins; see oreByRef)
-    oreYieldByOre: { copper: 3, tin: 3, iron: 5, corundum: 3, silver: 2, quicksilver: 2, orichalcum: 2, moonstone: 2, gold: 1, ebony: 1, malachite: 1, stalhrim: 1, salt: 4, meteoriciron: 2, adamantium: 1, zinc: 2, mithril: 1, amber: 1 },
+    // Stone and clay 3: a furnished home's decor takes about 2 stone and 4 clay (8 and 6 with an oven), so one or two
+    // rounds cover it (Worker 1's decor-catalog.json, 25 Oct)
+    oreYieldByOre: { copper: 3, tin: 3, iron: 5, corundum: 3, silver: 2, quicksilver: 2, orichalcum: 2, moonstone: 2, gold: 1, ebony: 1, malachite: 1, stalhrim: 1, salt: 4, stone: 3, clay: 3, meteoriciron: 2, adamantium: 1, zinc: 2, mithril: 1, amber: 1 },
     // A placed vein that gives another ore than its base says, keyed by the reference's desc (never the base: the same
     // MineOreIron04 is placed all over Cyrodiil). No vein activator for meteoric iron exists in the load order, so three
     // iron veins of the Bleak-Frost Mine (CYRBleakFrostMine01, DLE v13), the three furthest from its door by the cell's
@@ -130,7 +133,7 @@ module.exports = (api) => {
     // BSKRecipeIngotBrass, a tier 2 metal), so it opens with silver; Mithril (DBO_RecipeIngotMithril) is a tier 4 metal
     // beside Glass, so it opens with malachite; Amber (ccBGSSSE025_RecipeIngotAmber) is tier 5 in smithing.json, so it
     // opens with ebony. Nate may move them.
-    extraOreTier: { salt: 0, tin: 0, adamantium: 3, geode: 1, amethyst: 1, topaz: 1, ruby: 2, sapphire: 2, emerald: 3, diamond: 4, zinc: 1, mithril: 3, amber: 4 },
+    extraOreTier: { salt: 0, tin: 0, stone: 0, clay: 0, adamantium: 3, geode: 1, amethyst: 1, topaz: 1, ruby: 2, sapphire: 2, emerald: 3, diamond: 4, zinc: 1, mithril: 3, amber: 4 },
     // Every other geode gives the gem it is named for (the CYR ones name it in their MineOreScript Ore property)
     gemOre: { amethyst: '63b46:Skyrim.esm', topaz: '602427:BSAssets.esm', ruby: '63b42:Skyrim.esm', sapphire: '63b44:Skyrim.esm', emerald: '63b43:Skyrim.esm', diamond: '63b47:Skyrim.esm' },
     saltBonusChance: 0.1,
@@ -173,12 +176,20 @@ module.exports = (api) => {
     mithril: '1ac98b:DragonBreak Online Edits.esp',   // DBO_OreMithril, the Ore of the DLE's MineOreMithril veins
     amber: 'bc6:ccBGSSSE025-AdvDSGS.esm',             // "Amber", the Ore of the DLE's MineOreAmber veins
     salt: '34cdf:Skyrim.esm',
+    // Hearthfire's building materials, from its Stone Quarry and Clay Deposit activators (Nate, 25 Oct: "make quarry stone
+    // and clay deposits work"); the server never runs their MineOreScript. Beyond Skyrim's BSKBYOH*_PROXY_HF copies give
+    // these too, not BSAssets' proxy items, so one stone and one clay serve every recipe
+    stone: '306c:HearthFires.esm',   // BYOHMaterialStoneBlock, "Quarried Stone"
+    clay: '3043:HearthFires.esm',    // BYOHMaterialClay, "Clay"
     firewood: '6f993:Skyrim.esm',
     charcoal: '33760:Skyrim.esm',
   }, CFG.gemOre || {}, CFG.items || {});
 
   const MINER = (skills.skills || []).find((k) => k.id === 'miner') || {};
   const WOODCUTTER = (skills.skills || []).find((k) => k.id === 'woodcutter') || {};
+  // Quarried stone takes an Adept miner, clay any (Nat, 25 Oct): skills.json miner stoneMinTier (0 based) replaces the
+  // stone's extraOreTier, so Nat moves it there without a code change; the band also weighs the round's skill credit
+  if (Number.isFinite(Number(MINER.stoneMinTier))) CFG.extraOreTier = Object.assign({}, CFG.extraOreTier, { stone: Number(MINER.stoneMinTier) });
 
   // Rounds and spent nonces outlive a gamemode reload, or every save would strand a round in flight
   const sessions = globalThis.__dboLabourRounds || (globalThis.__dboLabourRounds = new Map()); // actorId -> round
@@ -237,7 +248,9 @@ module.exports = (api) => {
   };
   const titleCase = (s) => s.charAt(0).toUpperCase() + s.slice(1);
   // The name a player reads for an ore key: "meteoriciron" is "Meteoric Iron", the rest are one word
-  const ORE_NAMES = { meteoriciron: 'Meteoric Iron' };
+  // A building material's yield line opens with how it came out of the ground
+  const BUILD = { stone: 'You cut', clay: 'You dig out' };
+  const ORE_NAMES = { meteoriciron: 'Meteoric Iron', stone: 'Quarried Stone', clay: 'Clay' };
   const oreName = (ore) => ORE_NAMES[ore] || titleCase(ore);
   // oreByRef resolved to the server's form ids (the load order decides the plugin's index), once per load
   const REF_ORE = (() => {
@@ -263,8 +276,12 @@ module.exports = (api) => {
     return ore === 'blackreach' ? 'geode' : ore;
   };
 
-  // A Sea Salt Deposit and a Beyond Skyrim gem geode are worked like a seam
+  // A Sea Salt Deposit, a Beyond Skyrim gem geode and a Hearthfire Stone Quarry or Clay Deposit are worked like a seam:
+  // BYOHMineStone01, BYOHMineClay01Dirt01 and the rest, King of the Murkmire's BYOHMineClay01Mud, Beyond Skyrim's
+  // BSKBYOHMineClay01Dirt01_PROXY_HF
   const nodeOf = (targetId, edid) => {
+    const byoh = /^(?:BSK)?BYOHMine(Stone|Clay)/i.exec(edid);
+    if (byoh) return byoh[1].toLowerCase();
     if (/SeaSalt/i.test(edid)) return 'salt';
     if (!/^(?:CYR|BSK)MineGem/i.test(edid)) return '';
     const gem = (/MineGem([A-Za-z]+?)\d/i.exec(edid) || [])[1];
@@ -449,14 +466,18 @@ module.exports = (api) => {
     if (tier < 0) return false;
     { const live = liveRound(casterId); if (live) return reshow(casterId, live); }
     if (ore !== 'geode' && !ITEMS[ore]) return deny(casterId, 'You do not know what to do with this seam.');
-    if (oresUpTo(tier).indexOf(ore) === -1) return deny(casterId, beyondSkill(ore, own));
+    if (oresUpTo(tier).indexOf(ore) === -1) {
+      if (ore === 'stone') { const rank = (skills.tierNames || [])[oreBand(ore)] || 'Adept'; return deny(casterId, `Cutting building stone takes ${an(rank)} ${rank} miner. Clay is dug at any rank.`); }
+      return deny(casterId, beyondSkill(ore, own));
+    }
     // An owned mine's access rules (mines.js): its owner may keep its seams to a faction, named people or themselves
     { const gate = typeof globalThis.__dboMineGate === 'function' ? globalThis.__dboMineGate(targetId, casterId) : ''; if (gate) return deny(casterId, gate); }
     const rests = restsOf(casterId, 'private.minedVeins');
     const until = Math.max(Number(rests[restKey(targetId)]) || 0, sharedRest(targetId, ore));
-    if (until > Date.now()) return deny(casterId, `This seam is worked out for now. Come back in ${Math.ceil((until - Date.now()) / 60000)} minutes.`);
-    if (workedByOther(targetId, casterId, ore)) return deny(casterId, 'Someone is working this seam. Wait for them to finish.');
-    const round = roundFor(casterId, 'mining', tier, Math.max(1, Number(CFG.oreStrikes) || 6), ore === 'salt' ? 'Sea Salt Deposit' : ore === 'geode' || (CFG.gemOre || {})[ore] ? 'Geode' : `${oreName(ore)} Seam`, targetId);
+    const node = BUILD[ore] ? 'deposit' : 'seam';
+    if (until > Date.now()) return deny(casterId, `This ${node} is worked out for now. Come back in ${Math.ceil((until - Date.now()) / 60000)} minutes.`);
+    if (workedByOther(targetId, casterId, ore)) return deny(casterId, `Someone is working this ${node}. Wait for them to finish.`);
+    const round = roundFor(casterId, 'mining', tier, Math.max(1, Number(CFG.oreStrikes) || 6), ore === 'salt' ? 'Sea Salt Deposit' : ore === 'stone' ? 'Stone Quarry' : ore === 'clay' ? 'Clay Deposit' : ore === 'geode' || (CFG.gemOre || {})[ore] ? 'Geode' : `${oreName(ore)} Seam`, targetId);
     round.ore = ore;
     const started = startRound(casterId, round);
     reserve(targetId, casterId, round);
@@ -735,19 +756,27 @@ module.exports = (api) => {
       // An owned mine's share (mines.js): cut of the yield goes into the mine's store for its owner, once the miner's part is in hand
       const item = gem || ITEMS[round.ore];
       let share = null;
-      try { if (typeof globalThis.__dboMineShareQuote === 'function') share = globalThis.__dboMineShareQuote(round.refId, a, item, count, gem ? itemName(gem) : round.ore === 'salt' ? 'Salt Pile' : (CFG.gemOre || {})[round.ore] ? titleCase(round.ore) : `${oreName(round.ore)} Ore`); } catch (e) { share = null; }
+      try { if (typeof globalThis.__dboMineShareQuote === 'function') share = globalThis.__dboMineShareQuote(round.refId, a, item, count, gem ? itemName(gem) : round.ore === 'salt' ? 'Salt Pile' : BUILD[round.ore] ? oreName(round.ore) : (CFG.gemOre || {})[round.ore] ? titleCase(round.ore) : `${oreName(round.ore)} Ore`); } catch (e) { share = null; }
       const cut = share && share.cut > 0 ? Math.min(count, share.cut) : 0;
       const ok = count - cut > 0 ? giveItem(a, idOf(item), count - cut) : true;
       if (ok && cut) { try { share.commit(); } catch (e) { log('labour: the mine share failed', e.message); } }
       if (ok && bonus) giveItem(a, idOf(bonus), 1);
+      // Quartz comes up with the clay, for the smelter's Glass (Nat, 25 Oct), at every rank as clay is: skills.json miner
+      // clayQuartz { item, name, chance, count }, the count times the Miner multiplier. Off while item is empty
+      const QZ = MINER.clayQuartz || {};
+      const quartzChance = Number.isFinite(Number(QZ.chance)) ? Number(QZ.chance) : 1;
+      const quartz = ok && round.ore === 'clay' && QZ.item && Math.random() < quartzChance ? Math.max(1, Math.round((Number(QZ.count) || 1) * mult)) : 0;
+      const quartzOk = quartz > 0 && giveItem(a, idOf(QZ.item), quartz);
+      const quartzName = String(QZ.name || 'Quartz');
       const kept = count - cut;
       text = !ok ? 'The seam gives way, but you cannot carry any more.'
         : round.ore === 'geode' ? (cut ? `The geode cracks open: ${itemName(gem)}, the mine's share for ${share.to}.` : `The geode cracks open: ${itemName(gem)}.`)
         : round.ore === 'salt' ? `You scrape out ${kept} Salt Pile${kept === 1 ? '' : 's'}${bonus ? ` and some ${itemName(bonus)}` : ''}.`
+        : BUILD[round.ore] ? `${BUILD[round.ore]} ${kept} ${oreName(round.ore)}${quartzOk ? ` and ${quartz} ${quartzName}` : ''}.`
         : (CFG.gemOre || {})[round.ore] ? `The geode cracks open: ${kept} ${titleCase(round.ore)}${kept === 1 ? '' : 's'}.`
         : `The seam gives way: ${kept} ${oreName(round.ore)} Ore.`;
       if (ok && cut && round.ore !== 'geode') text += ` ${cut} more go${cut === 1 ? 'es' : ''} to ${share.to}, the mine's share.`;
-      if (ok) audit(`MINE ${who(a)} worked a ${round.ore} seam (tier ${round.tier + 1}) -> ${count} ${gem ? itemName(gem) : 'ore'}${bonus ? ` + ${itemName(bonus)}` : ''}${cut ? ` (${cut} to ${share.to}, the share of ${share.mine})` : ''}`);
+      if (ok) audit(`MINE ${who(a)} worked a ${round.ore} seam (tier ${round.tier + 1}) -> ${count} ${gem ? itemName(gem) : 'ore'}${bonus ? ` + ${itemName(bonus)}` : ''}${quartzOk ? ` + ${quartz} ${quartzName}` : ''}${cut ? ` (${cut} to ${share.to}, the share of ${share.mine})` : ''}`);
     } else {
       const count = Math.max(1, Math.round(tierValue(CFG.firewoodByTier, round.tier, 3)));
       const ok = giveItem(a, idOf(ITEMS.firewood), count);
