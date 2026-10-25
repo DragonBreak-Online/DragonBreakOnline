@@ -19,6 +19,8 @@ const WOOD = 0x6f993, IRON = 0x5ace4, SALT = 0x34cdf;
 const d = (id) => `${id.toString(16)}:Skyrim.esm`;
 fs.writeFileSync('housing.json', JSON.stringify([DOOR]));
 fs.writeFileSync('admin-placeables.json', JSON.stringify({ categories: [] }));
+// The Novice share is set low here so the "at least 1 of a material that cost 2 or more" rule shows (live: 0.5 .. 0.75)
+fs.writeFileSync('skills.json', JSON.stringify({ skills: [{ id: 'woodcutter', deconstructShareByTier: [0.2, 0.5, 0.6, 0.7, 0.75] }] }));
 fs.writeFileSync('doors-pos.json', JSON.stringify({ doors: { [d(0x500)]: [3000, 3000, 50, d(CELL).toLowerCase()] } }));
 fs.writeFileSync('decor-catalog.json', JSON.stringify({ groups: [
   { id: 'beds', label: 'Beds', pieces: [{ desc: d(0x9001), edid: 'CommonBed01', name: 'Bed', group: 'beds', type: 'FURN', radius: 100, costB: { [d(WOOD)]: 4, [d(IRON)]: 1 } }] },
@@ -129,9 +131,22 @@ ok(/holds its 3 pieces/.test(last(OWNER)), 'the budget of pieces stops the fourt
 // ---- remove, undo -------------------------------------------------------------------------------------------------------
 wood = held(OWNER, WOOD); const iron = held(OWNER, IRON);
 cmd(OWNER, 'list');
-fire('placeDelete', OWNER, [items()[0].ref]);
-ok(items().length === 2 && held(OWNER, WOOD) === wood + 2 && held(OWNER, IRON) === iron, 'remove gives back half, rounded down (2 wood, 0 iron)', { wood: held(OWNER, WOOD), iron: held(OWNER, IRON) });
+const gone = items()[0].ref;
+fire('placeDelete', OWNER, [gone]);
+ok(items().length === 2 && held(OWNER, WOOD) === wood + 1 && held(OWNER, IRON) === iron, 'deconstruct, no Woodcutter skill: the Novice share from skills.json (0.2 x 4 wood = 0.8, but at least 1 of a cost of 2+; 1 iron x 0.2 = 0)', { wood: held(OWNER, WOOD), iron: held(OWNER, IRON) });
+const w1 = held(OWNER, WOOD);
+fire('placeDelete', OWNER, [gone]);
+ok(held(OWNER, WOOD) === w1, 'deconstructing the same piece again pays nothing (the record went first)');
+ok(audits.some((t) => /^DECOR deconstruct Olaf Bed .* place 200 refund \{"6f993:Skyrim.esm":1\}/.test(t)), 'the deconstruct audit line: player, piece, home, refund', audits.filter((t) => /deconstruct/.test(t)));
 ok(deleted.length === 1 && !placementSaid.length, 'the reference is deleted and placement.js stays quiet');
+setp(OWNER, 'private.mastery', { order: ['alchemist', 'woodcutter'], skills: { alchemist: { rank: 1 }, woodcutter: { rank: 4 } } });
+placeAt(OWNER, 'bed'); const w2 = held(OWNER, WOOD), i2 = held(OWNER, IRON);
+cmd(OWNER, 'list'); cmd(OWNER, `remove ${items().length}`);
+ok(held(OWNER, WOOD) === w2 + 3 && held(OWNER, IRON) === i2, 'a Master Woodcutter gets 75%: 3 of 4 wood (iron 1 x 0.75 rounds to 0)', { wood: held(OWNER, WOOD) - w2, iron: held(OWNER, IRON) - i2 });
+T.reg().places[DOOR.toString(16)].items.push({ ref: 'ff0000ee', base: d(0x9fff), name: 'Old Stool', group: 'seating', cell: CELL, pos: [1000, 1000, 50], rot: [0, 0, 0], paid: { [d(WOOD)]: 8 } });
+const w3 = held(OWNER, WOOD);
+fire('placeDelete', OWNER, ['ff0000ee']);
+ok(held(OWNER, WOOD) === w3 && !items().some((i) => i.ref === 'ff0000ee'), 'a piece the catalogue no longer prices is taken down for nothing', { wood: held(OWNER, WOOD) - w3 });
 const wr = items().find((i) => i.container); setp(parseInt(wr.ref, 16), 'inventory', { entries: [{ baseId: WOOD, count: 1 }] });
 fire('placeDelete', OWNER, [wr.ref]);
 ok(items().includes(wr) && /Empty the/.test(last(OWNER)), 'a container with something in it stays', last(OWNER));

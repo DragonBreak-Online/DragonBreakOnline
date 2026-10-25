@@ -13,7 +13,9 @@
 //
 //   /decor                       budget here, and the commands         /decor find <words> [group]   the catalogue, 10 a page
 //   /decor place <n>             start placing result n of /decor find  /decor list                   what this place holds
-//   /decor move <n> / remove <n> move, or remove for removeRefund back  /decor undo                   the last place or move, undoSeconds
+//   /decor move <n>              move it (free)                         /decor undo                   the last place or move, undoSeconds
+//   /decor remove <n>            deconstruct: the Woodcutter's share back (skills.json woodcutter.deconstructShareByTier, 50% Novice
+//                                to 75% Master; at least 1 of a material that cost 2 or more), for pieces the catalogue prices
 //   /decor grant|revoke <player> the owner names who may decorate       /decor clear [here]           Developer: everything, refunded whole
 //
 // A place whose owner changes (abandon, revoke, sale) is cleared on the next owner scan and its previous owner is owed
@@ -33,7 +35,7 @@ const DEFAULTS = {
   reach: 700, rise: 250,              // from the actor, on the floor plane and up or down
   tilt: 2, tiltGroups: { decor: 90, lights: 90 }, // degrees of pitch/roll; rugs, tapestries and sconces may lie flat or hang
   doorClear: 120, doorRadiusCap: 300, // a piece's footprint (catalogue radius, capped) this near a load door is refused
-  removeRefund: 0.5, abandonRefund: 0.5, // D11
+  abandonRefund: 0.5,                 // D11; a player's own deconstruct pays the Woodcutter's share (skills.json)
   undoSeconds: 60, undoMax: 10,
   placeSeconds: 300,                  // an aim not confirmed by then is dropped
   perSecond: 1, perHour: 120,
@@ -175,6 +177,22 @@ module.exports = (api) => {
     return got;
   };
   // A material's name from the catalogue's own table (editor id -> desc), its words split: "Ingot Iron", "Firewood"
+  // The Woodcutter's deconstruct share, from skills.json's woodcutter.deconstructShareByTier by the same rule as labour.js's
+  // tierValue (the tier clamped into the list; without the skill, the Novice entry)
+  const deconstructShare = (a) => {
+    if (!S.shares) { try { const w = (JSON.parse(fs.readFileSync(path.resolve('skills.json'), 'utf8')).skills || []).find((k) => k.id === 'woodcutter') || {}; S.shares = Array.isArray(w.deconstructShareByTier) ? w.deconstructShareByTier : []; } catch (e) { S.shares = []; } }
+    const arr = S.shares.length ? S.shares : [0.5, 0.5625, 0.625, 0.6875, 0.75];
+    const v = Number(arr[Math.min(Math.max(skillRank(a, 'woodcutter'), 0), arr.length - 1)]);
+    return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0.5;
+  };
+  const giveRefund = (a, paid, share) => {
+    const got = {};
+    for (const [d, n] of Object.entries(paid)) {
+      const k = Math.max(Number(n) >= 2 ? 1 : 0, Math.floor(Number(n) * share));
+      if (k > 0 && giveItem(a, idOf(d), k) !== false) got[d] = k;
+    }
+    return got;
+  };
   const nameOfItem = (d) => {
     catalog();
     if (!S.matNames) {
@@ -314,25 +332,31 @@ module.exports = (api) => {
     p.items.push(it); save();
     pushUndo(a, { op: 'placed', root: hex(pl.root), ref: it.ref });
     audit(`DECOR place ${who(a)} ${piece.name} (${piece.desc}) ref ${it.ref} place ${hex(pl.root)} cell ${hex(cell)} at ${pos.map(Math.round).join(',')} paid ${JSON.stringify(cost)}`);
-    personal(a, `${piece.name} is placed. /decor undo within ${C.undoSeconds} seconds gives everything back; /decor remove later gives back ${Math.round(C.removeRefund * 100)}%.`);
+    personal(a, `${piece.name} is placed. /decor undo within ${C.undoSeconds} seconds gives everything back; /decor remove later gives back ${Math.round(deconstructShare(a) * 100)}% (more for a skilled Woodcutter).`);
     return true;
   };
+  // share 'deconstruct': the Woodcutter's share (deconstructShare), rounded down but at least 1 of a material that cost 2
+  // or more, and only for a piece the catalogue still prices; a number (undo: 1): that share of what was paid, exactly
   const removeItem = (a, found, share, why) => {
     const { place: p, item: it, root } = found;
     if (it.container && (get(parseInt(it.ref, 16) >>> 0, 'inventory', { entries: [] }).entries || []).length) return personal(a, `Empty the ${it.name} first.`);
-    destroy(it.ref); if (it.light) destroy(it.light);
+    const paid = it.paid || {}, priced = !!pieceOf(it.base) && Object.keys(paid).length > 0;
+    // the record goes first and is saved before anything is paid, so no path can pay for the same piece twice
     p.items.splice(p.items.indexOf(it), 1); save();
-    const got = share > 0 ? giveAll(a, it.paid || {}, share) : {};
+    destroy(it.ref); if (it.light) destroy(it.light);
+    let got = {};
+    if (share === 'deconstruct') { if (priced) got = giveRefund(a, paid, deconstructShare(a)); }
+    else if (share > 0) got = giveAll(a, paid, share);
     audit(`DECOR ${why} ${who(a)} ${it.name} (${it.base}) ref ${it.ref} place ${hex(root)} refund ${JSON.stringify(got)}`);
     personal(a, `${it.name} is taken down${Object.keys(got).length ? `; back to you: ${costText(got)}` : ''}.`);
     return true;
   };
   const undo = (a) => {
     const l = S.undo.get(a >>> 0) || [];
-    const step = l.pop();
-    if (!step || Date.now() - step.at > C.undoSeconds * 1000) return personal(a, `Nothing to undo: undo works for ${C.undoSeconds} seconds after a place or a move.`);
-    const found = itemByRef(step.ref);
-    if (!found) return personal(a, 'That piece is gone.');
+    // steps for pieces already taken down are skipped, so an undo never spends itself on something gone
+    let step = l.pop(), found = step ? itemByRef(step.ref) : null;
+    while (step && !found && Date.now() - step.at <= C.undoSeconds * 1000) { step = l.pop(); found = step ? itemByRef(step.ref) : null; }
+    if (!step || !found || Date.now() - step.at > C.undoSeconds * 1000) return personal(a, `Nothing to undo: undo works for ${C.undoSeconds} seconds after a place or a move.`);
     if (step.op === 'placed') return removeItem(a, found, 1, 'undo');
     const it = found.item;
     pose(parseInt(it.ref, 16) >>> 0, step.from.cell, step.from.pos, step.from.rot);
@@ -384,7 +408,7 @@ module.exports = (api) => {
       const pl = here(a);
       if (!pl || pl.root !== f.root || !mayDecorate(a, pl)) return personal(a, 'Only the owner, or someone the owner named, takes things down here.');
       if (!rateOk(a)) return personal(a, 'Slow down a little.');
-      removeItem(a, f, C.removeRefund, 'remove');
+      removeItem(a, f, 'deconstruct', 'deconstruct');
     } catch (e) { log('decor: delete failed', e.stack || e.message); }
   });
 
@@ -420,14 +444,14 @@ module.exports = (api) => {
     if (!pl) return personal(a, 'Stand inside your own home first.');
     const items = listOf(a, pl);
     if (sub === 'list') return personal(a, items.length ? items.map((it, i) => `${i + 1}. ${it.name} [${it.group}]`).join('\n') : 'Nothing placed here yet.');
-    if (sub === 'move' || sub === 'remove') {
+    if (sub === 'move' || sub === 'remove' || sub === 'deconstruct') {
       if (!mayDecorate(a, pl)) return personal(a, 'Only the owner, or someone the owner named, changes things here.');
       const it = items[Number(rest) - 1];
       if (!it) return personal(a, 'Pick a number from /decor list.');
       const found = { root: pl.root, place: placeEntry(pl.root, pl.rec), item: it };
       if (sub === 'move') return startMove(a, found);
       if (!rateOk(a)) return personal(a, 'Slow down a little.');
-      return removeItem(a, found, C.removeRefund, 'remove');
+      return removeItem(a, found, 'deconstruct', 'deconstruct');
     }
     if (sub === 'undo') return undo(a);
     if (sub === 'grant' || sub === 'revoke') {
