@@ -1,5 +1,20 @@
 [
   {
+    "title": "Fighting the guard no longer trains your skills",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Guards",
+        "items": [
+          "Hitting or killing a city guard, or being hit by one, no longer trains any skill. This now covers every guard in the world, not only the watch at its posts: Bruma's guards, every hold's guards and the guards of the other cities and towns.",
+          "Bandits, draugr and other enemies standing guard in a dungeon still train your skills as before."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The Knights of the Nine are recruiting",
     "date": "2026-10-25",
     "version": "Server update",
