@@ -1,5 +1,6 @@
 // The beast defends its own (Nat, 25 Oct; config werewolfDefend): a werewolf in mortal form at defendAtHealth or under in a
-// fight, before the day's first change, changes at once and spends that change. Loads the real supernatural.js against a
+// fight, before the day's first change, may change at once and spends that change: one roll of chance per fall through
+// defendAtHealth, re-armed only by health back above it. The old checks run at chance 1. Loads the real supernatural.js against a
 // stub api (as feral-warning-harness.js does) and drives the superDefend tick by hand.
 // node tests/werewolf-defend-harness.js   (from server/)
 'use strict';
@@ -31,7 +32,11 @@ globalThis.__dboBeastTransform = (a, key, forced) => { changes.push([a, key, for
 globalThis.__dboFrenzyForced = (a) => frenzies.push(a);
 globalThis.__dboCombatAt = new Map();
 const MODULE = path.resolve(__dirname, '..', 'supernatural.js');
-const load = (def) => { api.cfg = { werewolfDefend: def }; delete require.cache[MODULE]; require(MODULE)(api); };
+const audits = [];
+api.audit = (t) => { if (/defensive roll/.test(t)) audits.push(t); };
+const load = (def) => { api.cfg = { werewolfDefend: def && Object.assign({ chance: 1 }, def) }; delete require.cache[MODULE]; require(MODULE)(api); };
+let roll = 0.5;
+Math.random = () => roll;
 
 let fail = 0;
 const ok = (c, what, got) => { console.log(`${c ? 'ok  ' : 'FAIL'}  ${what}${c || got === undefined ? '' : '   ' + JSON.stringify(got)}`); if (!c) fail++; };
@@ -47,6 +52,7 @@ const fresh = () => {
   globalThis.__dboIsDowned = () => false; globalThis.__dboInDuel = () => false; globalThis.__dboAnticheat = null;
   globalThis.__dboGuildIsPackLeader = () => false; globalThis.__dboGuildsOf = () => [];
   globalThis.__dboFeralDue && globalThis.__dboFeralDue.clear();
+  globalThis.__dboDefendRolled && globalThis.__dboDefendRolled.clear(); audits.length = 0; roll = 0.5;
   outdoors = true; gameDays = 10.4; night = false; fullMoon = false;
   online = [A];
 };
@@ -60,7 +66,7 @@ fresh(); tick();
 ok(changes.length === 0 && bootOff,'off unless werewolfDefend.enabled: nothing happens, the boot line says off');
 
 load({ enabled: true });
-ok(logs.some((l) => /werewolf defence ON: at 25% health in a fight, before the day's first change; frenzy off/.test(l)), 'on: the boot line names 25%, the day\'s first change, no frenzy');
+ok(logs.some((l) => /werewolf defence ON: chance 1 at 25% health in a fight, once each fall through it, before the day's first change; frenzy off/.test(l)), 'on: the boot line names the chance, 25%, once a fall, the day\'s first change, no frenzy');
 
 // ---- the change ----
 fresh(); tick();
@@ -71,6 +77,7 @@ ok(said.some(([a, t]) => a === A && /Pain wakes the beast/.test(t)) && logs.some
 ok(frenzies.length === 0, 'no frenzy (frenzy false)');
 store.delete(`${A}|private.beast`); changes.length = 0; tick();
 ok(changes.length === 0 && why() === 'changed today', 'reverted and hit low again the same day: no second change (changed today)');
+store.set(`${A}|percentages`, { health: 0.9, magicka: 1, stamina: 1 }); tick(); store.set(`${A}|percentages`, { health: 0.2, magicka: 1, stamina: 1 });
 gameDays = 11.1; tick();
 ok(changes.length === 1, 'the next game day it can defend again (per world-clock day, not real time)');
 
@@ -117,6 +124,31 @@ ok(store.get(`${A}|private.fullMoonTaken`) === Math.floor(10.4 / 24), 'under the
 load({ enabled: true, defendAtHealth: 0.4 });
 fresh(); store.set(`${A}|percentages`, { health: 0.35, magicka: 1, stamina: 1 }); tick();
 ok(changes.length === 1, 'defendAtHealth 0.4: at 35% it comes');
+
+// ---- the chance (Nat, 25 Oct: random, not certain) ----
+load({ enabled: true, chance: 0.35 });
+fresh(); roll = 0.9; tick();
+ok(changes.length === 0 && audits.some((t) => /^BEAST 7 defensive roll 0\.900 against 0\.35: nothing$/.test(t)), 'chance 0.35, roll 0.9: no change, and the roll is audited (player, roll, chance, result)', audits);
+ok(store.get(SP).beastDay === -1, '...a failed roll costs nothing: the day\'s change is still there');
+roll = 0.0; for (let i = 0; i < 20; i++) tick();
+ok(changes.length === 0 && audits.length === 1, 'still under 25% in the fight: no second roll on later checks, however many (one roll per fall)', audits);
+store.set(`${A}|percentages`, { health: 0.3, magicka: 1, stamina: 1 }); tick();
+store.set(`${A}|percentages`, { health: 0.2, magicka: 1, stamina: 1 }); tick();
+ok(changes.length === 1 && audits.length === 2 && /roll 0\.000 against 0\.35: the beast comes$/.test(audits[1]), 'healed over 25% and fallen through it again: a new roll, and this one wins', audits);
+fresh(); roll = 0.2; tick();
+ok(changes.length === 1, 'chance 0.35, roll 0.2: the beast comes');
+fresh(); store.set(`${A}|percentages`, { health: 0.2, magicka: 1, stamina: 1 }); globalThis.__dboCombatAt.set(A, now - 60000); tick();
+ok(audits.length === 0, 'under 25% out of a fight: no roll is spent');
+globalThis.__dboCombatAt.set(A, now); roll = 0.0; tick();
+ok(changes.length === 1 && audits.length === 1, '...the first blow while still under it brings the one roll');
+load({ enabled: true, chance: 0 });
+fresh(); roll = 0; for (let i = 0; i < 5; i++) { tick(); store.set(`${A}|percentages`, { health: 0.5, magicka: 1, stamina: 1 }); tick(); store.set(`${A}|percentages`, { health: 0.2, magicka: 1, stamina: 1 }); }
+ok(changes.length === 0 && audits.length === 5, 'chance 0: never, over five falls (each one rolled and audited)', audits.length);
+load({ enabled: true, chance: 1 });
+fresh(); roll = 0.999; tick();
+ok(changes.length === 1, 'chance 1: always');
+fresh(); store.set(SP, { kind: 'werewolf', beastDay: 10, beastDayUses: 1 }); roll = 0; tick();
+ok(changes.length === 0 && audits.length === 0, 'already changed today: no roll at all');
 
 console.log(fail ? `${fail} FAILED` : 'all checks passed');
 process.exit(fail ? 1 : 0);
