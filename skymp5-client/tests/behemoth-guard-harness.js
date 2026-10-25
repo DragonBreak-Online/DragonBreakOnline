@@ -314,9 +314,13 @@ function sources() {
   const br = read('sync/beastRaces.ts');
   check('beastRaces.ts registers its resolver at load, for the modules that import beastRaceIds.ts alone', /^setPluginBeastResolver\(resolveBeastRaces\);$/m.test(br));
   check('...and resolves by Game.getFormFromFile(local id, plugin)', /resolvePluginBeastRaces\(\(file, localId\) => Game\.getFormFromFile\(localId, file\)/.test(br));
-  for (const [f, re] of [['view/formView.ts', /isBeastRaceId\(model\.appearance\.raceId\)/], ['view/niNodeQueue.ts', /isBeastRaceId\(race\.getFormID\(\)\)/],
-    ['sync/beastBody.ts', /isBeastRaceId\(race\)/], ['sync/ownLook.ts', /beastLook: isBeastRaceId\(raceId\)/]]) {
-    check(`${f} judges beasts through isBeastRaceId`, re.test(read(f)));
+  // isBeastOrPolymorphRaceId is accepted as well as isBeastRaceId: the staff polymorph work (22-23 Oct) widened the
+  // predicate these three use to `isBeastRaceId(x) || isPolymorphRaceId(x)`, a strict superset, so the Behemoth is still
+  // judged a beast through vanillaBeastRaceOf and PLUGIN_BEAST_RACES. Before this, the three greps below reported the
+  // Behemoth guard as broken on a client where it was intact
+  for (const [f, re] of [['view/formView.ts', /isBeast(OrPolymorph)?RaceId\(model\.appearance\.raceId\)/], ['view/niNodeQueue.ts', /isBeast(OrPolymorph)?RaceId\(race\.getFormID\(\)\)/],
+    ['sync/beastBody.ts', /isBeast(OrPolymorph)?RaceId\(race\)/], ['sync/ownLook.ts', /beastLook: isBeast(OrPolymorph)?RaceId\(raceId\)/]]) {
+    check(`${f} judges beasts through isBeastRaceId or the widened isBeastOrPolymorphRaceId`, re.test(read(f)));
   }
   const files = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
     e.isDirectory() ? files(path.join(dir, e.name)) : /\.(tsx?|jsx?)$/.test(e.name) ? [path.join(dir, e.name)] : []);
