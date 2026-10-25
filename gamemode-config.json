@@ -1553,7 +1553,8 @@
     "requiresFaith": {
      "_comment": "A church takes only a follower of one of its gods, checked when they join (guilds.js; prayer.js private.dboDeity). Both honour the Eight: under the White-Gold Concordat, not Talos (Nate, 19 Oct).",
      "imperial-cult": { "label": "the Eight Divines", "deities": ["akatosh", "arkay", "dibella", "julianos", "kynareth", "mara", "stendarr", "zenithar"] },
-     "great-faiths": { "label": "the Eight Divines", "deities": ["akatosh", "arkay", "dibella", "julianos", "kynareth", "mara", "stendarr", "zenithar"] }
+     "great-faiths": { "label": "the Eight Divines", "deities": ["akatosh", "arkay", "dibella", "julianos", "kynareth", "mara", "stendarr", "zenithar"] },
+     "knights-of-the-nine": { "_comment": "The holy order of the Nine (Nat, 25 Oct: followers of the Nine only): the Eight and Talos, by their prayer.js ids (skills.json deities.choices). Auriel, the elves' Akatosh, is not one of the Nine.", "label": "the Nine Divines", "deities": ["akatosh", "arkay", "dibella", "julianos", "kynareth", "mara", "stendarr", "talos", "zenithar"] }
     },
     "categories": {
      "allegiance": {

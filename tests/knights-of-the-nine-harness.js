@@ -45,6 +45,9 @@ const cults = DEFS.factions.filter((x) => x.kind === 'cult').map((x) => x.id);
 const vsCults = L.conflicts.find((c) => (c.a || []).includes(ID));
 ok(!!vsCults && cults.every((c) => vsCults.b.includes(c)), 'never alongside a Daedric cult, as the Vigil and the churches', vsCults && vsCults.a);
 ok((CFG.playerGuilds.compatibleIds || []).includes(ID), 'a Knight may also join a player guild, as the Vigil may');
+const faith = (L.requiresFaith || {})[ID];
+ok(!!faith && faith.label === 'the Nine Divines' && faith.deities.length === 9 && faith.deities.includes('talos') && !faith.deities.includes('auriel'),
+  'followers of the Nine only: the Eight and Talos (faction-limits-harness checks it in play)', faith);
 ok(/^#[0-9a-f]{6}$/i.test(String(((CFG.war || {}).colours || {})[ID] || '')), 'it has a war colour (config war.colours)', ((CFG.war || {}).colours || {})[ID]);
 
 // ---- the gear ----

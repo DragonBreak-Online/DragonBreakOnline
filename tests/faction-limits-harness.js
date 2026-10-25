@@ -180,6 +180,52 @@ ok('the override is spent: the next one is refused', !inF('companions', SYN));
 t = chat(LEAD, 'leader Fighter synod');
 ok('/faction leader is refused for a Fighters Guild leader to the Synod, nobody stepped down', /already serves the Fighters Guild/.test(t) && M().synod[String(SYN)].rank === 0, t);
 
+// ---- the Knights of the Nine: followers of the Nine only (Nat, 25 Oct) -------------------------------------------------
+// The Nine are nine prayer.js deity ids, the Eight and Talos; there is no separate "Eight" faith to choose, so a follower of
+// one of the Eight is a follower of the Nine. Auriel, the elves' Akatosh, is a Divine but not one of the Nine.
+const KOTN = 'knights-of-the-nine';
+const CRUSADER = 0x40, P1 = 0x41, P2 = 0x42, P3 = 0x43, P4 = 0x44, P5 = 0x45, P6 = 0x46;
+for (const [id, n] of [[CRUSADER, 'Crusader'], [P1, 'Faithless'], [P2, 'Taloite'], [P3, 'Azurite'], [P4, 'Aurielite'], [P5, 'Arkayan'], [P6, 'Candidate']]) { chars.set(id, n); names[id] = n; }
+const godOf = (a, id) => (id ? props.set(`${a}|private.dboDeity`, { id, kind: 'divine' }) : props.delete(`${a}|private.dboDeity`));
+ok('the Knights of the Nine take the Nine: the Eight and Talos, by their prayer.js ids', JSON.stringify(L.requiresFaith[KOTN].deities) === JSON.stringify(['akatosh', 'arkay', 'dibella', 'julianos', 'kynareth', 'mara', 'stendarr', 'talos', 'zenithar']), L.requiresFaith[KOTN]);
+godOf(CRUSADER, 'talos'); put(KOTN, CRUSADER, 0);
+godOf(P1, null);
+ro = invite(CRUSADER, P1, KOTN);
+ok('a character who follows no god is refused, told why', ro.error && /does not follow the Nine Divines; The Knights of the Nine takes? only those who do/.test(ro.error), ro);
+godOf(P2, 'talos');
+ro = invite(CRUSADER, P2, KOTN);
+ok('a follower of Talos may join', !ro.error, ro);
+ok('...and accepts as a Pilgrim', /You are now/.test(accept(P2, KOTN)) && inF(KOTN, P2) && globalThis.__dboGuildRankList(KOTN)[M()[KOTN][String(P2)].rank].title === 'Pilgrim');
+godOf(P3, 'azura');
+ro = invite(CRUSADER, P3, KOTN);
+ok('a worshipper of Azura (Daedric) is refused', ro.error && /does not follow the Nine Divines/.test(ro.error), ro);
+godOf(P4, 'auriel');
+ro = invite(CRUSADER, P4, KOTN);
+ok('a follower of Auriel is refused: not one of the Nine', ro.error && /does not follow the Nine Divines/.test(ro.error), ro);
+godOf(P5, 'arkay');
+ro = invite(CRUSADER, P5, KOTN);
+ok('a follower of Arkay, one of the Eight, is one of the Nine: allowed', !ro.error, ro);
+// Staff go through the same check: a Lead GM's Add member and /faction leader are refused alike, and the Lead GM override
+// (once, audited) is the only way past it
+godOf(P6, null);
+add(KOTN, 'Candidate');
+ok("a Lead GM's Add member of a faithless character is refused as joining is", !inF(KOTN, P6));
+t = chat(LEAD, `leader Candidate ${KOTN}`);
+ok('/faction leader is refused for a faithless character, told why', /does not follow the Nine Divines/.test(t) && !inF(KOTN, P6), t);
+godOf(P6, 'mara');
+add(KOTN, 'Candidate');
+ok('once they follow Mara, the Add member goes through', inF(KOTN, P6));
+// No hall until the Priory's part of Cyrodiil opens (Nat, 25 Oct): the F3 panel, the roster and the hall lookups must all
+// work without one
+let pay = null, threw = '';
+try { pay = globalThis.__dboFactionPayload(P2, true, true); } catch (e) { threw = e.message; }
+ok("a Pilgrim's F3 panel builds with no hall, naming the order", !threw && !!pay && JSON.stringify(pay).includes('Knights of the Nine'), threw || JSON.stringify(pay).slice(0, 200));
+try { pay = globalThis.__dboFactionPayload(CRUSADER, true, true); threw = ''; } catch (e) { threw = e.message; }
+ok("the Divine Crusader's panel too, with the roster", !threw && !!pay && JSON.stringify(pay).includes('Taloite'), threw);
+const info = globalThis.__dboGuildInfo(KOTN);
+ok('its info has no hall and no zone, and is not secret', !!info && !info.zone && !info.secret && !info.hall, info);
+ok('no cell names it as a hall', typeof globalThis.__dboHallFactionAt !== 'function' || ![...['161ff:Skyrim.esm', '20ff:BSHeartland.esm']].some((c) => (globalThis.__dboHallFactionAt(c) || {}).id === KOTN));
+
 // ---- off --------------------------------------------------------------------------------------------------------
 const off = JSON.parse(JSON.stringify(CFG)); off.factions.limits.enabled = false;
 const keep = JSON.parse(JSON.stringify(M()));
