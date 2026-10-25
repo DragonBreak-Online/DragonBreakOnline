@@ -12,7 +12,7 @@ const path = require('path');
 const bundle = process.argv[2];
 if (!bundle) { console.error('usage: node tests/housing-lock-fix-harness.js <bundled housingSystem.js>'); process.exit(2); }
 const src = require('fs').readFileSync(path.resolve(bundle), 'utf8');
-if (!/LOCK_FIX_ACTIONS/.test(src)) { console.log('ok   skipped: this HousingSystem predates GM lock fixes'); process.exit(0); }
+if (!/LOCK_FIX_ACTIONS/.test(src)) { require('./expect')('housing-lock-fix', 'this HousingSystem has no GM lock fixes'); console.log('ok   skipped: this HousingSystem predates GM lock fixes'); process.exit(0); }
 const { HousingSystem } = require(path.resolve(bundle));
 
 let fail = 0;
