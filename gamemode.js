@@ -1076,7 +1076,7 @@ const STAFF_HELP = [
     ['dossier', 'list | read <name|#TAG> | reports | add <name|#TAG> <text> | strike <name|#TAG> <n>: the Thalmor dossiers and informant reports (add and strike: Lead GM)']] },
   { key: 'world', title: 'World', items: ['settime', 'setweather', 'timescale', 'region', ['dungeon end', '<dungeon id|name>: end a dungeon claim now'],
     'placed', 'placeundo', 'placeexport', 'worldedits', 'worldhide', 'worldshow', 'masktest', 'couriers', 'traps', 'leverpuzzle',
-    ['guardpost', 'add [npc desc] | list | remove <hold> <n> | auto <hold>: stand where a guard should be and add places that hold\'s own guard there (an id like abe18:Skyrim.esm picks another). auto fills a hold with the posts its guards held in the old days']] },
+    ['guardpost', 'add [npc desc] | list | remove <hold> <n> | auto <hold>: stand where a guard should be and add places that hold\'s own guard there (an id like abe18:Skyrim.esm picks another). auto fills a hold with the posts its guards held in the old days']] }, // verify-formids: ignore (help text: an NPC id under the help menu's items key)
   { key: 'debug', title: 'Server and debugging', items: ['monitor', 'load', 'selftest', 'npc', 'mv', 'driftset', 'driftspawn', 'driftrepair',
     'staffdiag', 'voicediag', 'staffstats', 'gearswap', 'factiongear'] },
 ];
@@ -3433,7 +3433,7 @@ globalThis.__dboHandlers.disconnect = (userId) => {
   if (a && globalThis.__dboDungeonLeave) { try { globalThis.__dboDungeonLeave(a); } catch (e) { log('dungeon logout move failed', e.message); } }
   if (a && globalThis.__dboPartyLogout) { try { globalThis.__dboPartyLogout(a); } catch (e) { log('party logout failed', e.message); } }
   // What a UI said it can draw, and a deity offer already made, belong to this session (review C6, PRAY-1)
-  for (const k of ['__dboItemLeave', '__dboBankLeave', '__dboRobLeave', '__dboSilverTestLeave', '__dboDeityForget', '__dboPanelLeave', '__dboManualsLeave', '__dboLabourLeave', '__dboPrayerLeave', '__dboSkinLeave', '__dboSchoolsLeave', '__dboKeyRingLeave', '__dboRacialLeave', '__dboStartLeave']) { if (a && typeof globalThis[k] === 'function') { try { globalThis[k](a); } catch (e) { log(`${k} failed`, e.message); } } }
+  for (const k of ['__dboWarbandLeave', '__dboItemLeave', '__dboBankLeave', '__dboRobLeave', '__dboSilverTestLeave', '__dboDeityForget', '__dboPanelLeave', '__dboManualsLeave', '__dboLabourLeave', '__dboPrayerLeave', '__dboSkinLeave', '__dboSchoolsLeave', '__dboKeyRingLeave', '__dboRacialLeave', '__dboStartLeave']) { if (a && typeof globalThis[k] === 'function') { try { globalThis[k](a); } catch (e) { log(`${k} failed`, e.message); } } }
   // A duel ends with its duellist's logout (duel.js)
   if (a && typeof globalThis.__dboDuelLeave === 'function') { try { globalThis.__dboDuelLeave(a); } catch (e) { log('duel leave failed', e.message); } }
   if (a && typeof globalThis.__dboFrenzyLeave === 'function') { try { globalThis.__dboFrenzyLeave(a); } catch (e) { log('frenzy leave failed', e.message); } }
@@ -8823,7 +8823,7 @@ try {
 try {
   const WARBAND_JS = path.resolve('warband.js');
   delete require.cache[WARBAND_JS];
-  require(WARBAND_JS)({ mp, log, personal, audit, who, isAdmin, registerChatCommand, findByName, cfg, onUi, every, profileOf, onlineActors, runChat: (a, line) => handleChat(userOf(a), line) });
+  require(WARBAND_JS)({ mp, log, personal, audit, who, isAdmin, registerChatCommand, findByName, cfg, onUi, every, profileOf, onlineActors, sendPacket, runChat: (a, line) => handleChat(userOf(a), line) });
 } catch (e) { log('warband.js failed to load:', e.stack || e.message); }
 
 // ---- the F7 Place tab: NPCs and world objects placed by GMs (server\placement.js, admin-placeables.json) --------

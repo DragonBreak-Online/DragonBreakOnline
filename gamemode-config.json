@@ -1316,6 +1316,13 @@
   "budgetMax": 100000,
   "priceBounds": { "min": 1, "max": 200 }
  },
+ "warband": {
+  "_comment": "GM warbands (warband.js, the F7 Place tab's Warband view). Nat, 25 Oct: maxRaise the whole band (maxBand) in one press; onLogout what a GM's followers do when the GM leaves ('dismiss', or 'settle' the calm ones; each GM can choose with /warband onlogout); viewRadius (units) how far the panel lists targets and the GM's own raiders and garrison; presetsMax saved bands (/warband preset). Rollback: maxRaise 10 (hot reload).",
+  "maxRaise": 25,
+  "onLogout": "dismiss",
+  "viewRadius": 4200,
+  "presetsMax": 40
+ },
  "tickets": {
   "_comment": "In-game /ticket (gameticket.js, consolidation C9): the players who were within 40 m when a ticket opens are posted to this staff-only channel (#ticket-archive, named by claude-jake 2026-09-28), never into the ticket the reporter reads.",
   "staffChannelId": "1554223778228211894"
