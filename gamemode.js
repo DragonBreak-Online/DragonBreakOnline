@@ -7063,6 +7063,8 @@ const equipHook = (actorId, equipment, isAllowed, ...rest) => {
     // durability.js: a piece taken off gets its wear in its name; a Broken one put on comes off
     if (isAllowed && typeof globalThis.__dboDurabilityEquip === 'function') { try { globalThis.__dboDurabilityEquip(a, equipment); } catch (e) { log('durability equip failed', e.message); } }
     if (isAllowed) { try { raceEquipCheck(a, equipment); } catch (e) { log('race equip failed', e.message); } }
+    // briarheart.js: a Briarheart's bare chest shows the briar body; their own armour takes its place
+    if (isAllowed && typeof globalThis.__dboBriarheartEquip === 'function') { try { globalThis.__dboBriarheartEquip(a, equipment); } catch (e) { log('briarheart equip failed', e.message); } }
     // spawnwatch.js: the game has loaded, so its arrival report is due; until it comes its outfit is not remembered
     const spawnWatch = globalThis.__dboSpawnWatch;
     if (spawnWatch) { try { spawnWatch.report(a); } catch (e) { log('spawn watch report failed', e.message); } }
@@ -9269,7 +9271,7 @@ try {
   const BRIARHEART_JS = path.resolve('briarheart.js');
   delete require.cache[BRIARHEART_JS];
   require(BRIARHEART_JS)({ mp, log, personal, audit, who, display, cfg, registerChatCommand, onlineActors, isLeadStaff, findByName, every, giveItem, sourceResistsOf });
-} catch (e) { log('briarheart.js failed to load:', e.stack || e.message); for (const k of ['__dboIsBriarheart', '__dboBriarheartVitalBonus', '__dboBriarheartTargetMult', '__dboBriarheartRefusesDivine', '__dboBriarheartFaithLock', '__dboBriarheartLogin', '__dboBriarheartMenuEntries', '__dboBriarheartMenuAction']) globalThis[k] = null; }
+} catch (e) { log('briarheart.js failed to load:', e.stack || e.message); for (const k of ['__dboIsBriarheart', '__dboBriarheartVitalBonus', '__dboBriarheartTargetMult', '__dboBriarheartRefusesDivine', '__dboBriarheartFaithLock', '__dboBriarheartLogin', '__dboBriarheartMenuEntries', '__dboBriarheartMenuAction', '__dboBriarheartEquip']) globalThis[k] = null; }
 // ---- the Hagraven's pact for the women of the Reach (server\hagraven.js, config "hagraven"): after briarheart.js (its altars)
 // and exposure.js (known on sight) ----
 try {

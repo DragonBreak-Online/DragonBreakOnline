@@ -16,8 +16,11 @@ const ok = (c, what, got) => { console.log(`${c ? 'ok  ' : 'FAIL'}  ${what}${!c 
 // ---- the world ---------------------------------------------------------------------------------------------------------
 const WORLD = '3c:Skyrim.esm', ELSE = '1a26f:Skyrim.esm';
 const RACES = { 1: 'DBOReachmanRace', 2: 'NordRace', 3: 'DBOReachmanRaceVampire' };
-const ID = { '3ad61:Skyrim.esm': 0x3ad61, '2e504:Skyrim.esm': 0x2e504, '72317:Skyrim.esm': 0x72317, '400ad:Skyrim.esm': 0x400ad, '43599:Skyrim.esm': 0x43599, '5d008:Skyrim.esm': 0x5d008 };
+const ID = { '5d009:Skyrim.esm': 0x5d009, '3ad61:Skyrim.esm': 0x3ad61, '2e504:Skyrim.esm': 0x2e504, '72317:Skyrim.esm': 0x72317, '400ad:Skyrim.esm': 0x400ad, '43599:Skyrim.esm': 0x43599, '5d008:Skyrim.esm': 0x5d008 };
 const HEART = 0x3ad61, GEM = 0x2e504;
+// ARMO biped slots for the look: the two briar bodies and a cuirass cover the body (0x4), a helmet the head (0x1)
+const BRIAR = 0x5d008, BRIAR_EMPTY = 0x5d009, CUIRASS = 0x13ed9, HELMET = 0x12e4d;
+const ARMOS = { [BRIAR]: 0x4, [BRIAR_EMPTY]: 0x4, [CUIRASS]: 0x4, [HELMET]: 0x1 };
 const props = new Map();   // `${actor}|${prop}` -> value
 const P = (a, k) => props.get(`${a >>> 0}|${k}`);
 const setP = (a, k, v) => props.set(`${a >>> 0}|${k}`, v);
@@ -27,7 +30,7 @@ const mp = {
   set: (a, k, v) => setP(a, k, v === null ? null : JSON.parse(JSON.stringify(v))),
   getIdFromDesc: (d) => ID[d] || 0,
   getDescFromId: (id) => `${(id >>> 0).toString(16)}:Skyrim.esm`,
-  lookupEspmRecordById: (id) => (RACES[id] ? { record: { editorId: RACES[id] } } : { record: null }),
+  lookupEspmRecordById: (id) => (RACES[id] ? { record: { editorId: RACES[id] } } : ARMOS[id >>> 0] ? { record: { type: 'ARMO', editorId: 'armo', fields: [{ type: 'BOD2', data: new Uint8Array(new Uint32Array([ARMOS[id >>> 0], 2]).buffer) }] } } : { record: null }),
   callPapyrusFunction: (kind, cls, method, self, args) => { papyrusCalls.push({ method, self: self.desc, args: args.map((x) => x.desc !== undefined ? x.desc : x) }); return method === 'IsInFaction' ? true : undefined; },
 };
 const actor = (id, race, faith, pos, inv) => {
@@ -212,7 +215,7 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
 {
   const shipped = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'gamemode-config.json'), 'utf8')).briarheart;
   ok(shipped.failPermadeath === true && shipped.tearPermadeath === true && shipped.forswornFriendly === true, 'the shipped config: failPermadeath, tearPermadeath and forswornFriendly on');
-  ok(shipped.visual && shipped.visual.enabled === false && shipped.visual.armor === '1d21f8:DragonBreak Online Edits.esp', 'the shipped config: the visual off until the DLE ships, its armour the overlay DBO_BriarheartOverlay 1d21f8');
+  ok(shipped.visual && shipped.visual.enabled === true && shipped.visual.armor === '5d008:Skyrim.esm' && shipped.visual.emptyArmor === '5d009:Skyrim.esm' && shipped.visual.women === false, 'the shipped config: the vanilla briar body 05D008, the empty chest 05D009, men only');
   const logLines = [];
   delete require.cache[MODULE]; delete globalThis.__dboBriarheart;
   const M2 = require(MODULE)({
@@ -236,7 +239,7 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   ok(audits.some((t) => /accepted the rite's risks \(rite death for good, heart torn out for good\)/.test(t)), 'staff see the acceptance in the audit');
   ok(papyrusCalls.some((c) => c.method === 'AddToFaction' && c.args[0] === '43599:Skyrim.esm') && papyrusCalls.some((c) => c.method === 'IsInFaction'), 'forswornFriendly: AddToFaction, then IsInFaction read back');
   ok(logLines.some((l) => /briarheart: faction AddToFaction 43599:Skyrim\.esm on char40 \(rite\); IsInFaction now true/.test(l)), 'the faction call is logged with the read-back, for the in-game check', logLines);
-  ok(!papyrusCalls.some((c) => c.method === 'EquipItem') && !given.some(([a]) => a === NEWB), 'the visual, off, equips nothing');
+  ok(papyrusCalls.some((c) => c.method === 'EquipItem' && c.args[0] === '5d008:Skyrim.esm') && given.some(([a, id]) => a === NEWB && id === BRIAR), 'the shipped look: a bare chest gets the briar body at the rite');
   ok(/dies for good/.test(run(NEWB, 'status')), '/briarheart reminds a Briarheart what tearing means');
   logLines.length = 0;
   globalThis.__dboBriarheartLogin(NEWB);
@@ -251,6 +254,84 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   ok(audits.some((t) => /tore the briar heart out of who40 \(for good\)/.test(t)), 'audited as for good');
   ok(logLines.some((l) => /faction RemoveFromFaction .*IsInFaction now true/.test(l)), 'the faction removal is logged too (the stub always answers true)');
   downed.delete(NEWB);
+}
+
+// ---- the look (Nat, 25 Oct): the vanilla briar body on a bare chest only ---------------------------------------------------
+{
+  const logLines = [];
+  delete require.cache[MODULE]; delete globalThis.__dboBriarheart;
+  const ML = require(MODULE)({
+    mp, log: (...x) => logLines.push(x.join(' ')), personal: (a, t) => said.push([a >>> 0, t]), audit: (t) => audits.push(t), who: (a) => `who${(a >>> 0).toString(16)}`,
+    display: (a) => `char${(a >>> 0).toString(16)}`, cfg: { briarheart: { enabled: true, visual: { enabled: true, armor: '5d008:Skyrim.esm', emptyArmor: '5d009:Skyrim.esm', women: false, retrySeconds: 10, maxTries: 3 } } },
+    registerChatCommand: (n, f) => commands.set(n, f), onlineActors: () => online.slice(), isLeadStaff: (a) => (a >>> 0) === LEAD, findByName: () => 0, every: (n, ms, f) => { ticker = f; },
+    giveItem: (a, id, n) => { given.push([a >>> 0, id, n]); const e = ((P(a, 'inventory') || {}).entries || []).slice(); e.push({ baseId: id, count: n }); setP(a, 'inventory', { entries: e }); return true; }, sourceResistsOf: () => new Set(),
+  });
+  const MAN = actor(0x50, 1, 'reach', [0, 0, 0], [{ baseId: CUIRASS, count: 1 }]); online.push(MAN);
+  const WOMAN = actor(0x51, 1, 'reach', [0, 0, 0], []); online.push(WOMAN); setP(WOMAN, 'appearance', { raceId: 1, isFemale: true });
+  const eq = (...worn) => ({ inv: { entries: worn.map((id) => ({ baseId: id, count: 1, worn: true })) } });
+  const look = globalThis.__dboBriarheartEquip;
+  const lookCalls = () => papyrusCalls.filter((c) => c.method === 'EquipItem');
+  // the rite with their own cuirass on: nothing shows
+  setP(MAN, 'equipment', eq(CUIRASS)); papyrusCalls.length = 0; given.length = 0; logLines.length = 0;
+  ML.become(MAN, 'staff', 'test');
+  ok(!lookCalls().length && !given.some(([a, id]) => a === MAN && id === BRIAR), 'their own cuirass on: no briar body given or worn');
+  // the cuirass comes off: a bare chest gets the briar body
+  setP(MAN, 'equipment', eq());
+  look(MAN, eq());
+  ok(lookCalls().some((c) => c.args[0] === '5d008:Skyrim.esm') && given.some(([a, id]) => a === MAN && id === BRIAR), 'a bare chest: the briar body is given and equipped');
+  ok(logLines.some((l) => /briarheart: look on char50 \(equipment\): bare chest, briar body 5d008:Skyrim\.esm equipped \(try 1\)/.test(l)), '...and logged', logLines);
+  papyrusCalls.length = 0; look(MAN, eq());
+  ok(!lookCalls().length, 'a second report within retrySeconds does not equip again');
+  // a helmet alone is still a bare chest
+  globalThis.__dboBriarheart.looks.get(MAN).at = 0; papyrusCalls.length = 0;
+  look(MAN, eq(HELMET));
+  ok(lookCalls().length === 1, 'a helmet alone is still a bare chest');
+  // the briar body shows in the equipment: done
+  papyrusCalls.length = 0; look(MAN, eq(BRIAR, HELMET));
+  ok(!lookCalls().length && !globalThis.__dboBriarheart.looks.has(MAN), 'the briar body worn: nothing more to do');
+  // their own armour back on: the briar body leaves the pack
+  logLines.length = 0; look(MAN, eq(CUIRASS));
+  ok(inv(MAN, BRIAR) === 0 && inv(MAN, CUIRASS) === 1, 'their cuirass back on: the briar body leaves the pack (nothing to steal)');
+  ok(logLines.some((l) => /look off on char50 \(equipment\): own body armour 13ed9 on, briar body taken from the pack/.test(l)), '...and logged', logLines);
+  // equips that never show stop after maxTries
+  logLines.length = 0;
+  for (let k = 0; k < 5; k++) { const L = globalThis.__dboBriarheart.looks.get(MAN); if (L) L.at = 0; look(MAN, eq()); }
+  ok(logLines.filter((l) => /look on char50/.test(l)).length === 3 && logLines.some((l) => /look gave up on char50: 3 equips/.test(l)), 'an equip that never shows is tried maxTries times, then logged once', logLines);
+  // a woman: the vanilla briar body has no female model
+  papyrusCalls.length = 0; logLines.length = 0;
+  ML.become(WOMAN, 'staff', 'test'); look(WOMAN, eq()); look(WOMAN, eq());
+  ok(!lookCalls().length && logLines.filter((l) => /look skipped on char51: the vanilla briar body has no female model/.test(l)).length === 1, 'a woman gets no briar body (no MOD3), told once in the log', logLines);
+  // the heart torn out with the briar body on: the empty chest
+  globalThis.__dboBriarheart.looks.delete(MAN);
+  setP(MAN, 'equipment', eq(BRIAR)); setP(MAN, 'inventory', { entries: [{ baseId: CUIRASS, count: 1 }, { baseId: BRIAR, count: 1 }] });
+  downed.add(MAN); papyrusCalls.length = 0; logLines.length = 0; given.length = 0;
+  setP(HUNTER, 'locationalData', { cellOrWorldDesc: WORLD, pos: [0, 30, 0], rot: [0, 0, 0] });
+  globalThis.__dboBriarheartMenuAction(HUNTER, 'briartear', MAN);
+  globalThis.__dboBriarheart.tears.get(HUNTER).at = Date.now() - 11000; ticker();
+  ok(!ML.isBriar(MAN) && inv(MAN, BRIAR) === 0 && inv(MAN, BRIAR_EMPTY) === 1, 'the heart torn out: the briar body is gone, the empty chest given');
+  ok(lookCalls().some((c) => c.args[0] === '5d009:Skyrim.esm') && logLines.some((l) => /look swap on char50: heart torn out, 5d008:Skyrim\.esm -> 5d009:Skyrim\.esm/.test(l)), '...equipped and logged', logLines);
+  downed.delete(MAN);
+  // the empty chest stays on the body after the end (it is worn); a living ex-Briarheart's unworn leftovers are cleared at login
+  setP(MAN, 'equipment', eq(BRIAR_EMPTY)); logLines.length = 0; look(MAN, eq(BRIAR_EMPTY));
+  ok(inv(MAN, BRIAR_EMPTY) === 1, 'the worn empty chest is left on the body');
+  setP(MAN, 'equipment', eq(CUIRASS)); setP(MAN, 'inventory', { entries: [{ baseId: CUIRASS, count: 1 }, { baseId: BRIAR_EMPTY, count: 1 }, { baseId: BRIAR, count: 1 }] });
+  globalThis.__dboBriarheartLogin(MAN);
+  ok(inv(MAN, BRIAR) === 0 && inv(MAN, BRIAR_EMPTY) === 0 && logLines.some((l) => /look cleared on char50 \(login\): 2 briar bodies taken, not a Briarheart/.test(l)), 'not a Briarheart at login: leftover briar bodies are taken', logLines);
+  // the cure takes the briar body
+  ML.become(MAN, 'staff', 'again'); setP(MAN, 'equipment', eq()); globalThis.__dboBriarheart.looks.delete(MAN); look(MAN, eq());
+  ok(inv(MAN, BRIAR) === 1, '(a Briarheart again, bare chest: briar body given)');
+  ML.end(MAN, 'cured in the test');
+  ok(inv(MAN, BRIAR) === 0, 'the end (a cure, a revoke) takes the briar body');
+  ok(/__dboBriarheartEquip\(a, equipment\)/.test(fs.readFileSync(path.resolve(__dirname, '..', 'gamemode.js'), 'utf8')), 'gamemode.js equipHook asks briarheart.js on every equipment report');
+  // the login's naked reports: no briar body until the re-dress has settled
+  ML.become(MAN, 'staff', 'login test'); globalThis.__dboBriarheart.looks.delete(MAN);
+  globalThis.__dboConnectedAt = new Map([[MAN, Date.now() - 2000]]); papyrusCalls.length = 0;
+  look(MAN, eq());
+  ok(!lookCalls().length, 'within 15 s of connecting (the login re-dress): no briar body yet');
+  globalThis.__dboConnectedAt.set(MAN, Date.now() - 16000);
+  look(MAN, eq());
+  ok(lookCalls().length === 1, 'after it: a bare chest gets it');
+  delete globalThis.__dboConnectedAt; ML.end(MAN, 'login test done');
 }
 // ---- the hooks in the other modules ---------------------------------------------------------------------------------------
 const src = (f) => fs.readFileSync(path.resolve(__dirname, '..', f), 'utf8');

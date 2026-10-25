@@ -28,9 +28,16 @@
 //   heart goes to the one who took it (a Briar Heart). Never a staff member, nor in a duel, and the taker must not be down.
 // The cure: /briarheart cure at a shrine of Arkay or Stendarr touched in the last 10 minutes (prayer.js
 //   __dboPrayerLastShrine), spending a filled black soul gem: the heart withers and the character lives on as a mortal.
-// The look (A5): config visual { enabled, armor } puts an armour on the character at the rite and takes it at the end.
-//   Off and empty until Worker 1's plugin delivers the overlay ARMO/ARMA with the heart-only mesh: the vanilla
-//   ArmorBriarHeart (Skyrim 05D008) is a body-slot item and would take the place of the character's armour.
+// The look (A5; Nat, 25 Oct: "vanilla wound, bare chest only"): config visual { enabled, armor, emptyArmor, women }.
+//   While a Briarheart's BODY slot (32) is empty, the server gives and equips the vanilla ArmorBriarHeart (Skyrim 05D008,
+//   the open chest with the briar); their own body armour simply takes its place, and the briar body leaves the pack
+//   then (so it is never there to steal: robbery.js and pickpocket.js take only unworn copies), to come back the next
+//   time the chest is bare (gamemode.js equipHook asks __dboBriarheartEquip). The moment the heart is torn out it becomes
+//   ArmorBriarHeartEmpty (05D009), mostly for the corpse. Both are Non-Playable (record flag 0x4): itemguards.js refuses
+//   their drop, put and take. Their ARMAs (05D00C, 05D00D) carry a MALE model only (MOD2 Armor\BriarHeart\BriarHeart_1.nif,
+//   no MOD3), worn by DefaultRace (the Reachman race's armor race): a woman gets no briar body unless visual.women is set
+//   (what the engine shows a woman then is to be seen in game). Every give, equip, removal and swap is logged
+//   ("briarheart: look ..."). Equips are tried at most once per visual.retrySeconds and visual.maxTries times in a row.
 //
 // Chat: /briarheart [status] | rite | confirm [forever] | cure; staff: grant <name> <reason> | revoke <name> <reason> | list |
 //   altar add [radius] | altar list | altar remove <n>.
@@ -56,7 +63,7 @@ module.exports = (api) => {
     tearSeconds: 10, tearRange: 250, tearPermadeath: false, tearGivesHeart: true,
     noDivineBlessings: true, faithLocked: true,
     cureDeities: ['arkay', 'stendarr'], cureItem: '2e504:Skyrim.esm',  // a filled black soul gem
-    visual: { enabled: false, armor: '5d008:Skyrim.esm' },
+    visual: { enabled: false, armor: '5d008:Skyrim.esm', emptyArmor: '5d009:Skyrim.esm', women: false, retrySeconds: 10, maxTries: 5 },
     // A full Hagraven (hagraven.js, stage 3) at the altar performs the rite and is named in the audit; true: the rite
     // waits for one
     hagravenRequired: false,
@@ -70,6 +77,7 @@ module.exports = (api) => {
   const S = globalThis.__dboBriarheart || (globalThis.__dboBriarheart = { data: null, pending: new Map(), tears: new Map() });
   if (!(S.pending instanceof Map)) S.pending = new Map();
   if (!(S.tears instanceof Map)) S.tears = new Map();
+  if (!(S.looks instanceof Map)) S.looks = new Map();   // actor -> { at, tries, womanTold }: the bare-chest equip's throttle
   const data = () => {
     if (S.data) return S.data;
     let d = null; try { d = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch (e) { d = null; }
@@ -121,17 +129,92 @@ module.exports = (api) => {
   const faithId = (a) => String(call('__dboFaithIdOf', a >>> 0) || '');
   const waitText = (ms) => { const h = Math.floor(ms / HOUR), m = Math.ceil((ms % HOUR) / MIN); return `${h ? `${h}h ` : ''}${m}m`; };
 
+  // ---- the look: the briar body on a bare chest -------------------------------------------------------------------------
+  const V = () => Object.assign({ enabled: false, armor: '', emptyArmor: '', women: false, retrySeconds: 10, maxTries: 5 }, C.visual || {});
+  const isFemale = (a) => { try { const app = mp.get(a >>> 0, 'appearance'); return !!(app && app.isFemale === true); } catch (e) { return false; } };
+  // An ARMO's body slot (biped flag 0x4 = slot 32, in BOD2's first u32, or BODT's), read once per base
+  const BODY = 0x4;
+  const LOGIN_SETTLE_MS = 15000;   // gamemode.js WORN_GRACE_MS: the login re-dress happens inside it
+  const bodyCache = new Map();
+  const coversBody = (id) => {
+    id = Number(id) >>> 0; if (bodyCache.has(id)) return bodyCache.get(id);
+    let yes = false;
+    try {
+      const r = mp.lookupEspmRecordById(id); const rec = r && r.record;
+      if (rec && String(rec.type) === 'ARMO') {
+        const f = (rec.fields || []).find((x) => x && (x.type === 'BOD2' || x.type === 'BODT') && x.data && x.data.byteLength >= 4);
+        if (f) yes = (new DataView(f.data.buffer, f.data.byteOffset, f.data.byteLength).getUint32(0, true) & BODY) !== 0;
+      }
+    } catch (e) { yes = false; }
+    bodyCache.set(id, yes); return yes;
+  };
+  const wornIds = (equipment) => {
+    const entries = equipment && equipment.inv && Array.isArray(equipment.inv.entries) ? equipment.inv.entries : [];
+    return entries.filter((e) => e && (e.worn || e.wornLeft)).map((e) => Number(e.baseId) >>> 0);
+  };
+  const lookOn = (a) => { const v = V(); return !!(C.enabled && v.enabled && v.armor && isBriar(a) && (v.women || !isFemale(a))); };
+  const takeAll = (a, id) => { let n = 0; while (id && takeOne(a, id) && n < 50) n++; return n; };
+  // Every equipment report (and the rite and login): bare chest -> the briar body on; own body armour -> the briar body out
+  // of the pack. Not a Briarheart (cured, revoked, never): no briar body or empty chest left anywhere but on a dead one
+  const lookCheck = (a, equipment, why) => {
+    a = Number(a) >>> 0;
+    const v = V(); const full = idOf(v.armor), empty = idOf(v.emptyArmor);
+    if (!C.enabled || !v.enabled || !full) return;
+    const eq = equipment || get(a, 'equipment', null);
+    const worn = wornIds(eq);
+    if (!isBriar(a)) {
+      // The full briar body goes at once; the empty chest a torn-out heart left is the body's own wound, cleared only at
+      // login and only when not worn (the swap's equipment report can still show the old body for a moment)
+      const n = takeAll(a, full) + (why === 'login' && !worn.includes(empty) ? takeAll(a, empty) : 0);
+      if (n) log(`briarheart: look cleared on ${display(a)} (${why}): ${n} briar bod${n === 1 ? 'y' : 'ies'} taken, not a Briarheart`);
+      return;
+    }
+    if (!lookOn(a)) {
+      const L = S.looks.get(a) || {};
+      if (isFemale(a) && !L.womanTold) { L.womanTold = true; S.looks.set(a, L); log(`briarheart: look skipped on ${display(a)}: the vanilla briar body has no female model (visual.women false)`); }
+      return;
+    }
+    const own = worn.filter((id) => id !== full && id !== empty && coversBody(id));
+    if (own.length) {
+      // Their own armour is on: the briar body leaves the pack (it would be stealable there)
+      const n = takeAll(a, full);
+      if (n) log(`briarheart: look off on ${display(a)} (${why}): own body armour ${own[0].toString(16)} on, briar body taken from the pack`);
+      S.looks.delete(a);
+      return;
+    }
+    if (worn.includes(full)) { S.looks.delete(a); return; }
+    // The login's first reports are naked until gamemode.js redresses the character: no briar body then (the login hook
+    // looks again once that has settled)
+    const conn = globalThis.__dboConnectedAt instanceof Map ? Number(globalThis.__dboConnectedAt.get(a)) || 0 : 0;
+    if (conn && Date.now() - conn < LOGIN_SETTLE_MS) return;
+    // Bare chest: give it if missing and put it on, at most once per retrySeconds and maxTries in a row
+    const L = S.looks.get(a) || { at: 0, tries: 0 };
+    if (Date.now() - L.at < v.retrySeconds * 1000) return;
+    if (L.tries >= v.maxTries) { if (!L.gaveUp) { L.gaveUp = true; S.looks.set(a, L); log(`briarheart: look gave up on ${display(a)}: ${L.tries} equips of the briar body did not show in the equipment`); } return; }
+    L.at = Date.now(); L.tries += 1; S.looks.set(a, L);
+    if (!hasOne(a, full) && giveItem) giveItem(a, full, 1);
+    papyrus(a, 'EquipItem', [form(v.armor), false, true]);
+    log(`briarheart: look on ${display(a)} (${why}): bare chest, briar body ${v.armor} equipped (try ${L.tries})`);
+  };
+  // The heart torn out: the open chest becomes the empty one
+  const lookEmpty = (a) => {
+    a = Number(a) >>> 0; const v = V(); const full = idOf(v.armor), empty = idOf(v.emptyArmor);
+    if (!C.enabled || !v.enabled || !full || !empty) return;
+    const hadOn = wornIds(get(a, 'equipment', null)).includes(full);
+    takeAll(a, full);
+    if (!hadOn) return;   // under their own armour nothing shows; nothing to swap
+    if (!hasOne(a, empty) && giveItem) giveItem(a, empty, 1);
+    papyrus(a, 'EquipItem', [form(v.emptyArmor), false, true]);
+    log(`briarheart: look swap on ${display(a)}: heart torn out, ${v.armor} -> ${v.emptyArmor}`);
+  };
+
   // ---- the gifts on and off ---------------------------------------------------------------------------------------------
   // Spells, the faction and the look follow the record: applied at the rite and at each login, taken at the end
   const applyGifts = (a, why) => {
     if (!isOnline(a)) return;
     for (const d of C.spells || []) papyrus(a, 'AddSpell', [form(d), false]);
     if (C.forswornFriendly) faction(a, true, why || 'gifts');
-    if (C.visual && C.visual.enabled && C.visual.armor) {
-      const id = idOf(C.visual.armor);
-      if (id && !hasOne(a, id) && giveItem) giveItem(a >>> 0, id, 1);
-      if (id) papyrus(a, 'EquipItem', [form(C.visual.armor), false, true]);
-    }
+    S.looks.delete(a >>> 0); lookCheck(a, null, why || 'gifts');
     call('__dboCharLevelSyncBonus', a >>> 0);
   };
   const removeGifts = (a, why) => {
@@ -139,7 +222,8 @@ module.exports = (api) => {
       for (const d of C.spells || []) papyrus(a, 'RemoveSpell', [form(d)]);
       if (C.forswornFriendly) faction(a, false, why || 'end');
     }
-    if (C.visual && C.visual.enabled && C.visual.armor) { const id = idOf(C.visual.armor); if (id) takeOne(a, id); }
+    // The briar body goes (a torn-out heart has already left the empty chest on the body)
+    S.looks.delete(a >>> 0); lookCheck(a, null, why || 'end');
     call('__dboCharLevelSyncBonus', a >>> 0);
   };
   const become = (a, how, by) => {
@@ -248,6 +332,7 @@ module.exports = (api) => {
     const t = j.t;
     const no = tearRefusal(a, t);
     if (no) { if (isOnline(a)) personal(a, `The briar slips from your hand: ${no.toLowerCase()}`); return; }
+    lookEmpty(t);
     end(t, `heart torn out by ${who(a)}`);
     if (C.tearGivesHeart && giveItem) giveItem(a >>> 0, idOf(C.heartItem), 1);
     audit(`BRIARHEART ${who(a)} tore the briar heart out of ${who(t)}${C.tearPermadeath ? ' (for good)' : ''}`);
@@ -287,7 +372,15 @@ module.exports = (api) => {
   globalThis.__dboBriarheartRefusesDivine = (a) => (C.enabled && C.noDivineBlessings && isBriar(Number(a) >>> 0) ? 'The briar in your chest belongs to the Hagravens. No Divine\'s blessing reaches it.' : '');
   globalThis.__dboBriarheartFaithLock = (a) => (C.enabled && C.faithLocked && isBriar(Number(a) >>> 0) ? 'The briar binds you to the Old Gods of the Reach. While it beats, you turn to no other.' : '');
   // gamemode.js at login: the spells, faction and look come back with the character
-  globalThis.__dboBriarheartLogin = (a) => { if (C.enabled && isBriar(Number(a) >>> 0)) applyGifts(Number(a) >>> 0, 'login'); };
+  globalThis.__dboBriarheartLogin = (a) => {
+    if (!C.enabled) return;
+    a = Number(a) >>> 0;
+    if (isBriar(a)) applyGifts(a, 'login'); else lookCheck(a, null, 'login');
+    // Once the login re-dress has settled, a bare chest gets the briar body even if no new equipment report comes
+    if (isBriar(a)) setTimeout(() => { try { if (isOnline(a)) lookCheck(a, null, 'login settled'); } catch (e) { log('briarheart: settled look failed', e.message); } }, LOGIN_SETTLE_MS + 5000);
+  };
+  // gamemode.js equipHook: every equipment report
+  globalThis.__dboBriarheartEquip = (a, equipment) => { if (C.enabled) lookCheck(a, equipment, 'equipment'); };
   // playermenu.js (X): the entry over a fallen Briarheart
   globalThis.__dboBriarheartMenuEntries = (a, t) => (C.enabled && isBriar(t >>> 0) && isDowned(t >>> 0) && !isStaff(a) ? [{ id: 'briartear', label: 'Tear out the heart' }] : []);
   globalThis.__dboBriarheartMenuAction = (a, id, t) => { if (id !== 'briartear') return false; personal(a >>> 0, startTear(a >>> 0, t >>> 0)); return true; };
