@@ -16,6 +16,13 @@
 //   door      private.dboCell      { prisoner, name, picked }
 //   prisoner  private.dboSentence  { door, cell, totalMs, servedMs, by, at, arrester (actor who brought them in), concordat? }
 //
+// Jail doors (Nat, 25 Oct: "the ability to assign jail doors"): any door that is not a load door can be made a jail door of a
+// hold, at the door, by GM+ staff or by that hold's ruler, Steward, Commander or Captain of the Guard (/jaildoors, a menu).
+// A jail door is a cell door wherever it stands, its prisoner waiting at the spot the assigner stood on. It is opened only by
+// that hold's guards and officials (private.dboLawful while in the hold) and Lead GM+, and it opens on release. The watch
+// (guards.js) fills a hold's jail doors before its hold-jails.json cells, the nearest free one first. jail-doors.json
+// (runtime data, never tracked): { doors: [{ door, hold, cell, spot, by, at }] }.
+//
 // The White-Gold Concordat (thalmor.js, Nate 11 Oct): a Thalmor who arrested a Talos worshipper in the Empire is offered
 // the Concordat's sentence at the cell door (globalThis.__dboConcordatWarrant). That sentence is lawful: it carries
 // concordat { by, at }, and only the Thalmor's arresting ranks or a Lead GM may release it early or add to it
@@ -27,6 +34,9 @@ const path = require('path');
 module.exports = (api) => {
   const { mp, log, personal, system, audit, display, who, cfg, openWidget, closeWidget, onUi, registerChatCommand,
     onlineActors, every, isAdmin, distanceMeters } = api;
+  // A hold's officials by seat (gamemode.js ranksOf); an older gamemode passes none, and only staff assign jail doors
+  const ranksOf = typeof api.ranksOf === 'function' ? api.ranksOf : () => [];
+  const profileOf = typeof api.profileOf === 'function' ? api.profileOf : () => -1;
   // A GM observes; the powers below are for a Lead GM and above (claude-jake's review A3). Fails closed with an old gamemode.
   const isLeadStaff = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
 
@@ -70,7 +80,8 @@ module.exports = (api) => {
   const isJail = (cell) => !!cell && jailSet.has(cell);
   const jailName = (cell) => {
     try {
-      const raw = rawCells().find((c) => norm(c) === cell) || cell;
+      // A jail door's cell is named from the desc it was saved with (getIdFromDesc matches the plugin name exactly)
+      const raw = rawCells().concat(jailDoors.map((d) => String(d.cell))).find((c) => norm(c) === cell) || cell;
       const r = mp.lookupEspmRecordById(idOf(raw));
       const e = String((r && r.record && r.record.editorId) || '');
       const words = e.replace(/^(CYR|BSK|BSH)/, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\d+$/, '').trim();
@@ -83,7 +94,31 @@ module.exports = (api) => {
   try { for (const d of Object.keys(JSON.parse(fs.readFileSync(path.resolve('doors.json'), 'utf8')).doors || {})) { const id = idOf(d); if (id) LOAD_DOORS.add(id); } }
   catch (e) { log('jail: doors.json unreadable, every door in a jail counts as a cell door', e.message); }
   const isDoor = (ref) => { try { const r = mp.lookupEspmRecordById(idOf(get(ref, 'baseDesc', ''))); return !!(r && r.record && String(r.record.type) === 'DOOR'); } catch (e) { return false; } };
-  const isCellDoor = (ref) => ref < 0xff000000 && !LOAD_DOORS.has(ref >>> 0) && isJail(cellOf(ref)) && isDoor(ref);
+  // ---- jail doors a hold assigns ------------------------------------------------------------------------
+  const JD = Object.assign({ officialRanks: ['jarl', 'baron', 'count', 'steward', 'commander', 'guardcaptain', 'captain'], armSeconds: 60, reachMeters: 6, listMax: 12 }, CFG.doors || {});
+  const DOORS_FILE = path.resolve('jail-doors.json');
+  const readDoors = () => { try { const v = JSON.parse(fs.readFileSync(DOORS_FILE, 'utf8')); return Array.isArray(v.doors) ? v.doors.filter((d) => d && d.door && d.hold) : []; } catch (e) { return []; } };
+  let jailDoors = readDoors();
+  let doorById = new Map();
+  const indexDoors = () => { doorById = new Map(); for (const d of jailDoors) { const id = idOf(d.door); if (id) doorById.set(id, d); } };
+  indexDoors();
+  const saveDoors = () => {
+    try { fs.writeFileSync(DOORS_FILE + '.tmp', JSON.stringify({ doors: jailDoors }, null, 1)); fs.renameSync(DOORS_FILE + '.tmp', DOORS_FILE); }
+    catch (e) { log('jail: jail-doors.json write failed', e.message); }
+    indexDoors();
+  };
+  const jailDoorOf = (ref) => doorById.get(ref >>> 0) || null;
+  // The hold a player stands in, as the watch reads it (guards.js __dboHoldHere), else their zone
+  const holdHere = (a) => {
+    try { if (typeof globalThis.__dboHoldHere === 'function') { const h = String(globalThis.__dboHoldHere(a >>> 0) || ''); if (h) return h; } } catch (e) { /* the zone below */ }
+    try { const z = typeof api.zoneOfActor === 'function' ? api.zoneOfActor(a >>> 0) : null; return z ? String(z.id || z) : ''; } catch (e) { return ''; }
+  };
+  const holdOfficial = (a, hold) => {
+    try { return (ranksOf(profileOf(a), a >>> 0) || []).some((m) => m && String((m.zone && m.zone.id) || m.zone) === hold && (JD.officialRanks || []).includes(String(m.rank))); } catch (e) { return false; }
+  };
+  const mayAssign = (a, hold) => !!hold && (isAdmin(a) || holdOfficial(a, hold));
+
+  const isCellDoor = (ref) => ref < 0xff000000 && !LOAD_DOORS.has(ref >>> 0) && (!!jailDoorOf(ref) || isJail(cellOf(ref))) && isDoor(ref);
 
   const sentenceOf = (a) => { const s = get(a, 'private.dboSentence', null); return s && Number(s.totalMs) > 0 ? s : null; };
   const leftOf = (s) => Math.max(0, Number(s.totalMs) - (Number(s.servedMs) || 0));
@@ -96,6 +131,13 @@ module.exports = (api) => {
     return { prisoner: Number(c.prisoner) >>> 0, name: String(c.name || 'a prisoner'), picked: !!c.picked, sentence: s };
   };
   const lawful = (a) => get(a, 'private.dboLawful', false) === true || isLeadStaff(a);
+  // At a jail door, its own hold's guards and officials, its assigners there, and Lead GM+; elsewhere the plain rule
+  const lawfulAt = (a, door) => {
+    const jd = jailDoorOf(door);
+    if (!jd) return lawful(a);
+    if (isLeadStaff(a)) return true;
+    return holdHere(a) === jd.hold && (get(a, 'private.dboLawful', false) === true || holdOfficial(a, jd.hold));
+  };
   // A Concordat sentence is the Thalmor's: anyone else is refused its release and extension (thalmor.js decides who)
   const concordatHeld = (a, s) => {
     if (!s || !s.concordat || isLeadStaff(a)) return false;
@@ -184,10 +226,12 @@ module.exports = (api) => {
 
   // Called from the gamemode's activate chain; true means handled (the activation is refused).
   globalThis.__dboJailActivate = (target, caster) => {
-    if (!CFG.enabled || !isCellDoor(target)) return false;
+    if (!CFG.enabled) return false;
+    if (armedFor(caster) && isDoor(target)) return assignMenu(caster, target);
+    if (!isCellDoor(target)) return false;
     const occ = occupantOf(target);
     const isPrisoner = occ && occ.prisoner === (caster >>> 0);
-    if (lawful(caster) && !isPrisoner) {
+    if (lawfulAt(caster, target) && !isPrisoner) {
       if (occ) {
         const left = minutes(leftOf(occ.sentence));
         const held = concordatHeld(caster, occ.sentence);
@@ -221,7 +265,7 @@ module.exports = (api) => {
     return guard >>> 0;
   };
   const imprison = (guard, prisoner, door, mins, concordat) => {
-    if (!lawful(guard)) return;
+    if (!lawfulAt(guard, door)) return;
     if (sentenceOf(prisoner)) return personal(guard, `${display(prisoner)} is already serving a sentence.`);
     if (!onlineActors().includes(prisoner) || distanceMeters(prisoner, door) > CFG.reachMeters) return personal(guard, `${display(prisoner)} is no longer at the cell.`);
     if (occupantOf(door)) return personal(guard, 'Someone is already locked in that cell.');
@@ -248,9 +292,27 @@ module.exports = (api) => {
   // The hold's watch (guards.js) jails a player its NPC guards brought down: the first free cell of hold-jails.json, the
   // city jail before its prison (Nate, 23 Oct: "use the prisons as overflow"). Returns where to put the prisoner, or null
   const HOLD_JAILS = (() => { try { return JSON.parse(fs.readFileSync(path.resolve('hold-jails.json'), 'utf8')).holds || {}; } catch (e) { log('jail: hold-jails.json unreadable, the watch jails nobody', e.message); return {}; } })();
+  // The hold's jail doors, free ones only, those in the prisoner's own cell or world nearest first, then in assigned order
+  const assignedFor = (prisoner, hold) => {
+    const here = cellOf(prisoner);
+    let pos = null; try { pos = mp.get(prisoner, 'pos'); } catch (e) { pos = null; }
+    const dist = (d) => (Array.isArray(pos) && Array.isArray(d.spot) && norm(d.cell) === here ? Math.hypot(pos[0] - d.spot[0], pos[1] - d.spot[1], pos[2] - d.spot[2]) : Infinity);
+    return jailDoors.filter((d) => d.hold === String(hold) && Array.isArray(d.spot) && idOf(d.door) && !occupantOf(idOf(d.door)))
+      .map((d, i) => ({ d, i, k: dist(d) })).sort((x, y) => x.k - y.k || x.i - y.i).map((x) => x.d);
+  };
   globalThis.__dboJailByWatch = (prisoner, hold, mins, byLabel) => {
     prisoner = prisoner >>> 0;
     if (sentenceOf(prisoner)) return null;
+    for (const d of assignedFor(prisoner, hold)) {
+      const door = idOf(d.door);
+      const cell = norm(d.cell);
+      set(prisoner, 'private.dboSentence', { door, cell, totalMs: mins * MIN, servedMs: 0, by: String(byLabel || 'the watch'), at: Date.now(), arrester: 0, watch: String(hold) });
+      set(door, 'private.dboCell', { prisoner, name: display(prisoner), picked: false });
+      set(door, 'isOpen', false);
+      lastSeen.delete(prisoner);
+      audit(`JAIL ${who(prisoner)} jailed by the watch of ${hold} for ${mins} min behind the jail door ${d.door} (${jailName(cell)})`);
+      return { cellDesc: String(d.cell), pos: d.spot, kind: 'jail door', name: jailName(cell) };
+    }
     for (const c of HOLD_JAILS[String(hold)] || []) {
       // shared: one yard for every prisoner (Cidhna Mine), its gate neither locked nor counted
       const door = idOf(c.door); if (!door || (!c.shared && occupantOf(door))) continue;
@@ -269,7 +331,11 @@ module.exports = (api) => {
     const s = sentenceOf(prisoner); if (!s) return;
     const door = Number(s.door) >>> 0;
     const c = get(door, 'private.dboCell', null);
-    if (c && (Number(c.prisoner) >>> 0) === (prisoner >>> 0)) set(door, 'private.dboCell', null);
+    if (c && (Number(c.prisoner) >>> 0) === (prisoner >>> 0)) {
+      set(door, 'private.dboCell', null);
+      // A jail door a hold assigned opens on release (Nat, 25 Oct); a jail's own cell doors unlock as before
+      if (jailDoorOf(door)) set(door, 'isOpen', true);
+    }
     set(prisoner, 'private.dboSentence', null);
     lastSeen.delete(prisoner >>> 0);
     try { if (globalThis.__dboStatsAdd) globalThis.__dboStatsAdd(prisoner, 'jailMs', Number(s.servedMs) || 0); } catch (e) { /* journal stats only */ }
@@ -280,9 +346,9 @@ module.exports = (api) => {
     const p = pending.get(a >>> 0); const choice = String(args[0] || '');
     // Choosing a prisoner reopens this widget id as the sentence menu. Closing it first in the same tick lets the close's
     // cursor release land after the reopen took focus (the inn prompt, 2026-09-25), so only the other paths close it.
-    const reopening = !!p && lawful(a) && choice.startsWith('who:') && distanceMeters(a, p.door) <= CFG.reachMeters;
+    const reopening = !!p && lawfulAt(a, p.door) && choice.startsWith('who:') && distanceMeters(a, p.door) <= CFG.reachMeters;
     if (reopening) pending.delete(a >>> 0); else closeMenu(a);
-    if (!p || !lawful(a)) return;
+    if (!p || !lawfulAt(a, p.door)) return;
     const door = p.door;
     if (distanceMeters(a, door) > CFG.reachMeters) return personal(a, 'You are too far from the cell door.');
     if (choice === 'open') { set(door, 'isOpen', true); return; }
@@ -330,6 +396,82 @@ module.exports = (api) => {
   });
   onUi('jailClose', (a) => closeMenu(a));
   onUi('close', (a, args, widgetId) => { if (widgetId === WIDGET_ID) pending.delete(a >>> 0); });
+
+  // ---- assigning jail doors ---------------------------------------------------------------------------
+  // /jaildoors opens a menu: arm "the next door I use", and the hold's jail doors to unassign. Armed, the next door used opens
+  // the assignment menu instead of the door; the assigner stands inside the cell, where its prisoners will wait.
+  const armed = globalThis.__dboJailDoorArmed instanceof Map ? globalThis.__dboJailDoorArmed : (globalThis.__dboJailDoorArmed = new Map()); // actor -> until
+  const doorPending = globalThis.__dboJailDoorPending instanceof Map ? globalThis.__dboJailDoorPending : (globalThis.__dboJailDoorPending = new Map()); // actor -> { hold, door?, spot? }
+  function armedFor(a) { const t = armed.get(a >>> 0); if (!t) return false; if (t < Date.now()) { armed.delete(a >>> 0); return false; } return true; }
+  const DOOR_EVENTS = { action: 'dbo:jailDoorChoose', close: 'dbo:jailDoorClose' };
+  const holdLabel = (hold) => { try { const z = typeof api.zoneById === 'function' ? api.zoneById(hold) : null; return (z && z.name) || hold; } catch (e) { return hold; } };
+  const notTheirs = (hold) => (hold ? `Only staff or ${holdLabel(hold)}'s ruler, Steward, Commander or Captain of the Guard assign its jail doors.` : 'No hold claims this place.');
+  const doorLabel = (d) => {
+    const id = idOf(d.door); const occ = id ? occupantOf(id) : null;
+    return `${jailName(norm(d.cell))}, door ${d.door}${occ ? ` (holding ${occ.name})` : ''}`;
+  };
+  function assignMenu(a, door) {
+    armed.delete(a >>> 0);
+    if (door >= 0xff000000) { personal(a, 'A placed door cannot be a jail door: its id changes at every restart.'); return true; }
+    if (LOAD_DOORS.has(door >>> 0)) { personal(a, 'A load door cannot be a jail door. Use the door of the cell itself.'); return true; }
+    if (distanceMeters(a, door) > JD.reachMeters) { personal(a, 'Stand at the door you mean.'); return true; }
+    const jd = jailDoorOf(door);
+    const hold = jd ? jd.hold : holdHere(a);
+    if (!mayAssign(a, hold)) { personal(a, notTheirs(hold)); return true; }
+    let spot = null; try { const p = mp.get(a, 'pos'); spot = Array.isArray(p) ? p.slice(0, 3).map(Math.round) : null; } catch (e) { spot = null; }
+    doorPending.set(a >>> 0, { door: door >>> 0, spot, hold });
+    const actions = jd ? [{ id: 'unassign', label: `Unassign this jail door of ${holdLabel(hold)}` }]
+      : [{ id: 'assign', label: `Make this a jail door of ${holdLabel(hold)} (prisoners wait where you stand)` }];
+    actions.push({ id: 'cancel', label: 'Cancel' });
+    openWidget(a, { type: 'contextMenu', id: WIDGET_ID, mode: 'menu', targetName: jd ? `Jail door of ${holdLabel(hold)}` : 'Assign a jail door', actions, events: DOOR_EVENTS }, true);
+    return true;
+  }
+  const unassign = (a, d) => {
+    const id = idOf(d.door);
+    const occ = id ? occupantOf(id) : null;
+    if (occ) return personal(a, `${occ.name} is locked behind that door. Release them before unassigning it.`);
+    jailDoors = jailDoors.filter((x) => x !== d); saveDoors();
+    audit(`JAIL DOOR ${who(a)} unassigned ${d.door} (${jailName(norm(d.cell))}) as a jail door of ${d.hold}`);
+    personal(a, `That door is no longer a jail door of ${holdLabel(d.hold)}.`);
+  };
+  const doorsMenu = (a) => {
+    const hold = holdHere(a);
+    if (!mayAssign(a, hold)) return personal(a, notTheirs(hold));
+    const mine = jailDoors.filter((d) => d.hold === hold);
+    doorPending.set(a >>> 0, { hold });
+    const actions = [{ id: 'arm', label: 'Assign the next door I use' }]
+      .concat(mine.slice(0, JD.listMax).map((d) => ({ id: `rm:${d.door}`, label: `Unassign: ${doorLabel(d)}` })));
+    openWidget(a, { type: 'contextMenu', id: WIDGET_ID, mode: 'menu', targetName: `${holdLabel(hold)}: ${plural(mine.length, 'jail door')}`, actions, events: DOOR_EVENTS }, true);
+  };
+  onUi('jailDoorChoose', (a, args) => {
+    const p = doorPending.get(a >>> 0); const choice = String(args[0] || '');
+    doorPending.delete(a >>> 0); closeWidget(a, WIDGET_ID);
+    if (!p || choice === 'cancel') return;
+    if (choice === 'arm') {
+      if (!mayAssign(a, p.hold)) return;
+      armed.set(a >>> 0, Date.now() + JD.armSeconds * 1000);
+      return personal(a, `Stand inside the cell, where its prisoners should wait, and use its door within ${JD.armSeconds} seconds.`);
+    }
+    if (choice.startsWith('rm:')) {
+      const d = jailDoors.find((x) => x.door === choice.slice(3) && x.hold === p.hold);
+      if (!d || !mayAssign(a, d.hold)) return;
+      return unassign(a, d);
+    }
+    if (!p.door || !mayAssign(a, p.hold)) return;
+    if (distanceMeters(a, p.door) > JD.reachMeters) return personal(a, 'You are too far from the door.');
+    if (choice === 'unassign') { const d = jailDoorOf(p.door); if (d) unassign(a, d); return; }
+    if (choice === 'assign') {
+      if (jailDoorOf(p.door)) return personal(a, 'That door is a jail door already.');
+      if (!p.spot) return personal(a, 'Your position could not be read. Try again.');
+      const desc = mp.getDescFromId(p.door >>> 0);
+      const cell = String(get(p.door, 'worldOrCellDesc', ''));
+      jailDoors = jailDoors.concat([{ door: desc, hold: p.hold, cell, spot: p.spot, by: who(a), at: Date.now() }]); saveDoors();
+      audit(`JAIL DOOR ${who(a)} assigned ${desc} (${jailName(norm(cell))}) as a jail door of ${p.hold}, prisoners at ${p.spot.join(',')}`);
+      personal(a, `This is now a jail door of ${holdLabel(p.hold)}. The watch fills it before the hold's other cells, and a guard of the hold can lock someone behind it.`);
+    }
+  });
+  onUi('jailDoorClose', (a) => { doorPending.delete(a >>> 0); closeWidget(a, WIDGET_ID); });
+  registerChatCommand('jaildoors', (a) => doorsMenu(a), { help: 'Assign or unassign this hold\'s jail doors (staff, and the hold\'s ruler, Steward, Commander or Captain of the Guard)' });
 
   // ---- serving time -----------------------------------------------------------------------------------
   // Last tick each prisoner was seen online and in the jail. Nothing is persisted, so a login starts from zero.
@@ -406,5 +548,5 @@ module.exports = (api) => {
     personal(a, '/jail add (this cell becomes a jail), /jail remove, /jail list');
   }, { admin: true, help: 'Designate jail zones: /jail add | remove | list' });
 
-  log(`jail ${CFG.enabled ? 'on' : 'off'}: ${jailCells().size} jail zone(s), ${LOAD_DOORS.size} load doors known, sentences of ${(CFG.minutes || []).join('/')} min`);
+  log(`jail ${CFG.enabled ? 'on' : 'off'}: ${jailCells().size} jail zone(s), ${LOAD_DOORS.size} load doors known, ${jailDoors.length} assigned jail door(s), sentences of ${(CFG.minutes || []).join('/')} min`);
 };
