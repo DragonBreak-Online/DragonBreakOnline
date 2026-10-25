@@ -15,7 +15,7 @@ import json
 import os
 import sys
 
-sys.path.insert(0, os.path.expanduser('~nate/dragonbreak/ck-mcp'))
+sys.path.insert(0, os.environ.get('ESPLIB_DIR', os.path.expanduser('~nate/dragonbreak/ck-mcp')))
 import esplib  # noqa: E402
 
 DISABLED, STARTS_DEAD, DELETED = 0x800, 0x200, 0x20
