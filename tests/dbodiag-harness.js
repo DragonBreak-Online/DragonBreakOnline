@@ -80,7 +80,8 @@ check('...so a reload does not reopen the tap', logged.length === 0, JSON.string
 logged.length = 0;
 for (let i = 1; i <= 6; i++) api2(7, { customPacketType: 'dboDiag', lines: [`voice echo loop on (${i} packets); activation ptt; mics 1, aec on`, 'beat x'] });
 const voice = globalThis.__dboVoiceLines && globalThis.__dboVoiceLines.get('14');
-check('a capped player\'s voice lines are still kept, by actor id in hex', !!voice && logged.length === 0, JSON.stringify(voice));
+check('a capped player\'s voice lines are still kept, by actor id in hex', !!voice, JSON.stringify(voice));
+check('...and logged under their own allowance, the capped beats not', logged.length === 6 && logged.every((l) => l.includes(' voice echo loop ')), JSON.stringify(logged));
 check('...the last four, newest last, with the time', voice && voice.length === 4 && /\(3 packets\)/.test(voice[0].line) && /\(6 packets\)/.test(voice[3].line) && /^\d{4}-\d\d-\d\dT/.test(voice[3].at), JSON.stringify(voice));
 check('...and only lines that start with "voice "', voice && voice.every((v) => v.line.startsWith('voice ')));
 api(99, { customPacketType: 'dboDiag', lines: ['voice echo loop on'] });
