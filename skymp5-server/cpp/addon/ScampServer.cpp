@@ -558,6 +558,7 @@ ScampServer::ScampServer(const Napi::CallbackInfo& info)
       readFloat("burstSeconds", limits.burstSeconds);
       readFloat("peakLogFraction", limits.peakLogFraction);
       readUint("teleportGraceMs", limits.teleportGraceMs);
+      readUint("npcInsistMs", limits.npcInsistMs);
       readUint("snapBackIntervalMs", limits.snapBackIntervalMs);
       readUint("logIntervalMs", limits.logIntervalMs);
       // A zero or negative ceiling would refuse every packet forever
