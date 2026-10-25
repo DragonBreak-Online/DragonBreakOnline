@@ -11,6 +11,7 @@ const fs = require('fs');
 const bundle = process.argv[2];
 if (!bundle) { console.log('usage: node tests/court-post-front-harness.js <bundle>'); process.exit(2); }
 if (!/courtCommissionPost/.test(fs.readFileSync(bundle, 'utf8'))) {
+  require('./expect')('court-post-front', 'this front has no posting from the Court tab');
   console.log('ok   skipped: this front predates posting from the Court tab');
   process.exit(0);
 }
