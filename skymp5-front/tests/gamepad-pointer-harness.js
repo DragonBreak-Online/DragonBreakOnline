@@ -3,17 +3,22 @@
 // CT 115 (puppeteer + Chrome's libraries unpacked in ~/claude-c-layout, memory note front-widgets-measure-in-headless-chrome):
 //   LD_LIBRARY_PATH=$(cat ~/claude-c-layout/ldpath) node tests/gamepad-pointer-harness.js .
 'use strict';
-const fs = require('fs'), path = require('path'), os = require('os'), { execFileSync } = require('child_process');
+// Env: FRONT_NM, ESBUILD_DIR, PUPPETEER_DIR; each falls back to this checkout, then to the CT 115 layout
+const fs = require('fs'), path = require('path'), os = require('os');
 const FRONT = path.resolve(process.argv[2] || path.join(__dirname, '..'));
-const NM = path.join(process.env.HOME, 'dragonbreak/fork/skymp5-front/node_modules');
-const ESBUILD = path.join(process.env.HOME, 'dragonbreak/fork/skymp5-server/node_modules/.bin/esbuild');
+const HOME = process.env.HOME || os.homedir();
+const firstWith = (file, ...dirs) => dirs.find((d) => d && fs.existsSync(path.join(d, file)));
+const NM = firstWith('react-dom/package.json', process.env.FRONT_NM, path.join(FRONT, 'node_modules'), path.join(HOME, 'dragonbreak/fork/skymp5-front/node_modules'));
+const ESB = firstWith('package.json', process.env.ESBUILD_DIR, path.join(FRONT, '../skymp5-server/node_modules/esbuild'), path.join(HOME, 'dragonbreak/fork/skymp5-server/node_modules/esbuild'));
+if (!NM || !ESB) { console.log(`SKIP needs FRONT_NM (${NM}) and ESBUILD_DIR (${ESB})`); process.exit(0); }
+const esbuild = require(ESB);
 const OUT = fs.mkdtempSync(path.join(fs.existsSync('/dev/shm') ? '/dev/shm' : os.tmpdir(), 'claude-nate-padptr-'));
 process.on('exit', () => { try { fs.rmSync(OUT, { recursive: true, force: true }); } catch (e) { /* left for the OS */ } });
 let fails = 0;
 const ok = (c, what, got) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${what}${!c && got !== undefined ? '   ' + JSON.stringify(got) : ''}`); if (!c) fails++; };
 
 // The client half
-execFileSync(ESBUILD, [path.join(FRONT, '..', 'skymp5-client/src/services/services/gamepadPointer.ts'), '--bundle', '--platform=node', '--format=cjs', `--outfile=${path.join(OUT, 'ptr.js')}`, '--log-level=error']);
+esbuild.buildSync({ entryPoints: [path.join(FRONT, '..', 'skymp5-client/src/services/services/gamepadPointer.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: path.join(OUT, 'ptr.js'), logLevel: 'error' });
 const C = require(path.join(OUT, 'ptr.js'));
 ok(C.curve(0.1) === 0 && C.curve(-0.2) === 0, 'a resting stick inside the dead zone moves nothing');
 ok(C.curve(1) === 1 && C.curve(-1) === -1 && C.curve(0.6) > 0 && C.curve(0.6) < 0.6, 'full tilt is full speed, half tilt much slower');
@@ -30,11 +35,12 @@ ok(/new GamepadPointerService\(sp, controller\)/.test(idxTs), 'the client starts
 
 // The page half, in Chrome
 let puppeteer = null;
-try { puppeteer = require(path.join(process.env.HOME, 'claude-c-layout/node_modules/puppeteer')); } catch (e) { /* no browser here */ }
-if (!puppeteer) { console.log('skipped the browser half: no puppeteer in ~/claude-c-layout'); console.log(fails ? `${fails} FAILED` : 'all passed'); process.exit(fails ? 1 : 0); }
+const PUP = firstWith('package.json', process.env.PUPPETEER_DIR, path.join(HOME, 'claude-c-layout/node_modules/puppeteer'));
+try { if (PUP) puppeteer = require(PUP); } catch (e) { /* no browser here */ }
+if (!puppeteer) { console.log('skipped the browser half: no puppeteer (PUPPETEER_DIR, or ~/claude-c-layout)'); console.log(fails ? `${fails} FAILED` : 'all passed'); process.exit(fails ? 1 : 0); }
 fs.writeFileSync(path.join(OUT, 'entry.jsx'), `
 import React, { useState } from 'react'; import ReactDOM from 'react-dom';
-import '${path.join(FRONT, 'src/utils/GamepadPointer.js')}';
+import ${JSON.stringify(path.join(FRONT, 'src/utils/GamepadPointer.js'))};
 window.sent = []; window.skyrimPlatform = { sendMessage(...a) { window.sent.push(a); } };
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape') window.skyrimPlatform.sendMessage('menu:escape'); });
 const Panel = () => { const [hot, setHot] = useState(false);
@@ -44,7 +50,7 @@ const Panel = () => { const [hot, setHot] = useState(false);
   </div>; };
 ReactDOM.render(<Panel />, document.getElementById('root'));
 `);
-execFileSync(ESBUILD, [path.join(OUT, 'entry.jsx'), '--bundle', '--format=iife', '--define:process.env.NODE_ENV="production"', '--log-level=error', `--outfile=${path.join(OUT, 'bundle.js')}`], { stdio: 'inherit', env: { ...process.env, NODE_PATH: NM } });
+esbuild.buildSync({ entryPoints: [path.join(OUT, 'entry.jsx')], bundle: true, format: 'iife', define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'error', outfile: path.join(OUT, 'bundle.js'), nodePaths: [NM] });
 (async () => {
   const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--disable-gpu'] });
   try {
