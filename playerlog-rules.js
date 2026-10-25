@@ -624,6 +624,7 @@ excluded('WRITTEN', 'a written work\'s title, quoted');
 excluded('EVENT', 'the event announcement\'s text');
 excluded('GUILD', 'player guild names, a GM\'s reason');
 excluded('BOUNTY', 'the reason a ruler gave for a bounty');
+excluded('FACTION-RANK FACTION-MERGE', 'config-run faction upkeep at load (guilds.js addRanks, mergeRosters): faction names, rank titles and stored member names, no who()');
 excluded('EXPOSURE', 'staff only: who was seen changing into a beast, its witnesses and a GM\'s reason');
 excluded('LEADERSHIP', 'staff only: a double still seated days after the step-down notice; its seats are rank titles a faction\'s leader or a Lead GM renames, player-named charters and risings, and office names staff can rename');
 excluded('REBELLION', 'player-named risings and a secret petition\'s code');
@@ -1361,6 +1362,7 @@ bank.js BANK 858f3e4b parsed
 bank.js BANK 9a871c63 parsed
 bank.js BANK 9603dfa8 parsed
 bank.js BANK 385d28ea parsed
+bank.js BANK b26ffbd5 parsed
 blackreach.js BLACKREACH 3be01906 clean
 beastform.js BEAST d8772b8c clean
 beastform.js <expr> 403600c0 excluded
@@ -1625,6 +1627,9 @@ guilds.js FACTION 87ee4dd3 parsed
 guilds.js FACTION 9d54f47c parsed
 guilds.js FACTION 20feef99 parsed
 guilds.js FACTION bdc6897e parsed
+guilds.js FACTION-RANK 77565f59 excluded
+guilds.js FACTION-MERGE 03cc2a6a excluded
+guilds.js FACTION-MERGE 2062ec33 excluded
 jail.js JAIL 9a6540c2 clean
 jail.js JAIL 9a6540c2 clean
 jail.js JAIL 0e8664e2 clean
@@ -1917,6 +1922,7 @@ supernatural.js GM 3c8e58ad parsed
 supernatural.js GM 4eae7552 parsed
 supernatural.js FEED c6171020 clean
 supernatural.js FEED 70f09eb9 clean
+supernatural.js FEED 54466fd0 clean
 supernatural.js FEED 9de7df49 clean
 supernatural.js FEED aeb2f1ce clean
 supernatural.js SUPERNATURAL bae7ad8d parsed
