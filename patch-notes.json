@@ -1,5 +1,20 @@
 [
   {
+    "title": "Equilibrium is back",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Spells",
+        "items": [
+          "Equilibrium can be learned, prepared and cast again.",
+          "It now trades 25 health for 15 magicka each second while you hold it (it was 25 for 25), so it is a last resort rather than a magicka well."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Stone quarries and clay deposits",
     "date": "2026-10-25",
     "version": "Server update",
