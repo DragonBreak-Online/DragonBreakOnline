@@ -137,6 +137,8 @@ def build(lo, defs):
 
     # Drops named by editor id (drops.alwaysEdid): one pass over the item records of every plugin, the last one winning
     wanted = {str(e).lower() for b in defs['bosses'] for e, _ in (b.get('drops') or {}).get('alwaysEdid', [])}
+    wanted |= {str(x[0]).lower() for b in defs['bosses'] for x in (b.get('drops') or {}).get('extraEdid', [])}
+    wanted |= {str(b['rearmEdid']).lower() for b in defs['bosses'] if b.get('rearmEdid')}
     item_by_edid = {}
     if wanted:
         for p in lo.plugins:
@@ -167,7 +169,13 @@ def build(lo, defs):
     for b in defs['bosses']:
         who = b['id']
         w = key_of(b['world'])
-        o = {k: v for k, v in b.items() if k not in ('bossEdid', 'addEdids', 'guardian', 'drops', 'spots')}
+        o = {k: v for k, v in b.items() if k not in ('bossEdid', 'addEdids', 'guardian', 'drops', 'spots', 'rearmEdid')}
+        if b.get('rearmEdid'):
+            hit = item_by_edid.get(str(b['rearmEdid']).lower())
+            if hit and hit[1] == 'WEAP':
+                o['rearm'] = lo.desc(hit[0])
+            else:
+                bad.append(f"{who}: no weapon '{b['rearmEdid']}' to rearm with")
         o['world'] = lo.desc(w)
         o['boss'] = actor(b['bossEdid'], who)
         o['adds'] = [x for x in (actor(e, who + ' add') for e in b.get('addEdids', [])) if x]
@@ -192,6 +200,12 @@ def build(lo, defs):
                 bad.append(f"{who}: no item '{e}' in this load order")
                 continue
             drops['always'].append([lo.desc(hit[0]), n, hit[2]])
+        for e, chance, n in dr.get('extraEdid', []):
+            hit = item_by_edid.get(str(e).lower())
+            if not hit:
+                bad.append(f"{who}: no item '{e}' in this load order")
+                continue
+            drops.setdefault('extra', []).append([lo.desc(hit[0]), chance, n, hit[2]])
         if 'shards' in dr:
             drops['shards'] = dict(dr['shards'], desc=item(dr['shards'].get('desc'), who, dr['shards'].get('confirmedBy', '')) or '')
         for key in ('schematic', 'extraSchematic'):
@@ -223,6 +237,8 @@ def teleports(out, path):
     world_names = {str(r['world']).lower(): r.get('worldName', '') for r in loc['locations']}
     n = 0
     for b in out['bosses']:
+        if b.get('devOnly'):
+            continue   # a dev server's test, never a teleport on the live list
         for sp in b['spots']:
             where = ', '.join(x for x in [sp['id'] if len(b['spots']) > 1 else '', (sp.get('note') or '').split(',')[0] if len(b['spots']) == 1 else ''] if x)
             hold = b.get('hold') or ''

@@ -22,6 +22,10 @@
 // When:  a boss with night true stands only at night (worldclock.js __dboClock.isNight), its fight running on past dawn; a
 //         boss with event { minutes, waveEverySeconds, waveSize } stands only while an event a Lead GM starts lasts
 //         (/bossevent <id>), and a wave of waveSize adds comes every waveEverySeconds until it ends, felled or not.
+// Rare extras: drops.extra [[desc, chance, count]] rolled for each rewarded fighter (the Centurion's Heart Stone).
+// Tests: a boss with devOnly true runs only where bosses.devOnly is true (the dev server); rearm names a weapon put back in
+// a spawned boss's inventory when it lacks it (dungeons.js's arming: the server's EquipBestWeapon wears it at the next host
+// grant), and traceEquipment logs every change of the boss's equipment (the Minotaur Lord's axe test, 25 Oct).
 // State in bosses-state.json: { lockouts: { <boss>: { <profile>: until } }, spot: { <boss>: index }, kills: { <boss>: at } }.
 // gamemode-config.json "bosses": { enabled, creditShare, lockoutHours, pollSeconds, only: [ids], off: [ids], <boss id>: { enabled, spot } }:
 // each boss goes live on its own (its block's enabled over bosses.json's), and spot names the candidate it stands at (Nat's pick)
@@ -42,7 +46,7 @@ module.exports = (api) => {
   const readJson = (file, fallback) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return fallback; } };
   const DEFS = (readJson(path.resolve('bosses.json'), { bosses: [] }).bosses || []).filter((b) => b && b.id && b.boss && Array.isArray(b.spots) && b.spots.length);
   const own = (b) => (C[b.id] && typeof C[b.id] === 'object' ? C[b.id] : {});
-  const on = (b) => C.enabled && (own(b).enabled !== undefined ? own(b).enabled === true : b.enabled !== false) && (!Array.isArray(C.only) || C.only.includes(b.id)) && !(C.off || []).includes(b.id);
+  const on = (b) => C.enabled && (!b.devOnly || C.devOnly === true) && (own(b).enabled !== undefined ? own(b).enabled === true : b.enabled !== false) && (!Array.isArray(C.only) || C.only.includes(b.id)) && !(C.off || []).includes(b.id);
   const BOSSES = DEFS.filter(on);
   const byId = new Map(BOSSES.map((b) => [b.id, b]));
   const idOf = (desc) => { try { return mp.getIdFromDesc(String(desc)) >>> 0; } catch (e) { return 0; } };
@@ -166,6 +170,7 @@ module.exports = (api) => {
         glow([id], true, r.boss.world);
         tell(r.boss, (r.boss.announce || {}).spawn);
         audit(`BOSS ${r.boss.id} rose at ${spotOf(r.boss).id}`);
+        if (r.boss.rearm) rearm(r.boss, id);
       } else if (r.role === 'guardian' && !f.guardian) {
         f.guardian = id;
         G.byActor.set(id, { boss: r.boss.id, role: 'guardian' });
@@ -196,6 +201,13 @@ module.exports = (api) => {
     // A night boss rises at dusk and goes at dawn; an event's zones come and go with it
     const sig = standingSig();
     if (sig !== G.standingSig || G.zoneSig === '') { G.standingSig = sig; writeZones(); }
+    // The equipment trace of a test boss: a line whenever what it wears changes
+    for (const b of BOSSES) {
+      const f = G.fights.get(b.id);
+      if (!f || !f.boss || !b.traceEquipment) continue;
+      const eq = worn(f.boss);
+      if (eq !== f.lastWorn) { log(`bosses: ${b.id} ${f.boss.toString(16)} equipment ${f.lastWorn === undefined ? 'at spawn' : 'changed'}: ${eq}`); f.lastWorn = eq; }
+    }
     // Enrage
     for (const b of BOSSES) {
       const f = G.fights.get(b.id);
@@ -206,6 +218,23 @@ module.exports = (api) => {
         log(`bosses: ${b.id} enraged`);
       }
     }
+  };
+
+  // What a boss wears, for the trace: its equipment's worn entries, else the raw value
+  const worn = (id) => {
+    const eq = get(id, 'equipment');
+    const entries = eq && eq.inv && Array.isArray(eq.inv.entries) ? eq.inv.entries : null;
+    if (entries) return JSON.stringify(entries.filter((e) => e && e.worn).map((e) => (Number(e.baseId) >>> 0).toString(16)));
+    return JSON.stringify(eq === undefined ? null : eq).slice(0, 300);
+  };
+  // The weapon a test boss should hold, back in its inventory when the copy came without it (dungeons.js armLease)
+  const rearm = (b, id) => {
+    const wid = idOf(b.rearm);
+    if (!wid) return;
+    let entries = []; try { const inv = mp.get(id, 'inventory'); entries = inv && Array.isArray(inv.entries) ? inv.entries.slice() : []; } catch (e) { return; }
+    const had = entries.some((e) => (Number(e.baseId) >>> 0) === wid);
+    if (!had) { entries.push({ baseId: wid, count: 1 }); try { mp.set(id, 'inventory', { entries }); } catch (e) { log('bosses: rearm failed', e.message); return; } }
+    log(`bosses: ${b.id} ${id.toString(16)} ${had ? 'already carries' : 'rearmed with'} ${b.rearm} (worn on the next host grant)`);
   };
 
   // A summon's, a raised corpse's or a companion's blow counts for its owner (contracts.js creditedTo)
@@ -290,6 +319,7 @@ module.exports = (api) => {
         const s = schematic(p, dr.extraSchematic.family);
         if (s.given) { got.push(s.name); personal(p, `Among the remains you find ${s.name}.`); }
       }
+      for (const [desc, chance, n] of dr.extra || []) if (Math.random() < (Number(chance) || 0) && giveDesc(p, desc, Number(n) || 1)) got.push(`${Number(n) || 1}x ${desc} (rare)`);
       if (shards > 0 && giveDesc(p, dr.shards.desc, shards)) got.push(`${shards}x ${dr.shards.desc}`);
       (state().lockouts[b.id] = state().lockouts[b.id] || {})[pid] = now + lock;
       personal(p, `${titled(b.name)} falls.${got.length ? ' Your share is in your pack.' : ''}`);

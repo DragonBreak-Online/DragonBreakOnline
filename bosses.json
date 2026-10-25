@@ -750,6 +750,14 @@
    ],
    "drops": {
     "always": [],
+    "extra": [
+     [
+      "17749:Dragonborn.esm",
+      0.05,
+      1,
+      "DLC2HeartStone"
+     ]
+    ],
     "schematic": {
      "family": "dwarven",
      "chance": 0.08,
@@ -2772,6 +2780,286 @@
     ],
     "schematic": {
      "family": "glass",
+     "chance": 0.03,
+     "knownBonus": 0
+    }
+   }
+  },
+  {
+   "id": "karstaag",
+   "name": "Karstaag",
+   "enabled": false,
+   "waitingOn": "Solstheim, closed by the region lock (playtest.closedPlugins, Nate 14-15 Oct): turn it on when Solstheim opens (bosses.karstaag.enabled true)",
+   "hold": "",
+   "world": "800:Dragonborn.esm",
+   "openingAdds": 2,
+   "waves": [
+    [
+     0.66,
+     3
+    ],
+    [
+     0.33,
+     3
+    ]
+   ],
+   "toughness": 0.5,
+   "damageMult": 1.25,
+   "enrageSeconds": 600,
+   "enrage": {
+    "toughness": 0.25,
+    "damageMult": 2
+   },
+   "respawnSeconds": 14400,
+   "radius": 6000,
+   "announce": {
+    "spawn": "The throne of Castle Karstaag is no longer empty.",
+    "death": "Karstaag falls, for now."
+   },
+   "boss": {
+    "edid": "DLC2dunKarstaag",
+    "desc": "19665:Dragonborn.esm",
+    "options": [
+     [
+      90,
+      "19665:Dragonborn.esm",
+      "DLC2dunKarstaag"
+     ]
+    ]
+   },
+   "adds": [
+    {
+     "edid": "EncIceWraith",
+     "desc": "23ab3:Skyrim.esm",
+     "options": [
+      [
+       9,
+       "23ab3:Skyrim.esm",
+       "EncIceWraith"
+      ]
+     ]
+    }
+   ],
+   "spots": [
+    {
+     "id": "CK",
+     "pos": [
+      33312,
+      89920,
+      6294
+     ],
+     "note": "Castle Karstaag Ruins (its map marker), Solstheim",
+     "ref": "1e079:Dragonborn.esm",
+     "anchorDist": 1238,
+     "anchorSameCell": true
+    }
+   ],
+   "drops": {
+    "always": [
+     [
+      "3ad5f:Skyrim.esm",
+      2
+     ],
+     [
+      "2b06b:Dragonborn.esm",
+      3,
+      "DLC2OreStalhrim"
+     ]
+    ]
+   }
+  },
+  {
+   "id": "minotaurtest1",
+   "name": "the Minotaur Lord of Sancre Tor",
+   "enabled": true,
+   "devOnly": true,
+   "traceEquipment": true,
+   "hold": "bruma",
+   "world": "a764b:BSHeartland.esm",
+   "openingAdds": 0,
+   "waves": [],
+   "toughness": 0.5,
+   "damageMult": 1.25,
+   "enrageSeconds": 600,
+   "enrage": {
+    "toughness": 0.25,
+    "damageMult": 2
+   },
+   "respawnSeconds": 600,
+   "radius": 5000,
+   "announce": {
+    "spawn": "",
+    "death": ""
+   },
+   "_test": "B9 test 1 (25 Oct): the Minotaur Lord as is, hostile. Does BSKMinotaurLordAxe stay worn through a host change? traceEquipment logs every change of what it wears",
+   "boss": {
+    "edid": "CYREncMinotaur02Lord",
+    "desc": "d6fe5:BSHeartland.esm",
+    "options": [
+     [
+      44,
+      "d6fe5:BSHeartland.esm",
+      "CYREncMinotaur02Lord"
+     ]
+    ]
+   },
+   "adds": [],
+   "spots": [
+    {
+     "id": "ST",
+     "pos": [
+      -147.05,
+      195899.08,
+      5860.0
+     ],
+     "heading": 51.6,
+     "note": "Sancre Tor Ruins, the Minotaur Lord's spot (183380:DragonBreak Online Edits.esp)",
+     "ref": "e254a:BSHeartland.esm",
+     "anchorDist": 2626,
+     "anchorSameCell": false
+    }
+   ],
+   "drops": {
+    "always": [],
+    "schematic": {
+     "family": "adamantium",
+     "chance": 0.03,
+     "knownBonus": 0
+    }
+   }
+  },
+  {
+   "id": "minotaurtest2",
+   "name": "the Minotaur Lord of Sancre Tor",
+   "enabled": true,
+   "devOnly": true,
+   "traceEquipment": true,
+   "hold": "bruma",
+   "world": "a764b:BSHeartland.esm",
+   "openingAdds": 0,
+   "waves": [],
+   "toughness": 0.5,
+   "damageMult": 1.25,
+   "enrageSeconds": 600,
+   "enrage": {
+    "toughness": 0.25,
+    "damageMult": 2
+   },
+   "respawnSeconds": 600,
+   "radius": 5000,
+   "announce": {
+    "spawn": "",
+    "death": ""
+   },
+   "_test": "B9 test 2: the same, with its axe put back in its inventory after spawn (dungeons.js's arming), so the next host grant wears it",
+   "rearm": "6026df:BSAssets.esm",
+   "boss": {
+    "edid": "CYREncMinotaur02Lord",
+    "desc": "d6fe5:BSHeartland.esm",
+    "options": [
+     [
+      44,
+      "d6fe5:BSHeartland.esm",
+      "CYREncMinotaur02Lord"
+     ]
+    ]
+   },
+   "adds": [],
+   "spots": [
+    {
+     "id": "ST2",
+     "pos": [
+      -547.05,
+      195599.08,
+      5860.0
+     ],
+     "heading": 51.6,
+     "note": "Sancre Tor Ruins, 500 units from test 1's spot",
+     "ref": "e254a:BSHeartland.esm",
+     "anchorDist": 2525,
+     "anchorSameCell": false
+    }
+   ],
+   "drops": {
+    "always": [],
+    "schematic": {
+     "family": "adamantium",
+     "chance": 0.03,
+     "knownBonus": 0
+    }
+   }
+  },
+  {
+   "id": "risenlegate",
+   "name": "the Risen Legate of Sancre Tor",
+   "enabled": true,
+   "devOnly": true,
+   "hold": "bruma",
+   "world": "a764b:BSHeartland.esm",
+   "openingAdds": 2,
+   "waves": [
+    [
+     0.5,
+     3
+    ]
+   ],
+   "toughness": 0.6,
+   "damageMult": 1.5,
+   "enrageSeconds": 600,
+   "enrage": {
+    "toughness": 0.3,
+    "damageMult": 2.5
+   },
+   "respawnSeconds": 14400,
+   "radius": 5000,
+   "announce": {
+    "spawn": "The dead of Sancre Tor stir around their Legate.",
+    "death": "The Risen Legate of Sancre Tor lies still."
+   },
+   "_test": "B9 fallback if no minotaur works: the undead Nate put in the Minotaur Lords' spots (9 Oct; no Ayleid undead at Sancre Tor)",
+   "boss": {
+    "edid": "BSKEncZombie03",
+    "desc": "60292c:BSAssets.esm",
+    "options": [
+     [
+      25,
+      "60292c:BSAssets.esm",
+      "BSKEncZombie03"
+     ]
+    ]
+   },
+   "adds": [
+    {
+     "edid": "BSKEncZombie02",
+     "desc": "60292b:BSAssets.esm",
+     "options": [
+      [
+       14,
+       "60292b:BSAssets.esm",
+       "BSKEncZombie02"
+      ]
+     ]
+    }
+   ],
+   "spots": [
+    {
+     "id": "ST",
+     "pos": [
+      -247.05,
+      195799.08,
+      5860.0
+     ],
+     "heading": 51.6,
+     "note": "Sancre Tor Ruins, the Minotaur Lord's spot",
+     "ref": "e254a:BSHeartland.esm",
+     "anchorDist": 2608,
+     "anchorSameCell": false
+    }
+   ],
+   "drops": {
+    "always": [],
+    "schematic": {
+     "family": "adamantium",
      "chance": 0.03,
      "knownBonus": 0
     }

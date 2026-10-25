@@ -20000,6 +20000,22 @@
     0,
     0.0
    ]
+  },
+  {
+   "name": "Boss: Karstaag, Castle Karstaag Ruins (its map marker)",
+   "region": "Skyrim",
+   "world": "800:Dragonborn.esm",
+   "worldName": "Solstheim World",
+   "pos": [
+    33312,
+    89920,
+    6358
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
   }
  ]
 }
