@@ -574,7 +574,8 @@ const SEARCH_PAGE = 100;
 const SET_RADII = [10, 20, 40, 60];
 // The Warband view (server warband.js viewOf, packet adminWarbandView; Nat 25 Oct, W1-W10)
 export interface WarbandView {
-  members: Array<{ id: string; name: string; alive: boolean; dist: number | null; fighting: boolean }>;
+  // Step 1 of the rework (Nat, 25 Oct): health %, a state (dead, fighting, elsewhere, far behind, holding, following) and the target's name
+  members: Array<{ id: string; name: string; alive: boolean; dist: number | null; fighting: boolean; health?: number | null; state?: string; target?: string }>;
   counts: Array<{ name: string; count: number }>;
   placed: Array<{ id: string; name: string; hostile: boolean; alive: boolean; dist: number | null }>;
   players: Array<{ id: string; name: string; dist: number | null }>;
@@ -584,7 +585,19 @@ export interface WarbandView {
   presets: Array<{ name: string; count: number; what: string }>;
   onLogout: string; maxBand: number; maxRaise: number;
   last: { text: string; at: number } | null; at?: number;
+  // The GM's target (what the GM last struck, or who last struck the GM or the band), the foes near, the last NPC preview
+  target?: { id: string; name: string; dist: number | null } | null;
+  foes?: Array<{ id: string; name: string; dist: number }>;
+  info?: WarbandInfo | null;
 }
+// /warband info: an NPC before it is raised (server warband.js infoOf)
+export interface WarbandInfo {
+  desc: string; name: string; error?: string; kind?: string; level?: string; race?: string; types?: string[];
+  aggression?: string; settles?: boolean; refused?: string; entries?: number;
+}
+const warbandInfoLine = (i: WarbandInfo): string => i.error ? `${i.name || i.desc}: ${i.error}`
+  : [i.kind === 'leveled list' ? `leveled list of ${i.entries}` : i.kind, i.level ? `level ${i.level}` : '', i.race, i.aggression,
+    i.kind === 'leveled list' ? '' : i.settles ? 'can settle as a garrison' : 'would not settle', i.refused ? `refused: ${i.refused}` : ''].filter(Boolean).join(' · ');
 const WARBAND_COUNTS = [1, 2, 3, 5, 8, 10, 15, 20, 25];
 type PlaceView = 'catalog' | 'placed' | 'sets' | 'warband';
 const VIEWS: Array<[PlaceView, string]> = [['catalog', 'Catalog'], ['placed', 'Placed near me'], ['sets', 'Sets'], ['warband', 'Warband']];
@@ -743,11 +756,11 @@ export const PlaceTab = ({ events, placements, meta, results, sets, warband: ban
         <SearchBar value={search} onChange={setSearch} placeholder="Search NPCs to raise"
           chips={(meta ? meta.categories : []).map((c) => ({ id: c.id, label: c.label, count: c.count }))} chip={q ? '' : cat} onChip={(id) => { setCat(id); setSearch(''); }}
           plugins={meta ? meta.plugins : []} plugin={mod} onPlugin={setMod} onMove={cursor.move}
-          onEnter={() => { const r = npcRows[0]; if (r) setPicked(r); }} recent={recent.items} favourites={favs.items} onPick={pickSaved} />
+          onEnter={() => { const r = npcRows[0]; if (r) { setPicked(r); warband(`info ${r.desc}`); } }} recent={recent.items} favourites={favs.items} onPick={pickSaved} />
         <div className="admin-panel__list admin-panel__list--items">
           {!current ? <div className="admin-panel__empty">{meta ? 'Searching' : 'Loading the catalog'}</div> : npcRows.length === 0 ? <div className="admin-panel__empty">No NPC matches</div> : (
             npcRows.map((r) => (
-              <div key={r.desc} className={'admin-panel__row admin-panel__row--clickable' + (bandNpc && bandNpc.desc === r.desc ? ' admin-panel__row--selected' : '')} onClick={() => setPicked(r)}>
+              <div key={r.desc} className={'admin-panel__row admin-panel__row--clickable' + (bandNpc && bandNpc.desc === r.desc ? ' admin-panel__row--selected' : '')} onClick={() => { setPicked(r); warband(`info ${r.desc}`); }}>
                 <span className="admin-panel__cell admin-panel__cell--name">{r.name}</span>
                 <span className="admin-panel__cell admin-panel__cell--discord">{r.plugin.replace(/\.(esp|esm|esl)$/i, '')}</span>
               </div>
@@ -760,11 +773,16 @@ export const PlaceTab = ({ events, placements, meta, results, sets, warband: ban
           <Button text="Raise" width={96} height={32} disabled={!bandNpc || !mayPlace} onClick={() => bandNpc && ask(`raise ${bandNpc.desc} ${bandCount}`)} />
           <Button text="Refresh" width={104} height={32} onClick={() => adminRequest(events, 'adminWarbandView', {})} />
         </div>
+        {bandNpc && wb && wb.info && wb.info.desc === bandNpc.desc ? (
+          <div className="admin-panel__label admin-panel__warband-info">{bandNpc.name}: {warbandInfoLine(wb.info)}</div>
+        ) : null}
         <div className="admin-panel__list admin-panel__list--items">
           {!wb ? <div className="admin-panel__empty">Loading your warband</div> : wb.members.length === 0 ? <div className="admin-panel__empty">You lead no warband. Raise one above, or a saved band below.</div> : (
             wb.members.map((m) => (
               <div key={m.id} className="admin-panel__row">
-                <span className="admin-panel__cell admin-panel__cell--name">{m.name}{m.alive ? '' : ' (dead)'}{m.fighting ? ' (fighting)' : ''}</span>
+                <span className="admin-panel__cell admin-panel__cell--name">{m.name}</span>
+                <span className="admin-panel__cell admin-panel__cell--discord">{m.state ? (m.state === 'fighting' && m.target ? `fighting ${m.target}` : m.state) : (m.alive ? (m.fighting ? 'fighting' : '') : 'dead')}</span>
+                <span className="admin-panel__cell admin-panel__cell--discord">{m.alive && typeof m.health === 'number' ? `${m.health}%` : ''}</span>
                 <span className="admin-panel__cell admin-panel__cell--discord">{meters(m.dist)}</span>
                 <Button text="Dismiss" width={96} height={26} onClick={() => ask(`dismiss ${m.id}`)} />
               </div>
@@ -775,7 +793,9 @@ export const PlaceTab = ({ events, placements, meta, results, sets, warband: ban
           <div className="admin-panel__actions">
             <span className="admin-panel__label">{wb.counts.map((c) => `${c.count} ${c.name}`).join(', ')} &middot; {wb.members.length}/{wb.maxBand} &middot; {wb.stance === 'charging' ? 'charging' : wb.stance === 'stay' ? 'holding' : 'following'}</span>
             <Button text="Follow" width={96} height={32} disabled={wb.stance === 'follow'} onClick={() => ask('follow')} />
-            <Button text="Stay" width={90} height={32} disabled={wb.stance === 'stay'} onClick={() => ask('stay')} />
+            <Button text="Hold" width={90} height={32} disabled={wb.stance === 'stay'} onClick={() => ask('stay')} />
+            <Button text={wb.target ? `Attack ${wb.target.name}` : 'Attack my target'} width={190} height={32} disabled={!wb.target} onClick={() => ask('attacktarget')} />
+            <Button text="Attack nearest foe" width={180} height={32} disabled={!wb.foes || !wb.foes.length} onClick={() => ask('attacknearest')} />
             <Button text="Unleash (raid)" width={150} height={32} disabled={!mayHostile} onClick={() => ask('unleash')} />
             <Button text="Settle (garrison)" width={170} height={32} onClick={() => setSettling(true)} />
             <Button text="Dismiss all" width={120} height={32} onClick={() => setConfirm('dismiss')} />
@@ -801,7 +821,8 @@ export const PlaceTab = ({ events, placements, meta, results, sets, warband: ban
         ) : null}
         {wb && wb.members.length ? (
           <div className="admin-panel__actions">
-            <span className="admin-panel__label">Targets near you{wb.players.length || wb.npcs.length ? '' : ': none'}</span>
+            <span className="admin-panel__label">Targets near you{wb.players.length || wb.npcs.length || (wb.foes && wb.foes.length) ? '' : ': none'}{wb.target ? '' : ' (strike something and it becomes your target)'}</span>
+            {(wb.foes || []).map((f) => <Button key={`foe-${f.id}`} text={`Foe: ${f.name} ${meters(f.dist)}`} width={220} height={28} onClick={() => ask(`attacknpc ${f.id}`)} />)}
             {wb.players.map((p) => <Button key={p.id} text={`${p.name} ${meters(p.dist)}`} width={180} height={28} onClick={() => ask(`attack ${p.name}`)} />)}
             {wb.npcs.map((n) => <Button key={n.id} text={`${n.foe ? 'Enemy: ' : ''}${n.name} (${n.gm}) ${meters(n.dist)}`} width={240} height={28} onClick={() => ask(`attacknpc ${n.id}`)} />)}
           </div>
