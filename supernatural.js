@@ -1046,8 +1046,12 @@ module.exports = (api) => {
   // `chosen` is for the ways a player asks for this: the Great Hunt's mark and an admin's /super infect.
   // The share of a bite's or a feed's fever a race shrugs off (racial.js: the Argonian's Hist, with the overhaul on)
   const raceDiseaseResist = (t) => { try { const v = typeof globalThis.__dboRaceDiseaseResist === 'function' ? Number(globalThis.__dboRaceDiseaseResist(t >>> 0)) : 0; return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0; } catch (e) { return 0; } };
+  // A Briarheart (briarheart.js) has no heart of its own for a fever to take, and no curse is set on the Hagravens' briar
+  // A Hagraven's pact (hagraven.js) is as closed to a curse as the briar
+  const isBriarheart = (a) => { try { return (typeof globalThis.__dboIsBriarheart === 'function' && !!globalThis.__dboIsBriarheart(Number(a) >>> 0)) || (typeof globalThis.__dboHagravenStage === 'function' && Number(globalThis.__dboHagravenStage(Number(a) >>> 0)) > 0); } catch (e) { return false; } };
   const infect = (t, kind, by, chosen) => {
     const s = stateOf(t); if (!s || s.kind === kind || s.disease) return false;
+    if (isBriarheart(t)) { log(`supernatural: ${display(t)} is a Briarheart; ${kind} disease does not take`); return false; }
     // A werewolf does not catch vampirism from a scratch, nor a vampire lycanthropy. Lycanthropy's immunity to
     // disease is the vanilla rule, and surviving the other side's trial overwrites `kind`, so a random bite
     // could silently take a curse the player never agreed to give up (swag, 2026-09-27: a werewolf was handed
@@ -1461,6 +1465,7 @@ module.exports = (api) => {
     const waitMs = failedAt + C.riteFailCooldownHours * 3600000 - Date.now();
     if ((deity === 'molagbal' || deity === 'hircine') && waitMs > 0) return { reason: `The shrine is cold to you since you failed its rite. Try again in ${waitText(waitMs)}.`, loud: true };
     if (!deity) return { reason: 'Rites are made at a shrine: touch one of Molag Bal, Hircine, Arkay or Stendarr, then say /rite.' };
+    if ((deity === 'molagbal' || deity === 'hircine') && isBriarheart(a)) return { reason: 'You belong to the Hagravens\' craft already. No Prince takes you from them.' };
     if (deity === 'molagbal') {
       if (s.kind === 'vampire' && s.pure) return { reason: 'Your blood is already his.' };
       if (s.kind === 'werewolf') return { reason: 'Molag Bal will not take what Hircine has marked. Be cured first.' };

@@ -210,6 +210,8 @@ module.exports = (api) => {
     const fit = holding.filter((f) => faithFits(f, race)).sort((x, y) => (x.peoples || []).length - (y.peoples || []).length);
     return ((fit[0] || holding[0]) || {}).id || '';
   };
+  // The faith a character's god stands in (briarheart.js asks, for the Old Gods of the Reach)
+  globalThis.__dboFaithIdOf = (a) => faithIdOf(a, faithOf(a));
   // ── what a character worships ───────────────────────────────────────────────────────────────
   const faithOf = (a) => { try { const r = mp.get(a, 'private.dboDeity'); return r && typeof r === 'object' && r.id ? r : null; } catch (e) { return null; } };
   const setFaith = (a, v) => { try { mp.set(a, 'private.dboDeity', v); } catch (e) { log('prayer: faith save failed', e.message); } };
@@ -371,6 +373,16 @@ module.exports = (api) => {
   };
 
   const grantBlessing = (a, d, hours) => {
+    // A briar heart takes no Divine's blessing (briarheart.js); Sheogorath's pick comes back through here and is refused the same
+    if (d.kind === 'divine' && typeof globalThis.__dboBriarheartRefusesDivine === 'function') {
+      let no = ''; try { no = String(globalThis.__dboBriarheartRefusesDivine(a) || ''); } catch (e) { no = ''; }
+      if (no) { personal(a, no); return false; }
+    }
+    // A Hagraven's pact: no Divine but Kynareth (hagraven.js)
+    if (typeof globalThis.__dboHagravenRefusesDeity === 'function') {
+      let no = ''; try { no = String(globalThis.__dboHagravenRefusesDeity(a, d) || ''); } catch (e) { no = ''; }
+      if (no) { personal(a, no); return false; }
+    }
     if (d.capricious) {
       const other = capriceOf(d);
       if (!other) { personal(a, `${d.name} laughs, and gives you nothing. He may have meant to.`); return false; }
@@ -1498,6 +1510,11 @@ module.exports = (api) => {
   // the menu, because the brief moved conversion onto a menu key rather than a pilgrimage.
   const takeDeity = (a, d, opts) => {
     const faith = faithOf(a);
+    // A Briarheart keeps the Old Gods of the Reach while the briar beats (briarheart.js)
+    if (faith && typeof globalThis.__dboBriarheartFaithLock === 'function') {
+      let no = ''; try { no = String(globalThis.__dboBriarheartFaithLock(a) || ''); } catch (e) { no = ''; }
+      if (no) return { ok: false, text: no };
+    }
     // The faith asked for (the picker's), else the one this god is found in for this character; a god outside it is refused
     const wantFaith = opts && opts.faith ? faithById(opts.faith) : null;
     if (opts && opts.faith && (!wantFaith || !(wantFaith.patrons || []).includes(d.id))) return { ok: false, text: `${d.name} is no god of that faith.` };

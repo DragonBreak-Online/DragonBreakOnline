@@ -56,9 +56,11 @@ module.exports = (api) => {
     };
   };
   // The bonus the server adds to the maximum: the spent points plus the race's flat bonus (racial.js, the Half-Giant's +50 health)
+  // and a Briarheart's (briarheart.js)
   const avBonus = (a, spent) => {
     let r = { health: 0 }; try { if (typeof globalThis.__dboRaceVitalBonus === 'function') r = globalThis.__dboRaceVitalBonus(a) || r; } catch (e) { /* none */ }
-    return { health: (Number(spent.health) || 0) + (Number(r.health) || 0), magicka: Number(spent.magicka) || 0, stamina: Number(spent.stamina) || 0 };
+    let b = { health: 0 }; try { if (typeof globalThis.__dboBriarheartVitalBonus === 'function') b = globalThis.__dboBriarheartVitalBonus(a) || b; } catch (e) { /* none */ }
+    return { health: (Number(spent.health) || 0) + (Number(r.health) || 0) + (Number(b.health) || 0), magicka: Number(spent.magicka) || 0, stamina: Number(spent.stamina) || 0 };
   };
   const save = (a, st) => {
     st.per = CFG.perLevel;
@@ -200,6 +202,8 @@ module.exports = (api) => {
   }, { help: 'your character level and progress; /level <health|magicka|stamina> [n] spends points; staff: /level reset <player>' });
 
   globalThis.__dboCharLevel = (a) => stateOf(a).level;
+  // A bonus that changed outside a level spend (briarheart.js): written, and a gain sent to the client at once
+  globalThis.__dboCharLevelSyncBonus = (a) => { try { syncBonus(Number(a) >>> 0, stateOf(Number(a) >>> 0)); } catch (e) { log('charlevel: bonus sync failed', e.message); } };
   globalThis.__dboCharLevelPending = (a) => Number(stateOf(a).pending) || 0;
   // Never focused at login: a focused panel held the keyboard and the player could not move until it was closed
   globalThis.__dboCharLevelLogin = (a) => {
