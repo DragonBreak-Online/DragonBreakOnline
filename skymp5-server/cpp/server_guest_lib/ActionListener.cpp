@@ -1955,8 +1955,43 @@ void ActionListener::OnDropItem(const RawMessageData& rawMsgData,
   entry.SetWorn(Inventory::Worn::None);
 
   const auto owned = ac->GetInventory().FindEntriesFor(entry);
+
+  // The ground deletes a dropped item after two minutes (MpActor::DropItem), so anything a player made does not
+  // go there at all (Nat, 25 Oct). The test is the one DropItem uses to decide whether extras are worth keeping,
+  // so exactly the items that would carry extras onto the ground are the ones refused. HasIdentityExtras is not
+  // the test: SameItemAs ignores names and charge, which is most of what a player makes.
+  auto carriesExtras = [](const Inventory::Entry& e) {
+    Inventory::Entry probe = e;
+    probe.SetWorn(Inventory::Worn::None);
+    return !probe.EqualExceptCount(Inventory::Entry(e.baseId, e.count));
+  };
+  // Either side is enough: a client that reports no extras must not strip a made item, and one that invents them
+  // only ever refuses its own drop
+  const bool madeItem = carriesExtras(entry) ||
+    std::any_of(owned.begin(), owned.end(), carriesExtras);
+  if (madeItem) {
+    spdlog::info("MpActor::DropItem - refused for {:x}: base {:x} x{} carries extras, a made item stays in the pack",
+                 ac->GetFormId(), baseId, msg.count);
+    // The client has already taken it out of its own pack, so the server's inventory goes back or the two desync
+    ac->SetInventory(ac->GetInventory());
+    const auto userId = partOne.serverState.UserByActor(ac);
+    if (userId != Networking::InvalidUserId) {
+      const std::string what = entry.name && !entry.name->empty()
+        ? *entry.name
+        : std::string("a made item");
+      nlohmann::json notice{ { "customPacketType", "notification" },
+                             { "text",
+                               "You can't drop " + what +
+                                 " on the ground; store, sell or trade it instead." } };
+      partOne.SendCustomPacket(userId, notice.dump());
+    }
+    return;
+  }
+
   if (owned.empty()) {
-    return ac->DropItem(baseId, Inventory::Entry(baseId, msg.count));
+    // The assembled entry, not a bare one: a bare entry loses every extra, and DropItem then skips
+    // SetPickupExtras because the entry matches a bare one, so the item used to hit the ground stripped
+    return ac->DropItem(baseId, entry);
   }
   for (const auto& e : owned) {
     // Charge used since the last report would come back full on pickup, so the copy takes the dropping client's charge first

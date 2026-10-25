@@ -2081,6 +2081,10 @@ void MpActor::DropItem(const uint32_t baseId, const Inventory::Entry& entry)
 
   uint32_t droppedItemFormId = placedObject->GetFormId();
 
+  // The drop path had no log at info, so a lost item could not be traced at all (ticket #0409, 25 Oct)
+  spdlog::info("MpActor::DropItem - {:x} dropped {:x} x{} as {:x}, extras {}", GetFormId(), baseId, count,
+               droppedItemFormId, dropped.EqualExceptCount(Inventory::Entry(baseId, count)) ? "no" : "yes");
+
   // Filter our dropped items queue
   pImpl->droppedItemsQueue.erase(
     std::remove_if(
@@ -2106,8 +2110,8 @@ void MpActor::DropItem(const uint32_t baseId, const Inventory::Entry& entry)
       reference == worldState->LookupFormById(referenceFormId).get();
     if (referenceAlive) {
       if (!reference->IsDeleted()) {
-        spdlog::trace("MpActor::DropItem - deleting previously dropped {}",
-                      editorId);
+        spdlog::info("MpActor::DropItem - {:x} dropped an 11th item, deleting {:x} ({}) from the queue of {}",
+                     GetFormId(), referenceFormId, editorId, kDroppedItemsQueueMax);
         reference->Delete();
       } else {
         spdlog::warn("MpActor::DropItem - reference in queue was deleted");
@@ -2143,8 +2147,8 @@ void MpActor::DropItem(const uint32_t baseId, const Inventory::Entry& entry)
       return;
     }
 
-    spdlog::trace("MpActor::DropItem - deleting previously dropped {}",
-                  editorId);
+    spdlog::info("MpActor::DropItem - deleting dropped {:x} ({}) {} s after it was dropped",
+                 droppedItemFormId, editorId, kDeletionTimeSeconds);
 
     // Item deleted, not in queue anymore
     auto it = std::remove(this->pImpl->droppedItemsQueue.begin(),
