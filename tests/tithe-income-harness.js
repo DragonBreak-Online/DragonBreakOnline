@@ -120,6 +120,7 @@ const MARKED = [
   ['gamemode.js', /depositToTreasury\(z && typeof z === 'object' \? z\.id : z, gold, \{ income: 'temple offerings' \}\)/, 'temple offering'],
   ['bank.js', /const income = kind \|\| 'vault fees';\n\s*if \(depositToTreasury\(zone\.id, n, \{ income \}\)/, 'vault fees'],
   ['bank.js', /payHold\(zone, price, 'gem sales'\)/, 'gem sales'],
+  ['gamemode.js', /depositToTreasury\(hold\.id, share, \{ income: 'coin purses' \}\)/, 'coin purses'],
 ];
 for (const [f, rx, what, count] of MARKED) check(`${f}: ${what} is marked income`, (src(f).match(rx.global ? rx : new RegExp(rx.source, 'g')) || []).length === (count || 1));
 check('contracts.js: a contract reward returned is not income', /bankTreasury\(\)\.deposit\(zone\.id, amount\);/.test(src('contracts.js')));

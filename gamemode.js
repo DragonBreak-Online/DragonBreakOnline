@@ -5473,7 +5473,10 @@ try {
 // Vanilla coin purses are flora whose produce is a leveled gold list; the engine cannot hand that
 // over through the server, so the gamemode does: Harvesting tier decides the chance and the purse,
 // the purse then rests for a while for everyone. Credits Harvesting work through the skill system.
-const PURSE = Object.assign({ enabled: true, restMinutes: 45, goldMin: 8, goldMax: 30, unskilledChance: 0.25, unskilledMult: 0.5 }, cfg.coinPurses || {});
+// holdShare (Nat, 25 Oct: "diversify how holds get more income"): that share of each purse goes to the treasury of the hold the
+// purse stands in (its pinned cell indoors, the land outdoors), the opener keeps the rest; no new gold. A purse in no hold,
+// or in a hold without a treasury, is the opener's whole
+const PURSE = Object.assign({ enabled: true, restMinutes: 45, goldMin: 8, goldMax: 30, unskilledChance: 0.25, unskilledMult: 0.5, holdShare: 0.1 }, cfg.coinPurses || {});
 const HARVESTING = ((SKILLS_DEF.skills || []).find((k) => k.id === 'harvesting')) || {};
 const purseRest = globalThis.__dboPurseRest = globalThis.__dboPurseRest || new Map(); // refId -> until
 // A rest kept only in memory was lost at every restart, so each push to fork main refilled every purse and wisp stalk
@@ -5551,11 +5554,23 @@ globalThis.__dboCoinPurse = (targetId, casterId) => {
   setRest(purseRest, targetId, Date.now() + PURSE.restMinutes * 60000);
   if (Math.random() > chance) return say('You find nothing worth taking in the purse.');
   const gold = Math.max(1, Math.round((PURSE.goldMin + Math.random() * (PURSE.goldMax - PURSE.goldMin)) * mult));
-  if (giveItem(casterId, 0xf, gold)) {
-    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('loot', 'coin_purse', casterId, targetId, [], gold); } catch (e) { /* the player log is optional */ }
-    personal(casterId, `You pocket ${gold} gold from the purse.`);
+  // The hold's share: paid in only once the opener holds their part, and handed to the opener if the treasury will not take it
+  let hold = null;
+  try { const w = String(mp.get(targetId, 'worldOrCellDesc') || ''); const zid = w ? zoneAtPlace(w, mp.get(targetId, 'pos')) : null; hold = zid ? zoneById(zid) : null; } catch (e) { hold = null; }
+  const share = hold && hold.treasury ? Math.floor(gold * Math.max(0, Math.min(1, Number(PURSE.holdShare) || 0))) : 0;
+  const mine = gold - share;
+  if (giveItem(casterId, 0xf, mine)) {
+    let paid = 0;
+    if (share > 0) {
+      try { paid = Number(depositToTreasury(hold.id, share, { income: 'coin purses' })) || 0; } catch (e) { paid = 0; log('purse share failed', e.message); }
+      if (paid !== share && !giveItem(casterId, 0xf, share - paid)) log(`purse share: ${share - paid} gold for ${who(casterId)} could not be handed over`);
+    }
+    const kept = gold - paid;
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('loot', 'coin_purse', casterId, targetId, [], kept); } catch (e) { /* the player log is optional */ }
+    personal(casterId, paid > 0 ? `You pocket ${kept} gold from the purse; ${paid} goes to the ${hold.name} treasury.` : `You pocket ${kept} gold from the purse.`);
+    if (paid > 0) audit(`PURSE ${who(casterId)} opened a purse in ${hold.id}: ${gold} gold, ${paid} to its treasury`);
     // Imperial Luck (racial.js goldBonus): a purse is loot, so it pays the Imperial's share like a chest (Nate, 18 Oct)
-    try { if (typeof globalThis.__dboRaceGold === 'function') globalThis.__dboRaceGold(casterId, gold, 'a coin purse'); } catch (e) { log('racial gold failed', e.message); }
+    try { if (typeof globalThis.__dboRaceGold === 'function') globalThis.__dboRaceGold(casterId, kept, 'a coin purse'); } catch (e) { log('racial gold failed', e.message); }
     try { if (typeof globalThis.__alduinakMasteryEvent === 'function') globalThis.__alduinakMasteryEvent('activate', casterId, { refrId: targetId }); } catch (e) { /* no skill system */ }
   }
   return true;
