@@ -29,12 +29,16 @@
     "CYRCraftingAyleidWell": ["cyrodiil"]
   },
   "items": {
+    "_decor": "Home decorating's materials (decor.js, 25 Oct): Quartz is mined in Skyrim and Cyrodiil, the two provinces players build in; glass is smelted from it wherever it is found, and straw is threshed from wheat everywhere. Keyed by editor id: the DLE's load-order prefix can move.",
+    "DBO_Quartz": ["skyrim", "cyrodiil"],
     "_staples": "Butter, flour and milk are made and sold all over Tamriel (lore); only Hearthfire's own lists put them in Skyrim, so 17 Cook recipes could not be made in the Bruma lock (Worker F's cooking census, 30 Sep).",
     "BYOHFoodButter": "common",
     "BYOHFoodFlour": "common",
     "BYOHFoodMilk": "common"
   },
   "recipes": {
+    "DBO_DecorRecipeGlass": ["skyrim", "cyrodiil"],
+    "DBO_DecorRecipeStraw": "common",
     "_nordic": "Nordic carved gear (smithing.json family nordic: Dragonborn's recipes and the server's Nord1/Nord2 sets) is forged in Skyrim as well as Solstheim, as Dwarven and Dragon are: its schematic is found in Skyrim's Nordic barrows and by reading, so a smith who learned it in Skyrim was refused there as \"a Solstheim design\" (/bug #BGJN, 24 Oct). regions.json marks Dragonborn's recipes Solstheim by the plugin.",
     "DLC2RecipeArmorNordicShield": ["skyrim", "solstheim"],
     "DLC2RecipeArmorNordicHeavyBoots": ["skyrim", "solstheim"],
