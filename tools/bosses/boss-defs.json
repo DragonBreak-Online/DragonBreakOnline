@@ -718,9 +718,20 @@
     }
    ],
    "bossEdid": "CYREncMinotaur02Lord",
-   "addEdids": [],
+   "addEdids": [
+    "CYREncMinotaur"
+   ],
    "openingAdds": 0,
-   "waves": [],
+   "waves": [
+    [
+     0.66,
+     2
+    ],
+    [
+     0.33,
+     2
+    ]
+   ],
    "toughness": 0.5,
    "damageMult": 1.25,
    "enrageSeconds": 600,
@@ -758,7 +769,9 @@
     }
    },
    "waitingOn": "the dev test of the Minotaur Lord's axe (minotaurtest1/2): set rearmEdid to match the test that kept it, then enable",
-   "_note": "Drops (proposed, 25 Oct): Minotaur Horn x2 and Minotaur Hide (BSAssets, the beast's own), gold, Steel Plate 5%. Minotaur's Rest's own spawns are undead today (ownedSpawns.replace minotaur); if the Lord fights, Nat may want its minotaurs back as his adds"
+   "_note": "Drops (proposed, 25 Oct): Minotaur Horn x2 and Minotaur Hide (BSAssets, the beast's own), gold, Steel Plate 5%. Minotaur's Rest's own spawns are undead today (ownedSpawns.replace minotaur); if the Lord fights, Nat may want its minotaurs back as his adds",
+   "rearmAddsEdid": "BSKMinotaurWarAxe",
+   "_adds": "Nat, 25 Oct: the minotaurs come back at Minotaur's Rest as his adds; each gets its war axe back in its inventory (rearmAdds), as the Lord's test 2 does"
   },
   {
    "id": "minotaurtest1",
@@ -781,9 +794,20 @@
     }
    ],
    "bossEdid": "CYREncMinotaur02Lord",
-   "addEdids": [],
+   "addEdids": [
+    "CYREncMinotaur"
+   ],
    "openingAdds": 0,
-   "waves": [],
+   "waves": [
+    [
+     0.66,
+     2
+    ],
+    [
+     0.33,
+     2
+    ]
+   ],
    "toughness": 0.5,
    "damageMult": 1.25,
    "enrageSeconds": 600,
@@ -820,7 +844,8 @@
      "knownBonus": 0
     }
    },
-   "_test": "B9 test 1 (Nat, 25 Oct: the Minotaur Lord moves to Minotaur's Rest): CYREncMinotaur02Lord as is, hostile. Does BSKMinotaurLordAxe stay worn through a host change? traceEquipment logs every change"
+   "_test": "B9 test 1 (Nat, 25 Oct: the Minotaur Lord moves to Minotaur's Rest): CYREncMinotaur02Lord as is, hostile. Does BSKMinotaurLordAxe stay worn through a host change? traceEquipment logs every change",
+   "_adds": "Test 1 as is: the Lord and his minotaurs keep only what their records give them"
   },
   {
    "id": "minotaurtest2",
@@ -844,9 +869,20 @@
     }
    ],
    "bossEdid": "CYREncMinotaur02Lord",
-   "addEdids": [],
+   "addEdids": [
+    "CYREncMinotaur"
+   ],
    "openingAdds": 0,
-   "waves": [],
+   "waves": [
+    [
+     0.66,
+     2
+    ],
+    [
+     0.33,
+     2
+    ]
+   ],
    "toughness": 0.5,
    "damageMult": 1.25,
    "enrageSeconds": 600,
@@ -883,7 +919,9 @@
      "knownBonus": 0
     }
    },
-   "_test": "B9 test 2: the same, its axe put back in its inventory after spawn (dungeons.js's arming), worn at the next host grant"
+   "_test": "B9 test 2: the same, its axe put back in its inventory after spawn (dungeons.js's arming), worn at the next host grant",
+   "rearmAddsEdid": "BSKMinotaurWarAxe",
+   "_adds": "Nat, 25 Oct: the minotaurs come back at Minotaur's Rest as his adds; each gets its war axe back in its inventory (rearmAdds), as the Lord's test 2 does"
   }
  ]
 }

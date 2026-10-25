@@ -171,6 +171,10 @@ module.exports = (api) => {
         tell(r.boss, (r.boss.announce || {}).spawn);
         audit(`BOSS ${r.boss.id} rose at ${spotOf(r.boss).id}`);
         if (r.boss.rearm) rearm(r.boss, id);
+      } else if (r.role !== 'boss' && r.role !== 'guardian' && r.boss.rearmAdds) {
+        // An add of a kind whose weapon would not stay in hand (the Minotaur Lord's minotaurs) gets it back once
+        if (!G.armedAdds) G.armedAdds = new Set();
+        if (!G.armedAdds.has(id)) { G.armedAdds.add(id); rearm(r.boss, id, r.boss.rearmAdds); if (G.armedAdds.size > 2000) G.armedAdds.clear(); }
       } else if (r.role === 'guardian' && !f.guardian) {
         f.guardian = id;
         G.byActor.set(id, { boss: r.boss.id, role: 'guardian' });
@@ -228,13 +232,13 @@ module.exports = (api) => {
     return JSON.stringify(eq === undefined ? null : eq).slice(0, 300);
   };
   // The weapon a test boss should hold, back in its inventory when the copy came without it (dungeons.js armLease)
-  const rearm = (b, id) => {
-    const wid = idOf(b.rearm);
+  const rearm = (b, id, weapon = b.rearm) => {
+    const wid = idOf(weapon);
     if (!wid) return;
     let entries = []; try { const inv = mp.get(id, 'inventory'); entries = inv && Array.isArray(inv.entries) ? inv.entries.slice() : []; } catch (e) { return; }
     const had = entries.some((e) => (Number(e.baseId) >>> 0) === wid);
     if (!had) { entries.push({ baseId: wid, count: 1 }); try { mp.set(id, 'inventory', { entries }); } catch (e) { log('bosses: rearm failed', e.message); return; } }
-    log(`bosses: ${b.id} ${id.toString(16)} ${had ? 'already carries' : 'rearmed with'} ${b.rearm} (worn on the next host grant)`);
+    log(`bosses: ${b.id} ${id.toString(16)} ${had ? 'already carries' : 'rearmed with'} ${weapon} (worn on the next host grant)`);
   };
 
   // A summon's, a raised corpse's or a companion's blow counts for its owner (contracts.js creditedTo)

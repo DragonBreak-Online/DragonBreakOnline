@@ -138,7 +138,7 @@ def build(lo, defs):
     # Drops named by editor id (drops.alwaysEdid): one pass over the item records of every plugin, the last one winning
     wanted = {str(e).lower() for b in defs['bosses'] for e, _ in (b.get('drops') or {}).get('alwaysEdid', [])}
     wanted |= {str(x[0]).lower() for b in defs['bosses'] for x in (b.get('drops') or {}).get('extraEdid', [])}
-    wanted |= {str(b['rearmEdid']).lower() for b in defs['bosses'] if b.get('rearmEdid')}
+    wanted |= {str(b[k]).lower() for b in defs['bosses'] for k in ('rearmEdid', 'rearmAddsEdid') if b.get(k)}
     item_by_edid = {}
     if wanted:
         for p in lo.plugins:
@@ -169,13 +169,15 @@ def build(lo, defs):
     for b in defs['bosses']:
         who = b['id']
         w = key_of(b['world'])
-        o = {k: v for k, v in b.items() if k not in ('bossEdid', 'addEdids', 'guardian', 'drops', 'spots', 'rearmEdid')}
-        if b.get('rearmEdid'):
-            hit = item_by_edid.get(str(b['rearmEdid']).lower())
+        o = {k: v for k, v in b.items() if k not in ('bossEdid', 'addEdids', 'guardian', 'drops', 'spots', 'rearmEdid', 'rearmAddsEdid')}
+        for src, dst in (('rearmEdid', 'rearm'), ('rearmAddsEdid', 'rearmAdds')):
+            if not b.get(src):
+                continue
+            hit = item_by_edid.get(str(b[src]).lower())
             if hit and hit[1] == 'WEAP':
-                o['rearm'] = lo.desc(hit[0])
+                o[dst] = lo.desc(hit[0])
             else:
-                bad.append(f"{who}: no weapon '{b['rearmEdid']}' to rearm with")
+                bad.append(f"{who}: no weapon '{b[src]}' to rearm with")
         o['world'] = lo.desc(w)
         o['boss'] = actor(b['bossEdid'], who)
         o['adds'] = [x for x in (actor(e, who + ' add') for e in b.get('addEdids', [])) if x]
