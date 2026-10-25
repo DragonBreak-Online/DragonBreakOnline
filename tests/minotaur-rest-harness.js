@@ -47,9 +47,15 @@ const kindOfZone = (z) => z.Name.split(':')[1];
 const restZones = (zs) => zs.filter((z) => /p17857[f]|p17858[01]/.test(z.Name) || minos.filter((s) => s.group === REST).some((s) => z.Name.includes(`p${s.src.split(':')[0]}`)));
 const sancreZones = (zs) => zs.filter((z) => minos.filter((s) => s.group === SANCRE).some((s) => z.Name.includes(`p${s.src.split(':')[0]}`)));
 
-// ---- 1. today's config: undead in both ----
+// ---- 1. the shipped config (Nat, 25 Oct: "Minotaur's Rest isn't minotaurs, it's zombies"): minotaurs at the Rest, undead at Sancre Tor ----
 let z = load(live);
-ok(restZones(z).length === 3 && restZones(z).every((x) => kindOfZone(x) === 'undead') && sancreZones(z).every((x) => kindOfZone(x) === 'undead'), 'the live config as it stands: undead at Minotaur\'s Rest and Sancre Tor alike', restZones(z).map((x) => x.Name));
+ok(restZones(z).length === 3 && restZones(z).every((x) => kindOfZone(x) === 'minotaur') && sancreZones(z).length && sancreZones(z).every((x) => kindOfZone(x) === 'undead'),
+  'the shipped config: Minotaur\'s Rest has its minotaurs (exceptGroups), Sancre Tor its undead', restZones(z).map((x) => x.Name));
+ok(restZones(z).filter((x) => x.NPC[0].id === LORD).length === 1 && JSON.stringify(live.rearm) === JSON.stringify({ minotaur: { [MINO]: WAR_AXE, [LORD]: LORD_AXE } }) && (live.traceKinds || []).includes('minotaur') && !live.leaveOut,
+  '...one Minotaur Lord (the camp\'s own spot; leaveOut waits for the boss), each re-armed with its own axe, traced');
+const undeadEverywhere = JSON.parse(JSON.stringify(live)); delete undeadEverywhere.replace.minotaur.exceptGroups;
+z = load(undeadEverywhere);
+ok(restZones(z).every((x) => kindOfZone(x) === 'undead'), 'without exceptGroups (the rollback, and live before this) both are undead: what Nat saw', restZones(z).map((x) => x.Name));
 // ---- with the exception and the arming ----
 const withRest = JSON.parse(JSON.stringify(live));
 withRest.replace.minotaur.exceptGroups = [REST];
