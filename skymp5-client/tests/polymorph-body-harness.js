@@ -234,8 +234,9 @@ const made = relay && relay.DboRelayService ? attempt(() => new relay.DboRelaySe
 check('the relay service loads and listens for the page', typeof made === 'object' && (handlers.browserMessage || []).length === 1, String(made));
 const fromPage = (...a) => { sent.length = 0; (handlers.browserMessage || []).forEach((fn) => fn({ arguments: a })); return sent[0]; };
 const capsPkt = fromPage('dbo:uiCaps', 'bank', 'beastBody', 'journal');
+// The client's own caps follow the page's, in CLIENT_UI_CAPS order (actorLabels since 25 Oct, the boss nameplates)
 check('the page\'s dbo:uiCaps reaches the server with creatureBody added, after the page\'s own',
-  !!capsPkt && capsPkt.event === 'uiCaps' && JSON.stringify(capsPkt.args) === JSON.stringify(['bank', 'beastBody', 'journal', 'creatureBody']), capsPkt);
+  !!capsPkt && capsPkt.event === 'uiCaps' && JSON.stringify(capsPkt.args) === JSON.stringify(['bank', 'beastBody', 'journal', 'creatureBody', 'actorLabels']), capsPkt);
 const twice = fromPage('dbo:uiCaps', 'beastBody', 'creatureBody');
 check('...once only, if the page already said it', !!twice && twice.args.filter((c) => c === 'creatureBody').length === 1, twice);
 const other = fromPage('dbo:bankDeposit', '25');
