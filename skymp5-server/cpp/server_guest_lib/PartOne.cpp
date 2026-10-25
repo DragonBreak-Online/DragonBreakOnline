@@ -64,7 +64,13 @@ public:
     if (deserializeResult) {
       deserializeResult->message->WriteJson(j);
       message = std::move(deserializeResult->message);
-    } else {
+    } else if (data && length >= 2) {
+      // length - 1 is size_t: a Send with no raw bytes underflows it to SIZE_MAX and
+      // std::string throws length_error "basic_string::_M_create". A test that calls a
+      // handler directly passes a default RawMessageData (unparsed nullptr, length 0),
+      // and the relay inside the handler reaches here. MessageSerializer::Deserialize
+      // guards the identical construction with the same length < 2 test; this one did not,
+      // which is why 5 unit tests threw before reaching an assertion.
       std::string s(reinterpret_cast<const char*>(data + 1), length - 1);
       j = nlohmann::json::parse(s);
     }
