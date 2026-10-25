@@ -30,7 +30,8 @@ type Mp = any;
 // A Trial GM (adminRoles.trialgm, no admin tier) gets the menu (who is online, without Discord ids, addresses or hardware
 // ids), TP to a player or a location, Rename and the Invisible and Ghost modes (TRIAL_GM_ACTIONS / TRIAL_GM_MODES; Ghost
 // from 12 Oct, Nate: "trial gms need to use the ghost form button in the admin panel"); anything else is refused here and logged.
-// Give all spells and Give all shouts are refused for every tier (GIVE_ALL_OFF; Jake, 17 Oct: a give-all character froze the server).
+// Give all spells and Give all shouts are back for a Lead GM and above, batched across ticks and capped (GIVE_ALL_PER_TICK,
+// GIVE_ALL_MAX). They were refused outright from 17 Oct to 25 Oct after a give-all character froze the server.
 // The gameplay's staff rules (server\staffguard.js, globalThis.__dboAdminGate) may refuse any panel action after the rank checks:
 // staff powers only on a staff character, never on the staff member's own account, a call or ticket for a rename, a Trial
 // GM's teleports. At each actor assignment it also says whether the profile's modes are cleared (another character, or a
@@ -57,7 +58,7 @@ type Mp = any;
 //                     { customPacketType: "adminItemsRequest" }  -> adminItems
 //                     { customPacketType: "adminLocationsRequest" }  -> adminLocations  (settings locations + admin-locations.json map markers)
 //                     { customPacketType: "adminAction", action: "giveItem", item, count, targetName? }
-//                     { customPacketType: "adminAction", action: "giveWerewolf" | "giveVampireLord", targetName? }  ("giveSpells" and "giveShouts" are refused)
+//                     { customPacketType: "adminAction", action: "giveWerewolf" | "giveVampireLord", targetName? }  | { customPacketType: "adminAction", action: "giveSpells" | "giveShouts", targetName? }  (batched over ticks)
 //                     { customPacketType: "adminAction", action: "beastForm", form: "werewolf" | "vampirelord", op: "now" | "revert" | "revoke", targetName? }
 //                     { customPacketType: "adminAction", action: "giveDisease", kind: "vampire" | "werewolf", targetName? }
 //                     { customPacketType: "adminAction", action: "giveCurse", kind: "vampire" | "purevampire" | "werewolf" | "blessedwerewolf" | "cure" | "stage", stage?, targetName? }
@@ -94,15 +95,19 @@ const ADMIN_MODES: Array<{ id: string; label: string }> = [
 
 // Lead GM and above only (TIER_CAPS.spawn); a GM keeps teleports, kick, observing modes and the roster
 const SPAWN_ACTIONS = new Set(["kill", "deleteCharacter", "masteryGrant", "masteryReset", "masterySetTier", "masteryDrop",
-  "giveItem", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm", "polymorphSelf", "npcZoneAdd", "npcZoneDelete", "npcZoneReset"]);
+  "giveItem", "giveSpells", "giveShouts", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm", "polymorphSelf", "npcZoneAdd", "npcZoneDelete", "npcZoneReset"]);
 const SPAWN_MODES = new Set(["smite", "healhit"]);
 // Panel actions whose missing target means the staff member themself (resolveTarget)
-const SELF_TARGETED = new Set(["masterySetTier", "masteryDrop", "giveItem", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm"]);
+const SELF_TARGETED = new Set(["masterySetTier", "masteryDrop", "giveItem", "giveSpells", "giveShouts", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm"]);
 // Turned off for every tier: each learned-spell read costs the square of the list, and a give-all character froze the server
-const GIVE_ALL_OFF = new Map<string, string>([
-  ["giveSpells", "Give all spells is turned off: it froze the server. Give single spell tomes from the Items tab instead."],
-  ["giveShouts", "Give all shouts is turned off with Give all spells after the server froze."],
-]);
+// Give all spells is batched across ticks and capped. The 17 Oct freeze was not the grant loop itself: a character
+// with every spell learned sent its whole learned-spell array to every player who streamed it in, because
+// MpActor::VisitProperties assigned it outside the owner-only branch (fixed on this branch). What the loop did do was
+// fire one SpSnippet per spell in a single tick, which is bad manners at 252 whatever the broadcast costs, so it now
+// goes out a few per tick. GIVE_ALL_OFF is gone in the same commit as the batching, so there is never a build where
+// the old unbatched path can be reached.
+const GIVE_ALL_PER_TICK = 8;
+const GIVE_ALL_MAX = 400;
 // Ranks whose roster rows carry each account's Discord id and name (d, dn): Lead GM and above; a GM's rows have them blank
 const DISCORD_ROSTER_TIERS = new Set<AdminTier>(["senior", "developer", "leadgm"]);
 
@@ -412,11 +417,53 @@ export class AdminSystem implements System {
   }
 
   async updateAsync(ctx: SystemContext): Promise<void> {
+    // Before the ban sweep's own 2 s gate, or the batch would only move every other second
+    this.drainSpellGrants(ctx.svr as Mp);
     const now = Date.now();
     if (now - this.lastBanSweep < 2000 || !this.bans) return;
     this.lastBanSweep = now;
     const mp = ctx.svr as Mp;
     for (const p of this.onlinePlayers(mp)) this.enforceBan(mp, p.userId, p.profileId);
+  }
+
+  // One Give all spells in progress, drained a few spells a tick. Keyed by the actor being given to, so a second
+  // press on the same character is refused rather than queued twice; a different character may be queued at once.
+  private spellGrants = new Map<number, {
+    adminUserId: number; targetUserId: number; adminProfile: number; whom: string;
+    descs: string[]; at: number; done: number; failed: number;
+  }>();
+
+  // GIVE_ALL_PER_TICK spells per character per tick. Each AddSpell is a change-form edit and one SpSnippet to the
+  // client, so the old single-tick loop sent 252 messages at once; the save side was never the cost, since
+  // RequestSave dedupes by form index. An actor that has gone offline mid-grant drops out with what it got.
+  private drainSpellGrants(mp: Mp): void {
+    if (!this.spellGrants.size) return;
+    for (const [actorId, g] of [...this.spellGrants]) {
+      // The TARGET must still hold this actor; AddSpell on a character that has gone is dropped anyway
+      let online = false;
+      try { online = mp.getUserActor(g.targetUserId) === actorId; } catch { online = false; }
+      if (!online) {
+        this.spellGrants.delete(actorId);
+        this.adminLog(`profile ${g.adminProfile} gave ${g.done} of ${g.done + g.descs.length} spells to ${g.whom}, stopped: they left`);
+        this.reply(mp, g.adminUserId, false, `${g.whom} left after ${g.done} spells`);
+        continue;
+      }
+      const slice = g.descs.splice(0, GIVE_ALL_PER_TICK);
+      for (const desc of slice) {
+        try {
+          mp.callPapyrusFunction("method", "Actor", "AddSpell", { type: "form", desc: mp.getDescFromId(actorId) }, [{ type: "espm", desc }, false]);
+          g.done++;
+        } catch (e) {
+          g.failed++;
+          this.log(`AdminSystem: AddSpell ${desc} failed: ${e}`);
+        }
+      }
+      if (g.descs.length) continue;
+      this.spellGrants.delete(actorId);
+      const secs = ((Date.now() - g.at) / 1000).toFixed(1);
+      this.adminLog(`profile ${g.adminProfile} gave ${g.done} spells to ${g.whom} over ${secs}s${g.failed ? `, ${g.failed} failed` : ""}`);
+      this.reply(mp, g.adminUserId, g.done > 0, `${g.done} spells given to ${g.whom}${g.failed ? `, ${g.failed} failed` : ""}`);
+    }
   }
 
   // Voice asks before it mints a token, so a panel ban refuses one before the 2 s sweep's kick
@@ -456,14 +503,6 @@ export class AdminSystem implements System {
     try { myActorId = mp.getUserActor(userId); } catch { }
     // A Trial GM passes for the menu and the actions in TRIAL_GM_ACTIONS / TRIAL_GM_MODES alone
     const trial = !!myActorId && !this.isAdminActor(mp, myActorId) && isTrialGm(mp, myActorId, this.roleCfg);
-    const giveAllOff = type === "adminAction" ? GIVE_ALL_OFF.get(String(content["action"] ?? "")) : undefined;
-    if (giveAllOff && (trial || (!!myActorId && this.isAdminActor(mp, myActorId)))) {
-      let profile = 0;
-      try { profile = Number(mp.get(myActorId, "profileId")) || 0; } catch { }
-      this.adminLog(`profile ${profile} (${trial ? "trialgm" : this.tierOf(mp, myActorId)}) was refused ${String(content["action"])} (turned off)`);
-      this.reply(mp, userId, false, giveAllOff);
-      return;
-    }
     if (trial && !this.trialMay(type, content)) {
       let profile = 0;
       try { profile = Number(mp.get(myActorId, "profileId")) || 0; } catch { }
@@ -606,7 +645,7 @@ export class AdminSystem implements System {
       this.reply(mp, userId, true, "Done");
       return;
     }
-    if (["masterySetTier", "masteryDrop", "giveItem", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm"].indexOf(action) !== -1) {
+    if (["masterySetTier", "masteryDrop", "giveItem", "giveSpells", "giveShouts", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm"].indexOf(action) !== -1) {
       const who = this.resolveTarget(mp, myActorId, content);
       if (!who) { this.reply(mp, userId, false, "No online player by that name"); return; }
       this.selfServiceAction(ctx, mp, userId, myActorId, adminProfile, action, who, content);
@@ -872,6 +911,37 @@ export class AdminSystem implements System {
         this.reply(mp, userId, said.indexOf("could not") === -1, said || "Done");
         return;
       }
+      // Give all spells: queued and drained a few a tick (drainSpellGrants), never granted inline. The reply says it
+      // has started; the summary and the audit line come when the queue empties.
+      if (action === "giveSpells") {
+        const list = this.giveAllSpells();
+        if (!list.length) { this.reply(mp, userId, false, "admin-powers.json lists no spells to give"); return; }
+        if (this.spellGrants.has(who.actorId)) {
+          this.reply(mp, userId, false, `${who.name} is already being given spells; let it finish`);
+          return;
+        }
+        this.spellGrants.set(who.actorId, {
+          adminUserId: userId, targetUserId: who.userId, adminProfile, whom,
+          descs: list.map((x) => x[0]), at: Date.now(), done: 0, failed: 0,
+        });
+        // No time estimate: that would mean asserting a tick rate I have not measured. The finishing reply carries
+        // the real elapsed time, and the audit line records it.
+        this.adminLog(`profile ${adminProfile} started giving all ${list.length} spells to ${whom}`);
+        this.reply(mp, userId, true, `Giving ${list.length} spells to ${who.name}, ${GIVE_ALL_PER_TICK} at a time`);
+        return;
+      }
+      // Give all shouts: one packet, so there is nothing to batch. The client teaches the words, and the server has
+      // no shout storage, so private.dboAllShouts is what makes it happen again at every login
+      if (action === "giveShouts") {
+        const list = this.giveAllShouts();
+        if (!list.length) { this.reply(mp, userId, false, "admin-powers.json lists no shouts to give"); return; }
+        try { mp.set(who.actorId, "private.dboAllShouts", true); } catch { /* offline */ }
+        this.teachShouts(mp, who.userId);
+        const words = list.reduce((n, s) => n + (s.words || []).length, 0);
+        this.adminLog(`profile ${adminProfile} gave all ${list.length} shouts (${words} words) to ${whom}`);
+        this.reply(mp, userId, true, `${list.length} shouts (${words} words) given to ${who.name}`);
+        return;
+      }
       const powers = this.powers();
       if (!powers) { this.reply(mp, userId, false, "admin-powers.json is missing on the server"); return; }
       if (action === "giveWerewolf" || action === "giveVampireLord") {
@@ -895,15 +965,49 @@ export class AdminSystem implements System {
   }
 
   private teachShouts(mp: Mp, userId: number): void {
-    const powers = this.powers();
-    if (!powers) return;
-    try { mp.sendCustomPacket(userId, JSON.stringify({ customPacketType: "dboTeachShouts", shouts: powers.shouts.map((x) => ({ shout: x.shout, words: x.words })) })); }
+    // giveAllShouts, not powers.shouts: that key has been empty since 17 Oct and the real list is shoutsGate, so
+    // reading it directly taught nothing at login to everyone already given all shouts
+    const list = this.giveAllShouts();
+    if (!list.length) return;
+    try { mp.sendCustomPacket(userId, JSON.stringify({ customPacketType: "dboTeachShouts", shouts: list.map((x) => ({ shout: x.shout, words: x.words })) })); }
     catch (e) { this.log(`AdminSystem: dboTeachShouts failed: ${e}`); }
   }
 
-  // admin-powers.json from ck-mcp/admin_powers.py: shouts with their words (taught again at login to those given all shouts), the beast powers
-  private powers(): { spells?: Array<[string, string]>; shouts: Array<{ shout: string; name: string; words: string[] }>; werewolf: string; vampirelord?: string } | null {
+  // admin-powers.json from ck-mcp/admin_powers.py: shouts with their words (taught again at login to those given all shouts), the beast powers.
+  // spells and shouts have been empty since 17 Oct, with the real lists parked in spellsGiveAllOff and shoutsGate; the
+  // readers below take the live key first and fall back, so the data flip and the code flip stay independent
+  private powers(): { spells?: Array<[string, string]>; spellsGiveAllOff?: Array<[string, string]>; shouts: Array<{ shout: string; name: string; words: string[] }>; shoutsGate?: Array<{ shout: string; name: string; words: string[] }>; werewolf: string; vampirelord?: string } | null {
     try { return JSON.parse(fs.readFileSync(path.resolve("admin-powers.json"), "utf8")); } catch { return null; }
+  }
+
+  // Give all spells: the tome-taught catalogue, narrowed by source plugin when the gameplay layer says so
+  // (globalThis.__dboGiveAllSpellSources, from gamemode-config giveAll.spellSources; absent means all, which is
+  // Nat's answer of 25 Oct) and capped. Each entry's desc carries its plugin, so no second list is needed.
+  private giveAllSpells(): Array<[string, string]> {
+    const p = this.powers();
+    if (!p) return [];
+    const all = (p.spells && p.spells.length ? p.spells : p.spellsGiveAllOff) || [];
+    let list = all;
+    const hook = (globalThis as any).__dboGiveAllSpellSources;
+    if (typeof hook === "function") {
+      try {
+        const want = hook();
+        if (Array.isArray(want) && want.length) {
+          const keep = new Set(want.map((x: unknown) => String(x).toLowerCase()));
+          list = all.filter(([desc]) => keep.has(String(desc).split(":")[1].toLowerCase()));
+        }
+      } catch (e) { this.log(`AdminSystem: __dboGiveAllSpellSources failed: ${e}`); }
+    }
+    return list.slice(0, GIVE_ALL_MAX);
+  }
+
+  // Give all shouts: the 27 a player learns. shoutsGate is combat.js's own list and the same set, so the fallback
+  // never hands out a dragon breath even while shouts is empty
+  private giveAllShouts(): Array<{ shout: string; name: string; words: string[] }> {
+    const p = this.powers();
+    if (!p) return [];
+    const all = (p.shouts && p.shouts.length ? p.shouts : p.shoutsGate) || [];
+    return all.slice(0, GIVE_ALL_MAX);
   }
 
   // Map markers of every worldspace from ck-mcp/admin_catalog.py, grouped by region
