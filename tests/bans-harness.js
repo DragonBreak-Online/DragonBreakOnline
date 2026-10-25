@@ -211,7 +211,13 @@ ok(gate(GM, 'tempBan', { target: MIRA, hours: 73 }) === 'A GM can temp ban for a
 ok(/^The panel did not say how long/.test(gate(GM, 'tempBan', { target: MIRA })), 'P. ...and a GM temp ban that carries no hours is refused (the fork sends none today)');
 ok(/^Bans are for Lead GMs and above\./.test(gate(GM, 'ban', { target: MIRA })) && /^Bans are for Lead GMs and above\./.test(gate(GM, 'ipBan', { target: MIRA })), 'P. a GM never bans for good from the panel');
 ok(gate(LEAD, 'tempBan', { target: MIRA, hours: 24 * 300 }) === '', 'P. a Lead GM\'s temp ban length is the fork\'s to check');
-ok(gate(LEAD, 'unban', { target: 'b-123' }) === '' && gate(LEAD, 'kick', { target: LEAD2 }) === '', 'P. unban (a ban id) and kick are not ban actions here');
+ok(gate(LEAD, 'kick', { target: LEAD2 }) === '', 'P. kick is not a ban action here');
+// A panel unban names a ban: the fork says whose it is and who gave it (banBy 'profile N'), and the rule /discipline lift uses decides
+ok(gate(LEAD, 'unban', { target: 'b-1', banProfile: 50, banBy: 'profile 22' }) === '', 'P. a Lead GM lifts a ban another Lead GM gave');
+ok(/^That ban was given by a rank above yours/.test(gate(LEAD, 'unban', { target: 'b-2', banProfile: 50, banBy: 'profile 1' })), 'P. ...but not one an Owner gave');
+ok(/^Who gave that ban cannot be read/.test(gate(LEAD, 'unban', { target: 'b-3', banProfile: 50 })), 'P. ...and not one whose giver the fork did not name (fails closed)');
+ok(/^Lifting a ban is for Lead GMs and above./.test(gate(GM, 'unban', { target: 'b-1', banProfile: 50, banBy: 'profile 22' })), 'P. a GM never lifts a panel ban');
+ok(gate(OWNER, 'unban', { target: 'b-2', banProfile: 50, banBy: 'profile 1' }) === '', 'P. an Owner lifts any');
 const off = SG.load({ enabled: false });
 void off;
 ok(/rank or higher/.test(globalThis.__dboAdminGate(LEAD, 'ban', { target: LEAD2 })), 'P. the rank rule holds with staffPowers switched off (a punishment rule, not a staff power)');

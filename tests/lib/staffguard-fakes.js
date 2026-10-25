@@ -56,6 +56,13 @@ const make = (cfg) => {
       const pt = c(t).profile; if (pt === c(a).profile) return 'own';
       return api.accountRankOf(pt) >= (RANK[c(a).tier || (c(a).trial ? 'trialgm' : '')] || 0) ? 'rank' : null;
     },
+    // gamemode.js authorRefusalOf over this cast: who gave a record or a panel ban (profile 0 = the Owners) outranks the caller?
+    authorRefusal: (a, by) => {
+      const mine = RANK[c(a).tier || (c(a).trial ? 'trialgm' : '')] || 0;
+      if (mine >= RANK.senior) return null;
+      const theirs = by === 0 ? RANK.senior : [...byId.values()].some((x) => x.profile === by) ? api.accountRankOf(by) : -1;
+      return theirs < 0 ? 'unknown' : theirs > mine ? 'rank' : null;
+    },
     registerChatCommand: (n, fn, opts) => commands.set(n, { fn, opts: opts || {} }),
     onlineActors: () => [...byId.values()].filter((x) => x.online).map((x) => x.id),
   };

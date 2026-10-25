@@ -191,6 +191,23 @@ module.exports = (api) => {
   const adminGate = (a, action, info) => {
     a = Number(a) >>> 0; info = info || {};
     // The fork lets an action through when this throws, so the ban rule answers for itself
+    // A panel unban: a GM never lifts one, and nobody lifts a ban given by a rank above theirs (gamemode.js authorRefusalOf,
+    // the rule /discipline lift uses). The fork names the ban's account (banProfile) and who gave it (banBy, 'profile N')
+    if (action === 'unban') {
+      let no = '';
+      try {
+        let tier = null; try { tier = tierOf(a); } catch (e) { tier = null; }
+        if (tier === null || tier === 'gm') no = 'Lifting a ban is for Lead GMs and above.';
+        else {
+          const m = /^profile (\d+)$/.exec(String(info.banBy || ''));
+          const by = m ? Number(m[1]) : -1;
+          const r = by >= 0 && typeof api.authorRefusal === 'function' ? api.authorRefusal(a, by) : 'unknown';
+          if (r === 'rank') no = 'That ban was given by a rank above yours, so you cannot lift it. Ask someone of that rank, or the Owners.';
+          else if (r) no = 'Who gave that ban cannot be read, so it was not lifted. Ask an Owner.';
+        }
+      } catch (e) { no = 'The unban could not be checked, so it was not done.'; }
+      if (no) return no;
+    }
     if (BAN_ACTIONS.has(action)) { let no = ''; try { no = banRefusal(a, action, info); } catch (e) { no = 'The ban could not be checked, so it was not given.'; } if (no) return no; }
     if (!ON) return '';
     if (action === 'assign') return CHAR.enabled && CHAR.clearModes && !exempt(a) && (!isStaffChar(a) || info.changed === true) ? 'clear' : '';
