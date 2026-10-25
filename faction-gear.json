@@ -45,6 +45,72 @@
     "1ac96c:DragonBreak Online Edits.esp"
    ]
   },
+  "d75:knighterrant.esp": {
+   "name": "Knight-Errant Gauntlets",
+   "set": "Knights of the Nine",
+   "factions": [
+    "knights-of-the-nine"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d7a:knighterrant.esp"
+   ]
+  },
+  "d74:knighterrant.esp": {
+   "name": "Knight-Errant Greaves",
+   "set": "Knights of the Nine",
+   "factions": [
+    "knights-of-the-nine"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d7b:knighterrant.esp"
+   ]
+  },
+  "d76:knighterrant.esp": {
+   "name": "Knight-Errant Helmet",
+   "set": "Knights of the Nine",
+   "factions": [
+    "knights-of-the-nine"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d7c:knighterrant.esp"
+   ]
+  },
+  "d73:knighterrant.esp": {
+   "name": "Knight-Errant Outfit",
+   "set": "Knights of the Nine",
+   "factions": [
+    "knights-of-the-nine"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d79:knighterrant.esp"
+   ]
+  },
+  "d77:knighterrant.esp": {
+   "name": "Knight-Errant Satchel",
+   "set": "Knights of the Nine",
+   "factions": [
+    "knights-of-the-nine"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d7e:knighterrant.esp"
+   ]
+  },
+  "d78:knighterrant.esp": {
+   "name": "Knight-Errant Shoulder Cape",
+   "set": "Knights of the Nine",
+   "factions": [
+    "knights-of-the-nine"
+   ],
+   "role": "blacksmith",
+   "recipes": [
+    "d7d:knighterrant.esp"
+   ]
+  },
   "a6d7f:Skyrim.esm": {
    "name": "Fur Boots",
    "set": "Stormcloaks",

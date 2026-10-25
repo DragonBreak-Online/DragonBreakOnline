@@ -1128,6 +1128,38 @@
       }
     },
     {
+      "id": "knights-of-the-nine",
+      "name": "Knights of the Nine",
+      "kind": "guild",
+      "ranks": [
+        {
+          "title": "Divine Crusader",
+          "role": "leader"
+        },
+        {
+          "title": "Knight Commander",
+          "role": "officer"
+        },
+        {
+          "title": "Armorer",
+          "role": "blacksmith"
+        },
+        {
+          "title": "Clothier",
+          "role": "tailor"
+        },
+        {
+          "title": "Knight Errant",
+          "role": "member"
+        },
+        {
+          "title": "Pilgrim",
+          "role": "member"
+        }
+      ],
+      "_ranks": "The order's ranks in Oblivion (UESP, Knights of the Nine faction), highest first; Armorer and Clothier are the server's crafting seats, as in the County of Bruma. No hall yet: the Priory of the Nine is not in the load order, and Nat picks one (Nat, 25 Oct)."
+    },
+    {
       "id": "dawnguard",
       "name": "Dawnguard",
       "kind": "guild",
