@@ -1048,7 +1048,7 @@ const helpLine = (n) => { const c = commands.get(n); return `/${n}${c && c.help 
 // power inside a player command. An entry shows only while its command exists; an admin-only command missing here is
 // listed under Other staff tools.
 const STAFF_HELP = [
-  { key: 'players', title: 'Players', items: ['players', 'kick', 'discipline', 'tp', 'fixloc', 'chargen', 'grantappearance',
+  { key: 'players', title: 'Players', items: ['players', 'kick', 'discipline', 'ban', 'tempban', 'unban', 'bans', 'tp', 'fixloc', 'chargen', 'grantappearance',
     ['rename', '<player|#TAG> <new name> [call:<n>|ticket:<id>]: for a typo or a name against the rules. A new identity is a new character, never a rename'],
     'staffchar', 'staffref', 'sethunger', 'wipechars',
     ['tokens', '<player|#TAG>: someone\'s Patreon tier and identity rerolls left'], 'rerollrefund', 'stats', 'charstats', 'bugs', 'realnames', 'chars',
@@ -1076,7 +1076,7 @@ const STAFF_HELP = [
     ['dossier', 'list | read <name|#TAG> | reports | add <name|#TAG> <text> | strike <name|#TAG> <n>: the Thalmor dossiers and informant reports (add and strike: Lead GM)']] },
   { key: 'world', title: 'World', items: ['settime', 'setweather', 'timescale', 'region', ['dungeon end', '<dungeon id|name>: end a dungeon claim now'],
     'placed', 'placeundo', 'placeexport', 'worldedits', 'worldhide', 'worldshow', 'masktest', 'couriers', 'traps', 'leverpuzzle',
-    ['guardpost', 'add [npc desc] | list | remove <hold> <n> | auto <hold>: stand where a guard should be and add places that hold\'s own guard there (an id like abe18:Skyrim.esm picks another). auto fills a hold with the posts its guards held in the old days']] },
+    ['guardpost', 'add [npc desc] | list | remove <hold> <n> | auto <hold>: stand where a guard should be and add places that hold\'s own guard there (an id like abe18:Skyrim.esm picks another). auto fills a hold with the posts its guards held in the old days']] }, // verify-formids: ignore (an NPC id in help text; 'items' here is the topic list, not an inventory)
   { key: 'debug', title: 'Server and debugging', items: ['monitor', 'load', 'selftest', 'npc', 'mv', 'driftset', 'driftspawn', 'driftrepair',
     'staffdiag', 'voicediag', 'staffstats', 'gearswap', 'factiongear'] },
 ];
@@ -8741,7 +8741,7 @@ try {
 try {
   const STAFFGUARD_JS = path.resolve('staffguard.js');
   delete require.cache[STAFFGUARD_JS];
-  require(STAFFGUARD_JS)({ mp, log, audit, who, display, personal, profileOf, tierOf, staffTierOf, isLeadStaff, staffCharOf, accountRankOf,
+  require(STAFFGUARD_JS)({ mp, log, audit, who, display, personal, profileOf, tierOf, staffTierOf, isLeadStaff, staffCharOf, accountRankOf, rankRefusal: rankRefusalOf, authorRefusal: authorRefusalOf,
     findByName, offlineByTag, registerChatCommand, onlineActors, cfg });
 } catch (e) {
   log('staffguard.js failed to load:', e.stack || e.message);

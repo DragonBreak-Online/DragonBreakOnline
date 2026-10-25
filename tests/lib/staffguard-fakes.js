@@ -50,6 +50,19 @@ const make = (cfg) => {
     accountRankOf: (pid) => { let best = 0; for (const x of byId.values()) if (x.profile === pid) best = Math.max(best, RANK[x.tier || (x.trial ? 'trialgm' : '')] || 0); return best; },
     findByName: (q) => { const s = String(q || '').trim().toLowerCase().replace(/^#/, ''); if (!s) return 0; for (const x of byId.values()) if (x.online && (x.tag.toLowerCase() === s || x.name.toLowerCase() === s)) return x.id; return 0; },
     offlineByTag: (q) => { const m = String(q || '').match(/#([A-Za-z0-9]{4})$/); if (!m) return 0; for (const x of byId.values()) if (!x.online && x.tag.toLowerCase() === m[1].toLowerCase()) return x.id; return 0; },
+    // gamemode.js rankRefusalOf over this cast (tests/staff-rank-harness.js runs the real one): the panel's ban rule (25 Oct)
+    rankRefusal: (a, t) => {
+      if (!byId.has(t >>> 0)) return 'unknown';
+      const pt = c(t).profile; if (pt === c(a).profile) return 'own';
+      return api.accountRankOf(pt) >= (RANK[c(a).tier || (c(a).trial ? 'trialgm' : '')] || 0) ? 'rank' : null;
+    },
+    // gamemode.js authorRefusalOf over this cast: who gave a record or a panel ban (profile 0 = the Owners) outranks the caller?
+    authorRefusal: (a, by) => {
+      const mine = RANK[c(a).tier || (c(a).trial ? 'trialgm' : '')] || 0;
+      if (mine >= RANK.senior) return null;
+      const theirs = by === 0 ? RANK.senior : [...byId.values()].some((x) => x.profile === by) ? api.accountRankOf(by) : -1;
+      return theirs < 0 ? 'unknown' : theirs > mine ? 'rank' : null;
+    },
     registerChatCommand: (n, fn, opts) => commands.set(n, { fn, opts: opts || {} }),
     onlineActors: () => [...byId.values()].filter((x) => x.online).map((x) => x.id),
   };

@@ -175,7 +175,8 @@ const brief = (rep) => rep && { state: rep.state, why: rep.why, said: header(rep
   // (this harness registers chargen, discipline, kick and rename of those; /chars and /fixloc are not cut in, so not listed)
   const tagRules = Object.entries(rules.ALLOW).filter(([, a]) => ['tag', 'tagName', 'tagKindReason'].includes(a.rule)).map(([k]) => k).sort().join();
   check('H0. targetProfile: every listed command that names one #TAG, so the backend may send the account (chargen, chars, discipline, fixloc, kick, rename in code)',
-    tagRules === 'chargen,chars,discipline,fixloc,kick,rename' && flag('targetProfile') === 'chargen,discipline,kick,rename', [tagRules, flag('targetProfile')]);
+    // (ban, tempban, unban from 25 Oct: /discipline's aliases, kept out of allow.json until the backend knows them, console.js BACKEND_KINDS)
+    tagRules === 'ban,chargen,chars,discipline,fixloc,kick,rename,tempban,unban' && flag('targetProfile') === 'chargen,discipline,kick,rename', [tagRules, flag('targetProfile')]);
   check('H0. rank: /discipline and /kick only, so the backend fetches the target account\'s Discord roles for those', flag('rank') === 'discipline,kick', flag('rank'));
   check('H0. the switch commands, /players, /load and /whoami carry neither', allow.filter((x) => ['wwremote', 'vlremote', 'players', 'load', 'whoami'].includes(x.name)).every((x) => x.targetProfile === undefined && x.rank === undefined), allow);
 }
@@ -368,7 +369,8 @@ reset();
 // ---- H6. a Lead GM runs only /discipline and /kick from the console; Developers and Owners every command -------------------
 reset();
 {
-  const PUNISH_ONLY = 'A Lead GM can run only /discipline and /kick from the console. Run anything else in game.';
+  // (25 Oct: /ban, /tempban and /unban, /discipline's own kinds under other words, sit with it)
+  const PUNISH_ONLY = 'A Lead GM can run only /discipline, /ban, /tempban, /unban and /kick from the console. Run anything else in game.';
   const before = recordOf(5).length;
   store.get(A.bob)['private.wwBodyOff'] = { at: 1 };
   // Allowlisted ones (registered here or not), refused classes (/tp, /say) and an unknown word: punishOnly before the line's own rule
@@ -411,7 +413,7 @@ reset();
   rep = send('/discipline #8KWH warn The raised floor wins', AS_LEAD);
   check('H6. a raised floor (minTier developer) still refuses a Lead GM everything (tier)', refused(rep, 'tier'), brief(rep));
   loadConsole(CFG());
-  check('H6. the rule is in code, for the backend\'s copy: PUNISH_ONLY discipline and kick, the full console from developer', JSON.stringify(rules.PUNISH_ONLY) === '["discipline","kick"]' && rules.FULL_TIER === 'developer'
+  check('H6. the rule is in code, for the backend\'s copy: PUNISH_ONLY discipline and kick (and the ban aliases, 25 Oct), the full console from developer', JSON.stringify(rules.PUNISH_ONLY) === '["discipline","kick","ban","tempban","unban"]' && rules.FULL_TIER === 'developer'
     && Object.isFrozen(rules.PUNISH_ONLY), [rules.PUNISH_ONLY, rules.FULL_TIER]);
 }
 

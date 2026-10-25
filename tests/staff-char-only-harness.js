@@ -49,7 +49,7 @@ for (const [action, info] of [['toggleMode', { mode: 'invis' }], ['toggleMode', 
   ['masterySetTier', { target: MIRA }], ['setSchool', { target: MIRA }], ['giveCurse', { target: MIRA }], ['beastForm', { target: MIRA }], ['kill', { target: MIRA }], ['rename', { target: MIRA }]]) {
   check(`panel ${action}${info.mode ? ' ' + info.mode : ''} is refused on an RP character`, NOT_HERE.test(gate(LEAD_RP, action, info)), gate(LEAD_RP, action, info));
 }
-check('panel moderation still works there: kick, ban, temp ban, unban, staffChar', ['kick', 'ban', 'tempBan', 'unban', 'staffChar'].every((x) => gate(LEAD_RP, x, { target: MIRA }) === ''));
+check('panel moderation still works there: kick, ban, temp ban, unban, staffChar', ['kick', 'ban', 'tempBan', 'unban', 'staffChar'].every((x) => gate(LEAD_RP, x, { target: MIRA, hours: 24, banBy: 'profile 22' }) === ''));
 check('the panel works on the staff character', ['teleportTo', 'toggleMode', 'giveItem', 'kill'].every((x) => gate(LEAD, x, { target: MIRA, mode: 'invis' }) === ''));
 check('an Owner\'s RP character passes the panel', gate(OWNER_RP, 'toggleMode', { mode: 'invis' }) === '' && gate(OWNER_RP, 'teleportLoc', { location: 'x' }) === '');
 check('housing: the staff override is refused on an RP character', NOT_HERE.test(gate(LEAD_RP, 'housing', {})));
@@ -149,8 +149,8 @@ const cut = (from, to) => { const a = src.indexOf(from), b = src.indexOf(to, a +
 }
 
 // ---- wiring ----
-check('gamemode.js loads staffguard.js with the rank helpers, and drops its globals when the load fails',
-  /require\(STAFFGUARD_JS\)\(\{ mp, log, audit, who, display, personal, profileOf, tierOf, staffTierOf, isLeadStaff, staffCharOf, accountRankOf,\s*findByName, offlineByTag, registerChatCommand, onlineActors, cfg \}\)/.test(src)
+check('gamemode.js loads staffguard.js with the rank helpers (and the rank and record-author rules for panel bans and unbans, 25 Oct), and drops its globals when the load fails',
+  /require\(STAFFGUARD_JS\)\(\{ mp, log, audit, who, display, personal, profileOf, tierOf, staffTierOf, isLeadStaff, staffCharOf, accountRankOf, rankRefusal: rankRefusalOf, authorRefusal: authorRefusalOf,\s*findByName, offlineByTag, registerChatCommand, onlineActors, cfg \}\)/.test(src)
   && /for \(const k of \['__dboStaffGuard', '__dboAdminGate', '__dboStaffCharSet', '__dboIsStaffCharacter'\]\) delete globalThis\[k\]/.test(src));
 check('gamemode.js: a staff member on another character is told at login that staff powers are off there', /else if \(staffTierOf\(a\)\) \{ try \{ const g = staffGuard\(\); if \(g && !g\.powersOn\(a\)\) personal\(a, `This is not your staff character/.test(src));
 check('gamemode.js: the journal\'s command route asks the rules too', /if \(r && r\.refuse\) return \[r\.refuse\];/.test(src));

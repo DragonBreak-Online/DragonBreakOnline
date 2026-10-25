@@ -45,7 +45,7 @@ const R300 = `Took ${'a'.repeat(289)} goods`; // 300 characters
     '/discipline #8KWH warn Spamming the market chat', '/discipline #8KWH strike Griefing at the Bruma gate', '/discipline #8kwh strike lower-case tag, still one tag',
     '/discipline #8KWH suspend 12h stole from a barrel', '/discipline #8KWH suspend 3d stole from a barrel', '/discipline #8KWH suspend 1h short one',
     '/discipline #8KWH suspend 720h the longest in hours', '/discipline #8KWH suspend 30d the longest in days', '/discipline #8KWH suspend 12H upper case unit',
-    '/discipline #8KWH lift appeal accepted by Nate', '/discipline #8KWH overturn 3 wrong person, see ticket 0141', '/discipline #8KWH overturn 99999 the largest number',
+    '/discipline #8KWH lift appeal accepted by Nate', '/discipline #8KWH ban threats against players, ticket 0200', '/discipline #8KWH overturn 3 wrong person, see ticket 0141', '/discipline #8KWH overturn 99999 the largest number',
     '/discipline #8KWH WARN Upper case kind word', '/discipline #8KWH warn abcde', `/discipline #8KWH warn ${R300}`,
     `/discipline #8KWH warn Plain: . , ; : ! ? ' " ( ) - / & + % all allowed`, '/discipline #8KWH warn Ticket no. 0141, 2 of 3 strikes',
     `/discipline #8KWH warn Caf${'e'}${ch(0x301)} accents are composed (NFC)`, '/discipline #8KWH warn \u00c5sa \u00fcber \u00e7a \u0416\u0435\u043d\u044f letters in any script',
@@ -65,7 +65,8 @@ const R300 = `Took ${'a'.repeat(289)} goods`; // 300 characters
     ['/discipline 8KWH warn spamming the chat', 'needTag'], ['/discipline me warn spamming the chat', 'needTag'], ['/discipline #8K_H warn spamming the chat', 'needTag'],
     // wrong words: the record views stay in game, and only the five kinds
     ['/discipline', 'badKind'], ['/discipline #8KWH', 'badKind'], ['/discipline list', 'badKind'], ['/discipline LIST', 'badKind'], ['/discipline #8KWH note quiet staff note', 'badKind'],
-    ['/discipline #8KWH ban spamming the chat', 'badKind'], ['/discipline #8KWH tempban 3d spamming the chat', 'badKind'], ['/discipline #8KWH kick spamming the chat', 'badKind'],
+    // (ban is a kind since 25 Oct, R7; tempban is a command of its own, never a kind)
+    ['/discipline #8KWH tempban 3d spamming the chat', 'badKind'], ['/discipline #8KWH kick spamming the chat', 'badKind'],
     ['/discipline #8KWH warns spamming the chat', 'badKind'], ['/discipline #8KWH show', 'badKind'], ['/discipline #8KWH #LLX8 warn spamming the chat', 'badKind'],
     ['/discipline #8KWH constructor spamming the chat', 'badKind'], ['/discipline #8KWH __proto__ spamming the chat', 'badKind'], ['/discipline #8KWH hasOwnProperty spamming', 'badKind'],
     // bad durations: whole hours or days within maxSuspendDays (30), no decimals, no leading zero, a unit
@@ -128,9 +129,34 @@ const R300 = `Took ${'a'.repeat(289)} goods`; // 300 characters
 
   // The wording the admin reads
   const T = rules.TEXT;
-  check('R6. each new refusal says what to do, in plain words', typeof T.badKind === 'function' && /^From the console: \/discipline #TAG warn\|strike\|lift <reason>; suspend <1-720h\|1-30d> <reason>; overturn <n> <reason>\. A player's record and \/discipline list stay in game\.$/.test(T.badKind(decide('/discipline').subject))
+  check('R6. each new refusal says what to do, in plain words', typeof T.badKind === 'function' && /^From the console: \/discipline #TAG warn\|strike\|ban\|lift <reason>; suspend <1-720h\|1-30d> <reason>; overturn <n> <reason>\. A player's record and \/discipline list stay in game\.$/.test(T.badKind(decide('/discipline').subject))
     && /record number in digits/.test(T.badRecord()) && /at least 5 characters/.test(T.reasonShort()) && /at most 300 characters/.test(T.reasonLong())
     && /no colour codes, markup, mentions, symbols or line breaks/.test(T.reasonChars()) && T.denied('discipline suspend') === "/discipline suspend is switched off for the console in the game's config.", decide('/discipline'));
+}
+
+// ---- R7. /ban, /tempban, /unban (Nat, 25 Oct): /discipline's ban, suspend and lift under their own words, the same rule ------
+{
+  const has7 = (n) => has(n) || ['ban', 'tempban', 'unban'].includes(n);
+  const d7 = (text, deny = NO_DENY, opts) => { const clean = rules.cleanCommand(text); return clean === null ? { why: 'clean' } : rules.checkLine(clean, has7, deny, opts); };
+  const ok7 = [['/ban #8KWH threats against players', 'ban'], ['/tempban #8KWH 3d stole from a barrel', 'suspend'], ['/tempban #8KWH 720h the longest in hours', 'suspend'],
+    ['/unban #8KWH appeal accepted by Nate', 'lift'], ['/BAN #8kwh upper case command word', 'ban']];
+  const bad7 = ok7.map(([t, k]) => [t, k, d7(t)]).filter(([, k, l]) => !l || l.why || l.kind !== k || !/^#[A-Za-z0-9]{4}$/.test(l.tag || ''));
+  check('R7. /ban, /tempban <length>, /unban run with the kind discipline.js records (ban, suspend, lift), the #TAG named', !bad7.length, bad7);
+  const t = d7('/tempban #8KWH 3d stole from a barrel');
+  check('R7. ...and the line the game runs is the alias as typed (handleLine sends it to the alias)', t.cmd === 'tempban' && t.body === '#8KWH 3d stole from a barrel', t);
+  const refused7 = [['/ban Bob threats against players', 'needTag'], ['/ban', 'badKind'], ['/ban list', 'badKind'], ['/ban #8KWH', 'reasonShort'], ['/ban #8KWH hi', 'reasonShort'],
+    ['/ban #8KWH #{ff0000}red text', 'reasonChars'], ['/ban #8KWH <@200000000000000001> pinged', 'reasonChars'], [`/ban #8KWH ${R300}x`, 'reasonLong'],
+    ['/tempban #8KWH stole from a barrel', 'badLength'], ['/tempban #8KWH 31d stole from a barrel', 'badLength'], ['/tempban #8KWH 1.5d stole from a barrel', 'badLength'],
+    ['/tempban #8KWH 3d', 'reasonShort'], ['/unban #8KWH [[S]]fake notice', 'reasonChars'], ['/unban #8KWH 3', 'reasonShort']];
+  const w7 = refused7.map(([x, why]) => [x, why, d7(x)]).filter(([, why, l]) => !l || l.why !== why);
+  check('R7. ...each refused form is refused as /discipline refuses it (one #TAG, the length, REASON_RE, 5..300)', !w7.length, w7);
+  check('R7. deny "discipline suspend" denies /tempban, "discipline" all three, "ban" only /ban', d7('/tempban #8KWH 3d stole goods', new Set(['discipline suspend'])).why === 'denied'
+    && ['/ban #8KWH stole goods', '/tempban #8KWH 3d stole goods', '/unban #8KWH stole goods'].every((x) => d7(x, new Set(['discipline'])).why === 'denied')
+    && d7('/ban #8KWH stole goods', new Set(['ban'])).why === 'denied' && !d7('/tempban #8KWH 3d stole goods', new Set(['ban'])).why);
+  check('R7. maxSuspendDays 7 holds /tempban to 7d', !d7('/tempban #8KWH 7d stole goods', NO_DENY, { maxSuspendDays: 7 }).why && d7('/tempban #8KWH 8d stole goods', NO_DENY, { maxSuspendDays: 7 }).why === 'badLength');
+  check('R7. the aliases carry the rank check and take an offline #TAG, as /discipline', ['ban', 'tempban', 'unban'].every((n) => rules.ALLOW[n].rank === true && rules.ALLOW[n].offline === true && rules.ALLOW[n].rule === 'tagKindReason'));
+  check('R7. a Lead GM runs them (PUNISH_ONLY), and the usage the refusals show', ['ban', 'tempban', 'unban'].every((n) => rules.PUNISH_ONLY.includes(n))
+    && rules.usageOf('tempban', ['suspend'], 30) === '/tempban #TAG <1-720h|1-30d> <reason>' && rules.usageOf('ban', ['ban'], 30) === '/ban #TAG <reason>', rules.usageOf('tempban', ['suspend'], 30));
 }
 
 // ==== E. end to end: signed requests through the reader, the gate and discipline.js ==========================================
@@ -264,10 +290,14 @@ const AS_LEAD = { discordId: ID.lead, profileId: 9, roles: [ROLE.lead], user: 'i
   check('E1. allow.json lists /discipline with rule tagKindReason, every kind, and the longest suspension (30 days, from the config)', !!d && d.rule === 'tagKindReason'
     && JSON.stringify(d.kinds) === '["warn","strike","suspend","lift","overturn"]' && d.maxSuspendDays === 30, d);
   check('E1. ...with a usage that names each kind and its word', !!d && d.usage === '/discipline #TAG warn|strike|lift <reason>; suspend <1-720h|1-30d> <reason>; overturn <n> <reason>', d && d.usage);
-  check("E1. ...and the console's own help (the registry's names the record view and list, which the console refuses), at most 200 characters", !!d && /^A warning, strike, suspension, lift or overturn on the player's account record/.test(d.help) && d.help.length <= 200, d && d.help);
+  check("E1. ...and the console's own help (the registry's names the record view and list, which the console refuses), at most 200 characters", !!d && /^A warning, strike, suspension, ban, lift or overturn on the player's account record/.test(d.help) && d.help.length <= 200, d && d.help);
   const k = allow.find((x) => x.name === 'kick');
   check('E1. /kick stays #TAG only, and its help says it takes no reason', !!k && k.usage === '/kick #TAG' && k.rule === 'tag' && /takes no reason/.test(k.help), k);
   check('E1. no other entry carries kinds', allow.filter((x) => x.kinds).map((x) => x.name).join() === 'discipline', allow.map((x) => x.name));
+  // 25 Oct: the backend's copy (skymp5-backend allowlist.js) refuses all of allow.json for a kind or an entry it does not know, so
+  // ban and the aliases stay out of it until the backend learns them (console.js BACKEND_KINDS); the reader takes them all the same
+  check('E1. allow.json stays what the backend parses: no ban kind, no /ban, /tempban or /unban entry', !allow.some((x) => ['ban', 'tempban', 'unban'].includes(x.name))
+    && !(d && d.kinds.includes('ban')), allow.map((x) => x.name));
   loadConsole(CFG({ deny: ['discipline suspend', 'discipline overturn'] }));
   const n = (allowNow() || []).find((x) => x.name === 'discipline');
   check('E1. deny "discipline suspend" and "discipline overturn": allow.json lists warn, strike and lift only, no length, and a usage without them', !!n && JSON.stringify(n.kinds) === '["warn","strike","lift"]'
@@ -330,7 +360,7 @@ reset();
   // (the hardening's rank check refuses one's own account in the console first, ownAccount; discipline.js refuses it in game)
   check("E3. never one's own account: Jake on Jake Alt (profile 1) is refused (ownAccount), nothing recorded", rep && rep.state === 'refused' && rep.why === 'ownAccount' && JSON.stringify(recordOf(1)) === before, rep);
   rep = send('/discipline #LLX8 lift appeal accepted');
-  check('E3. a lift with no running suspension: "Lydia #LLX8 is not suspended."', rep && header(rep) === 'Lydia #LLX8 is not suspended.' && recordOf(6).length === 1, rep);
+  check('E3. a lift with no running suspension: "Lydia #LLX8 is not suspended."', rep && header(rep) === 'Lydia #LLX8 is not suspended or banned.' && recordOf(6).length === 1, rep);
   rep = send('/discipline #LLX8 overturn 9 no such record');
   check('E3. an overturn of a record the account does not have: "has no record #9", nothing recorded', rep && /^Lydia #LLX8 has no record #9\./.test(header(rep)) && recordOf(6).length === 1, rep);
   rep = send('/discipline #8KWH overturn 5 overturn the overturn');
@@ -411,7 +441,8 @@ reset();
   check('E7. the repo config denies nothing, so every kind is on once console.js ships (narrow it with deny "discipline <kind>")', Array.isArray(rc.deny) && !rc.deny.length);
   check('E7. the repo config keeps discipline.maxSuspendDays 30', (REPO_CFG.discipline || {}).maxSuspendDays === 30);
   logs.length = 0; loadConsole(CFG());
-  check('E7. the reader counts eleven commands', logs.some((l) => /console: reader on .*, 11 commands, floor leadgm, game pin 4$/.test(l)), logs);
+  // eleven, and /ban, /tempban, /unban from 25 Oct
+  check('E7. the reader counts fourteen commands', logs.some((l) => /console: reader on .*, 14 commands, floor leadgm, game pin 4$/.test(l)), logs);
 }
 
 // ---- E8. review (21 Oct): a suspended account cannot act from the console; a reason of blank letters is no reason -------------
@@ -439,6 +470,37 @@ reset();
   check('E8. once Jake lifts it, Leda acts again', rep && rep.state === 'ran' && back && back.state === 'ran' && /^Recorded: warn #\d+ on Lydia #LLX8\.$/.test(header(back)), [rep, back]);
   const blanks = [ch(0x3164).repeat(5), ch(0x115f).repeat(5), ch(0x1160).repeat(5), ch(0xffa0).repeat(5), `ok ${ch(0x3164)} reason`].map((x) => decide(`/discipline #8KWH warn ${x}`).why);
   check('E8. a reason holding a Hangul filler (a letter that draws nothing) is refused as reasonChars', blanks.every((w) => w === 'reasonChars'), blanks);
+}
+
+// ---- E9. /ban, /tempban, /unban from the console (Nat, 25 Oct: "discord commands that correlate so lead GMs can use it") ------
+reset();
+{
+  const n5 = recordOf(5).length;
+  let rep = send('/ban #8KWH threats against players, ticket 0200', AS_LEAD);
+  const b = recordOf(5)[n5] || {};
+  check('E9. a pinned Lead GM bans Bob from the console: "Recorded: ban #n on Bob #8KWH permanently.", a ban record with no end', rep && rep.state === 'ran' && rep.tier === 'leadgm'
+    && /^Recorded: ban #\d+ on Bob #8KWH permanently\.$/.test(header(rep)) && b.kind === 'ban' && b.until === undefined && b.by === 'Leda #LEAD', { rep, b });
+  check('E9. ...Bob is logged out with "banned permanently", and the #staff-commands line names /ban', kicked.includes(store.get(A.bob).__user)
+    && packets.some(([a, p]) => a === A.bob && p.customPacketType === 'kicked' && /^Your account is banned permanently\. Reason: threats against players/.test(p.reason))
+    && staffLines.length === 1 && /\(Lead GM\): \/ban #8KWH threats against players, ticket 0200 \[remote web [0-9a-f]{8}\]$/.test(staffLines[0].detail), { packets, staffLines });
+  check('E9. ...the DISCIPLINE audit line says permanently', audits().some((l) => /^DISCIPLINE ban #\d+ on Bob #8KWH .* permanently by Leda #LEAD .*: threats against players, ticket 0200$/.test(l)), audits().slice(-3));
+  reset();
+  rep = send('/unban #8KWH appeal accepted on ticket 0201', Object.assign({ src: 'discord' }, AS_LEAD));
+  check('E9. /unban from Discord lifts it (the lift kind)', rep && rep.state === 'ran' && /^Recorded: lift #\d+ on Bob #8KWH\./.test(header(rep)) && recordOf(5)[n5].lifted === true, rep);
+  rep = send('/tempban #8KWH 3d stole from a barrel', AS_LEAD);
+  check('E9. /tempban 3d suspends for 3 days', rep && rep.state === 'ran' && /^Recorded: suspend #\d+ on Bob #8KWH until /.test(header(rep)), rep);
+  rep = send('/ban #8KWH a fourth hold in the hour', AS_LEAD);
+  check('E9. the console cap counts bans and temp bans with the suspensions (3 an hour on one account): the next is suspendCap', rep && rep.why === 'suspendCap', rep);
+  reset();
+  const n5b = recordOf(5).length, n6 = recordOf(6).length;
+  rep = send('/ban #8KWH Gemma tries to ban', { discordId: ID.gm, profileId: 3, roles: [ROLE.gm], user: 'gemma' });
+  check('E9. a pinned GM is refused /ban by the floor (tier), nothing recorded, no staff line', rep && rep.why === 'tier' && recordOf(5).length === n5b && !staffLines.length, rep);
+  rep = send('/ban #LLX8 <@200000000000000001> pinged', AS_LEAD);
+  check('E9. a bad reason is refused (reasonChars) before the gate', rep && rep.why === 'reasonChars' && recordOf(6).length === n6 && !staffLines.length, rep);
+  rep = send('/ban #NNAT a Lead GM bans a Developer', AS_LEAD);
+  check('E9. a Lead GM cannot ban a Developer account from the console (rank)', rep && rep.why === 'rank' && !recordOf(2).some((e) => e.kind === 'ban'), rep);
+  rep = send('/ban #LEAD banning my own account', AS_LEAD);
+  check('E9. ...nor her own account (ownAccount)', rep && rep.why === 'ownAccount', rep);
 }
 
 global.setTimeout = realTimeout;

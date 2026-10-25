@@ -178,7 +178,7 @@ kicked.length = 0; online = [2, 3, 8, 9];
 ok(!login(8) && !kicked.length, 'B logs in again');
 ok(!login(3) && said.some(([a, t]) => a === 3 && /Your suspension was lifted: Ended early by Jake/.test(t)), 'the account logs in and is told it was lifted');
 reset(); load([{ key: 'lift-nothing', kind: 'lift', of: 'no-such', reason: 'nothing to lift', by: 'Jake' }]);
-ok(logs.some((l) => /record lift-nothing: no suspension no-such on record to lift/.test(l)), 'a lift of an unknown key is refused', logs);
+ok(logs.some((l) => /record lift-nothing: no suspension or ban no-such on record to lift/.test(l)), 'a lift of an unknown key is refused', logs); // "or ban": a config lift ends a ban too (25 Oct)
 
 // 9. The ids file: world readable warned; a key with no record named; broken JSON never quoted
 reset(); fs.chmodSync(DFILE, 0o644); fs.writeFileSync(DFILE, JSON.stringify({ 'rep-test': [ID_A], 'no-record': [ID_C], [ID_C]: [ID_C] }));
