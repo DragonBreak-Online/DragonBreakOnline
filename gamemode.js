@@ -1076,7 +1076,7 @@ const STAFF_HELP = [
     ['dossier', 'list | read <name|#TAG> | reports | add <name|#TAG> <text> | strike <name|#TAG> <n>: the Thalmor dossiers and informant reports (add and strike: Lead GM)']] },
   { key: 'world', title: 'World', items: ['settime', 'setweather', 'timescale', 'region', ['dungeon end', '<dungeon id|name>: end a dungeon claim now'],
     'placed', 'placeundo', 'placeexport', 'worldedits', 'worldhide', 'worldshow', 'masktest', 'couriers', 'traps', 'leverpuzzle',
-    ['guardpost', 'add [npc desc] | list | remove <hold> <n> | auto <hold>: stand where a guard should be and add places that hold\'s own guard there (an id like abe18:Skyrim.esm picks another). auto fills a hold with the posts its guards held in the old days']] },
+    ['guardpost', 'add [npc desc] | list | remove <hold> <n> | auto <hold>: stand where a guard should be and add places that hold\'s own guard there (an id like abe18:Skyrim.esm picks another). auto fills a hold with the posts its guards held in the old days']] }, // verify-formids: ignore (abe18 is an example NPC id in /guardpost's help, not an item)
   { key: 'debug', title: 'Server and debugging', items: ['monitor', 'load', 'selftest', 'npc', 'mv', 'driftset', 'driftspawn', 'driftrepair',
     'staffdiag', 'voicediag', 'staffstats', 'gearswap', 'factiongear'] },
 ];
@@ -2038,6 +2038,9 @@ mp.onActivate = (targetId, casterId) => {
   // Burglary by an approved thief faction (thievery.js): a break-in, a theft or the Fence Chest; nothing opens, and anyone
   // it does not handle falls through to the housing locks
   if (globalThis.__dboBurglaryActivate) { try { if (globalThis.__dboBurglaryActivate(target, caster)) return false; } catch (e) { log('burglary activate failed', e.message); } }
+  // A home's planter, and a study bookshelf in a home with too few of them (decor.js); a home study with enough shelves
+  // falls through to schools.js
+  if (globalThis.__dboDecorActivate) { try { if (globalThis.__dboDecorActivate(target, caster)) return false; } catch (e) { log('decor activate failed', e.message); } }
   // Study Magic and the Class Lectern (schools.js): their own panels, before a book on the shelf can start a reading
   if (globalThis.__dboSchoolsActivate && globalThis.__dboSchoolsActivate(target, caster)) return false;
   // A guild's own workshop (spells.js): the Synod Conclave's enchanting table, for Synod and College members
@@ -8839,8 +8842,8 @@ try {
 try {
   const DECOR_JS = path.resolve('decor.js');
   delete require.cache[DECOR_JS];
-  require(DECOR_JS)({ mp, log, personal, audit, who, onUi, sendPacket, isAdmin, tierOf, registerChatCommand, cfg, every, onlineActors, giveItem, findByName });
-} catch (e) { log('decor.js failed to load:', e.stack || e.message); globalThis.__dboDecorId = null; globalThis.__dboDecorRef = null; }
+  require(DECOR_JS)({ mp, log, personal, audit, who, onUi, sendPacket, isAdmin, tierOf, registerChatCommand, cfg, every, onlineActors, giveItem, findByName, itemName: (d) => adminItemName(d) });
+} catch (e) { log('decor.js failed to load:', e.stack || e.message); globalThis.__dboDecorId = null; globalThis.__dboDecorRef = null; globalThis.__dboDecorActivate = null; }
 
 // ---- breaking free of bound hands, /struggle (server\struggle.js, config "struggle") --------------
 try {

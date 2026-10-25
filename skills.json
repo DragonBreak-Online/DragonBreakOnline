@@ -791,7 +791,8 @@
     ],
     "activatePrefixes": [
      "CoinPurse",
-     "GoldPouch"
+     "GoldPouch",
+     "DBOPlanter"
     ]
    },
    "yieldChanceByTier": [

@@ -196,6 +196,8 @@
    "refs": ["651cc:BSHeartland.esm", "651cf:BSHeartland.esm", "651d2:BSHeartland.esm", "651d3:BSHeartland.esm", "652fe:BSHeartland.esm", "652ff:BSHeartland.esm", "6530d:BSHeartland.esm"],
    "tickSeconds": 10,
    "unitsPerTick": 1,
+   "_homeRate": "A home Study Bookshelf (decor.js, editor id DBOStudyBookshelf, also a Priest Studies spot) pays homeRate of this rate against the same 20-minute budget; 1 = a library (Nat via the Leader, 25 Oct). priestStudy.homeRate defaults to 1 in schools.js.",
+   "homeRate": 1,
    "minutesPerWindow": 20,
    "windowHours": 4,
    "moveLimitMeters": 1.5,
@@ -1794,7 +1796,11 @@
   "budgets": [{"pieces": 40, "lights": 4, "stations": 1, "containers": 6}, {"pieces": 70, "lights": 6, "stations": 2, "containers": 6}, {"pieces": 110, "lights": 8, "stations": 3, "containers": 6}],
   "cellCap": 150,
   "abandonRefund": 0.5,
-  "undoSeconds": 60
+  "undoSeconds": 60,
+  "_study": "The home Study Bookshelf (decor-growing.json; Nat via the Leader, 25 Oct). maxPerHome shelves at most; a home is a study (schools.js Study Magic and Priest Studies, at schools.study.homeRate / priestStudy.homeRate of a library's rate on the same budget) from minForStudy shelves. Each shelf also takes books of value minBookValue or more that the builder carries (never spell tomes or skill books), cheapest first; booksKept true gives them back on removal, false (the default) keeps them in the shelf for good.",
+  "study": { "maxPerHome": 3, "minForStudy": 2, "books": 10, "booksKept": false, "minBookValue": 5 },
+  "_planter": "The Planter (decor-growing.json): plant one of Hearthfire's 32 crops (/decor plant <n> when the character carries several), ripe after growHours of real time (rareHours for Deathbell, Nightshade, Glowing Mushroom and the like), picked with one Harvesting roll (skills.json harvesting yield chance and multiplier by tier) on baseYield, missYield when it fails. Owner or a /decor grant decorator only. maxPerHome planters at most. showZ lifts the soil and crop model above the planter's origin. tickSeconds: how often ripening is checked.",
+  "planter": { "maxPerHome": 4, "growHours": 24, "rareHours": 48, "baseYield": 2, "missYield": 1, "showZ": 30, "tickSeconds": 60 }
  },
  "consoleGate": {
   "_comment": "The ~ console closed for players and open for staff from Trial GM up (gamemode.js ff_console; Jake, 16 Oct). enabled false is the off switch: the next hot reload writes everyone online null and nothing is closed any more. testProfiles: profile ids whose console is closed whatever their rank, to check it in game as staff. A missing key is on.",

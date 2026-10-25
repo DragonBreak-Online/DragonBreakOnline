@@ -131,11 +131,13 @@ module.exports = (api) => {
     castUnitsBySchool: { Conjuration: 2 },
     castDailyUnits: 40,
     study: {
-      enabled: true, edid: 'StudyMagic', refs: [], tickSeconds: 10, unitsPerTick: 1, minutesPerWindow: 20, windowHours: 4,
+      // edids: more study bases; homeEdids: the ones a home has (decor.js's Study Bookshelf), paid at homeRate of a library's
+      // rate against the same per-character budget (1: a home study is convenience, never extra study; Nat via the Leader, 25 Oct)
+      enabled: true, edid: 'StudyMagic', edids: ['DBOStudyBookshelf'], homeEdids: ['DBOStudyBookshelf'], homeRate: 1, refs: [], tickSeconds: 10, unitsPerTick: 1, minutesPerWindow: 20, windowHours: 4,
       moveLimitMeters: 1.5, anim: 'IdleBook_PageTurn', exitAnim: 'IdleForceDefaultState', wheelEverySeconds: 60, wheelValue: 0,
     },
     priestStudy: {
-      enabled: true, edid: 'PriestStudy', refs: [], skill: 'priest', school: 'Restoration', tickSeconds: 10, unitsPerTick: 1, minutesPerWindow: 20,
+      enabled: true, edid: 'PriestStudy', edids: ['DBOStudyBookshelf'], homeEdids: ['DBOStudyBookshelf'], homeRate: 1, refs: [], skill: 'priest', school: 'Restoration', tickSeconds: 10, unitsPerTick: 1, minutesPerWindow: 20,
       windowHours: 4, moveLimitMeters: 1.5, anim: 'IdleBook_PageTurn', exitAnim: 'IdleForceDefaultState', wheelEverySeconds: 60, wheelValue: 0,
     },
     // Sermons at a temple pulpit: the Class Lectern's rules for Priest. A preacher follows a Divine (`teacherFaiths`, the
@@ -1006,9 +1008,16 @@ module.exports = (api) => {
   const refSet = (list) => new Set((Array.isArray(list) ? list : []).map((d) => idOf(d)).filter(Boolean));
   const STUDY_REFS = refSet(C.study.refs);
   const LECTERN_REFS = refSet(C.classes.lecterns);
-  const isStudy = (ref) => C.study.enabled && (STUDY_REFS.has(ref) || (!!C.study.edid && baseEdidOf(ref) === String(C.study.edid).toLowerCase()));
+  // a base editor id in conf.edid or conf.edids (the home Study Bookshelf is in both Study Magic's and Priest Studies')
+  const edidIn = (ref, conf, key = 'edids') => {
+    const e = baseEdidOf(ref);
+    return !!e && ((key === 'edids' && !!conf.edid && e === String(conf.edid).toLowerCase()) || (Array.isArray(conf[key]) && conf[key].some((x) => String(x).toLowerCase() === e)));
+  };
+  const isStudy = (ref) => C.study.enabled && (STUDY_REFS.has(ref) || edidIn(ref, C.study));
   const PRIEST_REFS = refSet(C.priestStudy.refs);
-  const isPriestStudy = (ref) => C.priestStudy.enabled && (PRIEST_REFS.has(ref) || (!!C.priestStudy.edid && baseEdidOf(ref) === String(C.priestStudy.edid).toLowerCase()));
+  const isPriestStudy = (ref) => C.priestStudy.enabled && (PRIEST_REFS.has(ref) || edidIn(ref, C.priestStudy));
+  // a home's study shelf: paid at homeRate (study.homeRate / priestStudy.homeRate, 1 = a library's rate)
+  const homeRate = (ref, conf) => { const r = Number(conf.homeRate); return edidIn(ref, conf, 'homeEdids') && Number.isFinite(r) ? Math.max(0, r) : 1; };
   const PREACH_REFS = refSet(C.preach.refs);
   const isPreach = (ref) => C.preach.enabled && (PREACH_REFS.has(ref) || (!!C.preach.edid && baseEdidOf(ref) === String(C.preach.edid).toLowerCase()));
   const isLectern = (ref) => C.classes.enabled && (LECTERN_REFS.has(ref) || (!!C.classes.edid && baseEdidOf(ref) === String(C.classes.edid).toLowerCase()));
@@ -1176,8 +1185,9 @@ module.exports = (api) => {
       const paid = Math.min(ticks, room);
       if (paid > 0 && s.primary) {
         const before = levelOf(s, s.primary);
-        credit(s, s.primary, paid * C.study.unitsPerTick);
-        ses.gained += paid * C.study.unitsPerTick;
+        const units = paid * C.study.unitsPerTick * homeRate(ses.ref, C.study);
+        credit(s, s.primary, units);
+        ses.gained += units;
         save(a, s);
         tellGain(a, s.primary, before, s);
         // The school has reached its first spell: the books close and the pick opens here
@@ -1554,7 +1564,9 @@ module.exports = (api) => {
           continue;
         }
         ses.wheelMark = units;
-        wheel(a, idOf(PRIEST_SPELL), PS.wheelValue, 1);
+        // a home shelf below a library's rate pays each minute's credit with that chance (the Wheel's credit is whole casts)
+        const hr = homeRate(ses.ref, PS);
+        if (!(hr < 1) || Math.random() < hr) wheel(a, idOf(PRIEST_SPELL), PS.wheelValue, 1);
       }
       if (paid < ticks) { stopPriest(a, 'budget'); closeWidget(a, PRIEST_PANEL_ID); continue; }
       if (priestAt.get(a) === ses.ref) openPriest(a, ses.ref, '', '', false);
@@ -2061,6 +2073,14 @@ module.exports = (api) => {
       // A Senior rank of the college whose hall this is chooses first: a class, or teaching a spell (spells.js)
       try { if (typeof globalThis.__dboTeachLecternMenu === 'function' && globalThis.__dboTeachLecternMenu(casterId, targetId >>> 0)) return true; } catch (e) { log('schools: lectern teach menu failed', e.message); }
       CLASSES.open(casterId, targetId >>> 0);
+      return true;
+    }
+    // One home shelf serves both: a character with a school still learning at the shelves studies magic, anyone else
+    // Priest Studies (a library has a separate activator for each)
+    if (isStudy(targetId) && isPriestStudy(targetId)) {
+      const s = stateOf(casterId);
+      if (s && s.primary && !studyRefusal(casterId, s)) useStudy(targetId >>> 0, casterId >>> 0);
+      else { notePriestStudy(targetId >>> 0); usePriest(targetId >>> 0, casterId >>> 0); }
       return true;
     }
     if (isStudy(targetId)) { useStudy(targetId >>> 0, casterId >>> 0); return true; }

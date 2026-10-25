@@ -1,0 +1,271 @@
+{
+ "_comment": "Home decorating's study bookshelf and planters (decor.js; Nat via the Leader, 25 Oct; design _work\\home-decorating\\study-and-planters-design-1025.md). The pieces are DLE records from DBO_StudyPlanters.esp, named here by editor id: their descs stay null until the merged DLE is read by tools/decor/fill_growing_ids.py, and a piece without a desc is not offered. The numbers (caps, books, grow hours, yield) are config \"decor\".study / .planter, not here.",
+ "pieces": [
+  {
+   "kind": "study",
+   "name": "Study Bookshelf",
+   "edid": "DBOStudyBookshelf",
+   "desc": null,
+   "group": "study",
+   "radius": 45,
+   "costA": {
+    "BYOHMaterialLog": 3,
+    "BYOHMaterialNails": 6,
+    "BYOHMaterialGlass": 1
+   },
+   "costB": {
+    "6f993:Skyrim.esm": 12,
+    "5ace4:Skyrim.esm": 2
+   }
+  },
+  {
+   "kind": "planter",
+   "name": "Planter",
+   "edid": "DBOPlanter",
+   "desc": null,
+   "group": "garden",
+   "radius": 130,
+   "costA": {
+    "BYOHMaterialClay": 2,
+    "BYOHMaterialLog": 1,
+    "BYOHMaterialStoneBlock": 2
+   },
+   "costB": {
+    "34cdf:Skyrim.esm": 2,
+    "6f993:Skyrim.esm": 4,
+    "71cf3:Skyrim.esm": 4
+   }
+  }
+ ],
+ "soil": {
+  "edid": "DBOPlanterSoil",
+  "desc": null
+ },
+ "_crops": "Hearthfire's own planter list (flPlanterPlantableItem, in order) and its grown plants (flPlanterPlantedFlora) as DLE statics (DBOPlanted...). 'item' is what is planted and what a pick gives; 'rare' grows for planter.rareHours.",
+ "crops": [
+  {
+   "item": "64b3f:Skyrim.esm",
+   "edid": "DBOPlantedFoodCabbage",
+   "desc": null,
+   "rare": false,
+   "of": "FoodCabbage"
+  },
+  {
+   "item": "64b40:Skyrim.esm",
+   "edid": "DBOPlantedFoodCarrot",
+   "desc": null,
+   "rare": false,
+   "of": "FoodCarrot"
+  },
+  {
+   "item": "10d666:Skyrim.esm",
+   "edid": "DBOPlantedFoodGourd",
+   "desc": null,
+   "rare": false,
+   "of": "FoodGourd"
+  },
+  {
+   "item": "669a5:Skyrim.esm",
+   "edid": "DBOPlantedFoodLeek",
+   "desc": null,
+   "rare": false,
+   "of": "FoodLeek"
+  },
+  {
+   "item": "64b41:Skyrim.esm",
+   "edid": "DBOPlantedFoodPotato",
+   "desc": null,
+   "rare": false,
+   "of": "FoodPotato"
+  },
+  {
+   "item": "6abcb:Skyrim.esm",
+   "edid": "DBOPlantedCanisRoot01",
+   "desc": null,
+   "rare": false,
+   "of": "CanisRoot01"
+  },
+  {
+   "item": "3f7f8:Skyrim.esm",
+   "edid": "DBOPlantedTundraCotton",
+   "desc": null,
+   "rare": false,
+   "of": "TundraCotton"
+  },
+  {
+   "item": "b2183:Skyrim.esm",
+   "edid": "DBOPlantedCreepClusterRoot",
+   "desc": null,
+   "rare": false,
+   "of": "CreepClusterRoot"
+  },
+  {
+   "item": "516c8:Skyrim.esm",
+   "edid": "DBOPlantedDeathBell",
+   "desc": null,
+   "rare": true,
+   "of": "deathBell"
+  },
+  {
+   "item": "889a2:Skyrim.esm",
+   "edid": "DBOPlantedDragonsTongue",
+   "desc": null,
+   "rare": false,
+   "of": "DragonsTongue"
+  },
+  {
+   "item": "7e8b7:Skyrim.esm",
+   "edid": "DBOPlantedSwampFungalPod01",
+   "desc": null,
+   "rare": false,
+   "of": "SwampFungalPod01"
+  },
+  {
+   "item": "7e8c1:Skyrim.esm",
+   "edid": "DBOPlantedGiantLichen",
+   "desc": null,
+   "rare": false,
+   "of": "GiantLichen"
+  },
+  {
+   "item": "7ee01:Skyrim.esm",
+   "edid": "DBOPlantedGlowingMushroom",
+   "desc": null,
+   "rare": true,
+   "of": "GlowingMushroom"
+  },
+  {
+   "item": "6ac4a:Skyrim.esm",
+   "edid": "DBOPlantedJazBay",
+   "desc": null,
+   "rare": false,
+   "of": "JazBay"
+  },
+  {
+   "item": "5076e:Skyrim.esm",
+   "edid": "DBOPlantedJuniperBerries",
+   "desc": null,
+   "rare": false,
+   "of": "JuniperBerries"
+  },
+  {
+   "item": "45c28:Skyrim.esm",
+   "edid": "DBOPlantedLavender",
+   "desc": null,
+   "rare": false,
+   "of": "Lavender"
+  },
+  {
+   "item": "ec870:Skyrim.esm",
+   "edid": "DBOPlantedMoraTapinellaBits",
+   "desc": null,
+   "rare": false,
+   "of": "MoraTapinellaBits"
+  },
+  {
+   "item": "77e1c:Skyrim.esm",
+   "edid": "DBOPlantedMountainFlower01Blue",
+   "desc": null,
+   "rare": false,
+   "of": "MountainFlower01Blue"
+  },
+  {
+   "item": "77e1e:Skyrim.esm",
+   "edid": "DBOPlantedMountainFlower01Purple",
+   "desc": null,
+   "rare": false,
+   "of": "MountainFlower01Purple"
+  },
+  {
+   "item": "77e1d:Skyrim.esm",
+   "edid": "DBOPlantedMountainFlower01Red",
+   "desc": null,
+   "rare": false,
+   "of": "MountainFlower01Red"
+  },
+  {
+   "item": "4da00:Skyrim.esm",
+   "edid": "DBOPlantedMushroom01",
+   "desc": null,
+   "rare": false,
+   "of": "Mushroom01"
+  },
+  {
+   "item": "4da20:Skyrim.esm",
+   "edid": "DBOPlantedMushroom02",
+   "desc": null,
+   "rare": false,
+   "of": "Mushroom02"
+  },
+  {
+   "item": "4da22:Skyrim.esm",
+   "edid": "DBOPlantedMushroom03",
+   "desc": null,
+   "rare": false,
+   "of": "Mushroom03"
+  },
+  {
+   "item": "4da23:Skyrim.esm",
+   "edid": "DBOPlantedMushroom04",
+   "desc": null,
+   "rare": false,
+   "of": "Mushroom04"
+  },
+  {
+   "item": "4da24:Skyrim.esm",
+   "edid": "DBOPlantedMushroom05",
+   "desc": null,
+   "rare": false,
+   "of": "Mushroom05"
+  },
+  {
+   "item": "4da25:Skyrim.esm",
+   "edid": "DBOPlantedMushroom06",
+   "desc": null,
+   "rare": false,
+   "of": "Mushroom06"
+  },
+  {
+   "item": "2f44c:Skyrim.esm",
+   "edid": "DBOPlantedNightshade",
+   "desc": null,
+   "rare": true,
+   "of": "Nightshade"
+  },
+  {
+   "item": "6f950:Skyrim.esm",
+   "edid": "DBOPlantedScalyPholiotaBits",
+   "desc": null,
+   "rare": false,
+   "of": "ScalyPholiotaBits"
+  },
+  {
+   "item": "1b3bd:Skyrim.esm",
+   "edid": "DBOPlantedSnowberry",
+   "desc": null,
+   "rare": false,
+   "of": "Snowberry"
+  },
+  {
+   "item": "83e64:Skyrim.esm",
+   "edid": "DBOPlantedSpikyGrass01",
+   "desc": null,
+   "rare": false,
+   "of": "SpikyGrass01"
+  },
+  {
+   "item": "134aa:Skyrim.esm",
+   "edid": "DBOPlantedThistle01",
+   "desc": null,
+   "rare": false,
+   "of": "Thistle01"
+  },
+  {
+   "item": "4b0ba:Skyrim.esm",
+   "edid": "DBOPlantedWheat",
+   "desc": null,
+   "rare": false,
+   "of": "Wheat"
+  }
+ ]
+}
