@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 import Button from '../../constructorComponents/button';
 import './styles.scss';
-import { PlayerPunish, DeityReset, SkillsTab, ItemsTab, PowersTab, TeleportTab, PlaceTab, PlayerCare, TargetPicker, PanelBan, MasteryTarget, TargetOption, BeastState, PanelPlacements, PlaceMeta, PlaceResults, PlaceSet } from './extraTabs';
+import { PlayerPunish, DeityReset, SkillsTab, ItemsTab, PowersTab, TeleportTab, PlaceTab, PlayerCare, TargetPicker, PanelBan, MasteryTarget, TargetOption, BeastState, PanelPlacements, PlaceMeta, PlaceResults, PlaceSet, WarbandView } from './extraTabs';
 import { SearchBar, fuzzyFilter } from '../../components/SearchBar/SearchBar';
 import { GmCallsTab, EnchantTab } from './staffTabs';
 import { ThieveryTab } from './thieveryTab';
@@ -102,6 +102,7 @@ export interface AdminPanelData {
   placeMeta?: PlaceMeta | null; // the Place tab's categories, mods and rights, after adminPlaceMeta
   placeResults?: PlaceResults | null; // the Place tab's current catalog search, a page at a time
   placeSets?: PlaceSet[] | null; // the Place tab's saved sets, after adminPlaceSets
+  warband?: WarbandView | null; // the Place tab's Warband view, after any warband step or adminWarbandView
   masteryTarget?: MasteryTarget | null; // the Skills tab's player, arrives after adminMasteryRequest
   me?: { a: string; b?: BeastState }; // the admin's own row, which the roster leaves out
 }
@@ -591,7 +592,7 @@ const AdminPanel = ({ data }: { data: AdminPanelData }) => {
         {tab === 'powers' ? <PowersTab events={ev} who={actingOn} beast={acting ? acting.beast : undefined} canSpawn={canSpawn} /> : null}
 
         {tab === 'teleport' ? <TeleportTab events={ev} locationsVersion={data.locationsVersion || 0} /> : null}
-        {tab === 'place' ? <PlaceTab events={ev} placements={data.placements || null} meta={data.placeMeta || null} results={data.placeResults || null} sets={data.placeSets || null} /> : null}
+        {tab === 'place' ? <PlaceTab events={ev} placements={data.placements || null} meta={data.placeMeta || null} results={data.placeResults || null} sets={data.placeSets || null} warband={data.warband || null} /> : null}
 
         {tab === 'modes' ? (
           <div className="admin-panel__modes">
