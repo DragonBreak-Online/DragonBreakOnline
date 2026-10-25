@@ -1000,10 +1000,10 @@ const HELP_GROUPS = [
       'Breaking gear down, with its skill: the station of its trade (a smelter, a tanning rack, a loom; books at a writing desk).',
       'A house you own or rent: look at its door and press X.', 'Your money: a bank counter.',
       'Your business: its ledger book. A shop\'s goods: its ledger book, or /shop inside it.', 'Where you are: /whereami.'] },
-  { key: 'rule', title: 'Rule and property', names: ['officials', 'appoint', 'dismiss', 'tax', 'ledgerpoint'], role: 'official',
+  { key: 'rule', title: 'Rule and property', names: ['officials', 'appoint', 'dismiss', 'tax', 'ledgerpoint', 'jaildoors'], role: 'official',
     hints: ['Your court: F3, the Court tab. A post you appoint someone to is offered, and they accept it.',
       'An outlaw of your hold (ruler or Steward): /bounty set <name or #TAG> <gold, up to 1000> <reason>; the jailer collects it.'] },
-  { key: 'groups', title: 'Groups and dungeons', names: ['party', 'guild', 'rebellion', 'court', 'charter', 'nobility', 'burglary', 'fence', 'stolen'],
+  { key: 'groups', title: 'Groups and dungeons', names: ['party', 'guild', 'rebellion', 'court', 'charter', 'nobility', 'burglary', 'fence', 'stolen', 'bosses'],
     hints: ['Your factions and your court: F3, the Faction and Court tabs. The nobles of your hold: F3, the Nobility tab.',
       'Thieves of a guild the staff approved: crouch at the locked door of a player\'s home to break in, and fence what you take at your guild\'s Fence Chest (/fence). Guards: /fence report a fence, /stolen to search a captured thief.',
       'A dungeon: its door. The party leader picks Novice, Adept, Expert or Master; /dungeon says what is claimed.',
@@ -1021,7 +1021,9 @@ const HELP_GROUPS = [
 const HELP_BY_OBJECT = new Set(['bank', 'board', 'business', 'faction', 'deity', 'rite', 'tomes', 'respawn', 'skills',
   'ledger', 'chill', 'sentence', 'hunger', 'rest', 'tokens', 'whoami', 'pigeonblock', 'sign', 'level', 'spells',
   'teach', 'reroll', 'offer', 'contract', 'commission', 'wildlife', 'champions', 'whereami', 'playtest', 'dungeon', 'ping',
-  'expedition', 'expeditions', 'blackreach', 'shop']);
+  'expedition', 'expeditions', 'blackreach', 'shop',
+  // Off until Nat switches each on; each gets its topic entry then
+  'briarheart', 'hagraven', 'decor']);
 const helpRoleOk = (a, role) => {
   if (!role) return true;
   try {
@@ -1075,7 +1077,7 @@ const STAFF_HELP = [
   { key: 'law', title: 'Law', items: ['jail', ['jaildoors', 'a menu: assign the next door you use as a jail door of this hold, or unassign one (GM+, and the hold\'s ruler, Steward, Commander or Captain of the Guard)'], ['concordat', '[races]: Concordat arrests standing, or the Thalmor outside the race rule'],
     ['dossier', 'list | read <name|#TAG> | reports | add <name|#TAG> <text> | strike <name|#TAG> <n>: the Thalmor dossiers and informant reports (add and strike: Lead GM)']] },
   { key: 'world', title: 'World', items: ['settime', 'setweather', 'timescale', 'region', ['dungeon end', '<dungeon id|name>: end a dungeon claim now'],
-    'placed', 'placeundo', 'placeexport', 'worldedits', 'worldhide', 'worldshow', 'masktest', 'couriers', 'traps', 'leverpuzzle',
+    'placed', 'placeundo', 'placeexport', 'worldedits', 'worldhide', 'worldshow', 'masktest', 'couriers', 'traps', 'leverpuzzle', 'bossevent',
     ['guardpost', 'add [npc desc] | list | remove <hold> <n> | auto <hold>: stand where a guard should be and add places that hold\'s own guard there (an id like abe18:Skyrim.esm picks another). auto fills a hold with the posts its guards held in the old days']] },  // verify-formids: ignore, the desc is an example in help text and 'items' here is the command list
   { key: 'debug', title: 'Server and debugging', items: ['monitor', 'load', 'selftest', 'npc', 'mv', 'driftset', 'driftspawn', 'driftrepair',
     'staffdiag', 'voicediag', 'staffstats', 'gearswap', 'factiongear'] },

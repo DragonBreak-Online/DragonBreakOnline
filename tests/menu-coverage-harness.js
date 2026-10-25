@@ -54,6 +54,9 @@ const EXCLUDED = {
   wildlife: 'rare: what roams the wilds',
   champions: 'rare: named beasts abroad',
   playtest: 'rare: what part of the world is open',
+  briarheart: 'off until Nat switches it on (briarheart.enabled); the rite is offered at a Hagraven altar, and it gets a Faith entry then',
+  hagraven: 'off until Nat switches it on (hagraven.enabled); the pact is made at a Hagraven altar, and it gets a Faith entry then',
+  decor: 'off until Nat switches it on (decor.enabled); it answers "not open yet", and gets a Work and the world entry then',
 };
 // Words the chat handler takes before it looks for a command (gamemode.js handleChat)
 const CHAT_WORDS = new Set(['say', 'low', 'whisper', 'wide', 'shout', 'me', 'melow', 'melong', 'my', 'mylow', 'mylong', 'do', 'dolow',
