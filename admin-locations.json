@@ -322,6 +322,22 @@
    ]
   },
   {
+   "name": "Anvil (site, no town)",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    -142939.91,
+    3531.13,
+    -13787.83
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
    "name": "Applewatch",
    "region": "Cyrodiil",
    "world": "a764b:BSHeartland.esm",
@@ -367,6 +383,22 @@
     0,
     0,
     299.84038056
+   ]
+  },
+  {
+   "name": "Bravil",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    98873.22,
+    17013.11,
+    -13075.2
+   ],
+   "rot": [
+    0,
+    0,
+    0
    ]
   },
   {
@@ -466,6 +498,22 @@
    ]
   },
   {
+   "name": "Camp Quintus",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    -127466.8,
+    120682.12,
+    -13610.66
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
    "name": "Capstone Cave",
    "region": "Cyrodiil",
    "world": "a764b:BSHeartland.esm",
@@ -490,6 +538,646 @@
     54211.25,
     204104.84,
     8454.49
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Cheydinhal (draft)",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    208203,
+    147595,
+    -5405
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "name": "Cheydinhal (draft) - Abandoned House",
+   "region": "Cyrodiil",
+   "world": "1007b6:DBO_Cheydinhal.esp",
+   "worldName": "Cheydinhal interior",
+   "pos": [
+    62.68,
+    -119.83,
+    -67.66
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Cheydinhal (draft) - Aldos Othran's House",
+   "region": "Cyrodiil",
+   "world": "1008d7:DBO_Cheydinhal.esp",
+   "worldName": "Cheydinhal interior",
+   "pos": [
+    62.5,
+    -131.35,
+    -56.0
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Cheydinhal (draft) - Bazur gro-Gharz's House",
+   "region": "Cyrodiil",
+   "world": "100741:DBO_Cheydinhal.esp",
+   "worldName": "Cheydinhal interior",
+   "pos": [
+    192.0,
+    -256.0,
+    -128.0
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Cheydinhal (draft) - Borba's Goods and Stores",
+   "region": "Cyrodiil",
+   "world": "10017d:DBO_Cheydinhal.esp",
+   "worldName": "Cheydinhal interior",
+   "pos": [
+    -6.25,
+    -172.75,
+    17.96
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Cheydinhal (draft) - Cheydinhal Bridge Inn",
+   "region": "Cyrodiil",
+   "world": "100292:DBO_Cheydinhal.esp",
+   "worldName": "Cheydinhal interior",
+   "pos": [
+    -241.7,
+    -199.18,
+    -221.26
+   ],
+   "rot": [
+    0,
+    0,
+    2.4
+   ]
+  },
+  {
+   "name": "Cheydinhal (draft) - Cheydinhal Castle",
+   "region": "Cyrodiil",
+   "world": "101a53:DBO_Cheydinhal.esp",
+   "worldName": "Cheydinhal interior",
+   "pos": [
+    -2577.91,
+    3259.89,
+    2369.01
+   ],
+   "rot": [
+    0,
+    0,
+    180.0
+   ]
+  },
+  {
+   "name": "Cheydinhal (draft) - Fighters Guild",
+   "region": "Cyrodiil",
+   "world": "1004b5:DBO_Cheydinhal.esp",
+   "worldName": "Cheydinhal interior",
+   "pos": [
+    -1.55,
+    -81.41,
+    -8.0
+   ],
+   "rot": [
+    0,
+    0,
+    180.0
+   ]
+  },
+  {
+   "name": "Cheydinhal (draft) - Ganredhel's House",
+   "region": "Cyrodiil",
+   "world": "10088f:DBO_Cheydinhal.esp",
+   "worldName": "Cheydinhal interior",
+   "pos": [
+    -18.03,
+    -193.84,
+    47.71
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Cheydinhal (draft) - Great Chapel of Arkay",
+   "region": "Cyrodiil",
+   "world": "100a73:DBO_Cheydinhal.esp",
+   "worldName": "Cheydinhal interior",
+   "pos": [
+    0.33,
+    -1205.97,
+    -686.38
+   ],
+   "rot": [
+    0,
+    0,
+    356.7
+   ]
+  },
+  {
+   "name": "Cheydinhal (draft) - House for Sale",
+   "region": "Cyrodiil",
+   "world": "1006ce:DBO_Cheydinhal.esp",
+   "worldName": "Cheydinhal interior",
+   "pos": [
+    248.77,
+    199.69,
+    -147.01
+   ],
+   "rot": [
+    0,
+    0,
+    270.0
+   ]
+  },
+  {
+   "name": "Cheydinhal (draft) - Mach-Na's Books",
+   "region": "Cyrodiil",
+   "world": "100312:DBO_Cheydinhal.esp",
+   "worldName": "Cheydinhal interior",
+   "pos": [
+    64.0,
+    -129.0,
+    -65.0
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Cheydinhal (draft) - Mages Guild",
+   "region": "Cyrodiil",
+   "world": "1003ee:DBO_Cheydinhal.esp",
+   "worldName": "Cheydinhal interior",
+   "pos": [
+    1656.32,
+    -609.64,
+    -25.82
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Cheydinhal (draft) - Newlands Lodge",
+   "region": "Cyrodiil",
+   "world": "1000e3:DBO_Cheydinhal.esp",
+   "worldName": "Cheydinhal interior",
+   "pos": [
+    11.11,
+    -264.48,
+    -279.36
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Cheydinhal (draft) - Oghash gra-Magul's House",
+   "region": "Cyrodiil",
+   "world": "100790:DBO_Cheydinhal.esp",
+   "worldName": "Cheydinhal interior",
+   "pos": [
+    62.52,
+    -126.14,
+    -67.66
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Cheydinhal (draft) - Riverview",
+   "region": "Cyrodiil",
+   "world": "1009d3:DBO_Cheydinhal.esp",
+   "worldName": "Cheydinhal interior",
+   "pos": [
+    -278.73,
+    -319.65,
+    -158.68
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Cheydinhal (draft) - Rythe Lythandas's House",
+   "region": "Cyrodiil",
+   "world": "10064b:DBO_Cheydinhal.esp",
+   "worldName": "Cheydinhal interior",
+   "pos": [
+    195.49,
+    -436.78,
+    13.27
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Cheydinhal (draft) - The March Rider",
+   "region": "Cyrodiil",
+   "world": "100398:DBO_Cheydinhal.esp",
+   "worldName": "Cheydinhal interior",
+   "pos": [
+    -239.33,
+    -275.73,
+    -216.1
+   ],
+   "rot": [
+    0,
+    0,
+    356.7
+   ]
+  },
+  {
+   "name": "Chorrol",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    -8389,
+    155640,
+    2223
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "name": "Chorrol - Alberic Litte's House",
+   "region": "Cyrodiil",
+   "world": "10119d:DBO_Chorrol.esp",
+   "worldName": "Chorrol interior",
+   "pos": [
+    260.64,
+    200.94,
+    -147.01
+   ],
+   "rot": [
+    0,
+    0,
+    270.0
+   ]
+  },
+  {
+   "name": "Chorrol - Arborwatch",
+   "region": "Cyrodiil",
+   "world": "100ccb:DBO_Chorrol.esp",
+   "worldName": "Chorrol interior",
+   "pos": [
+    -12.34,
+    -291.73,
+    -280.03
+   ],
+   "rot": [
+    0,
+    0,
+    2.2
+   ]
+  },
+  {
+   "name": "Chorrol - Casta Scribonia's House",
+   "region": "Cyrodiil",
+   "world": "10127f:DBO_Chorrol.esp",
+   "worldName": "Chorrol interior",
+   "pos": [
+    -255.97,
+    -523.72,
+    102.66
+   ],
+   "rot": [
+    0,
+    0,
+    4.1
+   ]
+  },
+  {
+   "name": "Chorrol - Castle Chorrol",
+   "region": "Cyrodiil",
+   "world": "101cd8:DBO_Chorrol.esp",
+   "worldName": "Chorrol interior",
+   "pos": [
+    35.27,
+    262.46,
+    1.01
+   ],
+   "rot": [
+    0,
+    0,
+    272.1
+   ]
+  },
+  {
+   "name": "Chorrol - Chapel of Stendarr",
+   "region": "Cyrodiil",
+   "world": "101729:DBO_Chorrol.esp",
+   "worldName": "Chorrol interior",
+   "pos": [
+    -9.1,
+    -1158.55,
+    -686.08
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Chorrol - Eugal Belette's House",
+   "region": "Cyrodiil",
+   "world": "1011f7:DBO_Chorrol.esp",
+   "worldName": "Chorrol interior",
+   "pos": [
+    97.49,
+    -377.51,
+    200.71
+   ],
+   "rot": [
+    0,
+    0,
+    352.6
+   ]
+  },
+  {
+   "name": "Chorrol - Fighters Guild",
+   "region": "Cyrodiil",
+   "world": "10020f:DBO_Chorrol.esp",
+   "worldName": "Chorrol interior",
+   "pos": [
+    1.78,
+    -538.24,
+    -221.76
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Chorrol - Fire and Steel",
+   "region": "Cyrodiil",
+   "world": "100ad7:DBO_Chorrol.esp",
+   "worldName": "Chorrol interior",
+   "pos": [
+    260.22,
+    -105.88,
+    -336.35
+   ],
+   "rot": [
+    0,
+    0,
+    270.0
+   ]
+  },
+  {
+   "name": "Chorrol - Francois Motierre's House",
+   "region": "Cyrodiil",
+   "world": "100d54:DBO_Chorrol.esp",
+   "worldName": "Chorrol interior",
+   "pos": [
+    -258.78,
+    -527.27,
+    102.65
+   ],
+   "rot": [
+    0,
+    0,
+    358.3
+   ]
+  },
+  {
+   "name": "Chorrol - Jirolin Doran's House",
+   "region": "Cyrodiil",
+   "world": "1010a2:DBO_Chorrol.esp",
+   "worldName": "Chorrol interior",
+   "pos": [
+    10.88,
+    -283.98,
+    -288.08
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Chorrol - Mages Guild",
+   "region": "Cyrodiil",
+   "world": "10038f:DBO_Chorrol.esp",
+   "worldName": "Chorrol interior",
+   "pos": [
+    1.74,
+    -30.92,
+    -4.94
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Chorrol - Malintus Ancrus' House",
+   "region": "Cyrodiil",
+   "world": "1013b1:DBO_Chorrol.esp",
+   "worldName": "Chorrol interior",
+   "pos": [
+    -257.75,
+    -527.18,
+    102.61
+   ],
+   "rot": [
+    0,
+    0,
+    358.3
+   ]
+  },
+  {
+   "name": "Chorrol - Modryn Oreyn's House",
+   "region": "Cyrodiil",
+   "world": "101328:DBO_Chorrol.esp",
+   "worldName": "Chorrol interior",
+   "pos": [
+    256.25,
+    201.09,
+    -147.01
+   ],
+   "rot": [
+    0,
+    0,
+    270.0
+   ]
+  },
+  {
+   "name": "Chorrol - Northern Goods and Trade",
+   "region": "Cyrodiil",
+   "world": "100f78:DBO_Chorrol.esp",
+   "worldName": "Chorrol interior",
+   "pos": [
+    -279.91,
+    -307.02,
+    -159.87
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Chorrol - Renoit's Books",
+   "region": "Cyrodiil",
+   "world": "100dfe:DBO_Chorrol.esp",
+   "worldName": "Chorrol interior",
+   "pos": [
+    257.0,
+    203.0,
+    -147.0
+   ],
+   "rot": [
+    0,
+    0,
+    270.0
+   ]
+  },
+  {
+   "name": "Chorrol - Reynald Jemane's House",
+   "region": "Cyrodiil",
+   "world": "10085a:DBO_Chorrol.esp",
+   "worldName": "Chorrol interior",
+   "pos": [
+    1653.85,
+    -601.89,
+    -25.82
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Chorrol - Rimalus Bruiant's House",
+   "region": "Cyrodiil",
+   "world": "100a46:DBO_Chorrol.esp",
+   "worldName": "Chorrol interior",
+   "pos": [
+    9.33,
+    -287.28,
+    -288.08
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Chorrol - The Grey Mare",
+   "region": "Cyrodiil",
+   "world": "100794:DBO_Chorrol.esp",
+   "worldName": "Chorrol interior",
+   "pos": [
+    -180.75,
+    -1349.03,
+    -221.42
+   ],
+   "rot": [
+    0,
+    0,
+    356.7
+   ]
+  },
+  {
+   "name": "Chorrol - The Oak and Crosier",
+   "region": "Cyrodiil",
+   "world": "1006d3:DBO_Chorrol.esp",
+   "worldName": "Chorrol interior",
+   "pos": [
+    -9.1,
+    -588.62,
+    -114.0
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Chorrol - Valus Odiil's House",
+   "region": "Cyrodiil",
+   "world": "10145e:DBO_Chorrol.esp",
+   "worldName": "Chorrol interior",
+   "pos": [
+    252.67,
+    201.2,
+    -147.01
+   ],
+   "rot": [
+    0,
+    0,
+    270.0
+   ]
+  },
+  {
+   "name": "Chorrol - Vilena Donton's House",
+   "region": "Cyrodiil",
+   "world": "1007f7:DBO_Chorrol.esp",
+   "worldName": "Chorrol interior",
+   "pos": [
+    1655.79,
+    -592.04,
+    -25.82
    ],
    "rot": [
     0,
@@ -610,6 +1298,22 @@
    ]
   },
   {
+   "name": "Fort Alessia",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    99498.02,
+    56692.41,
+    -13477.37
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
    "name": "Fort Caractacus",
    "region": "Cyrodiil",
    "world": "a764b:BSHeartland.esm",
@@ -658,6 +1362,22 @@
    ]
   },
   {
+   "name": "Fort Nickel",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    39601.27,
+    113605.53,
+    -12668.77
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
    "name": "Fort Pale Pass",
    "region": "Cyrodiil",
    "world": "a764b:BSHeartland.esm",
@@ -671,6 +1391,22 @@
     0,
     0,
     0.0
+   ]
+  },
+  {
+   "name": "Fort Urasek",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    120612.11,
+    111348.26,
+    -13561.54
+   ],
+   "rot": [
+    0,
+    0,
+    0
    ]
   },
   {
@@ -850,6 +1586,38 @@
    ]
   },
   {
+   "name": "Imperial City",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    89957,
+    108752,
+    -10811
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "name": "Kvatch (site, no town)",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    -81969.75,
+    26811.05,
+    -4501.03
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
    "name": "Lakeside Retreat",
    "region": "Cyrodiil",
    "world": "a764b:BSHeartland.esm",
@@ -863,6 +1631,22 @@
     0,
     0,
     0.0
+   ]
+  },
+  {
+   "name": "Leyawiin (site, no town)",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    149392.41,
+    -102410.66,
+    -12759.48
+   ],
+   "rot": [
+    0,
+    0,
+    0
    ]
   },
   {
@@ -911,6 +1695,22 @@
     0,
     0,
     0.0
+   ]
+  },
+  {
+   "name": "Nagasel",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    -122809.0,
+    160256.14,
+    -5541.7
+   ],
+   "rot": [
+    0,
+    0,
+    0
    ]
   },
   {
@@ -1122,6 +1922,22 @@
    ]
   },
   {
+   "name": "Skingrad (site, no town)",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    -16150.59,
+    29489.8,
+    -12007.52
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
    "name": "Skyrim 9,66",
    "region": "Cyrodiil",
    "world": "a764b:BSHeartland.esm",
@@ -1247,6 +2063,38 @@
     0,
     0,
     22.91832
+   ]
+  },
+  {
+   "name": "Vilverin",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    111568.27,
+    129350.13,
+    -13296.34
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "name": "Weye",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    60770.97,
+    108713.06,
+    -12939.92
+   ],
+   "rot": [
+    0,
+    0,
+    0
    ]
   },
   {
