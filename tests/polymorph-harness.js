@@ -703,19 +703,22 @@ ok(r15 === '' && !!pk15 && !!pk15.abilities, '15. the Hagraven sends a real load
 // report at all, which reads as fewer failures than there are
 const ab15 = (slot) => (pk15 && pk15.abilities && pk15.abilities[slot]) || [];
 const ids15 = (list) => (list || []).map((x) => x.id);
-ok(ids15(ab15('right')).includes(FIREBOLT) && ids15(ab15('right')).includes(FIREBALL),
-  '15. ...Firebolt and Fireball in the right hand, the ids EncHagraven carries', ids15(ab15('right')));
-ok(ids15(ab15('left')).includes(FASTHEAL) && ids15(ab15('left')).includes(CLOSEWOUNDS),
-  '15. ...Fast Healing and Close Wounds in the left', ids15(ab15('left')));
+// NOTHING in the hands: a creature body crashed on the humanoid weapon-draw path (25 Oct), and
+// equipping anything into a creature graph is unproven, so the hands stay empty until the client
+// guard ships. A safety property, so it is asserted rather than merely untested.
+ok(ids15(ab15('right')).length === 0, '15. ...and NOTHING in the right hand while a creature body is worn', ids15(ab15('right')));
+ok(ids15(ab15('left')).length === 0, '15. ...nor the left', ids15(ab15('left')));
+ok(!ids15(ab15('right')).includes(FIREBOLT) && !ids15(ab15('left')).includes(FASTHEAL),
+  '15. ...so her verified EncHagraven spells are held back rather than equipped', [ids15(ab15('right')), ids15(ab15('left'))]);
 ok(ids15(ab15('voice')).includes(REVERT), '15. ...and Revert Form on the shout key, so the form can be ended there', ids15(ab15('voice')));
 // self() wraps the actor in an espm/form object, so the method is what to filter on; the window holds only this change
 const added15 = papyrus.slice(papyrus15).filter((x) => x.method === 'AddSpell');
-ok(added15.length >= 4, '15. the server grants them too (AddSpell), as the beast path does', added15.length);
+ok(added15.length >= 3, '15. the server grants the voice powers too (AddSpell), as the beast path does', added15.length);
 
 const papyrusRevert15 = papyrus.length;
 globalThis.__dboBeastRevert(NEWP, 'test');
 const removed15 = papyrus.slice(papyrusRevert15).filter((x) => x.method === 'RemoveSpell');
-ok(removed15.length >= 4, '15. and the shared revert takes them away again (RemoveSpell)', removed15.length);
+ok(removed15.length >= 3, '15. and the shared revert takes them away again (RemoveSpell)', removed15.length);
 
 // ---- the camera offsets the client service reads --------------------------------------------------------------------
 restart({ beastform: { polymorph: { camera: { hagraven: { z: 50, combatZ: 40 } } } } });

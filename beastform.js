@@ -176,8 +176,15 @@ module.exports = (api) => {
     // cast states, and Spell.cast is the route if the hands refuse - so these are granted and ready rather than proven.
     // Revert Form last, so the default power on the Shout key is never the one that ends the form.
     hagraven: {
-      right: [spell('7d98f:Skyrim.esm', 'Firebolt'), spell('7d997:Skyrim.esm', 'Fireball')],
-      left: [spell('7231c:Skyrim.esm', 'Fast Healing'), spell('f95eb:Skyrim.esm', 'Close Wounds')],
+      // NOTHING IN THE HANDS while a creature body is worn (Nat via the Leader, 25 Oct, after the crash).
+      // applyHands() returns early on a null loadout, so before her powers landed a creature had nothing equipped;
+      // giving her hand spells put equip traffic into a creature graph for the first time. The crash was the
+      // humanoid weapon-draw path (H2H_Equip against HagravenProject), not a spell equip, but equipping anything
+      // there is new and unproven, so the hands stay empty until the client guard and her claw attack ship.
+      // Her four spells are kept here, commented, because they are the verified EncHagraven set and will come back:
+      //   right: Firebolt 7d98f, Fireball 7d997 | left: Fast Healing 7231c, Close Wounds f95eb
+      right: [],
+      left: [],
       // The two powers Nat approved on 25 Oct, built as DLE records (_notes-to-server\staged-20261025-hagraven-powers).
       // ids from Worker 3's merge; that DLE is a CANDIDATE, so if a child ahead of ours is rebuilt these move and are
       // the only lines to change. A desc that does not resolve gives id 0 and allSpells filters it out, so an older
