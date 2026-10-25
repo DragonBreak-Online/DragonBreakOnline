@@ -127,6 +127,7 @@ import { FavoritesService } from "./services/services/favoritesService";
 import { FovService } from "./services/services/fovService";
 import { CreatureCameraService } from "./services/services/creatureCameraService";
 import { CreatureAnimProbeService } from "./services/services/creatureAnimProbeService";
+import { CreatureInputGuardService } from "./services/services/creatureInputGuardService";
 import { LearnedEnchantmentsService } from "./services/services/learnedEnchantmentsService";
 import { CameraShakeService } from "./services/services/cameraShakeService";
 import { FrenzyService } from "./services/services/frenzyService";
@@ -279,6 +280,7 @@ const main = () => {
       new FovService(sp, controller),
       new CreatureCameraService(sp, controller),
       new CreatureAnimProbeService(sp, controller),
+      new CreatureInputGuardService(sp, controller),
       new LearnedEnchantmentsService(sp, controller),
       new CameraShakeService(sp, controller),
       new FrenzyService(sp, controller)
