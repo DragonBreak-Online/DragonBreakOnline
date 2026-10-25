@@ -30,6 +30,24 @@
     ]
   },
   {
+    "title": "Home decorating",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Furnish your home",
+        "items": [
+          "Owners can now furnish their own homes: /decor find lists over 450 pieces (beds, chairs, tables, chests, shelves, rugs, candles and more), and /decor place shows the piece in front of you to set down with the Place tool's controls.",
+          "Every piece costs materials you gather yourself, such as firewood, iron, salt, wheat and leather strips. Nothing is taken until the piece is set down, and /decor undo within a minute gives everything back.",
+          "Workbenches can go indoors too: an alchemy lab, an arcane enchanter, a staff enchanter, a tanning rack, a loom, an oven, a cooking pot and a smithing workbench, each for crafters of its trade and a home big enough for it.",
+          "Taking a piece apart (/decor remove, or Delete on it) returns half its materials, more for a skilled Woodcutter, up to three quarters at Master.",
+          "Name a friend with /decor grant and they can help you decorate; /decor revoke takes it back."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Server restart: soul gems, gates and strongholds",
     "date": "2026-10-25",
     "version": "Server update",

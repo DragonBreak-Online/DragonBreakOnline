@@ -454,6 +454,14 @@
    "sawnLogMinTier": 2,
    "_sawnLogMinTier": "The Woodcutter tier, 0 based, from which a saw mill run also pays millSawnLogsByTier Sawn Logs (2 = Adept; Nat, 25 Oct). Below it the run pays its firewood only. Read at boot.",
    "millCooldownMinutes": 30,
+   "_deconstructShare": "Home decorating (decor.js, Nat 25 Oct): the share of a placed piece's materials a deconstruct gives back, by Woodcutter tier (Novice 50% rising to Master 75%), rounded down but at least 1 of any material that cost 2 or more. Without the skill, the Novice share.",
+   "deconstructShareByTier": [
+    0.5,
+    0.5625,
+    0.625,
+    0.6875,
+    0.75
+   ],
    "tiers": [
     "4 strikes, rough charcoal",
     "8 strikes",
