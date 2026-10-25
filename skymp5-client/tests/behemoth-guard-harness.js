@@ -314,8 +314,9 @@ function sources() {
   const br = read('sync/beastRaces.ts');
   check('beastRaces.ts registers its resolver at load, for the modules that import beastRaceIds.ts alone', /^setPluginBeastResolver\(resolveBeastRaces\);$/m.test(br));
   check('...and resolves by Game.getFormFromFile(local id, plugin)', /resolvePluginBeastRaces\(\(file, localId\) => Game\.getFormFromFile\(localId, file\)/.test(br));
-  for (const [f, re] of [['view/formView.ts', /isBeastRaceId\(model\.appearance\.raceId\)/], ['view/niNodeQueue.ts', /isBeastRaceId\(race\.getFormID\(\)\)/],
-    ['sync/beastBody.ts', /isBeastRaceId\(race\)/], ['sync/ownLook.ts', /beastLook: isBeastRaceId\(raceId\)/]]) {
+  // isBeastOrPolymorphRaceId is isBeastRaceId plus the staff polymorph animals, so it keeps the Behemoth rule
+  for (const [f, re] of [['view/formView.ts', /isBeast(?:OrPolymorph)?RaceId\(model\.appearance\.raceId\)/], ['view/niNodeQueue.ts', /isBeast(?:OrPolymorph)?RaceId\(race\.getFormID\(\)\)/],
+    ['sync/beastBody.ts', /isBeast(?:OrPolymorph)?RaceId\(race\)/], ['sync/ownLook.ts', /beastLook: isBeastRaceId\(raceId\)/]]) {
     check(`${f} judges beasts through isBeastRaceId`, re.test(read(f)));
   }
   const files = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
