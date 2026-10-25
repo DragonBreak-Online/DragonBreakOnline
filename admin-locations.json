@@ -15922,6 +15922,22 @@
    ]
   },
   {
+   "name": "Windhelm Bank",
+   "region": "Skyrim",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    131421.5,
+    34043.58,
+    -13923.0
+   ],
+   "rot": [
+    0,
+    0,
+    180.0
+   ]
+  },
+  {
    "name": "Winterhold Bank",
    "region": "Skyrim",
    "world": "3c:Skyrim.esm",
