@@ -108,6 +108,46 @@ TEST_CASE("SetUserActor failures", "[PartOne]")
     ContainsSubstring("Form with id 0xff000000 is not Actor"));
 }
 
+// A watcher's createActor must not carry the actor's learned spells. It used
+// to: the array went out in every mode, so each neighbour paid a deep copy of
+// the change form's std::set, a second copy into a vector and a linear find
+// per base spell, and then received a list it had no use for - remoteServer.ts
+// reads props.learnedSpells only under `msg.isMe`. A character given all 254
+// spells from the admin panel was therefore a broadcast amplifier, and the
+// server froze (17 Oct).
+TEST_CASE("createActor sends learned spells to the owner only", "[PartOne]")
+{
+  PartOne partOne;
+
+  DoConnect(partOne, 0);
+  partOne.CreateActor(0xff000ABC, { 1.f, 2.f, 3.f }, 180.f, 0x3c);
+  // learned before the actor is handed to the user, so it is in the
+  // createActor that SetUserActor sends
+  partOne.worldState.GetFormAt<MpActor>(0xff000ABC).AddSpell(0x0001a4cc);
+  partOne.SetUserActor(0, 0xff000ABC);
+
+  // the owner's own message still has it
+  auto own = FindRefrMessageIdx<CreateActorMessage>(partOne, 0);
+  REQUIRE(own.filteredMessages.size() == 1);
+  REQUIRE(own.filteredMessages[0].isMe == true);
+  REQUIRE(own.filteredMessages[0].props.learnedSpells.has_value());
+  REQUIRE(*own.filteredMessages[0].props.learnedSpells ==
+          std::vector<uint32_t>({ 0x0001a4cc }));
+
+  partOne.Messages().clear();
+
+  // a second player is told about the first one: a neighbour message, and it
+  // must carry nothing
+  DoConnect(partOne, 1);
+  partOne.CreateActor(0xff000FFF, { 100.f, 200.f, 300.f }, 180.f, 0x3c);
+  partOne.SetUserActor(1, 0xff000FFF);
+
+  auto seen = FindRefrMessageIdx<CreateActorMessage>(partOne, 0);
+  REQUIRE(seen.filteredMessages.size() == 1);
+  REQUIRE(seen.filteredMessages[0].isMe == false);
+  REQUIRE(!seen.filteredMessages[0].props.learnedSpells.has_value());
+}
+
 TEST_CASE("createActor message contains Appearance", "[PartOne]")
 {
 

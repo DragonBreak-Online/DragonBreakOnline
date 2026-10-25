@@ -1956,33 +1956,39 @@ void ActionListener::OnDropItem(const RawMessageData& rawMsgData,
 
   const auto owned = ac->GetInventory().FindEntriesFor(entry);
 
-  // The ground deletes a dropped item after two minutes (MpActor::DropItem), so anything a player made does not
-  // go there at all (Nat, 25 Oct). The test is the one DropItem uses to decide whether extras are worth keeping,
-  // so exactly the items that would carry extras onto the ground are the ones refused. HasIdentityExtras is not
-  // the test: SameItemAs ignores names and charge, which is most of what a player makes.
+  // The ground deletes a dropped item after two minutes (MpActor::DropItem),
+  // so anything a player made does not go there at all (Nat, 25 Oct). The test
+  // is the one DropItem uses to decide whether extras are worth keeping, so
+  // exactly the items that would carry extras onto the ground are the ones
+  // refused. HasIdentityExtras is not the test: SameItemAs ignores names and
+  // charge, which is most of what a player makes.
   auto carriesExtras = [](const Inventory::Entry& e) {
     Inventory::Entry probe = e;
     probe.SetWorn(Inventory::Worn::None);
     return !probe.EqualExceptCount(Inventory::Entry(e.baseId, e.count));
   };
-  // Either side is enough: a client that reports no extras must not strip a made item, and one that invents them
-  // only ever refuses its own drop
+  // Either side is enough: a client that reports no extras must not strip a
+  // made item, and one that invents them only ever refuses its own drop
   const bool madeItem = carriesExtras(entry) ||
     std::any_of(owned.begin(), owned.end(), carriesExtras);
   if (madeItem) {
-    spdlog::info("MpActor::DropItem - refused for {:x}: base {:x} x{} carries extras, a made item stays in the pack",
+    spdlog::info("MpActor::DropItem - refused for {:x}: base {:x} x{} carries "
+                 "extras, a made item stays in the pack",
                  ac->GetFormId(), baseId, msg.count);
-    // The client has already taken it out of its own pack, so the server's inventory goes back or the two desync
+    // The client has already taken it out of its own pack, so the server's
+    // inventory goes back or the two desync
     ac->SetInventory(ac->GetInventory());
     const auto userId = partOne.serverState.UserByActor(ac);
     if (userId != Networking::InvalidUserId) {
       const std::string what = entry.name && !entry.name->empty()
         ? *entry.name
         : std::string("a made item");
-      nlohmann::json notice{ { "customPacketType", "notification" },
-                             { "text",
-                               "You can't drop " + what +
-                                 " on the ground; store, sell or trade it instead." } };
+      nlohmann::json notice{
+        { "customPacketType", "notification" },
+        { "text",
+          "You can't drop " + what +
+            " on the ground; store, sell or trade it instead." }
+      };
       partOne.SendCustomPacket(userId, notice.dump());
     }
     return;
@@ -2573,6 +2579,44 @@ void ActionListener::OnHit(const RawMessageData& rawMsgData,
                               aggressor->GetFormId()));
     aggressor->RespawnWithDelay(true);
     return;
+  }
+
+  // NPC against NPC, which nothing has ever counted. A successful hit is not
+  // logged anywhere, so the only hits in the log are the refusals above, and
+  // those carry dynamic ids with no base behind them - the Blackreach census
+  // (25 Oct) could not say whether Falmer and Dwarven automatons fight each
+  // other once an hour or a thousand times. Base ids and the cell are what
+  // make a line answerable: they say WHICH creatures and WHERE, which a
+  // dynamic ff id cannot. Players are left out; a player hitting an NPC is the
+  // ordinary case and would bury this. At most one line per aggressor every 10
+  // s, the rate the disabled-hit log above uses, because a pair of NPCs in
+  // combat swing several times a second and this must never become the loudest
+  // thing we write.
+  {
+    const bool aggressorIsNpc = !aggressor->IsCreatedAsPlayer() &&
+      partOne.serverState.UserByActor(aggressor) == Networking::InvalidUserId;
+    MpActor* targetAsActor = targetRef->AsActor();
+    const bool targetIsNpc = targetAsActor &&
+      !targetAsActor->IsCreatedAsPlayer() &&
+      partOne.serverState.UserByActor(targetAsActor) ==
+        Networking::InvalidUserId;
+    if (aggressorIsNpc && targetIsNpc) {
+      static std::unordered_map<uint32_t,
+                                std::chrono::steady_clock::time_point>
+        lastNpcVsNpcLog;
+      const auto now = std::chrono::steady_clock::now();
+      auto& last = lastNpcVsNpcLog[aggressor->GetFormId()];
+      if (now - last > std::chrono::seconds(10)) {
+        last = now;
+        const EspmFileTable& files = partOne.worldState.espmFiles;
+        spdlog::info(
+          "ActionListener::OnHit - npc vs npc: {:x} (base {:x}) hit "
+          "{:x} (base {:x}) in {:x}",
+          aggressor->GetFormId(), aggressor->GetBaseId(),
+          targetAsActor->GetFormId(), targetAsActor->GetBaseId(),
+          aggressorCellOrWorld.ToFormId(files));
+      }
+    }
   }
 
   auto sourceInEspm =

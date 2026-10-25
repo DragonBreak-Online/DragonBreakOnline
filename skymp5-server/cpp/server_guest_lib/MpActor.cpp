@@ -455,17 +455,28 @@ void MpActor::VisitProperties(CreateActorMessage& message,
                                                        changeForm, message);
   }
 
-  // Base NPC_/race spells ride along so the client's spell reconciliation does not wipe Flames/Healing
-  auto learnedSpells = changeForm.learnedSpells.GetLearnedSpells();
-  if (worldState && worldState->HasEspm()) {
-    for (uint32_t spellId : GetBaseSpells()) {
-      if (std::find(learnedSpells.begin(), learnedSpells.end(), spellId) ==
-          learnedSpells.end()) {
-        learnedSpells.push_back(spellId);
+  // Base NPC_/race spells ride along so the client's spell reconciliation does
+  // not wipe Flames/Healing. Owner only. This used to go out in every mode, so
+  // each watcher's CreateActor carried the whole learned-spell array and paid
+  // for it: the MpChangeForm copy above deep-copies the std::set once per
+  // recipient, GetLearnedSpells copies it again, and the dedupe below is a
+  // linear find per base spell. A character given all 254 spells from the
+  // admin panel therefore became a broadcast amplifier and the server froze
+  // (17 Oct). The client never wanted it either: remoteServer.ts reads
+  // props.learnedSpells only under `msg.isMe`, so a watcher received the array
+  // and dropped it on the floor.
+  if (mode == VisitPropertiesMode::All) {
+    auto learnedSpells = changeForm.learnedSpells.GetLearnedSpells();
+    if (worldState && worldState->HasEspm()) {
+      for (uint32_t spellId : GetBaseSpells()) {
+        if (std::find(learnedSpells.begin(), learnedSpells.end(), spellId) ==
+            learnedSpells.end()) {
+          learnedSpells.push_back(spellId);
+        }
       }
     }
+    message.props.learnedSpells = std::move(learnedSpells);
   }
-  message.props.learnedSpells = std::move(learnedSpells);
 
   if (!changeForm.templateChain.empty()) {
     std::vector<uint32_t> templateChain;
@@ -2081,9 +2092,12 @@ void MpActor::DropItem(const uint32_t baseId, const Inventory::Entry& entry)
 
   uint32_t droppedItemFormId = placedObject->GetFormId();
 
-  // The drop path had no log at info, so a lost item could not be traced at all (ticket #0409, 25 Oct)
-  spdlog::info("MpActor::DropItem - {:x} dropped {:x} x{} as {:x}, extras {}", GetFormId(), baseId, count,
-               droppedItemFormId, dropped.EqualExceptCount(Inventory::Entry(baseId, count)) ? "no" : "yes");
+  // The drop path had no log at info, so a lost item could not be traced at
+  // all (ticket #0409, 25 Oct)
+  spdlog::info(
+    "MpActor::DropItem - {:x} dropped {:x} x{} as {:x}, extras {}",
+    GetFormId(), baseId, count, droppedItemFormId,
+    dropped.EqualExceptCount(Inventory::Entry(baseId, count)) ? "no" : "yes");
 
   // Filter our dropped items queue
   pImpl->droppedItemsQueue.erase(
