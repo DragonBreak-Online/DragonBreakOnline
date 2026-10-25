@@ -7825,10 +7825,24 @@ const fleshArmorOf = (a) => {
 };
 globalThis.__dboFleshArmor = fleshArmorOf;
 globalThis.__dboFleshCast = fleshCast;
-// Below 1 when a Flesh spell holds on the target and the hit is a weapon's or a fist's: the rating counted with it over
-// the rating counted without it, by the engine's own reduction (fArmorScalingFactor, capped at fMaxArmorRating)
+// A Briarheart's briar skin (briarheart.js) while the briar chest shows on a bare chest: the light cuirass it names counts,
+// at that piece's counted rating under the target's light-armour multipliers, in place of the briar body's own rating the
+// engine already took. 0 when off
+const briarSkinArmorOf = (targetId) => {
+  let s = null; try { s = typeof globalThis.__dboBriarSkinArmor === 'function' ? globalThis.__dboBriarSkinArmor(targetId >>> 0) : null; } catch (e) { s = null; }
+  if (!s) return 0;
+  const from = armorPieceOf(Number(s.from) >>> 0), shown = s.shown ? armorPieceOf(Number(s.shown) >>> 0) : null;
+  if (!from) return 0;
+  const pm = defensePieceMult(targetId), gm = gearArmorMult(targetId);
+  const as = (p) => (p ? (p.counted || p.rating) * (p.heavy ? pm.heavy * gm.heavy : pm.light * gm.light) : 0);
+  return Math.max(0, as(from) - as(shown));
+};
+globalThis.__dboBriarSkinRating = briarSkinArmorOf;
+// Below 1 when a Flesh spell (or a briar skin) holds on the target and the hit is a weapon's or a fist's: the rating
+// counted with it over the rating counted without it, by the engine's own reduction (fArmorScalingFactor, capped at
+// fMaxArmorRating)
 const fleshDamageMult = (targetId, sourceId) => {
-  const extra = fleshArmorOf(targetId);
+  const extra = fleshArmorOf(targetId) + briarSkinArmorOf(targetId);
   if (!(extra > 0)) return 1;
   const physical = (sourceId >>> 0) === 0x1f4 || (() => { const r = recordOf(sourceId >>> 0); return !!r && String(r.record.type) === 'WEAP'; })();
   if (!physical) return 1;

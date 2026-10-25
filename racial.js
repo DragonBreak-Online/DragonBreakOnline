@@ -442,11 +442,13 @@ module.exports = (api) => {
   const regenFactor = (a, stat) => {
     // A Hagraven's magicka (hagraven.js) is hers whatever her race, and joins the race's gift
     let hag = 1; try { if (typeof globalThis.__dboHagravenRegenMult === 'function') hag = Math.max(1, Number(globalThis.__dboHagravenRegenMult(a, stat)) || 1); } catch (e) { hag = 1; }
-    const race = raceOf(a); if (!race) return hag;
+    // A Briarheart's briar skin (briarheart.js) quickens stamina whatever the race, and joins the race's gift
+    let briar = 1; try { if (typeof globalThis.__dboBriarRegenMult === 'function') briar = Math.max(1, Number(globalThis.__dboBriarRegenMult(a, stat)) || 1); } catch (e) { briar = 1; }
+    const race = raceOf(a); if (!race) return hag * briar;
     const passive = passiveRegen(race, a, stat);
     // A power's factor is timed (conditionalRegenCap) and stands in for the gift's while it runs, never on top of it
     const p = buff(a, `${stat}Regen`);
-    return (p > 1 ? Math.max(passive, capOf(p, true)) : passive) * hag;
+    return (p > 1 ? Math.max(passive, capOf(p, true)) : passive) * hag * briar;
   };
   const passiveRegen = (race, a, stat) => {
     const R = C[race];

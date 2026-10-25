@@ -16,11 +16,12 @@ const ok = (c, what, got) => { console.log(`${c ? 'ok  ' : 'FAIL'}  ${what}${!c 
 // ---- the world ---------------------------------------------------------------------------------------------------------
 const WORLD = '3c:Skyrim.esm', ELSE = '1a26f:Skyrim.esm';
 const RACES = { 1: 'DBOReachmanRace', 2: 'NordRace', 3: 'DBOReachmanRaceVampire' };
-const ID = { '5d009:Skyrim.esm': 0x5d009, '3ad61:Skyrim.esm': 0x3ad61, '2e504:Skyrim.esm': 0x2e504, '72317:Skyrim.esm': 0x72317, '400ad:Skyrim.esm': 0x400ad, '43599:Skyrim.esm': 0x43599, '5d008:Skyrim.esm': 0x5d008 };
+const ID = { '5d009:Skyrim.esm': 0x5d009, '3ad61:Skyrim.esm': 0x3ad61, '2e504:Skyrim.esm': 0x2e504, '72317:Skyrim.esm': 0x72317, '400ad:Skyrim.esm': 0x400ad, '43599:Skyrim.esm': 0x43599, '5d008:Skyrim.esm': 0x5d008, 'd8d50:Skyrim.esm': 0xd8d50 };
 const HEART = 0x3ad61, GEM = 0x2e504;
-// ARMO biped slots for the look: the two briar bodies and a cuirass cover the body (0x4), a helmet the head (0x1)
-const BRIAR = 0x5d008, BRIAR_EMPTY = 0x5d009, CUIRASS = 0x13ed9, HELMET = 0x12e4d;
-const ARMOS = { [BRIAR]: 0x4, [BRIAR_EMPTY]: 0x4, [CUIRASS]: 0x4, [HELMET]: 0x1 };
+// ARMO biped slots for the look, as the live load order has them: the two briar bodies in slot 35 (0x20, USSEP's), a cuirass
+// the body (0x4), a helmet the head (0x1), an amulet slot 35 (0x20)
+const BRIAR = 0x5d008, BRIAR_EMPTY = 0x5d009, CUIRASS = 0x13ed9, HELMET = 0x12e4d, AMULET = 0xc8911;
+const ARMOS = { [BRIAR]: 0x20, [BRIAR_EMPTY]: 0x20, [CUIRASS]: 0x4, [HELMET]: 0x1, [AMULET]: 0x20 };
 const props = new Map();   // `${actor}|${prop}` -> value
 const P = (a, k) => props.get(`${a >>> 0}|${k}`);
 const setP = (a, k, v) => props.set(`${a >>> 0}|${k}`, v);
@@ -332,6 +333,67 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   look(MAN, eq());
   ok(lookCalls().length === 1, 'after it: a bare chest gets it');
   delete globalThis.__dboConnectedAt; ML.end(MAN, 'login test done');
+  // an amulet shares the briar body's slot 35: it wins, the briar body leaves the pack, nothing is equipped over it
+  ML.become(MAN, 'staff', 'amulet test'); globalThis.__dboBriarheart.looks.delete(MAN);
+  setP(MAN, 'inventory', { entries: [{ baseId: AMULET, count: 1 }, { baseId: BRIAR, count: 1 }] }); papyrusCalls.length = 0; logLines.length = 0;
+  look(MAN, eq(AMULET));
+  ok(!lookCalls().length && inv(MAN, BRIAR) === 0, 'an amulet worn (slot 35, the briar body\'s at the live order): no briar body equipped over it, and none left in the pack');
+  ok(logLines.some((l) => /look off on char50 \(equipment\): c8911 in the briar body's slot on, briar body taken from the pack/.test(l)), '...and logged', logLines);
+  ML.end(MAN, 'amulet test done');
+}
+
+// ---- the briar skin (Nat, 25 Oct): armour as a Forsworn cuirass, stamina, DiseaseResist, only while the briar chest shows ----
+{
+  const logLines = [];
+  const loadSkin = (skin) => {
+    delete require.cache[MODULE]; delete globalThis.__dboBriarheart;
+    return require(MODULE)({
+      mp, log: (...x) => logLines.push(x.join(' ')), personal: (a, t) => said.push([a >>> 0, t]), audit: (t) => audits.push(t), who: (a) => `who${(a >>> 0).toString(16)}`,
+      display: (a) => `char${(a >>> 0).toString(16)}`, cfg: { briarheart: { enabled: true, visual: { enabled: true, armor: '5d008:Skyrim.esm', emptyArmor: '5d009:Skyrim.esm' }, briarSkin: skin } },
+      registerChatCommand: (n, f) => commands.set(n, f), onlineActors: () => online.slice(), isLeadStaff: (a) => (a >>> 0) === LEAD, findByName: () => 0, every: (n, ms, f) => { ticker = f; },
+      giveItem: (a, id, n) => { const e = ((P(a, 'inventory') || {}).entries || []).slice(); e.push({ baseId: id, count: n }); setP(a, 'inventory', { entries: e }); return true; }, sourceResistsOf: () => new Set(),
+    });
+  };
+  const SKIN = { enabled: true, armorFrom: 'd8d50:Skyrim.esm', staminaRegen: 1.25, diseaseResist: 50 };
+  const MS = loadSkin(SKIN);
+  globalThis.__dboBriarSkinRating = () => 21;   // gamemode.js's: ForswornCuirass 26 less the briar body's 5, no multipliers
+  const BH = actor(0x60, 1, 'reach', [0, 0, 0], []); online.push(BH);
+  const eq = (...worn) => ({ inv: { entries: worn.map((id) => ({ baseId: id, count: 1, worn: true })) } });
+  const report = globalThis.__dboBriarheartEquip;
+  const avCalls = () => papyrusCalls.filter((c) => c.method === 'SetActorValue');
+  setP(BH, 'equipment', eq()); MS.become(BH, 'staff', 'skin test');
+  ok(globalThis.__dboBriarSkinArmor(BH) === null && globalThis.__dboBriarRegenMult(BH, 'stamina') === 1, 'a bare chest before the briar body shows: no skin yet (it waits for the equipment to show it)');
+  papyrusCalls.length = 0; logLines.length = 0;
+  report(BH, eq(BRIAR, HELMET));
+  const s = globalThis.__dboBriarSkinArmor(BH);
+  ok(s && s.from === 0xd8d50 && s.shown === BRIAR, 'the briar chest shows: the skin counts as the Forsworn cuirass, over the briar body', s);
+  ok(globalThis.__dboBriarRegenMult(BH, 'stamina') === 1.25 && globalThis.__dboBriarRegenMult(BH, 'magicka') === 1 && globalThis.__dboBriarRegenMult(BH, 'health') === 1, 'stamina regeneration x1.25, and nothing else');
+  ok(avCalls().length === 1 && avCalls()[0].args[0] === 'DiseaseResist' && avCalls()[0].args[1] === 50, 'DiseaseResist 50 is sent through the server Papyrus', avCalls());
+  ok(logLines.some((l) => /briarheart: skin on char60 \(equipment\): armour as d8d50:Skyrim\.esm \(\+21\.0 over the briar body\), stamina regeneration x1\.25, DiseaseResist 50/.test(l)), '...and logged', logLines);
+  papyrusCalls.length = 0; logLines.length = 0; report(BH, eq(BRIAR));
+  ok(!avCalls().length && !logLines.some((l) => /skin/.test(l)), 'a second report: no repeat, no second SetActorValue');
+  report(BH, eq(BRIAR, CUIRASS));
+  ok(globalThis.__dboBriarSkinArmor(BH) === null && globalThis.__dboBriarRegenMult(BH, 'stamina') === 1, 'body armour on: the skin is off, the cuirass counts instead');
+  ok(avCalls().length === 1 && avCalls()[0].args[1] === 0 && logLines.some((l) => /briarheart: skin off char60 \(equipment\), DiseaseResist 0/.test(l)), '...DiseaseResist back to 0, logged', logLines);
+  logLines.length = 0; report(BH, eq(CUIRASS));
+  ok(!logLines.some((l) => /skin/.test(l)), 'still armoured: no repeat');
+  report(BH, eq(BRIAR));
+  ok(!!globalThis.__dboBriarSkinArmor(BH), 'the armour off and the briar chest back: the skin is on again');
+  // a new client: the skin turns on afresh at login, so DiseaseResist reaches the new engine
+  papyrusCalls.length = 0; setP(BH, 'equipment', eq(BRIAR)); globalThis.__dboBriarheartLogin(BH);
+  ok(avCalls().some((c) => c.args[1] === 50), 'login: DiseaseResist is sent again to the new client', avCalls());
+  papyrusCalls.length = 0; logLines.length = 0; MS.end(BH, 'skin test done');
+  ok(globalThis.__dboBriarSkinArmor(BH) === null && avCalls().some((c) => c.args[1] === 0) && logLines.some((l) => /skin off char60/.test(l)), 'no longer a Briarheart: the skin is off', logLines);
+  // a woman shows no briar chest (visual.women false), so no skin; briarSkin off gives nothing
+  const BW = actor(0x61, 1, 'reach', [0, 0, 0], []); online.push(BW); setP(BW, 'appearance', { raceId: 1, isFemale: true });
+  MS.become(BW, 'staff', 'woman'); report(BW, eq(BRIAR));
+  ok(globalThis.__dboBriarSkinArmor(BW) === null, 'a woman (no briar chest shown): no skin');
+  loadSkin(Object.assign({}, SKIN, { enabled: false })); MS.become(BH, 'staff', 'off test'); report(BH, eq(BRIAR));
+  ok(globalThis.__dboBriarSkinArmor(BH) === null && globalThis.__dboBriarRegenMult(BH, 'stamina') === 1, 'briarSkin off: nothing');
+  delete globalThis.__dboBriarSkinRating;
+  // the arithmetic gamemode.js does: a bare-chested Briarheart's hit lands as a Forsworn cuirass wearer's would
+  const scale = 0.12, cap = 80, kept = (r) => 1 - Math.min(r * scale, cap) / 100;
+  ok(Math.abs(kept(5) * (kept(5 + 21) / kept(5)) - kept(26)) < 1e-12, 'the skin\'s factor on top of the engine\'s briar-body 5 equals a worn Forsworn cuirass (26)');
 }
 // ---- the hooks in the other modules ---------------------------------------------------------------------------------------
 const src = (f) => fs.readFileSync(path.resolve(__dirname, '..', f), 'utf8');
@@ -342,6 +404,10 @@ ok(/isBriarheart\(t\)/.test(src('supernatural.js')) && /deity === 'hircine'\) &&
 ok(/__dboBriarheartMenuEntries/.test(src('playermenu.js')) && /__dboBriarheartMenuAction/.test(src('playermenu.js')), 'playermenu.js offers the tear');
 const gcfg = JSON.parse(src('gamemode-config.json'));
 ok(gcfg.briarheart && gcfg.briarheart.enabled === false, 'the shipped config has it OFF');
+ok(/const extra = fleshArmorOf\(targetId\) \+ briarSkinArmorOf\(targetId\)/.test(src('gamemode.js')) && /__dboBriarSkinArmor\(targetId >>> 0\)/.test(src('gamemode.js')) && /__dboBriarSkinRating = briarSkinArmorOf/.test(src('gamemode.js')), 'gamemode.js counts the skin on the hit, with the Flesh spells');
+ok(/__dboBriarRegenMult\(a, stat\)/.test(src('racial.js')), 'racial.js multiplies the regeneration by the skin');
+const bs = gcfg.briarheart.briarSkin || {};
+ok(bs.enabled === true && bs.armorFrom === 'd8d50:Skyrim.esm' && bs.staminaRegen === 1.25 && bs.diseaseResist === 50, 'the shipped briarSkin: on (with the module), Forsworn cuirass, stamina x1.25, DiseaseResist 50', bs);
 
 Math.random = realRandom;
 process.chdir(cwd);
