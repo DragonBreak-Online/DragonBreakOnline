@@ -145,8 +145,16 @@ ok(TRIMS7.every((e) => /^[\w .,;:()'-]+$/.test(String(e.by) + String(e.why)) && 
 // is undone. The 133 spells it gave before 16 Oct are all among its 254.
 const POWERS = JSON.parse(fs.readFileSync(path.join(SERVER, 'admin-powers.json'), 'utf8'));
 const GIVE = new Set([].concat(POWERS.spells || [], POWERS.spellsGiveAllOff || []).map((x) => (Array.isArray(x) ? x[0] : x)));
-ok(GIVE.size === 254, 'the Give all spells list holds its 254 tome spells', GIVE.size);
-ok(TRIMS7.every((e) => e.removeSpells.every((d) => GIVE.has(d))), 'every removal is on the Give all spells list', TRIMS7.flatMap((e) => e.removeSpells.filter((d) => !GIVE.has(d))));
+// 252 since 25 Oct, not 254. YokuWeapons' 0_ConjureSkeleSpell and 0_PuppetManConjurePLAYER are mod
+// internals that happen to be tome-taught, so the generator picked them up and give-all handed them out.
+// The trim records below are the proof: a staff member had to take those two off a character. They are
+// dropped from the catalogue by shape now (admin_powers.py SKIP_RE).
+const DROPPED_FROM_GIVE_ALL = new Set(['8bc:YokuWeapons.esp', '903:YokuWeapons.esp']);
+ok(GIVE.size === 252, 'the Give all spells list holds its 252 tome spells', GIVE.size);
+// A past removal may name a spell since dropped from the catalogue, so those count as known. Anything
+// else missing is a real inconsistency between the trim records and the list.
+ok(TRIMS7.every((e) => e.removeSpells.every((d) => GIVE.has(d) || DROPPED_FROM_GIVE_ALL.has(d))), 'every removal is on the Give all spells list, or was deliberately dropped from it', TRIMS7.flatMap((e) => e.removeSpells.filter((d) => !GIVE.has(d) && !DROPPED_FROM_GIVE_ALL.has(d))));
+ok([...DROPPED_FROM_GIVE_ALL].every((d) => !GIVE.has(d)), 'the two mod internals really are off the list');
 const SUSP = new Set(LIVE.suspendedSpells || []);
 ok(Object.values(SHIPPED).every((x) => x[3].every((d) => SUSP.has(d))), 'the removals held, not learned, are suspended spells (spells.hold holds them)');
 
@@ -429,8 +437,8 @@ clearOut();
 load({ staffTrims: [
   'not an object', { id: 'no actor', removeSpells: [S(1)], keepSpells: [] }, entry({ id: 'npc', actor: '0001a2b3' }),
   entry({ id: 'no-profile', actor: 'ff00a004', profile: undefined }),
-  entry({ id: 'bad-keep', actor: 'ff00a004', profile: 11, keepSpells: ['12:NotLoaded.esp'] }),
-  entry({ id: 'bad-remove', actor: 'ff00a004', profile: 11, removeSpells: ['12:NotLoaded.esp'] }),
+  entry({ id: 'bad-keep', actor: 'ff00a004', profile: 11, keepSpells: ['12:NotLoaded.esp'] }),  // verify-formids: ignore - NotLoaded.esp is absent on purpose; this case proves a keep spell outside the load order is skipped
+  entry({ id: 'bad-remove', actor: 'ff00a004', profile: 11, removeSpells: ['12:NotLoaded.esp'] }),  // verify-formids: ignore - NotLoaded.esp is absent on purpose; this case proves a remove spell outside the load order is skipped
   entry({ id: 'not-spell', actor: 'ff00a004', profile: 11, removeSpells: [S(40, 'Book.esm')] }),
   entry({ id: 'empty-remove', actor: 'ff00a004', profile: 11, removeSpells: [] }),
   entry({ id: 'bad-offline', actor: 'ff00a004', profile: 11, offline: 'later' }),
