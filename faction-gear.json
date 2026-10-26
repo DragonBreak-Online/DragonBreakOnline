@@ -1143,7 +1143,8 @@
    ],
    "role": "blacksmith",
    "recipes": [
-    "8c1:MoreCraftableEquipment.esp"
+    "8c1:MoreCraftableEquipment.esp",
+    "b9d:DragonBreak Nexus Patches.esp"
    ]
   },
   "2df2:Cloaks&Capes.esp": {
@@ -1187,7 +1188,8 @@
    ],
    "role": "blacksmith",
    "recipes": [
-    "8c2:MoreCraftableEquipment.esp"
+    "8c2:MoreCraftableEquipment.esp",
+    "b9e:DragonBreak Nexus Patches.esp"
    ]
   },
   "5cbfe:Skyrim.esm": {
@@ -1321,7 +1323,8 @@
    "role": "blacksmith",
    "recipes": [
     "53c7:DIS_Heavy_Legion.esp",
-    "8c9:MoreCraftableEquipment.esp"
+    "8c9:MoreCraftableEquipment.esp",
+    "53c7:DIS_Authentic_Legion.esp"
    ]
   },
   "601aa4:BSAssets.esm": {
@@ -1385,7 +1388,7 @@
    "factions": [
     "imperial-legion"
    ],
-   "role": "blacksmith",
+   "role": "tailor",
    "recipes": [
     "6aa09:Hothtrooper44_ArmorCompilation.esp"
    ]
@@ -1632,7 +1635,8 @@
    ],
    "role": "blacksmith",
    "recipes": [
-    "8c3:MoreCraftableEquipment.esp"
+    "8c3:MoreCraftableEquipment.esp",
+    "b9f:DragonBreak Nexus Patches.esp"
    ]
   },
   "e35e8:Skyrim.esm": {
@@ -1742,7 +1746,8 @@
    ],
    "role": "blacksmith",
    "recipes": [
-    "8c4:MoreCraftableEquipment.esp"
+    "8c4:MoreCraftableEquipment.esp",
+    "ba0:DragonBreak Nexus Patches.esp"
    ]
   },
   "2df4:Cloaks&Capes.esp": {
@@ -1786,7 +1791,8 @@
    ],
    "role": "blacksmith",
    "recipes": [
-    "8c5:MoreCraftableEquipment.esp"
+    "8c5:MoreCraftableEquipment.esp",
+    "ba1:DragonBreak Nexus Patches.esp"
    ]
   },
   "747bb:Immersive Weapons.esp": {
@@ -2056,7 +2062,8 @@
    ],
    "role": "blacksmith",
    "recipes": [
-    "8c6:MoreCraftableEquipment.esp"
+    "8c6:MoreCraftableEquipment.esp",
+    "ba2:DragonBreak Nexus Patches.esp"
    ]
   },
   "ab66:Hothtrooper44_ArmorCompilation.esp": {
@@ -2598,7 +2605,8 @@
    ],
    "role": "blacksmith",
    "recipes": [
-    "8c7:MoreCraftableEquipment.esp"
+    "8c7:MoreCraftableEquipment.esp",
+    "ba3:DragonBreak Nexus Patches.esp"
    ]
   },
   "214eb:Skyrim.esm": {
@@ -2609,7 +2617,8 @@
    ],
    "role": "blacksmith",
    "recipes": [
-    "9ee:MoreCraftableEquipment.esp"
+    "9ee:MoreCraftableEquipment.esp",
+    "ba6:DragonBreak Nexus Patches.esp"
    ]
   },
   "2df8:Cloaks&Capes.esp": {
@@ -2653,7 +2662,8 @@
    ],
    "role": "blacksmith",
    "recipes": [
-    "8c8:MoreCraftableEquipment.esp"
+    "8c8:MoreCraftableEquipment.esp",
+    "ba4:DragonBreak Nexus Patches.esp"
    ]
   },
   "723d0:BSHeartland.esm": {
@@ -4485,7 +4495,9 @@
     "imperial-legion"
    ],
    "role": "blacksmith",
-   "recipes": []
+   "recipes": [
+    "91d:DragonBreak Nexus Patches.esp"
+   ]
   },
   "1873:DIS_Heavy_Legion.esp": {
    "name": "Imperial General's Boots",
@@ -4494,7 +4506,9 @@
     "imperial-legion"
    ],
    "role": "blacksmith",
-   "recipes": []
+   "recipes": [
+    "91e:DragonBreak Nexus Patches.esp"
+   ]
   },
   "1874:DIS_Heavy_Legion.esp": {
    "name": "Imperial General's Armor",
@@ -4503,7 +4517,9 @@
     "imperial-legion"
    ],
    "role": "blacksmith",
-   "recipes": []
+   "recipes": [
+    "91f:DragonBreak Nexus Patches.esp"
+   ]
   },
   "1875:DIS_Heavy_Legion.esp": {
    "name": "Imperial General's Bracers",
@@ -4512,7 +4528,9 @@
     "imperial-legion"
    ],
    "role": "blacksmith",
-   "recipes": []
+   "recipes": [
+    "920:DragonBreak Nexus Patches.esp"
+   ]
   },
   "1876:DIS_Heavy_Legion.esp": {
    "name": "Imperial General's Helmet",
@@ -4521,7 +4539,9 @@
     "imperial-legion"
    ],
    "role": "blacksmith",
-   "recipes": []
+   "recipes": [
+    "921:DragonBreak Nexus Patches.esp"
+   ]
   },
   "187d:DIS_Heavy_Legion.esp": {
    "name": "Imperial Officer's Cloak",
@@ -4530,7 +4550,9 @@
     "imperial-legion"
    ],
    "role": "tailor",
-   "recipes": []
+   "recipes": [
+    "928:DragonBreak Nexus Patches.esp"
+   ]
   },
   "1301:DIS_Heavy_Legion.esp": {
    "name": "Emperor's Shield",
@@ -4584,7 +4606,9 @@
     "imperial-legion"
    ],
    "role": "blacksmith",
-   "recipes": []
+   "recipes": [
+    "927:DragonBreak Nexus Patches.esp"
+   ]
   },
   "800:Civil War Battlemage Armors.esp": {
    "name": "Imperial Battlemage Boots",
