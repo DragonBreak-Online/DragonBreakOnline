@@ -27750,6 +27750,278 @@
 "value": 5
 },
 {
+"id": "1d2402:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_StaffConjureCorruptedShade",
+"value": 5,
+"p": [
+"skyrim"
+]
+},
+{
+"id": "1d240d:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_StaffConjureDraugrScourge",
+"value": 5,
+"p": [
+"skyrim"
+]
+},
+{
+"id": "1d240a:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_StaffConjureDraugrThrall",
+"value": 5,
+"p": [
+"skyrim"
+]
+},
+{
+"id": "1d240b:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_StaffConjureDraugrTormented",
+"value": 5,
+"p": [
+"skyrim"
+]
+},
+{
+"id": "1d240c:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_StaffConjureDraugrWretch",
+"value": 5,
+"p": [
+"skyrim"
+]
+},
+{
+"id": "1d23f6:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_StaffConjureDremoraWarlock",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d23f2:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_StaffConjureHonedFamiliar",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d23f3:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_StaffConjureLich",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2409:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_StaffConjurePotentFamiliar",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2400:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_StaffConjureSkeleton",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2407:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_StaffConjureSkeletonArcher",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2401:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_StaffConjureSkeletonBowman",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2406:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_StaffConjureSkeletonGuardian",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d23f5:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_StaffConjureSkeletonHero",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2404:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_StaffConjureSkeletonMage",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2403:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_StaffConjureSkeletonMinion",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d23f4:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_StaffConjureSkeletonWarlock",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2405:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_StaffConjureStrongFamiliar",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2408:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_StaffConjureWispmother",
+"value": 5,
+"p": [
+"skyrim"
+]
+},
+{
+"id": "1d23fc:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_StaffFireSurge",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d23fa:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_StaffFlameBarrage",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d23f7:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_StaffFlameWave",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d23f8:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_StaffFrostWave",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d23fd:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_StaffIceSurge",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d23fe:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_StaffLightningSurge",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d23fb:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_StaffShockBarrage",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d23f9:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_StaffShockWave",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d23ff:DragonBreak Online Edits.esp",
+"name": "UDLC01_RES_StaffBlightLiving",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d23ef:DragonBreak Online Edits.esp",
+"name": "UDLC01_RES_StaffFoulPoison",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d23f1:DragonBreak Online Edits.esp",
+"name": "UDLC01_RES_StaffInfectLife",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d23f0:DragonBreak Online Edits.esp",
+"name": "UDLC01_RES_StaffNoxiousPoison",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d240f:DragonBreak Online Edits.esp",
+"name": "UDLC01_RES_StaffPlaugeLife",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d240e:DragonBreak Online Edits.esp",
+"name": "UDLC01_RES_StaffPoison",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d23ee:DragonBreak Online Edits.esp",
+"name": "UDLC01_RES_StaffScourgeLiving",
+"value": 5,
+"p": [
+"cyrodiil"
+]
+},
+{
 "id": "874d2:BSHeartland.esm",
 "name": "CYREnchIronDaggerShock01",
 "value": 10,
@@ -55871,6 +56143,448 @@
 "id": "1d4ec:Skyrim.esm",
 "name": "Torch01",
 "value": 2
+}
+],
+"scrolls": [
+{
+"id": "1d236a:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_ConjureCorruptedShadeScroll",
+"value": 30,
+"p": [
+"skyrim"
+]
+},
+{
+"id": "1d2399:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_ConjureDraugrThrallScroll",
+"value": 30,
+"p": [
+"skyrim"
+]
+},
+{
+"id": "1d2374:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_ConjureSkeletonBowmanScroll",
+"value": 30,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2375:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_ConjureSkeletonScroll",
+"value": 30,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d236f:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_BurningTouchScroll",
+"value": 30,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2366:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_ColdTouchScroll",
+"value": 30,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2391:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_ShockingTouchScroll",
+"value": 30,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2381:DragonBreak Online Edits.esp",
+"name": "UDLC01_ILLU_FrightScroll",
+"value": 30,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2394:DragonBreak Online Edits.esp",
+"name": "UDLC01_ILLU_SootheScroll",
+"value": 30,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2385:DragonBreak Online Edits.esp",
+"name": "UDLC01_RES_InfectLifeScroll",
+"value": 30,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d238d:DragonBreak Online Edits.esp",
+"name": "UDLC01_RES_SalveScroll",
+"value": 30,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d239a:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_ConjureDraugrTormentedScroll",
+"value": 60,
+"p": [
+"skyrim"
+]
+},
+{
+"id": "1d2368:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_ConjureGhostScroll",
+"value": 60,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2373:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_ConjureSkeletonMageScroll",
+"value": 60,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2377:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_ConjureSkeletonMinionScroll",
+"value": 60,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2378:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_ConjureStrongFamiliarScroll",
+"value": 60,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d237b:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_ElectricTouchScroll",
+"value": 60,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d237f:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_FlameTouchScroll",
+"value": 60,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2380:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_FlameWaveScroll",
+"value": 60,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2382:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_FrostTouchScroll",
+"value": 60,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2383:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_FrostWaveScroll",
+"value": 60,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2392:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_ShockWaveScroll",
+"value": 60,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d238a:DragonBreak Online Edits.esp",
+"name": "UDLC01_ILLU_RageScroll",
+"value": 60,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2393:DragonBreak Online Edits.esp",
+"name": "UDLC01_ILLU_ShroudScroll",
+"value": 60,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d236d:DragonBreak Online Edits.esp",
+"name": "UDLC01_RES_BlightLivingScroll",
+"value": 60,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d236e:DragonBreak Online Edits.esp",
+"name": "UDLC01_RES_BraveryScroll",
+"value": 60,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2396:DragonBreak Online Edits.esp",
+"name": "UDLC01_RES_FoulPoisonScroll",
+"value": 60,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d238c:DragonBreak Online Edits.esp",
+"name": "UDLC01_RES_RemedyScroll",
+"value": 60,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d239b:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_ConjureDraugrWretchScroll",
+"value": 120,
+"p": [
+"skyrim"
+]
+},
+{
+"id": "1d236b:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_ConjurePotentFamiliarScroll",
+"value": 120,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d236c:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_ConjureSkeletonArcherScroll",
+"value": 120,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2372:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_ConjureSkeletonGuardianScroll",
+"value": 120,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2379:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_ConjureWispmotherScroll",
+"value": 120,
+"p": [
+"skyrim"
+]
+},
+{
+"id": "1d237a:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_DrainSoulsScroll",
+"value": 120,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d237d:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_FieryGraspScroll",
+"value": 120,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d237e:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_FlameBarrageScroll",
+"value": 120,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2384:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_IceBarrageScroll",
+"value": 120,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2387:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_LightningrGraspScroll",
+"value": 120,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2390:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_ShockBarrageScroll",
+"value": 120,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2397:DragonBreak Online Edits.esp",
+"name": "UDLC01_DES_WintersGraspScroll",
+"value": 120,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d238f:DragonBreak Online Edits.esp",
+"name": "UDLC01_ILLU_SerenityScroll",
+"value": 120,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2395:DragonBreak Online Edits.esp",
+"name": "UDLC01_ILLU_TerrorScroll",
+"value": 120,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2389:DragonBreak Online Edits.esp",
+"name": "UDLC01_RES_PoisonCloakScroll",
+"value": 120,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d238b:DragonBreak Online Edits.esp",
+"name": "UDLC01_RES_RejuvenateScroll",
+"value": 120,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d239c:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_ConjureDraugrScourgeScroll",
+"value": 275,
+"p": [
+"skyrim"
+]
+},
+{
+"id": "1d2367:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_ConjureDremoraWarlockScroll",
+"value": 275,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2370:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_ConjureHonedFamiliarScroll",
+"value": 275,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2371:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_ConjureSkeletonHeroScroll",
+"value": 275,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2376:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_ConjureSkeletonWarlockScroll",
+"value": 275,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2386:DragonBreak Online Edits.esp",
+"name": "UDLC01_ILLU_InspirationScroll",
+"value": 275,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2398:DragonBreak Online Edits.esp",
+"name": "UDLC01_ILLU_WrathScroll",
+"value": 275,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d237c:DragonBreak Online Edits.esp",
+"name": "UDLC01_RES_NoxiousPoisonScroll",
+"value": 275,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2388:DragonBreak Online Edits.esp",
+"name": "UDLC01_RES_PlagueLifeScroll",
+"value": 275,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d238e:DragonBreak Online Edits.esp",
+"name": "UDLC01_RES_ScourgeLivingScroll",
+"value": 275,
+"p": [
+"cyrodiil"
+]
+},
+{
+"id": "1d2369:DragonBreak Online Edits.esp",
+"name": "UDLC01_CONJ_ConjureLichScroll",
+"value": 550,
+"p": [
+"cyrodiil"
+]
 }
 ]
 }
