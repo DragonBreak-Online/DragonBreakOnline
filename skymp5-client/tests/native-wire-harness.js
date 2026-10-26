@@ -19,16 +19,23 @@ check('the separator is the same on both sides', M.UI_SEP === String.fromCharCod
 check('the menu name is the same on both sides', LIB.includes(`var DBO_MENU = "${M.MENU_NAME}";`));
 check('the service pushes to the function the panels define', SVC.includes('"_root.dboData"'));
 
-const server = SERVER ? ['decor.js', 'prayer.js', 'gamemode.js'].map((f) => fs.readFileSync(path.join(SERVER, f), 'utf8')).join('\n') : '';
+const server = SERVER ? ['decor.js', 'prayer.js', 'gamemode.js', 'citizenship.js'].map((f) => fs.readFileSync(path.join(SERVER, f), 'utf8')).join('\n') : '';
 const handled = (ev) => new RegExp(`(onUi|panelAct)\\('${ev}'`).test(server);
 
 const fixtures = {
   dbo_prayer: { type: 'prayer', id: 35, nonce: 'n1', mode: 'pick', deity: 'Mara', kind: 'divine', shrine: 'Shrine of Mara', sphere: '', verses: [{ lines: ['a', 'b'] }, { lines: ['c', 'd'] }, { lines: ['e', 'f'] }], right: [0, 0, 0], slips: 2, totalMs: 120000, minPickMs: 300, judge: 'client' },
+  dbo_board: { boardName: 'Bruma', costGold: 30, gold: 100, maxTextLen: 600, maxNotes: 40, expiryDays: 7, events: { post: 'bountyBoard:post', remove: 'bountyBoard:remove', close: 'bountyBoard:close' },
+    tabs: [{ id: 'hold', label: 'Hold', cost: 0, canPost: false }, { id: 'shop', label: 'Shop', cost: 30, canPost: true }], notes: [{ id: 2, tab: 'hold', author: 'A', text: 't', ageHours: 1, canRemove: true }] },
   dbo_decor: { type: 'decor', id: 171, nonce: 'p1', view: 'catalog', home: 'h', owner: true, undo: 5, budget: [{ label: 'Pieces', used: 0, of: 3 }], groups: [{ id: 'beds', label: 'Beds' }], group: 'beds', page: 0, pages: 2, rows: [{ key: '9001:Skyrim.esm', name: 'Bed', cost: [], why: '' }], nearby: [] },
 };
 // Drives every control the panel has, so every key it can send is on the wire
 const drive = {
   dbo_prayer: (t) => { for (let k = 0; k < 3; k++) { t.st.time += 400; t.press(49); } t.press(27); },
+  dbo_board: (t) => {
+    const p = t.root.dboPanel;
+    t.press(49); p.list.remove.onRelease(); p.head.tab1.onRelease(); p.foot.write.onRelease();
+    p.head.ho0.onRelease(); p.head.ho1.onRelease(); p.foot.f0.onRelease(); t.press(27);
+  },
   dbo_decor: (t) => {
     const l = t.root.dboPanel.list;
     l.r0.onRelease(); l.g0.onRelease(); t.press(39); t.press(82); t.root.dboPanel.head.undo.onRelease();
@@ -56,7 +63,9 @@ for (const menu of Object.keys(fixtures)) {
     check(`${menu}${late ? ' (skse late)' : ''}: outbox sequences run 1, 2, 3... and the cursor reaches the end`,
       box.messages.every((m, i) => m.seq === i + 1) && box.consumed === String(t.root.dboOut).length, box.messages.map((m) => m.seq));
     const keys = [...new Set(parsed.map((p) => p.key))];
-    const unknown = keys.filter((k) => k !== 'ready' && k !== 'close' && !M.serverEventName(k));
+    // a client-service widget's own event keys go back through the router as browser messages, as does the composer hand-off
+    const local = ['ready', 'close', 'native:handoff'].concat(Object.values(fixtures[menu].events || {}));
+    const unknown = keys.filter((k) => !local.includes(k) && !M.serverEventName(k));
     check(`${menu}${late ? ' (skse late)' : ''}: every other key is a dbo: key the service forwards`, !unknown.length, unknown);
     if (SERVER && !late) {
       const missing = keys.filter((k) => M.serverEventName(k)).map((k) => M.serverEventName(k)).filter((ev) => !handled(ev));
