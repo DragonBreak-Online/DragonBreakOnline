@@ -8375,5 +8375,21 @@
         ]
       }
     ]
+  },
+  {
+    "title": "Warband orders for GMs",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Staff",
+    "sections": [
+      {
+        "heading": "GM tools",
+        "items": [
+          "The Warband view shows what an NPC is before you raise it: humanoid or creature, its level and race, and how aggressive it is (/warband info <npc>).",
+          "Two new orders: Attack my target (what you last struck, or whoever last struck you or your band) and Attack nearest foe (/warband attacktarget, /warband attacknearest).",
+          "Each member of your band now shows its health and what it is doing: following, holding, fighting someone, far behind, or dead."
+        ]
+      }
+    ]
   }
 ]

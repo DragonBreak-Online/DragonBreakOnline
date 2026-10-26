@@ -23,7 +23,7 @@
 //     __dboWarbandAvoidHost), so its AI fights the players it was unleashed on.
 // gamemode.js asks __dboWarbandRefusesHit in its hit hook before companionSystem's own.
 //
-//   /warband raise <name or id> [count] | follow | stay | attack <player> | attacknpc <id> | charge | unleash | preview |
+//   /warband raise <name or id> [count] | follow | stay | attack <player> | attacknpc <id> | attacktarget | attacknearest | info <npc> | charge | unleash | preview |
 //            settle [calm|unleashrest|dismissrest] | dismiss [id] | side [name|none] | preset list|save|raise|delete <name> |
 //            onlogout dismiss|settle
 //   /raid [all | clear [raiders|garrison|<id>] | clear all]
@@ -42,7 +42,7 @@ module.exports = (api) => {
   // far the panel looks for targets and the GM's raiders; onLogout, what a GM's followers do when the GM leaves (dismiss, or
   // settle the calm ones); presetsMax, saved bands per server
   const C = Object.assign({ maxBand: 25, maxRaise: 10, ringRadius: 160, bodySeconds: 300, chargeRange: 4096, avoidGmHost: true,
-    viewRadius: 4200, onLogout: 'dismiss', presetsMax: 40 }, cfg.warband || {});
+    viewRadius: 4200, onLogout: 'dismiss', presetsMax: 40, targetSeconds: 60 }, cfg.warband || {});
   // Every answer is said in chat as before, and kept as the last line the panel shows (W3)
   const lastSaid = globalThis.__dboWarbandSaid instanceof Map ? globalThis.__dboWarbandSaid : (globalThis.__dboWarbandSaid = new Map());
   const tell = (a, text) => { personal(a, text); lastSaid.set(a >>> 0, { text: String(text), at: Date.now() }); };
@@ -56,6 +56,13 @@ module.exports = (api) => {
   if (!(S.told instanceof Map)) S.told = new Map();
   // stance: GM actor -> 'follow' | 'stay' (companionSystem keeps no such flag it hands out); onLogout: GM profile -> choice
   if (!(S.stance instanceof Map)) S.stance = new Map();
+  // Step 1 of the warband rework (Nat, 25 Oct): what each GM last struck, and who last struck a GM or one of the GM's band
+  // (noted in the hit hook, __dboWarbandRefusesHit), for "attack my target" and "attack the nearest foe"
+  // struck: GM actor -> { id, at }; attackers: NPC id -> { gm, at }
+  if (!(S.struck instanceof Map)) S.struck = new Map();
+  if (!(S.attackers instanceof Map)) S.attackers = new Map();
+  // info: GM actor -> the last NPC preview asked for (/warband info), carried in the view so the panel keeps showing it
+  if (!(S.info instanceof Map)) S.info = new Map();
   if (!(S.onLogout instanceof Map)) S.onLogout = new Map();
   const comp = () => globalThis.__dboCompanions || null;
   // Vanilla PlayerFaction, as companionService.ts prepare() puts the GM's own followers in on the GM's screen
@@ -389,6 +396,122 @@ module.exports = (api) => {
     audit(`WARBAND ${who(a)} set ${n} NPC(s) on NPC ${id.toString(16)}`);
     tell(a, n ? `${n} of your warband go for ${nameOfNpc(id) === 'someone' ? 'that NPC' : nameOfNpc(id)}.` : 'They cannot reach that one (too far, or dead).');
   };
+  // ---- step 1 of the rework (Nat, 25 Oct: "make it more intuitive") ------------------------------------------------------
+  // Who struck whom, from the hit hook: a GM's own blow marks the GM's target; a blow on a GM or on one of a GM's followers
+  // marks the striker as that GM's foe. Kept targetSeconds (60 s); at most 512 strikers are remembered.
+  const noteHit = (agg, tgt) => {
+    const now = Date.now();
+    if (profileOf(agg) >= 0) { if (isAdmin(agg) && band(agg).length && profileOf(tgt) < 0 && !ownerOf(tgt)) S.struck.set(agg, { id: tgt, at: now }); return; }
+    const A = ownerOf(agg);
+    let gm = 0;
+    if (profileOf(tgt) >= 0) gm = isAdmin(tgt) && band(tgt).length ? tgt : 0;
+    else { const T = ownerOf(tgt); gm = T && !T.released ? T.gm : 0; }
+    if (!gm || (A && friends(A.profile, profileOf(gm)))) return;
+    S.attackers.set(agg, { gm, at: now });
+    if (S.attackers.size > 512) for (const [k, v] of S.attackers) if (now - v.at > C.targetSeconds * 1000) S.attackers.delete(k);
+  };
+  const fresh = (rec) => !!rec && Date.now() - rec.at <= C.targetSeconds * 1000;
+  // The GM's target: what the GM last struck, else whoever last struck the GM or the band (alive, in the GM's world)
+  const targetOf = (a) => {
+    const where = whereOf(a);
+    const ok = (id) => id && alive(id) && whereOf(id) === where;
+    const s = S.struck.get(a >>> 0);
+    if (fresh(s) && ok(s.id)) return s.id;
+    let best = 0, at = 0;
+    for (const [id, r] of S.attackers) if ((r.gm >>> 0) === (a >>> 0) && fresh(r) && r.at > at && ok(id)) { best = id; at = r.at; }
+    return best;
+  };
+  // Foes near the GM, nearest first: NPCs that struck the GM or the band lately, and NPCs of GMs on an enemy side
+  const foesOf = (a) => {
+    const me = posOf(a), where = whereOf(a);
+    if (!me) return [];
+    const seen = new Set(), out = [];
+    const add = (id) => { if (seen.has(id) || !alive(id) || whereOf(id) !== where) return; const p = posOf(id); if (!p) return; const d = dist(p, me); if (d > C.viewRadius) return; seen.add(id); out.push({ id, d }); };
+    for (const [id, r] of S.attackers) if ((r.gm >>> 0) === (a >>> 0) && fresh(r)) add(id);
+    for (const f of foesNear(a)) add(f.id);
+    return out.sort((x, y) => x.d - y.d);
+  };
+  const setOn = (a, t, what) => {
+    S.charging.delete(a >>> 0);
+    let n = 0; for (const c of band(a)) if (comp().attack(c.id, t)) n++;
+    const name = profileOf(t) >= 0 ? who(t) : (S.names.get(t >>> 0) || nameOfBase(t) || 'that one');
+    audit(`WARBAND ${who(a)} set ${n} NPC(s) on ${profileOf(t) >= 0 ? who(t) : `NPC ${(t >>> 0).toString(16)}`} (${what})`);
+    return tell(a, n ? `${n} of your warband go for ${name}.` : `They cannot reach ${name} (too far, or dead).`);
+  };
+  const attackTarget = (a) => {
+    if (!band(a).length) return tell(a, 'You lead no warband.');
+    const t = targetOf(a);
+    if (!t) return tell(a, `No target: strike something first, or be struck (the last ${C.targetSeconds} s count). Striking a foe also sends your band at it by itself.`);
+    return setOn(a, t, 'my target');
+  };
+  const attackNearest = (a) => {
+    if (!band(a).length) return tell(a, 'You lead no warband.');
+    const f = foesOf(a)[0];
+    if (!f) return tell(a, `No foe near: nothing has struck you or your band in the last ${C.targetSeconds} s, and no enemy side's NPC is within ${meters(C.viewRadius)} m.`);
+    return setOn(a, f.id, 'nearest foe');
+  };
+
+  // An NPC's preview before it is raised (24 Oct: GMs raised and dismissed six times in ten minutes to see what one is): its
+  // level, race, kind (the race's ActorType keywords), how aggressive it is and whether it is refused (crashyCreatures). The
+  // fields come from the record the template chain names for each (ACBS template flags: 0x01 traits, 0x02 stats).
+  const TEMPLATE_USE_TRAITS = 0x01, TEMPLATE_USE_STATS = 0x02, ACBS_PC_LEVEL_MULT = 0x80;
+  const recOf = (id) => { try { const r = mp.lookupEspmRecordById(id >>> 0); return r && r.record ? r : null; } catch (e) { return null; } };
+  const fieldOf = (r, t) => (r.record.fields || []).find((f) => f && f.type === t && f.data instanceof Uint8Array) || null;
+  const viewOfField = (f) => new DataView(f.data.buffer, f.data.byteOffset, f.data.byteLength);
+  const idAt = (r, f, at) => { try { return f && f.data.byteLength >= at + 4 ? r.toGlobalRecordId(viewOfField(f).getUint32(at, true)) >>> 0 : 0; } catch (e) { return 0; } };
+  // The NPC_ record that supplies a template-controlled part (flag), following TPLT up to 8 deep
+  const npcFor = (baseId, flag) => {
+    for (let id = Number(baseId) >>> 0, depth = 0; id && depth < 8; depth++) {
+      const r = recOf(id);
+      if (!r || String(r.record.type) !== 'NPC_') return null;
+      const acbs = fieldOf(r, 'ACBS');
+      const flags = acbs && acbs.data.byteLength >= 20 ? viewOfField(acbs).getUint16(18, true) : 0;
+      const next = idAt(r, fieldOf(r, 'TPLT'), 0);
+      if (!next || !(flags & flag)) return r;
+      id = next;
+    }
+    return null;
+  };
+  const editorIdOf = (id) => { const r = recOf(id); return r ? String(r.record.editorId || '') : ''; };
+  const nameOfBase = (id) => { try { const b = Number(mp.get(id, 'baseId')) >>> 0; const n = b && descOf(b); return n ? n.name : ''; } catch (e) { return ''; } };
+  const AGGRESSION = ['unaggressive', 'aggressive', 'very aggressive', 'frenzied'];
+  const infoOf = (desc) => {
+    let baseId = 0; try { baseId = mp.getIdFromDesc(String(desc)) >>> 0; } catch (e) { baseId = 0; }
+    const r = baseId ? recOf(baseId) : null;
+    if (!r) return { desc, error: 'not in this load order' };
+    const out = { desc, name: (descOf(baseId) || {}).name || editorIdOf(baseId), editorId: String(r.record.editorId || '') };
+    const bad = crashy(baseId);
+    if (bad) out.refused = bad.message;
+    if (String(r.record.type) === 'LVLN') { out.kind = 'leveled list'; out.entries = (r.record.fields || []).filter((f) => f && f.type === 'LVLO').length; return out; }
+    if (String(r.record.type) !== 'NPC_') { out.kind = String(r.record.type); return out; }
+    const stats = npcFor(baseId, TEMPLATE_USE_STATS), traits = npcFor(baseId, TEMPLATE_USE_TRAITS);
+    const acbs = stats && fieldOf(stats, 'ACBS');
+    if (acbs && acbs.data.byteLength >= 14) {
+      const v = viewOfField(acbs), flags = v.getUint32(0, true), lvl = v.getInt16(8, true);
+      out.level = flags & ACBS_PC_LEVEL_MULT ? `x${(lvl / 1000).toFixed(2)} of the player's level (${v.getUint16(10, true)}-${v.getUint16(12, true) || 'any'})` : String(lvl);
+    }
+    const race = traits ? idAt(traits, fieldOf(traits, 'RNAM'), 0) : 0;
+    if (race) {
+      out.race = editorIdOf(race);
+      const rr = recOf(race), kw = rr && fieldOf(rr, 'KWDA');
+      const types = [];
+      for (let i = 0; kw && i + 4 <= kw.data.byteLength; i += 4) { const e = editorIdOf(idAt(rr, kw, i)); if (/^ActorType/.test(e)) types.push(e.replace(/^ActorType/, '')); }
+      out.types = types;
+      out.kind = types.includes('NPC') ? 'humanoid' : types.length ? 'creature' : 'unknown';
+    }
+    const ag = aggressionOf(baseId);
+    out.aggression = ag === null ? 'unknown (leveled AI data)' : AGGRESSION[ag] || String(ag);
+    out.settles = ag !== null && ag <= SETTLE_MAX_AGGRESSION;
+    return out;
+  };
+  const infoCmd = (a, rest) => {
+    const found = findNpc(rest);
+    if (found.err) return tell(a, found.err);
+    const i = infoOf(found.n.desc);
+    S.info.set(a >>> 0, i);
+    return tell(a, `${i.name} (${i.desc}): ${i.error || [i.kind, i.level ? `level ${i.level}` : '', i.race, i.aggression, i.refused ? `REFUSED: ${i.refused}` : ''].filter(Boolean).join(', ')}.`);
+  };
+
   // W10: saved bands, raised in one press, kept beside the world like the Place tab's sets
   const stateDir = () => { try { return path.dirname(fs.realpathSync(path.resolve('world'))); } catch (e) { return path.resolve('.'); } };
   const PRESETS_FILE = path.join(stateDir(), 'warband-presets.json');
@@ -448,15 +571,28 @@ module.exports = (api) => {
     const profile = profileOf(a), me = posOf(a), where = whereOf(a);
     const near = (id) => { const p = posOf(id); return p && me && whereOf(id) === where ? meters(dist(p, me)) : null; };
     const counts = new Map();
-    const members = band(a).map((c) => { const name = nameOfNpc(c.id); counts.set(name, (counts.get(name) || 0) + 1); return { id: (c.id >>> 0).toString(16), name, alive: alive(c.id), dist: near(c.id), fighting: !!c.targetId }; });
+    const stance = S.charging.has(a >>> 0) ? 'charging' : S.stance.get(a >>> 0) || 'follow';
+    const label = (id) => (profileOf(id) >= 0 ? who(id) : S.names.get(id >>> 0) || nameOfBase(id) || 'an NPC');
+    const health = (id) => { try { const p = mp.get(id, 'percentages'); return p && Number.isFinite(Number(p.health)) ? Math.round(Number(p.health) * 100) : null; } catch (e) { return null; } };
+    // Each member's state as the GM would say it: dead, fighting someone, elsewhere (another world or cell), far behind (over
+    // 40 m), holding, following
+    const members = band(a).map((c) => {
+      const name = nameOfNpc(c.id); counts.set(name, (counts.get(name) || 0) + 1);
+      const d = near(c.id), live = alive(c.id);
+      const state = !live ? 'dead' : c.targetId ? 'fighting' : d === null ? 'elsewhere' : d > 40 ? 'far behind' : stance === 'stay' ? 'holding' : 'following';
+      return { id: (c.id >>> 0).toString(16), name, alive: live, dist: d, fighting: !!c.targetId, health: live ? health(c.id) : 0, state, target: c.targetId ? label(c.targetId) : '' };
+    });
+    const tgt = targetOf(a);
+    const target = tgt ? { id: (tgt >>> 0).toString(16), name: label(tgt), dist: near(tgt) } : null;
+    const foes = foesOf(a).slice(0, 10).map((f) => ({ id: (f.id >>> 0).toString(16), name: label(f.id), dist: meters(f.d) }));
     const placed = S.released.filter((r) => isMine(a, r)).map((r) => ({ id: (r.id >>> 0).toString(16), name: r.name, hostile: !!r.hostile, alive: alive(r.id), dist: near(r.id) }));
     const players = onlineActors().filter((x) => (x >>> 0) !== (a >>> 0)).map((x) => ({ id: (x >>> 0).toString(16), name: who(x), dist: near(x) })).filter((x) => x.dist !== null && x.dist <= meters(C.viewRadius)).sort((x, y) => x.dist - y.dist).slice(0, 20);
     const npcs = [...S.owners].filter(([id, o]) => o.profile !== profile && alive(id)).map(([id, o]) => ({ id: (id >>> 0).toString(16), name: nameOfNpc(id), gm: o.by, foe: !friends(profile, o.profile), dist: near(id) })).filter((x) => x.dist !== null && x.dist <= meters(C.viewRadius)).sort((x, y) => x.dist - y.dist).slice(0, 20);
     const plan = settlePlan(a);
     const side = sideOf(profile);
     return {
-      members, counts: [...counts].map(([name, n]) => ({ name, count: n })), placed, players, npcs,
-      stance: S.charging.has(a >>> 0) ? 'charging' : S.stance.get(a >>> 0) || 'follow',
+      members, counts: [...counts].map(([name, n]) => ({ name, count: n })), placed, players, npcs, target, foes, info: S.info.get(a >>> 0) || null,
+      stance,
       side, enemies: [...new Set([...S.sides].filter(([p, s]) => p !== profile && side && s.toLowerCase() !== side.toLowerCase()).map(([, s]) => s))],
       plan: { calm: plan.calm.length, kept: names(plan.kept), unread: names(plan.unread) },
       presets: Object.keys(presets()).sort().map((n) => ({ name: n, count: presets()[n].items.reduce((x, i) => x + i.count, 0), what: presets()[n].items.map((i) => `${i.count} ${i.name}`).join(', ') })),
@@ -494,6 +630,9 @@ module.exports = (api) => {
     if (cmd === 'preview') return previewCmd(a);
     if (cmd === 'dismiss') return rest ? dismissOne(a, rest) : dismissAll(a);
     if (cmd === 'attacknpc') return attackNpc(a, rest);
+    if (cmd === 'attacktarget') return attackTarget(a);
+    if (cmd === 'attacknearest') return attackNearest(a);
+    if (cmd === 'info') return infoCmd(a, rest);
     if (cmd === 'preset') return presetCmd(a, rest);
     if (cmd === 'onlogout') return logoutCmd(a, rest);
     if (!cmd) {
@@ -503,9 +642,9 @@ module.exports = (api) => {
       const count = new Map(); for (const c of mine) count.set(nameOfNpc(c.id), (count.get(nameOfNpc(c.id)) || 0) + 1);
       return tell(a, `Your warband of ${mine.length}: ${[...count].map(([k, v]) => `${v} ${k}`).join(', ')}.${tail}`);
     }
-    tell(a, 'Usage: /warband raise <name or id> [count] | follow | stay | attack <player> | attacknpc <id> | charge | unleash | preview | settle [calm|unleashrest|dismissrest] | dismiss [id] | side [name|none] | preset list|save|raise|delete <name> | onlogout dismiss|settle');
+    tell(a, 'Usage: /warband raise <name or id> [count] | follow | stay | attack <player> | attacknpc <id> | attacktarget | attacknearest | info <npc> | charge | unleash | preview | settle [calm|unleashrest|dismissrest] | dismiss [id] | side [name|none] | preset list|save|raise|delete <name> | onlogout dismiss|settle');
   };
-  registerChatCommand('warband', warbandCmd, { admin: true, help: 'raise <npc> [n] | follow | stay | attack <player> | attacknpc <id> | charge | unleash | preview | settle [calm|unleashrest|dismissrest] | dismiss [id] | side [name|none] | preset ... | onlogout ...: NPCs that follow you, and raids' });
+  registerChatCommand('warband', warbandCmd, { admin: true, help: 'raise <npc> [n] | follow | stay | attack <player> | attacknpc <id> | attacktarget | attacknearest | info <npc> | charge | unleash | preview | settle [calm|unleashrest|dismissrest] | dismiss [id] | side [name|none] | preset ... | onlogout ...: NPCs that follow you, and raids' });
 
   // ---- unleashed and settled NPCs, and their bodies -----------------------------------------------------------------------
   const isMine = (a, r) => (r.profile !== undefined && r.profile >= 0 ? r.profile === profileOf(a) : r.by === who(a));
@@ -586,6 +725,7 @@ module.exports = (api) => {
   globalThis.__dboWarbandRefusesHit = (aggressorId, targetId) => {
     const agg = Number(aggressorId) >>> 0, tgt = Number(targetId) >>> 0;
     if (agg === tgt) return false;
+    try { noteHit(agg, tgt); } catch (e) { /* a gone actor */ }
     const aggPlayer = profileOf(agg) >= 0, tgtPlayer = profileOf(tgt) >= 0;
     const A = aggPlayer ? null : ownerOf(agg);
     const T = tgtPlayer ? null : ownerOf(tgt);

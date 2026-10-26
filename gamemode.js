@@ -4311,7 +4311,9 @@ onUi('npcDrift', (a, args) => {
   const r = args[0] && typeof args[0] === 'object' ? args[0] : {};
   let note = '';
   try { note = driftNote(a, r); } catch (e) { /* diagnostics only */ }
-  log(`npcDrift ${display(a)} ${String(r.kind).slice(0, 24)}: ${JSON.stringify(r).slice(0, 900)}${note}`);
+  // A companion's report is whole up to 1600 characters (warband rework step 2 adds slot, ranged, leashed and waiting, and
+  // _work/warband-fluid-1025/analyze_drift.py reads it as JSON); every other kind keeps 900
+  log(`npcDrift ${display(a)} ${String(r.kind).slice(0, 24)}: ${JSON.stringify(r).slice(0, r.kind === 'companion' ? 1600 : 900)}${note}`);
   if (r.kind === 'heartbeat' && globalThis.__dboDoorSync) { try { globalThis.__dboDoorSync.heartbeat(a, r); } catch (e) { log('door sync failed', e.message); } }
 });
 // The staff trace (client staffHit.ts): a window the server opens for one player, by /staffdiag or at login while
