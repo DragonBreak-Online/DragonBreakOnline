@@ -394,6 +394,13 @@ export class ScaleformMenuService extends ClientListener {
 
   // Only ever called from onUpdate, where a native is callable. A throw here must not be read as "closed":
   // that would tear down a live panel, so it reports open and the ready timeout stays the real net.
+  //
+  // The two callers want OPPOSITE fail-safes, which is worth knowing before anyone "fixes" this. The
+  // self-close detection wants "open" on a throw, so a failed probe never kills a working panel. The hand-off
+  // wants "closed", because reporting open makes it wait. They are reconciled by handoffDue's timeout rather
+  // than by two probes: if this ever starts throwing, a hand-off is late by HANDOFF_CLOSE_TIMEOUT_MS and
+  // still arrives, which is a bounded failure. Do not flip the direction without first moving the self-close
+  // detection onto a probe of its own.
   private menuIsOpen(): boolean {
     try {
       return this.sp.Ui.isMenuOpen(MENU_NAME);
