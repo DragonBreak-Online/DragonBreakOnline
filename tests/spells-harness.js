@@ -154,8 +154,9 @@ const read = async (a, tome) => {
 (async () => {
 
 // ---- boot ----
-// 4 = the 2 older mage points (the activators are not in this load order yet) and the 2 permanent chapels (23 Oct)
-check('boot line counts the tomes and the study points', out.logs.some((l) => /spells on: \d+ tomes known, 4 study point\(s\), \d+ tomes in the Synod shop, 3 prepared, changed in 11 college cell\(s\)/.test(l)), out.logs);
+// 5 = the 2 older mage points (the activators are not in this load order yet), the 2 permanent chapels (23 Oct) and
+// House Telvanni's Golden Glow Estate (25 Oct)
+check('boot line counts the tomes and the study points', out.logs.some((l) => /spells on: \d+ tomes known, 5 study point\(s\), \d+ tomes in the Synod shop, 3 prepared, changed in 11 college cell\(s\)/.test(l)), out.logs);
 check('the read hook wraps the handler that was there', mp.onReadBook.__dboSpellsInner === original);
 load();
 check('a reload unwraps its own wrapper instead of stacking', mp.onReadBook.__dboSpellsInner === original);
@@ -164,7 +165,7 @@ check('a reload unwraps its own wrapper instead of stacking', mp.onReadBook.__db
 check('a book that teaches nothing goes to the engine untouched', (await read(MAGE, [PLAIN_BOOK, PLAIN_BOOK])) === undefined && innerCalls === 1);
 mastery(MAGE, { arcane: 0 });
 at(MAGE, BRUMA, [0, 0, 0]);
-check('refused outside a study point', (await read(MAGE, T.flames)) === false && /spell study point: The well in the Hall of the Elements, The Synod Conclave in Bruma/.test(said(MAGE)) && /You keep the tome/.test(said(MAGE)), said(MAGE));
+check('refused outside a study point', (await read(MAGE, T.flames)) === false && /spell study point: Golden Glow Estate, The well in the Hall of the Elements, The Synod Conclave in Bruma/.test(said(MAGE)) && /You keep the tome/.test(said(MAGE)), said(MAGE));
 check('...nothing goes into the spellbook', studied(MAGE, 'arcane').length === 0);
 check('...and the refusal is audited', /SPELL P14 refused tome 9cd51:Skyrim.esm/.test(out.audits[out.audits.length - 1]), out.audits);
 at(MAGE, SYNOD, [0, 0, 0]);
@@ -522,8 +523,12 @@ check('closing the panel closes widget 44', out.closed.some((c) => c[0] === OTHE
   const perm = points.filter((p) => !p.requires && !p.until);
   check('skills.json holds the generated Study Magic places, and the older mage points give way to them', gen.length >= 2 && gen.every((p) => p.places.length && p.radiusMeters)
     && points.filter((p) => !p.requires && p !== perm.find((q) => q === p)).every((p) => p.until === STUDY_MAGIC), points.map((p) => [p.name, p.requires, p.until]));
-  check('the permanent points are the chapels, for Restoration and Alteration only', perm.length === 2
-    && perm.every((p) => (p.schools || []).join() === 'Restoration,Alteration' && (p.cells || []).length && !p.places), perm.map((p) => [p.name, p.schools]));
+  const chapels = perm.filter((p) => p.name !== 'Golden Glow Estate'), golden = perm.find((p) => p.name === 'Golden Glow Estate');
+  check('the permanent points are the chapels, for Restoration and Alteration only, and Golden Glow Estate', perm.length === 3 && chapels.length === 2
+    && chapels.every((p) => (p.schools || []).join() === 'Restoration,Alteration' && (p.cells || []).length && !p.places), perm.map((p) => [p.name, p.schools]));
+  check('Golden Glow Estate: every school, in all four of House Telvanni\'s hall cells (guild-defs, shopPlaces)', !!golden && !golden.places
+    && golden.schools.join() === 'Destruction,Conjuration,Illusion,Restoration,Alteration'
+    && JSON.stringify(golden.cells) === JSON.stringify(require(path.join(SERVER, 'guild-defs.json')).factions.find((f) => f.id === 'house-telvanni').hall.cells), golden);
   const synod = gen.find((p) => p.cell === SYNOD), crag = gen.find((p) => p.cell === FROST_CRAG);
   const spot = synod.places[0].pos;
   const R = synod.radiusMeters * 70;
@@ -534,9 +539,15 @@ check('closing the panel closes widget 44', out.closed.some((c) => c[0] === OTHE
   const SM = 0x19; online.push(SM); mastery(SM, { arcane: 1, priest: 1 });
   at(SM, SYNOD, [spot[0] + R + 70, spot[1], spot[2]]);
   check('the Synod Conclave away from any activator is no longer a study point', (await read(SM, T.frostbite)) === false
-    && /spell study point: Study Magic in the Synod Conclave in Bruma, Study Magic in Frost Crag Spire/.test(said(SM)) && !/well in the Hall/.test(said(SM)), said(SM));
+    && /spell study point: Golden Glow Estate, Study Magic in the Synod Conclave in Bruma, Study Magic in Frost Crag Spire/.test(said(SM)) && !/well in the Hall/.test(said(SM)), said(SM));
   at(SM, SYNOD, [spot[0] + R - 20, spot[1], spot[2]]);
   check('...within radiusMeters of an activator it is', (await read(SM, T.frostbite)) !== false && studied(SM, 'arcane').length === 1, said(SM));
+  // House Telvanni's seat: its ledger sold tomes nobody could read there (ticket 1560957922618507346, 25 Oct)
+  const GG = 0x1b; online.push(GG); mastery(GG, { arcane: 1, priest: 1 });
+  at(GG, '161ff:Skyrim.esm', [-814, -1480, 636]);
+  check('Golden Glow Estate: a destruction tome is studied by the house\'s Scholars\' Ledger', (await read(GG, T.frostbite)) !== false && studied(GG, 'arcane').length === 1, said(GG));
+  at(GG, '2d3e8:Skyrim.esm', [0, 0, 0]);
+  check('...and a restoration one anywhere in the estate', (await read(GG, T.candlelight)) !== false && studied(GG, 'priest').length === 1, said(GG));
   at(SM, SYNOD_BASEMENT, [900, 900, 0]);
   check('the basement has no activator: not a study point any more', (await read(SM, T.sparks)) === false && studied(SM, 'arcane').length === 1);
   at(SM, HALL, [0, 0, 0]);
