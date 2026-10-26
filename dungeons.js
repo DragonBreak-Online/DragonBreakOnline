@@ -679,7 +679,8 @@ module.exports = (api) => {
   // bandanas at the tanning rack. Before this only a Nordic misc vendor list and salvage gave it. A common find, the same
   // at every difficulty (it is a crafting cloth, not a material of a tier); an expedition's trim thins it like every
   // roll. Burial linen is commonest where the dead are wrapped: a Nordic ruin or draugr crypt rolls `nordic` times as
-  // often. About 3.4 wraps per solo clear of a Bruma dungeon (tests/expedition-loot-budget-harness.js). Config dungeons.linen.
+  // often. About 4 wraps per solo clear of a Bruma dungeon with these defaults; gamemode-config's dungeons.linen raises it to
+  // about 8.7 for the decor's cloth (26 Oct; tests/expedition-loot-budget-harness.js). Config dungeons.linen.
   const LINEN = Object.assign({ item: '34cd6:Skyrim.esm', chest: 0.12, boss: 0.25, container: 0.02, stack: [1, 3], containerStack: [1, 1], nordic: 2 }, C.linen || {});
   const LINEN_STACK = stackOr(LINEN.stack, [1, 3]), LINEN_SMALL = stackOr(LINEN.containerStack, [1, 1]);
   const isNordicRuin = (d) => !!d && (d.type === 'nordic' || (d.keywords || []).some((kw) => /NordicRuin|DraugrCrypt/i.test(kw)));
