@@ -52,11 +52,23 @@ ok(/^#[0-9a-f]{6}$/i.test(String(((CFG.war || {}).colours || {})[ID] || '')), 'i
 
 // ---- the gear ----
 const mine = Object.entries(GEAR.items).filter(([, v]) => v.factions.includes(ID));
-ok(mine.length === 6, 'six Knight-Errant pieces are its faction gear', mine.map(([, v]) => v.name));
-ok(mine.every(([k, v]) => k.endsWith(':knighterrant.esp') && /^Knight-Errant /.test(v.name) && v.set === 'Knights of the Nine'),
-  'all from knighterrant.esp, named Knight-Errant, in the Knights of the Nine set');
-ok(mine.every(([, v]) => v.factions.length === 1 && v.role === 'blacksmith'), "made only by the order's own smiths (all are forge recipes)");
-ok(mine.every(([k, v]) => v.recipes.length && v.recipes.every((r) => RECIPES[r] && RECIPES[r].item === k)), 'each recipe is one regions.json knows, making that item');
+// The Knight-Errant set (knighterrant.esp), the order's first gear
+const errant = mine.filter(([, v]) => v.set === 'Knights of the Nine');
+ok(errant.length === 6 && errant.every(([k, v]) => k.endsWith(':knighterrant.esp') && /^Knight-Errant /.test(v.name)), 'six Knight-Errant pieces are its gear', errant.map(([, v]) => v.name));
+ok(errant.every(([, v]) => v.factions.length === 1 && v.role === 'blacksmith'), "made only by the order's own smiths (all are forge recipes)");
+ok(errant.every(([k, v]) => v.recipes.length && v.recipes.every((r) => RECIPES[r] && RECIPES[r].item === k)), 'each Knight-Errant recipe is one regions.json knows, making that item');
+// Knights of the Nine SE's Crusader set (Nexus 28392), crafted through DragonBreak KotN Patch.esp's recipes (Nat, 25 Oct)
+const KOTN = 'matys knights of the nine armor 2.1.esp', PATCH = 'DragonBreak KotN Patch.esp';
+const crusader = mine.filter(([, v]) => v.set === 'Knights of the Nine Crusader');
+ok(crusader.length === 16 && crusader.every(([k]) => k.endsWith(':' + KOTN)), 'sixteen Crusader pieces from the KotN plugin are its gear', crusader.length);
+ok(crusader.every(([, v]) => v.factions.length === 1 && v.recipes.length && v.recipes.every((r) => r.endsWith(':' + KOTN) || r.endsWith(':' + PATCH))),
+  "the order's alone, each with the KotN or KotN Patch recipe that makes it");
+ok(crusader.filter(([, v]) => v.role === 'tailor').map(([, v]) => v.name).join() === 'Cape of the Crusader' && crusader.filter(([, v]) => v.role === 'blacksmith').length === 15,
+  "the plain cape is the Clothier's (tanning rack), the rest the Armorer's (forge)");
+// The Talos robe and hood (Divine and Daedric Robes) are shared with the Stormcloaks
+const talos = mine.filter(([, v]) => v.set === 'Robes of Talos');
+ok(talos.length === 2 && talos.every(([, v]) => v.role === 'tailor' && JSON.stringify(v.factions) === '["knights-of-the-nine","stormcloaks"]'), "the Talos robe and hood are its tailors' and the Stormcloaks'");
+ok(mine.length === errant.length + crusader.length + talos.length, 'nothing else is its gear', mine.length);
 ok(!Object.values(GEAR.items).some((v) => /^Knight-Errant /.test(v.name) && !v.factions.includes(ID)), 'no other faction holds a Knight-Errant piece');
 
 console.log('');

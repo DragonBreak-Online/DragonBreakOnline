@@ -428,22 +428,6 @@
     ]
   },
   {
-    "title": "The Knights of the Nine are recruiting",
-    "date": "2026-10-25",
-    "version": "Server update",
-    "tag": "New",
-    "sections": [
-      {
-        "heading": "Factions",
-        "items": [
-          "The Knights of the Nine are a faction: the holy order of the Nine Divines, from Pilgrim and Knight Errant up to Knight Commander and the Divine Crusader.",
-          "Only a follower of one of the Nine Divines, Talos included, may join: choose your god at a shrine first. A Knight may not serve a Daedric cult.",
-          "Their Armorers alone forge the Knight-Errant armour."
-        ]
-      }
-    ]
-  },
-  {
     "title": "Every boss is ready: new loot, unique schematics, a giant chieftain",
     "date": "2026-10-26",
     "version": "Server update",
@@ -473,6 +457,44 @@
           "The Valkynaz of the Great Gate now stands at the Great Oblivion Gate on its own, with a High Clannfear at its side and Clannfear and scamps around it. Before, it only came during a GM event.",
           "The Wraith of the Ice Cap now waits at Skytemple Ruins on the coast past Winterhold.",
           "The Falmer Warmonger stands on the open cavern floor of Blackreach's Falmer city, apart from the city's other Falmer."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Crusader armour and the robes of the gods",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Knights of the Nine",
+        "items": [
+          "The Knights of the Nine forge the Crusader's armour and swords. Their Armorers make the set at the forge; their Clothiers make the cape at the tanning rack.",
+          "The Divine set is the plain set raised with an amulet of a Divine at the forge (the cuirass also takes the Book of Talos and Stendarr's amulet), and carries a blessing."
+        ]
+      },
+      {
+        "heading": "Robes of the gods",
+        "items": [
+          "Each of the Nine Divines and sixteen Daedric Princes has a robe and hood, made at the tanning rack by their faithful's tailors.",
+          "The Eight's are made by the Great Faiths and the Imperial Cult (Stendarr's by the Vigil too), Talos's by the Knights of the Nine and the Stormcloaks, Malacath's by the Orc clans, and each Prince's by his cult."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "The Knights of the Nine are recruiting",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Factions",
+        "items": [
+          "The Knights of the Nine are a faction: the holy order of the Nine Divines, from Pilgrim and Knight Errant up to Knight Commander and the Divine Crusader.",
+          "Only a follower of one of the Nine Divines, Talos included, may join: choose your god at a shrine first. A Knight may not serve a Daedric cult.",
+          "Their Armorers alone forge the Knight-Errant armour."
         ]
       }
     ]
