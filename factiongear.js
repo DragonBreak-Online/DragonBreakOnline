@@ -46,6 +46,7 @@ module.exports = (api) => {
   };
 
   const factionName = (fid) => { try { const f = typeof globalThis.__dboGuildInfo === 'function' ? globalThis.__dboGuildInfo(fid) : null; return (f && f.name) || fid; } catch (e) { return fid; } };
+  const factionKind = (fid) => { try { const f = typeof globalThis.__dboGuildInfo === 'function' ? globalThis.__dboGuildInfo(fid) : null; return (f && f.kind) || ''; } catch (e) { return ''; } };
   const ROLE_WORD = { blacksmith: 'smiths', tailor: 'tailors' };
   const listNames = (names) => (names.length <= 1 ? names.join('') : names.length === 2 ? `${names[0]} or ${names[1]}` : `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`);
 
@@ -63,10 +64,15 @@ module.exports = (api) => {
   };
 
   // "Imperial Helmet is made only by the Imperial Legion's smiths." and, for a member of the wrong rank, the rank it needs
+  // Who makes it, by who they are: every Orc stronghold (guild-defs kind stronghold) is "the strongholds'", the vampire
+  // clans' set "the vampire clans'"; any other list of more than three is not named one by one. A count alone used to
+  // decide, so the Robes of Malacath, made by the six strongholds, read "the vampire clans'" (Nat, 26 Oct)
   const makers = (e) => {
-    if (e.set === 'Orcish' || e.set === 'Orcish Clan') return "the strongholds'";
-    const names = [...new Set((e.factions || []).map(factionName))];
-    if (names.length > 3) return "the vampire clans'";
+    const fids = (e.factions || []).map(String);
+    if (e.set === 'Orcish' || e.set === 'Orcish Clan' || (fids.length && fids.every((f) => factionKind(f) === 'stronghold'))) return "the strongholds'";
+    if (e.set === 'Vampire clans') return "the vampire clans'";
+    const names = [...new Set(fids.map(factionName))];
+    if (names.length > 3) return "its own factions'";
     return `the ${listNames(names)}'s`.replace(/s's$/, "s'");
   };
   const refusalText = (v) => {

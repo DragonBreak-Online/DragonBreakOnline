@@ -43,7 +43,7 @@ const ranks = {
   [A.RF_SMITH]: [{ id: 'hold-riften', role: 'blacksmith' }], [A.VAMP_SMITH]: [{ id: 'crimson-scars', role: 'blacksmith' }],
 };
 globalThis.__dboGuildsOf = (a) => ranks[a] || [];
-globalThis.__dboGuildInfo = (fid) => { const f = defs.find((x) => x.id === fid); return f ? { id: f.id, name: f.name } : null; };
+globalThis.__dboGuildInfo = (fid) => { const f = defs.find((x) => x.id === fid); return f ? { id: f.id, name: f.name, kind: f.kind || '' } : null; };
 const said = [], audits = [], commands = new Map();
 const cfg = { factionGear: { enabled: true } };   // switched on for the rules; the off state is checked at the end
 // Armor records: body pieces carry BOD2 slot 32 (bit 2), a shield slot 39 (bit 9)
@@ -168,5 +168,18 @@ check('with no config at all it is off', globalThis.__dboFactionCraft(A.OUT, IMP
   check('the robes and hood are the tailor\'s, the rest the smith\'s', JSON.stringify(robes) === JSON.stringify(['Vigil Hood', 'Vigil Robes']), robes);
 }
 
+// The refusal names the makers by who they are (Nat, 26 Oct: "the hood of Malacath is tied to the vampires??"): the six
+// strongholds' Robes of Malacath say the strongholds, the vampire clans' set says the vampire clans
+{
+  const hood = Object.entries(gear).find(([, v]) => v.set === 'Robes of Malacath' && /Hood/.test(v.name));
+  const vamp = Object.entries(gear).find(([, v]) => v.set === 'Vampire clans');
+  const bench = (v) => (v.role === 'tailor' ? 'loom' : 'forge');
+  const words = (v) => (v.role === 'tailor' ? 'tailors' : 'smiths');
+  check('the Malacath Hood is gated to the six strongholds', !!hood && hood[1].factions.length === 6 && hood[1].factions.every((f) => (defs.find((x) => x.id === f) || {}).kind === 'stronghold'), hood && hood[1].factions);
+  const hoodSaid = hood && craft(98, idOf(hood[0])) === false && lastTo(98);   // fresh outsiders: refuse() tells one player once in 1.5 s
+  check('...and refused to an outsider as the strongholds\' work, never the vampire clans\'', hoodSaid === `${hood[1].name} is made only by the strongholds' ${words(hood[1])}. Your materials return when you leave the ${bench(hood[1])}.`, hoodSaid);
+  const vampSaid = vamp && craft(99, idOf(vamp[0])) === false && lastTo(99);
+  check('the vampire clans\' gear still says the vampire clans\'', !!vampSaid && new RegExp("is made only by the vampire clans' ").test(vampSaid), vampSaid);
+}
 console.log(failures ? `${failures} FAILED` : 'all checks passed');
 process.exit(failures ? 1 : 0);

@@ -1,5 +1,19 @@
 [
   {
+    "title": "The robes of Malacath belong to the strongholds",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Crafting",
+        "items": [
+          "Trying to make the Malacath Hood or Robes outside an Orc stronghold said they were the vampire clans' work. They are, and always were, made only by the tailors of the six strongholds; the message now says so."
+        ]
+      }
+    ]
+  },
+  {
     "title": "House Telvanni teaches as a college",
     "date": "2026-10-26",
     "version": "Server update",
