@@ -4658,9 +4658,11 @@ onUi('pigeonCompose', (a, args) => {
   if (!zoneId) return refusePigeon(a);
   const mode = String(args[1] || '');
   const to = Number(args[2]) >>> 0;
+  // A Cancel brings the native coop back on the tab its composer came from
+  const was = pigeonHandoff.get(a >>> 0);
   if (PIGEON_HANDOFF_MODES.includes(mode)) pigeonHandoff.set(a >>> 0, { mode, to: mode === 'send' && pigeonContactsOf(a).includes(to) ? to : 0 });
   else pigeonHandoff.delete(a >>> 0);
-  openPigeonCoop(a, undefined, undefined, PIGEON_HANDOFF_MODES.includes(mode) ? mode : undefined);
+  openPigeonCoop(a, undefined, undefined, PIGEON_HANDOFF_MODES.includes(mode) ? mode : was ? was.mode : undefined);
 });
 onUi('close', (a, args, widgetId) => { if (widgetId === PIGEON_WIDGET_ID) pigeonNonces.delete(a); });
 // Gold the server moves reaches the engine as a SetInventory, but the client cannot apply one while the player is

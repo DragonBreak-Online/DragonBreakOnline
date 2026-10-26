@@ -10,7 +10,7 @@ const gm = read('gamemode.js');
 const slice = (from, to) => { const a = gm.indexOf(from); const b = gm.indexOf(to, a); if (a < 0 || b < 0) throw new Error('missing ' + from); return gm.slice(a, b); };
 const coop = slice('const pigeonHandoff = ', 'globalThis.__dboOpenPigeonCoop = openPigeonCoop;');
 const openLine = gm.slice(gm.indexOf("onUi('pigeonOpen'"), gm.indexOf('\n', gm.indexOf("onUi('pigeonOpen'")));
-const handlers = slice("onUi('pigeonSend'", "onUi('close', (a, args, widgetId) => { if (widgetId === PIGEON_WIDGET_ID)");
+const handlers = slice("onUi('pigeonSign'", "onUi('close', (a, args, widgetId) => { if (widgetId === PIGEON_WIDGET_ID)");
 
 let fails = 0;
 const ok = (c, t, g) => { console.log(`${c ? 'ok  ' : 'FAIL'}  ${t}${c ? '' : '   ' + JSON.stringify(g)}`); if (!c) fails++; };
@@ -38,7 +38,13 @@ ui.pigeonOpen(A, ['letters']);
 ok(!last().browser && !last().handoff && last().view === 'letters', 'a coop opened at a board is unmarked (native for a client with the cap)', last());
 ui.pigeonCompose(A, [nonce(), 'send', BOB]);
 ok(last().browser === 1 && last().handoff === 'send' && last().handoffTo === BOB && last().view === 'send', '"Write the letter..." re-publishes the coop for the browser: the letter composer, to Bob', last());
-ui.pigeonSign && ui.pigeonSign(A, [nonce(), 'clear']);
+// /sign answers in the composer: the same view, its line, and the mark kept (a sign is not the letter)
+globalThis.__dboRunCommand = (a, cmd, how) => (cmd === 'sign' ? ['Your next letter is signed with your own name.'] : null);
+ui.pigeonSign(A, [nonce(), 'clear']);
+ok(last().browser === 1 && last().handoff === 'send' && last().view === 'send' && last().resultKind === 'sent' && last().result === 'Your next letter is signed with your own name.', 'signing answers inside the letter composer and does not end it', last());
+globalThis.__dboRunCommand = () => ['No such name.'];
+ui.pigeonSign(A, [nonce(), 'Nobody']);
+ok(last().handoff === 'send' && last().resultKind === 'refused', 'a refused signature is refused, still in the composer', last());
 const n1 = nonce();
 // A refused send keeps the composer up
 sendOk = false;
@@ -55,6 +61,9 @@ ok(!last().browser && !last().handoff, 'the composer\'s Cancel (mode \'\') bring
 
 ui.pigeonCompose(A, [nonce(), 'supply']);
 ok(last().handoff === 'supply' && last().view === 'supply' && last().browser === 1, 'Post an order... hands the supply composer over', last());
+ui.pigeonCompose(A, [nonce(), '']);
+ok(!last().browser && last().view === 'supply', 'its Cancel brings the native coop back on the supply tab', last());
+ui.pigeonCompose(A, [nonce(), 'supply']);
 globalThis.__dboPigeonHandoffDone(A, 'courier');
 globalThis.__dboOpenPigeonCoop(A, 'x', 'sent', 'supply');
 ok(last().handoff === 'supply', 'another composer\'s success does not end this one', last());
@@ -66,8 +75,11 @@ ui.pigeonCompose(A, [nonce(), 'courier']);
 ok(last().handoff === 'courier' && last().view === 'courier', 'Send a parcel... hands the courier composer over', last());
 ui.pigeonClose(A);
 ok(closed.includes(34), 'Close closes the coop');
-ui.pigeonOpen(A, []);
-ok(!last().browser, '...and the mark goes with it', last());
+globalThis.__dboOpenPigeonCoop(A, undefined, undefined, 'courier');
+ok(!last().browser && !last().handoff, '...and the mark goes with it (seen without the board-open path, which also clears it)', last());
+ui.pigeonCompose(A, [nonce(), 'courier']);
+ui.pigeonCompose(A, [nonce(), '']);
+ok(!last().browser && last().view === 'courier', 'Cancel from the courier composer comes back on the couriers tab', last());
 ui.pigeonCompose(A, [nonce(), 'supply']);
 ui.pigeonOpen(A, []);
 ok(!last().browser, 'a composer Escaped away is not left marked: the next open at a board is native', last());
