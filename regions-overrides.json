@@ -35,6 +35,16 @@
     "BYOHFoodMilk": "common"
   },
   "recipes": {
+    "_greatHouseCapes": "The Great House capes (DLE 1D2266-1D226E, tanning rack; the Leader, 26 Oct, on Worker 2's proposal): the seven house capes are made anywhere, gated only by faction gear to their own house's tailors (Telvanni's hall, Golden Glow Estate, is in the Riften zone, so a Solstheim lock would stop its own Clothier); Dagoth and the New Temple, which no faction holds, stay Morrowind's, Solstheim. By recipe desc, so the rule holds before and after regions.json is regenerated.",
+    "1d226f:dragonbreak online edits.esp": "common",
+    "1d2277:dragonbreak online edits.esp": "common",
+    "1d2270:dragonbreak online edits.esp": "common",
+    "1d2276:dragonbreak online edits.esp": "common",
+    "1d2272:dragonbreak online edits.esp": "common",
+    "1d2275:dragonbreak online edits.esp": "common",
+    "1d2271:dragonbreak online edits.esp": "common",
+    "1d2274:dragonbreak online edits.esp": ["solstheim"],
+    "1d2273:dragonbreak online edits.esp": ["solstheim"],
     "_nordic": "Nordic carved gear (smithing.json family nordic: Dragonborn's recipes and the server's Nord1/Nord2 sets) is forged in Skyrim as well as Solstheim, as Dwarven and Dragon are: its schematic is found in Skyrim's Nordic barrows and by reading, so a smith who learned it in Skyrim was refused there as \"a Solstheim design\" (/bug #BGJN, 24 Oct). regions.json marks Dragonborn's recipes Solstheim by the plugin.",
     "DLC2RecipeArmorNordicShield": ["skyrim", "solstheim"],
     "DLC2RecipeArmorNordicHeavyBoots": ["skyrim", "solstheim"],
