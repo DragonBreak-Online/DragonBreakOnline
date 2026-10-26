@@ -994,7 +994,7 @@ const HELP_GROUPS = [
   { key: 'beast', title: 'The beast in you', names: ['beast', 'forms', 'hunt', 'blood', 'feed', 'confess'], role: 'beast',
     hints: ['Your curse and its powers: F3, the Supernatural tab.',
       'Silver and fire hurt a vampire more; silver and poison spells hurt a werewolf more in beast form.'] },
-  { key: 'work', title: 'Work and the world', names: ['time', 'property', 'mine', 'keys', 'courier'],
+  { key: 'work', title: 'Work and the world', names: ['time', 'property', 'mine', 'keys', 'courier', 'decor'],
     hints: ['Hunting work: the Contracts tab of the expedition board (Synod Conclave, Fighters Guild, Frostcrag Spire).', 'Other work for pay: a notice board, then /commission.',
       'Mining and woodcutting: an ore vein or a chopping block. Richer ores need a higher Miner tier.',
       'The Bleak-Frost Mine, west of Bruma: iron, corundum and gold, and meteoric iron for Adept miners.',
