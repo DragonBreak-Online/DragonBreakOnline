@@ -51,7 +51,8 @@
           "Place hands the piece to the placing tool; set it down and the panel comes back. The Placed tab moves or takes down what is in the home, shows what taking a piece down gives back and how a planter is growing, and Undo works for a minute after a place or a move.",
           "Owners name who else may decorate in the People tab. The G key can be changed in the Journal, Settings, Keys.",
           "Pieces now cost Hearthfire building materials: sawn logs from the saw mill, quarried stone and clay from the quarries and clay pits, glass smelted from the quartz that clay digging turns up, straw from the grain mill, and nails, hinges, fittings and locks made at the forge. Cloth pieces still take linen, which only comes from dungeons.",
-          "Taking a piece down gives back half its materials, more the better a Woodcutter you are (up to three quarters at Master). Owners can hire carpenters in the Carpenters tab: it shows each one's woodworking rank and what share their work gives back, and what a hired carpenter takes down comes back to the owner."
+          "Taking a piece down gives back half its materials, more the better a Woodcutter you are (up to three quarters at Master). Owners can hire carpenters in the Carpenters tab: it shows each one's woodworking rank and what share their work gives back, and what a hired carpenter takes down comes back to the owner.",
+          "Study bookshelves now come in two kinds: an Arcane Study Bookshelf opens Study Magic, a Priest Study Bookshelf opens Priest Studies. Two shelves of the same kind make a study of that kind. Shelves already placed are arcane."
         ]
       }
     ]

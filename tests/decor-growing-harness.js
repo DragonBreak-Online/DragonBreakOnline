@@ -100,7 +100,7 @@ ok((SKILLS.skills.find((k) => k.id === 'harvesting').counts.activatePrefixes || 
 // ---- the study bookshelf ------------------------------------------------------------------------------------------------
 giveItem(OWNER, WOOD, 100); giveItem(OWNER, IRON, 20); giveItem(OWNER, SALT, 20); giveItem(OWNER, STONE, 40);
 cmd(OWNER, 'find study');
-ok(/1\. Study Bookshelf \[study\]/.test(last(OWNER)), '/decor find study lists the shelf', last(OWNER));
+ok(/1\. Arcane Study Bookshelf \[study\]/.test(last(OWNER)) && /2\. Priest Study Bookshelf \[study\]/.test(last(OWNER)), '/decor find study lists the shelf twice, arcane and priest (Nat, 26 Oct)', last(OWNER));
 giveItem(OWNER, NOVEL, 5); giveItem(OWNER, SKILLBOOK, 3); giveItem(OWNER, TOME, 2); giveItem(OWNER, NOTE, 6);
 cmd(OWNER, 'place 1');
 ok(/needs 10 books .* you have 5/.test(last(OWNER)) && !lastEdit(OWNER), 'skill books, tomes and notes do not count: 5 of 10, refused before the preview', last(OWNER));
@@ -111,16 +111,31 @@ ok(items().length === 1 && items()[0].kind === 'study', 'with 12 books: placed, 
 ok(held(OWNER, CHEAP) === 0 && held(OWNER, NOVEL) === 2 && held(OWNER, SKILLBOOK) === 3 && held(OWNER, TOME) === 2 && held(OWNER, NOTE) === 6, 'the 10 cheapest books went (7 at 6 gold, 3 at 25); skill books, tomes and notes stay', { cheap: held(OWNER, CHEAP), novel: held(OWNER, NOVEL) });
 ok(wood0 - held(OWNER, WOOD) === 12 && JSON.stringify(items()[0].books) === JSON.stringify({ [mp.getDescFromId(CHEAP)]: 7, [mp.getDescFromId(NOVEL)]: 3 }), 'paid the shelf\'s 12 firewood, the books recorded on the piece', items()[0].books);
 const shelf1 = items()[0].ref;
-ok(use(shelf1, OWNER) === true && /needs 2 study bookshelves; this home has 1/.test(last(OWNER)), 'one shelf: decor.js takes the use and says a study needs two', last(OWNER));
+ok(items()[0].studyKind === 'arcane', 'the first is placed as an arcane shelf', items()[0].studyKind);
+ok(use(shelf1, OWNER) === true && /arcane study needs 2 arcane study bookshelves; this home has 1/.test(last(OWNER)), 'one shelf: decor.js takes the use and says a study needs two of its kind', last(OWNER));
 giveItem(OWNER, CHEAP, 30);
 placeAt(OWNER, 'study');
 ok(use(shelf1, OWNER) === false, 'two shelves: the use falls through to schools.js (Study Magic / Priest Studies)');
 placeAt(OWNER, 'study');
 cmd(OWNER, 'find study'); cmd(OWNER, 'place 1');
-ok(items().filter((i) => i.kind === 'study').length === 3 && /its 3 study bookshelves already/.test(last(OWNER)), 'maxPerHome 3: the fourth is refused', last(OWNER));
+ok(items().filter((i) => i.kind === 'study').length === 3 && /its 3 arcane study bookshelves already/.test(last(OWNER)), 'maxPerHome 3 of a kind: the fourth arcane is refused', last(OWNER));
 const cheap0 = held(OWNER, CHEAP);
 cmd(OWNER, 'list'); cmd(OWNER, 'remove 3');
 ok(held(OWNER, CHEAP) === cheap0 && items().filter((i) => i.kind === 'study').length === 2, 'booksKept false: deconstructing a shelf gives no books back', held(OWNER, CHEAP) - cheap0);
+
+// ---- the priest shelf: the same base, its own kind and its own count ----
+giveItem(OWNER, CHEAP, 30); giveItem(OWNER, WOOD, 60); giveItem(OWNER, IRON, 10);
+placeAt(OWNER, 'priest');
+const priest1 = items().find((i) => i.studyKind === 'priest');
+ok(priest1 && priest1.base === items()[0].base && priest1.name === 'Priest Study Bookshelf', 'a priest shelf: the same base record, kind priest', priest1);
+ok(use(priest1.ref, OWNER) === true && /priest study needs 2 priest study bookshelves; this home has 1/.test(last(OWNER)), 'two arcane shelves do not make a priest study: counted per kind', last(OWNER));
+ok(use(items().find((i) => i.studyKind === 'arcane').ref, OWNER) === false, 'the two arcane shelves are still an arcane study');
+placeAt(OWNER, 'priest');
+ok(use(priest1.ref, OWNER) === false, 'two priest shelves: a priest study, the use goes to schools.js');
+ok(globalThis.__dboDecorStudyKind(parseInt(priest1.ref, 16)) === 'priest' && globalThis.__dboDecorStudyKind(parseInt(shelf1, 16)) === 'arcane' && globalThis.__dboDecorStudyKind(0x12345) === '',
+  'schools.js is told each shelf\'s kind, and nothing for a ref that is no decor shelf');
+const old = items().find((i) => i.studyKind === 'arcane'); delete old.studyKind;
+ok(globalThis.__dboDecorStudyKind(parseInt(old.ref, 16)) === 'arcane', 'a shelf placed before the kinds is arcane');
 
 // ---- the planter: who, what, planting ------------------------------------------------------------------------------------
 placeAt(OWNER, 'planter');

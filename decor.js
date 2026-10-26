@@ -40,11 +40,13 @@ const DEFAULTS = {
   placeSeconds: 300,                  // an aim not confirmed by then is dropped
   perSecond: 1, perHour: 120,
   ownerScanMinutes: 10, ownerScanPerTick: 5,
-  // The study bookshelf (decor-growing.json; Nat via the Leader, 25 Oct). A home counts as a study from minForStudy shelves,
-  // holds at most maxPerHome; each takes `books` books the character carries (no tomes, skill books or books under
+  // The study bookshelf (decor-growing.json; Nat via the Leader, 25 Oct), offered as one piece per kind (arcane opens Study
+  // Magic, priest Priest Studies; a shelf placed before the kinds is arcane). Per kind, a home counts as a study from
+  // minForStudy shelves and holds at most maxPerHome; each takes `books` books the character carries (no tomes, skill books or books under
   // minBookValue gold, which are notes and letters), consumed unless booksKept, when deconstructing gives them back. The
   // study rate at a home shelf is schools.js's study.homeRate.
-  study: { maxPerHome: 3, minForStudy: 2, books: 10, booksKept: false, minBookValue: 5 },
+  study: { maxPerHome: 3, minForStudy: 2, books: 10, booksKept: false, minBookValue: 5,
+    kinds: [{ id: 'arcane', name: 'Arcane Study Bookshelf' }, { id: 'priest', name: 'Priest Study Bookshelf' }] },
   // Planters: plant one of Hearthfire's crops, it ripens after growHours real hours (rareHours for the rare ones), a pick
   // is one Harvesting roll (skills.json harvesting: chance and multiplier by tier) on baseYield, missYield if it fails;
   // then the planter is empty again. showZ raises the soil and the crop to the planter's bed. tickSeconds: the ripening check.
@@ -92,13 +94,21 @@ module.exports = (api) => {
       for (const p of growing().pieces || []) {
         if (!p.desc) continue;
         const label = p.groupLabel || String(p.group || '').replace(/^./, (ch) => ch.toUpperCase());
-        const row = Object.assign({}, p, { groupLabel: label, hay: `${p.name} ${p.edid} ${p.group}`.toLowerCase() });
-        S.catalog.push(row); S.byDesc.set(String(p.desc).toLowerCase(), row);
+        // one study shelf base, offered once per kind (Nat, 26 Oct: arcane for Study Magic, priest for Priest Studies); the
+        // kind is the piece's key and the placed item's studyKind, so no new record is needed. The bare desc finds the first
+        const kinds = p.kind === 'study' ? studyKinds() : [null];
+        for (const k of kinds) {
+          const name = k ? k.name : p.name, key = k ? `${p.desc}#${k.id}` : p.desc;
+          const row = Object.assign({}, p, { name, key, groupLabel: label, hay: `${name} ${p.edid} ${p.group}`.toLowerCase() }, k ? { studyKind: k.id } : {});
+          S.catalog.push(row); S.byDesc.set(key.toLowerCase(), row);
+          if (!S.byDesc.has(String(p.desc).toLowerCase())) S.byDesc.set(String(p.desc).toLowerCase(), row);
+        }
       }
       log(`decor: catalogue of ${S.catalog.length} pieces`);
     } catch (e) { log('decor: decor-catalog.json unreadable', e.message); S.catalog = []; S.byDesc = new Map(); }
     return S.catalog;
   };
+  const studyKinds = () => (Array.isArray(C.study.kinds) && C.study.kinds.length ? C.study.kinds : DEFAULTS.study.kinds);
   const growing = () => {
     if (S.growing) return S.growing;
     try { S.growing = JSON.parse(fs.readFileSync(path.resolve('decor-growing.json'), 'utf8')); } catch (e) { S.growing = {}; }
@@ -108,6 +118,9 @@ module.exports = (api) => {
   };
   const crops = () => { growing(); return [...S.cropOf.values()]; };
   const pieceOf = (desc) => { catalog(); return S.byDesc.get(String(desc || '').toLowerCase()) || null; };
+  const keyOf = (piece) => piece.key || piece.desc;
+  const kindOf = (it) => (it.kind === 'study' ? it.studyKind || 'arcane' : '');
+  const sameKind = (items, piece) => items.filter((i) => i.kind === piece.kind && (piece.kind !== 'study' || kindOf(i) === (piece.studyKind || 'arcane')));
   // costA names materials by editor id (decor-catalog.json materials: edid -> desc); costB by desc
   const matDesc = () => {
     if (S.matDesc) return S.matDesc;
@@ -375,7 +388,7 @@ module.exports = (api) => {
     const yaw = (Number(ang[2]) || 0) * Math.PI / 180;
     const pos = [me[0] + Math.sin(yaw) * 150, me[1] + Math.cos(yaw) * 150, me[2]];
     const nonce = require('crypto').randomBytes(8).toString('hex');
-    S.pending.set(a >>> 0, { nonce, op: 'new', root: pl.root, desc: piece.desc, until: Date.now() + C.placeSeconds * 1000 });
+    S.pending.set(a >>> 0, { nonce, op: 'new', root: pl.root, desc: keyOf(piece), until: Date.now() + C.placeSeconds * 1000 });
     sendPacket(a, { customPacketType: 'placeEdit', id: ID_PREFIX + nonce, base: piece.desc, name: piece.name, kind: 'object', hostile: false, pos, rot: [0, 0, norm(Number(ang[2]) || 0)] });
     personal(a, `${piece.name} follows your aim (${costText(costOf(piece))}). Arrows turn it and set how far, PgUp/PgDn raise it, Enter sets it down, Backspace stops.`);
   };
@@ -386,7 +399,7 @@ module.exports = (api) => {
     if (piece.container && u.containers >= b.containers) return `This home has its ${b.containers} placed containers already.`;
     if (piece.kind === 'study' || piece.kind === 'planter') {
       const cap = Math.max(0, Number((piece.kind === 'study' ? C.study : C.planter).maxPerHome) || 0);
-      if (p.items.filter((i) => i.kind === piece.kind).length >= cap) return `This home has its ${cap} ${piece.kind === 'study' ? 'study bookshelves' : 'planters'} already.`;
+      if (sameKind(p.items, piece).length >= cap) return `This home has its ${cap} ${piece.kind === 'study' ? `${(piece.studyKind || 'arcane')} study bookshelves` : 'planters'} already.`;
     }
     if (piece.station) {
       const st = piece.station;
@@ -452,6 +465,7 @@ module.exports = (api) => {
     catch (e) { log('decor: create failed', e.stack || e.message); }
     if (!id) { giveAll(a, paid, 1); if (books) giveAll(a, books, 1); return refuse('It could not be placed; your materials are back.', 'create failed'); }
     const it = { ref: hex(id), base: piece.desc, name: piece.name, group: piece.group, cell, pos, rot, by: profile(a), char: a >>> 0, at: new Date().toISOString(), paid };
+    if (piece.studyKind) it.studyKind = piece.studyKind;
     if (piece.kind) it.kind = piece.kind;
     if (books) it.books = books;
     if (light) it.light = hex(light);
@@ -622,15 +636,17 @@ module.exports = (api) => {
     if (changed) save();
   };
   if (typeof api.every === 'function') api.every('decor-grow', Math.max(10, Number(C.planter.tickSeconds) || 60) * 1000, () => { try { if (C.enabled) ripen(); } catch (e) { log('decor: ripening failed', e.stack || e.message); } });
+  // schools.js asks which study a decor shelf opens: 'arcane', 'priest', or '' when the ref is no decor study shelf
+  globalThis.__dboDecorStudyKind = (target) => { try { const f = itemByRef(hex(target)); return f ? kindOf(f.item) : ''; } catch (e) { return ''; } };
   globalThis.__dboDecorActivate = (target, caster) => {
     if (!C.enabled) return false;
     const found = itemByRef(hex(target));
     if (!found) return false;
     const it = found.item;
     if (it.kind === 'study') {
-      // a home is a study from minForStudy shelves; then schools.js opens Study Magic or Priest Studies as at a library
-      const n = found.place.items.filter((i) => i.kind === 'study').length, need = Math.max(1, Number(C.study.minForStudy) || 1);
-      if (n < need) { personal(caster, `A home study needs ${need} study bookshelves; this home has ${n}.`); return true; }
+      // a home is a study of a kind from minForStudy shelves of that kind; then schools.js opens that kind's study
+      const kind = kindOf(it), n = found.place.items.filter((i) => kindOf(i) === kind).length, need = Math.max(1, Number(C.study.minForStudy) || 1);
+      if (n < need) { personal(caster, `A home ${kind} study needs ${need} ${kind} study bookshelves; this home has ${n}.`); return true; }
       return false;
     }
     if (it.kind !== 'planter') return false;
@@ -730,7 +746,7 @@ module.exports = (api) => {
       const pg = pageOf(list, st.page, st.rows || 8);
       Object.assign(out, { page: pg.at, pages: pg.pages, rows: pg.rows.map((x) => {
         const why = budgetProblem(pl, x, a) || (x.kind === 'study' && booksHeld(a) < C.study.books ? `Needs ${C.study.books} books; you carry ${booksHeld(a)}.` : '');
-        return { key: x.desc, name: x.name, cost: costRows(a, costOf(x)), why: why || '' };
+        return { key: keyOf(x), name: x.name, cost: costRows(a, costOf(x)), why: why || '' };
       }) });
     }
     st.page = out.page;
