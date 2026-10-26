@@ -9,6 +9,7 @@ var PANEL_W = 1180;
 var PANEL_H = 664;
 var PAD = 28;
 var BODY_TOP = 152;
+var bodyTop = BODY_TOP;
 var NO_DATA_CLOSE_MS = 8000;
 var BUSY_MS = 8000;
 var C_RED = 0xB23A3A;
@@ -149,6 +150,8 @@ function drawTabs()
       b.tabId = String(t.id);
    }
    dboRule(s, PAD, y + 34, PANEL_W - PAD * 2);
+   // a second row of tabs moves the page down under it
+   bodyTop = Math.max(BODY_TOP, y + 48);
 }
 
 function sectionOf(id)
@@ -159,7 +162,7 @@ function sectionOf(id)
 function drawBody()
 {
    var b = clear("body", 40);
-   flowStart(b, 1, PAD, BODY_TOP);
+   flowStart(b, 1, PAD, bodyTop);
    if (asking != null)
    {
       flowGap(60);
@@ -288,8 +291,7 @@ function tabStep(d)
 function build()
 {
    panel = _root.createEmptyMovieClip("dboPanel", 10);
-   panel._x = (STAGE_W - PANEL_W) / 2;
-   panel._y = 28;
+   dboFit(panel, PANEL_W, PANEL_H);
    var bg = panel.createEmptyMovieClip("bg", 1);
    dboBox(bg, 0, 0, PANEL_W, PANEL_H, 0x000000, 80);
    dboFadeIn(panel);

@@ -1,8 +1,9 @@
 // The property menu as a native panel (client housingService's widget, the same object the browser menu gets).
-// Events go out as the widget's own keys (events.*), which the client router replays as the browser would. The name box is
-// typed input, so "Rename..." hands off to the browser (native:handoff [housing, rename]).
+// Events go out as the widget's own keys (events.*), which the client router replays as the browser would. "Rename..." types
+// the name in the panel (dboInput); "Type in the browser instead" hands the name box to the browser (native:handoff), and is
+// all there is on a game that cannot take typed input.
 
-var DBO_SWF_VERSION = "housing-1";
+var DBO_SWF_VERSION = "housing-2";
 var STAGE_W = 1280;
 var PANEL_W = 920;
 var PANEL_H = 600;
@@ -17,10 +18,15 @@ var MAX_ROOMS = 6;
 var NO_DATA_CLOSE_MS = 8000;
 var C_RED = 0xB23A3A;
 var NAME_HINT = "Letters, numbers, spaces, apostrophes and dashes only.";
+// housingSystem.ts cleanName and the browser menu's NAME_CHARS
+var NAME_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 '_-";
+var NAME_MAX = 32;
 
 var panel;
 var data = null;
 var page = 0;
+// renaming: the name box is open in place of the right column
+var renaming = false;
 var builtAt = getTimer();
 
 function ev(k)
@@ -30,6 +36,7 @@ function ev(k)
 
 function closeMenu()
 {
+   endRename();
    dboSound("UIMenuCancel");
    dboSend(ev("cancel"), []);
    dboClose();
@@ -38,6 +45,7 @@ function closeMenu()
 // The service closes its menu behind these (a player to aim at next, or another panel); the native one goes with it
 function sendAndClose(key, args)
 {
+   endRename();
    dboSound("UIMenuOK");
    dboSend(key, args);
    dboClose();
@@ -105,7 +113,13 @@ function actionList(r)
       out.push(["Rename...", function()
       {
          dboSound("UIMenuOK");
-         dboSend("native:handoff", ["housing", "rename"]);
+         if (!dboCanType())
+         {
+            dboSend("native:handoff", ["housing", "rename"]);
+            return;
+         }
+         renaming = true;
+         draw();
       }]);
    }
    if (r.owner)
@@ -204,8 +218,95 @@ function roomButton(c, name, x, label, key, ref)
    b.ref = ref;
 }
 
+function nameOk(name)
+{
+   if (name == "")
+   {
+      return false;
+   }
+   for (var i = 0; i < name.length; i++)
+   {
+      if (NAME_CHARS.indexOf(name.charAt(i)) < 0)
+      {
+         return false;
+      }
+   }
+   return true;
+}
+
+function trimName(s)
+{
+   var t = String(s);
+   while (t.length && t.charAt(0) == " ")
+   {
+      t = t.substr(1);
+   }
+   while (t.length && t.charAt(t.length - 1) == " ")
+   {
+      t = t.substr(0, t.length - 1);
+   }
+   return t;
+}
+
+// The name box in place of the right column: Save sends the rename and the menu's answer redraws it with the new name
+function drawRename()
+{
+   var l = clear("right", 50);
+   var w = PANEL_W - RIGHT_X - PAD;
+   var head = dboText(l, "head", 1, RIGHT_X, ACT_TOP - 4, w, 30, dboFmt(F_BOLD, 22, C_TEXT, 0.8), false);
+   head.text = "Name this property";
+   var box = dboInput(l, "box", 2, RIGHT_X, ACT_TOP + 34, w, 34, dboFmt(F_PLAIN, 22, C_TEXT, 0.5), NAME_MAX, false);
+   box.text = data.name != null && data.name != undefined ? String(data.name) : "";
+   var hint = dboText(l, "hint", 3, RIGHT_X, ACT_TOP + 76, w, 24, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8), false);
+   hint.text = NAME_HINT;
+   box.onChanged = function()
+   {
+      var bad = trimName(box.text) != "" && !nameOk(trimName(box.text));
+      hint.textColor = bad ? C_RED : C_SECOND;
+   };
+   button(l, "save", 10, RIGHT_X, ACT_TOP + 112, 120, "Save", F_MEDIUM, 20, A_BUTTON_REST, function()
+   {
+      var name = trimName(box.text);
+      if (!nameOk(name))
+      {
+         dboSound("UIMenuCancel");
+         hint.textColor = C_RED;
+         return;
+      }
+      act(ev("rename"), [name]);
+      endRename();
+      draw();
+   });
+   button(l, "cancel", 11, RIGHT_X + 130, ACT_TOP + 112, 120, "Cancel", F_MEDIUM, 20, A_BUTTON_REST, function()
+   {
+      dboSound("UIMenuCancel");
+      endRename();
+      draw();
+   });
+   button(l, "browser", 12, RIGHT_X, ACT_TOP + 156, 290, "Type in the browser instead", F_MEDIUM, 18, A_ROW_REST, function()
+   {
+      endRename();
+      dboSound("UIMenuOK");
+      dboSend("native:handoff", ["housing", "rename"]);
+   });
+   return 1;
+}
+
+function endRename()
+{
+   if (renaming)
+   {
+      dboInputEnd();
+   }
+   renaming = false;
+}
+
 function drawRight(r)
 {
+   if (renaming && r.manages)
+   {
+      return drawRename();
+   }
    var l = clear("right", 50);
    var w = PANEL_W - RIGHT_X - PAD;
    var p = data.place;
@@ -289,8 +390,7 @@ function draw()
 function build()
 {
    panel = _root.createEmptyMovieClip("dboPanel", 10);
-   panel._x = (STAGE_W - PANEL_W) / 2;
-   panel._y = 60;
+   dboFit(panel, PANEL_W, PANEL_H);
    var bg = panel.createEmptyMovieClip("bg", 1);
    dboBox(bg, 0, 0, PANEL_W, PANEL_H, 0x000000, 80);
    dboFadeIn(panel);
@@ -313,6 +413,18 @@ keys.onKeyDown = function()
 {
    var code = dboKey();
    dboLog("housing key " + code);
+   if (code == 27 && renaming)
+   {
+      dboSound("UIMenuCancel");
+      endRename();
+      draw();
+      return;
+   }
+   // every other key is typing while the name box is open
+   if (renaming)
+   {
+      return;
+   }
    if (code == 27)
    {
       closeMenu();

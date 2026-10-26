@@ -16,7 +16,13 @@ const clip = (name) => {
   c.createEmptyMovieClip = (n) => { if (c.kids[n]) delete c.kids[n]; const k = clip(n); k._parent = c; c[n] = k; c.kids[n] = k; return k; };
   c.createTextField = (n, d, x, y, w, h) => { const t = { text: '', textColor: 0, _alpha: 100, _x: x || 0, _y: y || 0, _width: w || 0, _height: h || 0, setNewTextFormat(f) { this.fmt = f; this.textColor = f.color; } }; c[n] = t; c.kids[n] = t; };
   c.removeMovieClip = () => { if (c._parent) { delete c._parent[c._name]; delete c._parent.kids[c._name]; } };
-  for (const f of ['beginFill', 'moveTo', 'lineTo', 'endFill', 'clear']) c[f] = () => {};
+  // fills are recorded so tests/native-render.js can draw the panel
+  c.fills = [];
+  c.beginFill = (color, alpha) => { c._fill = { color, alpha: alpha === undefined ? 100 : alpha, pts: [] }; };
+  c.moveTo = (x, y) => { if (c._fill) c._fill.pts.push([x, y]); };
+  c.lineTo = (x, y) => { if (c._fill) c._fill.pts.push([x, y]); };
+  c.endFill = () => { if (c._fill) c.fills.push(c._fill); c._fill = null; };
+  c.clear = () => { c.fills = []; };
   return c;
 };
 
@@ -25,7 +31,8 @@ const boot = (menu, late, extra) => {
   const sent = [], sounds = [], logs = [];
   const st = { time: 1000, code: 0 };
   const root = clip('_root');
-  const skse = { SendModEvent: (e, s, n) => sent.push({ e, s, n }), Log: (m) => logs.push(m), CloseMenu: () => sent.push({ e: 'closeMenu' }) };
+  const skse = { SendModEvent: (e, s, n) => sent.push({ e, s, n }), Log: (m) => logs.push(m), CloseMenu: () => sent.push({ e: 'closeMenu' }), AllowTextInput: (on) => sent.push({ e: 'allowTextInput', on }) };
+  if (extra && extra.noTyping) delete skse.AllowTextInput;
   const ctx = {
     _root: root,
     _global: { skse: late ? undefined : skse },
@@ -33,6 +40,9 @@ const boot = (menu, late, extra) => {
     TextFormat: function TextFormat() {},
     Key: { listeners: [], addListener(l) { this.listeners.push(l); }, getCode: () => st.code },
     Mouse: { listeners: [], addListener(l) { this.listeners.push(l); } },
+    Selection: { focused: null, setFocus(t) { this.focused = t; } },
+    // the visible stage area; extra.visible simulates a screen that crops it (21:9, 16:10)
+    Stage: { visibleRect: (extra && extra.visible) || { left: 0, top: 0, right: 1280, bottom: 720 }, listeners: [], addListener(l) { this.listeners.push(l); } },
     Date,
     getTimer: () => st.time,
     Math, String, Number, isNaN, isFinite, parseInt,

@@ -489,4 +489,17 @@ const firstPage = (t) => { for (let i = 0; i < 6; i++) t.press(33); };
   check('staff get the staff view in the browser', btn(st, 'Staff view...') && !btn(st, 'Join'));
 }
 
+
+// ---- fifteen tabs wrap to a second row, and the page starts under it (Nat's board showed a row running off the panel) ----
+{
+  const many = ['profile','faction','court','stats','skills','magic','deity','supernatural','world','keys','citizen','referrals','wanted','notes','thalmor'].map((id) => ({ id, label: id.charAt(0).toUpperCase() + id.slice(1) })).concat([{ id: 'settings', label: 'Settings', pinned: true }]);
+  const t = S.boot('dbo_journal');
+  t.push(hub('stats', { tabs: many, stats }));
+  const tb = Object.keys(P(t).tabs.kids).filter((k) => /^t\d+$/.test(k)).map((k) => P(t).tabs[k]);
+  check('every tab ends inside the panel', tb.length === 16 && tb.every((b) => b._x + b.label._width <= 1180 - 28 + 1), tb.map((b) => [b.label.text, b._x + b.label._width]));
+  const rows = [...new Set(tb.map((b) => b._y))];
+  check('they wrap to a second row', rows.length === 2, rows);
+  check('and the page starts below it', P(t).body.flowClip._y >= Math.max(...rows) + 40, [P(t).body.flowClip._y, rows]);
+}
+
 T.done();

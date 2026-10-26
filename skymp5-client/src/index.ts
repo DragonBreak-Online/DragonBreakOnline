@@ -130,6 +130,8 @@ import { CreatureCameraService } from "./services/services/creatureCameraService
 import { CreatureAnimProbeService } from "./services/services/creatureAnimProbeService";
 import { CreatureInputGuardService } from "./services/services/creatureInputGuardService";
 import { ScaleformMenuService } from "./services/services/scaleformMenuService";
+import { MapRealmService } from "./services/services/mapRealmService";
+import { NativeBackdropService } from "./services/services/nativeBackdropService";
 import { LearnedEnchantmentsService } from "./services/services/learnedEnchantmentsService";
 import { CameraShakeService } from "./services/services/cameraShakeService";
 import { FrenzyService } from "./services/services/frenzyService";
@@ -285,6 +287,8 @@ const main = () => {
       new CreatureAnimProbeService(sp, controller),
       new CreatureInputGuardService(sp, controller),
       new ScaleformMenuService(sp, controller),
+      new MapRealmService(sp, controller),
+      new NativeBackdropService(sp, controller),
       new LearnedEnchantmentsService(sp, controller),
       new CameraShakeService(sp, controller),
       new FrenzyService(sp, controller)

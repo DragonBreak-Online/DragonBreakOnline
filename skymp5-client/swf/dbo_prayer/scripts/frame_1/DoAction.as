@@ -310,8 +310,8 @@ function reset(p)
 function build()
 {
    panel = _root.createEmptyMovieClip("dboPanel", 10);
-   panel._x = (STAGE_W - PANEL_W) / 2;
-   panel._y = 110;
+   // as tall as its verses at most; centred at the size of the tallest
+   dboFit(panel, PANEL_W, 500);
    panel.createEmptyMovieClip("bg", 1);
    titleTf = dboText(panel, "titleTf", 2, PAD, 22, PANEL_W - PAD * 2, 40, dboFmt(F_PLAIN, 30, C_TEXT, 1.0), false);
    sphereTf = dboText(panel, "sphereTf", 3, PAD, 64, PANEL_W - PAD * 2, 26, dboFmt(F_MEDIUM, 18, C_SECOND, 0.8), false);

@@ -389,6 +389,73 @@ function dboText(parent, name, depth, x, y, w, h, format, multi)
    return tf;
 }
 
+// The stage area the player actually sees (Scaleform's Stage.visibleRect, as SkyUI's map lays out by): at 21:9 or 16:10 a
+// 1280 x 720 stage is cropped top and bottom or left and right, so a panel is scaled into this and centred in it
+function dboVisible()
+{
+   var r = Stage.visibleRect;
+   if (r != undefined && r.right > r.left && r.bottom > r.top)
+   {
+      return {left: r.left, top: r.top, width: r.right - r.left, height: r.bottom - r.top};
+   }
+   return {left: 0, top: 0, width: 1280, height: 720};
+}
+
+// Fits a panel w x h into the visible area with a margin: never larger than designed, smaller where the screen crops it.
+// Done again whenever the stage changes size
+function dboFit(clip, w, h)
+{
+   var place = function()
+   {
+      var v = dboVisible();
+      var m = 16;
+      var s = Math.min(1, Math.min((v.width - m * 2) / w, (v.height - m * 2) / h));
+      clip._xscale = s * 100;
+      clip._yscale = s * 100;
+      clip._x = v.left + (v.width - w * s) / 2;
+      clip._y = v.top + (v.height - h * s) / 2;
+   };
+   place();
+   var l = {};
+   l.onResize = place;
+   Stage.addListener(l);
+}
+
+// Typed input in a native panel, as SkyUI's own search box takes it (skyui SearchWidget): an input field, the focus, and
+// skse.AllowTextInput(true) so the game stops reading the keys. dboInputEnd gives the keys back; call it before leaving.
+// Unproven in a CustomMenu until Nat types in one, so every panel that uses it keeps its browser hand-off as a fallback.
+function dboInput(parent, name, depth, x, y, w, h, format, maxChars, multi)
+{
+   var tf = dboText(parent, name, depth, x, y, w, h, format, multi);
+   tf.type = "input";
+   tf.selectable = true;
+   tf.maxChars = maxChars;
+   tf.background = true;
+   tf.backgroundColor = 0x101010;
+   tf.border = true;
+   tf.borderColor = 0x5A5A5A;
+   Selection.setFocus(tf);
+   if (_global.skse != undefined && _global.skse.AllowTextInput != undefined)
+   {
+      _global.skse.AllowTextInput(true);
+   }
+   return tf;
+}
+
+function dboInputEnd()
+{
+   if (_global.skse != undefined && _global.skse.AllowTextInput != undefined)
+   {
+      _global.skse.AllowTextInput(false);
+   }
+}
+
+// Whether this game can take typed input in a panel at all (SKSE's scaleform AllowTextInput)
+function dboCanType()
+{
+   return _global.skse != undefined && _global.skse.AllowTextInput != undefined;
+}
+
 function dboBox(clip, x, y, w, h, color, alpha)
 {
    clip.beginFill(color, alpha);

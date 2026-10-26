@@ -91,6 +91,11 @@ const world = (nativeOn) => {
   ok(w.S.native.length === 1 && w.S.browser.pop().args.handoff === 'compose:shop', "someone else's post meanwhile redraws the composer, it does not end it");
   w.browser('bountyBoard:post', 'shop', 'Mead for sale');
   ok(w.S.packets.pop().text === 'Mead for sale', 'the composer posts');
+  w.packet({ customPacketType: 'bountyBoardNotice', text: 'The pin is still warm; give it a moment.' });
+  w.packet(menu('refresh'));
+  ok(w.S.native.length === 1 && w.S.browser.pop().args.handoff === 'compose:shop', 'a refused post keeps the composer: a foreign refresh after it does not end it (Worker 6)');
+  w.browser('bountyBoard:post', 'shop', 'Mead for sale');
+  w.packet({ customPacketType: 'bountyBoardNotice', text: 'Your notice is pinned to the board.' });
   w.packet(menu('refresh'));
   ok(w.S.browser.some((x) => x.close === 26) && w.S.native.length === 2 && w.S.native[1].open === 'bountyBoard', 'the refresh after our post closes the composer and brings the native board back');
   w.key('bountyBoard:close', []);
@@ -111,6 +116,12 @@ const world = (nativeOn) => {
   new BountyBoardService({}, w.controller);
   w.packet(menu('open'));
   ok(w.S.browser.length === 1 && w.S.browser[0].args.handoff === '' && !w.S.native.length, 'without the native panel the browser board opens, unchanged');
+
+  // the client keys on the server's own words: the pinned notice must still be what bountyBoardSystem sends (Worker 6)
+  const sys = fs.readFileSync(path.join(HERE, '../skymp5-server/ts/systems/bountyBoardSystem.ts'), 'utf8');
+  const svc = fs.readFileSync(path.join(HERE, 'src/services/services/bountyBoardService.ts'), 'utf8');
+  const pinned = (svc.match(/const PINNED = \/\^([^/]+)\//) || [])[1];
+  ok(pinned && sys.includes('this.notice(ctx, userId, "' + pinned), 'bountyBoardSystem still sends the notice the client waits for', pinned);
 
   // ---- the property menu ----
   const prop = (extra) => Object.assign({ customPacketType: 'propertyMenu', target: 0x5000, view: 'owner', owned: true, name: 'Rose Hall', locked: false, hasKeys: true, canGrantContainers: false, ownerName: 'Olaf', keyRing: true }, extra || {});
