@@ -329,8 +329,8 @@ Date.now = realNow; Math.random = realRandom;
   glows.length = 0;
   tick([LB]);
   const p1 = labelsTo(P1), far = labelsTo(FAR);
-  ok(p1.length === 1 && p1[0].length === 1 && p1[0][0].id === LB && p1[0][0].text === 'The Centurion Master' && Array.isArray(p1[0][0].color),
-    'a player beside the risen boss is sent its name to draw over its head (dboActorLabels)', p1);
+  ok(p1.length === 1 && p1[0].length === 1 && p1[0][0].id === LB && p1[0][0].text === 'Kagrenzel Sentinel' && p1[0][0].sub === 'The Centurion Master' && Array.isArray(p1[0][0].color),
+    'a player beside the risen boss is sent its plate name and its title line to draw over its head (dboActorLabels, Nat 26 Oct)', p1);
   ok(far.length === 0, 'a player outside its radius is sent nothing', far);
   tick([LB]);
   ok(labelsTo(P1).length === 1, 'the same list is not sent again on the next tick');

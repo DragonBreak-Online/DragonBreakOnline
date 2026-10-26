@@ -174,12 +174,13 @@ module.exports = (api) => {
         const f = G.fights.get(b.id);
         if (!f) continue;
         const r = Number(b.radius) || 5000;
-        if (f.boss && get(f.boss, 'isDead') !== true && within(a, f.boss, r)) list.push({ id: f.boss >>> 0, text: titled(b.name), color: LABEL_COLOR.boss });
+        // A boss with a plateName shows it big and its title (its name) under it (Nat 26 Oct: "better name tags")
+        if (f.boss && get(f.boss, 'isDead') !== true && within(a, f.boss, r)) list.push({ id: f.boss >>> 0, text: b.plateName ? b.plateName : titled(b.name), sub: b.plateName ? titled(b.name) : '', color: LABEL_COLOR.boss });
         if (f.guardian && b.guardian && get(f.guardian, 'isDead') !== true && within(a, f.guardian, r)) {
-          list.push({ id: f.guardian >>> 0, text: titled(b.guardian.name || 'the guardian'), color: LABEL_COLOR.guardian });
+          list.push({ id: f.guardian >>> 0, text: titled(b.guardian.name || 'the guardian'), sub: b.plateName ? `guards ${b.plateName}` : '', color: LABEL_COLOR.guardian });
         }
       }
-      const sig = JSON.stringify(list.map((x) => [x.id, x.text]));
+      const sig = JSON.stringify(list.map((x) => [x.id, x.text, x.sub]));
       if (sig === (G.labelSig.get(a) || '[]')) continue;
       G.labelSig.set(a, sig);
       try { sendPacket(a, { customPacketType: 'dboActorLabels', list }); } catch (e) { /* gone */ }

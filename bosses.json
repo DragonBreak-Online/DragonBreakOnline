@@ -4,6 +4,7 @@
   {
    "id": "icecap",
    "name": "the Wraith of the Ice Cap",
+   "plateName": "Hrimkald",
    "enabled": true,
    "hold": "winterhold",
    "world": "3c:Skyrim.esm",
@@ -134,6 +135,7 @@
   {
    "id": "briarheartking",
    "name": "the Briarheart King",
+   "plateName": "Vorgun Briarheart",
    "enabled": true,
    "hold": "markarth",
    "world": "3c:Skyrim.esm",
@@ -718,6 +720,7 @@
   {
    "id": "centurion",
    "name": "the Centurion Master",
+   "plateName": "Kagrenzel Sentinel",
    "enabled": true,
    "hold": "",
    "world": "1ee62:Skyrim.esm",
@@ -859,6 +862,7 @@
   {
    "id": "palewarlord",
    "name": "the Warlord of the Pale Pass",
+   "plateName": "Kaszar the Pale",
    "enabled": true,
    "hold": "bruma",
    "world": "a764b:BSHeartland.esm",
@@ -1892,6 +1896,7 @@
   {
    "id": "falmerwarmonger",
    "name": "the Falmer Warmonger",
+   "plateName": "Grakhul Eyeless",
    "enabled": true,
    "hold": "",
    "world": "1ee62:Skyrim.esm",
@@ -2138,6 +2143,7 @@
   {
    "id": "movarth",
    "name": "the Master of Movarth's Lair",
+   "plateName": "Movarth Piquine",
    "enabled": true,
    "hold": "morthal",
    "world": "3c:Skyrim.esm",
@@ -2719,6 +2725,7 @@
   {
    "id": "duskthorn",
    "name": "the Warchief of Dusk Thorn",
+   "plateName": "Gnashrot",
    "enabled": true,
    "hold": "bruma",
    "world": "a764b:BSHeartland.esm",
@@ -2927,6 +2934,7 @@
   {
    "id": "valkynaz",
    "name": "the Valkynaz of the Great Gate",
+   "plateName": "Valkynaz Morvox",
    "enabled": true,
    "hold": "",
    "world": "3c:Skyrim.esm",
@@ -3091,6 +3099,7 @@
   {
    "id": "karstaag",
    "name": "Karstaag",
+   "plateName": "Karstaag",
    "enabled": false,
    "waitingOn": "Solstheim, closed by the region lock (playtest.closedPlugins, Nate 14-15 Oct): turn it on when Solstheim opens (bosses.karstaag.enabled true)",
    "hold": "",
@@ -3220,6 +3229,7 @@
   {
    "id": "risenlegate",
    "name": "the Risen Legate of Sancre Tor",
+   "plateName": "Legate Varus Sancretus",
    "enabled": true,
    "hold": "bruma",
    "world": "a764b:BSHeartland.esm",
@@ -3384,6 +3394,7 @@
   {
    "id": "minotaurlord",
    "name": "the Minotaur Lord of Minotaur's Rest",
+   "plateName": "Asterion",
    "enabled": true,
    "traceEquipment": false,
    "hold": "bruma",
@@ -3524,6 +3535,7 @@
   {
    "id": "werewolfbehemoth",
    "name": "the Behemoth of Hircine's Hunt",
+   "plateName": "Gorefang",
    "enabled": true,
    "hold": "falkreath",
    "world": "3c:Skyrim.esm",
@@ -3709,6 +3721,7 @@
   {
    "id": "giantchieftain",
    "name": "the Chieftain of Blizzard Rest",
+   "plateName": "Gromm Stonefist",
    "enabled": true,
    "hold": "dawnstar",
    "world": "3c:Skyrim.esm",
