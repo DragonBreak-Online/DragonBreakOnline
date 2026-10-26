@@ -1070,9 +1070,11 @@ const STAFF_HELP = [
     ['property', 'at a door, as an official: sell <price> | list <deposit> <weekly> | unlist | offer <name> | remind | grace | evict'],
     'grantproperty', 'leadership'] },
   { key: 'elections', title: 'Hold elections', items: ['electionreview', 'strikevote', 'unstrikevote'] },
-  { key: 'beasts', title: 'Beasts and the supernatural', items: ['beastform', 'frenzy', 'polymorph', 'curse', 'makesuper', 'vlremote', 'wwremote', 'feedpair', 'raid', 'warband', 'vampeyes'] },
+  { key: 'beasts', title: 'Beasts and the supernatural', items: ['beastform', 'frenzy', 'polymorph', 'curse',
+    ['hunt setrank', '<name> <rank name|number> <reason>: put an online werewolf at a Great Hunt rank (Fledgling 0 .. Elder 4); lead staff, audited'],
+    ['hunt reset', '<name> <reason>: back to Fledgling, no renown; lead staff, audited'], 'makesuper', 'vlremote', 'wwremote', 'feedpair', 'raid', 'warband', 'vampeyes'] },
   { key: 'magic', title: 'Magic and crafts', items: ['schools', 'shoutclean', 'classteacher', 'preacher', 'manual', 'smithing', 'tailoring', 'enchant'] },
-  { key: 'law', title: 'Law', items: ['jail', ['concordat', '[races]: Concordat arrests standing, or the Thalmor outside the race rule'],
+  { key: 'law', title: 'Law', items: ['jail', ['jaildoors', 'a menu: assign the next door you use as a jail door of this hold, or unassign one (GM+, and the hold\'s ruler, Steward, Commander or Captain of the Guard)'], ['concordat', '[races]: Concordat arrests standing, or the Thalmor outside the race rule'],
     ['dossier', 'list | read <name|#TAG> | reports | add <name|#TAG> <text> | strike <name|#TAG> <n>: the Thalmor dossiers and informant reports (add and strike: Lead GM)']] },
   { key: 'world', title: 'World', items: ['settime', 'setweather', 'timescale', 'region', ['dungeon end', '<dungeon id|name>: end a dungeon claim now'],
     'placed', 'placeundo', 'placeexport', 'worldedits', 'worldhide', 'worldshow', 'masktest', 'couriers', 'traps', 'leverpuzzle',
@@ -1766,12 +1768,12 @@ const GATE_CREATION_TELL_MS = 10000;
 // /unstuck refuses an unfinished character with the same line (review GC-2: it sent Stranger #MSFB from the Realm to Bruma)
 const GATE_CREATION_LINE = 'Your character is not finished yet, so the gates cannot take you. If the race menu already closed and you are still here, your game did not send your new look: quit Skyrim completely, start it again and log in, and the race menu opens again.';
 const gateCreationToldAt = globalThis.__dboGateCreationToldAt instanceof Map ? globalThis.__dboGateCreationToldAt : (globalThis.__dboGateCreationToldAt = new Map());
-const gateCreationTold = (a) => {
+const gateCreationTold = (a, line) => {
   const id = a >>> 0, now = Date.now();
   if (now - (gateCreationToldAt.get(id) || 0) < GATE_CREATION_TELL_MS) return;
   gateCreationToldAt.set(id, now);
   if (gateCreationToldAt.size > 500) for (const [k, t] of gateCreationToldAt) if (now - t > GATE_CREATION_TELL_MS) gateCreationToldAt.delete(k);
-  personal(id, GATE_CREATION_LINE);
+  personal(id, line || GATE_CREATION_LINE);
 };
 // One spot picker per gate; holds live on globalThis so a reload keeps the promises already made
 const gateSpotHolds = globalThis.__dboGateSpotHolds instanceof Map ? globalThis.__dboGateSpotHolds : (globalThis.__dboGateSpotHolds = new Map());
@@ -2038,6 +2040,9 @@ mp.onActivate = (targetId, casterId) => {
   // Burglary by an approved thief faction (thievery.js): a break-in, a theft or the Fence Chest; nothing opens, and anyone
   // it does not handle falls through to the housing locks
   if (globalThis.__dboBurglaryActivate) { try { if (globalThis.__dboBurglaryActivate(target, caster)) return false; } catch (e) { log('burglary activate failed', e.message); } }
+  // A home's planter, and a study bookshelf in a home with too few of them (decor.js); a home study with enough shelves
+  // falls through to schools.js
+  if (globalThis.__dboDecorActivate) { try { if (globalThis.__dboDecorActivate(target, caster)) return false; } catch (e) { log('decor activate failed', e.message); } }
   // Study Magic and the Class Lectern (schools.js): their own panels, before a book on the shelf can start a reading
   if (globalThis.__dboSchoolsActivate && globalThis.__dboSchoolsActivate(target, caster)) return false;
   // A guild's own workshop (spells.js): the Synod Conclave's enchanting table, for Synod and College members
@@ -2102,6 +2107,8 @@ mp.onActivate = (targetId, casterId) => {
   // A character still being made goes nowhere (the race menu and the god come first; never a move with RaceMenu open),
   // and is told why
   if (g && creationPending(casterId >>> 0)) { gateCreationTold(casterId >>> 0); return false; }
+  // ...nor without a birthsign (birthsigns.js), which comes before the god
+  if (g && birthsignHeld(casterId >>> 0)) { gateCreationTold(casterId >>> 0, globalThis.__dboBirthsignGateLine); return false; }
   if (g && globalThis.__dboPlaytestGate && globalThis.__dboPlaytestGate(casterId >>> 0)) return false;
   if (g) {
     try {
@@ -2348,22 +2355,30 @@ every('activatePrune', 60000, () => { const now = Date.now(); for (const [k, b] 
 // Every zone with a "treasury" in zones.json starts with 10,000 gold, seeded once; board fees are paid into it.
 const GOLD_BASE = 0x0000000f;
 const TREASURY_SEED_GOLD = Number((cfg.banks || {}).seedGold) || 10000;
+// Resolving a treasury chest and reading its flag is about half a second of native time per zone, and this
+// timer runs on every gamemode load, so a warm reload spent 4.6 s on nine zones that were already funded
+// (CAPACITY_PLAN, 24 Oct). The banks confirmed funded are remembered across reloads; one added later is
+// still seeded, because only the banks in the set are skipped.
+const seededBanks = globalThis.__dboTreasuriesSeeded instanceof Set
+  ? globalThis.__dboTreasuriesSeeded
+  : (globalThis.__dboTreasuriesSeeded = new Set());
 const seedTreasuries = () => {
-  let seeded = 0, kept = 0;
+  let seeded = 0, kept = 0, known = 0;
   for (const [bank, desc] of zoneList().filter((z) => z.treasury).map((z) => [z.id, z.treasury])) {
+    if (seededBanks.has(bank)) { known++; continue; }
     try {
       const id = mp.getIdFromDesc(desc); if (!id) { log(`treasury ${bank}: ${desc} not found`); continue; }
-      if (mp.get(id, 'private.treasurySeeded') === true) { kept++; continue; }
+      if (mp.get(id, 'private.treasurySeeded') === true) { kept++; seededBanks.add(bank); continue; }
       const inv = mp.get(id, 'inventory') || { entries: [] };
       const entries = Array.isArray(inv.entries) ? inv.entries.filter(e => e && e.baseId !== GOLD_BASE) : [];
       const gold = (Array.isArray(inv.entries) ? inv.entries : []).filter(e => e && e.baseId === GOLD_BASE).reduce((s, e) => s + (Number(e.count) || 0), 0);
       entries.push({ baseId: GOLD_BASE, count: Math.max(gold, TREASURY_SEED_GOLD) });
       mp.set(id, 'inventory', { entries });
       mp.set(id, 'private.treasurySeeded', true);
-      seeded++; audit(`BANK ${bank} treasury seeded with ${Math.max(gold, TREASURY_SEED_GOLD)} gold`);
+      seeded++; seededBanks.add(bank); audit(`BANK ${bank} treasury seeded with ${Math.max(gold, TREASURY_SEED_GOLD)} gold`);
     } catch (e) { log(`treasury ${bank} seed failed:`, e.message); }
   }
-  log(`bank treasuries: ${seeded} seeded, ${kept} already funded`);
+  log(`bank treasuries: ${seeded} seeded, ${kept} already funded${known ? `, ${known} known from an earlier load` : ''}`);
 };
 setTimeout(seedTreasuries, 3000);
 
@@ -2471,7 +2486,8 @@ const diagConnectionKey = (userId) => `u${userId}`;
 // they neither use up nor are starved by the shared one (most players spend all 60 on page and world lines); so does the
 // login save's "loadGame" line (client loadGameDiag.ts), written just before a BGSLoadFormBuffer crash would hit
 // The emote wheel's steps too ("emote ...", emoteDiag.ts): three game launches had spent Elaava's 60 by 07:41 (16 Oct)
-const DIAG_KIND_MAX = { apr: 400, cerr: 120, loadGame: 10, emote: 200 };
+// So do voice lines ("voice ..."): the link states and deaf rejoins of voice-resilience-1025 are counted all evening
+const DIAG_KIND_MAX = { apr: 400, cerr: 120, loadGame: 10, emote: 200, voice: 160 };
 const diagKindOf = (text) => { const k = text.slice(0, text.indexOf(' ')); return Object.prototype.hasOwnProperty.call(DIAG_KIND_MAX, k) ? k : null; };
 const resetDiagForConnection = (userId) => {
   const key = diagConnectionKey(userId);
@@ -2547,6 +2563,12 @@ globalThis.__dboHandlers.customPacket = (userId, rawContent) => {
     // (pageInputDiagService). Written straight to the server log so a stuck player needs to do nothing at all.
     if (content.customPacketType === 'dboDiag') {
       writeDiagLines(userId, content.lines);
+      return;
+    }
+    // The Scaleform test panel reports back (scaleformtest.js): ready, a row click, or closed
+    if (content.customPacketType === 'dboScaleform') {
+      const a = actorOf(userId); if (!a) return;
+      if (typeof globalThis.__dboScaleformPacket === 'function') globalThis.__dboScaleformPacket(a, content);
       return;
     }
     // RaceMenu face presets: uploads after RaceSexMenu and requests for a copy's face (racemenupresets.js)
@@ -2958,6 +2980,7 @@ const startQuestion = () => {
 // and a login in the Realm with the question still open
 const leaveRealm = (a) => {
   try {
+    if (birthsignHeld(a)) { if (!creationPending(a)) endCreation(a); return; }
     const choice = startChoiceOf(a);
     if (!askCyrodiil() || (choice !== 'asking' && choice !== 'skyrim')) return sendToArrival(a);
     if (mp.get(a, 'isOnline') === false || creationPending(a)) return;
@@ -3036,7 +3059,10 @@ function inHubForName(a) { try { return String(mp.get(a, 'worldOrCellDesc') || '
 // gates lead to the arrival, and with Skyrim open (leaveRealm above) the gates lead to the holds.
 const DEITY_STEP_MAX_MS = 5 * 60000;
 const inHub = (a) => { try { return String(mp.get(a, 'worldOrCellDesc') || '').toLowerCase() === String(HUB.cellOrWorldDesc).toLowerCase(); } catch (e) { return false; } };
-globalThis.__dboAtCreationEnd = (a) => inHub(a) && !creationPending(a);
+// A character in the hub with no birthsign stays until they choose one (birthsigns.js), unless its menu could not be sent
+const birthsignHeld = (a) => { try { return typeof globalThis.__dboBirthsignHold === 'function' && inHub(a) && !!globalThis.__dboBirthsignHold(a >>> 0); } catch (e) { return false; } };
+// The god's step waits for the birthsign's
+globalThis.__dboAtCreationEnd = (a) => inHub(a) && !creationPending(a) && !birthsignHeld(a);
 // Nobody making a character sees anyone else doing it, nor is seen (Nate, 4 Oct: people saw each other in the creator).
 // The live client already hides an actor whose neighbour-visible ff_adminModes says invis: formView draws the body at
 // alpha 0 with no nametag, and shows it to staff as a ghost. AdminSystem keeps the real modes per profile and only mirrors
@@ -3097,7 +3123,16 @@ globalThis.__dboCreationEndDone = (a) => {
   const wait = Math.max(2500, CREATION_MOVE_MS - (Date.now() - (creatorClosedAt.get(a) || 0)));
   setTimeout(() => leaveRealm(a), wait);
 };
+// The birthsign first (birthsigns.js), then the god; the sign's choice comes back through __dboBirthsignStepDone
 const endCreation = (a) => {
+  let signing = false;
+  try { signing = typeof globalThis.__dboBirthsignCreationOpen === 'function' && inHub(a) && !!globalThis.__dboBirthsignCreationOpen(a >>> 0); }
+  catch (e) { log('birthsign step failed', e.message); }
+  if (signing) return;
+  chooseGod(a);
+};
+globalThis.__dboBirthsignStepDone = (a) => chooseGod(a);
+const chooseGod = (a) => {
   let opened = false;
   try { opened = typeof globalThis.__dboDeityCreationOpen === 'function' && inHub(a) && globalThis.__dboDeityCreationOpen(a); }
   catch (e) { log('deity step failed', e.message); }
@@ -3332,10 +3367,14 @@ const onCharacterReady = (userId, a) => {
     try { if (globalThis.__dboPartyLogin) globalThis.__dboPartyLogin(a); } catch (e) { log('party login failed', e.message); }
     sendFavorites(a);
     try { if (globalThis.__dboCharLevelLogin) globalThis.__dboCharLevelLogin(a); } catch (e) { log('level login failed', e.message); }
+    // No birthsign yet: the choice comes up a moment after login (birthsigns.js)
+    try { if (globalThis.__dboBirthsignLogin) globalThis.__dboBirthsignLogin(a); } catch (e) { log('birthsign login failed', e.message); }
     try { if (globalThis.__dboBoostLogin) globalThis.__dboBoostLogin(a); } catch (e) { log('boost login failed', e.message); }
     try { if (globalThis.__dboEnchLearnedLogin) globalThis.__dboEnchLearnedLogin(a); } catch (e) { log('learned enchantments login failed', e.message); }
     // A shrine blessing still running is cast on the player again: the client's effect did not survive the logout (prayer.js)
     try { if (globalThis.__dboPrayerLogin) globalThis.__dboPrayerLogin(a); } catch (e) { log('prayer login failed', e.message); }
+    try { if (globalThis.__dboBriarheartLogin) globalThis.__dboBriarheartLogin(a); } catch (e) { log('briarheart login failed', e.message); }
+    try { if (globalThis.__dboHagravenLogin) globalThis.__dboHagravenLogin(a); } catch (e) { log('hagraven login failed', e.message); }
     // The first spell: a mage at Arcane Arts 25 with no school is offered the choice, one with a school and no spell gets its starter (schools.js)
     try { if (globalThis.__dboSchoolsLogin) globalThis.__dboSchoolsLogin(a); } catch (e) { log('schools login failed', e.message); }
     // The election notice of the current phase for a citizen of a hold that is choosing its Jarl, once per character (citizenship.js)
@@ -3433,7 +3472,7 @@ globalThis.__dboHandlers.disconnect = (userId) => {
   if (a && globalThis.__dboDungeonLeave) { try { globalThis.__dboDungeonLeave(a); } catch (e) { log('dungeon logout move failed', e.message); } }
   if (a && globalThis.__dboPartyLogout) { try { globalThis.__dboPartyLogout(a); } catch (e) { log('party logout failed', e.message); } }
   // What a UI said it can draw, and a deity offer already made, belong to this session (review C6, PRAY-1)
-  for (const k of ['__dboItemLeave', '__dboBankLeave', '__dboRobLeave', '__dboSilverTestLeave', '__dboDeityForget', '__dboPanelLeave', '__dboManualsLeave', '__dboLabourLeave', '__dboPrayerLeave', '__dboSkinLeave', '__dboSchoolsLeave', '__dboKeyRingLeave', '__dboRacialLeave', '__dboStartLeave']) { if (a && typeof globalThis[k] === 'function') { try { globalThis[k](a); } catch (e) { log(`${k} failed`, e.message); } } }
+  for (const k of ['__dboWarbandLeave', '__dboItemLeave', '__dboBankLeave', '__dboRobLeave', '__dboSilverTestLeave', '__dboDeityForget', '__dboPanelLeave', '__dboManualsLeave', '__dboLabourLeave', '__dboPrayerLeave', '__dboSkinLeave', '__dboSchoolsLeave', '__dboKeyRingLeave', '__dboRacialLeave', '__dboStartLeave', '__dboBirthsignLeave']) { if (a && typeof globalThis[k] === 'function') { try { globalThis[k](a); } catch (e) { log(`${k} failed`, e.message); } } }
   // A duel ends with its duellist's logout (duel.js)
   if (a && typeof globalThis.__dboDuelLeave === 'function') { try { globalThis.__dboDuelLeave(a); } catch (e) { log('duel leave failed', e.message); } }
   if (a && typeof globalThis.__dboFrenzyLeave === 'function') { try { globalThis.__dboFrenzyLeave(a); } catch (e) { log('frenzy leave failed', e.message); } }
@@ -4281,7 +4320,9 @@ onUi('npcDrift', (a, args) => {
   const r = args[0] && typeof args[0] === 'object' ? args[0] : {};
   let note = '';
   try { note = driftNote(a, r); } catch (e) { /* diagnostics only */ }
-  log(`npcDrift ${display(a)} ${String(r.kind).slice(0, 24)}: ${JSON.stringify(r).slice(0, 900)}${note}`);
+  // A companion's report is whole up to 1600 characters (warband rework step 2 adds slot, ranged, leashed and waiting, and
+  // _work/warband-fluid-1025/analyze_drift.py reads it as JSON); every other kind keeps 900
+  log(`npcDrift ${display(a)} ${String(r.kind).slice(0, 24)}: ${JSON.stringify(r).slice(0, r.kind === 'companion' ? 1600 : 900)}${note}`);
   if (r.kind === 'heartbeat' && globalThis.__dboDoorSync) { try { globalThis.__dboDoorSync.heartbeat(a, r); } catch (e) { log('door sync failed', e.message); } }
 });
 // The staff trace (client staffHit.ts): a window the server opens for one player, by /staffdiag or at login while
@@ -6624,6 +6665,7 @@ const deathHook = (actorId, killerId, ...rest) => {
   if ((Number(actorId) >>> 0) >= 0xff000000 && (() => { try { return !!mp.get(Number(actorId) >>> 0, 'private.npcSpawner'); } catch (e) { return false; } })()) { peltPending.set(Number(actorId) >>> 0, Date.now()); if (peltPending.size > 2048) for (const [k, t] of peltPending) if (Date.now() - t > PELT_PENDING_MS) peltPending.delete(k); }
   setTimeout(() => { try { stashPelts(Number(actorId) >>> 0); } catch (e) { log('pelt stash failed', e.message); } }, 50);
   try { if (globalThis.__dboChampionDeath) globalThis.__dboChampionDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('champion death failed', e.message); }
+  try { if (globalThis.__dboBossDeath) globalThis.__dboBossDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('boss death failed', e.message); }
   try { if (globalThis.__dboSuperDeath) globalThis.__dboSuperDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('supernatural death failed', e.message); }
   try { if (globalThis.__dboContractKill && killerId) globalThis.__dboContractKill(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('contract kill failed', e.message); }
   try { if (globalThis.__dboBlackreachDeath) globalThis.__dboBlackreachDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('blackreach death failed', e.message); }
@@ -6647,6 +6689,7 @@ const hitDamageHook = (aggressorId, targetId, sourceId, damage, ...rest) => {
   // so the tier's share has to be on the target by the time it looks.
   try { dealt += masteryBonusDamage(agg, tgt, dealt); } catch (e) { log('mastery damage failed', e.message); }
   try { if (globalThis.__dboChampionHit) globalThis.__dboChampionHit(agg, tgt, dealt); } catch (e) { log('champion hit failed', e.message); }
+  try { if (globalThis.__dboBossHit) globalThis.__dboBossHit(agg, tgt, dealt); } catch (e) { log('boss hit failed', e.message); }
   try { if (globalThis.__dboBlackreachHit && dealt > 0) globalThis.__dboBlackreachHit(agg, tgt); } catch (e) { log('blackreach hit failed', e.message); }
   try { dealt += superBonusDamage(agg, tgt, Number(sourceId) >>> 0, dealt); } catch (e) { log('supernatural damage failed', e.message); }
   try { if (globalThis.__dboSuperHit && dealt > 0) globalThis.__dboSuperHit(agg, tgt); } catch (e) { log('supernatural hit failed', e.message); }
@@ -6875,6 +6918,8 @@ const asylumHit = (agg, tgt) => {
 const castHook = (casterId, spellId, ...rest) => {
   try { if (racial) racial.onCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('racial cast failed', e.message); }
   try { if (globalThis.__dboBeastCast) globalThis.__dboBeastCast(casterId, spellId); } catch (e) { log('beast cast failed', e.message); }
+  // hagraven.js: the Hagraven Form power, cast from the Powers menu, takes or leaves the Hagraven body
+  try { if (typeof globalThis.__dboHagravenCast === 'function') globalThis.__dboHagravenCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('hagraven cast failed', e.message); }
   // A vampire's Restoration healing (supernatural.js vampireRestoration) is refused for the gameplay: no skill or school
   // credit, no chain. The C++ applies the heal after this hook whatever it returns, so supernatural.js takes it back
   try { if (typeof globalThis.__dboVampHealCast === 'function' && globalThis.__dboVampHealCast(Number(casterId) >>> 0, Number(spellId) >>> 0)) return false; } catch (e) { log('vampire healing cast failed', e.message); }
@@ -7076,6 +7121,8 @@ const equipHook = (actorId, equipment, isAllowed, ...rest) => {
     // durability.js: a piece taken off gets its wear in its name; a Broken one put on comes off
     if (isAllowed && typeof globalThis.__dboDurabilityEquip === 'function') { try { globalThis.__dboDurabilityEquip(a, equipment); } catch (e) { log('durability equip failed', e.message); } }
     if (isAllowed) { try { raceEquipCheck(a, equipment); } catch (e) { log('race equip failed', e.message); } }
+    // briarheart.js: a Briarheart's bare chest shows the briar body; their own armour takes its place
+    if (isAllowed && typeof globalThis.__dboBriarheartEquip === 'function') { try { globalThis.__dboBriarheartEquip(a, equipment); } catch (e) { log('briarheart equip failed', e.message); } }
     // spawnwatch.js: the game has loaded, so its arrival report is due; until it comes its outfit is not remembered
     const spawnWatch = globalThis.__dboSpawnWatch;
     if (spawnWatch) { try { spawnWatch.report(a); } catch (e) { log('spawn watch report failed', e.message); } }
@@ -7311,6 +7358,26 @@ const sourceResistsOf = (sourceId) => {
   return out;
 };
 const fitsElement = (element, sourceId) => ELEMENT_RESIST[element] !== undefined && sourceResistsOf(sourceId).has(ELEMENT_RESIST[element]);
+// The magic schools of a hit's source (a Set of actor value indexes: MGEF DATA magic skill, i32 at 12; Destruction 20,
+// Conjuration 19, read off Firebolt's and Conjure Familiar's effects), read once per source (hagraven.js)
+const sourceSkillCache = new Map();
+const sourceSkillsOf = (sourceId) => {
+  if (sourceSkillCache.has(sourceId)) return sourceSkillCache.get(sourceId);
+  const out = new Set();
+  const r = recordOf(sourceId);
+  const skillOf = (m) => { const d = m && String(m.record.type) === 'MGEF' && (m.record.fields || []).find((x) => x && x.type === 'DATA' && x.data instanceof Uint8Array && x.data.byteLength >= 16); return d ? new DataView(d.data.buffer, d.data.byteOffset, d.data.byteLength).getInt32(12, true) : null; };
+  if (r && String(r.record.type) === 'MGEF') { const k = skillOf(r); if (k !== null) out.add(k); }
+  if (r && ['SPEL', 'ENCH', 'SCRL'].includes(String(r.record.type))) {
+    for (const f of r.record.fields || []) {
+      if (!f || f.type !== 'EFID' || !(f.data instanceof Uint8Array) || f.data.byteLength < 4) continue;
+      const local = new DataView(f.data.buffer, f.data.byteOffset, f.data.byteLength).getUint32(0, true);
+      const k = skillOf(recordOf(typeof r.toGlobalRecordId === 'function' ? r.toGlobalRecordId(local) >>> 0 : local));
+      if (k !== null) out.add(k);
+    }
+  }
+  sourceSkillCache.set(sourceId, out);
+  return out;
+};
 // ---- The sun burns the undead: a Restoration sun spell does more to what should not be walking ------------------------
 // Nate, 15 Oct. Restoration's one bite is its sun, and it had none here: the server decides every hit from armour and
 // the multipliers below, and the conditions a vanilla sun effect carries ("more against the undead") are never evaluated
@@ -7709,6 +7776,15 @@ try {
   delete require.cache[RACIAL_JS];
   racial = require(RACIAL_JS)({ mp, log, personal, giveItem, profileOf, display, recordOf, every, onlineActors, weaponHandsOf, sourceResistsOf, gmstFloat, cfg, sendPacket, hasUiCap });
 } catch (e) { log('racial.js failed to load:', e.stack || e.message); racial = null; globalThis.__dboRaceGold = null; globalThis.__dboRaceOf = null; }
+// ---- the thirteen birthsigns: chosen once, small gifts for life through racial.js (server\birthsigns.js, config "birthsigns")
+try {
+  const BIRTHSIGNS_JS = path.resolve('birthsigns.js');
+  delete require.cache[BIRTHSIGNS_JS];
+  require(BIRTHSIGNS_JS)({ mp, log, personal, audit, who, display, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors, every, isLeadStaff, findByName, profileOf, hasUiCap });
+} catch (e) {
+  log('birthsigns.js failed to load:', e.stack || e.message);
+  for (const k of ['__dboBirthsignOf', '__dboBirthsignHold', '__dboBirthsignCreationOpen', '__dboBirthsignLogin', '__dboBirthsignLeave']) globalThis[k] = null;
+}
 // ---- enchantments the server judges: weapon hits, worn resistances and fortifies (server\gearench.js, config "gearEnchantments")
 try {
   const GEARENCH_JS = path.resolve('gearench.js');
@@ -7816,10 +7892,27 @@ const fleshArmorOf = (a) => {
 };
 globalThis.__dboFleshArmor = fleshArmorOf;
 globalThis.__dboFleshCast = fleshCast;
-// Below 1 when a Flesh spell holds on the target and the hit is a weapon's or a fist's: the rating counted with it over
-// the rating counted without it, by the engine's own reduction (fArmorScalingFactor, capped at fMaxArmorRating)
+// A Briarheart's briar skin (briarheart.js) while the briar chest shows on a bare chest: the faction cuirass it stands for counts,
+// at that piece's counted rating under the target's light-armour multipliers, in place of the briar body's own rating the
+// engine already took. 0 when off
+const briarSkinArmorOf = (targetId) => {
+  let s = null; try { s = typeof globalThis.__dboBriarSkinArmor === 'function' ? globalThis.__dboBriarSkinArmor(targetId >>> 0) : null; } catch (e) { s = null; }
+  if (!s) return 0;
+  // A rating of its own (the faction cuirass's, briarSkin.armor) counts as a light piece of that rating; else the piece s.from names
+  const from = Number(s.rating) > 0 ? { rating: Number(s.rating), counted: Number(s.rating), heavy: false } : armorPieceOf(Number(s.from) >>> 0);
+  const shown = s.shown ? armorPieceOf(Number(s.shown) >>> 0) : null;
+  const body = s.body ? armorPieceOf(Number(s.body) >>> 0) : null;   // the wound body (USSEP 90D63, rated 5) the engine counts too
+  if (!from) return 0;
+  const pm = defensePieceMult(targetId), gm = gearArmorMult(targetId);
+  const as = (p) => (p ? (p.counted || p.rating) * (p.heavy ? pm.heavy * gm.heavy : pm.light * gm.light) : 0);
+  return Math.max(0, as(from) - as(shown) - as(body));
+};
+globalThis.__dboBriarSkinRating = briarSkinArmorOf;
+// Below 1 when a Flesh spell (or a briar skin) holds on the target and the hit is a weapon's or a fist's: the rating
+// counted with it over the rating counted without it, by the engine's own reduction (fArmorScalingFactor, capped at
+// fMaxArmorRating)
 const fleshDamageMult = (targetId, sourceId) => {
-  const extra = fleshArmorOf(targetId);
+  const extra = fleshArmorOf(targetId) + briarSkinArmorOf(targetId);
   if (!(extra > 0)) return 1;
   const physical = (sourceId >>> 0) === 0x1f4 || (() => { const r = recordOf(sourceId >>> 0); return !!r && String(r.record.type) === 'WEAP'; })();
   if (!physical) return 1;
@@ -8256,11 +8349,15 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     let targetSide = defenseDamageMult(tgt) * fleshDamageMult(tgt, src) * blessingTargetMult(tgt, src) * potionResistMult(tgt, src) * gearResistMult(tgt, src);
     // Spellbreaker's ward while its wearer blocks a spell from the front (gearench.js), under the same cap as a racial ward
     try { if (gearEnch) targetSide *= gearEnch.spellbreakerMult(agg, tgt, src, dmg, flags); } catch (e) { log('spellbreaker failed', e.message); }
+    // A Briarheart's poison and frost resistance and fire weakness (briarheart.js), under the same cap as the race's
+    try { if (globalThis.__dboBriarheartTargetMult) targetSide *= Number(globalThis.__dboBriarheartTargetMult(agg, tgt, src)) || 1; } catch (e) { log('briarheart target failed', e.message); }
     if (racial) { try { targetSide = racial.capTargetSide(targetSide * racial.targetMult(agg, tgt, src, dmg)); } catch (e) { log('racial target failed', e.message); } }
     let raceAtk = 1;
-    if (racial && !beastAgg) { try { raceAtk = racial.attackMult(agg, tgt, src, dmg); } catch (e) { log('racial attack failed', e.message); } }
+    if (racial && !beastAgg) { try { raceAtk = racial.attackMult(agg, tgt, src, dmg, flags); } catch (e) { log('racial attack failed', e.message); } }
     let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * potionTakenMult(tgt, flags) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp;
     if (!beastAgg) mult *= gearAttackMult(agg, src);
+    // A Hagraven's Destruction (hagraven.js), by her stage
+    try { if (globalThis.__dboHagravenAttackMult) mult *= Number(globalThis.__dboHagravenAttackMult(agg, src)) || 1; } catch (e) { log('hagraven attack failed', e.message); }
     // The Shrouded Gloves double a one-handed sneak attack (gearench.js backstabMult)
     try { if (gearEnch && !beastAgg) mult *= gearEnch.backstabMult(agg, src, flags); } catch (e) { log('backstab failed', e.message); }
     // Tired blows, fists into armour, staves through it, the fist's stamina drain and disarm (martial.js)
@@ -8271,6 +8368,8 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     mult *= npcPowerHitMult(agg, tgt, flags, dmg);
     // A kind of creature's or NPC's hits on a player (npcDamage.byKind)
     mult *= npcKindDamageMult(agg, tgt, dmg);
+    // A boss's hits on a player, more once it is enraged (bosses.js)
+    try { if (globalThis.__dboBossDamageMult) mult *= Number(globalThis.__dboBossDamageMult(agg, tgt)) || 1; } catch (e) { log('boss damage failed', e.message); }
     // An enemy of a claimed dungeon by the lease's difficulty, and any NPC's spell (npcDamage.byDifficulty, spellMult)
     mult *= npcDifficultyDamageMult(agg, tgt, dmg, flags);
     // A family of creatures by race, on a player (npcToughness.kinds.<kind>.dealt; the draugr, 17 Oct)
@@ -8532,6 +8631,13 @@ try {
   require(CHAMPIONS_JS)({ mp, log, personal, audit, display, cfg, giveItem, registerChatCommand, sendPacket, onlineActors, every, stopTimer, loot: (() => { try { return JSON.parse(fs.readFileSync(path.resolve('loot.json'), 'utf8')); } catch (e) { return { pools: {} }; } })() });
 } catch (e) { log('champions.js failed to load:', e.stack || e.message); globalThis.__dboChampionHit = null; globalThis.__dboChampionDeath = null; }
 
+// ---- bosses worth grinding: the Wraith of the Ice Cap, the Briarheart King, the Centurion Master... (serverosses.js) --
+try {
+  const BOSSES_JS = path.resolve('bosses.js');
+  delete require.cache[BOSSES_JS];
+  require(BOSSES_JS)({ mp, log, personal, audit, display, who, cfg, giveItem, registerChatCommand, sendPacket, onlineActors, every, stopTimer, profileOf, zoneOfActor, isLeadStaff });
+} catch (e) { log('bosses.js failed to load:', e.stack || e.message); globalThis.__dboBossHit = null; globalThis.__dboBossDeath = null; globalThis.__dboBossDamageMult = null; }
+
 // ---- mining and woodcutting mini-games (server\labour.js, config "labour") ---------------------
 try {
   const LABOUR_JS = path.resolve('labour.js');
@@ -8653,7 +8759,8 @@ try {
 try {
   const JAIL_JS = path.resolve('jail.js');
   delete require.cache[JAIL_JS];
-  require(JAIL_JS)({ mp, log, personal, system, audit, display, who, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors, every, isAdmin, isLeadStaff, distanceMeters });
+  require(JAIL_JS)({ mp, log, personal, system, audit, display, who, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors, every, isAdmin, isLeadStaff, distanceMeters,
+    ranksOf, profileOf, zoneOfActor, zoneById });
 } catch (e) { log('jail.js failed to load:', e.stack || e.message); globalThis.__dboJailActivate = null; globalThis.__dboJailLogin = null; globalThis.__dboJailUnstuck = null; }
 
 // ---- commissions: work posted at the boards, the reward held until done (server\commissions.js, config "commissions") --
@@ -8845,7 +8952,7 @@ try {
 try {
   const WARBAND_JS = path.resolve('warband.js');
   delete require.cache[WARBAND_JS];
-  require(WARBAND_JS)({ mp, log, personal, audit, who, isAdmin, registerChatCommand, findByName, cfg, onUi, every, profileOf, onlineActors, runChat: (a, line) => handleChat(userOf(a), line) });
+  require(WARBAND_JS)({ mp, log, personal, audit, who, isAdmin, registerChatCommand, findByName, cfg, onUi, every, profileOf, onlineActors, sendPacket, runChat: (a, line) => handleChat(userOf(a), line) });
 } catch (e) { log('warband.js failed to load:', e.stack || e.message); }
 
 // ---- the F7 Place tab: NPCs and world objects placed by GMs (server\placement.js, admin-placeables.json) --------
@@ -8856,6 +8963,13 @@ try {
   // (config placement.rights; placing is Lead GM and above by default, as it was here)
   require(PLACEMENT_JS)({ mp, log, personal, audit, who, onUi, sendPacket, isAdmin, tierOf, registerChatCommand, cfg, every, onlineActors });
 } catch (e) { log('placement.js failed to load:', e.stack || e.message); }
+
+// ---- home decorating: players furnish their own homes for gathered resources (server\decor.js, decor-catalog.json, config "decor") ----
+try {
+  const DECOR_JS = path.resolve('decor.js');
+  delete require.cache[DECOR_JS];
+  require(DECOR_JS)({ mp, log, personal, audit, who, onUi, sendPacket, isAdmin, tierOf, registerChatCommand, cfg, every, onlineActors, giveItem, findByName, itemName: (d) => adminItemName(d) });
+} catch (e) { log('decor.js failed to load:', e.stack || e.message); globalThis.__dboDecorId = null; globalThis.__dboDecorRef = null; globalThis.__dboDecorActivate = null; }
 
 // ---- breaking free of bound hands, /struggle (server\struggle.js, config "struggle") --------------
 try {
@@ -8881,7 +8995,7 @@ try {
   const CHARLEVEL_JS = path.resolve('charlevel.js');
   delete require.cache[CHARLEVEL_JS];
   require(CHARLEVEL_JS)({ mp, log, personal, system, audit, display, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors, every, sendPacket, isAdmin, findByName });
-} catch (e) { log('charlevel.js failed to load:', e.stack || e.message); globalThis.__dboCharLevel = null; globalThis.__dboCharLevelLogin = null; globalThis.__dboCharLevelRefund = null; }
+} catch (e) { log('charlevel.js failed to load:', e.stack || e.message); globalThis.__dboCharLevel = null; globalThis.__dboCharLevelLogin = null; globalThis.__dboCharLevelRefund = null; globalThis.__dboCharLevelSyncBonus = null; }
 
 // ---- interaction animations: a notice board, an introduction, rope (server\idles.js) -----------------------------
 try {
@@ -9197,11 +9311,18 @@ try {
   require(BEASTFORM_JS)({ mp, log, personal, registerChatCommand, sendPacket, display, who, audit, findByName, every, redress, onlineActors, cfg, isAdmin, isLeadStaff, tierOf, hasUiCap });
 } catch (e) { log('beastform.js failed to load:', e.stack || e.message); for (const k of ['__dboBeastCast', '__dboBeastRevert', '__dboBeastOriginalRace', '__dboBeastTransform', '__dboBeastRequest', '__dboBeastAdmin', '__dboBeastHolds']) globalThis[k] = null; }
 
+// ---- the Scaleform test panel, dev only (server\scaleformtest.js) ----------------------------------
+try {
+  const SCALEFORMTEST_JS = path.resolve('scaleformtest.js');
+  delete require.cache[SCALEFORMTEST_JS];
+  require(SCALEFORMTEST_JS)({ mp, log, personal, registerChatCommand, sendPacket, who, isAdmin });
+} catch (e) { log('scaleformtest.js failed to load:', e.stack || e.message); globalThis.__dboScaleformPacket = null; }
+
 // ---- the Great Hunt: werewolf ranks from feeding, hunting and changing (server\greathunt.js) ----------------------
 try {
   const GREATHUNT_JS = path.resolve('greathunt.js');
   delete require.cache[GREATHUNT_JS];
-  require(GREATHUNT_JS)({ mp, log, personal, audit, who, sendPacket, onlineActors, profileOf, registerChatCommand, zoneOfActor, zoneById, isWorldspace, cfg });
+  require(GREATHUNT_JS)({ mp, log, personal, audit, who, sendPacket, onlineActors, profileOf, registerChatCommand, zoneOfActor, zoneById, isWorldspace, cfg, isLeadStaff, findByName });
 } catch (e) { log('greathunt.js failed to load:', e.stack || e.message); for (const k of ['__dboHuntFed', '__dboHuntKill', '__dboHuntChanged', '__dboHuntBeastSeconds', '__dboHuntFeedSeconds', '__dboHuntChangesPerDay', '__dboHuntForcedMult', '__dboHuntDamageMult', '__dboHuntReset', '__dboHuntHowled', '__dboHuntView']) globalThis[k] = null; }
 
 // ---- vampire ranks: blood from feeding on people (server\bloodranks.js) -----------------------------------------------
@@ -9259,6 +9380,20 @@ try {
   delete require.cache[DOWNED_JS];
   require(DOWNED_JS)({ mp, log, personal, sendPacket, audit, who, display, profileOf, nameOf, onlineActors, every, registerChatCommand, cfg, openWidget, closeWidget, onUi, redress });
 } catch (e) { log('downed.js failed to load:', e.stack || e.message); globalThis.__dboReviveWith = null; globalThis.__dboIsDowned = null; globalThis.__dboLabDraught = null; }
+// ---- Briarhearts: the Hagraven's rite for Reachmen of the Old Gods (serverriarheart.js, config "briarheart"): after
+// supernatural.js, prayer.js and downed.js, whose hooks it reads ----
+try {
+  const BRIARHEART_JS = path.resolve('briarheart.js');
+  delete require.cache[BRIARHEART_JS];
+  require(BRIARHEART_JS)({ mp, log, personal, audit, who, display, cfg, registerChatCommand, onlineActors, isLeadStaff, findByName, every, giveItem, sourceResistsOf });
+} catch (e) { log('briarheart.js failed to load:', e.stack || e.message); for (const k of ['__dboIsBriarheart', '__dboBriarheartVitalBonus', '__dboBriarheartTargetMult', '__dboBriarheartRefusesDivine', '__dboBriarheartFaithLock', '__dboBriarheartLogin', '__dboBriarheartMenuEntries', '__dboBriarheartMenuAction', '__dboBriarheartEquip']) globalThis[k] = null; }
+// ---- the Hagraven's pact for the women of the Reach (server\hagraven.js, config "hagraven"): after briarheart.js (its altars)
+// and exposure.js (known on sight) ----
+try {
+  const HAGRAVEN_JS = path.resolve('hagraven.js');
+  delete require.cache[HAGRAVEN_JS];
+  require(HAGRAVEN_JS)({ mp, log, personal, audit, who, display, cfg, registerChatCommand, onlineActors, isLeadStaff, findByName, every, giveItem, sourceSkillsOf, zoneOfActor });
+} catch (e) { log('hagraven.js failed to load:', e.stack || e.message); for (const k of ['__dboHagravenStage', '__dboHagravenAttackMult', '__dboHagravenRegenMult', '__dboHagravenRefusesDeity', '__dboHagravenRiteAt', '__dboHagravenLogin']) globalThis[k] = null; }
 // ---- the hold's watch: NPC guards at staff-placed posts, no loot or skill from them, jail by them (server\guards.js, config "guards") ----
 try {
   const GUARDS_JS = path.resolve('guards.js');
@@ -9475,3 +9610,8 @@ try {
 
 
 
+// hot deploy 2026-10-26T02:04:28Z (dev-integration-1025 8d240b2b2, changed since a638bd196)
+// hot deploy 2026-10-26T02:28:32Z (dev-integration-1025 474b20ddb, changed since 8d240b2b2)
+// polymorph ON after the d33c745f boot 2026-10-26T02:33:20Z
+// hot deploy 2026-10-26T03:00:01Z (dev-integration-1025 9e1c18914, changed since 474b20ddb)
+// hot deploy 2026-10-26T03:18:28Z (dev-integration-1025 043d9935b, changed since 9e1c18914)
