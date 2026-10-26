@@ -1,5 +1,21 @@
 [
   {
+    "title": "More sawn logs",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "Changed",
+    "sections": [
+      {
+        "heading": "Woodcutting",
+        "items": [
+          "A saw mill now cuts twice the Sawn Logs: 10 for an Apprentice Woodcutter up to 16 for a Master, and Apprentices get them too (they had to be Adept).",
+          "New in the decorating catalogue: the Lumber Pile, a home saw for Woodcutters of Apprentice rank and up. It turns the firewood you carry into Sawn Logs, 4 firewood a log for an Apprentice down to 2 for a Master, up to 10 logs at a time, every 10 minutes. One per home, and it takes a workbench slot.",
+          "Staff can now place a working saw mill wherever a town needs one."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Blackreach glows, and the Windhelm bank opens",
     "date": "2026-10-26",
     "version": "Server update",

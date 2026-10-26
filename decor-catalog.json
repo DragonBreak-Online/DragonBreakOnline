@@ -10882,6 +10882,37 @@
      }
     },
     {
+     "desc": "bb959:Skyrim.esm",
+     "edid": "WoodPile",
+     "name": "Lumber Pile",
+     "group": "workbenches",
+     "type": "FURN",
+     "costA": {
+      "Firewood01": 12,
+      "IngotIron": 1
+     },
+     "costB": {
+      "6f993:Skyrim.esm": 12,
+      "5ace4:Skyrim.esm": 1
+     },
+     "kind": "lumber",
+     "bounds": [
+      -109,
+      -10,
+      -34,
+      41,
+      122,
+      64
+     ],
+     "radius": 99,
+     "station": {
+      "skill": "woodcutter",
+      "tier": 1,
+      "minCells": 1,
+      "keyword": "WoodPile"
+     }
+    },
+    {
      "desc": "283f:HearthFires.esm",
      "edid": "CraftingOvenMarker",
      "name": "Oven",
