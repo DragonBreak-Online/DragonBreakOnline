@@ -4007,7 +4007,8 @@ const sendPacket = (a, payload) => {
 };
 // Native Scaleform panels (client scaleformMenuService, fork swf/): a widget of these types goes to a client that sent
 // nativeCaps naming it as a dboScaleform packet instead; the payload is the same object the browser widget gets
-const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_journal' };
+// labour: mining, woodcutting and the bound-hands struggle (labour.js, struggle.js), both the sweep and the pick round
+const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_journal', labour: 'dbo_labour' };
 // nativeOpen: actor -> the widget id on the custom menu; browserOpen: actor -> a widget of these types last sent to the browser
 const nativeState = () => { const p = globalThis.__dboPanelState || (globalThis.__dboPanelState = { caps: new Map(), nonces: new Map() }); if (!p.native) p.native = new Map(); if (!p.nativeOpen) p.nativeOpen = new Map(); if (!p.browserOpen) p.browserOpen = new Map(); return p; };
 const nativeSwfFor = (a, widget) => {
