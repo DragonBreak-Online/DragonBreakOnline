@@ -92,8 +92,8 @@ ok(logs.length === 1 && /equipment changed: \["[0-9a-f]*6026e6"\]/.test(logs[0])
 // ---- 3. bosses.js: the Lord's adds ----
 const B = JSON.parse(fs.readFileSync(path.join(ROOT, 'bosses.json'), 'utf8')).bosses;
 const bdef = (id) => B.find((b) => b.id === id);
-ok(['minotaurlord', 'minotaurtest1', 'minotaurtest2'].every((id) => bdef(id).adds.some((a) => a.options[0][1] === MINO)), 'the Minotaur Lord\'s adds are Minotaur\'s Rest\'s own minotaurs (CYREncMinotaur)');
-ok(bdef('minotaurtest2').rearmAdds === WAR_AXE && bdef('minotaurlord').rearmAdds === WAR_AXE && !bdef('minotaurtest1').rearmAdds, 'test 2 and the live Lord re-arm the adds\' war axes; test 1 leaves them as they are');
+ok(bdef('minotaurlord').adds.some((a) => a.options[0][1] === MINO) && !bdef('minotaurtest1') && !bdef('minotaurtest2'), 'the Minotaur Lord\'s adds are Minotaur\'s Rest\'s own minotaurs (CYREncMinotaur); the dev tests are gone (26 Oct)');
+ok(bdef('minotaurlord').rearmAdds === WAR_AXE && bdef('minotaurlord').enabled === true, 'the live Lord (on since 26 Oct) re-arms the adds\' war axes');
 const bsrc = fs.readFileSync(path.join(ROOT, 'bosses.js'), 'utf8');
 ok(/r\.boss\.rearmAdds/.test(bsrc) && /rearm\(r\.boss, id, r\.boss\.rearmAdds\)/.test(bsrc), 'bosses.js re-arms a boss\'s adds once each');
 

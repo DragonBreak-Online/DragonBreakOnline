@@ -19842,7 +19842,7 @@
    ]
   },
   {
-   "name": "Boss: the Warlord of the Pale Pass, SE (Bruma) (dev test)",
+   "name": "Boss: the Warlord of the Pale Pass, SE (Bruma)",
    "region": "Bosses",
    "world": "a764b:BSHeartland.esm",
    "worldName": "Heartland",
@@ -19858,7 +19858,7 @@
    ]
   },
   {
-   "name": "Boss: the Warlord of the Pale Pass, ST (Bruma) (dev test)",
+   "name": "Boss: the Warlord of the Pale Pass, ST (Bruma)",
    "region": "Bosses",
    "world": "a764b:BSHeartland.esm",
    "worldName": "Heartland",
@@ -19986,39 +19986,7 @@
    ]
   },
   {
-   "name": "Boss: the Minotaur Lord of Minotaur's Rest (axe test 1), Minotaur's Rest (Bruma) (dev test)",
-   "region": "Bosses",
-   "world": "a764b:BSHeartland.esm",
-   "worldName": "Heartland",
-   "pos": [
-    124198.92,
-    172698.27,
-    -6957.45
-   ],
-   "rot": [
-    0,
-    0,
-    28.6
-   ]
-  },
-  {
-   "name": "Boss: the Minotaur Lord of Minotaur's Rest (axe test 2), Minotaur's Rest (Bruma) (dev test)",
-   "region": "Bosses",
-   "world": "a764b:BSHeartland.esm",
-   "worldName": "Heartland",
-   "pos": [
-    124825.28,
-    173249.66,
-    -7072.22
-   ],
-   "rot": [
-    0,
-    0,
-    80.2
-   ]
-  },
-  {
-   "name": "Boss: the Behemoth of Hircine's Hunt, BMG (Falkreath) (dev test)",
+   "name": "Boss: the Behemoth of Hircine's Hunt, BMG (Falkreath)",
    "region": "Bosses",
    "world": "3c:Skyrim.esm",
    "worldName": "Tamriel",
@@ -20034,7 +20002,7 @@
    ]
   },
   {
-   "name": "Boss: the Behemoth of Hircine's Hunt, GC (Falkreath) (dev test)",
+   "name": "Boss: the Behemoth of Hircine's Hunt, GC (Falkreath)",
    "region": "Bosses",
    "world": "3c:Skyrim.esm",
    "worldName": "Tamriel",
@@ -20050,7 +20018,7 @@
    ]
   },
   {
-   "name": "Boss: the Behemoth of Hircine's Hunt, HM (Falkreath) (dev test)",
+   "name": "Boss: the Behemoth of Hircine's Hunt, HM (Falkreath)",
    "region": "Bosses",
    "world": "3c:Skyrim.esm",
    "worldName": "Tamriel",
@@ -20063,6 +20031,22 @@
     0,
     0,
     16.9
+   ]
+  },
+  {
+   "name": "Boss: the Chieftain of Blizzard Rest, Blizzard Rest (Dawnstar)",
+   "region": "Bosses",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    38300,
+    37700,
+    -8678.5
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
    ]
   },
   {

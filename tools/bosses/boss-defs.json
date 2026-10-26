@@ -4,8 +4,8 @@
   {
    "id": "icecap",
    "name": "the Wraith of the Ice Cap",
-   "enabled": false,
-   "waitingOn": "the restart DLE 743a8952 that carries the shard",
+   "plateName": "Hrimkald",
+   "enabled": true,
    "hold": "winterhold",
    "world": "3c:Skyrim.esm",
    "spots": [
@@ -64,12 +64,49 @@
      "family": "glacial_crystal",
      "chance": 0.03,
      "knownBonus": 2
+    },
+    "pool": {
+     "picks": 2,
+     "edids": [
+      [
+       "IceWraithTeeth",
+       4,
+       2
+      ],
+      [
+       "FrostSalts",
+       3,
+       2
+      ],
+      [
+       "FrostMirriam",
+       2,
+       3
+      ],
+      [
+       "GemSapphire",
+       2,
+       1
+      ],
+      [
+       "GemSapphireFlawless",
+       1,
+       1
+      ],
+      [
+       "SoulGemGreater",
+       1,
+       1
+      ]
+     ]
     }
-   }
+   },
+   "_enabledNote": "Nat 26 Oct: every boss ships complete; its shard (DBO_OreGlacialCrystal, DLE 1D2201) is in the production DLE ed7afac9"
   },
   {
    "id": "briarheartking",
    "name": "the Briarheart King",
+   "plateName": "Vorgun Briarheart",
    "enabled": true,
    "hold": "markarth",
    "world": "3c:Skyrim.esm",
@@ -133,15 +170,51 @@
      ]
     ],
     "schematic": {
-     "family": "silver",
+     "family": "nordic",
      "chance": 0.05,
      "knownBonus": 0
+    },
+    "pool": {
+     "picks": 2,
+     "edids": [
+      [
+       "BriarHeart",
+       4,
+       1
+      ],
+      [
+       "HagravenFeathers",
+       3,
+       2
+      ],
+      [
+       "HagravenClaw",
+       3,
+       1
+      ],
+      [
+       "GemGarnet",
+       2,
+       1
+      ],
+      [
+       "OreSilver",
+       2,
+       3
+      ],
+      [
+       "SoulGemCommon",
+       1,
+       1
+      ]
+     ]
     }
    }
   },
   {
    "id": "centurion",
    "name": "the Centurion Master",
+   "plateName": "Kagrenzel Sentinel",
    "enabled": true,
    "hold": "",
    "world": "1ee62:Skyrim.esm",
@@ -203,14 +276,49 @@
       1
      ]
     ],
-    "_extra": "A Heart Stone, rare (Nat, 25 Oct: the Dwemer tapped the Heart of Lorkhan; Heart Stones feed the staff crafting Nat is opening)"
+    "_extra": "A Heart Stone, rare (Nat, 25 Oct: the Dwemer tapped the Heart of Lorkhan; Heart Stones feed the staff crafting Nat is opening)",
+    "pool": {
+     "picks": 2,
+     "edids": [
+      [
+       "IngotDwarven",
+       4,
+       3
+      ],
+      [
+       "DwarvenOil",
+       3,
+       2
+      ],
+      [
+       "DwarvenGyro",
+       2,
+       1
+      ],
+      [
+       "DwarvenCenturionDynamo",
+       2,
+       1
+      ],
+      [
+       "OreQuicksilver",
+       2,
+       2
+      ],
+      [
+       "SoulGemGrand",
+       1,
+       1
+      ]
+     ]
+    }
    }
   },
   {
    "id": "palewarlord",
    "name": "the Warlord of the Pale Pass",
+   "plateName": "Kaszar the Pale",
    "enabled": true,
-   "waitingOn": "the dev test (bosses.devOnly on the dev server): Nat picked SE (the perch under the Sentinel statue) with ST (Serpent's Trail) as the roaming alternative, SR dropped (25 Oct)",
    "hold": "bruma",
    "world": "a764b:BSHeartland.esm",
    "spots": [
@@ -272,16 +380,51 @@
      "knownBonus": 0
     },
     "extraSchematic": {
-     "family": "steelplate",
+     "family": "ancient_imperial",
      "chance": 0.03
+    },
+    "pool": {
+     "picks": 2,
+     "edids": [
+      [
+       "IngotSteel",
+       4,
+       3
+      ],
+      [
+       "IngotCorundum",
+       3,
+       2
+      ],
+      [
+       "OreMoonstone",
+       2,
+       2
+      ],
+      [
+       "GemRuby",
+       2,
+       1
+      ],
+      [
+       "ImperialWarHorn",
+       1,
+       1
+      ],
+      [
+       "SoulGemGreater",
+       1,
+       1
+      ]
+     ]
     }
    },
-   "devOnly": true,
    "_spots": "Nat, 25 Oct, from the CK shots in _work/palewarlord-spots-1025: SE first, ST the roaming alternative (roam: the next spot after each kill); SR at Snowstone Rest's door dropped"
   },
   {
    "id": "falmerwarmonger",
    "name": "the Falmer Warmonger",
+   "plateName": "Grakhul Eyeless",
    "enabled": true,
    "hold": "",
    "world": "1ee62:Skyrim.esm",
@@ -349,12 +492,48 @@
      "family": "falmer_honed",
      "chance": 0.06,
      "knownBonus": 0
+    },
+    "pool": {
+     "picks": 2,
+     "edids": [
+      [
+       "ChaurusChitin",
+       4,
+       2
+      ],
+      [
+       "ChaurusEggs",
+       3,
+       3
+      ],
+      [
+       "FalmerEar",
+       3,
+       2
+      ],
+      [
+       "DLC01ChaurusHunterAntennae",
+       2,
+       2
+      ],
+      [
+       "GemAmethyst",
+       2,
+       1
+      ],
+      [
+       "SoulGemGreater",
+       1,
+       1
+      ]
+     ]
     }
    }
   },
   {
    "id": "movarth",
    "name": "the Master of Movarth's Lair",
+   "plateName": "Movarth Piquine",
    "enabled": true,
    "hold": "morthal",
    "world": "3c:Skyrim.esm",
@@ -402,19 +581,51 @@
      ]
     ],
     "schematic": {
-     "family": "steelplate",
+     "family": "EBONY",
      "chance": 0.06,
      "knownBonus": 0
     },
-    "extraSchematic": {
-     "family": "glass",
-     "chance": 0.01
+    "pool": {
+     "picks": 2,
+     "edids": [
+      [
+       "vampireDust",
+       4,
+       2
+      ],
+      [
+       "BoneMeal",
+       3,
+       3
+      ],
+      [
+       "HumanHeart",
+       2,
+       1
+      ],
+      [
+       "GemRuby",
+       2,
+       1
+      ],
+      [
+       "IngotEbony",
+       1,
+       1
+      ],
+      [
+       "SoulGemBlack",
+       1,
+       1
+      ]
+     ]
     }
    }
   },
   {
    "id": "duskthorn",
    "name": "the Warchief of Dusk Thorn",
+   "plateName": "Gnashrot",
    "enabled": true,
    "hold": "bruma",
    "world": "a764b:BSHeartland.esm",
@@ -475,12 +686,48 @@
      "family": "elven",
      "chance": 0.05,
      "knownBonus": 0
+    },
+    "pool": {
+     "picks": 2,
+     "edids": [
+      [
+       "IngotIron",
+       4,
+       3
+      ],
+      [
+       "BoneMeal",
+       3,
+       2
+      ],
+      [
+       "deathBell",
+       2,
+       2
+      ],
+      [
+       "OreMalachite",
+       2,
+       2
+      ],
+      [
+       "GemGarnet",
+       2,
+       1
+      ],
+      [
+       "SoulGemCommon",
+       1,
+       1
+      ]
+     ]
     }
    }
   },
   {
    "id": "valkynaz",
    "name": "the Valkynaz of the Great Gate",
+   "plateName": "Valkynaz Morvox",
    "enabled": true,
    "hold": "",
    "world": "3c:Skyrim.esm",
@@ -549,12 +796,48 @@
       200
      ]
     ],
-    "_note": "No Ebony: it is never loot (dungeons.js BANNED_LOOT; its schematic only from a Master Scholar's reading)"
+    "_note": "No Ebony: it is never loot (dungeons.js BANNED_LOOT; its schematic only from a Master Scholar's reading)",
+    "pool": {
+     "picks": 2,
+     "edids": [
+      [
+       "DaedraHeart",
+       3,
+       1
+      ],
+      [
+       "VoidSalts",
+       3,
+       2
+      ],
+      [
+       "FireSalts",
+       3,
+       2
+      ],
+      [
+       "IngotMalachite",
+       2,
+       2
+      ],
+      [
+       "GemDiamond",
+       1,
+       1
+      ],
+      [
+       "SoulGemGrand",
+       1,
+       1
+      ]
+     ]
+    }
    }
   },
   {
    "id": "karstaag",
    "name": "Karstaag",
+   "plateName": "Karstaag",
    "enabled": false,
    "waitingOn": "Solstheim, closed by the region lock (playtest.closedPlugins, Nate 14-15 Oct): turn it on when Solstheim opens (bosses.karstaag.enabled true)",
    "hold": "",
@@ -611,12 +894,53 @@
       2
      ]
     ],
-    "_note": "The Stalhrim schematic stays reading-only (Nate: the Skaal keep it close); Nat decides if Karstaag may drop it"
+    "_note": "The Stalhrim schematic stays reading-only (Nate: the Skaal keep it close); Nat decides if Karstaag may drop it",
+    "schematic": {
+     "family": "stalhrim",
+     "chance": 0.05,
+     "knownBonus": 0
+    },
+    "pool": {
+     "picks": 2,
+     "edids": [
+      [
+       "DLC2OreStalhrim",
+       4,
+       2
+      ],
+      [
+       "FrostSalts",
+       3,
+       2
+      ],
+      [
+       "IceWraithTeeth",
+       2,
+       2
+      ],
+      [
+       "DLC2HeartStone",
+       2,
+       1
+      ],
+      [
+       "GemSapphireFlawless",
+       1,
+       1
+      ],
+      [
+       "SoulGemGrand",
+       1,
+       1
+      ]
+     ]
+    }
    }
   },
   {
    "id": "risenlegate",
    "name": "the Risen Legate of Sancre Tor",
+   "plateName": "Legate Varus Sancretus",
    "enabled": true,
    "hold": "bruma",
    "world": "a764b:BSHeartland.esm",
@@ -669,6 +993,41 @@
      "family": "adamantium",
      "chance": 0.03,
      "knownBonus": 0
+    },
+    "pool": {
+     "picks": 2,
+     "edids": [
+      [
+       "Ectoplasm",
+       4,
+       3
+      ],
+      [
+       "BoneMeal",
+       3,
+       2
+      ],
+      [
+       "IngotOrichalcum",
+       2,
+       2
+      ],
+      [
+       "glowDust",
+       2,
+       1
+      ],
+      [
+       "GemEmerald",
+       2,
+       1
+      ],
+      [
+       "SoulGemBlack",
+       1,
+       1
+      ]
+     ]
     }
    },
    "_note": "Nat, 25 Oct: Sancre Tor stays undead (an Imperial fort town; no Ayleid undead, Nate 9 Oct): an undead legion from Sancre Tor's own pools (gamemode-config ownedSpawns.replace minotaur: CYREncSkeleton01 lines and BSKEncZombie02). Adamantium's home, so its schematic stays here"
@@ -676,7 +1035,8 @@
   {
    "id": "minotaurlord",
    "name": "the Minotaur Lord of Minotaur's Rest",
-   "enabled": false,
+   "plateName": "Asterion",
+   "enabled": true,
    "traceEquipment": false,
    "hold": "bruma",
    "world": "a764b:BSHeartland.esm",
@@ -738,171 +1098,57 @@
      ]
     ],
     "schematic": {
-     "family": "steelplate",
+     "family": "ayleid",
      "chance": 0.05,
      "knownBonus": 0
+    },
+    "pool": {
+     "picks": 2,
+     "edids": [
+      [
+       "OreMoonstone",
+       4,
+       2
+      ],
+      [
+       "IngotIMoonstone",
+       3,
+       1
+      ],
+      [
+       "BoneMeal",
+       3,
+       2
+      ],
+      [
+       "GemEmerald",
+       2,
+       1
+      ],
+      [
+       "GemEmeraldFlawless",
+       1,
+       1
+      ],
+      [
+       "SoulGemGreater",
+       1,
+       1
+      ]
+     ]
     }
    },
-   "waitingOn": "the dev test of the Minotaur Lord's axe (minotaurtest1/2): set rearmEdid to match the test that kept it, then enable",
    "_note": "Drops (proposed, 25 Oct): Minotaur Horn x2 and Minotaur Hide (BSAssets, the beast's own), gold, Steel Plate 5%. Minotaur's Rest's own spawns are undead today (ownedSpawns.replace minotaur); if the Lord fights, Nat may want its minotaurs back as his adds",
    "rearmAddsEdid": "BSKMinotaurWarAxe",
-   "_adds": "Nat, 25 Oct: the minotaurs come back at Minotaur's Rest as his adds; each gets its war axe back in its inventory (rearmAdds), as the Lord's test 2 does"
-  },
-  {
-   "id": "minotaurtest1",
-   "name": "the Minotaur Lord of Minotaur's Rest (axe test 1)",
-   "enabled": true,
-   "devOnly": true,
-   "traceEquipment": true,
-   "hold": "bruma",
-   "world": "a764b:BSHeartland.esm",
-   "spots": [
-    {
-     "id": "MR",
-     "pos": [
-      124198.92,
-      172698.27,
-      -7021.45
-     ],
-     "heading": 28.6,
-     "note": "Minotaur's Rest, the DLE's Minotaur Lord spot (178580:DragonBreak Online Edits.esp)"
-    }
-   ],
-   "bossEdid": "CYREncMinotaur02Lord",
-   "addEdids": [
-    "CYREncMinotaur"
-   ],
-   "openingAdds": 0,
-   "waves": [
-    [
-     0.66,
-     2
-    ],
-    [
-     0.33,
-     2
-    ]
-   ],
-   "toughness": 0.5,
-   "damageMult": 1.25,
-   "enrageSeconds": 600,
-   "enrage": {
-    "toughness": 0.25,
-    "damageMult": 2
-   },
-   "respawnSeconds": 600,
-   "radius": 5000,
-   "announce": {
-    "spawn": "",
-    "death": ""
-   },
-   "drops": {
-    "alwaysEdid": [
-     [
-      "CYRMinotaurHorn",
-      2
-     ],
-     [
-      "CYRMinotaurHide",
-      1
-     ]
-    ],
-    "always": [
-     [
-      "f:Skyrim.esm",
-      100
-     ]
-    ],
-    "schematic": {
-     "family": "steelplate",
-     "chance": 0.05,
-     "knownBonus": 0
-    }
-   },
-   "_test": "B9 test 1 (Nat, 25 Oct: the Minotaur Lord moves to Minotaur's Rest): CYREncMinotaur02Lord as is, hostile. Does BSKMinotaurLordAxe stay worn through a host change? traceEquipment logs every change",
-   "_adds": "Test 1 as is: the Lord and his minotaurs keep only what their records give them"
-  },
-  {
-   "id": "minotaurtest2",
-   "name": "the Minotaur Lord of Minotaur's Rest (axe test 2)",
-   "enabled": true,
-   "devOnly": true,
-   "traceEquipment": true,
+   "_adds": "Nat, 25 Oct: the minotaurs come back at Minotaur's Rest as his adds; each gets its war axe back in its inventory (rearmAdds), as the Lord's test 2 does",
    "rearmEdid": "BSKMinotaurLordAxe",
-   "hold": "bruma",
-   "world": "a764b:BSHeartland.esm",
-   "spots": [
-    {
-     "id": "MR2",
-     "pos": [
-      124825.28,
-      173249.66,
-      -7136.22
-     ],
-     "heading": 80.2,
-     "note": "Minotaur's Rest, a minotaur spot (178581:DragonBreak Online Edits.esp)"
-    }
-   ],
-   "bossEdid": "CYREncMinotaur02Lord",
-   "addEdids": [
-    "CYREncMinotaur"
-   ],
-   "openingAdds": 0,
-   "waves": [
-    [
-     0.66,
-     2
-    ],
-    [
-     0.33,
-     2
-    ]
-   ],
-   "toughness": 0.5,
-   "damageMult": 1.25,
-   "enrageSeconds": 600,
-   "enrage": {
-    "toughness": 0.25,
-    "damageMult": 2
-   },
-   "respawnSeconds": 600,
-   "radius": 5000,
-   "announce": {
-    "spawn": "",
-    "death": ""
-   },
-   "drops": {
-    "alwaysEdid": [
-     [
-      "CYRMinotaurHorn",
-      2
-     ],
-     [
-      "CYRMinotaurHide",
-      1
-     ]
-    ],
-    "always": [
-     [
-      "f:Skyrim.esm",
-      100
-     ]
-    ],
-    "schematic": {
-     "family": "steelplate",
-     "chance": 0.05,
-     "knownBonus": 0
-    }
-   },
-   "_test": "B9 test 2: the same, its axe put back in its inventory after spawn (dungeons.js's arming), worn at the next host grant",
-   "rearmAddsEdid": "BSKMinotaurWarAxe",
-   "_adds": "Nat, 25 Oct: the minotaurs come back at Minotaur's Rest as his adds; each gets its war axe back in its inventory (rearmAdds), as the Lord's test 2 does"
+   "_rearmNote": "Nat 26 Oct: the two dev tests (minotaurtest1, minotaurtest2) stood under this boss's own name, which put two 'The Minotaur Lord' plates up at once; both kept the axe at spawn (dev 26 Oct 03:49, 6026df), so the Lord takes test 2's set-up (rearmEdid, which puts the axe back if it is ever lost) and the tests are gone"
   },
   {
    "id": "werewolfbehemoth",
    "name": "the Behemoth of Hircine's Hunt",
+   "plateName": "Gorefang",
    "enabled": true,
-   "devOnly": true,
    "hold": "falkreath",
    "world": "3c:Skyrim.esm",
    "night": true,
@@ -991,16 +1237,164 @@
      "chance": 0.05,
      "knownBonus": 0
     },
-    "extraSchematic": {
-     "family": "glass",
-     "chance": 0.01
+    "pool": {
+     "picks": 2,
+     "edids": [
+      [
+       "WolfPelt",
+       4,
+       2
+      ],
+      [
+       "OreSilver",
+       3,
+       3
+      ],
+      [
+       "SabrecatTooth",
+       2,
+       2
+      ],
+      [
+       "BearPelt",
+       2,
+       1
+      ],
+      [
+       "SabreCatPelt",
+       2,
+       1
+      ],
+      [
+       "SoulGemGreater",
+       1,
+       1
+      ]
+     ]
     }
    },
-   "waitingOn": "the dev test (bosses.devOnly on the dev server, with the restart DLE d0831dd6 that carries 1D2207): a werewolf pack streamed to several watchers, and the Behemoth about a third taller than its Werewolf Brute adds",
    "_note": "Proposed 25 Oct (the Leader for Nat): vanilla's top werewolf boss (EncWerewolf06Boss, Dawnguard's ladder) named and rim-lit; the server's SetScale is a stub, so the boss is its own NPC_ on the Behemoth race (DLE 1D2207, Nat 25 Oct: 1.3x the pack: race 1.30 x NAM6 1.13 = 1.47 against the adds' 1.13). Pack: a werewolf and two wolves at the start, then 3 and 4 more (werewolf, wolf, wolf in turn). Drops: a Werewolf Pelt (Hothtrooper's werewolf fur and leather recipes take it) and three wolf pelts, gold, Silver 5% (the hunter's metal, Hircine's joke), Glass 1%. Every zone is hostile, player werewolves included. fullMoon true (here or in its config block) keeps it to full-moon nights",
    "bossDesc": "1d2207:DragonBreak Online Edits.esp",
    "bossLevel": 42,
    "bossConfirmedBy": "Worker 3, 25 Oct: merged into the restart DLE d0831dd6 as 491D2207, read back: TPLT EncWerewolf06Boss (level 42), race DBO_WerewolfBehemothRace 1D1F9E, NAM6 1.13, FULL 'Werewolf Behemoth'"
+  },
+  {
+   "id": "giantchieftain",
+   "name": "the Chieftain of Blizzard Rest",
+   "plateName": "Gromm Stonefist",
+   "enabled": true,
+   "hold": "dawnstar",
+   "world": "3c:Skyrim.esm",
+   "_note": "Nat 26 Oct: 'We should make a giant boss too', built with the proposal's defaults: Blizzard Rest (BlizzardRestLocation 018EEE), the most remote of the twelve giant camps; a vanilla giant at normal size (a scaled-race Chieftain is a later, separate item); a bull mammoth guards him; mammoths and a giant come in waves. Giants take half damage from magic (npcToughness.giant), so it is a fight for weapons. Schematic: Steel Plate, the heavy plate a giant's strength calls for",
+   "spots": [
+    {
+     "id": "BR",
+     "pos": [
+      38300,
+      37700,
+      -8742.5
+     ],
+     "note": "Blizzard Rest, the camp's floor south of its chest, cell (9, 9): on navmesh (-8742.5 over terrain -8797), nothing placed within 330 units, 900+ from the camp's wild giant and mammoths"
+    }
+   ],
+   "bossEdid": "EncGiant01",
+   "guardian": {
+    "edid": "EncMammothWild",
+    "offset": [
+     260,
+     180,
+     0
+    ],
+    "name": "the Chieftain's bull",
+    "bossToughnessWhileAlive": 0.7
+   },
+   "addEdids": [
+    "EncMammothWild",
+    "EncGiant02"
+   ],
+   "openingAdds": 2,
+   "waves": [
+    [
+     0.66,
+     2
+    ],
+    [
+     0.33,
+     2
+    ]
+   ],
+   "toughness": 0.5,
+   "damageMult": 1.0,
+   "enrageSeconds": 480,
+   "enrage": {
+    "toughness": 0.3,
+    "damageMult": 1.5
+   },
+   "respawnSeconds": 10800,
+   "radius": 6000,
+   "announce": {
+    "spawn": "Drums thunder at Blizzard Rest: the giants have a Chieftain.",
+    "death": "The Chieftain of Blizzard Rest is dead, and his bull with him."
+   },
+   "drops": {
+    "alwaysEdid": [
+     [
+      "GiantToes",
+      2
+     ],
+     [
+      "MammothTusk",
+      2
+     ]
+    ],
+    "always": [
+     [
+      "f:Skyrim.esm",
+      250
+     ]
+    ],
+    "schematic": {
+     "family": "steelplate",
+     "chance": 0.05,
+     "knownBonus": 0
+    },
+    "pool": {
+     "picks": 2,
+     "edids": [
+      [
+       "GiantToes",
+       4,
+       1
+      ],
+      [
+       "MammothTusk",
+       4,
+       1
+      ],
+      [
+       "GiantLichen",
+       3,
+       3
+      ],
+      [
+       "PowderedMammothTusk",
+       2,
+       2
+      ],
+      [
+       "GemDiamond",
+       1,
+       1
+      ],
+      [
+       "SoulGemGrand",
+       1,
+       1
+      ]
+     ]
+    }
+   }
   }
- ]
+ ],
+ "_plateNames": "Nat 26 Oct: 'make better name tags for them above their health bar'. plateName is the big line of a boss's nameplate, its name the smaller title line under it (bosses.js sendLabels, the client's actorLabelService). Movarth Piquine and Karstaag are their lore names; the rest are new and can be changed here"
 }
