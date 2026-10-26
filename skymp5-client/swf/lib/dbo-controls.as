@@ -24,6 +24,7 @@ function button(parent, name, depth, x, y, w, label, font, size, rest, onPick)
    c.onRollOut = function()
    {
       this._alpha = this.rest;
+      dboWash(this, false);
       // so the mouse coming back focuses it again
       if (focus == this.idx)
       {
@@ -61,9 +62,11 @@ function setFocus(i)
    if (focus >= 0 && focus < actions.length)
    {
       actions[focus]._alpha = actions[focus].rest;
+      dboWash(actions[focus], false);
    }
    focus = i;
    actions[focus]._alpha = A_FOCUS;
+   dboWash(actions[focus], true);
    dboSound("UIMenuFocus");
 }
 
@@ -75,3 +78,4 @@ function clear(name, depth)
    }
    return panel.createEmptyMovieClip(name, depth);
 }
+

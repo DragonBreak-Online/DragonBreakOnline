@@ -123,8 +123,7 @@ function headline(text)
 function drawTabs()
 {
    var h = clear("head", 20);
-   var title = dboText(h, "title", 1, PAD, 18, PANEL_W - PAD * 2, 40, dboFmt(F_PLAIN, 30, C_TEXT, 1.0), false);
-   title.text = String(data.boardName) + " Notice Board";
+   dboTitle(h, "title", 1, PAD, 18, PANEL_W - PAD * 2, String(data.boardName) + " Notice Board");
    // The board's tabs, each as wide as its label, and under them the other panels it opens, in the same weight
    var x = PAD;
    for (var k = 0; k < data.tabs.length; k++)
@@ -141,6 +140,10 @@ function drawTabs()
          draw();
       });
       b.tabKey = t.id;
+      if (t.id == tabId)
+      {
+         dboTabMark(b, tabWidth(label) - 28);
+      }
       x += tabWidth(label) + 8;
    }
    x = PAD;
@@ -154,12 +157,12 @@ function drawTabs()
       hb.arg = HANDOVERS[j][2];
       x += tabWidth(HANDOVERS[j][0]) + 8;
    }
-   dboRule(h, PAD, 138, PANEL_W - PAD * 2);
+   dboDivider(h, PAD, 140, PANEL_W - PAD * 2);
 }
 
 function tabWidth(label)
 {
-   return String(label).length * 11 + 28;
+   return String(label).length * 10 + 28;
 }
 
 function drawList()
@@ -193,6 +196,8 @@ function drawList()
       c._alpha = A_ROW_REST;
       c.noteId = n.id;
       c.rowIndex = i;
+      c.washW = PANEL_W - PAD * 2;
+      c.washH = ROW_H - 4;
       c.idx = actions.length;
       actions.push(c);
       c.onPick = function()
@@ -375,7 +380,7 @@ function drawFoot(pages)
 {
    var f = clear("foot", 60);
    var y = FOOT_Y;
-   dboRule(f, PAD, y - 8, PANEL_W - PAD * 2);
+   dboDivider(f, PAD, y - 10, PANEL_W - PAD * 2);
    var t = currentTab();
    var cost = Number(t.cost) || 0;
    var hint = dboText(f, "hint", 1, PAD, y, PANEL_W - PAD * 2, 24, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8), false);
@@ -440,7 +445,8 @@ function build()
    panel = _root.createEmptyMovieClip("dboPanel", 10);
    dboFit(panel, PANEL_W, PANEL_H);
    var bg = panel.createEmptyMovieClip("bg", 1);
-   dboBox(bg, 0, 0, PANEL_W, PANEL_H, 0x000000, 80);
+   dboGround(bg, PANEL_W, PANEL_H);
+   dboWatermark(panel, 5, PANEL_W - 50, 170, 300);
    dboFadeIn(panel);
 }
 

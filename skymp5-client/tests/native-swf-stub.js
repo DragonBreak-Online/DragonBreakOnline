@@ -19,6 +19,7 @@ const clip = (name) => {
   // fills are recorded so tests/native-render.js can draw the panel
   c.fills = [];
   c.beginFill = (color, alpha) => { c._fill = { color, alpha: alpha === undefined ? 100 : alpha, pts: [] }; };
+  c.beginGradientFill = (type, colors, alphas, ratios, m) => { c._fill = { gradient: { colors, alphas, ratios, r: (m && m.r) || 0 }, color: colors[0], alpha: 100, pts: [] }; };
   c.moveTo = (x, y) => { if (c._fill) c._fill.pts.push([x, y]); };
   c.lineTo = (x, y) => { if (c._fill) c._fill.pts.push([x, y]); };
   c.endFill = () => { if (c._fill) c.fills.push(c._fill); c._fill = null; };
@@ -47,6 +48,11 @@ const boot = (menu, late, extra) => {
     getTimer: () => st.time,
     Math, String, Number, isNaN, isFinite, parseInt,
   };
+  // a loaded picture is recorded on its clip (the renderer draws it); our hourglass art is 420 x 520
+  function MovieClipLoader() { this.ls = []; }
+  MovieClipLoader.prototype.addListener = function (l) { this.ls.push(l); };
+  MovieClipLoader.prototype.loadClip = function (p, target) { target._image = p; target._width = 420; target._height = 520; for (const l of this.ls) if (l.onLoadInit) l.onLoadInit(target); };
+  ctx.MovieClipLoader = MovieClipLoader;
   Object.assign(ctx, extra || {});
   vm.createContext(ctx);
   vm.runInContext(sourceOf(menu), ctx);

@@ -154,6 +154,7 @@ function setFocus(i)
       var r = panel.rows["row" + k];
       r._alpha = k == focus ? A_FOCUS : A_ROW_REST;
       r.underline._visible = k == focus;
+      dboWash(r, k == focus);
    }
 }
 
@@ -169,8 +170,8 @@ function clearClip(name, depth)
 function draw()
 {
    var daedric = data.kind == "daedra";
-   titleTf.text = data.shrine != undefined && data.shrine != "" ? String(data.shrine) : "Shrine of " + data.deity;
-   titleTf.textColor = daedric ? C_DAEDRIC : C_TEXT;
+   titleTf.text = (data.shrine != undefined && data.shrine != "" ? String(data.shrine) : "Shrine of " + data.deity).toUpperCase();
+   titleTf.textColor = daedric ? C_DAEDRIC : C_SILVER;
    var sphereAll = data.sphere == undefined ? "" : String(data.sphere);
    var cut = sphereAll.indexOf(". ");
    sphereTf.text = sphereAll.length ? data.deity + ": " + (cut > 0 ? sphereAll.substr(0, cut + 1) : sphereAll) : "";
@@ -193,7 +194,7 @@ function draw()
    if (!done() && spoken < verses.length)
    {
       y += 10;
-      dboRule(rows, PAD, y, PANEL_W - PAD * 2);
+      dboDivider(rows, PAD, y, PANEL_W - PAD * 2);
       y += 8;
       var lines = verses[spoken].lines;
       for (var j = 0; j < lines.length && j < 9; j++)
@@ -213,6 +214,10 @@ function draw()
          dboRule(u, PAD + 34, ROW_H - 5, PANEL_W - PAD * 2 - 44);
          u._visible = j == focus;
          r._alpha = j == focus ? A_FOCUS : A_ROW_REST;
+         r.washX = PAD;
+         r.washW = PANEL_W - PAD * 2;
+         r.washH = ROW_H - 4;
+         dboWash(r, j == focus);
          r.idx = j;
          r.onRollOver = function()
          {
@@ -250,14 +255,19 @@ function draw()
    var at = dboText(act, "label", 1, PAD, 2, 150, 28, dboFmt(F_MEDIUM, 22, C_TEXT, 0.8, "left"), false);
    at.text = label;
    act._alpha = A_BUTTON_REST;
+   act.washX = PAD;
+   act.washW = 150;
+   act.washH = 30;
    act.onRollOver = function()
    {
       this._alpha = A_FOCUS;
+      dboWash(this, true);
       dboSound("UIMenuFocus");
    };
    act.onRollOut = function()
    {
       this._alpha = A_BUTTON_REST;
+      dboWash(this, false);
    };
    act.onRelease = function()
    {
@@ -269,8 +279,8 @@ function draw()
 
    var h = y + 30 + PAD;
    panel.bg.clear();
-   dboBox(panel.bg, 0, 0, PANEL_W, h, 0x000000, 80);
-   dboRule(panel.bg, PAD, 100, PANEL_W - PAD * 2);
+   dboGround(panel.bg, PANEL_W, h);
+   dboDivider(panel.bg, PAD, 100, PANEL_W - PAD * 2);
 }
 
 function reset(p)
@@ -313,7 +323,8 @@ function build()
    // as tall as its verses at most; centred at the size of the tallest
    dboFit(panel, PANEL_W, 500);
    panel.createEmptyMovieClip("bg", 1);
-   titleTf = dboText(panel, "titleTf", 2, PAD, 22, PANEL_W - PAD * 2, 40, dboFmt(F_PLAIN, 30, C_TEXT, 1.0), false);
+   dboWatermark(panel, 6, PANEL_W - 40, 110, 220);
+   titleTf = dboTitle(panel, "titleTf", 2, PAD, 22, PANEL_W - PAD * 2, "");
    sphereTf = dboText(panel, "sphereTf", 3, PAD, 64, PANEL_W - PAD * 2, 26, dboFmt(F_MEDIUM, 18, C_SECOND, 0.8), false);
    statusTf = dboText(panel, "statusTf", 4, PAD, 110, PANEL_W - PAD * 2, 34, dboFmt(F_MEDIUM, 20, C_TEXT, 0.8), true);
    keysTf = dboText(panel, "keysTf", 5, PAD + 170, 0, PANEL_W - PAD * 2 - 170, 24, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8, "right"), false);
