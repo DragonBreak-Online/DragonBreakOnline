@@ -30,9 +30,22 @@ export const UI_SEP = "\u0001";
 export const DBO_PREFIX = "dbo:";
 
 // The panels this client can render natively. The server gates on these and falls back to the browser
-// widget or to chat for a client that does not name them, so an old client keeps working untouched.
+// widget or to chat for a client that does not name them, so an old client keeps working untouched - and
+// withholding a cap is therefore the fallback switch, with no rebuild needed to go back to CEF.
 export const NATIVE_CAPS = ["native:prayer", "native:decor"];
 export const CAPS_RETRY_MS = 5000;
+
+// sp.settings["skymp5-client"]["nativePanels"]: true or absent announces them all, false announces none, and
+// an object turns them off one at a time, e.g. { decor: false } to put the G key back on the CEF panel while
+// prayer stays native. Mirrors the creatureGuard flag: a panel that misbehaves in a session can be put back
+// without waiting for another client build.
+export const capsFor = (setting: unknown): string[] => {
+  if (setting === false) return [];
+  if (setting === undefined || setting === null || setting === true) return NATIVE_CAPS.slice();
+  if (typeof setting !== "object") return NATIVE_CAPS.slice();
+  const off = setting as Record<string, unknown>;
+  return NATIVE_CAPS.filter((cap) => off[cap.replace("native:", "")] !== false);
+};
 
 export const MAX_PAYLOAD_CHARS = 60000;
 // openCustomMenu queues a UI message, so the menu is not there when the call returns. If ready never

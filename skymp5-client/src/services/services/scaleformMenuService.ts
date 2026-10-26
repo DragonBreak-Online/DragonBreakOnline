@@ -5,7 +5,7 @@ import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { parseCustomPacket, sendCustomPacket } from "./customPacketUtil";
 import {
-  Action, CAPS_RETRY_MS, MENU_NAME, MenuState, NATIVE_CAPS, OUT_VAR, UiEvent, isNew, newState, parseOutbox,
+  Action, CAPS_RETRY_MS, MENU_NAME, MenuState, OUT_VAR, UiEvent, capsFor, isNew, newState, parseOutbox,
   parseUiEvent, planClose, planOpen, planReady, planTick, readyFrameOf, serverEventName, summary,
 } from "./scaleformMenu";
 
@@ -33,12 +33,15 @@ export class ScaleformMenuService extends ClientListener {
   // error anywhere, so it is announced on connect and once again a few seconds later.
   private announce(why: string): void {
     try {
+      const caps = capsFor(this.nativePanelsSetting());
       sendCustomPacket(this.controller, {
-        customPacketType: "dbo", event: "nativeCaps", args: NATIVE_CAPS.slice(), widget: 0,
+        customPacketType: "dbo", event: "nativeCaps", args: caps, widget: 0,
       });
       this.announcedAt = Date.now();
       this.announces++;
-      logTrace(this, "native caps announced", why, NATIVE_CAPS.join(","));
+      // Logged even when empty, because "no native panels" is a choice someone made and the session should
+      // show it rather than leave us wondering why the browser widget came up.
+      logTrace(this, "native caps announced", why, caps.length ? caps.join(",") : "(none: CEF fallback)");
     } catch (e) {
       logError(this, "could not announce the native caps", e);
     }
@@ -177,6 +180,15 @@ export class ScaleformMenuService extends ClientListener {
         this.note(`action '${a.do}' threw: ${e}`);
         if (a.do === "open") this.state.phase = "closed";
       }
+    }
+  }
+
+  private nativePanelsSetting(): unknown {
+    try {
+      const all = this.sp.settings["skymp5-client"] as Record<string, unknown> | undefined;
+      return all ? all["nativePanels"] : undefined;
+    } catch {
+      return undefined;
     }
   }
 

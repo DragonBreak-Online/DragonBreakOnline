@@ -246,6 +246,23 @@ check('the reason is written down next to it, not just fixed',
   /g_nativeCallRequirements\.vm only inside OnUpdate/.test(SVC));
 check('the frame skse appeared on is logged, since that number was unknown', /ready on frame/.test(SVC));
 check('a failed action is reported rather than swallowed', /logError\(this, `Scaleform action '\$\{a\.do\}' failed`/.test(SVC));
+// The fallback switch: the server gates on what we announce, so withholding a cap puts CEF back with no
+// rebuild. Absent must mean "all", or an existing settings file silently turns the panels off.
+check('an absent setting announces every panel, so no settings file is needed',
+  () => M.capsFor(undefined).length === 2 && M.capsFor(null).length === 2 && M.capsFor(true).length === 2);
+check('false announces none, which is the whole-panel CEF fallback', M.capsFor(false).length === 0);
+check('one panel can be turned off without the other', () => {
+  const c = M.capsFor({ decor: false });
+  return c.length === 1 && c[0] === 'native:prayer';
+}, M.capsFor({ decor: false }));
+check('...and the other way round', () => {
+  const c = M.capsFor({ prayer: false });
+  return c.length === 1 && c[0] === 'native:decor';
+});
+check('an unrelated key does not turn anything off', M.capsFor({ nonsense: false }).length === 2);
+check('a junk setting falls back to announcing all rather than nothing',
+  () => M.capsFor('yes').length === 2 && M.capsFor(7).length === 2);
+
 check('the caps the server gates on are declared, both panels', () => M.NATIVE_CAPS.length === 2
   && M.NATIVE_CAPS.indexOf('native:prayer') >= 0 && M.NATIVE_CAPS.indexOf('native:decor') >= 0, M.NATIVE_CAPS);
 check('they are announced on connect, as their own event so the browser uiCaps is not replaced',
