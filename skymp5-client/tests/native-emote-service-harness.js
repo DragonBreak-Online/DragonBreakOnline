@@ -85,6 +85,7 @@ const world = (nativeOn, focused) => {
   w.press(B);
   const o = w.S.native[0];
   ok(o && o.open === 'emoteWheel' && o.widgetId === 24 && !w.S.browser.length, 'B opens the wheel natively when the router takes it, and not in the browser', w.S);
+  ok(o.widget.last === '', 'nothing played yet: widget.last is empty', o.widget.last);
   ok(o.widget.type === 'emoteWheel' && o.widget.id === 24 && o.widget.groups.length === 6 && o.widget.events.play === 'emote:play' && o.widget.events.stop === 'emote:stop' && o.widget.events.close === 'emote:close',
     'the router gets the widget object the panel reads: type, id, the six groups and the events', o.widget);
   w.S.focused = false;
@@ -95,6 +96,7 @@ const world = (nativeOn, focused) => {
   ok(w.S.native.some((x) => x.close === 'emoteWheel') && w.S.notes.some((n) => /^play IdleWave/.test(n)), 'emote:play from the panel plays as the browser\'s does, and closes the native wheel', w.S.notes);
   w.S.native.length = 0;
   w.press(B);
+  ok(w.S.native[0].widget.last === 'IdleWave', 'the next opening tells the panel the emote played last (widget.last)', w.S.native[0].widget.last);
   w.key('close', ['selfClosed']);
   ok(!w.S.native.some((x) => x.close), 'the panel closing itself clears the wheel without closing it again', w.S.native);
   w.press(B);

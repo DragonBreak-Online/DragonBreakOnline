@@ -300,6 +300,8 @@ export class EmoteService extends ClientListener {
     }
     if (key === events.play) {
       const anim = typeof args[0] === "string" ? (args[0] as string) : "";
+      // The native wheel is loaded afresh each time: it opens on the emote chosen last, as the browser wheel remembers it
+      this.lastAnim = anim;
       // The player's own choice is never the server's idle, even when it is the same clip
       this.serverIdle = "";
       this.closeMenu(`a choice (${anim || "?"})`);
@@ -593,7 +595,7 @@ export class EmoteService extends ClientListener {
     // The native wheel when the client has it (swf/dbo_emotes), else the browser one
     if (!this.noNative) {
       const scaleform = this.controller.lookupListener(ScaleformMenuService);
-      const widget = { type: "emoteWheel", id: WIDGET_ID, groups: GROUPS, events };
+      const widget = { type: "emoteWheel", id: WIDGET_ID, groups: GROUPS, events, last: this.lastAnim };
       if (scaleform && scaleform.openNative({ type: "emoteWheel", widget, widgetId: WIDGET_ID, onKey: (k, a) => this.handleKey(k, a) })) {
         this.native = true;
         emoteNote("wheel open (native)");
@@ -653,6 +655,8 @@ export class EmoteService extends ClientListener {
   // The wheel is the native panel (openNative), and the browser one for the rest of an opening whose panel failed
   private native = false;
   private noNative = false;
+  // The emote chosen last on either wheel, for the native one's widget.last
+  private lastAnim = "";
   private openedAt = 0;
   private unfocusedSince = 0;
   private lastWatch = 0;
