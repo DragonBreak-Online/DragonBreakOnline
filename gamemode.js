@@ -4007,17 +4007,31 @@ const sendPacket = (a, payload) => {
 };
 // Native Scaleform panels (client scaleformMenuService, fork swf/): a widget of these types goes to a client that sent
 // nativeCaps naming it as a dboScaleform packet instead; the payload is the same object the browser widget gets
-const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor' };
-const nativeState = () => { const p = globalThis.__dboPanelState || (globalThis.__dboPanelState = { caps: new Map(), nonces: new Map() }); if (!p.native) p.native = new Map(); if (!p.nativeOpen) p.nativeOpen = new Map(); return p; };
+const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_journal' };
+// nativeOpen: actor -> the widget id on the custom menu; browserOpen: actor -> a widget of these types last sent to the browser
+const nativeState = () => { const p = globalThis.__dboPanelState || (globalThis.__dboPanelState = { caps: new Map(), nonces: new Map() }); if (!p.native) p.native = new Map(); if (!p.nativeOpen) p.nativeOpen = new Map(); if (!p.browserOpen) p.browserOpen = new Map(); return p; };
 const nativeSwfFor = (a, widget) => {
   const swf = widget && NATIVE_SWF[widget.type];
   if (!swf || (widget.type === 'prayer' && widget.mode !== 'pick')) return '';
   const c = nativeState().native.get(a >>> 0);
-  return c && c.has('native:' + widget.type) ? swf : '';
+  if (!c || !c.has('native:' + widget.type)) return '';
+  // The journal is native per hub tab, for each tab the client's swf draws; Profile and Settings stay in the browser
+  if (widget.type === 'journal' && (widget.browser || !(widget.hub && c.has('native:journalTab:' + widget.tab)))) return '';
+  return swf;
 };
+// A widget that moves between the custom menu and the browser (the journal changing tab) closes where it was first
 const openWidget = (a, widget, focus) => {
   const swf = nativeSwfFor(a, widget);
-  if (swf) { nativeState().nativeOpen.set(a >>> 0, widget.id); return sendPacket(a, { customPacketType: 'dboScaleform', swf, payload: widget, widget: widget.id }); }
+  const st = nativeState(), id = a >>> 0;
+  if (swf) {
+    if (st.browserOpen.get(id) === widget.id) { st.browserOpen.delete(id); sendPacket(a, { customPacketType: 'dboWidget', close: widget.id }); }
+    st.nativeOpen.set(id, widget.id);
+    return sendPacket(a, { customPacketType: 'dboScaleform', swf, payload: widget, widget: widget.id });
+  }
+  if (widget && NATIVE_SWF[widget.type]) {
+    if (st.nativeOpen.get(id) === widget.id) { st.nativeOpen.delete(id); sendPacket(a, { customPacketType: 'dboScaleform', close: true }); focus = true; }
+    st.browserOpen.set(id, widget.id);
+  }
   const sent = sendPacket(a, { customPacketType: 'dboWidget', widget, focus: !!focus });
   // Another focused panel takes the screen from an open Character Journal (journal.js): the new one is sent first, then the
   // journal goes as a plain close, which keeps the cursor on the new one (the panel handoff rule)
@@ -4026,6 +4040,7 @@ const openWidget = (a, widget, focus) => {
 };
 const closeWidget = (a, id) => {
   const open = nativeState().nativeOpen;
+  if (nativeState().browserOpen.get(a >>> 0) === id) nativeState().browserOpen.delete(a >>> 0);
   if (open.get(a >>> 0) === id) { open.delete(a >>> 0); return sendPacket(a, { customPacketType: 'dboScaleform', close: true }); }
   return sendPacket(a, { customPacketType: 'dboWidget', close: id });
 };
@@ -4227,7 +4242,7 @@ const closePlayerMenu = (a) => { panelState.nonces.delete(a >>> 0); closeWidget(
 onUi('uiCaps', (a, args) => { panelState.caps.set(a >>> 0, new Set((args || []).map(String))); });
 // The client's native panels, kept apart from the browser's caps so neither list replaces the other
 onUi('nativeCaps', (a, args) => { nativeState().native.set(a >>> 0, new Set((args || []).map(String).filter((c) => c.startsWith('native:')))); });
-onUi('close', (a, args, widgetId) => { const open = nativeState().nativeOpen; if (open.get(a >>> 0) === widgetId) open.delete(a >>> 0); });
+onUi('close', (a, args, widgetId) => { for (const m of [nativeState().nativeOpen, nativeState().browserOpen]) if (m.get(a >>> 0) === widgetId) m.delete(a >>> 0); });
 onUi('menuOpen', (a, args) => {
   if (!hasPlayerMenu(a)) return;
   let tab = String((args || [])[0] || '');
@@ -4271,7 +4286,7 @@ const worldView = (a) => ({
     ? globalThis.__dboJournalSections : (globalThis.__dboJournalSections = {});
   SECTIONS.world = { visible: () => true, view: (a) => worldView(a), label: 'World' };
 }
-globalThis.__dboPanelLeave = (a) => { panelState.caps.delete(a >>> 0); panelState.nonces.delete(a >>> 0); nativeState().native.delete(a >>> 0); nativeState().nativeOpen.delete(a >>> 0); };
+globalThis.__dboPanelLeave = (a) => { panelState.caps.delete(a >>> 0); panelState.nonces.delete(a >>> 0); nativeState().native.delete(a >>> 0); nativeState().nativeOpen.delete(a >>> 0); nativeState().browserOpen.delete(a >>> 0); };
 
 // ---- meals: eating takes time (Nate, 2026-09-27, from athny's and dunthril's reports) ----------------------------------
 // The engine uses the food up at once; its hunger counts only when the meal is finished. The client (MealService) slows
