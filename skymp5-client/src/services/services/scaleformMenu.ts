@@ -39,7 +39,59 @@ export interface UiEvent {
   args: unknown[];
   // the frame the SWF saw _global.skse appear on, which is the number nobody had written down
   frame: number;
+  // the SWF's own counter, so the same message arriving on both channels is handled once
+  seq: number;
 }
+
+// MEASURED 26 Oct: skse.Log works from the movie (its line is in skse64.log) but SendModEvent never reached
+// on('modEvent') - and nothing else in this client has ever subscribed to that event, so the path may simply
+// not work in our build. The PULL direction is proven: Ui.setFloat already drives the vanilla HUD today.
+// So the SWF also appends every message to a string the client reads with Ui.getString, and the client takes
+// whichever channel arrives first. A record is seq + US + key + US + json, records joined by RS.
+export const OUT_VAR = "_root.dboOut";
+export const REC_SEP = "";
+export const UNIT_SEP = "";
+
+export interface Outbox {
+  messages: UiEvent[];
+  consumed: number;
+}
+
+// The SWF only ever APPENDS and the client never writes back, so there is no window in which a message
+// written between a read and a clear is lost. The cursor is the client's alone.
+export const parseOutbox = (raw: unknown, consumed: number): Outbox => {
+  const s = String(raw === undefined || raw === null ? "" : raw);
+  const from = Math.max(0, Math.min(consumed, s.length));
+  const out: UiEvent[] = [];
+  if (s.length <= from) return { messages: out, consumed: from };
+  const tail = s.slice(from);
+  // A trailing partial record (the SWF appends the separator last) is left for the next read
+  const parts = tail.split(REC_SEP);
+  const whole = parts.slice(0, parts.length - 1);
+  let used = from;
+  for (const rec of whole) {
+    used += rec.length + REC_SEP.length;
+    if (!rec) continue;
+    const a = rec.indexOf(UNIT_SEP);
+    const b = a < 0 ? -1 : rec.indexOf(UNIT_SEP, a + 1);
+    if (a < 0 || b < 0) continue;
+    const seq = Math.round(Number(rec.slice(0, a)) || 0);
+    const key = rec.slice(a + 1, b);
+    if (!key) continue;
+    let args: unknown[] = [];
+    const json = rec.slice(b + 1);
+    if (json) {
+      try {
+        const parsed = JSON.parse(json);
+        args = Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        continue;
+      }
+    }
+    out.push({ key, args, frame: 0, seq });
+  }
+  return { messages: out, consumed: used };
+};
 
 // null means "not ours, leave it alone".
 export const parseUiEvent = (eventName: string, strArg: string, numArg: number): UiEvent | null => {
@@ -63,7 +115,8 @@ export const parseUiEvent = (eventName: string, strArg: string, numArg: number):
     }
   }
   const frame = Math.max(0, Math.round(Number(numArg) || 0));
-  return { key, args, frame };
+  // A mod event carries no sequence, so it can only be de-duplicated by key; the outbox is the numbered one.
+  return { key, args, frame, seq: 0 };
 };
 
 // What a "dbo:*" key becomes on the wire. Returns "" for a key that is not one, so the caller can tell.
@@ -91,12 +144,18 @@ export interface MenuState {
   readyAt: number;
   readyFrame: number;
   sent: number;
+  // how much of the SWF's outbox string this client has already handled
+  outRead: number;
+  lastSeq: number;
+  viaOutbox: number;
+  viaModEvent: number;
   foreignEvents: number;
 }
 
 export const newState = (): MenuState => ({
   phase: "closed", swf: "", json: "null", widgetId: 0,
   openedAt: 0, readyAt: 0, readyFrame: 0, sent: 0, foreignEvents: 0,
+  outRead: 0, lastSeq: 0, viaOutbox: 0, viaModEvent: 0,
 });
 
 export type Action =
@@ -117,6 +176,8 @@ export const planOpen = (s: MenuState, swf: unknown, payload: unknown, widgetId:
   s.phase = "opening";
   s.openedAt = now;
   s.readyAt = 0;
+  s.outRead = 0;
+  s.lastSeq = 0;
   return [{ do: "open", swf: s.swf }];
 };
 
@@ -148,12 +209,25 @@ export const planTick = (s: MenuState, now: number): Action[] => {
   ];
 };
 
+// True when this message has not been handled yet. The same message can arrive twice, once per channel.
+export const isNew = (s: MenuState, m: UiEvent): boolean => {
+  if (m.seq > 0) {
+    if (m.seq <= s.lastSeq) return false;
+    s.lastSeq = m.seq;
+    return true;
+  }
+  // No sequence means it came by mod event. If the outbox has already delivered past this point, the
+  // outbox copy wins and this is the duplicate.
+  return s.lastSeq === 0;
+};
+
 export const summary = (s: MenuState): string => {
   // readyAt, not openedAt: testing a timestamp for truthiness makes the line claim "never became ready"
   // about a panel that did, and a diagnostic that lies is worse than none.
   const opened = s.readyAt > 0
     ? `${s.readyAt - s.openedAt}ms to ready on frame ${s.readyFrame}`
     : "never became ready";
-  return `swf=${s.swf} phase=${s.phase} ${opened} payload=${s.json.length}ch sent=${s.sent}` +
+  return `swf=${s.swf} phase=${s.phase} ${opened} payload=${s.json.length}ch sent=${s.sent} ` +
+    `in=${s.viaOutbox}outbox/${s.viaModEvent}modevent` +
     (s.foreignEvents ? ` (ignored ${s.foreignEvents} mod events from elsewhere)` : "");
 };

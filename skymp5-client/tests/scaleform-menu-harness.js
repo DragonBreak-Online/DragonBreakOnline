@@ -113,6 +113,62 @@ check('...and names the frame when it did', () => {
   return /50ms to ready on frame 3/.test(line) && /sent=2/.test(line) && /ignored 7 mod events/.test(line);
 }, (() => { const t = M.newState(); M.planOpen(t, 'x', {}, 1, 0); M.planReady(t, 3, 50); t.sent = 2; t.foreignEvents = 7; return M.summary(t); })());
 
+// ---- 5b. the polled outbox, the channel that does not depend on modEvent ------------------------------------------
+const RS = '\u001e', US = '\u001f';
+const rec = (seq, key, json) => seq + US + key + US + (json || '') + RS;
+
+let box = M.parseOutbox(rec(1, 'ready', '[1]') + rec(2, 'dbo:testRow', '[0]'), 0);
+check('a full outbox parses into messages in order',
+  () => box.messages.length === 2 && box.messages[0].key === 'ready' && box.messages[1].key === 'dbo:testRow',
+  box.messages);
+check('...each carrying its sequence', () => box.messages[0].seq === 1 && box.messages[1].seq === 2);
+check('...and the cursor lands at the end', box.consumed === rec(1, 'ready', '[1]').length + rec(2, 'dbo:testRow', '[0]').length);
+
+const partial = rec(1, 'ready', '[1]') + '2' + US + 'dbo:half';
+box = M.parseOutbox(partial, 0);
+check('a half-written record is LEFT for the next read, not parsed',
+  () => box.messages.length === 1 && box.consumed === rec(1, 'ready', '[1]').length, box);
+check('...and is picked up once it completes', () => {
+  const full = partial + US + '[7]' + RS;
+  const b2 = M.parseOutbox(full, box.consumed);
+  return b2.messages.length === 1 && b2.messages[0].key === 'dbo:half' && b2.messages[0].args[0] === 7;
+});
+check('nothing new means nothing re-read', () => {
+  const all = rec(1, 'a', '[]');
+  const b = M.parseOutbox(all, all.length);
+  return b.messages.length === 0 && b.consumed === all.length;
+});
+check('a record with bad JSON is skipped, not fatal', () => {
+  const b = M.parseOutbox(rec(1, 'dbo:x', '{bad') + rec(2, 'dbo:y', '[]'), 0);
+  return b.messages.length === 1 && b.messages[0].key === 'dbo:y';
+});
+check('a missing or empty outbox is survivable',
+  () => M.parseOutbox(undefined, 0).messages.length === 0 && M.parseOutbox('', 5).messages.length === 0);
+
+// The whole point of two channels: handle a message once.
+let st = M.newState();
+M.planOpen(st, 'x', {}, 1, 0);
+const viaBox = { key: 'ready', args: [], frame: 0, seq: 1 };
+check('the first delivery is new', M.isNew(st, viaBox) === true);
+check('...and the same sequence arriving again is not', M.isNew(st, { key: 'ready', args: [], frame: 0, seq: 1 }) === false);
+check('...nor is an older one', M.isNew(st, { key: 'ready', args: [], frame: 0, seq: 0.5 }) === false);
+check('a mod event copy after the outbox has delivered is dropped',
+  M.isNew(st, { key: 'ready', args: [], frame: 2, seq: 0 }) === false);
+check('but a mod event is accepted when the outbox has delivered nothing', () => {
+  const t = M.newState(); M.planOpen(t, 'x', {}, 1, 0);
+  return M.isNew(t, { key: 'ready', args: [], frame: 2, seq: 0 }) === true;
+});
+check('the cursor resets on a new open, so a second panel does not skip its own messages', () => {
+  const t = M.newState(); M.planOpen(t, 'x', {}, 1, 0); t.outRead = 500; t.lastSeq = 9;
+  M.planClose(t); M.planOpen(t, 'x', {}, 1, 10);
+  return t.outRead === 0 && t.lastSeq === 0;
+});
+check('the summary says which channel delivered, so one session settles it', () => {
+  const t = M.newState(); M.planOpen(t, 'x', {}, 1, 0); M.planReady(t, 1, 10);
+  t.viaOutbox = 3; t.viaModEvent = 0;
+  return /in=3outbox\/0modevent/.test(M.summary(t));
+}, (() => { const t = M.newState(); M.planOpen(t, 'x', {}, 1, 0); M.planReady(t, 1, 10); t.viaOutbox = 3; return M.summary(t); })());
+
 // ---- 6. the service wiring ----------------------------------------------------------------------------------------
 check('data goes in as ONE invokeString of the whole payload', /invokeString\(MENU_NAME, "_root\.dboData", a\.json\)/.test(SVC));
 check('a panel message goes out as the SAME packet the browser widgets send',
@@ -155,6 +211,9 @@ check('the SWF sends under the event name the service listens for', /DBO_EVENT =
   && /DBO_UI_EVENT = "dboUi"/.test(read('src/services/services/scaleformMenu.ts')));
 check('the SWF uses the same key separator the parser splits on', /DBO_SEP = "\u0001"/.test(AS2));
 check('a row click uses the dbo: prefix the server mapping requires', /send\("dbo:testRow"/.test(AS2));
+check('the SWF writes the outbox the service reads', /_root\.dboOut \+=/.test(AS2) && /OUT_VAR = "_root\.dboOut"/.test(read('src/services/services/scaleformMenu.ts')));
+check('...and both halves use the same record separators', /DBO_RS = "\u001e"/.test(AS2) && /DBO_US = "\u001f"/.test(AS2));
+check('every message is numbered, so two channels cannot double-handle it', /dboSeq\+\+/.test(AS2));
 check('the skse bridge is never assumed anywhere', /function haveSkse\(\)/.test(AS2));
 check('the font is a $-name resolved from the player\'s own gfxfontlib, with nothing shipped',
   /\$EverywhereFont/.test(AS2) && !/\.embedFonts/.test(AS2));

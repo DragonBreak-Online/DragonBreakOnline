@@ -69,7 +69,7 @@ run(['-export', 'script', verifyDir, final]);
 // The shared wire (agreed with Worker 1, 26 Oct): the payload arrives as one JSON string on _root.dboData
 // and everything out goes through SendModEvent. Worker 1's branch moves this list into
 // swf/<name>/verify.txt so each menu names its own; until that merges it stays here.
-const want = ['dboData', 'SendModEvent', '$EverywhereFont'];
+const want = ['dboData', 'SendModEvent', 'dboOut', '$EverywhereFont'];
 let text = '';
 const walk = (d) => {
   for (const e of fs.readdirSync(d, { withFileTypes: true })) {

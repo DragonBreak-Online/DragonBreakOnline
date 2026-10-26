@@ -5,8 +5,8 @@ import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { parseCustomPacket, sendCustomPacket } from "./customPacketUtil";
 import {
-  Action, MENU_NAME, MenuState, newState, parseUiEvent, planClose, planOpen, planReady, planTick,
-  serverEventName, summary,
+  Action, MENU_NAME, MenuState, OUT_VAR, UiEvent, isNew, newState, parseOutbox, parseUiEvent, planClose,
+  planOpen, planReady, planTick, serverEventName, summary,
 } from "./scaleformMenu";
 
 // A real Skyrim Scaleform panel driven from the server, instead of the CEF overlay (Nat, 25 Oct).
@@ -50,6 +50,37 @@ export class ScaleformMenuService extends ClientListener {
         if (this.state.phase !== "closed") this.state.foreignEvents++;
         return;
       }
+      if (!isNew(this.state, parsed)) return;
+      this.state.viaModEvent++;
+      this.handle(parsed);
+    } catch (err) {
+      logError(this, "mod event handling failed", err);
+    }
+  }
+
+  // The proven channel. skse.Log works from the movie but SendModEvent has never been seen to arrive, and
+  // nothing else in this client subscribes to modEvent, so the panel also appends every message to a string
+  // and we read it here with Ui.getString, which is the same native family that already drives the vanilla
+  // HUD. Whichever channel delivers first wins; the sequence number stops a message being handled twice.
+  private drainOutbox(): void {
+    let raw = "";
+    try {
+      raw = String(this.sp.Ui.getString(MENU_NAME, OUT_VAR) || "");
+    } catch (e) {
+      return;
+    }
+    if (!raw || raw.length <= this.state.outRead) return;
+    const box = parseOutbox(raw, this.state.outRead);
+    this.state.outRead = box.consumed;
+    for (const m of box.messages) {
+      if (!isNew(this.state, m)) continue;
+      this.state.viaOutbox++;
+      this.handle(m);
+    }
+  }
+
+  private handle(parsed: UiEvent): void {
+    try {
       if (parsed.key === "ready") {
         // The frame number is the measurement: _global.skse does not exist on frame 1, and until one
         // session reported this nobody knew which frame it does appear on.
@@ -75,7 +106,7 @@ export class ScaleformMenuService extends ClientListener {
       });
       this.state.sent++;
     } catch (err) {
-      logError(this, "mod event handling failed", err);
+      logError(this, "panel message handling failed", err);
     }
   }
 
@@ -89,6 +120,8 @@ export class ScaleformMenuService extends ClientListener {
       this.exec(q);
     }
     if (this.state.phase === "closed") return;
+    // Every tick, not throttled: a click must not wait a quarter of a second to be noticed.
+    if (this.state.phase === "ready") this.drainOutbox();
     const now = Date.now();
     if (now - this.lastTick < 250) return;
     this.lastTick = now;
