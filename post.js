@@ -389,7 +389,8 @@ module.exports = (api) => {
   });
   act('pigeonCollect', (a, z, [id]) => collect(a, id), 'letters');
   act('supplySearch', (a, z, [q]) => { search(a, q); return null; }, 'supply');
-  act('supplyPost', (a, z, [desc, count, reward]) => { const r = post(a, z, desc, count, reward); if (r.ok) S.search.delete(a >>> 0); return r; }, 'supply');
+  // A posted order answers the native coop's supply composer (gamemode.js pigeonHandoff)
+  act('supplyPost', (a, z, [desc, count, reward]) => { const r = post(a, z, desc, count, reward); if (r.ok) { S.search.delete(a >>> 0); if (typeof globalThis.__dboPigeonHandoffDone === 'function') globalThis.__dboPigeonHandoffDone(a, 'supply'); } return r; }, 'supply');
   act('supplyDeliver', (a, z, [id, count]) => deliver(a, z, id, count), 'supply');
   act('supplyCancel', (a, z, [id]) => cancel(a, id), 'supply');
 
