@@ -100,13 +100,15 @@ const SPAWN_ACTIONS = new Set(["kill", "deleteCharacter", "masteryGrant", "maste
 const SPAWN_MODES = new Set(["smite", "healhit"]);
 // Panel actions whose missing target means the staff member themself (resolveTarget)
 const SELF_TARGETED = new Set(["masterySetTier", "masteryDrop", "giveItem", "giveSpells", "giveShouts", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm"]);
-// Turned off for every tier: each learned-spell read costs the square of the list, and a give-all character froze the server
-// Give all spells is batched across ticks and capped. The 17 Oct freeze was not the grant loop itself: a character
-// with every spell learned sent its whole learned-spell array to every player who streamed it in, because
-// MpActor::VisitProperties assigned it outside the owner-only branch (fixed on this branch). What the loop did do was
-// fire one SpSnippet per spell in a single tick, which is bad manners at 252 whatever the broadcast costs, so it now
-// goes out a few per tick. GIVE_ALL_OFF is gone in the same commit as the batching, so there is never a build where
-// the old unbatched path can be reached.
+// Give all spells and Give all shouts are batched across ticks and capped.
+// The 17 Oct freeze was the Papyrus learned-list read: Actor.GetSpellCount and GetNthSpell called
+// IsSpellLearnedFromBase once per learned spell, and each call re-evaluated the NPC_, template, leveled list,
+// SPEL and RACE records plus a parse of the appearance, so one read cost N squared. Jake measured about 4.5 s
+// per read at 331 spells and fixed it in d780bb9a, which is live. An earlier version of this comment blamed
+// the neighbour broadcast instead; that is a real cost but it is not what froze the server.
+// What the grant loop itself did was fire one SpSnippet per spell in a single tick, which is bad manners at
+// 252 however cheap the reads are, so it now goes out a few per tick. GIVE_ALL_OFF is gone in the same commit
+// as the batching, so there is no build where the old unbatched path can be reached.
 const GIVE_ALL_PER_TICK = 8;
 const GIVE_ALL_MAX = 400;
 // Ranks whose roster rows carry each account's Discord id and name (d, dn): Lead GM and above; a GM's rows have them blank

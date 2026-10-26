@@ -460,11 +460,13 @@ void MpActor::VisitProperties(CreateActorMessage& message,
   // each watcher's CreateActor carried the whole learned-spell array and paid
   // for it: the MpChangeForm copy above deep-copies the std::set once per
   // recipient, GetLearnedSpells copies it again, and the dedupe below is a
-  // linear find per base spell. A character given all 254 spells from the
-  // admin panel therefore became a broadcast amplifier and the server froze
-  // (17 Oct). The client never wanted it either: remoteServer.ts reads
-  // props.learnedSpells only under `msg.isMe`, so a watcher received the array
-  // and dropped it on the floor.
+  // linear find per base spell. That is worth avoiding for every character,
+  // not only a give-all one. It was NOT the cause of the 17 Oct freeze: that
+  // was the Papyrus learned-list read (IsSpellLearnedFromBase once per learned
+  // spell, N squared, about 4.5 s per read at 331 spells), fixed in d780bb9a.
+  // The client never wanted this array either: remoteServer.ts reads
+  // props.learnedSpells only under `msg.isMe`, the only read anywhere in the
+  // client, so a watcher received it and dropped it on the floor.
   if (mode == VisitPropertiesMode::All) {
     auto learnedSpells = changeForm.learnedSpells.GetLearnedSpells();
     if (worldState && worldState->HasEspm()) {
