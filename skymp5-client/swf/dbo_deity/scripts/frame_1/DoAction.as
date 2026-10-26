@@ -6,12 +6,12 @@
 var DBO_SWF_VERSION = "deity-1";
 var STAGE_W = 1280;
 var PANEL_W = 1000;
-var PANEL_H = 600;
+var PANEL_H = 640;
 var PAD = 28;
 var ROW_H = 34;
 var MAX_ROWS = 9;
 var LIST_W = 400;
-var LIST_TOP = 162;
+var LIST_TOP = 186;
 var DETAIL_X = 460;
 var NO_DATA_CLOSE_MS = 8000;
 var C_DAEDRIC = 0xC9A86A;
@@ -128,7 +128,7 @@ function marksOf(g)
 
 function selectRow(id)
 {
-   dboSound("UIMenuFocus");
+   dboSound("UIMenuOK");
    selected = id;
    confirming = false;
    draw();
@@ -143,7 +143,7 @@ function drawHead()
    sub.text = subText();
    if (data.notice != undefined && data.notice != "")
    {
-      var n = dboText(h, "notice", 3, PAD, 84, PANEL_W - PAD * 2, 26, dboFmt(F_MEDIUM, 18, C_TEXT, 0.8), false);
+      var n = dboText(h, "notice", 3, PAD, 84, PANEL_W - PAD * 2, 50, dboFmt(F_MEDIUM, 18, C_TEXT, 0.8), true);
       n.text = String(data.notice);
       n.textColor = data.noticeKind == "taken" ? C_HELD : data.noticeKind == "refused" ? C_RED : C_TEXT;
    }
@@ -155,7 +155,7 @@ function drawHead()
       {
          continue;
       }
-      var b = button(h, "tab" + g, 30 + g, x, 116, 180, GROUPS[g][1] + "  " + count, F_BOLD, 20, g == tab ? A_FOCUS : A_ROW_REST, function()
+      var b = button(h, "tab" + g, 30 + g, x, 138, 180, GROUPS[g][1] + "  " + count, F_BOLD, 20, g == tab ? A_FOCUS : A_ROW_REST, function()
       {
          dboSound("UIMenuPrevNext");
          tab = this.group;
@@ -165,7 +165,7 @@ function drawHead()
       b.group = g;
       x += 190;
    }
-   dboRule(h, PAD, 152, PANEL_W - PAD * 2);
+   dboRule(h, PAD, 174, PANEL_W - PAD * 2);
 }
 
 function drawList()
@@ -371,7 +371,7 @@ function build()
 {
    panel = _root.createEmptyMovieClip("dboPanel", 10);
    panel._x = (STAGE_W - PANEL_W) / 2;
-   panel._y = 60;
+   panel._y = 40;
    var bg = panel.createEmptyMovieClip("bg", 1);
    dboBox(bg, 0, 0, PANEL_W, PANEL_H, 0x000000, 80);
    dboFadeIn(panel);

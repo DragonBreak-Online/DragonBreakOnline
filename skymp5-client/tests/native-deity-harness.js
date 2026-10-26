@@ -14,7 +14,7 @@ const picker = (o) => Object.assign({ type: 'deityPicker', id: 36, nonce: 'd1', 
 const msgs = (t, key) => t.msgs().filter((m) => m.key === key);
 const P = (t) => t.root.dboPanel;
 const rowsOf = (t) => Object.keys(P(t).list.kids).filter((n) => /^r\d$/.test(n)).map((n) => P(t).list[n]);
-const closed = (t) => t.sent.some((m) => m.e === 'closeMenu');
+const closed = (t) => t.closed();
 
 {
   const t = S.boot('dbo_deity');
@@ -102,6 +102,18 @@ const closed = (t) => t.sent.some((m) => m.e === 'closeMenu');
   check('a server with Divines only: one tab, no pager', P(t).head.tab0 && !P(t).head.tab1 && !P(t).head.tab2 && !P(t).list.page);
   t.press(39);
   check('...Right stays put', P(t).head.tab0._alpha === 100);
+  const n = S.boot('dbo_deity');
+  n.push(picker({ current: 'mara', first: false }));
+  n.press(51);
+  const okSounds = n.sounds.filter((x) => x === 'PlaySound:UIMenuOK').length;
+  check('choosing a god plays UIMenuOK', okSounds === 1 && n.root.dboPanel.detail.name.text === 'Dibella', n.sounds);
+  n.push(picker({ current: 'mara', first: false, notice: 'The shrine is quiet.' }));
+  check('a re-send with the same nonce keeps the god being read', n.root.dboPanel.detail.name.text === 'Dibella');
+  check('a notice with no kind is drawn white, not red', n.root.dboPanel.head.notice.textColor === 0xFFFFFF);
+  const long = 'You now follow Dibella. Her shrines will hear you, and her blessing rests on you; you may turn to another god in seven days, not before.';
+  n.push(picker({ nonce: 'd9', current: 'dibella', first: false, notice: long, noticeKind: 'taken' }));
+  const nt = n.root.dboPanel.head.notice;
+  check('a long notice wraps onto two lines with room for them, above the tabs', nt.multiline === true && nt._height >= 48 && nt._y + nt._height <= n.root.dboPanel.head.tab0._y && long.length > 120, [nt._height, n.root.dboPanel.head.tab0._y]);
   const o = S.boot('dbo_deity');
   o.push(picker({ current: 'prince12', first: false }));
   check('opens on the tab and page that hold the worshipper\'s god', o.root.dboPanel.head.tab1._alpha === 100 && o.root.dboPanel.list.page.text === 'Page 2 of 2' && o.root.dboPanel.detail.name.text === 'Prince 12');
