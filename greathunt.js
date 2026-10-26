@@ -20,10 +20,15 @@
 // interior counts as its hold) reads "A howl echoes through <place>", once a minute per howler (Nate 16 Oct, Skyrim open).
 // A cure, or the end of the curse, starts the next werewolf again as a Fledgling (supernatural.js clears the state).
 // /hunt shows a werewolf their rank, renown and what the next rank brings.
+// Staff (lead staff, audited; Nat, 25 Oct, to test the Behemoth, the Elder's form, on the dev server):
+//   /hunt setrank <name> <rank name|number> <reason>   renown set to that rank's threshold (an online werewolf only)
+//   /hunt reset <name> <reason>                        back to Fledgling, no renown (__dboHuntReset)
 'use strict';
 
 module.exports = (api) => {
   const { mp, log, personal, audit, who, sendPacket, onlineActors, profileOf, registerChatCommand, zoneOfActor, zoneById, isWorldspace, cfg } = api;
+  const isLeadStaff = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
+  const findByName = typeof api.findByName === 'function' ? api.findByName : () => null;
   const G = cfg.greatHunt || {};
   const C = Object.assign({
     ranks: ['Fledgling', 'Prowler', 'Hunter', 'Blood-Howler', 'Elder'],
@@ -185,7 +190,48 @@ module.exports = (api) => {
     const s = stateOf(a); const renown = Number(s && s.renown) || 0;
     return `${C.ranks[rankFor(renown)]} of the Hunt (${renown} renown), ${standingOf(a).text}`;
   });
-  registerChatCommand('hunt', (a) => {
+  // A rank by name (any case, a prefix will do when only one rank starts so) or by number, 0 = Fledgling; -1 when none
+  const rankNamed = (w) => {
+    const t = String(w || '').toLowerCase();
+    if (/^\d+$/.test(t)) { const n = Number(t); return n < C.ranks.length ? n : -1; }
+    const exact = C.ranks.findIndex((r) => r.toLowerCase() === t);
+    if (exact >= 0) return exact;
+    const pre = C.ranks.map((r, i) => (t && r.toLowerCase().startsWith(t) ? i : -1)).filter((i) => i >= 0);
+    return pre.length === 1 ? pre[0] : -1;
+  };
+  const aRank = (r) => `${/^[aeiou]/i.test(C.ranks[r]) ? 'an' : 'a'} ${C.ranks[r]}`;
+  const staffHunt = (a, words) => {
+    const sub = String(words[0] || '').toLowerCase();
+    if (!isLeadStaff(a)) return personal(a, 'Only lead staff can do that.');
+    const usage = sub === 'setrank' ? `Usage: /hunt setrank <name> <rank name or number: ${C.ranks.map((r, i) => `${i} ${r}`).join(', ')}> <reason>` : 'Usage: /hunt reset <name> <reason>';
+    const t = !words[1] ? null : words[1].toLowerCase() === 'me' ? a : findByName(words[1]);
+    if (!t) return personal(a, words[1] ? `No one online is called ${words[1]}. ${usage}` : usage);
+    if (!isWerewolf(t)) return personal(a, `${who(t)} is no werewolf: the Great Hunt has no rank for them.`);
+    if (sub === 'setrank') {
+      const r = rankNamed(words[2]);
+      const reason = words.slice(3).join(' ').trim();
+      if (r < 0 || !reason) return personal(a, usage);
+      const s = stateOf(t); if (!s) return personal(a, `${who(t)} cannot be read just now.`);
+      const before = rankFor(Number(s.renown) || 0);
+      s.renown = C.thresholds[r];
+      save(t, s);
+      audit(`HUNT ${who(a)} set ${who(t)} to ${C.ranks[r]}: ${reason}`);
+      log(`greathunt: ${who(a)} set ${who(t)} from ${C.ranks[before]} to ${C.ranks[r]} (${s.renown} renown): ${reason}`);
+      personal(a, `${who(t)} is now ${aRank(r)} of the Hunt (${s.renown} renown).`);
+      if (t !== a) personal(t, `You are now ${aRank(r)} of the Hunt.`);
+      return;
+    }
+    const reason = words.slice(2).join(' ').trim();
+    if (!reason) return personal(a, usage);
+    if (typeof globalThis.__dboHuntReset === 'function') globalThis.__dboHuntReset(t);
+    audit(`HUNT ${who(a)} reset ${who(t)} to ${C.ranks[0]}: ${reason}`);
+    log(`greathunt: ${who(a)} reset ${who(t)} to ${C.ranks[0]}: ${reason}`);
+    personal(a, `${who(t)} is a ${C.ranks[0]} of the Hunt again, with no renown.`);
+    if (t !== a) personal(t, `You are a ${C.ranks[0]} of the Hunt again.`);
+  };
+  registerChatCommand('hunt', (a, args) => {
+    const words = (Array.isArray(args) ? args.map(String) : String(args || '').trim().split(/\s+/)).filter(Boolean);
+    if (/^(setrank|reset)$/i.test(words[0] || '')) return staffHunt(a, words);
     if (!isWerewolf(a)) return personal(a, 'The Great Hunt is for those who carry the beast.');
     const s = stateOf(a); const renown = Number(s && s.renown) || 0; const r = rankFor(renown);
     personal(a, `You are a ${C.ranks[r]} of the Hunt, with ${renown} renown.`);

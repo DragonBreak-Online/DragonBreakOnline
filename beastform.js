@@ -1076,7 +1076,8 @@ module.exports = (api) => {
   // Admins: grant or take the power, or force a form for testing
   registerChatCommand('beastform', (a, args) => {
     const [who_, what, op] = String(args || '').trim().split(/\s+/);
-    const t = who_ ? findByName(who_) : a;
+    // 'me' is the caller, as the usage line says (findByName knows no 'me', and finds no one in a beast form by name)
+    const t = !who_ || who_.toLowerCase() === 'me' ? a : findByName(who_);
     const key = String(what || '').toLowerCase().replace(/[^a-z]/g, '');
     const f = FORMS[key === 'vampire' ? 'vampirelord' : key];
     if (!t || !f) return personal(a, 'Usage: /beastform <player|#TAG|me> <werewolf|vampirelord> [grant|remove|now|revert]');
