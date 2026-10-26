@@ -1172,8 +1172,9 @@ module.exports = (api) => {
       return personal(a, (m[1].toLowerCase() === 'sell' ? gemSell : gemBuy)(a, m[2], m[3]).text);
     }
     if (['vault', 'rent', 'pay', 'store', 'take'].includes(s)) return personal(a, V.enabled ? vaultPanelOnly : closedText);
-    personal(a, 'Usage at a bank: /bank, /bank deposit <gold|all>, /bank withdraw <gold|all>, /bank treasury <name> <gold|all>, /bank gems');
-  }, { help: 'at a bank: your account (the same in every town); deposit, withdraw, pay into a treasury you answer for, or buy and sell gems (/bank gems)' });
+    // the gem counter only while it is open (bank.gemCounter.enabled; closed again 25 Oct): /bank gems answers that it is closed
+    personal(a, `Usage at a bank: /bank, /bank deposit <gold|all>, /bank withdraw <gold|all>, /bank treasury <name> <gold|all>${G.enabled ? ', /bank gems' : ''}`);
+  }, { help: 'at a bank: your account (the same in every town); deposit, withdraw, or pay into a treasury you answer for (and the gem counter, /bank gems, when it is open)' });
 
   log(`bank loaded: ${bankBases().size} bank activator base(s), ${Object.keys(data().factions).length} faction treasury balance(s), vaults ${V.enabled ? tierList().map((t) => `${t.weight}/${t.weekly}g`).join(' ') : 'closed'}${zoneOfCell ? '' : ' (no zoneOfCell: no bank keeps vaults)'}`);
   return { balanceOf, treasuriesOf, deposit, withdraw, payIn, gemPrices, gemSell, gemBuy, gemList, vaultRent, vaultPay, vaultEnd, vaultStore, vaultTake, vaultView, settle, weightOf, vaultHas, vaultTakeStaff, vaultLines, restoreSeizure, saleOf };

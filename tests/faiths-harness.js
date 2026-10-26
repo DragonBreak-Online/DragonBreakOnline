@@ -129,4 +129,13 @@ ok('every patron of every faith is a god in the roster', FAITHS.faiths.every((f)
   r = choose(REACHMAN, 'dibella', 'reach');
   ok('Dibella is no god of the Reach Old Gods', r.kind === 'refused' && /no god of that faith/.test(r.text), r);
 }
+// An offering made to an aspect counts at the shrine that answers it (Lorkh at Shor's, Alkosh at Akatosh's; 26 Oct: it was
+// spent for nothing, since the prayer is answered by the shrine's god and the offering named the follower's own)
+{
+  const fav = globalThis.__dboOfferingFavour;
+  const o = (id, g) => ({ deityId: id, gold: g, until: wallClock + 60000 });
+  ok('Lorkh\'s offering counts at Shor\'s shrine, and full gold doubles it', fav(o('lorkh', 100), 'shor') === 2 && fav(o('lorkh', 40), 'shor') === 1.4, [fav(o('lorkh', 100), 'shor'), fav(o('lorkh', 40), 'shor')]);
+  ok('Alkosh\'s counts at Akatosh\'s', fav(o('alkosh', 50), 'akatosh') === 1.5, fav(o('alkosh', 50), 'akatosh'));
+  ok('Peryite\'s, a god of the same faith but no aspect, does not count at Shor\'s', fav(o('peryite', 100), 'shor') === 1, fav(o('peryite', 100), 'shor'));
+}
 console.log(fails ? `${fails} FAILED` : 'all checks passed'); process.exit(fails ? 1 : 0);

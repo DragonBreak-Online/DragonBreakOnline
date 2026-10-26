@@ -1,5 +1,20 @@
 [
   {
+    "title": "Offerings to Lorkh and Alkosh count, and /decor is in the help",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Faith and help",
+        "items": [
+          "A follower of Lorkh prays at Shor's shrine, and of Alkosh at Akatosh's. An offering made before such a prayer was spent without raising the odds; it now counts, as it does for every other god.",
+          "/decor is listed in the U menu and /help, and /bank no longer offers the gem counter while it is closed."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Briarhearts: the Hagravens' rite",
     "date": "2026-10-26",
     "version": "Server update",

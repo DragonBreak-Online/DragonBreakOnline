@@ -994,7 +994,7 @@ const HELP_GROUPS = [
   { key: 'beast', title: 'The beast in you', names: ['beast', 'forms', 'hunt', 'blood', 'feed', 'confess'], role: 'beast',
     hints: ['Your curse and its powers: F3, the Supernatural tab.',
       'Silver and fire hurt a vampire more; silver and poison spells hurt a werewolf more in beast form.'] },
-  { key: 'work', title: 'Work and the world', names: ['time', 'property', 'mine', 'keys', 'courier'],
+  { key: 'work', title: 'Work and the world', names: ['time', 'property', 'mine', 'keys', 'courier', 'decor'],
     hints: ['Hunting work: the Contracts tab of the expedition board (Synod Conclave, Fighters Guild, Frostcrag Spire).', 'Other work for pay: a notice board, then /commission.',
       'Mining and woodcutting: an ore vein or a chopping block. Richer ores need a higher Miner tier.',
       'The Bleak-Frost Mine, west of Bruma: iron, corundum and gold, and meteoric iron for Adept miners.',
@@ -3181,6 +3181,8 @@ const appearanceHook = (actorId, appearance, isAllowed) => {
   try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('appearance', actorId, appearance, isAllowed); } catch (e) { /* the player log is optional */ }
   if (isAllowed && globalThis.__dboEditorOpenAt instanceof Map) globalThis.__dboEditorOpenAt.delete(actorId >>> 0);
   if (isAllowed) { try { goblinLook(actorId >>> 0, appearance); } catch (e) { log('goblin look check failed', e.message); } }
+  // No child is played (childrace.js, Nat 26 Oct): a close on a child race is set to an adult race once it has settled
+  if (isAllowed) { try { const g = globalThis.__dboChildRaceGuard; if (typeof g === 'function') g(actorId >>> 0, appearance); } catch (e) { log('child race check failed', e.message); } }
   let result = true;
   // A player's own /appearance edit (appearance.js): settled there (charge, locks), and none of creation's steps below run
   if (isAllowed) {
@@ -7771,6 +7773,12 @@ try {
   delete require.cache[RACIAL_JS];
   racial = require(RACIAL_JS)({ mp, log, personal, giveItem, profileOf, display, recordOf, every, onlineActors, weaponHandsOf, sourceResistsOf, gmstFloat, cfg, sendPacket, hasUiCap });
 } catch (e) { log('racial.js failed to load:', e.stack || e.message); racial = null; globalThis.__dboRaceGold = null; globalThis.__dboRaceOf = null; }
+// ---- no child is played: a RaceMenu close on a child race is set to an adult race (server\childrace.js; Nat, 26 Oct)
+try {
+  const CHILDRACE_JS = path.resolve('childrace.js');
+  delete require.cache[CHILDRACE_JS];
+  require(CHILDRACE_JS)({ mp, log, personal, display });
+} catch (e) { log('childrace.js failed to load:', e.stack || e.message); globalThis.__dboChildRaceGuard = null; }
 // ---- the thirteen birthsigns: chosen once, small gifts for life through racial.js (server\birthsigns.js, config "birthsigns")
 try {
   const BIRTHSIGNS_JS = path.resolve('birthsigns.js');
