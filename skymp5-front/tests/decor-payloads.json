@@ -2,7 +2,7 @@
  "catalog": {
   "type": "decor",
   "id": 171,
-  "nonce": "f2ad886aa9ec",
+  "nonce": "0ecb6537d66f",
   "view": "catalog",
   "home": "Olaf's home",
   "owner": true,
@@ -75,7 +75,7 @@
  "blocked": {
   "type": "decor",
   "id": 171,
-  "nonce": "f2ad886aa9ec",
+  "nonce": "0ecb6537d66f",
   "view": "catalog",
   "home": "Olaf's home",
   "owner": true,
@@ -143,7 +143,7 @@
  "placed": {
   "type": "decor",
   "id": 171,
-  "nonce": "f2ad886aa9ec",
+  "nonce": "0ecb6537d66f",
   "view": "placed",
   "home": "Olaf's home",
   "owner": true,
@@ -212,7 +212,7 @@
  "people": {
   "type": "decor",
   "id": 171,
-  "nonce": "f2ad886aa9ec",
+  "nonce": "0ecb6537d66f",
   "view": "people",
   "home": "Olaf's home",
   "owner": true,
@@ -263,24 +263,37 @@
   "rows": [
    {
     "key": "9",
-    "name": "Stray"
+    "name": "Stray",
+    "online": true,
+    "tier": "Novice",
+    "refund": 20
    }
   ],
   "nearby": [
    {
     "key": "8",
-    "name": "Frida"
+    "name": "Frida",
+    "online": true,
+    "tier": "Novice",
+    "refund": 20
    },
    {
     "key": "10",
-    "name": "Gemma"
+    "name": "Gemma",
+    "online": true,
+    "tier": "Novice",
+    "refund": 20
    }
-  ]
+  ],
+  "own": {
+   "tier": "Novice",
+   "refund": 20
+  }
  },
  "search": {
   "type": "decor",
   "id": 171,
-  "nonce": "f2ad886aa9ec",
+  "nonce": "0ecb6537d66f",
   "view": "catalog",
   "home": "Olaf's home",
   "owner": true,

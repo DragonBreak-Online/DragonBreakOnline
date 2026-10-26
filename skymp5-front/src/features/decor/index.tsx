@@ -5,7 +5,11 @@ import './styles.scss';
 // Home decorating (server decor.js, widget 171): the server builds every row and re-checks every action, as /decor does.
 // Actions go as dbo:decor* events with the window's nonce; the server answers by sending the panel again.
 export interface DecorCost { name: string; n: number; have: number }
-export interface DecorRow { key: string; name: string; cost?: DecorCost[]; why?: string; group?: string; state?: string; refund?: string }
+export interface DecorRow {
+  key: string; name: string; cost?: DecorCost[]; why?: string; group?: string; state?: string;
+  // placed: the refund preview text; carpenters: the share their takedowns give back, in percent
+  refund?: string | number | null; tier?: string; online?: boolean;
+}
 export interface DecorMeter { label: string; used: number; of: number }
 export interface DecorData {
   id: number;
@@ -22,7 +26,10 @@ export interface DecorData {
   pages: number;
   rows: DecorRow[];
   nearby: DecorRow[];
+  own?: { tier: string; refund: number };
 }
+
+const skillText = (r: DecorRow): string => (r.tier ? `${r.tier} woodworker, ${r.refund}% back` : 'offline');
 
 const send = (key: string, ...args: unknown[]): void => {
   try {
@@ -63,7 +70,7 @@ const Decor = ({ data }: { data: DecorData }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
-  const tabs: [string, string][] = [['catalog', 'Catalogue'], ['placed', 'Placed'], ...(data.owner ? [['people', 'People'] as [string, string]] : [])];
+  const tabs: [string, string][] = [['catalog', 'Catalogue'], ['placed', 'Placed'], ...(data.owner ? [['people', 'Carpenters'] as [string, string]] : [])];
 
   return (
     <div className="decor">
@@ -110,7 +117,7 @@ const Decor = ({ data }: { data: DecorData }) => {
         <div className="decor__list">
           {rows.length === 0 && (
             <p className="decor__empty">
-              {data.view === 'catalog' ? (data.search ? 'Nothing matches.' : 'Nothing in this group.') : data.view === 'placed' ? 'Nothing placed here yet.' : 'Nobody else is named.'}
+              {data.view === 'catalog' ? (data.search ? 'Nothing matches.' : 'Nothing in this group.') : data.view === 'placed' ? 'Nothing placed here yet.' : 'No carpenters hired yet. Bring one inside to hire them.'}
             </p>
           )}
           {data.view === 'catalog' && rows.map((r) => (
@@ -138,17 +145,22 @@ const Decor = ({ data }: { data: DecorData }) => {
           ))}
           {data.view === 'people' && (
             <>
+              <p className="decor__note">
+                Carpenters may place, move and take down pieces here. What a carpenter takes down comes back to you, at their
+                woodworking skill: a better Woodcutter gives back more.{data.own ? ` Your own: ${data.own.tier}, ${data.own.refund}% back.` : ''}
+              </p>
+              {rows.length > 0 && <span className="decor__label decor__sub">Your carpenters</span>}
               {rows.map((r) => (
                 <div key={r.key} className="decor__row">
-                  <div className="decor__main"><span className="decor__name">{r.name}</span><span className="decor__why">may decorate here</span></div>
-                  <button className="decor__button" disabled={busy} onClick={() => act('dbo:decorRevoke', r.key)}>Revoke</button>
+                  <div className="decor__main"><span className="decor__name">{r.name}</span><span className="decor__why">{skillText(r)}</span></div>
+                  <button className="decor__button" disabled={busy} onClick={() => act('dbo:decorRevoke', r.key)}>Dismiss</button>
                 </div>
               ))}
               {(data.nearby || []).length > 0 && <span className="decor__label decor__sub">Here now</span>}
               {(data.nearby || []).map((r) => (
                 <div key={r.key} className="decor__row">
-                  <div className="decor__main"><span className="decor__name">{r.name}</span></div>
-                  <button className="decor__button" disabled={busy} onClick={() => act('dbo:decorGrant', r.key)}>Grant</button>
+                  <div className="decor__main"><span className="decor__name">{r.name}</span><span className="decor__why">{skillText(r)}</span></div>
+                  <button className="decor__button" disabled={busy} onClick={() => act('dbo:decorGrant', r.key)}>Hire</button>
                 </div>
               ))}
             </>
