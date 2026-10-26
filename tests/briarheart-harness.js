@@ -618,6 +618,15 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
     ok(eqs.length === 2 && eqs.every((c) => c.args[1] === want && c.args[2] === true), what, eqs.map((c) => c.args));
     ML.end(LK, 'lock test done');
   }
+  // visual.blockReequip: the refused cuirass comes off with abPreventEquip; by default without
+  for (const [flag, want] of [[undefined, false], [true, true]]) {
+    const MB = load({ briarheart: { enabled: true, visual: Object.assign({ enabled: true, armor: '5d008:Skyrim.esm', emptyArmor: '5d009:Skyrim.esm', settleMs: 0 }, flag === undefined ? {} : { blockReequip: flag }) } });
+    setP(LK, 'equipment', { inv: { entries: [] } }); MB.become(LK, 'staff', 'reequip test'); papyrusCalls.length = 0;
+    globalThis.__dboBriarheartEquip(LK, { inv: { entries: [{ baseId: CUIRASS, count: 1, worn: true }] } });
+    const offs = papyrusCalls.filter((c) => c.method === 'UnequipItem');
+    ok(offs.length === 1 && offs[0].args[0] === '13ed9:Skyrim.esm' && offs[0].args[1] === want, flag ? 'blockReequip true: the cuirass comes off with abPreventEquip' : 'by default the cuirass comes off without abPreventEquip', offs.map((c) => c.args));
+    MB.end(LK, 'reequip test done');
+  }
   online.splice(online.indexOf(LK), 1);
 }
 // ---- what a Briarheart is, in Active Effects: the display ability goes and comes with the gifts ---------------------------
