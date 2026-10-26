@@ -15,7 +15,7 @@ const gate = { type: 'dungeonGate', id: 60, nonce: 'g1', name: 'Bleak Falls Barr
 const msgs = (t, key) => t.msgs().filter((m) => m.key === key);
 const B = (t) => t.root.dboPanel.body;
 const rowsOf = (t) => Object.keys(B(t).kids).filter((n) => /^d\d$/.test(n)).map((n) => B(t)[n]);
-const closed = (t) => t.sent.some((m) => m.e === 'closeMenu');
+const closed = (t) => t.closed();
 
 {
   const t = S.boot('dbo_dungeon');
