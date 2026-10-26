@@ -61,7 +61,7 @@ module.exports = (api) => {
   C.planter = Object.assign({}, DEFAULTS.planter, ((api.cfg || {}).decor || {}).planter || {});
   const itemName = (d) => { try { const n = typeof api.itemName === 'function' ? api.itemName(d) : ''; return n && n !== d ? String(n) : String(d); } catch (e) { return String(d); } };
   const S = globalThis.__dboDecor || (globalThis.__dboDecor = { catalog: null, byDesc: null, reg: null, pending: new Map(), undo: new Map(), rate: new Map(), found: new Map(), scanAt: 0, scanIdx: 0 });
-  S.catalog = null; S.growing = null; S.matNames = null; S.matDesc = null;   // a hot reload reads the catalogue files again (decor-growing.json's ids are filled in later)
+  S.catalog = null; S.growing = null; S.matNames = null; S.matDesc = null; S.matGroups = null;   // a hot reload reads the catalogue files again (decor-growing.json's ids are filled in later)
   if (!S.plantFor) S.plantFor = new Map();                  // actor -> the planter whose /decor plant list they were shown
 
   const ID_PREFIX = 'decor:';
@@ -91,7 +91,8 @@ module.exports = (api) => {
       // the study bookshelf and the planter (decor-growing.json): offered once the merged DLE's ids are filled in
       for (const p of growing().pieces || []) {
         if (!p.desc) continue;
-        const row = Object.assign({}, p, { groupLabel: p.group, hay: `${p.name} ${p.edid} ${p.group}`.toLowerCase() });
+        const label = p.groupLabel || String(p.group || '').replace(/^./, (ch) => ch.toUpperCase());
+        const row = Object.assign({}, p, { groupLabel: label, hay: `${p.name} ${p.edid} ${p.group}`.toLowerCase() });
         S.catalog.push(row); S.byDesc.set(String(p.desc).toLowerCase(), row);
       }
       log(`decor: catalogue of ${S.catalog.length} pieces`);
@@ -199,7 +200,43 @@ module.exports = (api) => {
 
   // ---- inventory: all of the cost or none of it ------------------------------------------------------------------------
   const heldOf = (a, baseId) => (get(a, 'inventory', { entries: [] }).entries || []).reduce((n, e) => n + ((Number(e.baseId) >>> 0) === baseId && !e.worn ? Number(e.count) || 0 : 0), 0);
-  const shortOf = (a, cost) => Object.entries(cost).map(([d, n]) => ({ d, n, have: heldOf(a, idOf(d)) })).filter((x) => x.have < x.n);
+  // Every variant of a material counts (decor-catalog.json materialGroups: HearthFires, BSAssets, the Fishing CC log)
+  const groupMap = () => {
+    if (S.matGroups) return S.matGroups;
+    S.matGroups = new Map();
+    try {
+      for (const g of JSON.parse(fs.readFileSync(path.resolve('decor-catalog.json'), 'utf8')).materialGroups || []) {
+        const grp = { name: String(g.name), members: (g.members || []).map(String) };
+        for (const m of grp.members) S.matGroups.set(m.toLowerCase(), grp);
+      }
+    } catch (e) { /* single items */ }
+    return S.matGroups;
+  };
+  const groupOf = (d) => { name: '', members: [String(d)] };
+  const heldGroup = (a, d) => groupOf(d).members.reduce((n, m) => n + heldOf(a, idOf(m)), 0);
+  const shortOf = (a, cost) => Object.entries(cost).map(([d, n]) => ({ d, n, have: heldGroup(a, d) })).filter((x) => x.have < x.n);
+  // All of a cost or none of it, each material from its variants in the listed order; returns what was taken, by desc
+  const spendAll = (a, cost) => {
+    const entries = (get(a, 'inventory', { entries: [] }).entries || []).map((e) => Object.assign({}, e));
+    const taken = {};
+    for (const [d, n] of Object.entries(cost)) {
+      let left = n;
+      for (const m of groupOf(d).members) {
+        const id = idOf(m);
+        if (!id) continue;
+        for (const e of entries) {
+          if (left <= 0) break;
+          if ((Number(e.baseId) >>> 0) !== id || e.worn) continue;
+          const k = Math.min(left, Number(e.count) || 0);
+          if (k <= 0) continue;
+          e.count = (Number(e.count) || 0) - k; left -= k; taken[m] = (taken[m] || 0) + k;
+        }
+      }
+      if (left > 0) return null;
+    }
+    mp.set(a, 'inventory', { entries: entries.filter((e) => (Number(e.count) || 0) > 0) });
+    return taken;
+  };
   const takeAll = (a, cost) => {
     const entries = (get(a, 'inventory', { entries: [] }).entries || []).map((e) => Object.assign({}, e));
     for (const [d, n] of Object.entries(cost)) {
@@ -270,6 +307,8 @@ module.exports = (api) => {
     return got;
   };
   const nameOfItem = (d) => {
+    const g = groupOf(d);
+    if (g.name) return g.name;
     catalog();
     if (!S.matNames) {
       S.matNames = new Map();
@@ -278,7 +317,7 @@ module.exports = (api) => {
     }
     return S.matNames.get(String(d).toLowerCase()) || String(d);
   };
-  const costText = (cost, a) => Object.entries(cost).map(([d, n]) => `${n} ${nameOfItem(d)}${a ? ` (${heldOf(a, idOf(d))})` : ''}`).join(', ');
+  const costText = (cost, a) => Object.entries(cost).map(([d, n]) => `${n} ${nameOfItem(d)}${a ? ` (${heldGroup(a, d)})` : ''}`).join(', ');
 
   // ---- rate, undo ------------------------------------------------------------------------------------------------------
   const rateOk = (a) => {
@@ -403,15 +442,16 @@ module.exports = (api) => {
     if (why) return refuse(why, 'spot or budget');
     const cost = costOf(piece);
     if (piece.kind === 'study' && booksHeld(a) < C.study.books) return refuse(`${piece.name} needs ${C.study.books} books.`, 'books');
-    if (!takeAll(a, cost)) return refuse(`${piece.name} needs ${costText(cost, a)}.`, 'materials');
+    const paid = spendAll(a, cost);
+    if (!paid) return refuse(`${piece.name} needs ${costText(cost, a)}.`, 'materials');
     let books = null;
-    if (piece.kind === 'study') { books = takeBooks(a, C.study.books); if (!books) { giveAll(a, cost, 1); return refuse(`${piece.name} needs ${C.study.books} books.`, 'books'); } }
+    if (piece.kind === 'study') { books = takeBooks(a, C.study.books); if (!books) { giveAll(a, paid, 1); return refuse(`${piece.name} needs ${C.study.books} books.`, 'books'); } }
     const tag = { root: hex(pl.root), by: profile(a), at: Date.now() };
     let id = 0, light = 0;
     try { id = create(a, piece.desc, cell, pos, rot, tag); if (id && piece.light && piece.light.base) light = create(a, piece.light.base, cell, pos, rot, Object.assign({ of: hex(id) }, tag)); }
     catch (e) { log('decor: create failed', e.stack || e.message); }
-    if (!id) { giveAll(a, cost, 1); if (books) giveAll(a, books, 1); return refuse('It could not be placed; your materials are back.', 'create failed'); }
-    const it = { ref: hex(id), base: piece.desc, name: piece.name, group: piece.group, cell, pos, rot, by: profile(a), char: a >>> 0, at: new Date().toISOString(), paid: cost };
+    if (!id) { giveAll(a, paid, 1); if (books) giveAll(a, books, 1); return refuse('It could not be placed; your materials are back.', 'create failed'); }
+    const it = { ref: hex(id), base: piece.desc, name: piece.name, group: piece.group, cell, pos, rot, by: profile(a), char: a >>> 0, at: new Date().toISOString(), paid };
     if (piece.kind) it.kind = piece.kind;
     if (books) it.books = books;
     if (light) it.light = hex(light);
@@ -419,7 +459,7 @@ module.exports = (api) => {
     if (piece.station) it.station = piece.station.keyword;
     p.items.push(it); save();
     pushUndo(a, { op: 'placed', root: hex(pl.root), ref: it.ref });
-    audit(`DECOR place ${who(a)} ${piece.name} (${piece.desc}) ref ${it.ref} place ${hex(pl.root)} cell ${hex(cell)} at ${pos.map(Math.round).join(',')} paid ${JSON.stringify(cost)}`);
+    audit(`DECOR place ${who(a)} ${piece.name} (${piece.desc}) ref ${it.ref} place ${hex(pl.root)} cell ${hex(cell)} at ${pos.map(Math.round).join(',')} paid ${JSON.stringify(paid)}`);
     personal(a, `${piece.name} is placed. /decor undo within ${C.undoSeconds} seconds gives everything back; /decor remove later gives back ${Math.round(deconstructShare(a) * 100)}% (more for a skilled Woodcutter).`);
     return true;
   };
@@ -615,7 +655,7 @@ module.exports = (api) => {
     const pages = Math.max(1, Math.ceil(list.length / n)), at = Math.max(0, Math.min(pages - 1, Math.floor(Number(page) || 0)));
     return { at, pages, rows: list.slice(at * n, at * n + n) };
   };
-  const costRows = (a, cost) => Object.entries(cost).map(([d, n]) => ({ name: nameOfItem(d), n, have: heldOf(a, idOf(d)) }));
+  const costRows = (a, cost) => Object.entries(cost).map(([d, n]) => ({ name: nameOfItem(d), n, have: heldGroup(a, d) }));
   const planterState = (it) => {
     if (it.kind !== 'planter') return '';
     if (!it.crop) return 'empty';

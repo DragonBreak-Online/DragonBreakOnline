@@ -2053,6 +2053,31 @@ worldclock.js CLOCK 976f9d7b clean
 worldclock.js CLOCK 91485c97 clean
 worldclock.js CLOCK ccc4cdd1 clean
 worldedit.js WORLDEDIT 197a6260 clean
+briarheart.js BRIARHEART 3a054391 excluded
+briarheart.js BRIARHEART 3f114ea4 excluded
+briarheart.js BRIARHEART b46479a3 excluded
+briarheart.js BRIARHEART e7b4144f excluded
+briarheart.js BRIARHEART 88ac4a79 excluded
+briarheart.js BRIARHEART 06672576 excluded
+briarheart.js BRIARHEART 170469e8 excluded
+briarheart.js BRIARHEART 6e5a4fdc excluded
+briarheart.js BRIARHEART 05129113 excluded
+briarheart.js BRIARHEART 1cedb469 excluded
+decor.js DECOR b3fa102b excluded
+decor.js DECOR 1799b5db excluded
+decor.js DECOR f0797531 excluded
+decor.js DECOR e716fb8f excluded
+decor.js DECOR c4970c1e excluded
+decor.js DECOR 44e37985 excluded
+decor.js DECOR 8acd9a0c excluded
+decor.js DECOR 78b19505 excluded
+decor.js DECOR 58dabe15 excluded
+decor.js DECOR 9650b7e1 excluded
+jail.js JAIL 30daab92 clean
+jail.js JAIL 8d55381d clean
+jail.js JAIL 23dd5d8e clean
+labour.js MILL 861ed5b1 clean
+supernatural.js FEED 54466fd0 clean
 `.trim().split('\n').filter(Boolean).map((l) => { const [file, verb, hash, cls] = l.trim().split(/\s+/); return { file, verb, hash, cls }; });
 
 module.exports = {
