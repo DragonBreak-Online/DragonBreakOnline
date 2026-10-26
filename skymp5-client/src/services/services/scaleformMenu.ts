@@ -48,6 +48,9 @@ export const NATIVE_CAPS = [
   "native:deityPicker", "native:rite", "native:dungeonGate",
   // Worker 6's labour panel (dbo_labour, widget 55; sends dbo:labour/labourCancel, dbo:struggle/struggleCancel)
   "native:labour",
+  // Worker 6's pigeon coop (dbo_pigeon, widget 34). All its keys are dbo:*, and its typed input goes back to
+  // the browser coop with browser: 1, so the cap is the whole of the client's part.
+  "native:pigeon",
 ];
 export const CAPS_RETRY_MS = 5000;
 
