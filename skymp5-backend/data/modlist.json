@@ -1032,5 +1032,26 @@
     "required": true,
     "enabled": true,
     "source": "url"
+  },
+  {
+    "name": "Knights of the Nine SE",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 28392
+  },
+  {
+    "name": "Gods and Worship Lite - Divine and Daedric Robes",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 145124
+  },
+  {
+    "name": "Magical Blackreach",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 37636
   }
 ]
