@@ -30,6 +30,7 @@ const fixtures = {
     place: { root: 1, name: 'H', here: 0, more: 0, rooms: [{ ref: 11, label: 'Chest', kind: 'chest', assigned: null, shared: false, other: null }, { ref: 12, label: 'Box', kind: 'chest', assigned: 'B', shared: true, other: null }] },
     events: { claim: 'housing:claim', abandon: 'housing:abandon', revoke: 'housing:revoke', lock: 'housing:lock', unlock: 'housing:unlock', transfer: 'housing:transfer', rename: 'housing:rename', createKey: 'housing:createkey', revokeKeys: 'housing:revokekeys', grantContainer: 'housing:grantcontainer', assign: 'housing:assign', unassign: 'housing:unassign', share: 'housing:share', unshare: 'housing:unshare', cancel: 'housing:cancel' } },
   dbo_labour: { type: 'labour', id: 55, nonce: 'n1', kind: 'mining', title: 'Iron Seam', strikes: 1, band: 8, bands: [50], sweepMs: 1400, totalMs: 30000, hitMs: 250, missMs: 600, judge: 'client' },
+  dbo_emotes: { type: 'emoteWheel', id: 24, events: { play: 'emote:play', close: 'emote:close', stop: 'emote:stop' }, groups: [{ id: 'a', label: 'A', emotes: [{ anim: 'IdleWave', label: 'Wave' }, { anim: 'IdleSalute', label: 'Salute' }] }, { id: 'b', label: 'B', emotes: [{ anim: 'IdleLaugh', label: 'Laugh' }] }] },
   dbo_decor: { type: 'decor', id: 171, nonce: 'p1', view: 'catalog', home: 'h', owner: true, undo: 5, budget: [{ label: 'Pieces', used: 0, of: 3 }], groups: [{ id: 'beds', label: 'Beds' }], group: 'beds', page: 0, pages: 2, rows: [{ key: '9001:Skyrim.esm', name: 'Bed', cost: [], why: '' }], nearby: [] },
 };
 // Drives every control the panel has, so every key it can send is on the wire
@@ -50,6 +51,10 @@ const drive = {
   dbo_labour: (t) => {
     t.st.time += 2100; t.tick(); t.press(32); t.root.dboPanel.acts.stand.onRelease();
     t.push(Object.assign({}, fixtures.dbo_labour, { nonce: 'n2', kind: 'struggle', event: 'struggle' })); t.press(27);
+  },
+  dbo_emotes: (t) => {
+    const p = t.root.dboPanel;
+    p.groups.g1.onRelease(); p.rows.e0.onRelease(); p.foot.stop.onRelease(); p.foot.close.onRelease(); t.press(27);
   },
   dbo_decor: (t) => {
     const l = t.root.dboPanel.list;
