@@ -1,5 +1,21 @@
 [
   {
+    "title": "The Old Gods of the Reach",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Faiths",
+        "items": [
+          "The Reach Old Gods now follow the lore: Hircine, Namira, Peryite and Lorkh are its four great spirits, and Molag Bal, Nocturnal, Mehrunes Dagon, Mephala and Malacath are honoured there too. Thanks to par.lar for the report.",
+          "Lorkh is the Spirit of Man, the Reach's name for Shor. His followers pray at Shor's shrine and receive his blessing.",
+          "A follower of the Reach Old Gods is now heard at the shrines of all nine. Your own patron answers most often, as before. Nobody's chosen god has changed."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The bank gem counters close",
     "date": "2026-10-25",
     "version": "Server update",
