@@ -13,6 +13,8 @@ import { BrowserMessageEvent, ButtonEvent, DxScanCode, InputDeviceType } from "s
 import { logTrace } from "../../logging";
 import { MIN_IDLE_SECONDS, MAX_IDLE_SECONDS, idleRequest, stopsIdle } from "./idleControl";
 import { wheelWatch, wheelKeyAction } from "./emoteWheelWatch";
+import { ScaleformMenuService } from "./scaleformMenuService";
+import { CLOSE_KEY, FAILED_KEY } from "./nativeWidgets";
 
 // for the browser-side widget setter (executed inside the CEF browser)
 declare const window: any;
@@ -261,6 +263,24 @@ export class EmoteService extends ClientListener {
     if (typeof key !== "string" || !key.startsWith("emote:")) {
       return;
     }
+    this.handleKey(key, Array.prototype.slice.call(e.arguments, 1));
+  }
+
+  // The wheel's keys, from the browser or the native panel (the router's onKey) alike; args exclude the key
+  private handleKey(key: string, args: unknown[]): void {
+    if (key === FAILED_KEY) {
+      // The panel could not be drawn: the browser wheel for the rest of this opening
+      this.native = false;
+      this.noNative = true;
+      if (this.menuOpen) this.openMenu();
+      return;
+    }
+    if (key === CLOSE_KEY) {
+      // The native wheel has gone (it closes itself after each choice, or Skyrim Souls took it down)
+      this.native = false;
+      if (this.menuOpen) this.closeMenu("the native wheel closing");
+      return;
+    }
     // A message tagged emote: can only have come from the wheel, so the wheel is on screen whatever the flag
     // says. It can say the wrong thing: browserWindowLoaded clears menuOpen without removing the widget, and
     // opening the wheel makes the browser visible and focused, which is the sort of thing that fires it. The
@@ -279,7 +299,7 @@ export class EmoteService extends ClientListener {
       return;
     }
     if (key === events.play) {
-      const anim = typeof e.arguments[1] === "string" ? (e.arguments[1] as string) : "";
+      const anim = typeof args[0] === "string" ? (args[0] as string) : "";
       // The player's own choice is never the server's idle, even when it is the same clip
       this.serverIdle = "";
       this.closeMenu(`a choice (${anim || "?"})`);
@@ -570,6 +590,16 @@ export class EmoteService extends ClientListener {
     this.menuOpen = true;
     this.openedAt = Date.now();
     this.unfocusedSince = 0;
+    // The native wheel when the client has it (swf/dbo_emotes), else the browser one
+    if (!this.noNative) {
+      const scaleform = this.controller.lookupListener(ScaleformMenuService);
+      const widget = { type: "emoteWheel", id: WIDGET_ID, groups: GROUPS, events };
+      if (scaleform && scaleform.openNative({ type: "emoteWheel", widget, widgetId: WIDGET_ID, onKey: (k, a) => this.handleKey(k, a) })) {
+        this.native = true;
+        emoteNote("wheel open (native)");
+        return;
+      }
+    }
     openFormMenu(this.sp, this.emoteWidgetSetter, { GROUPS, events, WIDGET_ID }, this.controller);
     emoteNote("wheel open");
   }
@@ -578,7 +608,13 @@ export class EmoteService extends ClientListener {
     const wasOpen = this.menuOpen;
     this.menuOpen = false;
     this.unfocusedSince = 0;
-    closeFormMenu(this.sp, WIDGET_ID);
+    this.noNative = false;
+    if (this.native) {
+      this.native = false;
+      this.controller.lookupListener(ScaleformMenuService).closeNative("emoteWheel");
+    } else {
+      closeFormMenu(this.sp, WIDGET_ID);
+    }
     // How long it was up, and what took it down: the server log's [dboDiag] emote lines
     if (wasOpen && this.openedAt) emoteNote(`wheel closed after ${Date.now() - this.openedAt} ms by ${why}`);
     this.openedAt = 0;
@@ -586,7 +622,8 @@ export class EmoteService extends ClientListener {
 
   // Four times a second while the wheel is up: drawn without the cursor for UNFOCUSED_CLOSE_MS, it is taken down
   private watchWheel(): void {
-    if (!this.menuOpen) return;
+    // The native wheel never has the browser's cursor, so only the browser wheel is watched
+    if (!this.menuOpen || this.native) return;
     const now = Date.now();
     if (now - this.lastWatch < 250) return;
     this.lastWatch = now;
@@ -613,6 +650,9 @@ export class EmoteService extends ClientListener {
   private menuKey: DxScanCode = DxScanCode.B;
   private menuPad: number = GamepadButton.LeftThumb;
   private menuOpen = false;
+  // The wheel is the native panel (openNative), and the browser one for the rest of an opening whose panel failed
+  private native = false;
+  private noNative = false;
   private openedAt = 0;
   private unfocusedSince = 0;
   private lastWatch = 0;
