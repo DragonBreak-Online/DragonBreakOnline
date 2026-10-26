@@ -30,6 +30,8 @@ const groupBtns = (t) => Object.keys(P(t).groups.kids).filter((n) => /^g\d$/.tes
   t.push(widget);
   check(`every group down the left (${GROUPS.length}), the first bright`, groupBtns(t).length === GROUPS.length && groupBtns(t)[0]._alpha === 100 && groupBtns(t)[1]._alpha === 30 && groupBtns(t).map((b) => b.label.text).join('|') === GROUPS.map((g) => g.label).join('|'));
   check('the first group\'s emotes as rows, in the service\'s order', rows(t).map((r) => r.label.text).join('|') === GROUPS[0].emotes.map((e) => e.label).join('|'), rows(t).map((r) => r.label.text));
+  check('rows rest dim (30) until focused', rows(t)[1]._alpha === 30 && rows(t)[0]._alpha === 30, rows(t).map((r) => r._alpha));
+  check('the browser\'s hint', P(t).foot.hint.text === 'Hover to preview  \u2022  Click to play  \u2022  Esc or right-click to close', P(t).foot.hint.text);
   check('each row has its number key', P(t).rows.k0.text === '1' && P(t).rows['k' + (GROUPS[0].emotes.length - 1)].text === String(GROUPS[0].emotes.length));
   check('the centre names the group in spaced capitals and the emote it would play', P(t).centre.category.text === GROUPS[0].label.toUpperCase() && P(t).centre.emote.text === GROUPS[0].emotes[0].label);
   rows(t)[2].onRollOver();
@@ -47,18 +49,28 @@ const groupBtns = (t) => Object.keys(P(t).groups.kids).filter((n) => /^g\d$/.tes
   t.push(widget);
   t.press(39); t.press(39);
   check('Right twice moves two groups on', rows(t)[0].label.text === GROUPS[2].emotes[0].label);
+  for (let i = 2; i < GROUPS.length; i++) t.press(39);
+  check('Right from the last group wraps to the first', rows(t)[0].label.text === GROUPS[0].emotes[0].label);
+  t.press(39); t.press(39);
   t.press(37); t.press(37); t.press(37);
   check('Left wraps from the first to the last group', rows(t)[0].label.text === GROUPS[GROUPS.length - 1].emotes[0].label);
-  t.press(50);
-  check('key 2 plays the second emote of the group shown', msgs(t, 'emote:play')[0].args[0] === GROUPS[GROUPS.length - 1].emotes[1].anim && closed(t));
+  t.press(98);
+  check('numpad 2 plays the second emote of the group shown', msgs(t, 'emote:play')[0].args[0] === GROUPS[GROUPS.length - 1].emotes[1].anim && closed(t));
   const u = S.boot(MENU);
   u.push(widget);
   u.press(57);
   check('a number past the last row plays nothing', !msgs(u, 'emote:play').length || GROUPS[0].emotes.length >= 9);
-  u.press(40); u.press(40); u.press(13);
-  check('Down, Down, Enter: the second control in the focus order (the second group)', rows(u)[0].label.text === GROUPS[1].emotes[0].label);
+  for (let i = 0; i < GROUPS.length + 3; i++) u.press(40);
+  check('Down onto a row names that emote in the centre, as hover does', P(u).centre.emote.text === GROUPS[0].emotes[2].label, P(u).centre.emote.text);
+  u.press(38);
+  check('and Up does the same', P(u).centre.emote.text === GROUPS[0].emotes[1].label, P(u).centre.emote.text);
+  for (let i = 0; i < GROUPS.length + 1; i++) u.press(38);
+  u.press(40); u.press(13);
+  check('Up and Down walk the focus order: groups, then rows; Enter on the second group opens it', rows(u)[0].label.text === GROUPS[1].emotes[0].label);
+  u.press(9);
+  check('Tab does nothing', !msgs(u, 'emote:close').length);
   P(u).foot.stop.onRelease();
-  check('Cancel Emote sends stop and closes', msgs(u, 'emote:stop').length === 1 && closed(u));
+  check('Cancel Emote sends stop, with no arguments, and closes', msgs(u, 'emote:stop').length === 1 && msgs(u, 'emote:stop')[0].args.length === 0 && closed(u), msgs(u, 'emote:stop'));
   const v = S.boot(MENU);
   v.push(widget);
   v.press(27);
@@ -66,7 +78,19 @@ const groupBtns = (t) => Object.keys(P(t).groups.kids).filter((n) => /^g\d$/.tes
   const w = S.boot(MENU);
   w.push(widget);
   P(w).foot.close.onRelease();
-  check('Close does the same', msgs(w, 'emote:close').length === 1 && closed(w));
+  check('Close does the same, with the cancel sound', msgs(w, 'emote:close').length === 1 && closed(w) && w.sounds.includes('PlaySound:UIMenuCancel'));
+  const x = S.boot(MENU);
+  x.push(widget);
+  x.ctx.Mouse.listeners.forEach((l) => l.onMouseDown(1));
+  check('a left click on nothing does not close', !msgs(x, 'emote:close').length);
+  x.ctx.Mouse.listeners.forEach((l) => l.onMouseDown(2));
+  check('right-click closes, as on the browser wheel', msgs(x, 'emote:close').length === 1 && closed(x));
+  // the emote played last: the service passes it (widget.last), its group opens first and its row is marked
+  const lastAnim = GROUPS[3].emotes[2].anim;
+  const y = S.boot(MENU);
+  y.push(Object.assign({}, widget, { last: lastAnim }));
+  check('the emote played last opens its group and is named in the centre', rows(y)[0].label.text === GROUPS[3].emotes[0].label && P(y).centre.emote.text === GROUPS[3].emotes[2].label, P(y).centre.emote.text);
+  check('its row stays bright, as the browser marks its active emote', rows(y)[2]._alpha === 100 && rows(y)[2].rest === 100 && rows(y)[1]._alpha === 30);
 }
 
 {

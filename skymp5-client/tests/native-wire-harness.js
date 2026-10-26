@@ -30,7 +30,10 @@ const fixtures = {
     place: { root: 1, name: 'H', here: 0, more: 0, rooms: [{ ref: 11, label: 'Chest', kind: 'chest', assigned: null, shared: false, other: null }, { ref: 12, label: 'Box', kind: 'chest', assigned: 'B', shared: true, other: null }] },
     events: { claim: 'housing:claim', abandon: 'housing:abandon', revoke: 'housing:revoke', lock: 'housing:lock', unlock: 'housing:unlock', transfer: 'housing:transfer', rename: 'housing:rename', createKey: 'housing:createkey', revokeKeys: 'housing:revokekeys', grantContainer: 'housing:grantcontainer', assign: 'housing:assign', unassign: 'housing:unassign', share: 'housing:share', unshare: 'housing:unshare', cancel: 'housing:cancel' } },
   dbo_labour: { type: 'labour', id: 55, nonce: 'n1', kind: 'mining', title: 'Iron Seam', strikes: 1, band: 8, bands: [50], sweepMs: 1400, totalMs: 30000, hitMs: 250, missMs: 600, judge: 'client' },
+  'dbo_labour#struggle': { type: 'labour', id: 55, nonce: 'n2', kind: 'struggle', event: 'struggle', strikes: 1, band: 8, bands: [50], sweepMs: 1400, sweeps: [1400], failOnMiss: true, totalMs: 30000, hitMs: 0, missMs: 0, judge: 'client' },
   dbo_emotes: { type: 'emoteWheel', id: 24, events: { play: 'emote:play', close: 'emote:close', stop: 'emote:stop' }, groups: [{ id: 'a', label: 'A', emotes: [{ anim: 'IdleWave', label: 'Wave' }, { anim: 'IdleSalute', label: 'Salute' }] }, { id: 'b', label: 'B', emotes: [{ anim: 'IdleLaugh', label: 'Laugh' }] }] },
+  'dbo_emotes#stop': null,
+  'dbo_emotes#close': null,
   dbo_decor: { type: 'decor', id: 171, nonce: 'p1', view: 'catalog', home: 'h', owner: true, undo: 5, budget: [{ label: 'Pieces', used: 0, of: 3 }], groups: [{ id: 'beds', label: 'Beds' }], group: 'beds', page: 0, pages: 2, rows: [{ key: '9001:Skyrim.esm', name: 'Bed', cost: [], why: '' }], nearby: [] },
 };
 // Drives every control the panel has, so every key it can send is on the wire
@@ -48,15 +51,15 @@ const drive = {
     for (const n of Object.keys(a.kids)) if (/Transfer|Key Ring|Rent/.test(a[n].label.text)) a[n].onRelease();
     t.press(27);
   },
+  // A panel that closes after a key is driven once per key: nothing is sent after dboClose (lib 0947624d)
   dbo_labour: (t) => {
     t.st.time += 2100; t.tick(); t.press(32); t.root.dboPanel.acts.stand.onRelease();
-    // the struggle on its own event: a pull outside the band ends it (failOnMiss), then Escape walks away
-    t.push(Object.assign({}, fixtures.dbo_labour, { nonce: 'n2', kind: 'struggle', event: 'struggle', sweeps: [1400], failOnMiss: true })); t.tick(); t.press(32); t.press(27);
   },
-  dbo_emotes: (t) => {
-    const p = t.root.dboPanel;
-    p.groups.g1.onRelease(); p.rows.e0.onRelease(); p.foot.stop.onRelease(); p.foot.close.onRelease(); t.press(27);
-  },
+  // a pull outside the band ends the struggle (failOnMiss), then Escape walks away
+  'dbo_labour#struggle': (t) => { t.tick(); t.press(32); t.press(27); },
+  dbo_emotes: (t) => { const p = t.root.dboPanel; p.groups.g1.onRelease(); p.rows.e0.onRelease(); },
+  'dbo_emotes#stop': (t) => { t.root.dboPanel.foot.stop.onRelease(); },
+  'dbo_emotes#close': (t) => { t.press(27); },
   dbo_decor: (t) => {
     const l = t.root.dboPanel.list;
     l.r0.onRelease(); l.g0.onRelease(); t.press(39); t.press(82); t.root.dboPanel.head.undo.onRelease();
@@ -68,15 +71,21 @@ const drive = {
   },
 };
 
+// '<swf>#<what>' is another session of <swf>; a null fixture reuses the panel's own
+const swfOf = (menu) => menu.split('#')[0];
+const fixtureOf = (menu) => fixtures[menu] || fixtures[swfOf(menu)];
+// a session that ends in a closing key carries fewer events than a whole drive
+const MIN_EVENTS = { dbo_labour: 3, 'dbo_labour#struggle': 3, dbo_emotes: 2, 'dbo_emotes#stop': 2, 'dbo_emotes#close': 2 };
+const seen = {};
 for (const menu of Object.keys(fixtures)) {
   for (const late of [false, true]) {
-    const t = S.boot(menu, late);
+    const t = S.boot(swfOf(menu), late);
     if (late) { t.tick(); t.arrive(); t.tick(); }
-    t.push(fixtures[menu]);
+    t.push(fixtureOf(menu));
     drive[menu](t);
     const events = t.sent.filter((m) => m.e === 'dboUi');
     const parsed = events.map((m) => M.parseUiEvent(m.e, m.s, m.n));
-    check(`${menu}${late ? ' (skse late)' : ''}: the service parses every event the panel sends`, parsed.length > 3 && parsed.every(Boolean), events.filter((m, i) => !parsed[i]));
+    check(`${menu}${late ? ' (skse late)' : ''}: the service parses every event the panel sends`, parsed.length >= (MIN_EVENTS[menu] || 4) && parsed.every(Boolean), events.filter((m, i) => !parsed[i]));
     check(`${menu}${late ? ' (skse late)' : ''}: ready leads and carries its frame where the service reads it`, parsed[0].key === 'ready' && parsed[0].frame === (late ? 2 : 1), parsed[0]);
     const box = M.parseOutbox(t.root.dboOut, 0);
     check(`${menu}${late ? ' (skse late)' : ''}: the outbox carries the same messages, in order, through parseOutbox`,
@@ -84,9 +93,9 @@ for (const menu of Object.keys(fixtures)) {
     check(`${menu}${late ? ' (skse late)' : ''}: outbox sequences run 1, 2, 3... and the cursor reaches the end`,
       box.messages.every((m, i) => m.seq === i + 1) && box.consumed === String(t.root.dboOut).length, box.messages.map((m) => m.seq));
     const keys = [...new Set(parsed.map((p) => p.key))];
-    if (menu === 'dbo_labour') check(`dbo_labour${late ? ' (skse late)' : ''}: the drive sends all four labour keys`, ['dbo:labour', 'dbo:labourCancel', 'dbo:struggle', 'dbo:struggleCancel'].every((k) => keys.includes(k)), keys);
+    if (!late) seen[swfOf(menu)] = (seen[swfOf(menu)] || []).concat(keys);
     // a client-service widget's own event keys go back through the router as browser messages, as does the composer hand-off
-    const local = ['ready', 'close', 'native:handoff'].concat(Object.values(fixtures[menu].events || {}));
+    const local = ['ready', 'close', 'native:handoff'].concat(Object.values(fixtureOf(menu).events || {}));
     const unknown = keys.filter((k) => !local.includes(k) && !M.serverEventName(k));
     check(`${menu}${late ? ' (skse late)' : ''}: every other key is a dbo: key the service forwards`, !unknown.length, unknown);
     if (SERVER && !late) {
@@ -97,6 +106,9 @@ for (const menu of Object.keys(fixtures)) {
 }
 
 // The journal's tabs send many module events (dbo:court*, journalMagic...): each key in its source has a handler in some server module
+check('dbo_labour: its sessions send all four labour keys', ['dbo:labour', 'dbo:labourCancel', 'dbo:struggle', 'dbo:struggleCancel'].every((k) => (seen.dbo_labour || []).includes(k)), seen.dbo_labour);
+check('dbo_emotes: its sessions send all three emote keys', ['emote:play', 'emote:stop', 'emote:close'].every((k) => (seen.dbo_emotes || []).includes(k)), seen.dbo_emotes);
+
 if (SERVER) {
   const src = fs.readdirSync(path.resolve(__dirname, '..', 'swf/dbo_journal/tabs')).map((f) => read(`swf/dbo_journal/tabs/${f}`)).concat(read('swf/dbo_journal/scripts/frame_1/DoAction.as')).join('\n');
   const keys = [...new Set([...src.matchAll(/"dbo:([A-Za-z]+)"|act\("([A-Za-z]+)"/g)].map((m) => m[1] || m[2]))];

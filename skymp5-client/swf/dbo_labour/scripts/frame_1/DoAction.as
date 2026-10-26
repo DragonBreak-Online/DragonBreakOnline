@@ -660,7 +660,7 @@ _root.dboData = function(json)
 var keys = {};
 keys.onKeyDown = function()
 {
-   var code = Key.getCode();
+   var code = dboKey();
    if (code == 27)
    {
       if (data != null)
@@ -684,10 +684,6 @@ keys.onKeyDown = function()
    else if (pick && code >= 49 && code <= 57)
    {
       choose(code - 49);
-   }
-   else if (pick && code >= 97 && code <= 105)
-   {
-      choose(code - 97);
    }
    else if (!pick && (code == 32 || code == 13))
    {
