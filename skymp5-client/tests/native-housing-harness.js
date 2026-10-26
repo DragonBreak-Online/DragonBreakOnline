@@ -6,6 +6,8 @@ const T = S.checker();
 const check = T.check;
 // SKSE's AllowTextInput is a counter (GameInput.cpp): what the panel holds is the trues less the falses
 const held = (t) => t.sent.reduce((n, m) => n + (m.e === 'allowTextInput' ? (m.on ? 1 : -1) : 0), 0);
+// the lowest the count went: below 0 is a release SKSE refuses (counter underflow)
+const lowest = (t) => t.sent.reduce((s, m) => { if (m.e === 'allowTextInput') { s.n += m.on ? 1 : -1; s.min = Math.min(s.min, s.n); } return s; }, { n: 0, min: 0 }).min;
 
 const events = {
   claim: 'housing:claim', abandon: 'housing:abandon', revoke: 'housing:revoke', lock: 'housing:lock', unlock: 'housing:unlock',
@@ -58,6 +60,19 @@ const rooms = (t) => Object.keys(P(t).right.kids).filter((n) => /^r\d$/.test(n))
   check('a re-publish while naming holds the keys once, or gives them back with the box', held(t) === (P(t).right.box ? 1 : 0), [held(t), !!P(t).right.box]);
   t.press(27);
   check('...and Escape after it gives them back', held(t) === 0, held(t));
+  {
+    // every way out of the name box after N re-publishes: held once, given back once, never below zero
+    const ways = { 'Escape': (c) => c.press(27), 'Save': (c) => P(c).right.save.onRelease(), 'the browser': (c) => P(c).right.browser.onRelease(), 'Close': (c) => P(c).foot.close.onRelease() };
+    for (const [way, out] of Object.entries(ways)) {
+      const c = S.boot('dbo_housing');
+      c.push(base);
+      btn(c, 'Rename...').onRelease();
+      for (let i = 0; i < 5; i++) c.push(base);
+      const during = held(c);
+      out(c);
+      check(`${way} after 5 re-publishes while naming: held at most once, given back once`, during <= 1 && held(c) === 0 && lowest(c) === 0, [during, held(c), lowest(c)]);
+    }
+  }
   check('the hint is the Key Ring one', /Key Ring, where you can give it/.test(P(t).right.hint.text));
   const nt = S.boot('dbo_housing', false, { noTyping: true });
   nt.push(base);

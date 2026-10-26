@@ -6,6 +6,8 @@ const T = S.checker();
 const check = T.check;
 // SKSE's AllowTextInput is a counter (GameInput.cpp): what the panel holds is the trues less the falses
 const held = (t) => t.sent.reduce((n, m) => n + (m.e === 'allowTextInput' ? (m.on ? 1 : -1) : 0), 0);
+// the lowest the count went: below 0 is a release SKSE refuses (counter underflow)
+const lowest = (t) => t.sent.reduce((s, m) => { if (m.e === 'allowTextInput') { s.n += m.on ? 1 : -1; s.min = Math.min(s.min, s.n); } return s; }, { n: 0, min: 0 }).min;
 
 const ev = { post: 'bountyBoard:post', remove: 'bountyBoard:remove', close: 'bountyBoard:close' };
 const board = {
@@ -176,6 +178,29 @@ const closed = (t) => t.closed();
   P(n).head.tab1.onRelease();
   P(n).foot.write.onRelease();
   check('a game that cannot take typed input goes straight to the browser composer', msgs(n, 'native:handoff').length === 1 && !P(n).list.box);
+
+  // Every way out of a composer, after N refreshes while typing: the keys are held once and given back exactly once
+  const N = 5;
+  const mine = Object.assign({}, board, { notes: board.notes.concat([{ id: 8, tab: 'shop', author: 'Olaf', text: 'Mead', ageHours: 0, canRemove: true }]) });
+  const ways = {
+    'Escape': (c) => c.press(27),
+    'Close': (c) => P(c).foot.close.onRelease(),
+    'another tab': (c) => P(c).head.tab0.onRelease(),
+    'a hand-over (Letters)': (c) => P(c).head.ho0.onRelease(),
+    'a footer hand-over': (c) => P(c).foot.f0.onRelease(),
+    'Type in the browser instead': (c) => P(c).list.browser.onRelease(),
+    'our notice pinned': (c) => { P(c).list.box.text = 'Mead'; P(c).list.box.onChanged(); P(c).list.post.onRelease(); c.push(mine); },
+  };
+  for (const [way, out] of Object.entries(ways)) {
+    const c = S.boot('dbo_board');
+    c.push(board);
+    P(c).head.tab1.onRelease();
+    P(c).foot.write.onRelease();
+    for (let i = 0; i < N; i++) c.push(board);
+    const during = held(c);
+    out(c);
+    check(`${way} after ${N} refreshes mid-compose: held once while typing, given back once`, during === 1 && held(c) === 0 && lowest(c) === 0, [during, held(c), lowest(c)]);
+  }
 }
 
 T.done();
