@@ -91,9 +91,9 @@ const WANT = {
   warrior: 'Blade, Blunt, Martial Arts and Defense learn 10% faster',
   mage: 'Arcane Arts and Enchanter learn 10% faster',
   thief: 'Archery learns 10% faster; 5% more gold from loot and contract pay',
-  lady: 'Health and stamina regenerate 10% faster',
-  lord: 'Health regenerates 10% faster; fire hurts 5% more',
-  steed: 'Stamina regenerates 10% faster',
+  lady: 'Health and stamina regenerate 7% faster',
+  lord: 'Health regenerates 10% faster; fire hurts 5% more; weapons and fists hurt 5% less',
+  steed: 'Stamina regenerates 10% faster; +50 carry weight',
   apprentice: 'Magicka regenerates 15% faster; spells hurt 5% more',
   atronach: '+25 maximum magicka; magicka regenerates 10% slower; spells hurt 5% less',
   ritual: 'Priest learns 10% faster; health regenerates 15% faster below 30% health',
@@ -132,11 +132,14 @@ check('...told by name: "The Thief", and "Imperial Luck and The Thief"', told.so
 signAll('lady'); given.length = 0;
 check('no Thief: a plain player gets no gold, an Imperial his 10', R.goldBonus(P0, 100) === 0 && R.goldBonus(IMPERIAL, 100) === 10);
 
-check('Lady: health and stamina x1.10, magicka x1', near(R.regenFactor(P0, 'health'), 1.1) && near(R.regenFactor(P0, 'stamina'), 1.1) && R.regenFactor(P0, 'magicka') === 1);
+check('Lady: health and stamina x1.07, magicka x1 (Nat, 26 Oct: smaller, as she does both)', near(R.regenFactor(P0, 'health'), 1.07) && near(R.regenFactor(P0, 'stamina'), 1.07) && R.regenFactor(P0, 'magicka') === 1);
 check('Lady Redguard: stamina 1.25 x 1.10 capped at alwaysRegenCap 1.25', near(R.regenFactor(REDGUARD, 'stamina'), 1.25), R.regenFactor(REDGUARD, 'stamina'));
 
 signAll('lord');
-check('Lord: health x1.10; fire hurts 5% more, a sword or frost not', near(R.regenFactor(P0, 'health'), 1.1) && near(R.targetMult(NPC, P0, FLAMES), 1.05) && R.targetMult(NPC, P0, SWORD) === 1 && R.targetMult(NPC, P0, 0x211) === 1);
+check('Lord: health x1.10; fire hurts 5% more, frost not; a sword or a fist 5% less, a spell not (Nat, 26 Oct: his own niche)', near(R.regenFactor(P0, 'health'), 1.1) && near(R.targetMult(NPC, P0, FLAMES), 1.05) && R.targetMult(NPC, P0, 0x211) === 1
+  && near(R.targetMult(NPC, P0, SWORD), 0.95) && near(R.targetMult(NPC, P0, FIST), 0.95) && R.targetMult(NPC, P0, SPARKS) === 1, [R.targetMult(NPC, P0, SWORD), R.targetMult(NPC, P0, FIST), R.targetMult(NPC, P0, SPARKS)]);
+check('Lord against a player: a sword 2.5% less (the PvP half)', near(R.targetMult(NORD, P0, SWORD), 0.975), R.targetMult(NORD, P0, SWORD));
+globalThis.__dboRacialState.pvpAt.clear(); // that player hit opened a PvP fight; the PvE checks below start outside one
 check('Lord Dunmer: fire 0.5 x 1.05', near(R.targetMult(NPC, DUNMER, FLAMES), 0.525), R.targetMult(NPC, DUNMER, FLAMES));
 
 signAll('steed');
@@ -206,15 +209,15 @@ check('Serpent Argonian: poison 0.5 x 0.85', near(R.targetMult(NPC, ARGONIAN, PO
   check('Lord: a player\'s fire 2.5% more (the weakness halves too), an NPC\'s 5% more', near(R.targetMult(NORD, P0, FLAMES), 1.025) && near(R.targetMult(NPC, P0, FLAMES), 1.05));
   signAll('lady');
   const L = 41; race(L); sign(L, 'lady');
-  check('Lady out of a fight: health x1.10', near(R.regenFactor(L, 'health'), 1.1));
+  check('Lady out of a fight: health x1.07', near(R.regenFactor(L, 'health'), 1.07));
   R.attackMult(NPC, L, SWORD, 10, {});
-  check('...a hit from an NPC is no PvP fight: still x1.10', near(R.regenFactor(L, 'health'), 1.1));
+  check('...a hit from an NPC is no PvP fight: still x1.07', near(R.regenFactor(L, 'health'), 1.07));
   R.attackMult(NORD, L, SWORD, 10, {});
-  check('...hit by a player: x1.05 for the fight', near(R.regenFactor(L, 'health'), 1.05), R.regenFactor(L, 'health'));
+  check('...hit by a player: x1.035 for the fight', near(R.regenFactor(L, 'health'), 1.035), R.regenFactor(L, 'health'));
   const A = 42; race(A); sign(A, 'atronach'); R.attackMult(NORD, A, SWORD, 10, {});
   check('...the Atronach\'s slower magicka is never eased in a fight: x0.90', near(R.regenFactor(A, 'magicka'), 0.9));
   globalThis.__dboRacialState.pvpAt.set(L, Date.now() - 11000);
-  check('...and back to x1.10 once 10 s pass without a player hit', near(R.regenFactor(L, 'health'), 1.1));
+  check('...and back to x1.07 once 10 s pass without a player hit', near(R.regenFactor(L, 'health'), 1.07));
 }
 signAll('tower');
 check('Tower: Lockpicking x1.15 only', near(XP(P0, 'lockpicking'), 1.15) && XP(P0, 'blade') === 1);
@@ -254,7 +257,7 @@ check('...and the character is held in the hub', globalThis.__dboBirthsignHold(N
 const n0 = widgets.length;
 check('asked again while it is up (leaveRealm): no second menu, still at the step', globalThis.__dboBirthsignCreationOpen(NEW) === true && widgets.length === n0);
 fire('birthsignChoose', NEW, 'lady');
-check('a pick asks to confirm, for life', /^The Lady, for life: Health and stamina regenerate 10% faster\. Only staff can change it later\.$/.test(last()[1].targetName) && last()[1].actions.map((x) => x.id).join() === 'confirm,back', last()[1]);
+check('a pick asks to confirm, for life', /^The Lady, for life: Health and stamina regenerate 7% faster\. Only staff can change it later\.$/.test(last()[1].targetName) && last()[1].actions.map((x) => x.id).join() === 'confirm,back', last()[1]);
 fire('birthsignChoose', NEW, 'back');
 check('Choose again: the thirteen again, nothing written', last()[1].actions.length === 13 && !state[NEW].props['private.dboBirthsign']);
 fire('birthsignChoose', NEW, 'confirm');
@@ -363,7 +366,7 @@ const pk = last()[1];
 check('...thirteen cards, each Guardian then its charges, the Serpent last', pk.signs.map((x) => x.id).join() === 'warrior,lady,steed,lord,mage,apprentice,atronach,ritual,thief,lover,shadow,tower,serpent');
 check('...the Guardians marked \'\', their charges by Guardian, the Serpent \'none\'', pk.signs.map((x) => x.guardian).join() === ',warrior,warrior,warrior,,mage,mage,mage,,thief,thief,thief,none');
 const lord = pk.signs.find((x) => x.id === 'lord');
-check('...a card: name, the mock\'s lore line, the effect from the numbers', lord.name === 'The Lord' && lord.lore === 'The blood of the North runs strong, and fire bites deeper.' && lord.effect === 'Health regenerates 10% faster; fire hurts 5% more', lord);
+check('...a card: name, the mock\'s lore line, the effect from the numbers', lord.name === 'The Lord' && lord.lore === 'The blood of the North runs strong, and fire bites deeper.' && lord.effect === 'Health regenerates 10% faster; fire hurts 5% more; weapons and fists hurt 5% less', lord);
 check('...the mock\'s title and line', pk.title === 'Choose your birthsign' && pk.sub === 'The stars you were born under. Yours for life; only staff can change it later.');
 check('...every emblem is stars on the 40 x 40 grid and lines between real stars', pk.signs.every((x) => x.emblem && x.emblem.stars.length >= 4
   && x.emblem.stars.every(([px, py]) => px >= 0 && px <= 40 && py >= 0 && py <= 40)
@@ -430,5 +433,23 @@ const note = list.find((n) => /birthsign/i.test(JSON.stringify(n)));
 // Among the newest few rather than first: a release carries several new features' notes, and only one can be on top
 check('patch-notes.json: a Birthsigns note, among the newest', !!note && list.indexOf(note) >= 0 && list.indexOf(note) < 10, note);
 
+// ---- the Steed's carry weight: the DLE's DBO_ReferralCarry ability (+50, 1D1FA7), given by AddSpell like the Maormer's ----
+{
+  const calls = []; const realCall = mp.callPapyrusFunction; const realLookup = mp.lookupEspmRecordById;
+  const CARRY = 0x481d1fa7;
+  mp.callPapyrusFunction = (k, cls, fn, self, args) => { calls.push([fn, self.desc, args[0] && args[0].desc]); };
+  mp.lookupEspmRecordById = (id) => ((id >>> 0) === CARRY ? { record: { type: 'SPEL', editorId: 'DBO_ReferralCarry', fields: [] } } : (realLookup ? realLookup(id) : null));
+  const realDesc = mp.getIdFromDesc, realDescOf = mp.getDescFromId;
+  mp.getIdFromDesc = (d) => (String(d).toLowerCase() === '1d1fa7:dragonbreak online edits.esp' ? CARRY : realDesc ? realDesc(d) : 0);
+  mp.getDescFromId = (id) => ((id >>> 0) === CARRY ? '1d1fa7:DragonBreak Online Edits.esp' : realDescOf ? realDescOf(id) : String(id));
+  const ST = 71; race(ST); sign(ST, 'steed'); const LA = 72; race(LA); sign(LA, 'lady');
+  globalThis.__dboBirthsignAbilityTick(); globalThis.__dboBirthsignAbilityTick();
+  check('the Steed is given the carry ability once a session; the Lady not', calls.filter((c) => c[0] === 'AddSpell' && c[2] === '1d1fa7:DragonBreak Online Edits.esp').length === 1 && !calls.some((c) => String(c[1]) === String(mp.getDescFromId(LA))) && state[ST].props['private.dboBirthsignAbility'] === '1d1fa7:DragonBreak Online Edits.esp', calls);
+  calls.length = 0; sign(ST, 'lady'); globalThis.__dboBirthsignAbilityTick();
+  check('...taken back when staff change the sign', calls.some((c) => c[0] === 'RemoveSpell') && !state[ST].props['private.dboBirthsignAbility'], calls);
+  calls.length = 0; sign(ST, 'steed'); globalThis.__dboBirthsignAbilityTick(); state[ST].props['private.dboReferralCarry'] = '1d1fa7:DragonBreak Online Edits.esp'; sign(ST, 'lady'); globalThis.__dboBirthsignAbilityTick();
+  check('...but never when the referral reward gave the same ability (it stays theirs)', !calls.some((c) => c[0] === 'RemoveSpell') && !state[ST].props['private.dboBirthsignAbility'], calls);
+  mp.callPapyrusFunction = realCall; mp.lookupEspmRecordById = realLookup; mp.getIdFromDesc = realDesc; mp.getDescFromId = realDescOf;
+}
 console.log(failures ? `${failures} FAILED` : 'all checks passed');
 process.exit(failures ? 1 : 0);
