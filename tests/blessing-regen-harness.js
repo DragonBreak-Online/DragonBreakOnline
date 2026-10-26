@@ -27,7 +27,7 @@ const choiceOf = (id) => SKILLS.deities.choices.find((c) => c.id === id);
 const spellOf = (id) => idOf(choiceOf(id).blessing);
 
 // A deity for the filter only: its spell carries a detrimental and a hostile regeneration effect beside a good one
-SKILLS.deities.choices.push({ id: 'testgod', name: 'Test God', kind: 'faith', blessing: 'abcde:Skyrim.esm', shrines: [], prayAnywhere: true, boon: 'x', sphere: 'x', blessingSource: 'vanilla' });
+SKILLS.deities.choices.push({ id: 'testgod', name: 'Test God', kind: 'faith', blessing: 'abcde:Skyrim.esm', shrines: [], prayAnywhere: true, boon: 'x', sphere: 'x', blessingSource: 'vanilla' });   // verify-formids: ignore - a made-up blessing for the test god
 
 const field = (type, bytes) => ({ type, data: Uint8Array.from(bytes) });
 const u32le = (n) => [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255];
@@ -110,7 +110,11 @@ const bless = (deity, hours = 8, extra = {}) => {
 };
 const blessingSpell = (deity) => { const s = String(choiceOf(deity).blessing || ''); return /^[0-9a-f]+:/i.test(s) ? idOf(s) : 0; };
 // n ticks of the regeneration timer, a second apart
-const run = (n = 1) => { for (let i = 0; i < n; i++) { wallClock += 1000; timers.get('prayerBlessingRegen').fn(); } };
+// The client's report of each bar, which the tick now waits for before it pays (a fresh report: prayer.js, 26 Oct); here every
+// tick stands for one, with the bars as they are. blessing-regen-stale-harness.js runs a real client and the server's crop
+const report = () => { const o = globalThis.__dboBlessingRegenOwed && globalThis.__dboBlessingRegenOwed.get(ACTOR); if (o) o.seen = {}; };
+// n seconds of the regeneration timer, four ticks a second (prayer.js, as racial.js)
+const run = (n = 1) => { for (let i = 0; i < n * 4; i++) { wallClock += 250; report(); timers.get('prayerBlessingRegen').fn(); } };
 const gained = (deity, stat, secs, start = 0.5) => {
   bless(deity); setPc(start, start, start); out.sets.length = 0;
   run(secs);
@@ -126,7 +130,7 @@ check('the boot line names every regeneration blessing, as the tick reads it',
   /akatosh MagickaRateMult \+10/.test(line) && /hircine StaminaRate \+10/.test(line) && /meridia HealRateMult \+25/.test(line)
   && /hist HealRateMult \+50/.test(line) && /yokudan StaminaRateMult \+100/.test(line) && /wormcult MagickaRateMult \+100/.test(line)
   && !/julianos/.test(line), line.replace(/^.*: /, ''));
-check('the tick runs every second', timers.get('prayerBlessingRegen').ms === 1000);
+check('the tick runs four times a second, as racial.js\'s', timers.get('prayerBlessingRegen').ms === 250);
 
 const RATES = [
   // deity, bar, per second (share of the bar), why
@@ -159,8 +163,10 @@ for (const [deity, stat, perSec, why] of RATES) {
 // ---- the rest of the rule ------------------------------------------------------------------------------------------
 check('a blessing with no rate effect (Julianos, Magicka +25) adds nothing', (() => { const g = gained('julianos', 'magicka', 10); return near(g, 0) && out.sets.length === 0; })());
 check('nor does a blessing the server cleared', (() => { bless('akatosh'); props.delete(ACTOR + '|private.dboBlessing'); setPc(0.5, 0.5, 0.5); out.sets.length = 0; run(5); return out.sets.length === 0; })());
-check('a slow boon waits for a whole step (minStep 0.002): Meridia\'s 0.00175 a second is sent every second tick',
-  (() => { bless('meridia'); setPc(0.5, 0.5, 0.5); out.sets.length = 0; run(1); const one = out.sets.length; run(1); return one === 0 && out.sets.length === 1 && near(pc().health, 0.5035); })());
+// A step is a second of the bar's own regeneration (payoutSeconds 1), more than a report's age can take back: a Nord's
+// 0.7% of health a second, so Meridia's 0.00175 a second is sent every fourth second
+check('a slow boon waits for a whole step (a second of the bar\'s own regeneration): Meridia\'s 0.00175 a second is sent every fourth second',
+  (() => { bless('meridia'); setPc(0.5, 0.5, 0.5); out.sets.length = 0; run(3); const three = out.sets.length; run(1); return three === 0 && out.sets.length === 1 && near(pc().health, 0.507); })());
 check('a full bar is left alone', (() => { bless('hircine'); setPc(0.5, 0.5, 1); out.sets.length = 0; run(5); return out.sets.length === 0 && pc().stamina === 1; })());
 check('and the last step stops at full', (() => { bless('hircine'); setPc(0.5, 0.5, 0.97); run(1); return pc().stamina === 1; })());
 check('nothing for the dead', (() => { bless('hircine'); setPc(0, 0.5, 0.5); out.sets.length = 0; run(3); return out.sets.length === 0; })());
@@ -172,7 +178,7 @@ check('Death\'s Chill slows it by its own factor for that bar (downed.js): half'
 globalThis.__dboChillRateMult = (a, av) => (av === 'StaminaRateMult' ? 0 : 1);
 check('and stops it at the chill\'s cap (factor 0)', near(gained('hircine', 'stamina', 10), 0));
 delete globalThis.__dboChillRateMult;
-check('a long stall pays at most three ticks', (() => { bless('hircine'); setPc(0.2, 0.2, 0.2); run(1); wallClock += 60000; timers.get('prayerBlessingRegen').fn(); return near(pc().stamina, 0.2 + 0.1 + 0.3, 1e-6); })());
+check('a long stall pays at most three ticks (0.75 s)', (() => { bless('hircine'); setPc(0.2, 0.2, 0.2); run(1); wallClock += 60000; report(); timers.get('prayerBlessingRegen').fn(); return near(pc().stamina, 0.2 + 0.1 + 0.075, 1e-6); })(), pc().stamina);
 bless('testgod');
 check('only boosts count: a detrimental or hostile rate effect is left out, a plain Value Modifier is in',
   (() => { const h = globalThis.__dboBlessingRegen(ACTOR); return h.length === 1 && h[0].av === 'StaminaRateMult' && near(h[0].perSecond, 0.01); })(), JSON.stringify(globalThis.__dboBlessingRegen(ACTOR)));
@@ -220,7 +226,8 @@ check('gear Heal Rate 25 (no blessing) adds a quarter of the Nord\'s 0.7%/s: +0.
 gearList = [{ av: 'MagickaRateMult', stat: 'magicka', kind: 'mult', mag: 200, gear: true }];
 check('...gear Magicka Rate 200 is held to gearRegenCap 0.5 of 3%/s: +0.03 in 2 s, not 0.12', (() => { globalThis.__dboBlessingRegenOwed.delete(ACTOR); setPc(0.5, 0.5, 0.5); run(2); return near(pc().magicka, 0.53, 1e-6); })(), JSON.stringify(pc()));
 gearList = [{ av: 'MagickaRateMult', stat: 'magicka', kind: 'mult', mag: 75, gear: true }];
-check('...with Akatosh\'s Magicka Rate 10 (0.003/s) they add: 0.003 + 0.015 a second', (() => { bless('akatosh'); setPc(0.5, 0.2, 0.5); run(2); return near(pc().magicka, 0.236, 1e-6); })(), JSON.stringify(pc()));
+// Paid in steps (a second of 3%), so what reached the bar and what still waits make the rate
+check('...with Akatosh\'s Magicka Rate 10 (0.003/s) they add: 0.003 + 0.015 a second, paid and owed', (() => { bless('akatosh'); setPc(0.5, 0.2, 0.5); run(2); return near(pc().magicka - 0.2 + globalThis.__dboBlessingRegenOwed.get(ACTOR).magicka, 0.036, 1e-6); })(), JSON.stringify(pc()));
 gearList = [{ av: 'HealRateMult', stat: 'health', kind: 'mult', mag: 25 }];
 check('...an entry not marked gear is never taken from the gear hook', (() => { props.delete(ACTOR + '|private.dboBlessing'); globalThis.__dboBlessingRegenOwed.delete(ACTOR); setPc(0.5, 0.5, 0.5); out.sets.length = 0; run(3); return out.sets.length === 0; })());
 delete globalThis.__dboGearRegen;

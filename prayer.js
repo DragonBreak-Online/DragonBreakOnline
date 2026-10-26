@@ -602,7 +602,9 @@ module.exports = (api) => {
   // A deity with no spell can name its regeneration in skills.json (blessingRegen: { HealRateMult: 50 }, same units).
   // Nothing is added to the dead or the downed, to a bar already full, or past what Death's Chill allows (its rate factor
   // for that bar, 0 at its cap: downed.js). Steps under minStep wait in regenOwed, so a slow boon is not a packet a second.
-  const REGEN = Object.assign({ enabled: true, tickSeconds: 1, minStep: 0.002 }, CFG.blessingRegen || {});
+  // Paid as racial.js pays its gift (10 Oct): four ticks a second, a bar only on a fresh report of it, and at least
+  // payoutSeconds of the bar's own regeneration at a time, more than a report's age can take back (26 Oct)
+  const REGEN = Object.assign({ enabled: true, tickSeconds: 0.25, minStep: 0.002, payoutSeconds: 1 }, CFG.blessingRegen || {});
   const REGEN_TICK_MS = Math.max(250, Math.round((Number(REGEN.tickSeconds) || 1) * 1000));
   const REGEN_MIN_STEP = Math.max(0, Number(REGEN.minStep) || 0);
   // libespm ActorValue.h: index -> [the bar, a rate or a Mult]
@@ -714,21 +716,37 @@ module.exports = (api) => {
       let downed = false; try { downed = typeof globalThis.__dboIsDowned === 'function' && !!globalThis.__dboIsDowned(a); } catch (e) { downed = false; }
       if (!pc || !(Number(pc.health) > 0) || downed || !(secs > 0)) { owed.health = owed.magicka = owed.stamina = 0; continue; }
       const next = { health: Number(pc.health), magicka: Number(pc.magicka), stamina: Number(pc.stamina) };
-      let changed = false;
+      // A write replaces the client's bar, and the server holds only the client's last report of it (at most one a second,
+      // none while it casts), so a write from a stale report threw away the client's own regeneration since then (flasnex,
+      // 25 Oct: the blessing of Akatosh "destroying my magicka regen"). A bar is paid only on the tick its stored float32
+      // moved, a fresh report, as racial.js has since 10 Oct (4b5f9a658); in between the share waits in owed
+      const seen = owed.seen && typeof owed.seen === 'object' ? owed.seen : (owed.seen = {});
+      const paid = [];
       for (const stat of ['health', 'magicka', 'stamina']) {
+        const v = Math.fround(next[stat]);
+        const fresh = seen[stat] !== v;
+        seen[stat] = v;
         let add = 0, gear = 0;
         for (const e of list) if (e.stat === stat) { if (e.gear) gear += regenPerSecond(a, e); else add += regenPerSecond(a, e) * secs; }
         // Worn gear adds to a blessing, its own share at most gearRegenCap of the bar's base rate
         if (gear > 0) add += Math.min(gear, gearRegenCapOf() * raceRateOf(a, stat) / 100 * REGEN_MULT) * secs;
         add *= chillOf(a, stat);
         if (!(next[stat] < 1) || !(add > 0)) { owed[stat] = 0; continue; }
-        owed[stat] += add;
-        if (owed[stat] < REGEN_MIN_STEP) continue;
+        const per = add / secs, own = raceRateOf(a, stat) / 100 * REGEN_MULT;
+        const step = Math.max(REGEN_MIN_STEP, own * Math.max(0, Number(REGEN.payoutSeconds) || 0));
+        // Owed stops at a step plus 1.5 s of the boon: a pause (a menu, the regen delay) adds no regen, so it is not paid as one jump
+        owed[stat] = Math.min(owed[stat] + add, step + per * 1.5);
+        if (!fresh) continue;
+        // Or the rest when the bar's own regeneration fills it first
+        const fillsFirst = next[stat] + own >= 1 && owed[stat] >= own * 0.5;
+        if (owed[stat] < step && !fillsFirst) continue;
         next[stat] = Math.min(1, next[stat] + owed[stat]);
         owed[stat] = 0;
-        changed = true;
+        paid.push(stat);
       }
-      if (changed) { try { mp.set(a, 'percentages', next); } catch (e) { regenOwed.delete(a); } }
+      if (paid.length) {
+        try { mp.set(a, 'percentages', next); for (const stat of paid) seen[stat] = Math.fround(next[stat]); } catch (e) { regenOwed.delete(a); }
+      }
     }
     for (const a of [...regenOwed.keys()]) if (!here.has(a)) regenOwed.delete(a);
   });

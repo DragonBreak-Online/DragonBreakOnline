@@ -1,5 +1,27 @@
 [
   {
+    "title": "Blessings no longer slow your regeneration; tomes you could not read are refunded",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Gods and regeneration",
+        "items": [
+          "A god's blessing that speeds your regeneration (Akatosh's magicka, Hircine's stamina, Meridia's health and the rest) could pull your bar back while it ran, so a blessed bar refilled slower than an unblessed one. It now adds its share without ever taking yours, the same way the racial gifts do. Thanks to flasnex for the report and the clip.",
+          "Regeneration from worn gear is paid the same way."
+        ]
+      },
+      {
+        "heading": "Spell tomes",
+        "items": [
+          "The tome shop and the Scholars' Ledgers no longer sell tomes of spells that are held back for now (such as the Open Lock spells), which could never be read.",
+          "If you bought one, your gold has been returned, the unreadable tome taken back, and your tome purchase for the week given back to you."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The bank gem counters close",
     "date": "2026-10-25",
     "version": "Server update",
