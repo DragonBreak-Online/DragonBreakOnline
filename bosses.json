@@ -3638,19 +3638,6 @@
      "ref": "f77ca:Skyrim.esm",
      "anchorDist": 383,
      "anchorSameCell": true
-    },
-    {
-     "id": "HM",
-     "pos": [
-      -42817.49,
-      -58192.09,
-      1018.63
-     ],
-     "heading": 16.9,
-     "note": "Falkreath: Half-Moon Mill's lakeside woods",
-     "ref": "10d3d8:Skyrim.esm",
-     "anchorDist": 380,
-     "anchorSameCell": true
     }
    ],
    "drops": {
