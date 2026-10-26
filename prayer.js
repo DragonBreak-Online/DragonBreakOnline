@@ -1090,6 +1090,13 @@ module.exports = (api) => {
   // closely: the next prayer's blessing chance grows by the offering, up to double at offerFullGold.
   const OFFER = Object.assign({ min: 5, max: 1000, fullGold: 100, minutes: 60 }, (cfg.prayer || {}).offering || {});
   const offeringOf = (a) => { try { const o = mp.get(a, 'private.dboOffering'); return o && o.until > Date.now() ? o : null; } catch (e) { return null; } };
+  // What an offering adds to a prayer to god d: up to double, if it was made to d or to an aspect of the same god (sameFaith).
+  // An aspect has no shrine of its own, so its follower kneels at the other's and is answered by it (Lorkh at Shor's, Alkosh
+  // at Akatosh's): the offering, made to the follower's own god, never matched the shrine's and was spent for nothing
+  // (the Leader for Nat, 26 Oct: a bug)
+  const offeringFavour = (offering, d) => (offering && d && (offering.deityId === d.id || sameFaith(deityById(offering.deityId), d))
+    ? 1 + Math.min(Number(offering.gold) || 0, OFFER.fullGold) / OFFER.fullGold : 1);
+  globalThis.__dboOfferingFavour = (offering, deityId) => offeringFavour(offering, deityById(deityId));
   registerChatCommand('offer', (a, argStr) => {
     const gold = Math.floor(Number(String(argStr || '').trim()));
     const faith = faithOf(a);
@@ -1382,7 +1389,7 @@ module.exports = (api) => {
 
     // An offering to this god within the hour raises the odds, up to double, and is spent by the prayer
     const offering = offeringOf(a);
-    const favour = offering && offering.deityId === d.id ? 1 + Math.min(offering.gold, OFFER.fullGold) / OFFER.fullGold : 1;
+    const favour = offeringFavour(offering, d);
     if (offering) { try { mp.set(a, 'private.dboOffering', null); } catch (e) { /* not an actor */ } }
     let text = `${round.mode === 'pick' ? 'You speak the three verses' : 'You hold the three verses'}. ${d.name} takes note, and no more.`;
     if (Math.random() < chance * favour) {

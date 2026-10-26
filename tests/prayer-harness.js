@@ -579,6 +579,16 @@ globalThis.__dboPrayerLastShrine && globalThis.__dboPrayerLastShrine.clear();
 clear();
 commands.get('offer')(ACTOR, '20');
 check('an offering to a shrine god is made at the shrine', /at their shrine/.test(out.personals[0]) && gold === 440);
+// An aspect's follower kneels at the other god's shrine and is answered by that god: the offering still counts (26 Oct)
+{
+  const fav = globalThis.__dboOfferingFavour;
+  const o = (id, g) => ({ deityId: id, gold: g, until: wallClock + 60000 });
+  check('an offering raises the odds at its own god\'s shrine (50 of 100 gold: x1.5)', fav(o('akatosh', 50), 'akatosh') === 1.5, fav(o('akatosh', 50), 'akatosh'));
+  // skills.json's aspect (faiths are off here; faiths-harness checks Lorkh at Shor's and Alkosh at Akatosh's)
+  check('Auri-El\'s offering counts at Akatosh\'s shrine, and full gold doubles it', fav(o('auriel', 100), 'akatosh') === 2 && fav(o('auriel', 500), 'akatosh') === 2, [fav(o('auriel', 100), 'akatosh'), fav(o('auriel', 500), 'akatosh')]);
+  check('...and the other way, Akatosh\'s at an answer from Auri-El', fav(o('akatosh', 50), 'auriel') === 1.5);
+  check('another god\'s offering does not (Mara\'s at Akatosh\'s), nor no offering, nor an unknown god', fav(o('mara', 100), 'akatosh') === 1 && fav(null, 'akatosh') === 1 && fav(o('auriel', 100), 'nosuchgod') === 1);
+}
 
 // The god offer waits until the player has been in the world a while, and a relog offers it again (release review PRAY-1)
 props.delete(ACTOR + '|private.dboDeity');
@@ -1020,7 +1030,7 @@ console.log('pick prayers:');
   stand(1400);
   let m = prayNear();
   check('20 m from the statue, /pray says where to stand', !m.w && /Stand beside the Statue of Meridia and say \/pray/.test(m.said), m.said);
-  stand(200, '3c:Somewhere.esp');
+  stand(200, '3c:Somewhere.esp');   // verify-formids: ignore - a made-up world, on purpose: the player stands somewhere else
   m = prayNear();
   check('the same coordinates in another world are not the statue', !m.w, m.said);
   stand(200);
