@@ -172,6 +172,10 @@ act(OWNER, 'decorView', 'catalog', 'beds', 0, 'x'.repeat(500));
 ok(lastPanel(OWNER).search.length === 40, 'a search is cut to 40 characters');
 
 // ---- closing ----
+act(OWNER, 'decorView', 'catalog', 'beds', 0, '');
+act(OWNER, 'decorClose');
+ok(closedPanel(OWNER) && !T.S.panel.has(OWNER), 'Close closes the widget and forgets the panel');
+cmd(OWNER, '');
 fire('close', OWNER, [], 171);
 fire('decorView', OWNER, [n0, 'catalog', 'beds', 0]);
 ok(!T.S.panel.has(OWNER), 'closing forgets the panel; an old nonce does nothing');
