@@ -4629,10 +4629,20 @@ const giveItem = (a, baseId, count) => {
 
 // ---- notice boards (BountyBoardSystem, re-keyed to Manny's boards; one pool per hold) -------
 globalThis.__alduinakBoardLog = (text) => audit(`BOARD ${text}`);
-registerChatCommand('board', (a) => {
+const BOARD_POST_TABS = { hold: 'hold', shop: 'shop', citizen: 'citizen', recruit: 'recruit', ad: 'shop', notice: 'citizen' };
+registerChatCommand('board', (a, args) => {
+  // /board post <tab> <text>: the typed fallback for the native board, which hands its composer to the browser
+  const m = /^\s*post\s+(\S+)\s+([\s\S]+)$/i.exec(String(args || ''));
+  if (/^\s*post\b/i.test(String(args || ''))) {
+    const tab = m && BOARD_POST_TABS[m[1].toLowerCase()];
+    if (!tab) return personal(a, 'Usage: /board post <shop|citizen|recruit|hold> <your notice>');
+    const post = globalThis.__alduinakBountyPost;
+    if (typeof post === 'function') post(a, tab, m[2].trim()); else personal(a, 'The notice boards are not in service right now.');
+    return;
+  }
   const open = globalThis.__alduinakBountyOpen;
   if (typeof open === 'function') open(a); else personal(a, 'The notice boards are not in service right now.');
-}, { help: 'open the notice board you are standing at' });
+}, { help: 'open the notice board you are standing at; /board post <shop|citizen|recruit|hold> <text> pins a notice' });
 
 // ---- officials: who holds which rank in which zone (officials.json, read by the server too) --
 const ZONES = (() => { try { return JSON.parse(fs.readFileSync(path.resolve('zones.json'), 'utf8')); } catch (e) { log('zones.json unreadable', e.message); return {}; } })();
