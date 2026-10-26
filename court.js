@@ -29,6 +29,11 @@
 //   courtContractBudget   [nonce, zoneId, gold]         its weekly budget for standing contracts (/contract budget)
 //   courtContractStanding [nonce, zoneId, 'on'|'off']   standing contracts on or off (/contract standing); all three by
 //                                                       whoever sets its tax, with /contract's bounds and audit
+//   courtContractPostBudget [nonce, zoneId, gold]       the weekly pool for posted work and commissions (/contract postbudget)
+//   courtContractPost     [nonce, zoneId, kind, count, reward]   an official posts hunting work (/contract post)
+//   courtCommissionPost   [nonce, zoneId, itemDesc, count, price] an official commissions goods (/contract commission)
+//   courtContractWithdraw [nonce, zoneId, noticeId]     its poster or a tax-setter takes it down (/contract withdraw)
+//   courtCommissionSearch [nonce, zoneId, query]        goods for a commission; the matches come back in contracts.search
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -300,6 +305,17 @@ module.exports = (api) => {
   onUi('courtContractPrice', (a, args) => { if (fresh(a, args)) answer(a, () => setContract(a, args, 'price', [args[2], args[3]])); });
   onUi('courtContractBudget', (a, args) => { if (fresh(a, args)) answer(a, () => setContract(a, args, 'budget', [args[2]])); });
   onUi('courtContractStanding', (a, args) => { if (fresh(a, args)) answer(a, () => setContract(a, args, 'standing', [args[2] === true || args[2] === 'on' ? 'on' : args[2] === false || args[2] === 'off' ? 'off' : String(args[2])])); });
+  onUi('courtContractPostBudget', (a, args) => { if (fresh(a, args)) answer(a, () => setContract(a, args, 'postbudget', [args[2]])); });
+  // Posting by hand and commissions (Nat, 25 Oct): contracts.js's rules, gates and audit, for an official of this court
+  const terms = (a, args, fn) => {
+    const z = zoneFor(a, args[1]); if (!z) return NO_COURT;
+    if (!z.treasury || !globalThis.__dboContractTerms || typeof globalThis.__dboContractTerms[fn] !== 'function') return { error: `${z.name} posts no work.` };
+    return globalThis.__dboContractTerms[fn](a, z.id, ...args.slice(2)) || { error: 'That cannot be done just now.' };
+  };
+  onUi('courtContractPost', (a, args) => { if (fresh(a, args)) answer(a, () => terms(a, args, 'post')); });
+  onUi('courtCommissionPost', (a, args) => { if (fresh(a, args)) answer(a, () => terms(a, args, 'commission')); });
+  onUi('courtContractWithdraw', (a, args) => { if (fresh(a, args)) answer(a, () => terms(a, args, 'withdraw')); });
+  onUi('courtCommissionSearch', (a, args) => { if (fresh(a, args)) answer(a, () => terms(a, args, 'search')); });
   // courtWage [nonce, zoneId, office, gold]: economy.js's rules (the ruler or Steward; nobody sets their own)
   onUi('courtWage', (a, args) => {
     if (!fresh(a, args)) return;

@@ -1322,7 +1322,14 @@
   "citizensOnly": true,
   "weeklyBudget": 1000,
   "budgetMax": 100000,
-  "priceBounds": { "min": 1, "max": 200 }
+  "priceBounds": { "min": 1, "max": 200 },
+  "_comment_fauna": "Nat, 25 Oct (ticket 0414): every creature a hold's spots put down is work (ogres, boars, rats, undead, goblins...), a kind only where it has at least minSpots spots, and at most tierLimit standing notices of a danger tier per board. postBudget: gold a hold's hand-posted work and commissions may commit per UTC week (tax-setters: /contract postbudget, Court tab); postsPerDay per official. Commissions (/contract commission, Court tab): goods from commissionCategories of admin-items.json at most commissionValueMult x their worth, up commissionHours, handed in at the board. Rollback: minSpots 1, tierLimit {}, postBudget 100000, postsPerDay 99 (hot reload).",
+  "minSpots": 3,
+  "tierLimit": { "3": 2 },
+  "postBudget": 2000,
+  "postsPerDay": 3,
+  "commissionHours": 48,
+  "commissionValueMult": 1.5
  },
  "tickets": {
   "_comment": "In-game /ticket (gameticket.js, consolidation C9): the players who were within 40 m when a ticket opens are posted to this staff-only channel (#ticket-archive, named by claude-jake 2026-09-28), never into the ticket the reporter reads.",

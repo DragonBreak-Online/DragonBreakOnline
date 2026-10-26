@@ -125,6 +125,7 @@ declare -A NEEDS=(
   [capture-rope]=server:skymp5-server/ts/systems/captureSystem.ts
   [trade-open-hook]=server:skymp5-server/ts/systems/tradeSystem.ts
   [contracts-tab]=front:skymp5-front/src/features/expeditionBoard/index.tsx
+  [court-post-front]=front:skymp5-front/src/features/court/index.tsx
   [supernatural-tab]=front:skymp5-front/src/features/masteryMenu/index.tsx
   [shrine-panel-widget]=front:skymp5-front/src/features/shrinePanel/index.tsx
   [school-meters]=front:skymp5-front/src/features/masteryMenu/index.tsx

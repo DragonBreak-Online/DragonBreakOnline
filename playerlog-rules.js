@@ -466,16 +466,17 @@ AUDIT_VERBS.SPELL.cut = (text) => text.replace(/^(SPELL TRIM [\s\S]*?, shouts: (
 // true when unquote(raw) lost the end of the line (a quote left unmatched takes the rest with it), or parseAudit's cap did:
 // the line then ends in someone's words, so a cut that keeps the server's own end of the line has none to keep
 const endLost = (raw) => { const s = String(raw || ''); return s.length >= 600 || s.replace(/"[^"\n]{0,600}"/g, '').includes('"'); };
-// CONTRACT <official> set <hold> <price|budget|standing> <typed>: <sentence> (contracts.js setTerms): the chat passes every
+// CONTRACT <official> set <hold> <price|budget|postbudget|standing> <typed>: <sentence> (contracts.js setTerms): the chat passes every
 // word typed after the term and setTerms reads only the first one or two, so the rest is an official's own words (review
 // F2/PLA-2, 22 Oct): they go. The server's sentence stays (it says the tier, the gold or on/off): the one after the last
 // ": <hold>", kept only when it is word for word one setTerms writes and the end of the line is not lost, so typed words with
 // a colon, a fake sentence or a quote in them never pass. With no such sentence nothing after the term is kept, and a set
 // line of any other shape keeps nothing at all
-const CONTRACT_SET = new RegExp(`^(CONTRACT ${WHO_RX} set (.{1,60}?) (price|budget|standing))(?= )`);
+const CONTRACT_SET = new RegExp(`^(CONTRACT ${WHO_RX} set (.{1,60}?) (price|budget|postbudget|standing))(?= )`);
 const CONTRACT_SAID = {
   price: /^ now pays \d{1,12} gold a kill for (?:pests|dangerous beasts|deadly beasts) \(tier [123]; was \d{1,12}\)\. Contracts already taken keep their pay\.$/,
   budget: /^'s standing contracts may now commit \d{1,12} gold a week \(was \d{1,12}\); -?\d{1,12} is left this week\.$/,
+  postbudget: /^'s posted work and commissions may now commit \d{1,12} gold a week \(was \d{1,12}\); -?\d{1,12} is left this week\.$/,
   standing: /^ posts (?:standing contracts again|no standing contracts; those up now come down and their gold goes back to the treasury\. Contracts already taken run on)\.$/,
 };
 AUDIT_VERBS.CONTRACT.cut = (text, raw) => {
@@ -1487,6 +1488,9 @@ contracts.js CONTRACT b6341078 clean
 contracts.js CONTRACT 1c58c02d clean
 contracts.js CONTRACT aaccf4b3 clean
 contracts.js CONTRACT bdffe91c clean
+contracts.js CONTRACT a8cb7bc9 clean
+contracts.js CONTRACT d0264a47 clean
+contracts.js CONTRACT f7a57db2 clean
 couriers.js COURIER 23513b81 parsed
 couriers.js COURIER 2b9f065b parsed
 couriers.js COURIER d0598bda parsed
