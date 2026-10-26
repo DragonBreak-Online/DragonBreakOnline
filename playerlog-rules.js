@@ -1957,6 +1957,8 @@ supernatural.js SUPERNATURAL 644712c6 parsed
 supernatural.js SUPERNATURAL 34ab901a parsed
 supernatural.js SUPERNATURAL b84ebdba parsed
 supernatural.js SUPERNATURAL 6a6a6673 parsed
+supernatural.js BEAST 9d5182b9 clean
+supernatural.js BEAST 19f5745b clean
 tailoring.js TAILOR 4ccf2f80 clean
 tenancy.js PROPERTY 8dbca314 parsed
 tenancy.js PROPERTY e3463099 parsed

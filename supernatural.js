@@ -3048,6 +3048,85 @@ module.exports = (api) => {
     }
   });
 
+  // The beast defends its own (Nat, 25 Oct): a werewolf in mortal form brought to defendAtHealth or under in a fight, who has
+  // not changed yet this game day, may change at once, with no warning: one roll of `chance` each time health crosses down
+  // through defendAtHealth (Nat: random, not certain). A failed roll costs nothing and waits until health has been back
+  // above defendAtHealth and falls through it again; every roll is audited. A change spends the day's change (beastDay, the count
+  // __dboBeastAllow keeps), so it only ever comes before the first change of the day; it counts as the full moon's change
+  // too. It never comes in a duel (a fair fight), when dead or down (downed.js lies under it), bound, carried or jailed,
+  // on a horse, in a staff polymorph or another beast form, in the character editor, during a rite, a forced change's
+  // warning or the login grace; indoors only with indoors true (the full moon's change already goes indoors). Spared
+  // werewolves (an Alpha, Hircine's blessed) call the beast at will and are left to it. A pack member's change counts
+  // against the pack's own daily changes. frenzy false (the default): no frenzy, the beast fights for the werewolf, not
+  // against everyone. Config "werewolfDefend"; rollback enabled false (hot reload).
+  const DEF = Object.assign({ enabled: false, defendAtHealth: 0.25, combatSeconds: 10, indoors: true, packMembers: true,
+    frenzy: false, everyMs: 500, chance: 0.35 }, cfg.werewolfDefend || {});
+  // Werewolves who have had their roll since health last fell through defendAtHealth; health back above it re-arms them
+  const defRolled = globalThis.__dboDefendRolled instanceof Set ? globalThis.__dboDefendRolled : (globalThis.__dboDefendRolled = new Set());
+  const healthOf = (a) => { try { const p = mp.get(a, 'percentages'); return p && typeof p.health === 'number' ? p.health : NaN; } catch (e) { return NaN; } };
+  const defendRefusal = (a) => {
+    const s = stateOf(a);
+    if (!s || s.kind !== 'werewolf') return 'no werewolf';
+    if (spared(a, s)) return 'spared';
+    if (beastForm(a)) return 'beast form';
+    if (!DEF.packMembers && packMember(a, s)) return 'pack';
+    const g = (k) => { try { return mp.get(a, k); } catch (e) { return undefined; } };
+    if (g('isDead') === true) return 'dead';
+    let p = null; try { p = mp.get(a, 'percentages'); } catch (e) { p = null; }
+    const hp = p && typeof p.health === 'number' ? p.health : NaN;
+    if (!(hp > 0) || hp > Number(DEF.defendAtHealth)) return 'health';
+    const hit = globalThis.__dboCombatAt instanceof Map ? Number(globalThis.__dboCombatAt.get(a >>> 0)) || 0 : 0;
+    if (Date.now() - hit > Math.max(1, Number(DEF.combatSeconds) || 0) * 1000) return 'no fight';
+    try { if (typeof globalThis.__dboIsDowned === 'function' && globalThis.__dboIsDowned(a)) return 'downed'; } catch (e) { return 'downed'; }
+    try { if (typeof globalThis.__dboInDuel === 'function' && globalThis.__dboInDuel(a)) return 'duel'; } catch (e) { return 'duel'; }
+    const r = g('private.restrained');
+    if (r && (r.boundHands || r.carried || r.captorActorId)) return 'bound';
+    const jail = g('private.dboSentence');
+    if (jail && Number(jail.totalMs) > (Number(jail.servedMs) || 0)) return 'jailed';
+    try { const ac = globalThis.__dboAnticheat; const st = ac && ac.players instanceof Map ? ac.players.get(a >>> 0) : null; if (st && st.mounted === true && st.horse) return 'mounted'; } catch (e) { /* no anticheat */ }
+    if (/horse|mount/.test(String(g('lastAnimEvent') || '').toLowerCase()) && !/dismount|exit|stop/.test(String(g('lastAnimEvent') || '').toLowerCase())) return 'mounted';
+    if (g('private.dboAppearanceEdit')) return 'editor';
+    if (rites.has(a) || FERAL_DUE.has(a)) return 'changing';
+    if (inLoginGrace(a)) return 'login';
+    if (!DEF.indoors && !isOutdoors(a)) return 'indoors';
+    const c = clock();
+    const now = c && typeof c.gameDays === 'function' ? Number(c.gameDays()) : NaN;
+    if (!Number.isFinite(now)) return 'no clock';
+    if (s.beastDay === Math.floor(now) && (Number(s.beastDayUses) || 0) > 0) return 'changed today';
+    return '';
+  };
+  globalThis.__dboDefendRefusal = (a) => defendRefusal(Number(a) >>> 0);
+  const defend = (a) => {
+    const s = stateOf(a);
+    const c = clock();
+    s.beastDay = Math.floor(Number(c.gameDays())); s.beastDayUses = 1; saveState(a, s);
+    personal(a, 'Pain wakes the beast, and it will not let you fall.');
+    quietNear(a, (v) => `${nameTo(v, a)} staggers, bleeding, and something tears its way out of them.`, 3000);
+    markMoonTaken(a);
+    const ok = typeof globalThis.__dboBeastTransform === 'function' && globalThis.__dboBeastTransform(a, 'werewolf', true);
+    log(`supernatural: ${display(a)} changed to defend themselves (${ok ? 'the day\'s change spent' : 'the change failed'})`);
+    audit(`BEAST ${who(a)} defensive change${ok ? '' : ' failed'}`);
+    if (ok && DEF.frenzy === true && !packMember(a, stateOf(a))) { try { if (typeof globalThis.__dboFrenzyForced === 'function') globalThis.__dboFrenzyForced(a); } catch (e) { log(`supernatural: frenzy check failed: ${e.message}`); } }
+    return ok;
+  };
+  globalThis.__dboDefendTick = () => {
+    if (DEF.enabled !== true) return;
+    const chance = Math.max(0, Math.min(1, Number(DEF.chance) || 0));
+    for (const a of onlineActors()) {
+      if (healthOf(a) > Number(DEF.defendAtHealth)) { defRolled.delete(a); continue; }
+      if (defRolled.has(a) || defendRefusal(a)) continue;
+      defRolled.add(a);
+      const roll = Math.random();
+      const yes = roll < chance;
+      audit(`BEAST ${who(a)} defensive roll ${roll.toFixed(3)} against ${chance}: ${yes ? 'the beast comes' : 'nothing'}`);
+      if (yes) defend(a);
+      else log(`supernatural: ${display(a)} fell under ${Math.round(Number(DEF.defendAtHealth) * 100)}% in a fight; the beast stayed down (roll ${roll.toFixed(3)}, chance ${chance})`);
+    }
+    if (defRolled.size > 2000) defRolled.clear();
+  };
+  log(`supernatural: werewolf defence ${DEF.enabled === true ? 'ON' : 'off'}: chance ${DEF.chance} at ${Math.round(Number(DEF.defendAtHealth) * 100)}% health in a fight, once each fall through it, before the day's first change; frenzy ${DEF.frenzy === true ? 'on' : 'off'}`);
+  every('superDefend', Math.max(250, Number(DEF.everyMs) || 500), () => globalThis.__dboDefendTick());
+
   // ---- admin -----------------------------------------------------------------------------------------------
   registerChatCommand('curse', (a, args) => {
     const [name, what, arg] = String(args || '').trim().split(/\s+/);
