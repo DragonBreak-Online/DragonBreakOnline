@@ -362,7 +362,7 @@ const DOMAINS = {
   prayer: 'aedric', deityPicker: 'aedric', shrinePanel: 'aedric', birthsignPicker: 'aedric',
   rite: 'lorkhan', bountyBoard: 'lorkhan', expeditionBoard: 'lorkhan', dungeonGate: 'lorkhan', death: 'lorkhan', robPrompt: 'lorkhan', feedPrompt: 'lorkhan', downed: 'lorkhan',
   mastery: 'dragonbreak', journal: 'dragonbreak', namePrompt: 'dragonbreak', reading: 'dragonbreak', tomeShop: 'dragonbreak', spellbook: 'dragonbreak', studyMagic: 'dragonbreak', classLectern: 'dragonbreak',
-  labour: 'bronze', skinning: 'bronze', housing: 'bronze', pigeon: 'bronze', courierHandover: 'bronze', mailMarkers: 'bronze', trade: 'bronze', bank: 'bronze',
+  labour: 'bronze', skinning: 'bronze', housing: 'bronze', decor: 'bronze', pigeon: 'bronze', courierHandover: 'bronze', mailMarkers: 'bronze', trade: 'bronze', bank: 'bronze',
 };
 
 // Each panel also carries its own size (utils/PanelScale.js): Ctrl + wheel over it
