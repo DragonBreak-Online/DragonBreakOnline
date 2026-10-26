@@ -282,6 +282,53 @@ def main():
         else:
             oks.append(f'audit: stale-reference audit PASS over {nchild} child plugin(s), sha256 matches')
 
+    # ---- containers ------------------------------------------------------------------------------------------------
+    # A child plugin carries the parent CELL and WRLD of every reference it overrides, and merge_into_dle.py's PROOF
+    # cannot see when those replace the DLE's own: its check is "DLE records the child does not touch that changed",
+    # and a container IS a record the child carries. On 2026-10-25 a two-plank fix built against the first 22 lines of
+    # the load order replaced WRLD 0000003C (Tamriel) with a 312-byte stub in place of 45,961 bytes, and PROOF OK was
+    # printed. Nothing else caught it - not the proof, not the audit, not this gate.
+    #
+    # So: a CELL or WRLD that differs from live must be declared in containers-expected.txt beside the esp (one
+    # "<local id> <plugin>" per line, # for comments). Strict by default: with no such file, ANY changed container
+    # fails. Losing a subrecord type that live has is refused whether declared or not - that is the stub signature,
+    # and if it is ever legitimate a human should decide, not a list.
+    exp = set()
+    expf = os.path.join(os.path.dirname(os.path.abspath(a.esp)), 'containers-expected.txt')
+    if os.path.isfile(expf):
+        for line in open(expf, encoding='utf-8', errors='replace'):
+            line = line.split('#')[0].strip()
+            if not line:
+                continue
+            w = line.split(None, 1)
+            if len(w) == 2:
+                try:
+                    exp.add((w[1].strip().lower(), int(w[0], 16) & 0xFFFFFF))
+                except ValueError:
+                    fails.append(f'containers: cannot read "{line}" in containers-expected.txt')
+    undeclared, gutted, nsame = [], [], 0
+    for k, (t, fl, off, sz) in new.rec.items():
+        if t not in ('CELL', 'WRLD') or k not in live.rec or live.rec[k][0] != t:
+            continue
+        ns, ls = new.subs(k), live.subs(k)
+        if ns == ls:
+            nsame += 1
+            continue
+        lost = {s for s, _ in ls} - {s for s, _ in ns}
+        if lost:
+            gutted.append((t, k, sorted(s.decode('latin-1') for s in lost)))
+        elif k not in exp:
+            undeclared.append((t, k))
+    for t, k, lost in gutted:
+        fails.append(f'containers: {t} {k[1]:06X} of {k[0]} has LOST subrecord(s) {",".join(lost)} that live has - '
+                     'a child built against a partial load order replaces containers with stubs; '
+                     'restore them from the DLE (ck-mcp/restore_child_parents.py) before shipping')
+    for t, k in undeclared:
+        fails.append(f'containers: {t} {k[1]:06X} of {k[0]} differs from live and is not in containers-expected.txt')
+    if not gutted and not undeclared:
+        oks.append(f'containers: {nsame} CELL/WRLD identical to live'
+                   + (f', {len(exp)} declared change(s)' if exp else ', none changed'))
+
     for o in oks:
         print('ok  ', o)
     for f in fails:
