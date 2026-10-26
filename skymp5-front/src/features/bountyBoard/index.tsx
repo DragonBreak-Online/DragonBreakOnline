@@ -36,6 +36,8 @@ export interface BountyBoardData {
   tabs: BoardTab[];
   notes: BoardNote[];
   events: BoardEvents;
+  // set by the client router when the native board hands off its typed input: 'compose:<tab id>'
+  handoff?: string;
 }
 
 const FALLBACK_TABS: BoardTab[] = [
@@ -72,7 +74,12 @@ const BountyBoard = ({ data }: { data: BountyBoardData }) => {
   const tabs = data.tabs && data.tabs.length ? data.tabs : FALLBACK_TABS;
   const allNotes = data.notes || [];
 
-  const [tabId, setTabId] = useState(tabs[0].id);
+  // a native board's "Write a notice..." opens only this composer; the router takes the board back to native after
+  const handoffTab = typeof data.handoff === 'string' && data.handoff.indexOf('compose') === 0 ? data.handoff.slice(8) : null;
+  const composeOnly = handoffTab !== null;
+  const startTab = tabs.filter((t) => t.id === handoffTab)[0] || tabs[0];
+
+  const [tabId, setTabId] = useState(startTab.id);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [composing, setComposing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -80,6 +87,10 @@ const BountyBoard = ({ data }: { data: BountyBoardData }) => {
   const tab = tabs.filter((t) => t.id === tabId)[0] || tabs[0];
   const notes = allNotes.filter((n) => n.tab === tab.id);
   const selected = allNotes.filter((n) => n.id === selectedId)[0] || null;
+
+  useEffect(() => {
+    if (composeOnly) setTabId(startTab.id);
+  }, [composeOnly, startTab.id]);
 
   // A refresh can pull the note being read off the board.
   useEffect(() => {
@@ -103,16 +114,16 @@ const BountyBoard = ({ data }: { data: BountyBoardData }) => {
   // index.js fires menu:escape globally; while a paper or the compose dialog
   // is up, Escape should back out one layer rather than close the board.
   useEffect(() => {
-    if (!composing && selectedId === null) return undefined;
+    if (!composing && !composeOnly && selectedId === null) return undefined;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       e.stopImmediatePropagation();
-      if (composing) setComposing(false);
+      if (composing || composeOnly) cancelCompose();
       else setSelectedId(null);
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [composing, selectedId]);
+  }, [composing, composeOnly, selectedId]);
 
   const full = allNotes.length >= data.maxNotes;
   const cost = Number(tab.cost) || 0;
@@ -120,10 +131,13 @@ const BountyBoard = ({ data }: { data: BountyBoardData }) => {
   const canPost = tab.canPost !== false;
   const trimmed = draft.trim();
 
+  // a hand-off's cancel ends it with the board's close; the router then has nothing to take back
+  const cancelCompose = () => (composeOnly ? send(ev.close) : setComposing(false));
+
   const submit = () => {
     if (!trimmed) return;
     send(ev.post, tab.id, trimmed);
-    setComposing(false);
+    if (!composeOnly) setComposing(false);
   };
 
   const postLabel = !canPost
@@ -131,6 +145,46 @@ const BountyBoard = ({ data }: { data: BountyBoardData }) => {
     : full ? 'The board is full'
       : !canAfford ? 'Not enough gold'
         : 'Pin a notice';
+
+  const composer = (
+    <div className="bountyBoard__shade">
+      <div className="bountyBoard__compose">
+        <h3 className="bountyBoard__compose-title">Pin a notice &middot; {tab.label}</h3>
+        <textarea
+          className="bountyBoard__compose-text"
+          value={draft}
+          maxLength={data.maxTextLen}
+          autoFocus
+          placeholder={tab.id === 'shop' ? 'What are you selling, and where?' : tab.id === 'hold' ? 'Word from the hold...' : 'What should the hold read here?'}
+          onChange={(e) => setDraft(e.target.value)}
+        />
+        <div className="bountyBoard__compose-foot">
+          <span className="bountyBoard__hint">
+            {draft.length + ' / ' + data.maxTextLen + (cost ? ' · ' + cost + ' gold' : ' · free')}
+          </span>
+          <div className="bountyBoard__actions">
+            <button
+              className="bountyBoard__button bountyBoard__button--primary"
+              disabled={!trimmed}
+              onClick={submit}
+            >
+              {cost ? 'Post for ' + cost + ' gold' : 'Post'}
+            </button>
+            <button className="bountyBoard__button" onClick={cancelCompose}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (composeOnly) {
+    return (
+      <div className="bountyBoard">
+        <div className="bountyBoard__fade" />
+        {composer}
+      </div>
+    );
+  }
 
   return (
     <div className="bountyBoard">
@@ -218,36 +272,7 @@ const BountyBoard = ({ data }: { data: BountyBoardData }) => {
           </div>
         ) : null}
 
-        {composing ? (
-          <div className="bountyBoard__shade">
-            <div className="bountyBoard__compose">
-              <h3 className="bountyBoard__compose-title">Pin a notice &middot; {tab.label}</h3>
-              <textarea
-                className="bountyBoard__compose-text"
-                value={draft}
-                maxLength={data.maxTextLen}
-                autoFocus
-                placeholder={tab.id === 'shop' ? 'What are you selling, and where?' : tab.id === 'hold' ? 'Word from the hold...' : 'What should the hold read here?'}
-                onChange={(e) => setDraft(e.target.value)}
-              />
-              <div className="bountyBoard__compose-foot">
-                <span className="bountyBoard__hint">
-                  {draft.length + ' / ' + data.maxTextLen + (cost ? ' · ' + cost + ' gold' : ' · free')}
-                </span>
-                <div className="bountyBoard__actions">
-                  <button
-                    className="bountyBoard__button bountyBoard__button--primary"
-                    disabled={!trimmed}
-                    onClick={submit}
-                  >
-                    {cost ? 'Post for ' + cost + ' gold' : 'Post'}
-                  </button>
-                  <button className="bountyBoard__button" onClick={() => setComposing(false)}>Cancel</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
+        {composing ? composer : null}
       </div>
     </div>
   );
