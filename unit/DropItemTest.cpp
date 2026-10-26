@@ -209,3 +209,57 @@ TEST_CASE("A dropped item carrying extras survives the drop queue cap",
   REQUIRE(liveDaggers == 10);
   REQUIRE(deadDaggers == 1);
 }
+
+// Nat tested the extras fix on dev with an item named 'asd' and it came straight back to his inventory. That
+// is not the extras path at all: ActionListener::OnDropItem refuses a NAMED item outright ("a made item
+// stays in the pack") and re-sends the inventory so the two sides cannot desync, so MpActor::DropItem is
+// never reached and nothing is ever placed in the world.
+//
+// The two features therefore disagree about named items, and this case pins the precedence down so that
+// nobody repairs one of them by quietly breaking the other. Whether a made item SHOULD be droppable is
+// Nat's decision, not something to settle in code.
+TEST_CASE("A named item is refused before it can be dropped at all",
+          "[DropItemTest]")
+{
+  auto& partOne = GetPartOne();
+  constexpr uint32_t ironSword = 0x00012EB7;
+
+  DoConnect(partOne, 0);
+  partOne.CreateActor(0xff000000, { 1, 2, 3 }, 0, 0x3c);
+  partOne.SetUserActor(0, 0xff000000);
+  MpActor& ac = partOne.worldState.GetFormAt<MpActor>(0xff000000);
+  ac.RemoveAllItems();
+
+  uint32_t firstNew = 0xff000001;
+  for (uint32_t id = 0xff000001; id < 0xff000400; ++id) {
+    if (partOne.worldState.LookupFormById(id).get()) {
+      firstNew = id + 1;
+    }
+  }
+
+  Inventory::Entry named(ironSword, 1);
+  named.name = "asd";
+  named.health = 1.5f;
+  ac.AddItems({ named });
+  REQUIRE(ac.GetInventory().GetItemCount(ironSword) == 1);
+
+  DoMessage(partOne, 0,
+            nlohmann::json{ { "t", MsgType::DropItem },
+                            { "baseId", ironSword },
+                            { "count", 1 } });
+  partOne.Tick();
+
+  // Still in the pack, which is the made-item rule doing its job
+  REQUIRE(ac.GetInventory().GetItemCount(ironSword) == 1);
+
+  // And nothing was placed in the world, so the extras keep-alive never came into it
+  int placed = 0;
+  for (uint32_t id = firstNew; id < 0xff000400; ++id) {
+    auto form = partOne.worldState.LookupFormById(id);
+    auto* refr = dynamic_cast<MpObjectReference*>(form.get());
+    if (refr && refr->GetBaseId() == ironSword && !refr->IsDeleted()) {
+      ++placed;
+    }
+  }
+  REQUIRE(placed == 0);
+}
