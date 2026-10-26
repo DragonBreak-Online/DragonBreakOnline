@@ -1,5 +1,20 @@
 [
   {
+    "title": "Bosses come back every hour, and three of them hit harder",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Bosses",
+        "items": [
+          "Every boss now returns one hour after it falls. The Behemoth of Hircine's Hunt still walks only at night.",
+          "The Chieftain of Blizzard Rest, the Behemoth and the Valkynaz are much tougher and hit harder, and their guardians shield them longer. Bring a group."
+        ]
+      }
+    ]
+  },
+  {
     "title": "A decorating panel",
     "date": "2026-10-26",
     "version": "Server update",

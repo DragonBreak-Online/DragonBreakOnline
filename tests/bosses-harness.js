@@ -18,7 +18,7 @@ const def = (id) => REAL.bosses.find((b) => b.id === id);
 // ---- the shipped data ----
 ok(REAL.bosses.map((b) => b.id).join() === 'icecap,briarheartking,centurion,palewarlord,falmerwarmonger,movarth,duskthorn,valkynaz,karstaag,risenlegate,minotaurlord,werewolfbehemoth,giantchieftain',
   'eight bosses: the Ice Cap Wraith, the Briarheart King, the Centurion Master, the Warlord of the Pale Pass, the Falmer Warmonger, the Master of Movarth\'s Lair, the Warchief of Dusk Thorn, the Valkynaz');
-ok(def('movarth').night === true && !def('valkynaz').event && def('valkynaz').respawnSeconds === 10800 && def('falmerwarmonger').guardian.options.length && def('duskthorn').guardian.options.length,
+ok(def('movarth').night === true && !def('valkynaz').event && def('valkynaz').respawnSeconds === 3600 && def('falmerwarmonger').guardian.options.length && def('duskthorn').guardian.options.length,
   'Movarth\'s master walks at night, the Valkynaz stands on its own (Nat 26 Oct: it was a GM event), the Warmonger and the Warchief have their shamans');
 ok(def('valkynaz').guardian.options[0][2] === 'mihailhighclannfear_NPC' && def('valkynaz').adds[0].options.some((o) => o[2] === 'DDRClannfear') && def('valkynaz').adds[1].options.every((o) => /Scamp/.test(o[2])),
   '...with a High Clannfear guardian, Clannfear and scamps (Nat 26 Oct: "nor Clennifar or the scamp minions with it")');
@@ -29,6 +29,7 @@ ok(!def('palewarlord').devOnly && def('palewarlord').spots.map((s) => s.id).join
   'the Warlord of the Pale Pass: live since 26 Oct, at SE (under the Sentinel) roaming to ST (Serpent’s Trail)');
 ok(def('icecap').enabled === true && def('briarheartking').enabled && def('centurion').enabled, 'the Wraith is on (its shard is in the production DLE); the King and the Centurion are on');
 ok(!REAL.bosses.some((b) => b.devOnly) && !REAL.bosses.some((b) => /test/i.test(b.id)), 'no boss is a dev-only test any more (Nat 26 Oct: the test copies go; none can ship)');
+ok(REAL.bosses.every((b) => b.respawnSeconds === 3600), 'every boss respawns 1 h after it falls (Nat 26 Oct)', REAL.bosses.map((b) => [b.id, b.respawnSeconds]));
 ok(REAL.bosses.filter((b) => b.enabled).length === 12 && !def('karstaag').enabled, 'every boss ships on but Karstaag, who waits on Solstheim');
 const fams = REAL.bosses.flatMap((b) => ['schematic', 'extraSchematic'].map((k) => b.drops[k] && b.drops[k].family).filter(Boolean));
 ok(REAL.bosses.every((b) => b.drops.schematic && b.drops.schematic.family) && new Set(fams).size === fams.length, 'every boss has a schematic and no two share a family (Nat 26 Oct: "unique schematics")', fams);
@@ -105,7 +106,7 @@ let z = zones();
 ok(z.some((x) => x.Name === 'wild:wolf:1') && z.some((x) => x.Name === 'dungeon:X:1'), 'the other modules\' zones are kept');
 const bz = z.filter((x) => x.Name.startsWith('boss:'));
 const king = bz.find((x) => x.Name === 'boss:briarheartking:boss'), hag = bz.find((x) => x.Name === 'boss:briarheartking:guardian');
-ok(king && hag && king.Hostile && hag.Hostile && king.Respawn === 7200 && king.NPC[0].id === 'ad7c1:Skyrim.esm', 'the King and his Hagraven: hostile boss zones, back 2 h after a kill, the strongest boss shaman', [king, hag]);
+ok(king && hag && king.Hostile && hag.Hostile && king.Respawn === 3600 && king.NPC[0].id === 'ad7c1:Skyrim.esm', 'the King and his Hagraven: hostile boss zones, back 1 h after a kill (Nat 26 Oct), the strongest boss shaman', [king, hag]);
 ok(bz.filter((x) => /^boss:icecap:open\d$/.test(x.Name)).length === 3 && bz.filter((x) => /^boss:palewarlord:open\d$/.test(x.Name)).length === 2, 'opening adds: the Wraith\'s three ice wraiths, the Warlord\'s two bandits');
 load({ bosses: { only: ['centurion'] } });
 ok(zones().filter((x) => x.Name.startsWith('boss:')).every((x) => x.Name.startsWith('boss:centurion:')), 'bosses.only keeps the rest\'s zones out');
