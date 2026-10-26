@@ -1,5 +1,20 @@
 [
   {
+    "title": "Pigeons to someone away",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Pigeons",
+        "items": [
+          "A pigeon to someone who is away still flies: the letter waits in their coop, and they are told of it as soon as they come into the land. The coop now says so when you send it.",
+          "/ledger letter reaches everyone the coop does, including someone you introduced yourselves to but never met in person."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Birthsigns rebalanced, and you may change yours once",
     "date": "2026-10-26",
     "version": "Server update",

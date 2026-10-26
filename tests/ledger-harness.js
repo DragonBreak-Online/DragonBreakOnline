@@ -14,9 +14,9 @@ const home = process.cwd();
 process.chdir(dir);
 
 const HOUSE_DOOR = 0x5000;
-fs.writeFileSync('doors.json', JSON.stringify({ doors: { '5000:Skyrim.esm': 'Home' } }));
-fs.writeFileSync('doors-pos.json', JSON.stringify({ doors: { '5000:Skyrim.esm': [0, 0, 0, 'house:skyrim.esm'] } }));
-const ME = 1, CLAN = 2, GUILD = 3, STRANGER = 4, FRIEND = 5, ADMIN = 6, OUTSIDER = 7;
+fs.writeFileSync('doors.json', JSON.stringify({ doors: { '5000:Skyrim.esm': 'Home' } }));   // verify-formids: ignore (a mock door)
+fs.writeFileSync('doors-pos.json', JSON.stringify({ doors: { '5000:Skyrim.esm': [0, 0, 0, 'house:skyrim.esm'] } }));   // verify-formids: ignore (a mock door)
+const ME = 1, CLAN = 2, GUILD = 3, STRANGER = 4, FRIEND = 5, ADMIN = 6, OUTSIDER = 7, INTRO = 8;
 const chars = {
   [ME]: { name: 'Argosh gro-Shatul', tag: 'ME00', profile: 10, where: 'tamriel', pos: [0, 0, 0], met: [CLAN, GUILD, STRANGER, FRIEND] },
   [CLAN]: { name: 'Bolar gra-Shatul', tag: 'CLAN', profile: 20, where: 'tamriel', pos: [0, 0, 0], met: [ME] },
@@ -25,6 +25,8 @@ const chars = {
   [FRIEND]: { name: 'Eorlund Gray-Mane', tag: 'FRND', profile: 50, where: 'tamriel', pos: [0, 0, 0], met: [ME] },
   [ADMIN]: { name: 'Staff', tag: 'ADMN', profile: 60, where: 'tamriel', pos: [5000, 0, 0], met: [] },
   [OUTSIDER]: { name: 'Nobody', tag: 'OUTS', profile: 70, where: 'tamriel', pos: [5000, 0, 0], met: [] },
+  // Introduced to ME both ways, never met in person (playermenu.js ff_knownIds)
+  [INTRO]: { name: 'Ysolda Tall-Grass', tag: 'INTR', profile: 80, where: 'tamriel', pos: [5000, 0, 0], met: [] },
 };
 const props = {};
 const guilds = { [ME]: [{ id: 'fighters-guild', name: 'Fighters Guild', title: 'Associate' }], [GUILD]: [{ id: 'fighters-guild', name: 'Fighters Guild', title: 'Swordsman' }] };
@@ -58,6 +60,8 @@ require(MODULE)({
   presenceShown: (v, c, online) => online.has(c) && chars[c].met.includes(v) && chars[v].met.includes(c) && shareSet(c).has(v) && shareSet(v).has(c),
   togglePresenceShare: (a, b) => { const s = shareSet(a); if (s.has(b)) { s.delete(b); return false; } s.add(b); return true; },
   presenceSharesOf: (a) => [...shareSet(a)],
+  // gamemode.js pigeonContactsOf: met, or introduced both ways
+  pigeonContactsOf: (a) => chars[a].met.concat(a === ME ? [INTRO] : a === INTRO ? [ME] : []),
 });
 
 let failures = 0;
@@ -95,6 +99,16 @@ check('someone never met cannot be found', /You have to meet someone in person f
 
 r = run(ME, 'letter Flo Meet me at the Jerall gate');
 check('a letter goes by pigeon, paid in the town of the ledger', /pigeon flies to Flo Riahn/.test(r) && letters[0].to === GUILD && letters[0].text === 'Meet me at the Jerall gate' && letters[0].zone === 'bruma', r);
+// blamblam_banana, 26 Oct: the coop window lists the introduced, and /ledger letter refused them
+r = run(ME, 'letter Ysolda Tall-Grass The meeting is at noon');
+check('a letter reaches someone introduced both ways, never met (as the coop window does)', /pigeon flies to Ysolda Tall-Grass/.test(r) && letters.slice(-1)[0].to === INTRO && letters.slice(-1)[0].text === 'The meeting is at noon', r);
+r = run(ME, 'letter #INTR by tag');
+check('...by #TAG too', letters.slice(-1)[0].to === INTRO && letters.slice(-1)[0].text === 'by tag', r);
+const sent = letters.length;
+r = run(ME, 'letter Nobody hello');
+check('someone neither met nor introduced is still refused, and told an introduction also does', letters.length === sent && /meet someone in person or introduce yourselves first/.test(r), r);
+r = run(ME, '');
+check('the ledger page still lists only those met in person', /4 contacts/.test(r) && !/Ysolda/.test(r), r);
 
 r = run(ME, 'forget Eola');
 check('forgetting strikes them out, note and all', /struck out/.test(r) && !chars[ME].met.includes(STRANGER) && !(props[`${ME}:private.ledger`] || {})[STRANGER], r);

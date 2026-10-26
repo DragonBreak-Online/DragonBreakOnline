@@ -1671,7 +1671,10 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
     if (online) { personal(to, prep ? 'A pigeon has brought you a letter with a parcel. Collect it at any notice board.' : 'A pigeon has brought you a letter. Read it at any notice board.'); sendMailState(to); }
     const zone = zoneId ? zoneById(zoneId) : null;
     log(`pigeon ${who(a)} -> ${nameOf(to)} #${tagOf(to)}${taxed > 0 ? ` (${taxed} gold, ${paid ? zoneId + ' treasury' : 'no treasury'})` : ''}: ${text}`);
-    return { ok: true, text: `Your pigeon flies to ${ownNameOf(to)}, who will ${prep ? 'collect it' : 'read it'} at a notice board${taxed > 0 ? `. ${taxed} gold${zone ? ` to the ${zone.name} treasury` : ''}` : ''}.` };
+    // An away recipient's letter waits in their coop, and the login line tells them (blamblam_banana, 26 Oct: players took
+    // "Away" to mean the bird could not fly, and paid for Discord letters instead)
+    const away = online ? '' : ` ${ownNameOf(to)} is away: the letter waits for them, and they are told of it when they next come into the land`;
+    return { ok: true, text: `Your pigeon flies to ${ownNameOf(to)}, who will ${prep ? 'collect it' : 'read it'} at a notice board${taxed > 0 ? `. ${taxed} gold${zone ? ` to the ${zone.name} treasury` : ''}` : ''}.${away ? `${away}.` : ''}` };
   } catch (e) { return { ok: false, text: 'The pigeon refused to fly: ' + e.message }; }
 };
 const openPigeonCoop = (a, result, resultKind, view) => {
@@ -8898,7 +8901,7 @@ try {
   const LEDGER_JS = path.resolve('ledger.js');
   delete require.cache[LEDGER_JS];
   require(LEDGER_JS)({ mp, log, ownNameOf, ownDisplay, personal, audit, who, nameOf, tagOf, profileOf, onlineActors, registerChatCommand, isAdmin, isWorldspace,
-    metOf, forgetMet, sendPigeon, boardZoneNear, zoneOfActor, cfg, presenceShown, togglePresenceShare, presenceSharesOf });
+    metOf, forgetMet, sendPigeon, boardZoneNear, zoneOfActor, cfg, presenceShown, togglePresenceShare, presenceSharesOf, pigeonContactsOf });
 } catch (e) { log('ledger.js failed to load:', e.stack || e.message); }
 
 // ---- Oblivion-style lockpicking for cell doors and dungeon chests (server\lockpick.js, config "lockpick") -------

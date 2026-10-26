@@ -15,7 +15,7 @@ const path = require('path');
 
 module.exports = (api) => {
   const { mp, log, personal, audit, who, nameOf, tagOf, profileOf, onlineActors, registerChatCommand, isAdmin, isWorldspace,
-    metOf, forgetMet, sendPigeon, boardZoneNear, zoneOfActor, cfg } = api;
+    metOf, forgetMet, sendPigeon, boardZoneNear, zoneOfActor, cfg, pigeonContactsOf } = api;
   // The book names everyone by their own name, never a beast's, and a mask's only while rosterPrivacy.masks is off: a
   // contact listed as "Werewolf" beside their #TAG and factions told the reader who the beast was (gamemode.js
   // ownNameOf; tracker 1559074270959640676)
@@ -102,14 +102,15 @@ module.exports = (api) => {
     return words[words.length - 1].toLowerCase().replace(/^(gro|gra|at|af|ap)-/, '');
   };
 
-  const contactsOf = (a) => {
+  // ids: whom to list, the ones met in person unless given (a letter also reaches the introduced: pigeonContactsOf)
+  const contactsOf = (a, ids) => {
     const online = new Set(onlineActors());
     const mine = new Map(guildsOf(a).map((g) => [g.id, g]));
     const myFamily = familyName(ownNameOf(a));
     const b = book(a);
     const mineShared = new Set(sharesOf(a));
     const out = [];
-    for (const id of metOf(a)) {
+    for (const id of ids || metOf(a)) {
       try { if (!mp.get(id, 'appearance')) continue; } catch (e) { continue; }
       const e = b[id] || {};
       const name = ownNameOf(id);
@@ -123,24 +124,24 @@ module.exports = (api) => {
   };
 
   // A contact by #TAG, full name, or the start of a name when only one contact fits
-  const findContact = (a, query) => {
+  const findContact = (a, query, ids) => {
     const q = String(query || '').trim().toLowerCase().replace(/^#/, '');
     if (!q) return { err: 'Name someone from your ledger.' };
-    const list = contactsOf(a);
+    const list = contactsOf(a, ids);
     const byTag = list.find((c) => c.tag.toLowerCase() === q); if (byTag) return { c: byTag };
     const exact = list.filter((c) => c.name.toLowerCase() === q);
     if (exact.length === 1) return { c: exact[0] };
     const start = exact.length ? exact : list.filter((c) => c.name.toLowerCase().startsWith(q));
     if (start.length === 1) return { c: start[0] };
     if (start.length > 1) return { err: `Your ledger has ${start.length} who fit that: ${start.slice(0, 6).map((c) => `${c.name} #${c.tag}`).join(', ')}. Use their #TAG.` };
-    return { err: `Nobody called "${query.trim()}" is in your ledger. You have to meet someone in person first.` };
+    return { err: `Nobody called "${query.trim()}" is in your ledger. You have to meet someone in person${ids ? " or introduce yourselves" : ""} first.` };
   };
   // Splits "<who> <rest>" where who may be several words: the longest leading run that names exactly one contact wins
-  const splitContact = (a, text) => {
+  const splitContact = (a, text, ids) => {
     const words = String(text || '').trim().split(/\s+/).filter(Boolean);
     let lastErr = null;
     for (let n = Math.min(words.length, 5); n >= 1; n--) {
-      const r = findContact(a, words.slice(0, n).join(' '));
+      const r = findContact(a, words.slice(0, n).join(' '), ids);
       if (r.c) return { c: r.c, rest: words.slice(n).join(' ') };
       if (!lastErr || n === 1) lastErr = r.err;
     }
@@ -234,7 +235,8 @@ module.exports = (api) => {
       return personal(a, group === 'none' ? `${r.c.name} is filed under no group.` : `${r.c.name} is filed under ${group}.`);
     }
     if (cmd === 'letter') {
-      const r = splitContact(a, rest); if (r.err) return personal(a, r.err);
+      // The same people the coop window lists: met in person, or introduced both ways (blamblam_banana, 26 Oct)
+      const r = splitContact(a, rest, typeof pigeonContactsOf === 'function' ? pigeonContactsOf(a) : undefined); if (r.err) return personal(a, r.err);
       if (!r.rest) return personal(a, 'Usage: /ledger letter <name> <text>');
       const zone = zoneOfActor(a);
       const res = sendPigeon(a, r.c.id, r.rest, zone ? zone.id : null);
