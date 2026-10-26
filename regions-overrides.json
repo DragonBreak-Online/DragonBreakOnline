@@ -127,6 +127,11 @@
     "UDLC01_CONJ_StaffConjureWispmother": ["skyrim"]
   },
   "recipes": {
+    "_akaviriSamurai": "The Akaviri Samurai set (Hothtrooper44 recipes 4f25-4f28, faction gear blades): regions.json sells it in Cyrodiil only (Akaviri gear is Cyrodiil's), but the Blades sit at Sky Haven Temple in the Reach, so no Blade there could make it. Nat, 26 Oct (the gear audit): sell it in Skyrim too. Still gated to the Blades by faction gear.",
+    "4f25:hothtrooper44_armorcompilation.esp": ["cyrodiil", "skyrim"],
+    "4f26:hothtrooper44_armorcompilation.esp": ["cyrodiil", "skyrim"],
+    "4f27:hothtrooper44_armorcompilation.esp": ["cyrodiil", "skyrim"],
+    "4f28:hothtrooper44_armorcompilation.esp": ["cyrodiil", "skyrim"],
     "_telvanniGuardGear": "House Telvanni's guard gear (Journey to Baan Malur pieces, DragonBreak Nexus Patches recipes 849-84e, faction gear house-telvanni): regions.json sells its recipes in Solstheim only (culture morrowind), but House Telvanni has been seated at Golden Glow Estate by Riften since 25 Oct (Nat), so its smiths in Skyrim could not make their own gear. Made in Solstheim and Skyrim now; still gated to House Telvanni by faction gear (the Leader for Nat, 26 Oct: fix gear discrepancies).",
     "849:dragonbreak nexus patches.esp": ["solstheim", "skyrim"],
     "84a:dragonbreak nexus patches.esp": ["solstheim", "skyrim"],

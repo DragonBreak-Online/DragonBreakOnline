@@ -43,9 +43,8 @@ const homeOf = (fid) => {
   if (/bruma/.test(z)) return 'cyrodiil';
   return '';
 };
-// Waiting on Nat (the Leader's list, 26 Oct): the Akaviri set follows the Cyrodiil rule for Akaviri gear, while the Blades
-// sit at Sky Haven Temple in the Reach
-const KNOWN = { '4f26:hothtrooper44_armorcompilation.esp': 'Akaviri, Cyrodiil-only, Blades at Sky Haven', '4f25:hothtrooper44_armorcompilation.esp': 'Akaviri', '4f27:hothtrooper44_armorcompilation.esp': 'Akaviri', '4f28:hothtrooper44_armorcompilation.esp': 'Akaviri' };
+// What waits on a decision (none now: Nat, 26 Oct, sold the Akaviri set in Skyrim too, where the Blades sit)
+const KNOWN = {};
 
 const unknown = [], roleBad = [], regionBad = [];
 for (const [id, v] of Object.entries(gear)) {
@@ -65,6 +64,7 @@ for (const [id, v] of Object.entries(gear)) {
 ok('every faction gear entry names a faction guild-defs.json has', !unknown.length, unknown);
 ok('every role matches its recipes\' bench (tailor: loom or tanning rack; blacksmith: forge)', !roleBad.length, roleBad);
 ok('every recipe is sold where its factions live (or waits on a listed decision)', !regionBad.length, regionBad);
+ok('the Blades\' Akaviri Samurai set is made in Skyrim, where they sit at Sky Haven, and still in Cyrodiil (Nat, 26 Oct)', ['4f25', '4f26', '4f27', '4f28'].every((h) => JSON.stringify(resolve(OR[`${h}:hothtrooper44_armorcompilation.esp`])) === JSON.stringify(['cyrodiil', 'skyrim'])));
 ok('House Telvanni\'s guard gear is made in Skyrim, where the house sits, and still in Solstheim', ['849', '84a', '84b', '84c', '84d', '84e'].every((h) => JSON.stringify(resolve(OR[`${h}:dragonbreak nexus patches.esp`])) === JSON.stringify(['skyrim', 'solstheim'])));
 const mala = Object.values(gear).filter((v) => v.set === 'Robes of Malacath');
 ok('the Robes of Malacath belong to the six strongholds, none of them a vampire clan', mala.length === 2 && mala.every((v) => v.factions.length === 6 && v.factions.every((f) => (F.get(f) || {}).kind === 'stronghold')), mala.map((v) => v.factions));
