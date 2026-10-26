@@ -1,5 +1,48 @@
 [
   {
+    "title": "Blackreach glows, and the Windhelm bank opens",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "World",
+        "items": [
+          "Blackreach now uses Magical Blackreach (Nexus, by Emiryan): the great cavern is retextured and lit anew. The launcher installs it with the next update.",
+          "The Windhelm bank's door opens: two planks and a hidden wall left across the doorway are gone."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Crusader armour and the robes of the gods",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Knights of the Nine",
+        "items": [
+          "The Knights of the Nine forge the Crusader's armour and swords. Their Armorers make the set at the forge; their Clothiers make the cape at the tanning rack.",
+          "The Divine set is the plain set raised with an amulet of a Divine at the forge (the cuirass also takes the Book of Talos and Stendarr's amulet), and carries a blessing."
+        ]
+      },
+      {
+        "heading": "Robes of the gods",
+        "items": [
+          "Each of the Nine Divines and sixteen Daedric Princes has a robe and hood, made at the tanning rack by their faithful's tailors.",
+          "The Eight's are made by the Imperial Cult (Stendarr's by the Vigil too), Talos's by the Knights of the Nine and the Stormcloaks, Malacath's by the Orc clans, and each Prince's by his cult."
+        ]
+      },
+      {
+        "heading": "Getting them",
+        "items": [
+          "Both come from Nexus mods (Knights of the Nine SE and Gods and Worship Lite - Divine and Daedric Robes). The launcher installs them with the next update: press Update before you play."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Offerings to Lorkh and Alkosh count, and /decor is in the help",
     "date": "2026-10-26",
     "version": "Server update",
@@ -457,28 +500,6 @@
           "The Valkynaz of the Great Gate now stands at the Great Oblivion Gate on its own, with a High Clannfear at its side and Clannfear and scamps around it. Before, it only came during a GM event.",
           "The Wraith of the Ice Cap now waits at Skytemple Ruins on the coast past Winterhold.",
           "The Falmer Warmonger stands on the open cavern floor of Blackreach's Falmer city, apart from the city's other Falmer."
-        ]
-      }
-    ]
-  },
-  {
-    "title": "Crusader armour and the robes of the gods",
-    "date": "2026-10-25",
-    "version": "Server update",
-    "tag": "New",
-    "sections": [
-      {
-        "heading": "Knights of the Nine",
-        "items": [
-          "The Knights of the Nine forge the Crusader's armour and swords. Their Armorers make the set at the forge; their Clothiers make the cape at the tanning rack.",
-          "The Divine set is the plain set raised with an amulet of a Divine at the forge (the cuirass also takes the Book of Talos and Stendarr's amulet), and carries a blessing."
-        ]
-      },
-      {
-        "heading": "Robes of the gods",
-        "items": [
-          "Each of the Nine Divines and sixteen Daedric Princes has a robe and hood, made at the tanning rack by their faithful's tailors.",
-          "The Eight's are made by the Great Faiths and the Imperial Cult (Stendarr's by the Vigil too), Talos's by the Knights of the Nine and the Stormcloaks, Malacath's by the Orc clans, and each Prince's by his cult."
         ]
       }
     ]
