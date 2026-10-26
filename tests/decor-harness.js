@@ -149,7 +149,7 @@ ok(items().length === 2 && held(OWNER, WOOD) === wood + 1 && held(OWNER, IRON) =
 const w1 = held(OWNER, WOOD);
 fire('placeDelete', OWNER, [gone]);
 ok(held(OWNER, WOOD) === w1, 'deconstructing the same piece again pays nothing (the record went first)');
-ok(audits.some((t) => /^DECOR deconstruct Olaf Bed .* place 200 refund \{"6f993:Skyrim.esm":1\}/.test(t)), 'the deconstruct audit line: player, piece, home, refund', audits.filter((t) => /deconstruct/.test(t)));
+ok(audits.some((t) => /^DECOR deconstruct Olaf Bed .* place 200 share 0\.2 refund \{"6f993:Skyrim.esm":1\} to Olaf$/.test(t)), 'the deconstruct audit line: player, piece, home, share, refund, who got it', audits.filter((t) => /deconstruct/.test(t)));
 ok(deleted.length === 1 && !placementSaid.length, 'the reference is deleted and placement.js stays quiet');
 setp(OWNER, 'private.mastery', { order: ['alchemist', 'woodcutter'], skills: { alchemist: { rank: 1 }, woodcutter: { rank: 4 } } });
 placeAt(OWNER, 'bed'); const w2 = held(OWNER, WOOD), i2 = held(OWNER, IRON);
