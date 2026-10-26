@@ -408,5 +408,5 @@ _root.dboReady = true;
 dboBoot(function(frame)
 {
    dboLog("panel built, version " + DBO_SWF_VERSION + ", skse appeared on frame " + frame);
-   dboSend("ready", [frame]);
+   dboSend("ready", [frame], frame);
 });

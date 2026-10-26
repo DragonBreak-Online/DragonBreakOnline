@@ -46,20 +46,21 @@ function dboSound(name)
    }
 }
 
-// One mod event per message: the client splits key and JSON args and calls sendMessage(key, ...args)
-function dboSend(msgKey, args)
+// One mod event per message: the client splits key and JSON args and calls sendMessage(key, ...args); num is numArg
+function dboSend(msgKey, args, num)
 {
    var s = msgKey + DBO_SEP + dboJson(args);
+   var n = num == undefined ? 0 : num;
    if (!dboBooted)
    {
-      dboQueue.push(["send", s]);
+      dboQueue.push(["send", s, n]);
       return true;
    }
    if (_global.skse.SendModEvent == undefined)
    {
       return false;
    }
-   _global.skse.SendModEvent(DBO_UI_EVENT, s, 0);
+   _global.skse.SendModEvent(DBO_UI_EVENT, s, n);
    return true;
 }
 
@@ -75,7 +76,8 @@ function dboClose()
    }
 }
 
-// Polls each frame for _global.skse, then runs onReady(frame it appeared on) and flushes what was queued before it
+// Polls each frame for _global.skse, then runs onReady(frame it appeared on) and flushes what was queued before it.
+// The client reads the ready frame from numArg (scaleformMenu.ts parseUiEvent)
 function dboBoot(onReady)
 {
    var c = _root.createEmptyMovieClip("dboBootClip", 9999);
@@ -100,7 +102,7 @@ function dboBoot(onReady)
          }
          else if (_global.skse.SendModEvent != undefined)
          {
-            _global.skse.SendModEvent(DBO_UI_EVENT, q[i][1], 0);
+            _global.skse.SendModEvent(DBO_UI_EVENT, q[i][1], q[i][2]);
          }
       }
       if (dboCloseWanted)
