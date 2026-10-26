@@ -159,8 +159,9 @@ if (JSON_OUT > 0) fs.writeFileSync(process.argv[JSON_OUT + 1], JSON.stringify(Ob
   const most = rows.filter((r) => r.diff === 'normal').sort((a, b) => b.m.linen - a.m.linen).slice(0, 3).map((r) => `${r.d.name} ${r.m.linen.toFixed(1)}`);
   console.log(`      the most at Adept: ${most.join(', ')}`);
   if (!TABLE_ONLY) {
-    check(`linen wraps: about 2 to 3 per ordinary clear (${DIFFS.map((x) => ordL(x).toFixed(1)).join(', ')}), fewer in a trimmed expedition (${DIFFS.map((x) => expL(x).toFixed(1)).join(', ')})`,
-      DIFFS.every((x) => ordL(x) > 1 && ordL(x) < 4.5 && expL(x) > 0.3 && expL(x) < ordL(x) * 1.5));
+    // Raised 26 Oct for the decor's cloth (Nat: dungeon-only); about 4 before, config dungeons.linen
+    check(`linen wraps: about 8 to 9 per ordinary clear (${DIFFS.map((x) => ordL(x).toFixed(1)).join(', ')}), fewer in a trimmed expedition (${DIFFS.map((x) => expL(x).toFixed(1)).join(', ')})`,
+      DIFFS.every((x) => ordL(x) > 6 && ordL(x) < 11 && expL(x) > 2 && expL(x) <= ordL(x) * 1.05));
   }
 }
 if (TABLE_ONLY) process.exit(0);
