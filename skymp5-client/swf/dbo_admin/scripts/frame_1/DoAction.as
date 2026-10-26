@@ -277,6 +277,7 @@ _root.dboData = function(json)
    }
    var first = data == null;
    data = p;
+   dataAt = getTimer();
    if (str(p.tab) != ui.tab && !first)
    {
       ui.tab = str(p.tab);

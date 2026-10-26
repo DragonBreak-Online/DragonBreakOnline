@@ -262,7 +262,7 @@ const powersView = (data: any, ui: AdminUi) => {
 const placeView = (data: any, ui: AdminUi) => {
   const sub = ["catalog", "placed", "sets", "warband"].indexOf(str(ui.sub, 12)) !== -1 ? str(ui.sub, 12) : "catalog";
   const meta = data.placeMeta || null;
-  const out: any = { sub, meta: meta ? { categories: arr<any>(meta.categories).map((c) => ({ id: str(c.id, 40), label: str(c.label), kind: str(c.kind, 8), count: num(c.count) })), plugins: arr<string>(meta.plugins).map((p) => plugin(str(p))), rights: meta.rights || null } : null };
+  const out: any = { sub, meta: meta ? { categories: arr<any>(meta.categories).map((c) => ({ id: str(c.id, 40), label: str(c.label), kind: str(c.kind, 8), count: num(c.count) })), plugins: arr<string>(meta.plugins).map((p) => ({ id: str(p), label: plugin(str(p)) })), rights: meta.rights || null } : null };
   if (sub === "catalog" || sub === "warband") {
     const r = data.placeResults || null;
     // One results page from placement.js is up to 100 rows: the SWF gets nine of them, and asks the server for more past the end
@@ -356,8 +356,8 @@ const gmcallsView = (staff: Record<number, any>, at: Record<number, number>, ui:
   const d = staff[STAFF_WIDGETS.gmcalls] || null;
   if (!d) return { loading: true };
   const serverNow = num(d.now) + (Date.now() - (at[STAFF_WIDGETS.gmcalls] || Date.now()));
-  // A card is taller than a row: three calls a page
-  const pg = pageOf(arr<any>(d.open), ui.page, 3);
+  // A card is taller than a row: two calls a page, each with its last four lines
+  const pg = pageOf(arr<any>(d.open), ui.page, 2);
   return {
     serverNow, quiet: !!d.quiet, canGoto: !!d.canGoto, openCount: arr(d.open).length, waiting: arr<any>(d.open).filter((c) => !c.takenBy).length,
     open: pg.rows.map((c) => ({ n: num(c.n), name: str(c.name), online: !!c.online, place: str(c.place), at: num(c.at), takenBy: str(c.takenBy, 40), mine: !!c.mine, ticket: str(c.ticket, 24),
@@ -371,7 +371,7 @@ const thieveryView = (staff: Record<number, any>, at: Record<number, number>, ui
   const d = staff[STAFF_WIDGETS.thievery] || null;
   if (!d) return { loading: true };
   const serverNow = num(d.now) + (Date.now() - (at[STAFF_WIDGETS.thievery] || Date.now()));
-  const sub = ["factions", "raids", "ledger", "permits"].indexOf(str(ui.sub, 12)) !== -1 ? str(ui.sub, 12) : "factions";
+  const sub = ["factions", "approve", "raids", "ledger", "permits", "breaches"].indexOf(str(ui.sub, 12)) !== -1 ? str(ui.sub, 12) : "factions";
   const o = str(ui.owner, 40).trim().toLowerCase(), t = str(ui.thief, 40).trim().toLowerCase();
   const stolen = arr<any>(d.stolen);
   const ledger = stolen.filter((s) => (!o || str(s.owner).toLowerCase().indexOf(o) !== -1 || str(s.home).toLowerCase().indexOf(o) !== -1) && (!t || str(s.thief).toLowerCase().indexOf(t) !== -1));
@@ -383,12 +383,12 @@ const thieveryView = (staff: Record<number, any>, at: Record<number, number>, ui
     counts: { factions: arr(d.factions).length, raids: open.length, ledger: num(d.stolenTotal), permits: arr(d.permits).length + arr(d.breaches).length + arr(d.working).length },
     result: d.result && serverNow - num(d.result.at) < 60000 ? { ok: !!d.result.ok, text: str(d.result.text, 200) } : null,
   };
-  if (sub === "factions") {
+  if (sub === "factions" || sub === "approve") {
     out.factions = arr<any>(d.factions).slice(0, 20).map((f) => ({ id: str(f.id, 40), name: str(f.name), config: !!f.config,
       fence: f.fence ? { chest: str(f.fence.chest, 40), lots: num(f.fence.lots), frozen: num(f.fence.frozen) } : null }));
     out.candidates = arr<any>(d.candidates).slice(0, 20).map((c) => ({ id: str(c.id, 40), name: str(c.name) }));
   } else if (sub === "raids") {
-    const pg = pageOf(raids, ui.page, 3);
+    const pg = pageOf(raids, ui.page, 2);
     out.raids = pg.rows.map((r) => ({ n: num(r.n), faction: str(r.faction), state: str(r.state, 16), by: str(r.by, 40), evidence: str(r.evidence, 300), at: num(r.at), raidAt: num(r.raidAt), decidedBy: str(r.decidedBy, 40), reason: str(r.reason, 200) }));
     out.page = pg.page; out.pages = pg.pages;
   } else if (sub === "ledger") {
@@ -396,6 +396,7 @@ const thieveryView = (staff: Record<number, any>, at: Record<number, number>, ui
     out.ledger = pg.rows.map((s) => ({ n: num(s.n), item: str(s.item), owner: str(s.owner, 40), home: str(s.home, 60), thief: str(s.thief, 40), at: num(s.at), state: str(s.state, 24), canSendBack: !!s.canSendBack }));
     out.page = pg.page; out.pages = pg.pages; out.shown = ledger.length; out.loaded = stolen.length; out.total = num(d.stolenTotal);
   } else {
+    // Permits and Breaches share the data; the panel shows one or the other
     out.permits = arr<any>(d.permits).slice(0, 12).map((p) => ({ home: str(p.home, 60), homeName: str(p.homeName), thief: str(p.thief, 40), until: num(p.until), by: str(p.by, 40) }));
     out.working = arr<any>(d.working).slice(0, 8).map((w) => ({ thief: str(w.thief, 40), home: str(w.home, 60), kind: str(w.kind, 16), until: num(w.until) }));
     out.breaches = arr<any>(d.breaches).slice(0, 8).map((b) => ({ thief: str(b.thief, 40), home: str(b.home, 60), faction: str(b.faction, 40), until: num(b.until), at: num(b.at) }));

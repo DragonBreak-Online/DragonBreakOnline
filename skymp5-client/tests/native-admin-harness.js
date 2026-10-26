@@ -339,4 +339,148 @@ const LOCS = [{ name: 'Bruma', region: 'Cyrodiil', worldName: 'Cyrodiil' }, { na
   check('a search reaches every region and names it', B(t).r0.c0.text === 'Ald Velothi' && B(t).r0.c1.text === 'Morrowind - Morrowind');
 }
 
+// ---- Powers ----
+{
+  const roster = ROSTER.map((p, i) => (i === 1 ? Object.assign({}, p, { b: { werewolf: true, vampirelord: false, form: 'fox', creature: true, since: Date.now() - 180000 } }) : i === 2 ? Object.assign({}, p, { b: { werewolf: true, vampirelord: false, form: null } }) : p));
+  const t = open(panel({ players: roster, me: { a: 'ff00012a', b: { werewolf: false, vampirelord: false, form: null } }, polymorph: { on: true, setBy: 'admin', forms: [{ key: 'fox', name: 'Fox' }, { key: 'chicken', name: 'Chicken' }] } }));
+  P(t).rail.t7.onRelease(); t.serve();
+  check('Powers: polymorph on, set by an Owner, you in your own shape', /^on \(set by an Owner\), you are in your own shape$/.test(B(t).polyH.text), B(t).polyH.text);
+  check('...the open animals as buttons', B(t).form0.label.text === 'Fox' && B(t).form1.label.text === 'Chicken');
+  click(t, B(t).form1);
+  check('taking a shape: polymorphSelf with the form, no target', sentOf(t, 'admin::action').some((m) => m.args[0] === 'polymorphSelf' && m.args[1] === '{"form":"chicken"}'));
+  check('who is an animal now: Player 1 a fox for 3 min, with Revert', /^Player 1: Fox for 3 min$/.test(B(t).now0.text), B(t).now0.text);
+  click(t, B(t).nowRevert0);
+  check('...Revert sends beastForm revert with their actor', sentOf(t, 'admin::action').some((m) => m.args[0] === 'beastForm' && m.args[1] === '{"form":"fox","op":"revert","target":"ff000101"}'), sentOf(t, 'admin::action').map((m) => m.args[1]));
+  click(t, B(t).change); click(t, B(t).pick3);
+  check('acting on Player 2: werewolf power held, Vampire Lord not granted', B(t).bS0.text === 'power held' && B(t).bS1.text === 'not granted');
+  click(t, B(t).grant1);
+  check('Grant power: giveVampireLord with the target', sentOf(t, 'admin::action').some((m) => m.args[0] === 'giveVampireLord' && m.args[1] === '{"target":"ff000102"}'));
+  click(t, B(t).nowwerewolf);
+  check('Transform now: beastForm op now', sentOf(t, 'admin::action').some((m) => m.args[0] === 'beastForm' && JSON.parse(m.args[1]).op === 'now' && JSON.parse(m.args[1]).form === 'werewolf'));
+  click(t, B(t).revokewerewolf); click(t, B(t).revokewerewolf);
+  check('Revoke asks first, then beastForm op revoke', sentOf(t, 'admin::action').some((m) => m.args[0] === 'beastForm' && JSON.parse(m.args[1]).op === 'revoke'));
+  click(t, B(t).spells);
+  check('Give all spells asks first', !sentOf(t, 'admin::action').some((m) => m.args[0] === 'giveSpells') && /^Sure\?/.test(B(t).spells.label.text));
+  click(t, B(t).spells);
+  check('...then gives them to the one acted on', sentOf(t, 'admin::action').some((m) => m.args[0] === 'giveSpells' && m.args[1] === '{"target":"ff000102"}'));
+  const g = open(panel({ players: roster, caps: { ban: false, spawn: false }, polymorph: { on: true, setBy: '', forms: [{ key: 'fox', name: 'Fox' }] } }));
+  P(g).rail.t7.onRelease(); g.serve();
+  check('a GM sees the states but no power buttons', !B(g).form0 && !B(g).grant0 && !B(g).spells && /Powers are for a Lead GM/.test(B(g).foot.text));
+}
+
+// ---- Enchant ----
+const ENCH_CAT = { type: 'staffData', id: 141, list: [
+  { id: 'e1', n: 'Fire Damage', e: 'EnchWeaponFireDamage01', p: 'Skyrim.esm', k: 'w', m: 0, fx: [['Fire Damage', 10, 0, 0]] },
+  { id: 'e2', n: 'Fortify Health', e: 'EnchArmorFortifyHealth01', p: 'Skyrim.esm', k: 'a', m: 0, fx: [['Fortify Health', 20, 60, 0]] }], maxScale: 2 };
+const ENCH_PACK = (target) => ({ type: 'staffData', id: 142, target, targetName: target ? 'Player 2' : 'you', at: 0, items: [
+  { key: 'k1', name: 'Iron Sword', count: 2, kind: 'w', ok: true, why: '', now: '' }, { key: 'k2', name: 'Steel Helmet', count: 1, kind: 'a', ok: true, why: '', now: 'Fortify Magicka' },
+  { key: 'k3', name: 'Worn Boots', count: 1, kind: 'a', ok: false, why: 'Worn: take it off first', now: '' }] });
+{
+  const t = open(panel({ players: ROSTER }));
+  P(t).rail.t6.onRelease(); t.serve();
+  check('Enchant: opening asks for the catalog and the pack of the one acted on', JSON.stringify(sentOf(t, 'dbo:staffEnchant').map((m) => m.args)) === '[["catalog"],["items",""]]', sentOf(t, 'dbo:staffEnchant'));
+  t.st.staff[141] = ENCH_CAT; t.st.staff[142] = ENCH_PACK(''); t.refresh();
+  check('...the pack as pieces, a worn one greyed with why', B(t).piece0.label.text === 'Iron Sword x2' && B(t).piece2.disabled === true && /Worn: take it off/.test(B(t).pieceSub2.text));
+  click(t, B(t).piece0);
+  check('a weapon narrows the enchantments to weapon ones', kids(B(t), /^r\d$/).length === 1 && B(t).r0.c0.text === 'Fire Damage');
+  click(t, B(t).r0);
+  check('...picked: its effect, and strength from 10 up to 20', /^Fire Damage: 10 \(main\)$/.test(B(t).fx0.text) && B(t).strH.text === 'own 10, max 20');
+  typeInto(t, B(t).strength, '15');
+  check('...the preview follows the strength', /^Fire Damage: 15/.test(B(t).fx0.text));
+  typeInto(t, B(t).name, 'Ember');
+  click(t, B(t).apply);
+  check('Enchant: dbo:staffEnchant apply with target, piece, enchantment, strength and name', JSON.stringify(sentOf(t, 'dbo:staffEnchant').pop().args) === '["apply","{\\"target\\":\\"\\",\\"key\\":\\"k1\\",\\"ench\\":\\"e1\\",\\"name\\":\\"Ember\\",\\"strength\\":15}"]', sentOf(t, 'dbo:staffEnchant').pop());
+  typeInto(t, B(t).strength, '25');
+  check('more than the cap greys Enchant', B(t).apply.disabled === true);
+  click(t, B(t).piece1);
+  click(t, B(t).r0);
+  check('a piece already enchanted: Replace enchantment, which asks first', /Replace enchantment/.test(B(t).apply.label.text));
+  click(t, B(t).apply);
+  check('...nothing sent on the first press', JSON.parse(sentOf(t, 'dbo:staffEnchant').pop().args[1] || '{}').key === 'k1');
+  P(t).rail.t0.onRelease(); t.serve();
+  check('leaving the tab closes the feed: dbo:staffEnchant close', sentOf(t, 'dbo:staffEnchant').pop().args[0] === 'close');
+}
+
+// ---- GM Calls ----
+const now0 = Date.now();
+const GMCALLS = { type: 'staffData', id: 140, now: now0, quiet: false, canGoto: true, closed: [{ n: 3, name: 'Olaf', how: 'closed', by: 'nat', at: now0 - 3600000, note: 'sorted' }],
+  open: [{ n: 7, name: 'Bri', online: true, place: 'Bruma', at: now0 - 720000, lines: [{ at: now0 - 720000, text: 'stuck in a wall' }, { at: now0 - 60000, text: 'still stuck' }], takenBy: '', mine: false, ticket: '' },
+    { n: 8, name: 'Cass', online: false, place: 'Cheydinhal', at: now0 - 60000, lines: [{ at: now0 - 60000, text: 'lost my horse' }], takenBy: 'nat', mine: true, ticket: '41' },
+    { n: 9, name: 'Dov', online: true, place: 'Chorrol', at: now0, lines: [{ at: now0, text: 'hi' }], takenBy: 'kim', mine: false, ticket: '' }] };
+{
+  const t = open(panel());
+  P(t).rail.t2.onRelease(); t.serve();
+  check('GM Calls: opening it watches the list', sentOf(t, 'dbo:staffGmCalls')[0].args[0] === 'watch');
+  t.st.staff[140] = GMCALLS; t.st.staffAt[140] = Date.now(); t.refresh();
+  check('...three open, one waiting; two cards a page', B(t).count.text === '3 open, 1 waiting' && B(t).name0.text === '#7 Bri' && B(t).name1.text === '#8 Cass (offline)' && !B(t).name2);
+  check('...a card: place, age, its lines, waiting', B(t).place0.text === 'Bruma' && B(t).ago0.text === '12 min ago' && B(t).line0_0.text === 'stuck in a wall' && /^\+11 min  still stuck$/.test(B(t).line0_1.text) && B(t).state0.text === 'Waiting', B(t).line0_1.text);
+  check('...yours: no Take, Release, Go to where they called, the ticket', !B(t).take1 && !!B(t).release1 && B(t).goto1.label.text === 'Go to (where they called)' && B(t).ticket1.text === 'Discord ticket #41');
+  click(t, B(t).take0);
+  check('Take: dbo:staffGmCalls take 7', JSON.stringify(sentOf(t, 'dbo:staffGmCalls').pop().args) === '["take",7,""]');
+  typeInto(t, B(t).note7, 'teleported out');
+  click(t, B(t).close0);
+  check('Close asks first', sentOf(t, 'dbo:staffGmCalls').pop().args[0] === 'take');
+  click(t, B(t).close0);
+  check('...then closes with the note', JSON.stringify(sentOf(t, 'dbo:staffGmCalls').pop().args) === '["close",7,"teleported out"]');
+  click(t, B(t).quiet);
+  check('the banners switch: quiet on', JSON.stringify(sentOf(t, 'dbo:staffGmCalls').pop().args) === '["quiet","on"]');
+  t.press(39); t.serve();
+  check('Right shows the third call: Taken by kim, Take over', B(t).name0.text === '#9 Dov' && B(t).state0.text === 'Taken by kim' && B(t).take0.label.text === 'Take over');
+  click(t, B(t).sub1);
+  check('Lately closed: how, by whom, when and the note', B(t).cn0.text === '#3 Olaf' && B(t).ch0.text === 'closed by nat, 1 h 0 min ago' && B(t).cnote0.text === 'sorted');
+  P(t).rail.t0.onRelease(); t.serve();
+  check('leaving unwatches', sentOf(t, 'dbo:staffGmCalls').pop().args[0] === 'unwatch');
+}
+
+// ---- Thievery ----
+const THIEF = { type: 'staffData', id: 162, now: now0, enabled: true, lead: true, gm: true, armed: null, result: { ok: true, text: 'Fence marked.', at: now0 },
+  factions: [{ id: 'tg', name: 'Thieves Guild', config: true, fence: { chest: 'ff0001', by: 'nat', at: 0, frozen: 0, lots: 2 } }, { id: 'rats', name: 'Ratway Rats', config: false, fence: null }],
+  candidates: [{ id: 'ravens', name: 'Ravens' }],
+  raids: [{ n: 4, fid: 'tg', faction: 'Thieves Guild', state: 'pending', by: 'Guard Ulf', evidence: 'Found the chest', at: now0 - 600000, raidAt: 0, decidedBy: '', reason: '' },
+    { n: 5, fid: 'rats', faction: 'Ratway Rats', state: 'approved', by: 'Guard Ulf', evidence: 'A tip', at: now0 - 600000, raidAt: now0 + 3600000, decidedBy: 'nat', reason: '' }],
+  stolen: [{ n: 1, at: now0 - 60000, item: 'Gold Ring', owner: 'Olaf', thief: 'Bri', home: 'Rose Hall', state: 'fenced', canSendBack: true }, { n: 2, at: now0, item: 'Ale', owner: 'Gemma', thief: 'Cass', home: 'Inn', state: 'carried', canSendBack: false }],
+  stolenTotal: 2, permits: [{ home: 'h1', homeName: 'Rose Hall', thief: 'Bri', until: now0 + 7200000, by: 'nat' }], breaches: [], working: [{ thief: 'Cass', home: 'Inn', kind: 'door', until: now0 + 30000 }] };
+{
+  const t = open(panel());
+  P(t).rail.t3.onRelease(); t.serve();
+  check('Thievery: watched on open', sentOf(t, 'dbo:staffThievery')[0].args[0] === 'watch');
+  t.st.staff[162] = THIEF; t.st.staffAt[162] = Date.now(); t.refresh();
+  check('...views with counts, a Lead GM gets Approve; the last result in green', B(t).sub0.label.text === 'Factions & fences (2)' && B(t).sub1.label.text === 'Approve' && B(t).result.text === 'Fence marked.' && B(t).result.textColor === 0x8FBF7F);
+  check('a faction from the config cannot be revoked; one with lots cannot be unmarked', B(t).revoke0.disabled === true && B(t).unmark0.disabled === true && B(t).mark1.label.text === 'Mark fence');
+  click(t, B(t).mark1);
+  check('Mark fence: dbo:staffThievery mark <id>', JSON.stringify(sentOf(t, 'dbo:staffThievery').pop().args) === '["mark","rats"]');
+  click(t, B(t).revoke1); click(t, B(t).revoke1);
+  check('Revoke asks first, then revokes', JSON.stringify(sentOf(t, 'dbo:staffThievery').pop().args) === '["revoke","rats"]');
+  click(t, B(t).sub1);
+  click(t, B(t).approve0); click(t, B(t).approve0);
+  check('Approve a faction (after its confirm)', JSON.stringify(sentOf(t, 'dbo:staffThievery').pop().args) === '["approve","ravens"]');
+  click(t, B(t).sub2);
+  check('Raids: Deny greyed until a reason is typed', B(t).rdeny0.disabled === true);
+  typeInto(t, B(t).reason4, 'not enough evidence');
+  click(t, B(t).rdeny0); click(t, B(t).rdeny0);
+  check('...Deny with the reason', JSON.stringify(sentOf(t, 'dbo:staffThievery').pop().args) === '["raid",4,"deny","not enough evidence"]');
+  click(t, B(t).rwon1); click(t, B(t).rwon1);
+  check('a Lead GM may rule early: Won', JSON.stringify(sentOf(t, 'dbo:staffThievery').pop().args) === '["raid",5,"won"]');
+  click(t, B(t).sub3);
+  check('Ledger: both lots, newest state shown', kids(B(t), /^r\d$/).length === 2 && B(t).r0.c3.text === 'fenced');
+  typeInto(t, B(t).thief, 'cass');
+  check('...a thief filter (the service filters)', kids(B(t), /^r\d$/).length === 1 && B(t).r0.c0.text === '#2 Ale');
+  typeInto(t, B(t).thief, '');
+  click(t, B(t).r1);
+  check('...a carried lot cannot be sent back', B(t).sendback.disabled === true);
+  click(t, B(t).r0); click(t, B(t).sendback); click(t, B(t).sendback);
+  check('...a fenced one can (after its confirm)', JSON.stringify(sentOf(t, 'dbo:staffThievery').pop().args) === '["sendback",1]');
+  click(t, B(t).sub4);
+  typeInto(t, B(t).permitName, '#4SWL');
+  click(t, B(t).grant);
+  check('Permits: grant with the thief and the hours', JSON.stringify(sentOf(t, 'dbo:staffThievery').pop().args) === '["permit","#4SWL",24]');
+  click(t, B(t).p0); click(t, B(t).unpermit); click(t, B(t).unpermit);
+  check('...revoke a permit (after its confirm)', JSON.stringify(sentOf(t, 'dbo:staffThievery').pop().args) === '["unpermit","h1"]');
+  click(t, B(t).sub5);
+  check('At locks & breaches: Cass at the Inn door, no breach', B(t).wt0.text === 'Cass' && /at its door/.test(B(t).wh0.text) && /No home is breached/.test(B(t).noBreach.text));
+  t.st.staff[162] = Object.assign({}, THIEF, { armed: { kind: 'fence', fid: 'tg', name: 'Thieves Guild', until: now0 + 120000 } }); t.refresh();
+  click(t, B(t).cancel);
+  check('an armed tool can be cancelled', JSON.stringify(sentOf(t, 'dbo:staffThievery').pop().args) === '["cancel"]');
+}
+
 T.done();

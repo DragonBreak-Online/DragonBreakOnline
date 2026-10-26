@@ -11,6 +11,8 @@ var C_GREEN = 0x8FBF7F;
 var C_GOLD = 0xC9A86A;
 
 var data = null;
+// when the last payload arrived (getTimer), so a server clock it carries can be moved on between pushes
+var dataAt = 0;
 // Each tab (tabs/*.as): draw(c, x, y, w, h); open() when opened (the data it asks for); leave() when left; acting() when the
 // one acted on changes; tick() each frame
 var TABS = {};
@@ -45,7 +47,7 @@ function req(type, fields)
 }
 
 // The rows each list has room for, by tab or tab:view; the service pages by it (adminNativeView rowsOf)
-var ROWS_FOR = {"players": 6, "players:roster": 6, "items": 6, "teleport": 8};
+var ROWS_FOR = {"players": 6, "players:roster": 6, "items": 6, "teleport": 8, "enchant": 5, "thievery:ledger": 5};
 
 function rowsFor(tab, sub)
 {
