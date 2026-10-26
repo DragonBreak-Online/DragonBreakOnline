@@ -96,6 +96,7 @@ function dboSend(msgKey, args, num)
 // message sent just before (a cancel, a verdict) must still be there to be read when the movie goes
 var DBO_CLOSE_FRAMES = 6;
 var dboClosing = false;
+var dboTyping = false;
 
 // Key.getCode() with the numpad digits read as the row digits 1-9
 function dboKey()
@@ -117,6 +118,7 @@ function dboClose()
    }
    _root._visible = false;
    dboClosing = true;
+   dboInputEnd();
    var c = _root.createEmptyMovieClip("dboCloser", 9998);
    c.frames = 0;
    c.onEnterFrame = function()
@@ -445,17 +447,26 @@ function dboInput(parent, name, depth, x, y, w, h, format, maxChars, multi)
    tf.border = true;
    tf.borderColor = 0x5A5A5A;
    Selection.setFocus(tf);
-   if (_global.skse != undefined && _global.skse.AllowTextInput != undefined)
+   // SKSE counts AllowTextInput (GameInput.cpp: true ++, false --), so a redraw must never take a second count
+   if (!dboTyping && dboCanType())
    {
       _global.skse.AllowTextInput(true);
+      dboTyping = true;
+      // best effort for a close the panel never sees (the engine's, Souls RE's): the clip's unload gives the count back
+      var g = _root.createEmptyMovieClip("dboTypeGuard", 9997);
+      g.onUnload = function()
+      {
+         dboInputEnd();
+      };
    }
    return tf;
 }
 
 function dboInputEnd()
 {
-   if (_global.skse != undefined && _global.skse.AllowTextInput != undefined)
+   if (dboTyping && dboCanType())
    {
+      dboTyping = false;
       _global.skse.AllowTextInput(false);
    }
 }

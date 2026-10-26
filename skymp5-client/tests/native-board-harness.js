@@ -4,6 +4,8 @@
 const S = require('./native-swf-stub');
 const T = S.checker();
 const check = T.check;
+// SKSE's AllowTextInput is a counter (GameInput.cpp): what the panel holds is the trues less the falses
+const held = (t) => t.sent.reduce((n, m) => n + (m.e === 'allowTextInput' ? (m.on ? 1 : -1) : 0), 0);
 
 const ev = { post: 'bountyBoard:post', remove: 'bountyBoard:remove', close: 'bountyBoard:close' };
 const board = {
@@ -153,8 +155,9 @@ const closed = (t) => t.closed();
   check('a second Post while the first is on its way sends nothing', msgs(t, 'bountyBoard:post').length === 1);
   t.push(board);
   check('a refresh without our notice (someone else posted) keeps the composer and the text', P(t).list.box && P(t).list.box.text === '  Mead, 5 gold a bottle  ');
+  check('...and the redraw takes no second count of the keys', held(t) === 1, held(t));
   t.push(Object.assign({}, board, { notes: board.notes.concat([{ id: 7, tab: 'shop', author: 'Olaf', text: 'Mead, 5 gold a bottle', ageHours: 0, canRemove: true }]) }));
-  check('our notice on the board closes the composer and gives the keys back', !P(t).list.box && rowsOf(t).length === 3 && t.sent.filter((m) => m.e === 'allowTextInput').pop().on === false);
+  check('our notice on the board closes the composer and gives the keys back', !P(t).list.box && rowsOf(t).length === 3 && held(t) === 0, held(t));
   P(t).foot.write.onRelease();
   check('the next composer starts empty', P(t).list.box.text === '');
   P(t).list.box.text = 'Lost: a cat'; P(t).list.box.onChanged();
@@ -163,7 +166,7 @@ const closed = (t) => t.closed();
   P(t).list.post.onRelease();
   check('a post the server refused (no refresh) can be posted again after a while', msgs(t, 'bountyBoard:post').length === 3);
   t.press(27);
-  check('Escape leaves the composer, not the board, and gives the keys back', !P(t).list.box && !t.sent.some((m) => m.e === 'closeMenu') && t.sent.filter((m) => m.e === 'allowTextInput').pop().on === false);
+  check('Escape leaves the composer, not the board, and gives the keys back', !P(t).list.box && !t.sent.some((m) => m.e === 'closeMenu') && held(t) === 0, held(t));
   P(t).foot.write.onRelease();
   P(t).list.browser.onRelease();
   const h = msgs(t, 'native:handoff');
