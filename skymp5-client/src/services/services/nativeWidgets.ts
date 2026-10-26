@@ -23,9 +23,10 @@ export const NATIVE_WIDGETS: Readonly<Record<string, string>> = {
   bountyBoard: "dbo_board",
   housing: "dbo_housing",
   contextMenu: "dbo_context",
-  // Worker 6's emote wheel. They checked every server *.js for a publisher of this type and found none, so it
-  // needs no SHARED_WITH_GAMEPLAY entry - and the harness greps the gameplay checkout to keep that honest.
-  emoteWheel: "dbo_emotes",
+  // No emoteWheel entry, deliberately. The emote wheel stays on the CEF overlay: it is a hold-and-flick
+  // wheel, and a CustomMenu is modal and pauses the game, which is the wrong shape for it (the Leader,
+  // 26 Oct, agreeing with the original split). emoteService may keep its openNative call - with no entry here
+  // swfFor returns "" and openNative answers false, so it draws its own panel exactly as before.
 };
 
 // Registered types that the GAMEPLAY layer also publishes under the same name. contextMenu is a generic list
