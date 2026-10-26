@@ -1,51 +1,17 @@
 // Runs the native prayer panel's AS2 (swf/lib/dbo.as + swf/dbo_prayer) as JS on a stub stage, and checks its messages.
 //   node tests/native-prayer-harness.js [server dir with minigames.js, to judge the picks with the server's own rules]
 'use strict';
-const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const S = require('./native-swf-stub');
 
-const read = (f) => fs.readFileSync(path.resolve(__dirname, '..', f), 'utf8').replace(/\r\n/g, '\n');
-const SRC = read('swf/lib/dbo.as') + '\n' + read('swf/dbo_prayer/scripts/frame_1/DoAction.as');
 const MG = process.argv[2] ? require(path.resolve(process.argv[2], 'minigames.js')) : null;
-
-let failures = 0;
-const check = (name, ok, got) => {
-  console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${!ok && got !== undefined ? '   ' + JSON.stringify(got) : ''}`);
-  if (!ok) failures++;
-};
-
-const clip = (name) => {
-  const c = { _name: name, _x: 0, _y: 0, _alpha: 100, _visible: true, kids: {} };
-  c.createEmptyMovieClip = (n) => { const k = clip(n); k._parent = c; c[n] = k; c.kids[n] = k; return k; };
-  c.createTextField = (n) => { const t = { text: '', textColor: 0, _alpha: 100, _y: 0, setNewTextFormat(f) { this.fmt = f; this.textColor = f.color; } }; c[n] = t; c.kids[n] = t; };
-  c.removeMovieClip = () => { if (c._parent) { delete c._parent[c._name]; delete c._parent.kids[c._name]; } };
-  for (const f of ['beginFill', 'moveTo', 'lineTo', 'endFill', 'clear']) c[f] = () => {};
-  return c;
-};
-
+const T = S.checker();
+const check = T.check;
 const boot = (late) => {
-  const sent = [], sounds = [], logs = [];
-  const st = { time: 1000, code: 0 };
-  const root = clip('_root');
-  const ctx = {
-    _root: root,
-    _global: { skse: late ? undefined : { SendModEvent: (e, s, n) => sent.push({ e, s, n }), Log: (m) => logs.push(m), CloseMenu: () => sent.push({ e: 'closeMenu' }) } },
-    flash: { external: { ExternalInterface: { call: (fn, uid, name) => sounds.push(fn + ':' + name) } } },
-    TextFormat: function TextFormat() {},
-    Key: { listeners: [], addListener(l) { this.listeners.push(l); }, getCode: () => st.code },
-    getTimer: () => st.time,
-    Math, String, Number, isNaN, isFinite, parseInt,
-  };
-  vm.createContext(ctx);
-  vm.runInContext(SRC, ctx);
-  const skse = { SendModEvent: (e, s, n) => sent.push({ e, s, n }), Log: (m) => logs.push(m), CloseMenu: () => sent.push({ e: 'closeMenu' }) };
-  if (!late) root.dboBootClip.onEnterFrame();
-  const msgs = () => sent.filter((m) => m.e === 'dboUi').map((m) => { const k = m.s.indexOf('\u0001'); return { key: m.s.slice(0, k), args: JSON.parse(m.s.slice(k + 1)) }; });
-  const press = (code) => { st.code = code; for (const l of ctx.Key.listeners) l.onKeyDown(); };
-  const rows = () => { const r = root.dboPanel.rows; return r ? Object.keys(r.kids).filter((n) => /^row\d$/.test(n)).map((n) => r[n]) : []; };
-  const tick = () => { for (const k of Object.values(root.kids)) if (k.onEnterFrame) k.onEnterFrame(); if (root.onEnterFrame) root.onEnterFrame(); };
-  return { ctx, root, st, sent, sounds, logs, msgs, press, rows, tick, arrive: () => { ctx._global.skse = skse; } };
+  const t = S.boot('dbo_prayer', late);
+  t.rows = () => { const r = t.root.dboPanel.rows; return r ? Object.keys(r.kids).filter((n) => /^row\d$/.test(n)).map((n) => r[n]) : []; };
+  return t;
 };
 
 const ROUND = {
@@ -155,5 +121,4 @@ let sorted;
   check('the boot line logs the frame', t.logs.some((l) => l.indexOf('skse appeared on frame 2') >= 0), t.logs);
 }
 
-console.log(failures ? `\n${failures} failed` : '\nall passed');
-process.exit(failures ? 1 : 0);
+T.done();
