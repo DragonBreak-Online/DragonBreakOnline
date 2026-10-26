@@ -138,6 +138,7 @@ def build(lo, defs):
     # Drops named by editor id (drops.alwaysEdid): one pass over the item records of every plugin, the last one winning
     wanted = {str(e).lower() for b in defs['bosses'] for e, _ in (b.get('drops') or {}).get('alwaysEdid', [])}
     wanted |= {str(x[0]).lower() for b in defs['bosses'] for x in (b.get('drops') or {}).get('extraEdid', [])}
+    wanted |= {str(x[0]).lower() for b in defs['bosses'] for x in ((b.get('drops') or {}).get('pool') or {}).get('edids', [])}
     wanted |= {str(b[k]).lower() for b in defs['bosses'] for k in ('rearmEdid', 'rearmAddsEdid') if b.get(k)}
     item_by_edid = {}
     if wanted:
@@ -222,6 +223,17 @@ def build(lo, defs):
                 bad.append(f"{who}: no item '{e}' in this load order")
                 continue
             drops.setdefault('extra', []).append([lo.desc(hit[0]), chance, n, hit[2]])
+        # The boss's own loot pool (Nat 26 Oct: "their own loot pools"): each fighter draws pool.picks items by weight, without
+        # repeats, from [edid, weight, count]
+        if dr.get('pool'):
+            items = []
+            for e, wgt, n in dr['pool'].get('edids', []):
+                hit = item_by_edid.get(str(e).lower())
+                if not hit:
+                    bad.append(f"{who}: no pool item '{e}' in this load order")
+                    continue
+                items.append([lo.desc(hit[0]), wgt, n, hit[2]])
+            drops['pool'] = {'picks': int(dr['pool'].get('picks', 1)), 'items': items}
         if 'shards' in dr:
             drops['shards'] = dict(dr['shards'], desc=item(dr['shards'].get('desc'), who, dr['shards'].get('confirmedBy', '')) or '')
         for key in ('schematic', 'extraSchematic'):
@@ -238,6 +250,16 @@ def build(lo, defs):
     }
     for line in warn:
         print('  NOTE', line)
+    # Every boss's schematic is its own (Nat 26 Oct: "unique schematics"): no family is any two bosses' drop, extras included
+    fam_of = {}
+    for o in out['bosses']:
+        for key in ('schematic', 'extraSchematic'):
+            fam = ((o.get('drops') or {}).get(key) or {}).get('family')
+            if not fam:
+                continue
+            if fam in fam_of:
+                bad.append(f"{o['id']}: schematic family '{fam}' is {fam_of[fam]}'s too; every boss needs its own")
+            fam_of.setdefault(fam, o['id'])
     # Two bosses of one name read as one boss twice on the nameplates (Nat 26 Oct: two 'The Minotaur Lord of Minotaur's Rest'
     # at once, the two dev tests of its axe); every boss's name is its own
     seen = {}

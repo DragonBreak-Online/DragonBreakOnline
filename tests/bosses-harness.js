@@ -16,7 +16,7 @@ const REAL = JSON.parse(fs.readFileSync(path.join(ROOT, 'bosses.json'), 'utf8'))
 const def = (id) => REAL.bosses.find((b) => b.id === id);
 
 // ---- the shipped data ----
-ok(REAL.bosses.map((b) => b.id).join() === 'icecap,briarheartking,centurion,palewarlord,falmerwarmonger,movarth,duskthorn,valkynaz,karstaag,risenlegate,minotaurlord,minotaurtest1,minotaurtest2,werewolfbehemoth',
+ok(REAL.bosses.map((b) => b.id).join() === 'icecap,briarheartking,centurion,palewarlord,falmerwarmonger,movarth,duskthorn,valkynaz,karstaag,risenlegate,minotaurlord,werewolfbehemoth,giantchieftain',
   'eight bosses: the Ice Cap Wraith, the Briarheart King, the Centurion Master, the Warlord of the Pale Pass, the Falmer Warmonger, the Master of Movarth\'s Lair, the Warchief of Dusk Thorn, the Valkynaz');
 ok(def('movarth').night === true && !def('valkynaz').event && def('valkynaz').respawnSeconds === 10800 && def('falmerwarmonger').guardian.options.length && def('duskthorn').guardian.options.length,
   'Movarth\'s master walks at night, the Valkynaz stands on its own (Nat 26 Oct: it was a GM event), the Warmonger and the Warchief have their shamans');
@@ -25,16 +25,24 @@ ok(def('valkynaz').guardian.options[0][2] === 'mihailhighclannfear_NPC' && def('
 ok(def('falmerwarmonger').spots.length === 1 && def('falmerwarmonger').spots[0].id === 'BE' && def('falmerwarmonger').spots[0].pos[2] > 1040,
   'the Warmonger stands on the dry shore east of the city (BE, above the lakes at 1000), not by the wild Falmer anchors where the arrival froze a client');
 ok(!JSON.stringify(def('valkynaz').drops).includes('IngotEbony') && def('valkynaz').drops.always.some((x) => x[2] === 'DaedraHeart'), 'the Valkynaz drops a daedra heart and no Ebony (never loot)');
-ok(def('palewarlord').devOnly === true && def('palewarlord').spots.map((s) => s.id).join() === 'SE,ST' && def('palewarlord').roam === true,
-  'the Warlord of the Pale Pass: dev only, at SE (under the Sentinel) roaming to ST (Serpent’s Trail), SR dropped (Nat, 25 Oct)');
-ok(def('icecap').enabled === false && def('briarheartking').enabled && def('centurion').enabled, 'the Wraith and the Warlord wait on Nat (spot, shard); the King and the Centurion are on');
+ok(!def('palewarlord').devOnly && def('palewarlord').spots.map((s) => s.id).join() === 'SE,ST' && def('palewarlord').roam === true,
+  'the Warlord of the Pale Pass: live since 26 Oct, at SE (under the Sentinel) roaming to ST (Serpent’s Trail)');
+ok(def('icecap').enabled === true && def('briarheartking').enabled && def('centurion').enabled, 'the Wraith is on (its shard is in the production DLE); the King and the Centurion are on');
+ok(!REAL.bosses.some((b) => b.devOnly) && !REAL.bosses.some((b) => /test/i.test(b.id)), 'no boss is a dev-only test any more (Nat 26 Oct: the test copies go; none can ship)');
+ok(REAL.bosses.filter((b) => b.enabled).length === 12 && !def('karstaag').enabled, 'every boss ships on but Karstaag, who waits on Solstheim');
+const fams = REAL.bosses.flatMap((b) => ['schematic', 'extraSchematic'].map((k) => b.drops[k] && b.drops[k].family).filter(Boolean));
+ok(REAL.bosses.every((b) => b.drops.schematic && b.drops.schematic.family) && new Set(fams).size === fams.length, 'every boss has a schematic and no two share a family (Nat 26 Oct: "unique schematics")', fams);
+ok(REAL.bosses.every((b) => b.drops.pool && b.drops.pool.picks === 2 && b.drops.pool.items.length >= 5 && b.drops.pool.items.every((x) => /:/.test(x[0]) && x[1] > 0 && x[2] > 0)),
+  'every boss has its own loot pool, resolved to records: two picks from five or more', REAL.bosses.map((b) => [b.id, b.drops.pool && b.drops.pool.items.length]));
+const gc = def('giantchieftain');
+ok(gc && gc.enabled && gc.hold === 'dawnstar' && gc.boss.edid === 'EncGiant01' && gc.guardian.edid === 'EncMammothWild' && gc.adds.length === 2 && gc.drops.schematic.family === 'steelplate'
+  && gc.spots[0].id === 'BR', 'the Chieftain of Blizzard Rest: a giant, his bull mammoth, mammoths and a giant in waves, Steel Plate (Nat 26 Oct)');
 ok(def('icecap').boss.options[0][2] === 'EncIceWraith' && def('icecap').spots.length === 1 && def('icecap').spots[0].id === 'SK' && def('icecap').drops.schematic.family === 'glacial_crystal', 'the Wraith: a vanilla ice wraith at Skytemple Ruins (Nat 26 Oct), the Glacial Crystal schematic');
 ok(def('briarheartking').boss.options.slice(-1)[0][2] === 'EncForsworn06BossMagicBretonM03' && def('briarheartking').guardian.options[0][2] === 'EncHagraven', 'the King: the strongest Forsworn boss shaman, his Hagraven beside him');
 ok(REAL.bosses.every((b) => b.spots.every((s) => s.ref && s.anchorDist < 5000)), 'every spot has an anchor within 5000 units (Sancre Tor\'s and Minotaur\'s Rest\'s are the ones Nate\'s own zones there use)');
 ok(def('karstaag').enabled === false && /Solstheim/.test(def('karstaag').waitingOn) && def('karstaag').boss.options[0][2] === 'DLC2dunKarstaag', 'Karstaag is defined and off until Solstheim opens');
-ok(['minotaurtest1', 'minotaurtest2'].every((id) => def(id).devOnly === true && /Minotaur's Rest/.test(def(id).spots[0].note)) && def('minotaurtest2').rearm === '6026df:BSAssets.esm',
-  'the Minotaur Lord\'s two tests are dev-only, at Minotaur\'s Rest; test 2 re-arms BSKMinotaurLordAxe');
-ok(def('minotaurlord').enabled === false && !def('minotaurlord').devOnly && def('minotaurlord').drops.always.some((x) => x[2] === 'CYRMinotaurHorn'), 'the live Minotaur Lord waits on the test, his drop the beast\'s own horn and hide');
+ok(def('minotaurlord').enabled === true && def('minotaurlord').rearm === '6026df:BSAssets.esm' && def('minotaurlord').drops.always.some((x) => x[2] === 'CYRMinotaurHorn'),
+  'the Minotaur Lord is on, re-arming his axe (the dev tests kept it at spawn), his drop the beast\'s own horn and hide');
 ok(def('risenlegate').enabled === true && !def('risenlegate').devOnly && def('risenlegate').boss.options[0][2] === 'BSKEncZombie03' && def('risenlegate').adds.length === 5 && def('risenlegate').drops.schematic.family === 'adamantium',
   'Sancre Tor stays undead: the Risen Legate is a full boss with an undead legion of Sancre Tor\'s own pools, Adamantium 3%');
 ok(def('centurion').drops.extra.some((x) => x[0] === '17749:Dragonborn.esm' && x[1] === 0.05 && x[3] === 'DLC2HeartStone'), 'the Centurion Master drops a Heart Stone at 5%');
@@ -45,6 +53,9 @@ process.on('exit', () => { try { fs.rmSync(dir, { recursive: true, force: true }
 const SHARD = '3ad5f:Skyrim.esm';   // a stand-in for the Glacial Crystal Shard until Worker 2's id exists
 const copy = JSON.parse(JSON.stringify(REAL));
 for (const b of copy.bosses) { b.enabled = true; if (b.id === 'palewarlord') delete b.devOnly; }   // the Warlord's roaming is tested off the dev flag
+// The fight and reward checks below count exact gifts; the loot pool (26 Oct) is tested on its own, so it is left out here
+const POOLS = new Map(copy.bosses.map((b) => [b.id, b.drops.pool]));
+for (const b of copy.bosses) delete b.drops.pool;
 copy.bosses.find((b) => b.id === 'icecap').drops.shards.desc = SHARD;
 fs.writeFileSync(path.join(dir, 'bosses.json'), JSON.stringify(copy));
 fs.writeFileSync(path.join(dir, 'NPC-Spawns.json'), JSON.stringify({ zones: [{ Name: 'wild:wolf:1', NPC: [{ id: 'x', count: 1 }] }, { Name: 'dungeon:X:1', NPC: [] }] }));
@@ -160,6 +171,29 @@ const shards = (a) => given.filter((g) => g[0] === a && g[1] === idOf(SHARD)).re
 ok(shards(P1) === 7 + 2 && gotBy(P1).some((g) => g[1] === 0x7000 && g[2] === 1), 'the top damager: 7 shards + 2 Frost Salts, and at a 2% roll the Glacial schematic', gotBy(P1));
 ok(shards(P2) === 5 + 2 + 2 && !gotBy(P2).some((g) => g[1] === 0x7000), 'a smith who knows Glacial Crystal: 5 shards, 2 more instead of the schematic (+2 Frost Salts)', gotBy(P2));
 
+// ---- the loot pool: each fighter draws two different items from the boss's own pool ----
+{
+  const withPool = JSON.parse(JSON.stringify(copy));
+  const ic = withPool.bosses.find((b) => b.id === 'icecap');
+  ic.drops = { pool: POOLS.get('icecap') };
+  fs.writeFileSync(path.join(dir, 'bosses.json'), JSON.stringify(withPool));
+  load({});
+  const WP = 0xff700001;
+  put(WP, 'private.npcSpawner', 'boss:icecap:boss'); put(WP, 'percentages', { health: 1, magicka: 1, stamina: 1 });
+  tick([WP]);
+  hit(P1, WP, 600, 0.5);
+  now += 21 * 3600000;   // past the 20 h lockout of the Wraith fight above
+  given.length = 0; rnd = 0.5;
+  globalThis.__dboBossDeath(WP, P1);
+  const pool = POOLS.get('icecap');
+  const ids = new Set(pool.items.map((x) => idOf(x[0])));
+  const drawn = given.filter((g) => g[0] === P1 && ids.has(g[1]));
+  ok(drawn.length === 2 && new Set(drawn.map((g) => g[1])).size === 2 && drawn.every((g) => g[2] === pool.items.find((x) => idOf(x[0]) === g[1])[2]),
+    'a fighter draws two different pool items, each in its own count', drawn);
+  fs.writeFileSync(path.join(dir, 'bosses.json'), JSON.stringify(copy));
+  load({});
+}
+
 // ---- the roaming Warlord moves on after a kill ----
 const B = 0xff400001;
 put(B, 'private.npcSpawner', 'boss:palewarlord:boss'); put(B, 'percentages', { health: 1, magicka: 1, stamina: 1 });
@@ -180,8 +214,8 @@ ok(wraith && wraith.POS.join() === def('icecap').spots[0].pos.join(), 'bosses.ic
 ok(cz.some((x) => x.Name === 'boss:valkynaz:boss') && cz.some((x) => x.Name === 'boss:valkynaz:guardian'), 'the Valkynaz stands at the Great Gate with its High Clannfear, no event needed');
 load({ bosses: { icecap: { enabled: true, spot: 'S3' } } });
 ok((zones().find((x) => x.Name === 'boss:icecap:boss') || { POS: [] }).POS.join() === def('icecap').spots[0].pos.join(), '...and a pin to a retired spot (S3) falls back to Skytemple Ruins');
-ok(!cz.some((x) => x.Name.startsWith('boss:briarheartking:')) && cz.some((x) => x.Name === 'boss:centurion:boss') && !cz.some((x) => x.Name.startsWith('boss:palewarlord:')),
-  'bosses.briarheartking.enabled false takes the King off; the Centurion stays on and the Warlord off as the data says');
+ok(!cz.some((x) => x.Name.startsWith('boss:briarheartking:')) && cz.some((x) => x.Name === 'boss:centurion:boss') && cz.some((x) => x.Name.startsWith('boss:palewarlord:')),
+  'bosses.briarheartking.enabled false takes the King off; the Centurion and the Warlord stand as the data says');
 ok(def('icecap').drops.shards.desc === '1d2201:DragonBreak Online Edits.esp' && def('icecap').drops.shards.count === 5 && def('icecap').drops.shards.top === 7,
   'the Wraith drops the Glacial Crystal Shard (DLE 1D2201): 5 a fighter, 7 for the top damager (a 36-shard set in 5-7 days)');
 
@@ -225,24 +259,24 @@ tick([M]); hit(P1, M, 50, 0.8);
 night = false; tick([M]);
 ok(hasZone('boss:movarth:boss'), 'a fight in progress runs on past dawn');
 ok(!hasZone('boss:valkynaz:boss'), 'the Valkynaz stands nowhere until an event');
-// ---- the Werewolf Behemoth: dev only, at night; fullMoon keeps it to full-moon nights ----
+// ---- the Werewolf Behemoth: live since 26 Oct, at night; fullMoon keeps it to full-moon nights ----
 const ww = def('werewolfbehemoth');
-ok(ww && ww.devOnly === true && ww.night === true && ww.hold === 'falkreath' && ww.spots.length === 3 && ww.boss.options.length && ww.adds.length === 3,
-  'the Behemoth of Hircine\'s Hunt: dev only, a night boss of Falkreath, three spots, a werewolf and two wolves for its pack');
-ok(ww.drops.always.some((x) => x[2] === 'WerewolfPelt') && ww.drops.always.some((x) => x[2] === 'WolfPelt') && ww.drops.schematic.family === 'silver' && ww.drops.extraSchematic.family === 'glass',
-  '...it drops a Werewolf Pelt and wolf pelts, Silver 5%, Glass 1%');
+ok(ww && !ww.devOnly && ww.night === true && ww.hold === 'falkreath' && ww.spots.length === 3 && ww.boss.options.length && ww.adds.length === 3,
+  'the Behemoth of Hircine\'s Hunt: a live night boss of Falkreath, three spots, a werewolf and two wolves for its pack');
+ok(ww.drops.always.some((x) => x[2] === 'WerewolfPelt') && ww.drops.always.some((x) => x[2] === 'WolfPelt') && ww.drops.schematic.family === 'silver' && !ww.drops.extraSchematic,
+  '...it drops a Werewolf Pelt and wolf pelts, and Silver (the hunter\'s metal) is its own schematic');
 ok(ww.boss.options.length === 1 && ww.boss.options[0][1] === '1d2207:DragonBreak Online Edits.esp' && ww.boss.edid === 'DBO_EncWerewolfBehemothBoss' && ww.boss.options[0][0] === 42,
   '...the boss is its own NPC on the Behemoth race, DLE 1D2207 (the merge by Worker 3, 1.3x the pack), level 42 as its template');
 let moonUp = false;
 globalThis.__dboClock = { isNight: () => night, isFullMoon: () => moonUp };
-night = true; load({ bosses: { devOnly: true } });
-ok(hasZone('boss:werewolfbehemoth:boss') && zones().filter((x) => /^boss:werewolfbehemoth:open\d$/.test(x.Name)).length === 3, 'on the dev server at night it stands with its pack of three');
-load({ bosses: { devOnly: true, werewolfbehemoth: { fullMoon: true } } });
+night = true; load({});
+ok(hasZone('boss:werewolfbehemoth:boss') && zones().filter((x) => /^boss:werewolfbehemoth:open\d$/.test(x.Name)).length === 3, 'at night it stands with its pack of three, on any server');
+load({ bosses: { werewolfbehemoth: { fullMoon: true } } });
 ok(!hasZone('boss:werewolfbehemoth:boss'), 'fullMoon true: not on an ordinary night');
 moonUp = true; tick([]);
 ok(hasZone('boss:werewolfbehemoth:boss'), '...but on a full-moon night it rises');
 moonUp = false; night = false; load({});
-ok(!hasZone('boss:werewolfbehemoth:boss'), 'off the dev server it writes nothing');
+ok(!hasZone('boss:werewolfbehemoth:boss'), 'by day it writes nothing');
 said.length = 0;
 commands.get('bossevent')(P1, ['valkynaz']);
 ok(!hasZone('boss:valkynaz:boss') && /Only a Lead GM/.test(toldTo(P1)), 'a player cannot start the event');
@@ -253,18 +287,19 @@ ok(zones().filter((x) => /^boss:valkynaz:e0-\d$/.test(x.Name)).length === 3, 'fi
 now += 30 * 60000; tick([]);
 ok(!hasZone('boss:valkynaz:boss') && !zones().some((x) => x.Name.startsWith('boss:valkynaz:')) && audits.some((t) => /^BOSS valkynaz event ended$/.test(t)), 'after thirty minutes the gate closes and every zone of it goes, felled or not');
 
-// ---- the dev-only tests: the Minotaur Lord's axe, the Risen Legate ----
+// ---- the Minotaur Lord's axe (rearm) and the equipment trace, on a copy of the Lord with traceEquipment on ----
+const TR = JSON.parse(JSON.stringify(REAL));
+TR.bosses.find((b) => b.id === 'minotaurlord').traceEquipment = true;
+fs.writeFileSync(path.join(dir, 'bosses.json'), JSON.stringify(TR));
 load({});
-ok(!zones().some((x) => /^boss:(minotaurtest1|minotaurtest2):/.test(x.Name)) && hasZone('boss:risenlegate:boss'), 'off the dev server the test bosses write nothing; the Legate stands');
-load({ bosses: { devOnly: true } });
-ok(hasZone('boss:minotaurtest1:boss') && hasZone('boss:minotaurtest2:boss') && !hasZone('boss:karstaag:boss') && !hasZone('boss:minotaurlord:boss'), 'bosses.devOnly true: both Minotaur Lord tests stand; Karstaag and the live Lord stay off');
+ok(hasZone('boss:minotaurlord:boss') && hasZone('boss:risenlegate:boss') && !hasZone('boss:karstaag:boss'), 'the Minotaur Lord and the Legate stand; Karstaag stays off');
 const MT = 0xff600001, AXE = idOf('6026df:BSAssets.esm');
-put(MT, 'private.npcSpawner', 'boss:minotaurtest2:boss'); put(MT, 'percentages', { health: 1, magicka: 1, stamina: 1 });
+put(MT, 'private.npcSpawner', 'boss:minotaurlord:boss'); put(MT, 'percentages', { health: 1, magicka: 1, stamina: 1 });
 put(MT, 'inventory', { entries: [{ baseId: 0x123, count: 1 }] });
 put(MT, 'equipment', { inv: { entries: [{ baseId: 0x123, count: 1, worn: true }] } });
 logs.length = 0; tick([MT]);
-ok(props.get(`${MT}|inventory`).entries.some((e) => e.baseId === AXE) && logs.some((l) => /minotaurtest2 ff600001 rearmed with 6026df:BSAssets\.esm/.test(l)), 'test 2: the axe goes back into the copy\'s inventory, logged', logs);
-ok(logs.some((l) => /minotaurtest2 ff600001 equipment at spawn: \["123"\]/.test(l)), 'the trace logs what it wears at spawn', logs);
+ok(props.get(`${MT}|inventory`).entries.some((e) => e.baseId === AXE) && logs.some((l) => /minotaurlord ff600001 rearmed with 6026df:BSAssets\.esm/.test(l)), 'the Lord: the axe goes back into the copy\'s inventory, logged', logs);
+ok(logs.some((l) => /minotaurlord ff600001 equipment at spawn: \["123"\]/.test(l)), 'the trace logs what it wears at spawn', logs);
 put(MT, 'equipment', { inv: { entries: [{ baseId: 0x123, count: 1, worn: true }, { baseId: AXE, count: 1, worn: true }] } });
 logs.length = 0; tick([MT]);
 ok(logs.some((l) => /equipment changed: \["123","[0-9a-f]*6026df"\]/.test(l)), '...and each change, so the dev log shows whether the axe stays in hand through a host change', logs);

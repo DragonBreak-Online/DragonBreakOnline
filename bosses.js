@@ -12,6 +12,7 @@
 //              (SetDisplayName) and marked with the champions' rim glow instead of being made bigger
 //   toughness  a share of each hit is given back to the boss (champions.js's give-back), more while its guardian lives
 //   waves      at each share of the boss's health, add zones are written beside it; they go when the fight ends
+//   drops.pool { picks, items: [[desc, weight, count, edid]] }  each fighter's draw from the boss's own loot pool
 //   openingDelaySeconds, openingStepSeconds  (optional) the opening adds come that long after the boss rises and that far
 //              apart, instead of with it (Nat 26 Oct: a whole fight spawning on the arrival tick froze a client); 0 = with it
 //   enrage     enrageSeconds after the first blow the give-back falls and the boss's hits grow (enrage.toughness, damageMult)
@@ -349,6 +350,18 @@ module.exports = (api) => {
       return { given: giveItem(a, book.bookId, 1) !== false, known: false, name: book.name };
     } catch (e) { log('bosses: schematic failed', e.message); return { given: false, known: false }; }
   };
+  // The boss's own loot pool (Nat 26 Oct): pool.picks items by weight, no item twice, from [desc, weight, count, edid]
+  const poolPicks = (pool) => {
+    const left = ((pool && pool.items) || []).filter((x) => x && x[0] && Number(x[1]) > 0).slice();
+    const out = [];
+    for (let k = 0; k < (Number(pool && pool.picks) || 0) && left.length; k++) {
+      let r = Math.random() * left.reduce((t, x) => t + Number(x[1]), 0);
+      const i = Math.max(0, left.findIndex((x) => (r -= Number(x[1])) < 0));
+      const [x] = left.splice(i === -1 ? left.length - 1 : i, 1);
+      out.push([x[0], Math.max(1, Number(x[2]) || 1)]);
+    }
+    return out;
+  };
   const reward = (b, f, killer) => {
     let total = 0; for (const d of f.damage.values()) total += d;
     const share = clamp(Number(C.creditShare) || 0.1, 0, 1);
@@ -380,6 +393,7 @@ module.exports = (api) => {
         if (s.given) { got.push(s.name); personal(p, `Among the remains you find ${s.name}.`); }
       }
       for (const [desc, chance, n] of dr.extra || []) if (Math.random() < (Number(chance) || 0) && giveDesc(p, desc, Number(n) || 1)) got.push(`${Number(n) || 1}x ${desc} (rare)`);
+      for (const [desc, n] of poolPicks(dr.pool)) if (giveDesc(p, desc, n)) got.push(`${n}x ${desc}`);
       if (shards > 0 && giveDesc(p, dr.shards.desc, shards)) got.push(`${shards}x ${dr.shards.desc}`);
       (state().lockouts[b.id] = state().lockouts[b.id] || {})[pid] = now + lock;
       personal(p, `${titled(b.name)} falls.${got.length ? ' Your share is in your pack.' : ''}`);
