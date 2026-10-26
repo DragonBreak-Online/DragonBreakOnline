@@ -2094,7 +2094,13 @@ void MpActor::DropItem(const uint32_t baseId, const Inventory::Entry& entry)
 
   Inventory::Entry dropped = entry;
   dropped.SetWorn(Inventory::Worn::None);
-  if (!dropped.EqualExceptCount(Inventory::Entry(baseId, count))) {
+
+  // An enchantment, a temper, a rename, a soul, a poison or a player-made enchantment. Such an item is not
+  // litter: it is gear a player made or earned, and losing it is ticket 1563647648819581000.
+  const bool hasExtras =
+    !dropped.EqualExceptCount(Inventory::Entry(baseId, count));
+
+  if (hasExtras) {
     placedObject->SetPickupExtras(dropped);
   }
 
@@ -2144,8 +2150,19 @@ void MpActor::DropItem(const uint32_t baseId, const Inventory::Entry& entry)
     pImpl->droppedItemsQueue.erase(pImpl->droppedItemsQueue.begin());
   }
 
-  pImpl->droppedItemsQueue.push_back(
-    std::make_pair(droppedItemFormId, placedObject));
+  // Only ordinary litter goes in the queue. The queue deletes its oldest entry as soon as an eleventh item
+  // is dropped, so an enchanted sword dropped before ten pieces of junk used to vanish at once, well inside
+  // the two minutes. An item with extras is never queued and so is never capped away.
+  if (!hasExtras) {
+    pImpl->droppedItemsQueue.push_back(
+      std::make_pair(droppedItemFormId, placedObject));
+  }
+
+  if (hasExtras) {
+    ScheduleDroppedExtrasCheck(placedObject, droppedItemFormId, dropped,
+                               editorId);
+    return;
+  }
 
   auto time =
     Viet::TimeUtils::To<std::chrono::milliseconds>(kDeletionTimeSeconds);
@@ -2181,6 +2198,60 @@ void MpActor::DropItem(const uint32_t baseId, const Inventory::Entry& entry)
 
     placedObject->Delete();
     ++g_numDrops;
+  });
+}
+
+// An item carrying extras never despawns while its owner is online. When they log out it goes back into
+// their inventory, so it is recoverable and nothing accumulates on the ground for ever. A member rather than
+// a self-capturing lambda, so rescheduling does not need a shared_ptr that owns itself.
+void MpActor::ScheduleDroppedExtrasCheck(MpObjectReference* placedObject,
+                                         uint32_t droppedItemFormId,
+                                         const Inventory::Entry& dropped,
+                                         const std::string& editorId)
+{
+  constexpr float kExtrasCheckSeconds = 2 * 60;
+
+  auto worldState = GetParent();
+  if (!worldState) {
+    return;
+  }
+
+  const uint32_t formId = GetFormId();
+  const auto time =
+    Viet::TimeUtils::To<std::chrono::milliseconds>(kExtrasCheckSeconds);
+
+  worldState->SetTimer(time).Then([this, worldState, placedObject,
+                                   droppedItemFormId, dropped, editorId,
+                                   formId](Viet::Void) {
+    const bool actorStillAlive =
+      this == worldState->LookupFormById(formId).get();
+    if (!actorStillAlive) {
+      return;
+    }
+
+    const bool formStillAlive =
+      placedObject == worldState->LookupFormById(droppedItemFormId).get();
+    if (!formStillAlive) {
+      return;
+    }
+
+    // Somebody picked it up, which is the happy ending
+    if (placedObject->IsDeleted() || placedObject->IsHarvested()) {
+      return;
+    }
+
+    if (GetUserId() != Networking::InvalidUserId) {
+      // Owner still online: leave it exactly where they put it and look again later
+      ScheduleDroppedExtrasCheck(placedObject, droppedItemFormId, dropped,
+                                 editorId);
+      return;
+    }
+
+    spdlog::info("MpActor::DropItem {:x} - owner left, returning dropped {} "
+                 "with its extras to their inventory instead of deleting it",
+                 formId, editorId);
+    AddItems({ dropped });
+    placedObject->Delete();
   });
 }
 
