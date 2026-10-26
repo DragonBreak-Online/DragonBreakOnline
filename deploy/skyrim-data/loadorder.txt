@@ -141,3 +141,8 @@ DragonBreak Online Edits.esp
 DragonBreak Nexus Patches.esp
 DragonBreak Armory.esp
 DragonBreak Strongholds Fix.esp
+matys knights of the nine armor 2.1.esp
+DivineAndDaedricRobes.esp
+DragonBreak KotN Patch.esp
+MagicalBlackreach.esp
+DragonBreak Blackreach Actors-v2.esp
