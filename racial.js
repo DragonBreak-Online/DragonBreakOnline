@@ -190,8 +190,10 @@ module.exports = (api) => {
   const rpRace = (a) => { try { const rp = mp.get(a >>> 0, 'private.rp'); return rp && rp.race ? String(rp.race).toLowerCase() : ''; } catch (e) { return ''; } };
   // The race whose gift this player has now, or '' (not a player, a beast form, an unknown race, switched off)
   const raceOf = (a) => memoised('race', a, raceNow);
+  // A player out of any beast form, with racial on: who a race's gift or a sign can reach
+  const eligible = (a) => memoised('eligible', a, (x) => on() && isPlayer(x) && !inBeastForm(x));
   const raceNow = (a) => {
-    if (!on() || !isPlayer(a) || inBeastForm(a)) return '';
+    if (!eligible(a)) return '';
     const id = raceIdOf(a);
     // On the DLE's MaormerRace: the Maormer with the overhaul, the Altmer's gift without it (as on the High Elf record)
     if (MAORMER_IDS.includes(id)) return C.overhaul === true ? 'maormer' : 'altmer';
@@ -210,6 +212,11 @@ module.exports = (api) => {
     return r;
   };
   const healthOf = (a) => { try { const p = mp.get(a >>> 0, 'percentages'); return p ? Number(p.health) : NaN; } catch (e) { return NaN; } };
+  // The character's birthsign (birthsigns.js), or null: the same rules as a race's gift (players only, never in a beast form)
+  const signOf = (a) => memoised('sign', a, (x) => {
+    if (!eligible(x)) return null;
+    try { const f = globalThis.__dboBirthsignOf; return typeof f === 'function' ? f(x >>> 0) || null : null; } catch (e) { return null; }
+  });
 
   // RACE DATA floats (libespm RACE.cpp): regeneration at 84/88/92, unarmed damage at 96
   const raceData = new Map();
@@ -309,10 +316,24 @@ module.exports = (api) => {
   // MGEF: one effect of a player-made enchantment (gearench.js)
   const isMagicSource = (src) => { const r = recordOf(src >>> 0); return !!r && ['SPEL', 'ENCH', 'SCRL', 'MGEF'].includes(String(r.record.type)); };
   const hands = (src) => { try { return weaponHandsOf(src >>> 0) || ''; } catch (e) { return ''; } };
-  // The attacker's gift: above 1 hits harder. dmg is the engine's damage, for nothing but a guard against 0.
-  const attackMult = (agg, tgt, src, dmg) => {
-    const race = raceOf(agg); if (!race || !(dmg > 0) || agg === tgt) return 1;
-    return passiveAttack(race, agg, src) * powerAttack(agg, src);
+  // The attacker's gift and sign: above 1 hits harder. dmg is the engine's damage, for nothing but a guard against 0.
+  const attackMult = (agg, tgt, src, dmg, flags) => {
+    if (!(dmg > 0) || agg === tgt) return 1;
+    const race = raceOf(agg);
+    return (race ? passiveAttack(race, agg, src) * powerAttack(agg, src) : 1) * signAttack(signOf(agg), flags);
+  };
+  // The Shadow's sneak attack, never a spell's (gearench.js backstabMult's rule)
+  const signAttack = (sg, flags) => (sg && num(sg.sneakDamage, 0) > 0 && flags && flags.sneak && !flags.spell ? 1 + num(sg.sneakDamage, 0) : 1);
+  // The sign's share of a hit taken by kind: above 0 more, below 0 less (a reduction joins the race's under reductionCap)
+  const signTarget = (sg, src) => {
+    if (!sg || !sg.taken || typeof sg.taken !== 'object') return 1;
+    let m = 1, rs = null;
+    for (const [k, share] of Object.entries(sg.taken)) {
+      if (!num(share, 0)) continue;
+      const hit = k === 'magic' ? isMagicSource(src) : AV[k] !== undefined && (rs || (rs = resists(src))).has(AV[k]);
+      if (hit) m *= Math.max(0, 1 + num(share, 0));
+    }
+    return m;
   };
   const passiveAttack = (race, agg, src) => {
     const R = C[race];
@@ -341,7 +362,11 @@ module.exports = (api) => {
   // The target's gift: below 1 takes less, above 1 more (the Altmer's optional weakness)
   // dmg: the engine's damage, for the ward's absorb (no ward without it)
   const targetMult = (agg, tgt, src, dmg) => {
-    const race = raceOf(tgt); if (!race || agg === tgt) return 1;
+    if (agg === tgt) return 1;
+    const race = raceOf(tgt);
+    return (race ? raceTarget(race, tgt, src, dmg) : 1) * signTarget(signOf(tgt), src);
+  };
+  const raceTarget = (race, tgt, src, dmg) => {
     const R = C[race];
     const rs = resists(src);
     let m = 1;
@@ -438,17 +463,30 @@ module.exports = (api) => {
     return false;
   };
   globalThis.__dboCastHeld = castHeld;
-  // The race's factor on one bar's regeneration now (1 = none), capped by the rule for its kind
+  // The race's and the sign's factor on one bar's regeneration now (1 = none), capped by the rule for its kind
   const regenFactor = (a, stat) => {
     // A Hagraven's magicka (hagraven.js) is hers whatever her race, and joins the race's gift
     let hag = 1; try { if (typeof globalThis.__dboHagravenRegenMult === 'function') hag = Math.max(1, Number(globalThis.__dboHagravenRegenMult(a, stat)) || 1); } catch (e) { hag = 1; }
     // A Briarheart's briar skin (briarheart.js) quickens stamina whatever the race, and joins the race's gift
     let briar = 1; try { if (typeof globalThis.__dboBriarRegenMult === 'function') briar = Math.max(1, Number(globalThis.__dboBriarRegenMult(a, stat)) || 1); } catch (e) { briar = 1; }
-    const race = raceOf(a); if (!race) return hag * briar;
-    const passive = passiveRegen(race, a, stat);
+    const race = raceOf(a); const sg = signOf(a);
+    if (!race && !sg) return hag * briar;
+    const passive = signRegen(race, a, stat, race ? passiveRegen(race, a, stat) : 1, sg);
     // A power's factor is timed (conditionalRegenCap) and stands in for the gift's while it runs, never on top of it
-    const p = buff(a, `${stat}Regen`);
+    const p = race ? buff(a, `${stat}Regen`) : 0;
     return (p > 1 ? Math.max(passive, capOf(p, true)) : passive) * hag * briar;
+  };
+  // The sign's factor joins the race's under one cap, conditional when either part is (the Ritual's low health, the
+  // Argonian's, the Nord's cold); a slowing factor (the Atronach's magicka) is applied after the cap
+  const CONDITIONAL_RACE = { argonian: 'health', nord: 'stamina' };
+  const signRegen = (race, a, stat, own, sg) => {
+    if (!sg) return own;
+    const f = num((sg.regen || {})[stat], 1);
+    let up = f > 1 ? f : 1, conditional = false;
+    if (stat === 'health' && num(sg.lowHealthRegen, 1) > 1 && healthOf(a) < num(sg.lowHealth, 0)) { up *= num(sg.lowHealthRegen, 1); conditional = true; }
+    const down = f > 0 && f < 1 ? f : 1;
+    if (up === 1 && down === 1) return own;
+    return capOf(own * up, conditional || (own > 1 && CONDITIONAL_RACE[race] === stat)) * down;
   };
   const passiveRegen = (race, a, stat) => {
     const R = C[race];
@@ -473,8 +511,9 @@ module.exports = (api) => {
   const REGEN_MULT = (() => { try { const v = Number((mp.getServerSettings() || {}).regenerationMultiplier); return Number.isFinite(v) && v >= 0 ? v : 1; } catch (e) { return 1; } })();
   // The share of a bar a second the gift adds: the race's rate through the rest of the chain, times (factor - 1)
   // f: regenFactor(a, stat) when the caller has it already
+  // Below 1 (a sign's slower bar) it is negative: that share is taken back
   const extraPerSecond = (a, stat, f = regenFactor(a, stat)) => {
-    if (!(f > 1)) return 0;
+    if (!(f > 0) || f === 1) return 0;
     const av = STAT_AV[stat];
     // hunger and the vampire blood set the client's health and stamina rates (gamemode.js applyNeedsStage); magicka has neither
     const chain = stat === 'magicka' ? 1 : hook('__dboNeedsRateMult', a, av) * hook('__dboSuperRateMult', a, av);
@@ -492,11 +531,11 @@ module.exports = (api) => {
   const regenTick = (now = Date.now()) => {
     const here = new Set();
     if (!on()) { S.owed.clear(); return; }
-    memo = { race: new Map(), raceId: new Map(), buffs: new Map() };
+    memo = { race: new Map(), raceId: new Map(), buffs: new Map(), sign: new Map(), eligible: new Map() };
     try {
       for (const a of onlineActors()) {
         here.add(a);
-        if (!raceOf(a)) { S.owed.delete(a); continue; }
+        if (!raceOf(a) && !signOf(a)) { S.owed.delete(a); continue; }
         let owed = S.owed.get(a);
         if (!owed) { owed = { at: now - TICK_MS, health: 0, magicka: 0, stamina: 0 }; S.owed.set(a, owed); }
         // Just after a cast the server still holds the bars from before it: a write now would hand the spell's magicka back
@@ -518,17 +557,19 @@ module.exports = (api) => {
           seen[stat] = v;
           if (!(next[stat] < 1)) { owed[stat] = 0; continue; }
           const f = regenFactor(a, stat);
-          const per = f > 1 ? extraPerSecond(a, stat, f) : 0;
-          if (!(per > 0)) { owed[stat] = 0; continue; }
-          const own = per / (f - 1); // the bar's own regen a second
+          const signed = f !== 1 ? extraPerSecond(a, stat, f) : 0;
+          if (!signed) { owed[stat] = 0; continue; }
+          // owed is a size; a slowed bar (factor below 1) has it taken off instead of added
+          const per = Math.abs(signed);
+          const own = per / Math.abs(f - 1); // the bar's own regen a second
           // At least payoutSeconds of own regen, more than a report's age takes back; or the rest if own regen fills the bar first
           const step = Math.max(num(C.minStep, 0.002), own * Math.max(0, num(C.payoutSeconds, 1)));
           // Owed stops at a step plus 1.5 s of gift: a pause (a menu, the regen delay) adds no regen, so it is not paid as one jump
           owed[stat] = Math.min(owed[stat] + per * secs, step + per * 1.5);
           if (!fresh) continue;
-          const fillsFirst = next[stat] + own >= 1 && owed[stat] >= own * 0.5;
+          const fillsFirst = signed > 0 && next[stat] + own >= 1 && owed[stat] >= own * 0.5;
           if (owed[stat] < step && !fillsFirst) continue;
-          next[stat] = Math.min(1, next[stat] + owed[stat]);
+          next[stat] = signed > 0 ? Math.min(1, next[stat] + owed[stat]) : Math.max(0, next[stat] - owed[stat]);
           owed[stat] = 0;
           paid.push(stat);
         }
@@ -575,13 +616,16 @@ module.exports = (api) => {
   // bank, a trade between players, a refund or a staff grant: those never call this. The extra is new coin, given
   // straight to the Imperial. A lease chest pays only on the coin it was rolled with (dungeons.js counts that down), so
   // putting the pile back and taking it again pays nothing. Returns the extra given.
+  // The Thief's share adds to the race's
   const goldBonus = (a, amount, why) => {
-    const race = raceOf(a);
-    if ((race !== 'imperial' && race !== 'goblin') || !(amount > 0)) return 0;
-    const extra = Math.floor(amount * Math.max(0, num(C[race].goldBonus, 0)));
+    if (!(amount > 0)) return 0;
+    const race = raceOf(a); const sg = signOf(a);
+    const raceShare = race === 'imperial' || race === 'goblin' ? Math.max(0, num(C[race].goldBonus, 0)) : 0;
+    const signShare = sg ? Math.max(0, num(sg.goldBonus, 0)) : 0;
+    const extra = Math.floor(amount * (raceShare + signShare));
     if (extra < 1) return 0;
     if (!giveItem(a >>> 0, GOLD, extra)) return 0;
-    const gift = race === 'goblin' ? 'Goblin Greed' : 'Imperial Luck';
+    const gift = [raceShare > 0 ? (race === 'goblin' ? 'Goblin Greed' : 'Imperial Luck') : '', signShare > 0 ? sg.name : ''].filter((x) => x).join(' and ');
     try { personal(a >>> 0, `${gift}: ${extra} more gold.`); } catch (e) { /* the message is optional */ }
     log(`racial: ${display(a >>> 0)} ${gift} +${extra} gold on ${amount} (${why || 'loot'})`);
     return extra;
@@ -589,11 +633,18 @@ module.exports = (api) => {
 
   // ---- the overhaul: XP, disease, the Racial Power ---------------------------------------------------------------------
   // skillrates.js rateFor multiplies by this after its own rate (never for a staff award): the race's one boosted skill
+  // (the overhaul) and the sign's
   const skillRate = (a, skillId, kind) => {
-    if (!overhaul() || kind === 'award') return 1;
-    const race = raceOf(a); const xp = race && C[race].xp;
-    const r = xp && typeof xp === 'object' ? num(xp[skillId], 1) : 1;
-    return r > 0 ? r : 1;
+    if (kind === 'award') return 1;
+    let rate = 1;
+    if (overhaul()) {
+      const race = raceOf(a); const xp = race && C[race].xp;
+      const r = xp && typeof xp === 'object' ? num(xp[skillId], 1) : 1;
+      if (r > 0) rate *= r;
+    }
+    const sg = signOf(a);
+    if (sg) { const r = num((sg.xp || {})[skillId], 1) * num(sg.xpAll, 1); if (r > 0) rate *= r; }
+    return rate;
   };
   // supernatural.js: the share of a bite's or a feed's fever this player shrugs off (the Argonian's Hist)
   const diseaseResist = (a) => (overhaul() && raceOf(a) === 'argonian' ? clamp01(num(C.argonian.diseaseResist, 0)) : 0);
@@ -867,7 +918,10 @@ module.exports = (api) => {
   // gamemode.js needs tick: the race's appetite (the Half-Giant's 1.5), 1 for everyone else
   globalThis.__dboRaceHungerMult = (a) => { const r = raceOf(a >>> 0); return r ? Math.max(0, num((C[r] || {}).hunger, 1)) : 1; };
   // charlevel.js: a race's flat vital bonus, added to the spent level points in private.dboAvBonus
-  globalThis.__dboRaceVitalBonus = (a) => { const r = raceOf(a >>> 0); return { health: r ? Math.max(0, num((C[r] || {}).healthBonus, 0)) : 0 }; };
+  globalThis.__dboRaceVitalBonus = (a) => {
+    const r = raceOf(a >>> 0); const v = (signOf(a >>> 0) || {}).vital || {};
+    return { health: (r ? Math.max(0, num((C[r] || {}).healthBonus, 0)) : 0) + Math.max(0, num(v.health, 0)), magicka: Math.max(0, num(v.magicka, 0)), stamina: Math.max(0, num(v.stamina, 0)) };
+  };
   globalThis.__dboRaceOf = raceOf;
   globalThis.__dboRaceSkillRate = skillRate;
   globalThis.__dboRaceDiseaseResist = diseaseResist;
@@ -875,7 +929,7 @@ module.exports = (api) => {
   globalThis.__dboRacialPowerView = powerView;
   globalThis.__dboRacialPowerViews = powerViews;
   globalThis.__dboRacialPowerHud = hudField;
-  return { config: C, raceOf, attackMult, targetMult, capTargetSide, regenFactor, extraPerSecond, regenTick, onCast, castHeld, goldBonus, inCold, fighting, COMBAT,
+  return { config: C, raceOf, signOf, attackMult, targetMult, capTargetSide, regenFactor, extraPerSecond, regenTick, onCast, castHeld, goldBonus, inCold, fighting, COMBAT,
     skillRate, diseaseResist, powerView, powerViews, usePower, powerTick, statusLine, hudField, abilityTick, wardAbsorb, eyeTick };
 };
 module.exports.RACES = RACES;
