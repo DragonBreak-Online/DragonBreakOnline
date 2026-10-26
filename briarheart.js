@@ -40,6 +40,9 @@
 //   no MOD3), worn by DefaultRace (the Reachman race's armor race): a woman gets no briar body unless visual.women is set
 //   (what the engine shows a woman then is to be seen in game). Every give, equip, removal and swap is logged
 //   ("briarheart: look ..."). Equips are tried at most once per visual.retrySeconds and visual.maxTries times in a row.
+//   Spamming a chest piece (Nat's dev test, 26 Oct) cannot wear it or strip the look: every report takes the piece off,
+//   but the briar body goes back on only once no refusal has come for visual.settleMs, and a look the throttle holds
+//   back is looked at again when it allows, report or not ("briarheart: look on ... (settled)").
 //   Slots, read at the live load order (25 Oct): Skyrim.esm puts both in the body slot (32), but USSEP, which wins, moves
 //   them and their ARMAs to slot 35 (mask 0x20, the amulet slot), so in game the briar chest draws over whatever is worn.
 //   Bare chest only is Nat's rule, not the engine's. An amulet shares slot 35, and the briar chest wins (Nat, 25 Oct: "the
@@ -85,7 +88,7 @@ module.exports = (api) => {
     tearSeconds: 10, tearRange: 250, tearPermadeath: false, tearGivesHeart: true,
     noDivineBlessings: true, faithLocked: true,
     cureDeities: ['arkay', 'stendarr'], cureItem: '2e504:Skyrim.esm',  // a filled black soul gem
-    visual: { enabled: false, armor: '5d008:Skyrim.esm', emptyArmor: '5d009:Skyrim.esm', body: '90d63:unofficial skyrim special edition patch.esp', women: false, retrySeconds: 10, maxTries: 5 },
+    visual: { enabled: false, armor: '5d008:Skyrim.esm', emptyArmor: '5d009:Skyrim.esm', body: '90d63:unofficial skyrim special edition patch.esp', women: false, retrySeconds: 10, maxTries: 5, settleMs: 1500 },
     // A full Hagraven (hagraven.js, stage 3) at the altar performs the rite and is named in the audit; true: the rite
     // waits for one
     hagravenRequired: false,
@@ -108,6 +111,8 @@ module.exports = (api) => {
   if (!(S.skin instanceof Set)) S.skin = new Set();     // actors whose briar skin is on
   if (!(S.amuletTold instanceof Map)) S.amuletTold = new Map();   // actor -> when the amulet refusal was last told
   if (!(S.coverTold instanceof Map)) S.coverTold = new Map();     // actor -> when the covered-chest refusal was last told
+  if (!(S.covered instanceof Map)) S.covered = new Map();     // actor -> when a chest piece or amulet was last refused
+  if (!(S.settle instanceof Map)) S.settle = new Map();       // actor -> the pending settled look (a timer)
   const data = () => {
     if (S.data) return S.data;
     let d = null; try { d = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch (e) { d = null; }
@@ -162,7 +167,7 @@ module.exports = (api) => {
   const waitText = (ms) => { const h = Math.floor(ms / HOUR), m = Math.ceil((ms % HOUR) / MIN); return `${h ? `${h}h ` : ''}${m}m`; };
 
   // ---- the look: the briar body on a bare chest -------------------------------------------------------------------------
-  const V = () => Object.assign({ enabled: false, armor: '', emptyArmor: '', body: '', women: false, retrySeconds: 10, maxTries: 5 }, C.visual || {});
+  const V = () => Object.assign({ enabled: false, armor: '', emptyArmor: '', body: '', women: false, retrySeconds: 10, maxTries: 5, settleMs: 1500 }, C.visual || {});
   // The wound itself (dev, 25 Oct): ArmorBriarHeart is only the heart and its briars (slot 35). The open chest is USSEP's
   // USKPArmorBriarHeartBody (90D63, slot 32; its ARMA covers body, forearms and calves with the wound texture
   // SkinBodyMaleBriarHeart), worn by every vanilla Briarheart through the SkinBriarHeart outfit. Both go on a bare chest.
@@ -190,6 +195,13 @@ module.exports = (api) => {
   const wornIds = (equipment) => {
     const entries = equipment && equipment.inv && Array.isArray(equipment.inv.entries) ? equipment.inv.entries : [];
     return entries.filter((e) => e && (e.worn || e.wornLeft)).map((e) => Number(e.baseId) >>> 0);
+  };
+  // One pending look per character, re-armed by each call; it runs the newest module's look (a hot reload keeps it)
+  const settleLater = (a, ms) => {
+    const old = S.settle.get(a); if (old) clearTimeout(old);
+    const t = setTimeout(() => { S.settle.delete(a); const f = globalThis.__dboBriarheartSettled; if (typeof f === 'function') f(a); }, Math.max(50, ms));
+    if (t && typeof t.unref === 'function') t.unref();
+    S.settle.set(a, t);
   };
   const lookOn = (a) => { const v = V(); return !!(C.enabled && v.enabled && v.armor && isBriar(a) && (v.women || !isFemale(a))); };
   const takeAll = (a, id) => { let n = 0; while (id && takeOne(a, id) && n < 50) n++; return n; };
@@ -242,14 +254,22 @@ module.exports = (api) => {
         log(`briarheart: amulet refused on ${display(a)} (${why}): ${clash.map((id) => id.toString(16)).join(', ')} unequipped, kept in the pack (bare chest, the briar chest wins its slot)`);
       }
     }
+    // A refusal means the player swapped something in: a briar body missing now is their doing, not an equip that failed
+    if (own.length || clash.length) { S.covered.set(a, Date.now()); S.looks.delete(a); }
     if (worn.includes(full) && (!body || worn.includes(body))) { S.looks.delete(a); return; }
     // The login's first reports are naked until gamemode.js redresses the character: no briar body then (the login hook
     // looks again once that has settled)
     const conn = globalThis.__dboConnectedAt instanceof Map ? Number(globalThis.__dboConnectedAt.get(a)) || 0 : 0;
     if (conn && Date.now() - conn < LOGIN_SETTLE_MS) return;
-    // Bare chest: give it if missing and put it on, at most once per retrySeconds and maxTries in a row
+    // While refusals keep coming (equip spam) nothing goes on: the client's equips and ours would cross. The briar body
+    // goes on once the last refusal is settleMs old
+    const quietFor = Date.now() - (Number(S.covered.get(a)) || 0), settleMs = Math.max(0, Number(v.settleMs) || 0);
+    if (quietFor < settleMs) { settleLater(a, settleMs - quietFor); return; }
+    // Bare chest: give it if missing and put it on, at most once per retrySeconds and maxTries in a row; held back by
+    // retrySeconds, it is looked at again then, so the look recovers without another equipment report
     const L = S.looks.get(a) || { at: 0, tries: 0 };
-    if (Date.now() - L.at < v.retrySeconds * 1000) return;
+    const wait = v.retrySeconds * 1000 - (Date.now() - L.at);
+    if (wait > 0) { if (!L.gaveUp) settleLater(a, wait); return; }
     if (L.tries >= v.maxTries) { if (!L.gaveUp) { L.gaveUp = true; S.looks.set(a, L); log(`briarheart: look gave up on ${display(a)}: ${L.tries} equips of the briar body did not show in the equipment`); } return; }
     L.at = Date.now(); L.tries += 1; S.looks.set(a, L);
     // The wound body first (slot 32), then the heart over it (slot 35); each result is logged as it came back
@@ -260,6 +280,7 @@ module.exports = (api) => {
       results.push([desc, papyrus(a, 'EquipItem', [form(desc), false, true])]);
     }
     const bad = results.filter(([, ok]) => !ok).map(([d]) => d);
+    settleLater(a, v.retrySeconds * 1000);   // checked again if no report shows it (after the last try: given up)
     log(!bad.length ? `briarheart: look on ${display(a)} (${why}): bare chest, ${results.map(([d]) => d).join(' + ')} equipped (try ${L.tries})`
       : `briarheart: look FAILED on ${display(a)} (${why}): EquipItem of ${bad.join(', ')} refused by the server (try ${L.tries}; see the line above)`);
   };
@@ -482,6 +503,11 @@ module.exports = (api) => {
   };
   // gamemode.js equipHook: every equipment report
   globalThis.__dboBriarheartEquip = (a, equipment) => { if (C.enabled) lookCheck(a, equipment, 'equipment'); };
+  // settleLater: the look once equip spam has settled or the retry throttle allows, from the equipment as it is then
+  globalThis.__dboBriarheartSettled = (a) => {
+    a = Number(a) >>> 0;
+    try { if (C.enabled && isOnline(a)) lookCheck(a, null, 'settled'); } catch (e) { log('briarheart: settled look failed', e.message); }
+  };
   // playermenu.js (X): the entry over a fallen Briarheart
   globalThis.__dboBriarheartMenuEntries = (a, t) => (C.enabled && isBriar(t >>> 0) && isDowned(t >>> 0) && !isStaff(a) ? [{ id: 'briartear', label: 'Tear out the heart' }] : []);
   globalThis.__dboBriarheartMenuAction = (a, id, t) => { if (id !== 'briartear') return false; personal(a >>> 0, startTear(a >>> 0, t >>> 0)); return true; };
