@@ -1,6 +1,6 @@
 // Names over bosses' heads (Nat, 25 Oct: "can bosses have names over their head so we know what's a boss"): the server's
 // bosses.js sends dboActorLabels { list: [{ id, text, color }] } to players near a boss, only when their list changes, and
-// this client draws each name at the head node + 32 while the actor is alive, in line of sight and within 3000 units.
+// this client draws each name at the head node + 72 (above TrueHUD's bar at + 30) while the actor is alive, in line of sight and within 3000 units.
 // Runs actorLabelPlan.ts (transpiled with the client's TypeScript) and checks the service's wiring in its source. Run it
 // from skymp5-client with node_modules present:
 //
@@ -47,7 +47,7 @@ check('it listens for dboActorLabels', /content\["customPacketType"\] !== "dboAc
 check('the packet\'s list replaces the labels: one no longer listed is dropped', /for \(const id of Array\.from\(this\.entries\.keys\(\)\)\) if \(!wanted\.has\(id\)\) this\.drop\(id\);/.test(src));
 check('the server id goes through remoteIdToLocalId', /Actor\.from\(Game\.getFormEx\(remoteIdToLocalId\(id\)\)\)/.test(src));
 check('the plan decides, from isDead, getDistance and hasLOS', /shouldDraw\(\{ found: !!actor, dead: !!actor && actor\.isDead\(\), distance: actor \? player\.getDistance\(actor\) : Infinity, los: !!actor && player\.hasLOS\(actor\) \}\)/.test(src));
-check('drawn at the head node + 32, as formView\'s nametags', /const HEAD = "NPC Head \[Head\]";/.test(src) && /getNodeWorldPositionZ\(actor, HEAD, false\) \+ 32/.test(src));
+check('drawn above TrueHUD\'s health bar: the head node + 72, the bar sitting at + 30 (Nat 26 Oct: "above the health")', /const HEAD = "NPC Head \[Head\]";/.test(src) && /const LABEL_HEIGHT = 72;/.test(src) && /getNodeWorldPositionZ\(actor, HEAD, false\) \+ LABEL_HEIGHT/.test(src));
 check('behind the camera it is hidden', /if \(!p \|\| p\[2\] <= 0\) \{ this\.hide\(e\); continue; \}/.test(src));
 check('a hidden label destroys its text; a text is made once and moved after', /destroyText\(e\.textId\)/.test(src) && /e\.textId = createText\(x, y, e\.text, e\.color\)/.test(src) && /setTextPos\(e\.textId, x, y\)/.test(src));
 check('a changed name or colour updates the text in place', /setTextString\(e\.textId, e\.text\)/.test(src) && /setTextColor\(e\.textId, e\.color\)/.test(src));

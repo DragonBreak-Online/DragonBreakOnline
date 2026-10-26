@@ -10,9 +10,13 @@ import { LabelWanted, parseLabels, shouldDraw } from "./actorLabelPlan";
 // A name over a boss's head (Nat, 25 Oct: "can bosses have names over their head so we know what's a boss").
 //
 // The server sends dboActorLabels (actorLabelPlan.ts has the shape and the rules) to players near a boss; each label is drawn
-// like the nametags in formView (head node + 32, in screen space) while its actor is alive, in line of sight and within
+// above the actor's head (head node + LABEL_HEIGHT, in screen space) while its actor is alive, in line of sight and within
 // MAX_DISTANCE, and hidden otherwise. The client announces 'actorLabels' in its UI caps (lib/clientUiCaps.ts).
 const HEAD = "NPC Head [Head]";
+// Above TrueHUD's health bar (Nat 26 Oct: "can the name be ... above the health"): the bar is drawn at the head + 30
+// (TrueHUD MCM fInfoBarOffsetZ 30, uInfoBarAnchor 1), so a label at + 32, as the nametags sit, lay on it. 72 clears the bar
+// and keeps clear at any distance: both are world offsets, and the bar scales with distance (bInfoBarScaleWithDistance)
+const LABEL_HEIGHT = 72;
 const TEXT_SIZE = 0.5;
 
 interface Entry extends LabelWanted { textId: number; shown: string; shownColor: string }
@@ -49,7 +53,7 @@ export class ActorLabelService extends ClientListener {
       const p = worldPointToScreenPoint([
         NetImmerse.getNodeWorldPositionX(actor, HEAD, false),
         NetImmerse.getNodeWorldPositionY(actor, HEAD, false),
-        NetImmerse.getNodeWorldPositionZ(actor, HEAD, false) + 32,
+        NetImmerse.getNodeWorldPositionZ(actor, HEAD, false) + LABEL_HEIGHT,
       ])[0];
       if (!p || p[2] <= 0) { this.hide(e); continue; }
       const x = Math.round(p[0] * res.width);
