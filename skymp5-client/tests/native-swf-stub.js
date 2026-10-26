@@ -21,7 +21,7 @@ const clip = (name) => {
 };
 
 // late: skse arrives only when arrive() is called, as on frame 1 in game
-const boot = (menu, late) => {
+const boot = (menu, late, extra) => {
   const sent = [], sounds = [], logs = [];
   const st = { time: 1000, code: 0 };
   const root = clip('_root');
@@ -37,6 +37,7 @@ const boot = (menu, late) => {
     getTimer: () => st.time,
     Math, String, Number, isNaN, isFinite, parseInt,
   };
+  Object.assign(ctx, extra || {});
   vm.createContext(ctx);
   vm.runInContext(sourceOf(menu), ctx);
   if (!late) root.dboBootClip.onEnterFrame();
