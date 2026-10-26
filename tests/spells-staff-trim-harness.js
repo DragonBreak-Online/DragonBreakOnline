@@ -141,11 +141,11 @@ ok(TRIMS7.every((e) => e.keepSpells.concat(e.removeSpells).every((d) => DESC.tes
   TRIMS7.flatMap((e) => e.keepSpells.concat(e.removeSpells)).filter((d) => !DESC.test(d)));
 ok(TRIMS7.every((e) => e.offline === 'apply' && e.keepShouts === undefined), 'each trims the saved form while offline and leaves shouts alone (no keepShouts)');
 ok(TRIMS7.every((e) => /^[\w .,;:()'-]+$/.test(String(e.by) + String(e.why)) && !/\d{15,}/.test(String(e.by) + String(e.why))), 'by and why carry no Discord id', TRIMS7.map((e) => [e.by, e.why]));
-// The admin panel's Give all spells list: spellsGiveAllOff while the 17 Oct stopgap keeps spells empty, spells again once it
+// The admin panel's Give all spells list: spellsMeasureFirst while spells stays empty (26 Oct: until measured on dev), spells again once it
 // is undone. The 133 spells it gave before 16 Oct were all on its 17 Oct list of 254. The list was rebuilt on 26 Oct
 // (tooling/ck-mcp/give_all_spells.py: tome-taught only, no held spell), so a removal is on it now, or held back.
 const POWERS = JSON.parse(fs.readFileSync(path.join(SERVER, 'admin-powers.json'), 'utf8'));
-const GIVE = new Set([].concat(POWERS.spells || [], POWERS.spellsGiveAllOff || []).map((x) => (Array.isArray(x) ? x[0] : x)));
+const GIVE = new Set([].concat(POWERS.spells || [], POWERS.spellsGiveAllOff || [], POWERS.spellsMeasureFirst || []).map((x) => (Array.isArray(x) ? x[0] : x)));
 // held back, plus the two mod internals the 17 Oct list gave and the rebuilt one leaves out (YokuWeapons 0_ConjureSkeleSpell, 0_PuppetManConjurePLAYER)
 const HELD = new Set([].concat(LIVE.removedSpells || [], LIVE.suspendedSpells || [], ['8bc:YokuWeapons.esp', '903:YokuWeapons.esp']));
 ok(GIVE.size >= 254, 'the Give all spells list holds the tome spells (254 on 17 Oct, more since)', GIVE.size);

@@ -36,8 +36,11 @@ const NPC_NAME = /^(Dragon(?!rend)|L_|LShout|MQ|dun|DA13|dlc2MK)|Miraak|Greybear
 const npcNamed = shouts.filter((s) => NPC_NAME.test(s.name)).map((s) => s.name);
 ok(npcNamed.length === 0, `no dragon, Miraak, Greybeard, quest, racial or howl copy (${npcNamed.join(', ')})`);
 ok(shouts.every((s) => ['Skyrim.esm', 'Dawnguard.esm', 'Dragonborn.esm'].includes(pluginOf(s.shout))), 'no mod creature shout');
-// Give all spells has nothing to give (Jake, 17 Oct: it froze the server); the list waits in spellsGiveAllOff
-ok(Array.isArray(powers.spells) && powers.spells.length === 0 && (powers.spellsGiveAllOff || []).length > 0, 'Give all spells has nothing to give, and the old list is kept aside');
+// Give all spells has nothing to give (Jake, 17 Oct: it froze the server) until it is measured on dev (the Leader, 26 Oct).
+// The batched give-all fork (68d0b736 adminSystem.ts giveAllSpells) reads spells, and spellsGiveAllOff when spells is empty,
+// so the list waits in spellsMeasureFirst, which nothing reads
+ok(Array.isArray(powers.spells) && powers.spells.length === 0 && !(powers.spellsGiveAllOff || []).length && (powers.spellsMeasureFirst || []).length > 0,
+  'Give all spells has nothing to give: neither spells nor spellsGiveAllOff holds the list, which waits in spellsMeasureFirst');
 ok(!!powers.werewolf && !!powers.vampirelord, 'the werewolf and Vampire Lord powers are untouched');
 
 // ---- the combat gate reads the allow-list too -------------------------------------------------------------------
