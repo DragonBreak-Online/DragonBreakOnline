@@ -143,6 +143,21 @@ check('study.homeRate 0.5: the home shelf pays half a library\'s units in the sa
 check('priestStudy.homeRate 0: no Wheel credit at home', casts(PRIEST) === c0 && ST().priestStudying.has(PRIEST), casts(PRIEST) - c0);
 stopAll();
 
+// ---- decor's shelf kinds (Nat, 26 Oct): a priest shelf opens Priest Studies, an arcane one Study Magic, whoever uses it ----
+load();
+globalThis.__dboDecorStudyKind = () => 'priest';
+check('a priest shelf: a mage with a school gets Priest Studies, not Study Magic', globalThis.__dboSchoolsActivate(SHELF, MAGE) === true && ST().priestStudying.has(MAGE) && !ST().studying.has(MAGE));
+stopAll();
+globalThis.__dboDecorStudyKind = () => 'arcane';
+const arcane = globalThis.__dboSchoolsActivate(SHELF, PRIEST);
+check('an arcane shelf: a priest with no school is not sent to Priest Studies', arcane === true && !ST().priestStudying.has(PRIEST), { took: arcane, priest: ST().priestStudying.has(PRIEST) });
+check('an arcane shelf: a mage studies magic there', globalThis.__dboSchoolsActivate(SHELF, MAGE) === true && ST().studying.has(MAGE));
+stopAll();
+globalThis.__dboDecorStudyKind = () => '';
+check('no kind (a library shelf): the old rule, mage to Study Magic', globalThis.__dboSchoolsActivate(SHELF, MAGE) === true && ST().studying.has(MAGE));
+stopAll();
+delete globalThis.__dboDecorStudyKind;
+
 // ---- a base that is not a study spot ----
 const BARE = idOf('1d2302:DragonBreak Online Edits.esp'); put(BARE, 'baseDesc', '1d2241:DragonBreak Online Edits.esp'); at(BARE, HOME); // verify-formids: ignore (made-up DLE ids)
 RECORDS[idOf('1d2241:DragonBreak Online Edits.esp')] = { type: 'ACTI', editorId: 'DBOPlanter', fields: [] }; // verify-formids: ignore (made-up DLE ids)
