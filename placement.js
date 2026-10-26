@@ -182,6 +182,8 @@ module.exports = (api) => {
     if (!Array.isArray(S.registry)) S.registry = [];
     return S.registry;
   };
+  // briarheart.js (and any module that gives a placed thing a meaning): what the Place tool placed of one base, as listed
+  globalThis.__dboPlacedOf = (desc) => { const d = String(desc || '').toLowerCase(); return registry().filter((e) => e && String(e.base || '').toLowerCase() === d && e.kind !== 'npc'); };
   const saveRegistry = () => {
     try { fs.writeFileSync(REGISTRY + '.tmp', JSON.stringify(registry(), null, 1)); fs.renameSync(REGISTRY + '.tmp', REGISTRY); }
     catch (e) { log('placement: saving placements.json failed', e.message); }

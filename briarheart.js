@@ -73,6 +73,10 @@
 //   Deepwood Vale (DeepwoodRedoubtWorld, Skyrim 029AB7, cell HagsEndOrigin -31,19): the raised Nordic floor ringed by the
 //   three blood-bowl fires and the goat and skeever poles, on navmesh 0AA49C (floor -3316). Our plugins change nothing
 //   there but sink its rubble (Dungeons) and disable the placed Forsworn (DLE).
+// Placed altars (Nat, 26 Oct: "make sure it's in the Place tool"): F7 Place's Briarheart category has "Hagraven Altar
+//   (Briarheart rite)", the vanilla HagravenBloodbowl01 (config altarBase). Every one the Place tool has placed is an altar
+//   where it stands, read from the Place tool's own list (placement.js __dboPlacedOf), so removing it there, or Undo, takes
+//   the altar away and a restart keeps it. Nothing is written to briarheart.json for them.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -85,7 +89,7 @@ module.exports = (api) => {
     enabled: false,
     races: ['DBOReachmanRace'], faiths: ['reach'],
     heartItem: '3ad61:Skyrim.esm',            // Briar Heart (INGR)
-    altarRadius: 400, confirmMinutes: 5,
+    altarRadius: 400, confirmMinutes: 5, altarBase: 'acafc:Skyrim.esm',
     altars: [{ world: '29ab7:Skyrim.esm', pos: [-124700, 79930, -3316], radius: 500, name: 'Deepwood Vale, the Hagravens\' ritual court' }],
     failChance: 0.1, failPermadeath: false, failCooldownHours: 24,
     healthBonus: 50, resist: { poison: 0.15, frost: 0.15 }, fireWeakness: 0.25,
@@ -161,7 +165,13 @@ module.exports = (api) => {
   const dist = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], (p[2] || 0) - (q[2] || 0));
   // The seeded altars (config), then the ones staff placed (briarheart.json)
   const seededAltars = () => (Array.isArray(C.altars) ? C.altars : []).filter((x) => x && x.world && Array.isArray(x.pos) && x.pos.length >= 3).map((x) => Object.assign({ seeded: true }, x));
-  const allAltars = () => seededAltars().concat(data().altars);
+  const placedAltars = () => {
+    const f = globalThis.__dboPlacedOf; if (typeof f !== 'function' || !C.altarBase) return [];
+    let rows = []; try { rows = f(C.altarBase) || []; } catch (e) { return []; }
+    return rows.filter((e) => e && e.where && Array.isArray(e.pos) && e.pos.length >= 3)
+      .map((e) => ({ world: String(e.where), pos: e.pos.map((v) => Math.round(Number(v))), radius: C.altarRadius, by: e.by, at: e.at, placed: String(e.id) }));
+  };
+  const allAltars = () => seededAltars().concat(placedAltars(), data().altars);
   const altarNear = (a) => {
     const here = posOf(a); if (!here || !here.pos) return null;
     return allAltars().find((x) => String(x.world) === String(here.world) && dist(x.pos, here.pos) <= (Number(x.radius) || C.altarRadius)) || null;
@@ -567,13 +577,15 @@ module.exports = (api) => {
         return personal(a, `Hagraven altar ${n} removed.`);
       }
       const seeded = seededAltars().map((x) => `seeded: ${x.name ? `${x.name}, ` : ''}${x.world} ${x.pos.join(',')} r${Number(x.radius) || C.altarRadius}`);
+      const viaTool = placedAltars().map((x) => `Place tool (${x.placed}): ${x.world} ${x.pos.join(',')} r${x.radius}`);
       const placed = d.altars.map((x, i) => `${i + 1}. ${x.world} ${x.pos.join(',')} r${x.radius}`);
-      return personal(a, seeded.length || placed.length ? seeded.concat(placed).join(' | ') : 'No Hagraven altar is placed: stand at one and say /briarheart altar add.');
+      const all = seeded.concat(viaTool, placed);
+      return personal(a, all.length ? all.join(' | ') : 'No Hagraven altar is placed: stand at one and say /briarheart altar add, or place a Hagraven Altar with F7 Place.');
     }
     return personal(a, 'Usage: /briarheart [status] | rite | confirm | cure; staff: grant|revoke <name> <reason> | list | altar add [radius] | altar list | altar remove <n>');
   }, { help: 'Briarhearts: [status] | rite (at a Hagraven altar) | confirm | cure (at Arkay or Stendarr); staff: grant | revoke | list | altar' });
 
-  log(`briarheart: ${C.enabled ? 'on' : 'off'}, ${allAltars().length} altar(s) (${seededAltars().length} seeded), races ${(C.races || []).join('/')}, faiths ${(C.faiths || []).join('/')}`);
+  log(`briarheart: ${C.enabled ? 'on' : 'off'}, ${allAltars().length} altar(s) (${seededAltars().length} seeded, ${placedAltars().length} placed), races ${(C.races || []).join('/')}, faiths ${(C.faiths || []).join('/')}`);
   // For the harness
   return { riteRefusal, rite, confirm, cure, tearRefusal, startTear, tick, end, become, isBriar, C, data };
 };

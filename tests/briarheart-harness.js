@@ -629,6 +629,35 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   }
   online.splice(online.indexOf(LK), 1);
 }
+// ---- the altar from the F7 Place tool (Nat, 26 Oct: "make sure it's in the Place tool") ----------------------------------
+{
+  const REACH = '3c:Skyrim.esm', AT = [5000, 6000, 100];
+  const placedRows = [];
+  globalThis.__dboPlacedOf = (desc) => placedRows.filter((e) => e.base.toLowerCase() === String(desc).toLowerCase());
+  const PL = actor(0xd0, 1, 'reach', [AT[0] + 200, AT[1], AT[2]], []); online.push(PL);
+  setP(PL, 'locationalData', { cellOrWorldDesc: REACH, pos: [AT[0] + 200, AT[1], AT[2]], rot: [0, 0, 0] });
+  delete require.cache[MODULE]; delete globalThis.__dboBriarheart; fs.rmSync('briarheart.json', { force: true });
+  const MP = load({ briarheart: { enabled: true, altars: [] } });
+  ok(/Hagraven altar in the Reach/.test(MP.riteRefusal(PL) || ''), 'nothing placed: no altar there');
+  placedRows.push({ id: 'ff00abcd', base: 'acafc:Skyrim.esm', name: 'Hagraven Altar (Briarheart rite)', kind: 'object', where: REACH, pos: AT.slice(), by: 7, at: 1 });
+  ok(!/Hagraven altar in the Reach/.test(MP.riteRefusal(PL) || ''), 'a Hagraven Altar placed with F7 Place is an altar where it stands (radius altarRadius)', MP.riteRefusal(PL));
+  ok(!MP.data().altars.length, '...with nothing written to briarheart.json');
+  ok(/Place tool \(ff00abcd\): 3c:Skyrim\.esm 5000,6000,100 r400/.test(run(LEAD, 'altar list')), 'altar list shows it as placed with the Place tool', run(LEAD, 'altar list'));
+  placedRows.push({ id: 'ff00abce', base: '13ed9:Skyrim.esm', name: 'something else', kind: 'object', where: REACH, pos: [AT[0] + 9000, AT[1], AT[2]], by: 7, at: 1 });
+  setP(PL, 'locationalData', { cellOrWorldDesc: REACH, pos: [AT[0] + 9000, AT[1], AT[2]], rot: [0, 0, 0] });
+  ok(/Hagraven altar in the Reach/.test(MP.riteRefusal(PL) || ''), 'another placed base is not an altar');
+  setP(PL, 'locationalData', { cellOrWorldDesc: REACH, pos: [AT[0] + 200, AT[1], AT[2]], rot: [0, 0, 0] });
+  placedRows.splice(0, placedRows.length);
+  ok(/Hagraven altar in the Reach/.test(MP.riteRefusal(PL) || ''), 'removed with the Place tool (gone from its list): the altar is gone');
+  delete globalThis.__dboPlacedOf;
+  ok(/Hagraven altar in the Reach/.test(MP.riteRefusal(PL) || ''), 'without placement.js loaded, placed altars are simply none');
+  online.splice(online.indexOf(PL), 1);
+  // The catalog row and placement.js's reader, as shipped
+  const cat = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'admin-placeables.json'), 'utf8')).categories;
+  const last = cat[cat.length - 1];
+  ok(last.id === 'Briarheart' && last.kind === 'object' && last.items.length === 1 && last.items[0][0] === 'acafc:Skyrim.esm' && last.items[0][1] === 'Hagraven Altar (Briarheart rite)', 'F7 Place: the Briarheart category is last, with the Hagraven Altar (so the catalog names the base after it)', last);
+  ok(/globalThis\.__dboPlacedOf = \(desc\) =>/.test(fs.readFileSync(path.resolve(__dirname, '..', 'placement.js'), 'utf8')), 'placement.js exports __dboPlacedOf');
+}
 // ---- what a Briarheart is, in Active Effects: the display ability goes and comes with the gifts ---------------------------
 {
   ID['801:DragonBreak Supernatural Displays.esp'] = 0xb4000801; // verify-formids: ignore - harness fixture: the display plugin is not in the release order (briarheart.display ships empty)
