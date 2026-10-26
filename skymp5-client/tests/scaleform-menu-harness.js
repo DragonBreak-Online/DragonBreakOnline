@@ -86,6 +86,26 @@ let acts = M.planOpen(s, 'dbo_prayer', { widget: 35, mode: 'pick' }, 35, 1000);
 check('opening asks for the menu and pushes NOTHING yet',
   () => acts.length === 1 && acts[0].do === 'open' && acts[0].swf === 'dbo_prayer', acts);
 check('...and remembers the widget id for the trip back', s.widgetId === 35);
+// The 05:02 session: everything worked and the payload was the string "null", silently.
+check('a MISSING payload is reported before the open, not pushed silently', () => {
+  const t = M.newState();
+  const r = M.planOpen(t, 'dbo_prayer', undefined, 35, 1000);
+  return r.length === 2 && r[0].do === 'report' && /sent no payload/.test(r[0].text) && r[1].do === 'open';
+}, M.planOpen(M.newState(), 'dbo_prayer', undefined, 35, 1000));
+check('...and so is an empty object, which is what a wrong packet shape looks like', () => {
+  const t = M.newState();
+  return M.planOpen(t, 'x', {}, 0, 0)[0].do === 'report';
+});
+check('a real payload is NOT reported', () => {
+  const t = M.newState();
+  const r = M.planOpen(t, 'x', { mode: 'pick' }, 1, 0);
+  return r.length === 1 && r[0].do === 'open';
+});
+check('an empty re-send while open is reported too', () => {
+  const t = M.newState(); M.planOpen(t, 'x', { a: 1 }, 1, 0); M.planReady(t, 1, 10);
+  const r = M.planOpen(t, 'x', null, 1, 20);
+  return r.length === 2 && r[0].do === 'report' && /re-sent an empty payload/.test(r[0].text);
+});
 check('a tick before the timeout does nothing', M.planTick(s, 1000 + M.READY_TIMEOUT_MS - 1).length === 0);
 acts = M.planReady(s, 2, 1400);
 check('ready pushes the payload that was waiting',
@@ -106,6 +126,19 @@ check('an open that never reports ready is REPORTED and CLOSED, not left on scre
   () => acts.length === 2 && acts[0].do === 'report' && /never reported ready/.test(acts[0].text) && acts[1].do === 'close', acts);
 check('...and the state goes back to closed so a retry is possible', s.phase === 'closed');
 check('ready arriving after a close is ignored', () => M.planReady(M.newState(), 1, 1).length === 0);
+// The live line said "ready on frame 0" whenever the outbox won, which the SWF can never produce.
+check('a ready that arrived by MOD EVENT reports its numArg frame',
+  M.readyFrameOf({ key: 'ready', args: [], frame: 2, seq: 0 }) === 2);
+check('a ready that arrived by OUTBOX reports the frame from its args, not 0',
+  M.readyFrameOf({ key: 'ready', args: [1], frame: 0, seq: 7 }) === 1);
+check('...and a string arg works too, since JSON from AS2 may quote it',
+  M.readyFrameOf({ key: 'ready', args: ['3'], frame: 0, seq: 7 }) === 3);
+check('no frame anywhere stays 0 rather than inventing one',
+  M.readyFrameOf({ key: 'ready', args: [], frame: 0, seq: 7 }) === 0
+  && M.readyFrameOf({ key: 'ready', args: ['x'], frame: 0, seq: 7 }) === 0);
+check('numArg wins when both are present, because that is the channel that measured it',
+  M.readyFrameOf({ key: 'ready', args: [9], frame: 2, seq: 0 }) === 2);
+
 check('the summary says whether it ever became ready', () => /never became ready/.test(M.summary(s)), M.summary(s));
 check('...and names the frame when it did', () => {
   const t = M.newState(); M.planOpen(t, 'x', {}, 1, 0); M.planReady(t, 3, 50); t.sent = 2; t.foreignEvents = 7;
@@ -141,6 +174,18 @@ check('nothing new means nothing re-read', () => {
 check('a record with bad JSON is skipped, not fatal', () => {
   const b = M.parseOutbox(rec(1, 'dbo:x', '{bad') + rec(2, 'dbo:y', '[]'), 0);
   return b.messages.length === 1 && b.messages[0].key === 'dbo:y';
+});
+// The contract the SWF side must hold up (Worker 1's lib escapes every character below 32): a RAW record
+// separator inside the JSON would split the record and lose the tail. Encoded here so it is a tested
+// assumption rather than a conversation.
+check('an ESCAPED separator inside the payload survives the trip', () => {
+  const b = M.parseOutbox(rec(1, 'dbo:x', JSON.stringify(['a\u001eb'])), 0);
+  return b.messages.length === 1 && b.messages[0].args[0] === 'a\u001eb';
+}, M.parseOutbox(rec(1, 'dbo:x', JSON.stringify(['a\u001eb'])), 0).messages);
+check('...while a RAW one truncates that record rather than corrupting the next', () => {
+  const b = M.parseOutbox(rec(1, 'dbo:x', '["a' + RS + 'b"]') + rec(2, 'dbo:y', '[]'), 0);
+  // the first record is unparseable JSON and skipped; the LAST one still arrives intact
+  return b.messages.length >= 1 && b.messages[b.messages.length - 1].key === 'dbo:y';
 });
 check('a missing or empty outbox is survivable',
   () => M.parseOutbox(undefined, 0).messages.length === 0 && M.parseOutbox('', 5).messages.length === 0);

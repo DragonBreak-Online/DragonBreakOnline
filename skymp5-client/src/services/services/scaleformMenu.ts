@@ -169,21 +169,36 @@ export type Action =
   | { do: "close" }
   | { do: "report"; text: string };
 
+// A payload the server never sent is the silent failure that cost the 26 Oct 05:02 session: the panel opened,
+// both channels worked, ready arrived in 54ms, and the client pushed the four characters "null" because the
+// server had put its fields at the top level instead of inside payload. Nothing was wrong anywhere except
+// the shape, and nothing said so. It is now a reported line.
+const noPayload = (payload: unknown): boolean =>
+  payload === undefined || payload === null ||
+  (typeof payload === "object" && Object.keys(payload as object).length === 0);
+
 export const planOpen = (s: MenuState, swf: unknown, payload: unknown, widgetId: unknown, now: number): Action[] => {
+  const empty = noPayload(payload);
   s.swf = String(swf || SWF_NAME);
   s.json = payloadJson(payload);
   s.widgetId = Math.max(0, Math.round(Number(widgetId) || 0));
   if (s.phase === "ready") {
     // Already on screen: replace the contents, since only one custom menu can exist at a time. A re-sent
     // payload with the same nonce (the server's verdict) comes through here too.
-    return [{ do: "push", json: s.json }];
+    const push: Action[] = [{ do: "push", json: s.json }];
+    return empty
+      ? [{ do: "report", text: `${s.swf}: the server re-sent an empty payload` }, ...push]
+      : push;
   }
   s.phase = "opening";
   s.openedAt = now;
   s.readyAt = 0;
   s.outRead = 0;
   s.lastSeq = 0;
-  return [{ do: "open", swf: s.swf }];
+  const open: Action[] = [{ do: "open", swf: s.swf }];
+  return empty
+    ? [{ do: "report", text: `${s.swf}: the server sent no payload, so the panel will have nothing to show` }, ...open]
+    : open;
 };
 
 // The SWF said it is up. Only now can anything be invoked on it: before ready, _global.skse does not exist
@@ -212,6 +227,16 @@ export const planTick = (s: MenuState, now: number): Action[] => {
     { do: "report", text: `openCustomMenu(${s.swf}) never reported ready within ${READY_TIMEOUT_MS}ms` },
     { do: "close" },
   ];
+};
+
+// The frame _global.skse appeared on. It rides numArg on the mod-event channel and args[0] on the outbox,
+// which carries no numArg, so a ready that arrived by outbox reports frame 0 until this reads the args.
+// On 26 Oct the live line said "ready on frame 0" whenever the outbox won the race, which is a diagnostic
+// stating something impossible: the SWF counts from 1.
+export const readyFrameOf = (m: UiEvent): number => {
+  if (m.frame > 0) return m.frame;
+  const first = m.args.length ? Number(m.args[0]) : NaN;
+  return isFinite(first) && first > 0 ? Math.round(first) : 0;
 };
 
 // True when this message has not been handled yet. The same message can arrive twice, once per channel.

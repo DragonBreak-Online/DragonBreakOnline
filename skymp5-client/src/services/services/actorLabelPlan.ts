@@ -1,12 +1,13 @@
 // The rules of actorLabelService, apart from the engine so tests/actor-label-harness.js can run them.
 //
-// Server -> client: { customPacketType: "dboActorLabels", list: [{ id: <server actor id>, text, color?: [r, g, b, a] }] },
+// Server -> client: { customPacketType: "dboActorLabels", list: [{ id: <server actor id>, text, sub?, color?: [r, g, b, a] }] },
+// sub being a smaller title line under the name,
 // the whole list of labelled actors near you, sent again only when it changes (bosses.js sendLabels); an empty list clears
 // every label.
 
 export type Rgba = [number, number, number, number];
 
-export interface LabelWanted { text: string; color: Rgba }
+export interface LabelWanted { text: string; sub: string; color: Rgba }
 
 // A boss's gold (bosses.js LABEL_COLOR.boss), for a row that names no colour or a bad one
 export const DEFAULT_COLOR: Rgba = [1, 0.84, 0.35, 0.95];
@@ -29,9 +30,10 @@ export const parseLabels = (content: Record<string, unknown> | null | undefined)
     if (!row || typeof row !== "object") continue;
     const r = row as Record<string, unknown>;
     const id = Number(r["id"]) >>> 0;
-    const text = typeof r["text"] === "string" ? r["text"].replace(/\s+/g, " ").trim().slice(0, MAX_TEXT) : "";
+    const line = (v: unknown): string => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, MAX_TEXT) : "");
+    const text = line(r["text"]);
     if (!id || !text) continue;
-    out.set(id, { text, color: colorOf(r["color"]) });
+    out.set(id, { text, sub: line(r["sub"]), color: colorOf(r["color"]) });
   }
   return out;
 };

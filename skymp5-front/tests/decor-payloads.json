@@ -1,0 +1,348 @@
+{
+ "catalog": {
+  "type": "decor",
+  "id": 171,
+  "nonce": "f2ad886aa9ec",
+  "view": "catalog",
+  "home": "Olaf's home",
+  "owner": true,
+  "undo": 0,
+  "budget": [
+   {
+    "label": "Pieces",
+    "used": 0,
+    "of": 3
+   },
+   {
+    "label": "Lights",
+    "used": 0,
+    "of": 1
+   },
+   {
+    "label": "Workbenches",
+    "used": 0,
+    "of": 1
+   },
+   {
+    "label": "Containers",
+    "used": 0,
+    "of": 1
+   }
+  ],
+  "groups": [
+   {
+    "id": "beds",
+    "label": "Beds"
+   },
+   {
+    "id": "storage",
+    "label": "Storage"
+   },
+   {
+    "id": "lights",
+    "label": "Lights"
+   },
+   {
+    "id": "workbenches",
+    "label": "Workbenches"
+   }
+  ],
+  "group": "beds",
+  "page": 0,
+  "pages": 1,
+  "rows": [
+   {
+    "key": "9001:Skyrim.esm",
+    "name": "Bed",
+    "cost": [
+     {
+      "name": "6f993:Skyrim.esm",
+      "n": 4,
+      "have": 0
+     },
+     {
+      "name": "5ace4:Skyrim.esm",
+      "n": 1,
+      "have": 0
+     }
+    ],
+    "why": ""
+   }
+  ],
+  "nearby": [],
+  "search": ""
+ },
+ "blocked": {
+  "type": "decor",
+  "id": 171,
+  "nonce": "f2ad886aa9ec",
+  "view": "catalog",
+  "home": "Olaf's home",
+  "owner": true,
+  "undo": 0,
+  "budget": [
+   {
+    "label": "Pieces",
+    "used": 0,
+    "of": 3
+   },
+   {
+    "label": "Lights",
+    "used": 0,
+    "of": 1
+   },
+   {
+    "label": "Workbenches",
+    "used": 0,
+    "of": 1
+   },
+   {
+    "label": "Containers",
+    "used": 0,
+    "of": 1
+   }
+  ],
+  "groups": [
+   {
+    "id": "beds",
+    "label": "Beds"
+   },
+   {
+    "id": "storage",
+    "label": "Storage"
+   },
+   {
+    "id": "lights",
+    "label": "Lights"
+   },
+   {
+    "id": "workbenches",
+    "label": "Workbenches"
+   }
+  ],
+  "group": "workbenches",
+  "page": 0,
+  "pages": 1,
+  "rows": [
+   {
+    "key": "9004:Skyrim.esm",
+    "name": "Alchemy Lab",
+    "cost": [
+     {
+      "name": "34cdf:Skyrim.esm",
+      "n": 2,
+      "have": 0
+     }
+    ],
+    "why": "Setting up a Alchemy Lab is for alchemists of rank 2 and above."
+   }
+  ],
+  "nearby": [],
+  "search": ""
+ },
+ "placed": {
+  "type": "decor",
+  "id": 171,
+  "nonce": "f2ad886aa9ec",
+  "view": "placed",
+  "home": "Olaf's home",
+  "owner": true,
+  "undo": 60,
+  "budget": [
+   {
+    "label": "Pieces",
+    "used": 2,
+    "of": 3
+   },
+   {
+    "label": "Lights",
+    "used": 0,
+    "of": 1
+   },
+   {
+    "label": "Workbenches",
+    "used": 0,
+    "of": 1
+   },
+   {
+    "label": "Containers",
+    "used": 1,
+    "of": 1
+   }
+  ],
+  "groups": [
+   {
+    "id": "beds",
+    "label": "Beds"
+   },
+   {
+    "id": "storage",
+    "label": "Storage"
+   },
+   {
+    "id": "lights",
+    "label": "Lights"
+   },
+   {
+    "id": "workbenches",
+    "label": "Workbenches"
+   }
+  ],
+  "group": "beds",
+  "page": 0,
+  "pages": 1,
+  "rows": [
+   {
+    "key": "ff0000a0",
+    "name": "Bed",
+    "group": "beds",
+    "state": "",
+    "refund": "1 6f993:Skyrim.esm"
+   },
+   {
+    "key": "ff0000a1",
+    "name": "Wardrobe",
+    "group": "storage",
+    "state": "",
+    "refund": "1 6f993:Skyrim.esm"
+   }
+  ],
+  "nearby": []
+ },
+ "people": {
+  "type": "decor",
+  "id": 171,
+  "nonce": "f2ad886aa9ec",
+  "view": "people",
+  "home": "Olaf's home",
+  "owner": true,
+  "undo": 60,
+  "budget": [
+   {
+    "label": "Pieces",
+    "used": 0,
+    "of": 3
+   },
+   {
+    "label": "Lights",
+    "used": 0,
+    "of": 1
+   },
+   {
+    "label": "Workbenches",
+    "used": 0,
+    "of": 1
+   },
+   {
+    "label": "Containers",
+    "used": 0,
+    "of": 1
+   }
+  ],
+  "groups": [
+   {
+    "id": "beds",
+    "label": "Beds"
+   },
+   {
+    "id": "storage",
+    "label": "Storage"
+   },
+   {
+    "id": "lights",
+    "label": "Lights"
+   },
+   {
+    "id": "workbenches",
+    "label": "Workbenches"
+   }
+  ],
+  "group": "beds",
+  "page": 0,
+  "pages": 1,
+  "rows": [
+   {
+    "key": "9",
+    "name": "Stray"
+   }
+  ],
+  "nearby": [
+   {
+    "key": "8",
+    "name": "Frida"
+   },
+   {
+    "key": "10",
+    "name": "Gemma"
+   }
+  ]
+ },
+ "search": {
+  "type": "decor",
+  "id": 171,
+  "nonce": "f2ad886aa9ec",
+  "view": "catalog",
+  "home": "Olaf's home",
+  "owner": true,
+  "undo": 60,
+  "budget": [
+   {
+    "label": "Pieces",
+    "used": 0,
+    "of": 3
+   },
+   {
+    "label": "Lights",
+    "used": 0,
+    "of": 1
+   },
+   {
+    "label": "Workbenches",
+    "used": 0,
+    "of": 1
+   },
+   {
+    "label": "Containers",
+    "used": 0,
+    "of": 1
+   }
+  ],
+  "groups": [
+   {
+    "id": "beds",
+    "label": "Beds"
+   },
+   {
+    "id": "storage",
+    "label": "Storage"
+   },
+   {
+    "id": "lights",
+    "label": "Lights"
+   },
+   {
+    "id": "workbenches",
+    "label": "Workbenches"
+   }
+  ],
+  "group": "beds",
+  "page": 0,
+  "pages": 1,
+  "rows": [
+   {
+    "key": "9002:Skyrim.esm",
+    "name": "Wardrobe",
+    "cost": [
+     {
+      "name": "6f993:Skyrim.esm",
+      "n": 4,
+      "have": 7
+     }
+    ],
+    "why": ""
+   }
+  ],
+  "nearby": [],
+  "search": "ward"
+ }
+}
