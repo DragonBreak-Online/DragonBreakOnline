@@ -19,7 +19,7 @@
      "note": "Skytemple Ruins, the open ground ~540 units in front of the ruined chamber's door (SkytempleRuinsLocation EF0B0), cell (29, 29); on navmesh (-10485.5 over terrain -10528), nothing placed within 350 units. Nat 26 Oct: 'Sky Temple Ruins is the perfect place for the Ice Wraith boss', instead of the S3 iceberg (S1-S4 retired)"
     }
    ],
-   "bossEdid": "EncIceWraith",
+   "bossEdid": "DBO_Boss_icecap",
    "addEdids": [
     "EncIceWraith"
    ],
@@ -106,7 +106,8 @@
     }
    },
    "_enabledNote": "Nat 26 Oct: every boss ships complete; its shard (DBO_OreGlacialCrystal, DLE 1D2201) is in the production DLE ed7afac9",
-   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
+   "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D244B, templated on the original with every flag) in DragonBreak_Bosses.ini"
   },
   {
    "id": "briarheartking",
@@ -127,7 +128,7 @@
      "note": "Lost Valley Redoubt's upper platform, by its hagravens (camp boss spot 34129:Skyrim.esm)"
     }
    ],
-   "bossEdid": "LvlForswornBossShaman",
+   "bossEdid": "DBO_Boss_briarheartking",
    "guardian": {
     "edid": "EncHagraven",
     "offset": [
@@ -219,7 +220,8 @@
      ]
     }
    },
-   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
+   "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D244C, templated on the original with every flag) in DragonBreak_Bosses.ini"
   },
   {
    "id": "centurion",
@@ -239,7 +241,7 @@
      "note": "Blackreach's pump station, beside its centurion spot (b10e11b)"
     }
    ],
-   "bossEdid": "EncDwarvenCenturion03",
+   "bossEdid": "DBO_Boss_centurion",
    "addEdids": [
     "EncDwarvenSphere03",
     "EncDwarvenSpider03"
@@ -327,7 +329,8 @@
      ]
     }
    },
-   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
+   "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D244D, templated on the original with every flag) in DragonBreak_Bosses.ini"
   },
   {
    "id": "palewarlord",
@@ -357,7 +360,7 @@
     }
    ],
    "roam": true,
-   "bossEdid": "CYRLvlBanditBoss",
+   "bossEdid": "DBO_Boss_palewarlord",
    "addEdids": [
     "CYRLvlBanditMeleeAny",
     "CYRLvlBanditMissile"
@@ -443,7 +446,8 @@
     }
    },
    "_spots": "Nat, 25 Oct, from the CK shots in _work/palewarlord-spots-1025: SE first, ST the roaming alternative (roam: the next spot after each kill); SR at Snowstone Rest's door dropped",
-   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
+   "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D244E, templated on the original with every flag) in DragonBreak_Bosses.ini"
   },
   {
    "id": "falmerwarmonger",
@@ -463,7 +467,7 @@
      "note": "the dry shore east of Blackreach's Falmer city, cell (2, 1): on navmesh (1082.8) in a cell with no water, 83 above the neighbouring lakes (XCLW 1000), nothing placed within 1,160 units, 1,900 from the wild Falmer anchors (b1d1f5e-61); checked by CK eye shots 26 Oct. Nat 26 Oct: the old spot BC (6894, 7152, 1374) sat beside those anchors and the arrival froze his client; the first replacement (6994, 7952, 993) turned out to be under the lake"
     }
    ],
-   "bossEdid": "EncFalmer05MeleeBoss",
+   "bossEdid": "DBO_Boss_falmerwarmonger",
    "guardian": {
     "edid": "LvlFalmerShaman",
     "offset": [
@@ -557,7 +561,8 @@
      ]
     }
    },
-   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
+   "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D244F, templated on the original with every flag) in DragonBreak_Bosses.ini"
   },
   {
    "id": "movarth",
@@ -678,7 +683,7 @@
      "note": "Dusk Thorn Camp, by its boss chest"
     }
    ],
-   "bossEdid": "CYREncGoblinDeepRoot03BossMelee",
+   "bossEdid": "DBO_Boss_duskthorn",
    "guardian": {
     "edid": "CYREncGoblinDeepRoot02BossMagic",
     "offset": [
@@ -769,7 +774,8 @@
      ]
     }
    },
-   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
+   "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D2450, templated on the original with every flag) in DragonBreak_Bosses.ini"
   },
   {
    "id": "valkynaz",
@@ -790,7 +796,7 @@
      "note": "The Great Oblivion Gate (its map marker), on navmesh (2653.2; it stood 13 units under it before 26 Oct)"
     }
    ],
-   "bossEdid": "CYREncDremoraWarlock06",
+   "bossEdid": "DBO_Boss_valkynaz",
    "guardian": {
     "edid": "mihailhighclannfear_NPC",
     "offset": [
@@ -888,7 +894,8 @@
      ]
     }
    },
-   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
+   "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D2451, templated on the original with every flag) in DragonBreak_Bosses.ini"
   },
   {
    "id": "karstaag",
@@ -1017,7 +1024,7 @@
      "note": "Sancre Tor Ruins, the Minotaur Lord's spot"
     }
    ],
-   "bossEdid": "BSKEncZombie03",
+   "bossEdid": "DBO_Boss_risenlegate",
    "addEdids": [
     "CYREncSkeleton01Melee1H",
     "CYREncSkeleton01Melee1Hshield",
@@ -1096,7 +1103,8 @@
     }
    },
    "_note": "Nat, 25 Oct: Sancre Tor stays undead (an Imperial fort town; no Ayleid undead, Nate 9 Oct): an undead legion from Sancre Tor's own pools (gamemode-config ownedSpawns.replace minotaur: CYREncSkeleton01 lines and BSKEncZombie02). Adamantium's home, so its schematic stays here",
-   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
+   "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D2452, templated on the original with every flag) in DragonBreak_Bosses.ini"
   },
   {
    "id": "minotaurlord",
@@ -1118,7 +1126,7 @@
      "note": "Minotaur's Rest, the DLE's Minotaur Lord spot (178580:DragonBreak Online Edits.esp)"
     }
    ],
-   "bossEdid": "CYREncMinotaur02Lord",
+   "bossEdid": "DBO_Boss_minotaurlord",
    "addEdids": [
     "CYREncMinotaur"
    ],
@@ -1213,7 +1221,8 @@
    "_adds": "Nat, 25 Oct: the minotaurs come back at Minotaur's Rest as his adds; each gets its war axe back in its inventory (rearmAdds), as the Lord's test 2 does",
    "rearmEdid": "BSKMinotaurLordAxe",
    "_rearmNote": "Nat 26 Oct: the two dev tests (minotaurtest1, minotaurtest2) stood under this boss's own name, which put two 'The Minotaur Lord' plates up at once; both kept the axe at spawn (dev 26 Oct 03:49, 6026df), so the Lord takes test 2's set-up (rearmEdid, which puts the axe back if it is ever lost) and the tests are gone",
-   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
+   "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D2453, templated on the original with every flag) in DragonBreak_Bosses.ini"
   },
   {
    "id": "werewolfbehemoth",
@@ -1373,7 +1382,7 @@
      "note": "Blizzard Rest, the camp's floor south of its chest, cell (9, 9): on navmesh (-8742.5 over terrain -8797), nothing placed within 330 units, 900+ from the camp's wild giant and mammoths"
     }
    ],
-   "bossEdid": "EncGiant01",
+   "bossEdid": "DBO_Boss_giantchieftain",
    "guardian": {
     "edid": "EncMammothWild",
     "offset": [
@@ -1474,7 +1483,8 @@
      ]
     }
    },
-   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
+   "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D2454, templated on the original with every flag) in DragonBreak_Bosses.ini"
   }
  ],
  "_plateNames": "Nat 26 Oct: 'make better name tags for them above their health bar'. plateName is the big line of a boss's nameplate, its name the smaller title line under it (bosses.js sendLabels, the client's actorLabelService). Movarth Piquine and Karstaag are their lore names; the rest are new and can be changed here",
