@@ -81,6 +81,9 @@ const widgets = (a) => packets.filter(([x, p]) => x === a && p.customPacketType 
 const lastPanel = (a) => { const w = widgets(a).filter(([, p]) => p.widget && p.widget.type === 'decor'); return w.length ? w[w.length - 1][1].widget : null; };
 const closedPanel = (a) => { const w = widgets(a); return w.length && w[w.length - 1][1].close === 171; };
 const act = (a, n, ...args) => fire(n, a, [lastPanel(a).nonce, ...args]);
+// DECOR_PAYLOADS=<file>: the payloads as sent, for the front harness (skymp5-front tests/decor-front-harness.js)
+const captured = {};
+const capture = (name) => { captured[name] = JSON.parse(JSON.stringify(lastPanel(OWNER))); };
 
 // ---- opening ----
 cmd(OWNER, '');
@@ -90,6 +93,7 @@ ok(w.home === "Olaf's home" && w.owner === true, 'it names the home and knows th
 ok(w.budget.length === 4 && w.budget[0].used === 0 && w.budget[0].of === 3, 'four budget meters from the home budget', w.budget);
 ok(w.groups.map((g) => g.id).join() === 'beds,storage,lights,workbenches', 'groups in catalogue order, the race-locked chamber hidden from a Nord', w.groups);
 ok(w.rows.length === 1 && w.rows[0].name === 'Bed' && w.rows[0].cost.some((c) => c.n === 4 && c.have === 0), 'the bed row carries its cost and what is held', w.rows);
+capture('catalog');
 const n0 = w.nonce;
 cmd(FRIEND, '');
 ok(!lastPanel(FRIEND), 'a client without the native panel gets chat, not a widget', last(FRIEND));
@@ -102,6 +106,7 @@ ok(/cannot show the decorating panel/.test(last(FRIEND)), 'the G key on an old c
 act(OWNER, 'decorView', 'catalog', 'workbenches', 0);
 w = lastPanel(OWNER);
 ok(w.group === 'workbenches' && w.rows.length === 1 && /alchemists of rank 2/.test(w.rows[0].why), 'a group filter, and the reason a row cannot be placed', w.rows);
+capture('blocked');
 fire('decorView', OWNER, ['stale', 'catalog', 'beds', 0]);
 ok(lastPanel(OWNER).group === 'workbenches', 'a stale nonce does nothing');
 
@@ -125,6 +130,7 @@ act(OWNER, 'decorView', 'placed', null, 0);
 w = lastPanel(OWNER);
 ok(w.view === 'placed' && w.rows.length === 2 && w.rows[0].name === 'Bed', 'placed pieces nearest first', w.rows.map((r) => r.name));
 ok(/Firewood|6f993/.test(w.rows[0].refund), 'each placed row previews its refund', w.rows[0].refund);
+capture('placed');
 act(OWNER, 'decorUndo');
 w = lastPanel(OWNER);
 ok(items().length === 1 && w.rows.length === 1, 'Undo takes back the last place and the list follows', w.rows);
@@ -146,6 +152,7 @@ ok(w.view === 'people' && w.rows.length === 0 && w.nearby.some((x) => x.name ===
 act(OWNER, 'decorGrant', String(PROFILE[STRANGER]));
 w = lastPanel(OWNER);
 ok(w.rows.length === 1 && w.rows[0].name === 'Stray' && !w.nearby.some((x) => x.name === 'Stray'), 'Grant names them, by name', w.rows);
+capture('people');
 setp(STRANGER, 'worldOrCellDesc', d(OTHER));
 act(OWNER, 'decorView', 'people', null, 0);
 ok(lastPanel(OWNER).rows[0].name === 'Stray', 'a decorator who left is still listed by name');
@@ -163,6 +170,7 @@ ok(!(T.reg().places[DOOR.toString(16)].decorators || []).includes(PROFILE[STRANG
 act(OWNER, 'decorView', 'catalog', 'beds', 0, 'ward');
 w = lastPanel(OWNER);
 ok(w.search === 'ward' && w.rows.length === 1 && w.rows[0].name === 'Wardrobe', 'a search finds across groups', w.rows.map((r) => r.name));
+capture('search');
 act(OWNER, 'decorView', 'catalog', 'beds', 0, 'nothing like this');
 ok(lastPanel(OWNER).rows.length === 0, 'a search with no match gives no rows');
 act(OWNER, 'decorView', 'catalog', 'beds', 0, '');
@@ -180,5 +188,6 @@ fire('close', OWNER, [], 171);
 fire('decorView', OWNER, [n0, 'catalog', 'beds', 0]);
 ok(!T.S.panel.has(OWNER), 'closing forgets the panel; an old nonce does nothing');
 
+if (process.env.DECOR_PAYLOADS) fs.writeFileSync(process.env.DECOR_PAYLOADS, JSON.stringify(captured, null, 1));
 console.log(fails ? `\n${fails} failed` : '\nall passed');
 process.exit(fails ? 1 : 0);
