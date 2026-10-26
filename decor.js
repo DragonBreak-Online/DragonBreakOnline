@@ -128,7 +128,7 @@ module.exports = (api) => {
     if (S.reg) return S.reg;
     try { S.reg = JSON.parse(fs.readFileSync(REG, 'utf8')); } catch (e) { S.reg = null; }
     if (!S.reg || typeof S.reg !== 'object') S.reg = {};
-    S.reg.places = S.reg.places || {}; S.reg.owed = S.reg.owed || {};
+    S.reg.places = S.reg.places || {}; S.reg.owed = S.reg.owed || {}; S.reg.carpentry = S.reg.carpentry || {};
     return S.reg;
   };
   const save = () => { try { fs.writeFileSync(REG + '.tmp', JSON.stringify(reg(), null, 1)); fs.renameSync(REG + '.tmp', REG); } catch (e) { log('decor: saving decor.json failed', e.message); } };
@@ -473,12 +473,32 @@ module.exports = (api) => {
     p.items.splice(p.items.indexOf(it), 1); save();
     destroy(it.ref); if (it.light) destroy(it.light); if (it.show) destroy(it.show);
     let got = {};
-    if (share === 'deconstruct') { if (priced) got = giveRefund(a, paid, deconstructShare(a)); }
-    else if (share > 0) got = giveAll(a, paid, share);
-    // a study bookshelf's books come back whole on undo, and on deconstruct when booksKept (else they are in the shelf)
-    if (it.books && (share === 1 || C.study.booksKept)) for (const [d, n] of Object.entries(giveAll(a, it.books, 1))) got[d] = (got[d] || 0) + n;
-    audit(`DECOR ${why} ${who(a)} ${it.name} (${it.base}) ref ${it.ref} place ${hex(root)} refund ${JSON.stringify(got)}`);
-    personal(a, `${it.name} is taken down${Object.keys(got).length ? `; back to you: ${costText(got)}` : ''}.`);
+    // Undo is the placer's own full refund. A deconstruct takes the share of whoever does it (their Woodcutter tier),
+    // and what comes back is the owner's: a hired carpenter's work is paid to the home (Nat, 26 Oct)
+    if (share !== 'deconstruct') {
+      if (share > 0) got = giveAll(a, paid, share);
+      if (it.books && share === 1) for (const [d, n] of Object.entries(giveAll(a, it.books, 1))) got[d] = (got[d] || 0) + n;
+      audit(`DECOR ${why} ${who(a)} ${it.name} (${it.base}) ref ${it.ref} place ${hex(root)} refund ${JSON.stringify(got)}`);
+      personal(a, `${it.name} is taken down${Object.keys(got).length ? `; back to you: ${costText(got)}` : ''}.`);
+      return true;
+    }
+    const back = priced ? refundOf(paid, deconstructShare(a)) : {};
+    if (it.books && C.study.booksKept) for (const [d, n] of Object.entries(it.books)) back[d] = (back[d] || 0) + n;
+    const rec = get(root, 'private.housing', null);
+    const owner = owns(a, rec) ? a : (onlineActors().find((x) => x !== a && owns(x, rec)) || 0);
+    if (owner) got = giveAll(owner, back, 1);
+    else if (Object.keys(back).length) {
+      const key = ownerKey(p.owner, p.ownerChar), r = reg(), owed = r.carpentry[key] = r.carpentry[key] || {};
+      for (const [d, n] of Object.entries(back)) owed[d] = (owed[d] || 0) + n;
+      save();
+    }
+    audit(`DECOR ${why} ${who(a)} ${it.name} (${it.base}) ref ${it.ref} place ${hex(root)} share ${deconstructShare(a)} refund ${JSON.stringify(owner ? got : back)} to ${owner ? who(owner) : `owner ${p.owner}:${hex(p.ownerChar)} (offline)`}`);
+    const list = Object.keys(back).length ? costText(back) : '';
+    if (owner === a) personal(a, `${it.name} is taken down${list ? `; back to you: ${list}` : ''}.`);
+    else {
+      personal(a, `${it.name} is taken down${list ? `; what comes back (${list}) is the home owner's` : ''}.`);
+      if (owner && list) personal(owner, `${who(a)} took down ${it.name} in your home; back to you: ${list}.`);
+    }
     return true;
   };
   const undo = (a) => {
@@ -523,6 +543,15 @@ module.exports = (api) => {
       delete r.owed[k]; changed = true;
       audit(`DECOR owed ${who(a)} ${JSON.stringify(got)}`);
       personal(a, `Your old home's furnishings were taken down; back to you: ${costText(got)}.`);
+    }
+    // a hired carpenter's deconstructs while the owner was away
+    for (const a of onlineActors()) {
+      const key = ownerKey(profile(a), a >>> 0), alt = ownerKey(profile(a), 0), k = r.carpentry[key] ? key : (r.carpentry[alt] ? alt : null);
+      if (!k) continue;
+      const got = giveAll(a, r.carpentry[k], 1);
+      delete r.carpentry[k]; changed = true;
+      audit(`DECOR carpentry ${who(a)} ${JSON.stringify(got)}`);
+      personal(a, `Your carpenters took down pieces in your home while you were away; back to you: ${costText(got)}.`);
     }
     if (changed) save();
   };
@@ -642,6 +671,7 @@ module.exports = (api) => {
   const PANEL_ID = 171;
   // the browser widget (skymp5-front features/decor, cap decorPanel) or the native swf (native:decor), 'rows' a page each
   const PANEL_CAPS = [{ cap: 'decorPanel', rows: 20 }, { cap: 'native:decor', rows: 8 }];
+  const CARPENTER_TIERS = ['Novice', 'Apprentice', 'Adept', 'Expert', 'Master'];
   const panelCap = (a) => PANEL_CAPS.find((c) => hasUiCap(a, c.cap)) || null;
   const MAX_SEARCH = 40;
   if (!S.panel) S.panel = new Map();                       // actor -> { nonce, view, group, page, reopen }
@@ -684,9 +714,13 @@ module.exports = (api) => {
       Object.assign(out, { page: pg.at, pages: pg.pages, rows: pg.rows.map((it) => ({ key: it.ref, name: it.name, group: it.group, state: planterState(it),
         refund: pieceOf(it.base) && it.paid ? costText(refundOf(it.paid, share)) : '' })) });
     } else if (st.view === 'people') {
+      // Carpenters: each one's Woodcutter tier and the share their deconstructs give back (to the owner), so a skilled one is worth hiring
       const names = p.decoratorNames || {}, granted = p.decorators || [];
-      out.rows = granted.map((pid) => ({ key: String(pid), name: names[pid] || 'someone' }));
-      if (isOwner) out.nearby = onlineActors().filter((x) => x !== a && !granted.includes(profile(x)) && (here(x) || {}).root === pl.root).map((x) => ({ key: String(profile(x)), name: who(x) }));
+      const skillOf = (x) => ({ tier: CARPENTER_TIERS[Math.max(0, skillRank(x, 'woodcutter'))] || '', refund: Math.round(deconstructShare(x) * 100) });
+      const online = (pid) => onlineActors().find((x) => profile(x) === pid);
+      out.rows = granted.map((pid) => { const x = online(pid); return Object.assign({ key: String(pid), name: names[pid] || 'someone', online: !!x }, x ? skillOf(x) : { tier: '', refund: null }); });
+      if (isOwner) out.nearby = onlineActors().filter((x) => x !== a && !granted.includes(profile(x)) && (here(x) || {}).root === pl.root).map((x) => Object.assign({ key: String(profile(x)), name: who(x), online: true }, skillOf(x)));
+      out.own = skillOf(a);
     } else {
       out.view = 'catalog';
       // a search runs across every group, as /decor find does
