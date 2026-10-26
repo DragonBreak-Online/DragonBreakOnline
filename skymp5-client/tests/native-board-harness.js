@@ -18,7 +18,7 @@ const board = {
 const msgs = (t, key) => t.msgs().filter((m) => m.key === key);
 const P = (t) => t.root.dboPanel;
 const rowsOf = (t) => Object.keys(P(t).list.kids).filter((n) => /^r\d$/.test(n)).map((n) => P(t).list[n]);
-const closed = (t) => t.sent.some((m) => m.e === 'closeMenu');
+const closed = (t) => t.closed();
 
 {
   const t = S.boot('dbo_board');
@@ -53,6 +53,7 @@ const closed = (t) => t.sent.some((m) => m.e === 'closeMenu');
   t.push(Object.assign({}, board, { notes: board.notes.slice(0, 2) }));
   check('a re-publish keeps the open tab', P(t).head.tab1._alpha === 100 && rowsOf(t).length === 1);
   t.press(27);
+  check('the panel hides at once but the menu waits, so the client can still read the close from the outbox', t.root._visible === false && !t.sent.some((m) => m.e === 'closeMenu') && String(t.root.dboOut).indexOf('bountyBoard:close') >= 0);
   check('Escape on the list sends the widget close (no bare close, as the browser Close) and closes', msgs(t, 'bountyBoard:close').length === 1 && msgs(t, 'close').length === 0 && closed(t));
 }
 

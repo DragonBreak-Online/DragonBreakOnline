@@ -46,7 +46,9 @@ const boot = (menu, late, extra) => {
   const wheel = (delta) => { for (const l of ctx.Mouse.listeners) l.onMouseWheel(delta); };
   const tick = () => { for (const k of Object.values(root.kids)) if (k.onEnterFrame) k.onEnterFrame(); if (root.onEnterFrame) root.onEnterFrame(); };
   const push = (payload) => vm.runInContext('_root.dboData(' + JSON.stringify(JSON.stringify(payload)) + ')', ctx);
-  return { ctx, root, st, sent, sounds, logs, msgs, press, wheel, tick, push, arrive: () => { ctx._global.skse = skse; } };
+  // dboClose hides the panel at once and closes the menu some frames later (lib/dbo.as); closed() runs those frames first
+  const closed = () => { for (let i = 0; i < 8; i++) tick(); return sent.some((m) => m.e === 'closeMenu'); };
+  return { ctx, root, st, sent, sounds, logs, msgs, press, wheel, tick, push, closed, arrive: () => { ctx._global.skse = skse; } };
 };
 
 const checker = () => {

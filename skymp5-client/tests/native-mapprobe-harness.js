@@ -30,5 +30,5 @@ check('after the wait every answer goes to the server once, the silent one as a 
 t.tick();
 check('and only once', t.msgs().filter((m) => m.key === 'dbo:mapProbe').length === 1);
 t.press(27);
-check('Escape closes', t.sent.some((m) => m.e === 'closeMenu'));
+check('Escape closes', t.closed());
 T.done();

@@ -17,7 +17,7 @@ const msgs = (t, key) => t.msgs().filter((m) => m.key === key);
 const P = (t) => t.root.dboPanel;
 const labels = (t) => Object.keys(P(t).acts.kids).map((n) => P(t).acts[n].label.text);
 const btn = (t, label) => Object.keys(P(t).acts.kids).map((n) => P(t).acts[n]).find((b) => b.label.text === label);
-const closed = (t) => t.sent.some((m) => m.e === 'closeMenu');
+const closed = (t) => t.closed();
 const rooms = (t) => Object.keys(P(t).right.kids).filter((n) => /^r\d$/.test(n)).map((n) => P(t).right[n]);
 
 {

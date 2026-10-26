@@ -26,7 +26,7 @@ const texts = (t) => {
 const buttonsOf = (t) => { const out = []; const walk = (c) => { for (const k of Object.keys(c.kids)) { const x = c.kids[k]; if (x.kids && x.label && x.onPick) out.push(x); else if (x.kids) walk(x); } }; walk(shownPage(t)); return out; };
 const btn = (t, label) => buttonsOf(t).find((b) => b.label.text === label);
 const btnStarting = (t, label) => buttonsOf(t).find((b) => b.label.text.indexOf(label) === 0);
-const closed = (t) => t.sent.some((m) => m.e === 'closeMenu');
+const closed = (t) => t.closed();
 
 {
   const t = S.boot('dbo_journal');

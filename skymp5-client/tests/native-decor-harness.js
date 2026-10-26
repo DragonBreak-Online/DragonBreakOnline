@@ -96,7 +96,7 @@ const rowsOf = (t) => Object.keys(list(t).kids).filter((n) => /^r\d$/.test(n)).m
   t.push(Object.assign({}, catalog, { page: 1 }));
   check('page 2 of 2: back arrow only', t.root.dboPanel.foot.prev && !t.root.dboPanel.foot.next && t.root.dboPanel.foot.page.text === 'Page 2 of 2');
   t.press(27);
-  check('Escape sends close and closes from the SWF', msgs(t, 'close').length === 1 && t.sent.some((m) => m.e === 'closeMenu'));
+  check('Escape sends close and closes from the SWF', msgs(t, 'close').length === 1 && t.closed());
 }
 
 {
@@ -105,7 +105,7 @@ const rowsOf = (t) => Object.keys(list(t).kids).filter((n) => /^r\d$/.test(n)).m
   t.st.time += 8000; t.tick();
   check('without skse nothing is sent, and the close waits for it', t.sent.length === 0);
   t.arrive(); t.tick();
-  check('once skse appears: ready, then the self-close for the missing payload', t.msgs()[0].key === 'ready' && t.sent.some((m) => m.e === 'closeMenu'), t.sent);
+  check('once skse appears: ready, then the self-close for the missing payload', t.msgs()[0].key === 'ready' && t.closed(), t.sent);
   const u = S.boot('dbo_decor');
   u.push({ nonce: 'x' });
   check('an unreadable payload is logged, not drawn', u.logs.some((l) => l.indexOf('unreadable payload') >= 0) && !u.root.dboPanel.list);
