@@ -46,6 +46,8 @@ export const NATIVE_CAPS = [
   "native:journal", ...JOURNAL_TABS.map((t) => `native:journalTab:${t}`),
   // Worker 2's gamemode panels (dbo_deity, dbo_rite, dbo_dungeon)
   "native:deityPicker", "native:rite", "native:dungeonGate",
+  // Worker 6's labour panel (dbo_labour, widget 55; sends dbo:labour/labourCancel, dbo:struggle/struggleCancel)
+  "native:labour",
 ];
 export const CAPS_RETRY_MS = 5000;
 

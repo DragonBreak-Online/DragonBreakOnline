@@ -298,7 +298,7 @@ check('a switch for one panel never takes another panel\'s tabs with it', () => 
 
 check('the caps the server gates on are declared, for every panel the workers built', () => {
   const want = ['native:prayer', 'native:decor', 'native:journal',
-    'native:deityPicker', 'native:rite', 'native:dungeonGate'];
+    'native:deityPicker', 'native:rite', 'native:dungeonGate', 'native:labour'];
   return want.every((c) => M.NATIVE_CAPS.indexOf(c) >= 0);
 }, M.NATIVE_CAPS);
 check('no cap is announced twice, which would make the server gate on a duplicate',
