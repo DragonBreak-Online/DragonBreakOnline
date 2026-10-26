@@ -143,7 +143,7 @@ ok(TRIMS7.every((e) => e.offline === 'apply' && e.keepShouts === undefined), 'ea
 ok(TRIMS7.every((e) => /^[\w .,;:()'-]+$/.test(String(e.by) + String(e.why)) && !/\d{15,}/.test(String(e.by) + String(e.why))), 'by and why carry no Discord id', TRIMS7.map((e) => [e.by, e.why]));
 // The admin panel's Give all spells list: spellsMeasureFirst while spells stays empty (26 Oct: until measured on dev), spells again once it
 // is undone. The 133 spells it gave before 16 Oct were all on its 17 Oct list of 254. The list was rebuilt on 26 Oct
-// (tooling/ck-mcp/give_all_spells.py: tome-taught only, no held spell), so a removal is on it now, or held back.
+// (tooling/ck-mcp/admin_powers.py: tome-taught only, no held spell), so a removal is on it now, or held back.
 const POWERS = JSON.parse(fs.readFileSync(path.join(SERVER, 'admin-powers.json'), 'utf8'));
 const GIVE = new Set([].concat(POWERS.spells || [], POWERS.spellsGiveAllOff || [], POWERS.spellsMeasureFirst || []).map((x) => (Array.isArray(x) ? x[0] : x)));
 // held back, plus the two mod internals the 17 Oct list gave and the rebuilt one leaves out (YokuWeapons 0_ConjureSkeleSpell, 0_PuppetManConjurePLAYER)
@@ -152,6 +152,7 @@ ok(GIVE.size >= 254, 'the Give all spells list holds the tome spells (254 on 17 
 ok(![...GIVE].some((d) => HELD.has(d)), 'the Give all spells list gives no removed or suspended spell', [...GIVE].filter((d) => HELD.has(d)));
 ok(TRIMS7.every((e) => e.removeSpells.every((d) => GIVE.has(d) || HELD.has(d))), 'every removal is on the Give all spells list, or held back, or one of the two mod internals',
   TRIMS7.flatMap((e) => e.removeSpells.filter((d) => !GIVE.has(d) && !HELD.has(d))));
+ok(['8bc:YokuWeapons.esp', '903:YokuWeapons.esp'].every((d) => !GIVE.has(d)), 'the two mod internals really are off the list (admin_powers.py SKIP_RE)');
 const SUSP = new Set(LIVE.suspendedSpells || []);
 ok(Object.values(SHIPPED).every((x) => x[3].every((d) => SUSP.has(d))), 'the removals held, not learned, are suspended spells (spells.hold holds them)');
 
@@ -434,8 +435,8 @@ clearOut();
 load({ staffTrims: [
   'not an object', { id: 'no actor', removeSpells: [S(1)], keepSpells: [] }, entry({ id: 'npc', actor: '0001a2b3' }),
   entry({ id: 'no-profile', actor: 'ff00a004', profile: undefined }),
-  entry({ id: 'bad-keep', actor: 'ff00a004', profile: 11, keepSpells: ['12:NotLoaded.esp'] }),   // verify-formids: ignore - a plugin not loaded, on purpose
-  entry({ id: 'bad-remove', actor: 'ff00a004', profile: 11, removeSpells: ['12:NotLoaded.esp'] }),   // verify-formids: ignore - a plugin not loaded, on purpose
+  entry({ id: 'bad-keep', actor: 'ff00a004', profile: 11, keepSpells: ['12:NotLoaded.esp'] }),  // verify-formids: ignore - NotLoaded.esp is absent on purpose; this case proves a keep spell outside the load order is skipped
+  entry({ id: 'bad-remove', actor: 'ff00a004', profile: 11, removeSpells: ['12:NotLoaded.esp'] }),  // verify-formids: ignore - NotLoaded.esp is absent on purpose; this case proves a remove spell outside the load order is skipped
   entry({ id: 'not-spell', actor: 'ff00a004', profile: 11, removeSpells: [S(40, 'Book.esm')] }),
   entry({ id: 'empty-remove', actor: 'ff00a004', profile: 11, removeSpells: [] }),
   entry({ id: 'bad-offline', actor: 'ff00a004', profile: 11, offline: 'later' }),
