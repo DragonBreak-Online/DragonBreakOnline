@@ -94,7 +94,7 @@ module.exports = (api) => {
     tearSeconds: 10, tearRange: 250, tearPermadeath: false, tearGivesHeart: true,
     noDivineBlessings: true, faithLocked: true,
     cureDeities: ['arkay', 'stendarr'], cureItem: '2e504:Skyrim.esm',  // a filled black soul gem
-    visual: { enabled: false, armor: '5d008:Skyrim.esm', emptyArmor: '5d009:Skyrim.esm', body: '90d63:unofficial skyrim special edition patch.esp', women: false, retrySeconds: 10, maxTries: 5, settleMs: 1500, lockBody: false },
+    visual: { enabled: false, armor: '5d008:Skyrim.esm', emptyArmor: '5d009:Skyrim.esm', body: '90d63:unofficial skyrim special edition patch.esp', women: false, retrySeconds: 10, maxTries: 5, settleMs: 1500, lockBody: false, blockReequip: false },
     briarSkin: { enabled: false, armor: 38, armorFrom: '', staminaRegen: 1.25, diseaseResist: 50 },
     // What a Briarheart is, in Magic > Active Effects (Nat, 25 Oct): a display ability (a DLE SPEL, type Ability, whose
     // one effect carries the text and changes nothing; prayer.js's blessing displays are the same records), learned with
@@ -173,7 +173,7 @@ module.exports = (api) => {
   const waitText = (ms) => { const h = Math.floor(ms / HOUR), m = Math.ceil((ms % HOUR) / MIN); return `${h ? `${h}h ` : ''}${m}m`; };
 
   // ---- the look: the briar body on a bare chest -------------------------------------------------------------------------
-  const V = () => Object.assign({ enabled: false, armor: '', emptyArmor: '', body: '', women: false, retrySeconds: 10, maxTries: 5, settleMs: 1500, lockBody: false }, C.visual || {});
+  const V = () => Object.assign({ enabled: false, armor: '', emptyArmor: '', body: '', women: false, retrySeconds: 10, maxTries: 5, settleMs: 1500, lockBody: false, blockReequip: false }, C.visual || {});
   // The wound itself (dev, 25 Oct): ArmorBriarHeart is only the heart and its briars (slot 35). The open chest is USSEP's
   // USKPArmorBriarHeartBody (90D63, slot 32; its ARMA covers body, forearms and calves with the wound texture
   // SkinBodyMaleBriarHeart), worn by every vanilla Briarheart through the SkinBriarHeart outfit. Both go on a bare chest.
@@ -239,7 +239,9 @@ module.exports = (api) => {
     // once a minute however often it is put back on
     const own = worn.filter((id) => !mine.has(id) && coversBody(id));
     if (own.length) {
-      for (const id of own) papyrus(a, 'UnequipItem', [form(mp.getDescFromId(id)), false, true]);
+      // visual.blockReequip (off by default; a dev test, 26 Oct): UnequipItem's abPreventEquip, which the CK wiki says keeps the
+      // player from equipping that item again. How long the engine keeps it (a relog, the cure) is what the test is for
+      for (const id of own) papyrus(a, 'UnequipItem', [form(mp.getDescFromId(id)), v.blockReequip === true, true]);
       const told = Number(S.coverTold.get(a)) || 0;
       if (Date.now() - told >= AMULET_TELL_MS) {
         S.coverTold.set(a, Date.now());
