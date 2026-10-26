@@ -32,7 +32,7 @@ const LEAD = 0x14, OWNER = 0x15, GM = 0x16, PLAYER = 0x17, NEWP = 0x18, WOLF = 0
 const HUMAN = 0x13746, WEREWOLF_RACE = 0xcdd84, VL_RACE = 0x283a;
 const ANIMALS = { chicken: 0xa919d, hare: 0x6dc99, goat: 0x6fc4a, fox: 0x109c7c, dog: 0x131ee, skeever: 0x13201, mudcrab: 0xba545, deer: 0xcf89b };
 const CREATURE_RACES = new Set(Object.values(ANIMALS));
-const WORLD = '3c:Skyrim.esm', OTHER_WORLD = '9f:Skyrim.esm', INSIDE = '1691:Skyrim.esm';
+const WORLD = '3c:Skyrim.esm', OTHER_WORLD = '9f:Skyrim.esm', INSIDE = '1691:Skyrim.esm'; // verify-formids: ignore - mock descs for a second worldspace and an interior; RECORDS below supplies their type, nothing looks them up in the load order
 const RECORDS = { 0x3c: 'WRLD', 0x9f: 'WRLD', 0x1691: 'CELL' };
 const TIER = { [LEAD]: 'leadgm', [OWNER]: 'senior', [GM]: 'gm' };
 let props, commands, timersByName, said, audits, logs, packets, papyrus, appearanceWrites;
@@ -159,11 +159,11 @@ revertToOwn(); delete globalThis.__dboCombatAt; props.set(`${LEAD}|lastAnimEvent
 // ---- 4. the visibility guard -------------------------------------------------------------------------------------------------
 place(PLAYER, 3000);
 r = run(LEAD, 'chicken');
-ok(/^1 player nearby would see a stripped human/.test(r) && !beast(LEAD), '4. a player on a client with only beastBody 3000 units away: refused', r);
+ok(/^A player nearby cannot see this form yet/.test(r) && !beast(LEAD), '4. a player on a client with only beastBody 3000 units away: refused', r);
 caps.set(PLAYER, new Set());
 place(FARP, 5900);
 r = run(LEAD, 'chicken');
-ok(/^2 players nearby would see/.test(r) && !beast(LEAD), '4. two such players (one with no capability at all, at 5900): refused, counted, never named', r);
+ok(/^2 players nearby cannot see this form yet/.test(r) && !beast(LEAD), '4. two such players (one with no capability at all, at 5900): refused, counted, never named', r);
 place(PLAYER, 3000, OTHER_WORLD); place(FARP, 13000);
 r = run(LEAD, 'chicken');
 ok(beast(LEAD) && beast(LEAD).form === 'chicken', '4. the same spot in another worldspace, and 13000 units (three grid squares off): allowed', r);
@@ -217,7 +217,7 @@ const streamed = [
 for (const [label, lp, pp] of streamed) {
   at(LEAD, lp); at(PLAYER, pp);
   const r4 = run(LEAD, 'chicken');
-  ok(/^1 player nearby would see a stripped human/.test(r4) && !beast(LEAD), `4b. a 0.3.106 player ${label}: refused`, r4);
+  ok(/^A player nearby cannot see this form yet/.test(r4) && !beast(LEAD), `4b. a 0.3.106 player ${label}: refused`, r4);
   revertToOwn();
 }
 at(LEAD, [4200, 0, 0]); at(PLAYER, [16400, 0, 0]);
@@ -250,12 +250,12 @@ ok(!beast(LEAD) && told(n0, LEAD).some((t) => /a player came near whose game can
   '4b. tick: the fork lists a 0.3.106 player as a neighbour (their place says another worldspace): reverted, told, silently', told(n0, LEAD));
 revertToOwn();
 r = run(LEAD, 'chicken');
-ok(/^1 player nearby would see a stripped human/.test(r) && !beast(LEAD), '4b. ...and refused while the fork lists them', r);
+ok(/^A player nearby cannot see this form yet/.test(r) && !beast(LEAD), '4b. ...and refused while the fork lists them', r);
 revertToOwn();
 props.delete(`${LEAD}|actorNeighbors`);
 at(PLAYER, [NaN, 0, 0]);
 r = run(LEAD, 'chicken');
-ok(/^1 player nearby would see a stripped human/.test(r) && !beast(LEAD), '4b. a player in the same worldspace whose place is not a number counts as near (fails closed)', r);
+ok(/^A player nearby cannot see this form yet/.test(r) && !beast(LEAD), '4b. a player in the same worldspace whose place is not a number counts as near (fails closed)', r);
 revertToOwn();
 for (const [a, c, p] of kept4b) { props.set(`${a}|worldOrCellDesc`, c); props.set(`${a}|pos`, p); }
 caps.set(PLAYER, capsPlayer4b);
@@ -477,8 +477,360 @@ r = run(LEAD, '');
 ok(/Polymorph is on/.test(r) && /chicken, hare, goat, fox, dog, skeever, mudcrab, deer/.test(r) && !/on\|off/.test(r), '11. /polymorph alone: the state and the animals (the switch named to Owners only)', r);
 ok(/on\|off/.test(run(OWNER, '')), '11. ...an Owner is shown the switch');
 r = run(LEAD, 'wolf');
-ok(/^Usage: \/polymorph <chicken\|hare\|goat\|fox\|dog\|skeever\|mudcrab\|deer> \| revert \| list\./.test(r) && !beast(LEAD), '11. wolf and horse are not animals here', r);
+// The usage line stopped naming the animals once there were eighteen; what matters is that the wolf, the
+// horse and the giant are not among them, so this asks the form list rather than the sentence
+ok(/^Usage: \/polymorph <animal> \| revert \| list\./.test(r) && !beast(LEAD), '11. an unknown animal gets the usage line', r);
+ok(!globalThis.__dboPolymorphPanel().forms.some((f) => /wolf|horse|giant/.test(f.key)), '11. wolf, horse and giant are not animals here', globalThis.__dboPolymorphPanel().forms.map((f) => f.key));
 ok(/^Usage/.test(run(LEAD, 'horse')) && !beast(LEAD), '11. ...nor the horse');
+
+// ---- 12. what the admin panel is fed -------------------------------------------------------------------------------
+// The panel's two hops are the fork's adminSystem.ts payload and adminMenuService's panelData mirror; everything the
+// gameplay layer has to say rides these two hooks. The front must keep NO list of its own, or it offers an animal the
+// server refuses.
+restart({ beastform: {} });
+let P = globalThis.__dboPolymorphPanel();
+ok(P.on === true && Array.isArray(P.forms) && P.forms.length === 18, '12. __dboPolymorphPanel: the switch and all eighteen animals', P.forms.length);
+ok(P.forms.map((f) => f.key).join(',') === 'chicken,hare,goat,fox,dog,skeever,mudcrab,deer,hagraven,bear,snowbear,sabrecat,snowsabrecat,troll,draugr,skeleton,spriggan,falmer', '12. ...in the table order, by key', P.forms.map((f) => f.key));
+// The ten added on 25 Oct must each resolve in this load order, or the panel offers a shape the server refuses
+ok(['hagraven', 'bear', 'snowbear', 'sabrecat', 'snowsabrecat', 'troll', 'draugr', 'skeleton', 'spriggan', 'falmer'].every((k) => P.forms.some((f) => f.key === k)), '12. every form added on 25 Oct resolves in the load order');
+ok(P.forms.every((f) => f.name && f.name !== f.key) && P.forms.find((f) => f.key === 'mudcrab').name === 'Mudcrab', '12. ...each with the name the panel shows', P.forms);
+ok(!P.forms.some((f) => /wolf|horse/.test(f.key)), '12. ...and never the wolf or the horse');
+
+// A narrowed config must narrow the panel too, or the picker offers what /polymorph will refuse
+restart({ beastform: { polymorph: { forms: ['fox', 'deer'] } } });
+P = globalThis.__dboPolymorphPanel();
+ok(P.forms.length === 2 && P.forms.map((f) => f.key).join(',') === 'fox,deer', '12. polymorph.forms narrows the panel\'s picker as well as the command', P.forms);
+ok(/not open for polymorph/.test(run(LEAD, 'goat')), '12. ...and the command still refuses what the picker no longer offers');
+
+restart({ beastform: {} });
+run(OWNER, 'off');
+P = globalThis.__dboPolymorphPanel();
+ok(P.on === false && P.setBy === 'admin', '12. the panel sees the Owners\' switch and who set it', P);
+run(OWNER, 'on');
+ok(globalThis.__dboPolymorphPanel().on === true, '12. ...and sees it come back on');
+
+// creature and since: the panel tells an animal from a beast without a list, and can print "for N min"
+revertToOwn();
+let H = globalThis.__dboBeastHolds(LEAD);
+ok(H.form === null && H.creature === false && H.since === null, '12. __dboBeastHolds in one\'s own shape: no form, no creature, no since', H);
+run(LEAD, 'skeever');
+H = globalThis.__dboBeastHolds(LEAD);
+ok(H.form === 'skeever' && H.creature === true && typeof H.since === 'number' && H.since > 0, '12. ...a skeever: creature true, since set', H);
+revertToOwn();
+props.set(`${LEAD}|private.werewolfGrant`, true);
+globalThis.__dboBeastTransform(LEAD, 'werewolf', true);
+H = globalThis.__dboBeastHolds(LEAD);
+ok(H.form === 'werewolf' && H.creature === false && typeof H.since === 'number', '12. ...a werewolf: a form with a since, but NOT a creature', H);
+revertToOwn();
+props.set(`${LEAD}|private.werewolfGrant`, undefined);
+
+ok(!/\u2014/.test(src), '12. still no em dash in beastform.js');
+
+// ---- 13. __dboPolymorphSelf, the hook the F7 panel calls ------------------------------------------------------------
+// The fork's adminSystem.ts 'polymorphSelf' action calls globalThis.__dboPolymorphSelf(actorId, form) and shows its
+// return value. It was missing: I wrote the fork side and never the gameplay side, so the panel answered "This
+// server's beastform.js has no panel polymorph" and Nat hit it on dev (25 Oct). Section 12 checked the panel's DATA
+// and never the panel's ACTION, which is the gap that let it through. These call it exactly as adminSystem does.
+restart({ beastform: {} });
+ok(typeof globalThis.__dboPolymorphSelf === 'function', '13. beastform.js defines __dboPolymorphSelf for the panel');
+revertToOwn();
+let r13 = globalThis.__dboPolymorphSelf(LEAD, 'fox');
+ok(r13 === '' && beast(LEAD) && beast(LEAD).form === 'fox', '13. a Lead GM takes a fox from the panel: \'\' and the shape is on', [r13, beast(LEAD) && beast(LEAD).form]);
+revertToOwn();
+
+// the rank is re-checked here, so the gate never depends on the caller
+r13 = globalThis.__dboPolymorphSelf(GM, 'fox');
+ok(/Lead GM/.test(r13) && !beast(GM), '13. a GM is refused by the hook itself, whatever the caller gated', r13);
+
+// the command's alias works, and an unknown word is refused rather than thrown
+revertToOwn();
+r13 = globalThis.__dboPolymorphSelf(LEAD, 'rabbit');
+ok(r13 === '' && beast(LEAD) && beast(LEAD).form === 'hare', '13. the rabbit alias reaches the hare, as /polymorph does', [r13, beast(LEAD) && beast(LEAD).form]);
+revertToOwn();
+ok(/no such animal/i.test(globalThis.__dboPolymorphSelf(LEAD, 'dragon')) && !beast(LEAD), '13. an animal that is not in the table is refused');
+ok(/no such animal/i.test(globalThis.__dboPolymorphSelf(LEAD, '')) && !beast(LEAD), '13. ...and so is an empty form');
+ok(/no such animal/i.test(globalThis.__dboPolymorphSelf(LEAD, undefined)) && !beast(LEAD), '13. ...and undefined, which a packet with no form gives');
+
+// every refusal of the chat command applies, because it is the same path: the Owners' switch
+run(OWNER, 'off');
+r13 = globalThis.__dboPolymorphSelf(LEAD, 'fox');
+ok(/switched off/i.test(r13) && !beast(LEAD), '13. the Owners\' switch refuses the panel too', r13);
+run(OWNER, 'on');
+
+// and the config allow-list
+restart({ beastform: { polymorph: { forms: ['fox'] } } });
+revertToOwn();
+ok(globalThis.__dboPolymorphSelf(LEAD, 'fox') === '', '13. a narrowed allow-list still lets its own form through');
+revertToOwn();
+ok(/not open for polymorph/i.test(globalThis.__dboPolymorphSelf(LEAD, 'goat')) && !beast(LEAD), '13. ...and refuses one it leaves out');
+restart({ beastform: {} });
+revertToOwn();
+
+// the fork calls it with an actor and a form and nothing else: there is no target to aim at anybody
+ok(globalThis.__dboPolymorphSelf.length === 2, '13. the hook takes an actor and a form alone, so the panel cannot target anyone else');
+
+
+// ---- 14. __dboPolymorphAs, the entry for a module that has decided eligibility itself ------------------------------
+// hagraven.js (Worker 5) turns a stage-3 Hagraven into the creature and back. It must reuse this path so every guard
+// applies, but it cannot use __dboPolymorphSelf, which gates on Lead GM. 'fox' throughout: these check the hook, not
+// the form table. LEAD has no creatureBody cap, so it is kept outside the guard radius; NEWP has one.
+restart({ beastform: {} });
+revertToOwn();
+place(LEAD, 900000, OTHER_WORLD);
+place(NEWP, 0);
+
+const hasAs = typeof globalThis.__dboPolymorphAs === 'function';
+// Through a wrapper so a missing hook FAILS every check below instead of throwing and ending the run early, which
+// would report far fewer failures than there are
+const polyAs = (a, k, o) => (hasAs ? globalThis.__dboPolymorphAs(a, k, o) : 'no __dboPolymorphAs hook');
+ok(hasAs, '14. beastform.js defines __dboPolymorphAs for gameplay modules');
+ok(hasAs && globalThis.__dboPolymorphAs.length === 3, '14. it takes an actor, a form and an opts, so the caller can name itself');
+
+let r14 = globalThis.__dboPolymorphSelf(NEWP, 'fox');
+ok(/Lead GM/.test(r14) && !beast(NEWP), '14. a plain player is still refused by the staff hook', r14);
+r14 = polyAs(NEWP, 'fox', { by: 'hagraven' });
+ok(r14 === '' && beast(NEWP) && beast(NEWP).form === 'fox', '14. ...and allowed by __dboPolymorphAs, which does not check rank', [r14, beast(NEWP) && beast(NEWP).form]);
+ok(beast(NEWP) && beast(NEWP).by === 'hagraven', '14. private.beast.by names the module, so others can tell whose shape it is', beast(NEWP));
+ok(audits.some((t) => /took the Fox shape \(polymorph, hagraven\)$/.test(t)), '14. the audit names the caller instead of staff', audits.slice(-1));
+
+// These three ended only the START before: a shape taken a moment earlier survived them
+// Each of these asserts the shape was ON first: without that, a run where no shape is ever taken passes them all
+let on14 = !!beast(NEWP);
+globalThis.__dboIsDowned = (a) => a === NEWP;
+tick();
+ok(on14 && !beast(NEWP), '14. tick: a player who goes down while in a shape is reverted', on14);
+delete globalThis.__dboIsDowned;
+
+polyAs(NEWP, 'fox', { by: 'hagraven' });
+on14 = !!beast(NEWP);
+props.set(NEWP + '|private.dboSentence', { totalMs: 60000, servedMs: 0 });
+tick();
+ok(on14 && !beast(NEWP), '14. tick: a player taken to jail while in a shape is reverted', on14);
+props.set(NEWP + '|private.dboSentence', null);
+
+polyAs(NEWP, 'fox', { by: 'hagraven' });
+on14 = !!beast(NEWP);
+props.set(NEWP + '|private.restrained', { boundHands: true });
+tick();
+ok(on14 && !beast(NEWP), '14. tick: a player bound while in a shape is reverted', on14);
+props.set(NEWP + '|private.restrained', null);
+
+// The module says its own ending, so the animal wording is not put in a Hagraven's mouth
+polyAs(NEWP, 'fox', { by: 'hagraven' });
+let n14 = said.length;
+on14 = !!beast(NEWP);
+place(NEWP, 0, INSIDE);
+tick();
+ok(on14 && !beast(NEWP), '14. tick: indoors still ends a module shape', on14);
+ok(!told(n14, NEWP).some((t) => /cannot open doors/.test(t)), '14. ...and the player is NOT told the animal line, so the module can say its own', told(n14, NEWP));
+ok(audits.some((t) => /left the Fox shape \(polymorph, hagraven\): went indoors$/.test(t)), '14. ...while the audit still names the caller and the reason', audits.slice(-1));
+place(NEWP, 0);
+
+// A staff shape keeps the animal wording it always had
+place(NEWP, 900000, OTHER_WORLD);
+place(LEAD, 0);
+globalThis.__dboPolymorphSelf(LEAD, 'fox');
+n14 = said.length;
+place(LEAD, 0, INSIDE);
+tick();
+ok(told(n14, LEAD).some((t) => /cannot open doors/.test(t)), '14. a staff shape is still told the animal line', told(n14, LEAD));
+place(LEAD, 0);
+
+// The same three for a STAFF shape, taken through the hook that already existed. This isolates the polymorphBreak
+// change from the new entry point, and covers Worker 5's point that it should apply to staff too.
+place(NEWP, 900000, OTHER_WORLD);
+place(LEAD, 0);
+globalThis.__dboPolymorphSelf(LEAD, 'fox');
+on14 = !!beast(LEAD);
+globalThis.__dboIsDowned = (a) => a === LEAD;
+tick();
+ok(on14 && !beast(LEAD), '14. tick: a STAFF shape also ends on a down', on14);
+delete globalThis.__dboIsDowned;
+
+globalThis.__dboPolymorphSelf(LEAD, 'fox');
+on14 = !!beast(LEAD);
+props.set(LEAD + '|private.dboSentence', { totalMs: 60000, servedMs: 0 });
+tick();
+ok(on14 && !beast(LEAD), '14. tick: a STAFF shape also ends on a jail sentence', on14);
+props.set(LEAD + '|private.dboSentence', null);
+
+globalThis.__dboPolymorphSelf(LEAD, 'fox');
+on14 = !!beast(LEAD);
+props.set(LEAD + '|private.restrained', { carried: true });
+tick();
+ok(on14 && !beast(LEAD), '14. tick: a STAFF shape also ends on being carried', on14);
+props.set(LEAD + '|private.restrained', null);
+revertToOwn();
+
+// Every other refusal is unchanged
+place(LEAD, 900000, OTHER_WORLD);
+place(NEWP, 0);
+run(OWNER, 'off');
+ok(/switched off/i.test(polyAs(NEWP, 'fox', { by: 'hagraven' })) && !beast(NEWP), '14. the Owners\' switch refuses a module shape too');
+run(OWNER, 'on');
+ok(/no such animal/i.test(polyAs(NEWP, 'dragon', { by: 'hagraven' })) && !beast(NEWP), '14. an animal not in the table is refused');
+props.set(NEWP + '|isDead', true);
+ok(/dead/i.test(polyAs(NEWP, 'fox', { by: 'hagraven' })) && !beast(NEWP), '14. polymorphRefusal still applies: not while dead');
+props.set(NEWP + '|isDead', false);
+restart({ beastform: { polymorph: { forms: ['chicken'] } } });
+place(LEAD, 900000, OTHER_WORLD);
+place(NEWP, 0);
+ok(/not open for polymorph/i.test(polyAs(NEWP, 'fox', { by: 'hagraven' })) && !beast(NEWP), '14. ...and so does the allow-list');
+restart({ beastform: {} });
+
+// ---- 15. a creature form with a loadout: the Hagraven ---------------------------------------------------------------
+// The four spells are exactly what EncHagraven (023ab0) carries, read off the record: HagravenRace has no SPLO at all.
+// Whether a player can CAST them in the body is an in-game question; these checks are that they are granted, announced
+// and removed, which is the part a harness can settle.
+restart({ beastform: {} });
+revertToOwn();
+place(LEAD, 900000, OTHER_WORLD);
+place(NEWP, 0);
+
+const FIREBOLT = 0x7d98f, FIREBALL = 0x7d997, FASTHEAL = 0x7231c, CLOSEWOUNDS = 0xf95eb, REVERT = 0xcd5c;
+
+let r15 = polyAs(NEWP, 'chicken', { by: 'test' });
+let pk15 = lastBeastPacket(NEWP);
+ok(r15 === '' && pk15 && pk15.abilities === null, '15. a form with no loadout still sends abilities null', pk15 && pk15.abilities);
+ok(pk15 && (pk15.camera === null || pk15.camera === undefined), '15. ...and no camera offsets when the config names none', pk15 && pk15.camera);
+globalThis.__dboBeastRevert(NEWP, 'test');
+
+const papyrus15 = papyrus.length;
+r15 = polyAs(NEWP, 'hagraven', { by: 'hagraven' });
+pk15 = lastBeastPacket(NEWP);
+ok(r15 === '' && !!pk15 && !!pk15.abilities, '15. the Hagraven sends a real loadout rather than null', r15 || (pk15 && pk15.abilities));
+// Null-safe on purpose: without it a run where abilities come back null throws here and the later checks never
+// report at all, which reads as fewer failures than there are
+const ab15 = (slot) => (pk15 && pk15.abilities && pk15.abilities[slot]) || [];
+const ids15 = (list) => (list || []).map((x) => x.id);
+// NOTHING in the hands: a creature body crashed on the humanoid weapon-draw path (25 Oct), and
+// equipping anything into a creature graph is unproven, so the hands stay empty until the client
+// guard ships. A safety property, so it is asserted rather than merely untested.
+ok(ids15(ab15('right')).length === 0, '15. ...and NOTHING in the right hand while a creature body is worn', ids15(ab15('right')));
+ok(ids15(ab15('left')).length === 0, '15. ...nor the left', ids15(ab15('left')));
+ok(!ids15(ab15('right')).includes(FIREBOLT) && !ids15(ab15('left')).includes(FASTHEAL),
+  '15. ...so her verified EncHagraven spells are held back rather than equipped', [ids15(ab15('right')), ids15(ab15('left'))]);
+ok(ids15(ab15('voice')).includes(REVERT), '15. ...and Revert Form on the shout key, so the form can be ended there', ids15(ab15('voice')));
+// self() wraps the actor in an espm/form object, so the method is what to filter on; the window holds only this change
+const added15 = papyrus.slice(papyrus15).filter((x) => x.method === 'AddSpell');
+ok(added15.length >= 3, '15. the server grants the voice powers too (AddSpell), as the beast path does', added15.length);
+
+const papyrusRevert15 = papyrus.length;
+globalThis.__dboBeastRevert(NEWP, 'test');
+const removed15 = papyrus.slice(papyrusRevert15).filter((x) => x.method === 'RemoveSpell');
+ok(removed15.length >= 3, '15. and the shared revert takes them away again (RemoveSpell)', removed15.length);
+
+// ---- the camera offsets the client service reads --------------------------------------------------------------------
+restart({ beastform: { polymorph: { camera: { hagraven: { z: 50, combatZ: 40 } } } } });
+place(LEAD, 900000, OTHER_WORLD);
+place(NEWP, 0);
+polyAs(NEWP, 'hagraven', { by: 'hagraven' });
+pk15 = lastBeastPacket(NEWP);
+ok(pk15 && pk15.camera && pk15.camera.z === 50 && pk15.camera.combatZ === 40,
+  '15. the camera offsets come from the config, so they can be tuned without a client build', pk15 && pk15.camera);
+ok(pk15 && pk15.camera && pk15.camera.x === undefined, '15. ...and only the keys the config names are sent', pk15 && pk15.camera);
+globalThis.__dboBeastRevert(NEWP, 'test');
+
+restart({ beastform: { polymorph: { camera: { hagraven: { z: 'high', combatX: null } } } } });
+place(LEAD, 900000, OTHER_WORLD);
+place(NEWP, 0);
+polyAs(NEWP, 'hagraven', { by: 'hagraven' });
+pk15 = lastBeastPacket(NEWP);
+ok(pk15 && pk15.camera === null, '15. a camera value that is not a number is dropped rather than sent to an ini', pk15 && pk15.camera);
+globalThis.__dboBeastRevert(NEWP, 'test');
+restart({ beastform: {} });
+
+
+// ---- 16. the Hagraven's two powers (DLE records, Nat 25 Oct) --------------------------------------------------------
+// Scream reuses the howl's sweep with her own kind spared; Summon Spriggan has NO POWERS entry on purpose, because
+// the fork's ConjurationSystem already spawns any SummonCreature a player casts.
+restart({ beastform: {} });
+revertToOwn();
+place(LEAD, 900000, OTHER_WORLD);
+place(NEWP, 0);
+
+const SCREAM = 0x1d2233, SUMMON_SPRIGGAN = 0x1d2234;
+
+polyAs(NEWP, 'hagraven', { by: 'hagraven' });
+let pk16 = lastBeastPacket(NEWP);
+const voice16 = ((pk16 && pk16.abilities && pk16.abilities.voice) || []).map((x) => x.id);
+ok(voice16.indexOf(SCREAM) >= 0, '16. the Hagraven is granted her Scream', voice16);
+ok(voice16.indexOf(SUMMON_SPRIGGAN) >= 0, '16. ...and Summon Spriggan', voice16);
+ok(voice16[voice16.length - 1] === 0xcd5c, '16. ...with Revert Form LAST, so the default shout-key power never ends the form', voice16);
+
+// A victim who can be frightened: same place, alive, with percentages to write
+place(PLAYER, 100);
+props.set(`${PLAYER}|percentages`, { health: 1, magicka: 1, stamina: 1 });
+props.set(`${PLAYER}|isDead`, false);
+
+let n16 = packets.length;
+globalThis.__dboBeastPower(NEWP, SCREAM);
+const terrors = packets.slice(n16).filter((x) => x.p && x.p.customPacketType === 'dboStatus' && x.p.kind === 'terror');
+ok(terrors.length === 1 && terrors[0].a === PLAYER, '16. the Scream terrifies a player nearby', terrors.map((t) => t.a));
+ok(terrors.length === 1 && /shriek/i.test(terrors[0].p.text), '16. ...and it is a shriek, not a howl, in her mouth', terrors[0] && terrors[0].p.text);
+
+// The negative that matters: no POWERS entry for the summon, so nothing here runs it twice
+n16 = packets.length;
+globalThis.__dboBeastPower(NEWP, SUMMON_SPRIGGAN);
+const after16 = packets.slice(n16).filter((x) => x.p && x.p.customPacketType === 'dboStatus' && x.p.kind === 'terror');
+ok(after16.length === 0, '16. Summon Spriggan runs NOTHING here: ConjurationSystem owns the spawn', after16.length);
+
+// Her kind is spared, where a werewolf would not be
+props.set(`${PLAYER}|percentages`, { health: 1, magicka: 1, stamina: 1 });
+polyAs(PLAYER, 'hagraven', { by: 'hagraven' });
+n16 = packets.length;
+globalThis.__dboBeastPower(NEWP, SCREAM);
+const kinSpared = packets.slice(n16).filter((x) => x.p && x.p.customPacketType === 'dboStatus' && x.p.kind === 'terror');
+ok(kinSpared.length === 0, '16. another Hagraven is kin and is not frightened', kinSpared.length);
+globalThis.__dboBeastRevert(PLAYER, 'test');
+
+// And the form gate still holds: her power does nothing in somebody else's body
+globalThis.__dboBeastRevert(NEWP, 'test');
+props.set(`${PLAYER}|percentages`, { health: 1, magicka: 1, stamina: 1 });
+n16 = packets.length;
+globalThis.__dboBeastPower(NEWP, SCREAM);
+ok(packets.slice(n16).filter((x) => x.p && x.p.kind === 'terror').length === 0,
+  '16. the Scream does nothing when she is not in the body', packets.slice(n16).length);
+
+
+// ---- 17. a missing ability record says so, instead of granting nothing in silence ----------------------------------
+// The DLE id table is an interface with no failure signal (Worker 3, 26 Oct): a desc that stops resolving gives id 0
+// and allSpells filters it, so a shifted id would leave the Hagraven with no powers and no complaint. These check the
+// complaint exists, because a safety net nobody triggers is not one.
+
+// the normal case first: everything resolves, so nothing is said
+restart({ beastform: {} });
+ok(logs.filter((l) => /not in this load order/.test(l)).length === 0,
+  '17. a load order that has every record says nothing', logs.filter((l) => /not in this load order/.test(l)));
+
+// now a load order where the DLE records are absent, as an older client or a shifted candidate would be
+logs = [];
+delete require.cache[BEASTFORM];
+delete globalThis.__dboBeastAbilitiesChecked;
+const api17 = api({ beastform: {} });
+const realDesc17 = api17.mp.getIdFromDesc;
+api17.mp.getIdFromDesc = (d) => (/DragonBreak Online Edits/.test(String(d)) ? 0 : realDesc17(d));
+require(BEASTFORM)(api17);
+
+const gone17 = logs.filter((l) => /not in this load order/.test(l));
+ok(gone17.length === 2, '17. both missing DLE records are named, one line each', gone17);
+ok(gone17.some((l) => /Hagraven Scream/.test(l) && /1d2233/.test(l)),
+  '17. ...the Scream, with the desc that failed, so a log search finds it', gone17);
+ok(gone17.some((l) => /Summon Spriggan/.test(l) && /1d2234/.test(l)), '17. ...and Summon Spriggan', gone17);
+ok(gone17.every((l) => /grants it to nobody/.test(l)), '17. ...and each says what the consequence is', gone17);
+ok(logs.some((l) => /2 ability record\(s\) missing/.test(l)), '17. ...with a count to notice at a glance',
+  logs.filter((l) => /missing from the load order/.test(l)));
+
+// and it is once per process: a hot reload must not repeat it on every save
+logs = [];
+delete require.cache[BEASTFORM];
+require(BEASTFORM)(api17);
+ok(logs.filter((l) => /not in this load order/.test(l)).length === 0,
+  '17. a hot reload does not say it again: the load order cannot change without a restart',
+  logs.filter((l) => /not in this load order/.test(l)));
+
+restart({ beastform: {} });
+
 
 console.log(fail ? `\n${fail} FAILED, ${pass} passed` : `\nall ${pass} checks passed`);
 process.exit(fail ? 1 : 0);

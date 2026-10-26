@@ -77,8 +77,14 @@ module.exports = (api) => {
   // key reaches the beast powers: /beastform grant|remove, the admin panel's grant and revoke, holdsPower, byPower and the daily
   // limit all look in FORMS alone. Each race is its Skyrim.esm RACE record, read from /opt/skyrim-data/Skyrim.esm (22 Oct):
   // ChickenRace a919d, HareRace 6dc99, GoatDomesticsRace 6fc4a, FoxRace 109c7c, DogRace 131ee, SkeeverRace 13201, MudcrabRace
-  // ba545, DeerRace cf89b. None is timed. Wolf and horse are left out: today's clients make a player wolf's copy hostile
-  // (formView ambushRaces), and a horse's copy can be ridden. Entries are never taken out while someone may be in one.
+  // ba545, DeerRace cf89b, and ten more from 25 Oct listed below. None is timed. Entries are never taken out while
+  // someone may be in one.
+  // GIANT is deliberately NOT here (Nat asked for it): creature scale is not in the RACE record at all, so the clipping
+  // and doorway risk cannot be ranked from the data and wants a dev test first. HORSE stays out because its copy can be
+  // ridden. WOLF stays out too, but note its stated reason may be stale: it was excluded because today's clients make a
+  // player wolf's copy hostile (formView ambushRaces), and formView.attacksEveryone now returns false on
+  // model.appearance BEFORE the race test, so a player's copy in a polymorph body is already exempt. Left excluded
+  // pending Nat's word rather than quietly re-enabled.
   const CREATURES = {
     chicken: { name: 'Chicken', race: idOf('a919d:Skyrim.esm') },
     hare: { name: 'Hare', race: idOf('6dc99:Skyrim.esm') },
@@ -88,6 +94,23 @@ module.exports = (api) => {
     skeever: { name: 'Skeever', race: idOf('13201:Skyrim.esm') },
     mudcrab: { name: 'Mudcrab', race: idOf('ba545:Skyrim.esm') },
     deer: { name: 'Deer', race: idOf('cf89b:Skyrim.esm') },
+    // Added 25 Oct on Nat's ask for "draugr, giant etc". Each one was measured first
+    // (_work/polymorph-more-forms-1025.md): a creature behaviour graph, already in the client's
+    // NON_HUMANOID_RACES so no caster variables are relayed for it, and no castable race spell. Whether a
+    // player can ATTACK in any of them is unknown and only answerable in game: the werewolf fights while
+    // sharing NO attack event names with the humanoid set, so name overlap predicts nothing. Draugr and
+    // Skeleton are the most promising (they share AttackStartH2HLeft/Right and bashStart) and are the first
+    // to test. Until that test they are walk-around shapes, like the eight above.
+    hagraven: { name: 'Hagraven', race: idOf('131fb:Skyrim.esm') },
+    bear: { name: 'Bear', race: idOf('131e8:Skyrim.esm') },
+    snowbear: { name: 'Snow Bear', race: idOf('131e9:Skyrim.esm') },
+    sabrecat: { name: 'Sabre Cat', race: idOf('13200:Skyrim.esm') },
+    snowsabrecat: { name: 'Snowy Sabre Cat', race: idOf('13202:Skyrim.esm') },
+    troll: { name: 'Troll', race: idOf('13205:Skyrim.esm') },
+    draugr: { name: 'Draugr', race: idOf('d53:Skyrim.esm') },
+    skeleton: { name: 'Skeleton', race: idOf('b7998:Skyrim.esm') },
+    spriggan: { name: 'Spriggan', race: idOf('13204:Skyrim.esm') },
+    falmer: { name: 'Falmer', race: idOf('131f4:Skyrim.esm') },
   };
   const CREATURE_WORDS = { rabbit: 'hare' };
   const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -129,9 +152,9 @@ module.exports = (api) => {
   // the equipment the client reports and refuses its casts and hits, which is why no beast spell ever reached anyone.
   // right/left/voice are what the client equips and binds to keys 1-9 (beastFormService.ts); passive are abilities,
   // hidden are the spells those abilities cast (bat bites, talon poison, grip damage). Ids read out of the load order.
-  const spell = (desc, name) => ({ id: idOf(desc), name });
+  const spell = (desc, name) => ({ id: idOf(desc), name, desc });
   // A werewolf howl is a shout (SHOU + word of power) in vanilla; the voice slot will not cast the bare spell
-  const howl = (spellDesc, shoutDesc, wordDesc, name) => ({ id: idOf(spellDesc), shout: idOf(shoutDesc), word: idOf(wordDesc), name });
+  const howl = (spellDesc, shoutDesc, wordDesc, name) => ({ id: idOf(spellDesc), shout: idOf(shoutDesc), word: idOf(wordDesc), name, desc: spellDesc });
   const ABILITIES = {
     vampirelord: {
       // Drain05Alt: 15 health/magicka/stamina absorbed + 50 damage a hit. 09Alt (vanilla's level 41+) dealt 175,
@@ -145,6 +168,33 @@ module.exports = (api) => {
       passive: [spell('126b8:Dawnguard.esm', 'Night Cloak')],
       hidden: [spell('126b7:Dawnguard.esm', 'Night Cloak bite'), spell('59a1:Dawnguard.esm', 'Poison Talons'), spell('e7da:Dawnguard.esm', 'Grip damage')],
     },
+    // A creature form's loadout. The Hagraven's four are exactly what EncHagraven (023ab0) carries, read from the
+    // record: the race itself grants nothing (HagravenRace has no SPLO at all). They are the NPC left-hand variants,
+    // which is what the creature casts; the player-facing duplicates would look tidier in the magic menu but would no
+    // longer be "what a Hagraven has".
+    // Whether a player can cast ANY of them in a creature body is still an in-game question - the creature graph has no
+    // cast states, and Spell.cast is the route if the hands refuse - so these are granted and ready rather than proven.
+    // Revert Form last, so the default power on the Shout key is never the one that ends the form.
+    hagraven: {
+      // NOTHING IN THE HANDS while a creature body is worn (Nat via the Leader, 25 Oct, after the crash).
+      // applyHands() returns early on a null loadout, so before her powers landed a creature had nothing equipped;
+      // giving her hand spells put equip traffic into a creature graph for the first time. The crash was the
+      // humanoid weapon-draw path (H2H_Equip against HagravenProject), not a spell equip, but equipping anything
+      // there is new and unproven, so the hands stay empty until the client guard and her claw attack ship.
+      // Her four spells are kept here, commented, because they are the verified EncHagraven set and will come back:
+      //   right: Firebolt 7d98f, Fireball 7d997 | left: Fast Healing 7231c, Close Wounds f95eb
+      right: [],
+      left: [],
+      // The two powers Nat approved on 25 Oct, built as DLE records (_notes-to-server\staged-20261025-hagraven-powers).
+      // ids from Worker 3's merge; that DLE is a CANDIDATE, so if a child ahead of ours is rebuilt these move and are
+      // the only lines to change. A desc that does not resolve gives id 0 and allSpells filters it out, so an older
+      // load order simply grants nothing rather than failing.
+      // Revert Form last, so the default power on the Shout key is never the one that ends the form.
+      voice: [spell('1d2233:DragonBreak Online Edits.esp', 'Hagraven Scream'),   // verify-formids: ignore - in Worker 3's DLE candidate (staged-20261026), not the live load order yet; the desc resolves to 0 and is filtered until it ships
+        spell('1d2234:DragonBreak Online Edits.esp', 'Summon Spriggan'),   // verify-formids: ignore - in Worker 3's DLE candidate (staged-20261026), not the live load order yet; the desc resolves to 0 and is filtered until it ships
+        spell('cd5c:Dawnguard.esm', 'Revert Form')],
+      passive: [], hidden: [],
+    },
     werewolf: {
       // Summon Wolves is left out: its wolves are placed by a Papyrus script that never runs here
       right: [], left: [],
@@ -156,6 +206,25 @@ module.exports = (api) => {
       // What the body casts by itself: the power attack's knockback and the feeding victim's hold (both were refused)
       passive: [], hidden: [spell('f3f0a:Skyrim.esm', 'Knockback'), spell('106396:Skyrim.esm', 'Feeding hold')],
     },
+  };
+  // A desc that stops resolving gives id 0 and allSpells filters it, so a form silently grants nothing: the DLE id
+  // table is an interface with no failure signal (Worker 3, 26 Oct, after our Hagraven ids landed in a candidate).
+  // One line per missing record at boot turns that into something a log search finds. Once per process, because the
+  // load order cannot change without a restart and a hot reload would only repeat it.
+  const reportUnresolvedAbilities = () => {
+    if (globalThis.__dboBeastAbilitiesChecked) return;
+    globalThis.__dboBeastAbilitiesChecked = true;
+    let missing = 0;
+    for (const key of Object.keys(ABILITIES)) {
+      for (const slot of ['right', 'left', 'voice', 'passive', 'hidden']) {
+        for (const sp of (ABILITIES[key] && ABILITIES[key][slot]) || []) {
+          if (sp.id) continue;
+          missing++;
+          log(`beastform: ${key} ${slot} "${sp.name}" (${sp.desc}) is not in this load order, so the form grants it to nobody`);
+        }
+      }
+    }
+    if (missing) log(`beastform: ${missing} ability record(s) missing from the load order`);
   };
   const allSpells = (key) => { const x = ABILITIES[key]; return x ? [...x.right, ...x.left, ...x.voice, ...x.passive, ...x.hidden].filter((sp) => sp.id) : []; };
   const learn = (a, key, on) => { for (const sp of allSpells(key)) papyrus(a, on ? 'AddSpell' : 'RemoveSpell', on ? [spellArg(sp.id), false] : [spellArg(sp.id)]); };
@@ -383,7 +452,12 @@ module.exports = (api) => {
   const DRAIN_HEAL = 15 / 450;   // Drain05Alt absorbs 15 health; a Vampire Lord has 450 (race 300 + Player 150)
   const ST = globalThis.__dboBeastPowers = globalThis.__dboBeastPowers || { cooldown: new Map(), ethereal: new Map() };
   const ethereal = (a, seconds) => { ST.ethereal.set(a, Date.now() + seconds * 1000); personal(a, `You cannot be touched for ${seconds} seconds.`); return true; };
-  const terror = (a, spellId) => {
+  // opts: { kinForm, powerName, victimText, casterText } - a Hagraven screams rather than howls and spares
+  // her own kind, not wolves. Called with no opts the werewolf's wording and kin rule are exactly as before.
+  const terror = (a, spellId, opts) => {
+    const o = opts || {};
+    const kinForm = o.kinForm || 'werewolf';
+    const powerName = o.powerName || 'Howl of Terror';
     let here = null, pos = null; try { here = mp.get(a, 'worldOrCellDesc'); pos = mp.get(a, 'pos'); } catch (e) { return false; }
     let n = 0, kin = 0;
     for (const t of api.onlineActors()) {
@@ -393,18 +467,20 @@ module.exports = (api) => {
         if (mp.get(t, 'worldOrCellDesc') !== here || Math.hypot(p[0] - pos[0], p[1] - pos[1], p[2] - pos[2]) > TERROR_RADIUS || mp.get(t, 'isDead')) continue;
         // The beast does not frighten its own kind
         const ts = stateOf(t);
-        if (ts && ts.form === 'werewolf') { kin++; continue; }
+        if (ts && ts.form === kinForm) { kin++; continue; }
         // The hit chain decides who can be touched at all (god mode refuses)
         if (typeof mp.onHitDamageAttempt === 'function' && mp.onHitDamageAttempt(a, t, spellId, 0) === false) continue;
         const pc = mp.get(t, 'percentages');
         mp.set(t, 'percentages', { health: pc.health, magicka: pc.magicka, stamina: 0 });
-        sendPacket(t, { customPacketType: 'dboStatus', kind: 'terror', seconds: TERROR_SECONDS, speedMult: -50, text: `A howl freezes your blood. You are terrified for ${TERROR_SECONDS} seconds.` });
+        sendPacket(t, { customPacketType: 'dboStatus', kind: 'terror', seconds: TERROR_SECONDS, speedMult: -50,
+          text: o.victimText ? `${o.victimText} You are terrified for ${TERROR_SECONDS} seconds.` : `A howl freezes your blood. You are terrified for ${TERROR_SECONDS} seconds.` });
         n++;
       } catch (e) { /* elsewhere */ }
     }
     const pack = kin ? ` ${kin} of your own kind ${kin === 1 ? 'stands' : 'stand'} unmoved.` : '';
-    personal(a, (n ? `Your howl terrifies ${n} ${n === 1 ? 'soul' : 'souls'}.` : 'Your howl echoes, but no one is near enough to fear it.') + pack);
-    log(`beastform: ${display(a)} Howl of Terror, ${n} terrified, ${kin} werewolf kin spared`);
+    const what = o.casterText || 'howl';
+    personal(a, (n ? `Your ${what} terrifies ${n} ${n === 1 ? 'soul' : 'souls'}.` : `Your ${what} echoes, but no one is near enough to fear it.`) + pack);
+    log(`beastform: ${display(a)} ${powerName}, ${n} terrified, ${kin} ${kinForm} kin spared`);
     return true;
   };
   const POWERS = new Map([
@@ -412,6 +488,14 @@ module.exports = (api) => {
     [idOf('38ba:Dawnguard.esm'), { name: 'Mist Form', form: 'vampirelord', cooldown: 20, run: (a) => ethereal(a, 15) }],
     // Bats had a 3 s cooldown on 3 s of ethereal, so pressing the key kept a Vampire Lord untouchable for good
     [idOf('38b9:Dawnguard.esm'), { name: 'Bats', form: 'vampirelord', cooldown: 12, run: (a) => ethereal(a, 3) }],
+    // The Hagraven's scream: the same sweep as the howl, her own kind spared instead of wolves.
+    // There is deliberately NO entry for Summon Spriggan: the fork's ConjurationSystem already spawns any
+    // SummonCreature effect a player casts (conjurationSystem.ts onSpellCast -> companions.spawn), so a run here
+    // would summon a second Spriggan. __dboBeastPower is a notification from gamemode.js whose answer is discarded,
+    // so an entry could not gate the cast either - it would buy nothing and cost a double summon.
+    [idOf('1d2233:DragonBreak Online Edits.esp'), { name: 'Hagraven Scream', form: 'hagraven', cooldown: 30,   // verify-formids: ignore - in Worker 3's DLE candidate (staged-20261026), not the live load order yet; the desc resolves to 0 and is filtered until it ships
+      run: (a, id) => terror(a, id, { kinForm: 'hagraven', powerName: 'Hagraven Scream',
+        victimText: 'A shriek splits the air.', casterText: 'scream' }) }],
   ]);
   globalThis.__dboBeastPower = (a, spellId) => {
     a = Number(a) >>> 0; spellId = Number(spellId) >>> 0;
@@ -705,6 +789,7 @@ module.exports = (api) => {
   // guardUnits, combatSeconds, forms (a list narrowing which animals may be taken; a shape already taken still ends as usual) }
   const PCFG = Object.assign({ enabled: true, guardUnits: 6000, combatSeconds: 30, forms: null },
     CFG.polymorph && typeof CFG.polymorph === 'object' ? CFG.polymorph : {});
+  reportUnresolvedAbilities();
   if (globalThis.__dboPolymorphSetBy === undefined) {
     const saved = readState();
     if (saved && typeof saved.polymorphOn === 'boolean') {
@@ -788,7 +873,9 @@ module.exports = (api) => {
     }
     return n;
   };
-  const unseeingText = (n) => `${n} ${n === 1 ? 'player' : 'players'} nearby would see a stripped human instead of the animal: their game cannot show it yet. Polymorph with nobody else within about 250 m.`;
+  // Nat's wording, 25 Oct: once 0.3.109 is live every client has creatureBody, so this should read as a temporary
+  // nuisance rather than a rule of the world
+  const unseeingText = (n) => `${n === 1 ? 'A player' : `${n} players`} nearby cannot see this form yet: move away from others, or ask them to update.`;
   // Why a cannot take an animal shape now, or ''
   const polymorphRefusal = (a) => {
     if (globalThis.__dboPolymorphOn !== true) return 'Polymorph is switched off for now.';
@@ -822,6 +909,14 @@ module.exports = (api) => {
     if (globalThis.__dboPolymorphOn !== true) return 'polymorph off';
     if (isIndoors(a)) return 'polymorph indoors';
     if (animShape(a) === 'water') return 'polymorph water';
+    // polymorphRefusal refuses these at the START; without them here a shape taken a moment before a down, a jail
+    // transfer or a binding simply survived it (Worker 5, 25 Oct). They end the shape for everyone, staff included.
+    let downed = false; try { downed = typeof globalThis.__dboIsDowned === 'function' && !!globalThis.__dboIsDowned(a); } catch (e) { downed = false; }
+    if (downed) return 'polymorph downed';
+    const jail = getp(a, 'private.dboSentence');
+    if (jail && Number(jail.totalMs) > (Number(jail.servedMs) || 0)) return 'polymorph jailed';
+    const r = getp(a, 'private.restrained');
+    if (r && (r.boundHands || r.carried || r.captorActorId)) return 'polymorph bound';
     if (unseeingNear(a) > 0) return 'polymorph guard';
     return '';
   };
@@ -836,16 +931,20 @@ module.exports = (api) => {
   // The staff audit line (who, which animal, why it ended: a fixed word, never typed text) and the staff member's own line
   const POLY_END = { 'asked to revert': 'asked', death: 'died', logout: 'logged out', login: 'logged in', 'time up': 'time up',
     'polymorph off': 'switched off', 'polymorph guard': 'a player who cannot see it came near', 'polymorph indoors': 'went indoors',
+    'polymorph downed': 'went down', 'polymorph jailed': 'was jailed', 'polymorph bound': 'was bound or carried',
     'polymorph water': 'went into water', 'reverted from the admin panel': 'staff panel', 'revert power': 'revert power' };
   const POLY_TELL = { 'polymorph off': 'polymorph was switched off', 'polymorph guard': 'a player came near whose game cannot show the animal yet',
     'polymorph indoors': 'these animals cannot open doors, so it ends indoors', 'polymorph water': 'most of these animals cannot swim, so it ends in water',
+    'polymorph downed': 'you went down', 'polymorph jailed': 'you were taken to jail', 'polymorph bound': 'you were bound or carried',
     death: 'the animal died', login: 'you were still an animal when you left' };
   const polymorphEnded = (a, s, why) => {
     const w = String(why || '');
     const end = own(POLY_END, w) ? POLY_END[w] : /^reverted by /.test(w) ? 'staff command' : 'other';
     const name = isCreature(s.form) ? CREATURES[s.form].name : 'animal';
-    audit(`BEAST ${who(a)} left the ${name} shape (polymorph): ${end}`);
-    if (own(POLY_TELL, w)) personal(a, `You are yourself again: ${POLY_TELL[w]}.`);
+    const by = String(s.by || '');
+    audit(`BEAST ${who(a)} left the ${name} shape (polymorph${by ? ', ' + by : ''}): ${end}`);
+    // A module that asked for the shape says its own ending in its own words; the animal wording suits staff polymorph
+    if (!by && own(POLY_TELL, w)) personal(a, `You are yourself again: ${POLY_TELL[w]}.`);
   };
   // A creature's body for a 'creatureBody' viewer: the race kept in private.beast at the change, else the creature table's
   const creatureBodyOf = (a) => {
@@ -854,9 +953,25 @@ module.exports = (api) => {
     const race = (Number(s.race) >>> 0) || (isCreature(s.form) ? CREATURES[s.form].race >>> 0 : 0);
     return race ? { id: a >>> 0, race } : null;
   };
+  // The third-person camera offsets for a form, sent to the client (creatureCameraService). The client applies them
+  // only when the skeleton really carries a "Camera3rd [Cam3]" node, so a form whose skeleton has none is unaffected.
+  // Config, not code: the numbers cannot be derived (creature scale is not in the RACE record) and want tuning by eye.
+  const cameraFor = (key) => {
+    const all = PCFG.camera;
+    const c = all && own(all, String(key)) ? all[String(key)] : null;
+    if (!c || typeof c !== 'object') return null;
+    const out = {};
+    for (const k of ['x', 'z', 'combatX', 'combatZ']) {
+      const v = Number(c[k]);
+      if (c[k] !== undefined && c[k] !== null && Number.isFinite(v)) out[k] = v;
+    }
+    return Object.keys(out).length ? out : null;
+  };
   const polymorphOn = () => globalThis.__dboPolymorphOn === true;
   // Returns '' when the change happened, else the sentence that says why not
-  const polymorphTo = (a, key) => {
+  // opts.by names the module that decided this change (hagraven.js passes 'hagraven'); '' is a staff change of their own
+  const polymorphTo = (a, key, opts) => {
+    const by = String((opts && opts.by) || '');
     const c = isCreature(key) ? CREATURES[key] : null;
     if (!c) return 'There is no such animal.';
     if (!c.race) return `The ${c.name} is not in this load order.`;
@@ -867,7 +982,9 @@ module.exports = (api) => {
     if (!original || !original.raceId) return 'This character has no appearance yet.';
     const race = c.race >>> 0;
     try {
-      mp.set(a, 'private.beast', { form: key, original, at: Date.now(), until: 0, race, creature: true });
+      const state = { form: key, original, at: Date.now(), until: 0, race, creature: true };
+      if (by) state.by = by;
+      mp.set(a, 'private.beast', state);
       // The mortal race stays in the appearance for every client, as a beast's does; only the name changes
       mp.set(a, 'appearance', Object.assign({}, original, { name: String((own(NAMES, key) && NAMES[key]) || c.name) }));
     } catch (e) {
@@ -875,20 +992,51 @@ module.exports = (api) => {
       try { mp.set(a, 'appearance', original); mp.set(a, 'private.beast', null); } catch (e2) { /* as it was */ }
       return 'That failed; see the server log.';
     }
-    sendPacket(a, { customPacketType: 'dboBeast', race, beast: true, form: key, wear: [], abilities: null });
-    audit(`BEAST ${who(a)} took the ${c.name} shape (polymorph, staff, own character)`);
+    // packetAbilities is null for a form with no entry, so the other seventeen are unchanged; learn() is the server
+    // half, as the beast path does both. The shared revert already calls learn(..., false), so removal is free.
+    learn(a, key, true);
+    sendPacket(a, { customPacketType: 'dboBeast', race, beast: true, form: key, wear: [], abilities: packetAbilities(key), camera: cameraFor(key) });
+    audit(`BEAST ${who(a)} took the ${c.name} shape (polymorph, ${by || 'staff, own character'})`);
     log(`beastform: ${display(a)} polymorphed into ${c.name} (race ${race.toString(16)})`);
     sendBeastBodies();
     try { if (globalThis.__dboBeastChanged) globalThis.__dboBeastChanged(a, key, true); } catch (e) { log('beast change hook failed', e.message); }
     return '';
   };
   const animals = () => Object.keys(CREATURES).filter((k) => CREATURES[k].race && !(Array.isArray(PCFG.forms) && !PCFG.forms.map(String).includes(k)));
+  // The F7 panel's picker, called by the fork's adminSystem.ts 'polymorphSelf' action. It is the SAME path
+  // /polymorph uses, so every refusal comes from polymorphTo and polymorphRefusal: the Owners' switch, the
+  // form allow-list, dead, down, bound, jailed, duelling, in a fight, mounted, seated, in water, indoors,
+  // and the creatureBody distance guard. '' means the shape was taken, anything else is the sentence to show.
+  // The rank is re-checked here rather than trusted to the caller: adminSystem gates it to a Lead GM through
+  // SPAWN_ACTIONS, and this makes the gameplay layer's own answer independent of that.
+  // It takes an actor and a form and nothing else, so there is no target to aim at somebody - Nat's call,
+  // 25 Oct: polymorph works on your own character alone.
+  globalThis.__dboPolymorphSelf = (a, key) => {
+    const me = Number(a) >>> 0;
+    if (!isLeadStaff(me)) return 'That is for a Lead GM and above.';
+    const w = String(key == null ? '' : key).trim().toLowerCase();
+    const k = own(CREATURE_WORDS, w) ? CREATURE_WORDS[w] : w;
+    if (!isCreature(k)) return 'There is no such animal.';
+    return polymorphTo(me, k);
+  };
+  // The same path for a module that has already decided the player may change - a stage-3 Hagraven, say. It skips the
+  // rank gate and NOTHING else: polymorphRefusal, the PCFG.forms allow-list, the Owners' switch and the creatureBody
+  // distance guard all still apply, and the caller is named in private.beast.by and in the audit line.
+  // It is reachable only from our own modules in this process, same trust as every other __dbo hook.
+  globalThis.__dboPolymorphAs = (a, key, opts) => {
+    const me = Number(a) >>> 0;
+    const w = String(key == null ? '' : key).trim().toLowerCase();
+    const k = own(CREATURE_WORDS, w) ? CREATURE_WORDS[w] : w;
+    if (!isCreature(k)) return 'There is no such animal.';
+    return polymorphTo(me, k, opts);
+  };
   registerChatCommand('polymorph', (a, args) => {
     a = a >>> 0;
     if (!isLeadStaff(a)) return personal(a, 'That is for a Lead GM and above.');
     const words = String(args || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
     const w = words[0] || '';
-    const usage = `Usage: /polymorph <${animals().join('|')}> | revert | list${isOwner(a) ? ' | on | off' : ''}. It works on yourself alone.`;
+    // The animals are no longer named here: there are eighteen, and /polymorph with no argument lists them
+    const usage = `Usage: /polymorph <animal> | revert | list${isOwner(a) ? ' | on | off' : ''}. It works on yourself alone; /polymorph on its own names the animals.`;
     if (w === 'on' || w === 'off') {
       if (!isOwner(a)) return personal(a, 'Only an Owner switches polymorph on or off.');
       if (words.length > 1) return personal(a, usage);
@@ -923,7 +1071,7 @@ module.exports = (api) => {
     const why = polymorphTo(a, key);
     if (why) { log(`beastform: ${display(a)} could not polymorph into ${key}: ${why}`); return personal(a, why); }
     personal(a, `You are a ${CREATURES[key].name}. Nobody near you is told. /polymorph revert turns you back; so do a death, a logout, going indoors or into water, and a player coming near whose game cannot show the animal.`);
-  }, { admin: true, help: 'chicken|hare|goat|fox|dog|skeever|mudcrab|deer|revert|list|on|off: take an animal shape yourself (never anyone else) or end it; on and off: the Owners\' switch for everyone' });
+  }, { admin: true, help: '<animal>|revert|list|on|off: take an animal shape yourself (never anyone else) or end it; /polymorph on its own names the animals; on and off: the Owners\' switch for everyone' });
 
   // Admins: grant or take the power, or force a form for testing
   registerChatCommand('beastform', (a, args) => {
@@ -1000,9 +1148,26 @@ module.exports = (api) => {
     const why = tryTransform(a, k, true);
     return why ? `${display(a)} could not change: ${why}.` : `${display(a)} took ${FORMS[k].name}.`;
   };
-  globalThis.__dboBeastHolds = (a) => ({
-    werewolf: holdsPower(a, 'werewolf'), vampirelord: holdsPower(a, 'vampirelord'),
-    form: (stateOf(a) || {}).form || null,
+  globalThis.__dboBeastHolds = (a) => {
+    const s = stateOf(a) || {};
+    return {
+      werewolf: holdsPower(a, 'werewolf'), vampirelord: holdsPower(a, 'vampirelord'),
+      form: s.form || null,
+      // The admin panel tells an animal shape from a beast one by this, not by a list of its own, so a form the
+      // panel's build never heard of is still shown and still revertible
+      creature: isCreatureState(s),
+      // When the shape was taken, for the panel's "for N min" (what /polymorph list prints); null in no shape
+      since: s.form ? Number(s.at) || null : null,
+    };
+  };
+  // Panel-wide polymorph state (fork adminSystem.ts -> adminMenuService panelData -> front): the Owners' switch
+  // and the animals that may be taken RIGHT NOW, which is CREATURES narrowed by what resolves in this load order
+  // and by config beastform.polymorph.forms. The front must not keep a list of its own: it would offer an animal
+  // the server refuses. Flat and small, since it rides every panel refresh.
+  globalThis.__dboPolymorphPanel = () => ({
+    on: polymorphOn(),
+    setBy: String(globalThis.__dboPolymorphSetBy || ''),
+    forms: animals().map((k) => ({ key: k, name: CREATURES[k].name })),
   });
   registerChatCommand('beast', (a, args) => {
     const w = String(args || '').trim().toLowerCase();
