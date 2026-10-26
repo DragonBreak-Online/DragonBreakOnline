@@ -583,7 +583,7 @@
      "note": "the marsh at the mouth of Movarth's Lair, Hjaalmarch"
     }
    ],
-   "bossEdid": "dunMovarthVampireBoss",
+   "bossEdid": "DBO_Boss_movarth",
    "addEdids": [
     "LvlVampire"
    ],
@@ -663,7 +663,8 @@
      ]
     }
    },
-   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
+   "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D2473, templated on the original with every flag) in DragonBreak_Bosses.ini"
   },
   {
    "id": "duskthorn",
