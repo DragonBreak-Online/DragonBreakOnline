@@ -92,6 +92,13 @@ public:
 
   Networking::UserId GetUserId() const;
 
+  // Re-checks a dropped item that carries extras: kept while its owner is online, returned to their
+  // inventory when they log out. See MpActor::DropItem.
+  void ScheduleDroppedExtrasCheck(MpObjectReference* placedObject,
+                                  uint32_t droppedItemFormId,
+                                  const Inventory::Entry& dropped,
+                                  const std::string& editorId);
+
   // Returns the actor to send messages to, considering hosters.
   // If this actor is offline and has a hoster, returns the hoster.
   // Otherwise returns this actor.

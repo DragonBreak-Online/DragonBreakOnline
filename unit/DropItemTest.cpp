@@ -143,3 +143,69 @@ TEST_CASE("A dropped enchanted weapon keeps the charge it was dropped with",
   DoDisconnect(partOne, 5);
   partOne.DestroyActor(0xff0a0000);
 }
+
+// Ticket 1563647648819581000: players lose enchanted and tempered gear they drop. MpActor::DropItem had two
+// ways to destroy a dropped object, and the queue cap is the faster one: it deletes the oldest live drop the
+// moment an eleventh item is dropped, so an enchanted sword put down before ten pieces of junk vanished
+// immediately, well inside the two minutes everyone was blaming.
+//
+// The two-minute timer itself is not covered here, because WorldState::TickTimers is private and a test
+// cannot fast-forward two minutes. The queue cap needs no clock at all.
+TEST_CASE("A dropped item carrying extras survives the drop queue cap",
+          "[DropItemTest]")
+{
+  auto& partOne = GetPartOne();
+  constexpr uint32_t ironDagger = 0x0001397E;
+  constexpr uint32_t ironSword = 0x00012EB7;
+
+  DoConnect(partOne, 0);
+  partOne.CreateActor(0xff000000, { 1, 2, 3 }, 0, 0x3c);
+  partOne.SetUserActor(0, 0xff000000);
+  MpActor& ac = partOne.worldState.GetFormAt<MpActor>(0xff000000);
+  ac.RemoveAllItems();
+
+  // Other cases in this binary share the world and have dropped these same base ids, so count only the
+  // objects created from here on rather than assuming any form id.
+  uint32_t firstNew = 0xff000001;
+  for (uint32_t id = 0xff000001; id < 0xff000400; ++id) {
+    if (partOne.worldState.LookupFormById(id).get()) {
+      firstNew = id + 1;
+    }
+  }
+
+  // A tempered sword. health is one of the extras that SetPickupExtras carries, and the same test holds for
+  // an enchantment, a rename, a soul or a player-made enchantment.
+  Inventory::Entry tempered(ironSword, 1);
+  tempered.health = 1.5f;
+  ac.AddItems({ tempered });
+  ac.DropItem(ironSword, tempered);
+
+  // Eleven ordinary daggers. Ten is the cap, so the eleventh evicts the oldest DAGGER.
+  for (int i = 0; i < 11; ++i) {
+    ac.AddItem(ironDagger, 1);
+    ac.DropItem(ironDagger, Inventory::Entry(ironDagger, 1));
+  }
+  partOne.Tick();
+
+  int liveSwords = 0, liveDaggers = 0, deadDaggers = 0;
+  for (uint32_t id = firstNew; id < 0xff000400; ++id) {
+    auto form = partOne.worldState.LookupFormById(id);
+    auto* refr = dynamic_cast<MpObjectReference*>(form.get());
+    if (!refr) {
+      continue;
+    }
+    const bool dead = refr->IsDeleted();
+    if (refr->GetBaseId() == ironSword && !dead) {
+      ++liveSwords;
+    }
+    if (refr->GetBaseId() == ironDagger) {
+      dead ? ++deadDaggers : ++liveDaggers;
+    }
+  }
+
+  // The fix: the tempered sword is still on the ground after eleven later drops
+  REQUIRE(liveSwords == 1);
+  // Unchanged: ordinary litter is still capped, so exactly one dagger was evicted
+  REQUIRE(liveDaggers == 10);
+  REQUIRE(deadDaggers == 1);
+}
