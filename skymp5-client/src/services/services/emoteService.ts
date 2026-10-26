@@ -26,6 +26,10 @@ interface EmoteDef {
   prop?: boolean;
   // Graph event that plays the idle's own exit clip
   exit?: string;
+  // An FNIS sequence: [seconds after the first event, event] sent while it is still the active emote
+  steps?: Array<[number, string]>;
+  // A sequence always leaves through its exit clip, movement included, then sends this [seconds later, event]
+  settle?: [number, string];
 }
 
 interface EmoteGroup {
@@ -101,6 +105,12 @@ const GROUPS: EmoteGroup[] = [
       { anim: 'IdleRitualStart', label: 'Ritual' },
       { anim: 'IdleNoteRead', label: 'Read Note', prop: true },
       { anim: 'IdleBook_PageTurn', label: 'Read Book', prop: true },
+      // Pipe Smoking SE (Nexus 13061), timed as its PipeSmokingLongPipePlayerFXScript; needs the FNIS output that registers it
+      {
+        anim: 'pipesmokingcrossleggedenter', label: 'Smoke Pipe', prop: true, exit: 'pipesmokingcrossleggedexit',
+        steps: [[3, 'pipesmokingcrossleggedstartblaze'], [3.1, 'pipesmokingcrossleggedblazed'], [7, 'pipesmokingcrosslegged']],
+        settle: [3, 'IdleStop'],
+      },
     ],
   },
   {
@@ -186,6 +196,7 @@ export class EmoteService extends ClientListener {
         this.allowedAnims.add(emote.anim);
         if (emote.prop) this.propAnims.add(emote.anim);
         if (emote.exit) this.exitEvents.set(emote.anim, emote.exit);
+        if (emote.steps) this.sequences.set(emote.anim, emote);
       }
     }
     for (const idle of ACTION_IDLES) {
@@ -199,6 +210,11 @@ export class EmoteService extends ClientListener {
       leave: (ctx) => {
         if (this.probeAnim && ctx.animEventName === this.probeAnim) {
           this.probeSucceeded = ctx.animationSucceeded;
+        }
+        // A sequence's graph without its FNIS registration refuses the first event: say what fixes it
+        if (ctx.animEventName === this.activeEmote && this.sequences.has(ctx.animEventName) && !ctx.animationSucceeded) {
+          this.activeEmote = "";
+          notifyNextUpdate(this.controller, this.sp, "This emote needs the latest game files: use Check Files in the launcher.");
         }
         if (this.diagAnim && ctx.animEventName === this.diagAnim) {
           emoteNote(`graph ${this.diagAnim} accepted=${ctx.animationSucceeded}`);
@@ -467,7 +483,7 @@ export class EmoteService extends ClientListener {
     // Ground poses hold the sit state, which refuses every other idle until it is left.
     const pose = this.exitEvents.get(previous) === "IdleChairExitStart";
     if (previous && ((previous.indexOf("Offset") === 0) !== (anim.indexOf("Offset") === 0) || this.propAnims.has(previous) || pose)) {
-      this.exitEmote(previous, () => this.sendEmote(anim));
+      this.exitEmote(previous, () => this.sendEmote(anim), this.sequences.has(previous));
       return;
     }
     this.chainId++;
@@ -492,7 +508,24 @@ export class EmoteService extends ClientListener {
       emoteNote(`sent ${anim}`);
       this.sp.Debug.sendAnimationEvent(player, anim);
       logTrace(this, `Playing emote`, anim);
+      this.runSteps(anim);
     });
+  }
+
+  // A sequence's later events, each on its own frame so the single-slot animation sync relays every one
+  private runSteps(anim: string): void {
+    const seq = this.sequences.get(anim);
+    if (!seq || !seq.steps) return;
+    const run = ++this.sequenceRun;
+    for (const [at, event] of seq.steps) {
+      this.sp.Utility.wait(at).then(() => {
+        this.controller.once("update", () => {
+          if (this.activeEmote !== anim || this.sequenceRun !== run) return;
+          const player = this.sp.Game.getPlayer();
+          if (player) this.sp.Debug.sendAnimationEvent(player, event);
+        });
+      });
+    }
   }
 
   private stopActiveEmote(graceful = false, why = "an idle's end or a newer idle"): void {
@@ -501,7 +534,21 @@ export class EmoteService extends ClientListener {
     // An emote ended within two seconds of being sent is the "nothing happens" the wheel shows: say what ended it
     if (anim && this.diagSentAt === 0) emoteNote(`stopped ${anim} before sent by ${why}`);
     else if (anim && Date.now() - this.diagSentAt < 2000) emoteNote(`stopped ${anim} after ${Date.now() - this.diagSentAt} ms by ${why}`);
-    if (anim) this.exitEmote(anim, undefined, graceful);
+    if (!anim) return;
+    const seq = this.sequences.get(anim);
+    this.sequenceRun++;
+    this.exitEmote(anim, undefined, graceful || !!seq);
+    if (!seq || !seq.settle) return;
+    // The mod's own ending: once the exit clip is over, its settle event, unless something else has begun since
+    const chain = this.chainId;
+    const [after, event] = seq.settle;
+    this.sp.Utility.wait(after).then(() => {
+      this.controller.once("update", () => {
+        if (this.chainId !== chain || this.activeEmote) return;
+        const player = this.sp.Game.getPlayer();
+        if (player) this.sp.Debug.sendAnimationEvent(player, event);
+      });
+    });
   }
 
   // IdleForceDefaultState breaks most idles; state idles that reject it get
@@ -645,6 +692,9 @@ export class EmoteService extends ClientListener {
   private allowedAnims: Set<string>;
   private propAnims: Set<string>;
   private exitEvents = new Map<string, string>();
+  private sequences = new Map<string, EmoteDef>();
+  // Bumped when a sequence starts or ends, so its pending steps know they are stale
+  private sequenceRun = 0;
   private probeAnim = "";
   // The emote last sent to the graph, for its diagnostic line (emoteNote), and when
   private diagAnim = "";
