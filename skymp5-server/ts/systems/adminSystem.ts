@@ -982,8 +982,11 @@ export class AdminSystem implements System {
   }
 
   // admin-powers.json from ck-mcp/admin_powers.py: shouts with their words (taught again at login to those given all shouts), the beast powers.
-  // spells and shouts have been empty since 17 Oct, with the real lists parked in spellsGiveAllOff and shoutsGate; the
-  // readers below take the live key first and fall back, so the data flip and the code flip stay independent
+  // spells and shouts have been empty since 17 Oct. Shouts live in shoutsGate. The spell catalogue is parked in
+  // spellsMeasureFirst, which NOTHING reads, until it has been measured on dev; renaming that key to spells is
+  // what turns the button on, and is meant to be a deliberate one-word change rather than a fallback nobody
+  // remembers is load-bearing. spellsGiveAllOff is kept as a fallback key only.
+  // The readers below take the live key first and fall back, so the data flip and the code flip stay independent
   private powers(): { spells?: Array<[string, string]>; spellsGiveAllOff?: Array<[string, string]>; shouts: Array<{ shout: string; name: string; words: string[] }>; shoutsGate?: Array<{ shout: string; name: string; words: string[] }>; werewolf: string; vampirelord?: string } | null {
     try { return JSON.parse(fs.readFileSync(path.resolve("admin-powers.json"), "utf8")); } catch { return null; }
   }
