@@ -44,9 +44,12 @@ module.exports = (api) => {
   // "bases": { "<placed base desc>": [[weight, "<desc>"], ...] }, "count": <1-4 per spot> } }. The new kind names the zones, so hostileKinds and
   // factions are the new kind's; a base the map does not list keeps the plugin's own options.
   const REPLACE = ((cfg.ownedSpawns || {}).replace) || {};
+  // exceptGroups: camps (an owned spawn's group, its marker or cell) the rule leaves to the plugin's own creature (Nat, 25 Oct:
+  // the minotaurs back at Minotaur's Rest, 17857a, while Sancre Tor keeps its undead)
   const replacedSpawn = (sp) => {
     const r = REPLACE[sp.kind];
     if (!r || typeof r !== 'object') return sp;
+    if (Array.isArray(r.exceptGroups) && r.exceptGroups.map((g) => String(g).toLowerCase()).includes(String(sp.group || '').toLowerCase())) return sp;
     const bases = r.bases || {};
     const list = Array.isArray(bases[sp.base]) ? bases[sp.base].filter((o) => Array.isArray(o) && Number(o[0]) > 0 && o[1]) : [];
     // [weight, desc]: one per spot, fixed by the spot's own id (the plugin's options are [level, desc], picked by level)
@@ -226,9 +229,13 @@ module.exports = (api) => {
       if (!id) { if (left) n++; continue; }
       out.push({ Name: `${PREFIX}${pl.kind}:${n++}`, ID: pl.world, POS: pl.pos, Size: C.radius, Anchor: pl.ref, NPC: [{ id, count: 1 }], Despawn: C.despawnSeconds, Respawn: (fromPlan && (kindOf(id) || {}).respawn) || (fromPlan && fromPlan.danger ? dangerRespawn : C.respawnSeconds) });
     }
+    // ownedSpawns.leaveOut [src]: owned spots that spawn nothing (Nat, 25 Oct: Minotaur's Rest's own Minotaur Lord, 178580, while
+    // the boss stands there; its two minotaurs stay)
+    const leaveOut = new Set((((cfg.ownedSpawns || {}).leaveOut) || []).map((x) => String(x).toLowerCase()));
     for (const raw of OWNED.spawns || []) {
       if (out.length >= C.maxZones) break;
       if (!raw || !raw.src || !raw.kind || !raw.ref || !raw.world || !Array.isArray(raw.pos)) continue;
+      if (leaveOut.has(String(raw.src).toLowerCase())) continue;
       const sp = replacedSpawn(raw);
       const { id } = safePick(sp.options, pickFor(sp));
       if (!id) continue;
@@ -395,6 +402,37 @@ module.exports = (api) => {
   const factioned = globalThis.__dboOwnedFactioned instanceof Map ? globalThis.__dboOwnedFactioned : (globalThis.__dboOwnedFactioned = new Map());
   // The sidecar is read again only when it changed, or when an apply failed and is waiting for its retry
   const factionState = globalThis.__dboOwnedFactionState || (globalThis.__dboOwnedFactionState = { mtime: 0, retry: false });
+  // An owned spawn of a kind whose weapon would not stay in hand (the minotaurs, 9 Oct) gets it back in its inventory, as
+  // dungeons.js arms its NPCs: the server's EquipBestWeapon wears it at the next host grant. gamemode-config.json
+  // ownedSpawns.rearm { <kind>: { <base desc>: <weapon desc> } }; ownedSpawns.traceKinds [<kind>] logs what each one
+  // wears at spawn and at every change (the axe test on the dev server, 25 Oct)
+  const REARM = ((cfg.ownedSpawns || {}).rearm) || {};
+  const TRACE = new Set((((cfg.ownedSpawns || {}).traceKinds) || []).map(String));
+  const traced = globalThis.__dboOwnedTraced instanceof Map ? globalThis.__dboOwnedTraced : (globalThis.__dboOwnedTraced = new Map());
+  const rearmOwned = (id, kind) => {
+    let base = ''; try { base = String(mp.get(id, 'baseDesc') || '').toLowerCase(); } catch (e) { return; }
+    const map = REARM[kind] || {};
+    const desc = Object.keys(map).find((k) => k.toLowerCase() === base);
+    const wid = desc ? idOf(map[desc]) : 0;
+    if (!wid) return;
+    let entries = []; try { const inv = mp.get(id, 'inventory'); entries = inv && Array.isArray(inv.entries) ? inv.entries.slice() : []; } catch (e) { return; }
+    const had = entries.some((e) => (Number(e.baseId) >>> 0) === wid);
+    if (!had) { entries.push({ baseId: wid, count: 1 }); try { mp.set(id, 'inventory', { entries }); } catch (e) { log('owned-spawn rearm failed', e.message); return; } }
+    log(`wildlife: ${kind} ${id.toString(16)} ${had ? 'already carries' : 'rearmed with'} ${map[desc]}`);
+  };
+  const wornOf = (id) => {
+    let eq; try { eq = mp.get(id, 'equipment'); } catch (e) { return null; }
+    const entries = eq && eq.inv && Array.isArray(eq.inv.entries) ? eq.inv.entries : null;
+    return entries ? JSON.stringify(entries.filter((e) => e && e.worn).map((e) => (Number(e.baseId) >>> 0).toString(16))) : JSON.stringify(eq === undefined ? null : eq).slice(0, 300);
+  };
+  globalThis.__dboOwnedTraceTick = () => {
+    for (const [id, t] of traced) {
+      let tag = ''; try { tag = String(mp.get(id, 'private.npcSpawner') || ''); } catch (e) { tag = ''; }
+      if (!tag) { traced.delete(id); continue; }
+      const w = wornOf(id);
+      if (w !== t.worn) { log(`wildlife: ${t.kind} ${id.toString(16)} equipment ${t.worn === undefined ? 'at spawn' : 'changed'}: ${w}`); t.worn = w; }
+    }
+  };
   const ownedFactionTick = () => {
     if (!Object.keys(factionIds).length) return;
     let mtime = 0; try { mtime = fs.statSync(SPAWNED_IDS_FILE).mtimeMs; } catch (e) { return; }
@@ -411,6 +449,8 @@ module.exports = (api) => {
       let tag = ''; try { tag = String(mp.get(id, 'private.npcSpawner') || ''); } catch (e) { continue; }
       const m = /^wild:([^:]+):p/.exec(tag);
       const kind = m ? m[1] : /^wild:br[a-z]+:b[0-9a-f]+-/.test(tag) ? 'blackreach' : /^wild:fw[a-z]+:[a-z0-9]+-/.test(tag) ? 'forsworn' : '';
+      if (kind && REARM[kind]) rearmOwned(id, kind);
+      if (kind && TRACE.has(kind)) traced.set(id, { kind, worn: undefined });
       const want = kind && factionIds[kind];
       if (!want) { factioned.set(id, ''); continue; }
       // Recorded only once applied: a failed apply is tried again on the next tick
@@ -420,7 +460,10 @@ module.exports = (api) => {
   };
   globalThis.__dboOwnedFactionTick = ownedFactionTick;
   if (globalThis.__dboOwnedFactionTimer) clearInterval(globalThis.__dboOwnedFactionTimer);
-  globalThis.__dboOwnedFactionTimer = setInterval(() => { try { globalThis.__dboOwnedFactionTick(); } catch (e) { log('owned-spawn factions tick failed', e.message); } }, 2000);
+  globalThis.__dboOwnedFactionTimer = setInterval(() => {
+    try { globalThis.__dboOwnedFactionTick(); } catch (e) { log('owned-spawn factions tick failed', e.message); }
+    try { globalThis.__dboOwnedTraceTick(); } catch (e) { log('owned-spawn trace failed', e.message); }
+  }, 2000);
   const denyAt = new Map();
   globalThis.__dboCampChest = (targetId, casterId) => {
     const hit = campChests.get(targetId);

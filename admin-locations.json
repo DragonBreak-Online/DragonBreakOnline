@@ -19794,6 +19794,214 @@
    ]
   },
   {
+   "name": "Boss: the Wraith of the Ice Cap, S1 (Winterhold)",
+   "region": "Skyrim",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    116555,
+    112027,
+    -7345
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: the Wraith of the Ice Cap, S2 (Winterhold)",
+   "region": "Skyrim",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    119754,
+    112980,
+    -8818
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: the Wraith of the Ice Cap, S3 (Winterhold)",
+   "region": "Skyrim",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    121379,
+    121316,
+    -10654
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: the Wraith of the Ice Cap, S4 (Winterhold)",
+   "region": "Skyrim",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    115771,
+    141550,
+    -14257
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: the Briarheart King, Lost Valley Redoubt's upper platform (Markarth)",
+   "region": "Skyrim",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    -92100,
+    -41500,
+    1850.79
+   ],
+   "rot": [
+    0,
+    0,
+    352.8
+   ]
+  },
+  {
+   "name": "Boss: the Centurion Master, Blackreach's pump station",
+   "region": "Skyrim",
+   "world": "1ee62:Skyrim.esm",
+   "worldName": "Blackreach",
+   "pos": [
+    15456.31,
+    13746.16,
+    1125.07
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: the Falmer Warmonger, Blackreach's Falmer city",
+   "region": "Skyrim",
+   "world": "1ee62:Skyrim.esm",
+   "worldName": "Blackreach",
+   "pos": [
+    6894.26,
+    7152.59,
+    1438.45
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: the Master of Movarth's Lair, the marsh at the mouth of Movarth's Lair (Morthal)",
+   "region": "Skyrim",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    -31704,
+    77495,
+    -13380
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: the Warchief of Dusk Thorn, Dusk Thorn Camp (Bruma)",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    70061.82,
+    179794.61,
+    -3984.07
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: the Valkynaz of the Great Gate, The Great Oblivion Gate (its map marker)",
+   "region": "Skyrim",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    -231,
+    43919,
+    2704
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: Karstaag, Castle Karstaag Ruins (its map marker)",
+   "region": "Skyrim",
+   "world": "800:Dragonborn.esm",
+   "worldName": "Solstheim World",
+   "pos": [
+    33312,
+    89920,
+    6358
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: the Risen Legate of Sancre Tor, Sancre Tor Ruins (Bruma)",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    -247.05,
+    195799.08,
+    5924.0
+   ],
+   "rot": [
+    0,
+    0,
+    51.6
+   ]
+  },
+  {
+   "name": "Boss: the Minotaur Lord of Minotaur's Rest, Minotaur's Rest (Bruma)",
+   "region": "Cyrodiil",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    124198.92,
+    172698.27,
+    -6957.45
+   ],
+   "rot": [
+    0,
+    0,
+    28.6
+   ]
+  },
+  {
    "name": "Forsworn camp: Lost Valley Redoubt (Falkreath)",
    "region": "Skyrim",
    "world": "3c:Skyrim.esm",
