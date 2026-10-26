@@ -238,28 +238,37 @@ def build(lo, defs):
     }
     for line in warn:
         print('  NOTE', line)
+    # Two bosses of one name read as one boss twice on the nameplates (Nat 26 Oct: two 'The Minotaur Lord of Minotaur's Rest'
+    # at once, the two dev tests of its axe); every boss's name is its own
+    seen = {}
+    for o in out['bosses']:
+        k = str(o.get('name', '')).strip().lower()
+        if k in seen:
+            bad.append(f"{o['id']}: its name '{o.get('name')}' is {seen[k]}'s too; every boss needs its own")
+        seen.setdefault(k, o['id'])
     return out, bad
 
 
-REGION_BY_WORLD = {'a764b:bsheartland.esm': 'Cyrodiil'}
+# Every boss teleport sits in one F7 group (Nat 26 Oct: "Where is the TP for all of the bosses?"); the panel lists a region it
+# does not know as its own chip (extraTabs.tsx regions), so no client change is needed
+BOSS_REGION = 'Bosses'
 
 
 def teleports(out, path):
     """Nat's standing rule (25 Oct: "always make sure Location teleports and all items are always updated"): every boss spot is an
-    F7 teleport, named 'Boss: <name>, <spot> (<hold>)' in its province, 64 units above the spot as admin_catalog.py places a
-    marker's. Earlier 'Boss: ' entries are replaced; nothing else in the file changes."""
+    F7 teleport, named 'Boss: <name>, <spot> (<hold>)' in the Bosses group, 64 units above the spot as admin_catalog.py places
+    a marker's. A dev-only boss gets one too, marked '(dev test)' (Nat 26 Oct: "I don't see the werewolf one either"). Earlier
+    'Boss: ' entries are replaced; nothing else in the file changes."""
     loc = json.load(open(path, encoding='utf-8'))
     rows = [r for r in loc['locations'] if not str(r.get('name', '')).startswith('Boss: ')]
     world_names = {str(r['world']).lower(): r.get('worldName', '') for r in loc['locations']}
     n = 0
     for b in out['bosses']:
-        if b.get('devOnly'):
-            continue   # a dev server's test, never a teleport on the live list
         for sp in b['spots']:
             where = ', '.join(x for x in [sp['id'] if len(b['spots']) > 1 else '', (sp.get('note') or '').split(',')[0] if len(b['spots']) == 1 else ''] if x)
             hold = b.get('hold') or ''
-            name = f"Boss: {b['name']}{', ' + where if where else ''}{' (' + hold.capitalize() + ')' if hold else ''}"
-            rows.append({'name': name, 'region': REGION_BY_WORLD.get(b['world'].lower(), 'Skyrim'), 'world': b['world'],
+            name = f"Boss: {b['name']}{', ' + where if where else ''}{' (' + hold.capitalize() + ')' if hold else ''}{' (dev test)' if b.get('devOnly') else ''}"
+            rows.append({'name': name, 'region': BOSS_REGION, 'world': b['world'],
                          'worldName': world_names.get(b['world'].lower(), ''), 'pos': [sp['pos'][0], sp['pos'][1], sp['pos'][2] + 64],
                          'rot': [0, 0, float(sp.get('heading', 0))]})
             n += 1

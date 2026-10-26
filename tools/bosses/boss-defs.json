@@ -5,45 +5,18 @@
    "id": "icecap",
    "name": "the Wraith of the Ice Cap",
    "enabled": false,
-   "waitingOn": "Nat's choice of spot (S1-S4), and the restart DLE 743a8952 that carries the shard",
+   "waitingOn": "the restart DLE 743a8952 that carries the shard",
    "hold": "winterhold",
    "world": "3c:Skyrim.esm",
    "spots": [
     {
-     "id": "S1",
+     "id": "SK",
      "pos": [
-      116555,
-      112027,
-      -7409
+      120700,
+      121400,
+      -10485.5
      ],
-     "note": "the open snowfield NE of Winterhold, 41 flat drifts, cell (28, 27); its anchor is from Obscure's College of Winterhold, so check the College's grounds"
-    },
-    {
-     "id": "S2",
-     "pos": [
-      119754,
-      112980,
-      -8882
-     ],
-     "note": "the glacier's edge, cell (29, 27)"
-    },
-    {
-     "id": "S3",
-     "pos": [
-      121379,
-      121316,
-      -10718
-     ],
-     "note": "drifts on an iceberg beyond the cliffs, cell (29, 29)"
-    },
-    {
-     "id": "S4",
-     "pos": [
-      115771,
-      141550,
-      -14321
-     ],
-     "note": "iceberg ledges at sea level, the Sea of Ghosts, cell (28, 34)"
+     "note": "Skytemple Ruins, the open ground ~540 units in front of the ruined chamber's door (SkytempleRuinsLocation EF0B0), cell (29, 29); on navmesh (-10485.5 over terrain -10528), nothing placed within 350 units. Nat 26 Oct: 'Sky Temple Ruins is the perfect place for the Ice Wraith boss', instead of the S3 iceberg (S1-S4 retired)"
     }
    ],
    "bossEdid": "EncIceWraith",
@@ -314,13 +287,13 @@
    "world": "1ee62:Skyrim.esm",
    "spots": [
     {
-     "id": "BC",
+     "id": "BE",
      "pos": [
-      6894.26,
-      7152.59,
-      1374.45
+      8594,
+      7152,
+      1082.8
      ],
-     "note": "Blackreach's Falmer city, beside its heavy Falmer spot (b1d1f5f)"
+     "note": "the dry shore east of Blackreach's Falmer city, cell (2, 1): on navmesh (1082.8) in a cell with no water, 83 above the neighbouring lakes (XCLW 1000), nothing placed within 1,160 units, 1,900 from the wild Falmer anchors (b1d1f5e-61); checked by CK eye shots 26 Oct. Nat 26 Oct: the old spot BC (6894, 7152, 1374) sat beside those anchors and the arrival froze his client; the first replacement (6994, 7952, 993) turned out to be under the lake"
     }
    ],
    "bossEdid": "EncFalmer05MeleeBoss",
@@ -339,6 +312,9 @@
     "LvlFalmerMelee"
    ],
    "openingAdds": 2,
+   "openingDelaySeconds": 4,
+   "openingStepSeconds": 3,
+   "_openingNote": "Nat 26 Oct: arriving at the old spot froze his client while the boss fight and five wild Falmer zones spawned at once; the opening adds now come 4 s after the Warmonger rises and 3 s apart (bosses.js openingDelaySeconds, openingStepSeconds)",
    "waves": [
     [
      0.66,
@@ -508,26 +484,32 @@
    "enabled": true,
    "hold": "",
    "world": "3c:Skyrim.esm",
-   "event": {
-    "minutes": 30,
-    "waveEverySeconds": 300,
-    "waveSize": 3
-   },
+   "_valkynazNote": "Nat 26 Oct: 'the Valkynaz boss doesn't spawn, nor Clennifar or the scamp minions with it'. It was an event boss (it stood only while a Lead GM ran /bossevent valkynaz) with two Dremora as adds; Nat chose (a): it stands on its own like the others, as Beyond Skyrim's Dremora Valkynaz (CYREncDremoraWarlock06, ddb29:BSHeartland.esm), with Journey to Baan Malur's High Clannfear as its guardian (mihailhighclannfear_NPC 8cb: the plain NPC; 8d5 is its summon variant) and Clannfear and Beyond Skyrim scamps as its adds",
    "spots": [
     {
      "id": "GG",
      "pos": [
       -231,
       43919,
-      2640
+      2653.2
      ],
-     "note": "The Great Oblivion Gate (its map marker)"
+     "note": "The Great Oblivion Gate (its map marker), on navmesh (2653.2; it stood 13 units under it before 26 Oct)"
     }
    ],
-   "bossEdid": "EncDremoraMelee06",
+   "bossEdid": "CYREncDremoraWarlock06",
+   "guardian": {
+    "edid": "mihailhighclannfear_NPC",
+    "offset": [
+     240,
+     -160,
+     0
+    ],
+    "name": "the Valkynaz's High Clannfear",
+    "bossToughnessWhileAlive": 0.75
+   },
    "addEdids": [
-    "EncDremoraWarlock06",
-    "EncDremoraMelee05"
+    "DDRClannfear",
+    "BSKLCharScamp"
    ],
    "openingAdds": 3,
    "waves": [
@@ -543,10 +525,10 @@
     "toughness": 0.3,
     "damageMult": 2.5
    },
-   "respawnSeconds": 1000000000,
+   "respawnSeconds": 10800,
    "radius": 6000,
    "announce": {
-    "spawn": "The Great Oblivion Gate burns open: a Valkynaz steps through.",
+    "spawn": "The Great Oblivion Gate burns open: a Valkynaz steps through, its Clannfear at its heels.",
     "death": "The Valkynaz of the Great Gate is banished."
    },
    "drops": {
@@ -768,7 +750,7 @@
   },
   {
    "id": "minotaurtest1",
-   "name": "the Minotaur Lord of Minotaur's Rest",
+   "name": "the Minotaur Lord of Minotaur's Rest (axe test 1)",
    "enabled": true,
    "devOnly": true,
    "traceEquipment": true,
@@ -842,7 +824,7 @@
   },
   {
    "id": "minotaurtest2",
-   "name": "the Minotaur Lord of Minotaur's Rest",
+   "name": "the Minotaur Lord of Minotaur's Rest (axe test 2)",
    "enabled": true,
    "devOnly": true,
    "traceEquipment": true,
