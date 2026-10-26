@@ -9,7 +9,7 @@
 // that nothing is listening for, which is a silent no-op rather than a break.
 
 module.exports = (api) => {
-  const { log, personal, registerChatCommand, sendPacket, who, isAdmin } = api;
+  const { log, personal, registerChatCommand, sendPacket, who, isAdmin, onUi } = api;
 
   const ROWS = [
     'Gold: 1,240',
