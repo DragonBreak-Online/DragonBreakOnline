@@ -40,12 +40,26 @@ const DEFAULTS = {
   placeSeconds: 300,                  // an aim not confirmed by then is dropped
   perSecond: 1, perHour: 120,
   ownerScanMinutes: 10, ownerScanPerTick: 5,
+  // The study bookshelf (decor-growing.json; Nat via the Leader, 25 Oct). A home counts as a study from minForStudy shelves,
+  // holds at most maxPerHome; each takes `books` books the character carries (no tomes, skill books or books under
+  // minBookValue gold, which are notes and letters), consumed unless booksKept, when deconstructing gives them back. The
+  // study rate at a home shelf is schools.js's study.homeRate.
+  study: { maxPerHome: 3, minForStudy: 2, books: 10, booksKept: false, minBookValue: 5 },
+  // Planters: plant one of Hearthfire's crops, it ripens after growHours real hours (rareHours for the rare ones), a pick
+  // is one Harvesting roll (skills.json harvesting: chance and multiplier by tier) on baseYield, missYield if it fails;
+  // then the planter is empty again. showZ raises the soil and the crop to the planter's bed. tickSeconds: the ripening check.
+  planter: { maxPerHome: 4, growHours: 24, rareHours: 48, baseYield: 2, missYield: 1, showZ: 30, tickSeconds: 60 },
 };
 
 module.exports = (api) => {
   const { mp, log, personal, audit, who, onUi, sendPacket, registerChatCommand, onlineActors, isAdmin, giveItem, findByName } = api;
   const C = Object.assign({}, DEFAULTS, (api.cfg || {}).decor || {});
+  C.study = Object.assign({}, DEFAULTS.study, ((api.cfg || {}).decor || {}).study || {});
+  C.planter = Object.assign({}, DEFAULTS.planter, ((api.cfg || {}).decor || {}).planter || {});
+  const itemName = (d) => { try { const n = typeof api.itemName === 'function' ? api.itemName(d) : ''; return n && n !== d ? String(n) : String(d); } catch (e) { return String(d); } };
   const S = globalThis.__dboDecor || (globalThis.__dboDecor = { catalog: null, byDesc: null, reg: null, pending: new Map(), undo: new Map(), rate: new Map(), found: new Map(), scanAt: 0, scanIdx: 0 });
+  S.catalog = null; S.growing = null; S.matNames = null;   // a hot reload reads the catalogue files again (decor-growing.json's ids are filled in later)
+  if (!S.plantFor) S.plantFor = new Map();                  // actor -> the planter whose /decor plant list they were shown
 
   const ID_PREFIX = 'decor:';
   const TAG = 'private.dboDecor';
@@ -71,10 +85,24 @@ module.exports = (api) => {
         const row = Object.assign({}, p, { groupLabel: g.label, hay: `${p.name} ${p.edid} ${g.id}`.toLowerCase() });
         S.catalog.push(row); S.byDesc.set(String(p.desc).toLowerCase(), row);
       }
+      // the study bookshelf and the planter (decor-growing.json): offered once the merged DLE's ids are filled in
+      for (const p of growing().pieces || []) {
+        if (!p.desc) continue;
+        const row = Object.assign({}, p, { groupLabel: p.group, hay: `${p.name} ${p.edid} ${p.group}`.toLowerCase() });
+        S.catalog.push(row); S.byDesc.set(String(p.desc).toLowerCase(), row);
+      }
       log(`decor: catalogue of ${S.catalog.length} pieces`);
     } catch (e) { log('decor: decor-catalog.json unreadable', e.message); S.catalog = []; S.byDesc = new Map(); }
     return S.catalog;
   };
+  const growing = () => {
+    if (S.growing) return S.growing;
+    try { S.growing = JSON.parse(fs.readFileSync(path.resolve('decor-growing.json'), 'utf8')); } catch (e) { S.growing = {}; }
+    S.cropOf = new Map();
+    for (const c of S.growing.crops || []) if (c.desc && c.item) S.cropOf.set(String(c.item).toLowerCase(), c);
+    return S.growing;
+  };
+  const crops = () => { growing(); return [...S.cropOf.values()]; };
   const pieceOf = (desc) => { catalog(); return S.byDesc.get(String(desc || '').toLowerCase()) || null; };
   const costOf = (piece) => {
     const out = {}, src = piece[C.costField] || piece.costB || {};
@@ -177,6 +205,36 @@ module.exports = (api) => {
     mp.set(a, 'inventory', { entries: entries.filter((e) => (Number(e.count) || 0) > 0) });
     return true;
   };
+  // ---- books for a study bookshelf: any BOOK carried, except one that teaches a skill or a spell (DATA flags 0x1, 0x4) and
+  // one worth under minBookValue (notes, letters); the cheapest go first. SSE BOOK DATA: flags u8, type u8, u16, teaches u32,
+  // value u32, weight f32
+  const bookValue = (baseId) => {
+    if (!S.bookVal) S.bookVal = new Map();
+    if (S.bookVal.has(baseId)) return S.bookVal.get(baseId);
+    let v = -1;
+    try {
+      const r = mp.lookupEspmRecordById(baseId), rec = r && r.record;
+      if (rec && String(rec.type) === 'BOOK') {
+        const f = (rec.fields || []).find((x) => x.type === 'DATA');
+        if (f && f.data instanceof Uint8Array && f.data.byteLength >= 12) {
+          const dv = new DataView(f.data.buffer, f.data.byteOffset, f.data.byteLength);
+          v = (dv.getUint8(0) & 0x05) ? -1 : dv.getUint32(8, true);
+        }
+      }
+    } catch (e) { v = -1; }
+    S.bookVal.set(baseId, v);
+    return v;
+  };
+  const booksOf = (a) => (get(a, 'inventory', { entries: [] }).entries || [])
+    .filter((e) => !e.worn && (Number(e.count) || 0) > 0 && bookValue(Number(e.baseId) >>> 0) >= (Number(C.study.minBookValue) || 0))
+    .sort((x, y) => bookValue(Number(x.baseId) >>> 0) - bookValue(Number(y.baseId) >>> 0));
+  const booksHeld = (a) => booksOf(a).reduce((n, e) => n + (Number(e.count) || 0), 0);
+  const takeBooks = (a, n) => {
+    const out = {}; let left = n;
+    for (const e of booksOf(a)) { if (left <= 0) break; const k = Math.min(left, Number(e.count) || 0); out[mp.getDescFromId(Number(e.baseId) >>> 0)] = k; left -= k; }
+    if (left > 0 || !takeAll(a, out)) return null;
+    return out;
+  };
   const giveAll = (a, cost, share) => {
     const got = {};
     for (const [d, n] of Object.entries(cost)) { const k = Math.floor(Number(n) * share); if (k > 0 && giveItem(a, idOf(d), k) !== false) got[d] = k; }
@@ -261,6 +319,7 @@ module.exports = (api) => {
     if (why) return personal(a, why);
     const short = shortOf(a, costOf(piece));
     if (short.length) return personal(a, `${piece.name} needs ${costText(costOf(piece), a)}. Short: ${short.map((x) => `${x.n - x.have} ${nameOfItem(x.d)}`).join(', ')}.`);
+    if (piece.kind === 'study' && booksHeld(a) < C.study.books) return personal(a, `${piece.name} also needs ${C.study.books} books to fill it (any you carry but spell tomes, skill books, notes and letters); you have ${booksHeld(a)}.`);
     const me = get(a, 'pos', [0, 0, 0]), ang = get(a, 'angle', [0, 0, 0]);
     const yaw = (Number(ang[2]) || 0) * Math.PI / 180;
     const pos = [me[0] + Math.sin(yaw) * 150, me[1] + Math.cos(yaw) * 150, me[2]];
@@ -274,6 +333,10 @@ module.exports = (api) => {
     if (u.pieces >= b.pieces) return `This home holds its ${b.pieces} pieces already. Remove one first.`;
     if (piece.light && u.lights >= b.lights) return `This home has its ${b.lights} lights already.`;
     if (piece.container && u.containers >= b.containers) return `This home has its ${b.containers} placed containers already.`;
+    if (piece.kind === 'study' || piece.kind === 'planter') {
+      const cap = Math.max(0, Number((piece.kind === 'study' ? C.study : C.planter).maxPerHome) || 0);
+      if (p.items.filter((i) => i.kind === piece.kind).length >= cap) return `This home has its ${cap} ${piece.kind === 'study' ? 'study bookshelves' : 'planters'} already.`;
+    }
     if (piece.station) {
       const st = piece.station;
       if (u.stations.has(st.keyword)) return `This home has a ${piece.name} already.`;
@@ -315,6 +378,7 @@ module.exports = (api) => {
       const from = { pos: it.pos, rot: it.rot, cell: it.cell };
       pose(parseInt(it.ref, 16) >>> 0, cell, pos, rot);
       if (it.light) pose(parseInt(it.light, 16) >>> 0, cell, pos, rot);
+      if (it.show) pose(parseInt(it.show, 16) >>> 0, cell, showPos(pos), rot);
       Object.assign(it, { pos, rot, cell }); save();
       pushUndo(a, { op: 'moved', root: hex(pl.root), ref: it.ref, from });
       audit(`DECOR move ${who(a)} ${it.name} (${it.base}) ref ${it.ref} place ${hex(pl.root)} to ${pos.map(Math.round).join(',')}`);
@@ -326,13 +390,18 @@ module.exports = (api) => {
     const why = spotProblem(a, pl, piece, pos, rot) || budgetProblem(pl, piece, a);
     if (why) return refuse(why, 'spot or budget');
     const cost = costOf(piece);
+    if (piece.kind === 'study' && booksHeld(a) < C.study.books) return refuse(`${piece.name} needs ${C.study.books} books.`, 'books');
     if (!takeAll(a, cost)) return refuse(`${piece.name} needs ${costText(cost, a)}.`, 'materials');
+    let books = null;
+    if (piece.kind === 'study') { books = takeBooks(a, C.study.books); if (!books) { giveAll(a, cost, 1); return refuse(`${piece.name} needs ${C.study.books} books.`, 'books'); } }
     const tag = { root: hex(pl.root), by: profile(a), at: Date.now() };
     let id = 0, light = 0;
     try { id = create(a, piece.desc, cell, pos, rot, tag); if (id && piece.light && piece.light.base) light = create(a, piece.light.base, cell, pos, rot, Object.assign({ of: hex(id) }, tag)); }
     catch (e) { log('decor: create failed', e.stack || e.message); }
-    if (!id) { giveAll(a, cost, 1); return refuse('It could not be placed; your materials are back.', 'create failed'); }
+    if (!id) { giveAll(a, cost, 1); if (books) giveAll(a, books, 1); return refuse('It could not be placed; your materials are back.', 'create failed'); }
     const it = { ref: hex(id), base: piece.desc, name: piece.name, group: piece.group, cell, pos, rot, by: profile(a), char: a >>> 0, at: new Date().toISOString(), paid: cost };
+    if (piece.kind) it.kind = piece.kind;
+    if (books) it.books = books;
     if (light) it.light = hex(light);
     if (piece.container) it.container = true;
     if (piece.station) it.station = piece.station.keyword;
@@ -350,10 +419,12 @@ module.exports = (api) => {
     const paid = it.paid || {}, priced = !!pieceOf(it.base) && Object.keys(paid).length > 0;
     // the record goes first and is saved before anything is paid, so no path can pay for the same piece twice
     p.items.splice(p.items.indexOf(it), 1); save();
-    destroy(it.ref); if (it.light) destroy(it.light);
+    destroy(it.ref); if (it.light) destroy(it.light); if (it.show) destroy(it.show);
     let got = {};
     if (share === 'deconstruct') { if (priced) got = giveRefund(a, paid, deconstructShare(a)); }
     else if (share > 0) got = giveAll(a, paid, share);
+    // a study bookshelf's books come back whole on undo, and on deconstruct when booksKept (else they are in the shelf)
+    if (it.books && (share === 1 || C.study.booksKept)) for (const [d, n] of Object.entries(giveAll(a, it.books, 1))) got[d] = (got[d] || 0) + n;
     audit(`DECOR ${why} ${who(a)} ${it.name} (${it.base}) ref ${it.ref} place ${hex(root)} refund ${JSON.stringify(got)}`);
     personal(a, `${it.name} is taken down${Object.keys(got).length ? `; back to you: ${costText(got)}` : ''}.`);
     return true;
@@ -368,6 +439,7 @@ module.exports = (api) => {
     const it = found.item;
     pose(parseInt(it.ref, 16) >>> 0, step.from.cell, step.from.pos, step.from.rot);
     if (it.light) pose(parseInt(it.light, 16) >>> 0, step.from.cell, step.from.pos, step.from.rot);
+    if (it.show) pose(parseInt(it.show, 16) >>> 0, step.from.cell, showPos(step.from.pos), step.from.rot);
     Object.assign(it, step.from); save();
     audit(`DECOR undo-move ${who(a)} ${it.name} ref ${it.ref}`);
     return personal(a, `${it.name} is back where it was.`);
@@ -385,8 +457,9 @@ module.exports = (api) => {
       if (same) continue;
       const owed = r.owed[ownerKey(p.owner, p.ownerChar)] = r.owed[ownerKey(p.owner, p.ownerChar)] || {};
       for (const it of p.items) {
-        destroy(it.ref); if (it.light) destroy(it.light);
+        destroy(it.ref); if (it.light) destroy(it.light); if (it.show) destroy(it.show);
         for (const [d, n] of Object.entries(it.paid || {})) { const q = Math.floor(n * C.abandonRefund); if (q > 0) owed[d] = (owed[d] || 0) + q; }
+        if (it.books && C.study.booksKept) for (const [d, n] of Object.entries(it.books)) owed[d] = (owed[d] || 0) + n;
       }
       audit(`DECOR abandon place ${k} owner ${p.owner}:${hex(p.ownerChar)} items ${p.items.length} owed ${JSON.stringify(owed)}`);
       delete r.places[k]; changed = true;
@@ -402,6 +475,87 @@ module.exports = (api) => {
     if (changed) save();
   };
   if (typeof api.every === 'function') api.every('decor-owners', Math.max(1, C.ownerScanMinutes) * 60000, () => { try { if (C.enabled) scanOwners(); } catch (e) { log('decor: owner scan failed', e.stack || e.message); } });
+
+  // ---- the study bookshelf and the planters at work (gamemode.js asks __dboDecorActivate before schools.js) -------------
+  const showPos = (pos) => [pos[0], pos[1], pos[2] + (Number(C.planter.showZ) || 0)];
+  const placeOfFound = (found) => ({ root: found.root, rec: get(found.root, 'private.housing', null) });
+  const inWords = (ms) => { const m = Math.max(1, Math.ceil(ms / 60000)); return m < 90 ? `${m} minutes` : `${Math.round(m / 60)} hours`; };
+  const harvesting = () => {
+    if (!S.harvest) { try { S.harvest = (JSON.parse(fs.readFileSync(path.resolve('skills.json'), 'utf8')).skills || []).find((k) => k.id === 'harvesting') || {}; } catch (e) { S.harvest = {}; } }
+    return S.harvest;
+  };
+  const cropFor = (item) => { growing(); return S.cropOf.get(String(item || '').toLowerCase()) || null; };
+  const hoursOf = (crop) => Number(crop && crop.rare ? C.planter.rareHours : C.planter.growHours) || 24;
+  // the planter's model: soil while a crop grows, the crop once ripe, nothing when empty; made at the planter itself, so
+  // ripening needs nobody there
+  const showCrop = (it, desc) => {
+    if (it.show) { destroy(it.show); delete it.show; }
+    if (!desc) return;
+    let id = 0;
+    try { id = create(parseInt(it.ref, 16) >>> 0, desc, it.cell, showPos(it.pos), it.rot, { of: it.ref, show: true }); } catch (e) { log('decor: planter model failed', e.message); }
+    if (id) it.show = hex(id);
+  };
+  const plant = (a, found, crop) => {
+    const it = found.item;
+    if (!takeAll(a, { [crop.item]: 1 })) return personal(a, `You have no ${itemName(crop.item)} to plant.`);
+    it.crop = { item: crop.item, at: Date.now(), ripeAt: Date.now() + hoursOf(crop) * 3600000, by: profile(a) };
+    showCrop(it, (growing().soil || {}).desc);
+    save();
+    audit(`DECOR plant ${who(a)} ${crop.item} in planter ${it.ref} place ${hex(found.root)} ripe ${new Date(it.crop.ripeAt).toISOString()}`);
+    return personal(a, `You plant ${itemName(crop.item)}. It ripens in ${hoursOf(crop)} hours.`);
+  };
+  // a pick is one Harvesting roll (skills.json harvesting, as a wild plant rolls) on baseYield; missYield if it fails
+  const pick = (a, found) => {
+    const it = found.item, crop = it.crop, H = harvesting(), tier = skillRank(a, 'harvesting');
+    const chance = tier >= 0 ? Number((H.yieldChanceByTier || [])[tier]) || 1 : Number((H.unskilled || {}).yieldChance) || 0.25;
+    const mult = tier >= 0 ? Number((H.yieldMultiplierByTier || [])[tier]) || 1 : Number((H.unskilled || {}).yieldMultiplier) || 0.5;
+    const n = Math.random() < chance ? Math.max(1, Math.round((Number(C.planter.baseYield) || 1) * mult)) : Math.max(0, Number(C.planter.missYield) || 0);
+    // the record goes first and is saved before anything is given, so no path can pick the same crop twice
+    delete it.crop; showCrop(it, null); save();
+    if (n > 0) giveItem(a, idOf(crop.item), n);
+    try { if (typeof globalThis.__alduinakMasteryEvent === 'function') globalThis.__alduinakMasteryEvent('activate', a, { refrId: parseInt(it.ref, 16) >>> 0 }); } catch (e) { /* no skill system */ }
+    audit(`DECOR pick ${who(a)} ${crop.item} x${n} from planter ${it.ref} place ${hex(found.root)} tier ${tier}`);
+    return personal(a, n ? `You pick ${n} ${itemName(crop.item)}. The planter is empty again.` : `The ${itemName(crop.item)} failed. The planter is empty again.`);
+  };
+  const usePlanter = (a, found) => {
+    const it = found.item;
+    if (!mayDecorate(a, placeOfFound(found))) return personal(a, 'Only the owner, or someone the owner named with /decor grant, tends this planter.');
+    if (!it.crop) {
+      const held = crops().filter((c) => heldOf(a, idOf(c.item)) > 0);
+      if (!held.length) return personal(a, `Nothing to plant. A planter grows Hearthfire's crops: ${crops().slice(0, 8).map((c) => itemName(c.item)).join(', ')} and more.`);
+      if (held.length === 1) return plant(a, found, held[0]);
+      S.plantFor.set(a >>> 0, { ref: it.ref, list: held.map((c) => c.item), at: Date.now() });
+      return personal(a, `Plant what? ${held.map((c, i) => `${i + 1}. ${itemName(c.item)}${c.rare ? ' (slow)' : ''}`).join(', ')}. Say /decor plant <n>.`);
+    }
+    if (!it.crop.ripe && Date.now() < it.crop.ripeAt) return personal(a, `The ${itemName(it.crop.item)} is growing; ready in ${inWords(it.crop.ripeAt - Date.now())}.`);
+    return pick(a, found);
+  };
+  const ripen = () => {
+    const now = Date.now(); let changed = false;
+    for (const p of Object.values(reg().places)) for (const it of p.items) {
+      if (it.kind !== 'planter' || !it.crop || it.crop.ripe || now < it.crop.ripeAt) continue;
+      const crop = cropFor(it.crop.item);
+      showCrop(it, crop && crop.desc);
+      it.crop.ripe = true; changed = true;
+    }
+    if (changed) save();
+  };
+  if (typeof api.every === 'function') api.every('decor-grow', Math.max(10, Number(C.planter.tickSeconds) || 60) * 1000, () => { try { if (C.enabled) ripen(); } catch (e) { log('decor: ripening failed', e.stack || e.message); } });
+  globalThis.__dboDecorActivate = (target, caster) => {
+    if (!C.enabled) return false;
+    const found = itemByRef(hex(target));
+    if (!found) return false;
+    const it = found.item;
+    if (it.kind === 'study') {
+      // a home is a study from minForStudy shelves; then schools.js opens Study Magic or Priest Studies as at a library
+      const n = found.place.items.filter((i) => i.kind === 'study').length, need = Math.max(1, Number(C.study.minForStudy) || 1);
+      if (n < need) { personal(caster, `A home study needs ${need} study bookshelves; this home has ${n}.`); return true; }
+      return false;
+    }
+    if (it.kind !== 'planter') return false;
+    try { usePlanter(caster, found); } catch (e) { log('decor: planter failed', e.stack || e.message); personal(caster, 'That failed; see the server log.'); }
+    return true;
+  };
 
   // ---- the edit mode's packets (placement.js leaves 'decor:' ids and decor references to this file) --------------------
   globalThis.__dboDecorId = (id) => String(id || '').startsWith(ID_PREFIX);
@@ -448,6 +602,17 @@ module.exports = (api) => {
       if (!piece) return personal(a, 'Pick a number from /decor find first.');
       return startNew(a, piece);
     }
+    if (sub === 'plant') {
+      const pf = S.plantFor.get(a >>> 0), n = Number(rest);
+      if (!pf || Date.now() - pf.at > 300000) return personal(a, 'Use an empty planter first; it lists what you can plant.');
+      const found = itemByRef(pf.ref), crop = Number.isInteger(n) && n >= 1 ? cropFor(pf.list[n - 1]) : null;
+      if (!found || found.item.kind !== 'planter') return personal(a, 'That planter is gone.');
+      if (!crop) return personal(a, 'Pick a number from the planter list.');
+      if (found.item.crop) return personal(a, 'Something is already growing there.');
+      if (!mayDecorate(a, placeOfFound(found))) return personal(a, 'Only the owner, or someone the owner named with /decor grant, tends this planter.');
+      S.plantFor.delete(a >>> 0);
+      return plant(a, found, crop);
+    }
     if (!pl) return personal(a, 'Stand inside your own home first.');
     const items = listOf(a, pl);
     if (sub === 'list') return personal(a, items.length ? items.map((it, i) => `${i + 1}. ${it.name} [${it.group}]`).join('\n') : 'Nothing placed here yet.');
@@ -475,14 +640,14 @@ module.exports = (api) => {
     if (sub === 'clear') {
       if (!isDeveloper(a)) return personal(a, 'That is for Developers.');
       const p = placeEntry(pl.root, pl.rec), r = reg(), owed = r.owed[ownerKey(p.owner, p.ownerChar)] = r.owed[ownerKey(p.owner, p.ownerChar)] || {};
-      for (const it of p.items) { destroy(it.ref); if (it.light) destroy(it.light); for (const [d, n] of Object.entries(it.paid || {})) owed[d] = (owed[d] || 0) + n; }
+      for (const it of p.items) { destroy(it.ref); if (it.light) destroy(it.light); if (it.show) destroy(it.show); for (const [d, n] of Object.entries(Object.assign({}, it.paid || {}, it.books || {}))) owed[d] = (owed[d] || 0) + n; }
       audit(`DECOR clear ${who(a)} place ${hex(pl.root)} items ${p.items.length} owed whole to ${p.owner}:${hex(p.ownerChar)}`);
       p.items = []; save();
       return personal(a, 'Cleared; the owner gets everything back at their next scan online.');
     }
     return personal(a, 'Unknown. /decor help');
-  }, { help: 'decorate your home: find, place, list, move, remove, undo, grant, revoke' });
+  }, { help: 'decorate your home: find, place, list, move, remove, undo, grant, revoke, plant' });
 
   // test hooks (tests/decor-harness.js)
-  return { _test: { takeAll, costOf, budgetProblem, spotProblem, confirm, scanOwners, reg, S, C } };
+  return { _test: { takeAll, costOf, budgetProblem, spotProblem, confirm, scanOwners, reg, S, C, usePlanter, plant, pick, ripen, showPos } };
 };
