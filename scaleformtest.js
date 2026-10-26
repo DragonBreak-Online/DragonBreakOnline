@@ -33,6 +33,10 @@ module.exports = (api) => {
   registerChatCommand('testmenu', (a, args) => {
     const sub = String(args || '').trim().toLowerCase();
     if (sub === 'close') { sendPacket(a, { customPacketType: 'dboScaleform', close: true }); return personal(a, 'Closing the test panel.'); }
+    if (sub === 'mapmenu') {
+      sendPacket(a, { customPacketType: 'dboMapTest' });
+      return personal(a, 'Map tests armed. Open the map (M), keep it still for two seconds, then pan slowly until a line in chat gives the results. Say whether you see a "The Realm" legend at the top right.');
+    }
     if (sub === 'map') {
       sendPacket(a, { customPacketType: 'dboScaleform', swf: 'dbo_mapprobe', payload: { paths: MAP_PATHS, waitMs: 6000 }, widget: 0 });
       return personal(a, 'Opening the map image probe: each line says whether that path loaded. Close it when every line has an answer.');
@@ -42,7 +46,7 @@ module.exports = (api) => {
     show(a, 'DBO test panel', ROWS);
     personal(a, 'Opening the test panel. It pauses the game; click Close to come back. /testmenu many and /testmenu wide are the other two.');
     log(`scaleform test panel opened by ${who(a)}`);
-  }, { admin: true, hidden: true, help: '[many|wide|map|close] open the Scaleform test panel (hagtest2 client only)' });
+  }, { admin: true, hidden: true, help: '[many|wide|map|mapmenu|close] open the Scaleform test panel (hagtest2 client only)' });
 
   // A row click. The panel sends "dbo:testRow" with [index] on the shared panel wire, so the client turns it
   // into the same { customPacketType: 'dbo', event, args, widget } packet a browser widget sends and it
@@ -62,6 +66,16 @@ module.exports = (api) => {
     const text = list.map((r) => `${r && r.path}: ${r && r.state}${r && r.state === 'init' ? ` ${r.w}x${r.h}` : r && r.code ? ` ${r.code}` : ''}`).join('; ');
     log(`scaleform map probe from ${who(a)}: ${text || 'no results'}`);
     if (isAdmin(a)) personal(a, `Map probe: ${text || 'no results'}`);
+  });
+
+  // The M map tests' answers (_work/mmap-build-1026.md): T1 a clip made on the map, T2 how often markers move, T3 the legend
+  // mounted, T4 a marker's scale after panning
+  onUi('mapTest', (a, args) => {
+    const r = Array.isArray(args) && args[0] && typeof args[0] === 'object' ? args[0] : {};
+    const t2 = r.t2 && typeof r.t2 === 'object' ? `still ${r.t2.still}, panning ${r.t2.panning} of ${r.t2.frames} frames` : 'none';
+    const text = `T1 ${r.t1}; T2 ${t2}; T3 ${r.t3}; T4 scale ${r.t4}; ${r.markers} markers; ${r.end}`;
+    log(`scaleform mapmenu test from ${who(a)}: ${text}`);
+    if (isAdmin(a)) personal(a, `Map tests: ${text}`);
   });
 
   // The older reply shape, kept only for a client that predates the shared wire. The live client sends its
