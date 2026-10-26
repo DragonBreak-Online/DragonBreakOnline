@@ -1,6 +1,7 @@
 dbo.as
 dbo-controls.as
-../dbo_journal/flow.as
+dbo-flow.as
+../dbo_journal/tabs.as
 ../dbo_journal/tabs/stats.as
 ../dbo_journal/tabs/world.as
 ../dbo_journal/tabs/wanted.as

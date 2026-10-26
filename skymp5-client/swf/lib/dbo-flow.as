@@ -1,8 +1,7 @@
-// The native journal's page layout: a tab draws blocks top to bottom, and a block that does not fit starts the next page.
-// Every page is drawn; only the shown one is visible and only its controls take the focus (flowEnd).
-// JT[tabId] = function(section, ctx) draws one tab with these; ctx is the shell's (act, openTab, browser, busy, readOnly).
+// Paged layout for a native panel: a panel draws blocks top to bottom, and a block that does not fit starts the next page.
+// Every page is drawn; only the shown one is visible and only its controls take the focus (flowShow).
+// A panel calls flowStart(parent, depth, x, y), its blocks, then flowShow(page); BODY_W and BODY_H are the page size.
 
-var JT = {};
 var BODY_W = 1124;
 var BODY_H = 410;
 var LINE_GAP = 6;
