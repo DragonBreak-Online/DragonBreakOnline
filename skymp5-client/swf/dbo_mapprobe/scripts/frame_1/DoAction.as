@@ -97,8 +97,7 @@ function probe(i)
 function build(paths)
 {
    panel = _root.createEmptyMovieClip("dboPanel", 10);
-   panel._x = (STAGE_W - PANEL_W) / 2;
-   panel._y = 30;
+   dboFit(panel, PANEL_W, PANEL_H);
    var bg = panel.createEmptyMovieClip("bg", 1);
    dboBox(bg, 0, 0, PANEL_W, PANEL_H, 0x000000, 85);
    var title = dboText(panel, "title", 2, PAD, 12, PANEL_W - PAD * 2, 36, dboFmt(F_PLAIN, 26, C_TEXT, 1.0), false);

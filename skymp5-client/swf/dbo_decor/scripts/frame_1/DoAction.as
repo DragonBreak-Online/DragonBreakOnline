@@ -344,8 +344,10 @@ function drawFooter()
          });
       }
    }
-   var hint = dboText(f, "hint", 5, PANEL_W - PAD - 380, y + 6, 380, 24, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8, "right"), false);
-   hint.text = "1-8 or click to choose.  Arrows: page.  Q / R: tab.  Esc: close.";
+   // starts after the page arrows, so the hint never runs under them
+   var hx = PANEL_W / 2 + 150;
+   var hint = dboText(f, "hint", 5, hx, y + 6, PANEL_W - PAD - hx, 24, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8, "right"), false);
+   hint.text = "1-8 choose  -  Arrows page  -  Q / R tab";
 }
 
 function draw()
@@ -372,8 +374,7 @@ function draw()
 function build()
 {
    panel = _root.createEmptyMovieClip("dboPanel", 10);
-   panel._x = (STAGE_W - PANEL_W) / 2;
-   panel._y = 60;
+   dboFit(panel, PANEL_W, PANEL_H);
    var bg = panel.createEmptyMovieClip("bg", 1);
    dboBox(bg, 0, 0, PANEL_W, PANEL_H, 0x000000, 80);
    dboFadeIn(panel);

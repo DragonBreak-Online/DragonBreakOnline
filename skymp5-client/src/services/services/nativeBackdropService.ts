@@ -1,9 +1,13 @@
 import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { logError } from "../../logging";
 
-// While a native panel is open, the HUD's crosshair shows through its translucent ground at the centre of the screen, and
-// reads as a logo behind the panel (Nat, 26 Oct). It is faded to a faint watermark for as long as the panel is up and
-// given back its own alpha after. The path is vanilla hudmenu.swf's (read only): _root.HUDMovieBaseInstance.Crosshair.
+// While a native panel (CustomMenu) is open, what is behind and over it is quietened (Nat, 26 Oct):
+// - the browser is hidden, as browserService hides it for the vanilla menus. It draws over every Scaleform menu, so the
+//   chat and the HUD's hourglass watermark sat on top of the panel (the map probe's screenshot). It comes back after,
+//   if this hid it;
+// - the HUD crosshair shows through the panel's translucent ground at the centre of the screen. It is faded to a faint
+//   watermark and given back its own alpha after. The path is vanilla hudmenu.swf's (read only):
+//   _root.HUDMovieBaseInstance.Crosshair.
 export const HUD_MENU = "HUD Menu";
 export const CROSSHAIR_ALPHA = "_root.HUDMovieBaseInstance.Crosshair._alpha";
 export const PANEL_MENU = "CustomMenu";
@@ -30,11 +34,20 @@ export class NativeBackdropService extends ClientListener {
         this.sp.Ui.setFloat(HUD_MENU, CROSSHAIR_ALPHA, this.saved);
         this.saved = null;
       }
+      // Re-asserted while open: another service may show the browser meanwhile (a HUD refresh)
+      if (open && this.sp.browser.isVisible()) {
+        this.sp.browser.setVisible(false);
+        this.hidBrowser = true;
+      } else if (!open && this.hidBrowser) {
+        this.hidBrowser = false;
+        this.sp.browser.setVisible(true);
+      }
     } catch (e) {
-      logError(this, "crosshair fade failed", e);
+      logError(this, "native backdrop failed", e);
     }
   }
 
   private lastPoll = 0;
   private saved: number | null = null;
+  private hidBrowser = false;
 }

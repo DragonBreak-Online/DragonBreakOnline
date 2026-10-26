@@ -29,8 +29,8 @@ module.exports = { ClientListener, logError };
   });
   globalThis.__errors = [];
   const { NativeBackdropService, CROSSHAIR_ALPHA, FADED_ALPHA } = require(out);
-  const st = { open: false, props: { [CROSSHAIR_ALPHA]: 85 }, writes: [] };
-  const sp = { Ui: {
+  const st = { open: false, props: { [CROSSHAIR_ALPHA]: 85 }, writes: [], visible: true, shows: [] };
+  const sp = { browser: { isVisible: () => st.visible, setVisible: (v) => { st.visible = v; st.shows.push(v); } }, Ui: {
     isMenuOpen: (m) => m === 'CustomMenu' && st.open,
     getFloat: (m, p) => (m === 'HUD Menu' ? st.props[p] : NaN),
     setFloat: (m, p, v) => { st.writes.push([m, p, v]); st.props[p] = v; },
@@ -46,14 +46,20 @@ module.exports = { ClientListener, logError };
   ok(!st.writes.length, 'with no native panel open nothing is touched');
   st.open = true; tick();
   ok(st.props[CROSSHAIR_ALPHA] === FADED_ALPHA && st.writes[0][0] === 'HUD Menu' && FADED_ALPHA > 0 && FADED_ALPHA <= 20, 'a native panel opening fades the HUD crosshair to a faint watermark', st.writes);
+  ok(st.visible === false, 'and hides the browser, which draws over every Scaleform menu (the chat and the hourglass sat on the panel)');
   tick(); tick();
   ok(st.writes.length === 1, 'and leaves it alone while the panel stays up');
+  st.visible = true; tick();
+  ok(st.visible === false, 'the browser shown again by something else while the panel is up is hidden again');
   st.open = false; tick();
   ok(st.props[CROSSHAIR_ALPHA] === 85, 'closing the panel gives the crosshair back its own alpha (85 here)');
-  st.open = true; tick(); st.open = false; tick();
-  ok(st.props[CROSSHAIR_ALPHA] === 85 && st.writes.length === 4, 'again on the next panel');
+  ok(st.visible === true, '...and shows the browser again');
+  st.visible = false; st.shows.length = 0; st.open = true; tick(); st.open = false; tick();
+  ok(!st.shows.includes(true), 'a browser that was already hidden (a vanilla menu, the UI toggled off) is not shown by this');
+  st.visible = true; st.writes.length = 0; st.open = true; tick(); st.open = false; tick();
+  ok(st.props[CROSSHAIR_ALPHA] === 85 && st.writes.length === 2 && st.visible === true, 'again on the next panel');
   now += 50; update();
-  ok(st.writes.length === 4, 'it looks at most every 150 ms');
+  ok(st.writes.length === 2, 'it looks at most every 150 ms');
   ok(!globalThis.__errors.length, 'no failure', globalThis.__errors);
 
   Date.now = realNow;
