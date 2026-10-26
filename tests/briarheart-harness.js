@@ -268,12 +268,13 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
 }
 
 // ---- the look (Nat, 25 Oct): the vanilla briar body on a bare chest only ---------------------------------------------------
+// (settleMs 0: these checks are the look's single steps; the equip spam block below drives the settling)
 {
   const logLines = [];
   delete require.cache[MODULE]; delete globalThis.__dboBriarheart;
   const ML = require(MODULE)({
     mp, log: (...x) => logLines.push(x.join(' ')), personal: (a, t) => said.push([a >>> 0, t]), audit: (t) => audits.push(t), who: (a) => `who${(a >>> 0).toString(16)}`,
-    display: (a) => `char${(a >>> 0).toString(16)}`, cfg: { briarheart: { enabled: true, visual: { enabled: true, armor: '5d008:Skyrim.esm', emptyArmor: '5d009:Skyrim.esm', women: false, retrySeconds: 10, maxTries: 3 } } },
+    display: (a) => `char${(a >>> 0).toString(16)}`, cfg: { briarheart: { enabled: true, visual: { enabled: true, armor: '5d008:Skyrim.esm', emptyArmor: '5d009:Skyrim.esm', women: false, retrySeconds: 10, maxTries: 3, settleMs: 0 } } },
     registerChatCommand: (n, f) => commands.set(n, f), onlineActors: () => online.slice(), isLeadStaff: (a) => (a >>> 0) === LEAD, findByName: () => 0, every: (n, ms, f) => { ticker = f; },
     giveItem: (a, id, n) => { given.push([a >>> 0, id, n]); const e = ((P(a, 'inventory') || {}).entries || []).slice(); e.push({ baseId: id, count: n }); setP(a, 'inventory', { entries: e }); return true; }, sourceResistsOf: () => new Set(),
   });
@@ -507,6 +508,79 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   MW.become(BW, 'staff', 'cure test'); setP(BW, 'inventory', { entries: [{ baseId: WOUND, count: 1 }, { baseId: BRIAR, count: 1 }] }); setP(BW, 'equipment', eq(WOUND, BRIAR));
   MW.end(BW, 'cure test');
   ok(inv(BW, WOUND) === 0 && inv(BW, BRIAR) === 0, 'no longer a Briarheart, alive: the heart and the wound body both go', P(BW, 'inventory'));
+}
+// ---- equip spam (Nat's dev test, 26 Oct: "you can repeatedly press to equip a chest piece, then it bugs the form out") ------
+// A fake clock and timers drive the settled look. Each press is two reports, as in the dev log: the piece worn over the heart
+// (the wound body pushed out of slot 32), then the piece gone again after our UnequipItem
+{
+  const logLines = []; const realNow = Date.now, realSet = globalThis.setTimeout, realClear = globalThis.clearTimeout;
+  let now = 1800000000000; const timers = new Map(); let seq = 0;
+  Date.now = () => now;
+  globalThis.setTimeout = (f, ms) => { const id = ++seq; timers.set(id, { at: now + ms, f }); return id; };
+  globalThis.clearTimeout = (id) => { timers.delete(id); };
+  const advance = (ms) => {
+    const end = now + ms;
+    for (;;) {
+      const due = [...timers.entries()].filter(([, t]) => t.at <= end).sort((x, y) => x[1].at - y[1].at)[0];
+      if (!due) break;
+      timers.delete(due[0]); now = due[1].at; due[1].f();
+    }
+    now = end;
+  };
+  const load = () => require(MODULE)({
+    mp, log: (...x) => logLines.push(x.join(' ')), personal: (a, t) => said.push([a >>> 0, t]), audit: (t) => audits.push(t), who: (a) => `who${(a >>> 0).toString(16)}`,
+    display: (a) => `char${(a >>> 0).toString(16)}`, cfg: { briarheart: { enabled: true, visual: { enabled: true, armor: '5d008:Skyrim.esm', emptyArmor: '5d009:Skyrim.esm', body: '90d63:unofficial skyrim special edition patch.esp', retrySeconds: 10, maxTries: 5, settleMs: 1500 } } },
+    registerChatCommand: (n, f) => commands.set(n, f), onlineActors: () => online.slice(), isLeadStaff: (a) => (a >>> 0) === LEAD, findByName: () => 0, every: (n, ms, f) => { ticker = f; },
+    giveItem: (a, id, n) => { const e = ((P(a, 'inventory') || {}).entries || []).slice(); e.push({ baseId: id, count: n }); setP(a, 'inventory', { entries: e }); return true; }, sourceResistsOf: () => new Set(),
+  });
+  delete require.cache[MODULE]; delete globalThis.__dboBriarheart;
+  const MX = load();
+  const eq = (...worn) => ({ inv: { entries: worn.map((id) => ({ baseId: id, count: 1, worn: true })) } });
+  const report = (a, ...worn) => { setP(a, 'equipment', eq(...worn)); globalThis.__dboBriarheartEquip(a, eq(...worn)); };
+  const equips = () => papyrusCalls.filter((c) => c.method === 'EquipItem').map((c) => c.args[0]);
+  const offs = () => papyrusCalls.filter((c) => c.method === 'UnequipItem').map((c) => c.args[0]);
+  const SP = actor(0xa0, 1, 'reach', [0, 0, 0], [{ baseId: CUIRASS, count: 1 }]); online.push(SP);
+  setP(SP, 'equipment', eq()); MX.become(SP, 'staff', 'spam test');
+  report(SP, WOUND, BRIAR); advance(30000);
+  // twenty presses, 300 ms apart
+  papyrusCalls.length = 0; logLines.length = 0;
+  for (let k = 0; k < 20; k++) { report(SP, CUIRASS, BRIAR); advance(150); report(SP, BRIAR); advance(150); }
+  ok(offs().length === 20 && offs().every((d) => d === '13ed9:Skyrim.esm'), 'twenty presses of a cuirass: it is unequipped twenty times', offs());
+  ok(!equips().length, 'while the presses keep coming, nothing is equipped (no crossing equips)', equips());
+  ok(inv(SP, CUIRASS) === 1, '...the cuirass stays in the pack');
+  advance(1500 - 300 - 10);
+  ok(!equips().length, '...nor before the last refusal is settleMs old');
+  advance(10);
+  ok(equips().join() === '90d63:unofficial skyrim special edition patch.esp', 'settled: the wound body goes back on, once, without a new report (the heart is still worn)', equips());
+  ok(logLines.some((l) => /look on chara0 \(settled\): bare chest, 90d63:unofficial skyrim special edition patch\.esp equipped \(try 1\)/.test(l)), '...logged as settled', logLines);
+  report(SP, WOUND, BRIAR); papyrusCalls.length = 0; advance(60000);
+  ok(!equips().length && !offs().length && !timers.size, 'the look shows: nothing more is equipped and no look stays pending');
+  // the last press's own report still shows the cuirass (our UnequipItem lost to a crossing equip): the settled look takes it off again
+  papyrusCalls.length = 0;
+  for (let k = 0; k < 5; k++) { report(SP, CUIRASS, BRIAR); advance(150); report(SP, BRIAR); advance(150); }
+  report(SP, CUIRASS, BRIAR); papyrusCalls.length = 0; advance(1600);
+  ok(offs().join() === '13ed9:Skyrim.esm' && !equips().length, 'spam that ends on a worn cuirass: the settled look unequips it again, still nothing equipped over it', { offs: offs(), eq: equips() });
+  setP(SP, 'equipment', eq(BRIAR)); advance(1600);
+  ok(equips().join() === '90d63:unofficial skyrim special edition patch.esp', '...and once the chest is bare, the wound body goes on', equips());
+  report(SP, WOUND, BRIAR); advance(60000);
+  // the throttle no longer strands the look: the wound body slips within retrySeconds of a try and no report follows
+  globalThis.__dboBriarheart.looks.delete(SP); report(SP, BRIAR); papyrusCalls.length = 0;
+  report(SP, BRIAR); advance(1000);
+  ok(!equips().length, 'a report within retrySeconds of a try equips nothing at once');
+  advance(9500);
+  ok(equips().length === 1, '...and the look is tried again when retrySeconds allows, with no new report', equips());
+  // an equip that never shows: tried maxTries times by the settled looks alone, then given up, nothing left pending
+  logLines.length = 0; papyrusCalls.length = 0; advance(120000);
+  ok(equips().length === 3 && logLines.some((l) => /look gave up on chara0: 5 equips/.test(l)) && !timers.size, 'an equip that never shows: retried up to maxTries, given up once, no timer left', { eq: equips(), timers: timers.size });
+  // a hot reload with a settled look pending: the timer runs the new module's look, once
+  globalThis.__dboBriarheart.looks.delete(SP); report(SP, CUIRASS, BRIAR); report(SP, BRIAR); papyrusCalls.length = 0;
+  delete require.cache[MODULE]; load();
+  advance(1600);
+  ok(equips().length === 1, 'a hot reload in between: the pending look runs once, in the reloaded module', equips());
+  // offline: a pending look does nothing
+  report(SP, WOUND, BRIAR); advance(60000); report(SP, CUIRASS, BRIAR); report(SP, BRIAR); online.splice(online.indexOf(SP), 1); papyrusCalls.length = 0; advance(60000);
+  ok(!papyrusCalls.length, 'logged out before it settles: nothing is equipped');
+  Date.now = realNow; globalThis.setTimeout = realSet; globalThis.clearTimeout = realClear;
 }
 // ---- what a Briarheart is, in Active Effects: the display ability goes and comes with the gifts ---------------------------
 {
