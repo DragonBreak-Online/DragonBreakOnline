@@ -13,6 +13,7 @@ const CELL = 0x100, CELL2 = 0x101, OTHER = 0x102, WORLD = 0x3c, DOOR = 0x200, OU
 const OWNER = 0xff000001, FRIEND = 0xff000002, STRANGER = 0xff000003, GM = 0xff000004;
 const PROFILE = { [OWNER]: 7, [FRIEND]: 8, [STRANGER]: 9, [GM]: 10 };
 const NAME = { [OWNER]: 'Olaf', [FRIEND]: 'Frida', [STRANGER]: 'Stray', [GM]: 'Gemma' };
+let ONLINE = [OWNER, FRIEND, STRANGER, GM];
 const WOOD = 0x6f993, IRON = 0x5ace4, SALT = 0x34cdf;
 const d = (id) => `${id.toString(16)}:Skyrim.esm`;
 fs.writeFileSync('housing.json', JSON.stringify([DOOR]));
@@ -60,7 +61,7 @@ const cfg = { decor: { enabled: true, budgets: [{ pieces: 3, lights: 1, stations
 const api = {
   mp, log: (...x) => logs.push(x.join(' ')), audit: (t) => audits.push(t), who: (a) => NAME[a], personal: (a, t) => said.push([a, t]),
   onUi, sendPacket: (a, p) => { packets.push([a, p]); return true; }, registerChatCommand: (n, f) => { cmds[n] = f; },
-  onlineActors: () => [OWNER, FRIEND, STRANGER, GM], isAdmin: (a) => a === GM, tierOf: (a) => (a === GM ? 'developer' : null), giveItem,
+  onlineActors: () => ONLINE, isAdmin: (a) => a === GM, tierOf: (a) => (a === GM ? 'developer' : null), giveItem,
   findByName: (q) => Number(Object.keys(NAME).find((a) => NAME[a].toLowerCase() === String(q).toLowerCase())) || 0,
   every: (name, ms, fn) => { timers[name] = fn; }, cfg,
   hasUiCap: (a, cap) => cap === 'decorPanel' && a !== FRIEND,
@@ -178,6 +179,45 @@ w = lastPanel(OWNER);
 ok(w.search === '' && w.group === 'beds' && w.rows[0].name === 'Bed', 'clearing it is the group again', w.rows.map((r) => r.name));
 act(OWNER, 'decorView', 'catalog', 'beds', 0, 'x'.repeat(500));
 ok(lastPanel(OWNER).search.length === 40, 'a search is cut to 40 characters');
+
+// ---- carpenters (Nat, 26 Oct): a hired carpenter's deconstruct uses THEIR Woodcutter share, and the refund is the owner's ----
+setp(STRANGER, 'private.mastery', { order: ['woodcutter'], skills: { woodcutter: { rank: 2 } } });
+act(OWNER, 'decorGrant', String(PROFILE[STRANGER]));
+act(OWNER, 'decorView', 'people', null, 0);
+w = lastPanel(OWNER);
+ok(w.rows[0].name === 'Stray' && w.rows[0].tier === 'Adept' && w.rows[0].refund === 60, 'a hired carpenter shows their woodworking tier and refund %', w.rows[0]);
+ok(w.own && w.own.refund === 20, "the owner sees their own refund % to compare (Novice here, the harness's 20%)", w.own);
+giveItem(OWNER, WOOD, 20); giveItem(OWNER, IRON, 5);
+act(OWNER, 'decorView', 'catalog', 'beds', 0, '');
+act(OWNER, 'decorPlace', d(0x9001));
+fire('placeMove', OWNER, [lastEdit(OWNER).id, [1300, 1000, 50], [0, 0, 0]]);
+const bedRef = items()[items().length - 1].ref;
+const ownWood = held(OWNER, WOOD), strayWood = held(STRANGER, WOOD);
+cmd(STRANGER, '');
+fire('decorRemove', STRANGER, [lastPanel(STRANGER).nonce, bedRef]);
+ok(held(OWNER, WOOD) === ownWood + 2 && held(STRANGER, WOOD) === strayWood, "the carpenter's deconstruct: 60% of 4 firewood (2) to the owner, nothing to the carpenter", { owner: held(OWNER, WOOD) - ownWood, stray: held(STRANGER, WOOD) - strayWood });
+ok(/is the home owner's/.test(last(STRANGER)) && /Stray took down Bed in your home; back to you: 2 /.test(last(OWNER)), 'both are told', [last(STRANGER), last(OWNER)]);
+// the owner offline: it waits in carpentry, paid at their next owner scan
+act(OWNER, 'decorPlace', d(0x9001));
+fire('placeMove', OWNER, [lastEdit(OWNER).id, [1300, 1000, 50], [0, 0, 0]]);
+const bed2 = items()[items().length - 1].ref;
+ONLINE = [FRIEND, STRANGER, GM];
+const w2 = held(OWNER, WOOD);
+cmd(STRANGER, '');
+fire('decorRemove', STRANGER, [lastPanel(STRANGER).nonce, bed2]);
+ok(held(OWNER, WOOD) === w2 && JSON.stringify(Object.values(T.reg().carpentry)[0]) === JSON.stringify({ [d(WOOD)]: 2 }), 'owner offline: the refund waits, owed to the owner', T.reg().carpentry);
+ONLINE = [OWNER, FRIEND, STRANGER, GM];
+T.scanOwners();
+ok(held(OWNER, WOOD) === w2 + 2 && Object.keys(T.reg().carpentry).length === 0 && /Your carpenters took down/.test(last(OWNER)), 'back online: the owner scan pays it once', { got: held(OWNER, WOOD) - w2 });
+T.scanOwners();
+ok(held(OWNER, WOOD) === w2 + 2, 'and only once');
+// the owner's own deconstruct still pays the owner, at the owner's share
+act(OWNER, 'decorPlace', d(0x9001));
+fire('placeMove', OWNER, [lastEdit(OWNER).id, [1300, 1000, 50], [0, 0, 0]]);
+const w3 = held(OWNER, WOOD);
+act(OWNER, 'decorRemove', items()[items().length - 1].ref);
+ok(held(OWNER, WOOD) === w3 + 1, "the owner's own deconstruct: their 20% (at least 1 of 4)", held(OWNER, WOOD) - w3);
+act(OWNER, 'decorRevoke', String(PROFILE[STRANGER]));
 
 // ---- closing ----
 act(OWNER, 'decorView', 'catalog', 'beds', 0, '');
