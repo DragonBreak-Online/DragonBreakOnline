@@ -1,5 +1,43 @@
 [
   {
+    "title": "Briarhearts: the Hagravens' rite",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Who may take the briar",
+        "items": [
+          "Reachfolk who keep the Old Gods of the Reach can now become Briarhearts, as Faolan, the Red Eagle, was the first. Their own heart is cut out and a briar set in its place.",
+          "The rite is made at the Hagravens' altar in Deepwood Vale, the ritual court below Hag's End, beyond Deepwood Redoubt. Bring a Briar Heart, stand at the altar and type /briarheart rite, then /briarheart confirm within 5 minutes.",
+          "Vampires, werewolves and anyone with a fever must be cured first. Staff take no rite."
+        ]
+      },
+      {
+        "heading": "The risk",
+        "items": [
+          "One rite in ten fails. A failed rite ends that character for good, so the confirm step asks you to type /briarheart confirm forever.",
+          "A fallen Briarheart's heart can be torn out by anyone standing over them for 10 seconds. That too ends the character for good, and the one who tears it out takes a Briar Heart."
+        ]
+      },
+      {
+        "heading": "What it gives",
+        "items": [
+          "50 more health, poison and frost resistance (15% each), and Ironflesh and Lightning Cloak. Fire hurts you 25% more.",
+          "Your chest stays bare and shows the briar: cuirasses and robes cannot be worn over it, and stay in your pack. Briar Skin protects like a light faction cuirass, quickens your stamina and resists disease.",
+          "The Forsworn know their own and leave you be. No Divine will bless you, and you cannot leave the Old Gods while the briar grows."
+        ]
+      },
+      {
+        "heading": "Being cured",
+        "items": [
+          "A shrine of Arkay or Stendarr draws the briar out: touch one, then type /briarheart cure with a filled black soul gem in your pack. You live on as a mortal.",
+          "Type /briarheart at any time to see your state."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Birthsigns",
     "date": "2026-10-25",
     "version": "Server update",
