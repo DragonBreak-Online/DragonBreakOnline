@@ -77,6 +77,9 @@ const RECORDS = { [idOf(DWARVEN_ARMOR)]: { type: 'ARMO', editorId: 'ArmorDwarven
 // regions-overrides.json by editor id, which regions.js reads off the record
 const DLE_TOME = (edid) => { const t = TOMES_JSON.find((x) => x.name === edid); return `${t.id.split(':')[1].toLowerCase().replace(/^0+/, '')}:DragonBreak Online Edits.esp`; };
 for (const t of TOMES_JSON.filter((x) => x.plugin === 'DragonBreak Online Edits.esp')) RECORDS[idOf(DLE_TOME(t.name))] = { type: 'BOOK', editorId: t.name, fields: [] };
+// Every other tome's editor id too, as the server's lookupEspmRecordById gives it: a tome regions.json does not list (the 26 Oct
+// live-order regen's 114) is placed by an editor-id override, which without its record would fall through to failOpen
+for (const t of TOMES_JSON.filter((x) => x.plugin !== 'DragonBreak Online Edits.esp' && x.plugin in PLUGINS)) { const d = `${t.id.split(':')[1].toLowerCase().replace(/^0+/, '')}:${t.plugin}`; if (!RECORDS[idOf(d)]) RECORDS[idOf(d)] = { type: 'BOOK', editorId: t.name, fields: [] }; }
 const BURNING_TOUCH_BOOK = DLE_TOME('UDLC01_DES_SpellTomeBurningTouch'), DRAUGR_THRALL_BOOK = DLE_TOME('UDLC01_CONJ_SpellTomeConjureDraugrThrall');
 
 const SMITH = 0x14, ADMIN = 0x15, MAGE = 0x16;
@@ -199,17 +202,18 @@ const expected = TOMES_JSON.filter((t) => t.rank <= 3 && !EXC.test(t.name) && ![
   .sort((x, y) => x.school.localeCompare(y.school) || x.rank - y.rank || pref(x) - pref(y) || String(x.spellName).localeCompare(String(y.spellName)))
   .filter((t) => (seen.has(t.spellId) ? false : seen.add(t.spellId))).filter(inCyrodiil);
 check('the Synod panel is titled for Cyrodiil', shop(MAGE).title === 'The Synod: Spell Tomes of Cyrodiil', shop(MAGE).title);
-// 112: 49 of the base game and Beyond Skyrim plus Tomebound's 63 Cyrodiil tomes (DLE, 26 Oct). Open Master Lock is a Master tome since 3e3f5ae, above the shop's Expert cap. Raising the dead is a restricted art
+// 115: 49 of the base game and Beyond Skyrim plus Tomebound's 63 Cyrodiil tomes (DLE, 26 Oct), plus 3 the live-order regen found
+// (26 Oct: BSAssets Toxic Missile and Greater Toxic Missile, Cyrodiil as the other BSAssets tomes; Ice Storm, Cyrodiil and Skyrim as Fireball). Open Master Lock is a Master tome since 3e3f5ae, above the shop's Expert cap. Raising the dead is a restricted art
 // for Senior ranks only (seniorOnlyTomes, 71dc8a3), so this plain member's shelf lacks the two zombie tomes
 const SENIOR_ONLY = ['SpellTomeRaiseZombie', 'CYRSpellTomeSummonZombie'];
 const shelf = expected.filter((t) => !SENIOR_ONLY.includes(t.name));
-check(`...stocks the Cyrodiil list (${shelf.length} of its ${expected.length} tomes for a Master of both skills below Senior rank)`, shop(MAGE).tomes.length === shelf.length && expected.length === 112 && shelf.length === 110 && shelf.every((t) => row(MAGE, canonToDesc(t.id))), [shop(MAGE).tomes.length, shelf.length, expected.length]);
+check(`...stocks the Cyrodiil list (${shelf.length} of its ${expected.length} tomes for a Master of both skills below Senior rank)`, shop(MAGE).tomes.length === shelf.length && expected.length === 115 && shelf.length === 113 && shelf.every((t) => row(MAGE, canonToDesc(t.id))), [shop(MAGE).tomes.length, shelf.length, expected.length]);
 check('...core, Cyrodiil and shared tomes are there', row(MAGE, SPARKS_BOOK) && row(MAGE, FROSTFLAMES_BOOK) && row(MAGE, FIREBOLT_BOOK));
 check('...Skyrim and Solstheim tomes are not', !row(MAGE, INCINERATE_BOOK) && !row(MAGE, ASHSHELL_BOOK));
 check('Tomebound (DLE): Burning Touch is a Cyrodiil tome and on the Synod\'s shelf; Conjure Draugr Thrall is Skyrim\'s and is not',
   R().tomeWhere(idOf(BURNING_TOUCH_BOOK)).join() === 'cyrodiil' && R().tomeWhere(idOf(DRAUGR_THRALL_BOOK)).join() === 'skyrim' && !!row(MAGE, BURNING_TOUCH_BOOK) && !row(MAGE, DRAUGR_THRALL_BOOK),
   [R().tomeWhere(idOf(BURNING_TOUCH_BOOK)), R().tomeWhere(idOf(DRAUGR_THRALL_BOOK)), !!row(MAGE, BURNING_TOUCH_BOOK), !!row(MAGE, DRAUGR_THRALL_BOOK)]);
-check('the boot line counts the Cyrodiil stock', out.logs.some((l) => /tomes in the Synod shop, .*, 112 stocked for Cyrodiil/.test(l)), out.logs.filter((l) => /spells on/.test(l)));
+check('the boot line counts the Cyrodiil stock', out.logs.some((l) => /tomes in the Synod shop, .*, 115 stocked for Cyrodiil/.test(l)), out.logs.filter((l) => /spells on/.test(l)));
 ui('tomeBuy', MAGE, [shop(MAGE).nonce, INCINERATE_BOOK]);
 check('a forged buy of a Skyrim tome is refused and costs nothing', shop(MAGE).resultKind === 'refused' && shop(MAGE).result === 'The Synod does not stock Incinerate; it is sold in Skyrim.' && count(MAGE, 'f:Skyrim.esm') === 5000 && count(MAGE, INCINERATE_BOOK) === 0, shop(MAGE).result);
 spellsCfg = { shopStock: 999, shopShowForeign: true }; load();
@@ -385,6 +389,15 @@ check(`every regional cooking recipe in regions.json passes in Bruma (${cookable
   [globalThis.__dboGuildsOf, globalThis.__dboGuildRankList] = had;
 }
 
+// Every tome spell-tomes.json lists has a place, in regions.json or by an override (desc or editor id): none relies on failOpen,
+// which would sell it in every province, the Synod included (26 Oct: the live-order regen added 114 tomes regions.json lacks)
+{
+  const nd = (d) => { const i = d.lastIndexOf(':'); return `${parseInt(d.slice(0, i), 16).toString(16)}:${d.slice(i + 1).toLowerCase()}`; };
+  const RJ = {}; for (const k of Object.keys(JSON.parse(fs.readFileSync(path.join(SERVER, 'regions.json'), 'utf8')).tomes || {})) RJ[nd(k)] = true;
+  const OJ = {}; for (const k of Object.keys(OVR_BASE.tomes || {})) if (k[0] !== '_') OJ[k.includes(':') ? nd(k) : k.toLowerCase()] = true;
+  const placeless = TOMES_JSON.filter((t) => { const d = nd(canonToDesc(t.id)); return !RJ[d] && !OJ[d] && !OJ[String(t.name).toLowerCase()]; });
+  check(`every one of the ${TOMES_JSON.length} tomes has a place (regions.json or an override), none sold by failOpen`, placeless.length === 0, placeless.map((t) => `${t.name} (${t.plugin})`));
+}
 console.log(`\n${checks - failures}/${checks} passed`);
 process.chdir(os.tmpdir());
 fs.rmSync(dir, { recursive: true, force: true });
