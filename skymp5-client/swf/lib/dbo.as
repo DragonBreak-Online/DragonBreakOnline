@@ -15,6 +15,11 @@ var A_BUTTON_REST = 80;
 var A_FOCUS = 100;
 var FADE_MS = 300;
 
+// _global.skse does not exist on frame 1 (Worker 4, measured 26 Oct): nothing touches it until dboBoot sees it
+var dboBooted = false;
+var dboQueue = [];
+var dboCloseWanted = false;
+
 function dboHaveSkse()
 {
    return _global.skse != undefined;
@@ -22,35 +27,87 @@ function dboHaveSkse()
 
 function dboLog(msg)
 {
-   if (dboHaveSkse() && _global.skse.Log != undefined)
+   if (!dboBooted)
+   {
+      dboQueue.push(["log", msg]);
+   }
+   else if (_global.skse.Log != undefined)
    {
       _global.skse.Log("[dbo] " + msg);
    }
 }
 
-// SKSE's CustomMenu registers "PlaySound"; GameDelegate's wire shape is (name, uid, args...)
+// SKSE's CustomMenu registers "PlaySound"; GameDelegate's wire shape is (name, uid, args...). Dropped before boot
 function dboSound(name)
 {
-   flash.external.ExternalInterface.call("PlaySound", 0, name);
+   if (dboBooted)
+   {
+      flash.external.ExternalInterface.call("PlaySound", 0, name);
+   }
 }
 
 // One mod event per message: the client splits key and JSON args and calls sendMessage(key, ...args)
 function dboSend(msgKey, args)
 {
-   if (!dboHaveSkse() || _global.skse.SendModEvent == undefined)
+   var s = msgKey + DBO_SEP + dboJson(args);
+   if (!dboBooted)
+   {
+      dboQueue.push(["send", s]);
+      return true;
+   }
+   if (_global.skse.SendModEvent == undefined)
    {
       return false;
    }
-   _global.skse.SendModEvent(DBO_UI_EVENT, msgKey + DBO_SEP + dboJson(args), 0);
+   _global.skse.SendModEvent(DBO_UI_EVENT, s, 0);
    return true;
 }
 
 function dboClose()
 {
-   if (dboHaveSkse() && _global.skse.CloseMenu != undefined)
+   if (!dboBooted)
+   {
+      dboCloseWanted = true;
+   }
+   else if (_global.skse.CloseMenu != undefined)
    {
       _global.skse.CloseMenu(DBO_MENU);
    }
+}
+
+// Polls each frame for _global.skse, then runs onReady(frame it appeared on) and flushes what was queued before it
+function dboBoot(onReady)
+{
+   var c = _root.createEmptyMovieClip("dboBootClip", 9999);
+   c.frames = 0;
+   c.onEnterFrame = function()
+   {
+      this.frames++;
+      if (!dboHaveSkse())
+      {
+         return;
+      }
+      delete this.onEnterFrame;
+      dboBooted = true;
+      onReady(this.frames);
+      var q = dboQueue;
+      dboQueue = [];
+      for (var i = 0; i < q.length; i++)
+      {
+         if (q[i][0] == "log")
+         {
+            dboLog(q[i][1]);
+         }
+         else if (_global.skse.SendModEvent != undefined)
+         {
+            _global.skse.SendModEvent(DBO_UI_EVENT, q[i][1], 0);
+         }
+      }
+      if (dboCloseWanted)
+      {
+         dboClose();
+      }
+   };
 }
 
 // ---- JSON ----

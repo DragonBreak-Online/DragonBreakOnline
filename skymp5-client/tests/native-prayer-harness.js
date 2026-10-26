@@ -24,13 +24,13 @@ const clip = (name) => {
   return c;
 };
 
-const boot = () => {
+const boot = (late) => {
   const sent = [], sounds = [], logs = [];
   const st = { time: 1000, code: 0 };
   const root = clip('_root');
   const ctx = {
     _root: root,
-    _global: { skse: { SendModEvent: (e, s, n) => sent.push({ e, s, n }), Log: (m) => logs.push(m), CloseMenu: () => sent.push({ e: 'closeMenu' }) } },
+    _global: { skse: late ? undefined : { SendModEvent: (e, s, n) => sent.push({ e, s, n }), Log: (m) => logs.push(m), CloseMenu: () => sent.push({ e: 'closeMenu' }) } },
     flash: { external: { ExternalInterface: { call: (fn, uid, name) => sounds.push(fn + ':' + name) } } },
     TextFormat: function TextFormat() {},
     Key: { listeners: [], addListener(l) { this.listeners.push(l); }, getCode: () => st.code },
@@ -39,11 +39,13 @@ const boot = () => {
   };
   vm.createContext(ctx);
   vm.runInContext(SRC, ctx);
+  const skse = { SendModEvent: (e, s, n) => sent.push({ e, s, n }), Log: (m) => logs.push(m), CloseMenu: () => sent.push({ e: 'closeMenu' }) };
+  if (!late) root.dboBootClip.onEnterFrame();
   const msgs = () => sent.filter((m) => m.e === 'dboUi').map((m) => { const k = m.s.indexOf('\u0001'); return { key: m.s.slice(0, k), args: JSON.parse(m.s.slice(k + 1)) }; });
   const press = (code) => { st.code = code; for (const l of ctx.Key.listeners) l.onKeyDown(); };
   const rows = () => { const r = root.dboPanel.rows; return r ? Object.keys(r.kids).filter((n) => /^row\d$/.test(n)).map((n) => r[n]) : []; };
-  const tick = () => root.onEnterFrame();
-  return { ctx, root, st, sent, sounds, logs, msgs, press, rows, tick };
+  const tick = () => { for (const k of Object.values(root.kids)) if (k.onEnterFrame) k.onEnterFrame(); if (root.onEnterFrame) root.onEnterFrame(); };
+  return { ctx, root, st, sent, sounds, logs, msgs, press, rows, tick, arrive: () => { ctx._global.skse = skse; } };
 };
 
 const ROUND = {
@@ -139,6 +141,18 @@ let sorted;
   check('no close before the payload wait runs out', !u.sent.some((m) => m.e === 'closeMenu'));
   u.st.time += 1; u.tick();
   check('a panel that never gets its payload closes itself', u.sent.some((m) => m.e === 'closeMenu'), u.sent);
+}
+
+{
+  const t = boot(true);
+  t.tick(); t.press(27);
+  check('nothing reaches skse before it exists', t.sent.length === 0 && t.sounds.length === 0, t.sent);
+  t.arrive(); t.tick();
+  const m = t.msgs();
+  check('ready leads once skse appears, with its frame', m[0] && m[0].key === 'ready' && m[0].args[0] === 2, m);
+  check('a stand-up pressed before boot is sent after it', m.some((x) => x.key === 'dbo:prayerCancel'), m);
+  check('and its close is carried out', t.sent.some((x) => x.e === 'closeMenu'), t.sent);
+  check('the boot line logs the frame', t.logs.some((l) => l.indexOf('skse appeared on frame 2') >= 0), t.logs);
 }
 
 console.log(failures ? `\n${failures} failed` : '\nall passed');
