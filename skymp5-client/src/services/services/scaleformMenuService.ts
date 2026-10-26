@@ -8,7 +8,9 @@ import {
   Action, CAPS_RETRY_MS, MENU_NAME, MenuState, OUT_VAR, UiEvent, capsFor, isNew, newState, parseOutbox,
   parseUiEvent, planClose, planOpen, planReady, planRefresh, planTick, readyFrameOf, summary,
 } from "./scaleformMenu";
-import { CLOSE_KEY, FAILED_KEY, HANDOFF_KEY, Replay, replayFor, swfFor } from "./nativeWidgets";
+import {
+  CLOSE_KEY, FAILED_KEY, HANDOFF_KEY, PendingHandoff, Replay, handoffDue, replayFor, swfFor,
+} from "./nativeWidgets";
 
 // What a client-side service passes to openNative. onKey receives the panel's own namespaced keys verbatim,
 // plus FAILED_KEY if the panel could not be drawn and CLOSE_KEY when it reports that it has gone.
@@ -171,8 +173,7 @@ export class ScaleformMenuService extends ClientListener {
       // browser widget with the mode set. The owner is deliberately NOT cleared: it reopens the native panel
       // when the input is done, and openNative will set it again.
       this.enqueue(planClose(this.state));
-      const o = this.owner;
-      if (!o) {
+      if (!this.owner) {
         // A gamemode dboScaleform panel has no client-side owner, so there is nobody to draw the browser
         // widget: that needs the SERVER to publish it, which is not wired. Said out loud rather than dropped,
         // because a rename button that does nothing is the failure that wastes a session.
@@ -181,12 +182,11 @@ export class ScaleformMenuService extends ClientListener {
         this.note(text);
         return;
       }
-      logTrace(this, "handing off to the browser", r.type, r.mode);
-      try {
-        o.onKey(HANDOFF_KEY, [r.type, r.mode]);
-      } catch (e) {
-        logError(this, `the service owning '${o.type}' threw on the hand-off`, e);
-      }
+      // NOT delivered here. closeCustomMenu above only queues a UI message, so the menu is still open for a
+      // frame or two; NativeBackdropService hides the browser while it is, so a composer drawn now would be
+      // invisible until its next 150 ms poll. onUpdate delivers once the menu has really gone.
+      logTrace(this, "hand-off held until the panel closes", r.type, r.mode);
+      this.pendingHandoff = { type: r.type, mode: r.mode, at: Date.now() };
       return;
     }
     logTrace(this, "Scaleform panel", r.text);
@@ -250,6 +250,9 @@ export class ScaleformMenuService extends ClientListener {
   public closeNative(type?: string): void {
     const t = String(type || "");
     if (t && this.owner && this.owner.type !== t) return;
+    // A hand-off still waiting is dropped: the service has closed the panel itself, so delivering it would
+    // reopen a composer for a panel nobody is looking at any more.
+    this.pendingHandoff = null;
     this.owner = null;
     this.enqueue(planClose(this.state));
   }
@@ -278,6 +281,29 @@ export class ScaleformMenuService extends ClientListener {
     // One retry, because the first can land before the server has an actor for this user
     if (this.announces === 1 && this.announcedAt && Date.now() - this.announcedAt > CAPS_RETRY_MS) {
       this.announce("retry");
+    }
+    // Before the closed-phase return, exactly like the queue above: by the time a hand-off is deliverable
+    // the panel IS closed, so anything after this line would never run.
+    if (this.pendingHandoff) {
+      const due = handoffDue(this.pendingHandoff, this.menuIsOpen(), Date.now());
+      if (due !== "wait") {
+        const h = this.pendingHandoff;
+        this.pendingHandoff = null;
+        if (due === "late") {
+          // Delivered anyway: a hand-off that never arrives loses what the player was about to type.
+          logError(this, "the panel did not close in time, handing off anyway", `${h.type}/${h.mode}`);
+          this.note(`${h.type}: the panel did not close in time, so the browser was asked anyway`);
+        }
+        const o = this.owner;
+        if (o) {
+          logTrace(this, "handing off to the browser", h.type, h.mode);
+          try {
+            o.onKey(HANDOFF_KEY, [h.type, h.mode]);
+          } catch (e) {
+            logError(this, `the service owning '${o.type}' threw on the hand-off`, e);
+          }
+        }
+      }
     }
     if (this.state.phase === "closed") return;
     // Every tick, not throttled: a click must not wait a quarter of a second to be noticed.
@@ -391,6 +417,8 @@ export class ScaleformMenuService extends ClientListener {
   }
 
   private owner: { type: string; onKey: (key: string, args: unknown[]) => void } | null = null;
+  // A hand-off waiting for the panel to actually close (handoffDue decides when)
+  private pendingHandoff: PendingHandoff | null = null;
   // Types whose panel could not be drawn this session. An array, not a Set: the client targets es2019 but the
   // rest of this file stays to the plainest shapes, and this list is never longer than the registry.
   private failedTypes: string[] = [];

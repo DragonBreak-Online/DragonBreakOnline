@@ -212,14 +212,18 @@ check('the owner is NOT cleared when the panel reports ready, or it would stop r
 
 // ---- 6b. the hand-off, wired -------------------------------------------------------------------------------------
 // The CustomMenu is modal and pauses the game, so the page cannot be typed into while it is up.
-check('a hand-off takes the native panel DOWN before the browser is asked to draw', () => {
+// These two used to assert that the close was ENQUEUED before the owner was called in the same pass. That
+// ordering is no longer how the guarantee is made: the hand-off is held and delivered only once the menu has
+// actually gone (section 8), which is stronger, because enqueuing a close does not mean the menu is shut.
+check('the hand-off branch closes the panel and delivers NOTHING itself', () => {
   const h = at(SERVICE, 'if (r.do === "handoff")');
   const end = SERVICE.indexOf('\n    }\n', h);
   const body = SERVICE.slice(h, end);
-  return h > 0 && body.indexOf('this.enqueue(planClose(') < body.indexOf('o.onKey(HANDOFF_KEY');
+  return h > 0 && body.indexOf('this.enqueue(planClose(') >= 0 && body.indexOf('o.onKey(') < 0;
 }, { h: at(SERVICE, 'if (r.do === "handoff")') });
 check('it delivers the type AND the mode, so compose:<tabId> survives',
-  () => /o\.onKey\(HANDOFF_KEY, \[r\.type, r\.mode\]\)/.test(SERVICE));
+  () => /o\.onKey\(HANDOFF_KEY, \[h\.type, h\.mode\]\)/.test(SERVICE)
+     && /this\.pendingHandoff = \{ type: r\.type, mode: r\.mode, at: Date\.now\(\) \};/.test(SERVICE));
 check('the owner is NOT cleared, because the service reopens the panel when the input is done', () => {
   const h = at(SERVICE, 'if (r.do === "handoff")');
   const end = SERVICE.indexOf('\n    }\n', h);
@@ -281,5 +285,42 @@ check('a throw from isMenuOpen reports OPEN, so a live panel is never torn down 
   return m > 0 && /catch \(e\) \{\s*\n\s*return true;/.test(body);
 });
 
-console.log(failures ? `${failures} failed` : `all passed${skipped ? ` (${skipped} skipped)` : ''}`);
+// ---- 8. the hand-off waits for the panel to actually close ------------------------------------------------------
+// closeCustomMenu only QUEUES a UI message, so the menu is still open for a frame or two. NativeBackdropService
+// hides the browser while a CustomMenu is open, so a hand-off delivered in the same pass made the owning
+// service draw its composer into a hidden browser, and the player waited for the next 150ms poll to see it.
+const PH = (over) => Object.assign({ type: "housing", mode: "rename", at: 1000 }, over || {});
+check("nothing pending means nothing to do", () => M.handoffDue(null, false, 2000) === "wait");
+check("while the menu is still open the hand-off WAITS", () => M.handoffDue(PH(), true, 1100) === "wait");
+check("once the menu has gone it is DELIVERED", () => M.handoffDue(PH(), false, 1100) === "deliver");
+check("delivered the instant the menu goes, not on a timer", () => M.handoffDue(PH(), false, 1000) === "deliver");
+check("a menu that never closes delivers LATE rather than never, or the typing is lost", () => {
+  return M.handoffDue(PH(), true, 1000 + M.HANDOFF_CLOSE_TIMEOUT_MS) === "late";
+}, M.handoffDue(PH(), true, 1000 + M.HANDOFF_CLOSE_TIMEOUT_MS));
+check("...and one tick before the timeout it still waits",
+  () => M.handoffDue(PH(), true, 999 + M.HANDOFF_CLOSE_TIMEOUT_MS) === "wait");
+check("the timeout is a second or less, so a stuck panel is not a long stare",
+  () => M.HANDOFF_CLOSE_TIMEOUT_MS > 0 && M.HANDOFF_CLOSE_TIMEOUT_MS <= 1000, M.HANDOFF_CLOSE_TIMEOUT_MS);
+
+check("the service holds the hand-off instead of delivering it in the same pass",
+  () => /this\.pendingHandoff = \{ type: r\.type, mode: r\.mode, at: Date\.now\(\) \};/.test(SERVICE)
+     && !/if \(r\.do === "handoff"\)[\s\S]{0,700}?o\.onKey\(HANDOFF_KEY/.test(SERVICE));
+check("it is delivered from onUpdate, through handoffDue",
+  () => /const due = handoffDue\(this\.pendingHandoff, this\.menuIsOpen\(\), Date\.now\(\)\);/.test(SERVICE));
+check("...BEFORE the closed-phase return, or it could never fire at all", () => {
+  const d = at(SERVICE, "if (this.pendingHandoff) {");
+  const ret = SERVICE.indexOf("if (this.state.phase === \"closed\") return;", at(SERVICE, "private onUpdate"));
+  return d > 0 && ret > d;
+}, { deliver: at(SERVICE, "if (this.pendingHandoff) {") });
+check("the pending hand-off is cleared BEFORE the callback, so it cannot fire twice", () => {
+  const d = at(SERVICE, "if (this.pendingHandoff) {");
+  const body = SERVICE.slice(d, d + 1200);
+  return body.indexOf("this.pendingHandoff = null;") < body.indexOf("o.onKey(HANDOFF_KEY");
+});
+check("a late hand-off is said out loud, not delivered silently",
+  () => /did not close in time, handing off anyway/.test(SERVICE));
+check("closeNative drops a waiting hand-off, so it cannot reopen a composer nobody is looking at",
+  () => /this\.pendingHandoff = null;\s*\n\s*this\.owner = null;/.test(SERVICE));
+
+console.log(failures ? `${failures} failed` : `all passed${skipped ? ` (${skipped} skipped)` : ""}`);
 process.exit(failures ? 1 : 0);
