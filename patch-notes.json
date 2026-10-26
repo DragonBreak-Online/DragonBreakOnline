@@ -1,5 +1,21 @@
 [
   {
+    "title": "Every spell tome in the world is known to the college, and three join the Synod's shelf",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Spell tomes",
+        "items": [
+          "The server's list of spell tomes was missing 114 tomes from the newer lands and mods (the Reach's Druadach magic, Arnima, the Summerset Isles and a few more). They are known now, each with its school and rank, so studying them and the tome rules treat them like any other.",
+          "They are sold where they belong: the Reach, Arnima and Summerset tomes in Skyrim, not at the Synod.",
+          "The Synod's shelf gains Toxic Missile and Greater Toxic Missile (Restoration, as Beyond Skyrim made them) and Ice Storm."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Seventy new spells",
     "date": "2026-10-26",
     "version": "Server update",
