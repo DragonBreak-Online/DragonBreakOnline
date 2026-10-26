@@ -94,9 +94,9 @@ const STATE: Record<string, string> = {
 export const CourierHint = (c: CourierData | undefined): string =>
   !c ? '' : c.enabled ? 'Couriers carry goods for pay. The board holds the goods and the pay until the parcel arrives.' : 'No courier takes work here yet.';
 
-// select: the job shown first (none: the form to post one)
-const Courier = ({ c, nonce, gold, contacts, busy, act, select }: {
-  c: CourierData; nonce: string; gold: number; contacts: CourierContact[]; busy: boolean; act: (key: string, ...args: unknown[]) => void; select?: number;
+// select: the job shown first (none: the form to post one); composeOnly: the form alone (the native coop's hand-off)
+const Courier = ({ c, nonce, gold, contacts, busy, act, select, composeOnly }: {
+  c: CourierData; nonce: string; gold: number; contacts: CourierContact[]; busy: boolean; act: (key: string, ...args: unknown[]) => void; select?: number; composeOnly?: boolean;
 }) => {
   const [jobId, setJobId] = useState<number | null>(select === undefined ? null : select);
   const [destKey, setDestKey] = useState<string>(c.destinations.length ? c.destinations[0].key : '');
@@ -115,7 +115,7 @@ const Courier = ({ c, nonce, gold, contacts, busy, act, select }: {
   }, [nonce]);
 
   const all = c.open.concat(c.carrying, c.broken, c.mine);
-  const job = all.filter((j) => j.id === jobId)[0] || null;
+  const job = composeOnly ? null : all.filter((j) => j.id === jobId)[0] || null;
   const dest = c.destinations.filter((d) => d.key === destKey)[0] || null;
   const inPerson = !!dest && dest.kind === 'person';
   const recipient = inPerson && to === 0 ? null : to;
@@ -144,6 +144,7 @@ const Courier = ({ c, nonce, gold, contacts, busy, act, select }: {
 
   return (
     <div className="pigeon__body">
+      {composeOnly ? null : (
       <div className="pigeon__contacts">
         {c.rank ? (
           <div className="pigeon__section" title={c.rank.line}>
@@ -160,6 +161,7 @@ const Courier = ({ c, nonce, gold, contacts, busy, act, select }: {
         <div className="pigeon__section">Your parcels</div>
         {c.mine.length ? c.mine.map(row) : <p className="pigeon__empty">You have sent nothing by courier.</p>}
       </div>
+      )}
       <div className="pigeon__letter">
         {job
           ? (
