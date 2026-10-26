@@ -770,6 +770,15 @@ parsed('TEACH', {
   },
 });
 parsed('PERMADEATH', { parse: (text, P) => (P.length ? [ev('combat.death_final', 0, { kind: 'permadeath' })] : []) });
+// PK: staff end a character (/pk, gamemode.js) or lift it (/unpk). The reason is staff-written and never kept
+parsed('PK', {
+  parse: (text, P) => {
+    if (P.length < 2) return [];
+    if (/ permakilled /.test(text)) return [ev('staff.action', 0, { action: 'pk', via: 'command', outcome: 'ok' }, [[1, 'target']], { mirror: true }), ev('combat.death_final', 1, { kind: 'permadeath' }, [[0, 'staff']])];
+    if (/ lifted the permadeath of /.test(text)) return [ev('staff.action', 0, { action: 'unpk', via: 'command', outcome: 'ok' }, [[1, 'target']], { mirror: true })];
+    return [];
+  },
+});
 // PERM: a staff tier or the Discord roles changed (the role ids are never kept)
 const TIERS_ = ['senior', 'developer', 'leadgm', 'gm', 'trialgm', 'none'];
 parsed('PERM', {
@@ -1947,6 +1956,9 @@ supernatural.js SUPERNATURAL 3f6b1b4e parsed
 supernatural.js SUPERNATURAL b538d135 parsed
 supernatural.js SUPERNATURAL 20a78766 parsed
 supernatural.js PERMADEATH d8f3928d parsed
+gamemode.js OFFICIAL 12e5f91b parsed
+gamemode.js PK 70ee8bbf parsed
+gamemode.js PK 92ad77b4 parsed
 supernatural.js SUPERNATURAL b0a3c71f parsed
 supernatural.js RITE 994d3da4 clean
 supernatural.js RITE 11804524 clean
