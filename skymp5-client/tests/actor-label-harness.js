@@ -48,6 +48,7 @@ check('the packet\'s list replaces the labels: one no longer listed is dropped',
 check('the server id goes through remoteIdToLocalId', /Actor\.from\(Game\.getFormEx\(remoteIdToLocalId\(id\)\)\)/.test(src));
 check('the plan decides, from isDead, getDistance and hasLOS', /shouldDraw\(\{ found: !!actor, dead: !!actor && actor\.isDead\(\), distance: actor \? player\.getDistance\(actor\) : Infinity, los: !!actor && player\.hasLOS\(actor\) \}\)/.test(src));
 check('a name above TrueHUD\'s health bar at the head + 96, its title line under it at + 70, the bar at + 30 (Nat 26 Oct)', /const LABEL_HEIGHT = 96;/.test(src) && /const SUB_HEIGHT = 70;/.test(src) && /hz \+ LABEL_HEIGHT/.test(src) && /hz \+ SUB_HEIGHT/.test(src));
+check('a creature without "NPC Head [Head]" (the ice wraith: "IW Head") hangs its label from the magic node, else the top of its bounds (Nat 26 Oct)', /const ANCHORS = \["NPC Head \[Head\]", "NPC Head MagicNode \[Hmag\]"\];/.test(src) && /NetImmerse\.hasNode\(actor, node, false\)/.test(src) && /actor\.getPositionZ\(\) \+ actor\.getHeight\(\)/.test(src));
 { const m = plan.parseLabels({ list: [{ id: 5, text: 'Gromm Stonefist', sub: '  the Chieftain   of Blizzard Rest ' }, { id: 6, text: 'Plain' }] });
   check('the title line is parsed and tidied; a row without one has none', m.get(5).sub === 'the Chieftain of Blizzard Rest' && m.get(6).sub === ''); }
 check('behind the camera it is hidden', /if \(!p \|\| p\[2\] <= 0\) \{ this\.hide\(e\); continue; \}/.test(src));

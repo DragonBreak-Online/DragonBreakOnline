@@ -12,7 +12,8 @@ import { LabelWanted, parseLabels, shouldDraw } from "./actorLabelPlan";
 // The server sends dboActorLabels (actorLabelPlan.ts has the shape and the rules) to players near a boss; each label is drawn
 // above the actor's head (head node + LABEL_HEIGHT, in screen space) while its actor is alive, in line of sight and within
 // MAX_DISTANCE, and hidden otherwise. The client announces 'actorLabels' in its UI caps (lib/clientUiCaps.ts).
-const HEAD = "NPC Head [Head]";
+// The nodes a label hangs from, in order; creatures such as the ice wraith have no "NPC Head [Head]" (it has "IW Head")
+const ANCHORS = ["NPC Head [Head]", "NPC Head MagicNode [Hmag]"];
 // Above TrueHUD's health bar (Nat 26 Oct: "can the name be ... above the health"): the bar is drawn at the head + 30
 // (TrueHUD MCM fInfoBarOffsetZ 30, uInfoBarAnchor 1), so a label at + 32, as the nametags sit, lay on it. 72 clears the bar
 // and keeps clear at any distance: both are world offsets, and the bar scales with distance (bInfoBarScaleWithDistance)
@@ -22,6 +23,16 @@ const SUB_HEIGHT = 70;
 const TEXT_SIZE = 0.55;
 const SUB_SIZE = 0.4;
 const SUB_COLOR: [number, number, number, number] = [0.86, 0.86, 0.86, 0.92];
+
+// The head node, else the magic node, else the top of the actor's bounds
+const anchorOf = (actor: Actor): [number, number, number] => {
+  for (const node of ANCHORS) {
+    if (NetImmerse.hasNode(actor, node, false)) {
+      return [NetImmerse.getNodeWorldPositionX(actor, node, false), NetImmerse.getNodeWorldPositionY(actor, node, false), NetImmerse.getNodeWorldPositionZ(actor, node, false)];
+    }
+  }
+  return [actor.getPositionX(), actor.getPositionY(), actor.getPositionZ() + actor.getHeight()];
+};
 
 interface Entry extends LabelWanted { textId: number; shown: string; shownColor: string; subId: number; shownSub: string }
 
@@ -54,9 +65,7 @@ export class ActorLabelService extends ClientListener {
       let draw = false;
       try { draw = shouldDraw({ found: !!actor, dead: !!actor && actor.isDead(), distance: actor ? player.getDistance(actor) : Infinity, los: !!actor && player.hasLOS(actor) }); } catch { draw = false; }
       if (!draw || !actor) { this.hide(e); continue; }
-      const hx = NetImmerse.getNodeWorldPositionX(actor, HEAD, false);
-      const hy = NetImmerse.getNodeWorldPositionY(actor, HEAD, false);
-      const hz = NetImmerse.getNodeWorldPositionZ(actor, HEAD, false);
+      const [hx, hy, hz] = anchorOf(actor);
       const [p, q] = worldPointToScreenPoint([hx, hy, hz + LABEL_HEIGHT], [hx, hy, hz + SUB_HEIGHT]);
       if (!p || p[2] <= 0) { this.hide(e); continue; }
       this.drawSub(e, q, res);
