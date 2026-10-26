@@ -275,10 +275,6 @@ JT.deity = function(s, ctx)
    {
       facts.push(["The faith asks", DEITY_RULES[faith.id]]);
    }
-   if (shown.note != undefined && shown.note != "")
-   {
-      facts.push(["Staff note", shown.note]);
-   }
    for (var k = 0; k < facts.length; k++)
    {
       colText(c, x, py, 150, facts[k][0], 16, C_SECOND);

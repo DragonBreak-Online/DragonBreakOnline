@@ -146,7 +146,7 @@ const closed = (t) => t.closed();
 // ---- Deity ----
 {
   const god = (id, name, kind, extra) => Object.assign({ id, name, kind, sphere: 'of ' + name, boon: name + "'s boon", reachable: true, inBruma: 1, prayAnywhere: false, lawful: true, unlawfulWhere: '', aspectOf: '', alsoKnownAs: [] }, extra || {});
-  const choices = [god('akatosh', 'Akatosh', 'divine'), god('mara', 'Mara', 'divine'), god('aurielfaith', 'Auri-El', 'divine', { aspectOf: 'akatosh' }), god('boethiah', 'Boethiah', 'daedra', { lawful: false, unlawfulWhere: 'Proscribed in Cyrodiil.', reachable: false })];
+  const choices = [god('akatosh', 'Akatosh', 'divine'), god('mara', 'Mara', 'divine', { note: 'Moved shrine 26 Oct' }), god('aurielfaith', 'Auri-El', 'divine', { aspectOf: 'akatosh' }), god('boethiah', 'Boethiah', 'daedra', { lawful: false, unlawfulWhere: 'Proscribed in Cyrodiil.', reachable: false })];
   const faiths = [{ id: 'nine', name: 'The Nine', patrons: ['akatosh', 'mara'], suggested: false }, { id: 'aldmeri', name: 'The Aldmeri Pantheon', patrons: ['aurielfaith'], suggested: true }];
   const t = S.boot('dbo_journal');
   const T2 = TABS.concat([{ id: 'deity', label: 'Deity' }]);
@@ -154,6 +154,7 @@ const closed = (t) => t.closed();
   let tx = texts(t).join('|');
   check('Deity: the faiths, the one of your people first, yours open onto its patrons', /The faiths\|The Aldmeri Pantheon   of your people\|The Nine   your faith\|Akatosh\|Mara   your god/.test(tx), tx);
   check('the page is your god: name, sphere, boon, shrines, the law, and that it is yours', /Mara\|of Mara\|Boon\|Mara's boon\|Shrines\|1 shrine in Bruma\. Any shrine of The Nine hears you/.test(tx) && /Mara is your god\./.test(tx) && /You follow Mara, in The Nine\. Another faith in 3 days\./.test(tx), tx);
+  check('a staff note on a god is not shown to players (Nat 26 Oct)', !/Staff note|Moved shrine/.test(tx), tx);
   btnStarting(t, 'Akatosh').onRelease();
   check('another patron in your faith: Turn to it', btn(t, 'Turn to Akatosh') && !btn(t, 'Turn to Akatosh').disabled);
   btn(t, 'Turn to Akatosh').onRelease();

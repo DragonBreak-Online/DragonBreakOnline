@@ -169,7 +169,6 @@ export const DeityTab = ({ section, busy, act }: JournalTabProps<DeitySection>) 
             <dt>Shrines</dt><dd>{shrinesLine(shown)}{faith && inFaith ? ` Any shrine of ${faith.name} hears you; your own god's answers most often.` : ''}</dd>
             <dt>Under the law</dt><dd className={shown.lawful ? '' : 'jdeity__unlawful'}>{lawLine(shown)}</dd>
             {faith && inFaith && FAITH_RULES[faith.id] ? <><dt>The faith asks</dt><dd>{FAITH_RULES[faith.id]}</dd></> : null}
-            {shown.note ? <><dt>Staff note</dt><dd className="jdeity__note">{shown.note}</dd></> : null}
           </dl>
           <div className="journal__rule" />
           <p className="jdeity__state">{stateLine}</p>
