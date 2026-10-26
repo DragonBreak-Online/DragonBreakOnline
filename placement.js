@@ -324,6 +324,9 @@ module.exports = (api) => {
     return { ok: true, text: `Placed ${known.name}.`, entry };
   };
 
+  // briarheart.js: an object placed through the Place tool on a module's behalf (as if actor a placed it: its cell, its
+  // name in the audit), so it is listed, saved with the world and removable like any placement
+  globalThis.__dboPlaceAs = (a, desc, pos, rot) => { loadCatalog(); return place(Number(a) >>> 0, String(desc), 'object', pos, rot || [0, 0, 0], false, { undo: false, anyReach: true }); };
   const remove = (a, idHex, opts = {}) => {
     const target = resolveTarget(idHex);
     if (!target.ref && !target.entry) return { ok: false, text: String(idHex || '') ? 'Only things placed with the Place tab can be removed this way.' : 'Aim at something first.' };

@@ -74,9 +74,14 @@
 //   three blood-bowl fires and the goat and skeever poles, on navmesh 0AA49C (floor -3316). Our plugins change nothing
 //   there but sink its rubble (Dungeons) and disable the placed Forsworn (DLE).
 // Placed altars (Nat, 26 Oct: "make sure it's in the Place tool"): F7 Place's Briarheart category has "Hagraven Altar
-//   (Briarheart rite)", the vanilla HagravenBloodbowl01 (config altarBase). Every one the Place tool has placed is an altar
-//   where it stands, read from the Place tool's own list (placement.js __dboPlacedOf), so removing it there, or Undo, takes
-//   the altar away and a restart keeps it. Nothing is written to briarheart.json for them.
+//   (Briarheart rite)", the vanilla SkyHavenBloodBowl01 activator, a blood bowl with no script (config altarBase). Every one
+//   the Place tool has placed is an altar where it stands, read from the Place tool's own list (placement.js __dboPlacedOf),
+//   so removing it there, or Undo, takes the altar away and a restart keeps it. Nothing is written to briarheart.json for them.
+// The altar object (Nat, 26 Oct: "more noticeable, like an activator"): each placed altar is named "Hagraven Altar" on the
+//   crosshair (ObjectReference.SetDisplayName, kept in its change form) and activating it is the rite: the first activation
+//   gives the checks and the permanent-death warning, a second within confirmMinutes accepts (as /briarheart confirm forever).
+//   A seeded altar gets its object through the Place tool the first time a player stands in its cell (the Place tool moves
+//   a reference within its own cell only), and never twice: an altar object already within 150 units counts.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -89,7 +94,7 @@ module.exports = (api) => {
     enabled: false,
     races: ['DBOReachmanRace'], faiths: ['reach'],
     heartItem: '3ad61:Skyrim.esm',            // Briar Heart (INGR)
-    altarRadius: 400, confirmMinutes: 5, altarBase: 'acafc:Skyrim.esm',
+    altarRadius: 400, confirmMinutes: 5, altarBase: '6aeed:Skyrim.esm', altarName: 'Hagraven Altar',
     // As hard as the werewolf's road (Nat, 26 Oct): Reachmen only, three Hagraven Feathers and two Hagraven Claws beside the
     // heart (all taken at the rite, whether or not the briar takes), and only by night (worldclock.js; 'fullmoon' or 'any')
     sexes: ['male'], riteAt: 'night',
@@ -177,6 +182,36 @@ module.exports = (api) => {
       .map((e) => ({ world: String(e.where), pos: e.pos.map((v) => Math.round(Number(v))), radius: C.altarRadius, by: e.by, at: e.at, placed: String(e.id) }));
   };
   const allAltars = () => seededAltars().concat(placedAltars(), data().altars);
+  // The altar objects: named once a run (the name itself is kept in the change form), and the seeded ones placed
+  if (!(S.named instanceof Set)) S.named = new Set();
+  const placedRowFor = (target) => {
+    const f = globalThis.__dboPlacedOf; if (typeof f !== 'function' || !C.altarBase) return null;
+    const h = (Number(target) >>> 0).toString(16);
+    try { return (f(C.altarBase) || []).find((e) => e && String(e.id).toLowerCase() === h) || null; } catch (e) { return null; }
+  };
+  const nameAltar = (idHex) => {
+    const h = String(idHex).toLowerCase(); if (S.named.has(h)) return; S.named.add(h);
+    try { mp.callPapyrusFunction('method', 'ObjectReference', 'SetDisplayName', { type: 'form', desc: mp.getDescFromId(parseInt(h, 16) >>> 0) }, [String(C.altarName || 'Hagraven Altar'), true]); }
+    catch (e) { log(`briarheart: naming altar ${h} failed`, e.message); }
+  };
+  const SEED_EVERY_MS = 10000;
+  const ensureAltarObjects = () => {
+    if (!C.enabled || Date.now() - (Number(S.seedAt) || 0) < SEED_EVERY_MS) return;
+    S.seedAt = Date.now();
+    for (const r of placedAltars()) nameAltar(r.placed);
+    const place = globalThis.__dboPlaceAs; if (typeof place !== 'function' || !C.altarBase) return;
+    for (const s of seededAltars()) {
+      if (s.object === false) continue;
+      const w = String(s.world).toLowerCase();
+      if (placedAltars().some((r) => r.world.toLowerCase() === w && dist(r.pos, s.pos) <= 150)) continue;
+      const cx = Math.floor(s.pos[0] / 4096), cy = Math.floor(s.pos[1] / 4096);
+      const by = onlineActors().find((a) => { const p = posOf(a); return p && String(p.world).toLowerCase() === w && Math.floor(p.pos[0] / 4096) === cx && Math.floor(p.pos[1] / 4096) === cy; });
+      if (!by) continue;
+      let r = null; try { r = place(by, C.altarBase, s.pos.slice(0, 3), [0, 0, Number(s.rotZ) || 0]); } catch (e) { r = { ok: false, text: e.message }; }
+      log(r && r.ok ? `briarheart: the altar object for ${s.name || s.world} placed (${r.entry && r.entry.id}), from ${display(by)} in its cell` : `briarheart: placing the altar object for ${s.name || s.world} failed: ${r && r.text}`);
+      if (r && r.ok && r.entry) nameAltar(r.entry.id);
+    }
+  };
   const altarNear = (a) => {
     const here = posOf(a); if (!here || !here.pos) return null;
     return allAltars().find((x) => String(x.world) === String(here.world) && dist(x.pos, here.pos) <= (Number(x.radius) || C.altarRadius)) || null;
@@ -492,7 +527,7 @@ module.exports = (api) => {
       S.tears.delete(a); finishTear(a, j);
     }
   };
-  if (typeof every === 'function') every('briarheart', 1000, tick);
+  if (typeof every === 'function') every('briarheart', 1000, () => { tick(); try { ensureAltarObjects(); } catch (e) { log('briarheart: altar objects failed', e.message); } });
 
   // ---- hooks for the other modules ----------------------------------------------------------------------------------------
   globalThis.__dboIsBriarheart = (a) => C.enabled && isBriar(Number(a) >>> 0);
@@ -536,6 +571,21 @@ module.exports = (api) => {
   };
   // gamemode.js equipHook: every equipment report
   globalThis.__dboBriarheartEquip = (a, equipment) => { if (C.enabled) lookCheck(a, equipment, 'equipment'); };
+  // gamemode.js onActivate: an altar object is the rite. The first activation checks and warns; a second within
+  // confirmMinutes accepts the permanent risks, as /briarheart confirm forever would
+  globalThis.__dboBriarheartActivate = (target, caster) => {
+    if (!C.enabled) return false;
+    const row = placedRowFor(target); if (!row) return false;
+    const a = Number(caster) >>> 0;
+    nameAltar(row.id);
+    if (!isOnline(a)) return true;
+    if (isBriar(a)) { personal(a, 'A briar heart already beats in your chest.'); return true; }
+    const at = S.pending.get(a);
+    if (at && Date.now() - at <= C.confirmMinutes * MIN) { personal(a, confirm(a, 'forever')); return true; }
+    const said = rite(a);
+    personal(a, S.pending.has(a) ? `${said} Or activate the altar again to accept.` : said);
+    return true;
+  };
   // settleLater: the look once equip spam has settled or the retry throttle allows, from the equipment as it is then
   globalThis.__dboBriarheartSettled = (a) => {
     a = Number(a) >>> 0;
