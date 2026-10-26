@@ -14,7 +14,8 @@
 // Built headlessly: ../../build-swf.js -> ffdec -xml2swf then -importScript. Source lives in git; the SWF is
 // ours, not Bethesda-derived, so it may be tracked.
 
-var DBO_EVENT = "dboTestMenu";
+var DBO_EVENT = "dboUi";
+var DBO_SEP = "";
 var DBO_SWF_VERSION = "testmenu-1";
 var MENU_NAME = "CustomMenu";
 
@@ -49,11 +50,13 @@ function log(msg)
    }
 }
 
-function send(what, num)
+// key + separator + JSON args, the shared wire. A key with no args sends the key alone.
+function send(key, args, num)
 {
    if (haveSkse() && _global.skse.SendModEvent != undefined)
    {
-      _global.skse.SendModEvent(DBO_EVENT, what, num);
+      var s = args == undefined ? key : key + DBO_SEP + args;
+      _global.skse.SendModEvent(DBO_EVENT, s, num);
       return true;
    }
    return false;
@@ -123,7 +126,7 @@ function addRow(i, label)
    {
       // The index goes in BOTH the string and the number, so the session shows which of the two survives
       // the trip - strArg and numArg are separate fields all the way to on('modEvent').
-      if (send("row:" + this.idx, this.idx))
+      if (send("dbo:testRow", "[" + this.idx + "]", this.idx))
       {
          statusTf.text = "sent row " + this.idx;
       }
@@ -154,7 +157,7 @@ function addCloseRow()
    };
    c.onRelease = function()
    {
-      send("close", -1);
+      send("close", undefined, 0);
       // Close from the SWF as well as telling the client. This menu is modal and PAUSES the game, so the
       // way out must not depend on the client listening, on the server answering, or on input reaching JS.
       if (haveSkse() && _global.skse.CloseMenu != undefined)
@@ -184,32 +187,41 @@ function build()
 
 // ---- the API the client drives through Ui.invoke* / Ui.get* -------------------------------------------------
 
-// Ui.invokeStringA passes an array as SEPARATE arguments, so this reads `arguments`, not a single array.
-_root.dboSetRows = function()
+// The shared wire: the client sends the WHOLE payload as one JSON string, exactly as the CEF widget would
+// receive it. This test panel reads only title and rows out of it; a real panel reads its own fields.
+// A tiny reader, because the payload here is flat and known; the real panels use swf/lib/dbo.as.
+_root.dboData = function(json)
 {
+   var s = String(json);
+   titleTf.text = pick(s, "title", "DBO test panel");
    clearRows();
-   var n = arguments.length;
-   if (n > MAX_ROWS)
+   var n = 0;
+   var at = s.indexOf("\"rows\"");
+   if (at >= 0)
    {
-      n = MAX_ROWS;
-   }
-   for (var i = 0; i < n; i++)
-   {
-      addRow(i, String(arguments[i]));
+      var seg = s.substring(s.indexOf("[", at) + 1, s.indexOf("]", at));
+      var parts = seg.split("\",\"");
+      for (var i = 0; i < parts.length && n < MAX_ROWS; i++)
+      {
+         var v = parts[i];
+         while (v.charAt(0) == "\"" || v.charAt(0) == " ") { v = v.substring(1); }
+         while (v.charAt(v.length - 1) == "\"") { v = v.substring(0, v.length - 1); }
+         if (v.length) { addRow(n, v); n++; }
+      }
    }
    statusTf.text = n + " row(s) from the server - click one";
-   log("rows set: " + n);
+   log("payload in: " + s.length + " chars, " + n + " rows");
 };
 
-_root.dboSetTitle = function(s)
+function pick(s, key, dflt)
 {
-   titleTf.text = String(s);
-};
-
-_root.dboSetStatus = function(s)
-{
-   statusTf.text = String(s);
-};
+   var at = s.indexOf("\"" + key + "\"");
+   if (at < 0) { return dflt; }
+   var q = s.indexOf("\"", s.indexOf(":", at) + 1);
+   if (q < 0) { return dflt; }
+   var e = s.indexOf("\"", q + 1);
+   return e < 0 ? dflt : s.substring(q + 1, e);
+}
 
 // Read back with Ui.getBool / Ui.getString: a second, pull-based way to tell whether this SWF is the one
 // loaded, independent of whether any mod event got through.
@@ -219,7 +231,30 @@ _root.dboVersion = DBO_SWF_VERSION;
 build();
 _root.dboReady = true;
 
-// The most useful line in the file: it proves the SWF loaded AND that the out-path works, before anybody
-// clicks anything. The client waits for this instead of guessing when the async open has finished.
-log("panel built, version " + DBO_SWF_VERSION);
-send("ready", 0);
+// MEASURED 26 Oct: on frame 1 _global.skse DOES NOT EXIST YET. The panel drew itself, so this script ran,
+// yet skse.Log produced no line in skse64.log and no mod event reached the client - both of which go through
+// _global.skse. SKSE installs that object while the movie is being created (InstallHooks, trampolined into
+// the movie-creation path) and our frame-1 actions run first, so calling it here is simply too early.
+//
+// So wait for it instead of assuming it. An empty clip's onEnterFrame polls until the object appears, then
+// announces once and stops. The frame number goes in the log line, because "which frame does skse appear on"
+// is the fact nobody has written down and the next menu will need it.
+_root.createEmptyMovieClip("dboBoot", 1);
+_root.dboBoot.frames = 0;
+_root.dboBoot.onEnterFrame = function()
+{
+   this.frames++;
+   if (haveSkse())
+   {
+      log("panel built, version " + DBO_SWF_VERSION + ", skse appeared on frame " + this.frames);
+      send("ready", "[" + this.frames + "]", this.frames);
+      delete this.onEnterFrame;
+      return;
+   }
+   // Say so on screen rather than sitting on "waiting for the server" forever. The client closes the menu
+   // on its own after READY_TIMEOUT_MS, which is verified to work, so this is a message and not a trap.
+   if (this.frames == 120)
+   {
+      statusTf.text = "no skse bridge after 120 frames - the out path is unavailable";
+   }
+};

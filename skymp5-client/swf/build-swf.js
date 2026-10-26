@@ -79,11 +79,11 @@ const verifyDir = path.join(outDir, '.verify-' + name);
 fs.rmSync(verifyDir, { recursive: true, force: true });
 run(['-export', 'script', verifyDir, final]);
 
-// swf/<name>/verify.txt names strings only this menu's source has, one per line
+// swf/<name>/verify.txt names strings only this menu's source has, one per line; else the shared wire's own names
 const verifyList = path.join(srcDir, 'verify.txt');
 const want = fs.existsSync(verifyList)
   ? fs.readFileSync(verifyList, 'utf8').split('\n').map((l) => l.trim()).filter(Boolean)
-  : ['dboSetRows', 'SendModEvent', '$EverywhereFont'];
+  : ['dboData', 'SendModEvent', '$EverywhereFont'];
 let text = '';
 const walk = (d) => {
   for (const e of fs.readdirSync(d, { withFileTypes: true })) {
