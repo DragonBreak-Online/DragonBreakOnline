@@ -47,10 +47,10 @@ const templates = JSON.parse(fs.readFileSync(path.join(SERVER, 'guild-defs.json'
 const ranksOf = (fid) => { const f = defs.find((x) => x.id === fid); return f ? (f.ranks || templates[f.template] || []) : []; };
 const tailors = [...new Set(robes.flatMap(([, v]) => v.factions))];
 check('every faction a robe names has a leader, at least, to make it', tailors.every((fid) => ranksOf(fid).some((r) => r.role === 'tailor' || r.role === 'leader')));
-// The Imperial Cult has no tailor rank, so until it gets one only its Primate makes the Eight's robes
+// The Imperial Cult had no tailor rank (only its Primate made the Eight's robes); [] once it has one
 const noTailor = tailors.filter((fid) => !ranksOf(fid).some((r) => r.role === 'tailor'));
-console.log(`${JSON.stringify(noTailor) === '["imperial-cult"]' ? 'NOTE' : 'FAIL'}  factions with no tailor rank, so only their leader makes their robes: ${JSON.stringify(noTailor)}`);
-if (JSON.stringify(noTailor) !== '["imperial-cult"]') failures++;
+console.log(`${['[]', '["imperial-cult"]'].includes(JSON.stringify(noTailor)) ? 'NOTE' : 'FAIL'}  factions with no tailor rank, so only their leader makes their robes: ${JSON.stringify(noTailor)}`);
+if (!['[]', '["imperial-cult"]'].includes(JSON.stringify(noTailor))) failures++;
 
 // ---- in play ----
 const ids = new Map(); const descs = new Map(); let next = 0x100;
