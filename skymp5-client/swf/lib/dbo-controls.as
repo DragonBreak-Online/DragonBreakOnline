@@ -24,6 +24,11 @@ function button(parent, name, depth, x, y, w, label, font, size, rest, onPick)
    c.onRollOut = function()
    {
       this._alpha = this.rest;
+      // so the mouse coming back focuses it again
+      if (focus == this.idx)
+      {
+         focus = -1;
+      }
    };
    c.onRelease = function()
    {

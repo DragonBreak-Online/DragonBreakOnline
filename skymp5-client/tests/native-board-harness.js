@@ -24,6 +24,8 @@ const closed = (t) => t.closed();
   const t = S.boot('dbo_board');
   check('says ready with the frame skse appeared on', msgs(t, 'ready').length === 1 && msgs(t, 'ready')[0].args[0] === 1, t.msgs());
   t.push(board);
+  const cb = P(t).foot.close; cb.onRollOver(); cb.onRollOut(); cb.onRollOver();
+  check('a button the mouse leaves and comes back to brightens again (dbo-controls)', cb._alpha === 100, cb._alpha);
   check('the title names the board', P(t).head.title.text === 'Bruma Notice Board', P(t).head.title.text);
   check('tabs carry their counts, the first open and bright', P(t).head.tab0.label.text === 'Hold Notices  1' && P(t).head.tab1.label.text === 'Shop Ads  2' && P(t).head.tab0._alpha === 100 && P(t).head.tab1._alpha === 30);
   const r = rowsOf(t);
