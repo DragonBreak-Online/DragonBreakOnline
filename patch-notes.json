@@ -1,5 +1,20 @@
 [
   {
+    "title": "The Lady, the Lord and the Steed each have their own gift",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Birthsigns",
+        "items": [
+          "The Lady did everything the Lord and the Steed did. Now: the Lady, health and stamina regenerate 7% faster (was 10%); the Lord, health regenerates 10% faster and blows from weapons and fists hurt 5% less, with fire still 5% worse; the Steed, stamina regenerates 10% faster and +50 carry weight.",
+          "Against other players the Lord's guard is halved, as every sign's change to damage taken is."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Birthsigns rebalanced for duels, and no pop-ups in dungeons",
     "date": "2026-10-26",
     "version": "Server update",

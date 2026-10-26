@@ -335,7 +335,9 @@ module.exports = (api) => {
     const keep = pvp ? num(pvpOf().takenShare, 1) : 1;
     for (const [k, share] of Object.entries(sg.taken)) {
       if (!num(share, 0)) continue;
-      const hit = k === 'magic' ? isMagicSource(src) : AV[k] !== undefined && (rs || (rs = resists(src))).has(AV[k]);
+      // physical: a weapon's or a fist's blow, never a spell's (the Lord's guard)
+      const hit = k === 'magic' ? isMagicSource(src) : k === 'physical' ? !isMagicSource(src) && (['one', 'two', 'bow'].includes(hands(src)) || (src >>> 0) === UNARMED)
+        : AV[k] !== undefined && (rs || (rs = resists(src))).has(AV[k]);
       if (hit) m *= Math.max(0, 1 + num(share, 0) * keep);
     }
     return m;

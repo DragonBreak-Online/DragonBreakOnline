@@ -31,7 +31,11 @@ const PVP_DEFAULTS = { enabled: true, sneakDamage: 0, takenShare: 0.5, regenShar
 const ORDER = ['warrior', 'mage', 'thief', 'lady', 'lord', 'steed', 'apprentice', 'atronach', 'ritual', 'lover', 'shadow', 'serpent', 'tower'];
 // xp: skill -> rate; xpAll: every skill; regen: stat -> factor (below 1 slows it); lowHealth/lowHealthRegen: a conditional
 // health factor below that share of health; taken: fire/frost/shock/poison/magic -> share more (below 0: less);
-// sneakDamage: a share more on a sneak attack; goldBonus: a share of loot and pay; vital: flat health/magicka/stamina.
+// sneakDamage: a share more on a sneak attack; goldBonus: a share of loot and pay; vital: flat health/magicka/stamina;
+// taken.physical: a weapon's or a fist's blow (racial.js); carry: the carry weight the sign's ability gives (config
+// birthsigns.carrySpell, a constant-effect ability the engine applies; the number is for the picker and must match it).
+// The Warrior's charges each have their own niche (Nat, 26 Oct: "why would you pick the Lord or the Steed if the Lady does
+// both?"): the Lady both regens but smaller, the Lord health and a guard against blows, the Steed stamina and a burden.
 // For the picker: guardian ('' a Guardian, 'none' the Serpent, else its Guardian's id), lore (one line, Nat approved the
 // mock's), emblem (original line-art: stars [x, y] on a 40 x 40 grid, then lines between them by index; never game art)
 const SIGNS = {
@@ -46,13 +50,13 @@ const SIGNS = {
     xp: { archery: 1.1 }, goldBonus: 0.05 },
   lady: { name: 'The Lady', guardian: 'warrior', lore: 'Kind and patient, and slow to tire.',
     emblem: { stars: [[20, 6], [13, 15], [27, 15], [15, 33], [25, 33], [20, 22]], lines: [[0, 1], [0, 2], [1, 5], [2, 5], [5, 3], [5, 4]] },
-    regen: { health: 1.1, stamina: 1.1 } },
+    regen: { health: 1.07, stamina: 1.07 } },
   lord: { name: 'The Lord', guardian: 'warrior', lore: 'The blood of the North runs strong, and fire bites deeper.',
     emblem: { stars: [[20, 4], [12, 12], [28, 12], [20, 20], [13, 34], [27, 34]], lines: [[0, 1], [0, 2], [1, 3], [2, 3], [3, 4], [3, 5]] },
-    regen: { health: 1.1 }, taken: { fire: 0.05 } },
+    regen: { health: 1.1 }, taken: { fire: 0.05, physical: -0.05 } },
   steed: { name: 'The Steed', guardian: 'warrior', lore: 'Restless, and always on the move.',
     emblem: { stars: [[8, 26], [15, 18], [24, 16], [32, 10], [31, 22], [16, 31]], lines: [[0, 1], [1, 2], [2, 3], [2, 4], [1, 5]] },
-    regen: { stamina: 1.1 } },
+    regen: { stamina: 1.1 }, carry: 50 },
   apprentice: { name: 'The Apprentice', guardian: 'mage', lore: 'Quick with magic, and open to it as well.',
     emblem: { stars: [[10, 30], [17, 22], [24, 16], [31, 8], [27, 27]], lines: [[0, 1], [1, 2], [2, 3], [2, 4]] },
     regen: { magicka: 1.15 }, taken: { magic: 0.05 } },
@@ -78,11 +82,12 @@ const SIGNS = {
 // The picker's cards: each Guardian, then its charges; the Serpent last
 const PICKER_ORDER = ['warrior', 'lady', 'steed', 'lord', 'mage', 'apprentice', 'atronach', 'ritual', 'thief', 'lover', 'shadow', 'tower', 'serpent'];
 const PICKER_CAP = 'birthsignPicker';
-const DEFAULTS = { enabled: true, requireAtCreation: true, loginDelaySeconds: 20, reshowSeconds: 90, creationReshowSeconds: 15, fightSeconds: 30 };
+const DEFAULTS = { enabled: true, requireAtCreation: true, loginDelaySeconds: 20, reshowSeconds: 90, creationReshowSeconds: 15, fightSeconds: 30,
+  carrySpell: '1d1fa7:DragonBreak Online Edits.esp' };
 const SKILL = { blade: 'Blade', blunt: 'Blunt', archery: 'Archery', defense: 'Defense', arcane: 'Arcane Arts', unarmed: 'Martial Arts',
   blacksmith: 'Blacksmith', alchemist: 'Alchemist', woodcutter: 'Woodcutter', miner: 'Miner', tailor: 'Tailor', skinner: 'Skinner',
   scholar: 'Scholar', enchanter: 'Enchanter', priest: 'Priest', cook: 'Cook', harvesting: 'Harvesting', lockpicking: 'Lockpicking' };
-const TAKEN = { fire: 'fire', frost: 'frost', shock: 'shock', poison: 'poison', magic: 'spells' };
+const TAKEN = { fire: 'fire', frost: 'frost', shock: 'shock', poison: 'poison', magic: 'spells', physical: 'weapons and fists' };
 
 const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
 const pct = (f) => Math.round(Math.abs(f) * 100);
@@ -112,7 +117,8 @@ const describe = (s) => {
   else for (const [k, f] of up) out.push(`${k} regenerates ${pct(num(f, 1) - 1)}% faster`);
   for (const [k, f] of down) out.push(`${k} regenerates ${pct(1 - num(f, 1))}% slower`);
   if (num(s.lowHealthRegen, 1) > 1) out.push(`health regenerates ${pct(num(s.lowHealthRegen, 1) - 1)}% faster below ${pct(num(s.lowHealth, 0))}% health`);
-  for (const [k, sh] of Object.entries(s.taken || {})) if (num(sh, 0)) out.push(`${TAKEN[k] || k} hurt${k === 'magic' ? '' : 's'} ${pct(num(sh, 0))}% ${num(sh, 0) > 0 ? 'more' : 'less'}`);
+  for (const [k, sh] of Object.entries(s.taken || {})) if (num(sh, 0)) out.push(`${TAKEN[k] || k} hurt${k === 'magic' || k === 'physical' ? '' : 's'} ${pct(num(sh, 0))}% ${num(sh, 0) > 0 ? 'more' : 'less'}`);
+  if (num(s.carry, 0) > 0) out.push(`+${num(s.carry, 0)} carry weight`);
   if (num(s.sneakDamage, 0) > 0) out.push(`sneak attacks deal ${pct(num(s.sneakDamage, 0))}% more`);
   if (num(s.goldBonus, 0) > 0) out.push(`${pct(num(s.goldBonus, 0))}% more gold from loot and contract pay`);
   const text = out.join('; ');
@@ -272,6 +278,42 @@ module.exports = (api) => {
     }
   };
   every('birthsignPrompt', 5000, () => { try { tick(); } catch (e) { log('birthsign prompt failed', e.message); } });
+
+  // ---- a sign's ability (the Steed's carry weight) ----------------------------------------------------------------------
+  // Given once a session to a player whose sign has `carry` (config carrySpell; default the DLE's DBO_ReferralCarry, a
+  // constant +50 CarryWeight ability, 1D1FA7), taken back when the sign changes. racial.js gives the Maormer's ability the same
+  // way. The referral reward shares the record: a Steed who earned it there has +50 once, not twice (one spell cannot stack).
+  const ABILITY = 'private.dboBirthsignAbility';
+  if (!(S.abilityOn instanceof Set)) S.abilityOn = new Set();
+  const carryId = () => { try { const id = mp.getIdFromDesc(String(C.carrySpell || '')) >>> 0; const r = id ? mp.lookupEspmRecordById(id) : null; return r && r.record && String(r.record.type) === 'SPEL' ? id : 0; } catch (e) { return 0; } };
+  const papyrusSpell = (a, add, id) => {
+    try {
+      mp.callPapyrusFunction('method', 'Actor', add ? 'AddSpell' : 'RemoveSpell', { type: 'form', desc: mp.getDescFromId(a >>> 0) },
+        add ? [{ type: 'espm', desc: mp.getDescFromId(id >>> 0) }, false] : [{ type: 'espm', desc: mp.getDescFromId(id >>> 0) }]);
+      return true;
+    } catch (e) { log(`birthsigns: ${add ? 'AddSpell' : 'RemoveSpell'} ${id.toString(16)} on ${display(a >>> 0)} failed`, e.message); return false; }
+  };
+  const abilityTick = () => {
+    const want = on() ? carryId() : 0;
+    const here = new Set();
+    for (const a0 of onlineActors()) {
+      const a = a0 >>> 0; here.add(a);
+      let held = ''; try { held = String(mp.get(a, ABILITY) || ''); } catch (e) { held = ''; }
+      const sg = recordOf(a) ? signOf(a) : null;
+      if (want && sg && num(sg.carry, 0) > 0) {
+        if (S.abilityOn.has(a)) continue;
+        if (papyrusSpell(a, true, want)) { S.abilityOn.add(a); try { mp.set(a, ABILITY, mp.getDescFromId(want)); } catch (e) { /* given anyway */ } }
+      } else if (held) {
+        // the referral reward's own copy stays: it is taken back only if the referral never gave it
+        let referral = ''; try { referral = String(mp.get(a, 'private.dboReferralCarry') || ''); } catch (e) { referral = ''; }
+        const id = (() => { try { return mp.getIdFromDesc(held) >>> 0; } catch (e) { return 0; } })();
+        if (!id || referral === held || papyrusSpell(a, false, id)) { S.abilityOn.delete(a); try { mp.set(a, ABILITY, null); } catch (e) { /* tried */ } }
+      }
+    }
+    for (const a of [...S.abilityOn]) if (!here.has(a)) S.abilityOn.delete(a);
+  };
+  every('birthsignAbility', 15000, () => { try { abilityTick(); } catch (e) { log('birthsign ability failed', e.message); } });
+  globalThis.__dboBirthsignAbilityTick = abilityTick;
 
   // ---- /birthsign ---------------------------------------------------------------------------------------------------------
   // Online by name or tag, offline by #TAG (supernatural.js findCharacter's rule)
