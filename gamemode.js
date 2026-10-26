@@ -2348,22 +2348,30 @@ every('activatePrune', 60000, () => { const now = Date.now(); for (const [k, b] 
 // Every zone with a "treasury" in zones.json starts with 10,000 gold, seeded once; board fees are paid into it.
 const GOLD_BASE = 0x0000000f;
 const TREASURY_SEED_GOLD = Number((cfg.banks || {}).seedGold) || 10000;
+// Resolving a treasury chest and reading its flag is about half a second of native time per zone, and this
+// timer runs on every gamemode load, so a warm reload spent 4.6 s on nine zones that were already funded
+// (CAPACITY_PLAN, 24 Oct). The banks confirmed funded are remembered across reloads; one added later is
+// still seeded, because only the banks in the set are skipped.
+const seededBanks = globalThis.__dboTreasuriesSeeded instanceof Set
+  ? globalThis.__dboTreasuriesSeeded
+  : (globalThis.__dboTreasuriesSeeded = new Set());
 const seedTreasuries = () => {
-  let seeded = 0, kept = 0;
+  let seeded = 0, kept = 0, known = 0;
   for (const [bank, desc] of zoneList().filter((z) => z.treasury).map((z) => [z.id, z.treasury])) {
+    if (seededBanks.has(bank)) { known++; continue; }
     try {
       const id = mp.getIdFromDesc(desc); if (!id) { log(`treasury ${bank}: ${desc} not found`); continue; }
-      if (mp.get(id, 'private.treasurySeeded') === true) { kept++; continue; }
+      if (mp.get(id, 'private.treasurySeeded') === true) { kept++; seededBanks.add(bank); continue; }
       const inv = mp.get(id, 'inventory') || { entries: [] };
       const entries = Array.isArray(inv.entries) ? inv.entries.filter(e => e && e.baseId !== GOLD_BASE) : [];
       const gold = (Array.isArray(inv.entries) ? inv.entries : []).filter(e => e && e.baseId === GOLD_BASE).reduce((s, e) => s + (Number(e.count) || 0), 0);
       entries.push({ baseId: GOLD_BASE, count: Math.max(gold, TREASURY_SEED_GOLD) });
       mp.set(id, 'inventory', { entries });
       mp.set(id, 'private.treasurySeeded', true);
-      seeded++; audit(`BANK ${bank} treasury seeded with ${Math.max(gold, TREASURY_SEED_GOLD)} gold`);
+      seeded++; seededBanks.add(bank); audit(`BANK ${bank} treasury seeded with ${Math.max(gold, TREASURY_SEED_GOLD)} gold`);
     } catch (e) { log(`treasury ${bank} seed failed:`, e.message); }
   }
-  log(`bank treasuries: ${seeded} seeded, ${kept} already funded`);
+  log(`bank treasuries: ${seeded} seeded, ${kept} already funded${known ? `, ${known} known from an earlier load` : ''}`);
 };
 setTimeout(seedTreasuries, 3000);
 
