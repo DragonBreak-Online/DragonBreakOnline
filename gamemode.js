@@ -402,6 +402,8 @@ const TIER_LABEL = { senior: 'Senior', developer: 'Developer', leadgm: 'Lead GM'
 const LEAD_ONLY = new Set(['rerollrefund', 'beastform', 'frenzy', 'polymorph', 'vlremote', 'wwremote', 'feedpair', 'sethunger', 'wipechars', 'driftspawn', 'driftrepair', 'driftset',
   'jail', 'placeexport', 'staffstats', 'war', 'exposure', 'curse', 'schedule', 'warband', 'raid', 'settime', 'timescale', 'setweather', 'npc remove', 'dungeon end',
   'appoint', 'dismiss',
+  // Ending a character for good, and lifting it (Nat, 26 Oct)
+  'pk', 'unpk',
   // Handing out a smithing manual is handing out an item (the T5 ones are given in roleplay, like artifacts)
   'manual grant',
   // A staff override on the state of a player, like the property override (A3-1): /deity reset <player> in prayer.js
@@ -1052,7 +1054,7 @@ const helpLine = (n) => { const c = commands.get(n); return `/${n}${c && c.help 
 // power inside a player command. An entry shows only while its command exists; an admin-only command missing here is
 // listed under Other staff tools.
 const STAFF_HELP = [
-  { key: 'players', title: 'Players', items: ['players', 'kick', 'discipline', 'ban', 'tempban', 'unban', 'bans', 'tp', 'fixloc', 'chargen', 'grantappearance',
+  { key: 'players', title: 'Players', items: ['players', 'kick', 'discipline', 'ban', 'tempban', 'unban', 'bans', 'pk', 'unpk', 'tp', 'fixloc', 'chargen', 'grantappearance',
     ['rename', '<player|#TAG> <new name> [call:<n>|ticket:<id>]: for a typo or a name against the rules. A new identity is a new character, never a rename'],
     'staffchar', 'staffref', 'sethunger', 'wipechars',
     ['tokens', '<player|#TAG>: someone\'s Patreon tier and identity rerolls left'], 'rerollrefund', 'stats', 'charstats', 'bugs', 'realnames', 'chars',
@@ -1178,6 +1180,80 @@ registerChatCommand('kick', (a, args) => {
   try { mp.kick(userOf(t)); broadcast(`[[S]]#{${C.SYS}}${nameOf(t)} was kicked by ${nameOf(a)}.`); audit(`GM ${who(a)} kicked ${who(t)} via /kick`); }
   catch (e) { personal(a, 'Kick failed: ' + e.message); }
 }, { admin: true, help: '<player>' });
+// ---- a staff permadeath (Nat, 26 Oct: Jarl Uhtred was ruled "officially PKed" and no tool could end a character) ----
+// /pk ends one character for good, online or offline, the way supernatural.js permaKill and realm.js wars do
+// (private.permaDead + isDead): fork spawn.ts refuses the slot at login and shows it dead, and the account's other
+// characters stay playable. Every seat the character holds goes vacant. /unpk (Owners) lifts it; the seats stay vacant.
+// The target is "<#TAG or exact own name> <reason>": the longest leading words that name exactly one character
+const pkTargetOf = (text) => {
+  const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+  for (let n = words.length - 1; n >= 1; n--) {
+    const q = words.slice(0, n).join(' ');
+    const t = findAnyByName(q);
+    if (!(t > 0)) continue;
+    const tagged = /#[a-z0-9]{4}$/i.test(q) && q.toLowerCase().endsWith(`#${String(tagOf(t)).toLowerCase()}`);
+    if (tagged || String(ownNameOf(t)).toLowerCase() === q.toLowerCase()) return { t: t >>> 0, reason: words.slice(n).join(' ') };
+  }
+  return null;
+};
+// The seats of t's account that are t's own: bound to t, or bound to no character (officials-seats.json); a seat the
+// account holds through another of its characters stays. Returns [{ z, r }] vacated.
+const vacateSeatsOf = (t, byWho) => {
+  const pid = profileOf(t); if (!(pid >= 0)) return [];
+  const o = readOfficials(); const out = [];
+  for (const z of zoneList()) for (const r of (z.officials || [])) {
+    if (!((o[z.id] || {})[r] || []).map(Number).includes(pid)) continue;
+    const held = seatHolder(z.id, r, pid);
+    if (held && held !== (t >>> 0)) continue;
+    o[z.id][r] = o[z.id][r].filter((x) => Number(x) !== pid);
+    out.push({ z, r });
+  }
+  if (!out.length) return out;
+  writeOfficials(o);
+  const s = readSeats(); let bound = false;
+  for (const { z, r } of out) if (((s[z.id] || {})[r] || {})[pid] !== undefined) { delete s[z.id][r][pid]; bound = true; }
+  if (bound) writeSeats(s);
+  const tg = { pid, actor: t >>> 0, online: userOf(t) >= 0 ? t >>> 0 : 0, label: publicDisplay(t), who: who(t) };
+  for (const { z, r } of out) { audit(`OFFICIAL ${byWho} unseated ${tg.who} as ${rankTitle(r, z.id)} of ${z.name} (permadeath)`); courtOfficeSync(z, tg, r, false); }
+  return out;
+};
+registerChatCommand('pk', (a, args) => {
+  if (!isLeadStaff(a)) return personal(a, 'Only a Lead GM or above can end a character. Ask one.');
+  const p = pkTargetOf(args);
+  if (!p) return personal(a, 'Usage: /pk <#TAG or exact name> <reason>, e.g. /pk #NWVK ruled permakilled in ticket 123. Nobody was ended.');
+  const { t, reason } = p;
+  const no = rankRefusalOf(a, t);
+  if (no === 'own') return personal(a, `You cannot end a character of your own account: ${display(t)} is on it.`);
+  if (no === 'rank') return personal(a, `${display(t)} is on a staff account of your rank or higher, so you cannot end them. Take it to the Owners.`);
+  if (no) return personal(a, `The staff rank of ${display(t)}'s account could not be read, so nobody was ended. Try again, or ask an Owner.`);
+  let dead = false; try { dead = mp.get(t, 'private.permaDead') === true; } catch (e) { return personal(a, `${display(t)} could not be read, so nobody was ended. Try again.`); }
+  if (dead) return personal(a, `${display(t)} is already permanently dead.`);
+  const online = userOf(t) >= 0;
+  try { mp.set(t, 'private.permaDead', true); mp.set(t, 'isDead', true); mp.set(t, 'private.pk', { by: profileOf(a), reason, at: Date.now() }); }
+  catch (e) { return personal(a, `${display(t)} could not be ended, try again: ${e.message}`); }
+  audit(`PK GM ${who(a)} permakilled ${who(t)}${online ? '' : ' (offline)'}: ${reason}`);
+  let seats = [];
+  try { seats = vacateSeatsOf(t, `GM ${who(a)}`); } catch (e) { log('pk: seats not vacated', e.message); personal(a, `The seats of ${display(t)} could not be vacated (${e.message}): use /dismiss.`); }
+  if (online) {
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('leave_reason', t, 'permadeath', a); } catch (e) { /* the player log is optional */ }
+    const text = `${nameOf(t)} has died, and this life is over. You will be returned to the menu.`;
+    try { sendPacket(t, { customPacketType: 'dboBanner', text, seconds: 7 }); personal(t, text); } catch (e) { /* the kick still comes */ }
+    setTimeout(() => { try { if (mp.get(t, 'private.permaDead') !== true) return; const u = userOf(t); if (u >= 0) mp.kick(u); } catch (e) { log('pk: kick failed', e.message); } }, 8000);
+  }
+  personal(a, `${display(t)} is permanently dead${online ? ' and is sent to the menu in 8 s' : ' (offline: the slot is refused at their next login)'}. ${seats.length ? `Seats vacated: ${seats.map(({ z, r }) => `${rankTitle(r, z.id)} of ${z.name}`).join(', ')}.` : 'They held no seat.'} Their other characters stay playable. /unpk undoes it (Owners).`);
+}, { admin: true, help: '<#TAG or exact name> <reason>: end a character for good, online or offline (Lead GM+); its seats go vacant' });
+registerChatCommand('unpk', (a, args) => {
+  if (tierOf(a) !== 'senior') return personal(a, 'Only the Owners can lift a permadeath.');
+  const p = pkTargetOf(args);
+  if (!p) return personal(a, 'Usage: /unpk <#TAG or exact name> <reason>. Nobody was restored.');
+  const { t, reason } = p;
+  let dead = false; try { dead = mp.get(t, 'private.permaDead') === true; } catch (e) { return personal(a, `${display(t)} could not be read. Try again.`); }
+  if (!dead) return personal(a, `${display(t)} is not permanently dead.`);
+  try { mp.set(t, 'private.permaDead', false); mp.set(t, 'private.pk', null); } catch (e) { return personal(a, `${display(t)} could not be restored, try again: ${e.message}`); }
+  try { mp.set(t, 'isDead', false); } catch (e) { /* revived on login */ }
+  audit(`PK GM ${who(a)} lifted the permadeath of ${who(t)}: ${reason}`);
+  personal(a, `${display(t)} is restored and can be played again. Any seat they lost stays vacant: /appoint to give it back.`);
+}, { admin: true, help: '<#TAG or exact name> <reason>: lift a permadeath (Owners)' });
 // Give all Shouts taught every SHOU in the load order until 16 Oct (dragon breaths, Miraak's, Greybeard copies; Nate:
 // "it gave me every shout that you shouldnt have"). The server cannot remove a shout (no RemoveShout in PapyrusActor) and
 // keeps none: the client holds them until its next login, which loads a fresh game, and adminSystem then teaches
