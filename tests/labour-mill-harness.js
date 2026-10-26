@@ -59,12 +59,12 @@ const said = () => out.personals.join(' | ');
 const T1 = WOODCUTTER.millFirewoodByTier[0];
 // Hearthfire's Sawn Log (BYOHMaterialLog), sawn with the firewood (Nat, 25 Oct: "make the saw machine for sawn logs work")
 const SAWNLOG = 0x300e;
-// Sawn logs from Adept up (woodcutter sawnLogMinTier, Nat 25 Oct); a Novice or Apprentice gets the firewood alone
+// Sawn logs from Apprentice up (woodcutter sawnLogMinTier; Adept on 25 Oct, Apprentice since 26 Oct); a Novice gets the firewood alone
 const LOG_TIER = WOODCUTTER.sawnLogMinTier;
-const ADEPT_LINE = /Sawn logs for building come at an Adept Woodcutter\./;
-check('skills.json: sawn logs from Adept (sawnLogMinTier 2)', LOG_TIER === 2, String(LOG_TIER));
+const LOG_LINE = /Sawn logs for building come at an Apprentice Woodcutter\./;
+check('skills.json: sawn logs from Apprentice (sawnLogMinTier 1)', LOG_TIER === 1, String(LOG_TIER));
 const paid = (id) => out.items.filter(([i]) => i === id).reduce((n, [, c]) => n + c, 0);
-check('skills.json saws logs too: 4 to 8 Sawn Logs by tier', JSON.stringify(WOODCUTTER.millSawnLogsByTier) === '[4,5,6,7,8]', JSON.stringify(WOODCUTTER.millSawnLogsByTier));
+check('skills.json saws logs too: 8 to 16 Sawn Logs by tier (Nat, 26 Oct: "more sawn logs from the mill")', JSON.stringify(WOODCUTTER.millSawnLogsByTier) === '[8,10,12,14,16]', JSON.stringify(WOODCUTTER.millSawnLogsByTier));
 
 check('skills.json still holds the design: firewood for 5 tiers and a 30-minute rest',
   Array.isArray(WOODCUTTER.millFirewoodByTier) && WOODCUTTER.millFirewoodByTier.length === 5 && WOODCUTTER.millCooldownMinutes === 30, JSON.stringify(WOODCUTTER.millFirewoodByTier));
@@ -79,8 +79,8 @@ if (gated) check('...and the mill pays Nat\'s 20 to 60 by tier', JSON.stringify(
 setTier(0);
 let r = use(MILL);
 check('a Novice Woodcutter runs the mill: the activation is the server\'s (nobody is seated)', r === true);
-check(`...and gets ${T1} Firewood and no Sawn Logs: those come at Adept`, out.items.length === 1 && paid(FIREWOOD) === T1 && paid(SAWNLOG) === 0, JSON.stringify(out.items));
-check('...told so, with when to come back and that sawn logs come at Adept', new RegExp(`${T1} Firewood`).test(said()) && /30 minutes/.test(said()) && ADEPT_LINE.test(said()), said());
+check(`...and gets ${T1} Firewood and no Sawn Logs: those come at Apprentice`, out.items.length === 1 && paid(FIREWOOD) === T1 && paid(SAWNLOG) === 0, JSON.stringify(out.items));
+check('...told so, with when to come back and that sawn logs come at Apprentice', new RegExp(`${T1} Firewood`).test(said()) && /30 minutes/.test(said()) && LOG_LINE.test(said()), said());
 check('...audited as a MILL line naming the mill', out.audits.length === 1 && out.audits[0] === `MILL Tester #ABCD (profile 1) ran a saw mill at 5565c:Skyrim.esm (tier 1) -> ${T1} firewood`, out.audits[0]);
 check('...and credited as woodcutting (a chop event on the mill)', out.events.length === 1 && out.events[0].kind === 'chop' && out.events[0].detail.refrId === MILL);
 
@@ -98,13 +98,13 @@ check('the first mill pays again once its 30 minutes are up', paid(SAWNLOG) === 
 setTier(1);
 wallClock += 31 * 60000;
 r = use(MILL);
-check('an Apprentice still gets firewood alone, and the Adept line', paid(SAWNLOG) === 0 && paid(FIREWOOD) === WOODCUTTER.millFirewoodByTier[1] && ADEPT_LINE.test(said()), JSON.stringify(out.items) + ' ' + said());
+check(`an Apprentice now gets ${WOODCUTTER.millSawnLogsByTier[1]} Sawn Logs with the firewood, and no "come at" line`, paid(SAWNLOG) === WOODCUTTER.millSawnLogsByTier[1] && paid(FIREWOOD) === WOODCUTTER.millFirewoodByTier[1] && !LOG_LINE.test(said()), JSON.stringify(out.items) + ' ' + said());
 setTier(2);
 wallClock += 31 * 60000;
 r = use(MILL);
 check(`an Adept gets ${WOODCUTTER.millSawnLogsByTier[2]} Sawn Logs and ${WOODCUTTER.millFirewoodByTier[2]} Firewood`, paid(SAWNLOG) === WOODCUTTER.millSawnLogsByTier[2] && paid(FIREWOOD) === WOODCUTTER.millFirewoodByTier[2], JSON.stringify(out.items));
-check('...told of both, and no Adept line', new RegExp(`${WOODCUTTER.millSawnLogsByTier[2]} Sawn Logs and`).test(said()) && !ADEPT_LINE.test(said()), said());
-check('...audited with both', /-> 6 sawn logs, 40 firewood$/.test(out.audits[0] || ''), out.audits[0]);
+check('...told of both, and no "come at" line', new RegExp(`${WOODCUTTER.millSawnLogsByTier[2]} Sawn Logs and`).test(said()) && !LOG_LINE.test(said()), said());
+check('...audited with both', /-> 12 sawn logs, 40 firewood$/.test(out.audits[0] || ''), out.audits[0]);
 
 setTier(4);
 wallClock += 31 * 60000;
@@ -134,6 +134,26 @@ check('an NPC working the mill is left to its own animation', r === false && out
 setTier(0);
 r = use(BLOCK);
 check('a chopping block still runs its round', r === true && out.widgets.length === 1 && out.items.length === 0);
+
+// A mill staff place from F7 (Crafting Stations, "Saw Mill (log pile)"; Nat via the Leader, 26 Oct: Bruma has none) is a
+// dynamic id marked private.dboPlaced: it saws as any mill, and rests by where it stands (its id changes every restart)
+const PLACED = 0xff000123, LOOSE = 0xff000124;
+for (const ref of [PLACED, LOOSE]) { props.set(ref + '|baseDesc', '71c47:Skyrim.esm'); props.set(ref + '|pos', [60000, 250000, 1000]); }
+props.set(PLACED + '|private.dboPlaced', { by: 'staff' });
+globalThis.__dboLabourRounds.delete(ACTOR);   // the chopping block's round above would be re-shown instead
+setTier(2);
+wallClock += 31 * 60000;
+r = use(PLACED);
+check('a staff-placed saw mill saws as any mill: logs and firewood by tier', r === true && paid(SAWNLOG) === WOODCUTTER.millSawnLogsByTier[2] && paid(FIREWOOD) === WOODCUTTER.millFirewoodByTier[2], JSON.stringify(out.items));
+r = use(PLACED);
+check('...and rests per player like any mill', r === true && out.items.length === 0 && /Come back in 30 minutes/.test(said()), said());
+const rested = Object.keys(props.get(ACTOR + '|private.milledLogs') || {});
+check('...its rest kept by where it stands, so a restart does not reset it', rested.some((k) => /^p\d+_\d+$/.test(k)), rested);
+r = use(LOOSE);
+check('a dynamic mill nobody placed through F7 is not ours (nothing paid)', r === false && out.items.length === 0);
+const PLACE = JSON.parse(require('fs').readFileSync(path.resolve(__dirname, '..', 'admin-placeables.json'), 'utf8'));
+const stations = (PLACE.categories.find((c) => c.label === 'Crafting Stations') || { items: [] }).items;
+check('F7 Place lists the saw mill under Crafting Stations', stations.some((row) => /^71c47:Skyrim\.esm$/i.test(row[0])), stations.length);
 
 Date.now = realNow;
 console.log('');

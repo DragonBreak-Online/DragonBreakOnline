@@ -444,15 +444,15 @@
     60
    ],
    "millSawnLogsByTier": [
-    4,
-    5,
-    6,
-    7,
-    8
+    8,
+    10,
+    12,
+    14,
+    16
    ],
-   "_millSawnLogs": "Hearthfire Sawn Logs (300e:HearthFires.esm) per run of a saw mill, by Woodcutter tier, with the firewood (labour.js mill; Nat, 25 Oct). 4 at Novice times the usual tier multiplier (1, 1.2, 1.4, 1.7, 2): a furnished one-cell home's decor takes about 22 (Worker 1's decor-catalog.json, 25 Oct), some 5 or 6 runs, and the firewood keeps a run near the decor's price of 4 firewood a log. A whole Hearthfire house with every wing is about 256. The mill takes nothing in: Skyrim has no raw log.",
-   "sawnLogMinTier": 2,
-   "_sawnLogMinTier": "The Woodcutter tier, 0 based, from which a saw mill run also pays millSawnLogsByTier Sawn Logs (2 = Adept; Nat, 25 Oct). Below it the run pays its firewood only. Read at boot.",
+   "_millSawnLogs": "Hearthfire Sawn Logs (300e:HearthFires.esm) per run of a saw mill, by Woodcutter tier, with the firewood (labour.js mill; Nat, 25 Oct; doubled 26 Oct, Nat: \"more sawn logs from the mill\"). 8 at Novice times the usual tier multiplier (1, 1.2, 1.4, 1.7, 2): a 40-piece home's decor takes about 28 at costA (Worker 1, 26 Oct), some 3 runs, and the firewood keeps a run near the decor's price of 4 firewood a log. A whole Hearthfire house with every wing is about 256. The mill takes nothing in: Skyrim has no raw log.",
+   "sawnLogMinTier": 1,
+   "_sawnLogMinTier": "The Woodcutter tier, 0 based, from which a saw mill run also pays millSawnLogsByTier Sawn Logs (1 = Apprentice since 26 Oct; was 2, Adept; Nat, 25 Oct). Below it the run pays its firewood only. Read at boot.",
    "millCooldownMinutes": 30,
    "_deconstructShare": "Home decorating (decor.js, Nat 25 Oct): the share of a placed piece's materials a deconstruct gives back, by Woodcutter tier (Novice 50% rising to Master 75%), rounded down but at least 1 of any material that cost 2 or more. Without the skill, the Novice share.",
    "deconstructShareByTier": [
