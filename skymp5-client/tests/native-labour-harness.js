@@ -19,7 +19,7 @@ const serverMarkerOn = (ms, sweeps, hitAt) => {
 const sweep = { type: 'labour', id: 55, nonce: 'n1', kind: 'mining', title: 'Iron Seam', strikes: 2, band: 8, bands: [50, 50], sweepMs: 1400, totalMs: 30000, hitMs: 250, missMs: 600, judge: 'client' };
 const msgs = (t, key) => t.msgs().filter((m) => m.key === key);
 const P = (t) => t.root.dboPanel;
-const closed = (t) => t.sent.some((m) => m.e === 'closeMenu');
+const closed = (t) => t.closed();
 const at = (t, ms) => { t.st.time = 1000 + ms; t.tick(); };   // the round starts at stub time 1000
 
 {
@@ -35,29 +35,31 @@ const at = (t, ms) => { t.st.time = 1000 + ms; t.tick(); };   // the round start
   check('a strike outside the band glances: the miss word in red', P(t).lineTf.text === 'The pick glances off the stone.' && P(t).lineTf.textColor === 0xB23A3A, [P(t).lineTf.text, P(t).lineTf.textColor]);
   at(t, 700);
   t.press(32);
-  check('a strike in the stagger after a miss (600 ms) counts for nothing', P(t).lineTf.text === 'The pick glances off the stone.' && !Object.keys(P(t).tally).length === false);
+  check('a strike in the stagger after a miss (600 ms) draws no new word', P(t).lineTf.text === 'The pick glances off the stone.');
   at(t, 2100);
-  check('the server\'s marker is in the band at 2100 ms', Math.abs(serverMarkerAt(2100, 1400) - 50) <= 8);
+  check('the panel\'s marker is in the band at 2100 ms', Math.abs(P(t).bar.marker._x / 844 * 100 - 50) <= 8, P(t).bar.marker._x);
   t.press(13);
   check('Enter lands it: a hit word in green', /^(The rock cracks along the grain\.|Stone chips fly from the seam\.|The vein shifts in the rock\.)$/.test(P(t).lineTf.text) && P(t).lineTf.textColor === 0x8FBF7F, P(t).lineTf.text);
   at(t, 2300);
   P(t).bar.onRelease();
   check('a click on the face inside the 250 ms after a hit counts for nothing either', msgs(t, 'dbo:labour').length === 0);
   at(t, 4900);
-  check('the server\'s marker is in the band at 4900 ms', Math.abs(serverMarkerAt(4900, 1400) - 50) <= 8);
+  check('the panel\'s marker is in the band at 4900 ms', Math.abs(P(t).bar.marker._x / 844 * 100 - 50) <= 8, P(t).bar.marker._x);
   P(t).acts.strike.onRelease();
   const r = msgs(t, 'dbo:labour');
   check('the second landed blow ends the round: one report', r.length === 1, r);
   const args = r[0].args;
-  check('it reports the nonce, every strike time on the frame clock, the end time and the widget\'s count', args[0] === 'n1' && args[1] === '[350,2100,4900]' && args[2] === 4900 && JSON.parse(args[3]).v === 1 && JSON.parse(args[3]).win === true && JSON.parse(args[3]).hits === 2, args);
+  check('it reports the nonce, every counted strike time on the frame clock (not the one in the stagger), the end time and the widget\'s count', args[0] === 'n1' && args[1] === '[350,2100,4900]' && args[2] === 4900 && JSON.parse(args[3]).v === 1 && JSON.parse(args[3]).win === true && JSON.parse(args[3]).hits === 2, args);
   const replay = JSON.parse(args[1]); let hits = 0, ready = 0;
   for (const s of replay) { if (s < ready) continue; const landed = Math.abs(serverMarkerAt(s, 1400) - 50) <= 8; ready = s + (landed ? 250 : 600); if (landed) hits++; }
   check('the server replaying those times on its own sweep counts the same two hits', hits === 2, hits);
   check('the client judge shows its verdict at once, with Stand up', P(t).lineTf.text === 'The seam gives up its ore.' && P(t).acts.stand.label.text === 'Stand up' && !P(t).acts.strike, P(t).lineTf.text);
   t.push(Object.assign({}, sweep, { result: 'You free 2 Iron Ore.', resultKind: 'win' }));
   check('the server\'s verdict with the same nonce replaces the line and keeps the round', P(t).lineTf.text === 'You free 2 Iron Ore.' && msgs(t, 'dbo:labour').length === 1);
-  P(t).acts.stand.onRelease();
-  check('Stand up sends the cancel and closes', msgs(t, 'dbo:labourCancel').length === 1 && msgs(t, 'dbo:labourCancel')[0].args[0] === 'n1' && closed(t));
+  t.press(9);
+  check('Tab does nothing, as in the browser', msgs(t, 'dbo:labourCancel').length === 0 && !t.sent.some((m) => m.e === 'closeMenu'));
+  t.press(13);
+  check('Enter on a finished round is Stand up: the cancel, then the close', msgs(t, 'dbo:labourCancel').length === 1 && msgs(t, 'dbo:labourCancel')[0].args[0] === 'n1' && closed(t));
 }
 
 {
@@ -70,6 +72,9 @@ const at = (t, ms) => { t.st.time = 1000 + ms; t.tick(); };   // the round start
   const r = msgs(t, 'dbo:labour');
   check('the time running out reports the round lost, with no strikes', r.length === 1 && r[0].args[1] === '[]' && r[0].args[2] === 5000 && JSON.parse(r[0].args[3]).win === false, r);
   check('a server judge: no verdict of its own, the strike button greys', P(t).lineTf.text === 'Chip along the crust where the salt has dried thick.' && P(t).acts.strike._alpha === 50);
+  const focusSounds = t.sounds.filter((x) => x === 'PlaySound:UIMenuFocus').length;
+  P(t).acts.strike.onRollOver();
+  check('a greyed Strike does not brighten or sound on hover', P(t).acts.strike._alpha === 50 && t.sounds.filter((x) => x === 'PlaySound:UIMenuFocus').length === focusSounds);
   t.press(32);
   check('nothing more is sent', msgs(t, 'dbo:labour').length === 1);
   t.push(Object.assign({}, sweep, { nonce: 'n2' }));
@@ -90,7 +95,9 @@ const at = (t, ms) => { t.st.time = 1000 + ms; t.tick(); };   // the round start
   t.press(32);
   check('a pull at 700 lands (the first sweep is 1400)', JSON.stringify(msgs(t, 'dbo:struggle')) === '[]' && /knot gives|rope slackens|strand of the rope/.test(P(t).lineTf.text), P(t).lineTf.text);
   // after the hit at 700 the sweep is 1000: the marker is back at 50 when the phase from 700 is 0.5 more, at 700 + 500 * ... find it
-  let ms = 701; while (Math.abs(serverMarkerOn(ms, [1400, 1000, 700], [700]) - 50) > 10) ms++;
+  at(t, 700 + 4321);
+  check('far past a sweep after a pull, the panel\'s marker is the server\'s markerOn (its % 2)', Math.abs(P(t).bar.marker._x - 844 * serverMarkerOn(700 + 4321, [1400, 1000, 700], [700]) / 100) < 1e-9, [P(t).bar.marker._x, 844 * serverMarkerOn(700 + 4321, [1400, 1000, 700], [700]) / 100]);
+  let ms = 701 + 4321; while (Math.abs(serverMarkerOn(ms, [1400, 1000, 700], [700]) - 50) > 10) ms++;
   at(t, ms + 1);
   check('the panel\'s marker after a landed pull is the server\'s markerOn', Math.abs(P(t).bar.marker._x - 844 * serverMarkerOn(ms + 1, [1400, 1000, 700], [700]) / 100) < 1e-9);
   t.press(32);
@@ -119,14 +126,16 @@ const at = (t, ms) => { t.st.time = 1000 + ms; t.tick(); };   // the round start
   at(t, 400);
   P(t).bar.spot0.onRelease();
   check('a faint cue is a slip', P(t).lineTf.text === 'The blade skids off a knot.');
+  P(t).bar.spot0.onRollOver();
+  check('a spot brightens and sounds on hover', P(t).bar.spot0._alpha === 100 && t.sounds.includes('PlaySound:UIMenuFocus'));
   at(t, 800);
-  t.press(49);
-  check('a slip spends that blow: key 1 picks on the next blow, where the first spot is the clear one, and lands', /axe bites|wood splits|splinter/.test(P(t).lineTf.text), P(t).lineTf.text);
+  t.press(97);
+  check('a slip spends that blow: numpad 1 picks on the next blow, where the first spot is the clear one, and lands', /axe bites|wood splits|splinter/.test(P(t).lineTf.text), P(t).lineTf.text);
   check('the next blow\'s two spots show', P(t).bar.spot1 && !P(t).bar.spot2);
   at(t, 1200);
   P(t).bar.spot1.onRelease();
   const r = msgs(t, 'dbo:labour');
-  check('the second landed pick wins: picks as [index, ms], v 2, slips counted', r.length === 1 && r[0].args[1] === '[[0,400],[0,800],[1,1200]]' && r[0].args[2] === 1200 && JSON.stringify(JSON.parse(r[0].args[3])) !== '' && JSON.parse(r[0].args[3]).mode === 'pick' && JSON.parse(r[0].args[3]).slips === 1 && JSON.parse(r[0].args[3]).win === true, r);
+  check('the second landed pick wins: picks as [index, ms], v 2, slips counted', r.length === 1 && r[0].args[1] === '[[0,400],[0,800],[1,1200]]' && r[0].args[2] === 1200 && JSON.parse(r[0].args[3]).mode === 'pick' && JSON.parse(r[0].args[3]).slips === 1 && JSON.parse(r[0].args[3]).win === true, r);
   check('split clean', P(t).lineTf.text === 'Split clean.');
   const u = S.boot(MENU);
   u.push(Object.assign({}, pick, { nonce: 'p2', kind: 'mining', title: 'Iron Seam', slips: 0 }));
@@ -135,7 +144,10 @@ const at = (t, ms) => { t.st.time = 1000 + ms; t.tick(); };   // the round start
   check('with no slips left the first wrong pick loses at once: the arms give out', msgs(u, 'dbo:labour').length === 1 && P(u).lineTf.text === 'The seam holds. Your arms give out before the rock does.', P(u).lineTf.text);
   const w = S.boot(MENU);
   w.push(Object.assign({}, pick, { nonce: 'p3', totalMs: 10000 }));
-  at(w, 10000);
+  w.st.time = 1000 + 10500;
+  P(w).bar.spot1.onRelease();
+  check('a pick after the round\'s time (before the frame that ends it) counts for nothing', !msgs(w, 'dbo:labour').length && P(w).lineTf.text === 'Read the grain and pick where the wood will split.', P(w).lineTf.text);
+  w.tick();
   check('a pick round left idle: the idle words', msgs(w, 'dbo:labour').length === 1 && P(w).lineTf.text === 'You stand idle at the block too long and set the axe down.', P(w).lineTf.text);
 }
 
@@ -156,6 +168,33 @@ const at = (t, ms) => { t.st.time = 1000 + ms; t.tick(); };   // the round start
   at(v, 2100);
   v.press(32);
   check('the sounds: OK on a landed blow', v.sounds.includes('PlaySound:UIMenuOK'));
+}
+
+{
+  // sweepMs 100000: the marker stands at ms / 1000, so the band (42..58) is 42000..58000 ms
+  const slow = Object.assign({}, sweep, { nonce: 'w1', strikes: 3, bands: [50, 50, 50], sweepMs: 100000, totalMs: 200000 });
+  const t = S.boot(MENU);
+  t.push(slow);
+  at(t, 30000); t.press(32);
+  at(t, 30300); t.press(32);
+  at(t, 50000); t.press(32);
+  at(t, 50300); t.press(32);
+  check('300 ms after a hit counts (the hit stagger is 250), 300 ms after a miss does not (600)', /^(The rock cracks|Stone chips|The vein shifts)/.test(P(t).lineTf.text) && !msgs(t, 'dbo:labour').length, P(t).lineTf.text);
+  at(t, 57000); t.press(32);
+  const r = msgs(t, 'dbo:labour');
+  check('the third hit wins: every counted strike reported', r.length === 1 && r[0].args[1] === '[30000,50000,50300,57000]' && JSON.parse(r[0].args[3]).hits === 3, r);
+  // At exactly one sweep the marker is exactly 100: a band centred on 92 has its edge there, with no rounding
+  const e = S.boot(MENU);
+  e.push(Object.assign({}, slow, { nonce: 'w3', strikes: 1, bands: [92] }));
+  at(e, 100000); e.press(32);
+  check('the band edge lands: |100 - 92| = 8 is inside a half width of 8', msgs(e, 'dbo:labour').length === 1 && JSON.parse(msgs(e, 'dbo:labour')[0].args[3]).hits === 1, msgs(e, 'dbo:labour'));
+  const u = S.boot(MENU);
+  u.push(Object.assign({}, slow, { nonce: 'w2', strikes: 1 }));
+  at(u, 50000);
+  u.st.time = 1000 + 60000;   // the press comes later, before the next frame is drawn
+  u.press(32);
+  const q = msgs(u, 'dbo:labour');
+  check('a strike is timed at the frame on screen (50000), not at the press (60000), which is outside the band', q.length === 1 && q[0].args[1] === '[50000]' && JSON.parse(q[0].args[3]).hits === 1, q);
 }
 
 T.done();

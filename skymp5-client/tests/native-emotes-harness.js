@@ -20,7 +20,7 @@ const widget = { type: 'emoteWheel', id: 24, groups: GROUPS, events };
 
 const msgs = (t, key) => t.msgs().filter((m) => m.key === key);
 const P = (t) => t.root.dboPanel;
-const closed = (t) => t.sent.some((m) => m.e === 'closeMenu');
+const closed = (t) => t.closed();
 const rows = (t) => Object.keys(P(t).rows.kids).filter((n) => /^e\d$/.test(n)).map((n) => P(t).rows[n]);
 const groupBtns = (t) => Object.keys(P(t).groups.kids).filter((n) => /^g\d$/.test(n)).map((n) => P(t).groups[n]);
 

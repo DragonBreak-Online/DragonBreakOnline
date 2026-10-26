@@ -50,7 +50,8 @@ const drive = {
   },
   dbo_labour: (t) => {
     t.st.time += 2100; t.tick(); t.press(32); t.root.dboPanel.acts.stand.onRelease();
-    t.push(Object.assign({}, fixtures.dbo_labour, { nonce: 'n2', kind: 'struggle', event: 'struggle' })); t.press(27);
+    // the struggle on its own event: a pull outside the band ends it (failOnMiss), then Escape walks away
+    t.push(Object.assign({}, fixtures.dbo_labour, { nonce: 'n2', kind: 'struggle', event: 'struggle', sweeps: [1400], failOnMiss: true })); t.tick(); t.press(32); t.press(27);
   },
   dbo_emotes: (t) => {
     const p = t.root.dboPanel;
@@ -83,6 +84,7 @@ for (const menu of Object.keys(fixtures)) {
     check(`${menu}${late ? ' (skse late)' : ''}: outbox sequences run 1, 2, 3... and the cursor reaches the end`,
       box.messages.every((m, i) => m.seq === i + 1) && box.consumed === String(t.root.dboOut).length, box.messages.map((m) => m.seq));
     const keys = [...new Set(parsed.map((p) => p.key))];
+    if (menu === 'dbo_labour') check(`dbo_labour${late ? ' (skse late)' : ''}: the drive sends all four labour keys`, ['dbo:labour', 'dbo:labourCancel', 'dbo:struggle', 'dbo:struggleCancel'].every((k) => keys.includes(k)), keys);
     // a client-service widget's own event keys go back through the router as browser messages, as does the composer hand-off
     const local = ['ready', 'close', 'native:handoff'].concat(Object.values(fixtures[menu].events || {}));
     const unknown = keys.filter((k) => !local.includes(k) && !M.serverEventName(k));

@@ -398,22 +398,32 @@ function actButton(parent, name, depth, x, label, onPick)
    var b = parent.createEmptyMovieClip(name, depth);
    b._x = x;
    dboBox(b, 0, 0, 170, 32, 0x000000, 1);
-   var t = dboText(b, "label", 1, 0, 2, 170, 30, dboFmt(F_MEDIUM, 22, C_TEXT, 0.8, "center"), false);
+   var t = dboText(b, "label", 1, 0, 2, 170, 30, dboFmt(F_MEDIUM, 20, C_TEXT, 0.8, "center"), false);
    t.text = label;
    b._alpha = A_BUTTON_REST;
    b.onPick = onPick;
    b.onRollOver = function()
    {
+      if (this.disabled == true)
+      {
+         return;
+      }
       this._alpha = A_FOCUS;
       dboSound("UIMenuFocus");
    };
    b.onRollOut = function()
    {
-      this._alpha = A_BUTTON_REST;
+      if (this.disabled != true)
+      {
+         this._alpha = A_BUTTON_REST;
+      }
    };
    b.onRelease = function()
    {
-      this.onPick();
+      if (this.disabled != true)
+      {
+         this.onPick();
+      }
    };
    return b;
 }
@@ -475,6 +485,16 @@ function drawBar()
       kt.text = String(j + 1);
       dboBox(s, -size, -14, size * 2, 44, 0x000000, 1);
       s.idx = j;
+      s._alpha = 80;
+      s.onRollOver = function()
+      {
+         this._alpha = A_FOCUS;
+         dboSound("UIMenuFocus");
+      };
+      s.onRollOut = function()
+      {
+         this._alpha = 80;
+      };
       s.onRelease = function()
       {
          choose(this.idx);
@@ -540,6 +560,7 @@ function drawActions()
       });
       if (sent)
       {
+         s.disabled = true;
          s._alpha = 50;
          s.label.textColor = C_DISABLED;
       }
@@ -640,7 +661,7 @@ var keys = {};
 keys.onKeyDown = function()
 {
    var code = Key.getCode();
-   if (code == 27 || code == 9)
+   if (code == 27)
    {
       if (data != null)
       {
@@ -656,17 +677,21 @@ keys.onKeyDown = function()
    {
       return;
    }
-   if (pick && code >= 49 && code <= 57)
+   if ((code == 13 || code == 69) && done())
+   {
+      leave();
+   }
+   else if (pick && code >= 49 && code <= 57)
    {
       choose(code - 49);
+   }
+   else if (pick && code >= 97 && code <= 105)
+   {
+      choose(code - 97);
    }
    else if (!pick && (code == 32 || code == 13))
    {
       strike();
-   }
-   else if ((code == 13 || code == 69) && done())
-   {
-      leave();
    }
 };
 Key.addListener(keys);
