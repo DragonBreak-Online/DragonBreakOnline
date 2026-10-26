@@ -25,15 +25,24 @@ module.exports = (api) => {
   // the string "null" to a panel that was otherwise working perfectly.
   const show = (a, title, rows) => sendPacket(a, { customPacketType: 'dboScaleform', swf: 'dbo_testmenu', payload: { title, rows }, widget: 0 });
 
+  // Can a native panel load the realm map at run time (Leader, 26 Oct)? The same picture as a PNG and a DDS, by the paths
+  // a CustomMenu might resolve: beside the swf in DataInterface, in the browser's DataPlatformUI, and through img://
+  const MAP_PATHS = ['dbo-realm-bruma.png', '../Platform/UI/dbo-realm-bruma.png', 'dbo-realm-bruma.dds',
+    'img://textures/interface/dbo/realm-bruma.dds', 'img://interface/dbo/realm-bruma.dds', '../textures/interface/dbo/realm-bruma.dds'];
+
   registerChatCommand('testmenu', (a, args) => {
     const sub = String(args || '').trim().toLowerCase();
     if (sub === 'close') { sendPacket(a, { customPacketType: 'dboScaleform', close: true }); return personal(a, 'Closing the test panel.'); }
+    if (sub === 'map') {
+      sendPacket(a, { customPacketType: 'dboScaleform', swf: 'dbo_mapprobe', payload: { paths: MAP_PATHS, waitMs: 6000 }, widget: 0 });
+      return personal(a, 'Opening the map image probe: each line says whether that path loaded. Close it when every line has an answer.');
+    }
     if (sub === 'wide') return show(a, 'Width test', [new Array(12).fill('wide').join(' ')]);
     if (sub === 'many') return show(a, 'Row cap test', new Array(30).fill(0).map((_, i) => `row ${i + 1} of 30`));
     show(a, 'DBO test panel', ROWS);
     personal(a, 'Opening the test panel. It pauses the game; click Close to come back. /testmenu many and /testmenu wide are the other two.');
     log(`scaleform test panel opened by ${who(a)}`);
-  }, { admin: true, hidden: true, help: '[many|wide|close] open the Scaleform test panel (hagtest2 client only)' });
+  }, { admin: true, hidden: true, help: '[many|wide|map|close] open the Scaleform test panel (hagtest2 client only)' });
 
   // A row click. The panel sends "dbo:testRow" with [index] on the shared panel wire, so the client turns it
   // into the same { customPacketType: 'dbo', event, args, widget } packet a browser widget sends and it
@@ -45,6 +54,14 @@ module.exports = (api) => {
     log(`scaleform row ${i} from ${who(a)}`);
     if (!isAdmin(a)) return;
     personal(a, `You clicked row ${i + 1}: ${ROWS[i] !== undefined ? ROWS[i] : '(not one of the fixed rows)'}`);
+  });
+
+  // The probe's answers, one entry per path: init (with its size), error (with the engine's code) or timeout
+  onUi('mapProbe', (a, args) => {
+    const list = Array.isArray(args) && Array.isArray(args[0]) ? args[0] : [];
+    const text = list.map((r) => `${r && r.path}: ${r && r.state}${r && r.state === 'init' ? ` ${r.w}x${r.h}` : r && r.code ? ` ${r.code}` : ''}`).join('; ');
+    log(`scaleform map probe from ${who(a)}: ${text || 'no results'}`);
+    if (isAdmin(a)) personal(a, `Map probe: ${text || 'no results'}`);
   });
 
   // The older reply shape, kept only for a client that predates the shared wire. The live client sends its
