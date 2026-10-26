@@ -24,7 +24,7 @@ const rooms = (t) => Object.keys(P(t).right.kids).filter((n) => /^r\d$/.test(n))
   const t = S.boot('dbo_housing');
   check('says ready with the frame skse appeared on', msgs(t, 'ready').length === 1 && msgs(t, 'ready')[0].args[0] === 1);
   t.push(base);
-  check('the title is the name, the status says yours and unlocked', P(t).head.title.text === 'Rose Hall' && P(t).head.status.text === 'Yours - unlocked', P(t).head.status.text);
+  check('the title is the name, the status says yours and unlocked', P(t).head.title.text === 'ROSE HALL' && P(t).head.status.text === 'Yours - unlocked', P(t).head.status.text);
   check('an owner gets the browser menu\'s actions in its order', labels(t).join('|') === 'Lock|Cut a key|Void all keys|Transfer|Rename...|Give up|Key Ring|Rent and sale', labels(t).join('|'));
   check('Give up is red', btn(t, 'Give up').label.textColor === 0xB23A3A);
   btn(t, 'Lock').onRelease();
