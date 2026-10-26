@@ -360,7 +360,8 @@ module.exports = (api) => {
     if (choice.startsWith('h:')) {
       const [, h16, ...d] = choice.split(':'); const helper = parseInt(h16, 16) >>> 0; const sp = classify(idOf(d.join(':')));
       if (!sp || sp.rank < 4) return refuse(a, p, 'That spell cannot be written.');
-      const why = tomeRefusal(a, sp) || coWriterRefusal(a, helper, sp);
+      const why = tomeRefusal(a, sp) || coWriterRefusal(a, helper, sp)
+        || ((typeof globalThis.__dboPromptBusy === 'function' ? globalThis.__dboPromptBusy(helper) : '') ? globalThis.__dboPromptBusyLine(display(helper), (typeof globalThis.__dboPromptBusy === 'function' ? globalThis.__dboPromptBusy(helper) : '')) : '');
       if (why) return refuse(a, p, why);
       S.offers.set(helper, { writer: a >>> 0, spellId: sp.id, place: p.place, at: Date.now() });
       S.pending.delete(helper);

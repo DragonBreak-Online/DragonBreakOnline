@@ -2380,6 +2380,7 @@ module.exports = (api) => {
     const why = takeRefusal(a, t);
     if (why) return personal(a, why);
     if (!teachable(a, t).some((sp) => sp.id >>> 0 === o.id)) return personal(a, `${display(t)} cannot study ${o.name} now.`);
+    if ((typeof globalThis.__dboPromptBusy === 'function' ? globalThis.__dboPromptBusy(t >>> 0) : '')) return personal(a, globalThis.__dboPromptBusyLine(display(t), (typeof globalThis.__dboPromptBusy === 'function' ? globalThis.__dboPromptBusy(t) : '')));
     const nonce = mkNonce('o', t);
     apOffers.set(t >>> 0, { teacher: a >>> 0, spell: descOf(o.id), name: o.name, school: o.school, rank: o.rank, nonce, until: Date.now() + Math.max(1, Number(AP.offerMinutes) || 5) * 60000 });
     openWidget(t, { type: 'contextMenu', id: APPRENTICE_MENU_ID, mode: 'menu',

@@ -190,6 +190,32 @@ signAll('serpent');
 check('Serpent: poison hurts 15% less, Alchemist x1.10', near(R.targetMult(NPC, P0, POISON), 0.85) && near(XP(P0, 'alchemist'), 1.1) && R.targetMult(NPC, P0, FLAMES) === 1);
 check('Serpent Argonian: poison 0.5 x 0.85', near(R.targetMult(NPC, ARGONIAN, POISON), 0.425));
 
+// ---- 2b. against players (Nat, 26 Oct: "Rebalance the birthsigns for PvP"; config birthsigns.pvp, defaults below) ----
+// sneakDamage 0: the Shadow's sneak bonus is PvE's alone; takenShare 0.5: half a sign's damage-taken modifier when the attacker
+// is a player; regenShare 0.5: half a sign's regen bonus (never its slowing) for 10 s after a hit between players
+{
+  const PV = globalThis.__dboBirthsignPvp();
+  check('the PvP defaults: no sneak share, half the taken and regen shares, a 10 s fight', PV.sneakDamage === 0 && PV.takenShare === 0.5 && PV.regenShare === 0.5 && PV.fightSeconds === 10, PV);
+  signAll('shadow');
+  check('Shadow on a player: no sneak bonus; on an NPC still +15%', R.attackMult(P0, NORD, SWORD, 10, { sneak: true }) === 1 && near(R.attackMult(P0, NPC, SWORD, 10, { sneak: true }), 1.15), [R.attackMult(P0, NORD, SWORD, 10, { sneak: true }), R.attackMult(P0, NPC, SWORD, 10, { sneak: true })]);
+  signAll('atronach');
+  check('Atronach: a player\'s spell 2.5% less, an NPC\'s 5% less', near(R.targetMult(NORD, P0, SPARKS), 0.975) && near(R.targetMult(NPC, P0, SPARKS), 0.95), [R.targetMult(NORD, P0, SPARKS), R.targetMult(NPC, P0, SPARKS)]);
+  signAll('serpent');
+  check('Serpent: a player\'s poison 7.5% less, an NPC\'s 15% less', near(R.targetMult(NORD, P0, POISON), 0.925) && near(R.targetMult(NPC, P0, POISON), 0.85));
+  signAll('lord');
+  check('Lord: a player\'s fire 2.5% more (the weakness halves too), an NPC\'s 5% more', near(R.targetMult(NORD, P0, FLAMES), 1.025) && near(R.targetMult(NPC, P0, FLAMES), 1.05));
+  signAll('lady');
+  const L = 41; race(L); sign(L, 'lady');
+  check('Lady out of a fight: health x1.10', near(R.regenFactor(L, 'health'), 1.1));
+  R.attackMult(NPC, L, SWORD, 10, {});
+  check('...a hit from an NPC is no PvP fight: still x1.10', near(R.regenFactor(L, 'health'), 1.1));
+  R.attackMult(NORD, L, SWORD, 10, {});
+  check('...hit by a player: x1.05 for the fight', near(R.regenFactor(L, 'health'), 1.05), R.regenFactor(L, 'health'));
+  const A = 42; race(A); sign(A, 'atronach'); R.attackMult(NORD, A, SWORD, 10, {});
+  check('...the Atronach\'s slower magicka is never eased in a fight: x0.90', near(R.regenFactor(A, 'magicka'), 0.9));
+  globalThis.__dboRacialState.pvpAt.set(L, Date.now() - 11000);
+  check('...and back to x1.10 once 10 s pass without a player hit', near(R.regenFactor(L, 'health'), 1.1));
+}
 signAll('tower');
 check('Tower: Lockpicking x1.15 only', near(XP(P0, 'lockpicking'), 1.15) && XP(P0, 'blade') === 1);
 
@@ -268,6 +294,8 @@ const GUARDS = [
   ['serving a sentence', () => { state[OLD].props['private.dboSentence'] = { totalMs: 60000, servedMs: 1000 }; }, () => { delete state[OLD].props['private.dboSentence']; }],
   ['downed', () => { globalThis.__dboIsDowned = (a) => a === OLD; }, () => { globalThis.__dboIsDowned = () => false; }],
   ['fighting', () => { globalThis.__dboCombatAt = new Map([[OLD, t0 + 150000]]); }, () => { globalThis.__dboCombatAt = new Map(); }],
+  // promptguard.js (Nat, 26 Oct: prompts in dungeons disrupt people)
+  ['in a dungeon', () => { globalThis.__dboPromptBusy = (a) => (a === OLD ? 'in a dungeon' : ''); }, () => { globalThis.__dboPromptBusy = null; }],
 ];
 for (const [what, on, off] of GUARDS) {
   on();

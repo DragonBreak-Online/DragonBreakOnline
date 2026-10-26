@@ -7779,6 +7779,12 @@ try {
   delete require.cache[RACIAL_JS];
   racial = require(RACIAL_JS)({ mp, log, personal, giveItem, profileOf, display, recordOf, every, onlineActors, weaponHandsOf, sourceResistsOf, gmstFloat, cfg, sendPacket, hasUiCap });
 } catch (e) { log('racial.js failed to load:', e.stack || e.message); racial = null; globalThis.__dboRaceGold = null; globalThis.__dboRaceOf = null; }
+// ---- unasked prompts wait while a player is down, fighting or in a dungeon (server\promptguard.js; Nat, 26 Oct)
+try {
+  const PROMPTGUARD_JS = path.resolve('promptguard.js');
+  delete require.cache[PROMPTGUARD_JS];
+  require(PROMPTGUARD_JS)({ mp, cfg });
+} catch (e) { log('promptguard.js failed to load:', e.stack || e.message); globalThis.__dboPromptBusy = null; }
 // ---- the thirteen birthsigns: chosen once, small gifts for life through racial.js (server\birthsigns.js, config "birthsigns")
 try {
   const BIRTHSIGNS_JS = path.resolve('birthsigns.js');
