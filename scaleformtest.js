@@ -9,7 +9,7 @@
 // that nothing is listening for, which is a silent no-op rather than a break.
 
 module.exports = (api) => {
-  const { log, personal, registerChatCommand, sendPacket, who, isAdmin } = api;
+  const { log, personal, registerChatCommand, sendPacket, who, isAdmin, onUi } = api;
 
   const ROWS = [
     'Gold: 1,240',
@@ -19,7 +19,11 @@ module.exports = (api) => {
     'A long row to see where the panel clips the text instead of wrapping it off the edge',
   ];
 
-  const show = (a, title, rows) => sendPacket(a, { customPacketType: 'dboScaleform', title, rows });
+  // The shared panel packet: swf, the WHOLE payload, and the widget id. The client reads content.payload and
+  // JSON-stringifies it for _root.dboData, so title and rows go INSIDE payload. Sending them at the top
+  // level is what made the 26 Oct 05:02 session report payload=4ch: the client found no payload and sent
+  // the string "null" to a panel that was otherwise working perfectly.
+  const show = (a, title, rows) => sendPacket(a, { customPacketType: 'dboScaleform', swf: 'dbo_testmenu', payload: { title, rows }, widget: 0 });
 
   registerChatCommand('testmenu', (a, args) => {
     const sub = String(args || '').trim().toLowerCase();
@@ -31,6 +35,20 @@ module.exports = (api) => {
     log(`scaleform test panel opened by ${who(a)}`);
   }, { admin: true, hidden: true, help: '[many|wide|close] open the Scaleform test panel (hagtest2 client only)' });
 
+  // A row click. The panel sends "dbo:testRow" with [index] on the shared panel wire, so the client turns it
+  // into the same { customPacketType: 'dbo', event, args, widget } packet a browser widget sends and it
+  // arrives here through onUi, exactly like every other widget. 17 clicks reached the server on 26 Oct at
+  // 17:13 and nothing answered them, because this handler did not exist yet.
+  onUi('testRow', (a, args) => {
+    const i = Number(Array.isArray(args) ? args[0] : args);
+    if (!Number.isFinite(i)) { log(`scaleform row: a click with no index from ${who(a)}`); return; }
+    log(`scaleform row ${i} from ${who(a)}`);
+    if (!isAdmin(a)) return;
+    personal(a, `You clicked row ${i + 1}: ${ROWS[i] !== undefined ? ROWS[i] : '(not one of the fixed rows)'}`);
+  });
+
+  // The older reply shape, kept only for a client that predates the shared wire. The live client sends its
+  // clicks through onUi above, so nothing reaches this on hagtest5 or later.
   // What the client reports back: "ready" once the SWF has built itself, then a row index per click.
   // Every line is logged, because an open that never reports ready is the result this test is looking for.
   globalThis.__dboScaleformPacket = (a, content) => {
