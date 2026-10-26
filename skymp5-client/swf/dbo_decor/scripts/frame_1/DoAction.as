@@ -428,9 +428,9 @@ function tabStep(d)
 var keys = {};
 keys.onKeyDown = function()
 {
-   var code = Key.getCode();
+   var code = dboKey();
    dboLog("decor key " + code);
-   if (code == 27 || code == 9)
+   if (code == 27)
    {
       closePanel();
       return;

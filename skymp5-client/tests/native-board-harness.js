@@ -41,6 +41,11 @@ const closed = (t) => t.closed();
   const h = msgs(t, 'native:handoff');
   check('Write a notice hands off to the browser composer for this tab', h.length === 1 && h[0].args.join('|') === 'bountyBoard|compose:shop', h);
   check('and leaves the native board open for the router to close', !closed(t));
+  t.press(9);
+  check('Tab does nothing, it is the Skyrim menu key', !t.root.dboPanel.list.text && !t.sent.some((m) => m.e === 'closeMenu'));
+  t.press(97);
+  check('numpad 1 is key 1: it opens the first note', t.root.dboPanel.list.text && t.root.dboPanel.list.text.text === 'Iron ingots, cheap.');
+  t.press(27);
   t.press(49);
   check('key 1 opens the first note in the reader', P(t).list.text.text === 'Iron ingots, cheap.' && P(t).list.author.text === '- Olaf');
   check('the reader shows when it fades', P(t).list.age.text === 'Pinned yesterday  -  Fades in 6 days', P(t).list.age.text);
@@ -56,6 +61,8 @@ const closed = (t) => t.closed();
   check('a re-publish keeps the open tab', P(t).head.tab1._alpha === 100 && rowsOf(t).length === 1);
   t.press(27);
   check('the panel hides at once but the menu waits, so the client can still read the close from the outbox', t.root._visible === false && !t.sent.some((m) => m.e === 'closeMenu') && String(t.root.dboOut).indexOf('bountyBoard:close') >= 0);
+  t.press(49); P(t).foot.write.onRelease();
+  check('a key or click in the frames before the menu closes sends nothing', msgs(t, 'native:handoff').length === 1 && msgs(t, 'bountyBoard:close').length === 1);
   check('Escape on the list sends the widget close (no bare close, as the browser Close) and closes', msgs(t, 'bountyBoard:close').length === 1 && msgs(t, 'close').length === 0 && closed(t));
 }
 
