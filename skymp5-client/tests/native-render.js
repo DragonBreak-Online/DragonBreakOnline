@@ -23,6 +23,8 @@ const visibleFor = (aspect) => {
 };
 const ASPECTS = [['16x9', 16 / 9, 1920, 1080], ['16x10', 16 / 10, 1728, 1080], ['21x9', 21 / 9, 2520, 1080]];
 
+// a loaded DDS shown by its source art in the front (our hourglass); anything else by its path's name
+const IMAGES = (p) => (/hourglass/.test(p) ? 'file:///' + path.resolve(__dirname, '../../skymp5-front/src/img/dbo-watermark.png').replace(/\\/g, '/') : '');
 const hex = (c) => '#' + ('000000' + (Number(c) >>> 0).toString(16)).slice(-6);
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const FONTS = { '$EverywhereFont': 300, '$EverywhereMediumFont': 400, '$EverywhereBoldFont': 600 };
@@ -30,16 +32,32 @@ const FONTS = { '$EverywhereFont': 300, '$EverywhereMediumFont': 400, '$Everywhe
 // The clip tree as absolutely placed HTML: boxes for fills, divs for text, in depth order (the order things were made)
 const toHtml = (root) => {
   const out = [];
+  let gid = 0;
   const walk = (c, x, y, sx, sy, a) => {
     if (c._visible === false) return;
     const nx = x + (c._x || 0) * sx, ny = y + (c._y || 0) * sy;
     const nsx = sx * ((c._xscale === undefined ? 100 : c._xscale) / 100), nsy = sy * ((c._yscale === undefined ? 100 : c._yscale) / 100);
     const na = a * ((c._alpha === undefined ? 100 : c._alpha) / 100);
+    // each fill as its own small SVG, so fills and texts keep the order they were made in
     for (const f of c.fills || []) {
-      const xs = f.pts.map((p) => p[0]), ys = f.pts.map((p) => p[1]);
+      const pts = f.pts.map((p) => [nx + p[0] * nsx, ny + p[1] * nsy]);
+      if (pts.length < 3) continue;
+      const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
       const l = Math.min(...xs), t = Math.min(...ys), w = Math.max(...xs) - l, h = Math.max(...ys) - t;
       if (!(w > 0 && h > 0)) continue;
-      out.push(`<div style="position:absolute;left:${nx + l * nsx}px;top:${ny + t * nsy}px;width:${w * nsx}px;height:${Math.max(1, h * nsy)}px;background:${hex(f.color)};opacity:${(f.alpha / 100) * na}"></div>`);
+      let paint = hex(f.color), defs = '';
+      if (f.gradient) {
+        const id = 'g' + (gid++);
+        const vertical = Math.abs(f.gradient.r - Math.PI / 2) < 0.01;
+        defs = '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="' + (vertical ? 0 : 1) + '" y2="' + (vertical ? 1 : 0) + '">'
+          + f.gradient.colors.map((col, i) => '<stop offset="' + (f.gradient.ratios[i] / 255) + '" stop-color="' + hex(col) + '" stop-opacity="' + (f.gradient.alphas[i] / 100) + '"/>').join('') + '</linearGradient></defs>';
+        paint = 'url(#' + id + ')';
+      }
+      const poly = pts.map((p) => (p[0] - l).toFixed(2) + ',' + (p[1] - t).toFixed(2)).join(' ');
+      out.push('<svg style="position:absolute;left:' + l + 'px;top:' + t + 'px;overflow:visible;opacity:' + ((f.gradient ? 1 : f.alpha / 100) * na) + '" width="' + w + '" height="' + Math.max(1, h) + '">' + defs + '<polygon points="' + poly + '" fill="' + paint + '"/></svg>');
+    }
+    if (c._image) {
+      out.push('<img src="' + IMAGES(c._image) + '" style="position:absolute;left:' + nx + 'px;top:' + ny + 'px;width:' + (c._width || 420) * nsx + 'px;height:' + (c._height || 520) * nsy + 'px;opacity:' + na + '">');
     }
     for (const k of Object.keys(c.kids)) {
       const t = c.kids[k];
