@@ -8415,5 +8415,38 @@
         ]
       }
     ]
+  },
+  {
+    "title": "Seventy new spells",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Magic",
+        "items": [
+          "About seventy new spells from Elder Scrolls lore join the five schools, from Novice to Expert: fire, frost and shock touches, waves, surges and barrages; poisons and plagues; self-healing over time; fear, calm, rage and courage; an invisibility veil; a strong ward; cloaks that drain souls or poison what comes close; and twenty-one new summons, from skeleton heroes and liches to wispmothers and death hounds.",
+          "Their tomes follow the rules of every other tome: learned at a study point, by a mage whose school is high enough, with three spells prepared at a time. Most are sold in the Synod's shop in Bruma now. The Nordic, Draugr and Volkihar arts belong to Skyrim and wait for it to open.",
+          "Their scrolls can now turn up in dungeon chests, and their staves are rare finds among the enchanted loot.",
+          "Spells from The Elder Scrolls - Tomebound by Elyem, with thanks. Only the spells that work in multiplayer were taken; Lightning Form's magicka surge was toned down to suit it."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "The Knights of the Nine are recruiting",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Factions",
+        "items": [
+          "The Knights of the Nine are a faction: the holy order of the Nine Divines, from Pilgrim and Knight Errant up to Knight Commander and the Divine Crusader.",
+          "Only a follower of one of the Nine Divines, Talos included, may join: choose your god at a shrine first. A Knight may not serve a Daedric cult.",
+          "Their Armorers alone forge the Knight-Errant armour."
+        ]
+      }
+    ]
   }
 ]

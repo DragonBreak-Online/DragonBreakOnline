@@ -58,7 +58,7 @@ let wallClock = 1780000000000;
 Date.now = () => wallClock;
 
 // Exact plugin-name matching, like the server's FormDesc::ToFormId; an ESL sits in the 0xfe space
-const PLUGINS = { 'Skyrim.esm': 0x00, 'Update.esm': 0x01, 'Dawnguard.esm': 0x02, 'HearthFires.esm': 0x03, 'Dragonborn.esm': 0x04, 'BSAssets.esm': 0x0a, 'BSHeartland.esm': 0x0b, 'Journey to Baan Malur.esp': 0x0c, 'DragonBreak Hub.esp': 0x38, 'Immersive Weapons.esp': 0x3b, 'DragonBreak.esp': 0x60, 'ccBGSSSE025-AdvDSGS.esm': 0x70 };
+const PLUGINS = { 'Skyrim.esm': 0x00, 'Update.esm': 0x01, 'Dawnguard.esm': 0x02, 'HearthFires.esm': 0x03, 'Dragonborn.esm': 0x04, 'BSAssets.esm': 0x0a, 'BSHeartland.esm': 0x0b, 'Journey to Baan Malur.esp': 0x0c, 'DragonBreak Hub.esp': 0x38, 'Immersive Weapons.esp': 0x3b, 'DragonBreak.esp': 0x60, 'ccBGSSSE025-AdvDSGS.esm': 0x70, 'DragonBreak Online Edits.esp': 0x49 };
 const ESL = { 'ccQDRSSE001-SurvivalMode.esl': 0x001 };
 const BY_INDEX = Object.fromEntries(Object.entries(PLUGINS).map(([k, v]) => [v, k]));
 const BY_ESL = Object.fromEntries(Object.entries(ESL).map(([k, v]) => [v, k]));
@@ -73,6 +73,11 @@ const descOf = (id) => {
   const p = BY_INDEX[id >>> 24]; if (!p) throw new Error('no plugin'); return `${(id & 0xffffff).toString(16)}:${p}`;
 };
 const RECORDS = { [idOf(DWARVEN_ARMOR)]: { type: 'ARMO', editorId: 'ArmorDwarvenCuirass', fields: [] }, [idOf(SURVIVAL_CELL)]: { type: 'CELL', editorId: 'AAASurvivalMarkerCell', fields: [] } };
+// Tomebound's tomes, merged into the DLE (Nat 25 Oct): regions.json does not list them, so their province comes from
+// regions-overrides.json by editor id, which regions.js reads off the record
+const DLE_TOME = (edid) => { const t = TOMES_JSON.find((x) => x.name === edid); return `${t.id.split(':')[1].toLowerCase().replace(/^0+/, '')}:DragonBreak Online Edits.esp`; };
+for (const t of TOMES_JSON.filter((x) => x.plugin === 'DragonBreak Online Edits.esp')) RECORDS[idOf(DLE_TOME(t.name))] = { type: 'BOOK', editorId: t.name, fields: [] };
+const BURNING_TOUCH_BOOK = DLE_TOME('UDLC01_DES_SpellTomeBurningTouch'), DRAUGR_THRALL_BOOK = DLE_TOME('UDLC01_CONJ_SpellTomeConjureDraugrThrall');
 
 const SMITH = 0x14, ADMIN = 0x15, MAGE = 0x16;
 const props = new Map();
@@ -186,21 +191,25 @@ cmd('tomes', MAGE);
 // The shop spells.js builds, filtered to Cyrodiil the way regions.py counts it
 const EXC = /^(dun|MGR)|quest|FF\d\d|WillotheWisp/i; // spells.js shopExcludePattern (the wisp left the shop in a45a490b)
 const canonToDesc = (c) => { const i = c.lastIndexOf(':'); return `${parseInt(c.slice(i + 1), 16).toString(16)}:${c.slice(0, i)}`; };
-const inCyrodiil = (t) => { const p = (DATA.tomes[canonToDesc(t.id)] || {}).p; return p === 'common' || (Array.isArray(p) && p.includes('cyrodiil')); };
+// regions.json's own tag, or the hand override by editor id (Tomebound's tomes are listed only there)
+const inCyrodiil = (t) => { const o = (OVR_BASE.tomes || {})[t.name]; const p = o !== undefined ? o : (DATA.tomes[canonToDesc(t.id)] || {}).p; return p === 'common' || (Array.isArray(p) && p.includes('cyrodiil')); };
 const pref = (t) => ({ 'BSHeartland.esm': 0, 'BSAssets.esm': 1 }[t.plugin] ?? 99);
 const seen = new Set();
 const expected = TOMES_JSON.filter((t) => t.rank <= 3 && !EXC.test(t.name) && !['Gray Fox Cowl.esm', 'SurWR.esp'].includes(t.plugin))
   .sort((x, y) => x.school.localeCompare(y.school) || x.rank - y.rank || pref(x) - pref(y) || String(x.spellName).localeCompare(String(y.spellName)))
   .filter((t) => (seen.has(t.spellId) ? false : seen.add(t.spellId))).filter(inCyrodiil);
 check('the Synod panel is titled for Cyrodiil', shop(MAGE).title === 'The Synod: Spell Tomes of Cyrodiil', shop(MAGE).title);
-// 49: Open Master Lock is a Master tome since 3e3f5ae, above the shop's Expert cap. Raising the dead is a restricted art
+// 112: 49 of the base game and Beyond Skyrim plus Tomebound's 63 Cyrodiil tomes (DLE, 26 Oct). Open Master Lock is a Master tome since 3e3f5ae, above the shop's Expert cap. Raising the dead is a restricted art
 // for Senior ranks only (seniorOnlyTomes, 71dc8a3), so this plain member's shelf lacks the two zombie tomes
 const SENIOR_ONLY = ['SpellTomeRaiseZombie', 'CYRSpellTomeSummonZombie'];
 const shelf = expected.filter((t) => !SENIOR_ONLY.includes(t.name));
-check(`...stocks the Cyrodiil list (${shelf.length} of its ${expected.length} tomes for a Master of both skills below Senior rank)`, shop(MAGE).tomes.length === shelf.length && expected.length === 49 && shelf.length === 47 && shelf.every((t) => row(MAGE, canonToDesc(t.id))), [shop(MAGE).tomes.length, shelf.length, expected.length]);
+check(`...stocks the Cyrodiil list (${shelf.length} of its ${expected.length} tomes for a Master of both skills below Senior rank)`, shop(MAGE).tomes.length === shelf.length && expected.length === 112 && shelf.length === 110 && shelf.every((t) => row(MAGE, canonToDesc(t.id))), [shop(MAGE).tomes.length, shelf.length, expected.length]);
 check('...core, Cyrodiil and shared tomes are there', row(MAGE, SPARKS_BOOK) && row(MAGE, FROSTFLAMES_BOOK) && row(MAGE, FIREBOLT_BOOK));
 check('...Skyrim and Solstheim tomes are not', !row(MAGE, INCINERATE_BOOK) && !row(MAGE, ASHSHELL_BOOK));
-check('the boot line counts the Cyrodiil stock', out.logs.some((l) => /tomes in the Synod shop, .*, 49 stocked for Cyrodiil/.test(l)), out.logs.filter((l) => /spells on/.test(l)));
+check('Tomebound (DLE): Burning Touch is a Cyrodiil tome and on the Synod\'s shelf; Conjure Draugr Thrall is Skyrim\'s and is not',
+  R().tomeWhere(idOf(BURNING_TOUCH_BOOK)).join() === 'cyrodiil' && R().tomeWhere(idOf(DRAUGR_THRALL_BOOK)).join() === 'skyrim' && !!row(MAGE, BURNING_TOUCH_BOOK) && !row(MAGE, DRAUGR_THRALL_BOOK),
+  [R().tomeWhere(idOf(BURNING_TOUCH_BOOK)), R().tomeWhere(idOf(DRAUGR_THRALL_BOOK)), !!row(MAGE, BURNING_TOUCH_BOOK), !!row(MAGE, DRAUGR_THRALL_BOOK)]);
+check('the boot line counts the Cyrodiil stock', out.logs.some((l) => /tomes in the Synod shop, .*, 112 stocked for Cyrodiil/.test(l)), out.logs.filter((l) => /spells on/.test(l)));
 ui('tomeBuy', MAGE, [shop(MAGE).nonce, INCINERATE_BOOK]);
 check('a forged buy of a Skyrim tome is refused and costs nothing', shop(MAGE).resultKind === 'refused' && shop(MAGE).result === 'The Synod does not stock Incinerate; it is sold in Skyrim.' && count(MAGE, 'f:Skyrim.esm') === 5000 && count(MAGE, INCINERATE_BOOK) === 0, shop(MAGE).result);
 spellsCfg = { shopStock: 999, shopShowForeign: true }; load();
