@@ -593,8 +593,10 @@ module.exports = (api) => {
 
   // ---- the panel (native swf dbo_decor): the server builds every row and re-checks every action as the chat path does ----
   const PANEL_ID = 171;
-  const PANEL_CAP = 'native:decor';
-  const PAGE_ROWS = 8;
+  // the browser widget (skymp5-front features/decor, cap decorPanel) or the native swf (native:decor), 'rows' a page each
+  const PANEL_CAPS = [{ cap: 'decorPanel', rows: 20 }, { cap: 'native:decor', rows: 8 }];
+  const panelCap = (a) => PANEL_CAPS.find((c) => hasUiCap(a, c.cap)) || null;
+  const MAX_SEARCH = 40;
   if (!S.panel) S.panel = new Map();                       // actor -> { nonce, view, group, page, reopen }
   const homeName = (pl) => String((pl.rec && pl.rec.name) || (pl.rec && pl.rec.ownerName ? `${pl.rec.ownerName}'s home` : 'This home'));
   const groupsFor = (a) => {
@@ -602,9 +604,9 @@ module.exports = (api) => {
     for (const p of catalog()) if (raceOk(a, p.station) && !seen.has(p.group)) { seen.add(p.group); out.push({ id: p.group, label: p.groupLabel || p.group }); }
     return out;
   };
-  const pageOf = (list, page) => {
-    const pages = Math.max(1, Math.ceil(list.length / PAGE_ROWS)), at = Math.max(0, Math.min(pages - 1, Math.floor(Number(page) || 0)));
-    return { at, pages, rows: list.slice(at * PAGE_ROWS, at * PAGE_ROWS + PAGE_ROWS) };
+  const pageOf = (list, page, n) => {
+    const pages = Math.max(1, Math.ceil(list.length / n)), at = Math.max(0, Math.min(pages - 1, Math.floor(Number(page) || 0)));
+    return { at, pages, rows: list.slice(at * n, at * n + n) };
   };
   const costRows = (a, cost) => Object.entries(cost).map(([d, n]) => ({ name: nameOfItem(d), n, have: heldOf(a, idOf(d)) }));
   const planterState = (it) => {
@@ -631,7 +633,7 @@ module.exports = (api) => {
     };
     if (st.view === 'placed') {
       const me = get(a, 'pos', [0, 0, 0]), share = deconstructShare(a), far = (it) => Math.hypot(it.pos[0] - me[0], it.pos[1] - me[1]);
-      const pg = pageOf(p.items.slice().sort((x, y) => far(x) - far(y)), st.page);
+      const pg = pageOf(p.items.slice().sort((x, y) => far(x) - far(y)), st.page, st.rows || 8);
       Object.assign(out, { page: pg.at, pages: pg.pages, rows: pg.rows.map((it) => ({ key: it.ref, name: it.name, group: it.group, state: planterState(it),
         refund: pieceOf(it.base) && it.paid ? costText(refundOf(it.paid, share)) : '' })) });
     } else if (st.view === 'people') {
@@ -640,7 +642,11 @@ module.exports = (api) => {
       if (isOwner) out.nearby = onlineActors().filter((x) => x !== a && !granted.includes(profile(x)) && (here(x) || {}).root === pl.root).map((x) => ({ key: String(profile(x)), name: who(x) }));
     } else {
       out.view = 'catalog';
-      const pg = pageOf(catalog().filter((x) => x.group === st.group && raceOk(a, x.station)), st.page);
+      // a search runs across every group, as /decor find does
+      const terms = String(st.search || '').toLowerCase().split(/\s+/).filter(Boolean);
+      const list = catalog().filter((x) => (terms.length ? terms.every((t) => x.hay.includes(t)) : x.group === st.group) && raceOk(a, x.station));
+      out.search = st.search || '';
+      const pg = pageOf(list, st.page, st.rows || 8);
       Object.assign(out, { page: pg.at, pages: pg.pages, rows: pg.rows.map((x) => {
         const why = budgetProblem(pl, x, a) || (x.kind === 'study' && booksHeld(a) < C.study.books ? `Needs ${C.study.books} books; you carry ${booksHeld(a)}.` : '');
         return { key: x.desc, name: x.name, cost: costRows(a, costOf(x)), why: why || '' };
@@ -654,7 +660,7 @@ module.exports = (api) => {
     const pl = here(a);
     if (!pl || !mayDecorate(a, pl)) return personal(a, 'Decorating works inside your own home, or one its owner named you in.');
     const old = S.panel.get(a >>> 0);
-    const st = { nonce: require('crypto').randomBytes(6).toString('hex'), view: view || (old && old.view) || 'catalog', group: old ? old.group : '', page: old && !view ? old.page : 0, reopen: false };
+    const st = { nonce: require('crypto').randomBytes(6).toString('hex'), view: view || (old && old.view) || 'catalog', group: old ? old.group : '', page: old && !view ? old.page : 0, search: old ? old.search || '' : '', rows: (panelCap(a) || { rows: 8 }).rows, reopen: false };
     S.panel.set(a >>> 0, st);
     const w = panelFor(a, st);
     if (w) openWidget(a, w, true);
@@ -676,7 +682,8 @@ module.exports = (api) => {
     } catch (e) { log(`decor: panel ${name} failed`, e.stack || e.message); }
   });
   const placedHere = (a, ref) => { const pl = here(a), f = itemByRef(String(ref || '')); return pl && f && f.root === pl.root && mayDecorate(a, pl) ? f : null; };
-  panelAct('decorView', (a, st, [view, group, page]) => {
+  panelAct('decorView', (a, st, [view, group, page, search]) => {
+    if (search !== undefined && search !== null) { const q = String(search).slice(0, MAX_SEARCH); if (q !== (st.search || '')) { st.search = q; st.page = 0; } }
     st.view = ['catalog', 'placed', 'people'].includes(String(view)) ? String(view) : 'catalog';
     if (group !== undefined && group !== null && group !== '' && String(group) !== st.group) { st.group = String(group); st.page = 0; } else st.page = Math.max(0, Math.floor(Number(page) || 0));
     refresh(a);
@@ -714,7 +721,7 @@ module.exports = (api) => {
   });
   // the G key (a client release away) sends decorOpen; a client without the native panel is told to use chat
   onUi('decorOpen', (a) => {
-    try { if (hasUiCap(a, PANEL_CAP)) openPanel(a); else personal(a, 'Your client cannot show the decorating panel yet; use /decor help.'); }
+    try { if (panelCap(a)) openPanel(a); else personal(a, 'Your client cannot show the decorating panel yet; use /decor help.'); }
     catch (e) { log('decor: open failed', e.stack || e.message); }
   });
   onUi('close', (a, args, widgetId) => { if (widgetId !== PANEL_ID) return; const st = S.panel.get(a >>> 0); if (st && !st.reopen) S.panel.delete(a >>> 0); });
@@ -724,7 +731,7 @@ module.exports = (api) => {
     const words = String(args || '').trim().split(/\s+/).filter(Boolean), sub = (words.shift() || '').toLowerCase(), rest = words.join(' ');
     if (!C.enabled && !(sub === 'clear' && isDeveloper(a))) return personal(a, 'Decorating is not open yet.');
     const pl = here(a);
-    if (!sub && pl && mayDecorate(a, pl) && hasUiCap(a, PANEL_CAP)) return openPanel(a);
+    if (!sub && pl && mayDecorate(a, pl) && panelCap(a)) return openPanel(a);
     if (!sub || sub === 'help') {
       if (!pl) return personal(a, 'Decorating works inside your own home. /decor find <words> lists what you can place.');
       const u = usage(placeEntry(pl.root, pl.rec)), b = budgetOf(pl);

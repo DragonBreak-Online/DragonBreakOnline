@@ -1,5 +1,22 @@
 [
   {
+    "title": "A decorating panel",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Homes",
+        "items": [
+          "Press G inside your own home (or one its owner named you in) to open the decorating panel. /decor with no words opens it too.",
+          "The Catalogue tab lists every piece by group, with a search box. Each row shows what it costs against what you carry, and greys out what this home cannot take yet, with the reason.",
+          "Place hands the piece to the placing tool; set it down and the panel comes back. The Placed tab moves or takes down what is in the home, shows what taking a piece down gives back and how a planter is growing, and Undo works for a minute after a place or a move.",
+          "Owners name who else may decorate in the People tab. The G key can be changed in the Journal, Settings, Keys."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Briarhearts: the Hagravens' rite",
     "date": "2026-10-26",
     "version": "Server update",

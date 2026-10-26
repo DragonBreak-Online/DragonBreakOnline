@@ -63,7 +63,7 @@ const api = {
   onlineActors: () => [OWNER, FRIEND, STRANGER, GM], isAdmin: (a) => a === GM, tierOf: (a) => (a === GM ? 'developer' : null), giveItem,
   findByName: (q) => Number(Object.keys(NAME).find((a) => NAME[a].toLowerCase() === String(q).toLowerCase())) || 0,
   every: (name, ms, fn) => { timers[name] = fn; }, cfg,
-  hasUiCap: (a, cap) => cap === 'native:decor' && a !== FRIEND,
+  hasUiCap: (a, cap) => cap === 'decorPanel' && a !== FRIEND,
 };
 let fails = 0;
 const ok = (c, what, detail) => { console.log(`${c ? 'ok  ' : 'FAIL'}  ${what}${!c && detail !== undefined ? '   ' + JSON.stringify(detail) : ''}`); if (!c) fails++; };
@@ -158,6 +158,18 @@ ok(!(T.reg().places[DOOR.toString(16)].decorators || []).includes(PROFILE[GM]), 
 ok(sw.nearby.length === 0, 'a decorator is offered nobody to name', sw.nearby);
 act(OWNER, 'decorRevoke', String(PROFILE[STRANGER]));
 ok(!(T.reg().places[DOOR.toString(16)].decorators || []).includes(PROFILE[STRANGER]), 'Revoke takes them off');
+
+// ---- search (the browser panel has a text box) ----
+act(OWNER, 'decorView', 'catalog', 'beds', 0, 'ward');
+w = lastPanel(OWNER);
+ok(w.search === 'ward' && w.rows.length === 1 && w.rows[0].name === 'Wardrobe', 'a search finds across groups', w.rows.map((r) => r.name));
+act(OWNER, 'decorView', 'catalog', 'beds', 0, 'nothing like this');
+ok(lastPanel(OWNER).rows.length === 0, 'a search with no match gives no rows');
+act(OWNER, 'decorView', 'catalog', 'beds', 0, '');
+w = lastPanel(OWNER);
+ok(w.search === '' && w.group === 'beds' && w.rows[0].name === 'Bed', 'clearing it is the group again', w.rows.map((r) => r.name));
+act(OWNER, 'decorView', 'catalog', 'beds', 0, 'x'.repeat(500));
+ok(lastPanel(OWNER).search.length === 40, 'a search is cut to 40 characters');
 
 // ---- closing ----
 fire('close', OWNER, [], 171);
