@@ -137,8 +137,7 @@ function selectRow(id)
 function drawHead()
 {
    var h = clear("head", 20);
-   var title = dboText(h, "title", 1, PAD, 18, PANEL_W - PAD * 2, 40, dboFmt(F_PLAIN, 30, C_TEXT, 1.0), false);
-   title.text = data.first == true ? "Choose your god" : "Your faith";
+   dboTitle(h, "title", 1, PAD, 18, PANEL_W - PAD * 2, data.first == true ? "Choose your god" : "Your faith");
    var sub = dboText(h, "sub", 2, PAD, 58, PANEL_W - PAD * 2, 26, dboFmt(F_MEDIUM, 18, C_SECOND, 0.8), false);
    sub.text = subText();
    if (data.notice != undefined && data.notice != "")
@@ -163,9 +162,13 @@ function drawHead()
          draw();
       });
       b.group = g;
+      if (g == tab)
+      {
+         dboTabMark(b, 152);
+      }
       x += 190;
    }
-   dboRule(h, PAD, 174, PANEL_W - PAD * 2);
+   dboDivider(h, PAD, 174, PANEL_W - PAD * 2);
 }
 
 function drawList()
@@ -204,6 +207,8 @@ function drawList()
       c._alpha = c.rest;
       c.godId = g.id;
       c.rowIndex = i;
+      c.washW = LIST_W;
+      c.washH = ROW_H - 4;
       c.idx = actions.length;
       actions.push(c);
       c.onPick = function()
@@ -295,7 +300,7 @@ function drawDetail()
    var sp = dboText(d, "sphere", 3, DETAIL_X, y, w, 96, dboFmt(F_MEDIUM, 18, C_SECOND, 0.8), true);
    sp.text = g.sphere == undefined ? "" : String(g.sphere);
    y += Math.max(26, Math.ceil(sp.text.length / 48) * 24 + 8);
-   dboRule(d, DETAIL_X, y, w);
+   dboDivider(d, DETAIL_X, y, w);
    y += 10;
    y = fact(d, "boon", 10, y, "Boon", g.boon != undefined && g.boon != "" ? String(g.boon) : "None recorded.", C_TEXT);
    y = fact(d, "shrines", 12, y, "Shrines", g.reachable == true ? "There are shrines you can reach." : "No shrine you can reach yet. You could still take them, but there would be nowhere to pray.", C_TEXT);
@@ -309,7 +314,7 @@ function drawFoot()
 {
    var f = clear("foot", 60);
    var y = PANEL_H - 60;
-   dboRule(f, PAD, y - 12, PANEL_W - PAD * 2);
+   dboDivider(f, PAD, y - 12, PANEL_W - PAD * 2);
    var g = shownGod();
    var current = byId(data.current);
    var isCurrent = g != null && g.id == data.current;
@@ -370,10 +375,10 @@ function draw()
 function build()
 {
    panel = _root.createEmptyMovieClip("dboPanel", 10);
-   panel._x = (STAGE_W - PANEL_W) / 2;
-   panel._y = 40;
+   dboFit(panel, PANEL_W, PANEL_H);
    var bg = panel.createEmptyMovieClip("bg", 1);
-   dboBox(bg, 0, 0, PANEL_W, PANEL_H, 0x000000, 80);
+   dboGround(bg, PANEL_W, PANEL_H);
+   dboWatermark(panel, 5, PANEL_W - 40, 190, 360);
    dboFadeIn(panel);
 }
 

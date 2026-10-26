@@ -10,7 +10,8 @@ var PAD = 22;
 var ROW_H = 34;
 var MAX_ROWS = 9;
 var GAP = 18;
-var LONG_TITLE = 20;
+// past this a name takes two smaller lines: the branded title is spaced wide
+var LONG_TITLE = 14;
 var BODY_MAX = 360;
 var NO_DATA_CLOSE_MS = 8000;
 var DEFAULT_EVENTS = {action: "pa:action", close: "pa:close"};
@@ -201,10 +202,10 @@ function draw()
    kick.text = inspect ? "Inspect" : "Interact";
    var name = String(data.targetName);
    var twoLines = name.length > LONG_TITLE;
-   var title = dboText(b, "title", 2, PAD, 36, PANEL_W - PAD * 2, twoLines ? 52 : 36, dboFmt(F_PLAIN, twoLines ? 20 : 26, C_TEXT, 1.0), twoLines);
-   title.text = name;
+   var title = twoLines ? dboText(b, "title", 2, PAD, 36, PANEL_W - PAD * 2, 52, dboFmt(F_PLAIN, 20, C_SILVER, 1.5), true) : dboTitle(b, "title", 2, PAD, 34, PANEL_W - PAD * 2, name);
+   title.text = name.toUpperCase();
    var y = twoLines ? 92 : 76;
-   dboRule(b, PAD, y, PANEL_W - PAD * 2);
+   dboDivider(b, PAD, y, PANEL_W - PAD * 2);
    y += 10;
    var pages = pageCount();
    if (page >= pages)
@@ -248,6 +249,8 @@ function draw()
          c._alpha = A_ROW_REST;
          c.actionId = String(a.id);
          c.rowIndex = n;
+         c.washW = PANEL_W - PAD * 2;
+         c.washH = ROW_H - 4;
          c.idx = actions.length;
          actions.push(c);
          c.onPick = function()
@@ -294,7 +297,7 @@ function draw()
       y += 30;
    }
    y += 6;
-   dboRule(b, PAD, y, PANEL_W - PAD * 2);
+   dboDivider(b, PAD, y, PANEL_W - PAD * 2);
    y += 10;
    button(b, "close", 95, PAD, y, 120, "Close", F_MEDIUM, 22, A_BUTTON_REST, function()
    {
@@ -302,10 +305,12 @@ function draw()
    });
    var height = y + 32 + PAD - 6;
    panel.bg.clear();
-   dboBox(panel.bg, 0, 0, PANEL_W, height, 0x000000, 80);
+   dboGround(panel.bg, PANEL_W, height);
    // down-right of the crosshair, kept on the screen, as the browser menu opens
-   panel._x = STAGE_W / 2 + GAP;
-   panel._y = Math.max(40, Math.min(STAGE_H - 40 - height, STAGE_H / 2 - height / 3));
+   // what the screen shows (21:9 crops the top and bottom of the stage), so the menu is never cut off
+   var v = dboVisible();
+   panel._x = v.left + v.width / 2 + GAP;
+   panel._y = Math.max(v.top + 40, Math.min(v.top + v.height - 40 - height, v.top + v.height / 2 - height / 3));
 }
 
 function turnPage(d)

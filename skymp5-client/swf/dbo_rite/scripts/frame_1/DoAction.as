@@ -278,8 +278,7 @@ function draw()
    actions = [];
    focus = -1;
    var b = clear("body", 20);
-   var title = dboText(b, "title", 1, PAD, 20, PANEL_W - PAD * 2, 40, dboFmt(F_PLAIN, 30, C_TEXT, 1.0), false);
-   title.text = String(data.title);
+   dboTitle(b, "title", 1, PAD, 20, PANEL_W - PAD * 2, String(data.title));
    var fl = dboText(b, "flavor", 2, PAD, 62, PANEL_W - PAD * 2, 52, dboFmt(F_MEDIUM, 18, C_SECOND, 0.8), true);
    fl.text = data.flavor == undefined ? "" : String(data.flavor);
    var y = 120;
@@ -310,7 +309,7 @@ function draw()
    var hint = dboText(b, "hint", 30, PAD, y, PANEL_W - PAD * 2, linesHeight(ht), dboFmt(F_MEDIUM, 18, C_TEXT, 0.8), true);
    hint.text = ht;
    y += linesHeight(ht) + 4;
-   dboRule(b, PAD, y, PANEL_W - PAD * 2);
+   dboDivider(b, PAD, y, PANEL_W - PAD * 2);
    y += 12;
    if (asking)
    {
@@ -348,7 +347,7 @@ function draw()
    }
    var h = y + 32 + PAD;
    panel.bg.clear();
-   dboBox(panel.bg, 0, 0, PANEL_W, h, 0x000000, data.deadly == true ? 88 : 80);
+   dboGround(panel.bg, PANEL_W, h);
 }
 
 function reset(p)
@@ -374,10 +373,11 @@ function reset(p)
 function build()
 {
    panel = _root.createEmptyMovieClip("dboPanel", 10);
-   panel._x = (STAGE_W - PANEL_W) / 2;
-   panel._y = 140;
+   // as tall as a deadly pick rite asking to yield (about 608) at most; centred in what the screen shows
+   dboFit(panel, PANEL_W, 620);
    panel.createEmptyMovieClip("bg", 1);
-   dboBox(panel.bg, 0, 0, PANEL_W, 200, 0x000000, 80);
+   dboGround(panel.bg, PANEL_W, 200);
+   dboWatermark(panel, 5, PANEL_W - 30, 90, 260);
    dboFadeIn(panel);
 }
 

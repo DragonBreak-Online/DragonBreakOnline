@@ -44,9 +44,8 @@ function draw()
    var b = clear("body", 20);
    var kind = dboText(b, "kind", 1, PAD, 20, PANEL_W - PAD * 2, 26, dboFmt(F_MEDIUM, 18, C_SECOND, 0.8), false);
    kind.text = data.kind == undefined ? "" : String(data.kind);
-   var title = dboText(b, "title", 2, PAD, 44, PANEL_W - PAD * 2, 40, dboFmt(F_PLAIN, 30, C_TEXT, 1.0), false);
-   title.text = String(data.name);
-   dboRule(b, PAD, 92, PANEL_W - PAD * 2);
+   dboTitle(b, "title", 2, PAD, 44, PANEL_W - PAD * 2, String(data.name));
+   dboDivider(b, PAD, 92, PANEL_W - PAD * 2);
    var hint = dboText(b, "hint", 3, PAD, 102, PANEL_W - PAD * 2, 56, dboFmt(F_MEDIUM, 20, C_TEXT, 0.8), true);
    hint.text = hintText();
    var party = data.party instanceof Array ? data.party : [];
@@ -72,6 +71,8 @@ function draw()
       c._alpha = A_ROW_REST;
       c.diffId = String(d.id);
       c.rowIndex = i;
+      c.washW = PANEL_W - PAD * 2;
+      c.washH = ROW_H - 4;
       c.idx = actions.length;
       actions.push(c);
       c.onPick = function()
@@ -93,7 +94,7 @@ function draw()
       y += ROW_H;
    }
    y += 8;
-   dboRule(b, PAD, y, PANEL_W - PAD * 2);
+   dboDivider(b, PAD, y, PANEL_W - PAD * 2);
    y += 12;
    button(b, "back", 40, PAD, y, 160, "Turn back", F_MEDIUM, 22, A_BUTTON_REST, function()
    {
@@ -103,16 +104,17 @@ function draw()
    keysTf.text = diffs.length ? "Click a difficulty or press 1-" + diffs.length + ". Escape to turn back." : "Escape to turn back.";
    var h = y + 32 + PAD;
    panel.bg.clear();
-   dboBox(panel.bg, 0, 0, PANEL_W, h, 0x000000, 80);
+   dboGround(panel.bg, PANEL_W, h);
 }
 
 function build()
 {
    panel = _root.createEmptyMovieClip("dboPanel", 10);
-   panel._x = (STAGE_W - PANEL_W) / 2;
-   panel._y = 140;
+   // as tall as its difficulties at most; centred in what the screen shows
+   dboFit(panel, PANEL_W, 480);
    panel.createEmptyMovieClip("bg", 1);
-   dboBox(panel.bg, 0, 0, PANEL_W, 200, 0x000000, 80);
+   dboGround(panel.bg, PANEL_W, 200);
+   dboWatermark(panel, 5, PANEL_W - 30, 100, 260);
    dboFadeIn(panel);
 }
 

@@ -33,10 +33,10 @@ const nativeOrder = (t) => Object.keys(B(t).kids).filter((n) => /^(head\d+|r\d)$
   const t = S.boot('dbo_context');
   check('says ready with the frame skse appeared on', msgs(t, 'ready').length === 1 && msgs(t, 'ready')[0].args[0] === 1, t.msgs());
   t.push(guardMenu);
-  check('Interact above the name', B(t).kicker.text === 'Interact' && B(t).title.text === 'Lydia');
+  check('Interact above the name', B(t).kicker.text === 'Interact' && B(t).title.text === 'LYDIA');
   check('the entries under the browser\'s headings, in its order', JSON.stringify(nativeOrder(t)) === JSON.stringify(browserOrder(guardMenu.actions)), { native: nativeOrder(t), browser: browserOrder(guardMenu.actions) });
   check('...an unknown id (trade, emote) first and unheaded', rowsOf(t)[0].label.text === 'Trade' && rowsOf(t)[1].label.text === 'Wave' && headsOf(t)[0] === 'Party');
-  check('rows numbered 1-7 at 30%, a Close row', rowsOf(t).length === 7 && rowsOf(t)[6].key.text === '7' && rowsOf(t).every((r) => r._alpha === 30) && B(t).close.label.text === 'Close');
+  check('rows numbered 1-7 at 50% (the brand), a Close row', rowsOf(t).length === 7 && rowsOf(t)[6].key.text === '7' && rowsOf(t).every((r) => r._alpha === 50) && B(t).close.label.text === 'Close');
   check('down-right of the crosshair, on the screen', t.root.dboPanel._x === 658 && t.root.dboPanel._y >= 40);
   t.press(53);
   const a = msgs(t, 'pa:action');

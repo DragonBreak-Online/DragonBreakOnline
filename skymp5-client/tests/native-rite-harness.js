@@ -31,7 +31,7 @@ const run = (t, ms) => { for (let left = ms; left > 0; left -= 33) { t.st.time +
   const t = S.boot('dbo_rite');
   check('says ready with the frame skse appeared on', msgs(t, 'ready').length === 1 && msgs(t, 'ready')[0].args[0] === 1, t.msgs());
   t.push(timed());
-  check('title, flavour and three pending pips', B(t).title.text === 'The Rite of the Moon' && B(t).flavor.text === 'Hircine watches.' && pipStates(t) === ',,');
+  check('title, flavour and three pending pips', B(t).title.text === 'THE RITE OF THE MOON' && B(t).flavor.text === 'Hircine watches.' && pipStates(t) === ',,');
   check('the browser\'s hint, with the deadly line', B(t).hint.text === 'Round 1 of 3: strike 2 true blows. Space or Enter. Failure here can be the end of this life.', B(t).hint.text);
   check('the zone sits where the payload puts it', B(t).bar.zone && B(t).bar.marker._x === 0);
   t.press(32);
