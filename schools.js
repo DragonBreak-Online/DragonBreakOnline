@@ -2078,8 +2078,9 @@ module.exports = (api) => {
     }
     // A decor study shelf is arcane (Study Magic) or priest (Priest Studies) by the kind it was placed as (decor.js)
     const shelfKind = typeof globalThis.__dboDecorStudyKind === 'function' ? globalThis.__dboDecorStudyKind(targetId) : '';
-    if (shelfKind === 'arcane' && isStudy(targetId)) { useStudy(targetId >>> 0, casterId >>> 0); return true; }
-    if (shelfKind === 'priest' && isPriestStudy(targetId)) { notePriestStudy(targetId >>> 0); usePriest(targetId >>> 0, casterId >>> 0); return true; }
+    // A kinded shelf never falls back to the other study: with its own study off, schools.js leaves the use alone
+    if (shelfKind === 'arcane') { if (!isStudy(targetId)) return false; useStudy(targetId >>> 0, casterId >>> 0); return true; }
+    if (shelfKind === 'priest') { if (!isPriestStudy(targetId)) return false; notePriestStudy(targetId >>> 0); usePriest(targetId >>> 0, casterId >>> 0); return true; }
     // Otherwise one shelf serves both: a character with a school still learning at the shelves studies magic, anyone else
     // Priest Studies (a library has a separate activator for each)
     if (isStudy(targetId) && isPriestStudy(targetId)) {
