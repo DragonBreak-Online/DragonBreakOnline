@@ -48,17 +48,30 @@ const final = path.join(outDir, name + '.swf');
 
 const run = (args) => execFileSync('java', ['-jar', ffdec, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
 
+// swf/<name>/lib.txt names the swf/lib/*.as files to put ahead of the frame script, staged so the source stays clean
+const libList = path.join(srcDir, 'lib.txt');
+const stagedScripts = path.join(outDir, '.scripts-' + name);
+fs.rmSync(stagedScripts, { recursive: true, force: true });
+fs.cpSync(scriptsDir, stagedScripts, { recursive: true });
+const frameAs = path.join(stagedScripts, 'frame_1', 'DoAction.as');
+if (fs.existsSync(libList) && fs.existsSync(frameAs)) {
+  const lib = fs.readFileSync(libList, 'utf8').split('\n').map((l) => l.trim()).filter(Boolean)
+    .map((f) => fs.readFileSync(path.join(here, 'lib', f), 'utf8')).join('\n');
+  fs.writeFileSync(frameAs, lib + '\n' + fs.readFileSync(frameAs, 'utf8'));
+}
+
 run(['-xml2swf', baseXml, stage]);
 if (!fs.existsSync(stage)) {
   console.error('xml2swf produced nothing');
   process.exit(1);
 }
-run(['-importScript', stage, final, scriptsDir]);
+run(['-importScript', stage, final, stagedScripts]);
 if (!fs.existsSync(final)) {
   console.error('importScript produced nothing');
   process.exit(1);
 }
 fs.unlinkSync(stage);
+fs.rmSync(stagedScripts, { recursive: true, force: true });
 
 // A SWF that builds is not a SWF that carries our code, so prove the source landed rather than trusting the
 // exit code: decompile the result and look for a string only our AS2 has.
@@ -66,7 +79,11 @@ const verifyDir = path.join(outDir, '.verify-' + name);
 fs.rmSync(verifyDir, { recursive: true, force: true });
 run(['-export', 'script', verifyDir, final]);
 
-const want = ['dboSetRows', 'SendModEvent', '$EverywhereFont'];
+// swf/<name>/verify.txt names strings only this menu's source has, one per line
+const verifyList = path.join(srcDir, 'verify.txt');
+const want = fs.existsSync(verifyList)
+  ? fs.readFileSync(verifyList, 'utf8').split('\n').map((l) => l.trim()).filter(Boolean)
+  : ['dboSetRows', 'SendModEvent', '$EverywhereFont'];
 let text = '';
 const walk = (d) => {
   for (const e of fs.readdirSync(d, { withFileTypes: true })) {
