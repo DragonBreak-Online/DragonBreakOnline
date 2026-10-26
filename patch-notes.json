@@ -8287,5 +8287,20 @@
         ]
       }
     ]
+  },
+  {
+    "title": "Saw mills",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Woodcutting",
+        "items": [
+          "A lumber mill's saw works now. A Woodcutter who runs it gets Firewood (20 at Novice up to 60 at Master), and from Adept up Sawn Logs too, the timber houses are built from (6 at Adept up to 8 at Master). It takes nothing in.",
+          "Each mill has more for you every 30 minutes, so a round of the mills you know pays best."
+        ]
+      }
+    ]
   }
 ]
