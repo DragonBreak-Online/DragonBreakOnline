@@ -34,6 +34,16 @@ export function wheelWatch(s: WheelWatchState): { action: "close" | "keep"; unfo
   return { action: s.now - since >= UNFOCUSED_CLOSE_MS ? "close" : "keep", unfocusedSince: since };
 }
 
+/** The wheel key held at least this long before its release is a hold (skymp5-front emoteWheel/wheelGeometry.ts HOLD_MS) */
+export const HOLD_MS = 220;
+/** The window event the front's wheel listens for: play the emote under the pointer */
+export const WHEEL_RELEASE_EVENT = "dbo:emoteWheelRelease";
+
+/** The wheel key released: "commit" after a hold plays what the pointer is on; "keep" leaves a tapped wheel open for clicks */
+export function wheelReleaseAction(menuOpen: boolean, heldFrom: number, now: number): "commit" | "keep" {
+  return menuOpen && heldFrom > 0 && now - heldFrom >= HOLD_MS ? "commit" : "keep";
+}
+
 /** The wheel's key pressed: open it when closed, close it when open (it used to be ignored while open) */
 export function wheelKeyAction(menuOpen: boolean): "open" | "close" {
   return menuOpen ? "close" : "open";

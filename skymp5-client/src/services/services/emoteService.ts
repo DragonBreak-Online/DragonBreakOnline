@@ -12,7 +12,7 @@ import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { BrowserMessageEvent, ButtonEvent, DxScanCode, InputDeviceType } from "skyrimPlatform";
 import { logTrace } from "../../logging";
 import { MIN_IDLE_SECONDS, MAX_IDLE_SECONDS, idleRequest, stopsIdle } from "./idleControl";
-import { wheelWatch, wheelKeyAction } from "./emoteWheelWatch";
+import { WHEEL_RELEASE_EVENT, wheelWatch, wheelKeyAction, wheelReleaseAction } from "./emoteWheelWatch";
 
 // for the browser-side widget setter (executed inside the CEF browser)
 declare const window: any;
@@ -221,6 +221,10 @@ export class EmoteService extends ClientListener {
     if (e.isDown && this.activeEmote && CANCEL_KEYS.includes(code) && !isGameInputBlocked(this.sp, this.controller)) {
       this.stopActiveEmote(false, `movement key ${code}`);
     }
+    if (code === this.menuKey && e.isUp) {
+      this.onWheelKeyUp();
+      return;
+    }
     if (code !== this.menuKey || !e.isDown) {
       return;
     }
@@ -239,6 +243,22 @@ export class EmoteService extends ClientListener {
       return;
     }
     this.openMenu();
+    this.heldFrom = Date.now();
+  }
+
+  // The key held past HOLD_MS and let go plays the emote under the pointer (the front's wheel); a tap leaves it open for clicks
+  private onWheelKeyUp(): void {
+    const heldFrom = this.heldFrom;
+    this.heldFrom = 0;
+    if (wheelReleaseAction(this.menuOpen, heldFrom, Date.now()) !== "commit") return;
+    emoteNote(`wheel key released after ${Date.now() - heldFrom} ms: the pointed emote`);
+    this.controller.once("update", () => {
+      try {
+        this.sp.browser.executeJavaScript(`window.dispatchEvent(new CustomEvent(${JSON.stringify(WHEEL_RELEASE_EVENT)}));`);
+      } catch (err) {
+        logTrace(this, `Wheel release not delivered`, err);
+      }
+    });
   }
 
   // Nothing on screen says why the key did nothing, so the diagnostic line names the gate; a B typed in the console is no refusal
@@ -578,6 +598,7 @@ export class EmoteService extends ClientListener {
     const wasOpen = this.menuOpen;
     this.menuOpen = false;
     this.unfocusedSince = 0;
+    this.heldFrom = 0;
     closeFormMenu(this.sp, WIDGET_ID);
     // How long it was up, and what took it down: the server log's [dboDiag] emote lines
     if (wasOpen && this.openedAt) emoteNote(`wheel closed after ${Date.now() - this.openedAt} ms by ${why}`);
@@ -614,6 +635,8 @@ export class EmoteService extends ClientListener {
   private menuPad: number = GamepadButton.LeftThumb;
   private menuOpen = false;
   private openedAt = 0;
+  // When the wheel key opened the wheel and is still down, 0 once released
+  private heldFrom = 0;
   private unfocusedSince = 0;
   private lastWatch = 0;
   // The idle a dboIdle began, the only one a dboIdleStop may end
