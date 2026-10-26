@@ -4005,14 +4005,30 @@ const sendPacket = (a, payload) => {
     return true;
   } catch (e) { log('sendCustomPacket failed', e.message); return false; }
 };
+// Native Scaleform panels (client scaleformMenuService, fork swf/): a widget of these types goes to a client that sent
+// nativeCaps naming it as a dboScaleform packet instead; the payload is the same object the browser widget gets
+const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor' };
+const nativeState = () => { const p = globalThis.__dboPanelState || (globalThis.__dboPanelState = { caps: new Map(), nonces: new Map() }); if (!p.native) p.native = new Map(); if (!p.nativeOpen) p.nativeOpen = new Map(); return p; };
+const nativeSwfFor = (a, widget) => {
+  const swf = widget && NATIVE_SWF[widget.type];
+  if (!swf || (widget.type === 'prayer' && widget.mode !== 'pick')) return '';
+  const c = nativeState().native.get(a >>> 0);
+  return c && c.has('native:' + widget.type) ? swf : '';
+};
 const openWidget = (a, widget, focus) => {
+  const swf = nativeSwfFor(a, widget);
+  if (swf) { nativeState().nativeOpen.set(a >>> 0, widget.id); return sendPacket(a, { customPacketType: 'dboScaleform', swf, payload: widget, widget: widget.id }); }
   const sent = sendPacket(a, { customPacketType: 'dboWidget', widget, focus: !!focus });
   // Another focused panel takes the screen from an open Character Journal (journal.js): the new one is sent first, then the
   // journal goes as a plain close, which keeps the cursor on the new one (the panel handoff rule)
   if (focus && widget && typeof globalThis.__dboJournalYield === 'function') { try { globalThis.__dboJournalYield(a, widget.id); } catch (e) { log('journal yield failed', e.message); } }
   return sent;
 };
-const closeWidget = (a, id) => sendPacket(a, { customPacketType: 'dboWidget', close: id });
+const closeWidget = (a, id) => {
+  const open = nativeState().nativeOpen;
+  if (open.get(a >>> 0) === id) { open.delete(a >>> 0); return sendPacket(a, { customPacketType: 'dboScaleform', close: true }); }
+  return sendPacket(a, { customPacketType: 'dboWidget', close: id });
+};
 const notify = (a, text) => sendPacket(a, { customPacketType: 'dboNotice', text });
 globalThis.__dboUiEvents = new Map(); // event name -> [(actorId, args, widgetId)]; rebuilt on every reload
 // Several widgets answer the same event name, "close" above all, so every handler is kept and called
@@ -4200,7 +4216,7 @@ const hasPlayerMenu = (a) => { const c = panelState.caps.get(a >>> 0); return !!
 // Any other capability the client's UI named in dbo:uiCaps (hud UI_CAPS): lockpick.js asks for 'lockpickLocal' and
 // supernatural.js for 'riteJudge' before they issue a round the widget judges itself, since an older widget given one
 // would hang or be judged wrongly (DESIGN.md 3.2)
-const hasUiCap = (a, cap) => { const c = panelState.caps.get(a >>> 0); return !!c && c.has(String(cap)); };
+const hasUiCap = (a, cap) => { const c = panelState.caps.get(a >>> 0), n = nativeState().native.get(a >>> 0); return (!!c && c.has(String(cap))) || (!!n && n.has(String(cap))); };
 const openPlayerMenu = (a, tab, search) => {
   const nonce = `${(a >>> 0).toString(16)}-${Date.now().toString(36)}`;
   panelState.nonces.set(a >>> 0, nonce);
@@ -4209,6 +4225,9 @@ const openPlayerMenu = (a, tab, search) => {
 };
 const closePlayerMenu = (a) => { panelState.nonces.delete(a >>> 0); closeWidget(a, PANEL_WIDGET_ID); };
 onUi('uiCaps', (a, args) => { panelState.caps.set(a >>> 0, new Set((args || []).map(String))); });
+// The client's native panels, kept apart from the browser's caps so neither list replaces the other
+onUi('nativeCaps', (a, args) => { nativeState().native.set(a >>> 0, new Set((args || []).map(String).filter((c) => c.startsWith('native:')))); });
+onUi('close', (a, args, widgetId) => { const open = nativeState().nativeOpen; if (open.get(a >>> 0) === widgetId) open.delete(a >>> 0); });
 onUi('menuOpen', (a, args) => {
   if (!hasPlayerMenu(a)) return;
   let tab = String((args || [])[0] || '');
@@ -4252,7 +4271,7 @@ const worldView = (a) => ({
     ? globalThis.__dboJournalSections : (globalThis.__dboJournalSections = {});
   SECTIONS.world = { visible: () => true, view: (a) => worldView(a), label: 'World' };
 }
-globalThis.__dboPanelLeave = (a) => { panelState.caps.delete(a >>> 0); panelState.nonces.delete(a >>> 0); };
+globalThis.__dboPanelLeave = (a) => { panelState.caps.delete(a >>> 0); panelState.nonces.delete(a >>> 0); nativeState().native.delete(a >>> 0); nativeState().nativeOpen.delete(a >>> 0); };
 
 // ---- meals: eating takes time (Nate, 2026-09-27, from athny's and dunthril's reports) ----------------------------------
 // The engine uses the food up at once; its hunger counts only when the meal is finished. The client (MealService) slows
