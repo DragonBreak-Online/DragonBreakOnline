@@ -796,6 +796,7 @@ module.exports = (api) => {
     if (!sp) return personal(teacher, 'You cannot teach that spell.');
     const why = teachRefusal(teacher, student, sp);
     if (why) return personal(teacher, why);
+    if ((typeof globalThis.__dboPromptBusy === 'function' ? globalThis.__dboPromptBusy(student >>> 0) : '')) return personal(teacher, globalThis.__dboPromptBusyLine(display(student), (typeof globalThis.__dboPromptBusy === 'function' ? globalThis.__dboPromptBusy(student) : '')));
     offers.set(student >>> 0, { teacher: teacher >>> 0, spellId, at: Date.now() });
     openWidget(student, { type: 'contextMenu', id: MENU_ID, mode: 'menu', targetName: `${display(teacher)} offers to teach you ${spellLabel(sp)}`,
       actions: [{ id: 'accept', label: 'Learn it (it goes into your spellbook)' }, { id: 'decline', label: 'Decline' }],
@@ -1224,6 +1225,7 @@ module.exports = (api) => {
     if (why) return spellsMenuFor(a, student, p, why);
     const credit = creditFor(a, sp.id);
     if (credit.why) return spellsMenuFor(a, student, p, credit.why);
+    if ((typeof globalThis.__dboPromptBusy === 'function' ? globalThis.__dboPromptBusy(student >>> 0) : '')) return spellsMenuFor(a, student, p, globalThis.__dboPromptBusyLine(display(student), (typeof globalThis.__dboPromptBusy === 'function' ? globalThis.__dboPromptBusy(student) : '')));
     closeMenu(a);
     offers.set(student >>> 0, { teacher: a >>> 0, spellId: sp.id, at: Date.now(), college: { place: p.place, fid: p.fid } });
     openWidget(student, { type: 'contextMenu', id: MENU_ID, mode: 'menu', targetName: `${display(a)} offers to teach you ${spellLabel(sp)}`,

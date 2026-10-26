@@ -1,5 +1,29 @@
 [
   {
+    "title": "Birthsigns rebalanced for duels, and no pop-ups in dungeons",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Birthsigns against other players",
+        "items": [
+          "Against NPCs every sign is as it was. Against another player: the Shadow's sneak bonus does not apply, and a sign's change to the damage you take is halved (the Atronach's and the Serpent's protection, and the Lord's and the Apprentice's weakness alike).",
+          "For 10 seconds after a blow between two players, a sign's faster regeneration is halved (the Lady, Lord, Steed, Apprentice and Ritual). The Atronach's slower magicka stays as it is.",
+          "Skill learning, gold and the Atronach's extra magicka are unchanged."
+        ]
+      },
+      {
+        "heading": "Fewer interruptions",
+        "items": [
+          "The birthsign choice waits until you are out of a dungeon, as it already waited while you fought or were down.",
+          "The level-up menu no longer opens by itself in a fight, while you are down or in a dungeon; /level opens it whenever you like.",
+          "Another player's offer to teach you, take you as apprentice or co-write a tome is turned back while you are down, fighting or in a dungeon, and they are told to ask again later."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The Blades can forge their Akaviri armour in Skyrim",
     "date": "2026-10-26",
     "version": "Server update",

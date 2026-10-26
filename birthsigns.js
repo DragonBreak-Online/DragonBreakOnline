@@ -24,6 +24,10 @@
 
 const WIDGET_ID = 163;
 const PROP = 'private.dboBirthsign';
+// Against a player (racial.js): sneakDamage the Shadow's sneak share kept (0: none), takenShare the share kept of a sign's
+// damage-taken modifiers (the Atronach's and Serpent's less, the Lord's and Apprentice's more), regenShare the share kept
+// of a sign's regeneration bonus (never its slowing) for fightSeconds after a hit between players
+const PVP_DEFAULTS = { enabled: true, sneakDamage: 0, takenShare: 0.5, regenShare: 0.5, fightSeconds: 10 };
 const ORDER = ['warrior', 'mage', 'thief', 'lady', 'lord', 'steed', 'apprentice', 'atronach', 'ritual', 'lover', 'shadow', 'serpent', 'tower'];
 // xp: skill -> rate; xpAll: every skill; regen: stat -> factor (below 1 slows it); lowHealth/lowHealthRegen: a conditional
 // health factor below that share of health; taken: fire/frost/shock/poison/magic -> share more (below 0: less);
@@ -152,6 +156,8 @@ module.exports = (api) => {
     if (jailing(a)) return 'jail';
     if (downed(a)) return 'downed';
     if (fighting(a, now)) return 'fighting';
+    // nor in a dungeon (promptguard.js; Nat, 26 Oct: prompts there disrupt people); it comes once they are out
+    if ((typeof globalThis.__dboPromptBusy === 'function' ? globalThis.__dboPromptBusy(a >>> 0) : '') === 'in a dungeon') return 'dungeon';
     return '';
   };
 
@@ -316,6 +322,8 @@ module.exports = (api) => {
 
   // racial.js: the sign whose gifts apply to this character, or null
   globalThis.__dboBirthsignOf = (a) => (on() ? signOf(a) : null);
+  // The signs against players (racial.js; Nat, 26 Oct: "Rebalance the birthsigns for PvP"): config birthsigns.pvp
+  globalThis.__dboBirthsignPvp = () => Object.assign({}, PVP_DEFAULTS, C.pvp || {});
   log(`birthsigns ${on() ? 'on' : 'off'}: ${ORDER.length} signs, ${C.requireAtCreation === false ? 'optional' : 'required'} at creation`);
   return { config: C, signOf, describe, waitReason, tick, choose, staffSet, findCharacter, card, WIDGET_ID };
 };

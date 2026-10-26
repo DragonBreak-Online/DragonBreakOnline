@@ -320,18 +320,23 @@ module.exports = (api) => {
   const attackMult = (agg, tgt, src, dmg, flags) => {
     if (!(dmg > 0) || agg === tgt) return 1;
     const race = raceOf(agg);
-    return (race ? passiveAttack(race, agg, src) * powerAttack(agg, src) : 1) * signAttack(signOf(agg), flags);
+    return (race ? passiveAttack(race, agg, src) * powerAttack(agg, src) : 1) * signAttack(signOf(agg), flags, pvpHit(agg, tgt));
   };
   // The Shadow's sneak attack, never a spell's (gearench.js backstabMult's rule)
-  const signAttack = (sg, flags) => (sg && num(sg.sneakDamage, 0) > 0 && flags && flags.sneak && !flags.spell ? 1 + num(sg.sneakDamage, 0) : 1);
+  const signAttack = (sg, flags, pvp) => (sg && num(sg.sneakDamage, 0) > 0 && flags && flags.sneak && !flags.spell ? 1 + num(sg.sneakDamage, 0) * (pvp ? num(pvpOf().sneakDamage, 0) : 1) : 1);
+  // The signs against players (birthsigns.js __dboBirthsignPvp): their combat shares scaled when both sides are players
+  const pvpOf = () => { try { const f = globalThis.__dboBirthsignPvp; const v = typeof f === 'function' ? f() : null; return v && v.enabled !== false ? v : { sneakDamage: 1, takenShare: 1, regenShare: 1, fightSeconds: 0 }; } catch (e) { return { sneakDamage: 1, takenShare: 1, regenShare: 1, fightSeconds: 0 }; } };
+  const pvpHit = (agg, tgt) => { if (!isPlayer(agg) || !isPlayer(tgt)) return false; const now = Date.now(); if (!(S.pvpAt instanceof Map)) S.pvpAt = new Map(); S.pvpAt.set(agg >>> 0, now); S.pvpAt.set(tgt >>> 0, now); return true; };
+  const inPvpFight = (a) => { const s = num(pvpOf().fightSeconds, 0); const t = S.pvpAt instanceof Map ? S.pvpAt.get(a >>> 0) || 0 : 0; return s > 0 && t > 0 && Date.now() - t < s * 1000; };
   // The sign's share of a hit taken by kind: above 0 more, below 0 less (a reduction joins the race's under reductionCap)
-  const signTarget = (sg, src) => {
+  const signTarget = (sg, src, pvp) => {
     if (!sg || !sg.taken || typeof sg.taken !== 'object') return 1;
     let m = 1, rs = null;
+    const keep = pvp ? num(pvpOf().takenShare, 1) : 1;
     for (const [k, share] of Object.entries(sg.taken)) {
       if (!num(share, 0)) continue;
       const hit = k === 'magic' ? isMagicSource(src) : AV[k] !== undefined && (rs || (rs = resists(src))).has(AV[k]);
-      if (hit) m *= Math.max(0, 1 + num(share, 0));
+      if (hit) m *= Math.max(0, 1 + num(share, 0) * keep);
     }
     return m;
   };
@@ -364,7 +369,7 @@ module.exports = (api) => {
   const targetMult = (agg, tgt, src, dmg) => {
     if (agg === tgt) return 1;
     const race = raceOf(tgt);
-    return (race ? raceTarget(race, tgt, src, dmg) : 1) * signTarget(signOf(tgt), src);
+    return (race ? raceTarget(race, tgt, src, dmg) : 1) * signTarget(signOf(tgt), src, pvpHit(agg, tgt));
   };
   const raceTarget = (race, tgt, src, dmg) => {
     const R = C[race];
@@ -483,6 +488,8 @@ module.exports = (api) => {
     let up = f > 1 ? f : 1, conditional = false;
     if (stat === 'health' && num(sg.lowHealthRegen, 1) > 1 && healthOf(a) < num(sg.lowHealth, 0)) { up *= num(sg.lowHealthRegen, 1); conditional = true; }
     const down = f > 0 && f < 1 ? f : 1;
+    // Mid-fight with a player the sign's bonus is scaled (regenShare); its slowing never is
+    if (up > 1 && inPvpFight(a)) up = 1 + (up - 1) * num(pvpOf().regenShare, 1);
     if (up === 1 && down === 1) return own;
     return capOf(own * up, conditional || (own > 1 && CONDITIONAL_RACE[race] === stat)) * down;
   };

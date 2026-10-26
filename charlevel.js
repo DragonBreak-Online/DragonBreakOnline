@@ -101,6 +101,9 @@ module.exports = (api) => {
   const openChoice = (a, focus) => {
     const st = stateOf(a);
     if (!st.pending) return;
+    // Unasked (a level gained, a refund, a login) it waits while the player is down, fighting or in a dungeon (promptguard.js;
+    // Nat, 26 Oct): the chat line already says /level
+    if (!focus && (typeof globalThis.__dboPromptBusy === 'function' ? globalThis.__dboPromptBusy(a >>> 0) : '')) return;
     const actions = Object.keys(VITALS).map((av) => ({ id: av, label: `+${CFG.perLevel} ${VITALS[av]} (now +${st.spent[av]})` }));
     // A race swap (beast form) tears the panel down client-side while the id stays taken, and the re-open is then ignored
     closeWidget(a, WIDGET_ID);
