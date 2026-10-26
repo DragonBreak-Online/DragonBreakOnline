@@ -11,6 +11,7 @@ var ROW_H = 34;
 var MAX_ROWS = 9;
 var GAP = 18;
 var LONG_TITLE = 20;
+var BODY_MAX = 360;
 var NO_DATA_CLOSE_MS = 8000;
 var DEFAULT_EVENTS = {action: "pa:action", close: "pa:close"};
 var LAW = ["search", "capture", "release", "carry", "putdown", "ropelead", "ropeleave", "ropecut"];
@@ -138,11 +139,49 @@ function pagesOf(rows)
    return pages;
 }
 
+// The owner closes or re-sends: playerActionService closes on its action, a gameplay menu (alchemy) redraws in place
 function pick(id)
 {
    dboSound("UIMenuOK");
    dboSend(ev("action"), [id]);
-   dboClose();
+}
+
+// A wrapped line's height: about 34 characters a line at 18 px across the panel
+function lineHeight(s)
+{
+   return Math.max(1, Math.ceil(s.length / 34)) * 22 + 4;
+}
+
+// Inspect lines in pages no taller than BODY_MAX, so Close is never pushed off the screen
+function linePages(lines)
+{
+   var pages = [];
+   var cur = [];
+   var h = 0;
+   for (var i = 0; i < lines.length; i++)
+   {
+      var t = String(lines[i]);
+      var lh = Math.min(BODY_MAX, lineHeight(t));
+      if (cur.length && h + lh > BODY_MAX)
+      {
+         pages.push(cur);
+         cur = [];
+         h = 0;
+      }
+      cur.push(t);
+      h += lh;
+   }
+   pages.push(cur);
+   return pages;
+}
+
+function pageCount()
+{
+   if (data.mode == "inspect")
+   {
+      return linePages(data.lines instanceof Array ? data.lines : []).length;
+   }
+   return pagesOf(rowsOf(data.actions instanceof Array ? data.actions : [])).length;
 }
 
 function closeMenu()
@@ -167,26 +206,25 @@ function draw()
    var y = twoLines ? 92 : 76;
    dboRule(b, PAD, y, PANEL_W - PAD * 2);
    y += 10;
-   var pages = 1;
+   var pages = pageCount();
+   if (page >= pages)
+   {
+      page = pages - 1;
+   }
    if (inspect)
    {
-      var lines = data.lines instanceof Array ? data.lines : [];
+      var lines = linePages(data.lines instanceof Array ? data.lines : [])[page];
       for (var i = 0; i < lines.length; i++)
       {
-         var lt = dboText(b, "line" + i, 10 + i, PAD, y, PANEL_W - PAD * 2, 48, dboFmt(F_MEDIUM, 18, C_TEXT, 0.8), true);
-         lt.text = String(lines[i]);
-         y += Math.max(26, Math.ceil(lt.text.length / 34) * 22 + 4);
+         var lh = Math.min(BODY_MAX, lineHeight(lines[i]));
+         var lt = dboText(b, "line" + i, 10 + i, PAD, y, PANEL_W - PAD * 2, lh, dboFmt(F_MEDIUM, 18, C_TEXT, 0.8), true);
+         lt.text = lines[i];
+         y += lh;
       }
    }
    else
    {
-      var all = pagesOf(rowsOf(data.actions instanceof Array ? data.actions : []));
-      pages = all.length;
-      if (page >= pages)
-      {
-         page = pages - 1;
-      }
-      var rows = all[page];
+      var rows = pagesOf(rowsOf(data.actions instanceof Array ? data.actions : []))[page];
       var n = 0;
       for (var r = 0; r < rows.length; r++)
       {
@@ -231,12 +269,29 @@ function draw()
          y += ROW_H;
          n++;
       }
-      if (pages > 1)
+   }
+   if (pages > 1)
+   {
+      y += 4;
+      var prev = button(b, "prev", 90, PAD, y, 100, "Previous", F_MEDIUM, 18, A_BUTTON_REST, function()
       {
-         var pt = dboText(b, "page", 90, PAD, y + 2, PANEL_W - PAD * 2, 22, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8, "right"), false);
-         pt.text = "Page " + (page + 1) + " of " + pages + "  (Left / Right)";
-         y += 26;
+         turnPage(-1);
+      });
+      var next = button(b, "next", 91, PAD + 106, y, 70, "Next", F_MEDIUM, 18, A_BUTTON_REST, function()
+      {
+         turnPage(1);
+      });
+      if (page == 0)
+      {
+         disable(prev);
       }
+      if (page >= pages - 1)
+      {
+         disable(next);
+      }
+      var pt = dboText(b, "page", 92, PAD + 180, y + 4, PANEL_W - PAD * 2 - 180, 22, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8, "right"), false);
+      pt.text = "Page " + (page + 1) + " of " + pages;
+      y += 30;
    }
    y += 6;
    dboRule(b, PAD, y, PANEL_W - PAD * 2);
@@ -255,11 +310,7 @@ function draw()
 
 function turnPage(d)
 {
-   if (data.mode == "inspect")
-   {
-      return;
-   }
-   var pages = pagesOf(rowsOf(data.actions instanceof Array ? data.actions : [])).length;
+   var pages = pageCount();
    if (page + d < 0 || page + d >= pages)
    {
       return;
