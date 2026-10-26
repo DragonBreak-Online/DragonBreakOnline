@@ -175,6 +175,11 @@ export class HousingSystem implements System {
         if (rec.issued === null) rec.issued = [];
         return this.write(ctx, p, rec) ? "" : CHANGE_FAILED;
       },
+      // A menu request from chat (/property name), with the menu's own reach, cooldown and rights checks
+      request: (actorId: unknown, ref: unknown, action: string, extra?: Record<string, unknown>): void => {
+        const userId = this.userOf(ctx, Number(actorId) >>> 0);
+        if (userId >= 0) this.onPropertyRequest(ctx, userId, Object.assign({}, extra || {}, { target: Number(ref) >>> 0, action }));
+      },
       release: (ref: unknown): boolean => {
         const p = primary(ref); if (!p) return false;
         const rec = this.read(ctx, p); if (!rec || rec.owner === 0) return true;
