@@ -23,6 +23,9 @@ export const NATIVE_WIDGETS: Readonly<Record<string, string>> = {
   bountyBoard: "dbo_board",
   housing: "dbo_housing",
   contextMenu: "dbo_context",
+  // Worker 6's emote wheel. They checked every server *.js for a publisher of this type and found none, so it
+  // needs no SHARED_WITH_GAMEPLAY entry - and the harness greps the gameplay checkout to keep that honest.
+  emoteWheel: "dbo_emotes",
 };
 
 // Registered types that the GAMEPLAY layer also publishes under the same name. contextMenu is a generic list
