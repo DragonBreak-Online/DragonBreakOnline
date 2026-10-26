@@ -30,6 +30,17 @@ if (mod) {
   check('a short loss of the cursor that comes back is forgiven', blink.out === 'keep', blink);
   check('the key opens a closed wheel', wheelKeyAction(false) === 'open');
   check('the key closes an open wheel (it was ignored)', wheelKeyAction(true) === 'close');
+  // Hold and flick (Nat, 26 Oct: "a custom emote wheel"): the key held past HOLD_MS and let go plays the pointed emote
+  const { wheelReleaseAction, HOLD_MS, WHEEL_RELEASE_EVENT } = mod;
+  check('a release after a hold commits the pointed emote', wheelReleaseAction(true, 1000, 1000 + HOLD_MS) === 'commit');
+  check('...a tap (released sooner) leaves the wheel open for clicks', wheelReleaseAction(true, 1000, 1000 + HOLD_MS - 1) === 'keep');
+  check('...a release with the wheel already closed does nothing', wheelReleaseAction(false, 1000, 9000) === 'keep');
+  check('...nor one whose press did not open the wheel (heldFrom 0)', wheelReleaseAction(true, 0, 9000) === 'keep');
+  const front = path.join(__dirname, '..', '..', 'skymp5-front', 'src', 'features', 'emoteWheel');
+  const geo = fs.readFileSync(path.join(front, 'wheelGeometry.ts'), 'utf8');
+  const wheel = fs.readFileSync(path.join(front, 'index.tsx'), 'utf8');
+  check('the front listens for the same release event', wheel.includes(`RELEASE_EVENT = '${WHEEL_RELEASE_EVENT}'`), WHEEL_RELEASE_EVENT);
+  check('the front and the client agree on HOLD_MS', geo.includes(`export const HOLD_MS = ${HOLD_MS};`), HOLD_MS);
 }
 
 // emoteService.ts uses both
@@ -37,6 +48,8 @@ const svc = fs.readFileSync(path.join(__dirname, '..', 'src/services/services/em
 check('emoteService no longer ignores its key while the wheel is open', !/code !== this\.menuKey \|\| !e\.isDown \|\| this\.menuOpen/.test(svc));
 check('emoteService closes on its key through wheelKeyAction', /wheelKeyAction\(this\.menuOpen\) === "close"/.test(svc));
 check('emoteService watches the open wheel every update', /controller\.on\("update", \(\) => this\.watchWheel\(\)\)/.test(svc) && /wheelWatch\(\{/.test(svc));
+check('emoteService sends the release on its key\'s up, through wheelReleaseAction', /code === this\.menuKey && e\.isUp/.test(svc) && /wheelReleaseAction\(this\.menuOpen, heldFrom, Date\.now\(\)\) !== "commit"/.test(svc) && /dispatchEvent\(new CustomEvent\(\$\{JSON\.stringify\(WHEEL_RELEASE_EVENT\)\}\)\)/.test(svc));
+check('the hold is timed from the key press that opened the wheel, and cleared on close', /this\.openMenu\(\);\n    this\.heldFrom = Date\.now\(\);/.test(svc) && /this\.heldFrom = 0;\n    closeFormMenu/.test(svc));
 check('the wheel says how long it was open and what closed it', /wheel closed after \$\{Date\.now\(\) - this\.openedAt\} ms by/.test(svc));
 
 console.log(failures ? `${failures} FAILED` : 'all passed');
