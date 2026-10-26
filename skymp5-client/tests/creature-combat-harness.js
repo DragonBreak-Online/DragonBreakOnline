@@ -32,25 +32,33 @@ check('HAGRAVEN_RACE is the id read out of the plugin (000131FB)', HAGRAVEN_RACE
 check('she is the only form with attacks in this test client',
   CREATURE_ATTACKS.size === 1 && !!CREATURE_ATTACKS.get(HAGRAVEN_RACE));
 
-const p = planFor(HAGRAVEN_RACE, 'weaponDraw');
-check('her draw becomes her own right-hand attack event', () => p && p.kind === 'attack' && p.to === 'attackStart_R', p);
-check('the event name is matched case-insensitively (the engine emits "weaponDraw")',
-  () => { const q = planFor(HAGRAVEN_RACE, 'WEAPONDRAW'); return q && q.kind === 'attack' && q.to === 'attackStart_R'; });
+// WeapEquip is the MEASURED name: the 26 Oct session recorded "WeapEquip 3/0 WeapUnEquip 2/0" and
+// "attack/cast: NONE EMITTED", while the crash log's "weaponDraw" never fired at all. That is why the first
+// build reported "nothing intercepted", so the measured name is the one that must work.
+const p = planFor(HAGRAVEN_RACE, 'WeapEquip');
+check('the MEASURED draw event becomes her own right-hand attack', () => p && p.kind === 'attack' && p.to === 'attackStart_R', p);
+check('the measured sheathe event is intercepted and blanked',
+  () => { const q = planFor(HAGRAVEN_RACE, 'WeapUnEquip'); return q && q.kind === 'blank-draw' && q.to === ''; },
+  planFor(HAGRAVEN_RACE, 'WeapUnEquip'));
+check('the crash-log name is still handled, since it costs nothing',
+  () => { const q = planFor(HAGRAVEN_RACE, 'weaponDraw'); return q && q.kind === 'attack' && q.to === 'attackStart_R'; });
+check('event names are matched case-insensitively',
+  () => { const q = planFor(HAGRAVEN_RACE, 'WEAPEQUIP'); return q && q.kind === 'attack'; });
 
 // Sheathe must be intercepted (it runs the humanoid unequip clip) but must never swing a claw.
-const sh = planFor(HAGRAVEN_RACE, 'weaponSheathe');
+const sh = planFor(HAGRAVEN_RACE, 'weapUnEquip');
 check('her sheathe is intercepted', () => sh !== null, sh);
 check('...and is BLANKED, never rewritten to an attack', () => sh.to === '' && sh.kind === 'blank-draw', sh);
 
 // ---- 2. every other creature body: the guard without the claws ----------------------------------------------------
 [['a chicken', CHICKEN], ['a fox', FOX]].forEach(([name, id]) => {
-  const d = planFor(id, 'weaponDraw');
+  const d = planFor(id, 'WeapEquip');
   check(`${name} draw is blanked, not translated`, () => d && d.kind === 'blank-draw' && d.to === '', d);
-  const s = planFor(id, 'weaponSheathe');
+  const s = planFor(id, 'WeapUnEquip');
   check(`${name} sheathe is blanked too`, () => s && s.to === '', s);
 });
 check('a race id that arrived signed does not throw or match the Hagraven by accident',
-  () => { const d = planFor(-1, 'weaponDraw'); return d && d.kind === 'blank-draw'; });
+  () => { const d = planFor(-1, 'WeapEquip'); return d && d.kind === 'blank-draw'; });
 
 // ---- 3. furniture, which is the same crash class waiting to happen ------------------------------------------------
 ['IdleChairFrontEnter', 'IdleBlacksmithForgeEnter', 'IdleSitCrossLeggedEnter', 'IdleBedRollEnterStart',
@@ -74,16 +82,16 @@ check('a blank or missing event name is never rewritten',
 // ---- 5. the log: what the one dev session has to answer ----------------------------------------------------------
 const log = new GuardLog();
 check('nothing intercepted yet reads as such', log.summary('131fb').indexOf('nothing intercepted') >= 0, log.summary('131fb'));
-const t1 = log.record(p, 'weaponDraw');
-const t1again = log.record(p, 'weaponDraw');
+const t1 = log.record(p, 'WeapEquip');
+const t1again = log.record(p, 'WeapEquip');
 check('the same rewrite tallies into one entry', () => t1 === t1again && t1.seen === 2 && log.count === 1, t1);
-const t2 = log.record(sh, 'weaponSheathe');
+const t2 = log.record(sh, 'WeapUnEquip');
 check('a different source event is its own entry', () => t2 !== t1 && log.count === 2);
 t1.ok += 1; t1.failed += 1; t1.hits += 1;
 const line = log.summary('131fb');
 check('the summary is one line', line.indexOf('\n') < 0, line);
 check('...and carries the two answers: did the graph take it, did a hit follow',
-  () => /attack "weaponDraw"->"attackStart_R" seen 2 graph 1\/1 hits 1/.test(line), line);
+  () => /attack "WeapEquip"->"attackStart_R" seen 2 graph 1\/1 hits 1/.test(line), line);
 check('...naming the body it came from', line.indexOf('131fb:') === 0, line);
 check('a blank rewrite prints readably rather than as nothing', line.indexOf('->"(blank)"') >= 0, line);
 

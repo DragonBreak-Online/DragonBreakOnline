@@ -29,11 +29,16 @@ export const CREATURE_ATTACKS: ReadonlyMap<number, AttackEvents> = new Map([
   [HAGRAVEN_RACE, { left: "attackStart_L", right: "attackStart_R" }],
 ]);
 
-// The event from the crash log. Compared lowercased.
-const DRAW_EVENT = "weapondraw";
-// Its counterpart runs the humanoid unequip clip, so it must be intercepted too - but it is NEVER rewritten to an
-// attack: putting a weapon away should not swing a claw.
-const SHEATHE_EVENT = "weaponsheathe";
+// MEASURED, not taken from the crash log. The 26 Oct 02:00Z session proved the crash-log string was wrong:
+// the probe recorded "attack/cast: NONE EMITTED | other: WeapEquip 3/0 WeapUnEquip 2/0 ...", so a draw press in
+// a creature body emits WeapEquip, and the graph accepts it. "weaponDraw" at RSP+2F8 in the crash log was the
+// engine handler's own constant, not the event SendAnimationEventHook sees, so the first guard matched nothing
+// and reported "nothing intercepted". The crash-log names are kept because they cost nothing and may yet appear
+// on another input path. All compared lowercased.
+const DRAW_EVENTS = ["weapequip", "weapondraw"];
+// Their counterparts run the humanoid unequip clip, so they must be intercepted too - but are NEVER rewritten to
+// an attack: putting a weapon away should not swing a claw.
+const SHEATHE_EVENTS = ["weapunequip", "weaponsheathe"];
 
 // Furniture and crafting entry, which is the SAME mismatch waiting to happen: IdleBlacksmithForgeEnter and friends
 // are humanoid furniture animations. Deliberately the same vocabulary beastform.js already uses for its "seated"
@@ -60,16 +65,18 @@ export const planFor = (raceId: number, eventName: string): GuardPlan | null => 
   if (!name) return null;
   const lower = name.toLowerCase();
 
-  if (lower === SHEATHE_EVENT) {
+  if (SHEATHE_EVENTS.indexOf(lower) >= 0) {
     return { to: "", kind: "blank-draw", why: "the humanoid unequip clip, blanked (never an attack)" };
   }
 
-  if (lower === DRAW_EVENT) {
+  if (DRAW_EVENTS.indexOf(lower) >= 0) {
     const attacks = CREATURE_ATTACKS.get(Number(raceId) >>> 0);
     if (attacks) {
       // The test conflates a draw with an attack ON PURPOSE: it answers both open questions in one press -
       // whether rewriting stops RightHandWeaponDrawHandler, and whether her own event produces a hit. The
       // shipped version should map the real attack input, once the probe says which event that is.
+      // WeapEquip names no hand, so this is the right claw unless a left-handed event turns up. The probe
+      // will say if one ever does; guessing a hand from an event that has none would be inventing data.
       const to = isLeft(lower) ? attacks.left : attacks.right;
       return { to, kind: "attack", why: "draw rewritten to the form's own attack event" };
     }
