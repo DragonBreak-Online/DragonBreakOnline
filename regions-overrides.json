@@ -127,6 +127,13 @@
     "UDLC01_CONJ_StaffConjureWispmother": ["skyrim"]
   },
   "recipes": {
+    "_telvanniGuardGear": "House Telvanni's guard gear (Journey to Baan Malur pieces, DragonBreak Nexus Patches recipes 849-84e, faction gear house-telvanni): regions.json sells its recipes in Solstheim only (culture morrowind), but House Telvanni has been seated at Golden Glow Estate by Riften since 25 Oct (Nat), so its smiths in Skyrim could not make their own gear. Made in Solstheim and Skyrim now; still gated to House Telvanni by faction gear (the Leader for Nat, 26 Oct: fix gear discrepancies).",
+    "849:dragonbreak nexus patches.esp": ["solstheim", "skyrim"],
+    "84a:dragonbreak nexus patches.esp": ["solstheim", "skyrim"],
+    "84b:dragonbreak nexus patches.esp": ["solstheim", "skyrim"],
+    "84c:dragonbreak nexus patches.esp": ["solstheim", "skyrim"],
+    "84d:dragonbreak nexus patches.esp": ["solstheim", "skyrim"],
+    "84e:dragonbreak nexus patches.esp": ["solstheim", "skyrim"],
     "_greatHouseCapes": "The Great House capes (DLE 1D2266-1D226E, tanning rack; the Leader, 26 Oct, on Worker 2's proposal): the seven house capes are made anywhere, gated only by faction gear to their own house's tailors (Telvanni's hall, Golden Glow Estate, is in the Riften zone, so a Solstheim lock would stop its own Clothier); Dagoth and the New Temple, which no faction holds, stay Morrowind's, Solstheim. By recipe desc, so the rule holds before and after regions.json is regenerated.",
     "1d226f:dragonbreak online edits.esp": "common",
     "1d2277:dragonbreak online edits.esp": "common",
