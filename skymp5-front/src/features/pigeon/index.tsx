@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import './styles.scss';
 import Courier, { CourierData, CourierHint } from './courier';
@@ -144,6 +144,9 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
   // Sign as: another's name for the next letter (/sign; a Scholar's forgery), or '' for none typed yet
   const [signAs, setSignAs] = useState('');
   const [busy, setBusy] = useState(false);
+  // Set by our own Send: only its answer clears the letter. A signature's answer is 'sent' too, and once cleared the
+  // text, gold and goods typed in the composer (Worker 1's review, 26 Oct)
+  const letterSent = useRef(false);
   const letters = data.letters || [];
   const waitingCount = letters.filter((l) => !l.read || l.parcel).length;
   const [view, setView] = useState<'letters' | 'send' | 'supply' | 'courier'>(handoff || data.view || 'send');
@@ -169,7 +172,8 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
   // A fresh window from the server (a new nonce) ends the wait; a sent pigeon clears the letter and the parcel
   useEffect(() => {
     setBusy(false);
-    if (data.resultKind === 'sent' && (data.view || 'send') === 'send') { setText(''); setGold(''); setPacked({}); }
+    if (data.resultKind === 'sent' && (data.view || 'send') === 'send' && letterSent.current) { setText(''); setGold(''); setPacked({}); }
+    letterSent.current = false;
     if (data.resultKind === 'sent' && data.view === 'supply') { setHandCount(''); if (pick && !(supply && supply.results.length)) { setPick(null); setOrderCount(''); setOrderReward(''); } }
     if (data.view) setView(data.view);
     if (letterId !== null && !letters.some((l) => l.id === letterId)) setLetterId(null);
@@ -213,6 +217,7 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
   const submit = () => {
     if (!canSend || !chosen) return;
     setBusy(true);
+    letterSent.current = true;
     send('dbo:pigeonSend', data.nonce, chosen.id, trimmed, goldSent, JSON.stringify(packedList));
   };
 

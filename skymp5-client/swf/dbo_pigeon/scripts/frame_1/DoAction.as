@@ -22,6 +22,7 @@ var PER_PAGE = 8;
 var C_RED = 0xB23A3A;
 var C_GREEN = 0x8FBF7F;
 var NO_DATA_CLOSE_MS = 8000;
+var BUSY_MS = 8000;
 
 var panel;
 var data = null;
@@ -35,6 +36,8 @@ var jobId = null;
 var handCount = -1;
 var asked = "";
 var busy = false;
+var busyAt = 0;
+var pageCount = 1;
 var builtAt = getTimer();
 
 function num(v, fallback)
@@ -111,9 +114,12 @@ function act(key, args)
       return;
    }
    busy = true;
+   busyAt = getTimer();
    asked = "";
    dboSound("UIMenuOK");
    dboSend(key, [nonce].concat(args));
+   // greyed until the answer, so a click that would do nothing looks it
+   draw();
 }
 
 function compose(mode, to)
@@ -123,8 +129,10 @@ function compose(mode, to)
       return;
    }
    busy = true;
+   busyAt = getTimer();
    dboSound("UIMenuOK");
    dboSend("dbo:pigeonCompose", [nonce, mode, to]);
+   draw();
 }
 
 function closeCoop()
@@ -153,6 +161,18 @@ function confirmLabel(key, args, label, ask)
    return asked == key + ":" + args.join(",") ? ask : label;
 }
 
+function turnPage(d)
+{
+   var to = Math.max(0, Math.min(pageCount - 1, page + d));
+   if (to == page)
+   {
+      return;
+   }
+   dboSound("UIMenuPrevNext");
+   page = to;
+   draw();
+}
+
 function setView(v)
 {
    if (v == view)
@@ -177,7 +197,7 @@ function txt(parent, name, depth, x, y, w, h, size, color, text, multi, font)
 
 function act2(parent, name, depth, x, y, w, label, onPick, color, off)
 {
-   var b = button(parent, name, depth, x, y, w, label, F_MEDIUM, 20, A_BUTTON_REST, onPick);
+   var b = button(parent, name, depth, x, y, w, label, F_MEDIUM, 22, A_BUTTON_REST, onPick);
    if (color != undefined)
    {
       b.label.textColor = color;
@@ -192,8 +212,8 @@ function act2(parent, name, depth, x, y, w, label, onPick, color, off)
 // A list row: the label, a grey line under it, bright when chosen
 function listRow(parent, i, label, sub, on, onPick, mark)
 {
-   var b = button(parent, "r" + i, 10 + i, PAD, TOP + i * ROW_H, LIST_W, (mark ? String.fromCharCode(8226) + " " : "") + label, F_MEDIUM, 20, on ? A_FOCUS : A_ROW_REST, onPick);
-   var s = dboText(b, "sub", 2, 0, 24, LIST_W, 20, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8), false);
+   var b = button(parent, "r" + i, 10 + i, PAD, TOP + i * ROW_H, LIST_W, (mark ? String.fromCharCode(8226) + " " : "") + label, F_MEDIUM, 22, on ? A_FOCUS : A_ROW_REST, onPick);
+   var s = dboText(b, "sub", 2, 0, 26, LIST_W, 20, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8), false);
    s.text = String(sub);
    if (on)
    {
@@ -252,9 +272,28 @@ function drawList(rows, empty)
          b.key = r[6];
       }
    }
+   pageCount = pages.length;
    if (pages.length > 1)
    {
-      txt(l, "more", 60, PAD, TOP + PER_PAGE * ROW_H + 4, LIST_W, 22, 16, C_SECOND, "Page " + (page + 1) + " of " + pages.length + " (Page Up / Page Down)");
+      var y = TOP + PER_PAGE * ROW_H + 4;
+      var pt = dboText(l, "more", 60, PAD + 130, y + 6, LIST_W - 260, 22, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8, "center"), false);
+      pt.text = "Page " + (page + 1) + " of " + pages.length;
+      var pv = button(l, "prev", 61, PAD, y, 120, "Previous", F_MEDIUM, 22, A_BUTTON_REST, function()
+      {
+         turnPage(-1);
+      });
+      var nx = button(l, "next", 62, PAD + LIST_W - 120, y, 120, "Next", F_MEDIUM, 22, A_BUTTON_REST, function()
+      {
+         turnPage(1);
+      });
+      if (page == 0)
+      {
+         disable(pv);
+      }
+      if (page >= pages.length - 1)
+      {
+         disable(nx);
+      }
    }
 }
 
@@ -311,7 +350,7 @@ function drawLetters(r)
       return;
    }
    txt(r, "head", 1, RIGHT_X, TOP, RIGHT_W, 26, 16, C_SECOND, "From " + l.from + ", " + whenText(l.at));
-   var body = txt(r, "body", 2, RIGHT_X, TOP + 30, RIGHT_W, 250, 20, C_TEXT, l.text, true);
+   var body = txt(r, "body", 2, RIGHT_X, TOP + 30, RIGHT_W, 250, 22, C_TEXT, l.text, true);
    var y = TOP + 290;
    var hasParcel = l.parcel != undefined && l.parcel != null;
    if (hasParcel)
@@ -372,7 +411,7 @@ function drawSend(r)
    var waiting = num(data.cooldownMinutes, 0) > 0;
    if (chosen != null)
    {
-      txt(r, "who", 1, RIGHT_X, TOP, RIGHT_W, 30, 20, C_TEXT, "A letter for " + chosen.name);
+      txt(r, "who", 1, RIGHT_X, TOP, RIGHT_W, 30, 22, C_TEXT, "A letter for " + chosen.name);
    }
    txt(r, "how", 2, RIGHT_X, TOP + 36, RIGHT_W, 70, 16, C_SECOND, "A letter is written in the coop's window: what it says, how it is signed, and any gold or goods it carries.", true);
    var label = waiting ? "Pigeon is out" : chosen == null ? "Choose someone" : "Write to " + chosen.name + "...";
@@ -389,7 +428,11 @@ function drawSend(r)
    {
       act("dbo:pigeonSign", ["unsigned"]);
    });
-   txt(r, "signHint", 4, RIGHT_X, TOP + 206, RIGHT_W, 40, 16, C_SECOND, "Another name is written with the letter.", true);
+   act2(r, "signOther", 13, RIGHT_X + 120, TOP + 204, 420, "Another name...", function()
+   {
+      compose("send", selectedId == null ? 0 : selectedId);
+   });
+   txt(r, "signHint", 4, RIGHT_X, TOP + 248, RIGHT_W, 40, 16, C_SECOND, "Another name is typed in the coop's window, even while your pigeon is out.", true);
 }
 
 function supplyOrders()
@@ -468,7 +511,7 @@ function drawSupply(r)
    var o = chosenOrder();
    if (o == null)
    {
-      txt(r, "head", 1, RIGHT_X, TOP, RIGHT_W, 30, 20, C_TEXT, "Post a supply order");
+      txt(r, "head", 1, RIGHT_X, TOP, RIGHT_W, 30, 22, C_TEXT, "Post a supply order");
       txt(r, "how", 2, RIGHT_X, TOP + 36, RIGHT_W, 70, 16, C_SECOND, "Post an order and the board holds your reward. You are sent the goods; whoever brings them is paid.", true);
       act2(r, "post", 10, RIGHT_X, TOP + 110, RIGHT_W, "Post an order...", function()
       {
@@ -477,7 +520,7 @@ function drawSupply(r)
       txt(r, "rules", 3, RIGHT_X, TOP + 156, RIGHT_W, 40, 16, C_SECOND, "Up to " + s.maxCount + "; open " + s.openDays + " days; " + Math.round(num(s.feeShare, 0) * 100) + "% to post, at least " + s.minFee + ".", true);
       return;
    }
-   txt(r, "head", 1, RIGHT_X, TOP, RIGHT_W, 30, 20, C_TEXT, o.count + " " + o.name + ", " + o.filled + " brought");
+   txt(r, "head", 1, RIGHT_X, TOP, RIGHT_W, 30, 22, C_TEXT, o.count + " " + o.name + ", " + o.filled + " brought");
    txt(r, "note", 2, RIGHT_X, TOP + 36, RIGHT_W, 70, 16, C_SECOND, o.reward + " gold for the lot, " + o.perUnit + " each. " + o.held + " gold still held. Posted by " + o.poster + " at " + o.zone + ".", true);
    if (o.mine == true)
    {
@@ -589,6 +632,10 @@ function drawCourier(r)
    if (c.rank != undefined && c.rank != null)
    {
       rows.push(["h", c.rank.name + " courier " + String.fromCharCode(183) + " " + c.rank.delivered + " " + (c.rank.delivered == 1 ? "delivery" : "deliveries") + (c.rank.next != undefined && c.rank.next != null ? " " + String.fromCharCode(183) + " " + c.rank.next.name + " at " + c.rank.next.at : "")]);
+      if (c.rank.line != undefined && c.rank.line != null && c.rank.line != "")
+      {
+         rows.push(["h", String(c.rank.line)]);
+      }
    }
    var carrying = listOf(c.carrying);
    if (carrying.length)
@@ -632,7 +679,7 @@ function drawCourier(r)
          txt(r, "off", 1, RIGHT_X, TOP + 10, RIGHT_W, 40, 16, C_SECOND, "No courier takes work here yet.", true);
          return;
       }
-      txt(r, "head", 1, RIGHT_X, TOP, RIGHT_W, 30, 20, C_TEXT, "Send goods by courier");
+      txt(r, "head", 1, RIGHT_X, TOP, RIGHT_W, 30, 22, C_TEXT, "Send goods by courier");
       var days = num(c.rules.limitGameDays, 1);
       txt(r, "how", 2, RIGHT_X, TOP + 36, RIGHT_W, 70, 16, C_SECOND, Math.round(num(c.rules.feeShare, 0) * 100) + "% of the pay to post (at least " + c.rules.minFee + "); insurance " + Math.round(num(c.rules.premiumRate, 0) * 100) + "% of the value, paid by " + (c.place != undefined && c.place != "" ? c.place : "the hold") + " if it is robbed. Up to " + c.rules.maxStacks + " kinds; the courier has " + days + " " + (days == 1 ? "day" : "days") + ".", true);
       act2(r, "post", 10, RIGHT_X, TOP + 120, RIGHT_W, "Send a parcel by courier...", function()
@@ -642,8 +689,8 @@ function drawCourier(r)
       return;
    }
    var days2 = num(c.rules.limitGameDays, 1);
-   txt(r, "head", 1, RIGHT_X, TOP, RIGHT_W, 30, 20, C_TEXT, "For " + j.dest + ", " + j.pay + " gold");
-   txt(r, "goods", 2, RIGHT_X, TOP + 36, RIGHT_W, 50, 20, C_TEXT, j.state == "robbed" && j.mine != true ? "A broken parcel. Open it to see what is inside." : j.goods, true);
+   txt(r, "head", 1, RIGHT_X, TOP, RIGHT_W, 30, 22, C_TEXT, "For " + j.dest + ", " + j.pay + " gold");
+   txt(r, "goods", 2, RIGHT_X, TOP + 36, RIGHT_W, 50, 22, C_TEXT, j.state == "robbed" && j.mine != true ? "A broken parcel. Open it to see what is inside." : j.goods, true);
    txt(r, "from", 3, RIGHT_X, TOP + 90, RIGHT_W, 60, 16, C_SECOND, "From " + j.sender + " to " + j.recipient + ", posted at " + j.origin + ". " + stateText(j.state) + (num(j.insured, 0) > 0 ? ", insured for " + j.insured + " gold" : "") + "." + (j.state == "carried" && j.mine != true ? " " + jobLeft(j) + " (" + Math.round(num(j.hoursLeft, 0)) + " real hours)." : ""), true);
    var y = TOP + 160;
    if (j.state == "open" && j.mine != true)
@@ -708,8 +755,8 @@ function drawTabs()
    var x = PAD;
    for (var i = 0; i < tabs.length; i++)
    {
-      var w = Math.max(150, tabs[i][1].length * 11 + 30);
-      var b = button(h, "t" + i, 10 + i, x, 66, w, tabs[i][1], F_MEDIUM, 20, tabs[i][0] == shown() ? A_FOCUS : A_ROW_REST, function()
+      var w = Math.max(150, tabs[i][1].length * 12 + 30);
+      var b = button(h, "t" + i, 10 + i, x, 66, w, tabs[i][1], F_MEDIUM, 22, tabs[i][0] == shown() ? A_FOCUS : A_ROW_REST, function()
       {
          setView(this.v);
       });
@@ -779,7 +826,7 @@ function draw()
    var f = clear("foot", 60);
    dboRule(f, PAD, PANEL_H - 62, PANEL_W - PAD * 2);
    txt(f, "hint", 1, PAD, PANEL_H - 50, PANEL_W - PAD * 2 - 160, 40, 16, C_SECOND, hintText(), true);
-   button(f, "close", 2, PANEL_W - PAD - 130, PANEL_H - 50, 130, "Close", F_MEDIUM, 20, A_BUTTON_REST, function()
+   button(f, "close", 2, PANEL_W - PAD - 130, PANEL_H - 50, 130, "Close", F_MEDIUM, 22, A_BUTTON_REST, function()
    {
       closeCoop();
    });
@@ -862,20 +909,6 @@ _root.dboData = function(json)
    draw();
 };
 
-function listLength()
-{
-   var s = shown();
-   if (s == "letters")
-   {
-      return letters().length;
-   }
-   if (s == "send")
-   {
-      return contacts().length;
-   }
-   return 1000;
-}
-
 var keys = {};
 keys.onKeyDown = function()
 {
@@ -935,21 +968,29 @@ keys.onKeyDown = function()
       }
       setView(order[(at + (code == 39 ? 1 : order.length - 1)) % order.length]);
    }
-   else if (code == 33 && page > 0)
+   else if (code == 33)
    {
-      dboSound("UIMenuPrevNext");
-      page--;
-      draw();
+      turnPage(-1);
    }
    else if (code == 34)
    {
-      dboSound("UIMenuPrevNext");
-      page++;
-      draw();
+      turnPage(1);
    }
 };
 Key.addListener(keys);
 
+var wheel = {};
+wheel.onMouseWheel = function(delta)
+{
+   if (data != null)
+   {
+      turnPage(delta > 0 ? -1 : 1);
+   }
+};
+Mouse.addListener(wheel);
+
+// Some answers are only a line in chat and no redraw (no board in reach, a letter already gone, a stale nonce): the
+// wait lapses rather than leave every button grey
 _root.onEnterFrame = function()
 {
    if (data == null && getTimer() - builtAt >= NO_DATA_CLOSE_MS)
@@ -957,6 +998,12 @@ _root.onEnterFrame = function()
       dboLog("pigeon: no payload in " + NO_DATA_CLOSE_MS + " ms, closing");
       delete _root.onEnterFrame;
       dboClose();
+      return;
+   }
+   if (busy && getTimer() - busyAt >= BUSY_MS)
+   {
+      busy = false;
+      draw();
    }
 };
 

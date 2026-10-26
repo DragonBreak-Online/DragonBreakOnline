@@ -74,6 +74,8 @@ export const render = (data) => renderToStaticMarkup(React.createElement(Pigeon,
   const src = fs.readFileSync(SRC, 'utf8');
   ok(/onClick=\{\(\) => send\('dbo:pigeonCompose', data\.nonce, ''\)\}>Cancel/.test(src), 'Cancel sends dbo:pigeonCompose with no mode, which brings the native coop back');
 
+  ok(/if \(data\.resultKind === 'sent' && \(data\.view \|\| 'send'\) === 'send' && letterSent\.current\) \{ setText\(''\); setGold\(''\); setPacked\(\{\}\); \}/.test(src) && /letterSent\.current = true;\s*send\('dbo:pigeonSend'/.test(src),
+    'only the answer to our own Send clears the letter: a signature (also "sent") keeps the text, gold and goods');
   fs.rmSync(TMP, { recursive: true, force: true });
   console.log(fails ? `\n${fails} failed` : '\nall passed');
   process.exit(fails ? 1 : 0);

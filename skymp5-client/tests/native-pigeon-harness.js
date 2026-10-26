@@ -21,7 +21,7 @@ const coop = (extra) => Object.assign({
     mine: [{ id: 9, name: 'Wheat', count: 10, filled: 0, reward: 30, perUnit: 3, held: 30, poster: 'You', hoursLeft: 50, zone: 'Bruma', state: 'open', mine: true, have: 0 }] },
   courier: { enabled: true, place: 'Bruma', placeId: 'bruma', destinations: [], goods: [],
     rules: { feeShare: 0.1, minFee: 5, premiumRate: 0.05, maxStacks: 3, minPay: 10, maxPay: 1000, limitGameDays: 3, openDays: 3, maxCarried: 2, maxOpen: 3, maxPayoutsPerWeek: 5 },
-    rank: { name: 'Novice', delivered: 1, carry: 1, maxValue: 100, boards: true, line: '', next: { name: 'Runner', at: 5 } },
+    rank: { name: 'Novice', delivered: 1, carry: 1, maxValue: 100, boards: true, line: 'Bring five parcels to become a Runner.', next: { name: 'Runner', at: 5 } },
     open: [{ id: 3, goods: '2 Iron Ingot', kinds: 1, pay: 40, dest: 'Whiterun', kind: 'board', origin: 'Bruma', sender: 'Ann', recipient: 'Ann', insured: 0, state: 'open', hoursLeft: 20, gameHoursLeft: 0, mine: false }],
     carrying: [{ id: 4, goods: '1 Silver Ingot', kinds: 1, pay: 60, dest: 'Bruma', kind: 'board', origin: 'Chorrol', sender: 'Dee', recipient: 'Dee', insured: 30, state: 'carried', hoursLeft: 30, gameHoursLeft: 30, mine: false, here: true }],
     broken: [{ id: 5, goods: '?', kinds: 1, pay: 10, dest: 'Skingrad', kind: 'board', origin: 'Bruma', sender: 'Eli', recipient: 'Eli', insured: 0, state: 'robbed', hoursLeft: 0, gameHoursLeft: 0, mine: false }],
@@ -60,6 +60,9 @@ const R = (t) => P(t).right;
   check('opening a read letter tells the server nothing', msgs(t, 'dbo:pigeonRead').length === 1);
   check('a letter with a parcel: what comes with it, and Collect', R(t).parcel.text === 'With it: 20 gold, 2 Iron Ingot' && R(t).collect.label.text === 'Collect the parcel' && !R(t).burn);
   R(t).collect.onRelease();
+  check('an action greys the panel until the answer', R(t).ignore.disabled === true);
+  R(t).ignore.onPick();
+  check('even a direct call of a greyed action sends nothing while it waits', !msgs(t, 'dbo:pigeonBlockLetter').length);
   check('Collect sends pigeonCollect with the letter', msgs(t, 'dbo:pigeonCollect').length === 1 && msgs(t, 'dbo:pigeonCollect')[0].args.join('|') === 'n2|l2');
   t.push(coop({ nonce: 'n3', result: 'Your pigeon will not carry that.', resultKind: 'refused' }));
   R(t).ignore && R(t).ignore.onRelease();
@@ -75,6 +78,16 @@ const R = (t) => P(t).right;
   check('choosing Eve: the letter is for her', R(t).who.text === 'A letter for Eve' && R(t).write.label.text === 'Write to Eve...' && rows(t)[1]._alpha === 100);
   R(t).write.onRelease();
   check('Write to Eve... hands the letter to the browser coop with her id', msgs(t, 'dbo:pigeonCompose').length === 1 && msgs(t, 'dbo:pigeonCompose')[0].args.join('|') === 'n1|send|12');
+  R(t).write.onRelease();
+  R(t).write.onPick();
+  check('a second press while the server answers sends nothing more, nor a direct call', msgs(t, 'dbo:pigeonCompose').length === 1);
+  check('and every button greys while it waits', R(t).write.disabled === true && R(t).signNone.disabled === true);
+  t.st.time += 7000; t.tick();
+  check('7 s with no answer: still waiting', R(t).write.disabled === true);
+  t.st.time += 1500; t.tick();
+  check('8 s with no answer (only a line in chat, no redraw): the wait lapses and the buttons come back', R(t).write.disabled !== true && R(t).signNone.disabled !== true);
+  R(t).write.onRelease();
+  check('and they work again', msgs(t, 'dbo:pigeonCompose').length === 2);
   const u = S.boot(MENU);
   u.push(coop({ view: 'send' }));
   u.root.dboPanel.right.signNone.onRelease();
@@ -84,9 +97,14 @@ const R = (t) => P(t).right;
   check('Your name sends pigeonSign clear', msgs(u, 'dbo:pigeonSign').pop().args.join('|') === 'n2|clear');
   const w = S.boot(MENU);
   w.push(coop({ view: 'send', cooldownMinutes: 12 }));
+  check('rows are drawn at 22, as STYLE asks for a list row', P(w).list.r0.label.fmt.size === 22);
+  P(w).right.signOther.onRelease();
+  check('Another name... opens the letter composer even while the pigeon is out, as the browser allows', msgs(w, 'dbo:pigeonCompose').length === 1 && msgs(w, 'dbo:pigeonCompose')[0].args.join('|') === 'n1|send|11');
+  w.push(coop({ view: 'send', cooldownMinutes: 12, nonce: 'n2' }));
   check('a pigeon still out: greyed, says so, and the footer gives the minutes', P(w).right.write.label.text === 'Pigeon is out' && P(w).right.write.disabled === true && P(w).foot.hint.text === 'Your pigeon is still out. The next one can fly in 12 min.');
+  const before = msgs(w, 'dbo:pigeonCompose').length;
   P(w).right.write.onRelease();
-  check('and sends nothing', !msgs(w, 'dbo:pigeonCompose').length);
+  check('and sends nothing', msgs(w, 'dbo:pigeonCompose').length === before);
   const x = S.boot(MENU);
   x.push(coop({ view: 'send', contacts: [] }));
   check('no contacts: the browser\'s words, and nobody to write to', /only knows the way to people you have met/.test(P(x).list.empty.text) && P(x).right.write.label.text === 'Choose someone' && P(x).right.write.disabled === true);
@@ -130,7 +148,7 @@ const R = (t) => P(t).right;
 {
   const t = S.boot(MENU);
   t.push(coop({ view: 'courier' }));
-  check('couriers: the rank, what you carry, the broken, the wanted and yours', heads(t)[0] === 'Novice courier · 1 delivery · Runner at 5' && heads(t)[1] === 'You carry (1 of 2)' && heads(t)[2] === 'Broken parcels' && heads(t)[3] === 'Wanted at Bruma', heads(t));
+  check('couriers: the rank and its line, what you carry, the broken, the wanted', heads(t)[0] === 'Novice courier \u00b7 1 delivery \u00b7 Runner at 5' && heads(t)[1] === 'Bring five parcels to become a Runner.' && heads(t)[2] === 'You carry (1 of 2)' && heads(t)[3] === 'Broken parcels' && heads(t)[4] === 'Wanted at Bruma', heads(t));
   check('the jobs by pay and destination, with their state', rows(t)[0].label.text === '60 gold · Bruma' && rows(t)[0].sub.text === '1 d 6 h left · insured · deliver here' && rows(t)[1].sub.text === 'Robbed' && rows(t)[2].sub.text === '20 h on the board', rows(t).map((r) => r.sub.text));
   rows(t)[0].onRelease();
   check('a parcel for here: Deliver it here', R(t).deliver.label.text === 'Deliver it here');
@@ -158,6 +176,12 @@ const R = (t) => P(t).right;
   check('your posted job: taking it down asks first', !msgs(w, 'dbo:courierCancel').length && R(w).cancel.label.text === 'Take it down for good?');
   R(w).cancel.onRelease();
   check('then sends courierCancel', msgs(w, 'dbo:courierCancel').pop().args.join('|') === 'n1|6');
+  // without the rank line the Your parcels heading would be the eighth line of page 1: it goes over with its row
+  const z = S.boot(MENU);
+  z.push(coop({ view: 'courier', courier: Object.assign({}, coop().courier, { rank: Object.assign({}, coop().courier.rank, { line: '' }) }) }));
+  check('a heading never ends a page: page 1 stops before Your parcels', heads(z).indexOf('Your parcels') < 0 && rows(z).length === 3, heads(z));
+  P(z).list.next.onRelease();
+  check('page 2 opens with the heading and its row', heads(z)[0] === 'Your parcels' && rows(z)[0].label.text === '25 gold · Cheydinhal', heads(z).concat(rows(z).map((r) => r.label.text)));
   const x = S.boot(MENU);
   x.push(coop({ view: 'courier' }));
   check('nothing chosen: send a parcel (in the browser)', R(x).post.label.text === 'Send a parcel by courier...');
@@ -184,6 +208,17 @@ const R = (t) => P(t).right;
   for (let i = 0; i < 11; i++) many.push({ id: 'm' + i, from: 'Sender ' + i, text: 'x', at: 0, read: true });
   t.push(coop({ nonce: 'n2', view: 'letters', letters: many }));
   check('a long list pages eight at a time', rows(t).length === 8 && /Page 1 of 2/.test(P(t).list.more.text));
+  check('on the first page Previous is greyed, Next is not', P(t).list.prev.disabled === true && P(t).list.next.disabled !== true && P(t).list.more.text === 'Page 1 of 2');
+  P(t).list.next.onRelease();
+  check('Next (the mouse alone) shows the rest', rows(t).length === 3 && rows(t)[0].label.text === 'Sender 8' && P(t).list.next.disabled === true);
+  P(t).list.prev.onRelease();
+  check('Previous comes back', rows(t)[0].label.text === 'Sender 0');
+  t.wheel(-1);
+  check('the wheel down turns to the next page', rows(t)[0].label.text === 'Sender 8');
+  t.wheel(1);
+  check('the wheel up turns back', rows(t)[0].label.text === 'Sender 0');
+  t.wheel(1);
+  check('and no further than the first', rows(t)[0].label.text === 'Sender 0');
   t.press(34);
   check('Page Down shows the rest', rows(t).length === 3 && rows(t)[0].label.text === 'Sender 8');
   t.press(33);
