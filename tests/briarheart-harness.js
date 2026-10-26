@@ -642,7 +642,7 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   delete require.cache[MODULE]; delete globalThis.__dboBriarheart; fs.rmSync('briarheart.json', { force: true });
   const MP = load({ briarheart: { enabled: true, altars: [] } });
   ok(/Hagraven altar in the Reach/.test(MP.riteRefusal(PL) || ''), 'nothing placed: no altar there');
-  placedRows.push({ id: 'ff00abcd', base: 'acafc:Skyrim.esm', name: 'Hagraven Altar (Briarheart rite)', kind: 'object', where: REACH, pos: AT.slice(), by: 7, at: 1 });
+  placedRows.push({ id: 'ff00abcd', base: '6aeed:Skyrim.esm', name: 'Hagraven Altar (Briarheart rite)', kind: 'object', where: REACH, pos: AT.slice(), by: 7, at: 1 });
   ok(!/Hagraven altar in the Reach/.test(MP.riteRefusal(PL) || ''), 'a Hagraven Altar placed with F7 Place is an altar where it stands (radius altarRadius)', MP.riteRefusal(PL));
   ok(!MP.data().altars.length, '...with nothing written to briarheart.json');
   ok(/Place tool \(ff00abcd\): 3c:Skyrim\.esm 5000,6000,100 r400/.test(run(LEAD, 'altar list')), 'altar list shows it as placed with the Place tool', run(LEAD, 'altar list'));
@@ -658,7 +658,7 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   // The catalog row and placement.js's reader, as shipped
   const cat = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'admin-placeables.json'), 'utf8')).categories;
   const last = cat[cat.length - 1];
-  ok(last.id === 'Briarheart' && last.kind === 'object' && last.items.length === 1 && last.items[0][0] === 'acafc:Skyrim.esm' && last.items[0][1] === 'Hagraven Altar (Briarheart rite)', 'F7 Place: the Briarheart category is last, with the Hagraven Altar (so the catalog names the base after it)', last);
+  ok(last.id === 'Briarheart' && last.kind === 'object' && last.items.length === 1 && last.items[0][0] === '6aeed:Skyrim.esm' && last.items[0][1] === 'Hagraven Altar (Briarheart rite)', 'F7 Place: the Briarheart category is last, with the Hagraven Altar (so the catalog names the base after it)', last);
   ok(/globalThis\.__dboPlacedOf = \(desc\) =>/.test(fs.readFileSync(path.resolve(__dirname, '..', 'placement.js'), 'utf8')), 'placement.js exports __dboPlacedOf');
 }
 // ---- as hard as the werewolf's road (Nat, 26 Oct: "make it as hard as werewolf, and Reachman MALE required") -------------
@@ -691,6 +691,44 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   ok(!MH.isBriar(HH) && inv(HH, FEATHER) === 0 && inv(HH, CLAW) === 0, 'a failed rite (0.1 < 0.25) takes the offerings too', P(HH, 'inventory'));
   Math.random = realRandom;
   delete globalThis.__dboClock; online.splice(online.indexOf(HH), 1);
+}
+// ---- the altar as an object you activate (Nat, 26 Oct: "more noticeable, like an activator") -----------------------------
+{
+  const FEATHER = 0x3ad66, CLAW = 0x6b689; ID['3ad66:Skyrim.esm'] = FEATHER; ID['6b689:Skyrim.esm'] = CLAW;
+  const VALE = '29ab7:Skyrim.esm', COURT = [-124700, 79930, -3316];
+  const rows = []; const placeCalls = [];
+  globalThis.__dboPlacedOf = (desc) => rows.filter((e) => e.base.toLowerCase() === String(desc).toLowerCase());
+  globalThis.__dboPlaceAs = (a, desc, pos, rot) => { placeCalls.push({ a, desc, pos, rot }); const e = { id: 'ff00beef', base: desc, name: 'Hagraven Altar (Briarheart rite)', kind: 'object', where: VALE, pos: pos.slice(), by: 1, at: 1 }; rows.push(e); return { ok: true, entry: e }; };
+  globalThis.__dboClock = { isNight: () => true, isFullMoon: () => false };
+  const AC = actor(0xf0, 1, 'reach', [0, 0, 0], []); online.push(AC);
+  const at = (world, pos) => setP(AC, 'locationalData', { cellOrWorldDesc: world, pos, rot: [0, 0, 0] });
+  delete require.cache[MODULE]; delete globalThis.__dboBriarheart; fs.rmSync('briarheart.json', { force: true });
+  const MA = load({ briarheart: { enabled: true, keepDefaults: true, failPermadeath: true } });
+  globalThis.__dboPermaKill = () => true;
+  // the seeded Deepwood altar gets its object once someone stands in its cell, and only once
+  at(VALE, [COURT[0] + 5000, COURT[1], COURT[2]]); globalThis.__dboBriarheart.seedAt = 0; MA.tick && ticker && ticker();
+  ok(!placeCalls.length, 'nobody in the altar\'s cell: no object placed yet');
+  at(VALE, [COURT[0] + 300, COURT[1] + 100, COURT[2]]); globalThis.__dboBriarheart.seedAt = 0; ticker();
+  ok(placeCalls.length === 1 && placeCalls[0].desc === '6aeed:Skyrim.esm' && placeCalls[0].pos.join() === COURT.join() && placeCalls[0].a === AC, 'a player in the cell: the Place tool places the altar object at the seeded spot, once', placeCalls);
+  ok(papyrusCalls.some((c) => c.method === 'SetDisplayName' && c.args[0] === 'Hagraven Altar'), '...and it is named Hagraven Altar on the crosshair');
+  globalThis.__dboBriarheart.seedAt = 0; ticker();
+  ok(placeCalls.length === 1, 'the next tick (and a restart, which reads the same Place list) does not place a second one');
+  // activating it is the rite: refusals, the warning, then a second activation accepts
+  const act = globalThis.__dboBriarheartActivate;
+  ok(act(0x123, AC) === false, 'any other reference falls through to the rest of the activate chain');
+  setP(AC, 'inventory', { entries: [{ baseId: HEART, count: 1 }] });
+  said.length = 0; ok(act(0xff00beef, AC) === true && said.some(([a, t]) => a === AC && /3 Hagraven Feathers and 2 Hagraven Claws/.test(t)), 'activating the altar without the offerings: refused, with what is needed', said);
+  setP(AC, 'inventory', { entries: [{ baseId: HEART, count: 1 }, { baseId: FEATHER, count: 3 }, { baseId: CLAW, count: 2 }] });
+  said.length = 0; act(0xff00beef, AC);
+  ok(said.some(([a, t]) => a === AC && /PERMANENT DEATH: 25 in 100 die/.test(t) && / Or activate the altar again to accept\.$/.test(t)) && !MA.isBriar(AC), 'with everything: the permanent-death warning, and a second activation to accept', said);
+  setRandom(0.99); said.length = 0; act(0xff00beef, AC); Math.random = realRandom; delete globalThis.__dboPermaKill;
+  ok(MA.isBriar(AC) && inv(AC, HEART) === 0, 'the second activation within the window takes the rite', said);
+  said.length = 0; act(0xff00beef, AC);
+  ok(said.some(([, t]) => /already beats/.test(t)), 'a Briarheart activating it is told so');
+  MA.end(AC, 'activator test');
+  delete globalThis.__dboPlaceAs; delete globalThis.__dboPlacedOf; delete globalThis.__dboClock; online.splice(online.indexOf(AC), 1);
+  ok(/__dboBriarheartActivate\(target, caster\)/.test(fs.readFileSync(path.resolve(__dirname, '..', 'gamemode.js'), 'utf8')), 'gamemode.js asks briarheart.js in the activate chain');
+  ok(/globalThis\.__dboPlaceAs = /.test(fs.readFileSync(path.resolve(__dirname, '..', 'placement.js'), 'utf8')), 'placement.js exports __dboPlaceAs');
 }
 // ---- what a Briarheart is, in Active Effects: the display ability goes and comes with the gifts ---------------------------
 {

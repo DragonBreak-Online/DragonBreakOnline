@@ -2051,6 +2051,8 @@ mp.onActivate = (targetId, casterId) => {
   // A home's planter, and a study bookshelf in a home with too few of them (decor.js); a home study with enough shelves
   // falls through to schools.js
   if (globalThis.__dboDecorActivate) { try { if (globalThis.__dboDecorActivate(target, caster)) return false; } catch (e) { log('decor activate failed', e.message); } }
+  // A Briarheart altar object (briarheart.js): activating it is the rite
+  if (globalThis.__dboBriarheartActivate) { try { if (globalThis.__dboBriarheartActivate(target, caster)) return false; } catch (e) { log('briarheart activate failed', e.message); } }
   // Study Magic and the Class Lectern (schools.js): their own panels, before a book on the shelf can start a reading
   if (globalThis.__dboSchoolsActivate && globalThis.__dboSchoolsActivate(target, caster)) return false;
   // A guild's own workshop (spells.js): the Synod Conclave's enchanting table, for Synod and College members
@@ -9380,7 +9382,7 @@ try {
   const BRIARHEART_JS = path.resolve('briarheart.js');
   delete require.cache[BRIARHEART_JS];
   require(BRIARHEART_JS)({ mp, log, personal, audit, who, display, cfg, registerChatCommand, onlineActors, isLeadStaff, findByName, every, giveItem, sourceResistsOf });
-} catch (e) { log('briarheart.js failed to load:', e.stack || e.message); for (const k of ['__dboIsBriarheart', '__dboBriarheartVitalBonus', '__dboBriarheartTargetMult', '__dboBriarheartRefusesDivine', '__dboBriarheartFaithLock', '__dboBriarheartLogin', '__dboBriarheartMenuEntries', '__dboBriarheartMenuAction', '__dboBriarheartEquip']) globalThis[k] = null; }
+} catch (e) { log('briarheart.js failed to load:', e.stack || e.message); for (const k of ['__dboIsBriarheart', '__dboBriarheartVitalBonus', '__dboBriarheartTargetMult', '__dboBriarheartRefusesDivine', '__dboBriarheartFaithLock', '__dboBriarheartLogin', '__dboBriarheartMenuEntries', '__dboBriarheartMenuAction', '__dboBriarheartEquip', '__dboBriarheartActivate']) globalThis[k] = null; }
 // ---- the hold's watch: NPC guards at staff-placed posts, no loot or skill from them, jail by them (server\guards.js, config "guards") ----
 try {
   const GUARDS_JS = path.resolve('guards.js');
