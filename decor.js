@@ -61,7 +61,7 @@ module.exports = (api) => {
   C.planter = Object.assign({}, DEFAULTS.planter, ((api.cfg || {}).decor || {}).planter || {});
   const itemName = (d) => { try { const n = typeof api.itemName === 'function' ? api.itemName(d) : ''; return n && n !== d ? String(n) : String(d); } catch (e) { return String(d); } };
   const S = globalThis.__dboDecor || (globalThis.__dboDecor = { catalog: null, byDesc: null, reg: null, pending: new Map(), undo: new Map(), rate: new Map(), found: new Map(), scanAt: 0, scanIdx: 0 });
-  S.catalog = null; S.growing = null; S.matNames = null;   // a hot reload reads the catalogue files again (decor-growing.json's ids are filled in later)
+  S.catalog = null; S.growing = null; S.matNames = null; S.matDesc = null;   // a hot reload reads the catalogue files again (decor-growing.json's ids are filled in later)
   if (!S.plantFor) S.plantFor = new Map();                  // actor -> the planter whose /decor plant list they were shown
 
   const ID_PREFIX = 'decor:';
@@ -107,9 +107,16 @@ module.exports = (api) => {
   };
   const crops = () => { growing(); return [...S.cropOf.values()]; };
   const pieceOf = (desc) => { catalog(); return S.byDesc.get(String(desc || '').toLowerCase()) || null; };
+  // costA names materials by editor id (decor-catalog.json materials: edid -> desc); costB by desc
+  const matDesc = () => {
+    if (S.matDesc) return S.matDesc;
+    S.matDesc = new Map();
+    try { for (const [e, ds] of Object.entries(JSON.parse(fs.readFileSync(path.resolve('decor-catalog.json'), 'utf8')).materials || {})) if (ds) S.matDesc.set(e.toLowerCase(), String(ds)); } catch (e) { /* descs only */ }
+    return S.matDesc;
+  };
   const costOf = (piece) => {
     const out = {}, src = piece[C.costField] || piece.costB || {};
-    for (const [d, n] of Object.entries(src)) out[d] = Math.max(1, Math.ceil(Number(n) * (Number(C.costMultiplier) || 1)));
+    for (const [d, n] of Object.entries(src)) out[matDesc().get(d.toLowerCase()) || d] = Math.max(1, Math.ceil(Number(n) * (Number(C.costMultiplier) || 1)));
     return out;
   };
 
