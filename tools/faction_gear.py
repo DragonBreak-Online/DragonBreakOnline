@@ -99,14 +99,25 @@ for desc, r in recipes.items():
 
 # Sets whose recipes regions.json may not list yet (it is regenerated on the PC by ck-mcp/regions.py): kept by hand so a
 # rerun before that regeneration does not drop them; a recipe regions.json does list is merged as above
+WHISPERS = ('College of Whispers', ['college-of-whispers'], 'blacksmith')
+# The Great House capes (Dunmer Great House Capes, merged into the DLE 26 Oct; Worker 2's fits, the Leader's yes): each house's
+# cape, and its colour variant, only for that house's tailors (tanning-rack work). Dagoth and New Temple have no faction and
+# stay open; regions-overrides locks those two to Solstheim
 HAND_ITEMS = {
-    '1ac968:DragonBreak Online Edits.esp': ('College of Whispers Hood', '1ac96c:DragonBreak Online Edits.esp'),
-    '1ac969:DragonBreak Online Edits.esp': ('College of Whispers Cuirass', '1ac96e:DragonBreak Online Edits.esp'),
-    '1ac96a:DragonBreak Online Edits.esp': ('College of Whispers Gauntlets', '1ac970:DragonBreak Online Edits.esp'),
-    '1ac96b:DragonBreak Online Edits.esp': ('College of Whispers Greaves', '1ac972:DragonBreak Online Edits.esp'),
+    '1ac968:DragonBreak Online Edits.esp': ('College of Whispers Hood', '1ac96c:DragonBreak Online Edits.esp', WHISPERS),
+    '1ac969:DragonBreak Online Edits.esp': ('College of Whispers Cuirass', '1ac96e:DragonBreak Online Edits.esp', WHISPERS),
+    '1ac96a:DragonBreak Online Edits.esp': ('College of Whispers Gauntlets', '1ac970:DragonBreak Online Edits.esp', WHISPERS),
+    '1ac96b:DragonBreak Online Edits.esp': ('College of Whispers Greaves', '1ac972:DragonBreak Online Edits.esp', WHISPERS),
+    '1d2266:DragonBreak Online Edits.esp': ('House Redoran Cape', '1d226f:DragonBreak Online Edits.esp', ('House Redoran', ['house-redoran'], 'tailor')),
+    '1d226e:DragonBreak Online Edits.esp': ('House Hlaalu Cape', '1d2277:DragonBreak Online Edits.esp', ('House Hlaalu', ['house-hlaalu'], 'tailor')),
+    '1d2267:DragonBreak Online Edits.esp': ('House Telvanni Cape', '1d2270:DragonBreak Online Edits.esp', ('House Telvanni', ['house-telvanni'], 'tailor')),
+    '1d226c:DragonBreak Online Edits.esp': ('House Telvanni Cape (Purple)', '1d2276:DragonBreak Online Edits.esp', ('House Telvanni', ['house-telvanni'], 'tailor')),
+    '1d226a:DragonBreak Online Edits.esp': ('House Indoril Cape', '1d2272:DragonBreak Online Edits.esp', ('House Indoril', ['house-indoril'], 'tailor')),
+    '1d226d:DragonBreak Online Edits.esp': ('House Indoril Cape (White and Gold)', '1d2275:DragonBreak Online Edits.esp', ('House Indoril', ['house-indoril'], 'tailor')),
+    '1d2269:DragonBreak Online Edits.esp': ('House Dres Cape', '1d2271:DragonBreak Online Edits.esp', ('House Dres', ['house-dres'], 'tailor')),
 }
-for item, (name, recipe) in HAND_ITEMS.items():
-    cur = items.setdefault(item, {'name': name, 'set': 'College of Whispers', 'factions': ['college-of-whispers'], 'role': 'blacksmith', 'recipes': []})
+for item, (name, recipe, (st, factions, role)) in HAND_ITEMS.items():
+    cur = items.setdefault(item, {'name': name, 'set': st, 'factions': factions, 'role': role, 'recipes': []})
     if recipe not in cur['recipes']: cur['recipes'].append(recipe)
 
 # Merge, never overwrite. Most of faction-gear.json is no longer reproducible from the SETS above: 177 of its items are
