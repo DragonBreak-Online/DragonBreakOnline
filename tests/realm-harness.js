@@ -14,6 +14,7 @@ const path = require('path');
 
 const SERVER = path.resolve(__dirname, '..');
 const REALM = path.join(SERVER, 'realm.js');
+const sentPackets = [];
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'realm-harness-'));
 fs.copyFileSync(path.join(SERVER, 'territories.json'), path.join(tmp, 'territories.json'));
 process.chdir(tmp);
@@ -59,7 +60,7 @@ const api = {
   },
   log: () => {}, personal: (a, t) => out.personal.push({ a, t }), system: (a, t) => out.system.push({ a, t }), audit: (t) => out.audits.push(t),
   who: (a) => `P${a}`, display: (a) => `P${a}`, cfg: {}, onUi: (ev, fn) => handlers.set(ev, fn), registerChatCommand: (n, fn) => handlers.set('/' + n, fn),
-  isAdmin: () => false, onlineActors: () => online.slice(), every: (n, ms, fn) => timers.set(n, fn), sendPacket: () => true,
+  isAdmin: () => false, onlineActors: () => online.slice(), every: (n, ms, fn) => timers.set(n, fn), sendPacket: (a, p) => { sentPackets.push([a, p]); return true; },
   ranksOf: (pid) => ranks.get(pid) || [], profileOf: (a) => a, zoneById: (id) => (id === 'bruma' ? { id: 'bruma', name: 'Bruma', officials: ['count', 'steward', 'guard'] } : null),
   readOfficials: () => JSON.parse(JSON.stringify(officials)), writeOfficials: (o) => { officials = JSON.parse(JSON.stringify(o)); },
 };
@@ -301,6 +302,15 @@ check('a hidden place is never land: the nearest public marker still owns that s
 
 // Files
 check('owners and wars are kept on disk', fs.existsSync('territory-owners.json') && fs.existsSync('wars.json') && JSON.parse(fs.readFileSync('wars.json', 'utf8')).wars.length === 3);
+
+// The realm's places on the M map: map-markers.json goes to a client when it announces its caps, with the kinds the client knows
+sentPackets.length = 0;
+handlers.get('uiCaps')(7, []);
+check('without map-markers.json nothing is sent', !sentPackets.some((x) => x[1].customPacketType === 'dboMapRealm'));
+fs.writeFileSync('map-markers.json', JSON.stringify({ markers: [{ id: 'bruma', kind: 'capital', name: 'Bruma', desc: 'aa:BSHeartland.esm' }, { id: 'x', kind: 'tavern', name: 'X', desc: 'bb:Skyrim.esm' }, { id: 'icecap', kind: 'boss', name: 'Ice Cap', desc: 'cc:DragonBreak Online Edits.esp' }] })); // verify-formids: ignore
+handlers.get('uiCaps')(7, []);
+const mp = sentPackets.find((x) => x[1].customPacketType === 'dboMapRealm');
+check('a client announcing its caps gets the realm markers: a capital as a seat, an unknown kind dropped', mp && mp[0] === 7 && mp[1].markers.map((m) => m.kind + ':' + m.name).join() === 'seat:Bruma,boss:Ice Cap', mp && mp[1].markers);
 
 console.log(failures ? `${failures} failure(s)` : 'all passed');
 process.exit(failures ? 1 : 0);
