@@ -8448,5 +8448,22 @@
         ]
       }
     ]
+  },
+  {
+    "title": "Capes of the Great Houses",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Clothing",
+        "items": [
+          "Nine new capes bearing the seals of Morrowind: House Redoran, Hlaalu, Telvanni, Indoril and Dres, a purple Telvanni and a white and gold Indoril cape, House Dagoth and the New Temple.",
+          "Each house's capes are made at a tanning rack by that house's own Clothiers (or its leader), from linen wraps and common alchemy ingredients.",
+          "The House Dagoth and New Temple capes belong to no house: any tailor can make them, but only in Solstheim.",
+          "Capes by TheSilverSpoonhead (Dunmer Great House Capes), on cape meshes by Nazenn."
+        ]
+      }
+    ]
   }
 ]
