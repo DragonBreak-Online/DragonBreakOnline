@@ -82,7 +82,10 @@ const RESIST = { 0x500: new Set([40]), 0x501: new Set([43]), 0x502: new Set([41]
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'briarheart-'));
 const cwd = process.cwd(); process.chdir(scratch);
 const MODULE = path.resolve(__dirname, '..', 'briarheart.js');
+// The checks before the harder rite (26 Oct) keep its old bar unless a block asks for the shipped defaults (keepDefaults)
+const oldBar = (cfg) => { const b = cfg && cfg.briarheart; if (!b || b.keepDefaults) return cfg; return Object.assign({}, cfg, { briarheart: Object.assign({ components: [], riteAt: 'any', failChance: 0.1, failCooldownHours: 24 }, b) }); };
 const load = (cfg) => {
+  cfg = oldBar(cfg);
   delete require.cache[MODULE]; delete globalThis.__dboBriarheart;
   return require(MODULE)({
     mp, log: () => {}, personal: (a, t) => said.push([a >>> 0, t]), audit: (t) => audits.push(t), who: (a) => `who${(a >>> 0).toString(16)}`,
@@ -657,6 +660,37 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   const last = cat[cat.length - 1];
   ok(last.id === 'Briarheart' && last.kind === 'object' && last.items.length === 1 && last.items[0][0] === 'acafc:Skyrim.esm' && last.items[0][1] === 'Hagraven Altar (Briarheart rite)', 'F7 Place: the Briarheart category is last, with the Hagraven Altar (so the catalog names the base after it)', last);
   ok(/globalThis\.__dboPlacedOf = \(desc\) =>/.test(fs.readFileSync(path.resolve(__dirname, '..', 'placement.js'), 'utf8')), 'placement.js exports __dboPlacedOf');
+}
+// ---- as hard as the werewolf's road (Nat, 26 Oct: "make it as hard as werewolf, and Reachman MALE required") -------------
+{
+  const FEATHER = 0x3ad66, CLAW = 0x6b689;
+  ID['3ad66:Skyrim.esm'] = FEATHER; ID['6b689:Skyrim.esm'] = CLAW;
+  let night = true; globalThis.__dboClock = { isNight: () => night, isFullMoon: () => false };
+  const HH = actor(0xe0, 1, 'reach', [0, 0, 0], []); online.push(HH);
+  const give = (inv) => setP(HH, 'inventory', { entries: inv.map(([id, n]) => ({ baseId: id, count: n })) });
+  delete require.cache[MODULE]; delete globalThis.__dboBriarheart; fs.rmSync('briarheart.json', { force: true });
+  const MH = load({ briarheart: { enabled: true, keepDefaults: true, altars: [{ world: WORLD, pos: [0, 0, 0], radius: 400 }] } });
+  ok(MH.C.failChance === 0.25 && MH.C.failCooldownHours === 72 && MH.C.riteAt === 'night' && MH.C.sexes.join() === 'male', 'the defaults: one in four fails, a 72 h wait, night only, men only', [MH.C.failChance, MH.C.failCooldownHours, MH.C.riteAt, MH.C.sexes]);
+  give([[HEART, 1]]);
+  ok(/3 Hagraven Feathers and 2 Hagraven Claws beside the Briar Heart\. You lack 3 Hagraven Feathers and 2 Hagraven Claws/.test(MH.riteRefusal(HH)), 'a heart alone is not enough: the feathers and claws are named', MH.riteRefusal(HH));
+  give([[HEART, 1], [FEATHER, 2], [CLAW, 2]]);
+  ok(/You lack 1 Hagraven Feathers\.$/.test(MH.riteRefusal(HH)), '...and what is still lacking is counted', MH.riteRefusal(HH));
+  give([[HEART, 1], [FEATHER, 3], [CLAW, 2]]);
+  ok(MH.riteRefusal(HH) === '', 'a Reachman with all of it, by night, at the altar: no refusal', MH.riteRefusal(HH));
+  night = false;
+  ok(/only by night/.test(MH.riteRefusal(HH)), 'by day the Hagravens refuse', MH.riteRefusal(HH));
+  night = true;
+  setP(HH, 'appearance', { raceId: 1, isFemale: true });
+  ok(MH.riteRefusal(HH) === 'The Hagravens give the briar only to Reachmen.', 'a Reachwoman is refused', MH.riteRefusal(HH));
+  setP(HH, 'appearance', { raceId: 1 });
+  // the offerings are taken whether the briar takes or not
+  setRandom(0.99); MH.rite(HH); MH.confirm(HH, 'forever');
+  ok(MH.isBriar(HH) && inv(HH, HEART) === 0 && inv(HH, FEATHER) === 0 && inv(HH, CLAW) === 0, 'the briar takes: the heart, the feathers and the claws are all used', P(HH, 'inventory'));
+  MH.end(HH, 'harder test');
+  give([[HEART, 1], [FEATHER, 3], [CLAW, 2]]); setRandom(0.1); MH.rite(HH); MH.confirm(HH, 'forever');
+  ok(!MH.isBriar(HH) && inv(HH, FEATHER) === 0 && inv(HH, CLAW) === 0, 'a failed rite (0.1 < 0.25) takes the offerings too', P(HH, 'inventory'));
+  Math.random = realRandom;
+  delete globalThis.__dboClock; online.splice(online.indexOf(HH), 1);
 }
 // ---- what a Briarheart is, in Active Effects: the display ability goes and comes with the gifts ---------------------------
 {

@@ -8,15 +8,15 @@
       {
         "heading": "Who may take the briar",
         "items": [
-          "Reachfolk who keep the Old Gods of the Reach can now become Briarhearts, as Faolan, the Red Eagle, was the first. Their own heart is cut out and a briar set in its place.",
-          "The rite is made at the Hagravens' altar in Deepwood Vale, the ritual court below Hag's End, beyond Deepwood Redoubt. Bring a Briar Heart, stand at the altar and type /briarheart rite, then /briarheart confirm within 5 minutes.",
+          "Reachmen who keep the Old Gods of the Reach can now become Briarhearts, as Faolan, the Red Eagle, was the first. Their own heart is cut out and a briar set in its place. The Hagravens give it to men only.",
+          "The rite is made by night at the Hagravens' altar in Deepwood Vale, the ritual court below Hag's End, beyond Deepwood Redoubt. Bring a Briar Heart, 3 Hagraven Feathers and 2 Hagraven Claws, stand at the altar and type /briarheart rite, then /briarheart confirm within 5 minutes. The offerings are taken whatever comes of it.",
           "Vampires, werewolves and anyone with a fever must be cured first. Staff take no rite."
         ]
       },
       {
         "heading": "The risk",
         "items": [
-          "One rite in ten fails. A failed rite ends that character for good, so the confirm step asks you to type /briarheart confirm forever.",
+          "One rite in four fails. A failed rite ends that character for good, so the confirm step asks you to type /briarheart confirm forever.",
           "A fallen Briarheart's heart can be torn out by anyone standing over them for 10 seconds. That too ends the character for good, and the one who tears it out takes a Briar Heart."
         ]
       },

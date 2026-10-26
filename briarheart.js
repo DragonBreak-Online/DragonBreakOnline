@@ -90,8 +90,12 @@ module.exports = (api) => {
     races: ['DBOReachmanRace'], faiths: ['reach'],
     heartItem: '3ad61:Skyrim.esm',            // Briar Heart (INGR)
     altarRadius: 400, confirmMinutes: 5, altarBase: 'acafc:Skyrim.esm',
+    // As hard as the werewolf's road (Nat, 26 Oct): Reachmen only, three Hagraven Feathers and two Hagraven Claws beside the
+    // heart (all taken at the rite, whether or not the briar takes), and only by night (worldclock.js; 'fullmoon' or 'any')
+    sexes: ['male'], riteAt: 'night',
+    components: [{ item: '3ad66:Skyrim.esm', count: 3, name: 'Hagraven Feathers' }, { item: '6b689:Skyrim.esm', count: 2, name: 'Hagraven Claws' }],
     altars: [{ world: '29ab7:Skyrim.esm', pos: [-124700, 79930, -3316], radius: 500, name: 'Deepwood Vale, the Hagravens\' ritual court' }],
-    failChance: 0.1, failPermadeath: false, failCooldownHours: 24,
+    failChance: 0.25, failPermadeath: false, failCooldownHours: 72,
     healthBonus: 50, resist: { poison: 0.15, frost: 0.15 }, fireWeakness: 0.25,
     spells: ['72317:Skyrim.esm', '400ad:Skyrim.esm'],   // IronfleshLeftHand, LightningCloakLeftHand (the Briarheart template's)
     forswornFriendly: false, forswornFaction: '43599:Skyrim.esm',
@@ -155,6 +159,7 @@ module.exports = (api) => {
   const raceEdid = (a) => { try { const app = mp.get(a >>> 0, 'appearance'); const r = app && mp.lookupEspmRecordById(Number(app.raceId) >>> 0); return String((r && r.record && r.record.editorId) || ''); } catch (e) { return ''; } };
   const invOf = (a) => { try { return ((mp.get(a >>> 0, 'inventory') || {}).entries || []); } catch (e) { return []; } };
   const hasOne = (a, id) => invOf(a).some((e) => (Number(e.baseId) >>> 0) === id && Number(e.count) > 0);
+  const countOf = (a, id) => invOf(a).filter((e) => (Number(e.baseId) >>> 0) === id).reduce((n, e) => n + (Number(e.count) || 0), 0);
   const takeOne = (a, id) => {
     const entries = invOf(a).map((e) => Object.assign({}, e));
     const hit = entries.find((e) => (Number(e.baseId) >>> 0) === id && Number(e.count) > 0);
@@ -378,12 +383,25 @@ module.exports = (api) => {
     const race = raceEdid(a);
     if (!(C.races || []).some((r) => race === r)) return 'The Hagravens give the briar only to the Reachfolk.';
     if (!(C.faiths || []).includes(faithId(a))) return 'The briar is for those who keep the Old Gods of the Reach. Take them as your faith first.';
+    const sexes = (Array.isArray(C.sexes) && C.sexes.length ? C.sexes : ['male', 'female']).map((x) => String(x).toLowerCase());
+    if (!sexes.includes(isFemale(a) ? 'female' : 'male')) return sexes.includes('male') ? 'The Hagravens give the briar only to Reachmen.' : 'The Hagravens give the briar only to Reachwomen.';
     const failed = Number(get(a, FAILED, 0)) || 0, wait = failed + C.failCooldownHours * HOUR - Date.now();
     if (wait > 0) return `The altar is cold to you since the briar would not take. Try again in ${waitText(wait)}.`;
     if (!altarNear(a)) return 'The rite is made at a Hagraven altar in the Reach.';
     if (!hasOne(a, idOf(C.heartItem))) return 'The rite needs a Briar Heart to set in your chest.';
+    const lacking = components().filter((c) => countOf(a, c.id) < c.count);
+    if (lacking.length) return `The Hagraven wants ${components().map((c) => `${c.count} ${c.name}`).join(' and ')} beside the Briar Heart. You lack ${lacking.map((c) => `${c.count - Math.min(c.count, countOf(a, c.id))} ${c.name}`).join(' and ')}.`;
+    const when = String(C.riteAt || 'any').toLowerCase(), clock = globalThis.__dboClock;
+    if (when !== 'any' && clock && typeof clock.isNight === 'function') {
+      try {
+        if (!clock.isNight()) return 'The Hagravens work the briar only by night. Come back after dark.';
+        if (when === 'fullmoon' && typeof clock.isFullMoon === 'function' && !clock.isFullMoon()) return 'The Hagravens work the briar only under a full moon.';
+      } catch (e) { log('briarheart: the world clock failed', e.message); }
+    }
     return '';
   };
+  // The rite's other offerings (config components), resolved once per call
+  const components = () => (Array.isArray(C.components) ? C.components : []).map((c) => ({ id: idOf(c && c.item), count: Math.max(1, Number(c && c.count) || 1), name: String((c && c.name) || (c && c.item) || '') })).filter((c) => c.id);
   // The rite's permanent risks, said plainly (Nat, 25 Oct: both on)
   const forever = () => !!(C.failPermadeath || C.tearPermadeath);
   const risks = () => [
@@ -407,6 +425,8 @@ module.exports = (api) => {
     const no = riteRefusal(a); if (no) return no;
     audit(`BRIARHEART ${who(a)} accepted the rite's risks (${riskAudit()})`);
     if (!takeOne(a, idOf(C.heartItem))) return 'The rite needs a Briar Heart to set in your chest.';
+    // The offerings go into the rite whatever comes of it
+    for (const c of components()) for (let k = 0; k < c.count; k++) takeOne(a, c.id);
     if (Math.random() < C.failChance) {
       set(a, FAILED, Date.now());
       audit(`BRIARHEART ${who(a)} died in the rite${C.failPermadeath ? ' (for good)' : ''}`);
