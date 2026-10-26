@@ -294,6 +294,18 @@
    "kind": "boss",
    "name": "Blizzard Rest",
    "desc": "16214:Skyrim.esm"
+  },
+  {
+   "id": "centurion",
+   "kind": "boss",
+   "name": "Alftand",
+   "desc": "15d4a:Skyrim.esm"
+  },
+  {
+   "id": "falmerwarmonger",
+   "kind": "boss",
+   "name": "Raldbthar",
+   "desc": "90595:Skyrim.esm"
   }
  ]
 }
