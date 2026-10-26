@@ -5,8 +5,8 @@ import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { parseCustomPacket, sendCustomPacket } from "./customPacketUtil";
 import {
-  Action, MENU_NAME, MenuState, newState, parseUiEvent, planClose, planOpen, planReady, planTick,
-  serverEventName, summary,
+  Action, CAPS_RETRY_MS, MENU_NAME, MenuState, NATIVE_CAPS, OUT_VAR, UiEvent, isNew, newState, parseOutbox, parseUiEvent, planClose,
+  planOpen, planReady, planTick, serverEventName, summary,
 } from "./scaleformMenu";
 
 // A real Skyrim Scaleform panel driven from the server, instead of the CEF overlay (Nat, 25 Oct).
@@ -25,6 +25,23 @@ export class ScaleformMenuService extends ClientListener {
     this.controller.emitter.on("customPacketMessage", (e) => this.onCustomPacketMessage(e));
     this.controller.on("modEvent", (e) => this.onModEvent(e));
     this.controller.on("update", () => this.onUpdate());
+    this.controller.emitter.on("connectionAccepted", () => this.announce("connected"));
+  }
+
+  // The server gates each native panel on the client naming it, and falls back to the browser widget or to
+  // chat otherwise. A cap that arrives late is therefore invisible: the player just gets the old UI with no
+  // error anywhere, so it is announced on connect and once again a few seconds later.
+  private announce(why: string): void {
+    try {
+      sendCustomPacket(this.controller, {
+        customPacketType: "dbo", event: "nativeCaps", args: NATIVE_CAPS.slice(), widget: 0,
+      });
+      this.announcedAt = Date.now();
+      this.announces++;
+      logTrace(this, "native caps announced", why, NATIVE_CAPS.join(","));
+    } catch (e) {
+      logError(this, "could not announce the native caps", e);
+    }
   }
 
   private onCustomPacketMessage(event: ConnectionMessage<CustomPacketMessage>): void {
@@ -50,6 +67,37 @@ export class ScaleformMenuService extends ClientListener {
         if (this.state.phase !== "closed") this.state.foreignEvents++;
         return;
       }
+      if (!isNew(this.state, parsed)) return;
+      this.state.viaModEvent++;
+      this.handle(parsed);
+    } catch (err) {
+      logError(this, "mod event handling failed", err);
+    }
+  }
+
+  // The proven channel. skse.Log works from the movie but SendModEvent has never been seen to arrive, and
+  // nothing else in this client subscribes to modEvent, so the panel also appends every message to a string
+  // and we read it here with Ui.getString, which is the same native family that already drives the vanilla
+  // HUD. Whichever channel delivers first wins; the sequence number stops a message being handled twice.
+  private drainOutbox(): void {
+    let raw = "";
+    try {
+      raw = String(this.sp.Ui.getString(MENU_NAME, OUT_VAR) || "");
+    } catch (e) {
+      return;
+    }
+    if (!raw || raw.length <= this.state.outRead) return;
+    const box = parseOutbox(raw, this.state.outRead);
+    this.state.outRead = box.consumed;
+    for (const m of box.messages) {
+      if (!isNew(this.state, m)) continue;
+      this.state.viaOutbox++;
+      this.handle(m);
+    }
+  }
+
+  private handle(parsed: UiEvent): void {
+    try {
       if (parsed.key === "ready") {
         // The frame number is the measurement: _global.skse does not exist on frame 1, and until one
         // session reported this nobody knew which frame it does appear on.
@@ -75,7 +123,7 @@ export class ScaleformMenuService extends ClientListener {
       });
       this.state.sent++;
     } catch (err) {
-      logError(this, "mod event handling failed", err);
+      logError(this, "panel message handling failed", err);
     }
   }
 
@@ -88,7 +136,13 @@ export class ScaleformMenuService extends ClientListener {
       this.queue = [];
       this.exec(q);
     }
+    // One retry, because the first can land before the server has an actor for this user
+    if (this.announces === 1 && this.announcedAt && Date.now() - this.announcedAt > CAPS_RETRY_MS) {
+      this.announce("retry");
+    }
     if (this.state.phase === "closed") return;
+    // Every tick, not throttled: a click must not wait a quarter of a second to be noticed.
+    if (this.state.phase === "ready") this.drainOutbox();
     const now = Date.now();
     if (now - this.lastTick < 250) return;
     this.lastTick = now;
@@ -131,6 +185,8 @@ export class ScaleformMenuService extends ClientListener {
   }
 
   private state: MenuState = newState();
+  private announces = 0;
+  private announcedAt = 0;
   private lastTick = 0;
   private queue: Action[] = [];
 }

@@ -16,6 +16,8 @@
 
 var DBO_EVENT = "dboUi";
 var DBO_SEP = "";
+var DBO_RS = "";
+var DBO_US = "";
 var DBO_SWF_VERSION = "testmenu-1";
 var MENU_NAME = "CustomMenu";
 
@@ -50,9 +52,22 @@ function log(msg)
    }
 }
 
-// key + separator + JSON args, the shared wire. A key with no args sends the key alone.
+// TWO CHANNELS, because only one of them is proven. skse.Log reaches skse64.log from this movie, so the
+// bridge exists, but SendModEvent has never been seen to arrive in the client and nothing else in that
+// client subscribes to modEvent. So every message is ALSO appended to _root.dboOut, which the client reads
+// with Ui.getString - the same native family that already drives the vanilla HUD. The sequence number lets
+// the client handle a message once when both channels deliver it, and the session tells us which works.
+//
+// The client only ever reads and never writes, so appending can never lose a message to a race.
+_root.dboOut = "";
+var dboSeq = 0;
+
 function send(key, args, num)
 {
+   dboSeq++;
+   var json = args == undefined ? "" : args;
+   // record = seq US key US json RS. The separator goes last, so a half-written record is never read.
+   _root.dboOut += dboSeq + DBO_US + key + DBO_US + json + DBO_RS;
    if (haveSkse() && _global.skse.SendModEvent != undefined)
    {
       var s = args == undefined ? key : key + DBO_SEP + args;

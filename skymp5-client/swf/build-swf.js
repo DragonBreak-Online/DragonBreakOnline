@@ -83,7 +83,7 @@ run(['-export', 'script', verifyDir, final]);
 const verifyList = path.join(srcDir, 'verify.txt');
 const want = fs.existsSync(verifyList)
   ? fs.readFileSync(verifyList, 'utf8').split('\n').map((l) => l.trim()).filter(Boolean)
-  : ['dboData', 'SendModEvent', '$EverywhereFont'];
+  : ['dboData', 'SendModEvent', 'dboOut', '$EverywhereFont'];
 let text = '';
 const walk = (d) => {
   for (const e of fs.readdirSync(d, { withFileTypes: true })) {
