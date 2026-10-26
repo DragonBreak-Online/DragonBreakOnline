@@ -142,6 +142,18 @@ check('a record with bad JSON is skipped, not fatal', () => {
   const b = M.parseOutbox(rec(1, 'dbo:x', '{bad') + rec(2, 'dbo:y', '[]'), 0);
   return b.messages.length === 1 && b.messages[0].key === 'dbo:y';
 });
+// The contract the SWF side must hold up (Worker 1's lib escapes every character below 32): a RAW record
+// separator inside the JSON would split the record and lose the tail. Encoded here so it is a tested
+// assumption rather than a conversation.
+check('an ESCAPED separator inside the payload survives the trip', () => {
+  const b = M.parseOutbox(rec(1, 'dbo:x', JSON.stringify(['a\u001eb'])), 0);
+  return b.messages.length === 1 && b.messages[0].args[0] === 'a\u001eb';
+}, M.parseOutbox(rec(1, 'dbo:x', JSON.stringify(['a\u001eb'])), 0).messages);
+check('...while a RAW one truncates that record rather than corrupting the next', () => {
+  const b = M.parseOutbox(rec(1, 'dbo:x', '["a' + RS + 'b"]') + rec(2, 'dbo:y', '[]'), 0);
+  // the first record is unparseable JSON and skipped; the LAST one still arrives intact
+  return b.messages.length >= 1 && b.messages[b.messages.length - 1].key === 'dbo:y';
+});
 check('a missing or empty outbox is survivable',
   () => M.parseOutbox(undefined, 0).messages.length === 0 && M.parseOutbox('', 5).messages.length === 0);
 
