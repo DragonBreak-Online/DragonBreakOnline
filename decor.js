@@ -212,7 +212,7 @@ module.exports = (api) => {
     } catch (e) { /* single items */ }
     return S.matGroups;
   };
-  const groupOf = (d) => { name: '', members: [String(d)] };
+  const groupOf = (d) => groupMap().get(String(d).toLowerCase()) || { name: '', members: [String(d)] };
   const heldGroup = (a, d) => groupOf(d).members.reduce((n, m) => n + heldOf(a, idOf(m)), 0);
   const shortOf = (a, cost) => Object.entries(cost).map(([d, n]) => ({ d, n, have: heldGroup(a, d) })).filter((x) => x.have < x.n);
   // All of a cost or none of it, each material from its variants in the listed order; returns what was taken, by desc
