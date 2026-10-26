@@ -709,6 +709,7 @@ module.exports = (api) => {
     refresh(a);
   });
   panelAct('decorUndo', (a) => { undo(a); refresh(a); });
+  panelAct('decorClose', (a) => { S.panel.delete(a >>> 0); closeWidget(a, PANEL_ID); });
   panelAct('decorGrant', (a, st, [pid]) => {
     const pl = here(a), t = pl && onlineActors().find((x) => x !== a && String(profile(x)) === String(pid) && (here(x) || {}).root === pl.root);
     if (t && owns(a, pl.rec)) setDecorator(a, pl, profile(t), true, who(t));
