@@ -247,7 +247,7 @@ at(SMITH, SYNOD_CELL);
 check('...and made in Bruma', craft(SMITH, AYLEID) !== false && count(SMITH, AYLEID[1]) === 1);
 check('Daedric (Cyrodiil and Skyrim) is allowed in Bruma and refused on Solstheim', R().recipeOk(SMITH, idOf(DAEDRIC[1]), idOf(DAEDRIC[0])).ok && (at(SMITH, SOLSTHEIM_WORLD), !R().recipeOk(SMITH, idOf(DAEDRIC[1]), idOf(DAEDRIC[0])).ok));
 at(SMITH, SYNOD_CELL);
-check('a staff at the staff enchanter is Solstheim by its bench', !R().recipeOk(SMITH, idOf(STAFF[1]), idOf(STAFF[0])).ok && R().recipeWhere(idOf(STAFF[0]), idOf(STAFF[1])).p.join() === 'solstheim');
+check('a staff at the staff enchanter is Skyrim and Solstheim by its bench (Nat, 25 Oct), so still refused in Cyrodiil', !R().recipeOk(SMITH, idOf(STAFF[1]), idOf(STAFF[0])).ok && R().recipeWhere(idOf(STAFF[0]), idOf(STAFF[1])).p.join() === 'skyrim,solstheim');
 at(SMITH, HUB_WORLD); stock(SMITH, DWARVEN); wallClock += 1600;
 check('in the Hub only common designs are made', craft(SMITH, DWARVEN) === false && /only designs known in every province can be made here/.test(said(SMITH)) && R().recipeOk(SMITH, idOf(IRON[1]), idOf(IRON[0])).ok, said(SMITH));
 at(SMITH, BRUMA_WORLD);
