@@ -255,4 +255,121 @@ const closed = (t) => t.sent.some((m) => m.e === 'closeMenu');
   check('a focus from elsewhere (Profile\'s meters) opens that skill; an untaken one names its station', /Untaken\. Set your hand to an anvil and the first spoke is yours\./.test(tx), tx);
 }
 
+// every page of the open tab, turning with Next
+const allPages = (t) => { const out = []; for (let i = 0; i < 6; i++) { out.push(...texts(t)); const n = t.root.dboPanel.foot.next; if (!n || n.disabled) break; n.onRelease(); } return out.join('|'); };
+const tabsWith = (id, label) => TABS.concat([{ id, label }]);
+const firstPage = (t) => { for (let i = 0; i < 6; i++) t.press(33); };
+
+// ---- Supernatural ----
+{
+  const t = S.boot('dbo_journal');
+  const sup = { kind: 'vampire', group: 'curse', label: 'Vampirism', epithet: 'Child of the Night', creed: 'Blood is the coin.', rows: [{ label: 'Stage', value: '2', hint: 'fed 3 h ago' }],
+    powers: [{ name: 'Vampiric Drain', have: true, note: 'drains life' }, { name: 'Mist Form', have: false, note: 'at Elder' }],
+    ladder: { name: 'The Bloodline', unit: 'feedings', value: 12, rank: 1, earn: 'Feed to rise.', ranks: [{ name: 'Fledgling', at: 0, perk: 'p0' }, { name: 'Stalker', at: 10, perk: 'p1' }, { name: 'Elder', at: 30, perk: 'p2' }] } };
+  t.push(hub('supernatural', { tabs: tabsWith('supernatural', 'Vampirism'), supernatural: sup }));
+  const tx = allPages(t);
+  check('Supernatural: epithet, creed, rows, powers, where you stand and the ranks', /Child of the Night\|Blood is the coin\.\|Stage\|2   fed 3 h ago\|Powers\|Vampiric Drain\|drains life\|Mist Form\|at Elder\|12 feedings   Stalker\|18 more feedings to Elder\. Feed to rise\.\|The Bloodline\|Fledgling\|p0   from the start\|Stalker  \(yours\)\|p1   10 feedings\|Elder\|p2   30 feedings/.test(tx), tx);
+}
+
+// ---- Citizen ----
+{
+  const t = S.boot('dbo_journal');
+  const cit = { holds: [{ zone: 'bruma', name: 'Bruma', since: 1790000000000, how: 'granted', auto: false }, { zone: 'chorrol', name: 'Chorrol', since: 0, how: 'paid', auto: false }, { zone: 'leyawiin', name: 'Leyawiin', since: 0, how: '', auto: true }],
+    maxHolds: 2, cooldownUntil: 0, requests: [{ zone: 'anvil', name: 'Anvil', at: 1790000000000 }], invites: [{ zone: 'bruma', name: 'Bruma', court: 'c1', jarl: 'Narri', seat: 'Steward' }],
+    elections: [{ zone: 'bruma', name: 'Bruma', phase: 'voting', endsAt: 0, revote: false, voted: false, mine: false }],
+    manage: [{ zone: 'bruma', name: 'Bruma', policy: 'paid', fee: 50, requests: [{ actor: 'ff1', name: 'Bram', tag: 'BRAM', at: 0 }] }], staff: null };
+  t.push(hub('citizen', { tabs: tabsWith('citizen', 'Citizen'), citizen: cit }));
+  let tx = allPages(t);
+  check('Citizen: your holds, Primary first; Make Primary only on the second; the faction one has no buttons', /Citizenship\|Bruma\|Primary  -  since/.test(tx) && /Chorrol\|Secondary/.test(tx) && /Leyawiin\|through a faction or court based there/.test(tx), tx);
+  firstPage(t);
+  check('...Make Primary sits on Chorrol alone', buttonsOf(t).filter((b) => b.label.text === 'Make Primary').length === 1);
+  btn(t, 'Make Primary').onRelease();
+  check('Make Primary sends citizenJ primary with the zone twice', msgs(t, 'dbo:citizenJ').pop().args.join('|') === 'n1|primary|chorrol|chorrol');
+  t.push(hub('citizen', { nonce: 'n2', tabs: tabsWith('citizen', 'Citizen'), citizen: cit }));
+  buttonsOf(t).filter((b) => b.label.text === 'Renounce')[0].onRelease();
+  check('Renounce asks with the 7-day wait', /Renounce the citizenship of Bruma\? You cannot take another for 7 days\./.test(texts(t).join('|')));
+  btn(t, 'Renounce').onRelease();
+  check('...and sends renounce', msgs(t, 'dbo:citizenJ').pop().args.join('|') === 'n2|renounce|bruma|bruma');
+  t.push(hub('citizen', { nonce: 'n3', tabs: tabsWith('citizen', 'Citizen'), citizen: cit }));
+  firstPage(t);
+  tx = allPages(t);
+  check('the invitation, the election and the ruler\'s requests', /Narri names you Steward in their court for Jarl of Bruma\./.test(tx) && /Bruma: the vote is open\|vote at a notice board of the hold/.test(tx) && /Bruma: citizenship is paid \(50 gold\)/.test(tx) && /Bram #BRAM asks to become a citizen/.test(tx), tx);
+  btn(t, 'Grant').onRelease();
+  check('Grant sends the actor', msgs(t, 'dbo:citizenJ').pop().args.join('|') === 'n3|grant|bruma|ff1');
+  const g = S.boot('dbo_journal');
+  g.push(hub('citizen', { tabs: tabsWith('citizen', 'Citizen'), citizen: Object.assign({}, cit, { staff: [{ zone: 'bruma', name: 'Bruma', phase: 'held', endsAt: 0, citizens: 4, threshold: 6 }], lookup: { actor: 'ff9', name: 'Gemma', tag: 'GEMA', holds: [{ zone: 'bruma', name: 'Bruma', since: 0, how: 'granted', auto: false, via: '' }] } }) }));
+  tx = allPages(g);
+  check('staff: the look-up hands off, its result has Revoke; a held election has Resume and Restart', /Staff: a character's citizenships/.test(tx) && /Gemma #GEMA/.test(tx) && /Bruma: held by the staff\|4 of 6 citizens/.test(tx) && btn(g, 'Resume') && btn(g, 'Restart'), tx);
+  btn(g, 'Restart').onRelease(); btn(g, 'Restart').onRelease();
+  check('Restart asks, then sends staff restart', msgs(g, 'dbo:citizenJ').pop().args.join('|') === 'n1|staff|bruma|restart');
+}
+
+// ---- Referrals ----
+{
+  const t = S.boot('dbo_journal');
+  const ref = { link: 'https://dragonbreakonline.com/r/ABCD1234', code: 'ABCD1234', counted: 1, friends: [{ n: 1, status: 'counted', text: 'Gemma counted' }],
+    queue: [{ kind: 'first', mult: 1.5, leftMs: 3 * 3600000 + 5 * 60000, running: true }, { kind: 'later', mult: 1.25, leftMs: 3600000, running: false }],
+    waitingBehind: false, carry: true, carryLive: false, canEnter: true, referredBy: null,
+    rules: { qualifyHours: 10, qualifyDays: 3, boostHours: 20, firstMult: 1.5, laterMult: 1.25, welcomeMult: 1.2, queueCap: 3, carryWeight: 50, commandWindowHours: 24 } };
+  t.push(hub('referrals', { tabs: tabsWith('referrals', 'Referrals'), referrals: ref }));
+  const tx = allPages(t);
+  check('Referrals: the link and code, the friends, the boosts with time left, the carry weight', /Your link\|https:\/\/dragonbreakonline\.com\/r\/ABCD1234\|Your code\|ABCD1234/.test(tx) && /Friends \(1 counted\)\|Gemma counted/.test(tx) && /1\. First friend: \+50% skill progress\|3 h 5 m of play left, running/.test(tx) && /2\. Friend: \+25% skill progress\|1 h 0 m of play left, queued/.test(tx) && /it arrives with a coming update/.test(tx), tx);
+  btn(t, 'Enter a code...').onRelease();
+  check('Enter a code hands the tab to the browser', msgs(t, 'dbo:journalTab').pop().args.join('|') === 'n1|referrals||browser');
+}
+
+// ---- Notes ----
+{
+  const limits = { entryMax: 4000, titleMax: 60, entriesMax: 50, foldersMax: 8, folderNameMax: 24, receivedMax: 20 };
+  const base = { ready: true, limits, folders: [{ id: 'f1', name: 'Travels', count: 1 }], entries: [{ id: 'e1', folder: 'f1', title: 'The pass', at: 1790000000000, edited: 0, length: 40 }, { id: 'e2', folder: '', title: 'A dream', at: 1790000000000, edited: 0, length: 9 }],
+    received: [{ id: 'r1', title: 'A letter', author: 'Gemma', itemKind: 'Letter', at: 0 }], carried: [], open: null, write: { on: true, atDesk: true, requireDesk: true, paper: 2, kinds: [{ id: 'note', label: 'Note', paper: 1, free: 3 }, { id: 'book', label: 'Book', paper: 5, free: 1 }] } };
+  const T5 = tabsWith('notes', 'Notes');
+  const t = S.boot('dbo_journal');
+  t.push(hub('notes', { tabs: T5, notes: base }));
+  let tx = texts(t).join('|');
+  check('Notes: the filters with counts, and every entry with its folder and date', btn(t, 'All entries (2)') && btn(t, 'Travels (1)') && btn(t, 'Received (1)') && /The pass\|Travels  -  \d+ \w{3} \d{4}/.test(tx), tx);
+  btn(t, 'Travels (1)').onRelease();
+  check('a folder shows only its entries, and offers to remove it', !/A dream/.test(texts(t).join('|')) && btn(t, 'Remove the folder Travels'));
+  btn(t, 'New entry...').onRelease();
+  check('New entry hands the tab to the browser', msgs(t, 'dbo:journalTab').pop().args[3] === 'browser');
+  buttonsOf(t).filter((b) => b.label.text === 'Open')[0].onRelease();
+  const o = msgs(t, 'dbo:journalTab').pop();
+  check('Open asks the server for the page, as a tab switch with a focus', o.args[1] === 'notes' && o.args[2].entry === 'e1' && o.args.length === 3, o);
+  t.push(hub('notes', { tabs: T5, notes: Object.assign({}, base, { open: { kind: 'entry', id: 'e1', title: 'The pass', text: 'Snow to the knees.', at: 1790000000000, folder: 'f1' } }) }));
+  tx = texts(t).join('|');
+  check('the page: title, folder and date, the text, Edit, Tear out and writing it out', /The pass\|Travels  -  Written/.test(tx) && /Snow to the knees\./.test(tx) && btn(t, 'Edit...') && btn(t, 'Tear out') && btn(t, 'Note (1 paper)') && btn(t, 'Book (5 paper)').disabled === true, tx);
+  btn(t, 'Signed with your name').onRelease();
+  btn(t, 'Note (1 paper)').onRelease();
+  check('writing it out unsigned sends write with no signature', msgs(t, 'dbo:journalNotes').pop().args.join('|') === 'n1|write|e1|note|');
+  t.push(hub('notes', { nonce: 'n2', tabs: T5, notes: Object.assign({}, base, { open: { kind: 'entry', id: 'e1', title: 'The pass', text: 'Snow to the knees.', at: 1790000000000, folder: 'f1' } }) }));
+  btn(t, 'Edit...').onRelease();
+  const e = msgs(t, 'dbo:journalTab').pop();
+  check('Edit hands the open entry to the browser', e.args[2].entry === 'e1' && e.args[3] === 'browser', e);
+  btn(t, 'Back to the list').onRelease();
+  check('Back goes to the list', btn(t, 'All entries (2)'));
+  t.push(hub('notes', { nonce: 'n3', tabs: T5, notes: Object.assign({}, base, { open: { kind: 'received', id: 'r1', title: 'A letter', text: 'Come home.', at: 0, itemKind: 'Letter', author: 'Gemma' } }) }));
+  btn(t, 'Remove from my journal').onRelease(); btn(t, 'Remove it').onRelease();
+  check('a received writing is removed after asking', msgs(t, 'dbo:journalNotes').pop().args.join('|') === 'n3|forget|r1');
+}
+
+// ---- Thalmor ----
+{
+  const thal = { rank: 'Justiciar', canRead: true, canWrite: true, canArrest: true, concordat: { on: true, minutes: 30, where: 'Cyrodiil', here: false, arrestRanks: 'Justiciars' },
+    reports: [{ at: Date.UTC(2026, 9, 26, 14, 5), shrine: 'shrine of Talos', place: 'near Bruma', world: '', god: 'talos' }],
+    dossiers: [{ key: 'k1', name: 'Bram', tag: 'BRAM', updated: 0, notes: [{ at: Date.UTC(2026, 9, 25, 9, 0), byName: 'Elenwen', text: 'Seen at the shrine.' }] }], limits: { noteMax: 500, notesPer: 20 } };
+  const t = S.boot('dbo_journal');
+  t.push(hub('thalmor', { tabs: tabsWith('thalmor', 'Thalmor'), thalmor: thal }));
+  let tx = texts(t).join('|');
+  check('Thalmor: the rank, the Concordat, the reports with a UTC stamp', /The Thalmor: Justiciar/.test(tx) && /gives no authority/.test(tx) && /Someone knelt at the shrine of Talos, near Bruma\.\|2026-10-26 14:05 UTC/.test(tx), tx);
+  btn(t, 'Dossiers (1)').onRelease();
+  btn(t, 'Bram #BRAM (1)').onRelease();
+  tx = texts(t).join('|');
+  check('a dossier: its notes, signed and stamped, with Strike', /Seen at the shrine\.\|Elenwen, 2026-10-25 09:00 UTC/.test(tx) && btn(t, 'Strike'), tx);
+  btn(t, 'Strike').onRelease();
+  check('Strike sends the key and the note time', msgs(t, 'dbo:thalmorStrike').pop().args.join('|') === `n1|k1|${Date.UTC(2026, 9, 25, 9, 0)}`);
+  t.push(hub('thalmor', { nonce: 'n2', tabs: tabsWith('thalmor', 'Thalmor'), thalmor: thal }));
+  btn(t, 'A note on Bram...').onRelease();
+  check('a note is typed: it hands the tab to the browser', msgs(t, 'dbo:journalTab').pop().args[3] === 'browser');
+}
+
 T.done();

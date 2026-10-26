@@ -14,3 +14,11 @@ JT.skills
 SendModEvent
 $EverywhereMediumFont
 dboOut
+JT.supernatural
+JT.citizen
+JT.referrals
+JT.notes
+JT.thalmor
+dbo:citizenJ
+dbo:journalNotes
+thalmorStrike
