@@ -53,6 +53,9 @@ const DEFAULTS = {
 
 module.exports = (api) => {
   const { mp, log, personal, audit, who, onUi, sendPacket, registerChatCommand, onlineActors, isAdmin, giveItem, findByName } = api;
+  const openWidget = api.openWidget || ((a, widget, focus) => sendPacket(a, { customPacketType: 'dboWidget', widget, focus: !!focus }));
+  const closeWidget = api.closeWidget || ((a, id) => sendPacket(a, { customPacketType: 'dboWidget', close: id }));
+  const hasUiCap = api.hasUiCap || (() => false);
   const C = Object.assign({}, DEFAULTS, (api.cfg || {}).decor || {});
   C.study = Object.assign({}, DEFAULTS.study, ((api.cfg || {}).decor || {}).study || {});
   C.planter = Object.assign({}, DEFAULTS.planter, ((api.cfg || {}).decor || {}).planter || {});
@@ -249,12 +252,14 @@ module.exports = (api) => {
     const v = Number(arr[Math.min(Math.max(skillRank(a, 'woodcutter'), 0), arr.length - 1)]);
     return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0.5;
   };
+  const refundOf = (paid, share) => {
+    const out = {};
+    for (const [d, n] of Object.entries(paid)) { const k = Math.max(Number(n) >= 2 ? 1 : 0, Math.floor(Number(n) * share)); if (k > 0) out[d] = k; }
+    return out;
+  };
   const giveRefund = (a, paid, share) => {
     const got = {};
-    for (const [d, n] of Object.entries(paid)) {
-      const k = Math.max(Number(n) >= 2 ? 1 : 0, Math.floor(Number(n) * share));
-      if (k > 0 && giveItem(a, idOf(d), k) !== false) got[d] = k;
-    }
+    for (const [d, k] of Object.entries(refundOf(paid, share))) if (giveItem(a, idOf(d), k) !== false) got[d] = k;
     return got;
   };
   const nameOfItem = (d) => {
@@ -560,7 +565,7 @@ module.exports = (api) => {
   // ---- the edit mode's packets (placement.js leaves 'decor:' ids and decor references to this file) --------------------
   globalThis.__dboDecorId = (id) => String(id || '').startsWith(ID_PREFIX);
   globalThis.__dboDecorRef = (refHex) => !!itemByRef(refHex);
-  onUi('placeMove', (a, args) => { const id = String((args || [])[0] || ''); if (!id.startsWith(ID_PREFIX)) return; try { confirm(a, id, (args || [])[1], (args || [])[2]); } catch (e) { log('decor: confirm failed', e.stack || e.message); personal(a, 'That failed; see the server log.'); } });
+  onUi('placeMove', (a, args) => { const id = String((args || [])[0] || ''); if (!id.startsWith(ID_PREFIX)) return; try { confirm(a, id, (args || [])[1], (args || [])[2]); } catch (e) { log('decor: confirm failed', e.stack || e.message); personal(a, 'That failed; see the server log.'); } reopenAfterEdit(a); });
   onUi('placeSelect', (a, args) => { try { if (!C.enabled) return; const f = itemByRef((args || [])[0]); if (f) startMove(a, f); } catch (e) { log('decor: select failed', e.stack || e.message); } });
   onUi('placeDelete', (a, args) => {
     try {
@@ -575,10 +580,151 @@ module.exports = (api) => {
 
   // ---- /decor -----------------------------------------------------------------------------------------------------------
   const listOf = (a, pl) => placeEntry(pl.root, pl.rec).items;
+  // names are kept beside the ids so the panel lists a decorator who is offline
+  const setDecorator = (a, pl, pid, grant, name) => {
+    const p = placeEntry(pl.root, pl.rec);
+    p.decorators = (p.decorators || []).filter((x) => x !== pid);
+    p.decoratorNames = p.decoratorNames || {};
+    if (grant) { p.decorators.push(pid); p.decoratorNames[pid] = String(name || ''); } else delete p.decoratorNames[pid];
+    save();
+    audit(`DECOR ${grant ? 'grant' : 'revoke'} ${who(a)} -> ${name} (${pid}) place ${hex(pl.root)}`);
+    return personal(a, grant ? 'They may now decorate here.' : 'They may no longer decorate here.');
+  };
+
+  // ---- the panel (native swf dbo_decor): the server builds every row and re-checks every action as the chat path does ----
+  const PANEL_ID = 171;
+  const PANEL_CAP = 'native:decor';
+  const PAGE_ROWS = 8;
+  if (!S.panel) S.panel = new Map();                       // actor -> { nonce, view, group, page, reopen }
+  const homeName = (pl) => String((pl.rec && pl.rec.name) || (pl.rec && pl.rec.ownerName ? `${pl.rec.ownerName}'s home` : 'This home'));
+  const groupsFor = (a) => {
+    const out = [], seen = new Set();
+    for (const p of catalog()) if (raceOk(a, p.station) && !seen.has(p.group)) { seen.add(p.group); out.push({ id: p.group, label: p.groupLabel || p.group }); }
+    return out;
+  };
+  const pageOf = (list, page) => {
+    const pages = Math.max(1, Math.ceil(list.length / PAGE_ROWS)), at = Math.max(0, Math.min(pages - 1, Math.floor(Number(page) || 0)));
+    return { at, pages, rows: list.slice(at * PAGE_ROWS, at * PAGE_ROWS + PAGE_ROWS) };
+  };
+  const costRows = (a, cost) => Object.entries(cost).map(([d, n]) => ({ name: nameOfItem(d), n, have: heldOf(a, idOf(d)) }));
+  const planterState = (it) => {
+    if (it.kind !== 'planter') return '';
+    if (!it.crop) return 'empty';
+    const left = Number(it.crop.ripeAt) - Date.now();
+    return it.crop.ripe || left <= 0 ? 'ripe' : `growing, ${inWords(left)} left`;
+  };
+  const undoLeft = (a) => {
+    const l = S.undo.get(a >>> 0) || [], st = l[l.length - 1];
+    const s = st ? Math.ceil((C.undoSeconds * 1000 - (Date.now() - st.at)) / 1000) : 0;
+    return s > 0 ? s : 0;
+  };
+  const panelFor = (a, st) => {
+    const pl = here(a);
+    if (!pl || !mayDecorate(a, pl)) return null;
+    const p = placeEntry(pl.root, pl.rec), u = usage(p), b = budgetOf(pl), isOwner = owns(a, pl.rec), groups = groupsFor(a);
+    if (!groups.some((g) => g.id === st.group)) st.group = groups.length ? groups[0].id : '';
+    const out = {
+      type: 'decor', id: PANEL_ID, nonce: st.nonce, view: st.view, home: homeName(pl), owner: isOwner, undo: undoLeft(a),
+      budget: [{ label: 'Pieces', used: u.pieces, of: b.pieces }, { label: 'Lights', used: u.lights, of: b.lights },
+        { label: 'Workbenches', used: u.stations.size, of: b.stations }, { label: 'Containers', used: u.containers, of: b.containers }],
+      groups, group: st.group, page: 0, pages: 1, rows: [], nearby: [],
+    };
+    if (st.view === 'placed') {
+      const me = get(a, 'pos', [0, 0, 0]), share = deconstructShare(a), far = (it) => Math.hypot(it.pos[0] - me[0], it.pos[1] - me[1]);
+      const pg = pageOf(p.items.slice().sort((x, y) => far(x) - far(y)), st.page);
+      Object.assign(out, { page: pg.at, pages: pg.pages, rows: pg.rows.map((it) => ({ key: it.ref, name: it.name, group: it.group, state: planterState(it),
+        refund: pieceOf(it.base) && it.paid ? costText(refundOf(it.paid, share)) : '' })) });
+    } else if (st.view === 'people') {
+      const names = p.decoratorNames || {}, granted = p.decorators || [];
+      out.rows = granted.map((pid) => ({ key: String(pid), name: names[pid] || 'someone' }));
+      if (isOwner) out.nearby = onlineActors().filter((x) => x !== a && !granted.includes(profile(x)) && (here(x) || {}).root === pl.root).map((x) => ({ key: String(profile(x)), name: who(x) }));
+    } else {
+      out.view = 'catalog';
+      const pg = pageOf(catalog().filter((x) => x.group === st.group && raceOk(a, x.station)), st.page);
+      Object.assign(out, { page: pg.at, pages: pg.pages, rows: pg.rows.map((x) => {
+        const why = budgetProblem(pl, x, a) || (x.kind === 'study' && booksHeld(a) < C.study.books ? `Needs ${C.study.books} books; you carry ${booksHeld(a)}.` : '');
+        return { key: x.desc, name: x.name, cost: costRows(a, costOf(x)), why: why || '' };
+      }) });
+    }
+    st.page = out.page;
+    return out;
+  };
+  const openPanel = (a, view) => {
+    if (!C.enabled) return personal(a, 'Decorating is not open yet.');
+    const pl = here(a);
+    if (!pl || !mayDecorate(a, pl)) return personal(a, 'Decorating works inside your own home, or one its owner named you in.');
+    const old = S.panel.get(a >>> 0);
+    const st = { nonce: require('crypto').randomBytes(6).toString('hex'), view: view || (old && old.view) || 'catalog', group: old ? old.group : '', page: old && !view ? old.page : 0, reopen: false };
+    S.panel.set(a >>> 0, st);
+    const w = panelFor(a, st);
+    if (w) openWidget(a, w, true);
+    return true;
+  };
+  const refresh = (a) => {
+    const st = S.panel.get(a >>> 0);
+    if (!st) return;
+    const w = panelFor(a, st);
+    if (w) openWidget(a, w, true);
+    else { S.panel.delete(a >>> 0); closeWidget(a, PANEL_ID); }
+  };
+  // every action names the panel's nonce, so a stale or forged one does nothing
+  const panelAct = (name, fn) => onUi(name, (a, args) => {
+    try {
+      const st = S.panel.get(a >>> 0), arg = args || [];
+      if (!C.enabled || !st || String(arg[0]) !== st.nonce) return;
+      fn(a, st, arg.slice(1));
+    } catch (e) { log(`decor: panel ${name} failed`, e.stack || e.message); }
+  });
+  const placedHere = (a, ref) => { const pl = here(a), f = itemByRef(String(ref || '')); return pl && f && f.root === pl.root && mayDecorate(a, pl) ? f : null; };
+  panelAct('decorView', (a, st, [view, group, page]) => {
+    st.view = ['catalog', 'placed', 'people'].includes(String(view)) ? String(view) : 'catalog';
+    if (group !== undefined && group !== null && group !== '' && String(group) !== st.group) { st.group = String(group); st.page = 0; } else st.page = Math.max(0, Math.floor(Number(page) || 0));
+    refresh(a);
+  });
+  panelAct('decorPlace', (a, st, [desc]) => {
+    const piece = pieceOf(desc);
+    if (!piece || !raceOk(a, piece.station)) { personal(a, 'That is not in the catalogue.'); return refresh(a); }
+    const before = S.pending.get(a >>> 0);
+    startNew(a, piece);
+    if (S.pending.get(a >>> 0) !== before) { st.reopen = true; closeWidget(a, PANEL_ID); } else refresh(a);
+  });
+  panelAct('decorMove', (a, st, [ref]) => {
+    const f = placedHere(a, ref);
+    if (!f) return refresh(a);
+    startMove(a, f);
+    st.reopen = true;
+    closeWidget(a, PANEL_ID);
+  });
+  panelAct('decorRemove', (a, st, [ref]) => {
+    const f = placedHere(a, ref);
+    if (f && rateOk(a)) removeItem(a, f, 'deconstruct', 'deconstruct');
+    else if (f) personal(a, 'Slow down a little.');
+    refresh(a);
+  });
+  panelAct('decorUndo', (a) => { undo(a); refresh(a); });
+  panelAct('decorGrant', (a, st, [pid]) => {
+    const pl = here(a), t = pl && onlineActors().find((x) => x !== a && String(profile(x)) === String(pid) && (here(x) || {}).root === pl.root);
+    if (t && owns(a, pl.rec)) setDecorator(a, pl, profile(t), true, who(t));
+    refresh(a);
+  });
+  panelAct('decorRevoke', (a, st, [pid]) => {
+    const pl = here(a), n = Number(pid), p = pl && placeEntry(pl.root, pl.rec);
+    if (p && owns(a, pl.rec) && (p.decorators || []).includes(n)) setDecorator(a, pl, n, false, (p.decoratorNames || {})[n] || String(n));
+    refresh(a);
+  });
+  // the G key (a client release away) sends decorOpen; a client without the native panel is told to use chat
+  onUi('decorOpen', (a) => {
+    try { if (hasUiCap(a, PANEL_CAP)) openPanel(a); else personal(a, 'Your client cannot show the decorating panel yet; use /decor help.'); }
+    catch (e) { log('decor: open failed', e.stack || e.message); }
+  });
+  onUi('close', (a, args, widgetId) => { if (widgetId !== PANEL_ID) return; const st = S.panel.get(a >>> 0); if (st && !st.reopen) S.panel.delete(a >>> 0); });
+  // the panel comes back once the edit mode it closed for sets a piece down or refuses it
+  function reopenAfterEdit(a) { const st = S.panel.get(a >>> 0); if (st && st.reopen) { st.reopen = false; refresh(a); } }
   registerChatCommand('decor', (a, args) => {
     const words = String(args || '').trim().split(/\s+/).filter(Boolean), sub = (words.shift() || '').toLowerCase(), rest = words.join(' ');
     if (!C.enabled && !(sub === 'clear' && isDeveloper(a))) return personal(a, 'Decorating is not open yet.');
     const pl = here(a);
+    if (!sub && pl && mayDecorate(a, pl) && hasUiCap(a, PANEL_CAP)) return openPanel(a);
     if (!sub || sub === 'help') {
       if (!pl) return personal(a, 'Decorating works inside your own home. /decor find <words> lists what you can place.');
       const u = usage(placeEntry(pl.root, pl.rec)), b = budgetOf(pl);
@@ -630,12 +776,7 @@ module.exports = (api) => {
       if (!owns(a, pl.rec)) return personal(a, 'Only the owner names who may decorate.');
       const t = findByName(rest);
       if (!t) return personal(a, 'Nobody online by that name.');
-      const p = placeEntry(pl.root, pl.rec), pid = profile(t);
-      p.decorators = (p.decorators || []).filter((x) => x !== pid);
-      if (sub === 'grant') p.decorators.push(pid);
-      save();
-      audit(`DECOR ${sub} ${who(a)} -> ${who(t)} place ${hex(pl.root)}`);
-      return personal(a, `${sub === 'grant' ? 'They may now decorate here.' : 'They may no longer decorate here.'}`);
+      return setDecorator(a, pl, profile(t), sub === 'grant', who(t));
     }
     if (sub === 'clear') {
       if (!isDeveloper(a)) return personal(a, 'That is for Developers.');
@@ -649,5 +790,5 @@ module.exports = (api) => {
   }, { help: 'decorate your home: find, place, list, move, remove, undo, grant, revoke, plant' });
 
   // test hooks (tests/decor-harness.js)
-  return { _test: { takeAll, costOf, budgetProblem, spotProblem, confirm, scanOwners, reg, S, C, usePlanter, plant, pick, ripen, showPos } };
+  return { _test: { panelFor, openPanel, refundOf, takeAll, costOf, budgetProblem, spotProblem, confirm, scanOwners, reg, S, C, usePlanter, plant, pick, ripen, showPos } };
 };
