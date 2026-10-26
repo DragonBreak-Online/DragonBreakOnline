@@ -50,6 +50,11 @@ for (const menu of Object.keys(fixtures)) {
     const parsed = events.map((m) => M.parseUiEvent(m.e, m.s, m.n));
     check(`${menu}${late ? ' (skse late)' : ''}: the service parses every event the panel sends`, parsed.length > 3 && parsed.every(Boolean), events.filter((m, i) => !parsed[i]));
     check(`${menu}${late ? ' (skse late)' : ''}: ready leads and carries its frame where the service reads it`, parsed[0].key === 'ready' && parsed[0].frame === (late ? 2 : 1), parsed[0]);
+    const box = M.parseOutbox(t.root.dboOut, 0);
+    check(`${menu}${late ? ' (skse late)' : ''}: the outbox carries the same messages, in order, through parseOutbox`,
+      box.messages.length === parsed.length && box.messages.every((m, i) => m.key === parsed[i].key && JSON.stringify(m.args) === JSON.stringify(parsed[i].args)), { box: box.messages.map((m) => m.key), ev: parsed.map((p) => p.key) });
+    check(`${menu}${late ? ' (skse late)' : ''}: outbox sequences run 1, 2, 3... and the cursor reaches the end`,
+      box.messages.every((m, i) => m.seq === i + 1) && box.consumed === String(t.root.dboOut).length, box.messages.map((m) => m.seq));
     const keys = [...new Set(parsed.map((p) => p.key))];
     const unknown = keys.filter((k) => k !== 'ready' && k !== 'close' && !M.serverEventName(k));
     check(`${menu}${late ? ' (skse late)' : ''}: every other key is a dbo: key the service forwards`, !unknown.length, unknown);
