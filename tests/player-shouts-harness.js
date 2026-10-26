@@ -89,5 +89,34 @@ ok(!!powers.werewolf && !!powers.vampirelord, 'the werewolf and Vampire Lord pow
   ok(cfg.combat && cfg.combat.shoutCleanup === false, 'combat.shoutCleanup ships off');
 }
 
+// ---- the generator must not flatten the gated layout ---------------------------------------------
+// admin_powers.py used to write `spells` and `shouts` directly and knew nothing about spellsGiveAllOff
+// or shoutsGate, so simply running it re-enabled give-all in data and removed the key combat.js reads
+// for the shout gate. That is how a stale 254-spell, 123-shout file came to sit in the working checkout
+// while origin/server had the gated one. These checks fail if the layout is ever flattened again.
+{
+  const gen = fs.readFileSync(path.join(ROOT, 'tooling', 'ck-mcp', 'admin_powers.py'), 'utf8');
+  ok(/"spellsMeasureFirst":/.test(gen) && !/"spellsGiveAllOff":/.test(gen), 'the generator writes spellsMeasureFirst, never spellsGiveAllOff (the batched action gives what that key holds)');
+  ok(/"shoutsGate":/.test(gen), 'the generator writes shoutsGate');
+  ok(/"spells":\s*\[\]/.test(gen), '...and leaves spells empty, so a regenerate cannot re-enable give-all in data');
+  ok(/"shouts":\s*\[\]/.test(gen), '...and leaves shouts empty, so the gate keeps its own key');
+  ok(/DRAGONBORN_SHOUTS/.test(gen), 'the generator still narrows shouts to the named 27');
+  ok(/SKIP_RE/.test(gen), 'the generator drops mod internals by shape (SKIP_RE)');
+
+  // spellSources lets give-all be narrowed by source plugin from config without regenerating
+  const give = powers.spellsMeasureFirst || powers.spells || [];
+  // 252 on 25 Oct; 307 on 26 Oct: Tomebound, tome-taught powers, the live order, without held spells (admin_powers.py)
+  ok(Array.isArray(give) && give.length === 307, `the tome-taught catalogue is the 307 (${give.length})`);
+  ok(powers.spellSources && typeof powers.spellSources === 'object', 'admin-powers.json carries spellSources');
+  const fromDescs = new Set(give.map((r) => String(r[0]).split(':')[1]));
+  const listed = new Set(Object.keys(powers.spellSources || {}));
+  ok(fromDescs.size === listed.size && [...fromDescs].every((p) => listed.has(p)),
+     'spellSources names exactly the plugins the catalogue draws from');
+  const counted = Object.values(powers.spellSources || {}).reduce((a, b) => a + b, 0);
+  ok(counted === give.length, `spellSources counts add up to the catalogue (${counted} vs ${give.length})`);
+  ok(!give.some((r) => /^0_|PLAYER$/.test(String(r[1] || ''))),
+     'no mod internals left in the catalogue (YokuWeapons 0_ConjureSkeleSpell, 0_PuppetManConjurePLAYER)');
+}
+
 console.log(`${pass}/${pass + fail}`);
 process.exit(fail ? 1 : 0);
