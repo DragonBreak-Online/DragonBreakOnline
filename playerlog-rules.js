@@ -929,8 +929,8 @@ parsed('THEFT', {
   },
 });
 parsed('WARBAND', {
-  // the side name (typed by a GM) is cut
-  cut: / fights for .*$| for (?!\S+ NPC).*$| charges for .*$/,
+  // the side name and a preset's name (typed by a GM) are cut
+  cut: / fights for .*$| for (?!\S+ NPC).*$| charges for .*$|(?<= (?:saved|deleted) the preset) .*$/,
   parse: (text, P) => {
     if (!P.length) return [];
     if (/ set \d+ NPC\(s\) on /.test(text) && P.length > 1) return [ev('staff.action', 0, { action: 'warband_attack', via: 'command', outcome: 'ok', params: { count: num((text.match(/ set (\d+) NPC/) || [])[1]) } }, [[1, 'target']], { mirror: true })];
@@ -2021,6 +2021,10 @@ warband.js WARBAND 08930733 parsed
 warband.js WARBAND bf500dff parsed
 warband.js WARBAND 7ac16355 parsed
 warband.js WARBAND d2d7dc43 parsed
+warband.js WARBAND 57c1a667 parsed
+warband.js WARBAND b9719d78 parsed
+warband.js WARBAND bdfa1348 parsed
+warband.js WARBAND de03d398 parsed
 weaponracks.js WEAPONRACK d2aa0860 parsed
 weaponracks.js WEAPONRACK 97d57c44 parsed
 weaponracks.js WEAPONRACK 13b7bc1a parsed
