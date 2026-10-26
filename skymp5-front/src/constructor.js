@@ -29,6 +29,7 @@ import Labour from './features/labour';
 import Lockpick from './features/lockpick';
 import Prayer from './features/prayer';
 import Decor from './features/decor';
+import MapRealm from './features/mapRealm';
 import DeityPicker from './features/deityPicker';
 import BirthsignPicker from './features/birthsignPicker';
 import Pigeon from './features/pigeon';
@@ -285,6 +286,8 @@ const Constructor = props => {
       return <Lockpick data={rend} />;
     case 'prayer':
       return <Prayer data={rend} />;
+    case 'mapRealm':
+      return <MapRealm data={rend} />;
     case 'decor':
       return <Decor data={rend} />;
     case 'deityPicker':
