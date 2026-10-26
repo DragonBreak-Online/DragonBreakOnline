@@ -93,8 +93,7 @@ function drawHead()
 {
    var h = clear("head", 20);
    var hd = data.head != undefined && data.head != null ? data.head : {name: "", title: "", race: ""};
-   var n = dboText(h, "name", 1, PAD, 14, 700, 40, dboFmt(F_PLAIN, 30, C_TEXT, 1.0), false);
-   n.text = String(hd.name);
+   dboTitle(h, "name", 1, PAD, 14, 700, hd.name);
    var s = dboText(h, "subtitle", 2, PAD, 50, 700, 24, dboFmt(F_MEDIUM, 17, C_SECOND, 0.8), false);
    s.text = String(hd.title) + (hd.race != undefined && hd.race != "" ? "  -  " + hd.race : "");
    var c = data.clock;
@@ -148,8 +147,12 @@ function drawTabs()
          openTab(this.tabId);
       });
       b.tabId = String(t.id);
+      if (t.id == tab)
+      {
+         dboTabMark(b, w - 30);
+      }
    }
-   dboRule(s, PAD, y + 34, PANEL_W - PAD * 2);
+   dboDivider(s, PAD, y + 36, PANEL_W - PAD * 2);
    // a second row of tabs moves the page down under it
    bodyTop = Math.max(BODY_TOP, y + 48);
 }
@@ -212,7 +215,7 @@ function drawFoot(total)
 {
    var f = clear("foot", 60);
    var y = PANEL_H - 52;
-   dboRule(f, PAD, y - 10, PANEL_W - PAD * 2);
+   dboDivider(f, PAD, y - 10, PANEL_W - PAD * 2);
    dboText(f, "result", 1, PAD, y, 640, 26, dboFmt(F_MEDIUM, 17, C_TEXT, 0.5), false);
    showResult();
    var h = dboText(f, "hint", 2, PAD, y + 24, 640, 22, dboFmt(F_MEDIUM, 14, C_SECOND, 0.5), false);
@@ -293,7 +296,8 @@ function build()
    panel = _root.createEmptyMovieClip("dboPanel", 10);
    dboFit(panel, PANEL_W, PANEL_H);
    var bg = panel.createEmptyMovieClip("bg", 1);
-   dboBox(bg, 0, 0, PANEL_W, PANEL_H, 0x000000, 80);
+   dboGround(bg, PANEL_W, PANEL_H);
+   dboWatermark(panel, 5, PANEL_W - 50, 170, 300);
    dboFadeIn(panel);
 }
 

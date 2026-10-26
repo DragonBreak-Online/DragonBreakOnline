@@ -15,9 +15,19 @@ var F_PLAIN = "$EverywhereFont";
 var F_MEDIUM = "$EverywhereMediumFont";
 var F_BOLD = "$EverywhereBoldFont";
 var C_TEXT = 0xFFFFFF;
-var C_SECOND = 0x999999;
+// The branded look (Nat chose B, 26 Oct; STYLE.md section 11): the web front's dbo-theme, in our own vector art
+var C_SECOND = 0x8C9A9C;
+var C_SILVER = 0xE6ECEC;
+var C_ACCENT = 0x8FD3D0;
+var C_STONE = 0x5D6B6E;
+var C_STONE_LIGHT = 0x8C9A9C;
+var C_GROUND = 0x08191C;
+var C_GROUND_2 = 0x0F2A2E;
+// our hourglass, shipped as a loose DDS (launcher extras) and loaded by relative path, the way the map probe proved
+var DBO_HOURGLASS = "../textures/interface/dbo/dbo-hourglass.dds";
 var C_DISABLED = 0x606060;
-var A_ROW_REST = 30;
+// rows and tabs at rest; brighter than vanilla's 30 so they read on the teal ground
+var A_ROW_REST = 50;
 var A_BUTTON_REST = 80;
 var A_FOCUS = 100;
 var FADE_MS = 300;
@@ -467,9 +477,156 @@ function dboBox(clip, x, y, w, h, color, alpha)
    clip.endFill();
 }
 
+// A rule: one pixel of stone that fades out at both ends
 function dboRule(clip, x, y, w)
 {
-   dboBox(clip, x, y, w, 1, 0xFFFFFF, 25);
+   dboGradientBox(clip, x, y, w, 1, [C_STONE_LIGHT, C_STONE_LIGHT, C_STONE_LIGHT, C_STONE_LIGHT], [0, 70, 70, 0], [0, 30, 225, 255], 0);
+}
+
+// A fill from colour to colour across a box: rotation 0 runs left to right, Math.PI / 2 top to bottom
+function dboGradientBox(clip, x, y, w, h, colors, alphas, ratios, rotation)
+{
+   clip.beginGradientFill("linear", colors, alphas, ratios, {matrixType: "box", x: x, y: y, w: w, h: h, r: rotation});
+   clip.moveTo(x, y);
+   clip.lineTo(x + w, y);
+   clip.lineTo(x + w, y + h);
+   clip.lineTo(x, y + h);
+   clip.lineTo(x, y);
+   clip.endFill();
+}
+
+// A diamond of half-size r centred on cx, cy: aqua with a ground-coloured heart, as the corners and dividers carry
+function dboDiamond(clip, cx, cy, r)
+{
+   dboPoly(clip, [[cx, cy - r], [cx + r, cy], [cx, cy + r], [cx - r, cy]], C_ACCENT, 90);
+   dboPoly(clip, [[cx, cy - r + 1.5], [cx + r - 1.5, cy], [cx, cy + r - 1.5], [cx - r + 1.5, cy]], C_GROUND, 100);
+}
+
+function dboPoly(clip, pts, color, alpha)
+{
+   clip.beginFill(color, alpha);
+   clip.moveTo(pts[0][0], pts[0][1]);
+   for (var i = 1; i < pts.length; i++)
+   {
+      clip.lineTo(pts[i][0], pts[i][1]);
+   }
+   clip.lineTo(pts[0][0], pts[0][1]);
+   clip.endFill();
+}
+
+// A divider between a panel's parts: the fading rule with a diamond at its middle
+function dboDivider(clip, x, y, w)
+{
+   dboRule(clip, x, y, w);
+   dboDiamond(clip, x + w / 2, y, 5);
+}
+
+// One corner piece at (x, y), turned by sx and sy (1 or -1): a stone L, an aqua L inside it and a diamond on the point
+function dboCorner(clip, x, y, sx, sy)
+{
+   var box = function(bx, by, bw, bh, color, alpha)
+   {
+      var l = sx > 0 ? x + bx : x - bx - bw;
+      var t = sy > 0 ? y + by : y - by - bh;
+      dboBox(clip, l, t, bw, bh, color, alpha);
+   };
+   box(-3, -3, 27, 2.5, C_STONE_LIGHT, 100);
+   box(-3, -3, 2.5, 27, C_STONE_LIGHT, 100);
+   box(3, 3, 17, 1, C_ACCENT, 70);
+   box(3, 3, 1, 17, C_ACCENT, 70);
+   dboDiamond(clip, x - sx * 2, y - sy * 2, 5);
+}
+
+// The panel's ground and frame (Nat's B): teal deepening to black at the edges, a stone border, a faint aqua line
+// inside it, and the four corner pieces. Replaces the plain black box every panel had
+function dboGround(clip, w, h)
+{
+   dboGradientBox(clip, 0, 0, w, h, [C_GROUND, C_GROUND_2, C_GROUND], [93, 90, 94], [0, 150, 255], Math.PI / 2);
+   var line = function(x, y, lw, lh, color, alpha)
+   {
+      dboBox(clip, x, y, lw, lh, color, alpha);
+   };
+   line(0, 0, w, 1.5, C_STONE, 90);
+   line(0, h - 1.5, w, 1.5, C_STONE, 90);
+   line(0, 0, 1.5, h, C_STONE, 90);
+   line(w - 1.5, 0, 1.5, h, C_STONE, 90);
+   line(6, 6, w - 12, 1, C_ACCENT, 22);
+   line(6, h - 7, w - 12, 1, C_ACCENT, 22);
+   line(6, 6, 1, h - 12, C_ACCENT, 22);
+   line(w - 7, 6, 1, h - 12, C_ACCENT, 22);
+   dboCorner(clip, 0, 0, 1, 1);
+   dboCorner(clip, w, 0, -1, 1);
+   dboCorner(clip, 0, h, 1, -1);
+   dboCorner(clip, w, h, -1, -1);
+}
+
+// A panel's title: capitals in silver, spaced out
+function dboTitle(parent, name, depth, x, y, w, text)
+{
+   var t = dboText(parent, name, depth, x, y, w, 40, dboFmt(F_PLAIN, 28, C_SILVER, 4.0), false);
+   t.text = String(text).toUpperCase();
+   return t;
+}
+
+// The hourglass, faint, behind a panel's content: h high, its right edge at right, its top at top. Loaded from our
+// own DDS; where it cannot load the panel simply has none
+function dboWatermark(parent, depth, right, top, h)
+{
+   var c = parent.createEmptyMovieClip("dboMark", depth);
+   c._alpha = 5;
+   if (MovieClipLoader == undefined)
+   {
+      return c;
+   }
+   var pic = c.createEmptyMovieClip("pic", 1);
+   var l = {};
+   l.onLoadInit = function(t)
+   {
+      if (t._height > 0)
+      {
+         var ow = t._width;
+         var s = h / t._height;
+         t._xscale = s * 100;
+         t._yscale = s * 100;
+         t._x = right - ow * s;
+         t._y = top;
+      }
+   };
+   var mcl = new MovieClipLoader();
+   mcl.addListener(l);
+   mcl.loadClip(DBO_HOURGLASS, pic);
+   return c;
+}
+
+// The open tab's mark: an aqua line under its label, as wide as the label's words (w), on the button clip itself
+function dboTabMark(b, w)
+{
+   dboBox(b, 0, b.label._y + b.label._height + 1, w, 2, C_ACCENT, 85);
+}
+
+// The focused control's aqua wash (Nat's B): a band that fades to the right, under its label. washX and washW place it
+// where the control set them (rows), else it spans the engine's measure of the clip
+function dboWash(c, on)
+{
+   if (on != true || c.disabled == true)
+   {
+      if (c.wash != undefined)
+      {
+         c.wash.removeMovieClip();
+         delete c.wash;
+      }
+      return;
+   }
+   if (c.wash != undefined)
+   {
+      return;
+   }
+   var w = c.washW != undefined ? c.washW : c._width > 0 ? c._width : 200;
+   var h = c.washH != undefined ? c.washH : c._height > 0 ? c._height : 30;
+   var g = c.createEmptyMovieClip("wash", 0);
+   var x = c.washX != undefined ? c.washX : 0;
+   dboGradientBox(g, x - 10, -2, w + 10, h + 4, [C_ACCENT, C_ACCENT], [16, 0], [0, 255], 0);
+   c.wash = g;
 }
 
 // Linear alpha fade over FADE_MS; input is never blocked while it runs

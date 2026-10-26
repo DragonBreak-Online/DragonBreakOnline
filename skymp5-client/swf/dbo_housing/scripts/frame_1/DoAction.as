@@ -169,8 +169,7 @@ function hintText(r)
 function drawHead(r)
 {
    var h = clear("head", 20);
-   var title = dboText(h, "title", 1, PAD, 18, PANEL_W - PAD * 2 - 240, 40, dboFmt(F_PLAIN, 30, C_TEXT, 1.0), false);
-   title.text = data.name != null && data.name != "" ? String(data.name) : data.targetLabel != null && data.targetLabel != "" ? String(data.targetLabel) : "Property";
+   dboTitle(h, "title", 1, PAD, 18, PANEL_W - PAD * 2 - 240, data.name != null && data.name != "" ? String(data.name) : data.targetLabel != null && data.targetLabel != "" ? String(data.targetLabel) : "Property");
    var st = dboText(h, "status", 2, PANEL_W - PAD - 240, 28, 240, 26, dboFmt(F_MEDIUM, 18, data.locked == true ? C_RED : C_SECOND, 0.8, "right"), false);
    st.text = r.canLock ? (r.owner ? "Yours" : r.manager ? "Managed" : "Key holder") + (data.locked == true ? " - locked" : " - unlocked") : (data.owned == true ? "Owned by another" : "Unclaimed");
    var line = "";
@@ -184,7 +183,7 @@ function drawHead(r)
    }
    var o = dboText(h, "owner", 3, PAD, 62, PANEL_W - PAD * 2, 24, dboFmt(F_MEDIUM, 18, C_SECOND, 0.8), false);
    o.text = line;
-   dboRule(h, PAD, 96, PANEL_W - PAD * 2);
+   dboDivider(h, PAD, 96, PANEL_W - PAD * 2);
 }
 
 function drawActions(r)
@@ -369,7 +368,7 @@ function drawRight(r)
 function drawFoot()
 {
    var f = clear("foot", 60);
-   dboRule(f, PAD, PANEL_H - 62, PANEL_W - PAD * 2);
+   dboDivider(f, PAD, PANEL_H - 62, PANEL_W - PAD * 2);
    button(f, "close", 1, PANEL_W - PAD - 100, PANEL_H - 48, 100, "Close", F_MEDIUM, 20, A_BUTTON_REST, function()
    {
       closeMenu();
@@ -392,7 +391,8 @@ function build()
    panel = _root.createEmptyMovieClip("dboPanel", 10);
    dboFit(panel, PANEL_W, PANEL_H);
    var bg = panel.createEmptyMovieClip("bg", 1);
-   dboBox(bg, 0, 0, PANEL_W, PANEL_H, 0x000000, 80);
+   dboGround(bg, PANEL_W, PANEL_H);
+   dboWatermark(panel, 5, PANEL_W - 50, 150, 280);
    dboFadeIn(panel);
 }
 
