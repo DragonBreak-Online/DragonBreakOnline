@@ -1905,15 +1905,15 @@
    },
    "spots": [
     {
-     "id": "BF",
+     "id": "BE",
      "pos": [
-      6994,
-      7952,
-      993.0
+      8594,
+      7152,
+      1082.8
      ],
-     "note": "Blackreach's Falmer city, the open cavern floor north of it, cell (1, 1): on navmesh (993), nothing placed within 670 units and 1,040 from the nearest wild Falmer anchor (b1d1f5e-61). Nat 26 Oct: the old spot BC (6894, 7152, 1374) sat beside those anchors with no navmesh under it, and the arrival froze his client while the boss fight and five wild Falmer zones (11 actors) spawned at once (_work/boss-spots-1026/blackreach_scan.py)",
-     "ref": "f3b51:Skyrim.esm",
-     "anchorDist": 881,
+     "note": "the dry shore east of Blackreach's Falmer city, cell (2, 1): on navmesh (1082.8) in a cell with no water, 83 above the neighbouring lakes (XCLW 1000), nothing placed within 1,160 units, 1,900 from the wild Falmer anchors (b1d1f5e-61); checked by CK eye shots 26 Oct. Nat 26 Oct: the old spot BC (6894, 7152, 1374) sat beside those anchors and the arrival froze his client; the first replacement (6994, 7952, 993) turned out to be under the lake",
+     "ref": "f3abb:Skyrim.esm",
+     "anchorDist": 1601,
      "anchorSameCell": true
     }
    ],

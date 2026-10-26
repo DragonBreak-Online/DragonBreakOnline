@@ -19874,14 +19874,14 @@
    ]
   },
   {
-   "name": "Boss: the Falmer Warmonger, Blackreach's Falmer city",
+   "name": "Boss: the Falmer Warmonger, the dry shore east of Blackreach's Falmer city",
    "region": "Bosses",
    "world": "1ee62:Skyrim.esm",
    "worldName": "Blackreach",
    "pos": [
-    6994,
-    7952,
-    1057.0
+    8594,
+    7152,
+    1146.8
    ],
    "rot": [
     0,

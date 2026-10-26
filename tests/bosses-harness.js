@@ -22,8 +22,8 @@ ok(def('movarth').night === true && !def('valkynaz').event && def('valkynaz').re
   'Movarth\'s master walks at night, the Valkynaz stands on its own (Nat 26 Oct: it was a GM event), the Warmonger and the Warchief have their shamans');
 ok(def('valkynaz').guardian.options[0][2] === 'mihailhighclannfear_NPC' && def('valkynaz').adds[0].options.some((o) => o[2] === 'DDRClannfear') && def('valkynaz').adds[1].options.every((o) => /Scamp/.test(o[2])),
   '...with a High Clannfear guardian, Clannfear and scamps (Nat 26 Oct: "nor Clennifar or the scamp minions with it")');
-ok(def('falmerwarmonger').spots.length === 1 && def('falmerwarmonger').spots[0].id === 'BF' && def('falmerwarmonger').spots[0].pos[2] < 1100,
-  'the Warmonger stands on the cavern floor (BF, navmesh 993), not by the wild Falmer anchors where the arrival froze a client');
+ok(def('falmerwarmonger').spots.length === 1 && def('falmerwarmonger').spots[0].id === 'BE' && def('falmerwarmonger').spots[0].pos[2] > 1040,
+  'the Warmonger stands on the dry shore east of the city (BE, above the lakes at 1000), not by the wild Falmer anchors where the arrival froze a client');
 ok(!JSON.stringify(def('valkynaz').drops).includes('IngotEbony') && def('valkynaz').drops.always.some((x) => x[2] === 'DaedraHeart'), 'the Valkynaz drops a daedra heart and no Ebony (never loot)');
 ok(def('palewarlord').devOnly === true && def('palewarlord').spots.map((s) => s.id).join() === 'SE,ST' && def('palewarlord').roam === true,
   'the Warlord of the Pale Pass: dev only, at SE (under the Sentinel) roaming to ST (Serpent’s Trail), SR dropped (Nat, 25 Oct)');
