@@ -986,10 +986,11 @@ const HELP_GROUPS = [
       'Changing a school of magic: a Scholars\' Ledger or a Study Magic shelf, once every 7 days.',
       'Spell tomes: bought in the Synod Conclave, read at a study spot there or in Frost Crag Spire.',
       `Classes: a Class Lectern. At ${TEACH_TIER_NAME} in Arcane Arts or Priest you can /teach a spell to someone beside you.`] },
-  { key: 'faith', title: 'Faith and the unseen', names: ['pray', 'greenpact', 'partake'],
+  { key: 'faith', title: 'Faith and the unseen', names: ['pray', 'greenpact', 'partake', 'briarheart'],
     hints: ['Your god, and turning to another: F3, the Deity tab, or /deity.',
       'Offerings and rites: a shrine. Molag Bal gives the Embrace, Hircine the Great Hunt; Arkay or Stendarr lift a curse for a filled black soul gem.',
-      'A fever caught from a vampire or a werewolf: a Cure Disease potion, or prayer at a shrine of the Divines.'] },
+      'A fever caught from a vampire or a werewolf: a Cure Disease potion, or prayer at a shrine of the Divines.',
+      'A briar heart (Reachfolk of the Old Gods): the Hagravens\' altar in Deepwood Vale, with a Briar Heart. /briarheart rite there.'] },
   { key: 'beast', title: 'The beast in you', names: ['beast', 'forms', 'hunt', 'blood', 'feed', 'confess'], role: 'beast',
     hints: ['Your curse and its powers: F3, the Supernatural tab.',
       'Silver and fire hurt a vampire more; silver and poison spells hurt a werewolf more in beast form.'] },
@@ -1023,8 +1024,8 @@ const HELP_BY_OBJECT = new Set(['bank', 'board', 'business', 'faction', 'deity',
   'ledger', 'chill', 'sentence', 'hunger', 'rest', 'tokens', 'whoami', 'pigeonblock', 'sign', 'level', 'spells',
   'teach', 'reroll', 'offer', 'contract', 'commission', 'wildlife', 'champions', 'whereami', 'playtest', 'dungeon', 'ping',
   'expedition', 'expeditions', 'blackreach', 'shop',
-  // Off until Nat switches each on; each gets its topic entry then
-  'briarheart', 'decor']);
+  // Off until Nat switches it on; it gets its topic entry then
+  'decor']);
 const helpRoleOk = (a, role) => {
   if (!role) return true;
   try {
