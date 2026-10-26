@@ -35,6 +35,20 @@ module.exports = (api) => {
     log(`scaleform test panel opened by ${who(a)}`);
   }, { admin: true, hidden: true, help: '[many|wide|close] open the Scaleform test panel (hagtest2 client only)' });
 
+  // A row click. The panel sends "dbo:testRow" with [index] on the shared panel wire, so the client turns it
+  // into the same { customPacketType: 'dbo', event, args, widget } packet a browser widget sends and it
+  // arrives here through onUi, exactly like every other widget. 17 clicks reached the server on 26 Oct at
+  // 17:13 and nothing answered them, because this handler did not exist yet.
+  onUi('testRow', (a, args) => {
+    const i = Number(Array.isArray(args) ? args[0] : args);
+    if (!Number.isFinite(i)) { log(`scaleform row: a click with no index from ${who(a)}`); return; }
+    log(`scaleform row ${i} from ${who(a)}`);
+    if (!isAdmin(a)) return;
+    personal(a, `You clicked row ${i + 1}: ${ROWS[i] !== undefined ? ROWS[i] : '(not one of the fixed rows)'}`);
+  });
+
+  // The older reply shape, kept only for a client that predates the shared wire. The live client sends its
+  // clicks through onUi above, so nothing reaches this on hagtest5 or later.
   // What the client reports back: "ready" once the SWF has built itself, then a row index per click.
   // Every line is logged, because an open that never reports ready is the result this test is looking for.
   globalThis.__dboScaleformPacket = (a, content) => {
