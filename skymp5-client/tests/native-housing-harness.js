@@ -45,7 +45,7 @@ const rooms = (t) => Object.keys(P(t).right.kids).filter((n) => /^r\d$/.test(n))
   const t = S.boot('dbo_housing');
   t.push(Object.assign({}, base, { keyRing: true }));
   btn(t, 'Key Ring').onRelease();
-  check('Key Ring opens the ring, cancels this menu, closes', msgs(t, 'dbo:keyRingOpen').length === 1 && msgs(t, 'housing:cancel').length === 1 && msgs(t, 'close').length === 1 && closed(t));
+  check('Key Ring opens the ring, cancels this menu, closes', msgs(t, 'dbo:keyRingOpen').length === 1 && msgs(t, 'housing:cancel').length === 1 && msgs(t, 'close').length === 0 && closed(t));
   const u = S.boot('dbo_housing');
   u.push(Object.assign({}, base, { view: 'manager', ownerName: 'Olaf', hasKeys: false, canGrantContainers: true, keyRing: false }));
   check('a manager: lock, transfer as grant, rename, revoke, grant container; no market at a container', labels(u).join('|') === 'Lock|Grant ownership|Rename...|Revoke ownership|Grant this container', labels(u).join('|'));
@@ -99,7 +99,7 @@ const rooms = (t) => Object.keys(P(t).right.kids).filter((n) => /^r\d$/.test(n))
   const t = S.boot('dbo_housing');
   t.push(base);
   t.press(27);
-  check('Escape sends the cancel and closes', msgs(t, 'housing:cancel').length === 1 && msgs(t, 'close').length === 1 && closed(t));
+  check('Escape sends the cancel and closes', msgs(t, 'housing:cancel').length === 1 && msgs(t, 'close').length === 0 && closed(t));
   const l = S.boot('dbo_housing', true);
   l.tick(); l.st.time += 8000; l.tick();
   check('without skse nothing is sent', l.sent.length === 0);

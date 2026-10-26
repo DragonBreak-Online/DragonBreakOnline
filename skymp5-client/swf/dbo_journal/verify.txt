@@ -22,3 +22,9 @@ JT.thalmor
 dbo:citizenJ
 dbo:journalNotes
 thalmorStrike
+JT.nobility
+JT.court
+JT.faction
+dbo:nobilityRevoke
+dbo:courtDismiss
+dbo:factionSetRank

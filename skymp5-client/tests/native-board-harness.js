@@ -53,7 +53,7 @@ const closed = (t) => t.sent.some((m) => m.e === 'closeMenu');
   t.push(Object.assign({}, board, { notes: board.notes.slice(0, 2) }));
   check('a re-publish keeps the open tab', P(t).head.tab1._alpha === 100 && rowsOf(t).length === 1);
   t.press(27);
-  check('Escape on the list sends the widget close and closes', msgs(t, 'bountyBoard:close').length === 1 && msgs(t, 'close').length === 1 && closed(t));
+  check('Escape on the list sends the widget close (no bare close, as the browser Close) and closes', msgs(t, 'bountyBoard:close').length === 1 && msgs(t, 'close').length === 0 && closed(t));
 }
 
 {

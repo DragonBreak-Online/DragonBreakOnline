@@ -32,7 +32,6 @@ function closeMenu()
 {
    dboSound("UIMenuCancel");
    dboSend(ev("cancel"), []);
-   dboSend("close", []);
    dboClose();
 }
 
@@ -41,7 +40,6 @@ function sendAndClose(key, args)
 {
    dboSound("UIMenuOK");
    dboSend(key, args);
-   dboSend("close", []);
    dboClose();
 }
 

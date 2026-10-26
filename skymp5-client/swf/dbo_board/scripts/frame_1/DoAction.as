@@ -31,7 +31,6 @@ function closeBoard()
 {
    dboSound("UIMenuCancel");
    dboSend(ev("close"), []);
-   dboSend("close", []);
    dboClose();
 }
 

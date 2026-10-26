@@ -13,3 +13,6 @@ dbo-controls.as
 ../dbo_journal/tabs/referrals.as
 ../dbo_journal/tabs/notes.as
 ../dbo_journal/tabs/thalmor.as
+../dbo_journal/tabs/nobility.as
+../dbo_journal/tabs/court.as
+../dbo_journal/tabs/faction.as

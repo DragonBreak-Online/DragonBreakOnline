@@ -372,4 +372,121 @@ const firstPage = (t) => { for (let i = 0; i < 6; i++) t.press(33); };
   check('a note is typed: it hands the tab to the browser', msgs(t, 'dbo:journalTab').pop().args[3] === 'browser');
 }
 
+// ---- Nobility ----
+{
+  const noble = (actor, name, label) => ({ actor, name, tag: name.slice(0, 4).toUpperCase(), online: actor === 'a1', title: 'baron', label, fief: '', estate: '', since: 1790000000000 });
+  const nob = { enabled: true, fiefShare: 10, selected: '', mine: [{ hold: 'bruma', label: 'Baron of Applewatch', since: 1790000000000, fief: { id: 'apple', name: 'Applewatch', treasury: 120, properties: [{ ref: 'r1', name: 'The mill', owner: 'Gemma' }] } }],
+    holds: [{ id: 'bruma', name: 'Bruma', realm: 'cyrodiil', ruler: { name: 'Narri', style: 'Countess' }, isRuler: true, canRevoke: true, titles: [{ id: 'baron', label: 'Baron', needs: 'fief' }],
+      fiefs: [{ id: 'apple', name: 'Applewatch', buildings: 1, holder: noble('a1', 'Olaf', 'Baron of Applewatch'), treasury: 120 }, { id: 'pell', name: 'Pell', buildings: 0, holder: null, treasury: null }],
+      roll: [noble('a1', 'Olaf', 'Baron of Applewatch')] }, { id: 'chorrol', name: 'Chorrol', realm: 'cyrodiil', ruler: null, isRuler: false, fiefs: [], roll: [], titles: [] }] };
+  const t = S.boot('dbo_journal');
+  t.push(hub('nobility', { tabs: tabsWith('nobility', 'Nobility'), nobility: nob }));
+  let tx = allPages(t);
+  firstPage(t);
+  check('Nobility: the holds, the open one\'s ruler, fiefs (vacant greyed) and roll', btn(t, 'Bruma  (yours)') && /County of Bruma\|Countess: Narri/.test(tx) && /Applewatch\|Baron of Applewatch: Olaf #OLAF  \(online\)   120 gold/.test(tx) && /Pell\|Vacant/.test(tx), tx);
+  btn(t, 'Revoke') || t.root.dboPanel.foot.next.onRelease();
+  btn(t, 'Revoke').onRelease(); btn(t, 'Revoke').onRelease();
+  check('Revoke asks, then sends nobilityRevoke with the hold and the noble', msgs(t, 'dbo:nobilityRevoke').pop().args.join('|') === 'n1|bruma|a1');
+  t.push(hub('nobility', { nonce: 'n2', tabs: tabsWith('nobility', 'Nobility'), nobility: nob }));
+  tx = allPages(t);
+  check('a ruler grants by name in the browser', /Grant a title/.test(tx) && btn(t, 'Grant a title...'));
+  firstPage(t);
+  btn(t, 'Your titles (1)').onRelease();
+  tx = texts(t).join('|');
+  check('Your titles: the title, the fief treasury and its buildings', /Baron of Applewatch/.test(tx) && /The treasury of Applewatch holds 120 gold\. It takes 10% of the weekly property tax here/.test(tx) && /The mill\|Gemma/.test(tx), tx);
+}
+
+// ---- Court ----
+{
+  const holder = (pid, name, online) => ({ pid, name, tag: name.slice(0, 4).toUpperCase(), online });
+  const court = { id: 'bruma', name: 'Bruma', kind: 'hold', mine: true, treasury: 900, keepsBooks: true, canName: false, tax: { pct: 5, max: 20, canSet: true },
+    offices: [{ rank: 'steward', title: 'Steward', seats: 1, holders: [holder(7, 'Gemma', true)], canAppoint: true, wage: 40 }, { rank: 'guard', title: 'Guard Captain', seats: 2, holders: [], canAppoint: true }],
+    appointable: [{ rank: 'steward', title: 'Steward' }, { rank: 'guard', title: 'Guard Captain' }],
+    outgoing: [{ id: 'o1', name: 'Bram', rank: 'guard', title: 'Guard Captain', from: 'Narri', at: 0, expiresAt: Date.now() + 5 * 3600000 }],
+    household: { id: 'hh', name: 'House of Bruma', myRank: 1, canInvite: true, canKick: true, canSetRank: true, ranks: [{ title: 'Jarl', role: 'leader' }, { title: 'Courtier', role: 'officer' }, { title: 'Retainer', role: 'member' }],
+      members: [{ actorId: 9, name: 'Bram', tag: 'BRAM', rank: 2, title: 'Retainer', role: 'member', online: false }], pending: [{ actorId: 10, name: 'Sven', from: 'Narri', at: 0 }] },
+    contracts: { tiers: [{ tier: 1, name: 'lesser', price: 20, kinds: ['wolf'] }], bounds: { min: 5, max: 100 }, budget: 500, budgetMax: 5000, spent: 40, left: 460, resetsAt: Date.now() + 86400000 * 2, standing: true, citizensOnly: false, canSet: true, by: '', at: 0,
+      canPost: true, postBudget: 200, postLeft: 150, fauna: [], posted: [{ id: 'p1', type: 'hunt', what: '3 wolves', by: 'Narri', held: 60, hoursLeft: 20, mine: false, canWithdraw: true }] } };
+  const sec = { staff: false, outright: false, selected: 'bruma', courts: [court], offers: [{ id: 'x1', zone: 'cheydinhal', zoneName: 'Cheydinhal', rank: 'guard', title: 'Guard Captain', from: 'Andel', at: 0, expiresAt: Date.now() + 30 * 60000 }] };
+  const T6 = tabsWith('court', 'Court');
+  const t = S.boot('dbo_journal');
+  t.push(hub('court', { tabs: T6, court: sec }));
+  let tx = texts(t).join('|');
+  check('Court: an offer to you with Accept, the court with its views, the treasury and tax with Set', /Offered: Guard Captain of Cheydinhal, by Andel\|less than an hour left/.test(tx) && /Bruma/.test(tx) && btn(t, 'Offices') && btn(t, 'Hunting') && /The treasury holds 900 gold\./.test(tx) && /Tax: 5%/.test(tx) && btn(t, 'Set...'), tx);
+  btn(t, 'Accept').onRelease();
+  check('Accept answers the offer', msgs(t, 'dbo:courtAnswer').pop().args.join('|') === 'n1|x1|accept');
+  t.push(hub('court', { nonce: 'n2', tabs: T6, court: sec }));
+  tx = allPages(t);
+  check('a member of the court may Step down; the offers waiting have Withdraw', /Offers waiting\|Bram: Guard Captain\|by Narri, 5 hours left/.test(tx), tx);
+  firstPage(t);
+  btn(t, 'Offices').onRelease();
+  tx = texts(t).join('|');
+  check('Offices: each office, its seats, its wage and holders; a vacant one says so', /Steward   1 \/ 1\|40 gold a week\|    Gemma #GEMM/.test(tx) && /Guard Captain   0 \/ 2\|    Vacant\./.test(tx), tx);
+  btn(t, 'Move to...').onRelease();
+  btn(t, 'Guard Captain').onRelease();
+  check('Move to... lists the other offices; picking one moves the holder', msgs(t, 'dbo:courtMove').pop().args.join('|') === 'n2|bruma|7|guard');
+  t.push(hub('court', { nonce: 'n3', tabs: T6, court: sec }));
+  btn(t, 'Dismiss').onRelease(); btn(t, 'Dismiss').onRelease();
+  check('Dismiss asks, then sends', msgs(t, 'dbo:courtDismiss').pop().args.join('|') === 'n3|bruma|7');
+  t.push(hub('court', { nonce: 'n4', tabs: T6, court: sec }));
+  tx = allPages(t);
+  check('appointing by name is typed: one button to the browser', btn(t, 'Appoint, wages, names...') && /typed in the browser journal/.test(tx));
+  firstPage(t);
+  btn(t, 'Household').onRelease();
+  tx = texts(t).join('|');
+  check('Household: members with their rank, who is invited', /House of Bruma\|Bram #BRAM \(offline\)   Retainer/.test(tx) && /Invited: Sven/.test(tx), tx);
+  btn(t, 'Rank...').onRelease();
+  check('Rank... offers every rank but the head\'s, the member\'s own bright', !btn(t, 'Jarl') && btn(t, 'Retainer')._alpha === 100 && btn(t, 'Courtier'));
+  btn(t, 'Courtier').onRelease();
+  check('a rank picked sends courtRank with its index', msgs(t, 'dbo:courtRank').pop().args.join('|') === 'n4|bruma|9|1');
+  t.push(hub('court', { nonce: 'n5', tabs: T6, court: sec }));
+  btn(t, 'Hunting').onRelease();
+  tx = allPages(t);
+  check('Hunting: pay per kill, the budget, standing with its switch, the week, and the work posted', /Lesser\|20 gold a kill   wolf/.test(tx) && /Weekly budget\|500 gold/.test(tx) && /Standing contracts: On/.test(tx) && /40 gold spent, 460 left/.test(tx) && /3 wolves\|by Narri, 60 gold held, 20h left/.test(tx), tx);
+  btn(t, 'Take down').onRelease();
+  check('Take down withdraws posted work', msgs(t, 'dbo:courtContractWithdraw').pop().args.join('|') === 'n5|bruma|p1');
+}
+
+// ---- Faction ----
+{
+  const fm = (actorId, name, rank, title) => ({ actorId, name, tag: name.slice(0, 4).toUpperCase(), rank, title, role: 'member', online: true });
+  const fac = { id: 37, nonce: 'f1', admin: false, self: 1, selected: '', charters: true,
+    invites: [{ factionId: 'mages', name: 'Mages Guild', from: 'Gemma' }],
+    factions: [{ id: 'hold:bruma', name: 'House of Bruma', kind: 'hold', court: true, myRank: 2, secret: false, prince: '', myTitle: 'Retainer', canInvite: false, canKick: false, canSetRank: false, ranks: [], members: [] },
+      { id: 'fighters', name: 'Fighters Guild', kind: 'guild', court: false, myRank: 0, secret: false, prince: '', myTitle: 'Champion', canInvite: true, canKick: true, canSetRank: true, canRename: true,
+        ranks: [{ title: 'Champion', role: 'leader' }, { title: 'Warden', role: 'officer' }, { title: 'Associate', role: 'member' }], members: [fm(1, 'Olaf', 0, 'Champion'), fm(4, 'Bram', 2, 'Associate')] }],
+    realm: { wars: [{}, {}] } };
+  const T7 = tabsWith('faction', 'Faction');
+  const t = S.boot('dbo_journal');
+  t.push(hub('faction', { tabs: T7, faction: fac }));
+  let tx = allPages(t);
+  check('Faction: the sub-tabs drawn by the browser, an invitation, the hold household pointed to Court', /Realm\.\.\.\|War \(2\)\.\.\.\|Found a faction/.test(tx), tx);
+  firstPage(t);
+  tx = texts(t).join('|');
+  check('...an invite with Join, the court household left to Court, your faction open', /Gemma invites you to Mages Guild/.test(tx) && /Your hold's household is on the Court tab\./.test(tx) && /Fighters Guild\|Guild  -  you are Champion/.test(tx) && !btn(t, 'House of Bruma (Retainer)'), tx);
+  btn(t, 'Join').onRelease();
+  check('Join carries the faction menu\'s own nonce, not the journal\'s', msgs(t, 'dbo:factionAccept').pop().args.join('|') === 'f1|mages');
+  t.push(hub('faction', { tabs: T7, faction: Object.assign({}, fac, { nonce: 'f2' }) }));
+  check('a new faction nonce ends the wait', P(t).foot.result.text !== '...');
+  tx = allPages(t);
+  check('members with their title; no Rank on yourself', /Bram #BRAM   Associate/.test(tx) && buttonsOf(t).filter((b) => b.label.text === 'Rank...').length <= 1, tx);
+  firstPage(t);
+  const pageWith = (label) => { for (let i = 0; i < 4 && !btn(t, label); i++) t.root.dboPanel.foot.next.onRelease(); return btn(t, label); };
+  pageWith('Rank...').onRelease();
+  pageWith('Warden').onRelease();
+  check('Rank... then a rank sends factionSetRank', msgs(t, 'dbo:factionSetRank').pop().args.join('|') === 'f2|fighters|4|1');
+  t.push(hub('faction', { tabs: T7, faction: Object.assign({}, fac, { nonce: 'f3' }) }));
+  pageWith('Leave faction').onRelease(); btn(t, 'Leave').onRelease();
+  check('Leave asks, then sends factionLeave', msgs(t, 'dbo:factionLeave').pop().args.join('|') === 'f3|fighters');
+  t.push(hub('faction', { tabs: T7, faction: Object.assign({}, fac, { nonce: 'f4' }) }));
+  firstPage(t);
+  btn(t, 'Found a faction').onRelease();
+  check('Found a faction opens the charter in the panel', msgs(t, 'dbo:menuFind').pop().args.join('|') === 'charter');
+  pageWith('Invite someone...').onRelease();
+  check('inviting by name hands the tab to the browser', msgs(t, 'dbo:journalTab').pop().args[3] === 'browser');
+  const st = S.boot('dbo_journal');
+  st.push(hub('faction', { tabs: T7, faction: Object.assign({}, fac, { staff: true }) }));
+  check('staff get the staff view in the browser', btn(st, 'Staff view...') && !btn(st, 'Join'));
+}
+
 T.done();
