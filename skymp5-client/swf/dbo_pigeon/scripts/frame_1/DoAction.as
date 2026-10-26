@@ -765,10 +765,11 @@ function drawTabs()
       }
       x += w + 10;
    }
-   dboDivider(h, PAD, 104, PANEL_W - PAD * 2);
+   // below the open tab's mark, so its diamond sits clear of the tabs (as the board's does)
+   dboDivider(h, PAD, 114, PANEL_W - PAD * 2);
    if (data.result != undefined && data.result != null && data.result != "")
    {
-      var res = txt(h, "result", 30, PAD, 112, PANEL_W - PAD * 2, 30, 16, data.resultKind == "refused" ? C_RED : C_GREEN, data.result, true);
+      var res = txt(h, "result", 30, PAD, 120, PANEL_W - PAD * 2, 28, 16, data.resultKind == "refused" ? C_RED : C_GREEN, data.result, true);
    }
 }
 
