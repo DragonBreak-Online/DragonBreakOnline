@@ -40,5 +40,40 @@ ok(last().customPacketType === 'dboWidget', 'and only once', last());
 openWidget(B, { type: 'bank', id: 40 }, true);
 ok(last().customPacketType === 'dboWidget', 'a type with no SWF is untouched', last());
 
+// The journal: native per hub tab the client's swf names, and a tab switch moves it between the two surfaces
+const C = 0xff000003;
+const J = (tab, extra) => Object.assign({ type: 'journal', id: 50, nonce: 'j', hub: 1, tab }, extra || {});
+setCaps(C, ['native:journal', 'native:journalTab:stats', 'native:journalTab:deity']);
+openWidget(C, J('stats'), true);
+ok(last().customPacketType === 'dboScaleform' && last().swf === 'dbo_journal', 'a journal tab the swf draws goes native', last());
+sent.length = 0;
+openWidget(C, J('profile'));
+ok(sent.length === 2 && sent[0][1].customPacketType === 'dboScaleform' && sent[0][1].close === true && sent[1][1].customPacketType === 'dboWidget' && sent[1][1].focus === true,
+  'switching to Profile closes the custom menu, then opens the browser journal with the cursor', sent.map((x) => x[1]));
+sent.length = 0;
+openWidget(C, J('profile', { result: 'saved' }));
+ok(sent.length === 1 && sent[0][1].customPacketType === 'dboWidget' && sent[0][1].focus === false, 'a redraw in the browser stays a plain redraw', sent.map((x) => x[1]));
+sent.length = 0;
+openWidget(C, J('deity'));
+ok(sent.length === 2 && sent[0][1].customPacketType === 'dboWidget' && sent[0][1].close === 50 && sent[1][1].customPacketType === 'dboScaleform',
+  'switching back to a native tab closes the browser journal, then opens the native one', sent.map((x) => x[1]));
+openWidget(C, J('magic'));
+ok(last().customPacketType === 'dboWidget' && last().focus === true, 'a tab the swf does not name goes to the browser', last());
+openWidget(C, Object.assign(J('stats'), { hub: 0 }));
+ok(last().customPacketType === 'dboWidget', 'a journal without the hub is never native', last());
+sent.length = 0;
+openWidget(C, J('stats')); closeWidget(C, 50);
+ok(sent.length === 3 && sent[2][1].close === true, 'closing the journal closes whichever surface has it', sent.map((x) => x[1]));
+sent.length = 0;
+openWidget(C, J('settings')); closeWidget(C, 50); openWidget(C, J('stats'));
+ok(sent.length === 3 && sent[1][1].close === 50 && sent[2][1].customPacketType === 'dboScaleform', 'a closed browser journal is not closed again on the next native open', sent.map((x) => x[1]));
+openWidget(C, J('stats', { browser: 1 }));
+ok(last().customPacketType === 'dboWidget' && last().focus === true, 'a draw marked browser (the native journal handing off typed input) goes to the browser', last());
+openWidget(C, J('stats'));
+ok(last().customPacketType === 'dboScaleform', 'and the next unmarked one comes back native', last());
+setCaps(B, ['native:decor']);
+openWidget(B, J('stats'));
+ok(last().customPacketType === 'dboWidget', 'a client without native:journal keeps the browser journal', last());
+
 console.log(fails ? `\n${fails} failed` : '\nall passed');
 process.exit(fails ? 1 : 0);
