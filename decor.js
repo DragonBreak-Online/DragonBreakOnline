@@ -51,6 +51,10 @@ const DEFAULTS = {
   // is one Harvesting roll (skills.json harvesting: chance and multiplier by tier) on baseYield, missYield if it fails;
   // then the planter is empty again. showZ raises the soil and the crop to the planter's bed. tickSeconds: the ripening check.
   planter: { maxPerHome: 4, growHours: 24, rareHours: 48, baseYield: 2, missYield: 1, showZ: 30, tickSeconds: 60 },
+  // The Lumber Pile (Nat 26 Oct, a home's saw): a Woodcutter of minTier (0 based; 1 Apprentice) saws carried firewood into
+  // Sawn Logs, firewoodPerLogByTier firewood a log by tier, at most logsPerUse logs a use, then cooldownMinutes per player
+  // per pile. Who may decorate the home may use it. The piece is one per home (its station keyword) and takes a workbench slot.
+  lumber: { minTier: 1, firewoodPerLogByTier: [0, 4, 3, 3, 2], logsPerUse: 10, cooldownMinutes: 10, firewood: '6f993:Skyrim.esm', log: '300e:HearthFires.esm' },
 };
 
 module.exports = (api) => {
@@ -61,6 +65,7 @@ module.exports = (api) => {
   const C = Object.assign({}, DEFAULTS, (api.cfg || {}).decor || {});
   C.study = Object.assign({}, DEFAULTS.study, ((api.cfg || {}).decor || {}).study || {});
   C.planter = Object.assign({}, DEFAULTS.planter, ((api.cfg || {}).decor || {}).planter || {});
+  C.lumber = Object.assign({}, DEFAULTS.lumber, ((api.cfg || {}).decor || {}).lumber || {});
   const itemName = (d) => { try { const n = typeof api.itemName === 'function' ? api.itemName(d) : ''; return n && n !== d ? String(n) : String(d); } catch (e) { return String(d); } };
   const S = globalThis.__dboDecor || (globalThis.__dboDecor = { catalog: null, byDesc: null, reg: null, pending: new Map(), undo: new Map(), rate: new Map(), found: new Map(), scanAt: 0, scanIdx: 0 });
   S.catalog = null; S.growing = null; S.matNames = null; S.matDesc = null; S.matGroups = null;   // a hot reload reads the catalogue files again (decor-growing.json's ids are filled in later)
@@ -612,6 +617,28 @@ module.exports = (api) => {
     audit(`DECOR pick ${who(a)} ${crop.item} x${n} from planter ${it.ref} place ${hex(found.root)} tier ${tier}`);
     return personal(a, n ? `You pick ${n} ${itemName(crop.item)}. The planter is empty again.` : `The ${itemName(crop.item)} failed. The planter is empty again.`);
   };
+  // The Lumber Pile: carried firewood (any variant) into Sawn Logs, by the sawyer's Woodcutter tier; the rest is the
+  // character's (private.decorLumber, by pile), so it survives a restart and each player keeps their own
+  const LUMBER_RESTS = 'private.decorLumber';
+  const useLumber = (a, found) => {
+    const L = C.lumber, it = found.item;
+    if (!mayDecorate(a, placeOfFound(found))) return personal(a, 'Only the owner, or someone the owner hired, saws at this lumber pile.');
+    const tier = skillRank(a, 'woodcutter'), min = Math.max(0, Number(L.minTier) || 0);
+    if (tier < min) return personal(a, `Sawing building timber takes ${CARPENTER_TIERS[min] === 'Apprentice' ? 'an' : 'a'} ${CARPENTER_TIERS[min] || 'Apprentice'} Woodcutter.`);
+    const rests = Object.assign({}, get(a, LUMBER_RESTS, {}) || {}), until = Number(rests[it.ref]) || 0;
+    if (until > Date.now()) return personal(a, `The saw is still warm from your last batch. Come back in ${Math.ceil((until - Date.now()) / 60000)} minutes.`);
+    const per = Math.max(1, Number((L.firewoodPerLogByTier || [])[Math.min(tier, (L.firewoodPerLogByTier || []).length - 1)]) || 4);
+    const have = heldGroup(a, L.firewood), n = Math.min(Math.max(1, Number(L.logsPerUse) || 10), Math.floor(have / per));
+    if (n < 1) return personal(a, `A Sawn Log takes ${per} Firewood at your skill; you carry ${have}.`);
+    const paid = spendAll(a, { [L.firewood]: n * per });
+    if (!paid) return personal(a, `A Sawn Log takes ${per} Firewood at your skill; you carry ${have}.`);
+    if (giveItem(a, idOf(L.log), n) === false) { giveAll(a, paid, 1); return personal(a, 'The logs are sawn, but you cannot carry them; your firewood is back.'); }
+    for (const k of Object.keys(rests)) if (Number(rests[k]) < Date.now()) delete rests[k];
+    rests[it.ref] = Date.now() + Math.max(1, Number(L.cooldownMinutes) || 10) * 60000;
+    try { mp.set(a, LUMBER_RESTS, rests); } catch (e) { log('decor: lumber rest save failed', e.message); }
+    audit(`DECOR lumber ${who(a)} sawed ${n * per} firewood into ${n} sawn logs (tier ${tier + 1}) at ${it.ref} place ${hex(found.root)}`);
+    return personal(a, `You saw ${n * per} Firewood into ${n} Sawn Log${n === 1 ? '' : 's'}. The saw needs ${Math.max(1, Number(L.cooldownMinutes) || 10)} minutes before your next batch.`);
+  };
   const usePlanter = (a, found) => {
     const it = found.item;
     if (!mayDecorate(a, placeOfFound(found))) return personal(a, 'Only the owner, or someone the owner named with /decor grant, tends this planter.');
@@ -648,6 +675,10 @@ module.exports = (api) => {
       const kind = kindOf(it), n = found.place.items.filter((i) => kindOf(i) === kind).length, need = Math.max(1, Number(C.study.minForStudy) || 1);
       if (n < need) { personal(caster, `A home ${kind} study needs ${need} ${kind} study bookshelves; this home has ${n}.`); return true; }
       return false;
+    }
+    if (it.kind === 'lumber') {
+      try { useLumber(caster, found); } catch (e) { log('decor: lumber pile failed', e.stack || e.message); personal(caster, 'That failed; see the server log.'); }
+      return true;
     }
     if (it.kind !== 'planter') return false;
     try { usePlanter(caster, found); } catch (e) { log('decor: planter failed', e.stack || e.message); personal(caster, 'That failed; see the server log.'); }
