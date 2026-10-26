@@ -30,9 +30,52 @@ export const UI_SEP = "\u0001";
 export const DBO_PREFIX = "dbo:";
 
 // The panels this client can render natively. The server gates on these and falls back to the browser
-// widget or to chat for a client that does not name them, so an old client keeps working untouched.
-export const NATIVE_CAPS = ["native:prayer", "native:decor"];
+// widget or to chat for a client that does not name them, so an old client keeps working untouched - and
+// withholding a cap is therefore the fallback switch, with no rebuild needed to go back to CEF.
+// The Character Journal's tabs are announced one at a time because the server switches surfaces per tab and
+// closes the old one: a tab whose cap is missing stays on the browser journal while the rest go native, so
+// the shell can land before all fifteen are drawn (Worker 1, 26 Oct). Profile and Settings stay in the
+// browser deliberately and have no cap.
+export const JOURNAL_TABS = [
+  "stats", "world", "wanted", "keys", "deity", "magic", "skills", "supernatural",
+  "citizen", "referrals", "notes", "thalmor", "nobility", "court", "faction",
+];
+
+export const NATIVE_CAPS = [
+  "native:prayer", "native:decor",
+  "native:journal", ...JOURNAL_TABS.map((t) => `native:journalTab:${t}`),
+  // Worker 2's gamemode panels (dbo_deity, dbo_rite, dbo_dungeon)
+  "native:deityPicker", "native:rite", "native:dungeonGate",
+];
 export const CAPS_RETRY_MS = 5000;
+
+// sp.settings["skymp5-client"]["nativePanels"]: true or absent announces them all, false announces none, and
+// an object turns them off one at a time, e.g. { decor: false } to put the G key back on the CEF panel while
+// prayer stays native. Mirrors the creatureGuard flag: a panel that misbehaves in a session can be put back
+// without waiting for another client build.
+// Which panel a compound cap belongs to, so one switch governs the whole panel: { journal: false } must take
+// the fifteen journalTab caps with it, or the server is told about tabs of a shell that is on the browser.
+// Stated rather than derived - deriving it would mean turning "journalTab" into "journal" by string surgery,
+// which works until the next name does not end in "Tab".
+const CAP_PARENT: Readonly<Record<string, string>> = { journalTab: "journal" };
+
+export const capsFor = (setting: unknown): string[] => {
+  if (setting === false) return [];
+  if (setting === undefined || setting === null || setting === true) return NATIVE_CAPS.slice();
+  if (typeof setting !== "object") return NATIVE_CAPS.slice();
+  const off = setting as Record<string, unknown>;
+  const isOff = (name: string) => off[name] === false;
+  return NATIVE_CAPS.filter((cap) => {
+    const name = cap.replace("native:", "");
+    if (isOff(name)) return false;
+    const colon = name.indexOf(":");
+    if (colon < 0) return true;
+    const head = name.slice(0, colon);
+    if (isOff(head)) return false;
+    const parent = CAP_PARENT[head];
+    return !parent || !isOff(parent);
+  });
+};
 
 export const MAX_PAYLOAD_CHARS = 60000;
 // openCustomMenu queues a UI message, so the menu is not there when the call returns. If ready never
@@ -179,26 +222,53 @@ const noPayload = (payload: unknown): boolean =>
 
 export const planOpen = (s: MenuState, swf: unknown, payload: unknown, widgetId: unknown, now: number): Action[] => {
   const empty = noPayload(payload);
-  s.swf = String(swf || SWF_NAME);
+  // The requested SWF is compared against what is ON SCREEN before s.swf is overwritten. Writing s.swf first
+  // and then testing only the phase was the bug Worker 1 found on 26 Oct: a journal arriving while decor was
+  // ready pushed the journal's JSON into dbo_decor, and s.swf then named a movie that was not up.
+  const want = String(swf || SWF_NAME);
+  const sameSwf = s.swf === want;
+  s.swf = want;
   s.json = payloadJson(payload);
   s.widgetId = Math.max(0, Math.round(Number(widgetId) || 0));
-  if (s.phase === "ready") {
-    // Already on screen: replace the contents, since only one custom menu can exist at a time. A re-sent
-    // payload with the same nonce (the server's verdict) comes through here too.
+  if (s.phase === "ready" && sameSwf) {
+    // The same panel, already on screen: replace the contents. A re-sent payload with the same nonce (the
+    // server's verdict) comes through here too.
     const push: Action[] = [{ do: "push", json: s.json }];
     return empty
       ? [{ do: "report", text: `${s.swf}: the server re-sent an empty payload` }, ...push]
       : push;
   }
+  // A different panel, or one still opening. Only one CustomMenu exists at a time, so the old one goes down
+  // first. Whether the engine accepts a close and an open in the SAME frame is NOT established; if it does
+  // not, the panel misses its ready and the 5s timeout reports it (and a relay-routed widget falls back to
+  // the browser), and the fix is to defer the open by one tick rather than to guess again here.
+  const needsClose = s.phase !== "closed" && !sameSwf;
   s.phase = "opening";
   s.openedAt = now;
   s.readyAt = 0;
   s.outRead = 0;
   s.lastSeq = 0;
-  const open: Action[] = [{ do: "open", swf: s.swf }];
+  const open: Action[] = needsClose
+    ? [{ do: "close" }, { do: "open", swf: s.swf }]
+    : [{ do: "open", swf: s.swf }];
   return empty
     ? [{ do: "report", text: `${s.swf}: the server sent no payload, so the panel will have nothing to show` }, ...open]
     : open;
+};
+
+// New contents for the panel that is already on screen. This is NOT planOpen: planOpen with the menu still
+// "opening" would set the phase back to opening and emit a second openCustomMenu, and two opens of one
+// CustomMenu is how the 26 Oct 03:26 session lost a panel. A refresh that arrives before the SWF answers
+// just replaces the payload, and planReady pushes the fresh one when the movie is finally there.
+export const planRefresh = (s: MenuState, payload: unknown, widgetId: unknown): Action[] => {
+  if (s.phase === "closed") return [];
+  s.widgetId = Math.max(0, Math.round(Number(widgetId) || s.widgetId));
+  s.json = payloadJson(payload);
+  if (s.phase !== "ready") return [];
+  return noPayload(payload)
+    ? [{ do: "report", text: `${s.swf}: a refresh carried an empty payload, so the panel will blank` },
+       { do: "push", json: s.json }]
+    : [{ do: "push", json: s.json }];
 };
 
 // The SWF said it is up. Only now can anything be invoked on it: before ready, _global.skse does not exist

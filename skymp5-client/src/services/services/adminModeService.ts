@@ -44,9 +44,22 @@ export class AdminModeService extends ClientListener {
     this.controller.once("update", () => this.apply(mode, on));
   }
 
-  // Admin panel "all shouts": the server has no shout storage, so it sends the list at the grant and at every login.
-  // desc is "hex:Plugin.esm". Only a word not yet unlocked is taught and unlocked, and only a shout not yet held is added:
-  // each call shows its own popup, so re-teaching the whole list made a wall of them at every login (Nat, 25 Oct).
+  // Admin panel "all shouts": the server has no shout storage, so it sends the list at the grant and again 15s
+  // after every login (adminSystem.ts 130). desc is "hex:Plugin.esm". Only a word not yet unlocked is taught
+  // and unlocked, and only a shout not yet held is added, so after the first grant this loop does nothing and
+  // says nothing.
+  //
+  // This comment used to claim "each call shows its own popup", which is why Nat's wall of them was blamed on
+  // the natives. That is NOT established and the vanilla scripts contradict it: PlayerWerewolfChangeScript and
+  // C03RampageQuest both call UnlockWord three times plus AddShout with no message at all (becoming a werewolf
+  // does not flash three popups), and QF_MQ104B calls TeachWord as a "failsafe - player should have it from
+  // Bleak Falls" and then authors its own LearnShoutMsg.Show() fourteen lines later in the SAME fragment - a
+  // native that popped its own message would double-message every player who already had Fus.
+  //
+  // Our own path has only ever produced one line each side: adminSystem replies once, and this sends one
+  // showSystemNotification, which is a chat System-tab line, not a corner popup. Even the original (95d8af5e)
+  // summarised. So if a wall is still seen, it is neither of those and wants ONE measurement before anything
+  // here is changed: grant all shouts to a fresh character and count what appears.
   private teachShouts(shouts: Array<{ shout: string; words: string[] }>): void {
     const player = this.sp.Game.getPlayer();
     if (!player) return;

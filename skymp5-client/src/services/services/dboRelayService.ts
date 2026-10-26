@@ -240,6 +240,11 @@ export class DboRelayService extends ClientListener {
     }
     if (type === "dboFade") { this.setFade(!!content["on"]); return; }
     if (type !== "dboWidget") return;
+    // Deliberately NOT routed to a native panel here. The gamemode panels that have one are sent as
+    // dboScaleform by the server instead, gated on NATIVE_CAPS, and they never reach this branch; the
+    // client-side services that have one call ScaleformMenuService.openNative themselves. A registry shared
+    // with this path would have drawn contextMenu twice, since the gamemode publishes it AND
+    // playerActionService owns one.
     const closeId = Number(content["close"]);
     if (Number.isFinite(closeId) && closeId > 0) {
       if (this.focusedId === closeId) { this.focusedId = 0; closeFormMenu(this.sp, closeId); }
@@ -251,12 +256,17 @@ export class DboRelayService extends ClientListener {
     const wid = Number((w as any).id);
     if (!Number.isFinite(wid) || wid <= 0) return;
     if (content["focus"]) {
-      this.focusedId = wid;
-      openFormMenu(this.sp, this.browsersideWidgetSetter, { widget: w, id: wid }, this.controller);
-      this.controller.lookupListener(AutoMoveService).onFocusedWidget((w as any).type);
+      this.drawInBrowser(w, wid);
     } else {
       refreshFormMenu(this.sp, this.browsersideWidgetSetter, { widget: w, id: wid });
     }
+  }
+
+  // The browser overlay drawing a focused widget.
+  private drawInBrowser(w: unknown, wid: number): void {
+    this.focusedId = wid;
+    openFormMenu(this.sp, this.browsersideWidgetSetter, { widget: w, id: wid }, this.controller);
+    this.controller.lookupListener(AutoMoveService).onFocusedWidget((w as any).type);
   }
 
   // A black screen held while the server carries a new character into the hub; it lifts on its own if the server never says so
