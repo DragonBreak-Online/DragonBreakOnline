@@ -73,6 +73,10 @@
 //   Deepwood Vale (DeepwoodRedoubtWorld, Skyrim 029AB7, cell HagsEndOrigin -31,19): the raised Nordic floor ringed by the
 //   three blood-bowl fires and the goat and skeever poles, on navmesh 0AA49C (floor -3316). Our plugins change nothing
 //   there but sink its rubble (Dungeons) and disable the placed Forsworn (DLE).
+// Placed altars (Nat, 26 Oct: "make sure it's in the Place tool"): F7 Place's Briarheart category has "Hagraven Altar
+//   (Briarheart rite)", the vanilla HagravenBloodbowl01 (config altarBase). Every one the Place tool has placed is an altar
+//   where it stands, read from the Place tool's own list (placement.js __dboPlacedOf), so removing it there, or Undo, takes
+//   the altar away and a restart keeps it. Nothing is written to briarheart.json for them.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -85,9 +89,13 @@ module.exports = (api) => {
     enabled: false,
     races: ['DBOReachmanRace'], faiths: ['reach'],
     heartItem: '3ad61:Skyrim.esm',            // Briar Heart (INGR)
-    altarRadius: 400, confirmMinutes: 5,
+    altarRadius: 400, confirmMinutes: 5, altarBase: 'acafc:Skyrim.esm',
+    // As hard as the werewolf's road (Nat, 26 Oct): Reachmen only, three Hagraven Feathers and two Hagraven Claws beside the
+    // heart (all taken at the rite, whether or not the briar takes), and only by night (worldclock.js; 'fullmoon' or 'any')
+    sexes: ['male'], riteAt: 'night',
+    components: [{ item: '3ad66:Skyrim.esm', count: 3, name: 'Hagraven Feathers' }, { item: '6b689:Skyrim.esm', count: 2, name: 'Hagraven Claws' }],
     altars: [{ world: '29ab7:Skyrim.esm', pos: [-124700, 79930, -3316], radius: 500, name: 'Deepwood Vale, the Hagravens\' ritual court' }],
-    failChance: 0.1, failPermadeath: false, failCooldownHours: 24,
+    failChance: 0.25, failPermadeath: false, failCooldownHours: 72,
     healthBonus: 50, resist: { poison: 0.15, frost: 0.15 }, fireWeakness: 0.25,
     spells: ['72317:Skyrim.esm', '400ad:Skyrim.esm'],   // IronfleshLeftHand, LightningCloakLeftHand (the Briarheart template's)
     forswornFriendly: false, forswornFaction: '43599:Skyrim.esm',
@@ -151,6 +159,7 @@ module.exports = (api) => {
   const raceEdid = (a) => { try { const app = mp.get(a >>> 0, 'appearance'); const r = app && mp.lookupEspmRecordById(Number(app.raceId) >>> 0); return String((r && r.record && r.record.editorId) || ''); } catch (e) { return ''; } };
   const invOf = (a) => { try { return ((mp.get(a >>> 0, 'inventory') || {}).entries || []); } catch (e) { return []; } };
   const hasOne = (a, id) => invOf(a).some((e) => (Number(e.baseId) >>> 0) === id && Number(e.count) > 0);
+  const countOf = (a, id) => invOf(a).filter((e) => (Number(e.baseId) >>> 0) === id).reduce((n, e) => n + (Number(e.count) || 0), 0);
   const takeOne = (a, id) => {
     const entries = invOf(a).map((e) => Object.assign({}, e));
     const hit = entries.find((e) => (Number(e.baseId) >>> 0) === id && Number(e.count) > 0);
@@ -161,7 +170,13 @@ module.exports = (api) => {
   const dist = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], (p[2] || 0) - (q[2] || 0));
   // The seeded altars (config), then the ones staff placed (briarheart.json)
   const seededAltars = () => (Array.isArray(C.altars) ? C.altars : []).filter((x) => x && x.world && Array.isArray(x.pos) && x.pos.length >= 3).map((x) => Object.assign({ seeded: true }, x));
-  const allAltars = () => seededAltars().concat(data().altars);
+  const placedAltars = () => {
+    const f = globalThis.__dboPlacedOf; if (typeof f !== 'function' || !C.altarBase) return [];
+    let rows = []; try { rows = f(C.altarBase) || []; } catch (e) { return []; }
+    return rows.filter((e) => e && e.where && Array.isArray(e.pos) && e.pos.length >= 3)
+      .map((e) => ({ world: String(e.where), pos: e.pos.map((v) => Math.round(Number(v))), radius: C.altarRadius, by: e.by, at: e.at, placed: String(e.id) }));
+  };
+  const allAltars = () => seededAltars().concat(placedAltars(), data().altars);
   const altarNear = (a) => {
     const here = posOf(a); if (!here || !here.pos) return null;
     return allAltars().find((x) => String(x.world) === String(here.world) && dist(x.pos, here.pos) <= (Number(x.radius) || C.altarRadius)) || null;
@@ -368,12 +383,25 @@ module.exports = (api) => {
     const race = raceEdid(a);
     if (!(C.races || []).some((r) => race === r)) return 'The Hagravens give the briar only to the Reachfolk.';
     if (!(C.faiths || []).includes(faithId(a))) return 'The briar is for those who keep the Old Gods of the Reach. Take them as your faith first.';
+    const sexes = (Array.isArray(C.sexes) && C.sexes.length ? C.sexes : ['male', 'female']).map((x) => String(x).toLowerCase());
+    if (!sexes.includes(isFemale(a) ? 'female' : 'male')) return sexes.includes('male') ? 'The Hagravens give the briar only to Reachmen.' : 'The Hagravens give the briar only to Reachwomen.';
     const failed = Number(get(a, FAILED, 0)) || 0, wait = failed + C.failCooldownHours * HOUR - Date.now();
     if (wait > 0) return `The altar is cold to you since the briar would not take. Try again in ${waitText(wait)}.`;
     if (!altarNear(a)) return 'The rite is made at a Hagraven altar in the Reach.';
     if (!hasOne(a, idOf(C.heartItem))) return 'The rite needs a Briar Heart to set in your chest.';
+    const lacking = components().filter((c) => countOf(a, c.id) < c.count);
+    if (lacking.length) return `The Hagraven wants ${components().map((c) => `${c.count} ${c.name}`).join(' and ')} beside the Briar Heart. You lack ${lacking.map((c) => `${c.count - Math.min(c.count, countOf(a, c.id))} ${c.name}`).join(' and ')}.`;
+    const when = String(C.riteAt || 'any').toLowerCase(), clock = globalThis.__dboClock;
+    if (when !== 'any' && clock && typeof clock.isNight === 'function') {
+      try {
+        if (!clock.isNight()) return 'The Hagravens work the briar only by night. Come back after dark.';
+        if (when === 'fullmoon' && typeof clock.isFullMoon === 'function' && !clock.isFullMoon()) return 'The Hagravens work the briar only under a full moon.';
+      } catch (e) { log('briarheart: the world clock failed', e.message); }
+    }
     return '';
   };
+  // The rite's other offerings (config components), resolved once per call
+  const components = () => (Array.isArray(C.components) ? C.components : []).map((c) => ({ id: idOf(c && c.item), count: Math.max(1, Number(c && c.count) || 1), name: String((c && c.name) || (c && c.item) || '') })).filter((c) => c.id);
   // The rite's permanent risks, said plainly (Nat, 25 Oct: both on)
   const forever = () => !!(C.failPermadeath || C.tearPermadeath);
   const risks = () => [
@@ -397,6 +425,8 @@ module.exports = (api) => {
     const no = riteRefusal(a); if (no) return no;
     audit(`BRIARHEART ${who(a)} accepted the rite's risks (${riskAudit()})`);
     if (!takeOne(a, idOf(C.heartItem))) return 'The rite needs a Briar Heart to set in your chest.';
+    // The offerings go into the rite whatever comes of it
+    for (const c of components()) for (let k = 0; k < c.count; k++) takeOne(a, c.id);
     if (Math.random() < C.failChance) {
       set(a, FAILED, Date.now());
       audit(`BRIARHEART ${who(a)} died in the rite${C.failPermadeath ? ' (for good)' : ''}`);
@@ -567,13 +597,15 @@ module.exports = (api) => {
         return personal(a, `Hagraven altar ${n} removed.`);
       }
       const seeded = seededAltars().map((x) => `seeded: ${x.name ? `${x.name}, ` : ''}${x.world} ${x.pos.join(',')} r${Number(x.radius) || C.altarRadius}`);
+      const viaTool = placedAltars().map((x) => `Place tool (${x.placed}): ${x.world} ${x.pos.join(',')} r${x.radius}`);
       const placed = d.altars.map((x, i) => `${i + 1}. ${x.world} ${x.pos.join(',')} r${x.radius}`);
-      return personal(a, seeded.length || placed.length ? seeded.concat(placed).join(' | ') : 'No Hagraven altar is placed: stand at one and say /briarheart altar add.');
+      const all = seeded.concat(viaTool, placed);
+      return personal(a, all.length ? all.join(' | ') : 'No Hagraven altar is placed: stand at one and say /briarheart altar add, or place a Hagraven Altar with F7 Place.');
     }
     return personal(a, 'Usage: /briarheart [status] | rite | confirm | cure; staff: grant|revoke <name> <reason> | list | altar add [radius] | altar list | altar remove <n>');
   }, { help: 'Briarhearts: [status] | rite (at a Hagraven altar) | confirm | cure (at Arkay or Stendarr); staff: grant | revoke | list | altar' });
 
-  log(`briarheart: ${C.enabled ? 'on' : 'off'}, ${allAltars().length} altar(s) (${seededAltars().length} seeded), races ${(C.races || []).join('/')}, faiths ${(C.faiths || []).join('/')}`);
+  log(`briarheart: ${C.enabled ? 'on' : 'off'}, ${allAltars().length} altar(s) (${seededAltars().length} seeded, ${placedAltars().length} placed), races ${(C.races || []).join('/')}, faiths ${(C.faiths || []).join('/')}`);
   // For the harness
   return { riteRefusal, rite, confirm, cure, tearRefusal, startTear, tick, end, become, isBriar, C, data };
 };
