@@ -175,6 +175,14 @@
           "Only a follower of one of the Nine Divines, Talos included, may join: choose your god at a shrine first. A Knight may not serve a Daedric cult.",
           "Their Armorers alone forge the Knight-Errant armour."
         ]
+      },
+      {
+        "heading": "A study and a garden at home",
+        "items": [
+          "Study Bookshelf: a glass-fronted bookcase that you fill with 10 of your own books (not spell tomes, skill books, notes or letters). Two of them make your home a study, and you can study there as you would in a library, for Study Magic or Priest Studies. It uses the same daily study time as the libraries. A home holds up to three.",
+          "Planter: plant one of Hearthfire's 32 garden crops, such as cabbage, potatoes, lavender, wheat or deathbell. It ripens in a day (rare crops take two) whether or not you are home. Picking it rolls your Harvesting skill as a wild plant does and trains it. A home holds up to four planters.",
+          "Only the owner and the friends they name with /decor grant can plant or pick. If you carry several crops, the planter lists them and you choose one with /decor plant <number>."
+        ]
       }
     ]
   },
