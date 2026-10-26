@@ -4018,9 +4018,7 @@ const sendPacket = (a, payload) => {
 // nativeCaps naming it as a dboScaleform packet instead; the payload is the same object the browser widget gets
 // labour: mining, woodcutting and the bound-hands struggle (labour.js, struggle.js), both the sweep and the pick round
 // pigeon: the coop window (openPigeonCoop, post.js, couriers.js); its typed input goes to the browser (pigeonHandoff)
-// DEV ONLY (Leader, 26 Oct): pigeon is out until Worker 6's rebuilt pigeon SWF ships (native2 lacks it, so it waited
-// 5 s and fell back); restore: pigeon: 'dbo_pigeon'. Labour came back with native2's rebuilt dbo_labour.
-const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_journal', deityPicker: 'dbo_deity', rite: 'dbo_rite', dungeonGate: 'dbo_dungeon', labour: 'dbo_labour' };
+const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_journal', deityPicker: 'dbo_deity', rite: 'dbo_rite', dungeonGate: 'dbo_dungeon', labour: 'dbo_labour', pigeon: 'dbo_pigeon' };
 // nativeOpen: actor -> the widget id on the custom menu; browserOpen: actor -> a widget of these types last sent to the browser
 const nativeState = () => { const p = globalThis.__dboPanelState || (globalThis.__dboPanelState = { caps: new Map(), nonces: new Map() }); if (!p.native) p.native = new Map(); if (!p.nativeOpen) p.nativeOpen = new Map(); if (!p.browserOpen) p.browserOpen = new Map(); return p; };
 const nativeSwfFor = (a, widget) => {
