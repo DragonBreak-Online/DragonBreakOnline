@@ -582,6 +582,53 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   ok(!papyrusCalls.length, 'logged out before it settles: nothing is equipped');
   Date.now = realNow; globalThis.setTimeout = realSet; globalThis.clearTimeout = realClear;
 }
+// ---- the seeded altar (Nat, 26 Oct: "place them at Deepwood Redoubt, at that open inner interior") -------------------------
+{
+  const VALE = '29ab7:Skyrim.esm', COURT = [-124700, 79930, -3316];
+  const SEEKER = actor(0xb0, 1, 'reach', [COURT[0] + 300, COURT[1], COURT[2]], []); online.push(SEEKER);
+  setP(SEEKER, 'locationalData', { cellOrWorldDesc: VALE, pos: [COURT[0] + 300, COURT[1], COURT[2]], rot: [0, 0, 0] });
+  delete require.cache[MODULE]; delete globalThis.__dboBriarheart; fs.rmSync('briarheart.json', { force: true });
+  let MA = load({ briarheart: { enabled: true } });
+  ok(MA.C.altars.length === 1 && MA.C.altars[0].world === VALE && MA.C.altars[0].pos.join() === COURT.join(), 'the default seeds one altar: Deepwood Vale, the ritual court', MA.C.altars);
+  ok(!MA.data().altars.length, '...it is not written to briarheart.json (staff placements only)');
+  ok(!/Hagraven altar in the Reach/.test(MA.riteRefusal(SEEKER) || ''), 'a Reachman 300 units from the court is at an altar with no staff placement', MA.riteRefusal(SEEKER));
+  setP(SEEKER, 'locationalData', { cellOrWorldDesc: VALE, pos: [COURT[0] + 700, COURT[1], COURT[2]], rot: [0, 0, 0] });
+  ok(/Hagraven altar in the Reach/.test(MA.riteRefusal(SEEKER) || ''), '...700 units off (radius 500) is not');
+  setP(SEEKER, 'locationalData', { cellOrWorldDesc: WORLD, pos: COURT.slice(), rot: [0, 0, 0] });
+  ok(/Hagraven altar in the Reach/.test(MA.riteRefusal(SEEKER) || ''), '...nor the same coordinates in another worldspace');
+  const list = run(LEAD, 'altar list');
+  ok(/^seeded: Deepwood Vale, the Hagravens' ritual court, 29ab7:Skyrim\.esm -124700,79930,-3316 r500$/.test(list), 'altar list shows the seeded altar first', list);
+  ok(/Usage: \/briarheart altar remove/.test(run(LEAD, 'altar remove 1')), 'altar remove cannot take a seeded altar (nothing placed to remove)');
+  run(LEAD, 'altar add'); ok(/^seeded: .* \| 1\. /.test(run(LEAD, 'altar list')), 'a placed altar is listed after it, numbered from 1');
+  delete require.cache[MODULE]; delete globalThis.__dboBriarheart; fs.rmSync('briarheart.json', { force: true });
+  MA = load({ briarheart: { enabled: true, altars: [] } });
+  setP(SEEKER, 'locationalData', { cellOrWorldDesc: VALE, pos: COURT.slice(), rot: [0, 0, 0] });
+  ok(/Hagraven altar in the Reach/.test(MA.riteRefusal(SEEKER) || '') && /No Hagraven altar is placed/.test(run(LEAD, 'altar list')), 'config altars [] turns the seed off');
+  online.splice(online.indexOf(SEEKER), 1);
+}
+// ---- visual.lockBody: the wound body equipped with abPreventRemoval (a dev test; off by default) ---------------------------
+{
+  const lockLoad = (lockBody) => load({ briarheart: { enabled: true, visual: Object.assign({ enabled: true, armor: '5d008:Skyrim.esm', emptyArmor: '5d009:Skyrim.esm', body: '90d63:unofficial skyrim special edition patch.esp' }, lockBody === undefined ? {} : { lockBody }) } });
+  const LK = actor(0xc0, 1, 'reach', [0, 0, 0], []); online.push(LK);
+  const eq = () => ({ inv: { entries: [] } });
+  for (const [lock, want, what] of [[undefined, false, 'by default the briar pieces go on without abPreventRemoval'], [true, true, 'lockBody true: both go on with abPreventRemoval']]) {
+    const ML = lockLoad(lock); setP(LK, 'equipment', eq()); papyrusCalls.length = 0;
+    ML.become(LK, 'staff', 'lock test');
+    const eqs = papyrusCalls.filter((c) => c.method === 'EquipItem');
+    ok(eqs.length === 2 && eqs.every((c) => c.args[1] === want && c.args[2] === true), what, eqs.map((c) => c.args));
+    ML.end(LK, 'lock test done');
+  }
+  // visual.blockReequip: the refused cuirass comes off with abPreventEquip; by default without
+  for (const [flag, want] of [[undefined, false], [true, true]]) {
+    const MB = load({ briarheart: { enabled: true, visual: Object.assign({ enabled: true, armor: '5d008:Skyrim.esm', emptyArmor: '5d009:Skyrim.esm', settleMs: 0 }, flag === undefined ? {} : { blockReequip: flag }) } });
+    setP(LK, 'equipment', { inv: { entries: [] } }); MB.become(LK, 'staff', 'reequip test'); papyrusCalls.length = 0;
+    globalThis.__dboBriarheartEquip(LK, { inv: { entries: [{ baseId: CUIRASS, count: 1, worn: true }] } });
+    const offs = papyrusCalls.filter((c) => c.method === 'UnequipItem');
+    ok(offs.length === 1 && offs[0].args[0] === '13ed9:Skyrim.esm' && offs[0].args[1] === want, flag ? 'blockReequip true: the cuirass comes off with abPreventEquip' : 'by default the cuirass comes off without abPreventEquip', offs.map((c) => c.args));
+    MB.end(LK, 'reequip test done');
+  }
+  online.splice(online.indexOf(LK), 1);
+}
 // ---- what a Briarheart is, in Active Effects: the display ability goes and comes with the gifts ---------------------------
 {
   ID['801:DragonBreak Supernatural Displays.esp'] = 0xb4000801; // verify-formids: ignore - harness fixture: the display plugin is not in the release order (briarheart.display ships empty)
