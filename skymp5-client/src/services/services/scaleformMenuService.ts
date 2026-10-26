@@ -5,18 +5,20 @@ import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { parseCustomPacket, sendCustomPacket } from "./customPacketUtil";
 import {
-  Action, MENU_NAME, MenuState, SWF_NAME, newState, parseMenuEvent, planClose, planOpen, planReady, planTick, summary,
+  Action, MENU_NAME, MenuState, newState, parseUiEvent, planClose, planOpen, planReady, planTick,
+  serverEventName, summary,
 } from "./scaleformMenu";
 
 // A real Skyrim Scaleform panel driven from the server, instead of the CEF overlay (Nat, 25 Oct).
 //
-//   Server -> Client: { customPacketType: "dboScaleform", title, rows: [...] }   shows the panel
-//                     { customPacketType: "dboScaleform", close: true }          closes it
-//   Client -> Server: { customPacketType: "dboScaleform", kind: "ready"|"row"|"close", index }
+//   Server -> Client: { customPacketType: "dboScaleform", swf, payload, widget }   shows the panel
+//                     { customPacketType: "dboScaleform", close: true }            closes it
+//   Client -> Server: whatever the panel sends, as the SAME packet the browser widgets send:
+//                     { customPacketType: "dbo", event, args, widget }
 //
-// The loop needs no C++: Ui.openCustomMenu loads Data\Interface\dbo_testmenu.swf, Ui.invokeStringA pushes
-// data in, and the SWF's skse.SendModEvent comes back as on('modEvent'). The decisions and the evidence are
-// in _work\scaleform-ui-spike-1025.md; the pure half, with the SKSE constraints, is scaleformMenu.ts.
+// The loop needs no C++: Ui.openCustomMenu loads Data\Interface\<swf>.swf, Ui.invokeString pushes the whole
+// payload in as JSON, and the SWF's skse.SendModEvent comes back as on('modEvent'). The evidence and the
+// panel-by-panel plan are in _work\scaleform-ui-spike-1025.md; the pure half is scaleformMenu.ts.
 export class ScaleformMenuService extends ClientListener {
   constructor(private sp: Sp, private controller: CombinedController) {
     super();
@@ -33,37 +35,45 @@ export class ScaleformMenuService extends ClientListener {
         this.enqueue(planClose(this.state));
         return;
       }
-      this.enqueue(planOpen(this.state, content["title"], content["rows"], Date.now()));
+      this.enqueue(planOpen(this.state, content["swf"], content["payload"], content["widget"], Date.now()));
     } catch (e) {
       logError(this, "dboScaleform packet failed", e);
     }
   }
 
   // on('modEvent') hears every mod event in the game, from any installed mod, so most of what arrives here
-  // is somebody else's and parseMenuEvent returns null for it.
+  // is somebody else's and parseUiEvent returns null for it.
   private onModEvent(e: ModEvent): void {
     try {
-      const parsed = parseMenuEvent(e.eventName, e.strArg, e.numArg);
+      const parsed = parseUiEvent(e.eventName, e.strArg, e.numArg);
       if (!parsed) {
         if (this.state.phase !== "closed") this.state.foreignEvents++;
         return;
       }
-      if (parsed.kind === "ready") {
-        logTrace(this, "Scaleform panel reported ready");
-        this.enqueue(planReady(this.state, Date.now()));
-        this.toServer("ready", 0);
+      if (parsed.key === "ready") {
+        // The frame number is the measurement: _global.skse does not exist on frame 1, and until one
+        // session reported this nobody knew which frame it does appear on.
+        logTrace(this, "Scaleform panel ready on frame", String(parsed.frame));
+        this.enqueue(planReady(this.state, parsed.frame, Date.now()));
         this.note(summary(this.state));
         return;
       }
-      if (parsed.kind === "row") {
-        this.state.clicks++;
-        this.toServer("row", parsed.index);
+      if (parsed.key === "close") {
+        // The SWF closes itself too, so this is the client catching up rather than the way out.
+        this.enqueue(planClose(this.state));
+        this.note(summary(this.state));
         return;
       }
-      // The SWF closes itself too, so this is the client catching up rather than the way out.
-      this.enqueue(planClose(this.state));
-      this.toServer("close", -1);
-      this.note(summary(this.state));
+      const eventName = serverEventName(parsed.key);
+      if (!eventName) {
+        logTrace(this, "Scaleform panel sent an unknown key", parsed.key);
+        return;
+      }
+      // Exactly what dboRelayService sends for a browser widget, so the server's onUi handlers are unchanged
+      sendCustomPacket(this.controller, {
+        customPacketType: "dbo", event: eventName, args: parsed.args, widget: this.state.widgetId,
+      });
+      this.state.sent++;
     } catch (err) {
       logError(this, "mod event handling failed", err);
     }
@@ -94,14 +104,12 @@ export class ScaleformMenuService extends ClientListener {
     for (const a of actions) {
       try {
         if (a.do === "open") {
-          // flags is read by nothing in SKSE, so 0. The SWF answers with "ready" when it has built itself,
-          // because the open is queued as a UI message and is not done when this returns.
+          // flags is read by nothing in SKSE, so 0. The SWF answers with "ready" once _global.skse exists,
+          // which is never on frame 1, so nothing may be invoked before then.
           this.sp.Ui.openCustomMenu(a.swf, 0);
           logTrace(this, "openCustomMenu", a.swf);
         } else if (a.do === "push") {
-          this.sp.Ui.invokeString(MENU_NAME, "_root.dboSetTitle", a.title);
-          this.sp.Ui.invokeStringA(MENU_NAME, "_root.dboSetRows", a.rows);
-          this.readLoaded();
+          this.sp.Ui.invokeString(MENU_NAME, "_root.dboData", a.json);
         } else if (a.do === "close") {
           this.sp.Ui.closeCustomMenu();
         } else {
@@ -109,31 +117,12 @@ export class ScaleformMenuService extends ClientListener {
           this.note(a.text);
         }
       } catch (e) {
-        // A failure here is the finding, not noise: it is the first time anything has called openCustomMenu
-        // from this client, so say which step died rather than swallowing it.
+        // A failure here is the finding, not noise: say which step died rather than swallowing it.
         logError(this, `Scaleform action '${a.do}' failed`, e);
         this.note(`action '${a.do}' threw: ${e}`);
         if (a.do === "open") this.state.phase = "closed";
       }
     }
-  }
-
-  // A second, pull-based check that the right SWF is loaded, independent of any mod event getting through.
-  // Read from exec (inside the update tick) and cached, because a mod event handler is a less certain place
-  // to call a native from and a diagnostic that quietly returns "" would tell us nothing.
-  private readLoaded(): void {
-    try {
-      const v = String(this.sp.Ui.getString(MENU_NAME, "_root.dboVersion") || "");
-      if (v) this.loaded = v;
-    } catch (e) {
-      logTrace(this, "could not read the panel version", String(e));
-    }
-  }
-
-  private toServer(kind: string, index: number): void {
-    sendCustomPacket(this.controller, {
-      customPacketType: "dboScaleform", kind, index, swf: SWF_NAME, loaded: this.loaded,
-    });
   }
 
   private note(text: string): void {
@@ -144,5 +133,4 @@ export class ScaleformMenuService extends ClientListener {
   private state: MenuState = newState();
   private lastTick = 0;
   private queue: Action[] = [];
-  private loaded = "";
 }
