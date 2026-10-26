@@ -38,14 +38,15 @@
    },
    "_enabledNote": "Nat 26 Oct: every boss ships complete; its shard (DBO_OreGlacialCrystal, DLE 1D2201) is in the production DLE ed7afac9",
    "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
+   "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D244B, templated on the original with every flag) in DragonBreak_Bosses.ini",
    "boss": {
-    "edid": "EncIceWraith",
-    "desc": "23ab3:Skyrim.esm",
+    "edid": "DBO_Boss_icecap",
+    "desc": "1d244b:DragonBreak Online Edits.esp",
     "options": [
      [
       9,
-      "23ab3:Skyrim.esm",
-      "EncIceWraith"
+      "1d244b:DragonBreak Online Edits.esp",
+      "DBO_Boss_icecap"
      ]
     ]
    },
@@ -174,9 +175,10 @@
     "death": "The Briarheart King of Lost Valley has fallen."
    },
    "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
+   "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D244C, templated on the original with every flag) in DragonBreak_Bosses.ini",
    "boss": {
-    "edid": "LvlForswornBossShaman",
-    "desc": "442d3:Skyrim.esm",
+    "edid": "DBO_Boss_briarheartking",
+    "desc": "1d244c:DragonBreak Online Edits.esp",
     "options": [
      [
       1,
@@ -763,14 +765,15 @@
     "death": "The Centurion Master of Blackreach is still."
    },
    "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
+   "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D244D, templated on the original with every flag) in DragonBreak_Bosses.ini",
    "boss": {
-    "edid": "EncDwarvenCenturion03",
-    "desc": "23a96:Skyrim.esm",
+    "edid": "DBO_Boss_centurion",
+    "desc": "1d244d:DragonBreak Online Edits.esp",
     "options": [
      [
       36,
-      "23a96:Skyrim.esm",
-      "EncDwarvenCenturion03"
+      "1d244d:DragonBreak Online Edits.esp",
+      "DBO_Boss_centurion"
      ]
     ]
    },
@@ -912,9 +915,10 @@
    },
    "_spots": "Nat, 25 Oct, from the CK shots in _work/palewarlord-spots-1025: SE first, ST the roaming alternative (roam: the next spot after each kill); SR at Snowstone Rest's door dropped",
    "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
+   "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D244E, templated on the original with every flag) in DragonBreak_Bosses.ini",
    "boss": {
-    "edid": "CYRLvlBanditBoss",
-    "desc": "2dad4:BSHeartland.esm",
+    "edid": "DBO_Boss_palewarlord",
+    "desc": "1d244e:DragonBreak Online Edits.esp",
     "options": [
      [
       1,
@@ -1956,14 +1960,15 @@
     "death": "The Falmer Warmonger of Blackreach is dead."
    },
    "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
+   "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D244F, templated on the original with every flag) in DragonBreak_Bosses.ini",
    "boss": {
-    "edid": "EncFalmer05MeleeBoss",
-    "desc": "5238e:Skyrim.esm",
+    "edid": "DBO_Boss_falmerwarmonger",
+    "desc": "1d244f:DragonBreak Online Edits.esp",
     "options": [
      [
       44,
-      "5238e:Skyrim.esm",
-      "EncFalmer05MeleeBoss"
+      "1d244f:DragonBreak Online Edits.esp",
+      "DBO_Boss_falmerwarmonger"
      ]
     ]
    },
@@ -2796,14 +2801,15 @@
     "death": "The Warchief of Dusk Thorn is dead."
    },
    "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
+   "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D2450, templated on the original with every flag) in DragonBreak_Bosses.ini",
    "boss": {
-    "edid": "CYREncGoblinDeepRoot03BossMelee",
-    "desc": "e9de2:BSHeartland.esm",
+    "edid": "DBO_Boss_duskthorn",
+    "desc": "1d2450:DragonBreak Online Edits.esp",
     "options": [
      [
       24,
-      "e9de2:BSHeartland.esm",
-      "CYREncGoblinDeepRoot03BossMelee"
+      "1d2450:DragonBreak Online Edits.esp",
+      "DBO_Boss_duskthorn"
      ]
     ]
    },
@@ -3015,14 +3021,15 @@
     "death": "The Valkynaz of the Great Gate is banished."
    },
    "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
+   "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D2451, templated on the original with every flag) in DragonBreak_Bosses.ini",
    "boss": {
-    "edid": "CYREncDremoraWarlock06",
-    "desc": "ddb29:BSHeartland.esm",
+    "edid": "DBO_Boss_valkynaz",
+    "desc": "1d2451:DragonBreak Online Edits.esp",
     "options": [
      [
       46,
-      "ddb29:BSHeartland.esm",
-      "CYREncDremoraWarlock06"
+      "1d2451:DragonBreak Online Edits.esp",
+      "DBO_Boss_valkynaz"
      ]
     ]
    },
@@ -3324,14 +3331,15 @@
    },
    "_note": "Nat, 25 Oct: Sancre Tor stays undead (an Imperial fort town; no Ayleid undead, Nate 9 Oct): an undead legion from Sancre Tor's own pools (gamemode-config ownedSpawns.replace minotaur: CYREncSkeleton01 lines and BSKEncZombie02). Adamantium's home, so its schematic stays here",
    "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
+   "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D2452, templated on the original with every flag) in DragonBreak_Bosses.ini",
    "boss": {
-    "edid": "BSKEncZombie03",
-    "desc": "60292c:BSAssets.esm",
+    "edid": "DBO_Boss_risenlegate",
+    "desc": "1d2452:DragonBreak Online Edits.esp",
     "options": [
      [
       25,
-      "60292c:BSAssets.esm",
-      "BSKEncZombie03"
+      "1d2452:DragonBreak Online Edits.esp",
+      "DBO_Boss_risenlegate"
      ]
     ]
    },
@@ -3497,16 +3505,17 @@
    "_adds": "Nat, 25 Oct: the minotaurs come back at Minotaur's Rest as his adds; each gets its war axe back in its inventory (rearmAdds), as the Lord's test 2 does",
    "_rearmNote": "Nat 26 Oct: the two dev tests (minotaurtest1, minotaurtest2) stood under this boss's own name, which put two 'The Minotaur Lord' plates up at once; both kept the axe at spawn (dev 26 Oct 03:49, 6026df), so the Lord takes test 2's set-up (rearmEdid, which puts the axe back if it is ever lost) and the tests are gone",
    "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
+   "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D2453, templated on the original with every flag) in DragonBreak_Bosses.ini",
    "rearm": "6026df:BSAssets.esm",
    "rearmAdds": "6026e6:BSAssets.esm",
    "boss": {
-    "edid": "CYREncMinotaur02Lord",
-    "desc": "d6fe5:BSHeartland.esm",
+    "edid": "DBO_Boss_minotaurlord",
+    "desc": "1d2453:DragonBreak Online Edits.esp",
     "options": [
      [
       44,
-      "d6fe5:BSHeartland.esm",
-      "CYREncMinotaur02Lord"
+      "1d2453:DragonBreak Online Edits.esp",
+      "DBO_Boss_minotaurlord"
      ]
     ]
    },
@@ -3831,14 +3840,15 @@
     "death": "The Chieftain of Blizzard Rest is dead, and his bull with him."
    },
    "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
+   "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D2454, templated on the original with every flag) in DragonBreak_Bosses.ini",
    "boss": {
-    "edid": "EncGiant01",
-    "desc": "23aae:Skyrim.esm",
+    "edid": "DBO_Boss_giantchieftain",
+    "desc": "1d2454:DragonBreak Online Edits.esp",
     "options": [
      [
       32,
-      "23aae:Skyrim.esm",
-      "EncGiant01"
+      "1d2454:DragonBreak Online Edits.esp",
+      "DBO_Boss_giantchieftain"
      ]
     ]
    },

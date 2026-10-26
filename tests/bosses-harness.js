@@ -31,21 +31,22 @@ ok(def('icecap').enabled === true && def('briarheartking').enabled && def('centu
 ok(!REAL.bosses.some((b) => b.devOnly) && !REAL.bosses.some((b) => /test/i.test(b.id)), 'no boss is a dev-only test any more (Nat 26 Oct: the test copies go; none can ship)');
 ok(REAL.bosses.every((b) => b.respawnSeconds === 3600), 'every boss respawns 1 h after it falls (Nat 26 Oct)', REAL.bosses.map((b) => [b.id, b.respawnSeconds]));
 ok(REAL.bosses.every((b) => b.toughness >= 0.85 && b.enrage.toughness >= 0.65 && (!b.guardian || b.guardian.bossToughnessWhileAlive === 0.95) && b.openingAdds >= 3 && b.waves.length === 3 && b.enrageSeconds === 600), 'every boss is a world boss: 6.7x health or more, a 20x guardian shield, 3 opening adds, three waves, enrage at 10 min (Nat 26 Oct)', REAL.bosses.map((b) => [b.id, b.toughness, b.openingAdds]));
+ok(['icecap', 'centurion', 'falmerwarmonger', 'duskthorn', 'valkynaz', 'risenlegate', 'minotaurlord', 'giantchieftain'].every((id) => def(id).boss.edid === `DBO_Boss_${id}` && def(id).boss.options.length === 1 && def(id).boss.options[0][2] === `DBO_Boss_${id}` && /:DragonBreak Online Edits\.esp$/.test(def(id).boss.options[0][1])), 'the boss bar: each boss spawns as its own DLE copy, the record DragonBreak_Bosses.ini names (TrueHUD, 26 Oct)', REAL.bosses.map((b) => [b.id, b.boss.options.length, b.boss.options[0][2]]));
 ok(REAL.bosses.filter((b) => b.enabled).length === 12 && !def('karstaag').enabled, 'every boss ships on but Karstaag, who waits on Solstheim');
 const fams = REAL.bosses.flatMap((b) => ['schematic', 'extraSchematic'].map((k) => b.drops[k] && b.drops[k].family).filter(Boolean));
 ok(REAL.bosses.every((b) => b.drops.schematic && b.drops.schematic.family) && new Set(fams).size === fams.length, 'every boss has a schematic and no two share a family (Nat 26 Oct: "unique schematics")', fams);
 ok(REAL.bosses.every((b) => b.drops.pool && b.drops.pool.picks === 2 && b.drops.pool.items.length >= 5 && b.drops.pool.items.every((x) => /:/.test(x[0]) && x[1] > 0 && x[2] > 0)),
   'every boss has its own loot pool, resolved to records: two picks from five or more', REAL.bosses.map((b) => [b.id, b.drops.pool && b.drops.pool.items.length]));
 const gc = def('giantchieftain');
-ok(gc && gc.enabled && gc.hold === 'dawnstar' && gc.boss.edid === 'EncGiant01' && gc.guardian.edid === 'EncMammothWild' && gc.adds.length === 2 && gc.drops.schematic.family === 'steelplate'
+ok(gc && gc.enabled && gc.hold === 'dawnstar' && gc.boss.edid === 'DBO_Boss_giantchieftain' && gc.guardian.edid === 'EncMammothWild' && gc.adds.length === 2 && gc.drops.schematic.family === 'steelplate'
   && gc.spots[0].id === 'BR', 'the Chieftain of Blizzard Rest: a giant, his bull mammoth, mammoths and a giant in waves, Steel Plate (Nat 26 Oct)');
-ok(def('icecap').boss.options[0][2] === 'EncIceWraith' && def('icecap').spots.length === 1 && def('icecap').spots[0].id === 'SK' && def('icecap').drops.schematic.family === 'glacial_crystal', 'the Wraith: a vanilla ice wraith at Skytemple Ruins (Nat 26 Oct), the Glacial Crystal schematic');
+ok(def('icecap').boss.options[0][2] === 'DBO_Boss_icecap' && def('icecap').spots.length === 1 && def('icecap').spots[0].id === 'SK' && def('icecap').drops.schematic.family === 'glacial_crystal', 'the Wraith: a vanilla ice wraith at Skytemple Ruins (Nat 26 Oct), the Glacial Crystal schematic');
 ok(def('briarheartking').boss.options.slice(-1)[0][2] === 'EncForsworn06BossMagicBretonM03' && def('briarheartking').guardian.options[0][2] === 'EncHagraven', 'the King: the strongest Forsworn boss shaman, his Hagraven beside him');
 ok(REAL.bosses.every((b) => b.spots.every((s) => s.ref && s.anchorDist < 5000)), 'every spot has an anchor within 5000 units (Sancre Tor\'s and Minotaur\'s Rest\'s are the ones Nate\'s own zones there use)');
 ok(def('karstaag').enabled === false && /Solstheim/.test(def('karstaag').waitingOn) && def('karstaag').boss.options[0][2] === 'DLC2dunKarstaag', 'Karstaag is defined and off until Solstheim opens');
 ok(def('minotaurlord').enabled === true && def('minotaurlord').rearm === '6026df:BSAssets.esm' && def('minotaurlord').drops.always.some((x) => x[2] === 'CYRMinotaurHorn'),
   'the Minotaur Lord is on, re-arming his axe (the dev tests kept it at spawn), his drop the beast\'s own horn and hide');
-ok(def('risenlegate').enabled === true && !def('risenlegate').devOnly && def('risenlegate').boss.options[0][2] === 'BSKEncZombie03' && def('risenlegate').adds.length === 5 && def('risenlegate').drops.schematic.family === 'adamantium',
+ok(def('risenlegate').enabled === true && !def('risenlegate').devOnly && def('risenlegate').boss.options[0][2] === 'DBO_Boss_risenlegate' && def('risenlegate').adds.length === 5 && def('risenlegate').drops.schematic.family === 'adamantium',
   'Sancre Tor stays undead: the Risen Legate is a full boss with an undead legion of Sancre Tor\'s own pools, Adamantium 3%');
 ok(def('centurion').drops.extra.some((x) => x[0] === '17749:Dragonborn.esm' && x[1] === 0.05 && x[3] === 'DLC2HeartStone'), 'the Centurion Master drops a Heart Stone at 5%');
 
@@ -229,7 +230,7 @@ ok(def('icecap').drops.shards.desc === '1d2201:DragonBreak Online Edits.esp' && 
 
 // ---- 26 Oct: one name per boss, Beyond Skyrim's Valkynaz, the Warmonger's opening adds after it rises ----
 ok(new Set(REAL.bosses.map((b) => b.name.toLowerCase())).size === REAL.bosses.length, 'every boss has its own name (Nat 26 Oct: two "The Minotaur Lord" at once were the two axe tests)', REAL.bosses.map((b) => b.name));
-ok(def('valkynaz').boss.options[0][1] === 'ddb29:BSHeartland.esm' && def('valkynaz').boss.edid === 'CYREncDremoraWarlock06', 'the Valkynaz is Beyond Skyrim\'s Dremora Valkynaz (ddb29), Nat\'s choice');
+ok(def('valkynaz').boss.options[0][1] === '1d2451:DragonBreak Online Edits.esp' && def('valkynaz').boss.edid === 'DBO_Boss_valkynaz', 'the Valkynaz is Beyond Skyrim\'s Dremora Valkynaz (ddb29), Nat\'s choice, through its boss-bar copy templated on it');
 ok(def('falmerwarmonger').openingDelaySeconds === 4 && def('falmerwarmonger').openingStepSeconds === 3, 'the Warmonger\'s opening adds wait 4 s after it rises, then come 3 s apart');
 load({ bosses: { only: ['falmerwarmonger', 'centurion'] } });
 const openOf = (id) => zones().filter((x) => new RegExp(`^boss:${id}:open\\d$`).test(x.Name)).length;
