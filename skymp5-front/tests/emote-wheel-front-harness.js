@@ -80,6 +80,9 @@ export const render = (data) => renderToStaticMarkup(React.createElement(EmoteWh
   ok(!/<img|\.gif|data:image\/gif/.test(html), 'no GIF and no image: the art is our own glyphs');
   ok((html.match(/class="emote-wheel__glyph"/g) || []).length === GROUPS.length && html.includes('emote-wheel__hub-glyph'), 'a glyph per group, and the active one in the hub');
   ok(html.includes('>Stop emote<'), 'the stop button is there');
+  ok(/textLength="64" lengthAdjust="spacingAndGlyphs"[^>]*>Entertain</.test(html) || /lengthAdjust="spacingAndGlyphs" textLength="64"[^>]*>Entertain</.test(html) || /textLength="64"[^>]*lengthAdjust="spacingAndGlyphs"[^>]*>Entertain</.test(html), 'a long group label (Entertain) is fitted to its wedge, not cut');
+  ok(!/textLength="64"[^>]*>Dialog</.test(html), '...a short one is left at its own width');
+  ok(GROUPS.find((g) => g.id === 'activities').emotes.some((e) => e.anim === 'pipesmokingcrossleggedenter' && e.label === 'Smoke Pipe'), 'Smoke Pipe is on the wheel under Activities');
   ok(fs.readdirSync(path.join(FRONT, 'src/features/emoteWheel')).every((f) => !/\.(gif|png|webp)$/.test(f)) && !fs.existsSync(path.join(FRONT, 'src/features/emoteWheel/assets')), 'the ported GIF art is gone from the feature');
   const many = render({ groups: [{ id: 'x', label: 'X', emotes: Array.from({ length: 12 }, (_, i) => ({ anim: 'A' + i, label: 'Emote ' + i })) }], events: data.events });
   ok((many.match(/class="emote-wheel__key"/g) || []).length === 9 && (many.match(/class="emote-wheel__emote[ "]/g) || []).length === 12, 'a group of twelve draws twelve segments, nine with keys');
