@@ -59,6 +59,10 @@ const Glyph = ({ id, x, y, size, className }: { id: string; x: number; y: number
   <path className={className} d={glyphOf(id)} transform={`translate(${x - size / 2} ${y - size / 2}) scale(${size / 24})`} />
 );
 
+// A group label wider than its wedge is fitted to it rather than cut (ENTERTAIN, REACTIONS)
+export const GROUP_LABEL_FIT = 64;
+const groupFit = (label: string) => (label.length > 8 ? { textLength: GROUP_LABEL_FIT, lengthAdjust: 'spacingAndGlyphs' } : {});
+
 const shortenLabel = (label: string): string => (label.length <= 16 ? label : label.slice(0, 15) + '.');
 
 // Selection survives close and reopen; the client tears the widget down each time.
@@ -175,7 +179,7 @@ const EmoteWheel = ({ data }: { data: EmoteWheelData }) => {
               <g key={g.id} className={'emote-wheel__group' + (on ? ' is-active' : '') + (hot ? ' is-hot' : '')} onClick={() => { setGroup(i); dwell.current = { candidate: -1, since: 0 }; }}>
                 <path className="emote-wheel__seg" d={arcPath(GROUP_INNER, GROUP_OUTER, a.start, a.end)} />
                 <Glyph id={g.id} x={c.x} y={c.y - 9} size={24} className="emote-wheel__glyph" />
-                <text className="emote-wheel__group-label" x={c.x} y={c.y + 19}>{g.label}</text>
+                <text className="emote-wheel__group-label" x={c.x} y={c.y + 19} {...groupFit(g.label)}>{g.label}</text>
               </g>
             );
           })}
