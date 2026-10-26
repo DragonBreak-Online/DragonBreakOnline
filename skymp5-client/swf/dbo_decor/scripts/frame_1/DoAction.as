@@ -8,10 +8,12 @@ var PAD = 28;
 var ROW_H = 46;
 var LIST_X = 230;
 var LIST_TOP = 168;
+// the rows that fit above the footer; the server pages at 8 for native:decor (decor.js PANEL_CAPS)
+var MAX_ROWS = 8;
 var C_AMBER = 0xC9A86A;
 var C_RED = 0xB23A3A;
 var NO_DATA_CLOSE_MS = 8000;
-var TABS = [["catalog", "Catalogue"], ["placed", "Placed"], ["people", "People"]];
+var TABS = [["catalog", "Catalogue"], ["placed", "Placed"], ["people", "Carpenters"]];
 
 var panel;
 var data = null;
@@ -219,7 +221,7 @@ function small(parent, name, x, label, pick)
 function drawCatalog(l)
 {
    drawGroups(l);
-   for (var i = 0; i < data.rows.length; i++)
+   for (var i = 0; i < data.rows.length && i < MAX_ROWS; i++)
    {
       var r = data.rows[i];
       var blocked = r.why != "";
@@ -240,7 +242,7 @@ function drawCatalog(l)
 
 function drawPlaced(l)
 {
-   for (var i = 0; i < data.rows.length; i++)
+   for (var i = 0; i < data.rows.length && i < MAX_ROWS; i++)
    {
       var r = data.rows[i];
       var bits = [];
@@ -273,27 +275,36 @@ function drawPlaced(l)
    }
 }
 
+// A carpenter's rank and the share their takedowns give back to the owner (decor.js people rows: tier, refund, online)
+function skillText(r)
+{
+   return r.tier != undefined && r.tier != "" ? r.tier + " woodworker, " + r.refund + "% back" : "offline";
+}
+
 function drawPeople(l)
 {
+   var note = dboText(l, "note", 300, PAD, LIST_TOP, LIST_X - PAD - 16, 260, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8), true);
+   note.text = "Carpenters may place, move and take down pieces here. What they take down comes back to you, at their woodworking skill." +
+      (data.own != undefined ? "\n\nYour own: " + data.own.tier + ", " + data.own.refund + "% back." : "");
    var i = 0;
    var w = PANEL_W - LIST_X - PAD;
-   for (var k = 0; k < data.rows.length; k++, i++)
+   for (var k = 0; k < data.rows.length && i < MAX_ROWS; k++, i++)
    {
-      var c = row(l, i, String(data.rows[k].name), "may decorate here", C_SECOND, false, null);
+      var c = row(l, i, String(data.rows[k].name), skillText(data.rows[k]), C_SECOND, false, null);
       c._alpha = A_FOCUS;
       c.key = data.rows[k].key;
-      small(c, "rv", w - 110, "Revoke", function()
+      small(c, "rv", w - 110, "Dismiss", function()
       {
          dboSound("UIMenuOK");
          send("dbo:decorRevoke", [this._parent.key]);
       });
    }
-   for (var n = 0; n < data.nearby.length && i < 8; n++, i++)
+   for (var n = 0; n < data.nearby.length && i < MAX_ROWS; n++, i++)
    {
-      var c2 = row(l, i, String(data.nearby[n].name), "here now", C_SECOND, false, null);
+      var c2 = row(l, i, String(data.nearby[n].name), "here now: " + skillText(data.nearby[n]), C_SECOND, false, null);
       c2._alpha = A_FOCUS;
       c2.key = data.nearby[n].key;
-      small(c2, "gr", w - 110, "Grant", function()
+      small(c2, "gr", w - 110, "Hire", function()
       {
          dboSound("UIMenuOK");
          send("dbo:decorGrant", [this._parent.key]);
@@ -301,7 +312,7 @@ function drawPeople(l)
    }
    if (!i)
    {
-      row(l, 0, "Nobody is named, and nobody else is here.", "Bring a friend inside to name them.", C_SECOND, true, null);
+      row(l, 0, "No carpenters hired yet.", "Bring one inside to hire them.", C_SECOND, true, null);
    }
 }
 

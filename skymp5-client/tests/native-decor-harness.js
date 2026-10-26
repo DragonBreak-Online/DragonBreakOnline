@@ -75,12 +75,22 @@ const rowsOf = (t) => Object.keys(list(t).kids).filter((n) => /^r\d$/.test(n)).m
 
 {
   const t = S.boot('dbo_decor');
-  t.push(Object.assign({}, base, { view: 'people', pages: 1, rows: [{ key: '9', name: 'Stray' }], nearby: [{ key: '10', name: 'Gemma' }] }));
+  // the shape decor.js sends since the carpenters (26 Oct): each row's Woodcutter tier and refund %, and the viewer's own
+  t.push(Object.assign({}, base, { view: 'people', pages: 1, own: { tier: 'Novice', refund: 50 },
+    rows: [{ key: '9', name: 'Stray', online: true, tier: 'Adept', refund: 63 }, { key: '11', name: 'Away', online: false, tier: '', refund: null }],
+    nearby: [{ key: '10', name: 'Gemma', online: true, tier: 'Master', refund: 75 }] }));
   const r = rowsOf(t);
-  check('people: the named, then who is here', r.length === 2 && r[0].label.text === 'Stray' && r[1].label.text === 'Gemma');
+  check('carpenters: the hired, then who is here', r.length === 3 && r[0].label.text === 'Stray' && r[2].label.text === 'Gemma');
+  check("each shows their woodworking rank and refund share; an offline one says so", r[0].sub.text === 'Adept woodworker, 63% back' && r[1].sub.text === 'offline' && r[2].sub.text === 'here now: Master woodworker, 75% back', [r[0].sub.text, r[1].sub.text, r[2].sub.text]);
+  check("the note says a carpenter's takedowns come back to the owner, with the owner's own share", /comes back to you, at their woodworking skill/.test(t.root.dboPanel.list.note.text) && /Your own: Novice, 50% back\./.test(t.root.dboPanel.list.note.text), t.root.dboPanel.list.note.text);
+  check('the tab reads Carpenters', t.root.dboPanel.head.tab2.label.text === 'Carpenters');
+  const many = Array.from({ length: 20 }, (_, i) => ({ key: `k${i}`, name: `Piece ${i}`, cost: [], why: '' }));
+  const tm = S.boot('dbo_decor');
+  tm.push(Object.assign({}, catalog, { rows: many }));
+  check('a 20-row page draws 8: no row over the footer', rowsOf(tm).length === 8, rowsOf(tm).length);
   r[0].rv.onRelease();
-  r[1].gr.onRelease();
-  check('Revoke and Grant send the profile', msgs(t, 'dbo:decorRevoke').pop().args[1] === '9' && msgs(t, 'dbo:decorGrant').pop().args[1] === '10');
+  r[2].gr.onRelease();
+  check('Dismiss and Hire send the profile', r[0].rv.label.text === 'Dismiss' && r[2].gr.label.text === 'Hire' && msgs(t, 'dbo:decorRevoke').pop().args[1] === '9' && msgs(t, 'dbo:decorGrant').pop().args[1] === '10');
   t.push(Object.assign({}, catalog, { owner: false }));
   check('a decorator who is not the owner has no People tab', !t.root.dboPanel.head.tab2);
   t.push(Object.assign({}, catalog, { page: 1 }));
