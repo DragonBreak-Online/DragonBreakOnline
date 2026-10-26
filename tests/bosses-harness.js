@@ -18,13 +18,17 @@ const def = (id) => REAL.bosses.find((b) => b.id === id);
 // ---- the shipped data ----
 ok(REAL.bosses.map((b) => b.id).join() === 'icecap,briarheartking,centurion,palewarlord,falmerwarmonger,movarth,duskthorn,valkynaz,karstaag,risenlegate,minotaurlord,minotaurtest1,minotaurtest2,werewolfbehemoth',
   'eight bosses: the Ice Cap Wraith, the Briarheart King, the Centurion Master, the Warlord of the Pale Pass, the Falmer Warmonger, the Master of Movarth\'s Lair, the Warchief of Dusk Thorn, the Valkynaz');
-ok(def('movarth').night === true && def('valkynaz').event && def('valkynaz').event.minutes === 30 && def('falmerwarmonger').guardian.options.length && def('duskthorn').guardian.options.length,
-  'Movarth\'s master walks at night, the Valkynaz is a 30-minute event, the Warmonger and the Warchief have their shamans');
+ok(def('movarth').night === true && !def('valkynaz').event && def('valkynaz').respawnSeconds === 10800 && def('falmerwarmonger').guardian.options.length && def('duskthorn').guardian.options.length,
+  'Movarth\'s master walks at night, the Valkynaz stands on its own (Nat 26 Oct: it was a GM event), the Warmonger and the Warchief have their shamans');
+ok(def('valkynaz').guardian.options[0][2] === 'mihailhighclannfear_NPC' && def('valkynaz').adds[0].options.some((o) => o[2] === 'DDRClannfear') && def('valkynaz').adds[1].options.every((o) => /Scamp/.test(o[2])),
+  '...with a High Clannfear guardian, Clannfear and scamps (Nat 26 Oct: "nor Clennifar or the scamp minions with it")');
+ok(def('falmerwarmonger').spots.length === 1 && def('falmerwarmonger').spots[0].id === 'BF' && def('falmerwarmonger').spots[0].pos[2] < 1100,
+  'the Warmonger stands on the cavern floor (BF, navmesh 993), not by the wild Falmer anchors where the arrival froze a client');
 ok(!JSON.stringify(def('valkynaz').drops).includes('IngotEbony') && def('valkynaz').drops.always.some((x) => x[2] === 'DaedraHeart'), 'the Valkynaz drops a daedra heart and no Ebony (never loot)');
 ok(def('palewarlord').devOnly === true && def('palewarlord').spots.map((s) => s.id).join() === 'SE,ST' && def('palewarlord').roam === true,
   'the Warlord of the Pale Pass: dev only, at SE (under the Sentinel) roaming to ST (Serpent’s Trail), SR dropped (Nat, 25 Oct)');
 ok(def('icecap').enabled === false && def('briarheartking').enabled && def('centurion').enabled, 'the Wraith and the Warlord wait on Nat (spot, shard); the King and the Centurion are on');
-ok(def('icecap').boss.options[0][2] === 'EncIceWraith' && def('icecap').spots.length === 4 && def('icecap').drops.schematic.family === 'glacial_crystal', 'the Wraith: a vanilla ice wraith, four candidate spots, the Glacial Crystal schematic');
+ok(def('icecap').boss.options[0][2] === 'EncIceWraith' && def('icecap').spots.length === 1 && def('icecap').spots[0].id === 'SK' && def('icecap').drops.schematic.family === 'glacial_crystal', 'the Wraith: a vanilla ice wraith at Skytemple Ruins (Nat 26 Oct), the Glacial Crystal schematic');
 ok(def('briarheartking').boss.options.slice(-1)[0][2] === 'EncForsworn06BossMagicBretonM03' && def('briarheartking').guardian.options[0][2] === 'EncHagraven', 'the King: the strongest Forsworn boss shaman, his Hagraven beside him');
 ok(REAL.bosses.every((b) => b.spots.every((s) => s.ref && s.anchorDist < 5000)), 'every spot has an anchor within 5000 units (Sancre Tor\'s and Minotaur\'s Rest\'s are the ones Nate\'s own zones there use)');
 ok(def('karstaag').enabled === false && /Solstheim/.test(def('karstaag').waitingOn) && def('karstaag').boss.options[0][2] === 'DLC2dunKarstaag', 'Karstaag is defined and off until Solstheim opens');
@@ -168,17 +172,23 @@ ok(JSON.parse(fs.readFileSync(path.join(dir, 'bosses-state.json'), 'utf8')).spot
 
 // ---- each boss's own config block (Nat, 25 Oct: they go live one by one) ----
 fs.writeFileSync(path.join(dir, 'bosses.json'), JSON.stringify(REAL));
-load({ bosses: { icecap: { enabled: true, spot: 'S2' }, briarheartking: { enabled: false } } });
+load({ bosses: { icecap: { enabled: true, spot: 'SK' }, briarheartking: { enabled: false } } });
 const cz = zones().filter((x) => x.Name.startsWith('boss:'));
 const wraith = cz.find((x) => x.Name === 'boss:icecap:boss');
-ok(wraith && wraith.POS.join() === def('icecap').spots[1].pos.join(), 'bosses.icecap { enabled, spot: S2 } turns the Wraith on at its second candidate, whatever bosses.json says', wraith);
+ok(wraith && wraith.POS.join() === def('icecap').spots[0].pos.join(), 'bosses.icecap { enabled, spot: SK } turns the Wraith on at Skytemple Ruins, whatever bosses.json says', wraith);
+ok(cz.some((x) => x.Name === 'boss:valkynaz:boss') && cz.some((x) => x.Name === 'boss:valkynaz:guardian'), 'the Valkynaz stands at the Great Gate with its High Clannfear, no event needed');
+load({ bosses: { icecap: { enabled: true, spot: 'S3' } } });
+ok((zones().find((x) => x.Name === 'boss:icecap:boss') || { POS: [] }).POS.join() === def('icecap').spots[0].pos.join(), '...and a pin to a retired spot (S3) falls back to Skytemple Ruins');
 ok(!cz.some((x) => x.Name.startsWith('boss:briarheartking:')) && cz.some((x) => x.Name === 'boss:centurion:boss') && !cz.some((x) => x.Name.startsWith('boss:palewarlord:')),
   'bosses.briarheartking.enabled false takes the King off; the Centurion stays on and the Warlord off as the data says');
 ok(def('icecap').drops.shards.desc === '1d2201:DragonBreak Online Edits.esp' && def('icecap').drops.shards.count === 5 && def('icecap').drops.shards.top === 7,
   'the Wraith drops the Glacial Crystal Shard (DLE 1D2201): 5 a fighter, 7 for the top damager (a 36-shard set in 5-7 days)');
 
 // ---- the night boss and the event boss ----
-fs.writeFileSync(path.join(dir, 'bosses.json'), JSON.stringify(REAL));
+// bosses.js still runs event bosses (/bossevent); since 26 Oct none ships as one, so the Valkynaz is made one for this part
+const EV = JSON.parse(JSON.stringify(REAL));
+EV.bosses.find((b) => b.id === 'valkynaz').event = { minutes: 30, waveEverySeconds: 300, waveSize: 3 };
+fs.writeFileSync(path.join(dir, 'bosses.json'), JSON.stringify(EV));
 let night = false;
 globalThis.__dboClock = { isNight: () => night };
 load({});

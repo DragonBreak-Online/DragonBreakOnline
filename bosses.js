@@ -408,7 +408,7 @@ module.exports = (api) => {
     writeZones();
     audit(`BOSS ${b.id} event started by ${who(a)} for ${b.event.minutes} min`);
     personal(a, `${titled(b.name)} is coming, for ${b.event.minutes} minutes.`);
-  }, { admin: true, help: '<boss> start an event boss (Lead GM): the Valkynaz of the Great Gate' });
+  }, { admin: true, help: '<boss> start an event boss (Lead GM); none ships as one since 26 Oct (the Valkynaz stands on its own)' });
 
   registerChatCommand('bosses', (a) => {
     if (!BOSSES.length) return personal(a, 'No bosses walk the world right now.');

@@ -1,5 +1,21 @@
 [
   {
+    "title": "Bosses: the Valkynaz walks, the Ice Wraith moves to Skytemple Ruins",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Bosses",
+        "items": [
+          "The Valkynaz of the Great Gate now stands at the Great Oblivion Gate on its own, with a High Clannfear at its side and Clannfear and scamps around it. Before, it only came during a GM event.",
+          "The Wraith of the Ice Cap now waits at Skytemple Ruins on the coast past Winterhold.",
+          "The Falmer Warmonger stands on the open cavern floor of Blackreach's Falmer city, apart from the city's other Falmer."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Server restart: soul gems, gates and strongholds",
     "date": "2026-10-25",
     "version": "Server update",
