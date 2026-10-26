@@ -832,5 +832,68 @@ ok(logs.filter((l) => /not in this load order/.test(l)).length === 0,
 restart({ beastform: {} });
 
 
+
+// ---- 18. the Hagraven keeps her body indoors (Nat, 26 Oct: "allow the form in interiors") -------------------
+// Hers alone: she has hands and a humanoid-ish graph, so unlike the animals she can work a door. Every animal
+// still ends indoors, which is the half of this that is easiest to break by accident.
+restart({ beastform: {} });
+// Everyone else parked in another worldspace: anybody standing near trips the "nobody near can see this form
+// yet" guard, and then every refusal below would be that guard rather than the indoors rule under test.
+for (const a of [OWNER, GM, PLAYER, WOLF, LORD, FARP, LEAD]) place(a, 900000, OTHER_WORLD);
+place(NEWP, 0);
+
+let n18 = said.length;
+polyAs(NEWP, 'hagraven', { by: 'hagraven' });
+const hagOn = !!beast(NEWP);
+ok(hagOn, '18. the Hagraven body can be taken', hagOn);
+place(NEWP, 0, INSIDE);
+tick();
+ok(hagOn && !!beast(NEWP), '18. tick: she KEEPS the body indoors', { on: hagOn, still: !!beast(NEWP) });
+ok(!told(n18, NEWP).some((t) => /cannot open doors/.test(t)),
+  '18. ...and is never told the animals line about doors', told(n18, NEWP));
+tick(); tick();
+ok(!!beast(NEWP), '18. ...and still has it several ticks later, so it is not a one-tick reprieve');
+
+// The exemption covers the INDOORS rule only.
+globalThis.__dboPolymorphOn = false;
+tick();
+ok(!beast(NEWP), '18. the Owners switch still ends her shape indoors, so the exemption is scoped to one rule');
+globalThis.__dboPolymorphOn = true;
+place(NEWP, 0);
+
+// The regression that matters most.
+let n18b = said.length;
+polyAs(NEWP, 'fox', { by: 'hagraven' });
+const foxOn = !!beast(NEWP);
+place(NEWP, 0, INSIDE);
+tick();
+ok(foxOn && !beast(NEWP), '18. a fox indoors is STILL reverted: the exemption is hers alone', { on: foxOn, still: !!beast(NEWP) });
+place(NEWP, 0);
+
+// Entry too: refusing the change indoors while not reverting indoors would be incoherent.
+place(NEWP, 900000, OTHER_WORLD);
+place(LEAD, 0, INSIDE);   // alone in an interior, with everyone else a worldspace away
+const rIn = run(LEAD, 'hagraven');
+ok(!!beast(LEAD) && !/indoors/.test(rIn), '18. she can be taken WHILE indoors', rIn);
+run(LEAD, 'revert');
+const rFox = run(LEAD, 'chicken');
+ok(!beast(LEAD) && /indoors/.test(rFox), '18. ...while an animal taken indoors is still refused', rFox);
+place(LEAD, 0);
+
+// Her line must not promise something that no longer happens.
+const n18c = said.length;
+run(LEAD, 'hagraven');
+const hagTell = told(n18c, LEAD).join(' | ');
+ok(!/going indoors/.test(hagTell), '18. her own line does not promise that going indoors turns her back', hagTell);
+run(LEAD, 'revert');
+const n18d = said.length;
+run(LEAD, 'chicken');
+ok(/going indoors/.test(told(n18d, LEAD).join(' | ')), '18. ...while an animal is still told that it does', told(n18d, LEAD));
+run(LEAD, 'revert');
+
+// It is a per-form capability, not a default: fail closed.
+ok((src.match(/indoors: true/g) || []).length === 1, '18. exactly one form carries the indoors flag');
+ok(/allowsIndoors\(key\)/.test(src) && /allowsIndoors\(form\)/.test(src), '18. both the refusal and the tick consult it');
+
 console.log(fail ? `\n${fail} FAILED, ${pass} passed` : `\nall ${pass} checks passed`);
 process.exit(fail ? 1 : 0);

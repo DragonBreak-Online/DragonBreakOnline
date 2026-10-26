@@ -32,7 +32,8 @@
 // The body (Nat, 25 Oct, the Leader's brief): a Hagraven (stage 3) takes the real Hagraven creature with /hagraven form and
 //   leaves it the same way, at will, form.cooldownSeconds between changes. It is beastform.js's polymorph (__dboPolymorphAs,
 //   by 'hagraven'), so its guards all apply: the Owners' switch, dead, down, bound, jailed, duelling, in a fight, mounted,
-//   seated, in water, indoors, and the creatureBody distance guard; death, logout and login revert it as any form. The
+//   seated, in water and the creatureBody distance guard; death, logout and login revert it as any form. She is the
+//   one form NOT ended indoors (Nat, 26 Oct): beastform's CREATURES.hagraven carries indoors: true. The
 //   creature casts nothing, so she leaves the body to cast; her stage stays on her, its SpeedMult is put back after the body.
 //   Down, jail, bound or carried, the pact ended or her stage lowered end the body (formTick, every 5 s).
 // Chat: /hagraven [status] | pact | confirm | form | cure; staff: grant <name> <reason> | revoke <name> <reason> |
