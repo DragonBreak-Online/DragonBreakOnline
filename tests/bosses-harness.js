@@ -30,6 +30,7 @@ ok(!def('palewarlord').devOnly && def('palewarlord').spots.map((s) => s.id).join
 ok(def('icecap').enabled === true && def('briarheartking').enabled && def('centurion').enabled, 'the Wraith is on (its shard is in the production DLE); the King and the Centurion are on');
 ok(!REAL.bosses.some((b) => b.devOnly) && !REAL.bosses.some((b) => /test/i.test(b.id)), 'no boss is a dev-only test any more (Nat 26 Oct: the test copies go; none can ship)');
 ok(REAL.bosses.every((b) => b.respawnSeconds === 3600), 'every boss respawns 1 h after it falls (Nat 26 Oct)', REAL.bosses.map((b) => [b.id, b.respawnSeconds]));
+ok(REAL.bosses.every((b) => b.toughness >= 0.85 && b.enrage.toughness >= 0.65 && (!b.guardian || b.guardian.bossToughnessWhileAlive === 0.95) && b.openingAdds >= 3 && b.waves.length === 3 && b.enrageSeconds === 600), 'every boss is a world boss: 6.7x health or more, a 20x guardian shield, 3 opening adds, three waves, enrage at 10 min (Nat 26 Oct)', REAL.bosses.map((b) => [b.id, b.toughness, b.openingAdds]));
 ok(REAL.bosses.filter((b) => b.enabled).length === 12 && !def('karstaag').enabled, 'every boss ships on but Karstaag, who waits on Solstheim');
 const fams = REAL.bosses.flatMap((b) => ['schematic', 'extraSchematic'].map((k) => b.drops[k] && b.drops[k].family).filter(Boolean));
 ok(REAL.bosses.every((b) => b.drops.schematic && b.drops.schematic.family) && new Set(fams).size === fams.length, 'every boss has a schematic and no two share a family (Nat 26 Oct: "unique schematics")', fams);
@@ -107,7 +108,7 @@ ok(z.some((x) => x.Name === 'wild:wolf:1') && z.some((x) => x.Name === 'dungeon:
 const bz = z.filter((x) => x.Name.startsWith('boss:'));
 const king = bz.find((x) => x.Name === 'boss:briarheartking:boss'), hag = bz.find((x) => x.Name === 'boss:briarheartking:guardian');
 ok(king && hag && king.Hostile && hag.Hostile && king.Respawn === 3600 && king.NPC[0].id === 'ad7c1:Skyrim.esm', 'the King and his Hagraven: hostile boss zones, back 1 h after a kill (Nat 26 Oct), the strongest boss shaman', [king, hag]);
-ok(bz.filter((x) => /^boss:icecap:open\d$/.test(x.Name)).length === 3 && bz.filter((x) => /^boss:palewarlord:open\d$/.test(x.Name)).length === 2, 'opening adds: the Wraith\'s three ice wraiths, the Warlord\'s two bandits');
+ok(bz.filter((x) => /^boss:icecap:open\d$/.test(x.Name)).length === def('icecap').openingAdds && bz.filter((x) => /^boss:palewarlord:open\d$/.test(x.Name)).length === def('palewarlord').openingAdds, `opening adds: the Wraith's ${def('icecap').openingAdds} ice wraiths, the Warlord's ${def('palewarlord').openingAdds} bandits`);
 load({ bosses: { only: ['centurion'] } });
 ok(zones().filter((x) => x.Name.startsWith('boss:')).every((x) => x.Name.startsWith('boss:centurion:')), 'bosses.only keeps the rest\'s zones out');
 load({ bosses: { enabled: false } });
@@ -123,19 +124,25 @@ ok(names.some(([d, n]) => d === K.toString(16) && n === 'The Briarheart King') &
 ok(glows.some(([, p]) => p.kind === 'champion' && p.refs.includes(K) && p.on), 'the King glows as a champion does (SetScale is a stub)');
 ok(/crowned a Briarheart King/.test(toldTo(P1)) && !/crowned/.test(toldTo(FAR)), 'Markarth\'s hold hears he has risen; Whiterun does not');
 const hit = (agg, tgt, dmg, healthAfter) => { put(tgt, 'percentages', { health: healthAfter, magicka: 1, stamina: 1 }); globalThis.__dboBossHit(agg, tgt, dmg); return props.get(`${tgt}|percentages`).health; };
+const KB = def('briarheartking'), KG = KB.guardian.bossToughnessWhileAlive, KT = KB.toughness;
 let h = hit(P1, K, 100, 0.9);
-ok(Math.abs(h - (0.9 + 0.1 * 0.85)) < 1e-9, 'while the Hagraven lives, 85% of each blow is given back', h);
+ok(Math.abs(h - (0.9 + 0.1 * KG)) < 1e-9, `while the Hagraven lives, ${Math.round(KG * 100)}% of each blow is given back`, h);
 globalThis.__dboBossDeath(H, P2);
 ok(/laid open/.test(toldTo(P1)), 'the Hagraven falls: the King is laid open');
+const hBefore = h;
 h = hit(P2, K, 250, h - 0.1);
-ok(Math.abs(h - (0.985 - 0.1 + 0.1 * 0.4)) < 1e-9, '...and then only 40% is given back', h);
-ok(globalThis.__dboBossDamageMult(K, P1) === 1.5 && globalThis.__dboBossDamageMult(ADD, P1) === 1 && globalThis.__dboBossDamageMult(K, ADD) === 1, 'the King hits players x1.5; an add, or a hit on an NPC, is untouched');
-h = hit(P3, K, 300, 0.45);
-ok(zones().filter((x) => /^boss:briarheartking:w0-\d$/.test(x.Name)).length === 2 && zones().find((x) => x.Name === 'boss:briarheartking:w0-0').Respawn === 1e9, 'below 66%: the first wave, two Forsworn beside him, never respawning', zones().filter((x) => x.Name.includes(':w')).map((x) => x.Name));
-h = hit(PET, K, 200, 0.1);
-ok(zones().filter((x) => /^boss:briarheartking:w1-\d$/.test(x.Name)).length === 3, 'below 33%: the second wave of three');
-now += 481000; tick([K]);
-ok(globalThis.__dboBossDamageMult(K, P1) === 2.5 && /grows furious/.test(toldTo(P2)), 'eight minutes after the first blow he is enraged: x2.5');
+ok(Math.abs(h - (hBefore - 0.1 + 0.1 * KT)) < 1e-9, `...and then only ${Math.round(KT * 100)}% is given back`, h);
+ok(globalThis.__dboBossDamageMult(K, P1) === KB.damageMult && globalThis.__dboBossDamageMult(ADD, P1) === 1 && globalThis.__dboBossDamageMult(K, ADD) === 1, `the King hits players x${KB.damageMult}; an add, or a hit on an NPC, is untouched`);
+// Blows until his health is at or under a share: the give-back hands most of each one back
+const hitTo = (agg, dmg, share) => { let x = hit(agg, K, dmg, Math.max(0.001, h - 0.3)); for (let i = 0; x > share && i < 500; i++) x = hit(agg, K, 0, Math.max(0.001, x - 0.3)); return x; };
+const waveBy = [[P3, 300], [PET, 200], [P1, 0]];
+KB.waves.forEach(([share, n], i) => {
+  h = hitTo(waveBy[i % 3][0], waveBy[i % 3][1], share);
+  const w = zones().filter((x) => new RegExp(`^boss:briarheartking:w${i}-\\d$`).test(x.Name));
+  ok(h <= share && w.length === n && w.every((x) => x.Respawn === 1e9), `below ${Math.round(share * 100)}%: wave ${i + 1}, ${n} beside him, never respawning`, [h, zones().filter((x) => x.Name.includes(':w')).map((x) => x.Name)]);
+});
+now += KB.enrageSeconds * 1000 + 1000; tick([K]);
+ok(globalThis.__dboBossDamageMult(K, P1) === KB.enrage.damageMult && /grows furious/.test(toldTo(P2)), `${KB.enrageSeconds / 60} minutes after the first blow he is enraged: x${KB.enrage.damageMult}`);
 hit(BRIAR, K, 400, 0.1);
 hit(FAR, K, 20, 0.05);   // under 10% of the damage
 given.length = 0; said.length = 0; rnd = 0.01;
@@ -250,7 +257,7 @@ load({});
 const hasZone = (name) => zones().some((x) => x.Name === name);
 ok(!hasZone('boss:movarth:boss') && hasZone('boss:falmerwarmonger:boss') && hasZone('boss:duskthorn:guardian'), 'by day the Master of Movarth\'s Lair is nowhere; the Warmonger and the Warchief stand with their shamans');
 night = true; tick([]);
-ok(hasZone('boss:movarth:boss') && zones().filter((x) => /^boss:movarth:open\d$/.test(x.Name)).length === 2, 'at nightfall he rises at the mouth of his lair with two thralls');
+ok(hasZone('boss:movarth:boss') && zones().filter((x) => /^boss:movarth:open\d$/.test(x.Name)).length === def('movarth').openingAdds, `at nightfall he rises at the mouth of his lair with ${def('movarth').openingAdds} thralls`);
 night = false; tick([]);
 ok(!hasZone('boss:movarth:boss'), '...and is gone at dawn when nobody is fighting him');
 const M = 0xff500001;
