@@ -96,6 +96,8 @@ const mp = {
     throw new Error('unexpected papyrus ' + fn);
   },
 };
+// The saved index the tag lookups read (gamemode.js indexName): private.indexed.tagKey
+mp.findFormsByPropertyValue = (k, v) => [...props.entries()].filter(([key, val]) => key.endsWith('|' + k) && val === v).map(([key]) => Number(key.split('|')[0]));
 let innerCalls = 0;
 mp.onReadBook = () => { innerCalls++; return undefined; };
 const original = mp.onReadBook;
@@ -641,6 +643,51 @@ check('closing the panel closes widget 44', out.closed.some((c) => c[0] === OTHE
   check('...and /teach can offer it again (the Teach whom? menu opens)', out.said.filter((p) => p[0] === TCH).length === toldT && /Teach whom/.test(JSON.stringify(lastWidget(TCH))), [said(TCH), lastWidget(TCH)]);
   check('a lifted spell is open to apprenticeship again', !/held back/.test(globalThis.__dboSpellsOpenTo(N, eq)));
   online = online.filter((x) => ![H, L, N, TCH].includes(x));
+}
+
+// ---- a held spell's tome is not sold, and its buyers are refunded once (flasnex, 25 Oct: Open Expert Lock bought, never read) ----
+{
+  const OPEN = ['6028d3:BSAssets.esm', '6028cd:BSAssets.esm'], openBook = idOf(OPEN[0]);
+  const goldOf = (a) => ((props.get(a + '|inventory') || { entries: [] }).entries.find((e) => e.baseId === 0xf) || { count: 0 }).count;
+  const countOf = (a, id) => ((props.get(a + '|inventory') || { entries: [] }).entries.find((e) => e.baseId === id) || { count: 0 }).count;
+  const B = 0x45;
+  put(B, 'profileId', 0x45); at(B, SYNOD, [0, 0, 0]); online.push(B); mastery(B, { priest: 2 });
+  put(B, 'inventory', { entries: [{ baseId: 0xf, count: 1000 }] }); put(B, 'private.dboGuilds', [{ id: 'synod', role: 'member' }]);
+  globalThis.__dboGuildsOf = () => [{ id: 'synod', title: 'Associate', role: 'member' }]; globalThis.__dboGuildRankList = () => SYNOD_RANKS;
+  load({ shopStock: 999 });
+  cmd('tomes', B);
+  check('not held: the Synod stocks Open Apprentice Lock', !!shop(B).tomes.find((t) => t.id === OPEN[0]), shop(B).tomes.length);
+  load({ shopStock: 999, suspendedSpells: [OPEN[1]] });
+  cmd('tomes', B);
+  check('held: its tome is not on the shelf', !shop(B).tomes.find((t) => t.id === OPEN[0]), shop(B).tomes.map((t) => t.id).filter((id) => /6028/.test(id)));
+  ui('tomeBuy', B, [shop(B).nonce, OPEN[0]]);
+  check('...and a forged buy is refused with the hold line, costing nothing and spending no purchase', shop(B).resultKind === 'refused' && /Open Apprentice Lock is held back for a short while, so its tome is not sold/.test(shop(B).result)
+    && goldOf(B) === 1000 && countOf(B, openBook) === 0 && !props.get(B + '|private.dboTomeBuys'), shop(B).result);
+  delete globalThis.__dboGuildsOf; delete globalThis.__dboGuildRankList;
+  online = online.filter((x) => x !== B);
+
+  // the refund: found by its tag, profile checked, gold back, the tome taken back, the weekly purchase freed, once
+  const R = 0x46, bought = wallClock - 3600000, older = wallClock - 3 * DAY;
+  put(R, 'profileId', 0x46); put(R, 'private.indexed.tagKey', 'rfnd'); online.push(R);
+  put(R, 'inventory', { entries: [{ baseId: openBook, count: 1 }] });
+  put(R, 'private.dboTomeBuys', [older, bought]); put(R, 'private.dboTomeBoughtAt', bought);
+  const entry = (x) => Object.assign({ id: 'refund-test', tag: '#RFND', profile: 0x46, tome: OPEN[0], gold: 80, boughtAt: new Date(bought + 60000).toISOString(), by: 'Nat', why: 'held tome sold' }, x);
+  out.audits.length = 0; out.logs.length = 0;
+  load({ suspendedSpells: [OPEN[1]], tomeRefunds: [entry({}), entry({ id: 'refund-wrong-profile', profile: 99 }), entry({ id: 'refund-no-such-tag', tag: 'ZZZZ' })] });
+  const rec = (props.get(R + '|private.dboTomeRefunds') || {})['refund-test'];
+  check('a refund gives the gold back and takes the tome back', goldOf(R) === 80 && countOf(R, openBook) === 0, [goldOf(R), countOf(R, openBook)]);
+  check('...frees the weekly purchase it spent, and the last-purchase mark goes back to the one before',
+    JSON.stringify(props.get(R + '|private.dboTomeBuys')) === JSON.stringify([older]) && props.get(R + '|private.dboTomeBoughtAt') === older, [props.get(R + '|private.dboTomeBuys'), props.get(R + '|private.dboTomeBoughtAt')]);
+  check('...keeps its record on the character, and is audited and told', !!rec && rec.paid === true && rec.tomeTaken === true && rec.slot === true && rec.gold === 80
+    && out.audits.some((l) => /^SPELL REFUND refund-test P46 80 gold for tome 6028d3:BSAssets\.esm: gold given, tome taken back, weekly tome freed$/.test(l))
+    && /Open Apprentice Lock tome you bought could not be read.*Your 80 gold is returned, and your tome purchase this week is yours again/.test(said(R)), [rec, out.audits.filter((l) => /REFUND/.test(l)), said(R)]);
+  check('a wrong profile or an unknown tag refunds nothing, and says so in the log', !(props.get(R + '|private.dboTomeRefunds') || {})['refund-wrong-profile']
+    && out.logs.some((l) => /tome refund refund-wrong-profile skipped: #RFND is not profile 99/.test(l)) && out.logs.some((l) => /tome refund refund-no-such-tag skipped: no single character with the tag #ZZZZ/.test(l))
+    && out.audits.filter((l) => /REFUND/.test(l)).length === 1, out.logs.filter((l) => /refund/.test(l)));
+  out.audits.length = 0;
+  load({ suspendedSpells: [OPEN[1]], tomeRefunds: [entry({})] });
+  check('the next load (a hot reload) applies it no second time', goldOf(R) === 80 && !out.audits.some((l) => /REFUND/.test(l)), [goldOf(R), out.audits]);
+  online = online.filter((x) => x !== R);
 }
 
 console.log(`\n${checks - failures}/${checks} passed`);

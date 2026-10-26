@@ -833,7 +833,8 @@ module.exports = (api) => {
     const pref = (t) => { const i = (CFG.shopPreferPlugins || []).indexOf(t.plugin); return i < 0 ? 99 : i; };
     const seen = new Set();
     return [...TOMES.values()]
-      .filter((t) => t.rank <= Number(CFG.shopMaxRank) && !removed(t.spellId) && !(CFG.shopExcludePlugins || []).includes(t.plugin) && !(excluded && excluded.test(t.edid)))
+      // nor a held spell's (suspendedSpells): it could not be read (flasnex, 25 Oct: Open Expert Lock sold and never learned)
+      .filter((t) => t.rank <= Number(CFG.shopMaxRank) && !removed(t.spellId) && !suspended(t.spellId) && !(CFG.shopExcludePlugins || []).includes(t.plugin) && !(excluded && excluded.test(t.edid)))
       .sort((x, y) => x.school.localeCompare(y.school) || x.rank - y.rank || pref(x) - pref(y) || x.name.localeCompare(y.name))
       .filter((t) => (seen.has(t.spellId) ? false : seen.add(t.spellId)));
   })();
@@ -1076,6 +1077,8 @@ module.exports = (api) => {
   const buy = (a, bookId) => {
     const why = shopRefusal(a);
     if (why) return { ok: false, text: why };
+    const heldTome = tomeOf(bookId);
+    if (heldTome && suspended(heldTome.spellId)) return { ok: false, text: `${heldTome.name} is held back for a short while, so its tome is not sold.` };
     const t = SHOP.find((x) => x.bookId === bookId);
     if (!t || !pathsOf(a, t.school).some((skill) => tierOf(a, skill.id) >= 0)) return { ok: false, text: 'The court mage will not sell you that tome.' };
     const R = regions();
@@ -1650,6 +1653,58 @@ module.exports = (api) => {
   };
   globalThis.__dboSpellsStaffTrims = () => [...trimRuns.values()].map((run) => ({ id: run.id, actor: run.actor, left: run.list.length - run.i, removed: run.removed.length, wait: run.wait }));
   try { staffTrims(); } catch (e) { log('spells: staff trims failed', e.stack || e.message); }
+
+  // ---- one-off tome refunds (Nat 26 Oct: tomes of held spells were sold and could never be read) ----------------------------
+  // spells.tomeRefunds = [{ id, tag: 'SDN7', profile: 16, tome: '6028d4:BSAssets.esm', gold: 240, boughtAt: ISO time, by, why }].
+  // At load, and so at every hot reload, each entry not yet applied to its character (private.dboTomeRefunds[id]) gives the gold
+  // back, takes one copy of the tome if the character still carries it, and frees the weekly purchase it spent (its time in
+  // private.dboTomeBuys within 10 minutes of boughtAt, and the last-purchase mark if it was that one). The character is found by
+  // its #TAG and must have the entry's profile, or nothing happens. The record is written before anything is given, so a failure
+  // halfway never pays twice; the audit line says what was done, and an online character is told.
+  const REFUNDS = 'private.dboTomeRefunds';
+  const REFUND_MATCH_MS = 10 * 60000;
+  const refundsOf = (a) => { const r = get(a, REFUNDS, null); return r && typeof r === 'object' && !Array.isArray(r) ? r : {}; };
+  const freeSlot = (a, at) => {
+    const buys = (Array.isArray(get(a, BUYS, null)) ? get(a, BUYS, []) : []).map(Number).filter((t) => t > 0);
+    const last = Number(get(a, BOUGHT, 0)) || 0;
+    const hit = buys.find((t) => Math.abs(t - at) <= REFUND_MATCH_MS);
+    const lastHit = last && Math.abs(last - at) <= REFUND_MATCH_MS;
+    if (hit === undefined && !lastHit) return false;
+    const rest = buys.filter((t) => t !== hit && !(lastHit && t === last));
+    set(a, BUYS, rest);
+    if (lastHit) set(a, BOUGHT, rest.length ? Math.max(...rest) : 0);
+    return true;
+  };
+  const tomeRefunds = () => {
+    const list = CFG.tomeRefunds;
+    if (list === undefined || list === null) return;
+    if (!Array.isArray(list)) { log('spells: config tomeRefunds is not a list; nothing refunded'); return; }
+    for (const x of list) {
+      try {
+        const id = x && typeof x.id === 'string' ? x.id.trim() : '';
+        if (!TRIM_ID.test(id)) { log('spells: tome refund skipped: a bad or missing id'); continue; }
+        const tag = String((x && x.tag) || '').trim().replace(/^#/, '').toLowerCase();
+        let actor = 0;
+        try { const r = mp.findFormsByPropertyValue('private.indexed.tagKey', tag); actor = Array.isArray(r) && r.length === 1 ? Number(r[0]) >>> 0 : 0; } catch (e) { actor = 0; }
+        if (!tag || !actor) { log(`spells: tome refund ${id} skipped: no single character with the tag #${tag.toUpperCase()}`); continue; }
+        if (Number(get(actor, 'profileId', NaN)) !== Number(x.profile)) { log(`spells: tome refund ${id} skipped: #${tag.toUpperCase()} is not profile ${x.profile}`); continue; }
+        const done = refundsOf(actor);
+        if (done[id]) continue;
+        const book = idOf(String(x.tome || '')), gold = Math.round(Number(x.gold)), at = Date.parse(String(x.boughtAt || ''));
+        if (!book || !(gold > 0) || !Number.isFinite(at)) { log(`spells: tome refund ${id} skipped: it needs a tome in this load order, gold and boughtAt`); continue; }
+        const rec = { at: Date.now(), gold, tome: descOf(book), by: trimText(x.by), why: trimText(x.why, 160) };
+        if (!set(actor, REFUNDS, Object.assign({}, done, { [id]: rec }))) { log(`spells: tome refund ${id} not applied: its record could not be written`); continue; }
+        const tomeTaken = takeOneItem(actor, book);
+        const paid = giveItem(actor, GOLD, gold);
+        const slot = freeSlot(actor, at);
+        set(actor, REFUNDS, Object.assign({}, done, { [id]: Object.assign(rec, { paid, tomeTaken, slot }) }));
+        audit(`SPELL REFUND ${id} ${who(actor)} ${gold} gold for tome ${descOf(book)}: gold ${paid ? 'given' : 'NOT given'}, tome ${tomeTaken ? 'taken back' : 'not carried'}, weekly tome ${slot ? 'freed' : 'already free'}`);
+        let online = false; try { online = mp.get(actor, 'isOnline') !== false; } catch (e) { online = false; }
+        if (online) personal(actor, `The ${(tomeOf(book) || {}).name || 'spell'} tome you bought could not be read, as its spell is held back for now. Your ${gold} gold is returned${slot ? ', and your tome purchase this week is yours again' : ''}.`);
+      } catch (e) { log('spells: tome refund failed', e.stack || e.message); }
+    }
+  };
+  try { tomeRefunds(); } catch (e) { log('spells: tome refunds failed', e.stack || e.message); }
 
   const R0 = regions();
   log(`spells ${CFG.enabled ? 'on' : 'off'}: ${TOMES.size} tomes known, ${STUDY_POINTS.length} study point(s), ${SHOP.length} tomes in the Synod shop, ${MAXP()} prepared, changed in ${COLLEGE_CELLS.size} college cell(s)${R0 ? `, ${SHOP.filter((t) => soldHere(R0, t)).length} stocked for ${R0.provinceName(CFG.shopProvince)}` : ''}`);

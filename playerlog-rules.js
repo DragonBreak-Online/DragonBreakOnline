@@ -1899,6 +1899,7 @@ spells.js TEACH d52977b9 parsed
 spells.js SPELL f950cf7a clean
 spells.js SPELL 6eaecec5 clean
 spells.js SPELL 970641d9 clean
+spells.js SPELL ee0f5d7e clean
 sprstrip.js SPRSTRIP ac1572f1 parsed
 sprstrip.js SPRSTRIP a7b3a299 parsed
 sprstrip.js SPRSTRIP d281443a parsed
