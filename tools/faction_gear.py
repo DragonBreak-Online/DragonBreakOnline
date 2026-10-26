@@ -123,16 +123,29 @@ for item, (name, recipe, (st, factions, role)) in HAND_ITEMS.items():
 # Merge, never overwrite. Most of faction-gear.json is no longer reproducible from the SETS above: 177 of its items are
 # there by hand, among them every Morrowind house guard, the Orcish Clan (no recipe at all; staff hand it out), Bruma
 # Guard and the Synod, and some whose recipe regions.json no longer lists. Overwriting the file dropped all of them
-# silently, which is how a rerun could have quietly opened 17 sets to any smith. An entry this run produces wins, so
-# editing the SETS still works; an entry it does not produce is kept and counted. --prune is the only way to delete.
+# silently, which is how a rerun could have quietly opened 17 sets to any smith. An entry it does not produce is kept and
+# counted; --prune is the only way to delete.
+# An entry already in the file keeps its name, set, factions and role, and gains only the recipes this run finds (26 Oct,
+# the Leader): the file carries decisions the SETS do not, and a rerun used to undo them (the Dawnguard's Silver Hand silver,
+# House Ravenwatch's vampire gear, the Windhelm guard cloak). Where the rules disagree with the file the run says so; to let
+# the rules win for an entry, change it by hand or pass --rules-win. tests/faction-gear-rerun-harness.js holds this.
 PRUNE = '--prune' in sys.argv
 CHECK = '--check' in sys.argv
+RULES_WIN = '--rules-win' in sys.argv
+KEEP_FIELDS = ('name', 'set', 'factions', 'role')
 try:
     was = json.load(open(os.path.join(SERVER, 'faction-gear.json')))['items']
 except (OSError, ValueError, KeyError):
     was = {}
 kept = {k: v for k, v in was.items() if k not in items}
 added = sorted(k for k in items if k not in was)
+disagree = sorted(k for k in items if k in was and any(was[k].get(f) != items[k].get(f) for f in KEEP_FIELDS))
+if not RULES_WIN:
+    for k in items:
+        if k in was:
+            e = dict(was[k])
+            e['recipes'] = list(was[k].get('recipes', [])) + [r for r in items[k]['recipes'] if r not in was[k].get('recipes', [])]
+            items[k] = e
 changed = sorted(k for k in items if k in was and was[k] != items[k])
 merged = dict(items) if PRUNE else {**kept, **items}
 
@@ -150,7 +163,10 @@ out = {
     'uniforms': UNIFORM_EXTRA,
 }
 if not CHECK:
-    json.dump(out, open(os.path.join(SERVER, 'faction-gear.json'), 'w'), indent=1, ensure_ascii=False)
+    # the file's own line endings (CRLF as committed), on Windows and Linux alike
+    try: eol = '\r\n' if b'\r\n' in open(os.path.join(SERVER, 'faction-gear.json'), 'rb').read(4096) else '\n'
+    except OSError: eol = '\n'
+    json.dump(out, open(os.path.join(SERVER, 'faction-gear.json'), 'w', encoding='utf-8', newline=eol), indent=1, ensure_ascii=False)
 from collections import Counter
 print('%d items: %d from the rules, %d kept%s' % (len(merged), len(items), len(kept), ' (DELETED by --prune)' if PRUNE else ''))
 if kept:
@@ -160,6 +176,8 @@ if kept:
 # A rerun gates items that were not gated before, which is a decision, not housekeeping: say so rather than do it quietly.
 if added: print(' %d item(s) this run ADDS to the gate: %s' % (len(added), ', '.join(items[k]['name'] for k in added[:8]) + (' ...' if len(added) > 8 else '')))
 if changed: print(' %d item(s) this run CHANGES: %s' % (len(changed), ', '.join(items[k]['name'] for k in changed[:8]) + (' ...' if len(changed) > 8 else '')))
+if disagree: print(' %d item(s) where the SETS disagree with the file (%s): %s' % (len(disagree), 'the rules won: --rules-win' if RULES_WIN else 'the file is kept',
+    ', '.join(was[k]['name'] for k in disagree[:8]) + (' ...' if len(disagree) > 8 else '')))
 print(' %s; --prune would delete the %d kept entr%s' % ('--check: nothing was written' if CHECK else 'written; --check shows this without writing',
                                                          len(kept), 'y' if len(kept) == 1 else 'ies'))
 for st, n in sorted(Counter(v['set'] for v in merged.values()).items()): print(' %-26s %d' % (st, n))
