@@ -99,6 +99,21 @@ closeWidget(D, 60);
 ok(last().customPacketType === 'dboScaleform' && last().close === true, 'the gate closes the custom menu', last());
 openWidget(D, { type: 'contextMenu', id: 70, actions: [] }, true);
 ok(last().customPacketType === 'dboWidget', 'a gameplay context menu stays in the browser (it has no NATIVE_SWF route)', last());
+{
+// The labour panel (labour.js, struggle.js: widget 55), the sweep and the pick round alike
+const D = 0xff000004;
+openWidget(D, { type: 'labour', id: 55, nonce: 'l1', kind: 'mining' });
+ok(last().customPacketType === 'dboWidget', 'labour without native:labour stays in the browser', last());
+setCaps(D, ['native:labour']);
+openWidget(D, { type: 'labour', id: 55, nonce: 'l1', kind: 'mining' });
+ok(last().customPacketType === 'dboScaleform' && last().swf === 'dbo_labour' && last().widget === 55, 'with native:labour a sweep round goes to dbo_labour', last());
+openWidget(D, { type: 'labour', id: 55, nonce: 'l1', kind: 'mining', result: 'You free 2 Iron Ore.' });
+ok(last().customPacketType === 'dboScaleform' && last().payload.result === 'You free 2 Iron Ore.', 'the server\'s verdict for the same round goes to the same panel', last());
+openWidget(D, { type: 'labour', id: 55, nonce: 's1', kind: 'struggle', event: 'struggle', mode: 'pick' });
+ok(last().customPacketType === 'dboScaleform' && last().swf === 'dbo_labour', 'a struggle and a pick round too', last());
+closeWidget(D, 55);
+ok(last().customPacketType === 'dboScaleform' && last().close === true, 'labourCancel\'s closeWidget closes the custom menu', last());
+}
 
 console.log(fails ? `\n${fails} failed` : '\nall passed');
 process.exit(fails ? 1 : 0);
