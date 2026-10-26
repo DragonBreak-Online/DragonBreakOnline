@@ -102,6 +102,32 @@ check('...and reports clicks and ignored foreign events', () => {
 }, (() => { const t = M.newState(); M.planOpen(t, 'x', ['a'], 0); M.planReady(t, 50); t.clicks = 2; t.foreignEvents = 7; return M.summary(t); })());
 
 // ---- 5. the service wiring ---------------------------------------------------------------------------------------
+// The 26 Oct 03:26 failure: openCustomMenu threw "can't be called in this context". SkyrimPlatform sets
+// g_nativeCallRequirements.vm only inside OnUpdate (main.cpp:84/93), so a Papyrus native called from a packet
+// handler throws. These checks exist so that cannot come back.
+check('the packet handler ENQUEUES and never calls a native itself',
+  /this\.enqueue\(planClose/.test(SVC) && /this\.enqueue\(planOpen\(/.test(SVC)
+  && !/onCustomPacketMessage[\s\S]{0,400}?this\.(exec|sp\.Ui)/.test(SVC));
+check('the mod event handler enqueues too, so there is one code path', /this\.enqueue\(planReady\(/.test(SVC));
+check('exec is reachable ONLY from onUpdate', () => {
+  const up = SVC.indexOf('private onUpdate()');
+  const next = SVC.indexOf('private enqueue(', up);
+  if (up < 0 || next < 0) return false;
+  let found = 0;
+  const re = /this\.exec\(/g;
+  let m;
+  while ((m = re.exec(SVC)) !== null) {
+    found++;
+    if (m.index < up || m.index > next) return false;
+  }
+  return found === 2;
+});
+check('the queue is drained BEFORE the closed-phase early return, or a close would never run',
+  /this\.exec\(q\);[\s\S]{0,80}?if \(this\.state\.phase === "closed"\) return;/.test(SVC));
+check('the reason is written down next to it, not just fixed',
+  /g_nativeCallRequirements\.vm only inside OnUpdate/.test(SVC));
+check('the panel version is read inside the tick and cached, not read from the event handler',
+  /private readLoaded\(\): void/.test(SVC) && /loaded: this\.loaded,/.test(SVC));
 check('the service opens with flags 0, which SKSE ignores anyway', /openCustomMenu\(a\.swf, 0\)/.test(SVC));
 check('data goes in through invokeString/invokeStringA on the custom menu',
   /invokeString\(MENU_NAME, "_root\.dboSetTitle"/.test(SVC) && /invokeStringA\(MENU_NAME, "_root\.dboSetRows"/.test(SVC));

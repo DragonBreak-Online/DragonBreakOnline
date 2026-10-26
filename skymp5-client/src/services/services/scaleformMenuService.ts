@@ -30,10 +30,10 @@ export class ScaleformMenuService extends ClientListener {
     if (!content || content["customPacketType"] !== "dboScaleform") return;
     try {
       if (content["close"]) {
-        this.run(planClose(this.state));
+        this.enqueue(planClose(this.state));
         return;
       }
-      this.run(planOpen(this.state, content["title"], content["rows"], Date.now()));
+      this.enqueue(planOpen(this.state, content["title"], content["rows"], Date.now()));
     } catch (e) {
       logError(this, "dboScaleform packet failed", e);
     }
@@ -50,7 +50,7 @@ export class ScaleformMenuService extends ClientListener {
       }
       if (parsed.kind === "ready") {
         logTrace(this, "Scaleform panel reported ready");
-        this.run(planReady(this.state, Date.now()));
+        this.enqueue(planReady(this.state, Date.now()));
         this.toServer("ready", 0);
         this.note(summary(this.state));
         return;
@@ -61,7 +61,7 @@ export class ScaleformMenuService extends ClientListener {
         return;
       }
       // The SWF closes itself too, so this is the client catching up rather than the way out.
-      this.run(planClose(this.state));
+      this.enqueue(planClose(this.state));
       this.toServer("close", -1);
       this.note(summary(this.state));
     } catch (err) {
@@ -69,15 +69,28 @@ export class ScaleformMenuService extends ClientListener {
     }
   }
 
+  // Every native runs from here. SkyrimPlatform sets g_nativeCallRequirements.vm only inside OnUpdate
+  // (main.cpp), so a Papyrus call from a packet handler throws "can't be called in this context" - which is
+  // exactly what openCustomMenu did on 26 Oct at 03:26. It is also why customPacketUtil has notifyNextUpdate.
   private onUpdate(): void {
+    if (this.queue.length) {
+      const q = this.queue;
+      this.queue = [];
+      this.exec(q);
+    }
     if (this.state.phase === "closed") return;
     const now = Date.now();
     if (now - this.lastTick < 250) return;
     this.lastTick = now;
-    this.run(planTick(this.state, now));
+    this.exec(planTick(this.state, now));
   }
 
-  private run(actions: Action[]): void {
+  // Queued, not run: the caller may be outside the update tick, where no native can be called.
+  private enqueue(actions: Action[]): void {
+    for (const a of actions) this.queue.push(a);
+  }
+
+  private exec(actions: Action[]): void {
     for (const a of actions) {
       try {
         if (a.do === "open") {
@@ -88,6 +101,7 @@ export class ScaleformMenuService extends ClientListener {
         } else if (a.do === "push") {
           this.sp.Ui.invokeString(MENU_NAME, "_root.dboSetTitle", a.title);
           this.sp.Ui.invokeStringA(MENU_NAME, "_root.dboSetRows", a.rows);
+          this.readLoaded();
         } else if (a.do === "close") {
           this.sp.Ui.closeCustomMenu();
         } else {
@@ -105,17 +119,20 @@ export class ScaleformMenuService extends ClientListener {
   }
 
   // A second, pull-based check that the right SWF is loaded, independent of any mod event getting through.
-  private readLoaded(): string {
+  // Read from exec (inside the update tick) and cached, because a mod event handler is a less certain place
+  // to call a native from and a diagnostic that quietly returns "" would tell us nothing.
+  private readLoaded(): void {
     try {
-      return String(this.sp.Ui.getString(MENU_NAME, "_root.dboVersion") || "");
-    } catch {
-      return "";
+      const v = String(this.sp.Ui.getString(MENU_NAME, "_root.dboVersion") || "");
+      if (v) this.loaded = v;
+    } catch (e) {
+      logTrace(this, "could not read the panel version", String(e));
     }
   }
 
   private toServer(kind: string, index: number): void {
     sendCustomPacket(this.controller, {
-      customPacketType: "dboScaleform", kind, index, swf: SWF_NAME, loaded: this.readLoaded(),
+      customPacketType: "dboScaleform", kind, index, swf: SWF_NAME, loaded: this.loaded,
     });
   }
 
@@ -126,4 +143,6 @@ export class ScaleformMenuService extends ClientListener {
 
   private state: MenuState = newState();
   private lastTick = 0;
+  private queue: Action[] = [];
+  private loaded = "";
 }
