@@ -26,7 +26,7 @@
     "toughness": 0.5,
     "damageMult": 6
    },
-   "respawnSeconds": 10800,
+   "respawnSeconds": 3600,
    "radius": 6000,
    "announce": {
     "spawn": "Something cold stirs on the ice above Winterhold.",
@@ -157,7 +157,7 @@
     "toughness": 0.2,
     "damageMult": 2.5
    },
-   "respawnSeconds": 7200,
+   "respawnSeconds": 3600,
    "radius": 6000,
    "excludeBriarhearts": true,
    "announce": {
@@ -742,7 +742,7 @@
     "toughness": 0.3,
     "damageMult": 2.5
    },
-   "respawnSeconds": 14400,
+   "respawnSeconds": 3600,
    "radius": 4000,
    "announce": {
     "spawn": "Steam hisses through Blackreach: the Centurion Master wakes.",
@@ -881,7 +881,7 @@
     "toughness": 0.25,
     "damageMult": 2
    },
-   "respawnSeconds": 7200,
+   "respawnSeconds": 3600,
    "radius": 6000,
    "announce": {
     "spawn": "A warlord's horn sounds on the Pale Pass road.",
@@ -1921,7 +1921,7 @@
     "toughness": 0.25,
     "damageMult": 2.5
    },
-   "respawnSeconds": 10800,
+   "respawnSeconds": 3600,
    "radius": 4000,
    "announce": {
     "spawn": "War drums beat in the Falmer city of Blackreach.",
@@ -2162,7 +2162,7 @@
     "toughness": 0.25,
     "damageMult": 2.5
    },
-   "respawnSeconds": 10800,
+   "respawnSeconds": 3600,
    "radius": 5000,
    "announce": {
     "spawn": "Night falls on Hjaalmarch, and something old wakes in Movarth's Lair.",
@@ -2743,7 +2743,7 @@
     "toughness": 0.15,
     "damageMult": 2
    },
-   "respawnSeconds": 5400,
+   "respawnSeconds": 3600,
    "radius": 5000,
    "announce": {
     "spawn": "The goblins of Dusk Thorn have a Warchief again.",
@@ -2946,19 +2946,20 @@
      3
     ]
    ],
-   "toughness": 0.6,
-   "damageMult": 1.5,
+   "toughness": 0.72,
+   "damageMult": 1.8,
    "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.3,
-    "damageMult": 2.5
+    "toughness": 0.5,
+    "damageMult": 2.8
    },
-   "respawnSeconds": 10800,
+   "respawnSeconds": 3600,
    "radius": 6000,
    "announce": {
     "spawn": "The Great Oblivion Gate burns open: a Valkynaz steps through, its Clannfear at its heels.",
     "death": "The Valkynaz of the Great Gate is banished."
    },
+   "_tuneNote": "Nat 26 Oct: 'make the new bosses stronger' (toughness, damage, enrage raised; see the bosses-tune-1026 commit)",
    "boss": {
     "edid": "CYREncDremoraWarlock06",
     "desc": "ddb29:BSHeartland.esm",
@@ -3012,7 +3013,7 @@
      0
     ],
     "name": "the Valkynaz's High Clannfear",
-    "bossToughnessWhileAlive": 0.75,
+    "bossToughnessWhileAlive": 0.85,
     "options": [
      [
       0,
@@ -3122,7 +3123,7 @@
     "toughness": 0.25,
     "damageMult": 2
    },
-   "respawnSeconds": 14400,
+   "respawnSeconds": 3600,
    "radius": 6000,
    "announce": {
     "spawn": "The throne of Castle Karstaag is no longer empty.",
@@ -3251,7 +3252,7 @@
     "toughness": 0.3,
     "damageMult": 2.5
    },
-   "respawnSeconds": 14400,
+   "respawnSeconds": 3600,
    "radius": 5000,
    "announce": {
     "spawn": "The undead legion of Sancre Tor forms up around its Legate.",
@@ -3417,7 +3418,7 @@
     "toughness": 0.25,
     "damageMult": 2
    },
-   "respawnSeconds": 10800,
+   "respawnSeconds": 3600,
    "radius": 5000,
    "announce": {
     "spawn": "Something heavy stirs in Minotaur's Rest.",
@@ -3552,20 +3553,21 @@
      4
     ]
    ],
-   "toughness": 0.5,
-   "damageMult": 1.5,
+   "toughness": 0.65,
+   "damageMult": 1.8,
    "enrageSeconds": 480,
    "enrage": {
-    "toughness": 0.25,
-    "damageMult": 2.25
+    "toughness": 0.45,
+    "damageMult": 2.6
    },
-   "respawnSeconds": 10800,
+   "respawnSeconds": 3600,
    "radius": 5000,
    "announce": {
     "spawn": "A howl rolls down from the Falkreath pines. Hircine's hunt is abroad tonight.",
     "death": "The Behemoth of Hircine's Hunt is dead, and the pack scatters."
    },
    "_note": "Proposed 25 Oct (the Leader for Nat): vanilla's top werewolf boss (EncWerewolf06Boss, Dawnguard's ladder) named and rim-lit; the server's SetScale is a stub, so the boss is its own NPC_ on the Behemoth race (DLE 1D2207, Nat 25 Oct: 1.3x the pack: race 1.30 x NAM6 1.13 = 1.47 against the adds' 1.13). Pack: a werewolf and two wolves at the start, then 3 and 4 more (werewolf, wolf, wolf in turn). Drops: a Werewolf Pelt (Hothtrooper's werewolf fur and leather recipes take it) and three wolf pelts, gold, Silver 5% (the hunter's metal, Hircine's joke), Glass 1%. Every zone is hostile, player werewolves included. fullMoon true (here or in its config block) keeps it to full-moon nights",
+   "_tuneNote": "Nat 26 Oct: 'make the new bosses stronger' (toughness, damage, enrage raised; see the bosses-tune-1026 commit)",
    "boss": {
     "edid": "DBO_EncWerewolfBehemothBoss",
     "desc": "1d2207:DragonBreak Online Edits.esp",
@@ -3737,19 +3739,20 @@
      2
     ]
    ],
-   "toughness": 0.5,
-   "damageMult": 1.0,
+   "toughness": 0.7,
+   "damageMult": 1.3,
    "enrageSeconds": 480,
    "enrage": {
-    "toughness": 0.3,
-    "damageMult": 1.5
+    "toughness": 0.5,
+    "damageMult": 1.8
    },
-   "respawnSeconds": 10800,
+   "respawnSeconds": 3600,
    "radius": 6000,
    "announce": {
     "spawn": "Drums thunder at Blizzard Rest: the giants have a Chieftain.",
     "death": "The Chieftain of Blizzard Rest is dead, and his bull with him."
    },
+   "_tuneNote": "Nat 26 Oct: 'make the new bosses stronger' (toughness, damage, enrage raised; see the bosses-tune-1026 commit)",
    "boss": {
     "edid": "EncGiant01",
     "desc": "23aae:Skyrim.esm",
@@ -3793,7 +3796,7 @@
      0
     ],
     "name": "the Chieftain's bull",
-    "bossToughnessWhileAlive": 0.7,
+    "bossToughnessWhileAlive": 0.85,
     "options": [
      [
       38,
