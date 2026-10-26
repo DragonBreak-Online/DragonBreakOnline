@@ -105,4 +105,28 @@ ok('every patron of every faith is a god in the roster', FAITHS.faiths.every((f)
   props.set(A + '|private.dboBlessing', { deity: 'allmaker', until: 1 });
   ok('an expired blessing gives nothing', globalThis.__dboBlessingSkillRate(A, 'harvesting') === 1);
 }
+// The Reach Old Gods (ticket 1563649910778101870, Nat 25 Oct; UESP Lore:Reachmen): Hircine, Namira, Peryite and Lorkh first,
+// then the Princes also honoured there, Malacath last; Dibella is the Imperial Cult's
+{
+  const reach = FAITHS.faiths.find((f) => f.id === 'reach');
+  ok('the Reach Old Gods: the four main spirits, then the five also honoured', reach.patrons.join() === 'hircine,namira,peryite,lorkh,molagbal,nocturnal,mehrunes,mephala,malacath', reach.patrons);
+  ok('...and not Dibella, a Divine of the Imperial Cult', !reach.patrons.includes('dibella') && FAITHS.faiths.find((f) => f.id === 'imperial').patrons.includes('dibella'));
+  const view = globalThis.__dboDeityView(ACTOR);
+  ok('every Reach patron is a god in the roster', reach.patrons.every((id) => view.choices.some((c) => c.id === id)), reach.patrons.filter((id) => !view.choices.some((c) => c.id === id)));
+  const lorkh = FAITHS.deities.find((x) => x.id === 'lorkh'), shor = FAITHS.deities.find((x) => x.id === 'shor');
+  ok('Lorkh is an aspect of Shor with Shor\'s boon and blessing, and no shrine of his own', lorkh && lorkh.aspectOf === 'shor' && lorkh.boon === shor.boon && lorkh.blessing === shor.blessing && !(lorkh.shrines || []).length, lorkh);
+  const REACHMAN = 0x18; RACES[0x103] = 'DBOReachmanRace'; records.set(0x103, { record: { type: 'RACE', editorId: 'DBOReachmanRace' } });
+  props.set(REACHMAN + '|appearance', { raceId: 0x103 });
+  ok('a Reachman is offered the Reach Old Gods', globalThis.__dboDeityView(REACHMAN).faiths.find((f) => f.id === 'reach').suggested === true);
+  const shrine = (n, god) => { const id = 0x2100 + n; const desc = (FAITHS.deities.find((x) => x.id === god) || choiceOf(god)).shrines[0]; props.set(id + '|baseDesc', desc); records.set(idOf(desc), { record: { type: 'ACTI', editorId: `Shrine_${god}` } }); return id; };
+  const SHOR_S = shrine(1, 'shor'), PERYITE_S = shrine(2, 'peryite'), MALACATH_S = shrine(3, 'malacath'), DIBELLA_S = shrine(4, 'dibella');
+  r = choose(REACHMAN, 'lorkh', 'reach');
+  ok('a Reachman takes Lorkh in the Reach Old Gods', r.kind === 'ok' && rec(REACHMAN).id === 'lorkh' && rec(REACHMAN).faith === 'reach', r);
+  ok('...Shor\'s shrine hears Lorkh\'s follower (an aspect)', !globalThis.__dboPrayerRefusal(REACHMAN, SHOR_S), globalThis.__dboPrayerRefusal(REACHMAN, SHOR_S));
+  ok('...so do Peryite\'s and Malacath\'s, gods of the faith', !globalThis.__dboPrayerRefusal(REACHMAN, PERYITE_S) && !globalThis.__dboPrayerRefusal(REACHMAN, MALACATH_S), [globalThis.__dboPrayerRefusal(REACHMAN, PERYITE_S), globalThis.__dboPrayerRefusal(REACHMAN, MALACATH_S)]);
+  ok('...and Dibella\'s does not: another faith', /no ear/.test(String(globalThis.__dboPrayerRefusal(REACHMAN, DIBELLA_S))), globalThis.__dboPrayerRefusal(REACHMAN, DIBELLA_S));
+  wallClock += 8 * 86400000;
+  r = choose(REACHMAN, 'dibella', 'reach');
+  ok('Dibella is no god of the Reach Old Gods', r.kind === 'refused' && /no god of that faith/.test(r.text), r);
+}
 console.log(fails ? `${fails} FAILED` : 'all checks passed'); process.exit(fails ? 1 : 0);

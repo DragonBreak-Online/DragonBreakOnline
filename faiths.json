@@ -176,7 +176,12 @@
       "patrons": [
         "hircine",
         "namira",
+        "peryite",
+        "lorkh",
         "molagbal",
+        "nocturnal",
+        "mehrunes",
+        "mephala",
         "malacath"
       ]
     },
@@ -337,6 +342,18 @@
       "shrines": [
         "1d1fb6:DragonBreak Online Edits.esp"
       ]
+    },
+    {
+      "id": "lorkh",
+      "name": "Lorkh",
+      "kind": "aedra",
+      "sphere": "The Spirit of Man, as the Reachfolk know Shor: he made the world to teach through suffering, and still walks among mortals in their hour of need. Never named in prayer.",
+      "boon": "Heavy Armor +10",
+      "blessing": "1d1faa:DragonBreak Online Edits.esp",
+      "blessingSource": "vanilla",
+      "aspectOf": "shor",
+      "inBruma": 1,
+      "note": "An aspect of Shor (Lore:Lorkhan; Great Spirits of the Reach, Vol. 5), as Alkosh is of Akatosh: no shrine of his own, so a follower prays at Shor's and is answered with Shor's blessing (Nat, 25 Oct, ticket 1563649910778101870)."
     },
     {
       "id": "tsun",
