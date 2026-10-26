@@ -5,8 +5,8 @@ import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { parseCustomPacket, sendCustomPacket } from "./customPacketUtil";
 import {
-  Action, CAPS_RETRY_MS, MENU_NAME, MenuState, NATIVE_CAPS, OUT_VAR, UiEvent, isNew, newState, parseOutbox, parseUiEvent, planClose,
-  planOpen, planReady, planTick, serverEventName, summary,
+  Action, CAPS_RETRY_MS, MENU_NAME, MenuState, NATIVE_CAPS, OUT_VAR, UiEvent, isNew, newState, parseOutbox,
+  parseUiEvent, planClose, planOpen, planReady, planTick, readyFrameOf, serverEventName, summary,
 } from "./scaleformMenu";
 
 // A real Skyrim Scaleform panel driven from the server, instead of the CEF overlay (Nat, 25 Oct).
@@ -101,8 +101,9 @@ export class ScaleformMenuService extends ClientListener {
       if (parsed.key === "ready") {
         // The frame number is the measurement: _global.skse does not exist on frame 1, and until one
         // session reported this nobody knew which frame it does appear on.
-        logTrace(this, "Scaleform panel ready on frame", String(parsed.frame));
-        this.enqueue(planReady(this.state, parsed.frame, Date.now()));
+        const frame = readyFrameOf(parsed);
+        logTrace(this, "Scaleform panel ready on frame", String(frame));
+        this.enqueue(planReady(this.state, frame, Date.now()));
         this.note(summary(this.state));
         return;
       }

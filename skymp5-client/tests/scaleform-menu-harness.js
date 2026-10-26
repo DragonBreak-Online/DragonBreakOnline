@@ -126,6 +126,19 @@ check('an open that never reports ready is REPORTED and CLOSED, not left on scre
   () => acts.length === 2 && acts[0].do === 'report' && /never reported ready/.test(acts[0].text) && acts[1].do === 'close', acts);
 check('...and the state goes back to closed so a retry is possible', s.phase === 'closed');
 check('ready arriving after a close is ignored', () => M.planReady(M.newState(), 1, 1).length === 0);
+// The live line said "ready on frame 0" whenever the outbox won, which the SWF can never produce.
+check('a ready that arrived by MOD EVENT reports its numArg frame',
+  M.readyFrameOf({ key: 'ready', args: [], frame: 2, seq: 0 }) === 2);
+check('a ready that arrived by OUTBOX reports the frame from its args, not 0',
+  M.readyFrameOf({ key: 'ready', args: [1], frame: 0, seq: 7 }) === 1);
+check('...and a string arg works too, since JSON from AS2 may quote it',
+  M.readyFrameOf({ key: 'ready', args: ['3'], frame: 0, seq: 7 }) === 3);
+check('no frame anywhere stays 0 rather than inventing one',
+  M.readyFrameOf({ key: 'ready', args: [], frame: 0, seq: 7 }) === 0
+  && M.readyFrameOf({ key: 'ready', args: ['x'], frame: 0, seq: 7 }) === 0);
+check('numArg wins when both are present, because that is the channel that measured it',
+  M.readyFrameOf({ key: 'ready', args: [9], frame: 2, seq: 0 }) === 2);
+
 check('the summary says whether it ever became ready', () => /never became ready/.test(M.summary(s)), M.summary(s));
 check('...and names the frame when it did', () => {
   const t = M.newState(); M.planOpen(t, 'x', {}, 1, 0); M.planReady(t, 3, 50); t.sent = 2; t.foreignEvents = 7;

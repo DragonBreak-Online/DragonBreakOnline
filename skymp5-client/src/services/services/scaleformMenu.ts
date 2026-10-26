@@ -229,6 +229,16 @@ export const planTick = (s: MenuState, now: number): Action[] => {
   ];
 };
 
+// The frame _global.skse appeared on. It rides numArg on the mod-event channel and args[0] on the outbox,
+// which carries no numArg, so a ready that arrived by outbox reports frame 0 until this reads the args.
+// On 26 Oct the live line said "ready on frame 0" whenever the outbox won the race, which is a diagnostic
+// stating something impossible: the SWF counts from 1.
+export const readyFrameOf = (m: UiEvent): number => {
+  if (m.frame > 0) return m.frame;
+  const first = m.args.length ? Number(m.args[0]) : NaN;
+  return isFinite(first) && first > 0 ? Math.round(first) : 0;
+};
+
 // True when this message has not been handled yet. The same message can arrive twice, once per channel.
 export const isNew = (s: MenuState, m: UiEvent): boolean => {
   if (m.seq > 0) {
