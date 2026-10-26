@@ -137,3 +137,28 @@ export const replayFor = (key: string, args: unknown[], hasOwner?: boolean): Rep
     text: `a native panel sent '${k}', which has no ${DBO_PREFIX} prefix and no service owns it: the browser path drops such a key silently, so this would do nothing`,
   }];
 };
+
+// ---- delivering a hand-off only once the panel has really gone ---------------------------------------------
+
+export const HANDOFF_CLOSE_TIMEOUT_MS = 1000;
+
+export interface PendingHandoff {
+  type: string;
+  mode: string;
+  at: number;
+}
+
+// Ui.closeCustomMenu QUEUES a UI message, so the menu is still open for a frame or two after the call
+// returns. NativeBackdropService hides the browser while a CustomMenu is open, so a hand-off delivered in the
+// same pass as the close makes the owning service draw its composer into a hidden browser, and the player
+// waits for the next 150 ms poll to see it. So the hand-off waits for the menu to actually go.
+//
+// "late" rather than waiting for ever: if the menu never closes, a hand-off that never arrives loses what the
+// player was about to type, which is worse than a flicker. The caller should say so in the log.
+export const handoffDue = (
+  p: PendingHandoff | null, menuOpen: boolean, now: number,
+): "wait" | "deliver" | "late" => {
+  if (!p) return "wait";
+  if (!menuOpen) return "deliver";
+  return now - p.at >= HANDOFF_CLOSE_TIMEOUT_MS ? "late" : "wait";
+};
