@@ -105,16 +105,21 @@ export class PlacementService extends ClientListener {
   // Browser messages arrive in tick context, where every Papyrus native throws: start() (Game.getCameraState,
   // forceFirstPerson, getFormFromFile, Debug.notification) runs on the next frame, the JSON is read here
   private onBrowserMessage(e: BrowserMessageEvent): void {
-    const kind = e.arguments[0];
+    this.fromPanel(e.arguments);
+  }
+
+  // The admin panel's Place keys ([key, ...args]): the browser's, and the native panel's through adminMenuService
+  fromPanel(a: unknown[]): void {
+    const kind = a[0];
     let begin: (() => void) | null = null;
     if (kind === "admin::place") {
-      const raw = this.parse(e.arguments[1]);
+      const raw = this.parse(a[1]);
       if (raw && raw.desc) {
         const pick: Pick = { desc: String(raw.desc), kind: raw.kind === "npc" ? "npc" : "object", name: String(raw.name || "it"), hostile: raw.hostile === true };
         begin = () => this.start(pick, null);
       }
     } else if (kind === "admin::placeedit") {
-      const raw = this.parse(e.arguments[1]);
+      const raw = this.parse(a[1]);
       if (raw) begin = () => this.startEdit(raw);
     } else if (kind === "admin::placeselect" || kind === "admin::placedelete") {
       begin = () => this.start(null, null);
