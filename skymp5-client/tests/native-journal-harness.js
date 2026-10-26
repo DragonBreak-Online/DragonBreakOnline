@@ -32,9 +32,9 @@ const closed = (t) => t.closed();
   const t = S.boot('dbo_journal');
   check('says ready with the frame skse appeared on', msgs(t, 'ready').length === 1 && msgs(t, 'ready')[0].args[0] === 1);
   t.push(hub('stats', { stats }));
-  check('the head: name, title and race; the clock at the right', P(t).head.name.text === 'Olaf' && P(t).head.subtitle.text === 'Wanderer  -  Nord' && /Frostfall\n14:05  -  Masser full/.test(P(t).head.clock.text), [P(t).head.subtitle.text, P(t).head.clock.text]);
+  check('the head: name, title and race; the clock at the right', P(t).head.name.text === 'OLAF' && P(t).head.subtitle.text === 'Wanderer  -  Nord' && /Frostfall\n14:05  -  Masser full/.test(P(t).head.clock.text), [P(t).head.subtitle.text, P(t).head.clock.text]);
   const tabs = Object.keys(P(t).tabs.kids).filter((k) => /^t\d$/.test(k)).map((k) => P(t).tabs[k]);
-  check('every tab the server lists is in the strip, the open one bright, a badge in brackets', tabs.length === 5 && tabs[1]._alpha === 100 && tabs[0]._alpha === 30 && tabs[2].label.text === 'Wanted  (2)', tabs.map((x) => x.label.text));
+  check('every tab the server lists is in the strip, the open one bright, a badge in brackets', tabs.length === 5 && tabs[1]._alpha === 100 && tabs[0]._alpha === 50 && tabs[2].label.text === 'Wanted  (2)', tabs.map((x) => x.label.text));
   check('a pinned tab sits at the right end', tabs[4]._x > tabs[3]._x && tabs[4]._x + 0 > 900, tabs.map((x) => x._x));
   check('Stats draws its groups and rows, a hint after the value', texts(t).join('|') === 'Combat|Kills|12|Deaths|3   two to wolves|Travel|Walked|41 km', texts(t).join('|'));
   tabs[0].onRelease();
@@ -487,6 +487,19 @@ const firstPage = (t) => { for (let i = 0; i < 6; i++) t.press(33); };
   const st = S.boot('dbo_journal');
   st.push(hub('faction', { tabs: T7, faction: Object.assign({}, fac, { staff: true }) }));
   check('staff get the staff view in the browser', btn(st, 'Staff view...') && !btn(st, 'Join'));
+}
+
+
+// ---- fifteen tabs wrap to a second row, and the page starts under it (Nat's board showed a row running off the panel) ----
+{
+  const many = ['profile','faction','court','stats','skills','magic','deity','supernatural','world','keys','citizen','referrals','wanted','notes','thalmor'].map((id) => ({ id, label: id.charAt(0).toUpperCase() + id.slice(1) })).concat([{ id: 'settings', label: 'Settings', pinned: true }]);
+  const t = S.boot('dbo_journal');
+  t.push(hub('stats', { tabs: many, stats }));
+  const tb = Object.keys(P(t).tabs.kids).filter((k) => /^t\d+$/.test(k)).map((k) => P(t).tabs[k]);
+  check('every tab ends inside the panel', tb.length === 16 && tb.every((b) => b._x + b.label._width <= 1180 - 28 + 1), tb.map((b) => [b.label.text, b._x + b.label._width]));
+  const rows = [...new Set(tb.map((b) => b._y))];
+  check('they wrap to a second row', rows.length === 2, rows);
+  check('and the page starts below it', P(t).body.flowClip._y >= Math.max(...rows) + 40, [P(t).body.flowClip._y, rows]);
 }
 
 T.done();

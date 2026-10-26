@@ -1,0 +1,22 @@
+// Skyrim's own map furniture rather than a DragonBreak panel: white Futura on a soft fade from the edge, thin rules, the
+// numbers in the key boxes of the map's bottom bar. Sizes are in vh so the legend keeps its place at every resolution.
+@import '../../dbo-theme';
+
+.mapRealm {
+  position: fixed; top: 6.7vh; right: 0; width: 32.6vh; padding: 2.4vh 4.4vh 2.1vh 3.75vh;
+  background: linear-gradient(to left, rgba(0, 0, 0, .74) 0%, rgba(0, 0, 0, .62) 72%, rgba(0, 0, 0, 0) 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 3.2vh, #000 calc(100% - 3.2vh), transparent 100%);
+  font-family: $dbo-ui-font; font-weight: 300; color: rgba(255, 255, 255, .86); pointer-events: none;
+}
+.mapRealm__title { font-size: 2.36vh; letter-spacing: .42vh; text-transform: uppercase; color: $dbo-silver; }
+.mapRealm__sub { margin: .3vh 0 0; font-size: 1.5vh; color: rgba(255, 255, 255, .46); }
+.mapRealm__rule { height: 1px; margin: .7vh 0 1vh; background: linear-gradient(to left, rgba(255, 255, 255, .22), rgba(255, 255, 255, .08)); }
+.mapRealm__row { display: grid; grid-template-columns: 2.6vh 3vh 1fr auto; align-items: center; height: 3.5vh; font-size: 2.08vh; letter-spacing: .03vh; }
+.mapRealm__row--off { color: rgba(255, 255, 255, .4); }
+.mapRealm__row--off .mapRealm__glyph { opacity: .35; }
+.mapRealm__key { justify-self: start; min-width: 1.5vh; padding: 0 .35vh; border: 1px solid rgba(255, 255, 255, .5); border-radius: .5vh; font-size: 1.32vh; text-align: center; line-height: 1.8vh; }
+.mapRealm__glyph { width: 2.1vh; height: 2.1vh; display: inline-block; }
+.mapRealm__count { color: rgba(255, 255, 255, .46); font-size: 1.6vh; }
+.mapRealm__hint { margin-top: 1.25vh; font-size: 1.46vh; line-height: 1.35; color: rgba(255, 255, 255, .46); }
+.mapRealm__bar { position: fixed; bottom: 1.4vh; left: 52vw; font-family: $dbo-ui-font; font-weight: 300; font-size: 2.57vh; color: rgba(255, 255, 255, .86); pointer-events: none; }
+.mapRealm__barkey { display: inline-block; min-width: 2vh; padding: .1vh .6vh; margin-right: .5vh; border: 1px solid rgba(255, 255, 255, .5); border-radius: .55vh; font-size: 1.8vh; text-align: center; }

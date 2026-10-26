@@ -1,16 +1,19 @@
 // The notice board as a native panel (client bountyBoardService's widget, the same object the browser board gets).
 // Events go out as the widget's own keys (events.post/remove/close) and dbo:* hand-overs; the client router replays them as
-// the browser would. Writing a notice is typed, so "Write a notice..." hands off to the browser composer (native:handoff).
+// the browser would. "Write a notice..." types in the panel (dboInput); "Type in the browser instead" hands the composer
+// to the browser (native:handoff), and is all there is on a game that cannot take typed input.
 
-var DBO_SWF_VERSION = "board-1";
+var DBO_SWF_VERSION = "board-2";
 var STAGE_W = 1280;
 var PANEL_W = 920;
-var PANEL_H = 600;
+var PANEL_H = 640;
 var PAD = 28;
 var ROW_H = 46;
-var LIST_TOP = 150;
+var LIST_TOP = 162;
 var MAX_ROWS = 8;
+var FOOT_Y = PANEL_H - 90;
 var NO_DATA_CLOSE_MS = 8000;
+var POST_WAIT_MS = 6000;
 var C_RED = 0xB23A3A;
 var HANDOVERS = [["Letters", "dbo:pigeonOpen", "letters"], ["Citizenship", "dbo:citizenOpen", "citizenship"], ["Voting", "dbo:citizenOpen", "voting"]];
 var FOOT = [["Send a pigeon", "dbo:pigeonOpen", "send"], ["Supply orders", "dbo:pigeonOpen", "supply"], ["Couriers", "dbo:pigeonOpen", "courier"]];
@@ -20,6 +23,10 @@ var data = null;
 var tabId = "";
 var page = 0;
 var reading = -1;
+// composing: the tab a notice is being written for ("" when not); postedAt: when the post went, until the board shows it
+var composing = "";
+var draft = "";
+var postedAt = 0;
 var builtAt = getTimer();
 
 function ev(k)
@@ -29,6 +36,7 @@ function ev(k)
 
 function closeBoard()
 {
+   dboInputEnd();
    dboSound("UIMenuCancel");
    dboSend(ev("close"), []);
    dboClose();
@@ -37,6 +45,7 @@ function closeBoard()
 // A hand-over to another panel (pigeon coop, citizenship): its event, then this board closes as the browser board does
 function handOver(key, arg)
 {
+   dboInputEnd();
    dboSound("UIMenuOK");
    dboSend(key, [arg]);
    dboSend(ev("close"), []);
@@ -114,34 +123,46 @@ function headline(text)
 function drawTabs()
 {
    var h = clear("head", 20);
-   var title = dboText(h, "title", 1, PAD, 18, PANEL_W - PAD * 2, 40, dboFmt(F_PLAIN, 30, C_TEXT, 1.0), false);
-   title.text = String(data.boardName) + " Notice Board";
+   dboTitle(h, "title", 1, PAD, 18, PANEL_W - PAD * 2, String(data.boardName) + " Notice Board");
+   // The board's tabs, each as wide as its label, and under them the other panels it opens, in the same weight
    var x = PAD;
    for (var k = 0; k < data.tabs.length; k++)
    {
       var t = data.tabs[k];
-      var b = button(h, "tab" + k, 30 + k, x, 70, 170, t.label + "  " + notesOf(t.id).length, F_BOLD, 20, t.id == tabId ? A_FOCUS : A_ROW_REST, function()
+      var label = t.label + "  " + notesOf(t.id).length;
+      var b = button(h, "tab" + k, 30 + k, x, 62, tabWidth(label), label, F_BOLD, 20, t.id == tabId ? A_FOCUS : A_ROW_REST, function()
       {
          dboSound("UIMenuPrevNext");
          tabId = this.tabKey;
          page = 0;
          reading = -1;
+         endCompose();
          draw();
       });
       b.tabKey = t.id;
-      x += 176;
+      if (t.id == tabId)
+      {
+         dboTabMark(b, tabWidth(label) - 28);
+      }
+      x += tabWidth(label) + 8;
    }
+   x = PAD;
    for (var j = 0; j < HANDOVERS.length; j++)
    {
-      var hb = button(h, "ho" + j, 50 + j, x, 70, 112, HANDOVERS[j][0], F_MEDIUM, 18, A_ROW_REST, function()
+      var hb = button(h, "ho" + j, 50 + j, x, 98, tabWidth(HANDOVERS[j][0]), HANDOVERS[j][0], F_BOLD, 20, A_ROW_REST, function()
       {
          handOver(this.key, this.arg);
       });
       hb.key = HANDOVERS[j][1];
       hb.arg = HANDOVERS[j][2];
-      x += 116;
+      x += tabWidth(HANDOVERS[j][0]) + 8;
    }
-   dboRule(h, PAD, 112, PANEL_W - PAD * 2);
+   dboDivider(h, PAD, 140, PANEL_W - PAD * 2);
+}
+
+function tabWidth(label)
+{
+   return String(label).length * 10 + 28;
 }
 
 function drawList()
@@ -175,6 +196,8 @@ function drawList()
       c._alpha = A_ROW_REST;
       c.noteId = n.id;
       c.rowIndex = i;
+      c.washW = PANEL_W - PAD * 2;
+      c.washH = ROW_H - 4;
       c.idx = actions.length;
       actions.push(c);
       c.onPick = function()
@@ -204,16 +227,24 @@ function drawRead()
       reading = -1;
       return drawList();
    }
-   var txt = dboText(l, "text", 1, PAD + 20, LIST_TOP, PANEL_W - PAD * 2 - 40, 270, dboFmt(F_PLAIN, 22, C_TEXT, 1.0), true);
+   // The note as tall as its text (the engine measures it; an estimate stands in where it cannot), the signature and the
+   // actions right under it, all above the footer's rule
+   var w = PANEL_W - PAD * 2 - 40;
+   var maxH = FOOT_Y - 8 - 110 - LIST_TOP;
+   var txt = dboText(l, "text", 1, PAD + 20, LIST_TOP, w, maxH, dboFmt(F_PLAIN, 22, C_TEXT, 1.0), true);
    txt.text = String(n.text);
-   var by = dboText(l, "author", 2, PAD + 20, LIST_TOP + 280, PANEL_W - PAD * 2 - 40, 28, dboFmt(F_MEDIUM, 20, C_SECOND, 0.8), false);
+   var th = Math.min(maxH, txt.textHeight > 0 ? txt.textHeight + 8 : estimateHeight(String(n.text), 22, w));
+   txt._height = th;
+   var y = LIST_TOP + th + 10;
+   var by = dboText(l, "author", 2, PAD + 20, y, w, 28, dboFmt(F_MEDIUM, 20, C_SECOND, 0.8), false);
    by.text = "- " + n.author;
-   var age = dboText(l, "age", 3, PAD + 20, LIST_TOP + 308, PANEL_W - PAD * 2 - 40, 24, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8), false);
+   var age = dboText(l, "age", 3, PAD + 20, y + 28, w, 24, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8), false);
    age.text = pinnedLabel(n.ageHours) + "  -  " + fadesLabel(n.ageHours);
+   var ay = y + 64;
    var bx = PAD + 20;
    if (n.canRemove == true)
    {
-      var rm = button(l, "remove", 20, bx, LIST_TOP + 345, 150, "Take down", F_MEDIUM, 20, A_BUTTON_REST, function()
+      var rm = button(l, "remove", 20, bx, ay, 150, "Take down", F_MEDIUM, 20, A_BUTTON_REST, function()
       {
          dboSound("UIMenuOK");
          dboSend(ev("remove"), [this.noteId]);
@@ -224,7 +255,7 @@ function drawRead()
       rm.label.textColor = C_RED;
       bx += 160;
    }
-   button(l, "back", 21, bx, LIST_TOP + 345, 120, "Back", F_MEDIUM, 20, A_BUTTON_REST, function()
+   button(l, "back", 21, bx, ay, 120, "Back", F_MEDIUM, 20, A_BUTTON_REST, function()
    {
       dboSound("UIMenuCancel");
       reading = -1;
@@ -233,15 +264,128 @@ function drawRead()
    return 1;
 }
 
+// Wrapped text's height from its length, where the engine cannot measure (characters per line at this size)
+function estimateHeight(text, size, w)
+{
+   var per = Math.max(10, Math.floor(w / (size * 0.52)));
+   var parts = text.split("\n");
+   var lines = 0;
+   for (var i = 0; i < parts.length; i++)
+   {
+      lines += Math.max(1, Math.ceil(parts[i].length / per));
+   }
+   return lines * (size + 6) + 8;
+}
+
+// The composer, in the panel: a box to type in, its count and price, Post and Cancel, and the browser as the fallback
+function drawCompose()
+{
+   var l = clear("list", 40);
+   var t = currentTab();
+   var cost = Number(t.cost) || 0;
+   var w = PANEL_W - PAD * 2;
+   var head = dboText(l, "head", 1, PAD, LIST_TOP, w, 30, dboFmt(F_BOLD, 22, C_TEXT, 0.8), false);
+   head.text = "Pin a notice  -  " + t.label;
+   var max = Number(data.maxTextLen) || 500;
+   var box = dboInput(l, "box", 2, PAD, LIST_TOP + 38, w, 230, dboFmt(F_PLAIN, 22, C_TEXT, 0.5), max, true);
+   box.text = draft;
+   var count = dboText(l, "count", 3, PAD, LIST_TOP + 274, w, 24, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8), false);
+   var showCount = function()
+   {
+      count.text = box.text.length + " / " + max + (cost ? "  -  " + cost + " gold" : "  -  free") + (postedAt ? "  -  posting..." : "");
+   };
+   box.onChanged = function()
+   {
+      draft = box.text;
+      showCount();
+   };
+   showCount();
+   var post = button(l, "post", 10, PAD, LIST_TOP + 306, 200, cost ? "Post for " + cost + " gold" : "Post", F_MEDIUM, 20, A_BUTTON_REST, function()
+   {
+      var text = trimText(draft);
+      if (text == "" || postedAt)
+      {
+         dboSound("UIMenuCancel");
+         return;
+      }
+      dboSound("UIMenuOK");
+      postedAt = getTimer();
+      dboSend(ev("post"), [composing, text]);
+      showCount();
+   });
+   button(l, "cancel", 11, PAD + 210, LIST_TOP + 306, 120, "Cancel", F_MEDIUM, 20, A_BUTTON_REST, function()
+   {
+      dboSound("UIMenuCancel");
+      endCompose();
+      draft = "";
+      draw();
+   });
+   button(l, "browser", 12, PANEL_W - PAD - 290, LIST_TOP + 306, 290, "Type in the browser instead", F_MEDIUM, 18, A_ROW_REST, function()
+   {
+      toBrowser();
+   });
+   return 1;
+}
+
+function trimText(s)
+{
+   var t = String(s);
+   var a = 0;
+   var b = t.length;
+   while (a < b && " \r\n\t".indexOf(t.charAt(a)) >= 0)
+   {
+      a++;
+   }
+   while (b > a && " \r\n\t".indexOf(t.charAt(b - 1)) >= 0)
+   {
+      b--;
+   }
+   return t.substring(a, b);
+}
+
+function startCompose()
+{
+   dboSound("UIMenuOK");
+   if (!dboCanType())
+   {
+      composing = currentTab().id;
+      toBrowser();
+      return;
+   }
+   composing = currentTab().id;
+   reading = -1;
+   postedAt = 0;
+   draw();
+}
+
+function endCompose()
+{
+   if (composing != "")
+   {
+      dboInputEnd();
+   }
+   composing = "";
+   postedAt = 0;
+}
+
+// The browser composer for this tab, back to the native board after posting (client router, native:handoff)
+function toBrowser()
+{
+   var tab = composing != "" ? composing : currentTab().id;
+   endCompose();
+   dboSend("native:handoff", ["bountyBoard", "compose:" + tab]);
+}
+
 function drawFoot(pages)
 {
    var f = clear("foot", 60);
-   var y = PANEL_H - 90;
-   dboRule(f, PAD, y - 8, PANEL_W - PAD * 2);
+   var y = FOOT_Y;
+   dboDivider(f, PAD, y - 10, PANEL_W - PAD * 2);
    var t = currentTab();
    var cost = Number(t.cost) || 0;
    var hint = dboText(f, "hint", 1, PAD, y, PANEL_W - PAD * 2, 24, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8), false);
-   hint.text = t.id == "hold" ? "Hold Notices are posted by the Jarl, Steward and Lord Commander. Notices fade after " + data.expiryDays + " days."
+   // the tab's footnote only over its list: the reader and the composer have the room to themselves
+   hint.text = reading >= 0 || composing != "" ? "" : t.id == "hold" ? "Hold Notices are posted by the Jarl, Steward and Lord Commander. Notices fade after " + data.expiryDays + " days."
       : "A notice costs " + cost + " gold and fades after " + data.expiryDays + " days. You carry " + data.gold + " gold.";
    if (pages > 1 && reading < 0)
    {
@@ -251,12 +395,14 @@ function drawFoot(pages)
    var by = y + 32;
    var write = button(f, "write", 10, PAD, by, 200, "Write a notice...", F_MEDIUM, 20, A_BUTTON_REST, function()
    {
-      // typed text: the browser composer for this tab, back to this board after posting (client router, native:handoff)
-      dboSound("UIMenuOK");
-      dboSend("native:handoff", ["bountyBoard", "compose:" + currentTab().id]);
+      startCompose();
    });
    var full = data.notes.length >= data.maxNotes;
-   if (t.canPost == false)
+   if (composing != "")
+   {
+      disable(write);
+   }
+   else if (t.canPost == false)
    {
       disable(write, "Officials only");
    }
@@ -290,17 +436,17 @@ function draw()
    actions = [];
    focus = -1;
    drawTabs();
-   var pages = reading >= 0 ? drawRead() : drawList();
+   var pages = composing != "" ? drawCompose() : reading >= 0 ? drawRead() : drawList();
    drawFoot(pages);
 }
 
 function build()
 {
    panel = _root.createEmptyMovieClip("dboPanel", 10);
-   panel._x = (STAGE_W - PANEL_W) / 2;
-   panel._y = 60;
+   dboFit(panel, PANEL_W, PANEL_H);
    var bg = panel.createEmptyMovieClip("bg", 1);
-   dboBox(bg, 0, 0, PANEL_W, PANEL_H, 0x000000, 80);
+   dboGround(bg, PANEL_W, PANEL_H);
+   dboWatermark(panel, 5, PANEL_W - 50, 170, 300);
    dboFadeIn(panel);
 }
 
@@ -326,14 +472,46 @@ _root.dboData = function(json)
    {
       reading = -1;
    }
+   // our post is on the board: the composer has done its work
+   if (composing != "" && postedAt && posted())
+   {
+      endCompose();
+      draft = "";
+   }
    draw();
 };
+
+function posted()
+{
+   var text = trimText(draft);
+   var list = notesOf(composing);
+   for (var i = 0; i < list.length; i++)
+   {
+      if (trimText(list[i].text) == text)
+      {
+         return true;
+      }
+   }
+   return false;
+}
 
 var keys = {};
 keys.onKeyDown = function()
 {
    var code = dboKey();
    dboLog("board key " + code);
+   if (code == 27 && composing != "")
+   {
+      dboSound("UIMenuCancel");
+      endCompose();
+      draw();
+      return;
+   }
+   // every other key is typing while the composer is open
+   if (composing != "")
+   {
+      return;
+   }
    if (code == 27)
    {
       if (reading >= 0)
@@ -390,6 +568,15 @@ Key.addListener(keys);
 
 _root.onEnterFrame = function()
 {
+   // a post the server refused never shows on the board: after a while the composer may post again
+   if (postedAt && getTimer() - postedAt >= POST_WAIT_MS)
+   {
+      postedAt = 0;
+      if (composing != "")
+      {
+         draw();
+      }
+   }
    if (data == null && getTimer() - builtAt >= NO_DATA_CLOSE_MS)
    {
       dboLog("board: no payload in " + NO_DATA_CLOSE_MS + " ms, closing");

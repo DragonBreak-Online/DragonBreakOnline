@@ -50,7 +50,7 @@ This writes `swf/build/<name>.swf` and checks it against `verify.txt`. AS2 traps
 
 ## Typed input
 
-A native menu has no text box. For a name, a number, a note or a search, the panel gets a button ("Write a notice...", "Rename...") that opens the browser for that input only, and returns to the native panel once it is answered. Keep the chat command as a fallback; add one if there is none.
+For a name, a number, a note or a search, the panel types in place with dboInput (lib/dbo.as, SkyUI's method: an input field and skse.AllowTextInput), and keeps a "Type in the browser instead" button that opens the browser for that input only, returning to the native panel once it is answered. Keep the chat command as a fallback; add one if there is none.
 - **Router panels:** send `native:handoff [type, mode]`, and give the browser front a mode that draws only that input (see `features/bountyBoard`, `features/housing`).
 - **Gamemode panels:** ask Worker 1. The journal does it server-side (`journalTab [nonce, tab, focus, 'browser']`).
 

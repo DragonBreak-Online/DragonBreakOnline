@@ -4,6 +4,8 @@
 const S = require('./native-swf-stub');
 const T = S.checker();
 const check = T.check;
+// SKSE's AllowTextInput is a counter (GameInput.cpp): what the panel holds is the trues less the falses
+const held = (t) => t.sent.reduce((n, m) => n + (m.e === 'allowTextInput' ? (m.on ? 1 : -1) : 0), 0);
 
 const ev = { post: 'bountyBoard:post', remove: 'bountyBoard:remove', close: 'bountyBoard:close' };
 const board = {
@@ -26,8 +28,9 @@ const closed = (t) => t.closed();
   t.push(board);
   const cb = P(t).foot.close; cb.onRollOver(); cb.onRollOut(); cb.onRollOver();
   check('a button the mouse leaves and comes back to brightens again (dbo-controls)', cb._alpha === 100, cb._alpha);
-  check('the title names the board', P(t).head.title.text === 'Bruma Notice Board', P(t).head.title.text);
-  check('tabs carry their counts, the first open and bright', P(t).head.tab0.label.text === 'Hold Notices  1' && P(t).head.tab1.label.text === 'Shop Ads  2' && P(t).head.tab0._alpha === 100 && P(t).head.tab1._alpha === 30);
+  check('the focused button carries the aqua wash and loses it on roll-out', cb.wash !== undefined && (cb.onRollOut(), cb.wash === undefined), cb.wash);
+  check('the title names the board', P(t).head.title.text === 'BRUMA NOTICE BOARD', P(t).head.title.text);
+  check('tabs carry their counts, the first open and bright', P(t).head.tab0.label.text === 'Hold Notices  1' && P(t).head.tab1.label.text === 'Shop Ads  2' && P(t).head.tab0._alpha === 100 && P(t).head.tab1._alpha === 50);
   const r = rowsOf(t);
   check('hold tab lists its one notice, first line only, with author and age', r.length === 1 && r[0].label.text === 'Curfew at dusk.' && r[0].sub.text === 'Jarl Narri  -  Pinned today', r.map((x) => [x.label.text, x.sub.text]));
   check('on the hold tab Write a notice is greyed: officials only', P(t).foot.write.disabled === true && P(t).foot.write.label.text === 'Officials only');
@@ -37,10 +40,6 @@ const closed = (t) => t.closed();
   check('a tab click switches the list', rowsOf(t).length === 2 && P(t).head.tab1._alpha === 100, rowsOf(t).length);
   check('ages read yesterday and days ago', rowsOf(t)[0].sub.text === 'Olaf  -  Pinned yesterday' && rowsOf(t)[1].sub.text === 'Gemma  -  Pinned 4 days ago');
   check('the hint gives the cost and the gold carried', /costs 30 gold.*fades after 7 days.*carry 120 gold/.test(P(t).foot.hint.text), P(t).foot.hint.text);
-  P(t).foot.write.onRelease();
-  const h = msgs(t, 'native:handoff');
-  check('Write a notice hands off to the browser composer for this tab', h.length === 1 && h[0].args.join('|') === 'bountyBoard|compose:shop', h);
-  check('and leaves the native board open for the router to close', !closed(t));
   t.press(9);
   check('Tab does nothing, it is the Skyrim menu key', !t.root.dboPanel.list.text && !t.sent.some((m) => m.e === 'closeMenu'));
   t.press(97);
@@ -61,8 +60,8 @@ const closed = (t) => t.closed();
   check('a re-publish keeps the open tab', P(t).head.tab1._alpha === 100 && rowsOf(t).length === 1);
   t.press(27);
   check('the panel hides at once but the menu waits, so the client can still read the close from the outbox', t.root._visible === false && !t.sent.some((m) => m.e === 'closeMenu') && String(t.root.dboOut).indexOf('bountyBoard:close') >= 0);
-  t.press(49); P(t).foot.write.onRelease();
-  check('a key or click in the frames before the menu closes sends nothing', msgs(t, 'native:handoff').length === 1 && msgs(t, 'bountyBoard:close').length === 1);
+  t.press(49); P(t).foot.close.onRelease();
+  check('a key or click in the frames before the menu closes sends nothing', msgs(t, 'bountyBoard:close').length === 1);
   check('Escape on the list sends the widget close (no bare close, as the browser Close) and closes', msgs(t, 'bountyBoard:close').length === 1 && msgs(t, 'close').length === 0 && closed(t));
 }
 
@@ -109,6 +108,74 @@ const closed = (t) => t.closed();
   const u = S.boot('dbo_board');
   u.push({ boardName: 'x' });
   check('an unreadable payload is logged, not drawn', u.logs.some((l) => l.indexOf('unreadable payload') >= 0) && !u.root.dboPanel.list);
+}
+
+// ---- the layout Nat saw (26 Oct): every tab fits, and the reader's actions stand clear of the footnote ----
+{
+  const t = S.boot('dbo_board');
+  const tabs = board.tabs.concat([{ id: 'recruit', label: 'Recruitment', cost: 30, canPost: true }]);
+  t.push(Object.assign({}, board, { tabs }));
+  const h = P(t).head;
+  const right = (b) => b._x + b.label._width;
+  const all = Object.keys(h.kids).filter((k) => /^(tab|ho)\d$/.test(k)).map((k) => h[k]);
+  check('every tab and hand-over ends inside the panel (920 less the padding)', all.length === 7 && all.every((b) => right(b) <= 920 - 28), all.map((b) => [b.label.text, right(b)]));
+  check('the hand-overs are a second row in the same weight as the tabs', h.ho0._y > h.tab0._y && h.ho0.label.fmt.font === h.tab0.label.fmt.font && h.ho2.label.text === 'Voting');
+  const long = Object.assign({}, board, { notes: [{ id: 9, tab: 'hold', author: 'Jarl Narri', text: new Array(12).fill('A long line of the decree of the Jarl that wraps across the page.').join(' '), ageHours: 1, canRemove: true }] });
+  t.push(long);
+  t.press(49);
+  const l = P(t).list;
+  const footTop = 640 - 90 - 8;
+  check('a long note: its Take down and Back stay above the footer rule', l.remove._y + 30 <= footTop && l.back._y === l.remove._y, [l.remove._y, footTop]);
+  check('...under its signature', l.remove._y > l.age._y && l.age._y > l.author._y && l.author._y > l.text._y);
+  check('the footnote is hidden while reading', P(t).foot.hint.text === '');
+  const s2 = S.boot('dbo_board');
+  s2.push(board);
+  s2.press(49);
+  const sl = P(s2).list;
+  check('a short note keeps its signature close under the text, not at the bottom', sl.author._y - sl.text._y < 80, [sl.text._y, sl.author._y]);
+}
+
+// ---- writing a notice in the panel (dboInput), and the browser as the fallback ----
+{
+  const t = S.boot('dbo_board');
+  t.push(board);
+  P(t).head.tab1.onRelease();
+  P(t).foot.write.onRelease();
+  const l = P(t).list;
+  check('Write a notice opens a composer in the panel for this tab, typing allowed', l.head.text === 'Pin a notice  -  Shop Ads' && l.box.type === 'input' && l.box.maxChars === 600 && t.ctx.Selection.focused === l.box && t.sent.some((m) => m.e === 'allowTextInput' && m.on === true));
+  check('the footnote makes way, and Write is greyed while composing', P(t).foot.hint.text === '' && P(t).foot.write.disabled === true);
+  t.press(49);
+  check('digits are typing now, not row picks', P(t).list.box && !P(t).list.text);
+  l.box.text = '  Mead, 5 gold a bottle  '; l.box.onChanged();
+  check('the count follows the typing, with the price', l.count.text === '25 / 600  -  30 gold', l.count.text);
+  l.post.onRelease();
+  const p = msgs(t, 'bountyBoard:post');
+  check('Post sends the widget post event with the tab and the trimmed text', p.length === 1 && p[0].args.join('|') === 'shop|Mead, 5 gold a bottle', p);
+  l.post.onRelease();
+  check('a second Post while the first is on its way sends nothing', msgs(t, 'bountyBoard:post').length === 1);
+  t.push(board);
+  check('a refresh without our notice (someone else posted) keeps the composer and the text', P(t).list.box && P(t).list.box.text === '  Mead, 5 gold a bottle  ');
+  check('...and the redraw takes no second count of the keys', held(t) === 1, held(t));
+  t.push(Object.assign({}, board, { notes: board.notes.concat([{ id: 7, tab: 'shop', author: 'Olaf', text: 'Mead, 5 gold a bottle', ageHours: 0, canRemove: true }]) }));
+  check('our notice on the board closes the composer and gives the keys back', !P(t).list.box && rowsOf(t).length === 3 && held(t) === 0, held(t));
+  P(t).foot.write.onRelease();
+  check('the next composer starts empty', P(t).list.box.text === '');
+  P(t).list.box.text = 'Lost: a cat'; P(t).list.box.onChanged();
+  P(t).list.post.onRelease();
+  t.st.time += 6000; t.tick();
+  P(t).list.post.onRelease();
+  check('a post the server refused (no refresh) can be posted again after a while', msgs(t, 'bountyBoard:post').length === 3);
+  t.press(27);
+  check('Escape leaves the composer, not the board, and gives the keys back', !P(t).list.box && !t.sent.some((m) => m.e === 'closeMenu') && held(t) === 0, held(t));
+  P(t).foot.write.onRelease();
+  P(t).list.browser.onRelease();
+  const h = msgs(t, 'native:handoff');
+  check('Type in the browser instead hands the composer for this tab to the browser', h.length === 1 && h[0].args.join('|') === 'bountyBoard|compose:shop', h);
+  const n = S.boot('dbo_board', false, { noTyping: true });
+  n.push(board);
+  P(n).head.tab1.onRelease();
+  P(n).foot.write.onRelease();
+  check('a game that cannot take typed input goes straight to the browser composer', msgs(n, 'native:handoff').length === 1 && !P(n).list.box);
 }
 
 T.done();

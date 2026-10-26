@@ -4,6 +4,8 @@
 const S = require('./native-swf-stub');
 const T = S.checker();
 const check = T.check;
+// SKSE's AllowTextInput is a counter (GameInput.cpp): what the panel holds is the trues less the falses
+const held = (t) => t.sent.reduce((n, m) => n + (m.e === 'allowTextInput' ? (m.on ? 1 : -1) : 0), 0);
 
 const events = {
   claim: 'housing:claim', abandon: 'housing:abandon', revoke: 'housing:revoke', lock: 'housing:lock', unlock: 'housing:unlock',
@@ -24,15 +26,43 @@ const rooms = (t) => Object.keys(P(t).right.kids).filter((n) => /^r\d$/.test(n))
   const t = S.boot('dbo_housing');
   check('says ready with the frame skse appeared on', msgs(t, 'ready').length === 1 && msgs(t, 'ready')[0].args[0] === 1);
   t.push(base);
-  check('the title is the name, the status says yours and unlocked', P(t).head.title.text === 'Rose Hall' && P(t).head.status.text === 'Yours - unlocked', P(t).head.status.text);
+  check('the title is the name, the status says yours and unlocked', P(t).head.title.text === 'ROSE HALL' && P(t).head.status.text === 'Yours - unlocked', P(t).head.status.text);
   check('an owner gets the browser menu\'s actions in its order', labels(t).join('|') === 'Lock|Cut a key|Void all keys|Transfer|Rename...|Give up|Key Ring|Rent and sale', labels(t).join('|'));
   check('Give up is red', btn(t, 'Give up').label.textColor === 0xB23A3A);
   btn(t, 'Lock').onRelease();
   check('Lock sends the lock event and keeps the menu open', msgs(t, 'housing:lock').length === 1 && !closed(t));
   btn(t, 'Rename...').onRelease();
+  const rb = P(t).right.box;
+  check('Rename opens a name box in the panel, the current name in it, typing allowed', rb && rb.type === 'input' && rb.maxChars === 32 && rb.text === 'Rose Hall' && t.ctx.Selection.focused === rb && t.sent.some((m) => m.e === 'allowTextInput' && m.on === true));
+  t.press(40);
+  check('arrow keys are typing while the box is open', P(t).right.box === rb);
+  rb.text = 'Rose Hall!'; rb.onChanged();
+  check('a character the server refuses turns the hint red', P(t).right.hint.textColor === 0xB23A3A);
+  P(t).right.save.onRelease();
+  check('...and Save sends nothing', msgs(t, 'housing:rename').length === 0);
+  rb.text = '  Thorn Hall '; rb.onChanged();
+  P(t).right.save.onRelease();
+  const rn = msgs(t, 'housing:rename');
+  check('Save sends the rename event with the trimmed name, gives the keys back, and leaves the box', rn.length === 1 && rn[0].args[0] === 'Thorn Hall' && !P(t).right.box && held(t) === 0, rn);
+  btn(t, 'Rename...').onRelease();
+  P(t).right.browser.onRelease();
   const h = msgs(t, 'native:handoff');
-  check('Rename hands the name box to the browser', h.length === 1 && h[0].args.join('|') === 'housing|rename' && !closed(t), h);
+  check('Type in the browser instead hands the name box to the browser', h.length === 1 && h[0].args.join('|') === 'housing|rename' && !closed(t), h);
+  check('...and gives the keys back', held(t) === 0, held(t));
+  btn(t, 'Rename...').onRelease();
+  t.press(27);
+  check('Escape leaves the name box, not the menu', !P(t).right.box && !closed(t));
+  check('...and gives the keys back', held(t) === 0, held(t));
+  btn(t, 'Rename...').onRelease();
+  t.push(base);
+  check('a re-publish while naming holds the keys once, or gives them back with the box', held(t) === (P(t).right.box ? 1 : 0), [held(t), !!P(t).right.box]);
+  t.press(27);
+  check('...and Escape after it gives them back', held(t) === 0, held(t));
   check('the hint is the Key Ring one', /Key Ring, where you can give it/.test(P(t).right.hint.text));
+  const nt = S.boot('dbo_housing', false, { noTyping: true });
+  nt.push(base);
+  btn(nt, 'Rename...').onRelease();
+  check('a game that cannot take typed input goes straight to the browser name box', msgs(nt, 'native:handoff').length === 1 && !P(nt).right.box);
   t.push(Object.assign({}, base, { locked: true }));
   check('a re-publish redraws: Unlock, locked in red', labels(t)[0] === 'Unlock' && P(t).head.status.textColor === 0xB23A3A && P(t).head.status.text === 'Yours - locked');
   t.press(40); t.press(13);

@@ -12,6 +12,8 @@ import { CLOSE_KEY, FAILED_KEY, HANDOFF_KEY } from "./nativeWidgets";
 declare const window: any;
 
 const WIDGET_ID = 26;
+// bountyBoardSystem onPost: the notice it sends when a post is taken
+const PINNED = /^Your notice is pinned/;
 
 // Event keys exchanged with the browser. Namespaced to avoid collisions.
 const events = {
@@ -126,14 +128,16 @@ export class BountyBoardService extends ClientListener {
           logTrace(this, `Opening board`, info.boardName);
           this.openMenu();
         } else if (this.menuOpen) {
-          // The refresh after our own post from the composer brings the native board back; anyone else's leaves it
-          if (handoff && this.posted) this.endHandoff();
+          // The refresh after our own post was pinned brings the native board back; anyone else's leaves the composer up
+          if (handoff && this.pinned) this.endHandoff();
           this.openMenu();
         }
         break;
       }
       case "bountyBoardNotice":
         if (typeof content["text"] === "string") {
+          // The server says "pinned" before the refresh of a post it took, and anything else for one it refused
+          if (handoff && this.posted) { this.pinned = PINNED.test(content["text"] as string); this.posted = false; }
           notifyNextUpdate(this.controller, this.sp, content["text"]);
         }
         break;
@@ -172,6 +176,7 @@ export class BountyBoardService extends ClientListener {
       this.native = false;
       handoff = typeof args[1] === "string" ? (args[1] as string) : "compose";
       this.posted = false;
+      this.pinned = false;
       if (this.menuOpen) this.openMenu();
       return;
     }
@@ -219,6 +224,7 @@ export class BountyBoardService extends ClientListener {
   private endHandoff(): void {
     handoff = "";
     this.posted = false;
+    this.pinned = false;
     closeFormMenu(this.sp, WIDGET_ID);
   }
 
@@ -233,6 +239,7 @@ export class BountyBoardService extends ClientListener {
     }
     handoff = "";
     this.posted = false;
+    this.pinned = false;
     // The server keeps a per-player board session; tell it we walked away.
     sendCustomPacket(this.controller, { customPacketType: "bountyBoardClose" });
   }
@@ -262,4 +269,5 @@ export class BountyBoardService extends ClientListener {
   private native = false;
   private noNative = false;
   private posted = false;
+  private pinned = false;
 }

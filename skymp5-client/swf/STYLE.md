@@ -57,9 +57,7 @@ The other names `gfxfontlib.swf` exports are `$DragonFont`, `$SkyrimBooks`, `$Ha
 | Disabled text | `#606060` (vanilla) / `#505050` (SkyUI) | BSScrollingList.SetEntryText, ButtonListEntry |
 | Shapes | `#000000`, `#BBBDBF`, `#A6A8AB` | trainingmenu, tweenmenu fills |
 
-**DBO:**
-- The panel background is `#000000` at 80 % alpha. Vanilla backgrounds are bitmaps we cannot reuse, so this flat dark stands in.
-- Separators are 1 px `#FFFFFF` at 25 %.
+**DBO:** the branded look (section 11) replaced the flat `#000000` at 80 % and the plain white rules on 26 Oct; its table holds the colours. What follows still holds.
 - Colour is used only for meaning:
   - `#C9A86A` for a daedric prayer's accent;
   - `#B23A3A` for a failure line;
@@ -75,9 +73,9 @@ The other names `gfxfontlib.swf` exports are `$DragonFont`, `$SkyrimBooks`, `$Ha
 - **SkyUI options:** `ALPHA_SELECTED 100`, `ALPHA_ACTIVE 75`, `ALPHA_DISABLED 50` (configpanel OptionsListEntry).
 
 **DBO rule:**
-- Rows rest at 30 % (lists) or 80 % (a few big buttons), and the focused row goes to 100 %.
+- Rows rest at **50 %** (lists; vanilla's 30 % read as dead on the teal ground, so the brand raised it) or 80 % (a few big buttons), and the focused row goes to 100 %.
 - Disabled rows sit at 50 % in `#606060`.
-- No filled bar and no colour change. At most a 1 px underline at 25 % on the focused row.
+- No solid bar and no colour change in the text. The focused row carries the brand's aqua wash (section 11), and at most a 1 px underline.
 
 ## 5. List rows, headers, separators
 
@@ -88,7 +86,7 @@ The other names `gfxfontlib.swf` exports are `$DragonFont`, `$SkyrimBooks`, `$Ha
   - A list row is **34 px** for a 22-26 px font: text inset 10 px, 4 px between rows.
   - The header sits 16 px from the top, with a separator 8 px below it.
   - Rows are left-aligned. Only messagebox-style buttons are centred.
-  - A number key hint (`1`, `2`, `3`) goes left of the row in `$EverywhereBoldFont` 20 at `#999999`.
+  - A number key hint (`1`, `2`, `3`) goes left of the row in `$EverywhereBoldFont` 20 in `C_SECOND`.
 - **DBO:** at most 9 rows on screen. Longer lists scroll by a page (PAGE_UP/PAGE_DOWN) and by the wheel, as BSScrollingList does.
 
 ## 6. Motion
@@ -163,5 +161,32 @@ Skyrim Souls RE unpauses CustomMenu on our pack, with movement allowed and auto-
 
 - No Bethesda or mod shapes, bitmaps, scripts or class files, even "just the list component". We write our own.
 - No embedded fonts.
-- No text input. Chat stays CEF.
+- No text input except through dboInput (lib/dbo.as): an input field with skse.AllowTextInput, the way SkyUI's own search box takes typing. It is unproven in a CustomMenu until Nat types in one, so the panel keeps its browser hand-off as a visible fallback ("Type in the browser instead"). SKSE's AllowTextInput is a counter, not a switch (skse64 GameInput.cpp: true adds one, false takes one), so only the lib calls it: dboInput takes one count however often a panel redraws its box, and dboInputEnd (also run by dboClose) gives it back. A count left behind keeps the player's keys captured until relog. Chat stays CEF.
 - No rules in the SWF: the server decides, as with the CEF widgets.
+
+## 11. The branded look (Nat's B, 26 Oct)
+
+Nat picked B from the A-vs-B mockup: the website's teal, silver and aqua over Skyrim's layout rules. Everything above still holds; this section is the skin. **Every helper is in `lib/dbo.as`; a panel never draws these by hand.**
+
+| use | constant | value |
+|---|---|---|
+| Ground (edges / middle) | `C_GROUND` / `C_GROUND_2` | `#08191C` / `#0F2A2E` |
+| Frame | `C_STONE` | `#5D6B6E` |
+| Accent (tab mark, wash, inner line, diamonds) | `C_ACCENT` | `#8FD3D0` |
+| Title | `C_SILVER` | `#E6ECEC` |
+| Body text | `C_TEXT` | `#FFFFFF` |
+| Secondary text | `C_SECOND` | `#8C9A9C` (was `#999999`) |
+
+The meaning colours of section 3 (daedric gold, failure red, success green) are unchanged.
+
+**A panel, in order:**
+1. `dboGround(bg, PANEL_W, PANEL_H)` on its `bg` clip: a vertical gradient ground, a stone frame, an aqua inner line and four corner pieces. A panel whose height changes (prayer) clears `bg` and calls it again.
+2. `dboWatermark(panel, depth, right, top, h)` right after: the hourglass at 5 %, right-aligned behind the content. It loads `../textures/interface/dbo/dbo-hourglass.dds`; where it does not load the panel simply has none.
+3. `dboTitle(parent, name, depth, x, y, w, text)` for the panel's title: `$EverywhereFont` 28, silver, capitals, spaced 4. One per panel, top left. A colour that means something (prayer's daedric gold) may replace the silver.
+4. Tabs: the open one at 100 % with `dboTabMark(button, width)`, a 2 px aqua line under its label; the rest at `A_ROW_REST`.
+5. `dboDivider(clip, x, y, w)` for every separator: a line that fades out at both ends with a small diamond in the middle. `dboRule` alone (the line without the diamond) is for a rule inside a row or a field.
+6. Focus: `dboWash(clip, true/false)`, an aqua band at 16 % that fades to the right, under the focused control. `dbo-controls.as` buttons do it already; a panel with its own rows calls it from its own focus code and sets `washW`/`washH` (and `washX` where the row's drawing starts right of its origin) so the band covers the row, not the engine's measure of it.
+
+**The art:** `swf/art/dbo-hourglass.dds`, our own hourglass (`skymp5-front/src/img/dbo-watermark.png`), saved by Pillow as an uncompressed RGBA DDS (420 x 520), the same format Nat's map probe proved loads by relative path. It ships with the SWFs as **`Data/textures/interface/dbo/dbo-hourglass.dds`** in the launcher extras. Any new image follows the same path: our own art, uncompressed RGBA DDS, under `textures/interface/dbo/`, listed for the extras. PNG does not load (URLNotFound), and `img://` gives a placeholder.
+
+**Checks:** `tests/native-render.js` draws the ground, gradients, diamonds and the watermark, so its renders at 16:9, 16:10 and 21:9 are the review picture, and `CHECK=1` is the overlap check every panel must pass at all three. A new panel adds its scenes to the renderer.
