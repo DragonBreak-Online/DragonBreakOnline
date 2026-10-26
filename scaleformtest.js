@@ -19,7 +19,11 @@ module.exports = (api) => {
     'A long row to see where the panel clips the text instead of wrapping it off the edge',
   ];
 
-  const show = (a, title, rows) => sendPacket(a, { customPacketType: 'dboScaleform', title, rows });
+  // The shared panel packet: swf, the WHOLE payload, and the widget id. The client reads content.payload and
+  // JSON-stringifies it for _root.dboData, so title and rows go INSIDE payload. Sending them at the top
+  // level is what made the 26 Oct 05:02 session report payload=4ch: the client found no payload and sent
+  // the string "null" to a panel that was otherwise working perfectly.
+  const show = (a, title, rows) => sendPacket(a, { customPacketType: 'dboScaleform', swf: 'dbo_testmenu', payload: { title, rows }, widget: 0 });
 
   registerChatCommand('testmenu', (a, args) => {
     const sub = String(args || '').trim().toLowerCase();
