@@ -68,6 +68,11 @@
 //   altar add [radius] | altar list | altar remove <n>.
 // State: private.dboBriarheart = { since, how: 'rite'|'staff', by } on the character; briarheart.json beside the server
 //   (runtime, gitignored) = { altars: [{ world, pos: [x, y, z], radius, by, at }] }.
+// Seeded altars (config altars, same shape as briarheart.json's; Nat, 26 Oct): there without a staff member placing them,
+//   listed first and marked seeded; altar remove takes only placed ones. The default is the Hagravens' ritual court in
+//   Deepwood Vale (DeepwoodRedoubtWorld, Skyrim 029AB7, cell HagsEndOrigin -31,19): the raised Nordic floor ringed by the
+//   three blood-bowl fires and the goat and skeever poles, on navmesh 0AA49C (floor -3316). Our plugins change nothing
+//   there but sink its rubble (Dungeons) and disable the placed Forsworn (DLE).
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -81,6 +86,7 @@ module.exports = (api) => {
     races: ['DBOReachmanRace'], faiths: ['reach'],
     heartItem: '3ad61:Skyrim.esm',            // Briar Heart (INGR)
     altarRadius: 400, confirmMinutes: 5,
+    altars: [{ world: '29ab7:Skyrim.esm', pos: [-124700, 79930, -3316], radius: 500, name: 'Deepwood Vale, the Hagravens\' ritual court' }],
     failChance: 0.1, failPermadeath: false, failCooldownHours: 24,
     healthBonus: 50, resist: { poison: 0.15, frost: 0.15 }, fireWeakness: 0.25,
     spells: ['72317:Skyrim.esm', '400ad:Skyrim.esm'],   // IronfleshLeftHand, LightningCloakLeftHand (the Briarheart template's)
@@ -88,7 +94,7 @@ module.exports = (api) => {
     tearSeconds: 10, tearRange: 250, tearPermadeath: false, tearGivesHeart: true,
     noDivineBlessings: true, faithLocked: true,
     cureDeities: ['arkay', 'stendarr'], cureItem: '2e504:Skyrim.esm',  // a filled black soul gem
-    visual: { enabled: false, armor: '5d008:Skyrim.esm', emptyArmor: '5d009:Skyrim.esm', body: '90d63:unofficial skyrim special edition patch.esp', women: false, retrySeconds: 10, maxTries: 5, settleMs: 1500 },
+    visual: { enabled: false, armor: '5d008:Skyrim.esm', emptyArmor: '5d009:Skyrim.esm', body: '90d63:unofficial skyrim special edition patch.esp', women: false, retrySeconds: 10, maxTries: 5, settleMs: 1500, lockBody: false },
     // A full Hagraven (hagraven.js, stage 3) at the altar performs the rite and is named in the audit; true: the rite
     // waits for one
     hagravenRequired: false,
@@ -156,9 +162,12 @@ module.exports = (api) => {
   };
   const posOf = (a) => { try { const l = mp.get(a >>> 0, 'locationalData'); return l && Array.isArray(l.pos) ? { world: String(l.cellOrWorldDesc || ''), pos: l.pos } : null; } catch (e) { return null; } };
   const dist = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], (p[2] || 0) - (q[2] || 0));
+  // The seeded altars (config), then the ones staff placed (briarheart.json)
+  const seededAltars = () => (Array.isArray(C.altars) ? C.altars : []).filter((x) => x && x.world && Array.isArray(x.pos) && x.pos.length >= 3).map((x) => Object.assign({ seeded: true }, x));
+  const allAltars = () => seededAltars().concat(data().altars);
   const altarNear = (a) => {
     const here = posOf(a); if (!here || !here.pos) return null;
-    return data().altars.find((x) => String(x.world) === String(here.world) && dist(x.pos, here.pos) <= (Number(x.radius) || C.altarRadius)) || null;
+    return allAltars().find((x) => String(x.world) === String(here.world) && dist(x.pos, here.pos) <= (Number(x.radius) || C.altarRadius)) || null;
   };
   const isStaff = (a) => !!call('__dboIsStaff', a >>> 0);
   const superKind = (a) => call('__dboSuperKind', a >>> 0) || null;
@@ -167,7 +176,7 @@ module.exports = (api) => {
   const waitText = (ms) => { const h = Math.floor(ms / HOUR), m = Math.ceil((ms % HOUR) / MIN); return `${h ? `${h}h ` : ''}${m}m`; };
 
   // ---- the look: the briar body on a bare chest -------------------------------------------------------------------------
-  const V = () => Object.assign({ enabled: false, armor: '', emptyArmor: '', body: '', women: false, retrySeconds: 10, maxTries: 5, settleMs: 1500 }, C.visual || {});
+  const V = () => Object.assign({ enabled: false, armor: '', emptyArmor: '', body: '', women: false, retrySeconds: 10, maxTries: 5, settleMs: 1500, lockBody: false }, C.visual || {});
   // The wound itself (dev, 25 Oct): ArmorBriarHeart is only the heart and its briars (slot 35). The open chest is USSEP's
   // USKPArmorBriarHeartBody (90D63, slot 32; its ARMA covers body, forearms and calves with the wound texture
   // SkinBodyMaleBriarHeart), worn by every vanilla Briarheart through the SkinBriarHeart outfit. Both go on a bare chest.
@@ -277,7 +286,9 @@ module.exports = (api) => {
     for (const [id, desc] of [[body, v.body], [full, v.armor]]) {
       if (!id || worn.includes(id)) continue;
       if (!hasOne(a, id) && giveItem) giveItem(a, id, 1);
-      results.push([desc, papyrus(a, 'EquipItem', [form(desc), false, true])]);
+      // visual.lockBody (off by default; a dev test, 26 Oct): EquipItem's abPreventRemoval, so the engine itself may refuse
+      // the player's swap. Whether it also stops a body-slot piece from displacing the wound is what the test is for
+      results.push([desc, papyrus(a, 'EquipItem', [form(desc), v.lockBody === true, true])]);
     }
     const bad = results.filter(([, ok]) => !ok).map(([d]) => d);
     settleLater(a, v.retrySeconds * 1000);   // checked again if no report shows it (after the last try: given up)
@@ -563,12 +574,14 @@ module.exports = (api) => {
         audit(`BRIARHEART ${who(a)} removed Hagraven altar ${n} (${x.world} ${x.pos.join(',')})`);
         return personal(a, `Hagraven altar ${n} removed.`);
       }
-      return personal(a, d.altars.length ? d.altars.map((x, i) => `${i + 1}. ${x.world} ${x.pos.join(',')} r${x.radius}`).join(' | ') : 'No Hagraven altar is placed: stand at one and say /briarheart altar add.');
+      const seeded = seededAltars().map((x) => `seeded: ${x.name ? `${x.name}, ` : ''}${x.world} ${x.pos.join(',')} r${Number(x.radius) || C.altarRadius}`);
+      const placed = d.altars.map((x, i) => `${i + 1}. ${x.world} ${x.pos.join(',')} r${x.radius}`);
+      return personal(a, seeded.length || placed.length ? seeded.concat(placed).join(' | ') : 'No Hagraven altar is placed: stand at one and say /briarheart altar add.');
     }
     return personal(a, 'Usage: /briarheart [status] | rite | confirm | cure; staff: grant|revoke <name> <reason> | list | altar add [radius] | altar list | altar remove <n>');
   }, { help: 'Briarhearts: [status] | rite (at a Hagraven altar) | confirm | cure (at Arkay or Stendarr); staff: grant | revoke | list | altar' });
 
-  log(`briarheart: ${C.enabled ? 'on' : 'off'}, ${data().altars.length} altar(s), races ${(C.races || []).join('/')}, faiths ${(C.faiths || []).join('/')}`);
+  log(`briarheart: ${C.enabled ? 'on' : 'off'}, ${allAltars().length} altar(s) (${seededAltars().length} seeded), races ${(C.races || []).join('/')}, faiths ${(C.faiths || []).join('/')}`);
   // For the harness
   return { riteRefusal, rite, confirm, cure, tearRefusal, startTear, tick, end, become, isBriar, C, data };
 };
