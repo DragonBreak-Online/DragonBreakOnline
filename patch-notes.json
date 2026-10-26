@@ -8302,5 +8302,20 @@
         ]
       }
     ]
+  },
+  {
+    "title": "Stone quarries and clay deposits",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Mining",
+        "items": [
+          "Stone Quarries and Clay Deposits can be worked now, mined like an ore vein. Clay Deposits are open to any Miner and give 3 Clay and a Quartz, the smelter's glass. Cutting building stone takes an Adept Miner, for 4 Quarried Stone (more at higher tiers). A worked deposit rests for 30 minutes.",
+          "There are about 150 across Skyrim, by the homestead plots, villages and mines. Touching one can start you on the Miner skill."
+        ]
+      }
+    ]
   }
 ]
