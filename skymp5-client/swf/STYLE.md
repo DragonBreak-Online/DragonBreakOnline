@@ -142,7 +142,8 @@ The other names `gfxfontlib.swf` exports are `$DragonFont`, `$SkyrimBooks`, `$Ha
   - nothing happens while `bDisableInput` is set.
 
 **DBO, for every panel:**
-- UP/DOWN (and W/S) move the focus. ENTER/E choose. Escape/Tab close.
+- UP/DOWN (and W/S) move the focus. ENTER/E choose. Escape closes (or backs out one layer). Tab does nothing: it is Skyrim's menu key, and a reflex press must never cost the player a round or a panel.
+- Number keys take the numpad too (codes 97-105 as 49-57).
 - Number keys 1-9 choose a row directly.
 - The mouse always works: hover focuses, click chooses.
 - On a gamepad: the D-pad, A to choose, B to close.

@@ -66,6 +66,11 @@ function dboDispatch(msgKey, json, n)
 // One message: the client splits key and JSON args and calls sendMessage(key, ...args); num is numArg
 function dboSend(msgKey, args, num)
 {
+   // the panel is gone for the player once dboClose ran: a key pressed in the frames before the menu closes sends nothing
+   if (dboClosing)
+   {
+      return false;
+   }
    var json = dboJson(args);
    var n = num == undefined ? 0 : num;
    if (!dboBooted)
@@ -77,16 +82,46 @@ function dboSend(msgKey, args, num)
    return true;
 }
 
+// The panel hides at once and the menu closes DBO_CLOSE_FRAMES later: the client reads the outbox on its update, so a
+// message sent just before (a cancel, a verdict) must still be there to be read when the movie goes
+var DBO_CLOSE_FRAMES = 6;
+var dboClosing = false;
+
+// Key.getCode() with the numpad digits read as the row digits 1-9
+function dboKey()
+{
+   var code = Key.getCode();
+   return code >= 97 && code <= 105 ? code - 48 : code;
+}
+
 function dboClose()
 {
    if (!dboBooted)
    {
       dboCloseWanted = true;
+      return;
    }
-   else if (_global.skse.CloseMenu != undefined)
+   if (_root.dboCloser != undefined)
    {
-      _global.skse.CloseMenu(DBO_MENU);
+      return;
    }
+   _root._visible = false;
+   dboClosing = true;
+   var c = _root.createEmptyMovieClip("dboCloser", 9998);
+   c.frames = 0;
+   c.onEnterFrame = function()
+   {
+      this.frames++;
+      if (this.frames < DBO_CLOSE_FRAMES)
+      {
+         return;
+      }
+      delete this.onEnterFrame;
+      if (_global.skse.CloseMenu != undefined)
+      {
+         _global.skse.CloseMenu(DBO_MENU);
+      }
+   };
 }
 
 // Polls each frame for _global.skse, then runs onReady(frame it appeared on) and flushes what was queued before it.

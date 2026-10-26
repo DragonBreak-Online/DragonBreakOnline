@@ -101,12 +101,12 @@ let sorted;
 {
   const t = boot();
   t.press(27);
-  check('Escape closes the menu from the SWF itself', t.sent.some((m) => m.e === 'closeMenu'), t.sent);
+  check('Escape closes the menu from the SWF itself', t.closed(), t.sent);
   const u = boot();
   u.st.time += 7999; u.tick();
-  check('no close before the payload wait runs out', !u.sent.some((m) => m.e === 'closeMenu'));
+  check('no close before the payload wait runs out', !u.closed());
   u.st.time += 1; u.tick();
-  check('a panel that never gets its payload closes itself', u.sent.some((m) => m.e === 'closeMenu'), u.sent);
+  check('a panel that never gets its payload closes itself', u.closed(), u.sent);
 }
 
 {
@@ -117,7 +117,7 @@ let sorted;
   const m = t.msgs();
   check('ready leads once skse appears, with its frame', m[0] && m[0].key === 'ready' && m[0].args[0] === 2, m);
   check('a stand-up pressed before boot is sent after it', m.some((x) => x.key === 'dbo:prayerCancel'), m);
-  check('and its close is carried out', t.sent.some((x) => x.e === 'closeMenu'), t.sent);
+  check('and its close is carried out', t.closed(), t.sent);
   check('the boot line logs the frame', t.logs.some((l) => l.indexOf('skse appeared on frame 2') >= 0), t.logs);
 }
 

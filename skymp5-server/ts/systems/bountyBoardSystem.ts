@@ -163,6 +163,19 @@ export class BountyBoardSystem implements System {
       const userId = this.userOf(ctx, Number(actorId) >>> 0);
       if (userId >= 0) this.onOpenRequest(ctx, userId);
     };
+    // The /board post chat fallback for typed notices: the board in use, else the nearest, then the menu's own checks
+    (globalThis as any).__alduinakBountyPost = (actorId: number, tab: string, text: string) => {
+      const id = Number(actorId) >>> 0;
+      const userId = this.userOf(ctx, id);
+      if (userId < 0) return;
+      const board = this.sessions.get(userId) || this.nearestBoard(ctx, id);
+      if (!board) {
+        this.notice(ctx, userId, "There is no notice board within reach. Walk up to one and use it.");
+        return;
+      }
+      this.sessions.set(userId, board);
+      this.onPost(ctx, userId, { board: board.zoneId, tab, text });
+    };
     // The zone of the board an actor stands at, or null; the gamemode sends pigeons only from a board
     (globalThis as any).__alduinakBoardNear = (actorId: number): string | null => {
       const board = this.nearestBoard(ctx, Number(actorId) >>> 0);

@@ -7,11 +7,15 @@ import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { Actor, BrowserMessageEvent, ButtonEvent, DxScanCode, InputDeviceType } from "skyrimPlatform";
 import { localIdToRemoteId } from "../../view/worldViewMisc";
 import { logTrace } from "../../logging";
+import { ScaleformMenuService } from "./scaleformMenuService";
+import { CLOSE_KEY, FAILED_KEY, HANDOFF_KEY } from "./nativeWidgets";
 
 // for the browser-side widget setter (executed inside the CEF browser)
 declare const window: any;
 
 const WIDGET_ID = 8;
+// The native menu handed its name box to the browser ('rename'); the front then draws only that
+let handoff = "";
 
 // A hand-over waits for one more housing-key press; it must not wait forever.
 const PENDING_RECIPIENT_MS = 30000;
@@ -222,6 +226,8 @@ export class HousingService extends ClientListener {
           assignedToYou: content["assignedToYou"] === true,
           keyRing: content["keyRing"] === true,
         };
+        // The answer to a rename from the browser name box brings the native menu back
+        if (handoff && this.renamed) this.endHandoff();
         // A pending recipient pick owns the screen; a late reply must not reopen.
         if (this.pendingRecipient === null) this.openMenu();
         break;
@@ -243,9 +249,32 @@ export class HousingService extends ClientListener {
       if (this.menuOpen) this.closeMenu();
       return;
     }
-    if (typeof key !== "string" || !key.startsWith("housing:") || !this.menuOpen) {
+    if (typeof key !== "string" || !key.startsWith("housing:")) return;
+    this.handleKey(key, Array.prototype.slice.call(e.arguments, 1));
+  }
+
+  // The menu's keys, from the browser or the native panel (the router's onKey) alike; args exclude the key
+  private handleKey(key: string, args: unknown[]): void {
+    if (key === FAILED_KEY) {
+      // The panel could not be drawn: the browser one for the rest of this opening
+      this.native = false;
+      this.noNative = true;
+      if (this.menuOpen) this.openMenu();
       return;
     }
+    if (key === CLOSE_KEY) {
+      this.native = false;
+      if (this.menuOpen) this.closeMenu();
+      return;
+    }
+    if (key === HANDOFF_KEY) {
+      this.native = false;
+      handoff = typeof args[1] === "string" ? (args[1] as string) : "rename";
+      this.renamed = false;
+      if (this.menuOpen) this.openMenu();
+      return;
+    }
+    if (!this.menuOpen) return;
     const target = info.target || this.target;
 
     switch (key) {
@@ -263,9 +292,10 @@ export class HousingService extends ClientListener {
         break;
       }
       case events.rename: {
-        const name = typeof e.arguments[1] === "string" ? (e.arguments[1] as string).trim() : "";
+        const name = typeof args[0] === "string" ? (args[0] as string).trim() : "";
         if (name) {
           sendCustomPacket(this.controller, { customPacketType: "propertyRequest", action: "rename", target, name });
+          if (handoff) this.renamed = true;
         }
         break;
       }
@@ -286,7 +316,7 @@ export class HousingService extends ClientListener {
       case events.unassign:
       case events.share:
       case events.unshare: {
-        const ref = Number(e.arguments[1]) >>> 0;
+        const ref = Number(args[0]) >>> 0;
         if (!ref || !info.place || !info.place.rooms.some((r) => r.ref === ref)) break;
         const action = key.slice("housing:".length);
         if (key === events.assign) {
@@ -306,14 +336,41 @@ export class HousingService extends ClientListener {
     }
   }
 
+  // The native menu when the client has it, else the browser one; the name box hand-off is always the browser
   private openMenu(): void {
     this.menuOpen = true;
-    openFormMenu(this.sp, this.browsersideWidgetSetter, { events, info, targetLabel, WIDGET_ID }, this.controller);
+    if (!handoff && !this.noNative) {
+      const scaleform = this.controller.lookupListener(ScaleformMenuService);
+      const widget = {
+        type: "housing", id: WIDGET_ID, targetLabel, view: info.view, owned: info.owned, name: info.name, locked: info.locked,
+        hasKeys: info.hasKeys, canGrantContainers: info.canGrantContainers, ownerName: info.ownerName, place: info.place,
+        placeName: info.placeName, assignedToYou: info.assignedToYou, keyRing: info.keyRing, events,
+      };
+      if (scaleform && scaleform.openNative({ type: "housing", widget, widgetId: WIDGET_ID, onKey: (k, a) => this.handleKey(k, a) })) {
+        this.native = true;
+        return;
+      }
+    }
+    openFormMenu(this.sp, this.browsersideWidgetSetter, { events, info, targetLabel, WIDGET_ID, handoff }, this.controller);
+  }
+
+  private endHandoff(): void {
+    handoff = "";
+    this.renamed = false;
+    closeFormMenu(this.sp, WIDGET_ID);
   }
 
   private closeMenu(): void {
     this.menuOpen = false;
-    closeFormMenu(this.sp, WIDGET_ID);
+    this.noNative = false;
+    if (this.native) {
+      this.native = false;
+      this.controller.lookupListener(ScaleformMenuService).closeNative("housing");
+    } else {
+      closeFormMenu(this.sp, WIDGET_ID);
+    }
+    handoff = "";
+    this.renamed = false;
   }
 
   // Runs inside the CEF browser. Only injected vars + window are available.
@@ -335,6 +392,7 @@ export class HousingService extends ClientListener {
       assignedToYou: info.assignedToYou,
       keyRing: info.keyRing,
       events: events,
+      handoff: handoff,
     };
     const others = (window.skyrimPlatform.widgets.get() || []).filter((w: any) => w.id !== WIDGET_ID);
     window.skyrimPlatform.widgets.set(others.concat([widget]));
@@ -342,6 +400,9 @@ export class HousingService extends ClientListener {
 
   private menuKey: DxScanCode = DxScanCode.X;
   private menuOpen = false;
+  private native = false;
+  private noNative = false;
+  private renamed = false;
   private target = 0;
   private pendingRecipient: { action: string; target: number; ref: number; expiresAt: number } | null = null;
 }
