@@ -3130,14 +3130,14 @@
   },
   {
     "title": "Spell tomes from reading",
-    "date": "2026-10-16",
-    "version": "Hotfix",
-    "tag": "Fix",
+    "date": "2026-10-11",
+    "version": "Server update",
+    "tag": "Change",
     "sections": [
       {
-        "heading": "Fixes",
+        "heading": "Reading",
         "items": [
-          "Reading as a Scholar no longer finds Transmute tomes. Transmute was taken out of the game, so those tomes could not be read. You now get a tome you can actually learn."
+          "Spell tomes from reading no longer stop at two a day. They're a rare chance on every reading, rarer after each one you find that day, and still guaranteed after 100 readings without one."
         ]
       }
     ]
@@ -5008,8 +5008,12 @@
       {
         "heading": "Fixes",
         "items": [
-          "The U menu is up to date: your journal and its keys, magic, mining and smelting, rites and cures, homes and courts are all in it, and Help & trouble has a button for each kind of ticket. Before, the one ticket button only listed the kinds.",
-          "Enemies and other NPCs in Fort Cutpurse, Northfringe Sanctum, Underpall and other dungeons no longer slam a door open and shut over and over when they come through it. Once an enemy opens a door it stays open, and you can still open and close it yourself."
+          "Character creation: new characters no longer appear inside someone else, and people making a character can no longer see each other.",
+          "First spells that went missing from your spell list come back, with a message when they do. A new first spell now arrives once your game has settled after loading.",
+          "Enchanted gear swapped by the new loot rules keeps its enchantment. Pieces that were swapped plain get their enchantment back the next time you log in.",
+          "Dungeon parties face fewer extra enemies for each member.",
+          "Chests, barrels and stashes now follow the same steel cap as the gear you carry: each is checked the first time it is opened. Everyone's pack is checked once more at their next login, and enchantments are kept as before.",
+          "Iron and corundum seams give more ore and recover faster."
         ]
       }
     ]

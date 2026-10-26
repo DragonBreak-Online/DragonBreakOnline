@@ -87,7 +87,7 @@ ok(/No coven answers/.test(run('hagraven', WITCH, 'pact')), 'off by default: the
 ok(globalThis.__dboHagravenStage(WITCH) === 0 && globalThis.__dboHagravenAttackMult(WITCH, 0x600) === 1, 'off: no hook does anything');
 
 // ---- on: the altars come from briarheart.js -----------------------------------------------------------------------------
-const CFG = { hagraven: { enabled: true }, briarheart: { enabled: true } };
+const CFG = { hagraven: { enabled: true }, briarheart: { enabled: true, sexes: ['male', 'female'], components: [], riteAt: 'any' } };
 let B = loadB(CFG);
 H = loadH(CFG);
 ok(/at a Hagraven altar/.test(run('hagraven', WITCH, 'pact')), 'no altar: refused');
@@ -158,7 +158,7 @@ ok(/char20 presses the briar into your chest/.test(done), 'the Hagraven is the o
 ok(audits.some((t) => /took the briar heart at a Hagraven altar, from the Hagraven who20/.test(t)), 'the audit names her');
 ok(said.some(([a, t]) => a === WITCH && /You press the briar into char27's chest/.test(t)), 'and she is told');
 B.end(REACHMAN, 'test');
-B = loadB({ briarheart: { enabled: true, hagravenRequired: true } }); B.data();
+B = loadB({ briarheart: { enabled: true, hagravenRequired: true, sexes: ['male', 'female'], components: [], riteAt: 'any' } }); B.data();
 setP(WITCH, 'locationalData', { cellOrWorldDesc: WORLD, pos: [900, 0, 0], rot: [0, 0, 0] });
 ok(/No Hagraven tends this altar/.test(run('briarheart', REACHMAN, 'rite')), 'hagravenRequired: with no Hagraven at the altar the rite waits');
 setP(WITCH, 'locationalData', { cellOrWorldDesc: WORLD, pos: [0, 0, 0], rot: [0, 0, 0] });
