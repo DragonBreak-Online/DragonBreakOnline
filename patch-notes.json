@@ -108,23 +108,6 @@
     ]
   },
   {
-    "title": "Seventy new spells",
-    "date": "2026-10-26",
-    "version": "Server update",
-    "tag": "New",
-    "sections": [
-      {
-        "heading": "Magic",
-        "items": [
-          "About seventy new spells from Elder Scrolls lore join the five schools, from Novice to Expert: fire, frost and shock touches, waves, surges and barrages; poisons and plagues; self-healing over time; fear, calm, rage and courage; an invisibility veil; a strong ward; cloaks that drain souls or poison what comes close; and twenty-one new summons, from skeleton heroes and liches to wispmothers and death hounds.",
-          "Their tomes follow the rules of every other tome: learned at a study point, by a mage whose school is high enough, with three spells prepared at a time. Most are sold in the Synod's shop in Bruma now. The Nordic, Draugr and Volkihar arts belong to Skyrim and wait for it to open.",
-          "Their scrolls can now turn up in dungeon chests, and their staves are rare finds among the enchanted loot.",
-          "Spells from The Elder Scrolls - Tomebound by Elyem, with thanks. Only the spells that work in multiplayer were taken; Lightning Form's magicka surge was toned down to suit it."
-        ]
-      }
-    ]
-  },
-  {
     "title": "Capes of the Great Houses",
     "date": "2026-10-26",
     "version": "Server update",
@@ -137,6 +120,55 @@
           "Each house's capes are made at a tanning rack by that house's own Clothiers (or its leader), from linen wraps and common alchemy ingredients.",
           "The House Dagoth and New Temple capes belong to no house: any tailor can make them, but only in Solstheim.",
           "Capes by TheSilverSpoonhead (Dunmer Great House Capes), on cape meshes by Nazenn."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Briarhearts bare the briar",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Briarhearts",
+        "items": [
+          "A Briarheart's chest is always bare, showing the briar heart: cuirasses and robes cannot be worn over it, and come off into your pack.",
+          "In return, Briar Skin now protects like a light faction cuirass.",
+          "Gauntlets, boots, helmets and shields are worn as before. Briar Skin still quickens your stamina and resists disease."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Every spell tome in the world is known to the college, and three join the Synod's shelf",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Spell tomes",
+        "items": [
+          "The server's list of spell tomes was missing 114 tomes from the newer lands and mods (the Reach's Druadach magic, Arnima, the Summerset Isles and a few more). They are known now, each with its school and rank, so studying them and the tome rules treat them like any other.",
+          "They are sold where they belong: the Reach, Arnima and Summerset tomes in Skyrim, not at the Synod.",
+          "The Synod's shelf gains Toxic Missile and Greater Toxic Missile (Restoration, as Beyond Skyrim made them) and Ice Storm."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Seventy new spells",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Magic",
+        "items": [
+          "About seventy new spells from Elder Scrolls lore join the five schools, from Novice to Expert: fire, frost and shock touches, waves, surges and barrages; poisons and plagues; self-healing over time; fear, calm, rage and courage; an invisibility veil; a strong ward; cloaks that drain souls or poison what comes close; and twenty-one new summons, from skeleton heroes and liches to wispmothers and death hounds.",
+          "Their tomes follow the rules of every other tome: learned at a study point, by a mage whose school is high enough, with three spells prepared at a time. Most are sold in the Synod's shop in Bruma now. The Nordic, Draugr and Volkihar arts belong to Skyrim and wait for it to open.",
+          "Their scrolls can now turn up in dungeon chests, and their staves are rare finds among the enchanted loot.",
+          "Spells from The Elder Scrolls - Tomebound by Elyem, with thanks. Only the spells that work in multiplayer were taken; Lightning Form's magicka surge was toned down to suit it."
         ]
       }
     ]
@@ -316,22 +348,6 @@
           "The Knights of the Nine are a faction: the holy order of the Nine Divines, from Pilgrim and Knight Errant up to Knight Commander and the Divine Crusader.",
           "Only a follower of one of the Nine Divines, Talos included, may join: choose your god at a shrine first. A Knight may not serve a Daedric cult.",
           "Their Armorers alone forge the Knight-Errant armour."
-        ]
-      }
-    ]
-  },
-  {
-    "title": "Briarhearts bare the briar",
-    "date": "2026-10-25",
-    "version": "Server update",
-    "tag": "Balance",
-    "sections": [
-      {
-        "heading": "Briarhearts",
-        "items": [
-          "A Briarheart's chest is always bare, showing the briar heart: cuirasses and robes cannot be worn over it, and come off into your pack.",
-          "In return, Briar Skin now protects like a light faction cuirass.",
-          "Gauntlets, boots, helmets and shields are worn as before. Briar Skin still quickens your stamina and resists disease."
         ]
       }
     ]
