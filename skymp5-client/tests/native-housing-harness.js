@@ -4,6 +4,8 @@
 const S = require('./native-swf-stub');
 const T = S.checker();
 const check = T.check;
+// SKSE's AllowTextInput is a counter (GameInput.cpp): what the panel holds is the trues less the falses
+const held = (t) => t.sent.reduce((n, m) => n + (m.e === 'allowTextInput' ? (m.on ? 1 : -1) : 0), 0);
 
 const events = {
   claim: 'housing:claim', abandon: 'housing:abandon', revoke: 'housing:revoke', lock: 'housing:lock', unlock: 'housing:unlock',
@@ -41,14 +43,21 @@ const rooms = (t) => Object.keys(P(t).right.kids).filter((n) => /^r\d$/.test(n))
   rb.text = '  Thorn Hall '; rb.onChanged();
   P(t).right.save.onRelease();
   const rn = msgs(t, 'housing:rename');
-  check('Save sends the rename event with the trimmed name, gives the keys back, and leaves the box', rn.length === 1 && rn[0].args[0] === 'Thorn Hall' && !P(t).right.box && t.sent.filter((m) => m.e === 'allowTextInput').pop().on === false, rn);
+  check('Save sends the rename event with the trimmed name, gives the keys back, and leaves the box', rn.length === 1 && rn[0].args[0] === 'Thorn Hall' && !P(t).right.box && held(t) === 0, rn);
   btn(t, 'Rename...').onRelease();
   P(t).right.browser.onRelease();
   const h = msgs(t, 'native:handoff');
   check('Type in the browser instead hands the name box to the browser', h.length === 1 && h[0].args.join('|') === 'housing|rename' && !closed(t), h);
+  check('...and gives the keys back', held(t) === 0, held(t));
   btn(t, 'Rename...').onRelease();
   t.press(27);
   check('Escape leaves the name box, not the menu', !P(t).right.box && !closed(t));
+  check('...and gives the keys back', held(t) === 0, held(t));
+  btn(t, 'Rename...').onRelease();
+  t.push(base);
+  check('a re-publish while naming holds the keys once, or gives them back with the box', held(t) === (P(t).right.box ? 1 : 0), [held(t), !!P(t).right.box]);
+  t.press(27);
+  check('...and Escape after it gives them back', held(t) === 0, held(t));
   check('the hint is the Key Ring one', /Key Ring, where you can give it/.test(P(t).right.hint.text));
   const nt = S.boot('dbo_housing', false, { noTyping: true });
   nt.push(base);

@@ -161,7 +161,7 @@ Skyrim Souls RE unpauses CustomMenu on our pack, with movement allowed and auto-
 
 - No Bethesda or mod shapes, bitmaps, scripts or class files, even "just the list component". We write our own.
 - No embedded fonts.
-- No text input except through dboInput (lib/dbo.as): an input field with skse.AllowTextInput, the way SkyUI's own search box takes typing. It is unproven in a CustomMenu until Nat types in one, so the panel keeps its browser hand-off as a visible fallback ("Type in the browser instead"). Chat stays CEF.
+- No text input except through dboInput (lib/dbo.as): an input field with skse.AllowTextInput, the way SkyUI's own search box takes typing. It is unproven in a CustomMenu until Nat types in one, so the panel keeps its browser hand-off as a visible fallback ("Type in the browser instead"). SKSE's AllowTextInput is a counter, not a switch (skse64 GameInput.cpp: true adds one, false takes one), so only the lib calls it: dboInput takes one count however often a panel redraws its box, and dboInputEnd (also run by dboClose) gives it back. A count left behind keeps the player's keys captured until relog. Chat stays CEF.
 - No rules in the SWF: the server decides, as with the CEF widgets.
 
 ## 11. The branded look (Nat's B, 26 Oct)
