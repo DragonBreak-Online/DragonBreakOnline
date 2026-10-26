@@ -1,5 +1,19 @@
 [
   {
+    "title": "The Blades can forge their Akaviri armour in Skyrim",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Crafting",
+        "items": [
+          "The Akaviri Samurai armour could only be forged in Cyrodiil, while the Blades keep Sky Haven Temple in the Reach. The Blades can now forge it in Skyrim too; it is still theirs alone."
+        ]
+      }
+    ]
+  },
+  {
     "title": "More sawn logs",
     "date": "2026-10-26",
     "version": "Server update",
