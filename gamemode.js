@@ -8960,7 +8960,7 @@ try {
 try {
   const DECOR_JS = path.resolve('decor.js');
   delete require.cache[DECOR_JS];
-  require(DECOR_JS)({ mp, log, personal, audit, who, onUi, sendPacket, isAdmin, tierOf, registerChatCommand, cfg, every, onlineActors, giveItem, findByName, itemName: (d) => adminItemName(d) });
+  require(DECOR_JS)({ mp, log, personal, audit, who, onUi, sendPacket, isAdmin, tierOf, registerChatCommand, cfg, every, onlineActors, giveItem, findByName, openWidget, closeWidget, hasUiCap, itemName: (d) => adminItemName(d) });
 } catch (e) { log('decor.js failed to load:', e.stack || e.message); globalThis.__dboDecorId = null; globalThis.__dboDecorRef = null; globalThis.__dboDecorActivate = null; }
 
 // ---- breaking free of bound hands, /struggle (server\struggle.js, config "struggle") --------------
