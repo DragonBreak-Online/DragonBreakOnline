@@ -11116,5 +11116,180 @@
     }
    ]
   }
+ ],
+ "_materialGroups": "Every variant of a material counts toward a cost and is spent in the order listed (Nat, 26 Oct: the F7 copies did not count). Built from the live order: BYOHMaterial* (HearthFires), BSKBYOHMaterial*_PROXY_HF (BSAssets), CrownfallSawnLog (ccBGSSSE001-Fish). name is what the panel and chat show.",
+ "materialGroups": [
+  {
+   "name": "Sawn Logs",
+   "members": [
+    "300e:HearthFires.esm",
+    "602b1e:BSAssets.esm",
+    "90081c:ccBGSSSE001-Fish.esm"
+   ]
+  },
+  {
+   "name": "Nails",
+   "members": [
+    "300f:HearthFires.esm",
+    "602b1f:BSAssets.esm"
+   ]
+  },
+  {
+   "name": "Hinges",
+   "members": [
+    "3011:HearthFires.esm",
+    "602b20:BSAssets.esm"
+   ]
+  },
+  {
+   "name": "Locks",
+   "members": [
+    "3012:HearthFires.esm",
+    "602b21:BSAssets.esm"
+   ]
+  },
+  {
+   "name": "Iron Fittings",
+   "members": [
+    "3035:HearthFires.esm",
+    "602b22:BSAssets.esm"
+   ]
+  },
+  {
+   "name": "Clay",
+   "members": [
+    "3043:HearthFires.esm",
+    "602b24:BSAssets.esm"
+   ]
+  },
+  {
+   "name": "Quarried Stone",
+   "members": [
+    "306c:HearthFires.esm",
+    "602b25:BSAssets.esm"
+   ]
+  },
+  {
+   "name": "Straw",
+   "members": [
+    "5a68:HearthFires.esm",
+    "602b26:BSAssets.esm"
+   ]
+  },
+  {
+   "name": "Glass",
+   "members": [
+    "5a69:HearthFires.esm",
+    "602b27:BSAssets.esm"
+   ]
+  },
+  {
+   "name": "Firewood",
+   "members": [
+    "6f993:Skyrim.esm"
+   ]
+  },
+  {
+   "name": "Iron Ingots",
+   "members": [
+    "5ace4:Skyrim.esm"
+   ]
+  },
+  {
+   "name": "Leather Strips",
+   "members": [
+    "800e4:Skyrim.esm"
+   ]
+  },
+  {
+   "name": "Linen Wraps",
+   "members": [
+    "34cd6:Skyrim.esm"
+   ]
+  },
+  {
+   "name": "Salt",
+   "members": [
+    "34cdf:Skyrim.esm"
+   ]
+  },
+  {
+   "name": "Wheat",
+   "members": [
+    "4b0ba:Skyrim.esm"
+   ]
+  },
+  {
+   "name": "Iron Ore",
+   "members": [
+    "71cf3:Skyrim.esm"
+   ]
+  },
+  {
+   "name": "Corundum Ingots",
+   "members": [
+    "5ad93:Skyrim.esm"
+   ]
+  },
+  {
+   "name": "Silver Ingots",
+   "members": [
+    "5ace3:Skyrim.esm"
+   ]
+  },
+  {
+   "name": "Gold Ingots",
+   "members": [
+    "5ad9e:Skyrim.esm"
+   ]
+  },
+  {
+   "name": "Dwarven Metal Ingots",
+   "members": [
+    "db8a2:Skyrim.esm"
+   ]
+  },
+  {
+   "name": "Refined Moonstone",
+   "members": [
+    "5ad9f:Skyrim.esm"
+   ]
+  },
+  {
+   "name": "Quicksilver Ingots",
+   "members": [
+    "5ada0:Skyrim.esm"
+   ]
+  },
+  {
+   "name": "Amethysts",
+   "members": [
+    "63b46:Skyrim.esm"
+   ]
+  },
+  {
+   "name": "Garnets",
+   "members": [
+    "63b45:Skyrim.esm"
+   ]
+  },
+  {
+   "name": "Petty Soul Gems (filled)",
+   "members": [
+    "2e4e3:Skyrim.esm"
+   ]
+  },
+  {
+   "name": "Common Soul Gems (filled)",
+   "members": [
+    "2e4f3:Skyrim.esm"
+   ]
+  },
+  {
+   "name": "Greater Soul Gems (filled)",
+   "members": [
+    "2e4fb:Skyrim.esm"
+   ]
+  }
  ]
 }
