@@ -659,7 +659,7 @@ ok(/d\.kind === 'divine' && typeof globalThis\.__dboBriarheartRefusesDivine/.tes
 ok(/isBriarheart\(t\)/.test(src('supernatural.js')) && /deity === 'hircine'\) && isBriarheart\(a\)/.test(src('supernatural.js')), 'supernatural.js keeps fevers and its rites off a Briarheart');
 ok(/__dboBriarheartMenuEntries/.test(src('playermenu.js')) && /__dboBriarheartMenuAction/.test(src('playermenu.js')), 'playermenu.js offers the tear');
 const gcfg = JSON.parse(src('gamemode-config.json'));
-ok(gcfg.briarheart && gcfg.briarheart.enabled === false, 'the shipped config has it OFF');
+ok(gcfg.briarheart && gcfg.briarheart.enabled === true && gcfg.briarheart.visual && gcfg.briarheart.visual.blockReequip === true, 'the shipped config has it ON, with blockReequip (Nat signed it off, 26 Oct)');
 ok(/const extra = fleshArmorOf\(targetId\) \+ briarSkinArmorOf\(targetId\)/.test(src('gamemode.js')) && /__dboBriarSkinArmor\(targetId >>> 0\)/.test(src('gamemode.js')) && /__dboBriarSkinRating = briarSkinArmorOf/.test(src('gamemode.js')), 'gamemode.js counts the skin on the hit, with the Flesh spells');
 ok(/__dboBriarRegenMult\(a, stat\)/.test(src('racial.js')), 'racial.js multiplies the regeneration by the skin');
 const bs = gcfg.briarheart.briarSkin || {};
