@@ -4015,8 +4015,10 @@ const nativeSwfFor = (a, widget) => {
   if (!swf || (widget.type === 'prayer' && widget.mode !== 'pick')) return '';
   const c = nativeState().native.get(a >>> 0);
   if (!c || !c.has('native:' + widget.type)) return '';
+  // browser: 1 hands a native panel's typed input to the browser panel, until the module publishes it unmarked again
+  if (widget.browser) return '';
   // The journal is native per hub tab, for each tab the client's swf draws; Profile and Settings stay in the browser
-  if (widget.type === 'journal' && (widget.browser || !(widget.hub && c.has('native:journalTab:' + widget.tab)))) return '';
+  if (widget.type === 'journal' && !(widget.hub && c.has('native:journalTab:' + widget.tab))) return '';
   return swf;
 };
 // A widget that moves between the custom menu and the browser (the journal changing tab) closes where it was first
