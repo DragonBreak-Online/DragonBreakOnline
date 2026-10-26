@@ -3357,7 +3357,6 @@ const onCharacterReady = (userId, a) => {
     // A shrine blessing still running is cast on the player again: the client's effect did not survive the logout (prayer.js)
     try { if (globalThis.__dboPrayerLogin) globalThis.__dboPrayerLogin(a); } catch (e) { log('prayer login failed', e.message); }
     try { if (globalThis.__dboBriarheartLogin) globalThis.__dboBriarheartLogin(a); } catch (e) { log('briarheart login failed', e.message); }
-    try { if (globalThis.__dboHagravenLogin) globalThis.__dboHagravenLogin(a); } catch (e) { log('hagraven login failed', e.message); }
     // The first spell: a mage at Arcane Arts 25 with no school is offered the choice, one with a school and no spell gets its starter (schools.js)
     try { if (globalThis.__dboSchoolsLogin) globalThis.__dboSchoolsLogin(a); } catch (e) { log('schools login failed', e.message); }
     // The election notice of the current phase for a citizen of a hold that is choosing its Jarl, once per character (citizenship.js)
@@ -7355,26 +7354,6 @@ const sourceResistsOf = (sourceId) => {
   return out;
 };
 const fitsElement = (element, sourceId) => ELEMENT_RESIST[element] !== undefined && sourceResistsOf(sourceId).has(ELEMENT_RESIST[element]);
-// The magic schools of a hit's source (a Set of actor value indexes: MGEF DATA magic skill, i32 at 12; Destruction 20,
-// Conjuration 19, read off Firebolt's and Conjure Familiar's effects), read once per source (hagraven.js)
-const sourceSkillCache = new Map();
-const sourceSkillsOf = (sourceId) => {
-  if (sourceSkillCache.has(sourceId)) return sourceSkillCache.get(sourceId);
-  const out = new Set();
-  const r = recordOf(sourceId);
-  const skillOf = (m) => { const d = m && String(m.record.type) === 'MGEF' && (m.record.fields || []).find((x) => x && x.type === 'DATA' && x.data instanceof Uint8Array && x.data.byteLength >= 16); return d ? new DataView(d.data.buffer, d.data.byteOffset, d.data.byteLength).getInt32(12, true) : null; };
-  if (r && String(r.record.type) === 'MGEF') { const k = skillOf(r); if (k !== null) out.add(k); }
-  if (r && ['SPEL', 'ENCH', 'SCRL'].includes(String(r.record.type))) {
-    for (const f of r.record.fields || []) {
-      if (!f || f.type !== 'EFID' || !(f.data instanceof Uint8Array) || f.data.byteLength < 4) continue;
-      const local = new DataView(f.data.buffer, f.data.byteOffset, f.data.byteLength).getUint32(0, true);
-      const k = skillOf(recordOf(typeof r.toGlobalRecordId === 'function' ? r.toGlobalRecordId(local) >>> 0 : local));
-      if (k !== null) out.add(k);
-    }
-  }
-  sourceSkillCache.set(sourceId, out);
-  return out;
-};
 // ---- The sun burns the undead: a Restoration sun spell does more to what should not be walking ------------------------
 // Nate, 15 Oct. Restoration's one bite is its sun, and it had none here: the server decides every hit from armour and
 // the multipliers below, and the conditions a vanilla sun effect carries ("more against the undead") are never evaluated
@@ -8344,8 +8323,6 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     if (racial && !beastAgg) { try { raceAtk = racial.attackMult(agg, tgt, src, dmg); } catch (e) { log('racial attack failed', e.message); } }
     let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * potionTakenMult(tgt, flags) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp;
     if (!beastAgg) mult *= gearAttackMult(agg, src);
-    // A Hagraven's Destruction (hagraven.js), by her stage
-    try { if (globalThis.__dboHagravenAttackMult) mult *= Number(globalThis.__dboHagravenAttackMult(agg, src)) || 1; } catch (e) { log('hagraven attack failed', e.message); }
     // The Shrouded Gloves double a one-handed sneak attack (gearench.js backstabMult)
     try { if (gearEnch && !beastAgg) mult *= gearEnch.backstabMult(agg, src, flags); } catch (e) { log('backstab failed', e.message); }
     // Tired blows, fists into armour, staves through it, the fist's stamina drain and disarm (martial.js)
@@ -9368,13 +9345,6 @@ try {
   delete require.cache[BRIARHEART_JS];
   require(BRIARHEART_JS)({ mp, log, personal, audit, who, display, cfg, registerChatCommand, onlineActors, isLeadStaff, findByName, every, giveItem, sourceResistsOf });
 } catch (e) { log('briarheart.js failed to load:', e.stack || e.message); for (const k of ['__dboIsBriarheart', '__dboBriarheartVitalBonus', '__dboBriarheartTargetMult', '__dboBriarheartRefusesDivine', '__dboBriarheartFaithLock', '__dboBriarheartLogin', '__dboBriarheartMenuEntries', '__dboBriarheartMenuAction', '__dboBriarheartEquip']) globalThis[k] = null; }
-// ---- the Hagraven's pact for the women of the Reach (server\hagraven.js, config "hagraven"): after briarheart.js (its altars)
-// and exposure.js (known on sight) ----
-try {
-  const HAGRAVEN_JS = path.resolve('hagraven.js');
-  delete require.cache[HAGRAVEN_JS];
-  require(HAGRAVEN_JS)({ mp, log, personal, audit, who, display, cfg, registerChatCommand, onlineActors, isLeadStaff, findByName, every, giveItem, sourceSkillsOf, zoneOfActor });
-} catch (e) { log('hagraven.js failed to load:', e.stack || e.message); for (const k of ['__dboHagravenStage', '__dboHagravenAttackMult', '__dboHagravenRegenMult', '__dboHagravenRefusesDeity', '__dboHagravenRiteAt', '__dboHagravenLogin']) globalThis[k] = null; }
 // ---- the hold's watch: NPC guards at staff-placed posts, no loot or skill from them, jail by them (server\guards.js, config "guards") ----
 try {
   const GUARDS_JS = path.resolve('guards.js');

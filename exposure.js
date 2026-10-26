@@ -42,7 +42,7 @@ module.exports = (api) => {
     deposeRulers: true, confess: true, confessConfirmSeconds: 60,
     guardTitles: ['Guard', 'Guard Sergeant', 'Guard Captain'],
     // guild-defs.json ids (verified 23 Oct): vigil-of-stendarr, silver-hand, dawnguard
-    hunters: { werewolf: ['vigil-of-stendarr', 'silver-hand'], vampireLord: ['dawnguard', 'vigil-of-stendarr'], hagraven: ['vigil-of-stendarr'] },
+    hunters: { werewolf: ['vigil-of-stendarr', 'silver-hand'], vampireLord: ['dawnguard', 'vigil-of-stendarr'] },
     exempt: [{ faction: 'companions', zone: 'whiterun', titles: ['Harbinger', 'Elder of Jorrvaskr'], roles: ['leader', 'officer'] }],
     tickSeconds: 15,
   }, cfg.exposure || {});
@@ -73,15 +73,10 @@ module.exports = (api) => {
   const FORMS = { werewolf: { kind: 'werewolf', hunters: 'werewolf', noun: 'a werewolf', crime: 'seen changing into a werewolf' },
     vampirelord: { kind: 'vampire', hunters: 'vampireLord', noun: 'a Vampire Lord', crime: 'seen rising as a Vampire Lord' },
     // A confession (/confess, /exposure confess) names the curse, not a shape: a confessed vampire is a vampire
-    vampire: { kind: 'vampire', hunters: 'vampireLord', noun: 'a vampire', crime: 'confessed to being a vampire' },
-    // A Hagraven's pact at its third stage (hagraven.js): known on sight, no change of shape needed
-    hagraven: { kind: 'hagraven', hunters: 'hagraven', noun: 'a Hagraven', crime: 'seen as a Hagraven' } };
+    vampire: { kind: 'vampire', hunters: 'vampireLord', noun: 'a vampire', crime: 'confessed to being a vampire' } };
   const formForKind = (kind) => (kind === 'werewolf' ? 'werewolf' : kind === 'vampire' ? 'vampire' : null);
   const formOf = (h) => FORMS[(h && h.form) || 'werewolf'] || FORMS.werewolf;
-  const stillOfKind = (a, form) => {
-    if (form === 'hagraven') return safe(() => (g('__dboHagravenStage') ? Number(g('__dboHagravenStage')(id(a))) >= 3 : false), false);
-    const s = get(a, 'private.supernatural'); return !!(s && s.kind === (FORMS[form] || FORMS.werewolf).kind);
-  };
+  const stillOfKind = (a, form) => { const s = get(a, 'private.supernatural'); return !!(s && s.kind === (FORMS[form] || FORMS.werewolf).kind); };
   const ordersFor = (form) => { const l = (C.hunters || {})[(FORMS[form] || FORMS.werewolf).hunters]; return Array.isArray(l) ? l.map(String) : []; };
   const orderOf = (x, form) => { const mine = guildsOf(x); return ordersFor(form).find((o) => mine.some((gm) => gm.id === o)) || ''; };
   const orderName = (fid) => safe(() => (g('__dboGuildInfo') ? (g('__dboGuildInfo')(fid) || {}).name : ''), '') || fid;
@@ -170,7 +165,7 @@ module.exports = (api) => {
     audit(`EXPOSURE ${who(a)} ${crime}${how === 'seen' ? ` by ${seen}` : how === 'staff' ? ` (marked by staff: ${why})` : ' openly'} at ${place.place} (${holdName(zid)}, ${place.city ? 'city' : 'wilds'}${hurt ? ', hurt people' : ''}): known for ${C.days} days, bounty ${h.bounty || 0}${h.hunters.length ? `; hunters among the witnesses: ${h.hunters.map((x) => `${x.who} (${x.order})`).join(', ')}` : ''}`);
     if (how !== 'seen') system(a, `You have confessed before ${holdName(zid)} what you are. ${h.bounty ? `The hold has put a bounty of ${h.bounty} gold on you, and ` : ''}its guards will know you on sight.`);
     else system(a, was ? `You were seen in the beast's shape again in ${holdName(zid)}. The word against you there will not die down soon.`
-      : `You were seen ${form === 'werewolf' ? 'changing into a beast' : form === 'hagraven' ? 'for the Hagraven you are' : 'rising as a Vampire Lord'} near ${place.place}. Word will spread through ${holdName(zid)}: ${h.bounty ? `the hold has put a bounty of ${h.bounty} gold on you, and ` : ''}its guards will know you on sight.`);
+      : `You were seen ${form === 'werewolf' ? 'changing into a beast' : 'rising as a Vampire Lord'} near ${place.place}. Word will spread through ${holdName(zid)}: ${h.bounty ? `the hold has put a bounty of ${h.bounty} gold on you, and ` : ''}its guards will know you on sight.`);
     tick();
     return true;
   };
