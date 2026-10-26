@@ -597,6 +597,8 @@ module.exports = (api) => {
   const POT = Object.assign({ chest: 0.2, boss: 0.6, container: 0.05, body: 0.1, corpseKeep: 0.25, strongWeight: 2 }, C.potions || {});
   // A gemstone in a chest (not story difficulty): a grind to get (Nat, 25 Oct; was 0.15 and 0.6). Config dungeons.gems
   const GEMS = Object.assign({ chest: 0.05, boss: 0.35 }, C.gems || {});
+  // A spell scroll (loot.json scrolls: Tomebound's, Nat 25 Oct), the dungeon's province's. Config dungeons.scrolls
+  const SCROLLS = Object.assign({ chest: 0.08, boss: 0.3 }, C.scrolls || {});
   const potionPick = (tier, ok) => {
     const list = potionPool(tier, ok); if (!list.length) return null;
     const w = list.map((it) => Math.pow(rankOf(it.name) || 1, -Math.max(0, Number(POT.strongWeight) || 0)));
@@ -706,6 +708,7 @@ module.exports = (api) => {
     if (diff.id !== 'story' && p(Number(boss ? GEMS.boss : GEMS.chest))) addEntry(entries, pickFrom(pool('gems', diff.gear, ok)), 1);
     if (p(0.3 * ARROW_CHANCE)) addEntry(entries, pickFrom(pool('arrows', 0, ok)), rnd(k.arrows[0], k.arrows[1]));
     if (p(0.2)) addEntry(entries, pickFrom(pool('lockpicks', 0, ok)), rnd(1, k.single ? 2 : 3));
+    if (p(Number(boss ? SCROLLS.boss : SCROLLS.chest))) addEntry(entries, pickFrom(pool('scrolls', 0, ok)), 1);
     if (LINEN.item && p(chanceOr(boss ? LINEN.boss : LINEN.chest, 0) * (Number.isFinite(k.linen) ? k.linen : 1))) addEntry(entries, { id: String(LINEN.item) }, rnd(LINEN_STACK[0], LINEN_STACK[1]));
     // Torches: once common in the dark Ayleid ruins (Nate, 2026-09-28), they crowded out the rest (groundedpasta, 2026-09-29:
     // "4 torches in one cave"); a rare find now, one at most (Nate, 10 Oct). Config dungeons.torchChance / expeditionTorchChance
