@@ -12,6 +12,8 @@
 //              (SetDisplayName) and marked with the champions' rim glow instead of being made bigger
 //   toughness  a share of each hit is given back to the boss (champions.js's give-back), more while its guardian lives
 //   waves      at each share of the boss's health, add zones are written beside it; they go when the fight ends
+//   openingDelaySeconds, openingStepSeconds  (optional) the opening adds come that long after the boss rises and that far
+//              apart, instead of with it (Nat 26 Oct: a whole fight spawning on the arrival tick froze a client); 0 = with it
 //   enrage     enrageSeconds after the first blow the give-back falls and the boss's hits grow (enrage.toughness, damageMult)
 //   damage     the boss's hits on a player x damageMult (gamemode.js asks __dboBossDamageMult in the attempt chain)
 // The reward: every player with creditShare (10%) or more of the damage dealt to the boss and its guardian (a summon's or a
@@ -91,13 +93,26 @@ module.exports = (api) => {
       const off = Array.isArray(b.guardian.offset) ? b.guardian.offset : [200, 0, 0];
       out.push(zone(b, 'guardian', [sp.pos[0] + off[0], sp.pos[1] + off[1], sp.pos[2] + (off[2] || 0)], pickHigh(b.guardian.options), Number(b.respawnSeconds) || 10800, sp.heading));
     }
-    for (let i = 0; i < (Number(b.openingAdds) || 0); i++) { const id = addOf(b, i); if (id) out.push(zone(b, `open${i}`, ring(sp.pos, i, b.openingAdds, 350), id, Number(b.respawnSeconds) || 10800, sp.heading)); }
     const f = G.fights.get(b.id);
+    const due = openingDue(b, f);
+    for (let i = 0; i < due; i++) { const id = addOf(b, i); if (id) out.push(zone(b, `open${i}`, ring(sp.pos, i, b.openingAdds, 350), id, Number(b.respawnSeconds) || 10800, sp.heading)); }
     for (const w of (f && f.waveZones) || []) out.push(w);
     const ev = G.events.get(b.id);
     for (const w of (ev && ev.waves) || []) out.push(w);
     return out;
   };
+  // How many opening adds stand now: all of them, or with openingDelaySeconds / openingStepSeconds (its config block over
+  // bosses.json) none until the boss has risen and then one more every step
+  function openingDue(b, f) {
+    const n = Number(b.openingAdds) || 0;
+    const pick = (k) => { const v = own(b)[k] !== undefined ? own(b)[k] : b[k]; return Math.max(0, Number(v) || 0); };
+    const delay = pick('openingDelaySeconds'), step = pick('openingStepSeconds');
+    if (!(delay > 0 || step > 0)) return n;
+    if (!f || !f.risenAt) return 0;
+    const since = (Date.now() - f.risenAt) / 1000 - delay;
+    return since < 0 ? 0 : Math.min(n, 1 + (step > 0 ? Math.floor(since / step) : n));
+  }
+  const openingSig = () => BOSSES.map((b) => (standing(b) ? openingDue(b, G.fights.get(b.id)) : 0)).join(',');
   // Whether a boss stands now: an event boss while its event lasts, a night boss at night or while its fight goes on
   const isNight = () => { try { return !!(globalThis.__dboClock && typeof globalThis.__dboClock.isNight === 'function' && globalThis.__dboClock.isNight()); } catch (e) { return false; } };
   const isFullMoon = () => { try { return !!(globalThis.__dboClock && typeof globalThis.__dboClock.isFullMoon === 'function' && globalThis.__dboClock.isFullMoon()); } catch (e) { return false; } };
@@ -205,7 +220,7 @@ module.exports = (api) => {
       if (!r) continue;
       const f = fightOf(r.boss);
       if (r.role === 'boss' && !f.boss) {
-        f.boss = id; f.health = healthOf(id) ?? 1;
+        f.boss = id; f.health = healthOf(id) ?? 1; f.risenAt = Date.now();
         G.byActor.set(id, { boss: r.boss.id, role: 'boss' });
         name(id, titled(r.boss.name));
         glow([id], true, r.boss.world);
@@ -244,7 +259,7 @@ module.exports = (api) => {
       }
     }
     // A night boss rises at dusk and goes at dawn; an event's zones come and go with it
-    const sig = standingSig();
+    const sig = standingSig() + '|' + openingSig();
     if (sig !== G.standingSig || G.zoneSig === '') { G.standingSig = sig; writeZones(); }
     // The equipment trace of a test boss: a line whenever what it wears changes
     for (const b of BOSSES) {

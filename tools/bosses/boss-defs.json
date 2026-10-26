@@ -312,6 +312,9 @@
     "LvlFalmerMelee"
    ],
    "openingAdds": 2,
+   "openingDelaySeconds": 4,
+   "openingStepSeconds": 3,
+   "_openingNote": "Nat 26 Oct: arriving at the old spot froze his client while the boss fight and five wild Falmer zones spawned at once; the opening adds now come 4 s after the Warmonger rises and 3 s apart (bosses.js openingDelaySeconds, openingStepSeconds)",
    "waves": [
     [
      0.66,
@@ -481,7 +484,7 @@
    "enabled": true,
    "hold": "",
    "world": "3c:Skyrim.esm",
-   "_valkynazNote": "Nat 26 Oct: 'the Valkynaz boss doesn't spawn, nor Clennifar or the scamp minions with it'. It was an event boss (it stood only while a Lead GM ran /bossevent valkynaz) with two Dremora as adds; now it stands on its own like the others, with Journey to Baan Malur's High Clannfear as its guardian and Clannfear and Beyond Skyrim scamps as its adds (the Leader's choice a)",
+   "_valkynazNote": "Nat 26 Oct: 'the Valkynaz boss doesn't spawn, nor Clennifar or the scamp minions with it'. It was an event boss (it stood only while a Lead GM ran /bossevent valkynaz) with two Dremora as adds; Nat chose (a): it stands on its own like the others, as Beyond Skyrim's Dremora Valkynaz (CYREncDremoraWarlock06, ddb29:BSHeartland.esm), with Journey to Baan Malur's High Clannfear as its guardian (mihailhighclannfear_NPC 8cb: the plain NPC; 8d5 is its summon variant) and Clannfear and Beyond Skyrim scamps as its adds",
    "spots": [
     {
      "id": "GG",
@@ -493,7 +496,7 @@
      "note": "The Great Oblivion Gate (its map marker), on navmesh (2653.2; it stood 13 units under it before 26 Oct)"
     }
    ],
-   "bossEdid": "EncDremoraMelee06",
+   "bossEdid": "CYREncDremoraWarlock06",
    "guardian": {
     "edid": "mihailhighclannfear_NPC",
     "offset": [
@@ -747,7 +750,7 @@
   },
   {
    "id": "minotaurtest1",
-   "name": "the Minotaur Lord of Minotaur's Rest",
+   "name": "the Minotaur Lord of Minotaur's Rest (axe test 1)",
    "enabled": true,
    "devOnly": true,
    "traceEquipment": true,
@@ -821,7 +824,7 @@
   },
   {
    "id": "minotaurtest2",
-   "name": "the Minotaur Lord of Minotaur's Rest",
+   "name": "the Minotaur Lord of Minotaur's Rest (axe test 2)",
    "enabled": true,
    "devOnly": true,
    "traceEquipment": true,

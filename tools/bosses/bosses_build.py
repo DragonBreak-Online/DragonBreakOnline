@@ -238,6 +238,14 @@ def build(lo, defs):
     }
     for line in warn:
         print('  NOTE', line)
+    # Two bosses of one name read as one boss twice on the nameplates (Nat 26 Oct: two 'The Minotaur Lord of Minotaur's Rest'
+    # at once, the two dev tests of its axe); every boss's name is its own
+    seen = {}
+    for o in out['bosses']:
+        k = str(o.get('name', '')).strip().lower()
+        if k in seen:
+            bad.append(f"{o['id']}: its name '{o.get('name')}' is {seen[k]}'s too; every boss needs its own")
+        seen.setdefault(k, o['id'])
     return out, bad
 
 
