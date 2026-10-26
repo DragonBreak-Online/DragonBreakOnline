@@ -372,7 +372,7 @@ module.exports = (api) => {
     }
     become(a, 'rite', '');
     audit(`BRIARHEART ${who(a)} took the briar heart at a Hagraven altar`);
-    return 'The Hagraven presses the briar into your chest. It takes root. You feel the Reach in your blood, and nothing of the Divines.';
+    return 'The Hagraven presses the briar into your chest. It takes root, as it did in Faolan, the Red Eagle, the first of you. Like Lorkh, you have given your heart. You feel the Reach in your blood, and nothing of the Divines.';
   };
 
   // ---- the cure ---------------------------------------------------------------------------------------------------------
@@ -483,7 +483,7 @@ module.exports = (api) => {
     const sub = (words.shift() || 'status').toLowerCase();
     if (sub === 'status') {
       const r = recOf(a);
-      return personal(a, r ? `A briar heart has beaten in your chest since ${new Date(r.since).toISOString().slice(0, 10)}.${C.tearPermadeath ? ' If it is torn out of you while you are down, this character dies for good.' : ''}` : 'Your heart is your own.');
+      return personal(a, r ? `A briar heart has beaten in your chest since ${new Date(r.since).toISOString().slice(0, 10)}, as one did in Faolan, the Red Eagle, the first of you.${C.tearPermadeath ? ' If it is torn out of you while you are down, this character dies for good.' : ''}` : 'Your heart is your own.');
     }
     if (sub === 'rite') return personal(a, rite(a));
     if (sub === 'confirm') return personal(a, confirm(a, words[0]));
