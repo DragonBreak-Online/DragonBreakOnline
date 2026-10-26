@@ -101,7 +101,9 @@ module.exports = (api) => {
     // sharing NO attack event names with the humanoid set, so name overlap predicts nothing. Draugr and
     // Skeleton are the most promising (they share AttackStartH2HLeft/Right and bashStart) and are the first
     // to test. Until that test they are walk-around shapes, like the eight above.
-    hagraven: { name: 'Hagraven', race: idOf('131fb:Skyrim.esm') },
+    // indoors: she keeps the body inside (Nat, 26 Oct). She has hands and a humanoid-ish graph, so unlike the
+    // animals she can work a door. Add the flag to any other form that proves it can; nothing else has it.
+    hagraven: { name: 'Hagraven', race: idOf('131fb:Skyrim.esm'), indoors: true },
     bear: { name: 'Bear', race: idOf('131e8:Skyrim.esm') },
     snowbear: { name: 'Snow Bear', race: idOf('131e9:Skyrim.esm') },
     sabrecat: { name: 'Sabre Cat', race: idOf('13200:Skyrim.esm') },
@@ -115,6 +117,7 @@ module.exports = (api) => {
   const CREATURE_WORDS = { rabbit: 'hare' };
   const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   const isCreature = (key) => own(CREATURES, String(key));
+  const allowsIndoors = (key) => isCreature(key) && CREATURES[String(key)].indoors === true;
   // A form's name for any key, a creature's or one no longer in either table included: never throws
   const formName = (key) => (own(FORMS, String(key)) ? FORMS[key].name : isCreature(key) ? CREATURES[key].name : String(key || ''));
   // A creature shape is marked so at the change (private.beast.creature), or known by its key
@@ -877,7 +880,7 @@ module.exports = (api) => {
   // nuisance rather than a rule of the world
   const unseeingText = (n) => `${n === 1 ? 'A player' : `${n} players`} nearby cannot see this form yet: move away from others, or ask them to update.`;
   // Why a cannot take an animal shape now, or ''
-  const polymorphRefusal = (a) => {
+  const polymorphRefusal = (a, key) => {
     if (globalThis.__dboPolymorphOn !== true) return 'Polymorph is switched off for now.';
     if (!isOnline(a)) return 'You are not in the world.';
     let downed = false; try { downed = typeof globalThis.__dboIsDowned === 'function' && !!globalThis.__dboIsDowned(a); } catch (e) { downed = false; }
@@ -898,16 +901,17 @@ module.exports = (api) => {
     if (shape === 'seated') return 'Not while you are sitting or using something: stand up first.';
     if (shape === 'water') return 'Not in water: most of these animals cannot swim.';
     if (getp(a, 'private.dboAppearanceEdit')) return 'Close the appearance editor first.';
-    if (isIndoors(a)) return 'Not indoors: these animals cannot open doors. Go outside first.';
+    if (isIndoors(a) && !allowsIndoors(key)) return 'Not indoors: these animals cannot open doors. Go outside first.';
     const n = unseeingNear(a);
     if (n === null) return 'The server cannot read where you are.';
     if (n > 0) return unseeingText(n);
     return '';
   };
   // What ends a shape already taken, checked every tick: the switch, indoors, water, a player near who cannot see it
-  const polymorphBreak = (a) => {
+  const polymorphBreak = (a, s) => {
     if (globalThis.__dboPolymorphOn !== true) return 'polymorph off';
-    if (isIndoors(a)) return 'polymorph indoors';
+    const form = s && s.form ? String(s.form) : '';
+    if (isIndoors(a) && !allowsIndoors(form)) return 'polymorph indoors';
     if (animShape(a) === 'water') return 'polymorph water';
     // polymorphRefusal refuses these at the START; without them here a shape taken a moment before a down, a jail
     // transfer or a binding simply survived it (Worker 5, 25 Oct). They end the shape for everyone, staff included.
@@ -924,7 +928,7 @@ module.exports = (api) => {
     for (const a of online) {
       const s = stateOf(a);
       if (!s || !isCreatureState(s)) continue;
-      const why = polymorphBreak(a);
+      const why = polymorphBreak(a, s);
       if (why) revert(a, why);
     }
   };
@@ -976,7 +980,7 @@ module.exports = (api) => {
     if (!c) return 'There is no such animal.';
     if (!c.race) return `The ${c.name} is not in this load order.`;
     if (Array.isArray(PCFG.forms) && !PCFG.forms.map(String).includes(key)) return `The ${c.name} is not open for polymorph now.`;
-    const why = polymorphRefusal(a);
+    const why = polymorphRefusal(a, key);
     if (why) return why;
     let original = null; try { original = mp.get(a, 'appearance'); } catch (e) { /* none */ }
     if (!original || !original.raceId) return 'This character has no appearance yet.';
@@ -1070,7 +1074,8 @@ module.exports = (api) => {
     if (!isCreature(key)) return personal(a, usage);
     const why = polymorphTo(a, key);
     if (why) { log(`beastform: ${display(a)} could not polymorph into ${key}: ${why}`); return personal(a, why); }
-    personal(a, `You are a ${CREATURES[key].name}. Nobody near you is told. /polymorph revert turns you back; so do a death, a logout, going indoors or into water, and a player coming near whose game cannot show the animal.`);
+    const ends = allowsIndoors(key) ? 'a death, a logout or going into water' : 'a death, a logout, going indoors or into water';
+    personal(a, `You are a ${CREATURES[key].name}. Nobody near you is told. /polymorph revert turns you back; so do ${ends}, and a player coming near whose game cannot show the animal.`);
   }, { admin: true, help: '<animal>|revert|list|on|off: take an animal shape yourself (never anyone else) or end it; /polymorph on its own names the animals; on and off: the Owners\' switch for everyone' });
 
   // Admins: grant or take the power, or force a form for testing
