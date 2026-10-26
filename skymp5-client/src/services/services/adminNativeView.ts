@@ -206,7 +206,8 @@ const itemsView = (cats: AdminCatalogs, ui: AdminUi) => {
   const pg = pageOf(rows, ui.page, rowsOf(ui));
   return {
     chips: [{ id: "", label: "All", count: matches.length }].concat(cats.items.map((c) => ({ id: c.id, label: c.label, count: counts[c.id] || 0 })).filter((c) => !q || c.count)),
-    plugins: Object.keys(plugins).sort((a, b) => a.localeCompare(b)).map(plugin),
+    // the filter compares the full plugin name; the panel shows it without its extension
+    plugins: Object.keys(plugins).sort((a, b) => a.localeCompare(b)).map((p) => ({ id: p, label: plugin(p) })),
     rows: pg.rows.map((r) => ({ desc: r.desc, name: r.name, cat: r.catLabel, plugin: plugin(r.plugin) })),
     page: pg.page, pages: pg.pages, total: pg.total, hint: !rows.length ? (q || cat ? "No items" : "Type to search, or pick a category") : "",
   };

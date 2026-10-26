@@ -3,5 +3,8 @@ dbo-controls.as
 ../dbo_admin/ui.as
 ../dbo_admin/tabs/debug.as
 ../dbo_admin/tabs/players.as
+../dbo_admin/tabs/skills.as
+../dbo_admin/tabs/items.as
+../dbo_admin/tabs/teleport.as
 ../dbo_admin/tabs/modes.as
 ../dbo_admin/tabs/npcs.as

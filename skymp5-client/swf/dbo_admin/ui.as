@@ -45,7 +45,7 @@ function req(type, fields)
 }
 
 // The rows each list has room for, by tab or tab:view; the service pages by it (adminNativeView rowsOf)
-var ROWS_FOR = {"players": 6, "players:roster": 6};
+var ROWS_FOR = {"players": 6, "players:roster": 6, "items": 6, "teleport": 8};
 
 function rowsFor(tab, sub)
 {
@@ -290,7 +290,9 @@ function field(parent, name, depth, x, y, w, value, placeholder, max, onCommit, 
 {
    if (editing != null && editing.name == name)
    {
-      var box = inputBox(parent, name, depth, x, y, w, 28, dboFmt(F_MEDIUM, 18, C_TEXT, 0.4), max);
+      // the lib takes one AllowTextInput count per typing session however often this is redrawn (dboTyping)
+      var box = dboInput(parent, name, depth, x, y, w, 28, dboFmt(F_MEDIUM, 18, C_TEXT, 0.4), max, false);
+      box.borderColor = C_ACCENT;
       box.text = editing.text;
       if (Selection.setSelection != undefined)
       {
@@ -320,8 +322,6 @@ function field(parent, name, depth, x, y, w, value, placeholder, max, onCommit, 
    return b;
 }
 
-// SKSE's AllowTextInput is a counter (InputManager: ++ on true, -- on false), not a switch: it is raised once when typing
-// starts and lowered once when it ends, however often the field is redrawn in between, or the player keeps no controls
 function startEdit(name, value, onCommit, live)
 {
    if (!dboCanType())
@@ -330,10 +330,6 @@ function startEdit(name, value, onCommit, live)
       return;
    }
    dboSound("UIMenuOK");
-   if (editing == null)
-   {
-      _global.skse.AllowTextInput(true);
-   }
    editing = {name: name, text: str(value), onCommit: onCommit, live: live == true, changedAt: 0, sentText: str(value)};
    // the service holds F7 while the game takes keys as text
    setUi("typing", true, true);
@@ -361,21 +357,6 @@ function finishEdit(keep)
    // the service learns typing is over even when nothing was kept
    sendUi();
    draw();
-}
-
-// The typing box itself, redrawn as often as the panel is; only startEdit and finishEdit touch AllowTextInput
-function inputBox(parent, name, depth, x, y, w, h, format, maxChars)
-{
-   var tf = dboText(parent, name, depth, x, y, w, h, format, false);
-   tf.type = "input";
-   tf.selectable = true;
-   tf.maxChars = maxChars;
-   tf.background = true;
-   tf.backgroundColor = 0x101010;
-   tf.border = true;
-   tf.borderColor = C_ACCENT;
-   Selection.setFocus(tf);
-   return tf;
 }
 
 // Called each frame: a live field's pause has passed, so its text goes out

@@ -261,4 +261,82 @@ const MASTERY_T = (target) => ({ name: 'Player 2', target, detail: { skills: [{ 
   check('...and no mastery request is sent for them', !sentOf(tr, 'admin::request').some((m) => m.args[0] === 'adminMasteryRequest'));
 }
 
+// ---- Skills ----
+{
+  const t = open(panel({ players: ROSTER }));
+  t.st.data.masteryTarget = MASTERY_T('');
+  P(t).rail.t4.onRelease(); t.serve();
+  check('Skills: opening it asks for the acted-on character\'s skills', sentOf(t, 'admin::request').some((m) => m.args[0] === 'adminMasteryRequest' && m.args[1] === '{}'));
+  check('...a row per skill, the followed one with its tier and hours', B(t).n0.text === 'Smithing' && B(t).st0.text === 'Apprentice - 3' && B(t).st1.text === 'not followed');
+  check('...the chosen tier lit, Set aside on the followed skill only', B(t).t0_1.rest === 100 && B(t).t0_0.rest === 50 && !!B(t).aside0 && !B(t).aside1);
+  click(t, B(t).t1_2);
+  const st = sentOf(t, 'admin::action').find((m) => m.args[0] === 'masterySetTier');
+  check('a tier chip sends masterySetTier with skill and tier', st && st.args[1] === '{"target":"","skill":"alch","tier":2}', st);
+  click(t, B(t).aside0);
+  check('Set aside sends masteryDrop', sentOf(t, 'admin::action').some((m) => m.args[0] === 'masteryDrop' && JSON.parse(m.args[1]).skill === 'smith'));
+  click(t, B(t).change); click(t, B(t).pick3);
+  check('changing who is acted on asks again for theirs', sentOf(t, 'admin::request').filter((m) => m.args[0] === 'adminMasteryRequest').pop().args[1] === '{"target":"ff000102"}');
+  const g = open(panel({ caps: { ban: false, spawn: false } }));
+  g.st.data.masteryTarget = MASTERY_T('');
+  P(g).rail.t4.onRelease(); g.serve();
+  check('a GM views the skills without the tier chips', !B(g).t0_0 && /Changing skills is for a Lead GM/.test(B(g).foot.text));
+}
+
+// ---- Items ----
+const ITEMS = [{ id: 'weapons', label: 'Weapons', items: [['12eb7:Skyrim.esm', 'Iron Sword', 'Skyrim.esm'], ['13981:Skyrim.esm', 'Steel Sword', 'Skyrim.esm'], ['1a2b:BS.esm', 'Cyrod Blade', 'BSAssets.esm']] },
+  { id: 'armor', label: 'Armour', items: [['12e49:Skyrim.esm', 'Iron Helmet', 'Skyrim.esm'], ['9999:DLE.esp', 'DLC2ArmorNordicHeavyBoots']] }];
+{
+  const t = open(panel({ players: ROSTER }));
+  P(t).rail.t5.onRelease(); t.serve();
+  check('Items: no catalog yet, so the tab asks for it', sentOf(t, 'admin::request').some((m) => m.args[0] === 'adminItemsRequest') && /Loading items/.test(B(t).loading.text));
+  t.st.cats.items = ITEMS; t.refresh();
+  check('...arrived: All and a chip per category, with counts', B(t).cat0.label.text === 'All 5' && B(t).cat1.label.text === 'Weapons 3' && B(t).cat2.label.text === 'Armour 2');
+  check('...nothing listed until a search or a category, as the browser', /Type to search, or pick a category/.test(B(t).none.text));
+  click(t, B(t).cat1);
+  check('a category lists its items with their mod', kids(B(t), /^r\d$/).map((r) => r.c0.text).join(',') === 'Iron Sword,Steel Sword,Cyrod Blade' && B(t).r2.c1.text === 'BSAssets');
+  click(t, B(t).cat0);
+  typeInto(t, B(t).search, 'iron');
+  // the editor id DLC2ArmorNordicHeavyBoots holds i-r-o-n in order, so it ranks third, as in the browser's search
+  check('a search ranks across every category, showing each one\'s category', kids(B(t), /^r\d$/).map((r) => r.c0.text).slice(0, 2).join(',') === 'Iron Sword,Iron Helmet' && B(t).r1.c1.text === 'Armour', kids(B(t), /^r\d$/).map((r) => r.c0.text));
+  typeInto(t, B(t).search, 'nordic boots');
+  check('an editor id reads as words (Nordic Heavy Boots)', B(t).r0.c0.text === 'Nordic Heavy Boots');
+  typeInto(t, B(t).search, '');
+  click(t, B(t).mod);
+  check('the Mod button opens the mods: every mod first', B(t).mod0.c0.text === 'Every mod' && B(t).mod1.c0.text === 'BSAssets');
+  click(t, B(t).mod1);
+  click(t, B(t).cat1);
+  check('...narrowed to BSAssets, Weapons holds one', kids(B(t), /^r\d$/).length === 1 && B(t).r0.c0.text === 'Cyrod Blade' && /BSAssets/.test(B(t).mod.label.text));
+  click(t, B(t).r0);
+  check('picking names it; Spawn becomes live', B(t).picked.text === 'Cyrod Blade' && B(t).spawn.disabled !== true);
+  typeInto(t, B(t).count, '5');
+  click(t, B(t).spawn);
+  check('Spawn: giveItem with item, count and target', sentOf(t, 'admin::action').some((m) => m.args[0] === 'giveItem' && m.args[1] === '{"item":"1a2b:BS.esm","count":5}'), sentOf(t, 'admin::action'));
+  click(t, B(t).r0);
+  check('picking it again spawns it again (Enter twice in the browser)', sentOf(t, 'admin::action').filter((m) => m.args[0] === 'giveItem').length === 2);
+  typeInto(t, B(t).count, '0');
+  check('a count of 0 greys Spawn', B(t).spawn.disabled === true);
+  const g = open(panel({ caps: { ban: false, spawn: false } }));
+  g.st.cats.items = ITEMS;
+  P(g).rail.t5.onRelease(); g.serve();
+  check('a GM sees the catalog but no Spawn', !B(g).spawn && /for a Lead GM/.test(B(g).spawnHint.text));
+}
+
+// ---- Teleport ----
+const LOCS = [{ name: 'Bruma', region: 'Cyrodiil', worldName: 'Cyrodiil' }, { name: 'Cheydinhal', region: 'Cyrodiil', worldName: 'Cyrodiil' }, { name: 'Frostcrag Spire', region: 'Cyrodiil', worldName: 'Frostcrag' },
+  { name: 'Whiterun', region: 'Skyrim', worldName: 'Tamriel' }, { name: 'Ald Velothi', region: 'Morrowind', worldName: 'Morrowind' }];
+{
+  const t = open(panel());
+  P(t).rail.t8.onRelease(); t.serve();
+  check('Teleport: asks for the locations', sentOf(t, 'admin::request').some((m) => m.args[0] === 'adminLocationsRequest'));
+  t.st.cats.locations = LOCS; t.refresh();
+  check('...Cyrodiil open by default, regions as chips in the browser\'s order', B(t).region0.label.text === 'Skyrim 1' && B(t).region1.label.text === 'Cyrodiil 3' && B(t).region1.rest === 100);
+  check('...two worlds in Cyrodiil: All and each', B(t).world0.label.text === 'All 3' && B(t).world1.label.text === 'Cyrodiil 2');
+  click(t, B(t).world2);
+  check('a world narrows to its places', kids(B(t), /^r\d$/).length === 1 && B(t).r0.c0.text === 'Frostcrag Spire');
+  click(t, B(t).r0);
+  check('choosing a place teleports: admin::tploc <name>', sentOf(t, 'admin::tploc')[0].args[0] === 'Frostcrag Spire');
+  typeInto(t, B(t).search, 'ald');
+  check('a search reaches every region and names it', B(t).r0.c0.text === 'Ald Velothi' && B(t).r0.c1.text === 'Morrowind - Morrowind');
+}
+
 T.done();
