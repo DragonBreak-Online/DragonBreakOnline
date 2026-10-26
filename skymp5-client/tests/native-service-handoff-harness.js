@@ -91,6 +91,11 @@ const world = (nativeOn) => {
   ok(w.S.native.length === 1 && w.S.browser.pop().args.handoff === 'compose:shop', "someone else's post meanwhile redraws the composer, it does not end it");
   w.browser('bountyBoard:post', 'shop', 'Mead for sale');
   ok(w.S.packets.pop().text === 'Mead for sale', 'the composer posts');
+  w.packet({ customPacketType: 'bountyBoardNotice', text: 'The pin is still warm; give it a moment.' });
+  w.packet(menu('refresh'));
+  ok(w.S.native.length === 1 && w.S.browser.pop().args.handoff === 'compose:shop', 'a refused post keeps the composer: a foreign refresh after it does not end it (Worker 6)');
+  w.browser('bountyBoard:post', 'shop', 'Mead for sale');
+  w.packet({ customPacketType: 'bountyBoardNotice', text: 'Your notice is pinned to the board.' });
   w.packet(menu('refresh'));
   ok(w.S.browser.some((x) => x.close === 26) && w.S.native.length === 2 && w.S.native[1].open === 'bountyBoard', 'the refresh after our post closes the composer and brings the native board back');
   w.key('bountyBoard:close', []);
