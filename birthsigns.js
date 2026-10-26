@@ -32,8 +32,9 @@ const ORDER = ['warrior', 'mage', 'thief', 'lady', 'lord', 'steed', 'apprentice'
 // xp: skill -> rate; xpAll: every skill; regen: stat -> factor (below 1 slows it); lowHealth/lowHealthRegen: a conditional
 // health factor below that share of health; taken: fire/frost/shock/poison/magic -> share more (below 0: less);
 // sneakDamage: a share more on a sneak attack; goldBonus: a share of loot and pay; vital: flat health/magicka/stamina;
-// taken.physical: a weapon's or a fist's blow (racial.js); carry: the carry weight the sign's ability gives (config
-// birthsigns.carrySpell, a constant-effect ability the engine applies; the number is for the picker and must match it).
+// taken.physical: a weapon's or a fist's blow (racial.js); carry / speed: the carry weight and the % movement speed the
+// sign's abilities give (config carrySpell, speedSpell: constant-effect abilities the engine applies; the numbers are for
+// the picker and must match the records); snapLess: a share fewer lockpicks snapping (lockpick.js).
 // The Warrior's charges each have their own niche (Nat, 26 Oct: "why would you pick the Lord or the Steed if the Lady does
 // both?"): the Lady both regens but smaller, the Lord health and a guard against blows, the Steed stamina and a burden.
 // For the picker: guardian ('' a Guardian, 'none' the Serpent, else its Guardian's id), lore (one line, Nat approved the
@@ -53,16 +54,16 @@ const SIGNS = {
     regen: { health: 1.07, stamina: 1.07 } },
   lord: { name: 'The Lord', guardian: 'warrior', lore: 'The blood of the North runs strong, and fire bites deeper.',
     emblem: { stars: [[20, 4], [12, 12], [28, 12], [20, 20], [13, 34], [27, 34]], lines: [[0, 1], [0, 2], [1, 3], [2, 3], [3, 4], [3, 5]] },
-    regen: { health: 1.1 }, taken: { fire: 0.05, physical: -0.05 } },
+    regen: { health: 1.05 }, taken: { fire: 0.1, physical: -0.05 } },
   steed: { name: 'The Steed', guardian: 'warrior', lore: 'Restless, and always on the move.',
     emblem: { stars: [[8, 26], [15, 18], [24, 16], [32, 10], [31, 22], [16, 31]], lines: [[0, 1], [1, 2], [2, 3], [2, 4], [1, 5]] },
-    regen: { stamina: 1.1 }, carry: 50 },
+    carry: 50, speed: 2 },
   apprentice: { name: 'The Apprentice', guardian: 'mage', lore: 'Quick with magic, and open to it as well.',
     emblem: { stars: [[10, 30], [17, 22], [24, 16], [31, 8], [27, 27]], lines: [[0, 1], [1, 2], [2, 3], [2, 4]] },
-    regen: { magicka: 1.15 }, taken: { magic: 0.05 } },
+    regen: { magicka: 1.2 }, taken: { magic: 0.1 } },
   atronach: { name: 'The Atronach', guardian: 'mage', lore: 'A deep well of magicka that is slow to fill.',
     emblem: { stars: [[20, 5], [32, 14], [28, 31], [12, 31], [8, 14], [20, 20]], lines: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 0], [5, 0], [5, 2], [5, 3]] },
-    vital: { magicka: 25 }, regen: { magicka: 0.9 }, taken: { magic: -0.05 } },
+    vital: { magicka: 50 }, regen: { magicka: 0.75 }, taken: { magic: -0.05 } },
   ritual: { name: 'The Ritual', guardian: 'mage', lore: 'Mercy for those brought low.',
     emblem: { stars: [[20, 6], [30, 14], [30, 28], [20, 34], [10, 28], [10, 14]], lines: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 0], [0, 3]] },
     xp: { priest: 1.1 }, lowHealth: 0.3, lowHealthRegen: 1.15 },
@@ -77,13 +78,14 @@ const SIGNS = {
     xp: { alchemist: 1.1 }, taken: { poison: -0.15 } },
   tower: { name: 'The Tower', guardian: 'thief', lore: 'No lock stays shut for long.',
     emblem: { stars: [[14, 36], [26, 36], [15, 18], [25, 18], [20, 5]], lines: [[0, 2], [1, 3], [2, 3], [2, 4], [3, 4]] },
-    xp: { lockpicking: 1.15 } },
+    xp: { lockpicking: 1.15 }, snapLess: 0.25 },
 };
 // The picker's cards: each Guardian, then its charges; the Serpent last
 const PICKER_ORDER = ['warrior', 'lady', 'steed', 'lord', 'mage', 'apprentice', 'atronach', 'ritual', 'thief', 'lover', 'shadow', 'tower', 'serpent'];
 const PICKER_CAP = 'birthsignPicker';
 const DEFAULTS = { enabled: true, requireAtCreation: true, loginDelaySeconds: 20, reshowSeconds: 90, creationReshowSeconds: 15, fightSeconds: 30,
-  carrySpell: '1d1fa7:DragonBreak Online Edits.esp' };
+  // the DLE's DBO_ReferralCarry (CarryWeight +50) and Summerset's AbSSISteed (SpeedMult +2), read from the live order 26 Oct
+  carrySpell: '1d1fa7:DragonBreak Online Edits.esp', speedSpell: 'ffc154:summersetisles.esp', changeOnce: true };
 const SKILL = { blade: 'Blade', blunt: 'Blunt', archery: 'Archery', defense: 'Defense', arcane: 'Arcane Arts', unarmed: 'Martial Arts',
   blacksmith: 'Blacksmith', alchemist: 'Alchemist', woodcutter: 'Woodcutter', miner: 'Miner', tailor: 'Tailor', skinner: 'Skinner',
   scholar: 'Scholar', enchanter: 'Enchanter', priest: 'Priest', cook: 'Cook', harvesting: 'Harvesting', lockpicking: 'Lockpicking' };
@@ -119,6 +121,8 @@ const describe = (s) => {
   if (num(s.lowHealthRegen, 1) > 1) out.push(`health regenerates ${pct(num(s.lowHealthRegen, 1) - 1)}% faster below ${pct(num(s.lowHealth, 0))}% health`);
   for (const [k, sh] of Object.entries(s.taken || {})) if (num(sh, 0)) out.push(`${TAKEN[k] || k} hurt${k === 'magic' || k === 'physical' ? '' : 's'} ${pct(num(sh, 0))}% ${num(sh, 0) > 0 ? 'more' : 'less'}`);
   if (num(s.carry, 0) > 0) out.push(`+${num(s.carry, 0)} carry weight`);
+  if (num(s.speed, 0) > 0) out.push(`moves ${num(s.speed, 0)}% faster`);
+  if (num(s.snapLess, 0) > 0) out.push(`lockpicks snap ${pct(num(s.snapLess, 0))}% less often`);
   if (num(s.sneakDamage, 0) > 0) out.push(`sneak attacks deal ${pct(num(s.sneakDamage, 0))}% more`);
   if (num(s.goldBonus, 0) > 0) out.push(`${pct(num(s.goldBonus, 0))}% more gold from loot and contract pay`);
   const text = out.join('; ');
@@ -174,41 +178,48 @@ module.exports = (api) => {
   const card = (s) => ({ id: s.id, name: s.name, guardian: String(s.guardian || ''), lore: String(s.lore || ''), effect: describe(s),
     emblem: s.emblem && Array.isArray(s.emblem.stars) ? { stars: s.emblem.stars, lines: Array.isArray(s.emblem.lines) ? s.emblem.lines : [] } : null });
   // The front's picker: its own confirm, then dbo:birthsignPick <nonce> <sign>. A new nonce each time, so a stale panel's answer is dropped
-  const sendPicker = (a) => {
+  const sendPicker = (a, change) => {
     const nonce = Math.floor(Math.random() * 0x7fffffff).toString(36);
-    const ok = openWidget(a >>> 0, { type: 'birthsignPicker', id: WIDGET_ID, nonce, title: 'Choose your birthsign',
-      sub: 'The stars you were born under. Yours for life; only staff can change it later.',
+    const ok = openWidget(a >>> 0, { type: 'birthsignPicker', id: WIDGET_ID, nonce, title: change ? 'Change your birthsign, once' : 'Choose your birthsign',
+      sub: change ? 'Your one change: the sign you pick now is final, and only staff can change it after this.' : `The stars you were born under. Yours for life${C.changeOnce !== false ? ': you may change it once yourself (/birthsign change), then only staff can' : '; only staff can change it later'}.`,
       signs: PICKER_ORDER.filter((id) => C.signs[id]).map((id) => card(C.signs[id])) }, true);
     return ok ? nonce : '';
   };
-  const openPick = (a) => {
-    const nonce = picker(a) ? sendPicker(a) : '';
-    const ok = nonce || send(a, 'Choose your birthsign. It is yours for life.', ORDER.map((id) => row(C.signs[id])));
-    if (ok) { S.open.set(a >>> 0, nonce ? { mode: 'picker', nonce, at: Date.now() } : { mode: 'pick', at: Date.now() }); S.failed.delete(a >>> 0); } else S.failed.add(a >>> 0);
+  const openPick = (a, change) => {
+    const nonce = picker(a) ? sendPicker(a, change) : '';
+    const ok = nonce || send(a, change ? 'Change your birthsign, once. The sign you pick now is final.' : 'Choose your birthsign. It is yours for life.', ORDER.map((id) => row(C.signs[id])));
+    if (ok) { S.open.set(a >>> 0, Object.assign(nonce ? { mode: 'picker', nonce, at: Date.now() } : { mode: 'pick', at: Date.now() }, change ? { change: true } : {})); S.failed.delete(a >>> 0); } else S.failed.add(a >>> 0);
     return !!ok;
   };
-  const openConfirm = (a, s) => {
-    const ok = send(a, `${s.name}, for life: ${describe(s)}. Only staff can change it later.`, [{ id: 'confirm', label: 'Confirm' }, { id: 'back', label: 'Choose again' }]);
-    if (ok) S.open.set(a >>> 0, { mode: 'confirm', sign: s.id, at: Date.now() });
+  const openConfirm = (a, s, change) => {
+    const ok = send(a, change ? `${s.name}, your one change: ${describe(s)}. Final: only staff can change it after this.` : `${s.name}, for life: ${describe(s)}. Only staff can change it later.`, [{ id: 'confirm', label: 'Confirm' }, { id: 'back', label: 'Choose again' }]);
+    if (ok) S.open.set(a >>> 0, Object.assign({ mode: 'confirm', sign: s.id, at: Date.now() }, change ? { change: true } : {}));
     return !!ok;
   };
   const delayMs = (a) => num(S.step.has(a >>> 0) ? C.creationReshowSeconds : C.reshowSeconds, 90) * 1000;
   const syncVitals = (a) => { try { if (typeof globalThis.__dboCharLevelSyncBonus === 'function') globalThis.__dboCharLevelSyncBonus(a >>> 0); } catch (e) { log('birthsign vital sync failed', e.message); } };
-  const write = (a, id, by) => {
-    try { mp.set(a >>> 0, PROP, id ? { id, at: Date.now(), by } : null); return true; } catch (e) { log('birthsign write failed', e.message); return false; }
+  // A self-service change once (Nat, 26 Oct: "allow people to change their birth sign ONCE"): `changed` on the record, kept
+  // through every later write (a staff set or clear never hands the change back)
+  const write = (a, id, by, extra) => {
+    let prev = null; try { prev = get(a, PROP, null); } catch (e) { prev = null; }
+    const keep = prev && typeof prev === 'object' && prev.changed ? { changed: prev.changed } : {};
+    try { mp.set(a >>> 0, PROP, id ? Object.assign({ id, at: Date.now(), by }, keep, extra || {}) : (keep.changed ? Object.assign({ id: '', at: Date.now(), by }, keep) : null)); return true; } catch (e) { log('birthsign write failed', e.message); return false; }
   };
+  const changedOf = (a) => { const r = get(a, PROP, null); return !!(r && typeof r === 'object' && r.changed); };
   // The creation step goes on to the god once there is a sign
   const stepDone = (a) => {
     if (!S.step.delete(a >>> 0)) return;
     try { if (typeof globalThis.__dboBirthsignStepDone === 'function') globalThis.__dboBirthsignStepDone(a >>> 0); } catch (e) { log('birthsign step end failed', e.message); }
   };
-  const choose = (a, s) => {
-    if (recordOf(a)) return false;
-    if (!write(a, s.id, 'self')) return false;
+  const choose = (a, s, change) => {
+    const was = recordOf(a);
+    if (was && !(change && !changedOf(a) && C.changeOnce !== false)) return false;
+    if (was && was.id === s.id) { S.open.delete(a >>> 0); try { closeWidget(a >>> 0, WIDGET_ID); } catch (e) { /* not open */ } personal(a >>> 0, `You are already born under ${s.name}; your one change is still yours.`); return true; }
+    if (!write(a, s.id, 'self', was ? { changed: { from: was.id, at: Date.now() } } : null)) return false;
     S.open.delete(a >>> 0); S.nextAt.delete(a >>> 0); S.failed.delete(a >>> 0);
     try { closeWidget(a >>> 0, WIDGET_ID); } catch (e) { /* not open */ }
-    audit(`BIRTHSIGN ${who(a)} was born under ${s.name}`);
-    personal(a >>> 0, `You were born under ${s.name}: ${describe(s)}.`);
+    if (was) { audit(`BIRTHSIGN ${who(a)} changed their sign once, from ${(C.signs[was.id] || {}).name || was.id} to ${s.name}`); personal(a >>> 0, `You are now born under ${s.name}: ${describe(s)}. That was your one change; only staff can change it now.`); }
+    else { audit(`BIRTHSIGN ${who(a)} was born under ${s.name}`); personal(a >>> 0, `You were born under ${s.name}: ${describe(s)}.${C.changeOnce !== false ? ' You may change it once yourself: /birthsign change.' : ''}`); }
     syncVitals(a);
     stepDone(a);
     return true;
@@ -216,21 +227,21 @@ module.exports = (api) => {
 
   onUi('birthsignChoose', (a, args) => {
     const st = S.open.get(a >>> 0);
-    if (!st || recordOf(a)) { try { closeWidget(a >>> 0, WIDGET_ID); } catch (e) { /* not open */ } S.open.delete(a >>> 0); return; }
+    if (!st || (recordOf(a) && !st.change)) { try { closeWidget(a >>> 0, WIDGET_ID); } catch (e) { /* not open */ } S.open.delete(a >>> 0); return; }
     const choice = String((args && args[0]) || '');
     if (st.mode === 'picker') return;
-    if (st.mode === 'pick') { const s = C.signs[choice]; if (s && ORDER.includes(choice)) openConfirm(a, s); return; }
-    if (choice === 'back') { openPick(a); return; }
-    if (choice === 'confirm' && C.signs[st.sign]) choose(a, C.signs[st.sign]);
+    if (st.mode === 'pick') { const s = C.signs[choice]; if (s && ORDER.includes(choice)) openConfirm(a, s, st.change); return; }
+    if (choice === 'back') { openPick(a, st.change); return; }
+    if (choice === 'confirm' && C.signs[st.sign]) choose(a, C.signs[st.sign], st.change);
   });
   // The picker's answer, confirmed in the front: [nonce, sign]
   onUi('birthsignPick', (a, args) => {
     const st = S.open.get(a >>> 0);
     const nonce = String((args && args[0]) || ''), choice = String((args && args[1]) || '');
     if (!st || st.mode !== 'picker' || st.nonce !== nonce) return;
-    if (recordOf(a)) { S.open.delete(a >>> 0); try { closeWidget(a >>> 0, WIDGET_ID); } catch (e) { /* not open */ } return; }
+    if (recordOf(a) && !st.change) { S.open.delete(a >>> 0); try { closeWidget(a >>> 0, WIDGET_ID); } catch (e) { /* not open */ } return; }
     const s = ORDER.includes(choice) ? C.signs[choice] : null;
-    if (s) choose(a, s);
+    if (s) choose(a, s, st.change);
   });
   onUi('birthsignClose', (a, args) => {
     const st = S.open.get(a >>> 0);
@@ -238,7 +249,7 @@ module.exports = (api) => {
     if (st && st.mode === 'picker' && args && args.length && String(args[0]) !== st.nonce) return;
     if (!S.open.delete(a >>> 0)) return;
     try { closeWidget(a >>> 0, WIDGET_ID); } catch (e) { /* not open */ }
-    if (recordOf(a)) return;
+    if (recordOf(a)) { if (st && st.change) personal(a >>> 0, 'Your sign is unchanged, and your one change is still yours.'); return; }
     S.nextAt.set(a >>> 0, Date.now() + delayMs(a));
     personal(a >>> 0, `Every character is born under a sign. The choice comes back in ${Math.round(delayMs(a) / 1000)} seconds, or type /birthsign to see the signs.`);
   });
@@ -285,7 +296,8 @@ module.exports = (api) => {
   // way. The referral reward shares the record: a Steed who earned it there has +50 once, not twice (one spell cannot stack).
   const ABILITY = 'private.dboBirthsignAbility';
   if (!(S.abilityOn instanceof Set)) S.abilityOn = new Set();
-  const carryId = () => { try { const id = mp.getIdFromDesc(String(C.carrySpell || '')) >>> 0; const r = id ? mp.lookupEspmRecordById(id) : null; return r && r.record && String(r.record.type) === 'SPEL' ? id : 0; } catch (e) { return 0; } };
+  const spellIdOf = (desc) => { try { const id = mp.getIdFromDesc(String(desc || '')) >>> 0; const r = id ? mp.lookupEspmRecordById(id) : null; return r && r.record && String(r.record.type) === 'SPEL' ? id : 0; } catch (e) { return 0; } };
+  const carryId = () => spellIdOf(C.carrySpell);
   const papyrusSpell = (a, add, id) => {
     try {
       mp.callPapyrusFunction('method', 'Actor', add ? 'AddSpell' : 'RemoveSpell', { type: 'form', desc: mp.getDescFromId(a >>> 0) },
@@ -293,22 +305,23 @@ module.exports = (api) => {
       return true;
     } catch (e) { log(`birthsigns: ${add ? 'AddSpell' : 'RemoveSpell'} ${id.toString(16)} on ${display(a >>> 0)} failed`, e.message); return false; }
   };
+  // The abilities a sign wants: carry (carrySpell), speed (speedSpell); each given once a session, the held list on the
+  // character (comma-joined descs) so a changed sign takes back what it no longer wants
+  const wantedOf = (sg) => (on() && sg ? [num(sg.carry, 0) > 0 ? carryId() : 0, num(sg.speed, 0) > 0 ? spellIdOf(C.speedSpell) : 0].filter(Boolean) : []);
   const abilityTick = () => {
-    const want = on() ? carryId() : 0;
     const here = new Set();
     for (const a0 of onlineActors()) {
       const a = a0 >>> 0; here.add(a);
-      let held = ''; try { held = String(mp.get(a, ABILITY) || ''); } catch (e) { held = ''; }
-      const sg = recordOf(a) ? signOf(a) : null;
-      if (want && sg && num(sg.carry, 0) > 0) {
-        if (S.abilityOn.has(a)) continue;
-        if (papyrusSpell(a, true, want)) { S.abilityOn.add(a); try { mp.set(a, ABILITY, mp.getDescFromId(want)); } catch (e) { /* given anyway */ } }
-      } else if (held) {
-        // the referral reward's own copy stays: it is taken back only if the referral never gave it
-        let referral = ''; try { referral = String(mp.get(a, 'private.dboReferralCarry') || ''); } catch (e) { referral = ''; }
-        const id = (() => { try { return mp.getIdFromDesc(held) >>> 0; } catch (e) { return 0; } })();
-        if (!id || referral === held || papyrusSpell(a, false, id)) { S.abilityOn.delete(a); try { mp.set(a, ABILITY, null); } catch (e) { /* tried */ } }
-      }
+      let held = []; try { held = String(mp.get(a, ABILITY) || '').split(',').filter(Boolean); } catch (e) { held = []; }
+      const want = wantedOf(recordOf(a) ? signOf(a) : null).map((id) => mp.getDescFromId(id));
+      if (S.abilityOn.has(a) && want.length && want.every((d) => held.includes(d)) && held.every((d) => want.includes(d))) continue;
+      // the referral reward's own copy stays: taken back only if the referral never gave it
+      let referral = ''; try { referral = String(mp.get(a, 'private.dboReferralCarry') || ''); } catch (e) { referral = ''; }
+      const keep = [];
+      for (const d of held) { if (want.includes(d)) { keep.push(d); continue; } const id = (() => { try { return mp.getIdFromDesc(d) >>> 0; } catch (e) { return 0; } })(); if (id && referral !== d && !papyrusSpell(a, false, id)) keep.push(d); }
+      for (const d of want) if (!keep.includes(d)) { const id = (() => { try { return mp.getIdFromDesc(d) >>> 0; } catch (e) { return 0; } })(); if (id && papyrusSpell(a, true, id)) keep.push(d); }
+      try { mp.set(a, ABILITY, keep.length ? keep.join(',') : null); } catch (e) { /* tried */ }
+      if (want.length) S.abilityOn.add(a); else S.abilityOn.delete(a);
     }
     for (const a of [...S.abilityOn]) if (!here.has(a)) S.abilityOn.delete(a);
   };
@@ -351,19 +364,31 @@ module.exports = (api) => {
     if (sub === 'set') { const target = args.slice(1, -1); if (target.length > 1 && /^the$/i.test(target[target.length - 1])) target.pop(); return personal(a, staffSet(a, target.join(' '), args[args.length - 1], false)); }
     if (sub === 'clear') return personal(a, staffSet(a, args.slice(1).join(' '), '', true));
     const mine = signOf(a);
-    if (mine) return personal(a, `You were born under ${mine.name}: ${describe(mine)}.${args.length ? ' Only staff can change it.' : ''}`);
+    if (sub === 'change') {
+      if (!on()) return personal(a, 'Birthsigns are not in use yet.');
+      if (!mine) { if (!openPick(a)) personal(a, `Choose by typing it: /birthsign ${ORDER.join(', ')}.`); return; }
+      if (C.changeOnce === false) return personal(a, 'Only staff can change a birthsign.');
+      if (changedOf(a)) return personal(a, 'You have used your one change. Only staff can change your sign now.');
+      const why = waitReason(a);
+      if (why === 'fighting' || why === 'downed' || why === 'dungeon') return personal(a, 'Not now: change your sign somewhere safe, out of a fight and out of a dungeon.');
+      if (!openPick(a, true)) personal(a, 'The signs could not be shown. Try again in a moment.');
+      return;
+    }
+    if (mine) return personal(a, `You were born under ${mine.name}: ${describe(mine)}.${changedOf(a) || C.changeOnce === false ? (args.length ? ' Only staff can change it.' : '') : ' You may change it once: /birthsign change.'}`);
     if (!on()) return personal(a, 'Birthsigns are not in use yet.');
     // Typing the sign is the choice, for anyone the menu cannot reach
     if (args.length) { const s = find(args.join(' ')); if (s) return choose(a, s) ? undefined : personal(a, 'Your birthsign could not be written. Try again.'); }
     if (args.length) personal(a, `No such sign. The signs: ${ORDER.map((id) => C.signs[id].name.replace(/^The /, '')).join(', ')}.`);
     if (!openPick(a)) personal(a, `Choose by typing it: /birthsign ${ORDER.join(', ')}.`);
-  }, { help: 'your birthsign; /birthsign <sign> chooses one if you have none; staff: /birthsign set <player|#TAG> <sign>, /birthsign clear <player|#TAG>' });
+  }, { help: 'your birthsign; /birthsign <sign> chooses one if you have none; /birthsign change, once per character; staff: /birthsign set <player|#TAG> <sign>, /birthsign clear <player|#TAG>' });
 
   const addStatus = (key, order, fn) => { try { if (typeof globalThis.__dboRegisterStatus === 'function') globalThis.__dboRegisterStatus(key, order, fn); } catch (e) { /* gamemode older than /status */ } };
   addStatus('birthsign', 55, (a) => { const s = signOf(a); return s ? `Birthsign: ${s.name} (${describe(s)})` : null; });
 
   // racial.js: the sign whose gifts apply to this character, or null
   globalThis.__dboBirthsignOf = (a) => (on() ? signOf(a) : null);
+  // lockpick.js: the share of a pick's snap chance this character keeps (the Tower: 0.75)
+  globalThis.__dboBirthsignSnapMult = (a) => { const s = on() ? signOf(a) : null; return s && num(s.snapLess, 0) > 0 ? Math.max(0, 1 - num(s.snapLess, 0)) : 1; };
   // The signs against players (racial.js; Nat, 26 Oct: "Rebalance the birthsigns for PvP"): config birthsigns.pvp
   globalThis.__dboBirthsignPvp = () => Object.assign({}, PVP_DEFAULTS, C.pvp || {});
   log(`birthsigns ${on() ? 'on' : 'off'}: ${ORDER.length} signs, ${C.requireAtCreation === false ? 'optional' : 'required'} at creation`);

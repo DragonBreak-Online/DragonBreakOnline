@@ -194,7 +194,9 @@ module.exports = (api) => {
     if (L.mode === 'client') verdictLine(L, 'issue', ` judge=client${L.pick ? ` pick spots=${L.steps[0].length}` : ''} tumblers=${L.holds.length} picks=${L.picksAtBegin}`);
     return openWidget(a, payload(L), true);
   };
-  const snapChanceOf = (L) => { const S2 = C.snap; return Math.max(S2.min, L.tier < 0 ? S2.anyone : S2.lockpicker + S2.perTier * L.tier); };
+  // A birthsign's steady hand (birthsigns.js __dboBirthsignSnapMult; the Tower snaps 25% fewer picks, Nat 26 Oct) scales the chance
+  const signSnap = (a) => { try { const f = globalThis.__dboBirthsignSnapMult; const m = typeof f === 'function' ? Number(f(a >>> 0)) : 1; return Number.isFinite(m) && m >= 0 && m <= 1 ? m : 1; } catch (e) { return 1; } };
+  const snapChanceOf = (L) => { const S2 = C.snap; return Math.max(S2.min, L.tier < 0 ? S2.anyone : S2.lockpicker + S2.perTier * L.tier) * signSnap(L.a); };
   const timeoutMs = () => Math.max(60000, (Number(C.roundTimeoutMinutes) || 10) * 60000);
   // A lock ends only on a win, a last pick snapped, stepping away or Escape, so one open when the client went away (a
   // crash, a relog, a disconnect) stayed in S until a restart, S being kept on globalThis across reloads: busy() was then

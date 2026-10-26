@@ -1,5 +1,31 @@
 [
   {
+    "title": "Birthsigns rebalanced, and you may change yours once",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "The signs",
+        "items": [
+          "The Lady: health and stamina regenerate 7% faster.",
+          "The Lord: health regenerates 5% faster, and blows from weapons and fists hurt 5% less; fire hurts 10% more.",
+          "The Steed: +50 carry weight, and you move 2% faster.",
+          "The Apprentice: magicka regenerates 20% faster; spells hurt 10% more.",
+          "The Atronach: +50 maximum magicka and spells hurt 5% less; magicka regenerates 25% slower.",
+          "The Tower: Lockpicking learns 15% faster, and your lockpicks snap 25% less often.",
+          "The Warrior, the Mage, the Thief, the Ritual, the Lover, the Shadow and the Serpent are as they were."
+        ]
+      },
+      {
+        "heading": "One change",
+        "items": [
+          "Every character may change their birthsign once: type /birthsign change somewhere safe (not in a fight or a dungeon). The sign you pick is final; after that only staff can change it."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The Lady, the Lord and the Steed each have their own gift",
     "date": "2026-10-26",
     "version": "Server update",

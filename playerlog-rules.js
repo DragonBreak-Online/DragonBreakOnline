@@ -1369,6 +1369,7 @@ appearance.js APPEARANCE b80ac1f1 clean
 appearance.js APPEARANCE b0525394 clean
 birthsigns.js BIRTHSIGN b05aa6cf clean
 birthsigns.js BIRTHSIGN 4171b66d clean
+birthsigns.js BIRTHSIGN af92543f clean
 bank.js BANK 462e889d parsed
 bank.js BANK f4890f79 parsed
 bank.js BANK 5efd151e parsed
