@@ -403,17 +403,17 @@ _root.dboData = function(json)
 var keys = {};
 keys.onKeyDown = function()
 {
-   var code = Key.getCode();
+   var code = dboKey();
    dboLog("rite key " + code);
    if (data == null)
    {
-      if (code == 27 || code == 9)
+      if (code == 27)
       {
          dboClose();
       }
       return;
    }
-   if (code == 27 || code == 9)
+   if (code == 27)
    {
       ask(!asking);
       return;

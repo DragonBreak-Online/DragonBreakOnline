@@ -349,9 +349,9 @@ _root.dboData = function(json)
 var keys = {};
 keys.onKeyDown = function()
 {
-   var code = Key.getCode();
+   var code = dboKey();
    dboLog("context key " + code);
-   if (code == 27 || code == 9)
+   if (code == 27)
    {
       if (data == null)
       {

@@ -66,7 +66,11 @@ const drive = {
     t.push(Object.assign({}, fixtures.dbo_deity, { nonce: 'd2', current: '', first: true })); t.press(49); t.root.dboPanel.foot.take.onRelease(); t.press(27);
   },
   dbo_dungeon: (t) => {
-    t.press(49); t.push(Object.assign({}, fixtures.dbo_dungeon, { nonce: 'g2' })); t.press(50); t.root.dboPanel.body.back.onRelease();
+    t.press(50);
+  },
+  // the gate closes on its first choice and sends nothing after, so its other key gets a run of its own
+  'dbo_dungeon#back': (t) => {
+    t.root.dboPanel.body.back.onRelease();
   },
   dbo_rite: (t) => {
     t.st.time += 400; t.tick(); t.press(32);
@@ -79,15 +83,17 @@ const drive = {
   },
 };
 
+fixtures['dbo_dungeon#back'] = fixtures.dbo_dungeon;
+
 for (const menu of Object.keys(fixtures)) {
   for (const late of [false, true]) {
-    const t = S.boot(menu, late);
+    const t = S.boot(menu.split('#')[0], late);
     if (late) { t.tick(); t.arrive(); t.tick(); }
     t.push(fixtures[menu]);
     drive[menu](t);
     const events = t.sent.filter((m) => m.e === 'dboUi');
     const parsed = events.map((m) => M.parseUiEvent(m.e, m.s, m.n));
-    check(`${menu}${late ? ' (skse late)' : ''}: the service parses every event the panel sends`, parsed.length > 3 && parsed.every(Boolean), events.filter((m, i) => !parsed[i]));
+    check(`${menu}${late ? ' (skse late)' : ''}: the service parses every event the panel sends`, parsed.length > (menu.indexOf('dbo_dungeon') === 0 ? 1 : 3) && parsed.every(Boolean), events.filter((m, i) => !parsed[i]));
     check(`${menu}${late ? ' (skse late)' : ''}: ready leads and carries its frame where the service reads it`, parsed[0].key === 'ready' && parsed[0].frame === (late ? 2 : 1), parsed[0]);
     const box = M.parseOutbox(t.root.dboOut, 0);
     check(`${menu}${late ? ' (skse late)' : ''}: the outbox carries the same messages, in order, through parseOutbox`,

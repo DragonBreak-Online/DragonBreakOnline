@@ -60,7 +60,9 @@ const closed = (t) => t.closed();
   const tab = S.boot('dbo_dungeon');
   tab.push(gate);
   tab.press(9);
-  check('Tab turns back too', msgs(tab, 'dbo:dungeonCancel').length === 1);
+  check('Tab does nothing (STYLE: Escape alone closes)', msgs(tab, 'dbo:dungeonCancel').length === 0 && !closed(tab));
+  tab.press(98);
+  check('numpad 2 claims Adept', msgs(tab, 'dbo:dungeonClaim').length === 1 && msgs(tab, 'dbo:dungeonClaim')[0].args[1] === 'normal');
   check('no bare close is ever sent', [t, u, w, e, tab].every((x) => msgs(x, 'close').length === 0));
 }
 

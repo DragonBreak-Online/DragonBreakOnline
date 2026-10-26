@@ -117,11 +117,13 @@ const run = (t, ms) => { for (let left = ms; left > 0; left -= 33) { t.st.time +
   t.press(27);
   check('Escape again backs out of the question', !B(t).ask && !closed(t));
   t.press(9);
+  check('Tab does not ask (STYLE: Escape alone)', !B(t).ask);
+  t.press(27);
   B(t).yield.onRelease();
   check('Yield sends dbo:riteClose [nonce] and closes (no bare close)', msgs(t, 'dbo:riteClose').length === 1 && msgs(t, 'dbo:riteClose')[0].args[0] === 'r1' && closed(t) && msgs(t, 'close').length === 0);
   const u = S.boot('dbo_rite');
   u.push(timed({ deadly: false, startsIn: 0 }));
-  u.press(9);
+  u.press(27);
   check('a rite that is not deadly asks without the death line', u.root.dboPanel.body.ask.text === 'Yield the rite? It counts as lost.');
   u.press(40); u.press(40); u.press(13);
   check('Down to Go on and Enter goes on', !u.root.dboPanel.body.ask && msgs(u, 'dbo:riteClose').length === 0, Object.keys(u.root.dboPanel.body.kids));
