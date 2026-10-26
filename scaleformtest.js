@@ -33,6 +33,10 @@ module.exports = (api) => {
   registerChatCommand('testmenu', (a, args) => {
     const sub = String(args || '').trim().toLowerCase();
     if (sub === 'close') { sendPacket(a, { customPacketType: 'dboScaleform', close: true }); return personal(a, 'Closing the test panel.'); }
+    if (sub === 'ui') {
+      sendPacket(a, { customPacketType: 'dboScaleform', swf: 'dbo_uiprobe', payload: { probe: 'ui' }, widget: 0 });
+      return personal(a, 'Opening the UI probe: type in its box and press Send, then say which of the three boxes glow or cast a shadow.');
+    }
     if (sub === 'mapmenu') {
       sendPacket(a, { customPacketType: 'dboMapTest' });
       return personal(a, 'Map tests armed. Open the map (M), keep it still for two seconds, then pan slowly until a line in chat gives the results. Say whether you see a "The Realm" legend at the top right.');
@@ -46,7 +50,7 @@ module.exports = (api) => {
     show(a, 'DBO test panel', ROWS);
     personal(a, 'Opening the test panel. It pauses the game; click Close to come back. /testmenu many and /testmenu wide are the other two.');
     log(`scaleform test panel opened by ${who(a)}`);
-  }, { admin: true, hidden: true, help: '[many|wide|map|mapmenu|close] open the Scaleform test panel (hagtest2 client only)' });
+  }, { admin: true, hidden: true, help: '[many|wide|map|mapmenu|ui|close] open the Scaleform test panel (hagtest2 client only)' });
 
   // A row click. The panel sends "dbo:testRow" with [index] on the shared panel wire, so the client turns it
   // into the same { customPacketType: 'dbo', event, args, widget } packet a browser widget sends and it
@@ -76,6 +80,14 @@ module.exports = (api) => {
     const text = `T1 ${r.t1}; T2 ${t2}; T3 ${r.t3}; T4 scale ${r.t4}; ${r.markers} markers; ${r.end}`;
     log(`scaleform mapmenu test from ${who(a)}: ${text}`);
     if (isAdmin(a)) personal(a, `Map tests: ${text}`);
+  });
+
+  // The UI probe's answers: whether this game can type in a panel, what was typed, and whether the filters stayed
+  onUi('uiProbe', (a, args) => {
+    const r = Array.isArray(args) && args[0] && typeof args[0] === 'object' ? args[0] : {};
+    const text = `canType ${r.canType}; glow ${r.glow}; shadow ${r.shadow}${r.typed !== undefined ? `; typed "${String(r.typed).slice(0, 80)}" (${r.typedLength})` : ''}`;
+    log(`scaleform ui probe from ${who(a)}: ${text}`);
+    if (isAdmin(a)) personal(a, `UI probe: ${text}`);
   });
 
   // The older reply shape, kept only for a client that predates the shared wire. The live client sends its
