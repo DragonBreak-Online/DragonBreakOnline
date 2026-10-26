@@ -19,7 +19,7 @@ export const MENU_KEYS: Record<string, number> = {
   chatKeyCode: DxScanCode.T, freeCursorKeyCode: DxScanCode.F8, housingMenuKeyCode: DxScanCode.X, playerActionKeyCode: DxScanCode.X,
   personalMenuKeyCode: DxScanCode.U, factionMenuKeyCode: DxScanCode.F3, masteryMenuKeyCode: DxScanCode.K, emoteWheelKeyCode: DxScanCode.B,
   nametagKeyCode: DxScanCode.F1, hideUiKeyCode: DxScanCode.F2, voicePushToTalkKeyCode: DxScanCode.V, voiceModeKeyCode: DxScanCode.LeftAlt,
-  maskToggleKeyCode: DxScanCode.H, adminMenuKeyCode: DxScanCode.F7, hideChatKeyCode: 0,
+  maskToggleKeyCode: DxScanCode.H, adminMenuKeyCode: DxScanCode.F7, decorMenuKeyCode: DxScanCode.G, hideChatKeyCode: 0,
 };
 
 const RESERVED_KEYS: number[] = [DxScanCode.Escape, DxScanCode.Backspace, DxScanCode.Enter];
