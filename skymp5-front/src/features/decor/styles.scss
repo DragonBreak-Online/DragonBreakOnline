@@ -1,0 +1,176 @@
+// Home decorating in the DragonBreak palette: the budget meters on top, tabs, the catalogue with its search and group chips
+@import '../../dbo-theme.scss';
+
+.decor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 54;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  font-family: $dbo-ui-font;
+  color: $dbo-text;
+
+  &__fade {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, rgba(8, 25, 28, 0.42), rgba(3, 10, 12, 0.85) 100%);
+  }
+
+  &__panel {
+    position: relative;
+    pointer-events: auto;
+    box-sizing: border-box;
+    width: min(760px, calc(94 * var(--dbo-vw)));
+    max-height: min(820px, calc(92 * var(--dbo-vh)));
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 20px 24px 14px;
+    @include dbo-panel;
+  }
+
+  &__title {
+    margin: 0;
+    @include dbo-title;
+    font-size: clamp(20px, calc(2.2 * var(--dbo-vw)), 28px);
+    text-align: center;
+  }
+
+  &__budget {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid $dbo-border;
+  }
+
+  &__meter { display: flex; flex-direction: column; gap: 3px; }
+  &__meter--last &__count, &__meter--last &__bar span { color: $dbo-amber; background: $dbo-amber; }
+  &__meter--full &__count, &__meter--full &__bar span { color: $dbo-red; background: $dbo-red; }
+
+  &__label {
+    color: $dbo-text-dim;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  &__bar {
+    height: 4px;
+    background: $dbo-ground-3;
+
+    span { display: block; height: 100%; background: $dbo-aqua; }
+  }
+
+  &__count { font-size: 15px; background: none !important; }
+
+  &__tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  &__tab {
+    @include dbo-button;
+
+    &--on { border-color: $dbo-gold-border-strong; background: $dbo-gold-fill-hover; }
+  }
+
+  &__undo { margin-left: auto; }
+
+  &__search {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid $dbo-border;
+    background: $dbo-ground;
+    color: $dbo-text;
+    font-family: $dbo-ui-font;
+    font-size: 15px;
+    outline: none;
+
+    &:focus { border-color: $dbo-border-strong; }
+  }
+
+  &__chips { display: flex; flex-wrap: wrap; gap: 5px; }
+
+  &__chip {
+    padding: 3px 10px;
+    border: 1px solid $dbo-border;
+    border-radius: 12px;
+    background: transparent;
+    color: $dbo-text-dim;
+    font-family: $dbo-ui-font;
+    font-size: 13px;
+    cursor: pointer;
+
+    &:hover { color: $dbo-text; border-color: $dbo-border-strong; }
+    &--on { color: $dbo-gold; border-color: $dbo-gold-border-strong; background: $dbo-gold-fill; }
+  }
+
+  &__list {
+    flex: 1 1 auto;
+    min-height: 120px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: $dbo-panel-soft;
+    border: 1px solid transparent;
+
+    &:hover { border-color: $dbo-border; background: $dbo-ground-3; }
+    &--blocked { opacity: 0.6; }
+  }
+
+  &__main { flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  &__name { font-size: 16px; }
+  &__why { color: $dbo-text-dim; font-size: 13px; }
+  &__costs { display: flex; flex-wrap: wrap; gap: 4px; }
+
+  &__cost {
+    padding: 1px 6px;
+    border: 1px solid $dbo-border;
+    font-size: 12px;
+    color: $dbo-text-dim;
+
+    &--short { color: $dbo-red; border-color: $dbo-red; }
+  }
+
+  &__button {
+    @include dbo-button;
+    flex: none;
+  }
+
+  &__empty { color: $dbo-text-dim; text-align: center; margin: 18px 0; }
+  &__sub { margin-top: 8px; }
+
+  &__foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 6px;
+    border-top: 1px solid $dbo-border;
+  }
+
+  &__pager { display: flex; align-items: center; gap: 10px; color: $dbo-text-dim; font-size: 14px; }
+
+  &__link {
+    background: none;
+    border: none;
+    color: $dbo-aqua;
+    font-family: $dbo-ui-font;
+    font-size: 14px;
+    cursor: pointer;
+
+    &:disabled { color: $dbo-text-dim; cursor: default; }
+  }
+
+  &__close { @include dbo-button; }
+}

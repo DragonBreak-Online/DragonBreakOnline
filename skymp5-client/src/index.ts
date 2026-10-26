@@ -93,6 +93,7 @@ import { SpellInvisReportService } from "./services/services/spellInvisReportSer
 import { ExecutionService } from "./services/services/executionService";
 // U: the player menu, the server's help topics as a panel (Nate, 2026-09-28)
 import { PersonalMenuService } from "./services/services/personalMenuService";
+import { DecorMenuService } from "./services/services/decorMenuService";
 import { GamepadPointerService } from "./services/services/gamepadPointerService";
 import { ChatService } from "./services/services/chatService";
 import { FactionService } from "./services/services/factionService";
@@ -252,6 +253,7 @@ const main = () => {
       new DeadCritterService(sp, controller),
       new AdminMenuService(sp, controller),
       new PersonalMenuService(sp, controller),
+      new DecorMenuService(sp, controller),
       new GamepadPointerService(sp, controller),
       new PlacementService(sp, controller),
       new WorldEditService(sp, controller),

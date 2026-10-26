@@ -20,6 +20,7 @@ export const KEY_ROWS: KeyRow[] = [
   { id: 'journal', group: 'menus', label: 'Journal', names: ['factionMenuKeyCode'] },
   { id: 'skills', group: 'menus', label: 'Skills', names: ['masteryMenuKeyCode'] },
   { id: 'emotes', group: 'menus', label: 'Emote wheel', names: ['emoteWheelKeyCode'] },
+  { id: 'decor', group: 'menus', label: 'Decorate home', names: ['decorMenuKeyCode'], hint: 'Inside your own home, or one its owner named you in.' },
   { id: 'nametags', group: 'view', label: 'Nametags', names: ['nametagKeyCode'] },
   { id: 'hideUi', group: 'view', label: 'Hide interface', names: ['hideUiKeyCode'] },
   { id: 'hideChat', group: 'view', label: 'Hide chat', names: ['hideChatKeyCode'], optional: true, hint: 'Hides the chat until pressed again; T still opens it.' },
