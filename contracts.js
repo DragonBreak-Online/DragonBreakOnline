@@ -51,8 +51,10 @@ module.exports = (api) => {
     mudcrab: 1, skeever: 1, slaughterfish: 1, horker: 1,
     wolf: 1, frostbitespider: 2, sabrecat: 2, bear: 2, riekling: 2, netch: 2, werebear: 3,
     troll: 3, giant: 3, mammoth: 3, lurker: 3,
+    // The Forsworn camps (wildlife.js wild:fw* spots, Nat 25 Oct): their warriors, archers, shamans and Briarhearts, and their hagravens
+    forsworn: 2, hagraven: 3,
   };
-  const PLURAL = { wolf: 'wolves', fox: 'foxes', sabrecat: 'sabre cats', frostbitespider: 'frostbite spiders', mudcrab: 'mudcrabs', skeever: 'skeevers', troll: 'trolls', bear: 'bears', giant: 'giants', mammoth: 'mammoths', riekling: 'rieklings', netch: 'netches', horker: 'horkers', slaughterfish: 'slaughterfish', lurker: 'lurkers', werebear: 'werebears' };
+  const PLURAL = { wolf: 'wolves', fox: 'foxes', sabrecat: 'sabre cats', frostbitespider: 'frostbite spiders', mudcrab: 'mudcrabs', skeever: 'skeevers', troll: 'trolls', bear: 'bears', giant: 'giants', mammoth: 'mammoths', riekling: 'rieklings', netch: 'netches', horker: 'horkers', slaughterfish: 'slaughterfish', lurker: 'lurkers', werebear: 'werebears', forsworn: 'Forsworn', hagraven: 'hagravens' };
   const GOLD_BASE = 0x0000000f;
   const FILE = path.resolve('contracts.json');
   const SPAWNS = path.resolve('NPC-Spawns.json');
@@ -103,7 +105,7 @@ module.exports = (api) => {
   // and EncIceWraith name no kind at all.
   // Case-sensitive: every spawn edid is CamelCase, and /Crab/i matched CYREncRabbit ('EncRabbit'), so rabbits counted for
   // mudcrab contracts and fox spots were read as mudcrab fauna (sunk_turtle, 9 Oct)
-  const CREATURE_WORD = /(Werewolf|Werebear|FrostbiteSpider|SabreCat|Slaughterfish|Skeever|Mudcrab|Crab|Horker|Mammoth|Giant|Troll|Riekling|Netch|Lurker|Wolf|Bear|Chicken|Cow|Hare|Dog|Deer|Elk|Goat|Fox)/;
+  const CREATURE_WORD = /(Forsworn|Hagraven|Werewolf|Werebear|FrostbiteSpider|SabreCat|Slaughterfish|Skeever|Mudcrab|Crab|Horker|Mammoth|Giant|Troll|Riekling|Netch|Lurker|Wolf|Bear|Chicken|Cow|Hare|Dog|Deer|Elk|Goat|Fox)/;
   const kindOfEdid = (edid) => { const m = CREATURE_WORD.exec(String(edid || '')); if (!m) return ''; const k = m[1].toLowerCase(); return k === 'crab' ? 'mudcrab' : k; };
   // undefined when the record cannot be read: the caller then goes by the spawn tag, as before
   const kindOfBase = (desc) => {
