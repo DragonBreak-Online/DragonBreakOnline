@@ -11,6 +11,8 @@ import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { isOwnCompanion } from "./companionService";
 import { isTradeInviteWaiting } from "./tradeService";
 import { XSkipInfo, XSkipReason, createXDiagLog } from "./xMenuDiag";
+import { ScaleformMenuService } from "./scaleformMenuService";
+import { CLOSE_KEY, FAILED_KEY } from "./nativeWidgets";
 
 // for the browser-side widget setter (executed inside the CEF browser)
 declare const window: any;
@@ -191,6 +193,12 @@ export class PlayerActionService extends ClientListener {
 
   private onMenuPacket(event: ConnectionMessage<CustomPacketMessage>): void {
     const content = parseCustomPacket(event);
+    // A gameplay contextMenu (alchemy, business, charlevel, dungeons) draws in the browser, so the native one makes way for it
+    if (content && content["customPacketType"] === "dboWidget" && this.native && this.menuOpen) {
+      const w = content["widget"] as Record<string, unknown> | undefined;
+      if (w && w["type"] === "contextMenu" && w["id"] !== WIDGET_ID) this.closeMenu();
+      return;
+    }
     if (!content || content["customPacketType"] !== "dboPlayerMenu") return;
     const target = Number(content["target"]) >>> 0;
     if (!target || target !== this.playerTarget) return;
@@ -214,6 +222,11 @@ export class PlayerActionService extends ClientListener {
       if (this.menuOpen) this.closeMenu();
       return;
     }
+    this.handleKey(key, e.arguments.slice(1));
+  }
+
+  // The menu's keys, from the browser widget or from the native panel (ScaleformMenuService hands them back verbatim)
+  private handleKey(key: unknown, args: unknown[]): void {
     if (typeof key !== "string" || !key.startsWith("pa:") || !this.menuOpen) {
       return;
     }
@@ -229,7 +242,7 @@ export class PlayerActionService extends ClientListener {
       return;
     }
     if (key === events.action) {
-      const actionId = typeof e.arguments[1] === "string" ? (e.arguments[1] as string) : "";
+      const actionId = typeof args[0] === "string" ? (args[0] as string) : "";
       this.closeMenu();
       if (!this.playerTarget) {
         notifyNextUpdate(this.controller, this.sp, "Look at a player first.");
@@ -255,11 +268,50 @@ export class PlayerActionService extends ClientListener {
 
   private openMenu(): void {
     this.menuOpen = true;
+    this.native = this.openNativeMenu();
+    if (!this.native) this.openBrowserMenu();
+  }
+
+  // The native dbo_context panel, given the same widget object the browser gets; false when the client has it off
+  private openNativeMenu(): boolean {
+    const widget = { type: "contextMenu", id: WIDGET_ID, targetName, actions: menuActions, lines: menuLines, mode: menuMode, events };
+    try {
+      return this.controller.lookupListener(ScaleformMenuService).openNative({
+        type: "contextMenu", widget, widgetId: WIDGET_ID, onKey: (key, args) => this.onNativeKey(key, args),
+      });
+    } catch {
+      return false;
+    }
+  }
+
+  private openBrowserMenu(): void {
     openFormMenu(this.sp, this.playerWidgetSetter, { menuActions, menuLines, menuMode, targetName, events, WIDGET_ID }, this.controller);
+  }
+
+  private onNativeKey(key: string, args: unknown[]): void {
+    if (!this.native || !this.menuOpen) return;
+    // The SWF could not be drawn: the browser menu after all
+    if (key === FAILED_KEY) {
+      this.native = false;
+      this.openBrowserMenu();
+      return;
+    }
+    // The panel has gone (Souls RE closed it, or it closed itself)
+    if (key === CLOSE_KEY) {
+      this.menuOpen = false;
+      this.native = false;
+      return;
+    }
+    this.handleKey(key, args);
   }
 
   private closeMenu(): void {
     this.menuOpen = false;
+    if (this.native) {
+      this.native = false;
+      this.controller.lookupListener(ScaleformMenuService).closeNative("contextMenu");
+      return;
+    }
     closeFormMenu(this.sp, WIDGET_ID);
   }
 
@@ -279,6 +331,7 @@ export class PlayerActionService extends ClientListener {
   };
 
   private menuOpen = false;
+  private native = false;
   private playerTarget = 0;
   private lastMaskToggle = 0;
   private lastRangeCheck = 0;
