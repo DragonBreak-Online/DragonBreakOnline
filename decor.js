@@ -686,7 +686,8 @@ module.exports = (api) => {
   // ---- the panel (native swf dbo_decor): the server builds every row and re-checks every action as the chat path does ----
   const PANEL_ID = 171;
   // the browser widget (skymp5-front features/decor, cap decorPanel) or the native swf (native:decor), 'rows' a page each
-  const PANEL_CAPS = [{ cap: 'decorPanel', rows: 20 }, { cap: 'native:decor', rows: 8 }];
+  // native first: gamemode.js routes the widget to the native panel whenever the client has native:decor, so its page size wins
+  const PANEL_CAPS = [{ cap: 'native:decor', rows: 8 }, { cap: 'decorPanel', rows: 20 }];
   const CARPENTER_TIERS = ['Novice', 'Apprentice', 'Adept', 'Expert', 'Master'];
   const panelCap = (a) => PANEL_CAPS.find((c) => hasUiCap(a, c.cap)) || null;
   const MAX_SEARCH = 40;

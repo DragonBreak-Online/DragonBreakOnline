@@ -64,7 +64,7 @@ const api = {
   onlineActors: () => ONLINE, isAdmin: (a) => a === GM, tierOf: (a) => (a === GM ? 'developer' : null), giveItem,
   findByName: (q) => Number(Object.keys(NAME).find((a) => NAME[a].toLowerCase() === String(q).toLowerCase())) || 0,
   every: (name, ms, fn) => { timers[name] = fn; }, cfg,
-  hasUiCap: (a, cap) => cap === 'decorPanel' && a !== FRIEND,
+  hasUiCap: (a, cap) => (cap === 'decorPanel' && a !== FRIEND) || (cap === 'native:decor' && a === GM),
 };
 let fails = 0;
 const ok = (c, what, detail) => { console.log(`${c ? 'ok  ' : 'FAIL'}  ${what}${!c && detail !== undefined ? '   ' + JSON.stringify(detail) : ''}`); if (!c) fails++; };
@@ -179,6 +179,14 @@ w = lastPanel(OWNER);
 ok(w.search === '' && w.group === 'beds' && w.rows[0].name === 'Bed', 'clearing it is the group again', w.rows.map((r) => r.name));
 act(OWNER, 'decorView', 'catalog', 'beds', 0, 'x'.repeat(500));
 ok(lastPanel(OWNER).search.length === 40, 'a search is cut to 40 characters');
+
+// ---- page size follows the panel the client is routed to: native first (gamemode.js sends native:decor clients the swf) ----
+act(OWNER, 'decorGrant', String(PROFILE[GM]));
+cmd(GM, '');
+ok(T.S.panel.get(GM) && T.S.panel.get(GM).rows === 8, 'a client with both caps gets the native page of 8 (it is routed to the swf)', T.S.panel.get(GM));
+ok(T.S.panel.get(OWNER).rows === 20, 'a browser-only client keeps 20 a page', T.S.panel.get(OWNER).rows);
+fire('close', GM, [], 171);
+act(OWNER, 'decorRevoke', String(PROFILE[GM]));
 
 // ---- carpenters (Nat, 26 Oct): a hired carpenter's deconstruct uses THEIR Woodcutter share, and the refund is the owner's ----
 setp(STRANGER, 'private.mastery', { order: ['woodcutter'], skills: { woodcutter: { rank: 2 } } });
