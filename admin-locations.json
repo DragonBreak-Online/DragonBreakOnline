@@ -20018,22 +20018,6 @@
    ]
   },
   {
-   "name": "Boss: the Behemoth of Hircine's Hunt, HM (Falkreath)",
-   "region": "Bosses",
-   "world": "3c:Skyrim.esm",
-   "worldName": "Tamriel",
-   "pos": [
-    -42817.49,
-    -58192.09,
-    1082.63
-   ],
-   "rot": [
-    0,
-    0,
-    16.9
-   ]
-  },
-  {
    "name": "Boss: the Chieftain of Blizzard Rest, Blizzard Rest (Dawnstar)",
    "region": "Bosses",
    "world": "3c:Skyrim.esm",
