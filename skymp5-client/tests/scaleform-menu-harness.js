@@ -86,6 +86,26 @@ let acts = M.planOpen(s, 'dbo_prayer', { widget: 35, mode: 'pick' }, 35, 1000);
 check('opening asks for the menu and pushes NOTHING yet',
   () => acts.length === 1 && acts[0].do === 'open' && acts[0].swf === 'dbo_prayer', acts);
 check('...and remembers the widget id for the trip back', s.widgetId === 35);
+// The 05:02 session: everything worked and the payload was the string "null", silently.
+check('a MISSING payload is reported before the open, not pushed silently', () => {
+  const t = M.newState();
+  const r = M.planOpen(t, 'dbo_prayer', undefined, 35, 1000);
+  return r.length === 2 && r[0].do === 'report' && /sent no payload/.test(r[0].text) && r[1].do === 'open';
+}, M.planOpen(M.newState(), 'dbo_prayer', undefined, 35, 1000));
+check('...and so is an empty object, which is what a wrong packet shape looks like', () => {
+  const t = M.newState();
+  return M.planOpen(t, 'x', {}, 0, 0)[0].do === 'report';
+});
+check('a real payload is NOT reported', () => {
+  const t = M.newState();
+  const r = M.planOpen(t, 'x', { mode: 'pick' }, 1, 0);
+  return r.length === 1 && r[0].do === 'open';
+});
+check('an empty re-send while open is reported too', () => {
+  const t = M.newState(); M.planOpen(t, 'x', { a: 1 }, 1, 0); M.planReady(t, 1, 10);
+  const r = M.planOpen(t, 'x', null, 1, 20);
+  return r.length === 2 && r[0].do === 'report' && /re-sent an empty payload/.test(r[0].text);
+});
 check('a tick before the timeout does nothing', M.planTick(s, 1000 + M.READY_TIMEOUT_MS - 1).length === 0);
 acts = M.planReady(s, 2, 1400);
 check('ready pushes the payload that was waiting',
