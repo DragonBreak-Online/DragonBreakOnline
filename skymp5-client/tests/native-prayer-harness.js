@@ -130,5 +130,16 @@ let sorted;
   check('key presses reach skse.Log', t.logs.some((l) => l.indexOf('prayer key 65') >= 0), t.logs);
 }
 
+{
+  const t = boot();
+  t.press(27);
+  check('Escape closes the menu from the SWF itself', t.sent.some((m) => m.e === 'closeMenu'), t.sent);
+  const u = boot();
+  u.st.time += 7999; u.tick();
+  check('no close before the payload wait runs out', !u.sent.some((m) => m.e === 'closeMenu'));
+  u.st.time += 1; u.tick();
+  check('a panel that never gets its payload closes itself', u.sent.some((m) => m.e === 'closeMenu'), u.sent);
+}
+
 console.log(failures ? `\n${failures} failed` : '\nall passed');
 process.exit(failures ? 1 : 0);

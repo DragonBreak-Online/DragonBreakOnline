@@ -133,10 +133,12 @@ function choose(i)
    draw();
 }
 
+// Closes from the SWF too: the client may not be listening while the menu is open
 function standUp()
 {
    dboSound("UIMenuCancel");
    dboSend("dbo:prayerCancel", [nonce]);
+   dboClose();
 }
 
 function setFocus(i)
@@ -379,8 +381,18 @@ keys.onKeyDown = function()
 Key.addListener(keys);
 
 // A prayer left unspoken ends at the round's limit
+var NO_DATA_CLOSE_MS = 8000;
+var builtAt = getTimer();
+
 _root.onEnterFrame = function()
 {
+   if (data == null && getTimer() - builtAt >= NO_DATA_CLOSE_MS)
+   {
+      dboLog("prayer: no payload in " + NO_DATA_CLOSE_MS + " ms, closing");
+      delete _root.onEnterFrame;
+      dboClose();
+      return;
+   }
    if (data != null && !sent && !done() && now() >= total)
    {
       idle = true;
