@@ -3336,6 +3336,8 @@ const onCharacterReady = (userId, a) => {
     try { if (globalThis.__dboEnchLearnedLogin) globalThis.__dboEnchLearnedLogin(a); } catch (e) { log('learned enchantments login failed', e.message); }
     // A shrine blessing still running is cast on the player again: the client's effect did not survive the logout (prayer.js)
     try { if (globalThis.__dboPrayerLogin) globalThis.__dboPrayerLogin(a); } catch (e) { log('prayer login failed', e.message); }
+    try { if (globalThis.__dboBriarheartLogin) globalThis.__dboBriarheartLogin(a); } catch (e) { log('briarheart login failed', e.message); }
+    try { if (globalThis.__dboHagravenLogin) globalThis.__dboHagravenLogin(a); } catch (e) { log('hagraven login failed', e.message); }
     // The first spell: a mage at Arcane Arts 25 with no school is offered the choice, one with a school and no spell gets its starter (schools.js)
     try { if (globalThis.__dboSchoolsLogin) globalThis.__dboSchoolsLogin(a); } catch (e) { log('schools login failed', e.message); }
     // The election notice of the current phase for a citizen of a hold that is choosing its Jarl, once per character (citizenship.js)
@@ -6877,6 +6879,8 @@ const asylumHit = (agg, tgt) => {
 const castHook = (casterId, spellId, ...rest) => {
   try { if (racial) racial.onCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('racial cast failed', e.message); }
   try { if (globalThis.__dboBeastCast) globalThis.__dboBeastCast(casterId, spellId); } catch (e) { log('beast cast failed', e.message); }
+  // hagraven.js: the Hagraven Form power, cast from the Powers menu, takes or leaves the Hagraven body
+  try { if (typeof globalThis.__dboHagravenCast === 'function') globalThis.__dboHagravenCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('hagraven cast failed', e.message); }
   // A vampire's Restoration healing (supernatural.js vampireRestoration) is refused for the gameplay: no skill or school
   // credit, no chain. The C++ applies the heal after this hook whatever it returns, so supernatural.js takes it back
   try { if (typeof globalThis.__dboVampHealCast === 'function' && globalThis.__dboVampHealCast(Number(casterId) >>> 0, Number(spellId) >>> 0)) return false; } catch (e) { log('vampire healing cast failed', e.message); }
@@ -7078,6 +7082,8 @@ const equipHook = (actorId, equipment, isAllowed, ...rest) => {
     // durability.js: a piece taken off gets its wear in its name; a Broken one put on comes off
     if (isAllowed && typeof globalThis.__dboDurabilityEquip === 'function') { try { globalThis.__dboDurabilityEquip(a, equipment); } catch (e) { log('durability equip failed', e.message); } }
     if (isAllowed) { try { raceEquipCheck(a, equipment); } catch (e) { log('race equip failed', e.message); } }
+    // briarheart.js: a Briarheart's bare chest shows the briar body; their own armour takes its place
+    if (isAllowed && typeof globalThis.__dboBriarheartEquip === 'function') { try { globalThis.__dboBriarheartEquip(a, equipment); } catch (e) { log('briarheart equip failed', e.message); } }
     // spawnwatch.js: the game has loaded, so its arrival report is due; until it comes its outfit is not remembered
     const spawnWatch = globalThis.__dboSpawnWatch;
     if (spawnWatch) { try { spawnWatch.report(a); } catch (e) { log('spawn watch report failed', e.message); } }
@@ -7313,6 +7319,26 @@ const sourceResistsOf = (sourceId) => {
   return out;
 };
 const fitsElement = (element, sourceId) => ELEMENT_RESIST[element] !== undefined && sourceResistsOf(sourceId).has(ELEMENT_RESIST[element]);
+// The magic schools of a hit's source (a Set of actor value indexes: MGEF DATA magic skill, i32 at 12; Destruction 20,
+// Conjuration 19, read off Firebolt's and Conjure Familiar's effects), read once per source (hagraven.js)
+const sourceSkillCache = new Map();
+const sourceSkillsOf = (sourceId) => {
+  if (sourceSkillCache.has(sourceId)) return sourceSkillCache.get(sourceId);
+  const out = new Set();
+  const r = recordOf(sourceId);
+  const skillOf = (m) => { const d = m && String(m.record.type) === 'MGEF' && (m.record.fields || []).find((x) => x && x.type === 'DATA' && x.data instanceof Uint8Array && x.data.byteLength >= 16); return d ? new DataView(d.data.buffer, d.data.byteOffset, d.data.byteLength).getInt32(12, true) : null; };
+  if (r && String(r.record.type) === 'MGEF') { const k = skillOf(r); if (k !== null) out.add(k); }
+  if (r && ['SPEL', 'ENCH', 'SCRL'].includes(String(r.record.type))) {
+    for (const f of r.record.fields || []) {
+      if (!f || f.type !== 'EFID' || !(f.data instanceof Uint8Array) || f.data.byteLength < 4) continue;
+      const local = new DataView(f.data.buffer, f.data.byteOffset, f.data.byteLength).getUint32(0, true);
+      const k = skillOf(recordOf(typeof r.toGlobalRecordId === 'function' ? r.toGlobalRecordId(local) >>> 0 : local));
+      if (k !== null) out.add(k);
+    }
+  }
+  sourceSkillCache.set(sourceId, out);
+  return out;
+};
 // ---- The sun burns the undead: a Restoration sun spell does more to what should not be walking ------------------------
 // Nate, 15 Oct. Restoration's one bite is its sun, and it had none here: the server decides every hit from armour and
 // the multipliers below, and the conditions a vanilla sun effect carries ("more against the undead") are never evaluated
@@ -7818,10 +7844,27 @@ const fleshArmorOf = (a) => {
 };
 globalThis.__dboFleshArmor = fleshArmorOf;
 globalThis.__dboFleshCast = fleshCast;
-// Below 1 when a Flesh spell holds on the target and the hit is a weapon's or a fist's: the rating counted with it over
-// the rating counted without it, by the engine's own reduction (fArmorScalingFactor, capped at fMaxArmorRating)
+// A Briarheart's briar skin (briarheart.js) while the briar chest shows on a bare chest: the faction cuirass it stands for counts,
+// at that piece's counted rating under the target's light-armour multipliers, in place of the briar body's own rating the
+// engine already took. 0 when off
+const briarSkinArmorOf = (targetId) => {
+  let s = null; try { s = typeof globalThis.__dboBriarSkinArmor === 'function' ? globalThis.__dboBriarSkinArmor(targetId >>> 0) : null; } catch (e) { s = null; }
+  if (!s) return 0;
+  // A rating of its own (the faction cuirass's, briarSkin.armor) counts as a light piece of that rating; else the piece s.from names
+  const from = Number(s.rating) > 0 ? { rating: Number(s.rating), counted: Number(s.rating), heavy: false } : armorPieceOf(Number(s.from) >>> 0);
+  const shown = s.shown ? armorPieceOf(Number(s.shown) >>> 0) : null;
+  const body = s.body ? armorPieceOf(Number(s.body) >>> 0) : null;   // the wound body (USSEP 90D63, rated 5) the engine counts too
+  if (!from) return 0;
+  const pm = defensePieceMult(targetId), gm = gearArmorMult(targetId);
+  const as = (p) => (p ? (p.counted || p.rating) * (p.heavy ? pm.heavy * gm.heavy : pm.light * gm.light) : 0);
+  return Math.max(0, as(from) - as(shown) - as(body));
+};
+globalThis.__dboBriarSkinRating = briarSkinArmorOf;
+// Below 1 when a Flesh spell (or a briar skin) holds on the target and the hit is a weapon's or a fist's: the rating
+// counted with it over the rating counted without it, by the engine's own reduction (fArmorScalingFactor, capped at
+// fMaxArmorRating)
 const fleshDamageMult = (targetId, sourceId) => {
-  const extra = fleshArmorOf(targetId);
+  const extra = fleshArmorOf(targetId) + briarSkinArmorOf(targetId);
   if (!(extra > 0)) return 1;
   const physical = (sourceId >>> 0) === 0x1f4 || (() => { const r = recordOf(sourceId >>> 0); return !!r && String(r.record.type) === 'WEAP'; })();
   if (!physical) return 1;
@@ -8258,11 +8301,15 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     let targetSide = defenseDamageMult(tgt) * fleshDamageMult(tgt, src) * blessingTargetMult(tgt, src) * potionResistMult(tgt, src) * gearResistMult(tgt, src);
     // Spellbreaker's ward while its wearer blocks a spell from the front (gearench.js), under the same cap as a racial ward
     try { if (gearEnch) targetSide *= gearEnch.spellbreakerMult(agg, tgt, src, dmg, flags); } catch (e) { log('spellbreaker failed', e.message); }
+    // A Briarheart's poison and frost resistance and fire weakness (briarheart.js), under the same cap as the race's
+    try { if (globalThis.__dboBriarheartTargetMult) targetSide *= Number(globalThis.__dboBriarheartTargetMult(agg, tgt, src)) || 1; } catch (e) { log('briarheart target failed', e.message); }
     if (racial) { try { targetSide = racial.capTargetSide(targetSide * racial.targetMult(agg, tgt, src, dmg)); } catch (e) { log('racial target failed', e.message); } }
     let raceAtk = 1;
     if (racial && !beastAgg) { try { raceAtk = racial.attackMult(agg, tgt, src, dmg); } catch (e) { log('racial attack failed', e.message); } }
     let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * potionTakenMult(tgt, flags) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp;
     if (!beastAgg) mult *= gearAttackMult(agg, src);
+    // A Hagraven's Destruction (hagraven.js), by her stage
+    try { if (globalThis.__dboHagravenAttackMult) mult *= Number(globalThis.__dboHagravenAttackMult(agg, src)) || 1; } catch (e) { log('hagraven attack failed', e.message); }
     // The Shrouded Gloves double a one-handed sneak attack (gearench.js backstabMult)
     try { if (gearEnch && !beastAgg) mult *= gearEnch.backstabMult(agg, src, flags); } catch (e) { log('backstab failed', e.message); }
     // Tired blows, fists into armour, staves through it, the fist's stamina drain and disarm (martial.js)
@@ -9270,6 +9317,20 @@ try {
   delete require.cache[DOWNED_JS];
   require(DOWNED_JS)({ mp, log, personal, sendPacket, audit, who, display, profileOf, nameOf, onlineActors, every, registerChatCommand, cfg, openWidget, closeWidget, onUi, redress });
 } catch (e) { log('downed.js failed to load:', e.stack || e.message); globalThis.__dboReviveWith = null; globalThis.__dboIsDowned = null; globalThis.__dboLabDraught = null; }
+// ---- Briarhearts: the Hagraven's rite for Reachmen of the Old Gods (serverriarheart.js, config "briarheart"): after
+// supernatural.js, prayer.js and downed.js, whose hooks it reads ----
+try {
+  const BRIARHEART_JS = path.resolve('briarheart.js');
+  delete require.cache[BRIARHEART_JS];
+  require(BRIARHEART_JS)({ mp, log, personal, audit, who, display, cfg, registerChatCommand, onlineActors, isLeadStaff, findByName, every, giveItem, sourceResistsOf });
+} catch (e) { log('briarheart.js failed to load:', e.stack || e.message); for (const k of ['__dboIsBriarheart', '__dboBriarheartVitalBonus', '__dboBriarheartTargetMult', '__dboBriarheartRefusesDivine', '__dboBriarheartFaithLock', '__dboBriarheartLogin', '__dboBriarheartMenuEntries', '__dboBriarheartMenuAction', '__dboBriarheartEquip']) globalThis[k] = null; }
+// ---- the Hagraven's pact for the women of the Reach (server\hagraven.js, config "hagraven"): after briarheart.js (its altars)
+// and exposure.js (known on sight) ----
+try {
+  const HAGRAVEN_JS = path.resolve('hagraven.js');
+  delete require.cache[HAGRAVEN_JS];
+  require(HAGRAVEN_JS)({ mp, log, personal, audit, who, display, cfg, registerChatCommand, onlineActors, isLeadStaff, findByName, every, giveItem, sourceSkillsOf, zoneOfActor });
+} catch (e) { log('hagraven.js failed to load:', e.stack || e.message); for (const k of ['__dboHagravenStage', '__dboHagravenAttackMult', '__dboHagravenRegenMult', '__dboHagravenRefusesDeity', '__dboHagravenRiteAt', '__dboHagravenLogin']) globalThis[k] = null; }
 // ---- the hold's watch: NPC guards at staff-placed posts, no loot or skill from them, jail by them (server\guards.js, config "guards") ----
 try {
   const GUARDS_JS = path.resolve('guards.js');

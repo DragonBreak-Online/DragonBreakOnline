@@ -8254,5 +8254,38 @@
     "tag": "Update",
     "version": "Launcher 2.1.17",
     "body": "The launcher now downloads DragonBreak's own plugins, archives and assets, and fetches only the files that changed. No manual installs after an update."
+  },
+  {
+    "title": "Briarhearts bare the briar",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Briarhearts",
+        "items": [
+          "A Briarheart's chest is always bare, showing the briar heart: cuirasses and robes cannot be worn over it, and come off into your pack.",
+          "In return, Briar Skin now protects like a light faction cuirass.",
+          "Gauntlets, boots, helmets and shields are worn as before. Briar Skin still quickens your stamina and resists disease."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Hagravens can take the Hagraven body",
+    "date": "2026-10-25",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Hagravens",
+        "items": [
+          "A full Hagraven can now take the true Hagraven body with /hagraven form, and leave it the same way. There is a short wait between changes.",
+          "The body casts no spells: leave it to cast. Your Hagraven gifts stay with you either way.",
+          "It cannot be taken indoors, in water, in the middle of a fight, while mounted or seated, or while bound, jailed or down.",
+          "Being struck down, jailed or bound ends it, and so does dying or logging out."
+        ]
+      }
+    ]
   }
 ]
