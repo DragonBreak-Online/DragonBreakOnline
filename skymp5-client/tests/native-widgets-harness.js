@@ -248,6 +248,26 @@ check('an open that THROWS falls over at once, without waiting out the timeout',
 });
 check('a failover whose service also fails is said out loud, not swallowed',
   () => /could not draw its own panel either/.test(SERVICE));
+// Worker 1 hit this: a service that simply reopens on FAILED_KEY called openNative, got true because the type
+// was still registered, and looped back into the panel that cannot be drawn. Guarded here, once, rather than
+// in every service - which is what this design exists to avoid.
+check('a type that failed is refused by openNative, so reopening on FAILED_KEY cannot loop',
+  () => /if \(this\.failedTypes\.indexOf\(type\) >= 0\) return false;/.test(SERVICE));
+check('...and it is refused BEFORE the swf is looked up, so the registry cannot override it', () => {
+  const o = at(SERVICE, 'public openNative');
+  const guard = SERVICE.indexOf('this.failedTypes.indexOf(type)', o);
+  const swf = SERVICE.indexOf('const swf = swfFor(', o);
+  return o > 0 && guard > o && guard < swf;
+});
+check('the failure is recorded BEFORE the callback, so a reopen from inside it is already refused', () => {
+  const f = at(SERVICE, 'private failover(');
+  const body = SERVICE.slice(f, f + 1100);
+  return body.indexOf('this.failedTypes.push(o.type)') < body.indexOf('o.onKey(');
+}, { push: SERVICE.slice(at(SERVICE, 'private failover('), at(SERVICE, 'private failover(') + 1100).indexOf('this.failedTypes.push(o.type)') });
+check('resetNative exists, so a service can re-arm a type deliberately',
+  () => /public resetNative\(type: string\): void \{/.test(SERVICE));
+check('the doc comment tells callers reopening is safe, since that is the trap',
+  () => /Reopening from inside FAILED_KEY is SAFE/.test(SERVICE));
 // Worker 1's panels close themselves, and nothing reports that.
 check('an SWF that closed itself is noticed, through Ui.isMenuOpen',
   () => /if \(this\.state\.phase === "ready" && !this\.menuIsOpen\(\)\)/.test(SERVICE)

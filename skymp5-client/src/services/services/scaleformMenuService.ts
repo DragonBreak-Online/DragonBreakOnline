@@ -197,11 +197,17 @@ export class ScaleformMenuService extends ClientListener {
   // its widget, its packets and its key switch; all it changes is the call site and a callback.
   //
   //   if (!this.controller.lookupListener(ScaleformMenuService).openNative({
-  //         type: "bountyBoard", widget: { events, info, WIDGET_ID }, widgetId: WIDGET_ID,
+  //         type: "contextMenu", widgetId: WIDGET_ID,
+  //         widget: { type, id, targetName, actions, lines, mode, events },
   //         onKey: (key, args) => this.handleKey(key, args),
   //       })) {
   //     openFormMenu(...);   // as before
   //   }
+  //
+  // widget is passed through to _root.dboData untouched, so it must be the WIDGET object the SWF reads - the
+  // same one the browser would have received - and not the injected-vars object openFormMenu takes for its
+  // stringified setter. Nothing here inspects it, so the wrong shape reaches the panel silently and the panel
+  // draws blank.
   //
   // false means "not native, draw it yourself" - an unknown type, or the nativePanels setting turning it off -
   // so the service needs no knowledge of which panels have an SWF. Keys the service namespaced for itself
@@ -209,9 +215,22 @@ export class ScaleformMenuService extends ClientListener {
   //
   // onKey is also called with FAILED_KEY if the panel cannot be drawn, so the service can open its browser
   // menu after all, and with CLOSE_KEY when the panel reports it has gone.
+  //
+  // Reopening from inside FAILED_KEY is SAFE: openNative returns false for a type that failed this session,
+  // so the plainest possible handler - call openNative, and openFormMenu when it says false - cannot loop.
+  // No service needs a flag of its own for that.
   public openNative(opts: NativeOpen): boolean {
     try {
       const type = String(opts.type || "");
+      // A type whose panel already failed this session stays on the browser. Without this, a service that
+      // simply reopens on FAILED_KEY calls openNative, gets true because the type is still registered, and
+      // loops straight back into the panel that cannot be drawn (Worker 1, 26 Oct). Guarding it in each
+      // service would put the burden back where this design exists to take it away from.
+      //
+      // Session-long rather than retried: the cause is a missing or broken Data\Interface\<swf>.swf, which
+      // does not heal, and retrying costs the player the 5s ready timeout on every open. resetNative clears
+      // it for a service that has reason to try again.
+      if (this.failedTypes.indexOf(type) >= 0) return false;
       const swf = swfFor(type, this.nativePanelsSetting());
       if (!swf) return false;
       const id = Math.max(0, Math.round(Number(opts.widgetId) || 0));
@@ -322,10 +341,19 @@ export class ScaleformMenuService extends ClientListener {
   //
   // Only a client-service panel has somewhere to fall back to. A gamemode dboScaleform panel has no owner, so
   // this does nothing for one of those and its failure is reported by planTick alone.
+  // A service may re-arm a type that failed, if it has reason to think the panel can be drawn now. Rarely
+  // needed: a missing SWF stays missing for the session.
+  public resetNative(type: string): void {
+    const i = this.failedTypes.indexOf(String(type || ""));
+    if (i >= 0) this.failedTypes.splice(i, 1);
+  }
+
   private failover(why: string): void {
     const o = this.owner;
     this.owner = null;
     if (!o) return;
+    // Recorded BEFORE the callback, so a service that reopens from inside it gets false rather than looping
+    if (this.failedTypes.indexOf(o.type) < 0) this.failedTypes.push(o.type);
     const text = `a native panel for '${o.type}' did not come up (${why}), so the service draws its own`;
     logError(this, "native panel failover", text);
     this.note(text);
@@ -363,6 +391,9 @@ export class ScaleformMenuService extends ClientListener {
   }
 
   private owner: { type: string; onKey: (key: string, args: unknown[]) => void } | null = null;
+  // Types whose panel could not be drawn this session. An array, not a Set: the client targets es2019 but the
+  // rest of this file stays to the plainest shapes, and this list is never longer than the registry.
+  private failedTypes: string[] = [];
   private state: MenuState = newState();
   private announces = 0;
   private announcedAt = 0;
