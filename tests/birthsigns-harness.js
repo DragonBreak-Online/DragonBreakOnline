@@ -92,15 +92,15 @@ const WANT = {
   mage: 'Arcane Arts and Enchanter learn 10% faster',
   thief: 'Archery learns 10% faster; 5% more gold from loot and contract pay',
   lady: 'Health and stamina regenerate 7% faster',
-  lord: 'Health regenerates 10% faster; fire hurts 5% more; weapons and fists hurt 5% less',
-  steed: 'Stamina regenerates 10% faster; +50 carry weight',
-  apprentice: 'Magicka regenerates 15% faster; spells hurt 5% more',
-  atronach: '+25 maximum magicka; magicka regenerates 10% slower; spells hurt 5% less',
+  lord: 'Health regenerates 5% faster; fire hurts 10% more; weapons and fists hurt 5% less',
+  steed: '+50 carry weight; moves 2% faster',
+  apprentice: 'Magicka regenerates 20% faster; spells hurt 10% more',
+  atronach: '+50 maximum magicka; magicka regenerates 25% slower; spells hurt 5% less',
   ritual: 'Priest learns 10% faster; health regenerates 15% faster below 30% health',
   lover: 'Every skill learns 5% faster',
   shadow: 'Sneak attacks deal 15% more',
   serpent: 'Alchemist learns 10% faster; poison hurts 15% less',
-  tower: 'Lockpicking learns 15% faster',
+  tower: 'Lockpicking learns 15% faster; lockpicks snap 25% less often',
 };
 for (const [id, text] of Object.entries(WANT)) check(`${S[id].name}: the menu says "${text}"`, D(S[id]) === text, D(S[id]));
 
@@ -136,25 +136,25 @@ check('Lady: health and stamina x1.07, magicka x1 (Nat, 26 Oct: smaller, as she 
 check('Lady Redguard: stamina 1.25 x 1.10 capped at alwaysRegenCap 1.25', near(R.regenFactor(REDGUARD, 'stamina'), 1.25), R.regenFactor(REDGUARD, 'stamina'));
 
 signAll('lord');
-check('Lord: health x1.10; fire hurts 5% more, frost not; a sword or a fist 5% less, a spell not (Nat, 26 Oct: his own niche)', near(R.regenFactor(P0, 'health'), 1.1) && near(R.targetMult(NPC, P0, FLAMES), 1.05) && R.targetMult(NPC, P0, 0x211) === 1
+check('Lord: health x1.05; fire hurts 10% more, frost not; a sword or a fist 5% less, a spell not (Nat, 26 Oct: his own niche)', near(R.regenFactor(P0, 'health'), 1.05) && near(R.targetMult(NPC, P0, FLAMES), 1.1) && R.targetMult(NPC, P0, 0x211) === 1
   && near(R.targetMult(NPC, P0, SWORD), 0.95) && near(R.targetMult(NPC, P0, FIST), 0.95) && R.targetMult(NPC, P0, SPARKS) === 1, [R.targetMult(NPC, P0, SWORD), R.targetMult(NPC, P0, FIST), R.targetMult(NPC, P0, SPARKS)]);
 check('Lord against a player: a sword 2.5% less (the PvP half)', near(R.targetMult(NORD, P0, SWORD), 0.975), R.targetMult(NORD, P0, SWORD));
 globalThis.__dboRacialState.pvpAt.clear(); // that player hit opened a PvP fight; the PvE checks below start outside one
-check('Lord Dunmer: fire 0.5 x 1.05', near(R.targetMult(NPC, DUNMER, FLAMES), 0.525), R.targetMult(NPC, DUNMER, FLAMES));
+check('Lord Dunmer: fire 0.5 x 1.10', near(R.targetMult(NPC, DUNMER, FLAMES), 0.55), R.targetMult(NPC, DUNMER, FLAMES));
 
 signAll('steed');
-check('Steed: stamina x1.10 only', near(R.regenFactor(P0, 'stamina'), 1.1) && R.regenFactor(P0, 'health') === 1 && R.regenFactor(P0, 'magicka') === 1);
+check('Steed: no regeneration gift now (carry weight and speed instead; Nat, 26 Oct)', R.regenFactor(P0, 'stamina') === 1 && R.regenFactor(P0, 'health') === 1 && R.regenFactor(P0, 'magicka') === 1);
 
 signAll('apprentice');
-check('Apprentice: magicka x1.15; a spell hurts 5% more, a sword not', near(R.regenFactor(P0, 'magicka'), 1.15) && near(R.targetMult(NPC, P0, SPARKS), 1.05) && R.targetMult(NPC, P0, SWORD) === 1);
+check('Apprentice: magicka x1.20; a spell hurts 10% more, a sword not', near(R.regenFactor(P0, 'magicka'), 1.2) && near(R.targetMult(NPC, P0, SPARKS), 1.1) && R.targetMult(NPC, P0, SWORD) === 1);
 check('Apprentice Altmer: magicka 1.25 x 1.15 capped at 1.25', near(R.regenFactor(ALTMER, 'magicka'), 1.25));
 
 signAll('atronach');
-check('Atronach: magicka x0.90 (slower), a spell hurts 5% less', near(R.regenFactor(P0, 'magicka'), 0.9) && near(R.targetMult(NPC, P0, SPARKS), 0.95));
-check('Atronach Altmer: the cap first, then the slowing (1.25 x 0.90)', near(R.regenFactor(ALTMER, 'magicka'), 1.125), R.regenFactor(ALTMER, 'magicka'));
+check('Atronach: magicka x0.75 (slower), a spell hurts 5% less', near(R.regenFactor(P0, 'magicka'), 0.75) && near(R.targetMult(NPC, P0, SPARKS), 0.95));
+check('Atronach Altmer: the cap first, then the slowing (1.25 x 0.75)', near(R.regenFactor(ALTMER, 'magicka'), 0.9375), R.regenFactor(ALTMER, 'magicka'));
 check('Atronach Breton: magic 25% off, then 5% more off (0.75 x 0.95)', near(R.targetMult(NPC, BRETON, SPARKS), 0.7125), R.targetMult(NPC, BRETON, SPARKS));
 check('reductionCap still holds every reduction together: 0.1 x the Breton Atronach -> 0.25', near(R.capTargetSide(0.1 * R.targetMult(NPC, BRETON, SPARKS)), 0.25));
-check('Atronach: +25 maximum magicka through the race\'s vital bonus; a Lady none', JSON.stringify(globalThis.__dboRaceVitalBonus(P0)) === '{"health":0,"magicka":25,"stamina":0}'
+check('Atronach: +50 maximum magicka through the race\'s vital bonus; a Lady none', JSON.stringify(globalThis.__dboRaceVitalBonus(P0)) === '{"health":0,"magicka":50,"stamina":0}'
   && (() => { sign(P0, 'lady'); const v = globalThis.__dboRaceVitalBonus(P0); sign(P0, 'atronach'); return v.magicka === 0; })());
 check('Atronach: the slower magicka is taken back (extraPerSecond is negative), a full bar is left alone', R.extraPerSecond(P0, 'magicka') < 0 && R.extraPerSecond(P0, 'magicka', 1) === 0);
 // the regeneration tick takes the share off a fresh report instead of adding it
@@ -169,7 +169,7 @@ for (let i = 0; i < 40; i++) {
   R.regenTick(tStart + i * 250);
   if (state[P0].pc.magicka < reported) { taken += reported - state[P0].pc.magicka; reported = state[P0].pc.magicka; }
 }
-check('...the tick takes about a tenth of the bar\'s own refill back over 10 s (own 0.03/s: 0.03 of it)', taken > 0.015 && taken < 0.04, taken);
+check('...the tick takes about a quarter of the bar\'s own refill back over 10 s (own 0.03/s: 0.075 of it)', taken > 0.045 && taken < 0.09, taken);
 state[P0].pc = { health: 1, magicka: 1, stamina: 1 };
 R.regenTick(Date.now());
 check('...and never below a full bar\'s report: a full bar is not touched', state[P0].pc.magicka === 1);
@@ -206,7 +206,7 @@ check('Serpent Argonian: poison 0.5 x 0.85', near(R.targetMult(NPC, ARGONIAN, PO
   signAll('serpent');
   check('Serpent: a player\'s poison 7.5% less, an NPC\'s 15% less', near(R.targetMult(NORD, P0, POISON), 0.925) && near(R.targetMult(NPC, P0, POISON), 0.85));
   signAll('lord');
-  check('Lord: a player\'s fire 2.5% more (the weakness halves too), an NPC\'s 5% more', near(R.targetMult(NORD, P0, FLAMES), 1.025) && near(R.targetMult(NPC, P0, FLAMES), 1.05));
+  check('Lord: a player\'s fire 5% more (the weakness halves too), an NPC\'s 10% more', near(R.targetMult(NORD, P0, FLAMES), 1.05) && near(R.targetMult(NPC, P0, FLAMES), 1.1));
   signAll('lady');
   const L = 41; race(L); sign(L, 'lady');
   check('Lady out of a fight: health x1.07', near(R.regenFactor(L, 'health'), 1.07));
@@ -215,7 +215,7 @@ check('Serpent Argonian: poison 0.5 x 0.85', near(R.targetMult(NPC, ARGONIAN, PO
   R.attackMult(NORD, L, SWORD, 10, {});
   check('...hit by a player: x1.035 for the fight', near(R.regenFactor(L, 'health'), 1.035), R.regenFactor(L, 'health'));
   const A = 42; race(A); sign(A, 'atronach'); R.attackMult(NORD, A, SWORD, 10, {});
-  check('...the Atronach\'s slower magicka is never eased in a fight: x0.90', near(R.regenFactor(A, 'magicka'), 0.9));
+  check('...the Atronach\'s slower magicka is never eased in a fight: x0.75', near(R.regenFactor(A, 'magicka'), 0.75));
   globalThis.__dboRacialState.pvpAt.set(L, Date.now() - 11000);
   check('...and back to x1.07 once 10 s pass without a player hit', near(R.regenFactor(L, 'health'), 1.07));
 }
@@ -272,7 +272,7 @@ check('...audited, told, the menu closed', audits.includes('BIRTHSIGN P50 #T50 (
 check('...the creation step goes on to the god, once', JSON.stringify(stepDone) === '[50]');
 check('...and nothing holds them now', globalThis.__dboBirthsignHold(NEW) === false && globalThis.__dboBirthsignCreationOpen(NEW) === false);
 check('fixed for life: a later row, or /birthsign warrior, changes nothing', (() => { fire('birthsignChoose', NEW, 'warrior'); commands.get('birthsign')(NEW, 'warrior'); return state[NEW].props['private.dboBirthsign'].id === 'lady'; })()
-  && told.some(([a, t]) => a === NEW && /You were born under The Lady: .*Only staff can change it\./.test(t)));
+  && told.some(([a, t]) => a === NEW && /You were born under The Lady: .*(Only staff can change it|You may change it once: \/birthsign change)\./.test(t)));
 
 // close: it comes back, and nothing keeps it away for good
 const OLD = 60; race(OLD, 'breton');
@@ -326,7 +326,7 @@ check('.../birthsign tells them to type the sign', told.some(([a, t]) => a === S
 widgetOk = true;
 commands.get('birthsign')(STUCK, 'the serpent');
 check('...and /birthsign the serpent chooses it, at once', state[STUCK].props['private.dboBirthsign'].id === 'serpent');
-check('/birthsign: your sign and its gift', (() => { told.length = 0; commands.get('birthsign')(STUCK, ''); return told.some(([a, t]) => /^You were born under The Serpent: Alchemist learns 10% faster; poison hurts 15% less\.$/.test(t)); })(), told);
+check('/birthsign: your sign and its gift', (() => { told.length = 0; commands.get('birthsign')(STUCK, ''); return told.some(([a, t]) => /^You were born under The Serpent: Alchemist learns 10% faster; poison hurts 15% less\. You may change it once: \/birthsign change\.$/.test(t)); })(), told);
 check('an unknown sign typed: the list, and the menu', (() => { const Y = 71; race(Y, 'nord'); told.length = 0; const n = widgets.length; commands.get('birthsign')(Y, 'dragon'); return told.some(([, t]) => /^No such sign\. The signs: Warrior, Mage/.test(t)) && widgets.length === n + 1; })());
 check('optional at creation when config says so (requireAtCreation false)', (() => { loadSigns({ requireAtCreation: false }); const Z = 72; race(Z, 'nord'); const r = globalThis.__dboBirthsignCreationOpen(Z) === false && globalThis.__dboBirthsignHold(Z) === false; B = loadSigns({}); return r; })());
 
@@ -366,8 +366,8 @@ const pk = last()[1];
 check('...thirteen cards, each Guardian then its charges, the Serpent last', pk.signs.map((x) => x.id).join() === 'warrior,lady,steed,lord,mage,apprentice,atronach,ritual,thief,lover,shadow,tower,serpent');
 check('...the Guardians marked \'\', their charges by Guardian, the Serpent \'none\'', pk.signs.map((x) => x.guardian).join() === ',warrior,warrior,warrior,,mage,mage,mage,,thief,thief,thief,none');
 const lord = pk.signs.find((x) => x.id === 'lord');
-check('...a card: name, the mock\'s lore line, the effect from the numbers', lord.name === 'The Lord' && lord.lore === 'The blood of the North runs strong, and fire bites deeper.' && lord.effect === 'Health regenerates 10% faster; fire hurts 5% more; weapons and fists hurt 5% less', lord);
-check('...the mock\'s title and line', pk.title === 'Choose your birthsign' && pk.sub === 'The stars you were born under. Yours for life; only staff can change it later.');
+check('...a card: name, the mock\'s lore line, the effect from the numbers', lord.name === 'The Lord' && lord.lore === 'The blood of the North runs strong, and fire bites deeper.' && lord.effect === 'Health regenerates 5% faster; fire hurts 10% more; weapons and fists hurt 5% less', lord);
+check('...the mock\'s title and line', pk.title === 'Choose your birthsign' && pk.sub === 'The stars you were born under. Yours for life: you may change it once yourself (/birthsign change), then only staff can.');
 check('...every emblem is stars on the 40 x 40 grid and lines between real stars', pk.signs.every((x) => x.emblem && x.emblem.stars.length >= 4
   && x.emblem.stars.every(([px, py]) => px >= 0 && px <= 40 && py >= 0 && py <= 40)
   && x.emblem.lines.length > 0 && x.emblem.lines.every(([i, j]) => i !== j && x.emblem.stars[i] && x.emblem.stars[j])));
@@ -443,12 +443,40 @@ check('patch-notes.json: a Birthsigns note, at the top', !!note && list.indexOf(
   mp.getDescFromId = (id) => ((id >>> 0) === CARRY ? '1d1fa7:DragonBreak Online Edits.esp' : realDescOf ? realDescOf(id) : String(id));
   const ST = 71; race(ST); sign(ST, 'steed'); const LA = 72; race(LA); sign(LA, 'lady');
   globalThis.__dboBirthsignAbilityTick(); globalThis.__dboBirthsignAbilityTick();
-  check('the Steed is given the carry ability once a session; the Lady not', calls.filter((c) => c[0] === 'AddSpell' && c[2] === '1d1fa7:DragonBreak Online Edits.esp').length === 1 && !calls.some((c) => String(c[1]) === String(mp.getDescFromId(LA))) && state[ST].props['private.dboBirthsignAbility'] === '1d1fa7:DragonBreak Online Edits.esp', calls);
+  check('the Steed is given the carry ability once a session; the Lady not (speedSpell is not in this stub\'s order, so only carry)', calls.filter((c) => c[0] === 'AddSpell' && c[2] === '1d1fa7:DragonBreak Online Edits.esp').length === 1 && !calls.some((c) => String(c[1]) === String(mp.getDescFromId(LA))) && state[ST].props['private.dboBirthsignAbility'] === '1d1fa7:DragonBreak Online Edits.esp', calls);
   calls.length = 0; sign(ST, 'lady'); globalThis.__dboBirthsignAbilityTick();
   check('...taken back when staff change the sign', calls.some((c) => c[0] === 'RemoveSpell') && !state[ST].props['private.dboBirthsignAbility'], calls);
   calls.length = 0; sign(ST, 'steed'); globalThis.__dboBirthsignAbilityTick(); state[ST].props['private.dboReferralCarry'] = '1d1fa7:DragonBreak Online Edits.esp'; sign(ST, 'lady'); globalThis.__dboBirthsignAbilityTick();
   check('...but never when the referral reward gave the same ability (it stays theirs)', !calls.some((c) => c[0] === 'RemoveSpell') && !state[ST].props['private.dboBirthsignAbility'], calls);
   mp.callPapyrusFunction = realCall; mp.lookupEspmRecordById = realLookup; mp.getIdFromDesc = realDesc; mp.getDescFromId = realDescOf;
+}
+// ---- the Tower's steady hand: lockpick.js scales the snap chance by __dboBirthsignSnapMult ----
+{
+  const TW = 73; race(TW); sign(TW, 'tower'); const OT = 74; race(OT); sign(OT, 'lady');
+  check('the Tower keeps 75% of a pick\'s snap chance; another sign all of it', near(globalThis.__dboBirthsignSnapMult(TW), 0.75) && globalThis.__dboBirthsignSnapMult(OT) === 1);
+  const lp = fs.readFileSync(path.join(SERVER, 'lockpick.js'), 'utf8');
+  check('lockpick.js multiplies its snap chance by the sign\'s share', /\* signSnap\(L\.a\); \};/.test(lp) && /__dboBirthsignSnapMult/.test(lp));
+}
+// ---- one change of sign per character (Nat, 26 Oct: "allow people to change their birth sign ONCE") ----
+{
+  const CH = 75; race(CH); state[CH].props.isOnline = true; sign(CH, 'lady');
+  told.length = 0; commands.get('birthsign')(CH, 'change');
+  const w = widgets[widgets.length - 1];
+  check('/birthsign change reopens the signs as the one change', w && w[0] === CH && /once/i.test(JSON.stringify(w[1])), w && w[1].targetName);
+  fire('birthsignChoose', CH, 'lord'); fire('birthsignChoose', CH, 'confirm');
+  const rec = state[CH].props['private.dboBirthsign'];
+  check('...picking writes the new sign with the change spent, audited, and told it was the one change', rec.id === 'lord' && rec.changed && rec.changed.from === 'lady'
+    && audits.some((t) => /changed their sign once, from The Lady to The Lord/.test(t)) && told.some(([a, t]) => a === CH && /That was your one change/.test(t)), [rec, told.filter(([a]) => a === CH)]);
+  told.length = 0; const n = widgets.length; commands.get('birthsign')(CH, 'change');
+  check('...a second change is refused: only staff now', widgets.length === n && told.some(([a, t]) => a === CH && /used your one change/.test(t)));
+  staffLead.add(80); commands.get('birthsign')(80, `set P${CH} steed`);
+  check('...a staff set keeps the change spent (it is never handed back)', state[CH].props['private.dboBirthsign'].id === 'steed' && !!state[CH].props['private.dboBirthsign'].changed, state[CH].props['private.dboBirthsign']);
+  const CB = 76; race(CB); state[CB].props.isOnline = true; sign(CB, 'mage');
+  globalThis.__dboPromptBusy = (a) => (a === CB ? 'in a dungeon' : ''); told.length = 0; const n2 = widgets.length; commands.get('birthsign')(CB, 'change');
+  check('...not in a dungeon, a fight or while down', widgets.length === n2 && told.some(([a, t]) => a === CB && /somewhere safe/.test(t)));
+  globalThis.__dboPromptBusy = null;
+  commands.get('birthsign')(CB, 'change'); fire('birthsignClose', CB);
+  check('...closing the change keeps the old sign and the change', state[CB].props['private.dboBirthsign'].id === 'mage' && !state[CB].props['private.dboBirthsign'].changed);
 }
 console.log(failures ? `${failures} FAILED` : 'all checks passed');
 process.exit(failures ? 1 : 0);
