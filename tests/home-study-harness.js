@@ -156,7 +156,18 @@ stopAll();
 globalThis.__dboDecorStudyKind = () => '';
 check('no kind (a library shelf): the old rule, mage to Study Magic', globalThis.__dboSchoolsActivate(SHELF, MAGE) === true && ST().studying.has(MAGE));
 stopAll();
+// Nat, 26 Oct: both his shelves opened Priest Studies. An arcane shelf must never fall back to priest, even with Study Magic off
+load({ enabled: false });
+globalThis.__dboDecorStudyKind = () => 'arcane';
+const off = globalThis.__dboSchoolsActivate(SHELF, PRIEST);
+check('Study Magic off: an arcane shelf is left alone, never Priest Studies', off === false && !ST().priestStudying.has(PRIEST), { took: off, priest: ST().priestStudying.has(PRIEST) });
+load(undefined, { enabled: false });
+globalThis.__dboDecorStudyKind = () => 'priest';
+const offP = globalThis.__dboSchoolsActivate(SHELF, MAGE);
+check('Priest Studies off: a priest shelf is left alone, never Study Magic', offP === false && !ST().studying.has(MAGE), { took: offP, studying: ST().studying.has(MAGE) });
+stopAll();
 delete globalThis.__dboDecorStudyKind;
+load();
 
 // ---- a base that is not a study spot ----
 const BARE = idOf('1d2302:DragonBreak Online Edits.esp'); put(BARE, 'baseDesc', '1d2241:DragonBreak Online Edits.esp'); at(BARE, HOME); // verify-formids: ignore (made-up DLE ids)
