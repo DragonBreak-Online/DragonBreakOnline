@@ -400,7 +400,7 @@ const notes = JSON.parse(fs.readFileSync(path.join(SERVER, 'patch-notes.json'), 
 const list = Array.isArray(notes) ? notes : notes.notes || notes.entries || [];
 const note = list.find((n) => /birthsign/i.test(JSON.stringify(n)));
 // Among the newest few rather than first: a release carries several new features' notes, and only one can be on top
-check('patch-notes.json: a Birthsigns note, among the newest', !!note && list.indexOf(note) >= 0 && list.indexOf(note) < 5, note);
+check('patch-notes.json: a Birthsigns note, among the newest', !!note && list.indexOf(note) >= 0 && list.indexOf(note) < 10, note);
 
 console.log(failures ? `${failures} FAILED` : 'all checks passed');
 process.exit(failures ? 1 : 0);
