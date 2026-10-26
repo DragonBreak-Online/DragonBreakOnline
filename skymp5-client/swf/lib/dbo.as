@@ -3,6 +3,13 @@
 var DBO_UI_EVENT = "dboUi";
 var DBO_MENU = "CustomMenu";
 var DBO_SEP = String.fromCharCode(1);
+var DBO_US = String.fromCharCode(0x1f);
+var DBO_RS = String.fromCharCode(0x1e);
+
+// The client also polls _root.dboOut with Ui.getString (SendModEvent was never seen to arrive): seq US key US json RS,
+// appended only, the separator last; the sequence lets the client take a message once when both channels deliver it
+_root.dboOut = "";
+var dboSeq = 0;
 
 var F_PLAIN = "$EverywhereFont";
 var F_MEDIUM = "$EverywhereMediumFont";
@@ -46,21 +53,27 @@ function dboSound(name)
    }
 }
 
-// One mod event per message: the client splits key and JSON args and calls sendMessage(key, ...args); num is numArg
+function dboDispatch(msgKey, json, n)
+{
+   dboSeq++;
+   _root.dboOut += dboSeq + DBO_US + msgKey + DBO_US + json + DBO_RS;
+   if (_global.skse.SendModEvent != undefined)
+   {
+      _global.skse.SendModEvent(DBO_UI_EVENT, msgKey + DBO_SEP + json, n);
+   }
+}
+
+// One message: the client splits key and JSON args and calls sendMessage(key, ...args); num is numArg
 function dboSend(msgKey, args, num)
 {
-   var s = msgKey + DBO_SEP + dboJson(args);
+   var json = dboJson(args);
    var n = num == undefined ? 0 : num;
    if (!dboBooted)
    {
-      dboQueue.push(["send", s, n]);
+      dboQueue.push(["send", msgKey, json, n]);
       return true;
    }
-   if (_global.skse.SendModEvent == undefined)
-   {
-      return false;
-   }
-   _global.skse.SendModEvent(DBO_UI_EVENT, s, n);
+   dboDispatch(msgKey, json, n);
    return true;
 }
 
@@ -100,9 +113,9 @@ function dboBoot(onReady)
          {
             dboLog(q[i][1]);
          }
-         else if (_global.skse.SendModEvent != undefined)
+         else
          {
-            _global.skse.SendModEvent(DBO_UI_EVENT, q[i][1], q[i][2]);
+            dboDispatch(q[i][1], q[i][2], q[i][3]);
          }
       }
       if (dboCloseWanted)
