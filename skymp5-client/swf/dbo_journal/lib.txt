@@ -1,0 +1,10 @@
+dbo.as
+dbo-controls.as
+../dbo_journal/flow.as
+../dbo_journal/tabs/stats.as
+../dbo_journal/tabs/world.as
+../dbo_journal/tabs/wanted.as
+../dbo_journal/tabs/keys.as
+../dbo_journal/tabs/deity.as
+../dbo_journal/tabs/magic.as
+../dbo_journal/tabs/skills.as

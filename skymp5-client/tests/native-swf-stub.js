@@ -14,7 +14,7 @@ const sourceOf = (menu) => {
 const clip = (name) => {
   const c = { _name: name, _x: 0, _y: 0, _alpha: 100, _visible: true, kids: {} };
   c.createEmptyMovieClip = (n) => { if (c.kids[n]) delete c.kids[n]; const k = clip(n); k._parent = c; c[n] = k; c.kids[n] = k; return k; };
-  c.createTextField = (n) => { const t = { text: '', textColor: 0, _alpha: 100, _y: 0, setNewTextFormat(f) { this.fmt = f; this.textColor = f.color; } }; c[n] = t; c.kids[n] = t; };
+  c.createTextField = (n, d, x, y, w, h) => { const t = { text: '', textColor: 0, _alpha: 100, _x: x || 0, _y: y || 0, _width: w || 0, _height: h || 0, setNewTextFormat(f) { this.fmt = f; this.textColor = f.color; } }; c[n] = t; c.kids[n] = t; };
   c.removeMovieClip = () => { if (c._parent) { delete c._parent[c._name]; delete c._parent.kids[c._name]; } };
   for (const f of ['beginFill', 'moveTo', 'lineTo', 'endFill', 'clear']) c[f] = () => {};
   return c;
@@ -32,6 +32,8 @@ const boot = (menu, late) => {
     flash: { external: { ExternalInterface: { call: (fn, uid, name) => sounds.push(fn + ':' + name) } } },
     TextFormat: function TextFormat() {},
     Key: { listeners: [], addListener(l) { this.listeners.push(l); }, getCode: () => st.code },
+    Mouse: { listeners: [], addListener(l) { this.listeners.push(l); } },
+    Date,
     getTimer: () => st.time,
     Math, String, Number, isNaN, isFinite, parseInt,
   };
@@ -40,9 +42,10 @@ const boot = (menu, late) => {
   if (!late) root.dboBootClip.onEnterFrame();
   const msgs = () => sent.filter((m) => m.e === 'dboUi').map((m) => { const k = m.s.indexOf('\u0001'); return { key: m.s.slice(0, k), args: JSON.parse(m.s.slice(k + 1)) }; });
   const press = (code) => { st.code = code; for (const l of ctx.Key.listeners) l.onKeyDown(); };
+  const wheel = (delta) => { for (const l of ctx.Mouse.listeners) l.onMouseWheel(delta); };
   const tick = () => { for (const k of Object.values(root.kids)) if (k.onEnterFrame) k.onEnterFrame(); if (root.onEnterFrame) root.onEnterFrame(); };
   const push = (payload) => vm.runInContext('_root.dboData(' + JSON.stringify(JSON.stringify(payload)) + ')', ctx);
-  return { ctx, root, st, sent, sounds, logs, msgs, press, tick, push, arrive: () => { ctx._global.skse = skse; } };
+  return { ctx, root, st, sent, sounds, logs, msgs, press, wheel, tick, push, arrive: () => { ctx._global.skse = skse; } };
 };
 
 const checker = () => {
