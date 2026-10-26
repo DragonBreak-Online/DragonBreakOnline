@@ -389,6 +389,41 @@ function dboText(parent, name, depth, x, y, w, h, format, multi)
    return tf;
 }
 
+// Typed input in a native panel, as SkyUI's own search box takes it (skyui SearchWidget): an input field, the focus, and
+// skse.AllowTextInput(true) so the game stops reading the keys. dboInputEnd gives the keys back; call it before leaving.
+// Unproven in a CustomMenu until Nat types in one, so every panel that uses it keeps its browser hand-off as a fallback.
+function dboInput(parent, name, depth, x, y, w, h, format, maxChars, multi)
+{
+   var tf = dboText(parent, name, depth, x, y, w, h, format, multi);
+   tf.type = "input";
+   tf.selectable = true;
+   tf.maxChars = maxChars;
+   tf.background = true;
+   tf.backgroundColor = 0x101010;
+   tf.border = true;
+   tf.borderColor = 0x5A5A5A;
+   Selection.setFocus(tf);
+   if (_global.skse != undefined && _global.skse.AllowTextInput != undefined)
+   {
+      _global.skse.AllowTextInput(true);
+   }
+   return tf;
+}
+
+function dboInputEnd()
+{
+   if (_global.skse != undefined && _global.skse.AllowTextInput != undefined)
+   {
+      _global.skse.AllowTextInput(false);
+   }
+}
+
+// Whether this game can take typed input in a panel at all (SKSE's scaleform AllowTextInput)
+function dboCanType()
+{
+   return _global.skse != undefined && _global.skse.AllowTextInput != undefined;
+}
+
 function dboBox(clip, x, y, w, h, color, alpha)
 {
    clip.beginFill(color, alpha);

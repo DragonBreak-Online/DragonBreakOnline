@@ -25,7 +25,8 @@ const boot = (menu, late, extra) => {
   const sent = [], sounds = [], logs = [];
   const st = { time: 1000, code: 0 };
   const root = clip('_root');
-  const skse = { SendModEvent: (e, s, n) => sent.push({ e, s, n }), Log: (m) => logs.push(m), CloseMenu: () => sent.push({ e: 'closeMenu' }) };
+  const skse = { SendModEvent: (e, s, n) => sent.push({ e, s, n }), Log: (m) => logs.push(m), CloseMenu: () => sent.push({ e: 'closeMenu' }), AllowTextInput: (on) => sent.push({ e: 'allowTextInput', on }) };
+  if (extra && extra.noTyping) delete skse.AllowTextInput;
   const ctx = {
     _root: root,
     _global: { skse: late ? undefined : skse },
@@ -33,6 +34,7 @@ const boot = (menu, late, extra) => {
     TextFormat: function TextFormat() {},
     Key: { listeners: [], addListener(l) { this.listeners.push(l); }, getCode: () => st.code },
     Mouse: { listeners: [], addListener(l) { this.listeners.push(l); } },
+    Selection: { focused: null, setFocus(t) { this.focused = t; } },
     Date,
     getTimer: () => st.time,
     Math, String, Number, isNaN, isFinite, parseInt,

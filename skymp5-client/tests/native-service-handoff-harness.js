@@ -117,6 +117,12 @@ const world = (nativeOn) => {
   w.packet(menu('open'));
   ok(w.S.browser.length === 1 && w.S.browser[0].args.handoff === '' && !w.S.native.length, 'without the native panel the browser board opens, unchanged');
 
+  // the client keys on the server's own words: the pinned notice must still be what bountyBoardSystem sends (Worker 6)
+  const sys = fs.readFileSync(path.join(HERE, '../skymp5-server/ts/systems/bountyBoardSystem.ts'), 'utf8');
+  const svc = fs.readFileSync(path.join(HERE, 'src/services/services/bountyBoardService.ts'), 'utf8');
+  const pinned = (svc.match(/const PINNED = \/\^([^/]+)\//) || [])[1];
+  ok(pinned && sys.includes('this.notice(ctx, userId, "' + pinned), 'bountyBoardSystem still sends the notice the client waits for', pinned);
+
   // ---- the property menu ----
   const prop = (extra) => Object.assign({ customPacketType: 'propertyMenu', target: 0x5000, view: 'owner', owned: true, name: 'Rose Hall', locked: false, hasKeys: true, canGrantContainers: false, ownerName: 'Olaf', keyRing: true }, extra || {});
   w = world(true);
