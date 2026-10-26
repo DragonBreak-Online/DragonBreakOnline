@@ -27,7 +27,7 @@ const choiceOf = (id) => SKILLS.deities.choices.find((c) => c.id === id);
 const spellOf = (id) => idOf(choiceOf(id).blessing);
 
 // A deity for the filter only: its spell carries a detrimental and a hostile regeneration effect beside a good one
-SKILLS.deities.choices.push({ id: 'testgod', name: 'Test God', kind: 'faith', blessing: 'abcde:Skyrim.esm', shrines: [], prayAnywhere: true, boon: 'x', sphere: 'x', blessingSource: 'vanilla' });
+SKILLS.deities.choices.push({ id: 'testgod', name: 'Test God', kind: 'faith', blessing: 'abcde:Skyrim.esm', shrines: [], prayAnywhere: true, boon: 'x', sphere: 'x', blessingSource: 'vanilla' }); // verify-formids: ignore (a test god's spell)
 
 const field = (type, bytes) => ({ type, data: Uint8Array.from(bytes) });
 const u32le = (n) => [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255];
@@ -109,8 +109,13 @@ const bless = (deity, hours = 8, extra = {}) => {
   props.set(ACTOR + '|private.dboBlessing', Object.assign({ deity, spell: blessingSpell(deity), until: wallClock + hours * H, via: 'cast' }, extra));
 };
 const blessingSpell = (deity) => { const s = String(choiceOf(deity).blessing || ''); return /^[0-9a-f]+:/i.test(s) ? idOf(s) : 0; };
-// n ticks of the regeneration timer, a second apart
-const run = (n = 1) => { for (let i = 0; i < n; i++) { wallClock += 1000; timers.get('prayerBlessingRegen').fn(); } };
+// n ticks of the regeneration timer, a second apart, each after a fresh client report of every bar (the rule for stale
+// reports, and the 0.25 s tick and payout step that go with it, are blessing-regen-fresh-harness's)
+const report = () => { const o = globalThis.__dboBlessingRegenOwed.get(ACTOR); if (o) o.seen = {}; };
+const run = (n = 1) => { for (let i = 0; i < n; i++) { wallClock += 1000; report(); timers.get('prayerBlessingRegen').fn(); } };
+// This file counts a second at a time, every step paid as it falls due (the 1 Oct rule): a one-second tick, no payout step
+const BASE = { tickSeconds: 1, payoutSeconds: 0 };
+api.cfg = { prayer: { blessingRegen: BASE } };
 const gained = (deity, stat, secs, start = 0.5) => {
   bless(deity); setPc(start, start, start); out.sets.length = 0;
   run(secs);
@@ -126,7 +131,7 @@ check('the boot line names every regeneration blessing, as the tick reads it',
   /akatosh MagickaRateMult \+10/.test(line) && /hircine StaminaRate \+10/.test(line) && /meridia HealRateMult \+25/.test(line)
   && /hist HealRateMult \+50/.test(line) && /yokudan StaminaRateMult \+100/.test(line) && /wormcult MagickaRateMult \+100/.test(line)
   && !/julianos/.test(line), line.replace(/^.*: /, ''));
-check('the tick runs every second', timers.get('prayerBlessingRegen').ms === 1000);
+check('the tick this file sets runs every second', timers.get('prayerBlessingRegen').ms === 1000);
 
 const RATES = [
   // deity, bar, per second (share of the bar), why
@@ -172,7 +177,7 @@ check('Death\'s Chill slows it by its own factor for that bar (downed.js): half'
 globalThis.__dboChillRateMult = (a, av) => (av === 'StaminaRateMult' ? 0 : 1);
 check('and stops it at the chill\'s cap (factor 0)', near(gained('hircine', 'stamina', 10), 0));
 delete globalThis.__dboChillRateMult;
-check('a long stall pays at most three ticks', (() => { bless('hircine'); setPc(0.2, 0.2, 0.2); run(1); wallClock += 60000; timers.get('prayerBlessingRegen').fn(); return near(pc().stamina, 0.2 + 0.1 + 0.3, 1e-6); })());
+check('a long stall pays at most a step and 1.5 s of the gift (24 Oct; was three ticks)', (() => { bless('hircine'); setPc(0.2, 0.2, 0.2); run(1); wallClock += 60000; report(); timers.get('prayerBlessingRegen').fn(); return near(pc().stamina, 0.2 + 0.1 + 0.002 + 0.15, 1e-6); })(), JSON.stringify(pc()));
 bless('testgod');
 check('only boosts count: a detrimental or hostile rate effect is left out, a plain Value Modifier is in',
   (() => { const h = globalThis.__dboBlessingRegen(ACTOR); return h.length === 1 && h[0].av === 'StaminaRateMult' && near(h[0].perSecond, 0.01); })(), JSON.stringify(globalThis.__dboBlessingRegen(ACTOR)));
@@ -190,11 +195,11 @@ load();
 check('the server\'s regenerationMultiplier scales it as the crop is scaled', (() => { bless('akatosh'); return near(globalThis.__dboBlessingRegen(ACTOR)[0].perSecond, 0.006); })()
   && /regenerationMultiplier 2/.test(out.logs.find((l) => /regeneration held/.test(l)) || ''));
 settings = {};
-api.cfg = { prayer: { blessingRegen: { enabled: false } } };
+api.cfg = { prayer: { blessingRegen: Object.assign({ enabled: false }, BASE) } };
 load();
 check('config can turn the tick off (the timer stays registered, so a reload replaces a running one)', /\(off\)/.test(out.logs.find((l) => /regeneration held/.test(l)) || '')
   && (() => { bless('hircine'); setPc(0.5, 0.5, 0.5); out.sets.length = 0; run(3); return timers.has('prayerBlessingRegen') && out.sets.length === 0; })());
-api.cfg = {};
+api.cfg = { prayer: { blessingRegen: BASE } };
 load();
 online = [];
 bless('hircine'); globalThis.__dboBlessingRegenOwed.set(ACTOR, { at: wallClock, health: 0, magicka: 0, stamina: 0.001 });
