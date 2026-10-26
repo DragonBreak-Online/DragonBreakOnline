@@ -178,10 +178,15 @@ function resultText()
    return data.result != undefined ? String(data.result) : "";
 }
 
+// A wrapped field's height for its text: about 58 characters a line at 18 px across the panel
+function linesHeight(s)
+{
+   return Math.max(1, Math.ceil(s.length / 58)) * 24 + 6;
+}
+
 function hintText()
 {
-   var r = resultText();
-   var s = r != "" ? r + " " : "";
+   var s = "";
    if (pick)
    {
       var read = data.cue == "trail" ? "Choose the freshest track of the prey." : "Choose the strongest beat of the slowing heart.";
@@ -227,7 +232,7 @@ function drawTimed(b, y)
    var zone = bar.createEmptyMovieClip("zone", 1);
    dboBox(zone, (center - width / 2) * BAR_W, 0, width * BAR_W, BAR_H, C_TEXT, 40);
    var m = bar.createEmptyMovieClip("marker", 2);
-   dboBox(m, -2, -6, 4, BAR_H + 12, own == "miss" || own == "late" ? C_RED : C_TEXT, 100);
+   dboBox(m, -2, -6, 4, BAR_H + 12, C_TEXT, 100);
    m._x = shown * BAR_W;
    m._alpha = struck ? 60 : 100;
    return y + BAR_H + 16;
@@ -253,7 +258,7 @@ function drawPick(b, y)
       kt.text = String(i + 1);
       if (ownIndex == i)
       {
-         dboBox(c, 4, SPOT_W - 6, SPOT_W - 8, 2, own == "hit" ? C_HELD : C_RED, 100);
+         dboBox(c, 4, SPOT_W - 6, SPOT_W - 8, 2, C_TEXT, 100);
       }
       c.idx = i;
       c.onRelease = function()
@@ -287,25 +292,32 @@ function draw()
       var pip = pips.createEmptyMovieClip("p" + i, i);
       pip._x = PAD + i * 22;
       pip._y = y;
-      dboBox(pip, 0, 0, 14, 14, done ? (i < hits ? C_TEXT : C_RED) : C_SECOND, done ? 100 : 40);
+      dboBox(pip, 0, 0, 14, 14, done ? (i < hits ? C_TEXT : C_DISABLED) : C_SECOND, done ? 100 : 40);
       pip.state = done ? (i < hits ? "hit" : "miss") : "";
    }
    y += 30;
    y = pick ? drawPick(b, y) : drawTimed(b, y);
-   var hint = dboText(b, "hint", 30, PAD, y, PANEL_W - PAD * 2, 54, dboFmt(F_MEDIUM, 18, C_TEXT, 0.8), true);
-   hint.text = hintText();
+   // The verdict is the one coloured line; the hint under it stays white
+   var r = resultText();
+   var res = dboText(b, "result", 29, PAD, y, PANEL_W - PAD * 2, 26, dboFmt(F_MEDIUM, 18, C_TEXT, 0.8), false);
+   res.text = r;
    if (own == "hit" || own == "miss" || own == "late")
    {
-      hint.textColor = own == "hit" ? C_HELD : C_RED;
+      res.textColor = own == "hit" ? C_HELD : C_RED;
    }
-   y += 60;
+   y += r != "" ? 28 : 0;
+   var ht = hintText();
+   var hint = dboText(b, "hint", 30, PAD, y, PANEL_W - PAD * 2, linesHeight(ht), dboFmt(F_MEDIUM, 18, C_TEXT, 0.8), true);
+   hint.text = ht;
+   y += linesHeight(ht) + 4;
    dboRule(b, PAD, y, PANEL_W - PAD * 2);
    y += 12;
    if (asking)
    {
-      var q = dboText(b, "ask", 40, PAD, y, PANEL_W - PAD * 2, 26, dboFmt(F_MEDIUM, 18, C_TEXT, 0.8), false);
-      q.text = data.deadly == true ? "Yield the rite? It counts as lost, and failure here can be the end of this life." : "Yield the rite? It counts as lost.";
-      y += 32;
+      var qt = data.deadly == true ? "Yield the rite? It counts as lost, and failure here can be the end of this life." : "Yield the rite? It counts as lost.";
+      var q = dboText(b, "ask", 40, PAD, y, PANEL_W - PAD * 2, linesHeight(qt), dboFmt(F_MEDIUM, 18, C_TEXT, 0.8), true);
+      q.text = qt;
+      y += linesHeight(qt) + 6;
       var go = button(b, "yield", 41, PAD, y, 150, "Yield", F_MEDIUM, 22, A_BUTTON_REST, function()
       {
          yieldRite();

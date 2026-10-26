@@ -22,7 +22,7 @@ const picked = (o) => Object.assign({ type: 'rite', id: 39, nonce: 'p1', title: 
   result: '', judge: 'client', rnonce: 'b1', mode: 'pick', spots: [[20, 40, 0.3], [50, 60, 0.9], [80, 30, 0.5]], cue: 'pulse', minPickMs: 300, limitMs: 9000 }, o || {});
 const msgs = (t, key) => t.msgs().filter((m) => m.key === key);
 const B = (t) => t.root.dboPanel.body;
-const closed = (t) => t.sent.some((m) => m.e === 'closeMenu');
+const closed = (t) => t.closed();
 const pipStates = (t) => Object.keys(B(t).pips.kids).map((n) => B(t).pips[n].state).join(',');
 // steps the stage clock by ms, one frame at a time (30 fps)
 const run = (t, ms) => { for (let left = ms; left > 0; left -= 33) { t.st.time += Math.min(33, left); t.tick(); } };
@@ -45,22 +45,25 @@ const run = (t, ms) => { for (let left = ms; left > 0; left -= 33) { t.st.time +
   check('Space strikes: [nonce, round, rnonce, verdict, pressMs, atMs, shown]', s && s.args.length === 7 && s.args[0] === 'r1' && s.args[1] === 1 && s.args[2] === 'a1' && Number.isInteger(press) && s.args[5] >= 1400, s);
   check('the verdict is the browser judge\'s for the same press', s && s.args[3] === (J.riteHit(1600, 0.5, 0.2, press, 100) ? 'hit' : 'miss') && s.args[3] === 'hit', s && s.args);
   check('shown is the marker drawn on that frame, to 4 places', s && s.args[6] === Math.round(J.riteMarkerAt(1600, press) * 10000) / 10000 && String(s.args[6]).length <= 6, s && [s.args[6], J.riteMarkerAt(1600, press)]);
-  check('the hit counts at once: True., a filled pip, Strike greyed', /^True\. Round 1/.test(B(t).hint.text) && pipStates(t) === 'hit,,' && B(t).strike.disabled === true, [B(t).hint.text, pipStates(t)]);
+  check('the hit counts at once: True., a filled pip, Strike greyed', B(t).result.text === 'True.' && B(t).result.textColor === 0x8FBF7F && /^Round 1/.test(B(t).hint.text) && B(t).hint.textColor === 0xFFFFFF && pipStates(t) === 'hit,,' && B(t).strike.disabled === true, [B(t).result.text, pipStates(t)]);
+  const at0 = B(t).bar.marker._x;
+  run(t, 300);
+  check('the marker stays where it was struck', B(t).bar.marker._x === at0 && at0 > 0, [at0, B(t).bar.marker._x]);
   t.press(32);
   run(t, 8000);
   check('one strike a round, and no timeout after it', msgs(t, 'dbo:riteStrike').length === 1 && msgs(t, 'dbo:riteTimeout').length === 0);
   t.push(timed({ round: 2, rnonce: 'a2', hits: 1, startsIn: 0, result: 'True.' }));
-  check('the next round restarts: Strike live again, the server\'s tally', !B(t).strike.disabled && pipStates(t) === 'hit,,' && /^True\. Round 2 of 3/.test(B(t).hint.text), B(t).hint.text);
+  check('the next round restarts: Strike live again, the server\'s tally', !B(t).strike.disabled && pipStates(t) === 'hit,,' && B(t).result.text === 'True.' && /^Round 2 of 3/.test(B(t).hint.text), B(t).hint.text);
   run(t, 1600);
   t.press(13);
   const m = msgs(t, 'dbo:riteStrike')[1];
   check('Enter strikes too; at the period\'s end the marker is home, off the mark: a miss', m && m.args[3] === 'miss' && m.args[3] === (J.riteHit(1600, 0.5, 0.2, m.args[4], 100) ? 'hit' : 'miss'), m && m.args);
-  check('...shown as Missed (off the mark). with a red pip', /^Missed \(off the mark\)\./.test(B(t).hint.text) && pipStates(t) === 'hit,miss,' && B(t).bar.marker._alpha === 60, [B(t).hint.text, pipStates(t)]);
+  check('...shown as Missed (off the mark). on the red line, the pip greyed (no red boxes)', B(t).result.text === 'Missed (off the mark).' && B(t).result.textColor === 0xB23A3A && B(t).hint.textColor === 0xFFFFFF && pipStates(t) === 'hit,miss,' && B(t).bar.marker._alpha === 60, [B(t).hint.text, pipStates(t)]);
   t.push(timed({ round: 3, rnonce: 'a3', hits: 1, misses: 1, startsIn: 0 }));
   run(t, 7100);
   const to = msgs(t, 'dbo:riteTimeout');
   check('no press within limitMs: dbo:riteTimeout [nonce, round, rnonce, atMs]', to.length === 1 && to[0].args.slice(0, 3).join('|') === 'r1|3|a3' && to[0].args[3] >= 7000, to);
-  check('...shown as Missed (too late).', /^Missed \(too late\)\./.test(B(t).hint.text));
+  check('...shown as Missed (too late).', B(t).result.text === 'Missed (too late).');
   t.push(timed({ round: 3, rnonce: 'a3', hits: 1, misses: 2, startsIn: 0, result: 'The rite fails.' }));
   check('the same round again redraws in place without restarting it', B(t).strike.disabled === true && msgs(t, 'dbo:riteTimeout').length === 1);
 }
@@ -94,7 +97,7 @@ const run = (t, ms) => { for (let left = ms; left > 0; left -= 33) { t.st.time +
   t.press(32);
   const s = msgs(t, 'dbo:riteStrike');
   check('a server-judged rite sends the old bare strike [nonce]', s.length === 1 && s[0].args.length === 1 && s[0].args[0] === 'r1', s);
-  check('...and claims no verdict of its own', !/^True|^Missed/.test(B(t).hint.text) && B(t).hint.text === 'Round 1 of 3: strike 2 true blows. Space or Enter.', B(t).hint.text);
+  check('...and claims no verdict of its own', B(t).result.text === '' && B(t).hint.text === 'Round 1 of 3: strike 2 true blows. Space or Enter.', B(t).hint.text);
   run(t, 9000);
   check('...nor a timeout: the server keeps the time', msgs(t, 'dbo:riteTimeout').length === 0);
 }
@@ -139,14 +142,14 @@ const run = (t, ms) => { for (let left = ms; left > 0; left -= 33) { t.st.time +
   t.st.time += 200; t.press(50);
   const s = msgs(t, 'dbo:riteStrike');
   check('key 2 picks: [nonce, round, rnonce, pick, index, atMs]', s.length === 1 && s[0].args.slice(0, 5).join('|') === 'p1|1|b1|pick|1' && s[0].args[5] === 400, s);
-  check('...the clearest mark, as the browser judge says: True.', J.pickRight(picked().spots) === 1 && /^True\./.test(B(t).hint.text) && pipStates(t) === 'hit,,');
+  check('...the clearest mark, as the browser judge says: True.', J.pickRight(picked().spots) === 1 && B(t).result.text === 'True.' && pipStates(t) === 'hit,,');
   t.press(49);
   check('one pick a round', msgs(t, 'dbo:riteStrike').length === 1);
   t.push(picked({ round: 2, rnonce: 'b2', hits: 1, cue: 'trail', spots: [[30, 50, 0.95], [70, 50, 0.4]] }));
   check('the trail hint for a hunt', /Choose the freshest track of the prey\. Click a mark or press 1-2\.$/.test(B(t).hint.text), B(t).hint.text);
   t.st.time += 500;
   B(t).strip.s1.onRelease();
-  check('a click on the fainter track: Missed (the wrong mark).', msgs(t, 'dbo:riteStrike')[1].args[4] === 1 && /^Missed \(the wrong mark\)\./.test(B(t).hint.text) && pipStates(t) === 'hit,miss,');
+  check('a click on the fainter track: Missed (the wrong mark).', msgs(t, 'dbo:riteStrike')[1].args[4] === 1 && B(t).result.text === 'Missed (the wrong mark).' && pipStates(t) === 'hit,miss,');
   t.push(picked({ judge: 'server' }));
   check('a pick payload from a server-judged rite falls back to the timed bar, as the browser', !!B(t).bar && !B(t).strip);
 }
@@ -161,6 +164,33 @@ const run = (t, ms) => { for (let left = ms; left > 0; left -= 33) { t.st.time +
   const u = S.boot('dbo_rite');
   u.push({ nonce: 'x' });
   check('an unreadable payload is logged, not drawn', u.logs.some((l) => l.indexOf('unreadable payload') >= 0) && !u.root.dboPanel.body);
+}
+
+{
+  // exact press times: the stage clock set by hand, one frame, then the key
+  const at = (t, ms, base) => { t.st.time = base + ms; t.tick(); t.press(32); return msgs(t, 'dbo:riteStrike').pop().args; };
+  const one = (o, ms) => { const t = S.boot('dbo_rite'); const base = t.st.time; t.push(timed(Object.assign({ startsIn: 0 }, o))); return at(t, ms, base); };
+  // period 800: the marker is t/400 on the way out, so the zone [0.5, 0.25] begins at 150 ms, exactly in binary
+  check('on the zone\'s edge is in it (<=), as the browser judge', one({ period: 800, zone: [0.5, 0.25], graceMs: 0 }, 150)[3] === 'hit' && J.riteHit(800, 0.5, 0.25, 150, 0));
+  check('...a millisecond before it, with no grace, is not', one({ period: 800, zone: [0.5, 0.25], graceMs: 0 }, 149)[3] === 'miss' && !J.riteHit(800, 0.5, 0.25, 149, 0));
+  check('grace reaches exactly graceMs (10 ms short of the edge hits with 10)', one({ period: 800, zone: [0.5, 0.25], graceMs: 10 }, 140)[3] === 'hit' && J.riteHit(800, 0.5, 0.25, 140, 10));
+  check('...and no further', one({ period: 800, zone: [0.5, 0.25], graceMs: 10 }, 139)[3] === 'miss');
+  // period 10000: the zone [0.5, 0.25] begins at 1875 ms; a server asking for 600 ms of grace gets the browser's 500
+  check('grace is capped at 500 ms: 500 short of the zone hits', one({ period: 10000, zone: [0.5, 0.25], graceMs: 600 }, 1375)[3] === 'hit');
+  check('...550 short does not, whatever the payload asks', one({ period: 10000, zone: [0.5, 0.25], graceMs: 600 }, 1325)[3] === 'miss' && !J.riteHit(10000, 0.5, 0.25, 1325, 500));
+  // the Yield question does not stop the round's clock: the server's round runs on regardless
+  const y = S.boot('dbo_rite');
+  y.push(timed({ startsIn: 0 }));
+  y.press(27);
+  run(y, 7100);
+  check('the round\'s time runs out while Yield asks: the timeout is still sent', msgs(y, 'dbo:riteTimeout').length === 1 && !!B(y).ask);
+  // a deadly pick rite's hint keeps its death line: the field is tall enough for the whole text
+  const d = S.boot('dbo_rite');
+  d.push(picked({ deadly: true }));
+  const h = B(d).hint;
+  check('a deadly pick rite\'s hint wraps and has room for its death line', h.multiline === true && /end of this life\.$/.test(h.text) && h._height >= Math.ceil(h.text.length / 58) * 24, [h.text.length, h._height]);
+  d.press(27);
+  check('the Yield question wraps with room for the death line', B(d).ask.multiline === true && B(d).ask._height >= 2 * 24, B(d).ask._height);
 }
 
 T.done();
