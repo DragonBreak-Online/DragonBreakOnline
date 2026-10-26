@@ -371,6 +371,40 @@
     ]
   },
   {
+    "title": "Every boss is ready: new loot, unique schematics, a giant chieftain",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "Content",
+    "sections": [
+      {
+        "heading": "Bosses",
+        "items": [
+          "Thirteen bosses now stand across Skyrim and Cyrodiil, each with its own loot: every fallen boss gives each fighter two picks from its own themed pool of ingredients, ores, gems and soul gems.",
+          "Every boss has its own schematic, and no two share one: Glacial Crystal (the Ice Cap Wraith), Nordic (the Briarheart King), Dwarven and Mithril (the Centurion Master), Scaled and Ancient Imperial (the Warlord of the Pale Pass), Honed Falmer (the Falmer Warmonger), Ebony (the Master of Movarth's Lair), Elven (the Warchief of Dusk Thorn), Glass (the Valkynaz), Stalhrim (Karstaag), Adamantium (the Risen Legate), Ayleid (the Minotaur Lord), Silver (the Behemoth) and Steel Plate (the Chieftain of Blizzard Rest).",
+          "New: the Chieftain of Blizzard Rest, a giant with his bull mammoth at his side and more mammoths and giants coming as he weakens. Giants shrug off magic, so bring steel. He drops Giant's Toes and Mammoth Tusks, and Steel Plate is his schematic: the heavy plate a giant's strength calls for.",
+          "The Behemoth of Hircine's Hunt, the Warlord of the Pale Pass and the Minotaur Lord now stand for everyone. The Ice Cap Wraith is back at Skytemple Ruins.",
+          "Karstaag waits in Solstheim until it opens."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Bosses: the Valkynaz walks, the Ice Wraith moves to Skytemple Ruins",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Bosses",
+        "items": [
+          "The Valkynaz of the Great Gate now stands at the Great Oblivion Gate on its own, with a High Clannfear at its side and Clannfear and scamps around it. Before, it only came during a GM event.",
+          "The Wraith of the Ice Cap now waits at Skytemple Ruins on the coast past Winterhold.",
+          "The Falmer Warmonger stands on the open cavern floor of Blackreach's Falmer city, apart from the city's other Falmer."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Server restart: soul gems, gates and strongholds",
     "date": "2026-10-25",
     "version": "Server update",

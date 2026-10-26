@@ -12,6 +12,9 @@
 //              (SetDisplayName) and marked with the champions' rim glow instead of being made bigger
 //   toughness  a share of each hit is given back to the boss (champions.js's give-back), more while its guardian lives
 //   waves      at each share of the boss's health, add zones are written beside it; they go when the fight ends
+//   drops.pool { picks, items: [[desc, weight, count, edid]] }  each fighter's draw from the boss's own loot pool
+//   openingDelaySeconds, openingStepSeconds  (optional) the opening adds come that long after the boss rises and that far
+//              apart, instead of with it (Nat 26 Oct: a whole fight spawning on the arrival tick froze a client); 0 = with it
 //   enrage     enrageSeconds after the first blow the give-back falls and the boss's hits grow (enrage.toughness, damageMult)
 //   damage     the boss's hits on a player x damageMult (gamemode.js asks __dboBossDamageMult in the attempt chain)
 // The reward: every player with creditShare (10%) or more of the damage dealt to the boss and its guardian (a summon's or a
@@ -91,13 +94,26 @@ module.exports = (api) => {
       const off = Array.isArray(b.guardian.offset) ? b.guardian.offset : [200, 0, 0];
       out.push(zone(b, 'guardian', [sp.pos[0] + off[0], sp.pos[1] + off[1], sp.pos[2] + (off[2] || 0)], pickHigh(b.guardian.options), Number(b.respawnSeconds) || 10800, sp.heading));
     }
-    for (let i = 0; i < (Number(b.openingAdds) || 0); i++) { const id = addOf(b, i); if (id) out.push(zone(b, `open${i}`, ring(sp.pos, i, b.openingAdds, 350), id, Number(b.respawnSeconds) || 10800, sp.heading)); }
     const f = G.fights.get(b.id);
+    const due = openingDue(b, f);
+    for (let i = 0; i < due; i++) { const id = addOf(b, i); if (id) out.push(zone(b, `open${i}`, ring(sp.pos, i, b.openingAdds, 350), id, Number(b.respawnSeconds) || 10800, sp.heading)); }
     for (const w of (f && f.waveZones) || []) out.push(w);
     const ev = G.events.get(b.id);
     for (const w of (ev && ev.waves) || []) out.push(w);
     return out;
   };
+  // How many opening adds stand now: all of them, or with openingDelaySeconds / openingStepSeconds (its config block over
+  // bosses.json) none until the boss has risen and then one more every step
+  function openingDue(b, f) {
+    const n = Number(b.openingAdds) || 0;
+    const pick = (k) => { const v = own(b)[k] !== undefined ? own(b)[k] : b[k]; return Math.max(0, Number(v) || 0); };
+    const delay = pick('openingDelaySeconds'), step = pick('openingStepSeconds');
+    if (!(delay > 0 || step > 0)) return n;
+    if (!f || !f.risenAt) return 0;
+    const since = (Date.now() - f.risenAt) / 1000 - delay;
+    return since < 0 ? 0 : Math.min(n, 1 + (step > 0 ? Math.floor(since / step) : n));
+  }
+  const openingSig = () => BOSSES.map((b) => (standing(b) ? openingDue(b, G.fights.get(b.id)) : 0)).join(',');
   // Whether a boss stands now: an event boss while its event lasts, a night boss at night or while its fight goes on
   const isNight = () => { try { return !!(globalThis.__dboClock && typeof globalThis.__dboClock.isNight === 'function' && globalThis.__dboClock.isNight()); } catch (e) { return false; } };
   const isFullMoon = () => { try { return !!(globalThis.__dboClock && typeof globalThis.__dboClock.isFullMoon === 'function' && globalThis.__dboClock.isFullMoon()); } catch (e) { return false; } };
@@ -158,12 +174,13 @@ module.exports = (api) => {
         const f = G.fights.get(b.id);
         if (!f) continue;
         const r = Number(b.radius) || 5000;
-        if (f.boss && get(f.boss, 'isDead') !== true && within(a, f.boss, r)) list.push({ id: f.boss >>> 0, text: titled(b.name), color: LABEL_COLOR.boss });
+        // A boss with a plateName shows it big and its title (its name) under it (Nat 26 Oct: "better name tags")
+        if (f.boss && get(f.boss, 'isDead') !== true && within(a, f.boss, r)) list.push({ id: f.boss >>> 0, text: b.plateName ? b.plateName : titled(b.name), sub: b.plateName ? titled(b.name) : '', color: LABEL_COLOR.boss });
         if (f.guardian && b.guardian && get(f.guardian, 'isDead') !== true && within(a, f.guardian, r)) {
-          list.push({ id: f.guardian >>> 0, text: titled(b.guardian.name || 'the guardian'), color: LABEL_COLOR.guardian });
+          list.push({ id: f.guardian >>> 0, text: titled(b.guardian.name || 'the guardian'), sub: b.plateName ? `guards ${b.plateName}` : '', color: LABEL_COLOR.guardian });
         }
       }
-      const sig = JSON.stringify(list.map((x) => [x.id, x.text]));
+      const sig = JSON.stringify(list.map((x) => [x.id, x.text, x.sub]));
       if (sig === (G.labelSig.get(a) || '[]')) continue;
       G.labelSig.set(a, sig);
       try { sendPacket(a, { customPacketType: 'dboActorLabels', list }); } catch (e) { /* gone */ }
@@ -205,7 +222,7 @@ module.exports = (api) => {
       if (!r) continue;
       const f = fightOf(r.boss);
       if (r.role === 'boss' && !f.boss) {
-        f.boss = id; f.health = healthOf(id) ?? 1;
+        f.boss = id; f.health = healthOf(id) ?? 1; f.risenAt = Date.now();
         G.byActor.set(id, { boss: r.boss.id, role: 'boss' });
         name(id, titled(r.boss.name));
         glow([id], true, r.boss.world);
@@ -244,7 +261,7 @@ module.exports = (api) => {
       }
     }
     // A night boss rises at dusk and goes at dawn; an event's zones come and go with it
-    const sig = standingSig();
+    const sig = standingSig() + '|' + openingSig();
     if (sig !== G.standingSig || G.zoneSig === '') { G.standingSig = sig; writeZones(); }
     // The equipment trace of a test boss: a line whenever what it wears changes
     for (const b of BOSSES) {
@@ -334,6 +351,18 @@ module.exports = (api) => {
       return { given: giveItem(a, book.bookId, 1) !== false, known: false, name: book.name };
     } catch (e) { log('bosses: schematic failed', e.message); return { given: false, known: false }; }
   };
+  // The boss's own loot pool (Nat 26 Oct): pool.picks items by weight, no item twice, from [desc, weight, count, edid]
+  const poolPicks = (pool) => {
+    const left = ((pool && pool.items) || []).filter((x) => x && x[0] && Number(x[1]) > 0).slice();
+    const out = [];
+    for (let k = 0; k < (Number(pool && pool.picks) || 0) && left.length; k++) {
+      let r = Math.random() * left.reduce((t, x) => t + Number(x[1]), 0);
+      const i = Math.max(0, left.findIndex((x) => (r -= Number(x[1])) < 0));
+      const [x] = left.splice(i === -1 ? left.length - 1 : i, 1);
+      out.push([x[0], Math.max(1, Number(x[2]) || 1)]);
+    }
+    return out;
+  };
   const reward = (b, f, killer) => {
     let total = 0; for (const d of f.damage.values()) total += d;
     const share = clamp(Number(C.creditShare) || 0.1, 0, 1);
@@ -365,6 +394,7 @@ module.exports = (api) => {
         if (s.given) { got.push(s.name); personal(p, `Among the remains you find ${s.name}.`); }
       }
       for (const [desc, chance, n] of dr.extra || []) if (Math.random() < (Number(chance) || 0) && giveDesc(p, desc, Number(n) || 1)) got.push(`${Number(n) || 1}x ${desc} (rare)`);
+      for (const [desc, n] of poolPicks(dr.pool)) if (giveDesc(p, desc, n)) got.push(`${n}x ${desc}`);
       if (shards > 0 && giveDesc(p, dr.shards.desc, shards)) got.push(`${shards}x ${dr.shards.desc}`);
       (state().lockouts[b.id] = state().lockouts[b.id] || {})[pid] = now + lock;
       personal(p, `${titled(b.name)} falls.${got.length ? ' Your share is in your pack.' : ''}`);
@@ -408,7 +438,7 @@ module.exports = (api) => {
     writeZones();
     audit(`BOSS ${b.id} event started by ${who(a)} for ${b.event.minutes} min`);
     personal(a, `${titled(b.name)} is coming, for ${b.event.minutes} minutes.`);
-  }, { admin: true, help: '<boss> start an event boss (Lead GM): the Valkynaz of the Great Gate' });
+  }, { admin: true, help: '<boss> start an event boss (Lead GM); none ships as one since 26 Oct (the Valkynaz stands on its own)' });
 
   registerChatCommand('bosses', (a) => {
     if (!BOSSES.length) return personal(a, 'No bosses walk the world right now.');

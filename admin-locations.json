@@ -19874,62 +19874,14 @@
    ]
   },
   {
-   "name": "Boss: the Wraith of the Ice Cap, S1 (Winterhold)",
-   "region": "Skyrim",
+   "name": "Boss: the Wraith of the Ice Cap, Skytemple Ruins (Winterhold)",
+   "region": "Bosses",
    "world": "3c:Skyrim.esm",
    "worldName": "Tamriel",
    "pos": [
-    116555,
-    112027,
-    -7345
-   ],
-   "rot": [
-    0,
-    0,
-    0.0
-   ]
-  },
-  {
-   "name": "Boss: the Wraith of the Ice Cap, S2 (Winterhold)",
-   "region": "Skyrim",
-   "world": "3c:Skyrim.esm",
-   "worldName": "Tamriel",
-   "pos": [
-    119754,
-    112980,
-    -8818
-   ],
-   "rot": [
-    0,
-    0,
-    0.0
-   ]
-  },
-  {
-   "name": "Boss: the Wraith of the Ice Cap, S3 (Winterhold)",
-   "region": "Skyrim",
-   "world": "3c:Skyrim.esm",
-   "worldName": "Tamriel",
-   "pos": [
-    121379,
-    121316,
-    -10654
-   ],
-   "rot": [
-    0,
-    0,
-    0.0
-   ]
-  },
-  {
-   "name": "Boss: the Wraith of the Ice Cap, S4 (Winterhold)",
-   "region": "Skyrim",
-   "world": "3c:Skyrim.esm",
-   "worldName": "Tamriel",
-   "pos": [
-    115771,
-    141550,
-    -14257
+    120700,
+    121400,
+    -10421.5
    ],
    "rot": [
     0,
@@ -19939,7 +19891,7 @@
   },
   {
    "name": "Boss: the Briarheart King, Lost Valley Redoubt's upper platform (Markarth)",
-   "region": "Skyrim",
+   "region": "Bosses",
    "world": "3c:Skyrim.esm",
    "worldName": "Tamriel",
    "pos": [
@@ -19955,7 +19907,7 @@
   },
   {
    "name": "Boss: the Centurion Master, Blackreach's pump station",
-   "region": "Skyrim",
+   "region": "Bosses",
    "world": "1ee62:Skyrim.esm",
    "worldName": "Blackreach",
    "pos": [
@@ -19970,14 +19922,46 @@
    ]
   },
   {
-   "name": "Boss: the Falmer Warmonger, Blackreach's Falmer city",
-   "region": "Skyrim",
+   "name": "Boss: the Warlord of the Pale Pass, SE (Bruma)",
+   "region": "Bosses",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    64214,
+    232252,
+    11423
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: the Warlord of the Pale Pass, ST (Bruma)",
+   "region": "Bosses",
+   "world": "a764b:BSHeartland.esm",
+   "worldName": "Heartland",
+   "pos": [
+    58987,
+    242571,
+    14140
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: the Falmer Warmonger, the dry shore east of Blackreach's Falmer city",
+   "region": "Bosses",
    "world": "1ee62:Skyrim.esm",
    "worldName": "Blackreach",
    "pos": [
-    6894.26,
-    7152.59,
-    1438.45
+    8594,
+    7152,
+    1146.8
    ],
    "rot": [
     0,
@@ -19987,7 +19971,7 @@
   },
   {
    "name": "Boss: the Master of Movarth's Lair, the marsh at the mouth of Movarth's Lair (Morthal)",
-   "region": "Skyrim",
+   "region": "Bosses",
    "world": "3c:Skyrim.esm",
    "worldName": "Tamriel",
    "pos": [
@@ -20003,7 +19987,7 @@
   },
   {
    "name": "Boss: the Warchief of Dusk Thorn, Dusk Thorn Camp (Bruma)",
-   "region": "Cyrodiil",
+   "region": "Bosses",
    "world": "a764b:BSHeartland.esm",
    "worldName": "Heartland",
    "pos": [
@@ -20019,13 +20003,13 @@
   },
   {
    "name": "Boss: the Valkynaz of the Great Gate, The Great Oblivion Gate (its map marker)",
-   "region": "Skyrim",
+   "region": "Bosses",
    "world": "3c:Skyrim.esm",
    "worldName": "Tamriel",
    "pos": [
     -231,
     43919,
-    2704
+    2717.2
    ],
    "rot": [
     0,
@@ -20035,7 +20019,7 @@
   },
   {
    "name": "Boss: Karstaag, Castle Karstaag Ruins (its map marker)",
-   "region": "Skyrim",
+   "region": "Bosses",
    "world": "800:Dragonborn.esm",
    "worldName": "Solstheim World",
    "pos": [
@@ -20051,7 +20035,7 @@
   },
   {
    "name": "Boss: the Risen Legate of Sancre Tor, Sancre Tor Ruins (Bruma)",
-   "region": "Cyrodiil",
+   "region": "Bosses",
    "world": "a764b:BSHeartland.esm",
    "worldName": "Heartland",
    "pos": [
@@ -20067,7 +20051,7 @@
   },
   {
    "name": "Boss: the Minotaur Lord of Minotaur's Rest, Minotaur's Rest (Bruma)",
-   "region": "Cyrodiil",
+   "region": "Bosses",
    "world": "a764b:BSHeartland.esm",
    "worldName": "Heartland",
    "pos": [
@@ -20079,6 +20063,70 @@
     0,
     0,
     28.6
+   ]
+  },
+  {
+   "name": "Boss: the Behemoth of Hircine's Hunt, BMG (Falkreath)",
+   "region": "Bosses",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    -37646.53,
+    -36967.41,
+    -3459.07
+   ],
+   "rot": [
+    0,
+    0,
+    179.9
+   ]
+  },
+  {
+   "name": "Boss: the Behemoth of Hircine's Hunt, GC (Falkreath)",
+   "region": "Bosses",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    -78689.48,
+    -55425.25,
+    4365.62
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
+  },
+  {
+   "name": "Boss: the Behemoth of Hircine's Hunt, HM (Falkreath)",
+   "region": "Bosses",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    -42817.49,
+    -58192.09,
+    1082.63
+   ],
+   "rot": [
+    0,
+    0,
+    16.9
+   ]
+  },
+  {
+   "name": "Boss: the Chieftain of Blizzard Rest, Blizzard Rest (Dawnstar)",
+   "region": "Bosses",
+   "world": "3c:Skyrim.esm",
+   "worldName": "Tamriel",
+   "pos": [
+    38300,
+    37700,
+    -8678.5
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
    ]
   }
  ]
