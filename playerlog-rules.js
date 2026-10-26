@@ -2060,7 +2060,7 @@ briarheart.js BRIARHEART 3a054391 excluded
 briarheart.js BRIARHEART 3f114ea4 excluded
 briarheart.js BRIARHEART b46479a3 excluded
 briarheart.js BRIARHEART e7b4144f excluded
-briarheart.js BRIARHEART 56814f5c excluded
+briarheart.js BRIARHEART 88ac4a79 excluded
 briarheart.js BRIARHEART 06672576 excluded
 briarheart.js BRIARHEART 170469e8 excluded
 briarheart.js BRIARHEART 6e5a4fdc excluded
@@ -2074,12 +2074,8 @@ decor.js DECOR c4970c1e excluded
 decor.js DECOR 44e37985 excluded
 decor.js DECOR 24015003 excluded
 decor.js DECOR 78b19505 excluded
-hagraven.js HAGRAVEN 145e24b9 excluded
-hagraven.js HAGRAVEN fd10af1b excluded
-hagraven.js HAGRAVEN d397150f excluded
-hagraven.js HAGRAVEN 0660b547 excluded
-hagraven.js HAGRAVEN 4c68d96d excluded
-hagraven.js HAGRAVEN d5b0e848 excluded
+decor.js DECOR 58dabe15 excluded
+decor.js DECOR 9650b7e1 excluded
 jail.js JAIL 30daab92 clean
 jail.js JAIL 8d55381d clean
 jail.js JAIL 23dd5d8e clean

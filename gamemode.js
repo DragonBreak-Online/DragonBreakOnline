@@ -1023,7 +1023,7 @@ const HELP_BY_OBJECT = new Set(['bank', 'board', 'business', 'faction', 'deity',
   'teach', 'reroll', 'offer', 'contract', 'commission', 'wildlife', 'champions', 'whereami', 'playtest', 'dungeon', 'ping',
   'expedition', 'expeditions', 'blackreach', 'shop',
   // Off until Nat switches each on; each gets its topic entry then
-  'briarheart', 'hagraven', 'decor']);
+  'briarheart', 'decor']);
 const helpRoleOk = (a, role) => {
   if (!role) return true;
   try {
