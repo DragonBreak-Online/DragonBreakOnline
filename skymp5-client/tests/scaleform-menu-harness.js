@@ -189,12 +189,24 @@ check('exec is reachable ONLY from onUpdate', () => {
   while ((m = re.exec(SVC)) !== null) { found++; if (m.index < up || m.index > next) return false; }
   return found === 2;
 });
-check('the queue is drained BEFORE the closed-phase early return, or a close would never run',
-  /this\.exec\(q\);[\s\S]{0,120}?if \(this\.state\.phase === "closed"\) return;/.test(SVC));
+// Order, not proximity: a distance-based regex here broke the moment an unrelated line was added between
+// the two, while the invariant it guards was perfectly intact.
+check('the queue is drained BEFORE the closed-phase early return, or a close would never run', () => {
+  const up = SVC.indexOf('private onUpdate()');
+  const drain = SVC.indexOf('this.exec(q);', up);
+  const early = SVC.indexOf('if (this.state.phase === "closed") return;', up);
+  return up >= 0 && drain > up && early > drain;
+});
 check('the reason is written down next to it, not just fixed',
   /g_nativeCallRequirements\.vm only inside OnUpdate/.test(SVC));
 check('the frame skse appeared on is logged, since that number was unknown', /ready on frame/.test(SVC));
 check('a failed action is reported rather than swallowed', /logError\(this, `Scaleform action '\$\{a\.do\}' failed`/.test(SVC));
+check('the caps the server gates on are declared, both panels', () => M.NATIVE_CAPS.length === 2
+  && M.NATIVE_CAPS.indexOf('native:prayer') >= 0 && M.NATIVE_CAPS.indexOf('native:decor') >= 0, M.NATIVE_CAPS);
+check('they are announced on connect, as their own event so the browser uiCaps is not replaced',
+  /connectionAccepted", \(\) => this\.announce/.test(SVC) && /event: "nativeCaps"/.test(SVC));
+check('...and announced once more, because a late cap is invisible rather than an error',
+  /this\.announces === 1 && this\.announcedAt/.test(SVC) && M.CAPS_RETRY_MS >= 1000);
 check('the service is registered', /ScaleformMenuService/.test(INDEX));
 
 // ---- 7. the SWF, which the client cannot be tested without ----------------------------------------------------------

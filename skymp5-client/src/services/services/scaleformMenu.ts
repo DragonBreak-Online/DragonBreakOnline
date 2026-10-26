@@ -29,6 +29,11 @@ export const UI_SEP = "\u0001";
 // The browser's own prefix. dboRelayService strips exactly these four characters, and so do we.
 export const DBO_PREFIX = "dbo:";
 
+// The panels this client can render natively. The server gates on these and falls back to the browser
+// widget or to chat for a client that does not name them, so an old client keeps working untouched.
+export const NATIVE_CAPS = ["native:prayer", "native:decor"];
+export const CAPS_RETRY_MS = 5000;
+
 export const MAX_PAYLOAD_CHARS = 60000;
 // openCustomMenu queues a UI message, so the menu is not there when the call returns. If ready never
 // arrives within this, the open failed and saying so is the result.

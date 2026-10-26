@@ -5,7 +5,7 @@ import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { parseCustomPacket, sendCustomPacket } from "./customPacketUtil";
 import {
-  Action, MENU_NAME, MenuState, OUT_VAR, UiEvent, isNew, newState, parseOutbox, parseUiEvent, planClose,
+  Action, CAPS_RETRY_MS, MENU_NAME, MenuState, NATIVE_CAPS, OUT_VAR, UiEvent, isNew, newState, parseOutbox, parseUiEvent, planClose,
   planOpen, planReady, planTick, serverEventName, summary,
 } from "./scaleformMenu";
 
@@ -25,6 +25,23 @@ export class ScaleformMenuService extends ClientListener {
     this.controller.emitter.on("customPacketMessage", (e) => this.onCustomPacketMessage(e));
     this.controller.on("modEvent", (e) => this.onModEvent(e));
     this.controller.on("update", () => this.onUpdate());
+    this.controller.emitter.on("connectionAccepted", () => this.announce("connected"));
+  }
+
+  // The server gates each native panel on the client naming it, and falls back to the browser widget or to
+  // chat otherwise. A cap that arrives late is therefore invisible: the player just gets the old UI with no
+  // error anywhere, so it is announced on connect and once again a few seconds later.
+  private announce(why: string): void {
+    try {
+      sendCustomPacket(this.controller, {
+        customPacketType: "dbo", event: "nativeCaps", args: NATIVE_CAPS.slice(), widget: 0,
+      });
+      this.announcedAt = Date.now();
+      this.announces++;
+      logTrace(this, "native caps announced", why, NATIVE_CAPS.join(","));
+    } catch (e) {
+      logError(this, "could not announce the native caps", e);
+    }
   }
 
   private onCustomPacketMessage(event: ConnectionMessage<CustomPacketMessage>): void {
@@ -119,6 +136,10 @@ export class ScaleformMenuService extends ClientListener {
       this.queue = [];
       this.exec(q);
     }
+    // One retry, because the first can land before the server has an actor for this user
+    if (this.announces === 1 && this.announcedAt && Date.now() - this.announcedAt > CAPS_RETRY_MS) {
+      this.announce("retry");
+    }
     if (this.state.phase === "closed") return;
     // Every tick, not throttled: a click must not wait a quarter of a second to be noticed.
     if (this.state.phase === "ready") this.drainOutbox();
@@ -164,6 +185,8 @@ export class ScaleformMenuService extends ClientListener {
   }
 
   private state: MenuState = newState();
+  private announces = 0;
+  private announcedAt = 0;
   private lastTick = 0;
   private queue: Action[] = [];
 }
