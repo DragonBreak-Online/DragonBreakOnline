@@ -381,7 +381,9 @@ const row = (id) => p.tomes.find((t) => t.id === id);
 check('...Novice and Apprentice tomes listed open, higher ranks not listed (6 Oct: only what the buyer can learn)', row(T.firebolt[0]).blocked === '' && !row(T.fireball[0]) && !row(T.incinerate[0]) && p.tomes.every((t) => t.blocked === ''), [row(T.firebolt[0]), row(T.fireball[0]), row(T.incinerate[0])]);
 check('...with real names and prices', row(T.frostFlames[0]).name === 'Spell Tome: Frost Flames' && row(T.frostFlames[0]).spell === 'Frost Flames' && row(T.frostFlames[0]).price === 94 && row(T.frostFlames[0]).rankName === 'Novice' && row(T.frostFlames[0]).canAfford === true, row(T.frostFlames[0]));
 check('...quest tomes and other lands are left out', !p.tomes.some((t) => t.id === QUEST_TOME || t.id === HAMMERFELL_TOME));
-check('...Cyrodiil tomes first within a rank', (() => { const d0 = p.tomes.filter((t) => t.school === 'Destruction' && t.rank === 0); return d0[0].id === T.frostFlames[0]; })(), p.tomes.filter((t) => t.school === 'Destruction' && t.rank === 0).map((t) => t.id));
+// The panel lists the week's shuffled shelf (shelfOrder), so which Novice tome comes first is the seed's; Tomebound's
+// Novice Destruction tomes (26 Oct) changed it. What holds is that the Cyrodiil copy is listed
+check('...the Cyrodiil Novice tome is listed', p.tomes.some((t) => t.id === T.frostFlames[0] && t.school === 'Destruction' && t.rank === 0), p.tomes.filter((t) => t.school === 'Destruction' && t.rank === 0).map((t) => t.id));
 buy(OTHER, T.fireball[0]);
 check('a blocked tome cannot be bought', shop(OTHER).resultKind === 'refused' && /Needs Arcane Arts Adept/.test(shop(OTHER).result) && count(OTHER, 0xf) === 1000, shop(OTHER).result);
 ui('tomeBuy', OTHER, ['stale-nonce', T.frostFlames[0]], 44);
@@ -462,9 +464,10 @@ mastery(OTHER, { arcane: 4 });
 load({ shopStock: 999 });
 cmd('tomes', OTHER);
 const shortPool = shop(OTHER).tomes.map((t) => t.id).sort().join();
-load();
+// Novice Destruction holds 4 tomes since Tomebound (26 Oct), as many as the default shelf: a shelf of 5 keeps the pool short
+load({ shopStock: 5 });
 cmd('tomes', OTHER);
-check('a short pool lists what exists', shop(OTHER).tomes.length > 0 && shop(OTHER).tomes.length < 4 && shop(OTHER).tomes.map((t) => t.id).sort().join() === shortPool && shop(OTHER).tomes.every((t) => t.school === 'Destruction' && t.rank === 0), shop(OTHER).tomes.map((t) => [t.id, t.school, t.rank]));
+check('a short pool lists what exists', shop(OTHER).tomes.length > 0 && shop(OTHER).tomes.length < 5 && shop(OTHER).tomes.map((t) => t.id).sort().join() === shortPool && shop(OTHER).tomes.every((t) => t.school === 'Destruction' && t.rank === 0), shop(OTHER).tomes.map((t) => [t.id, t.school, t.rank]));
 globalThis.__dboSchoolsRefusal = () => 'Your study is elsewhere.';
 cmd('tomes', OTHER);
 check('...and an empty one says so', shop(OTHER).tomes.length === 0 && /holds no tome your study can take/.test(shop(OTHER).result), shop(OTHER).result);
