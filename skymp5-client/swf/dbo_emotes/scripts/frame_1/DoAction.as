@@ -1,7 +1,8 @@
 // The emote wheel as a native panel (client emoteService's widget 24, the same object the browser wheel gets): the groups
 // down the left, the chosen group's emotes as rows, Cancel Emote and Close. The browser's previews are another mod's art,
 // so the native panel names the emote instead. Every choice sends the widget's own key (events.play, stop, close); the
-// service closes the wheel behind each, and so does this panel.
+// service closes the wheel behind each, and so does this panel. The panel is loaded afresh each time, so the emote
+// played last (and its group, opened first) comes from the service as widget.last.
 
 var DBO_SWF_VERSION = "emotes-1";
 var STAGE_W = 1280;
@@ -21,6 +22,7 @@ var data = null;
 var groups = [];
 var group = 0;
 var preview = "";
+var last = "";
 var builtAt = getTimer();
 
 function ev(k)
@@ -85,6 +87,15 @@ function chooseGroup(g)
    draw();
 }
 
+function previewFocused()
+{
+   if (focus >= 0 && actions[focus].anim != undefined && actions[focus].anim != preview)
+   {
+      preview = actions[focus].anim;
+      drawCentre();
+   }
+}
+
 function previewed()
 {
    var list = emotesOf(group);
@@ -102,9 +113,9 @@ function drawCentre()
 {
    var c = clear("centre", 30);
    var e = previewed();
-   var cat = dboText(c, "category", 1, ROW_X, TOP - 50, ROW_W, 24, dboFmt(F_PLAIN, 18, C_SECOND, 6.5), false);
+   var cat = dboText(c, "category", 1, ROW_X, TOP - 50, ROW_W, 24, dboFmt(F_PLAIN, 16, C_SECOND, 6.5), false);
    cat.text = groups[group] != undefined ? String(groups[group].label).toUpperCase() : "";
-   var name = dboText(c, "emote", 2, ROW_X, TOP - 28, ROW_W, 32, dboFmt(F_BOLD, 24, C_TEXT, 0), false);
+   var name = dboText(c, "emote", 2, ROW_X, TOP - 28, ROW_W, 32, dboFmt(F_BOLD, 22, C_TEXT, 0), false);
    name.text = e != null ? String(e.label) : "";
 }
 
@@ -135,6 +146,12 @@ function draw()
       });
       row.i = i;
       row.anim = String(list[i].anim);
+      if (row.anim == last)
+      {
+         row.rest = A_FOCUS;
+         row._alpha = A_FOCUS;
+         dboRule(row, 0, ROW_H - 6, ROW_W - 34);
+      }
       // Hover previews, as on the browser wheel: the name above the rows follows it
       row.onRollOver = function()
       {
@@ -145,22 +162,23 @@ function draw()
             drawCentre();
          }
       };
-      var k = dboText(r, "k" + i, 30 + i, ROW_X, TOP + i * ROW_H + 3, 26, 28, dboFmt(F_BOLD, 20, C_SECOND, 0), false);
+      var k = dboText(r, "k" + i, 30 + i, ROW_X, TOP + i * ROW_H + 3, 26, 28, dboFmt(F_BOLD, 22, C_SECOND, 0), false);
       k.text = String(i + 1);
    }
    drawCentre();
    var f = clear("foot", 60);
    dboRule(f, PAD, PANEL_H - 72, PANEL_W - PAD * 2);
-   button(f, "stop", 1, ROW_X, PANEL_H - 58, 200, "Cancel Emote", F_MEDIUM, 20, A_BUTTON_REST, function()
+   button(f, "stop", 1, ROW_X, PANEL_H - 58, 200, "Cancel Emote", F_MEDIUM, 22, A_BUTTON_REST, function()
    {
       stopEmote();
    });
-   button(f, "close", 2, PANEL_W - PAD - 120, PANEL_H - 58, 120, "Close", F_MEDIUM, 20, A_BUTTON_REST, function()
+   button(f, "close", 2, PANEL_W - PAD - 120, PANEL_H - 58, 120, "Close", F_MEDIUM, 22, A_BUTTON_REST, function()
    {
       closeMenu();
    });
    var h = dboText(f, "hint", 3, PAD, PANEL_H - 52, ROW_X - PAD - 10, 24, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8), false);
-   h.text = "1-" + Math.min(MAX_ROWS, list.length) + " or click to play. Left and Right change the group. Escape to close.";
+   var dot = "  " + String.fromCharCode(8226) + "  ";
+   h.text = "Hover to preview" + dot + "Click to play" + dot + "Esc or right-click to close";
    h.wordWrap = true;
    h.multiline = true;
    h._height = 48;
@@ -198,10 +216,23 @@ _root.dboData = function(json)
          groups.push(p.groups[i]);
       }
    }
+   last = p.last != undefined && p.last != null ? String(p.last) : "";
    if (first || group >= groups.length)
    {
       group = 0;
       preview = groups.length ? String(groups[0].emotes[0].anim) : "";
+      for (var g = 0; g < groups.length && last != ""; g++)
+      {
+         var es = groups[g].emotes;
+         for (var e = 0; e < es.length; e++)
+         {
+            if (String(es[e].anim) == last)
+            {
+               group = g;
+               preview = last;
+            }
+         }
+      }
    }
    draw();
 };
@@ -209,8 +240,8 @@ _root.dboData = function(json)
 var keys = {};
 keys.onKeyDown = function()
 {
-   var code = Key.getCode();
-   if (code == 27 || code == 9)
+   var code = dboKey();
+   if (code == 27)
    {
       if (data != null)
       {
@@ -241,10 +272,12 @@ keys.onKeyDown = function()
    else if ((code == 38 || code == 87) && actions.length)
    {
       setFocus(focus <= 0 ? actions.length - 1 : focus - 1);
+      previewFocused();
    }
    else if ((code == 40 || code == 83) && actions.length)
    {
       setFocus(focus < 0 || focus >= actions.length - 1 ? 0 : focus + 1);
+      previewFocused();
    }
    else if ((code == 13 || code == 69) && focus >= 0 && actions[focus].disabled != true)
    {
@@ -252,6 +285,18 @@ keys.onKeyDown = function()
    }
 };
 Key.addListener(keys);
+
+// Right-click closes, as on the browser wheel. Scaleform passes the button to onMouseDown (1 left, 2 right); unproven in
+// game, so anything but 2 does nothing
+var mouse = {};
+mouse.onMouseDown = function(button)
+{
+   if (button == 2 && data != null)
+   {
+      closeMenu();
+   }
+};
+Mouse.addListener(mouse);
 
 _root.onEnterFrame = function()
 {
