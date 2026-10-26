@@ -937,6 +937,12 @@
    "_comment": "The other chapel the Imperial Cult's ledger stands in (spells.js shopPlaces)."
   },
   {
+   "name": "Golden Glow Estate",
+   "cells": ["161ff:Skyrim.esm", "2d3e7:Skyrim.esm", "2d3e8:Skyrim.esm", "a013b:Skyrim.esm"],
+   "schools": ["Destruction", "Conjuration", "Illusion", "Restoration", "Alteration"],
+   "_comment": "House Telvanni's seat (guild-defs hall, spells.js shopPlaces; Nat 25 Oct). Whole cells, as the chapels: its Scholars' Ledger sold tomes that could be read nowhere in the estate (ticket 1560957922618507346). Every school: the house teaches them all, as a college does."
+  },
+  {
    "name": "The well in the Hall of the Elements",
    "cell": "1380e:Skyrim.esm",
    "refr": "108d6f:Skyrim.esm",
