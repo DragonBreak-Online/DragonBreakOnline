@@ -357,6 +357,20 @@ check('an apprenticeship left while the teacher was away is cleared from their l
 // Restricted arts, removed and non-tome spells never pass by apprenticeship
 const REANIM = idOf('65bd7:Skyrim.esm');
 check('spells.js: a restricted art is closed to an Associate, a removed spell and a spell no tome teaches to anyone', /restricted arts/.test(globalThis.__dboSpellsOpenTo(S4, REANIM)) && globalThis.__dboSpellsOpenTo(S4, idOf('109111:Skyrim.esm')) !== '' && globalThis.__dboSpellsOpenTo(S4, idOf('b3165:Skyrim.esm')) !== '' && globalThis.__dboSpellsOpenTo(S4, FB) === '');
+// House Telvanni teaches as a college (Nat, 26 Oct): the tracked config names it a senior guild, so its leader, officers and
+// senior ranks keep 3 apprentices; its other ranks one; and it is still no college in guild-defs.json (an allegiance)
+{
+  load();
+  const max = (guilds) => { put(T3, 'private.dboGuilds', guilds); return globalThis.__dboApprenticeMax(T3); };
+  check('config: schools.apprenticeship.seniorGuilds names House Telvanni beside the Synod and the colleges', JSON.stringify(((CONFIG.schools || {}).apprenticeship || {}).seniorGuilds) === JSON.stringify(['synod', 'college-of-winterhold', 'college-of-whispers', 'house-telvanni']));
+  check('a Telvanni Archmagister (leader), Magister (officer) or Mouth (sergeant) keeps 3 apprentices', ['leader', 'officer', 'sergeant'].every((r) => max([{ id: 'house-telvanni', role: r }]) === 3), ['leader', 'officer', 'sergeant'].map((r) => max([{ id: 'house-telvanni', role: r }])));
+  check('...a Telvanni Wizard (mage) or Oathman (member) one, as in a college', max([{ id: 'house-telvanni', role: 'mage' }]) === 1 && max([{ id: 'house-telvanni', role: 'member' }]) === 1);
+  check('...a Synod Senior Magister still 3, and another House\'s officer one', max([{ id: 'synod', role: 'sergeant' }]) === 3 && max([{ id: 'house-redoran', role: 'officer' }]) === 1);
+  const defs = JSON.parse(fs.readFileSync(path.join(SERVER, 'guild-defs.json'), 'utf8'));
+  const tel = (defs.factions || []).find((f) => f && f.id === 'house-telvanni');
+  check('House Telvanni stays an allegiance: not marked college in guild-defs.json', !!tel && tel.college !== true, tel && tel.college);
+  put(T3, 'private.dboGuilds', []);
+}
 // Config: bad values fall back to their defaults, logged; mages-guild is gone from the senior list
 out.logs.length = 0;
 load({ apprenticeship: { dailyXp: 'lots', radiusMeters: -5, daysByRank: [1, 2], seniorGuilds: 'synod' } });

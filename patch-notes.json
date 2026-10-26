@@ -1,5 +1,20 @@
 [
   {
+    "title": "House Telvanni teaches as a college",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "House Telvanni",
+        "items": [
+          "House Telvanni is a college as well as a Great House. Its Archmagister, Magisters, Masters and Mouth may keep up to three apprentices at once, like the senior mages of the Synod and the colleges; its other ranks keep one.",
+          "It stays one of the Great Houses: belonging to it still counts as your allegiance."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Blackreach glows, and the Windhelm bank opens",
     "date": "2026-10-26",
     "version": "Server update",

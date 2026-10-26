@@ -211,6 +211,8 @@
    "exitAnim": "IdleForceDefaultState",
    "wheelEverySeconds": 60
   },
+  "_apprenticeship": "House Telvanni teaches as a college (Nat, 26 Oct: \"Telvanni is also a college institution, however falls under allegiances\"): its leader, officers and senior ranks take up to seniorMax (3) apprentices like the Synod's and the colleges'. Named here rather than marked college in guild-defs.json, which would also let its members sit in a player guild (guilds.js bandCompatible) and stop it counting as an allegiance. Its tomes (spells shopFactions and the Golden Glow shop place), ledger teaching (its hall) and classes (classes.teacherGuilds) already had it. ROLLBACK: remove apprenticeship.",
+  "apprenticeship": { "seniorGuilds": ["synod", "college-of-winterhold", "college-of-whispers", "house-telvanni"] },
   "classes": {
    "enabled": true,
    "edid": "ClassLectern",

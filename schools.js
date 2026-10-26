@@ -2283,6 +2283,8 @@ module.exports = (api) => {
   const engineHas = (a, id) => knownSpells(a).some((sp) => sp.id >>> 0 === id >>> 0);
   const isSenior = (a) => guildRolesOf(a).some((m) => ((AP.seniorGuilds || []).includes(m.id) || (AP.collegeGuilds !== false && isCollege(m.id))) && (AP.seniorRoles || []).includes(m.role));
   const apMax = (a) => Math.max(0, Number(isSenior(a) ? AP.seniorMax : AP.max) || 0);
+  // How many apprentices `a` may keep, for the harnesses (read only)
+  globalThis.__dboApprenticeMax = (a) => apMax(a >>> 0);
   const apList = (s) => (Array.isArray(s.apprentices) ? s.apprentices : []);
   const canTeachAny = (a) => arcaneOf(a).level >= AP.teacherArcaneLevel || (priestOf(a).held && priestOf(a).level >= AP.teacherPriestLevel);
   const canTeachSchool = (a, school) => (school === RESTORATION ? priestOf(a).held && priestOf(a).level >= AP.teacherPriestLevel : arcaneOf(a).level >= AP.teacherArcaneLevel);
