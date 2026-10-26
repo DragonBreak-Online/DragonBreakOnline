@@ -121,12 +121,15 @@ export class AdminMenuService extends ClientListener {
     // A key, or a bindable mouse button as 256 + the button (mouseKeys.ts); never the gamepad
     const code = buttonKeyCode(e);
     if (code === null || !e.isDown) return;
+    // The native panel takes Escape itself: it cancels typing, a picker or an armed button before it closes
     if (code === DxScanCode.Escape && this.menuOpen) {
-      this.closeMenu();
+      if (!this.native) this.closeMenu();
       return;
     }
     if (code !== this.menuKey) return;
     if (this.menuOpen) {
+      // Never under the typing: the menu would go with the game still taking keys as text
+      if (this.native && this.ui.typing) return;
       this.closeMenu();
       return;
     }
@@ -331,6 +334,13 @@ export class AdminMenuService extends ClientListener {
     }
   }
 
+  // The gamemode-fed tabs stop their updates when the panel goes, as the browser tabs do when they unmount
+  private leaveStaffTab(): void {
+    const leave: Record<string, [string, string]> = { gmcalls: ["staffGmCalls", "unwatch"], thievery: ["staffThievery", "unwatch"], enchant: ["staffEnchant", "close"] };
+    const l = leave[String(this.ui.tab || "")];
+    if (l) sendCustomPacket(this.controller, { customPacketType: "dbo", event: l[0], args: [l[1]] });
+  }
+
   private nativeView(): unknown {
     return adminNativeView(panelData, this.catalogs, this.staff, this.staffAt, this.ui, WIDGET_ID);
   }
@@ -347,6 +357,7 @@ export class AdminMenuService extends ClientListener {
     if (key === CLOSE_KEY) {
       this.menuOpen = false;
       this.native = false;
+      this.leaveStaffTab();
       return;
     }
     // What the panel shows: its tab, search and page, answered with that page
@@ -377,6 +388,7 @@ export class AdminMenuService extends ClientListener {
     this.menuOpen = false;
     if (this.native) {
       this.native = false;
+      this.leaveStaffTab();
       this.controller.lookupListener(ScaleformMenuService).closeNative("adminPanel");
       return;
     }

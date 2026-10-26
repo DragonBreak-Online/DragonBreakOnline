@@ -1,0 +1,7 @@
+dbo.as
+dbo-controls.as
+../dbo_admin/ui.as
+../dbo_admin/tabs/debug.as
+../dbo_admin/tabs/players.as
+../dbo_admin/tabs/modes.as
+../dbo_admin/tabs/npcs.as

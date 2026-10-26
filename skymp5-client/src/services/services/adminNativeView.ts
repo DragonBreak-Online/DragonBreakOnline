@@ -40,6 +40,9 @@ export interface AdminUi {
   owner?: string;
   thief?: string;
   zone?: string;
+  typing?: boolean;
+  // how many rows the panel has room for on this view (1 to PAGE_ROWS)
+  rows?: number;
 }
 
 export interface AdminCatalogs {
@@ -98,6 +101,9 @@ const num = (v: unknown, d = 0): number => (typeof v === "number" && isFinite(v)
 const arr = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 const plugin = (p: string): string => p.replace(/\.(esp|esm|esl)$/i, "");
 
+// The rows a page holds: what the panel asked for, never more than nine
+const rowsOf = (ui: AdminUi): number => Math.max(1, Math.min(PAGE_ROWS, Math.floor(num(ui && ui.rows, PAGE_ROWS))));
+
 // One page of a list: the rows, where it starts and how many there are
 export function pageOf<T>(rows: T[], page: unknown, size = PAGE_ROWS): { rows: T[]; page: number; pages: number; total: number } {
   const pages = Math.max(1, Math.ceil(rows.length / size));
@@ -150,7 +156,7 @@ const playersView = (data: any, ui: AdminUi) => {
     const hay = [pl.n, pl.t ? "#" + pl.t : "", pl.dn, pl.d, String(pl.p), pl.a || "", pl.ip, pl.hwid].join(" ").toLowerCase();
     return hay.indexOf(filter) !== -1;
   });
-  const pg = pageOf(shown, ui.page);
+  const pg = pageOf(shown, ui.page, rowsOf(ui));
   const row = (pl: any) => ({
     p: num(pl.p), n: str(pl.n) || "-", t: str(pl.t, 8), a: str(pl.a, 16), online: !!pl.online,
     ping: pl.online && typeof pl.ping === "number" ? pl.ping : null, dn: str(pl.dn, 40), d: str(pl.d, 24), ip: str(pl.ip, 40), hwid: str(pl.hwid, 40),
@@ -197,7 +203,7 @@ const itemsView = (cats: AdminCatalogs, ui: AdminUi) => {
   const rows = cat ? matches.filter((r) => r.cat === cat) : q ? matches : [];
   const counts: Record<string, number> = {};
   for (const r of matches) counts[r.cat] = (counts[r.cat] || 0) + 1;
-  const pg = pageOf(rows, ui.page);
+  const pg = pageOf(rows, ui.page, rowsOf(ui));
   return {
     chips: [{ id: "", label: "All", count: matches.length }].concat(cats.items.map((c) => ({ id: c.id, label: c.label, count: counts[c.id] || 0 })).filter((c) => !q || c.count)),
     plugins: Object.keys(plugins).sort((a, b) => a.localeCompare(b)).map(plugin),
@@ -223,7 +229,7 @@ const teleportView = (cats: AdminCatalogs, ui: AdminUi) => {
   const world = worlds.some((x) => x.w === ui.world) ? str(ui.world, 80) : "";
   const list = world ? inScope.filter((l) => (l.worldName || "-") === world) : inScope;
   const rows = q ? list : list.slice().sort((a, b) => a.name.localeCompare(b.name));
-  const pg = pageOf(rows, ui.page);
+  const pg = pageOf(rows, ui.page, rowsOf(ui));
   return {
     region, world,
     chips: (q ? [{ id: "", label: "All", count: matches.length }] : []).concat(regions.map((r) => ({ id: r, label: r, count: counts[r] || 0 }))),
@@ -261,7 +267,7 @@ const placeView = (data: any, ui: AdminUi) => {
     // One results page from placement.js is up to 100 rows: the SWF gets nine of them, and asks the server for more past the end
     if (r) {
       const items = arr<any>(r.items).filter((it) => sub === "catalog" || it[4] === "npc");
-      const pg = pageOf(items, ui.page);
+      const pg = pageOf(items, ui.page, rowsOf(ui));
       out.results = {
         query: str(r.query, 60), category: str(r.category, 40), plugin: str(r.plugin, 80), total: num(r.total), loaded: items.length,
         rows: pg.rows.map((it) => ({ desc: str(it[0], 40), name: str(it[1]), plugin: plugin(str(it[2])), cat: str(it[3], 40), kind: str(it[4], 8) })),
@@ -272,7 +278,7 @@ const placeView = (data: any, ui: AdminUi) => {
   if (sub === "placed") {
     const p = data.placements || null;
     if (p) {
-      const pg = pageOf(arr<any>(p.items), ui.page);
+      const pg = pageOf(arr<any>(p.items), ui.page, rowsOf(ui));
       out.placements = {
         here: num(p.here), total: num(p.total), page: pg.page, pages: pg.pages, count: pg.total,
         rows: pg.rows.map((r) => ({ id: str(r.id, 24), base: str(r.base, 40), name: str(r.name), kind: str(r.kind, 8), hostile: !!r.hostile, dist: num(r.dist), mine: r.mine !== false, group: r.group ? str(r.group, 60).split("#")[0] : "", pos: arr<number>(r.pos).slice(0, 3), rot: arr<number>(r.rot).slice(0, 3) })),
@@ -282,7 +288,7 @@ const placeView = (data: any, ui: AdminUi) => {
   if (sub === "sets") {
     const s = Array.isArray(data.placeSets) ? data.placeSets : null;
     if (s) {
-      const pg = pageOf(s, ui.page);
+      const pg = pageOf(s, ui.page, rowsOf(ui));
       out.sets = { rows: pg.rows.map((x: any) => ({ name: str(x.name, 40), count: num(x.count) })), page: pg.page, pages: pg.pages, total: pg.total };
     } else out.sets = null;
   }
@@ -309,7 +315,7 @@ const placeView = (data: any, ui: AdminUi) => {
 const npcsView = (data: any, ui: AdminUi) => {
   const zones = arr<any>(data.npcZones);
   const shown = fuzzyFilter(zones, str(ui.q, 60), (z) => str(z.name));
-  const pg = pageOf(shown, ui.page);
+  const pg = pageOf(shown, ui.page, rowsOf(ui));
   const at = num(data.npcZonesAt, Date.now());
   const elapsed = Math.round((Date.now() - at) / 1000);
   return {
@@ -332,7 +338,7 @@ const enchantView = (staff: Record<number, any>, ui: AdminUi, acting: string) =>
   const kind = piece ? piece.kind : "";
   const list = (catalog ? arr<any>(catalog.list) : []).filter((r) => !kind || r.k === kind);
   const rows = fuzzyFilter(list, str(ui.q, 60), (r) => r.n + " " + r.e + " " + r.p + " " + arr<any>(r.fx).map((f) => f[0]).join(" "));
-  const pg = pageOf(rows, ui.page);
+  const pg = pageOf(rows, ui.page, rowsOf(ui));
   const ench = (catalog ? arr<any>(catalog.list) : []).find((r) => r.id === ui.ench) || null;
   return {
     loading: !catalog, packName: pack ? str(pack.targetName) : "", packLoading: !items,
@@ -385,7 +391,7 @@ const thieveryView = (staff: Record<number, any>, at: Record<number, number>, ui
     out.raids = pg.rows.map((r) => ({ n: num(r.n), faction: str(r.faction), state: str(r.state, 16), by: str(r.by, 40), evidence: str(r.evidence, 300), at: num(r.at), raidAt: num(r.raidAt), decidedBy: str(r.decidedBy, 40), reason: str(r.reason, 200) }));
     out.page = pg.page; out.pages = pg.pages;
   } else if (sub === "ledger") {
-    const pg = pageOf(ledger, ui.page);
+    const pg = pageOf(ledger, ui.page, rowsOf(ui));
     out.ledger = pg.rows.map((s) => ({ n: num(s.n), item: str(s.item), owner: str(s.owner, 40), home: str(s.home, 60), thief: str(s.thief, 40), at: num(s.at), state: str(s.state, 24), canSendBack: !!s.canSendBack }));
     out.page = pg.page; out.pages = pg.pages; out.shown = ledger.length; out.loaded = stolen.length; out.total = num(d.stolenTotal);
   } else {
@@ -407,6 +413,8 @@ export const adminNativeView = (data: any, cats: AdminCatalogs, staff: Record<nu
   const out: any = {
     type: "adminPanel", id: widgetId, admin: !!d.admin, tier: str(d.tier, 16), tab, tabs: tabs.map((t) => ({ id: t, label: TAB_LABELS[t] })),
     caps, acting: { id: acting.id, label: acting.label }, events: d.events || {},
+    // the admin's own actor, for the rows that name "You" (Mastery hours); the debug block travels on the Debug tab only
+    selfId: str((d.me && d.me.a) || (d.debug && d.debug.actorId), 16),
   };
   if (d.admin && ACTS_ON.indexOf(tab) !== -1) out.targets = targets.slice(0, 120).map((t) => ({ id: t.id, label: t.label }));
   if (tab === "debug") out.debug = d.debug || null;
