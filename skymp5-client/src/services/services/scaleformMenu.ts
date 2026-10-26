@@ -214,6 +214,21 @@ export const planOpen = (s: MenuState, swf: unknown, payload: unknown, widgetId:
     : open;
 };
 
+// New contents for the panel that is already on screen. This is NOT planOpen: planOpen with the menu still
+// "opening" would set the phase back to opening and emit a second openCustomMenu, and two opens of one
+// CustomMenu is how the 26 Oct 03:26 session lost a panel. A refresh that arrives before the SWF answers
+// just replaces the payload, and planReady pushes the fresh one when the movie is finally there.
+export const planRefresh = (s: MenuState, payload: unknown, widgetId: unknown): Action[] => {
+  if (s.phase === "closed") return [];
+  s.widgetId = Math.max(0, Math.round(Number(widgetId) || s.widgetId));
+  s.json = payloadJson(payload);
+  if (s.phase !== "ready") return [];
+  return noPayload(payload)
+    ? [{ do: "report", text: `${s.swf}: a refresh carried an empty payload, so the panel will blank` },
+       { do: "push", json: s.json }]
+    : [{ do: "push", json: s.json }];
+};
+
 // The SWF said it is up. Only now can anything be invoked on it: before ready, _global.skse does not exist
 // and the movie may not be built.
 export const planReady = (s: MenuState, frame: number, now: number): Action[] => {

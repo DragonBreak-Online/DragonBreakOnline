@@ -6,8 +6,14 @@ import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { parseCustomPacket, sendCustomPacket } from "./customPacketUtil";
 import {
   Action, CAPS_RETRY_MS, MENU_NAME, MenuState, OUT_VAR, UiEvent, capsFor, isNew, newState, parseOutbox,
-  parseUiEvent, planClose, planOpen, planReady, planTick, readyFrameOf, serverEventName, summary,
+  parseUiEvent, planClose, planOpen, planReady, planRefresh, planTick, readyFrameOf, summary,
 } from "./scaleformMenu";
+import { Replay, replayFor, routeWidget } from "./nativeWidgets";
+
+// How the relay draws a widget in the browser, handed over per packet so this service never imports the
+// relay: dboRelayService already imports this file, and the pair would be a cycle.
+export type Failover = (widget: unknown, id: number) => void;
+import { withClientUiCaps } from "../../lib/clientUiCaps";
 
 // A real Skyrim Scaleform panel driven from the server, instead of the CEF overlay (Nat, 25 Oct).
 //
@@ -106,28 +112,82 @@ export class ScaleformMenuService extends ClientListener {
         // session reported this nobody knew which frame it does appear on.
         const frame = readyFrameOf(parsed);
         logTrace(this, "Scaleform panel ready on frame", String(frame));
+        this.pending = null;
         this.enqueue(planReady(this.state, frame, Date.now()));
         this.note(summary(this.state));
         return;
       }
-      if (parsed.key === "close") {
-        // The SWF closes itself too, so this is the client catching up rather than the way out.
-        this.enqueue(planClose(this.state));
-        this.note(summary(this.state));
-        return;
-      }
-      const eventName = serverEventName(parsed.key);
-      if (!eventName) {
-        logTrace(this, "Scaleform panel sent an unknown key", parsed.key);
-        return;
-      }
-      // Exactly what dboRelayService sends for a browser widget, so the server's onUi handlers are unchanged
-      sendCustomPacket(this.controller, {
-        customPacketType: "dbo", event: eventName, args: parsed.args, widget: this.state.widgetId,
-      });
-      this.state.sent++;
+      // One decision table for every panel, whether the gamemode opened it with a dboScaleform packet or the
+      // relay routed a widget here. nativeWidgets.replayFor owns it so that both arrive on the same wire.
+      for (const r of replayFor(parsed.key, parsed.args)) this.replay(r);
     } catch (err) {
       logError(this, "panel message handling failed", err);
+    }
+  }
+
+  private replay(r: Replay): void {
+    if (r.do === "server") {
+      // Byte for byte what dboRelayService.onBrowserMessage sends, withClientUiCaps included, so the
+      // server's onUi handlers cannot tell which UI drew the panel. That is the whole design.
+      sendCustomPacket(this.controller, {
+        customPacketType: "dbo", event: r.event, args: withClientUiCaps(r.event, r.args),
+        widget: this.state.widgetId,
+      });
+      this.state.sent++;
+      return;
+    }
+    if (r.do === "close") {
+      this.enqueue(planClose(this.state));
+      this.note(summary(this.state));
+      return;
+    }
+    if (r.do === "handoff") {
+      // Parsed and reported, not yet routed: handing one typed-input control back to the browser needs the
+      // relay to open a browser widget over a paused game, which is not built. Said out loud rather than
+      // dropped, because a panel whose rename button does nothing is the failure that wastes a session.
+      const text = "a panel asked the browser to take over '" + r.type + "' in '" + r.mode + "' mode, which is not wired yet";
+      logTrace(this, "Scaleform hand-off", text);
+      this.note(text);
+      return;
+    }
+    logTrace(this, "Scaleform panel", r.text);
+    this.note(r.text);
+  }
+
+  // Called by dboRelayService before it draws a widget in the browser; true means the native path has taken
+  // this packet and the browser must not also see it. Every native call is queued, never made here: this
+  // runs inside a packet handler, where g_nativeCallRequirements.vm is unset.
+  public takeWidgetPacket(content: Record<string, unknown>, drawInBrowser: Failover): boolean {
+    try {
+      const nativeId = this.state.phase === "closed" ? 0 : this.state.widgetId;
+      const route = routeWidget(
+        { close: content["close"], widget: content["widget"], focus: content["focus"] },
+        nativeId, this.nativePanelsSetting());
+      if (route.to === "browser") return false;
+      if (route.to === "ignore") {
+        // The browser path rejects these too, with its own guards. Reported once, here, and then left to it.
+        logTrace(this, "widget packet not routed", route.why);
+        return false;
+      }
+      if (route.action === "close") {
+        logTrace(this, "server closed the native panel", String(route.id));
+        this.enqueue(planClose(this.state));
+        this.note(summary(this.state));
+        return true;
+      }
+      if (route.action === "open") {
+        logTrace(this, "routing widget to a native panel", route.swf, String(route.id));
+        // Held until the SWF says it is up. If it never does, this is what the widget falls back to.
+        this.pending = { widget: route.widget, id: route.id, swf: route.swf, draw: drawInBrowser };
+        this.enqueue(planOpen(this.state, route.swf, route.widget, route.id, Date.now()));
+        return true;
+      }
+      this.enqueue(planRefresh(this.state, route.widget, route.id));
+      return true;
+    } catch (e) {
+      // The browser is the safe fallback: the player gets a panel either way, which beats getting none.
+      logError(this, "routing a widget packet failed, leaving it to the browser", e);
+      return false;
     }
   }
 
@@ -150,7 +210,10 @@ export class ScaleformMenuService extends ClientListener {
     const now = Date.now();
     if (now - this.lastTick < 250) return;
     this.lastTick = now;
-    this.exec(planTick(this.state, now));
+    const tick = planTick(this.state, now);
+    if (!tick.length) return;
+    this.exec(tick);
+    this.failover("the panel never reported ready");
   }
 
   // Queued, not run: the caller may be outside the update tick, where no native can be called.
@@ -178,8 +241,32 @@ export class ScaleformMenuService extends ClientListener {
         // A failure here is the finding, not noise: say which step died rather than swallowing it.
         logError(this, `Scaleform action '${a.do}' failed`, e);
         this.note(`action '${a.do}' threw: ${e}`);
-        if (a.do === "open") this.state.phase = "closed";
+        if (a.do === "open") {
+          this.state.phase = "closed";
+          this.failover(`openCustomMenu threw: ${e}`);
+        }
       }
+    }
+  }
+
+  // A widget routed natively whose panel never came up. Whether a missing Data\\Interface\\<swf>.swf makes
+  // openCustomMenu throw or quietly do nothing is NOT established - so both are covered: exec calls this when
+  // the open throws, and planTick's 5s timeout calls it when nothing arrives. Either way the player ends up
+  // with the browser panel rather than an empty screen, which is what happened before this existed.
+  //
+  // Only relay-routed panels have a fallback. A gamemode-driven dboScaleform panel has no browser widget to
+  // fall back to, so pending stays null for those and this does nothing.
+  private failover(why: string): void {
+    const p = this.pending;
+    this.pending = null;
+    if (!p) return;
+    const text = `${p.swf} did not come up (${why}), so widget ${p.id} goes to the browser instead`;
+    logError(this, "native panel failover", text);
+    this.note(text);
+    try {
+      p.draw(p.widget, p.id);
+    } catch (e) {
+      logError(this, "the browser failover ALSO failed, so this widget is lost", e);
     }
   }
 
@@ -197,6 +284,7 @@ export class ScaleformMenuService extends ClientListener {
     try { if (typeof n === "function") n("scaleform", text); } catch { /* diagnostics only */ }
   }
 
+  private pending: { widget: unknown; id: number; swf: string; draw: Failover } | null = null;
   private state: MenuState = newState();
   private announces = 0;
   private announcedAt = 0;

@@ -217,8 +217,14 @@ check('the summary says which channel delivered, so one session settles it', () 
 // ---- 6. the service wiring ----------------------------------------------------------------------------------------
 check('data goes in as ONE invokeString of the whole payload', /invokeString\(MENU_NAME, "_root\.dboData", a\.json\)/.test(SVC));
 check('a panel message goes out as the SAME packet the browser widgets send',
-  /customPacketType: "dbo", event: eventName, args: parsed\.args, widget: this\.state\.widgetId/.test(SVC));
-check('an unknown key is logged, not forwarded raw', /Scaleform panel sent an unknown key/.test(SVC));
+  /customPacketType: "dbo", event: r\.event, args: withClientUiCaps\(r\.event, r\.args\),\s*widget: this\.state\.widgetId/.test(SVC));
+// The service used to carry its own copy of the dbo: rule. It now shares nativeWidgets.replayFor with the
+// relay-routed panels, so an unknown key is judged by that one table (and tested in
+// native-widgets-harness.js) rather than here. What this file still has to see is that the service routes
+// through it, and that the report branch says something out loud.
+check('key decisions come from the one shared table, not a private copy',
+  /for \(const r of replayFor\(parsed\.key, parsed\.args\)\) this\.replay\(r\);/.test(SVC) && !/serverEventName/.test(SVC));
+check('an unknown key is logged, not forwarded raw', /logTrace\(this, "Scaleform panel", r\.text\)/.test(SVC));
 check('the service opens with flags 0, which SKSE ignores anyway', /openCustomMenu\(a\.swf, 0\)/.test(SVC));
 // The 26 Oct 03:26 failure: natives are only callable inside OnUpdate.
 check('the packet handler ENQUEUES and never calls a native itself',
@@ -296,6 +302,54 @@ check('the base SWF carries no assets of anyone else: one frame, one empty actio
   /actionBytes="00"/.test(XML) && /frameCount="1"/.test(XML) && !/DefineShape|DefineFont|DefineBits/.test(XML));
 check('the build verifies the AS2 came back out of the SWF rather than trusting the exit code',
   /-export', 'script', verifyDir/.test(BUILD) && /missing\.length/.test(BUILD));
+
+// ---- 9. planRefresh: new contents for a panel already on screen, which must never open a second menu ---------------
+// The relay routes a non-focus dboWidget for the natively-open widget here. planOpen cannot do this job: with
+// the menu still "opening" it would emit a SECOND openCustomMenu.
+check('a refresh while READY pushes the new payload and nothing else', () => {
+  const t = M.newState(); M.planOpen(t, 'dbo_board', { rows: 1 }, 7, 0); M.planReady(t, 2, 10);
+  const r = M.planRefresh(t, { rows: 2 }, 7);
+  return r.length === 1 && r[0].do === 'push' && JSON.parse(r[0].json).rows === 2;
+}, (() => { const t = M.newState(); M.planOpen(t, 'dbo_board', { rows: 1 }, 7, 0); M.planReady(t, 2, 10); return M.planRefresh(t, { rows: 2 }, 7); })());
+check('a refresh while still OPENING invokes nothing, because the movie is not there to invoke on', () => {
+  const t = M.newState(); M.planOpen(t, 'dbo_board', { rows: 1 }, 7, 0);
+  return M.planRefresh(t, { rows: 2 }, 7).length === 0;
+});
+check('...but it is the FRESH payload that planReady then pushes, not the stale one', () => {
+  const t = M.newState(); M.planOpen(t, 'dbo_board', { rows: 1 }, 7, 0);
+  M.planRefresh(t, { rows: 2 }, 7);
+  const r = M.planReady(t, 3, 20);
+  return r.length === 1 && r[0].do === 'push' && JSON.parse(r[0].json).rows === 2;
+}, (() => { const t = M.newState(); M.planOpen(t, 'dbo_board', { rows: 1 }, 7, 0); M.planRefresh(t, { rows: 2 }, 7); return M.planReady(t, 3, 20); })());
+check('a refresh NEVER emits an open, whatever the phase', () => {
+  const phases = [];
+  let t = M.newState(); M.planOpen(t, 'dbo_board', { a: 1 }, 7, 0); phases.push(M.planRefresh(t, { a: 2 }, 7));
+  t = M.newState(); M.planOpen(t, 'dbo_board', { a: 1 }, 7, 0); M.planReady(t, 1, 5); phases.push(M.planRefresh(t, { a: 2 }, 7));
+  t = M.newState(); phases.push(M.planRefresh(t, { a: 2 }, 7));
+  return phases.every((r) => !r.some((x) => x.do === 'open'));
+});
+check('a refresh with the menu CLOSED does nothing at all', () => M.planRefresh(M.newState(), { a: 1 }, 7).length === 0);
+check('a refresh does not lose the phase, so the outbox keeps being drained', () => {
+  const t = M.newState(); M.planOpen(t, 'dbo_board', { a: 1 }, 7, 0); M.planReady(t, 1, 5);
+  M.planRefresh(t, { a: 2 }, 7);
+  return t.phase === 'ready';
+});
+check('a refresh does not reset the sequence or the outbox cursor, which would replay old clicks', () => {
+  const t = M.newState(); M.planOpen(t, 'dbo_board', { a: 1 }, 7, 0); M.planReady(t, 1, 5);
+  t.outRead = 120; t.lastSeq = 4;
+  M.planRefresh(t, { a: 2 }, 7);
+  return t.outRead === 120 && t.lastSeq === 4;
+});
+check('an empty refresh payload is REPORTED, because a blanked panel looks like a dead one', () => {
+  const t = M.newState(); M.planOpen(t, 'dbo_board', { a: 1 }, 7, 0); M.planReady(t, 1, 5);
+  const r = M.planRefresh(t, {}, 7);
+  return r.length === 2 && r[0].do === 'report' && r[1].do === 'push';
+}, (() => { const t = M.newState(); M.planOpen(t, 'dbo_board', { a: 1 }, 7, 0); M.planReady(t, 1, 5); return M.planRefresh(t, {}, 7); })());
+check('a refresh keeps the widget id when the caller does not name one, so replies still carry it', () => {
+  const t = M.newState(); M.planOpen(t, 'dbo_board', { a: 1 }, 7, 0); M.planReady(t, 1, 5);
+  M.planRefresh(t, { a: 2 }, 0);
+  return t.widgetId === 7;
+});
 
 console.log(failures ? `${failures} failed` : 'all passed');
 process.exit(failures ? 1 : 0);
