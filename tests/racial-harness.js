@@ -49,7 +49,7 @@ const mp = {
     return undefined;
   },
   set: (id, k, v) => { state[id] = state[id] || {}; if (k === 'percentages') state[id].pc = v; if (k === 'inventory') state[id].inv = v.entries; },
-  getIdFromDesc: (d) => ({ '3c:Skyrim.esm': 0x3c, 'a764b:BSHeartland.esm': 0xa764b, '5000:Skyrim.esm': 0x5000 })[d] || 0,
+  getIdFromDesc: (d) => ({ '3c:Skyrim.esm': 0x3c, 'a764b:BSHeartland.esm': 0xa764b, '5000:Skyrim.esm': 0x5000 })[d] || 0,   // verify-formids: ignore (5000 is the mock interior cell)
   getServerSettings: () => ({}),
 };
 const lifted = new Function('mp', 'recordOf', 'cfg', gm.slice(a0, b0) + '\nreturn { sourceResistsOf, weaponHandsOf, blessingTargetMult, blessingAttackMult, blessingDamageMult };');
@@ -86,7 +86,7 @@ check('Dunmer: fire 50% less, frost and a fire staff\'s fire too', near(R.target
 check('Khajiit: a punch counts the claws\' base 10 + 8 (x1.8), a sword unchanged', near(R.attackMult(7, NPC, FIST, 10), 1.8) && R.attackMult(7, NPC, SWORD, 10) === 1);
 check('Nord: frost 50% less, fire unchanged', near(R.targetMult(NPC, 8, FROSTBITE), 0.5) && R.targetMult(NPC, 8, FLAMES) === 1);
 check('Nord: stamina x1.15 outdoors in Skyrim', near(R.regenFactor(8, 'stamina'), 1.15));
-state[8].desc = '5000:Skyrim.esm';
+state[8].desc = '5000:Skyrim.esm';   // verify-formids: ignore (the mock interior cell)
 check('...not indoors', R.regenFactor(8, 'stamina') === 1);
 state[8].desc = 'a764b:BSHeartland.esm'; state[8].pos = [60000, 205000, 7100];
 check('...outdoors at Bruma (the Jerall Mountains), yes', near(R.regenFactor(8, 'stamina'), 1.15));
@@ -221,8 +221,8 @@ delete globalThis.__dboCombatAt;
 const hook = gm.slice(gm.indexOf('const hitDamageAttemptHook'), gm.indexOf('hitDamageAttemptHook.__dbo = true;'));
 check('gamemode: the target\'s side is Defense x a Flesh spell x the target\'s blessing x a resist potion x worn resistances x the race, capped together',
   /let targetSide = defenseDamageMult\(tgt\) \* fleshDamageMult\(tgt, src\) \* blessingTargetMult\(tgt, src\) \* potionResistMult\(tgt, src\) \* gearResistMult\(tgt, src\);/.test(hook) && /targetSide = racial\.capTargetSide\(targetSide \* racial\.targetMult\(agg, tgt, src, dmg\)\)/.test(hook));
-check('gamemode: the race\'s attack gift joins the product, never for a beast',
-  /if \(racial && !beastAgg\) \{ try \{ raceAtk = racial\.attackMult\(agg, tgt, src, dmg\)/.test(hook) && /\* targetSide \* blessingAttackMult\(agg, src\) \* raceAtk \*/.test(hook) && !/blessingDamageMult\(/.test(hook));
+check('gamemode: the race\'s attack gift (and the sign\'s, which reads the hit\'s flags) joins the product, never for a beast',
+  /if \(racial && !beastAgg\) \{ try \{ raceAtk = racial\.attackMult\(agg, tgt, src, dmg, flags\)/.test(hook) && /\* targetSide \* blessingAttackMult\(agg, src\) \* raceAtk \*/.test(hook) && !/blessingDamageMult\(/.test(hook));
 check('gamemode: the blessing split keeps the old product', /const blessingDamageMult = \(aggressorId, targetId, sourceId\) => blessingAttackMult\(aggressorId, sourceId\) \* blessingTargetMult\(targetId, sourceId\);/.test(gm));
 check('gamemode: racial.js is loaded fresh on every reload', /delete require\.cache\[RACIAL_JS\];\s*racial = require\(RACIAL_JS\)/.test(gm));
 check('gamemode: castHook tells racial.js of a cast', /const castHook = [^\n]*\n\s*try \{ if \(racial\) racial\.onCast\(/.test(gm));

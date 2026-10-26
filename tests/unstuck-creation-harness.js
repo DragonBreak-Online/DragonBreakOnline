@@ -22,8 +22,8 @@ const cmd = src.slice(u0, u1);
 const l0 = src.indexOf('const GATE_CREATION_LINE = ');
 const lineSrc = l0 > 0 ? src.slice(l0, src.indexOf('\n', l0)) : "const GATE_CREATION_LINE = '(no GATE_CREATION_LINE in gamemode.js)';";
 check('the gates\' line for an unfinished character is one const, GATE_CREATION_LINE', l0 > 0);
-const h0 = src.indexOf('const gateCreationTold = (a) => {'), h1 = src.indexOf('\n};', h0);
-check('...which the gate tell sends', h0 > 0 && h1 > h0 && /personal\(id, GATE_CREATION_LINE\)/.test(src.slice(h0, h1)));
+const h0 = src.indexOf('const gateCreationTold = (a, line) => {'), h1 = src.indexOf('\n};', h0);
+check('...which the gate tell sends', h0 > 0 && h1 > h0 && /personal\(id, line \|\| GATE_CREATION_LINE\)/.test(src.slice(h0, h1)));
 check('...and which is defined above both the gate tell and /unstuck', l0 > 0 && l0 < h0 && l0 < u0);
 
 const HUB = '17482:DragonBreak Hub.esp', HUB_POS = [1965.4, 1820.2, -1.3];
