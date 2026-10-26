@@ -223,7 +223,8 @@ check('a panel message goes out as the SAME packet the browser widgets send',
 // native-widgets-harness.js) rather than here. What this file still has to see is that the service routes
 // through it, and that the report branch says something out loud.
 check('key decisions come from the one shared table, not a private copy',
-  /for \(const r of replayFor\(parsed\.key, parsed\.args\)\) this\.replay\(r\);/.test(SVC) && !/serverEventName/.test(SVC));
+  /for \(const r of replayFor\(parsed\.key, parsed\.args, !!this\.owner\)\) this\.replay\(r\);/.test(SVC)
+  && !/serverEventName/.test(SVC));
 check('an unknown key is logged, not forwarded raw', /logTrace\(this, "Scaleform panel", r\.text\)/.test(SVC));
 check('the service opens with flags 0, which SKSE ignores anyway', /openCustomMenu\(a\.swf, 0\)/.test(SVC));
 // The 26 Oct 03:26 failure: natives are only callable inside OnUpdate.
@@ -254,23 +255,54 @@ check('the frame skse appeared on is logged, since that number was unknown', /re
 check('a failed action is reported rather than swallowed', /logError\(this, `Scaleform action '\$\{a\.do\}' failed`/.test(SVC));
 // The fallback switch: the server gates on what we announce, so withholding a cap puts CEF back with no
 // rebuild. Absent must mean "all", or an existing settings file silently turns the panels off.
+// Counted against NATIVE_CAPS rather than against a hardcoded 2: these all failed the moment the journal's
+// fifteen tabs and Worker 2's three panels were added, which is a test breaking on a number rather than on
+// the behaviour it is supposed to be watching.
+const ALL = M.NATIVE_CAPS.length;
 check('an absent setting announces every panel, so no settings file is needed',
-  () => M.capsFor(undefined).length === 2 && M.capsFor(null).length === 2 && M.capsFor(true).length === 2);
+  () => M.capsFor(undefined).length === ALL && M.capsFor(null).length === ALL && M.capsFor(true).length === ALL);
 check('false announces none, which is the whole-panel CEF fallback', M.capsFor(false).length === 0);
-check('one panel can be turned off without the other', () => {
+check('one panel can be turned off without the others', () => {
   const c = M.capsFor({ decor: false });
-  return c.length === 1 && c[0] === 'native:prayer';
+  return c.length === ALL - 1 && c.indexOf('native:decor') < 0 && c.indexOf('native:prayer') >= 0;
 }, M.capsFor({ decor: false }));
 check('...and the other way round', () => {
   const c = M.capsFor({ prayer: false });
-  return c.length === 1 && c[0] === 'native:decor';
+  return c.length === ALL - 1 && c.indexOf('native:prayer') < 0 && c.indexOf('native:decor') >= 0;
 });
-check('an unrelated key does not turn anything off', M.capsFor({ nonsense: false }).length === 2);
+check('an unrelated key does not turn anything off', M.capsFor({ nonsense: false }).length === ALL);
 check('a junk setting falls back to announcing all rather than nothing',
-  () => M.capsFor('yes').length === 2 && M.capsFor(7).length === 2);
+  () => M.capsFor('yes').length === ALL && M.capsFor(7).length === ALL);
 
-check('the caps the server gates on are declared, both panels', () => M.NATIVE_CAPS.length === 2
-  && M.NATIVE_CAPS.indexOf('native:prayer') >= 0 && M.NATIVE_CAPS.indexOf('native:decor') >= 0, M.NATIVE_CAPS);
+// The journal switches surfaces per tab, so each tab is its own cap; turning the journal off has to take its
+// tabs with it, or the server is told about fifteen tabs of a shell that is on the browser.
+check('every journal tab has its own cap', () => M.JOURNAL_TABS.length === 15
+  && M.JOURNAL_TABS.every((t) => M.NATIVE_CAPS.indexOf(`native:journalTab:${t}`) >= 0), M.JOURNAL_TABS);
+check('one journal tab can be turned off on its own', () => {
+  const c = M.capsFor({ 'journalTab:notes': false });
+  return c.length === ALL - 1 && c.indexOf('native:journalTab:notes') < 0
+    && c.indexOf('native:journalTab:court') >= 0 && c.indexOf('native:journal') >= 0;
+}, M.capsFor({ 'journalTab:notes': false }).length);
+check('turning the journal off takes all fifteen tabs with it', () => {
+  const c = M.capsFor({ journal: false });
+  return c.length === ALL - 16 && !c.some((x) => x.indexOf('native:journal') === 0);
+}, M.capsFor({ journal: false }).filter((x) => x.indexOf('native:journal') === 0));
+check('...and it leaves the unrelated panels alone',
+  () => M.capsFor({ journal: false }).indexOf('native:prayer') >= 0);
+// A parent switch must only govern its own children. Turning off a panel that owns no compound caps cannot
+// take anyone else's tabs with it.
+check('a switch for one panel never takes another panel\'s tabs with it', () => {
+  const c = M.capsFor({ prayer: false });
+  return M.JOURNAL_TABS.every((t) => c.indexOf(`native:journalTab:${t}`) >= 0);
+}, M.capsFor({ prayer: false }).filter((x) => x.indexOf('native:journalTab:') === 0).length);
+
+check('the caps the server gates on are declared, for every panel the workers built', () => {
+  const want = ['native:prayer', 'native:decor', 'native:journal',
+    'native:deityPicker', 'native:rite', 'native:dungeonGate'];
+  return want.every((c) => M.NATIVE_CAPS.indexOf(c) >= 0);
+}, M.NATIVE_CAPS);
+check('no cap is announced twice, which would make the server gate on a duplicate',
+  () => new Set(M.NATIVE_CAPS).size === M.NATIVE_CAPS.length);
 check('they are announced on connect, as their own event so the browser uiCaps is not replaced',
   /connectionAccepted", \(\) => this\.announce/.test(SVC) && /event: "nativeCaps"/.test(SVC));
 check('...and announced once more, because a late cap is invisible rather than an error',
@@ -329,6 +361,55 @@ check('a refresh NEVER emits an open, whatever the phase', () => {
   return phases.every((r) => !r.some((x) => x.do === 'open'));
 });
 check('a refresh with the menu CLOSED does nothing at all', () => M.planRefresh(M.newState(), { a: 1 }, 7).length === 0);
+check('...and does not touch the state either, or the next open would inherit a stale payload', () => {
+  const t = M.newState();
+  M.planRefresh(t, { a: 1 }, 7);
+  return t.json === 'null' && t.widgetId === 0 && t.phase === 'closed';
+}, (() => { const t = M.newState(); M.planRefresh(t, { a: 1 }, 7); return { json: t.json, widgetId: t.widgetId }; })());
+
+// ---- 9b. planOpen when a DIFFERENT panel is already up ------------------------------------------------------------
+// Worker 1 found this on 26 Oct: s.swf was overwritten before the phase was tested, so a journal arriving
+// while decor was ready pushed the journal's JSON into dbo_decor and s.swf then named a movie not on screen.
+// These four exist because the mutant pass showed the fix had no test at all.
+check('a DIFFERENT swf while one is ready closes the old panel and opens the new one', () => {
+  const t = M.newState();
+  M.planOpen(t, 'dbo_decor', { a: 1 }, 1, 0); M.planReady(t, 2, 10);
+  const r = M.planOpen(t, 'dbo_journal', { tab: 'stats' }, 2, 20);
+  return r.length === 2 && r[0].do === 'close' && r[1].do === 'open' && r[1].swf === 'dbo_journal';
+}, (() => { const t = M.newState(); M.planOpen(t, 'dbo_decor', { a: 1 }, 1, 0); M.planReady(t, 2, 10); return M.planOpen(t, 'dbo_journal', { tab: 'stats' }, 2, 20); })());
+check('...and it NEVER pushes the new payload into the panel already on screen', () => {
+  const t = M.newState();
+  M.planOpen(t, 'dbo_decor', { a: 1 }, 1, 0); M.planReady(t, 2, 10);
+  return !M.planOpen(t, 'dbo_journal', { tab: 'stats' }, 2, 20).some((x) => x.do === 'push');
+});
+check('...the close comes BEFORE the open, since only one CustomMenu exists at a time', () => {
+  const t = M.newState();
+  M.planOpen(t, 'dbo_decor', { a: 1 }, 1, 0); M.planReady(t, 2, 10);
+  const r = M.planOpen(t, 'dbo_journal', { tab: 'stats' }, 2, 20);
+  return r.findIndex((x) => x.do === 'close') < r.findIndex((x) => x.do === 'open');
+});
+check('...and the phase goes back to opening, so the ready timeout guards the new panel', () => {
+  const t = M.newState();
+  M.planOpen(t, 'dbo_decor', { a: 1 }, 1, 0); M.planReady(t, 2, 10);
+  M.planOpen(t, 'dbo_journal', { tab: 'stats' }, 2, 20);
+  return t.phase === 'opening' && t.swf === 'dbo_journal' && t.openedAt === 20;
+}, (() => { const t = M.newState(); M.planOpen(t, 'dbo_decor', { a: 1 }, 1, 0); M.planReady(t, 2, 10); M.planOpen(t, 'dbo_journal', { tab: 'stats' }, 2, 20); return { phase: t.phase, swf: t.swf }; })());
+check('the SAME swf while ready still only replaces the contents, with no close/open flicker', () => {
+  const t = M.newState();
+  M.planOpen(t, 'dbo_decor', { a: 1 }, 1, 0); M.planReady(t, 2, 10);
+  const r = M.planOpen(t, 'dbo_decor', { a: 2 }, 1, 20);
+  return r.length === 1 && r[0].do === 'push' && JSON.parse(r[0].json).a === 2;
+}, (() => { const t = M.newState(); M.planOpen(t, 'dbo_decor', { a: 1 }, 1, 0); M.planReady(t, 2, 10); return M.planOpen(t, 'dbo_decor', { a: 2 }, 1, 20); })());
+check('a different swf while still OPENING also closes first, since that menu may be up already', () => {
+  const t = M.newState();
+  M.planOpen(t, 'dbo_decor', { a: 1 }, 1, 0);
+  const r = M.planOpen(t, 'dbo_journal', { a: 1 }, 2, 5);
+  return r.length === 2 && r[0].do === 'close' && r[1].do === 'open';
+}, (() => { const t = M.newState(); M.planOpen(t, 'dbo_decor', { a: 1 }, 1, 0); return M.planOpen(t, 'dbo_journal', { a: 1 }, 2, 5); })());
+check('the FIRST open of all emits no close, there being nothing to close', () => {
+  const r = M.planOpen(M.newState(), 'dbo_decor', { a: 1 }, 1, 0);
+  return r.length === 1 && r[0].do === 'open';
+});
 check('a refresh does not lose the phase, so the outbox keeps being drained', () => {
   const t = M.newState(); M.planOpen(t, 'dbo_board', { a: 1 }, 7, 0); M.planReady(t, 1, 5);
   M.planRefresh(t, { a: 2 }, 7);

@@ -1,22 +1,29 @@
-// Scripted test for the widget-to-SWF router's decisions (Worker 4, 26 Oct). nativeWidgets.ts has no
+// Scripted test for native panels owned by CLIENT-SIDE services (Worker 4, 26 Oct). nativeWidgets.ts has no
 // imports and transpiles on its own. Run from skymp5-client:
 //
 //   ./node_modules/typescript/bin/tsc src/services/services/nativeWidgets.ts --outDir <tmp> --module commonjs --target es2019
-//   node tests/native-widgets-harness.js <tmp>/nativeWidgets.js
+//   node tests/native-widgets-harness.js <tmp>/nativeWidgets.js [server dir]
 //
-// Two of these checks read dboRelayService.ts rather than the router. They are there because the router's
-// whole contract is "produce what the browser path produces", and that is a PREMISE: the 26 Oct creature
-// guard passed 64 of 64 checks against an event name the engine never emits, because code and test shared an
-// unverified premise. So the premises are asserted against the real relay, not restated here.
+// The optional server dir is the GAMEPLAY checkout, and it drives the premise checks in section 1b. Give it
+// a worktree that is up to date - PC server\ is behind (see the project memory note), which is exactly how
+// the first version of this file came to assert four registry entries, three of which were dead.
+//
+// Two checks read dboRelayService.ts rather than this module. They are premises, not logic: the 26 Oct
+// creature guard passed 64 of 64 against an event name the engine never emits because code and test shared
+// an unverified premise, so premises are asserted against the real source.
 'use strict';
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const M = require(path.resolve(process.argv[2] || path.join(os.tmpdir(), 'nw', 'nativeWidgets.js')));
+const SERVER = process.argv[3] ? path.resolve(process.argv[3]) : null;
 const read = (f) => fs.readFileSync(path.resolve(__dirname, '..', f), 'utf8').replace(/\r\n/g, '\n');
 const RELAY = read('src/services/services/dboRelayService.ts');
+const SERVICE = read('src/services/services/scaleformMenuService.ts');
+const at = (hay, needle) => hay.indexOf(needle);
 
 let failures = 0;
+let skipped = 0;
 const check = (name, fn, got) => {
   let ok = false, err = null;
   try { ok = typeof fn === 'function' ? fn() : fn; } catch (e) { err = e; }
@@ -24,44 +31,94 @@ const check = (name, fn, got) => {
   console.log(`${ok && !err ? 'ok  ' : 'FAIL'} ${name}${extra}`);
   if (!ok || err) failures++;
 };
-const widget = (over) => Object.assign(
-  { type: 'bountyBoard', id: 7, events: { close: 'dbo:boardClose', post: 'dbo:boardPost' } }, over || {});
+const skip = (name, why) => { console.log(`skip ${name}   (${why})`); skipped++; };
 
 // ---- 1. the registry and its off switch --------------------------------------------------------------------------
 check('every registered type maps to a dbo_ swf',
   () => Object.values(M.NATIVE_WIDGETS).every((s) => /^dbo_[a-z]+$/.test(s)), M.NATIVE_WIDGETS);
-check('the four panels Worker 1 built are registered',
-  () => ['prayer', 'decor', 'bountyBoard', 'housing'].every((t) => M.NATIVE_WIDGETS[t]));
-check('an absent setting routes a known type natively', M.swfFor('housing', undefined) === 'dbo_housing');
-check('...and true does too', M.swfFor('housing', true) === 'dbo_housing');
-check('false sends every type back to the browser', M.swfFor('housing', false) === '');
+check('an absent setting routes a known type natively', M.swfFor('bountyBoard', undefined) === 'dbo_board');
+check('...and true does too', M.swfFor('bountyBoard', true) === 'dbo_board');
+check('false sends every type back to the browser', M.swfFor('bountyBoard', false) === '');
 check('one type can be switched off without the others',
-  () => M.swfFor('housing', { housing: false }) === '' && M.swfFor('decor', { housing: false }) === 'dbo_decor');
+  () => M.swfFor('housing', { housing: false }) === '' && M.swfFor('bountyBoard', { housing: false }) === 'dbo_board');
 check('an UNKNOWN type is never routed, whatever the setting',
   () => M.swfFor('journal', undefined) === '' && M.swfFor('journal', true) === '' && M.swfFor('', true) === '');
 check('a junk setting does not accidentally disable everything',
-  () => M.swfFor('decor', 'yes') === 'dbo_decor' && M.swfFor('decor', 7) === 'dbo_decor');
+  () => M.swfFor('housing', 'yes') === 'dbo_housing' && M.swfFor('housing', 7) === 'dbo_housing');
+
+// ---- 1b. PREMISES about what each registered type actually is ----------------------------------------------------
+// The whole point of this section. The first version of this file asserted "the four panels Worker 1 built are
+// registered", which tested my own assumption: prayer and decor turned out to arrive as dboScaleform before
+// the relay, and bountyBoard and housing never reach the relay at all. Three dead entries, one passing test.
+check('a GAMEPLAY-published widget type is never in this registry, or it would be drawn twice', () => {
+  // contextMenu is the trap: the gamemode publishes type:'contextMenu' AND playerActionService owns one. It
+  // may be here ONLY while nothing routes gameplay widget packets to a native panel.
+  return !/takeWidgetPacket|routeWidget/.test(RELAY);
+}, RELAY.match(/takeWidgetPacket|routeWidget/g));
+check('PREMISE: the relay says in writing why it does not route, so this does not get re-added by accident',
+  () => /Deliberately NOT routed to a native panel here/.test(RELAY));
+
+if (!SERVER) {
+  skip('PREMISE: every registered type is owned by a client-side service, not the gameplay layer', 'no server dir given');
+} else {
+  const files = fs.readdirSync(SERVER).filter((f) => f.endsWith('.js'));
+  const published = new Set();
+  for (const f of files) {
+    let src = '';
+    try { src = fs.readFileSync(path.join(SERVER, f), 'utf8'); } catch { continue; }
+    for (const m of src.matchAll(/type:\s*'([a-zA-Z]+)',\s*id:/g)) published.add(m[1]);
+  }
+  // A registered type the gameplay layer ALSO publishes is allowed, but only once someone has written down
+  // that it is shared and what follows from that. contextMenu is the live example: a generic list renderer
+  // used by alchemy, business, charlevel and dungeons as well as by playerActionService.
+  check(`PREMISE: every registered type the gameplay layer also publishes is declared shared (${published.size} types seen in ${files.length} files)`,
+    () => Object.keys(M.NATIVE_WIDGETS).filter((t) => published.has(t))
+      .every((t) => M.SHARED_WITH_GAMEPLAY.indexOf(t) >= 0),
+    Object.keys(M.NATIVE_WIDGETS).filter((t) => published.has(t) && M.SHARED_WITH_GAMEPLAY.indexOf(t) < 0));
+  check('...and nothing is declared shared that the gameplay layer does not actually publish, so the list cannot rot',
+    () => M.SHARED_WITH_GAMEPLAY.every((t) => published.has(t)),
+    M.SHARED_WITH_GAMEPLAY.filter((t) => !published.has(t)));
+}
 
 // ---- 2. the rule the browser path enforces, which we must match --------------------------------------------------
-check('PREMISE: the relay really does drop a non-dbo key, so this is worth guarding',
+check('PREMISE: the relay really does drop a non-dbo key, so the report below is worth having',
   /!key\.startsWith\("dbo:"\)\) return;/.test(RELAY));
 check('a dbo: key becomes the same server event the browser produces', () => {
-  const r = M.replayFor('dbo:boardPost', ['a', 1]);
-  return r.length === 1 && r[0].do === 'server' && r[0].event === 'boardPost' && r[0].args[1] === 1;
-}, M.replayFor('dbo:boardPost', ['a', 1]));
-check('a key WITHOUT the prefix is reported, not dropped the way the browser drops it', () => {
-  const r = M.replayFor('bountyBoard:post', []);
-  return r.length === 1 && r[0].do === 'report' && /no dbo: prefix/.test(r[0].text);
-}, M.replayFor('bountyBoard:post', []));
+  const r = M.replayFor('dbo:pigeonOpen', ['a', 1]);
+  return r.length === 1 && r[0].do === 'server' && r[0].event === 'pigeonOpen' && r[0].args[1] === 1;
+}, M.replayFor('dbo:pigeonOpen', ['a', 1]));
+check('a dbo: key goes to the SERVER even when a service owns the panel', () => {
+  const r = M.replayFor('dbo:pigeonOpen', [], true);
+  return r.length === 1 && r[0].do === 'server';
+}, M.replayFor('dbo:pigeonOpen', [], true));
 check('an empty key is reported', () => M.replayFor('', [])[0].do === 'report');
-check('the widget\'s own close key is just another dbo: key, not a special case', () => {
-  const r = M.replayFor(widget().events.close, []);
-  return r.length === 1 && r[0].do === 'server' && r[0].event === 'boardClose' && !r.some((x) => x.do === 'close');
-}, M.replayFor('dbo:boardClose', []));
 
-// ---- 3. a bare close must be byte-for-byte what closeFocused sends -----------------------------------------------
+// ---- 3. the owning service's own keys ----------------------------------------------------------------------------
+check("a service's namespaced key goes back to it verbatim", () => {
+  const r = M.replayFor('bountyBoard:post', ['wanted', 'text'], true);
+  return r.length === 1 && r[0].do === 'owner' && r[0].key === 'bountyBoard:post'
+    && r[0].args[0] === 'wanted' && r[0].args[1] === 'text';
+}, M.replayFor('bountyBoard:post', ['wanted', 'text'], true));
+check('...including the prefixes the other services use', () => {
+  for (const k of ['housing:claim', 'pa:trade', 'pa:close']) {
+    const r = M.replayFor(k, [], true);
+    if (r.length !== 1 || r[0].do !== 'owner' || r[0].key !== k) return false;
+  }
+  return true;
+});
+check('the key is NOT rewritten, stripped or lowercased on the way back', () => {
+  const r = M.replayFor('bountyBoard:Remove', ['X'], true);
+  return r[0].key === 'bountyBoard:Remove' && r[0].args[0] === 'X';
+});
+// This is the regression Worker 1 caught on 3e6531a8: with no owner the board's Post did nothing but log.
+check('with NO owner the same key is reported, not silently dropped the way the browser drops it', () => {
+  const r = M.replayFor('bountyBoard:post', []);
+  return r.length === 1 && r[0].do === 'report' && /no service owns it/.test(r[0].text);
+}, M.replayFor('bountyBoard:post', []));
+
+// ---- 4. a bare close must be byte-for-byte what closeFocused sends -----------------------------------------------
 // Three live gamemode handlers hang off this packet (dbo-gamemode.js 4224 panel nonces, 4609 pigeon nonces,
-// 5400 abandoning a read). A native panel that closed without it would leak all three.
+// 5400 abandoning a read). A panel that closed without it would leak all three.
 check('PREMISE: closeFocused sends the generic close with a reason, which is what we are copying',
   /customPacketType: "dbo", event: "close", args: \[why\]/.test(RELAY));
 check('a bare close sends the generic close packet AND takes the menu down', () => {
@@ -78,196 +135,131 @@ check('the packet is sent BEFORE the menu goes down, so a throw cannot swallow i
   const r = M.replayFor('close', []);
   return r.findIndex((x) => x.do === 'server') < r.findIndex((x) => x.do === 'close');
 });
-check('a bare close never fires the widget\'s events.close as well, which would close it twice', () => {
-  const r = M.replayFor('close', []);
-  return !r.some((x) => x.do === 'server' && x.event === 'boardClose');
+check('an owning service is TOLD about a close, or its menuOpen flag would stay set', () => {
+  const r = M.replayFor('close', ['selfClosed'], true);
+  return r.length === 3 && r[2].do === 'owner' && r[2].key === 'close' && r[2].args[0] === 'selfClosed';
+}, M.replayFor('close', ['selfClosed'], true));
+check('...and it is told LAST, because its handler usually calls back in to close the menu', () => {
+  const r = M.replayFor('close', [], true);
+  return r[r.length - 1].do === 'owner';
 });
 
-// ---- 4. the hand-off, which must never be confused with a close --------------------------------------------------
+// ---- 5. the hand-off, which must never be confused with a close --------------------------------------------------
 check('a hand-off carries its type and mode', () => {
   const r = M.replayFor('native:handoff', ['housing', 'rename']);
   return r.length === 1 && r[0].do === 'handoff' && r[0].type === 'housing' && r[0].mode === 'rename';
 }, M.replayFor('native:handoff', ['housing', 'rename']));
+check("...for the board's compose mode too, which carries a tab id", () => {
+  const r = M.replayFor('native:handoff', ['bountyBoard', 'compose:wanted']);
+  return r[0].do === 'handoff' && r[0].type === 'bountyBoard' && r[0].mode === 'compose:wanted';
+}, M.replayFor('native:handoff', ['bountyBoard', 'compose:wanted']));
 check('a hand-off with no mode is REFUSED, not treated as a close', () => {
   const r = M.replayFor('native:handoff', ['housing']);
   return r.length === 1 && r[0].do === 'report' && !r.some((x) => x.do === 'close');
 }, M.replayFor('native:handoff', ['housing']));
-check('...and with no args at all', () => {
-  const r = M.replayFor('native:handoff', []);
-  return r.length === 1 && r[0].do === 'report';
-});
+check('...and with no args at all', () => M.replayFor('native:handoff', []).length === 1
+  && M.replayFor('native:handoff', [])[0].do === 'report');
 check('a hand-off never also closes, because the two do opposite things',
   () => !M.replayFor('native:handoff', ['housing', 'rename']).some((x) => x.do === 'close'));
+check('a hand-off is NOT mistaken for an owning service\'s key when one is registered', () => {
+  const r = M.replayFor('native:handoff', ['housing', 'rename'], true);
+  return r.length === 1 && r[0].do === 'handoff';
+}, M.replayFor('native:handoff', ['housing', 'rename'], true));
 
-check('typeOf reads the published type and nothing else',
-  () => M.typeOf(widget()) === 'bountyBoard' && M.typeOf({}) === '' && M.typeOf(undefined) === '');
-
-// ---- 5. routeWidget: which UI draws the packet -------------------------------------------------------------------
-const route = (p, nativeId, setting) => M.routeWidget(p, nativeId === undefined ? 0 : nativeId, setting);
-
-check('a focused native widget opens the SWF', () => {
-  const r = route({ widget: widget(), focus: true });
-  return r.to === 'native' && r.action === 'open' && r.swf === 'dbo_board' && r.id === 7 && r.widget.type === 'bountyBoard';
-}, route({ widget: widget(), focus: true }));
-check('a focused widget of an unknown type goes to the browser untouched',
-  () => route({ widget: widget({ type: 'journal' }), focus: true }).to === 'browser');
-check('...and so does one whose type is switched off',
-  () => route({ widget: widget(), focus: true }, 0, { bountyBoard: false }).to === 'browser');
-check('a refresh for the widget open natively goes native', () => {
-  const r = route({ widget: widget() }, 7);
-  return r.to === 'native' && r.action === 'refresh' && r.id === 7;
-}, route({ widget: widget() }, 7));
-check('a refresh for a DIFFERENT widget is the browser\'s, even though its type is native',
-  () => route({ widget: widget({ id: 9 }) }, 7).to === 'browser', route({ widget: widget({ id: 9 }) }, 7));
-check('a refresh with nothing open natively is the browser\'s',
-  () => route({ widget: widget() }, 0).to === 'browser');
-
-// Worker 1's requirement, verbatim: a close for a type that is open natively must take the CustomMenu down,
-// never reach the browser's closeFormMenu (which hands focus back to the page through takeDeferredFocus).
-check('a server close for the NATIVE widget closes the CustomMenu', () => {
-  const r = route({ close: 7 }, 7);
-  return r.to === 'native' && r.action === 'close' && r.id === 7;
-}, route({ close: 7 }, 7));
-check('a server close for some OTHER widget stays with the browser',
-  () => route({ close: 9 }, 7).to === 'browser');
-check('a server close with nothing open natively stays with the browser',
-  () => route({ close: 7 }, 0).to === 'browser');
-check('a close is never mistaken for an open: it carries no swf',
-  () => route({ close: 7 }, 7).swf === undefined);
-
-check('refocusing the panel already open natively is a refresh, not a reopen that would reset the SWF', () => {
-  const r = route({ widget: widget(), focus: true }, 7);
-  return r.to === 'native' && r.action === 'refresh';
-}, route({ widget: widget(), focus: true }, 7));
-check('a widget open natively STAYS native even if the setting now says browser, so it cannot split in two',
-  () => route({ widget: widget() }, 7, false).to === 'native', route({ widget: widget() }, 7, false));
-
-check('a packet with no widget and no close is ignored with a reason', () => {
-  const r = route({});
-  return r.to === 'ignore' && /no widget object/.test(r.why);
-}, route({}));
-check('a widget with a junk id is ignored with a reason, not routed to id NaN', () => {
-  const r = route({ widget: widget({ id: 'seven' }), focus: true });
-  return r.to === 'ignore' && /not a positive number/.test(r.why);
-}, route({ widget: widget({ id: 'seven' }), focus: true }));
-check('a close id of 0 is not a close',
-  () => route({ close: 0, widget: widget(), focus: true }, 0).to === 'native');
-
-// ---- 6. the wiring, which the pure tests above cannot see ---------------------------------------------------------
-// The service needs sp, so its wiring is asserted against the source. Positions are compared, never
-// distances: an earlier version of this file used a regex spanning both lines and broke the moment an
-// unrelated line moved between them, which is a test failing for a reason that is not a fault.
-const SERVICE = read('src/services/services/scaleformMenuService.ts');
-const INDEX = read('src/index.ts');
-const at = (hay, needle) => hay.indexOf(needle);
-
-// Matched on the call and its arguments, not on where the line happens to wrap: the first version of these
-// four pinned "takeWidgetPacket(content)" exactly and all four broke the moment the call grew a second
-// argument, which is a test failing for a reason that is not a fault.
-check('the relay offers every dboWidget packet to the native path',
-  () => /lookupListener\(ScaleformMenuService\)\s*\.\s*takeWidgetPacket\(\s*content\s*,/.test(RELAY));
-check('...and hands over the browser failover with it, or a dead SWF would lose the panel',
-  () => /takeWidgetPacket\(\s*content\s*,\s*\(w, id\) => this\.drawInBrowser\(w, id\)\)/.test(RELAY));
-check('...and returns straight away when the native path takes it, so the browser never also draws it',
-  () => /takeWidgetPacket\([^;]*\)\) return;/.test(RELAY));
-check('...BEFORE it reads close or opens a browser menu, or both UIs would answer one packet', () => {
-  const hook = at(RELAY, 'takeWidgetPacket(');
-  const close = at(RELAY, 'const closeId = Number(content["close"]);');
-  const open = at(RELAY, 'this.drawInBrowser(w, wid);');
-  return hook > 0 && close > hook && open > hook;
-}, { hook: at(RELAY, 'takeWidgetPacket('), close: at(RELAY, 'const closeId = Number(content["close"]);'), open: at(RELAY, 'this.drawInBrowser(w, wid);') });
-check('the hook sits inside the dboWidget branch, not above the packet type check', () => {
-  const guard = at(RELAY, 'if (type !== "dboWidget") return;');
-  return guard > 0 && at(RELAY, 'takeWidgetPacket(') > guard;
+// ---- 6. the service API the other workers call -------------------------------------------------------------------
+// openNative needs sp, so its wiring is asserted against the source. Positions are compared, never distances.
+check('openNative exists and takes the options object the services were given',
+  () => /public openNative\(opts: NativeOpen\): boolean \{/.test(SERVICE));
+check('it returns false for a type with no SWF, so the service draws its own',
+  () => /const swf = swfFor\(type, this\.nativePanelsSetting\(\)\);\s*\n\s*if \(!swf\) return false;/.test(SERVICE));
+check('it records the owner BEFORE queueing the open, or the first key would arrive unowned', () => {
+  const o = at(SERVICE, 'public openNative');
+  const own = SERVICE.indexOf('this.owner = {', o);
+  const open = SERVICE.indexOf('this.enqueue(planOpen(', o);
+  return o > 0 && own > o && open > own;
+}, { o: at(SERVICE, 'public openNative'), own: SERVICE.indexOf('this.owner = {', at(SERVICE, 'public openNative')) });
+check('a throw in openNative clears the owner and returns false, never leaving a half-open panel', () => {
+  const o = at(SERVICE, 'public openNative');
+  const end = SERVICE.indexOf('\n  }\n', o);
+  const c = SERVICE.indexOf('catch', o);
+  const tail = SERVICE.slice(c, end);
+  return c > 0 && c < end && /this\.owner = null;/.test(tail) && /return false;/.test(tail);
 });
-check('the service is actually constructed, or lookupListener would throw on the first widget',
-  () => /new ScaleformMenuService\(sp, controller\)/.test(INDEX));
-
-check('takeWidgetPacket calls NO native: it runs in a packet handler, where none can be called', () => {
-  const body = SERVICE.slice(at(SERVICE, 'public takeWidgetPacket'));
-  const end = body.indexOf('\n  }\n');
-  return end > 0 && !/this\.sp\./.test(body.slice(0, end));
+check('closeNative and isNativeOpen exist for the service\'s own closeMenu',
+  () => /public closeNative\(type\?: string\): void \{/.test(SERVICE) && /public isNativeOpen\(type\?: string\): boolean \{/.test(SERVICE));
+check('closeNative for someone ELSE\'s panel is a no-op, so two services cannot close each other',
+  () => /if \(t && this\.owner && this\.owner\.type !== t\) return;/.test(SERVICE));
+check('refreshNative exists, so a service can update a panel in place',
+  () => /public refreshNative\(widget: unknown, widgetId\?: number\): void \{/.test(SERVICE));
+check('openNative calls NO native itself: it may run outside the update tick', () => {
+  const o = at(SERVICE, 'public openNative');
+  const end = SERVICE.indexOf('\n  }\n', o);
+  return !/this\.sp\./.test(SERVICE.slice(o, end));
 });
-check('...and queues through the plans instead', () => {
-  const body = SERVICE.slice(at(SERVICE, 'public takeWidgetPacket'));
-  const end = body.indexOf('\n  }\n');
-  const b = body.slice(0, end);
-  return /this\.enqueue\(planOpen\(/.test(b) && /this\.enqueue\(planClose\(/.test(b) && /this\.enqueue\(planRefresh\(/.test(b);
-});
-check('a refresh uses planRefresh, NOT planOpen, which would open a second CustomMenu while opening', () => {
-  const body = SERVICE.slice(at(SERVICE, 'public takeWidgetPacket'));
-  const end = body.indexOf('\n  }\n');
-  const b = body.slice(0, end);
-  // planOpen appears once, for the open action, and the refresh tail uses planRefresh
-  return b.split('planOpen(').length === 2 && b.split('planRefresh(').length === 2;
-});
-check('a routing failure falls back to the browser rather than leaving the player with no panel', () => {
-  const body = SERVICE.slice(at(SERVICE, 'public takeWidgetPacket'));
-  const end = body.indexOf('\n  }\n');
-  const b = body.slice(0, end);
-  const c = b.indexOf('catch');
-  return c > 0 && /return false;/.test(b.slice(c));
-});
-
-check('the panel message path runs through replayFor, so there is ONE decision table, not two',
-  () => /for \(const r of replayFor\(parsed\.key, parsed\.args\)\) this\.replay\(r\);/.test(SERVICE));
-check('the old private copy of the dbo: rule is gone from the service',
-  () => !/serverEventName/.test(SERVICE), SERVICE.match(/serverEventName/g));
-check('the replayed packet carries withClientUiCaps, exactly as the browser path does',
-  () => /args: withClientUiCaps\(r\.event, r\.args\)/.test(SERVICE));
-check('the replayed packet is the same shape the relay sends',
-  () => /customPacketType: "dbo", event: r\.event/.test(SERVICE) && /widget: this\.state\.widgetId/.test(SERVICE));
-check('a hand-off is reported rather than dropped, since it is parsed but not yet routed',
-  () => /not wired yet/.test(SERVICE));
-
-// focusedId gates the browser overlay's Escape and its hidden-UI close. A native panel must not be in it:
-// the CustomMenu is modal and pauses the game, handles its own Escape, and reports a bare "close".
-check('the relay does not claim focus for a native panel, which would close it twice', () => {
-  const hook = at(RELAY, 'takeWidgetPacket(');
-  const ret = RELAY.indexOf('return;', hook);
-  return hook > 0 && ret > hook && !/focusedId/.test(RELAY.slice(hook, ret));
-});
-
-// ---- 7. the failover: a routed panel whose SWF never comes up ----------------------------------------------------
-// Only two of the four SWFs are installed in the dev game today (dbo_prayer, dbo_decor), so this is the
-// difference between a missing file costing a delay and costing the panel.
-check('the service remembers what to fall back to when it routes a widget natively',
-  () => /this\.pending = \{ widget: route\.widget, id: route\.id, swf: route\.swf, draw: drawInBrowser \}/.test(SERVICE));
-check('ready clears the fallback, so a working panel can never be second-guessed later', () => {
+check('replayFor is told whether a service owns the open panel',
+  () => /replayFor\(parsed\.key, parsed\.args, !!this\.owner\)/.test(SERVICE));
+check('the owner branch delivers the key and survives a throw in the service',
+  () => /o\.onKey\(r\.key, r\.args\)/.test(SERVICE) && /threw on key/.test(SERVICE));
+check('a key arriving with no owner is reported rather than crashing on a null callback',
+  () => /a panel key arrived with no owning service/.test(SERVICE));
+check('the owner is cleared on a close key, so a stale callback cannot be called again',
+  () => /if \(r\.key === CLOSE_KEY\) this\.owner = null;/.test(SERVICE));
+check('the owner is NOT cleared when the panel reports ready, or it would stop receiving keys', () => {
   const r = at(SERVICE, 'parsed.key === "ready"');
-  const clear = SERVICE.indexOf('this.pending = null;', r);
-  const planReady = SERVICE.indexOf('planReady(this.state', r);
-  return r > 0 && clear > r && clear < planReady;
+  const end = SERVICE.indexOf('return;', r);
+  return r > 0 && !/this\.owner = null/.test(SERVICE.slice(r, end));
 });
-check('the 5s timeout falls over to the browser instead of just closing',
+
+// ---- 6b. the hand-off, wired -------------------------------------------------------------------------------------
+// The CustomMenu is modal and pauses the game, so the page cannot be typed into while it is up.
+check('a hand-off takes the native panel DOWN before the browser is asked to draw', () => {
+  const h = at(SERVICE, 'if (r.do === "handoff")');
+  const end = SERVICE.indexOf('\n    }\n', h);
+  const body = SERVICE.slice(h, end);
+  return h > 0 && body.indexOf('this.enqueue(planClose(') < body.indexOf('o.onKey(HANDOFF_KEY');
+}, { h: at(SERVICE, 'if (r.do === "handoff")') });
+check('it delivers the type AND the mode, so compose:<tabId> survives',
+  () => /o\.onKey\(HANDOFF_KEY, \[r\.type, r\.mode\]\)/.test(SERVICE));
+check('the owner is NOT cleared, because the service reopens the panel when the input is done', () => {
+  const h = at(SERVICE, 'if (r.do === "handoff")');
+  const end = SERVICE.indexOf('\n    }\n', h);
+  return !/this\.owner = null/.test(SERVICE.slice(h, end));
+});
+check('a gamemode panel asking to hand off is reported, having no client-side owner to draw it',
+  () => /but only a client-service panel can hand off/.test(SERVICE));
+check('a service that throws on the hand-off does not take the client with it',
+  () => /threw on the hand-off/.test(SERVICE));
+
+// ---- 7. the failover, and the SWF that closes itself -------------------------------------------------------------
+check('a panel that cannot be drawn tells its service to draw its own',
+  () => /o\.onKey\(FAILED_KEY, \[why\]\)/.test(SERVICE));
+check('the owner is cleared BEFORE the callback, so a callback that reopens cannot loop', () => {
+  const f = at(SERVICE, 'private failover(');
+  const body = SERVICE.slice(f, f + 900);
+  return body.indexOf('this.owner = null;') < body.indexOf('o.onKey(');
+});
+check('the 5s timeout falls over, instead of just closing',
   () => /this\.exec\(tick\);\s*\n\s*this\.failover\("the panel never reported ready"\);/.test(SERVICE));
-// Anchored on exec's catch, not on the first 'if (a.do === "open")' - that one is the try branch, and
-// matching it made this check look for the failover in the wrong half of the method.
 check('an open that THROWS falls over at once, without waiting out the timeout', () => {
   const exec = at(SERVICE, 'private exec(actions: Action[]): void {');
   const c = SERVICE.indexOf('} catch (e) {', exec);
   const end = SERVICE.indexOf('\n  }\n', c);
-  const tail = SERVICE.slice(c, end);
-  return exec > 0 && c > exec && /if \(a\.do === "open"\) \{[\s\S]*this\.failover\(/.test(tail);
+  return exec > 0 && c > exec && /if \(a\.do === "open"\) \{[\s\S]*this\.failover\(/.test(SERVICE.slice(c, end));
 });
-check('the failover draws the widget the relay gave it, through the relay',
-  () => /p\.draw\(p\.widget, p\.id\)/.test(SERVICE));
-check('a failover that itself fails is said out loud, not swallowed',
-  () => /browser failover ALSO failed/.test(SERVICE));
-check('the fallback is consumed, so one bad open cannot draw the widget twice', () => {
-  const f = at(SERVICE, 'private failover(');
-  const body = SERVICE.slice(f, f + 700);
-  return body.indexOf('this.pending = null;') < body.indexOf('p.draw(');
+check('a failover whose service also fails is said out loud, not swallowed',
+  () => /could not draw its own panel either/.test(SERVICE));
+// Worker 1's panels close themselves, and nothing reports that.
+check('an SWF that closed itself is noticed, through Ui.isMenuOpen',
+  () => /if \(this\.state\.phase === "ready" && !this\.menuIsOpen\(\)\)/.test(SERVICE)
+     && /this\.sp\.Ui\.isMenuOpen\(MENU_NAME\)/.test(SERVICE));
+check('...and it is handled through the SAME close table, not a second copy of the rule',
+  () => /replayFor\(CLOSE_KEY, \["selfClosed"\], !!this\.owner\)/.test(SERVICE));
+check('a throw from isMenuOpen reports OPEN, so a live panel is never torn down by a failed probe', () => {
+  const m = at(SERVICE, 'private menuIsOpen()');
+  const end = SERVICE.indexOf('\n  }\n', m);
+  const body = SERVICE.slice(m, end);
+  return m > 0 && /catch \(e\) \{\s*\n\s*return true;/.test(body);
 });
-check('a gamemode-driven dboScaleform panel has no fallback, having no browser widget to fall back to', () => {
-  // planOpen is reached from onCustomPacketMessage without touching pending
-  const p = at(SERVICE, 'private onCustomPacketMessage');
-  const end = SERVICE.indexOf('\n  }\n', p);
-  return p > 0 && !/this\.pending/.test(SERVICE.slice(p, end));
-});
-check('the relay exposes drawInBrowser and the focus branch uses it, so there is one path, not two',
-  () => /private drawInBrowser\(w: unknown, wid: number\): void \{/.test(RELAY)
-     && /if \(content\["focus"\]\) \{\s*\n\s*this\.drawInBrowser\(w, wid\);/.test(RELAY));
 
-console.log(failures ? `${failures} failed` : 'all passed');
+console.log(failures ? `${failures} failed` : `all passed${skipped ? ` (${skipped} skipped)` : ''}`);
 process.exit(failures ? 1 : 0);

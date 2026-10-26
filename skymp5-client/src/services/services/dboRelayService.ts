@@ -5,7 +5,6 @@ import { openFormMenu, closeFormMenu, closeWidget, refreshFormMenu } from "./wid
 import { ConnectionMessage } from "../events/connectionMessage";
 import { TimersService } from "./timersService";
 import { AutoMoveService } from "./autoMoveService";
-import { ScaleformMenuService } from "./scaleformMenuService";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { Actor, BrowserMessageEvent, ButtonEvent, DxScanCode, InputDeviceType, Menu, storage } from "skyrimPlatform";
 import { COMPANION_HUD_KEY } from "./companionService";
@@ -241,17 +240,11 @@ export class DboRelayService extends ClientListener {
     }
     if (type === "dboFade") { this.setFade(!!content["on"]); return; }
     if (type !== "dboWidget") return;
-    // A widget whose type has a native SWF is drawn by Scaleform instead, and the browser never hears about
-    // it. The service replays everything the panel sends as the identical { customPacketType: "dbo", event,
-    // args, widget } packet this file sends for a browser widget, so no service above needs native code.
-    //
-    // focusedId is deliberately left at 0 for a native panel. It gates onButtonEvent's Escape and the
-    // uiHiddenChanged handler, both of which belong to the browser overlay; the CustomMenu is opened with
-    // kFlag_Modal | kFlag_PausesGame (SKSE CustomMenu.cpp), handles its own Escape and reports it as a bare
-    // "close" key, which the service turns back into the same close packet closeFocused sends. Setting
-    // focusedId here would give the panel two closes, one of them against a browser widget never opened.
-    if (this.controller.lookupListener(ScaleformMenuService)
-      .takeWidgetPacket(content, (w, id) => this.drawInBrowser(w, id))) return;
+    // Deliberately NOT routed to a native panel here. The gamemode panels that have one are sent as
+    // dboScaleform by the server instead, gated on NATIVE_CAPS, and they never reach this branch; the
+    // client-side services that have one call ScaleformMenuService.openNative themselves. A registry shared
+    // with this path would have drawn contextMenu twice, since the gamemode publishes it AND
+    // playerActionService owns one.
     const closeId = Number(content["close"]);
     if (Number.isFinite(closeId) && closeId > 0) {
       if (this.focusedId === closeId) { this.focusedId = 0; closeFormMenu(this.sp, closeId); }
@@ -269,8 +262,7 @@ export class DboRelayService extends ClientListener {
     }
   }
 
-  // The browser overlay drawing a focused widget. Also what a native panel falls back to when its SWF never
-  // comes up, which is why it is a method rather than four lines inside the packet handler.
+  // The browser overlay drawing a focused widget.
   private drawInBrowser(w: unknown, wid: number): void {
     this.focusedId = wid;
     openFormMenu(this.sp, this.browsersideWidgetSetter, { widget: w, id: wid }, this.controller);

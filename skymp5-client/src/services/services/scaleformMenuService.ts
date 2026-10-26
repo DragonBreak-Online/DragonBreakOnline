@@ -8,11 +8,16 @@ import {
   Action, CAPS_RETRY_MS, MENU_NAME, MenuState, OUT_VAR, UiEvent, capsFor, isNew, newState, parseOutbox,
   parseUiEvent, planClose, planOpen, planReady, planRefresh, planTick, readyFrameOf, summary,
 } from "./scaleformMenu";
-import { Replay, replayFor, routeWidget } from "./nativeWidgets";
+import { CLOSE_KEY, FAILED_KEY, HANDOFF_KEY, Replay, replayFor, swfFor } from "./nativeWidgets";
 
-// How the relay draws a widget in the browser, handed over per packet so this service never imports the
-// relay: dboRelayService already imports this file, and the pair would be a cycle.
-export type Failover = (widget: unknown, id: number) => void;
+// What a client-side service passes to openNative. onKey receives the panel's own namespaced keys verbatim,
+// plus FAILED_KEY if the panel could not be drawn and CLOSE_KEY when it reports that it has gone.
+export interface NativeOpen {
+  type: string;
+  widget: unknown;
+  widgetId?: number;
+  onKey: (key: string, args: unknown[]) => void;
+}
 import { withClientUiCaps } from "../../lib/clientUiCaps";
 
 // A real Skyrim Scaleform panel driven from the server, instead of the CEF overlay (Nat, 25 Oct).
@@ -112,14 +117,16 @@ export class ScaleformMenuService extends ClientListener {
         // session reported this nobody knew which frame it does appear on.
         const frame = readyFrameOf(parsed);
         logTrace(this, "Scaleform panel ready on frame", String(frame));
-        this.pending = null;
+        // The owner is NOT cleared here: it receives keys for the whole life of the panel. It is cleared on
+        // close, on closeNative and on failover - and failover can only fire before ready, because planTick
+        // acts only while the phase is "opening".
         this.enqueue(planReady(this.state, frame, Date.now()));
         this.note(summary(this.state));
         return;
       }
-      // One decision table for every panel, whether the gamemode opened it with a dboScaleform packet or the
-      // relay routed a widget here. nativeWidgets.replayFor owns it so that both arrive on the same wire.
-      for (const r of replayFor(parsed.key, parsed.args)) this.replay(r);
+      // One decision table for every panel, whether the gamemode opened it with a dboScaleform packet or a
+      // client service called openNative. nativeWidgets.replayFor owns it so the two cannot disagree.
+      for (const r of replayFor(parsed.key, parsed.args, !!this.owner)) this.replay(r);
     } catch (err) {
       logError(this, "panel message handling failed", err);
     }
@@ -141,54 +148,103 @@ export class ScaleformMenuService extends ClientListener {
       this.note(summary(this.state));
       return;
     }
+    if (r.do === "owner") {
+      // The owning service's own key, handed back untouched. Its switch runs exactly as it does for the
+      // browser panel, which is the whole point of option 2.
+      const o = this.owner;
+      if (!o) {
+        logTrace(this, "a panel key arrived with no owning service", r.key);
+        return;
+      }
+      if (r.key === CLOSE_KEY) this.owner = null;
+      try {
+        o.onKey(r.key, r.args);
+      } catch (e) {
+        logError(this, `the service owning '${o.type}' threw on key '${r.key}'`, e);
+      }
+      return;
+    }
     if (r.do === "handoff") {
-      // Parsed and reported, not yet routed: handing one typed-input control back to the browser needs the
-      // relay to open a browser widget over a paused game, which is not built. Said out loud rather than
-      // dropped, because a panel whose rename button does nothing is the failure that wastes a session.
-      const text = "a panel asked the browser to take over '" + r.type + "' in '" + r.mode + "' mode, which is not wired yet";
-      logTrace(this, "Scaleform hand-off", text);
-      this.note(text);
+      // One typed-input control goes back to the browser: the board's compose box, housing's rename. The
+      // CustomMenu is opened with kFlag_Modal | kFlag_PausesGame (SKSE CustomMenu.cpp), so the page cannot be
+      // seen or typed into while it is up - the panel comes down FIRST and the owner then draws its own
+      // browser widget with the mode set. The owner is deliberately NOT cleared: it reopens the native panel
+      // when the input is done, and openNative will set it again.
+      this.enqueue(planClose(this.state));
+      const o = this.owner;
+      if (!o) {
+        // A gamemode dboScaleform panel has no client-side owner, so there is nobody to draw the browser
+        // widget: that needs the SERVER to publish it, which is not wired. Said out loud rather than dropped,
+        // because a rename button that does nothing is the failure that wastes a session.
+        const text = `a gamemode panel asked for '${r.type}' in '${r.mode}' mode, but only a client-service panel can hand off`;
+        logTrace(this, "Scaleform hand-off", text);
+        this.note(text);
+        return;
+      }
+      logTrace(this, "handing off to the browser", r.type, r.mode);
+      try {
+        o.onKey(HANDOFF_KEY, [r.type, r.mode]);
+      } catch (e) {
+        logError(this, `the service owning '${o.type}' threw on the hand-off`, e);
+      }
       return;
     }
     logTrace(this, "Scaleform panel", r.text);
     this.note(r.text);
   }
 
-  // Called by dboRelayService before it draws a widget in the browser; true means the native path has taken
-  // this packet and the browser must not also see it. Every native call is queued, never made here: this
-  // runs inside a packet handler, where g_nativeCallRequirements.vm is unset.
-  public takeWidgetPacket(content: Record<string, unknown>, drawInBrowser: Failover): boolean {
+  // A client-side service drawing its own panel natively instead of calling openFormMenu. The service keeps
+  // its widget, its packets and its key switch; all it changes is the call site and a callback.
+  //
+  //   if (!this.controller.lookupListener(ScaleformMenuService).openNative({
+  //         type: "bountyBoard", widget: { events, info, WIDGET_ID }, widgetId: WIDGET_ID,
+  //         onKey: (key, args) => this.handleKey(key, args),
+  //       })) {
+  //     openFormMenu(...);   // as before
+  //   }
+  //
+  // false means "not native, draw it yourself" - an unknown type, or the nativePanels setting turning it off -
+  // so the service needs no knowledge of which panels have an SWF. Keys the service namespaced for itself
+  // ("bountyBoard:post") come back to onKey verbatim; dbo: keys still go straight to the server.
+  //
+  // onKey is also called with FAILED_KEY if the panel cannot be drawn, so the service can open its browser
+  // menu after all, and with CLOSE_KEY when the panel reports it has gone.
+  public openNative(opts: NativeOpen): boolean {
     try {
-      const nativeId = this.state.phase === "closed" ? 0 : this.state.widgetId;
-      const route = routeWidget(
-        { close: content["close"], widget: content["widget"], focus: content["focus"] },
-        nativeId, this.nativePanelsSetting());
-      if (route.to === "browser") return false;
-      if (route.to === "ignore") {
-        // The browser path rejects these too, with its own guards. Reported once, here, and then left to it.
-        logTrace(this, "widget packet not routed", route.why);
-        return false;
-      }
-      if (route.action === "close") {
-        logTrace(this, "server closed the native panel", String(route.id));
-        this.enqueue(planClose(this.state));
-        this.note(summary(this.state));
-        return true;
-      }
-      if (route.action === "open") {
-        logTrace(this, "routing widget to a native panel", route.swf, String(route.id));
-        // Held until the SWF says it is up. If it never does, this is what the widget falls back to.
-        this.pending = { widget: route.widget, id: route.id, swf: route.swf, draw: drawInBrowser };
-        this.enqueue(planOpen(this.state, route.swf, route.widget, route.id, Date.now()));
-        return true;
-      }
-      this.enqueue(planRefresh(this.state, route.widget, route.id));
+      const type = String(opts.type || "");
+      const swf = swfFor(type, this.nativePanelsSetting());
+      if (!swf) return false;
+      const id = Math.max(0, Math.round(Number(opts.widgetId) || 0));
+      this.owner = { type, onKey: opts.onKey };
+      logTrace(this, "opening a native panel for a client service", type, swf);
+      this.enqueue(planOpen(this.state, swf, opts.widget, id, Date.now()));
       return true;
     } catch (e) {
-      // The browser is the safe fallback: the player gets a panel either way, which beats getting none.
-      logError(this, "routing a widget packet failed, leaving it to the browser", e);
+      // Never leave the service believing the panel is up when it is not.
+      logError(this, `openNative('${opts && opts.type}') failed, so the service should draw its own`, e);
+      this.owner = null;
       return false;
     }
+  }
+
+  // The owning service's closeMenu. Safe to call when nothing is open.
+  public closeNative(type?: string): void {
+    const t = String(type || "");
+    if (t && this.owner && this.owner.type !== t) return;
+    this.owner = null;
+    this.enqueue(planClose(this.state));
+  }
+
+  public isNativeOpen(type?: string): boolean {
+    if (this.state.phase === "closed") return false;
+    const t = String(type || "");
+    return !t || (!!this.owner && this.owner.type === t);
+  }
+
+  // New contents for a panel already on screen, for a service whose state changed.
+  public refreshNative(widget: unknown, widgetId?: number): void {
+    if (this.state.phase === "closed") return;
+    this.enqueue(planRefresh(this.state, widget, widgetId === undefined ? this.state.widgetId : widgetId));
   }
 
   // Every native runs from here. SkyrimPlatform sets g_nativeCallRequirements.vm only inside OnUpdate
@@ -210,6 +266,16 @@ export class ScaleformMenuService extends ClientListener {
     const now = Date.now();
     if (now - this.lastTick < 250) return;
     this.lastTick = now;
+    // The SWF can take itself down (Worker 1's panels close themselves on their Close button), and nothing
+    // reports that. Left unnoticed the phase stays "ready" over a dead menu, drainOutbox polls a menu that
+    // is gone and the next open thinks the same panel is still up. Ui.isMenuOpen is in the local typings
+    // (index.d.ts:3300); checked on the 250ms tick rather than every frame, because a quarter second of
+    // lateness is invisible and this is cleanup.
+    if (this.state.phase === "ready" && !this.menuIsOpen()) {
+      logTrace(this, "the panel closed itself, catching up");
+      for (const r of replayFor(CLOSE_KEY, ["selfClosed"], !!this.owner)) this.replay(r);
+      return;
+    }
     const tick = planTick(this.state, now);
     if (!tick.length) return;
     this.exec(tick);
@@ -249,24 +315,36 @@ export class ScaleformMenuService extends ClientListener {
     }
   }
 
-  // A widget routed natively whose panel never came up. Whether a missing Data\\Interface\\<swf>.swf makes
-  // openCustomMenu throw or quietly do nothing is NOT established - so both are covered: exec calls this when
-  // the open throws, and planTick's 5s timeout calls it when nothing arrives. Either way the player ends up
-  // with the browser panel rather than an empty screen, which is what happened before this existed.
+  // A native panel that never came up. Whether a missing Data\\Interface\\<swf>.swf makes openCustomMenu throw
+  // or quietly do nothing is NOT established, so both are covered: exec calls this when the open throws, and
+  // planTick's 5s timeout calls it when nothing arrives. Either way the owning service is told to draw its
+  // own browser menu, so the player gets a panel rather than an empty screen.
   //
-  // Only relay-routed panels have a fallback. A gamemode-driven dboScaleform panel has no browser widget to
-  // fall back to, so pending stays null for those and this does nothing.
+  // Only a client-service panel has somewhere to fall back to. A gamemode dboScaleform panel has no owner, so
+  // this does nothing for one of those and its failure is reported by planTick alone.
   private failover(why: string): void {
-    const p = this.pending;
-    this.pending = null;
-    if (!p) return;
-    const text = `${p.swf} did not come up (${why}), so widget ${p.id} goes to the browser instead`;
+    const o = this.owner;
+    this.owner = null;
+    if (!o) return;
+    const text = `a native panel for '${o.type}' did not come up (${why}), so the service draws its own`;
     logError(this, "native panel failover", text);
     this.note(text);
+    // The service opens its browser menu instead. Told once, and the owner is cleared first so a callback
+    // that calls back in here cannot loop.
     try {
-      p.draw(p.widget, p.id);
+      o.onKey(FAILED_KEY, [why]);
     } catch (e) {
-      logError(this, "the browser failover ALSO failed, so this widget is lost", e);
+      logError(this, "the owning service could not draw its own panel either, so this panel is lost", e);
+    }
+  }
+
+  // Only ever called from onUpdate, where a native is callable. A throw here must not be read as "closed":
+  // that would tear down a live panel, so it reports open and the ready timeout stays the real net.
+  private menuIsOpen(): boolean {
+    try {
+      return this.sp.Ui.isMenuOpen(MENU_NAME);
+    } catch (e) {
+      return true;
     }
   }
 
@@ -284,7 +362,7 @@ export class ScaleformMenuService extends ClientListener {
     try { if (typeof n === "function") n("scaleform", text); } catch { /* diagnostics only */ }
   }
 
-  private pending: { widget: unknown; id: number; swf: string; draw: Failover } | null = null;
+  private owner: { type: string; onKey: (key: string, args: unknown[]) => void } | null = null;
   private state: MenuState = newState();
   private announces = 0;
   private announcedAt = 0;

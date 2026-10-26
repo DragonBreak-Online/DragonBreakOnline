@@ -1,38 +1,52 @@
-// The generic widget-to-SWF router (Worker 4 with Worker 1, 26 Oct).
+// Native panels for CLIENT-SIDE services (Worker 4 with Worker 1 and Worker 2, 26 Oct).
 //
-// A service publishes a widget and does not care who draws it. If the widget's type has a native SWF and
-// that type is switched on, the panel is drawn by Scaleform instead of the browser, and the SAME widget
-// object the browser would have received is pushed to _root.dboData. Everything the panel sends back is
-// replayed as the IDENTICAL packet the browser path produces, so no service needs native code and the relay
-// keeps one wire:
+// Two different kinds of panel reach the Scaleform layer, and confusing them wasted a commit:
 //
-//   { customPacketType: "dbo", event: <key without "dbo:">, args, widget }
+//  1. Gamemode panels (prayer, decor, journal, deityPicker, rite, dungeonGate...). The SERVER decides, gated
+//     on NATIVE_CAPS, and sends { customPacketType: "dboScaleform", swf, payload, widget }. Nothing here is
+//     involved: add the cap to NATIVE_CAPS in scaleformMenu.ts and the swf to the gamemode's NATIVE_SWF.
+//  2. Client-service panels (bountyBoard, housing, contextMenu...). The service owns the widget, receives its
+//     own packets and calls openFormMenu itself, so the server never names them and no relay packet carries
+//     them. Those are what this file is for: the service calls ScaleformMenuService.openNative instead of
+//     openFormMenu and hands over a callback, and its existing key switch runs unchanged.
 //
-// That one rule is the whole reason this design is cheap, and it is also the trap: dboRelayService drops any
-// browser key that does not start "dbo:", SILENTLY. A native panel that sends an unprefixed key would do
-// nothing at all and nothing would say why, which is how three separate faults presented today. So a key
-// without the prefix is REPORTED here rather than dropped.
-//
-// The panel sends the widget's own event strings VERBATIM, out of the payload it was given
-// (widget.events.close and friends). The client never invents or looks up a key: in the browser the front
-// does the same thing, and a key invented here would be one no handler reads.
+// An earlier version routed widgets out of dboRelayService's dboWidget packet. That was built on a premise
+// Worker 1 corrected: bountyBoardService and housingService never go through the relay at all (they call
+// openFormMenu directly), and contextMenu is BOTH a relay type the gamemode publishes and a client-service
+// panel, so a registry shared by both paths would have opened it twice. The relay hook is gone.
 //
 // No imports, so a harness loads it on its own (tests/native-widgets-harness.js).
 
-// type, as the service publishes it in widget.type -> the SWF in Data\Interface
+// The service's own panel name -> the SWF in Data\Interface. ONLY client-service panels belong here. A
+// gamemode panel in this table would be drawn twice.
 export const NATIVE_WIDGETS: Readonly<Record<string, string>> = {
-  prayer: "dbo_prayer",
-  decor: "dbo_decor",
   bountyBoard: "dbo_board",
   housing: "dbo_housing",
+  contextMenu: "dbo_context",
 };
+
+// Registered types that the GAMEPLAY layer also publishes under the same name. contextMenu is a generic list
+// renderer shared by alchemy.js, business.js, charlevel.js and dungeons.js (each with its own widget id and
+// its own dbo: events) as well as by playerActionService, so one dbo_context.swf serves both.
+//
+// Listing a type here is an acknowledgement, not a fix, and it is safe only because nothing routes gameplay
+// widget packets to a native panel any more. Two things follow that the owning service must handle:
+//  - a gameplay contextMenu arriving while the native one is up draws in the BROWSER beside it, because the
+//    relay cannot close a panel it does not know about (the gamemode's panel-handoff rule only reaches
+//    widgets the relay owns);
+//  - the keys differ by caller: playerActionService uses pa:*, the gameplay callers use dbo:*. replayFor
+//    sends each to the right place, so the SWF must pass whatever its payload gave it, verbatim.
+export const SHARED_WITH_GAMEPLAY: ReadonlyArray<string> = ["contextMenu"];
 
 export const HANDOFF_KEY = "native:handoff";
 export const CLOSE_KEY = "close";
 export const DBO_PREFIX = "dbo:";
+// What the owning service is told when its native panel could not be drawn, so it can open its own browser
+// menu instead. The service must treat this as "draw it yourself", not as a close.
+export const FAILED_KEY = "native:failed";
 
-// Shares the nativePanels setting with the gamemode-driven panels, so one switch covers everything and a
-// panel that misbehaves in a session goes back to the browser without a rebuild:
+// Shares the nativePanels setting with the gamemode panels, so one switch covers everything and a panel that
+// misbehaves in a session goes back to the browser without a rebuild:
 //   absent or true     every type native
 //   false              none, so every panel is the browser one again
 //   { housing: false } that one type browser, the rest native
@@ -45,12 +59,6 @@ export const swfFor = (type: unknown, setting: unknown): string => {
     if (off[t] === false) return "";
   }
   return NATIVE_WIDGETS[t];
-};
-
-export const typeOf = (widget: unknown): string => {
-  if (!widget || typeof widget !== "object") return "";
-  const t = (widget as Record<string, unknown>)["type"];
-  return typeof t === "string" ? t : "";
 };
 
 export interface Handoff {
@@ -71,13 +79,22 @@ export const handoffOf = (key: string, args: unknown[]): Handoff | null => {
 
 export type Replay =
   | { do: "server"; event: string; args: unknown[] }
+  | { do: "owner"; key: string; args: unknown[] }
   | { do: "close" }
   | { do: "handoff"; type: string; mode: string }
   | { do: "report"; text: string };
 
-// What a key coming out of a native panel means. The order matters: a hand-off and a close do opposite
-// things, so neither may fall through to the other.
-export const replayFor = (key: string, args: unknown[]): Replay[] => {
+// What a key coming out of a native panel means. ONE table for both kinds of panel, so a gamemode panel and
+// a client-service panel cannot disagree about what a key does.
+//
+// hasOwner is true when a client service registered a callback for the panel that is open. With an owner, a
+// key the service namespaced for itself ("bountyBoard:post", "pa:trade") is delivered to it verbatim, which
+// is what makes option 2 cost the service nothing but a call site. Without one, such a key is REPORTED: the
+// browser path drops an unprefixed key silently, and a panel wired that way looks like a server that never
+// answers, which is how three faults presented on 26 Oct.
+//
+// The order matters: a hand-off and a close do opposite things, so neither may fall through to the other.
+export const replayFor = (key: string, args: unknown[], hasOwner?: boolean): Replay[] => {
   const k = String(key || "");
   if (!k) return [{ do: "report", text: "a native panel sent an empty key" }];
 
@@ -88,78 +105,31 @@ export const replayFor = (key: string, args: unknown[]): Replay[] => {
   }
 
   // A bare "close" is the panel saying it has gone, which is the Scaleform equivalent of Escape in the
-  // browser. dboRelayService.closeFocused answers that with { event: "close", args: [why] }, and THREE live
+  // browser. dboRelayService.closeFocused answers Escape with { event: "close", args: [why] }, and THREE live
   // gamemode handlers hang off that packet: the player panel's nonces, the pigeon nonces, and abandoning a
-  // half-finished read (dbo-gamemode.js 4224, 4609, 5400). A native panel that closed without it would leak
-  // all three, so this is parity, not politeness. The packet goes first, so that a close which throws has
-  // still told the server.
+  // half-finished read (dbo-gamemode.js 4224, 4609, 5400). A panel that closed without it would leak all
+  // three, so this is parity, not politeness. The packet goes first, so a close that throws has still told
+  // the server; the owner is told last, because its handler usually calls back in to close the menu.
   //
-  // A panel whose Close button should run the server's OWN close handler sends the widget's events.close
-  // string instead. That is dbo:-prefixed and needs none of this.
+  // A Close button that should run the server's OWN close handler sends the widget's events.close string
+  // instead - dbo: for a gamemode panel, the service's own prefix for a client-service one. Either way it is
+  // just another key below, and the panel stays up until whoever owns it takes it down.
   if (k === CLOSE_KEY) {
     const why = args.length && args[0] ? String(args[0]) : "native";
-    return [{ do: "server", event: "close", args: [why] }, { do: "close" }];
+    const out: Replay[] = [{ do: "server", event: "close", args: [why] }, { do: "close" }];
+    if (hasOwner) out.push({ do: "owner", key: CLOSE_KEY, args: [why] });
+    return out;
   }
 
   if (k.indexOf(DBO_PREFIX) === 0) {
     return [{ do: "server", event: k.slice(DBO_PREFIX.length), args }];
   }
 
-  // The silent-drop trap, made loud. dboRelayService.onBrowserMessage refuses a key without the prefix and
-  // says nothing, so a panel wired this way looks like a server that never answers.
+  // The service's own namespaced key, handed back to it untouched.
+  if (hasOwner) return [{ do: "owner", key: k, args }];
+
   return [{
     do: "report",
-    text: `a native panel sent '${k}', which has no ${DBO_PREFIX} prefix: the browser path drops such a key silently, so this would do nothing`,
+    text: `a native panel sent '${k}', which has no ${DBO_PREFIX} prefix and no service owns it: the browser path drops such a key silently, so this would do nothing`,
   }];
-};
-
-// ---- the inbound half: which UI draws a dboWidget packet ---------------------------------------------------
-
-export interface WidgetPacket {
-  close?: unknown;
-  widget?: unknown;
-  focus?: unknown;
-}
-
-export type Route =
-  | { to: "native"; action: "open"; swf: string; id: number; widget: unknown }
-  | { to: "native"; action: "refresh"; id: number; widget: unknown }
-  | { to: "native"; action: "close"; id: number }
-  | { to: "browser" }
-  | { to: "ignore"; why: string };
-
-// nativeId is the widget the CustomMenu is currently drawing, or 0. The rules that matter:
-//
-//  - a server close for the widget that is open NATIVELY takes the CustomMenu down. It must never reach
-//    closeFormMenu/closeWidget, which talk to a browser widget that was never opened and which, through
-//    takeDeferredFocus, would hand focus back to the page (Worker 1 asked for this explicitly).
-//  - a refresh goes native only for the widget we actually opened natively. A refresh for any other is the
-//    browser's, even when its type is a native one, because that widget is drawn by the page.
-//  - once a widget is open natively it STAYS native even if the setting says otherwise, so a setting edited
-//    mid-session cannot split one panel across both UIs.
-export const routeWidget = (packet: WidgetPacket, nativeId: number, setting: unknown): Route => {
-  const open = Number(nativeId) > 0 ? Number(nativeId) : 0;
-
-  const closeId = Number(packet.close);
-  if (isFinite(closeId) && closeId > 0) {
-    return open && closeId === open ? { to: "native", action: "close", id: closeId } : { to: "browser" };
-  }
-
-  const w = packet.widget;
-  if (!w || typeof w !== "object") return { to: "ignore", why: "the packet carries no widget object" };
-  const raw = (w as Record<string, unknown>)["id"];
-  const id = Number(raw);
-  if (!isFinite(id) || id <= 0) return { to: "ignore", why: `widget id '${String(raw)}' is not a positive number` };
-
-  const mine = open === id;
-  const swf = swfFor(typeOf(w), setting);
-  if (!swf && !mine) return { to: "browser" };
-
-  if (packet.focus) {
-    // Reopening the one already open would restart the SWF and lose whatever the player had typed into it,
-    // so that is a refresh. Scaleform allows one CustomMenu at a time in any case.
-    if (mine) return { to: "native", action: "refresh", id, widget: w };
-    return { to: "native", action: "open", swf, id, widget: w };
-  }
-  return mine ? { to: "native", action: "refresh", id, widget: w } : { to: "browser" };
 };
