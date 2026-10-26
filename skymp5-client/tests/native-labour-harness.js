@@ -26,7 +26,7 @@ const at = (t, ms) => { t.st.time = 1000 + ms; t.tick(); };   // the round start
   const t = S.boot(MENU);
   check('says ready with the frame skse appeared on', msgs(t, 'ready').length === 1 && msgs(t, 'ready')[0].args[0] === 1);
   t.push(sweep);
-  check('the title is the seam, the line the craft before the first blow', P(t).titleTf.text === 'Iron Seam' && P(t).lineTf.text === 'Read the seam and strike along the grain, where the rock is weakest.', P(t).lineTf.text);
+  check('the title is the seam, the line the craft before the first blow', P(t).titleTf.text === 'IRON SEAM' && P(t).lineTf.text === 'Read the seam and strike along the grain, where the rock is weakest.', P(t).lineTf.text);
   check('the keys line and the browser\'s two buttons', P(t).keysTf.text === 'Space, Enter or click to strike. Escape to walk away.' && P(t).acts.strike.label.text === 'Strike' && P(t).acts.leave.label.text === 'Walk away');
   check('the band sits where the server put it, 8 either side of 50', !!P(t).bar.band && !!P(t).bar.marker);
   at(t, 350);
@@ -90,7 +90,7 @@ const at = (t, ms) => { t.st.time = 1000 + ms; t.tick(); };   // the round start
   const st = { type: 'labour', id: 55, kind: 'struggle', event: 'struggle', nonce: 's1', strikes: 3, band: 10, bands: [50, 50, 50], sweepMs: 1400, sweeps: [1400, 1000, 700], failOnMiss: true, totalMs: 20000, hitMs: 0, missMs: 0, judge: 'client' };
   const t = S.boot(MENU);
   t.push(st);
-  check('the struggle: its title fallback and its lead', P(t).titleTf.text === 'A block' && P(t).lineTf.text === 'Work the knot loose. Pull when the rope gives.', P(t).titleTf.text);
+  check('the struggle: its title fallback and its lead', P(t).titleTf.text === 'A BLOCK' && P(t).lineTf.text === 'Work the knot loose. Pull when the rope gives.', P(t).titleTf.text);
   at(t, 700);
   t.press(32);
   check('a pull at 700 lands (the first sweep is 1400)', JSON.stringify(msgs(t, 'dbo:struggle')) === '[]' && /knot gives|rope slackens|strand of the rope/.test(P(t).lineTf.text), P(t).lineTf.text);

@@ -213,12 +213,10 @@ function act2(parent, name, depth, x, y, w, label, onPick, color, off)
 function listRow(parent, i, label, sub, on, onPick, mark)
 {
    var b = button(parent, "r" + i, 10 + i, PAD, TOP + i * ROW_H, LIST_W, (mark ? String.fromCharCode(8226) + " " : "") + label, F_MEDIUM, 22, on ? A_FOCUS : A_ROW_REST, onPick);
+   b.washW = LIST_W;
+   b.washH = ROW_H - 4;
    var s = dboText(b, "sub", 2, 0, 26, LIST_W, 20, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8), false);
    s.text = String(sub);
-   if (on)
-   {
-      dboRule(b, 0, ROW_H - 4, LIST_W);
-   }
    return b;
 }
 
@@ -763,11 +761,11 @@ function drawTabs()
       b.v = tabs[i][0];
       if (tabs[i][0] == shown())
       {
-         dboRule(b, 0, 30, w);
+         dboTabMark(b, w - 30);
       }
       x += w + 10;
    }
-   dboRule(h, PAD, 104, PANEL_W - PAD * 2);
+   dboDivider(h, PAD, 104, PANEL_W - PAD * 2);
    if (data.result != undefined && data.result != null && data.result != "")
    {
       var res = txt(h, "result", 30, PAD, 112, PANEL_W - PAD * 2, 30, 16, data.resultKind == "refused" ? C_RED : C_GREEN, data.result, true);
@@ -803,7 +801,7 @@ function draw()
    actions = [];
    focus = -1;
    var t = clear("title", 10);
-   txt(t, "text", 1, PAD, 16, PANEL_W - PAD * 2, 40, 30, C_TEXT, data.boardName + " Pigeon Coop", false, F_PLAIN);
+   dboTitle(t, "text", 1, PAD, 16, PANEL_W - PAD * 2, data.boardName + " Pigeon Coop");
    drawTabs();
    var r = clear("right", 40);
    var s = shown();
@@ -824,7 +822,7 @@ function draw()
       drawSend(r);
    }
    var f = clear("foot", 60);
-   dboRule(f, PAD, PANEL_H - 62, PANEL_W - PAD * 2);
+   dboDivider(f, PAD, PANEL_H - 62, PANEL_W - PAD * 2);
    txt(f, "hint", 1, PAD, PANEL_H - 50, PANEL_W - PAD * 2 - 160, 40, 16, C_SECOND, hintText(), true);
    button(f, "close", 2, PANEL_W - PAD - 130, PANEL_H - 50, 130, "Close", F_MEDIUM, 22, A_BUTTON_REST, function()
    {
@@ -890,10 +888,11 @@ function take(p)
 function build()
 {
    panel = _root.createEmptyMovieClip("dboPanel", 10);
-   panel._x = (STAGE_W - PANEL_W) / 2;
-   panel._y = 50;
+   // scaled into what the player sees: 21:9 and 16:10 crop the 1280 x 720 stage
+   dboFit(panel, PANEL_W, PANEL_H);
    var bg = panel.createEmptyMovieClip("bg", 1);
-   dboBox(bg, 0, 0, PANEL_W, PANEL_H, 0x000000, 80);
+   dboGround(bg, PANEL_W, PANEL_H);
+   dboWatermark(panel, 5, PANEL_W - 50, 160, 320);
    dboFadeIn(panel);
 }
 

@@ -401,6 +401,8 @@ function actButton(parent, name, depth, x, label, onPick)
    var t = dboText(b, "label", 1, 0, 2, 170, 30, dboFmt(F_MEDIUM, 20, C_TEXT, 0.8, "center"), false);
    t.text = label;
    b._alpha = A_BUTTON_REST;
+   b.washW = 170;
+   b.washH = 32;
    b.onPick = onPick;
    b.onRollOver = function()
    {
@@ -409,10 +411,12 @@ function actButton(parent, name, depth, x, label, onPick)
          return;
       }
       this._alpha = A_FOCUS;
+      dboWash(this, true);
       dboSound("UIMenuFocus");
    };
    b.onRollOut = function()
    {
+      dboWash(this, false);
       if (this.disabled != true)
       {
          this._alpha = A_BUTTON_REST;
@@ -506,6 +510,7 @@ function drawTally()
 {
    var t = clearClip("tally", 30);
    t._y = BAR_Y + BAR_H + 18;
+   dboDivider(t, PAD, 30, PANEL_W - PAD * 2);
    var x = PAD;
    for (var i = 0; i < need; i++)
    {
@@ -574,7 +579,7 @@ function drawActions()
 function draw()
 {
    var ore = kind == "mining" ? oreKey(data.title) : "";
-   titleTf.text = data.title != undefined && data.title != "" ? String(data.title) : kind == "mining" ? "A seam" : "A block";
+   titleTf = dboTitle(panel, "titleTf", 2, PAD, 18, PANEL_W - PAD * 2, data.title != undefined && data.title != "" ? String(data.title) : kind == "mining" ? "A seam" : "A block");
    lineTf.text = lineText(ore);
    var wordShown = word != null && (data.result == undefined || data.result == "") && ownText(ore) == "";
    lineTf.textColor = wordShown ? (word.landed ? C_HIT : C_MISS) : C_TEXT;
@@ -627,11 +632,12 @@ function reset(p)
 function build()
 {
    panel = _root.createEmptyMovieClip("dboPanel", 10);
-   panel._x = (STAGE_W - PANEL_W) / 2;
-   panel._y = 140;
+   // scaled into what the player sees: 21:9 and 16:10 crop the 1280 x 720 stage
+   dboFit(panel, PANEL_W, 440);
    var bg = panel.createEmptyMovieClip("bg", 1);
-   dboBox(bg, 0, 0, PANEL_W, 440, 0x000000, 80);
-   titleTf = dboText(panel, "titleTf", 2, PAD, 18, PANEL_W - PAD * 2, 40, dboFmt(F_PLAIN, 30, C_TEXT, 1.0), false);
+   dboGround(bg, PANEL_W, 440);
+   dboWatermark(panel, 5, PANEL_W - 50, 110, 300);
+   titleTf = dboTitle(panel, "titleTf", 2, PAD, 18, PANEL_W - PAD * 2, "");
    lineTf = dboText(panel, "lineTf", 3, PAD, 66, PANEL_W - PAD * 2, 50, dboFmt(F_MEDIUM, 20, C_TEXT, 0.8), true);
    keysTf = dboText(panel, "keysTf", 4, PAD, BAR_Y + BAR_H + 62, PANEL_W - PAD * 2 - 370, 24, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8), false);
    dboFadeIn(panel);

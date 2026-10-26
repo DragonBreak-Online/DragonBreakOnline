@@ -114,6 +114,25 @@ const decor = { type: 'decor', id: 171, nonce: 'p1', view: 'catalog', home: "Ola
   rows: Array.from({ length: 8 }, (_, i) => ({ key: `k${i}`, name: `Bed ${i + 1}`, cost: [{ name: 'Firewood', n: 4, have: 6 }], why: '' })) };
 const prayer = { type: 'prayer', id: 35, nonce: 'n1', mode: 'pick', deity: 'Mara', kind: 'divine', shrine: 'Shrine of Mara', sphere: 'Love and compassion', verses: [{ lines: ['Mother of all, hear me', 'Mother of storms, hear me', 'Mother of none, hear me'] }, { lines: ['a', 'b', 'c'] }], right: [0, 0], slips: 2, totalMs: 120000, minPickMs: 300, judge: 'client' };
 
+const labour = { type: 'labour', id: 55, nonce: 'l1', kind: 'mining', title: 'Iron Seam', strikes: 3, band: 8, bands: [50, 62, 38], sweepMs: 1400, totalMs: 30000, hitMs: 250, missMs: 600, judge: 'client' };
+const labourPick = { type: 'labour', id: 55, nonce: 'l2', kind: 'chopping', title: 'Chopping Block', mode: 'pick', strikes: 3, slips: 2, totalMs: 90000, minPickMs: 300, judge: 'client',
+  steps: [[[18, 40, 0.2], [42, 62, 0.9], [66, 35, 0.4], [86, 58, 0.3]]] };
+const pigeon = {
+  type: 'pigeon', id: 34, nonce: 'p1', boardName: 'Bruma', gold: 120, cooldownMinutes: 0, maxText: 240, view: 'letters',
+  contacts: [{ id: 11, name: 'Bobin Farseer-Rosa', tag: 'BGJN', online: true, price: 5 }, { id: 12, name: 'Elsilda Farseer', tag: 'FJL5', online: false, price: 5 }, { id: 13, name: 'Moss-Pocket', tag: '8G8Z', online: true, price: 6 }],
+  letters: [{ id: 'l1', from: 'Elsilda Farseer', text: 'You are always welcome within the walls of Windhelm, dear. Settle in and make yourself at home. Your Grandmother', at: 1792972800000, read: false },
+    { id: 'l2', from: 'Moss-Pocket', text: 'Blacksmith shop is free here.', at: 1792960000000, read: true, parcel: { gold: 20, items: [{ name: 'Iron Ingot', count: 2 }] } }],
+  supply: { enabled: true, zone: 'Bruma', feeShare: 0.1, minFee: 5, maxCount: 50, maxOpen: 3, openDays: 3, search: '', results: [],
+    orders: [{ id: 7, name: 'Iron Ore', count: 20, filled: 4, reward: 200, perUnit: 10, held: 160, poster: 'Ann', hoursLeft: 30, zone: 'Bruma', state: 'open', mine: false, have: 6 }],
+    mine: [{ id: 9, name: 'Wheat', count: 10, filled: 0, reward: 30, perUnit: 3, held: 30, poster: 'You', hoursLeft: 50, zone: 'Bruma', state: 'open', mine: true, have: 0 }] },
+  courier: { enabled: true, place: 'Bruma', placeId: 'bruma', destinations: [], goods: [],
+    rules: { feeShare: 0.1, minFee: 5, premiumRate: 0.05, maxStacks: 3, minPay: 10, maxPay: 1000, limitGameDays: 3, openDays: 3, maxCarried: 2, maxOpen: 3, maxPayoutsPerWeek: 5 },
+    rank: { name: 'Novice', delivered: 1, carry: 1, maxValue: 100, boards: true, line: 'Bring five parcels to become a Runner.', next: { name: 'Runner', at: 5 } },
+    open: [{ id: 3, goods: '2 Iron Ingot', kinds: 1, pay: 40, dest: 'Whiterun', kind: 'board', origin: 'Bruma', sender: 'Ann', recipient: 'Ann', insured: 0, state: 'open', hoursLeft: 20, gameHoursLeft: 0, mine: false }],
+    carrying: [{ id: 4, goods: '1 Silver Ingot', kinds: 1, pay: 60, dest: 'Bruma', kind: 'board', origin: 'Chorrol', sender: 'Dee', recipient: 'Dee', insured: 30, state: 'carried', hoursLeft: 30, gameHoursLeft: 30, mine: false, here: true }],
+    broken: [], mine: [] },
+};
+
 const SETUPS = [
   ['board-list', { swf: 'dbo_board', drive: (t) => t.push(board) }],
   ['board-reader', { swf: 'dbo_board', drive: (t) => { t.push(board); t.press(49); } }],
@@ -123,6 +142,12 @@ const SETUPS = [
   ['journal', { swf: 'dbo_journal', drive: (t) => t.push(journal) }],
   ['decor', { swf: 'dbo_decor', drive: (t) => t.push(decor) }],
   ['prayer', { swf: 'dbo_prayer', drive: (t) => t.push(prayer) }],
+  ['labour', { swf: 'dbo_labour', drive: (t) => { t.push(labour); t.st.time += 2100; t.tick(); t.press(32); } }],
+  ['labour-pick', { swf: 'dbo_labour', drive: (t) => t.push(labourPick) }],
+  ['pigeon-letters', { swf: 'dbo_pigeon', drive: (t) => { t.push(pigeon); t.root.dboPanel.list.r0.onRelease(); } }],
+  ['pigeon-send', { swf: 'dbo_pigeon', drive: (t) => t.push(Object.assign({}, pigeon, { view: 'send', result: 'Your pigeon flies to Elsilda Farseer.', resultKind: 'sent' })) }],
+  ['pigeon-supply', { swf: 'dbo_pigeon', drive: (t) => { t.push(Object.assign({}, pigeon, { view: 'supply' })); t.root.dboPanel.list.r1.onRelease(); } }],
+  ['pigeon-courier', { swf: 'dbo_pigeon', drive: (t) => { t.push(Object.assign({}, pigeon, { view: 'courier' })); const l = t.root.dboPanel.list; l[Object.keys(l.kids).find((k) => /^r\d$/.test(k))].onRelease(); } }],
 ];
 // Where each visible text actually sits on the stage: its field's box narrowed to the estimated width of its words by its
 // alignment (single lines), or the field's box (wrapped text), so two texts that touch can be found without a renderer

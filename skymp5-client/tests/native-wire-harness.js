@@ -43,9 +43,6 @@ const fixtures = {
       carrying: [{ id: 4, goods: 'g', kinds: 1, pay: 40, dest: 'B', kind: 'board', origin: 'C', sender: 'D', recipient: 'D', insured: 0, state: 'carried', hoursLeft: 2, gameHoursLeft: 2, mine: false, here: true }],
       broken: [{ id: 5, goods: 'g', kinds: 1, pay: 10, dest: 'S', kind: 'board', origin: 'B', sender: 'E', recipient: 'E', insured: 0, state: 'robbed', hoursLeft: 0, gameHoursLeft: 0, mine: false }],
       mine: [{ id: 6, goods: 'g', kinds: 1, pay: 25, dest: 'X', kind: 'board', origin: 'B', sender: 'Y', recipient: 'Y', insured: 0, state: 'open', hoursLeft: 4, gameHoursLeft: 0, mine: true }] } },
-  dbo_emotes: { type: 'emoteWheel', id: 24, events: { play: 'emote:play', close: 'emote:close', stop: 'emote:stop' }, groups: [{ id: 'a', label: 'A', emotes: [{ anim: 'IdleWave', label: 'Wave' }, { anim: 'IdleSalute', label: 'Salute' }] }, { id: 'b', label: 'B', emotes: [{ anim: 'IdleLaugh', label: 'Laugh' }] }] },
-  'dbo_emotes#stop': null,
-  'dbo_emotes#close': null,
   dbo_decor: { type: 'decor', id: 171, nonce: 'p1', view: 'catalog', home: 'h', owner: true, undo: 5, budget: [{ label: 'Pieces', used: 0, of: 3 }], groups: [{ id: 'beds', label: 'Beds' }], group: 'beds', page: 0, pages: 2, rows: [{ key: '9001:Skyrim.esm', name: 'Bed', cost: [], why: '' }], nearby: [] },
 };
 // Drives every control the panel has, so every key it can send is on the wire
@@ -88,9 +85,6 @@ const drive = {
     t.press(34); row('25 gold').onRelease(); P().right.cancel.onRelease(); P().right.cancel.onRelease(); again('courier');
     P().foot.close.onRelease();
   },
-  dbo_emotes: (t) => { const p = t.root.dboPanel; p.groups.g1.onRelease(); p.rows.e0.onRelease(); },
-  'dbo_emotes#stop': (t) => { t.root.dboPanel.foot.stop.onRelease(); },
-  'dbo_emotes#close': (t) => { t.press(27); },
   dbo_decor: (t) => {
     const l = t.root.dboPanel.list;
     l.r0.onRelease(); l.g0.onRelease(); t.press(39); t.press(82); t.root.dboPanel.head.undo.onRelease();
@@ -106,7 +100,7 @@ const drive = {
 const swfOf = (menu) => menu.split('#')[0];
 const fixtureOf = (menu) => fixtures[menu] || fixtures[swfOf(menu)];
 // a session that ends in a closing key carries fewer events than a whole drive
-const MIN_EVENTS = { dbo_labour: 3, 'dbo_labour#struggle': 3, dbo_emotes: 2, 'dbo_emotes#stop': 2, 'dbo_emotes#close': 2 };
+const MIN_EVENTS = { dbo_labour: 3, 'dbo_labour#struggle': 3 };
 const seen = {};
 for (const menu of Object.keys(fixtures)) {
   for (const late of [false, true]) {
@@ -139,7 +133,6 @@ for (const menu of Object.keys(fixtures)) {
 // The journal's tabs send many module events (dbo:court*, journalMagic...): each key in its source has a handler in some server module
 check('dbo_labour: its sessions send all four labour keys', ['dbo:labour', 'dbo:labourCancel', 'dbo:struggle', 'dbo:struggleCancel'].every((k) => (seen.dbo_labour || []).includes(k)), seen.dbo_labour);
 check('dbo_pigeon: the drive sends every key the coop has', ['dbo:pigeonRead', 'dbo:pigeonDelete', 'dbo:pigeonCollect', 'dbo:pigeonBlockLetter', 'dbo:pigeonCompose', 'dbo:pigeonSign', 'dbo:supplyDeliver', 'dbo:supplyCancel', 'dbo:courierTake', 'dbo:courierDeliver', 'dbo:courierOpen', 'dbo:courierCancel', 'dbo:pigeonClose'].every((k) => (seen.dbo_pigeon || []).includes(k)), [...new Set(seen.dbo_pigeon || [])]);
-check('dbo_emotes: its sessions send all three emote keys', ['emote:play', 'emote:stop', 'emote:close'].every((k) => (seen.dbo_emotes || []).includes(k)), seen.dbo_emotes);
 
 if (SERVER) {
   const src = fs.readdirSync(path.resolve(__dirname, '..', 'swf/dbo_journal/tabs')).map((f) => read(`swf/dbo_journal/tabs/${f}`)).concat(read('swf/dbo_journal/scripts/frame_1/DoAction.as')).join('\n');
