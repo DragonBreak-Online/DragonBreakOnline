@@ -549,6 +549,16 @@ module.exports = (api) => {
     let r;
     switch ((verb || '').toLowerCase()) {
       case '': r = info(a); break;
+      // the typed half of the native property menu, which hands its name box to the browser
+      case 'name': {
+        const h = here(a);
+        const H = housing();
+        if (h.err) r = h.err;
+        else if (!rest.length) r = 'Usage: /property name <new name>, at the door';
+        else if (!H || typeof H.request !== 'function') r = 'Naming property from chat is not in service yet; use the property menu.';
+        else { H.request(a, h.door, 'rename', { name: rest.join(' ') }); r = []; }
+        break;
+      }
       // "mine" rather than "list": /property list <deposit> <weekly> is the officials' listing action
       case 'mine': r = overview(a); break;
       case 'list': r = list(a, rest[0], rest[1]); break;
@@ -563,12 +573,12 @@ module.exports = (api) => {
       case 'evict': r = evict(a); break;
       case 'grace': r = grace(a); break;
       case 'remind': r = remind(a); break;
-      default: r = 'Usage: /property [mine|buy <price>|interest|accept|pay [weeks]|leave]; officials: sell <price>|list <deposit> <weekly>|unlist|offer <name>|remind|grace|evict';
+      default: r = 'Usage: /property [mine|name <new name>|buy <price>|interest|accept|pay [weeks]|leave]; officials: sell <price>|list <deposit> <weekly>|unlist|offer <name>|remind|grace|evict';
     }
     for (const t of [].concat(r)) personal(a, t);
   // kept in the player menu until every player has the property panel (front propertyMarket, widget 82, client 0.3.94+);
   // buy names the price the buyer agrees to pay (claude-jake review, 12 Oct)
-  }, { help: 'at a door: buying and renting property (mine, buy <price>, interest, accept, pay, leave; officials sell <price>, list, offer, remind, grace, evict)' });
+  }, { help: 'at a door: buying and renting property (mine, name <new name>, buy <price>, interest, accept, pay, leave; officials sell <price>, list, offer, remind, grace, evict)' });
   registerChatCommand('properties', (a) => { for (const t of overview(a)) personal(a, t); }, { hidden: true, help: 'the property you manage; now /property mine' });
 
   // Rent falling due, offers running out, notices and money for people who come back online

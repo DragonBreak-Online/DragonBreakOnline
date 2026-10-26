@@ -18,9 +18,9 @@ const realNow = Date.now;
 Date.now = () => now;
 
 const DOOR = 0x5000, FAR_DOOR = 0x5001;
-fs.writeFileSync('doors.json', JSON.stringify({ doors: { '5000:Skyrim.esm': 'A house', '5001:Skyrim.esm': 'Somewhere else', '5002:Skyrim.esm': 'Newer than the file', '5003:Skyrim.esm': 'Disabled' } }));
+fs.writeFileSync('doors.json', JSON.stringify({ doors: { '5000:Skyrim.esm': 'A house', '5001:Skyrim.esm': 'Somewhere else', '5002:Skyrim.esm': 'Newer than the file', '5003:Skyrim.esm': 'Disabled' } }));   // verify-formids: ignore - made-up harness doors
 // The places tenancy.js reads instead of loading each door (tools/door-positions.py); no door is ever asked of the engine
-fs.writeFileSync('doors-pos.json', JSON.stringify({ doors: { '5000:Skyrim.esm': [0, 0, 0, 'Bruma'], '5001:Skyrim.esm': [9000, 0, 0, 'bruma'], 'bad:Skyrim.esm': [1, 2] }, off: ['5003:Skyrim.esm'] }));
+fs.writeFileSync('doors-pos.json', JSON.stringify({ doors: { '5000:Skyrim.esm': [0, 0, 0, 'Bruma'], '5001:Skyrim.esm': [9000, 0, 0, 'bruma'], 'bad:Skyrim.esm': [1, 2] }, off: ['5003:Skyrim.esm'] }));   // verify-formids: ignore - made-up harness doors
 const engineCalls = { doorGet: {}, ids: [] };
 // The background fallback runs on timers; they are held here and run on demand
 const timers = [];
@@ -147,11 +147,20 @@ check('without the fief holder question only the hold\'s managers rent', /Only t
 // The 3.5-minute freeze (5-9 Oct): the doors come from doors-pos.json, never from the engine
 const T = globalThis.__dboTenancy;
 check('no door in the file is loaded through the engine, nor one listed off', !engineCalls.doorGet['5000'] && !engineCalls.doorGet['5001'] && !engineCalls.doorGet['5003'], JSON.stringify(engineCalls.doorGet));
-check('a malformed entry is skipped and the world is compared in lower case', T.doors.filter((d) => d.desc !== '5002:Skyrim.esm').length === 2 && T.doors[0].where === 'bruma');
-check('a door missing from the file waits for a timer instead of loading at once', timers.length === 1 && timers[0][1] === 250 && !T.doors.some((d) => d.desc === '5002:Skyrim.esm'), timers.length);
+check('a malformed entry is skipped and the world is compared in lower case', T.doors.filter((d) => d.desc !== '5002:Skyrim.esm').length === 2 && T.doors[0].where === 'bruma');   // verify-formids: ignore - made-up harness doors
+check('a door missing from the file waits for a timer instead of loading at once', timers.length === 1 && timers[0][1] === 250 && !T.doors.some((d) => d.desc === '5002:Skyrim.esm'), timers.length);   // verify-formids: ignore - made-up harness doors
 while (timers.length) timers.shift()[0]();
-check('...then resolves in the background, with its world in lower case', T.doors.some((d) => d.desc === '5002:Skyrim.esm' && d.where === 'elsewhere' && d.id === 0x5002) && engineCalls.doorGet['5002'] === 2, JSON.stringify(engineCalls.doorGet));
-check('only the door found and the background one are resolved to ids', JSON.stringify(engineCalls.ids.sort()) === JSON.stringify(['5000:Skyrim.esm', '5002:Skyrim.esm']), JSON.stringify(engineCalls.ids));
+check('...then resolves in the background, with its world in lower case', T.doors.some((d) => d.desc === '5002:Skyrim.esm' && d.where === 'elsewhere' && d.id === 0x5002) && engineCalls.doorGet['5002'] === 2, JSON.stringify(engineCalls.doorGet));   // verify-formids: ignore - made-up harness doors
+check('only the door found and the background one are resolved to ids', JSON.stringify(engineCalls.ids.sort()) === JSON.stringify(['5000:Skyrim.esm', '5002:Skyrim.esm']), JSON.stringify(engineCalls.ids));   // verify-formids: ignore - made-up harness doors
+// /property name: the chat road for the native menu's name box, through the housing system's own request
+check('/property name before the housing bridge has request says so', /not in service yet/.test(run(STEWARD, 'name Rose Hall')));
+const named = [];
+globalThis.__dboHousing.request = (a, ref, action, extra) => named.push([a, ref, action, extra && extra.name]);
+const nameOut = run(STEWARD, 'name Rose  Hall');
+check('/property name <name> at the door asks the housing system to rename it, and says nothing itself', named.length === 1 && named[0].join('|') === `${STEWARD}|${DOOR}|rename|Rose Hall` && nameOut === '', JSON.stringify(named) + ' ' + nameOut);
+check('/property name with no name gives the usage', /Usage: \/property name/.test(run(STEWARD, 'name')) && named.length === 1);
+delete globalThis.__dboHousing.request;
+
 // A missing file places no door and refuses politely, with no engine call
 delete globalThis.__dboTenancy;
 fs.rmSync('doors-pos.json');
@@ -168,7 +177,7 @@ const keys = Object.keys(shipped);
 check('doors-pos.json places the 3927 doors the live server places (4059 in doors.json on the 140-plugin order of 16 Oct, less 131 deleted or initially disabled and 177f9c, which no plugin has)', keys.length === 3927, keys.length);
 check('...each one a doors.json door', keys.every((k) => listed.includes(k)));
 const offList = JSON.parse(fs.readFileSync(path.join(home, 'doors-pos.json'), 'utf8')).off || [];
-check('...and the 131 disabled ones listed off, so the background fallback loads nothing on the live server', offList.length === 131 && listed.every((k) => shipped[k] || offList.includes(k) || k === '177f9c:DragonBreak Online Edits.esp'), offList.length);
+check('...and the 131 disabled ones listed off, so the background fallback loads nothing on the live server', offList.length === 131 && listed.every((k) => shipped[k] || offList.includes(k) || k === '177f9c:DragonBreak Online Edits.esp'), offList.length);   // verify-formids: ignore - the doors.json door no plugin has
 check('...each a position and a lower-case <hex>:<plugin> world or cell', keys.every((k) => { const p = shipped[k]; return p.length === 4 && p.slice(0, 3).every(Number.isFinite) && /^[0-9a-f]+:[^A-Z]+\.es[mpl]$/.test(p[3]); }));
 check('...Beasts Maw\'s door stands in BS Heartland, the world players there report', shipped['8aeef:BSHeartland.esm'] && shipped['8aeef:BSHeartland.esm'][3] === 'a764b:bsheartland.esm');
 
