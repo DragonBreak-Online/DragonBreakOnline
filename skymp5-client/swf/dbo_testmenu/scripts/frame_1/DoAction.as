@@ -1,0 +1,225 @@
+// DBO test panel - the hello-world for real Skyrim Scaleform menus (Worker 4, 25 Oct).
+//
+// It answers three things that could not be settled by reading source, in one dev session:
+//   1. does Ui.openCustomMenu work from our client at all (nothing has ever called it);
+//   2. does a $-named font from the player's own gfxfontlib.swf bind inside a CUSTOM menu's movie;
+//   3. does AS2 -> skse.SendModEvent arrive in our client as on('modEvent').
+//
+// Everything is built at runtime, so the SWF carries no shapes, no text assets and no fonts. Every AS2 call
+// used here was verified present in Skyrim's own or an installed menu SWF before it was written:
+//   createEmptyMovieClip, createTextField, TextFormat, setNewTextFormat, onRollOver/onRollOut/onRelease,
+//   beginFill/moveTo/lineTo/endFill. (embedFonts is used by NO installed SWF, so the font is set through
+//   TextFormat.font alone, which is the vanilla pattern.)
+//
+// Built headlessly: ../../build-swf.js -> ffdec -xml2swf then -importScript. Source lives in git; the SWF is
+// ours, not Bethesda-derived, so it may be tracked.
+
+var DBO_EVENT = "dboTestMenu";
+var DBO_SWF_VERSION = "testmenu-1";
+var MENU_NAME = "CustomMenu";
+
+// A $-prefixed name is resolved from the player's own gfxfontlib.swf. Nothing is shipped with this file.
+var FONT = "$EverywhereFont";
+
+var STAGE_W = 1280;
+var PANEL_W = 600;
+var PANEL_H = 440;
+var PAD = 18;
+var ROW_H = 34;
+var ROW_TOP = 74;
+var MAX_ROWS = 9;
+
+var panel;
+var titleTf;
+var statusTf;
+var rowCount = 0;
+
+// skse is installed into every movie by SKSE's InstallHooks, but never assume it: a missing bridge must
+// degrade to a visible message rather than a frozen, modal, game-pausing menu with no way out.
+function haveSkse()
+{
+   return _global.skse != undefined;
+}
+
+function log(msg)
+{
+   if (haveSkse() && _global.skse.Log != undefined)
+   {
+      _global.skse.Log("[dbo] " + msg);
+   }
+}
+
+function send(what, num)
+{
+   if (haveSkse() && _global.skse.SendModEvent != undefined)
+   {
+      _global.skse.SendModEvent(DBO_EVENT, what, num);
+      return true;
+   }
+   return false;
+}
+
+function fmt(size, color, bold)
+{
+   var f = new TextFormat();
+   f.font = FONT;
+   f.size = size;
+   f.color = color;
+   f.bold = bold;
+   return f;
+}
+
+function makeText(parent, name, depth, x, y, w, h, format)
+{
+   parent.createTextField(name, depth, x, y, w, h);
+   var tf = parent[name];
+   tf.selectable = false;
+   tf.multiline = true;
+   tf.wordWrap = true;
+   tf.setNewTextFormat(format);
+   return tf;
+}
+
+function box(clip, w, h, color, alpha)
+{
+   clip.beginFill(color, alpha);
+   clip.moveTo(0, 0);
+   clip.lineTo(w, 0);
+   clip.lineTo(w, h);
+   clip.lineTo(0, h);
+   clip.lineTo(0, 0);
+   clip.endFill();
+}
+
+function clearRows()
+{
+   for (var i = 0; i < rowCount; i++)
+   {
+      panel["row" + i].removeMovieClip();
+   }
+   rowCount = 0;
+}
+
+function addRow(i, label)
+{
+   var c = panel.createEmptyMovieClip("row" + i, 100 + i);
+   c._x = PAD;
+   c._y = ROW_TOP + i * ROW_H;
+   // A filled rect is what makes a MovieClip hit-testable, so the row is both visible and clickable.
+   box(c, PANEL_W - PAD * 2, ROW_H - 4, 0x2E2E2E, 60);
+   var tf = makeText(c, "label", 1, 10, 4, PANEL_W - PAD * 2 - 20, ROW_H - 6, fmt(18, 0xE8E0CC, false));
+   tf.text = label;
+   c.idx = i;
+   c._alpha = 75;
+   c.onRollOver = function()
+   {
+      this._alpha = 100;
+   };
+   c.onRollOut = function()
+   {
+      this._alpha = 75;
+   };
+   c.onRelease = function()
+   {
+      // The index goes in BOTH the string and the number, so the session shows which of the two survives
+      // the trip - strArg and numArg are separate fields all the way to on('modEvent').
+      if (send("row:" + this.idx, this.idx))
+      {
+         statusTf.text = "sent row " + this.idx;
+      }
+      else
+      {
+         statusTf.text = "skse bridge missing - nothing sent";
+      }
+   };
+   rowCount++;
+}
+
+function addCloseRow()
+{
+   var c = panel.createEmptyMovieClip("closeRow", 90);
+   c._x = PAD;
+   c._y = PANEL_H - 44;
+   box(c, PANEL_W - PAD * 2, 30, 0x4A1F1F, 70);
+   var tf = makeText(c, "label", 1, 10, 3, PANEL_W - PAD * 2 - 20, 26, fmt(17, 0xFFD9D9, true));
+   tf.text = "Close";
+   c._alpha = 80;
+   c.onRollOver = function()
+   {
+      this._alpha = 100;
+   };
+   c.onRollOut = function()
+   {
+      this._alpha = 80;
+   };
+   c.onRelease = function()
+   {
+      send("close", -1);
+      // Close from the SWF as well as telling the client. This menu is modal and PAUSES the game, so the
+      // way out must not depend on the client listening, on the server answering, or on input reaching JS.
+      if (haveSkse() && _global.skse.CloseMenu != undefined)
+      {
+         _global.skse.CloseMenu(MENU_NAME);
+      }
+   };
+}
+
+function build()
+{
+   panel = _root.createEmptyMovieClip("dboPanel", 10);
+   panel._x = (STAGE_W - PANEL_W) / 2;
+   panel._y = 140;
+   box(panel, PANEL_W, PANEL_H, 0x0B0B0B, 88);
+
+   titleTf = makeText(panel, "titleTf", 1, PAD, 16, PANEL_W - PAD * 2, 34, fmt(26, 0xFFFFFF, true));
+   titleTf.text = "DBO test panel";
+
+   // Deliberately states the font being asked for: if this line renders in a different face from the rest
+   // of Skyrim, the $-name did not bind in a custom movie and that is the answer to question 2.
+   statusTf = makeText(panel, "statusTf", 2, PAD, 50, PANEL_W - PAD * 2, 22, fmt(15, 0x9AA0A6, false));
+   statusTf.text = "waiting for the server (font: " + FONT + ")";
+
+   addCloseRow();
+}
+
+// ---- the API the client drives through Ui.invoke* / Ui.get* -------------------------------------------------
+
+// Ui.invokeStringA passes an array as SEPARATE arguments, so this reads `arguments`, not a single array.
+_root.dboSetRows = function()
+{
+   clearRows();
+   var n = arguments.length;
+   if (n > MAX_ROWS)
+   {
+      n = MAX_ROWS;
+   }
+   for (var i = 0; i < n; i++)
+   {
+      addRow(i, String(arguments[i]));
+   }
+   statusTf.text = n + " row(s) from the server - click one";
+   log("rows set: " + n);
+};
+
+_root.dboSetTitle = function(s)
+{
+   titleTf.text = String(s);
+};
+
+_root.dboSetStatus = function(s)
+{
+   statusTf.text = String(s);
+};
+
+// Read back with Ui.getBool / Ui.getString: a second, pull-based way to tell whether this SWF is the one
+// loaded, independent of whether any mod event got through.
+_root.dboReady = false;
+_root.dboVersion = DBO_SWF_VERSION;
+
+build();
+_root.dboReady = true;
+
+// The most useful line in the file: it proves the SWF loaded AND that the out-path works, before anybody
+// clicks anything. The client waits for this instead of guessing when the async open has finished.
+log("panel built, version " + DBO_SWF_VERSION);
+send("ready", 0);

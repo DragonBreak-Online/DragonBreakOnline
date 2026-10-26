@@ -1,0 +1,2 @@
+# Built SWFs are artifacts: build them with build-swf.js. Only the source is tracked.
+build/

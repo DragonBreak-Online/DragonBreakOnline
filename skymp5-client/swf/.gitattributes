@@ -1,0 +1,4 @@
+# Pin line endings so a SWF built on Windows hashes the same as one built on Linux: the AS2 source is
+# compiled into the file, so CRLF would change its bytes and break any hash comparison of the artifact.
+*.as text eol=lf
+*.xml text eol=lf
