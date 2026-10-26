@@ -83,5 +83,22 @@ setCaps(B, ['native:decor']);
 openWidget(B, J('stats'));
 ok(last().customPacketType === 'dboWidget', 'a client without native:journal keeps the browser journal', last());
 
+// The deity picker, the rite and the dungeon gate: each native for a client that names it, the rest untouched
+const D = 0xff000004;
+setCaps(D, ['native:deityPicker', 'native:rite']);
+openWidget(D, { type: 'deityPicker', id: 36, nonce: 'd' }, true);
+ok(last().customPacketType === 'dboScaleform' && last().swf === 'dbo_deity' && last().widget === 36, 'a deity picker goes native as dbo_deity', last());
+openWidget(D, { type: 'rite', id: 39, nonce: 'r', mode: 'pick' }, true);
+ok(last().customPacketType === 'dboScaleform' && last().swf === 'dbo_rite', 'a rite goes native as dbo_rite, pick or timed', last());
+openWidget(D, { type: 'dungeonGate', id: 60, nonce: 'g' }, true);
+ok(last().customPacketType === 'dboWidget', 'a client without native:dungeonGate keeps the browser gate', last());
+setCaps(D, ['native:dungeonGate']);
+openWidget(D, { type: 'dungeonGate', id: 60, nonce: 'g' }, true);
+ok(last().customPacketType === 'dboScaleform' && last().swf === 'dbo_dungeon', '...and with it the gate goes native as dbo_dungeon', last());
+closeWidget(D, 60);
+ok(last().customPacketType === 'dboScaleform' && last().close === true, 'the gate closes the custom menu', last());
+openWidget(D, { type: 'contextMenu', id: 70, actions: [] }, true);
+ok(last().customPacketType === 'dboWidget', 'a gameplay context menu stays in the browser (it has no NATIVE_SWF route)', last());
+
 console.log(fails ? `\n${fails} failed` : '\nall passed');
 process.exit(fails ? 1 : 0);
