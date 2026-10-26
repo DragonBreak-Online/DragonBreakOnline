@@ -1817,6 +1817,16 @@
   "_comment": "The F7 Place tab (placement.js); every key defaults in code. worldEdit (worldedit.js): client true = 0.3.102+ clients apply staff edits of plugin-placed objects (hide and move, statics too) from the worldEdits list; resendMs 0 stops the 0.3.101 hide resend. Nate 16 Oct: turn it on. Hot reload.",
   "worldEdit": {"client": true, "resendMs": 0}
  },
+ "decor": {
+  "_comment": "Home decorating (decor.js, decor-catalog.json; Nat approved the design 25 Oct, _work\\home-decorating-design-1025.md on the PC). Players furnish their own homes (housing places) for gathered resources: /decor find, place, list, move, remove, undo, grant, revoke; the Place tool's edit mode aims the piece. costField costB pays today's resources (firewood, ingots, ore, salt, wheat, leather strips); costA once the Hearthfire materials are made by our trades. Budgets by the place's cell count (1, 2, 3+): pieces, lights, workbenches, placed containers. /decor remove deconstructs a piece for the Woodcutter's share (skills.json woodcutter.deconstructShareByTier, 50% Novice to 75% Master, at least 1 of a material that cost 2 or more); abandonRefund: the share back when the owner changes; undo within undoSeconds gives everything back. Every key defaults in decor.js. OFF until tested on dev. ROLLBACK: enabled false (placed pieces stay; nothing is refunded). Hot reload.",
+  "enabled": false,
+  "costField": "costB",
+  "costMultiplier": 1,
+  "budgets": [{"pieces": 40, "lights": 4, "stations": 1, "containers": 6}, {"pieces": 70, "lights": 6, "stations": 2, "containers": 6}, {"pieces": 110, "lights": 8, "stations": 3, "containers": 6}],
+  "cellCap": 150,
+  "abandonRefund": 0.5,
+  "undoSeconds": 60
+ },
  "consoleGate": {
   "_comment": "The ~ console closed for players and open for staff from Trial GM up (gamemode.js ff_console; Jake, 16 Oct). enabled false is the off switch: the next hot reload writes everyone online null and nothing is closed any more. testProfiles: profile ids whose console is closed whatever their rank, to check it in game as staff. A missing key is on.",
   "enabled": true,

@@ -8917,6 +8917,13 @@ try {
   require(PLACEMENT_JS)({ mp, log, personal, audit, who, onUi, sendPacket, isAdmin, tierOf, registerChatCommand, cfg, every, onlineActors });
 } catch (e) { log('placement.js failed to load:', e.stack || e.message); }
 
+// ---- home decorating: players furnish their own homes for gathered resources (server\decor.js, decor-catalog.json, config "decor") ----
+try {
+  const DECOR_JS = path.resolve('decor.js');
+  delete require.cache[DECOR_JS];
+  require(DECOR_JS)({ mp, log, personal, audit, who, onUi, sendPacket, isAdmin, tierOf, registerChatCommand, cfg, every, onlineActors, giveItem, findByName });
+} catch (e) { log('decor.js failed to load:', e.stack || e.message); globalThis.__dboDecorId = null; globalThis.__dboDecorRef = null; }
+
 // ---- breaking free of bound hands, /struggle (server\struggle.js, config "struggle") --------------
 try {
   const STRUGGLE_JS = path.resolve('struggle.js');
