@@ -9207,7 +9207,7 @@ try {
 try {
   const SCALEFORMTEST_JS = path.resolve('scaleformtest.js');
   delete require.cache[SCALEFORMTEST_JS];
-  require(SCALEFORMTEST_JS)({ mp, log, personal, registerChatCommand, sendPacket, who, isAdmin });
+  require(SCALEFORMTEST_JS)({ mp, log, personal, registerChatCommand, sendPacket, who, isAdmin, onUi });
 } catch (e) { log('scaleformtest.js failed to load:', e.stack || e.message); globalThis.__dboScaleformPacket = null; }
 
 // ---- the Great Hunt: werewolf ranks from feeding, hunting and changing (server\greathunt.js) ----------------------
