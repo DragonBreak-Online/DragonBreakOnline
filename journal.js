@@ -406,6 +406,7 @@ module.exports = (api) => {
     if (st.viewOf) { out.readOnly = 1; out.subject = (st.viewOf >>> 0).toString(16); }
     out.opened = st.opened;
     for (const k of ['result', 'resultKind']) if (x[k] !== undefined) out[k] = x[k];
+    if (x.browser || (st.browserTab && st.browserTab === tab)) out.browser = 1;
     return out;
   };
   // focus only on opening: a redraw is data only and never moves the keyboard (the relay's refresh)
@@ -522,15 +523,19 @@ module.exports = (api) => {
     if (!st || !st.hub) return;
     const tab = String((args || [])[1] || '');
     const focus = (args || [])[2];
+    // 'browser': the native journal hands this tab's typed input to the browser journal (gamemode.js openWidget), until the
+    // action is answered or the tab changes; a module's redraw meanwhile stays in the browser
+    const browser = (args || [])[3] === 'browser';
     if (!tabOk(a, tab, st.viewOf || a)) { draw(a, st, {}, false); return; }
     // A scripted flood gets one answer per gap, the latest one
     const run = () => {
       const s2 = J.open.get(id);
       if (!s2) return;
       s2.tab = tab;
+      s2.browserTab = browser ? tab : null;
       if (!s2.viewOf) J.lastTab.set(id, tab);
       J.tabAt.set(id, Date.now());
-      draw(a, s2, { tab, focus: focus && typeof focus === 'object' ? focus : undefined }, false);
+      draw(a, s2, { tab, focus: focus && typeof focus === 'object' ? focus : undefined, browser }, false);
     };
     const wait = TAB_GAP_MS - (Date.now() - (J.tabAt.get(id) || 0));
     if (wait <= 0) return run();
@@ -542,7 +547,7 @@ module.exports = (api) => {
   // ---- the profile ------------------------------------------------------------------------------------------------
   // Newlines stay; every other control character goes
   const clean = (v, max) => String(v === undefined || v === null ? '' : v).replace(/\r\n?/g, '\n').replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, '').slice(0, max);
-  const answer = (a, st, text, kind) => { st.nonce = mkNonce(a); draw(a, st, { result: text, resultKind: kind }, false); };
+  const answer = (a, st, text, kind) => { st.nonce = mkNonce(a); st.browserTab = null; draw(a, st, { result: text, resultKind: kind }, false); };
   // One answer every saveEveryMs per player, whatever it says: a request inside the window is kept, the latest one wins,
   // and it is answered when the window ends, so a scripted client gets one redraw per window and a real one still gets
   // its answer (the front waits for a new nonce)
