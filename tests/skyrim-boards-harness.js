@@ -23,6 +23,9 @@ fs.writeFileSync('expeditions.json', JSON.stringify({ expeditions: [{ id: 'CYRNi
   entrances: [{ expedition: true, cell: SYNOD, pos: [0, 0, 0], rot: [0, 0, 0], doorPos: [0, 0, 0], insideDesc: 'ef1ad:BSHeartland.esm', insideCell: RUIN, insidePos: [0, 0, 0], insideRot: [0, 0, 0] }] }] }));
 const props = new Map();
 const put = (id, k, v) => props.set(`${id >>> 0}|${k}`, v);
+// The real base of every board, Nat's new ones included: DragonBreak.esp 000006, "Noticeboard" in DragonBreak.esp but
+// ExpeditionBoard in its winning override (DragonBreak Online Edits.esp), which is what the server reads. The town notice
+// boards are other bases (manny_up_NoticeBoardActivator, OBS_*, RP_NoticeBoard: notice-board-spots.json)
 for (const b of [SKY_BOARD, SKY_BOARD2, SYNOD_BOARD]) put(b, 'baseDesc', '6:DragonBreak.esp');
 put(SKY_BOARD, 'worldOrCellDesc', WHITERUN); put(SKY_BOARD2, 'worldOrCellDesc', TAMRIEL); put(SYNOD_BOARD, 'worldOrCellDesc', SYNOD);
 const descOf = (id) => ((id >>> 24) === 0x4a ? `${(id & 0xffffff).toString(16)}:DragonBreak Strongholds Fix.esp` : `${(id >>> 0).toString(16)}:Skyrim.esm`);
