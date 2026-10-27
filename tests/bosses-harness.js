@@ -352,5 +352,20 @@ Date.now = realNow; Math.random = realRandom;
   const bsrc = fs.readFileSync(path.join(ROOT, 'bosses.js'), 'utf8');
   ok(/sweep\(\); \} catch[\s\S]{0,80}sendLabels\(\)/.test(bsrc), 'the boss timer sends the labels after each sweep');
 }
+// ---- one side: a boss, its guardian and its adds never hurt each other (the Valkynaz, 27 Oct) ----
+{
+  load({});
+  const BOSS = 0xff00217e, GUARD = 0xff00217f, ADD = 0xff002182, OTHER = 0xff002190, WILD = 0xff002191;
+  put(BOSS, 'private.npcSpawner', 'boss:valkynaz:boss'); put(GUARD, 'private.npcSpawner', 'boss:valkynaz:guardian'); put(ADD, 'private.npcSpawner', 'boss:valkynaz:open1');
+  put(OTHER, 'private.npcSpawner', 'boss:icecap:boss'); put(WILD, 'private.npcSpawner', 'wild:wolf:588');
+  const allies = globalThis.__dboBossAllies;
+  ok(typeof allies === 'function' && allies(GUARD, BOSS) && allies(ADD, BOSS) && allies(BOSS, GUARD) && allies(BOSS, ADD), 'the Valkynaz, its High Clannfear guardian and its scamp are one side (the guardian\'s power attack felled it, 15:14:08)');
+  ok(allies(GUARD, ADD), '...and the guardian and the adds too');
+  ok(!allies(BOSS, P1) && !allies(P1, BOSS), 'a player is never its ally');
+  ok(!allies(BOSS, OTHER) && !allies(WILD, BOSS), 'another boss\'s fight or a wolf is not');
+  const g = fs.readFileSync(path.join(ROOT, 'gamemode.js'), 'utf8');
+  const da = g.slice(g.indexOf('const dungeonAllies = '), g.indexOf('const dungeonAllies = ') + 900);
+  ok(/globalThis\.__dboBossAllies\(a, b\)\) return true;/.test(da) && da.indexOf('profileOf(a) >= 0') < da.indexOf('__dboBossAllies'), 'gamemode.js dungeonAllies asks it, after its no-player rule, so the hit is refused before damage (2c)');
+}
 console.log(fails ? `${fails} FAILED` : 'all checks passed');
 process.exit(fails ? 1 : 0);
