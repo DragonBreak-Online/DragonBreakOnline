@@ -21,6 +21,29 @@ espm::ActorValue ConvertToAV(CIString actorValueName)
   if (!actorValueName.compare("magicka")) {
     return espm::ActorValue::Magicka;
   }
+  // The regeneration values. These were missing, which is why SetActorValue
+  // could not reach the server's copy of them even once it tried to: the
+  // gameplay layer sends "HealRateMult" and "StaminaRateMult" for hunger and
+  // the blessings, and both resolved to None here. CIString compares without
+  // case, and compare() is exact, so "healrate" does not catch "health".
+  if (!actorValueName.compare("healrate")) {
+    return espm::ActorValue::HealRate;
+  }
+  if (!actorValueName.compare("magickarate")) {
+    return espm::ActorValue::MagickaRate;
+  }
+  if (!actorValueName.compare("staminarate")) {
+    return espm::ActorValue::StaminaRate;
+  }
+  if (!actorValueName.compare("healratemult")) {
+    return espm::ActorValue::HealRateMult_or_CombatHealthRegenMultMod;
+  }
+  if (!actorValueName.compare("magickaratemult")) {
+    return espm::ActorValue::MagickaRateMult_or_CombatHealthRegenMultPowerMod;
+  }
+  if (!actorValueName.compare("staminaratemult")) {
+    return espm::ActorValue::StaminaRateMult;
+  }
   return espm::ActorValue::None;
 }
 }
@@ -87,11 +110,28 @@ VarValue PapyrusActor::SetActorValue(VarValue self,
 {
   if (auto actor = GetFormPtr<MpActor>(self)) {
 
-    // TODO: fix that at least for important AVs like attributes
-    // SpSnippet impl helps scripted draugrs attack, nothing more (Aggression
-    // var)
-    spdlog::warn("SetActorValue executes locally at this moment. Results will "
-                 "not affect server calculations");
+    // Apply to the server's own copy first, for the values it models. Without
+    // this the write reached the client alone, and CropRegeneration then built
+    // its ceiling from the server's stale rate and clawed back every tick the
+    // client regenerated above it - the bigger the blessing or the enchantment,
+    // the worse the regeneration got. The call reports whether it modelled the
+    // value, so the warning below is kept for the ones it genuinely cannot.
+    bool appliedOnServer = false;
+    if (arguments.size() >= 2) {
+      const espm::ActorValue av =
+        ConvertToAV(static_cast<const char*>(arguments[0]));
+      if (av != espm::ActorValue::None) {
+        const float value = static_cast<double>(arguments[1]);
+        appliedOnServer = actor->SetActorValue(av, value);
+      }
+    }
+
+    if (!appliedOnServer) {
+      // Aggression, SpeedMult and the other client-side values still go out as
+      // a snippet and nothing else; that is what makes scripted draugr attack.
+      spdlog::warn("SetActorValue executes locally at this moment. Results will "
+                   "not affect server calculations");
+    }
 
     auto it = actor->GetParent()->hosters.find(actor->GetFormId());
 

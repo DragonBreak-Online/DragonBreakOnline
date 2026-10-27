@@ -179,7 +179,11 @@ public:
 
   void RestoreActorValue(espm::ActorValue av, float value);
   void DamageActorValue(espm::ActorValue av, float value);
-  void SetActorValue(espm::ActorValue actorValue, float value);
+  // Returns false for an actor value the server does not model, having changed
+  // nothing. The switch inside is the only list of what the server keeps, so a
+  // caller that needs to know asks here instead of holding a second copy that
+  // can drift out of step with it.
+  bool SetActorValue(espm::ActorValue actorValue, float value);
 
   // TODO: only used in legacy MGEF implementation, remove when MGEF is
   // rewritten

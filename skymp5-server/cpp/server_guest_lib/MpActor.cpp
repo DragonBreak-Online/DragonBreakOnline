@@ -2273,7 +2273,7 @@ NiPoint3 MpActor::GetViewDirection() const
            std::cos(GetAngle().z * kAngleToRadians), 0 };
 }
 
-void MpActor::SetActorValue(espm::ActorValue actorValue, float value)
+bool MpActor::SetActorValue(espm::ActorValue actorValue, float value)
 {
   ActorValues currentActorValues = GetChangeForm().actorValues;
   switch (actorValue) {
@@ -2305,7 +2305,10 @@ void MpActor::SetActorValue(espm::ActorValue actorValue, float value)
       currentActorValues.magickaRateMult = value;
       break;
     default:
-      break;
+      // Not modelled here: Aggression, SpeedMult and the rest are client-side
+      // only. Say so rather than silently doing nothing, so the Papyrus shim can
+      // warn for those and stay quiet for the ones that did apply.
+      return false;
   }
 
   std::vector<espm::ActorValue> avFilter = { actorValue };
@@ -2313,6 +2316,7 @@ void MpActor::SetActorValue(espm::ActorValue actorValue, float value)
   EditChangeForm([&](MpChangeForm& changeForm) {
     changeForm.actorValues = currentActorValues;
   });
+  return true;
 }
 
 // TODO: only used in legacy MGEF implementation, remove when MGEF is rewritten
