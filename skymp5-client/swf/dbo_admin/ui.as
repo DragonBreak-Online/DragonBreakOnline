@@ -47,7 +47,17 @@ function req(type, fields)
 }
 
 // The rows each list has room for, by tab or tab:view; the service pages by it (adminNativeView rowsOf)
-var ROWS_FOR = {"players": 6, "players:roster": 6, "items": 6, "teleport": 8, "enchant": 5, "thievery:ledger": 5};
+var ROWS_FOR = {};
+ROWS_FOR["players"] = 6;
+ROWS_FOR["players:roster"] = 6;
+ROWS_FOR["items"] = 6;
+ROWS_FOR["teleport"] = 8;
+ROWS_FOR["enchant"] = 5;
+ROWS_FOR["thievery:ledger"] = 5;
+ROWS_FOR["place"] = 8;
+ROWS_FOR["place:warband"] = 6;
+ROWS_FOR["place:placed"] = 8;
+ROWS_FOR["place:sets"] = 8;
 
 function rowsFor(tab, sub)
 {

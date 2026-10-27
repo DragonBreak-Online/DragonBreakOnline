@@ -333,6 +333,14 @@ keys.onKeyDown = function()
          draw();
          return;
       }
+      // a tab's own overlay (a mod picker, a settle plan) closes before the panel does
+      var et = tabOf(ui.tab);
+      if (et != null && et.escape != undefined && et.escape() == true)
+      {
+         dboSound("UIMenuCancel");
+         draw();
+         return;
+      }
       closeAdmin();
       return;
    }

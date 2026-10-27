@@ -317,7 +317,7 @@ TABS.thievery = {
       }
       subs.push(["raids", "Raids (" + D.counts.raids + ")"]);
       subs.push(["ledger", "Stolen ledger (" + D.counts.ledger + ")"]);
-      subs.push(["permits", "Permits (" + (D.permits instanceof Array ? D.permits.length : "") + ")"]);
+      subs.push(["permits", "Permits (" + D.counts.permits + ")"]);
       subs.push(["breaches", "At locks & breaches"]);
       var sub = str(D.sub);
       var cy = chips(c, "sub", 2, x, y, x + w, subs, sub, function()

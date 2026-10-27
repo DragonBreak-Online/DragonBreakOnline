@@ -124,6 +124,47 @@ const SETUPS = [
   ['decor', { swf: 'dbo_decor', drive: (t) => t.push(decor) }],
   ['prayer', { swf: 'dbo_prayer', drive: (t) => t.push(prayer) }],
 ];
+// The admin panel's scenes, each tab and view with the harness's data, answered by the real view builder
+const A = (() => { try { return require('./native-admin-fixture'); } catch (e) { return null; } })();
+const adminScene = (data, go) => ({ swf: 'dbo_admin', drive: (t) => { A.wire(t, A.panel(data)); if (go) go(t, A.P(t), () => A.B(t)); } });
+const tab = (n) => (t, P) => { P.rail['t' + n].onRelease(); t.serve(); };
+const then = (...fs) => (t, P, B) => { for (const f of fs) f(t, P, B); };
+const tap = (name) => (t, P, B) => { B()[name].onRelease(); t.serve(); };
+const feed = (f) => (t, P, B) => { f(t.adm); t.refresh(); };
+const BEASTS = A && A.ROSTER.map((p, i) => (i === 1 ? Object.assign({}, p, { b: { werewolf: true, vampirelord: true, form: 'fox', creature: true, since: Date.now() - 180000 } }) : p));
+const PLACEMENTS = { here: 9, total: 30, items: Array.from({ length: 9 }, (_, i) => ({ id: 'p' + i, base: 'Skyrim.esm:' + i, name: 'Bandit Marauder Chieftain ' + i, kind: i % 2 ? 'npc' : 'obj', hostile: true, dist: i * 7, mine: i !== 3, group: 'Bandit camp near the Bruma gate#' + i, pos: [1, 2, 3], rot: [0, 0, 0] })) };
+const WB_FULL = A && Object.assign({}, A.WB, { members: Array.from({ length: 7 }, (_, i) => ({ id: 'm' + i, name: 'Bandit Marauder ' + i, alive: i !== 4, dist: i === 5 ? null : 3 + i, fighting: i === 1, health: 60 + i, state: i === 1 ? 'fighting' : '', target: i === 1 ? 'Troll' : '' })),
+  players: [{ id: 'a', name: 'Brienne of Bruma', dist: 10 }, { id: 'b', name: 'Cassius', dist: 40 }], npcs: [{ id: 'n1', name: 'Orc Warlord', gm: 'kim', foe: true, dist: 20 }, { id: 'n2', name: 'Legion Soldier', gm: 'jo', foe: false, dist: 33 }],
+  foes: [{ id: 'f', name: 'Troll', dist: 12 }], side: 'Legion', enemies: ['kim'], presets: Array.from({ length: 5 }, (_, i) => ({ name: 'Saved band ' + i, count: 3 + i })) });
+const ADMIN_SETUPS = !A ? [] : [
+  ['admin-debug', adminScene({})],
+  ['admin-players-roster', adminScene({ players: A.ROSTER, me: { a: 'ff00012a' } }, then(tab(1)))],
+  ['admin-players-punish', adminScene({ players: A.ROSTER, bans: [{ id: 'b1', profileId: 99, name: 'Griefer', ip: '1.2.3.4', until: Date.now() + 86400000, reason: '', by: 'nat', at: 0 }], me: { a: 'ff00012a' } }, then(tab(1), (t) => { t.press(51); t.serve(); }, tap('sub1')))],
+  ['admin-players-care', adminScene({ players: A.ROSTER, me: { a: 'ff00012a' }, masteryTarget: A.MASTERY_T('') }, then(tab(1), tap('sub2')))],
+  ['admin-players-mastery', adminScene({ players: A.ROSTER, me: { a: 'ff00012a' }, masteryTarget: A.MASTERY_T(''), mastery: { profession: null, label: '', rank: 0, rankName: '', hours: 2 } }, then(tab(1), tap('sub3')))],
+  ['admin-picker', adminScene({ players: A.ROSTER }, then(tab(4), tap('change')))],
+  ['admin-gmcalls', adminScene({}, then(tab(2), feed((s) => { s.staff[140] = A.GMCALLS; s.staffAt[140] = Date.now(); })))],
+  ...[0, 1, 2, 3, 4, 5].map((n) => ['admin-thievery-' + n, adminScene({}, then(tab(3), feed((s) => { s.staff[162] = A.THIEF; s.staffAt[162] = Date.now(); }), tap('sub' + n)))]),
+  ['admin-skills', adminScene({ players: A.ROSTER, masteryTarget: A.MASTERY_T('') }, then(tab(4)))],
+  ['admin-items', adminScene({ players: A.ROSTER }, then(tab(5), feed((s) => { s.cats.items = A.ITEMS; }), tap('cat1'), tap('r0')))],
+  ['admin-items-mods', adminScene({ players: A.ROSTER }, then(tab(5), feed((s) => { s.cats.items = A.ITEMS; }), tap('mod')))],
+  ['admin-enchant', adminScene({ players: A.ROSTER }, then(tab(6), feed((s) => { s.staff[141] = A.ENCH_CAT; s.staff[142] = A.ENCH_PACK(''); }), tap('piece0'), tap('r0')))],
+  ['admin-powers', adminScene({ players: BEASTS, me: { a: 'ff00012a', b: { werewolf: true, vampirelord: true, form: null } }, polymorph: { on: true, setBy: 'admin', forms: [{ key: 'fox', name: 'Fox' }, { key: 'chicken', name: 'Chicken' }, { key: 'mudcrab', name: 'Mudcrab' }] } }, then(tab(7)))],
+  ['admin-teleport', adminScene({}, then(tab(8), feed((s) => { s.cats.locations = A.LOCS; })))],
+  ['admin-place-catalog', adminScene({ placeMeta: A.PMETA, placeResults: { query: '', category: 'npc:bandit', plugin: '', offset: 0, total: 140, items: A.pitems(100, 0) } }, then(tab(9), tap('r0')))],
+  ['admin-place-placed', adminScene({ placeMeta: A.PMETA, placements: PLACEMENTS }, then(tab(9), tap('view1'), tap('r0')))],
+  ['admin-place-sets', adminScene({ placeMeta: A.PMETA, placeSets: Array.from({ length: 12 }, (_, i) => ({ name: 'Bandit camp set ' + i, count: i + 2 })) }, then(tab(9), tap('view2'), tap('r0')))],
+  ['admin-warband-raise', adminScene({ placeMeta: A.PMETA, warband: WB_FULL, placeResults: { query: '', category: 'npc:bandit', plugin: '', offset: 0, total: 140, items: A.pitems(30, 0) } }, then(tab(9), tap('view3'), tap('r0')))],
+  ['admin-warband-band', adminScene({ placeMeta: A.PMETA, warband: WB_FULL }, then(tab(9), tap('view3'), tap('wsub1')))],
+  ['admin-warband-settle', adminScene({ placeMeta: A.PMETA, warband: Object.assign({}, WB_FULL, { plan: { calm: 4, kept: 'Wolf, Bear, Sabre Cat', unread: 'Draugr' } }) }, then(tab(9), tap('view3'), tap('wsub1'), tap('settle')))],
+  ['admin-warband-sides', adminScene({ placeMeta: A.PMETA, warband: WB_FULL }, then(tab(9), tap('view3'), tap('wsub2')))],
+  ['admin-warband-raiders', adminScene({ placeMeta: A.PMETA, warband: Object.assign({}, WB_FULL, { placed: Array.from({ length: 9 }, (_, i) => ({ id: 'r' + i, name: 'Raider ' + i, hostile: i % 2 === 0, alive: i !== 2, dist: i * 9 })) }) }, then(tab(9), tap('view3'), tap('wsub3')))],
+  ['admin-modes', adminScene({}, then(tab(10)))],
+  ['admin-npcs', adminScene({}, then(tab(11)))],
+  ['admin-npcs-add', adminScene({}, then(tab(11), tap('subAdd')))],
+];
+SETUPS.push(...ADMIN_SETUPS);
+
 // Where each visible text actually sits on the stage: its field's box narrowed to the estimated width of its words by its
 // alignment (single lines), or the field's box (wrapped text), so two texts that touch can be found without a renderer
 const textBoxes = (root) => {

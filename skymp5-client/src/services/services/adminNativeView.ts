@@ -48,6 +48,8 @@ export interface AdminUi {
 export interface AdminCatalogs {
   items: Array<{ id: string; label: string; items: Array<[string, string, string?]> }> | null;
   locations: Array<{ name: string; region: string; worldName: string }> | null;
+  // what this session spawned and teleported to, newest first (the browser keeps these in its storage; the native panel in the service)
+  recent?: { items: string[]; teleport: string[] };
 }
 
 // ---- the browser's fuzzy search (skymp5-front components/SearchBar/fuzzy.ts), so a search ranks the same in both ----
@@ -200,7 +202,9 @@ const itemsView = (cats: AdminCatalogs, ui: AdminUi) => {
   const q = str(ui.q, 60).trim();
   const cat = str(ui.cat, 40);
   const matches = fuzzyFilter(index.filter((r) => !mod || r.plugin === mod), q, (r) => r.hay);
-  const rows = cat ? matches.filter((r) => r.cat === cat) : q ? matches : [];
+  // with no search and no category the browser shows the recent ones; so does this
+  const recent = !q && !cat ? arr<string>(cats.recent && cats.recent.items).map((d) => index.find((r) => r.desc === d && (!mod || r.plugin === mod))).filter((r): r is typeof index[number] => !!r) : [];
+  const rows = cat ? matches.filter((r) => r.cat === cat) : q ? matches : recent;
   const counts: Record<string, number> = {};
   for (const r of matches) counts[r.cat] = (counts[r.cat] || 0) + 1;
   const pg = pageOf(rows, ui.page, rowsOf(ui));
@@ -210,9 +214,11 @@ const itemsView = (cats: AdminCatalogs, ui: AdminUi) => {
     plugins: Object.keys(plugins).sort((a, b) => a.localeCompare(b)).map((p) => ({ id: p, label: plugin(p) })),
     rows: pg.rows.map((r) => ({ desc: r.desc, name: r.name, cat: r.catLabel, plugin: plugin(r.plugin) })),
     page: pg.page, pages: pg.pages, total: pg.total, hint: !rows.length ? (q || cat ? "No items" : "Type to search, or pick a category") : "",
+    recent: recent.length > 0,
   };
 };
 
+const RECENT = "~recent";
 const teleportView = (cats: AdminCatalogs, ui: AdminUi) => {
   if (!cats.locations) return { loading: true };
   const q = str(ui.q, 60).trim();
@@ -221,19 +227,21 @@ const teleportView = (cats: AdminCatalogs, ui: AdminUi) => {
   for (const l of matches) counts[l.region] = (counts[l.region] || 0) + 1;
   const regions = REGIONS.filter((r) => counts[r]).concat(Object.keys(counts).filter((r) => REGIONS.indexOf(r) === -1).sort());
   // As the browser: typing searches every region; with no text a region is always open
+  // Recent: the places teleported to this session, as the browser's Recent row
+  const recent = arr<string>(cats.recent && cats.recent.teleport).map((n) => cats.locations!.find((l) => l.name === n)).filter((l): l is { name: string; region: string; worldName: string } => !!l);
   let region = ui.region === undefined ? "Cyrodiil" : str(ui.region, 40);
-  if (!q && (!region || !counts[region])) region = regions[0] || "";
-  const inScope = region ? matches.filter((l) => l.region === region) : matches;
+  if (!q && (!region || (!counts[region] && !(region === RECENT && recent.length)))) region = regions[0] || "";
+  const inScope = region === RECENT ? recent : region ? matches.filter((l) => l.region === region) : matches;
   const wc: Record<string, number> = {};
   for (const l of inScope) wc[l.worldName || "-"] = (wc[l.worldName || "-"] || 0) + 1;
   const worlds = Object.keys(wc).sort((a, b) => wc[b] - wc[a] || a.localeCompare(b)).map((w) => ({ w, n: wc[w] }));
   const world = worlds.some((x) => x.w === ui.world) ? str(ui.world, 80) : "";
   const list = world ? inScope.filter((l) => (l.worldName || "-") === world) : inScope;
-  const rows = q ? list : list.slice().sort((a, b) => a.name.localeCompare(b.name));
+  const rows = q || region === RECENT ? list : list.slice().sort((a, b) => a.name.localeCompare(b.name));
   const pg = pageOf(rows, ui.page, rowsOf(ui));
   return {
     region, world,
-    chips: (q ? [{ id: "", label: "All", count: matches.length }] : []).concat(regions.map((r) => ({ id: r, label: r, count: counts[r] || 0 }))),
+    chips: (q ? [{ id: "", label: "All", count: matches.length }] : recent.length ? [{ id: RECENT, label: "Recent", count: recent.length }] : []).concat(regions.map((r) => ({ id: r, label: r, count: counts[r] || 0 }))),
     worlds: worlds.length > 1 ? [{ w: "", n: inScope.length }].concat(worlds) : [],
     rows: pg.rows.map((l) => ({ name: str(l.name), where: (q ? l.region + " - " : "") + str(l.worldName) })),
     page: pg.page, pages: pg.pages, total: pg.total,
@@ -270,7 +278,7 @@ const placeView = (data: any, ui: AdminUi) => {
       const items = arr<any>(r.items).filter((it) => sub === "catalog" || it[4] === "npc");
       const pg = pageOf(items, ui.page, rowsOf(ui));
       out.results = {
-        query: str(r.query, 60), category: str(r.category, 40), plugin: str(r.plugin, 80), total: num(r.total), loaded: items.length,
+        query: str(r.query, 60), category: str(r.category, 40), plugin: str(r.plugin, 80), total: num(r.total), loaded: items.length, offset: arr<any>(r.items).length,
         rows: pg.rows.map((it) => ({ desc: str(it[0], 40), name: str(it[1]), plugin: plugin(str(it[2])), cat: str(it[3], 40), kind: str(it[4], 8) })),
         page: pg.page, pages: pg.pages,
       };
@@ -380,7 +388,7 @@ const thieveryView = (staff: Record<number, any>, at: Record<number, number>, ui
   const out: any = {
     sub, serverNow, enabled: !!d.enabled, lead: !!d.lead, gm: !!d.gm,
     armed: d.armed ? { kind: str(d.armed.kind, 12), name: str(d.armed.name), until: num(d.armed.until) } : null,
-    counts: { factions: arr(d.factions).length, raids: open.length, ledger: num(d.stolenTotal), permits: arr(d.permits).length + arr(d.breaches).length + arr(d.working).length },
+    counts: { factions: arr(d.factions).length, raids: open.length, ledger: num(d.stolenTotal), permits: arr(d.permits).length },
     result: d.result && serverNow - num(d.result.at) < 60000 ? { ok: !!d.result.ok, text: str(d.result.text, 200) } : null,
   };
   if (sub === "factions" || sub === "approve") {

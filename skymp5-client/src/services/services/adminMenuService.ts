@@ -513,6 +513,7 @@ export class AdminMenuService extends ClientListener {
       return;
     }
     if (kind === events.tpLoc) {
+      this.remember("teleport", String(a[1] ?? ""));
       sendCustomPacket(this.controller, { customPacketType: "adminAction", action: "teleportLoc", target: String(a[1] ?? "") });
       return;
     }
@@ -526,6 +527,7 @@ export class AdminMenuService extends ClientListener {
       try { fields = JSON.parse(String(a[2] ?? "{}")) || {}; } catch { fields = {}; }
       const action = String(a[1] ?? "");
       sendCustomPacket(this.controller, Object.assign({}, fields, { customPacketType: "adminAction", action }));
+      if (action === "giveItem") this.remember("items", String(fields["item"] ?? ""));
       if (["kill", "deleteCharacter", "ipBan", "tempBan", "unban"].indexOf(action) !== -1) {
         sendCustomPacket(this.controller, { customPacketType: "adminMenuRequest" });
       }
@@ -645,7 +647,15 @@ export class AdminMenuService extends ClientListener {
   private menuOpen = false;
   private native = false;
   // For the native panel: the catalogs, the gamemode's staff widgets, and what the panel shows
-  private catalogs: AdminCatalogs = { items: null, locations: null };
+  private catalogs: AdminCatalogs = { items: null, locations: null, recent: { items: [], teleport: [] } };
+
+  // The native panel's Recent lists (the browser keeps its own in its storage): this game session only, newest first
+  private remember(list: "items" | "teleport", id: string): void {
+    if (!id || !this.catalogs.recent) return;
+    const l = this.catalogs.recent[list].filter((x) => x !== id);
+    l.unshift(id);
+    this.catalogs.recent[list] = l.slice(0, 8);
+  }
   private staff: Record<number, unknown> = {};
   private staffAt: Record<number, number> = {};
   private ui: AdminUi = {};

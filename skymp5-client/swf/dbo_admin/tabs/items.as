@@ -56,6 +56,12 @@ function drawModPicker(c, x, y, w, I)
 }
 
 TABS.items = {
+   escape: function()
+   {
+      var was = itemsLocal.modPicking;
+      itemsLocal.modPicking = false;
+      return was;
+   },
    open: function()
    {
       if (data.items == undefined || data.items.loading == true)
@@ -102,6 +108,11 @@ TABS.items = {
          setUi("cat", this.key);
       });
       var rows = I.rows instanceof Array ? I.rows : [];
+      if (I.recent == true)
+      {
+         hint(c, "recentHead", 61, x, cy + 2, w, "Spawned lately (type to search, or pick a category)");
+         cy += 26;
+      }
       if (!rows.length)
       {
          empty(c, "none", 60, x, cy + 6, w, str(I.hint) != "" ? I.hint : "No items");

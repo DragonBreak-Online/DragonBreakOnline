@@ -3,75 +3,13 @@
 // are tested together, and every other key is recorded as the browser panel would have sent it.
 //   node tests/native-admin-harness.js [path to a compiled adminNativeView.js]
 'use strict';
-const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const S = require('./native-swf-stub');
+// the fixture compiles adminNativeView.ts itself unless a build is given
+if (process.argv[2]) process.env.ADMIN_VIEW_JS = path.resolve(process.argv[2]);
 const T = S.checker();
 const check = T.check;
-
-// adminNativeView.ts, compiled here unless a build is given
-const viewJs = (() => {
-  if (process.argv[2]) return path.resolve(process.argv[2]);
-  const ts = require(path.resolve(__dirname, '../node_modules/typescript'));
-  const src = fs.readFileSync(path.resolve(__dirname, '../src/services/services/adminNativeView.ts'), 'utf8');
-  const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'admin-view-')), 'adminNativeView.js');
-  fs.writeFileSync(out, ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019 } }).outputText);
-  return out;
-})();
-const V = require(viewJs);
-
-const EVENTS = {
-  tp: 'admin::tp', summon: 'admin::summon', kick: 'admin::kick', ban: 'admin::ban', tpLoc: 'admin::tploc', mode: 'admin::mode', refresh: 'admin::refresh',
-  debugRefresh: 'admin::debugrefresh', close: 'admin::close', npcList: 'admin::npclist', npcAdd: 'admin::npcadd', npcTp: 'admin::npctp', npcReset: 'admin::npcreset',
-  npcDelete: 'admin::npcdelete', masteryGrant: 'admin::masterygrant', masteryReset: 'admin::masteryreset', action: 'admin::action', request: 'admin::request',
-};
-const DEBUG = {
-  account: 'nat', character: 'Aela', formId: 'ff00012a', actorId: 'ff00012a', profileId: 7, server: { name: 'DragonBreak', offsetMs: 0, tzOffsetMin: 0 },
-  pos: [1000.4, -2000.6, 300], cell: { id: '3c', name: 'Bruma', interior: false, world: 'Cyrodiil', location: '' }, heading: { deg: 91, compass: 'E' },
-  target: { name: 'Door', id: '1a2b', dist: 120 }, av: { health: [100, 120], magicka: [50, 80], stamina: [90, 90] },
-  gameTime: { hour: 13.5, day: 3, month: 7, year: 201, weekday: 2 }, hoursOffset: 0, localTime: Date.now(),
-  effects: [{ id: 'abc', name: 'Fortify Health', elapsedSec: 65 }], updatedAt: Date.now(),
-};
-const ZONES = Array.from({ length: 12 }, (_, i) => ({ name: 'Zone ' + i, active: i % 2 === 0, alive: 2, total: 4, inside: 0, readyInSec: i === 3 ? -1 : i === 5 ? 90 : 0 }));
-const panel = (o) => Object.assign({
-  admin: true, debug: DEBUG, players: [], locations: [], modes: [{ id: 'invisible', label: 'Invisible', active: true }, { id: 'ghost', label: 'Ghost', active: false }],
-  npcZones: ZONES, npcZonesAt: Date.now(), caps: { ban: true, del: true, spawn: true }, tier: 'senior', mastery: null, bans: [], events: EVENTS,
-}, o || {});
-
-// A panel wired to the view builder: boot it, push the first view, and answer every admin::ui from then on
-const open = (data, extra) => {
-  const t = S.boot('dbo_admin', false, extra);
-  const st = { data, cats: { items: null, locations: null }, staff: {}, staffAt: {}, ui: {}, seen: 0, views: [] };
-  t.view = () => V.adminNativeView(st.data, st.cats, st.staff, st.staffAt, st.ui, 23);
-  t.serve = () => {
-    for (;;) {
-      const m = t.msgs();
-      if (st.seen >= m.length) break;
-      const next = m.slice(st.seen); st.seen = m.length;
-      let pushed = false;
-      for (const x of next) if (x.key === 'admin::ui') { st.ui = JSON.parse(x.args[0]); pushed = true; }
-      if (pushed) { const v = t.view(); st.views.push(v); t.push(v); }
-    }
-  };
-  t.refresh = () => { const v = t.view(); st.views.push(v); t.push(v); t.serve(); };
-  t.st = st;
-  t.refresh();
-  return t;
-};
-const P = (t) => t.root.dboPanel;
-const B = (t) => P(t).body;
-const sentOf = (t, key) => t.msgs().filter((m) => m.key === key);
-const click = (t, c) => { c.onRelease(); t.serve(); };
-const kids = (c, re) => Object.keys(c.kids).filter((n) => re.test(n)).map((n) => c[n]);
-const railLabels = (t) => kids(P(t).rail, /^t\d+$/).map((b) => b.label.text);
-const typeInto = (t, fieldClip, text, keep) => {
-  click(t, fieldClip);
-  const name = fieldClip._name;
-  const box = B(t)[name];
-  box.text = text; box.onChanged();
-  t.press(keep === false ? 27 : 13); t.serve();
-};
+const { EVENTS, DEBUG, ZONES, panel, open, P, B, sentOf, click, kids, railLabels, typeInto, ROSTER, MASTERY_T, ITEMS, LOCS, ENCH_CAT, ENCH_PACK, now0, GMCALLS, THIEF, PMETA, pitems, preq, WB } = require('./native-admin-fixture');
 
 // ---- the frame ----
 {
@@ -154,13 +92,6 @@ const typeInto = (t, fieldClip, text, keep) => {
 }
 
 // ---- Players ----
-const ROSTER = Array.from({ length: 14 }, (_, i) => ({
-  a: i < 10 ? (0xff000100 + i).toString(16) : undefined, p: 100 + i, n: 'Player ' + i, t: 'T' + i, d: '9' + i, dn: 'disc' + i, ip: '1.2.x.x', hwid: 'hw' + i,
-  online: i < 10, ping: i < 10 ? 40 + i : null, m: { profession: i === 2 ? 'smith' : null, label: 'Smith', rank: 1, rankName: 'Apprentice', hours: 3 },
-}));
-const MASTERY_T = (target) => ({ name: 'Player 2', target, detail: { skills: [{ id: 'smith', label: 'Smithing', chosen: true, rank: 1, hours: 3 }, { id: 'alch', label: 'Alchemy', chosen: false, rank: 0, hours: 0 }],
-  tierNames: ['Novice', 'Apprentice', 'Adept'], tierHours: [0, 10, 40], maxChosen: 3,
-  schools: [{ name: 'Destruction', level: 20, role: 'mage', roleLabel: 'Mage' }, { name: 'Restoration', level: 5, role: 'priest', roleLabel: 'Priest' }] } });
 {
   const data = panel({ players: ROSTER, bans: [{ id: 'b1', profileId: 99, name: 'Griefer', ip: '', until: 0, reason: '', by: 'nat', at: 0 }], mastery: { profession: null, label: '', rank: 0, rankName: '', hours: 2 }, me: { a: 'ff00012a' } });
   const t = open(data);
@@ -219,7 +150,7 @@ const MASTERY_T = (target) => ({ name: 'Player 2', target, detail: { skills: [{ 
   click(t, B(t).deity); click(t, B(t).deity);
   check('...and Reset deity finds them by name and profile', JSON.stringify(sentOf(t, 'dbo:deityReset')[1].args) === '["","Player 12",112]', sentOf(t, 'dbo:deityReset')[1]);
   // Care, on the one acted on (Player 2 still)
-  t.st.data.masteryTarget = MASTERY_T('ff000102');
+  t.adm.data.masteryTarget = MASTERY_T('ff000102');
   click(t, B(t).sub2);
   check('Care: the strip names who it acts on', B(t).actingOn.text === 'Acting on: Player 2');
   click(t, B(t).disV); click(t, B(t).disV);
@@ -264,7 +195,7 @@ const MASTERY_T = (target) => ({ name: 'Player 2', target, detail: { skills: [{ 
 // ---- Skills ----
 {
   const t = open(panel({ players: ROSTER }));
-  t.st.data.masteryTarget = MASTERY_T('');
+  t.adm.data.masteryTarget = MASTERY_T('');
   P(t).rail.t4.onRelease(); t.serve();
   check('Skills: opening it asks for the acted-on character\'s skills', sentOf(t, 'admin::request').some((m) => m.args[0] === 'adminMasteryRequest' && m.args[1] === '{}'));
   check('...a row per skill, the followed one with its tier and hours', B(t).n0.text === 'Smithing' && B(t).st0.text === 'Apprentice - 3' && B(t).st1.text === 'not followed');
@@ -277,19 +208,17 @@ const MASTERY_T = (target) => ({ name: 'Player 2', target, detail: { skills: [{ 
   click(t, B(t).change); click(t, B(t).pick3);
   check('changing who is acted on asks again for theirs', sentOf(t, 'admin::request').filter((m) => m.args[0] === 'adminMasteryRequest').pop().args[1] === '{"target":"ff000102"}');
   const g = open(panel({ caps: { ban: false, spawn: false } }));
-  g.st.data.masteryTarget = MASTERY_T('');
+  g.adm.data.masteryTarget = MASTERY_T('');
   P(g).rail.t4.onRelease(); g.serve();
   check('a GM views the skills without the tier chips', !B(g).t0_0 && /Changing skills is for a Lead GM/.test(B(g).foot.text));
 }
 
 // ---- Items ----
-const ITEMS = [{ id: 'weapons', label: 'Weapons', items: [['12eb7:Skyrim.esm', 'Iron Sword', 'Skyrim.esm'], ['13981:Skyrim.esm', 'Steel Sword', 'Skyrim.esm'], ['1a2b:BS.esm', 'Cyrod Blade', 'BSAssets.esm']] },
-  { id: 'armor', label: 'Armour', items: [['12e49:Skyrim.esm', 'Iron Helmet', 'Skyrim.esm'], ['9999:DLE.esp', 'DLC2ArmorNordicHeavyBoots']] }];
 {
   const t = open(panel({ players: ROSTER }));
   P(t).rail.t5.onRelease(); t.serve();
   check('Items: no catalog yet, so the tab asks for it', sentOf(t, 'admin::request').some((m) => m.args[0] === 'adminItemsRequest') && /Loading items/.test(B(t).loading.text));
-  t.st.cats.items = ITEMS; t.refresh();
+  t.adm.cats.items = ITEMS; t.refresh();
   check('...arrived: All and a chip per category, with counts', B(t).cat0.label.text === 'All 5' && B(t).cat1.label.text === 'Weapons 3' && B(t).cat2.label.text === 'Armour 2');
   check('...nothing listed until a search or a category, as the browser', /Type to search, or pick a category/.test(B(t).none.text));
   click(t, B(t).cat1);
@@ -315,20 +244,21 @@ const ITEMS = [{ id: 'weapons', label: 'Weapons', items: [['12eb7:Skyrim.esm', '
   check('picking it again spawns it again (Enter twice in the browser)', sentOf(t, 'admin::action').filter((m) => m.args[0] === 'giveItem').length === 2);
   typeInto(t, B(t).count, '0');
   check('a count of 0 greys Spawn', B(t).spawn.disabled === true);
+  t.adm.cats.recent = { items: ['13981:Skyrim.esm', 'gone:Old.esm'], teleport: [] };
+  click(t, B(t).mod); click(t, B(t).mod0); click(t, B(t).cat0); t.refresh();
+  check('no search and no category: what was spawned lately, named so (one no longer in the catalog left out)', !!B(t).recentHead && kids(B(t), /^r\d$/).length === 1 && B(t).r0.c0.text === 'Steel Sword', kids(B(t), /^r\d$/).map((r) => r.c0.text));
   const g = open(panel({ caps: { ban: false, spawn: false } }));
-  g.st.cats.items = ITEMS;
+  g.adm.cats.items = ITEMS;
   P(g).rail.t5.onRelease(); g.serve();
   check('a GM sees the catalog but no Spawn', !B(g).spawn && /for a Lead GM/.test(B(g).spawnHint.text));
 }
 
 // ---- Teleport ----
-const LOCS = [{ name: 'Bruma', region: 'Cyrodiil', worldName: 'Cyrodiil' }, { name: 'Cheydinhal', region: 'Cyrodiil', worldName: 'Cyrodiil' }, { name: 'Frostcrag Spire', region: 'Cyrodiil', worldName: 'Frostcrag' },
-  { name: 'Whiterun', region: 'Skyrim', worldName: 'Tamriel' }, { name: 'Ald Velothi', region: 'Morrowind', worldName: 'Morrowind' }];
 {
   const t = open(panel());
   P(t).rail.t8.onRelease(); t.serve();
   check('Teleport: asks for the locations', sentOf(t, 'admin::request').some((m) => m.args[0] === 'adminLocationsRequest'));
-  t.st.cats.locations = LOCS; t.refresh();
+  t.adm.cats.locations = LOCS; t.refresh();
   check('...Cyrodiil open by default, regions as chips in the browser\'s order', B(t).region0.label.text === 'Skyrim 1' && B(t).region1.label.text === 'Cyrodiil 3' && B(t).region1.rest === 100);
   check('...two worlds in Cyrodiil: All and each', B(t).world0.label.text === 'All 3' && B(t).world1.label.text === 'Cyrodiil 2');
   click(t, B(t).world2);
@@ -337,6 +267,11 @@ const LOCS = [{ name: 'Bruma', region: 'Cyrodiil', worldName: 'Cyrodiil' }, { na
   check('choosing a place teleports: admin::tploc <name>', sentOf(t, 'admin::tploc')[0].args[0] === 'Frostcrag Spire');
   typeInto(t, B(t).search, 'ald');
   check('a search reaches every region and names it', B(t).r0.c0.text === 'Ald Velothi' && B(t).r0.c1.text === 'Morrowind - Morrowind');
+  typeInto(t, B(t).search, '');
+  t.adm.cats.recent = { items: [], teleport: ['Frostcrag Spire', 'Bruma', 'Nowhere'] }; t.refresh();
+  check('places teleported to lately: a Recent chip first, newest first, the unknown left out', B(t).region0.label.text === 'Recent 2');
+  click(t, B(t).region0);
+  check('...holding them in that order', kids(B(t), /^r\d$/).map((r) => r.c0.text).join(',') === 'Frostcrag Spire,Bruma', kids(B(t), /^r\d$/).map((r) => r.c0.text));
 }
 
 // ---- Powers ----
@@ -369,17 +304,11 @@ const LOCS = [{ name: 'Bruma', region: 'Cyrodiil', worldName: 'Cyrodiil' }, { na
 }
 
 // ---- Enchant ----
-const ENCH_CAT = { type: 'staffData', id: 141, list: [
-  { id: 'e1', n: 'Fire Damage', e: 'EnchWeaponFireDamage01', p: 'Skyrim.esm', k: 'w', m: 0, fx: [['Fire Damage', 10, 0, 0]] },
-  { id: 'e2', n: 'Fortify Health', e: 'EnchArmorFortifyHealth01', p: 'Skyrim.esm', k: 'a', m: 0, fx: [['Fortify Health', 20, 60, 0]] }], maxScale: 2 };
-const ENCH_PACK = (target) => ({ type: 'staffData', id: 142, target, targetName: target ? 'Player 2' : 'you', at: 0, items: [
-  { key: 'k1', name: 'Iron Sword', count: 2, kind: 'w', ok: true, why: '', now: '' }, { key: 'k2', name: 'Steel Helmet', count: 1, kind: 'a', ok: true, why: '', now: 'Fortify Magicka' },
-  { key: 'k3', name: 'Worn Boots', count: 1, kind: 'a', ok: false, why: 'Worn: take it off first', now: '' }] });
 {
   const t = open(panel({ players: ROSTER }));
   P(t).rail.t6.onRelease(); t.serve();
   check('Enchant: opening asks for the catalog and the pack of the one acted on', JSON.stringify(sentOf(t, 'dbo:staffEnchant').map((m) => m.args)) === '[["catalog"],["items",""]]', sentOf(t, 'dbo:staffEnchant'));
-  t.st.staff[141] = ENCH_CAT; t.st.staff[142] = ENCH_PACK(''); t.refresh();
+  t.adm.staff[141] = ENCH_CAT; t.adm.staff[142] = ENCH_PACK(''); t.refresh();
   check('...the pack as pieces, a worn one greyed with why', B(t).piece0.label.text === 'Iron Sword x2' && B(t).piece2.disabled === true && /Worn: take it off/.test(B(t).pieceSub2.text));
   click(t, B(t).piece0);
   check('a weapon narrows the enchantments to weapon ones', kids(B(t), /^r\d$/).length === 1 && B(t).r0.c0.text === 'Fire Damage');
@@ -402,16 +331,11 @@ const ENCH_PACK = (target) => ({ type: 'staffData', id: 142, target, targetName:
 }
 
 // ---- GM Calls ----
-const now0 = Date.now();
-const GMCALLS = { type: 'staffData', id: 140, now: now0, quiet: false, canGoto: true, closed: [{ n: 3, name: 'Olaf', how: 'closed', by: 'nat', at: now0 - 3600000, note: 'sorted' }],
-  open: [{ n: 7, name: 'Bri', online: true, place: 'Bruma', at: now0 - 720000, lines: [{ at: now0 - 720000, text: 'stuck in a wall' }, { at: now0 - 60000, text: 'still stuck' }], takenBy: '', mine: false, ticket: '' },
-    { n: 8, name: 'Cass', online: false, place: 'Cheydinhal', at: now0 - 60000, lines: [{ at: now0 - 60000, text: 'lost my horse' }], takenBy: 'nat', mine: true, ticket: '41' },
-    { n: 9, name: 'Dov', online: true, place: 'Chorrol', at: now0, lines: [{ at: now0, text: 'hi' }], takenBy: 'kim', mine: false, ticket: '' }] };
 {
   const t = open(panel());
   P(t).rail.t2.onRelease(); t.serve();
   check('GM Calls: opening it watches the list', sentOf(t, 'dbo:staffGmCalls')[0].args[0] === 'watch');
-  t.st.staff[140] = GMCALLS; t.st.staffAt[140] = Date.now(); t.refresh();
+  t.adm.staff[140] = GMCALLS; t.adm.staffAt[140] = Date.now(); t.refresh();
   check('...three open, one waiting; two cards a page', B(t).count.text === '3 open, 1 waiting' && B(t).name0.text === '#7 Bri' && B(t).name1.text === '#8 Cass (offline)' && !B(t).name2);
   check('...a card: place, age, its lines, waiting', B(t).place0.text === 'Bruma' && B(t).ago0.text === '12 min ago' && B(t).line0_0.text === 'stuck in a wall' && /^\+11 min  still stuck$/.test(B(t).line0_1.text) && B(t).state0.text === 'Waiting', B(t).line0_1.text);
   check('...yours: no Take, Release, Go to where they called, the ticket', !B(t).take1 && !!B(t).release1 && B(t).goto1.label.text === 'Go to (where they called)' && B(t).ticket1.text === 'Discord ticket #41');
@@ -433,19 +357,12 @@ const GMCALLS = { type: 'staffData', id: 140, now: now0, quiet: false, canGoto: 
 }
 
 // ---- Thievery ----
-const THIEF = { type: 'staffData', id: 162, now: now0, enabled: true, lead: true, gm: true, armed: null, result: { ok: true, text: 'Fence marked.', at: now0 },
-  factions: [{ id: 'tg', name: 'Thieves Guild', config: true, fence: { chest: 'ff0001', by: 'nat', at: 0, frozen: 0, lots: 2 } }, { id: 'rats', name: 'Ratway Rats', config: false, fence: null }],
-  candidates: [{ id: 'ravens', name: 'Ravens' }],
-  raids: [{ n: 4, fid: 'tg', faction: 'Thieves Guild', state: 'pending', by: 'Guard Ulf', evidence: 'Found the chest', at: now0 - 600000, raidAt: 0, decidedBy: '', reason: '' },
-    { n: 5, fid: 'rats', faction: 'Ratway Rats', state: 'approved', by: 'Guard Ulf', evidence: 'A tip', at: now0 - 600000, raidAt: now0 + 3600000, decidedBy: 'nat', reason: '' }],
-  stolen: [{ n: 1, at: now0 - 60000, item: 'Gold Ring', owner: 'Olaf', thief: 'Bri', home: 'Rose Hall', state: 'fenced', canSendBack: true }, { n: 2, at: now0, item: 'Ale', owner: 'Gemma', thief: 'Cass', home: 'Inn', state: 'carried', canSendBack: false }],
-  stolenTotal: 2, permits: [{ home: 'h1', homeName: 'Rose Hall', thief: 'Bri', until: now0 + 7200000, by: 'nat' }], breaches: [], working: [{ thief: 'Cass', home: 'Inn', kind: 'door', until: now0 + 30000 }] };
 {
   const t = open(panel());
   P(t).rail.t3.onRelease(); t.serve();
   check('Thievery: watched on open', sentOf(t, 'dbo:staffThievery')[0].args[0] === 'watch');
-  t.st.staff[162] = THIEF; t.st.staffAt[162] = Date.now(); t.refresh();
-  check('...views with counts, a Lead GM gets Approve; the last result in green', B(t).sub0.label.text === 'Factions & fences (2)' && B(t).sub1.label.text === 'Approve' && B(t).result.text === 'Fence marked.' && B(t).result.textColor === 0x8FBF7F);
+  t.adm.staff[162] = THIEF; t.adm.staffAt[162] = Date.now(); t.refresh();
+  check('...views with counts, a Lead GM gets Approve; the last result in green', B(t).sub0.label.text === 'Factions & fences (2)' && B(t).sub1.label.text === 'Approve' && B(t).sub4.label.text === 'Permits (1)' && B(t).result.text === 'Fence marked.' && B(t).result.textColor === 0x8FBF7F);
   check('a faction from the config cannot be revoked; one with lots cannot be unmarked', B(t).revoke0.disabled === true && B(t).unmark0.disabled === true && B(t).mark1.label.text === 'Mark fence');
   click(t, B(t).mark1);
   check('Mark fence: dbo:staffThievery mark <id>', JSON.stringify(sentOf(t, 'dbo:staffThievery').pop().args) === '["mark","rats"]');
@@ -478,9 +395,149 @@ const THIEF = { type: 'staffData', id: 162, now: now0, enabled: true, lead: true
   check('...revoke a permit (after its confirm)', JSON.stringify(sentOf(t, 'dbo:staffThievery').pop().args) === '["unpermit","h1"]');
   click(t, B(t).sub5);
   check('At locks & breaches: Cass at the Inn door, no breach', B(t).wt0.text === 'Cass' && /at its door/.test(B(t).wh0.text) && /No home is breached/.test(B(t).noBreach.text));
-  t.st.staff[162] = Object.assign({}, THIEF, { armed: { kind: 'fence', fid: 'tg', name: 'Thieves Guild', until: now0 + 120000 } }); t.refresh();
+  t.adm.staff[162] = Object.assign({}, THIEF, { armed: { kind: 'fence', fid: 'tg', name: 'Thieves Guild', until: now0 + 120000 } }); t.refresh();
   click(t, B(t).cancel);
   check('an armed tool can be cancelled', JSON.stringify(sentOf(t, 'dbo:staffThievery').pop().args) === '["cancel"]');
+}
+
+// ---- Place ----
+{
+  const t = open(panel());
+  P(t).rail.t9.onRelease(); t.serve();
+  check('Place: opening it asks for the catalog meta', preq(t, 'adminPlaceMeta').length === 1);
+  t.adm.data.placeMeta = PMETA; t.refresh();
+  const s0 = preq(t, 'adminPlaceSearch');
+  check('...then the first category opens, searched on the server', s0.length === 1 && s0[0].category === 'npc:bandit' && s0[0].query === '' && s0[0].offset === 0, s0);
+  t.adm.data.placeResults = { query: '', category: 'npc:bandit', plugin: '', offset: 0, total: 140, items: pitems(100, 0) }; t.refresh();
+  check('...eight rows a page of the hundred loaded', kids(B(t), /^r\d$/).length === 8 && B(t).r0.c0.text === 'Bandit 0' && /Page 1 of 13, 100 of 140 loaded/.test(B(t).where.text), B(t).where && B(t).where.text);
+  click(t, B(t).r0);
+  check('picking a row names it and offers Hostile, on', B(t).picked.text === 'Bandit 0' && B(t).hostile && B(t).hostile.rest === 100);
+  click(t, B(t).r0);
+  const pl = sentOf(t, 'admin::place');
+  check('picking it again places it: admin::place {desc, kind, name, hostile}', pl.length === 1 && JSON.stringify(JSON.parse(pl[0].args[0])) === '{"desc":"Skyrim.esm:3e8","kind":"npc","name":"Bandit 0","hostile":true}', pl);
+  click(t, B(t).hostile); click(t, B(t).place);
+  check('...Hostile off places it friendly', JSON.parse(sentOf(t, 'admin::place')[1].args[0]).hostile === false);
+  click(t, B(t).select);
+  check('Select tool: admin::placeselect', sentOf(t, 'admin::placeselect').length === 1);
+  for (let i = 0; i < 12; i++) { t.press(39); t.serve(); }
+  check('the last loaded page offers the rest', /Load 40 more/.test(B(t).next.label.text), B(t).next.label.text);
+  t.press(39); t.serve();
+  const more = preq(t, 'adminPlaceSearch').pop();
+  check('...Right past it asks for the next hundred from where it stopped', more.offset === 100 && more.category === 'npc:bandit', more);
+  typeInto(t, B(t).search, 'Bandit 4');
+  const q = preq(t, 'adminPlaceSearch').pop();
+  check('a typed search goes to the server across every category', q.query === 'bandit 4' && q.category === '' && q.offset === 0, q);
+  t.adm.data.placeResults = { query: 'bandit 4', category: '', plugin: '', offset: 0, total: 1, items: [['Skyrim.esm:1', 'Bandit 4', 'Skyrim.esm', 'npc:bandit', 'npc']] }; t.refresh();
+  check('...and its rows show their category', B(t).r0.c1.text === 'Bandits' && kids(B(t), /^r\d$/).length === 1);
+  t.adm.data.placeResults = { query: 'old', category: '', plugin: '', offset: 0, total: 1, items: [['x', 'Stale', 'Skyrim.esm', 'npc:bandit', 'npc']] }; t.refresh();
+  check('...a late answer to an older search is not shown', !B(t).r0 && /Searching/.test(B(t).searching.text));
+  typeInto(t, B(t).search, '');
+  click(t, B(t).mod);
+  check('the mod button opens a picker of every mod', B(t).mod0.c0.text === 'Every mod' && B(t).mod2.c0.text === 'BSHeartland', [0, 1, 2].map((i) => B(t)['mod' + i] && B(t)['mod' + i].c0.text));
+  t.press(27); t.serve();
+  check('...Escape closes the picker, not the panel', !t.closed() && !B(t).mod0 && !!B(t).search);
+  click(t, B(t).mod); click(t, B(t).mod2);
+  const mq = preq(t, 'adminPlaceSearch').pop();
+  check('...choosing one searches that mod by its file name', mq.plugin === 'BSHeartland.esm', mq);
+  t.adm.data.placeMeta = Object.assign({}, PMETA, { rights: { place: false, hostile: false, others: false, placeNeeds: 'senior GM' } });
+  t.adm.data.placeResults = { query: '', category: 'npc:bandit', plugin: 'BSHeartland.esm', offset: 0, total: 1, items: pitems(1, 0) }; t.refresh();
+  click(t, B(t).r0);
+  check('without the right to place, Place is greyed and says who may', B(t).place.disabled === true && /senior GM/.test(B(t).picked.text), B(t).picked.text);
+}
+{
+  const t = open(panel({ placeMeta: PMETA }));
+  P(t).rail.t9.onRelease(); t.serve();
+  click(t, B(t).view1);
+  check('Placed near me: asks for the list', preq(t, 'adminPlacementsRequest').length === 1);
+  t.adm.data.placements = { here: 2, total: 5, items: [{ id: 'p1', base: 'Skyrim.esm:1', name: 'Chair', kind: 'obj', dist: 3, mine: true, group: 'g#1', pos: [1, 2, 3], rot: [0, 0, 90] }, { id: 'p2', base: 'Skyrim.esm:2', name: 'Bandit', kind: 'npc', hostile: true, dist: 9, mine: false, group: '', pos: [4, 5, 6], rot: [] }] }; t.refresh();
+  check('...rows with kind, group and distance', B(t).r0.c0.text === 'Chair' && B(t).r1.c1.text === 'NPC, hostile' && B(t).r0.c2.text === 'g' && B(t).r0.c3.text === '3 m');
+  click(t, B(t).r0); click(t, B(t).goto);
+  check('Go to: adminPlacementGoto {id}', preq(t, 'adminPlacementGoto')[0].id === 'p1');
+  click(t, B(t).edit);
+  const ed = JSON.parse(sentOf(t, 'admin::placeedit')[0].args[0]);
+  check('Edit hands it to the placement tool with its pose', ed.id === 'p1' && ed.base === 'Skyrim.esm:1' && ed.rot[2] === 90 && ed.pos[0] === 1, ed);
+  click(t, B(t).remove);
+  check('Remove asks first', preq(t, 'adminPlacementRemove').length === 0 && /^Sure\? Remove/.test(B(t).remove.label.text));
+  click(t, B(t).remove);
+  check('...then removes', preq(t, 'adminPlacementRemove')[0].id === 'p1');
+  click(t, B(t).r0); click(t, B(t).clearGroup); click(t, B(t).clearGroup);
+  check('Clear group asks first, then clears', preq(t, 'adminPlaceGroupClear').length === 1 && preq(t, 'adminPlaceGroupClear')[0].id === 'p1');
+  click(t, B(t).r1);
+  check('another GM placement cannot be changed without the right', B(t).edit.disabled === true && B(t).remove.disabled === true && B(t).another.disabled !== true);
+  click(t, B(t).another);
+  check('Place another of it', JSON.parse(sentOf(t, 'admin::place')[0].args[0]).desc === 'Skyrim.esm:2');
+  click(t, B(t).undo);
+  check('Undo: adminPlaceUndo', preq(t, 'adminPlaceUndo').length === 1);
+  click(t, B(t).view2);
+  check('Sets: asks for the sets', preq(t, 'adminPlaceSets').length === 1);
+  t.adm.data.placeSets = [{ name: 'Camp', count: 12 }]; t.refresh();
+  click(t, B(t).r0); click(t, B(t).putDown);
+  check('...Put down here', preq(t, 'adminPlaceSetPlace')[0].name === 'Camp');
+  click(t, B(t).deleteSet); click(t, B(t).deleteSet);
+  check('...Delete set asks first, then deletes', preq(t, 'adminPlaceSetDelete')[0].name === 'Camp');
+  check('...Save is greyed until named', B(t).saveSet.disabled === true);
+  typeInto(t, B(t).setName, 'Watch post');
+  click(t, B(t).radius2); click(t, B(t).saveSet);
+  check('...Save with the name and radius', JSON.stringify(preq(t, 'adminPlaceSetSave')[0]) === '{"name":"Watch post","radius":40}', preq(t, 'adminPlaceSetSave'));
+}
+{
+  const t = open(panel({ placeMeta: PMETA }));
+  P(t).rail.t9.onRelease(); t.serve();
+  click(t, B(t).view3);
+  check('Warband: asks for the band', preq(t, 'adminWarbandView').length === 1);
+  t.adm.data.warband = WB;
+  t.adm.data.placeResults = { query: '', category: 'npc:bandit', plugin: '', offset: 0, total: 140, items: pitems(9, 0) }; t.refresh();
+  check('...Raise lists NPCs only, with the last result', kids(B(t), /^r\d$/).length === 6 && B(t).last.text === 'Raised 2 bandits.' && kids(B(t), /^r\d$/).every((r) => /^Bandit [013467]$/.test(r.c0.text)), kids(B(t), /^r\d$/).map((r) => r.c0.text));
+  t.press(39); t.serve();
+  check('...More past the NPCs asks from the raw row the server stopped at, not the NPC count', preq(t, 'adminPlaceSearch').pop().offset === 9, preq(t, 'adminPlaceSearch'));
+  check('...counts up to the raise cap', kids(B(t), /^count\d$/).map((c) => c.label.text).join(',') === '1,2,3,5,8,10');
+  click(t, B(t).r1);
+  check('picking an NPC asks for its preview: info <desc>', JSON.stringify(preq(t, 'adminWarband').pop()) === '{"text":"info Skyrim.esm:3e9"}');
+  click(t, B(t).count3); click(t, B(t).raise);
+  check('Raise: raise <desc> <count>', preq(t, 'adminWarband').pop().text === 'raise Skyrim.esm:3e9 5');
+  click(t, B(t).wsub1);
+  check('Band: members with state, health and distance', B(t).m0.c0.text === 'Bandit' && B(t).m0.c2.text === '80%' && B(t).m1.c1.text === 'dead' && B(t).m1.c3.text === 'elsewhere');
+  click(t, B(t).hold);
+  check('Hold: stay', preq(t, 'adminWarband').pop().text === 'stay');
+  check('Follow greyed while following; Attack my target named', B(t).follow.disabled === true && B(t).attackTarget.label.text === 'Attack Troll');
+  click(t, B(t).m0); click(t, B(t).dismissOne);
+  check('Dismiss one: dismiss <id>', preq(t, 'adminWarband').pop().text === 'dismiss m1');
+  click(t, B(t).settle);
+  check('Settle shows the plan first', /1 will stay as a garrison/.test(B(t).plan.text) && /Wolf/.test(B(t).plan.text));
+  t.press(27); t.serve();
+  check('...Escape drops the plan, not the panel', !t.closed() && !B(t).plan && !!B(t).settle);
+  click(t, B(t).settle); click(t, B(t).settleDismiss);
+  check('...and the dismiss-the-rest choice', preq(t, 'adminWarband').pop().text === 'settle dismissrest');
+  click(t, B(t).dismissAll);
+  check('Dismiss all asks first', preq(t, 'adminWarband').pop().text === 'settle dismissrest');
+  click(t, B(t).dismissAll);
+  check('...then dismisses', preq(t, 'adminWarband').pop().text === 'dismiss');
+  const tl = kids(B(t), /^target\d$/).map((b) => b.label.text);
+  check('targets: the player and the enemy GM NPC', tl.length === 2 && /^Bri 10 m$/.test(tl[0]) && /^Enemy: Orc \(kim\)/.test(tl[1]), tl);
+  click(t, B(t).target1);
+  check('...attacknpc <id>', preq(t, 'adminWarband').pop().text === 'attacknpc n1');
+  click(t, B(t).target0);
+  check('...attack <player>', preq(t, 'adminWarband').pop().text === 'attack Bri');
+  click(t, B(t).wsub2);
+  typeInto(t, B(t).side, 'Legion');
+  click(t, B(t).setSide);
+  check('Sides: side <name>', preq(t, 'adminWarband').pop().text === 'side Legion');
+  click(t, B(t).praise0);
+  check('a saved band raises: preset raise <name>', preq(t, 'adminWarband').pop().text === 'preset raise Camp crew');
+  click(t, B(t).pdelete0); click(t, B(t).pdelete0);
+  check('...and deletes after its confirm', preq(t, 'adminWarband').pop().text === 'preset delete Camp crew');
+  typeInto(t, B(t).preset, 'Night watch'); click(t, B(t).savePreset);
+  check('...save this band as', preq(t, 'adminWarband').pop().text === 'preset save Night watch');
+  click(t, B(t).onLogout);
+  check('on logout: settle', preq(t, 'adminWarband').pop().text === 'onlogout settle');
+  click(t, B(t).wsub3);
+  check('Raiders & garrison: both listed', B(t).p0.c0.text === 'Raider' && /^garrison/.test(B(t).p1.c1.text));
+  click(t, B(t).p1); click(t, B(t).removeOne);
+  check('Remove one: raid clear <id>', preq(t, 'adminRaid').pop().text === 'clear g1');
+  click(t, B(t).clearRaiders);
+  check('Clear raiders asks first', preq(t, 'adminRaid').length === 1);
+  click(t, B(t).clearRaiders);
+  check('...then clears', preq(t, 'adminRaid').pop().text === 'clear raiders');
 }
 
 T.done();

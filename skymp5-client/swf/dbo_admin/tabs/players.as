@@ -317,11 +317,11 @@ function drawCare(c, x, y, w, h)
       var f = field(c, "school_" + sc.name, 62 + k * 5, x + 360, ry, 80, text, String(sc.level), 3, makeLevelCommit(sc.name));
       var nv = Number(text);
       var valid = isWhole(text) && nv >= 0 && nv <= 100 && nv != sc.level;
-      var set = btn(c, "set" + k, 63 + k * 5, x + 452, ry - 2, 72, "Set", function()
+      var setB = btn(c, "set" + k, 63 + k * 5, x + 452, ry - 2, 72, "Set", function()
       {
          act("setSchool", targetFields({school: this.school, level: Number(playersLocal.levels[this.school])}));
       }, !valid);
-      set.school = sc.name;
+      setB.school = sc.name;
    }
 }
 

@@ -12,3 +12,4 @@ dbo-controls.as
 ../dbo_admin/tabs/teleport.as
 ../dbo_admin/tabs/modes.as
 ../dbo_admin/tabs/npcs.as
+../dbo_admin/tabs/place.as
