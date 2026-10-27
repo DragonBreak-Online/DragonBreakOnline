@@ -16,7 +16,7 @@ const CELL = 0x100, CELL2 = 0x101, OTHER = 0x102, DOOR = 0x200, OUTDOOR = 0x201;
 const OWNER = 0xff000001, FRIEND = 0xff000002, STRANGER = 0xff000003, GM = 0xff000004;
 const PROFILE = { [OWNER]: 7, [FRIEND]: 8, [STRANGER]: 9, [GM]: 10 };
 const NAME = { [OWNER]: 'Olaf', [FRIEND]: 'Frida', [STRANGER]: 'Stray', [GM]: 'Gemma' };
-const TABLE = 0x7001, CHEST = 0x7002, FAR = 0x7003, WALL = 0x7004;
+const TABLE = 0x7001, CHEST = 0x7002, FAR = 0x7003, WALL = 0x7004, GMREF = 0x7005;
 const d = (id) => `${id.toString(16)}:Skyrim.esm`;
 fs.writeFileSync('housing.json', JSON.stringify([DOOR]));
 fs.writeFileSync('admin-placeables.json', JSON.stringify({ categories: [] }));
@@ -24,7 +24,7 @@ fs.writeFileSync('decor-catalog.json', JSON.stringify({ groups: [
   { id: 'tables', label: 'Tables', pieces: [{ desc: d(0x9006), edid: 'CommonTable01', name: 'Table', group: 'tables', type: 'STAT', radius: 80, costB: { [d(0x6f993)]: 4 } }] },
   { id: 'storage', label: 'Storage', pieces: [{ desc: d(0x9002), edid: 'CommonChest01', name: 'Chest', group: 'storage', type: 'CONT', radius: 60, container: true, costB: { [d(0x6f993)]: 4 } }] },
 ] }));
-fs.writeFileSync('decor-fixtures.json', JSON.stringify({ cells: { [d(CELL)]: [[d(TABLE), d(0x9006)], [d(CHEST), d(0x9002)]], [d(OTHER)]: [[d(FAR), d(0x9006)]] } }));
+fs.writeFileSync('decor-fixtures.json', JSON.stringify({ cells: { [d(CELL)]: [[d(TABLE), d(0x9006)], [d(CHEST), d(0x9002)], [d(GMREF), d(0x9006)]], [d(OTHER)]: [[d(FAR), d(0x9006)]] } }));
 
 const props = new Map();
 const setp = (id, k, v) => props.set(`${id}|${k}`, v);
@@ -36,7 +36,7 @@ for (const a of [OWNER, FRIEND, STRANGER, GM]) { setp(a, 'worldOrCellDesc', d(CE
 setp(CHEST, 'type', 'MpObjectReference'); setp(CHEST, 'worldOrCellDesc', d(CELL)); setp(CHEST, 'pos', [1050, 1100, 50]); setp(CHEST, 'inventory', { entries: [{ baseId: 0xf, count: 3 }] });
 const f32 = (xs) => { const b = Buffer.alloc(24); xs.forEach((x, i) => b.writeFloatLE(x, i * 4)); return b; };
 const u32 = (n) => { const b = Buffer.alloc(4); b.writeUInt32LE(n); return b; };
-const REFS = { [TABLE]: [0x9006, [1100, 1000, 50]], [CHEST]: [0x9002, [1050, 1100, 50]], [FAR]: [0x9006, [1000, 1050, 50]], [WALL]: [0x9007, [1000, 900, 50]] };
+const REFS = { [GMREF]: [0x9006, [1080, 950, 50]], [TABLE]: [0x9006, [1100, 1000, 50]], [CHEST]: [0x9002, [1050, 1100, 50]], [FAR]: [0x9006, [1000, 1050, 50]], [WALL]: [0x9007, [1000, 900, 50]] };
 const BASES = { 0x9006: 'STAT', 0x9002: 'CONT', 0x9007: 'STAT', [CELL]: 'CELL', [CELL2]: 'CELL', [OTHER]: 'CELL' };
 let shift = 0;   // a load-order shift: every plugin id moves by this much
 const live = (id) => id + shift;
@@ -144,11 +144,23 @@ shift = 0;
 T = load();
 ok(JSON.stringify(globalThis.__dboWorldEditApi.data().edits[t]) === JSON.stringify(Object.assign(JSON.parse(before))), 'and back again', globalThis.__dboWorldEditApi.data().edits[t]);
 
+// A GM's world edit in the home is never the owner's to take over (Worker 2's review)
+const WEA = globalThis.__dboWorldEditApi, g = GMREF.toString(16);
+WEA.change(GM, g, Object.assign(WEA.fresh(GM, WEA.inspect(g)), { hidden: true }), 'hide', 'Table');
+n = packets.length;
+fire('placeSelect', OWNER, [g]); fire('placeDelete', OWNER, [g]);
+ok(!editFor(OWNER, n) && WEA.data().edits[g] && WEA.data().edits[g].hidden && !WEA.data().edits[g].decor, 'a piece a GM hid stays with the GM: the owner can neither move it nor take it over', WEA.data().edits[g]);
+
+// A housing record unreadable at boot is no owner change
+setp(DOOR, 'private.housing', null);
+timers['decor-owners']();
+ok(WEA.data().edits[t] && WEA.data().edits['7002'], 'an unreadable housing record leaves the edits of the home alone', Object.keys(WEA.data().edits));
+
 // A new owner gets the home as built
 setp(DOOR, 'private.housing', { owner: 11, ownerChar: 0xff000009, ownerName: 'Nils', partner: OUTDOOR, place: { cells: [d(CELL), d(CELL2)], builtAt: 1 } });
 timers['decor-owners']();
 const left = globalThis.__dboWorldEditApi.data().edits;
-ok(!left[t] && !left['7002'], 'a new owner: every moved or stored piece is back as its plugin has it', Object.keys(left));
+ok(!left[t] && !left['7002'] && left[g], 'a new owner: every moved or stored piece is back as its plugin has it; the GM edit stays', Object.keys(left));
 ok(papyrus.some((p) => p[0] === 'Enable' && p[1] === CHEST), '...the stored chest is enabled again');
 
 console.log(fails ? `${fails} failed` : 'all passed');

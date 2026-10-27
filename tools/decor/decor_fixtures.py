@@ -6,7 +6,8 @@ _work\decor-preexisting-1027.md on the PC).
 Cells: the interiors behind every housing.json door and those their load doors lead to (DEPTH steps). The server also
 requires the cell to be one of the place's own, so this may over-include. A reference is listed when its base is a
 decor-catalog.json piece that is not a light, and it is plain: not deleted, not initially disabled, not persistent, no
-script (VMAD) on it or its base, no enable parent (XESP), and not a bed with an owner (XOWN).
+script (VMAD) on it or its base, no enable parent (XESP), not locked (XLOC), not a bed with an owner (XOWN), and not a
+container whose base holds items (CNTO).
     { cells: { cellDesc: [[refDesc, baseDesc], ...] } }
 """
 import argparse, json, os, struct, sys
@@ -154,8 +155,12 @@ def main():
                 reason = 'enable parent'
             elif group == 'beds' and field(s, b'XOWN') is not None:
                 reason = 'owned bed'
+            elif field(s, b'XLOC') is not None:
+                reason = 'locked'
             elif b in base_rec and field(subs(base_rec[b]), b'VMAD') is not None:
                 reason = 'scripted base'
+            elif base_type.get(b) == 'CONT' and b in base_rec and field(subs(base_rec[b]), b'CNTO') is not None:
+                reason = 'container with base items'
             if reason:
                 why[reason] = why.get(reason, 0) + 1
                 continue

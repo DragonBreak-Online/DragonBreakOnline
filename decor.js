@@ -360,7 +360,8 @@ module.exports = (api) => {
     const fx = fixtures().get(desc), pl = here(a);
     if (!fx || !pl || !pl.cells.includes(idOf(fx.cell)) || !mayDecorate(a, pl)) return null;
     const entry = we.data().edits[hex(parseInt(k, 16))] || null;
-    if (entry && entry.decor && entry.decor !== hex(pl.root)) return null;
+    // a GM's world edit, or another home's, is never taken over
+    if (entry && (!entry.decor || entry.decor !== hex(pl.root))) return null;
     const info = we.inspect(k);
     if (!info.ok || !info.pos) return null;
     return { refHex: info.ref, info, piece: pieceOf(fx.base) || { name: info.name, group: 'decor', radius: 50 }, pl, entry };
@@ -395,7 +396,8 @@ module.exports = (api) => {
     for (const e of Object.values(we.data().edits)) {
       if (!e.decor) continue;
       const rec = get(parseInt(e.decor, 16) >>> 0, 'private.housing', null);
-      if (rec && ownerKey(Number(rec.owner) || 0, Number(rec.ownerChar) >>> 0) === e.decorOwner) continue;
+      // a housing record unreadable (at boot it can be) is unknown, never an owner change
+      if (!rec || ownerKey(Number(rec.owner) || 0, Number(rec.ownerChar) >>> 0) === e.decorOwner) continue;
       try { we.change(0, e.ref, null, 'decor-reset', e.name); } catch (err) { log('decor: reset of a home\'s own piece failed', e.ref, err.message); continue; }
       audit(`DECOR reset place ${e.decor} ${e.name} (home's own, ref ${e.ref}): the owner changed`);
     }
