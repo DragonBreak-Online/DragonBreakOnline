@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import './styles.scss';
 import Courier, { CourierData, CourierHint } from './courier';
@@ -20,6 +20,9 @@ export { Courier };
 //                                | ('dbo:supplyDeliver', nonce, orderId, count) | ('dbo:supplyCancel', nonce, orderId)
 //   Courier tab (courier.tsx):   sendMessage('dbo:courierPost' | 'dbo:courierTake' | ..., nonce, ...)
 //   Close:                       sendMessage('dbo:pigeonClose', nonce)
+// The native coop (swf/dbo_pigeon) hands its typed input here: data.handoff 'send' (a letter to handoffTo), 'supply' (an
+// order) or 'courier' (a job) draws only that composer; Cancel sends dbo:pigeonCompose [nonce, ''], which brings the
+// native coop back, and a success comes back native from the server.
 export interface PigeonContact {
   id: number;
   name: string;
@@ -94,6 +97,8 @@ export interface PigeonData {
   parcel?: { enabled: boolean; taxRate: number; itemFee: number; maxStacks: number; maxGold: number };
   supply?: SupplyData;
   courier?: CourierData;
+  handoff?: 'send' | 'supply' | 'courier';
+  handoffTo?: number;
 }
 
 const send = (key: string, ...args: unknown[]): void => {
@@ -132,14 +137,19 @@ const parcelText = (p: PigeonParcel): string =>
 const Pigeon = ({ data }: { data: PigeonData }) => {
   const contacts = data.contacts || [];
   const maxText = Math.max(1, Number(data.maxText) || 240);
-  const [selectedId, setSelectedId] = useState<number | null>(contacts.length ? contacts[0].id : null);
+  const handoff = data.handoff === 'send' || data.handoff === 'supply' || data.handoff === 'courier' ? data.handoff : null;
+  const firstId = handoff === 'send' && contacts.some((c) => c.id === data.handoffTo) ? (data.handoffTo as number) : contacts.length ? contacts[0].id : null;
+  const [selectedId, setSelectedId] = useState<number | null>(firstId);
   const [text, setText] = useState('');
   // Sign as: another's name for the next letter (/sign; a Scholar's forgery), or '' for none typed yet
   const [signAs, setSignAs] = useState('');
   const [busy, setBusy] = useState(false);
+  // Set by our own Send: only its answer clears the letter. A signature's answer is 'sent' too, and once cleared the
+  // text, gold and goods typed in the composer (Worker 1's review, 26 Oct)
+  const letterSent = useRef(false);
   const letters = data.letters || [];
   const waitingCount = letters.filter((l) => !l.read || l.parcel).length;
-  const [view, setView] = useState<'letters' | 'send' | 'supply' | 'courier'>(data.view || 'send');
+  const [view, setView] = useState<'letters' | 'send' | 'supply' | 'courier'>(handoff || data.view || 'send');
   const [letterId, setLetterId] = useState<string | null>(null);
   // The parcel being packed: gold, and goods by base id
   const parcelRules = data.parcel && data.parcel.enabled ? data.parcel : null;
@@ -150,7 +160,8 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
   const supply = data.supply && data.supply.enabled ? data.supply : null;
   // A view asked for from outside (the notice board's buttons) may not exist at this board, and its tab is then not
   // drawn: fall back rather than show a panel with nothing under it.
-  const shown = (view === 'supply' && !supply) || (view === 'courier' && !data.courier) ? 'letters' : view;
+  const wanted = handoff || view;
+  const shown = (wanted === 'supply' && !supply) || (wanted === 'courier' && !data.courier) ? 'letters' : wanted;
   const [orderId, setOrderId] = useState<number | null>(null);
   const [handCount, setHandCount] = useState('');
   const [query, setQuery] = useState(supply ? supply.search : '');
@@ -161,11 +172,13 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
   // A fresh window from the server (a new nonce) ends the wait; a sent pigeon clears the letter and the parcel
   useEffect(() => {
     setBusy(false);
-    if (data.resultKind === 'sent' && (data.view || 'send') === 'send') { setText(''); setGold(''); setPacked({}); }
+    if (data.resultKind === 'sent' && (data.view || 'send') === 'send' && letterSent.current) { setText(''); setGold(''); setPacked({}); }
+    letterSent.current = false;
     if (data.resultKind === 'sent' && data.view === 'supply') { setHandCount(''); if (pick && !(supply && supply.results.length)) { setPick(null); setOrderCount(''); setOrderReward(''); } }
     if (data.view) setView(data.view);
     if (letterId !== null && !letters.some((l) => l.id === letterId)) setLetterId(null);
-    if (selectedId !== null && !contacts.some((c) => c.id === selectedId)) setSelectedId(contacts.length ? contacts[0].id : null);
+    if (handoff === 'send' && firstId !== null) setSelectedId(firstId);
+    else if (selectedId !== null && !contacts.some((c) => c.id === selectedId)) setSelectedId(contacts.length ? contacts[0].id : null);
     if (orderId !== null && supply && !supply.orders.concat(supply.mine).some((o) => o.id === orderId)) setOrderId(null);
     // Goods no longer in the pack drop out of the parcel
     setPacked((p) => Object.fromEntries(Object.entries(p).filter(([id]) => sendable.some((s) => s.baseId === Number(id)))));
@@ -204,6 +217,7 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
   const submit = () => {
     if (!canSend || !chosen) return;
     setBusy(true);
+    letterSent.current = true;
     send('dbo:pigeonSend', data.nonce, chosen.id, trimmed, goldSent, JSON.stringify(packedList));
   };
 
@@ -228,7 +242,7 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
       : 'The farther the bird flies, the more it costs.';
 
   // Supply
-  const order = supply ? supply.orders.concat(supply.mine).filter((o) => o.id === orderId)[0] || null : null;
+  const order = supply && !handoff ? supply.orders.concat(supply.mine).filter((o) => o.id === orderId)[0] || null : null;
   const handN = Math.max(0, Math.min(order ? order.count - order.filled : 0, Number(handCount) || (order ? Math.min(order.have, order.count - order.filled) : 0)));
   const oCount = Number(orderCount) || 0;
   const oReward = Number(orderReward) || 0;
@@ -255,7 +269,8 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
     <div className="pigeon">
       <div className="pigeon__fade" />
       <div className="pigeon__panel">
-        <h1 className="pigeon__title">{data.boardName} Pigeon Coop</h1>
+        <h1 className="pigeon__title">{handoff === 'send' ? (chosen ? 'A letter for ' + chosen.name : 'A letter') : handoff === 'supply' ? data.boardName + ' supply orders' : handoff === 'courier' ? data.boardName + ' couriers' : data.boardName + ' Pigeon Coop'}</h1>
+        {handoff ? null : (
         <div className="pigeon__tabs">
           <button className={'pigeon__tab' + (shown === 'letters' ? ' pigeon__tab--active' : '')} onClick={() => setView('letters')}>
             Letters{waitingCount ? <span className="pigeon__badge">{waitingCount}</span> : null}
@@ -274,6 +289,7 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
               )
             : null}
         </div>
+        )}
         {data.result && (
           <p className={'pigeon__result pigeon__result--' + (data.resultKind || 'sent')}>{data.result}</p>
         )}
@@ -321,11 +337,12 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
             )
           : shown === 'courier' && data.courier
             ? (
-          <Courier c={data.courier} nonce={data.nonce} gold={data.gold} contacts={contacts} busy={busy} act={act} />
+          <Courier c={data.courier} nonce={data.nonce} gold={data.gold} contacts={contacts} busy={busy} act={act} composeOnly={handoff === 'courier'} />
               )
             : shown === 'send'
               ? (
         <div className="pigeon__body">
+          {handoff ? null : (
           <div className="pigeon__contacts">
             {contacts.length
               ? contacts.map((c) => (
@@ -345,6 +362,7 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
               <p className="pigeon__empty">Your pigeon only knows the way to people you have met. Stand and speak with someone first.</p>
                 )}
           </div>
+          )}
 
           <div className="pigeon__letter">
             <textarea
@@ -401,12 +419,14 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
               : supply
                 ? (
         <div className="pigeon__body">
+          {handoff ? null : (
           <div className="pigeon__contacts">
             <div className="pigeon__section">Your orders ({supply.mine.filter((o) => o.state === 'open').length} of {supply.maxOpen})</div>
             {supply.mine.length ? supply.mine.map(orderRow) : <p className="pigeon__empty">You have no orders up.</p>}
             <div className="pigeon__section">On the {supply.zone || data.boardName} boards</div>
             {supply.orders.filter((o) => !o.mine).length ? supply.orders.filter((o) => !o.mine).map(orderRow) : <p className="pigeon__empty">No one has posted an order here.</p>}
           </div>
+          )}
           <div className="pigeon__letter">
             {order
               ? (
@@ -476,7 +496,9 @@ const Pigeon = ({ data }: { data: PigeonData }) => {
           <span className="pigeon__hint">{shown === 'letters' ? (waitingCount ? waitingCount + ' letter' + (waitingCount === 1 ? '' : 's') + ' waiting.' : 'All letters read.') : shown === 'supply' ? supplyHint : shown === 'courier' ? CourierHint(data.courier) : hint}</span>
           <div className="pigeon__actions">
             {shown === 'send' && <button className="pigeon__button pigeon__button--primary" disabled={!canSend} onClick={submit}>{sendLabel}</button>}
-            <button className="pigeon__button" onClick={() => send('dbo:pigeonClose', data.nonce)}>Close</button>
+            {handoff
+              ? <button className="pigeon__button" onClick={() => send('dbo:pigeonCompose', data.nonce, '')}>Cancel</button>
+              : <button className="pigeon__button" onClick={() => send('dbo:pigeonClose', data.nonce)}>Close</button>}
           </div>
         </div>
       </div>
