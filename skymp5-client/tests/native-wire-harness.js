@@ -19,7 +19,7 @@ check('the separator is the same on both sides', M.UI_SEP === String.fromCharCod
 check('the menu name is the same on both sides', LIB.includes(`var DBO_MENU = "${M.MENU_NAME}";`));
 check('the service pushes to the function the panels define', SVC.includes('"_root.dboData"'));
 
-const server = SERVER ? ['decor.js', 'prayer.js', 'gamemode.js', 'citizenship.js', 'keyring.js', 'tenancy.js'].map((f) => fs.readFileSync(path.join(SERVER, f), 'utf8')).join('\n') : '';
+const server = SERVER ? ['decor.js', 'prayer.js', 'gamemode.js', 'citizenship.js', 'keyring.js', 'tenancy.js', 'dungeons.js', 'supernatural.js'].map((f) => fs.readFileSync(path.join(SERVER, f), 'utf8')).join('\n') : '';
 const handled = (ev) => new RegExp(`(onUi|panelAct)\\('${ev}'`).test(server);
 
 const fixtures = {
@@ -30,6 +30,12 @@ const fixtures = {
     place: { root: 1, name: 'H', here: 0, more: 0, rooms: [{ ref: 11, label: 'Chest', kind: 'chest', assigned: null, shared: false, other: null }, { ref: 12, label: 'Box', kind: 'chest', assigned: 'B', shared: true, other: null }] },
     events: { claim: 'housing:claim', abandon: 'housing:abandon', revoke: 'housing:revoke', lock: 'housing:lock', unlock: 'housing:unlock', transfer: 'housing:transfer', rename: 'housing:rename', createKey: 'housing:createkey', revokeKeys: 'housing:revokekeys', grantContainer: 'housing:grantcontainer', assign: 'housing:assign', unassign: 'housing:unassign', share: 'housing:share', unshare: 'housing:unshare', cancel: 'housing:cancel' } },
   dbo_decor: { type: 'decor', id: 171, nonce: 'p1', view: 'catalog', home: 'h', owner: true, undo: 5, budget: [{ label: 'Pieces', used: 0, of: 3 }], groups: [{ id: 'beds', label: 'Beds' }], group: 'beds', page: 0, pages: 2, rows: [{ key: '9001:Skyrim.esm', name: 'Bed', cost: [], why: '' }], nearby: [] },
+  dbo_deity: { type: 'deityPicker', id: 36, nonce: 'd1', current: 'mara', first: false, daysLeft: 0, cooldownDays: 7, canChoose: true, notice: '', noticeKind: '',
+    choices: [{ id: 'mara', name: 'Mara', kind: 'divine', sphere: '', boon: '', reachable: true, lawful: true, aspectOf: '' }, { id: 'boethiah', name: 'Boethiah', kind: 'daedra', sphere: '', boon: '', reachable: true, lawful: false, aspectOf: '' }] },
+  dbo_dungeon: { type: 'dungeonGate', id: 60, nonce: 'g1', name: 'Bleak Falls Barrow', kind: 'Nordic ruin', party: [], difficulties: [{ id: 'story', label: 'Novice', blurb: '' }, { id: 'normal', label: 'Adept', blurb: '' }], minutes: 60, cooldownMinutes: 120, canClaim: true },
+  dbo_rite: { type: 'rite', id: 39, nonce: 'r1', title: 'Rite', flavor: '', deadly: true, round: 1, rounds: 3, need: 2, hits: 0, misses: 0, period: 1600, zone: [0.5, 0.2], startsIn: 0, result: '', judge: 'client', rnonce: 'a1', graceMs: 100, limitMs: 7000 },
+  dbo_context: { type: 'contextMenu', id: 10, targetName: 'Lydia', mode: 'menu', lines: [], events: { action: 'pa:action', close: 'pa:close', trade: 'pa:trade' },
+    actions: [{ id: 'trade', label: 'Trade' }, { id: 'party', label: 'Invite to party' }, { id: 'search', label: 'Search' }] },
 };
 // Drives every control the panel has, so every key it can send is on the wire
 const drive = {
@@ -55,17 +61,39 @@ const drive = {
     t.root.dboPanel.list.r0.rv.onRelease(); t.root.dboPanel.list.r1.gr.onRelease();
     t.press(27);
   },
+  dbo_deity: (t) => {
+    t.press(39); t.press(49); t.root.dboPanel.foot.take.onRelease(); t.root.dboPanel.foot.go.onRelease();
+    t.push(Object.assign({}, fixtures.dbo_deity, { nonce: 'd2', current: '', first: true })); t.press(49); t.root.dboPanel.foot.take.onRelease(); t.press(27);
+  },
+  dbo_dungeon: (t) => {
+    t.press(50);
+  },
+  // the gate closes on its first choice and sends nothing after, so its other key gets a run of its own
+  'dbo_dungeon#back': (t) => {
+    t.root.dboPanel.body.back.onRelease();
+  },
+  dbo_rite: (t) => {
+    t.st.time += 400; t.tick(); t.press(32);
+    t.push(Object.assign({}, fixtures.dbo_rite, { round: 2, rnonce: 'a2' })); t.st.time += 7100; t.tick();
+    t.push(Object.assign({}, fixtures.dbo_rite, { round: 3, rnonce: 'a3', mode: 'pick', spots: [[20, 50, 0.2], [70, 50, 0.9]], minPickMs: 300 })); t.st.time += 400; t.press(50);
+    t.press(27); t.root.dboPanel.body.yield.onRelease();
+  },
+  dbo_context: (t) => {
+    t.press(49); t.push(fixtures.dbo_context); t.root.dboPanel.body.r2.onRelease(); t.push(fixtures.dbo_context); t.press(27);
+  },
 };
+
+fixtures['dbo_dungeon#back'] = fixtures.dbo_dungeon;
 
 for (const menu of Object.keys(fixtures)) {
   for (const late of [false, true]) {
-    const t = S.boot(menu, late);
+    const t = S.boot(menu.split('#')[0], late);
     if (late) { t.tick(); t.arrive(); t.tick(); }
     t.push(fixtures[menu]);
     drive[menu](t);
     const events = t.sent.filter((m) => m.e === 'dboUi');
     const parsed = events.map((m) => M.parseUiEvent(m.e, m.s, m.n));
-    check(`${menu}${late ? ' (skse late)' : ''}: the service parses every event the panel sends`, parsed.length > 3 && parsed.every(Boolean), events.filter((m, i) => !parsed[i]));
+    check(`${menu}${late ? ' (skse late)' : ''}: the service parses every event the panel sends`, parsed.length > (menu.indexOf('dbo_dungeon') === 0 ? 1 : 3) && parsed.every(Boolean), events.filter((m, i) => !parsed[i]));
     check(`${menu}${late ? ' (skse late)' : ''}: ready leads and carries its frame where the service reads it`, parsed[0].key === 'ready' && parsed[0].frame === (late ? 2 : 1), parsed[0]);
     const box = M.parseOutbox(t.root.dboOut, 0);
     check(`${menu}${late ? ' (skse late)' : ''}: the outbox carries the same messages, in order, through parseOutbox`,

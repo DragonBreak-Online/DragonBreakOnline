@@ -114,6 +114,16 @@ const decor = { type: 'decor', id: 171, nonce: 'p1', view: 'catalog', home: "Ola
   rows: Array.from({ length: 8 }, (_, i) => ({ key: `k${i}`, name: `Bed ${i + 1}`, cost: [{ name: 'Firewood', n: 4, have: 6 }], why: '' })) };
 const prayer = { type: 'prayer', id: 35, nonce: 'n1', mode: 'pick', deity: 'Mara', kind: 'divine', shrine: 'Shrine of Mara', sphere: 'Love and compassion', verses: [{ lines: ['Mother of all, hear me', 'Mother of storms, hear me', 'Mother of none, hear me'] }, { lines: ['a', 'b', 'c'] }], right: [0, 0], slips: 2, totalMs: 120000, minPickMs: 300, judge: 'client' };
 
+const deity = { type: 'deityPicker', id: 36, nonce: 'd1', current: '', first: true, daysLeft: 0, cooldownDays: 7, canChoose: true, notice: '', noticeKind: '',
+  choices: ['Akatosh', 'Arkay', 'Dibella', 'Julianos', 'Kynareth', 'Mara', 'Stendarr', 'Talos', 'Zenithar', 'Auri-El'].map((n) => ({ id: n.toLowerCase().replace('-', ''), name: n, kind: 'divine', sphere: 'Love, compassion and the bonds between people. The Mother of Mankind, she blesses marriages.', boon: 'Restoration spells cost 10% less.', reachable: n !== 'Talos', lawful: n !== 'Talos', aspectOf: n === 'Auri-El' ? 'akatosh' : '' }))
+    .concat(Array.from({ length: 16 }, (_, i) => ({ id: 'p' + i, name: 'Prince ' + i, kind: 'daedra', sphere: '', boon: '', reachable: true, lawful: false, aspectOf: '' }))) };
+const rite = { type: 'rite', id: 39, nonce: 'r1', title: 'The Rite of the Moon', flavor: 'Hircine watches. Strike true while the moon stands in the mark, or be his quarry.', deadly: true, round: 2, rounds: 3, need: 2, hits: 1, misses: 0,
+  period: 1600, zone: [0.5, 0.2], startsIn: 0, result: 'True.', judge: 'client', rnonce: 'a1', graceMs: 100, limitMs: 7000 };
+const gate = { type: 'dungeonGate', id: 60, nonce: 'g1', name: 'Bleak Falls Barrow', kind: 'Nordic ruin, boss dungeon', party: ['Lydia', 'Faendal', 'Camilla Valerius'], minutes: 60, cooldownMinutes: 120, canClaim: true,
+  difficulties: [{ id: 'story', label: 'Novice', blurb: 'Ordinary foes, fewer of them. Modest loot, no locked chests.' }, { id: 'normal', label: 'Adept', blurb: 'As Bethesda placed them. Fair loot, a few locked chests.' }, { id: 'hard', label: 'Expert', blurb: 'The strongest of each kind, more of them. Better loot.' }, { id: 'nightmare', label: 'Master', blurb: 'The strongest, half again as many, most chests locked. The best loot.' }] };
+const ctxMenu = { targetName: 'Lydia', mode: 'menu', lines: [], events: { action: 'pa:action', close: 'pa:close' },
+  actions: [{ id: 'trade', label: 'Trade' }, { id: 'party', label: 'Invite to party' }, { id: 'search', label: 'Search' }, { id: 'capture', label: 'Arrest' }, { id: 'pickpocket', label: 'Pickpocket' }, { id: 'super:feed', label: 'Feed' }] };
+
 const SETUPS = [
   ['board-list', { swf: 'dbo_board', drive: (t) => t.push(board) }],
   ['board-reader', { swf: 'dbo_board', drive: (t) => { t.push(board); t.press(49); } }],
@@ -123,6 +133,12 @@ const SETUPS = [
   ['journal', { swf: 'dbo_journal', drive: (t) => t.push(journal) }],
   ['decor', { swf: 'dbo_decor', drive: (t) => t.push(decor) }],
   ['prayer', { swf: 'dbo_prayer', drive: (t) => t.push(prayer) }],
+  ['deity', { swf: 'dbo_deity', drive: (t) => { t.push(deity); t.press(51); } }],
+  ['deity-turn', { swf: 'dbo_deity', drive: (t) => { t.push(Object.assign({}, deity, { current: 'mara', first: false, canChoose: true, notice: 'You now follow Mara. Her shrines will hear you, and her blessing rests on you; you may turn again in seven days.', noticeKind: 'taken' })); t.press(39); t.press(49); t.root.dboPanel.foot.take.onRelease(); } }],
+  ['rite', { swf: 'dbo_rite', drive: (t) => t.push(rite) }],
+  ['rite-pick-yield', { swf: 'dbo_rite', drive: (t) => { t.push(Object.assign({}, rite, { mode: 'pick', spots: [[20, 40, 0.3], [50, 60, 0.9], [80, 30, 0.5]], cue: 'pulse', minPickMs: 300 })); t.press(27); } }],
+  ['dungeon', { swf: 'dbo_dungeon', drive: (t) => t.push(gate) }],
+  ['context', { swf: 'dbo_context', drive: (t) => t.push(ctxMenu) }],
 ];
 // Where each visible text actually sits on the stage: its field's box narrowed to the estimated width of its words by its
 // alignment (single lines), or the field's box (wrapped text), so two texts that touch can be found without a renderer
