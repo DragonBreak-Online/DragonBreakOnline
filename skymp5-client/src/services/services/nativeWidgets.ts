@@ -23,6 +23,10 @@ export const NATIVE_WIDGETS: Readonly<Record<string, string>> = {
   bountyBoard: "dbo_board",
   housing: "dbo_housing",
   contextMenu: "dbo_context",
+  // The F7 admin panel (Worker 2). Client-service only: no server module publishes a widget of this type, so
+  // it needs no SHARED_WITH_GAMEPLAY entry. adminMenuService keeps the catalogs in TS and answers the SWF
+  // one paged tab at a time through admin::ui, because the whole catalogue is far over MAX_PAYLOAD_CHARS.
+  adminPanel: "dbo_admin",
   // No emoteWheel entry, deliberately. The emote wheel stays on the CEF overlay: it is a hold-and-flick
   // wheel, and a CustomMenu is modal and pauses the game, which is the wrong shape for it (the Leader,
   // 26 Oct, agreeing with the original split). emoteService may keep its openNative call - with no entry here
