@@ -119,11 +119,38 @@ namespace {
 
 constexpr auto kPotionCooldown = std::chrono::seconds{ 10 };
 
+float PercentageOf(const ActorValues& values, espm::ActorValue av)
+{
+  switch (av) {
+    case espm::ActorValue::Health:
+      return values.healthPercentage;
+    case espm::ActorValue::Magicka:
+      return values.magickaPercentage;
+    case espm::ActorValue::Stamina:
+      return values.staminaPercentage;
+    default:
+      return -1.f;
+  }
+}
+
 void RestoreActorValuePatched(MpActor* actor, espm::ActorValue actorValue,
                               float value)
 {
+  // [restore] (Worker 4, 27 Oct) - a measurement, not a fix. Players report a potion's effect appearing and
+  // then being taken away again, and every candidate cause on this path has been ruled out by reading it:
+  // the effect is classified, the gamemode does not cancel the event, the ceiling already exempts a fresh
+  // restore for five seconds, and server and client agree on the maximum. So record what actually happens -
+  // the magnitude, the maximum it is divided by, and the percentage either side - and let the next report
+  // say which of those is wrong. Remove once it is understood.
+  const float before = PercentageOf(actor->GetActorValues(), actorValue);
   actor->RestoreActorValue(actorValue, value);
+  const float after = PercentageOf(actor->GetActorValues(), actorValue);
   actor->UpdateNextRestorationTime(actorValue, std::chrono::seconds{ 5 });
+  spdlog::info(
+    "[restore] {:x} av={} magnitude={} max={} percentage {} -> {}",
+    actor->GetFormId(),
+    static_cast<std::underlying_type_t<espm::ActorValue>>(actorValue), value,
+    actor->GetMaximumValues().GetValue(actorValue), before, after);
 }
 
 }

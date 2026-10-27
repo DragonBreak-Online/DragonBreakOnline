@@ -2263,6 +2263,10 @@ void ActionListener::OnChangeValues(const RawMessageData& rawMsgData,
       outVal = currentVal;
       sendOutMsg = true;
       actor->SetLastPercentageUpdate(av, now);
+      // Pairs with [restore] in MpActor.cpp: what the client reported against what we echo back.
+      spdlog::info("[restore] {:x} av={} echo: client reported {}, server holds {}",
+                   actor->GetFormId(), static_cast<int>(av), *inputVal,
+                   currentVal);
       return;
     }
 
@@ -2282,6 +2286,14 @@ void ActionListener::OnChangeValues(const RawMessageData& rawMsgData,
     if (!MathUtils::IsNearlyEqual(newVal, *inputVal)) {
       outVal = newVal;
       sendOutMsg = true;
+      // Only a big clawback is worth a line. Ordinary per-tick cropping differs by a rounding, whereas a
+      // potion being undone takes a visible slice of the bar back, which is the thing being chased.
+      constexpr float kInterestingClawback = 0.02f;
+      if (*inputVal - newVal > kInterestingClawback) {
+        spdlog::info("[crop] {:x} av={} clawed back: client {} -> {}",
+                     actor->GetFormId(), static_cast<int>(av), *inputVal,
+                     newVal);
+      }
     }
 
     actor->SetPercentage(av, newVal);
