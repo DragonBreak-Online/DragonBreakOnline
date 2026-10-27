@@ -1652,7 +1652,7 @@ module.exports = (api) => {
   // Returns false to block the activation, true to let it through, null when it is not ours.
   globalThis.__dboDungeonActivate = (targetId, casterId) => {
     if (!C.enabled) return null;
-    if (isExpeditionBoard(targetId)) { openBoard(casterId); return false; }
+    if (isExpeditionBoard(targetId)) { openBoard(casterId, targetId); return false; }
     const inside = insideDoors.get(targetId);
     if (inside && inside.entrance.expedition) {
       // The ruin's main door has no destination of its own: it leads home to the hall the party left from
@@ -1938,13 +1938,40 @@ module.exports = (api) => {
   const uiCaps = globalThis.__dboExpeditionCaps instanceof Map ? globalThis.__dboExpeditionCaps : (globalThis.__dboExpeditionCaps = new Map());
   onUi('uiCaps', (a, args) => { uiCaps.set(a >>> 0, new Set((args || []).map(String))); });
   const boardCaps = { has: (a) => (uiCaps.get(a >>> 0) || new Set()).has('expeditionBoard') };
-  const openExpeditions = (a, st, tab) => {
-    const list = EXPEDITIONS.map((x) => byId.get(x.id)).filter(Boolean);
+  // Which boards post expeditions (Nat, 27 Oct: the boards in the Skyrim holds show contracts and the rest, "NOT expeditions",
+  // Skyrim having no ruin to send a party to yet). dungeons.boards { expeditions: { <province>: bool }, refs: { <board desc>:
+  // { expeditions, province } } }: a ref's own setting wins, then its province's (by the board's cell, else the reader's, as
+  // provinceOfDungeon reads a ruin), then true. A board that posts them still sends a party only from a hall in
+  // expeditionStarts; a board that does not opens on its Contracts tab with an empty expeditions list
+  const BOARDS = Object.assign({ expeditions: { cyrodiil: true, skyrim: false, solstheim: false }, refs: {} }, C.boards || {});
+  const boardRefCfg = (ref) => {
+    const refs = BOARDS.refs || {};
+    let desc = ''; try { desc = String(mp.getDescFromId ? mp.getDescFromId(ref >>> 0) : ''); } catch (e) { desc = ''; }
+    const k = Object.keys(refs).find((x) => normDesc(x) === normDesc(desc) || (parseInt(x, 16) >>> 0) === (ref >>> 0));
+    return k ? refs[k] || {} : {};
+  };
+  const provinceOfBoard = (ref, a) => {
+    const own = boardRefCfg(ref).province;
+    if (own) return String(own).toLowerCase();
+    let where = ''; try { where = String(mp.get(ref >>> 0, 'worldOrCellDesc') || ''); } catch (e) { where = ''; }
+    return provinceOfDungeon({ cell: where || whereIs(a) });
+  };
+  const boardPostsExpeditions = (ref, a) => {
+    if (!ref) return true;
+    const own = boardRefCfg(ref).expeditions;
+    if (typeof own === 'boolean') return own;
+    const v = (BOARDS.expeditions || {})[provinceOfBoard(ref, a)];
+    return typeof v === 'boolean' ? v : true;
+  };
+  const openExpeditions = (a, st, tab, ref) => {
+    const posts = boardPostsExpeditions(ref, a);
+    const list = posts ? EXPEDITIONS.map((x) => byId.get(x.id)).filter(Boolean) : [];
     // The Contracts tab (Nate, 2026-09-30): the hold's hunting work, from contracts.js; absent when it failed to load
     let contracts;
     try { contracts = globalThis.__dboContractsBoard ? globalThis.__dboContractsBoard.view(a) : undefined; } catch (e) { log('contracts board view failed', e.message); }
-    if (!list.length && !contracts) return personal(a, 'No expeditions are being organised right now.');
-    expeditionPending.set(a, true);
+    if (!list.length && !contracts) return personal(a, posts ? 'No expeditions are being organised right now.' : 'Nothing is posted on this board right now.');
+    expeditionPending.set(a, ref || true);
+    if (!posts && !boardCaps.has(a)) return personal(a, 'This board posts the hold\'s hunting work: /contract lists it.');
     if (!boardCaps.has(a)) {
       return openWidget(a, { type: 'contextMenu', id: EXPEDITION_WIDGET_ID, mode: 'menu', targetName: `Expeditions from ${st.name}: Ayleid ruins far to the south`,
         actions: list.map((d) => ({ id: d.id, label: `${d.name}, ${kindLabel(d)}${d.county ? `, ${d.county}` : ''} (${expeditionStatus(a, d)})` })),
@@ -1952,22 +1979,25 @@ module.exports = (api) => {
     }
     openWidget(a, { type: 'expeditionBoard', id: EXPEDITION_WIDGET_ID, hall: st.name,
       expeditions: list.map((d) => ({ id: d.id, name: d.name, county: d.county || '', kind: kindLabel(d), status: expeditionStatus(a, d), state: statusState(a, d), masters: mastersOf(d) })),
-      bossReturnMinutes: C.bossReturnMinutes, leaseMinutes: C.leaseMinutes, contracts, tab: tab === 'contracts' ? 'contracts' : 'expeditions',
+      bossReturnMinutes: C.bossReturnMinutes, leaseMinutes: C.leaseMinutes, contracts, tab: tab === 'contracts' || !posts ? 'contracts' : 'expeditions', expeditionsPosted: posts,
       events: { pick: 'dbo:expeditionPick', close: 'dbo:expeditionClose', contractTake: 'dbo:contractTake', contractAbandon: 'dbo:contractAbandon', contractDeliver: 'dbo:contractDeliver' } }, true);
   };
   // contracts.js redraws the board on the Contracts tab after a take or a give-up, if that player still has it open
   globalThis.__dboExpeditionBoardRefresh = (a, tab) => {
     if (!expeditionPending.has(a)) return;
-    const st = startOf(a);
-    if (st) openExpeditions(a, st, tab);
+    const ref = expeditionPending.get(a);
+    openBoard(a, typeof ref === 'number' ? ref : 0, tab);
   };
-  const openBoard = (a) => {
+  const openBoard = (a, ref, tab) => {
     const st = startOf(a);
-    if (!st) return personal(a, WHERE_FROM);
-    openExpeditions(a, st);
+    if (boardPostsExpeditions(ref, a)) return st ? openExpeditions(a, st, tab, ref) : personal(a, WHERE_FROM);
+    const zone = (() => { try { const v = globalThis.__dboContractsBoard ? globalThis.__dboContractsBoard.view(a) : null; return v && v.zone; } catch (e) { return ''; } })();
+    openExpeditions(a, st || { name: zone || 'this hold' }, 'contracts', ref);
   };
   onUi('expeditionPick', (a, args) => {
+    const from = expeditionPending.get(a);
     if (!expeditionPending.delete(a)) return;
+    if (typeof from === 'number' && !boardPostsExpeditions(from, a)) return closeWidget(a, EXPEDITION_WIDGET_ID);
     closeWidget(a, EXPEDITION_WIDGET_ID);
     const d = byId.get(String(args[0] || ''));
     if (!d || !d.expedition) return;
