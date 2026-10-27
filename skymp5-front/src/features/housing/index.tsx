@@ -55,6 +55,8 @@ export interface HousingData {
   assignedToYou?: boolean;
   // Keys are on the Key Ring (/keys) and a key opens a locked door for its holder
   keyRing?: boolean;
+  // set by the client router when the native menu hands off its name box: 'rename'
+  handoff?: string;
   events: HousingEvents;
 }
 
@@ -134,6 +136,53 @@ const Housing = ({ data }: { data: HousingData }) => {
   const status = canLock
     ? (isOwner ? 'Yours' : isManager ? 'Managed' : 'Key holder') + (data.locked ? ' · locked' : ' · unlocked')
     : (data.owned ? 'Owned by another' : 'Unclaimed');
+
+  const renameBox = (
+    <>
+      <div className="housing__rename">
+        <input
+          className="housing__input"
+          placeholder="name this property"
+          maxLength={32}
+          spellCheck={false}
+          autoFocus={data.handoff === 'rename'}
+          value={rename}
+          onChange={(e) => setRename(e.target.value)}
+        />
+        <button
+          className="housing__button"
+          disabled={!rename.trim() || !NAME_CHARS.test(rename.trim())}
+          onClick={() => send(ev.rename, rename.trim())}
+        >
+          Save
+        </button>
+      </div>
+      {rename.trim() && !NAME_CHARS.test(rename.trim()) ? (
+        <p className="housing__hint">Letters, numbers, spaces, apostrophes and dashes only.</p>
+      ) : null}
+    </>
+  );
+
+  // The native menu's Rename...: only the name box; Save keeps it up until the router takes the menu back to native,
+  // Cancel closes the menu (its cancel ends the hand-off)
+  if (data.handoff === 'rename' && manages) {
+    return (
+      <div className="housing">
+        <div className="housing__fade" />
+        <div className="housing__panel">
+          <div className="housing__header">
+            <h2 className="housing__title">Rename {displayName}</h2>
+          </div>
+          {renameBox}
+          <div className="housing__footer">
+            <button className="housing__button housing__button--quiet" onClick={() => send(ev.cancel)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="housing">
@@ -229,29 +278,7 @@ const Housing = ({ data }: { data: HousingData }) => {
           <p className="housing__hint">A locked door keeps out everyone without a key; you and your key holders walk straight in. Cut a key puts it on your Key Ring (the Key Ring button here, or Keys in your journal), where you can give it, cut one for a player beside you, or take a copy back. Void all keys cancels every copy.</p>
         )}
 
-        {manages ? (
-          <div className="housing__rename">
-            <input
-              className="housing__input"
-              placeholder="name this property"
-              maxLength={32}
-              spellCheck={false}
-              value={rename}
-              onChange={(e) => setRename(e.target.value)}
-            />
-            <button
-              className="housing__button"
-              disabled={!rename.trim() || !NAME_CHARS.test(rename.trim())}
-              onClick={() => send(ev.rename, rename.trim())}
-            >
-              Save
-            </button>
-          </div>
-        ) : null}
-
-        {manages && rename.trim() && !NAME_CHARS.test(rename.trim()) ? (
-          <p className="housing__hint">Letters, numbers, spaces, apostrophes and dashes only.</p>
-        ) : null}
+        {manages ? renameBox : null}
 
         {manages && data.place ? <Rooms place={data.place} ev={ev} /> : null}
 

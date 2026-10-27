@@ -40,15 +40,16 @@ let sorted;
   const t = boot();
   vm.runInContext('_root.dboData(' + JSON.stringify(JSON.stringify(ROUND)) + ')', t.ctx);
   const p = t.root.dboPanel;
-  check('the title is the shrine', p.titleTf.text === 'Shrine of Mara', p.titleTf.text);
+  check('the title is the shrine', p.titleTf.text === 'SHRINE OF MARA', p.titleTf.text);
   check('the sphere is its first sentence', p.sphereTf.text === 'Mara: Love and compassion.', p.sphereTf.text);
   check('three rows for the first verse', t.rows().length === 3, t.rows().length);
-  check('rows rest at 30 percent', t.rows().every((r) => r._alpha === 30));
+  check('rows rest at 50 percent (the branded rest, brighter than vanilla 30 on the teal)', t.rows().every((r) => r._alpha === 50));
   check('a quoted line survives the payload', t.rows()[0].label.text === 'A "quoted" line', t.rows()[0].label.text);
   t.st.time += 100; t.rows()[1].onRelease();
   check('a pick inside the lock is ignored', t.msgs().length === 1, t.msgs());
   t.st.time += 400; t.rows()[0].onRollOver();
   check('hover focuses at full alpha with a focus sound', t.rows()[0]._alpha === 100 && t.sounds.includes('PlaySound:UIMenuFocus'), t.sounds);
+  check('the focused row carries the aqua wash, the others none', t.rows()[0].wash !== undefined && t.rows()[1].wash === undefined);
   t.rows()[0].onRelease();
   check('the first pick sends prayerStart', t.msgs()[1] && t.msgs()[1].key === 'dbo:prayerStart' && t.msgs()[1].args[0] === 'n1', t.msgs());
   check('a wrong line says how many more it bears', p.statusTf.text.indexOf('will bear one more') > 0, p.statusTf.text);
@@ -101,12 +102,12 @@ let sorted;
 {
   const t = boot();
   t.press(27);
-  check('Escape closes the menu from the SWF itself', t.sent.some((m) => m.e === 'closeMenu'), t.sent);
+  check('Escape closes the menu from the SWF itself', t.closed(), t.sent);
   const u = boot();
   u.st.time += 7999; u.tick();
-  check('no close before the payload wait runs out', !u.sent.some((m) => m.e === 'closeMenu'));
+  check('no close before the payload wait runs out', !u.closed());
   u.st.time += 1; u.tick();
-  check('a panel that never gets its payload closes itself', u.sent.some((m) => m.e === 'closeMenu'), u.sent);
+  check('a panel that never gets its payload closes itself', u.closed(), u.sent);
 }
 
 {
@@ -117,7 +118,7 @@ let sorted;
   const m = t.msgs();
   check('ready leads once skse appears, with its frame', m[0] && m[0].key === 'ready' && m[0].args[0] === 2, m);
   check('a stand-up pressed before boot is sent after it', m.some((x) => x.key === 'dbo:prayerCancel'), m);
-  check('and its close is carried out', t.sent.some((x) => x.e === 'closeMenu'), t.sent);
+  check('and its close is carried out', t.closed(), t.sent);
   check('the boot line logs the frame', t.logs.some((l) => l.indexOf('skse appeared on frame 2') >= 0), t.logs);
 }
 

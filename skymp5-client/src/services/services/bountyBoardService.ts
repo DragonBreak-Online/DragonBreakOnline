@@ -5,11 +5,15 @@ import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { BrowserMessageEvent, ButtonEvent, DxScanCode, InputDeviceType } from "skyrimPlatform";
 import { logTrace } from "../../logging";
+import { ScaleformMenuService } from "./scaleformMenuService";
+import { CLOSE_KEY, FAILED_KEY, HANDOFF_KEY } from "./nativeWidgets";
 
 // for the browser-side widget setter (executed inside the CEF browser)
 declare const window: any;
 
 const WIDGET_ID = 26;
+// bountyBoardSystem onPost: the notice it sends when a post is taken
+const PINNED = /^Your notice is pinned/;
 
 // Event keys exchanged with the browser. Namespaced to avoid collisions.
 const events = {
@@ -48,6 +52,8 @@ interface BoardInfo {
 }
 
 // Module-level so the browser-side widget setter can read it (runtime injection).
+// handoff: the native board handed its typed input to the browser ('compose:<tab>'); the front then draws only the composer
+let handoff = "";
 let info: BoardInfo = {
   board: "", boardName: "", costGold: 30, gold: 0,
   maxTextLen: 500, maxNotes: 60, expiryDays: 7, tabs: [], notes: [],
@@ -80,7 +86,7 @@ export class BountyBoardService extends ClientListener {
     // A front reload drops the widget without a close message; the server
     // still holds a board session, so close that too.
     this.controller.emitter.on("browserWindowLoaded", () => {
-      if (!this.menuOpen) return;
+      if (!this.menuOpen || this.native) return;
       this.menuOpen = false;
       sendCustomPacket(this.controller, { customPacketType: "bountyBoardClose" });
     });
@@ -122,12 +128,16 @@ export class BountyBoardService extends ClientListener {
           logTrace(this, `Opening board`, info.boardName);
           this.openMenu();
         } else if (this.menuOpen) {
+          // The refresh after our own post was pinned brings the native board back; anyone else's leaves the composer up
+          if (handoff && this.pinned) this.endHandoff();
           this.openMenu();
         }
         break;
       }
       case "bountyBoardNotice":
         if (typeof content["text"] === "string") {
+          // The server says "pinned" before the refresh of a post it took, and anything else for one it refused
+          if (handoff && this.posted) { this.pinned = PINNED.test(content["text"] as string); this.posted = false; }
           notifyNextUpdate(this.controller, this.sp, content["text"]);
         }
         break;
@@ -143,36 +153,93 @@ export class BountyBoardService extends ClientListener {
       if (this.menuOpen) this.closeMenu();
       return;
     }
-    if (typeof key !== "string" || !key.startsWith("bountyBoard:") || !this.menuOpen) return;
+    if (typeof key !== "string" || !key.startsWith("bountyBoard:")) return;
+    this.handleKey(key, Array.prototype.slice.call(e.arguments, 1));
+  }
+
+  // The board's keys, from the browser or the native panel (the router's onKey) alike
+  private handleKey(key: string, args: unknown[]): void {
+    if (key === FAILED_KEY) {
+      // The panel could not be drawn: the browser one for the rest of this opening
+      this.native = false;
+      this.noNative = true;
+      if (this.menuOpen) this.openMenu();
+      return;
+    }
+    if (key === CLOSE_KEY) {
+      // The panel went without the board's own close (Skyrim Souls' walk-away): end the session as Close would
+      this.native = false;
+      if (this.menuOpen) this.closeMenu();
+      return;
+    }
+    if (key === HANDOFF_KEY) {
+      this.native = false;
+      handoff = typeof args[1] === "string" ? (args[1] as string) : "compose";
+      this.posted = false;
+      this.pinned = false;
+      if (this.menuOpen) this.openMenu();
+      return;
+    }
+    if (!this.menuOpen) return;
 
     if (key === events.close) {
       this.closeMenu();
       return;
     }
     if (key === events.post) {
-      const tab = typeof e.arguments[1] === "string" ? (e.arguments[1] as string) : "";
-      const text = typeof e.arguments[2] === "string" ? (e.arguments[2] as string).trim() : "";
+      const tab = typeof args[0] === "string" ? (args[0] as string) : "";
+      const text = typeof args[1] === "string" ? (args[1] as string).trim() : "";
       if (tab && text) {
         sendCustomPacket(this.controller, { customPacketType: "bountyBoardPost", board: info.board, tab, text });
+        if (handoff) this.posted = true;
       }
       return;
     }
     if (key === events.remove) {
-      const id = Number(e.arguments[1]);
+      const id = Number(args[0]);
       if (Number.isFinite(id)) {
         sendCustomPacket(this.controller, { customPacketType: "bountyBoardRemove", board: info.board, id });
       }
     }
   }
 
+  // The native board when the client has it, else the browser one; the composer hand-off is always the browser
   private openMenu(): void {
     this.menuOpen = true;
-    openFormMenu(this.sp, this.browsersideWidgetSetter, { events, info, WIDGET_ID }, this.controller);
+    if (!handoff && !this.noNative) {
+      const scaleform = this.controller.lookupListener(ScaleformMenuService);
+      const widget = {
+        type: "bountyBoard", id: WIDGET_ID, boardName: info.boardName, costGold: info.costGold, gold: info.gold,
+        maxTextLen: info.maxTextLen, maxNotes: info.maxNotes, expiryDays: info.expiryDays, tabs: info.tabs, notes: info.notes, events,
+      };
+      if (scaleform && scaleform.openNative({ type: "bountyBoard", widget, widgetId: WIDGET_ID, onKey: (k, a) => this.handleKey(k, a) })) {
+        this.native = true;
+        return;
+      }
+    }
+    openFormMenu(this.sp, this.browsersideWidgetSetter, { events, info, WIDGET_ID, handoff }, this.controller);
+  }
+
+  // The composer's post was answered: the browser composer goes, the native board comes back on the next open
+  private endHandoff(): void {
+    handoff = "";
+    this.posted = false;
+    this.pinned = false;
+    closeFormMenu(this.sp, WIDGET_ID);
   }
 
   private closeMenu(): void {
     this.menuOpen = false;
-    closeFormMenu(this.sp, WIDGET_ID);
+    this.noNative = false;
+    if (this.native) {
+      this.native = false;
+      this.controller.lookupListener(ScaleformMenuService).closeNative("bountyBoard");
+    } else {
+      closeFormMenu(this.sp, WIDGET_ID);
+    }
+    handoff = "";
+    this.posted = false;
+    this.pinned = false;
     // The server keeps a per-player board session; tell it we walked away.
     sendCustomPacket(this.controller, { customPacketType: "bountyBoardClose" });
   }
@@ -192,10 +259,15 @@ export class BountyBoardService extends ClientListener {
       tabs: info.tabs,
       notes: info.notes,
       events: events,
+      handoff: handoff,
     };
     const others = (window.skyrimPlatform.widgets.get() || []).filter((w: any) => w.id !== WIDGET_ID);
     window.skyrimPlatform.widgets.set(others.concat([widget]));
   };
 
   private menuOpen = false;
+  private native = false;
+  private noNative = false;
+  private posted = false;
+  private pinned = false;
 }

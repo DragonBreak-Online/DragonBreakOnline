@@ -64,11 +64,13 @@ function button(parent, name, depth, x, y, w, label, font, size, rest, onPick)
    c.onRollOver = function()
    {
       this._alpha = A_FOCUS;
+      dboWash(this, true);
       dboSound("UIMenuFocus");
    };
    c.onRollOut = function()
    {
       this._alpha = this.rest;
+      dboWash(this, false);
    };
    c.onRelease = function()
    {
@@ -95,11 +97,13 @@ function setFocus(i)
    if (focus >= 0 && focus < actions.length)
    {
       actions[focus]._alpha = actions[focus].rest;
+      dboWash(actions[focus], false);
    }
    focus = i;
    if (focus >= 0)
    {
       actions[focus]._alpha = A_FOCUS;
+      dboWash(actions[focus], true);
       dboSound("UIMenuFocus");
    }
 }
@@ -107,8 +111,7 @@ function setFocus(i)
 function drawHeader()
 {
    var h = clear("head", 20);
-   var title = dboText(h, "title", 1, PAD, 20, PANEL_W - PAD * 2, 40, dboFmt(F_PLAIN, 30, C_TEXT, 1.0), false);
-   title.text = String(data.home);
+   dboTitle(h, "title", 1, PAD, 20, PANEL_W - PAD * 2, data.home);
    var x = PAD;
    for (var i = 0; i < data.budget.length; i++)
    {
@@ -117,7 +120,7 @@ function drawHeader()
       t.text = m.label + "  " + m.used + "/" + m.of;
       x += 200;
    }
-   dboRule(h, PAD, 98, PANEL_W - PAD * 2);
+   dboDivider(h, PAD, 98, PANEL_W - PAD * 2);
    var tx = PAD;
    for (var k = 0; k < TABS.length; k++)
    {
@@ -130,6 +133,10 @@ function drawHeader()
          view(this.v, null, 0);
       });
       b.v = TABS[k][0];
+      if (TABS[k][0] == data.view)
+      {
+         dboTabMark(b, TABS[k][1].length * 13);
+      }
       tx += 160;
    }
    if (data.undo > 0)
@@ -192,6 +199,8 @@ function row(l, i, title, sub, subColor, disabled, pick)
    var s = dboText(c, "sub", 3, 26, 24, w - 26, 22, dboFmt(F_MEDIUM, 16, subColor, 0.8), false);
    s.text = sub;
    c.rest = disabled ? 50 : A_ROW_REST;
+   c.washW = w;
+   c.washH = ROW_H - 4;
    c._alpha = c.rest;
    if (pick != null)
    {
@@ -320,7 +329,7 @@ function drawFooter()
 {
    var f = clear("foot", 60);
    var y = PANEL_H - 52;
-   dboRule(f, PAD, y - 8, PANEL_W - PAD * 2);
+   dboDivider(f, PAD, y - 8, PANEL_W - PAD * 2);
    button(f, "close", 1, PAD, y, 120, "Close", F_MEDIUM, 22, A_BUTTON_REST, function()
    {
       closePanel();
@@ -344,8 +353,10 @@ function drawFooter()
          });
       }
    }
-   var hint = dboText(f, "hint", 5, PANEL_W - PAD - 380, y + 6, 380, 24, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8, "right"), false);
-   hint.text = "1-8 or click to choose.  Arrows: page.  Q / R: tab.  Esc: close.";
+   // starts after the page arrows, so the hint never runs under them
+   var hx = PANEL_W / 2 + 150;
+   var hint = dboText(f, "hint", 5, hx, y + 6, PANEL_W - PAD - hx, 24, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8, "right"), false);
+   hint.text = "1-8 choose  -  Arrows page  -  Q / R tab";
 }
 
 function draw()
@@ -372,10 +383,10 @@ function draw()
 function build()
 {
    panel = _root.createEmptyMovieClip("dboPanel", 10);
-   panel._x = (STAGE_W - PANEL_W) / 2;
-   panel._y = 60;
+   dboFit(panel, PANEL_W, PANEL_H);
    var bg = panel.createEmptyMovieClip("bg", 1);
-   dboBox(bg, 0, 0, PANEL_W, PANEL_H, 0x000000, 80);
+   dboGround(bg, PANEL_W, PANEL_H);
+   dboWatermark(panel, 5, PANEL_W - 50, 160, 280);
    dboFadeIn(panel);
 }
 
@@ -428,9 +439,9 @@ function tabStep(d)
 var keys = {};
 keys.onKeyDown = function()
 {
-   var code = Key.getCode();
+   var code = dboKey();
    dboLog("decor key " + code);
-   if (code == 27 || code == 9)
+   if (code == 27)
    {
       closePanel();
       return;
