@@ -57,7 +57,7 @@ TEST_CASE("Dropping an item", "[DropItemTest]")
 // describe an item's condition, and ordinary enchanted loot carries
 // enchantmentId and maxCharge, so testing "any extras" made every looted sword
 // of flames undroppable. The case below this one is what caught that.
-TEST_CASE("A named item is not dropped, an unnamed one is", "[DropItemTest]")
+TEST_CASE("A named item drops, like any other", "[DropItemTest]")
 {
   auto& partOne = GetPartOne();
   constexpr uint32_t ironSword = 0x00012EB7;
@@ -75,12 +75,14 @@ TEST_CASE("A named item is not dropped, an unnamed one is", "[DropItemTest]")
     return ac.GetInventory().GetItemCount(ironSword);
   };
 
-  // named at an enchanting or crafting table: it stays in the pack
+  // Named at an enchanting or crafting table. It was refused for a while; Nat reversed that on 26 Oct, so
+  // it leaves the pack like anything else - and MpActor::DropItem's extras keep-alive is what now stops it
+  // being lost to the two-minute ground, which is the reason the refusal existed at all.
   Inventory::ExtraData named;
   named.name = "Sylvia's Greatsword";
   ac.RemoveAllItems();
   ac.AddItems({ Inventory::Entry(ironSword, 1, named) });
-  REQUIRE(tryDrop() == 1);
+  REQUIRE(tryDrop() == 0);
 
   // tempered and enchanted but unnamed: ordinary gear, and it drops
   Inventory::ExtraData gear;
@@ -218,8 +220,10 @@ TEST_CASE("A dropped item carrying extras survives the drop queue cap",
 // The two features therefore disagree about named items, and this case pins the precedence down so that
 // nobody repairs one of them by quietly breaking the other. Whether a made item SHOULD be droppable is
 // Nat's decision, not something to settle in code.
-TEST_CASE("A named item is refused before it can be dropped at all",
-          "[DropItemTest]")
+// The refusal used to stop a named item ever reaching MpActor::DropItem, so the extras keep-alive could not
+// apply to the very items it was written for. With the refusal gone (Nat, 26 Oct) that path is live, and this
+// is the case that was unreachable before: a NAMED item is placed in the world carrying its name.
+TEST_CASE("A named item reaches the ground and keeps its name", "[DropItemTest]")
 {
   auto& partOne = GetPartOne();
   constexpr uint32_t ironSword = 0x00012EB7;
@@ -238,7 +242,7 @@ TEST_CASE("A named item is refused before it can be dropped at all",
   }
 
   Inventory::Entry named(ironSword, 1);
-  named.name = "asd";
+  named.name = "Sylvia's Greatsword";
   named.health = 1.5f;
   ac.AddItems({ named });
   REQUIRE(ac.GetInventory().GetItemCount(ironSword) == 1);
@@ -249,10 +253,10 @@ TEST_CASE("A named item is refused before it can be dropped at all",
                             { "count", 1 } });
   partOne.Tick();
 
-  // Still in the pack, which is the made-item rule doing its job
-  REQUIRE(ac.GetInventory().GetItemCount(ironSword) == 1);
+  // It left the pack
+  REQUIRE(ac.GetInventory().GetItemCount(ironSword) == 0);
 
-  // And nothing was placed in the world, so the extras keep-alive never came into it
+  // ...and it is on the ground, still named, which is what the keep-alive protects
   int placed = 0;
   for (uint32_t id = firstNew; id < 0xff000400; ++id) {
     auto form = partOne.worldState.LookupFormById(id);
@@ -261,5 +265,5 @@ TEST_CASE("A named item is refused before it can be dropped at all",
       ++placed;
     }
   }
-  REQUIRE(placed == 0);
+  REQUIRE(placed == 1);
 }
