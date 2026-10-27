@@ -144,6 +144,10 @@ module.exports = (api) => {
 
   // ---- the fight ----------------------------------------------------------------------------------------------------
   const roleOf = (tag) => { const m = /^boss:([a-z0-9]+):([a-z0-9-]+)$/.exec(String(tag || '')); return m && byId.has(m[1]) ? { boss: byId.get(m[1]), role: m[2] } : null; };
+  // A boss, its guardian and its adds are one side (Nat, 27 Oct: the Valkynaz "keeps killing itself"; its High Clannfear
+  // guardian and its scamp fought it on the hoster's client, and the guardian's power attack felled it 20 s after it rose,
+  // "killed by nobody" each time). gamemode.js dungeonAllies asks this, so their hits on each other are refused
+  globalThis.__dboBossAllies = (a, b) => { const x = roleOf(get(a, 'private.npcSpawner')), y = roleOf(get(b, 'private.npcSpawner')); return !!(x && y && x.boss.id === y.boss.id); };
   const name = (id, text) => { try { mp.callPapyrusFunction('method', 'ObjectReference', 'SetDisplayName', { type: 'form', desc: mp.getDescFromId(id >>> 0) }, [text, true]); } catch (e) { log('bosses: naming failed', e.message); } };
   const glow = (ids, on, world) => { for (const a of onlineActors()) { if (world && String(get(a, 'worldOrCellDesc') || '') !== world) continue; try { sendPacket(a, { customPacketType: 'dboGlow', refs: ids, on, kind: 'champion' }); } catch (e) { /* offline */ } } };
   const healthOf = (id) => { const p = get(id, 'percentages'); return p && typeof p.health === 'number' ? p.health : null; };

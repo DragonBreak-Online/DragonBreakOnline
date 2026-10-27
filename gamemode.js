@@ -8087,6 +8087,8 @@ const dungeonAllies = (a, b) => {
     if (mp.get(a, 'private.dboCompanion') || mp.get(b, 'private.dboCompanion')) return false;
     // Blackreach's spawns (blackreach.js): one open-world dungeon, whose camps stand side by side
     if (typeof globalThis.__dboBlackreachAllies === 'function' && globalThis.__dboBlackreachAllies(a, b)) return true;
+    // A world boss's own fight (bosses.js): the boss, its guardian and its adds
+    if (typeof globalThis.__dboBossAllies === 'function' && globalThis.__dboBossAllies(a, b)) return true;
     const cell = cellKey(a);
     return cell === cellKey(b) && !!globalThis.__dboDungeonCells && globalThis.__dboDungeonCells.has(cell);
   } catch (e) { return false; }
@@ -8727,7 +8729,7 @@ try {
   const BOSSES_JS = path.resolve('bosses.js');
   delete require.cache[BOSSES_JS];
   require(BOSSES_JS)({ mp, log, personal, audit, display, who, cfg, giveItem, registerChatCommand, sendPacket, onlineActors, every, stopTimer, profileOf, zoneOfActor, isLeadStaff });
-} catch (e) { log('bosses.js failed to load:', e.stack || e.message); globalThis.__dboBossHit = null; globalThis.__dboBossDeath = null; globalThis.__dboBossDamageMult = null; }
+} catch (e) { log('bosses.js failed to load:', e.stack || e.message); globalThis.__dboBossHit = null; globalThis.__dboBossDeath = null; globalThis.__dboBossDamageMult = null; globalThis.__dboBossAllies = null; }
 
 // ---- mining and woodcutting mini-games (server\labour.js, config "labour") ---------------------
 try {
