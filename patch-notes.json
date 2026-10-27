@@ -1,5 +1,41 @@
 [
   {
+    "title": "Strongholds, inn boards and home planters",
+    "date": "2026-10-28",
+    "version": "Server update",
+    "tag": "Update",
+    "sections": [
+      {
+        "heading": "Regeneration",
+        "items": [
+          "Hunger and cold now really slow your regeneration - being cold enough can stop it entirely. Until now they were set but never took effect.",
+          "Blessings and enchanted clothing that speed up regeneration now work properly. The server was holding you to your unblessed rate, so the bigger the bonus, the worse your regeneration got."
+        ]
+      },
+      {
+        "heading": "Contract boards",
+        "items": [
+          "The hold inns across Skyrim now have contract boards: Windpeak in Dawnstar, Dead Man's Drink in Falkreath, the Silver-Blood in Markarth, Moorside in Morthal, the Bee and Barb in Riften, the Winking Skeever in Solitude, the Drunken Huntsman in Whiterun, Candlehearth in Windhelm and the Frozen Hearth in Winterhold."
+        ]
+      },
+      {
+        "heading": "Home planters",
+        "items": [
+          "Ash Yams and Moon Sugar can now be grown in home planters."
+        ]
+      },
+      {
+        "heading": "Orc strongholds",
+        "items": [
+          "Largashbur has been rebuilt: the collapsed stockade, scaffolding, rubble and overgrowth are cleared and the stronghold is put back together.",
+          "Cracked Tusk Keep no longer has doors stacked in the same doorway.",
+          "Mor Khazgur, Dushnikh Yal and Narzulbur have been tidied up as well.",
+          "Thanks to the player who reported the stronghold problems on Discord."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Briarheart fixes",
     "date": "2026-10-27",
     "version": "Server update",
