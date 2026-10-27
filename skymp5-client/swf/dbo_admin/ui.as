@@ -304,6 +304,7 @@ function field(parent, name, depth, x, y, w, value, placeholder, max, onCommit, 
    {
       // the lib takes one AllowTextInput count per typing session however often this is redrawn (dboTyping)
       var box = dboInput(parent, name, depth, x, y, w, 28, dboFmt(F_MEDIUM, 18, C_TEXT, 0.4), max, false);
+      editing.drawn = true;
       box.borderColor = C_ACCENT;
       box.text = editing.text;
       if (Selection.setSelection != undefined)
@@ -369,6 +370,17 @@ function finishEdit(keep)
    // the service learns typing is over even when nothing was kept
    sendUi();
    draw();
+}
+
+// Typing ends, keeping the text, with no redraw: a press elsewhere while typing, as a browser field loses focus
+function endTyping()
+{
+   var e = editing;
+   editing = null;
+   dboInputEnd();
+   ui.typing = false;
+   e.onCommit(e.text, true);
+   sendUi();
 }
 
 // Called each frame: a live field's pause has passed, so its text goes out

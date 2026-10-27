@@ -17,6 +17,8 @@ var panel;
 var builtAt = getTimer();
 var picking = false;
 var pickPage = 0;
+// counts redraws, so a press while typing knows whether its action drew
+var drawSeq = 0;
 
 function tabOf(id)
 {
@@ -224,7 +226,12 @@ function draw()
    }
    // the focused control keeps its place across a redraw (a data push, the clock)
    var kept = focus;
+   drawSeq++;
    actions = [];
+   if (editing != null)
+   {
+      editing.drawn = false;
+   }
    focus = -1;
    pageTurn = null;
    var c = clear("body", 40);
@@ -248,11 +255,41 @@ function draw()
    }
    drawRail();
    drawHead();
+   if (editing != null)
+   {
+      // the field being typed in is gone (another view, the picker): typing ends there, keeping the text
+      if (editing.drawn != true)
+      {
+         endTyping();
+         draw();
+         return;
+      }
+      // a press on anything else while typing ends the typing first, then does what it does
+      for (var i = 0; i < actions.length; i++)
+      {
+         actions[i].basePick = actions[i].onPick;
+         actions[i].onPick = pickWhileTyping;
+      }
+   }
    if (kept >= 0 && kept < actions.length && actions[kept].disabled != true)
    {
       focus = kept;
       actions[kept]._alpha = A_FOCUS;
       dboWash(actions[kept], true);
+   }
+}
+
+function pickWhileTyping()
+{
+   var seq = drawSeq;
+   if (editing != null)
+   {
+      endTyping();
+   }
+   this.basePick();
+   if (drawSeq == seq)
+   {
+      draw();
    }
 }
 

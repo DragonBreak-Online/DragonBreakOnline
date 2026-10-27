@@ -540,4 +540,81 @@ const { EVENTS, DEBUG, ZONES, panel, open, P, B, sentOf, click, kids, railLabels
   check('...then clears', preq(t, 'adminRaid').pop().text === 'clear raiders');
 }
 
+// ---- every way out of typing ----
+// After N data pushes while typing, each exit gives the game its keys back exactly once: held 1 during, 0 after, never below 0
+const held = (t) => t.sent.reduce((n, m) => n + (m.e === 'allowTextInput' ? (m.on ? 1 : -1) : 0), 0);
+const lowest = (t) => t.sent.reduce((s, m) => { if (m.e === 'allowTextInput') { s.n += m.on ? 1 : -1; s.min = Math.min(s.min, s.n); } return s; }, { n: 0, min: 0 }).min;
+const EXITS = [
+  ['Enter', (t) => t.press(13), (t) => !t.closed()],
+  ['Escape', (t) => t.press(27), (t) => !t.closed()],
+  ['another tab', (t) => P(t).rail.t10.onRelease(), (t) => !!B(t).m0],
+  ['Close', (t) => P(t).head.close.onRelease(), (t) => t.closed() && sentOf(t, 'admin::close').length === 1],
+  // Refresh draws nothing itself: the box must still go back to a plain field
+  ['Refresh', (t) => P(t).head.refresh.onRelease(), (t) => sentOf(t, 'admin::refresh').length === 1 && B(t).zoneSearch.type !== 'input'],
+  ['a row pick', (t) => B(t).z0.onRelease(), (t) => B(t).picked.text === 'Zone 1'],
+  ['a view chip', (t) => B(t).subAdd.onRelease(), (t) => !B(t).zoneSearch || B(t).zoneSearch.type !== 'input'],
+];
+for (const N of [0, 3]) {
+  for (const [way, leave, after] of EXITS) {
+    const t = open(panel());
+    P(t).rail.t11.onRelease(); t.serve();
+    click(t, B(t).zoneSearch);
+    const box = B(t).zoneSearch;
+    box.text = 'zone 1'; box.onChanged();
+    t.st.time += 1000; t.tick(); t.serve();
+    for (let i = 0; i < N; i++) t.refresh();
+    const during = held(t);
+    leave(t); t.serve();
+    const done = !t.closed() ? t.adm.ui.typing !== true : true;
+    check(`typing, ${N} pushes, then ${way}: keys held once while typing and given back once, the panel no longer typing`, during === 1 && held(t) === 0 && lowest(t) === 0 && done && after(t), [during, held(t), lowest(t), done, after(t)]);
+  }
+}
+{
+  // the picker replaces the tab, so the field being typed in is gone: typing ends, then choosing someone acts on them
+  const t = open(panel({ players: ROSTER, me: { a: 'ff00012a' } }));
+  P(t).rail.t1.onRelease(); t.serve();
+  click(t, B(t).search);
+  B(t).search.text = 'player'; B(t).search.onChanged();
+  t.refresh(); t.refresh();
+  const during = held(t);
+  click(t, B(t).change);
+  const atPicker = held(t);
+  click(t, B(t).pick3);
+  check('typing, then Change and a pick in the picker: given back at the picker, never below 0, the pick acts', during === 1 && atPicker === 0 && held(t) === 0 && lowest(t) === 0 && t.adm.ui.acting !== '' && t.adm.ui.typing !== true, [during, atPicker, held(t), lowest(t), t.adm.ui.acting]);
+  click(t, B(t).search);
+  check('...and a field can be typed in again afterwards: one count', held(t) === 1);
+  t.press(27); t.serve();
+  check('...given back once more', held(t) === 0 && lowest(t) === 0);
+}
+{
+  // a push takes the field away while it is typed in: GM call 7 is closed elsewhere while its note is being written
+  const t = open(panel());
+  P(t).rail.t2.onRelease(); t.serve();
+  t.adm.staff[140] = GMCALLS; t.adm.staffAt[140] = Date.now(); t.refresh();
+  click(t, B(t).note7);
+  B(t).note7.text = 'half a no'; B(t).note7.onChanged();
+  t.refresh();
+  const during = held(t);
+  t.adm.staff[140] = Object.assign({}, GMCALLS, { open: GMCALLS.open.slice(1), openCount: 2 }); t.refresh();
+  check('a push that takes the typed-in field away ends the typing: keys back once, panel keys work again', during === 1 && held(t) === 0 && lowest(t) === 0 && t.adm.ui.typing !== true && !B(t).note7, [during, held(t), lowest(t)]);
+  t.press(27); t.serve();
+  check('...so Escape closes the panel again', t.closed());
+}
+{
+  // in the game the service answers a frame later: before it does, a press that draws nothing must already show a plain field
+  const t = open(panel());
+  P(t).rail.t11.onRelease(); t.serve();
+  click(t, B(t).zoneSearch);
+  P(t).head.refresh.onRelease();
+  check('Refresh while typing: the box is a plain field again before the service answers', B(t).zoneSearch.type !== 'input' && held(t) === 0);
+}
+{
+  // openTab's own release, for any way in that does not pass a press (the mouse path ends the typing before it runs)
+  const t = open(panel());
+  P(t).rail.t11.onRelease(); t.serve();
+  click(t, B(t).zoneSearch);
+  t.ctx.openTab('modes'); t.serve();
+  check('switching tab while typing gives the keys back once', held(t) === 0 && lowest(t) === 0 && !!B(t).m0, [held(t), lowest(t)]);
+}
+
 T.done();
