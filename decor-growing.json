@@ -270,14 +270,14 @@
   {
    "item": "206e7:Dragonborn.esm",
    "edid": "DBOPlantedDLC2AshYam",
-   "desc": null,
+   "desc": "1d2474:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "DLC2TreeFloraAshYam01"
   },
   {
    "item": "d8e3f:Skyrim.esm",
    "edid": "DBOPlantedMoonSugar",
-   "desc": null,
+   "desc": "1d2475:DragonBreak Online Edits.esp",
    "rare": true,
    "of": "DLC2TreeFloraSpikyGrassAsh01"
   }
