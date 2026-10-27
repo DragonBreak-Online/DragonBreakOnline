@@ -1363,7 +1363,7 @@
   "_comment": "vampireLordRemoteRace / werewolfRemoteRace: whether other players see that form's body, for everyone (/vlremote, /wwremote on|off; beastform-state.json keeps an admin's choice across restarts and deploys). On, a beast's appearance keeps its mortal race and only a client whose UI announced 'beastBody' (0.3.77+, which relays no animation snapshot from a beast and guards a listed copy) is sent dboBeastBody and builds the body; 0.3.76 keeps the human fallback named after the form.",
   "vampireLordRemoteRace": true,
   "werewolfRemoteRace": true,
-  "behemoth": { "_comment": "The Werewolf Behemoth (DLE race 1d1f9e, 1.3x) is an Elder werewolf's form only (Nate, 15 Oct; greathunt.js rank name); everyone else keeps the vanilla werewolf. OFF until client 0.3.100 with its watcher guard is out and a live two-player test passes.", "enabled": false, "race": "1d1f9e:DragonBreak Online Edits.esp", "rank": "Elder" },
+  "behemoth": { "_comment": "The Werewolf Behemoth (DLE race 1d1f9e, 1.3x) is an Elder werewolf's form only (Nate, 15 Oct; greathunt.js rank name); everyone else keeps the vanilla werewolf. ON since 27 Oct: Nat tested it live ('behemoth form works perfectly'), which is the two-player test this was waiting on.", "enabled": true, "race": "1d1f9e:DragonBreak Online Edits.esp", "rank": "Elder" },
   "_remoteRace": "Both on (Nate, 5 Oct: 'we need both vamp lord and werewolf bodies on'), for capable clients only.",
   "breakerDrops": 2,
   "breakerWindowSeconds": 600,

@@ -1,7 +1,7 @@
 [
   {
     "title": "Strongholds, inn boards and home planters",
-    "date": "2026-10-28",
+    "date": "2026-10-27",
     "version": "Server update",
     "tag": "Update",
     "sections": [
@@ -31,6 +31,12 @@
           "Cracked Tusk Keep no longer has doors stacked in the same doorway.",
           "Mor Khazgur, Dushnikh Yal and Narzulbur have been tidied up as well.",
           "Thanks to the player who reported the stronghold problems on Discord."
+        ]
+      },
+      {
+        "heading": "The Great Hunt",
+        "items": [
+          "Elders of the Great Hunt now take the Werewolf Behemoth form."
         ]
       }
     ]
