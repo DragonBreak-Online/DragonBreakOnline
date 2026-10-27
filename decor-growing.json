@@ -41,7 +41,7 @@
   "edid": "DBOPlanterSoil",
   "desc": "1d2237:DragonBreak Online Edits.esp"
  },
- "_crops": "Hearthfire's own planter list (flPlanterPlantableItem, in order) and its grown plants (flPlanterPlantedFlora) as DLE statics (DBOPlanted...). 'item' is what is planted and what a pick gives; 'rare' grows for planter.rareHours.",
+ "_crops": "Hearthfire's own planter list (flPlanterPlantableItem, in order) and its grown plants (flPlanterPlantedFlora) as DLE statics (DBOPlanted...). 'item' is what is planted and what a pick gives; 'rare' grows for planter.rareHours. Ash Yam and Moon Sugar (Nat via the Leader, 27 Oct) are not Hearthfire's: their statics use the wild plant model (Dragonborn's DLC2TreeFloraAshYam01, FloraDLC2AshYam01.nif) and, for Moon Sugar, a vanilla stand-in until a moon sugar model is cleared for use (DLC2TreeFloraSpikyGrassAsh01, FloraSpikyGrassAsh01.nif); desc stays null, and the crop unoffered, until those statics are in the merged DLE.",
  "crops": [
   {
    "item": "64b3f:Skyrim.esm",
@@ -266,6 +266,20 @@
    "desc": "1d2257:DragonBreak Online Edits.esp",
    "rare": false,
    "of": "Wheat"
+  },
+  {
+   "item": "206e7:Dragonborn.esm",
+   "edid": "DBOPlantedDLC2AshYam",
+   "desc": null,
+   "rare": false,
+   "of": "DLC2TreeFloraAshYam01"
+  },
+  {
+   "item": "d8e3f:Skyrim.esm",
+   "edid": "DBOPlantedMoonSugar",
+   "desc": null,
+   "rare": true,
+   "of": "DLC2TreeFloraSpikyGrassAsh01"
   }
  ]
 }

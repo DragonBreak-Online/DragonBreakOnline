@@ -24,10 +24,11 @@ const OWNER = 0xff000001, STRANGER = 0xff000003;
 const PROFILE = { [OWNER]: 7, [STRANGER]: 9 };
 const NAME = { [OWNER]: 'Olaf', [STRANGER]: 'Stray' };
 const WOOD = 0x6f993, IRON = 0x5ace4, SALT = 0x34cdf, STONE = 0x71cf3;
-const CABBAGE = 0x64b3f, DEATHBELL = 0x516c8;
+const CABBAGE = 0x64b3f, DEATHBELL = 0x516c8, ASHYAM = 0x206e7, MOONSUGAR = 0xd8e3f;
+const ASHYAM_D = '206e7:Dragonborn.esm', MOONSUGAR_D = 'd8e3f:Skyrim.esm';
 const NOVEL = 0xb001, CHEAP = 0xb002, SKILLBOOK = 0xb003, TOME = 0xb004, NOTE = 0xb005;
 const SHELF_D = 'd800:DragonBreak Online Edits.esp', PLANTER_D = 'd801:DragonBreak Online Edits.esp', SOIL_D = 'd802:DragonBreak Online Edits.esp'; // verify-formids: ignore (made-up DLE ids: the merged ids are filled in later)
-const CAB_STATIC = 'd803:DragonBreak Online Edits.esp', BELL_STATIC = 'd804:DragonBreak Online Edits.esp'; // verify-formids: ignore (made-up DLE ids: the merged ids are filled in later)
+const CAB_STATIC = 'd803:DragonBreak Online Edits.esp', BELL_STATIC = 'd804:DragonBreak Online Edits.esp', ASHYAM_STATIC = 'd805:DragonBreak Online Edits.esp'; // verify-formids: ignore (made-up DLE ids: the merged ids are filled in later)
 const d = (id) => `${id.toString(16)}:Skyrim.esm`;
 fs.writeFileSync('housing.json', JSON.stringify([DOOR]));
 fs.writeFileSync('skills.json', JSON.stringify({ skills: SKILLS.skills.filter((k) => k.id === 'woodcutter' || k.id === 'harvesting') }));
@@ -36,7 +37,9 @@ fs.writeFileSync('decor-catalog.json', JSON.stringify({ groups: [] }));
 const G = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'decor-growing.json'), 'utf8'));
 const tracked = JSON.parse(JSON.stringify(G));
 G.pieces[0].desc = SHELF_D; G.pieces[1].desc = PLANTER_D; G.soil.desc = SOIL_D;
-G.crops = [Object.assign({}, G.crops.find((c) => c.item === d(CABBAGE)), { desc: CAB_STATIC }), Object.assign({}, G.crops.find((c) => c.item === d(DEATHBELL)), { desc: BELL_STATIC }), Object.assign({}, G.crops[2], { desc: null })];
+G.crops = [Object.assign({}, G.crops.find((c) => c.item === d(CABBAGE)), { desc: CAB_STATIC }), Object.assign({}, G.crops.find((c) => c.item === d(DEATHBELL)), { desc: BELL_STATIC }), Object.assign({}, G.crops[2], { desc: null }),
+  // Ash Yam as it will be once its static is in the merged DLE; Moon Sugar as tracked today (no static yet)
+  Object.assign({}, G.crops.find((c) => c.item === ASHYAM_D), { desc: ASHYAM_STATIC }), Object.assign({}, G.crops.find((c) => c.item === MOONSUGAR_D))];
 fs.writeFileSync('decor-growing.json', JSON.stringify(G));
 
 const props = new Map();
@@ -71,7 +74,7 @@ const cmds = {};
 const giveItem = (a, baseId, count) => { const inv = getp(a, 'inventory') || { entries: [] }; const e = inv.entries.map((x) => Object.assign({}, x)); const h = e.find((x) => x.baseId === baseId); if (h) h.count += count; else e.push({ baseId, count }); setp(a, 'inventory', { entries: e }); return true; };
 const held = (a, id) => (getp(a, 'inventory').entries.find((e) => e.baseId === id) || { count: 0 }).count;
 const timers = {};
-const NAMES_OF = { [d(CABBAGE).toLowerCase()]: 'Cabbage', [d(DEATHBELL).toLowerCase()]: 'Deathbell' };
+const NAMES_OF = { [d(CABBAGE).toLowerCase()]: 'Cabbage', [d(DEATHBELL).toLowerCase()]: 'Deathbell', [ASHYAM_D.toLowerCase()]: 'Ash Yam', [MOONSUGAR_D.toLowerCase()]: 'Moon Sugar' };
 const cfg = { decor: { enabled: true, perSecond: 0, perHour: 1000, budgets: [{ pieces: 20, lights: 1, stations: 1, containers: 1 }] } };
 const api = {
   mp, log: (...x) => logs.push(x.join(' ')), audit: (t) => audits.push(t), who: (a) => NAME[a], personal: (a, t) => said.push([a, t]),
@@ -93,7 +96,11 @@ const placeAt = (a, n) => { cmd(a, 'find ' + n); cmd(a, 'place 1'); const e = la
 const use = (ref, a) => globalThis.__dboDecorActivate(parseInt(ref, 16) >>> 0, a);
 
 // ---- the tracked file: nothing offered until the merged DLE's ids are filled in -------------------------------------------
-ok(tracked.pieces.every((p) => /^[0-9a-f]+:DragonBreak Online Edits\.esp$/.test(p.desc)) && tracked.crops.length === 32 && tracked.crops.every((c) => /^[0-9a-f]+:DragonBreak Online Edits\.esp$/.test(c.desc) && /^DBOPlanted/.test(c.edid)), 'decor-growing.json as tracked: 2 pieces and 32 crops, descs filled from the merged DLE (fill_growing_ids.py)', tracked.crops.length);
+const hearthfire = tracked.crops.filter((c) => c.item !== ASHYAM_D && c.item !== MOONSUGAR_D);
+ok(tracked.pieces.every((p) => /^[0-9a-f]+:DragonBreak Online Edits\.esp$/.test(p.desc)) && hearthfire.length === 32 && hearthfire.every((c) => /^[0-9a-f]+:DragonBreak Online Edits\.esp$/.test(c.desc) && /^DBOPlanted/.test(c.edid)), 'decor-growing.json as tracked: 2 pieces and Hearthfire\'s 32 crops, descs filled from the merged DLE (fill_growing_ids.py)', hearthfire.length);
+const ash = tracked.crops.find((c) => c.item === ASHYAM_D), moon = tracked.crops.find((c) => c.item === MOONSUGAR_D);
+ok(tracked.crops.length === 34 && ash && moon && ash.edid === 'DBOPlantedDLC2AshYam' && moon.edid === 'DBOPlantedMoonSugar' && ash.rare === false && moon.rare === true
+  && [ash, moon].every((c) => c.desc === null || /^[0-9a-f]+:DragonBreak Online Edits\.esp$/.test(c.desc)), 'Ash Yam (Dragonborn\'s, 24 h) and Moon Sugar (48 h) listed; desc null until their statics are merged, never a guessed id', { ash, moon });
 ok(tracked.pieces.every((p) => p.costA && p.costB), 'both pieces carry costA (Hearthfire) and costB (today\'s resources) as the catalogue does');
 ok((SKILLS.skills.find((k) => k.id === 'harvesting').counts.activatePrefixes || []).includes('DBOPlanter'), 'skills.json: Harvesting counts a planter pick (activatePrefixes DBOPlanter)');
 
@@ -197,6 +204,23 @@ const show2 = parseInt(pl2.show, 16);
 cmd(OWNER, 'list'); cmd(OWNER, `remove ${items().indexOf(pl2) + 1}`);
 ok(!items().includes(pl2) && deleted.includes(show2) && deleted.includes(parseInt(pl2.ref, 16)), 'remove: the planter and its crop model are deleted', { deleted });
 ok(use(pl2.ref, OWNER) === false, 'a removed planter is no longer decor.js\'s');
+
+// ---- Solstheim crops (Nat via the Leader, 27 Oct): Ash Yam once its static is in the DLE; Moon Sugar not before ----------------
+giveItem(OWNER, WOOD, 60); giveItem(OWNER, IRON, 10); giveItem(OWNER, SALT, 10); giveItem(OWNER, STONE, 20);
+placeAt(OWNER, 'planter');
+const pl3 = items().find((i) => i.kind === 'planter');
+// the earlier crops eaten, so only the Solstheim ones are carried
+setp(OWNER, 'inventory', { entries: getp(OWNER, 'inventory').entries.filter((e) => e.baseId !== CABBAGE && e.baseId !== DEATHBELL) });
+giveItem(OWNER, MOONSUGAR, 2);
+use(pl3.ref, OWNER);
+ok(pl3 && !pl3.crop && /Nothing to plant/.test(last(OWNER)) && held(OWNER, MOONSUGAR) === 2, 'Moon Sugar with no static in the DLE yet: not offered, none taken', last(OWNER));
+giveItem(OWNER, ASHYAM, 3);
+use(pl3.ref, OWNER);
+ok(pl3.crop && pl3.crop.item === ASHYAM_D && /You plant Ash Yam\. It ripens in 24 hours/.test(last(OWNER)) && held(OWNER, ASHYAM) === 2 && held(OWNER, MOONSUGAR) === 2, 'Ash Yam, the only one offered, is planted at once: one Dragonborn Ash Yam taken, 24 hours', last(OWNER));
+clock += 24 * HOUR; timers['decor-grow']();
+ok(pl3.crop.ripe && getp(parseInt(pl3.show, 16), 'baseDesc') === ASHYAM_STATIC, '...and ripens into the Ash Yam static');
+roll = 0.01; use(pl3.ref, OWNER);
+ok(!pl3.crop && held(OWNER, ASHYAM) > 2 && /You pick \d+ Ash Yam/.test(last(OWNER)), 'the pick gives Ash Yams (the Dragonborn item) back', last(OWNER));
 
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
 process.exit(fails ? 1 : 0);
