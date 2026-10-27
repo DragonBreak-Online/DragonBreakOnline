@@ -1,7 +1,0 @@
-dboData
-emote:
-Cancel Emote
-SendModEvent
-$EverywhereMediumFont
-PlaySound
-dboOut
