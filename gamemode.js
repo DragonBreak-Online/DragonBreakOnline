@@ -2662,6 +2662,12 @@ globalThis.__dboHandlers.customPacket = (userId, rawContent) => {
       writeDiagLines(userId, content.lines);
       return;
     }
+    // The Scaleform test panel reports back (scaleformtest.js): ready, a row click, or closed
+    if (content.customPacketType === 'dboScaleform') {
+      const a = actorOf(userId); if (!a) return;
+      if (typeof globalThis.__dboScaleformPacket === 'function') globalThis.__dboScaleformPacket(a, content);
+      return;
+    }
     // RaceMenu face presets: uploads after RaceSexMenu and requests for a copy's face (racemenupresets.js)
     if (typeof content.customPacketType === 'string' && content.customPacketType.startsWith('dboPreset')) {
       if (typeof globalThis.__dboPresetPacket === 'function') globalThis.__dboPresetPacket(userId, content);
@@ -9464,6 +9470,13 @@ try {
   delete require.cache[BEASTFORM_JS];
   require(BEASTFORM_JS)({ mp, log, personal, registerChatCommand, sendPacket, display, who, audit, findByName, every, redress, onlineActors, cfg, isAdmin, isLeadStaff, tierOf, hasUiCap });
 } catch (e) { log('beastform.js failed to load:', e.stack || e.message); for (const k of ['__dboBeastCast', '__dboBeastRevert', '__dboBeastOriginalRace', '__dboBeastTransform', '__dboBeastRequest', '__dboBeastAdmin', '__dboBeastHolds']) globalThis[k] = null; }
+
+// ---- the Scaleform test panel, dev only (server\scaleformtest.js) ----------------------------------
+try {
+  const SCALEFORMTEST_JS = path.resolve('scaleformtest.js');
+  delete require.cache[SCALEFORMTEST_JS];
+  require(SCALEFORMTEST_JS)({ mp, log, personal, registerChatCommand, sendPacket, who, isAdmin, onUi });
+} catch (e) { log('scaleformtest.js failed to load:', e.stack || e.message); globalThis.__dboScaleformPacket = null; }
 
 // ---- the Great Hunt: werewolf ranks from feeding, hunting and changing (server\greathunt.js) ----------------------
 try {
