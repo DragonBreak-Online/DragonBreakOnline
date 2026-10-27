@@ -1,5 +1,21 @@
 [
   {
+    "title": "Briarheart fixes",
+    "date": "2026-10-27",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Briarhearts",
+        "items": [
+          "Ironflesh and Lightning Cloak are now the player versions and go to either hand.",
+          "Forsworn and hagravens can no longer hurt a Briarheart, unless the Briarheart attacked that one in the last minute.",
+          "The Briarheart skin now counts in your inventory armour rating (relog to see it)."
+        ]
+      }
+    ]
+  },
+  {
     "title": "More sawn logs",
     "date": "2026-10-26",
     "version": "Server update",
