@@ -8,6 +8,10 @@ import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { AuthGameData, authGameDataStorageKey } from "../../features/authModel";
 import { weekdayOf } from "./calendar";
 import { ActiveEffectApplyRemoveEvent, BrowserMessageEvent, ButtonEvent, DxScanCode, InputDeviceType } from "skyrimPlatform";
+import { ScaleformMenuService } from "./scaleformMenuService";
+import { PlacementService } from "./placementService";
+import { CLOSE_KEY, FAILED_KEY } from "./nativeWidgets";
+import { AdminCatalogs, AdminUi, STAFF_WIDGETS, adminNativeView } from "./adminNativeView";
 
 declare const window: any;
 
@@ -17,6 +21,9 @@ declare const window: any;
 // The Players tab also grants mastery hours (admin::masterygrant target amount / admin::masteryreset target -> adminAction masteryGrant / masteryReset).
 
 const WIDGET_ID = 23;
+// The native panel's own key: what it shows ([JSON of AdminUi]), answered with that page (adminNativeView.ts)
+const NATIVE_UI_KEY = "admin::ui";
+const STAFF_IDS = [STAFF_WIDGETS.gmcalls, STAFF_WIDGETS.enchantCatalog, STAFF_WIDGETS.enchantItems, STAFF_WIDGETS.thievery];
 const PLAYER_FORM_ID = 0x14;
 const DEBUG_REFRESH_MS = 5000;
 const EFFECTS_STORAGE_KEY = "adminDebugEffects";
@@ -114,12 +121,15 @@ export class AdminMenuService extends ClientListener {
     // A key, or a bindable mouse button as 256 + the button (mouseKeys.ts); never the gamepad
     const code = buttonKeyCode(e);
     if (code === null || !e.isDown) return;
+    // The native panel takes Escape itself: it cancels typing, a picker or an armed button before it closes
     if (code === DxScanCode.Escape && this.menuOpen) {
-      this.closeMenu();
+      if (!this.native) this.closeMenu();
       return;
     }
     if (code !== this.menuKey) return;
     if (this.menuOpen) {
+      // Never under the typing: the menu would go with the game still taking keys as text
+      if (this.native && this.ui.typing) return;
       this.closeMenu();
       return;
     }
@@ -129,6 +139,7 @@ export class AdminMenuService extends ClientListener {
 
   // Admin data is cleared on every open so a demoted admin never sees stale tabs
   private openMenu(): void {
+    this.ui = { tab: this.ui.tab };
     panelData.admin = false;
     panelData.players = [];
     panelData.locations = [];
@@ -146,12 +157,23 @@ export class AdminMenuService extends ClientListener {
   private onUpdate(): void {
     if (!this.menuOpen || Date.now() - this.lastDebugAt < DEBUG_REFRESH_MS) return;
     this.refreshDebug();
-    this.pushData();
+    // The native panel is sent the debug block on its Debug tab only, so another tab is not redrawn under the typing
+    if (!this.native || !this.ui.tab || this.ui.tab === "debug") this.pushData();
   }
 
   private onCustomPacketMessage(event: ConnectionMessage<CustomPacketMessage>): void {
     const content = parseCustomPacket(event);
     if (!content) return;
+    if (content["customPacketType"] === "dboWidget") {
+      const w = content["widget"] as Record<string, unknown> | undefined;
+      const id = w ? Number(w["id"]) : NaN;
+      if (w && w["type"] === "staffData" && STAFF_IDS.indexOf(id) !== -1) {
+        this.staff[id] = w;
+        this.staffAt[id] = Date.now();
+        if (this.native) this.pushData();
+      }
+      return;
+    }
     if (content["customPacketType"] === "adminMenu") {
       const caps = content["caps"];
       panelData = {
@@ -224,6 +246,7 @@ export class AdminMenuService extends ClientListener {
       const isItems = content["customPacketType"] === "adminItems";
       const list = isItems ? content["categories"] : content["locations"];
       const json = JSON.stringify(Array.isArray(list) ? list : []);
+      if (isItems) this.catalogs.items = Array.isArray(list) ? list : []; else this.catalogs.locations = Array.isArray(list) ? list : [];
       this.sp.browser.executeJavaScript(`window.${isItems ? "__dboAdminItems" : "__dboAdminLocations"} = ${json};`);
       if (isItems) panelData.itemsVersion = Date.now(); else panelData.locationsVersion = Date.now();
       this.pushData();
@@ -291,18 +314,85 @@ export class AdminMenuService extends ClientListener {
   }
 
   private showMenu(): void {
-    openFormMenu(this.sp, this.browsersideWidgetSetter, { panelData, WIDGET_ID }, this.controller);
     this.menuOpen = true;
+    this.native = this.openNativeMenu();
+    if (!this.native) this.openBrowserMenu();
+  }
+
+  private openBrowserMenu(): void {
+    openFormMenu(this.sp, this.browsersideWidgetSetter, { panelData, WIDGET_ID }, this.controller);
+  }
+
+  // The native dbo_admin panel (ScaleformMenuService.openNative); false when this client has it off, and the browser draws it
+  private openNativeMenu(): boolean {
+    try {
+      return this.controller.lookupListener(ScaleformMenuService).openNative({
+        type: "adminPanel", widget: this.nativeView(), widgetId: WIDGET_ID, onKey: (key, args) => this.onNativeKey(key, args),
+      });
+    } catch {
+      return false;
+    }
+  }
+
+  // The gamemode-fed tabs stop their updates when the panel goes, as the browser tabs do when they unmount
+  private leaveStaffTab(): void {
+    const leave: Record<string, [string, string]> = { gmcalls: ["staffGmCalls", "unwatch"], thievery: ["staffThievery", "unwatch"], enchant: ["staffEnchant", "close"] };
+    const l = leave[String(this.ui.tab || "")];
+    if (l) sendCustomPacket(this.controller, { customPacketType: "dbo", event: l[0], args: [l[1]] });
+  }
+
+  private nativeView(): unknown {
+    return adminNativeView(panelData, this.catalogs, this.staff, this.staffAt, this.ui, WIDGET_ID);
+  }
+
+  private onNativeKey(key: string, args: unknown[]): void {
+    if (!this.native || !this.menuOpen) return;
+    // The SWF could not be drawn: the browser panel after all
+    if (key === FAILED_KEY) {
+      this.native = false;
+      this.openBrowserMenu();
+      return;
+    }
+    // The panel has gone (it closed itself, or the game closed it)
+    if (key === CLOSE_KEY) {
+      this.menuOpen = false;
+      this.native = false;
+      this.leaveStaffTab();
+      return;
+    }
+    // What the panel shows: its tab, search and page, answered with that page
+    if (key === NATIVE_UI_KEY) {
+      try { this.ui = JSON.parse(String(args[0] ?? "{}")) || {}; } catch { this.ui = {}; }
+      this.pushData();
+      return;
+    }
+    const a = ([key] as unknown[]).concat(args);
+    // The browser's Place keys reach PlacementService as browser messages; the native panel's are handed to it
+    if (key === "admin::place" || key === "admin::placeedit" || key === "admin::placeselect") {
+      try { this.controller.lookupListener(PlacementService).fromPanel(a); } catch { /* no placement service */ }
+    }
+    this.handleKey(a);
   }
 
   // Re-pushes data while open without re-taking focus or re-showing a browser a vanilla menu hid
   private pushData(): void {
-    if (this.menuOpen) refreshFormMenu(this.sp, this.browsersideWidgetSetter, { panelData, WIDGET_ID });
+    if (!this.menuOpen) return;
+    if (this.native) {
+      this.controller.lookupListener(ScaleformMenuService).refreshNative(this.nativeView(), WIDGET_ID);
+      return;
+    }
+    refreshFormMenu(this.sp, this.browsersideWidgetSetter, { panelData, WIDGET_ID });
   }
 
   private closeMenu(): void {
-    closeFormMenu(this.sp, WIDGET_ID);
     this.menuOpen = false;
+    if (this.native) {
+      this.native = false;
+      this.leaveStaffTab();
+      this.controller.lookupListener(ScaleformMenuService).closeNative("adminPanel");
+      return;
+    }
+    closeFormMenu(this.sp, WIDGET_ID);
   }
 
   // SP has no active-effect enumeration, so only effects seen starting on the player after this script loaded are tracked
@@ -395,7 +485,12 @@ export class AdminMenuService extends ClientListener {
   }
 
   private onBrowserMessage(e: BrowserMessageEvent) {
-    const kind = e.arguments[0];
+    this.handleKey(e.arguments);
+  }
+
+  // The panel's keys: [key, ...args], from the browser widget or the native panel
+  private handleKey(a: unknown[]): void {
+    const kind = a[0];
     // PlacementService takes over the screen; the panel would hold the mouse and the crosshair
     if ((kind === "admin::place" || kind === "admin::placedelete" || kind === "admin::placeselect" || kind === "admin::placeedit") && this.menuOpen) {
       this.closeMenu();
@@ -418,26 +513,28 @@ export class AdminMenuService extends ClientListener {
       return;
     }
     if (kind === events.tpLoc) {
-      sendCustomPacket(this.controller, { customPacketType: "adminAction", action: "teleportLoc", target: String(e.arguments[1] ?? "") });
+      this.remember("teleport", String(a[1] ?? ""));
+      sendCustomPacket(this.controller, { customPacketType: "adminAction", action: "teleportLoc", target: String(a[1] ?? "") });
       return;
     }
     if (kind === events.mode) {
-      sendCustomPacket(this.controller, { customPacketType: "adminAction", action: "toggleMode", mode: String(e.arguments[1] ?? "") });
+      sendCustomPacket(this.controller, { customPacketType: "adminAction", action: "toggleMode", mode: String(a[1] ?? "") });
       return;
     }
     if (kind === events.action) {
       // admin::action <action> <JSON of extra fields>; the server checks rank and target for every one
       let fields: Record<string, unknown> = {};
-      try { fields = JSON.parse(String(e.arguments[2] ?? "{}")) || {}; } catch { fields = {}; }
-      const action = String(e.arguments[1] ?? "");
+      try { fields = JSON.parse(String(a[2] ?? "{}")) || {}; } catch { fields = {}; }
+      const action = String(a[1] ?? "");
       sendCustomPacket(this.controller, Object.assign({}, fields, { customPacketType: "adminAction", action }));
+      if (action === "giveItem") this.remember("items", String(fields["item"] ?? ""));
       if (["kill", "deleteCharacter", "ipBan", "tempBan", "unban"].indexOf(action) !== -1) {
         sendCustomPacket(this.controller, { customPacketType: "adminMenuRequest" });
       }
       return;
     }
     if (kind === events.request) {
-      const type = String(e.arguments[1] ?? "");
+      const type = String(a[1] ?? "");
       if (!PANEL_REQUESTS.has(type)) return;
       // The Place tab's catalog is served by the gamemode (placement.js), not by AdminSystem
       if (type === "adminPlaceablesRequest") {
@@ -457,7 +554,7 @@ export class AdminMenuService extends ClientListener {
       };
       if (PLACE_EVENTS[type]) {
         let f: Record<string, unknown> = {};
-        try { f = JSON.parse(String(e.arguments[2] ?? "{}")) || {}; } catch { f = {}; }
+        try { f = JSON.parse(String(a[2] ?? "{}")) || {}; } catch { f = {}; }
         const [event, keys] = PLACE_EVENTS[type];
         sendCustomPacket(this.controller, { customPacketType: "dbo", event, args: keys.map((k) => f[k] ?? "") });
         return;
@@ -473,13 +570,13 @@ export class AdminMenuService extends ClientListener {
       }
       if (type === "adminPlaceSearch") {
         let f: Record<string, unknown> = {};
-        try { f = JSON.parse(String(e.arguments[2] ?? "{}")) || {}; } catch { f = {}; }
+        try { f = JSON.parse(String(a[2] ?? "{}")) || {}; } catch { f = {}; }
         sendCustomPacket(this.controller, { customPacketType: "dbo", event: "placeSearch", args: [String(f.query ?? ""), String(f.category ?? ""), String(f.plugin ?? ""), Number(f.offset) || 0] });
         return;
       }
       if (type === "adminPlacementsRequest" || type === "adminPlacementRemove" || type === "adminPlacementGoto") {
         let id = "";
-        try { id = String((JSON.parse(String(e.arguments[2] ?? "{}")) || {}).id ?? ""); } catch { id = ""; }
+        try { id = String((JSON.parse(String(a[2] ?? "{}")) || {}).id ?? ""); } catch { id = ""; }
         if (type === "adminPlacementsRequest") {
           sendCustomPacket(this.controller, { customPacketType: "dbo", event: "placeList", args: [] });
         } else if (type === "adminPlacementRemove") {
@@ -491,7 +588,7 @@ export class AdminMenuService extends ClientListener {
         return;
       }
       let fields: Record<string, unknown> = {};
-      try { fields = JSON.parse(String(e.arguments[2] ?? "{}")) || {}; } catch { fields = {}; }
+      try { fields = JSON.parse(String(a[2] ?? "{}")) || {}; } catch { fields = {}; }
       sendCustomPacket(this.controller, Object.assign({}, fields, { customPacketType: type }));
       return;
     }
@@ -501,13 +598,13 @@ export class AdminMenuService extends ClientListener {
     }
     if (kind === events.npcAdd) {
       // The front sends one NPC-Spawns.json entry as a JSON string; the server pushes npcZones after every mutation
-      sendCustomPacket(this.controller, { customPacketType: "adminAction", action: "npcZoneAdd", zone: typeof e.arguments[1] === "string" ? e.arguments[1] : "" });
+      sendCustomPacket(this.controller, { customPacketType: "adminAction", action: "npcZoneAdd", zone: typeof a[1] === "string" ? a[1] : "" });
       return;
     }
     if (kind === events.masteryGrant || kind === events.masteryReset) {
-      const target = String(e.arguments[1] ?? "");
+      const target = String(a[1] ?? "");
       if (kind === events.masteryGrant) {
-        sendCustomPacket(this.controller, { customPacketType: "adminAction", action: "masteryGrant", target, amount: Number(e.arguments[2]) });
+        sendCustomPacket(this.controller, { customPacketType: "adminAction", action: "masteryGrant", target, amount: Number(a[2]) });
       } else {
         sendCustomPacket(this.controller, { customPacketType: "adminAction", action: "masteryReset", target });
       }
@@ -517,11 +614,11 @@ export class AdminMenuService extends ClientListener {
     }
     if (kind === events.npcTp || kind === events.npcReset || kind === events.npcDelete) {
       const zoneAction = kind === events.npcTp ? "npcZoneTp" : kind === events.npcReset ? "npcZoneReset" : "npcZoneDelete";
-      sendCustomPacket(this.controller, { customPacketType: "adminAction", action: zoneAction, target: String(e.arguments[1] ?? "") });
+      sendCustomPacket(this.controller, { customPacketType: "adminAction", action: zoneAction, target: String(a[1] ?? "") });
       return;
     }
     if (kind !== events.tp && kind !== events.summon && kind !== events.kick && kind !== events.ban) return;
-    const target = String(e.arguments[1] ?? "");
+    const target = String(a[1] ?? "");
     const action =
       kind === events.tp ? "teleportTo" :
       kind === events.summon ? "summon" :
@@ -548,6 +645,20 @@ export class AdminMenuService extends ClientListener {
 
   private menuKey: DxScanCode;
   private menuOpen = false;
+  private native = false;
+  // For the native panel: the catalogs, the gamemode's staff widgets, and what the panel shows
+  private catalogs: AdminCatalogs = { items: null, locations: null, recent: { items: [], teleport: [] } };
+
+  // The native panel's Recent lists (the browser keeps its own in its storage): this game session only, newest first
+  private remember(list: "items" | "teleport", id: string): void {
+    if (!id || !this.catalogs.recent) return;
+    const l = this.catalogs.recent[list].filter((x) => x !== id);
+    l.unshift(id);
+    this.catalogs.recent[list] = l.slice(0, 8);
+  }
+  private staff: Record<number, unknown> = {};
+  private staffAt: Record<number, number> = {};
+  private ui: AdminUi = {};
   private lastDebugAt = 0;
   private server: DebugServer | null = null;
   private serverActorId = "";

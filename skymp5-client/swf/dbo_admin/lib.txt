@@ -1,0 +1,15 @@
+dbo.as
+dbo-controls.as
+../dbo_admin/ui.as
+../dbo_admin/tabs/debug.as
+../dbo_admin/tabs/players.as
+../dbo_admin/tabs/gmcalls.as
+../dbo_admin/tabs/thievery.as
+../dbo_admin/tabs/skills.as
+../dbo_admin/tabs/items.as
+../dbo_admin/tabs/enchant.as
+../dbo_admin/tabs/powers.as
+../dbo_admin/tabs/teleport.as
+../dbo_admin/tabs/modes.as
+../dbo_admin/tabs/npcs.as
+../dbo_admin/tabs/place.as
