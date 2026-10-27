@@ -357,9 +357,9 @@ module.exports = (api) => {
   // ---- the briar skin: armour, stamina and DiseaseResist while the briar chest shows ---------------------------------------
   const skinLine = () => {
     const k = K(), r = skinRating(k);
-    return C.enabled && k.enabled && (r || k.armorFrom) ? ` Your briar skin turns blades like faction armour${r ? ` (${r})` : ''}: it counts against every weapon and fist blow in a fight, though your inventory shows only the armour you wear.` : '';
+    return C.enabled && k.enabled && (r || k.armorFrom) ? ` Your briar skin turns blades like faction armour${r ? ` (${r})` : ''}, counted in your armour rating while your chest is bare.` : '';
   };
-  const K = () => Object.assign({ enabled: false, armor: 0, armorFrom: '', staminaRegen: 1, diseaseResist: 0 }, C.briarSkin || {});
+  const K = () => Object.assign({ enabled: false, armor: 0, armorFrom: '', staminaRegen: 1, diseaseResist: 0, showRating: true }, C.briarSkin || {});
   const skinRating = (k) => Math.max(0, Number(k.armor) || 0);
   const skinShown = (worn) => { const v = V(), full = idOf(v.armor), mine = mineOf(v); return !!(full && worn.includes(full) && !worn.some((id) => !mine.has(id) && coversBody(id))); };
   const skinCheck = (a, equipment, why) => {
@@ -370,9 +370,13 @@ module.exports = (api) => {
     if (on) S.skin.add(a); else S.skin.delete(a);
     const dr = Math.max(0, Number(k.diseaseResist) || 0);
     if (dr > 0 && isOnline(a)) papyrus(a, 'SetActorValue', ['DiseaseResist', on ? dr : 0]);
-    if (!on) { log(`briarheart: skin off ${display(a)} (${why})${dr > 0 ? ', DiseaseResist 0' : ''}`); return; }
+    // Nat, 27 Oct: the skin shows in the inventory's armour rating. The extra the server's hit maths counts (gamemode.js
+    // fleshDamageMult) goes to the client's DamageResist base, which the C++ damage formula never reads (worn ARMO only)
+    const shown = on && k.showRating ? Math.max(0, Math.round(Number(call('__dboBriarSkinRating', a)) || 0)) : 0;
+    if (k.showRating && isOnline(a)) papyrus(a, 'SetActorValue', ['DamageResist', shown]);
+    if (!on) { log(`briarheart: skin off ${display(a)} (${why})${dr > 0 ? ', DiseaseResist 0' : ''}${k.showRating ? ', DamageResist 0' : ''}`); return; }
     const extra = Number(call('__dboBriarSkinRating', a)) || 0;
-    log(`briarheart: skin on ${display(a)} (${why}): armour as ${skinRating(k) ? `a faction cuirass (${skinRating(k)})` : k.armorFrom} (+${extra.toFixed(1)} over the briar pieces), stamina regeneration x${Math.max(1, Number(k.staminaRegen) || 1)}, DiseaseResist ${dr}`);
+    log(`briarheart: skin on ${display(a)} (${why}): armour as ${skinRating(k) ? `a faction cuirass (${skinRating(k)})` : k.armorFrom} (+${extra.toFixed(1)} over the briar pieces${k.showRating ? `, DamageResist ${shown} shown` : ''}), stamina regeneration x${Math.max(1, Number(k.staminaRegen) || 1)}, DiseaseResist ${dr}`);
   };
   const lookCheck = (a, equipment, why) => { lookApply(a, equipment, why); skinCheck(a, equipment, why); };
   // The heart torn out: the open chest becomes the empty one

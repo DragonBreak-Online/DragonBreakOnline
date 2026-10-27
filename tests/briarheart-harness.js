@@ -408,15 +408,15 @@ ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction'), 'and the faction 
   const s = globalThis.__dboBriarSkinArmor(BH);
   ok(s && s.rating === 38 && !s.from && s.shown === BRIAR, 'the briar chest shows: the skin counts as a light faction cuirass (38), over the briar body', s);
   ok(globalThis.__dboBriarRegenMult(BH, 'stamina') === 1.25 && globalThis.__dboBriarRegenMult(BH, 'magicka') === 1 && globalThis.__dboBriarRegenMult(BH, 'health') === 1, 'stamina regeneration x1.25, and nothing else');
-  ok(avCalls().length === 1 && avCalls()[0].args[0] === 'DiseaseResist' && avCalls()[0].args[1] === 50, 'DiseaseResist 50 is sent through the server Papyrus', avCalls());
-  ok(logLines.some((l) => /briarheart: skin on char60 \(equipment\): armour as a faction cuirass \(38\) \(\+33\.0 over the briar pieces\), stamina regeneration x1\.25, DiseaseResist 50/.test(l)), '...and logged', logLines);
+  ok(avCalls().map((c) => c.args.join(' ')).join() === 'DiseaseResist 50,DamageResist 33', 'DiseaseResist 50 is sent through the server Papyrus, and DamageResist 33: the extra the hit maths counts, in the armour rating', avCalls());
+  ok(logLines.some((l) => /briarheart: skin on char60 \(equipment\): armour as a faction cuirass \(38\) \(\+33\.0 over the briar pieces, DamageResist 33 shown\), stamina regeneration x1\.25, DiseaseResist 50/.test(l)), '...and logged', logLines);
   papyrusCalls.length = 0; logLines.length = 0; report(BH, eq(BRIAR));
   ok(!avCalls().length && !logLines.some((l) => /skin/.test(l)), 'a second report: no repeat, no second SetActorValue');
   // a cuirass reported worn (being taken off) never stacks with the skin: off until the bare chest is reported again
   report(BH, eq(BRIAR, CUIRASS));
   ok(globalThis.__dboBriarSkinArmor(BH) === null && globalThis.__dboBriarRegenMult(BH, 'stamina') === 1, 'a cuirass reported worn: the skin is off meanwhile (never both)');
   ok(papyrusCalls.some((c) => c.method === 'UnequipItem' && c.args[0] === '13ed9:Skyrim.esm'), '...and the cuirass is unequipped');
-  ok(avCalls().length === 1 && avCalls()[0].args[1] === 0 && logLines.some((l) => /briarheart: skin off char60 \(equipment\), DiseaseResist 0/.test(l)), '...DiseaseResist back to 0, logged', logLines);
+  ok(avCalls().map((c) => c.args.join(' ')).join() === 'DiseaseResist 0,DamageResist 0' && logLines.some((l) => /briarheart: skin off char60 \(equipment\), DiseaseResist 0, DamageResist 0/.test(l)), '...DiseaseResist and DamageResist back to 0, logged', logLines);
   report(BH, eq(BRIAR));
   ok(!!globalThis.__dboBriarSkinArmor(BH), 'the cuirass gone and the briar chest reported: the skin is on again');
   // a new client: the skin turns on afresh at login, so DiseaseResist reaches the new engine
@@ -806,13 +806,25 @@ ok(/"spells": \["51b16:Skyrim\.esm", "3aea3:Skyrim\.esm"\]/.test(src('gamemode-c
   M = loadFw({ forswornFriendly: false });
   ok(!spares(CAMP, BH), 'with forswornFriendly off the Forsworn fight a Briarheart as anyone');
   M = loadFw();
-  ok(/turns blades like faction armour \(38\): it counts against every weapon and fist blow in a fight, though your inventory shows only the armour you wear/.test(run(BH, 'status')), '/briarheart status says the briar skin counts in a fight though the inventory shows only worn armour');
+  ok(/turns blades like faction armour \(38\), counted in your armour rating/.test(run(BH, 'status')), '/briarheart status says the briar skin is in the armour rating');
   M = loadFw({ briarSkin: { enabled: false } });
   ok(!/faction armour/.test(run(BH, 'status')), 'and says nothing of it while the skin is off');
   const g = src('gamemode.js');
   ok(/globalThis\.__dboBriarheartSpares && globalThis\.__dboBriarheartSpares\(agg, tgt\)\) return false;/.test(g) && g.indexOf('__dboBriarheartSpares(agg, tgt)') < g.indexOf('// 3. Mastery'), 'gamemode.js refuses the spared hit in onHitDamageAttempt, before any damage is counted');
   ok(/sourceResistsOf, recordOf \}\);/.test(g), 'gamemode.js hands briarheart.js recordOf');
   online.splice(online.indexOf(BH), 1); online.splice(online.indexOf(MORTAL), 1);
+}
+// ---- the briar skin in the inventory's armour rating (Nat, 27 Oct) ---------------------------------------------------------
+{
+  const bm = fs.readFileSync(MODULE, 'utf8');
+  ok(/papyrus\(a, 'SetActorValue', \['DamageResist', shown\]\)/.test(bm) && /const shown = on && k\.showRating \? Math\.max\(0, Math\.round\(Number\(call\('__dboBriarSkinRating', a\)\)/.test(bm),
+    'the skin sets the client DamageResist to the very extra gamemode.js counts (__dboBriarSkinRating), 0 when it goes');
+  // The fork beside this checkout, or DBO_FORK; skipped where there is none (a worktree, the dev server)
+  const DF = [process.env.DBO_FORK, path.resolve(__dirname, '..', '..', 'fork')].filter(Boolean).map((d) => path.join(d, 'skymp5-server', 'cpp', 'server_guest_lib', 'formulas', 'TES5DamageFormula.cpp')).find((f) => fs.existsSync(f));
+  const dm = DF ? fs.readFileSync(DF, 'utf8') : '';
+  if (!DF) console.log('skip  the server damage formula check: no fork here (set DBO_FORK)');
+  else ok(/combinedArmorRating \+= CalcArmorRatingComponent\(entry\)/.test(dm) && !/GetActorValue|DamageResist\)\s*;/.test(dm.replace(/actorValueType == espm::ActorValue::DamageResist/g, '')),
+    'the server damage formula counts worn ARMO (and their enchantments) only, never the DamageResist value: no double count');
 }
 
 Math.random = realRandom;
