@@ -46,6 +46,13 @@ module.exports = (api) => {
     if (!S.data || typeof S.data !== 'object') S.data = {};
     if (!S.data.edits || typeof S.data.edits !== 'object') S.data.edits = {};
     if (!Array.isArray(S.data.log)) S.data.log = [];
+    // keyed by load-order id: an entry whose desc (local id and plugin) now resolves to another id follows it
+    for (const [k, e] of Object.entries(S.data.edits)) {
+      if (!e || !e.desc) continue;
+      let id = 0;
+      try { id = mp.getIdFromDesc(String(e.desc)) >>> 0; } catch (err) { id = 0; }
+      if (id && hex(id) !== k && !S.data.edits[hex(id)]) { delete S.data.edits[k]; e.ref = hex(id); S.data.edits[e.ref] = e; log(`worldedit: ${e.name} re-keyed ${k} -> ${e.ref} (load order)`); }
+    }
     return S.data;
   };
   const save = () => {
@@ -149,7 +156,7 @@ module.exports = (api) => {
   };
 
   const fresh = (a, info) => ({
-    ref: info.ref, base: info.base, name: info.name, type: info.type, where: info.where || String(mp.get(a, 'worldOrCellDesc') || ''),
+    ref: info.ref, desc: (() => { try { return String(mp.getDescFromId(info.id)); } catch (e) { return ''; } })(), base: info.base, name: info.name, type: info.type, where: info.where || String(mp.get(a, 'worldOrCellDesc') || ''),
     orig: { pos: info.pos, rot: info.rot }, hidden: false, moved: null, serverForm: info.serverForm, by: profile(a), at: new Date().toISOString(),
   });
   const needsClient = (info) => `${info.name} (${info.type || 'object'}) is not kept by the server, so only the 0.3.102 client can hide or move it.`;
@@ -282,5 +289,7 @@ module.exports = (api) => {
     else api.every('worldEditResend', 3600000, () => {});
   }
 
-  return { isKey, isPluginRef, inspect, describe, hide, reset, move, undo, editPacket, rows, goTo, answerRequest, resend, data, packet, client: !!W.client };
+  return { isKey, isPluginRef, inspect, describe, hide, reset, move, undo, editPacket, rows, goTo, answerRequest, resend, data, packet, client: !!W.client,
+    // decor.js (the home's own pieces): its own checks stand in for the GM's rights
+    change, fresh, clone };
 };
