@@ -1677,6 +1677,13 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
     return { ok: true, text: `Your pigeon flies to ${ownNameOf(to)}, who will ${prep ? 'collect it' : 'read it'} at a notice board${taxed > 0 ? `. ${taxed} gold${zone ? ` to the ${zone.name} treasury` : ''}` : ''}.${away ? `${away}.` : ''}` };
   } catch (e) { return { ok: false, text: 'The pigeon refused to fly: ' + e.message }; }
 };
+// The native coop has no text box: dbo:pigeonCompose [nonce, mode, to] hands one composer to the browser coop ('send' a
+// letter to `to`, 'supply' an order, 'courier' a job). Every publish carries browser: 1 and handoff until the action
+// succeeds (pigeonHandoffDone), the composer is cancelled (mode ''), the coop is closed or opened afresh at a board.
+const pigeonHandoff = globalThis.__dboPigeonHandoff instanceof Map ? globalThis.__dboPigeonHandoff : (globalThis.__dboPigeonHandoff = new Map()); // actor -> { mode, to }
+const PIGEON_HANDOFF_MODES = ['send', 'supply', 'courier'];
+const pigeonHandoffDone = (a, mode) => { const h = pigeonHandoff.get(a >>> 0); if (h && h.mode === mode) pigeonHandoff.delete(a >>> 0); };
+globalThis.__dboPigeonHandoffDone = pigeonHandoffDone;
 const openPigeonCoop = (a, result, resultKind, view) => {
   const zoneId = boardZoneNear(a);
   const zone = zoneId ? zoneById(zoneId) : null;
@@ -1700,6 +1707,7 @@ const openPigeonCoop = (a, result, resultKind, view) => {
       parcel: m.parcel ? { gold: Number(m.parcel.gold) || 0, items: (m.parcel.items || []).map((t) => ({ name: postItemName(t.baseId), count: Number(t.count) || 0 })) } : undefined })),
     view: view || (pigeonsWaiting(a) ? 'letters' : 'send'), result, resultKind,
     ...postView(a), ...courierView(a),
+    ...(pigeonHandoff.has(a >>> 0) ? { browser: 1, handoff: pigeonHandoff.get(a >>> 0).mode, handoffTo: pigeonHandoff.get(a >>> 0).to, view: pigeonHandoff.get(a >>> 0).mode } : {}),
   }, true);
 };
 globalThis.__dboOpenPigeonCoop = openPigeonCoop;
@@ -4010,7 +4018,9 @@ const sendPacket = (a, payload) => {
 };
 // Native Scaleform panels (client scaleformMenuService, fork swf/): a widget of these types goes to a client that sent
 // nativeCaps naming it as a dboScaleform packet instead; the payload is the same object the browser widget gets
-const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_journal', deityPicker: 'dbo_deity', rite: 'dbo_rite', dungeonGate: 'dbo_dungeon' };
+// labour: mining, woodcutting and the bound-hands struggle (labour.js, struggle.js), both the sweep and the pick round
+// pigeon: the coop window (openPigeonCoop, post.js, couriers.js); its typed input goes to the browser (pigeonHandoff)
+const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_journal', deityPicker: 'dbo_deity', rite: 'dbo_rite', dungeonGate: 'dbo_dungeon', labour: 'dbo_labour', pigeon: 'dbo_pigeon' };
 // nativeOpen: actor -> the widget id on the custom menu; browserOpen: actor -> a widget of these types last sent to the browser
 const nativeState = () => { const p = globalThis.__dboPanelState || (globalThis.__dboPanelState = { caps: new Map(), nonces: new Map() }); if (!p.native) p.native = new Map(); if (!p.nativeOpen) p.nativeOpen = new Map(); if (!p.browserOpen) p.browserOpen = new Map(); return p; };
 const nativeSwfFor = (a, widget) => {
@@ -4598,7 +4608,7 @@ registerChatCommand('driftset', (a, args) => {
   audit(`GM ${who(a)} set the drift switch ${key} to ${value}`);
 }, { admin: true, help: '<key> <value|default> a client drift switch; no key lists them' });
 const refusePigeon = (a) => { pigeonNonces.delete(a); closeWidget(a, PIGEON_WIDGET_ID); personal(a, 'Pigeons are sent from a notice board. Walk up to one and use it.'); };
-onUi('pigeonOpen', (a, args) => { if (!boardZoneNear(a)) return refusePigeon(a); openPigeonCoop(a, undefined, undefined, ['letters', 'send', 'supply', 'courier'].includes(args[0]) ? args[0] : undefined); });
+onUi('pigeonOpen', (a, args) => { if (!boardZoneNear(a)) return refusePigeon(a); pigeonHandoff.delete(a >>> 0); openPigeonCoop(a, undefined, undefined, ['letters', 'send', 'supply', 'courier'].includes(args[0]) ? args[0] : undefined); });
 // Letters: opening one marks it read, and a letter can be thrown away; both answer with a fresh Letters tab
 const updateLetter = (a, args, change) => {
   if (String(args[0]) !== pigeonNonces.get(a)) return;
@@ -4639,9 +4649,24 @@ onUi('pigeonSend', (a, args) => {
   const zoneId = boardZoneNear(a);
   if (!zoneId) return refusePigeon(a);
   const r = sendPigeon(a, Number(args[1]) >>> 0, args[2], zoneId, args[3], args[4]);
+  if (r.ok) pigeonHandoffDone(a, 'send');
   openPigeonCoop(a, r.text, r.ok ? 'sent' : 'refused', 'send');
 });
-onUi('pigeonClose', (a) => { pigeonNonces.delete(a); closeWidget(a, PIGEON_WIDGET_ID); });
+onUi('pigeonClose', (a) => { pigeonNonces.delete(a); pigeonHandoff.delete(a >>> 0); closeWidget(a, PIGEON_WIDGET_ID); });
+// pigeonCompose [nonce, mode, to]: the native coop's "Write the letter..." (and supply, courier) opens that composer in the
+// browser coop; mode '' is its Cancel, which brings the native coop back
+onUi('pigeonCompose', (a, args) => {
+  if (String(args[0]) !== pigeonNonces.get(a)) return;
+  const zoneId = boardZoneNear(a);
+  if (!zoneId) return refusePigeon(a);
+  const mode = String(args[1] || '');
+  const to = Number(args[2]) >>> 0;
+  // A Cancel brings the native coop back on the tab its composer came from
+  const was = pigeonHandoff.get(a >>> 0);
+  if (PIGEON_HANDOFF_MODES.includes(mode)) pigeonHandoff.set(a >>> 0, { mode, to: mode === 'send' && pigeonContactsOf(a).includes(to) ? to : 0 });
+  else pigeonHandoff.delete(a >>> 0);
+  openPigeonCoop(a, undefined, undefined, PIGEON_HANDOFF_MODES.includes(mode) ? mode : was ? was.mode : undefined);
+});
 onUi('close', (a, args, widgetId) => { if (widgetId === PIGEON_WIDGET_ID) pigeonNonces.delete(a); });
 // Gold the server moves reaches the engine as a SetInventory, but the client cannot apply one while the player is
 // looking at their own inventory: remoteServer.ts skips the apply for as long as InventoryMenu is open (sync/equipment

@@ -107,6 +107,9 @@ let CA = load();
 globalThis.__dboPigeonNonces = new Map([[S, 'nS'], [K, 'nK'], [R, 'nR'], [T, 'nT'], [ALT, 'nA'], [MATE, 'nM']]);
 let opened = [];
 globalThis.__dboOpenPigeonCoop = (a, text, kind, view) => opened.push({ a, text, kind, view });
+// gamemode.js pigeonHandoffDone: a posted job ends the native coop's courier composer
+const handoffDone = [];
+globalThis.__dboPigeonHandoffDone = (a, mode) => handoffDone.push([a, mode]);
 const ui = (ev, a, ...args) => { opened = []; for (const fn of handlers.get(ev) || []) fn(a, [globalThis.__dboPigeonNonces.get(a), ...args]); return opened[0] || {}; };
 const rawUi = (ev, a, args, widgetId) => { for (const fn of handlers.get(ev) || []) fn(a, args, widgetId); };
 const jobs = () => JSON.parse(fs.readFileSync(path.join(TMP, 'couriers.json'), 'utf8')).jobs;
@@ -149,7 +152,9 @@ check('the goods leave the sender\'s pack', count(S, SWORD) === 2 && count(S, IN
 check('the pay and a fee of 10 (10% of 100, at least 10) are taken', count(S, GOLD) === 2000 - 110, count(S, GOLD));
 check('the fee goes to the Bruma treasury', treasury.bruma === 10, treasury);
 check('the job is written: open, held pay 100, the goods worth 190', job(id).state === 'open' && job(id).held === 100 && job(id).value === 190, job(id));
+check('a posted job ends the native coop\'s courier composer (pigeonHandoffDone), once', handoffDone.length === 1 && handoffDone[0][0] === S && handoffDone[0][1] === 'courier', handoffDone);
 check('a job may not go to the sender in person', ui('courierPost', S, 'person', S, 50, 0, JSON.stringify([[INGOT, 1]])).kind === 'refused');
+check('a refused job leaves the composer up', handoffDone.length === 1, handoffDone);
 check('no more than 6 kinds', ui('courierPost', S, 'person', R, 50, 0, JSON.stringify([[1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [7, 1]])).kind === 'refused');
 check('a worn dagger cannot go', /Iron Dagger|not wearing/.test(ui('courierPost', S, 'person', R, 50, 0, JSON.stringify([[DAGGER, 1]])).text || ''));
 check('a key cannot go', ui('courierPost', S, 'person', R, 50, 0, JSON.stringify([[KEY, 1]])).kind === 'refused');
