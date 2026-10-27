@@ -337,6 +337,70 @@ module.exports = (api) => {
   };
   const costText = (cost, a) => Object.entries(cost).map(([d, n]) => `${n} ${nameOfItem(d)}${a ? ` (${heldGroup(a, d)})` : ''}`).join(', ');
 
+  // ---- the home's own pieces: what a plugin put there (decor-fixtures.json; design _work\decor-preexisting-1027.md) ----
+  // Moved and stored through worldedit.js (placement.js hands it over): a stored piece is a hidden world edit carrying
+  // decor: <place root>, so the home's stored list is never a second record. No materials either way, no budget.
+  const WE = () => globalThis.__dboWorldEditApi || null;
+  const fixtures = () => {
+    if (S.fixtures) return S.fixtures;
+    S.fixtures = new Map();
+    try {
+      for (const [cell, rows] of Object.entries(JSON.parse(fs.readFileSync(path.resolve('decor-fixtures.json'), 'utf8')).cells || {})) {
+        for (const [ref, base] of rows) S.fixtures.set(String(ref).toLowerCase(), { cell: String(cell), base: String(base) });
+      }
+    } catch (e) { log('decor: decor-fixtures.json unreadable; a home\'s own pieces stay put', e.message); }
+    return S.fixtures;
+  };
+  // { refHex, info, piece, pl, entry } when a may move or store this reference of the home a stands in
+  const fixtureOf = (a, refHex) => {
+    const k = String(refHex || '').toLowerCase(), we = WE();
+    if (!C.enabled || !we || !we.isPluginRef(k)) return null;
+    let desc = '';
+    try { desc = String(mp.getDescFromId(parseInt(k, 16) >>> 0)).toLowerCase(); } catch (e) { return null; }
+    const fx = fixtures().get(desc), pl = here(a);
+    if (!fx || !pl || !pl.cells.includes(idOf(fx.cell)) || !mayDecorate(a, pl)) return null;
+    const entry = we.data().edits[hex(parseInt(k, 16))] || null;
+    if (entry && entry.decor && entry.decor !== hex(pl.root)) return null;
+    const info = we.inspect(k);
+    if (!info.ok || !info.pos) return null;
+    return { refHex: info.ref, info, piece: pieceOf(fx.base) || { name: info.name, group: 'decor', radius: 50 }, pl, entry };
+  };
+  const fixtureEdit = (a, fx, next, action) => {
+    const we = WE();
+    const before = we.clone(fx.entry);
+    const e = Object.assign(fx.entry ? we.clone(fx.entry) : we.fresh(a, fx.info), next, { decor: hex(fx.pl.root), decorOwner: ownerKey(Number(fx.pl.rec.owner) || 0, Number(fx.pl.rec.ownerChar) >>> 0) });
+    we.change(a, fx.refHex, e, action, fx.piece.name);
+    pushUndo(a, { op: 'fixture', root: hex(fx.pl.root), ref: fx.refHex, before });
+    audit(`DECOR ${action} ${who(a)} ${fx.piece.name} (home's own, ref ${fx.refHex}) place ${hex(fx.pl.root)}`);
+  };
+  const startFixture = (a, fx) => {
+    const e = fx.entry, pose0 = e && e.moved ? e.moved : { pos: fx.info.pos, rot: fx.info.rot };
+    const nonce = require('crypto').randomBytes(8).toString('hex');
+    S.pending.set(a >>> 0, { nonce, op: 'fixture', root: fx.pl.root, ref: fx.refHex, until: Date.now() + C.placeSeconds * 1000 });
+    sendPacket(a, { customPacketType: 'placeEdit', id: ID_PREFIX + nonce, base: fx.info.base, name: fx.piece.name, kind: 'object', hostile: false, pos: pose0.pos, rot: pose0.rot || [0, 0, 0] });
+    personal(a, `${fx.piece.name} follows your aim. Enter sets it down, Backspace stops. It belongs to the home: moving it is free.`);
+  };
+  const pickUp = (a, fx) => {
+    if (fx.entry && fx.entry.hidden) return personal(a, `${fx.piece.name} is already stored.`);
+    if (fx.info.serverForm && (get(parseInt(fx.refHex, 16) >>> 0, 'inventory', { entries: [] }).entries || []).length) return personal(a, `Empty the ${fx.piece.name} first.`);
+    if (!rateOk(a)) return personal(a, 'Slow down a little.');
+    fixtureEdit(a, fx, { hidden: true }, 'store');
+    personal(a, `${fx.piece.name} is stored. It belongs to the home, so nothing comes back for it; /decor stored lists it to put back, free.`);
+  };
+  const storedHere = (pl) => { const we = WE(); return we ? Object.values(we.data().edits).filter((e) => e.decor === hex(pl.root) && e.hidden) : []; };
+  // A place with a new owner gets its own pieces back where the plugin had them
+  const resetFixtures = () => {
+    const we = WE();
+    if (!we) return;
+    for (const e of Object.values(we.data().edits)) {
+      if (!e.decor) continue;
+      const rec = get(parseInt(e.decor, 16) >>> 0, 'private.housing', null);
+      if (rec && ownerKey(Number(rec.owner) || 0, Number(rec.ownerChar) >>> 0) === e.decorOwner) continue;
+      try { we.change(0, e.ref, null, 'decor-reset', e.name); } catch (err) { log('decor: reset of a home\'s own piece failed', e.ref, err.message); continue; }
+      audit(`DECOR reset place ${e.decor} ${e.name} (home's own, ref ${e.ref}): the owner changed`);
+    }
+  };
+
   // ---- rate, undo ------------------------------------------------------------------------------------------------------
   const rateOk = (a) => {
     const now = Date.now(), l = (S.rate.get(a >>> 0) || []).filter((t) => now - t < 3600000);
@@ -438,6 +502,15 @@ module.exports = (api) => {
     if (!finite(posIn, 3) || !finite(rotIn, 3)) return refuse('A bad position.', 'bad numbers');
     const pos = posIn.slice(0, 3).map((n) => Math.round(n * 10) / 10), rot = rotIn.slice(0, 3).map(norm).map((n) => Math.round(n * 10) / 10);
     const cell = idOf(get(a, 'worldOrCellDesc', '')), p = placeEntry(pl.root, pl.rec);
+    if (s.op === 'fixture') {
+      const fx = fixtureOf(a, s.ref);
+      if (!fx) return refuse('That piece is no longer yours to move.', 'fixture gone or no right');
+      const why = spotProblem(a, pl, fx.piece, pos, rot);
+      if (why) return refuse(why, 'spot');
+      fixtureEdit(a, fx, { hidden: false, moved: { pos, rot } }, fx.entry && fx.entry.hidden ? 'put back' : 'move');
+      personal(a, `${fx.piece.name} is set down.`);
+      return true;
+    }
     if (s.op === 'move') {
       const it = p.items.find((i) => i.ref === s.ref);
       if (!it) return refuse('That piece is gone.', 'moved piece missing');
@@ -522,6 +595,14 @@ module.exports = (api) => {
   };
   const undo = (a) => {
     const l = S.undo.get(a >>> 0) || [];
+    const last = l[l.length - 1], we = WE();
+    if (last && last.op === 'fixture' && we && Date.now() - last.at <= C.undoSeconds * 1000) {
+      l.pop();
+      const now = we.data().edits[last.ref] || null, name = (now || last.before || {}).name || 'It';
+      we.change(a, last.ref, we.clone(last.before), 'decor-undo', name);
+      audit(`DECOR undo ${who(a)} ${name} (home's own, ref ${last.ref})`);
+      return personal(a, `${name} is back as it was.`);
+    }
     // steps for pieces already taken down are skipped, so an undo never spends itself on something gone
     let step = l.pop(), found = step ? itemByRef(step.ref) : null;
     while (step && !found && Date.now() - step.at <= C.undoSeconds * 1000) { step = l.pop(); found = step ? itemByRef(step.ref) : null; }
@@ -573,6 +654,7 @@ module.exports = (api) => {
       personal(a, `Your carpenters took down pieces in your home while you were away; back to you: ${costText(got)}.`);
     }
     if (changed) save();
+    resetFixtures();
   };
   if (typeof api.every === 'function') api.every('decor-owners', Math.max(1, C.ownerScanMinutes) * 60000, () => { try { if (C.enabled) scanOwners(); } catch (e) { log('decor: owner scan failed', e.stack || e.message); } });
 
@@ -687,13 +769,14 @@ module.exports = (api) => {
 
   // ---- the edit mode's packets (placement.js leaves 'decor:' ids and decor references to this file) --------------------
   globalThis.__dboDecorId = (id) => String(id || '').startsWith(ID_PREFIX);
-  globalThis.__dboDecorRef = (refHex) => !!itemByRef(refHex);
+  globalThis.__dboDecorRef = (refHex, a) => !!itemByRef(refHex) || (a !== undefined && !!fixtureOf(a, refHex));
   onUi('placeMove', (a, args) => { const id = String((args || [])[0] || ''); if (!id.startsWith(ID_PREFIX)) return; try { confirm(a, id, (args || [])[1], (args || [])[2]); } catch (e) { log('decor: confirm failed', e.stack || e.message); personal(a, 'That failed; see the server log.'); } reopenAfterEdit(a); });
-  onUi('placeSelect', (a, args) => { try { if (!C.enabled) return; const f = itemByRef((args || [])[0]); if (f) startMove(a, f); } catch (e) { log('decor: select failed', e.stack || e.message); } });
+  onUi('placeSelect', (a, args) => { try { if (!C.enabled) return; const f = itemByRef((args || [])[0]); if (f) return startMove(a, f); const fx = fixtureOf(a, (args || [])[0]); if (fx) startFixture(a, fx); } catch (e) { log('decor: select failed', e.stack || e.message); } });
   onUi('placeDelete', (a, args) => {
     try {
       if (!C.enabled) return;
-      const f = itemByRef((args || [])[0]); if (!f) return;
+      const f = itemByRef((args || [])[0]);
+      if (!f) { const fx = fixtureOf(a, (args || [])[0]); if (fx) pickUp(a, fx); return; }
       const pl = here(a);
       if (!pl || pl.root !== f.root || !mayDecorate(a, pl)) return personal(a, 'Only the owner, or someone the owner named, takes things down here.');
       if (!rateOk(a)) return personal(a, 'Slow down a little.');
@@ -864,7 +947,7 @@ module.exports = (api) => {
     if (!sub || sub === 'help') {
       if (!pl) return personal(a, 'Decorating works inside your own home. /decor find <words> lists what you can place.');
       const u = usage(placeEntry(pl.root, pl.rec)), b = budgetOf(pl);
-      return personal(a, `This home: ${u.pieces}/${b.pieces} pieces, ${u.lights}/${b.lights} lights, ${u.stations.size}/${b.stations} workbenches. /decor find <words> [group], /decor place <n>, /decor list, /decor move <n>, /decor remove <n>, /decor undo, /decor grant|revoke <player>.`);
+      return personal(a, `This home: ${u.pieces}/${b.pieces} pieces, ${u.lights}/${b.lights} lights, ${u.stations.size}/${b.stations} workbenches. /decor find <words> [group], /decor place <n>, /decor list, /decor move <n>, /decor remove <n>, /decor undo, /decor grant|revoke <player>. The home's own pieces: Enter on one with the select tool moves it, Delete stores it (no materials), /decor stored and /decor putback <n> put it back.`);
     }
     if (sub === 'find' || sub === 'groups') {
       catalog();
@@ -908,6 +991,16 @@ module.exports = (api) => {
       return removeItem(a, found, 'deconstruct', 'deconstruct');
     }
     if (sub === 'undo') return undo(a);
+    if (sub === 'stored' || sub === 'putback') {
+      if (!pl || !mayDecorate(a, pl)) return personal(a, 'Stand inside a home you may decorate.');
+      const st = storedHere(pl);
+      if (sub === 'stored') return personal(a, st.length ? `Stored here (the home's own, free to put back): ${st.map((e, i) => `${i + 1}. ${e.name}`).join(', ')}. /decor putback <n>.` : 'Nothing of this home\'s own is stored. Delete on a piece with the select tool stores it.');
+      const e = st[(parseInt(words[0], 10) || 0) - 1];
+      if (!e) return personal(a, 'Use /decor putback <n>, n from /decor stored.');
+      const fx = fixtureOf(a, e.ref);
+      if (!fx) return personal(a, 'That piece is no longer yours to put back.');
+      return startFixture(a, fx);
+    }
     if (sub === 'grant' || sub === 'revoke') {
       if (!owns(a, pl.rec)) return personal(a, 'Only the owner names who may decorate.');
       const t = findByName(rest);
@@ -923,7 +1016,7 @@ module.exports = (api) => {
       return personal(a, 'Cleared; the owner gets everything back at their next scan online.');
     }
     return personal(a, 'Unknown. /decor help');
-  }, { help: 'decorate your home: find, place, list, move, remove, undo, grant, revoke, plant' });
+  }, { help: 'decorate your home: find, place, list, move, remove, undo, grant, revoke, plant, stored, putback' });
 
   // test hooks (tests/decor-harness.js)
   return { _test: { panelFor, openPanel, refundOf, takeAll, costOf, budgetProblem, spotProblem, confirm, scanOwners, reg, S, C, usePlanter, plant, pick, ripen, showPos } };

@@ -259,6 +259,8 @@ module.exports = (api) => {
       return require(p)({ mp, log, audit, who, personal, sendPacket, can, needs, profile, papyrus, sameWhere, stateDir: stateDir(), every: api.every, onlineActors: api.onlineActors, cfg: P.worldEdit || {} });
     } catch (e) { log('placement: worldedit.js failed to load', e.stack || e.message); return null; }
   })();
+  // decor.js moves and stores a home's own pieces through the same world edits
+  globalThis.__dboWorldEditApi = WE;
   // A plugin reference the tab did not place (an id below 0xff000000 with no list entry and no tag)
   const worldTarget = (raw) => {
     if (!WE || !WE.isPluginRef(raw)) return false;
@@ -582,7 +584,7 @@ module.exports = (api) => {
   });
 
   onUi('placeDelete', (a, args) => {
-    if (decor(args[0], true)) return;
+    if (decor(args[0], true, a)) return;
     if (!isAdmin(a)) { log(`placement: placeDelete ${String(args[0] || '?')} from ${who(a)} refused: not an admin`); return; }
     let r;
     try {
@@ -631,7 +633,8 @@ module.exports = (api) => {
   // A business ledger moved with this same edit mode (business.js startPlace) answers to business.js alone
   const bizLedger = (id, ref) => { try { return ref ? globalThis.__dboBizLedgerRef && globalThis.__dboBizLedgerRef(id) === true : globalThis.__dboBizLedgerPlaceId && globalThis.__dboBizLedgerPlaceId(id) === true; } catch (e) { return false; } };
   // A player's home decorating (decor.js) uses the same edit mode: its ids and pieces answer to decor.js alone
-  const decor = (id, ref) => { try { return ref ? globalThis.__dboDecorRef && globalThis.__dboDecorRef(id) === true : globalThis.__dboDecorId && globalThis.__dboDecorId(id) === true; } catch (e) { return false; } };
+  // A home's own piece, aimed at by someone who may decorate that home, is decor.js's too (actor a)
+  const decor = (id, ref, a) => { try { return ref ? globalThis.__dboDecorRef && globalThis.__dboDecorRef(id, a) === true : globalThis.__dboDecorId && globalThis.__dboDecorId(id) === true; } catch (e) { return false; } };
   onUi('placeMove', (a, args) => {
     const idHex = String(args[0] || '');
     if (bizLedger(idHex, false) || decor(idHex, false)) return;
@@ -653,7 +656,7 @@ module.exports = (api) => {
 
   // The select tool aimed at something: if it was placed with the tab and this GM may change it, the client edits it
   onUi('placeSelect', (a, args) => {
-    if (!isAdmin(a) || bizLedger(args[0], true) || decor(args[0], true)) return;
+    if (!isAdmin(a) || bizLedger(args[0], true) || decor(args[0], true, a)) return;
     // Something a plugin placed: what it is and what Delete does; with client 0.3.102 also the edit mode to move it
     if (worldTarget(args[0])) {
       let d;
