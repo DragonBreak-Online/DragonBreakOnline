@@ -142,3 +142,86 @@ TEST_CASE("CropHealthRegeneration, CropMagickaRegeneration and "
   p.DestroyActor(0xff000000);
   DoDisconnect(p, 0);
 }
+
+// Nat, 27 Oct: hunger and cold must really slow regeneration. The ceiling used to take
+// std::max(base, current), so anything below the race's base was ignored and both the needs system's hunger
+// and the chill system's StaminaRateMult 0 did nothing at all. The assertion that catches a regression here
+// is "slowed < atBase" - under std::max those two are equal.
+TEST_CASE("The regeneration ceiling follows the actor's rate mult in both directions",
+          "[CropRegeneration]")
+{
+  PartOne& p = GetPartOne();
+  DoConnect(p, 0);
+  p.CreateActor(0xff000000, { 0, 0, 0 }, 0, 0x3c);
+  p.SetUserActor(0, 0xff000000);
+  auto& ac = p.worldState.GetFormAt<MpActor>(0xff000000);
+
+  ActorValues half;
+  half.healthPercentage = .5f;
+  half.magickaPercentage = .5f;
+  half.staminaPercentage = .5f;
+  ac.SetPercentages(half);
+
+  auto appearance = ac.GetAppearance();
+  const BaseActorValues base = GetBaseActorValues(
+    &p.worldState, ac.GetBaseId(), appearance ? appearance->raceId : 0, {});
+
+  // Without a positive base there is nothing to be above or below, and every case below collapses together.
+  REQUIRE(base.staminaRateMult > 0.f);
+
+  const float kOld = .5f;
+  auto ceilingWith = [&](float mult) {
+    ac.SetActorValue(espm::ActorValue::StaminaRateMult, mult);
+    return CropStaminaRegeneration(1.0f, 1.0f, &ac); // the client claims a full bar
+  };
+
+  const float atBase = ceilingWith(base.staminaRateMult);
+  const float slowed = ceilingWith(base.staminaRateMult * .25f); // hungry
+  const float frozen = ceilingWith(0.f);                         // chilled to a standstill
+  const float hastened = ceilingWith(base.staminaRateMult * 4.f); // blessed
+
+  REQUIRE(atBase > kOld);       // a plain actor still regenerates
+  REQUIRE(slowed < atBase);     // hunger bites. Equal to atBase under the old std::max
+  REQUIRE(slowed > kOld);       // but is a slowdown, not a stop
+  REQUIRE(frozen == kOld);      // a chill freeze means exactly no regeneration
+  REQUIRE(hastened > atBase);   // and a blessing still helps
+
+  p.DestroyActor(0xff000000);
+  DoDisconnect(p, 0);
+}
+
+// The guard Nat asked for: a value nothing has written must read as the race's base, never as a freeze.
+// Zero is deliberately NOT treated as unset - zero is the chill.
+TEST_CASE("An unusable rate mult falls back to the race's base, not to zero",
+          "[CropRegeneration]")
+{
+  PartOne& p = GetPartOne();
+  DoConnect(p, 0);
+  p.CreateActor(0xff000000, { 0, 0, 0 }, 0, 0x3c);
+  p.SetUserActor(0, 0xff000000);
+  auto& ac = p.worldState.GetFormAt<MpActor>(0xff000000);
+
+  ActorValues half;
+  half.healthPercentage = .5f;
+  half.magickaPercentage = .5f;
+  half.staminaPercentage = .5f;
+  ac.SetPercentages(half);
+
+  auto appearance = ac.GetAppearance();
+  const BaseActorValues base = GetBaseActorValues(
+    &p.worldState, ac.GetBaseId(), appearance ? appearance->raceId : 0, {});
+  REQUIRE(base.staminaRateMult > 0.f);
+
+  ac.SetActorValue(espm::ActorValue::StaminaRateMult, base.staminaRateMult);
+  const float atBase = CropStaminaRegeneration(1.0f, 1.0f, &ac);
+
+  ac.SetActorValue(espm::ActorValue::StaminaRateMult, -1.f);
+  REQUIRE(CropStaminaRegeneration(1.0f, 1.0f, &ac) == atBase);
+
+  ac.SetActorValue(espm::ActorValue::StaminaRateMult,
+                   std::numeric_limits<float>::quiet_NaN());
+  REQUIRE(CropStaminaRegeneration(1.0f, 1.0f, &ac) == atBase);
+
+  p.DestroyActor(0xff000000);
+  DoDisconnect(p, 0);
+}

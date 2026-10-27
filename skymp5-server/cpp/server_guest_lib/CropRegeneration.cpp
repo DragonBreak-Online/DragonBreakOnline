@@ -4,6 +4,7 @@
 #include "MpActor.h"
 #include "MpChangeForms.h"
 #include "WorldState.h"
+#include <cmath>
 
 namespace {
 
@@ -21,6 +22,25 @@ float GetServerRegenMultiplier(MpActor* actor)
 {
   auto worldState = actor->GetParent();
   return worldState ? worldState->regenerationMultiplier : 1.f;
+}
+
+// The rate mult the ceiling should use.
+//
+// This was std::max(base, current), which floored the ceiling at the race's base and so made every debuff
+// inert: the needs system's hunger, and the chill system writing StaminaRateMult 0 to freeze stamina, both
+// changed nothing. Nat asked on 27 Oct for them to really slow regeneration, a freeze to 0 included, so the
+// actor's own value wins in both directions.
+//
+// Base is the answer only when nothing has written a usable value. ApplyChangeForm seeds the change form
+// from the race's base whenever espm is loaded, so in a running server there is always one; this guards the
+// case where there is not. It deliberately does NOT treat 0 as unset - a 0 is the chill freeze, and reading
+// it as "unset" would be the one thing Nat asked for that silently did not work.
+float ResolveRateMult(float current, float base)
+{
+  if (!std::isfinite(current) || current < 0.f) {
+    return base;
+  }
+  return current;
 }
 
 }
@@ -80,7 +100,7 @@ float CropHealthRegeneration(float newAttributeValue,
   const float rate = std::max(baseValues.healRate, actorValues.healRate) *
     GetServerRegenMultiplier(actor);
   const float rateMult =
-    std::max(baseValues.healRateMult, actorValues.healRateMult);
+    ResolveRateMult(actorValues.healRateMult, baseValues.healRateMult);
   const float oldPercentage = actorValues.healthPercentage;
   const bool hasActiveMagicEffects = !actor->GetActiveMagicEffects().Empty();
   return CropRegeneration(newAttributeValue, secondsAfterLastRegen, rate,
@@ -96,7 +116,7 @@ float CropMagickaRegeneration(float newAttributeValue,
     std::max(baseValues.magickaRate, actorValues.magickaRate) *
     GetServerRegenMultiplier(actor);
   const float rateMult =
-    std::max(baseValues.magickaRateMult, actorValues.magickaRateMult);
+    ResolveRateMult(actorValues.magickaRateMult, baseValues.magickaRateMult);
   const float oldPercentage = actorValues.magickaPercentage;
   const bool hasActiveMagicEffects = !actor->GetActiveMagicEffects().Empty();
   return CropRegeneration(newAttributeValue, secondsAfterLastRegen, rate,
@@ -113,7 +133,7 @@ float CropStaminaRegeneration(float newAttributeValue,
     : std::max(baseValues.staminaRate, actorValues.staminaRate)) *
     GetServerRegenMultiplier(actor);
   const float rateMult =
-    std::max(baseValues.staminaRateMult, actorValues.staminaRateMult);
+    ResolveRateMult(actorValues.staminaRateMult, baseValues.staminaRateMult);
   const float oldPercentage = actorValues.staminaPercentage;
   const bool hasActiveMagicEffects = !actor->GetActiveMagicEffects().Empty();
   return CropRegeneration(newAttributeValue, secondsAfterLastRegen, rate,
