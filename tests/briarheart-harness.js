@@ -16,7 +16,7 @@ const ok = (c, what, got) => { console.log(`${c ? 'ok  ' : 'FAIL'}  ${what}${!c 
 // ---- the world ---------------------------------------------------------------------------------------------------------
 const WORLD = '3c:Skyrim.esm', ELSE = '1a26f:Skyrim.esm';
 const RACES = { 1: 'DBOReachmanRace', 2: 'NordRace', 3: 'DBOReachmanRaceVampire' };
-const ID = { '5d009:Skyrim.esm': 0x5d009, '3ad61:Skyrim.esm': 0x3ad61, '2e504:Skyrim.esm': 0x2e504, '72317:Skyrim.esm': 0x72317, '400ad:Skyrim.esm': 0x400ad, '43599:Skyrim.esm': 0x43599, '5d008:Skyrim.esm': 0x5d008, 'd8d50:Skyrim.esm': 0xd8d50, '90d63:unofficial skyrim special edition patch.esp': 0x7090d63 };
+const ID = { '5d009:Skyrim.esm': 0x5d009, '3ad61:Skyrim.esm': 0x3ad61, '2e504:Skyrim.esm': 0x2e504, '72317:Skyrim.esm': 0x72317, '400ad:Skyrim.esm': 0x400ad, '51b16:Skyrim.esm': 0x51b16, '3aea3:Skyrim.esm': 0x3aea3, '4359e:Skyrim.esm': 0x4359e, '43599:Skyrim.esm': 0x43599, '5d008:Skyrim.esm': 0x5d008, 'd8d50:Skyrim.esm': 0xd8d50, '90d63:unofficial skyrim special edition patch.esp': 0x7090d63 };
 const HEART = 0x3ad61, GEM = 0x2e504;
 // ARMO biped slots for the look, as the live load order has them: the two briar bodies in slot 35 (0x20, USSEP's), a cuirass
 // the body (0x4), a helmet the head (0x1), an amulet slot 35 (0x20)
@@ -132,7 +132,8 @@ setRandom(0.99);
 ok(/takes root/.test(run(TARRARE, 'confirm')), 'the rite: the briar takes');
 ok(M.isBriar(TARRARE) && P(TARRARE, 'private.dboBriarheart').how === 'rite', 'the record is on the character');
 ok(inv(TARRARE, HEART) === 1, 'one Briar Heart is spent');
-ok(papyrusCalls.filter((c) => c.method === 'AddSpell').map((c) => c.args[0]).join() === '72317:Skyrim.esm,400ad:Skyrim.esm', 'Ironflesh and Lightning Cloak are given', papyrusCalls);
+ok(papyrusCalls.filter((c) => c.method === 'AddSpell').map((c) => c.args[0]).join() === '51b16:Skyrim.esm,3aea3:Skyrim.esm', 'Ironflesh and Lightning Cloak are given, the player\'s (51B16, 3AEA3), not the template\'s LeftHand pair', papyrusCalls);
+ok(papyrusCalls.filter((c) => c.method === 'RemoveSpell').map((c) => c.args[0]).join() === '72317:Skyrim.esm,400ad:Skyrim.esm', 'and the LeftHand pair an earlier Briarheart learned is taken back', papyrusCalls);
 ok(!papyrusCalls.some((c) => c.method === 'AddToFaction'), 'forswornFriendly is off: no faction');
 ok(!papyrusCalls.some((c) => c.method === 'EquipItem') && !given.length, 'the visual is off: nothing worn or given');
 ok(syncs.includes(TARRARE) && globalThis.__dboBriarheartVitalBonus(TARRARE).health === 50 && globalThis.__dboBriarheartVitalBonus(NORD).health === 0, '+50 health, sent at once');
@@ -192,7 +193,7 @@ ticker();
 ok(!M.isBriar(TARRARE) && P(TARRARE, 'private.dboBriarheart') === null, 'after tearSeconds the Briarheart is one no more');
 ok(kills.some((k) => k.t === TARRARE && k.by === HUNTER && /torn out/.test(k.why)), 'and dies at once (downed.js __dboDownedKill)');
 ok(given.some(([a, id]) => a === HUNTER && id === HEART), 'the taker gets the Briar Heart');
-ok(papyrusCalls.filter((c) => c.method === 'RemoveSpell').length === 2 && globalThis.__dboBriarheartVitalBonus(TARRARE).health === 0, 'the spells and the health go with it');
+ok(papyrusCalls.filter((c) => c.method === 'RemoveSpell').map((c) => c.args[0]).sort().join() === '3aea3:Skyrim.esm,400ad:Skyrim.esm,51b16:Skyrim.esm,72317:Skyrim.esm' && globalThis.__dboBriarheartVitalBonus(TARRARE).health === 0, 'the spells (and the retired LeftHand pair) and the health go with it');
 ok(audits.some((t) => /tore the briar heart out of/.test(t)), 'audited');
 ok(tearAt > 0, '(the tear kept its start time)');
 downed.delete(TARRARE);
@@ -766,6 +767,53 @@ ok(/__dboBriarRegenMult\(a, stat\)/.test(src('racial.js')), 'racial.js multiplie
 const bs = gcfg.briarheart.briarSkin || {};
 ok(bs.enabled === true && bs.armor === 38 && !bs.armorFrom && bs.staminaRegen === 1.25 && bs.diseaseResist === 50, 'the shipped briarSkin: on (with the module), a light faction cuirass (38), stamina x1.25, DiseaseResist 50', bs);
 ok(/Number\(s\.rating\) > 0 \? \{ rating: Number\(s\.rating\), counted: Number\(s\.rating\), heavy: false \}/.test(src('gamemode.js')), 'gamemode.js counts a rating of its own as a light piece');
+ok(/"spells": \["51b16:Skyrim\.esm", "3aea3:Skyrim\.esm"\]/.test(src('gamemode-config.json')), 'the shipped config gives the player\'s Ironflesh and Lightning Cloak');
+
+// ---- the Forsworn spare a Briarheart (par.lar, 27 Oct) ---------------------------------------------------------------------
+{
+  const EDIDS = { 0xe1: 'EncForsworn01MissileBretonF01', 0xe2: 'EncWolf', 0xe3: 'EncHagravenBoss' };
+  ID['e1:Skyrim.esm'] = 0xe1; ID['e2:Skyrim.esm'] = 0xe2; ID['e3:Skyrim.esm'] = 0xe3; // verify-formids: ignore - harness fixture: stand-in bases, read through the stub recordOf
+  const loadFw = (b) => {
+    delete require.cache[MODULE]; delete globalThis.__dboBriarheart;
+    return require(MODULE)({
+      mp, log: () => {}, personal: (a, t) => said.push([a >>> 0, t]), audit: (t) => audits.push(t), who: (a) => `who${(a >>> 0).toString(16)}`,
+      display: (a) => `char${(a >>> 0).toString(16)}`, cfg: { briarheart: Object.assign({ enabled: true, forswornFriendly: true, briarSkin: { enabled: true, armor: 38 } }, b || {}) },
+      registerChatCommand: (n, f) => commands.set(n, f), onlineActors: () => online.slice(), isLeadStaff: () => false, findByName: () => 0, every: (n, ms, f) => { ticker = f; },
+      giveItem: () => true, sourceResistsOf: () => new Set(), recordOf: (id) => (EDIDS[id >>> 0] ? { record: { editorId: EDIDS[id >>> 0] } } : null),
+    });
+  };
+  const BH = actor(0xa0, 1, 'reach', [0, 0, 0], []); setP(BH, 'profileId', 501); online.push(BH);
+  const MORTAL = actor(0xa1, 1, 'reach', [0, 0, 0], []); setP(MORTAL, 'profileId', 502); online.push(MORTAL);
+  const npc = (id, base, factions) => { setP(id, 'profileId', -1); setP(id, 'baseDesc', base); if (factions) setP(id, 'ff_factions', { f: factions.map((f) => [f, 0]), c: 0 }); return id; };
+  const CAMP = npc(0xff000b01, '9999:Skyrim.esm', [0x43599, 0x4359e]);   // a Forsworn camp's spawn: wildlife.js gave it the factions
+  const LEASE = npc(0xff000b02, 'e1:Skyrim.esm', null);                   // a dungeon lease's Forsworn: no ff_factions, its base says it // verify-formids: ignore - harness fixture: stand-in base
+  const HAG = npc(0xff000b03, 'e3:Skyrim.esm', null); // verify-formids: ignore - harness fixture: stand-in base
+  const WOLF = npc(0xff000b04, 'e2:Skyrim.esm', null); // verify-formids: ignore - harness fixture: stand-in base
+  const PLAYER_FW = actor(0xa2, 1, 'reach', [0, 0, 0], []); setP(PLAYER_FW, 'profileId', 503); setP(PLAYER_FW, 'ff_factions', { f: [[0x43599, 0]], c: 0 });
+  let M = loadFw();
+  M.become(BH, 'staff', 'forsworn test');
+  const spares = (a, t) => typeof globalThis.__dboBriarheartSpares === 'function' && globalThis.__dboBriarheartSpares(a, t) === true;
+  ok(spares(CAMP, BH), 'a Forsworn camp spawn (ForswornFaction in ff_factions) does not hurt a Briarheart');
+  ok(spares(LEASE, BH), 'nor a dungeon lease\'s Forsworn, known by its base (EncForsworn01MissileBretonF01): the Deepwood Redoubt shots');
+  ok(spares(HAG, BH), 'nor a hagraven');
+  ok(!spares(WOLF, BH), 'a wolf still bites a Briarheart');
+  ok(!spares(CAMP, MORTAL), 'the Forsworn still hurt anyone else');
+  ok(!spares(PLAYER_FW, BH), 'a player is never spared this way, whatever factions it carries');
+  ok(!spares(BH, CAMP) && !spares(CAMP, BH), 'a Briarheart that strikes a Forsworn provokes it: it may answer');
+  globalThis.__dboBriarheart.provoked.set(CAMP >>> 0, Date.now() - 61000);
+  ok(spares(CAMP, BH), 'and once provokeSeconds have passed it spares them again');
+  ok(spares(LEASE, BH), '(the provocation was that one Forsworn\'s alone)');
+  M = loadFw({ forswornFriendly: false });
+  ok(!spares(CAMP, BH), 'with forswornFriendly off the Forsworn fight a Briarheart as anyone');
+  M = loadFw();
+  ok(/turns blades like faction armour \(38\): it counts against every weapon and fist blow in a fight, though your inventory shows only the armour you wear/.test(run(BH, 'status')), '/briarheart status says the briar skin counts in a fight though the inventory shows only worn armour');
+  M = loadFw({ briarSkin: { enabled: false } });
+  ok(!/faction armour/.test(run(BH, 'status')), 'and says nothing of it while the skin is off');
+  const g = src('gamemode.js');
+  ok(/globalThis\.__dboBriarheartSpares && globalThis\.__dboBriarheartSpares\(agg, tgt\)\) return false;/.test(g) && g.indexOf('__dboBriarheartSpares(agg, tgt)') < g.indexOf('// 3. Mastery'), 'gamemode.js refuses the spared hit in onHitDamageAttempt, before any damage is counted');
+  ok(/sourceResistsOf, recordOf \}\);/.test(g), 'gamemode.js hands briarheart.js recordOf');
+  online.splice(online.indexOf(BH), 1); online.splice(online.indexOf(MORTAL), 1);
+}
 
 Math.random = realRandom;
 process.chdir(cwd);

@@ -8396,6 +8396,9 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
   // bandit's Chain Lightning arced through its own allies for full damage (Plundered Mine, 2026-09-23).
   globalThis.__dboHitRefusal = 'dungeon_ally';
   if (dmg > 0 && agg !== tgt && dungeonAllies(agg, tgt)) return false;
+  // 2c'. The Forsworn spare a Briarheart unless provoked (briarheart.js); the hosting client's AI may still swing
+  globalThis.__dboHitRefusal = 'briarheart_spared';
+  try { if (dmg > 0 && globalThis.__dboBriarheartSpares && globalThis.__dboBriarheartSpares(agg, tgt)) return false; } catch (e) { log('briarheart spare failed', e.message); }
 
   // 2d. GM warbands (warband.js): an NPC a GM raised never harms that GM, after a raid or settle too, and the NPCs of two
   // friendly GMs never harm each other. Before companionSystem's hook, so a refused hit sets no band on anyone.
@@ -9466,8 +9469,8 @@ try {
 try {
   const BRIARHEART_JS = path.resolve('briarheart.js');
   delete require.cache[BRIARHEART_JS];
-  require(BRIARHEART_JS)({ mp, log, personal, audit, who, display, cfg, registerChatCommand, onlineActors, isLeadStaff, findByName, every, giveItem, sourceResistsOf });
-} catch (e) { log('briarheart.js failed to load:', e.stack || e.message); for (const k of ['__dboIsBriarheart', '__dboBriarheartVitalBonus', '__dboBriarheartTargetMult', '__dboBriarheartRefusesDivine', '__dboBriarheartFaithLock', '__dboBriarheartLogin', '__dboBriarheartMenuEntries', '__dboBriarheartMenuAction', '__dboBriarheartEquip', '__dboBriarheartActivate']) globalThis[k] = null; }
+  require(BRIARHEART_JS)({ mp, log, personal, audit, who, display, cfg, registerChatCommand, onlineActors, isLeadStaff, findByName, every, giveItem, sourceResistsOf, recordOf });
+} catch (e) { log('briarheart.js failed to load:', e.stack || e.message); for (const k of ['__dboIsBriarheart', '__dboBriarheartVitalBonus', '__dboBriarheartTargetMult', '__dboBriarheartRefusesDivine', '__dboBriarheartFaithLock', '__dboBriarheartLogin', '__dboBriarheartMenuEntries', '__dboBriarheartMenuAction', '__dboBriarheartEquip', '__dboBriarheartActivate', '__dboBriarheartSpares']) globalThis[k] = null; }
 // ---- the hold's watch: NPC guards at staff-placed posts, no loot or skill from them, jail by them (server\guards.js, config "guards") ----
 try {
   const GUARDS_JS = path.resolve('guards.js');

@@ -88,6 +88,7 @@ const path = require('path');
 
 module.exports = (api) => {
   const { mp, log, personal, audit, who, display, cfg, registerChatCommand, onlineActors, isLeadStaff, findByName, every } = api;
+  const recordOf = typeof api.recordOf === 'function' ? api.recordOf : () => null;
   const sourceResistsOf = typeof api.sourceResistsOf === 'function' ? api.sourceResistsOf : () => new Set();
   const giveItem = typeof api.giveItem === 'function' ? api.giveItem : null;
   const C = Object.assign({
@@ -102,8 +103,17 @@ module.exports = (api) => {
     altars: [{ world: '29ab7:Skyrim.esm', pos: [-124700, 79930, -3316], radius: 500, name: 'Deepwood Vale, the Hagravens\' ritual court' }],
     failChance: 0.25, failPermadeath: false, failCooldownHours: 72,
     healthBonus: 50, resist: { poison: 0.15, frost: 0.15 }, fireWeakness: 0.25,
-    spells: ['72317:Skyrim.esm', '400ad:Skyrim.esm'],   // IronfleshLeftHand, LightningCloakLeftHand (the Briarheart template's)
+    // Ironflesh and Lightning Cloak, the player's (par.lar, 27 Oct: the template's LeftHand pair "can only Equip to the Left
+    // Hand"; both read in the live load order, no override). retiredSpells are taken back at every login and at the end
+    spells: ['51b16:Skyrim.esm', '3aea3:Skyrim.esm'],
+    retiredSpells: ['72317:Skyrim.esm', '400ad:Skyrim.esm'],   // IronfleshLeftHand, LightningCloakLeftHand
     forswornFriendly: false, forswornFaction: '43599:Skyrim.esm',
+    // The Forsworn spare a Briarheart (par.lar, 27 Oct: "Forsworn Enemies still attack me"; the faction alone is the hosting
+    // client's AI, and the Deepwood Redoubt lease's Forsworn shot him six times): with forswornFriendly, a hit from a
+    // Forsworn or a hagraven on a Briarheart is refused (gamemode.js onHitDamageAttempt, __dboBriarheartSpares), unless the
+    // Briarheart struck that one in the last provokeSeconds. Forsworn: ForswornFaction or HagravenFaction in its ff_factions
+    // (the camps, the leases), or a base editor id matching forswornMatch (case-blind)
+    forswornMatch: 'forsworn|hagraven', provokeSeconds: 60,
     tearSeconds: 10, tearRange: 250, tearPermadeath: false, tearGivesHeart: true,
     noDivineBlessings: true, faithLocked: true,
     cureDeities: ['arkay', 'stendarr'], cureItem: '2e504:Skyrim.esm',  // a filled black soul gem
@@ -345,6 +355,10 @@ module.exports = (api) => {
       : `briarheart: look FAILED on ${display(a)} (${why}): EquipItem of ${bad.join(', ')} refused by the server (try ${L.tries}; see the line above)`);
   };
   // ---- the briar skin: armour, stamina and DiseaseResist while the briar chest shows ---------------------------------------
+  const skinLine = () => {
+    const k = K(), r = skinRating(k);
+    return C.enabled && k.enabled && (r || k.armorFrom) ? ` Your briar skin turns blades like faction armour${r ? ` (${r})` : ''}: it counts against every weapon and fist blow in a fight, though your inventory shows only the armour you wear.` : '';
+  };
   const K = () => Object.assign({ enabled: false, armor: 0, armorFrom: '', staminaRegen: 1, diseaseResist: 0 }, C.briarSkin || {});
   const skinRating = (k) => Math.max(0, Number(k.armor) || 0);
   const skinShown = (worn) => { const v = V(), full = idOf(v.armor), mine = mineOf(v); return !!(full && worn.includes(full) && !worn.some((id) => !mine.has(id) && coversBody(id))); };
@@ -376,10 +390,12 @@ module.exports = (api) => {
   };
 
   // ---- the gifts on and off ---------------------------------------------------------------------------------------------
+  const retired = () => (C.retiredSpells || []).filter((d) => !(C.spells || []).includes(d));
   // Spells, the faction and the look follow the record: applied at the rite and at each login, taken at the end
   const applyGifts = (a, why) => {
     if (!isOnline(a)) return;
     for (const d of C.spells || []) papyrus(a, 'AddSpell', [form(d), false]);
+    for (const d of retired()) papyrus(a, 'RemoveSpell', [form(d)]);
     if (C.display && idOf(C.display)) papyrus(a, 'AddSpell', [form(C.display), false]);
     if (C.forswornFriendly) faction(a, true, why || 'gifts');
     S.looks.delete(a >>> 0); lookCheck(a, null, why || 'gifts');
@@ -387,7 +403,7 @@ module.exports = (api) => {
   };
   const removeGifts = (a, why) => {
     if (isOnline(a)) {
-      for (const d of C.spells || []) papyrus(a, 'RemoveSpell', [form(d)]);
+      for (const d of [...(C.spells || []), ...retired()]) papyrus(a, 'RemoveSpell', [form(d)]);
       if (C.display && idOf(C.display)) papyrus(a, 'RemoveSpell', [form(C.display)]);
       if (C.forswornFriendly) faction(a, false, why || 'end');
     }
@@ -471,7 +487,7 @@ module.exports = (api) => {
     }
     become(a, 'rite', '');
     audit(`BRIARHEART ${who(a)} took the briar heart at a Hagraven altar`);
-    return 'The Hagraven presses the briar into your chest. It takes root, as it did in Faolan, the Red Eagle, the first of you. Like Lorkh, you have given your heart. You feel the Reach in your blood, and nothing of the Divines.';
+    return 'The Hagraven presses the briar into your chest. It takes root, as it did in Faolan, the Red Eagle, the first of you. Like Lorkh, you have given your heart. You feel the Reach in your blood, and nothing of the Divines.' + skinLine();
   };
 
   // ---- the cure ---------------------------------------------------------------------------------------------------------
@@ -564,6 +580,36 @@ module.exports = (api) => {
     const rating = skinRating(k), from = rating ? 0 : idOf(k.armorFrom);
     return rating || from ? Object.assign(rating ? { rating } : { from }, { shown: idOf(V().armor), body: idOf(V().body) }) : null;
   };
+  // gamemode.js onHitDamageAttempt: true refuses a Forsworn's (or a hagraven's) hit on a Briarheart. A Briarheart's own hit
+  // on one of them marks it provoked, and a provoked one may answer for provokeSeconds
+  if (!(S.provoked instanceof Map)) S.provoked = new Map();   // Forsworn actor -> when a Briarheart last struck it
+  const fwFactions = () => [idOf(C.forswornFaction), idOf('4359e:Skyrim.esm')].filter(Boolean);
+  const isPlayer = (id) => { try { const p = mp.get(id, 'profileId'); return typeof p === 'number' && p >= 0; } catch (e) { return false; } };
+  const isForsworn = (id) => {
+    if (isPlayer(id)) return false;
+    let ff = null; try { ff = mp.get(id, 'ff_factions'); } catch (e) { ff = null; }
+    const want = fwFactions();
+    if (ff && Array.isArray(ff.f) && ff.f.some((x) => want.includes(Number(Array.isArray(x) ? x[0] : x) >>> 0))) return true;
+    if (!C.forswornMatch) return false;
+    let base = ''; try { base = String(mp.get(id, 'baseDesc') || ''); } catch (e) { return false; }
+    const r = base ? (() => { try { return recordOf(idOf(base)); } catch (e) { return null; } })() : null;
+    const edid = r && r.record ? String(r.record.editorId || '') : '';
+    try { return !!edid && new RegExp(String(C.forswornMatch), 'i').test(edid); } catch (e) { return false; }
+  };
+  globalThis.__dboBriarheartSpares = (agg, tgt) => {
+    agg = Number(agg) >>> 0; tgt = Number(tgt) >>> 0;
+    if (!C.enabled || !C.forswornFriendly || agg === tgt) return false;
+    const now = Date.now(), ms = Math.max(0, Number(C.provokeSeconds) || 0) * 1000;
+    if (isBriar(agg) && isForsworn(tgt)) {
+      if (!S.provoked.has(tgt)) log(`briarheart: ${display(agg)} struck a Forsworn (${tgt.toString(16)}); it may answer for ${ms / 1000} s`);
+      S.provoked.set(tgt, now);
+      if (S.provoked.size > 256) for (const [k, t] of S.provoked) if (now - t > ms) S.provoked.delete(k);
+      return false;
+    }
+    if (!isBriar(tgt) || !isForsworn(agg)) return false;
+    if (now - (S.provoked.get(agg) || 0) < ms) return false;
+    return true;
+  };
   // racial.js regenFactor: stamina regeneration while the briar skin is on
   globalThis.__dboBriarRegenMult = (a, stat) => {
     a = Number(a) >>> 0; const k = K();
@@ -602,7 +648,7 @@ module.exports = (api) => {
     const sub = (words.shift() || 'status').toLowerCase();
     if (sub === 'status') {
       const r = recOf(a);
-      return personal(a, r ? `A briar heart has beaten in your chest since ${new Date(r.since).toISOString().slice(0, 10)}, as one did in Faolan, the Red Eagle, the first of you.${C.tearPermadeath ? ' If it is torn out of you while you are down, this character dies for good.' : ''}` : 'Your heart is your own.');
+      return personal(a, r ? `A briar heart has beaten in your chest since ${new Date(r.since).toISOString().slice(0, 10)}, as one did in Faolan, the Red Eagle, the first of you.${C.tearPermadeath ? ' If it is torn out of you while you are down, this character dies for good.' : ''}${skinLine()}` : 'Your heart is your own.');
     }
     if (sub === 'rite') return personal(a, rite(a));
     if (sub === 'confirm') return personal(a, confirm(a, words[0]));
