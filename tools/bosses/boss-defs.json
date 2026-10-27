@@ -26,22 +26,26 @@
    "openingAdds": 3,
    "waves": [
     [
-     0.66,
+     0.75,
      3
     ],
     [
-     0.33,
+     0.5,
      3
+    ],
+    [
+     0.25,
+     4
     ]
    ],
    "toughness": 0.9,
    "damageMult": 4,
-   "enrageSeconds": 480,
+   "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.5,
+    "toughness": 0.7,
     "damageMult": 6
    },
-   "respawnSeconds": 10800,
+   "respawnSeconds": 3600,
    "radius": 6000,
    "announce": {
     "spawn": "Something cold stirs on the ice above Winterhold.",
@@ -101,7 +105,8 @@
      ]
     }
    },
-   "_enabledNote": "Nat 26 Oct: every boss ships complete; its shard (DBO_OreGlacialCrystal, DLE 1D2201) is in the production DLE ed7afac9"
+   "_enabledNote": "Nat 26 Oct: every boss ships complete; its shard (DBO_OreGlacialCrystal, DLE 1D2201) is in the production DLE ed7afac9",
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
   },
   {
    "id": "briarheartking",
@@ -131,31 +136,35 @@
      -60
     ],
     "name": "the King's Hagraven",
-    "bossToughnessWhileAlive": 0.85
+    "bossToughnessWhileAlive": 0.95
    },
    "addEdids": [
     "LvlForswornMelee",
     "LvlForswornMissile"
    ],
-   "openingAdds": 0,
+   "openingAdds": 3,
    "waves": [
     [
-     0.66,
-     2
+     0.75,
+     3
     ],
     [
-     0.33,
+     0.5,
      3
+    ],
+    [
+     0.25,
+     4
     ]
    ],
-   "toughness": 0.4,
-   "damageMult": 1.5,
-   "enrageSeconds": 480,
+   "toughness": 0.9,
+   "damageMult": 2.5,
+   "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.2,
-    "damageMult": 2.5
+    "toughness": 0.7,
+    "damageMult": 3.5
    },
-   "respawnSeconds": 7200,
+   "respawnSeconds": 3600,
    "radius": 6000,
    "excludeBriarhearts": true,
    "announce": {
@@ -209,7 +218,8 @@
       ]
      ]
     }
-   }
+   },
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
   },
   {
    "id": "centurion",
@@ -234,25 +244,29 @@
     "EncDwarvenSphere03",
     "EncDwarvenSpider03"
    ],
-   "openingAdds": 0,
+   "openingAdds": 3,
    "waves": [
     [
-     0.66,
-     2
+     0.75,
+     3
     ],
     [
-     0.33,
+     0.5,
      3
+    ],
+    [
+     0.25,
+     4
     ]
    ],
-   "toughness": 0.6,
-   "damageMult": 1.5,
-   "enrageSeconds": 360,
+   "toughness": 0.85,
+   "damageMult": 1.75,
+   "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.3,
+    "toughness": 0.65,
     "damageMult": 2.5
    },
-   "respawnSeconds": 14400,
+   "respawnSeconds": 3600,
    "radius": 4000,
    "announce": {
     "spawn": "Steam hisses through Blackreach: the Centurion Master wakes.",
@@ -312,7 +326,8 @@
       ]
      ]
     }
-   }
+   },
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
   },
   {
    "id": "palewarlord",
@@ -347,21 +362,29 @@
     "CYRLvlBanditMeleeAny",
     "CYRLvlBanditMissile"
    ],
-   "openingAdds": 2,
+   "openingAdds": 3,
    "waves": [
+    [
+     0.75,
+     3
+    ],
     [
      0.5,
      3
+    ],
+    [
+     0.25,
+     4
     ]
    ],
-   "toughness": 0.5,
-   "damageMult": 1.25,
-   "enrageSeconds": 360,
+   "toughness": 0.9,
+   "damageMult": 2.5,
+   "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.25,
-    "damageMult": 2
+    "toughness": 0.7,
+    "damageMult": 3.5
    },
-   "respawnSeconds": 7200,
+   "respawnSeconds": 3600,
    "radius": 6000,
    "announce": {
     "spawn": "A warlord's horn sounds on the Pale Pass road.",
@@ -419,7 +442,8 @@
      ]
     }
    },
-   "_spots": "Nat, 25 Oct, from the CK shots in _work/palewarlord-spots-1025: SE first, ST the roaming alternative (roam: the next spot after each kill); SR at Snowstone Rest's door dropped"
+   "_spots": "Nat, 25 Oct, from the CK shots in _work/palewarlord-spots-1025: SE first, ST the roaming alternative (roam: the next spot after each kill); SR at Snowstone Rest's door dropped",
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
   },
   {
    "id": "falmerwarmonger",
@@ -448,34 +472,38 @@
      0
     ],
     "name": "the Warmonger's shaman",
-    "bossToughnessWhileAlive": 0.75
+    "bossToughnessWhileAlive": 0.95
    },
    "addEdids": [
     "LvlChaurus",
     "LvlFalmerMelee"
    ],
-   "openingAdds": 2,
+   "openingAdds": 3,
    "openingDelaySeconds": 4,
    "openingStepSeconds": 3,
    "_openingNote": "Nat 26 Oct: arriving at the old spot froze his client while the boss fight and five wild Falmer zones spawned at once; the opening adds now come 4 s after the Warmonger rises and 3 s apart (bosses.js openingDelaySeconds, openingStepSeconds)",
    "waves": [
     [
-     0.66,
-     2
+     0.75,
+     3
     ],
     [
-     0.33,
+     0.5,
      3
+    ],
+    [
+     0.25,
+     4
     ]
    ],
-   "toughness": 0.5,
-   "damageMult": 1.5,
-   "enrageSeconds": 420,
+   "toughness": 0.9,
+   "damageMult": 2.5,
+   "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.25,
-    "damageMult": 2.5
+    "toughness": 0.7,
+    "damageMult": 3.5
    },
-   "respawnSeconds": 10800,
+   "respawnSeconds": 3600,
    "radius": 4000,
    "announce": {
     "spawn": "War drums beat in the Falmer city of Blackreach.",
@@ -528,7 +556,8 @@
       ]
      ]
     }
-   }
+   },
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
   },
   {
    "id": "movarth",
@@ -553,21 +582,29 @@
    "addEdids": [
     "LvlVampire"
    ],
-   "openingAdds": 2,
+   "openingAdds": 3,
    "waves": [
+    [
+     0.75,
+     3
+    ],
     [
      0.5,
      3
+    ],
+    [
+     0.25,
+     4
     ]
    ],
-   "toughness": 0.5,
-   "damageMult": 1.5,
-   "enrageSeconds": 420,
+   "toughness": 0.9,
+   "damageMult": 2.5,
+   "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.25,
-    "damageMult": 2.5
+    "toughness": 0.7,
+    "damageMult": 3.5
    },
-   "respawnSeconds": 10800,
+   "respawnSeconds": 3600,
    "radius": 5000,
    "announce": {
     "spawn": "Night falls on Hjaalmarch, and something old wakes in Movarth's Lair.",
@@ -620,7 +657,8 @@
       ]
      ]
     }
-   }
+   },
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
   },
   {
    "id": "duskthorn",
@@ -649,27 +687,35 @@
      0
     ],
     "name": "the Warchief's shaman",
-    "bossToughnessWhileAlive": 0.8
+    "bossToughnessWhileAlive": 0.95
    },
    "addEdids": [
     "CYRLvlGoblinMelee",
     "CYRLvlGoblinMissile"
    ],
-   "openingAdds": 2,
+   "openingAdds": 3,
    "waves": [
+    [
+     0.75,
+     3
+    ],
     [
      0.5,
      3
+    ],
+    [
+     0.25,
+     4
     ]
    ],
-   "toughness": 0.35,
-   "damageMult": 1.2,
-   "enrageSeconds": 360,
+   "toughness": 0.9,
+   "damageMult": 2.5,
+   "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.15,
-    "damageMult": 2
+    "toughness": 0.7,
+    "damageMult": 3.5
    },
-   "respawnSeconds": 5400,
+   "respawnSeconds": 3600,
    "radius": 5000,
    "announce": {
     "spawn": "The goblins of Dusk Thorn have a Warchief again.",
@@ -722,7 +768,8 @@
       ]
      ]
     }
-   }
+   },
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
   },
   {
    "id": "valkynaz",
@@ -752,7 +799,7 @@
      0
     ],
     "name": "the Valkynaz's High Clannfear",
-    "bossToughnessWhileAlive": 0.75
+    "bossToughnessWhileAlive": 0.95
    },
    "addEdids": [
     "DDRClannfear",
@@ -761,18 +808,26 @@
    "openingAdds": 3,
    "waves": [
     [
+     0.75,
+     3
+    ],
+    [
      0.5,
      3
+    ],
+    [
+     0.25,
+     4
     ]
    ],
-   "toughness": 0.6,
-   "damageMult": 1.5,
+   "toughness": 0.9,
+   "damageMult": 2.5,
    "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.3,
-    "damageMult": 2.5
+    "toughness": 0.7,
+    "damageMult": 3.5
    },
-   "respawnSeconds": 10800,
+   "respawnSeconds": 3600,
    "radius": 6000,
    "announce": {
     "spawn": "The Great Oblivion Gate burns open: a Valkynaz steps through, its Clannfear at its heels.",
@@ -832,7 +887,8 @@
       ]
      ]
     }
-   }
+   },
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
   },
   {
    "id": "karstaag",
@@ -857,25 +913,29 @@
    "addEdids": [
     "EncIceWraith"
    ],
-   "openingAdds": 2,
+   "openingAdds": 3,
    "waves": [
     [
-     0.66,
+     0.75,
      3
     ],
     [
-     0.33,
+     0.5,
      3
+    ],
+    [
+     0.25,
+     4
     ]
    ],
-   "toughness": 0.5,
-   "damageMult": 1.25,
+   "toughness": 0.85,
+   "damageMult": 1.75,
    "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.25,
-    "damageMult": 2
+    "toughness": 0.65,
+    "damageMult": 2.5
    },
-   "respawnSeconds": 14400,
+   "respawnSeconds": 3600,
    "radius": 6000,
    "announce": {
     "spawn": "The throne of Castle Karstaag is no longer empty.",
@@ -935,7 +995,8 @@
       ]
      ]
     }
-   }
+   },
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
   },
   {
    "id": "risenlegate",
@@ -967,22 +1028,26 @@
    "openingAdds": 3,
    "waves": [
     [
-     0.66,
+     0.75,
      3
     ],
     [
-     0.33,
+     0.5,
+     3
+    ],
+    [
+     0.25,
      4
     ]
    ],
-   "toughness": 0.6,
-   "damageMult": 1.5,
+   "toughness": 0.9,
+   "damageMult": 2.5,
    "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.3,
-    "damageMult": 2.5
+    "toughness": 0.7,
+    "damageMult": 3.5
    },
-   "respawnSeconds": 14400,
+   "respawnSeconds": 3600,
    "radius": 5000,
    "announce": {
     "spawn": "The undead legion of Sancre Tor forms up around its Legate.",
@@ -1030,7 +1095,8 @@
      ]
     }
    },
-   "_note": "Nat, 25 Oct: Sancre Tor stays undead (an Imperial fort town; no Ayleid undead, Nate 9 Oct): an undead legion from Sancre Tor's own pools (gamemode-config ownedSpawns.replace minotaur: CYREncSkeleton01 lines and BSKEncZombie02). Adamantium's home, so its schematic stays here"
+   "_note": "Nat, 25 Oct: Sancre Tor stays undead (an Imperial fort town; no Ayleid undead, Nate 9 Oct): an undead legion from Sancre Tor's own pools (gamemode-config ownedSpawns.replace minotaur: CYREncSkeleton01 lines and BSKEncZombie02). Adamantium's home, so its schematic stays here",
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
   },
   {
    "id": "minotaurlord",
@@ -1056,25 +1122,29 @@
    "addEdids": [
     "CYREncMinotaur"
    ],
-   "openingAdds": 0,
+   "openingAdds": 3,
    "waves": [
     [
-     0.66,
-     2
+     0.75,
+     3
     ],
     [
-     0.33,
-     2
+     0.5,
+     3
+    ],
+    [
+     0.25,
+     4
     ]
    ],
-   "toughness": 0.5,
-   "damageMult": 1.25,
+   "toughness": 0.85,
+   "damageMult": 1.75,
    "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.25,
-    "damageMult": 2
+    "toughness": 0.65,
+    "damageMult": 2.5
    },
-   "respawnSeconds": 10800,
+   "respawnSeconds": 3600,
    "radius": 5000,
    "announce": {
     "spawn": "Something heavy stirs in Minotaur's Rest.",
@@ -1142,7 +1212,8 @@
    "rearmAddsEdid": "BSKMinotaurWarAxe",
    "_adds": "Nat, 25 Oct: the minotaurs come back at Minotaur's Rest as his adds; each gets its war axe back in its inventory (rearmAdds), as the Lord's test 2 does",
    "rearmEdid": "BSKMinotaurLordAxe",
-   "_rearmNote": "Nat 26 Oct: the two dev tests (minotaurtest1, minotaurtest2) stood under this boss's own name, which put two 'The Minotaur Lord' plates up at once; both kept the axe at spawn (dev 26 Oct 03:49, 6026df), so the Lord takes test 2's set-up (rearmEdid, which puts the axe back if it is ever lost) and the tests are gone"
+   "_rearmNote": "Nat 26 Oct: the two dev tests (minotaurtest1, minotaurtest2) stood under this boss's own name, which put two 'The Minotaur Lord' plates up at once; both kept the axe at spawn (dev 26 Oct 03:49, 6026df), so the Lord takes test 2's set-up (rearmEdid, which puts the axe back if it is ever lost) and the tests are gone",
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
   },
   {
    "id": "werewolfbehemoth",
@@ -1194,22 +1265,26 @@
    "openingAdds": 3,
    "waves": [
     [
-     0.66,
+     0.75,
      3
     ],
     [
-     0.33,
+     0.5,
+     3
+    ],
+    [
+     0.25,
      4
     ]
    ],
-   "toughness": 0.5,
-   "damageMult": 1.5,
-   "enrageSeconds": 480,
+   "toughness": 0.85,
+   "damageMult": 1.8,
+   "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.25,
-    "damageMult": 2.25
+    "toughness": 0.65,
+    "damageMult": 2.6
    },
-   "respawnSeconds": 10800,
+   "respawnSeconds": 3600,
    "radius": 5000,
    "announce": {
     "spawn": "A howl rolls down from the Falkreath pines. Hircine's hunt is abroad tonight.",
@@ -1276,7 +1351,8 @@
    "_note": "Proposed 25 Oct (the Leader for Nat): vanilla's top werewolf boss (EncWerewolf06Boss, Dawnguard's ladder) named and rim-lit; the server's SetScale is a stub, so the boss is its own NPC_ on the Behemoth race (DLE 1D2207, Nat 25 Oct: 1.3x the pack: race 1.30 x NAM6 1.13 = 1.47 against the adds' 1.13). Pack: a werewolf and two wolves at the start, then 3 and 4 more (werewolf, wolf, wolf in turn). Drops: a Werewolf Pelt (Hothtrooper's werewolf fur and leather recipes take it) and three wolf pelts, gold, Silver 5% (the hunter's metal, Hircine's joke), Glass 1%. Every zone is hostile, player werewolves included. fullMoon true (here or in its config block) keeps it to full-moon nights",
    "bossDesc": "1d2207:DragonBreak Online Edits.esp",
    "bossLevel": 42,
-   "bossConfirmedBy": "Worker 3, 25 Oct: merged into the restart DLE d0831dd6 as 491D2207, read back: TPLT EncWerewolf06Boss (level 42), race DBO_WerewolfBehemothRace 1D1F9E, NAM6 1.13, FULL 'Werewolf Behemoth'"
+   "bossConfirmedBy": "Worker 3, 25 Oct: merged into the restart DLE d0831dd6 as 491D2207, read back: TPLT EncWerewolf06Boss (level 42), race DBO_WerewolfBehemothRace 1D1F9E, NAM6 1.13, FULL 'Werewolf Behemoth'",
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
   },
   {
    "id": "giantchieftain",
@@ -1306,31 +1382,35 @@
      0
     ],
     "name": "the Chieftain's bull",
-    "bossToughnessWhileAlive": 0.7
+    "bossToughnessWhileAlive": 0.95
    },
    "addEdids": [
     "EncMammothWild",
     "EncGiant02"
    ],
-   "openingAdds": 2,
+   "openingAdds": 3,
    "waves": [
     [
-     0.66,
-     2
+     0.75,
+     3
     ],
     [
-     0.33,
-     2
+     0.5,
+     3
+    ],
+    [
+     0.25,
+     4
     ]
    ],
-   "toughness": 0.5,
-   "damageMult": 1.0,
-   "enrageSeconds": 480,
+   "toughness": 0.85,
+   "damageMult": 1.5,
+   "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.3,
-    "damageMult": 1.5
+    "toughness": 0.65,
+    "damageMult": 2.0
    },
-   "respawnSeconds": 10800,
+   "respawnSeconds": 3600,
    "radius": 6000,
    "announce": {
     "spawn": "Drums thunder at Blizzard Rest: the giants have a Chieftain.",
@@ -1393,8 +1473,10 @@
       ]
      ]
     }
-   }
+   },
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
   }
  ],
- "_plateNames": "Nat 26 Oct: 'make better name tags for them above their health bar'. plateName is the big line of a boss's nameplate, its name the smaller title line under it (bosses.js sendLabels, the client's actorLabelService). Movarth Piquine and Karstaag are their lore names; the rest are new and can be changed here"
+ "_plateNames": "Nat 26 Oct: 'make better name tags for them above their health bar'. plateName is the big line of a boss's nameplate, its name the smaller title line under it (bosses.js sendLabels, the client's actorLabelService). Movarth Piquine and Karstaag are their lore names; the rest are new and can be changed here",
+ "_respawnNote": "Nat 26 Oct: every boss respawns 1 h after it falls (respawnSeconds 3600); the Behemoth still stands only at night (night true)"
 }

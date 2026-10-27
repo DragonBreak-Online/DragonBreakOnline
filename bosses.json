@@ -11,28 +11,33 @@
    "openingAdds": 3,
    "waves": [
     [
-     0.66,
+     0.75,
      3
     ],
     [
-     0.33,
+     0.5,
      3
+    ],
+    [
+     0.25,
+     4
     ]
    ],
    "toughness": 0.9,
    "damageMult": 4,
-   "enrageSeconds": 480,
+   "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.5,
+    "toughness": 0.7,
     "damageMult": 6
    },
-   "respawnSeconds": 10800,
+   "respawnSeconds": 3600,
    "radius": 6000,
    "announce": {
     "spawn": "Something cold stirs on the ice above Winterhold.",
     "death": "The cold above Winterhold breaks."
    },
    "_enabledNote": "Nat 26 Oct: every boss ships complete; its shard (DBO_OreGlacialCrystal, DLE 1D2201) is in the production DLE ed7afac9",
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
    "boss": {
     "edid": "EncIceWraith",
     "desc": "23ab3:Skyrim.esm",
@@ -139,31 +144,36 @@
    "enabled": true,
    "hold": "markarth",
    "world": "3c:Skyrim.esm",
-   "openingAdds": 0,
+   "openingAdds": 3,
    "waves": [
     [
-     0.66,
-     2
+     0.75,
+     3
     ],
     [
-     0.33,
+     0.5,
      3
+    ],
+    [
+     0.25,
+     4
     ]
    ],
-   "toughness": 0.4,
-   "damageMult": 1.5,
-   "enrageSeconds": 480,
+   "toughness": 0.9,
+   "damageMult": 2.5,
+   "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.2,
-    "damageMult": 2.5
+    "toughness": 0.7,
+    "damageMult": 3.5
    },
-   "respawnSeconds": 7200,
+   "respawnSeconds": 3600,
    "radius": 6000,
    "excludeBriarhearts": true,
    "announce": {
     "spawn": "The Forsworn of Lost Valley have crowned a Briarheart King.",
     "death": "The Briarheart King of Lost Valley has fallen."
    },
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
    "boss": {
     "edid": "LvlForswornBossShaman",
     "desc": "442d3:Skyrim.esm",
@@ -637,7 +647,7 @@
      -60
     ],
     "name": "the King's Hagraven",
-    "bossToughnessWhileAlive": 0.85,
+    "bossToughnessWhileAlive": 0.95,
     "options": [
      [
       20,
@@ -724,30 +734,35 @@
    "enabled": true,
    "hold": "",
    "world": "1ee62:Skyrim.esm",
-   "openingAdds": 0,
+   "openingAdds": 3,
    "waves": [
     [
-     0.66,
-     2
+     0.75,
+     3
     ],
     [
-     0.33,
+     0.5,
      3
+    ],
+    [
+     0.25,
+     4
     ]
    ],
-   "toughness": 0.6,
-   "damageMult": 1.5,
-   "enrageSeconds": 360,
+   "toughness": 0.85,
+   "damageMult": 1.75,
+   "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.3,
+    "toughness": 0.65,
     "damageMult": 2.5
    },
-   "respawnSeconds": 14400,
+   "respawnSeconds": 3600,
    "radius": 4000,
    "announce": {
     "spawn": "Steam hisses through Blackreach: the Centurion Master wakes.",
     "death": "The Centurion Master of Blackreach is still."
    },
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
    "boss": {
     "edid": "EncDwarvenCenturion03",
     "desc": "23a96:Skyrim.esm",
@@ -867,27 +882,36 @@
    "hold": "bruma",
    "world": "a764b:BSHeartland.esm",
    "roam": true,
-   "openingAdds": 2,
+   "openingAdds": 3,
    "waves": [
+    [
+     0.75,
+     3
+    ],
     [
      0.5,
      3
+    ],
+    [
+     0.25,
+     4
     ]
    ],
-   "toughness": 0.5,
-   "damageMult": 1.25,
-   "enrageSeconds": 360,
+   "toughness": 0.9,
+   "damageMult": 2.5,
+   "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.25,
-    "damageMult": 2
+    "toughness": 0.7,
+    "damageMult": 3.5
    },
-   "respawnSeconds": 7200,
+   "respawnSeconds": 3600,
    "radius": 6000,
    "announce": {
     "spawn": "A warlord's horn sounds on the Pale Pass road.",
     "death": "The Warlord of the Pale Pass is dead."
    },
    "_spots": "Nat, 25 Oct, from the CK shots in _work/palewarlord-spots-1025: SE first, ST the roaming alternative (roam: the next spot after each kill); SR at Snowstone Rest's door dropped",
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
    "boss": {
     "edid": "CYRLvlBanditBoss",
     "desc": "2dad4:BSHeartland.esm",
@@ -1900,33 +1924,38 @@
    "enabled": true,
    "hold": "",
    "world": "1ee62:Skyrim.esm",
-   "openingAdds": 2,
+   "openingAdds": 3,
    "openingDelaySeconds": 4,
    "openingStepSeconds": 3,
    "_openingNote": "Nat 26 Oct: arriving at the old spot froze his client while the boss fight and five wild Falmer zones spawned at once; the opening adds now come 4 s after the Warmonger rises and 3 s apart (bosses.js openingDelaySeconds, openingStepSeconds)",
    "waves": [
     [
-     0.66,
-     2
+     0.75,
+     3
     ],
     [
-     0.33,
+     0.5,
      3
+    ],
+    [
+     0.25,
+     4
     ]
    ],
-   "toughness": 0.5,
-   "damageMult": 1.5,
-   "enrageSeconds": 420,
+   "toughness": 0.9,
+   "damageMult": 2.5,
+   "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.25,
-    "damageMult": 2.5
+    "toughness": 0.7,
+    "damageMult": 3.5
    },
-   "respawnSeconds": 10800,
+   "respawnSeconds": 3600,
    "radius": 4000,
    "announce": {
     "spawn": "War drums beat in the Falmer city of Blackreach.",
     "death": "The Falmer Warmonger of Blackreach is dead."
    },
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
    "boss": {
     "edid": "EncFalmer05MeleeBoss",
     "desc": "5238e:Skyrim.esm",
@@ -2035,7 +2064,7 @@
      0
     ],
     "name": "the Warmonger's shaman",
-    "bossToughnessWhileAlive": 0.75,
+    "bossToughnessWhileAlive": 0.95,
     "options": [
      [
       1,
@@ -2148,26 +2177,35 @@
    "hold": "morthal",
    "world": "3c:Skyrim.esm",
    "night": true,
-   "openingAdds": 2,
+   "openingAdds": 3,
    "waves": [
+    [
+     0.75,
+     3
+    ],
     [
      0.5,
      3
+    ],
+    [
+     0.25,
+     4
     ]
    ],
-   "toughness": 0.5,
-   "damageMult": 1.5,
-   "enrageSeconds": 420,
+   "toughness": 0.9,
+   "damageMult": 2.5,
+   "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.25,
-    "damageMult": 2.5
+    "toughness": 0.7,
+    "damageMult": 3.5
    },
-   "respawnSeconds": 10800,
+   "respawnSeconds": 3600,
    "radius": 5000,
    "announce": {
     "spawn": "Night falls on Hjaalmarch, and something old wakes in Movarth's Lair.",
     "death": "The Master of Movarth's Lair is ash."
    },
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
    "boss": {
     "edid": "dunMovarthVampireBoss",
     "desc": "8bb91:Skyrim.esm",
@@ -2729,26 +2767,35 @@
    "enabled": true,
    "hold": "bruma",
    "world": "a764b:BSHeartland.esm",
-   "openingAdds": 2,
+   "openingAdds": 3,
    "waves": [
+    [
+     0.75,
+     3
+    ],
     [
      0.5,
      3
+    ],
+    [
+     0.25,
+     4
     ]
    ],
-   "toughness": 0.35,
-   "damageMult": 1.2,
-   "enrageSeconds": 360,
+   "toughness": 0.9,
+   "damageMult": 2.5,
+   "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.15,
-    "damageMult": 2
+    "toughness": 0.7,
+    "damageMult": 3.5
    },
-   "respawnSeconds": 5400,
+   "respawnSeconds": 3600,
    "radius": 5000,
    "announce": {
     "spawn": "The goblins of Dusk Thorn have a Warchief again.",
     "death": "The Warchief of Dusk Thorn is dead."
    },
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
    "boss": {
     "edid": "CYREncGoblinDeepRoot03BossMelee",
     "desc": "e9de2:BSHeartland.esm",
@@ -2852,7 +2899,7 @@
      0
     ],
     "name": "the Warchief's shaman",
-    "bossToughnessWhileAlive": 0.8,
+    "bossToughnessWhileAlive": 0.95,
     "options": [
      [
       15,
@@ -2942,23 +2989,32 @@
    "openingAdds": 3,
    "waves": [
     [
+     0.75,
+     3
+    ],
+    [
      0.5,
      3
+    ],
+    [
+     0.25,
+     4
     ]
    ],
-   "toughness": 0.6,
-   "damageMult": 1.5,
+   "toughness": 0.9,
+   "damageMult": 2.5,
    "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.3,
-    "damageMult": 2.5
+    "toughness": 0.7,
+    "damageMult": 3.5
    },
-   "respawnSeconds": 10800,
+   "respawnSeconds": 3600,
    "radius": 6000,
    "announce": {
     "spawn": "The Great Oblivion Gate burns open: a Valkynaz steps through, its Clannfear at its heels.",
     "death": "The Valkynaz of the Great Gate is banished."
    },
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
    "boss": {
     "edid": "CYREncDremoraWarlock06",
     "desc": "ddb29:BSHeartland.esm",
@@ -3012,7 +3068,7 @@
      0
     ],
     "name": "the Valkynaz's High Clannfear",
-    "bossToughnessWhileAlive": 0.75,
+    "bossToughnessWhileAlive": 0.95,
     "options": [
      [
       0,
@@ -3104,30 +3160,35 @@
    "waitingOn": "Solstheim, closed by the region lock (playtest.closedPlugins, Nate 14-15 Oct): turn it on when Solstheim opens (bosses.karstaag.enabled true)",
    "hold": "",
    "world": "800:Dragonborn.esm",
-   "openingAdds": 2,
+   "openingAdds": 3,
    "waves": [
     [
-     0.66,
+     0.75,
      3
     ],
     [
-     0.33,
+     0.5,
      3
+    ],
+    [
+     0.25,
+     4
     ]
    ],
-   "toughness": 0.5,
-   "damageMult": 1.25,
+   "toughness": 0.85,
+   "damageMult": 1.75,
    "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.25,
-    "damageMult": 2
+    "toughness": 0.65,
+    "damageMult": 2.5
    },
-   "respawnSeconds": 14400,
+   "respawnSeconds": 3600,
    "radius": 6000,
    "announce": {
     "spawn": "The throne of Castle Karstaag is no longer empty.",
     "death": "Karstaag falls, for now."
    },
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
    "boss": {
     "edid": "DLC2dunKarstaag",
     "desc": "19665:Dragonborn.esm",
@@ -3236,28 +3297,33 @@
    "openingAdds": 3,
    "waves": [
     [
-     0.66,
+     0.75,
      3
     ],
     [
-     0.33,
+     0.5,
+     3
+    ],
+    [
+     0.25,
      4
     ]
    ],
-   "toughness": 0.6,
-   "damageMult": 1.5,
+   "toughness": 0.9,
+   "damageMult": 2.5,
    "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.3,
-    "damageMult": 2.5
+    "toughness": 0.7,
+    "damageMult": 3.5
    },
-   "respawnSeconds": 14400,
+   "respawnSeconds": 3600,
    "radius": 5000,
    "announce": {
     "spawn": "The undead legion of Sancre Tor forms up around its Legate.",
     "death": "The Risen Legate of Sancre Tor lies still, and his legion with him."
    },
    "_note": "Nat, 25 Oct: Sancre Tor stays undead (an Imperial fort town; no Ayleid undead, Nate 9 Oct): an undead legion from Sancre Tor's own pools (gamemode-config ownedSpawns.replace minotaur: CYREncSkeleton01 lines and BSKEncZombie02). Adamantium's home, so its schematic stays here",
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
    "boss": {
     "edid": "BSKEncZombie03",
     "desc": "60292c:BSAssets.esm",
@@ -3399,25 +3465,29 @@
    "traceEquipment": false,
    "hold": "bruma",
    "world": "a764b:BSHeartland.esm",
-   "openingAdds": 0,
+   "openingAdds": 3,
    "waves": [
     [
-     0.66,
-     2
+     0.75,
+     3
     ],
     [
-     0.33,
-     2
+     0.5,
+     3
+    ],
+    [
+     0.25,
+     4
     ]
    ],
-   "toughness": 0.5,
-   "damageMult": 1.25,
+   "toughness": 0.85,
+   "damageMult": 1.75,
    "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.25,
-    "damageMult": 2
+    "toughness": 0.65,
+    "damageMult": 2.5
    },
-   "respawnSeconds": 10800,
+   "respawnSeconds": 3600,
    "radius": 5000,
    "announce": {
     "spawn": "Something heavy stirs in Minotaur's Rest.",
@@ -3426,6 +3496,7 @@
    "_note": "Drops (proposed, 25 Oct): Minotaur Horn x2 and Minotaur Hide (BSAssets, the beast's own), gold, Steel Plate 5%. Minotaur's Rest's own spawns are undead today (ownedSpawns.replace minotaur); if the Lord fights, Nat may want its minotaurs back as his adds",
    "_adds": "Nat, 25 Oct: the minotaurs come back at Minotaur's Rest as his adds; each gets its war axe back in its inventory (rearmAdds), as the Lord's test 2 does",
    "_rearmNote": "Nat 26 Oct: the two dev tests (minotaurtest1, minotaurtest2) stood under this boss's own name, which put two 'The Minotaur Lord' plates up at once; both kept the axe at spawn (dev 26 Oct 03:49, 6026df), so the Lord takes test 2's set-up (rearmEdid, which puts the axe back if it is ever lost) and the tests are gone",
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
    "rearm": "6026df:BSAssets.esm",
    "rearmAdds": "6026e6:BSAssets.esm",
    "boss": {
@@ -3544,28 +3615,33 @@
    "openingAdds": 3,
    "waves": [
     [
-     0.66,
+     0.75,
      3
     ],
     [
-     0.33,
+     0.5,
+     3
+    ],
+    [
+     0.25,
      4
     ]
    ],
-   "toughness": 0.5,
-   "damageMult": 1.5,
-   "enrageSeconds": 480,
+   "toughness": 0.85,
+   "damageMult": 1.8,
+   "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.25,
-    "damageMult": 2.25
+    "toughness": 0.65,
+    "damageMult": 2.6
    },
-   "respawnSeconds": 10800,
+   "respawnSeconds": 3600,
    "radius": 5000,
    "announce": {
     "spawn": "A howl rolls down from the Falkreath pines. Hircine's hunt is abroad tonight.",
     "death": "The Behemoth of Hircine's Hunt is dead, and the pack scatters."
    },
    "_note": "Proposed 25 Oct (the Leader for Nat): vanilla's top werewolf boss (EncWerewolf06Boss, Dawnguard's ladder) named and rim-lit; the server's SetScale is a stub, so the boss is its own NPC_ on the Behemoth race (DLE 1D2207, Nat 25 Oct: 1.3x the pack: race 1.30 x NAM6 1.13 = 1.47 against the adds' 1.13). Pack: a werewolf and two wolves at the start, then 3 and 4 more (werewolf, wolf, wolf in turn). Drops: a Werewolf Pelt (Hothtrooper's werewolf fur and leather recipes take it) and three wolf pelts, gold, Silver 5% (the hunter's metal, Hircine's joke), Glass 1%. Every zone is hostile, player werewolves included. fullMoon true (here or in its config block) keeps it to full-moon nights",
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
    "boss": {
     "edid": "DBO_EncWerewolfBehemothBoss",
     "desc": "1d2207:DragonBreak Online Edits.esp",
@@ -3726,30 +3802,35 @@
    "hold": "dawnstar",
    "world": "3c:Skyrim.esm",
    "_note": "Nat 26 Oct: 'We should make a giant boss too', built with the proposal's defaults: Blizzard Rest (BlizzardRestLocation 018EEE), the most remote of the twelve giant camps; a vanilla giant at normal size (a scaled-race Chieftain is a later, separate item); a bull mammoth guards him; mammoths and a giant come in waves. Giants take half damage from magic (npcToughness.giant), so it is a fight for weapons. Schematic: Steel Plate, the heavy plate a giant's strength calls for",
-   "openingAdds": 2,
+   "openingAdds": 3,
    "waves": [
     [
-     0.66,
-     2
+     0.75,
+     3
     ],
     [
-     0.33,
-     2
+     0.5,
+     3
+    ],
+    [
+     0.25,
+     4
     ]
    ],
-   "toughness": 0.5,
-   "damageMult": 1.0,
-   "enrageSeconds": 480,
+   "toughness": 0.85,
+   "damageMult": 1.5,
+   "enrageSeconds": 600,
    "enrage": {
-    "toughness": 0.3,
-    "damageMult": 1.5
+    "toughness": 0.65,
+    "damageMult": 2.0
    },
-   "respawnSeconds": 10800,
+   "respawnSeconds": 3600,
    "radius": 6000,
    "announce": {
     "spawn": "Drums thunder at Blizzard Rest: the giants have a Chieftain.",
     "death": "The Chieftain of Blizzard Rest is dead, and his bull with him."
    },
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
    "boss": {
     "edid": "EncGiant01",
     "desc": "23aae:Skyrim.esm",
@@ -3793,7 +3874,7 @@
      0
     ],
     "name": "the Chieftain's bull",
-    "bossToughnessWhileAlive": 0.7,
+    "bossToughnessWhileAlive": 0.95,
     "options": [
      [
       38,

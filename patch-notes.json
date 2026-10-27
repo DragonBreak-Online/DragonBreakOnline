@@ -1,5 +1,20 @@
 [
   {
+    "title": "Every boss is now a world boss, and comes back every hour",
+    "date": "2026-10-26",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Bosses",
+        "items": [
+          "Every boss now returns one hour after it falls. The Behemoth of Hircine's Hunt still walks only at night.",
+          "Every boss is now a group fight for five or more: many times tougher, harder hitting, with more adds in three waves. A guardian shields its boss almost completely while it lives, so kill it first. After ten minutes a boss grows furious."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Pigeons to someone away",
     "date": "2026-10-26",
     "version": "Server update",
