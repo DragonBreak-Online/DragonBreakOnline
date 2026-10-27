@@ -1,0 +1,311 @@
+{
+ "_comment": "The map marker that stands for each place of the realm on Skyrim's M map, from Worker 3's inventory (_notes-to-server/mmap-1026/markers.json, 26 Oct). name is the marker's own name, which is its label on the map and what the client matches. Sent by realm.js (dboMapRealm); the client reveals each with addToMap.",
+ "markers": [
+  {
+   "id": "bruma",
+   "kind": "capital",
+   "name": "Castle Bruma",
+   "desc": "757ff:BSHeartland.esm"
+  },
+  {
+   "id": "applewatch",
+   "kind": "town",
+   "name": "Applewatch",
+   "desc": "206d:BSHeartland.esm"
+  },
+  {
+   "id": "greenwood",
+   "kind": "village",
+   "name": "Greenwood",
+   "desc": "6da26:BSHeartland.esm"
+  },
+  {
+   "id": "aleswell",
+   "kind": "town",
+   "name": "Aleswell",
+   "desc": "13f779:DragonBreak Online Edits.esp"
+  },
+  {
+   "id": "fort-caractacus",
+   "kind": "fort",
+   "name": "Fort Caractacus",
+   "desc": "13f77a:DragonBreak Online Edits.esp"
+  },
+  {
+   "id": "pale-pass",
+   "kind": "fort",
+   "name": "Fort Pale Pass",
+   "desc": "5ec81:BSHeartland.esm"
+  },
+  {
+   "id": "whiterun",
+   "kind": "capital",
+   "name": "Whiterun",
+   "desc": "162ce:Skyrim.esm"
+  },
+  {
+   "id": "riften",
+   "kind": "capital",
+   "name": "Riften",
+   "desc": "1c390:Skyrim.esm"
+  },
+  {
+   "id": "solitude",
+   "kind": "capital",
+   "name": "Solitude",
+   "desc": "4d0f4:Skyrim.esm"
+  },
+  {
+   "id": "windhelm",
+   "kind": "capital",
+   "name": "Windhelm",
+   "desc": "38436:Skyrim.esm"
+  },
+  {
+   "id": "markarth",
+   "kind": "capital",
+   "name": "Markarth",
+   "desc": "1c38a:Skyrim.esm"
+  },
+  {
+   "id": "falkreath",
+   "kind": "capital",
+   "name": "Falkreath",
+   "desc": "17760:Skyrim.esm"
+  },
+  {
+   "id": "morthal",
+   "kind": "capital",
+   "name": "Morthal",
+   "desc": "177b0:Skyrim.esm"
+  },
+  {
+   "id": "dawnstar",
+   "kind": "capital",
+   "name": "Dawnstar",
+   "desc": "1773a:Skyrim.esm"
+  },
+  {
+   "id": "winterhold",
+   "kind": "capital",
+   "name": "Winterhold",
+   "desc": "177ef:Skyrim.esm"
+  },
+  {
+   "id": "riverwood",
+   "kind": "town",
+   "name": "Riverwood",
+   "desc": "162a4:Skyrim.esm"
+  },
+  {
+   "id": "rorikstead",
+   "kind": "town",
+   "name": "Rorikstead",
+   "desc": "177cc:Skyrim.esm"
+  },
+  {
+   "id": "ivarstead",
+   "kind": "town",
+   "name": "Ivarstead",
+   "desc": "17791:Skyrim.esm"
+  },
+  {
+   "id": "shors-stone",
+   "kind": "town",
+   "name": "Shor's Stone",
+   "desc": "177d7:Skyrim.esm"
+  },
+  {
+   "id": "dragon-bridge",
+   "kind": "town",
+   "name": "Dragon Bridge",
+   "desc": "17753:Skyrim.esm"
+  },
+  {
+   "id": "karthwasten",
+   "kind": "town",
+   "name": "Karthwasten",
+   "desc": "1779a:Skyrim.esm"
+  },
+  {
+   "id": "kynesgrove",
+   "kind": "village",
+   "name": "Kynesgrove",
+   "desc": "177a1:Skyrim.esm"
+  },
+  {
+   "id": "old-hroldan",
+   "kind": "village",
+   "name": "Old Hroldan",
+   "desc": "177c3:Skyrim.esm"
+  },
+  {
+   "id": "fort-greymoor",
+   "kind": "fort",
+   "name": "Fort Greymoor",
+   "desc": "1624a:Skyrim.esm"
+  },
+  {
+   "id": "fort-greenwall",
+   "kind": "fort",
+   "name": "Fort Greenwall",
+   "desc": "1624d:Skyrim.esm"
+  },
+  {
+   "id": "fort-hraggstad",
+   "kind": "fort",
+   "name": "Fort Hraggstad",
+   "desc": "3f510:Skyrim.esm"
+  },
+  {
+   "id": "fort-amol",
+   "kind": "fort",
+   "name": "Fort Amol",
+   "desc": "16249:Skyrim.esm"
+  },
+  {
+   "id": "fort-sungard",
+   "kind": "fort",
+   "name": "Fort Sungard",
+   "desc": "16252:Skyrim.esm"
+  },
+  {
+   "id": "fort-neugrad",
+   "kind": "fort",
+   "name": "Fort Neugrad",
+   "desc": "16250:Skyrim.esm"
+  },
+  {
+   "id": "fort-snowhawk",
+   "kind": "fort",
+   "name": "Fort Snowhawk",
+   "desc": "16251:Skyrim.esm"
+  },
+  {
+   "id": "fort-dunstad",
+   "kind": "fort",
+   "name": "Fort Dunstad",
+   "desc": "1624b:Skyrim.esm"
+  },
+  {
+   "id": "fort-fellhammer",
+   "kind": "fort",
+   "name": "Fort Fellhammer",
+   "desc": "1624c:Skyrim.esm"
+  },
+  {
+   "id": "fort-kastav",
+   "kind": "fort",
+   "name": "Fort Kastav",
+   "desc": "1624f:Skyrim.esm"
+  },
+  {
+   "id": "largashbur",
+   "kind": "stronghold",
+   "name": "Largashbur",
+   "desc": "1626f:Skyrim.esm"
+  },
+  {
+   "id": "narzulbur",
+   "kind": "stronghold",
+   "name": "Narzulbur",
+   "desc": "1628d:Skyrim.esm"
+  },
+  {
+   "id": "dushnikh-yal",
+   "kind": "stronghold",
+   "name": "Dushnikh Yal",
+   "desc": "1623e:Skyrim.esm"
+  },
+  {
+   "id": "mor-khazgur",
+   "kind": "stronghold",
+   "name": "Mor Khazgur",
+   "desc": "16287:Skyrim.esm"
+  },
+  {
+   "id": "gol-kharzum",
+   "kind": "stronghold",
+   "name": "Gol-Kharzum",
+   "desc": "2063:DragonBreak.esp"
+  },
+  {
+   "id": "cracked-tusk-keep",
+   "kind": "stronghold",
+   "name": "Cracked Tusk Keep",
+   "desc": "1625b:Skyrim.esm"
+  },
+  {
+   "id": "icecap",
+   "kind": "boss",
+   "name": "Skytemple Ruins",
+   "desc": "ef0ae:Skyrim.esm"
+  },
+  {
+   "id": "briarheartking",
+   "kind": "boss",
+   "name": "Lost Valley Redoubt",
+   "desc": "16274:Skyrim.esm"
+  },
+  {
+   "id": "palewarlord",
+   "kind": "boss",
+   "name": "The Sentinel",
+   "desc": "86df1:BSHeartland.esm"
+  },
+  {
+   "id": "movarth",
+   "kind": "boss",
+   "name": "Movarth's Lair",
+   "desc": "16256:Skyrim.esm"
+  },
+  {
+   "id": "duskthorn",
+   "kind": "boss",
+   "name": "Dusk Thorn Camp",
+   "desc": "1540c1:DragonBreak Online Edits.esp"
+  },
+  {
+   "id": "valkynaz",
+   "kind": "boss",
+   "name": "The Great Oblivion Gate",
+   "desc": "127a4:DragonBreak.esp"
+  },
+  {
+   "id": "risenlegate",
+   "kind": "boss",
+   "name": "Sancre Tor Ruins",
+   "desc": "1833e2:DragonBreak Online Edits.esp"
+  },
+  {
+   "id": "minotaurlord",
+   "kind": "boss",
+   "name": "Minotaur's Rest",
+   "desc": "17857a:DragonBreak Online Edits.esp"
+  },
+  {
+   "id": "werewolfbehemoth",
+   "kind": "boss",
+   "name": "Glenmoril Coven",
+   "desc": "16257:Skyrim.esm"
+  },
+  {
+   "id": "giantchieftain",
+   "kind": "boss",
+   "name": "Blizzard Rest",
+   "desc": "16214:Skyrim.esm"
+  },
+  {
+   "id": "centurion",
+   "kind": "boss",
+   "name": "Alftand",
+   "desc": "15d4a:Skyrim.esm"
+  },
+  {
+   "id": "falmerwarmonger",
+   "kind": "boss",
+   "name": "Raldbthar",
+   "desc": "90595:Skyrim.esm"
+  }
+ ]
+}
