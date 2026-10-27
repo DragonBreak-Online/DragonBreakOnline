@@ -1,5 +1,59 @@
 # DragonBreak Online checklist (2026-09-14)
 
+## 27 Oct - regeneration: the server never saw the gameplay layer's rates (Worker 4, PC)
+
+**`rc-1027-regen` @ `db824264`, off `d728be8e`. Unit tests green on the homeserver dev box: [Papyrus] 798
+assertions / 32 cases, [CropRegeneration] 23 / 13.** Not deployed; the Leader owns that.
+
+**The regeneration complaints were one bug, and it was never in the regeneration code.** The gameplay layer
+drives hunger, chill and the blessings through `Actor.SetActorValue("HealRateMult"/"StaminaRateMult", ...)`.
+`PapyrusActor::SetActorValue` only ever sent that to the client as a snippet - its own warning says the
+result "will not affect server calculations" - so the server kept its starting rate, and `CropRegeneration`
+built its anti-cheat ceiling (`old + rate * rateMult * seconds`) from that stale rate and clawed back every
+tick the client regenerated above it. **The bigger the bonus, the worse regeneration got**, which is exactly
+flasnex's "Akatosh blessing is still destroying my magicka regen" and fabled_is_me's "this is true for any
+bonus on clothing also". The live log had been saying so **3,927 times**: that many
+`SetActorValue executes locally` warnings, against **2,169** `needs ... RateMult ->` writes, every one lost.
+
+**Calling the server-side writer was not enough, and this is the part that would have wasted a build.**
+`ConvertToAV` knew `health`, `stamina` and `magicka` only, so `"HealRateMult"` and `"StaminaRateMult"` - the
+only two AVs the gameplay layer ever sends through that shim - both resolved to `None`. Both halves are
+needed. `MpActor::SetActorValue` now returns whether it modelled the value, so its switch stays the single
+list of what the server keeps; the old warning survives for the values it genuinely cannot model, and
+Aggression and SpeedMult still go out as a snippet alone, which is what makes scripted draugr attack.
+
+**`std::max(base, current)` is gone for the rate mults (Nat, 27 Oct: hunger and cold should really slow
+regeneration, a chill freeze to 0 included).** It floored the ceiling at the race's base, so every debuff was
+inert - including the chill system's `StaminaRateMult -> 0`, which is visible in the log doing nothing.
+`ResolveRateMult` falls back to base only for a negative or non-finite value and **deliberately not for 0**,
+because 0 is the freeze. Scope is the rate mult; the plain rate keeps its `std::max` and
+`CropStaminaRegeneration` keeps its block-active case.
+
+**The tests were proven, not asserted.** Reverting only the C++ sources and rebuilding fails 3 of the 5 new
+cases with `healRateMult 100.0f == 300.0f`, `ceilingAfter 0.507 > 0.507` and `slowed 0.55 < 0.55`. The other
+two pass either way by design: they pin behaviour that must not regress.
+
+**The potion report is NOT this bug and is still open.** "Use a minor stamina potion for 25 points, it'll go
+up then back down" (blamblam_banana, and the sweet apple cider with it). Ruled out by measurement or by
+reading: restore effects are classified (`Unknown espm::MGEF::EffectType` is **0** in the live log, which
+disconfirmed my first hypothesis); the gamemode's `onEatItem` hooks do not cancel it (`GameModeEvent::Fire`
+blocks only on an explicit `false`, and both hooks pass the previous verdict through); the ceiling already
+exempts a fresh restore for five seconds via `UpdateNextRestorationTime`, so the clamp is not undoing it; and
+server and client agree on the maximum, because `AddLevelBonus` reads the same `private.dboAvBonus` that
+`charlevel.js` writes. **Re-enabling the commented-out `hasActiveMagicEffects` block would be a mistake** -
+it sits below the `new > valid` return, so it fires only when the report is at or below the ceiling and then
+forces the value *up* to it, which would mask poisons and damage over time. The RC therefore carries a
+**measurement instead of a guess**: `[restore]` logs the magnitude, the maximum it is divided by and the
+percentage either side, its pair logs what the client then reports against what is echoed back, and `[crop]`
+logs a clawback over 2% of a bar. Read those after the next deploy; remove them once it is understood.
+
+**Also worth knowing.** `6fa17721` is Nat's own fix for this same bug class on the **spell-cast** path
+(Highborn, 29 Sep); this is its Papyrus-path twin and the two pass together. `rest.js:30` documents another
+worker hitting the same wall and working around it with `RestoreActorValue`. And **"can't learn spell books"
+is not broken**: the live log shows 4 learned against 4 refused, every refusal with a reason, the recurring
+one being the study-point rule - "the nearest one here is 8 m away; read within 4 m of it". That is a radius
+players cannot see, not a bug; left alone on the Leader's call.
+
 ## 20 Oct, night - spawned NPCs freeze when they walk between the cells of a dungeon (Worker 2, PC)
 
 Nat picked this off the open list: "an NPC's cell is never updated by movement, and an update that
