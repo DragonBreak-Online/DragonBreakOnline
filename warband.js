@@ -42,7 +42,7 @@ module.exports = (api) => {
   // far the panel looks for targets and the GM's raiders; onLogout, what a GM's followers do when the GM leaves (dismiss, or
   // settle the calm ones); presetsMax, saved bands per server
   const C = Object.assign({ maxBand: 25, maxRaise: 10, ringRadius: 160, bodySeconds: 300, chargeRange: 4096, avoidGmHost: true,
-    viewRadius: 4200, onLogout: 'dismiss', presetsMax: 40 }, cfg.warband || {});
+    viewRadius: 4200, onLogout: 'dismiss', presetsMax: 40, guardRadius: 1500, guardReturn: 400 }, cfg.warband || {});
   // Every answer is said in chat as before, and kept as the last line the panel shows (W3)
   const lastSaid = globalThis.__dboWarbandSaid instanceof Map ? globalThis.__dboWarbandSaid : (globalThis.__dboWarbandSaid = new Map());
   const tell = (a, text) => { personal(a, text); lastSaid.set(a >>> 0, { text: String(text), at: Date.now() }); };
@@ -57,6 +57,8 @@ module.exports = (api) => {
   // stance: GM actor -> 'follow' | 'stay' (companionSystem keeps no such flag it hands out); onLogout: GM profile -> choice
   if (!(S.stance instanceof Map)) S.stance = new Map();
   if (!(S.onLogout instanceof Map)) S.onLogout = new Map();
+  // guards: GM actor -> { radius, profile, posts: npc id -> { pos, rot, where } }
+  if (!(S.guards instanceof Map)) S.guards = new Map();
   const comp = () => globalThis.__dboCompanions || null;
   // Vanilla PlayerFaction, as companionService.ts prepare() puts the GM's own followers in on the GM's screen
   const PLAYER_FACTION = 0xdb1;
@@ -340,6 +342,54 @@ module.exports = (api) => {
       : `No enemy NPC within ${Math.round(C.chargeRange / 70)} m. Your warband charges as soon as one comes near; follow or stay calls it off.`);
   };
 
+  // ---- guard (Nat, 28 Oct: a band told to stay attacks any nearby non-GM player on its own, never staff) --------------------
+  // /warband guard [radius]: the band stays, each NPC keeps the spot it stood on as its post, and every 2 s an NPC with no
+  // player to fight goes for the nearest player within radius of its post (guardRadius 1500 units, about 21 m): never staff,
+  // never a character of its own GM, never one who is down. A target that leaves the radius is dropped, and an NPC with
+  // nothing to fight and further than guardReturn (400 units) from its post is put back on it (a server move, a teleport).
+  // companionSystem's attack order still needs the target within 4096 units of the GM. follow or stay ends it.
+  const guardFoes = (g, post) => onlineActors().filter((t) => profileOf(t) >= 0 && profileOf(t) !== g.profile && !isAdmin(t) && alive(t)
+    && !(typeof globalThis.__dboIsDowned === 'function' && globalThis.__dboIsDowned(t)) && whereOf(t) === post.where
+    && (() => { const q = posOf(t); return !!q && dist(q, post.pos) <= g.radius; })());
+  const guardPass = (gm) => {
+    const g = S.guards.get(gm >>> 0);
+    if (!g) return 0;
+    const mine = band(gm);
+    if (!mine.length) { S.guards.delete(gm >>> 0); return 0; }
+    let n = 0;
+    for (const c of mine) {
+      let post = g.posts.get(c.id >>> 0);
+      if (!post) { const p0 = posOf(c.id); if (!p0) continue; let rot = [0, 0, 0]; try { rot = mp.get(c.id, 'angle') || rot; } catch (e) { /* default */ } post = { pos: p0, rot, where: whereOf(c.id) }; g.posts.set(c.id >>> 0, post); }
+      const foes = guardFoes(g, post);
+      if (c.targetId && foes.includes(c.targetId >>> 0)) continue;
+      if (foes.length) {
+        foes.sort((x, y) => dist(posOf(x), post.pos) - dist(posOf(y), post.pos));
+        try { if (comp().attack(c.id, foes[0])) { n++; continue; } } catch (e) { /* gone */ }
+      }
+      // A player target gone from the radius is dropped; an NPC it is defending against is left to companionSystem
+      if (c.targetId && profileOf(c.targetId) >= 0) { try { comp().stay(c.id); } catch (e) { /* gone */ } }
+      if (c.targetId && profileOf(c.targetId) < 0) continue;
+      const p = posOf(c.id);
+      if (p && whereOf(c.id) === post.where && dist(p, post.pos) > C.guardReturn) {
+        try { mp.set(c.id, 'locationalData', { cellOrWorldDesc: post.where, pos: post.pos, rot: post.rot }); } catch (e) { /* not movable now */ }
+      }
+    }
+    return n;
+  };
+  const guardCmd = (a, text) => {
+    const mine = band(a);
+    if (!mine.length) return tell(a, 'You lead no warband.');
+    const r = text ? Number(text) : C.guardRadius;
+    if (!(r >= 200 && r <= 4000)) return tell(a, 'Usage: /warband guard [radius], the radius in units from 200 to 4000 (70 to a metre); without one it is ' + C.guardRadius + '.');
+    S.charging.delete(a >>> 0);
+    S.stance.set(a >>> 0, 'guard');
+    for (const c of mine) comp().stay(c.id);
+    S.guards.set(a >>> 0, { radius: r, profile: profileOf(a), posts: new Map() });
+    const n = guardPass(a);
+    audit(`WARBAND ${who(a)} set ${mine.length} NPC(s) on guard, radius ${r}`);
+    return tell(a, `Your warband of ${mine.length} guards this spot: any player within ${meters(r)} m who is not staff is attacked${n ? ` (${n} already engaged)` : ''}. Stay within ${meters(4096)} m of them; follow or stay ends it.`);
+  };
+
   // ---- the panel's own steps (Nat, 25 Oct) -------------------------------------------------------------------------------
   // W6: who a settle would leave in the band, before it is done: calm ones settle, aggressive and unreadable ones stay
   const settlePlan = (a) => {
@@ -476,8 +526,10 @@ module.exports = (api) => {
     if (cmd === 'raise') return raise(a, rest);
     if (cmd === 'side') return sideCmd(a, rest);
     if (cmd === 'charge') return chargeCmd(a);
+    if (cmd === 'guard') return guardCmd(a, rest);
     if (cmd === 'follow' || cmd === 'stay') {
       S.charging.delete(a >>> 0);
+      S.guards.delete(a >>> 0);
       S.stance.set(a >>> 0, cmd);
       for (const c of mine) comp()[cmd](c.id);
       return tell(a, mine.length ? `Your warband of ${mine.length} ${cmd === 'stay' ? 'holds its ground' : 'follows you'}.` : 'You lead no warband.');
@@ -503,9 +555,9 @@ module.exports = (api) => {
       const count = new Map(); for (const c of mine) count.set(nameOfNpc(c.id), (count.get(nameOfNpc(c.id)) || 0) + 1);
       return tell(a, `Your warband of ${mine.length}: ${[...count].map(([k, v]) => `${v} ${k}`).join(', ')}.${tail}`);
     }
-    tell(a, 'Usage: /warband raise <name or id> [count] | follow | stay | attack <player> | attacknpc <id> | charge | unleash | preview | settle [calm|unleashrest|dismissrest] | dismiss [id] | side [name|none] | preset list|save|raise|delete <name> | onlogout dismiss|settle');
+    tell(a, 'Usage: /warband raise <name or id> [count] | follow | stay | guard [radius] | attack <player> | attacknpc <id> | charge | unleash | preview | settle [calm|unleashrest|dismissrest] | dismiss [id] | side [name|none] | preset list|save|raise|delete <name> | onlogout dismiss|settle');
   };
-  registerChatCommand('warband', warbandCmd, { admin: true, help: 'raise <npc> [n] | follow | stay | attack <player> | attacknpc <id> | charge | unleash | preview | settle [calm|unleashrest|dismissrest] | dismiss [id] | side [name|none] | preset ... | onlogout ...: NPCs that follow you, and raids' });
+  registerChatCommand('warband', warbandCmd, { admin: true, help: 'raise <npc> [n] | follow | stay | guard [radius] | attack <player> | attacknpc <id> | charge | unleash | preview | settle [calm|unleashrest|dismissrest] | dismiss [id] | side [name|none] | preset ... | onlogout ...: NPCs that follow you, and raids' });
 
   // ---- unleashed and settled NPCs, and their bodies -----------------------------------------------------------------------
   const isMine = (a, r) => (r.profile !== undefined && r.profile >= 0 ? r.profile === profileOf(a) : r.by === who(a));
@@ -581,6 +633,7 @@ module.exports = (api) => {
   if (typeof api.every === 'function') api.every('warband', 10000, tick);
   // The charge looks again every 3 s; the body clock above has no need to
   if (typeof api.every === 'function') api.every('warbandCharge', 3000, () => { for (const gm of [...S.charging]) { try { chargePass(gm); } catch (e) { /* next pass */ } } });
+  if (typeof api.every === 'function') api.every('warbandGuard', 2000, () => { for (const gm of [...S.guards.keys()]) { try { guardPass(gm); } catch (e) { /* next pass */ } } });
 
   // gamemode.js hit hook, before companionSystem's: true refuses the hit. See the header for the rules.
   globalThis.__dboWarbandRefusesHit = (aggressorId, targetId) => {
@@ -595,6 +648,8 @@ module.exports = (api) => {
     // A follower spares a friendly GM as it spares its own: the friendly GM's swings at it are refused below, so its blows
     // must not land either. An unleashed raider is fair game both ways (a GM may defend against another GM's raid).
     else if (A && !A.released && tgtPlayer && isAdmin(tgt) && friends(A.profile, profileOf(tgt))) why = 'a friendly GM';
+    // A guarding band never touches staff, whoever they are (Nat, 28 Oct)
+    else if (A && !A.released && tgtPlayer && isAdmin(tgt) && S.guards.has(A.gm >>> 0)) why = 'staff, while it guards';
     else if (A && T && A.profile !== T.profile && friends(A.profile, T.profile)) why = 'a friendly GM\'s NPC';
     else if (A && T && A.profile === T.profile && (A.released || T.released)) why = 'an NPC of the same GM';
     else if (T && !T.released && aggPlayer && profileOf(agg) !== T.profile && isAdmin(agg) && friends(profileOf(agg), T.profile)) why = 'a friendly GM\'s follower';
