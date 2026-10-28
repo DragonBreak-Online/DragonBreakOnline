@@ -1,5 +1,19 @@
 [
   {
+    "title": "Announcements show across the screen",
+    "date": "2026-10-28",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Announcements",
+        "items": [
+          "Staff announcements and event calls now show as the big banner across the middle of the screen again, as do restart warnings."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Strongholds, inn boards and home planters",
     "date": "2026-10-27",
     "version": "Server update",
