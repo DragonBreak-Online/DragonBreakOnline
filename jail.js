@@ -524,15 +524,23 @@ module.exports = (api) => {
   };
 
   // Staff /unstuck refuses a prisoner, online or offline, from the sentence as saved: a staff move would strand it (Jake, 28 Oct:
-  // "Yes, refuse prisoners"). { cell, release, concordat } while time is still owed, else null; a served or released sentence
-  // is gone (finish). release: whether `by` gets Release at the door, by the menu's own rule (lawfulAt, and the Concordat's)
+  // "Yes, refuse prisoners"). { cell, release, concordat, shared } while time is still owed, else null; a served or released
+  // sentence is gone (finish). release: whether `by` would get Release at the door now, as the menu decides it: the door holds
+  // this prisoner, `by` is a Lead GM or stands in that jail, lawfulAt, and not a Concordat sentence they may not lift; never
+  // for oneself. shared: a yard every prisoner shares (Cidhna Mine), whose gate holds no prisoner, so nobody releases early
   globalThis.__dboJailSentence = (a, by) => {
     if (!CFG.enabled) return null;
+    a = Number(a) >>> 0;
     const s = sentenceOf(a);
     if (!s || leftOf(s) <= 0) return null;
+    const door = Number(s.door) >>> 0;
+    const shared = Object.values(HOLD_JAILS).some((list) => (Array.isArray(list) ? list : []).some((c) => c && c.shared && idOf(c.door) === door));
     let release = false;
-    try { release = by !== undefined && lawfulAt(Number(by) >>> 0, Number(s.door) >>> 0) && !concordatHeld(Number(by) >>> 0, s); } catch (e) { release = false; }
-    return { cell: jailName(s.cell), release, concordat: !!s.concordat };
+    try {
+      const b = Number(by) >>> 0, occ = occupantOf(door);
+      release = by !== undefined && b !== a && !!occ && occ.prisoner === a && (isLeadStaff(b) || cellOf(b) === s.cell) && lawfulAt(b, door) && !concordatHeld(b, s);
+    } catch (e) { release = false; }
+    return { cell: jailName(s.cell), release, concordat: !!s.concordat, shared };
   };
 
   // ---- commands ---------------------------------------------------------------------------------------

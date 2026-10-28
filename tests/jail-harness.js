@@ -18,12 +18,14 @@ const DOOR_BASE = '6c43c:BSHeartland.esm', LOAD_DOOR_DESC = '6c51f:BSHeartland.e
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jail-harness-'));
 process.chdir(dir);
 fs.writeFileSync('doors.json', JSON.stringify({ doors: { [LOAD_DOOR_DESC]: 'Bruma Castle' } }));
+// one yard every prisoner shares (as Cidhna Mine), for staff /unstuck's 'nobody can release them early there'
+fs.writeFileSync('hold-jails.json', JSON.stringify({ holds: { reach: [{ kind: 'mine', cell: JAIL_CELL, door: '6c4ff:BSHeartland.esm', spot: [0, 900, 0], shared: true }] } }));
 
 let wallClock = 1780000000000;
 Date.now = () => wallClock;
 const MIN = 60000;
 
-const GUARD = 0x14, PRISONER = 0x15, OTHER = 0x16;
+const GUARD = 0x14, PRISONER = 0x15, OTHER = 0x16, MINER = 0x17, LEAD = 0x18;
 const CELL_DOOR = 0x6c438, LOAD_DOOR = 0x6c51f, INN_DOOR = 0x7001;
 const props = new Map();
 const put = (id, p, v) => props.set(id + '|' + p, v);
@@ -68,6 +70,7 @@ const api = {
   onlineActors: () => online.slice(),
   every: (name, ms, fn) => timers.set(name, fn),
   isAdmin: (a) => a === GUARD && props.get(GUARD + '|isAdminFlag') === true,
+  isLeadStaff: (a) => a === LEAD,
   distanceMeters: (a, b) => {
     const p = props.get(a + '|pos'), q = props.get(b + '|pos');
     if (props.get(a + '|worldOrCellDesc') !== props.get(b + '|worldOrCellDesc')) return Infinity;
@@ -149,6 +152,18 @@ check('/unstuck is fine elsewhere', globalThis.__dboJailUnstuck(OTHER) === null)
 check('a prisoner serving: __dboJailSentence names the jail', (globalThis.__dboJailSentence(PRISONER) || {}).cell === 'Bruma Castle Dungeon', globalThis.__dboJailSentence(PRISONER));
 check('...and says the guard gets Release at the door, someone else not (the menu\'s own rule)', globalThis.__dboJailSentence(PRISONER, GUARD).release === true
   && globalThis.__dboJailSentence(PRISONER, OTHER).release === false && globalThis.__dboJailSentence(PRISONER).release === false, [globalThis.__dboJailSentence(PRISONER, GUARD), globalThis.__dboJailSentence(PRISONER, OTHER)]);
+// release as the menu decides it now (claude-jake-pc, 28 Oct): the door holds this prisoner, the caller is a Lead GM or stands in
+// that jail, lawful there, and never for oneself
+check('...the guard standing outside the jail: no Release (they must be there)', (() => { at(GUARD, PLAIN_CELL, [0, 0, 0]); const r = globalThis.__dboJailSentence(PRISONER, GUARD).release; at(GUARD, JAIL_CELL, [100, 0, 0]); return r === false; })());
+check('...a Lead GM anywhere: Release', (() => { at(LEAD, PLAIN_CELL, [0, 0, 0]); return globalThis.__dboJailSentence(PRISONER, LEAD).release === true; })());
+check('...the prisoner themselves, lawful or not: never', (() => { put(PRISONER, 'private.dboLawful', true); const r = globalThis.__dboJailSentence(PRISONER, PRISONER).release; put(PRISONER, 'private.dboLawful', false); return r === false; })());
+check('...and not shared: a cell door', globalThis.__dboJailSentence(PRISONER, GUARD).shared === false);
+at(MINER, TAMRIEL, [0, 0, 0]);
+const mined = globalThis.__dboJailByWatch(MINER, 'reach', 10, 'the watch');
+check('the watch puts someone in the shared yard', !!mined && (props.get(MINER + '|private.dboSentence') || {}).totalMs === 10 * MIN, mined);
+check('...whose sentence is shared, so nobody gets Release, a Lead GM neither', globalThis.__dboJailSentence(MINER, GUARD).shared === true && globalThis.__dboJailSentence(MINER, LEAD).release === false
+  && globalThis.__dboJailSentence(MINER, GUARD).release === false, globalThis.__dboJailSentence(MINER, LEAD));
+put(MINER, 'private.dboSentence', null);
 check('...anyone else: null', globalThis.__dboJailSentence(OTHER) === null && globalThis.__dboJailSentence(GUARD) === null);
 
 // ---- serving time ----

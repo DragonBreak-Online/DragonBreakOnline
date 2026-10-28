@@ -1353,15 +1353,21 @@ const liveTagCarriers = (want) => {
 };
 // Every live character called exactly q: online and not behind a mask or in a beast form, or in the engine's name index,
 // each once; null when the index threw. A staff move takes an exact name before any prefix (verification of a0d5517b9: with
-// Neem offline, '/unstuck Neem hub' moved the online Neema through findByName's unique prefix)
+// Neem offline, '/unstuck Neem hub' moved the online Neema through findByName's unique prefix). .hidden: the online ones
+// behind a mask or in a beast form whose own name it is, never taken but counted, so their namesake never moves in their
+// stead (verification of 248ce9838, M1: a masked Lydia online, '/unstuck Lydia hub' moved the offline Lydia)
 const exactNamed = (q) => {
-  const key = String(q || '').trim().toLowerCase(); if (!key) return [];
+  const key = String(q || '').trim().replace(/\s+/g, ' ').toLowerCase(); if (!key) return [];
   const onIds = onlineActors().map((o) => Number(o) >>> 0); const onSet = new Set(onIds);
-  const on = onIds.filter((o) => { try { return !disguisedOf(o) && String(nameOf(o)).toLowerCase() === key; } catch (e) { return false; } });
+  const hid = (o) => { try { return disguisedOf(o) === true; } catch (e) { return false; } };
+  const on = onIds.filter((o) => { try { return String(hid(o) ? realNameOf(o) : nameOf(o)).toLowerCase() === key; } catch (e) { return false; } });
   let ix = [];
   try { if (typeof mp.findFormsByPropertyValue === 'function') ix = mp.findFormsByPropertyValue('private.indexed.nameKey', key) || []; } catch (e) { return null; }
-  const live = ix.map((x) => Number(x) >>> 0).filter((id) => id && !(typeof globalThis.__dboFormGone === 'function' && globalThis.__dboFormGone(id)) && !(onSet.has(id) && disguisedOf(id)));
-  return [...new Set([...on, ...live])];
+  const live = ix.map((x) => Number(x) >>> 0).filter((id) => id && !(typeof globalThis.__dboFormGone === 'function' && globalThis.__dboFormGone(id)));
+  const all = [...new Set([...on, ...live])];
+  const out = all.filter((id) => !(onSet.has(id) && hid(id)));
+  out.hidden = all.filter((id) => onSet.has(id) && hid(id));
+  return out;
 };
 const staffTargetOf = (by, q) => {
   // One #TAG at most: the console checks the first a line names and this binds the last, so two would part them (C, 28 Oct);
@@ -1381,7 +1387,8 @@ const staffTargetOf = (by, q) => {
   // has. No prefix or partial match for a staff move (Jake, 28 Oct: "Yes, exact only"); other commands keep their lookup
   const ex = exactNamed(q);
   if (ex === null) { personal(by, `Cannot move ${q}: the game could not check who is called that. Try again.`); return 0; }
-  if (ex.length > 1) { personal(by, `Cannot move ${q}: ${ex.length} characters are called that; add their #TAG.`); return 0; }
+  const named = ex.length + (ex.hidden || []).length;
+  if (named > 1) { personal(by, `Cannot move ${q}: ${named} characters are called that; add their #TAG.`); return 0; }
   if (!ex.length) { personal(by, `Cannot move ${q}: no character is called that; use their full name or #TAG.`); return 0; }
   const t = ex[0];
   // From the remote console an offline character is named by #TAG only (Jake, 28 Oct); a name that finds one asks for it
@@ -6103,19 +6110,29 @@ registerChatCommand('unstuck', (a, args) => {
     const TAG = words[tagAt].slice(-5).toUpperCase();
     const before = [...words.slice(0, tagAt), words[tagAt].slice(0, -5)].filter(Boolean);
     const early = before.findIndex(isDest);
-    if (early >= 0) {
+    // Whatever they hold, words before the tag must all be words of its carrier's own name: else the tag came from the form's
+    // place or ticket box (verification of 248ce9838, F1: '/unstuck Bob hbu Ticket #4832' moved the offline Selene #4832)
+    if (before.length) {
       const c = liveTagCarriers(TAG.slice(1).toLowerCase());
       if (c === null) return personal(a, `Cannot move ${TAG}: the game could not check whether another character carries that tag. Try again.`);
       if (c.length !== 1) return personal(a, `Cannot move ${TAG}: no live character carries that tag, or more than one does.`);
-      const own = String(nameOf(c[0])).toLowerCase().split(/\s+/);
-      if (!before.every((w) => own.includes(w.toLowerCase()))) return personal(a, early === 0 ? usage : `Cannot move ${head.join(' ')}: put the place after the #TAG, as /unstuck ${TAG} ${before[early].toLowerCase()}.`);
+      const own = (() => { const n = [nameOf(c[0])]; try { const f = globalThis.__dboOwnName; if (typeof f === 'function') n.push(String(f(c[0]) || '')); } catch (e) { /* the name shown */ } return n.join(' ').toLowerCase().split(/\s+/); })();
+      const mine = (w) => own.includes(w.toLowerCase());
+      if (!before.every(mine)) {
+        if (early === 0) return personal(a, usage);
+        // The suggestion only when the words before the place are the carrier's own (F5: never '/unstuck <a ticket's tag> hub')
+        if (early > 0 && before.slice(0, early).every(mine)) return personal(a, `Cannot move ${head.join(' ')}: put the place after the #TAG, as /unstuck ${TAG} ${before[early].toLowerCase()}.`);
+        return personal(a, early > 0 ? `Cannot move ${head.join(' ')}: a #TAG after the place is never the player; put the place after the #TAG of the one you mean, and a ticket as ticket:<id>.`
+          : `Cannot move ${head.join(' ')}: the words before ${TAG} are not that character's name; use the #TAG alone, or the full name with it.`);
+      }
     }
   } else {
     const reads = [];
     for (let j = 1; j <= words.length && words.slice(0, j).join(' ').length <= 64; j++) {
       const e = exactNamed(words.slice(0, j).join(' '));
       if (e === null) return personal(a, `Cannot move ${words.join(' ')}: the game could not check who is called that. Try again.`);
-      if (e.length) reads.push({ j, e, ok: j === words.length || isDest(words[j]) });
+      const all = [...e, ...(e.hidden || [])];
+      if (all.length) reads.push({ j, e: all, ok: j === words.length || isDest(words[j]) });
     }
     const first = reads.find((r) => r.ok);
     const counted = first ? reads.filter((r) => r.j >= first.j) : reads;
@@ -6130,6 +6147,10 @@ registerChatCommand('unstuck', (a, args) => {
   }
   const dest = rest[0] || '';
   if (dest && !isDest(dest)) return personal(a, `Unknown place ${dest.slice(0, 24)}: hub or respawn.`);
+  // One place: another place word past it means the place came from inside a name or the form's target box (verification
+  // of 248ce9838, F2: 'Anna Temple hub' with Anna Temple not found moved Anna to the temple; claude-jake-pc's rule N)
+  const more = rest.slice(1).filter(isDest);
+  if (more.length) return personal(a, `Cannot move ${words.join(' ').slice(0, 80)}: more than one place (${[dest, ...more].join(', ').toLowerCase().slice(0, 40)}); name the player, then one place.`);
   // Staff may name an offline character too, by name or #TAG (Jake, 28 Oct); from the console by #TAG only (staffTargetOf)
   const t = staffTargetOf(a, head.join(' ')); if (!t) return;
   // A prisoner stays where they serve, whatever the place: a staff move would strand the sentence (Jake, 28 Oct: "Yes, refuse
@@ -6139,7 +6160,8 @@ registerChatCommand('unstuck', (a, args) => {
   // Only who gets Release at the door is told to use it: a GM or Trial GM gets the lock and the lockpick there, and a picked
   // door leaves the sentence standing (C's review, 28 Oct)
   if (held) {
-    const how = held.release ? 'release them first at their cell door (activate it, then Release).'
+    const how = held.shared ? 'they share a yard with every prisoner there, so nobody can release them early there.'
+      : held.release ? 'release them first at their cell door (activate it, then Release).'
       : held.concordat ? 'the White-Gold Concordat holds them, so only the Thalmor or a Lead GM can release them, at their cell door.'
         : 'a Lead GM, or that hold\'s guards and officials, can release them at their cell door.';
     return personal(a, `Cannot move ${display(t)}: they are serving a sentence in ${held.cell}; ${how}`);
@@ -6151,6 +6173,8 @@ registerChatCommand('unstuck', (a, args) => {
   if (toHub) {
     let down = false;
     try { down = !!mp.get(t, 'isDead'); } catch (e) { down = false; }
+    // or still in downed.js's down, which the wake ends (claude-jake-pc, 28 Oct)
+    if (!down) { try { const ds = globalThis.__dboDownedState; down = !!(ds && ds.downed instanceof Map && (ds.downed.has(t >>> 0) || ds.downed.has(t))); } catch (e) { down = false; } }
     if (down) return personal(a, `Cannot move ${display(t)} to the hub while they are down; once they are up (at most a minute), /unstuck #${tagOf(t)} hub moves them.`);
   }
   if (toHub) hubActor(t, a, '/unstuck', why); else unstuckActor(t, a, why);
@@ -9016,7 +9040,7 @@ try {
   delete require.cache[JAIL_JS];
   require(JAIL_JS)({ mp, log, personal, system, audit, display, who, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors, every, isAdmin, isLeadStaff, distanceMeters,
     ranksOf, profileOf, zoneOfActor, zoneById });
-} catch (e) { log('jail.js failed to load:', e.stack || e.message); globalThis.__dboJailActivate = null; globalThis.__dboJailLogin = null; globalThis.__dboJailUnstuck = null; }
+} catch (e) { log('jail.js failed to load:', e.stack || e.message); globalThis.__dboJailActivate = null; globalThis.__dboJailLogin = null; globalThis.__dboJailUnstuck = null; globalThis.__dboJailSentence = null; }
 
 // ---- commissions: work posted at the boards, the reward held until done (server\commissions.js, config "commissions") --
 try {

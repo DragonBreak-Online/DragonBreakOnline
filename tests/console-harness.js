@@ -977,9 +977,9 @@ reset();
   const neem = actor(0xff000f21, { name: 'Neem', tag: 'LBRF', profile: 97 });
   const anna = actor(0xff000f22, { name: 'Anna', tag: 'ANN1', profile: 101, online: true });
   const ids = [neem, anna, A.lydia, A.jake, A.bob];
-  const jailed = new Set(), concordat = new Set();
+  const jailed = new Set(), concordat = new Set(), yard = new Set();
   // (whether the caller gets Release at the door is jail.js's lawfulAt; Lead GM and above always do, here)
-  globalThis.__dboJailSentence = (x, by) => (jailed.has(x >>> 0) ? { cell: 'Bruma Castle Dungeon', release: G.isLeadStaff(by), concordat: concordat.has(x >>> 0) } : null);
+  globalThis.__dboJailSentence = (x, by) => (jailed.has(x >>> 0) ? { cell: 'Bruma Castle Dungeon', release: G.isLeadStaff(by) && !yard.has(x >>> 0), concordat: concordat.has(x >>> 0), shared: yard.has(x >>> 0) } : null);
   const where = () => { for (const id of ids) delete store.get(id).locationalData; const o = store.get(neem); o.worldOrCellDesc = '6c410:BSHeartland.esm'; o.pos = [-100, 0, 0]; };
   const at = (id) => (store.get(id).locationalData || {}).cellOrWorldDesc || '';
   const moved = () => ids.filter((id) => at(id)).map((id) => `${G.display(id)}@${at(id) === HUB ? 'hub' : at(id) === TEMPLE ? 'temple' : at(id)}`).join(',');
@@ -1009,6 +1009,11 @@ reset();
   check('7g. ...a Concordat sentence: only the Thalmor or a Lead GM', m === '' && h === 'Cannot move Neem #LBRF: they are serving a sentence in Bruma Castle Dungeon; the White-Gold Concordat holds them, so only the Thalmor or a Lead GM can release them, at their cell door.', [m, h]);
   concordat.delete(neem);
   setOnline(A.trial, false);
+  // a yard every prisoner shares (Cidhna Mine): nobody can release them early, so nobody is told to (claude-jake-pc, 28 Oct)
+  yard.add(neem);
+  [m, h] = typed(A.jake, '#LBRF hub');
+  check('7g. a shared yard: refused, and nobody can release them early there', m === '' && h === 'Cannot move Neem #LBRF: they are serving a sentence in Bruma Castle Dungeon; they share a yard with every prisoner there, so nobody can release them early there.', [m, h]);
+  yard.delete(neem);
   setOnline(A.lead, true);
   [m, h] = typed(A.lead, '#LBRF hub');
   check('7g. a Lead GM: refused, and told to release them at the cell door (they get Release there)', m === '' && h === NEEM_HELD, [m, h]);
@@ -1076,10 +1081,11 @@ reset();
   check('7h. C: the form "/unstuck Bob hub ticket:7" (Bob offline, Bob Hubert online) asks for the #TAG', m === '' && /^Cannot move Bob #8KWH: they are offline/.test(h), [m, h]);
   [m, h] = typed('unstuck', 'Bob hub ticket:7');
   check('7h. C: ...typed it moves Bob, never Bob Hubert', m === 'Bob #8KWH@hub', [m, h]);
+  // (one place only, 28 Oct: F2 / rule N)
   [m, h] = typed('unstuck', 'Ivar Temple hub');
-  check('7h. C: typed "/unstuck Ivar Temple hub" (Ivar offline, Ivar Templeton online) moves Ivar, never Ivar Templeton', m === 'Ivar #IVR2@temple', [m, h]);
+  check('7h. C: typed "/unstuck Ivar Temple hub" (Ivar offline, Ivar Templeton online) moves nobody: more than one place', m === '' && h === 'Cannot move Ivar Temple hub: more than one place (temple, hub); name the player, then one place.', [m, h]);
   [m, h] = remote('/unstuck Ivar Temple hub');
-  check('7h. C: ...from the console it asks for the #TAG', m === '' && /^Cannot move Ivar #IVR2: they are offline/.test(h), [m, h]);
+  check('7h. C: ...from the console the same', m === '' && /more than one place \(temple, hub\)/.test(h), [m, h]);
   globalThis.__dboDisguised = (x) => (x >>> 0) === masky;
   [m, h] = typed('unstuck', 'Masky hub');
   check('7h. C: a masked character\'s exact name finds nobody: refused', m === '' && h === 'Cannot move Masky: no character is called that; use their full name or #TAG.', [m, h]);
@@ -1089,6 +1095,164 @@ reset();
   setOnline(A.bob, true); delete store.get(A.bob).locationalData;
   for (const x of [annaOff, bobH, ivarOff, ivarT, masky]) store.delete(x);
   store.delete(annaH); delete mp.findFormsByPropertyValue;
+}
+
+// ---- 7i. verification of 248ce9838 (28 Oct): a masked or beast-form namesake is counted, never taken (M1); a #TAG binds only after
+// its carrier's own name (F1); one place only (F2, F4); a ticket's tag is never suggested (F5) ---------------------------------
+reset();
+{
+  const HUB = '17482:DragonBreak Hub.esp', TEMPLE = 'a764b:BSHeartland.esm';
+  mp.findFormsByPropertyValue = (k, v) => [...store].filter(([, o]) => (k === 'private.indexed.tagKey' ? String(o['private.charTag'] || '').toLowerCase() === v
+    : k === 'private.indexed.nameKey' ? String(o.__ix || (o.appearance || {}).name || '').toLowerCase() === v : false)).map(([id]) => id);
+  const masked = new Map(); const gone = new Set();
+  const prevD = globalThis.__dboDisguised, prevO = globalThis.__dboOwnName, prevG = globalThis.__dboFormGone;
+  globalThis.__dboDisguised = (x) => masked.has(x >>> 0);
+  globalThis.__dboOwnName = (x) => masked.get(x >>> 0) || ((store.get(x >>> 0) || {}).appearance || {}).name || '';
+  globalThis.__dboFormGone = (x) => gone.has(x >>> 0);
+  const mask = (id, shown) => { const o = store.get(id); masked.set(id, o.appearance.name); o.__ix = o.appearance.name; o.appearance = { name: shown || 'Masked Person' }; };
+  let made = [];
+  const mk = (id, o) => { const x = actor(id, o); made.push(x); return x; };
+  const clear = () => { for (const x of made) store.delete(x); made = []; masked.clear(); gone.clear(); };
+  const at = (id) => ((store.get(id) || {}).locationalData || {}).cellOrWorldDesc || '';
+  const moved = () => [...store.keys()].filter((id) => at(id)).map((id) => `${G.display(id)}@${at(id) === HUB ? 'hub' : at(id) === TEMPLE ? 'temple' : at(id)}`).join(',');
+  const where = () => { for (const [, o] of store) { delete o.locationalData; if (o.__user < 0) { o.worldOrCellDesc = '6ca03:BSHeartland.esm'; o.pos = [1, 2, 3]; } } };
+  const told = () => ((chatWrites.filter(([id]) => id === A.jake).slice(-1)[0] || [])[1] || '').split('|').slice(1).join('|');
+  const typed = (cmd, args) => { where(); reset(); store.get(A.jake)['private.unstuckAt'] = 0; G.commands.get(cmd).fn(A.jake, args); return [moved(), told()]; };
+  const remote = (text) => { where(); reset(); store.get(A.jake)['private.unstuckAt'] = 0; const { rep } = send(text, { src: 'discord' }); return [moved(), header(rep)]; };
+  const P = (id, label, r, ok) => check(`7i. ${id}: ${label}`, ok(r[0], r[1]), r);
+  const none = (m) => m === '';
+  // M1: a masked or beast-form namesake
+  mk(0xff00e001, { name: 'Lyra', tag: 'LYR1', profile: 501, online: true }); mk(0xff00e002, { name: 'Lyra', tag: 'LYR2', profile: 502 }); mask(0xff00e001);
+  P('M1.1', 'typed /unstuck Lyra hub (Lyra #LYR1 masked online, Lyra #LYR2 offline)', typed('unstuck', 'Lyra hub'), none);
+  P('M1.1', 'typed /unstuck Lyra', typed('unstuck', 'Lyra'), none);
+  P('M1.1', 'typed /fixloc Lyra', typed('fixloc', 'Lyra'), none);
+  P('M1.c', 'control typed /unstuck #LYR2 hub', typed('unstuck', '#LYR2 hub'), (m) => m === 'Lyra #LYR2@hub');
+  P('M1.c', 'control typed /unstuck #LYR1 hub (the masked one by tag)', typed('unstuck', '#LYR1 hub'), (m) => m === 'Masked Person #LYR1@hub');
+  clear();
+  mk(0xff00e003, { name: 'Nim', tag: 'NIM2', profile: 503, online: true }); mk(0xff00e004, { name: 'Nim', tag: 'NIM3', profile: 504 }); mask(0xff00e003, 'Werewolf');
+  P('M1.2', 'typed /unstuck Nim hub ticket:12 (Nim #NIM2 beast form online, Nim #NIM3 offline)', typed('unstuck', 'Nim hub ticket:12'), none);
+  clear();
+  mk(0xff00e005, { name: 'Anna', tag: 'ANN1', profile: 505, online: true }); mk(0xff00e006, { name: 'Anna Hub', tag: 'AHV1', profile: 506, online: true }); mask(0xff00e005);
+  P('M1.3', 'typed /unstuck Anna hub (Anna masked, Anna Hub online)', typed('unstuck', 'Anna hub'), none);
+  P('M1.3', 'form /unstuck Anna hub', remote('/unstuck Anna hub'), none);
+  P('M1.c', 'control typed /unstuck #AHV1 hub', typed('unstuck', '#AHV1 hub'), (m) => m === 'Anna Hub #AHV1@hub');
+  P('M1.c', 'control typed /unstuck Anna Hub #AHV1 respawn', typed('unstuck', 'Anna Hub #AHV1 respawn'), (m) => m === 'Anna Hub #AHV1@temple');
+  clear();
+  mk(0xff00e005, { name: 'Anna', tag: 'ANN1', profile: 505, online: true }); mk(0xff00e007, { name: 'Anna Temple', tag: 'ANT1', profile: 507 }); mask(0xff00e005);
+  P('M1.4', 'typed /unstuck Anna temple (Anna masked, Anna Temple offline)', typed('unstuck', 'Anna temple'), none);
+  clear();
+  mk(0xff00e005, { name: 'Anna', tag: 'ANN1', profile: 505, online: true }); mk(0xff00e007, { name: 'Anna Temple', tag: 'ANT1', profile: 507, online: true }); mask(0xff00e005);
+  P('M1.5', 'console /unstuck anna temple ticket:#BHB1 respawn (Anna masked, Anna Temple online)', remote('/unstuck anna temple ticket:#BHB1 respawn'), none);
+  clear();
+  mk(0xff00e005, { name: 'Anna', tag: 'ANN1', profile: 505, online: true }); mask(0xff00e005);
+  P('M1.c', 'control: only a masked Anna, typed /unstuck Anna hub is refused (by design)', typed('unstuck', 'Anna hub'), none);
+  clear();
+  // F1: a #TAG from the form's place or ticket box
+  mk(0xff00e011, { name: 'Selene', tag: '4832', profile: 511 }); mk(0xff00e012, { name: 'Neem', tag: 'LBRF', profile: 512 });
+  P('F1', 'console /unstuck Bob hbu Ticket #4832 (Selene #4832 offline)', remote('/unstuck Bob hbu Ticket #4832'), none);
+  P('F1', 'console /unstuck Bob respwan #4832', remote('/unstuck Bob respwan #4832'), none);
+  P('F1', 'console /unstuck Bob bruma see #LBRF', remote('/unstuck Bob bruma see #LBRF'), none);
+  P('F1', 'console /unstuck Bob #lbrf (the place box held the tag)', remote('/unstuck Bob #lbrf'), none);
+  P('F1', 'console /unstuck Bob https://x.example/t#4832', remote('/unstuck Bob https://x.example/t#4832'), none);
+  P('F1', 'typed /unstuck Bob hbu Ticket #4832', typed('unstuck', 'Bob hbu Ticket #4832'), none);
+  P('F1', 'console /unstuck bob bruma see #ABCD (the caller own tag)', remote('/unstuck bob bruma see #ABCD'), none);
+  P('F1.c', 'control console /unstuck Neem #LBRF hub', remote('/unstuck Neem #LBRF hub'), (m) => m === 'Neem #LBRF@hub');
+  P('F1.c', 'control console /unstuck Bob hub ticket:4832', remote('/unstuck Bob hub ticket:4832'), (m) => m === 'Bob #8KWH@hub');
+  P('F1.c', 'control console /unstuck #4832 respawn', remote('/unstuck #4832 respawn'), (m) => m === 'Selene #4832@temple');
+  P('N7', 'typed /unstuck Lydia #LBRF hub (name and tag disagree) moves nobody', typed('unstuck', 'Lydia #LBRF hub'), none);
+  P('N7', 'typed /fixloc Lydia #LBRF still binds the tag (7c)', typed('fixloc', 'Lydia #LBRF'), (m) => m === 'Neem #LBRF@hub');
+  // F5: the suggestion never names a ticket's tag
+  P('F5', 'console /unstuck Bob hub Ticket #4832: no suggestion to move #4832', remote('/unstuck Bob hub Ticket #4832'), (m, h) => m === '' && !/\/unstuck #4832/.test(h));
+  P('F5.c', 'control console /unstuck Neem hub #LBRF keeps the put-after reply', remote('/unstuck Neem hub #LBRF'), (m, h) => m === '' && /as \/unstuck #LBRF hub\./.test(h));
+  clear();
+  // F2: a shorter exact name followed by a place word in the target box
+  mk(0xff00e021, { name: 'Anna', tag: 'ANN2', profile: 521, online: true }); mk(0xff00e022, { name: 'Anna Temple', tag: 'ANT2', profile: 522, online: true }); mask(0xff00e022);
+  P('F2', 'console /unstuck Anna Temple hub (Anna Temple masked)', remote('/unstuck Anna Temple hub'), none);
+  P('F2', 'typed /unstuck Anna Temple hub ticket:12', typed('unstuck', 'Anna Temple hub ticket:12'), none);
+  clear();
+  mk(0xff00e021, { name: 'Anna', tag: 'ANN2', profile: 521, online: true }); mk(0xff00e023, { name: 'Anna Templeton', tag: 'ATL1', profile: 523, online: true });
+  P('F2', 'console /unstuck Anna Temple hub (meant Anna Templeton)', remote('/unstuck Anna Temple hub'), none);
+  P('F2', 'console /unstuck Anna Hub Guard respawn (nobody called that)', remote('/unstuck Anna Hub Guard respawn'), none);
+  P('F2', 'console /unstuck Anna respawn hub ticket:#481', remote('/unstuck Anna respawn hub ticket:#481'), none);
+  P('F2.c', 'control console /unstuck Anna hub No ticket', remote('/unstuck Anna hub No ticket'), (m) => m === 'Anna #ANN2@hub');
+  P('F2.c', 'control console /unstuck Anna respawn ticket:4', remote('/unstuck Anna respawn ticket:4'), (m) => m === 'Anna #ANN2@temple');
+  P('F2.c', 'control console /unstuck Anna Templeton hub', remote('/unstuck Anna Templeton hub'), (m) => m === 'Anna Templeton #ATL1@hub');
+  clear();
+  mk(0xff00e021, { name: 'Anna', tag: 'ANN2', profile: 521, online: true }); mk(0xff00e024, { name: 'Anna Respawn', tag: 'ARS1', profile: 524 }); gone.add(0xff00e024);
+  P('F2', 'console /unstuck Anna Respawn hub (Anna Respawn deleted)', remote('/unstuck Anna Respawn hub'), none);
+  clear();
+  // F4: '#TAG Name' whose name starts with a place word
+  mk(0xff00e031, { name: 'Temple Templeton', tag: '8YZW', profile: 531 }); mk(0xff00e032, { name: 'Hub Hub', tag: 'HHB1', profile: 532 });
+  P('F4', 'console /unstuck #8YZW Temple Templeton hub ticket:#481', remote('/unstuck #8YZW Temple Templeton hub ticket:#481'), (m) => m === '' || m === 'Temple Templeton #8YZW@hub');
+  P('F4', 'console /unstuck #HHB1 Hub Hub respawn', remote('/unstuck #HHB1 Hub Hub respawn'), (m) => m === '' || m === 'Hub Hub #HHB1@temple');
+  P('F4.c', 'control console /unstuck Temple Templeton #8YZW hub', remote('/unstuck Temple Templeton #8YZW hub'), (m) => m === 'Temple Templeton #8YZW@hub');
+  clear();
+  globalThis.__dboDisguised = prevD; globalThis.__dboOwnName = prevO; globalThis.__dboFormGone = prevG;
+  if (prevD === undefined) delete globalThis.__dboDisguised; if (prevO === undefined) delete globalThis.__dboOwnName; if (prevG === undefined) delete globalThis.__dboFormGone;
+  delete mp.findFormsByPropertyValue; where();
+}
+
+
+// ---- 7j. the follow-up of 28 Oct: one place only (F2, rule N); a #TAG binds only when every word before it is a word of the
+// carrier's own name (F1); a down in downed.js counts as down; a bare place word gets the usage ----------------------------
+reset();
+{
+  mp.findFormsByPropertyValue = (k, v) => [...store].filter(([, o]) => (k === 'private.indexed.tagKey' ? String(o['private.charTag'] || '').toLowerCase() === v
+    : k === 'private.indexed.nameKey' ? String((o.appearance || {}).name || '').toLowerCase() === v : false)).map(([id]) => id);
+  const HUB = '17482:DragonBreak Hub.esp', TEMPLE = 'a764b:BSHeartland.esm';
+  const neem = actor(0xff000f41, { name: 'Neem', tag: 'LBRF', profile: 97 });
+  const ivar = actor(0xff000f42, { name: 'Ivar', tag: 'IVR4', profile: 142 });
+  const ivarT = actor(0xff000f43, { name: 'Ivar Templeton', tag: 'IVT4', profile: 143, online: true });
+  const hubSmith = actor(0xff000f44, { name: 'Hub Smith', tag: 'HUBS', profile: 144 });
+  const guard = actor(0xff000f45, { name: 'Temple Guard', tag: 'TG04', profile: 145 });
+  const zed = actor(0xff000f46, { name: 'Zed', tag: '9B74', profile: 146 });
+  const anna = actor(0xff000f47, { name: 'Anna', tag: 'ANN4', profile: 147, online: true });
+  const ids = [neem, ivar, ivarT, hubSmith, guard, zed, anna, A.bob, A.jake];
+  const where = () => { for (const id of ids) delete store.get(id).locationalData; };
+  const at = (id) => (store.get(id).locationalData || {}).cellOrWorldDesc || '';
+  const moved = () => ids.filter((id) => at(id)).map((id) => `${G.display(id)}@${at(id) === HUB ? 'hub' : at(id) === TEMPLE ? 'temple' : at(id)}`).join(',');
+  const told = () => ((chatWrites.filter(([id]) => id === A.jake).slice(-1)[0] || [])[1] || '').split('|').slice(1).join('|');
+  const typed = (args) => { where(); reset(); G.commands.get('unstuck').fn(A.jake, args); return [moved(), told()]; };
+  const remote = (text) => { where(); reset(); const { rep } = send(text, { src: 'discord' }); return [moved(), header(rep)]; };
+  let m, h;
+  // rule N
+  [m, h] = typed('Bob Hub hub ticket:7');
+  check('7j. N: typed "Bob Hub hub ticket:7" moves nobody: more than one place', m === '' && h === 'Cannot move Bob Hub hub: more than one place (hub, hub); name the player, then one place.', [m, h]);
+  [m, h] = remote('/unstuck Bob Hub hub ticket:7');
+  check('7j. N: ...the form the same', m === '' && /more than one place \(hub, hub\)/.test(h), [m, h]);
+  [m, h] = typed('Ivar Temple');
+  check('7j. N: "Ivar Temple" (one place) still moves Ivar to the temple', m === 'Ivar #IVR4@temple', [m, h]);
+  [m, h] = typed('Bob Hub');
+  check('7j. N: "Bob Hub" still moves Bob to the hub', m === 'Bob #8KWH@hub', [m, h]);
+  [m, h] = remote('/unstuck Hub Smith #HUBS hub');
+  check('7j. N: "Hub Smith #HUBS hub" (a place word in the name, then the place) moves Hub Smith to the hub', m === 'Hub Smith #HUBS@hub', [m, h]);
+  [m, h] = remote('/unstuck Temple Guard #TG04');
+  check('7j. N: "Temple Guard #TG04" binds, to the temple', m === 'Temple Guard #TG04@temple', [m, h]);
+  // a note after the place that names another place is refused too (F2: it cannot be told from a place typed in the target box)
+  [m, h] = typed('#LBRF hub stuck at temple');
+  check('7j. N: "#LBRF hub stuck at temple" (a second place in the note) moves nobody', m === '' && /more than one place \(hub, temple\)/.test(h), [m, h]);
+  where(); reset(); G.commands.get('unstuck').fn(A.jake, '#LBRF hub stuck on a rock');
+  check('7j. N: ...a note with no place in it is fine: Neem to the hub, the note left out', moved() === 'Neem #LBRF@hub'
+    && chatWrites.some(([id, l]) => id === A.jake && /Left out, not a ticket:<id> or call:<n>: stuck on a rock/.test(l)), [moved(), chatWrites.filter(([id]) => id === A.jake).map((x) => x[1])]);
+  // every word before a #TAG must be a word of its carrier's name
+  [m, h] = typed('Anna Ticket #9B74');
+  check('7j. "/unstuck Anna Ticket #9B74" moves nobody, never Zed #9B74 nor Anna: the words are not its name', m === '' && h === 'Cannot move Anna Ticket #9B74: the words before #9B74 are not that character\'s name; use the #TAG alone, or the full name with it.', [m, h]);
+  [m, h] = remote('/unstuck Anna Ticket #9B74 hub');
+  check('7j. ...the form the same', m === '' && /the words before #9B74 are not that character's name/.test(h), [m, h]);
+  [m, h] = remote('/unstuck Zed #9B74 hub');
+  check('7j. ...while "Zed #9B74 hub" moves Zed', m === 'Zed #9B74@hub', [m, h]);
+  // a down still in downed.js (not isDead) counts as down for the hub move
+  globalThis.__dboDownedState = { downed: new Map([[neem, { at: 1 }]]) };
+  [m, h] = typed('#LBRF hub');
+  check('7j. a target still in downed.js\'s down is refused the hub move', m === '' && /^Cannot move Neem #LBRF to the hub while they are down/.test(h), [m, h]);
+  delete globalThis.__dboDownedState;
+  // a bare place word
+  for (const t of ['hub', 'respawn', 'Temple']) {
+    [m, h] = typed(t);
+    check(`7j. a bare place word ("${t}") gets the usage`, m === '' && /^Usage: \/unstuck/.test(h), [m, h]);
+  }
+  for (const id of [neem, ivar, ivarT, hubSmith, guard, zed, anna]) store.delete(id);
+  delete store.get(A.bob).locationalData; delete mp.findFormsByPropertyValue;
 }
 
 // ---- 12. reply state is "ran", with the handler's own first line ------------------------------------------------------------------------
