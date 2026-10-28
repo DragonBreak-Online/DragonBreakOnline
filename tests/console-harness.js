@@ -830,6 +830,32 @@ reset();
   [m, h] = remote('/unstuck hub #LBRF');
   check('7f. a place typed first gets the usage, nobody moves', m === '' && /^Usage: \/unstuck <player\|#TAG> \[hub\|respawn\]/.test(h), [m, h]);
   check('7f. ...typed in game the same', typed('hub #LBRF') === '' && /^Usage: \/unstuck/.test(told()), told());
+  // Verification of 67de9db92 (28 Oct): a name before a place word is that name, never a longer online one it begins (F1); a
+  // name that starts with Hub, Respawn or Temple binds with its #TAG, a place word typed first gets the usage (F2)
+  // the Dragon Baron form, as dragonbaronCommand.js builds the line
+  const form = (target, dest, ticket) => `/unstuck ${target} ${dest || 'hub'}${ticket ? ` ${ticket}` : ''}`;
+  const extra = [actor(0xff000f11, { name: 'Anna Hubbard', tag: 'AHB1', profile: 111, online: true }), actor(0xff000f12, { name: 'Al', tag: 'AL01', profile: 112, online: true }),
+    actor(0xff000f13, { name: 'Al Hubert', tag: 'ALHB', profile: 113, online: true }), actor(0xff000f14, { name: 'Lydia Respawnsen', tag: 'LRS1', profile: 114, online: true }),
+    actor(0xff000f15, { name: 'Hub', tag: 'HUB1', profile: 115 }), actor(0xff000f16, { name: 'Respawn', tag: 'RSP1', profile: 116 }),
+    actor(0xff000f17, { name: 'Temple Guard', tag: 'TG01', profile: 117 })];
+  ids.push(...extra);
+  check('7f. F1: typed "/unstuck Anna hub" with Anna Hubbard online sends Anna to the hub, never Anna Hubbard', typed('Anna hub') === 'Anna #ANN1@hub', moved());
+  [m, h] = remote(form('Anna', 'hub', ''));
+  check('7f. F1: ...the form "/unstuck Anna hub" the same', m === 'Anna #ANN1@hub', [m, h]);
+  check('7f. F1: typed "/unstuck Lydia respawn" with Lydia Respawnsen online sends Lydia to the temple', typed('Lydia respawn') === 'Lydia #LLX8@temple', moved());
+  [m, h] = remote(form('Al', '', ''));
+  check('7f. F1: the form "/unstuck Al hub" with Al Hubert online sends Al to the hub', m === 'Al #AL01@hub', [m, h]);
+  for (const [t, want] of [['/unstuck Hub #HUB1', 'Hub #HUB1@temple'], ['/unstuck Respawn #RSP1 hub', 'Respawn #RSP1@hub'], ['/unstuck Temple Guard #TG01', 'Temple Guard #TG01@temple'],
+    ['/unstuck Temple #TG01 hub', 'Temple Guard #TG01@hub']]) {
+    [m, h] = remote(t);
+    check(`7f. F2: "${t}" binds the tag (a place word in the carrier's own name)`, m === want, [m, h]);
+  }
+  for (const t of ['/unstuck hub #LBRF', '/unstuck respawn #LBRF hub', '/unstuck hub #ALHB']) {
+    [m, h] = remote(t);
+    check(`7f. F2: "${t}" (a place word first, not in the carrier's name) moves nobody and gets the usage`, m === '' && /^Usage: \/unstuck/.test(h), [m, h]);
+  }
+  for (const x of extra) store.delete(x);
+  ids.splice(ids.length - extra.length, extra.length);
   // S5: one online and one offline character carry a tag
   const ghost = actor(0xff000f05, { name: 'Ghost', tag: 'LLX8', profile: 104 });
   [m, h] = remote('/unstuck Ghost #LLX8 hub');
@@ -867,8 +893,14 @@ reset();
   // U5: staff are told whom, and the hub
   store.get(neem).isDead = true;
   check('7f. staff "/unstuck #LBRF" of a dead offline Neem: nobody moves, staff are told whom and the hub way', typed('#LBRF') === ''
-    && told() === 'Cannot move Neem #LBRF to a temple while they are dead; /unstuck #LBRF hub or /fixloc #LBRF moves them to the hub.', told());
+    && told() === 'Cannot move Neem #LBRF to a temple while they are dead; once they are up, /unstuck #LBRF hub or /fixloc #LBRF moves them to the hub.', told());
   check('7f. ...and "/unstuck #LBRF hub" moves them', typed('#LBRF hub') === 'Neem #LBRF@hub', moved());
+  // a Trial GM is not pointed to /fixloc (admins only); they keep the hub move (Jake, 28 Oct)
+  setOnline(A.trial, true); where(); reset();
+  G.commands.get('unstuck').fn(A.trial, '#LBRF');
+  const trialTold = ((chatWrites.filter(([id]) => id === A.trial).slice(-1)[0] || [])[1] || '').split('|').slice(1).join('|');
+  check('7f. ...a Trial GM is told the hub way only, without /fixloc', moved() === '' && trialTold === 'Cannot move Neem #LBRF to a temple while they are dead; once they are up, /unstuck #LBRF hub moves them to the hub.', trialTold);
+  setOnline(A.trial, false);
   store.get(neem).isDead = false; store.get(neem)['private.restrained'] = { boundHands: true };
   check('7f. ...bound: the same, "restrained or carried"', typed('#LBRF') === '' && /^Cannot move Neem #LBRF to a temple while they are restrained or carried; /.test(told()), told());
   delete store.get(neem)['private.restrained'];

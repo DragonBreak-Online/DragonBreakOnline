@@ -1342,21 +1342,26 @@ const offlineByTag = (q) => {
 // The character a staff move names (/fixloc, staff /unstuck), online or offline; 0 after telling `by` why. A typed #TAG binds,
 // as /rename: the one live character that carries it, online or not. A query without one may name an offline character too
 // (findAnyByName)
+// Every live character carrying a tag (lower case, no '#'), online (tagOf) or in the engine's index, each once, as console.js
+// liveByTag counts them; null when the index threw
+const liveTagCarriers = (want) => {
+  const on = onlineActors().map((o) => Number(o) >>> 0).filter((o) => { try { return String(tagOf(o)).toLowerCase() === want; } catch (e) { return false; } });
+  let ix = [];
+  try { if (typeof mp.findFormsByPropertyValue === 'function') ix = mp.findFormsByPropertyValue('private.indexed.tagKey', want) || []; } catch (e) { return null; }
+  const live = ix.map((x) => Number(x) >>> 0).filter((id) => id && !(typeof globalThis.__dboFormGone === 'function' && globalThis.__dboFormGone(id)));
+  return [...new Set([...on, ...live])];
+};
 const staffTargetOf = (by, q) => {
   // One #TAG at most: the console checks the first a line names and this binds the last, so two would part them (C, 28 Oct);
   // a tag glued to a word ('x#NMA1', 'ticket:#8KWH') counts too
   if ((q.match(/#[A-Za-z0-9]{4}(?![A-Za-z0-9])/g) || []).length > 1) { personal(by, `Cannot move ${q}: name one character, with one #TAG.`); return 0; }
   const tagIn = (q.match(/#([A-Za-z0-9]{4})$/) || [])[1];
   if (tagIn) {
-    // Every live carrier, online (tagOf) or in the engine's index, as console.js liveByTag counts them: a tag one online and
-    // one offline character carry is refused, never the online one taken (review S5, 28 Oct)
-    const want = tagIn.toLowerCase(), TAG = `#${tagIn.toUpperCase()}`;
-    const on = onlineActors().map((o) => Number(o) >>> 0).filter((o) => { try { return String(tagOf(o)).toLowerCase() === want; } catch (e) { return false; } });
-    let ix = [];
-    try { if (typeof mp.findFormsByPropertyValue === 'function') ix = mp.findFormsByPropertyValue('private.indexed.tagKey', want) || []; } catch (e) { ix = null; }
-    if (ix === null) { personal(by, `Cannot move ${TAG}: the game could not check whether another character carries that tag. Try again.`); return 0; }
-    const live = ix.map((x) => Number(x) >>> 0).filter((id) => id && !(typeof globalThis.__dboFormGone === 'function' && globalThis.__dboFormGone(id)));
-    const all = [...new Set([...on, ...live])];
+    // Every live carrier, online or not: a tag one online and one offline character carry is refused, never the online one
+    // taken (review S5, 28 Oct)
+    const TAG = `#${tagIn.toUpperCase()}`;
+    const all = liveTagCarriers(tagIn.toLowerCase());
+    if (all === null) { personal(by, `Cannot move ${TAG}: the game could not check whether another character carries that tag. Try again.`); return 0; }
     if (all.length !== 1) { personal(by, `Cannot move ${TAG}: no live character carries that tag, or more than one does.`); return 0; }
     return all[0];
   }
@@ -6008,8 +6013,11 @@ const unstuckActor = (a, by, refs = '') => {
   // Staff may move an offline character (Jake, 28 Oct): its temple comes from where it was saved, and only staff are told
   const online = userOf(a) >= 0;
   // Staff are told whom, and the way that still works (review U5): the hub move has neither wait
-  const notNow = (why) => personal(by, by === a ? `You cannot use /unstuck while ${why}.` : `Cannot move ${display(a)} to a temple while they are ${why}; /unstuck #${tagOf(a)} hub or /fixloc #${tagOf(a)} moves them to the hub.`);
-  try { if (mp.get(a, 'isDead')) return notNow('dead'); } catch (e) { /* alive */ }
+  // (a wake would undo a move made while they are down, so a dead one is moved once up; /fixloc is for admins, a Trial GM keeps
+  // the hub move; verification of 67de9db92, 28 Oct)
+  const notNow = (why, later) => personal(by, by === a ? `You cannot use /unstuck while ${why}.`
+    : `Cannot move ${display(a)} to a temple while they are ${why}; ${later ? 'once they are up, ' : ''}/unstuck #${tagOf(a)} hub${isAdmin(by) ? ` or /fixloc #${tagOf(a)}` : ''} moves them to the hub.`);
+  try { if (mp.get(a, 'isDead')) return notNow('dead', true); } catch (e) { /* alive */ }
   // A character still in creation stays in the Realm (20 Oct: the Realm has no zone, so it went to the Bruma temple with no
   // look and no name); a full restart brings the race menu back, which frees one caught in the Realm too. Staff may move one.
   if (!admin && creationPending(a)) return personal(by, GATE_CREATION_LINE);
@@ -6063,6 +6071,9 @@ registerChatCommand('unstuck', (a, args) => {
   const usage = 'Usage: /unstuck <player|#TAG> [hub|respawn] [ticket:<id>]';
   const isDest = (w) => Object.prototype.hasOwnProperty.call(UNSTUCK_DEST, String(w).toLowerCase());
   const isTag = (w) => /^#[A-Za-z0-9]{4}$/.test(w);
+  // A name as typed: a character called exactly that, or more than one; never a longer online name it only begins ('Anna hub'
+  // is not Anna Hubbard, whom findByName's unique prefix would give; verification of 67de9db92, 28 Oct)
+  const names = (q) => { const t = findAnyByName(q); return t < 0 || (t > 0 && (userOf(t) < 0 || nameOf(t).toLowerCase() === q.toLowerCase())); };
   const typed = name.split(/\s+/);
   const refs = typed.map((w) => UNSTUCK_REF.exec(w)).filter(Boolean).map((m) => `${m[1].toLowerCase()}:${m[2]}`);
   const words = typed.filter((w) => !UNSTUCK_REF.test(w));
@@ -6071,24 +6082,26 @@ registerChatCommand('unstuck', (a, args) => {
   const tagAt = words.findIndex(isTag);
   let head = words, rest = [];
   if (tagAt >= 0) { head = words.slice(0, tagAt + 1); rest = words.slice(tagAt + 1); }
-  else if (!(words.length > 1 && findAnyByName(words.join(' ')) !== 0)) {
+  else if (!(words.length > 1 && names(words.join(' ')))) {
     const at = words.map((w, i) => (i > 0 && isDest(w) ? i : -1)).filter((i) => i > 0);
-    const cut = at.slice().reverse().find((i) => findAnyByName(words.slice(0, i).join(' ')) !== 0) || at[0];
+    const cut = at.slice().reverse().find((i) => names(words.slice(0, i).join(' '))) || at[0];
     if (cut) { head = words.slice(0, cut); rest = words.slice(cut); }
   }
-  if (isDest(head[0]) && head.length > 1 && (tagAt >= 0 || findAnyByName(head.join(' ')) === 0)) return personal(a, usage);
+  // A place word before a #TAG is the carrier's own name ('Hub #HUB1', 'Temple Guard #TG01') or a place typed too early: first,
+  // the usage; later ('Neem hub #LBRF'), put it after the tag (C's review). The tag word alone finds the carrier, never a prefix
+  // nor the whole head; a tag no one or many carry goes on to staffTargetOf, which says so
+  if (tagAt > 0) {
+    const c = liveTagCarriers(words[tagAt].slice(1).toLowerCase());
+    if (c && c.length === 1) {
+      const own = nameOf(c[0]).toLowerCase().split(/\s+/);
+      const early = head.slice(0, -1).find((w) => isDest(w) && !own.includes(w.toLowerCase()));
+      if (early) return personal(a, early === head[0] ? usage : `Cannot move ${head.join(' ')}: put the place after the #TAG, as /unstuck ${words[tagAt]} ${early.toLowerCase()}.`);
+    }
+  } else if (isDest(head[0]) && head.length > 1 && !names(head.join(' '))) return personal(a, usage);
   const dest = rest[0] || '';
   if (dest && !isDest(dest)) return personal(a, `Unknown place ${dest.slice(0, 24)}: hub or respawn.`);
   // Staff may name an offline character too, by name or #TAG (Jake, 28 Oct); from the console by #TAG only (staffTargetOf)
   const t = staffTargetOf(a, head.join(' ')); if (!t) return;
-  // A place word typed before the #TAG ('Neem hub #LBRF') is not read as the place: unless it is part of the carrier's own
-  // name ('Ash Temple #TMPL'), the line is refused, so nobody is sent where staff did not mean (C's review, 28 Oct)
-  if (tagAt > 0) {
-    let own = [];
-    try { own = String((mp.get(t, 'appearance') || {}).name || '').toLowerCase().split(/\s+/); } catch (e) { own = []; }
-    const early = head.slice(0, -1).find((w) => isDest(w) && !own.includes(w.toLowerCase()));
-    if (early) return personal(a, `Cannot move ${head.join(' ')}: put the place after the #TAG, as /unstuck ${head[head.length - 1]} ${early.toLowerCase()}.`);
-  }
   const why = refs.length ? ` (${refs.join(' ')})` : '';
   if (dest && UNSTUCK_DEST[dest.toLowerCase()] === 'hub') hubActor(t, a, '/unstuck', why); else unstuckActor(t, a, why);
   const left = rest.slice(1);

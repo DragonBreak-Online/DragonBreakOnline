@@ -52,6 +52,8 @@ const stubs = {
   every: (n, ms, fn) => { if (n === 'outside') stubs.outside = fn; }, onlineActors: () => [A], log: () => {}, display: () => 'Bear Bait #4ZRT',
   profileOf: (a) => Number(mp.get(a, 'profileId')), userOf: (a) => (OFFLINE.has(a >>> 0) ? -1 : 1), personal: (a, t) => { told.push(t); toldTo.push([a >>> 0, t]); },
   staffCan: (a) => (a >>> 0) === STAFF, staffTargetOf: (by, q) => TARGETS[q] || 0, findAnyByName: (q) => TARGETS[q] || 0,
+  // /unstuck's parse: the own name of a character, and the carriers of a tag (Neem #LBRF's only)
+  nameOf: (a) => ((a >>> 0) === (A >>> 0) ? 'Bear Bait' : 'Neem'), liveTagCarriers: (want) => (want === 'lbrf' ? [O] : []), isAdmin: (a) => (a >>> 0) === STAFF,
   creationPending: () => false, GATE_CREATION_LINE: 'unfinished', findByName: () => 0, audit: (t) => audits.push(t), who: () => 'Bear Bait #4ZRT',
   registerChatCommand: (n, fn) => { if (n === 'unstuck') stubs.unstuck = fn; },
   // typed in game (tests/console-harness.js runs the remote console's)
@@ -64,7 +66,7 @@ const ex = /toTemple: (\(a\) => \{ const t = templeFor\(.*?return true; \}) \}\)
 ok(i0 > 0 && i1 > i0 && !!ex, 'the temple, zone, /unstuck and chopping block code is in gamemode.js');
 if (!(i0 > 0 && i1 > i0 && ex)) process.exit(1);
 const names = ['cfg', 'mp', 'recordOf', 'ZONES', 'fs', 'path', 'every', 'onlineActors', 'log', 'display', 'profileOf', 'userOf', 'personal', 'staffCan',
-  'creationPending', 'GATE_CREATION_LINE', 'findByName', 'audit', 'who', 'registerChatCommand', 'staffTargetOf', 'remoteLine', 'remoteBy', 'findAnyByName'];
+  'creationPending', 'GATE_CREATION_LINE', 'findByName', 'audit', 'who', 'registerChatCommand', 'staffTargetOf', 'remoteLine', 'remoteBy', 'findAnyByName', 'nameOf', 'liveTagCarriers', 'isAdmin'];
 const G = new Function(...names, `${src.slice(i0, i1)}\nconst chopToTemple = ${ex[1]};\nreturn { templeFor, zoneOfActor, setDeathTemple, chopToTemple, combatAt };`)(...names.map((k) => stubs[k]));
 
 // realm.js and guards.js, loaded after gamemode.js's own code as on the server
