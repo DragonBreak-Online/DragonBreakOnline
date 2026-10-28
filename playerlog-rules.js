@@ -560,7 +560,7 @@ AUDIT_VERBS.CITIZEN.cut = (text, raw) => {
 // "Cut ticket text"); the staff audit channels keep the line whole. Who, the count, the item or spell (a record name, or the
 // id typed) and whom stay, the target in their post. Any other end, or a lost one, keeps the head only; a line of these
 // shapes the cut cannot read keeps nothing. Other STAFF lines are not cut
-const ITEMSPELL_OPEN = /^STAFF .{1,200}? (?:gave \d{1,9}x |queued gift \d{1,9}x |took \d{1,9}x |granted spell |removed spell )/;
+const ITEMSPELL_OPEN = /^STAFF (?!ENCHANT ).{1,200}? (?:gave \d{1,9}x |queued gift \d{1,9}x |took \d{1,9}x |granted spell |removed spell )/;
 const ITEMSPELL_HEAD = new RegExp(`^(STAFF ${WHO_RX} (?:gave \\d{1,9}x .{1,120}? \\(0x[0-9a-f]{1,8}\\) to|queued gift \\d{1,9}x .{1,120}? for offline|took \\d{1,9}x .{1,120}? from|granted spell .{1,120}? \\(0x[0-9a-f]{1,8}\\) to|removed spell .{1,120}? \\(0x[0-9a-f]{1,8}\\) from) ${WHO_RX})(?= \\(|$)`);
 const ITEMSPELL_REF = /^ \((?:ticket|call):[\s\S]*\)$/i;
 const ENCHANT_HEAD = new RegExp(`^(STAFF ENCHANT ${WHO_RX} enchanted (?:their own|${WHO_RX}'s)) `);
@@ -579,6 +579,25 @@ AUDIT_VERBS.STAFF.cut = (text, raw) => {
   const e = endLost(raw) ? null : rest.match(ENCHANT_END);
   if (!e) return `${h[1]} piece`;
   return `${h[1]} piece${/ \(named "…"\)$/.test(rest.slice(0, e.index)) ? ' (named "…")' : ''}: ${e[1]}`;
+};
+// UNSTUCK <target> ... by staff <staff>[, offline]|via /fixloc|/unstuck[ (<ticket:…|call:…>…)][ from the remote console (<src>, <user>,
+// req <id>)] (gamemode.js hubActor, unstuckActor; 28 Oct): the ticket's text is what staff typed and the console's sender is
+// a Discord handle, so in a post the ticket is "a ticket" and the console only "the remote console" (review S1); the staff
+// audit channels keep the line whole. A lost end keeps the line up to the first of them only
+const UNSTUCK_REMOTE = / from the remote console \((?:web|discord), [^,()]{1,40}, req [0-9a-z]{1,12}\)$/;
+const UNSTUCK_TICKET = / \((?:ticket|call):[^()]*\)$/i;
+const UNSTUCK_TAILS = / \((?:ticket|call):| from the remote console /i;
+AUDIT_VERBS.UNSTUCK.cut = (text, raw) => {
+  if (endLost(raw)) { const k = text.search(UNSTUCK_TAILS); return k < 0 ? text : text.slice(0, k); }
+  let t = text, remote = '';
+  const r = t.match(UNSTUCK_REMOTE);
+  if (r) { t = t.slice(0, r.index); remote = ' from the remote console'; }
+  const k = t.match(UNSTUCK_TICKET);
+  if (k) t = `${t.slice(0, k.index)} (a ticket)`;
+  // anything else of those shapes left in the line goes too
+  const j = t.search(UNSTUCK_TAILS);
+  if (j >= 0 && !t.endsWith(' (a ticket)')) t = t.slice(0, j);
+  return t + remote;
 };
 // ELECTION STAFF <staff> struck the vote of <voter> in <hold> (round N): <reason> (citizenship.js strikeVote): the reason is
 // everything the Lead GM typed after the voter in /strikevote, their own words, so it goes, and a character it names is

@@ -50,8 +50,9 @@ const ID_RE = /^(w-[0-9a-f-]{36}|d-\d{17,20})$/;
 const SNOWFLAKE = /^\d{17,20}$/;
 const USER_RE = /^[a-z0-9_.]{2,32}$/;
 const TAG_RE = /^#[A-Za-z0-9]{4}$/;
-// One plain word for /fixloc and /unstuck (itemSpells): a name, a #TAG, hub|respawn, ticket:<id>; never a mention or markup
-const PLAIN_WORD = /^[A-Za-z0-9'#:\/.-]{1,40}$/;
+// One plain word for /fixloc and /unstuck (itemSpells): a name, a #TAG, hub|respawn, ticket:<id> (gamemode.js UNSTUCK_REF); never
+// a mention or markup
+const PLAIN_WORD = /^[A-Za-z0-9'#:\/._-]{1,40}$/;
 // gamemode.js NAME_RE: the rename handler's own rule for a new name
 const NAME_RE = /^[A-Za-z][A-Za-z' -]{1,30}$/;
 // The backend's cleaning set (serverControl.js UNSAFE_RE): C0, DEL, soft hyphen, zero-width and bidi controls, the line and
@@ -181,6 +182,7 @@ const TEXT = {
   notYet: (cmd) => `/${cmd} is not available from the console in v1.`,
   denied: (cmd) => `/${cmd} is switched off for the console in the game's config.`,
   badArgs: (cmd) => `From the console: ${ALLOW[cmd] ? ALLOW[cmd].usage : `/${cmd}`}`,
+  badWord: (x) => { const [cmd, w] = String(x).split(' '); return `"${w}" is not a word the console takes for /${cmd} (letters, digits and ' # : / . _ - only). ${TEXT.badArgs(cmd)}`; },
   badName: () => 'Names: 2-31 letters, spaces, apostrophes or hyphens, starting with a letter.',
   // The tagKindReason refusals: the subject is the usage (badKind), the config's maxSuspendDays (badLength)
   badKind: (usage) => `From the console: ${usage || '/discipline'}. A player's record and /discipline list stay in game.`,
@@ -324,7 +326,9 @@ const checkLine = (text, has, deny, opts) => {
     // words: a command's own pattern for each word (SEC-2)
     case 'itemSpells': {
       if (words.length < 1) return { cmd, why: 'badArgs' };
-      if (rule.words && !words.every((w) => rule.words.test(w))) return { cmd, why: 'badArgs' };
+      // a word that is not one names itself, its other characters shown as '?' (no mention or markup goes back either)
+      const bad = rule.words ? words.find((w) => !rule.words.test(w)) : undefined;
+      if (bad !== undefined) return { cmd, why: 'badWord', subject: `${cmd} ${bad.replace(/[^A-Za-z0-9'#:/._-]/g, '?').slice(0, 40)}` };
       return TAG_RE.test(words[0]) ? { cmd, body, tag: words[0] } : { cmd, body };
     }
     // #TAG <kind> [<length>|<n>] <reason>: one target by tag, never a name; a fixed kind word; the kind's own word; a reason

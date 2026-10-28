@@ -157,7 +157,7 @@ const gateRun = (() => {
   const g = cut('  const c = commands.get(cmd);', "  try { c.fn(a, body, userId); }");
   if (!g) return null;
   return new Function('commands', 'personal', 'isAdmin', 'staffCan', 'TRIAL_COMMANDS', 'LEAD_ONLY', 'isLeadStaff', 'staffLog', 'display', 'tierOf', 'staffTierOf',
-    'staffWho', 'TIER_LABEL', 'log', 'hasPlayerMenu', 'a', 'cmd', 'body', 'userId', 'remote', 'dry', g + '  c.fn(a, body, userId);\n  return \'ran\';');
+    'staffWho', 'TIER_LABEL', 'log', 'hasPlayerMenu', 'a', 'cmd', 'body', 'userId', 'remote', 'dry', 'remoteLine', g + '  c.fn(a, body, userId);\n  return \'ran\';');
 })();
 const staffLines = [];
 const gate = (a, line) => {

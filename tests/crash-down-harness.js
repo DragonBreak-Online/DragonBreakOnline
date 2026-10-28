@@ -154,6 +154,18 @@ const at = () => (get(P, 'pos') || []).join(',');
   check('late: still away, so they are put back where they fell at full health', at() === FELL.join(',') && get(P, 'percentages').health === 1, at());
   check('late: the CRASH-DOWN line says the Chill was lifted after the wake', audits.some((t) => /^CRASH-DOWN forgiven .*; the Chill lifted after the wake$/.test(t)), audits);
 
+  // Staff moved them after the wake (gamemode.js staffMoved: /fixloc, staff /unstuck): the late note lifts the Chill but never
+  // puts them back where they fell, which would undo the move (review U7, 28 Oct)
+  fresh('16:30:00'); packet('16:30:00');
+  writeNotes([]); await read();
+  down('16:30:10'); online = []; respawn('16:31:10');
+  mp.set(P, 'locationalData', { cellOrWorldDesc: '17482:DragonBreak Hub.esp', pos: [2122, 2079, 3], rot: [0, 0, 0] });
+  globalThis.__dboDownedStaffMoved(P);
+  now = T('16:32:00');
+  writeNotes([note('crash', T('16:30:05'))]); await read();
+  check('late after a staff move: the note lifts the Chill', !chilled());
+  check('late after a staff move: they stay where staff put them', at() === '2122,2079,3', at());
+
   fresh('17:00:00'); packet('17:00:00');
   writeNotes([]); await read();
   down('17:00:10'); respawn('17:01:10');

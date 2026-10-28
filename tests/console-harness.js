@@ -427,8 +427,8 @@ reset();
   for (const t of passes) { const rep = send(t, { mode: 'dry-run' }).rep; if (!rep || rep.state !== 'dry-run') bad.push([t, rep && rep.state, rep && rep.why]); }
   check('6. every allowed form passes every check (dry run)', !bad.length, bad);
   const refusals = [
-    ['/kick', 'needTag'], ['/fixloc', 'badArgs'], ['/chargen', 'self'], ['/unstuck', 'badArgs'], ['/unstuck #8KWH hub <@1>', 'badArgs'], ['/unstuck @everyone', 'badArgs'],
-    ['/unstuck #8KWH hub **x**', 'badArgs'], ['/fixloc Bob <@1>', 'badArgs'], ['/kick Bob', 'needTag'], ['/kick Bob #8KWH', 'needTag'], ['/kick me', 'needTag'],
+    ['/kick', 'needTag'], ['/fixloc', 'badArgs'], ['/chargen', 'self'], ['/unstuck', 'badArgs'], ['/unstuck #8KWH hub <@1>', 'badWord'], ['/unstuck @everyone', 'badWord'],
+    ['/unstuck #8KWH hub **x**', 'badWord'], ['/fixloc Bob <@1>', 'badWord'], ['/kick Bob', 'needTag'], ['/kick Bob #8KWH', 'needTag'], ['/kick me', 'needTag'],
     ['/kick 5', 'needTag'], ['/kick ff000b01', 'needTag'], ['/rename Bob Bobby', 'needTag'], ['/rename #8KWH', 'badArgs'], ['/rename #8KWH B0b', 'badName'],
     ['/wwremote clear', 'needTag'], ['/wwremote clear Bob', 'needTag'], ['/wwremote clear Bob #8KWH', 'needTag'], ['/wwremote sideways', 'badArgs'],
     ['/wwremote on now', 'badArgs'], ['/load everything', 'badArgs'], ['/whoami Bob', 'badArgs'], ['/players anything', 'badArgs'], ['/players #8KWH', 'badArgs'],
@@ -708,9 +708,9 @@ reset();
   // A bare name: online, it is found as typed in game; offline, the console asks for the #TAG
   where(); reset();
   ({ r, rep } = send(form('Neem', 'hub', ''), D));
-  check('7e. form "/unstuck Neem hub" with Neem offline moves nobody and asks for the #TAG', !at(neem) && !at(A.jake) && /Neem #LBRF is offline\. From the console, name an offline character by its #TAG/.test(header(rep)) && !unstuckLines().length, header(rep));
+  check('7e. form "/unstuck Neem hub" with Neem offline moves nobody and asks for the #TAG', !at(neem) && !at(A.jake) && /Cannot move Neem #LBRF: they are offline, and from the console an offline character is named by its #TAG/.test(header(rep)) && !unstuckLines().length, header(rep));
   ({ r, rep } = send(form('Neem', 'respawn', 'ticket:481'), D));
-  check('7e. ...and "/unstuck Neem respawn ticket:481" the same', !at(neem) && /is offline\. From the console, name an offline character by its #TAG/.test(header(rep)), header(rep));
+  check('7e. ...and "/unstuck Neem respawn ticket:481" the same', !at(neem) && /they are offline, and from the console an offline character is named by its #TAG/.test(header(rep)), header(rep));
   where(); reset();
   ({ r, rep } = send(form('Lydia', 'hub', ''), D));
   check('7e. form "/unstuck Lydia hub" with Lydia online: Lydia to the hub, told who brought her', rep.state === 'ran' && at(A.lydia) === HUB && !at(A.jake)
@@ -725,12 +725,12 @@ reset();
   // Refused: a tag nobody or two carry, words that are not plain, and every other targeted command on an offline one
   where(); reset();
   ({ r, rep } = send('/fixloc Neem', D));
-  check('7e. "/fixloc Neem" with Neem offline moves nobody and asks for the #TAG', !at(neem) && /Neem #LBRF is offline\. From the console, name an offline character by its #TAG/.test(header(rep)), header(rep));
+  check('7e. "/fixloc Neem" with Neem offline moves nobody and asks for the #TAG', !at(neem) && /Cannot move Neem #LBRF: they are offline, and from the console an offline character is named by its #TAG/.test(header(rep)), header(rep));
   ({ r, rep } = send('/fixloc Neem #LBRF', D));
   check('7e. "/fixloc Neem #LBRF": the tag binds, Neem to the hub', rep.state === 'ran' && at(neem) === HUB, header(rep));
   where(); reset();
   const refused = [['/unstuck #ZZZZ hub', 'targetAny'], ['/fixloc #ZZZZ', 'targetAny'],
-    ['/unstuck #LBRF hub <@1>', 'badArgs'], ['/kick #LBRF', 'target'], ['/chargen #LBRF', 'target'], ['/wwremote clear #LBRF', 'target'],
+    ['/unstuck #LBRF hub <@1>', 'badWord'], ['/kick #LBRF', 'target'], ['/chargen #LBRF', 'target'], ['/wwremote clear #LBRF', 'target'],
     ['/tp #LBRF', 'self'], ['/beastform #LBRF werewolf', 'self']];
   const wrong = refused.map(([t, why]) => [t, why, send(t, D).rep]).filter(([, why, rep]) => !rep || rep.state !== 'refused' || rep.why !== why).map(([t, why, rep]) => [t, why, rep && rep.why]);
   check('7e. a tag nobody carries, a word that is not plain and the other targeted commands on offline Neem are refused, each with its class', !wrong.length, wrong);
@@ -752,7 +752,7 @@ reset();
   where(); reset();
   globalThis.__dboStaffGuard = { rightOk: (a, what) => what !== 'unstuck', command: () => null };
   const noRight = send('/unstuck #LBRF hub', D).rep;
-  check('7e. without the unstuck right the remote /unstuck moves nobody, never the caller instead', !at(neem) && !at(A.jake) && /Only staff may \/unstuck another character/.test(header(noRight)), noRight);
+  check('7e. without the unstuck right the remote /unstuck moves nobody, never the caller instead', !at(neem) && !at(A.jake) && /Cannot move another character: \/unstuck on someone else is for staff/.test(header(noRight)), noRight);
   delete globalThis.__dboStaffGuard;
   // Typed in game: a bare name finds an offline character as before, the place and ticket work the same, no remote words
   where(); reset();
@@ -793,6 +793,83 @@ reset();
   check('7e. remote "/fixloc Neem #LBRF" with Neema online moves Neem #LBRF, never Neema', at(neem) === HUB && !at(neema), both());
   store.delete(neema);
   store.delete(neem); delete mp.findFormsByPropertyValue;
+}
+
+// ---- 7f. the review of 28 Oct: /unstuck reads a name that holds Hub, Respawn or Temple (S2), a tag one online and one offline
+// character carry is refused (S5), '_' in a ticket and a bad word named (RC-8), staff are told of a dead or bound target (U5),
+// a staff move tells downed.js (U7) and the hub move from /unstuck is logged as an unstuck (U9) ----------------------------
+reset();
+{
+  mp.findFormsByPropertyValue = (k, v) => [...store].filter(([, o]) => (k === 'private.indexed.tagKey' ? String(o['private.charTag'] || '').toLowerCase() === v
+    : k === 'private.indexed.nameKey' ? String((o.appearance || {}).name || '').toLowerCase() === v : false)).map(([id]) => id);
+  const HUB = '17482:DragonBreak Hub.esp', TEMPLE = 'a764b:BSHeartland.esm';
+  const neem = actor(0xff000f01, { name: 'Neem', tag: 'LBRF', profile: 97 });
+  const anna = actor(0xff000f02, { name: 'Anna', tag: 'ANN1', profile: 101, online: true });
+  const annaT = actor(0xff000f03, { name: 'Anna Temple', tag: 'ANT1', profile: 102, online: true });
+  const ralof = actor(0xff000f04, { name: 'Ralof Temple', tag: 'RT01', profile: 103 });
+  const ids = [neem, anna, annaT, ralof, A.lydia, A.jake];
+  const where = () => { for (const id of ids) delete store.get(id).locationalData; for (const id of [neem, ralof]) { const o = store.get(id); o.worldOrCellDesc = '6ca03:BSHeartland.esm'; o.pos = [77, -12, -66]; } };
+  const at = (id) => (store.get(id).locationalData || {}).cellOrWorldDesc || '';
+  const moved = () => ids.filter((id) => at(id)).map((id) => `${G.display(id)}@${at(id) === HUB ? 'hub' : at(id) === TEMPLE ? 'temple' : at(id)}`).join(',');
+  const told = () => ((chatWrites.filter(([id]) => id === A.jake).slice(-1)[0] || [])[1] || '').split('|').slice(1).join('|');
+  const typed = (args) => { where(); reset(); G.commands.get('unstuck').fn(A.jake, args); return moved(); };
+  const D = { src: 'discord' };
+  const remote = (text) => { where(); reset(); const { rep } = send(text, D); return [moved(), header(rep), rep]; };
+  // S2: a name that holds a place word
+  check('7f. typed "/unstuck Anna Temple" sends Anna Temple to the temple, never Anna', typed('Anna Temple') === 'Anna Temple #ANT1@temple', moved());
+  check('7f. typed "/unstuck Anna Temple hub" sends Anna Temple to the hub', typed('Anna Temple hub') === 'Anna Temple #ANT1@hub', moved());
+  check('7f. typed "/unstuck Anna hub" sends Anna to the hub', typed('Anna hub') === 'Anna #ANN1@hub', moved());
+  check('7f. typed "/unstuck Anna Temple respawn ticket:9" the temple, and the ticket in the line', typed('Anna Temple respawn ticket:9') === 'Anna Temple #ANT1@temple'
+    && audits().some((l) => /^UNSTUCK Anna Temple #ANT1 .* by staff Jake #ABCD .*\(ticket:9\)$/.test(l)), audits());
+  let [m, h] = remote('/unstuck Ralof Temple #RT01 hub');
+  check('7f. remote "/unstuck Ralof Temple #RT01 hub" (offline, a name with Temple in it): Ralof Temple to the hub', m === 'Ralof Temple #RT01@hub', [m, h]);
+  [m, h] = remote('/unstuck Ralof Temple #RT01');
+  check('7f. ...and with no place, the temple', m === 'Ralof Temple #RT01@temple', [m, h]);
+  [m, h] = remote('/unstuck #LBRF bruma');
+  check('7f. an unknown word where the place goes moves nobody: "Unknown place bruma: hub or respawn"', m === '' && h === 'Unknown place bruma: hub or respawn.', [m, h]);
+  [m, h] = remote('/unstuck hub #LBRF');
+  check('7f. a place typed first gets the usage, nobody moves', m === '' && /^Usage: \/unstuck <player\|#TAG> \[hub\|respawn\]/.test(h), [m, h]);
+  check('7f. ...typed in game the same', typed('hub #LBRF') === '' && /^Usage: \/unstuck/.test(told()), told());
+  // S5: one online and one offline character carry a tag
+  const ghost = actor(0xff000f05, { name: 'Ghost', tag: 'LLX8', profile: 104 });
+  [m, h] = remote('/unstuck Ghost #LLX8 hub');
+  check('7f. "Ghost #LLX8 hub" with Lydia online and Ghost offline both carrying #LLX8 moves nobody, never Lydia', m === '' && /Cannot move #LLX8: no live character carries that tag, or more than one does/.test(h), [m, h]);
+  where(); reset(); G.commands.get('fixloc').fn(A.jake, '#LLX8');
+  check('7f. ...typed "/fixloc #LLX8" the same', moved() === '' && /Cannot move #LLX8/.test(told()), [moved(), told()]);
+  [m, h] = remote('/fixloc #LLX8');
+  check('7f. ...and the console refuses it itself (tagShared)', m === '' && /More than one character carries #LLX8/.test(h), [m, h]);
+  store.delete(ghost);
+  check('7f. with Ghost gone, "/fixloc #LLX8" moves Lydia', (() => { where(); reset(); G.commands.get('fixloc').fn(A.jake, '#LLX8'); return moved(); })() === 'Lydia #LLX8@hub', moved());
+  // RC-8: '_' in a ticket passes the console; a bad word is named, made harmless
+  let rep;
+  [m, h, rep] = remote('/unstuck #LBRF hub ticket:gm_4');
+  check('7f. "ticket:gm_4" passes the console and reaches the line', m === 'Neem #LBRF@hub' && audits().some((l) => / via \/unstuck \(ticket:gm_4\) from the remote console /.test(l)), [m, h, rep.why]);
+  [m, h, rep] = remote('/unstuck #LBRF hub <@1>');
+  check('7f. a word that is not plain is named (its other characters as ?), with the usage, and nobody moves', m === '' && rep.why === 'badWord'
+    && h === '"??1?" is not a word the console takes for /unstuck (letters, digits and \' # : / . _ - only). From the console: /unstuck <#TAG|name> [hub|respawn] [ticket:<id>]', [m, h]);
+  // U5: staff are told whom, and the hub
+  store.get(neem).isDead = true;
+  check('7f. staff "/unstuck #LBRF" of a dead offline Neem: nobody moves, staff are told whom and the hub way', typed('#LBRF') === ''
+    && told() === 'Cannot move Neem #LBRF to a temple while they are dead; /unstuck #LBRF hub or /fixloc #LBRF moves them to the hub.', told());
+  check('7f. ...and "/unstuck #LBRF hub" moves them', typed('#LBRF hub') === 'Neem #LBRF@hub', moved());
+  store.get(neem).isDead = false; store.get(neem)['private.restrained'] = { boundHands: true };
+  check('7f. ...bound: the same, "restrained or carried"', typed('#LBRF') === '' && /^Cannot move Neem #LBRF to a temple while they are restrained or carried; /.test(told()), told());
+  delete store.get(neem)['private.restrained'];
+  // U7 and U9: a staff move tells downed.js; the hub move from /unstuck is logged as an unstuck, from /fixloc as a fixloc
+  const staffMoves = [], hooks = [], prevHook = globalThis.__dboPlogHook;
+  globalThis.__dboDownedStaffMoved = (x) => staffMoves.push(x >>> 0);
+  // (the player log runs every command through its hook: 'command' calls it on)
+  globalThis.__dboPlogHook = (...x) => { if (x[0] === 'command') return x[2].call(x[3], x[4], x[5], x[6]); if (x[0] === 'travel') hooks.push([x[1] >>> 0, x[2]]); };
+  try {
+    typed('#LBRF hub'); typed('#LBRF respawn'); where(); G.commands.get('fixloc').fn(A.jake, '#LBRF');
+    check('7f. each staff move (hub, temple, /fixloc) tells downed.js, so a late crash note cannot undo it', staffMoves.length === 3 && staffMoves.every((x) => x === neem), staffMoves);
+    check('7f. the player log hears "unstuck" for both /unstuck moves and "fixloc" for /fixloc', JSON.stringify(hooks.map((x) => x[1])) === '["unstuck","unstuck","fixloc"]', hooks);
+    staffMoves.length = 0; where(); reset(); store.get(A.bob)['private.unstuckAt'] = 0;
+    G.handleLine(A.bob, '/unstuck', store.get(A.bob).__user);
+    check('7f. a player\'s own /unstuck does not (it is no staff move)', at(A.bob) === TEMPLE && !staffMoves.length, staffMoves);
+  } finally { globalThis.__dboPlogHook = prevHook; delete globalThis.__dboDownedStaffMoved; delete store.get(A.bob).locationalData; store.get(A.bob)['private.unstuckAt'] = 0; }
+  for (const id of [neem, anna, annaT, ralof]) store.delete(id);
+  delete mp.findFormsByPropertyValue;
 }
 
 // ---- 12. reply state is "ran", with the handler's own first line ------------------------------------------------------------------------

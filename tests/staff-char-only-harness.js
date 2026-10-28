@@ -130,7 +130,7 @@ const cut = (from, to) => { const a = src.indexOf(from), b = src.indexOf(to, a +
   for (const n of ['tp', 'realnames', 'bugs', 'kick']) commands.set(n, { admin: true, fn: (a, body) => ran.push([a, n, body, globalThis.__dboStaffGuardState.ambient]) });
   for (const n of ['gm', 'faction', 'rename']) commands.set(n, { admin: n === 'rename', fn: (a, body) => ran.push([a, n, body, globalThis.__dboStaffGuardState.ambient]) });
   const run = new Function('commands', 'personal', 'isAdmin', 'staffCan', 'TRIAL_COMMANDS', 'LEAD_ONLY', 'isLeadStaff', 'staffLog', 'display', 'tierOf', 'staffTierOf',
-    'staffWho', 'TIER_LABEL', 'log', 'staffGuard', 'a', 'cmd', 'body', 'userId', 'remote', 'dry', `${gateCode}  c.fn(a, body, userId); if (staffRefEnd) staffRefEnd();\n  return 'ran';`);
+    'staffWho', 'TIER_LABEL', 'log', 'staffGuard', 'a', 'cmd', 'body', 'userId', 'remote', 'dry', 'remoteLine', `${gateCode}  c.fn(a, body, userId); if (staffRefEnd) staffRefEnd();\n  return 'ran';`);
   const chat = (a, line) => { ran.length = 0; said.length = 0; logged.length = 0; const [c, ...rest] = line.split(' ');
     return run(commands, (x, t) => said.push(t), (x) => [GM, GM_RP, LEAD, LEAD_RP].includes(x), () => true, {}, new Set(), () => false,
       (w, tier, what, detail) => logged.push(detail), String, () => 'gm', () => 'gm', String, { gm: 'GM' }, () => {}, () => globalThis.__dboStaffGuard, a, c, rest.join(' '), 1, undefined, false); };

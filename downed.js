@@ -480,6 +480,12 @@ module.exports = (api) => {
   // held here: the client holds the controls (dboParalyse, quiet), and the hit hook above refuses hits both ways.
   S.recovering = S.recovering instanceof Map ? S.recovering : new Map(); // actor -> { at, until }
   globalThis.__dboBleedOutStop = (a) => anim(Number(a) >>> 0, 'BleedOutStop');
+  // Staff moved them (/fixloc, staff /unstuck, gamemode.js staffMoved): a late crash forgiveness still lifts the Chill, but no
+  // longer puts them back where they fell, which would undo the move (review U7, 28 Oct)
+  globalThis.__dboDownedStaffMoved = (a) => {
+    if (!(S.recentWakes instanceof Map)) return;
+    for (const k of [Number(a) >>> 0, a]) { const w = S.recentWakes.get(k); if (w && w.d) S.recentWakes.set(k, { d: Object.assign({}, w.d, { fell: null }), wokeAt: w.wokeAt }); }
+  };
   const anim = (a, ev) => { try { mp.callPapyrusFunction('global', 'Debug', 'SendAnimationEvent', null, [{ type: 'form', desc: mp.getDescFromId(a) }, ev]); } catch (e) { log(`downed: ${ev} failed for ${display(a)}: ${e.message}`); } };
   const startRecovery = (t) => {
     const now = Date.now();

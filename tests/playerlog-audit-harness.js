@@ -502,6 +502,32 @@ ok(got === ': Discord roles now give developer (was gm); logged out so it takes 
   ok(JSON.stringify(gotAll) === JSON.stringify(want), '...the player log has each in the staff member\'s and the target\'s posts, the ticket as "a ticket" (the offline gift too)', gotAll);
   ok(told.some(([a]) => a === SE) && !told.some(([a, t]) => a === SE && (t.includes(CANARY) || /ticket|call:/i.test(t))), '...and the player is told what happened, never the ticket', told.filter(([a]) => a === SE));
 }
+// A STAFF ENCHANT line whose piece name holds the words of a staffitemspells line is still read as STAFF ENCHANT (review PL-3)
+got = enchantOf(`STAFF ENCHANT ${ROWAN} enchanted ${SELENE}'s ${CANARY} Ring granted spell to the: ${FIRE}`, 1);
+ok(got === `ENCHANT Rowan #PGDB enchanted Selene #K2QX's piece: ${FIRE}`, 'STAFF ENCHANT: a piece named like a staffitemspells line ("granted spell ") is still cut as ENCHANT', got);
+// UNSTUCK <target> ... by staff <staff> via /fixloc|/unstuck [(ticket:…)] [from the remote console (<src>, <user>, req <id>)]
+// (gamemode.js hubActor and unstuckActor): the ticket's text and the console sender's handle never reach a post; "a ticket" and
+// "the remote console" stand for them (review S1, 28 Oct); the line without them is kept whole
+{
+  const unstuckOf = (line) => {
+    const o = run(line);
+    const fine = o.length === 1 && o[0].ev === 'act.UNSTUCK' && o[0].c === 'K2QX' && roleOf(o[0], 'PGDB') === 'staff' && !/plogcanary/i.test(JSON.stringify(o));
+    return fine ? o[0].f.text : JSON.stringify(o);
+  };
+  const USER = 'plogcanary.x_1';
+  got = unstuckOf(`UNSTUCK ${SELENE} from 6ca03:BSHeartland.esm at 77,-12,-66 to the hub (offline) by staff ${ROWAN} via /unstuck (ticket:${CANARY}-griefer.alt/of#K2QX call:${CANARY}) from the remote console (discord, ${USER}, req 12345678)`);
+  ok(/to the hub \(offline\) by staff Rowan #PGDB via \/unstuck \(a ticket\) from the remote console$/.test(got), 'UNSTUCK hub: the ticket is "a ticket", the console sender and request go ("the remote console"); target and staff in their posts', got);
+  got = unstuckOf(`UNSTUCK ${SELENE} from "6ca03:BSHeartland.esm" at 77,-12,-66 to the bruma respawn by staff ${ROWAN}, offline (ticket:<@1>${CANARY}) from the remote console (web, ${USER}, req 6f1c2a3b)`);
+  ok(/to the bruma respawn by staff Rowan #PGDB, offline \(a ticket\) from the remote console$/.test(got), '...the temple line the same (a mention in the ticket)', got);
+  got = unstuckOf(`UNSTUCK ${SELENE} from 6ca03:BSHeartland.esm at 77,-12,-66 to the hub (online) by staff ${ROWAN} via /fixloc from the remote console (web, ${USER}, req 6f1c2a3b)`);
+  ok(/via \/fixloc from the remote console$/.test(got), '...a console line without a ticket: only the sender goes', got);
+  got = unstuckOf(`UNSTUCK ${SELENE} from 6ca03:BSHeartland.esm at 77,-12,-66 to the hub (online) by staff ${ROWAN} via /unstuck (ticket:https://evil.example/${CANARY})`);
+  ok(/via \/unstuck \(a ticket\)$/.test(got) && !got.includes(CANARY), '...a typed line with a ticket (a URL in it): "a ticket"', got);
+  got = unstuckOf(`UNSTUCK ${SELENE} from 6ca03:BSHeartland.esm at 77,-12,-66 to the hub (online) by staff ${ROWAN} via /fixloc`);
+  ok(/to the hub \(online\) by staff Rowan #PGDB via \/fixloc$/.test(got), '...a line with neither is kept whole', got);
+  got = unstuckOf(`UNSTUCK ${SELENE} from 6ca03:BSHeartland.esm at 77,-12,-66 to the hub (offline) by staff ${ROWAN} via /unstuck (ticket:"${CANARY}) from the remote console (discord, ${USER}, req 12345678)`);
+  ok(/via \/unstuck$/.test(got) && !got.includes(CANARY), '...a lost end (a quote in the ticket) keeps the line up to the ticket only', got);
+}
 // STAFFGUARD <staff> used a staff tool (<kind>) on the staff account of <target>, STAFFCHAR <staff> marked|unmarked <target> as
 // a staff character (staffguard.js): identities and the code's own words; the staff member acts, the other is the target
 got = actOf(`STAFFGUARD ${ROWAN} used a staff tool (skills) on the staff account of ${SELENE}`, 'STAFFGUARD', 1);

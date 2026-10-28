@@ -1340,23 +1340,30 @@ const offlineByTag = (q) => {
   return live.length === 1 ? live[0] : 0;
 };
 // The character a staff move names (/fixloc, staff /unstuck), online or offline; 0 after telling `by` why. A typed #TAG binds,
-// as /rename: an online character only if it carries the tag, else its one live offline carrier. A query without one may
-// name an offline character too (findAnyByName)
+// as /rename: the one live character that carries it, online or not. A query without one may name an offline character too
+// (findAnyByName)
 const staffTargetOf = (by, q) => {
   // One #TAG at most: the console checks the first a line names and this binds the last, so two would part them (C, 28 Oct)
   if ((q.match(/(?:^|\s)#[A-Za-z0-9]{4}(?=\s|$)/g) || []).length > 1) { personal(by, `Cannot move ${q}: name one character, with one #TAG.`); return 0; }
   const tagIn = (q.match(/#([A-Za-z0-9]{4})$/) || [])[1];
   if (tagIn) {
-    let t = findByName(q); if (t && tagOf(t).toLowerCase() !== tagIn.toLowerCase()) t = 0;
-    t = t || offlineByTag(q);
-    if (!t) personal(by, `Cannot move #${tagIn.toUpperCase()}: no live character carries that tag, or more than one does.`);
-    return t;
+    // Every live carrier, online (tagOf) or in the engine's index, as console.js liveByTag counts them: a tag one online and
+    // one offline character carry is refused, never the online one taken (review S5, 28 Oct)
+    const want = tagIn.toLowerCase(), TAG = `#${tagIn.toUpperCase()}`;
+    const on = onlineActors().map((o) => Number(o) >>> 0).filter((o) => { try { return String(tagOf(o)).toLowerCase() === want; } catch (e) { return false; } });
+    let ix = [];
+    try { if (typeof mp.findFormsByPropertyValue === 'function') ix = mp.findFormsByPropertyValue('private.indexed.tagKey', want) || []; } catch (e) { ix = null; }
+    if (ix === null) { personal(by, `Cannot move ${TAG}: the game could not check whether another character carries that tag. Try again.`); return 0; }
+    const live = ix.map((x) => Number(x) >>> 0).filter((id) => id && !(typeof globalThis.__dboFormGone === 'function' && globalThis.__dboFormGone(id)));
+    const all = [...new Set([...on, ...live])];
+    if (all.length !== 1) { personal(by, `Cannot move ${TAG}: no live character carries that tag, or more than one does.`); return 0; }
+    return all[0];
   }
   const t = findAnyByName(q);
   if (t < 0) { personal(by, `Cannot move ${q}: ${-t} characters are called that; add their #TAG.`); return 0; }
   if (!t) personal(by, 'No such player.');
   // From the remote console an offline character is named by #TAG only (Jake, 28 Oct); a name that finds one asks for it
-  if (t > 0 && remoteLine && userOf(t) < 0) { personal(by, `${display(t)} is offline. From the console, name an offline character by its #TAG.`); return 0; }
+  if (t > 0 && remoteLine && userOf(t) < 0) { personal(by, `Cannot move ${display(t)}: they are offline, and from the console an offline character is named by its #TAG.`); return 0; }
   return t;
 };
 // A staff rename, for /rename and the F7 panel's Rename (fork adminSystem.ts calls __dboAdminRename): { ok, text }
@@ -3901,8 +3908,9 @@ const hubActor = (t, by, via, refs = '') => {
   let from = '?', pos = '?';
   try { from = String(mp.get(t, 'worldOrCellDesc') || '?'); const p = mp.get(t, 'pos'); if (Array.isArray(p)) pos = p.map((v) => Math.round(v)).join(','); } catch (e) { /* where is unknown */ }
   try {
-    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('travel', t, 'fixloc', by); } catch (e) { /* the player log is optional */ }
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('travel', t, via === '/unstuck' ? 'unstuck' : 'fixloc', by); } catch (e) { /* the player log is optional */ }
     mp.set(t, 'locationalData', { cellOrWorldDesc: '17482:DragonBreak Hub.esp', pos: [2122.2, 2079.6, 3], rot: [0, 0, 22.9] });
+    staffMoved(t);
     audit(`UNSTUCK ${who(t)} from ${from} at ${pos} to the hub (${state}) by staff ${who(by)} via ${via}${refs}${remoteBy()}`);
     if (online && via === '/unstuck' && t !== by) personal(t, `${display(by)} brings you to the DragonBreak Hub.`);
     personal(by, online ? `Moved ${display(t)} to the hub; server now says ${JSON.stringify(mp.get(t, 'worldOrCellDesc'))}.`
@@ -5998,13 +6006,15 @@ const unstuckActor = (a, by, refs = '') => {
   const admin = staffCan(by, 'unstuck');
   // Staff may move an offline character (Jake, 28 Oct): its temple comes from where it was saved, and only staff are told
   const online = userOf(a) >= 0;
-  try { if (mp.get(a, 'isDead')) return personal(by, 'You cannot use /unstuck while dead.'); } catch (e) { /* alive */ }
+  // Staff are told whom, and the way that still works (review U5): the hub move has neither wait
+  const notNow = (why) => personal(by, by === a ? `You cannot use /unstuck while ${why}.` : `Cannot move ${display(a)} to a temple while they are ${why}; /unstuck #${tagOf(a)} hub or /fixloc #${tagOf(a)} moves them to the hub.`);
+  try { if (mp.get(a, 'isDead')) return notNow('dead'); } catch (e) { /* alive */ }
   // A character still in creation stays in the Realm (20 Oct: the Realm has no zone, so it went to the Bruma temple with no
   // look and no name); a full restart brings the race menu back, which frees one caught in the Realm too. Staff may move one.
   if (!admin && creationPending(a)) return personal(by, GATE_CREATION_LINE);
   // Frozen in the engine's bleed-out after a temple wake (camera locked, no movement): /unstuck ends it first, cooldown or not
   try { if (typeof globalThis.__dboBleedOutStop === 'function') globalThis.__dboBleedOutStop(a); } catch (e) { /* the move still runs */ }
-  try { const r = mp.get(a, 'private.restrained'); if (r && (r.boundHands || r.carried || r.captorActorId)) return personal(by, 'You cannot use /unstuck while restrained or carried.'); } catch (e) { /* free */ }
+  try { const r = mp.get(a, 'private.restrained'); if (r && (r.boundHands || r.carried || r.captorActorId)) return notNow('restrained or carried'); } catch (e) { /* free */ }
   // No walking out of a jail, or out of a sentence (jail.js)
   if (!admin && globalThis.__dboJailUnstuck) { const why = globalThis.__dboJailUnstuck(a); if (why) return personal(by, why); }
   const combatMs = (Number(UNSTUCK.combatSeconds ?? UNSTUCK.pvpCombatSeconds) || 0) * 1000;
@@ -6024,7 +6034,7 @@ const unstuckActor = (a, by, refs = '') => {
   try {
     try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('travel', a, 'unstuck', by); } catch (e) { /* the player log is optional */ }
     mp.set(a, 'locationalData', { cellOrWorldDesc: t.world, pos: t.pos, rot: [0, 0, Number(t.rotZ) || 0] });
-    if (by === a) mp.set(a, 'private.unstuckAt', Date.now());
+    if (by === a) mp.set(a, 'private.unstuckAt', Date.now()); else staffMoved(a);
   } catch (e) { log('unstuck failed', e.message); return personal(by, 'That did not work. Ask a GM for help.'); }
   if (online) personal(a, by === a ? `You find your way back to safety. /unstuck is ready again in ${UNSTUCK.cooldownMinutes} minutes.` : `${display(by)} brings you back to safety.`);
   const why = fellBack ? ` (where it was resolves to no temple of its own, so Bruma's, as /unstuck always does there)` : '';
@@ -6033,6 +6043,8 @@ const unstuckActor = (a, by, refs = '') => {
   const off = online ? '' : ', offline';
   audit(`UNSTUCK ${who(a)} from ${from} to the ${zone} respawn${by !== a ? ` by staff ${who(by)}${off}` : ''}${refs}${remoteBy()}`);
 };
+// A late crash forgiveness (downed.js) puts a character back where they fell, which would undo a staff move (review U7)
+const staffMoved = (t) => { try { if (typeof globalThis.__dboDownedStaffMoved === 'function') globalThis.__dboDownedStaffMoved(t); } catch (e) { /* downed.js is optional */ } };
 // Staff /unstuck <player|#TAG> [hub|respawn] [ticket:<id>|call:<n>], the Dragon Baron's Unstuck form as it sends it (Jake, 28 Oct):
 // hub is /fixloc's move, respawn (the default typed in game) the temple rule; the call or ticket goes into the audit line
 const UNSTUCK_DEST = Object.freeze({ hub: 'hub', respawn: 'respawn', temple: 'respawn' });
@@ -6040,21 +6052,37 @@ const UNSTUCK_REF = /^(ticket|call):#?([A-Za-z0-9_./-]{1,40})$/i;
 registerChatCommand('unstuck', (a, args) => {
   const name = String(args || '').trim();
   // From the remote console the line always names a #TAG (console.js); it never moves the caller's own character instead
-  if (remoteLine && (!name || !staffCan(a, 'unstuck'))) return personal(a, 'Only staff may /unstuck another character.');
+  if (remoteLine && (!name || !staffCan(a, 'unstuck'))) return personal(a, 'Cannot move another character: /unstuck on someone else is for staff.');
   if (!name || !staffCan(a, 'unstuck')) return unstuckActor(a, a);
-  // The player, then where to (a first word is always the player's), then the call or ticket; other words after the place
-  // (the form's ticket box holding "No ticket") are left out and said so
-  const words = name.split(/\s+/);
-  const at = words.findIndex((w, i) => i > 0 && Object.prototype.hasOwnProperty.call(UNSTUCK_DEST, w.toLowerCase()));
-  const head = at < 0 ? words : words.slice(0, at), tail = at < 0 ? [] : words.slice(at + 1);
-  const refs = [...head, ...tail].map((w) => UNSTUCK_REF.exec(w)).filter(Boolean).map((m) => `${m[1].toLowerCase()}:${m[2]}`);
-  const left = tail.filter((w) => !UNSTUCK_REF.test(w));
-  const q = head.filter((w) => !UNSTUCK_REF.test(w)).join(' ');
-  if (!q) return personal(a, 'Usage: /unstuck <player|#TAG> [hub|respawn] [ticket:<id>]');
+  // The player, then where to, then the call or ticket (review S2: a name may hold Hub, Respawn or Temple). With a #TAG the
+  // player ends at it (exactly that tag when it comes first). With none, the whole line when it names someone, else the
+  // words before the last place word that leaves a name, else before the first. A place word after the player must be one;
+  // a place typed first gets the usage. Other words after the place (the form's ticket box holding "No ticket") are left out
+  // and said so
+  const usage = 'Usage: /unstuck <player|#TAG> [hub|respawn] [ticket:<id>]';
+  const isDest = (w) => Object.prototype.hasOwnProperty.call(UNSTUCK_DEST, String(w).toLowerCase());
+  const isTag = (w) => /^#[A-Za-z0-9]{4}$/.test(w);
+  const typed = name.split(/\s+/);
+  const refs = typed.map((w) => UNSTUCK_REF.exec(w)).filter(Boolean).map((m) => `${m[1].toLowerCase()}:${m[2]}`);
+  const words = typed.filter((w) => !UNSTUCK_REF.test(w));
+  if (!words.length) return personal(a, usage);
+  if (words.filter(isTag).length > 1) return personal(a, `Cannot move ${words.join(' ')}: name one character, with one #TAG.`);
+  const tagAt = words.findIndex(isTag);
+  let head = words, rest = [];
+  if (tagAt >= 0) { head = words.slice(0, tagAt + 1); rest = words.slice(tagAt + 1); }
+  else if (!(words.length > 1 && findAnyByName(words.join(' ')) !== 0)) {
+    const at = words.map((w, i) => (i > 0 && isDest(w) ? i : -1)).filter((i) => i > 0);
+    const cut = at.slice().reverse().find((i) => findAnyByName(words.slice(0, i).join(' ')) !== 0) || at[0];
+    if (cut) { head = words.slice(0, cut); rest = words.slice(cut); }
+  }
+  if (isDest(head[0]) && head.length > 1 && (tagAt >= 0 || findAnyByName(head.join(' ')) === 0)) return personal(a, usage);
+  const dest = rest[0] || '';
+  if (dest && !isDest(dest)) return personal(a, `Unknown place ${dest.slice(0, 24)}: hub or respawn.`);
   // Staff may name an offline character too, by name or #TAG (Jake, 28 Oct); from the console by #TAG only (staffTargetOf)
-  const t = staffTargetOf(a, q); if (!t) return;
+  const t = staffTargetOf(a, head.join(' ')); if (!t) return;
   const why = refs.length ? ` (${refs.join(' ')})` : '';
-  if (at >= 0 && UNSTUCK_DEST[words[at].toLowerCase()] === 'hub') hubActor(t, a, '/unstuck', why); else unstuckActor(t, a, why);
+  if (dest && UNSTUCK_DEST[dest.toLowerCase()] === 'hub') hubActor(t, a, '/unstuck', why); else unstuckActor(t, a, why);
+  const left = rest.slice(1);
   if (left.length) personal(a, `Left out, not a ticket:<id> or call:<n>: ${left.join(' ').slice(0, 60)}`);
 }, { help: `move to the respawn point of your area (every ${UNSTUCK.cooldownMinutes} min, not in combat); staff: <player|#TAG> [hub|respawn] [ticket:<id>], offline ones too` });
 const setDeathTemple = (a) => {

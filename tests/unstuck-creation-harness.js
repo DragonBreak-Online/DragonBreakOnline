@@ -48,6 +48,7 @@ const sandbox = {
   findByName: (q) => (/stranger/i.test(q) ? NEW : 0),
   // staff /unstuck <name> resolves through staffTargetOf (the console harness runs the real one); online characters here
   staffTargetOf: (by, q) => { const t = /stranger/i.test(q) ? NEW : 0; if (!t) told.push([by >>> 0, 'No such player.']); return t; },
+  findAnyByName: (q) => (/stranger/i.test(q) ? NEW : 0),
   userOf: () => 1,
   // typed in game (tests/console-harness.js runs the remote console's)
   remoteLine: null, remoteBy: () => '',
