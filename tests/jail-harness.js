@@ -145,13 +145,18 @@ check('no /unstuck while serving', /serving a sentence/.test(globalThis.__dboJai
 check('no /unstuck in a jail', /in a jail/.test(globalThis.__dboJailUnstuck(OTHER) || ''));
 at(OTHER, PLAIN_CELL, [0, 0, 0]);
 check('/unstuck is fine elsewhere', globalThis.__dboJailUnstuck(OTHER) === null);
+// staff /unstuck refuses a prisoner (gamemode.js; Jake, 28 Oct: "Yes, refuse prisoners"): the jail names the cell
+check('a prisoner serving: __dboJailSentence names the jail', JSON.stringify(globalThis.__dboJailSentence(PRISONER)) === '{"cell":"Bruma Castle Dungeon"}', globalThis.__dboJailSentence(PRISONER));
+check('...anyone else: null', globalThis.__dboJailSentence(OTHER) === null && globalThis.__dboJailSentence(GUARD) === null);
 
 // ---- serving time ----
 tick(1);
 check('the first tick after arriving counts nothing', sentence().servedMs === 0);
 tick(12);
 check('a minute in the cell counts a minute', sentence().servedMs === 60000, sentence().servedMs);
-online = [GUARD, OTHER]; tick(24); online = [GUARD, PRISONER, OTHER];
+online = [GUARD, OTHER]; tick(24);
+check('...logged out, the saved sentence still names the jail (an offline prisoner)', JSON.stringify(globalThis.__dboJailSentence(PRISONER)) === '{"cell":"Bruma Castle Dungeon"}');
+online = [GUARD, PRISONER, OTHER];
 check('two minutes logged out count nothing', sentence().servedMs === 60000, sentence().servedMs);
 tick(1);
 check('the first tick back counts nothing', sentence().servedMs === 60000, sentence().servedMs);
@@ -164,6 +169,7 @@ check('/sentence says what is left', /14 minutes left of 15 minutes in Bruma Cas
 tick(1 + 14 * 12 + 1);
 check('served: the prisoner is told', /Your time is served/.test(said(PRISONER)), said(PRISONER));
 check('...the sentence is gone', sentence() === null);
+check('...and __dboJailSentence is null: a served sentence never blocks a staff /unstuck', globalThis.__dboJailSentence(PRISONER) === null);
 check('...and the door is free', props.get(CELL_DOOR + '|private.dboCell') === null && act(CELL_DOOR, PRISONER) === false);
 check('/unstuck is back outside the jail', (() => { at(PRISONER, PLAIN_CELL, [0, 0, 0]); const r = globalThis.__dboJailUnstuck(PRISONER); at(PRISONER, JAIL_CELL, [-100, 0, 0]); return r === null; })());
 
@@ -171,6 +177,7 @@ check('/unstuck is back outside the jail', (() => { at(PRISONER, PLAIN_CELL, [0,
 act(CELL_DOOR, GUARD); ui('jailChoose', GUARD, ['who:15']); ui('jailChoose', GUARD, ['time:15:30']);
 act(CELL_DOOR, GUARD); ui('jailChoose', GUARD, ['release']);
 check('a guard can release early', sentence() === null && /releases you/.test(said(PRISONER)));
+check('...and a released prisoner is no longer held (__dboJailSentence null)', globalThis.__dboJailSentence(PRISONER) === null);
 
 // ---- the tumbler lock (lockpick.js) finishing after the cell changed hands ----
 const begun = [];

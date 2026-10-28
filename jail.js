@@ -523,6 +523,14 @@ module.exports = (api) => {
     return null;
   };
 
+  // Staff /unstuck refuses a prisoner, online or offline, from the sentence as saved: a staff move would strand it (Jake, 28 Oct:
+  // "Yes, refuse prisoners"). { cell } while time is still owed, else null; a served or released sentence is gone (finish)
+  globalThis.__dboJailSentence = (a) => {
+    if (!CFG.enabled) return null;
+    const s = sentenceOf(a);
+    return s && leftOf(s) > 0 ? { cell: jailName(s.cell) } : null;
+  };
+
   // ---- commands ---------------------------------------------------------------------------------------
   const addStatus = (key, order, fn) => { try { if (typeof globalThis.__dboRegisterStatus === 'function') globalThis.__dboRegisterStatus(key, order, fn); } catch (e) { /* gamemode older than /status */ } };
   addStatus('sentence', 40, (a) => { const s = sentenceOf(a); return s ? `Sentence ${plural(minutes(leftOf(s)), 'minute')} left in ${jailName(s.cell)}` : null; });

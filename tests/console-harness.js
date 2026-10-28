@@ -921,6 +921,58 @@ reset();
   delete mp.findFormsByPropertyValue;
 }
 
+// ---- 7g. staff /unstuck refuses a prisoner, online or offline, typed or from the console, whatever the place (Jake, 28 Oct:
+// "Yes, refuse prisoners"); jail.js's __dboJailSentence decides from the saved sentence (tests/jail-harness.js), stubbed here.
+// /fixloc and a player's own /unstuck are unchanged ------------------------------------------------------------------------
+reset();
+{
+  mp.findFormsByPropertyValue = (k, v) => [...store].filter(([, o]) => (k === 'private.indexed.tagKey' ? String(o['private.charTag'] || '').toLowerCase() === v
+    : k === 'private.indexed.nameKey' ? String((o.appearance || {}).name || '').toLowerCase() === v : false)).map(([id]) => id);
+  const HUB = '17482:DragonBreak Hub.esp', TEMPLE = 'a764b:BSHeartland.esm';
+  const neem = actor(0xff000f21, { name: 'Neem', tag: 'LBRF', profile: 97 });
+  const anna = actor(0xff000f22, { name: 'Anna', tag: 'ANN1', profile: 101, online: true });
+  const ids = [neem, anna, A.lydia, A.jake, A.bob];
+  const jailed = new Set();
+  globalThis.__dboJailSentence = (x) => (jailed.has(x >>> 0) ? { cell: 'Bruma Castle Dungeon' } : null);
+  const where = () => { for (const id of ids) delete store.get(id).locationalData; const o = store.get(neem); o.worldOrCellDesc = '6c410:BSHeartland.esm'; o.pos = [-100, 0, 0]; };
+  const at = (id) => (store.get(id).locationalData || {}).cellOrWorldDesc || '';
+  const moved = () => ids.filter((id) => at(id)).map((id) => `${G.display(id)}@${at(id) === HUB ? 'hub' : at(id) === TEMPLE ? 'temple' : at(id)}`).join(',');
+  const toldTo = (who) => ((chatWrites.filter(([id]) => id === who).slice(-1)[0] || [])[1] || '').split('|').slice(1).join('|');
+  const typed = (by, args) => { where(); reset(); G.commands.get('unstuck').fn(by, args); return [moved(), toldTo(by)]; };
+  const remote = (text) => { where(); reset(); const { rep } = send(text, { src: 'discord' }); return [moved(), header(rep), rep]; };
+  const NEEM_HELD = 'Cannot move Neem #LBRF: they are serving a sentence in Bruma Castle Dungeon; release them first at their cell door (activate it, then Release).';
+  jailed.add(neem); jailed.add(A.lydia);
+  let m, h;
+  for (const t of ['/unstuck #LBRF hub ticket:12', '/unstuck #LBRF respawn', '/unstuck #LBRF temple ticket:3', '/unstuck #LBRF']) {
+    [m, h] = remote(t);
+    check(`7g. remote "${t}" with Neem serving a sentence offline moves nobody: "Cannot move ... serving a sentence ... Release"`, m === '' && h === NEEM_HELD && !audits().some((l) => l.startsWith('UNSTUCK ')), [m, h]);
+  }
+  [m, h] = typed(A.jake, '#LBRF hub');
+  check('7g. typed by an admin, the same', m === '' && h === NEEM_HELD, [m, h]);
+  [m, h] = typed(A.jake, 'Lydia hub');
+  check('7g. an ONLINE prisoner (Lydia), typed: refused, nobody moves', m === '' && /^Cannot move Lydia #LLX8: they are serving a sentence in Bruma Castle Dungeon; release them first/.test(h), [m, h]);
+  setOnline(A.trial, true);
+  [m, h] = typed(A.trial, '#LBRF hub');
+  check('7g. a Trial GM: refused the same, the hub included', m === '' && h === NEEM_HELD, [m, h]);
+  [m, h] = typed(A.trial, '#LBRF respawn');
+  check('7g. ...and the temple', m === '' && h === NEEM_HELD, [m, h]);
+  setOnline(A.trial, false);
+  [m, h] = typed(A.jake, 'Anna hub');
+  check('7g. someone not serving is moved as before', m === 'Anna #ANN1@hub', [m, h]);
+  where(); reset(); G.commands.get('fixloc').fn(A.jake, '#LBRF');
+  check('7g. /fixloc on a prisoner is unchanged (Jake): Neem to the hub', moved() === 'Neem #LBRF@hub', moved());
+  jailed.delete(neem);
+  [m, h] = remote('/unstuck #LBRF hub ticket:12');
+  check('7g. just released: the form moves Neem to the hub', m === 'Neem #LBRF@hub', [m, h]);
+  jailed.add(A.bob); where(); reset(); store.get(A.bob)['private.unstuckAt'] = 0;
+  G.handleLine(A.bob, '/unstuck', store.get(A.bob).__user);
+  check('7g. a player\'s own /unstuck never gets the staff refusal (the jail refuses it itself, __dboJailUnstuck)', !chatWrites.some(([id, l]) => id === A.bob && /Cannot move .*serving a sentence/.test(l)), chatWrites.filter(([id]) => id === A.bob));
+  delete store.get(A.bob).locationalData; store.get(A.bob)['private.unstuckAt'] = 0;
+  delete globalThis.__dboJailSentence;
+  for (const id of [neem, anna]) store.delete(id);
+  delete mp.findFormsByPropertyValue;
+}
+
 // ---- 12. reply state is "ran", with the handler's own first line ------------------------------------------------------------------------
 reset();
 {

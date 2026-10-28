@@ -6102,6 +6102,11 @@ registerChatCommand('unstuck', (a, args) => {
   if (dest && !isDest(dest)) return personal(a, `Unknown place ${dest.slice(0, 24)}: hub or respawn.`);
   // Staff may name an offline character too, by name or #TAG (Jake, 28 Oct); from the console by #TAG only (staffTargetOf)
   const t = staffTargetOf(a, head.join(' ')); if (!t) return;
+  // A prisoner stays where they serve, whatever the place: a staff move would strand the sentence (Jake, 28 Oct: "Yes, refuse
+  // prisoners"). jail.js reads it from the saved sentence, so an offline one too; /fixloc is unchanged
+  let held = null;
+  try { held = typeof globalThis.__dboJailSentence === 'function' ? globalThis.__dboJailSentence(t) : null; } catch (e) { held = null; }
+  if (held) return personal(a, `Cannot move ${display(t)}: they are serving a sentence in ${held.cell}; release them first at their cell door (activate it, then Release).`);
   const why = refs.length ? ` (${refs.join(' ')})` : '';
   if (dest && UNSTUCK_DEST[dest.toLowerCase()] === 'hub') hubActor(t, a, '/unstuck', why); else unstuckActor(t, a, why);
   const left = rest.slice(1);
