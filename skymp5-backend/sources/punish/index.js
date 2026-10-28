@@ -82,7 +82,7 @@ function createPunishments({ config, readStore, dynamicFields, characterName, lo
   const plog = playerLog || createPlayerLog({ dir: config.punishPlayerLogDir, days: config.punishPlayerLogDays, now })
   const identity = createIdentity({ loadProfiles, loadPlayers, readStore, dynamicFields, characterName, now })
   let plogCache = { version: -1, rows: [] }
-  let snapshot = null
+  const snapshots = { panel: null, tracker: null }
 
   // The paths the game itself uses (discipline.js and restitution.js resolve them from the server's working directory)
   function paths(cfg) {
@@ -126,15 +126,18 @@ function createPunishments({ config, readStore, dynamicFields, characterName, lo
     if (staffName) r.by = `${staffName} (profile ${staff[1]}${staff[2] ? `, ${staff[2]}` : ''})`
   }
 
-  function collect() {
+  // skipPlayerLog leaves the player log unread, so the tracker never wakes its worker
+  function collect({ skipPlayerLog = false } = {}) {
+    const key = skipPlayerLog ? 'tracker' : 'panel'
     const t = now()
-    if (snapshot && t - snapshot.at < COLLECT_MS) return snapshot
+    const cached = snapshots[key]
+    if (cached && t - cached.at < COLLECT_MS) return cached
     const g = gameConfig.read(path.join(gameDir(), 'gamemode-config.json'))
     const cfg = g.value || R.DEFAULT_CONFIG
     const p = paths(cfg)
     const read = Object.fromEntries(Object.entries(files).map(([k, f]) => [k, f.read(p[k])]))
     const j = journal.read()
-    plog.refresh()
+    if (!skipPlayerLog) plog.refresh()
     const id = identity.get()
     const dsc = R.disciplineRows(read.discipline.value || [], { now: t, strikeDays: cfg.discipline.strikeDays, held: read.held.value || new Map() })
     const rows = [
@@ -144,19 +147,20 @@ function createPunishments({ config, readStore, dynamicFields, characterName, lo
       ...R.jailRows(id.sentences),
       ...R.restitutionRows(read.cases.value || [], read.restitution.value || new Map(), cfg.restitution),
       ...R.journalRows(j.rows, { now: t }),
-      ...plogRows().map(r => ({ ...r, target: { ...r.target } })),
+      ...(skipPlayerLog ? [] : plogRows().map(r => ({ ...r, target: { ...r.target } }))),
     ]
     for (const r of rows) fill(r, id)
     const flag = v => ({ status: v.status, asOf: v.asOf })
     const restStatus = read.cases.status === 'ok' && read.restitution.status === 'unreadable' ? read.restitution : read.cases
-    snapshot = {
+    const snapshot = {
       at: t, rows: R.oneRowPerBan(rows), strikes: dsc.strikes, cfg, id,
       sources: {
         discipline: flag(read.discipline), panelBans: flag(read.panelBans), bans: flag(read.bans),
         jail: { status: id.status.store === 'ok' ? 'ok' : 'unreadable', asOf: iso(t) },
-        restitution: flag(restStatus), journal: flag(j), playerLog: plog.view(),
+        restitution: flag(restStatus), journal: flag(j), ...(skipPlayerLog ? {} : { playerLog: plog.view() }),
       },
     }
+    snapshots[key] = snapshot
     return snapshot
   }
 
@@ -364,8 +368,9 @@ function createPunishments({ config, readStore, dynamicFields, characterName, lo
     },
 
     // The backend's punishment tracker only, never served over HTTP: every row unfiltered, with Discord ids, staff targets and
-    // the viewer's own records, plus each source's status and the strike counts. The snapshot is shared and must not be changed
-    trackerSnapshot: () => collect(),
+    // the viewer's own records, plus each source's status and the strike counts. The snapshot is shared and must not be changed.
+    // It has no player-log rows or playerLog source: the tracker does not use them and must not start the player log's reader
+    trackerSnapshot: () => collect({ skipPlayerLog: true }),
 
     stop: () => plog.stop(),
   }

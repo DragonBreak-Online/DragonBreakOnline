@@ -4,8 +4,12 @@
 
 const { test, after } = require('node:test')
 const assert = require('node:assert/strict')
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
 const { createPunishFixture, PEOPLE } = require('./helpers/punishFixture')
 const { createPunishments } = require('../sources/punish')
+const { start } = require('../sources/punish/tracker')
 
 const F = createPunishFixture()
 after(() => F.cleanup())
@@ -116,7 +120,7 @@ test('trackerSnapshot holds the rows a GM is not shown, with each source\'s stat
   const ended = s.rows.find(r => r.id === 'mod:M-BBBBBB')
   assert.ok(ended && ended.state === 'ended' && !seen.includes(ended.id), 'a timeout that has ended')
   assert.equal(ended.by, 'Gina')
-  for (const k of ['discipline', 'panelBans', 'bans', 'jail', 'restitution', 'journal', 'playerLog']) assert.equal(s.sources[k].status, 'ok', k)
+  for (const k of ['discipline', 'panelBans', 'bans', 'jail', 'restitution', 'journal']) assert.equal(s.sources[k].status, 'ok', k)
   assert.deepEqual([...s.strikes], [[10, 1], [30, 1]])
 })
 
@@ -124,4 +128,54 @@ test('a lift is served with the kind of hold it lifted, so the panel can say sus
   const rows = (await service({}).recent(OWNER, { from: '2000-01-01', limit: '100' })).rows
   const lift = rows.find(r => r.id === 'dsc:10:4')
   assert.deepEqual([lift.kind, lift.lifts, lift.liftsKind], ['lift', 3, 'suspend'])
+})
+
+// A player log that counts what is asked of it, with one ban in it
+function spyLog() {
+  const calls = { refresh: 0, events: 0, view: 0 }
+  const ban = { ev: 'session.ban', kind: 'ban', g: 'g1', s: 1, t: F.now - 3600000, p: PEOPLE.gm.profileId + 1000, n: 'Plog Target' }
+  return {
+    calls,
+    refresh() { calls.refresh++ },
+    events: () => { calls.events++; return { version: 1, list: [ban] } },
+    view: () => { calls.view++; return { status: 'ok', asOf: null, from: null, days: 90 } },
+    stop: async () => {},
+  }
+}
+
+test('trackerSnapshot never asks the player log for anything, and the panel still reads it', async () => {
+  const log = spyLog()
+  const svc = service({ playerLog: log, staffStatusOf: async () => 'player' })
+  const s = svc.trackerSnapshot()
+  assert.deepEqual(log.calls, { refresh: 0, events: 0, view: 0 }, 'the player log\'s worker is not woken')
+  assert.ok(!s.rows.some(r => r.source === 'playerLog'), 'no player-log rows')
+  assert.equal(s.sources.playerLog, undefined)
+  assert.equal(s.sources.discipline.status, 'ok')
+
+  // The panel's own snapshot is taken apart from the tracker's, though the tracker's is still fresh
+  const rows = (await svc.recent(OWNER, { from: '2000-01-01', limit: '100' })).rows
+  assert.equal(log.calls.refresh, 1, 'the panel refreshes the player log')
+  assert.ok(rows.some(r => r.id === 'plog:g1:1'), 'the panel shows the player log\'s ban')
+  assert.equal(svc.trackerSnapshot(), s, 'the tracker\'s cached snapshot is its own')
+  assert.equal(log.calls.refresh, 1)
+})
+
+test('the tracker ticks on the real service without waking the player log or freezing a source', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dbo-ptrack-svc-'))
+  after(() => fs.rmSync(dir, { recursive: true, force: true }))
+  const log = spyLog()
+  const svc = service({ playerLog: log })
+  const lines = []
+  const tracker = start({
+    config: { punishTracker: 'dry', punishTrackerFile: path.join(dir, 'punish-threads.json'), punishTrackerDryFile: path.join(dir, 'dry.jsonl') },
+    punishments: () => svc, log: l => lines.push(l),
+  })
+  try {
+    assert.equal(await tracker.tick(), true)
+    clock += 60000
+    assert.equal(await tracker.tick(), true)
+  } finally { tracker.stop() }
+  assert.deepEqual(log.calls, { refresh: 0, events: 0, view: 0 })
+  assert.ok(!lines.some(l => /waits until|cannot be read|tick failed|player ?log/i.test(l)), lines.join('\n'))
+  assert.ok(fs.existsSync(path.join(dir, 'punish-threads.dry.json')))
 })
