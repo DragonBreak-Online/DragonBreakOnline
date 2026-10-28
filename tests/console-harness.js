@@ -89,6 +89,7 @@ const body = [
   lineOf(/^const staffSay = .*$/m, 'staffSay'),
   cut('const quoteSay = ', '// ---- Realm of Lorkhan hold gates', 'handleChat and handleLine'),
   cut("registerChatCommand('players'", '// The staff teleport:', '/players to /rename'),
+  cut('const findAnyByName = ', '// ---- letters: kept in private.pigeons', 'findAnyByName'),
   cut("registerChatCommand('fixloc'", '// One line per online player on every reload', '/fixloc'),
   cut("registerChatCommand('load'", '// The spawned npcs near you', '/load'),
   `return { deliver, system, personal, captureFor, actorOf, userOf, nameOf, profileOf, discordOf, tagOf, display, who, tierFrom, tierOf, isAdmin,
