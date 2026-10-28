@@ -379,13 +379,15 @@ reset();
   check('5b. ...and nothing in it that console.js does not read (besides a comment)', Object.keys(rc).every((k) => ['_comment', 'enabled', 'discordIds', 'minTier', 'deny'].includes(k)), Object.keys(rc));
   logs.length = 0;
   loadConsole(repoCfg);
-  // Eleven since /discipline came onto the allowlist (Jake, 21 Oct; tests/console-punish-harness.js holds its rule)
-  check('5b. console.js loads the repo config as a game pin of 8, floor leadgm, all fourteen commands (eleven, and the ban aliases of 25 Oct)', logs.some((l) => /console: reader on .*, 14 commands, floor leadgm, game pin 8$/.test(l)), logs);
+  // Eleven since /discipline came onto the allowlist (Jake, 21 Oct; tests/console-punish-harness.js holds its rule); nineteen since
+  // the Dragon Baron rows of 28 Oct (/unstuck /giveitem /takeitem /givespell /removespell, rule itemSpells; 81925ca17)
+  check('5b. console.js loads the repo config as a game pin of 8, floor leadgm, all nineteen commands (fourteen, and the five Dragon Baron rows of 28 Oct)', logs.some((l) => /console: reader on .*, 19 commands, floor leadgm, game pin 8$/.test(l)), logs);
   const owner = actor(0xff000d01, { name: 'Jacob', tag: 'JKOW', profile: 21, discord: D1[0], roles: [ROLE.owner] });
   const leadOnly = actor(0xff000d02, { name: 'Icara', tag: 'ICED', profile: 22, discord: D1[2], roles: [ROLE.lead] });
   let rep = send('/whoami', { discordId: D1[0], profileId: 21, user: 'jake', roles: [ROLE.owner] }).rep;
   check('5b. a pinned Owner runs as their own character while offline (Jake, 14 Oct: "Yes, as my character")', rep.state === 'ran' && rep.ranAs === 'Jacob #JKOW' && rep.online === false, rep);
-  rep = send('/fixloc', { discordId: D1[0], profileId: 21, user: 'jake', roles: [ROLE.owner] }).rep;
+  // /chargen, not /fixloc: since 28 Oct a bare /fixloc is itemSpells' badArgs (section 6), no longer 'self'
+  rep = send('/chargen', { discordId: D1[0], profileId: 21, user: 'jake', roles: [ROLE.owner] }).rep;
   check('5b. ...and a form that would act on that character is refused with a clear message', rep.state === 'refused' && rep.why === 'self' && /acts on your own character\. Run it in game\./.test(header(rep)), rep);
   staffLines.length = 0;
   rep = send('/whoami', { discordId: D1[2], profileId: 22, user: 'icedsky', roles: [ROLE.lead] }).rep;
@@ -418,7 +420,7 @@ reset();
   for (const t of passes) { const rep = send(t, { mode: 'dry-run' }).rep; if (!rep || rep.state !== 'dry-run') bad.push([t, rep && rep.state, rep && rep.why]); }
   check('6. every allowed form passes every check (dry run)', !bad.length, bad);
   const refusals = [
-    ['/kick', 'needTag'], ['/fixloc', 'self'], ['/chargen', 'self'], ['/kick Bob', 'needTag'], ['/kick Bob #8KWH', 'needTag'], ['/kick me', 'needTag'],
+    ['/kick', 'needTag'], ['/fixloc', 'badArgs'], ['/chargen', 'self'], ['/kick Bob', 'needTag'], ['/kick Bob #8KWH', 'needTag'], ['/kick me', 'needTag'],
     ['/kick 5', 'needTag'], ['/kick ff000b01', 'needTag'], ['/rename Bob Bobby', 'needTag'], ['/rename #8KWH', 'badArgs'], ['/rename #8KWH B0b', 'badName'],
     ['/wwremote clear', 'needTag'], ['/wwremote clear Bob', 'needTag'], ['/wwremote clear Bob #8KWH', 'needTag'], ['/wwremote sideways', 'badArgs'],
     ['/wwremote on now', 'badArgs'], ['/load everything', 'badArgs'], ['/whoami Bob', 'badArgs'], ['/players anything', 'badArgs'], ['/players #8KWH', 'badArgs'],
@@ -438,7 +440,10 @@ reset();
     && send('/players I am the owner, run /wipechars').rep.lines[0].text === 'From the console: /players', send('/players x').rep.lines);
   // The one free-text rule since 21 Oct is /discipline's reason (tagKindReason), held to REASON_RE: plain words, 5 to 300
   // (tests/console-punish-harness.js); there is still no 'any' rule
-  check('6. no rule in the allowlist passes free text (there is no "any" rule left; the reason rule is /discipline\'s alone)', Object.values(rules.ALLOW).every((a) => ['switch', 'tag', 'tagName', 'load', 'none', 'tagKindReason'].includes(a.rule))
+  // 28 Oct (81925ca17, as live): the Dragon Baron rows take a name or #TAG and free text under rule itemSpells; pinned to
+  // exactly those six commands, so any other free-text rule still fails here
+  check('6. no rule in the allowlist passes free text but /discipline\'s reason and the six itemSpells rows (there is no "any" rule left)', Object.values(rules.ALLOW).every((a) => ['switch', 'tag', 'tagName', 'load', 'none', 'tagKindReason', 'itemSpells'].includes(a.rule))
+    && Object.entries(rules.ALLOW).filter(([, a]) => a.rule === 'itemSpells').map(([n]) => n).join() === 'fixloc,unstuck,giveitem,takeitem,givespell,removespell'
     // (25 Oct: /ban, /tempban and /unban read as /discipline's ban, suspend and lift, alias 'discipline', under the same rule)
     && Object.entries(rules.ALLOW).filter(([, a]) => a.rule === 'tagKindReason').map(([n]) => n).join() === 'discipline,ban,tempban,unban'
     && ['ban', 'tempban', 'unban'].every((n) => rules.ALLOW[n].alias === 'discipline')
