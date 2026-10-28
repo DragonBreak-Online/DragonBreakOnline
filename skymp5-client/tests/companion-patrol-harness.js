@@ -23,7 +23,7 @@ function run(m) {
   const pkt = { customPacketType: 'companionPatrol', centre: [1000, -2000, 300], radius: 1200, ids: [0xff000101, 0xff000102, 0xff000103] };
   const p = m.parsePatrol(pkt);
   check('the server\'s packet reads as a patrol: centre, radius and members', p && p.radius === 1200 && p.centre.join() === '1000,-2000,300' && p.ids.length === 3, p);
-  check('ids [] ends the patrol', m.parsePatrol({ customPacketType: 'companionPatrol', ids: [] }) === null);
+  check('ids [] ends the patrol, even with a centre and radius', m.parsePatrol(Object.assign({}, pkt, { ids: [] })) === null && m.parsePatrol({ customPacketType: 'companionPatrol', ids: [] }) === null);
   check('a malformed centre or radius is no patrol', m.parsePatrol(Object.assign({}, pkt, { centre: [1, 2] })) === null && m.parsePatrol(Object.assign({}, pkt, { radius: -5 })) === null
     && m.parsePatrol(Object.assign({}, pkt, { radius: 'far' })) === null && m.parsePatrol(Object.assign({}, pkt, { centre: [1, NaN, 2] })) === null);
 
@@ -41,6 +41,8 @@ function run(m) {
   check('...and they cover the area, not one spot (some beyond half the radius, some near the centre)', pts.some((q) => Math.hypot(q[0] - 1000, q[1] + 2000) > 600) && pts.some((q) => Math.hypot(q[0] - 1000, q[1] + 2000) < 300));
   const first = p.ids.map((id) => m.patrolPoint(p, id, 1).map(Math.round).join());
   check('members set out for different points', new Set(first).size === 3, first);
+const dirs = p.ids.map((x) => { const q = m.patrolPoint(p, x, 1); return Math.round(Math.atan2(q[1] + 2000, q[0] - 1000) * 100); });
+check('...in different directions from the centre, not one line', new Set(dirs).size === 3, dirs);
   check('a member\'s next walk goes somewhere new', m.patrolPoint(p, p.ids[0], 1).join() !== m.patrolPoint(p, p.ids[0], 2).join());
   check('the same member and walk give the same point (deterministic)', m.patrolPoint(p, p.ids[0], 5).join() === m.patrolPoint(p, p.ids[0], 5).join());
 
@@ -50,7 +52,7 @@ function run(m) {
   check('...not again before 15 s', !m.patrolDue(1e9, 1e9 + 14999, id));
   check('...and again by 18 s', m.patrolDue(1e9, 1e9 + 18000, id));
   const stagger = p.ids.map((x) => { let t = 15000; while (!m.patrolDue(0, t, x)) t += 100; return t; });
-  check('members are staggered within 15-18 s', stagger.every((t) => t >= 15000 && t <= 18000), stagger);
+  check('members are staggered within 15-18 s, not all at once', stagger.every((t) => t >= 15000 && t <= 18000) && new Set(stagger).size > 1, stagger);
 
   // The service: the packet, the walk, the marker
   const src = fs.readFileSync(path.resolve(__dirname, '../src/services/services/companionService.ts'), 'utf8');
