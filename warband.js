@@ -42,7 +42,7 @@ module.exports = (api) => {
   // far the panel looks for targets and the GM's raiders; onLogout, what a GM's followers do when the GM leaves (dismiss, or
   // settle the calm ones); presetsMax, saved bands per server
   const C = Object.assign({ maxBand: 25, maxRaise: 10, ringRadius: 160, bodySeconds: 300, chargeRange: 4096, avoidGmHost: true,
-    viewRadius: 4200, onLogout: 'dismiss', presetsMax: 40, guardRadius: 1500, guardLeash: 500, guardReturn: 400 }, cfg.warband || {});
+    viewRadius: 4200, onLogout: 'dismiss', presetsMax: 40, guardRadius: 1500, guardLeash: 500, guardWalkSeconds: 20 }, cfg.warband || {});
   // Every answer is said in chat as before, and kept as the last line the panel shows (W3)
   const lastSaid = globalThis.__dboWarbandSaid instanceof Map ? globalThis.__dboWarbandSaid : (globalThis.__dboWarbandSaid = new Map());
   const tell = (a, text) => { personal(a, text); lastSaid.set(a >>> 0, { text: String(text), at: Date.now() }); };
@@ -57,7 +57,7 @@ module.exports = (api) => {
   // stance: GM actor -> 'follow' | 'stay' (companionSystem keeps no such flag it hands out); onLogout: GM profile -> choice
   if (!(S.stance instanceof Map)) S.stance = new Map();
   if (!(S.onLogout instanceof Map)) S.onLogout = new Map();
-  // guards: GM actor -> { radius, profile, centre, where, posts: npc id -> { pos, rot } }
+  // guards: GM actor -> { radius, profile, centre, where, posts: npc id -> { pos, rot }, walking: npc id -> since }
   if (!(S.guards instanceof Map)) S.guards = new Map();
   const comp = () => globalThis.__dboCompanions || null;
   // Vanilla PlayerFaction, as companionService.ts prepare() puts the GM's own followers in on the GM's screen
@@ -347,9 +347,11 @@ module.exports = (api) => {
   // /warband defend [radius] (guard is the same): the area is centred where the GM stands, in the GM's cell; the band stays
   // and each NPC keeps the spot it stood on as its post. Every 2 s an NPC with no player to fight goes for the player nearest
   // the centre inside the area (guardRadius 1500 units, about 21 m): never staff, never a character of its own GM, never one
-  // who is down. A target that leaves the area is dropped; an NPC further than radius + guardLeash (500) from the centre gives
-  // up its fight, and one with nothing to fight further than guardReturn (400) from its post is put back on it (a server move,
-  // a teleport). companionSystem's attack order still needs the target within 4096 units of the GM. follow or stay ends it.
+  // who is down. A target that leaves the area is dropped. An NPC further than radius + guardLeash (500) from the centre gives
+  // up its fight and walks back: it is ordered to follow the GM (the live client has no walk-to-point order, and a server move
+  // is a teleport; Nat, 28 Oct: "it rubber-bands them back"), and stays again once inside the area. Only one still past the
+  // leash after guardWalkSeconds (20) is put back on its post (a teleport). Idle NPCs inside the area are left where they are.
+  // companionSystem's attack order still needs the target within 4096 units of the GM. follow or stay ends it.
   const guardFoes = (g) => onlineActors().filter((t) => profileOf(t) >= 0 && profileOf(t) !== g.profile && !isAdmin(t) && alive(t)
     && !(typeof globalThis.__dboIsDowned === 'function' && globalThis.__dboIsDowned(t)) && whereOf(t) === g.where
     && (() => { const q = posOf(t); return !!q && dist(q, g.centre) <= g.radius; })());
@@ -371,10 +373,17 @@ module.exports = (api) => {
       }
       // A player target gone from the area, or any fight past the leash, is dropped; an NPC it is defending against inside
       // the leash is left to companionSystem
-      if (c.targetId && (leashed || profileOf(c.targetId) >= 0)) { try { comp().stay(c.id); } catch (e) { /* gone */ } }
-      else if (c.targetId) continue;
-      if (p && whereOf(c.id) === g.where && dist(p, post.pos) > C.guardReturn) {
-        try { mp.set(c.id, 'locationalData', { cellOrWorldDesc: g.where, pos: post.pos, rot: post.rot }); } catch (e) { /* not movable now */ }
+      if (!leashed) {
+        if (c.targetId && profileOf(c.targetId) >= 0) { try { comp().stay(c.id); } catch (e) { /* gone */ } }
+        // Walked back inside the area: it holds there again
+        if (g.walking.has(c.id >>> 0) && p && dist(p, g.centre) <= g.radius) { g.walking.delete(c.id >>> 0); try { comp().stay(c.id); } catch (e) { /* gone */ } }
+        continue;
+      }
+      const since = g.walking.get(c.id >>> 0);
+      if (!since) { g.walking.set(c.id >>> 0, Date.now()); try { comp().follow(c.id); } catch (e) { /* gone */ } continue; }
+      if (Date.now() - since >= C.guardWalkSeconds * 1000) {
+        g.walking.delete(c.id >>> 0);
+        try { mp.set(c.id, 'locationalData', { cellOrWorldDesc: g.where, pos: post.pos, rot: post.rot }); comp().stay(c.id); } catch (e) { /* not movable now */ }
       }
     }
     return n;
@@ -389,7 +398,7 @@ module.exports = (api) => {
     S.charging.delete(a >>> 0);
     S.stance.set(a >>> 0, 'defend');
     for (const c of mine) comp().stay(c.id);
-    S.guards.set(a >>> 0, { radius: r, profile: profileOf(a), centre: centre.slice(), where: whereOf(a), posts: new Map() });
+    S.guards.set(a >>> 0, { radius: r, profile: profileOf(a), centre: centre.slice(), where: whereOf(a), posts: new Map(), walking: new Map() });
     const n = guardPass(a);
     audit(`WARBAND ${who(a)} set ${mine.length} NPC(s) to defend an area, radius ${r}`);
     return tell(a, `Your warband of ${mine.length} defends this area: any player within ${meters(r)} m of where you stand who is not staff is attacked, and none chases past ${meters(r + C.guardLeash)} m${n ? ` (${n} already engaged)` : ''}. Stay within ${meters(4096)} m of them; follow or stay ends it.`);

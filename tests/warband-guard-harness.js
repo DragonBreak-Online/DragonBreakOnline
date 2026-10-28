@@ -81,7 +81,7 @@ at(NEAR, 4000, 0);
 moves.length = 0;
 tick();
 check('a target that leaves the area is dropped (back on stay)', all((c) => !c.targetId && c.staying), band().map((c) => [c.targetId, c.staying]));
-check('the NPC that chased it is put back on its post', moves.some(([id, v]) => id === post && Math.hypot(v.pos[0], v.pos[1]) < 200), moves);
+check('...and nobody is snapped back: an idle NPC inside the area stays where it is (Nat: "it rubber-bands them back")', moves.length === 0, moves);
 
 // ---- the leash: a target still inside, but the NPC past the edge plus 500, gives up and goes back -------------------------
 at(NEAR, 1400, 0);
@@ -91,9 +91,20 @@ put(post, 'pos', [2100, 0, 0]);  // 1500 + 500 + 100 from the centre
 moves.length = 0;
 tick();
 const leashed = companions.get(post);
-check('an NPC chased past the area\'s edge plus the leash drops its target', !leashed.targetId && leashed.staying, [leashed.targetId, leashed.staying]);
-check('...and is put back on its post', moves.some(([id, v]) => id === post && Math.hypot(v.pos[0], v.pos[1]) < 200), moves);
+check('an NPC chased past the area\'s edge plus the leash drops its target and walks back (follow), not a teleport', !leashed.targetId && !leashed.staying && moves.length === 0, [leashed.targetId, leashed.staying, moves]);
 check('...while the others inside keep fighting', band().filter((c) => c.id !== post).every((c) => c.targetId === NEAR));
+put(post, 'pos', [1300, 0, 0]);  // it walked back inside, and the player has gone
+at(NEAR, 4000, 0);
+tick();
+check('...and once inside the area again, with nobody to fight, it holds there (stay)', companions.get(post).staying && !companions.get(post).targetId, [companions.get(post).staying, companions.get(post).targetId]);
+// Stuck past the leash: only after 20 s is it put back on its post
+put(post, 'pos', [2100, 0, 0]); moves.length = 0;
+tick();
+check('(past the leash again: walking back)', !companions.get(post).staying && moves.length === 0);
+const realNow = Date.now; Date.now = () => realNow() + 21000;
+tick();
+Date.now = realNow;
+check('one still past the leash after 20 s is put back on its post (the only teleport)', moves.some(([id, v]) => id === post && Math.hypot(v.pos[0], v.pos[1]) < 200) && companions.get(post).staying, moves);
 
 // ---- the area stays where it was ordered, not where the GM walks ----------------------------------------------------------
 run('stay');
