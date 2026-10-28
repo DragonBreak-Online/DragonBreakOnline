@@ -17,9 +17,15 @@ const FIX = path.join(__dirname, 'fixtures', 'mod0422');
 let fails = 0, passes = 0;
 const ok = (c, what, got) => { if (c) passes++; else fails++; console.log(`${c ? 'ok  ' : 'FAIL'}  ${what}${c || got === undefined ? '' : '   ' + JSON.stringify(got).slice(0, 400)}`); };
 const clone = (o) => JSON.parse(JSON.stringify(o));
+// the module adds no handler (deploy-batch.sh hot-reload grep); these source checks need no fixtures, so they run before the skip
+const src = fs.readFileSync(MOD, 'utf8');
+ok(!/mp\.on\(|__dboHandlers *= |for \(const ev of \[/.test(src), 'no mp handler: the hot-reload grep finds nothing in the module');
+ok(/require\(MOD0422_JS\)/.test(fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8')), 'gamemode.js loads the module');
+ok(fs.readFileSync(path.join(SERVER, '.gitignore'), 'utf8').includes('mod0422-restore*.json'), 'the run, ledger and report files are gitignored');
+ok(/^tests\/fixtures\/mod0422\/$/m.test(fs.readFileSync(path.join(SERVER, '.gitignore'), 'utf8')), 'the fixtures are gitignored (the real plan names characters; the remote is public)');
 // The fixtures are the real plan and castle containers: they name characters, so they stay on the box (gitignored: the remote
 // is public). tools/mod0422/make_fixtures.py writes them; a checkout without them skips.
-if (!fs.existsSync(path.join(FIX, 'plan.json')) || !fs.existsSync(path.join(FIX, 'world.json'))) { require('./expect')('mod0422-restore', `this checkout has no ${FIX} (gitignored: run tools/mod0422/make_fixtures.py)`); console.log('SKIP  this checkout has no mod-0422 fixtures (the real plan names characters: gitignored)'); process.exit(0); }
+if (!fs.existsSync(path.join(FIX, 'plan.json')) || !fs.existsSync(path.join(FIX, 'world.json'))) { require('./expect')('mod0422-restore', `this checkout has no ${FIX} (gitignored: run tools/mod0422/make_fixtures.py)`); console.log('SKIP  this checkout has no mod-0422 fixtures (the real plan names characters: gitignored)'); console.log(`${passes} passed, ${fails} failed (source checks only)`); process.exit(fails ? 1 : 0); }
 const PLAN0 = JSON.parse(fs.readFileSync(path.join(FIX, 'plan.json'), 'utf8'));
 const WORLD = JSON.parse(fs.readFileSync(path.join(FIX, 'world.json'), 'utf8'));
 const { takeFromContainer, packLetters, same, letterId } = require(MOD);
@@ -128,7 +134,8 @@ const env = (props, opts) => {
 const tmp = fs.mkdtempSync(path.join(fs.existsSync('/dev/shm') ? '/dev/shm' : os.tmpdir(), 'mod0422-'));
 const files = (tag) => ({ run: path.join(tmp, `${tag}-run.json`), plan: path.join(tmp, `${tag}-plan.json`), ledger: path.join(tmp, `${tag}-ledger.json`), report: path.join(tmp, `${tag}-report.json`) });
 // The runs below choose the Count (pack, then bank) unless they say otherwise ("noGold": none chosen)
-const writeRun = (F, R, plan) => { fs.writeFileSync(F.plan, JSON.stringify(plan || PLAN0)); const r = Object.assign({ planFile: path.basename(F.plan), ledgerFile: F.ledger, reportFile: F.report }, R); if (r.noGold) delete r.noGold; else if (!r.goldOrder && r.mode !== 'undo') r.goldOrder = ['inventory', 'bank']; if (r.mode === 'apply' && r.newLedger === undefined) r.newLedger = true; fs.writeFileSync(F.run, JSON.stringify(r)); };
+// and say "newLedger" only on a tag's first apply: a later one runs as run-apply-stage2.json does (ledger there, no newLedger)
+const writeRun = (F, R, plan) => { fs.writeFileSync(F.plan, JSON.stringify(plan || PLAN0)); const r = Object.assign({ planFile: path.basename(F.plan), ledgerFile: F.ledger, reportFile: F.report }, R); if (r.noGold) delete r.noGold; else if (!r.goldOrder && r.mode !== 'undo') r.goldOrder = ['inventory', 'bank']; if (r.mode === 'apply' && r.newLedger === undefined && !fs.existsSync(r.ledgerFile)) r.newLedger = true; fs.writeFileSync(F.run, JSON.stringify(r)); };
 const report = (F) => JSON.parse(fs.readFileSync(F.report, 'utf8'));
 const ledger = (F) => JSON.parse(fs.readFileSync(F.ledger, 'utf8'));
 const inv = (props, id) => clone((props.get(id >>> 0).inventory || {}).entries || []);
@@ -489,6 +496,17 @@ const sameWorldContainers = (pr) => PLAN0.containers.every((c) => { const a = mu
   ok(!Lu.closed && Object.values(Lu.letters).some((l) => l.status === 'recalled') && E.sets.length === s1 && JSON.stringify([...pr.entries()]) === w1 && (report(G).refused || []).includes('undone'), 'undo not closed (a letter in conflict): a later apply is refused, no recalled letter sent again', [Lu.closed, E.sets.length - s1, report(G).refused]);
 }
 {
+  // an undo run again after a letter in conflict was put right: its goods go back into the containers, the pool is empty
+  const G = files('undo5'); const pr = mkWorld(WORLD.live, 3000, 0); const E = env(pr, { runFile: G.run });
+  writeRun(G, { mode: 'apply', stages: [1], confirm: PLAN0.confirm }); E.tick();
+  const m = pr.get(A.mike)['private.pigeons'].find((x) => String(x.id).startsWith(LID('mike'))); m.parcel.items.push({ baseId: 0x12345, count: 1 });
+  writeRun(G, { mode: 'undo', confirm: `undo-${PLAN0.confirm}` }); E.tick();
+  const open1 = !ledger(G).closed; m.parcel.items.pop();
+  writeRun(G, { mode: 'undo', confirm: `undo-${PLAN0.confirm}`, again: 1 }); E.tick();
+  const Lu = ledger(G);
+  ok(open1 && Lu.closed && m0422(pr, A.mike).length === 0 && sameWorldContainers(pr) && Object.keys(Lu.pool.plain).length === 0 && Object.keys(Lu.pool.uniques).length === 0 && goldIn(pr, A.count) === 3000, 'undo again after a conflict was put right: the letter recalled, its goods back in the containers, the pool empty', [open1, Lu.closed, Lu.pool]);
+}
+{
   // the generation guard: a gamemode.js reload without this module (a rollback) stops its timer; the run file is not read
   const G = files('gen'); const pr = mkWorld(WORLD.live, 3000, 0); const timers = new Map(); const keepTimers = globalThis.__dboTimers; globalThis.__dboTimers = timers;
   const myGen = () => {}; globalThis.__dboRunCommand = myGen;
@@ -503,12 +521,6 @@ const sameWorldContainers = (pr) => PLAN0.containers.every((c) => { const a = mu
   if (keepTimers === undefined) delete globalThis.__dboTimers; else globalThis.__dboTimers = keepTimers;
   delete globalThis.__dboRunCommand;
 }
-// the module adds no handler (deploy-batch.sh hot-reload grep)
-const src = fs.readFileSync(MOD, 'utf8');
-ok(!/mp\.on\(|__dboHandlers *= |for \(const ev of \[/.test(src), 'no mp handler: the hot-reload grep finds nothing in the module');
-ok(/require\(MOD0422_JS\)/.test(fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8')), 'gamemode.js loads the module');
-ok(fs.readFileSync(path.join(SERVER, '.gitignore'), 'utf8').includes('mod0422-restore*.json'), 'the run, ledger and report files are gitignored');
-ok(/^tests\/fixtures\/mod0422\/$/m.test(fs.readFileSync(path.join(SERVER, '.gitignore'), 'utf8')), 'the fixtures are gitignored (the real plan names characters; the remote is public)');
 if (process.env.M0422_KEEP) console.log(`kept ${tmp}`); else try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) { /* tmp */ }
 console.log(`${passes} passed, ${fails} failed`);
 process.exit(fails ? 1 : 0);

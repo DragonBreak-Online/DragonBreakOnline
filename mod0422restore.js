@@ -573,17 +573,22 @@ module.exports = (api) => {
     }
     // 2. the containers: what each take step took, as far as the ledger still holds it
     for (const c of plan.containers) {
-      const st = L.steps[`take:${c.ref}`]; const sid = `undo:take:${c.ref}`; const cr = { ref: c.ref, label: c.label };
+      const st = L.steps[`take:${c.ref}`]; const sid0 = `undo:take:${c.ref}`; const cr = { ref: c.ref, label: c.label };
       rep.containers.push(cr);
-      if (L.steps[sid] && L.steps[sid].status === 'done') { cr.status = 'put back before'; continue; }
       if (!st || st.status !== 'done') { cr.status = `nothing to put back (step ${st ? st.status : 'never ran'})`; continue; }
+      // an earlier undo put back what the ledger held then: this one puts back the rest (a letter recalled since), as its own step
+      const before = Object.keys(L.steps).filter((k) => (k === sid0 || k.startsWith(`${sid0}:`)) && L.steps[k].status === 'done');
+      let sid = sid0; for (let i = 2; L.steps[sid] && L.steps[sid].status === 'done'; i++) sid = `${sid0}:${i}`;
+      const gave = {}; for (const k of before) for (const [h, n] of Object.entries(L.steps[k].plain || {})) gave[h] = (gave[h] || 0) + (Number(n) || 0);
       const plain = {}; const uniques = []; const missing = [];
-      for (const [h, n] of Object.entries((st.taken && st.taken.plain) || {})) {
-        const k = Math.min(Number(n) || 0, Number(L.pool.plain[h]) || 0);
+      for (const [h, n0] of Object.entries((st.taken && st.taken.plain) || {})) {
+        const n = (Number(n0) || 0) - (gave[h] || 0); if (!(n > 0)) continue;
+        const k = Math.min(n, Number(L.pool.plain[h]) || 0);
         if (k > 0) { plain[h] = k; L.pool.plain[h] -= k; if (!L.pool.plain[h]) delete L.pool.plain[h]; }
         if (k < n) missing.push({ base: h, want: n, back: k });
       }
       for (const uid of Object.keys((st.taken && st.taken.uniques) || {})) { if (L.pool.uniques[uid]) { uniques.push(L.pool.uniques[uid]); delete L.pool.uniques[uid]; } else missing.push({ uid }); }
+      if (before.length && !Object.keys(plain).length && !uniques.length) { cr.status = 'put back before'; continue; }
       Object.assign(cr, { items: Object.values(plain).reduce((s, n) => s + n, 0), uniques: uniques.length, missing });
       if (preview) { cr.status = 'would put back'; continue; }
       const ref = idOfDesc(c.desc);
@@ -618,7 +623,7 @@ module.exports = (api) => {
     }
     const leftGold = Number(L.pool.gold) || 0;
     rep.dropped.mintedGold = Math.min(leftGold, mintN);
-    const allBack = rep.containers.every((c) => /put back|nothing to put back/.test(String(c.status))) && rep.gold.every((g) => /returned|nothing in the ledger/.test(String(g.status))) && rep.letters.every((l) => /recall|collected|never in a mailbox/.test(String(l.status)));
+    const allBack = !Object.keys(L.pool.uniques).length && !Object.values(L.pool.plain).some((n) => Number(n) > 0) && rep.containers.every((c) => /put back|nothing to put back/.test(String(c.status))) && rep.gold.every((g) => /returned|nothing in the ledger/.test(String(g.status))) && rep.letters.every((l) => /recall|collected|never in a mailbox/.test(String(l.status)));
     if (!preview && allBack) {
       L.pool.gold = Math.max(0, leftGold - rep.dropped.mintedGold);
       L.closed = iso(); save(); note(`undo done: ledger closed (${rep.collected.length} letters already collected, left with their readers: staff decision)`);
