@@ -300,6 +300,7 @@ function buildConfigOverview() {
     announcements: '📢 Server Announcements',
     world_time: '🕒 World Clock & Date Control',
     audit_stats: '📊 Staff Audit & Diagnostics',
+    ask: 'Ask Dragonbaron (AI)',
     config: '⚙️ Permission & Role Configuration'
   }
 

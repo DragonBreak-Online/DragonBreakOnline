@@ -3,7 +3,7 @@
 const fs = require('fs')
 const path = require('path')
 
-const PERMS_FILE = path.resolve(__dirname, '../../data/dragonbaron-permissions.json')
+const PERMS_FILE = process.env.DRAGONBARON_PERMS_FILE || path.resolve(__dirname, '../../data/dragonbaron-permissions.json')
 
 // Staff Roles in DragonBreak Online Guild
 const ROLES = Object.freeze({
@@ -75,6 +75,12 @@ const DEFAULT_PERMISSIONS = Object.freeze({
     description: 'View 7-day staff command counts, online players, and server performance (/staffstats, /players, /load, /whoami)',
     allowedRoles: [ROLES.OWNER, ROLES.DEV, ROLES.LEAD_GM, ROLES.GM]
   },
+  ask: {
+    name: 'ask',
+    label: 'Ask Dragonbaron (AI)',
+    description: 'Ask the local AI about server data (read-only, private answers, runs nothing)',
+    allowedRoles: [ROLES.OWNER, ROLES.DEV, ROLES.LEAD_GM, ROLES.GM]
+  },
   config: {
     name: 'config',
     label: 'Permission & Role Configuration',
@@ -83,6 +89,9 @@ const DEFAULT_PERMISSIONS = Object.freeze({
     superAdminOnly: true
   }
 })
+
+// Nodes that grant their own command only, never the control panel
+const PANEL_EXEMPT = new Set(['ask'])
 
 let cachedPermissions = null
 
@@ -139,7 +148,8 @@ function canAccessPanel(memberRoles) {
   const perms = loadPermissions()
   const roleList = (memberRoles || []).map(String)
   if (roleList.includes(ROLES.OWNER) || roleList.includes(ROLES.DEV)) return true
-  for (const node of Object.values(perms)) {
+  for (const [key, node] of Object.entries(perms)) {
+    if (PANEL_EXEMPT.has(key)) continue
     if ((node.allowedRoles || []).some(r => roleList.includes(r))) return true
   }
   return false
@@ -163,6 +173,15 @@ function resetPermissionRoles(nodeName) {
   return savePermissions(perms)
 }
 
+// The highest staff rank held, for what /dragonbaron ask may read: owner, dev, leadgm, gm, trialgm, or null
+function askTier(memberRoles) {
+  const held = new Set((memberRoles || []).map(String))
+  for (const [tier, role] of [['owner', ROLES.OWNER], ['dev', ROLES.DEV], ['leadgm', ROLES.LEAD_GM], ['gm', ROLES.GM], ['trialgm', ROLES.TRIAL_GM]]) {
+    if (held.has(role)) return tier
+  }
+  return null
+}
+
 function resetAll() {
   const fresh = JSON.parse(JSON.stringify(DEFAULT_PERMISSIONS))
   return savePermissions(fresh)
@@ -178,5 +197,8 @@ module.exports = {
   canConfigure,
   setPermissionRoles,
   resetPermissionRoles,
-  resetAll
+  resetAll,
+  askTier,
+  PANEL_EXEMPT,
+  _resetCache: () => { cachedPermissions = null }
 }
