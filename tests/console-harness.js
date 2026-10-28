@@ -1060,6 +1060,34 @@ reset();
   [m, h] = typed('fixloc', 'anna hubbard');
   check('7h. typed "/fixloc anna hubbard" (the full name) moves Anna Hubbard', m === 'Anna Hubbard #AHB1@hub', [m, h]);
   check('7h. other commands keep their lookup: findByName still takes a unique prefix ("Lyd")', G.findByName('Lyd') === A.lydia);
+  // C's rows (set 4): the exactly named character OFFLINE beside an online one whose name it begins, and a masked exact name
+  const annaOff = actor(0xff000f32, { name: 'Anna', tag: 'AN01', profile: 132 });
+  const bobH = actor(0xff000f33, { name: 'Bob Hubert', tag: 'BHB2', profile: 133, online: true });
+  const ivarOff = actor(0xff000f34, { name: 'Ivar', tag: 'IVR2', profile: 134 });
+  const ivarT = actor(0xff000f35, { name: 'Ivar Templeton', tag: 'IVT2', profile: 135, online: true });
+  const masky = actor(0xff000f36, { name: 'Masky', tag: 'MSK1', profile: 136, online: true });
+  setOnline(A.bob, false);
+  ids.push(annaOff, bobH, A.bob, ivarOff, ivarT, masky);
+  [m, h] = remote('/unstuck Anna hub ticket:7');
+  check('7h. C: the form "/unstuck Anna hub ticket:7" (Anna offline, Anna Hubbard online) moves nobody and asks for the #TAG', m === '' && /^Cannot move Anna #AN01: they are offline, and from the console an offline character is named by its #TAG/.test(h), [m, h]);
+  [m, h] = typed('unstuck', 'Anna hub ticket:7');
+  check('7h. C: ...typed in game it moves Anna, never Anna Hubbard', m === 'Anna #AN01@hub', [m, h]);
+  [m, h] = remote('/unstuck Bob hub ticket:7');
+  check('7h. C: the form "/unstuck Bob hub ticket:7" (Bob offline, Bob Hubert online) asks for the #TAG', m === '' && /^Cannot move Bob #8KWH: they are offline/.test(h), [m, h]);
+  [m, h] = typed('unstuck', 'Bob hub ticket:7');
+  check('7h. C: ...typed it moves Bob, never Bob Hubert', m === 'Bob #8KWH@hub', [m, h]);
+  [m, h] = typed('unstuck', 'Ivar Temple hub');
+  check('7h. C: typed "/unstuck Ivar Temple hub" (Ivar offline, Ivar Templeton online) moves Ivar, never Ivar Templeton', m === 'Ivar #IVR2@temple', [m, h]);
+  [m, h] = remote('/unstuck Ivar Temple hub');
+  check('7h. C: ...from the console it asks for the #TAG', m === '' && /^Cannot move Ivar #IVR2: they are offline/.test(h), [m, h]);
+  globalThis.__dboDisguised = (x) => (x >>> 0) === masky;
+  [m, h] = typed('unstuck', 'Masky hub');
+  check('7h. C: a masked character\'s exact name finds nobody: refused', m === '' && h === 'Cannot move Masky: no character is called that; use their full name or #TAG.', [m, h]);
+  [m, h] = typed('unstuck', '#MSK1 hub');
+  check('7h. C: ...their #TAG still moves them', m === 'Masky #MSK1@hub', [m, h]);
+  delete globalThis.__dboDisguised;
+  setOnline(A.bob, true); delete store.get(A.bob).locationalData;
+  for (const x of [annaOff, bobH, ivarOff, ivarT, masky]) store.delete(x);
   store.delete(annaH); delete mp.findFormsByPropertyValue;
 }
 
