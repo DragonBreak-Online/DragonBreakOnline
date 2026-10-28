@@ -42,7 +42,7 @@ module.exports = (api) => {
   // far the panel looks for targets and the GM's raiders; onLogout, what a GM's followers do when the GM leaves (dismiss, or
   // settle the calm ones); presetsMax, saved bands per server
   const C = Object.assign({ maxBand: 25, maxRaise: 10, ringRadius: 160, bodySeconds: 300, chargeRange: 4096, avoidGmHost: true,
-    viewRadius: 4200, onLogout: 'dismiss', presetsMax: 40, guardRadius: 1500, guardLeash: 500, guardWalkSeconds: 20 }, cfg.warband || {});
+    viewRadius: 4200, onLogout: 'dismiss', presetsMax: 40, guardRadius: 1500, guardLeash: 500, guardWalkSeconds: 20, patrolResendSeconds: 30 }, cfg.warband || {});
   // Every answer is said in chat as before, and kept as the last line the panel shows (W3)
   const lastSaid = globalThis.__dboWarbandSaid instanceof Map ? globalThis.__dboWarbandSaid : (globalThis.__dboWarbandSaid = new Map());
   const tell = (a, text) => { personal(a, text); lastSaid.set(a >>> 0, { text: String(text), at: Date.now() }); };
@@ -355,11 +355,22 @@ module.exports = (api) => {
   const guardFoes = (g) => onlineActors().filter((t) => profileOf(t) >= 0 && profileOf(t) !== g.profile && !isAdmin(t) && alive(t)
     && !(typeof globalThis.__dboIsDowned === 'function' && globalThis.__dboIsDowned(t)) && whereOf(t) === g.where
     && (() => { const q = posOf(t); return !!q && dist(q, g.centre) <= g.radius; })());
+  // The GM's client walks a staying member with nothing to fight about the area (companionPatrol.ts, Nat 28 Oct: "rather than
+  // patrol around"): companionPatrol { centre, radius, ids }, ids [] when the order ends. Sent with the order and every
+  // patrolResendSeconds after, for a client that reconnected; a client without the handler ignores the packet
+  const sendPatrol = (gm, g) => {
+    if (typeof api.sendPacket !== 'function') return;
+    const ids = g ? band(gm).map((c) => c.id >>> 0) : [];
+    try { api.sendPacket(gm, g ? { customPacketType: 'companionPatrol', centre: g.centre, radius: g.radius, ids } : { customPacketType: 'companionPatrol', ids }); } catch (e) { log('warband: patrol packet failed', e.message); }
+    if (g) g.patrolSentAt = Date.now();
+  };
+  const endGuard = (gm) => { if (S.guards.delete(gm >>> 0)) sendPatrol(gm, null); };
   const guardPass = (gm) => {
     const g = S.guards.get(gm >>> 0);
     if (!g) return 0;
     const mine = band(gm);
-    if (!mine.length) { S.guards.delete(gm >>> 0); return 0; }
+    if (!mine.length) { endGuard(gm); return 0; }
+    if (Date.now() - (g.patrolSentAt || 0) >= C.patrolResendSeconds * 1000) sendPatrol(gm, g);
     const foes = guardFoes(g).sort((x, y) => dist(posOf(x), g.centre) - dist(posOf(y), g.centre));
     let n = 0;
     for (const c of mine) {
@@ -543,7 +554,7 @@ module.exports = (api) => {
     if (cmd === 'defend' || cmd === 'guard') return guardCmd(a, rest);
     if (cmd === 'follow' || cmd === 'stay') {
       S.charging.delete(a >>> 0);
-      S.guards.delete(a >>> 0);
+      endGuard(a);
       S.stance.set(a >>> 0, cmd);
       for (const c of mine) comp()[cmd](c.id);
       return tell(a, mine.length ? `Your warband of ${mine.length} ${cmd === 'stay' ? 'holds its ground' : 'follows you'}.` : 'You lead no warband.');

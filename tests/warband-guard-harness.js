@@ -33,7 +33,7 @@ globalThis.__dboCompanions = {
 };
 globalThis.__dboIsDowned = (a) => a === DOWNED;
 const timers = new Map();
-const said = [], commands = {};
+const said = [], commands = {}, packets = [];
 let online = [GM, STAFF, NEAR, FAR, GMALT, DOWNED, ELSEWHERE];
 require(MODULE)({
   mp: {
@@ -44,6 +44,7 @@ require(MODULE)({
   },
   log: () => {}, personal: (a, t) => said.push([a, t]), audit: () => {}, who: (a) => `#${a.toString(16)}`, isAdmin: (a) => a === GM || a === STAFF,
   registerChatCommand: (n, fn) => { commands[n] = fn; }, findByName: () => 0, cfg: {}, onUi: () => {},
+  sendPacket: (a, pk) => packets.push([a >>> 0, pk]),
   onlineActors: () => online.slice(), every: (n, ms, fn) => timers.set(n, fn), profileOf: (a) => (PROFILE[a >>> 0] !== undefined ? PROFILE[a >>> 0] : -1),
 });
 
@@ -128,6 +129,27 @@ tick();
 check('/warband stay ends defending: no attack on the next pass', all((c) => !c.targetId), band().map((c) => c.targetId));
 run('defend'); run('follow'); tick();
 check('/warband follow ends it too', all((c) => !c.targetId && !c.staying));
+// ---- the patrol: defend tells the GM's client the area, and the end of the order (client companionPatrol.ts) ----------------
+{
+  const patrols = () => packets.filter(([a, pk]) => a === GM && pk.customPacketType === 'companionPatrol').map(([, pk]) => pk);
+  run('stay'); packets.length = 0;
+  at(GM, 500, 600);
+  run('defend 1000');
+  const pk = patrols().pop();
+  const ids = band().map((c) => c.id >>> 0).sort().join();
+  check('defend sends the GM companionPatrol: the area around the GM, its radius and the band', !!pk && pk.centre.join() === '500,600,0' && pk.radius === 1000 && pk.ids.slice().sort().join() === ids, pk);
+  packets.length = 0; tick();
+  check('...not again on every pass', patrols().length === 0, patrols());
+  const realNow = Date.now; Date.now = () => realNow() + 31000; tick(); Date.now = realNow;
+  check('...but again after 30 s, for a client that reconnected', patrols().length === 1 && patrols()[0].ids.length === 3, patrols());
+  packets.length = 0; run('stay');
+  check('stay ends the patrol: companionPatrol with ids []', patrols().length === 1 && patrols()[0].ids.length === 0 && !patrols()[0].centre, patrols());
+  packets.length = 0; run('stay');
+  check('...and a stay with no defend sends nothing', patrols().length === 0, patrols());
+  run('defend'); packets.length = 0; run('follow');
+  check('follow ends it too', patrols().length === 1 && patrols()[0].ids.length === 0, patrols());
+  at(GM, 0, 0);
+}
 check('help names defend', /defend \[radius\]/.test(run('nonsense')));
 
 process.chdir(home);
