@@ -175,7 +175,8 @@ module.exports = (api) => {
       const ok = giveItem(tgt.actor, it.id, count);
       if (!ok) return personal(caller, `Failed to give ${it.name} to ${tgt.name}.`);
       personal(tgt.actor, `Staff gave you: ${it.name} x${count}.`);
-      audit(`STAFF ${who(caller)} gave ${count}x ${it.name} (0x${it.id.toString(16)}) to ${tgt.name}${reason ? ` (${reason})` : ''}`);
+      // who(): the line reaches the target's player log as well; the ticket's text is cut there (playerlog-rules.js STAFF)
+      audit(`STAFF ${who(caller)} gave ${count}x ${it.name} (0x${it.id.toString(16)}) to ${who(tgt.actor)}${reason ? ` (${reason})` : ''}`);
       return personal(caller, `Gave ${it.name} x${count} to ${tgt.name}.`);
     } else {
       try {
@@ -191,7 +192,7 @@ module.exports = (api) => {
           at: Date.now()
         };
         fs.writeFileSync(path.join(inboxDir, `${giftId}.json`), JSON.stringify(giftPayload, null, 2));
-        audit(`STAFF ${who(caller)} queued gift ${count}x ${it.name} for offline ${tgt.name}${reason ? ` (${reason})` : ''}`);
+        audit(`STAFF ${who(caller)} queued gift ${count}x ${it.name} for offline ${who(tgt.actor)}${reason ? ` (${reason})` : ''}`);
         return personal(caller, `Player is offline. Queued ${it.name} x${count} to be delivered on their next login.`);
       } catch (err) {
         return personal(caller, `Failed to queue offline gift: ${err.message}`);
@@ -247,7 +248,7 @@ module.exports = (api) => {
       if ((it.id >>> 0) === 0x0000000f && typeof api.goldChanged === 'function') api.goldChanged(tgt.actor);
 
       personal(tgt.actor, `Staff removed from your inventory: ${it.name} x${taken}.`);
-      audit(`STAFF ${who(caller)} took ${taken}x ${it.name} from ${tgt.name}${reason ? ` (${reason})` : ''}`);
+      audit(`STAFF ${who(caller)} took ${taken}x ${it.name} from ${who(tgt.actor)}${reason ? ` (${reason})` : ''}`);
       return personal(caller, `Removed ${it.name} x${taken} from ${tgt.name}'s inventory.`);
     } catch (e) {
       return personal(caller, `Failed to take item: ${e.message}`);
@@ -291,7 +292,7 @@ module.exports = (api) => {
       }
 
       personal(tgt.actor, `Staff granted you the spell: ${sp.name}.`);
-      audit(`STAFF ${who(caller)} granted spell ${sp.name} (0x${sp.id.toString(16)}) to ${tgt.name}${reason ? ` (${reason})` : ''}`);
+      audit(`STAFF ${who(caller)} granted spell ${sp.name} (0x${sp.id.toString(16)}) to ${who(tgt.actor)}${reason ? ` (${reason})` : ''}`);
       return personal(caller, `Granted spell '${sp.name}' to ${tgt.name}.`);
     } catch (e) {
       return personal(caller, `Failed to grant spell: ${e.message}`);
@@ -361,7 +362,7 @@ module.exports = (api) => {
       }
 
       personal(tgt.actor, `Staff removed the spell: ${sp.name}.`);
-      audit(`STAFF ${who(caller)} removed spell ${sp.name} (0x${sp.id.toString(16)}) from ${tgt.name}${reason ? ` (${reason})` : ''}`);
+      audit(`STAFF ${who(caller)} removed spell ${sp.name} (0x${sp.id.toString(16)}) from ${who(tgt.actor)}${reason ? ` (${reason})` : ''}`);
       return personal(caller, `Removed spell '${sp.name}' from ${tgt.name}.`);
     } catch (e) {
       return personal(caller, `Failed to remove spell: ${e.message}`);

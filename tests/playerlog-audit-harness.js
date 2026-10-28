@@ -448,6 +448,60 @@ ok(out.length === 0, '...a line the cut cannot read (a name of seven words) keep
     || actOf(`STAFFREF ${ROWAN} citizenship on ${SELENE} under ${ref}`, 'STAFFREF', 1) !== `citizenship on Selene #K2QX under ${keep ? ref : 'a ticket'}`);
   ok(refs.length === 3 && !refs.some(([r]) => r.includes('${')) && bad.length === 0, `...each reference staffguard.js writes (${refs.length} of 3) passes the cut: a call word for word, a ticket's id never`, bad);
 }
+// STAFF <staff> gave|queued gift|took <n>x <item> ..., granted|removed spell <spell> (0x<id>) to|from <target> (staffitemspells.js,
+// Jake's Dragon Baron tools): the ticket's text is what staff typed after ticket: or call:, so it goes and "a ticket" stands
+// for it (Jake, 28 Oct: "Cut ticket text"); who, the count, the item or spell and whom stay, the target in their post
+got = actOf(`STAFF ${ROWAN} gave 2x Iron Sword (0x12eb7) to ${SELENE} (ticket:${CANARY}-griefer.alt/of#K2QX)`, 'STAFF', 1);
+ok(got === 'gave 2x Iron Sword (0x12eb7) to Selene #K2QX (a ticket)', 'STAFF gave: a ticket\'s typed text is cut ("a ticket" stands for it); who, the count, the item and whom stay, the target in their post', got);
+got = actOf(`STAFF ${ROWAN} took 1x Iron Sword from ${SELENE} (ticket:<@1>${CANARY} call:https://evil.example/${CANARY})`, 'STAFF', 1);
+ok(got === 'took 1x Iron Sword from Selene #K2QX (a ticket)', '...a mention and a URL in the ticket go with it', got);
+got = actOf(`STAFF ${ROWAN} granted spell Flames (0x12fcd) to ${SELENE} (ticket:${CANARY} Dar #U6T6 (profile 4, <@44>))`, 'STAFF', 1);
+ok(got === 'granted spell Flames (0x12fcd) to Selene #K2QX (a ticket)', '...another character named in it goes too, and is no party', got);
+got = actOf(`STAFF ${ROWAN} removed spell Flames (0x12fcd) from ${SELENE}`, 'STAFF', 1);
+ok(got === 'removed spell Flames (0x12fcd) from Selene #K2QX', '...a line without a ticket is kept whole', got);
+got = actOf(`STAFF ${ROWAN} queued gift 3x Iron Sword for offline ${SELENE} (ticket:${CANARY}) ${CANARY} Dar #U6T6 (profile 4, <@44>)`, 'STAFF', 1);
+ok(got === 'queued gift 3x Iron Sword for offline Selene #K2QX (a ticket)', '...everything after a ticket opens goes with it (a character in it is no party)', got);
+got = actOf(`STAFF ${ROWAN} queued gift 3x Iron Sword for offline ${SELENE} (${CANARY} Dar #U6T6 (profile 4, <@44>))`, 'STAFF', 1);
+ok(got === 'queued gift 3x Iron Sword for offline Selene #K2QX', '...an end of any other shape keeps the head only (a character in it is no party)', got);
+out = run(`STAFF ${ROWAN} queued gift 3x Iron Sword for offline ${SELENE} ${CANARY} Dar #U6T6 (profile 4, <@44>)`);
+ok(out.length === 0, '...and words straight after the target leave a line the cut cannot read, which keeps nothing', out);
+out = run(`STAFF A B C D E F G #PGDB (profile 1, <@337337773973569537>) gave 1x Iron Sword (0x12eb7) to ${SELENE} (ticket:${CANARY})`);
+ok(out.length === 0, '...a line of these shapes the cut cannot read (a name of seven words) keeps nothing', out);
+got = actOf(`STAFF ${ROWAN}: Discord roles now give developer (was gm); logged out so it takes effect`, 'STAFF', 0);
+ok(got === ': Discord roles now give developer (was gm); logged out so it takes effect' || /Discord roles now give developer \(was gm\); logged out so it takes effect$/.test(got), '...and the other STAFF lines are not cut', got);
+// The real commands, run as the Dragon Baron sends them, with a ticket in each: the source line keeps the ticket for the staff
+// audit channels, the player log cuts it, and the player is told nothing of it
+{
+  const RW = CHARS[0].a, SE = CHARS[1].a;
+  const WHO = { [RW]: ROWAN, [SE]: SELENE }, lines = [], told = [], cmds = {};
+  let selOnline = true;
+  const inv = { entries: [{ baseId: 0x12eb7, count: 5 }] };
+  const REC = { [0x12eb7]: 'Iron Sword', [0x12fcd]: 'Flames' };
+  const smp = { get: (a, k) => (k === 'inventory' ? inv : undefined), set: () => {}, getDescFromId: (id) => (id >>> 0).toString(16), getIdFromDesc: () => 0,
+    lookupEspmRecordById: (id) => (REC[id >>> 0] ? { record: { name: REC[id >>> 0] } } : null), callPapyrusFunction: () => null };
+  const scratch = fs.mkdtempSync(path.join(fs.existsSync('/dev/shm') ? '/dev/shm' : require('os').tmpdir(), 'plog-itemspells-'));
+  const cwd = process.cwd();
+  try {
+    process.chdir(scratch);
+    const SIS = path.join(ROOT, 'staffitemspells.js');
+    delete require.cache[SIS];
+    require(SIS)({ mp: smp, log: () => {}, personal: (a, t) => told.push([a >>> 0, t]), audit: (t) => lines.push(t), who: (a) => WHO[a >>> 0] || '?',
+      display: (a) => ((a >>> 0) === SE ? 'Selene #K2QX' : 'Rowan #PGDB'), nameOf: (a) => ((a >>> 0) === SE ? 'Selene' : 'Rowan'), tagOf: (a) => ((a >>> 0) === SE ? 'K2QX' : 'PGDB'),
+      profileOf: (a) => ((a >>> 0) === SE ? 2 : 1), onlineActors: () => (selOnline ? [RW, SE] : [RW]), isLeadStaff: () => true, isAdmin: () => true, giveItem: () => true,
+      registerChatCommand: (n, f) => { cmds[n] = f; }, officialTarget: (q) => (/k2qx/i.test(q) ? { actor: SE, online: selOnline, label: 'Selene #K2QX', pid: 2 } : null) });
+    cmds.giveitem(RW, `#K2QX 0x12eb7 2 ticket:${CANARY}-free`);
+    selOnline = false; cmds.giveitem(RW, `#K2QX 0x12eb7 3 ticket:<@1>${CANARY}`); selOnline = true;
+    cmds.takeitem(RW, `#K2QX 0x12eb7 1 ticket:https://evil.example/${CANARY}`);
+    cmds.givespell(RW, `#K2QX 0x12fcd call:Dar#U6T6${CANARY}`);
+    cmds.removespell(RW, `#K2QX 0x12fcd ticket:${CANARY} call:${CANARY}`);
+  } finally { process.chdir(cwd); fs.rmSync(scratch, { recursive: true, force: true }); }
+  const want = ['gave 2x Iron Sword (0x12eb7) to Selene #K2QX (a ticket)', 'queued gift 3x Iron Sword for offline Selene #K2QX (a ticket)',
+    'took 1x Iron Sword from Selene #K2QX (a ticket)', 'granted spell Flames (0x12fcd) to Selene #K2QX (a ticket)', 'removed spell Flames (0x12fcd) from Selene #K2QX (a ticket)'];
+  ok(lines.length === 5 && lines.every((l) => l.includes(CANARY) && l.includes(SELENE)), 'staffitemspells.js: each of its five lines names the target with who() and keeps the ticket whole (the staff audit channels see it)', lines);
+  const gotAll = lines.map((l) => actOf(l, 'STAFF', 1));
+  ok(JSON.stringify(gotAll) === JSON.stringify(want), '...the player log has each in the staff member\'s and the target\'s posts, the ticket as "a ticket" (the offline gift too)', gotAll);
+  ok(told.some(([a]) => a === SE) && !told.some(([a, t]) => a === SE && (t.includes(CANARY) || /ticket|call:/i.test(t))), '...and the player is told what happened, never the ticket', told.filter(([a]) => a === SE));
+}
 // STAFFGUARD <staff> used a staff tool (<kind>) on the staff account of <target>, STAFFCHAR <staff> marked|unmarked <target> as
 // a staff character (staffguard.js): identities and the code's own words; the staff member acts, the other is the target
 got = actOf(`STAFFGUARD ${ROWAN} used a staff tool (skills) on the staff account of ${SELENE}`, 'STAFFGUARD', 1);

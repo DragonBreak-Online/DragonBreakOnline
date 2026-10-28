@@ -552,10 +552,26 @@ AUDIT_VERBS.CITIZEN.cut = (text, raw) => {
 // enchantment's name, form id, editor id and effects stay: the end of the line after its last ": " (record names and
 // numbers, never a colon or a bracket), and only when the end of the line is not lost, so a name with a colon, a bracket, a
 // fake end or a quote in it never passes. With no such end only who enchanted whose piece is kept; a line the cut cannot
-// read keeps nothing. Other STAFF lines are not cut
+// read keeps nothing.
+// staffitemspells.js (Jake's Dragon Baron tools, 28 Oct): STAFF <staff> gave <n>x <item> (0x<id>) to <target>, queued gift <n>x
+// <item> for offline <target>, took <n>x <item> from <target>, granted spell <spell> (0x<id>) to <target> and removed spell
+// <spell> (0x<id>) from <target>, each ending " (<ticket:…|call:…>…)" when the command carried one. The ticket's text is what
+// staff typed after ticket: or call: (never checked), so it goes and "a ticket" stands for it, as in STAFFREF (Jake, 28 Oct:
+// "Cut ticket text"); the staff audit channels keep the line whole. Who, the count, the item or spell (a record name, or the
+// id typed) and whom stay, the target in their post. Any other end, or a lost one, keeps the head only; a line of these
+// shapes the cut cannot read keeps nothing. Other STAFF lines are not cut
+const ITEMSPELL_OPEN = /^STAFF .{1,200}? (?:gave \d{1,9}x |queued gift \d{1,9}x |took \d{1,9}x |granted spell |removed spell )/;
+const ITEMSPELL_HEAD = new RegExp(`^(STAFF ${WHO_RX} (?:gave \\d{1,9}x .{1,120}? \\(0x[0-9a-f]{1,8}\\) to|queued gift \\d{1,9}x .{1,120}? for offline|took \\d{1,9}x .{1,120}? from|granted spell .{1,120}? \\(0x[0-9a-f]{1,8}\\) to|removed spell .{1,120}? \\(0x[0-9a-f]{1,8}\\) from) ${WHO_RX})(?= \\(|$)`);
+const ITEMSPELL_REF = /^ \((?:ticket|call):[\s\S]*\)$/i;
 const ENCHANT_HEAD = new RegExp(`^(STAFF ENCHANT ${WHO_RX} enchanted (?:their own|${WHO_RX}'s)) `);
 const ENCHANT_END = /: ([A-Za-z0-9 ]{1,80} \[[0-9a-f]{1,8} [A-Za-z0-9_]{1,100}\](?: [A-Za-z0-9 .,-]{0,300})?)$/;
 AUDIT_VERBS.STAFF.cut = (text, raw) => {
+  if (ITEMSPELL_OPEN.test(text)) {
+    const h = text.match(ITEMSPELL_HEAD);
+    if (!h) return 'STAFF';
+    const rest = text.slice(h[0].length);
+    return rest && !endLost(raw) && ITEMSPELL_REF.test(rest) ? `${h[1]} (a ticket)` : h[1];
+  }
   if (!text.startsWith('STAFF ENCHANT ')) return text;
   const h = text.match(ENCHANT_HEAD);
   if (!h) return 'STAFF ENCHANT';
@@ -604,6 +620,8 @@ AUDIT_VERBS.STAFFREF.cut = (text, raw) => {
   return e ? `${h[1]} under ${e[1] || 'a ticket'}${e[2] || ''}` : h[1];
 };
 AUDIT_VERBS.STAFFREF.roles = R_BY([[/ on $/, 'target']]);
+// staffitemspells.js: whom a staff member gave to, took from or taught (the STAFF cut above)
+AUDIT_VERBS.STAFF.roles = R_BY([[/ (?:to|from|for offline) $/, 'target']]);
 AUDIT_VERBS.STAFFGUARD.roles = R_BY([[/ the staff account of $/, 'target']]);
 AUDIT_VERBS.STAFFCHAR.roles = R_BY([[/ (?:marked|unmarked) $/, 'target']]);
 // Duels: display() names in the reasons ("Rowan #PGDB yielded"); the one beaten, killed or challenged is the target
@@ -1955,6 +1973,11 @@ sprstrip.js SPRSTRIP a7b3a299 parsed
 sprstrip.js SPRSTRIP d281443a parsed
 sprstrip.js SPRSTRIP 785ed462 parsed
 staffenchant.js STAFF 9a94a0c4 clean
+staffitemspells.js STAFF 899023ba clean
+staffitemspells.js STAFF a2632566 clean
+staffitemspells.js STAFF fb0bc2f8 clean
+staffitemspells.js STAFF bc1fa213 clean
+staffitemspells.js STAFF 949ee421 clean
 staffguard.js STAFFREF 793dd536 clean
 staffguard.js STAFFGUARD 486826c9 clean
 staffguard.js STAFFCHAR 25cceb6f clean
