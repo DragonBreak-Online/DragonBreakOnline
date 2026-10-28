@@ -9689,6 +9689,14 @@ try {
   require(STAFFITEMSPELLS_JS)({ mp, log, personal, audit, who, display, nameOf, tagOf, profileOf, onlineActors, isLeadStaff, isAdmin, giveItem, registerChatCommand, officialTarget });
 } catch (e) { log('staffitemspells.js failed to load:', e.stack || e.message); }
 
+// ---- ticket mod-0422: a one-shot restore of a player's goods from the Bruma Castle containers (server\mod0422restore.js;
+// Jake, 28 Oct). Idle unless mod0422-restore.json is in this folder; after post.js, supernatural.js and bank.js ----
+try {
+  const MOD0422_JS = path.resolve('mod0422restore.js');
+  delete require.cache[MOD0422_JS];
+  require(MOD0422_JS)({ mp, log, audit, personal, onlineActors, every, stopTimer, lettersOf, saveLetters, sendMailState, takeGold, goldOf, GOLD_BASE });
+} catch (e) { stopTimer('mod0422Restore'); log('mod0422restore.js failed to load:', e.stack || e.message); }
+
 // ---- remote staff console (server\console.js): after every module that registers commands (the player log below registers none)
 // Jake, 13 Oct: admins run in-game staff commands from the website dashboard or Discord. The backend drops signed requests
 // into /run/dragonbreak-console; console.js checks everything again and runs each through handleLine, the same gate as typed

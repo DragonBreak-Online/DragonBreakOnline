@@ -147,6 +147,7 @@ thalmor-intel.json.tmp
 sprstrip-state.json
 gearstrip-state.json
 restitution-state.json
+mod0422-restore*.json
 discipline.json
 # Discord accounts held out by a suspension (discipline.js discordFile): ids, never in git
 discipline-discord.json

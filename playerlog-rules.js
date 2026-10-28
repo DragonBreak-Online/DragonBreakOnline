@@ -622,6 +622,7 @@ excluded('ANNOUNCE', 'broadcast text: the command wrapper');
 excluded('THALMOR', 'dossier notes: the A2 dossier hook');
 excluded('SCHEDULE', 'staff-written reasons: the command wrapper');
 excluded('GIFT', 'staff-written reasons');
+excluded('M0422', 'the one-shot mod-0422 restore (mod0422restore.js): staff steps naming characters, containers and counts');
 excluded('ROLENAME', 'staff-written titles: the command wrapper');
 excluded('PLACE', 'staff-written set names: the command wrapper');
 excluded('LEDGER', 'ledger names: the command wrapper');
@@ -1732,6 +1733,7 @@ manuals.js MANUAL 8df0187e clean
 mines.js MINE c3af4e8a clean
 mines.js MINE 1b10e15b clean
 mines.js MINE 9cd1fd91 clean
+mod0422restore.js M0422 ffe7d63a excluded
 naming.js NAME 1cf7ac2d parsed
 naming.js NAME c75b6e10 parsed
 naming.js NAME d8ef2ef4 parsed
