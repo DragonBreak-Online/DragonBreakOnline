@@ -155,7 +155,7 @@ setImmediate(() => {
   const src = fs.readFileSync(path.join(ROOT, 'gamemode.js'), 'utf8');
   const loader = src.slice(src.indexOf("const STAFFTOOLS_JS = path.resolve('stafftools.js');") - 10, src.indexOf("stafftools.js failed to load:") + 60);
   const announce = src.slice(src.indexOf("const ANNOUNCE_PATH = path.resolve('announce.json');"), src.indexOf("registerChatCommand('announce'") + 400);
-  check('/announce and announce.json send each player one [[S]] line and no personal() after it (the on-screen overlay)', /system\(o, text\)/.test(announce) && !/personal\(o, text\)/.test(announce), announce.slice(0, 120));
+  check('/announce and announce.json show the GM-call banner (dboBanner) and one chat line, no [[S]] line beside it', (announce.match(/announceTo\(o, text\)/g) || []).length === 2 && /customPacketType: 'dboBanner', text/.test(announce) && !/system\(o, text\)/.test(announce), announce.slice(0, 160));
   check('gamemode.js loads stafftools.js by path.resolve with the cache cleared, in a try/catch', /delete require\.cache\[STAFFTOOLS_JS\]/.test(loader) && /catch \(e\) \{ log\('stafftools\.js failed to load:'/.test(loader));
   check('...after gmcall.js, before console.js (which publishes /chars on the allowlist)', src.indexOf("path.resolve('gmcall.js')") < src.indexOf("path.resolve('stafftools.js')") && src.indexOf("path.resolve('stafftools.js')") < src.indexOf("path.resolve('console.js')"));
   check('...passing the token the gm-call mirror uses, never printing it', /token: \(cfg\.discord \|\| \{\}\)\.botToken \|\| \(serverSettings\.discordAuth \|\| \{\}\)\.botToken/.test(loader) && !/log\([^)]*token/.test(fs.readFileSync(MOD, 'utf8')));

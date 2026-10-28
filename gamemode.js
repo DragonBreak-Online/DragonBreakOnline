@@ -9272,14 +9272,17 @@ try {
 } catch (e) { log('rebellion.js failed to load:', e.stack || e.message); for (const k of ['__dboRebellionOpen', '__dboRebellionLive', '__dboRebellionRaidSides', '__dboRebellionCapitalFalling', '__dboRebellionCapitalTaken', '__dboRebellionWarEnded']) globalThis[k] = null; }
 // ---- announcements: `bash dev-server.sh announce '<text>'` writes announce.json; every online player sees it once ----
 const ANNOUNCE_PATH = path.resolve('announce.json');
+// The GM-call banner (gmcall.js dboBanner, Nat 28 Oct: "exactly like the GM call") and one chat line; a custom packet,
+// so it never meets the chat line in the client's one-line-a-tick read
+const ANNOUNCE_SECONDS = 10;
+const announceTo = (o, text) => { try { sendPacket(o, { customPacketType: 'dboBanner', text, seconds: ANNOUNCE_SECONDS }); } catch (e) { /* old client */ } personal(o, text); };
 const announceSeen = globalThis.__dboAnnounceSeen || (globalThis.__dboAnnounceSeen = { at: 0 });
 every('announce', 5000, () => {
   let a = null; try { a = JSON.parse(fs.readFileSync(ANNOUNCE_PATH, 'utf8')); } catch (e) { return; }
   const at = Number(a && a.at) || 0; const text = String(a && a.text || '').trim();
   if (!text || at <= announceSeen.at || Date.now() - at > 600000) { announceSeen.at = Math.max(announceSeen.at, at); return; }
   announceSeen.at = at;
-  // one line a player: the client reads only the last chat line of a tick, so a second would hide the [[S]] overlay
-  for (const o of onlineActors()) system(o, text);
+  for (const o of onlineActors()) announceTo(o, text);
   log(`announcement to ${onlineActors().length} player(s): ${text}`);
 });
 // The 7-day staff command counts (also posted to #staff-commands daily): Lead GM and above
@@ -9290,8 +9293,7 @@ registerChatCommand('staffstats', (a, args) => {
 }, { admin: true, help: '[name] staff command counts for the last 7 days (Lead GM and above)' });
 registerChatCommand('announce', (a, args) => {
   const text = String(args || '').trim(); if (!text) return personal(a, 'Usage: /announce <text>');
-  // one line a player: the client reads only the last chat line of a tick, so a second would hide the [[S]] overlay
-  for (const o of onlineActors()) system(o, text);
+  for (const o of onlineActors()) announceTo(o, text);
   audit(`ANNOUNCE ${who(a)}: ${text}`);
 }, { admin: true, help: '<text> tell every online player, on screen and in chat' });
 
