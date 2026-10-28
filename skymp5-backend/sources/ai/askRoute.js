@@ -13,7 +13,7 @@ const OWNERS_ONLY_INTENTS = new Set(['held'])
 const MODEL_INTENTS = new Set(['version', 'handbook', 'rules'])
 
 const REFUSE_WORDS = /\b(ip|ips|hwid|device|alts?|vote[sd]?|election|ballot|transcripts?|password|token|webhook|backend\.env)\b/i
-const IMPERATIVE = /^(please\s+)?(run|kick|ban|unban|give|spawn|teleport|restart|announce|jail|warn)\b/i
+const IMPERATIVE = /^(please\s+)?(run|kick|ban|unban|give|spawn|teleport|restart|announce|jail|unjail|warn|mute|unmute|timeout|untimeout|promote|demote|grant|revoke|set|reset|remove|delete|add)\b/i
 
 const REFUSALS = Object.freeze([
   [/\b(vote[sd]?|election|ballot)\b/i, 'Election counts are never shown, to staff included (Staff Handbook 2.6). Nothing was run.'],

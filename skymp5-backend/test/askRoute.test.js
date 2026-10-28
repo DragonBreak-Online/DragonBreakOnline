@@ -63,6 +63,19 @@ test('the refusal names the reason, and an imperative says nothing runs', () => 
   assert.match(route('what is the backend.env webhook')[0].args.text, /never shown/)
 })
 
+test('action requests that start with a command verb are refused before any reader or model; real questions are not', () => {
+  for (const q of ['unjail Kara', 'please mute Bron', 'promote Bron to GM please', 'grant Kara the GM role', 'set the weather to rain',
+    'demote Ann', 'remove Bron from the guild', 'reset Kara\'s strikes', 'add Kara to the GM team', 'delete that bug thread', 'revoke Bron\'s role',
+    'untimeout Kara', 'timeout Bron for an hour', 'unmute Ann']) {
+    const got = route(q, extractEntities(q))
+    assert.deepEqual(got.map(r => r.intent), ['refuse'], q)
+    assert.equal(got[0].args.text, "I can't run commands. Use /console or the panel.", q)
+  }
+  for (const q of ['change log for today?', 'can you warn a player for metagaming?', 'can you restart the server?', 'who can set the weather?', 'make sense of rule D3']) {
+    assert.ok(!route(q, extractEntities(q)).some(r => r.intent === 'refuse'), q)
+  }
+})
+
 test('a version number is never read as a rule number, and #bug-tracker is not a #TAG', () => {
   const e = extractEntities('is 0.3.109 out, see #bug-tracker and D10')
   assert.deepEqual(e.ruleRefs, ['D10'])

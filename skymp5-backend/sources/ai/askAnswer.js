@@ -51,6 +51,10 @@ const BUDGET = Object.freeze({ facts: 5000, chunk: 500, excerpt: 700 })
 const REPAIR_MIN_MS = 15000
 const PK = /\b(pk\w*|player kills?|supernatural|vampires?|werewol\w+|hunters?|common laws?)\b/i
 const ANSWER_TOKENS = /\b\d+(?:\.\d+)+\b|\b\d{2,}\b|#[A-Za-z0-9]{4}\b|\bD\d{1,2}\b|\b\d{17,20}\b/g
+// Ask never runs anything, so an answer that says it did (first person only: "we changed" in a change summary is fine), or that asks
+// staff for a secret, is withheld
+const CLAIMS_ACTION = /\bI(?:'ve| have)?\s+(?:just\s+)?(?:ran|run|executed|banned|unbanned|kicked|jailed|unjailed|warned|muted|unmuted|restarted|promoted|demoted|granted|gave|given|spawned|teleported|deleted|removed|reset|announced)\b|^\s*(?:done|completed|executed)\b/i
+const ASKS_SECRET = /\b(passwords?|passcodes?|tokens?|api keys?|2fa|login codes?)\b/i
 
 const usable = c => c && c.text && c.text !== 'not available' && c.stale !== 'rank'
 const norm = s => String(s).replace(/[\u2018\u2019]/g, "'").replace(/[\u201c\u201d]/g, '"').replace(/\s+/g, ' ').trim()
@@ -111,6 +115,7 @@ function checkAnswer(reply, facts, q) {
   if (!value.answerable) return { ok: true, json: true, reason: null, value }
   if (!value.cited.length) return { ok: false, json: true, reason: 'cited' }
   if (!value.answer) return { ok: false, json: true, reason: 'empty' }
+  if (CLAIMS_ACTION.test(norm(value.answer)) || ASKS_SECRET.test(value.answer)) return { ok: false, json: true, reason: 'action' }
   const cited = value.cited.map(id => norm(byId.get(id).text))
   if (!value.quotes.every(x => cited.some(t => t.includes(norm(x))))) return { ok: false, json: true, reason: 'quote' }
   const known = `${facts.map(f => `${f.label} ${f.asOf || ''} ${f.text}`).join('\n')}\n${q}`

@@ -21,7 +21,7 @@ const { ChatInputCommandInteraction, MessageFlags } = require('discord.js')
 const perms = require('../sources/discord/dragonbaronPermissions')
 const { createAsk, compose, ERRORS } = require('../sources/discord/dragonbaronAsk')
 const { createSources } = require('../sources/ai/askSources')
-const { createAnswerer, TEXT, REPAIR, ASK_SCHEMA } = require('../sources/ai/askAnswer')
+const { createAnswerer, checkAnswer, TEXT, REPAIR, ASK_SCHEMA } = require('../sources/ai/askAnswer')
 const { createLocalModel, createSingleFlight } = require('../sources/ai/localModel')
 const { createLimiter } = require('../sources/ai/rateLimit')
 const { createUsageLog } = require('../sources/ai/askUsage')
@@ -239,6 +239,56 @@ test('7. a rules question calls the model once with the SPEC body', async () => 
   assert.match(e.content, /^D3 says in-character conflicts stay in character, with no OOC revenge\./)
   assert.match(e.content, /Sources: Server Rules 2026-10-21 \(D3\)/)
   assert.match(e.content, /AI answer from server data; check before acting\. Nothing was run\.$/)
+})
+
+test('7b. model=off with a URL set: excerpts only, the AI box is never contacted', async () => {
+  // The second case is a real switch file with only ask=on, so the absent model key reads as off
+  const f = path.join(TMP, `sw-${++seq}`)
+  fs.writeFileSync(f, 'ask=on\n')
+  for (const sw of [{ ...SW, model: false }, readSwitch(f)]) {
+    assert.equal(sw.ask, true)
+    SW = sw
+    model.probes = 0; model.chats = []; audits.length = 0
+    model.replies.push(VALID)
+    const { ask } = make()
+    const { it, calls } = interaction('what does D3 say about OOC revenge?')
+    await ask.handleInteraction(it)
+    assert.deepEqual([model.probes, model.chats.length], [0, 0])
+    assert.ok(edited(calls).content.startsWith(TEXT.off))
+    assert.match(edited(calls).content, /Keep IC and OOC separate/)
+    assert.match(audits[0], /-> answered via extractive/)
+  }
+})
+
+test('7c. a model answer that claims it ran a command, or asks for a secret, is withheld with no repair turn', async () => {
+  for (const answer of ['Done. I ran the command and kicked the player; D3 applies.', 'I have promoted Bron to Lead GM and executed /kick on Ann.',
+    'Please DM your password to an Owner so they can verify you.']) {
+    model.chats = []
+    model.replies.push({ ...VALID, answer, quotes: [] })
+    const { ask, usageFile } = make()
+    const { it, calls } = interaction('what does D3 say')
+    await ask.handleInteraction(it)
+    assert.equal(model.chats.length, 1, answer)
+    const e = edited(calls).content
+    assert.ok(e.startsWith(TEXT.withheld), answer)
+    assert.ok(!/kicked|promoted|password/i.test(e), answer)
+    const rec = JSON.parse(fs.readFileSync(usageFile, 'utf8').trim())
+    assert.deepEqual([rec.outcome, rec.mode, rec.check], ['withheld', 'extractive', 'fail:action'], answer)
+  }
+})
+
+test('7d. checkAnswer: action claims and secret requests fail as "action"; ordinary "we changed" answers pass', () => {
+  const facts = [{ id: 'F1', label: 'Server Rules 2026-10-21, D3', asOf: '2026-10-21', text: 'D3 Deathmatching is not allowed. In the last update we changed the jail timer.' }]
+  const reply = answer => ({ answerable: true, answer, cited: ['F1'], quotes: [] })
+  for (const a of ['Done. I ran the command and kicked the player', 'Please DM your password to an Owner', "I've just banned Bron.",
+    'Completed: the restart is done.', 'I\u2019ve kicked Ann.', 'I unjailed Kara and muted Bron.', 'Send me your API key and I will check.']) {
+    const r = checkAnswer(reply(a), facts, 'what does D3 say')
+    assert.deepEqual([r.ok, r.json, r.reason], [false, true, 'action'], a)
+  }
+  for (const a of ['In the last update we changed the jail timer.', 'We removed the old warning in the last update.', 'D3 says deathmatching is not allowed; I found it in F1.',
+    'The rules we set say deathmatching is not allowed.']) {
+    assert.equal(checkAnswer(reply(a), facts, 'what changed').ok, true, a)
+  }
 })
 
 test('8. fenced JSON parses', async () => {
