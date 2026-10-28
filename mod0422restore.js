@@ -279,7 +279,7 @@ module.exports = (api) => {
       }
       let bank = 0;
       try { bank = Math.max(0, Math.floor(Number(mp.get(count.id, 'private.bankGold')) || 0)); } catch (e) { return { error: `the Count's bank cannot be read (${e.message})` }; }
-      const plog = (from, to) => { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('bankwrite', count.id, 'restitution', from, to); } catch (e) { /* the player log is optional */ } };
+      const plog = (was, now) => { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('bankwrite', count.id, 'restitution', was, now); } catch (e) { /* the player log is optional */ } };
       return { have: bank, label: `the bank account of ${count.label}`,
         take: (n) => { mp.set(count.id, 'private.bankGold', bank - n); plog(bank, bank - n); return true; },
         give: (n) => { mp.set(count.id, 'private.bankGold', bank + n); plog(bank, bank + n); return true; } };
