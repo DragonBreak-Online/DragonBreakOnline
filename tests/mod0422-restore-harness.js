@@ -351,6 +351,6 @@ const src = fs.readFileSync(MOD, 'utf8');
 ok(!/mp\.on\(|__dboHandlers *= |for \(const ev of \[/.test(src), 'no mp handler: the hot-reload grep finds nothing in the module');
 ok(/require\(MOD0422_JS\)/.test(fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8')), 'gamemode.js loads the module');
 ok(fs.readFileSync(path.join(SERVER, '.gitignore'), 'utf8').includes('mod0422-restore*.json'), 'the run, ledger and report files are gitignored');
-try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) { /* tmp */ }
+if (process.env.M0422_KEEP) console.log(`kept ${tmp}`); else try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) { /* tmp */ }
 console.log(`${passes} passed, ${fails} failed`);
 process.exit(fails ? 1 : 0);
