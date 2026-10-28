@@ -14,6 +14,8 @@ const DISCIPLINE_KINDS = new Set(['warn', 'strike', 'suspend', 'ban', 'lift', 'o
 const HOLD_KINDS = new Set(['suspend', 'ban'])
 // ban and unban: the game ban list's, from the dashboard's actions, so a lifted ban keeps its history
 const JOURNAL_KINDS = new Set(['discord_timeout', 'discord_timeout_end', 'discord_ban', 'discord_unban', 'ban', 'unban'])
+// Where a journal row came from: the dashboard, a staff member's Discord client or a bot
+const JOURNAL_VIA = new Set(['dashboard', 'discord', 'bot'])
 const KICK_KINDS = new Set(['command', 'panel', 'suspension', 'discord_ban', 'ban_enforce'])
 // Kicks that enforce a ban or suspension at each login try: one row with a count
 const ENFORCING_KICKS = new Set(['suspension', 'discord_ban', 'ban_enforce'])
@@ -23,7 +25,7 @@ const BAN_REF_RE = /^B-[0-9A-HJKMNP-TV-Z]{6}$/
 // A ticket channel's name: rep-0305 or mod-1234 from Discord, mod-g0056 from the game
 const TICKET_NAME = '(?:rep|mod)-(?:g\\d{1,5}|\\d{3,5})'
 const TICKET_NAME_RE = new RegExp(`\\b(${TICKET_NAME})\\b`, 'i')
-const TICKET_FIELD_RE = new RegExp(`^(?:${TICKET_NAME}|#\\d{3,5})$`, 'i')
+const TICKET_FIELD_RE = new RegExp(`^(?:${TICKET_NAME}|#g?\\d{3,5})$`, 'i')
 
 const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v)
 const posInt = v => (Number.isSafeInteger(v) && v > 0 ? v : null)
@@ -41,14 +43,14 @@ function nameTag(value) {
   return { name: /^profile \d+$/.test(s) ? null : s, tag: null }
 }
 
-// The ticket a record names: rep-0305, mod-1234 or mod-g0056 in a config key or reason, or "ticket #0141"
+// The ticket a record names: rep-0305, mod-1234 or mod-g0056 in a config key or reason, or "ticket #0141" ("Ticket #G0001" in game)
 function ticketOf(...texts) {
   for (const t of texts) {
     const s = String(t ?? '')
     const name = TICKET_NAME_RE.exec(s)
     if (name) return name[1].toLowerCase()
-    const num = /\bticket #?(\d{3,5})\b/i.exec(s)
-    if (num) return `#${num[1]}`
+    const num = /\bticket #?(g?\d{3,5})\b/i.exec(s)
+    if (num) return `#${num[1].toLowerCase()}`
   }
   return null
 }
@@ -58,7 +60,7 @@ function row(fields) {
     id: null, kind: null, source: null, target: { profileId: null, name: null, tag: null, discordName: null }, _discordId: null,
     by: null, atMs: null, untilMs: null, fromMs: null, endsAtMs: null, state: 'recorded', active: false, reason: null, ref: null,
     ticket: null, told: null, outside: null, lifted: null, overturned: null, undid: null, lifts: null, hours: null, count: null,
-    how: null, leftMs: null, totalMs: null, concordat: null, alsoHolds: null, items: null,
+    how: null, leftMs: null, totalMs: null, concordat: null, alsoHolds: null, items: null, liftsKind: null, via: null,
     ...fields,
   }
 }
@@ -163,6 +165,8 @@ function disciplineRows(entries, { now, strikeDays = 90, held = new Map() }) {
         r.state = e.overturned ? 'overturned' : 'recorded'
       } else if (e.kind === 'lift') {
         r.lifts = ofLift.get(e.n) || e.lifts
+        const hold = list.find(x => x.n === r.lifts && HOLD_KINDS.has(x.kind))
+        r.liftsKind = (hold && hold.kind) || e.liftsKind
       } else if (e.kind === 'overturn') {
         r.undid = e.undid
       }
@@ -306,7 +310,7 @@ function parseJournalLine(o) {
     name: scrub(o.name, 48), discordName: scrub(o.discordName, 40), untilMs: isoMs(o.until), reason: scrub(o.reason),
     by: scrub(by.name, 48) || scrub(by.discordName, 40) || (posInt(by.profileId) ? `profile ${by.profileId}` : null),
     ticket: TICKET_FIELD_RE.test(String(o.ticket ?? '')) ? String(o.ticket).toLowerCase() : ticketOf(o.reason),
-    banRef: BAN_REF_RE.test(String(o.ref ?? '')) ? o.ref : null,
+    banRef: BAN_REF_RE.test(String(o.ref ?? '')) ? o.ref : null, via: JOURNAL_VIA.has(o.via) ? o.via : null,
   }
 }
 
@@ -320,7 +324,7 @@ function journalRows(entries, { now }) {
     const who = e._discordId || (e.profileId ? `p${e.profileId}` : null)
     const r = row({
       id: `mod:${e.id}`, kind: e.kind, source: 'journal', target: { profileId: e.profileId, name: e.name, tag: e.tag, discordName: e.discordName },
-      _discordId: e._discordId, by: e.by, atMs: e.atMs, reason: e.reason, ref: e.id, ticket: e.ticket,
+      _discordId: e._discordId, by: e.by, atMs: e.atMs, reason: e.reason, ref: e.id, ticket: e.ticket, via: e.via || null,
     })
     if (who && (e.kind === 'discord_timeout' || e.kind === 'discord_timeout_end')) {
       const prev = lastTimeout.get(who)
@@ -389,7 +393,7 @@ function oneRowPerBan(rows) {
     // A dashboard ban's journal row is the same ban by its ref; a Discord ban's is the one near it in time
     const same = x => (b.kind === 'ban' ? !!b.ref && x.ref === b.ref : near(x, b))
     const j = others.find(x => x.source === 'journal' && x.kind === b.kind && x.state !== 'lifted' && x._discordId === b._discordId && same(x) && !drop.has(x))
-    if (j) { b.by = j.by || b.by; b.reason = j.reason || b.reason; b.ticket = b.ticket || j.ticket; drop.add(j) }
+    if (j) { b.by = j.by || b.by; b.reason = j.reason || b.reason; b.ticket = b.ticket || j.ticket; b.via = b.via || j.via; drop.add(j) }
   }
   for (const r of rows) {
     const kinds = r.source === 'playerLog' ? PLOG_COPY_OF[r.kind] : null

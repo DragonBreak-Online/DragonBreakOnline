@@ -119,3 +119,9 @@ test('trackerSnapshot holds the rows a GM is not shown, with each source\'s stat
   for (const k of ['discipline', 'panelBans', 'bans', 'jail', 'restitution', 'journal', 'playerLog']) assert.equal(s.sources[k].status, 'ok', k)
   assert.deepEqual([...s.strikes], [[10, 1], [30, 1]])
 })
+
+test('a lift is served with the kind of hold it lifted, so the panel can say suspension or ban', async () => {
+  const rows = (await service({}).recent(OWNER, { from: '2000-01-01', limit: '100' })).rows
+  const lift = rows.find(r => r.id === 'dsc:10:4')
+  assert.deepEqual([lift.kind, lift.lifts, lift.liftsKind], ['lift', 3, 'suspend'])
+})

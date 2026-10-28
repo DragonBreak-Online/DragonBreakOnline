@@ -94,21 +94,24 @@ function markerOf(text) {
   return m ? m[1] : null
 }
 
-// Discord refusing this request for good: a 400 with Discord's JSON error code (audit.js's rule)
-const refusedForGood = err => err.status === 400 && Number.isInteger(err.code) && err.code > 0
+// Discord refusing this request for good: a 400 with Discord's JSON error code (audit.js's rule), except a full guild
+// (160006) or an archived thread (50083), which clear later
+const NOT_FINAL = new Set([160006, 50083])
+const refusedForGood = err => err.status === 400 && Number.isInteger(err.code) && err.code > 0 && !NOT_FINAL.has(err.code)
 const threadGone = err => err.status === 404 && err.code === 10003
 
 // ---- Discord writers: request(method, path, body) -> the parsed answer ----
 
 // Plain REST with the bot token: one request at a time, gapMs apart; a 429 pauses the queue for retry_after (the global
-// one too), a 5xx or network error backs off, and either gives up after `tries`
+// one too), a 5xx or network error backs off, and either gives up after `tries`. A request sent with { once: true } is
+// never sent again after a 5xx or network error, as Discord may have done it
 function createRestWriter({ token, fetch: doFetch = globalThis.fetch, gapMs = GAP_MS, tries = 5, timeoutMs = 15000, now = Date.now,
   sleep = wait, log = () => {} }) {
   let chain = Promise.resolve()
   let nextAt = 0
   const backoff = n => Math.min(30000, 1000 * 2 ** (n - 1))
 
-  async function send(method, p, body) {
+  async function send(method, p, body, once) {
     let failures = 0, limited = 0
     for (;;) {
       const idle = nextAt - now()
@@ -124,7 +127,7 @@ function createRestWriter({ token, fetch: doFetch = globalThis.fetch, gapMs = GA
         })
         text = await res.text()
       } catch (err) {
-        if (++failures >= tries) throw err
+        if (once || ++failures >= tries) throw err
         await sleep(backoff(failures))
         continue
       }
@@ -138,7 +141,7 @@ function createRestWriter({ token, fetch: doFetch = globalThis.fetch, gapMs = GA
         nextAt = Math.max(nextAt, now() + Math.ceil(after * 1000) + 100)
         continue
       }
-      if (res.status >= 500 && ++failures < tries) { await sleep(backoff(failures)); continue }
+      if (res.status >= 500 && !once && ++failures < tries) { await sleep(backoff(failures)); continue }
       const err = new Error(`discord ${method} ${p} failed (${res.status}): ${String(text || '').slice(0, 200)}`)
       err.status = res.status
       err.body = text
@@ -148,8 +151,8 @@ function createRestWriter({ token, fetch: doFetch = globalThis.fetch, gapMs = GA
   }
 
   return {
-    request(method, p, body) {
-      const run = chain.then(() => send(method, p, body))
+    request(method, p, body, { once = false } = {}) {
+      const run = chain.then(() => send(method, p, body, once))
       chain = run.catch(() => {})
       return run
     },
@@ -237,7 +240,7 @@ function charOf(r) {
 function sourceOf(r) {
   if (r.source === 'discipline') return r.outside ? `config record ${r.outside}` : 'game discipline'
   if (r.source === 'bans') return 'game ban list'
-  if (r.source === 'journal') return 'Discord (moderation journal)'
+  if (r.source === 'journal') return r.via === 'dashboard' ? 'dashboard' : r.via === 'bot' ? 'Discord bot' : 'Discord client'
   return 'F7 panel'
 }
 
@@ -252,11 +255,17 @@ function duration(r, x) {
   return r.kind === 'suspend' ? 'no end recorded' : 'permanent'
 }
 
+function issuer(r) {
+  if (r.outside) return `config ${r.outside} (by ${r.by || 'unknown'})`
+  const by = r.by || 'unknown'
+  return r.via === 'dashboard' && !/ \(dashboard\)$/.test(by) ? `${by} (dashboard)` : by
+}
+
 function replyText(r, st, x) {
   const lines = [
     `**${label(r)}** · ${r.id}`,
     `Character: ${charOf(r)}`,
-    `Issued by: ${r.outside ? `config ${r.outside} (by ${r.by || 'unknown'})` : r.by || 'unknown'}`,
+    `Issued by: ${issuer(r)}`,
     `When: ${ts(r.atMs, 'f')}`,
     `Duration: ${duration(r, x)}`,
     `Reason: ${r.reason || 'none given'}`,
@@ -269,6 +278,13 @@ function replyText(r, st, x) {
 
 const unmatchedText = r => `**LIFT/OVERTURN (unmatched)** · ${r.id} — ${r.kind} by ${r.by || 'unknown'} ${ts(r.atMs, 'f')}: ${r.reason || 'no reason given'}`
 const byWhom = o => `by ${(o && o.by) || 'unknown'}: ${(o && o.reason) || 'no reason given'}`
+const liftOf = (r, x) => (r.kind === 'overturn' && r.undid ? x.all.find(u => u.id === `dsc:${r.target.profileId}:${r.undid}` && u.kind === 'lift') || null : null)
+
+// An overturned lift reinstates nothing in the game, but the decision is posted
+function overturnedLiftText(r, lift, x) {
+  const hold = lift.lifts ? x.all.find(u => u.id === `dsc:${r.target.profileId}:${lift.lifts}`) : null
+  return `**OVERTURNED** · lift ${lift.id}${hold ? ` of ${nounOf(hold.kind, hold.id)} ${hold.id}` : ''} — ${byWhom(r)}`
+}
 
 function timeoutEnd(r, x) {
   const same = u => u.source === 'journal' && u._discordId && u._discordId === r._discordId && u.atMs >= r.atMs && u.id !== r.id
@@ -343,6 +359,7 @@ function starterText(key, acct, rows, x) {
   const name = acct.username || 'unknown'
   const lines = [key.startsWith('p:') ? `${key} · profile ${key.slice(2)} (no Discord link)` : `<@${key}> · ${name}`]
   if (acct.display && acct.display !== name) lines.push(`Display name: ${acct.display}`)
+  if (acct.nick && acct.nick !== name) lines.push(`Server nickname: ${acct.nick}`)
   const ps = acct.profileIds || []
   if (ps.length) lines.push(`Profile${ps.length > 1 ? 's' : ''}: ${ps.join(', ')}`)
   const chars = characters(ps, x.id)
@@ -380,8 +397,13 @@ const titleOf = name => [...String(name || 'unknown')].slice(0, TITLE_MAX).join(
 
 // ---- the reconciler ----
 function createTracker({ snapshot, config = {}, now = Date.now, store, discord, fetch: doFetch, log = line => console.log(`[punish-tracker] ${line}`),
-  staffStatusOf = null, maxRequests = MAX_REQUESTS, gapMs = GAP_MS, sleep = wait }) {
+  staffStatusOf = null, audit = null, maxRequests = MAX_REQUESTS, gapMs = GAP_MS, sleep = wait }) {
   const s = settings(config)
+  // Dry mode never asks Discord: a staff check there takes only an answer already cached by the panel, else unknown (hidden)
+  const staffLookup = !staffStatusOf ? null : s.mode !== 'dry' ? staffStatusOf
+    : async d => (typeof staffStatusOf.known === 'function' && staffStatusOf.known(d)) || 'unknown'
+  // The audit channel posts to Discord, so only a tracker that is on uses it
+  const alert = s.mode === 'on' && audit ? audit : null
   // Dry mode always writes to the file: no Discord writer or fetch handed in is ever used
   const writer = s.mode === 'dry' ? createDryWriter({ file: s.dryFile, now })
     : discord || createRestWriter({ token: s.token, fetch: doFetch, gapMs, now, sleep, log })
@@ -392,19 +414,38 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
 
   const note = (key, line, everyMs = Infinity) => {
     const at = noted.get(key)
-    if (at !== undefined && now() - at < everyMs) return
+    if (at !== undefined && now() - at < everyMs) return false
     noted.set(key, now())
     log(line)
+    return true
+  }
+  const waitNote = why => {
+    const line = `PUNISH-TRACKER waiting for thread headroom: ${why}`
+    if (!note('headroom', line, HOUR_MS) || !alert) return
+    try { alert(line) } catch (err) { log(`audit failed: ${err.message}`) }
+  }
+  // Discord's guild thread cap (160006): no thread is made or reopened until the next headroom check
+  const capped = err => {
+    if (err.code !== 160006) return false
+    headroom = { at: now(), count: Infinity }
+    waitNote('Discord refused to open a thread (160006)')
+    return true
   }
   const save = () => { registry.save(reg); dirty = false }
   const emptyRegistry = () => ({ v: 1, forumId: s.forumId, tagIds: {}, accounts: {}, skip: { profiles: s.skip } })
-  const newAccount = () => ({ threadId: null, title: null, username: null, usernameAt: 0, display: null, profileIds: [], state: 'none', status: 'active', tags: [], rows: {} })
+  const newAccount = () => ({ threadId: null, title: null, username: null, usernameAt: 0, display: null, nick: null, profileIds: [], state: 'none', status: 'active', tags: [], rows: {} })
   const recordOf = r => ({ state: null, postedAt: null, msgId: null, kind: r.kind, at: r.atMs || null, ref: r.ref || null })
 
-  async function call(method, p, body) {
+  async function call(method, p, body, opts) {
     if (budget <= 0) throw OUT
     budget--
-    return writer.request(method, p, body)
+    return writer.request(method, p, body, opts)
+  }
+
+  // Reopening a thread takes an active-thread slot like a new one, so a full guild (160006) holds it too
+  async function unarchive(acct) {
+    await call('PATCH', `/channels/${acct.threadId}`, { archived: false }).catch(err => { capped(err); throw err })
+    acct.state = 'open'
   }
 
   // A call into a thread that Discord archived on its own (50083): unarchive it and try once more
@@ -413,8 +454,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
       return await call(method, p, body)
     } catch (err) {
       if (err.code !== 50083) throw err
-      await call('PATCH', `/channels/${acct.threadId}`, { archived: false })
-      acct.state = 'open'
+      await unarchive(acct)
       return call(method, p, body)
     }
   }
@@ -423,7 +463,14 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     if (tagsAt && now() - tagsAt < CACHE_MS) return
     try {
       const forum = await call('GET', `/channels/${s.forumId}`)
-      reg.tagIds = Object.fromEntries(((forum && forum.available_tags) || []).filter(t => t && TAG_NAMES.includes(t.name)).map(t => [t.name, String(t.id)]))
+      const ids = Object.fromEntries(((forum && forum.available_tags) || []).filter(t => t && TAG_NAMES.includes(t.name)).map(t => [t.name, String(t.id)]))
+      const sorted = o => JSON.stringify(Object.entries(o || {}).sort())
+      // Tags made or changed on the forum reach every thread, a quiet one too, over the next ticks
+      if (sorted(ids) !== sorted(reg.tagIds)) {
+        for (const acct of Object.values(reg.accounts)) if (acct.threadId) acct.sync = true
+        dirty = true
+      }
+      reg.tagIds = ids
       tagsAt = now()
     } catch (err) {
       if (err === OUT) throw err
@@ -450,11 +497,11 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
       if (err === OUT) throw err
       if (err.status !== 404) return null
     }
-    if (member && member.user) return { username: member.user.username, display: member.nick || member.user.global_name || null }
+    if (member && member.user) return { username: member.user.username, display: member.user.global_name || null, nick: member.nick || null }
     // A banned user is no longer a member
     try {
       const user = await call('GET', `/users/${key}`)
-      return user && user.username ? { username: user.username, display: user.global_name || null } : null
+      return user && user.username ? { username: user.username, display: user.global_name || null, nick: null } : null
     } catch (err) {
       if (err === OUT) throw err
       return null
@@ -470,7 +517,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
   async function refreshName(key, acct, rows, x) {
     let found = null
     if (!key.startsWith('p:')) { found = await lookupUser(key); acct.usernameAt = x.now }
-    if (found) acct.display = scrub(found.display, TITLE_MAX)
+    if (found) Object.assign(acct, { display: scrub(found.display, TITLE_MAX) || null, nick: scrub(found.nick, TITLE_MAX) || null })
     const username = (found && scrub(found.username, TITLE_MAX)) || acct.username || localName(key, rows, x)
     if (username !== acct.username) { acct.username = username; acct.sync = true }
     const title = titleOf(username)
@@ -535,17 +582,47 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     }
   }
 
-  // A profile that gains a Discord link keeps its thread under the new key
+  // A profile that gains a Discord link keeps its thread under the new key. If that account has a thread already, the
+  // profile's records move into it and the profile's thread is closed with a pointer (retire)
   function rekey(groups, g) {
     for (const [key, rows] of groups) {
-      if (key.startsWith('p:') || reg.accounts[key]) continue
-      const old = profilesOf(key, rows, g).map(p => `p:${p}`).find(k => reg.accounts[k])
-      if (!old) continue
-      reg.accounts[key] = Object.assign(reg.accounts[old], { username: null, usernameAt: 0, sync: true })
-      delete reg.accounts[old]
-      dirty = true
+      if (key.startsWith('p:')) continue
+      for (const old of profilesOf(key, rows, g).map(p => `p:${p}`)) {
+        const from = reg.accounts[old], to = reg.accounts[key]
+        if (!from || from.movedTo || from.state === 'creating') continue
+        dirty = true
+        if (!to) {
+          reg.accounts[key] = Object.assign(from, { username: null, usernameAt: 0, sync: true })
+          delete reg.accounts[old]
+          continue
+        }
+        Object.assign(to, { rows: { ...from.rows, ...to.rows }, sync: true })
+        to.profileIds = [...new Set([...(to.profileIds || []), ...(from.profileIds || [])])].sort((a, b) => a - b)
+        if (!to.threadId && from.threadId) {
+          Object.assign(to, { threadId: from.threadId, title: from.title, state: from.state, starterHash: null, tags: from.tags || [], username: null, usernameAt: 0 })
+          delete reg.accounts[old]
+        } else if (from.threadId) Object.assign(from, { rows: {}, movedTo: key })
+        else delete reg.accounts[old]
+      }
     }
   }
+
+  async function retire(key, acct) {
+    if (acct.threadId) {
+      const ch = `/channels/${acct.threadId}`
+      if (acct.state === 'archived') await unarchive(acct)
+      if (!acct.starterGone) {
+        const content = finish(`Moved: profile ${key.slice(2)} is now linked to <@${acct.movedTo}>; its records continue in that account's thread.`)
+        await threadCall(acct, 'PATCH', `${ch}/messages/${acct.threadId}`, { content, allowed_mentions: NO_PINGS })
+      }
+      await call('PATCH', ch, { archived: true })
+    }
+    delete reg.accounts[key]
+    save()
+  }
+
+  // A row an account already holds is never posted again under another (a key that changed back, or a merge)
+  const heldElsewhere = (key, id) => Object.entries(reg.accounts).some(([k, a]) => k !== key && a.rows && a.rows[id])
 
   function profilesOf(key, rows, g) {
     const ps = new Set(rows.map(r => r.target && r.target.profileId).filter(hasProfile))
@@ -564,7 +641,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
 
   async function createThread(key, acct, rows, x) {
     if (!(await roomForThread())) {
-      note('headroom', 'PUNISH-TRACKER waiting for thread headroom: new threads are held', HOUR_MS)
+      waitNote('new threads are held')
       return false
     }
     await loadTags()
@@ -574,7 +651,8 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     if (tags.length) payload.applied_tags = tags
     acct.state = 'creating'
     save()
-    const post = body => call('POST', `/channels/${s.forumId}/threads`, body)
+    // Sent once: a thread made whose answer was lost is found by the marker scan, never made twice
+    const post = body => call('POST', `/channels/${s.forumId}/threads`, body, { once: true })
     let thread
     try {
       try {
@@ -590,15 +668,11 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
       // A definite answer means no thread was made; a lost one stays 'creating' for the marker scan
       if (err === OUT || (err.status && err.status < 500)) acct.state = 'none'
       save()
-      if (err.code === 160006) {
-        headroom = { at: now(), count: Infinity }
-        note('headroom', 'PUNISH-TRACKER waiting for thread headroom: Discord refused a new thread (160006)', HOUR_MS)
-        return false
-      }
+      if (capped(err)) return false
       throw err
     }
     if (headroom) headroom.count++
-    Object.assign(acct, { threadId: String(thread.id), title: payload.name, state: 'open', starterHash: hash, tags, status: tagNames(rows, x)[0] === 'Active' ? 'active' : 'expired', recreate: false })
+    Object.assign(acct, { threadId: String(thread.id), title: payload.name, state: 'open', starterHash: hash, starterGone: false, tags, status: tagNames(rows, x)[0] === 'Active' ? 'active' : 'expired', recreate: false })
     save()
     return true
   }
@@ -610,6 +684,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     try {
       msg = await threadCall(acct, 'POST', `/channels/${acct.threadId}/messages`, { content, allowed_mentions: NO_PINGS, nonce: nonceOf(key, id, w.st), enforce_nonce: true })
     } catch (err) {
+      capped(err)
       if (!refusedForGood(err)) throw err
       note(`drop-${id}-${w.st}`, `Discord refused the post for ${id} (${w.st}) for good, dropped: ${err.message}`)
       dropped = true
@@ -621,9 +696,16 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
   async function syncThread(key, acct, rows, x) {
     const ch = `/channels/${acct.threadId}`
     const { content, hash } = starterText(key, acct, rows, x)
-    if (hash !== acct.starterHash) {
-      if (acct.state === 'archived') { await call('PATCH', ch, { archived: false }); acct.state = 'open' }
-      await threadCall(acct, 'PATCH', `${ch}/messages/${acct.threadId}`, { content, allowed_mentions: NO_PINGS })
+    if (hash !== acct.starterHash && !acct.starterGone) {
+      if (acct.state === 'archived') await unarchive(acct)
+      try {
+        await threadCall(acct, 'PATCH', `${ch}/messages/${acct.threadId}`, { content, allowed_mentions: NO_PINGS })
+      } catch (err) {
+        if (err.status !== 404 || err.code !== 10008) throw err
+        // Staff deleted the starter and kept the thread: it cannot be edited again, the replies and tags go on
+        acct.starterGone = true
+        log(`the starter of the thread of ${key.startsWith('p:') ? key : 'a Discord account'} was deleted; it is no longer edited`)
+      }
       acct.starterHash = hash
       save()
     }
@@ -631,24 +713,28 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     const tags = tagsFor(rows, x)
     const patch = {}
     if (!sameSet(tags, acct.tags || [])) patch.applied_tags = tags
-    if (!x.inForce && acct.state !== 'archived') patch.archived = true
+    // An archived thread takes an edit only together with its unarchive; a clear one is archived again below
+    if (patch.applied_tags && acct.state === 'archived') patch.archived = false
+    else if (!x.inForce && acct.state !== 'archived') patch.archived = true
     if (Object.keys(patch).length) {
       try {
         await threadCall(acct, 'PATCH', ch, patch)
+        if ('archived' in patch) acct.state = patch.archived ? 'archived' : 'open'
       } catch (err) {
         if (err === OUT || !patch.applied_tags || (err.status !== 400 && err.status !== 403)) throw err
         note(`tags-${err.status}`, `the forum refused the tags (${err.status}); left as they were`, HOUR_MS)
-        if (patch.archived) await call('PATCH', ch, { archived: true })
+        if (patch.archived === true) { await call('PATCH', ch, { archived: true }); acct.state = 'archived' }
       }
       acct.tags = tags
-      if (patch.archived) acct.state = 'archived'
     }
+    if (!x.inForce && acct.state !== 'archived') { await call('PATCH', ch, { archived: true }); acct.state = 'archived' }
     Object.assign(acct, { status: x.inForce ? 'active' : 'expired', sync: false, recreate: false })
     save()
   }
 
   async function account(key, rows, g) {
     let acct = reg.accounts[key]
+    if (acct && acct.movedTo && !rows.length) return retire(key, acct)
     const profileIds = profilesOf(key, rows, g)
     const strikes = profileIds.reduce((n, p) => n + ((g.strikes && g.strikes.get(p)) || 0), 0)
     const x = { ...g, key, profileIds, strikes, inForce: rows.some(r => !isFold(r) && IN_FORCE.has(stateOf(r, g))) }
@@ -659,8 +745,14 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
       const st = stateOf(r, x)
       const rec = acct && acct.rows[r.id]
       if (!rec) {
-        const alias = st === 'unmatched' || isFold(r) ? null : aliasOf(acct, r)
-        if (st === 'unmatched') work.push({ r, st, text: unmatchedText(r), isNew: true })
+        if (heldElsewhere(key, r.id)) continue
+        // A row older than the first run's baseline that is not in force (a source or account first seen later) is history
+        const old = g.baseAt && (!r.atMs || r.atMs < g.baseAt) && !IN_FORCE.has(st)
+        const alias = old || st === 'unmatched' || isFold(r) ? null : aliasOf(acct, r)
+        const lift = old ? null : liftOf(r, x)
+        if (old) quiet.push({ id: r.id, st, base: recordOf(r), extra: { baseline: true } })
+        else if (st === 'unmatched') work.push({ r, st, text: unmatchedText(r), isNew: true })
+        else if (lift) work.push({ r, st, text: overturnedLiftText(r, lift, x) })
         else if (isFold(r) || alias) quiet.push({ id: r.id, st, base: recordOf(r), extra: alias ? { alias } : {} })
         else work.push({ r, st, isNew: true })
       } else if (rec.state !== st) {
@@ -696,10 +788,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     if (isNew || due || !acct.username) await refreshName(key, acct, rows, x)
     if (!acct.threadId) {
       if (!(await createThread(key, acct, rows, x))) return
-    } else if (work.length && acct.state === 'archived') {
-      await call('PATCH', `/channels/${acct.threadId}`, { archived: false })
-      acct.state = 'open'
-    }
+    } else if (work.length && acct.state === 'archived') await unarchive(acct)
     const at = w => (w.r ? w.r.atMs : w.rec.at) || 0
     for (const w of work.sort((a, b) => Number(!a.isNew) - Number(!b.isNew) || at(a) - at(b))) await postRow(key, acct, w, x)
     if (acct.sync) await syncThread(key, acct, rows, x)
@@ -715,11 +804,12 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
       groups.get(key).push(r)
     }
     for (const rows of groups.values()) rows.sort((a, b) => (a.atMs || 0) - (b.atMs || 0))
-    // As the panel does for a GM: a staff member's records are left out, and so are those of an account Discord gave no answer on
+    // As the panel does for a GM: a staff member's records are left out, and so are those of an account with no Discord
+    // link or that Discord gave no answer on
     if (s.hideStaff) {
+      if (s.mode === 'dry') note('dry-staff', 'dry run: staff targets are checked against cached answers only, the rest are left out')
       for (const key of [...groups.keys()]) {
-        if (key.startsWith('p:')) continue
-        const status = staffStatusOf ? await staffStatusOf(key).catch(() => 'unknown') : 'unknown'
+        const status = key.startsWith('p:') || !staffLookup ? 'unknown' : await staffLookup(key).catch(() => 'unknown')
         if (status !== 'player') { groups.delete(key); hidden.add(key) }
       }
     }
@@ -737,11 +827,15 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
       fresh = !loaded
     }
     const snap = snapshot()
+    // Without the profile links every record would key to its profile alone: a second thread and every post again
+    const idStatus = (snap.id && snap.id.status) || {}
+    const badId = ['profiles', 'players'].filter(k => idStatus[k] && idStatus[k] !== 'ok')
+    if (badId.length) { note('identity', `nothing is posted while ${badId.join(' and ')} cannot be read`, HOUR_MS); return }
     const d = (snap.cfg && snap.cfg.discipline) || {}
     const sources = snap.sources || {}
     const g = {
       now: now(), warnDays: s.warnDays, strikeDays: d.strikeDays || 90, review: d.strikesForReview || 3, id: snap.id || {},
-      all: snap.rows, ids: new Set(snap.rows.map(r => r.id)), strikes: snap.strikes || new Map(),
+      all: snap.rows, ids: new Set(snap.rows.map(r => r.id)), strikes: snap.strikes || new Map(), baseAt: Date.parse(reg.baselinedAt) || 0,
       // A source not read cleanly this tick is frozen: no new post, no ended and no unbanned from it
       frozen: k => !sources[k] || sources[k].status !== 'ok',
     }
@@ -754,11 +848,13 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
         await recover(groups, g)
         baseline(groups, g)
         reg.baselinedAt = iso(g.now)
+        g.baseAt = g.now
         fresh = false
         save()
       } else if (Object.values(reg.accounts).some(a => a.state === 'creating')) await recover(groups, g)
       reg.skip = { profiles: s.skip }
       rekey(groups, g)
+      if (Object.values(reg.accounts).some(a => a.threadId)) await loadTags()
       for (const key of new Set([...groups.keys(), ...Object.keys(reg.accounts)])) {
         if (hidden.has(key)) continue
         try {
@@ -796,7 +892,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
 }
 
 // From server.js once the backend listens: the panel's own service, the real writer (or the dry file) and a 30 s tick
-function start({ config = require('../../config'), punishments, staffStatusOf, log } = {}) {
+function start({ config = require('../../config'), punishments, staffStatusOf, audit, log } = {}) {
   const s = settings(config)
   if (s.mode === 'off') return null
   const say = log || (line => console.log(`[punish-tracker] ${line}`))
@@ -805,12 +901,14 @@ function start({ config = require('../../config'), punishments, staffStatusOf, l
   const tracker = createTracker({
     snapshot: () => service().trackerSnapshot(), config, log: say,
     staffStatusOf: staffStatusOf || (s.hideStaff ? require('./tier').staffStatusOf : null),
+    audit: s.mode !== 'on' ? null : audit || (line => require('../discord/audit').log(line)),
   })
   const timer = setInterval(() => { tracker.tick() }, TICK_MS)
   timer.unref()
-  setTimeout(() => { tracker.tick() }, 5000).unref()
+  const first = setTimeout(() => { tracker.tick() }, 5000)
+  first.unref()
   say(`started (${s.mode})`)
-  return { ...tracker, stop: () => clearInterval(timer) }
+  return { ...tracker, stop: () => { clearInterval(timer); clearTimeout(first) } }
 }
 
 module.exports = { createTracker, start, createRestWriter, createDryWriter, fileStore, settings, parseMode, markerOf, finish, nonceOf, tagNames }

@@ -39,6 +39,19 @@ test('ticketOf reads Moderation Help tickets, Discord mod-1234 and in-game mod-g
   assert.equal(R.parseJournalLine({ v: 1, id: 'M-AAAAAA', kind: 'discord_ban', at: '2026-10-21T00:00:00Z', ticket: 'mod-0042', reason: 'r' }).ticket, 'mod-0042')
 })
 
+test('ticketOf reads the in-game "Ticket #G0001" as players and staff see it', () => {
+  assert.equal(R.ticketOf(null, 'per Ticket #G0001'), '#g0001')
+  assert.equal(R.ticketOf('see ticket g0012'), '#g0012')
+  assert.equal(R.ticketOf('ticket #0141'), '#0141')
+  assert.equal(R.parseJournalLine({ v: 1, id: 'M-AAAAAA', kind: 'discord_ban', at: '2026-10-21T00:00:00Z', ticket: '#G0001', reason: 'r' }).ticket, '#g0001')
+})
+
+test('journal: where a row came from (via) is kept when it is dashboard, discord or bot', () => {
+  const line = via => R.parseJournalLine({ v: 1, id: 'M-AAAAAA', kind: 'discord_timeout', at: '2026-10-21T00:00:00Z', via })
+  assert.deepEqual(['dashboard', 'discord', 'bot', 'elsewhere', undefined].map(v => line(v).via), ['dashboard', 'discord', 'bot', null, null])
+  assert.equal(R.journalRows([line('dashboard')], { now: Date.parse('2026-10-21T00:00:01Z') })[0].via, 'dashboard')
+})
+
 test('cursor: round trip, and anything else is refused', () => {
   const c = encodeCursor(1792540800000, 'dsc:10:7')
   assert.deepEqual(decodeCursor(c), { key: 1792540800000, id: 'dsc:10:7' })
@@ -114,15 +127,15 @@ test('discipline: a ban runs with no end until lifted or overturned, and a lift 
   const ban = by['dsc:9:1']
   assert.deepEqual([ban.kind, ban.state, ban.active, ban.endsAtMs, ban.untilMs, ban.ticket, ban.alsoHolds, ban.told], ['ban', 'running', true, null, null, 'mod-1234', 1, null])
   assert.deepEqual([by['dsc:10:1'].state, by['dsc:10:1'].active, by['dsc:10:1'].lifted.by, by['dsc:10:2'].lifts], ['lifted', false, 'M #MMMM', 1])
-  assert.deepEqual([by['dsc:11:2'].state, by['dsc:11:2'].lifted.reason, by['dsc:11:3'].lifts], ['lifted', 'ban was too much', 2])
-  assert.deepEqual([by['dsc:11:1'].state, by['dsc:11:1'].lifted.reason, by['dsc:11:4'].lifts], ['lifted', 'served enough', 1])
+  assert.deepEqual([by['dsc:11:2'].state, by['dsc:11:2'].lifted.reason, by['dsc:11:3'].lifts, by['dsc:11:3'].liftsKind], ['lifted', 'ban was too much', 2, 'ban'])
+  assert.deepEqual([by['dsc:11:1'].state, by['dsc:11:1'].lifted.reason, by['dsc:11:4'].lifts, by['dsc:11:4'].liftsKind], ['lifted', 'served enough', 1, 'suspend'])
   assert.deepEqual([by['dsc:12:1'].state, by['dsc:12:1'].active], ['overturned', false])
   // An in-game lift saved before liftsKind (no lifts number either) ended the latest suspension or ban marked lifted
   const old = R.disciplineRows(R.parseDiscipline({ profiles: { 13: [
     { n: 1, kind: 'ban', reason: 'x', by: 'L #LLLL', at: at(2), char: 'U #UUUU', lifted: true },
     { n: 2, kind: 'lift', reason: 'undo', by: 'M #MMMM', at: at(1), char: 'U #UUUU' },
   ] } }), { now }).rows
-  assert.deepEqual([old[0].state, old[0].lifted.by, old[1].lifts], ['lifted', 'M #MMMM', 1])
+  assert.deepEqual([old[0].state, old[0].lifted.by, old[1].lifts, old[1].liftsKind], ['lifted', 'M #MMMM', 1, 'ban'])
 })
 
 test('parsers keep no address, hwid or Concordat "by", and bans.json is parsed without sources/bans.js', () => {

@@ -24,7 +24,7 @@ const LOOKUPS_AT_ONCE = 5
 const LOOKUPS_MS = 10000
 
 const ROW_FIELDS = ['id', 'kind', 'source', 'by', 'state', 'active', 'reason', 'ref', 'ticket', 'told', 'outside', 'undid', 'lifts',
-  'hours', 'count', 'how', 'leftMs', 'totalMs', 'concordat', 'alsoHolds']
+  'hours', 'count', 'how', 'leftMs', 'totalMs', 'concordat', 'alsoHolds', 'liftsKind']
 const iso = t => (Number.isFinite(t) && t > 0 ? new Date(t).toISOString() : null)
 
 class BadRequest extends Error {

@@ -8,7 +8,7 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const R = require('../sources/punish/records')
-const { createTracker, createRestWriter, finish, markerOf, tagNames } = require('../sources/punish/tracker')
+const { createTracker, createRestWriter, start, finish, markerOf, tagNames } = require('../sources/punish/tracker')
 
 const HOUR = 3600000
 const DAY = 24 * HOUR
@@ -33,11 +33,12 @@ const tempDir = () => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'dbo-tra
 // A discipline entry as the game's discipline.js writes it
 const entry = (n, kind, atMs, extra = {}) => ({ n, kind, reason: `reason ${n}`, by: 'Lena #LED1', at: iso(atMs), char: 'Alia #ALI1', ...extra })
 
-// What trackerSnapshot() hands over, from record file contents, with fill()'s profile and Discord matching
-function snap(d, now, status = {}, links = {}) {
-  const id = { profileOf: new Map(), discordOf: new Map(), names: new Map(), chars: new Map() }
+// What trackerSnapshot() hands over, from record file contents, with fill()'s profile and Discord matching. links: a
+// profile's Discord id put in (null takes it away); idStatus: identity.js's read status of profiles.json and players.json
+function snap(d, now, status = {}, links = {}, idStatus = { profiles: 'ok', players: 'ok', store: 'ok' }) {
+  const id = { profileOf: new Map(), discordOf: new Map(), names: new Map(), chars: new Map(), status: idStatus }
   for (const p of Object.values(PEOPLE)) {
-    const discordId = p.discordId || links[p.profileId]
+    const discordId = links[p.profileId] !== undefined ? links[p.profileId] : p.discordId
     if (discordId) {
       id.profileOf.set(discordId, p.profileId)
       id.discordOf.set(p.profileId, discordId)
@@ -73,11 +74,14 @@ function fakeDiscord({ tags = TAGS, active = 0, members = { [PEOPLE.alice.discor
   const nextId = () => String(700000000000000000n + BigInt(++seq))
   const fail = (status, code) => Object.assign(new Error(`fake ${status} ${code}`), { status, code, body: JSON.stringify({ code }) })
   const fake = {
-    calls, threads, tags, active, members, refuseTags: false, loseNextCreate: false,
+    // fail(method, path, body): an error to throw for this request instead of answering it, or nothing
+    calls, threads, tags, active, members, refuseTags: false, loseNextCreate: false, fail: () => null,
     writes: () => calls.filter(c => c.method !== 'GET'),
     thread: () => [...threads.values()][0],
     async request(method, p, body) {
       calls.push({ method, path: p, body })
+      const refused = fake.fail(method, p, body)
+      if (refused) throw refused
       let m
       if (method === 'GET' && p === `/channels/${FORUM}`) return { id: FORUM, available_tags: fake.tags }
       if (method === 'GET' && p === `/guilds/${GUILD}/threads/active`) {
@@ -88,7 +92,8 @@ function fakeDiscord({ tags = TAGS, active = 0, members = { [PEOPLE.alice.discor
         return { threads: [...threads.values()].filter(t => t.archived).map(t => ({ id: t.id, parent_id: FORUM, name: t.name, thread_metadata: { archived: true } })), has_more: false }
       }
       if (method === 'GET' && (m = /^\/guilds\/\d+\/members\/(\d+)$/.exec(p))) {
-        if (fake.members[m[1]]) return { user: { username: fake.members[m[1]], global_name: null }, nick: null }
+        const who = fake.members[m[1]]
+        if (who) return typeof who === 'string' ? { user: { username: who, global_name: null }, nick: null } : { user: { username: who.username, global_name: who.global_name || null }, nick: who.nick || null }
         throw fail(404, 10007)
       }
       if (method === 'GET' && /^\/users\/\d+$/.test(p)) throw fail(404, 10013)
@@ -133,19 +138,22 @@ function fakeDiscord({ tags = TAGS, active = 0, members = { [PEOPLE.alice.discor
   }
   return fake
 }
+fakeDiscord.error = (status, code) => Object.assign(new Error(`fake ${status} ${code}`), { status, code, body: JSON.stringify({ code }) })
 
 // A tracker on a temp registry, its record data, clock and fake forum; tick() builds a new snapshot each time
 function rig({ config = {}, discord = fakeDiscord(), staffStatusOf, data = {}, dir = tempDir(), maxRequests = 100 } = {}) {
-  const r = { now: T0, data, status: {}, links: {}, logs: [], discord, dir, file: path.join(dir, 'punish-threads.json') }
+  const r = { now: T0, data, status: {}, links: {}, idStatus: undefined, logs: [], audits: [], discord, dir, file: path.join(dir, 'punish-threads.json') }
   r.make = () => createTracker({
-    snapshot: () => snap(r.data, r.now, r.status, r.links),
+    snapshot: () => snap(r.data, r.now, r.status, r.links, r.idStatus),
     config: { punishTracker: 'on', punishTrackerFile: r.file, discordGuildId: GUILD, discordBotToken: 'test-token', ...config },
-    now: () => r.now, discord, staffStatusOf, maxRequests, log: l => r.logs.push(l),
+    now: () => r.now, discord, staffStatusOf, maxRequests, log: l => r.logs.push(l), audit: l => r.audits.push(l),
   })
   r.tracker = r.make()
   r.tick = () => r.tracker.tick()
   r.registry = () => JSON.parse(fs.readFileSync(r.file, 'utf8'))
   r.messages = () => (discord.thread() ? discord.thread().messages : [])
+  r.named = name => [...discord.threads.values()].find(t => t.name === name)
+  r.posts = () => [...discord.threads.values()].flatMap(t => t.messages.slice(1).map(m => m.content))
   return r
 }
 
@@ -454,6 +462,7 @@ test('thread headroom: above 975 active threads creation is held and logged once
   assert.equal(held.threadId, null)
   assert.equal(held.state, 'none')
   assert.equal(r.logs.filter(l => /waiting for thread headroom/.test(l)).length, 1)
+  assert.deepEqual(r.audits, ['PUNISH-TRACKER waiting for thread headroom: new threads are held'], 'one audit.log line an hour')
   assert.equal(d.calls.filter(c => c.path.endsWith('/threads/active')).length, 1, 'the first run\'s scan, cached for 10 minutes')
   d.active = 900
   r.now += 11 * 60000
@@ -538,14 +547,15 @@ test('a warning counts as active for warnDays, then ages out', async () => {
   assert.equal(t.archived, true)
 })
 
-test('PUNISH_TRACKER_HIDE_STAFF leaves out staff targets and accounts Discord gave no answer on; off posts them', async () => {
+test('PUNISH_TRACKER_HIDE_STAFF leaves out staff targets, accounts Discord gave no answer on and unlinked profiles; off posts them', async () => {
   const status = { [PEOPLE.alice.discordId]: 'player', [PEOPLE.bob.discordId]: 'staff' }
   const discipline = () => ({ 57: [entry(1, 'strike', T0)], 58: [entry(1, 'strike', T0, { char: 'Borin #BOR1' })], 70: [entry(1, 'warn', T0, { char: 'Nell #NEL1' })] })
   const r = await started({ config: { punishTrackerHideStaffTargets: true }, staffStatusOf: async d => status[d] || 'unknown' })
   r.data.discipline = discipline()
   await r.tick()
-  assert.deepEqual([...r.discord.threads.values()].map(t => t.name).sort(), ['alice_rp', 'profile 70'])
+  assert.deepEqual([...r.discord.threads.values()].map(t => t.name), ['alice_rp'])
   assert.equal(r.registry().accounts[PEOPLE.bob.discordId], undefined)
+  assert.equal(r.registry().accounts['p:70'], undefined, 'a profile with no Discord link cannot be checked, as on the panel')
   const off = await started({ staffStatusOf: async () => { throw new Error('not asked') } })
   off.data.discipline = discipline()
   await off.tick()
@@ -569,4 +579,472 @@ test('at most maxRequests a tick, the rest on later ticks with nothing posted tw
   for (const t of r.discord.threads.values()) assert.equal(t.messages.length, 2, t.name)
   const [a, b] = await Promise.all([r.tick(), r.tick()])
   assert.deepEqual([a, b], [true, false])
+})
+
+// ---- review fixes ----
+
+test('dry mode with hide-staff on never asks Discord: only cached staff answers, every other account left out', async () => {
+  const dir = tempDir()
+  const dryFile = path.join(dir, 'dry.jsonl')
+  const asked = []
+  const staffStatusOf = async d => { asked.push(d); throw new Error('dry mode asked Discord') }
+  staffStatusOf.known = d => (d === PEOPLE.alice.discordId ? 'player' : null)
+  const data = { discipline: { 57: [entry(1, 'strike', T0)], 58: [entry(1, 'strike', T0, { char: 'Borin #BOR1' })] } }
+  const logs = []
+  const t = createTracker({
+    snapshot: () => snap(data, T0), now: () => T0, staffStatusOf, log: l => logs.push(l),
+    config: { punishTracker: 'dry', punishTrackerHideStaffTargets: true, punishTrackerFile: path.join(dir, 'punish-threads.json'), punishTrackerDryFile: dryFile, discordGuildId: GUILD },
+  })
+  assert.equal(await t.tick(), true)
+  assert.deepEqual(asked, [])
+  const lines = fs.readFileSync(dryFile, 'utf8').trim().split('\n').map(l => JSON.parse(l))
+  assert.deepEqual(lines.filter(l => l.action === 'create-thread').map(l => l.body.name), ['alice_rp'])
+  assert.equal(logs.filter(l => /cached answers only/.test(l)).length, 1)
+})
+
+test('start(): on without a token or guild refuses; a dry start ticks on the panel\'s snapshot, never asks Discord, and stop() clears both timers', async t => {
+  const lines = []
+  assert.equal(start({ config: { punishTracker: 'on' }, punishments: () => { throw new Error('read') }, log: l => lines.push(l) }), null)
+  assert.match(lines[0], /needs DISCORD_BOT_TOKEN and DISCORD_GUILD_ID; not started/)
+  const dir = tempDir()
+  const asked = [], audits = []
+  let snaps = 0
+  const staffStatusOf = async d => { asked.push(d); return 'player' }
+  staffStatusOf.known = () => 'player'
+  const make = () => start({
+    config: { punishTracker: 'dry', punishTrackerHideStaffTargets: true, punishTrackerFile: path.join(dir, 'punish-threads.json'), punishTrackerDryFile: path.join(dir, 'dry.jsonl') },
+    punishments: () => ({ trackerSnapshot: () => { snaps++; return snap({ discipline: { 57: [entry(1, 'strike', T0)] } }, T0) } }),
+    staffStatusOf, audit: l => audits.push(l), log: l => lines.push(l),
+  })
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
+  // Stopped before its first tick (5 s): it never ticks
+  make().stop()
+  t.mock.timers.tick(60000)
+  assert.equal(snaps, 0)
+  const tracker = make()
+  assert.equal(tracker.mode, 'dry')
+  t.mock.timers.reset()
+  assert.equal(await tracker.tick(), true)
+  tracker.stop()
+  assert.equal(snaps, 1)
+  assert.deepEqual(asked, [])
+  assert.deepEqual(audits, [])
+  assert.ok(fs.existsSync(path.join(dir, 'punish-threads.dry.json')))
+  assert.ok(!fs.existsSync(path.join(dir, 'punish-threads.json')))
+  assert.match(fs.readFileSync(path.join(dir, 'dry.jsonl'), 'utf8'), /"create-thread"/)
+})
+
+test('journal rows name their source: the dashboard (with "(dashboard)" after the handle) or the Discord client', async () => {
+  const r = await started()
+  r.data.journal = [
+    { v: 1, id: 'M-DASH0001', kind: 'discord_timeout', at: iso(T0), until: iso(T0 + HOUR), discordId: PEOPLE.bob.discordId, reason: 'spam', by: { discordName: 'lena' }, via: 'dashboard' },
+    { v: 1, id: 'M-DISC0001', kind: 'discord_timeout', at: iso(T0), until: iso(T0 + HOUR), discordId: PEOPLE.alice.discordId, reason: 'spam', by: { name: 'Lena' }, via: 'discord' },
+  ]
+  await r.tick()
+  const bob = r.named('bob_rp').messages[1].content
+  assert.match(bob, /Issued by: lena \(dashboard\)\n/)
+  assert.match(bob, /Source: dashboard$/)
+  const alice = r.named('alice_rp').messages[1].content
+  assert.match(alice, /Issued by: Lena\n/)
+  assert.match(alice, /Source: Discord client$/)
+})
+
+test('a source missing on the first run is not posted from history once it reads: only what is in force opens a thread', async () => {
+  const r = rig()
+  r.status = { discipline: { status: 'missing' } }
+  await r.tick()
+  assert.ok(r.registry().baselinedAt)
+  r.status = {}
+  r.data.discipline = { 57: [entry(1, 'warn', T0 - 200 * DAY), entry(2, 'strike', T0 - 120 * DAY)], 58: [entry(1, 'suspend', T0 - HOUR, { char: 'Borin #BOR1', until: T0 + DAY })] }
+  r.now += 60000
+  await r.tick()
+  assert.deepEqual([...r.discord.threads.values()].map(t => t.name), ['bob_rp'])
+  assert.equal(r.named('bob_rp').messages.length, 2)
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].rows['dsc:57:1'].baseline, true)
+})
+
+test('hide-staff: an account hidden on the first run (no answer from Discord) is not posted from history once it shows', async () => {
+  let status = 'unknown'
+  const r = rig({ config: { punishTrackerHideStaffTargets: true }, staffStatusOf: async () => status,
+    data: { discipline: { 57: [entry(1, 'warn', T0 - 300 * DAY), entry(2, 'strike', T0 - 200 * DAY)] } } })
+  await r.tick()
+  status = 'player'
+  r.now += 60000
+  await r.tick()
+  assert.equal(r.discord.threads.size, 0)
+  r.data.discipline[57].push(entry(3, 'strike', r.now))
+  await r.tick()
+  assert.deepEqual(r.posts().map(c => c.split('\n')[0]), ['**STRIKE** · dsc:57:3'])
+})
+
+test('a lost thread-create answer, a timeout or a 5xx, is never sent again by the writer; a 429 still is', async () => {
+  let clock = 0
+  const seen = []
+  const writer = answers => createRestWriter({
+    token: 'test-token', now: () => clock, sleep: async ms => { clock += ms },
+    fetch: async (url, init) => {
+      seen.push(init.method)
+      const a = answers.shift()
+      if (a === 'timeout') throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' })
+      return { status: a.status, headers: { get: () => null }, text: async () => JSON.stringify(a.body || {}) }
+    },
+  })
+  const lost = await writer(['timeout', { status: 201, body: { id: '2' } }]).request('POST', `/channels/${FORUM}/threads`, {}, { once: true }).catch(e => e)
+  assert.match(lost.message, /timeout/)
+  assert.equal(seen.length, 1)
+  seen.length = 0
+  const bad = await writer([{ status: 502 }, { status: 201, body: { id: '2' } }]).request('POST', `/channels/${FORUM}/threads`, {}, { once: true }).catch(e => e)
+  assert.equal(bad.status, 502)
+  assert.equal(seen.length, 1)
+  seen.length = 0
+  const ok = await writer([{ status: 429, body: { retry_after: 1 } }, { status: 201, body: { id: '3' } }]).request('POST', `/channels/${FORUM}/threads`, {}, { once: true })
+  assert.deepEqual([ok, seen.length], [{ id: '3' }, 2])
+  // The tracker sends its thread POST this way; replies keep their retries (they carry a nonce)
+  const d = fakeDiscord()
+  const once = []
+  const real = d.request
+  d.request = (method, p, body, opts) => { if (opts && opts.once) once.push(`${method} ${p}`); return real(method, p, body) }
+  const r = await started({ discord: d })
+  r.data.discipline = { 57: [entry(1, 'strike', T0)] }
+  await r.tick()
+  assert.deepEqual(once, [`POST /channels/${FORUM}/threads`])
+})
+
+test('a profile linked to a Discord account that has its own thread: its records move there, nothing is posted twice, its thread is closed', async () => {
+  const d = fakeDiscord()
+  const r = await started({ discord: d })
+  const X = '844444444444444444'
+  d.members[X] = 'nell_rp'
+  r.data.discipline = { 70: [entry(1, 'strike', T0, { char: 'Nell #NEL1' })] }
+  await r.tick()
+  r.now += 60000
+  r.data.journal = [{ v: 1, id: 'M-NELL0001', kind: 'discord_timeout', at: iso(r.now), until: iso(r.now + DAY), discordId: X, reason: 'spam', by: { name: 'Lena' } }]
+  await r.tick()
+  assert.equal(d.threads.size, 2)
+  r.links[70] = X
+  r.now += 60000
+  await r.tick()
+  await r.tick()
+  assert.equal(r.posts().filter(c => c.startsWith('**STRIKE** · dsc:70:1')).length, 1)
+  const reg = r.registry()
+  assert.equal(reg.accounts['p:70'], undefined)
+  assert.ok(reg.accounts[X].rows['dsc:70:1'])
+  const old = r.named('profile 70')
+  assert.equal(old.archived, true)
+  assert.match(old.messages[0].content, /^Moved: profile 70 is now linked to <@844444444444444444>/)
+  assert.equal(markerOf(old.messages[0].content), null, 'never adopted again by the marker scan')
+  assert.match(r.named('nell_rp').messages[0].content, /Strikes counting: 1 of 3/)
+})
+
+test('profiles.json unreadable: nothing is posted; a record whose key changes back to its profile is never posted again', async () => {
+  const r = await started()
+  r.data.discipline = { 57: [entry(1, 'strike', T0)] }
+  await r.tick()
+  const writes = r.discord.writes().length
+  // identity.js leaves the maps empty when it cannot read profiles.json
+  r.links[57] = null
+  r.idStatus = { profiles: 'unreadable', players: 'ok', store: 'ok' }
+  r.now += 60000
+  await r.tick()
+  assert.equal(r.discord.writes().length, writes)
+  assert.ok(r.logs.some(l => /nothing is posted while profiles cannot be read/.test(l)))
+  // players.json backfilled only some links: the record keys to p:57, which must not post it again
+  r.idStatus = undefined
+  r.now += 60000
+  await r.tick()
+  assert.equal(r.discord.threads.size, 1)
+  assert.equal(r.discord.writes().length, writes)
+  assert.equal(r.registry().accounts['p:57'], undefined)
+  delete r.links[57]
+  r.now += 60000
+  await r.tick()
+  assert.equal(r.discord.threads.size, 1)
+  assert.equal(r.posts().filter(c => c.startsWith('**STRIKE** · dsc:57:1')).length, 1)
+})
+
+test('an overturned lift is posted as OVERTURNED in the thread', async () => {
+  const r = await started()
+  r.data.discipline = { 57: [entry(1, 'suspend', T0, { until: T0 + DAY })] }
+  await r.tick()
+  r.now += 60000
+  r.data.discipline[57][0].lifted = true
+  r.data.discipline[57].push(entry(2, 'lift', r.now, { by: 'Mia #MIA1', reason: 'served enough', lifts: 1, liftsKind: 'suspend' }))
+  await r.tick()
+  r.now += 60000
+  r.data.discipline[57][1].overturned = { by: 'Jake #JAKE', at: iso(r.now), reason: 'the lift was wrong' }
+  r.data.discipline[57].push(entry(3, 'overturn', r.now, { by: 'Jake #JAKE', reason: 'the lift was wrong', undid: 2 }))
+  await r.tick()
+  const msgs = r.messages()
+  assert.equal(msgs.length, 4)
+  assert.equal(msgs[3].content, '**OVERTURNED** · lift dsc:57:2 of suspension dsc:57:1 — by Jake #JAKE: the lift was wrong')
+  await r.tick()
+  assert.equal(r.messages().length, 4)
+})
+
+test('a thread Discord auto-archived at the guild\'s thread cap (160006) holds the post, never drops it', async () => {
+  const d = fakeDiscord()
+  const r = await started({ discord: d })
+  r.data.discipline = { 57: [entry(1, 'strike', T0)] }
+  await r.tick()
+  const t = d.thread()
+  t.archived = true
+  let full = true
+  d.fail = (method, p, body) => {
+    if (method === 'POST' && p === `/channels/${t.id}/messages` && t.archived) return fakeDiscord.error(400, 50083)
+    if (method === 'PATCH' && p === `/channels/${t.id}` && body.archived === false && full) return fakeDiscord.error(400, 160006)
+    return null
+  }
+  r.now += 60000
+  r.data.discipline[57].push(entry(2, 'strike', r.now))
+  await r.tick()
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].rows['dsc:57:2'], undefined, 'kept unposted, not dropped')
+  assert.deepEqual(r.audits, ['PUNISH-TRACKER waiting for thread headroom: Discord refused to open a thread (160006)'])
+  full = false
+  r.now += 60000
+  await r.tick()
+  assert.match(t.messages[2].content, /^\*\*STRIKE\*\* · dsc:57:2/)
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].rows['dsc:57:2'].dropped, undefined)
+})
+
+test('a starter deleted by staff (10008) is tried once, and the thread still gets its replies, tags and archive', async () => {
+  const d = fakeDiscord()
+  const r = await started({ discord: d })
+  r.data.discipline = { 57: [entry(1, 'suspend', T0, { until: T0 + HOUR })] }
+  await r.tick()
+  const t = d.thread()
+  const starter = `/channels/${t.id}/messages/${t.id}`
+  d.fail = (method, p) => (method === 'PATCH' && p === starter ? fakeDiscord.error(404, 10008) : null)
+  r.now += 2 * HOUR
+  for (let i = 0; i < 4; i++) { await r.tick(); r.now += 60000 }
+  assert.equal(d.calls.filter(c => c.method === 'PATCH' && c.path === starter).length, 1)
+  assert.match(t.messages[2].content, /^\*\*ENDED\*\*/)
+  assert.equal(t.archived, true)
+  assert.deepEqual(t.tags, [tagId('Expired'), tagId('Suspended')])
+  assert.equal(r.logs.filter(l => /starter .* was deleted/.test(l)).length, 1)
+})
+
+test('tags made on the forum later reach every thread, an archived clear one too, which stays archived', async () => {
+  const d = fakeDiscord({ tags: [] })
+  const r = await started({ discord: d })
+  r.data.discipline = { 57: [entry(1, 'strike', T0)], 58: [entry(1, 'suspend', T0, { char: 'Borin #BOR1', until: T0 + HOUR })] }
+  await r.tick()
+  r.now += 2 * HOUR
+  await r.tick()
+  const bob = r.named('bob_rp'), alice = r.named('alice_rp')
+  assert.equal(bob.archived, true)
+  assert.deepEqual([alice.tags, bob.tags], [[], []])
+  d.tags = TAGS
+  r.now += 11 * 60000
+  await r.tick()
+  assert.deepEqual(alice.tags, [tagId('Active'), tagId('Strike')])
+  assert.deepEqual(bob.tags, [tagId('Expired'), tagId('Suspended')])
+  assert.equal(bob.archived, true)
+  assert.equal(r.registry().accounts[PEOPLE.bob.discordId].state, 'archived')
+  const writes = d.writes().length
+  await r.tick()
+  assert.equal(d.writes().length, writes, 'done once')
+})
+
+test('display name and server nickname both go in the starter, each when it differs from the username', async () => {
+  const d = fakeDiscord()
+  d.members[PEOPLE.alice.discordId] = { username: 'alice_rp', global_name: 'Alice A', nick: 'Ali (GM bait)' }
+  const r = await started({ discord: d })
+  r.data.discipline = { 57: [entry(1, 'warn', T0)] }
+  await r.tick()
+  assert.match(d.thread().messages[0].content, /^<@811111111111111111> · alice_rp\nDisplay name: Alice A\nServer nickname: Ali \(GM bait\)\n/)
+})
+
+// ---- regression cover for the design's transitions and recovery paths ----
+
+test('a Discord ban seen in both the journal and the ban list is posted once, and its unban once (both orders)', async () => {
+  const ban = at => ({ ref: 'B-CCCCCC', discordId: PEOPLE.bob.discordId, reason: 'discord ban', bannedAt: iso(at), bannedBy: 'discord' })
+  const jban = at => ({ v: 1, id: 'M-BAN00001', kind: 'discord_ban', at: iso(at), discordId: PEOPLE.bob.discordId, reason: 'threats', by: { name: 'Lena' }, via: 'discord' })
+  const unban = at => ({ v: 1, id: 'M-UNB00001', kind: 'discord_unban', at: iso(at), discordId: PEOPLE.bob.discordId, reason: 'appeal', by: { name: 'Jake' }, via: 'discord' })
+  for (const journalFirst of [true, false]) {
+    const r = await started()
+    r.data.journal = [jban(T0)]
+    if (!journalFirst) r.data.bans = [ban(T0 + 5000)]
+    await r.tick()
+    r.now += 60000
+    r.data.bans = [ban(T0 + 5000)]
+    await r.tick()
+    r.now += HOUR
+    r.data.bans = []
+    r.data.journal.push(unban(r.now))
+    await r.tick()
+    await r.tick()
+    const posts = r.posts()
+    assert.equal(posts.filter(c => /^\*\*(DISCORD BAN|GAME BAN LIST)/.test(c)).length, 1, `journal first: ${journalFirst}`)
+    assert.equal(posts.filter(c => c.startsWith('**UNBANNED**')).length, 1, posts.join('\n'))
+    assert.match(posts.find(c => c.startsWith('**UNBANNED**')), /by Jake: appeal$/)
+    assert.equal(r.named('bob_rp').archived, true)
+  }
+})
+
+test('a strike stops counting (EXPIRED), an overturned strike posts OVERTURNED', async () => {
+  const r = await started()
+  r.data.discipline = { 57: [entry(1, 'strike', T0), entry(2, 'strike', T0)] }
+  await r.tick()
+  r.now += 60000
+  r.data.discipline[57][1].overturned = { by: 'Jake #JAKE', at: iso(r.now), reason: 'wrong player' }
+  await r.tick()
+  r.now += 91 * DAY
+  await r.tick()
+  const posts = r.posts()
+  assert.ok(posts.includes('**OVERTURNED** · strike dsc:57:2 — by Jake #JAKE: wrong player'))
+  assert.match(posts[posts.length - 1], /^\*\*EXPIRED\*\* · strike dsc:57:1 stopped counting <t:\d+:D>$/)
+})
+
+test('a Discord timeout ended early names who ended it; one replaced by a newer timeout says so', async () => {
+  const r = await started()
+  const to = (id, at, extra = {}) => ({ v: 1, id, kind: 'discord_timeout', at: iso(at), until: iso(at + HOUR), discordId: PEOPLE.bob.discordId, reason: 'spam', by: { name: 'Lena' }, ...extra })
+  r.data.journal = [to('M-TIME0001', T0)]
+  await r.tick()
+  r.now += 10 * 60000
+  r.data.journal.push({ v: 1, id: 'M-TEND0001', kind: 'discord_timeout_end', at: iso(r.now), discordId: PEOPLE.bob.discordId, by: { name: 'Mia' } })
+  await r.tick()
+  r.now += 10 * 60000
+  r.data.journal.push(to('M-TIME0002', r.now))
+  await r.tick()
+  r.now += 10 * 60000
+  r.data.journal.push(to('M-TIME0003', r.now))
+  await r.tick()
+  const posts = r.posts()
+  assert.ok(posts.includes('**TIMEOUT ENDED** · mod:M-TIME0001 (early by Mia)'))
+  assert.ok(posts.includes('**TIMEOUT ENDED** · mod:M-TIME0002 (replaced by a newer timeout)'))
+  assert.equal(posts.filter(c => c.startsWith('**DISCORD TIMEOUT**')).length, 3)
+})
+
+test('a thread deleted by staff (10003) is opened again with the history in its starter', async () => {
+  const r = await started()
+  r.data.discipline = { 57: [entry(1, 'strike', T0)] }
+  await r.tick()
+  r.discord.threads.clear()
+  r.now += 60000
+  r.data.discipline[57].push(entry(2, 'strike', r.now))
+  await r.tick()
+  await r.tick()
+  assert.equal(r.discord.threads.size, 1)
+  const t = r.discord.thread()
+  assert.match(t.messages[0].content, /History: 0 warnings, 2 strikes/)
+  assert.deepEqual(t.messages.slice(1).map(m => m.content.split('\n')[0]), ['**STRIKE** · dsc:57:2'])
+})
+
+test('a reply into a thread Discord archived on its own (50083) unarchives it and lands', async () => {
+  const d = fakeDiscord()
+  const r = await started({ discord: d })
+  r.data.discipline = { 57: [entry(1, 'strike', T0)] }
+  await r.tick()
+  const t = d.thread()
+  t.archived = true
+  d.fail = (method, p) => (method === 'POST' && p === `/channels/${t.id}/messages` && t.archived ? fakeDiscord.error(400, 50083) : null)
+  r.now += 60000
+  r.data.discipline[57].push(entry(2, 'strike', r.now))
+  await r.tick()
+  assert.match(t.messages[2].content, /^\*\*STRIKE\*\* · dsc:57:2/)
+  assert.ok(t.patches.some(p => p.archived === false))
+})
+
+test('the username is looked up again after 24 h and the thread renamed only when it changed', async () => {
+  const d = fakeDiscord()
+  const r = await started({ discord: d })
+  r.data.discipline = { 57: [entry(1, 'strike', T0)] }
+  await r.tick()
+  const t = d.thread()
+  r.now += 2 * HOUR
+  d.members[PEOPLE.alice.discordId] = 'alice_new'
+  await r.tick()
+  assert.equal(t.name, 'alice_rp')
+  r.now += 25 * HOUR
+  await r.tick()
+  assert.equal(t.name, 'alice_new')
+  assert.match(t.messages[0].content, /^<@811111111111111111> · alice_new\n/)
+  const renames = t.patches.filter(p => p.name).length
+  r.now += 25 * HOUR
+  await r.tick()
+  assert.equal(t.patches.filter(p => p.name).length, renames)
+})
+
+test('a lost registry adopts the forum\'s threads by marker with nothing posted again; a corrupt one posts nothing', async () => {
+  const r = await started()
+  r.data.discipline = { 57: [entry(1, 'strike', T0)], 58: [entry(1, 'suspend', T0, { char: 'Borin #BOR1', until: T0 + HOUR })] }
+  await r.tick()
+  r.now += 2 * HOUR
+  await r.tick()
+  const posts = () => r.discord.calls.filter(c => c.method === 'POST').length
+  const before = posts()
+  fs.rmSync(r.file)
+  r.tracker = r.make()
+  await r.tick()
+  await r.tick()
+  assert.equal(posts(), before)
+  assert.equal(r.discord.threads.size, 2)
+  const reg = r.registry()
+  assert.equal(reg.accounts[PEOPLE.alice.discordId].threadId, r.named('alice_rp').id)
+  assert.equal(reg.accounts[PEOPLE.bob.discordId].threadId, r.named('bob_rp').id)
+
+  fs.writeFileSync(r.file, '{bad')
+  r.tracker = r.make()
+  const writes = r.discord.writes().length
+  r.data.discipline[57].push(entry(2, 'strike', r.now))
+  await r.tick()
+  await r.tick()
+  assert.equal(r.discord.writes().length, writes)
+  assert.equal(r.logs.filter(l => /registry cannot be read/.test(l)).length, 1)
+})
+
+test('Discord refusing a new thread (160006) holds it and the row, the audit line once an hour', async () => {
+  const d = fakeDiscord()
+  const r = await started({ discord: d })
+  d.fail = (method, p) => (method === 'POST' && p === `/channels/${FORUM}/threads` ? fakeDiscord.error(400, 160006) : null)
+  r.data.discipline = { 57: [entry(1, 'strike', T0)] }
+  await r.tick()
+  r.now += 60000
+  await r.tick()
+  assert.equal(d.threads.size, 0)
+  assert.deepEqual(r.registry().accounts[PEOPLE.alice.discordId].rows, {})
+  assert.equal(r.audits.length, 1)
+  d.fail = () => null
+  r.now += 11 * 60000
+  await r.tick()
+  assert.equal(d.threads.size, 1)
+})
+
+test('the first run waits while a source cannot be read', async () => {
+  const r = rig({ data: { discipline: { 57: [entry(1, 'warn', T0 - 200 * DAY)] } } })
+  r.status = { journal: { status: 'unreadable' } }
+  await r.tick()
+  assert.ok(!fs.existsSync(r.file) || !r.registry().baselinedAt)
+  assert.ok(r.logs.some(l => /first run waits until journal can be read/.test(l)))
+  r.status = {}
+  await r.tick()
+  assert.ok(r.registry().baselinedAt)
+  assert.equal(r.discord.threads.size, 0)
+})
+
+test('a panel tempban that disappears (pruned once it ran out) posts ENDED', async () => {
+  const r = await started()
+  r.data.adminBans = [{ id: 't1', profileId: 57, name: 'Alia', until: T0 + DAY, reason: 'griefing', by: 'profile 1', at: T0 }]
+  await r.tick()
+  assert.match(r.messages()[1].content, /^\*\*PANEL TEMPBAN\*\* · abn:t1/)
+  r.now += 60000
+  r.data.adminBans = []
+  await r.tick()
+  assert.equal(r.messages()[2].content, '**ENDED** · panel tempban abn:t1 is no longer on the F7 panel ban list')
+})
+
+test('a row going backwards (a suspension extended after it ended) only re-renders the starter', async () => {
+  const r = await started()
+  r.data.discipline = { 57: [entry(1, 'suspend', T0, { until: T0 + HOUR })] }
+  await r.tick()
+  r.now += 2 * HOUR
+  await r.tick()
+  assert.equal(r.messages().length, 3)
+  r.data.discipline[57][0].until = r.now + DAY
+  r.now += 60000
+  await r.tick()
+  const t = r.discord.thread()
+  assert.equal(t.messages.length, 3)
+  assert.match(t.messages[0].content, /Status: \*\*ACTIVE\*\*/)
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].rows['dsc:57:1'].state, 'running')
 })

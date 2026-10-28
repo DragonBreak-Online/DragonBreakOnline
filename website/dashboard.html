@@ -978,10 +978,11 @@ function puWhat(r) {
   switch (r.kind) {
     case 'suspend': return [`Suspended${r.hours ? ` ${r.hours} h` : ''}`, r.from ? `from ${puWhen(r.from)}` : '', until].filter(Boolean).join(', ')
       + (r.alsoHolds ? `; also holds out ${plural(r.alsoHolds, 'Discord account')}` : '');
-    case 'lift': return r.lifts ? `Lifted suspension #${r.lifts}` : 'Lifted a suspension';
+    case 'lift': return r.lifts ? `Lifted ${r.liftsKind === 'ban' ? 'ban' : 'suspension'} #${r.lifts}` : `Lifted a ${r.liftsKind === 'ban' ? 'ban' : 'suspension'}`;
     case 'overturn': return r.undid ? `Overturned #${r.undid}` : 'Overturned a record';
     case 'tempban': return [`Banned${r.hours ? ` ${r.hours} h` : ''}`, until].filter(Boolean).join(', ');
-    case 'ban': return r.source === 'playerLog' ? 'Banned in the admin panel (the log does not say for how long)' : 'Banned, permanent';
+    case 'ban': return r.source === 'playerLog' ? 'Banned in the admin panel (the log does not say for how long)'
+      : 'Banned, permanent' + (r.alsoHolds ? `; also holds out ${plural(r.alsoHolds, 'Discord account')}` : '');
     case 'ipban': return `IP ban, ${r.until ? `until ${puWhen(r.until)}` : 'permanent'} (the address is never shown)`;
     case 'unban': return 'Ban lifted';
     case 'discord_ban': return r.source === 'bans' ? 'Banned on Discord, so banned from the game' : 'Banned on Discord';
