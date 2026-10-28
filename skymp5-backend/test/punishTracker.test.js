@@ -1300,3 +1300,30 @@ test('a row going backwards (a suspension extended after it ended) only re-rende
   assert.match(t.messages[0].content, /Status: \*\*ACTIVE\*\*/)
   assert.equal(r.registry().accounts[PEOPLE.alice.discordId].rows['dsc:57:1'].state, 'running')
 })
+
+test('ban-list entries with no ref: removing one never moves another\'s id, and a ref given later posts nothing again', async () => {
+  const r = await started()
+  const f7 = p => ({ discordId: p.discordId, reason: 'duping', bannedAt: iso(T0), bannedBy: 'lena (dashboard)' })
+  r.data.bans = [f7(PEOPLE.alice), f7(PEOPLE.bob)]
+  await r.tick()
+  await r.tick()
+  const bob = () => r.named('bob_rp').messages.slice(1).map(m => m.content)
+  const alice = () => r.named('alice_rp').messages.slice(1).map(m => m.content)
+  assert.equal(banPosts(r).length, 2)
+  r.now += HOUR
+  r.data.bans = [f7(PEOPLE.bob)]
+  await r.tick()
+  await r.tick()
+  assert.equal(bob().length, 1, bob().join('\n'))
+  assert.equal(alice().filter(c => c.startsWith('**UNBANNED**')).length, 1, alice().join('\n'))
+  r.now += HOUR
+  r.data.bans = [{ ...f7(PEOPLE.bob), ref: 'B-DDDDDD' }]
+  await r.tick()
+  await r.tick()
+  assert.equal(bob().length, 1, bob().join('\n'))
+  assert.equal(r.registry().accounts[PEOPLE.bob.discordId].rows['ban:B-DDDDDD'].state, 'running')
+  r.now += HOUR
+  r.data.bans = []
+  await r.tick()
+  assert.deepEqual(bob().slice(1).map(c => c.split(' — ')[0].split('\n')[0]), ['**UNBANNED** · ban:B-DDDDDD removed from the game ban list'])
+})

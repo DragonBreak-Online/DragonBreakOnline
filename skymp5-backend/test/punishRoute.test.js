@@ -8,6 +8,7 @@ const fs = require('fs')
 const http = require('http')
 const path = require('path')
 const { createPunishFixture, PEOPLE, SECRET_STRINGS, HOUR } = require('./helpers/punishFixture')
+const { reflessBanId } = require('../sources/punish/records')
 
 const F = createPunishFixture()
 let clock = F.now
@@ -167,7 +168,7 @@ test('an Owner sees everything running, ending soonest first, and the strikes co
   const r = await get(`${P}/active?limit=100`, 'owner')
   assert.equal(r.status, 200)
   const kinds = r.json.rows.map(x => `${x.kind}:${x.id}`)
-  for (const want of ['suspend:dsc:10:7', 'suspend:dsc:101:1', 'tempban:abn:tb1', 'ipban:abn:ip1', 'discord_ban:ban:B-WG6QYG', 'ban:ban:i1', 'jail:jail:ff000010', 'jail:jail:ff000020', 'restitution:rst:0138', 'discord_timeout:mod:M-AAAAAA']) {
+  for (const want of ['suspend:dsc:10:7', 'suspend:dsc:101:1', 'tempban:abn:tb1', 'ipban:abn:ip1', 'discord_ban:ban:B-WG6QYG', `ban:${reflessBanId(PEOPLE.ivan.discordId)}`, 'jail:jail:ff000010', 'jail:jail:ff000020', 'restitution:rst:0138', 'discord_timeout:mod:M-AAAAAA']) {
     assert.ok(kinds.includes(want), `${want} in ${kinds.join(', ')}`)
   }
   assert.ok(!kinds.includes('discord_timeout:mod:M-BBBBBB'), 'an ended timeout is not running')
@@ -188,7 +189,7 @@ test('an Owner sees everything running, ending soonest first, and the strikes co
   const ip = r.json.rows.find(x => x.id === 'abn:ip1')
   assert.equal(ip.target.name, 'Ivan')
   assert.equal(ip.by, 'Jake (profile 1)', 'the panel\'s "profile N" is named')
-  const dash = r.json.rows.find(x => x.id === 'ban:i1')
+  const dash = r.json.rows.find(x => x.id === reflessBanId(PEOPLE.ivan.discordId))
   assert.equal(dash.by, 'Old Admin', 'a raw Discord id in bannedBy becomes the Discord name')
   assert.equal(dash.target.profileId, 40)
   const ghost = r.json.rows.find(x => x.id === 'ban:B-WG6QYG')

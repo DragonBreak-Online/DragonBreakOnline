@@ -3,6 +3,7 @@
 // never an address, a hwid or a Discord id, except _discordId, which stays on the server to match records to accounts.
 // *Rows() turns that into the panel's rows at a given time.
 
+const crypto = require('crypto')
 const { scrub } = require('./scrub')
 
 const DAY_MS = 86400000
@@ -210,13 +211,26 @@ function adminBanRows(list, { now }) {
 // can save the file. hwid and ip are never read ----
 // A ban the panel gave (bannedBy '<handle> (dashboard)') shows up to 300 characters of its reason, any other ban 200
 const DASHBOARD_BY_RE = / \(dashboard\)$/
+// A ban-list entry with no ref is known by a hash of its Discord id (or of its fields without one), never by its place
+const digest = v => crypto.createHash('sha256').update(String(v)).digest('hex').slice(0, 12)
+const reflessBanId = discordId => `ban:d${digest(`ban\n${discordId}`)}`
 function parseBans(data) {
   if (!Array.isArray(data)) throw new Error('not a ban list')
-  return data.map((b, i) => {
+  const seen = new Map()
+  return data.map(b => {
     if (!isObj(b)) return null
     const byRaw = String(b.bannedBy ?? '').trim()
+    const _discordId = discordIdOf(b.discordId)
+    const ref = BAN_REF_RE.test(String(b.ref ?? '')) ? b.ref : null
+    let key = null
+    if (!ref) {
+      key = _discordId ? reflessBanId(_discordId) : `ban:x${digest(`${b.bannedAt}\n${byRaw}\n${b.reason}`)}`
+      const n = (seen.get(key) || 0) + 1
+      seen.set(key, n)
+      if (n > 1) key += `-${n}`
+    }
     return {
-      i, _discordId: discordIdOf(b.discordId), ref: BAN_REF_RE.test(String(b.ref ?? '')) ? b.ref : null,
+      key, _discordId, ref,
       reason: scrub(b.reason, DASHBOARD_BY_RE.test(byRaw) ? 300 : 200), atMs: isoMs(b.bannedAt),
       by: discordIdOf(byRaw) ? null : scrub(byRaw, 80), _byDiscordId: discordIdOf(byRaw),
     }
@@ -227,7 +241,7 @@ function banRows(list) {
   return list.map(b => {
     const viaDiscord = b.reason === 'discord ban' && b.by === 'discord'
     return row({
-      id: b.ref ? `ban:${b.ref}` : `ban:i${b.i}`, kind: viaDiscord ? 'discord_ban' : 'ban', source: 'bans', _discordId: b._discordId,
+      id: b.ref ? `ban:${b.ref}` : b.key, kind: viaDiscord ? 'discord_ban' : 'ban', source: 'bans', _discordId: b._discordId,
       _byDiscordId: b._byDiscordId, by: viaDiscord ? 'Discord' : b.by, atMs: b.atMs, reason: b.reason, ref: b.ref, state: 'running', active: true,
     })
   })
@@ -412,6 +426,6 @@ function oneRowPerBan(rows) {
 
 module.exports = {
   KINDS, DEFAULT_CONFIG, DAY_MS, ticketOf, nameTag,
-  parseGameConfig, parseDiscipline, parseHeld, disciplineRows, parseAdminBans, adminBanRows, parseBans, banRows, jailRows,
+  parseGameConfig, parseDiscipline, parseHeld, disciplineRows, parseAdminBans, adminBanRows, parseBans, reflessBanId, banRows, jailRows,
   parseCases, parseRestitutionState, restitutionRows, parseJournalLine, journalRows, playerLogRows, oneRowPerBan,
 }

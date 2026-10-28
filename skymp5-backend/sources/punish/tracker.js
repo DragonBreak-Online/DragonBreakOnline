@@ -10,7 +10,7 @@ const fs = require('fs')
 const path = require('path')
 const { readStore, replaceFile, isPlainObject } = require('../storeFile')
 const { scrub } = require('./scrub')
-const { ticketOf, DAY_MS } = require('./records')
+const { ticketOf, DAY_MS, reflessBanId } = require('./records')
 const { discordNameOf } = require('./identity')
 
 const HOUR_MS = 3600000
@@ -760,6 +760,15 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     const held = !!acct && Object.entries(acct.rows).some(([id, rec]) => frozen(id) && IN_FORCE.has(rec.state)
       && !rows.some(r => r.id === id && IN_FORCE.has(stateOf(r, x))))
     const work = [], quiet = [], unlinked = new Set()
+    // bans.js gives a ref-less entry its ref: its record moves to the new id, so it is neither posted again nor unbanned
+    if (acct) for (const r of rows) {
+      const old = r.source === 'bans' && r.ref && r._discordId && !acct.rows[r.id] ? reflessBanId(r._discordId) : null
+      if (!old || !acct.rows[old] || g.ids.has(old)) continue
+      acct.rows[r.id] = { ...acct.rows[old], ref: r.ref }
+      delete acct.rows[old]
+      for (const rec of Object.values(acct.rows)) if (rec.alias === old) rec.alias = r.id
+      dirty = true
+    }
     for (const r of rows) {
       if (frozen(r.id) || awaitsJournal(r, x)) continue
       const st = stateOf(r, x)

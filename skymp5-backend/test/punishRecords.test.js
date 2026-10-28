@@ -144,7 +144,7 @@ test('parsers keep no address, hwid or Concordat "by", and bans.json is parsed w
   assert.equal(JSON.stringify(ab).includes('81.2.69.1'), false)
   assert.equal(R.adminBanRows(ab, { now: 10 })[0].kind, 'ipban')
   const bans = R.parseBans([{ discordId: '123456789012345678', hwid: 'h', ip: '81.2.69.2', reason: 'dashboard ban', bannedAt: '2026-10-01T00:00:00Z', bannedBy: '123456789012345679' }, 7])
-  assert.deepEqual(Object.keys(bans[0]).sort(), ['_byDiscordId', '_discordId', 'atMs', 'by', 'i', 'reason', 'ref'])
+  assert.deepEqual(Object.keys(bans[0]).sort(), ['_byDiscordId', '_discordId', 'atMs', 'by', 'key', 'reason', 'ref'])
   assert.equal(bans[0].by, null)
   const jail = R.jailRows([{ key: 'ff01', profileId: 1, name: 'N', tag: 'TTTT', sentence: { totalMs: 600000, servedMs: 0, by: 'G #GGGG', at: 1, concordat: { by: 'G #GGGG (profile 2, <@123456789012345678>)' } } }], { now: 0 })
   assert.equal(jail[0].concordat, true)
@@ -294,4 +294,18 @@ test('bans.json reasons: a dashboard ban (bannedBy "<handle> (dashboard)") shows
   assert.equal(parsed[0].reason, long)
   for (const b of parsed.slice(1)) assert.equal(b.reason, scrub(long, 200), b.ref)
   assert.equal([...parsed[1].reason].length, 200)
+})
+
+test('bans.json entries with no ref keep their id when the list changes: by a hash of the Discord id, never the id itself', () => {
+  const at = '2026-10-21T12:00:00Z'
+  const a = { discordId: '100000000000000201', reason: 'duping', bannedAt: at, bannedBy: 'jake (dashboard)' }
+  const b = { discordId: '100000000000000202', reason: 'duping', bannedAt: at, bannedBy: 'jake (dashboard)' }
+  const none = { reason: 'old entry', bannedAt: at, bannedBy: 'in-game admin' }
+  const ids = list => R.banRows(R.parseBans(list)).map(x => x.id)
+  const both = ids([a, b, none, { ...none }])
+  assert.equal(new Set(both).size, 4, both.join(', '))
+  for (const id of both) assert.ok(!/\d{15}/.test(id), id)
+  assert.deepEqual(ids([b, none, { ...none }]), both.slice(1))
+  assert.deepEqual(ids([{ ...b, ref: 'B-WG6QYG' }, none]), ['ban:B-WG6QYG', both[2]])
+  assert.match(both[0], /^ban:d[0-9a-f]{12}$/)
 })
