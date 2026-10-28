@@ -943,6 +943,39 @@ test('a Discord ban replacing an F7 ban (guard off) is posted once with the jour
   assert.match(bans[1], /^\*\*GAME BAN LIST \(Discord ban\)\*\* · ban:B-DDDDDD\n[^]*Issued by: Lena\n[^]*Reason: threats/)
 })
 
+test('a Discord ban on the ban list waits for its journal row and is posted once with the journal\'s moderator', async () => {
+  const r = await started()
+  r.data.bans = [banOf(r.now, false)]
+  await r.tick()
+  assert.equal(banPosts(r).length, 0)
+  r.now += 20000
+  r.data.journal = [jbanOf(r.now - 15000)]
+  await r.tick()
+  await r.tick()
+  const bans = banPosts(r)
+  assert.equal(bans.length, 1, bans.join('\n'))
+  assert.match(bans[0], /^\*\*GAME BAN LIST \(Discord ban\)\*\* · ban:B-DDDDDD\n[^]*Issued by: Lena\n[^]*Reason: threats/)
+})
+
+test('a Discord ban with no journal row is posted after 60 s, or once the journal is read past it', async () => {
+  const r = await started()
+  r.data.bans = [banOf(r.now, false)]
+  await r.tick()
+  r.now += 30000
+  await r.tick()
+  assert.equal(banPosts(r).length, 0)
+  r.now += 30000
+  await r.tick()
+  assert.equal(banPosts(r).length, 1)
+  assert.match(banPosts(r)[0], /Issued by: Discord\n/)
+  const later = await started()
+  later.data.bans = [banOf(later.now, false)]
+  later.data.journal = [{ v: 1, id: 'M-TMO00001', kind: 'discord_timeout', at: iso(later.now + 15000), discordId: PEOPLE.alice.discordId, reason: 'spam', by: { name: 'Lena' }, via: 'discord', until: iso(later.now + HOUR) }]
+  later.now += 15000
+  await later.tick()
+  assert.equal(banPosts(later).length, 1)
+})
+
 test('a Discord ban over an F7 ban the guard kept (control) is posted once as a Discord ban', async () => {
   const r = await started()
   r.data.bans = [banOf(T0, true)]

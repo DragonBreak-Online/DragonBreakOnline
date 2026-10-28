@@ -25,6 +25,8 @@ const TITLE_MAX = 100
 const CACHE_MS = 10 * 60000
 const NAME_TTL_MS = 24 * HOUR_MS
 const SAME_BAN_MS = 10 * 60000
+const JOURNAL_WAIT_MS = 60000
+const JOURNAL_LAG_MS = 10000
 const NO_PINGS = Object.freeze({ parse: [] })
 const TAG_NAMES = ['Active', 'Expired', 'Warning', 'Strike', 'Suspended', 'Banned', 'Discord timeout', 'Review']
 const KIND_TAGS = ['Banned', 'Suspended', 'Discord timeout', 'Strike', 'Warning']
@@ -638,6 +640,10 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     return [...ps].sort((a, b) => a - b)
   }
 
+  // The bot writes the ban list before the journal: a Discord ban with no journal row yet waits for its who and why
+  const awaitsJournal = (r, x) => r.source === 'bans' && r.kind === 'discord_ban' && !r._journalId && Number.isFinite(r.atMs)
+    && x.now - r.atMs < JOURNAL_WAIT_MS && !(x.journalAt >= r.atMs + JOURNAL_LAG_MS)
+
   // A Discord ban seen in a second store (the journal's row once the ban list's merged copy is gone) is the same ban
   function aliasOf(acct, r) {
     if (!acct || r.kind !== 'discord_ban' || !r.atMs) return null
@@ -749,7 +755,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     const frozen = id => g.frozen(SOURCE_OF[prefixOf(id)])
     const work = [], quiet = [], unlinked = new Set()
     for (const r of rows) {
-      if (frozen(r.id)) continue
+      if (frozen(r.id) || awaitsJournal(r, x)) continue
       const st = stateOf(r, x)
       const rec = acct && acct.rows[r.id]
       if (!rec) {
@@ -853,6 +859,8 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
       all: snap.rows, ids: new Set(snap.rows.map(r => r.id)), strikes: snap.strikes || new Map(), baseAt: Date.parse(reg.baselinedAt) || 0,
       // A source not read cleanly this tick is frozen: no new post, no ended and no unbanned from it
       frozen: k => !sources[k] || sources[k].status !== 'ok',
+      // How far the journal has been read: its newest row, or a ban list row that took one in
+      journalAt: snap.rows.reduce((t, r) => (r.source === 'journal' || r._journalId) && r.atMs > t ? r.atMs : t, 0),
     }
     budget = maxRequests
     const { groups, hidden } = await groupRows(snap, g)
