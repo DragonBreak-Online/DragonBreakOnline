@@ -13,7 +13,8 @@
 //     gold order: plan.gold.choices lists Jake's two), "goldShortfall": "mint" | "report" (default: the plan's; both fixed
 //     by the first gold step that is done), "strict": true, "partial": false, "from": "DragonBreak Staff",
 //     "resolve": { "<step id>": "done" | "failed" (a step a crash left "started") | "skip" (a take: step that failed or
-//     never ran: nothing taken there, the deliveries go without it) }, "ledgerFile": "<path>" }
+//     never ran: nothing taken there, the deliveries go without it) }, "ledgerFile": "<path>",
+//     "newLedger": true (the first apply only: any later apply without the ledger is refused, never started over) }
 // The plan (mod0422/restore/plan.json, made by build_plan.py from the evidence) lists, per container, the exact entries to
 // remove (plain stacks by base, count, the level the container keeps, the count seen when the plan was made; the 15
 // one-of-a-kind entries by their exact extra data), the gold, and the deliveries (letters).
@@ -305,7 +306,10 @@ module.exports = (api) => {
     const o = openLedger(plan, planSha, ledgerPath); if (o.refused) return { refused: [o.refused] };
     let L = o.L;
     if (L && L.closed) { say(`the ledger ${ledgerPath} was closed by an undo at ${L.closed}: nothing done (a new plan needs a new ledger)`); return { refused: ['closed'] }; }
+    if (L && Object.keys(L.steps).some((k) => k.startsWith('undo:'))) { say(`an undo ran on the ledger ${ledgerPath} and did not close it: nothing done (run the undo again, never an apply)`); return { refused: ['undone'] }; }
     const fresh = !L;
+    // a lost ledger is not a first run: the containers are taken already, and the pool, the gold and the letters are only in it
+    if (fresh && !sim && R.newLedger !== true) { say(`no ledger at ${ledgerPath}: nothing done. The first apply says "newLedger": true; a later one needs the first one's ledger back at that path (its copy)`); return { refused: ['no ledger'] }; }
     if (!L) L = newLedger(plan, planSha);
     if (sim) L = JSON.parse(JSON.stringify(L));
     const save = () => { if (sim) return; L.updated = iso(); writeJson(ledgerPath, L); };

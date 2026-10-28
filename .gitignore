@@ -148,6 +148,8 @@ sprstrip-state.json
 gearstrip-state.json
 restitution-state.json
 mod0422-restore*.json
+# mod-0422 harness fixtures (tools/mod0422/make_fixtures.py): the real plan and castle containers, names characters
+tests/fixtures/mod0422/
 discipline.json
 # Discord accounts held out by a suspension (discipline.js discordFile): ids, never in git
 discipline-discord.json

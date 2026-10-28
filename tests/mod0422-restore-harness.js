@@ -17,6 +17,9 @@ const FIX = path.join(__dirname, 'fixtures', 'mod0422');
 let fails = 0, passes = 0;
 const ok = (c, what, got) => { if (c) passes++; else fails++; console.log(`${c ? 'ok  ' : 'FAIL'}  ${what}${c || got === undefined ? '' : '   ' + JSON.stringify(got).slice(0, 400)}`); };
 const clone = (o) => JSON.parse(JSON.stringify(o));
+// The fixtures are the real plan and castle containers: they name characters, so they stay on the box (gitignored: the remote
+// is public). tools/mod0422/make_fixtures.py writes them; a checkout without them skips.
+if (!fs.existsSync(path.join(FIX, 'plan.json')) || !fs.existsSync(path.join(FIX, 'world.json'))) { require('./expect')('mod0422-restore', `this checkout has no ${FIX} (gitignored: run tools/mod0422/make_fixtures.py)`); console.log('SKIP  this checkout has no mod-0422 fixtures (the real plan names characters: gitignored)'); process.exit(0); }
 const PLAN0 = JSON.parse(fs.readFileSync(path.join(FIX, 'plan.json'), 'utf8'));
 const WORLD = JSON.parse(fs.readFileSync(path.join(FIX, 'world.json'), 'utf8'));
 const { takeFromContainer, packLetters, same, letterId } = require(MOD);
@@ -125,7 +128,7 @@ const env = (props, opts) => {
 const tmp = fs.mkdtempSync(path.join(fs.existsSync('/dev/shm') ? '/dev/shm' : os.tmpdir(), 'mod0422-'));
 const files = (tag) => ({ run: path.join(tmp, `${tag}-run.json`), plan: path.join(tmp, `${tag}-plan.json`), ledger: path.join(tmp, `${tag}-ledger.json`), report: path.join(tmp, `${tag}-report.json`) });
 // The runs below choose the Count (pack, then bank) unless they say otherwise ("noGold": none chosen)
-const writeRun = (F, R, plan) => { fs.writeFileSync(F.plan, JSON.stringify(plan || PLAN0)); const r = Object.assign({ planFile: path.basename(F.plan), ledgerFile: F.ledger, reportFile: F.report }, R); if (r.noGold) delete r.noGold; else if (!r.goldOrder && r.mode !== 'undo') r.goldOrder = ['inventory', 'bank']; fs.writeFileSync(F.run, JSON.stringify(r)); };
+const writeRun = (F, R, plan) => { fs.writeFileSync(F.plan, JSON.stringify(plan || PLAN0)); const r = Object.assign({ planFile: path.basename(F.plan), ledgerFile: F.ledger, reportFile: F.report }, R); if (r.noGold) delete r.noGold; else if (!r.goldOrder && r.mode !== 'undo') r.goldOrder = ['inventory', 'bank']; if (r.mode === 'apply' && r.newLedger === undefined) r.newLedger = true; fs.writeFileSync(F.run, JSON.stringify(r)); };
 const report = (F) => JSON.parse(fs.readFileSync(F.report, 'utf8'));
 const ledger = (F) => JSON.parse(fs.readFileSync(F.ledger, 'utf8'));
 const inv = (props, id) => clone((props.get(id >>> 0).inventory || {}).entries || []);
@@ -319,6 +322,14 @@ ok([...out.values()].reduce((s, n) => s + n, 0) === PLAN0.totals.owedItems, `all
   globalThis.__dboTreasuryZone = globalThis.__dboTreasuryZoneKeep;
 }
 {
+  // a lost ledger is not a first run: a later apply (no "newLedger") does nothing, even one that names the gold order again
+  const G = files('lost'); const pr = mkWorld(WORLD.live, 3000, 0); const E14 = env(pr, { runFile: G.run });
+  writeRun(G, { mode: 'apply', stages: [1], confirm: PLAN0.confirm }); E14.tick();
+  fs.unlinkSync(G.ledger); const s0 = E14.sets.length; const w0 = JSON.stringify([...pr.entries()]);
+  writeRun(G, { mode: 'apply', stages: [1, 2], confirm: PLAN0.confirm, newLedger: false }); E14.tick();
+  ok(E14.sets.length === s0 && JSON.stringify([...pr.entries()]) === w0 && !fs.existsSync(G.ledger) && report(G).refused.includes('no ledger') && E14.logs.some((l) => /no ledger at .*"newLedger": true/.test(l)), 'a lost ledger: a later apply does nothing (no gold taken twice, no take marked done empty, no letter sent again)');
+}
+{
   // a reader online is told once, however many letters
   const G = files('online'); const pr = mkWorld(WORLD.live, 3000, 0); const E12 = env(pr, { runFile: G.run, online: [A.player] });
   writeRun(G, { mode: 'apply', stages: [1], confirm: PLAN0.confirm }); E12.tick();
@@ -468,6 +479,16 @@ const sameWorldContainers = (pr) => PLAN0.containers.every((c) => { const a = mu
   globalThis.__dboTreasuryZone = keepT;
 }
 {
+  // an undo that did not close the ledger (one letter's parcel changed in the mailbox): an apply afterwards sends nothing again
+  const G = files('undo4'); const pr = mkWorld(WORLD.live, 3000, 0); const E = env(pr, { runFile: G.run });
+  writeRun(G, { mode: 'apply', stages: [1], confirm: PLAN0.confirm }); E.tick();
+  const m = pr.get(A.mike)['private.pigeons'].find((x) => String(x.id).startsWith(LID('mike'))); m.parcel.items.push({ baseId: 0x12345, count: 1 });
+  writeRun(G, { mode: 'undo', confirm: `undo-${PLAN0.confirm}` }); E.tick();
+  const Lu = ledger(G); const w1 = JSON.stringify([...pr.entries()]); const s1 = E.sets.length;
+  writeRun(G, { mode: 'apply', stages: [1, 2], confirm: PLAN0.confirm }); E.tick();
+  ok(!Lu.closed && Object.values(Lu.letters).some((l) => l.status === 'recalled') && E.sets.length === s1 && JSON.stringify([...pr.entries()]) === w1 && (report(G).refused || []).includes('undone'), 'undo not closed (a letter in conflict): a later apply is refused, no recalled letter sent again', [Lu.closed, E.sets.length - s1, report(G).refused]);
+}
+{
   // the generation guard: a gamemode.js reload without this module (a rollback) stops its timer; the run file is not read
   const G = files('gen'); const pr = mkWorld(WORLD.live, 3000, 0); const timers = new Map(); const keepTimers = globalThis.__dboTimers; globalThis.__dboTimers = timers;
   const myGen = () => {}; globalThis.__dboRunCommand = myGen;
@@ -487,6 +508,7 @@ const src = fs.readFileSync(MOD, 'utf8');
 ok(!/mp\.on\(|__dboHandlers *= |for \(const ev of \[/.test(src), 'no mp handler: the hot-reload grep finds nothing in the module');
 ok(/require\(MOD0422_JS\)/.test(fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8')), 'gamemode.js loads the module');
 ok(fs.readFileSync(path.join(SERVER, '.gitignore'), 'utf8').includes('mod0422-restore*.json'), 'the run, ledger and report files are gitignored');
+ok(/^tests\/fixtures\/mod0422\/$/m.test(fs.readFileSync(path.join(SERVER, '.gitignore'), 'utf8')), 'the fixtures are gitignored (the real plan names characters; the remote is public)');
 if (process.env.M0422_KEEP) console.log(`kept ${tmp}`); else try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) { /* tmp */ }
 console.log(`${passes} passed, ${fails} failed`);
 process.exit(fails ? 1 : 0);
