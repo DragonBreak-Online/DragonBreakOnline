@@ -148,9 +148,11 @@ module.exports = (api) => {
   const stateDir = () => { try { return path.dirname(fs.realpathSync(path.resolve('world'))); } catch (e) { return path.resolve('.'); } };
   const REG = path.join(stateDir(), 'decor.json');
   const reg = () => {
-    if (S.reg) return S.reg;
-    try { S.reg = JSON.parse(fs.readFileSync(REG, 'utf8')); } catch (e) { S.reg = null; }
-    if (!S.reg || typeof S.reg !== 'object') S.reg = {};
+    if (!S.reg) {
+      try { S.reg = JSON.parse(fs.readFileSync(REG, 'utf8')); } catch (e) { S.reg = null; }
+      if (!S.reg || typeof S.reg !== 'object') S.reg = {};
+    }
+    // Every call: a hot reload keeps the S.reg an older decor.js read, which may lack a map added since (recalled, 28 Oct)
     S.reg.places = S.reg.places || {}; S.reg.owed = S.reg.owed || {}; S.reg.carpentry = S.reg.carpentry || {}; S.reg.recalled = S.reg.recalled || {};
     return S.reg;
   };
@@ -452,6 +454,8 @@ module.exports = (api) => {
   // ---- place, move, remove ---------------------------------------------------------------------------------------------
   const startNew = (a, piece) => {
     if (!C.enabled) return personal(a, 'Decorating is not open yet.');
+    // A /decor find from before a hot reload may still hold a piece blockBases has since taken out
+    if (BLOCKED.has(String(piece.desc).toLowerCase())) return personal(a, 'That is not in the catalogue.');
     const pl = here(a);
     if (!pl) return personal(a, 'Stand inside your own home to decorate it.');
     if (!mayDecorate(a, pl)) return personal(a, 'Only the owner, or someone the owner named with /decor grant, decorates here.');
