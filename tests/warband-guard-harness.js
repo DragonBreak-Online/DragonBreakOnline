@@ -1,5 +1,6 @@
-// /warband guard (Nat, 28 Oct, necromancer events): a band holds its spot and attacks any non-staff player who comes within
-// the radius, never staff and never its own GM, drops a target that leaves, goes back to its post, and follow or stay ends it.
+// /warband defend (guard) (Nat, 28 Oct, necromancer events, "or defend an area"): a band defends the area around where its
+// GM stood, attacks any non-staff player inside, never staff and never its own GM, drops a target that leaves, gives up past
+// the leash, goes back to its posts, and follow or stay ends it.
 // Loads the real warband.js against a mock companion system and world.
 //   node tests/warband-guard-harness.js   (from server/)
 'use strict';
@@ -60,44 +61,63 @@ at(STAFF, 300, 0); at(GMALT, 0, 300); at(DOWNED, -300, 0); at(FAR, 5000, 0); at(
 run('raise bandit melee 3');
 check('three raised for the test', band().length === 3, band().length);
 
-// ---- guard: the nearest non-staff player in range is attacked, staff and the rest are not --------------------------------
+// ---- defend: an area centred on the GM; the nearest non-staff player inside is attacked, staff and the rest are not -----
 online = [GM, STAFF, FAR, GMALT, DOWNED, ELSEWHERE];
-let r = run('guard');
-check('/warband guard holds the band (stay) and answers with the radius', all((c) => c.staying) && /guards this spot: any player within 21 m who is not staff/.test(r), r);
+let r = run('defend');
+check('/warband defend holds the band (stay) and answers with the area around the GM', all((c) => c.staying) && /defends this area: any player within 21 m of where you stand who is not staff is attacked, and none chases past 29 m/.test(r), r);
 check('with only staff, the GM\'s own alt, a downed player, someone far off and someone in another cell near, nobody is attacked', all((c) => !c.targetId), band().map((c) => c.targetId));
 online.push(NEAR);
 tick();
-check('a player who walks within the radius (1200 of 1500) is attacked by the band', all((c) => c.targetId === NEAR), band().map((c) => c.targetId));
-// The staff member on an enemy side, so the friendly-GM rule does not spare them and only guard's own rule can
+check('a player who walks into the area (1200 of 1500 from the centre) is attacked by the band', all((c) => c.targetId === NEAR), band().map((c) => c.targetId));
+// The staff member on an enemy side, so the friendly-GM rule does not spare them and only defend's own rule can
 commands.warband(GM, 'side Necromancers'); commands.warband(STAFF, 'side Legion');
-check('a staff target, even a GM on an enemy side, is refused by the hit rule while guarding', globalThis.__dboWarbandRefusesHit(band()[0].id, STAFF) === true);
-check('...but the player in range is not', globalThis.__dboWarbandRefusesHit(band()[0].id, NEAR) === false);
+check('a staff target, even a GM on an enemy side, is refused by the hit rule while defending', globalThis.__dboWarbandRefusesHit(band()[0].id, STAFF) === true);
+check('...but the player in the area is not', globalThis.__dboWarbandRefusesHit(band()[0].id, NEAR) === false);
 
-// ---- the target leaves: dropped, and the band goes back to its post -------------------------------------------------------
+// ---- the target leaves the area: dropped, and the band goes back to its posts --------------------------------------------
 const post = band()[0].id;
 put(post, 'pos', [900, 0, 0]);   // it chased the player
 at(NEAR, 4000, 0);
 moves.length = 0;
 tick();
-check('a target that leaves the radius is dropped (back on stay)', all((c) => !c.targetId && c.staying), band().map((c) => [c.targetId, c.staying]));
-check('the NPC that chased it is put back on its post', moves.some(([id, v]) => id === post && Math.hypot(v.pos[0] - props.get(`${GM}|pos`)[0], v.pos[1]) < 200), moves);
+check('a target that leaves the area is dropped (back on stay)', all((c) => !c.targetId && c.staying), band().map((c) => [c.targetId, c.staying]));
+check('the NPC that chased it is put back on its post', moves.some(([id, v]) => id === post && Math.hypot(v.pos[0], v.pos[1]) < 200), moves);
 
-// ---- a radius of its own, and out of range ------------------------------------------------------------------------------
-at(NEAR, 1200, 0);
-run('guard 800');
-check('/warband guard 800: the player at 1200 is out of range and ignored', all((c) => !c.targetId), band().map((c) => c.targetId));
-check('a radius outside 200-4000 is refused with the usage', /Usage: \/warband guard \[radius\]/.test(run('guard 50')));
+// ---- the leash: a target still inside, but the NPC past the edge plus 500, gives up and goes back -------------------------
+at(NEAR, 1400, 0);
+tick();
+check('(the player back inside at 1400 is attacked again)', all((c) => c.targetId === NEAR));
+put(post, 'pos', [2100, 0, 0]);  // 1500 + 500 + 100 from the centre
+moves.length = 0;
+tick();
+const leashed = companions.get(post);
+check('an NPC chased past the area\'s edge plus the leash drops its target', !leashed.targetId && leashed.staying, [leashed.targetId, leashed.staying]);
+check('...and is put back on its post', moves.some(([id, v]) => id === post && Math.hypot(v.pos[0], v.pos[1]) < 200), moves);
+check('...while the others inside keep fighting', band().filter((c) => c.id !== post).every((c) => c.targetId === NEAR));
+
+// ---- the area stays where it was ordered, not where the GM walks ----------------------------------------------------------
+run('stay');
+at(GM, 3000, 0); at(NEAR, 3100, 0); for (const c of band()) put(c.id, 'pos', [2900, 0, 0]);   // the band came with its GM
+run('defend');
+at(GM, 0, 0);
+tick();
+check('the area stays where the order was given: the player at 3100 is attacked after the GM walks away', all((c) => c.targetId === NEAR), band().map((c) => c.targetId));
+run('stay'); at(GM, 0, 0); at(NEAR, 1200, 0); for (const c of band()) put(c.id, 'pos', [100, 0, 0]);
+
+// ---- a radius of its own, out of range, and the guard alias ---------------------------------------------------------------
+run('defend 800');
+check('/warband defend 800: the player at 1200 is outside the area and ignored', all((c) => !c.targetId), band().map((c) => c.targetId));
+check('a radius outside 200-4000 is refused with the usage', /Usage: \/warband defend \[radius\]/.test(run('defend 50')));
+r = run('guard');
+check('/warband guard is the same order (an alias)', /defends this area/.test(r) && all((c) => c.targetId === NEAR), r);
 
 // ---- stay or follow ends it ----------------------------------------------------------------------------------------------
-run('guard');
-tick();
-check('(guarding again, the player at 1200 is attacked)', all((c) => c.targetId === NEAR));
 run('stay');
 tick();
-check('/warband stay ends guard: no attack on the next pass', all((c) => !c.targetId), band().map((c) => c.targetId));
-run('guard'); run('follow'); tick();
+check('/warband stay ends defending: no attack on the next pass', all((c) => !c.targetId), band().map((c) => c.targetId));
+run('defend'); run('follow'); tick();
 check('/warband follow ends it too', all((c) => !c.targetId && !c.staying));
-check('help names guard', /guard \[radius\]/.test(run('nonsense')));
+check('help names defend', /defend \[radius\]/.test(run('nonsense')));
 
 process.chdir(home);
 try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* left for the OS */ }
