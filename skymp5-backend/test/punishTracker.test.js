@@ -307,6 +307,37 @@ test('a source that cannot be read is frozen: no ENDED and no UNBANNED from it, 
   assert.ok(all.some(c => c.startsWith('**ENDED** · suspension dsc:57:1')))
 })
 
+test('a frozen source keeps its held rows in force: no CLEAR, Expired or archive, and the thread is synced once it reads again', async () => {
+  const r = await started()
+  r.data.bans = [{ ref: 'B-AAAAAA', discordId: PEOPLE.alice.discordId, reason: 'cheating', bannedAt: iso(T0 - HOUR), bannedBy: 'lena (dashboard)' }]
+  r.data.discipline = { 57: [entry(1, 'strike', T0 - HOUR)] }
+  await r.tick()
+  const t = r.named('alice_rp')
+  assert.match(t.messages[0].content, /Status: \*\*ACTIVE\*\*/)
+  // The ban list goes missing while the strike is overturned: the ban is still held, so the thread stays as it is
+  r.now += HOUR
+  r.data.bans = []
+  r.status = { bans: { status: 'missing' } }
+  r.data.discipline[57][0].overturned = { by: 'Jake #JAKE', at: iso(r.now), reason: 'wrong player' }
+  await r.tick()
+  assert.ok(t.messages.some(m => m.content.startsWith('**OVERTURNED** · strike dsc:57:1')))
+  assert.match(t.messages[0].content, /Status: \*\*ACTIVE\*\*/)
+  assert.equal(t.archived, false)
+  assert.ok(!t.tags.includes(tagId('Expired')))
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].rows['ban:B-AAAAAA'].state, 'running')
+  // Back with the ban still there: the first tick brings the starter up to date, still in force
+  r.now += 60000
+  r.status = {}
+  r.data.bans = [{ ref: 'B-AAAAAA', discordId: PEOPLE.alice.discordId, reason: 'cheating', bannedAt: iso(T0 - HOUR), bannedBy: 'lena (dashboard)' }]
+  await r.tick()
+  assert.match(t.messages[0].content, /Status: \*\*ACTIVE\*\*/)
+  assert.match(t.messages[0].content, /On the game ban list \(ban:B-AAAAAA\)/)
+  assert.match(t.messages[0].content, /overturned 1/)
+  assert.equal(t.archived, false)
+  assert.ok(t.tags.includes(tagId('Active')) && t.tags.includes(tagId('Banned')))
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].sync, false)
+})
+
 test('a new tracker on the same registry posts nothing twice; a thread whose creation lost its answer is found, not made again', async () => {
   const r = await started()
   r.data.discipline = { 57: [entry(1, 'strike', T0 - HOUR)] }

@@ -753,6 +753,9 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     const strikes = profileIds.reduce((n, p) => n + ((g.strikes && g.strikes.get(p)) || 0), 0)
     const x = { ...g, key, profileIds, strikes, inForce: rows.some(r => !isFold(r) && IN_FORCE.has(stateOf(r, g))) }
     const frozen = id => g.frozen(SOURCE_OF[prefixOf(id)])
+    // A frozen source's row held in force but not read as in force: the starter, tags and archive wait until it reads again
+    const held = !!acct && Object.entries(acct.rows).some(([id, rec]) => frozen(id) && IN_FORCE.has(rec.state)
+      && !rows.some(r => r.id === id && IN_FORCE.has(stateOf(r, x))))
     const work = [], quiet = [], unlinked = new Set()
     for (const r of rows) {
       if (frozen(r.id) || awaitsJournal(r, x)) continue
@@ -792,7 +795,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     // A failed lookup is tried again after CACHE_MS, not every tick
     const due = !!(acct && acct.threadId && !key.startsWith('p:') && s.guildId && x.now - (acct.usernameAt || 0) > NAME_TTL_MS && x.now - (acct.nameTriedAt || 0) > CACHE_MS)
     const recreate = !!(acct && acct.recreate && x.inForce)
-    if (!work.length && !quiet.length && !(acct && acct.threadId && (acct.sync || due)) && !recreate) return
+    if (!work.length && !quiet.length && !(acct && acct.threadId && ((acct.sync && !held) || due)) && !recreate) return
     if (!acct) acct = reg.accounts[key] = newAccount()
     acct.profileIds = [...new Set([...(acct.profileIds || []), ...profileIds])].sort((a, b) => a - b)
     for (const q of quiet) acct.rows[q.id] = { ...q.base, ...q.extra, state: q.st }
@@ -812,7 +815,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     } else if (work.length && acct.state === 'archived') await unarchive(acct)
     const at = w => (w.r ? w.r.atMs : w.rec.at) || 0
     for (const w of work.sort((a, b) => Number(!a.isNew) - Number(!b.isNew) || at(a) - at(b))) await postRow(key, acct, w, x)
-    if (acct.sync) await syncThread(key, acct, rows, x)
+    if (acct.sync && !held) await syncThread(key, acct, rows, x)
   }
 
   async function groupRows(snap, g) {
