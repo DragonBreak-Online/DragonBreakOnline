@@ -162,9 +162,10 @@ const BUILTIN = new Set(['say', 'low', 'whisper', 'wide', 'shout', 'me', 'melow'
 const TEXT = {
   needTag: () => 'Name the player by #TAG from the console.',
   target: (x) => `${x} is not online (or no such tag).`,
-  targetAny: (x) => `No character carries ${x} (or more than one does).`,
+  // (these three start with 'Cannot', so the player log marks them refused; claude-jake-pc, 28 Oct)
+  targetAny: (x) => `Cannot find ${x}: no character carries it, or more than one does.`,
   // A #TAG must name one character: more than one live form carrying it is refused, even with one of them online
-  tagShared: (x) => `More than one character carries ${x}, so the console will not guess which one you mean. Run it in game on the player you mean.`,
+  tagShared: (x) => `Cannot tell who ${x} is: more than one character carries it, so the console will not guess which one you mean. Run it in game on the player you mean.`,
   tagIndex: (x) => `The game could not check whether another character carries ${x}, so it did not act. Try again, or run it in game.`,
   // The dashboard's account check (targetProfileId) and the rank check (rule flag rank)
   targetProfile: (x) => `${x} is not a character of the account you opened, so nothing was done. Open the player again and pick the character from their list.`,
@@ -182,7 +183,7 @@ const TEXT = {
   notYet: (cmd) => `/${cmd} is not available from the console in v1.`,
   denied: (cmd) => `/${cmd} is switched off for the console in the game's config.`,
   badArgs: (cmd) => `From the console: ${ALLOW[cmd] ? ALLOW[cmd].usage : `/${cmd}`}`,
-  badWord: (x) => { const [cmd, w] = String(x).split(' '); return `"${w}" is not a word the console takes for /${cmd} (letters, digits and ' # : / . _ - only). ${TEXT.badArgs(cmd)}`; },
+  badWord: (x) => { const [cmd, w] = String(x).split(' '); return `Cannot take "${w}" for /${cmd}: the console takes letters, digits and ' # : / . _ - only. ${TEXT.badArgs(cmd)}`; },
   badName: () => 'Names: 2-31 letters, spaces, apostrophes or hyphens, starting with a letter.',
   // The tagKindReason refusals: the subject is the usage (badKind), the config's maxSuspendDays (badLength)
   badKind: (usage) => `From the console: ${usage || '/discipline'}. A player's record and /discipline list stay in game.`,

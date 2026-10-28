@@ -227,10 +227,12 @@ module.exports = (K) => {
   const targetsOf = (rest, spec) => {
     if (!spec || !rest.length) return undefined;
     const from = Math.max(0, Number(spec.from) || 0);
-    let words = rest.slice(from, spec.to === undefined ? undefined : Number(spec.to));
+    // A ticket or call word ('ticket:#4832') is never the target: its #TAG is not looked at and it is no part of the name
+    const isRef = (w) => /^(ticket|call):/i.test(w);
+    let words = rest.slice(from, spec.to === undefined ? undefined : Number(spec.to)).filter((w) => !isRef(w));
     // "Name Part #TAG" may run past a one-word slot: the words up to the tag are the query
-    const tagAt = rest.findIndex((w, i) => i >= from && /^#[A-Za-z0-9]{4}$|.#[A-Za-z0-9]{4}$/.test(w));
-    if (tagAt >= from && tagAt - from < 6) words = rest.slice(from, tagAt + 1);
+    const tagAt = rest.findIndex((w, i) => i >= from && !isRef(w) && /^#[A-Za-z0-9]{4}$|.#[A-Za-z0-9]{4}$/.test(w));
+    if (tagAt >= from && tagAt - from < 6) words = rest.slice(from, tagAt + 1).filter((w) => !isRef(w));
     const id = resolveTarget(words.join(' '), spec.lookup || 'online');
     if (!id) return undefined;
     const party = partyOf(id, 'target');

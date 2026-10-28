@@ -534,11 +534,12 @@ module.exports = (api) => {
     const s = sentenceOf(a);
     if (!s || leftOf(s) <= 0) return null;
     const door = Number(s.door) >>> 0;
-    const shared = Object.values(HOLD_JAILS).some((list) => (Array.isArray(list) ? list : []).some((c) => c && c.shared && idOf(c.door) === door));
+    const occ = occupantOf(door), mine = !!occ && occ.prisoner === a;
+    const shared = !mine && Object.values(HOLD_JAILS).some((list) => (Array.isArray(list) ? list : []).some((c) => c && c.shared && idOf(c.door) === door));
     let release = false;
     try {
-      const b = Number(by) >>> 0, occ = occupantOf(door);
-      release = by !== undefined && b !== a && !!occ && occ.prisoner === a && (isLeadStaff(b) || cellOf(b) === s.cell) && lawfulAt(b, door) && !concordatHeld(b, s);
+      const b = Number(by) >>> 0;
+      release = by !== undefined && b !== a && mine && isCellDoor(door) && (isLeadStaff(b) || cellOf(b) === s.cell) && lawfulAt(b, door) && !concordatHeld(b, s);
     } catch (e) { release = false; }
     return { cell: jailName(s.cell), release, concordat: !!s.concordat, shared };
   };

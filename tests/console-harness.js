@@ -592,7 +592,7 @@ reset();
   check('7b. ...and so are /chargen and /wwremote clear', send('/chargen #8KWH').rep.why === 'target' && send('/wwremote clear #8KWH').rep.why === 'target' && !raceMenus.length);
   store.get(alt)['private.charTag'] = '8KWH';
   const dup = send('/rename #8KWH Bobby').rep;
-  check('7b. a tag two offline characters carry is refused (tagShared), nobody renamed', dup.why === 'tagShared' && store.get(A.bob).appearance.name === 'Bob' && /More than one character carries #8KWH/.test(header(dup)), dup);
+  check('7b. a tag two offline characters carry is refused (tagShared), nobody renamed', dup.why === 'tagShared' && store.get(A.bob).appearance.name === 'Bob' && /Cannot tell who #8KWH is: more than one character carries it/.test(header(dup)), dup);
   store.get(alt)['private.charTag'] = 'BOB2';
   globalThis.__dboFormGone = (id) => (id >>> 0) === alt;
   check('7b. a deleted character in the index is not a target', send('/rename #BOB2 Robin').rep.why === 'targetAny' && store.get(alt).appearance.name === 'Roberta');
@@ -631,7 +631,9 @@ reset();
   check('7c. "/fixloc Neem #ZZZZ" (a tag nobody carries) moves nobody, not Neem #LBRF nor an online Neem', moved().length === 0, moved());
   check('7c. ...and says it cannot, so the player log marks it refused', /Cannot move #ZZZZ/.test(told()), told());
   fix('Lydia #LBRF');
-  check('7c. "/fixloc Lydia #LBRF" binds the tag: the offline #LBRF carrier, never the online Lydia', moved().join() === 'Neem #LBRF', moved());
+  // (28 Oct follow-up: the words before a #TAG must be its carrier's own name, as /unstuck has it; Jake: exact only)
+  check('7c. "/fixloc Lydia #LBRF" moves nobody, neither the #LBRF carrier nor Lydia: Lydia is not their name', moved().length === 0
+    && /Cannot move Lydia #LBRF: the words before #LBRF are not that character's name; use the #TAG alone, or the full name with it\.$/.test(told()), [moved(), told()]);
   fix('#LBRF');
   check('7c. the bare tag "/fixloc #LBRF" moves Neem #LBRF', moved().join() === 'Neem #LBRF', moved());
   const dup = actor(0xff000d04, { name: 'Neem Two', tag: 'LBRF', profile: 96 });
@@ -651,7 +653,7 @@ reset();
   // 7d. staff /unstuck names its target with the same lookup (staffTargetOf), the real one here
   const neema2 = actor(0xff000d05, { name: 'Neem', tag: 'NNN3', profile: 95, online: true });
   check('7d. staffTargetOf "Neem #LBRF" with an online namesake is the offline Neem #LBRF', G.staffTargetOf(A.jake, 'Neem #LBRF') === neem);
-  check('7d. staffTargetOf "Lydia #LBRF" is the #LBRF carrier, never Lydia', G.staffTargetOf(A.jake, 'Lydia #LBRF') === neem);
+  check('7d. staffTargetOf "Lydia #LBRF" is nobody (the words are not the carrier\'s name), never Lydia', G.staffTargetOf(A.jake, 'Lydia #LBRF') === 0 && /the words before #LBRF are not that character's name/.test(told()), told());
   check('7d. staffTargetOf "Neem #ZZZZ" is nobody, and says it cannot', G.staffTargetOf(A.jake, 'Neem #ZZZZ') === 0 && /Cannot move #ZZZZ/.test(told()), told());
   store.delete(neema2);
   store.delete(neem); store.delete(neema); delete mp.findFormsByPropertyValue;
@@ -829,7 +831,7 @@ reset();
   [m, h] = remote('/unstuck Ralof Temple #RT01');
   check('7f. ...and with no place, the temple', m === 'Ralof Temple #RT01@temple', [m, h]);
   [m, h] = remote('/unstuck #LBRF bruma');
-  check('7f. an unknown word where the place goes moves nobody: "Unknown place bruma: hub or respawn"', m === '' && h === 'Unknown place bruma: hub or respawn.', [m, h]);
+  check('7f. an unknown word where the place goes moves nobody: "Cannot move ...: unknown place bruma"', m === '' && h === 'Cannot move #LBRF bruma: unknown place bruma; the place is hub or respawn.', [m, h]);
   [m, h] = remote('/unstuck hub #LBRF');
   check('7f. a place typed first gets the usage, nobody moves', m === '' && /^Usage: \/unstuck <player\|#TAG> \[hub\|respawn\]/.test(h), [m, h]);
   check('7f. ...typed in game the same', typed('hub #LBRF') === '' && /^Usage: \/unstuck/.test(told()), told());
@@ -902,7 +904,7 @@ reset();
   where(); reset(); G.commands.get('fixloc').fn(A.jake, '#LLX8');
   check('7f. ...typed "/fixloc #LLX8" the same', moved() === '' && /Cannot move #LLX8/.test(told()), [moved(), told()]);
   [m, h] = remote('/fixloc #LLX8');
-  check('7f. ...and the console refuses it itself (tagShared)', m === '' && /More than one character carries #LLX8/.test(h), [m, h]);
+  check('7f. ...and the console refuses it itself (tagShared)', m === '' && /^Cannot tell who #LLX8 is: more than one character carries it/.test(h), [m, h]);
   store.delete(ghost);
   check('7f. with Ghost gone, "/fixloc #LLX8" moves Lydia', (() => { where(); reset(); G.commands.get('fixloc').fn(A.jake, '#LLX8'); return moved(); })() === 'Lydia #LLX8@hub', moved());
   // C's review: a place word typed before the #TAG is refused unless it is part of the carrier's own name; a tag glued to a word
@@ -928,7 +930,7 @@ reset();
   check('7f. "ticket:gm_4" passes the console and reaches the line', m === 'Neem #LBRF@hub' && audits().some((l) => / via \/unstuck \(ticket:gm_4\) from the remote console /.test(l)), [m, h, rep.why]);
   [m, h, rep] = remote('/unstuck #LBRF hub <@1>');
   check('7f. a word that is not plain is named (its other characters as ?), with the usage, and nobody moves', m === '' && rep.why === 'badWord'
-    && h === '"??1?" is not a word the console takes for /unstuck (letters, digits and \' # : / . _ - only). From the console: /unstuck <#TAG|name> [hub|respawn] [ticket:<id>]', [m, h]);
+    && h === 'Cannot take "??1?" for /unstuck: the console takes letters, digits and \' # : / . _ - only. From the console: /unstuck <#TAG|name> [hub|respawn] [ticket:<id>]', [m, h]);
   // U5: staff are told whom, and the hub
   store.get(neem).isDead = true;
   check('7f. staff "/unstuck #LBRF" of a dead offline Neem: nobody moves, staff are told whom and the hub way', typed('#LBRF') === ''
@@ -1160,7 +1162,7 @@ reset();
   P('F1.c', 'control console /unstuck Bob hub ticket:4832', remote('/unstuck Bob hub ticket:4832'), (m) => m === 'Bob #8KWH@hub');
   P('F1.c', 'control console /unstuck #4832 respawn', remote('/unstuck #4832 respawn'), (m) => m === 'Selene #4832@temple');
   P('N7', 'typed /unstuck Lydia #LBRF hub (name and tag disagree) moves nobody', typed('unstuck', 'Lydia #LBRF hub'), none);
-  P('N7', 'typed /fixloc Lydia #LBRF still binds the tag (7c)', typed('fixloc', 'Lydia #LBRF'), (m) => m === 'Neem #LBRF@hub');
+  P('N7', 'typed /fixloc Lydia #LBRF moves nobody now (the words before the tag are not its name; 28 Oct follow-up)', typed('fixloc', 'Lydia #LBRF'), (m, h) => m === '' && /^Cannot move Lydia #LBRF: the words before #LBRF/.test(h));
   // F5: the suggestion never names a ticket's tag
   P('F5', 'console /unstuck Bob hub Ticket #4832: no suggestion to move #4832', remote('/unstuck Bob hub Ticket #4832'), (m, h) => m === '' && !/\/unstuck #4832/.test(h));
   P('F5.c', 'control console /unstuck Neem hub #LBRF keeps the put-after reply', remote('/unstuck Neem hub #LBRF'), (m, h) => m === '' && /as \/unstuck #LBRF hub\./.test(h));
@@ -1253,6 +1255,48 @@ reset();
   }
   for (const id of [neem, ivar, ivarT, hubSmith, guard, zed, anna]) store.delete(id);
   delete store.get(A.bob).locationalData; delete mp.findFormsByPropertyValue;
+}
+
+// ---- 7k. follow-up 2 (28 Oct, Jake: "Yes, build them"): /fixloc's #TAG binds only after its carrier's own name, as /unstuck's;
+// every refusal the player log reads starts with 'Cannot' ------------------------------------------------------------------
+reset();
+{
+  mp.findFormsByPropertyValue = (k, v) => [...store].filter(([, o]) => (k === 'private.indexed.tagKey' ? String(o['private.charTag'] || '').toLowerCase() === v
+    : k === 'private.indexed.nameKey' ? String((o.appearance || {}).name || '').toLowerCase() === v : false)).map(([id]) => id);
+  const HUB = '17482:DragonBreak Hub.esp';
+  const hub = actor(0xff000f51, { name: 'Hub', tag: '8Q99', profile: 151 });
+  const neema = actor(0xff000f52, { name: 'Neema', tag: 'R4BQ', profile: 152, online: true });
+  const ids = [hub, neema, A.jake];
+  const where = () => { for (const id of ids) delete store.get(id).locationalData; };
+  const at = (id) => (store.get(id).locationalData || {}).cellOrWorldDesc || '';
+  const moved = () => ids.filter((id) => at(id)).map((id) => `${G.display(id)}@${at(id) === HUB ? 'hub' : at(id)}`).join(',');
+  const told = () => ((chatWrites.filter(([id]) => id === A.jake).slice(-1)[0] || [])[1] || '').split('|').slice(1).join('|');
+  const typed = (args) => { where(); reset(); G.commands.get('fixloc').fn(A.jake, args); return [moved(), told()]; };
+  const remote = (text) => { where(); reset(); const { rep } = send(text, { src: 'discord' }); return [moved(), header(rep)]; };
+  let m, h;
+  [m, h] = typed('Hubert #8Q99');
+  const wordsRefusal = h;
+  check('7k. typed "/fixloc Hubert #8Q99" moves nobody, never Hub #8Q99: Hubert is not their name', m === '' && h === 'Cannot move Hubert #8Q99: the words before #8Q99 are not that character\'s name; use the #TAG alone, or the full name with it.', [m, h]);
+  [m, h] = remote('/fixloc Hubert #8Q99');
+  check('7k. ...from the console the same', m === '' && /^Cannot move Hubert #8Q99: the words before #8Q99/.test(h), [m, h]);
+  [m, h] = typed('Neem Respawn No #R4BQ');
+  check('7k. typed "/fixloc Neem Respawn No #R4BQ" moves nobody, never Neema #R4BQ', m === '' && /^Cannot move Neem Respawn No #R4BQ: the words before #R4BQ/.test(h), [m, h]);
+  [m, h] = typed('Hub #8Q99');
+  check('7k. ...while "/fixloc Hub #8Q99" (its own name) moves Hub', m === 'Hub #8Q99@hub', [m, h]);
+  [m, h] = typed('#8Q99');
+  check('7k. ...and so does "/fixloc #8Q99" alone', m === 'Hub #8Q99@hub', [m, h]);
+  [m, h] = typed('neema #R4BQ');
+  check('7k. ...and "/fixloc neema #R4BQ" (its name in any case) moves Neema', m === 'Neema #R4BQ@hub', [m, h]);
+  [m, h] = typed('Neema#R4BQ');
+  check('7k. ...and a glued "Neema#R4BQ" too', m === 'Neema #R4BQ@hub', [m, h]);
+  // 'Cannot' first: the player log's REFUSAL_RX marks each refused
+  const RX = require(path.join(ROOT, 'playerlog-rules.js')).REFUSAL_RX;
+  where(); reset(); G.commands.get('unstuck').fn(A.jake, '#8Q99 bruma');
+  const texts = [told(), rules.TEXT.targetAny('#ZZZZ'), rules.TEXT.tagShared('#LLX8'), rules.TEXT.badWord('unstuck ??1?'), wordsRefusal];
+  check('7k. "Unknown place", targetAny, tagShared, badWord and the /fixloc words refusal all start with Cannot and read as refused',
+    texts.every((t) => /^Cannot /.test(t) && RX.test(t)) && /unknown place bruma/.test(texts[0]), texts);
+  for (const id of [hub, neema]) store.delete(id);
+  delete mp.findFormsByPropertyValue;
 }
 
 // ---- 12. reply state is "ran", with the handler's own first line ------------------------------------------------------------------------

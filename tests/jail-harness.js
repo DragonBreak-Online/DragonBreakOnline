@@ -25,7 +25,7 @@ let wallClock = 1780000000000;
 Date.now = () => wallClock;
 const MIN = 60000;
 
-const GUARD = 0x14, PRISONER = 0x15, OTHER = 0x16, MINER = 0x17, LEAD = 0x18;
+const GUARD = 0x14, PRISONER = 0x15, OTHER = 0x16, MINER = 0x17, LEAD = 0x18, GATED = 0x19, ELSE = 0x1a;
 const CELL_DOOR = 0x6c438, LOAD_DOOR = 0x6c51f, INN_DOOR = 0x7001;
 const props = new Map();
 const put = (id, p, v) => props.set(id + '|' + p, v);
@@ -164,6 +164,20 @@ check('the watch puts someone in the shared yard', !!mined && (props.get(MINER +
 check('...whose sentence is shared, so nobody gets Release, a Lead GM neither', globalThis.__dboJailSentence(MINER, GUARD).shared === true && globalThis.__dboJailSentence(MINER, LEAD).release === false
   && globalThis.__dboJailSentence(MINER, GUARD).release === false, globalThis.__dboJailSentence(MINER, LEAD));
 put(MINER, 'private.dboSentence', null);
+// C's set-6 review (28 Oct): a guard locking someone at the yard's own gate (as Cidhna Mine's bf4d4) puts them behind it, so the
+// gate holds them: not the shared yard, and a Lead GM gets Release there. The end state of the door menu's imprison:
+const YARD_GATE = idOf('6c4ff:BSHeartland.esm');
+at(YARD_GATE, JAIL_CELL, [0, 900, 0]); put(YARD_GATE, 'baseDesc', DOOR_BASE);
+put(GATED, 'private.dboSentence', { door: YARD_GATE, cell: JAIL_CELL.toLowerCase(), totalMs: 10 * MIN, servedMs: 0, by: 'Guard', at: wallClock, arrester: 0 });
+check('...(the same sentence, its gate holding nobody, is the shared yard)', YARD_GATE === idOf('6c4ff:BSHeartland.esm') && globalThis.__dboJailSentence(GATED, LEAD).shared === true, globalThis.__dboJailSentence(GATED, LEAD));
+put(YARD_GATE, 'private.dboCell', { prisoner: GATED, name: 'Gated', picked: false });
+check('locked at the yard gate itself: not shared, and a Lead GM gets Release', globalThis.__dboJailSentence(GATED, LEAD).shared === false && globalThis.__dboJailSentence(GATED, LEAD).release === true, globalThis.__dboJailSentence(GATED, LEAD));
+put(GATED, 'private.dboSentence', null); put(YARD_GATE, 'private.dboCell', null);
+// a sentence whose door holds someone else: nobody gets Release there for them, and it is no shared yard
+put(ELSE, 'private.dboSentence', { door: CELL_DOOR, cell: JAIL_CELL.toLowerCase(), totalMs: 10 * MIN, servedMs: 0, by: 'Guard', at: wallClock, arrester: 0 });
+check('a door that holds someone else: no Release for a Lead GM or the guard, and not shared', globalThis.__dboJailSentence(ELSE, LEAD).release === false
+  && globalThis.__dboJailSentence(ELSE, GUARD).release === false && globalThis.__dboJailSentence(ELSE, LEAD).shared === false, [globalThis.__dboJailSentence(ELSE, LEAD), props.get(CELL_DOOR + '|private.dboCell')]);
+put(ELSE, 'private.dboSentence', null);
 check('...anyone else: null', globalThis.__dboJailSentence(OTHER) === null && globalThis.__dboJailSentence(GUARD) === null);
 
 // ---- serving time ----

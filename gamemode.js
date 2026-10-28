@@ -1381,6 +1381,13 @@ const staffTargetOf = (by, q) => {
     const all = liveTagCarriers(tagIn.toLowerCase());
     if (all === null) { personal(by, `Cannot move ${TAG}: the game could not check whether another character carries that tag. Try again.`); return 0; }
     if (all.length !== 1) { personal(by, `Cannot move ${TAG}: no live character carries that tag, or more than one does.`); return 0; }
+    // Every word before the tag must be a word of its carrier's own name, as /unstuck has it, so /fixloc never binds a tag a
+    // note or another name came with (C's review, 28 Oct: '/fixloc Hubert #8Q99' moved Hub #8Q99; Jake: exact only)
+    const pre = q.slice(0, q.length - 5).trim();
+    if (pre) {
+      const own = (() => { const n = [nameOf(all[0])]; try { const f = globalThis.__dboOwnName; if (typeof f === 'function') n.push(String(f(all[0]) || '')); } catch (e) { /* the name shown */ } return n.join(' ').toLowerCase().split(/\s+/); })();
+      if (!pre.split(/\s+/).every((w) => own.includes(w.toLowerCase()))) { personal(by, `Cannot move ${q}: the words before ${TAG} are not that character's name; use the #TAG alone, or the full name with it.`); return 0; }
+    }
     return all[0];
   }
   // A name: the one character called exactly that (any case), online or not; several are refused, and so is a name nobody
@@ -6146,7 +6153,8 @@ registerChatCommand('unstuck', (a, args) => {
     }
   }
   const dest = rest[0] || '';
-  if (dest && !isDest(dest)) return personal(a, `Unknown place ${dest.slice(0, 24)}: hub or respawn.`);
+  // ('Cannot' first, so the player log marks every refusal refused; claude-jake-pc, 28 Oct)
+  if (dest && !isDest(dest)) return personal(a, `Cannot move ${words.join(' ').slice(0, 80)}: unknown place ${dest.slice(0, 24)}; the place is hub or respawn.`);
   // One place: another place word past it means the place came from inside a name or the form's target box (verification
   // of 248ce9838, F2: 'Anna Temple hub' with Anna Temple not found moved Anna to the temple; claude-jake-pc's rule N)
   const more = rest.slice(1).filter(isDest);

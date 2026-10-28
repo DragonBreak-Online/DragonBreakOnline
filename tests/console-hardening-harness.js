@@ -300,7 +300,7 @@ reset();
   const n5 = recordOf(5).length, n6 = recordOf(6).length;
   let rep = send('/discipline #8KWH warn One online and one offline carry it');
   check('H3. Bob #8KWH online and Lyra #8KWH offline: /discipline is refused (tagShared), nothing on either account', refused(rep, 'tagShared') && recordOf(5).length === n5 && recordOf(6).length === n6
-    && header(rep) === 'More than one character carries #8KWH, so the console will not guess which one you mean. Run it in game on the player you mean.', brief(rep));
+    && header(rep) === 'Cannot tell who #8KWH is: more than one character carries it, so the console will not guess which one you mean. Run it in game on the player you mean.', brief(rep));
   rep = send('/kick #8KWH');
   check('H3. ...and /kick too, nobody kicked', refused(rep, 'tagShared') && !kicked.length, brief(rep));
   rep = send('/discipline #8KWH warn With the page account of the online one', { targetProfileId: 5 });

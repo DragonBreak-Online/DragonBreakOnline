@@ -91,6 +91,16 @@ ok(out[0].o && out[0].o[0].c === 'ZZ9Q' && out[0].o[0].n === 'Aela', 'a target a
 M.player(T1, { profile: 5, name: 'Aela', tag: 'ZZ9Q', user: 7 });
 out = chat(6, `/kick ${CANARY}`);
 ok(out[0].o === undefined && !JSON.stringify(out).includes(CANARY), 'a miss: no target, and the query text is never kept', out);
+// a ticket or call word is never the target: 'ticket:#4832' names a ticket, not #4832's carrier (follow-up, 28 Oct)
+const TCK = 0xff00001a;
+M.player(TCK, { profile: 9, name: 'Selfine', tag: '4832', user: 9 }); ONLINE.push(TCK);
+out = chat(6, '/unstuck Quill Varo hub ticket:#4832');
+ok(out.length === 1 && out[0].f.name === 'unstuck' && !(out[0].o || []).some((x) => x.c === '4832'), '/unstuck "Quill Varo hub ticket:#4832": #4832\'s carrier is never the target', out[0] && out[0].o);
+out = chat(6, '/unstuck #K2QX hub ticket:#4832');
+ok(out[0].o && out[0].o.length === 1 && out[0].o[0].c === 'K2QX', '...while "#K2QX hub ticket:#4832" names Selene, never #4832', out[0].o);
+out = chat(6, '/unstuck Selene call:#4832');
+ok(out[0].o && out[0].o.length === 1 && out[0].o[0].c === 'K2QX', '...and "Selene call:#4832" names Selene too', out[0].o);
+ONLINE.pop(); M.props.delete(TCK);
 out = chat(3, `/party invite Selene ${CANARY}`);
 ok(out[0].f.sub === 'invite' && out[0].o && out[0].o[0].c === 'K2QX' && out[0].f.mirror === true, '/party invite: sub from the list, the target mirrored (an acting command)', out[0]);
 out = chat(3, `/party ${CANARY} Selene`);
