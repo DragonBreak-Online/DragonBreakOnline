@@ -3,7 +3,9 @@
 // from the evidence) and the real castle containers (the 24 Oct 00:01Z backup and the live change forms when the plan was
 // made) against a fake mp, and proves: a dryrun changes nothing; an apply removes exactly the planned entries, matches the
 // one-of-a-kind entries by their extra data, never touches the Steward's own goods, takes only the planned gold, delivers
-// stage 1 only; a second apply is a no-op; stage 2 later delivers the rest once. Also the refusals and crash paths.
+// stage 1 only; a second apply is a no-op; stage 2 later delivers the rest once. Also the refusals and crash paths, the
+// gold choice (none in the plan: an apply is refused until the run file picks), the preflight, the wait for every container
+// step before any letter, letter ids tied to the plan, a mailbox letter with another parcel, the undo, the generation guard.
 //   node tests/mod0422-restore-harness.js   (from server/)
 'use strict';
 const fs = require('fs');
@@ -17,7 +19,8 @@ const ok = (c, what, got) => { if (c) passes++; else fails++; console.log(`${c ?
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const PLAN0 = JSON.parse(fs.readFileSync(path.join(FIX, 'plan.json'), 'utf8'));
 const WORLD = JSON.parse(fs.readFileSync(path.join(FIX, 'world.json'), 'utf8'));
-const { takeFromContainer, packLetters, same } = require(MOD);
+const { takeFromContainer, packLetters, same, letterId } = require(MOD);
+const LID = (key) => letterId(PLAN0, key, '').replace(/-$/, ''); // m0422-<plan hash 8>-<key>
 const hexId = (h) => parseInt(h, 16) >>> 0;
 const GOLD = 0xf;
 const A = {}; for (const [k, v] of Object.entries(PLAN0.actors)) A[k] = hexId(v.id);
@@ -46,10 +49,21 @@ ok(same({ chargePercent: 635.0630493164062 }, { chargePercent: 635.0630493164062
 // ---- the real plan against the evidence --------------------------------------------------------------------------
 const sumTake = PLAN0.containers.reduce((s, c) => s + c.take.reduce((n, t) => n + t.count, 0) + c.uniques.reduce((n, u) => n + u.count, 0), 0);
 ok(sumTake === PLAN0.totals.takePlain + PLAN0.totals.takeUniques && PLAN0.totals.takeUniques === 15 && PLAN0.uniques.length === 14, `plan: ${sumTake} items to take, 15 one-of-a-kind in 14 entries`);
-ok(PLAN0.containers.every((c) => c.take.every((t) => t.keep + t.count <= plainOf(WORLD.live[c.ref], hexId(t.base)) && t.seen === plainOf(WORLD.live[c.ref], hexId(t.base)))), 'plan: every entry is within what the container held, above the level it keeps');
-ok(PLAN0.containers.every((c) => c.take.every((t) => t.keep === plainOf(WORLD.c24[c.ref], hexId(t.base)))), 'plan: the kept level of every entry is the container\'s 24 Oct 00:01Z count (the Steward\'s own)');
+ok(PLAN0.containers.every((c) => c.take.every((t) => t.keep + t.count === plainOf(WORLD.live[c.ref], hexId(t.base)) && t.seen === plainOf(WORLD.live[c.ref], hexId(t.base)))), 'plan: every entry is what the container held, the kept level plus the count taken');
+ok(PLAN0.containers.every((c) => c.take.every((t) => t.pre24 === plainOf(WORLD.c24[c.ref], hexId(t.base)) && t.keep >= t.t0 && t.t0 >= 0)), 'plan: every entry keeps at least the container\'s level at T0 (its 24 Oct 00:01Z count plus the moves before the Steward emptied the barrels)');
+{
+  const t = (ref, base) => (PLAN0.containers.find((c) => c.ref === ref) || { take: [] }).take.find((x) => x.base === base) || { count: 0 };
+  // F2 (28 Oct review): originals PROVEN still in the castle are taken back, not gifted as copies
+  ok(t('0806e2d9', '805bc44').count === 1 && t('0806e2d9', '805bc44').keep === 0 && t('0806e2d9', '805bc44').pre24 === 1, 'plan: the bow the Steward took out at 01:02Z and the player\'s put in at 02:26Z: taken, the level kept is 0', t('0806e2d9', '805bc44'));
+  ok(t('0806e2d9', '2f2f4').count === 3 && t('0806e2d9', 'e3c16').count === 3, 'plan: the 3 axes and 3 pickaxes of the player (the kit grants went to 0807284D)');
+  ok(t('0806faa4', '65c98').count === 6 && t('0806faa4', '300353c').count === 10, 'plan: the 6 Bread and 10 Butter put in on 24 Oct');
+  ok(t('0806e2d9', '76020c6').count === 1 && t('0806e2d9', '80d5450').count === 1 && t('0806e2d9', '76020c6').basis === 'fungible', 'plan: the Jade Ring and the Katana (the Steward still holds as many as he owned)');
+  // F3: the potions the Steward took from the strongbox on 21 Oct and put into 0806E2D9 on 24 Oct
+  ok(t('0806e2d9', '39be8').count >= 2 && t('0806e2d9', '39be8').keep + t('0806e2d9', '39be8').count === 4 && t('0806e2d9', '73f31').count >= 5 && t('0806e2d9', '73f31').count <= 6, 'plan: the strongbox potions in 0806E2D9 (Potion of Stamina, Poison) are taken back', [t('0806e2d9', '39be8'), t('0806e2d9', '73f31')]);
+  ok(PLAN0.notes.fungible && Object.values(PLAN0.notes.fungible).every((f) => f.holdsNow.pack + f.holdsNow.netPutInto0807284D + f.holdsNow.hisInCastleContainers - f.taken >= f.ownedAtMost), 'plan: every fungible take leaves the Steward at least as many as he could ever have owned');
+}
 ok(!Object.keys(PLAN0.leftAlone).some((r) => PLAN0.containers.some((c) => c.ref === r)), 'plan: 0807284D (Stibbons\' potions) is not touched');
-ok(PLAN0.gold.want === 2095 && PLAN0.gold.from === 'count' && JSON.stringify(PLAN0.gold.order) === '["inventory","bank"]', 'plan: 2095 gold from the Count, pack first then bank');
+ok(PLAN0.gold.want === 2095 && PLAN0.gold.from === 'count' && PLAN0.gold.order === null && JSON.stringify(PLAN0.gold.choices.treasury.order) === '["treasury:bruma"]' && JSON.stringify(PLAN0.gold.choices.count.order) === '["inventory","bank"]', 'plan: 2095 gold; no source chosen, Jake picks the Bruma treasury or the Count (pack, then bank)');
 const del = (k) => PLAN0.deliveries.find((d) => d.key === k);
 const SILVER = ['9171b', '87833', '80aeb00', '10aa19'], MIKE = ['8300021', '8300023', '80c7f19', 'f6f24'];
 ok(del('alt').to === 'alt' && SILVER.every((h) => del('alt').items.some((x) => x.base === h)) && !PLAN0.deliveries.filter((d) => d.to === 'player').some((d) => d.items.some((x) => SILVER.includes(x.base))), 'plan: the 4 silver pieces go to Winter #EBZN only');
@@ -103,13 +117,15 @@ const env = (props, opts) => {
   globalThis.__dboCannotCarry = (a, base) => { const s = props.get(a >>> 0) && props.get(a >>> 0)['private.supernatural']; const r = records.get(base >>> 0); return !!(s && s.kind) && !!r && /silver/i.test(r.record.editorId) && !NOT_SILVER.test(r.record.editorId); };
   globalThis.__dboFormGone = (id) => !props.has(id >>> 0);
   delete require.cache[MOD];
-  require(MOD)({ mp, log: (...a) => logs.push(a.join(' ')), audit: (t) => audits.push(t), personal: (a, t) => said.push([a, t]), onlineActors: () => o.online || [], every: (n, ms, fn) => { timer = fn; }, stopTimer: () => {},
-    lettersOf, saveLetters, sendMailState: () => {}, takeGold, goldOf, GOLD_BASE: GOLD, runFile: o.runFile });
-  return { sets, audits, logs, said, tick: () => timer(), lettersOf, mp };
+  const stopped = [];
+  require(MOD)({ mp, log: (...a) => logs.push(a.join(' ')), audit: (t) => audits.push(t), personal: (a, t) => said.push([a, t]), onlineActors: () => o.online || [], every: (n, ms, fn) => { timer = fn; if (o.timers) o.timers.set(n, fn); }, stopTimer: (n) => { stopped.push(n); if (o.timers) o.timers.delete(n); },
+    lettersOf, saveLetters, sendMailState: () => {}, takeGold, goldOf, GOLD_BASE: GOLD, runFile: o.runFile, gen: o.gen });
+  return { sets, audits, logs, said, stopped, tick: () => timer(), lettersOf, mp };
 };
 const tmp = fs.mkdtempSync(path.join(fs.existsSync('/dev/shm') ? '/dev/shm' : os.tmpdir(), 'mod0422-'));
 const files = (tag) => ({ run: path.join(tmp, `${tag}-run.json`), plan: path.join(tmp, `${tag}-plan.json`), ledger: path.join(tmp, `${tag}-ledger.json`), report: path.join(tmp, `${tag}-report.json`) });
-const writeRun = (F, R, plan) => { fs.writeFileSync(F.plan, JSON.stringify(plan || PLAN0)); fs.writeFileSync(F.run, JSON.stringify(Object.assign({ planFile: path.basename(F.plan), ledgerFile: F.ledger, reportFile: F.report }, R))); };
+// The runs below choose the Count (pack, then bank) unless they say otherwise ("noGold": none chosen)
+const writeRun = (F, R, plan) => { fs.writeFileSync(F.plan, JSON.stringify(plan || PLAN0)); const r = Object.assign({ planFile: path.basename(F.plan), ledgerFile: F.ledger, reportFile: F.report }, R); if (r.noGold) delete r.noGold; else if (!r.goldOrder && r.mode !== 'undo') r.goldOrder = ['inventory', 'bank']; fs.writeFileSync(F.run, JSON.stringify(r)); };
 const report = (F) => JSON.parse(fs.readFileSync(F.report, 'utf8'));
 const ledger = (F) => JSON.parse(fs.readFileSync(F.ledger, 'utf8'));
 const inv = (props, id) => clone((props.get(id >>> 0).inventory || {}).entries || []);
@@ -151,10 +167,10 @@ for (const c of PLAN0.containers) {
   // his own: what the container held on 24 Oct 00:01Z, as far as it was still there before the apply (he moved some himself)
   const kept = WORLD.c24[c.ref].every((e) => {
     if (Object.keys(e).length !== 2) return !was.some((x) => sig(x) === sig(e)) || now.some((x) => sig(x) === sig(e));
-    const b = e.baseId >>> 0; const pre = plainOf(WORLD.c24[c.ref], b), w = plainOf(was, b), n = plainOf(now, b);
-    return n >= Math.min(pre, w) && (w > pre || n === w);
+    const b = e.baseId >>> 0; const t = c.take.find((x) => hexId(x.base) === b); const w = plainOf(was, b), n = plainOf(now, b);
+    return t ? n === t.keep && t.keep >= t.t0 : n === w;
   });
-  ok(kept, `apply ${c.ref}: the Steward's own goods (24 Oct 00:01Z) all still there, plain and one-of-a-kind; a base at or below that level untouched`);
+  ok(kept, `apply ${c.ref}: the Steward's own goods all still there: every planned base at its kept level (never below its level at T0), every other base and one-of-a-kind entry of 24 Oct untouched`);
   const gone = c.uniques.every((u) => !now.some((x) => (x.baseId >>> 0) === hexId(u.base) && same(Object.fromEntries(Object.entries(x).filter(([k]) => k !== 'baseId' && k !== 'count')), u.match)));
   const otherExtras = extrasOnly(was).filter((e) => !c.uniques.some((u) => (e.baseId >>> 0) === hexId(u.base) && same(Object.fromEntries(Object.entries(e).filter(([k]) => k !== 'baseId' && k !== 'count')), u.match)));
   ok(gone && otherExtras.every((e) => now.some((x) => sig(x) === sig(e))), `apply ${c.ref}: the planned one-of-a-kind entries gone, every other enchanted or charged entry kept`);
@@ -165,7 +181,7 @@ const tookGold = Math.min(2095, WORLD.count.gold);
 ok(countGold === WORLD.count.gold - tookGold && props.get(A.count)['private.bankGold'] === WORLD.count.bank && inv(props, A.count).some((e) => e.baseId === 0x12345 && e.count === 3), `apply: the Count gives up ${tookGold} gold (all he has up to 2095), nothing else`, inv(props, A.count));
 ok(L3.steps['gold:mint'] && L3.steps['gold:mint'].n === 2095 - tookGold, 'apply: the rest of the 2095 minted (plan policy), written in the ledger');
 const P1 = m0422(props, A.player);
-ok(P1.length === R3.letters.filter((l) => l.to === 'player').length && P1.every((m) => m.id.startsWith('m0422-s1')) && P1.length >= 2, `apply: #VKRS gets ${P1.length} stage-1 letters, no stage 2`, P1.map((m) => m.id));
+ok(P1.length === R3.letters.filter((l) => l.to === 'player').length && P1.every((m) => m.id.startsWith(`${LID('s1')}-`) || m.id.startsWith(`${LID('s1m')}-`)) && P1.length >= 2, `apply: #VKRS gets ${P1.length} stage-1 letters, no stage 2; each id carries the plan (${LID('s1')}-1)`, P1.map((m) => m.id));
 ok(P1.reduce((s, m) => s + (m.parcel.gold || 0), 0) === 2095, 'apply: the letters carry exactly 2095 gold');
 ok(P1.every((m) => m.fromProfile === -1 && m.read === false && m.parcel && Array.isArray(m.parcel.items)), 'apply: board letters with parcels (post.js format)');
 ok(P1.every((m) => lettersWeight(m) <= 100.01 || m.parcel.items.length === 1), 'apply: every stage-1 letter of #VKRS weighs 100 or less', P1.map((m) => Math.round(lettersWeight(m))));
@@ -199,7 +215,7 @@ ok(E.sets.length === 0 && R4.letters.filter((l) => l.status === 'would send').ev
 writeRun(F, { mode: 'apply', stages: [1, 2], confirm: PLAN0.confirm }); E.tick();
 const R5 = report(F); const L5 = ledger(F);
 ok(!E.sets.some(([id]) => PLAN0.containers.some((c) => hexId(c.ref) === id)) && !E.sets.some(([id]) => id === A.count), 'stage 2: no container and no gold touched again');
-const P2 = m0422(props, A.player).filter((m) => m.id.startsWith('m0422-s2'));
+const P2 = m0422(props, A.player).filter((m) => m.id.startsWith(`${LID('s2')}-`) || m.id.startsWith(`${LID('s2m')}-`));
 const got2 = P2.flatMap((m) => m.parcel.items).reduce((s, e) => s + e.count, 0);
 const want2 = PLAN0.deliveries.filter((d) => d.stage === 2).reduce((s, d) => s + d.items.reduce((n, x) => n + x.count, 0), 0);
 ok(got2 === want2 && P2.every((m) => m.parcel.items.length <= 40), `stage 2: #VKRS gets the bulk (${got2} items) in ${P2.length} letters of 40 stacks or fewer`);
@@ -234,10 +250,11 @@ ok([...out.values()].reduce((s, n) => s + n, 0) === PLAN0.totals.owedItems, `all
 
 // ==== the castle containers rebuilt from the 24 Oct 00:01Z backup (c24) plus the player's goods the plan takes ==========
 {
+  // the 24 Oct entries, every planned base at its kept level plus the planned count, the one-of-a-kind entries
   const built = {};
   for (const c of PLAN0.containers) {
-    const es = clone(WORLD.c24[c.ref]);
-    for (const t of c.take) es.push({ baseId: hexId(t.base), count: t.count });
+    const es = clone(WORLD.c24[c.ref]).filter((e) => Object.keys(e).length !== 2 || !c.take.some((t) => hexId(t.base) === (e.baseId >>> 0)));
+    for (const t of c.take) es.push({ baseId: hexId(t.base), count: t.keep + t.count });
     const lv = WORLD.live[c.ref];
     for (const u of c.uniques) { const e = lv.find((x) => (x.baseId >>> 0) === hexId(u.base) && same(Object.fromEntries(Object.entries(x).filter(([k]) => k !== 'baseId' && k !== 'count')), u.match)); es.push(Object.assign({}, e, { count: u.count })); }
     built[c.ref] = es;
@@ -246,15 +263,20 @@ ok([...out.values()].reduce((s, n) => s + n, 0) === PLAN0.totals.owedItems, `all
   const E3 = env(pr, { runFile: G.run });
   writeRun(G, { mode: 'apply', stages: [1], confirm: PLAN0.confirm, strict: false });
   E3.tick();
-  const back = PLAN0.containers.every((c) => { const a = multiset(inv(pr, hexId(c.ref))), b = multiset(WORLD.c24[c.ref]); return a.size === b.size && [...b].every(([k, n]) => a.get(k) === n); });
-  ok(back, 'c24 world: after the apply each container holds exactly what it held on 24 Oct 00:01Z (the Steward\'s own goods, nothing more taken)');
+  const back = PLAN0.containers.every((c) => {
+    const want = clone(WORLD.c24[c.ref]).filter((e) => Object.keys(e).length !== 2 || !c.take.some((t) => hexId(t.base) === (e.baseId >>> 0)));
+    for (const t of c.take) if (t.keep) want.push({ baseId: hexId(t.base), count: t.keep });
+    const a = multiset(inv(pr, hexId(c.ref))), b = multiset(want); return a.size === b.size && [...b].every(([k, n]) => a.get(k) === n);
+  });
+  ok(back, 'built world: after the apply each container holds its 24 Oct goods with every planned base at its kept level (nothing more taken)');
   const cg = inv(pr, A.count).filter((e) => e.baseId === GOLD).reduce((s, e) => s + e.count, 0);
   ok(cg === 5000 - 2095 && pr.get(A.count)['private.bankGold'] === 700 && !ledger(G).steps['gold:mint'], 'c24 world: a Count with 5000 gold gives up exactly 2095, his bank is not touched, nothing minted');
-  // strict: the counts differ from what the plan saw, so every changed entry is refused
-  const H = files('strict'); const ps = mkWorld(built, 5000, 0); const E4 = env(ps, { runFile: H.run });
+  // strict: one more of every planned base than the plan saw, so every entry is refused as changed
+  const more = {}; for (const c of PLAN0.containers) more[c.ref] = built[c.ref].map((e) => (Object.keys(e).length === 2 && c.take.some((t) => hexId(t.base) === (e.baseId >>> 0)) ? Object.assign({}, e, { count: e.count + 1 }) : e));
+  const H = files('strict'); const ps = mkWorld(more, 5000, 0); const E4 = env(ps, { runFile: H.run });
   writeRun(H, { mode: 'dryrun', stages: [1] }); E4.tick();
   const R6 = report(H);
-  ok(R6.containers.some((c) => c.refused.some((x) => x.status === 'changed')) && R6.containers.every((c) => c.refused.every((x) => x.status === 'changed')), 'strict (default): an entry whose count differs from the plan is refused, never guessed');
+  ok(R6.containers.every((c, i) => c.refused.filter((x) => x.status === 'changed').length === PLAN0.containers[i].take.length && c.refused.every((x) => x.status === 'changed')), 'strict (default): an entry whose count differs from the plan is refused, never guessed');
   // gold from pack then bank
   const K = files('bank'); const pb = mkWorld(built, 1000, 5000); const E5 = env(pb, { runFile: K.run });
   writeRun(K, { mode: 'apply', stages: [1], confirm: PLAN0.confirm, strict: false }); E5.tick();
@@ -288,7 +310,7 @@ ok([...out.values()].reduce((s, n) => s + n, 0) === PLAN0.totals.owedItems, `all
   const zone = { bruma: 5000 };
   globalThis.__dboTreasuryZoneKeep = globalThis.__dboTreasuryZone;
   const G = files('treasury'); const pr = mkWorld(WORLD.live, 400, 300); const E13 = env(pr, { runFile: G.run });
-  globalThis.__dboTreasuryZone = { balance: (z) => zone[z] || 0, spend: (z, n) => { if ((zone[z] || 0) < n) return false; zone[z] -= n; return true; } };
+  globalThis.__dboTreasuryZone = { balance: (z) => zone[z] || 0, spend: (z, n) => { if ((zone[z] || 0) < n) return false; zone[z] -= n; return true; }, deposit: (z, n) => { zone[z] = (zone[z] || 0) + n; return n; } };
   writeRun(G, { mode: 'apply', stages: [1], confirm: PLAN0.confirm, goldOrder: ['treasury:bruma'] }); E13.tick();
   const cg = inv(pr, A.count).filter((e) => e.baseId === GOLD).reduce((s, e) => s + e.count, 0);
   ok(zone.bruma === 5000 - 2095 && cg === 400 && pr.get(A.count)['private.bankGold'] === 300 && m0422(pr, A.player).reduce((s, m) => s + (m.parcel.gold || 0), 0) === 2095, 'gold from the Bruma treasury: 2095 taken there, the Count untouched, 2095 in the letters');
@@ -314,10 +336,17 @@ ok([...out.values()].reduce((s, n) => s + n, 0) === PLAN0.totals.owedItems, `all
   let E9 = env(pr, { runFile: G.run, failSet: (id, k) => id === c0 && k === 'inventory' });
   writeRun(G, { mode: 'apply', stages: [1], confirm: PLAN0.confirm }); E9.tick();
   ok(ledger(G).steps[`take:${PLAN0.containers[0].ref}`].status === 'failed' && JSON.stringify(inv(pr, c0)) === JSON.stringify(WORLD.live[PLAN0.containers[0].ref]), 'crash: a failed container write leaves it untouched and the step failed');
-  ok(!m0422(pr, A.player).some((m) => m.parcel.items.some((e) => Object.keys(e).length > 2)), 'crash: the one-of-a-kind items of that container are not sent');
+  const RC = report(G); const LC = ledger(G);
+  ok(m0422(pr, A.player).length === 0 && m0422(pr, A.alt).length === 0 && m0422(pr, A.mike).length === 0 && !Object.keys(LC.steps).some((k) => k.startsWith('pack:')) && RC.waiting.includes(`take:${PLAN0.containers[0].ref}`) && RC.deliveries.filter((d) => d.stage === 1).every((d) => /not packed: a container step is not done/.test(d.status)), 'crash: no letter is packed or sent while a container step is not done (nothing packed short)', RC.deliveries);
   delete globalThis.__dboM0422; E9 = env(pr, { runFile: G.run });
   writeRun(G, { mode: 'apply', stages: [1], confirm: PLAN0.confirm, again: 1 }); E9.tick();
   ok(ledger(G).steps[`take:${PLAN0.containers[0].ref}`].status === 'done' && plainOf(inv(pr, c0), hexId(PLAN0.containers[0].take[0].base)) === PLAN0.containers[0].take[0].keep + (PLAN0.containers[0].take[0].seen - PLAN0.containers[0].take[0].keep - PLAN0.containers[0].take[0].count), 'crash: the failed step runs on the next apply');
+  {
+    const LP = ledger(G); const P9 = m0422(pr, A.player).flatMap((m) => m.parcel.items);
+    const s2n = PLAN0.deliveries.find((d) => d.key === 's2').items.reduce((s2, x) => s2 + x.count, 0);
+    ok(PLAN0.uniques.every((u) => P9.some((e) => (e.baseId >>> 0) === hexId(u.base) && same(Object.fromEntries(Object.entries(e).filter(([k]) => k !== 'baseId' && k !== 'count')), u.match))) && Object.keys(LP.pool.uniques).length === 0 && Object.values(LP.pool.plain).reduce((s2, n) => s2 + n, 0) === s2n && LP.shortfall.length === 0 && m0422(pr, A.alt).length === 1 && m0422(pr, A.mike).length === 1,
+      'crash, then a re-run: the 15 one-of-a-kind items reach #VKRS\'s letters, Winter and Mike get theirs, only stage 2 waits in the pool');
+  }
   // a step left "started" (crash between the ledger and the change) is never repeated until staff resolve it
   const L = ledger(G); L.steps[`take:${PLAN0.containers[1].ref}`] = { status: 'started', at: 'x', taken: { plain: {}, uniques: {} } }; delete L.steps[`take:${PLAN0.containers[2].ref}`];
   fs.writeFileSync(G.ledger, JSON.stringify(L));
@@ -345,6 +374,113 @@ ok([...out.values()].reduce((s, n) => s + n, 0) === PLAN0.totals.owedItems, `all
   const E11 = env(props, { runFile: G.run }); const n = E11.sets.length;
   writeRun(G, { mode: 'apply', stages: [1, 2], confirm: plan.confirm }, plan); E11.tick();
   ok(E11.sets.length === n && E11.logs.some((l) => l.includes('belongs to plan')), 'ledger: a run with another plan is refused while the ledger exists');
+}
+const goldIn = (pr, id) => inv(pr, id).filter((e) => e.baseId === GOLD).reduce((s, e) => s + e.count, 0);
+const sameWorldContainers = (pr) => PLAN0.containers.every((c) => { const a = multiset(inv(pr, hexId(c.ref))), b = multiset(WORLD.live[c.ref]); return a.size === b.size && [...b].every(([k, n]) => a.get(k) === n); });
+{
+  // F1 (gold): no source in the plan. A dryrun shows both choices; an apply is refused whole until the run file picks
+  const G = files('nogold'); const pr = mkWorld(WORLD.live, 3000, 0); const E = env(pr, { runFile: G.run });
+  writeRun(G, { mode: 'dryrun', stages: [1], noGold: true }); E.tick();
+  const Rd = report(G);
+  ok(Rd.gold.status === 'no source chosen' && Rd.gold.choices.count.sources[0].src === 'inventory' && Rd.gold.choices.count.taken === 2095 && !Rd.gold.choices.count.minted && Rd.gold.choices.treasury && E.logs.some((l) => /gold choice "treasury"/.test(l)) && E.logs.some((l) => /"goldOrder"/.test(l)), 'gold: a dryrun with no source chosen shows each of the plan\'s choices', Rd.gold);
+  writeRun(G, { mode: 'apply', stages: [1], confirm: PLAN0.confirm, noGold: true }); E.tick();
+  ok(E.sets.length === 0 && !fs.existsSync(G.ledger) && report(G).refused.includes('preflight') && E.logs.some((l) => /preflight: gold: no source chosen/.test(l)), 'gold: an apply with no source chosen is refused whole: nothing taken, no ledger');
+  writeRun(G, { mode: 'apply', stages: [1], confirm: PLAN0.confirm, goldOrder: ['the count'] }); E.tick();
+  ok(E.sets.length === 0 && !fs.existsSync(G.ledger), 'gold: an unknown source is refused whole');
+}
+{
+  // preflight: a reader who no longer exists, or a gold source that cannot be read: nothing at all is taken
+  const G = files('gone'); const pr = mkWorld(WORLD.live, 3000, 0); pr.delete(A.mike); const E = env(pr, { runFile: G.run });
+  writeRun(G, { mode: 'apply', stages: [1], confirm: PLAN0.confirm }); E.tick();
+  ok(E.sets.length === 0 && !fs.existsSync(G.ledger) && E.logs.some((l) => /preflight: reader mike: the character no longer exists/.test(l)), 'preflight: a reader who no longer exists: nothing at all is taken');
+  const H = files('notreasury'); const p2 = mkWorld(WORLD.live, 3000, 0); const E2 = env(p2, { runFile: H.run }); const keepT = globalThis.__dboTreasuryZone; delete globalThis.__dboTreasuryZone;
+  writeRun(H, { mode: 'apply', stages: [1], confirm: PLAN0.confirm, goldOrder: ['treasury:bruma'] }); E2.tick();
+  ok(E2.sets.length === 0 && !fs.existsSync(H.ledger) && E2.logs.some((l) => /preflight: gold treasury:bruma: bank.js treasuries not loaded/.test(l)), 'preflight: a gold source that cannot be read: nothing at all is taken');
+  globalThis.__dboTreasuryZone = keepT;
+}
+{
+  // a container step that keeps failing: staff can skip it; the rest is delivered, that container untouched
+  const G = files('skip'); const pr = mkWorld(WORLD.live, 3000, 0); const c2 = PLAN0.containers[2];
+  const E = env(pr, { runFile: G.run, failSet: (id, k) => id === hexId(c2.ref) && k === 'inventory' });
+  writeRun(G, { mode: 'apply', stages: [1], confirm: PLAN0.confirm }); E.tick();
+  const n0 = m0422(pr, A.player).length;
+  writeRun(G, { mode: 'apply', stages: [1], confirm: PLAN0.confirm, resolve: { [`take:${c2.ref}`]: 'skip' } }); E.tick();
+  const Ls = ledger(G);
+  ok(n0 === 0 && Ls.steps[`take:${c2.ref}`].status === 'skipped' && JSON.stringify(inv(pr, hexId(c2.ref))) === JSON.stringify(WORLD.live[c2.ref]) && m0422(pr, A.player).length > 0 && m0422(pr, A.mike).length === 1, 'resolve "skip": a container step that keeps failing is skipped by staff; the rest is delivered, that container untouched');
+}
+{
+  // F2 (letters): a letter of the plan's id with another parcel already in the mailbox is not counted as sent
+  const G = files('conflict'); const pr = mkWorld(WORLD.live, 3000, 0); const id1 = `${LID('s1')}-1`;
+  pr.get(A.player)['private.pigeons'].push({ id: id1, from: 'x', fromProfile: -1, text: 'x', at: 5, read: false, parcel: { gold: 1, items: [] } });
+  const E = env(pr, { runFile: G.run });
+  writeRun(G, { mode: 'apply', stages: [1], confirm: PLAN0.confirm }); E.tick();
+  const Lc = ledger(G); const box = letters(pr, A.player).filter((m) => m.id === id1);
+  ok(Lc.letters[id1].status === 'conflict' && box.length === 1 && box[0].parcel.gold === 1 && report(G).letters.find((l) => l.id === id1).status.startsWith('not sent') && !E.audits.some((t) => t.includes(id1)), 'letters: a letter of that id with another parcel already in the mailbox is not counted as sent (conflict, reported)');
+}
+{
+  // F2 (letters): a follow-up plan with its own ledger, after the first plan's letters are in the mailbox, sends its own
+  const plan2 = clone(PLAN0); plan2.hash = 'feedc0de00000001'; plan2.confirm = 'mod-0422-feedc0de'; plan2.gold.want = 0;
+  const G = files('followup'); const E = env(props, { runFile: G.run }); const before2 = m0422(props, A.player).length;
+  writeRun(G, { mode: 'apply', stages: [1], confirm: plan2.confirm }, plan2); E.tick();
+  const L2 = ledger(G); const mine2 = m0422(props, A.player).filter((m) => m.id.startsWith('m0422-feedc0de-'));
+  ok(mine2.length > 0 && mine2.length === Object.values(L2.letters).filter((l) => l.to === 'player').length && Object.values(L2.letters).every((l) => l.status === 'done' && !l.note) && m0422(props, A.player).length === before2 + mine2.length, 'a follow-up plan with its own ledger sends its own letters (the ids carry the plan), none "found in the mailbox"', Object.values(L2.letters).map((l) => [l.id, l.status, l.note]));
+}
+{
+  // F3 (undo): after a stage-1 apply, nothing collected: everything back where it was
+  const G = files('undo'); const pr = mkWorld(WORLD.live, 3000, 0); const E = env(pr, { runFile: G.run });
+  writeRun(G, { mode: 'apply', stages: [1], confirm: PLAN0.confirm }); E.tick();
+  const w1 = JSON.stringify([...pr.entries()]); const s1 = E.sets.length;
+  writeRun(G, { mode: 'undo' }); E.tick();
+  const Rp = report(G);
+  ok(E.sets.length === s1 && JSON.stringify([...pr.entries()]) === w1 && Rp.mode === 'undo preview' && Rp.letters.filter((l) => l.status === 'would recall').length === m0422(pr, A.player).length + 2 && E.logs.some((l) => l.includes(`"undo-${PLAN0.confirm}"`)), 'undo without the code: a preview, nothing changed');
+  writeRun(G, { mode: 'undo', confirm: `undo-${PLAN0.confirm}` }); E.tick();
+  const Ru = report(G); const Lu = ledger(G);
+  ok(sameWorldContainers(pr), 'undo: every container holds exactly what it held before the apply (plain counts and the one-of-a-kind entries)');
+  ok(m0422(pr, A.player).length === 0 && m0422(pr, A.alt).length === 0 && m0422(pr, A.mike).length === 0 && letters(pr, A.player).filter((m) => /^old/.test(m.id)).length === 6, 'undo: every uncollected letter taken back from the mailboxes, the older letters kept');
+  ok(goldIn(pr, A.count) === 3000 && pr.get(A.count)['private.bankGold'] === 0 && Ru.dropped.mintedGold === 0 && Ru.dropped.minted === PLAN0.deliveries.filter((d) => d.stage === 1).reduce((s2, d) => s2 + d.items.filter((x) => x.src === 'minted').reduce((n, x) => n + x.count, 0), 0), 'undo: the Count\'s 2095 back in his pack; the new copies dropped', [goldIn(pr, A.count), Ru.dropped]);
+  ok(Lu.closed && Object.values(Lu.pool.plain).every((n) => n === 0) && Object.keys(Lu.pool.uniques).length === 0 && E.audits.filter((t) => t.includes('undo')).length >= 4, 'undo: the ledger is closed, its pool empty, each step audited');
+  const w2 = JSON.stringify([...pr.entries()]); const s2 = E.sets.length;
+  writeRun(G, { mode: 'apply', stages: [1, 2], confirm: PLAN0.confirm, again: 9 }); E.tick();
+  writeRun(G, { mode: 'undo', confirm: `undo-${PLAN0.confirm}`, again: 9 }); E.tick();
+  ok(E.sets.length === s2 && JSON.stringify([...pr.entries()]) === w2 && E.logs.some((l) => /closed by an undo/.test(l)), 'undo: a closed ledger takes no further apply; a second undo does nothing');
+}
+{
+  // undo after the gold letter was collected: that letter stays with the player (staff decision), the rest goes back
+  const G = files('undo2'); const pr = mkWorld(WORLD.live, 3000, 0); const E = env(pr, { runFile: G.run });
+  writeRun(G, { mode: 'apply', stages: [1], confirm: PLAN0.confirm }); E.tick();
+  const id1 = `${LID('s1')}-1`; const box = pr.get(A.player)['private.pigeons']; const m = box.find((x) => x.id === id1);
+  const took = m.parcel.items.filter((e) => Object.keys(e).length === 2); delete m.parcel; m.collected = true; m.read = true;
+  writeRun(G, { mode: 'undo', confirm: `undo-${PLAN0.confirm}` }); E.tick();
+  const Ru = report(G);
+  const c0 = PLAN0.containers[0]; const lost = took.filter((e) => c0.take.some((t) => hexId(t.base) === (e.baseId >>> 0)));
+  ok(Ru.collected.length === 1 && Ru.collected[0].id === id1 && goldIn(pr, A.count) === 3000 - 2095 && Ru.gold.every((g) => /nothing in the ledger|returned/.test(g.status)) && ledger(G).closed, 'undo after a collect: the collected letter is listed for staff, its 2095 gold not refunded twice', Ru.gold);
+  ok(lost.length > 0 && lost.every((e) => plainOf(inv(pr, hexId(c0.ref)), e.baseId >>> 0) === plainOf(WORLD.live[c0.ref], e.baseId >>> 0) - e.count), 'undo after a collect: the containers get back everything but what the collected letter carried');
+}
+{
+  // undo with the gold from the Bruma treasury: the 2095 goes back into the treasury
+  const zone = { bruma: 5000 }; const keepT = globalThis.__dboTreasuryZone;
+  globalThis.__dboTreasuryZone = { balance: (z) => zone[z] || 0, spend: (z, n) => { if ((zone[z] || 0) < n) return false; zone[z] -= n; return true; }, deposit: (z, n) => { zone[z] = (zone[z] || 0) + n; return n; } };
+  const G = files('undo3'); const pr = mkWorld(WORLD.live, 400, 300); const E = env(pr, { runFile: G.run });
+  writeRun(G, { mode: 'apply', stages: [1], confirm: PLAN0.confirm, goldOrder: ['treasury:bruma'] }); E.tick();
+  const mid = zone.bruma;
+  writeRun(G, { mode: 'undo', confirm: `undo-${PLAN0.confirm}` }); E.tick();
+  ok(mid === 5000 - 2095 && zone.bruma === 5000 && goldIn(pr, A.count) === 400 && pr.get(A.count)['private.bankGold'] === 300 && sameWorldContainers(pr), 'undo: the 2095 back into the Bruma treasury, the Count untouched, the containers whole', [mid, zone.bruma]);
+  globalThis.__dboTreasuryZone = keepT;
+}
+{
+  // the generation guard: a gamemode.js reload without this module (a rollback) stops its timer; the run file is not read
+  const G = files('gen'); const pr = mkWorld(WORLD.live, 3000, 0); const timers = new Map(); const keepTimers = globalThis.__dboTimers; globalThis.__dboTimers = timers;
+  const myGen = () => {}; globalThis.__dboRunCommand = myGen;
+  const E = env(pr, { runFile: G.run, gen: myGen, timers });
+  writeRun(G, { mode: 'dryrun', stages: [1] });
+  E.tick();
+  ok(fs.existsSync(G.report), 'generation guard: the same generation runs');
+  fs.unlinkSync(G.report); E.stopped.length = 0;
+  globalThis.__dboRunCommand = () => {}; // a newer gamemode.js without this module
+  writeRun(G, { mode: 'dryrun', stages: [1], again: 1 }); E.tick();
+  ok(!fs.existsSync(G.report) && E.stopped.includes('mod0422Restore') && !timers.has('mod0422Restore') && E.logs.some((l) => /newer gamemode generation/.test(l)), 'generation guard: after a reload without this module the timer stops and the run file is not read');
+  if (keepTimers === undefined) delete globalThis.__dboTimers; else globalThis.__dboTimers = keepTimers;
+  delete globalThis.__dboRunCommand;
 }
 // the module adds no handler (deploy-batch.sh hot-reload grep)
 const src = fs.readFileSync(MOD, 'utf8');

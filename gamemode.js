@@ -9694,7 +9694,8 @@ try {
 try {
   const MOD0422_JS = path.resolve('mod0422restore.js');
   delete require.cache[MOD0422_JS];
-  require(MOD0422_JS)({ mp, log, audit, personal, onlineActors, every, stopTimer, lettersOf, saveLetters, sendMailState, takeGold, goldOf, GOLD_BASE });
+  require(MOD0422_JS)({ mp, log, audit, personal, onlineActors, every, stopTimer, lettersOf, saveLetters, sendMailState, takeGold, goldOf, GOLD_BASE,
+    gen: globalThis.__dboRunCommand });
 } catch (e) { stopTimer('mod0422Restore'); log('mod0422restore.js failed to load:', e.stack || e.message); }
 
 // ---- remote staff console (server\console.js): after every module that registers commands (the player log below registers none)
