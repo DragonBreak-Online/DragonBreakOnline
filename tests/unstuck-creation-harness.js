@@ -46,6 +46,9 @@ const sandbox = {
   pvpAt: new Map(), combatAt: new Map(),
   UNSTUCK: { cooldownMinutes: 30, combatSeconds: 60 },
   findByName: (q) => (/stranger/i.test(q) ? NEW : 0),
+  // staff /unstuck <name> resolves through staffTargetOf (the console harness runs the real one); online characters here
+  staffTargetOf: (by, q) => { const t = /stranger/i.test(q) ? NEW : 0; if (!t) told.push([by >>> 0, 'No such player.']); return t; },
+  userOf: () => 1,
   display: (a) => `#${(a >>> 0).toString(16)}`,
   personal: (a, t) => told.push([a >>> 0, t]),
   zoneOfActor: () => null, // the Realm has no zone

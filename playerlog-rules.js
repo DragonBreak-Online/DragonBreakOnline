@@ -1254,7 +1254,7 @@ const COMMAND_SCHEMA = {
   playtime: { target: { from: 0, lookup: 'any' }, info: true },
   tokens: { target: { from: 0, lookup: 'online' }, info: true },
   boost: { subs: S_('grant extend'), target: { from: 0, to: 1, lookup: 'online' }, nums: [1] },
-  unstuck: { target: { from: 0, lookup: 'online' } },
+  unstuck: { target: { from: 0, lookup: 'any' } },
   pigeonblock: { target: { from: 0, lookup: 'any' } },
   sign: { subs: S_('off') },
   curse: { target: { from: 0, to: 1, lookup: 'online' } },
@@ -1633,7 +1633,7 @@ gamemode.js <expr> 06af3bb2 parsed
 gamemode.js <expr> 81ff2a3c parsed
 gamemode.js READ 10c2287e clean
 gamemode.js WELL ecdbc739 clean
-gamemode.js UNSTUCK d8f634f3 clean
+gamemode.js UNSTUCK 0c9d4114 clean
 gamemode.js UNSTUCK ea5048d0 clean
 gamemode.js SKINNING-MISMATCH 25473bc6 clean
 gamemode.js BODY 5e5a70cb excluded

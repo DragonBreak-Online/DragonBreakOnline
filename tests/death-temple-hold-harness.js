@@ -38,7 +38,9 @@ const A = 0xff000c5f;
 const props = new Map();
 const put = (a, k, v) => props.set(`${a >>> 0}|${k}`, v);
 put(A, 'profileId', 77);
-const audits = [], told = [];
+const audits = [], told = [], toldTo = [];
+// Staff /unstuck of an offline character (Jake, 28 Oct): the staff member, the offline character and who the lookup finds
+const STAFF = 0xff000a02, O = 0xff001715, OFFLINE = new Set([O]), TARGETS = { 'Neem #LBRF': O, 'Bear Bait': A };
 const mp = {
   get: (a, k) => props.get(`${a >>> 0}|${k}`),
   set: (a, k, v) => { if (k === 'locationalData') { put(a, 'worldOrCellDesc', v.cellOrWorldDesc); put(a, 'pos', v.pos); } put(a, k, v); },
@@ -48,7 +50,8 @@ const mp = {
 const stubs = {
   cfg, mp, recordOf, ZONES, fs, path,
   every: (n, ms, fn) => { if (n === 'outside') stubs.outside = fn; }, onlineActors: () => [A], log: () => {}, display: () => 'Bear Bait #4ZRT',
-  profileOf: (a) => Number(mp.get(a, 'profileId')), userOf: () => 1, personal: (a, t) => told.push(t), staffCan: () => false,
+  profileOf: (a) => Number(mp.get(a, 'profileId')), userOf: (a) => (OFFLINE.has(a >>> 0) ? -1 : 1), personal: (a, t) => { told.push(t); toldTo.push([a >>> 0, t]); },
+  staffCan: (a) => (a >>> 0) === STAFF, staffTargetOf: (by, q) => TARGETS[q] || 0,
   creationPending: () => false, GATE_CREATION_LINE: 'unfinished', findByName: () => 0, audit: (t) => audits.push(t), who: () => 'Bear Bait #4ZRT',
   registerChatCommand: (n, fn) => { if (n === 'unstuck') stubs.unstuck = fn; },
 };
@@ -59,7 +62,7 @@ const ex = /toTemple: (\(a\) => \{ const t = templeFor\(.*?return true; \}) \}\)
 ok(i0 > 0 && i1 > i0 && !!ex, 'the temple, zone, /unstuck and chopping block code is in gamemode.js');
 if (!(i0 > 0 && i1 > i0 && ex)) process.exit(1);
 const names = ['cfg', 'mp', 'recordOf', 'ZONES', 'fs', 'path', 'every', 'onlineActors', 'log', 'display', 'profileOf', 'userOf', 'personal', 'staffCan',
-  'creationPending', 'GATE_CREATION_LINE', 'findByName', 'audit', 'who', 'registerChatCommand'];
+  'creationPending', 'GATE_CREATION_LINE', 'findByName', 'audit', 'who', 'registerChatCommand', 'staffTargetOf'];
 const G = new Function(...names, `${src.slice(i0, i1)}\nconst chopToTemple = ${ex[1]};\nreturn { templeFor, zoneOfActor, setDeathTemple, chopToTemple, combatAt };`)(...names.map((k) => stubs[k]));
 
 // realm.js and guards.js, loaded after gamemode.js's own code as on the server
@@ -135,6 +138,40 @@ stand(SOLSTHEIM, [30000, 60000, 0]);
 ok(same(die(), T('solstheim')), 'a death on Solstheim wakes at its temple (Windhelm\'s)', nameOf(mp.get(A, 'spawnPoint')));
 stand(TAMRIEL, [135308, -110597, 0]);
 ok(same(die(), T('riften')), 'Largashbur (an orc stronghold, no temple) keeps Riften', nameOf(mp.get(A, 'spawnPoint')));
+
+console.log('-- staff /unstuck of an OFFLINE character: the temple of where it was saved (Jake, 28 Oct)');
+put(STAFF, 'profileId', 1); put(O, 'profileId', 97);
+const unstickOffline = (world, pos, last) => {
+  put(O, 'worldOrCellDesc', world); put(O, 'pos', pos); put(O, 'private.lastOutside', last ? { world: last[0], pos: last[1] } : null);
+  put(O, 'locationalData', null); audits.length = 0; toldTo.length = 0;
+  stubs.unstuck(STAFF, 'Neem #LBRF');
+  return { loc: mp.get(O, 'locationalData'), audit: audits[0] || '', toStaff: toldTo.filter(([a]) => a === STAFF).map(([, t]) => t).join(' | '), toTarget: toldTo.filter(([a]) => a === O).length };
+};
+let o = unstickOffline('6ca03:BSHeartland.esm', [77.4, -12.2, -65.9]);
+ok(same(o.loc, T('bruma')), "Neem #LBRF offline in Aubert's House (a Beyond Skyrim interior) goes to the Bruma temple", nameOf(o.loc));
+ok(/\(offline, was in "6ca03:BSHeartland\.esm" at 77,-12,-66\) will wake at the bruma respawn at their next login\.$/.test(o.toStaff), 'staff are told it was offline, where it was and the temple it wakes at', o.toStaff);
+ok(o.toTarget === 0, 'nothing is written to the offline character');
+ok(/^UNSTUCK .* from "6ca03:BSHeartland\.esm" at 77,-12,-66 to the bruma respawn by staff .*, offline$/.test(o.audit), 'the UNSTUCK audit line has the cell, position, temple and offline', o.audit);
+o = unstickOffline(TAMRIEL, IVARSTEAD);
+ok(same(o.loc, T('riften')) && /riften respawn/.test(o.toStaff), 'offline at Ivarstead: the Riften temple, as a death there', nameOf(o.loc));
+o = unstickOffline('13a5c:Skyrim.esm', [0, 0, 0], [TAMRIEL, IVARSTEAD]);
+ok(same(o.loc, T('riften')), "offline in the Vilemyr Inn, saved last outside at Ivarstead: Riften's, from the saved last place outside", nameOf(o.loc));
+o = unstickOffline('a8b23:Skyrim.esm', [0, 0, 0], [WHITERUN_W, [22000, -4000, -3000]]);
+ok(same(o.loc, T('riften')), "offline in Riften's jail (hold-jails.json): Riften's, whatever its last place outside", nameOf(o.loc));
+o = unstickOffline(SOLSTHEIM, [30000, 60000, 0]);
+ok(same(o.loc, T('solstheim')), "offline on Solstheim: its temple (Windhelm's)", nameOf(o.loc));
+o = unstickOffline(HEARTLAND, [54211, 204105, 7500]);
+ok(same(o.loc, T('bruma')), 'offline in Bruma (Cyrodiil): the Bruma temple', nameOf(o.loc));
+o = unstickOffline(TAMRIEL, [135308, -110597, 0]);
+ok(same(o.loc, T('riften')), 'offline in Largashbur (an orc stronghold): Riften, as online', nameOf(o.loc));
+o = unstickOffline(BLACKREACH, [10000, 20000, -3000], null);
+ok(same(o.loc, T('bruma')) && /resolves to no temple of its own, so Bruma's/.test(o.toStaff), "offline in Blackreach with no saved last place outside: Bruma's, as online /unstuck does, and staff are told why", { to: nameOf(o.loc), told: o.toStaff });
+// An online character: as before
+stand(TAMRIEL, IVARSTEAD); put(A, 'locationalData', null); toldTo.length = 0; audits.length = 0;
+stubs.unstuck(STAFF, 'Bear Bait');
+ok(same(mp.get(A, 'locationalData'), T('riften')) && toldTo.some(([a, t]) => a === STAFF && /is back at the riften respawn\.$/.test(t)) && toldTo.some(([a, t]) => a === A && /brings you back to safety/.test(t)),
+  'staff /unstuck of an online character is as before: Riften, and both are told', toldTo);
+ok(/by staff [^,]*$/.test(audits[0] || ''), '...and its audit line has no offline mark', audits[0]);
 
 // Today's behaviour when a module is missing: every case above against templeFor(zoneOfActor)
 const CASES = [[TAMRIEL, IVARSTEAD], [TAMRIEL, FELL], [WHITERUN_W, [22000, -4000, -3000]], [SOLITUDE_W, [-60000, 108000, -8000]], [HEARTLAND, [54211, 204105, 7500]],

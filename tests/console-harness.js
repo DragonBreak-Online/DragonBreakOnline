@@ -94,7 +94,7 @@ const body = [
   cut("registerChatCommand('load'", '// The spawned npcs near you', '/load'),
   `return { deliver, system, personal, captureFor, actorOf, userOf, nameOf, profileOf, discordOf, tagOf, display, who, tierFrom, tierOf, isAdmin,
     isLeadStaff, staffTierFrom, staffTierOf, TIER_RANK, TIER_LABEL, LEAD_ONLY, broadcast, findByName, audit, commands, registerChatCommand, staffSay,
-    handleChat, handleLine, NAME_RE, offlineByTag, accountRankOf, rankRefusalOf };`,
+    handleChat, handleLine, NAME_RE, offlineByTag, accountRankOf, rankRefusalOf, staffTargetOf };`,
 ].join('\n');
 const world = { online };
 const G = new Function('mp', 'log', 'cfg', 'fs', 'path', 'world', 'CHAT_PROP', 'US', 'noteTold', 'ADMIN_PROFILES', 'TIERS', 'tierRoles', 'legacyAdminRoles',
@@ -635,6 +635,12 @@ reset();
   setOnline(neema, true);
   fix('Lydia');
   check('7c. an online character moves as before', moved().join() === 'Lydia #LLX8', moved());
+  // 7d. staff /unstuck names its target with the same lookup (staffTargetOf), the real one here
+  const neema2 = actor(0xff000d05, { name: 'Neem', tag: 'NNN3', profile: 95, online: true });
+  check('7d. staffTargetOf "Neem #LBRF" with an online namesake is the offline Neem #LBRF', G.staffTargetOf(A.jake, 'Neem #LBRF') === neem);
+  check('7d. staffTargetOf "Lydia #LBRF" is the #LBRF carrier, never Lydia', G.staffTargetOf(A.jake, 'Lydia #LBRF') === neem);
+  check('7d. staffTargetOf "Neem #ZZZZ" is nobody, and says it cannot', G.staffTargetOf(A.jake, 'Neem #ZZZZ') === 0 && /Cannot move #ZZZZ/.test(told()), told());
+  store.delete(neema2);
   store.delete(neem); store.delete(neema); delete mp.findFormsByPropertyValue;
 }
 

@@ -1339,6 +1339,22 @@ const offlineByTag = (q) => {
   const live = ids.map((x) => Number(x) >>> 0).filter((id) => id && !(typeof globalThis.__dboFormGone === 'function' && globalThis.__dboFormGone(id)));
   return live.length === 1 ? live[0] : 0;
 };
+// The character a staff move names (/fixloc, staff /unstuck), online or offline; 0 after telling `by` why. A typed #TAG binds,
+// as /rename: an online character only if it carries the tag, else its one live offline carrier. A query without one may
+// name an offline character too (findAnyByName)
+const staffTargetOf = (by, q) => {
+  const tagIn = (q.match(/#([A-Za-z0-9]{4})$/) || [])[1];
+  if (tagIn) {
+    let t = findByName(q); if (t && tagOf(t).toLowerCase() !== tagIn.toLowerCase()) t = 0;
+    t = t || offlineByTag(q);
+    if (!t) personal(by, `Cannot move #${tagIn.toUpperCase()}: no live character carries that tag, or more than one does.`);
+    return t;
+  }
+  const t = findAnyByName(q);
+  if (t < 0) { personal(by, `Cannot move ${q}: ${-t} characters are called that; add their #TAG.`); return 0; }
+  if (!t) personal(by, 'No such player.');
+  return t;
+};
 // A staff rename, for /rename and the F7 panel's Rename (fork adminSystem.ts calls __dboAdminRename): { ok, text }
 const renameCharacter = (a, t, rawName) => {
   const newName = String(rawName || '').trim().replace(/\s+/g, ' ');
@@ -3873,18 +3889,7 @@ registerChatCommand('wipechars', (a, args) => {
 registerChatCommand('fixloc', (a, args) => {
   // An offline character too: one whose game crashes where it logs in is moved before it comes back (Jake, 28 Oct)
   const q = args.trim();
-  // A typed #TAG binds, as /rename: an online character only if it carries that tag, else its one live offline carrier
-  const tagIn = (q.match(/#([A-Za-z0-9]{4})$/) || [])[1];
-  let t = a;
-  if (tagIn) {
-    t = findByName(q); if (t && tagOf(t).toLowerCase() !== tagIn.toLowerCase()) t = 0;
-    t = t || offlineByTag(q);
-    if (!t) return personal(a, `Cannot move #${tagIn.toUpperCase()}: no live character carries that tag, or more than one does.`);
-  } else if (q) {
-    t = findAnyByName(q);
-    if (t < 0) return personal(a, `Cannot move ${q}: ${-t} characters are called that; add their #TAG.`);
-    if (!t) return personal(a, 'No such player.');
-  }
+  const t = q ? staffTargetOf(a, q) : a; if (!t) return;
   const online = userOf(t) >= 0, state = online ? 'online' : 'offline';
   let from = '?', pos = '?';
   try { from = String(mp.get(t, 'worldOrCellDesc') || '?'); const p = mp.get(t, 'pos'); if (Array.isArray(p)) pos = p.map((v) => Math.round(v)).join(','); } catch (e) { /* where is unknown */ }
@@ -5977,6 +5982,8 @@ const inLoginGrace = (a) => {
 // a player to send back: by is who typed it, a is who moves
 const unstuckActor = (a, by) => {
   const admin = staffCan(by, 'unstuck');
+  // Staff may move an offline character (Jake, 28 Oct): its temple comes from where it was saved, and only staff are told
+  const online = userOf(a) >= 0;
   try { if (mp.get(a, 'isDead')) return personal(by, 'You cannot use /unstuck while dead.'); } catch (e) { /* alive */ }
   // A character still in creation stays in the Realm (20 Oct: the Realm has no zone, so it went to the Bruma temple with no
   // look and no name); a full restart brings the race menu back, which frees one caught in the Realm too. Staff may move one.
@@ -5992,8 +5999,10 @@ const unstuckActor = (a, by) => {
   const last = Number(mp.get(a, 'private.unstuckAt')) || 0;
   const wait = last + UNSTUCK.cooldownMinutes * 60000 - Date.now();
   if (!admin && wait > 0) return personal(by, `/unstuck is ready again in ${Math.ceil(wait / 60000)} minute${Math.ceil(wait / 60000) === 1 ? '' : 's'}.`);
-  const zone = templeZoneOf(a) || 'bruma';
-  const t = templeFor(zone) || templeFor('bruma');
+  // A place with no zone, or a zone with no temple, goes to Bruma's, as it always has
+  const found = templeZoneOf(a), fellBack = !found || !templeFor(found);
+  const zone = fellBack ? 'bruma' : found;
+  const t = templeFor(zone);
   if (!t) return personal(by, 'There is no respawn point for this area. Ask a GM for help.');
   // Read before the move: read after it, every line named the respawn's world (the Bleak-Frost Mine report, 4 Oct)
   let from = '?';
@@ -6003,17 +6012,20 @@ const unstuckActor = (a, by) => {
     mp.set(a, 'locationalData', { cellOrWorldDesc: t.world, pos: t.pos, rot: [0, 0, Number(t.rotZ) || 0] });
     if (by === a) mp.set(a, 'private.unstuckAt', Date.now());
   } catch (e) { log('unstuck failed', e.message); return personal(by, 'That did not work. Ask a GM for help.'); }
-  personal(a, by === a ? `You find your way back to safety. /unstuck is ready again in ${UNSTUCK.cooldownMinutes} minutes.` : `${display(by)} brings you back to safety.`);
-  if (by !== a) personal(by, `${display(a)} is back at the ${zone} respawn.`);
-  audit(`UNSTUCK ${who(a)} from ${from} to the ${zone} respawn${by !== a ? ` by staff ${who(by)}` : ''}`);
+  if (online) personal(a, by === a ? `You find your way back to safety. /unstuck is ready again in ${UNSTUCK.cooldownMinutes} minutes.` : `${display(by)} brings you back to safety.`);
+  const why = fellBack ? ` (where it was resolves to no temple of its own, so Bruma's, as /unstuck always does there)` : '';
+  if (by !== a) personal(by, online ? `${display(a)} is back at the ${zone} respawn${why}.`
+    : `${display(a)} (offline, was in ${from}) will wake at the ${zone} respawn at their next login${why}.`);
+  const off = online ? '' : ', offline';
+  audit(`UNSTUCK ${who(a)} from ${from} to the ${zone} respawn${by !== a ? ` by staff ${who(by)}${off}` : ''}`);
 };
 registerChatCommand('unstuck', (a, args) => {
   const name = String(args || '').trim();
   if (!name || !staffCan(a, 'unstuck')) return unstuckActor(a, a);
-  const t = findByName(name);
-  if (!t) return personal(a, `No player online called ${name}.`);
+  // Staff may name an offline character too, by name or #TAG (Jake, 28 Oct): it goes to the temple its saved spot resolves to
+  const t = staffTargetOf(a, name); if (!t) return;
   return unstuckActor(t, a);
-}, { help: `move to the respawn point of your area (every ${UNSTUCK.cooldownMinutes} min, not in combat); staff: [player]` });
+}, { help: `move to the respawn point of your area (every ${UNSTUCK.cooldownMinutes} min, not in combat); staff: [player|#TAG], offline ones too` });
 const setDeathTemple = (a) => {
   try { if (!(Number(mp.get(a, 'profileId')) >= 0)) return; } catch (e) { return; }
   const zone = templeZoneOf(a);
