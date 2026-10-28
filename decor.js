@@ -55,6 +55,9 @@ const DEFAULTS = {
   // Sawn Logs, firewoodPerLogByTier firewood a log by tier, at most logsPerUse logs a use, then cooldownMinutes per player
   // per pile. Who may decorate the home may use it. The piece is one per home (its station keyword) and takes a workbench slot.
   lumber: { minTier: 1, firewoodPerLogByTier: [0, 4, 3, 3, 2], logsPerUse: 10, cooldownMinutes: 10, firewood: '6f993:Skyrim.esm', log: '300e:HearthFires.esm' },
+  // Pieces whose model crashes every game that loads it once placed (SkyrimSE.exe+2E3C27, background 3D load; the Bruma Banner
+  // in two homes, 27 and 28 Oct): left out of the catalogue, and one already placed is taken down and refunded whole
+  blockBases: ['2a7f:BSHeartland.esm'],
 };
 
 module.exports = (api) => {
@@ -66,6 +69,7 @@ module.exports = (api) => {
   C.study = Object.assign({}, DEFAULTS.study, ((api.cfg || {}).decor || {}).study || {});
   C.planter = Object.assign({}, DEFAULTS.planter, ((api.cfg || {}).decor || {}).planter || {});
   C.lumber = Object.assign({}, DEFAULTS.lumber, ((api.cfg || {}).decor || {}).lumber || {});
+  const BLOCKED = new Set((Array.isArray(C.blockBases) ? C.blockBases : []).map((d) => String(d).toLowerCase()));
   const itemName = (d) => { try { const n = typeof api.itemName === 'function' ? api.itemName(d) : ''; return n && n !== d ? String(n) : String(d); } catch (e) { return String(d); } };
   const S = globalThis.__dboDecor || (globalThis.__dboDecor = { catalog: null, byDesc: null, reg: null, pending: new Map(), undo: new Map(), rate: new Map(), found: new Map(), scanAt: 0, scanIdx: 0 });
   S.catalog = null; S.growing = null; S.matNames = null; S.matDesc = null; S.matGroups = null;   // a hot reload reads the catalogue files again (decor-growing.json's ids are filled in later)
@@ -92,12 +96,13 @@ module.exports = (api) => {
       const raw = JSON.parse(fs.readFileSync(path.resolve('decor-catalog.json'), 'utf8'));
       S.catalog = []; S.byDesc = new Map();
       for (const g of raw.groups || []) for (const p of g.pieces || []) {
+        if (BLOCKED.has(String(p.desc).toLowerCase())) continue;
         const row = Object.assign({}, p, { groupLabel: g.label, hay: `${p.name} ${p.edid} ${g.id}`.toLowerCase() });
         S.catalog.push(row); S.byDesc.set(String(p.desc).toLowerCase(), row);
       }
       // the study bookshelf and the planter (decor-growing.json): offered once the merged DLE's ids are filled in
       for (const p of growing().pieces || []) {
-        if (!p.desc) continue;
+        if (!p.desc || BLOCKED.has(String(p.desc).toLowerCase())) continue;
         const label = p.groupLabel || String(p.group || '').replace(/^./, (ch) => ch.toUpperCase());
         // one study shelf base, offered once per kind (Nat, 26 Oct: arcane for Study Magic, priest for Priest Studies); the
         // kind is the piece's key and the placed item's studyKind, so no new record is needed. The bare desc finds the first
@@ -146,7 +151,7 @@ module.exports = (api) => {
     if (S.reg) return S.reg;
     try { S.reg = JSON.parse(fs.readFileSync(REG, 'utf8')); } catch (e) { S.reg = null; }
     if (!S.reg || typeof S.reg !== 'object') S.reg = {};
-    S.reg.places = S.reg.places || {}; S.reg.owed = S.reg.owed || {}; S.reg.carpentry = S.reg.carpentry || {};
+    S.reg.places = S.reg.places || {}; S.reg.owed = S.reg.owed || {}; S.reg.carpentry = S.reg.carpentry || {}; S.reg.recalled = S.reg.recalled || {};
     return S.reg;
   };
   const save = () => { try { fs.writeFileSync(REG + '.tmp', JSON.stringify(reg(), null, 1)); fs.renameSync(REG + '.tmp', REG); } catch (e) { log('decor: saving decor.json failed', e.message); } };
@@ -621,9 +626,27 @@ module.exports = (api) => {
 
   // ---- owners: a place whose owner changed is cleared; its previous owner is owed abandonRefund ------------------------
   const ownerKey = (owner, char) => `${owner}:${char >>> 0}`;
+  // Blocked pieces (C.blockBases) come down wherever they stand, nobody needing to enter; the place's owner is owed their whole cost
+  const recallBlocked = () => {
+    if (!BLOCKED.size) return false;
+    const r = reg(); let changed = false;
+    for (const [k, p] of Object.entries(r.places)) {
+      const bad = (p.items || []).filter((it) => BLOCKED.has(String(it.base).toLowerCase()));
+      if (!bad.length) continue;
+      const owed = r.recalled[ownerKey(p.owner, p.ownerChar)] = r.recalled[ownerKey(p.owner, p.ownerChar)] || {};
+      for (const it of bad) {
+        destroy(it.ref); if (it.light) destroy(it.light); if (it.show) destroy(it.show);
+        for (const [d, n] of Object.entries(Object.assign({}, it.paid || {}, it.books || {}))) owed[d] = (owed[d] || 0) + n;
+        audit(`DECOR recalled place ${k} ${it.name} ref ${it.ref} base ${it.base} owner ${p.owner}:${hex(p.ownerChar)}: it crashes the game`);
+      }
+      p.items = p.items.filter((it) => !bad.includes(it)); changed = true;
+    }
+    if (changed) save();
+    return changed;
+  };
   const scanOwners = () => {
     const r = reg(), roots = Object.keys(r.places);
-    let changed = false;
+    let changed = recallBlocked();
     for (let i = 0; i < Math.min(C.ownerScanPerTick, roots.length); i++) {
       S.scanIdx = (S.scanIdx + 1) % roots.length;
       const k = roots[S.scanIdx], p = r.places[k], rec = get(parseInt(k, 16) >>> 0, 'private.housing', null);
@@ -655,10 +678,21 @@ module.exports = (api) => {
       audit(`DECOR carpentry ${who(a)} ${JSON.stringify(got)}`);
       personal(a, `Your carpenters took down pieces in your home while you were away; back to you: ${costText(got)}.`);
     }
+    // pieces taken down because they crash the game (recallBlocked), refunded whole
+    for (const a of onlineActors()) {
+      const key = ownerKey(profile(a), a >>> 0), alt = ownerKey(profile(a), 0), k = r.recalled[key] ? key : (r.recalled[alt] ? alt : null);
+      if (!k) continue;
+      const got = giveAll(a, r.recalled[k], 1);
+      delete r.recalled[k]; changed = true;
+      audit(`DECOR recalled-owed ${who(a)} ${JSON.stringify(got)}`);
+      personal(a, `A piece in your home was taken down because it crashed the game for anyone near it; back to you in full: ${costText(got)}.`);
+    }
     if (changed) save();
     resetFixtures();
   };
   if (typeof api.every === 'function') api.every('decor-owners', Math.max(1, C.ownerScanMinutes) * 60000, () => { try { if (C.enabled) scanOwners(); } catch (e) { log('decor: owner scan failed', e.stack || e.message); } });
+  // On every load too, so a hot reload takes a blocked piece down at once
+  try { if (C.enabled) recallBlocked(); } catch (e) { log('decor: taking down blocked pieces failed', e.stack || e.message); }
 
   // ---- the study bookshelf and the planters at work (gamemode.js asks __dboDecorActivate before schools.js) -------------
   const showPos = (pos) => [pos[0], pos[1], pos[2] + (Number(C.planter.showZ) || 0)];
@@ -1021,5 +1055,5 @@ module.exports = (api) => {
   }, { help: 'decorate your home: find, place, list, move, remove, undo, grant, revoke, plant, stored, putback' });
 
   // test hooks (tests/decor-harness.js)
-  return { _test: { panelFor, openPanel, refundOf, takeAll, costOf, budgetProblem, spotProblem, confirm, scanOwners, reg, S, C, usePlanter, plant, pick, ripen, showPos } };
+  return { _test: { panelFor, openPanel, refundOf, takeAll, costOf, budgetProblem, spotProblem, confirm, scanOwners, recallBlocked, reg, S, C, usePlanter, plant, pick, ripen, showPos } };
 };
