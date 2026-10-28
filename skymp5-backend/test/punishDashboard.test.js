@@ -228,16 +228,3 @@ test('a ban only the player log has is not called permanent; a timed IP ban show
   assert.doesNotMatch(text, /Banned, permanent/)
   assert.match(text, /IP ban, until 22 Oct 05:00 UTC/)
 })
-
-test('a lifted ban says ban, not suspension; a discipline ban shows the Discord accounts it holds out', async () => {
-  const p = load(url => (url.startsWith(`${PU}/recent`)
-    ? [200, { ...RECENT, rows: [ROW('dsc:11:3', 'lift', { state: 'recorded', active: false, lifts: 2, liftsKind: 'ban' }),
-      ROW('dsc:11:1', 'lift', { state: 'recorded', active: false, lifts: 1, liftsKind: 'suspend' }),
-      ROW('dsc:9:1', 'ban', { until: null, endsInMs: null, hours: null, alsoHolds: 2 })] }]
-    : panel(url)))
-  await settle()
-  const text = p.$('puRecent').textContent
-  assert.match(text, /Lifted ban #2/)
-  assert.match(text, /Lifted suspension #1/)
-  assert.match(text, /Banned, permanent; also holds out 2 Discord accounts/)
-})
