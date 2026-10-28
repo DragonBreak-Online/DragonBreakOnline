@@ -43,7 +43,7 @@ const CODE_FLOOR = 'leadgm';
 const FULL_TIER = 'developer';
 // /ban, /tempban and /unban are /discipline's ban, suspend and lift under other words (discipline.js; Nat, 25 Oct), so they sit
 // with it
-const PUNISH_ONLY = Object.freeze(['discipline', 'kick', 'ban', 'tempban', 'unban']);
+const PUNISH_ONLY = Object.freeze(['discipline', 'kick', 'ban', 'tempban', 'unban', 'giveitem', 'takeitem', 'givespell', 'removespell', 'unstuck', 'fixloc']);
 const FLOOR_LABEL = Object.freeze({ leadgm: 'Lead GM', developer: 'Developer', senior: 'Senior' });
 
 const ID_RE = /^(w-[0-9a-f-]{36}|d-\d{17,20})$/;
@@ -109,7 +109,7 @@ const ALLOW = Object.freeze({
   vlremote: { usage: '/vlremote [on|off|clear #TAG]', rule: 'switch' },
   kick: { usage: '/kick #TAG', rule: 'tag', noArg: 'needTag', rank: true,
     help: 'Kicks one online character, named by #TAG. It takes no reason, and they can log straight back in.' },
-  fixloc: { usage: '/fixloc #TAG', rule: 'tag', noArg: 'self' },
+  fixloc: { usage: '/fixloc <#TAG|name>', rule: 'itemSpells', offline: false, help: '<#TAG|name>: reset a stuck character to the DragonBreak Hub' },
   rename: { usage: '/rename #TAG <new name>', rule: 'tagName', offline: true },
   chars: { usage: '/chars #TAG', rule: 'tag', noArg: 'needTag', offline: true },
   chargen: { usage: '/chargen #TAG', rule: 'tag', noArg: 'self', noBeast: true },
@@ -133,11 +133,21 @@ const ALLOW = Object.freeze({
     help: 'Suspends the account for a time, as /discipline #TAG suspend in game: logged out and refused at login until it ends.' },
   unban: { usage: '/unban #TAG <reason>', rule: 'tagKindReason', alias: 'discipline', kind: 'lift', kinds: Object.freeze(['lift']), offline: true, rank: true,
     help: 'Ends a ban or a suspension early, as /discipline #TAG lift in game. Lead GM and above, and of a rank at least that of who gave it.' },
+  unstuck: { usage: '/unstuck <#TAG|name> [hub|respawn] [ticket:<id>]', rule: 'itemSpells', offline: false,
+    help: '<#TAG|name> [hub|respawn] [ticket:<id>]: unstuck player to hub or local respawn' },
+  giveitem: { usage: '/giveitem <#TAG|name> <item name or hex id> [count] [ticket:<id>]', rule: 'itemSpells', offline: true,
+    help: '<#TAG|name> <item> [count] [ticket:<id>]: deliver an item to player (direct if online, gifts inbox if offline)' },
+  takeitem: { usage: '/takeitem <#TAG|name> <item name or hex id> [count] [ticket:<id>]', rule: 'itemSpells', offline: false,
+    help: '<#TAG|name> <item> [count] [ticket:<id>]: remove an item from online player inventory' },
+  givespell: { usage: '/givespell <#TAG|name> <spell name or hex id> [ticket:<id>]', rule: 'itemSpells', offline: false,
+    help: '<#TAG|name> <spell> [ticket:<id>]: grant a spell to an online player' },
+  removespell: { usage: '/removespell <#TAG|name> <spell name or hex id> [ticket:<id>]', rule: 'itemSpells', offline: false,
+    help: '<#TAG|name> <spell> [ticket:<id>]: remove a spell from an online player' },
 });
 // Why the rest are refused, by class (DESIGN 8.2). Built-ins that are not registry commands are notChat; any other
 // registry command is notYet
 const IN_WORLD = new Set(['npc', 'placed', 'jail', 'setweather', 'war', 'region', 'warband', 'raid', 'property', 'dungeon', 'whereami', 'teach']);
-const SELF = new Set(['tp', 'gm', 'masktest', 'mv', 'placeundo', 'factiongear', 'tailoring', 'smithing', 'beastform', 'makesuper', 'unstuck', 'appearance']);
+const SELF = new Set(['tp', 'gm', 'masktest', 'mv', 'placeundo', 'factiongear', 'tailoring', 'smithing', 'beastform', 'makesuper', 'appearance']);
 const LATER = new Set(['bugs', 'update', 'schedule']);
 const BUILTIN = new Set(['say', 'low', 'whisper', 'wide', 'shout', 'me', 'melow', 'melong', 'my', 'mylow', 'mylong', 'do', 'dolow', 'dolong',
   'looc', 'ooc', 'ooclow', 'ooclong', 'pm', 'dm', 'to', 'too', 'system', 'admin']);
@@ -303,6 +313,10 @@ const checkLine = (text, has, deny, opts) => {
     }
     case 'load': return !words.length || (words.length === 1 && words[0].toLowerCase() === 'reset') ? { cmd, body } : { cmd, why: 'badArgs' };
     case 'none': return words.length ? { cmd, why: 'badArgs' } : { cmd, body };
+    case 'itemSpells': {
+      if (words.length < 1) return { cmd, why: 'badArgs' };
+      return TAG_RE.test(words[0]) ? { cmd, body, tag: words[0] } : { cmd, body };
+    }
     // #TAG <kind> [<length>|<n>] <reason>: one target by tag, never a name; a fixed kind word; the kind's own word; a reason
     case 'tagKindReason': {
       const maxDays = opts && opts.maxSuspendDays !== undefined ? opts.maxSuspendDays : MAX_SUSPEND_DAYS;

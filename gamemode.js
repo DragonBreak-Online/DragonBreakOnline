@@ -5899,6 +5899,7 @@ const zoneOfActor = (a) => {
 // and an interior claimed by its plugin keep zoneOfActor, as does everything without guards.js or realm.js.
 const isHoldZone = (z) => (ZONES.holds || []).some((h) => h.id === z);
 const templeZoneOf = (a) => {
+  try { globalThis.__dboTempleFor = templeFor; globalThis.__dboTempleZoneOf = templeZoneOf; } catch (e) {}
   const zone = zoneOfActor(a);
   if (zone && !isHoldZone(zone)) return zone;
   let hold = '';
@@ -9663,6 +9664,13 @@ try {
   require(MOVETRACE_JS)({ mp, log, personal, display, registerChatCommand, onlineActors, every });
 } catch (e) { log('movetrace.js failed to load:', e.stack || e.message); }
 
+// ---- staff item, spell and unstuck management (/giveitem, /takeitem, /givespell, /removespell, /unstuck) ----
+try {
+  const STAFFITEMSPELLS_JS = path.resolve('staffitemspells.js');
+  delete require.cache[STAFFITEMSPELLS_JS];
+  require(STAFFITEMSPELLS_JS)({ mp, log, personal, audit, who, display, nameOf, tagOf, profileOf, onlineActors, isLeadStaff, isAdmin, giveItem, registerChatCommand, officialTarget });
+} catch (e) { log('staffitemspells.js failed to load:', e.stack || e.message); }
+
 // ---- remote staff console (server\console.js): after every module that registers commands (the player log below registers none)
 // Jake, 13 Oct: admins run in-game staff commands from the website dashboard or Discord. The backend drops signed requests
 // into /run/dragonbreak-console; console.js checks everything again and runs each through handleLine, the same gate as typed
@@ -9693,3 +9701,9 @@ try {
 
 
 
+
+// reload 1793166802630
+
+// reload 1793167225546
+
+// reload 1793167298940
