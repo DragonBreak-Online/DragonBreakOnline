@@ -368,60 +368,6 @@ module.exports = (api) => {
     }
   }, { admin: true, help: '<#TAG|name> <spell> [ticket:<id>]: remove a spell from an online player' });
 
-  // 5. /unstuck
-  registerChatCommand('unstuck', (caller, args) => {
-    if (!isLeadStaff(caller) && !isAdmin(caller) && (typeof api !== 'undefined' && typeof api.staffCan === 'function' ? !api.staffCan(caller, 'unstuck') : true)) {
-      return personal(caller, 'Only staff can unstuck other players.');
-    }
-    const raw = String(args || '').trim();
-    if (!raw) return personal(caller, 'Usage: /unstuck <#TAG|name> [hub|respawn] [ticket:<id>]');
-    const parts = raw.split(/\s+/);
-    const targetQuery = parts[0];
-    let dest = 'hub';
-    let reason = '';
-    for (let i = 1; i < parts.length; i++) {
-      const p = parts[i];
-      if (/^(ticket|call):/i.test(p)) reason += (reason ? ' ' : '') + p;
-      else if (p.toLowerCase() === 'respawn' || p.toLowerCase() === 'temple') dest = 'respawn';
-      else if (p.toLowerCase() === 'hub') dest = 'hub';
-    }
-
-    const tgt = resolveTarget(targetQuery);
-    if (!tgt || !tgt.online || !tgt.actor) {
-      return personal(caller, `Player '${targetQuery}' is not online (must be online to unstuck).`);
-    }
-
-    try {
-      if (dest === 'respawn') {
-        const getZone = typeof templeZoneOf === 'function' ? templeZoneOf : (globalThis.__dboTempleZoneOf || (() => 'bruma'));
-        const getTemple = typeof templeFor === 'function' ? templeFor : (globalThis.__dboTempleFor || (() => null));
-        const zone = getZone(tgt.actor) || 'bruma';
-        const t = getTemple(zone) || getTemple('bruma');
-        if (t && t.world && t.pos) {
-          try {
-            const h = globalThis.__dboPlogHook;
-            if (typeof h === 'function') h('travel', tgt.actor, 'unstuck', caller);
-          } catch (e) {}
-          mp.set(tgt.actor, 'locationalData', { cellOrWorldDesc: t.world, pos: t.pos, rot: [0, 0, Number(t.rotZ) || 0] });
-          personal(tgt.actor, 'Staff brings you back to safety.');
-          audit(`UNSTUCK ${who(tgt.actor)} to the ${zone} respawn by staff ${who(caller)}${reason ? ` (${reason})` : ''}`);
-          return personal(caller, `Unstuck ${tgt.name} to the ${zone} respawn.`);
-        }
-      }
-
-      try {
-        const h = globalThis.__dboPlogHook;
-        if (typeof h === 'function') h('travel', tgt.actor, 'fixloc', caller);
-      } catch (e) {}
-      mp.set(tgt.actor, 'locationalData', { cellOrWorldDesc: '17482:DragonBreak Hub.esp', pos: [2122.2, 2079.6, 3], rot: [0, 0, 22.9] });
-      personal(tgt.actor, 'Staff moved you to the safety of the DragonBreak Hub.');
-      audit(`UNSTUCK ${who(tgt.actor)} to the hub by staff ${who(caller)}${reason ? ` (${reason})` : ''}`);
-      return personal(caller, `Unstuck ${tgt.name} to the DragonBreak Hub.`);
-    } catch (e) {
-      return personal(caller, `Failed to unstuck player: ${e.message}`);
-    }
-  }, { admin: true, help: '<#TAG|name> [hub|respawn] [ticket:<id>]: unstuck player to hub or local respawn' });
-
-  log('staffitemspells: loaded (/giveitem, /takeitem, /givespell, /removespell, /unstuck registered)');
+  log('staffitemspells: loaded (/giveitem, /takeitem, /givespell, /removespell registered; /unstuck stays gamemode.js)');
 };
 

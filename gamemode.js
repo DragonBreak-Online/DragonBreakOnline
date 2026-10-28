@@ -9664,7 +9664,7 @@ try {
   require(MOVETRACE_JS)({ mp, log, personal, display, registerChatCommand, onlineActors, every });
 } catch (e) { log('movetrace.js failed to load:', e.stack || e.message); }
 
-// ---- staff item, spell and unstuck management (/giveitem, /takeitem, /givespell, /removespell, /unstuck) ----
+// ---- staff item and spell management (/giveitem, /takeitem, /givespell, /removespell) ----
 try {
   const STAFFITEMSPELLS_JS = path.resolve('staffitemspells.js');
   delete require.cache[STAFFITEMSPELLS_JS];
