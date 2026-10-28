@@ -22,6 +22,8 @@ const COLLECT_MS = 2000
 const LOOKUPS_AT_ONCE = 5
 // One GM request waits on Discord this long at most, however many accounts it covers; what is not answered is hidden
 const LOOKUPS_MS = 10000
+// The tracker's identity is rebuilt only when a record file changes or this long after it was built
+const TRACKER_ID_MS = 5 * 60000
 
 const ROW_FIELDS = ['id', 'kind', 'source', 'by', 'state', 'active', 'reason', 'ref', 'ticket', 'told', 'outside', 'undid', 'lifts',
   'hours', 'count', 'how', 'leftMs', 'totalMs', 'concordat', 'alsoHolds', 'liftsKind']
@@ -83,6 +85,7 @@ function createPunishments({ config, readStore, dynamicFields, characterName, lo
   const identity = createIdentity({ loadProfiles, loadPlayers, readStore, dynamicFields, characterName, now })
   let plogCache = { version: -1, rows: [] }
   const snapshots = { panel: null, tracker: null }
+  let trackerId = null
 
   // The paths the game itself uses (discipline.js and restitution.js resolve them from the server's working directory)
   function paths(cfg) {
@@ -126,6 +129,12 @@ function createPunishments({ config, readStore, dynamicFields, characterName, lo
     if (staffName) r.by = `${staffName} (profile ${staff[1]}${staff[2] ? `, ${staff[2]}` : ''})`
   }
 
+  // Each record file's parsed value is replaced only when the file changes, so the same values mean nothing changed
+  function trackerIdentity(stamp, t) {
+    if (!trackerId || t - trackerId.at >= TRACKER_ID_MS || stamp.some((v, i) => v !== trackerId.stamp[i])) trackerId = { at: t, stamp, id: identity.get() }
+    return trackerId.id
+  }
+
   // skipPlayerLog leaves the player log unread, so the tracker never wakes its worker
   function collect({ skipPlayerLog = false } = {}) {
     const key = skipPlayerLog ? 'tracker' : 'panel'
@@ -138,7 +147,7 @@ function createPunishments({ config, readStore, dynamicFields, characterName, lo
     const read = Object.fromEntries(Object.entries(files).map(([k, f]) => [k, f.read(p[k])]))
     const j = journal.read()
     if (!skipPlayerLog) plog.refresh()
-    const id = identity.get()
+    const id = skipPlayerLog ? trackerIdentity([read.discipline.value, read.panelBans.value, read.bans.value, j.rows], t) : identity.get()
     const dsc = R.disciplineRows(read.discipline.value || [], { now: t, strikeDays: cfg.discipline.strikeDays, held: read.held.value || new Map() })
     const rows = [
       ...dsc.rows,

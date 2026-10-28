@@ -179,3 +179,45 @@ test('the tracker ticks on the real service without waking the player log or fre
   assert.ok(!lines.some(l => /waits until|cannot be read|tick failed|player ?log/i.test(l)), lines.join('\n'))
   assert.ok(fs.existsSync(path.join(dir, 'punish-threads.dry.json')))
 })
+
+test('trackerSnapshot keeps its identity until a record file changes or 5 minutes pass, and the panel still reads afresh', async () => {
+  const G = createPunishFixture()
+  after(() => G.cleanup())
+  let t = G.now, reads = 0
+  const svc = createPunishments({
+    config: { gameServerDir: G.game, punishBansFile: G.bansFile, punishJournalFile: G.journalFile },
+    readStore: () => { reads++; return G.forms }, dynamicFields: cf => cf.dynamicFields || {}, characterName: cf => cf.displayName,
+    loadProfiles: () => G.profiles, loadPlayers: () => G.players, playerLog: plog, tailIntervalMs: 0, now: () => t,
+    staffStatusOf: async () => 'player',
+  })
+  const tick = () => { t += 30000; return svc.trackerSnapshot() }
+  const first = svc.trackerSnapshot()
+  assert.equal(reads, 1)
+  tick(); tick()
+  assert.equal(reads, 1, 'no changeForms scan while nothing changed')
+  assert.equal(tick().id, first.id)
+
+  fs.appendFileSync(G.journalFile, '\n' + JSON.stringify({ v: 1, id: 'M-DDDDDD', at: new Date(t).toISOString(), kind: 'discord_timeout', discordId: PEOPLE.bob.discordId, until: new Date(t + 3600000).toISOString(), reason: 'Spam', by: { discordName: 'Lena' }, via: 'discord' }) + '\n')
+  tick()
+  assert.equal(reads, 2, 'a new journal line rebuilds it')
+  tick()
+  assert.equal(reads, 2)
+
+  const disc = path.join(G.state, 'discipline.json')
+  fs.writeFileSync(disc, fs.readFileSync(disc, 'utf8') + ' ')
+  tick()
+  assert.equal(reads, 3, 'a changed discipline file rebuilds it')
+  fs.writeFileSync(G.bansFile, fs.readFileSync(G.bansFile, 'utf8') + ' ')
+  tick()
+  assert.equal(reads, 4, 'a changed ban list rebuilds it')
+
+  for (let i = 0; i < 8; i++) tick()
+  assert.equal(reads, 4, 'still cached at 4.5 minutes')
+  tick(); tick()
+  assert.equal(reads, 5, 'rebuilt once 5 minutes have passed')
+
+  // The panel keeps its own 5 s identity
+  t += 10000
+  await svc.recent(OWNER, { from: '2000-01-01', limit: '100' })
+  assert.equal(reads, 6, 'the panel reads the store again')
+})
