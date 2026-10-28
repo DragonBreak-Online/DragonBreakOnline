@@ -524,9 +524,10 @@ test('dry mode writes the would-be posts to its file and never calls fetch or th
   const lines = fs.readFileSync(dryFile, 'utf8').trim().split('\n').map(l => JSON.parse(l))
   assert.deepEqual(lines.map(l => l.action), ['create-thread', 'reply', 'reply', 'edit-starter', 'edit-thread'])
   assert.equal(lines[0].body.name, 'alice_rp')
+  assert.equal(lines[0].title, 'local fallback, not looked up', 'dry reads answer empty, so the create line says its title is local')
   assert.match(lines[2].body.content, /^\*\*ENDED\*\*/)
   assert.deepEqual(lines[4].body, { archived: true })
-  for (const l of lines) assert.deepEqual(Object.keys(l), ['at', 'action', 'method', 'path', 'body'])
+  for (const l of lines.slice(1)) assert.deepEqual(Object.keys(l), ['at', 'action', 'method', 'path', 'body'])
   assert.ok(fs.existsSync(path.join(dir, 'punish-threads.dry.json')), 'its own registry')
   assert.ok(!fs.existsSync(path.join(dir, 'punish-threads.json')), 'the live registry is untouched')
 })
@@ -1038,6 +1039,26 @@ test('the username is looked up again after 24 h and the thread renamed only whe
   r.now += 25 * HOUR
   await r.tick()
   assert.equal(t.patches.filter(p => p.name).length, renames)
+})
+
+test('a target known only by Discord is titled by the journal\'s name when the lookup fails, and looked up again after 10 min, not 24 h', async () => {
+  const d = fakeDiscord()
+  const r = await started({ discord: d })
+  const ghost = '844444444444444444'
+  r.data.bans = [{ discordId: ghost, ref: 'B-GHOST1', reason: 'discord ban', bannedBy: 'discord', bannedAt: iso(T0) }]
+  r.data.journal = [{ v: 1, id: 'M-GGGGGG', at: iso(T0 + 5000), kind: 'discord_ban', discordId: ghost, discordName: 'ghosty', reason: 'threats', by: { discordName: 'Lena' }, via: 'discord' }]
+  await r.tick()
+  const t = d.thread()
+  assert.equal(t.name, 'ghosty')
+  assert.equal(r.registry().accounts[ghost].usernameAt, 0, 'a failed lookup is not a fresh name')
+  d.members[ghost] = 'ghost_real'
+  r.now += 5 * 60000
+  await r.tick()
+  assert.equal(t.name, 'ghosty', 'not every tick')
+  r.now += 6 * 60000
+  await r.tick()
+  assert.equal(t.name, 'ghost_real')
+  assert.equal(r.registry().accounts[ghost].usernameAt, r.now)
 })
 
 test('a lost registry adopts the forum\'s threads by marker with nothing posted again; a corrupt one posts nothing', async () => {

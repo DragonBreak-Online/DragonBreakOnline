@@ -168,7 +168,7 @@ function createDryWriter({ file, now = Date.now }) {
     [/^PATCH \/channels\/(\d+)\/messages\/\1$/, 'edit-starter'], [/^PATCH \/channels\/\d+$/, 'edit-thread'],
   ]
   return {
-    async request(method, p, body) {
+    async request(method, p, body, opts) {
       if (method === 'GET') {
         if (/\/threads\/(active|archived\/public)/.test(p)) return { threads: [], has_more: false }
         if (/^\/channels\/\d+$/.test(p)) return { id: p.split('/')[2], available_tags: [] }
@@ -176,7 +176,10 @@ function createDryWriter({ file, now = Date.now }) {
       }
       const action = (ACTIONS.find(([rx]) => rx.test(`${method} ${p}`)) || [null, 'other'])[1]
       fs.mkdirSync(path.dirname(file), { recursive: true })
-      fs.appendFileSync(file, `${JSON.stringify({ at: iso(now()), action, method, path: p, body })}\n`, { mode: 0o600 })
+      const line = { at: iso(now()), action, method, path: p, body }
+      // Dry reads answer empty, so the review shows which titles were never looked up
+      if (action === 'create-thread' && opts && opts.localTitle) line.title = 'local fallback, not looked up'
+      fs.appendFileSync(file, `${JSON.stringify(line)}\n`, { mode: 0o600 })
       const id = fakeId()
       return action === 'create-thread' ? { id, message: { id } } : { id }
     },
@@ -516,9 +519,13 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
 
   async function refreshName(key, acct, rows, x) {
     let found = null
-    if (!key.startsWith('p:')) { found = await lookupUser(key); acct.usernameAt = x.now }
-    if (found) Object.assign(acct, { display: scrub(found.display, TITLE_MAX) || null, nick: scrub(found.nick, TITLE_MAX) || null })
-    const username = (found && scrub(found.username, TITLE_MAX)) || acct.username || localName(key, rows, x)
+    if (!key.startsWith('p:')) { found = await lookupUser(key); acct.nameTriedAt = x.now }
+    if (found) Object.assign(acct, { usernameAt: x.now, display: scrub(found.display, TITLE_MAX) || null, nick: scrub(found.nick, TITLE_MAX) || null })
+    const looked = found && scrub(found.username, TITLE_MAX)
+    // A Discord account's title not from a lookup is a local fallback, chosen again each time until one succeeds
+    const kept = acct.nameLocal ? null : acct.username
+    acct.nameLocal = !looked && !kept && !key.startsWith('p:')
+    const username = looked || kept || localName(key, rows, x)
     if (username !== acct.username) { acct.username = username; acct.sync = true }
     const title = titleOf(username)
     if (title === acct.title) return
@@ -653,7 +660,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     acct.state = 'creating'
     save()
     // Sent once: a thread made whose answer was lost is found by the marker scan, never made twice
-    const post = body => call('POST', `/channels/${s.forumId}/threads`, body, { once: true })
+    const post = body => call('POST', `/channels/${s.forumId}/threads`, body, { once: true, localTitle: !!acct.nameLocal })
     let thread
     try {
       try {
@@ -776,7 +783,8 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
       }
     }
     const isNew = work.some(w => w.isNew)
-    const due = !!(acct && acct.threadId && !key.startsWith('p:') && s.guildId && x.now - (acct.usernameAt || 0) > NAME_TTL_MS)
+    // A failed lookup is tried again after CACHE_MS, not every tick
+    const due = !!(acct && acct.threadId && !key.startsWith('p:') && s.guildId && x.now - (acct.usernameAt || 0) > NAME_TTL_MS && x.now - (acct.nameTriedAt || 0) > CACHE_MS)
     const recreate = !!(acct && acct.recreate && x.inForce)
     if (!work.length && !quiet.length && !(acct && acct.threadId && (acct.sync || due)) && !recreate) return
     if (!acct) acct = reg.accounts[key] = newAccount()

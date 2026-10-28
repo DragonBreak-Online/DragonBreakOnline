@@ -397,7 +397,11 @@ function oneRowPerBan(rows) {
     const gap = x => Math.abs(x.atMs - b.atMs) || 0
     const j = others.filter(x => x.source === 'journal' && x.kind === b.kind && x.state !== 'lifted' && x._discordId === b._discordId && same(x) && !drop.has(x))
       .reduce((best, x) => (!best || gap(x) < gap(best) ? x : best), null)
-    if (j) { b.by = j.by || b.by; b.reason = j.reason || b.reason; b.ticket = b.ticket || j.ticket; b.via = b.via || j.via; drop.add(j) }
+    if (j) {
+      Object.assign(b, { by: j.by || b.by, reason: j.reason || b.reason, ticket: b.ticket || j.ticket, via: b.via || j.via })
+      b.target.discordName = b.target.discordName || j.target.discordName || null
+      drop.add(j)
+    }
   }
   for (const r of rows) {
     const kinds = r.source === 'playerLog' ? PLOG_COPY_OF[r.kind] : null

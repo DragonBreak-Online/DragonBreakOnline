@@ -244,6 +244,15 @@ test('one row per ban: the player log\'s copy goes, the ban list takes the journ
   assert.equal(R.oneRowPerBan(alone), alone)
 })
 
+test('one row per ban: the ban list row keeps the journal\'s Discord name for a target known only by Discord', () => {
+  const t = Date.parse('2026-10-21T12:00:00Z')
+  const dA = '100000000000000101'
+  const bans = R.banRows(R.parseBans([{ discordId: dA, ref: 'B-WG6QYG', reason: 'discord ban', bannedBy: 'discord', bannedAt: new Date(t).toISOString() }]))
+  const journal = R.journalRows([R.parseJournalLine({ v: 1, id: 'M-AAAAAA', kind: 'discord_ban', at: new Date(t + 7000).toISOString(), discordId: dA, discordName: 'ghosty', reason: 'threats', by: { discordName: 'rowan_staff' } })], { now: t })
+  const out = R.oneRowPerBan([...bans, ...journal])
+  assert.deepEqual(out.map(r => [r.id, r.target.discordName]), [['ban:B-WG6QYG', 'ghosty']])
+})
+
 test('journal: a dashboard game ban is history, lifted by its unban; the ban list row takes its who and why by ref; reasons keep 300', () => {
   const t = Date.parse('2026-10-21T12:00:00Z')
   const d = '100000000000000101'
