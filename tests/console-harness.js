@@ -591,6 +591,48 @@ reset();
   store.delete(alt); delete mp.findFormsByPropertyValue;
 }
 
+// ---- 7c. typed /fixloc: an offline character by #TAG or name, a typed #TAG binds (Neem #LBRF, Jake 28 Oct; C's review) ------
+reset();
+{
+  // The engine's indexes, as indexName writes them: the lower-case tag and own name of every character
+  mp.findFormsByPropertyValue = (k, v) => [...store].filter(([, o]) => (k === 'private.indexed.tagKey' ? String(o['private.charTag'] || '').toLowerCase() === v
+    : k === 'private.indexed.nameKey' ? String((o.appearance || {}).name || '').toLowerCase() === v : false)).map(([id]) => id);
+  const neem = actor(0xff000d01, { name: 'Neem', tag: 'LBRF', profile: 97 });
+  const neema = actor(0xff000d02, { name: 'Neema', tag: 'NMA1', profile: 98, online: true });
+  const twin = actor(0xff000d03, { name: 'Neem', tag: 'NNN2', profile: 99, online: true });
+  store.get(neem).worldOrCellDesc = '6ca03:BSHeartland.esm'; store.get(neem).pos = [77.4, -12.2, -65.9];
+  const fix = (args) => { for (const id of [neem, neema, twin, A.lydia]) if (store.get(id)) delete store.get(id).locationalData; G.commands.get('fixloc').fn(A.jake, args); };
+  const moved = () => [neem, neema, twin, A.lydia].filter((id) => store.get(id) && store.get(id).locationalData).map((id) => G.display(id));
+  const told = () => (chatWrites.filter(([id]) => id === A.jake).slice(-1)[0] || [])[1] || '';
+  fix('Neem #LBRF');
+  check('7c. "/fixloc Neem #LBRF" with Neema and another Neem online moves the offline Neem #LBRF only', moved().join() === 'Neem #LBRF', moved());
+  check('7c. ...to the hub', (store.get(neem).locationalData || {}).cellOrWorldDesc === '17482:DragonBreak Hub.esp');
+  check('7c. ...with an UNSTUCK audit line naming where it was, offline, and the staff member', audits().some((l) => /^UNSTUCK Neem #LBRF \(profile 97\) from 6ca03:BSHeartland\.esm at 77,-12,-66 to the hub \(offline\) by staff Jake #ABCD .*via \/fixloc$/.test(l)), audits().slice(-2));
+  check('7c. ...and the reply names the character with its tag, offline and where it was', /Moved Neem #LBRF \(offline, was in 6ca03:BSHeartland\.esm\) to the hub/.test(told()), told());
+  fix('Neem #ZZZZ');
+  check('7c. "/fixloc Neem #ZZZZ" (a tag nobody carries) moves nobody, not Neem #LBRF nor an online Neem', moved().length === 0, moved());
+  check('7c. ...and says it cannot, so the player log marks it refused', /Cannot move #ZZZZ/.test(told()), told());
+  fix('Lydia #LBRF');
+  check('7c. "/fixloc Lydia #LBRF" binds the tag: the offline #LBRF carrier, never the online Lydia', moved().join() === 'Neem #LBRF', moved());
+  fix('#LBRF');
+  check('7c. the bare tag "/fixloc #LBRF" moves Neem #LBRF', moved().join() === 'Neem #LBRF', moved());
+  const dup = actor(0xff000d04, { name: 'Neem Two', tag: 'LBRF', profile: 96 });
+  fix('#LBRF');
+  check('7c. a tag two characters carry moves nobody', moved().length === 0, moved());
+  store.delete(dup);
+  // a bare name still loses to an online prefix match (findByName first, as before); with nobody online it is ambiguous
+  setOnline(twin, false); setOnline(neema, false);
+  fix('Neem');
+  check('7c. a bare name two offline characters share moves nobody (add their #TAG)', moved().length === 0 && /Cannot move Neem: 2 characters/.test(told()), [moved(), told()]);
+  store.delete(twin);
+  fix('Neem');
+  check('7c. a unique bare name finds the offline Neem', moved().join() === 'Neem #LBRF', moved());
+  setOnline(neema, true);
+  fix('Lydia');
+  check('7c. an online character moves as before', moved().join() === 'Lydia #LLX8', moved());
+  store.delete(neem); store.delete(neema); delete mp.findFormsByPropertyValue;
+}
+
 // ---- 12. reply state is "ran", with the handler's own first line ------------------------------------------------------------------------
 reset();
 {

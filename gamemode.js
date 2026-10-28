@@ -3871,17 +3871,29 @@ registerChatCommand('wipechars', (a, args) => {
   personal(a, `Wiped ${n} of ${ids.length} character(s) of profile ${pid}: ${names.join(', ')}.`);
 }, { admin: true, help: '<profile id|name|#TAG> destroy every character of that account' });
 registerChatCommand('fixloc', (a, args) => {
-  // An offline character too, by name or #TAG (as /wipechars): one whose game crashes where it logs in is moved before it comes back (Jake, 28 Oct)
-  const q = args.trim(); const t = q ? findAnyByName(q) : a;
-  if (t < 0) return personal(a, `${-t} characters are called that; add their #TAG.`);
-  if (!t) return personal(a, 'No such player.');
-  const online = userOf(t) >= 0;
-  let from = '?'; try { from = String(mp.get(t, 'worldOrCellDesc') || '?'); } catch (e) { /* where is unknown */ }
+  // An offline character too: one whose game crashes where it logs in is moved before it comes back (Jake, 28 Oct)
+  const q = args.trim();
+  // A typed #TAG binds, as /rename: an online character only if it carries that tag, else its one live offline carrier
+  const tagIn = (q.match(/#([A-Za-z0-9]{4})$/) || [])[1];
+  let t = a;
+  if (tagIn) {
+    t = findByName(q); if (t && tagOf(t).toLowerCase() !== tagIn.toLowerCase()) t = 0;
+    t = t || offlineByTag(q);
+    if (!t) return personal(a, `Cannot move #${tagIn.toUpperCase()}: no live character carries that tag, or more than one does.`);
+  } else if (q) {
+    t = findAnyByName(q);
+    if (t < 0) return personal(a, `Cannot move ${q}: ${-t} characters are called that; add their #TAG.`);
+    if (!t) return personal(a, 'No such player.');
+  }
+  const online = userOf(t) >= 0, state = online ? 'online' : 'offline';
+  let from = '?', pos = '?';
+  try { from = String(mp.get(t, 'worldOrCellDesc') || '?'); const p = mp.get(t, 'pos'); if (Array.isArray(p)) pos = p.map((v) => Math.round(v)).join(','); } catch (e) { /* where is unknown */ }
   try {
     try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('travel', t, 'fixloc', a); } catch (e) { /* the player log is optional */ }
     mp.set(t, 'locationalData', { cellOrWorldDesc: '17482:DragonBreak Hub.esp', pos: [2122.2, 2079.6, 3], rot: [0, 0, 22.9] });
-    personal(a, online ? `Moved ${nameOf(t)} to the hub; server now says ${JSON.stringify(mp.get(t, 'worldOrCellDesc'))}.`
-      : `Moved ${nameOf(t)} (offline, was in ${from}) to the hub; they arrive there at their next login. Server now says ${JSON.stringify(mp.get(t, 'worldOrCellDesc'))}.`);
+    audit(`UNSTUCK ${who(t)} from ${from} at ${pos} to the hub (${state}) by staff ${who(a)} via /fixloc`);
+    personal(a, online ? `Moved ${display(t)} to the hub; server now says ${JSON.stringify(mp.get(t, 'worldOrCellDesc'))}.`
+      : `Moved ${display(t)} (offline, was in ${from}) to the hub; they arrive there at their next login. Server now says ${JSON.stringify(mp.get(t, 'worldOrCellDesc'))}.`);
   } catch (e) { personal(a, 'Failed: ' + e.message); }
 }, { admin: true, help: '[player|#TAG] reset a stuck character to the hub, offline ones too' });
 // One line per online player on every reload, so it stays behind the debug flag

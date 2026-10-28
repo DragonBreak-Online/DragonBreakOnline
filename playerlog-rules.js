@@ -1241,7 +1241,7 @@ const COMMAND_SCHEMA = {
   grantappearance: { target: { from: 0, lookup: 'online' } },
   rename: { target: { from: 0, to: 1, lookup: 'any' } },
   chars: { target: { from: 0, lookup: 'any' }, info: true },
-  fixloc: { target: { from: 0, lookup: 'online' } },
+  fixloc: { target: { from: 0, lookup: 'any' } },
   sethunger: { target: { from: 0, to: 1, lookup: 'online' }, nums: [-1] },
   wipechars: { target: { from: 0, lookup: 'any' } },
   staffdiag: { target: { from: 0, to: 1, lookup: 'online' }, nums: [1] },
@@ -1633,6 +1633,7 @@ gamemode.js <expr> 81ff2a3c parsed
 gamemode.js READ 10c2287e clean
 gamemode.js WELL ecdbc739 clean
 gamemode.js UNSTUCK d8f634f3 clean
+gamemode.js UNSTUCK ea5048d0 clean
 gamemode.js SKINNING-MISMATCH 25473bc6 clean
 gamemode.js BODY 5e5a70cb excluded
 gamemode.js CONSOLE 9f79f5f1 parsed
