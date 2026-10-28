@@ -247,6 +247,25 @@ out.personal.length = 0;
 killOf(0x908, COUNT_ALT);
 check('an old contract whose notice is gone is closed with word of it', out.personal.some((p) => p.a === COUNT_ALT && /no longer posted/.test(p.t)) && !tk('14'), out.personal.map((p) => p.t).join(' | '));
 
+// ---- notice ids (28 Oct sweep: 4 notices in one millisecond drew the same id 1 time in 1296, and a take found the
+// wrong one): the clock and the dice held still, every notice still gets its own id, across a reload too ----------------
+{
+  clear();
+  inv(CHEST, 1000);
+  load(NOFLOOR);
+  const realNow = Date.now; const realRandom = Math.random; const at = realNow();
+  Date.now = () => at; Math.random = () => 0.5;
+  try {
+    run(COUNT, 'post wolf 2 24'); run(COUNT, 'post wolf 3 36'); run(COUNT, 'post bear 2 50'); run(COUNT, 'post wolf 4 48');
+    const ids1 = stored().contracts.map((c) => c.id);
+    check('4 notices in one millisecond get 4 ids', ids1.length === 4 && new Set(ids1).size === 4, JSON.stringify(ids1));
+    load(NOFLOOR);
+    run(COUNT, 'post bear 3 75');
+    const ids2 = stored().contracts.map((c) => c.id);
+    check('...and a notice after a reload, in the same millisecond, gets a fifth', ids2.length === 5 && new Set(ids2).size === 5, JSON.stringify(ids2));
+  } finally { Date.now = realNow; Math.random = realRandom; }
+}
+
 // ---- several contracts at once (Nate, 5 Oct: up to 3, each notice once) --------------------------------------------
 clear();
 inv(CHEST, 1000);

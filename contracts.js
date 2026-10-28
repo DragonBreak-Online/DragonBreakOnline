@@ -301,7 +301,10 @@ module.exports = (api) => {
   const budgetText = (zone) => `${zone.name} has spent this week's budget for standing contracts (${budgetOf(zone.id)} gold). It resets ${RESET_TEXT()}.`;
   const postBudgetText = (zone) => `${zone.name} has spent this week's budget for posted work (${postBudgetOf(zone.id)} gold). It resets ${RESET_TEXT()}.`;
 
-  const nextId = () => `${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`;
+  // A count, not dice: notices posted in one millisecond drew the same id 1 time in 1296, and a take then found the wrong
+  // one (court.js and duel.js count too). On globalThis, so a hot reload keeps counting
+  const idSeq = globalThis.__dboContractIds || (globalThis.__dboContractIds = { seq: 0 });
+  const nextId = () => `${Date.now().toString(36)}${(++idSeq.seq).toString(36)}`;
 
   // The kinds a hold posts standing work for: dangerous, and roaming at enough of its spots to be found
   const minSpots = () => Math.max(1, Math.floor(num(CFG.minSpots, 1)));
