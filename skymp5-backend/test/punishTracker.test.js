@@ -502,6 +502,74 @@ test('thread headroom: above 975 active threads creation is held and logged once
   assert.match(d.thread().messages[1].content, /^\*\*STRIKE\*\* · dsc:57:1/)
 })
 
+// Alice and Bob each with a suspension that ran out: both threads archived as Expired
+async function twoArchived(d) {
+  const r = await started({ discord: d })
+  r.data.discipline = {
+    57: [entry(1, 'suspend', T0 - HOUR, { until: T0 + HOUR })],
+    58: [entry(1, 'suspend', T0 - HOUR, { until: T0 + HOUR })],
+  }
+  await r.tick()
+  r.now += 2 * HOUR
+  await r.tick()
+  assert.ok([...d.threads.values()].every(t => t.archived))
+  return r
+}
+const reopens = d => d.calls.filter(c => c.method === 'PATCH' && c.body && c.body.archived === false)
+
+test('thread headroom: a new punishment reopens an archived thread only with room, and the reopen counts toward it', async () => {
+  const d = fakeDiscord()
+  const r = await twoArchived(d)
+  d.active = 976
+  r.now += 11 * 60000
+  r.data.discipline[57].push(entry(2, 'strike', r.now - 60000))
+  await r.tick()
+  const alice = r.named('alice_rp')
+  assert.equal(alice.archived, true, 'held above 975')
+  assert.equal(reopens(d).length, 0)
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].rows['dsc:57:2'], undefined, 'the row is kept unposted')
+  assert.deepEqual(r.audits, ['PUNISH-TRACKER waiting for thread headroom: reopened threads are held'])
+  // At exactly 975 one reopen fits; it takes the slot, so the second one in the same 10 minutes waits
+  d.active = 975
+  r.now += 11 * 60000
+  r.data.discipline[58].push(entry(2, 'strike', r.now - 60000))
+  await r.tick()
+  assert.equal(alice.archived, false)
+  assert.match(alice.messages[3].content, /^\*\*STRIKE\*\* · dsc:57:2/)
+  const bob = r.named('bob_rp')
+  assert.equal(bob.archived, true, 'the reopen above counted toward headroom')
+  assert.equal(r.registry().accounts[PEOPLE.bob.discordId].rows['dsc:58:2'], undefined)
+  assert.equal(reopens(d).length, 1)
+})
+
+test('thread headroom: after a 160006 no thread is reopened until the next headroom check', async () => {
+  const d = fakeDiscord()
+  const r = await started({ discord: d })
+  r.data.discipline = { 57: [entry(1, 'strike', T0)] }
+  await r.tick()
+  const t = d.thread()
+  t.archived = true
+  let full = true
+  d.fail = (method, p, body) => {
+    if (method === 'POST' && p === `/channels/${t.id}/messages` && t.archived) return fakeDiscord.error(400, 50083)
+    if (method === 'PATCH' && p === `/channels/${t.id}` && body.archived === false && full) return fakeDiscord.error(400, 160006)
+    return null
+  }
+  r.now += 60000
+  r.data.discipline[57].push(entry(2, 'strike', r.now))
+  await r.tick()
+  assert.equal(reopens(d).length, 1)
+  full = false
+  r.now += 60000
+  await r.tick()
+  assert.equal(reopens(d).length, 1, 'refused at once while the count is unknown')
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].rows['dsc:57:2'], undefined, 'kept unposted')
+  r.now += 10 * 60000
+  await r.tick()
+  assert.equal(reopens(d).length, 2)
+  assert.match(t.messages[2].content, /^\*\*STRIKE\*\* · dsc:57:2/)
+})
+
 test('the REST writer waits out a 429 (the global one too), backs off a 5xx, and spaces requests 1.5 s', async () => {
   let clock = 0
   const slept = []
@@ -832,7 +900,7 @@ test('a thread Discord auto-archived at the guild\'s thread cap (160006) holds t
   assert.equal(r.registry().accounts[PEOPLE.alice.discordId].rows['dsc:57:2'], undefined, 'kept unposted, not dropped')
   assert.deepEqual(r.audits, ['PUNISH-TRACKER waiting for thread headroom: Discord refused to open a thread (160006)'])
   full = false
-  r.now += 60000
+  r.now += 11 * 60000
   await r.tick()
   assert.match(t.messages[2].content, /^\*\*STRIKE\*\* · dsc:57:2/)
   assert.equal(r.registry().accounts[PEOPLE.alice.discordId].rows['dsc:57:2'].dropped, undefined)

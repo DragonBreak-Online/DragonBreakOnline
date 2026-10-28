@@ -449,7 +449,9 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
 
   // Reopening a thread takes an active-thread slot like a new one, so a full guild (160006) holds it too
   async function unarchive(acct) {
+    if (headroom && headroom.count === Infinity && now() - headroom.at <= CACHE_MS) throw new Error('the guild is at its thread cap; reopening waits for the next headroom check')
     await call('PATCH', `/channels/${acct.threadId}`, { archived: false }).catch(err => { capped(err); throw err })
+    if (headroom) headroom.count++
     acct.state = 'open'
   }
 
@@ -812,7 +814,13 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     if (isNew || due || !acct.username) await refreshName(key, acct, rows, x)
     if (!acct.threadId) {
       if (!(await createThread(key, acct, rows, x))) return
-    } else if (work.length && acct.state === 'archived') await unarchive(acct)
+    } else if (work.length && acct.state === 'archived') {
+      if (!(await roomForThread())) {
+        waitNote('reopened threads are held')
+        return
+      }
+      await unarchive(acct)
+    }
     const at = w => (w.r ? w.r.atMs : w.rec.at) || 0
     for (const w of work.sort((a, b) => Number(!a.isNew) - Number(!b.isNew) || at(a) - at(b))) await postRow(key, acct, w, x)
     if (acct.sync && !held) await syncThread(key, acct, rows, x)
