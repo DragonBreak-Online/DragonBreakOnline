@@ -6108,7 +6108,15 @@ registerChatCommand('unstuck', (a, args) => {
   try { held = typeof globalThis.__dboJailSentence === 'function' ? globalThis.__dboJailSentence(t) : null; } catch (e) { held = null; }
   if (held) return personal(a, `Cannot move ${display(t)}: they are serving a sentence in ${held.cell}; release them first at their cell door (activate it, then Release).`);
   const why = refs.length ? ` (${refs.join(' ')})` : '';
-  if (dest && UNSTUCK_DEST[dest.toLowerCase()] === 'hub') hubActor(t, a, '/unstuck', why); else unstuckActor(t, a, why);
+  const toHub = !!dest && UNSTUCK_DEST[dest.toLowerCase()] === 'hub';
+  // Nor to the hub while they are down: the wake would undo it, back where they fell or to the temple (C's review, 28 Oct);
+  // the temple path refuses the same in unstuckActor. /fixloc and the wake are unchanged
+  if (toHub) {
+    let down = false;
+    try { down = !!mp.get(t, 'isDead'); } catch (e) { down = false; }
+    if (down) return personal(a, `Cannot move ${display(t)} to the hub while they are down; once they are up (at most a minute), /unstuck #${tagOf(t)} hub moves them.`);
+  }
+  if (toHub) hubActor(t, a, '/unstuck', why); else unstuckActor(t, a, why);
   const left = rest.slice(1);
   if (left.length) personal(a, `Left out, not a ticket:<id> or call:<n>: ${left.join(' ').slice(0, 60)}`);
 }, { help: `move to the respawn point of your area (every ${UNSTUCK.cooldownMinutes} min, not in combat); staff: <player|#TAG> [hub|respawn] [ticket:<id>], offline ones too` });

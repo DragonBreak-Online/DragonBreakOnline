@@ -845,6 +845,17 @@ reset();
   check('7f. F1: typed "/unstuck Lydia respawn" with Lydia Respawnsen online sends Lydia to the temple', typed('Lydia respawn') === 'Lydia #LLX8@temple', moved());
   [m, h] = remote(form('Al', '', ''));
   check('7f. F1: the form "/unstuck Al hub" with Al Hubert online sends Al to the hub', m === 'Al #AL01@hub', [m, h]);
+  // C's rows (set3 review): Bob with Bob Hubert online, Ivar with Ivar Templeton online
+  const bobH = actor(0xff000f18, { name: 'Bob Hubert', tag: 'BHB1', profile: 118, online: true });
+  const ivar = actor(0xff000f19, { name: 'Ivar', tag: 'IVR0', profile: 119, online: true });
+  const ivarT = actor(0xff000f1a, { name: 'Ivar Templeton', tag: 'IVT1', profile: 120, online: true });
+  ids.push(A.bob, bobH, ivar, ivarT);
+  check('7f. F1: typed "/unstuck Bob hub" with Bob Hubert online sends Bob to the hub', typed('Bob hub') === 'Bob #8KWH@hub', moved());
+  [m, h] = remote(form('Bob', 'hub', 'ticket:7'));
+  check('7f. F1: ...the form "/unstuck Bob hub ticket:7" the same', m === 'Bob #8KWH@hub', [m, h]);
+  check('7f. F1: typed "/unstuck Ivar temple" with Ivar Templeton online sends Ivar to the temple', typed('Ivar temple') === 'Ivar #IVR0@temple', moved());
+  for (const x of [bobH, ivar, ivarT]) store.delete(x);
+  ids.splice(ids.indexOf(A.bob), 4);
   for (const [t, want] of [['/unstuck Hub #HUB1', 'Hub #HUB1@temple'], ['/unstuck Respawn #RSP1 hub', 'Respawn #RSP1@hub'], ['/unstuck Temple Guard #TG01', 'Temple Guard #TG01@temple'],
     ['/unstuck Temple #TG01 hub', 'Temple Guard #TG01@hub']]) {
     [m, h] = remote(t);
@@ -894,7 +905,13 @@ reset();
   store.get(neem).isDead = true;
   check('7f. staff "/unstuck #LBRF" of a dead offline Neem: nobody moves, staff are told whom and the hub way', typed('#LBRF') === ''
     && told() === 'Cannot move Neem #LBRF to a temple while they are dead; once they are up, /unstuck #LBRF hub or /fixloc #LBRF moves them to the hub.', told());
-  check('7f. ...and "/unstuck #LBRF hub" moves them', typed('#LBRF hub') === 'Neem #LBRF@hub', moved());
+  // ...nor the hub while they are down: the wake would undo it (C's review, 28 Oct); /fixloc is unchanged
+  check('7f. ...and "/unstuck #LBRF hub" while they are down moves nobody: wait until they are up', typed('#LBRF hub') === ''
+    && told() === 'Cannot move Neem #LBRF to the hub while they are down; once they are up (at most a minute), /unstuck #LBRF hub moves them.', told());
+  [m, h] = remote('/unstuck #LBRF hub ticket:4');
+  check('7f. ...the form the same', m === '' && /^Cannot move Neem #LBRF to the hub while they are down; once they are up/.test(h), [m, h]);
+  where(); reset(); G.commands.get('fixloc').fn(A.jake, '#LBRF');
+  check('7f. ...while /fixloc is unchanged: it moves them (Jake)', moved() === 'Neem #LBRF@hub', moved());
   // a Trial GM is not pointed to /fixloc (admins only); they keep the hub move (Jake, 28 Oct)
   setOnline(A.trial, true); where(); reset();
   G.commands.get('unstuck').fn(A.trial, '#LBRF');
