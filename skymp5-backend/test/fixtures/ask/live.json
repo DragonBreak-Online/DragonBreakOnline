@@ -1,0 +1,31 @@
+{
+ "at": 1799999970000,
+ "players": [
+  {
+   "id": 41,
+   "name": "Kara",
+   "world": "Tamriel",
+   "pos": [
+    1,
+    2,
+    3
+   ],
+   "terrainDz": 0.5,
+   "hosting": true,
+   "npcs": 4
+  },
+  {
+   "id": 42,
+   "name": "Bron",
+   "world": "Tamriel",
+   "pos": [
+    4,
+    5,
+    6
+   ],
+   "terrainDz": 0.1,
+   "hosting": false,
+   "npcs": 0
+  }
+ ]
+}

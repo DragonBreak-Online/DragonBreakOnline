@@ -1,0 +1,25 @@
+{
+ "command": "changes",
+ "hours": 24,
+ "since": "2026-10-27T18:37Z",
+ "until": "2026-10-28T18:37Z",
+ "count": 3,
+ "shown": 3,
+ "changes": [
+  {
+   "at": "2026-10-28T18:00Z",
+   "kind": "DEPLOYED",
+   "headline": "DEPLOYED gameplay batch 1cba29be: regeneration fix and contract boards."
+  },
+  {
+   "at": "2026-10-28T16:28Z",
+   "kind": "LIVE",
+   "headline": "Restore module LIVE (hot reload)."
+  },
+  {
+   "at": "2026-10-28T09:10Z",
+   "kind": "RELEASED",
+   "headline": "RELEASED client 0.3.109 to players."
+  }
+ ]
+}

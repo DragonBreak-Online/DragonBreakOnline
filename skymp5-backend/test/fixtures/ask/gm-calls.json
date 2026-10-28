@@ -1,0 +1,59 @@
+{
+ "counter": 14,
+ "open": [
+  {
+   "n": 13,
+   "at": 1799999160000,
+   "profile": 412,
+   "actor": "ff00a1b2",
+   "discord": "1000000000000000950",
+   "name": "Kara #QX7P",
+   "place": {
+    "zone": "Whiterun",
+    "cell": "WhiterunDragonsreach",
+    "desc": "Dragonsreach, great hall",
+    "pos": [
+     1,
+     2,
+     3
+    ]
+   },
+   "lines": [
+    "help I am stuck"
+   ],
+   "takenBy": null,
+   "lastAlert": 1800000000000,
+   "ticket": "ticket:328"
+  },
+  {
+   "n": 14,
+   "at": 1799999820000,
+   "profile": 77,
+   "actor": "ff00a1b3",
+   "discord": "1000000000000000951",
+   "name": "Bron #ZK2M",
+   "place": {
+    "zone": "Bruma",
+    "cell": "BrumaExterior",
+    "desc": "south gate",
+    "pos": [
+     4,
+     5,
+     6
+    ]
+   },
+   "lines": [
+    "my horse fell through the map"
+   ],
+   "takenBy": "Gemma",
+   "lastAlert": 1800000000000,
+   "ticket": null
+  }
+ ],
+ "closed": [
+  {
+   "n": 12,
+   "name": "Old Call #AAAA"
+  }
+ ]
+}

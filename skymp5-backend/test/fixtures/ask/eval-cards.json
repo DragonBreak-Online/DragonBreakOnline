@@ -1,0 +1,36 @@
+{
+ "version-0.3.109": [
+  {
+   "key": "version",
+   "source": "version",
+   "label": "Launcher API /api/version",
+   "asOf": "2026-10-28T18:37Z",
+   "stale": null,
+   "minTier": "trialgm",
+   "model": true,
+   "text": "Launcher 2.1.53, client 0.3.109, server 0.3.1."
+  },
+  {
+   "key": "news:0.3.109:1",
+   "source": "news",
+   "label": "Launcher news 2026-10-27 \"Strongholds and home planters\"",
+   "asOf": "2026-10-27",
+   "stale": null,
+   "minTier": "trialgm",
+   "model": true,
+   "text": "Strongholds and home planters (2026-10-27, version 0.3.109)\nRegeneration: Hunger and cold now really slow your regeneration. Blessings and enchanted clothing that speed up regeneration now work properly.\nContract boards: The hold inns across Skyrim now have contract boards.\nHome planters: Ash Yams and Moon Sugar can now be grown in home planters."
+  }
+ ],
+ "changes-24": [
+  {
+   "key": "changes:24",
+   "source": "changes",
+   "label": "Change log, last 24 h",
+   "asOf": "2026-10-28T18:37Z",
+   "stale": null,
+   "minTier": "trialgm",
+   "model": true,
+   "text": "2026-10-28 18:00Z DEPLOYED: gameplay batch: regeneration fix and contract boards.\n2026-10-28 16:28Z LIVE: Restore module LIVE (hot reload).\n2026-10-28 09:10Z RELEASED: client 0.3.109 to players."
+  }
+ ]
+}

@@ -1,0 +1,45 @@
+{"id": "a01", "question": "What does D3 say?", "cards": "rules", "expect": "answer", "must_contain": ["D3"]}
+{"id": "a02", "question": "What does rule 2 say about information from Discord?", "cards": "rules", "expect": "answer", "must_contain": ["Discord"]}
+{"id": "a03", "question": "What is the New Life Rule in rule 9?", "cards": "rules", "expect": "answer", "must_contain": ["30 minutes"]}
+{"id": "a04", "question": "What does D10 say about arguing staff actions?", "cards": "rules", "expect": "answer", "must_contain": ["ticket"]}
+{"id": "a05", "question": "What does 5.3, a fresh start, say about other servers?", "cards": "rules", "expect": "answer", "must_contain": ["other servers"]}
+{"id": "a06", "question": "Under 10.2, what does a PK need?", "cards": "rules", "expect": "answer", "must_contain": ["ticket"]}
+{"id": "a07", "question": "Can a vampire be PK'd without a ticket?", "cards": "rules", "expect": "answer", "must_contain": []}
+{"id": "a08", "question": "Is ERP allowed under rule 18?", "cards": "rules", "expect": "answer", "must_contain": []}
+{"id": "a09", "question": "How old must every character be under rule 19?", "cards": "rules", "expect": "answer", "must_contain": ["18"]}
+{"id": "a10", "question": "What does 7.1, standard E, say about real-money trading?", "cards": "rules", "expect": "answer", "must_contain": ["money"]}
+{"id": "a11", "question": "Can players sell gold for real money? Check 7.1.", "cards": "rules", "expect": "answer", "must_contain": []}
+{"id": "a12", "question": "What does D6 say?", "cards": "rules", "expect": "answer", "must_contain": ["D6"]}
+{"id": "a13", "question": "What does rule 1 say about staying in character?", "cards": "rules", "expect": "answer", "must_contain": ["character"]}
+{"id": "a14", "question": "What does a character forget under rule 9?", "cards": "rules", "expect": "answer", "must_contain": ["30"]}
+{"id": "a15", "question": "Under rule 8, can I return to the fight right after I die?", "cards": "rules", "expect": "answer", "must_contain": []}
+{"id": "a16", "question": "What does D5 forbid?", "cards": "rules", "expect": "answer", "must_contain": []}
+{"id": "a17", "question": "What does D9 protect?", "cards": "rules", "expect": "answer", "must_contain": ["personal"]}
+{"id": "a18", "question": "How long does a strike count against an account, per the handbook?", "cards": "rules", "expect": "answer", "must_contain": ["90 days"]}
+{"id": "a19", "question": "In the handbook, what happens at 3 strikes?", "cards": "rules", "expect": "answer", "must_contain": ["Lead GM"]}
+{"id": "a20", "question": "Per the staff handbook, who can ban a player?", "cards": "rules", "expect": "answer", "must_contain": []}
+{"id": "a21", "question": "In the handbook, may a Trial GM restart the server (2.8)?", "cards": "rules", "expect": "answer", "must_contain": []}
+{"id": "a22", "question": "What does handbook 2.6 say about election votes?", "cards": "rules", "expect": "answer", "must_contain": ["vote"]}
+{"id": "a23", "question": "Under 11.4, can staff vote in hold elections?", "cards": "rules", "expect": "answer", "must_contain": []}
+{"id": "a24", "question": "How does a player report a GM, under 11.7?", "cards": "rules", "expect": "answer", "must_contain": ["Report a GM"]}
+{"id": "a25", "question": "Under 3.1, how many Discord accounts may one person link?", "cards": "rules", "expect": "answer", "must_contain": ["one"]}
+{"id": "a26", "question": "What does 9.7 say about spies?", "cards": "rules", "expect": "answer", "must_contain": []}
+{"id": "a27", "question": "Who approves a rule change under 1.5?", "cards": "rules", "expect": "answer", "must_contain": ["Jake"]}
+{"id": "a28", "question": "What is in client 0.3.109?", "cards": "version-0.3.109", "expect": "answer", "must_contain": ["regeneration"]}
+{"id": "a29", "question": "Which launcher version is current?", "cards": "version-0.3.109", "expect": "answer", "must_contain": ["2.1.53"]}
+{"id": "a30", "question": "Summarise the changes in the last 24h", "cards": "changes-24", "expect": "answer", "must_contain": ["0.3.109"]}
+{"id": "a31", "question": "What does 10.4 say about executions?", "cards": "rules", "expect": "answer", "must_contain": []}
+{"id": "a32", "question": "What does D1 say?", "cards": "rules", "expect": "answer", "must_contain": ["respect"]}
+{"id": "u01", "question": "Under the rules, who is the Jarl of Whiterun right now?", "cards": "rules", "expect": "idk", "must_contain": []}
+{"id": "u02", "question": "When will client 0.3.120 be released?", "cards": "version-0.3.109", "expect": "idk", "must_contain": []}
+{"id": "u03", "question": "What is the rule about flying mounts?", "cards": "rules", "expect": "idk", "must_contain": []}
+{"id": "u04", "question": "Who leads the Vigilants of Stendarr on our server?", "cards": "rules", "expect": "idk", "must_contain": []}
+{"id": "u05", "question": "Per the rules, how much gold does the Bruma treasury hold?", "cards": "rules", "expect": "idk", "must_contain": []}
+{"id": "u06", "question": "What did the staff handbook say before 2026?", "cards": "rules", "expect": "idk", "must_contain": []}
+{"id": "u07", "question": "Why did the 0.3.108 release crash on launch?", "cards": "version-0.3.109", "expect": "idk", "must_contain": []}
+{"id": "u08", "question": "What does rule 25 say?", "cards": "rules", "expect": "idk", "must_contain": []}
+{"id": "u09", "question": "What does D20 say?", "cards": "rules", "expect": "idk", "must_contain": []}
+{"id": "u10", "question": "What is the rule on dragon taming quests?", "cards": "rules", "expect": "idk", "must_contain": []}
+{"id": "u11", "question": "What is the exact release date of the next launcher version?", "cards": "version-0.3.109", "expect": "idk", "must_contain": []}
+{"id": "u12", "question": "What is the rule for the maximum house size in Riften?", "cards": "rules", "expect": "idk", "must_contain": []}
+{"id": "u13", "question": "Which changes were rolled back last month?", "cards": "changes-24", "expect": "idk", "must_contain": []}

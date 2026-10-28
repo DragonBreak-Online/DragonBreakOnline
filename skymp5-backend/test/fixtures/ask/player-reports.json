@@ -1,0 +1,22 @@
+{
+ "command": "player-reports",
+ "query": "Kara #QX7P",
+ "match": "tag",
+ "characters": [
+  "Kara #QX7P"
+ ],
+ "count": 1,
+ "shown": 1,
+ "reports": [
+  {
+   "thread_id": "1000000000000000903",
+   "kind": "in-game",
+   "title": "Kara #QX7P: stuck in a wall at Bruma",
+   "date": "2026-10-05T14:00Z",
+   "status": "Fixed"
+  }
+ ],
+ "corpus_built": "2026-10-08T09:09Z",
+ "corpus_stale": true,
+ "note": "Only in-game reports carry a character."
+}

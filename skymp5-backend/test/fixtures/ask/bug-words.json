@@ -1,0 +1,27 @@
+{
+ "command": "bug",
+ "corpus_built": "2026-10-08T09:09Z",
+ "corpus_stale": true,
+ "query_type": "words",
+ "words": [
+  "horse",
+  "vanished"
+ ],
+ "match": "some",
+ "count": 1,
+ "threads": [
+  {
+   "thread_id": "1000000000000000902",
+   "forum": "bug-tracker",
+   "kind": "manual",
+   "title": "Horse vanished after fast travel",
+   "created": "2026-10-02T08:00:00Z",
+   "status": "New",
+   "resolution": null,
+   "resolution_at": null,
+   "linked": null
+  }
+ ],
+ "recent_fixes_available": false,
+ "recent_fixes": []
+}

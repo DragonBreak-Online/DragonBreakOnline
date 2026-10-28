@@ -29,6 +29,8 @@ function formatOutput(res) {
 
 async function handleInteraction(interaction, givenApi) {
   if (!interaction) return false
+  // /dragonbaron ask has its own handler, before the console and the generic defer: it reads server data and runs nothing
+  if (interaction.isChatInputCommand?.() && interaction.commandName === 'dragonbaron' && interaction.options?.getSubcommand?.(false) === 'ask') return require('./dragonbaronAsk').handleInteraction(interaction)
 
   const api = givenApi || require('../console').consoleApi()
   const memberRoles = rolesOf(interaction)

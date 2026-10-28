@@ -1,0 +1,20 @@
+{
+ "command": "bug",
+ "corpus_built": "2026-10-08T09:09Z",
+ "corpus_stale": true,
+ "query_type": "thread",
+ "source": "discord",
+ "threads": [
+  {
+   "thread_id": "1000000000000000901",
+   "forum": "bug-tracker",
+   "kind": "in-game",
+   "title": "Kara #QX7P: horse vanished at Whiterun stables",
+   "created": "2026-10-21T10:00:00Z",
+   "status": "Confirmed",
+   "resolution": "Fixed in the 27 Oct server update",
+   "resolution_at": "2026-10-27T12:00:00Z",
+   "linked": null
+  }
+ ]
+}
