@@ -24,7 +24,7 @@ const companions = new Map();
 const moves = [];
 const followOrders = [];   // follow orders given while the band defends (none may be)
 globalThis.__dboCompanions = {
-  spawn: (owner, baseId, opts) => { const id = next++; companions.set(id, { id, ownerId: owner, baseId, kind: opts.kind, staying: false, targetId: 0 }); put(id, 'pos', opts.pos.slice()); put(id, 'worldOrCellDesc', WORLD); put(id, 'private.dboCompanion', 'companion'); put(id, 'ff_companionOf', owner); return id; },
+  spawn: (owner, baseId, opts) => { const id = next++; companions.set(id, { id, ownerId: owner, baseId, kind: opts.kind, staying: false, targetId: 0 }); put(id, 'pos', opts.pos.slice()); put(id, 'baseDesc', '1e7e2:Skyrim.esm'); put(id, 'worldOrCellDesc', WORLD); put(id, 'private.dboCompanion', 'companion'); put(id, 'ff_companionOf', owner); return id; },
   list: (owner) => [...companions.values()].filter((c) => c.ownerId === owner && !c.released).map((c) => Object.assign({}, c)),
   follow: (id) => { const c = companions.get(id); if (defending) followOrders.push(id); c.staying = false; c.targetId = 0; return true; },
   stay: (id) => { const c = companions.get(id); c.staying = true; c.targetId = 0; return true; },
@@ -34,7 +34,7 @@ globalThis.__dboCompanions = {
 };
 globalThis.__dboIsDowned = (a) => a === DOWNED;
 const timers = new Map();
-const said = [], commands = {}, packets = [];
+const said = [], commands = {}, packets = [], logs = [];
 let defending = false;
 let online = [GM, STAFF, NEAR, FAR, GMALT, DOWNED, ELSEWHERE];
 require(MODULE)({
@@ -42,9 +42,11 @@ require(MODULE)({
     get: (id, k) => props.get(`${id >>> 0}|${k}`),
     set: (id, k, v) => { if (k === 'locationalData') { moves.push([id >>> 0, v]); put(id, 'pos', v.pos.slice()); } else put(id, k, v); },
     getIdFromDesc: (d) => parseInt(d, 16),
-    lookupEspmRecordById: () => ({ record: { type: 'NPC_', fields: [{ type: 'AIDT', data: new Uint8Array([0]) }] }, toGlobalRecordId: (x) => x }),
+    // The raised NPC's record: AI data and a top package that sandboxes (DefaultCreatureSandboxEditorLocation4000, Skyrim 10D485)
+    lookupEspmRecordById: (rid) => (rid === 0x10d485 ? { record: { type: 'PACK', editorId: 'DefaultCreatureSandboxEditorLocation4000' }, toGlobalRecordId: (x) => x }
+      : { record: { type: 'NPC_', fields: [{ type: 'AIDT', data: new Uint8Array([0]) }, { type: 'PKID', data: new Uint8Array(new Uint32Array([0x10d485]).buffer) }] }, toGlobalRecordId: (x) => x }),
   },
-  log: () => {}, personal: (a, t) => said.push([a, t]), audit: () => {}, who: (a) => `#${a.toString(16)}`, isAdmin: (a) => a === GM || a === STAFF,
+  log: (...x) => logs.push(x.join(' ')), personal: (a, t) => said.push([a, t]), audit: () => {}, who: (a) => `#${a.toString(16)}`, isAdmin: (a) => a === GM || a === STAFF,
   registerChatCommand: (n, fn) => { commands[n] = fn; }, findByName: () => 0, cfg: {}, onUi: () => {},
   sendPacket: (a, pk) => packets.push([a >>> 0, pk]),
   onlineActors: () => online.slice(), every: (n, ms, fn) => timers.set(n, fn), profileOf: (a) => (PROFILE[a >>> 0] !== undefined ? PROFILE[a >>> 0] : -1),
@@ -157,6 +159,19 @@ check('/warband follow ends it too', all((c) => !c.targetId && !c.staying));
   run('defend'); packets.length = 0; run('follow');
   check('follow ends it too', patrols().length === 1 && patrols()[0].ids.length === 0, patrols());
   at(GM, 0, 0);
+}
+// ---- the per-member state line (Nat: "some move some don't") ---------------------------------------------------------
+{
+  run('stay'); at(GM, 0, 0); for (const c of band()) put(c.id, 'pos', [100, 0, 0]);
+  logs.length = 0; run('defend');
+  const lines = logs.filter((l) => / member [0-9a-f]+ /.test(l));
+  check('defend logs one state line per member: its top AI package, inside or not, its distance and target',
+    lines.length === 3 && lines.every((l) => /package DefaultCreatureSandboxEditorLocation4000 inside 100\/1500 target 0/.test(l)), lines);
+  logs.length = 0; tick();
+  check('...not on every pass', logs.filter((l) => / member /.test(l)).length === 0);
+  const realNow = Date.now; Date.now = () => realNow() + 31000; tick(); Date.now = realNow;
+  check('...but again every 30 s', logs.filter((l) => / member /.test(l)).length === 3);
+  run('stay');
 }
 check('help names defend', /defend \[radius\]/.test(run('nonsense')));
 

@@ -42,7 +42,7 @@ module.exports = (api) => {
   // far the panel looks for targets and the GM's raiders; onLogout, what a GM's followers do when the GM leaves (dismiss, or
   // settle the calm ones); presetsMax, saved bands per server
   const C = Object.assign({ maxBand: 25, maxRaise: 10, ringRadius: 160, bodySeconds: 300, chargeRange: 4096, avoidGmHost: true,
-    viewRadius: 4200, onLogout: 'dismiss', presetsMax: 40, guardRadius: 1500, guardLeash: 500, guardWalkSeconds: 20, patrolResendSeconds: 30 }, cfg.warband || {});
+    viewRadius: 4200, onLogout: 'dismiss', presetsMax: 40, guardRadius: 1500, guardLeash: 500, guardWalkSeconds: 20, patrolResendSeconds: 30, guardReportSeconds: 30 }, cfg.warband || {});
   // Every answer is said in chat as before, and kept as the last line the panel shows (W3)
   const lastSaid = globalThis.__dboWarbandSaid instanceof Map ? globalThis.__dboWarbandSaid : (globalThis.__dboWarbandSaid = new Map());
   const tell = (a, text) => { personal(a, text); lastSaid.set(a >>> 0, { text: String(text), at: Date.now() }); };
@@ -239,6 +239,40 @@ module.exports = (api) => {
     return null;
   };
 
+  // The NPC's top AI package, through templates that pass packages on (ACBS template flag 0x20, "Use AI Packages", beside
+  // 0x10 AI Data above): what it does when no order drives it. Measured 28 Oct (Nat: "some move some don't"): on a hold the
+  // owner's client only clears the follow, so a member whose package sandboxes (DefaultCreatureSandboxEditorLocation4000)
+  // walks off while one on DefaultMasterPackage stands
+  const TEMPLATE_USE_AI_PACKAGES = 0x20;
+  const packageCache = new Map();
+  const topPackageOf = (baseId) => {
+    const key = Number(baseId) >>> 0;
+    if (packageCache.has(key)) return packageCache.get(key);
+    let out = '?';
+    for (let id = key, depth = 0; id && depth < 8; depth++) {
+      let res = null;
+      try { res = mp.lookupEspmRecordById(id); } catch (e) { break; }
+      if (!res || !res.record || String(res.record.type) !== 'NPC_') break;
+      const field = (t) => (res.record.fields || []).find((f) => f && f.type === t && f.data instanceof Uint8Array);
+      const view = (f) => new DataView(f.data.buffer, f.data.byteOffset, f.data.byteLength);
+      const acbs = field('ACBS'), tplt = field('TPLT');
+      const flags = acbs && acbs.data.byteLength >= 20 ? view(acbs).getUint16(18, true) : 0;
+      let next = 0;
+      try { next = tplt && tplt.data.byteLength >= 4 ? res.toGlobalRecordId(view(tplt).getUint32(0, true)) >>> 0 : 0; } catch (e) { next = 0; }
+      if (next && (flags & TEMPLATE_USE_AI_PACKAGES)) { id = next; continue; }
+      const pkid = field('PKID');
+      if (!pkid || pkid.data.byteLength < 4) { out = 'none'; break; }
+      try {
+        const pid = res.toGlobalRecordId(view(pkid).getUint32(0, true)) >>> 0;
+        const pr = mp.lookupEspmRecordById(pid);
+        out = (pr && pr.record && pr.record.editorId) || pid.toString(16);
+      } catch (e) { out = '?'; }
+      break;
+    }
+    packageCache.set(key, out);
+    return out;
+  };
+
   const release = (a, hostile) => {
     const mine = band(a);
     if (!mine.length) return tell(a, 'You lead no warband.');
@@ -378,6 +412,8 @@ module.exports = (api) => {
     if (!mine.length) { endGuard(gm, 'no band left'); return 0; }
     if (Date.now() - (g.patrolSentAt || 0) >= C.patrolResendSeconds * 1000) sendPatrol(gm, g);
     const foes = guardFoes(g).sort((x, y) => dist(posOf(x), g.centre) - dist(posOf(y), g.centre));
+    const report = Date.now() - (g.reportedAt || 0) >= C.guardReportSeconds * 1000;
+    if (report) g.reportedAt = Date.now();
     let n = 0;
     for (const c of mine) {
       const id = c.id >>> 0;
@@ -385,6 +421,11 @@ module.exports = (api) => {
       if (!post) { const p0 = posOf(c.id); if (!p0) continue; let rot = [0, 0, 0]; try { rot = mp.get(c.id, 'angle') || rot; } catch (e) { /* default */ } post = { pos: p0, rot }; g.posts.set(id, post); }
       const p = posOf(c.id);
       const outside = !!p && whereOf(c.id) === g.where && dist(p, g.centre) > g.radius + C.guardLeash;
+      if (report) {
+        let base = 0; try { base = mp.getIdFromDesc(String(mp.get(c.id, 'baseDesc') || '')) >>> 0; } catch (e) { base = 0; }
+        const d = p ? Math.round(dist(p, g.centre)) : -1;
+        log(`warband: defend ${who(gm)} member ${id.toString(16)} ${nameOfNpc(c.id)} package ${base ? topPackageOf(base) : '?'} ${p && whereOf(c.id) !== g.where ? 'other cell' : outside ? 'outside' : d > g.radius ? 'in the leash' : 'inside'} ${d}/${g.radius} target ${(c.targetId >>> 0).toString(16)}${g.outside.has(id) ? ` past the leash ${Math.round((Date.now() - g.outside.get(id)) / 1000)} s` : ''}`);
+      }
       if (!outside) {
         g.outside.delete(id);
         if (c.targetId && foes.includes(c.targetId >>> 0)) continue;
