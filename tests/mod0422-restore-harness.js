@@ -131,7 +131,7 @@ ok(!fs.existsSync(F.ledger), 'dryrun: no ledger written');
 ok(E.audits.length === 0, 'dryrun: no audit line');
 ok(R1.containers.every((c, i) => c.refused.length === 0 && c.takeItems === c.plannedItems && c.okEntries === PLAN0.containers[i].take.length && c.uniquesMatched === PLAN0.containers[i].uniques.length), 'dryrun: every planned entry found as expected in every container', R1.containers.map((c) => [c.ref, c.takeItems, c.plannedItems, c.uniquesMatched, c.refused.length]));
 ok(R1.containers.reduce((s, c) => s + c.uniquesMatched, 0) === 14, 'dryrun: the 14 one-of-a-kind entries (15 items) matched by extra data');
-ok(R1.gold.fromPack === Math.min(2095, WORLD.count.gold) && R1.gold.short === 2095 - Math.min(2095, WORLD.count.gold), 'dryrun: the gold the Count has, and the shortfall', R1.gold);
+ok(R1.gold.sources[0].src === 'inventory' && R1.gold.sources[0].n === Math.min(2095, WORLD.count.gold) && R1.gold.short === 2095 - Math.min(2095, WORLD.count.gold), 'dryrun: the gold the Count has, and the shortfall', R1.gold);
 ok(R1.letters.length > 0 && R1.letters.every((l) => l.stage === 1) && R1.queued.includes('s2') && R1.queued.includes('s2m'), 'dryrun: stage 1 letters listed, stage 2 queued', R1.letters.map((l) => l.id));
 ok(E.logs.some((l) => l.includes(`"confirm": "${PLAN0.confirm}"`)), 'dryrun: prints the confirm code for the apply');
 // 2. apply without the code
@@ -282,6 +282,19 @@ ok([...out.values()].reduce((s, n) => s + n, 0) === PLAN0.totals.owedItems, `all
   const G = files('silver'); const pr = mkWorld(WORLD.live, 3000, 0); const E7 = env(pr, { runFile: G.run });
   writeRun(G, { mode: 'apply', stages: [1], confirm: plan.confirm }, plan); E7.tick();
   ok(!m0422(pr, A.player).some((m) => m.parcel.items.some((e) => (e.baseId >>> 0) === 0x10aa19)) && report(G).held.some((x) => x.base === '10aa19'), 'silver guard: a silver piece in a vampire\'s delivery is held back and reported');
+}
+{
+  // the gold from the Bruma treasury instead (goldOrder), and a later run cannot change the order once gold was taken
+  const zone = { bruma: 5000 };
+  globalThis.__dboTreasuryZoneKeep = globalThis.__dboTreasuryZone;
+  const G = files('treasury'); const pr = mkWorld(WORLD.live, 400, 300); const E13 = env(pr, { runFile: G.run });
+  globalThis.__dboTreasuryZone = { balance: (z) => zone[z] || 0, spend: (z, n) => { if ((zone[z] || 0) < n) return false; zone[z] -= n; return true; } };
+  writeRun(G, { mode: 'apply', stages: [1], confirm: PLAN0.confirm, goldOrder: ['treasury:bruma'] }); E13.tick();
+  const cg = inv(pr, A.count).filter((e) => e.baseId === GOLD).reduce((s, e) => s + e.count, 0);
+  ok(zone.bruma === 5000 - 2095 && cg === 400 && pr.get(A.count)['private.bankGold'] === 300 && m0422(pr, A.player).reduce((s, m) => s + (m.parcel.gold || 0), 0) === 2095, 'gold from the Bruma treasury: 2095 taken there, the Count untouched, 2095 in the letters');
+  writeRun(G, { mode: 'apply', stages: [1, 2], confirm: PLAN0.confirm, goldOrder: ['inventory', 'bank'] }); E13.tick();
+  ok(inv(pr, A.count).filter((e) => e.baseId === GOLD).reduce((s, e) => s + e.count, 0) === 400 && pr.get(A.count)['private.bankGold'] === 300 && E13.logs.some((l) => l.includes('of the first apply hold')), 'gold: a changed order after the gold was taken is ignored (no second payment)');
+  globalThis.__dboTreasuryZone = globalThis.__dboTreasuryZoneKeep;
 }
 {
   // a reader online is told once, however many letters

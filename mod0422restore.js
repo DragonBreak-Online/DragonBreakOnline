@@ -9,7 +9,8 @@
 // is new or changed it runs once:
 //   { "mode": "dryrun" | "apply" | "off", "stages": [1] | [1, 2], "planFile": "mod0422-restore-plan.json" (or "plan": {..}),
 //     "confirm": "<plan.confirm, printed by the dryrun; apply only>", "strict": true, "partial": false,
-//     "goldShortfall": "mint" | "report" (default: the plan's), "from": "DragonBreak Staff",
+//     "goldShortfall": "mint" | "report" (default: the plan's), "goldOrder": ["inventory", "bank"] | ["treasury:bruma"] ...
+//     (default: the plan's; both are fixed by the first gold step that is done), "from": "DragonBreak Staff",
 //     "resolve": { "<step id>": "done" | "failed" } (only for a step left "started" by a crash), "ledgerFile": "<path>" }
 // The plan (mod0422/restore/plan.json, made by build_plan.py from the evidence) lists, per container, the exact entries to
 // remove (plain stacks by base, count, the level the container keeps, the count seen when the plan was made; the 15
@@ -19,7 +20,8 @@
 //           expects, the one-of-a-kind matches, refusals and shortfalls, the gold, and the letters it would send; writes
 //           the same as a report (mod0422-restore-report.json beside world/).
 //   apply:  removes exactly the planned entries from each container (an entry whose count is not there, or whose extra
-//           data does not match, is refused and logged), takes the gold (pack first, then bank), and delivers the
+//           data does not match, is refused and logged), takes the gold from the sources in order (the Count's pack,
+//           his bank account, or a hold's treasury; never more than the plan's figure in all), and delivers the
 //           deliveries of the stages listed as board letters with parcels (post.js format: exact entries, so charges,
 //           tempers and enchantments survive the collect). Goods of a stage not listed stay queued in the ledger.
 // Every step is written to the ledger (mod0422-restore-ledger.json beside world/) BEFORE it changes anything, and gets one
@@ -211,7 +213,7 @@ module.exports = (api) => {
     const opts = { strict: R.strict !== false, partial: R.partial === true };
     const stages = (Array.isArray(R.stages) ? R.stages : [1]).map(Number).filter((s) => s === 1 || s === 2);
     const from = String(R.from || 'DragonBreak Staff').slice(0, 60);
-    const shortfallPolicy = (R.goldShortfall || plan.gold.shortfall) === 'mint' ? 'mint' : 'report';
+    let shortfallPolicy = (R.goldShortfall || plan.gold.shortfall) === 'mint' ? 'mint' : 'report';
     let L = readJson(ledgerPath);
     if (L && (L.planHash !== plan.hash || L.planSha !== planSha)) {
       say(`the ledger ${ledgerPath} belongs to plan ${L.planHash}/${L.planSha}, not ${plan.hash}/${planSha}: nothing done (move the ledger aside only if no step of it ran)`);
@@ -260,64 +262,80 @@ module.exports = (api) => {
       note(`took ${took} items and ${cr.uniquesMatched} one-of-a-kind from ${c.label} (${c.ref}); ${r.refused.length} planned entries refused`);
     }
 
-    // 2. the gold: the Count's pack first, then his bank account; never more than the plan's figure
+    // 2. the gold, from the sources in order (plan.gold.order, or "goldOrder" in the run file): "inventory" (the Count's
+    // pack), "bank" (his account), "treasury:<zone>" (a hold's treasury, bank.js). Never more than the plan's figure in all:
+    // what every done gold step took (whatever the order now) and what was minted count against it.
+    let sources = (Array.isArray(R.goldOrder) ? R.goldOrder : (plan.gold.order || ['inventory', 'bank'])).map(String);
+    // Once a gold step is done, the order and the shortfall policy of that run hold (no overpaying, no gold left without a letter)
+    if (Object.entries(L.steps).some(([k, st]) => k.startsWith('gold:') && st.status === 'done') && L.gold) {
+      if (JSON.stringify(L.gold.order) !== JSON.stringify(sources) || L.gold.policy !== shortfallPolicy) say(`gold: the order ${JSON.stringify(L.gold.order)} and policy ${L.gold.policy} of the first apply hold; the run file's are ignored`);
+      sources = L.gold.order; shortfallPolicy = L.gold.policy; rep.goldShortfall = shortfallPolicy;
+    } else L.gold = { order: sources, policy: shortfallPolicy };
+    const goldSettled = () => sources.every((k) => L.steps[`gold:${k}`] && L.steps[`gold:${k}`].status === 'done');
     {
       const g = plan.gold; const want = Math.max(0, Math.floor(Number(g.want) || 0));
-      const gr = { want, policy: shortfallPolicy }; rep.gold = gr;
+      const gr = { want, policy: shortfallPolicy, order: sources, sources: [] }; rep.gold = gr;
       const count = actorOf(plan.actors[g.from]);
-      const sInv = L.steps['gold:inventory'], sBank = L.steps['gold:bank'], sMint = L.steps['gold:mint'];
-      const busy = [sInv, sBank, sMint].some((s) => s && s.status === 'started');
-      if (busy) { gr.status = 'stuck'; rep.stuck.push('gold'); say('a gold step was started and never finished: not repeated; check the Count and set "resolve"'); }
-      else if (!count.ok && !(sInv && sInv.status === 'done' && sBank && sBank.status === 'done')) { gr.status = `the Count: ${count.why}`; say(`gold: ${gr.status}; nothing taken`); }
-      else {
-        let invN = sInv && sInv.status === 'done' ? sInv.n : null;
-        if (invN === null) {
-          let have = 0; try { have = Math.max(0, Number(goldOf(count.id)) || 0); } catch (e) { have = 0; }
-          const n = Math.min(want, have); gr.packHas = have; gr.fromPack = n;
-          if (!sim) {
-            L.steps['gold:inventory'] = { status: 'started', at: iso(), want, n }; save();
-            let ok = n === 0;
-            if (!ok) { try { ok = takeGold(count.id, n) === true; } catch (e) { ok = false; } }
-            if (!ok && n > 0) { // gold in several stacks: takeGold reads one stack
-              try {
-                const es = inventoryOf(count.id); let left = n;
-                for (const e of es) { if (left <= 0) break; if ((Number(e.baseId) >>> 0) !== GOLD || e.worn) continue; const k = Math.min(left, Number(e.count) || 0); e.count -= k; left -= k; }
-                if (left === 0) { mp.set(count.id, 'inventory', { entries: es.filter((e) => (Number(e.count) || 0) > 0) }); ok = true; }
-              } catch (e) { ok = false; }
-            }
-            if (!ok) { L.steps['gold:inventory'].status = 'failed'; save(); say('gold: the pack take failed; nothing taken'); }
-            else { L.pool.gold = (L.pool.gold || 0) + n; L.steps['gold:inventory'].status = 'done'; save(); note(`took ${n} gold from the pack of ${count.label}`); invN = n; }
-          } else invN = n;
-        } else gr.fromPack = invN;
-        if (invN !== null) {
-          let bankN = sBank && sBank.status === 'done' ? sBank.n : null;
-          if (bankN === null) {
-            let bank = 0; try { bank = Math.max(0, Number(mp.get(count.id, 'private.bankGold')) || 0); } catch (e) { bank = 0; }
-            const n = Math.min(Math.max(0, want - invN), bank); gr.bankHas = bank; gr.fromBank = n;
-            if (!sim) {
-              L.steps['gold:bank'] = { status: 'started', at: iso(), n, before: bank }; save();
-              try {
-                if (n > 0) mp.set(count.id, 'private.bankGold', bank - n);
-                // the player log's record of the bank (restitution.js does the same)
-                if (n > 0) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('bankwrite', count.id, 'restitution', bank, bank - n); } catch (e) { /* the player log is optional */ } }
-                L.pool.gold = (L.pool.gold || 0) + n; L.steps['gold:bank'].status = 'done'; save(); bankN = n;
-                note(`took ${n} gold from the bank account of ${count.label}`);
-              } catch (e) { L.steps['gold:bank'].status = 'failed'; save(); say(`gold: the bank take failed (${e.message})`); }
-            } else bankN = n;
-          } else gr.fromBank = bankN;
-          if (bankN !== null) {
-            const short = Math.max(0, want - invN - bankN); gr.short = short;
-            if (short > 0 && shortfallPolicy === 'mint' && !(sMint && sMint.status === 'done')) {
-              gr.minted = short;
-              if (!sim) { L.steps['gold:mint'] = { status: 'done', at: iso(), n: short }; L.pool.gold = (L.pool.gold || 0) + short; save(); note(`the Count no longer has ${short} of the ${want} gold: ${short} gold minted for the player (plan policy)`); }
-            } else if (sMint && sMint.status === 'done') gr.minted = sMint.n;
-            gr.status = 'ok';
-            say(`${sim ? 'dryrun' : 'apply'} gold: want ${want}, from the pack ${invN}, from the bank ${bankN}, short ${short} (${shortfallPolicy === 'mint' ? 'minted' : 'reported only'})`);
+      const goldSteps = () => Object.entries(L.steps).filter(([k]) => k.startsWith('gold:'));
+      const doneSum = () => goldSteps().filter(([, st]) => st.status === 'done').reduce((s, [, st]) => s + (Number(st.n) || 0), 0);
+      let settled = true; let simGot = 0;
+      if (goldSteps().some(([, st]) => st.status === 'started')) { settled = false; gr.status = 'stuck'; rep.stuck.push('gold'); say('a gold step was started and never finished: not repeated; check it by hand and set "resolve"'); }
+      for (const src of settled ? sources : []) {
+        const sid = `gold:${src}`; const st = L.steps[sid];
+        if (st && st.status === 'done') { gr.sources.push({ src, n: st.n, status: 'done before' }); continue; }
+        const need = Math.max(0, want - doneSum() - simGot);
+        let have = 0; let take = null;
+        if (src === 'inventory' || src === 'bank') {
+          if (!count.ok) { settled = false; gr.status = `the Count: ${count.why}`; say(`gold: ${gr.status}; nothing taken from ${src}`); break; }
+          if (src === 'inventory') {
+            try { have = Math.max(0, Number(goldOf(count.id)) || 0); } catch (e) { have = 0; }
+            take = (n) => {
+              let ok = false; try { ok = takeGold(count.id, n) === true; } catch (e) { ok = false; }
+              if (ok) return true;
+              // gold in several stacks: takeGold reads one stack
+              const es = inventoryOf(count.id); let left = n;
+              for (const e of es) { if (left <= 0) break; if ((Number(e.baseId) >>> 0) !== GOLD || e.worn) continue; const k = Math.min(left, Number(e.count) || 0); e.count -= k; left -= k; }
+              if (left !== 0) return false;
+              mp.set(count.id, 'inventory', { entries: es.filter((e) => (Number(e.count) || 0) > 0) }); return true;
+            };
+          } else {
+            try { have = Math.max(0, Math.floor(Number(mp.get(count.id, 'private.bankGold')) || 0)); } catch (e) { have = 0; }
+            const bank = have;
+            take = (n) => {
+              mp.set(count.id, 'private.bankGold', bank - n);
+              // the player log's record of the bank (restitution.js does the same)
+              try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('bankwrite', count.id, 'restitution', bank, bank - n); } catch (e) { /* the player log is optional */ }
+              return true;
+            };
           }
-        }
+        } else if (/^treasury:[a-z0-9_-]+$/.test(src)) {
+          const T = globalThis.__dboTreasuryZone; const zone = src.slice(9);
+          if (!T || typeof T.balance !== 'function' || typeof T.spend !== 'function') { settled = false; gr.status = 'bank.js treasuries not loaded'; say(`gold: ${gr.status}`); break; }
+          try { have = Math.max(0, Math.floor(Number(T.balance(zone)) || 0)); } catch (e) { have = 0; }
+          take = (n) => T.spend(zone, n) === true;
+        } else { settled = false; gr.status = `unknown gold source ${src}`; say(`gold: ${gr.status}; nothing taken`); break; }
+        const n = Math.min(need, have);
+        gr.sources.push({ src, have, n });
+        if (sim) { simGot += n; L.pool.gold = (L.pool.gold || 0) + n; continue; } // the copy only
+        L.steps[sid] = { status: 'started', at: iso(), want, have, n }; save(); // before the change
+        let ok = n === 0;
+        if (!ok) { try { ok = take(n) === true; } catch (e) { ok = false; } }
+        if (!ok) { L.steps[sid].status = 'failed'; save(); settled = false; say(`gold: taking ${n} from ${src} failed; nothing taken, the step can run again`); break; }
+        L.pool.gold = (L.pool.gold || 0) + n; L.steps[sid].status = 'done'; L.steps[sid].done = iso(); save();
+        note(`took ${n} gold from ${src === 'inventory' ? `the pack of ${count.label}` : src === 'bank' ? `the bank account of ${count.label}` : `the ${src.slice(9)} treasury`}`);
+      }
+      if (settled) {
+        const got = doneSum() + simGot; const short = Math.max(0, want - got); gr.taken = got; gr.short = short;
+        const sMint = L.steps['gold:mint'];
+        if (short > 0 && shortfallPolicy === 'mint' && !(sMint && sMint.status === 'done')) {
+          gr.minted = short;
+          L.pool.gold = (L.pool.gold || 0) + short; // in a dryrun, the copy only
+          if (!sim) { L.steps['gold:mint'] = { status: 'done', at: iso(), n: short, minted: true }; save(); note(`${short} of the ${want} gold could not be taken back: ${short} gold minted for the player (plan policy)`); }
+        } else if (sMint && sMint.status === 'done') gr.minted = sMint.n;
+        gr.status = 'ok';
+        say(`${sim ? 'dryrun' : 'apply'} gold: want ${want}; ${gr.sources.map((x) => `${x.src} ${x.n}${x.have !== undefined ? ` of ${x.have}` : ''}`).join(', ') || 'no source'}; short ${short} (${shortfallPolicy === 'mint' ? 'minted' : 'reported only'})`);
       }
     }
-    const goldSettled = () => ['gold:inventory', 'gold:bank'].every((k) => L.steps[k] && L.steps[k].status === 'done');
     const told = new Map();
 
     // 3. the deliveries of the stages asked for; the rest stays queued
@@ -345,7 +363,7 @@ module.exports = (api) => {
           items.push({ entry: e, unique: uid }); delete L.pool.uniques[uid];
         }
         let gold = 0;
-        if (d.gold) { gold = Math.max(0, Number(L.pool.gold) || 0); L.pool.gold = 0; if (sim && !goldSettled()) gold = (rep.gold.fromPack || 0) + (rep.gold.fromBank || 0) + (rep.gold.minted || 0); }
+        if (d.gold) { gold = Math.max(0, Number(L.pool.gold) || 0); L.pool.gold = 0; }
         const letters = packLetters(items, gold, { maxWeight: d.maxWeight, maxStacks: d.maxStacks }, weightOf);
         const ids = letters.map((l, i) => `${LETTER_PREFIX}${d.key}-${i + 1}`);
         letters.forEach((l, i) => {

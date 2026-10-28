@@ -41,6 +41,15 @@ MIKE = {0x8300021: 'Colovian Steel Armor', 0x8300023: 'Colovian Steel Gauntlets'
 SILVER = {0x9171b: 'Silver Necklace', 0x87833: 'Silver Emerald Necklace', 0x80aeb00: 'Silver Mace', 0x10aa19: 'Silver Sword'}
 CORUNDUM = 0x5ad93
 GOLD_WANT = 2095
+def count_treasury():
+    # the Count's bank log entries from 24 Oct 03:00Z (amounts and kinds only)
+    try:
+        d = json.load(open('/opt/skymp-state/world/changeForms/303.json'))
+        t = int(datetime.datetime(2026, 10, 24, 3, 0, tzinfo=datetime.UTC).timestamp() * 1000)
+        return [{'at': datetime.datetime.fromtimestamp(e['at'] / 1000, datetime.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'), 'kind': e.get('kind'), 'amount': e.get('amount')}
+                for e in (d.get('dynamicFields') or {}).get('private.bankLog') or [] if e.get('at', 0) >= t][:40]
+    except Exception as e:
+        return 'unreadable: %s' % e
 
 # ---- names and stage classes -------------------------------------------------------------------------------------
 refund = json.load(open(os.path.join(M, 'items', 'refund-list-21oct0001.json')))
@@ -288,7 +297,8 @@ plan = {
     'containers': containers,
     'leftAlone': {'0807284d': 'the Count\'s box: the potions Stibbons #HQX4 took in good faith; not touched'},
     'gold': {'from': 'count', 'want': GOLD_WANT, 'order': ['inventory', 'bank'], 'shortfall': 'mint', 'to': 'player', 'delivery': 's1',
-             'note': 'The Steward traded 2099 to the Count on 24 Oct 03:22:14Z (2095 the player\'s). shortfall "mint" pays the player the part the Count no longer has; "report" pays only what was taken.'},
+             'note': 'The Steward traded 2099 to the Count on 24 Oct 03:22:14Z (2095 the player\'s) and the Count paid 2099 into the Bruma treasury the same minute (his bankLog, PROVEN). "order" is where the module takes it: inventory (his pack), bank (his account), treasury:bruma (the hold treasury, where the gold went); the run file can set "goldOrder" until the first gold step is done. shortfall "mint" pays the player the part not found; "report" pays only what was taken.',
+             'countBankLog24Oct': count_treasury()},
     'deliveries': deliveries,
     'uniques': [{k: v for k, v in u.items()} for u in uniques],
     'gifts': [dict(x, to=d['to'], delivery=d['key']) for d in deliveries if d['minted'] for x in d['items']] +
