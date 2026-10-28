@@ -1340,8 +1340,8 @@ const offlineByTag = (q) => {
   return live.length === 1 ? live[0] : 0;
 };
 // The character a staff move names (/fixloc, staff /unstuck), online or offline; 0 after telling `by` why. A typed #TAG binds,
-// as /rename: the one live character that carries it, online or not. A query without one may name an offline character too
-// (findAnyByName)
+// as /rename: the one live character that carries it, online or not. A query without one names the one character called
+// exactly that, online or offline (exactNamed), never a prefix
 // Every live character carrying a tag (lower case, no '#'), online (tagOf) or in the engine's index, each once, as console.js
 // liveByTag counts them; null when the index threw
 const liveTagCarriers = (want) => {
@@ -1349,6 +1349,18 @@ const liveTagCarriers = (want) => {
   let ix = [];
   try { if (typeof mp.findFormsByPropertyValue === 'function') ix = mp.findFormsByPropertyValue('private.indexed.tagKey', want) || []; } catch (e) { return null; }
   const live = ix.map((x) => Number(x) >>> 0).filter((id) => id && !(typeof globalThis.__dboFormGone === 'function' && globalThis.__dboFormGone(id)));
+  return [...new Set([...on, ...live])];
+};
+// Every live character called exactly q: online and not behind a mask or in a beast form, or in the engine's name index,
+// each once; null when the index threw. A staff move takes an exact name before any prefix (verification of a0d5517b9: with
+// Neem offline, '/unstuck Neem hub' moved the online Neema through findByName's unique prefix)
+const exactNamed = (q) => {
+  const key = String(q || '').trim().toLowerCase(); if (!key) return [];
+  const onIds = onlineActors().map((o) => Number(o) >>> 0); const onSet = new Set(onIds);
+  const on = onIds.filter((o) => { try { return !disguisedOf(o) && String(nameOf(o)).toLowerCase() === key; } catch (e) { return false; } });
+  let ix = [];
+  try { if (typeof mp.findFormsByPropertyValue === 'function') ix = mp.findFormsByPropertyValue('private.indexed.nameKey', key) || []; } catch (e) { return null; }
+  const live = ix.map((x) => Number(x) >>> 0).filter((id) => id && !(typeof globalThis.__dboFormGone === 'function' && globalThis.__dboFormGone(id)) && !(onSet.has(id) && disguisedOf(id)));
   return [...new Set([...on, ...live])];
 };
 const staffTargetOf = (by, q) => {
@@ -1365,9 +1377,13 @@ const staffTargetOf = (by, q) => {
     if (all.length !== 1) { personal(by, `Cannot move ${TAG}: no live character carries that tag, or more than one does.`); return 0; }
     return all[0];
   }
-  const t = findAnyByName(q);
-  if (t < 0) { personal(by, `Cannot move ${q}: ${-t} characters are called that; add their #TAG.`); return 0; }
-  if (!t) personal(by, 'No such player.');
+  // A name: the one character called exactly that (any case), online or not; several are refused, and so is a name nobody
+  // has. No prefix or partial match for a staff move (Jake, 28 Oct: "Yes, exact only"); other commands keep their lookup
+  const ex = exactNamed(q);
+  if (ex === null) { personal(by, `Cannot move ${q}: the game could not check who is called that. Try again.`); return 0; }
+  if (ex.length > 1) { personal(by, `Cannot move ${q}: ${ex.length} characters are called that; add their #TAG.`); return 0; }
+  if (!ex.length) { personal(by, `Cannot move ${q}: no character is called that; use their full name or #TAG.`); return 0; }
+  const t = ex[0];
   // From the remote console an offline character is named by #TAG only (Jake, 28 Oct); a name that finds one asks for it
   if (t > 0 && remoteLine && userOf(t) < 0) { personal(by, `Cannot move ${display(t)}: they are offline, and from the console an offline character is named by its #TAG.`); return 0; }
   return t;
@@ -6063,17 +6079,18 @@ registerChatCommand('unstuck', (a, args) => {
   // From the remote console the line always names a #TAG (console.js); it never moves the caller's own character instead
   if (remoteLine && (!name || !staffCan(a, 'unstuck'))) return personal(a, 'Cannot move another character: /unstuck on someone else is for staff.');
   if (!name || !staffCan(a, 'unstuck')) return unstuckActor(a, a);
-  // The player, then where to, then the call or ticket (review S2: a name may hold Hub, Respawn or Temple). With a #TAG the
-  // player ends at it (exactly that tag when it comes first). With none, the whole line when it names someone, else the
-  // words before the last place word that leaves a name, else before the first. A place word after the player must be one;
-  // a place typed first gets the usage. Other words after the place (the form's ticket box holding "No ticket") are left out
-  // and said so
+  // The player, then where to, then the call or ticket (review S2: a name may hold Hub, Respawn or Temple). With a #TAG, on its
+  // own or glued to a word, the player ends at it; words before it that hold a place word must all be words of the carrier's own
+  // name ('Temple Guard #TG01'), else a place came first (the usage) or before the tag (put it after); a tag in the ticket text
+  // never binds (verification of a0d5517b9: the form's ticket box 'see #9B74' moved Anna Hub). With none, each run of first
+  // words that names a character exactly is a reading when the end or a place word follows it; the readings from the first such
+  // one on, and any longer name past it, must name one character, else nobody moves ('Anna hub' with Anna Hub, 'Anna Temple hub'
+  // with Anna, 'Anna Temple bruma': the form's place and ticket box could be part of a name). No exact name: the words before
+  // the first place word, as before; a place typed first gets the usage. Other words after the place (the form's ticket box
+  // holding "No ticket") are left out and said so
   const usage = 'Usage: /unstuck <player|#TAG> [hub|respawn] [ticket:<id>]';
   const isDest = (w) => Object.prototype.hasOwnProperty.call(UNSTUCK_DEST, String(w).toLowerCase());
-  const isTag = (w) => /^#[A-Za-z0-9]{4}$/.test(w);
-  // A name as typed: a character called exactly that, or more than one; never a longer online name it only begins ('Anna hub'
-  // is not Anna Hubbard, whom findByName's unique prefix would give; verification of 67de9db92, 28 Oct)
-  const names = (q) => { const t = findAnyByName(q); return t < 0 || (t > 0 && (userOf(t) < 0 || nameOf(t).toLowerCase() === q.toLowerCase())); };
+  const isTag = (w) => /#[A-Za-z0-9]{4}$/.test(w);
   const typed = name.split(/\s+/);
   const refs = typed.map((w) => UNSTUCK_REF.exec(w)).filter(Boolean).map((m) => `${m[1].toLowerCase()}:${m[2]}`);
   const words = typed.filter((w) => !UNSTUCK_REF.test(w));
@@ -6081,23 +6098,36 @@ registerChatCommand('unstuck', (a, args) => {
   if ((words.join(' ').match(/#[A-Za-z0-9]{4}(?![A-Za-z0-9])/g) || []).length > 1) return personal(a, `Cannot move ${words.join(' ')}: name one character, with one #TAG.`);
   const tagAt = words.findIndex(isTag);
   let head = words, rest = [];
-  if (tagAt >= 0) { head = words.slice(0, tagAt + 1); rest = words.slice(tagAt + 1); }
-  else if (!(words.length > 1 && names(words.join(' ')))) {
-    const at = words.map((w, i) => (i > 0 && isDest(w) ? i : -1)).filter((i) => i > 0);
-    const cut = at.slice().reverse().find((i) => names(words.slice(0, i).join(' '))) || at[0];
-    if (cut) { head = words.slice(0, cut); rest = words.slice(cut); }
-  }
-  // A place word before a #TAG is the carrier's own name ('Hub #HUB1', 'Temple Guard #TG01') or a place typed too early: first,
-  // the usage; later ('Neem hub #LBRF'), put it after the tag (C's review). The tag word alone finds the carrier, never a prefix
-  // nor the whole head; a tag no one or many carry goes on to staffTargetOf, which says so
-  if (tagAt > 0) {
-    const c = liveTagCarriers(words[tagAt].slice(1).toLowerCase());
-    if (c && c.length === 1) {
-      const own = nameOf(c[0]).toLowerCase().split(/\s+/);
-      const early = head.slice(0, -1).find((w) => isDest(w) && !own.includes(w.toLowerCase()));
-      if (early) return personal(a, early === head[0] ? usage : `Cannot move ${head.join(' ')}: put the place after the #TAG, as /unstuck ${words[tagAt]} ${early.toLowerCase()}.`);
+  if (tagAt >= 0) {
+    head = words.slice(0, tagAt + 1); rest = words.slice(tagAt + 1);
+    const TAG = words[tagAt].slice(-5).toUpperCase();
+    const before = [...words.slice(0, tagAt), words[tagAt].slice(0, -5)].filter(Boolean);
+    const early = before.findIndex(isDest);
+    if (early >= 0) {
+      const c = liveTagCarriers(TAG.slice(1).toLowerCase());
+      if (c === null) return personal(a, `Cannot move ${TAG}: the game could not check whether another character carries that tag. Try again.`);
+      if (c.length !== 1) return personal(a, `Cannot move ${TAG}: no live character carries that tag, or more than one does.`);
+      const own = String(nameOf(c[0])).toLowerCase().split(/\s+/);
+      if (!before.every((w) => own.includes(w.toLowerCase()))) return personal(a, early === 0 ? usage : `Cannot move ${head.join(' ')}: put the place after the #TAG, as /unstuck ${TAG} ${before[early].toLowerCase()}.`);
     }
-  } else if (isDest(head[0]) && head.length > 1 && !names(head.join(' '))) return personal(a, usage);
+  } else {
+    const reads = [];
+    for (let j = 1; j <= words.length && words.slice(0, j).join(' ').length <= 64; j++) {
+      const e = exactNamed(words.slice(0, j).join(' '));
+      if (e === null) return personal(a, `Cannot move ${words.join(' ')}: the game could not check who is called that. Try again.`);
+      if (e.length) reads.push({ j, e, ok: j === words.length || isDest(words[j]) });
+    }
+    const first = reads.find((r) => r.ok);
+    const counted = first ? reads.filter((r) => r.j >= first.j) : reads;
+    const meant = new Set(counted.flatMap((r) => r.e));
+    if (meant.size > 1) return personal(a, `Cannot move ${words.join(' ')}: ${meant.size} characters could be meant; add the #TAG.`);
+    const pick = (counted.filter((r) => r.ok).pop() || counted[counted.length - 1] || {}).j;
+    if (pick) { head = words.slice(0, pick); rest = words.slice(pick); } else {
+      const at = words.findIndex((w, i) => i > 0 && isDest(w));
+      if (at > 0) { head = words.slice(0, at); rest = words.slice(at); }
+      if (isDest(head[0])) return personal(a, usage);
+    }
+  }
   const dest = rest[0] || '';
   if (dest && !isDest(dest)) return personal(a, `Unknown place ${dest.slice(0, 24)}: hub or respawn.`);
   // Staff may name an offline character too, by name or #TAG (Jake, 28 Oct); from the console by #TAG only (staffTargetOf)

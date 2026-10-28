@@ -816,10 +816,13 @@ reset();
   const D = { src: 'discord' };
   const remote = (text) => { where(); reset(); const { rep } = send(text, D); return [moved(), header(rep), rep]; };
   // S2: a name that holds a place word
-  check('7f. typed "/unstuck Anna Temple" sends Anna Temple to the temple, never Anna', typed('Anna Temple') === 'Anna Temple #ANT1@temple', moved());
-  check('7f. typed "/unstuck Anna Temple hub" sends Anna Temple to the hub', typed('Anna Temple hub') === 'Anna Temple #ANT1@hub', moved());
+  // Verification of a0d5517b9: with Anna and Anna Temple both live, 'Anna Temple [place]' reads two ways (the form's target 'Anna'
+  // with place 'temple' and the ticket box, or the name 'Anna Temple'), so nobody moves; the #TAG picks one
+  check('7f. typed "/unstuck Anna Temple" with Anna live moves nobody and asks for the #TAG', typed('Anna Temple') === '' && /2 characters could be meant; add the #TAG/.test(told()), [moved(), told()]);
+  check('7f. typed "/unstuck Anna Temple hub" the same', typed('Anna Temple hub') === '' && /could be meant/.test(told()), [moved(), told()]);
+  check('7f. typed "/unstuck Anna Temple #ANT1 hub" sends Anna Temple to the hub', typed('Anna Temple #ANT1 hub') === 'Anna Temple #ANT1@hub', moved());
   check('7f. typed "/unstuck Anna hub" sends Anna to the hub', typed('Anna hub') === 'Anna #ANN1@hub', moved());
-  check('7f. typed "/unstuck Anna Temple respawn ticket:9" the temple, and the ticket in the line', typed('Anna Temple respawn ticket:9') === 'Anna Temple #ANT1@temple'
+  check('7f. typed "/unstuck #ANT1 respawn ticket:9" the temple, and the ticket in the line', typed('#ANT1 respawn ticket:9') === 'Anna Temple #ANT1@temple'
     && audits().some((l) => /^UNSTUCK Anna Temple #ANT1 .* by staff Jake #ABCD .*\(ticket:9\)$/.test(l)), audits());
   let [m, h] = remote('/unstuck Ralof Temple #RT01 hub');
   check('7f. remote "/unstuck Ralof Temple #RT01 hub" (offline, a name with Temple in it): Ralof Temple to the hub', m === 'Ralof Temple #RT01@hub', [m, h]);
@@ -865,6 +868,31 @@ reset();
     [m, h] = remote(t);
     check(`7f. F2: "${t}" (a place word first, not in the carrier's name) moves nobody and gets the usage`, m === '' && /^Usage: \/unstuck/.test(h), [m, h]);
   }
+  // Verification of a0d5517b9 (28 Oct): an exact name beats an online prefix (V1); a #TAG after the place, own or glued, never
+  // binds (V2); a line two characters could be read as moves nobody (V3); a place typed first never prefix-matches (V4)
+  const vx = [actor(0xff000f18, { name: 'Neema', tag: 'NMV1', profile: 118, online: true }), actor(0xff000f19, { name: 'Anna Hub', tag: 'AHV1', profile: 119, online: true }),
+    actor(0xff000f1a, { name: 'Templeton', tag: 'TPV1', profile: 120, online: true })];
+  ids.push(...vx);
+  [m, h] = remote(form('Neem', 'hub', ''));
+  check('7f. V1: the form "/unstuck Neem hub" (Neem offline, Neema online) moves nobody and asks for the #TAG', m === '' && /Cannot move Neem #LBRF: they are offline/.test(h), [m, h]);
+  check('7f. V1: ...typed in game it moves Neem, never Neema', typed('Neem hub') === 'Neem #LBRF@hub', moved());
+  check('7f. V1: typed "/unstuck Neem" the same, to the temple', typed('Neem') === 'Neem #LBRF@temple', moved());
+  [m, h] = remote(form('Lydia', 'hub', 'see #HUB1'));
+  check('7f. V2: a #TAG in the form ticket box ("see #HUB1", a carrier called Hub) moves nobody', m === '' && /put the place after the #TAG/.test(h), [m, h]);
+  [m, h] = remote(form('Lydia', 'hub', 'Ticket#LBRF'));
+  check('7f. V2: ...nor a glued one ("Ticket#LBRF")', m === '' && /put the place after the #TAG/.test(h), [m, h]);
+  check('7f. V2: typed "hub#LBRF" gets the usage', typed('hub#LBRF') === '' && /^Usage: \/unstuck/.test(told()), told());
+  check('7f. V2: typed "Temple Guard#TG01 hub" binds the glued tag', typed('Temple Guard#TG01 hub') === 'Temple Guard #TG01@hub', moved());
+  [m, h] = remote(form('Anna', 'hub', ''));
+  check('7f. V3: the form "/unstuck Anna hub" with Anna Hub online moves nobody, never Anna Hub to a temple', m === '' && /2 characters could be meant/.test(h), [m, h]);
+  [m, h] = remote(form('Anna', 'hub', 'ticket:5'));
+  check('7f. V3: ...with a ticket the same', m === '' && /could be meant/.test(h), [m, h]);
+  [m, h] = remote(form('#AHV1', 'hub', ''));
+  check('7f. V3: ...and its #TAG moves Anna Hub to the hub', m === 'Anna Hub #AHV1@hub', [m, h]);
+  check('7f. V3: typed "Anna Temple bruma" moves nobody, never Anna', typed('Anna Temple bruma') === '' && /could be meant/.test(told()), [moved(), told()]);
+  check('7f. V4: typed "temple Respawn" (a place first, Templeton online) gets the usage', typed('temple Respawn') === '' && /^Usage: \/unstuck/.test(told()), [moved(), told()]);
+  for (const x of vx) store.delete(x);
+  ids.splice(ids.length - vx.length, vx.length);
   for (const x of extra) store.delete(x);
   ids.splice(ids.length - extra.length, extra.length);
   // S5: one online and one offline character carry a tag
@@ -988,6 +1016,40 @@ reset();
   delete globalThis.__dboJailSentence;
   for (const id of [neem, anna]) store.delete(id);
   delete mp.findFormsByPropertyValue;
+}
+
+// ---- 7h. a staff move takes an exact full name or a #TAG, never a prefix (Jake, 28 Oct: "Yes, exact only"); other commands
+// keep their lookup -----------------------------------------------------------------------------------------------------------
+reset();
+{
+  mp.findFormsByPropertyValue = (k, v) => [...store].filter(([, o]) => (k === 'private.indexed.tagKey' ? String(o['private.charTag'] || '').toLowerCase() === v
+    : k === 'private.indexed.nameKey' ? String((o.appearance || {}).name || '').toLowerCase() === v : false)).map(([id]) => id);
+  const HUB = '17482:DragonBreak Hub.esp', TEMPLE = 'a764b:BSHeartland.esm';
+  const annaH = actor(0xff000f31, { name: 'Anna Hubbard', tag: 'AHB1', profile: 131, online: true });
+  const ids = [annaH, A.lydia, A.jake];
+  const where = () => { for (const id of ids) delete store.get(id).locationalData; };
+  const at = (id) => (store.get(id).locationalData || {}).cellOrWorldDesc || '';
+  const moved = () => ids.filter((id) => at(id)).map((id) => `${G.display(id)}@${at(id) === HUB ? 'hub' : at(id) === TEMPLE ? 'temple' : at(id)}`).join(',');
+  const told = () => ((chatWrites.filter(([id]) => id === A.jake).slice(-1)[0] || [])[1] || '').split('|').slice(1).join('|');
+  const typed = (cmd, args) => { where(); reset(); G.commands.get(cmd).fn(A.jake, args); return [moved(), told()]; };
+  const remote = (text) => { where(); reset(); const { rep } = send(text, { src: 'discord' }); return [moved(), header(rep)]; };
+  let m, h;
+  [m, h] = typed('unstuck', 'Lyd hub');
+  check('7h. typed "/unstuck Lyd hub" (only Lydia online) moves nobody: no character is called Lyd', m === '' && h === 'Cannot move Lyd: no character is called that; use their full name or #TAG.', [m, h]);
+  [m, h] = remote('/unstuck Lyd hub ticket:2');
+  check('7h. ...the form the same', m === '' && /^Cannot move Lyd: no character is called that/.test(h), [m, h]);
+  [m, h] = typed('fixloc', 'Anna');
+  check('7h. typed "/fixloc Anna" (only Anna Hubbard online) moves nobody', m === '' && h === 'Cannot move Anna: no character is called that; use their full name or #TAG.', [m, h]);
+  [m, h] = remote('/fixloc Anna');
+  check('7h. ...from the console the same', m === '' && /^Cannot move Anna: no character is called that/.test(h), [m, h]);
+  [m, h] = typed('unstuck', 'lydia hub');
+  check('7h. typed "/unstuck lydia hub" (an exact name in any case) moves Lydia to the hub', m === 'Lydia #LLX8@hub', [m, h]);
+  [m, h] = remote('/unstuck lydia respawn ticket:3');
+  check('7h. ...the form "/unstuck lydia respawn ticket:3" moves Lydia to the temple', m === 'Lydia #LLX8@temple', [m, h]);
+  [m, h] = typed('fixloc', 'anna hubbard');
+  check('7h. typed "/fixloc anna hubbard" (the full name) moves Anna Hubbard', m === 'Anna Hubbard #AHB1@hub', [m, h]);
+  check('7h. other commands keep their lookup: findByName still takes a unique prefix ("Lyd")', G.findByName('Lyd') === A.lydia);
+  store.delete(annaH); delete mp.findFormsByPropertyValue;
 }
 
 // ---- 12. reply state is "ran", with the handler's own first line ------------------------------------------------------------------------
