@@ -100,3 +100,22 @@ test('a jail sentence with a fractional servedMs pages with a cursor the panel a
   assert.ok(seen.includes('jail:ff000041'))
   assert.equal(new Set(seen).size, seen.length)
 })
+
+test('trackerSnapshot holds the rows a GM is not shown, with each source\'s status, and asks Discord nothing', async () => {
+  const asked = []
+  const svc = service({ staffStatusOf: async d => { asked.push(d); return d === PEOPLE.gina.discordId ? 'staff' : 'player' } })
+  const seen = (await svc.recent(GM, { from: '2000-01-01', limit: '100' })).rows.map(r => r.id)
+  asked.length = 0
+  const s = svc.trackerSnapshot()
+  assert.deepEqual(asked, [], 'no staff lookup')
+  const ids = s.rows.map(r => r.id)
+  for (const id of seen) assert.ok(ids.includes(id), id)
+  const gina = s.rows.find(r => r.id === 'dsc:20:1')
+  assert.ok(gina && !seen.includes(gina.id), 'a record on a staff member')
+  assert.equal(gina._discordId, PEOPLE.gina.discordId)
+  const ended = s.rows.find(r => r.id === 'mod:M-BBBBBB')
+  assert.ok(ended && ended.state === 'ended' && !seen.includes(ended.id), 'a timeout that has ended')
+  assert.equal(ended.by, 'Gina')
+  for (const k of ['discipline', 'panelBans', 'bans', 'jail', 'restitution', 'journal', 'playerLog']) assert.equal(s.sources[k].status, 'ok', k)
+  assert.deepEqual([...s.strikes], [[10, 1], [30, 1]])
+})

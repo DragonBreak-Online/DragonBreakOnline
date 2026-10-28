@@ -363,6 +363,10 @@ function createPunishments({ config, readStore, dynamicFields, characterName, lo
       }
     },
 
+    // The backend's punishment tracker only, never served over HTTP: every row unfiltered, with Discord ids, staff targets and
+    // the viewer's own records, plus each source's status and the strike counts. The snapshot is shared and must not be changed
+    trackerSnapshot: () => collect(),
+
     stop: () => plog.stop(),
   }
 }
