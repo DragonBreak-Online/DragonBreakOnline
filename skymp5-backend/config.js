@@ -24,6 +24,8 @@ const DEVICE_MATCH = String(process.env.DEVICE_MATCH || '').trim().toLowerCase()
 const AUTO_REPORTS = String(process.env.AUTO_REPORTS || '').trim().toLowerCase()
 // Old launcher login switch: off and revoke are the only other values, so a typo keeps the old flow working
 const LAUNCHER_LOGIN_LEGACY = String(process.env.LAUNCHER_LOGIN_LEGACY || '').trim().toLowerCase()
+// Punishment tracker switch: on, dry (dry-run is the same), anything else is off
+const PUNISH_TRACKER = String(process.env.PUNISH_TRACKER || '').trim().toLowerCase()
 // The Lead GM Discord role (a role, not a person): the third of the console's default roles, after Owners and Dragon Break Dev
 const LEAD_GM_ROLE_ID = '1494126618065506425'
 // A comma-separated list of ids from the env; unset gives the fallback, set but empty gives none
@@ -154,6 +156,20 @@ module.exports = {
   punishActions: String(process.env.PUNISH_ACTIONS || 'off'),
   // A switch file read on every action that can only narrow PUNISH_ACTIONS (same format); missing narrows nothing, malformed is off
   punishActionsSwitchFile: process.env.PUNISH_ACTIONS_SWITCH_FILE || '/etc/dragonbreak/punish-actions',
+  // Active-punishments tracker (sources/punish/tracker.js): off by default; dry writes would-be posts to a local jsonl, never Discord
+  punishTracker: PUNISH_TRACKER === 'on' ? 'on' : PUNISH_TRACKER === 'dry' || PUNISH_TRACKER === 'dry-run' ? 'dry' : 'off',
+  punishTrackerForumId: process.env.PUNISH_TRACKER_FORUM_ID || '1564694518194774067',
+  // The registry of threads and posted rows (live-only, under the gitignored data/), and dry mode's output
+  punishTrackerFile: process.env.PUNISH_TRACKER_FILE || path.join(__dirname, 'data', 'punish-threads.json'),
+  punishTrackerDryFile: process.env.PUNISH_TRACKER_DRY_FILE || path.join(__dirname, 'data', 'punish-tracker-dry.jsonl'),
+  // Profiles never posted (Dialis's 28 Oct console tests by default); set but empty skips none
+  punishTrackerSkipProfiles: idList(process.env.PUNISH_TRACKER_SKIP_PROFILES, '126').map(Number),
+  // Warnings never expire in code; the tracker counts one as in force for this many days
+  punishTrackerWarnDays: positiveInt(process.env.PUNISH_TRACKER_WARN_DAYS, 90),
+  // Thread creation waits while the guild has more active threads than this (Discord's cap is 1000)
+  punishTrackerHeadroom: positiveInt(process.env.PUNISH_TRACKER_HEADROOM, 975),
+  // On (or true) leaves out rows whose target is staff, as the panel does, for when Lead GMs can read the forum
+  punishTrackerHideStaffTargets: ['on', 'true'].includes(String(process.env.PUNISH_TRACKER_HIDE_STAFF || '').trim().toLowerCase()),
   // The game's #staff-commands channel (gamemode-config discord.staffChannelId); the dashboard's bans and Discord actions are posted there too
   staffCommandsChannelId: process.env.STAFF_COMMANDS_CHANNEL_ID || '',
   // Optional channel lock for /console, comma separated; empty allows any channel of the guild
