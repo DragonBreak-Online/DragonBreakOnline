@@ -923,6 +923,30 @@ test('a starter deleted by staff (10008) is tried once, and the thread still get
   assert.equal(r.logs.filter(l => /starter .* was deleted/.test(l)).length, 1)
 })
 
+test('a tag change Discord answers with 160006 or 50083 is not taken as a refusal: the tags are tried again', async () => {
+  for (const code of [160006, 50083]) {
+    const d = fakeDiscord()
+    const r = await started({ discord: d })
+    r.data.discipline = { 57: [entry(1, 'strike', T0)] }
+    await r.tick()
+    const t = d.thread()
+    assert.deepEqual(t.tags, [tagId('Active'), tagId('Strike')])
+    let busy = true
+    d.fail = (method, p, body) => (busy && method === 'PATCH' && p === `/channels/${t.id}` && body.applied_tags ? fakeDiscord.error(400, code) : null)
+    r.now += 60000
+    r.data.discipline[57].push(entry(2, 'warn', r.now))
+    await r.tick()
+    assert.deepEqual(t.tags, [tagId('Active'), tagId('Strike')], `${code}: not applied yet`)
+    assert.deepEqual(r.registry().accounts[PEOPLE.alice.discordId].tags, [tagId('Active'), tagId('Strike')], `${code}: not recorded as applied`)
+    assert.ok(!r.logs.some(l => /refused the tags/.test(l)), `${code}: not logged as a refusal`)
+    busy = false
+    r.now += 11 * 60000
+    await r.tick()
+    assert.deepEqual(t.tags, [tagId('Active'), tagId('Strike'), tagId('Warning')], `${code}: applied on a later tick`)
+    assert.equal(t.messages.length, 3, `${code}: the warning posted once`)
+  }
+})
+
 test('tags made on the forum later reach every thread, an archived clear one too, which stays archived', async () => {
   const d = fakeDiscord({ tags: [] })
   const r = await started({ discord: d })

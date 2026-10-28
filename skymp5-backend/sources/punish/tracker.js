@@ -737,7 +737,8 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
         await threadCall(acct, 'PATCH', ch, patch)
         if ('archived' in patch) acct.state = patch.archived ? 'archived' : 'open'
       } catch (err) {
-        if (err === OUT || !patch.applied_tags || (err.status !== 400 && err.status !== 403)) throw err
+        // A full guild or a thread still archived is not a refusal of the tags: they are tried again later
+        if (err === OUT || capped(err) || NOT_FINAL.has(err.code) || !patch.applied_tags || (err.status !== 400 && err.status !== 403)) throw err
         note(`tags-${err.status}`, `the forum refused the tags (${err.status}); left as they were`, HOUR_MS)
         if (patch.archived === true) { await call('PATCH', ch, { archived: true }); acct.state = 'archived' }
       }
