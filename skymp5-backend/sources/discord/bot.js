@@ -34,6 +34,7 @@ client.on('interactionCreate', interaction => {
     .then(handled => (handled ? true : require('./consoleCommand').handleInteraction(interaction)))
     .then(handled => (handled ? true : require('./sayCommand').handleInteraction(interaction)))
     .then(handled => (handled ? true : require('./referralCommand').handleInteraction(interaction)))
+    .then(handled => (handled ? true : require('./dragonbaronCommand').handleInteraction(interaction)))
     .catch(err => {
       console.error('[discord-bot] interaction failed:', err.message)
     })

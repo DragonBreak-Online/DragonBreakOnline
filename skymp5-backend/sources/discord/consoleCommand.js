@@ -30,6 +30,7 @@ const fold = text => String(text ?? '').replace(/`/g, TICK)
 // The answer as one private message: the header, who it ran as, then the captured lines in a code block, cut to fit
 function format(result) {
   const body = result?.body || {}
+  if (body.help) return body.help.slice(0, 2000)
   if (!body.job) {
     const base = ERRORS[body.error] || 'The console could not run that.'
     return body.error === 'notRemote' && body.reason ? `${fold(body.reason)}\nNothing was run.` : base

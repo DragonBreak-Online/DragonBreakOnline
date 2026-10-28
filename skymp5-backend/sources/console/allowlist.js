@@ -22,7 +22,7 @@ const BLANK_RE = /[\u115f\u1160\u3164\uffa0]/
 const REASON_MIN = 5
 const REASON_MAX = 300
 // The record kinds and the word each takes before its reason (console.js KIND_ARGS); allow.json can only narrow them
-const KIND_ARGS = Object.freeze({ warn: 'none', strike: 'none', suspend: 'length', lift: 'none', overturn: 'record' })
+const KIND_ARGS = Object.freeze({ warn: 'none', strike: 'none', suspend: 'length', ban: 'none', lift: 'none', overturn: 'record' })
 const LENGTH_RE = /^(?:([1-9][0-9]{0,2})h|([1-9][0-9]?)d)$/
 const RECORD_RE = /^[1-9][0-9]{0,4}$/
 // A line break typed into a reason line is refused, not folded into the reason
@@ -30,16 +30,20 @@ const LINE_BREAK_RE = /[\n\r\u000b\u000c\u0085\u2028\u2029]/
 
 // The classes the game refuses with (console.js), for the commands that are not on the allowlist
 const IN_WORLD = new Set(['npc', 'placed', 'jail', 'setweather', 'war', 'region', 'warband', 'raid', 'property', 'dungeon', 'whereami', 'teach'])
-const SELF = new Set(['tp', 'gm', 'masktest', 'mv', 'placeundo', 'factiongear', 'tailoring', 'smithing', 'beastform', 'makesuper', 'unstuck', 'appearance'])
+const SELF = new Set(['tp', 'masktest', 'mv', 'placeundo', 'factiongear', 'tailoring', 'smithing', 'beastform', 'makesuper', 'appearance'])
 const LATER = new Set(['bugs', 'update', 'schedule'])
 const BUILTIN = new Set(['say', 'low', 'whisper', 'wide', 'shout', 'me', 'melow', 'melong', 'my', 'mylow', 'mylong', 'do', 'dolow', 'dolong',
   'looc', 'ooc', 'ooclow', 'ooclong', 'pm', 'dm', 'to', 'too', 'system', 'admin'])
 // No 'any' rule (review SEC-2); the only free text is /rename's name (NAME_RE) and /discipline's reason (REASON_RE)
-const RULES = new Set(['switch', 'tag', 'tagName', 'load', 'none', 'tagKindReason'])
+const RULES = new Set(['switch', 'tag', 'tagName', 'load', 'none', 'tagKindReason', 'faction', 'announce', 'gm', 'charter', 'settime', 'staffstats', 'citizenship', 'itemSpells'])
 // The empty form of a #TAG command: /kick needs a target, /fixloc and /chargen alone act on the caller
 const NO_ARG = Object.freeze({ kick: 'needTag', fixloc: 'self', chargen: 'self' })
 // All a Lead GM may run from the console (console.js PUNISH_ONLY; Jake, 22 Oct: "Punishments only")
-const PUNISH_ONLY = Object.freeze(['discipline', 'kick'])
+const PUNISH_ONLY = Object.freeze([
+  'discipline', 'kick', 'ban', 'tempban', 'unban', 'faction',
+  'announce', 'gm', 'bans', 'charter', 'time', 'settime', 'staffstats', 'citizenship', 'players', 'whoami',
+  'giveitem', 'takeitem', 'givespell', 'removespell', 'unstuck', 'fixloc'
+])
 
 // One clean '/word rest' line of at most 500 characters with '#{' broken, or null when it is not a command
 function cleanCommand(value) {
@@ -171,8 +175,88 @@ function precheck(text, allow, raw) {
       return NAME_RE.test(words.slice(1).join(' ')) ? null : refuse('badName')
     case 'load': return !words.length || (words.length === 1 && words[0].toLowerCase() === 'reset') ? null : refuse('badArgs')
     case 'none': return words.length ? refuse('badArgs') : null
+    case 'faction': {
+      if (!words.length) return refuse('badArgs')
+      const sub = (words[0] || '').toLowerCase()
+      if (sub === 'list') return null
+      if (sub === 'leader' || sub === 'remove') {
+        if (words.length !== 3) return refuse('badArgs')
+        if (!TAG_RE.test(words[1])) return refuse('needTag')
+        if (!/^[a-z0-9_-]{2,32}$/i.test(words[2])) return refuse('badArgs')
+        return null
+      }
+      return refuse('badArgs')
+    }
+    case 'announce': {
+      const text = (words.join(' ') || '').trim()
+      if (!text) return refuse('badArgs')
+      if (text.length > 300) return refuse('reasonLong')
+      return null
+    }
+    case 'gm': {
+      if (!words.length) return refuse('badArgs')
+      const sub = (words[0] || '').toLowerCase()
+      if (sub === 'list') {
+        if (words.length > 2 || (words.length === 2 && words[1].toLowerCase() !== 'all')) return refuse('badArgs')
+        return null
+      }
+      if (sub === 'close') {
+        if (words.length < 2 || !/^\d+$/.test(words[1])) return refuse('badArgs')
+        return null
+      }
+      if (sub === 'release') {
+        if (words.length !== 2 || !/^\d+$/.test(words[1])) return refuse('badArgs')
+        return null
+      }
+      if (sub === 'take' || sub === 'goto') return refuse('inWorld')
+      return refuse('badArgs')
+    }
+    case 'charter': {
+      if (!words.length) return refuse('badArgs')
+      const sub = (words[0] || '').toLowerCase()
+      if (sub === 'list') {
+        if (words.length > 2 || (words.length === 2 && words[1].toLowerCase() !== 'all')) return refuse('badArgs')
+        return null
+      }
+      if (sub === 'show' || sub === 'approve') {
+        if (words.length !== 2 || !/^\d+$/.test(words[1])) return refuse('badArgs')
+        return null
+      }
+      if (sub === 'deny') {
+        if (words.length < 3 || !/^\d+$/.test(words[1])) return refuse('badArgs')
+        return null
+      }
+      return refuse('badArgs')
+    }
+    case 'settime': {
+      if (words.length !== 1) return refuse('badArgs')
+      const h = Number(words[0])
+      if (!Number.isFinite(h) || h < 0 || h >= 24) return refuse('badArgs')
+      return null
+    }
+    case 'staffstats': {
+      if (!words.length) return null
+      if (words.length > 3 || !/^[a-z0-9_ -]{1,32}$/i.test(words.join(' '))) return refuse('badArgs')
+      return null
+    }
+    case 'citizenship': {
+      if (words.length < 2) return refuse('badArgs')
+      const sub = (words[1] || '').toLowerCase()
+      if (!['view', 'status', 'info', 'cooldown', 'grant', 'revoke'].includes(sub)) return refuse('badArgs')
+      if (sub === 'cooldown' && words.length < 3) return refuse('badArgs')
+      if ((sub === 'grant' || sub === 'revoke') && words.length < 3) return refuse('badArgs')
+      return null
+    }
+    case 'itemSpells': {
+      if (words.length < 1) return refuse('badArgs')
+      return null
+    }
     case 'tagKindReason': {
       if (typeof raw === 'string' && LINE_BREAK_RE.test(raw.trim())) return refuse('oneLine')
+      const aliasKinds = { ban: 'ban', tempban: 'suspend', unban: 'lift' }
+      if (aliasKinds[cmd] && words.length && TAG_RE.test(words[0])) {
+        words.splice(1, 0, aliasKinds[cmd])
+      }
       const kinds = Array.isArray(entry.kinds) ? entry.kinds : []
       const maxDays = typeof entry.maxSuspendDays === 'number' ? entry.maxSuspendDays : 0
       if (!words.length || !TAG_RE.test(words[0])) return words.length && words[0].toLowerCase() !== 'list' ? refuse('needTag') : refuse('badKind')

@@ -58,6 +58,77 @@ const withDeadline = (promise, ms) => {
   return Promise.race([Promise.resolve(promise).catch(() => null), deadline]).finally(() => clearTimeout(timer))
 }
 
+
+function generateHelpText(isFull, filterCmd) {
+  if (filterCmd) {
+    const f = filterCmd.toLowerCase().replace(/^\//, '')
+    const DETAILS = {
+      faction: "**Command:** `/faction`\n??? `/faction list` ??? List all active factions and leaders\n??? `/faction leader #TAG <faction_id>` ??? Appoint a new leader (steps down old leader)\n??? `/faction remove #TAG <faction_id>` ??? Remove a member from faction (works offline)\n*Requires: Lead GM or above*",
+      charter: "**Command:** `/charter`\n??? `/charter list` ??? List pending charters waiting for GM review\n??? `/charter list all` ??? List all open & gathering charters\n??? `/charter show <n>` ??? Inspect details of charter #n\n??? `/charter approve <n>` ??? Approve charter #n\n??? `/charter deny <n> <reason>` ??? Deny charter #n with reason\n*Requires: Lead GM or above*",
+      gm: "**Command:** `/gm`\n??? `/gm list` ??? List currently waiting in-game GM calls\n??? `/gm list all` ??? List waiting and lately closed GM calls\n??? `/gm close <n> [note]` ??? Close ticket #n with optional resolution note\n??? `/gm release <n>` ??? Return ticket #n back to the waiting queue\n*Requires: Lead GM or above*",
+      announce: "**Command:** `/announce`\n??? `/announce <text>` ??? Broadcast a message to all online players and on-screen.\n*Requires: Lead GM or above*",
+      bans: "**Command:** `/bans`\n??? `/bans` ??? List all active account bans and temporary suspensions.\n*Requires: Lead GM or above*",
+      discipline: "**Command:** `/discipline`\n??? `/discipline #TAG warn <reason>`\n??? `/discipline #TAG strike <reason>`\n??? `/discipline #TAG suspend <1-720h|1-30d> <reason>`\n??? `/discipline #TAG ban <reason>`\n??? `/discipline #TAG lift <reason>`\n??? `/discipline #TAG overturn <record_n> <reason>`\n*Requires: Lead GM or above*",
+      kick: "**Command:** `/kick`\n??? `/kick #TAG` ??? Disconnect an online character immediately.\n*Requires: Lead GM or above*",
+      ban: "**Command:** `/ban`\n??? `/ban #TAG <reason>` ??? Permanently ban player account.\n*Requires: Lead GM or above*",
+      tempban: "**Command:** `/tempban`\n??? `/tempban #TAG <length> <reason>` ??? Suspend player account (e.g. 12h, 3d).\n*Requires: Lead GM or above*",
+      unban: "**Command:** `/unban`\n??? `/unban #TAG <reason>` ??? Lift active suspension or ban early.\n*Requires: Lead GM or above*",
+      time: "**Command:** `/time`\n??? `/time` ??? Show current Tamriel in-game time, date, and moons.\n*Requires: Lead GM or above*",
+      settime: "**Command:** `/settime`\n??? `/settime <hour 0-23>` ??? Advance the world clock forward to the specified hour.\n*Requires: Lead GM or above*",
+      staffstats: "**Command:** `/staffstats`\n??? `/staffstats` ??? Audit of staff command activity over the past 7 days\n??? `/staffstats <name>` ??? Filter staff command audit by name\n*Requires: Lead GM or above*",
+      rename: "**Command:** `/rename`\n??? `/rename #TAG <new_name>` ??? Rename target character (works offline).\n*Requires: Developer or above*",
+      chars: "**Command:** `/chars`\n??? `/chars #TAG` ??? List all characters on the target's account.\n*Requires: Developer or above*",
+      fixloc: "**Command:** `/fixloc`\n??? `/fixloc #TAG` ??? Reset stuck character position to the hub.\n*Requires: Developer or above*",
+      chargen: "**Command:** `/chargen`\n??? `/chargen #TAG` ??? Reopen character creation for target.\n*Requires: Developer or above*",
+      players: "**Command:** `/players`\n??? `/players` ??? Show online player count and list.\n*Requires: Developer or above*",
+      load: "**Command:** `/load`\n??? `/load [reset]` ??? Show server performance stats.\n*Requires: Developer or above*",
+      whoami: "**Command:** `/whoami`\n??? `/whoami` ??? Display your staff identity, tag, and tier."
+    }
+    if (DETAILS[f]) return DETAILS[f]
+  }
+
+  let text = "**DragonBreak Remote Staff Console Commands**\n"
+  text += "Run via: `/console command:<command>`\n\n"
+  text += "**Faction & Charters**\n"
+  text += "??? `/faction list` ??? List all factions & leaders\n"
+  text += "??? `/faction leader #TAG <faction>` ??? Appoint faction leader\n"
+  text += "??? `/faction remove #TAG <faction>` ??? Remove member (works offline)\n"
+  text += "??? `/charter list [all]` ??? List pending/open faction charters\n"
+  text += "??? `/charter show <n>` ??? Inspect charter details\n"
+  text += "??? `/charter approve <n>` ??? Approve charter\n"
+  text += "??? `/charter deny <n> <reason>` ??? Deny charter with reason\n\n"
+  text += "**GM Tickets & Support**\n"
+  text += "??? `/gm list [all]` ??? List open GM support tickets\n"
+  text += "??? `/gm close <n> [note]` ??? Close ticket #n with note\n"
+  text += "??? `/gm release <n>` ??? Release ticket back to queue\n\n"
+  text += "**Moderation & Discipline**\n"
+  text += "??? `/kick #TAG` ??? Disconnect online character\n"
+  text += "??? `/discipline #TAG <warn|strike|suspend|ban|lift|overturn> <reason>`\n"
+  text += "??? `/ban #TAG <reason>` ??? Permanent ban\n"
+  text += "??? `/tempban #TAG <12h|3d> <reason>` ??? Timed suspension\n"
+  text += "??? `/unban #TAG <reason>` ??? Lift ban/suspension early\n"
+  text += "??? `/bans` ??? List active bans and suspensions\n\n"
+  text += "**World & Announcements**\n"
+  text += "??? `/announce <text>` ??? Broadcast to all online players\n"
+  text += "??? `/time` ??? Tamriel date, clock, and moons\n"
+  text += "??? `/settime <0-23>` ??? Advance world clock hour\n\n"
+  text += "**Administration & Audit**\n"
+  text += "??? `/staffstats [name]` ??? Staff activity audit (last 7 days)\n"
+  text += "??? `/whoami` ??? Show your admin identity & tier\n"
+  if (isFull) {
+    text += "??? `/chars #TAG` ??? List characters on player's account\n"
+    text += "??? `/rename #TAG <new_name>` ??? Rename character\n"
+    text += "??? `/fixloc #TAG` ??? Reset stuck character to hub\n"
+    text += "??? `/chargen #TAG` ??? Reopen character creation\n"
+    text += "??? `/players` ??? Show online player count\n"
+    text += "??? `/load [reset]` ??? Server performance stats\n"
+    text += "??? `/wwremote [on|off|clear #TAG]` ??? Werewolf visibility\n"
+    text += "??? `/vlremote [on|off|clear #TAG]` ??? Vampire Lord visibility\n"
+  }
+  text += "\n*Type `/console command:/help <cmd>` (e.g. `/help gm`, `/help charter`) for details.*"
+  return text
+}
+
 function createStaffConsole({
   config, discordBot, siteSessions, profileIdOf, spool, audit, jobsFile, switchFile, fs = nodeFs, now = Date.now, discordIdsOfProfile = () => [],
   log = (...a) => console.log('[console]', ...a), waitMs = WAIT_MS, lateWaitMs = LATE_WAIT_MS,
@@ -83,15 +154,35 @@ function createStaffConsole({
     return brand({ source: 'web', discordId: s.discordId, signedInAt: Number.isSafeInteger(s.signedInAt) ? s.signedInAt : 0 })
   }
 
-  // A discord.js slash command of our own client, named console, in our guild (and channel, when locked), not from a bot
+  // A discord.js interaction of our own client (slash commands /console, /dragonbaron, /admin, or Dragonbaron UI buttons/modals)
   function discordCaller(interaction) {
     const refused = (code, discordId) => { refusal('discord', discordId, '-', '', code, ''); return { refused: code } }
     const userId = interaction?.user?.id
-    if (!(interaction instanceof ChatInputCommandInteraction) || !discordBot.isOwnClient(interaction.client)) return refused('badInteraction', userId)
-    if (interaction.commandName !== 'console') return refused('badInteraction', userId)
+    if (!interaction || !discordBot.isOwnClient(interaction.client)) return refused('badInteraction', userId)
+
+    const isChat = typeof interaction.isChatInputCommand === 'function' && interaction.isChatInputCommand()
+    const isButton = typeof interaction.isButton === 'function' && interaction.isButton()
+    const isModal = typeof interaction.isModalSubmit === 'function' && interaction.isModalSubmit()
+    const isSelect = (typeof interaction.isAnySelectMenu === 'function' && interaction.isAnySelectMenu()) ||
+                    (typeof interaction.isStringSelectMenu === 'function' && interaction.isStringSelectMenu())
+
+    if (!isChat && !isButton && !isModal && !isSelect) return refused('badInteraction', userId)
+
+    if (isChat) {
+      if (interaction.commandName !== 'console' && interaction.commandName !== 'dragonbaron' && interaction.commandName !== 'admin') {
+        return refused('badInteraction', userId)
+      }
+    } else if (isButton || isModal || isSelect) {
+      if (!interaction.customId || !interaction.customId.startsWith('db:')) {
+        return refused('badInteraction', userId)
+      }
+    }
+
     if (C.problem) return refused('unavailable', userId)
     if (interaction.guildId !== C.guild) return refused('wrongGuild', userId)
-    if (C.channels.size && !C.channels.has(interaction.channelId)) return refused('wrongChannel', userId)
+    if (isChat && interaction.commandName === 'console' && C.channels.size && !C.channels.has(interaction.channelId)) {
+      return refused('wrongChannel', userId)
+    }
     if (!userId || !rules.SNOWFLAKE.test(userId) || interaction.user.bot) return refused('bot', userId)
     if (typeof interaction.id !== 'string' || !rules.SNOWFLAKE.test(interaction.id)) return refused('badInteraction', userId)
     return brand({ source: 'discord', discordId: userId, interactionId: interaction.id })
@@ -260,8 +351,15 @@ function createStaffConsole({
     // 7. One clean line
     const line = rules.cleanCommand(text)
     if (!line) return refuse(400, 'badCommand', handle)
-    // 7b. A caller held to some commands (the Punishments panel: /discipline and /kick) is refused the rest before any record
     const word = line.slice(1).split(' ')[0]
+    // Help command
+    if (word === 'help' || word === 'commands') {
+      const isFull = roles.some(r => C.full.has(r))
+      const filterCmd = line.slice(1).split(' ')[1] || ''
+      return answer(200, { v: 1, help: generateHelpText(isFull, filterCmd) })
+    }
+
+    // 7b. A caller held to some commands (the Punishments panel: /discipline and /kick) is refused the rest before any record
     if (request.only && !request.only.includes(word)) return refuse(422, 'notPunish', handle)
     // 7c. A Lead GM (no Owners or Dragon Break Dev role now) gets /discipline and /kick only, as the game holds them
     if (!roles.some(r => C.full.has(r)) && !rules.PUNISH_ONLY.includes(word)) {

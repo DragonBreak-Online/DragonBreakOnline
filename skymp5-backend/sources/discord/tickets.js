@@ -188,12 +188,66 @@ const closing = new Set()
 const largeRefused = new Map()
 const LARGE_CONFIRM_MS = 2 * 60 * 1000
 
+
+const GM_CLOSE_QUEUE_FILE = '/opt/alduinak/build/dist/server/gm-close-queue.json'
+const GM_CALLS_FILE = '/opt/alduinak/build/dist/server/gm-calls.json'
+
+function syncCloseToGame(channel, closerUser) {
+  try {
+    let gmNum = null
+    const topic = String(channel?.topic || '')
+    const topicMatch = topic.match(/gmcall:(\d+)/i) || topic.match(/GM (?:Ticket|Call) #(\d+)/i)
+    if (topicMatch) {
+      gmNum = Number(topicMatch[1])
+    }
+
+    if (!gmNum && fs.existsSync(GM_CALLS_FILE)) {
+      try {
+        const data = JSON.parse(fs.readFileSync(GM_CALLS_FILE, 'utf8'))
+        const found = (data.open || []).find(c => c.ticketChannelId === channel.id || c.ticket === channel.name)
+        if (found) gmNum = Number(found.n)
+      } catch (err) {
+        console.error('[tickets] error reading gm-calls.json:', err.message)
+      }
+    }
+
+    if (!gmNum) {
+      const nameMatch = (channel?.name || '').match(/^mod-(?:gm)?0*(\d+)/i)
+      if (nameMatch) gmNum = Number(nameMatch[1])
+    }
+
+    if (gmNum) {
+      let queue = []
+      try {
+        if (fs.existsSync(GM_CLOSE_QUEUE_FILE)) {
+          const raw = fs.readFileSync(GM_CLOSE_QUEUE_FILE, 'utf8').trim()
+          if (raw) queue = JSON.parse(raw)
+        }
+      } catch {}
+      if (!Array.isArray(queue)) queue = []
+
+      queue.push({
+        n: gmNum,
+        by: closerUser?.tag || closerUser?.username || 'Discord Staff',
+        note: `Closed on Discord #${channel.name || 'mod-ticket'}`,
+        at: Date.now()
+      })
+
+      fs.writeFileSync(GM_CLOSE_QUEUE_FILE, JSON.stringify(queue, null, 2) + '\n', 'utf8')
+      console.log(`[tickets] synced GM ticket #${gmNum} closure to game queue`)
+    }
+  } catch (err) {
+    console.error('[tickets] syncCloseToGame error:', err.message)
+  }
+}
+
 // The channel is deleted only once its transcript is kept somewhere; otherwise it stays open
 async function closeTicket(interaction, { wait = 5000, transcripts = transcript } = {}) {
   const channel = interaction.channel
   if (closing.has(channel.id)) return interaction.reply({ content: 'This ticket is already closing.', ephemeral: true })
   closing.add(channel.id)
   try {
+    syncCloseToGame(channel, interaction.user)
     await interaction.reply({ content: 'Closing in 5 seconds.' })
     // GMs read the audit channel, and the reporter can press Close, so an owners-only ticket logs no closer
     audit.log(isOwnersOnly(channel) ? `TICKET closed #${channel.name} (Owners only)`
