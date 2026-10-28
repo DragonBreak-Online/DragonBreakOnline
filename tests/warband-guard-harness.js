@@ -22,10 +22,11 @@ const put = (id, k, v) => props.set(`${id >>> 0}|${k}`, v);
 let next = 0xff000100;
 const companions = new Map();
 const moves = [];
+const followOrders = [];   // follow orders given while the band defends (none may be)
 globalThis.__dboCompanions = {
   spawn: (owner, baseId, opts) => { const id = next++; companions.set(id, { id, ownerId: owner, baseId, kind: opts.kind, staying: false, targetId: 0 }); put(id, 'pos', opts.pos.slice()); put(id, 'worldOrCellDesc', WORLD); put(id, 'private.dboCompanion', 'companion'); put(id, 'ff_companionOf', owner); return id; },
   list: (owner) => [...companions.values()].filter((c) => c.ownerId === owner && !c.released).map((c) => Object.assign({}, c)),
-  follow: (id) => { const c = companions.get(id); c.staying = false; c.targetId = 0; return true; },
+  follow: (id) => { const c = companions.get(id); if (defending) followOrders.push(id); c.staying = false; c.targetId = 0; return true; },
   stay: (id) => { const c = companions.get(id); c.staying = true; c.targetId = 0; return true; },
   attack: (id, t) => { companions.get(id).targetId = t; return true; },
   dismiss: (id) => companions.delete(id),
@@ -34,6 +35,7 @@ globalThis.__dboCompanions = {
 globalThis.__dboIsDowned = (a) => a === DOWNED;
 const timers = new Map();
 const said = [], commands = {}, packets = [];
+let defending = false;
 let online = [GM, STAFF, NEAR, FAR, GMALT, DOWNED, ELSEWHERE];
 require(MODULE)({
   mp: {
@@ -65,6 +67,7 @@ check('three raised for the test', band().length === 3, band().length);
 // ---- defend: an area centred on the GM; the nearest non-staff player inside is attacked, staff and the rest are not -----
 online = [GM, STAFF, FAR, GMALT, DOWNED, ELSEWHERE];
 let r = run('defend');
+defending = true;
 check('/warband defend holds the band (stay) and answers with the area around the GM', all((c) => c.staying) && /defends this area: any player within 21 m of where you stand who is not staff is attacked, and none chases past 29 m/.test(r), r);
 check('with only staff, the GM\'s own alt, a downed player, someone far off and someone in another cell near, nobody is attacked', all((c) => !c.targetId), band().map((c) => c.targetId));
 online.push(NEAR);
@@ -92,16 +95,21 @@ put(post, 'pos', [2100, 0, 0]);  // 1500 + 500 + 100 from the centre
 moves.length = 0;
 tick();
 const leashed = companions.get(post);
-check('an NPC chased past the area\'s edge plus the leash drops its target and walks back (follow), not a teleport', !leashed.targetId && !leashed.staying && moves.length === 0, [leashed.targetId, leashed.staying, moves]);
+check('an NPC chased past the area\'s edge plus the leash drops its target and holds where it stands: no follow (Nat: "THEY DON\'T STAY DEFENDING"), no teleport', !leashed.targetId && leashed.staying && moves.length === 0, [leashed.targetId, leashed.staying, moves]);
 check('...while the others inside keep fighting', band().filter((c) => c.id !== post).every((c) => c.targetId === NEAR));
-put(post, 'pos', [1300, 0, 0]);  // it walked back inside, and the player has gone
+put(post, 'pos', [1300, 0, 0]);  // back inside, and the player has gone
 at(NEAR, 4000, 0);
 tick();
-check('...and once inside the area again, with nobody to fight, it holds there (stay)', companions.get(post).staying && !companions.get(post).targetId, [companions.get(post).staying, companions.get(post).targetId]);
+check('...and inside the area again, with nobody to fight, it holds (stay)', companions.get(post).staying && !companions.get(post).targetId, [companions.get(post).staying, companions.get(post).targetId]);
+// The owner's client asks for a follow on its own (its leash, mid-fight): the next pass holds that member again
+companions.get(post).staying = false;
+tick();
+check('a member flipped to follow by anything but the GM\'s order is held again on the next pass', companions.get(post).staying, companions.get(post).staying);
+check('...and no defending member is ever ordered to follow', followOrders.length === 0, followOrders);
 // Stuck past the leash: only after 20 s is it put back on its post
 put(post, 'pos', [2100, 0, 0]); moves.length = 0;
 tick();
-check('(past the leash again: walking back)', !companions.get(post).staying && moves.length === 0);
+check('(past the leash again: holding, not yet moved)', companions.get(post).staying && moves.length === 0);
 const realNow = Date.now; Date.now = () => realNow() + 21000;
 tick();
 Date.now = realNow;

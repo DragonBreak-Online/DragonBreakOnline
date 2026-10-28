@@ -57,7 +57,7 @@ module.exports = (api) => {
   // stance: GM actor -> 'follow' | 'stay' (companionSystem keeps no such flag it hands out); onLogout: GM profile -> choice
   if (!(S.stance instanceof Map)) S.stance = new Map();
   if (!(S.onLogout instanceof Map)) S.onLogout = new Map();
-  // guards: GM actor -> { radius, profile, centre, where, posts: npc id -> { pos, rot }, walking: npc id -> since }
+  // guards: GM actor -> { radius, profile, centre, where, posts: npc id -> { pos, rot }, outside: npc id -> since past the leash }
   if (!(S.guards instanceof Map)) S.guards = new Map();
   const comp = () => globalThis.__dboCompanions || null;
   // Vanilla PlayerFaction, as companionService.ts prepare() puts the GM's own followers in on the GM's screen
@@ -348,9 +348,8 @@ module.exports = (api) => {
   // and each NPC keeps the spot it stood on as its post. Every 2 s an NPC with no player to fight goes for the player nearest
   // the centre inside the area (guardRadius 1500 units, about 21 m): never staff, never a character of its own GM, never one
   // who is down. A target that leaves the area is dropped. An NPC further than radius + guardLeash (500) from the centre gives
-  // up its fight and walks back: it is ordered to follow the GM (the live client has no walk-to-point order, and a server move
-  // is a teleport; Nat, 28 Oct: "it rubber-bands them back"), and stays again once inside the area. Only one still past the
-  // leash after guardWalkSeconds (20) is put back on its post (a teleport). Idle NPCs inside the area are left where they are.
+  // up its fight and holds where it stands; one still past the leash after guardWalkSeconds (20) is put back on its post (a
+  // teleport). Idle NPCs inside the area are left where they are (Nat, 28 Oct: "it rubber-bands them back").
   // companionSystem's attack order still needs the target within 4096 units of the GM. follow or stay ends it.
   const guardFoes = (g) => onlineActors().filter((t) => profileOf(t) >= 0 && profileOf(t) !== g.profile && !isAdmin(t) && alive(t)
     && !(typeof globalThis.__dboIsDowned === 'function' && globalThis.__dboIsDowned(t)) && whereOf(t) === g.where
@@ -364,37 +363,45 @@ module.exports = (api) => {
     try { api.sendPacket(gm, g ? { customPacketType: 'companionPatrol', centre: g.centre, radius: g.radius, ids } : { customPacketType: 'companionPatrol', ids }); } catch (e) { log('warband: patrol packet failed', e.message); }
     if (g) g.patrolSentAt = Date.now();
   };
-  const endGuard = (gm) => { if (S.guards.delete(gm >>> 0)) sendPatrol(gm, null); };
+  const endGuard = (gm, why) => { if (S.guards.delete(gm >>> 0)) { sendPatrol(gm, null); log(`warband: defend ${who(gm)} ended (${why || 'order'})`); } };
+  // Defend holds until stay, follow or dismiss (Nat, 28 Oct: "THEY DON'T STAY DEFENDING"; the live log showed the members
+  // flipping between staying and following within 15 s and no combat). companionSystem's list does not say who stays, and the
+  // owner's client asks for a follow on its own when a fighting member strays from it (companionService leash), so every pass
+  // orders each idle member to stay again: a member already staying with no target is not changed or resent
+  // (companionSystem.orderStay). No follow order is ever given while defending. Each deliberate change is logged.
+  const hold = (gm, id, why) => { try { comp().stay(id); } catch (e) { return; } log(`warband: defend ${who(gm)} ${(id >>> 0).toString(16)} holds (${why})`); };
+  const holdQuiet = (id) => { try { comp().stay(id); } catch (e) { /* gone */ } };
   const guardPass = (gm) => {
     const g = S.guards.get(gm >>> 0);
     if (!g) return 0;
     const mine = band(gm);
-    if (!mine.length) { endGuard(gm); return 0; }
+    if (!mine.length) { endGuard(gm, 'no band left'); return 0; }
     if (Date.now() - (g.patrolSentAt || 0) >= C.patrolResendSeconds * 1000) sendPatrol(gm, g);
     const foes = guardFoes(g).sort((x, y) => dist(posOf(x), g.centre) - dist(posOf(y), g.centre));
     let n = 0;
     for (const c of mine) {
-      let post = g.posts.get(c.id >>> 0);
-      if (!post) { const p0 = posOf(c.id); if (!p0) continue; let rot = [0, 0, 0]; try { rot = mp.get(c.id, 'angle') || rot; } catch (e) { /* default */ } post = { pos: p0, rot }; g.posts.set(c.id >>> 0, post); }
+      const id = c.id >>> 0;
+      let post = g.posts.get(id);
+      if (!post) { const p0 = posOf(c.id); if (!p0) continue; let rot = [0, 0, 0]; try { rot = mp.get(c.id, 'angle') || rot; } catch (e) { /* default */ } post = { pos: p0, rot }; g.posts.set(id, post); }
       const p = posOf(c.id);
-      const leashed = !!p && whereOf(c.id) === g.where && dist(p, g.centre) > g.radius + C.guardLeash;
-      if (!leashed) {
+      const outside = !!p && whereOf(c.id) === g.where && dist(p, g.centre) > g.radius + C.guardLeash;
+      if (!outside) {
+        g.outside.delete(id);
         if (c.targetId && foes.includes(c.targetId >>> 0)) continue;
         if (foes.length) { try { if (comp().attack(c.id, foes[0])) { n++; continue; } } catch (e) { /* gone */ } }
-      }
-      // A player target gone from the area, or any fight past the leash, is dropped; an NPC it is defending against inside
-      // the leash is left to companionSystem
-      if (!leashed) {
-        if (c.targetId && profileOf(c.targetId) >= 0) { try { comp().stay(c.id); } catch (e) { /* gone */ } }
-        // Walked back inside the area: it holds there again
-        if (g.walking.has(c.id >>> 0) && p && dist(p, g.centre) <= g.radius) { g.walking.delete(c.id >>> 0); try { comp().stay(c.id); } catch (e) { /* gone */ } }
+        if (c.targetId && profileOf(c.targetId) >= 0) { hold(gm, id, 'its target left the area'); continue; }
+        if (c.targetId) continue;   // an NPC it is defending against, companionSystem's
+        holdQuiet(id);
         continue;
       }
-      const since = g.walking.get(c.id >>> 0);
-      if (!since) { g.walking.set(c.id >>> 0, Date.now()); try { comp().follow(c.id); } catch (e) { /* gone */ } continue; }
+      // Past the edge plus the leash: it gives up any fight and holds where it stands, never following the GM back
+      if (c.targetId) hold(gm, id, 'past the leash'); else holdQuiet(id);
+      const since = g.outside.get(id);
+      if (!since) { g.outside.set(id, Date.now()); continue; }
       if (Date.now() - since >= C.guardWalkSeconds * 1000) {
-        g.walking.delete(c.id >>> 0);
+        g.outside.delete(id);
         try { mp.set(c.id, 'locationalData', { cellOrWorldDesc: g.where, pos: post.pos, rot: post.rot }); comp().stay(c.id); } catch (e) { /* not movable now */ }
+        log(`warband: defend ${who(gm)} ${id.toString(16)} put back on its post (past the leash for ${C.guardWalkSeconds} s)`);
       }
     }
     return n;
@@ -409,7 +416,7 @@ module.exports = (api) => {
     S.charging.delete(a >>> 0);
     S.stance.set(a >>> 0, 'defend');
     for (const c of mine) comp().stay(c.id);
-    S.guards.set(a >>> 0, { radius: r, profile: profileOf(a), centre: centre.slice(), where: whereOf(a), posts: new Map(), walking: new Map() });
+    S.guards.set(a >>> 0, { radius: r, profile: profileOf(a), centre: centre.slice(), where: whereOf(a), posts: new Map(), outside: new Map() });
     const n = guardPass(a);
     audit(`WARBAND ${who(a)} set ${mine.length} NPC(s) to defend an area, radius ${r}`);
     return tell(a, `Your warband of ${mine.length} defends this area: any player within ${meters(r)} m of where you stand who is not staff is attacked, and none chases past ${meters(r + C.guardLeash)} m${n ? ` (${n} already engaged)` : ''}. Stay within ${meters(4096)} m of them; follow or stay ends it.`);
@@ -554,7 +561,7 @@ module.exports = (api) => {
     if (cmd === 'defend' || cmd === 'guard') return guardCmd(a, rest);
     if (cmd === 'follow' || cmd === 'stay') {
       S.charging.delete(a >>> 0);
-      endGuard(a);
+      endGuard(a, cmd);
       S.stance.set(a >>> 0, cmd);
       for (const c of mine) comp()[cmd](c.id);
       return tell(a, mine.length ? `Your warband of ${mine.length} ${cmd === 'stay' ? 'holds its ground' : 'follows you'}.` : 'You lead no warband.');
