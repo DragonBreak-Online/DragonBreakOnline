@@ -739,7 +739,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     const strikes = profileIds.reduce((n, p) => n + ((g.strikes && g.strikes.get(p)) || 0), 0)
     const x = { ...g, key, profileIds, strikes, inForce: rows.some(r => !isFold(r) && IN_FORCE.has(stateOf(r, g))) }
     const frozen = id => g.frozen(SOURCE_OF[prefixOf(id)])
-    const work = [], quiet = []
+    const work = [], quiet = [], unlinked = new Set()
     for (const r of rows) {
       if (frozen(r.id)) continue
       const st = stateOf(r, x)
@@ -755,6 +755,10 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
         else if (lift) work.push({ r, st, text: overturnedLiftText(r, lift, x) })
         else if (isFold(r) || alias) quiet.push({ id: r.id, st, base: recordOf(r), extra: alias ? { alias } : {} })
         else work.push({ r, st, isNew: true })
+      } else if (prefixOf(r.id) === 'ban' && (rec.kind !== r.kind || (r.atMs && rec.at && Math.abs(r.atMs - rec.at) > SAME_BAN_MS))) {
+        // bans.js add() replaces a ban under the same ref: a new punishment
+        work.push({ r, st, isNew: true })
+        if (r.kind !== 'discord_ban') unlinked.add(r.id)
       } else if (rec.state !== st) {
         const text = !rec.alias && RANK[st] >= RANK[rec.state] ? updateText(r.id, rec, r, st, x) : null
         if (text) work.push({ r, rec, st, text })
@@ -777,6 +781,8 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     if (!acct) acct = reg.accounts[key] = newAccount()
     acct.profileIds = [...new Set([...(acct.profileIds || []), ...profileIds])].sort((a, b) => a - b)
     for (const q of quiet) acct.rows[q.id] = { ...q.base, ...q.extra, state: q.st }
+    // A Discord ban that was the same ban as a replaced entry stands alone again, so its unban posts
+    for (const rec of Object.values(acct.rows)) if (unlinked.has(rec.alias)) delete rec.alias
     dirty = true
     // Changes on an account with no thread are only recorded; a new punishment opens one
     if (!acct.threadId && !isNew && !recreate) {

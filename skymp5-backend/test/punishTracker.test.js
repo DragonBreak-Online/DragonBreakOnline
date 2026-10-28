@@ -881,6 +881,61 @@ test('a Discord ban seen in both the journal and the ban list is posted once, an
   }
 })
 
+// bans.js add() replaces an entry for the same Discord id and keeps its ref; the bot's keepOther guard keeps a game ban
+const banOf = (at, f7) => ({ ref: 'B-DDDDDD', discordId: PEOPLE.bob.discordId, reason: f7 ? 'duping' : 'discord ban', bannedAt: iso(at), bannedBy: f7 ? 'lena (dashboard)' : 'discord' })
+const jbanOf = at => ({ v: 1, id: 'M-BAN00002', kind: 'discord_ban', at: iso(at), discordId: PEOPLE.bob.discordId, reason: 'threats', by: { name: 'Lena' }, via: 'discord' })
+const banPosts = r => r.posts().filter(c => /^\*\*(DISCORD BAN|GAME BAN LIST)/.test(c))
+
+test('an F7 ban replacing a Discord copy under the same ref is posted once, and the Discord ban\'s unban still posts', async () => {
+  const r = await started()
+  r.data.journal = [jbanOf(T0)]
+  r.data.bans = [banOf(T0 + 5000, false)]
+  await r.tick()
+  assert.equal(banPosts(r).length, 1)
+  r.now += 2 * HOUR
+  r.data.bans = [banOf(r.now, true)]
+  await r.tick()
+  await r.tick()
+  const bans = banPosts(r)
+  assert.equal(bans.length, 2, bans.join('\n'))
+  assert.match(bans[1], /^\*\*GAME BAN LIST\*\* · ban:B-DDDDDD\n[^]*Issued by: lena \(dashboard\)\n[^]*Reason: duping/)
+  assert.equal(r.registry().accounts[PEOPLE.bob.discordId].rows['ban:B-DDDDDD'].kind, 'ban')
+  r.now += HOUR
+  r.data.journal.push({ v: 1, id: 'M-UNB00002', kind: 'discord_unban', at: iso(r.now), discordId: PEOPLE.bob.discordId, reason: 'appeal', by: { name: 'Jake' }, via: 'discord' })
+  await r.tick()
+  await r.tick()
+  assert.deepEqual(r.posts().filter(c => c.startsWith('**UNBANNED**')), ['**UNBANNED** · Discord ban mod:M-BAN00002 — by Jake: appeal'])
+  assert.equal(banPosts(r).length, 2)
+})
+
+test('a Discord ban replacing an F7 ban (guard off) is posted once with the journal\'s moderator', async () => {
+  const r = await started()
+  r.data.bans = [banOf(T0, true)]
+  await r.tick()
+  r.now += 2 * HOUR
+  r.data.bans = [banOf(r.now + 2000, false)]
+  r.data.journal = [jbanOf(r.now)]
+  await r.tick()
+  await r.tick()
+  const bans = banPosts(r)
+  assert.equal(bans.length, 2, bans.join('\n'))
+  assert.match(bans[1], /^\*\*GAME BAN LIST \(Discord ban\)\*\* · ban:B-DDDDDD\n[^]*Issued by: Lena\n[^]*Reason: threats/)
+})
+
+test('a Discord ban over an F7 ban the guard kept (control) is posted once as a Discord ban', async () => {
+  const r = await started()
+  r.data.bans = [banOf(T0, true)]
+  await r.tick()
+  r.now += 2 * HOUR
+  r.data.journal = [jbanOf(r.now)]
+  await r.tick()
+  await r.tick()
+  const bans = banPosts(r)
+  assert.equal(bans.length, 2, bans.join('\n'))
+  assert.match(bans[0], /^\*\*GAME BAN LIST\*\* · ban:B-DDDDDD/)
+  assert.match(bans[1], /^\*\*DISCORD BAN\*\* · mod:M-BAN00002\n[^]*Issued by: Lena/)
+})
+
 test('a strike stops counting (EXPIRED), an overturned strike posts OVERTURNED', async () => {
   const r = await started()
   r.data.discipline = { 57: [entry(1, 'strike', T0), entry(2, 'strike', T0)] }
