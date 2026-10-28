@@ -30,6 +30,15 @@ test('ticketOf reads rep-0305 and "ticket #0141"', () => {
   assert.equal(R.ticketOf('nothing', undefined), null)
 })
 
+test('ticketOf reads Moderation Help tickets, Discord mod-1234 and in-game mod-g0056', () => {
+  assert.equal(R.ticketOf('Spawn camping (mod-1234)'), 'mod-1234')
+  assert.equal(R.ticketOf(null, 'see MOD-G56'), 'mod-g56')
+  assert.equal(R.ticketOf('mod-g0056-rowan'), 'mod-g0056')
+  assert.equal(R.ticketOf('rep-g0012'), 'rep-g0012')
+  assert.equal(R.ticketOf('model-1234 or mod-12'), null)
+  assert.equal(R.parseJournalLine({ v: 1, id: 'M-AAAAAA', kind: 'discord_ban', at: '2026-10-21T00:00:00Z', ticket: 'mod-0042', reason: 'r' }).ticket, 'mod-0042')
+})
+
 test('cursor: round trip, and anything else is refused', () => {
   const c = encodeCursor(1792540800000, 'dsc:10:7')
   assert.deepEqual(decodeCursor(c), { key: 1792540800000, id: 'dsc:10:7' })
@@ -81,6 +90,39 @@ test('discipline: lifts found, strikes counted in their window, suspensions by s
     { n: 1, kind: 'lift', reason: 'too early', by: 'B #BBBB', at: at(2), char: 'Q #QQQQ', overturned: { by: 'C #CCCC', at: at(1), reason: 'not agreed' } },
   ] } }), { now }).rows[0]
   assert.deepEqual([undone.state, undone.overturned.by, undone.overturned.reason], ['overturned', 'C #CCCC', 'not agreed'])
+})
+
+test('discipline: a ban runs with no end until lifted or overturned, and a lift finds its ban or suspension by liftsKind', () => {
+  const now = Date.parse('2026-10-28T12:00:00Z')
+  const at = d => new Date(now - d * 86400000).toISOString()
+  const { rows } = R.disciplineRows(R.parseDiscipline({ profiles: {
+    // 9: a running ban; 10: a ban lifted in game; 11: a suspension then a ban, the suspension lifted by liftsKind; 12: an overturned ban
+    9: [{ n: 1, kind: 'ban', reason: 'griefing (mod-1234)', by: 'L #LLLL', at: at(1), char: 'P #PPPP', key: 'k9' }],
+    10: [
+      { n: 1, kind: 'ban', reason: 'cheating', by: 'L #LLLL', at: at(3), char: 'Q #QQQQ', lifted: true },
+      { n: 2, kind: 'lift', reason: 'appeal won', by: 'M #MMMM', at: at(1), char: 'Q #QQQQ', lifts: 1, liftsKind: 'ban' },
+    ],
+    11: [
+      { n: 1, kind: 'suspend', reason: 'spam', by: 'G #GGGG', at: at(3), char: 'S #SSSS', until: now + 86400000, lifted: true },
+      { n: 2, kind: 'ban', reason: 'worse', by: 'L #LLLL', at: at(2), char: 'S #SSSS', lifted: true },
+      { n: 3, kind: 'lift', reason: 'ban was too much', by: 'M #MMMM', at: at(1), char: 'S #SSSS', lifts: 2, liftsKind: 'ban' },
+      { n: 4, kind: 'lift', reason: 'served enough', by: 'M #MMMM', at: at(0.5), char: 'S #SSSS', lifts: 1, liftsKind: 'suspend' },
+    ],
+    12: [{ n: 1, kind: 'ban', reason: 'mistake', by: 'L #LLLL', at: at(2), char: 'T #TTTT', overturned: { by: 'O #OOOO', at: at(1), reason: 'wrong player' } }],
+  } }), { now, held: new Map([['k9', 1]]) })
+  const by = Object.fromEntries(rows.map(r => [r.id, r]))
+  const ban = by['dsc:9:1']
+  assert.deepEqual([ban.kind, ban.state, ban.active, ban.endsAtMs, ban.untilMs, ban.ticket, ban.alsoHolds, ban.told], ['ban', 'running', true, null, null, 'mod-1234', 1, null])
+  assert.deepEqual([by['dsc:10:1'].state, by['dsc:10:1'].active, by['dsc:10:1'].lifted.by, by['dsc:10:2'].lifts], ['lifted', false, 'M #MMMM', 1])
+  assert.deepEqual([by['dsc:11:2'].state, by['dsc:11:2'].lifted.reason, by['dsc:11:3'].lifts], ['lifted', 'ban was too much', 2])
+  assert.deepEqual([by['dsc:11:1'].state, by['dsc:11:1'].lifted.reason, by['dsc:11:4'].lifts], ['lifted', 'served enough', 1])
+  assert.deepEqual([by['dsc:12:1'].state, by['dsc:12:1'].active], ['overturned', false])
+  // An in-game lift saved before liftsKind (no lifts number either) ended the latest suspension or ban marked lifted
+  const old = R.disciplineRows(R.parseDiscipline({ profiles: { 13: [
+    { n: 1, kind: 'ban', reason: 'x', by: 'L #LLLL', at: at(2), char: 'U #UUUU', lifted: true },
+    { n: 2, kind: 'lift', reason: 'undo', by: 'M #MMMM', at: at(1), char: 'U #UUUU' },
+  ] } }), { now }).rows
+  assert.deepEqual([old[0].state, old[0].lifted.by, old[1].lifts], ['lifted', 'M #MMMM', 1])
 })
 
 test('parsers keep no address, hwid or Concordat "by", and bans.json is parsed without sources/bans.js', () => {

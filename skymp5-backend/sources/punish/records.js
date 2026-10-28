@@ -9,7 +9,9 @@ const DAY_MS = 86400000
 const HOUR_MS = 3600000
 const KINDS = ['warn', 'strike', 'suspend', 'lift', 'overturn', 'tempban', 'ban', 'ipban', 'unban', 'discord_ban', 'discord_unban',
   'discord_timeout', 'discord_timeout_end', 'kick', 'jail', 'restitution']
-const DISCIPLINE_KINDS = new Set(['warn', 'strike', 'suspend', 'lift', 'overturn'])
+const DISCIPLINE_KINDS = new Set(['warn', 'strike', 'suspend', 'ban', 'lift', 'overturn'])
+// A suspension or a ban holds the account out; a ban has no end
+const HOLD_KINDS = new Set(['suspend', 'ban'])
 // ban and unban: the game ban list's, from the dashboard's actions, so a lifted ban keeps its history
 const JOURNAL_KINDS = new Set(['discord_timeout', 'discord_timeout_end', 'discord_ban', 'discord_unban', 'ban', 'unban'])
 const KICK_KINDS = new Set(['command', 'panel', 'suspension', 'discord_ban', 'ban_enforce'])
@@ -18,6 +20,10 @@ const ENFORCING_KICKS = new Set(['suspension', 'discord_ban', 'ban_enforce'])
 const TAG_RE = /^[A-Z0-9?]{4}$/
 const DISCORD_ID_RE = /^\d{15,22}$/
 const BAN_REF_RE = /^B-[0-9A-HJKMNP-TV-Z]{6}$/
+// A ticket channel's name: rep-0305 or mod-1234 from Discord, mod-g0056 from the game
+const TICKET_NAME = '(?:rep|mod)-(?:g\\d{1,5}|\\d{3,5})'
+const TICKET_NAME_RE = new RegExp(`\\b(${TICKET_NAME})\\b`, 'i')
+const TICKET_FIELD_RE = new RegExp(`^(?:${TICKET_NAME}|#\\d{3,5})$`, 'i')
 
 const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v)
 const posInt = v => (Number.isSafeInteger(v) && v > 0 ? v : null)
@@ -35,12 +41,12 @@ function nameTag(value) {
   return { name: /^profile \d+$/.test(s) ? null : s, tag: null }
 }
 
-// The ticket a record names: rep-0305 in a config key or reason, or "ticket #0141"
+// The ticket a record names: rep-0305, mod-1234 or mod-g0056 in a config key or reason, or "ticket #0141"
 function ticketOf(...texts) {
   for (const t of texts) {
     const s = String(t ?? '')
-    const rep = /\b(rep-\d{3,5})\b/i.exec(s)
-    if (rep) return rep[1].toLowerCase()
+    const name = TICKET_NAME_RE.exec(s)
+    if (name) return name[1].toLowerCase()
     const num = /\bticket #?(\d{3,5})\b/i.exec(s)
     if (num) return `#${num[1]}`
   }
@@ -97,7 +103,7 @@ function parseDiscipline(data) {
       out.push({
         p, n: e.n, kind: e.kind, reason: scrub(e.reason), by: scrub(e.by, 80), atMs: isoMs(e.at), char: nameTag(e.char),
         seen: e.seen === true, untilMs: epoch(e.until), fromMs: epoch(e.from), lifted: e.lifted === true, overturned: o,
-        undid: posInt(e.undid), lifts: posInt(e.lifts), key: scrub(e.key, 60),
+        undid: posInt(e.undid), lifts: posInt(e.lifts), liftsKind: HOLD_KINDS.has(e.liftsKind) ? e.liftsKind : null, key: scrub(e.key, 60),
       })
     }
   }
@@ -122,12 +128,13 @@ function disciplineRows(entries, { now, strikeDays = 90, held = new Map() }) {
   const strikes = new Map()
   for (const [p, list] of byProfile) {
     list.sort((a, b) => a.n - b.n)
-    // A config lift names its suspension; an in-game lift ended the one running then, the latest marked lifted before it
+    // A lift names its suspension or ban (liftsKind); an older one ended the hold running then, the latest marked lifted before it
     const liftOf = new Map()
     const ofLift = new Map()
     for (const l of list.filter(e => e.kind === 'lift')) {
-      let s = l.lifts ? list.find(e => e.n === l.lifts && e.kind === 'suspend') : null
-      if (!s) s = list.filter(e => e.kind === 'suspend' && e.lifted && e.n < l.n && !liftOf.has(e.n)).pop() || null
+      const holds = e => (HOLD_KINDS.has(l.liftsKind) ? e.kind === l.liftsKind : HOLD_KINDS.has(e.kind))
+      let s = l.lifts ? list.find(e => e.n === l.lifts && holds(e)) : null
+      if (!s) s = list.filter(e => holds(e) && e.lifted && e.n < l.n && !liftOf.has(e.n)).pop() || null
       if (s && !liftOf.has(s.n)) { liftOf.set(s.n, l); ofLift.set(l.n, s.n) }
     }
     let counting = 0
@@ -135,10 +142,10 @@ function disciplineRows(entries, { now, strikeDays = 90, held = new Map() }) {
       const r = row({
         id: `dsc:${p}:${e.n}`, kind: e.kind, source: 'discipline', target: { profileId: p, name: e.char.name, tag: e.char.tag, discordName: null },
         by: e.by, atMs: e.atMs, reason: e.reason, ref: `#${e.n}`, ticket: ticketOf(e.key, e.reason), outside: e.key || null,
-        told: e.kind === 'suspend' ? null : e.seen,
+        told: HOLD_KINDS.has(e.kind) ? null : e.seen,
         overturned: e.overturned ? { ...e.overturned } : null,
       })
-      if (e.kind === 'suspend') {
+      if (HOLD_KINDS.has(e.kind)) {
         const l = liftOf.get(e.n)
         Object.assign(r, {
           untilMs: e.untilMs, fromMs: e.fromMs, endsAtMs: e.untilMs, hours: hoursBetween(e.fromMs || e.atMs, e.untilMs),
@@ -146,7 +153,7 @@ function disciplineRows(entries, { now, strikeDays = 90, held = new Map() }) {
           alsoHolds: e.key && held.has(e.key) ? held.get(e.key) : null,
         })
         r.state = e.overturned ? 'overturned' : e.lifted ? 'lifted' : e.fromMs && e.fromMs > now ? 'scheduled'
-          : e.untilMs && e.untilMs > now ? 'running' : 'ended'
+          : e.kind === 'ban' || e.untilMs && e.untilMs > now ? 'running' : 'ended'
         r.active = r.state === 'running' || r.state === 'scheduled'
       } else if (e.kind === 'strike') {
         const within = !e.overturned && e.atMs !== null && now - e.atMs < strikeDays * DAY_MS
@@ -298,7 +305,7 @@ function parseJournalLine(o) {
     id, kind: o.kind, atMs, _discordId: discordIdOf(o.discordId), profileId: posInt(o.profileId), tag: tags[0] || null,
     name: scrub(o.name, 48), discordName: scrub(o.discordName, 40), untilMs: isoMs(o.until), reason: scrub(o.reason),
     by: scrub(by.name, 48) || scrub(by.discordName, 40) || (posInt(by.profileId) ? `profile ${by.profileId}` : null),
-    ticket: /^(?:rep-\d{3,5}|#\d{3,5})$/i.test(String(o.ticket ?? '')) ? String(o.ticket).toLowerCase() : ticketOf(o.reason),
+    ticket: TICKET_FIELD_RE.test(String(o.ticket ?? '')) ? String(o.ticket).toLowerCase() : ticketOf(o.reason),
     banRef: BAN_REF_RE.test(String(o.ref ?? '')) ? o.ref : null,
   }
 }
