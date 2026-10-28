@@ -54,6 +54,8 @@ const stubs = {
   staffCan: (a) => (a >>> 0) === STAFF, staffTargetOf: (by, q) => TARGETS[q] || 0,
   creationPending: () => false, GATE_CREATION_LINE: 'unfinished', findByName: () => 0, audit: (t) => audits.push(t), who: () => 'Bear Bait #4ZRT',
   registerChatCommand: (n, fn) => { if (n === 'unstuck') stubs.unstuck = fn; },
+  // typed in game (tests/console-harness.js runs the remote console's)
+  remoteLine: null, remoteBy: () => '',
 };
 
 // gamemode.js: the temples, the zone code, /unstuck and the death temple, as one cut; and the chopping block's move
@@ -62,7 +64,7 @@ const ex = /toTemple: (\(a\) => \{ const t = templeFor\(.*?return true; \}) \}\)
 ok(i0 > 0 && i1 > i0 && !!ex, 'the temple, zone, /unstuck and chopping block code is in gamemode.js');
 if (!(i0 > 0 && i1 > i0 && ex)) process.exit(1);
 const names = ['cfg', 'mp', 'recordOf', 'ZONES', 'fs', 'path', 'every', 'onlineActors', 'log', 'display', 'profileOf', 'userOf', 'personal', 'staffCan',
-  'creationPending', 'GATE_CREATION_LINE', 'findByName', 'audit', 'who', 'registerChatCommand', 'staffTargetOf'];
+  'creationPending', 'GATE_CREATION_LINE', 'findByName', 'audit', 'who', 'registerChatCommand', 'staffTargetOf', 'remoteLine', 'remoteBy'];
 const G = new Function(...names, `${src.slice(i0, i1)}\nconst chopToTemple = ${ex[1]};\nreturn { templeFor, zoneOfActor, setDeathTemple, chopToTemple, combatAt };`)(...names.map((k) => stubs[k]));
 
 // realm.js and guards.js, loaded after gamemode.js's own code as on the server

@@ -15,7 +15,7 @@ const src = fs.readFileSync(process.env.GAMEMODE_JS || path.resolve(__dirname, '
 let failures = 0;
 const check = (name, ok, got) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${got !== undefined && !ok ? '   ' + JSON.stringify(got) : ''}`); if (!ok) failures++; };
 
-const u0 = src.indexOf('const unstuckActor = (a, by) => {'), u1 = src.indexOf('\nconst setDeathTemple', u0);
+const u0 = src.indexOf("const unstuckActor = (a, by, refs = '') => {"), u1 = src.indexOf('\nconst setDeathTemple', u0);
 check('/unstuck is in gamemode.js', u0 > 0 && u1 > u0);
 if (!(u0 > 0 && u1 > u0)) process.exit(1);
 const cmd = src.slice(u0, u1);
@@ -49,6 +49,8 @@ const sandbox = {
   // staff /unstuck <name> resolves through staffTargetOf (the console harness runs the real one); online characters here
   staffTargetOf: (by, q) => { const t = /stranger/i.test(q) ? NEW : 0; if (!t) told.push([by >>> 0, 'No such player.']); return t; },
   userOf: () => 1,
+  // typed in game (tests/console-harness.js runs the remote console's)
+  remoteLine: null, remoteBy: () => '',
   display: (a) => `#${(a >>> 0).toString(16)}`,
   personal: (a, t) => told.push([a >>> 0, t]),
   zoneOfActor: () => null, // the Realm has no zone

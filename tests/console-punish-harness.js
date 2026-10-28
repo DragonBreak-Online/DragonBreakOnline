@@ -442,7 +442,7 @@ reset();
   check('E7. the repo config keeps discipline.maxSuspendDays 30', (REPO_CFG.discipline || {}).maxSuspendDays === 30);
   logs.length = 0; loadConsole(CFG());
   // eleven, and /ban, /tempban, /unban from 25 Oct
-  check('E7. the reader counts fourteen commands', logs.some((l) => /console: reader on .*, 14 commands, floor leadgm, game pin 4$/.test(l)), logs);
+  check('E7. the reader counts nineteen commands (/unstuck and the staff item and spell commands since 28 Oct)', logs.some((l) => /console: reader on .*, 19 commands, floor leadgm, game pin 4$/.test(l)), logs);
 }
 
 // ---- E8. review (21 Oct): a suspended account cannot act from the console; a reason of blank letters is no reason -------------

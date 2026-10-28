@@ -50,6 +50,8 @@ const ID_RE = /^(w-[0-9a-f-]{36}|d-\d{17,20})$/;
 const SNOWFLAKE = /^\d{17,20}$/;
 const USER_RE = /^[a-z0-9_.]{2,32}$/;
 const TAG_RE = /^#[A-Za-z0-9]{4}$/;
+// One plain word for /fixloc and /unstuck (itemSpells): a name, a #TAG, hub|respawn, ticket:<id>; never a mention or markup
+const PLAIN_WORD = /^[A-Za-z0-9'#:\/.-]{1,40}$/;
 // gamemode.js NAME_RE: the rename handler's own rule for a new name
 const NAME_RE = /^[A-Za-z][A-Za-z' -]{1,30}$/;
 // The backend's cleaning set (serverControl.js UNSAFE_RE): C0, DEL, soft hyphen, zero-width and bidi controls, the line and
@@ -109,7 +111,10 @@ const ALLOW = Object.freeze({
   vlremote: { usage: '/vlremote [on|off|clear #TAG]', rule: 'switch' },
   kick: { usage: '/kick #TAG', rule: 'tag', noArg: 'needTag', rank: true,
     help: 'Kicks one online character, named by #TAG. It takes no reason, and they can log straight back in.' },
-  fixloc: { usage: '/fixloc <#TAG|name>', rule: 'itemSpells', offline: false, help: '<#TAG|name>: reset a stuck character to the DragonBreak Hub' },
+  // /fixloc and /unstuck may name an offline character, by #TAG only (Jake, 28 Oct: "Yes, allow it"; Neem #LBRF crashed at
+  // every login): a #TAG needs one live carrier, online or not, as typed in game; an online character may be named, an offline
+  // one only by #TAG (gamemode.js staffTargetOf); the handler's UNSTUCK line names the console. Each word a plain one (SEC-2)
+  fixloc: { usage: '/fixloc <#TAG|name>', rule: 'itemSpells', offline: true, words: PLAIN_WORD, help: '<#TAG|name>: reset a stuck character to the DragonBreak Hub' },
   rename: { usage: '/rename #TAG <new name>', rule: 'tagName', offline: true },
   chars: { usage: '/chars #TAG', rule: 'tag', noArg: 'needTag', offline: true },
   chargen: { usage: '/chargen #TAG', rule: 'tag', noArg: 'self', noBeast: true },
@@ -133,7 +138,8 @@ const ALLOW = Object.freeze({
     help: 'Suspends the account for a time, as /discipline #TAG suspend in game: logged out and refused at login until it ends.' },
   unban: { usage: '/unban #TAG <reason>', rule: 'tagKindReason', alias: 'discipline', kind: 'lift', kinds: Object.freeze(['lift']), offline: true, rank: true,
     help: 'Ends a ban or a suspension early, as /discipline #TAG lift in game. Lead GM and above, and of a rank at least that of who gave it.' },
-  unstuck: { usage: '/unstuck <#TAG|name> [hub|respawn] [ticket:<id>]', rule: 'itemSpells', offline: false,
+  // The Dragon Baron's Unstuck form as it sends it, '/unstuck <#TAG|name> <hub|respawn> [ticket:<id>]' (offline as /fixloc above)
+  unstuck: { usage: '/unstuck <#TAG|name> [hub|respawn] [ticket:<id>]', rule: 'itemSpells', offline: true, words: PLAIN_WORD,
     help: '<#TAG|name> [hub|respawn] [ticket:<id>]: unstuck player to hub or local respawn' },
   giveitem: { usage: '/giveitem <#TAG|name> <item name or hex id> [count] [ticket:<id>]', rule: 'itemSpells', offline: true,
     help: '<#TAG|name> <item> [count] [ticket:<id>]: deliver an item to player (direct if online, gifts inbox if offline)' },
@@ -189,7 +195,8 @@ const TEXT = {
   noChar: () => 'The console acts as your own character. Make one in game first.',
   suspended: () => 'Your account is suspended, so the console cannot act as you: a suspended account cannot act in game either.',
   tier: (floor) => `The console is for ${floor || 'Lead GM'} and above in game.`,
-  punishOnly: () => 'A Lead GM can run only /discipline, /ban, /tempban, /unban and /kick from the console. Run anything else in game.',
+  // Written from PUNISH_ONLY, so it names what a Lead GM may run (28 Oct: the staff item, spell and unstuck commands joined it)
+  punishOnly: () => `A Lead GM can run only ${PUNISH_ONLY.map((c) => `/${c}`).slice(0, -1).join(', ')} and /${PUNISH_ONLY[PUNISH_ONLY.length - 1]} from the console. Run anything else in game.`,
   rolesChanged: () => 'Your Discord roles changed since you last logged in (or your character has not been stamped with them yet). Log in once.',
   notPinned: () => "This Discord account is not on the game's console list.",
   tooMany: () => 'Too many console commands. Wait a minute.',
@@ -313,8 +320,11 @@ const checkLine = (text, has, deny, opts) => {
     }
     case 'load': return !words.length || (words.length === 1 && words[0].toLowerCase() === 'reset') ? { cmd, body } : { cmd, why: 'badArgs' };
     case 'none': return words.length ? { cmd, why: 'badArgs' } : { cmd, body };
+    // A #TAG or a name first, then words the handler reads; a #TAG is checked as every target is, a name by the handler.
+    // words: a command's own pattern for each word (SEC-2)
     case 'itemSpells': {
       if (words.length < 1) return { cmd, why: 'badArgs' };
+      if (rule.words && !words.every((w) => rule.words.test(w))) return { cmd, why: 'badArgs' };
       return TAG_RE.test(words[0]) ? { cmd, body, tag: words[0] } : { cmd, body };
     }
     // #TAG <kind> [<length>|<n>] <reason>: one target by tag, never a name; a fixed kind word; the kind's own word; a reason
@@ -654,7 +664,7 @@ module.exports = (api) => {
       // The player log (playerlog.js) names a command's route from __dboPlogRoute before it guesses from the capture
       const out = captureFor(a, !online, () => {
         const route = globalThis.__dboPlogRoute; globalThis.__dboPlogRoute = 'console';
-        try { return handleLine(a, r.text, userOf(a), { remote: { src: r.src, id8: id8(r.id) }, dry }); } finally { globalThis.__dboPlogRoute = route; }
+        try { return handleLine(a, r.text, userOf(a), { remote: { src: r.src, id8: id8(r.id), user: r.user }, dry }); } finally { globalThis.__dboPlogRoute = route; }
       });
       gate = String(out.result || 'ran'); lines = out.lines;
     } catch (e) { log('console: command failed', e.stack || e.message); gate = 'failed'; }

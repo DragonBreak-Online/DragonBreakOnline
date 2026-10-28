@@ -1343,6 +1343,8 @@ const offlineByTag = (q) => {
 // as /rename: an online character only if it carries the tag, else its one live offline carrier. A query without one may
 // name an offline character too (findAnyByName)
 const staffTargetOf = (by, q) => {
+  // One #TAG at most: the console checks the first a line names and this binds the last, so two would part them (C, 28 Oct)
+  if ((q.match(/(?:^|\s)#[A-Za-z0-9]{4}(?=\s|$)/g) || []).length > 1) { personal(by, `Cannot move ${q}: name one character, with one #TAG.`); return 0; }
   const tagIn = (q.match(/#([A-Za-z0-9]{4})$/) || [])[1];
   if (tagIn) {
     let t = findByName(q); if (t && tagOf(t).toLowerCase() !== tagIn.toLowerCase()) t = 0;
@@ -1353,6 +1355,8 @@ const staffTargetOf = (by, q) => {
   const t = findAnyByName(q);
   if (t < 0) { personal(by, `Cannot move ${q}: ${-t} characters are called that; add their #TAG.`); return 0; }
   if (!t) personal(by, 'No such player.');
+  // From the remote console an offline character is named by #TAG only (Jake, 28 Oct); a name that finds one asks for it
+  if (t > 0 && remoteLine && userOf(t) < 0) { personal(by, `${display(t)} is offline. From the console, name an offline character by its #TAG.`); return 0; }
   return t;
 };
 // A staff rename, for /rename and the F7 panel's Rename (fork adminSystem.ts calls __dboAdminRename): { ok, text }
@@ -1737,8 +1741,11 @@ registerChatCommand('pigeonblock', (a, args) => {
 // ---- incoming chat -------------------------------------------------------------------------
 const quoteSay = (name, verb, body, color) => `#{${color}}${name} ${verb}: "${body}"`;
 const handleChat = (userId, text) => { const a = actorOf(userId); if (!a) return; handleLine(a, text, userId); };
+// The remote console request the running command came from (handleLine), else null; a staff move's audit line names it
+let remoteLine = null;
+const remoteBy = () => (remoteLine ? ` from the remote console (${remoteLine.src}, ${remoteLine.user || 'unknown'}, req ${remoteLine.id8})` : '');
 // The one command gate, for typed chat (handleChat above, the U panel's menuRun, warband's runChat) and for the remote staff
-// console (console.js, Jake 13 Oct), which passes the admin's own character as `a` and opts { remote: { src, id8 }, dry }.
+// console (console.js, Jake 13 Oct), which passes the admin's own character as `a` and opts { remote: { src, id8, user }, dry }.
 // It returns how the line ended: 'unknown' | 'refused' | 'failed' | 'ran' | 'dry' (typed chat ignores it). A remote line
 // stays inside the command registry (never speech, an emote, /pm, /system, /admin or the bare-/ panel), always writes a
 // #staff-commands line tagged [remote <src> <id>], and a dry one stops after the gate, before the staff line and the command.
@@ -1813,7 +1820,8 @@ const handleLine = (a, text, userId, opts) => {
   if (dry) return 'dry';
   if (staffCmd && (isAdmin(a) || trial)) staffLog(display(a), staffTierOf(a), `/${cmd}`, `${staffWho(a)} (${TIER_LABEL[staffTierOf(a)] || 'staff'}): /${cmd} ${body.slice(0, 300)}${remoteTag}`);
   const staffRefEnd = staffRef ? staffGuard().enter(a, staffRef) : null;
-  try { c.fn(a, body, userId); } catch (e) { log('command', cmd, 'failed', e); personal(a, 'That command failed.'); return 'failed'; } finally { if (staffRefEnd) staffRefEnd(); }
+  const outerRemote = remoteLine; remoteLine = remote;
+  try { c.fn(a, body, userId); } catch (e) { log('command', cmd, 'failed', e); personal(a, 'That command failed.'); return 'failed'; } finally { remoteLine = outerRemote; if (staffRefEnd) staffRefEnd(); }
   return 'ran';
 };
 
@@ -3886,20 +3894,26 @@ registerChatCommand('wipechars', (a, args) => {
   audit(`GM ${who(a)} wiped ${n} character(s) of profile ${pid}: ${names.join(', ')}`);
   personal(a, `Wiped ${n} of ${ids.length} character(s) of profile ${pid}: ${names.join(', ')}.`);
 }, { admin: true, help: '<profile id|name|#TAG> destroy every character of that account' });
-registerChatCommand('fixloc', (a, args) => {
-  // An offline character too: one whose game crashes where it logs in is moved before it comes back (Jake, 28 Oct)
-  const q = args.trim();
-  const t = q ? staffTargetOf(a, q) : a; if (!t) return;
+// The hub move of /fixloc and of staff /unstuck <player> hub; an offline character arrives there at its next login. refs: the
+// call or ticket the line carried, for the audit line. /unstuck tells an online character, as its temple move does
+const hubActor = (t, by, via, refs = '') => {
   const online = userOf(t) >= 0, state = online ? 'online' : 'offline';
   let from = '?', pos = '?';
   try { from = String(mp.get(t, 'worldOrCellDesc') || '?'); const p = mp.get(t, 'pos'); if (Array.isArray(p)) pos = p.map((v) => Math.round(v)).join(','); } catch (e) { /* where is unknown */ }
   try {
-    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('travel', t, 'fixloc', a); } catch (e) { /* the player log is optional */ }
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('travel', t, 'fixloc', by); } catch (e) { /* the player log is optional */ }
     mp.set(t, 'locationalData', { cellOrWorldDesc: '17482:DragonBreak Hub.esp', pos: [2122.2, 2079.6, 3], rot: [0, 0, 22.9] });
-    audit(`UNSTUCK ${who(t)} from ${from} at ${pos} to the hub (${state}) by staff ${who(a)} via /fixloc`);
-    personal(a, online ? `Moved ${display(t)} to the hub; server now says ${JSON.stringify(mp.get(t, 'worldOrCellDesc'))}.`
+    audit(`UNSTUCK ${who(t)} from ${from} at ${pos} to the hub (${state}) by staff ${who(by)} via ${via}${refs}${remoteBy()}`);
+    if (online && via === '/unstuck' && t !== by) personal(t, `${display(by)} brings you to the DragonBreak Hub.`);
+    personal(by, online ? `Moved ${display(t)} to the hub; server now says ${JSON.stringify(mp.get(t, 'worldOrCellDesc'))}.`
       : `Moved ${display(t)} (offline, was in ${from}) to the hub; they arrive there at their next login. Server now says ${JSON.stringify(mp.get(t, 'worldOrCellDesc'))}.`);
-  } catch (e) { personal(a, 'Failed: ' + e.message); }
+  } catch (e) { personal(by, 'Failed: ' + e.message); }
+};
+registerChatCommand('fixloc', (a, args) => {
+  // An offline character too: one whose game crashes where it logs in is moved before it comes back (Jake, 28 Oct)
+  const q = args.trim();
+  const t = q ? staffTargetOf(a, q) : a; if (!t) return;
+  hubActor(t, a, '/fixloc');
 }, { admin: true, help: '[player|#TAG] reset a stuck character to the hub, offline ones too' });
 // One line per online player on every reload, so it stays behind the debug flag
 if ((cfg.debug || {}).logPlayerLocations) {
@@ -5980,7 +5994,7 @@ const inLoginGrace = (a) => {
 };
 // Staff (admins, and Trial GMs since 12 Oct: TRIAL_CAN unstuck) skip the cooldown, the jail and the PvP wait, and may name
 // a player to send back: by is who typed it, a is who moves
-const unstuckActor = (a, by) => {
+const unstuckActor = (a, by, refs = '') => {
   const admin = staffCan(by, 'unstuck');
   // Staff may move an offline character (Jake, 28 Oct): its temple comes from where it was saved, and only staff are told
   const online = userOf(a) >= 0;
@@ -6017,15 +6031,32 @@ const unstuckActor = (a, by) => {
   if (by !== a) personal(by, online ? `${display(a)} is back at the ${zone} respawn${why}.`
     : `${display(a)} (offline, was in ${from}) will wake at the ${zone} respawn at their next login${why}.`);
   const off = online ? '' : ', offline';
-  audit(`UNSTUCK ${who(a)} from ${from} to the ${zone} respawn${by !== a ? ` by staff ${who(by)}${off}` : ''}`);
+  audit(`UNSTUCK ${who(a)} from ${from} to the ${zone} respawn${by !== a ? ` by staff ${who(by)}${off}` : ''}${refs}${remoteBy()}`);
 };
+// Staff /unstuck <player|#TAG> [hub|respawn] [ticket:<id>|call:<n>], the Dragon Baron's Unstuck form as it sends it (Jake, 28 Oct):
+// hub is /fixloc's move, respawn (the default typed in game) the temple rule; the call or ticket goes into the audit line
+const UNSTUCK_DEST = Object.freeze({ hub: 'hub', respawn: 'respawn', temple: 'respawn' });
+const UNSTUCK_REF = /^(ticket|call):#?([A-Za-z0-9_./-]{1,40})$/i;
 registerChatCommand('unstuck', (a, args) => {
   const name = String(args || '').trim();
+  // From the remote console the line always names a #TAG (console.js); it never moves the caller's own character instead
+  if (remoteLine && (!name || !staffCan(a, 'unstuck'))) return personal(a, 'Only staff may /unstuck another character.');
   if (!name || !staffCan(a, 'unstuck')) return unstuckActor(a, a);
-  // Staff may name an offline character too, by name or #TAG (Jake, 28 Oct): it goes to the temple its saved spot resolves to
-  const t = staffTargetOf(a, name); if (!t) return;
-  return unstuckActor(t, a);
-}, { help: `move to the respawn point of your area (every ${UNSTUCK.cooldownMinutes} min, not in combat); staff: [player|#TAG], offline ones too` });
+  // The player, then where to (a first word is always the player's), then the call or ticket; other words after the place
+  // (the form's ticket box holding "No ticket") are left out and said so
+  const words = name.split(/\s+/);
+  const at = words.findIndex((w, i) => i > 0 && Object.prototype.hasOwnProperty.call(UNSTUCK_DEST, w.toLowerCase()));
+  const head = at < 0 ? words : words.slice(0, at), tail = at < 0 ? [] : words.slice(at + 1);
+  const refs = [...head, ...tail].map((w) => UNSTUCK_REF.exec(w)).filter(Boolean).map((m) => `${m[1].toLowerCase()}:${m[2]}`);
+  const left = tail.filter((w) => !UNSTUCK_REF.test(w));
+  const q = head.filter((w) => !UNSTUCK_REF.test(w)).join(' ');
+  if (!q) return personal(a, 'Usage: /unstuck <player|#TAG> [hub|respawn] [ticket:<id>]');
+  // Staff may name an offline character too, by name or #TAG (Jake, 28 Oct); from the console by #TAG only (staffTargetOf)
+  const t = staffTargetOf(a, q); if (!t) return;
+  const why = refs.length ? ` (${refs.join(' ')})` : '';
+  if (at >= 0 && UNSTUCK_DEST[words[at].toLowerCase()] === 'hub') hubActor(t, a, '/unstuck', why); else unstuckActor(t, a, why);
+  if (left.length) personal(a, `Left out, not a ticket:<id> or call:<n>: ${left.join(' ').slice(0, 60)}`);
+}, { help: `move to the respawn point of your area (every ${UNSTUCK.cooldownMinutes} min, not in combat); staff: <player|#TAG> [hub|respawn] [ticket:<id>], offline ones too` });
 const setDeathTemple = (a) => {
   try { if (!(Number(mp.get(a, 'profileId')) >= 0)) return; } catch (e) { return; }
   const zone = templeZoneOf(a);
