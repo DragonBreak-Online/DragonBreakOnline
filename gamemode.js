@@ -9278,7 +9278,8 @@ every('announce', 5000, () => {
   const at = Number(a && a.at) || 0; const text = String(a && a.text || '').trim();
   if (!text || at <= announceSeen.at || Date.now() - at > 600000) { announceSeen.at = Math.max(announceSeen.at, at); return; }
   announceSeen.at = at;
-  for (const o of onlineActors()) { system(o, text); personal(o, text); }
+  // one line a player: the client reads only the last chat line of a tick, so a second would hide the [[S]] overlay
+  for (const o of onlineActors()) system(o, text);
   log(`announcement to ${onlineActors().length} player(s): ${text}`);
 });
 // The 7-day staff command counts (also posted to #staff-commands daily): Lead GM and above
@@ -9289,7 +9290,8 @@ registerChatCommand('staffstats', (a, args) => {
 }, { admin: true, help: '[name] staff command counts for the last 7 days (Lead GM and above)' });
 registerChatCommand('announce', (a, args) => {
   const text = String(args || '').trim(); if (!text) return personal(a, 'Usage: /announce <text>');
-  for (const o of onlineActors()) { system(o, text); personal(o, text); }
+  // one line a player: the client reads only the last chat line of a tick, so a second would hide the [[S]] overlay
+  for (const o of onlineActors()) system(o, text);
   audit(`ANNOUNCE ${who(a)}: ${text}`);
 }, { admin: true, help: '<text> tell every online player, on screen and in chat' });
 

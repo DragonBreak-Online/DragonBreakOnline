@@ -66,7 +66,8 @@ module.exports = (api) => {
     const host = C.showHost ? realNameOf(a) : '';
     const line = `Event: ${text}${host ? ` (hosted by ${host})` : ''}`;
     const all = onlineActors();
-    for (const o of all) { system(o, line); personal(o, line); }
+    // one line a player: the client reads only the last chat line of a tick, so a second would hide the [[S]] overlay
+    for (const o of all) system(o, line);
     post(text, host);
     audit(`EVENT ${who(a)}${isStaff(a) ? '' : ' (event host role)'} to ${all.length} online${discordOn() ? ' and Discord' : ''}: ${text}`);
     log(`events: ${who(a)} announced to ${all.length} player(s)`);

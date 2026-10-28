@@ -62,7 +62,8 @@ check('a player without staff or the host role is refused, and nobody is told an
 run(A.trial, 'A tournament at Bruma Castle, at dusk');
 const line = 'Event: A tournament at Bruma Castle, at dusk (hosted by Trina)';
 const online = [...store].filter(([, o]) => o.online).map(([id]) => id);
-check('a Trial GM announces: every online player gets it on screen and in chat', online.every((o) => said.some((x) => x.a === o && x.kind === 'screen' && x.t === line) && said.some((x) => x.a === o && x.kind === 'chat' && x.t === line)), said);
+// One [[S]] line a player is both the on-screen overlay and the chat line: the client reads only the last line of a tick
+check('a Trial GM announces: every online player gets it on screen (and so in chat) as one line, nothing after it', online.every((o) => said.filter((x) => x.a === o && x.t === line).length === 1 && said.some((x) => x.a === o && x.kind === 'screen' && x.t === line)), said);
 check('...an offline character is not written to', !said.some((x) => x.a === A.bobAlt));
 check('...with one audit line naming the host', audits.length === 1 && /^EVENT Trina \(profile 2\) to 5 online: A tournament at Bruma Castle, at dusk$/.test(audits[0]), audits);
 check('...and no Discord post while discord is off', posts.length === 0);
@@ -86,7 +87,7 @@ run(A.gm, 'x'.repeat(301));
 check('too long is refused', /At most 300/.test(toMe(A.gm).pop()) && !audits.length);
 reset();
 run(A.gm, 'Duel  at\nthe [[S]]gate #{ff0000}now\u2028please');
-const sent = said.find((x) => x.a === A.bob && x.kind === 'chat');
+const sent = said.find((x) => x.a === A.bob && x.kind === 'screen');
 check('control characters, line breaks, chat markup and colour codes are broken up', sent && !/[\n\u2028]/.test(sent.t) && !sent.t.includes('[[S]]') && !sent.t.includes('#{') && /Duel at the/.test(sent.t), sent);
 check('...and the audit line is one line', audits.length === 1 && !/\n/.test(audits[0]));
 
@@ -153,6 +154,8 @@ setImmediate(() => {
   // ---- gamemode.js wiring and the config block -----------------------------------------------------------------------------
   const src = fs.readFileSync(path.join(ROOT, 'gamemode.js'), 'utf8');
   const loader = src.slice(src.indexOf("const STAFFTOOLS_JS = path.resolve('stafftools.js');") - 10, src.indexOf("stafftools.js failed to load:") + 60);
+  const announce = src.slice(src.indexOf("const ANNOUNCE_PATH = path.resolve('announce.json');"), src.indexOf("registerChatCommand('announce'") + 400);
+  check('/announce and announce.json send each player one [[S]] line and no personal() after it (the on-screen overlay)', /system\(o, text\)/.test(announce) && !/personal\(o, text\)/.test(announce), announce.slice(0, 120));
   check('gamemode.js loads stafftools.js by path.resolve with the cache cleared, in a try/catch', /delete require\.cache\[STAFFTOOLS_JS\]/.test(loader) && /catch \(e\) \{ log\('stafftools\.js failed to load:'/.test(loader));
   check('...after gmcall.js, before console.js (which publishes /chars on the allowlist)', src.indexOf("path.resolve('gmcall.js')") < src.indexOf("path.resolve('stafftools.js')") && src.indexOf("path.resolve('stafftools.js')") < src.indexOf("path.resolve('console.js')"));
   check('...passing the token the gm-call mirror uses, never printing it', /token: \(cfg\.discord \|\| \{\}\)\.botToken \|\| \(serverSettings\.discordAuth \|\| \{\}\)\.botToken/.test(loader) && !/log\([^)]*token/.test(fs.readFileSync(MOD, 'utf8')));
