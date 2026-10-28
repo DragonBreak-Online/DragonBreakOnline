@@ -252,6 +252,7 @@ check('an old contract whose notice is gone is closed with word of it', out.pers
 {
   clear();
   inv(CHEST, 1000);
+  delete globalThis.__dboContractIds; // as a fresh process has it
   load(NOFLOOR);
   const realNow = Date.now; const realRandom = Math.random; const at = realNow();
   Date.now = () => at; Math.random = () => 0.5;
@@ -263,6 +264,24 @@ check('an old contract whose notice is gone is closed with word of it', out.pers
     run(COUNT, 'post bear 3 75');
     const ids2 = stored().contracts.map((c) => c.id);
     check('...and a notice after a reload, in the same millisecond, gets a fifth', ids2.length === 5 && new Set(ids2).size === 5, JSON.stringify(ids2));
+    // a restart: the count starts again from nothing, the clock has moved on
+    delete globalThis.__dboContractIds; Date.now = () => at + 1;
+    load(NOFLOOR);
+    run(COUNT, 'post wolf 5 60');
+    const ids3 = stored().contracts.map((c) => c.id);
+    check('...and one after a restart gets a sixth', ids3.length === 6 && new Set(ids3).size === 6, JSON.stringify(ids3));
+    // a restart onto a millisecond already used (the clock came back): the id still on the board is skipped
+    delete globalThis.__dboContractIds; Date.now = () => at;
+    load(NOFLOOR);
+    run(COUNT, 'post bear 4 100');
+    const ids4 = stored().contracts.map((c) => c.id);
+    check('...and one after a restart onto a used millisecond gets a seventh', ids4.length === 7 && new Set(ids4).size === 7, JSON.stringify(ids4));
+    // the board emptied, then a restart a moment later: no id comes back, even one no notice holds now (logs and audit lines name ids)
+    clear(); delete globalThis.__dboContractIds; Date.now = () => at + 2;
+    load(NOFLOOR);
+    run(COUNT, 'post wolf 2 24');
+    const ids5 = stored().contracts.map((c) => c.id);
+    check('...and after the board empties and a restart, an id never comes back', ids5.length === 1 && !ids4.includes(ids5[0]), JSON.stringify(ids5));
   } finally { Date.now = realNow; Math.random = realRandom; }
 }
 
