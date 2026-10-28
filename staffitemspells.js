@@ -45,7 +45,11 @@ module.exports = (api) => {
     if (!q) return null;
     const directId = idOf(q);
     if (directId) {
-      let name = q;
+      // The record's name, else the tome list's for that spell, else the id: never the typed query, which reaches the audit
+      // line and the player log ('12fcd any words:Skyrim.esm' resolves; C's review, 28 Oct)
+      const d = descOf(directId).toLowerCase();
+      const tome = d ? tomesList.find((t) => String(t.spellId || '').toLowerCase() === d) : null;
+      let name = tome && tome.spellName ? String(tome.spellName) : `0x${directId.toString(16)}`;
       try {
         const spRecord = mp.lookupEspmRecordById(directId);
         if (spRecord && spRecord.record && spRecord.record.name) name = String(spRecord.record.name);
@@ -81,7 +85,10 @@ module.exports = (api) => {
     if (!q) return null;
     const directId = idOf(q);
     if (directId) {
-      let name = q;
+      // The record's name, else the catalogue's for that id, else the id: never the typed query (as resolveSpell)
+      const d = descOf(directId).toLowerCase();
+      const row = d ? itemsCatalog.find((it) => String(it[0]).toLowerCase() === d) : null;
+      let name = row ? String(row[1]) : `0x${directId.toString(16)}`;
       try {
         const rec = mp.lookupEspmRecordById(directId);
         if (rec && rec.record && rec.record.name) name = String(rec.record.name);

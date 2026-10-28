@@ -840,6 +840,23 @@ reset();
   check('7f. ...and the console refuses it itself (tagShared)', m === '' && /More than one character carries #LLX8/.test(h), [m, h]);
   store.delete(ghost);
   check('7f. with Ghost gone, "/fixloc #LLX8" moves Lydia', (() => { where(); reset(); G.commands.get('fixloc').fn(A.jake, '#LLX8'); return moved(); })() === 'Lydia #LLX8@hub', moved());
+  // C's review: a place word typed before the #TAG is refused unless it is part of the carrier's own name; a tag glued to a word
+  // counts as a second tag
+  const neema = actor(0xff000f06, { name: 'Neema', tag: 'NMA1', profile: 98, online: true });
+  ids.push(neema);
+  [m, h] = remote('/unstuck Neem hub #LBRF');
+  check('7f. "/unstuck Neem hub #LBRF" with Neema online moves nobody (not Neema, nor Neem to a temple) and says to put the place after the #TAG',
+    m === '' && h === 'Cannot move Neem hub #LBRF: put the place after the #TAG, as /unstuck #LBRF hub.', [m, h]);
+  check('7f. ...typed in game the same', typed('Neem hub #LBRF') === '' && /put the place after the #TAG/.test(told()), told());
+  [m, h] = remote('/unstuck Ralof Temple #RT01 hub');
+  check('7f. ...while "Temple" in the carrier\'s own name ("Ralof Temple #RT01 hub") is no place word', m === 'Ralof Temple #RT01@hub', [m, h]);
+  for (const t of ['/fixloc #LBRF x#NMA1', '/unstuck #LBRF x#NMA1 hub', '/fixloc Neema#NMA1 #LBRF', '/fixloc #LBRF ticket:#ANN1']) {
+    [m, h] = remote(t);
+    check(`7f. "${t}" (a second tag glued to a word) moves nobody and says to name one`, m === '' && /name one character, with one #TAG/.test(h), [m, h]);
+  }
+  [m, h] = remote('/fixloc Neema#NMA1');
+  check('7f. ...while one glued tag alone still binds it ("Neema#NMA1")', m === 'Neema #NMA1@hub', [m, h]);
+  store.delete(neema); ids.pop();
   // RC-8: '_' in a ticket passes the console; a bad word is named, made harmless
   let rep;
   [m, h, rep] = remote('/unstuck #LBRF hub ticket:gm_4');

@@ -560,8 +560,9 @@ AUDIT_VERBS.CITIZEN.cut = (text, raw) => {
 // "Cut ticket text"); the staff audit channels keep the line whole. Who, the count, the item or spell (a record name, or the
 // id typed) and whom stay, the target in their post. Any other end, or a lost one, keeps the head only; a line of these
 // shapes the cut cannot read keeps nothing. Other STAFF lines are not cut
-const ITEMSPELL_OPEN = /^STAFF (?!ENCHANT ).{1,200}? (?:gave \d{1,9}x |queued gift \d{1,9}x |took \d{1,9}x |granted spell |removed spell )/;
-const ITEMSPELL_HEAD = new RegExp(`^(STAFF ${WHO_RX} (?:gave \\d{1,9}x .{1,120}? \\(0x[0-9a-f]{1,8}\\) to|queued gift \\d{1,9}x .{1,120}? for offline|took \\d{1,9}x .{1,120}? from|granted spell .{1,120}? \\(0x[0-9a-f]{1,8}\\) to|removed spell .{1,120}? \\(0x[0-9a-f]{1,8}\\) from) ${WHO_RX})(?= \\(|$)`);
+// (any count form: '12345678901x', '1e+23x', 'Infinityx' are read as one, so a big count does not skip the cut)
+const ITEMSPELL_OPEN = /^STAFF (?!ENCHANT ).{1,200}? (?:gave \S{1,40}x |queued gift \S{1,40}x |took \S{1,40}x |granted spell |removed spell )/;
+const ITEMSPELL_HEAD = new RegExp(`^(STAFF ${WHO_RX} (?:gave \\S{1,40}?x .{1,120}? \\(0x[0-9a-f]{1,8}\\) to|queued gift \\S{1,40}?x .{1,120}? for offline|took \\S{1,40}?x .{1,120}? from|granted spell .{1,120}? \\(0x[0-9a-f]{1,8}\\) to|removed spell .{1,120}? \\(0x[0-9a-f]{1,8}\\) from) ${WHO_RX})(?= \\(|$)`);
 const ITEMSPELL_REF = /^ \((?:ticket|call):[\s\S]*\)$/i;
 const ENCHANT_HEAD = new RegExp(`^(STAFF ENCHANT ${WHO_RX} enchanted (?:their own|${WHO_RX}'s)) `);
 const ENCHANT_END = /: ([A-Za-z0-9 ]{1,80} \[[0-9a-f]{1,8} [A-Za-z0-9_]{1,100}\](?: [A-Za-z0-9 .,-]{0,300})?)$/;

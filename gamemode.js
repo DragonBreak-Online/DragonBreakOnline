@@ -1343,8 +1343,9 @@ const offlineByTag = (q) => {
 // as /rename: the one live character that carries it, online or not. A query without one may name an offline character too
 // (findAnyByName)
 const staffTargetOf = (by, q) => {
-  // One #TAG at most: the console checks the first a line names and this binds the last, so two would part them (C, 28 Oct)
-  if ((q.match(/(?:^|\s)#[A-Za-z0-9]{4}(?=\s|$)/g) || []).length > 1) { personal(by, `Cannot move ${q}: name one character, with one #TAG.`); return 0; }
+  // One #TAG at most: the console checks the first a line names and this binds the last, so two would part them (C, 28 Oct);
+  // a tag glued to a word ('x#NMA1', 'ticket:#8KWH') counts too
+  if ((q.match(/#[A-Za-z0-9]{4}(?![A-Za-z0-9])/g) || []).length > 1) { personal(by, `Cannot move ${q}: name one character, with one #TAG.`); return 0; }
   const tagIn = (q.match(/#([A-Za-z0-9]{4})$/) || [])[1];
   if (tagIn) {
     // Every live carrier, online (tagOf) or in the engine's index, as console.js liveByTag counts them: a tag one online and
@@ -6066,7 +6067,7 @@ registerChatCommand('unstuck', (a, args) => {
   const refs = typed.map((w) => UNSTUCK_REF.exec(w)).filter(Boolean).map((m) => `${m[1].toLowerCase()}:${m[2]}`);
   const words = typed.filter((w) => !UNSTUCK_REF.test(w));
   if (!words.length) return personal(a, usage);
-  if (words.filter(isTag).length > 1) return personal(a, `Cannot move ${words.join(' ')}: name one character, with one #TAG.`);
+  if ((words.join(' ').match(/#[A-Za-z0-9]{4}(?![A-Za-z0-9])/g) || []).length > 1) return personal(a, `Cannot move ${words.join(' ')}: name one character, with one #TAG.`);
   const tagAt = words.findIndex(isTag);
   let head = words, rest = [];
   if (tagAt >= 0) { head = words.slice(0, tagAt + 1); rest = words.slice(tagAt + 1); }
@@ -6080,6 +6081,14 @@ registerChatCommand('unstuck', (a, args) => {
   if (dest && !isDest(dest)) return personal(a, `Unknown place ${dest.slice(0, 24)}: hub or respawn.`);
   // Staff may name an offline character too, by name or #TAG (Jake, 28 Oct); from the console by #TAG only (staffTargetOf)
   const t = staffTargetOf(a, head.join(' ')); if (!t) return;
+  // A place word typed before the #TAG ('Neem hub #LBRF') is not read as the place: unless it is part of the carrier's own
+  // name ('Ash Temple #TMPL'), the line is refused, so nobody is sent where staff did not mean (C's review, 28 Oct)
+  if (tagAt > 0) {
+    let own = [];
+    try { own = String((mp.get(t, 'appearance') || {}).name || '').toLowerCase().split(/\s+/); } catch (e) { own = []; }
+    const early = head.slice(0, -1).find((w) => isDest(w) && !own.includes(w.toLowerCase()));
+    if (early) return personal(a, `Cannot move ${head.join(' ')}: put the place after the #TAG, as /unstuck ${head[head.length - 1]} ${early.toLowerCase()}.`);
+  }
   const why = refs.length ? ` (${refs.join(' ')})` : '';
   if (dest && UNSTUCK_DEST[dest.toLowerCase()] === 'hub') hubActor(t, a, '/unstuck', why); else unstuckActor(t, a, why);
   const left = rest.slice(1);

@@ -457,6 +457,12 @@ got = actOf(`STAFF ${ROWAN} took 1x Iron Sword from ${SELENE} (ticket:<@1>${CANA
 ok(got === 'took 1x Iron Sword from Selene #K2QX (a ticket)', '...a mention and a URL in the ticket go with it', got);
 got = actOf(`STAFF ${ROWAN} granted spell Flames (0x12fcd) to ${SELENE} (ticket:${CANARY} Dar #U6T6 (profile 4, <@44>))`, 'STAFF', 1);
 ok(got === 'granted spell Flames (0x12fcd) to Selene #K2QX (a ticket)', '...another character named in it goes too, and is no party', got);
+got = actOf(`STAFF ${ROWAN} gave 12345678901x Iron Sword (0x12eb7) to ${SELENE} (ticket:${CANARY})`, 'STAFF', 1);
+ok(got === 'gave 12345678901x Iron Sword (0x12eb7) to Selene #K2QX (a ticket)', '...a count of eleven digits is read as one, so its ticket is cut too', got);
+got = actOf(`STAFF ${ROWAN} queued gift 1e+23x Iron Sword for offline ${SELENE} (ticket:${CANARY})`, 'STAFF', 1);
+ok(got === 'queued gift 1e+23x Iron Sword for offline Selene #K2QX (a ticket)', '...and so are 1e+23x', got);
+got = actOf(`STAFF ${ROWAN} took Infinityx Iron Sword from ${SELENE} (ticket:${CANARY})`, 'STAFF', 1);
+ok(got === 'took Infinityx Iron Sword from Selene #K2QX (a ticket)', '...and Infinityx', got);
 got = actOf(`STAFF ${ROWAN} removed spell Flames (0x12fcd) from ${SELENE}`, 'STAFF', 1);
 ok(got === 'removed spell Flames (0x12fcd) from Selene #K2QX', '...a line without a ticket is kept whole', got);
 got = actOf(`STAFF ${ROWAN} queued gift 3x Iron Sword for offline ${SELENE} (ticket:${CANARY}) ${CANARY} Dar #U6T6 (profile 4, <@44>)`, 'STAFF', 1);
@@ -476,9 +482,10 @@ ok(got === ': Discord roles now give developer (was gm); logged out so it takes 
   const WHO = { [RW]: ROWAN, [SE]: SELENE }, lines = [], told = [], cmds = {};
   let selOnline = true;
   const inv = { entries: [{ baseId: 0x12eb7, count: 5 }] };
-  const REC = { [0x12eb7]: 'Iron Sword', [0x12fcd]: 'Flames' };
-  const smp = { get: (a, k) => (k === 'inventory' ? inv : undefined), set: () => {}, getDescFromId: (id) => (id >>> 0).toString(16), getIdFromDesc: () => 0,
-    lookupEspmRecordById: (id) => (REC[id >>> 0] ? { record: { name: REC[id >>> 0] } } : null), callPapyrusFunction: () => null };
+  // As the engine is: a record has no name for the gamemode, and a desc is read by its leading hex ('12eb7 any words:Skyrim.esm'
+  // resolves), so the typed query must never be the name (C's review, 28 Oct)
+  const smp = { get: (a, k) => (k === 'inventory' ? inv : undefined), set: () => {}, getDescFromId: (id) => `${(id >>> 0).toString(16)}:Skyrim.esm`,
+    getIdFromDesc: (x) => (parseInt(String(x).split(':')[0], 16) >>> 0) || 0, lookupEspmRecordById: (id) => ({ record: { type: 'WEAP' } }), callPapyrusFunction: () => null };
   const scratch = fs.mkdtempSync(path.join(fs.existsSync('/dev/shm') ? '/dev/shm' : require('os').tmpdir(), 'plog-itemspells-'));
   const cwd = process.cwd();
   try {
@@ -494,10 +501,13 @@ ok(got === ': Discord roles now give developer (was gm); logged out so it takes 
     cmds.takeitem(RW, `#K2QX 0x12eb7 1 ticket:https://evil.example/${CANARY}`);
     cmds.givespell(RW, `#K2QX 0x12fcd call:Dar#U6T6${CANARY}`);
     cmds.removespell(RW, `#K2QX 0x12fcd ticket:${CANARY} call:${CANARY}`);
+    cmds.giveitem(RW, `#K2QX 12eb7 ${CANARY} words:Skyrim.esm 1 ticket:x`);
   } finally { process.chdir(cwd); fs.rmSync(scratch, { recursive: true, force: true }); }
-  const want = ['gave 2x Iron Sword (0x12eb7) to Selene #K2QX (a ticket)', 'queued gift 3x Iron Sword for offline Selene #K2QX (a ticket)',
-    'took 1x Iron Sword from Selene #K2QX (a ticket)', 'granted spell Flames (0x12fcd) to Selene #K2QX (a ticket)', 'removed spell Flames (0x12fcd) from Selene #K2QX (a ticket)'];
-  ok(lines.length === 5 && lines.every((l) => l.includes(CANARY) && l.includes(SELENE)), 'staffitemspells.js: each of its five lines names the target with who() and keeps the ticket whole (the staff audit channels see it)', lines);
+  const want = ['gave 2x 0x12eb7 (0x12eb7) to Selene #K2QX (a ticket)', 'queued gift 3x 0x12eb7 for offline Selene #K2QX (a ticket)',
+    'took 1x 0x12eb7 from Selene #K2QX (a ticket)', 'granted spell 0x12fcd (0x12fcd) to Selene #K2QX (a ticket)', 'removed spell 0x12fcd (0x12fcd) from Selene #K2QX (a ticket)',
+    'gave 1x 0x12eb7 (0x12eb7) to Selene #K2QX (a ticket)'];
+  ok(lines.length === 6 && lines.slice(0, 5).every((l) => l.includes(CANARY) && l.includes(SELENE)), 'staffitemspells.js: each of its five lines names the target with who() and keeps the ticket whole (the staff audit channels see it)', lines);
+  ok(lines.length === 6 && !lines[5].includes(CANARY) && /gave 1x 0x12eb7 \(0x12eb7\)/.test(lines[5]), '...an item named by a desc with words in it ("12eb7 <words>:Skyrim.esm") is named by its id, never the typed words', lines[5]);
   const gotAll = lines.map((l) => actOf(l, 'STAFF', 1));
   ok(JSON.stringify(gotAll) === JSON.stringify(want), '...the player log has each in the staff member\'s and the target\'s posts, the ticket as "a ticket" (the offline gift too)', gotAll);
   ok(told.some(([a]) => a === SE) && !told.some(([a, t]) => a === SE && (t.includes(CANARY) || /ticket|call:/i.test(t))), '...and the player is told what happened, never the ticket', told.filter(([a]) => a === SE));
