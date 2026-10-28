@@ -11,6 +11,7 @@ import { buttonKeyCode } from "./mouseKeys";
 import { isMenuKeyPressBlocked, readMenuKeyCode } from "./widgetMenuUtil";
 import { getViewFromStorage, isRemoteHostedByMe, isRemotePlayerCharacter, localIdToRemoteId, remoteIdToLocalId } from "../../view/worldViewMisc";
 import { leavesPlayerFight, orderedTarget } from "./companionPvp";
+import { Patrol, parsePatrol, patrolDue, patrolPoint } from "./companionPatrol";
 import { COMPANION_IDS_KEY, isOwnCompanion, isAnyCompanion } from "../../sync/ownCompanions";
 import { applyMovement, settleTranslation } from "../../sync/movementApply";
 import { ObjectReferenceEx } from "../../extensions/objectReferenceEx";
@@ -35,6 +36,8 @@ const whereOf = (ref: ObjectReference | null): string => {
 const TWIN_SOULS_PERK = 0xd5f1c;
 // Vanilla summoning flash (SummonTargetFXActivator), played where a companion appears and where it vanishes
 const SUMMON_FX = 0x07cd55;
+// Vanilla XMarker (STAT, Skyrim.esm 00003B): the reference a patrolling member walks to (pathToReference needs one)
+const XMARKER = 0x00003b;
 // Vanilla DialogueFollower: its Follower and Animal aliases carry the engine's follow-the-player packages, so a companion
 // forced into one walks the navmesh, uses doors and fights like a hired follower. Papyrus events are blocked on the client,
 // so the quest's scripts stay inert; one slot per companion, which covers the summon limit of two.
@@ -98,6 +101,9 @@ interface LocalState {
   glancing: boolean;
   // The ordered fight's progress window (companionFightStall.ts)
   stall: FightStall | null;
+  // Defending an area (companionPatrol.ts): when this member last set out for a point, and how many it has walked to
+  patrolAt?: number;
+  patrolN?: number;
 }
 
 export class CompanionService extends ClientListener {
@@ -139,6 +145,8 @@ export class CompanionService extends ClientListener {
 
   private onConnectionAccepted(): void {
     this.setCompanions([]);
+    this.patrol = null;
+    this.clearPatrolMarkers();
     this.sentTwinSouls = false;
     this.lastPerkCheckMs = 0;
   }
@@ -152,6 +160,11 @@ export class CompanionService extends ClientListener {
         const player = this.sp.Game.getPlayer();
         if (player) this.summonFx(player, pos);
       }
+      return;
+    }
+    if (content["customPacketType"] === "companionPatrol") {
+      this.patrol = parsePatrol(content);
+      if (!this.patrol) this.clearPatrolMarkers();
       return;
     }
     if (content["customPacketType"] !== "companionState") {
@@ -335,6 +348,7 @@ export class CompanionService extends ClientListener {
         this.follow(actor, player, state);
       } else if (c.staying) {
         this.stay(actor, state, player);
+        try { this.patrolStep(actor, c, state, now, player); } catch (e) { state.followResult = "patrol failed"; }
       } else if (state.driven) {
         // applyMovement throws on a cell mismatch; a throw here would break every companion this tick
         try { this.drive(actor, player, state); } catch (e) { state.followResult = "drive failed"; }
@@ -809,6 +823,45 @@ export class CompanionService extends ClientListener {
     storage[COMPANION_HUD_KEY] = rows;
   }
 
+  // Defending an area: a staying member with nothing to fight walks to a new point in it every so often. pathToReference
+  // walks to a reference, so each member has its own XMarker, placed once and moved to each new point before the walk
+  private patrolStep(actor: Actor, c: CompanionEntry, state: LocalState, now: number, player: Actor): void {
+    const p = this.patrol;
+    if (!p || c.target || actor.isInCombat() || !p.ids.includes(c.id >>> 0)) return;
+    if (!patrolDue(state.patrolAt || 0, now, c.id)) return;
+    state.patrolAt = now;
+    const n = (state.patrolN || 0) + 1;
+    state.patrolN = n;
+    const marker = this.patrolMarker(c.id, player);
+    if (!marker) return;
+    const point = patrolPoint(p, c.id, n);
+    const actorId = actor.getFormID(), markerId = marker.getFormID();
+    marker.setPosition(point[0], point[1], point[2]).then(() => {
+      const a = Actor.from(this.sp.Game.getFormEx(actorId)), m = ObjectReference.from(this.sp.Game.getFormEx(markerId));
+      if (a && m && !a.isInCombat()) a.pathToReference(m, 0.5).catch(() => { /* interrupted */ });
+    }).catch(() => { /* marker gone */ });
+    state.followResult = "patrolling";
+  }
+
+  private patrolMarker(id: number, player: Actor): ObjectReference | null {
+    const known = this.patrolMarkers.get(id);
+    const ref = known ? ObjectReference.from(this.sp.Game.getFormEx(known)) : null;
+    if (ref) return ref;
+    try {
+      const base = this.sp.Game.getFormFromFile(XMARKER, "Skyrim.esm");
+      const placed = base ? player.placeAtMe(base, 1, false, false) : null;
+      if (placed) this.patrolMarkers.set(id, placed.getFormID());
+      return placed;
+    } catch { return null; }
+  }
+
+  private clearPatrolMarkers(): void {
+    for (const id of Array.from(this.patrolMarkers.values())) {
+      try { ObjectReference.from(this.sp.Game.getFormEx(id))?.delete(); } catch { /* already gone */ }
+    }
+    this.patrolMarkers.clear();
+  }
+
   private summonFx(ref: ObjectReference, at?: number[]): void {
     try {
       const fx = this.sp.Game.getFormFromFile(SUMMON_FX, "Skyrim.esm");
@@ -904,6 +957,9 @@ export class CompanionService extends ClientListener {
   private pendingFx: number[][] = [];
   private lastPos = new Map<number, number[]>();
   private fxRefs: Array<[number, number]> = [];
+  // The area a defending band walks about in (companionPatrol.ts), and each member's walk marker: remote id -> marker form id
+  private patrol: Patrol | null = null;
+  private patrolMarkers = new Map<number, number>();
   private lastAssistMs = 0;
   private questStartAsked = false;
   private pendingAliasClear: string[] = [];
