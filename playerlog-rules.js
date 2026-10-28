@@ -2065,6 +2065,7 @@ warband.js WARBAND bf500dff parsed
 warband.js WARBAND 7ac16355 parsed
 warband.js WARBAND d2d7dc43 parsed
 warband.js WARBAND 57c1a667 parsed
+warband.js WARBAND 9059feb3 parsed
 warband.js WARBAND b9719d78 parsed
 warband.js WARBAND bdfa1348 parsed
 warband.js WARBAND de03d398 parsed

@@ -391,7 +391,7 @@ module.exports = (api) => {
     for (const c of mine) comp().stay(c.id);
     S.guards.set(a >>> 0, { radius: r, profile: profileOf(a), centre: centre.slice(), where: whereOf(a), posts: new Map() });
     const n = guardPass(a);
-    audit(`WARBAND ${who(a)} set ${mine.length} NPC(s) to defend ${meters(r)} m around ${centre.map(Math.round).join(',')} in ${whereOf(a)}`);
+    audit(`WARBAND ${who(a)} set ${mine.length} NPC(s) to defend an area, radius ${r}`);
     return tell(a, `Your warband of ${mine.length} defends this area: any player within ${meters(r)} m of where you stand who is not staff is attacked, and none chases past ${meters(r + C.guardLeash)} m${n ? ` (${n} already engaged)` : ''}. Stay within ${meters(4096)} m of them; follow or stay ends it.`);
   };
 
