@@ -634,8 +634,9 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
   // A Discord ban seen in a second store (the journal's row once the ban list's merged copy is gone) is the same ban
   function aliasOf(acct, r) {
     if (!acct || r.kind !== 'discord_ban' || !r.atMs) return null
+    // One to one: a row that is already an alias, or already has one, is another ban
     const hit = Object.entries(acct.rows).find(([id, rec]) => id !== r.id && rec.kind === 'discord_ban' && prefixOf(id) !== prefixOf(r.id)
-      && rec.at && Math.abs(rec.at - r.atMs) <= SAME_BAN_MS)
+      && rec.at && Math.abs(rec.at - r.atMs) <= SAME_BAN_MS && !rec.alias && !Object.values(acct.rows).some(o => o.alias === id))
     return hit ? hit[0] : null
   }
 

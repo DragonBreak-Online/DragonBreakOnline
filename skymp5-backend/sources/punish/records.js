@@ -388,11 +388,15 @@ function oneRowPerBan(rows) {
   const others = rows.filter(r => r.source !== 'playerLog' && ['tempban', 'ban', 'discord_ban', 'discord_unban'].includes(r.kind))
   if (!others.length) return rows
   const drop = new Set()
+  // A journal Discord ban already followed by its unban is not the ban list's (newer) re-ban
+  const unbannedBefore = (x, b) => others.some(u => u.source === 'journal' && u.kind === 'discord_unban' && u._discordId === x._discordId && u.atMs > x.atMs && u.atMs <= b.atMs)
   for (const b of others) {
     if (b.source !== 'bans' || !b._discordId) continue
     // A dashboard ban's journal row is the same ban by its ref; a Discord ban's is the one near it in time
-    const same = x => (b.kind === 'ban' ? !!b.ref && x.ref === b.ref : near(x, b))
-    const j = others.find(x => x.source === 'journal' && x.kind === b.kind && x.state !== 'lifted' && x._discordId === b._discordId && same(x) && !drop.has(x))
+    const same = x => (b.kind === 'ban' ? !!b.ref && x.ref === b.ref : near(x, b) && !unbannedBefore(x, b))
+    const gap = x => Math.abs(x.atMs - b.atMs) || 0
+    const j = others.filter(x => x.source === 'journal' && x.kind === b.kind && x.state !== 'lifted' && x._discordId === b._discordId && same(x) && !drop.has(x))
+      .reduce((best, x) => (!best || gap(x) < gap(best) ? x : best), null)
     if (j) { b.by = j.by || b.by; b.reason = j.reason || b.reason; b.ticket = b.ticket || j.ticket; b.via = b.via || j.via; drop.add(j) }
   }
   for (const r of rows) {

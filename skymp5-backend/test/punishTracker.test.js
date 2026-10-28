@@ -881,6 +881,26 @@ test('a Discord ban seen in both the journal and the ban list is posted once, an
   }
 })
 
+test('a Discord ban, unban, re-ban and unban within 10 minutes posts each ban and each unban once', async () => {
+  const ban = (ref, at) => ({ ref, discordId: PEOPLE.bob.discordId, reason: 'discord ban', bannedAt: iso(at), bannedBy: 'discord' })
+  const jrow = (id, kind, at, reason, name) => ({ v: 1, id, kind, at: iso(at), discordId: PEOPLE.bob.discordId, reason, by: { name }, via: 'discord' })
+  const r = await started()
+  const step = async f => { r.now += 2 * 60000; f(); await r.tick(); await r.tick() }
+  await step(() => { r.data.journal = [jrow('M-BAN00011', 'discord_ban', r.now, 'threats', 'Lena')]; r.data.bans = [ban('B-EEEEE1', r.now + 2000)] })
+  await step(() => { r.data.bans = []; r.data.journal.push(jrow('M-UNB00011', 'discord_unban', r.now, 'wrong reason', 'Lena')) })
+  await step(() => { r.data.journal.push(jrow('M-BAN00012', 'discord_ban', r.now, 'threats in #general', 'Lena')); r.data.bans = [ban('B-EEEEE2', r.now + 2000)] })
+  await step(() => { r.data.bans = []; r.data.journal.push(jrow('M-UNB00012', 'discord_unban', r.now, 'appeal', 'Jake')) })
+  const posts = r.posts()
+  const bans = posts.filter(c => /^\*\*(DISCORD BAN|GAME BAN LIST)/.test(c))
+  assert.equal(bans.length, 2, posts.join('\n'))
+  assert.match(bans[0], /Reason: threats\n/)
+  assert.match(bans[1], /Reason: threats in #general\n/)
+  const unbans = posts.filter(c => c.startsWith('**UNBANNED**'))
+  assert.equal(unbans.length, 2, posts.join('\n'))
+  assert.match(unbans[0], /by Lena: wrong reason$/)
+  assert.match(unbans[1], /by Jake: appeal$/)
+})
+
 // bans.js add() replaces an entry for the same Discord id and keeps its ref; the bot's keepOther guard keeps a game ban
 const banOf = (at, f7) => ({ ref: 'B-DDDDDD', discordId: PEOPLE.bob.discordId, reason: f7 ? 'duping' : 'discord ban', bannedAt: iso(at), bannedBy: f7 ? 'lena (dashboard)' : 'discord' })
 const jbanOf = at => ({ v: 1, id: 'M-BAN00002', kind: 'discord_ban', at: iso(at), discordId: PEOPLE.bob.discordId, reason: 'threats', by: { name: 'Lena' }, via: 'discord' })
