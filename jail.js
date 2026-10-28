@@ -524,11 +524,15 @@ module.exports = (api) => {
   };
 
   // Staff /unstuck refuses a prisoner, online or offline, from the sentence as saved: a staff move would strand it (Jake, 28 Oct:
-  // "Yes, refuse prisoners"). { cell } while time is still owed, else null; a served or released sentence is gone (finish)
-  globalThis.__dboJailSentence = (a) => {
+  // "Yes, refuse prisoners"). { cell, release, concordat } while time is still owed, else null; a served or released sentence
+  // is gone (finish). release: whether `by` gets Release at the door, by the menu's own rule (lawfulAt, and the Concordat's)
+  globalThis.__dboJailSentence = (a, by) => {
     if (!CFG.enabled) return null;
     const s = sentenceOf(a);
-    return s && leftOf(s) > 0 ? { cell: jailName(s.cell) } : null;
+    if (!s || leftOf(s) <= 0) return null;
+    let release = false;
+    try { release = by !== undefined && lawfulAt(Number(by) >>> 0, Number(s.door) >>> 0) && !concordatHeld(Number(by) >>> 0, s); } catch (e) { release = false; }
+    return { cell: jailName(s.cell), release, concordat: !!s.concordat };
   };
 
   // ---- commands ---------------------------------------------------------------------------------------

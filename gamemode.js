@@ -6135,8 +6135,15 @@ registerChatCommand('unstuck', (a, args) => {
   // A prisoner stays where they serve, whatever the place: a staff move would strand the sentence (Jake, 28 Oct: "Yes, refuse
   // prisoners"). jail.js reads it from the saved sentence, so an offline one too; /fixloc is unchanged
   let held = null;
-  try { held = typeof globalThis.__dboJailSentence === 'function' ? globalThis.__dboJailSentence(t) : null; } catch (e) { held = null; }
-  if (held) return personal(a, `Cannot move ${display(t)}: they are serving a sentence in ${held.cell}; release them first at their cell door (activate it, then Release).`);
+  try { held = typeof globalThis.__dboJailSentence === 'function' ? globalThis.__dboJailSentence(t, a) : null; } catch (e) { held = null; }
+  // Only who gets Release at the door is told to use it: a GM or Trial GM gets the lock and the lockpick there, and a picked
+  // door leaves the sentence standing (C's review, 28 Oct)
+  if (held) {
+    const how = held.release ? 'release them first at their cell door (activate it, then Release).'
+      : held.concordat ? 'the White-Gold Concordat holds them, so only the Thalmor or a Lead GM can release them, at their cell door.'
+        : 'a Lead GM, or that hold\'s guards and officials, can release them at their cell door.';
+    return personal(a, `Cannot move ${display(t)}: they are serving a sentence in ${held.cell}; ${how}`);
+  }
   const why = refs.length ? ` (${refs.join(' ')})` : '';
   const toHub = !!dest && UNSTUCK_DEST[dest.toLowerCase()] === 'hub';
   // Nor to the hub while they are down: the wake would undo it, back where they fell or to the temple (C's review, 28 Oct);

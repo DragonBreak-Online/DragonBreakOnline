@@ -146,7 +146,9 @@ check('no /unstuck in a jail', /in a jail/.test(globalThis.__dboJailUnstuck(OTHE
 at(OTHER, PLAIN_CELL, [0, 0, 0]);
 check('/unstuck is fine elsewhere', globalThis.__dboJailUnstuck(OTHER) === null);
 // staff /unstuck refuses a prisoner (gamemode.js; Jake, 28 Oct: "Yes, refuse prisoners"): the jail names the cell
-check('a prisoner serving: __dboJailSentence names the jail', JSON.stringify(globalThis.__dboJailSentence(PRISONER)) === '{"cell":"Bruma Castle Dungeon"}', globalThis.__dboJailSentence(PRISONER));
+check('a prisoner serving: __dboJailSentence names the jail', (globalThis.__dboJailSentence(PRISONER) || {}).cell === 'Bruma Castle Dungeon', globalThis.__dboJailSentence(PRISONER));
+check('...and says the guard gets Release at the door, someone else not (the menu\'s own rule)', globalThis.__dboJailSentence(PRISONER, GUARD).release === true
+  && globalThis.__dboJailSentence(PRISONER, OTHER).release === false && globalThis.__dboJailSentence(PRISONER).release === false, [globalThis.__dboJailSentence(PRISONER, GUARD), globalThis.__dboJailSentence(PRISONER, OTHER)]);
 check('...anyone else: null', globalThis.__dboJailSentence(OTHER) === null && globalThis.__dboJailSentence(GUARD) === null);
 
 // ---- serving time ----
@@ -155,7 +157,7 @@ check('the first tick after arriving counts nothing', sentence().servedMs === 0)
 tick(12);
 check('a minute in the cell counts a minute', sentence().servedMs === 60000, sentence().servedMs);
 online = [GUARD, OTHER]; tick(24);
-check('...logged out, the saved sentence still names the jail (an offline prisoner)', JSON.stringify(globalThis.__dboJailSentence(PRISONER)) === '{"cell":"Bruma Castle Dungeon"}');
+check('...logged out, the saved sentence still names the jail (an offline prisoner)', (globalThis.__dboJailSentence(PRISONER, GUARD) || {}).cell === 'Bruma Castle Dungeon');
 online = [GUARD, PRISONER, OTHER];
 check('two minutes logged out count nothing', sentence().servedMs === 60000, sentence().servedMs);
 tick(1);
