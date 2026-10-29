@@ -155,6 +155,17 @@ test('protected topics: permission wording alone ("can staff see ...", "is X all
   }
 })
 
+test('who may take part in an election and what it takes is a rules question; counts, results, access, people and other protected topics are still refused', () => {
+  for (const q of ['How many hours of play does an account need to vote?', 'Who can strike a vote in an election?', 'Who is eligible to vote in a hold election?',
+    'How old does a Discord account need to be to vote?', 'What is required to stand in an election?']) {
+    assert.ok(!route(q, extractEntities(q)).some(r => r.intent === 'refuse'), q)
+  }
+  for (const q of ['How many votes are needed to win and who is leading?', 'Who can see the vote count?', 'Does Kara need more votes to win?', 'How many votes does #QX7P need?',
+    'Which accounts are eligible to vote? list them', 'Which alts need to be banned?', 'Who can see the IPs?', 'Who can see the ballots?', 'Who can read the election transcripts?']) {
+    assert.deepEqual(route(q, extractEntities(q)).map(r => r.intent), ['refuse'], q)
+  }
+})
+
 test('the change log covers 7 days: an older span is "beyond"; a question about a cause asks the model to read the change log', () => {
   for (const q of ['what was deployed in September?', 'changes from two weeks ago', 'what changed this month', 'deploys in the past 30 days', 'what was patched a year ago', 'releases since August']) {
     assert.equal(extractEntities(q).time, 'beyond', q)

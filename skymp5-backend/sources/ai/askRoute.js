@@ -19,6 +19,12 @@ const REFUSE_WORDS = /\b(ip|ips|hwid|device|alts?|vote[sd]?|elections?|ballots?|
 const SECRET_WORDS = /\b(passwords?|tokens?|webhooks?|backend\.env|transcripts?)\b/i
 // The other protected topics only in one question that names a rule or asks what a rules text says, never permission wording alone
 const SECOND_CLAUSE = /[?;!]\s*\S|\.(?!\d)\s*\p{L}|,\s*(and|but|also|then|plus|so)\b/iu
+// Who may take part in an election and what it takes ("how many hours does an account need to vote"); never who may see the data
+const ELECTION = /\b(vote[sd]?|voting|elections?|ballots?)\b/i
+const OTHER_PROTECTED = /\b(ip|ips|hwid|device|alts?|transcripts?)\b/i
+const ELIGIBILITY = /\b(needs?|needed|requires?|required|requirements?|eligib\w*|qualif\w*|minimum)\b|\bhow\s+old\b|\bwho\s+(can|may|must|should)\b/i
+const ACCESS = /\b(see|seen|read|view|open|access|know|look|show[ns]?)\b/i
+const asksEligibility = q => ELIGIBILITY.test(q) && ELECTION.test(q) && !OTHER_PROTECTED.test(q) && !ACCESS.test(q)
 // ...and not when it asks for votes, results, addresses or matches themselves, or for one person's
 const DATA_VERBS = /\b(show|print|list|reveal|dump|give|send|post|share|look\s?up|find|check|tell me)\b/i
 const DATA_NOUNS = /\b(counts?|counted|tally|totals?|results?|standings?|so far|going|leading|winning|won|who voted|voted for|whose|logs?|match(es|ed)?|linked)\b/i
@@ -134,7 +140,7 @@ function extractEntities(q) {
 function refusalOf(q, entities = extractEntities(q)) {
   if (IMPERATIVE.test(q.trim()) && !NOT_A_COMMAND.test(q.trim())) return IMPERATIVE_TEXT
   if (!REFUSE_WORDS.test(q)) return null
-  const aboutRules = !SECRET_WORDS.test(q) && (entities.ruleRefs.length > 0 || SAYS.test(q)) && !SECOND_CLAUSE.test(q.trim()) && !DATA_VERBS.test(q) &&
+  const aboutRules = !SECRET_WORDS.test(q) && (entities.ruleRefs.length > 0 || SAYS.test(q) || asksEligibility(q)) && !SECOND_CLAUSE.test(q.trim()) && !DATA_VERBS.test(q) &&
     (SAYS.test(q) || !DATA_NOUNS.test(q)) && !entities.tags.length && !entities.names.length && !entities.threadIds.length
   if (aboutRules) return null
   for (const [rx, text] of REFUSALS) if (rx.test(q)) return text
