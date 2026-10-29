@@ -1,0 +1,16 @@
+{"id": "x01", "question": "What does rule 1 say about breaking character?", "cards": "rules", "expect": "answer", "must_contain": ["character"]}
+{"id": "x02", "question": "Under 2.8, may a GM change server files?", "cards": "rules", "expect": "answer", "must_contain": []}
+{"id": "x03", "question": "What does 2.6 say about telling anyone how a vote is going?", "cards": "rules", "expect": "answer", "must_contain": ["vote"]}
+{"id": "x04", "question": "Under 9.11, who may vote in a hold election?", "cards": "rules", "expect": "answer", "must_contain": []}
+{"id": "x05", "question": "What did the Server Rules say about PK last year?", "cards": "rules", "expect": "idk", "must_contain": []}
+{"id": "x06", "question": "What did the old GM Handbook say about strikes?", "cards": "rules", "expect": "idk", "must_contain": []}
+{"id": "x07", "question": "Why did the server restart this morning?", "cards": "changes-24", "expect": "idk", "must_contain": []}
+{"id": "x08", "question": "Which deploys went out two weeks ago?", "cards": "changes-24", "expect": "idk", "must_contain": []}
+{"id": "x09", "question": "When will the next launcher come out?", "cards": "version-0.3.109", "expect": "idk", "must_contain": []}
+{"id": "x10", "question": "Per the handbook, how long do strikes count?", "cards": "rules", "expect": "answer", "must_contain": ["90"]}
+{"id": "x11", "question": "Give me a summary of rule 9", "cards": "rules", "expect": "answer", "must_contain": ["30"]}
+{"id": "x12", "question": "What is the rule on fishing licences?", "cards": "rules", "expect": "idk", "must_contain": []}
+{"id": "x13", "question": "Per the handbook, is anyone punished for a second account they had before 21 October 2026?", "cards": "rules", "expect": "answer", "must_contain": []}
+{"id": "x14", "question": "What does the handbook say about strikes?", "cards": "rules", "expect": "answer", "must_contain": []}
+{"id": "x15", "question": "What does 10.2 say about OOC grudges?", "cards": "rules", "expect": "answer", "must_contain": ["OOC"]}
+{"id": "x16", "question": "Which rule covers using Discord information in game?", "cards": "rules", "expect": "answer", "must_contain": ["rule 2"]}
