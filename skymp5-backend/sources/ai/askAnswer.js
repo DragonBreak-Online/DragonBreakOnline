@@ -257,8 +257,7 @@ function createAnswerer({ sources, model, flight, limiter, readSwitch, settings,
 
     const labels = [...new Set(cards.map(c => c.label))].join(', ') || 'nothing'
     if (!modelWanted) {
-      // Status, players online, GM calls and ticket counts are states, never causes: "why is the server down" gets the state
-      // with "I don't know why", not the state as if it were the reason
+      // States are never causes: "why is the server down" gets the state under "I don't know why"
       if (asksCause(question) && readable.every(i => NO_CAUSE_INTENTS.has(i.intent))) {
         return done({ outcome: 'idk', mode: 'template', lead: [`I don't know why from what I can see. I checked: ${labels}.`], blocks: renderTemplate(null, cards), sources: cards.filter(usable) })
       }
