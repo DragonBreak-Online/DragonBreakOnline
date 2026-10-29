@@ -476,7 +476,8 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
   }
 
   // A call into a thread that Discord archived on its own (50083): recorded as archived first, so a reopen held for
-  // headroom is not tried again every tick; then unarchived and tried once more, unless the call was to archive it
+  // headroom is not tried again every tick; then unarchived and tried once more, unless the call was only to archive it
+  // (a PATCH that also carries tags reopens, counted, so the tags land and are not marked applied on a refused call)
   async function threadCall(acct, method, p, body) {
     try {
       return await call(method, p, body)
@@ -484,7 +485,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
       if (err.code !== 50083) throw err
       acct.state = 'archived'
       dirty = true
-      if (body && body.archived === true) return null
+      if (body && body.archived === true && Object.keys(body).length === 1) return null
       await unarchive(acct)
       return call(method, p, body)
     }

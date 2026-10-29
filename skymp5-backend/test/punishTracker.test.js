@@ -977,6 +977,30 @@ test('thread headroom: a thread archived since its last post that answers 50083 
   assert.deepEqual(t.tags, ['800000000000000010', '800000000000000014'])
 })
 
+test('a tags-and-archive PATCH that meets 50083 (archived by hand after a failed try) reopens, counted, and lands the tags instead of marking them applied', async () => {
+  const d = fakeDiscord()
+  const r = await started({ discord: d })
+  r.data.discipline = { 57: [entry(1, 'suspend', T0 - HOUR, { until: T0 + HOUR })] }
+  await r.tick()
+  const t = d.thread()
+  // The suspension ends: the ENDED reply and the starter go out, the tags-and-archive PATCH meets a Discord 5xx
+  r.now += 2 * HOUR
+  d.fail = (method, p, body) => (method === 'PATCH' && p === `/channels/${t.id}` && body && body.applied_tags ? fakeDiscord.error(502, 0) : null)
+  await r.tick()
+  assert.equal(t.archived, false)
+  assert.deepEqual(t.tags, [tagId('Active'), tagId('Suspended')])
+  // A moderator closes the post before the next tick
+  t.archived = true
+  d.fail = () => null
+  r.now += 60000
+  await r.tick()
+  assert.deepEqual(t.tags, [tagId('Expired'), tagId('Suspended')], 'the tags landed, not just recorded')
+  assert.equal(t.archived, true)
+  assert.equal(reopens(d).length, 1, 'one counted reopen')
+  assert.deepEqual(r.registry().accounts[PEOPLE.alice.discordId].tags, t.tags)
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].state, 'archived')
+})
+
 test('thread headroom: a reply into a thread archived by hand that answers 160006 at the cap is recorded archived: sent once, no lookup a tick', async () => {
   const d = fakeDiscord()
   const r = await started({ discord: d })
