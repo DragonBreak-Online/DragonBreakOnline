@@ -15,6 +15,8 @@ const { compose } = require('../sources/discord/dragonbaronAsk')
 const THRESHOLDS = Object.freeze({ correct: 0.8, idk: 0.9, withheldShown: 0, p95Ms: 15000, warmLoadMs: 500 })
 const VIEWER = Object.freeze({ discordId: 'eval', tier: 'owner', punishTier: null, displayName: 'eval', username: 'eval' })
 
+const RELOAD_OVER_MS = 1000
+const median = list => (list.length ? [...list].sort((a, b) => a - b)[(list.length - 1) >> 1] : 0)
 const p95 = list => { const s = [...list].sort((a, b) => a - b); return s.length ? s[Math.min(s.length - 1, Math.ceil(s.length * 0.95) - 1)] : 0 }
 
 function classify(r) {
@@ -80,18 +82,23 @@ async function main(argv = process.argv.slice(2), { fetch = globalThis.fetch, se
     repairs: results.filter(r => r.repair).length,
     p95Ms: p95(results.map(r => r.ms)),
     warmLoadMs: loadsAfterFirst.length ? Math.max(...loadsAfterFirst) : 0,
-    // Ollama 0.30.10 reports about 500 ms load_duration on every call to the resident qwen3.5:9b, a reload or not (28 Oct): the
-    // median shows that floor, and a call far above it is the one to look at
-    warmLoadMedianMs: loadsAfterFirst.length ? [...loadsAfterFirst].sort((a, b) => a - b)[(loadsAfterFirst.length - 1) >> 1] : 0,
+    // Ollama 0.30.10 reports a constant ~500 ms load_duration on every call to a resident model; a reload stands far above it
+    warmLoadMedianMs: median(loadsAfterFirst),
+    warmLoadsOverMedian: loadsAfterFirst.filter(v => v > median(loadsAfterFirst) + RELOAD_OVER_MS).length,
     outcomes: results.reduce((a, r) => ({ ...a, [r.got]: (a[r.got] || 0) + 1 }), {}),
   }
-  const pass = metrics.correct >= THRESHOLDS.correct && metrics.idk >= THRESHOLDS.idk && metrics.withheldShown <= THRESHOLDS.withheldShown &&
-    metrics.p95Ms <= THRESHOLDS.p95Ms && metrics.warmLoadMs <= THRESHOLDS.warmLoadMs
+  metrics.gates = {
+    correct: metrics.correct >= THRESHOLDS.correct, idk: metrics.idk >= THRESHOLDS.idk, withheldShown: metrics.withheldShown <= THRESHOLDS.withheldShown,
+    p95Ms: metrics.p95Ms <= THRESHOLDS.p95Ms, warmLoadMs: metrics.warmLoadMs <= THRESHOLDS.warmLoadMs,
+  }
+  const pass = Object.values(metrics.gates).every(Boolean)
   metrics.thresholds = THRESHOLDS
   metrics.pass = pass
   fs.writeFileSync(path.join(outDir, 'results.jsonl'), results.map(r => JSON.stringify(r)).join('\n') + '\n', { mode: 0o600 })
   fs.writeFileSync(path.join(outDir, 'metrics.json'), `${JSON.stringify(metrics, null, 2)}\n`, { mode: 0o600 })
-  out(`ask eval: ${(metrics.correct * 100).toFixed(1)}% correct, idk ${(metrics.idk * 100).toFixed(1)}%, withheld ${metrics.withheld} (shown ${metrics.withheldShown}), p95 ${metrics.p95Ms} ms, warm load ${metrics.warmLoadMs} ms: ${pass ? 'PASS' : 'FAIL'}`)
+  const failed = Object.keys(metrics.gates).filter(k => !metrics.gates[k])
+  out(`ask eval: ${(metrics.correct * 100).toFixed(1)}% correct, idk ${(metrics.idk * 100).toFixed(1)}%, withheld ${metrics.withheld} (shown ${metrics.withheldShown}), p95 ${metrics.p95Ms} ms, ` +
+    `warm load ${metrics.warmLoadMs} ms (median ${metrics.warmLoadMedianMs}, ${metrics.warmLoadsOverMedian} over median+${RELOAD_OVER_MS}): ${pass ? 'PASS' : `FAIL (${failed.join(', ')})`}`)
   return pass ? 0 : 1
 }
 
