@@ -268,6 +268,7 @@ function duration(r, x) {
 }
 
 function issuer(r) {
+  if (r.source === 'bans' && r.kind === 'discord_ban' && !r._journalId) return 'unknown (Discord server ban, no moderation journal record)'
   if (r.outside) return `config ${r.outside} (by ${r.by || 'unknown'})`
   const by = r.by || 'unknown'
   return r.via === 'dashboard' && !/ \(dashboard\)$/.test(by) ? `${by} (dashboard)` : by
@@ -280,7 +281,7 @@ function replyText(r, st, x) {
     `Issued by: ${issuer(r)}`,
     `When: ${ts(r.atMs, 'f')}`,
     `Duration: ${duration(r, x)}`,
-    `Reason: ${r.reason || 'none given'}`,
+    `Reason: ${r.source === 'bans' && r.kind === 'discord_ban' && r.reason === 'discord ban' ? 'none recorded' : r.reason || 'none given'}`,
     `Ticket: ${r.ticket || ticketOf(r.outside, r.reason) || 'none named'}`,
     `Source: ${sourceOf(r)}`,
   ]

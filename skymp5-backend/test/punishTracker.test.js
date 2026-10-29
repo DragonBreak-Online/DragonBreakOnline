@@ -8,7 +8,7 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const R = require('../sources/punish/records')
-const { createTracker, createRestWriter, start, finish, markerOf, tagNames } = require('../sources/punish/tracker')
+const { createTracker, createRestWriter, start, finish, markerOf, tagNames, nonceOf } = require('../sources/punish/tracker')
 
 const HOUR = 3600000
 const DAY = 24 * HOUR
@@ -1265,6 +1265,33 @@ test('journal rows name their source: the dashboard (with "(dashboard)" after th
   assert.match(alice, /Source: Discord client$/)
 })
 
+test('ban list Discord bans with only the "discord ban" marker read "none recorded" and an unknown issuer; one with a journal row keeps its reason and moderator', async () => {
+  const carol = '844444444444444444'
+  const discord = fakeDiscord({ members: { [PEOPLE.alice.discordId]: 'alice_rp', [PEOPLE.bob.discordId]: 'bob_rp', [carol]: 'carol_rp' } })
+  const r = await started({ discord })
+  // What the bot writes to the ban list for a server ban: the marker "discord ban", by "discord"
+  const marker = (discordId, at) => ({ discordId, reason: 'discord ban', bannedAt: iso(at), bannedBy: 'discord' })
+  r.data.bans = [marker(PEOPLE.alice.discordId, T0 - 2 * HOUR), marker(PEOPLE.bob.discordId, T0 - HOUR), marker(carol, T0 - 30 * 60000)]
+  r.data.journal = [{ v: 1, id: 'M-DBAN0001', kind: 'discord_ban', at: iso(T0 - 30 * 60000 + 5000), discordId: carol, reason: 'harassment in #general', by: { name: 'Lena' }, via: 'discord' }]
+  await r.tick()
+  const reply = name => r.named(name).messages[1]
+  // The nonces hang on the account, the row id and the state only: these are what the code before this fix sent
+  const nonces = { alice_rp: 'defba46e7eb8bd46295594278', bob_rp: '835bd2b78b15d6838f487f6c8', carol_rp: '7b20bd098d3cf7820a0b1ee61' }
+  for (const [name, nonce] of Object.entries(nonces)) assert.equal(reply(name).nonce, nonce, name)
+  assert.equal(reply('alice_rp').nonce, nonceOf(PEOPLE.alice.discordId, R.reflessBanId(PEOPLE.alice.discordId), 'running'))
+  for (const name of ['alice_rp', 'bob_rp']) {
+    const text = reply(name).content
+    assert.match(text, /^\*\*GAME BAN LIST \(Discord ban\)\*\* · ban:/)
+    assert.match(text, /\nIssued by: unknown \(Discord server ban, no moderation journal record\)\n/)
+    assert.match(text, /\nReason: none recorded\n/)
+    assert.doesNotMatch(text, /discord ban|Issued by: Discord/)
+  }
+  const carolText = reply('carol_rp').content
+  assert.match(carolText, /\nIssued by: Lena\n/)
+  assert.match(carolText, /\nReason: harassment in #general\n/)
+  assert.doesNotMatch(carolText, /none recorded|no moderation journal record/)
+})
+
 test('a source missing on the first run is not posted from history once it reads: only what is in force opens a thread', async () => {
   const r = rig()
   r.status = { discipline: { status: 'missing' } }
@@ -1834,7 +1861,7 @@ test('a Discord ban with no journal row is posted after 60 s, or once the journa
   r.now += 30000
   await r.tick()
   assert.equal(banPosts(r).length, 1)
-  assert.match(banPosts(r)[0], /Issued by: Discord\n/)
+  assert.match(banPosts(r)[0], /Issued by: unknown \(Discord server ban, no moderation journal record\)\n/)
   const later = await started()
   later.data.bans = [banOf(later.now, false)]
   later.data.journal = [{ v: 1, id: 'M-TMO00001', kind: 'discord_timeout', at: iso(later.now + 15000), discordId: PEOPLE.alice.discordId, reason: 'spam', by: { name: 'Lena' }, via: 'discord', until: iso(later.now + HOUR) }]
@@ -1856,7 +1883,7 @@ test('a Discord ban waits while the journal is read only 5 s past it, and is pos
   r.now += 6000
   await r.tick()
   assert.equal(banPosts(r).length, 1)
-  assert.match(banPosts(r)[0], /Issued by: Discord\n/)
+  assert.match(banPosts(r)[0], /Issued by: unknown \(Discord server ban, no moderation journal record\)\n/)
 })
 
 test('a ban-list row that took in its journal row counts as the journal read that far: another Discord ban 12 s before it is posted', async () => {
@@ -1868,7 +1895,7 @@ test('a ban-list row that took in its journal row counts as the journal read tha
   await r.tick()
   const bans = banPosts(r)
   assert.equal(bans.length, 2, bans.join('\n'))
-  assert.ok(bans.some(c => /ban:B-DDDDDD\n[^]*Issued by: Discord\n/.test(c)), 'Bob\'s ban is not held for a journal already read past it')
+  assert.ok(bans.some(c => /ban:B-DDDDDD\n[^]*Issued by: unknown \(Discord server ban, no moderation journal record\)\n/.test(c)), 'Bob\'s ban is not held for a journal already read past it')
   assert.ok(bans.some(c => /ban:B-EEEEEE\n[^]*Issued by: Lena\n/.test(c)))
 })
 
