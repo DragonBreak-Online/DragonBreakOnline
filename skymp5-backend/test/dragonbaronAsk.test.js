@@ -717,3 +717,28 @@ test('29. checkAnswer grounding ignores harmless differences (markdown, case, qu
   // A quote must come from a fact it cites
   assert.deepEqual([ok(['A strike counts for 90 days'], 'Strikes last 90 days.', ['F1']).ok, ok(['A strike counts for 90 days'], 'Strikes last 90 days.', ['F1']).reason], [false, 'quote'])
 })
+
+test('30. an older version of the rules or handbook is not in the data: "I don\'t know" without reading or calling the model; a date inside a rule still reaches it', async () => {
+  const { ask, usageFile } = make()
+  const { it, calls } = interaction('What did the handbook say about teleporting players last year?')
+  await ask.handleInteraction(it)
+  const e = edited(calls).content
+  assert.match(e, /^I don't know from what I can see\. I can read only the current Server Rules and Staff Handbook, not older versions\./)
+  assert.deepEqual([reads.length, model.probes, model.chats.length], [0, 0, 0])
+  assert.deepEqual(JSON.parse(fs.readFileSync(usageFile, 'utf8').trim()).outcome, 'idk')
+  // With another intent, that one is answered and the reply says what the rules reader holds
+  const q = interaction('Is the server up, and what did the old rules say about PK?')
+  await ask.handleInteraction(q.it)
+  assert.match(edited(q.calls).content, /Players online: 26/)
+  assert.match(edited(q.calls).content, /I can read only the current Server Rules and Staff Handbook, not older versions\./)
+  assert.ok(!reads.includes('rules'))
+  model.replies.push(body => {
+    const cited = [...body.messages[1].content.matchAll(/^\[(F\d+)\]/gm)].map(m => m[1])
+    const content = JSON.stringify({ answerable: true, answer: 'Nobody is punished just for having had a second account before 21 October 2026.', cited, quotes: ['nobody is punished just for having had a second account before 21 October 2026'] })
+    return { status: 200, text: async () => JSON.stringify({ message: { content } }) }
+  })
+  const r = interaction('Per the handbook, is anyone punished for a second account made before 21 October 2026?')
+  await ask.handleInteraction(r.it)
+  assert.equal(model.chats.length, 1)
+  assert.match(edited(r.calls).content, /^Nobody is punished just for having had a second account before 21 October 2026\./)
+})

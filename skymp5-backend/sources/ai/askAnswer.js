@@ -2,7 +2,7 @@
 // Answers for /dragonbaron ask in three modes: template (code renders the cards), model (the local model phrases cited
 // excerpts and code checks it) and extractive (the excerpts themselves, when the model is off, down, late or not trusted)
 
-const { extractEntities, route, isLore, asksCause, MODEL_INTENTS, OWNERS_ONLY_INTENTS, NO_CAUSE_INTENTS } = require('./askRoute')
+const { extractEntities, route, isLore, asksCause, asksOldVersion, MODEL_INTENTS, OWNERS_ONLY_INTENTS, NO_CAUSE_INTENTS, DOC_INTENTS } = require('./askRoute')
 const { deadline: timer } = require('./localModel')
 const { docsFor } = require('./retrieve')
 
@@ -46,6 +46,7 @@ const TEXT = Object.freeze({
   canAnswerOwner: 'Owners can also ask for the held staff reports.',
   pkNote: 'Newer #rp-rules posts from 24-25 Oct are not in the official rules (2026-10-21); the official text applies until they are added (rule 1.5).',
   changesWindow: 'The change log I can read goes back 7 days at most.',
+  docsCurrent: 'I can read only the current Server Rules and Staff Handbook, not older versions.',
 })
 
 const MIN_SCORE = 5
@@ -206,12 +207,14 @@ function createAnswerer({ sources, model, flight, limiter, readSwitch, settings,
     if (intents[0]?.intent === 'refuse') return done({ outcome: 'refused', mode: 'template', lead: [intents[0].args.text] })
     const fallback = !intents.length
     if (fallback && isLore(question)) return done({ outcome: 'idk', mode: 'template', lead: [TEXT.lore, ...canAnswer], intents: ['fallback'] })
-    // A source that cannot hold the fact is not read, and a template never answers for it: the change log for a span older than
-    // 7 days ("last month") would otherwise list the last 24 h as if it were the answer
-    const beyond = intents.filter(i => i.intent === 'changes' && i.args.time === 'beyond')
-    if (beyond.length) {
-      if (beyond.length === intents.length) return done({ outcome: 'idk', mode: 'template', lead: [`I don't know from what I can see. ${TEXT.changesWindow}`] })
-      base.notes.push(TEXT.changesWindow)
+    // A source that cannot hold the fact asked for is not read: a change log span over 7 days, or an older version of the rules
+    const oldDocs = asksOldVersion(question, entities)
+    const beyond = intents.filter(i => (i.intent === 'changes' && i.args.time === 'beyond') || (oldDocs && DOC_INTENTS.has(i.intent)))
+    const limits = [...new Set(beyond.map(i => (i.intent === 'changes' ? TEXT.changesWindow : TEXT.docsCurrent)))]
+    if (fallback && oldDocs) limits.push(TEXT.docsCurrent)
+    if (limits.length) {
+      if (beyond.length === intents.length) return done({ outcome: 'idk', mode: 'template', lead: [`I don't know from what I can see. ${limits.join(' ')}`], ...(fallback ? { intents: ['fallback'] } : {}) })
+      base.notes.push(...limits)
     }
     const readable = intents.filter(i => !beyond.includes(i))
 

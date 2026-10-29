@@ -11,6 +11,8 @@ const OWNERS_ONLY_INTENTS = new Set(['held'])
 
 // Template intents read data and need no model; the rest are answered by the model from excerpts
 const MODEL_INTENTS = new Set(['version', 'handbook', 'rules'])
+// Intents read from the rules documents (the current Server Rules and Staff Handbook only)
+const DOC_INTENTS = new Set(['handbook', 'rules'])
 
 const REFUSE_WORDS = /\b(ip|ips|hwid|device|alts?|vote[sd]?|election|ballot|transcripts?|passwords?|tokens?|webhooks?|backend\.env)\b/i
 // Secrets are refused whatever the question; the other protected topics only when the question asks for the data itself
@@ -20,6 +22,12 @@ const RULE_TEXT = /\b(rules?|handbook|policy|policies|allowed|permitted|forbidde
 // ...but not when it asks for votes, results, addresses or matches themselves, or for one person's
 const DATA_ASK = /\b(show|print|list|reveal|dump|give|send|post|share|look\s?up|find|check|tell me|counts?|counted|tally|totals?|results?|standings?|so far|going|leading|winning|won|who voted|voted for|whose|logs?|match(es|ed)?|linked)\b/i
 const IMPERATIVE = /^(please\s+)?(run|kick|ban|unban|give|spawn|teleport|restart|announce|jail|unjail|warn|mute|unmute|timeout|untimeout|promote|demote|grant|revoke|set|reset|remove|delete|add)\b/i
+// A command verb that asks for information, not an action: "give me a summary of rule 9", "run me through 10.2", "ban rules?"
+const NOT_A_COMMAND = new RegExp([
+  /^(please\s+)?run\s+((me|us)\s+)?(through|down)\b/.source,
+  /^(please\s+)?give\s+(me|us)\s+((a|an|the|some)\s+)?((short|quick|brief|full|plain)\s+)?(summary|overview|rundown|list|breakdown|explanation|text|wording|answer|details|info\w*|rules?|gist)\b/.source,
+  /^(please\s+)?(kick|ban|warn|mute|jail|timeout|restart|promote|demote)\s+(rules?|polic(y|ies)|schedule|times?|length|duration|ladder|limits?|reasons?|appeals?|process|steps)\b/.source,
+].join('|'), 'i')
 
 const REFUSALS = Object.freeze([
   [/\b(vote[sd]?|election|ballot)\b/i, 'Election counts are never shown, to staff included (Staff Handbook 2.6). Nothing was run.'],
@@ -63,10 +71,19 @@ const BEYOND = new RegExp([
   /\b(\d+|an?|one|two|three|four|five|six|several|few)\s+(months?|years?)\b/.source,
   /\b([2-9]|\d{2,}|two|three|four|five|six|several|few)\s+weeks\b/.source,
   /\b(months?|years?)\s+ago\b/.source,
-  `\\b(in|during|since|before|throughout)\\s+(${MONTHS})\\b`,
-  /\b(in|during|since|before)\s+(19|20)\d{2}\b/.source,
+  `\\b(in|during|since|before|until|prior to|throughout)\\s+(${MONTHS})\\b`,
+  `\\b(before|until|prior to)\\s+(the\\s+)?\\d{1,2}(st|nd|rd|th)?\\s+(of\\s+)?(${MONTHS})\\b`,
+  /\b(in|during|since|before|until|prior to)\s+(19|20)\d{2}\b/.source,
   /\b(last|past)\s+([89]|[1-9]\d+)\s+days\b/.source,
 ].join('|'), 'i')
+// A question about an older version of the rules or handbook ("what did the handbook say before 2026"), which the reader never holds
+const OLD_DOC = new RegExp([
+  /\b(old|older|previous|former|outdated|superseded)\s+((server|discord)\s+)?(rules|rulebook|handbooks?|(staff|gm|trial gm)\s+handbooks?)\b/.source,
+  /\bused to (say|read|allow|forbid|require|be)\b/.source,
+].join('|'), 'i')
+const SAID = /\b(did|was|were|had)\b(?:[^.?!]|\.(?=\d)){0,60}?\b(say|said|read|state[sd]?|word(ed|ing)?|allow(ed)?|forb(id|ade|idden)|cover(ed)?|requir(e|ed)|permit(ted)?)\b/i
+const OLD_WORDING = /\b(old|older|previous|earlier|former|original|prior|past|first)\s+(versions?|editions?|wording|drafts?)\b|\bbefore\s+(the|its|their|it|they)\s+((last|latest|recent)\s+)?(was\s+|were\s+|got\s+)?(update|change|rewrite|revision|edit)\w*\b/i
+const OBJECT_TIME = /\b(made|created|had|joined|registered|opened|used|bought|done|given|issued|received|happened|linked)\s+(before|until|prior to|in|during|since)\b/i
 
 function extractEntities(q) {
   const text = String(q || '')
@@ -105,7 +122,7 @@ function extractEntities(q) {
 // when the question asks to see them; a question about what the rules say on them ("what does 2.6 say about election votes",
 // "under 11.4, can staff vote") is a rules question, unless it names a player (#TAG or a name) or asks for a count or a list
 function refusalOf(q, entities = extractEntities(q)) {
-  if (IMPERATIVE.test(q.trim())) return IMPERATIVE_TEXT
+  if (IMPERATIVE.test(q.trim()) && !NOT_A_COMMAND.test(q.trim())) return IMPERATIVE_TEXT
   if (!REFUSE_WORDS.test(q)) return null
   const aboutRules = !SECRET_WORDS.test(q) && (entities.ruleRefs.length > 0 || RULE_TEXT.test(q)) && !DATA_ASK.test(q) &&
     !entities.tags.length && !entities.names.length && !entities.threadIds.length
@@ -158,5 +175,11 @@ function route(q, entities = extractEntities(q), viewer = {}) {
 
 const isLore = q => LORE.test(String(q || ''))
 const asksCause = q => CAUSE.test(String(q || ''))
+function asksOldVersion(q, entities = extractEntities(q)) {
+  const text = String(q || '')
+  if (OLD_DOC.test(text)) return true
+  if (!SAID.test(text)) return false
+  return OLD_WORDING.test(text) || (entities.time === 'beyond' && !OBJECT_TIME.test(text))
+}
 
-module.exports = { extractEntities, route, refusalOf, isLore, asksCause, INTENTS, MODEL_INTENTS, OWNERS_ONLY_INTENTS, NO_CAUSE_INTENTS, HELD }
+module.exports = { extractEntities, route, refusalOf, isLore, asksCause, asksOldVersion, INTENTS, MODEL_INTENTS, OWNERS_ONLY_INTENTS, NO_CAUSE_INTENTS, DOC_INTENTS, HELD }

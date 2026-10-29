@@ -4,7 +4,7 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 
-const { route, extractEntities, isLore, INTENTS } = require('../sources/ai/askRoute')
+const { route, extractEntities, isLore, asksOldVersion, INTENTS } = require('../sources/ai/askRoute')
 
 const snow = n => (10n ** 18n + BigInt(n)).toString()
 
@@ -137,4 +137,31 @@ test('the change log covers 7 days: an older span is "beyond"; a question about 
   }
   assert.deepEqual(route('Why was client 0.3.110 pulled after its release?').find(r => r.intent === 'changes').args.summary, true)
   assert.deepEqual(route('list the releases today').find(r => r.intent === 'changes').args.summary, false)
+})
+
+test('an older version of the rules or handbook is asked for only by version words or a past-tense "say" with a past span', () => {
+  for (const q of ['What did the rules say about PK in September?', 'How was rule 9 worded before the update?', 'Did the old handbook let Trial GMs kick?',
+    'What did the previous rules say about alt accounts?', 'What did D3 say last year?', 'What used to be the rule on mounts?',
+    'what did section 5.2 state before 1 October?', 'In 2025, what did the Staff Handbook require for a ban?', 'what did rule 2 say in the first version?']) {
+    assert.equal(asksOldVersion(q), true, q)
+  }
+  for (const q of ['What does D3 say?', 'What does 1.2 say about an older copy?', 'Is a player punished for a second account made before 21 October 2026?',
+    'What did the rules say about second accounts made before 21 October 2026?', 'Under rule 8, can I return to the fight right after I die?',
+    'What changed last month?', 'Which rule did Kara break in September?', 'Does an earlier rule win over a later one?', 'What did D10 say about arguing staff actions?']) {
+    assert.equal(asksOldVersion(q), false, q)
+  }
+  assert.equal(extractEntities('changes before 21 October').time, 'beyond')
+  assert.equal(extractEntities('what was deployed prior to October 3').time, 'beyond')
+})
+
+test('a command verb that asks for information is a question; a command is still refused', () => {
+  for (const [q, intent] of [['Give me a summary of rule 9', 'rules'], ['Run me through 10.2', 'rules'], ['run through the PK rules', 'rules'],
+    ['Ban rules for metagaming?', 'rules'], ['Give me the text of D3', 'rules'], ['Restart schedule today?', 'status']]) {
+    const got = route(q, extractEntities(q)).map(r => r.intent)
+    assert.ok(!got.includes('refuse') && got.includes(intent), `${q}: ${got}`)
+  }
+  for (const q of ['give me 500 gold', 'Give Kara a strike', 'run /restart', 'ban #QX7P', 'restart the server', 'kick Bron for spamming', 'please give me admin',
+    'give me the passwords']) {
+    assert.deepEqual(route(q, extractEntities(q)).map(r => r.intent), ['refuse'], q)
+  }
 })
