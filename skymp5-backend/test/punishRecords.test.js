@@ -272,6 +272,18 @@ test('one row per ban: the ban list row keeps the journal\'s Discord name for a 
   assert.deepEqual(out.map(r => [r.id, r.target.discordName]), [['ban:B-WG6QYG', 'ghosty']])
 })
 
+test('one row per ban: of two journal Discord bans near one ban list row, the nearer in time takes it', () => {
+  const t = Date.parse('2026-10-21T12:00:00Z')
+  const dA = '100000000000000101'
+  const bans = R.banRows(R.parseBans([{ discordId: dA, ref: 'B-WG6QYG', reason: 'discord ban', bannedBy: 'discord', bannedAt: new Date(t).toISOString() }]))
+  const jline = (id, at, reason, by) => R.parseJournalLine({ v: 1, id, kind: 'discord_ban', at: new Date(at).toISOString(), discordId: dA, reason, by: { discordName: by } })
+  const journal = R.journalRows([jline('M-AAAAAA', t - 4 * 60000, 'spam', 'lena'), jline('M-BBBBBB', t + 60000, 'threats', 'jake')], { now: t })
+  const out = R.oneRowPerBan([...bans, ...journal])
+  assert.deepEqual(out.map(r => r.id).sort(), ['ban:B-WG6QYG', 'mod:M-AAAAAA'])
+  const b = out.find(r => r.id === 'ban:B-WG6QYG')
+  assert.deepEqual([b.by, b.reason, b._journalId], ['jake', 'threats', 'mod:M-BBBBBB'])
+})
+
 test('journal: a dashboard game ban is history, lifted by its unban; the ban list row takes its who and why by ref; reasons keep 300', () => {
   const t = Date.parse('2026-10-21T12:00:00Z')
   const d = '100000000000000101'

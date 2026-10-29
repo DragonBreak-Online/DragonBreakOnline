@@ -1126,6 +1126,79 @@ test('a Discord ban, unban, re-ban and unban within 10 minutes posts each ban an
   assert.match(unbans[1], /by Jake: appeal$/)
 })
 
+test('a Discord re-ban whose ban-list entry is read a tick before its journal row is posted with the new moderator and reason', async () => {
+  const ban = (ref, at) => ({ ref, discordId: PEOPLE.bob.discordId, reason: 'discord ban', bannedAt: iso(at), bannedBy: 'discord' })
+  const jrow = (id, kind, at, reason, name) => ({ v: 1, id, kind, at: iso(at), discordId: PEOPLE.bob.discordId, reason, by: { name }, via: 'discord' })
+  const r = await started()
+  const step = async f => { r.now += 2 * 60000; f(); await r.tick(); await r.tick() }
+  await step(() => { r.data.journal = [jrow('M-BAN00011', 'discord_ban', r.now, 'threats', 'Lena')]; r.data.bans = [ban('B-EEEEE1', r.now + 2000)] })
+  await step(() => { r.data.bans = []; r.data.journal.push(jrow('M-UNB00011', 'discord_unban', r.now, 'wrong reason', 'Lena')) })
+  r.now += 2 * 60000
+  const reAt = r.now
+  r.data.bans = [ban('B-EEEEE2', reAt)]
+  await r.tick()
+  r.now += 5000
+  r.data.journal.push(jrow('M-BAN00012', 'discord_ban', reAt + 3000, 'threats in #general', 'Jake'))
+  await r.tick()
+  await r.tick()
+  const bans = banPosts(r)
+  assert.equal(bans.length, 2, bans.join('\n---\n'))
+  assert.match(bans[1], /Issued by: Jake\n[^]*Reason: threats in #general\n/, bans[1])
+})
+
+test('a Discord unban, re-ban and unban between two passes posts the re-ban, which no longer aliases the first ban', async () => {
+  const ban = (ref, at) => ({ ref, discordId: PEOPLE.bob.discordId, reason: 'discord ban', bannedAt: iso(at), bannedBy: 'discord' })
+  const jrow = (id, kind, at, reason, name) => ({ v: 1, id, kind, at: iso(at), discordId: PEOPLE.bob.discordId, reason, by: { name }, via: 'discord' })
+  const r = await started()
+  r.now += 2 * 60000
+  r.data.journal = [jrow('M-BAN00011', 'discord_ban', r.now, 'threats', 'Lena')]
+  r.data.bans = [ban('B-EEEEE1', r.now + 2000)]
+  await r.tick()
+  await r.tick()
+  r.now += 2 * 60000
+  const t = r.now
+  r.data.bans = []
+  r.data.journal.push(jrow('M-UNB00011', 'discord_unban', t - 25000, 'wrong reason', 'Lena'))
+  r.data.journal.push(jrow('M-BAN00012', 'discord_ban', t - 20000, 'threats in #general', 'Lena'))
+  r.data.journal.push(jrow('M-UNB00012', 'discord_unban', t - 5000, 'mistake', 'Jake'))
+  await r.tick()
+  await r.tick()
+  const posts = r.posts()
+  const bans = banPosts(r)
+  assert.equal(bans.length, 2, posts.join('\n---\n'))
+  // The re-ban is first seen already unbanned: its post says so, the first ban's unban is its own reply
+  assert.match(bans[1], /^\*\*DISCORD BAN\*\* · mod:M-BAN00012\n[^]*Reason: threats in #general\n[^]*Now: unbanned$/)
+  const unbans = posts.filter(c => c.startsWith('**UNBANNED**'))
+  assert.deepEqual(unbans, ['**UNBANNED** · game ban list entry ban:B-EEEEE1 — by Lena: wrong reason'])
+  const rows = r.registry().accounts[PEOPLE.bob.discordId].rows
+  assert.deepEqual(Object.keys(rows).filter(id => rows[id].alias).map(id => [id, rows[id].alias]), [['mod:M-BAN00011', 'ban:B-EEEEE1']])
+})
+
+test('a late journal Discord ban near two posted ban-list bans is the same ban as the nearer one', async () => {
+  const ban = (ref, at) => ({ ref, discordId: PEOPLE.bob.discordId, reason: 'discord ban', bannedAt: iso(at), bannedBy: 'discord' })
+  const r = await started()
+  r.status.journal = { status: 'stale' }
+  const at1 = r.now += 60000
+  r.data.bans = [ban('B-EEEEE1', at1)]
+  r.now += 61000
+  await r.tick()
+  r.now += 60000
+  r.data.bans = []
+  await r.tick()
+  const at2 = r.now += 60000
+  r.data.bans = [ban('B-EEEEE2', at2)]
+  r.now += 61000
+  await r.tick()
+  r.data.bans = []
+  delete r.status.journal
+  r.data.journal = [{ v: 1, id: 'M-BAN00021', kind: 'discord_ban', at: iso(at2 + 2000), discordId: PEOPLE.bob.discordId, reason: 'threats', by: { name: 'Lena' }, via: 'discord' }]
+  r.now += 30000
+  await r.tick()
+  const rows = r.registry().accounts[PEOPLE.bob.discordId].rows
+  assert.equal(rows['mod:M-BAN00021'].alias, 'ban:B-EEEEE2', JSON.stringify(rows))
+  assert.equal(banPosts(r).length, 2, r.posts().join('\n---\n'))
+})
+
 // bans.js add() replaces an entry for the same Discord id and keeps its ref; the bot's keepOther guard keeps a game ban
 const banOf = (at, f7) => ({ ref: 'B-DDDDDD', discordId: PEOPLE.bob.discordId, reason: f7 ? 'duping' : 'discord ban', bannedAt: iso(at), bannedBy: f7 ? 'lena (dashboard)' : 'discord' })
 const jbanOf = at => ({ v: 1, id: 'M-BAN00002', kind: 'discord_ban', at: iso(at), discordId: PEOPLE.bob.discordId, reason: 'threats', by: { name: 'Lena' }, via: 'discord' })

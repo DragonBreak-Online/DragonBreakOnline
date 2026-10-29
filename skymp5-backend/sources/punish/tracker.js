@@ -651,11 +651,14 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     && x.now - r.atMs < JOURNAL_WAIT_MS && !(x.journalAt >= r.atMs + JOURNAL_LAG_MS)
 
   // A Discord ban seen in a second store (the journal's row once the ban list's merged copy is gone) is the same ban
-  function aliasOf(acct, r) {
+  function aliasOf(acct, r, claimed) {
     if (!acct || r.kind !== 'discord_ban' || !r.atMs) return null
-    // One to one: a row that is already an alias, or already has one, is another ban
-    const hit = Object.entries(acct.rows).find(([id, rec]) => id !== r.id && rec.kind === 'discord_ban' && prefixOf(id) !== prefixOf(r.id)
-      && rec.at && Math.abs(rec.at - r.atMs) <= SAME_BAN_MS && !rec.alias && !Object.values(acct.rows).some(o => o.alias === id))
+    // One to one, this pass included: a row that is already an alias, or already has one, is another ban; the nearest wins
+    const gap = rec => Math.abs(rec.at - r.atMs)
+    const hit = Object.entries(acct.rows).filter(([id, rec]) => id !== r.id && rec.kind === 'discord_ban' && prefixOf(id) !== prefixOf(r.id)
+      && rec.at && gap(rec) <= SAME_BAN_MS && !rec.alias && !claimed.has(id) && !Object.values(acct.rows).some(o => o.alias === id))
+      .reduce((best, e) => (!best || gap(e[1]) < gap(best[1]) ? e : best), null)
+    if (hit) claimed.add(hit[0])
     return hit ? hit[0] : null
   }
 
@@ -771,7 +774,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     // A frozen source's row held in force but not read as in force: the starter, tags and archive wait until it reads again
     const held = !!acct && Object.entries(acct.rows).some(([id, rec]) => frozen(id) && IN_FORCE.has(rec.state)
       && !rows.some(r => r.id === id && IN_FORCE.has(stateOf(r, x))))
-    const work = [], quiet = [], unlinked = new Set()
+    const work = [], quiet = [], unlinked = new Set(), claimed = new Set()
     // bans.js gives a ref-less entry its ref: its record moves to the new id, so it is neither posted again nor unbanned
     if (acct) for (const r of rows) {
       const old = r.source === 'bans' && r.ref && r._discordId && !acct.rows[r.id] ? reflessBanId(r._discordId) : null
@@ -790,7 +793,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
         if (heldElsewhere(key, r.id)) continue
         // A row older than the first run's baseline that is not in force (a source or account first seen later) is history
         const old = g.baseAt && (!r.atMs || r.atMs < g.baseAt) && !IN_FORCE.has(st)
-        const alias = old || st === 'unmatched' || isFold(r) ? null : aliasOf(acct, r)
+        const alias = old || st === 'unmatched' || isFold(r) ? null : aliasOf(acct, r, claimed)
         const lift = old ? null : liftOf(r, x)
         if (old) quiet.push({ id: r.id, st, base: recordOf(r), extra: { baseline: true } })
         else if (st === 'unmatched') work.push({ r, st, text: unmatchedText(r), isNew: true })
