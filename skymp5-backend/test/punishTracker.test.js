@@ -570,6 +570,33 @@ test('thread headroom: after a 160006 no thread is reopened until the next headr
   assert.match(t.messages[2].content, /^\*\*STRIKE\*\* · dsc:57:2/)
 })
 
+test('thread headroom: at the thread cap a tag change on archived threads sends nothing until there is room', async () => {
+  const d = fakeDiscord()
+  const r = await twoArchived(d)
+  d.active = 1000
+  d.fail = (method, p, body) => (method === 'PATCH' && body && body.archived === false && d.active > 975 ? fakeDiscord.error(400, 160006) : null)
+  // Renamed forum tags put every thread up for a tag change
+  d.tags = TAGS.map(t => ({ ...t, id: t.id.replace(/^9/, '8') }))
+  const calls = d.calls.length
+  r.now += 10 * 60000
+  for (let i = 0; i < 3; i++) {
+    r.now += 60000
+    await r.tick()
+  }
+  assert.equal(reopens(d).length, 0, 'no unarchive is tried while the guild is full')
+  assert.deepEqual(d.calls.slice(calls).map(c => `${c.method} ${c.path}`), [`GET /channels/${FORUM}`, `GET /guilds/${GUILD}/threads/active`], 'one tag read and one headroom check, no writes')
+  assert.deepEqual(r.audits, ['PUNISH-TRACKER waiting for thread headroom: reopened threads are held'])
+  const bob = r.named('bob_rp')
+  assert.deepEqual(bob.tags, [tagId('Expired'), tagId('Suspended')], 'left as they were')
+  assert.equal(r.registry().accounts[PEOPLE.bob.discordId].sync, true, 'kept for a later tick')
+  d.active = 0
+  r.now += 11 * 60000
+  await r.tick()
+  assert.deepEqual(bob.tags, ['800000000000000011', '800000000000000014'])
+  assert.equal(bob.archived, true)
+  assert.equal(r.registry().accounts[PEOPLE.bob.discordId].sync, false)
+})
+
 test('the REST writer waits out a 429 (the global one too), backs off a 5xx, and spaces requests 1.5 s', async () => {
   let clock = 0
   const slept = []

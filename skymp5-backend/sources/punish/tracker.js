@@ -712,7 +712,15 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
   async function syncThread(key, acct, rows, x) {
     const ch = `/channels/${acct.threadId}`
     const { content, hash } = starterText(key, acct, rows, x)
-    if (hash !== acct.starterHash && !acct.starterGone) {
+    const starter = hash !== acct.starterHash && !acct.starterGone
+    await loadTags()
+    const tags = tagsFor(rows, x)
+    // An edit that reopens an archived thread waits for headroom, the sync kept for a later tick
+    if (acct.state === 'archived' && (starter || !sameSet(tags, acct.tags || [])) && !(await roomForThread())) {
+      waitNote('reopened threads are held')
+      return
+    }
+    if (starter) {
       if (acct.state === 'archived') await unarchive(acct)
       try {
         await threadCall(acct, 'PATCH', `${ch}/messages/${acct.threadId}`, { content, allowed_mentions: NO_PINGS })
@@ -725,8 +733,6 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
       acct.starterHash = hash
       save()
     }
-    await loadTags()
-    const tags = tagsFor(rows, x)
     const patch = {}
     if (!sameSet(tags, acct.tags || [])) patch.applied_tags = tags
     // An archived thread takes an edit only together with its unarchive; a clear one is archived again below
