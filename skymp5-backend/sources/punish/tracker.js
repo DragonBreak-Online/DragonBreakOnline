@@ -454,6 +454,9 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     return writer.request(method, p, body, opts)
   }
 
+  // Archived as far as we know: by us, or idle long enough that Discord archived it on its own
+  const archivedOf = (acct, x) => acct.state === 'archived' || x.now - (acct.activeAt || 0) >= IDLE_MS
+
   // A title not sent while the thread was archived goes with the PATCH that reopens it
   const pendingName = acct => (acct.username && titleOf(acct.username) !== acct.title ? titleOf(acct.username) : null)
 
@@ -472,12 +475,16 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     acct.activeAt = now()
   }
 
-  // A call into a thread that Discord archived on its own (50083): unarchive it and try once more
+  // A call into a thread that Discord archived on its own (50083): recorded as archived first, so a reopen held for
+  // headroom is not tried again every tick; then unarchived and tried once more, unless the call was to archive it
   async function threadCall(acct, method, p, body) {
     try {
       return await call(method, p, body)
     } catch (err) {
       if (err.code !== 50083) throw err
+      acct.state = 'archived'
+      dirty = true
+      if (body && body.archived === true) return null
       await unarchive(acct)
       return call(method, p, body)
     }
@@ -549,8 +556,9 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     const username = looked || kept || localName(key, rows, x)
     if (username !== acct.username) { acct.username = username; acct.sync = true }
     const title = titleOf(username)
-    // An archived thread, or one about to be reopened, is renamed by the PATCH that reopens it, never reopened for a rename
-    if (title === acct.title || (acct.threadId && (acct.state === 'archived' || reopen))) return
+    // An archived thread (or one idle long enough that Discord archived it), or one about to be reopened, is renamed by
+    // the PATCH that reopens it, never reopened for a rename
+    if (title === acct.title || (acct.threadId && (archivedOf(acct, x) || reopen))) return
     if (acct.threadId) { await threadCall(acct, 'PATCH', `/channels/${acct.threadId}`, { name: title }); acct.sync = true }
     acct.title = title
   }
@@ -591,7 +599,8 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     for (const [key, t] of found) {
       const acct = reg.accounts[key] || (reg.accounts[key] = newAccount())
       if (acct.threadId && acct.state !== 'creating') continue
-      Object.assign(acct, { threadId: t.id, title: t.name, state: t.archived ? 'archived' : 'open', sync: true })
+      // A thread in the guild's active list counts as just active, so its first edits are not held as a reopen
+      Object.assign(acct, { threadId: t.id, title: t.name, state: t.archived ? 'archived' : 'open', sync: true }, t.archived ? {} : { activeAt: now() })
       if (fresh) for (const r of groups.get(key) || []) if (!acct.rows[r.id]) acct.rows[r.id] = { ...recordOf(r), state: stateOf(r, g), baseline: true }
       log(`adopted thread ${t.id} for ${key.startsWith('p:') ? key : 'a Discord account'}`)
     }
@@ -737,13 +746,16 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     const starter = hash !== acct.starterHash && !acct.starterGone
     await loadTags()
     const tags = tagsFor(rows, x)
-    // An edit that reopens an archived thread waits for headroom, the sync kept for a later tick
-    if (acct.state === 'archived' && (starter || !sameSet(tags, acct.tags || [])) && !(await roomForThread())) {
-      waitNote('reopened threads are held')
-      return
+    // An edit to an archived thread, or to one idle long enough that Discord archived it, waits for headroom (the sync
+    // kept for a later tick); with room the thread is reopened once, counted, before the edits
+    if (archivedOf(acct, x) && (starter || !sameSet(tags, acct.tags || []))) {
+      if (!(await roomForThread())) {
+        waitNote('reopened threads are held')
+        return
+      }
+      await unarchive(acct)
     }
     if (starter) {
-      if (acct.state === 'archived') await unarchive(acct)
       try {
         await threadCall(acct, 'PATCH', `${ch}/messages/${acct.threadId}`, { content, allowed_mentions: NO_PINGS })
       } catch (err) {
@@ -757,15 +769,12 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     }
     const patch = {}
     if (!sameSet(tags, acct.tags || [])) patch.applied_tags = tags
-    // An archived thread takes an edit only together with its unarchive; a clear one is archived again below
-    if (patch.applied_tags && acct.state === 'archived') Object.assign(patch, { archived: false }, pendingName(acct) ? { name: pendingName(acct) } : {})
-    else if (!x.inForce && acct.state !== 'archived') patch.archived = true
+    // A clear thread is archived with its tags
+    if (!x.inForce && acct.state !== 'archived') patch.archived = true
     if (Object.keys(patch).length) {
       try {
         await threadCall(acct, 'PATCH', ch, patch)
-        if ('archived' in patch) acct.state = patch.archived ? 'archived' : 'open'
-        if (patch.archived === false) acct.activeAt = now()
-        if (patch.name) acct.title = patch.name
+        if ('archived' in patch) acct.state = 'archived'
       } catch (err) {
         // A full guild or a thread still archived is not a refusal of the tags: they are tried again later
         if (err === OUT || capped(err) || NOT_FINAL.has(err.code) || !patch.applied_tags || (err.status !== 400 && err.status !== 403)) throw err
@@ -860,7 +869,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     }
     if (work.length || quiet.length) acct.sync = true
     // An open thread quiet for a week may be one Discord archived itself: reopened only with room, and counted
-    const reopen = !!acct.threadId && work.length > 0 && (acct.state === 'archived' || x.now - (acct.activeAt || 0) >= IDLE_MS)
+    const reopen = !!acct.threadId && work.length > 0 && archivedOf(acct, x)
     // A thread to make or reopen waits for headroom before the name is looked up or anything is sent
     if ((!acct.threadId || reopen) && !(await roomForThread())) {
       waitNote(acct.threadId ? 'reopened threads are held' : 'new threads are held')

@@ -780,6 +780,99 @@ test('thread headroom: a new punishment for a renamed user does not reopen the a
   assert.equal(r.registry().accounts[PEOPLE.alice.discordId].title, 'alice_new')
 })
 
+// Renamed forum tags put every thread up for a tag change, a sync with nothing to post
+const renameTags = d => { d.tags = TAGS.map(t => ({ ...t, id: t.id.replace(/^9/, '8') })) }
+
+test('thread headroom: above 975 an idle thread Discord archived itself, with only a sync to do, sends at most one request in 30 ticks; other posts go out', async () => {
+  for (const active of [980, 1000]) {
+    const d = fakeDiscord()
+    const r = await started({ discord: d, maxRequests: 10 })
+    r.data.discipline = {
+      57: [entry(1, 'suspend', T0 - HOUR, { until: T0 + 30 * DAY })],
+      58: [entry(1, 'suspend', T0 - HOUR, { char: 'Borin #BOR1', until: T0 + 30 * DAY })],
+    }
+    await r.tick()
+    // Six days on Bob gets a warning, which keeps his thread active
+    r.now += 6 * DAY
+    r.data.discipline[58].push(entry(2, 'warn', r.now - 60000, { char: 'Borin #BOR1' }))
+    await r.tick()
+    const alice = r.named('alice_rp'), bob = r.named('bob_rp')
+    // Two more days: Discord archives Alice's idle thread itself, the registry still says open
+    r.now += 2 * DAY
+    alice.archived = true
+    d.active = active
+    d.fail = (method, p, body) => (method === 'PATCH' && body && body.archived === false && d.active >= 1000 ? fakeDiscord.error(400, 160006) : null)
+    renameTags(d)
+    r.data.discipline[58].push(entry(3, 'strike', r.now - 60000, { char: 'Borin #BOR1' }))
+    const before = d.calls.length
+    for (let i = 0; i < 30; i++) {
+      r.now += 60000
+      await r.tick()
+    }
+    const into = d.calls.slice(before).filter(c => c.path.startsWith(`/channels/${alice.id}`))
+    assert.ok(into.length <= 1, `${active}: ${into.length} requests into Alice's thread in 30 ticks`)
+    assert.equal(alice.archived, true, `${active}: held`)
+    assert.equal(r.registry().accounts[PEOPLE.alice.discordId].sync, true, `${active}: the sync is kept for a later tick`)
+    assert.match(bob.messages.at(-1).content, /^\*\*STRIKE\*\* · dsc:58:3/, `${active}: Bob's strike posted`)
+    assert.equal(bob.messages.filter(m => /dsc:58:3/.test(m.content || '')).length, 1, `${active}: once`)
+    // With room Alice's thread is reopened once, counted, and takes the new tags
+    d.active = 900
+    r.now += 11 * 60000
+    await r.tick()
+    assert.equal(reopens(d).filter(c => c.path === `/channels/${alice.id}`).length, 1, `${active}: one reopen`)
+    assert.deepEqual(alice.tags, ['800000000000000010', '800000000000000014'])
+    assert.equal(r.registry().accounts[PEOPLE.alice.discordId].sync, false)
+  }
+})
+
+test('thread headroom: a thread archived since its last post that answers 50083 above 975 is recorded archived: one failing request, not one a tick', async () => {
+  const d = fakeDiscord()
+  const r = await started({ discord: d })
+  r.data.discipline = { 57: [entry(1, 'suspend', T0 - HOUR, { until: T0 + 30 * DAY })] }
+  await r.tick()
+  const t = d.thread()
+  // Archived by hand an hour later, not idle: the tracker only learns it from the 50083
+  r.now += HOUR
+  t.archived = true
+  d.active = 980
+  renameTags(d)
+  const before = d.calls.length
+  for (let i = 0; i < 30; i++) {
+    r.now += 60000
+    await r.tick()
+  }
+  const into = d.calls.slice(before).filter(c => c.path.startsWith(`/channels/${t.id}`))
+  assert.equal(into.length, 1, 'one failing tag PATCH, then held with no request')
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].state, 'archived')
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].sync, true)
+  assert.equal(reopens(d).length, 0)
+  d.active = 900
+  r.now += 11 * 60000
+  await r.tick()
+  assert.equal(reopens(d).length, 1)
+  assert.equal(t.archived, false)
+  assert.deepEqual(t.tags, ['800000000000000010', '800000000000000014'])
+})
+
+test('archiving a clear thread Discord already archived (50083) is not a reopen: one request, recorded archived', async () => {
+  const d = fakeDiscord()
+  const r = await twoArchived(d)
+  const alice = r.named('alice_rp')
+  // The registry still has it open (archived by Discord before the tracker's own archive was recorded)
+  const reg = r.registry()
+  Object.assign(reg.accounts[PEOPLE.alice.discordId], { state: 'open', sync: true })
+  fs.writeFileSync(r.file, JSON.stringify(reg))
+  r.tracker = r.make()
+  r.now += 60000
+  const before = d.calls.length
+  await r.tick()
+  assert.deepEqual(d.calls.slice(before).filter(c => c.path === `/channels/${alice.id}`).map(c => c.body), [{ archived: true }])
+  assert.equal(reopens(d).length, 0)
+  assert.equal(alice.archived, true)
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].state, 'archived')
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].sync, false)
+})
+
 test('the REST writer waits out a 429 (the global one too), backs off a 5xx, and spaces requests 1.5 s', async () => {
   let clock = 0
   const slept = []
