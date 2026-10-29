@@ -982,3 +982,21 @@ test('43. change log words that only look forward ("planned restart", "coming in
     assert.equal((await run(text)).chats.length, 1, text)
   }
 })
+
+test('44. a dated "since" inside the 7-day window reads the change log instead of saying it goes back 7 days at most', async () => {
+  const now = () => Date.UTC(2026, 9, 28, 12)
+  const run = async question => {
+    const reads = []
+    const a = createAnswerer({ sources: { read: async (intent, args) => { reads.push([intent, args.time]); return [{ key: `changes:${args.time}`, source: 'changes', label: 'Change log, last 7 days', asOf: '2026-10-28T12:00Z', text: '2026-10-27 09:00Z DEPLOYED: contract boards.' }] } },
+      model: { probe: async () => ({ ok: true }), chat: async () => ({ outcome: 'ok', content: '{"answerable":false,"answer":"","cited":[]}' }) }, flight: createSingleFlight(), readSwitch: () => ({ model: false }), settings: { ...DEFAULTS, url: 'http://model.test' }, now })
+    return { r: await a.answer({ question, viewer: { tier: 'owner' } }), reads }
+  }
+  for (const question of ['What has been deployed since October 25?', 'Any deploys since Oct 27th?']) {
+    const { r, reads } = await run(question)
+    assert.deepEqual([r.outcome, reads], ['answered', [['changes', 'week']]], question)
+    assert.ok(!r.notes.includes(TEXT.changesWindow), question)
+  }
+  const old = await run('What has been deployed since August 25?')
+  assert.deepEqual([old.r.outcome, old.reads], ['idk', []])
+  assert.match(old.r.lead[0], /goes back 7 days at most/)
+})

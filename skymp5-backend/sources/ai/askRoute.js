@@ -110,6 +110,18 @@ const BEYOND = new RegExp([
   /\b(in|during|since|before|until|prior to)\s+(19|20)\d{2}\b/.source,
   /\b(last|past)\s+([89]|[1-9]\d+)\s+days\b/.source,
 ].join('|'), 'i')
+// A dated start ("since October 25", "after the 27th of Oct 2025") is beyond only when that day is over 7 days before now
+const DATED = new RegExp(`\\b(?:since|after)\\s+(?:the\\s+)?(?:(${MONTHS})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?|(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?(${MONTHS}))\\b(?:,?\\s+((?:19|20)\\d{2})\\b)?`, 'gi')
+function datedSpan(text, now) {
+  let oldest = null
+  for (const m of text.matchAll(DATED)) {
+    const month = monthIndex(m[1] || m[4]), day = Number(m[2] || m[3]), year = m[5] ? Number(m[5]) : new Date(now).getUTCFullYear()
+    let t = Date.UTC(year, month, day)
+    if (!m[5] && t > now) t = Date.UTC(year - 1, month, day)
+    oldest = Math.max(oldest ?? 0, (now - t) / 86400000)
+  }
+  return oldest === null ? null : { beyond: oldest > 7, rest: text.replace(DATED, ' ') }
+}
 // Explicit wording inside the 7-day window wins over an older span named in passing
 const IN_WINDOW = /\b(today|tonight|yesterday|this week|last week|(the\s+)?(last|past)\s+(7 days|week|day|24 ?h(ours)?)|24 ?h|24 hours)\b/i
 // A question about a release still to come: "the next launcher version", "when will 0.3.120 be released"
@@ -129,7 +141,7 @@ const SAID = /\b(did|was|were|had)\b(?:[^.?!]|\.(?=\d)){0,60}?\b(say|said|read|s
 const OLD_WORDING = /\b(old|older|previous|earlier|former|original|prior|past|first)\s+(versions?|editions?|wording|drafts?)\b|\bbefore\s+(the|its|their|it|they)\s+((last|latest|recent)\s+)?(was\s+|were\s+|got\s+)?(update|change|rewrite|revision|edit)\w*\b/i
 const OBJECT_TIME = /\b(made|created|had|joined|registered|opened|used|bought|done|given|issued|received|happened|linked)\s+(before|until|prior to|in|during|since)\b/i
 
-function extractEntities(q) {
+function extractEntities(q, { now = Date.now() } = {}) {
   const text = String(q || '')
   const tags = [...new Set((text.match(/#[A-Za-z0-9]{4}(?![A-Za-z0-9-])/g) || []).map(t => t.toUpperCase()))]
   const threadIds = []
@@ -140,9 +152,10 @@ function extractEntities(q) {
   const clientVer = (/\b0\.3\.\d+\b/.exec(text) || [null])[0]
   const launcherVer = (/\b2\.1\.\d+\b/.exec(text) || [null])[0]
   const ruleRefs = ruleRefsOf(text)
+  const dated = datedSpan(text, now)
   const time = /since (the )?(last )?restart/i.test(text) ? 'restart'
-    : BEYOND.test(text) && !IN_WINDOW.test(text) ? 'beyond'
-    : /\b(this week|last week|week|7 days)\b/i.test(text) ? 'week'
+    : (dated ? dated.beyond || BEYOND.test(dated.rest) : BEYOND.test(text)) && !IN_WINDOW.test(text) ? 'beyond'
+    : dated || /\b(this week|last week|week|7 days)\b/i.test(text) ? 'week'
       : /\btoday\b/i.test(text) ? 'today'
         : /\b(24 ?h|24 hours|yesterday|last day)\b/i.test(text) ? '24' : null
   const quoted = [...text.matchAll(/["\u201c]([^"\u201d]{2,40})["\u201d]/g)].map(m => m[1].trim())

@@ -273,7 +273,7 @@ function createAnswerer({ sources, model, flight, limiter, readSwitch, settings,
   async function answer({ question, viewer, deadlineMs = 90000, ctx = {} }) {
     const started = now()
     const deadline = started + deadlineMs
-    const entities = extractEntities(question)
+    const entities = extractEntities(question, { now: now() })
     const owner = viewer && viewer.tier === 'owner'
     const intents = route(question, entities, viewer).filter(i => owner || !OWNERS_ONLY_INTENTS.has(i.intent))
     const canAnswer = owner ? [TEXT.canAnswer, TEXT.canAnswerOwner] : [TEXT.canAnswer]

@@ -311,3 +311,16 @@ test('protected topics: a second question after ":", a dash, "…", a fullwidth 
     assert.ok(!got.some(r => r.intent === 'refuse'), `${q}: ${JSON.stringify(got)}`)
   }
 })
+
+test('a dated "since" or "after" is beyond only when that day is over 7 days before now; inside the window it reads the 7-day log', () => {
+  const now = Date.UTC(2026, 9, 28, 12)
+  for (const q of ['What has been deployed since October 25?', 'Any deploys since Oct 27th?', 'What changed since 27 October?', 'updates since october 28th',
+    'What changed after October 25?', 'any patches since the 27th of October?']) {
+    const e = extractEntities(q, { now })
+    assert.equal(e.time, 'week', q)
+    assert.equal(route(q, e).find(r => r.intent === 'changes').args.time, 'week', q)
+  }
+  for (const q of ['releases since August', 'deploys since October 1', 'changes since December 30', 'changes since Oct 27 2025', 'what changed since Oct 27 and last month', 'what changed after September 3?']) {
+    assert.equal(extractEntities(q, { now }).time, 'beyond', q)
+  }
+})
