@@ -140,6 +140,14 @@ function disciplineRows(entries, { now, strikeDays = 90, held = new Map() }) {
       if (!s) s = list.filter(e => holds(e) && e.lifted && e.n < l.n && !liftOf.has(e.n)).pop() || null
       if (s && !liftOf.has(s.n)) { liftOf.set(s.n, l); ofLift.set(l.n, s.n) }
     }
+    // An offline player's overturn is saved before its undid: it takes the unclaimed record overturned closest at or before it
+    const undidOf = new Map()
+    const claimed = new Set(list.filter(e => e.kind === 'overturn' && e.undid).map(e => e.undid))
+    for (const o of list.filter(e => e.kind === 'overturn' && !e.undid && e.atMs !== null)) {
+      const t = list.filter(e => e.kind !== 'overturn' && e.n < o.n && e.overturned && e.overturned.atMs !== null
+        && e.overturned.atMs <= o.atMs && !claimed.has(e.n)).sort((a, b) => b.overturned.atMs - a.overturned.atMs || b.n - a.n)[0]
+      if (t) { claimed.add(t.n); undidOf.set(o.n, t.n) }
+    }
     let counting = 0
     for (const e of list) {
       const r = row({
@@ -169,7 +177,7 @@ function disciplineRows(entries, { now, strikeDays = 90, held = new Map() }) {
         const hold = list.find(x => x.n === r.lifts && HOLD_KINDS.has(x.kind))
         r.liftsKind = (hold && hold.kind) || e.liftsKind
       } else if (e.kind === 'overturn') {
-        r.undid = e.undid
+        r.undid = e.undid || undidOf.get(e.n) || null
       }
       // A lift can be overturned too; the page shows who and why only on an overturned state
       if (e.overturned && r.state === 'recorded') r.state = 'overturned'

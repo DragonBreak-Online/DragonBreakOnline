@@ -1228,6 +1228,41 @@ test('a strike stops counting (EXPIRED), an overturned strike posts OVERTURNED',
   assert.match(posts[posts.length - 1], /^\*\*EXPIRED\*\* · strike dsc:57:1 stopped counting <t:\d+:D>$/)
 })
 
+test('an overturn of an offline player (saved before its undid) posts OVERTURNED once, never an unmatched post', async () => {
+  const r = await started()
+  r.data.discipline = { 57: [entry(1, 'strike', T0), entry(2, 'strike', T0)] }
+  await r.tick()
+  r.now += 60000
+  r.data.discipline[57][1].overturned = { by: 'Jake #JAKE', at: iso(r.now), reason: 'wrong player' }
+  r.data.discipline[57].push(entry(3, 'overturn', r.now + 5, { by: 'Jake #JAKE', reason: 'wrong player' }))
+  await r.tick()
+  // The undid lands at the player's next login
+  r.now += 60000
+  r.data.discipline[57][2].undid = 2
+  await r.tick()
+  const posts = r.posts()
+  assert.ok(!posts.some(c => /unmatched/.test(c)), posts.join('\n'))
+  assert.equal(posts.filter(c => c === '**OVERTURNED** · strike dsc:57:2 — by Jake #JAKE: wrong player').length, 1)
+  assert.equal(r.discord.threads.size, 1)
+})
+
+test('an overturned lift of an offline player (no undid yet) is posted as OVERTURNED in the thread', async () => {
+  const r = await started()
+  r.data.discipline = { 57: [entry(1, 'suspend', T0, { until: T0 + DAY })] }
+  await r.tick()
+  r.now += 60000
+  r.data.discipline[57][0].lifted = true
+  r.data.discipline[57].push(entry(2, 'lift', r.now, { by: 'Mia #MIA1', reason: 'served enough', lifts: 1, liftsKind: 'suspend' }))
+  await r.tick()
+  r.now += 60000
+  r.data.discipline[57][1].overturned = { by: 'Jake #JAKE', at: iso(r.now), reason: 'the lift was wrong' }
+  r.data.discipline[57].push(entry(3, 'overturn', r.now, { by: 'Jake #JAKE', reason: 'the lift was wrong' }))
+  await r.tick()
+  const msgs = r.messages()
+  assert.equal(msgs.length, 4)
+  assert.equal(msgs[3].content, '**OVERTURNED** · lift dsc:57:2 of suspension dsc:57:1 — by Jake #JAKE: the lift was wrong')
+})
+
 test('a Discord timeout ended early names who ended it; one replaced by a newer timeout says so', async () => {
   const r = await started()
   const to = (id, at, extra = {}) => ({ v: 1, id, kind: 'discord_timeout', at: iso(at), until: iso(at + HOUR), discordId: PEOPLE.bob.discordId, reason: 'spam', by: { name: 'Lena' }, ...extra })

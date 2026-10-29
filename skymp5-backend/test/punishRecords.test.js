@@ -138,6 +138,25 @@ test('discipline: a ban runs with no end until lifted or overturned, and a lift 
   assert.deepEqual([old[0].state, old[0].lifted.by, old[1].lifts, old[1].liftsKind], ['lifted', 'M #MMMM', 1, 'ban'])
 })
 
+test('discipline: an overturn saved without undid (player offline) takes the unclaimed record overturned closest before it', () => {
+  const now = Date.parse('2026-10-28T12:00:00Z')
+  const at = m => new Date(now - m * 60000).toISOString()
+  const ov = m => ({ by: 'O #OOOO', at: at(m), reason: 'wrong player' })
+  const { rows } = R.disciplineRows(R.parseDiscipline({ profiles: { 14: [
+    { n: 1, kind: 'strike', reason: 'a', by: 'L #LLLL', at: at(60), char: 'V #VVVV', overturned: ov(30) },
+    { n: 2, kind: 'warn', reason: 'b', by: 'L #LLLL', at: at(50), char: 'V #VVVV', overturned: ov(20) },
+    { n: 3, kind: 'strike', reason: 'c', by: 'L #LLLL', at: at(40), char: 'V #VVVV', overturned: ov(10) },
+    { n: 4, kind: 'overturn', reason: 'wrong player', by: 'O #OOOO', at: at(30), char: 'V #VVVV' },
+    { n: 5, kind: 'overturn', reason: 'wrong player', by: 'O #OOOO', at: at(20), char: 'V #VVVV' },
+    // n 6 kept its undid (a later save landed it); n 7 has nothing left to claim
+    { n: 6, kind: 'overturn', reason: 'wrong player', by: 'O #OOOO', at: at(10), char: 'V #VVVV', undid: 3 },
+    { n: 7, kind: 'overturn', reason: 'wrong player', by: 'O #OOOO', at: at(5), char: 'V #VVVV' },
+  ] } }), { now })
+  const by = Object.fromEntries(rows.map(r => [r.id, r]))
+  assert.deepEqual([4, 5, 6, 7].map(n => by[`dsc:14:${n}`].undid), [1, 2, 3, null])
+  assert.deepEqual([1, 2, 3].map(n => by[`dsc:14:${n}`].state), ['overturned', 'overturned', 'overturned'])
+})
+
 test('parsers keep no address, hwid or Concordat "by", and bans.json is parsed without sources/bans.js', () => {
   const ab = R.parseAdminBans({ bans: [{ id: 'a1', profileId: 3, name: 'X', ip: '81.2.69.1', until: 0, reason: 'r', by: 'profile 1', at: 5 }, { id: '../x' }] })
   assert.equal(ab.length, 1)
