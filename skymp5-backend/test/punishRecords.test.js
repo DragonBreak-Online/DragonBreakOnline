@@ -157,6 +157,21 @@ test('discipline: an overturn saved without undid (player offline) takes the unc
   assert.deepEqual([1, 2, 3].map(n => by[`dsc:14:${n}`].state), ['overturned', 'overturned', 'overturned'])
 })
 
+test('discipline: an overturn without undid takes the closest record, not an older one whose overturn entry is missing', () => {
+  const now = Date.parse('2026-10-28T12:00:00Z')
+  const at = m => new Date(now - m * 60000).toISOString()
+  const ov = m => ({ by: 'O #OOOO', at: at(m), reason: 'wrong player' })
+  const { rows } = R.disciplineRows(R.parseDiscipline({ profiles: { 14: [
+    // n 1 is marked overturned but its overturn entry was never saved (an orphan marker), older than n 2's
+    { n: 1, kind: 'strike', reason: 'a', by: 'L #LLLL', at: at(60), char: 'V #VVVV', overturned: ov(40) },
+    { n: 2, kind: 'strike', reason: 'b', by: 'L #LLLL', at: at(50), char: 'V #VVVV', overturned: ov(10) },
+    { n: 3, kind: 'overturn', reason: 'wrong player', by: 'O #OOOO', at: at(10), char: 'V #VVVV' },
+  ] } }), { now })
+  const by = Object.fromEntries(rows.map(r => [r.id, r]))
+  assert.equal(by['dsc:14:3'].undid, 2)
+  assert.deepEqual([1, 2].map(n => by[`dsc:14:${n}`].state), ['overturned', 'overturned'])
+})
+
 test('parsers keep no address, hwid or Concordat "by", and bans.json is parsed without sources/bans.js', () => {
   const ab = R.parseAdminBans({ bans: [{ id: 'a1', profileId: 3, name: 'X', ip: '81.2.69.1', until: 0, reason: 'r', by: 'profile 1', at: 5 }, { id: '../x' }] })
   assert.equal(ab.length, 1)

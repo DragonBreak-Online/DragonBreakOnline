@@ -740,6 +740,50 @@ test('thread headroom: an idle thread Discord archived that answers 50083 is hel
   assert.match(t.messages.at(-1).content, /^\*\*STRIKE\*\* · dsc:57:3/)
 })
 
+// Idle means quiet 7 days less the 1 h margin, and an account with no activeAt (kept from before it was recorded) is idle
+test('thread headroom: a post 7 d - 1 h - 1 min after the last goes out unchecked; at 7 d - 1 h, or with no activeAt, it waits for room', async () => {
+  const quiet = async (gap, { dropActiveAt = false } = {}) => {
+    const d = fakeDiscord()
+    const r = await started({ discord: d })
+    r.data.discipline = { 57: [entry(1, 'suspend', T0 - HOUR, { until: T0 + 30 * DAY })] }
+    await r.tick()
+    const reg = r.registry()
+    const acct = reg.accounts[PEOPLE.alice.discordId]
+    assert.equal(acct.activeAt, T0)
+    if (dropActiveAt) {
+      delete acct.activeAt
+      fs.writeFileSync(r.file, JSON.stringify(reg))
+      r.tracker = r.make()
+    }
+    d.active = 980
+    r.now = T0 + gap
+    r.data.discipline[57].push(entry(2, 'strike', r.now - 60000))
+    const before = d.calls.length
+    await r.tick()
+    const checks = d.calls.slice(before).filter(c => c.path.endsWith('/threads/active')).length
+    return { r, d, checks, posted: r.registry().accounts[PEOPLE.alice.discordId].rows['dsc:57:2'] }
+  }
+  const early = await quiet(7 * DAY - HOUR - 60000)
+  assert.equal(early.checks, 0, 'not idle yet: no headroom check')
+  assert.ok(early.posted.postedAt, 'posted')
+  assert.match(early.r.messages().at(-1).content, /^\*\*STRIKE\*\* · dsc:57:2/)
+  assert.equal(reopens(early.d).length, 0)
+  for (const [name, idle] of [['7 d - 1 h', await quiet(7 * DAY - HOUR)], ['no activeAt', await quiet(60000, { dropActiveAt: true })]]) {
+    assert.equal(idle.checks, 1, `${name}: idle, headroom checked`)
+    assert.equal(idle.posted, undefined, `${name}: held above 975, the row kept unposted`)
+    assert.equal(reopens(idle.d).length, 0, name)
+    assert.deepEqual(idle.r.audits, ['PUNISH-TRACKER waiting for thread headroom: reopened threads are held'], name)
+  }
+  // With room, an account with no activeAt is reopened once (a no-op on an open thread) and the post lands
+  const none = await quiet(60000, { dropActiveAt: true })
+  none.d.active = 0
+  none.r.now += 11 * 60000
+  await none.r.tick()
+  assert.equal(reopens(none.d).length, 1)
+  assert.ok(none.r.registry().accounts[PEOPLE.alice.discordId].rows['dsc:57:2'].postedAt, 'posted')
+  assert.equal(none.r.registry().accounts[PEOPLE.alice.discordId].activeAt, none.r.now)
+})
+
 test('thread headroom: after a 160006 no thread is reopened until the next headroom check', async () => {
   const d = fakeDiscord()
   const r = await started({ discord: d })
