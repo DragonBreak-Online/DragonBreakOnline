@@ -1225,6 +1225,35 @@ test('a profile linked to a Discord account that has its own thread: its records
   assert.match(r.named('nell_rp').messages[0].content, /Strikes counting: 1 of 3/)
 })
 
+test('a profile thread moved to a Discord account with only history keeps its activity time: not held as a reopen above 975', async () => {
+  const d = fakeDiscord()
+  const X = '844444444444444444'
+  d.members[X] = 'nell_rp'
+  // X's only record, a timeout that ran out before the first run, is history: X has an account but no thread
+  const r = rig({ discord: d, data: { journal: [{ v: 1, id: 'M-NELL0002', kind: 'discord_timeout', at: iso(T0 - 10 * DAY), until: iso(T0 - 9 * DAY), discordId: X, reason: 'spam', by: { name: 'Lena' } }] } })
+  assert.equal(await r.tick(), true)
+  assert.equal(r.registry().accounts[X].threadId, null)
+  r.data.discipline = { 70: [entry(1, 'strike', T0, { char: 'Nell #NEL1' })] }
+  await r.tick()
+  const nell = r.named('profile 70')
+  assert.equal(r.registry().accounts['p:70'].activeAt, T0)
+  // Linked 11 minutes later, with 980 threads active and the headroom answer out of date
+  r.links[70] = X
+  d.active = 980
+  r.now += 11 * 60000
+  const before = d.calls.length
+  await r.tick()
+  const reg = r.registry()
+  assert.equal(reg.accounts['p:70'], undefined)
+  assert.equal(reg.accounts[X].threadId, nell.id)
+  assert.equal(reg.accounts[X].activeAt, T0, 'the activity time moves with the thread')
+  assert.deepEqual(r.audits, [], 'not held as a reopen')
+  assert.equal(d.calls.slice(before).filter(c => c.path.endsWith('/threads/active')).length, 0, 'no headroom check')
+  assert.equal(reopens(d).length, 0, 'no reopen of an open thread')
+  assert.equal(nell.archived, false)
+  assert.match(nell.messages[0].content, /^<@844444444444444444> · nell_rp\n/, 'the starter carries the new marker at once')
+})
+
 test('profiles.json unreadable: nothing is posted; a record whose key changes back to its profile is never posted again', async () => {
   const r = await started()
   r.data.discipline = { 57: [entry(1, 'strike', T0)] }

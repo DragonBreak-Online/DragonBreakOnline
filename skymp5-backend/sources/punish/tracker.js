@@ -637,7 +637,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
         Object.assign(to, { rows: { ...from.rows, ...to.rows }, sync: true })
         to.profileIds = [...new Set([...(to.profileIds || []), ...(from.profileIds || [])])].sort((a, b) => a - b)
         if (!to.threadId && from.threadId) {
-          Object.assign(to, { threadId: from.threadId, title: from.title, state: from.state, starterHash: null, tags: from.tags || [], username: null, usernameAt: 0 })
+          Object.assign(to, { threadId: from.threadId, title: from.title, state: from.state, activeAt: from.activeAt, starterHash: null, tags: from.tags || [], username: null, usernameAt: 0 })
           delete reg.accounts[old]
         } else if (from.threadId) Object.assign(from, { rows: {}, movedTo: key })
         else delete reg.accounts[old]
