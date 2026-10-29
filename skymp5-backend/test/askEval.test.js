@@ -36,6 +36,7 @@ test('the eval scores answers, "I don\'t know" and refusals, and reports the war
   const m = JSON.parse(fs.readFileSync(path.join(out, 'metrics.json'), 'utf8'))
   const rows = fs.readFileSync(path.join(out, 'results.jsonl'), 'utf8').trim().split('\n').map(l => JSON.parse(l))
   assert.deepEqual(rows.map(r => [r.id, r.got, r.correct]), [['x1', 'answer', true], ['x2', 'idk', true], ['x3', 'refuse', true], ['x4', 'withheld', false]])
+  assert.deepEqual([rows[0].answer, rows[0].missing, rows[3].answer], ['D3 says to keep IC and OOC separate.', [], null])
   assert.equal(m.correct, 0.75)
   assert.equal(m.idk, 1)
   assert.deepEqual([m.withheld, m.withheldShown], [1, 0])
@@ -45,4 +46,16 @@ test('the eval scores answers, "I don\'t know" and refusals, and reports the war
   assert.equal(code, 1)
   assert.match(lines[0], /75\.0% correct.*median 500, 0 over median\+1000\): FAIL \(correct, warmLoadMs\)$/)
   assert.equal(fs.statSync(path.join(out, 'metrics.json')).mode & 0o777, 0o600)
+})
+
+test('a load far above the median is counted as a reload; the gate keeps the spec threshold', async () => {
+  const set = path.join(TMP, 'set2.jsonl')
+  fs.writeFileSync(set, ['D1', 'D3', 'D5', 'D6'].map((r, i) => JSON.stringify({ id: `r${i}`, question: `What does ${r} say?`, cards: 'rules', expect: 'idk', must_contain: [] })).join('\n'))
+  const loads = [4000, 500, 2600, 480]
+  const fetch = async url => (url.endsWith('/api/version') ? { status: 200, text: async () => '{"version":"0.30.10"}' }
+    : { status: 200, text: async () => JSON.stringify({ message: { content: '{"answerable":false,"answer":"no","cited":[]}' }, load_duration: loads.shift() * 1e6 }) })
+  const out = path.join(TMP, 'out2')
+  await main(['--set', set, '--out', out], { fetch, settings: { ...DEFAULTS, url: 'http://model.test' }, out: () => {} })
+  const m = JSON.parse(fs.readFileSync(path.join(out, 'metrics.json'), 'utf8'))
+  assert.deepEqual([m.warmLoadMs, m.warmLoadMedianMs, m.warmLoadsOverMedian, m.gates.warmLoadMs, m.idk], [2600, 500, 1, false, 1])
 })

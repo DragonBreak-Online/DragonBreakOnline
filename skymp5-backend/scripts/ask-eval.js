@@ -66,9 +66,12 @@ async function main(argv = process.argv.slice(2), { fetch = globalThis.fetch, se
       const got = classify(r)
       const reply = compose(r).content
       const answerText = (r.answer || '').toLowerCase()
-      const contains = (row.must_contain || []).every(w => answerText.includes(String(w).toLowerCase()))
-      const correct = got === row.expect && (got !== 'answer' || contains)
-      results.push({ run, id: row.id, expect: row.expect, got, correct, outcome: r.outcome, mode: r.mode, check: r.check, repair: !!r.repair, ms, model_ms: r.modelMs || 0, load_ms: loads, withheld_shown: r.outcome === 'withheld' && !!r.answer && reply.includes(r.answer) })
+      const missing = (row.must_contain || []).filter(w => !answerText.includes(String(w).toLowerCase()))
+      const correct = got === row.expect && (got !== 'answer' || !missing.length)
+      results.push({
+        run, id: row.id, expect: row.expect, got, correct, outcome: r.outcome, mode: r.mode, check: r.check, repair: !!r.repair, ms, model_ms: r.modelMs || 0, load_ms: loads,
+        withheld_shown: r.outcome === 'withheld' && !!r.answer && reply.includes(r.answer), answer: r.answer || null, missing,
+      })
     }
   }
   const unanswerable = results.filter(r => r.expect === 'idk')
