@@ -64,30 +64,44 @@ const usable = c => c && c.text && c.text !== 'not available' && c.stale !== 'ra
 const norm = s => String(s).replace(/[\u2018\u2019]/g, "'").replace(/[\u201c\u201d]/g, '"').replace(/\s+/g, ' ').trim()
 const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-// Grounding compares words, not characters: case, whitespace, punctuation, quote marks and apostrophes, markdown (**bold**,
-// `code`, [links](...), list markers), hyphens and thousands separators (1,000 = 1000) do not count; every word and every
-// number must still be there, in the same order. "1.5" and "0.3.109" stay one word, so 1.5 never matches 15
+// Grounding compares words: case, punctuation, quote marks, markdown and thousands separators (1,000) do not count; "1.5" stays one word
 const unmark = s => String(s).normalize('NFKC').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_`~]+/g, ' ')
   .replace(/[\u2018\u2019\u02bc\u0060\u00b4]/g, "'").replace(/(\d),(?=\d{3}(?!\d))/g, '$1')
 const words = s => unmark(s).toLowerCase().match(/[\p{L}\p{N}]+(?:['.][\p{L}\p{N}]+)*/gu) || []
 const ELLIPSIS = /\s*(?:\.\s?){3,}\s*|\s*\[\s*\.\.\.\s*\]\s*/
-const MAX_GAP = 40
+const MAX_GAP = 60
+// A table row, a heading or a line led by bold text (a rule, a rank, "You can't:") starts a new block of a fact
+const BLOCK_START = /^\s*(\||#{1,6}\s|(?:[-*]\s+|\d+\.\s+)?\*\*)/
 
-// A quote is grounded when its words appear, in order and unbroken, in the fact's words. An ellipsis inside a quote marks words
-// left out: the parts must then appear in that order in the same fact, at most 40 words apart, so pieces from far apart in a
-// fact cannot be joined into a sentence it does not say. An empty quote is no quote
-function quoteIn(quote, factWords) {
+// A fact's words, each with the block it is in
+function factWords(text) {
+  const out = { words: [], block: [] }
+  let b = 0
+  for (const line of String(text).split('\n')) {
+    if (BLOCK_START.test(line)) b++
+    for (const w of words(line)) { out.words.push(w); out.block.push(b) }
+  }
+  return out
+}
+
+// The quote's words in order and unbroken; an ellipsis may leave out up to 60 words, never across a block (another rank's row)
+function quoteIn(quote, fact) {
   const parts = String(quote).split(ELLIPSIS).map(words).filter(p => p.length)
   if (!parts.length) return true
-  const at = (p, i) => p.every((w, k) => factWords[i + k] === w)
-  const from = (n, start, limit) => {
+  const fw = fact.words
+  const at = (p, i) => p.every((w, k) => fw[i + k] === w)
+  const from = (n, start, limit, block) => {
     if (n === parts.length) return true
-    for (let i = start; i <= Math.min(limit, factWords.length - parts[n].length); i++) {
-      if (at(parts[n], i) && from(n + 1, i + parts[n].length, i + parts[n].length + MAX_GAP)) return true
+    for (let i = start; i <= Math.min(limit, fw.length - parts[n].length); i++) {
+      if (block !== null && fact.block[i] !== block) break
+      if (at(parts[n], i) && from(n + 1, i + parts[n].length, i + parts[n].length + MAX_GAP, fact.block[i + parts[n].length - 1])) return true
     }
     return false
   }
-  return from(0, 0, factWords.length)
+  for (let i = 0; i <= fw.length - parts[0].length; i++) {
+    if (at(parts[0], i) && from(1, i + parts[0].length, i + parts[0].length + MAX_GAP, fact.block[i + parts[0].length - 1])) return true
+  }
+  return false
 }
 // Fact and question text cannot open a new fact or a new section of the prompt
 const neutral = s => String(s).replace(/\[F(\d{1,2})\]/g, '(F$1)').replace(/^(\s*)(QUESTION|FACTS)\s*:/gim, '$1$2 -')
@@ -131,23 +145,29 @@ function parseReply(text) {
 }
 
 const strings = (v, max, len) => Array.isArray(v) && v.length <= max && v.every(x => typeof x === 'string' && x.length <= len)
+// Size limits that only bound the reply: a grounded answer with a 4th quote or a 205-character quote is still checked, not repaired
+const LIMITS = Object.freeze({ answer: 900, cited: 8, quotes: 6, quote: 400 })
+const factId = x => (typeof x === 'string' ? (/^\s*\[?(F[0-9]{1,2})\]?\s*$/.exec(x) || [])[1] : undefined)
 
 // {ok, json: true|false, reason, value}: json false means the reply is not JSON for the schema (worth one repair turn)
 function checkAnswer(reply, facts, q) {
   const v = parseReply(reply)
   if (!v || typeof v !== 'object' || Array.isArray(v)) return { ok: false, json: false, reason: 'not json' }
-  if (typeof v.answerable !== 'boolean' || typeof v.answer !== 'string' || v.answer.length > 900) return { ok: false, json: false, reason: 'types' }
-  if (!strings(v.cited, 4, 3) || !v.cited.every(x => /^F[0-9]{1,2}$/.test(x))) return { ok: false, json: false, reason: 'types' }
-  if (v.quotes !== undefined && v.quotes !== null && !strings(v.quotes, 3, 200)) return { ok: false, json: false, reason: 'types' }
+  if (typeof v.answerable !== 'boolean') return { ok: false, json: false, reason: 'types', detail: 'answerable must be true or false' }
+  // "I don't know" shows no model text, so its citations and quotes cannot make it wrong
+  if (!v.answerable) return { ok: true, json: true, reason: null, value: { answerable: false, answer: typeof v.answer === 'string' ? v.answer.trim() : '', cited: [], quotes: [] } }
+  if (typeof v.answer !== 'string' || v.answer.length > LIMITS.answer) return { ok: false, json: false, reason: 'types', detail: `answer must be a string of at most ${LIMITS.answer} characters` }
+  const ids = Array.isArray(v.cited) && v.cited.length <= LIMITS.cited ? v.cited.map(factId) : null
+  if (!ids || ids.some(x => !x)) return { ok: false, json: false, reason: 'types', detail: 'cited must be a list of fact ids like "F1"' }
+  if (v.quotes !== undefined && v.quotes !== null && !strings(v.quotes, LIMITS.quotes, LIMITS.quote)) return { ok: false, json: false, reason: 'types', detail: 'quotes must be at most 3 short exact quotes' }
   const byId = new Map(facts.map(f => [f.id, f]))
-  if (!v.cited.every(id => byId.has(id))) return { ok: false, json: true, reason: 'cited' }
-  const value = { answerable: v.answerable, answer: v.answer.trim(), cited: [...new Set(v.cited)], quotes: (v.quotes || []).filter(x => x.trim()) }
-  if (!value.answerable) return { ok: true, json: true, reason: null, value }
+  if (!ids.every(id => byId.has(id))) return { ok: false, json: true, reason: 'cited' }
+  const value = { answerable: true, answer: v.answer.trim(), cited: [...new Set(ids)], quotes: (v.quotes || []).filter(x => x.trim()) }
   if (!value.cited.length) return { ok: false, json: true, reason: 'cited' }
   if (!value.answer) return { ok: false, json: true, reason: 'empty' }
   if (CLAIMS_ACTION.test(norm(value.answer)) || ASKS_SECRET.test(value.answer)) return { ok: false, json: true, reason: 'action' }
-  const cited = value.cited.map(id => words(byId.get(id).text))
-  if (!value.quotes.every(x => cited.some(w => quoteIn(x, w)))) return { ok: false, json: true, reason: 'quote' }
+  const cited = value.cited.map(id => factWords(byId.get(id).text))
+  if (!value.quotes.every(x => cited.some(f => quoteIn(x, f)))) return { ok: false, json: true, reason: 'quote' }
   const known = unmark(`${facts.map(f => `${f.label} ${f.asOf || ''} ${f.text}`).join('\n')}\n${q}`)
   for (const token of unmark(value.answer).match(ANSWER_TOKENS) || []) {
     // A bare number may carry a unit or a zone letter in the facts (18:00Z, 90d); it may never be part of a longer number
@@ -277,7 +297,8 @@ function createAnswerer({ sources, model, flight, limiter, readSwitch, settings,
       let checked = checkAnswer(first.content, facts, question)
       if (!checked.ok && !checked.json && left() >= REPAIR_MIN_MS) {
         out.repair = true
-        const second = await call([{ role: 'assistant', content: String(first.content).slice(0, 4000) }, { role: 'user', content: REPAIR }])
+        const fix = checked.detail ? `${REPAIR} The problem: ${checked.detail}.` : REPAIR
+        const second = await call([{ role: 'assistant', content: String(first.content).slice(0, 4000) }, { role: 'user', content: fix }])
         out.modelMs += second.ms || 0
         if (second.outcome !== 'ok') return { ...out, outcome: second.outcome }
         checked = checkAnswer(second.content, facts, question)

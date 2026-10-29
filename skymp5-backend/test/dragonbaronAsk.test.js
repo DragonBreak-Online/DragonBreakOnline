@@ -742,3 +742,34 @@ test('30. an older version of the rules or handbook is not in the data: "I don\'
   assert.equal(model.chats.length, 1)
   assert.match(edited(r.calls).content, /^Nobody is punished just for having had a second account before 21 October 2026\./)
 })
+
+test('31. an ellipsis may join a list heading to its items, never one block (a rank row, "You can:") to another', () => {
+  const list = { id: 'F1', label: 'Staff Handbook 2026-10-21, 6', asOf: '2026-10-21', text: "**You can:**\n\n- teleport to a player;\n- read `/bug` reports.\n\n**You can't:**\n\n- spawn or give items or gold;\n- reopen character creation for other players (ask a GM);\n- change skills, stats, races or character data beyond a rename;\n- grant, move or remove houses, rooms, shops or faction members;\n- kick, warn, strike, ban, mute or jail players, or free anyone from a jail sentence;\n- edit the world, dungeons, loot or server settings." }
+  const q = quote => checkAnswer({ answerable: true, answer: 'A Trial GM cannot edit server settings.', cited: ['F1'], quotes: [quote] }, [list], 'may a trial gm edit the world').ok
+  assert.equal(q("You can't: ... edit the world, dungeons, loot or server settings."), true)
+  assert.equal(q('You can: teleport to a player; read /bug reports.'), true)
+  assert.equal(q('You can: ... kick, warn, strike, ban, mute or jail players'), false)
+  assert.equal(q("You can't ... read /bug reports"), false)
+  assert.equal(q("You can't: ... edit the world, dungeons, loot or player settings."), false)
+})
+
+test('32. size limits never turn a grounded reply into a repair; "I don\'t know" ignores its citations; a bad type gets a repair that names it', async () => {
+  const fact = { id: 'F1', label: 'Server Rules 2026-10-21, rule 8', asOf: '2026-10-21', text: "**8. Do Not Immediately Return After Death.** If your character dies during an active conflict, you may not respawn and immediately return to that conflict. Your death triggers the server's New Life Rule, as rule 9 explains." }
+  const long = "Do Not Immediately Return After Death. If your character dies during an active conflict, you may not respawn and immediately return to that conflict. Your death triggers the server's New Life Rule, as rule 9 explains."
+  const ok = v => checkAnswer({ answerable: true, answer: 'You may not return to that conflict.', cited: ['F1'], ...v }, [fact], 'rule 8')
+  assert.ok(long.length > 200)
+  assert.deepEqual([ok({ quotes: ['Do Not Immediately Return After Death.', 'you may not respawn', 'New Life Rule', long] }).ok, ok({ cited: ['[F1]'], quotes: [long] }).ok], [true, true])
+  assert.deepEqual(ok({ quotes: ['Do Not Immediately Return After Death.', 'you may not respawn', 'New Life Rule', 'you may return after 5 minutes'] }).reason, 'quote')
+  const idk = checkAnswer({ answerable: false, answer: 'Nothing on house sizes.', cited: ['F1', 'F2', 'F3', 'F4', 'F9'], quotes: ['9.5. **How many factions**.', 'a', 'b', 'c'] }, [fact], 'house size')
+  assert.deepEqual([idk.ok, idk.value.answerable, idk.value.cited], [true, false, []])
+  assert.deepEqual([ok({ answerable: 'yes' }).json, ok({ answerable: 'yes' }).detail], [false, 'answerable must be true or false'])
+  assert.equal(ok({ cited: ['F1', 'F1', 'F1', 'F1', 'F1', 'F1', 'F1', 'F1', 'F1'] }).json, false)
+
+  model.replies.push({ ...VALID, answerable: 'yes' }, { ...VALID, answerable: 'yes' })
+  const { ask, usageFile } = make()
+  const { it } = interaction('what does D3 say')
+  await ask.handleInteraction(it)
+  assert.equal(model.chats.length, 2)
+  assert.equal(model.chats[1].messages.at(-1).content, `${REPAIR} The problem: answerable must be true or false.`)
+  assert.deepEqual(JSON.parse(fs.readFileSync(usageFile, 'utf8').trim()).check, 'badjson')
+})
