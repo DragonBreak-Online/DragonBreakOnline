@@ -940,6 +940,37 @@ test('thread headroom: a thread archived since its last post that answers 50083 
   assert.deepEqual(t.tags, ['800000000000000010', '800000000000000014'])
 })
 
+test('thread headroom: a reply into a thread archived by hand that answers 160006 at the cap is recorded archived: sent once, no lookup a tick', async () => {
+  const d = fakeDiscord()
+  const r = await started({ discord: d })
+  r.data.discipline = { 57: [entry(1, 'suspend', T0 - HOUR, { until: T0 + 30 * DAY })] }
+  await r.tick()
+  const t = d.thread()
+  // Closed by staff an hour later, not idle: the guild is full, so the reply's implied unarchive is refused
+  r.now += HOUR
+  t.archived = true
+  d.active = 1000
+  d.fail = (method, p) => (method === 'POST' && p === `/channels/${t.id}/messages` && t.archived && d.active >= 1000 ? fakeDiscord.error(400, 160006) : null)
+  r.data.discipline[57].push(entry(2, 'warn', r.now))
+  const before = d.calls.length
+  for (let i = 0; i < 30; i++) {
+    r.now += 60000
+    await r.tick()
+  }
+  const calls = d.calls.slice(before)
+  assert.equal(calls.filter(c => c.method === 'POST' && c.path === `/channels/${t.id}/messages`).length, 1, 'the refused reply is sent once')
+  assert.ok(calls.filter(c => c.path.startsWith(`/guilds/${GUILD}/members/`)).length <= 1, 'no username lookup a tick')
+  assert.equal(calls.filter(c => c.path.startsWith(`/channels/${t.id}`)).length, 1, 'held after the 160006 with nothing sent into the thread')
+  assert.equal(reopens(d).length, 0)
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].state, 'archived')
+  d.active = 900
+  r.now += 11 * 60000
+  await r.tick()
+  assert.equal(reopens(d).length, 1)
+  assert.equal(t.archived, false)
+  assert.equal(t.messages.length, 3, 'the starter, the suspension and the warning, each once')
+})
+
 test('archiving a clear thread Discord already archived (50083) is not a reopen: one request, recorded archived', async () => {
   const d = fakeDiscord()
   const r = await twoArchived(d)

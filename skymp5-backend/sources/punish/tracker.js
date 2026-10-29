@@ -734,7 +734,8 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     try {
       msg = await threadCall(acct, 'POST', `/channels/${acct.threadId}/messages`, { content, allowed_mentions: NO_PINGS, nonce: nonceOf(key, w.nonce ? `${id}|${w.nonce}` : id, w.st), enforce_nonce: true })
     } catch (err) {
-      capped(err)
+      // A reply into an archived thread at the cap: recorded archived, so the next tick's reopen waits for room
+      if (capped(err)) { acct.state = 'archived'; dirty = true }
       if (!refusedForGood(err)) throw err
       note(`drop-${id}-${w.st}`, `Discord refused the post for ${id} (${w.st}) for good, dropped: ${err.message}`)
       dropped = true
