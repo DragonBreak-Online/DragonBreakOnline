@@ -1574,3 +1574,35 @@ test('a ref-less ban lifted, then a new ban with a ref minutes later, is posted 
   assert.equal(rows['ban:B-DDDDDD'].state, 'running')
   assert.equal(rows[R.reflessBanId(PEOPLE.bob.discordId)].state, 'unbanned')
 })
+
+test('a registry kept from another forum posts nothing, logged once an hour, until the forum matches again', async () => {
+  const r = await started()
+  r.data.discipline = { 57: [entry(1, 'strike', T0)] }
+  await r.tick()
+  assert.equal(r.discord.threads.size, 1)
+  const saved = fs.readFileSync(r.file, 'utf8')
+  const calls = r.discord.calls.length
+  r.tracker = createTracker({
+    snapshot: () => snap(r.data, r.now, r.status, r.links, r.idStatus),
+    config: { punishTracker: 'on', punishTrackerFile: r.file, punishTrackerForumId: '1564694518194774099', discordGuildId: GUILD, discordBotToken: 'test-token' },
+    now: () => r.now, discord: r.discord, log: l => r.logs.push(l), audit: l => r.audits.push(l),
+  })
+  r.data.discipline[57].push(entry(2, 'strike', r.now))
+  r.data.discipline[58] = [entry(1, 'warn', r.now)]
+  await r.tick()
+  r.now += 30 * 60000
+  await r.tick()
+  assert.equal(r.discord.calls.length, calls, 'no request of any kind reaches Discord')
+  assert.equal(fs.readFileSync(r.file, 'utf8'), saved, 'the registry is left as it was')
+  const forumLogs = () => r.logs.filter(l => /registry belongs to forum 1564694518194774067, not the configured 1564694518194774099/.test(l)).length
+  assert.equal(forumLogs(), 1)
+  r.now += HOUR
+  await r.tick()
+  assert.equal(forumLogs(), 2)
+  assert.equal(r.discord.calls.length, calls)
+
+  r.tracker = r.make()
+  await r.tick()
+  assert.equal(r.discord.threads.size, 2)
+  assert.equal(r.named('alice_rp').messages.length, 3)
+})

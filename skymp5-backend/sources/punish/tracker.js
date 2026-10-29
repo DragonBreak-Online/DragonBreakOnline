@@ -886,6 +886,11 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
       reg = loaded || emptyRegistry()
       fresh = !loaded
     }
+    // A registry kept from another forum would send its threads' posts there and the new ones here
+    if (reg.forumId !== s.forumId) {
+      note('forum', `the registry belongs to forum ${reg.forumId}, not the configured ${s.forumId}; nothing is posted. Move it away so the tracker rebuilds it from this forum`, HOUR_MS)
+      return
+    }
     const snap = snapshot()
     // Without the profile links every record would key to its profile alone: a second thread and every post again
     const idStatus = (snap.id && snap.id.status) || {}
