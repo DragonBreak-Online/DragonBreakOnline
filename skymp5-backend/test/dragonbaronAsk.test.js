@@ -794,3 +794,16 @@ test('33. a release still to come is "I don\'t know" without the model unless a 
   const current = await run('Which launcher version is current?', [VERSION, NEWS])
   assert.equal(current.chats.length, 1)
 })
+
+test('34. a release still to come asked of the change log list: "I don\'t know" above the list, no model', async () => {
+  const { ask } = make()
+  const { it, calls } = interaction('When will the next update be deployed?')
+  await ask.handleInteraction(it)
+  const e = edited(calls).content
+  assert.match(e, /^I don't know from what I can see\. I checked: Change log/)
+  assert.deepEqual([model.probes, model.chats.length], [0, 0])
+  assert.match(audits.at(-1), /-> idk via template/)
+  const q = interaction('what was deployed today?')
+  await ask.handleInteraction(q.it)
+  assert.match(audits.at(-1), /-> answered via template/)
+})

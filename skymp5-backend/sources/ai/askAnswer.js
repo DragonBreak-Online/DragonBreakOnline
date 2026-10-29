@@ -63,6 +63,7 @@ const ASKS_SECRET = /\b(passwords?|passcodes?|tokens?|api keys?|2fa|login codes?
 // Words with which a fact speaks of what is still to come ("Coming with the next game update", "Planned, not live yet")
 const FUTURE_TEXT = /\b(next|upcoming|coming|planned|plans?|soon|will|later|future|not live yet|scheduled|eta)\b/i
 const RELEASE_INTENTS = new Set(['version', 'changes'])
+const speaksOfFuture = cards => cards.some(c => usable(c) && FUTURE_TEXT.test(c.text))
 const usable = c => c && c.text && c.text !== 'not available' && c.stale !== 'rank'
 const norm = s => String(s).replace(/[\u2018\u2019]/g, "'").replace(/[\u201c\u201d]/g, '"').replace(/\s+/g, ' ').trim()
 const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -256,10 +257,15 @@ function createAnswerer({ sources, model, flight, limiter, readSwitch, settings,
     const templateSources = templateCards.filter(usable)
 
     const labels = [...new Set(cards.map(c => c.label))].join(', ') || 'nothing'
+    // A release still to come is only in the data when a fact speaks of the future; the current version is not "the next one"
+    const future = asksFuture(question) && readable.some(i => RELEASE_INTENTS.has(i.intent))
     if (!modelWanted) {
       // States are never causes: "why is the server down" gets the state under "I don't know why"
       if (asksCause(question) && readable.every(i => NO_CAUSE_INTENTS.has(i.intent))) {
         return done({ outcome: 'idk', mode: 'template', lead: [`I don't know why from what I can see. I checked: ${labels}.`], blocks: renderTemplate(null, cards), sources: cards.filter(usable) })
+      }
+      if (future && !speaksOfFuture(cards)) {
+        return done({ outcome: 'idk', mode: 'template', lead: [`I don't know from what I can see. I checked: ${labels}.`], blocks: renderTemplate(null, cards), sources: cards.filter(usable) })
       }
       return done({ outcome: 'answered', mode: 'template', blocks: renderTemplate(null, cards), sources: cards.filter(usable) })
     }
@@ -267,8 +273,7 @@ function createAnswerer({ sources, model, flight, limiter, readSwitch, settings,
     const sw = readSwitch()
     const s = current()
     const modelOn = sw.model === true && !!s.url
-    // A release still to come is only in the data when a fact speaks of the future; the current version is not "the next one"
-    const noFuture = asksFuture(question) && readable.some(i => RELEASE_INTENTS.has(i.intent)) && !modelCards.some(c => FUTURE_TEXT.test(c.text))
+    const noFuture = future && !speaksOfFuture(modelCards)
     if (!modelCards.length || noFuture) {
       if (!modelOn && !noFuture) return done({ outcome: 'unreachable', mode: 'template', lead: [TEXT.needsModel], blocks: templateBlocks, sources: templateSources })
       return done({ outcome: 'idk', mode: 'template', lead: [`I don't know from what I can see. I checked: ${labels}.`], blocks: templateBlocks, sources: templateSources })
