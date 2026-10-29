@@ -19,7 +19,6 @@ const ASK_SCHEMA = Object.freeze({
 const ASK_PROMPT_V1 = [
   "You are Dragonbaron, the DragonBreak Online staff helper. Answer the staff member's QUESTION using ONLY the FACTS.",
   '1. Use only the facts. If they do not answer the question, set answerable=false and say in one sentence what you checked.',
-  '   Facts on the same topic are not an answer: if the question asks for a time, version, date, place, number or cause that the facts do not state, set answerable=false. Never describe other facts instead.',
   '2. Put the id of every fact you used in "cited" (e.g. "F2") and copy up to 3 short exact quotes from those facts into "quotes".',
   '3. Never invent names, numbers, dates, versions, causes, fixes or release dates.',
   '4. If a fact says it is stale or from an older list, say its date.',
