@@ -129,9 +129,10 @@ function createPunishments({ config, readStore, dynamicFields, characterName, lo
     if (staffName) r.by = `${staffName} (profile ${staff[1]}${staff[2] ? `, ${staff[2]}` : ''})`
   }
 
-  // Each record file's parsed value is replaced only when the file changes, so the same values mean nothing changed
+  // Each record file's parsed value is replaced only when the file changes, so the same values mean nothing changed; a failed read is retried
   function trackerIdentity(stamp, t) {
-    if (!trackerId || t - trackerId.at >= TRACKER_ID_MS || stamp.some((v, i) => v !== trackerId.stamp[i])) trackerId = { at: t, stamp, id: identity.get() }
+    const failed = trackerId && Object.values(trackerId.id.status).some(v => v !== 'ok')
+    if (!trackerId || failed || t - trackerId.at >= TRACKER_ID_MS || stamp.some((v, i) => v !== trackerId.stamp[i])) trackerId = { at: t, stamp, id: identity.get() }
     return trackerId.id
   }
 

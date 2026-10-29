@@ -180,6 +180,33 @@ test('the tracker ticks on the real service without waking the player log or fre
   assert.ok(fs.existsSync(path.join(dir, 'punish-threads.dry.json')))
 })
 
+test('trackerSnapshot does not keep an identity built while a store could not be read', () => {
+  const G = createPunishFixture()
+  after(() => G.cleanup())
+  let t = G.now, reads = 0, profilesFail = true, storeFail = false
+  const svc = createPunishments({
+    config: { gameServerDir: G.game, punishBansFile: G.bansFile, punishJournalFile: G.journalFile },
+    readStore: () => { reads++; if (storeFail) throw new Error('busy'); return G.forms }, dynamicFields: cf => cf.dynamicFields || {}, characterName: cf => cf.displayName,
+    loadProfiles: () => { if (profilesFail) throw new Error('busy'); return G.profiles }, loadPlayers: () => G.players, playerLog: plog, tailIntervalMs: 0, now: () => t,
+    staffStatusOf: async () => 'player',
+  })
+  const tick = () => { t += 30000; return svc.trackerSnapshot() }
+  assert.equal(svc.trackerSnapshot().id.status.profiles, 'unreadable')
+  profilesFail = false
+  assert.equal(tick().id.status.profiles, 'ok', 'retried on the next tick')
+  assert.equal(reads, 2)
+  tick()
+  assert.equal(reads, 2, 'a good identity is still cached')
+
+  storeFail = true
+  fs.writeFileSync(G.bansFile, fs.readFileSync(G.bansFile, 'utf8') + ' ')
+  assert.equal(tick().sources.jail.status, 'unreadable')
+  assert.equal(reads, 3)
+  storeFail = false
+  assert.equal(tick().sources.jail.status, 'ok', 'a failed changeForms read is retried too')
+  assert.equal(reads, 4)
+})
+
 test('trackerSnapshot keeps its identity until a record file changes or 5 minutes pass, and the panel still reads afresh', async () => {
   const G = createPunishFixture()
   after(() => G.cleanup())
