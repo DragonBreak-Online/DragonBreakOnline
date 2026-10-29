@@ -869,7 +869,7 @@ test('thread headroom: a new punishment for a renamed user does not reopen the a
 // Renamed forum tags put every thread up for a tag change, a sync with nothing to post
 const renameTags = d => { d.tags = TAGS.map(t => ({ ...t, id: t.id.replace(/^9/, '8') })) }
 
-test('thread headroom: above 975 an idle thread Discord archived itself, with only a sync to do, sends at most one request in 30 ticks; other posts go out', async () => {
+test('thread headroom: above 975 an idle thread Discord archived itself, with only a sync to do, sends nothing in 30 ticks; other posts go out', async () => {
   for (const active of [980, 1000]) {
     const d = fakeDiscord()
     const r = await started({ discord: d, maxRequests: 10 })
@@ -896,7 +896,8 @@ test('thread headroom: above 975 an idle thread Discord archived itself, with on
       await r.tick()
     }
     const into = d.calls.slice(before).filter(c => c.path.startsWith(`/channels/${alice.id}`))
-    assert.ok(into.length <= 1, `${active}: ${into.length} requests into Alice's thread in 30 ticks`)
+    // Nothing at all: the idle pre-check holds it, not a failing 50083 PATCH that threadCall then records
+    assert.equal(into.length, 0, `${active}: ${into.length} requests into Alice's thread in 30 ticks`)
     assert.equal(alice.archived, true, `${active}: held`)
     assert.equal(r.registry().accounts[PEOPLE.alice.discordId].sync, true, `${active}: the sync is kept for a later tick`)
     assert.match(bob.messages.at(-1).content, /^\*\*STRIKE\*\* · dsc:58:3/, `${active}: Bob's strike posted`)
@@ -909,6 +910,42 @@ test('thread headroom: above 975 an idle thread Discord archived itself, with on
     assert.deepEqual(alice.tags, ['800000000000000010', '800000000000000014'])
     assert.equal(r.registry().accounts[PEOPLE.alice.discordId].sync, false)
   }
+})
+
+test('thread headroom: a new username on an idle thread Discord archived itself is held above 975 with no rename sent; with room the reopen carries it', async () => {
+  const d = fakeDiscord()
+  const r = await started({ discord: d })
+  r.data.discipline = { 57: [entry(1, 'suspend', T0 - HOUR, { until: T0 + 30 * DAY })] }
+  await r.tick()
+  const t = d.thread()
+  // Eight idle days: Discord archives the thread itself, the registry still says open; the name is due for a lookup
+  r.now += 8 * DAY
+  t.archived = true
+  d.active = 980
+  d.members[PEOPLE.alice.discordId] = 'alice_new'
+  const before = d.calls.length
+  for (let i = 0; i < 10; i++) {
+    r.now += 60000
+    await r.tick()
+  }
+  const sent = d.calls.slice(before)
+  assert.deepEqual(sent.filter(c => c.path.startsWith(`/channels/${t.id}`)), [], 'nothing into the thread, no PATCH {name} first')
+  assert.equal(sent.filter(c => c.body && c.body.name).length, 0)
+  assert.equal(t.name, 'alice_rp')
+  assert.equal(t.archived, true)
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].username, 'alice_new')
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].sync, true, 'the sync is kept for a later tick')
+  // With room: one counted reopen with the name, then the starter
+  d.active = 900
+  r.now += 11 * 60000
+  const at = d.calls.length
+  await r.tick()
+  const into = d.calls.slice(at).filter(c => c.path.startsWith(`/channels/${t.id}`))
+  assert.deepEqual(into.map(c => c.body), [{ archived: false, name: 'alice_new' }, into[1].body])
+  assert.equal(into[1].path, `/channels/${t.id}/messages/${t.id}`)
+  assert.match(t.messages[0].content, /^<@811111111111111111> · alice_new\n/)
+  assert.equal(t.name, 'alice_new')
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].sync, false)
 })
 
 test('thread headroom: a thread archived since its last post that answers 50083 above 975 is recorded archived: one failing request, not one a tick', async () => {
