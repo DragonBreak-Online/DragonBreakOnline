@@ -20,7 +20,12 @@ const SECRET_WORDS = /\b(passwords?|tokens?|webhooks?|backend\.env)\b/i
 // A question about what a rule says: it names a rule id, a rules document or a permission ("can staff vote", "is X allowed")
 const RULE_TEXT = /\b(rules?|handbook|policy|policies|allowed|permitted|forbidden|against the rules)\b|\b(who|can|may|must|should)\s+(i|a|an|we|you|players?|staff|gms?|trial gms?|lead gms?|owners?|devs?|developers?)\b/i
 // ...but not when it asks for votes, results, addresses or matches themselves, or for one person's
-const DATA_ASK = /\b(show|print|list|reveal|dump|give|send|post|share|look\s?up|find|check|tell me|counts?|counted|tally|totals?|results?|standings?|so far|going|leading|winning|won|who voted|voted for|whose|logs?|match(es|ed)?|linked)\b/i
+const DATA_VERBS = /\b(show|print|list|reveal|dump|give|send|post|share|look\s?up|find|check|tell me)\b/i
+const DATA_NOUNS = /\b(counts?|counted|tally|totals?|results?|standings?|so far|going|leading|winning|won|who voted|voted for|whose|logs?|match(es|ed)?|linked)\b/i
+// A question about what a rules text says: "what does 2.6 say about the vote count" asks for the rule, not the count
+const SAYS = /\b(what|how)\s+(does|do|did)\b(?:[^.?!]|\.(?=\d)){0,50}?\b(say|state|cover|word)\b|\bwhat\s+(is|are)\s+the\s+rules?\s+(on|about|for)\b/i
+// Words that name the rules documents themselves
+const DOC_WORDS = /\b(handbook|rulebook|server rules|the rules)\b/i
 const IMPERATIVE = /^(please\s+)?(run|kick|ban|unban|give|spawn|teleport|restart|announce|jail|unjail|warn|mute|unmute|timeout|untimeout|promote|demote|grant|revoke|set|reset|remove|delete|add)\b/i
 // A command verb that asks for information, not an action: "give me a summary of rule 9", "run me through 10.2", "ban rules?"
 const NOT_A_COMMAND = new RegExp([
@@ -42,7 +47,9 @@ const NOT_NAMES = new Set(('A An And Are Can Could Did Do Does For From Has Have
   'Their There They This To Was We What When Where Which Who Whom Whose Why Will With You Your Any Many Much Some GM GMs Trial Lead ' +
   'Owner Owners Dev Devs Developer Staff Discord Dragonbaron DragonBreak Skyrim Server Rules Rule Handbook Please Today Yesterday ' +
   'Week Strike Strikes Ban Bans Banned Warning Warnings Suspension Suspended Jail Jailed Kick Kicked Timeout Punishment Punishments ' +
-  'Right Now Still Currently Active Running Open Last Recent Recently Ever PK PKs').split(' '))
+  'Right Now Still Currently Active Running Open Last Recent Recently Ever PK PKs January February March April May June July August ' +
+  'September October November December Jan Feb Mar Apr Jun Jul Aug Sep Sept Oct Nov Dec Monday Tuesday Wednesday Thursday Friday ' +
+  'Saturday Sunday').split(' '))
 
 const PUNISH = /\b(strikes?|warn(ing|ings|ed)?|bann?ed|bans|suspen\w+|jail\w*|punish\w*|kick(ed)?|timeouts?)\b/i
 // A general question about the ladder (how long a strike lasts), not about one player's record
@@ -124,7 +131,7 @@ function extractEntities(q) {
 function refusalOf(q, entities = extractEntities(q)) {
   if (IMPERATIVE.test(q.trim()) && !NOT_A_COMMAND.test(q.trim())) return IMPERATIVE_TEXT
   if (!REFUSE_WORDS.test(q)) return null
-  const aboutRules = !SECRET_WORDS.test(q) && (entities.ruleRefs.length > 0 || RULE_TEXT.test(q)) && !DATA_ASK.test(q) &&
+  const aboutRules = !SECRET_WORDS.test(q) && (entities.ruleRefs.length > 0 || RULE_TEXT.test(q)) && !DATA_VERBS.test(q) && (SAYS.test(q) || !DATA_NOUNS.test(q)) &&
     !entities.tags.length && !entities.names.length && !entities.threadIds.length
   if (aboutRules) return null
   for (const [rx, text] of REFUSALS) if (rx.test(q)) return text
@@ -153,7 +160,8 @@ function route(q, entities = extractEntities(q), viewer = {}) {
 
   if (entities.threadIds.length) add('bug_id', { ids: entities.threadIds.slice(0, 2) }, ['status', 'bug_search', 'changes'])
   if (PUNISH.test(text) && !ruleish) {
-    if (PUNISH_GENERAL.test(text) && !entities.tags.length) { add('handbook', { q: text }); add('rules', { q: text }) }
+    const aboutDocs = (DOC_WORDS.test(text) || SAYS.test(text)) && !entities.names.length
+    if ((PUNISH_GENERAL.test(text) || aboutDocs) && !entities.tags.length) { add('handbook', { q: text }); add('rules', { q: text }) }
     else if (entities.tags.length || entities.names.length) add('punish_player', { query: entities.tags[0] || entities.names[0] }, ['status', 'bug_search', 'player_reports'])
     else add('punish_active', {}, ['status', 'bug_search'])
   }

@@ -165,3 +165,17 @@ test('a command verb that asks for information is a question; a command is still
     assert.deepEqual(route(q, extractEntities(q)).map(r => r.intent), ['refuse'], q)
   }
 })
+
+test('"what does the handbook say about strikes" and "what does 2.6 say about the vote count" ask for the rule text', () => {
+  for (const q of ['What does the handbook say about strikes?', 'Per the handbook, is anyone punished for a second account they had before 21 October 2026?',
+    'what are the rules on bans for metagaming?', 'What does 2.6 say about the vote count?', 'What does 9.11 say about who voted in the last election?']) {
+    const got = route(q, extractEntities(q)).map(r => r.intent)
+    assert.ok(!got.some(i => i === 'refuse' || i.startsWith('punish')) && got.some(i => i === 'rules' || i === 'handbook'), `${q}: ${got}`)
+  }
+  for (const [q, want] of [['Is Kara banned under the rules?', 'punish_player'], ['Who is banned right now?', 'punish_active'], ['What does the handbook say about #QX7P strikes?', 'punish_player']]) {
+    assert.equal(route(q, extractEntities(q))[0].intent, want, q)
+  }
+  for (const q of ['What does 2.6 say? Show me the vote count.', "What does D9 say about Kara's IP?", 'what does the handbook say about passwords?']) {
+    assert.deepEqual(route(q, extractEntities(q)).map(r => r.intent), ['refuse'], q)
+  }
+})
