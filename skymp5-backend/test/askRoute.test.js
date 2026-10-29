@@ -256,3 +256,13 @@ test('a release still to come: "next version", "when will ... be released"; a pa
   for (const q of ['When was 0.3.109 released?', 'What is in client 0.3.109?', 'Which launcher version is current?', 'When will a strike expire?',
     'Summarise the changes in the last 24h', 'What does rule 9 say about the next life?']) assert.equal(asksFuture(q), false, q)
 })
+
+test('a release still to come in other words: "when does/is ... come out/due", "ETA", "out yet", "what will be in"; "when was/did" is not', () => {
+  for (const q of ['When does launcher 2.1.54 come out?', 'When is 0.3.110 coming out?', 'Is 0.3.110 out yet?', 'ETA on 0.3.110?', 'What will be in client 0.3.110?',
+    "when's the 0.3.110 release", 'when’s the next patch', 'When is the new launcher out?', 'When does the new client release?', 'When are the home planters due?']) {
+    assert.equal(asksFuture(q), true, q)
+  }
+  for (const q of ['When was launcher 2.1.53 released?', 'When did 0.3.109 come out?', 'What is in client 0.3.109?', 'When does a strike expire?', 'What did the last update change?']) {
+    assert.equal(asksFuture(q), false, q)
+  }
+})

@@ -61,12 +61,21 @@ const ASKS_SECRET = /\b(passwords?|passcodes?|tokens?|api keys?|2fa|login codes?
 
 // Phrases with which a fact speaks of what is still to come ("Coming with the next game update", "Planned, not live yet"), never a bare "will" or "next"
 const FUTURE_TEXT = new RegExp([
-  /\b(upcoming|planned|plans? to|eta|coming (soon|with|in|next)|(out|live|ready) soon|scheduled for|not (live|out|released) yet)\b/.source,
+  /\b(planned for|planned,? not|plans? to|coming (soon|with|next)|(out|live|ready) soon|scheduled for|not (live|out|released) yet)\b/.source,
+  /\bupcoming(\s*:|\s+(updates?|releases?|patch(es)?|versions?|builds?)\b)/.source,
   /\bfuture (updates?|releases?|patch(es)?|versions?|builds?)\b/.source,
   /\bwill (be (released|added|deployed|live|out|shipped|included)|ship|land|arrive|go live|come out|launch)\b/.source,
   /\b(in|with|for) the next (\w+ )?(updates?|releases?|patch|versions?|builds?)\b/.source,
 ].join('|'), 'i')
 const RELEASE_INTENTS = new Set(['version', 'changes'])
+const newer = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false }
+// A launcher or client version above the one the version card names is not released yet, whatever the wording
+function namesUnreleased(entities, cards) {
+  const v = cards.find(c => c.source === 'version' && usable(c))
+  if (!v) return false
+  const launcher = (/\bLauncher (\d+(?:\.\d+)+)/.exec(v.text) || [])[1], client = (/\bclient (\d+(?:\.\d+)+)/.exec(v.text) || [])[1]
+  return !!((entities.launcherVer && launcher && newer(entities.launcherVer, launcher)) || (entities.clientVer && client && newer(entities.clientVer, client)))
+}
 const speaksOfFuture = cards => cards.some(c => usable(c) && FUTURE_TEXT.test(c.text))
 const usable = c => c && c.text && c.text !== 'not available' && c.stale !== 'rank'
 const norm = s => String(s).replace(/[\u2018\u2019]/g, "'").replace(/[\u201c\u201d]/g, '"').replace(/\s+/g, ' ').trim()
@@ -281,7 +290,7 @@ function createAnswerer({ sources, model, flight, limiter, readSwitch, settings,
 
     const labels = [...new Set(cards.map(c => c.label))].join(', ') || 'nothing'
     // A release still to come is only in the data when a fact speaks of the future; the current version is not "the next one"
-    const future = asksFuture(question) && readable.some(i => RELEASE_INTENTS.has(i.intent))
+    const future = (asksFuture(question) || namesUnreleased(entities, cards)) && readable.some(i => RELEASE_INTENTS.has(i.intent))
     if (!modelWanted) {
       // States are never causes: "why is the server down" gets the state under "I don't know why"
       if (asksCause(question) && readable.every(i => NO_CAUSE_INTENTS.has(i.intent))) {

@@ -108,6 +108,8 @@ const FUTURE = new RegExp([
   /\b(next|upcoming|future|coming|planned|unreleased)\s+(\w+\s+)?(versions?|releases?|updates?|patch(es)?|launchers?|clients?|builds?)\b/.source,
   /\bwhen\s+(will|would|shall)\b(?:[^.?!]|\.(?=\d)){0,40}\b(releas\w*|out|ship\w*|launch\w*|live|deploy\w*|land|arrive|come)\b/.source,
   /\bwill\b(?:[^.?!]|\.(?=\d)){0,40}\b(be released|be out|come out|ship|go live|launch|be deployed)\b/.source,
+  /\bwhen(?:['\u2019]s|\s+(?:is|are|does|do))\b(?:[^.?!]|\.(?=\d)){0,40}\b(out|coming|due|releas\w*|launch\w*|ship\w*|go(?:es|ing)? live|drop\w*|land\w*|arriv\w*)\b/.source,
+  /\b(eta|out yet)\b|\bwhat\s+will\s+(be\s+in|change|come)\b/.source,
 ].join('|'), 'i')
 // A question about an older version of the rules or handbook ("what did the handbook say before 2026"), which the reader never holds
 const OLD_DOC = new RegExp([

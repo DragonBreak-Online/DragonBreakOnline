@@ -916,3 +916,41 @@ test('41. a number glued to letters (28th, 72h, 120d, 5000g) is checked by its d
   assert.deepEqual(checkAnswer({ answerable: true, answer: 'Launcher 2.1.54 comes out on October 28th.', cited: ['F1'], quotes: ['Launcher 2.1.53'] }, version, 'When does launcher 2.1.54 come out?').reason, 'number')
   assert.equal(check('The 10th build is due.', [{ id: 'F1', label: 'Change log', asOf: '2026-10-28', text: 'The 10th build is due.' }]).ok, true)
 })
+
+test('42. a launcher or client version above the current one is a release still to come, whatever the wording: "I don\'t know" without the model', async () => {
+  const VERSION = { key: 'version', source: 'version', label: 'Launcher API /api/version', asOf: '2026-10-28T18:37Z', stale: null, model: true, text: 'Launcher 2.1.53, client 0.3.109, server 0.3.1.' }
+  const NEWS = { key: 'news:1', source: 'news', label: 'Launcher news 2026-10-27', asOf: '2026-10-27', stale: null, model: true, text: 'Strongholds and home planters (2026-10-27, version 0.3.109)' }
+  const run = async question => {
+    const chats = []
+    const fakeModel = { probe: async () => ({ ok: true }), chat: async a => { chats.push(a); return { outcome: 'ok', content: JSON.stringify({ answerable: true, answer: 'Launcher 2.1.54 comes out on the 28th of October.', cited: ['F1'], quotes: ['Launcher 2.1.53'] }) } } }
+    const a = createAnswerer({ sources: { read: async () => [VERSION, NEWS].map(c => ({ ...c })) }, model: fakeModel, flight: createSingleFlight(), readSwitch: () => ({ model: true }), settings: { ...DEFAULTS, url: 'http://model.test' } })
+    return { r: await a.answer({ question, viewer: { tier: 'owner' } }), chats }
+  }
+  for (const question of ['When does launcher 2.1.54 come out?', 'ETA on launcher 2.1.54?', 'When was launcher 2.1.54 released?', 'What date is launcher 2.1.54 due?',
+    'what is the release date for 0.3.110', 'What is in client 0.3.110?']) {
+    const { r, chats } = await run(question)
+    assert.deepEqual([r.outcome, r.mode, chats.length], ['idk', 'template', 0], question)
+    assert.match(r.lead[0], /^I don't know from what I can see\. I checked: Launcher API/)
+  }
+  for (const question of ['When was launcher 2.1.53 released?', 'What is in client 0.3.109?', 'Was client 0.3.108 replaced?']) {
+    assert.equal((await run(question)).chats.length, 1, question)
+  }
+})
+
+test('43. change log words that only look forward ("planned restart", "coming in under", "the ETA of a download", "upcoming events board") are not a release still to come', async () => {
+  const LOG = { key: 'changes:week', source: 'changes', label: 'Change log, last 7 days', asOf: '2026-10-28', stale: null, model: true }
+  const run = async text => {
+    const chats = []
+    const fakeModel = { probe: async () => ({ ok: true }), chat: async a => { chats.push(a); return { outcome: 'ok', content: JSON.stringify({ answerable: true, answer: 'The next update will be deployed on October 28th.', cited: ['F1'], quotes: [] }) } } }
+    const a = createAnswerer({ sources: { read: async () => [{ ...LOG, text }] }, model: fakeModel, flight: createSingleFlight(), readSwitch: () => ({ model: true }), settings: { ...DEFAULTS, url: 'http://model.test' } })
+    return { r: await a.answer({ question: 'Summarize what the next update will change and when it will be deployed', viewer: { tier: 'owner' } }), chats }
+  }
+  for (const text of ['2026-10-28 18:00Z DEPLOYED: planned restart done', '2026-10-27 09:00Z LIVE: horses coming in under the Riften gate no longer vanish',
+    '2026-10-26 12:00Z LIVE: the launcher shows the ETA of a download', '2026-10-26 12:00Z FIXED: the upcoming events board is fixed']) {
+    const { r, chats } = await run(text)
+    assert.deepEqual([r.outcome, r.mode, chats.length], ['idk', 'template', 0], text)
+  }
+  for (const text of ['Planned for the next update: home planters', 'Upcoming release: home planters', 'Upcoming: home planters', 'Contract boards: planned, not live yet', 'Home planters are coming soon']) {
+    assert.equal((await run(text)).chats.length, 1, text)
+  }
+})
