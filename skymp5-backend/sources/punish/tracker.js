@@ -674,12 +674,16 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     && x.now - r.atMs < JOURNAL_WAIT_MS && !(x.journalAt >= r.atMs + JOURNAL_LAG_MS)
 
   // A Discord ban seen in a second store (the journal's row once the ban list's merged copy is gone) is the same ban
-  function aliasOf(acct, r, claimed) {
+  function aliasOf(acct, r, claimed, x) {
     if (!acct || r.kind !== 'discord_ban' || !r.atMs) return null
     // One to one, this pass included: a row that is already an alias, or already has one, is another ban; the nearest wins
     const gap = rec => Math.abs(rec.at - r.atMs)
+    // A Discord unban between the two is not the same ban (oneRowPerBan's rule)
+    const unbannedBetween = rec => x.all.some(u => u.source === 'journal' && u.kind === 'discord_unban' && u._discordId === r._discordId
+      && u.atMs > Math.min(rec.at, r.atMs) && u.atMs < Math.max(rec.at, r.atMs))
     const hit = Object.entries(acct.rows).filter(([id, rec]) => id !== r.id && rec.kind === 'discord_ban' && prefixOf(id) !== prefixOf(r.id)
-      && rec.at && gap(rec) <= SAME_BAN_MS && !rec.alias && !claimed.has(id) && !Object.values(acct.rows).some(o => o.alias === id))
+      && rec.at && gap(rec) <= SAME_BAN_MS && !rec.alias && !claimed.has(id) && !Object.values(acct.rows).some(o => o.alias === id)
+      && !unbannedBetween(rec))
       .reduce((best, e) => (!best || gap(e[1]) < gap(best[1]) ? e : best), null)
     if (hit) claimed.add(hit[0])
     return hit ? hit[0] : null
@@ -823,7 +827,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
         if (heldElsewhere(key, r.id)) continue
         // A row older than the first run's baseline that is not in force (a source or account first seen later) is history
         const old = g.baseAt && (!r.atMs || r.atMs < g.baseAt) && !IN_FORCE.has(st)
-        const alias = old || st === 'unmatched' || isFold(r) ? null : aliasOf(acct, r, claimed)
+        const alias = old || st === 'unmatched' || isFold(r) ? null : aliasOf(acct, r, claimed, x)
         const lift = old ? null : liftOf(r, x)
         if (old) quiet.push({ id: r.id, st, base: recordOf(r), extra: { baseline: true } })
         else if (st === 'unmatched') work.push({ r, st, text: unmatchedText(r), isNew: true })
