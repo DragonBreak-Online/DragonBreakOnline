@@ -32,5 +32,17 @@
    "model": true,
    "text": "2026-10-28 18:00Z DEPLOYED: gameplay batch: regeneration fix and contract boards.\n2026-10-28 16:28Z LIVE: Restore module LIVE (hot reload).\n2026-10-28 09:10Z RELEASED: client 0.3.109 to players."
   }
+ ],
+ "status": [
+  {
+   "key": "status",
+   "source": "status",
+   "label": "Server status 2026-10-28 18:37Z",
+   "asOf": "2026-10-28T18:37:28Z",
+   "stale": null,
+   "minTier": "trialgm",
+   "model": false,
+   "text": "Game server: active since 2026-10-27 23:35Z (19 h 1 min).\nBackend: active since 2026-10-28 06:02Z.\nPlayers online: 26. Launcher API: online. Client version: 0.3.109.\nOpen dungeons (2): Bruma Caverns, Gallows Rock."
+  }
  ]
 }

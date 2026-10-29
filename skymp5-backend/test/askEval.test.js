@@ -82,3 +82,33 @@ test('an answer on a row with no expected words is counted as correct but report
   assert.deepEqual([m.correct, m.ungradedCorrect], [1, 1])
   assert.match(lines[0], /100\.0% correct \(1 of them answered on rows with no expected words, not graded\)/)
 })
+
+test('"rules+<name>" reads the live rules only for the rules intent, and a template answer is graded on the reply staff see', async () => {
+  const dir = path.join(TMP, 'mixed')
+  fs.mkdirSync(dir)
+  fs.writeFileSync(path.join(dir, 'eval-cards.json'), JSON.stringify({
+    log: [{ key: 'changes:24', source: 'changes', label: 'Change log, last 24 h', asOf: '2026-10-28T18:37Z', stale: null, model: true, text: '2026-10-28 18:00Z DEPLOYED: contract boards.' }],
+    status: [{ key: 'status', source: 'status', label: 'Server status', asOf: '2026-10-28T18:37Z', stale: null, model: false, text: 'Open dungeons (1): Bruma Caverns.' }],
+  }))
+  const set = path.join(dir, 'set.jsonl')
+  fs.writeFileSync(set, [
+    { id: 'm1', question: 'Could you summarise the changes today?', cards: 'rules+log', expect: 'answer', must_contain: ['contract boards'] },
+    { id: 'm2', question: 'Can you tell me if PK is allowed?', cards: 'rules+log', expect: 'answer', must_contain: ['contract boards'] },
+    { id: 'm3', question: 'Which dungeons are open?', cards: 'status', expect: 'answered', must_contain: ['Bruma Caverns'] },
+    { id: 'm4', question: 'Is the server up?', cards: 'status', expect: 'answered', must_contain: ['Gallows Rock'] },
+  ].map(r => JSON.stringify(r)).join('\n'))
+  const seen = []
+  const fetch = async (url, init) => {
+    if (url.endsWith('/api/version')) return { status: 200, text: async () => '{"version":"0.30.10"}' }
+    const q = JSON.parse(init.body).messages[1].content
+    seen.push(/Change log/.test(q) ? 'log' : 'rules')
+    const reply = /contract boards/.test(q) ? { answerable: true, answer: 'The contract boards were deployed.', cited: ['F1'], quotes: ['contract boards'] } : { answerable: false, answer: 'no', cited: [] }
+    return { status: 200, text: async () => JSON.stringify({ message: { content: JSON.stringify(reply) }, load_duration: 0 }) }
+  }
+  const out = path.join(dir, 'out')
+  await main(['--set', set, '--out', out], { fetch, settings: { ...DEFAULTS, url: 'http://model.test' }, out: () => {} })
+  const rows = fs.readFileSync(path.join(out, 'results.jsonl'), 'utf8').trim().split('\n').map(l => JSON.parse(l))
+  assert.deepEqual(rows.map(r => [r.id, r.got, r.correct, r.graded]), [['m1', 'answer', true, true], ['m2', 'idk', false, true], ['m3', 'answered', true, true], ['m4', 'answered', false, true]])
+  assert.deepEqual(rows[3].missing, ['Gallows Rock'])
+  assert.deepEqual(seen, ['log', 'rules'])
+})

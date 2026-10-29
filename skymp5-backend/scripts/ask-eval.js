@@ -26,14 +26,20 @@ function classify(r) {
   return r.outcome
 }
 
-// The cards one row sees: "rules" is live retrieval over the repo's rules folder, any other name an entry of eval-cards.json
+// The cards one row sees: "rules" (live retrieval over data/rules), a name in eval-cards.json, or "rules+<name>" (the rules for the rules intent, the entry for any other)
 function sourcesFor(row, cardsFile, rulesSources) {
-  if (row.cards === 'rules') return { read: (intent, args, viewer, ctx) => (intent === 'rules' ? rulesSources.read(intent, args, viewer, ctx) : Promise.resolve([])) }
+  const [first, second] = String(row.cards).split('+')
+  const live = (intent, args, viewer, ctx) => (intent === 'rules' ? rulesSources.read(intent, args, viewer, ctx) : Promise.resolve([]))
+  if (first === 'rules' && !second) return { read: live }
+  const name = second || first
   const all = JSON.parse(fs.readFileSync(cardsFile, 'utf8'))
-  if (!Array.isArray(all[row.cards])) throw new Error(`row ${row.id}: no card set named ${row.cards}`)
+  if (!Array.isArray(all[name]) || (second && first !== 'rules')) throw new Error(`row ${row.id}: no card set named ${row.cards}`)
   let given = false
-  return { read: async () => { if (given) return []; given = true; return all[row.cards].map(c => ({ ...c })) } }
+  const named = async () => { if (given) return []; given = true; return all[name].map(c => ({ ...c })) }
+  return { read: second ? (intent, ...rest) => (intent === 'rules' ? live(intent, ...rest) : named()) : named }
 }
+// Rows that check words: a model answer by its text, a template answer ("answered") by the reply staff see
+const CHECKED = new Set(['answer', 'answered'])
 
 async function main(argv = process.argv.slice(2), { fetch = globalThis.fetch, settings = null, out = console.log, now = Date.now } = {}) {
   const opt = (name, def) => { const i = argv.indexOf(name); return i >= 0 && argv[i + 1] ? argv[i + 1] : def }
@@ -65,11 +71,11 @@ async function main(argv = process.argv.slice(2), { fetch = globalThis.fetch, se
       const ms = now() - t0
       const got = classify(r)
       const reply = compose(r).content
-      const answerText = (r.answer || '').toLowerCase()
+      const answerText = (got === 'answered' ? reply : r.answer || '').toLowerCase()
       const missing = (row.must_contain || []).filter(w => !answerText.includes(String(w).toLowerCase()))
-      const correct = got === row.expect && (got !== 'answer' || !missing.length)
+      const correct = got === row.expect && (!CHECKED.has(got) || !missing.length)
       // A row that expects an answer but lists no expected words counts any answer that is not withheld; it needs a hand check
-      const graded = row.expect !== 'answer' || (row.must_contain || []).length > 0
+      const graded = !CHECKED.has(row.expect) || (row.must_contain || []).length > 0
       results.push({
         run, id: row.id, expect: row.expect, got, correct, graded, outcome: r.outcome, mode: r.mode, check: r.check, repair: !!r.repair, ms, model_ms: r.modelMs || 0, load_ms: loads,
         withheld_shown: r.outcome === 'withheld' && !!r.answer && reply.includes(r.answer), answer: r.answer || null, missing,

@@ -14,3 +14,12 @@
 {"id": "x14", "question": "What does the handbook say about strikes?", "cards": "rules", "expect": "answer", "must_contain": []}
 {"id": "x15", "question": "What does 10.2 say about OOC grudges?", "cards": "rules", "expect": "answer", "must_contain": ["OOC"]}
 {"id": "x16", "question": "Which rule covers using Discord information in game?", "cards": "rules", "expect": "answer", "must_contain": ["rule 2"]}
+{"id": "x17", "question": "Can you summarise this week's changes for players?", "cards": "rules+changes-24", "expect": "answer", "must_contain": ["contract"]}
+{"id": "x18", "question": "Can you tell me if the server is up?", "cards": "status", "expect": "answered", "must_contain": ["Players online: 26"]}
+{"id": "x19", "question": "Which dungeons are open at the moment?", "cards": "status", "expect": "answered", "must_contain": ["Bruma Caverns"]}
+{"id": "x20", "question": "Which GM closed the most tickets this week?", "cards": "rules", "expect": "idk", "must_contain": []}
+{"id": "x21", "question": "Can a vampire join the Companions?", "cards": "rules", "expect": "idk", "must_contain": []}
+{"id": "x22", "question": "Are vampires allowed to join the Companions?", "cards": "rules", "expect": "idk", "must_contain": []}
+{"id": "x23", "question": "Did the rules forbid a second account before 21 October?", "cards": "rules", "expect": "answer", "must_contain": ["21"]}
+{"id": "x24", "question": "When is the new launcher version out?", "cards": "version-0.3.109", "expect": "idk", "must_contain": []}
+{"id": "x25", "question": "who can export the votes", "cards": "rules", "expect": "refuse", "must_contain": []}
