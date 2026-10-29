@@ -876,3 +876,15 @@ test('38. ordinary log words ("will see", "scheduled restart", "next to") do not
     assert.equal((await run(question, text)).chats.length, 1, text)
   }
 })
+
+test('39. a length of time in a question is not an older span: the change log and the rules are read, not "I don\'t know"', async () => {
+  SW = { ...SW, model: false }
+  const { ask } = make()
+  for (const [q, source, limit] of [['Did the last update fix the 3 month old horse bug?', 'changes', TEXT.changesWindow], ['Did the handbook say suspensions can last two months?', 'rules', TEXT.docsCurrent]]) {
+    const { it, calls } = interaction(q)
+    await ask.handleInteraction(it)
+    assert.ok(reads.includes(source), q)
+    assert.ok(!edited(calls).content.includes(limit), q)
+  }
+})
+

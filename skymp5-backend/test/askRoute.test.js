@@ -177,6 +177,24 @@ test('the change log covers 7 days: an older span is "beyond"; a question about 
   assert.deepEqual(route('list the releases today').find(r => r.intent === 'changes').args.summary, false)
 })
 
+test('a length of time ("3 month old", "can last two months", "one year anniversary") is not a span to look back over; explicit in-window wording wins', () => {
+  for (const [q, t] of [['Did the last update fix the 3 month old horse bug?', '24'], ['What was released this week for the one year anniversary?', 'week'],
+    ['Was the 2 year old Riften house bug patched today?', 'today'], ['What was patched today for the month long event?', 'today'],
+    ['Did the update today fix the year end event rewards?', 'today'], ['What changed in the last 24 hours to the 6 month old inventory bug?', '24']]) {
+    const e = extractEntities(q)
+    assert.notEqual(e.time, 'beyond', q)
+    assert.deepEqual(route(q, e).find(r => r.intent === 'changes')?.args.time, t, q)
+  }
+  for (const q of ['Did the handbook say suspensions can last two months?', 'What does the handbook say about a staff member who used to be a Lead GM?',
+    'Was a 6 month ban allowed by the rules?', 'Can a strike last a year under the handbook?']) {
+    assert.equal(asksOldVersion(q), false, q)
+  }
+  for (const q of ['what changed over the last 3 months', 'deploys in the past two years', 'what was patched a couple of months back', 'releases in 2025',
+    'what changed last month', 'changes three weeks ago', 'what was deployed during the past 2 weeks']) {
+    assert.equal(extractEntities(q).time, 'beyond', q)
+  }
+})
+
 test('an older version of the rules or handbook is asked for only by version words or a past-tense "say" with a past span', () => {
   for (const q of ['What did the rules say about PK in September?', 'How was rule 9 worded before the update?', 'Did the old handbook let Trial GMs kick?',
     'What did the previous rules say about alt accounts?', 'What did D3 say last year?', 'What used to be the rule on mounts?',

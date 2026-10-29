@@ -86,16 +86,23 @@ const CAUSE = /\b(why|how come|what caused|caused by|cause of|the cause)\b/i
 const NO_CAUSE_INTENTS = new Set(['status', 'online', 'gm_calls', 'tickets'])
 // A time span the change log cannot cover: it reads the last 24 h, today or the last 7 days, nothing older
 const MONTHS = 'january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec'
+const COUNT = '\\d+|an?|one|two|three|four|five|six|several|few|couple of'
+const WEEKS = '[2-9]|\\d{2,}|two|three|four|five|six|several|few|couple of'
+// Only how far back to look ("last month", "3 months ago", "in the past two years", "since August"), never a length ("3 month old", "can last two months")
 const BEYOND = new RegExp([
-  /\b(last|past|previous|this|a|one|the)\s+(month|year|quarter|fortnight)\b/.source,
-  /\b(\d+|an?|one|two|three|four|five|six|several|few)\s+(months?|years?)\b/.source,
-  /\b([2-9]|\d{2,}|two|three|four|five|six|several|few)\s+weeks\b/.source,
+  /\b(last|past|previous|this)\s+(month|year|quarter|fortnight)\b/.source,
+  `\\b(in|over|during|for|within)\\s+the\\s+(last|past|previous)\\s+(${COUNT})\\s+(months?|years?|quarters?)\\b`,
+  `\\b(in|over|during|for|within)\\s+the\\s+(last|past|previous)\\s+(${WEEKS})\\s+weeks\\b`,
+  `\\b(${COUNT})\\s+(months?|years?)\\s+(ago|back|earlier)\\b`,
+  `\\b(${WEEKS})\\s+weeks\\s+(ago|back|earlier)\\b`,
   /\b(months?|years?)\s+ago\b/.source,
   `\\b(in|during|since|before|until|prior to|throughout)\\s+(${MONTHS})\\b`,
   `\\b(before|until|prior to)\\s+(the\\s+)?\\d{1,2}(st|nd|rd|th)?\\s+(of\\s+)?(${MONTHS})\\b`,
   /\b(in|during|since|before|until|prior to)\s+(19|20)\d{2}\b/.source,
   /\b(last|past)\s+([89]|[1-9]\d+)\s+days\b/.source,
 ].join('|'), 'i')
+// Explicit wording inside the 7-day window wins over an older span named in passing
+const IN_WINDOW = /\b(today|tonight|yesterday|this week|last week|(the\s+)?(last|past)\s+(7 days|week|day|24 ?h(ours)?)|24 ?h|24 hours)\b/i
 // A question about a release still to come: "the next launcher version", "when will 0.3.120 be released"
 const FUTURE = new RegExp([
   /\b(next|upcoming|future|coming|planned|unreleased)\s+(\w+\s+)?(versions?|releases?|updates?|patch(es)?|launchers?|clients?|builds?)\b/.source,
@@ -105,7 +112,7 @@ const FUTURE = new RegExp([
 // A question about an older version of the rules or handbook ("what did the handbook say before 2026"), which the reader never holds
 const OLD_DOC = new RegExp([
   /\b(old|older|previous|former|outdated|superseded)\s+((server|discord)\s+)?(rules|rulebook|handbooks?|(staff|gm|trial gm)\s+handbooks?)\b/.source,
-  /\bused to (say|read|allow|forbid|require|be)\b/.source,
+  /\bused to (say|read|allow|forbid|require)\b|\bused to be\s+(the\s+)?(rules?|wording|text|limit|policy|allowed|forbidden|banned|required|punish\w*)\b/.source,
 ].join('|'), 'i')
 const SAID = /\b(did|was|were|had)\b(?:[^.?!]|\.(?=\d)){0,60}?\b(say|said|read|state[sd]?|word(ed|ing)?|allow(ed)?|forb(id|ade|idden)|cover(ed)?|requir(e|ed)|permit(ted)?)\b/i
 const OLD_WORDING = /\b(old|older|previous|earlier|former|original|prior|past|first)\s+(versions?|editions?|wording|drafts?)\b|\bbefore\s+(the|its|their|it|they)\s+((last|latest|recent)\s+)?(was\s+|were\s+|got\s+)?(update|change|rewrite|revision|edit)\w*\b/i
@@ -123,7 +130,7 @@ function extractEntities(q) {
   const launcherVer = (/\b2\.1\.\d+\b/.exec(text) || [null])[0]
   const ruleRefs = ruleRefsOf(text)
   const time = /since (the )?(last )?restart/i.test(text) ? 'restart'
-    : BEYOND.test(text) ? 'beyond'
+    : BEYOND.test(text) && !IN_WINDOW.test(text) ? 'beyond'
     : /\b(this week|last week|week|7 days)\b/i.test(text) ? 'week'
       : /\btoday\b/i.test(text) ? 'today'
         : /\b(24 ?h|24 hours|yesterday|last day)\b/i.test(text) ? '24' : null
