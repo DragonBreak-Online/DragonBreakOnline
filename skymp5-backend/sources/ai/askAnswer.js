@@ -2,7 +2,7 @@
 // Answers for /dragonbaron ask in three modes: template (code renders the cards), model (the local model phrases cited
 // excerpts and code checks it) and extractive (the excerpts themselves, when the model is off, down, late or not trusted)
 
-const { extractEntities, route, isLore, asksCause, asksFuture, asksOldVersion, MODEL_INTENTS, OWNERS_ONLY_INTENTS, NO_CAUSE_INTENTS, DOC_INTENTS } = require('./askRoute')
+const { extractEntities, route, isLore, asksCause, asksFuture, asksOldVersion, monthIndex, MONTHS, MONTH_NAMES, MODEL_INTENTS, OWNERS_ONLY_INTENTS, NO_CAUSE_INTENTS, DOC_INTENTS } = require('./askRoute')
 const { deadline: timer } = require('./localModel')
 const { docsFor } = require('./retrieve')
 
@@ -78,6 +78,26 @@ function namesUnreleased(entities, cards) {
 }
 const speaksOfFuture = cards => cards.some(c => usable(c) && FUTURE_TEXT.test(c.text))
 const usable = c => c && c.text && c.text !== 'not available' && c.stale !== 'rank'
+// The dates, months and years a question names, as patterns for card text; a bare "may" is a common word, not a month
+const ASKED_TIME = new RegExp(`\\b(?:(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?)?(${MONTHS})\\b(?:\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b)?|\\b((?:19|20)\\d{2})\\b`, 'gi')
+function askedTimes(q) {
+  const out = []
+  for (const m of String(q || '').matchAll(ASKED_TIME)) {
+    if (m[4]) { out.push(new RegExp(`\\b${m[4]}\\b`)); continue }
+    const month = MONTH_NAMES[monthIndex(m[2])]
+    const day = m[1] || m[3]
+    if (day) out.push(new RegExp(`\\b0?${Number(day)}(st|nd|rd|th)?\\s+(of\\s+)?${month}\\b|\\b${month}\\s+0?${Number(day)}\\b`, 'i'))
+    else if (month !== 'may') out.push(new RegExp(`\\b${month}\\b`, 'i'))
+  }
+  return out
+}
+// The current text answers a question about an earlier time when the rule it names (or else its best match other than an introduction) names that time
+function namesAskedTime(cards, q) {
+  const times = askedTimes(q)
+  const named = cards.filter(c => usable(c) && c.exact)
+  const topic = named.length ? named : cards.filter(c => usable(c) && !/:intro$/.test(c.key)).slice(0, 1)
+  return times.length > 0 && topic.some(c => times.some(rx => rx.test(c.text)))
+}
 const norm = s => String(s).replace(/[\u2018\u2019]/g, "'").replace(/[\u201c\u201d]/g, '"').replace(/\s+/g, ' ').trim()
 const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -263,18 +283,25 @@ function createAnswerer({ sources, model, flight, limiter, readSwitch, settings,
     if (intents[0]?.intent === 'refuse') return done({ outcome: 'refused', mode: 'template', lead: [intents[0].args.text] })
     const fallback = !intents.length
     if (fallback && isLore(question)) return done({ outcome: 'idk', mode: 'template', lead: [TEXT.lore, ...canAnswer], intents: ['fallback'] })
-    // A source that cannot hold the fact asked for is not read: a change log span over 7 days, or an older version of the rules
+    // A change log span over 7 days is not read; an older rules text is never held, but the current one is kept when it names the time asked about
     const oldDocs = asksOldVersion(question, entities)
-    const beyond = intents.filter(i => (i.intent === 'changes' && i.args.time === 'beyond') || (oldDocs && DOC_INTENTS.has(i.intent)))
-    const limits = [...new Set(beyond.map(i => (i.intent === 'changes' ? TEXT.changesWindow : TEXT.docsCurrent)))]
-    if (fallback && oldDocs) limits.push(TEXT.docsCurrent)
-    if (limits.length) {
-      if (beyond.length === intents.length) return done({ outcome: 'idk', mode: 'template', lead: [`I don't know from what I can see. ${limits.join(' ')}`], ...(fallback ? { intents: ['fallback'] } : {}) })
-      base.notes.push(...limits)
-    }
-    const readable = intents.filter(i => !beyond.includes(i))
+    const beyond = intents.filter(i => i.intent === 'changes' && i.args.time === 'beyond')
+    const limits = beyond.length ? [TEXT.changesWindow] : []
+    const idk = lim => done({ outcome: 'idk', mode: 'template', lead: [`I don't know from what I can see. ${lim.join(' ')}`], ...(fallback ? { intents: ['fallback'] } : {}) })
+    if (beyond.length && beyond.length === intents.length) return idk(limits)
+    base.notes.push(...limits)
+    let readable = intents.filter(i => !beyond.includes(i))
 
-    const { ruleCards, cards } = await readAll(readable, question, viewer, ctx, fallback)
+    let { ruleCards, cards } = await readAll(readable, question, viewer, ctx, fallback)
+    if (oldDocs && (fallback || readable.some(i => DOC_INTENTS.has(i.intent)))) {
+      if (!namesAskedTime(ruleCards, question)) {
+        cards = cards.filter(c => !ruleCards.includes(c))
+        readable = readable.filter(i => !DOC_INTENTS.has(i.intent))
+        if (!readable.length) return idk([...limits, TEXT.docsCurrent])
+        ruleCards = []
+      }
+      base.notes.push(TEXT.docsCurrent)
+    }
     base.cards = cards.map(c => c.key)
     if (fallback) {
       base.intents = ['fallback']

@@ -161,7 +161,7 @@ function bm25(query, chunks, k = 4, { k1 = 1.2, b = 0.75 } = {}) {
 function ruleRefsOf(q) {
   const text = String(q).replace(/\b\d+(?:\.\d+){2,}\b/g, ' ')
   const out = []
-  for (const m of text.matchAll(/\bD\d{1,2}\b|\brule\s+\d{1,2}\b|\b\d{1,2}\.\d{1,2}\b/gi)) {
+  for (const m of text.matchAll(/\bD\d{1,2}\b|\brule\s+\d{1,2}\b(?!\.\d)|\b\d{1,2}\.\d{1,2}\b/gi)) {
     const v = m[0].replace(/\s+/g, ' ')
     const ref = /^d/i.test(v) ? v.toUpperCase() : /^rule/i.test(v) ? v.toLowerCase() : v
     if (!out.includes(ref)) out.push(ref)

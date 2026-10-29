@@ -721,20 +721,20 @@ test('29. checkAnswer grounding ignores harmless differences (markdown, case, qu
   assert.deepEqual([ok(['A strike counts for 90 days', 'A ban lasts 90 days'], 'Strikes last 90 days.', ['F1']).reason], ['quote'])
 })
 
-test('30. an older version of the rules or handbook is not in the data: "I don\'t know" without reading or calling the model; a date inside a rule still reaches it', async () => {
+test('30. an older version of the rules or handbook is not in the data: "I don\'t know" without calling the model; a date inside a rule still reaches it', async () => {
   const { ask, usageFile } = make()
   const { it, calls } = interaction('What did the handbook say about teleporting players last year?')
   await ask.handleInteraction(it)
   const e = edited(calls).content
   assert.match(e, /^I don't know from what I can see\. I can read only the current Server Rules and Staff Handbook, not older versions\./)
-  assert.deepEqual([reads.length, model.probes, model.chats.length], [0, 0, 0])
+  assert.deepEqual([reads, model.probes, model.chats.length], [['rules'], 0, 0])
   assert.deepEqual(JSON.parse(fs.readFileSync(usageFile, 'utf8').trim()).outcome, 'idk')
-  // With another intent, that one is answered and the reply says what the rules reader holds
+  // With another intent, that one is answered, no rule is shown, and the reply says what the rules reader holds
   const q = interaction('Is the server up, and what did the old rules say about PK?')
   await ask.handleInteraction(q.it)
   assert.match(edited(q.calls).content, /Players online: 26/)
   assert.match(edited(q.calls).content, /I can read only the current Server Rules and Staff Handbook, not older versions\./)
-  assert.ok(!reads.includes('rules'))
+  assert.ok(!/Server Rules 2026-10-21|Staff Handbook 2026-10-21/.test(edited(q.calls).content), edited(q.calls).content)
   model.replies.push(body => {
     const cited = [...body.messages[1].content.matchAll(/^\[(F\d+)\]/gm)].map(m => m[1])
     const content = JSON.stringify({ answerable: true, answer: 'Nobody is punished just for having had a second account before 21 October 2026.', cited, quotes: ['nobody is punished just for having had a second account before 21 October 2026'] })
@@ -744,6 +744,34 @@ test('30. an older version of the rules or handbook is not in the data: "I don\'
   await ask.handleInteraction(r.it)
   assert.equal(model.chats.length, 1)
   assert.match(edited(r.calls).content, /^Nobody is punished just for having had a second account before 21 October 2026\./)
+})
+
+test('30b. a question about an earlier time that the current rules answer (3.7: before 21 October 2026, by 4 November 2026) reads them and reaches the model', async () => {
+  S = { ...S, askPerMin: 100, askPerHour: 1000 }
+  const { ask } = make()
+  for (const q of ['Did the rules forbid a second account before 21 October?', 'Were second accounts allowed before October?', 'What did rule 3.7 require before 4 November?',
+    'Was a second account allowed before 21 October 2026?', 'Did rule 3.7 say to open a ticket before 4 November?']) {
+    const before = model.chats.length
+    reads.length = 0
+    model.replies.push(body => {
+      const f = /^\[(F\d+)\] \([^;\n]*, 3\.7;/m.exec(body.messages[1].content)
+      const content = JSON.stringify({ answerable: true, answer: 'No written rule forbade a second Discord account before 21 October 2026.', cited: [f ? f[1] : 'F9'], quotes: ['No written rule forbade a second Discord account before 21 October 2026'] })
+      return { status: 200, text: async () => JSON.stringify({ message: { content } }) }
+    })
+    const { it, calls } = interaction(q)
+    await ask.handleInteraction(it)
+    assert.ok(reads.includes('rules'), q)
+    assert.equal(model.chats.length, before + 1, q)
+    assert.match(edited(calls).content, /^No written rule forbade a second Discord account before 21 October 2026\./, q)
+  }
+  // A time the current text does not name is still an older version: no model call
+  for (const q of ['What did the rules say about PK in September?', 'what did section 5.2 state before 1 October?', 'In 2025, what did the Staff Handbook require for a ban?']) {
+    const before = model.chats.length
+    const { it, calls } = interaction(q)
+    await ask.handleInteraction(it)
+    assert.match(edited(calls).content, /^I don't know from what I can see\. I can read only the current Server Rules and Staff Handbook, not older versions\./, q)
+    assert.equal(model.chats.length, before, q)
+  }
 })
 
 test('31. an ellipsis may join a list heading to its items, never one block (a rank row, "You can:") to another', () => {

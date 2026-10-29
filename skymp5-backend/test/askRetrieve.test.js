@@ -66,3 +66,9 @@ test('a "who can ban" handbook question retrieves the rank table or the ban sect
     assert.ok(cards.some(c => ['staff:1', 'staff:5.2', 'staff:4.4'].includes(c.key)), `${q}: ${cards.map(c => c.key)}`)
   }
 })
+
+test('"rule 3.7" pins section 3.7, not the rule 3 heading; "rule 3" alone still pins rule 3', () => {
+  assert.deepEqual(retrieve.ruleRefsOf('What did rule 3.7 require before 4 November?'), ['3.7'])
+  assert.deepEqual(retrieve.exactRefs('What did rule 3.7 require before 4 November?', chunks).map(c => c.id), ['rules:3.7'])
+  assert.deepEqual(retrieve.ruleRefsOf('what does rule 3 say'), ['rule 3'])
+})

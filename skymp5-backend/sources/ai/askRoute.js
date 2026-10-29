@@ -93,6 +93,8 @@ const CAUSE = /\b(why|how come|what caused|caused by|cause of|the cause)\b/i
 const NO_CAUSE_INTENTS = new Set(['status', 'online', 'gm_calls', 'tickets'])
 // A time span the change log cannot cover: it reads the last 24 h, today or the last 7 days, nothing older
 const MONTHS = 'january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec'
+const MONTH_NAMES = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december']
+const monthIndex = m => MONTH_NAMES.findIndex(f => f.startsWith(String(m).toLowerCase().slice(0, 3)))
 const COUNT = '\\d+|an?|one|two|three|four|five|six|several|few|couple of'
 const WEEKS = '[2-9]|\\d{2,}|two|three|four|five|six|several|few|couple of'
 // Only how far back to look ("last month", "3 months ago", "in the past two years", "since August"), never a length ("3 month old", "can last two months")
@@ -225,4 +227,4 @@ function asksOldVersion(q, entities = extractEntities(q)) {
   return OLD_WORDING.test(text) || (entities.time === 'beyond' && !OBJECT_TIME.test(text))
 }
 
-module.exports = { extractEntities, route, refusalOf, isLore, asksCause, asksFuture, asksOldVersion, INTENTS, MODEL_INTENTS, OWNERS_ONLY_INTENTS, NO_CAUSE_INTENTS, DOC_INTENTS, HELD }
+module.exports = { extractEntities, route, refusalOf, isLore, asksCause, asksFuture, asksOldVersion, monthIndex, MONTHS, MONTH_NAMES, INTENTS, MODEL_INTENTS, OWNERS_ONLY_INTENTS, NO_CAUSE_INTENTS, DOC_INTENTS, HELD }
