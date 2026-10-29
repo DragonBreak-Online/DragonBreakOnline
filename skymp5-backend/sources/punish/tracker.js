@@ -23,6 +23,9 @@ const GAP_MS = 1500
 const MSG_MAX = 1900
 const TITLE_MAX = 100
 const CACHE_MS = 10 * 60000
+const AUTO_ARCHIVE_MIN = 10080
+// A thread quiet this long may have been archived by Discord on its own (an hour short of its auto-archive window)
+const IDLE_MS = AUTO_ARCHIVE_MIN * 60000 - HOUR_MS
 const NAME_TTL_MS = 24 * HOUR_MS
 const SAME_BAN_MS = 10 * 60000
 const JOURNAL_WAIT_MS = 60000
@@ -453,6 +456,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     await call('PATCH', `/channels/${acct.threadId}`, { archived: false }).catch(err => { capped(err); throw err })
     if (headroom) headroom.count++
     acct.state = 'open'
+    acct.activeAt = now()
   }
 
   // A call into a thread that Discord archived on its own (50083): unarchive it and try once more
@@ -663,7 +667,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     await loadTags()
     const { content, hash } = starterText(key, acct, rows, x)
     const tags = tagsFor(rows, x)
-    const payload = { name: titleOf(acct.username), message: { content, allowed_mentions: NO_PINGS }, auto_archive_duration: 10080 }
+    const payload = { name: titleOf(acct.username), message: { content, allowed_mentions: NO_PINGS }, auto_archive_duration: AUTO_ARCHIVE_MIN }
     if (tags.length) payload.applied_tags = tags
     acct.state = 'creating'
     save()
@@ -688,7 +692,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
       throw err
     }
     if (headroom) headroom.count++
-    Object.assign(acct, { threadId: String(thread.id), title: payload.name, state: 'open', starterHash: hash, starterGone: false, tags, status: tagNames(rows, x)[0] === 'Active' ? 'active' : 'expired', recreate: false })
+    Object.assign(acct, { threadId: String(thread.id), title: payload.name, state: 'open', activeAt: now(), starterHash: hash, starterGone: false, tags, status: tagNames(rows, x)[0] === 'Active' ? 'active' : 'expired', recreate: false })
     save()
     return true
   }
@@ -705,6 +709,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
       note(`drop-${id}-${w.st}`, `Discord refused the post for ${id} (${w.st}) for good, dropped: ${err.message}`)
       dropped = true
     }
+    if (!dropped) acct.activeAt = now()
     acct.rows[id] = { ...(w.rec || recordOf(w.r)), state: w.st, postedAt: iso(now()), msgId: msg && msg.id ? String(msg.id) : null, ...(dropped ? { dropped } : {}) }
     save()
   }
@@ -742,6 +747,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
       try {
         await threadCall(acct, 'PATCH', ch, patch)
         if ('archived' in patch) acct.state = patch.archived ? 'archived' : 'open'
+        if (patch.archived === false) acct.activeAt = now()
       } catch (err) {
         // A full guild or a thread still archived is not a refusal of the tags: they are tried again later
         if (err === OUT || capped(err) || NOT_FINAL.has(err.code) || !patch.applied_tags || (err.status !== 400 && err.status !== 403)) throw err
@@ -832,7 +838,8 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     if (isNew || due || !acct.username) await refreshName(key, acct, rows, x)
     if (!acct.threadId) {
       if (!(await createThread(key, acct, rows, x))) return
-    } else if (work.length && acct.state === 'archived') {
+    } else if (work.length && (acct.state === 'archived' || x.now - (acct.activeAt || 0) >= IDLE_MS)) {
+      // An open thread quiet for a week may be one Discord archived itself: reopened only with room, and counted
       if (!(await roomForThread())) {
         waitNote('reopened threads are held')
         return

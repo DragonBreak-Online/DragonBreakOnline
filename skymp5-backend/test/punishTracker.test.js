@@ -542,6 +542,80 @@ test('thread headroom: a new punishment reopens an archived thread only with roo
   assert.equal(reopens(d).length, 1)
 })
 
+test('thread headroom: a thread Discord archived after 7 idle days is reopened only with room, and the reopen counts', async () => {
+  const d = fakeDiscord()
+  const r = await started({ discord: d })
+  // Alice's suspension runs out (archived by the tracker); Bob's 30-day one stays in force, his thread open
+  r.data.discipline = {
+    57: [entry(1, 'suspend', T0 - HOUR, { until: T0 + HOUR })],
+    58: [entry(1, 'suspend', T0 - HOUR, { until: T0 + 30 * DAY })],
+  }
+  await r.tick()
+  r.now += 2 * HOUR
+  await r.tick()
+  const alice = r.named('alice_rp'), bob = r.named('bob_rp')
+  assert.equal(alice.archived, true)
+  assert.equal(bob.archived, false)
+  assert.equal(r.registry().accounts[PEOPLE.bob.discordId].state, 'open')
+  // A week with no message: Discord archives Bob's thread itself, the registry still says open
+  r.now += 8 * DAY
+  bob.archived = true
+  d.active = 976
+  r.data.discipline[57].push(entry(2, 'strike', r.now - 60000))
+  r.data.discipline[58].push(entry(2, 'strike', r.now - 60000))
+  await r.tick()
+  assert.equal(bob.archived, true, 'held above 975')
+  assert.equal(alice.archived, true, 'held above 975')
+  assert.equal(reopens(d).length, 0)
+  assert.equal(r.registry().accounts[PEOPLE.bob.discordId].rows['dsc:58:2'], undefined, 'the row is kept unposted')
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].rows['dsc:57:2'], undefined, 'the row is kept unposted')
+  assert.deepEqual(r.audits, ['PUNISH-TRACKER waiting for thread headroom: reopened threads are held'])
+  // At exactly 975 one reopen fits and takes the slot, so the other waits
+  d.active = 975
+  r.now += 11 * 60000
+  await r.tick()
+  assert.equal([alice, bob].filter(t => !t.archived).length, 1, 'one reopened, the other counted out')
+  assert.equal(r.posts().filter(p => /^\*\*STRIKE\*\* · dsc:5[78]:2/.test(p)).length, 1)
+  d.active = 0
+  r.now += 11 * 60000
+  await r.tick()
+  assert.equal(r.posts().filter(p => /^\*\*STRIKE\*\* · dsc:5[78]:2/.test(p)).length, 2)
+})
+
+test('thread headroom: an idle thread Discord archived that answers 50083 is held above 975; a recent post keeps it open', async () => {
+  const d = fakeDiscord()
+  const r = await started({ discord: d })
+  r.data.discipline = { 57: [entry(1, 'suspend', T0 - HOUR, { until: T0 + 30 * DAY })] }
+  await r.tick()
+  const t = d.thread()
+  d.fail = (method, p) => (method === 'POST' && p === `/channels/${t.id}/messages` && t.archived ? fakeDiscord.error(400, 50083) : null)
+  // Six days on, a post: the thread is not idle, nothing is checked or reopened first
+  r.now += 6 * DAY
+  r.data.discipline[57].push(entry(2, 'warn', r.now - 60000))
+  const before = d.calls.length
+  await r.tick()
+  assert.equal(d.calls.slice(before).filter(c => c.path.endsWith('/threads/active')).length, 0)
+  assert.equal(reopens(d).length, 0)
+  // Six more days: the post above kept it active. Then eight idle days and Discord archives it
+  r.now += 6 * DAY
+  await r.tick()
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].activeAt, T0 + 6 * DAY)
+  r.now += 8 * DAY
+  t.archived = true
+  d.active = 990
+  r.data.discipline[57].push(entry(3, 'strike', r.now - 60000))
+  await r.tick()
+  assert.equal(t.archived, true)
+  assert.equal(reopens(d).length, 0)
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].rows['dsc:57:3'], undefined, 'the row is kept unposted')
+  assert.deepEqual(r.audits, ['PUNISH-TRACKER waiting for thread headroom: reopened threads are held'])
+  d.active = 900
+  r.now += 11 * 60000
+  await r.tick()
+  assert.equal(reopens(d).length, 1)
+  assert.match(t.messages.at(-1).content, /^\*\*STRIKE\*\* · dsc:57:3/)
+})
+
 test('thread headroom: after a 160006 no thread is reopened until the next headroom check', async () => {
   const d = fakeDiscord()
   const r = await started({ discord: d })
