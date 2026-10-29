@@ -848,7 +848,8 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     if (acct) {
       for (const [id, rec] of Object.entries(acct.rows)) {
         const st = GONE_STATE[prefixOf(id)]
-        if (!st || g.ids.has(id) || frozen(id) || !IN_FORCE.has(rec.state)) continue
+        // Only a clean read ends or unbans a row: a file read as empty (missing 15+ minutes) posts no ENDED for it
+        if (!st || g.ids.has(id) || frozen(id) || g.statusOf(SOURCE_OF[prefixOf(id)]) !== 'ok' || !IN_FORCE.has(rec.state)) continue
         const text = rec.alias ? null : updateText(id, rec, null, st, x)
         if (text) work.push({ id, rec, st, text })
         else quiet.push({ id, st, base: rec })

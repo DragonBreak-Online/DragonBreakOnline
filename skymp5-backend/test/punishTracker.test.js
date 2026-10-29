@@ -383,7 +383,7 @@ test('an unreadable discipline file whose kept copy shows a suspension ended hol
   assert.equal(t.archived, true)
 })
 
-test('a missing panel ban list is frozen for 15 minutes, then read as empty; an unreadable one and a missing ban list stay frozen', async () => {
+test('a missing panel ban list is frozen for 15 minutes, then read as empty without an ENDED; an unreadable one and a missing ban list stay frozen', async () => {
   const r = await started()
   r.data.adminBans = [{ id: 't1', profileId: 57, name: 'Alia', until: T0 + DAY, reason: 'griefing', by: 'profile 1', at: T0 }]
   r.data.bans = [{ ref: 'B-AAAAAA', discordId: PEOPLE.bob.discordId, reason: 'cheating', bannedAt: iso(T0 - HOUR), bannedBy: 'lena (dashboard)' }]
@@ -400,11 +400,11 @@ test('a missing panel ban list is frozen for 15 minutes, then read as empty; an 
   assert.equal(alice.messages.length, 2)
   assert.equal(alice.archived, false)
   assert.ok(r.logs.includes('a Discord account: its starter, tags and archive wait while the panelBans file is missing'))
-  // Past 15 minutes the panel ban list is really gone; the game ban list still waits
+  // Past 15 minutes the panel ban list reads as empty, but only a clean read ends a ban; the game ban list still waits
   r.now += 2 * 60000
   await r.tick()
-  assert.equal(alice.messages[2].content, '**ENDED** · panel tempban abn:t1 is no longer on the F7 panel ban list')
-  assert.equal(alice.archived, true)
+  assert.equal(alice.messages.length, 2, 'no ENDED from a file read as empty: only a clean read ends a panel ban')
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].rows['abn:t1'].state, 'running')
   assert.equal(bob.messages.length, 2, 'no UNBANNED from a missing ban list')
   assert.equal(bob.archived, false)
   assert.equal(r.registry().accounts[PEOPLE.bob.discordId].rows['ban:B-AAAAAA'].state, 'running')
@@ -418,6 +418,48 @@ test('a missing panel ban list is frozen for 15 minutes, then read as empty; an 
   for (let i = 0; i < 3; i++) { r2.now += HOUR; await r2.tick() }
   assert.equal(r2.named('alice_rp').messages.length, 2)
   assert.equal(r2.named('alice_rp').archived, false)
+})
+
+test('admin-bans.json missing 15+ minutes posts no ENDED for in-force F7 panel bans; they stay in force when it returns', async () => {
+  const r = await started()
+  r.data.adminBans = [
+    { id: 't1', profileId: 57, name: 'Alia', until: T0 + DAY, reason: 'griefing', by: 'profile 1', at: T0 },
+    { id: 't2', profileId: 58, name: 'Borin', until: 0, reason: 'cheating', by: 'profile 1', at: T0 },
+  ]
+  await r.tick()
+  const alice = r.named('alice_rp'), bob = r.named('bob_rp')
+  assert.equal(alice.messages.length, 2)
+  assert.equal(bob.messages.length, 2)
+  // The file goes missing for well past 15 minutes
+  r.data.adminBans = []
+  r.status = { panelBans: { status: 'missing' } }
+  for (let i = 0; i < 4; i++) { r.now += 10 * 60000; await r.tick() }
+  for (const t of [alice, bob]) {
+    assert.equal(t.messages.length, 2, 'no ENDED while the panel ban list reads as empty')
+    assert.ok(!t.messages.some(m => /ENDED/.test(m.content)))
+    assert.equal(t.archived, false)
+  }
+  const acc = r.registry().accounts
+  assert.equal(acc[PEOPLE.alice.discordId].rows['abn:t1'].state, 'running')
+  assert.equal(acc[PEOPLE.bob.discordId].rows['abn:t2'].state, 'running')
+  // It comes back with both bans: nothing to correct, still no ENDED
+  r.data.adminBans = [
+    { id: 't1', profileId: 57, name: 'Alia', until: T0 + DAY, reason: 'griefing', by: 'profile 1', at: T0 },
+    { id: 't2', profileId: 58, name: 'Borin', until: 0, reason: 'cheating', by: 'profile 1', at: T0 },
+  ]
+  r.status = {}
+  for (let i = 0; i < 2; i++) { r.now += 60000; await r.tick() }
+  for (const t of [alice, bob]) {
+    assert.equal(t.messages.length, 2)
+    assert.match(t.messages[0].content, /Status: \*\*ACTIVE\*\*/)
+    assert.equal(t.archived, false)
+  }
+  // A clean read without the ban still ends it
+  r.data.adminBans = [{ id: 't2', profileId: 58, name: 'Borin', until: 0, reason: 'cheating', by: 'profile 1', at: T0 }]
+  r.now += 60000
+  await r.tick()
+  assert.equal(alice.messages[2].content, '**ENDED** · panel tempban abn:t1 is no longer on the F7 panel ban list')
+  assert.equal(bob.messages.length, 2)
 })
 
 test('a new tracker on the same registry posts nothing twice; a thread whose creation lost its answer is found, not made again', async () => {
