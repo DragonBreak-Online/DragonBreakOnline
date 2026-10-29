@@ -14,12 +14,12 @@ const MODEL_INTENTS = new Set(['version', 'handbook', 'rules'])
 // Intents read from the rules documents (the current Server Rules and Staff Handbook only)
 const DOC_INTENTS = new Set(['handbook', 'rules'])
 
-const REFUSE_WORDS = /\b(ip|ips|hwid|device|alts?|vote[sd]?|election|ballot|transcripts?|passwords?|tokens?|webhooks?|backend\.env)\b/i
-// Secrets are refused whatever the question; the other protected topics only when the question asks for the data itself
-const SECRET_WORDS = /\b(passwords?|tokens?|webhooks?|backend\.env)\b/i
-// A question about what a rule says: it names a rule id, a rules document or a permission ("can staff vote", "is X allowed")
-const RULE_TEXT = /\b(rules?|handbook|policy|policies|allowed|permitted|forbidden|against the rules)\b|\b(who|can|may|must|should)\s+(i|a|an|we|you|players?|staff|gms?|trial gms?|lead gms?|owners?|devs?|developers?)\b/i
-// ...but not when it asks for votes, results, addresses or matches themselves, or for one person's
+const REFUSE_WORDS = /\b(ip|ips|hwid|device|alts?|vote[sd]?|elections?|ballots?|transcripts?|passwords?|tokens?|webhooks?|backend\.env)\b/i
+// Secrets and ticket transcripts (no rules document speaks of them) are refused whatever the question
+const SECRET_WORDS = /\b(passwords?|tokens?|webhooks?|backend\.env|transcripts?)\b/i
+// The other protected topics only in one question that names a rule or asks what a rules text says, never permission wording alone
+const SECOND_CLAUSE = /[?;!]\s*\S|\.(?!\d)\s*\p{L}|,\s*(and|but|also|then|plus|so)\b/iu
+// ...and not when it asks for votes, results, addresses or matches themselves, or for one person's
 const DATA_VERBS = /\b(show|print|list|reveal|dump|give|send|post|share|look\s?up|find|check|tell me)\b/i
 const DATA_NOUNS = /\b(counts?|counted|tally|totals?|results?|standings?|so far|going|leading|winning|won|who voted|voted for|whose|logs?|match(es|ed)?|linked)\b/i
 // A question about what a rules text says: "what does 2.6 say about the vote count" asks for the rule, not the count
@@ -35,7 +35,7 @@ const NOT_A_COMMAND = new RegExp([
 ].join('|'), 'i')
 
 const REFUSALS = Object.freeze([
-  [/\b(vote[sd]?|election|ballot)\b/i, 'Election counts are never shown, to staff included (Staff Handbook 2.6). Nothing was run.'],
+  [/\b(vote[sd]?|elections?|ballots?)\b/i, 'Election counts are never shown, to staff included (Staff Handbook 2.6). Nothing was run.'],
   [/\b(ip|ips|hwid|device|alts?)\b/i, 'IP addresses, device matches and alt accounts are never shown here. Nothing was run.'],
   [/\btranscripts?\b/i, 'Ticket transcripts are never used here. Nothing was run.'],
   [/\b(passwords?|tokens?|webhooks?|backend\.env)\b/i, 'Passwords, tokens, webhooks and server settings are never shown. Nothing was run.'],
@@ -134,8 +134,8 @@ function extractEntities(q) {
 function refusalOf(q, entities = extractEntities(q)) {
   if (IMPERATIVE.test(q.trim()) && !NOT_A_COMMAND.test(q.trim())) return IMPERATIVE_TEXT
   if (!REFUSE_WORDS.test(q)) return null
-  const aboutRules = !SECRET_WORDS.test(q) && (entities.ruleRefs.length > 0 || RULE_TEXT.test(q)) && !DATA_VERBS.test(q) && (SAYS.test(q) || !DATA_NOUNS.test(q)) &&
-    !entities.tags.length && !entities.names.length && !entities.threadIds.length
+  const aboutRules = !SECRET_WORDS.test(q) && (entities.ruleRefs.length > 0 || SAYS.test(q)) && !SECOND_CLAUSE.test(q.trim()) && !DATA_VERBS.test(q) &&
+    (SAYS.test(q) || !DATA_NOUNS.test(q)) && !entities.tags.length && !entities.names.length && !entities.threadIds.length
   if (aboutRules) return null
   for (const [rx, text] of REFUSALS) if (rx.test(q)) return text
   return 'That is never shown here. Nothing was run.'
