@@ -56,3 +56,13 @@ test('"staff" alone does not hide the Server Rules; a D-rule or "rule N" comes f
   assert.deepEqual(retrieve.exactRefs('what does the handbook say in 11.4', chunks), [])
   assert.deepEqual(retrieve.exactRefs('what does the handbook say in 5.3', chunks).map(c => c.id), ['staff:5.3'])
 })
+
+// Known gap (eval a20 and x10): section 3's many "ban evasion" mentions outrank the rank table, which is 5th of a 4-card cut
+test('a "who can ban" handbook question retrieves the rank table or the ban sections', { todo: 'retrieval ranks staff:1 5th; the answer comes from section 3 instead' }, async () => {
+  const { createSources } = require('../sources/ai/askSources')
+  const sources = createSources({ config: {} })
+  for (const q of ['Which staff rank can ban players, per the handbook?', 'Who is allowed to ban a player under the staff handbook?']) {
+    const cards = await sources.read('rules', { q, docs: retrieve.docsFor(q) }, { tier: 'owner' }, {})
+    assert.ok(cards.some(c => ['staff:1', 'staff:5.2', 'staff:4.4'].includes(c.key)), `${q}: ${cards.map(c => c.key)}`)
+  }
+})

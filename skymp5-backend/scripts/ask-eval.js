@@ -68,8 +68,10 @@ async function main(argv = process.argv.slice(2), { fetch = globalThis.fetch, se
       const answerText = (r.answer || '').toLowerCase()
       const missing = (row.must_contain || []).filter(w => !answerText.includes(String(w).toLowerCase()))
       const correct = got === row.expect && (got !== 'answer' || !missing.length)
+      // A row that expects an answer but lists no expected words counts any answer that is not withheld; it needs a hand check
+      const graded = row.expect !== 'answer' || (row.must_contain || []).length > 0
       results.push({
-        run, id: row.id, expect: row.expect, got, correct, outcome: r.outcome, mode: r.mode, check: r.check, repair: !!r.repair, ms, model_ms: r.modelMs || 0, load_ms: loads,
+        run, id: row.id, expect: row.expect, got, correct, graded, outcome: r.outcome, mode: r.mode, check: r.check, repair: !!r.repair, ms, model_ms: r.modelMs || 0, load_ms: loads,
         withheld_shown: r.outcome === 'withheld' && !!r.answer && reply.includes(r.answer), answer: r.answer || null, missing,
       })
     }
@@ -79,6 +81,7 @@ async function main(argv = process.argv.slice(2), { fetch = globalThis.fetch, se
   const metrics = {
     rows: rows.length, runs, model: s.model, num_ctx: s.numCtx,
     correct: results.filter(r => r.correct).length / Math.max(1, results.length),
+    ungradedCorrect: results.filter(r => r.correct && !r.graded).length,
     idk: unanswerable.filter(r => r.got === 'idk').length / Math.max(1, unanswerable.length),
     withheld: results.filter(r => r.outcome === 'withheld').length,
     withheldShown: results.filter(r => r.withheld_shown).length,
@@ -100,7 +103,7 @@ async function main(argv = process.argv.slice(2), { fetch = globalThis.fetch, se
   fs.writeFileSync(path.join(outDir, 'results.jsonl'), results.map(r => JSON.stringify(r)).join('\n') + '\n', { mode: 0o600 })
   fs.writeFileSync(path.join(outDir, 'metrics.json'), `${JSON.stringify(metrics, null, 2)}\n`, { mode: 0o600 })
   const failed = Object.keys(metrics.gates).filter(k => !metrics.gates[k])
-  out(`ask eval: ${(metrics.correct * 100).toFixed(1)}% correct, idk ${(metrics.idk * 100).toFixed(1)}%, withheld ${metrics.withheld} (shown ${metrics.withheldShown}), p95 ${metrics.p95Ms} ms, ` +
+  out(`ask eval: ${(metrics.correct * 100).toFixed(1)}% correct (${metrics.ungradedCorrect} of them answered on rows with no expected words, not graded), idk ${(metrics.idk * 100).toFixed(1)}%, withheld ${metrics.withheld} (shown ${metrics.withheldShown}), p95 ${metrics.p95Ms} ms, ` +
     `warm load ${metrics.warmLoadMs} ms (median ${metrics.warmLoadMedianMs}, ${metrics.warmLoadsOverMedian} over median+${RELOAD_OVER_MS}): ${pass ? 'PASS' : `FAIL (${failed.join(', ')})`}`)
   return pass ? 0 : 1
 }

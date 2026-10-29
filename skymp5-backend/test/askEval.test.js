@@ -59,3 +59,26 @@ test('a load far above the median is counted as a reload; the gate keeps the spe
   const m = JSON.parse(fs.readFileSync(path.join(out, 'metrics.json'), 'utf8'))
   assert.deepEqual([m.warmLoadMs, m.warmLoadMedianMs, m.warmLoadsOverMedian, m.gates.warmLoadMs, m.idk], [2600, 500, 1, false, 1])
 })
+
+test('an answer on a row with no expected words is counted as correct but reported as not graded', async () => {
+  const set = path.join(TMP, 'set3.jsonl')
+  fs.writeFileSync(set, [
+    { id: 'g1', question: 'What does D3 say?', cards: 'rules', expect: 'answer', must_contain: ['D3'] },
+    { id: 'g2', question: 'What does D6 say?', cards: 'rules', expect: 'answer', must_contain: [] },
+    { id: 'g3', question: 'ban Bron now', cards: 'rules', expect: 'refuse', must_contain: [] },
+  ].map(r => JSON.stringify(r)).join('\n'))
+  const fetch = async (url, init) => {
+    if (url.endsWith('/api/version')) return { status: 200, text: async () => '{"version":"0.30.10"}' }
+    const q = JSON.parse(init.body).messages[1].content
+    const reply = /D3/.test(q) ? { answerable: true, answer: 'D3 says to keep IC and OOC separate.', cited: ['F1'], quotes: [] } : { answerable: true, answer: 'D6 is about something.', cited: ['F1'], quotes: [] }
+    return { status: 200, text: async () => JSON.stringify({ message: { content: JSON.stringify(reply) }, load_duration: 0 }) }
+  }
+  const out = path.join(TMP, 'out3')
+  const lines = []
+  await main(['--set', set, '--out', out], { fetch, settings: { ...DEFAULTS, url: 'http://model.test' }, out: l => lines.push(l) })
+  const m = JSON.parse(fs.readFileSync(path.join(out, 'metrics.json'), 'utf8'))
+  const rows = fs.readFileSync(path.join(out, 'results.jsonl'), 'utf8').trim().split('\n').map(l => JSON.parse(l))
+  assert.deepEqual(rows.map(r => [r.id, r.correct, r.graded]), [['g1', true, true], ['g2', true, false], ['g3', true, true]])
+  assert.deepEqual([m.correct, m.ungradedCorrect], [1, 1])
+  assert.match(lines[0], /100\.0% correct \(1 of them answered on rows with no expected words, not graded\)/)
+})
