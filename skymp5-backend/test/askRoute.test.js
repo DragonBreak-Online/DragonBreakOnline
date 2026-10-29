@@ -324,3 +324,18 @@ test('a dated "since" or "after" is beyond only when that day is over 7 days bef
     assert.equal(extractEntities(q, { now }).time, 'beyond', q)
   }
 })
+
+test('"can you tell me / list / summarise ..." asks for data, not whether a rule allows it; dungeons are in the status; closed tickets are not the open-ticket counts', () => {
+  for (const [q, intent] of [["Can you summarise this week's changes for players?", 'changes'], ['Can you tell me if the server is up?', 'status'], ['Can you list the open tickets?', 'tickets'],
+    ['Can you show me the GM calls?', 'gm_calls'], ['Can you tell me what got deployed today?', 'changes'], ['Can you give me the change log for today?', 'changes'],
+    ['Can you check who is online?', 'online'], ['Can you look up bugs about horses?', 'bug_search'], ['Which dungeons are open at the moment?', 'status']]) {
+    const got = route(q, extractEntities(q)).map(r => r.intent)
+    assert.ok(got.includes(intent), `${q}: ${got}`)
+    assert.ok(!got.includes('rules'), `${q}: ${got}`)
+  }
+  for (const q of ['can you restart the server?', 'can you get banned for metagaming?', 'can you give gold to your own character?', 'Can you tell me if PK is allowed in Whiterun?']) {
+    assert.deepEqual(route(q, extractEntities(q)).map(r => r.intent), ['rules'], q)
+  }
+  assert.ok(!route('Which GM closed the most tickets this week?').some(r => r.intent === 'tickets'))
+  assert.ok(route('How many tickets are open, and how many were closed today?').some(r => r.intent === 'tickets'))
+})

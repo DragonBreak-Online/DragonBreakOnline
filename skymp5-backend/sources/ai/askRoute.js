@@ -76,6 +76,10 @@ const PUNISH = /\b(strikes?|warn(ing|ings|ed)?|bann?ed|bans|suspen\w+|jail\w*|pu
 // A general question about the ladder (how long a strike lasts), not about one player's record
 const PUNISH_GENERAL = /\bhow (long|many)\b|\bbefore (a )?review\b|\bexpire|\bladder\b|\bwhat happens\b|\bwho can\b/i
 const RULEISH = /\b(who (can|may)|can (i|a|an|we|you|players?|staff|gms?|trial gms?|lead gms?)|allowed|may (i|a|an|we)|permitted|against the rules)\b/i
+// "Can you tell me / list / summarise ..." asks the bot for data, not whether a rule allows something ("can you restart the server?")
+const ASK_BOT = /\bcan you\s+(please\s+)?(tell|show|give|send|get|pull up|find|look up|check|list|summar\w*|sum up|recap|count)\s+(me|us|what|which|who|whether|if|the|how|a list|all|any|this|today|recent)\b|\bcan you\s+(please\s+)?(list|summar\w*|sum up|recap|count|look up|pull up|check)\b/i
+// Closed or handled tickets are not in the open-ticket counts
+const CLOSED_TICKETS = /\b(closed|handled|answered|resolved|took|taken)\b[^.?!]*\btickets?\b|\btickets?\b[^.?!]*\b(closed|handled|answered|resolved)\b/i
 // "Is ERP banned?" asks about a rule; "Is Bron banned?" (a name or #TAG) asks about a record
 const BANNED_Q = /\b(is|are)\s+[\w' -]{1,30}?\s+(allowed|banned|forbidden|prohibited|against the rules)\b/i
 const LORE = /\b(lore|canon|uesp|daedr\w*|aedra|elder scrolls|vigilants?|thalmor|dragonborn)\b/i
@@ -204,7 +208,7 @@ function route(q, entities = extractEntities(q), viewer = {}) {
   if (viewer && viewer.tier === 'owner' && HELD.test(text)) {
     add('held', {}, ['handbook', 'player_reports', 'punish_active', 'bug_search', 'status', 'tickets', 'gm_calls'])
   }
-  const ruleish = RULEISH.test(text) || (BANNED_Q.test(text) && !entities.tags.length && !entities.names.length)
+  const ruleish = RULEISH.test(text.replace(ASK_BOT, ' ')) || (BANNED_Q.test(text) && !entities.tags.length && !entities.names.length)
   if (ruleish) for (const s of ['status', 'online', 'changes', 'tickets', 'gm_calls', 'bug_search']) suppressed.add(s)
 
   if (entities.threadIds.length) add('bug_id', { ids: entities.threadIds.slice(0, 2) }, ['status', 'bug_search', 'changes'])
@@ -216,9 +220,10 @@ function route(q, entities = extractEntities(q), viewer = {}) {
   }
   if (entities.tags.length && /\breport/i.test(text)) add('player_reports', { query: [entities.names[0], entities.tags[0]].filter(Boolean).join(' ') }, ['bug_search', 'status'])
   if (/how many (players|people|are (on|online|playing))|who('?s| is| are) (on|online|playing)|players? online/i.test(text)) add('online')
-  if (/\b(up|down|status|running|crash\w*|restart\w*|online)\b/i.test(text)) add('status')
+  if (/\b(up|down|status|running|crash\w*|restart\w*|online|dungeons?)\b/i.test(text)) add('status')
   if (/\bgm ?calls?\b|\/gm\b|waiting for a gm/i.test(text)) add('gm_calls', {}, ['handbook', 'tickets'])
-  if (/\b(how many|open|which|list|count|waiting)\b[^.?!]*\btickets?\b|\btickets?\b[^.?!]*\b(open|waiting|are there)\b/i.test(text)) add('tickets', {}, ['handbook'])
+  if ((!CLOSED_TICKETS.test(text) || /\bopen\b/i.test(text)) &&
+    /\b(how many|open|which|list|count|waiting)\b[^.?!]*\btickets?\b|\btickets?\b[^.?!]*\b(open|waiting|are there)\b/i.test(text)) add('tickets', {}, ['handbook'])
   if (/\b(chang\w+|deploy\w*|releas\w+|went live|updat\w+|patch\w*)\b/i.test(text)) {
     add('changes', { time: entities.time === 'restart' ? 'today' : entities.time || '24', summary: SUMMARY.test(text) || CAUSE.test(text) }, ['bug_search'])
   }
