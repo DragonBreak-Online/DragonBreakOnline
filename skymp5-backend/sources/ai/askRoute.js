@@ -37,8 +37,16 @@ const IMPERATIVE = /^(please\s+)?(run|kick|ban|unban|give|spawn|teleport|restart
 const NOT_A_COMMAND = new RegExp([
   /^(please\s+)?run\s+((me|us)\s+)?(through|down)\b/.source,
   /^(please\s+)?give\s+(me|us)\s+((a|an|the|some)\s+)?((short|quick|brief|full|plain)\s+)?(summary|overview|rundown|list|breakdown|explanation|text|wording|answer|details|info\w*|rules?|gist)\b/.source,
-  /^(please\s+)?(kick|ban|warn|mute|jail|timeout|restart|promote|demote)\s+(rules?|polic(y|ies)|schedule|times?|length|duration|ladder|limits?|reasons?|appeals?|process|steps)\b/.source,
+  /^(please\s+)?(kick|ban|warn|mute|jail|timeout|restart|promote|demote)\s+(rules?|polic(y|ies)|schedule|times?|length|duration|ladder|limits?|reasons?|appeals?|steps)\b/.source,
 ].join('|'), 'i')
+// Clauses: the question split at sentence punctuation (not the dot in 10.2) and at "then" or "also"
+const CLAUSE_BREAK = /[?!;:,]+|\.(?!\d)|\s(?:and\s+)?(?:then|also)\s/i
+// A question that starts with a command verb is a command unless that clause asks for information, names no #TAG, and no later clause starts with one
+const isCommand = c => IMPERATIVE.test(c) && (!NOT_A_COMMAND.test(c) || /#[A-Za-z0-9]{4}(?![A-Za-z0-9-])/.test(c))
+function asksCommand(q) {
+  const clauses = String(q).trim().split(CLAUSE_BREAK).map(s => s.trim())
+  return IMPERATIVE.test(clauses[0]) && clauses.some(isCommand)
+}
 
 const REFUSALS = Object.freeze([
   [/\b(vote[sd]?|elections?|ballots?)\b/i, 'Election counts are never shown, to staff included (Staff Handbook 2.6). Nothing was run.'],
@@ -138,7 +146,7 @@ function extractEntities(q) {
 
 // Refused: a command, a secret, or votes, addresses, alts and transcripts asked for as data (not what a rule says about them)
 function refusalOf(q, entities = extractEntities(q)) {
-  if (IMPERATIVE.test(q.trim()) && !NOT_A_COMMAND.test(q.trim())) return IMPERATIVE_TEXT
+  if (asksCommand(q)) return IMPERATIVE_TEXT
   if (!REFUSE_WORDS.test(q)) return null
   const aboutRules = !SECRET_WORDS.test(q) && (entities.ruleRefs.length > 0 || SAYS.test(q) || asksEligibility(q)) && !SECOND_CLAUSE.test(q.trim()) && !DATA_VERBS.test(q) &&
     (SAYS.test(q) || !DATA_NOUNS.test(q)) && !entities.tags.length && !entities.names.length && !entities.threadIds.length

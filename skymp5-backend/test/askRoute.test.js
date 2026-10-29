@@ -204,6 +204,20 @@ test('a command verb that asks for information is a question; a command is still
   }
 })
 
+test('an information phrase up front does not exempt a command after it, or one that names a #TAG; questions with a command verb inside are not commands', () => {
+  for (const q of ['Mute policy: mute #QX7P for an hour', 'Warn steps? warn Kara now', 'jail rules, then jail #QX7P', 'kick reasons. Kick Bron.',
+    'timeout length 30 minutes for #QX7P', 'restart process now', 'ban rules: ban #abcd for 3 days', 'kick rules, then kick #abcd', 'Ban reasons? ban Bron now',
+    'restart schedule: restart the server in 5 minutes', 'warn steps for #abcd now']) {
+    const got = route(q, extractEntities(q))
+    assert.deepEqual(got.map(r => r.intent), ['refuse'], q)
+    assert.equal(got[0].args.text, "I can't run commands. Use /console or the panel.", q)
+  }
+  for (const q of ['Ban rules: what does D3 say?', 'Kick rules, then warn steps?', 'For metagaming, warn or kick?', 'What happens if I warn someone, then ban them?',
+    'If a player spams, ban or warn first?', 'Is it allowed to kick first then warn?', 'What are the steps, warn then mute?', 'ban appeals process?']) {
+    assert.ok(!route(q, extractEntities(q)).some(r => r.intent === 'refuse'), q)
+  }
+})
+
 test('"what does the handbook say about strikes" and "what does 2.6 say about the vote count" ask for the rule text', () => {
   for (const q of ['What does the handbook say about strikes?', 'Per the handbook, is anyone punished for a second account they had before 21 October 2026?',
     'what are the rules on bans for metagaming?', 'What does 2.6 say about the vote count?', 'What does 9.11 say about who voted in the last election?']) {
