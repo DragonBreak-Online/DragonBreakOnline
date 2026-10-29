@@ -1327,3 +1327,41 @@ test('ban-list entries with no ref: removing one never moves another\'s id, and 
   await r.tick()
   assert.deepEqual(bob().slice(1).map(c => c.split(' — ')[0].split('\n')[0]), ['**UNBANNED** · ban:B-DDDDDD removed from the game ban list'])
 })
+
+test('an F7 ban replacing a Discord copy minutes later carries its own nonce, so Discord does not swallow it', async () => {
+  const r = await started()
+  r.data.journal = [jbanOf(T0)]
+  r.data.bans = [banOf(T0 + 5000, false)]
+  await r.tick()
+  r.now += 3 * 60000
+  r.data.bans = [banOf(r.now, true)]
+  await r.tick()
+  await r.tick()
+  const msgs = r.discord.thread().messages.slice(1).filter(m => /^\*\*(DISCORD BAN|GAME BAN LIST)/.test(m.content))
+  assert.equal(msgs.length, 2, msgs.map(m => m.content).join('\n'))
+  assert.ok(msgs[0].nonce && msgs[1].nonce)
+  assert.notEqual(msgs[0].nonce, msgs[1].nonce)
+})
+
+test('a ref-less ban lifted, then a new ban with a ref minutes later, is posted as a new ban', async () => {
+  const r = await started()
+  const f7 = at => ({ discordId: PEOPLE.bob.discordId, reason: 'duping', bannedAt: iso(at), bannedBy: 'lena (dashboard)' })
+  r.data.bans = [f7(T0)]
+  await r.tick()
+  await r.tick()
+  const bob = () => r.named('bob_rp').messages.slice(1).map(m => m.content.split('\n')[0])
+  assert.equal(bob().length, 1)
+  r.now += 2 * 60000
+  r.data.bans = []
+  await r.tick()
+  await r.tick()
+  assert.equal(bob().length, 2, bob().join('\n'))
+  r.now += 2 * 60000
+  r.data.bans = [{ ...f7(r.now), ref: 'B-DDDDDD' }]
+  await r.tick()
+  await r.tick()
+  assert.deepEqual(bob().slice(2), ['**GAME BAN LIST** · ban:B-DDDDDD'])
+  const rows = r.registry().accounts[PEOPLE.bob.discordId].rows
+  assert.equal(rows['ban:B-DDDDDD'].state, 'running')
+  assert.equal(rows[R.reflessBanId(PEOPLE.bob.discordId)].state, 'unbanned')
+})

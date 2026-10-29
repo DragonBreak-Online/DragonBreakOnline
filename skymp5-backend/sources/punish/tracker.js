@@ -698,7 +698,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     const content = finish(w.text || replyText(w.r, w.st, x))
     let msg = null, dropped = false
     try {
-      msg = await threadCall(acct, 'POST', `/channels/${acct.threadId}/messages`, { content, allowed_mentions: NO_PINGS, nonce: nonceOf(key, id, w.st), enforce_nonce: true })
+      msg = await threadCall(acct, 'POST', `/channels/${acct.threadId}/messages`, { content, allowed_mentions: NO_PINGS, nonce: nonceOf(key, w.nonce ? `${id}|${w.nonce}` : id, w.st), enforce_nonce: true })
     } catch (err) {
       capped(err)
       if (!refusedForGood(err)) throw err
@@ -763,7 +763,8 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     // bans.js gives a ref-less entry its ref: its record moves to the new id, so it is neither posted again nor unbanned
     if (acct) for (const r of rows) {
       const old = r.source === 'bans' && r.ref && r._discordId && !acct.rows[r.id] ? reflessBanId(r._discordId) : null
-      if (!old || !acct.rows[old] || g.ids.has(old)) continue
+      // Only a ban still in force moves: a lifted one stays lifted, and the entry with the ref is a new ban
+      if (!old || !acct.rows[old] || !IN_FORCE.has(acct.rows[old].state) || g.ids.has(old)) continue
       acct.rows[r.id] = { ...acct.rows[old], ref: r.ref }
       delete acct.rows[old]
       for (const rec of Object.values(acct.rows)) if (rec.alias === old) rec.alias = r.id
@@ -785,8 +786,9 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
         else if (isFold(r) || alias) quiet.push({ id: r.id, st, base: recordOf(r), extra: alias ? { alias } : {} })
         else work.push({ r, st, isNew: true })
       } else if (prefixOf(r.id) === 'ban' && (rec.kind !== r.kind || (r.atMs && rec.at && Math.abs(r.atMs - rec.at) > SAME_BAN_MS))) {
-        // bans.js add() replaces a ban under the same ref: a new punishment
-        work.push({ r, st, isNew: true })
+        // bans.js add() replaces a ban under the same ref: a new punishment, with its own nonce so Discord does not
+        // answer it with the first post's message
+        work.push({ r, st, isNew: true, nonce: `${r.kind}|${r.atMs}` })
         if (r.kind !== 'discord_ban') unlinked.add(r.id)
       } else if (rec.state !== st) {
         const text = !rec.alias && RANK[st] >= RANK[rec.state] ? updateText(r.id, rec, r, st, x) : null
