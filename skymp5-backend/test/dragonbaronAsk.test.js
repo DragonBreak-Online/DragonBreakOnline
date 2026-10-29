@@ -714,8 +714,10 @@ test('29. checkAnswer grounding ignores harmless differences (markdown, case, qu
   assert.equal(inTable('Developer | ... and scheduling restarts (/schedule)'), true)
   assert.equal(inTable('Trial GM | ... and scheduling restarts (/schedule)'), false)
   assert.equal(inTable('Trial GM | GM calls ... rename'), true)
-  // A quote must come from a fact it cites
-  assert.deepEqual([ok(['A strike counts for 90 days'], 'Strikes last 90 days.', ['F1']).ok, ok(['A strike counts for 90 days'], 'Strikes last 90 days.', ['F1']).reason], [false, 'quote'])
+  // A quote from a fact the reply did not cite is grounded, and that fact is cited; a quote in no fact is not
+  const uncited = ok(['A strike counts for 90 days'], 'Strikes last 90 days.', ['F1'])
+  assert.deepEqual([uncited.ok, uncited.value.cited], [true, ['F1', 'F2']])
+  assert.deepEqual([ok(['A strike counts for 90 days', 'A ban lasts 90 days'], 'Strikes last 90 days.', ['F1']).reason], ['quote'])
 })
 
 test('30. an older version of the rules or handbook is not in the data: "I don\'t know" without reading or calling the model; a date inside a rule still reaches it', async () => {

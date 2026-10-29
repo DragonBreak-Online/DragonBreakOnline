@@ -169,8 +169,14 @@ function checkAnswer(reply, facts, q) {
   if (!value.cited.length) return { ok: false, json: true, reason: 'cited' }
   if (!value.answer) return { ok: false, json: true, reason: 'empty' }
   if (CLAIMS_ACTION.test(norm(value.answer)) || ASKS_SECRET.test(value.answer)) return { ok: false, json: true, reason: 'action' }
-  const cited = value.cited.map(id => factWords(byId.get(id).text))
-  if (!value.quotes.every(x => cited.some(f => quoteIn(x, f)))) return { ok: false, json: true, reason: 'quote' }
+  // A quote from a fact the reply forgot to cite is still grounded: that fact is cited too
+  const indexed = facts.map(f => ({ id: f.id, words: factWords(f.text) }))
+  for (const x of value.quotes) {
+    if (indexed.some(f => value.cited.includes(f.id) && quoteIn(x, f.words))) continue
+    const other = indexed.find(f => quoteIn(x, f.words))
+    if (!other) return { ok: false, json: true, reason: 'quote' }
+    value.cited.push(other.id)
+  }
   const known = unmark(`${facts.map(f => `${f.label} ${f.asOf || ''} ${f.text}`).join('\n')}\n${q}`)
   for (const token of unmark(value.answer).match(ANSWER_TOKENS) || []) {
     // A bare number may carry a unit or a zone letter in the facts (18:00Z, 90d); it may never be part of a longer number
