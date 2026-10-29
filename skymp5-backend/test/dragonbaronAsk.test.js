@@ -765,7 +765,9 @@ test('30b. a question about an earlier time that the current rules answer (3.7: 
     assert.match(edited(calls).content, /^No written rule forbade a second Discord account before 21 October 2026\./, q)
   }
   // A time the current text does not name is still an older version: no model call
-  for (const q of ['What did the rules say about PK in September?', 'what did section 5.2 state before 1 October?', 'In 2025, what did the Staff Handbook require for a ban?']) {
+  // A bare year is not the time asked about when the current texts date from it (u06: every 2026 date in them would match "before 2026")
+  for (const q of ['What did the rules say about PK in September?', 'what did section 5.2 state before 1 October?', 'In 2025, what did the Staff Handbook require for a ban?',
+    'What did the staff handbook say before 2026?', 'What did rule 3.7 say before 2026?']) {
     const before = model.chats.length
     const { it, calls } = interaction(q)
     await ask.handleInteraction(it)

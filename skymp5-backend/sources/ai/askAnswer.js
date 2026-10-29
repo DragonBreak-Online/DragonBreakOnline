@@ -83,20 +83,21 @@ const ASKED_TIME = new RegExp(`\\b(?:(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?)?
 function askedTimes(q) {
   const out = []
   for (const m of String(q || '').matchAll(ASKED_TIME)) {
-    if (m[4]) { out.push(new RegExp(`\\b${m[4]}\\b`)); continue }
+    if (m[4]) { out.push({ rx: new RegExp(`\\b${m[4]}\\b`), year: Number(m[4]) }); continue }
     const month = MONTH_NAMES[monthIndex(m[2])]
     const day = m[1] || m[3]
-    if (day) out.push(new RegExp(`\\b0?${Number(day)}(st|nd|rd|th)?\\s+(of\\s+)?${month}\\b|\\b${month}\\s+0?${Number(day)}\\b`, 'i'))
-    else if (month !== 'may') out.push(new RegExp(`\\b${month}\\b`, 'i'))
+    if (day) out.push({ rx: new RegExp(`\\b0?${Number(day)}(st|nd|rd|th)?\\s+(of\\s+)?${month}\\b|\\b${month}\\s+0?${Number(day)}\\b`, 'i') })
+    else if (month !== 'may') out.push({ rx: new RegExp(`\\b${month}\\b`, 'i') })
   }
   return out
 }
-// The current text answers a question about an earlier time when the rule it names (or else its best match other than an introduction) names that time
+// The rule a question names (or else its best match other than an introduction) names the earlier time asked about; a bare year only before the text's own year
 function namesAskedTime(cards, q) {
   const times = askedTimes(q)
   const named = cards.filter(c => usable(c) && c.exact)
   const topic = named.length ? named : cards.filter(c => usable(c) && !/:intro$/.test(c.key)).slice(0, 1)
-  return times.length > 0 && topic.some(c => times.some(rx => rx.test(c.text)))
+  const names = (c, t) => (!t.year || t.year < Number(String(c.asOf || '').slice(0, 4))) && t.rx.test(c.text)
+  return topic.some(c => times.some(t => names(c, t)))
 }
 const norm = s => String(s).replace(/[\u2018\u2019]/g, "'").replace(/[\u201c\u201d]/g, '"').replace(/\s+/g, ' ').trim()
 const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
