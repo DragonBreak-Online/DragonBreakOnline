@@ -151,7 +151,7 @@ function extractEntities(q) {
   return { tags, threadIds, clientVer, launcherVer, ruleRefs, time, names: names.slice(0, 3) }
 }
 
-// Refused: a command, a secret, or votes, addresses, alts and transcripts asked for as data (not what a rule says about them)
+// Refused: a command, a secret or a transcript, or votes, addresses and alts asked for as data (not what a rule says about them)
 function refusalOf(q, entities = extractEntities(q)) {
   if (asksCommand(q)) return IMPERATIVE_TEXT
   if (!REFUSE_WORDS.test(q)) return null
