@@ -2,7 +2,7 @@
 // Answers for /dragonbaron ask in three modes: template (code renders the cards), model (the local model phrases cited
 // excerpts and code checks it) and extractive (the excerpts themselves, when the model is off, down, late or not trusted)
 
-const { extractEntities, route, isLore, asksCause, asksOldVersion, MODEL_INTENTS, OWNERS_ONLY_INTENTS, NO_CAUSE_INTENTS, DOC_INTENTS } = require('./askRoute')
+const { extractEntities, route, isLore, asksCause, asksFuture, asksOldVersion, MODEL_INTENTS, OWNERS_ONLY_INTENTS, NO_CAUSE_INTENTS, DOC_INTENTS } = require('./askRoute')
 const { deadline: timer } = require('./localModel')
 const { docsFor } = require('./retrieve')
 
@@ -60,6 +60,9 @@ const ANSWER_TOKENS = /\b\d+(?:\.\d+)+\b|\b\d{2,}\b|#[A-Za-z0-9]{4}\b|\bD\d{1,2}
 const CLAIMS_ACTION = /\bI(?:'ve| have)?\s+(?:just\s+)?(?:ran|run|executed|banned|unbanned|kicked|jailed|unjailed|warned|muted|unmuted|restarted|promoted|demoted|granted|gave|given|spawned|teleported|deleted|removed|reset|announced)\b|^\s*(?:done|completed|executed)\b/i
 const ASKS_SECRET = /\b(passwords?|passcodes?|tokens?|api keys?|2fa|login codes?)\b/i
 
+// Words with which a fact speaks of what is still to come ("Coming with the next game update", "Planned, not live yet")
+const FUTURE_TEXT = /\b(next|upcoming|coming|planned|plans?|soon|will|later|future|not live yet|scheduled|eta)\b/i
+const RELEASE_INTENTS = new Set(['version', 'changes'])
 const usable = c => c && c.text && c.text !== 'not available' && c.stale !== 'rank'
 const norm = s => String(s).replace(/[\u2018\u2019]/g, "'").replace(/[\u201c\u201d]/g, '"').replace(/\s+/g, ' ').trim()
 const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -265,8 +268,10 @@ function createAnswerer({ sources, model, flight, limiter, readSwitch, settings,
     const sw = readSwitch()
     const s = current()
     const modelOn = sw.model === true && !!s.url
-    if (!modelCards.length) {
-      if (!modelOn) return done({ outcome: 'unreachable', mode: 'template', lead: [TEXT.needsModel], blocks: templateBlocks, sources: templateSources })
+    // A release still to come is only in the data when a fact speaks of the future; the current version is not "the next one"
+    const noFuture = asksFuture(question) && readable.some(i => RELEASE_INTENTS.has(i.intent)) && !modelCards.some(c => FUTURE_TEXT.test(c.text))
+    if (!modelCards.length || noFuture) {
+      if (!modelOn && !noFuture) return done({ outcome: 'unreachable', mode: 'template', lead: [TEXT.needsModel], blocks: templateBlocks, sources: templateSources })
       return done({ outcome: 'idk', mode: 'template', lead: [`I don't know from what I can see. I checked: ${labels}.`], blocks: templateBlocks, sources: templateSources })
     }
     const excerpt = (lead, outcome, extra = {}) => done({

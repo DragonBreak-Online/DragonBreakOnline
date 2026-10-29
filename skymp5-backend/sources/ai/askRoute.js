@@ -82,6 +82,12 @@ const BEYOND = new RegExp([
   /\b(in|during|since|before|until|prior to)\s+(19|20)\d{2}\b/.source,
   /\b(last|past)\s+([89]|[1-9]\d+)\s+days\b/.source,
 ].join('|'), 'i')
+// A question about a release still to come: "the next launcher version", "when will 0.3.120 be released"
+const FUTURE = new RegExp([
+  /\b(next|upcoming|future|coming|planned|unreleased)\s+(\w+\s+)?(versions?|releases?|updates?|patch(es)?|launchers?|clients?|builds?)\b/.source,
+  /\bwhen\s+(will|would|shall)\b(?:[^.?!]|\.(?=\d)){0,40}\b(releas\w*|out|ship\w*|launch\w*|live|deploy\w*|land|arrive|come)\b/.source,
+  /\bwill\b(?:[^.?!]|\.(?=\d)){0,40}\b(be released|be out|come out|ship|go live|launch|be deployed)\b/.source,
+].join('|'), 'i')
 // A question about an older version of the rules or handbook ("what did the handbook say before 2026"), which the reader never holds
 const OLD_DOC = new RegExp([
   /\b(old|older|previous|former|outdated|superseded)\s+((server|discord)\s+)?(rules|rulebook|handbooks?|(staff|gm|trial gm)\s+handbooks?)\b/.source,
@@ -180,6 +186,7 @@ function route(q, entities = extractEntities(q), viewer = {}) {
 
 const isLore = q => LORE.test(String(q || ''))
 const asksCause = q => CAUSE.test(String(q || ''))
+const asksFuture = q => FUTURE.test(String(q || ''))
 function asksOldVersion(q, entities = extractEntities(q)) {
   const text = String(q || '')
   if (OLD_DOC.test(text)) return true
@@ -187,4 +194,4 @@ function asksOldVersion(q, entities = extractEntities(q)) {
   return OLD_WORDING.test(text) || (entities.time === 'beyond' && !OBJECT_TIME.test(text))
 }
 
-module.exports = { extractEntities, route, refusalOf, isLore, asksCause, asksOldVersion, INTENTS, MODEL_INTENTS, OWNERS_ONLY_INTENTS, NO_CAUSE_INTENTS, DOC_INTENTS, HELD }
+module.exports = { extractEntities, route, refusalOf, isLore, asksCause, asksFuture, asksOldVersion, INTENTS, MODEL_INTENTS, OWNERS_ONLY_INTENTS, NO_CAUSE_INTENTS, DOC_INTENTS, HELD }

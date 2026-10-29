@@ -773,3 +773,24 @@ test('32. size limits never turn a grounded reply into a repair; "I don\'t know"
   assert.equal(model.chats[1].messages.at(-1).content, `${REPAIR} The problem: answerable must be true or false.`)
   assert.deepEqual(JSON.parse(fs.readFileSync(usageFile, 'utf8').trim()).check, 'badjson')
 })
+
+test('33. a release still to come is "I don\'t know" without the model unless a fact speaks of the future', async () => {
+  const VERSION = { key: 'version', source: 'version', label: 'Launcher API /api/version', asOf: '2026-10-28T18:37Z', stale: null, model: true, text: 'Launcher 2.1.53, client 0.3.109, server 0.3.1.' }
+  const NEWS = { key: 'news:1', source: 'news', label: 'Launcher news 2026-10-27', asOf: '2026-10-27', stale: null, model: true, text: 'Hunger and cold now really slow your regeneration.' }
+  const COMING = { ...NEWS, key: 'news:2', text: 'Coming with the next game update: the ledger panel shows every courier.' }
+  const run = async (question, cards) => {
+    const chats = []
+    const fakeModel = { probe: async () => ({ ok: true }), chat: async a => { chats.push(a); return { outcome: 'ok', content: JSON.stringify({ answerable: true, answer: 'The ledger panel comes with the next game update.', cited: ['F1'], quotes: ['the ledger panel shows every courier'] }) } } }
+    const a = createAnswerer({ sources: { read: async () => cards.map(c => ({ ...c })) }, model: fakeModel, flight: createSingleFlight(), readSwitch: () => ({ model: true }), settings: { ...DEFAULTS, url: 'http://model.test' } })
+    return { r: await a.answer({ question, viewer: { tier: 'owner' } }), chats }
+  }
+  for (const question of ['What is the exact release date of the next launcher version?', 'When will client 0.3.120 be released?']) {
+    const { r, chats } = await run(question, [VERSION, NEWS])
+    assert.deepEqual([r.outcome, r.mode, chats.length], ['idk', 'template', 0], question)
+    assert.match(r.lead[0], /^I don't know from what I can see\. I checked: Launcher API/)
+  }
+  const coming = await run('What is coming in the next launcher version?', [COMING, VERSION])
+  assert.deepEqual([coming.r.outcome, coming.r.mode, coming.chats.length], ['answered', 'model', 1])
+  const current = await run('Which launcher version is current?', [VERSION, NEWS])
+  assert.equal(current.chats.length, 1)
+})

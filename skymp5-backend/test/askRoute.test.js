@@ -4,7 +4,7 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 
-const { route, extractEntities, isLore, asksOldVersion, INTENTS } = require('../sources/ai/askRoute')
+const { route, extractEntities, isLore, asksFuture, asksOldVersion, INTENTS } = require('../sources/ai/askRoute')
 
 const snow = n => (10n ** 18n + BigInt(n)).toString()
 
@@ -178,4 +178,11 @@ test('"what does the handbook say about strikes" and "what does 2.6 say about th
   for (const q of ['What does 2.6 say? Show me the vote count.', "What does D9 say about Kara's IP?", 'what does the handbook say about passwords?']) {
     assert.deepEqual(route(q, extractEntities(q)).map(r => r.intent), ['refuse'], q)
   }
+})
+
+test('a release still to come: "next version", "when will ... be released"; a past or current release is not', () => {
+  for (const q of ['What is the exact release date of the next launcher version?', 'When will client 0.3.120 be released?', 'When will the next update come out?',
+    'Is there an upcoming patch?', 'Will 0.3.110 be released today?']) assert.equal(asksFuture(q), true, q)
+  for (const q of ['When was 0.3.109 released?', 'What is in client 0.3.109?', 'Which launcher version is current?', 'When will a strike expire?',
+    'Summarise the changes in the last 24h', 'What does rule 9 say about the next life?']) assert.equal(asksFuture(q), false, q)
 })
