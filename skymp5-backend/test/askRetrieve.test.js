@@ -47,3 +47,12 @@ test('chunkMarkdown labels rules, Discord rules, numbered paragraphs and handboo
   assert.match(c[1].text, /More of rule three/)
   assert.ok(c[4].text.endsWith('.') && c[4].text.length <= 2000)
 })
+
+test('"staff" alone does not hide the Server Rules; a D-rule or "rule N" comes from the Server Rules even in a handbook question; numbered sections never cross documents', () => {
+  assert.deepEqual(retrieve.docsFor('what does D10 say about staff actions'), ['rules', 'staff'])
+  assert.deepEqual(retrieve.docsFor('per the staff handbook, who may ban'), ['staff'])
+  assert.deepEqual(retrieve.exactRefs('can staff vote under 11.4?', chunks).map(c => c.id), ['rules:11.4'])
+  assert.deepEqual(retrieve.exactRefs('does the handbook repeat D10?', chunks).map(c => c.id), ['rules:D10'])
+  assert.deepEqual(retrieve.exactRefs('what does the handbook say in 11.4', chunks), [])
+  assert.deepEqual(retrieve.exactRefs('what does the handbook say in 5.3', chunks).map(c => c.id), ['staff:5.3'])
+})

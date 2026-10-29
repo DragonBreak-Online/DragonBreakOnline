@@ -80,6 +80,9 @@ async function main(argv = process.argv.slice(2), { fetch = globalThis.fetch, se
     repairs: results.filter(r => r.repair).length,
     p95Ms: p95(results.map(r => r.ms)),
     warmLoadMs: loadsAfterFirst.length ? Math.max(...loadsAfterFirst) : 0,
+    // Ollama 0.30.10 reports about 500 ms load_duration on every call to the resident qwen3.5:9b, a reload or not (28 Oct): the
+    // median shows that floor, and a call far above it is the one to look at
+    warmLoadMedianMs: loadsAfterFirst.length ? [...loadsAfterFirst].sort((a, b) => a - b)[(loadsAfterFirst.length - 1) >> 1] : 0,
     outcomes: results.reduce((a, r) => ({ ...a, [r.got]: (a[r.got] || 0) + 1 }), {}),
   }
   const pass = metrics.correct >= THRESHOLDS.correct && metrics.idk >= THRESHOLDS.idk && metrics.withheldShown <= THRESHOLDS.withheldShown &&

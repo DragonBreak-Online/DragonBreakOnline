@@ -169,15 +169,19 @@ function ruleRefsOf(q) {
   return out
 }
 
-// Which documents a question is about: "handbook" or "staff" selects the handbook alone, otherwise both
-const docsFor = q => (/\b(handbook|staff)\b/i.test(String(q)) ? ['staff'] : ['rules', 'staff'])
+// Which documents a question is about: naming the handbook selects it alone, otherwise both. "staff" alone does not: the Server
+// Rules speak of staff too ("D10 ... staff actions", "11.4 Staff do not vote")
+const docsFor = q => (/\bhandbook\b/i.test(String(q)) ? ['staff'] : ['rules', 'staff'])
 
-// The chunks the question names by id, in the order it names them
-function exactRefs(q, chunks) {
-  const docs = docsFor(q)
+// The chunks the question names by id, in the order it names them, from the preferred documents. A D-rule or "rule N" that
+// they lack comes from any document in chunks that has it (D10 is a Server Rule even in a question about the handbook); a
+// numbered section (2.6) never does, since both documents number their sections the same way
+function exactRefs(q, chunks, docs = docsFor(q)) {
   const out = []
   for (const ref of ruleRefsOf(q)) {
-    for (const c of chunks) if (c.ref === ref && docs.includes(c.doc) && !out.includes(c)) out.push(c)
+    const all = chunks.filter(c => c.ref === ref)
+    const preferred = all.filter(c => docs.includes(c.doc))
+    for (const c of preferred.length || /^\d/.test(ref) ? preferred : all) if (!out.includes(c)) out.push(c)
   }
   return out
 }

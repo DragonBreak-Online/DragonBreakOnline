@@ -297,8 +297,10 @@ function createSources({
     let docs = args.docs || retrieve.docsFor(q)
     const staffHidden = docs.includes('staff') && !atLeast(viewer.tier, 'gm')
     if (staffHidden) docs = docs.filter(d => d !== 'staff')
-    const pool = chunks.filter(c => docs.includes(c.doc))
-    const pinned = retrieve.exactRefs(q, pool)
+    // The documents this rank may read; a named id may come from any of them (retrieve.exactRefs), the search from the chosen ones
+    const visible = chunks.filter(c => c.doc !== 'staff' || atLeast(viewer.tier, 'gm'))
+    const pool = visible.filter(c => docs.includes(c.doc))
+    const pinned = retrieve.exactRefs(q, visible, docs)
     const ranked = retrieve.bm25(q, pool, 8).filter(h => !pinned.includes(h.chunk))
     const picked = [...pinned.map(c => ({ chunk: c, score: Infinity })), ...ranked].slice(0, 4)
     const out = picked.map(({ chunk, score }) => card({

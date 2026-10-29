@@ -2,8 +2,9 @@
 // Answers for /dragonbaron ask in three modes: template (code renders the cards), model (the local model phrases cited
 // excerpts and code checks it) and extractive (the excerpts themselves, when the model is off, down, late or not trusted)
 
-const { extractEntities, route, isLore, MODEL_INTENTS, OWNERS_ONLY_INTENTS } = require('./askRoute')
+const { extractEntities, route, isLore, asksCause, MODEL_INTENTS, OWNERS_ONLY_INTENTS, NO_CAUSE_INTENTS } = require('./askRoute')
 const { deadline: timer } = require('./localModel')
+const { docsFor } = require('./retrieve')
 
 const ASK_SCHEMA = Object.freeze({
   type: 'object', additionalProperties: false, required: ['answerable', 'answer', 'cited'],
@@ -18,6 +19,7 @@ const ASK_SCHEMA = Object.freeze({
 const ASK_PROMPT_V1 = [
   "You are Dragonbaron, the DragonBreak Online staff helper. Answer the staff member's QUESTION using ONLY the FACTS.",
   '1. Use only the facts. If they do not answer the question, set answerable=false and say in one sentence what you checked.',
+  '   Facts on the same topic are not an answer: if the question asks for a time, version, date, place, number or cause that the facts do not state, set answerable=false. Never describe other facts instead.',
   '2. Put the id of every fact you used in "cited" (e.g. "F2") and copy up to 3 short exact quotes from those facts into "quotes".',
   '3. Never invent names, numbers, dates, versions, causes, fixes or release dates.',
   '4. If a fact says it is stale or from an older list, say its date.',
@@ -43,6 +45,7 @@ const TEXT = Object.freeze({
     "a player's reports, punishments (by rank), GM calls, open tickets, and the Server Rules and Staff Handbook. I can't run commands.",
   canAnswerOwner: 'Owners can also ask for the held staff reports.',
   pkNote: 'Newer #rp-rules posts from 24-25 Oct are not in the official rules (2026-10-21); the official text applies until they are added (rule 1.5).',
+  changesWindow: 'The change log I can read goes back 7 days at most.',
 })
 
 const MIN_SCORE = 5
@@ -59,6 +62,32 @@ const ASKS_SECRET = /\b(passwords?|passcodes?|tokens?|api keys?|2fa|login codes?
 const usable = c => c && c.text && c.text !== 'not available' && c.stale !== 'rank'
 const norm = s => String(s).replace(/[\u2018\u2019]/g, "'").replace(/[\u201c\u201d]/g, '"').replace(/\s+/g, ' ').trim()
 const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+// Grounding compares words, not characters: case, whitespace, punctuation, quote marks and apostrophes, markdown (**bold**,
+// `code`, [links](...), list markers), hyphens and thousands separators (1,000 = 1000) do not count; every word and every
+// number must still be there, in the same order. "1.5" and "0.3.109" stay one word, so 1.5 never matches 15
+const unmark = s => String(s).normalize('NFKC').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_`~]+/g, ' ')
+  .replace(/[\u2018\u2019\u02bc\u0060\u00b4]/g, "'").replace(/(\d),(?=\d{3}(?!\d))/g, '$1')
+const words = s => unmark(s).toLowerCase().match(/[\p{L}\p{N}]+(?:['.][\p{L}\p{N}]+)*/gu) || []
+const ELLIPSIS = /\s*(?:\.\s?){3,}\s*|\s*\[\s*\.\.\.\s*\]\s*/
+const MAX_GAP = 40
+
+// A quote is grounded when its words appear, in order and unbroken, in the fact's words. An ellipsis inside a quote marks words
+// left out: the parts must then appear in that order in the same fact, at most 40 words apart, so pieces from far apart in a
+// fact cannot be joined into a sentence it does not say. An empty quote is no quote
+function quoteIn(quote, factWords) {
+  const parts = String(quote).split(ELLIPSIS).map(words).filter(p => p.length)
+  if (!parts.length) return true
+  const at = (p, i) => p.every((w, k) => factWords[i + k] === w)
+  const from = (n, start, limit) => {
+    if (n === parts.length) return true
+    for (let i = start; i <= Math.min(limit, factWords.length - parts[n].length); i++) {
+      if (at(parts[n], i) && from(n + 1, i + parts[n].length, i + parts[n].length + MAX_GAP)) return true
+    }
+    return false
+  }
+  return from(0, 0, factWords.length)
+}
 // Fact and question text cannot open a new fact or a new section of the prompt
 const neutral = s => String(s).replace(/\[F(\d{1,2})\]/g, '(F$1)').replace(/^(\s*)(QUESTION|FACTS)\s*:/gim, '$1$2 -')
 
@@ -116,11 +145,13 @@ function checkAnswer(reply, facts, q) {
   if (!value.cited.length) return { ok: false, json: true, reason: 'cited' }
   if (!value.answer) return { ok: false, json: true, reason: 'empty' }
   if (CLAIMS_ACTION.test(norm(value.answer)) || ASKS_SECRET.test(value.answer)) return { ok: false, json: true, reason: 'action' }
-  const cited = value.cited.map(id => norm(byId.get(id).text))
-  if (!value.quotes.every(x => cited.some(t => t.includes(norm(x))))) return { ok: false, json: true, reason: 'quote' }
-  const known = `${facts.map(f => `${f.label} ${f.asOf || ''} ${f.text}`).join('\n')}\n${q}`
-  for (const token of value.answer.match(ANSWER_TOKENS) || []) {
-    if (!new RegExp(`(?<![0-9A-Za-z])${esc(token)}(?![0-9A-Za-z])`, 'i').test(known)) return { ok: false, json: true, reason: 'number' }
+  const cited = value.cited.map(id => words(byId.get(id).text))
+  if (!value.quotes.every(x => cited.some(w => quoteIn(x, w)))) return { ok: false, json: true, reason: 'quote' }
+  const known = unmark(`${facts.map(f => `${f.label} ${f.asOf || ''} ${f.text}`).join('\n')}\n${q}`)
+  for (const token of unmark(value.answer).match(ANSWER_TOKENS) || []) {
+    // A bare number may carry a unit or a zone letter in the facts (18:00Z, 90d); it may never be part of a longer number
+    const after = /^\d+$/.test(token) ? '(?![0-9])' : '(?![0-9A-Za-z])'
+    if (!new RegExp(`(?<![0-9A-Za-z])${esc(token)}${after}`, 'i').test(known)) return { ok: false, json: true, reason: 'number' }
   }
   return { ok: true, json: true, reason: null, value }
 }
@@ -148,7 +179,7 @@ function createAnswerer({ sources, model, flight, limiter, readSwitch, settings,
     const jobs = []
     const docs = new Set()
     for (const { intent, args } of intents) {
-      if (intent === 'rules') for (const d of /\b(handbook|staff)\b/i.test(question) ? ['staff'] : ['rules', 'staff']) docs.add(d)
+      if (intent === 'rules') for (const d of docsFor(question)) docs.add(d)
       else if (intent === 'handbook') docs.add('staff')
       else jobs.push(sources.read(intent, args, viewer, ctx))
     }
@@ -175,8 +206,16 @@ function createAnswerer({ sources, model, flight, limiter, readSwitch, settings,
     if (intents[0]?.intent === 'refuse') return done({ outcome: 'refused', mode: 'template', lead: [intents[0].args.text] })
     const fallback = !intents.length
     if (fallback && isLore(question)) return done({ outcome: 'idk', mode: 'template', lead: [TEXT.lore, ...canAnswer], intents: ['fallback'] })
+    // A source that cannot hold the fact is not read, and a template never answers for it: the change log for a span older than
+    // 7 days ("last month") would otherwise list the last 24 h as if it were the answer
+    const beyond = intents.filter(i => i.intent === 'changes' && i.args.time === 'beyond')
+    if (beyond.length) {
+      if (beyond.length === intents.length) return done({ outcome: 'idk', mode: 'template', lead: [`I don't know from what I can see. ${TEXT.changesWindow}`] })
+      base.notes.push(TEXT.changesWindow)
+    }
+    const readable = intents.filter(i => !beyond.includes(i))
 
-    const { ruleCards, cards } = await readAll(intents, question, viewer, ctx, fallback)
+    const { ruleCards, cards } = await readAll(readable, question, viewer, ctx, fallback)
     base.cards = cards.map(c => c.key)
     if (fallback) {
       base.intents = ['fallback']
@@ -184,18 +223,25 @@ function createAnswerer({ sources, model, flight, limiter, readSwitch, settings,
     }
     if (PK.test(question) && (fallback || intents.some(i => i.intent === 'rules' || i.intent === 'handbook'))) base.notes.push(TEXT.pkNote)
 
-    const modelWanted = fallback || intents.some(i => MODEL_INTENTS.has(i.intent) || (i.intent === 'changes' && i.args.summary))
+    const modelWanted = fallback || readable.some(i => MODEL_INTENTS.has(i.intent) || (i.intent === 'changes' && i.args.summary))
     const modelCards = cards.filter(c => c.model === true && usable(c))
     const templateCards = cards.filter(c => c.model !== true)
     const templateBlocks = templateCards.length ? renderTemplate(null, templateCards) : []
     const templateSources = templateCards.filter(usable)
 
-    if (!modelWanted) return done({ outcome: 'answered', mode: 'template', blocks: renderTemplate(null, cards), sources: cards.filter(usable) })
+    const labels = [...new Set(cards.map(c => c.label))].join(', ') || 'nothing'
+    if (!modelWanted) {
+      // Status, players online, GM calls and ticket counts are states, never causes: "why is the server down" gets the state
+      // with "I don't know why", not the state as if it were the reason
+      if (asksCause(question) && readable.every(i => NO_CAUSE_INTENTS.has(i.intent))) {
+        return done({ outcome: 'idk', mode: 'template', lead: [`I don't know why from what I can see. I checked: ${labels}.`], blocks: renderTemplate(null, cards), sources: cards.filter(usable) })
+      }
+      return done({ outcome: 'answered', mode: 'template', blocks: renderTemplate(null, cards), sources: cards.filter(usable) })
+    }
 
     const sw = readSwitch()
     const s = current()
     const modelOn = sw.model === true && !!s.url
-    const labels = [...new Set(cards.map(c => c.label))].join(', ') || 'nothing'
     if (!modelCards.length) {
       if (!modelOn) return done({ outcome: 'unreachable', mode: 'template', lead: [TEXT.needsModel], blocks: templateBlocks, sources: templateSources })
       return done({ outcome: 'idk', mode: 'template', lead: [`I don't know from what I can see. I checked: ${labels}.`], blocks: templateBlocks, sources: templateSources })

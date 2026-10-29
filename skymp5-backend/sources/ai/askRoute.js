@@ -12,14 +12,20 @@ const OWNERS_ONLY_INTENTS = new Set(['held'])
 // Template intents read data and need no model; the rest are answered by the model from excerpts
 const MODEL_INTENTS = new Set(['version', 'handbook', 'rules'])
 
-const REFUSE_WORDS = /\b(ip|ips|hwid|device|alts?|vote[sd]?|election|ballot|transcripts?|password|token|webhook|backend\.env)\b/i
+const REFUSE_WORDS = /\b(ip|ips|hwid|device|alts?|vote[sd]?|election|ballot|transcripts?|passwords?|tokens?|webhooks?|backend\.env)\b/i
+// Secrets are refused whatever the question; the other protected topics only when the question asks for the data itself
+const SECRET_WORDS = /\b(passwords?|tokens?|webhooks?|backend\.env)\b/i
+// A question about what a rule says: it names a rule id, a rules document or a permission ("can staff vote", "is X allowed")
+const RULE_TEXT = /\b(rules?|handbook|policy|policies|allowed|permitted|forbidden|against the rules)\b|\b(who|can|may|must|should)\s+(i|a|an|we|you|players?|staff|gms?|trial gms?|lead gms?|owners?|devs?|developers?)\b/i
+// ...but not when it asks for votes, results, addresses or matches themselves, or for one person's
+const DATA_ASK = /\b(show|print|list|reveal|dump|give|send|post|share|look\s?up|find|check|tell me|counts?|counted|tally|totals?|results?|standings?|so far|going|leading|winning|won|who voted|voted for|whose|logs?|match(es|ed)?|linked)\b/i
 const IMPERATIVE = /^(please\s+)?(run|kick|ban|unban|give|spawn|teleport|restart|announce|jail|unjail|warn|mute|unmute|timeout|untimeout|promote|demote|grant|revoke|set|reset|remove|delete|add)\b/i
 
 const REFUSALS = Object.freeze([
   [/\b(vote[sd]?|election|ballot)\b/i, 'Election counts are never shown, to staff included (Staff Handbook 2.6). Nothing was run.'],
   [/\b(ip|ips|hwid|device|alts?)\b/i, 'IP addresses, device matches and alt accounts are never shown here. Nothing was run.'],
   [/\btranscripts?\b/i, 'Ticket transcripts are never used here. Nothing was run.'],
-  [/\b(password|token|webhook|backend\.env)\b/i, 'Passwords, tokens, webhooks and server settings are never shown. Nothing was run.'],
+  [/\b(passwords?|tokens?|webhooks?|backend\.env)\b/i, 'Passwords, tokens, webhooks and server settings are never shown. Nothing was run.'],
 ])
 const IMPERATIVE_TEXT = "I can't run commands. Use /console or the panel."
 
@@ -46,6 +52,21 @@ const HELD = new RegExp([
   /\binfraction[- ]?(detection|watch|check|reports?|hits?)\b/,
 ].map(r => r.source).join('|'), 'i')
 const SUMMARY = /\b(summar\w*|overview|explain|what('s| is| was)? new|what changed|in short)\b/i
+// A question about a cause. The change log may name one, so the model reads it (summary); status, online, GM calls and tickets
+// hold states and counts, never causes, so on their own they cannot answer it
+const CAUSE = /\b(why|how come|what caused|caused by|cause of|the cause)\b/i
+const NO_CAUSE_INTENTS = new Set(['status', 'online', 'gm_calls', 'tickets'])
+// A time span the change log cannot cover: it reads the last 24 h, today or the last 7 days, nothing older
+const MONTHS = 'january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec'
+const BEYOND = new RegExp([
+  /\b(last|past|previous|this|a|one|the)\s+(month|year|quarter|fortnight)\b/.source,
+  /\b(\d+|an?|one|two|three|four|five|six|several|few)\s+(months?|years?)\b/.source,
+  /\b([2-9]|\d{2,}|two|three|four|five|six|several|few)\s+weeks\b/.source,
+  /\b(months?|years?)\s+ago\b/.source,
+  `\\b(in|during|since|before|throughout)\\s+(${MONTHS})\\b`,
+  /\b(in|during|since|before)\s+(19|20)\d{2}\b/.source,
+  /\b(last|past)\s+([89]|[1-9]\d+)\s+days\b/.source,
+].join('|'), 'i')
 
 function extractEntities(q) {
   const text = String(q || '')
@@ -59,6 +80,7 @@ function extractEntities(q) {
   const launcherVer = (/\b2\.1\.\d+\b/.exec(text) || [null])[0]
   const ruleRefs = ruleRefsOf(text)
   const time = /since (the )?(last )?restart/i.test(text) ? 'restart'
+    : BEYOND.test(text) ? 'beyond'
     : /\b(this week|last week|week|7 days)\b/i.test(text) ? 'week'
       : /\btoday\b/i.test(text) ? 'today'
         : /\b(24 ?h|24 hours|yesterday|last day)\b/i.test(text) ? '24' : null
@@ -79,9 +101,15 @@ function extractEntities(q) {
   return { tags, threadIds, clientVer, launcherVer, ruleRefs, time, names: names.slice(0, 3) }
 }
 
-function refusalOf(q) {
+// A request to act is always refused, and so is any question about a secret. Votes, addresses, alts and transcripts are refused
+// when the question asks to see them; a question about what the rules say on them ("what does 2.6 say about election votes",
+// "under 11.4, can staff vote") is a rules question, unless it names a player (#TAG or a name) or asks for a count or a list
+function refusalOf(q, entities = extractEntities(q)) {
   if (IMPERATIVE.test(q.trim())) return IMPERATIVE_TEXT
   if (!REFUSE_WORDS.test(q)) return null
+  const aboutRules = !SECRET_WORDS.test(q) && (entities.ruleRefs.length > 0 || RULE_TEXT.test(q)) && !DATA_ASK.test(q) &&
+    !entities.tags.length && !entities.names.length && !entities.threadIds.length
+  if (aboutRules) return null
   for (const [rx, text] of REFUSALS) if (rx.test(q)) return text
   return 'That is never shown here. Nothing was run.'
 }
@@ -90,7 +118,7 @@ function refusalOf(q) {
 // viewer.tier 'owner' adds the Owners-only intents; for any other viewer the result is exactly as if they did not exist
 function route(q, entities = extractEntities(q), viewer = {}) {
   const text = String(q || '')
-  const refusal = refusalOf(text)
+  const refusal = refusalOf(text, entities)
   if (refusal) return [{ intent: 'refuse', args: { text: refusal } }]
 
   const out = []
@@ -118,7 +146,7 @@ function route(q, entities = extractEntities(q), viewer = {}) {
   if (/\bgm ?calls?\b|\/gm\b|waiting for a gm/i.test(text)) add('gm_calls', {}, ['handbook', 'tickets'])
   if (/\b(how many|open|which|list|count|waiting)\b[^.?!]*\btickets?\b|\btickets?\b[^.?!]*\b(open|waiting|are there)\b/i.test(text)) add('tickets', {}, ['handbook'])
   if (/\b(chang\w+|deploy\w*|releas\w+|went live|updat\w+|patch\w*)\b/i.test(text)) {
-    add('changes', { time: entities.time === 'restart' ? 'today' : entities.time || '24', summary: SUMMARY.test(text) }, ['bug_search'])
+    add('changes', { time: entities.time === 'restart' ? 'today' : entities.time || '24', summary: SUMMARY.test(text) || CAUSE.test(text) }, ['bug_search'])
   }
   if (entities.clientVer || entities.launcherVer || /\bversion|launcher\b/i.test(text)) add('version', { clientVer: entities.clientVer, launcherVer: entities.launcherVer })
   if (/\b(bugs?|broken|fix(ed)?|issues?|glitch\w*)\b/i.test(text)) add('bug_search', { q: text })
@@ -129,5 +157,6 @@ function route(q, entities = extractEntities(q), viewer = {}) {
 }
 
 const isLore = q => LORE.test(String(q || ''))
+const asksCause = q => CAUSE.test(String(q || ''))
 
-module.exports = { extractEntities, route, refusalOf, isLore, INTENTS, MODEL_INTENTS, OWNERS_ONLY_INTENTS, HELD }
+module.exports = { extractEntities, route, refusalOf, isLore, asksCause, INTENTS, MODEL_INTENTS, OWNERS_ONLY_INTENTS, NO_CAUSE_INTENTS, HELD }

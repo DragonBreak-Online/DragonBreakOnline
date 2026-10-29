@@ -617,3 +617,103 @@ test('25. a held file that others could write, or that is not a file, is not tru
   await none.ask.handleInteraction(n.it)
   assert.equal(edited(n.calls).embeds[0].description, 'Nothing is held for the Owners.')
 })
+
+test('26. a change-log span older than 7 days is not read and not answered by the 24 h list: "I don\'t know" with what the log covers', async () => {
+  const { ask, usageFile } = make()
+  const { it, calls } = interaction('what was deployed in September?')
+  await ask.handleInteraction(it)
+  const e = edited(calls).content
+  assert.match(e, /^I don't know from what I can see\. The change log I can read goes back 7 days at most\./)
+  assert.ok(!/regeneration|Restore module/.test(e))
+  assert.deepEqual([reads.length, execCalls.length, model.probes, model.chats.length], [0, 0, 0, 0])
+  const rec = JSON.parse(fs.readFileSync(usageFile, 'utf8').trim())
+  assert.deepEqual([rec.outcome, rec.mode], ['idk', 'template'])
+  // With another intent, that one is answered and the reply says how far the change log goes
+  const q = interaction('is the server up, and what changed last month?')
+  await ask.handleInteraction(q.it)
+  const e2 = edited(q.calls).content
+  assert.match(e2, /Players online: 26/)
+  assert.match(e2, /The change log I can read goes back 7 days at most\./)
+  assert.ok(!execCalls.some(a => a[2] === 'changes'))
+})
+
+test('27. a "why" question: state templates say "I don\'t know why" under the state; the change log goes to the model, which may say it does not know', async () => {
+  let r = make()
+  let q = interaction('why is the server down?')
+  await r.ask.handleInteraction(q.it)
+  let e = edited(q.calls).content
+  assert.match(e, /^I don't know why from what I can see\. I checked: Server status/)
+  assert.match(e, /Players online: 26/)
+  assert.deepEqual([model.probes, model.chats.length], [0, 0])
+  assert.match(audits.at(-1), /-> idk via template/)
+
+  model.replies.push({ answerable: false, answer: 'The change log does not say why.', cited: [] })
+  r = make()
+  q = interaction('Why was the contract boards change rolled out late?')
+  await r.ask.handleInteraction(q.it)
+  assert.equal(model.chats.length, 1)
+  assert.match(model.chats[0].messages[1].content, /Change log, last 24 h/)
+  assert.match(edited(q.calls).content, /^I don't know from what I can see\. I checked: Change log, last 24 h/)
+  // A punishment record holds its reason, so "why" there is still a template answer
+  r = make()
+  q = interaction('why does #QX7P have a strike?')
+  await r.ask.handleInteraction(q.it)
+  assert.match(audits.at(-1), /-> answered via template/)
+})
+
+test('28. a rule id in a question that says "staff" is read from the Server Rules, and a question on what the rules say about votes reaches the rules', async () => {
+  model.replies.push({ answerable: true, answer: 'D10 says to use a ticket to disagree with a staff action, not to argue in public.', cited: ['F1'], quotes: ['use a ticket'] })
+  model.replies.push({ answerable: true, answer: 'Staff do not vote in hold elections.', cited: ['F1'], quotes: ['Staff do not vote in hold elections.'] })
+  const { ask } = make()
+  let q = interaction('Is D10 the rule about staff actions?')
+  await ask.handleInteraction(q.it)
+  assert.match(model.chats[0].messages[1].content, /FACTS:\n\[F1\] \(Server Rules 2026-10-21, D10;/)
+  assert.match(edited(q.calls).content, /^D10 says to use a ticket/)
+  q = interaction('Does 11.4 let staff vote in a hold election?')
+  await ask.handleInteraction(q.it)
+  assert.match(model.chats[1].messages[1].content, /FACTS:\n\[F1\] \(Server Rules 2026-10-21, 11\.4;/)
+  assert.match(edited(q.calls).content, /^Staff do not vote in hold elections\./)
+  assert.ok(audits.every(a => !/refused/.test(a)))
+})
+
+test('29. checkAnswer grounding ignores harmless differences (markdown, case, quote marks, hyphens, ellipses, 1,000/1000, 18:00Z) and still withholds made-up quotes and numbers', () => {
+  const facts = [
+    { id: 'F1', label: 'Server Rules 2026-10-21, rule 2', asOf: '2026-10-21', text: '**2. No Metagaming.** You may only act on information your character has learned in-game. Information obtained through Discord, streams, OOC conversations, or another character you play cannot be used IC.' },
+    { id: 'F2', label: 'Staff Handbook 2026-10-21, 5.3', asOf: '2026-10-21', text: '- A strike counts for 90 days; the fine is 1,000 gold. Restart window 18:00Z. Don’t argue with "players" in `#general`.' },
+  ]
+  const ok = (quotes, answer = 'Rule 2 says Discord information cannot be used in character.', cited = ['F1', 'F2']) => checkAnswer({ answerable: true, answer, cited, quotes }, facts, 'what does rule 2 say')
+  for (const quotes of [
+    ['2. No Metagaming. You may only act on information your character has learned in-game.'],
+    ['no metagaming. you may only act on information your character has learned in game'],
+    ['Information obtained through Discord, streams, OOC conversations ... cannot be used IC.'],
+    ['...or another character you play cannot be used IC'],
+    ['No Metagaming ... act on information your character has learned'],
+    ['You may only act on information…'],
+    ['“Information obtained through Discord”'],
+    ["Don't argue with “players” in #general"],
+    ['the fine is 1000 gold'],
+    ['A strike counts for 90 days'],
+    ['', '...'],
+  ]) assert.equal(ok(quotes).ok, true, JSON.stringify(quotes))
+  assert.equal(ok([], 'The fine is 1000 gold, or 1,000 gold; restarts at 18:00 for 90 days.').ok, true)
+  // Negative: made-up or altered quotes, quotes stitched from short pieces or out of order, and numbers not in the facts
+  for (const quotes of [
+    ['Revenge is always allowed.'],
+    ['Information obtained through Discord can be used IC.'],
+    ['You may act on information ... Discord'],
+    ['cannot be used IC ... Information obtained through Discord'],
+    ['Information obtained through Discord, streams, OOC conversations'.replace('streams', 'screenshots')],
+    ['A strike counts for 30 days'],
+  ]) assert.deepEqual([ok(quotes).ok, ok(quotes).reason], [false, 'quote'], JSON.stringify(quotes))
+  for (const answer of ['A strike counts for 60 days.', 'The fine is 1,500 gold.', 'The fine is 000 gold.', 'See rule 1.5 and section 15.']) {
+    assert.deepEqual([ok([], answer).ok, ok([], answer).reason], [false, 'number'], answer)
+  }
+  // Ellipsis parts must be close together: a table row's label cannot be joined to another row's last words
+  const table = { id: 'F3', label: 'Staff Handbook 2026-10-21, 1', asOf: '2026-10-21', text: '| **Trial GM** | GM calls, Admin chat, teleport to a player or a named place, Invisible and Ghost, rename, `/unstuck` for others, read `/bug` reports, look up a character, character names instead of "Stranger" (`/realnames`), character creation for your own character, one staff character slot |\n| **GM** | The full staff panel to look things up, Summon, Kick, God and NoClip, character creation for anyone, warnings and strikes |\n| **Developer** | Bans, deleting a character from the staff panel, and scheduling restarts (`/schedule`) |' }
+  const inTable = q => checkAnswer({ answerable: true, answer: 'x', cited: ['F3'], quotes: [q] }, [table], 'q').ok
+  assert.equal(inTable('Developer | ... and scheduling restarts (/schedule)'), true)
+  assert.equal(inTable('Trial GM | ... and scheduling restarts (/schedule)'), false)
+  assert.equal(inTable('Trial GM | GM calls ... rename'), true)
+  // A quote must come from a fact it cites
+  assert.deepEqual([ok(['A strike counts for 90 days'], 'Strikes last 90 days.', ['F1']).ok, ok(['A strike counts for 90 days'], 'Strikes last 90 days.', ['F1']).reason], [false, 'quote'])
+})
