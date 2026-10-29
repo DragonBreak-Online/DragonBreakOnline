@@ -338,6 +338,58 @@ test('a frozen source keeps its held rows in force: no CLEAR, Expired or archive
   assert.equal(r.registry().accounts[PEOPLE.alice.discordId].sync, false)
 })
 
+test('an account held by a frozen source is logged once an hour with the reason', async () => {
+  const r = await started()
+  r.data.bans = [{ ref: 'B-AAAAAA', discordId: PEOPLE.alice.discordId, reason: 'cheating', bannedAt: iso(T0 - HOUR), bannedBy: 'lena (dashboard)' }]
+  await r.tick()
+  r.data.bans = []
+  r.status = { bans: { status: 'unreadable' } }
+  const line = 'a Discord account: its starter, tags and archive wait while the bans file is unreadable'
+  for (let i = 0; i < 3; i++) { r.now += 60000; await r.tick() }
+  assert.deepEqual(r.logs.filter(l => l === line).length, 1, 'logged once, not every tick')
+  r.now += HOUR
+  await r.tick()
+  assert.deepEqual(r.logs.filter(l => l === line).length, 2, 'logged again an hour later')
+  assert.equal(r.named('alice_rp').archived, false)
+})
+
+test('a missing panel ban list is frozen for 15 minutes, then read as empty; an unreadable one and a missing ban list stay frozen', async () => {
+  const r = await started()
+  r.data.adminBans = [{ id: 't1', profileId: 57, name: 'Alia', until: T0 + DAY, reason: 'griefing', by: 'profile 1', at: T0 }]
+  r.data.bans = [{ ref: 'B-AAAAAA', discordId: PEOPLE.bob.discordId, reason: 'cheating', bannedAt: iso(T0 - HOUR), bannedBy: 'lena (dashboard)' }]
+  await r.tick()
+  const alice = r.named('alice_rp'), bob = r.named('bob_rp')
+  // Both files gone: inside the 15 minutes nothing ends
+  r.data.adminBans = []
+  r.data.bans = []
+  r.status = { panelBans: { status: 'missing' }, bans: { status: 'missing' } }
+  r.now += 60000
+  await r.tick()
+  r.now += 13 * 60000
+  await r.tick()
+  assert.equal(alice.messages.length, 2)
+  assert.equal(alice.archived, false)
+  assert.ok(r.logs.includes('a Discord account: its starter, tags and archive wait while the panelBans file is missing'))
+  // Past 15 minutes the panel ban list is really gone; the game ban list still waits
+  r.now += 2 * 60000
+  await r.tick()
+  assert.equal(alice.messages[2].content, '**ENDED** · panel tempban abn:t1 is no longer on the F7 panel ban list')
+  assert.equal(alice.archived, true)
+  assert.equal(bob.messages.length, 2, 'no UNBANNED from a missing ban list')
+  assert.equal(bob.archived, false)
+  assert.equal(r.registry().accounts[PEOPLE.bob.discordId].rows['ban:B-AAAAAA'].state, 'running')
+  assert.ok(r.logs.includes('a Discord account: its starter, tags and archive wait while the bans file is missing'))
+  // An unreadable panel ban list stays frozen however long it lasts
+  const r2 = await started()
+  r2.data.adminBans = [{ id: 't1', profileId: 57, name: 'Alia', until: T0 + DAY, reason: 'griefing', by: 'profile 1', at: T0 }]
+  await r2.tick()
+  r2.data.adminBans = []
+  r2.status = { panelBans: { status: 'unreadable' } }
+  for (let i = 0; i < 3; i++) { r2.now += HOUR; await r2.tick() }
+  assert.equal(r2.named('alice_rp').messages.length, 2)
+  assert.equal(r2.named('alice_rp').archived, false)
+})
+
 test('a new tracker on the same registry posts nothing twice; a thread whose creation lost its answer is found, not made again', async () => {
   const r = await started()
   r.data.discipline = { 57: [entry(1, 'strike', T0 - HOUR)] }

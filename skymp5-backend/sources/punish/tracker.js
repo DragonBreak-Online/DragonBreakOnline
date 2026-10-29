@@ -30,6 +30,10 @@ const NAME_TTL_MS = 24 * HOUR_MS
 const SAME_BAN_MS = 10 * 60000
 const JOURNAL_WAIT_MS = 60000
 const JOURNAL_LAG_MS = 10000
+// A record file missing this long is taken as really gone (nothing on record), not as a move or rewrite in progress
+const MISSING_FROZEN_MS = 15 * 60000
+// Except the ban list: read as empty it would post UNBANNED for every ban, so a missing one stays frozen
+const MISSING_FROZEN_ALWAYS = new Set(['bans'])
 const NO_PINGS = Object.freeze({ parse: [] })
 const TAG_NAMES = ['Active', 'Expired', 'Warning', 'Strike', 'Suspended', 'Banned', 'Discord timeout', 'Review']
 const KIND_TAGS = ['Banned', 'Suspended', 'Discord timeout', 'Strike', 'Warning']
@@ -418,7 +422,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
   const registry = store || fileStore(s.registryFile)
   let reg = null, fresh = false, busy = false, dirty = false, budget = 0
   let headroom = null, tagsAt = 0
-  const noted = new Map()
+  const noted = new Map(), missingSince = new Map()
 
   const note = (key, line, everyMs = Infinity) => {
     const at = noted.get(key)
@@ -774,6 +778,10 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     // A frozen source's row held in force but not read as in force: the starter, tags and archive wait until it reads again
     const held = !!acct && Object.entries(acct.rows).some(([id, rec]) => frozen(id) && IN_FORCE.has(rec.state)
       && !rows.some(r => r.id === id && IN_FORCE.has(stateOf(r, x))))
+    if (held) {
+      const why = [...new Set(Object.keys(acct.rows).map(id => SOURCE_OF[prefixOf(id)]).filter(k => k && g.frozen(k)))]
+      note(`held-${key}`, `${key.startsWith('p:') ? key : 'a Discord account'}: its starter, tags and archive wait while the ${why.map(k => `${k} file is ${g.statusOf(k)}`).join(' and the ')}`, HOUR_MS)
+    }
     const work = [], quiet = [], unlinked = new Set(), claimed = new Set()
     // bans.js gives a ref-less entry its ref: its record moves to the new id, so it is neither posted again nor unbanned
     if (acct) for (const r of rows) {
@@ -898,11 +906,17 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     if (badId.length) { note('identity', `nothing is posted while ${badId.join(' and ')} cannot be read`, HOUR_MS); return }
     const d = (snap.cfg && snap.cfg.discipline) || {}
     const sources = snap.sources || {}
+    const t = now()
+    for (const k of Object.values(SOURCE_OF)) {
+      if (sources[k] && sources[k].status === 'missing') { if (!missingSince.has(k)) missingSince.set(k, t) } else missingSince.delete(k)
+    }
+    const statusOf = k => (sources[k] ? sources[k].status : 'not read')
     const g = {
-      now: now(), warnDays: s.warnDays, strikeDays: d.strikeDays || 90, review: d.strikesForReview || 3, id: snap.id || {},
+      now: t, warnDays: s.warnDays, strikeDays: d.strikeDays || 90, review: d.strikesForReview || 3, id: snap.id || {},
       all: snap.rows, ids: new Set(snap.rows.map(r => r.id)), strikes: snap.strikes || new Map(), baseAt: Date.parse(reg.baselinedAt) || 0,
       // A source not read cleanly this tick is frozen: no new post, no ended and no unbanned from it
-      frozen: k => !sources[k] || sources[k].status !== 'ok',
+      frozen: k => statusOf(k) !== 'ok' && !(statusOf(k) === 'missing' && !MISSING_FROZEN_ALWAYS.has(k) && t - missingSince.get(k) >= MISSING_FROZEN_MS),
+      statusOf,
       // How far the journal has been read: its newest row, or a ban list row that took one in
       journalAt: snap.rows.reduce((t, r) => (r.source === 'journal' || r._journalId) && r.atMs > t ? r.atMs : t, 0),
     }
