@@ -520,7 +520,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
   }
 
   async function lookupUser(key) {
-    if (!s.guildId) return null
+    if (!s.guildId || s.mode === 'dry') return null
     let member = null
     try {
       member = await call('GET', `/guilds/${s.guildId}/members/${key}`)

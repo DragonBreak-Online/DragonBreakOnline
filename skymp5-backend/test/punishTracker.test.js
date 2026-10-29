@@ -1122,6 +1122,41 @@ test('dry mode with hide-staff on never asks Discord: only cached staff answers,
   assert.equal(logs.filter(l => /cached answers only/.test(l)).length, 1)
 })
 
+test('dry mode with a guild id never looks names up: the budget goes to the would-be posts, titles are the local names', async () => {
+  const dir = tempDir()
+  const dryFile = path.join(dir, 'dry.jsonl')
+  // The dry writer is built inside the tracker, so its GETs are counted where it matches their paths
+  const lookups = []
+  const DRY_GET = String(/\/threads\/(active|archived\/public)/)
+  const test0 = RegExp.prototype.test
+  RegExp.prototype.test = function (p) {
+    if (String(this) === DRY_GET && typeof p === 'string' && (p.startsWith(`/guilds/${GUILD}/members/`) || p.startsWith('/users/'))) lookups.push(p)
+    return test0.call(this, p)
+  }
+  try {
+    let now = T0
+    const data = { discipline: { 57: [entry(1, 'strike', T0)], 58: [entry(1, 'strike', T0, { char: 'Borin #BOR1' })] } }
+    const make = maxRequests => createTracker({
+      snapshot: () => snap(data, now), now: () => now, log: () => {}, maxRequests,
+      config: { punishTracker: 'dry', punishTrackerFile: path.join(dir, 'punish-threads.json'), punishTrackerDryFile: dryFile, discordGuildId: GUILD },
+    })
+    // A fresh registry's forum scan is not counted: one tag read and a thread plus its first reply each fit in five
+    assert.equal(await make(5).tick(), true)
+    const read = () => fs.readFileSync(dryFile, 'utf8').trim().split('\n').map(l => JSON.parse(l))
+    const made = read().filter(l => l.action === 'create-thread')
+    assert.deepEqual(made.map(l => l.body.name).sort(), ['alice_rp', 'bob_rp'])
+    for (const l of made) assert.equal(l.title, 'local fallback, not looked up')
+    // A day on every name is due again, and a new strike is still written
+    now += 2 * DAY
+    data.discipline[57].push(entry(2, 'strike', now))
+    assert.equal(await make().tick(), true)
+    assert.equal(read().filter(l => l.action === 'reply' && /reason 2/.test(JSON.stringify(l.body))).length, 1)
+    assert.deepEqual(lookups, [], 'no member or user lookup in dry mode')
+  } finally {
+    RegExp.prototype.test = test0
+  }
+})
+
 test('start(): on without a token or guild refuses; a dry start ticks on the panel\'s snapshot, never asks Discord, and stop() clears both timers', async t => {
   const lines = []
   assert.equal(start({ config: { punishTracker: 'on' }, punishments: () => { throw new Error('read') }, log: l => lines.push(l) }), null)
