@@ -353,6 +353,36 @@ test('an account held by a frozen source is logged once an hour with the reason'
   assert.equal(r.named('alice_rp').archived, false)
 })
 
+test('an unreadable discipline file whose kept copy shows a suspension ended holds the account through a tag change, synced once it reads', async () => {
+  const d = fakeDiscord()
+  const r = await started({ discord: d })
+  r.data.discipline = { 57: [entry(1, 'suspend', T0 - HOUR, { until: T0 + HOUR })] }
+  await r.tick()
+  const t = r.named('alice_rp')
+  assert.match(t.messages[0].content, /Status: \*\*ACTIVE\*\*/)
+  // The read fails and the last good copy is kept; the suspension runs out in it, and renamed forum tags put the thread up for a sync
+  r.status = { discipline: { status: 'unreadable' } }
+  r.now += 2 * HOUR
+  d.tags = TAGS.map(x => ({ ...x, id: x.id.replace(/^9/, '8') }))
+  await r.tick()
+  r.now += 60000
+  await r.tick()
+  assert.equal(t.messages.length, 2, 'no ENDED from an unreadable file')
+  assert.match(t.messages[0].content, /Status: \*\*ACTIVE\*\*/)
+  assert.equal(t.archived, false)
+  assert.ok(t.tags.includes(tagId('Active')), 'tags left as they were')
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].sync, true, 'the sync is kept for later')
+  assert.ok(r.logs.includes('a Discord account: its starter, tags and archive wait while the discipline file is unreadable'))
+  // Read again: ENDED posts and the thread is synced to the new tags and archived
+  r.status = {}
+  r.now += 60000
+  await r.tick()
+  assert.ok(t.messages[2].content.startsWith('**ENDED** · suspension dsc:57:1'))
+  assert.match(t.messages[0].content, /Status: \*\*CLEAR\*\*/)
+  assert.ok(t.tags.includes('800000000000000011'), 'Expired under its new id')
+  assert.equal(t.archived, true)
+})
+
 test('a missing panel ban list is frozen for 15 minutes, then read as empty; an unreadable one and a missing ban list stay frozen', async () => {
   const r = await started()
   r.data.adminBans = [{ id: 't1', profileId: 57, name: 'Alia', until: T0 + DAY, reason: 'griefing', by: 'profile 1', at: T0 }]
@@ -1377,6 +1407,35 @@ test('a Discord ban with no journal row is posted after 60 s, or once the journa
   assert.equal(banPosts(later).length, 1)
 })
 
+test('a Discord ban waits while the journal is read only 5 s past it, and is posted once it is read 11 s past it', async () => {
+  const r = await started()
+  const at = r.now
+  r.data.bans = [banOf(at, false)]
+  const tmo = (n, t) => ({ v: 1, id: `M-TMO0000${n}`, kind: 'discord_timeout', at: iso(t), discordId: PEOPLE.alice.discordId, reason: 'spam', by: { name: 'Lena' }, via: 'discord', until: iso(t + HOUR) })
+  r.data.journal = [tmo(1, at + 5000)]
+  r.now += 6000
+  await r.tick()
+  assert.equal(banPosts(r).length, 0, 'the journal read 5 s past the ban may still be missing its row')
+  r.data.journal.push(tmo(2, at + 11000))
+  r.now += 6000
+  await r.tick()
+  assert.equal(banPosts(r).length, 1)
+  assert.match(banPosts(r)[0], /Issued by: Discord\n/)
+})
+
+test('a ban-list row that took in its journal row counts as the journal read that far: another Discord ban 12 s before it is posted', async () => {
+  const r = await started()
+  const at = r.now
+  r.data.bans = [banOf(at, false), { ref: 'B-EEEEEE', discordId: PEOPLE.alice.discordId, reason: 'discord ban', bannedAt: iso(at + 12000), bannedBy: 'discord' }]
+  r.data.journal = [{ v: 1, id: 'M-BAN00003', kind: 'discord_ban', at: iso(at + 12000), discordId: PEOPLE.alice.discordId, reason: 'spam', by: { name: 'Lena' }, via: 'discord' }]
+  r.now += 15000
+  await r.tick()
+  const bans = banPosts(r)
+  assert.equal(bans.length, 2, bans.join('\n'))
+  assert.ok(bans.some(c => /ban:B-DDDDDD\n[^]*Issued by: Discord\n/.test(c)), 'Bob\'s ban is not held for a journal already read past it')
+  assert.ok(bans.some(c => /ban:B-EEEEEE\n[^]*Issued by: Lena\n/.test(c)))
+})
+
 test('a Discord ban over an F7 ban the guard kept (control) is posted once as a Discord ban', async () => {
   const r = await started()
   r.data.bans = [banOf(T0, true)]
@@ -1528,6 +1587,34 @@ test('a target known only by Discord is titled by the journal\'s name when the l
   await r.tick()
   assert.equal(t.name, 'ghost_real')
   assert.equal(r.registry().accounts[ghost].usernameAt, r.now)
+})
+
+test('a fallback title is chosen again while lookups fail; a name from a lookup is kept when a later lookup fails', async () => {
+  const d = fakeDiscord()
+  const r = await started({ discord: d })
+  const ghost = '844444444444444444'
+  r.data.bans = [{ discordId: ghost, ref: 'B-GHOST1', reason: 'discord ban', bannedBy: 'discord', bannedAt: iso(T0) }]
+  r.now += 61000
+  await r.tick()
+  const t = d.thread()
+  assert.equal(t.name, 'unknown user', 'no name source yet')
+  // A journal row naming the account arrives while lookups still fail
+  r.now += 11 * 60000
+  r.data.journal = [{ v: 1, id: 'M-GTMO01', at: iso(r.now), kind: 'discord_timeout', discordId: ghost, discordName: 'ghosty', reason: 'spam', by: { discordName: 'Lena' }, via: 'discord', until: iso(r.now + HOUR) }]
+  await r.tick()
+  r.now += 11 * 60000
+  await r.tick()
+  assert.equal(t.name, 'ghosty')
+  assert.equal(r.registry().accounts[ghost].username, 'ghosty')
+  // Found by a lookup, then gone from the guild: the looked-up name stays, the journal's never replaces it
+  d.members[ghost] = 'ghost_real'
+  r.now += 11 * 60000
+  await r.tick()
+  assert.equal(t.name, 'ghost_real')
+  delete d.members[ghost]
+  for (const step of [25 * HOUR, 11 * 60000, 11 * 60000]) { r.now += step; await r.tick() }
+  assert.equal(t.name, 'ghost_real')
+  assert.equal(r.registry().accounts[ghost].username, 'ghost_real')
 })
 
 test('a lost registry adopts the forum\'s threads by marker with nothing posted again; a corrupt one posts nothing', async () => {
