@@ -53,7 +53,7 @@ const TOKENS = c => Math.ceil(c / 3.5)
 const BUDGET = Object.freeze({ facts: 5000, chunk: 500, excerpt: 700 })
 const REPAIR_MIN_MS = 15000
 const PK = /\b(pk\w*|player kills?|supernatural|vampires?|werewol\w+|hunters?|common laws?)\b/i
-const ANSWER_TOKENS = /\b\d+(?:\.\d+)+\b|\b\d{2,}\b|#[A-Za-z0-9]{4}\b|\bD\d{1,2}\b|\b\d{17,20}\b/g
+const ANSWER_TOKENS = /\b\d{1,2}:\d{2}(?![0-9])|\b\d+(?:\.\d+)+\b|\b\d{2,}\b|#[A-Za-z0-9]{4}\b|\bD\d{1,2}\b|\b\d{17,20}\b/g
 // Ask never runs anything, so an answer that says it did (first person only: "we changed" in a change summary is fine), or that asks
 // staff for a secret, is withheld
 const CLAIMS_ACTION = /\bI(?:'ve| have)?\s+(?:just\s+)?(?:ran|run|executed|banned|unbanned|kicked|jailed|unjailed|warned|muted|unmuted|restarted|promoted|demoted|granted|gave|given|spawned|teleported|deleted|removed|reset|announced)\b|^\s*(?:done|completed|executed)\b/i
@@ -193,8 +193,8 @@ function checkAnswer(reply, facts, q) {
   }
   const known = unmark(`${facts.map(f => `${f.label} ${f.asOf || ''} ${f.text}`).join('\n')}\n${q}`)
   for (const token of unmark(value.answer).match(ANSWER_TOKENS) || []) {
-    // A bare number may carry one unit or zone letter in the facts (18:00Z, 90d), never the T of a date-time, a hash or a longer number
-    const after = /^\d+$/.test(token) ? '(?=[dhmsz]?(?![0-9A-Za-z]))' : '(?![0-9A-Za-z])'
+    // A bare number may carry a unit letter in the facts (90d), never a zone letter (18:37Z), a T, a hash or more digits; a clock time may carry its zone (18:00Z)
+    const after = /^\d+$/.test(token) ? '(?=[dhms]?(?![0-9A-Za-z]))' : token.includes(':') ? '(?=z?(?![0-9A-Za-z]))' : '(?![0-9A-Za-z])'
     if (!new RegExp(`(?<![0-9A-Za-z])${esc(token)}${after}`, 'i').test(known)) return { ok: false, json: true, reason: 'number' }
   }
   return { ok: true, json: true, reason: null, value }

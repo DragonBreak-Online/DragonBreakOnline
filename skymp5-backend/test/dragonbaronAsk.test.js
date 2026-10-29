@@ -888,3 +888,16 @@ test('39. a length of time in a question is not an older span: the change log an
   }
 })
 
+
+test('40. the minutes of a time stamp never ground a bare number; a whole clock time is one word and may carry its zone letter', () => {
+  const version = { id: 'F1', label: 'Launcher API /api/version', asOf: '2026-10-28T18:37Z', text: 'Launcher 2.1.53, client 0.3.109, server 0.3.1.' }
+  const log = { id: 'F2', label: 'Change log, last 24 h', asOf: '2026-10-28T18:05Z', text: '2026-10-28 18:00Z DEPLOYED: gameplay batch.\n2026-10-28 16:28Z LIVE: Restore module LIVE (hot reload).' }
+  const check = answer => checkAnswer({ answerable: true, answer, cited: ['F1', 'F2'], quotes: [] }, [version, log], 'what is going on')
+  for (const answer of ['There are 37 players online.', 'It went live 37 minutes ago.', 'There are 00 open tickets.', 'The server restarted 05 times.',
+    'The Restore module went live at 16:29.', 'The next restart is at 6:37pm.']) {
+    assert.deepEqual([check(answer).ok, check(answer).reason], [false, 'number'], answer)
+  }
+  for (const answer of ['The batch was deployed at 18:00 UTC.', 'The batch was deployed at 18:00Z on 2026-10-28.', 'The Restore module went live at 16:28.']) {
+    assert.equal(check(answer).ok, true, answer)
+  }
+})
