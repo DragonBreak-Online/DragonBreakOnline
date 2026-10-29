@@ -1225,6 +1225,37 @@ test('a profile linked to a Discord account that has its own thread: its records
   assert.match(r.named('nell_rp').messages[0].content, /Strikes counting: 1 of 3/)
 })
 
+test('retiring a moved profile thread Discord already archived (50083): one request, not one a tick, and the account is gone', async () => {
+  const d = fakeDiscord()
+  const r = await started({ discord: d })
+  const X = '844444444444444444'
+  d.members[X] = 'nell_rp'
+  r.data.discipline = { 70: [entry(1, 'strike', T0, { char: 'Nell #NEL1' })] }
+  await r.tick()
+  r.now += 60000
+  r.data.journal = [{ v: 1, id: 'M-NELL0001', kind: 'discord_timeout', at: iso(r.now), until: iso(r.now + DAY), discordId: X, reason: 'spam', by: { name: 'Lena' } }]
+  await r.tick()
+  r.links[70] = X
+  r.now += 60000
+  await r.tick()
+  await r.tick()
+  const old = r.named('profile 70')
+  assert.equal(old.archived, true)
+  // Not yet retired: starter gone, open in the registry, but Discord already archived it
+  const reg = r.registry()
+  reg.accounts['p:70'] = { rows: {}, movedTo: X, threadId: old.id, title: old.name, state: 'open', activeAt: T0, starterHash: null, starterGone: true, tags: [] }
+  fs.writeFileSync(r.file, JSON.stringify(reg))
+  r.tracker = r.make()
+  const before = d.calls.length
+  for (let i = 0; i < 3; i++) {
+    r.now += 60000
+    await r.tick()
+  }
+  assert.deepEqual(d.calls.slice(before).filter(c => c.path === `/channels/${old.id}`).map(c => c.body), [{ archived: true }])
+  assert.equal(r.registry().accounts['p:70'], undefined)
+  assert.equal(old.archived, true)
+})
+
 test('a profile thread moved to a Discord account with only history keeps its activity time: not held as a reopen above 975', async () => {
   const d = fakeDiscord()
   const X = '844444444444444444'

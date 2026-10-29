@@ -653,7 +653,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
         const content = finish(`Moved: profile ${key.slice(2)} is now linked to <@${acct.movedTo}>; its records continue in that account's thread.`)
         await threadCall(acct, 'PATCH', `${ch}/messages/${acct.threadId}`, { content, allowed_mentions: NO_PINGS })
       }
-      await call('PATCH', ch, { archived: true })
+      await threadCall(acct, 'PATCH', ch, { archived: true })
     }
     delete reg.accounts[key]
     save()
