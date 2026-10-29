@@ -1797,3 +1797,50 @@ test('a registry kept from another forum posts nothing, logged once an hour, unt
   assert.equal(r.discord.threads.size, 2)
   assert.equal(r.named('alice_rp').messages.length, 3)
 })
+
+test('a record file read as empty after 15 minutes missing re-syncs its accounts\' threads when it comes back', async () => {
+  const r = await started()
+  r.data.discipline = { 57: [entry(1, 'suspend', T0 - HOUR, { until: T0 + 3 * DAY })] }
+  r.data.adminBans = [{ id: 't1', profileId: 57, name: 'Alia', until: T0 + DAY, reason: 'griefing', by: 'profile 1', at: T0 }]
+  await r.tick()
+  const t = r.named('alice_rp')
+  r.data.discipline = {}
+  r.status = { discipline: { status: 'missing' } }
+  r.now += 60000
+  await r.tick()
+  r.data.adminBans = []
+  r.now += 60000
+  await r.tick()
+  // Past 15 minutes the discipline file is taken as really empty: nothing is in force
+  r.now += 15 * 60000
+  await r.tick()
+  assert.match(t.messages[0].content, /Status: \*\*CLEAR\*\*/)
+  assert.equal(t.archived, true)
+  // It comes back: the suspension it still holds is shown again, and the thread reopened
+  r.data.discipline = { 57: [entry(1, 'suspend', T0 - HOUR, { until: T0 + 3 * DAY })] }
+  r.status = {}
+  for (let i = 0; i < 3; i++) { r.now += 60000; await r.tick() }
+  assert.doesNotMatch(t.messages[0].content, /Status: \*\*CLEAR\*\*/)
+  assert.equal(t.archived, false)
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].rows['dsc:57:1'].state, 'running')
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].status, 'active')
+})
+
+test('an idle thread Discord archived itself, a new punishment and a new username: one reopen carries the name, counted once', async () => {
+  const d = fakeDiscord()
+  const r = await started({ discord: d })
+  r.data.discipline = { 57: [entry(1, 'suspend', T0 - HOUR, { until: T0 + 30 * DAY })] }
+  await r.tick()
+  const t = d.thread()
+  d.fail = (method, p) => (method === 'POST' && p === `/channels/${t.id}/messages` && t.archived ? fakeDiscord.error(400, 50083) : null)
+  r.now += 8 * DAY
+  t.archived = true
+  d.active = 900
+  d.members[PEOPLE.alice.discordId] = 'alice_new'
+  r.data.discipline[57].push(entry(2, 'strike', r.now - 60000))
+  await r.tick()
+  assert.equal(t.name, 'alice_new')
+  assert.equal(t.archived, false)
+  assert.equal(reopens(d).length, 1, 'one reopen')
+  assert.equal(reopens(d)[0].body.name, 'alice_new', 'the name goes with the reopen')
+})

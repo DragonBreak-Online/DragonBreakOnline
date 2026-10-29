@@ -538,7 +538,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     return scrub(name, 40) || (x.profileIds.length ? `profile ${x.profileIds[0]}` : 'unknown user')
   }
 
-  async function refreshName(key, acct, rows, x) {
+  async function refreshName(key, acct, rows, x, reopen = false) {
     let found = null
     if (!key.startsWith('p:')) { found = await lookupUser(key); acct.nameTriedAt = x.now }
     if (found) Object.assign(acct, { usernameAt: x.now, display: scrub(found.display, TITLE_MAX) || null, nick: scrub(found.nick, TITLE_MAX) || null })
@@ -549,8 +549,8 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     const username = looked || kept || localName(key, rows, x)
     if (username !== acct.username) { acct.username = username; acct.sync = true }
     const title = titleOf(username)
-    // An archived thread is renamed by the PATCH that reopens it, never reopened for a rename
-    if (title === acct.title || (acct.threadId && acct.state === 'archived')) return
+    // An archived thread, or one about to be reopened, is renamed by the PATCH that reopens it, never reopened for a rename
+    if (title === acct.title || (acct.threadId && (acct.state === 'archived' || reopen))) return
     if (acct.threadId) { await threadCall(acct, 'PATCH', `/channels/${acct.threadId}`, { name: title }); acct.sync = true }
     acct.title = title
   }
@@ -866,7 +866,7 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
       waitNote(acct.threadId ? 'reopened threads are held' : 'new threads are held')
       return
     }
-    if (isNew || due || !acct.username) await refreshName(key, acct, shown, x)
+    if (isNew || due || !acct.username) await refreshName(key, acct, shown, x, reopen)
     if (!acct.threadId) {
       if (!(await createThread(key, acct, shown, x))) return
     } else if (reopen) await unarchive(acct)
@@ -924,11 +924,25 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
       if (sources[k] && sources[k].status === 'missing') { if (!missingSince.has(k)) missingSince.set(k, t) } else missingSince.delete(k)
     }
     const statusOf = k => (sources[k] ? sources[k].status : 'not read')
+    const readEmpty = k => statusOf(k) === 'missing' && !MISSING_FROZEN_ALWAYS.has(k) && t - missingSince.get(k) >= MISSING_FROZEN_MS
+    // A file read as empty while missing: once it reads again, the threads of the accounts it has records on are rebuilt
+    const gone = new Set(reg.readEmpty || [])
+    for (const k of Object.values(SOURCE_OF)) {
+      if (readEmpty(k)) gone.add(k)
+      else if (statusOf(k) === 'ok' && gone.delete(k)) {
+        for (const acct of Object.values(reg.accounts)) if (acct.threadId && Object.keys(acct.rows).some(id => SOURCE_OF[prefixOf(id)] === k)) acct.sync = true
+      }
+    }
+    if (gone.size !== (reg.readEmpty || []).length) {
+      if (gone.size) reg.readEmpty = [...gone].sort()
+      else delete reg.readEmpty
+      dirty = true
+    }
     const g = {
       now: t, warnDays: s.warnDays, strikeDays: d.strikeDays || 90, review: d.strikesForReview || 3, id: snap.id || {},
       all: snap.rows, ids: new Set(snap.rows.map(r => r.id)), strikes: snap.strikes || new Map(), baseAt: Date.parse(reg.baselinedAt) || 0,
       // A source not read cleanly this tick is frozen: no new post, no ended and no unbanned from it
-      frozen: k => statusOf(k) !== 'ok' && !(statusOf(k) === 'missing' && !MISSING_FROZEN_ALWAYS.has(k) && t - missingSince.get(k) >= MISSING_FROZEN_MS),
+      frozen: k => statusOf(k) !== 'ok' && !readEmpty(k),
       statusOf,
       // How far the journal has been read: its newest row, or a ban list row that took one in
       journalAt: snap.rows.reduce((t, r) => (r.source === 'journal' || r._journalId) && r.atMs > t ? r.atMs : t, 0),
