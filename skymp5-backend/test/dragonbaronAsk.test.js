@@ -823,5 +823,21 @@ test('35. a quote of many ellipsis parts is checked in milliseconds, not by tryi
   const ms = Number(process.hrtime.bigint() - t0) / 1e6
   assert.deepEqual([c.ok, c.reason], [false, 'quote'])
   assert.ok(ms < 50, `${ms.toFixed(1)} ms`)
-  assert.equal(checkAnswer({ answerable: true, answer: 'x', cited: ['F1'], quotes: [Array(12).fill('staff').join(' ... ')] }, facts, 'q').ok, true)
+  assert.equal(checkAnswer({ answerable: true, answer: 'x', cited: ['F1'], quotes: ['GMs stay neutral ... Staff keep ... staff ... characters know'] }, facts, 'q').ok, true)
+})
+
+test('36. an ellipsis never leaves out a word that negates or forbids, so a quote cannot reverse a rule; faithful ellipses still pass', () => {
+  const facts = realFacts('rules:rule 18', 'rules:rule 8', 'staff:2.2', 'rules:rule 9', 'rules:11.4')
+  const q = (quote, cited = ['F1', 'F2', 'F3', 'F4', 'F5']) => checkAnswer({ answerable: true, answer: 'x', cited, quotes: [quote] }, facts, 'q')
+  for (const quote of ['ERP ... is permitted', 'Sexual roleplay [...] is permitted', 'may ... be actively roleplayed', 'sexual ... roleplay ... permitted',
+    'you may ... respawn and immediately return to that conflict', 'Housecarl (household rank) ... it is up to you', 'staff take ... seat in a court',
+    'the game does ... stop it', 'Staff ... vote in hold elections.', 'You may ... immediately return to the location of your death', 'may ... be used by your character']) {
+    assert.deepEqual([q(quote).ok, q(quote).reason], [false, 'quote'], quote)
+  }
+  // A quote from a fact the reply did not cite is not grounded through that fact either
+  assert.deepEqual([q('ERP ... is permitted', ['F2']).ok, q('ERP ... is permitted', ['F2']).reason], [false, 'quote'])
+  for (const quote of ['Any seat on an election ballot... No', 'Do Not Immediately Return After Death. ... you may not respawn',
+    'Romance between characters is permitted, but ... may not be actively roleplayed', 'You may not use OOC knowledge ... immediately return to the location of your death']) {
+    assert.equal(q(quote).ok, true, quote)
+  }
 })

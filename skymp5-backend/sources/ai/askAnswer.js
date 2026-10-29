@@ -73,6 +73,9 @@ const unmark = s => String(s).normalize('NFKC').replace(/\[([^\]]*)\]\([^)]*\)/g
 const words = s => unmark(s).toLowerCase().match(/[\p{L}\p{N}]+(?:['.][\p{L}\p{N}]+)*/gu) || []
 const ELLIPSIS = /\s*(?:\.\s?){3,}\s*|\s*\[\s*\.\.\.\s*\]\s*/
 const MAX_GAP = 60
+// An ellipsis never leaves out a word that negates or forbids: "Staff ... vote" is not "Staff do not vote"
+const NEGATION = new Set('not no never nor neither none nobody nothing cannot without except unless'.split(' '))
+const negates = w => NEGATION.has(w) || /n't$/.test(w) || /^(prohibit|forbid|forbad)/.test(w)
 // A table row, a heading or a line led by bold text (a rule, a rank, "You can't:") starts a new block of a fact
 const BLOCK_START = /^\s*(\||#{1,6}\s|(?:[-*]\s+|\d+\.\s+)?\*\*)/
 
@@ -102,6 +105,7 @@ function quoteIn(quote, fact) {
     for (let i = start; i <= Math.min(limit, fw.length - parts[n].length); i++) {
       if (block !== null && fact.block[i] !== block) break
       if (at(parts[n], i) && from(n + 1, i + parts[n].length, i + parts[n].length + MAX_GAP, fact.block[i + parts[n].length - 1])) return true
+      if (negates(fw[i])) break
     }
     failed.add(key)
     return false
