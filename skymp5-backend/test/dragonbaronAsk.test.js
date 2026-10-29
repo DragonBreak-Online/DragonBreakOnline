@@ -841,3 +841,20 @@ test('36. an ellipsis never leaves out a word that negates or forbids, so a quot
     assert.equal(q(quote).ok, true, quote)
   }
 })
+
+test('37. a number is never grounded by the date in a T time stamp or by the digits that open a commit hash; a zone or unit letter still counts', () => {
+  const facts = [
+    { id: 'F1', label: 'Launcher API /api/version', asOf: '2026-10-28T18:37Z', text: 'Launcher 2.1.53, client 0.3.109, server 0.3.1.' },
+    { id: 'F2', label: 'Launcher news 2026-10-27 "Strongholds and home planters"', asOf: '2026-10-27', text: 'Strongholds and home planters (2026-10-27, version 0.3.109)' },
+  ]
+  // The real u11 reply: the model read the version card's as-of time as a release date
+  const reply = { answerable: true, answer: 'The next launcher version is 2.1.53, which was released on October 28, 2026.', cited: ['F1'], quotes: ['Launcher 2.1.53'] }
+  for (const q of ['What is the exact release date of the next launcher version?', 'When was launcher 2.1.53 released?']) {
+    const c = checkAnswer(reply, facts, q)
+    assert.deepEqual([c.ok, c.reason], [false, 'number'], q)
+  }
+  const log = [{ id: 'F1', label: 'Change log', asOf: '2026-10-28', text: 'Deployed commit 89b4015a4 to the backend.' }]
+  assert.deepEqual(checkAnswer({ answerable: true, answer: 'There were 89 changes.', cited: ['F1'], quotes: [] }, log, 'how many changes').reason, 'number')
+  assert.equal(checkAnswer({ ...reply, quotes: [], answer: 'Restarts run at 18:00 and strikes last 90 days.' }, [{ ...facts[0], text: 'Restart window 18:00Z. A strike counts for 90d.' }], 'q').ok, true)
+  assert.equal(checkAnswer({ ...reply, quotes: [], answer: 'The news is from 2026-10-27, for client 0.3.109.' }, facts, 'q').ok, true)
+})

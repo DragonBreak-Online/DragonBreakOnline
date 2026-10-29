@@ -188,8 +188,8 @@ function checkAnswer(reply, facts, q) {
   }
   const known = unmark(`${facts.map(f => `${f.label} ${f.asOf || ''} ${f.text}`).join('\n')}\n${q}`)
   for (const token of unmark(value.answer).match(ANSWER_TOKENS) || []) {
-    // A bare number may carry a unit or a zone letter in the facts (18:00Z, 90d); it may never be part of a longer number
-    const after = /^\d+$/.test(token) ? '(?![0-9])' : '(?![0-9A-Za-z])'
+    // A bare number may carry one unit or zone letter in the facts (18:00Z, 90d), never the T of a date-time, a hash or a longer number
+    const after = /^\d+$/.test(token) ? '(?=[dhmsz]?(?![0-9A-Za-z]))' : '(?![0-9A-Za-z])'
     if (!new RegExp(`(?<![0-9A-Za-z])${esc(token)}${after}`, 'i').test(known)) return { ok: false, json: true, reason: 'number' }
   }
   return { ok: true, json: true, reason: null, value }
