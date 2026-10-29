@@ -858,3 +858,21 @@ test('37. a number is never grounded by the date in a T time stamp or by the dig
   assert.equal(checkAnswer({ ...reply, quotes: [], answer: 'Restarts run at 18:00 and strikes last 90 days.' }, [{ ...facts[0], text: 'Restart window 18:00Z. A strike counts for 90d.' }], 'q').ok, true)
   assert.equal(checkAnswer({ ...reply, quotes: [], answer: 'The news is from 2026-10-27, for client 0.3.109.' }, facts, 'q').ok, true)
 })
+
+test('38. ordinary log words ("will see", "scheduled restart", "next to") do not count as a release still to come; forward-looking phrases do', async () => {
+  const LOG = { key: 'changes:week', source: 'changes', label: 'Change log, last 7 days', asOf: '2026-10-28', stale: null, model: true }
+  const run = async (question, text) => {
+    const chats = []
+    const fakeModel = { probe: async () => ({ ok: true }), chat: async a => { chats.push(a); return { outcome: 'ok', content: JSON.stringify({ answerable: true, answer: 'The next update will be deployed on October 28.', cited: ['F1'], quotes: [] }) } } }
+    const a = createAnswerer({ sources: { read: async () => [{ ...LOG, text }] }, model: fakeModel, flight: createSingleFlight(), readSwitch: () => ({ model: true }), settings: { ...DEFAULTS, url: 'http://model.test' } })
+    return { r: await a.answer({ question, viewer: { tier: 'owner' } }), chats }
+  }
+  const question = 'Summarize what the next update will change and when it will be deployed'
+  for (const text of ['2026-10-28 scheduled restart done', '2026-10-27 players will see the new contract boards', '2026-10-26 a well next to the stables', 'Fixed the ledger as soon as the server restarted']) {
+    const { r, chats } = await run(question, text)
+    assert.deepEqual([r.outcome, r.mode, chats.length], ['idk', 'template', 0], text)
+  }
+  for (const text of ['Coming with the next game update: the ledger panel', 'Contract boards: planned, not live yet', 'The ledger will be deployed with the next patch', 'Upcoming: home planters']) {
+    assert.equal((await run(question, text)).chats.length, 1, text)
+  }
+})

@@ -59,8 +59,13 @@ const ANSWER_TOKENS = /\b\d+(?:\.\d+)+\b|\b\d{2,}\b|#[A-Za-z0-9]{4}\b|\bD\d{1,2}
 const CLAIMS_ACTION = /\bI(?:'ve| have)?\s+(?:just\s+)?(?:ran|run|executed|banned|unbanned|kicked|jailed|unjailed|warned|muted|unmuted|restarted|promoted|demoted|granted|gave|given|spawned|teleported|deleted|removed|reset|announced)\b|^\s*(?:done|completed|executed)\b/i
 const ASKS_SECRET = /\b(passwords?|passcodes?|tokens?|api keys?|2fa|login codes?)\b/i
 
-// Words with which a fact speaks of what is still to come ("Coming with the next game update", "Planned, not live yet")
-const FUTURE_TEXT = /\b(next|upcoming|coming|planned|plans?|soon|will|later|future|not live yet|scheduled|eta)\b/i
+// Phrases with which a fact speaks of what is still to come ("Coming with the next game update", "Planned, not live yet"), never a bare "will" or "next"
+const FUTURE_TEXT = new RegExp([
+  /\b(upcoming|planned|plans? to|eta|coming (soon|with|in|next)|(out|live|ready) soon|scheduled for|not (live|out|released) yet)\b/.source,
+  /\bfuture (updates?|releases?|patch(es)?|versions?|builds?)\b/.source,
+  /\bwill (be (released|added|deployed|live|out|shipped|included)|ship|land|arrive|go live|come out|launch)\b/.source,
+  /\b(in|with|for) the next (\w+ )?(updates?|releases?|patch|versions?|builds?)\b/.source,
+].join('|'), 'i')
 const RELEASE_INTENTS = new Set(['version', 'changes'])
 const speaksOfFuture = cards => cards.some(c => usable(c) && FUTURE_TEXT.test(c.text))
 const usable = c => c && c.text && c.text !== 'not available' && c.stale !== 'rank'
