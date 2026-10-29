@@ -67,8 +67,7 @@ const HELD = new RegExp([
   /\binfraction[- ]?(detection|watch|check|reports?|hits?)\b/,
 ].map(r => r.source).join('|'), 'i')
 const SUMMARY = /\b(summar\w*|overview|explain|what('s| is| was)? new|what changed|in short)\b/i
-// A question about a cause. The change log may name one, so the model reads it (summary); status, online, GM calls and tickets
-// hold states and counts, never causes, so on their own they cannot answer it
+// A question about a cause: the change log may name one (the model reads it); status, online, GM calls and tickets never do
 const CAUSE = /\b(why|how come|what caused|caused by|cause of|the cause)\b/i
 const NO_CAUSE_INTENTS = new Set(['status', 'online', 'gm_calls', 'tickets'])
 // A time span the change log cannot cover: it reads the last 24 h, today or the last 7 days, nothing older
@@ -125,9 +124,7 @@ function extractEntities(q) {
   return { tags, threadIds, clientVer, launcherVer, ruleRefs, time, names: names.slice(0, 3) }
 }
 
-// A request to act is always refused, and so is any question about a secret. Votes, addresses, alts and transcripts are refused
-// when the question asks to see them; a question about what the rules say on them ("what does 2.6 say about election votes",
-// "under 11.4, can staff vote") is a rules question, unless it names a player (#TAG or a name) or asks for a count or a list
+// Refused: a command, a secret, or votes, addresses, alts and transcripts asked for as data (not what a rule says about them)
 function refusalOf(q, entities = extractEntities(q)) {
   if (IMPERATIVE.test(q.trim()) && !NOT_A_COMMAND.test(q.trim())) return IMPERATIVE_TEXT
   if (!REFUSE_WORDS.test(q)) return null
