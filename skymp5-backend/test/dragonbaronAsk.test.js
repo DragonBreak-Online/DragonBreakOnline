@@ -21,7 +21,8 @@ const { ChatInputCommandInteraction, MessageFlags } = require('discord.js')
 const perms = require('../sources/discord/dragonbaronPermissions')
 const { createAsk, compose, ERRORS } = require('../sources/discord/dragonbaronAsk')
 const { createSources } = require('../sources/ai/askSources')
-const { createAnswerer, checkAnswer, TEXT, REPAIR, ASK_SCHEMA } = require('../sources/ai/askAnswer')
+const { createAnswerer, checkAnswer, factsFor, TEXT, REPAIR, ASK_SCHEMA } = require('../sources/ai/askAnswer')
+const retrieve = require('../sources/ai/retrieve')
 const { createLocalModel, createSingleFlight } = require('../sources/ai/localModel')
 const { createLimiter } = require('../sources/ai/rateLimit')
 const { createUsageLog } = require('../sources/ai/askUsage')
@@ -808,4 +809,19 @@ test('34. a release still to come asked of the change log list: "I don\'t know" 
   const q = interaction('what was deployed today?')
   await ask.handleInteraction(q.it)
   assert.match(audits.at(-1), /-> answered via template/)
+})
+
+// Facts from the real rules chunks, built the way the ask pipeline builds them
+const RULE_CHUNKS = retrieve.loadDocs(path.join(__dirname, '..', 'data', 'rules'))
+const realFacts = (...ids) => factsFor(ids.map(id => { const c = RULE_CHUNKS.find(x => x.id === id); return { key: c.id, label: c.label, asOf: c.version, text: c.text, model: true } }))
+
+test('35. a quote of many ellipsis parts is checked in milliseconds, not by trying every alignment again', () => {
+  const facts = realFacts('rules:11.2')
+  const quote = [...Array(29).fill('staff'), 'zzzz'].join(' ... ')
+  const t0 = process.hrtime.bigint()
+  const c = checkAnswer({ answerable: true, answer: 'Staff are not above the rules.', cited: ['F1'], quotes: [quote] }, facts, 'what is the staff code of conduct')
+  const ms = Number(process.hrtime.bigint() - t0) / 1e6
+  assert.deepEqual([c.ok, c.reason], [false, 'quote'])
+  assert.ok(ms < 50, `${ms.toFixed(1)} ms`)
+  assert.equal(checkAnswer({ answerable: true, answer: 'x', cited: ['F1'], quotes: [Array(12).fill('staff').join(' ... ')] }, facts, 'q').ok, true)
 })

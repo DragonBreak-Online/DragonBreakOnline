@@ -93,12 +93,17 @@ function quoteIn(quote, fact) {
   if (!parts.length) return true
   const fw = fact.words
   const at = (p, i) => p.every((w, k) => fw[i + k] === w)
+  // Part n from word start has one answer (limit and block follow from start), so a failed pair is never searched again
+  const failed = new Set()
   const from = (n, start, limit, block) => {
     if (n === parts.length) return true
+    const key = n * (fw.length + 1) + start
+    if (failed.has(key)) return false
     for (let i = start; i <= Math.min(limit, fw.length - parts[n].length); i++) {
       if (block !== null && fact.block[i] !== block) break
       if (at(parts[n], i) && from(n + 1, i + parts[n].length, i + parts[n].length + MAX_GAP, fact.block[i + parts[n].length - 1])) return true
     }
+    failed.add(key)
     return false
   }
   for (let i = 0; i <= fw.length - parts[0].length; i++) {
