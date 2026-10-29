@@ -723,6 +723,33 @@ test('thread headroom: at the thread cap a tag change on archived threads sends 
   assert.equal(r.registry().accounts[PEOPLE.bob.discordId].sync, false)
 })
 
+test('thread headroom: a new punishment for a renamed user does not reopen the archived thread by the rename above 975', async () => {
+  const d = fakeDiscord()
+  const r = await twoArchived(d)
+  d.active = 976
+  d.members[PEOPLE.alice.discordId] = 'alice_new'
+  r.now += 11 * 60000
+  r.data.discipline[57].push(entry(2, 'strike', r.now - 60000))
+  const before = d.calls.length
+  await r.tick()
+  const alice = [...d.threads.values()].find(t => t.messages[0].content.includes(PEOPLE.alice.discordId))
+  assert.equal(alice.archived, true, 'held above 975')
+  assert.equal(alice.name, 'alice_rp')
+  assert.deepEqual(d.calls.slice(before).filter(c => c.method !== 'GET'), [], 'nothing sent, the rename included')
+  assert.equal(d.calls.slice(before).filter(c => c.path.includes('/members/')).length, 0, 'no lookup while held')
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].rows['dsc:57:2'], undefined, 'the row is kept unposted')
+  assert.deepEqual(r.audits, ['PUNISH-TRACKER waiting for thread headroom: reopened threads are held'])
+  // With room the rename goes with the one PATCH that reopens it, and counts
+  d.active = 900
+  r.now += 11 * 60000
+  await r.tick()
+  assert.deepEqual(reopens(d).map(c => c.body), [{ archived: false, name: 'alice_new' }])
+  assert.equal(alice.name, 'alice_new')
+  assert.equal(alice.archived, false)
+  assert.match(alice.messages.at(-1).content, /^\*\*STRIKE\*\* · dsc:57:2/)
+  assert.equal(r.registry().accounts[PEOPLE.alice.discordId].title, 'alice_new')
+})
+
 test('the REST writer waits out a 429 (the global one too), backs off a 5xx, and spaces requests 1.5 s', async () => {
   let clock = 0
   const slept = []
@@ -1255,6 +1282,31 @@ test('a late journal Discord ban near two posted ban-list bans is the same ban a
 const banOf = (at, f7) => ({ ref: 'B-DDDDDD', discordId: PEOPLE.bob.discordId, reason: f7 ? 'duping' : 'discord ban', bannedAt: iso(at), bannedBy: f7 ? 'lena (dashboard)' : 'discord' })
 const jbanOf = at => ({ v: 1, id: 'M-BAN00002', kind: 'discord_ban', at: iso(at), discordId: PEOPLE.bob.discordId, reason: 'threats', by: { name: 'Lena' }, via: 'discord' })
 const banPosts = r => r.posts().filter(c => /^\*\*(DISCORD BAN|GAME BAN LIST)/.test(c))
+
+test('a Discord ban waiting for its journal row is not in force: a sync leaves an archived clear thread archived and CLEAR', async () => {
+  const d = fakeDiscord()
+  const r = await twoArchived(d)
+  const bob = r.named('bob_rp')
+  r.now += 11 * 60000
+  // Renamed forum tags put every thread up for a sync while Bob's Discord ban is on the ban list with no journal row yet
+  d.tags = TAGS.map(t => ({ ...t, id: t.id.replace(/^9/, '8') }))
+  r.data.bans = [banOf(r.now, false)]
+  await r.tick()
+  assert.equal(banPosts(r).length, 0, 'the ban waits for its journal row')
+  assert.equal(bob.archived, true, 'not reopened for a ban not posted yet')
+  assert.match(bob.messages[0].content, /Status: \*\*CLEAR\*\*/)
+  assert.ok(!bob.tags.includes('800000000000000010'), 'not tagged Active')
+  assert.equal(r.registry().accounts[PEOPLE.bob.discordId].status, 'expired')
+  // Its journal row arrives: the ban posts through the headroom gate and the thread turns ACTIVE
+  r.now += 20000
+  r.data.journal = [jbanOf(r.now - 15000)]
+  await r.tick()
+  assert.equal(banPosts(r).length, 1)
+  assert.match(banPosts(r)[0], /Issued by: Lena\n/)
+  assert.equal(bob.archived, false)
+  assert.match(bob.messages[0].content, /Status: \*\*ACTIVE\*\*/)
+  assert.ok(bob.tags.includes('800000000000000010'))
+})
 
 test('an F7 ban replacing a Discord copy under the same ref is posted once, and the Discord ban\'s unban still posts', async () => {
   const r = await started()

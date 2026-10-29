@@ -454,10 +454,19 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     return writer.request(method, p, body, opts)
   }
 
-  // Reopening a thread takes an active-thread slot like a new one, so a full guild (160006) holds it too
+  // A title not sent while the thread was archived goes with the PATCH that reopens it
+  const pendingName = acct => (acct.username && titleOf(acct.username) !== acct.title ? titleOf(acct.username) : null)
+
+  // Reopening a thread takes an active-thread slot like a new one: it waits for headroom, and a full guild (160006) holds it too
   async function unarchive(acct) {
     if (headroom && headroom.count === Infinity && now() - headroom.at <= CACHE_MS) throw new Error('the guild is at its thread cap; reopening waits for the next headroom check')
-    await call('PATCH', `/channels/${acct.threadId}`, { archived: false }).catch(err => { capped(err); throw err })
+    if (!(await roomForThread())) {
+      waitNote('reopened threads are held')
+      throw new Error('no thread headroom; reopening waits for room')
+    }
+    const name = pendingName(acct)
+    await call('PATCH', `/channels/${acct.threadId}`, { archived: false, ...(name ? { name } : {}) }).catch(err => { capped(err); throw err })
+    if (name) acct.title = name
     if (headroom) headroom.count++
     acct.state = 'open'
     acct.activeAt = now()
@@ -540,7 +549,8 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     const username = looked || kept || localName(key, rows, x)
     if (username !== acct.username) { acct.username = username; acct.sync = true }
     const title = titleOf(username)
-    if (title === acct.title) return
+    // An archived thread is renamed by the PATCH that reopens it, never reopened for a rename
+    if (title === acct.title || (acct.threadId && acct.state === 'archived')) return
     if (acct.threadId) { await threadCall(acct, 'PATCH', `/channels/${acct.threadId}`, { name: title }); acct.sync = true }
     acct.title = title
   }
@@ -748,13 +758,14 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     const patch = {}
     if (!sameSet(tags, acct.tags || [])) patch.applied_tags = tags
     // An archived thread takes an edit only together with its unarchive; a clear one is archived again below
-    if (patch.applied_tags && acct.state === 'archived') patch.archived = false
+    if (patch.applied_tags && acct.state === 'archived') Object.assign(patch, { archived: false }, pendingName(acct) ? { name: pendingName(acct) } : {})
     else if (!x.inForce && acct.state !== 'archived') patch.archived = true
     if (Object.keys(patch).length) {
       try {
         await threadCall(acct, 'PATCH', ch, patch)
         if ('archived' in patch) acct.state = patch.archived ? 'archived' : 'open'
         if (patch.archived === false) acct.activeAt = now()
+        if (patch.name) acct.title = patch.name
       } catch (err) {
         // A full guild or a thread still archived is not a refusal of the tags: they are tried again later
         if (err === OUT || capped(err) || NOT_FINAL.has(err.code) || !patch.applied_tags || (err.status !== 400 && err.status !== 403)) throw err
@@ -773,7 +784,9 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
     if (acct && acct.movedTo && !rows.length) return retire(key, acct)
     const profileIds = profilesOf(key, rows, g)
     const strikes = profileIds.reduce((n, p) => n + ((g.strikes && g.strikes.get(p)) || 0), 0)
-    const x = { ...g, key, profileIds, strikes, inForce: rows.some(r => !isFold(r) && IN_FORCE.has(stateOf(r, g))) }
+    // A ban waiting for its journal row is not shown yet: not in force, on the starter or in the tags
+    const shown = rows.filter(r => !awaitsJournal(r, g))
+    const x = { ...g, key, profileIds, strikes, inForce: shown.some(r => !isFold(r) && IN_FORCE.has(stateOf(r, g))) }
     const frozen = id => g.frozen(SOURCE_OF[prefixOf(id)])
     // A frozen source's row held in force but not read as in force: the starter, tags and archive wait until it reads again
     const held = !!acct && Object.entries(acct.rows).some(([id, rec]) => frozen(id) && IN_FORCE.has(rec.state)
@@ -793,8 +806,8 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
       for (const rec of Object.values(acct.rows)) if (rec.alias === old) rec.alias = r.id
       dirty = true
     }
-    for (const r of rows) {
-      if (frozen(r.id) || awaitsJournal(r, x)) continue
+    for (const r of shown) {
+      if (frozen(r.id)) continue
       const st = stateOf(r, x)
       const rec = acct && acct.rows[r.id]
       if (!rec) {
@@ -846,20 +859,20 @@ function createTracker({ snapshot, config = {}, now = Date.now, store, discord, 
       return
     }
     if (work.length || quiet.length) acct.sync = true
-    if (isNew || due || !acct.username) await refreshName(key, acct, rows, x)
-    if (!acct.threadId) {
-      if (!(await createThread(key, acct, rows, x))) return
-    } else if (work.length && (acct.state === 'archived' || x.now - (acct.activeAt || 0) >= IDLE_MS)) {
-      // An open thread quiet for a week may be one Discord archived itself: reopened only with room, and counted
-      if (!(await roomForThread())) {
-        waitNote('reopened threads are held')
-        return
-      }
-      await unarchive(acct)
+    // An open thread quiet for a week may be one Discord archived itself: reopened only with room, and counted
+    const reopen = !!acct.threadId && work.length > 0 && (acct.state === 'archived' || x.now - (acct.activeAt || 0) >= IDLE_MS)
+    // A thread to make or reopen waits for headroom before the name is looked up or anything is sent
+    if ((!acct.threadId || reopen) && !(await roomForThread())) {
+      waitNote(acct.threadId ? 'reopened threads are held' : 'new threads are held')
+      return
     }
+    if (isNew || due || !acct.username) await refreshName(key, acct, shown, x)
+    if (!acct.threadId) {
+      if (!(await createThread(key, acct, shown, x))) return
+    } else if (reopen) await unarchive(acct)
     const at = w => (w.r ? w.r.atMs : w.rec.at) || 0
     for (const w of work.sort((a, b) => Number(!a.isNew) - Number(!b.isNew) || at(a) - at(b))) await postRow(key, acct, w, x)
-    if (acct.sync && !held) await syncThread(key, acct, rows, x)
+    if (acct.sync && !held) await syncThread(key, acct, shown, x)
   }
 
   async function groupRows(snap, g) {
