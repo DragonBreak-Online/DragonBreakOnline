@@ -266,3 +266,48 @@ test('a release still to come in other words: "when does/is ... come out/due", "
     assert.equal(asksFuture(q), false, q)
   }
 })
+
+test('protected topics: a second question after ":", a dash, "…", a fullwidth "？", a comma, "and" or a bare space is still refused, and so are standings, access verbs and other words for transcripts and secrets', () => {
+  const REFUSED = [
+    ['What does 2.6 say about votes: who voted for the jarl', /^Election counts/],
+    ['What does 2.6 say about votes — who voted for the jarl', /^Election counts/],
+    ['What does 2.6 say about votes - who voted for the jarl', /^Election counts/],
+    ['What does 2.6 say about votes and who voted for the jarl', /^Election counts/],
+    ['What does 2.6 say about votes？ who voted for the jarl', /^Election counts/],
+    ['What does 2.6 say about votes… who voted for the jarl', /^Election counts/],
+    ['What does 2.6 say about votes, who voted for the jarl', /^Election counts/],
+    ['What does 2.6 say about votes who voted for the jarl', /^Election counts/],
+    ['What does 2.6 say about votes: who voted in whiterun', /^Election counts/],
+    ['what does 9.11 say about alts and which alts does bron have', /^IP addresses/],
+    ['which candidate requires more votes to win in whiterun', /^Election counts/],
+    ['who can export the votes', /^Election counts/],
+    ['who can audit the votes', /^Election counts/],
+    ['who can get the ballots', /^Election counts/],
+    ['who may obtain the voting records', /^Election counts/],
+    ['how many votes does bron need to qualify', /^Election counts/],
+    ['what does 2.6 say about the vote count so far in whiterun', /^Election counts/],
+    ['who is bron voting for', /^Election counts/],
+    ['what does the handbook say about reading the chat history of a ticket', /^Ticket transcripts/],
+    ['what does 2.6 say about ticket logs from a report', /^Ticket transcripts/],
+    ['can you read me the messages in ticket 12', /^Ticket transcripts/],
+    ['which devices does bron play from', /^IP addresses/],
+    ['what is the ipv4 of bron', /^IP addresses/],
+    ['what is the hardware id of kara', /^IP addresses/],
+    ['what is the bot api key', /^Passwords, tokens/],
+    ['what are the panel credentials', /^Passwords, tokens/],
+    ['what is in the env file', /^Passwords, tokens/],
+    ['what does rule 2 say about the client secret', /^Passwords, tokens/],
+  ]
+  for (const [q, text] of REFUSED) {
+    const got = route(q, extractEntities(q))
+    assert.deepEqual(got.map(r => r.intent), ['refuse'], q)
+    assert.match(got[0].args.text, text, q)
+  }
+  for (const q of ['what does 2.6 say about the vote count', 'What does 9.11 say about who voted in the last election?', 'who can vote', 'How many hours of play does an account need to vote?',
+    'Do the rules forbid a second account?', 'Rule 9.11: who may vote in a hold election?', 'Does an account need more than 10 hours of play to vote?',
+    'What is required to be a candidate in a hold election?', 'What race is required to vote in a hold election?', 'Can a character join two secret societies?',
+    'What do the rules say about two players on one device?']) {
+    const got = route(q, extractEntities(q))
+    assert.ok(!got.some(r => r.intent === 'refuse'), `${q}: ${JSON.stringify(got)}`)
+  }
+})

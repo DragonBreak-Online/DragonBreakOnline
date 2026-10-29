@@ -14,17 +14,23 @@ const MODEL_INTENTS = new Set(['version', 'handbook', 'rules'])
 // Intents read from the rules documents (the current Server Rules and Staff Handbook only)
 const DOC_INTENTS = new Set(['handbook', 'rules'])
 
-const REFUSE_WORDS = /\b(ip|ips|hwid|device|alts?|vote[sd]?|elections?|ballots?|transcripts?|passwords?|tokens?|webhooks?|backend\.env)\b/i
-// Secrets and ticket transcripts (no rules document speaks of them) are refused whatever the question
-const SECRET_WORDS = /\b(passwords?|tokens?|webhooks?|backend\.env|transcripts?)\b/i
-// The other protected topics only in one question that names a rule or asks what a rules text says, never permission wording alone
-const SECOND_CLAUSE = /[?;!]\s*\S|\.(?!\d)\s*\p{L}|,\s*(and|but|also|then|plus|so)\b/iu
-// Who may take part in an election and what it takes ("how many hours does an account need to vote"); never who may see the data
+// Secrets and ticket transcripts or logs (no rules document speaks of them) are refused whatever the question
+const SECRET_WORDS = /\b(passwords?|tokens?|webhooks?|backend\.env|env\s+files?|api\s+keys?|(api|client|bot|app)\s+secrets?|secret\s+keys?|credentials?)\b/i
+const TICKET_LOG = /\btranscripts?\b|\bchat\s+(history|logs?)\b|\btickets?\s+(logs?|history|chats?|conversations?)\b|\b(messages|conversations?|logs?|history)\s+(in|of|from)\s+((a|an|the|that|this|my|their)\s+)?tickets?\b/i
+const ADDRESSES = /\b(ip|ips|ipv[46]|hwids?|hardware\s+ids?|devices?|alts?)\b/i
 const ELECTION = /\b(vote[sd]?|voting|elections?|ballots?)\b/i
-const OTHER_PROTECTED = /\b(ip|ips|hwid|device|alts?|transcripts?)\b/i
+const REFUSE_WORDS = new RegExp([ADDRESSES, ELECTION, TICKET_LOG, SECRET_WORDS].map(r => r.source).join('|'), 'i')
+// The other protected topics only in one question that names a rule or asks what a rules text says, never permission wording alone
+const SECOND_CLAUSE = /[?;!\u2026\uff1f\uff01\uff1b]\s*\S|\p{L}\s*[:\uff1a]\s*\S|\.(?!\d)\s*\p{L}|\s[-\u2013\u2014]+\s*\p{L}|[\u2013\u2014]\s*\p{L}|,\s*(and|but|also|then|plus|so)\b|\b(and|or|but|plus)\s+(who|whom|whose|which|what|how|where|when)\b/iu
+// A second question run on after the topic with no mark: "say about votes who voted for the jarl"
+const RUN_ON = /\b(say|state|cover|word)\s+(about|on|regarding)\s+[^?]*?\p{L}[\s,]+(who|whose|which|how\s+many|how\s+much)\b/iu
+// Live state is never a rules topic, even after "what does 2.6 say about"
+const LIVE_DATA = /\b(so far|leading|winning|won|voted for|whose|linked|right now|currently|at the moment)\b/i
+// Who may take part in an election and what it takes ("how many hours does an account need to vote"); never who may see the data or who is ahead
 const ELIGIBILITY = /\b(needs?|needed|requires?|required|requirements?|eligib\w*|qualif\w*|minimum)\b|\bhow\s+old\b|\bwho\s+(can|may|must|should)\b/i
-const ACCESS = /\b(see|seen|read|view|open|access|know|look|show[ns]?)\b/i
-const asksEligibility = q => ELIGIBILITY.test(q) && ELECTION.test(q) && !OTHER_PROTECTED.test(q) && !ACCESS.test(q)
+const ACCESS = /\b(see|seen|read|view|open|access|know|look|show[ns]?|obtain|export|audit|download|pull|copy|count|tally)\b|\bget\s+(the|those|these|all)\b/i
+const STANDINGS = /\b(win|wins|winning|won|lead(s|ing)?|ahead|behind|margin)\b|\b(more|fewer|fewest|most)\s+votes\b|\bhow\s+many\s+(more\s+)?votes\b|\bwhich\s+candidates?\b|\brace\s+(in|for)\b/i
+const asksEligibility = q => ELIGIBILITY.test(q) && ELECTION.test(q) && !ADDRESSES.test(q) && !TICKET_LOG.test(q) && !ACCESS.test(q) && !STANDINGS.test(q)
 // ...and not when it asks for votes, results, addresses or matches themselves, or for one person's
 const DATA_VERBS = /\b(show|print|list|reveal|dump|give|send|post|share|look\s?up|find|check|tell me)\b/i
 const DATA_NOUNS = /\b(counts?|counted|tally|totals?|results?|standings?|so far|going|leading|winning|won|who voted|voted for|whose|logs?|match(es|ed)?|linked)\b/i
@@ -48,11 +54,12 @@ function asksCommand(q) {
   return IMPERATIVE.test(clauses[0]) && clauses.some(isCommand)
 }
 
+const TRANSCRIPTS_TEXT = 'Ticket transcripts are never used here. Nothing was run.'
 const REFUSALS = Object.freeze([
-  [/\b(vote[sd]?|elections?|ballots?)\b/i, 'Election counts are never shown, to staff included (Staff Handbook 2.6). Nothing was run.'],
-  [/\b(ip|ips|hwid|device|alts?)\b/i, 'IP addresses, device matches and alt accounts are never shown here. Nothing was run.'],
-  [/\btranscripts?\b/i, 'Ticket transcripts are never used here. Nothing was run.'],
-  [/\b(passwords?|tokens?|webhooks?|backend\.env)\b/i, 'Passwords, tokens, webhooks and server settings are never shown. Nothing was run.'],
+  [ELECTION, 'Election counts are never shown, to staff included (Staff Handbook 2.6). Nothing was run.'],
+  [ADDRESSES, 'IP addresses, device matches and alt accounts are never shown here. Nothing was run.'],
+  [TICKET_LOG, TRANSCRIPTS_TEXT],
+  [SECRET_WORDS, 'Passwords, tokens, webhooks and server settings are never shown. Nothing was run.'],
 ])
 const IMPERATIVE_TEXT = "I can't run commands. Use /console or the panel."
 
@@ -156,9 +163,10 @@ function extractEntities(q) {
 // Refused: a command, a secret or a transcript, or votes, addresses and alts asked for as data (not what a rule says about them)
 function refusalOf(q, entities = extractEntities(q)) {
   if (asksCommand(q)) return IMPERATIVE_TEXT
+  if (TICKET_LOG.test(q)) return TRANSCRIPTS_TEXT
   if (!REFUSE_WORDS.test(q)) return null
-  const aboutRules = !SECRET_WORDS.test(q) && (entities.ruleRefs.length > 0 || SAYS.test(q) || asksEligibility(q)) && !SECOND_CLAUSE.test(q.trim()) && !DATA_VERBS.test(q) &&
-    (SAYS.test(q) || !DATA_NOUNS.test(q)) && !entities.tags.length && !entities.names.length && !entities.threadIds.length
+  const aboutRules = !SECRET_WORDS.test(q) && (entities.ruleRefs.length > 0 || SAYS.test(q) || asksEligibility(q)) && !SECOND_CLAUSE.test(q.trim()) && !RUN_ON.test(q) && !LIVE_DATA.test(q) &&
+    !DATA_VERBS.test(q) && (SAYS.test(q) || !DATA_NOUNS.test(q)) && !entities.tags.length && !entities.names.length && !entities.threadIds.length
   if (aboutRules) return null
   for (const [rx, text] of REFUSALS) if (rx.test(q)) return text
   return 'That is never shown here. Nothing was run.'
