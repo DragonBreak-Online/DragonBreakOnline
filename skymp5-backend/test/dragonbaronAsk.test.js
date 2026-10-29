@@ -901,3 +901,18 @@ test('40. the minutes of a time stamp never ground a bare number; a whole clock 
     assert.equal(check(answer).ok, true, answer)
   }
 })
+
+test('41. a number glued to letters (28th, 72h, 120d, 5000g) is checked by its digits unless a fact writes it the same way; single digits stay unchecked', () => {
+  const rule = realFacts('rules:13.3')
+  const check = (answer, facts = rule) => checkAnswer({ answerable: true, answer, cited: ['F1'], quotes: [] }, facts, 'how long does a strike count')
+  for (const answer of ['A strike counts for 120d.', 'A suspension lasts up to 72h.', 'A strike lasts 48h.', 'The fine is 5000g.', 'This rule was updated on October 28th, 2026.']) {
+    assert.deepEqual([check(answer).ok, check(answer).reason], [false, 'number'], answer)
+  }
+  for (const answer of ['A strike counts for 90d.', 'A suspension lasts up to 30 days.', 'At the 3rd strike staff review a suspension.', 'This rule dates from October 21st, 2026.']) {
+    assert.equal(check(answer).ok, true, answer)
+  }
+  const version = [{ id: 'F1', label: 'Launcher API /api/version', asOf: '2026-10-28T18:37Z', text: 'Launcher 2.1.53, client 0.3.109, server 0.3.1.' }]
+  // E1: the version is grounded by the question, so only the date can catch it
+  assert.deepEqual(checkAnswer({ answerable: true, answer: 'Launcher 2.1.54 comes out on October 28th.', cited: ['F1'], quotes: ['Launcher 2.1.53'] }, version, 'When does launcher 2.1.54 come out?').reason, 'number')
+  assert.equal(check('The 10th build is due.', [{ id: 'F1', label: 'Change log', asOf: '2026-10-28', text: 'The 10th build is due.' }]).ok, true)
+})
