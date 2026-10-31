@@ -58,6 +58,8 @@ export const NATIVE_CAPS = [
   "native:propertyMarket",
   // Worker 6's key ring (dbo_keyring, widget 91). Its keys are dbo:keyRingGive/Cut/Take/Answer/Close
   "native:keyRing",
+  // Worker 6's spell tome shop (dbo_tomes). Its keys are dbo:tomeBuy and dbo:tomeClose
+  "native:tomeShop",
 ];
 export const CAPS_RETRY_MS = 5000;
 
