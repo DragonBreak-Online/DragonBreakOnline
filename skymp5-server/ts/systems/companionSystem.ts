@@ -53,6 +53,8 @@ interface Companion extends CompanionInfo {
   // Command Daedra: the owner it goes back to, and when (0: never)
   lentBy: number;
   returnAt: number;
+  // Last placed beside the owner because the owner's client reported it missing (regroup)
+  regroupedAt?: number;
 }
 
 interface Stored {
@@ -91,6 +93,8 @@ const SPAWN_LIFT = 16;
 const FOLLOW_OFFSET = -128;
 // Farther than this from the owner, or in another cell, the companion is moved behind them
 const FOLLOW_TELEPORT_DISTANCE = 2500;
+// A companion the owner's client reports missing is placed beside the owner again at most this often
+const REGROUP_MIN_MS = 30000;
 const COMMAND_RANGE = 4096;
 const TARGET_KEEP_RANGE = 6144;
 const DEFEND_RETARGET_MS = 3000;
@@ -452,7 +456,28 @@ export class CompanionSystem implements System {
       attack: (id: unknown, targetId: unknown) => this.orderAttack(Number(id) >>> 0, Number(targetId) >>> 0),
       list: (ownerId: unknown) => this.list(Number(ownerId) >>> 0),
       release: (id: unknown, hostile: unknown) => this.releaseToWorld(Number(id) >>> 0, hostile === true),
+      regroup: (id: unknown) => this.regroup(Number(id) >>> 0),
     };
+  }
+
+  // The owner's client reports the companion missing (gameplay npcDrift): it is placed beside the owner, then disabled and
+  // enabled, which unsubscribes and resubscribes every listener so the owner's client is sent the companion afresh
+  private regroup(id: number): string {
+    const c = this.companions.get(id);
+    if (!c) return "not a companion";
+    if (c.staying) return "staying";
+    if (userOf(this.mp, c.ownerId) < 0) return "owner offline";
+    const now = Date.now();
+    if (c.regroupedAt && now - c.regroupedAt < REGROUP_MIN_MS) return "too soon";
+    c.regroupedAt = now;
+    const mp = this.mp;
+    const loc = this.locationNear(c.ownerId, FOLLOW_OFFSET);
+    mp.set(c.id, "locationalData", loc);
+    mp.set(c.id, "spawnPoint", loc);
+    mp.set(c.id, "isDisabled", true);
+    mp.set(c.id, "isDisabled", false);
+    this.log(`CompanionSystem: ${c.kind} ${hex(c.id)} placed beside ${hex(c.ownerId)} again (missing on the owner's client)`);
+    return "placed";
   }
 
   private toInfo(c: Companion): CompanionInfo {
