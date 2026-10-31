@@ -4595,6 +4595,27 @@ every('driftLogSummary', 60000, () => {
   driftSeen.clear();
   if (rows.length) log(`npcDrift sampled (last 60 s, 1 in ${DRIFT_LOG.sample} of the chatty kinds): ${rows.join(' | ')}`);
 });
+// A companion its owner's own client reports missing twice in a row (npcDrift companion { exists: false }; 803 of 14,834
+// owner reports on 29-31 Oct, up to about 3 minutes each) is placed beside the owner and sent to that client again (fork
+// companionSystem regroup, branch companion-regroup-1031: stay companions and offline owners are left alone; until that
+// server build, regroup is missing and nothing happens). Config companions.regroup false turns it off.
+const companionMissing = globalThis.__dboCompanionMissing instanceof Map ? globalThis.__dboCompanionMissing : (globalThis.__dboCompanionMissing = new Map());
+const companionReport = (a, r) => {
+  if ((cfg.companions || {}).regroup === false) return '';
+  const id = parseInt(String(r.remoteId || ''), 16) >>> 0;
+  if (!id) return '';
+  if (r.exists !== false) { companionMissing.delete(id); return ''; }
+  let owner = 0; try { owner = Number(mp.get(id, 'ff_companionOf')) >>> 0; } catch (e) { return ''; }
+  if (owner !== (a >>> 0)) return '';
+  const n = (companionMissing.get(id) || 0) + 1;
+  if (n < 2) { if (companionMissing.size > 2048) companionMissing.clear(); companionMissing.set(id, n); return ''; }
+  companionMissing.delete(id);
+  const api = globalThis.__dboCompanions;
+  if (!api || typeof api.regroup !== 'function') return '';
+  let res = ''; try { res = String(api.regroup(id)); } catch (e) { log('companion regroup failed', e.message); return ''; }
+  log(`companion ${id.toString(16)} of ${display(a)} missing on the owner's client twice: ${res}`);
+  return res;
+};
 onUi('npcDrift', (a, args) => {
   const r = args[0] && typeof args[0] === 'object' ? args[0] : {};
   let note = '';
@@ -4607,6 +4628,7 @@ onUi('npcDrift', (a, args) => {
   driftSeen.set(kind, seen);
   if (keep) log(`npcDrift ${display(a)} ${kind}: ${JSON.stringify(r).slice(0, 900)}${note}`);
   if (r.kind === 'heartbeat' && globalThis.__dboDoorSync) { try { globalThis.__dboDoorSync.heartbeat(a, r); } catch (e) { log('door sync failed', e.message); } }
+  if (r.kind === 'companion') { try { companionReport(a, r); } catch (e) { log('companion report failed', e.message); } }
 });
 // The staff trace (client staffHit.ts): a window the server opens for one player, by /staffdiag or at login while
 // config staffHitDiag.enabled; each staff shot arrives as one line, at most STAFF_DIAG_MAX_LINES a window
