@@ -4481,11 +4481,35 @@ const driftPoints = (r) => {
   if (r.kind === 'remoteEvent') return [r.to, null, r.srv];
   return null;
 };
+// The drift diagnostic is the main instrument for actor bugs, but at Nat's Bruma event on 31 Oct it was the
+// single largest log producer: 2,080 lines/min and 0.76 MB/min from the one log() below, 11.3x its quiet rate,
+// stringifying 900 chars per packet for 65-72 players (_work\perf-1031\NOTE.md). Some kinds earn every line -
+// perf above all, since it is the only reason we can see a client's fps and jsMs at all - and the rare ones are
+// cheap anyway. The flood is factions 691/min, remote 366, weaponEquip 322, input 298, heartbeat 129 and
+// faceSync 128; one in DRIFT_LOG.sample of those is logged.
+// Nothing is dropped silently: the minute summary below says how many of each kind went unlogged, so a quiet
+// instrument can never be mistaken for a quiet server.
+// driftNote still runs for EVERY packet, because it is not a pure formatter: a heartbeat fills HOST_OF, which
+// driftHostNote reads. Only the log() is gated. The handler's heartbeat door-sync call is untouched too.
+// ROLLBACK: config driftLog { sample: 1 } logs every line again, on a hot reload.
+const DRIFT_LOG = Object.assign({ sample: 20, chatty: ['factions', 'remote', 'weaponEquip', 'input', 'heartbeat', 'faceSync'] }, cfg.driftLog || {});
+const driftSeen = globalThis.__dboDriftSeen instanceof Map ? globalThis.__dboDriftSeen : (globalThis.__dboDriftSeen = new Map()); // kind -> [logged, unlogged]
+every('driftLogSummary', 60000, () => {
+  const rows = [...driftSeen].filter(([, v]) => v[1] > 0).sort((x, y) => y[1][1] - x[1][1]).map(([k, v]) => `${k} ${v[0]} logged, ${v[1]} not`);
+  driftSeen.clear();
+  if (rows.length) log(`npcDrift sampled (last 60 s, 1 in ${DRIFT_LOG.sample} of the chatty kinds): ${rows.join(' | ')}`);
+});
 onUi('npcDrift', (a, args) => {
   const r = args[0] && typeof args[0] === 'object' ? args[0] : {};
   let note = '';
   try { note = driftNote(a, r); } catch (e) { /* diagnostics only */ }
-  log(`npcDrift ${display(a)} ${String(r.kind).slice(0, 24)}: ${JSON.stringify(r).slice(0, 900)}${note}`);
+  const kind = String(r.kind).slice(0, 24);
+  const seen = driftSeen.get(kind) || [0, 0];
+  const sample = Number(DRIFT_LOG.sample) > 1 ? Math.round(Number(DRIFT_LOG.sample)) : 1;
+  const keep = sample === 1 || DRIFT_LOG.chatty.indexOf(kind) < 0 || (seen[0] + seen[1]) % sample === 0;
+  seen[keep ? 0 : 1]++;
+  driftSeen.set(kind, seen);
+  if (keep) log(`npcDrift ${display(a)} ${kind}: ${JSON.stringify(r).slice(0, 900)}${note}`);
   if (r.kind === 'heartbeat' && globalThis.__dboDoorSync) { try { globalThis.__dboDoorSync.heartbeat(a, r); } catch (e) { log('door sync failed', e.message); } }
 });
 // The staff trace (client staffHit.ts): a window the server opens for one player, by /staffdiag or at login while
@@ -7544,6 +7568,8 @@ const hostHold = (req, act) => {
   return HOST_COOLDOWN.holds(act, req, current, canDrive);
 };
 globalThis.__dboHostCooldown = HOST_COOLDOWN && { holds: hostHold, noteHandover: HOST_COOLDOWN.noteHandover, noteFight: HOST_COOLDOWN.noteFight };
+// Kept on globalThis so a hot reload does not lose the running minute's count
+const hostGrants = globalThis.__dboHostGrants || (globalThis.__dboHostGrants = { n: 0, actors: new Set() });
 const hostAttemptHook = (requesterId, actorId) => {
   const req = Number(requesterId) >>> 0;
   const act = Number(actorId) >>> 0;
@@ -7568,11 +7594,25 @@ const hostAttemptHook = (requesterId, actorId) => {
   if (HOST_COOLDOWN && typeof mp.getHoster === 'function') {
     queueMicrotask(() => { try { if ((mp.getHoster(act) >>> 0) === req) HOST_COOLDOWN.noteHandover(act); } catch (e) { /* the NPC is gone */ } });
   }
-  console.log(`[hostAttempt] Host of act=${act.toString(16)} for req=${req.toString(16)} passed policy`);
+  // One line per GRANTED attempt was 441.8/min at the Bruma event against 37.2 quiet, 11.9x, and it says nothing
+  // a count does not. The refusals above stay as they are: those are the diagnostic worth having, and they are
+  // already conditional. A summary once a minute keeps the volume visible (_work\perf-1031\NOTE.md).
+  // The grant itself is unchanged - this is the log only.
+  // Off globalThis rather than the const above, because hostcooldown-harness.js runs this hook as its own slice
+  // with a fixed set of stand-ins: a reference out of the slice throws there. Keep it self-contained.
+  const hg = globalThis.__dboHostGrants || (globalThis.__dboHostGrants = { n: 0, actors: new Set() });
+  hg.n++;
+  if (hg.actors.size < 4096) hg.actors.add(act);
   return true;
 };
 hostAttemptHook.__dbo = true;
 mp.onHostAttempt = hostAttemptHook;
+every('hostAttemptSummary', 60000, () => {
+  if (!hostGrants.n) return;
+  log(`hostAttempt: ${hostGrants.n} grant(s) in the last 60 s over ${hostGrants.actors.size} actor(s)`);
+  hostGrants.n = 0;
+  hostGrants.actors.clear();
+});
 
 // ---- mastery: the combat tiers reach the damage the target takes -------------------------------
 // The number is computed in C++ (TES5DamageFormula: weapon damage, the target's worn armour, the
