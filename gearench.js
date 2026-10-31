@@ -614,6 +614,8 @@ module.exports = (api) => {
     if (sec > 0) IMMUNE.set(tgt, now + (sec + Math.max(0, num(PVP.pvpParalysisImmuneSeconds, 15))) * 1000);
     return sec;
   };
-  return { weaponAttempt, playerParalysis, regenCap, staffSpellHit, landed, resistMult, healthPoints, regenOf, bonus, spellbreakerMult, backstabMult,
+  // A raised guard toward the attacker, as Spellbreaker reads it (gamemode.js shield elemental protection)
+  const guardFacing = (tgt, agg) => blocking(tgt) && facing(tgt, agg);
+  return { weaponAttempt, playerParalysis, regenCap, staffSpellHit, landed, resistMult, healthPoints, regenOf, bonus, spellbreakerMult, backstabMult, guardFacing,
     noteMax, _test: { wornOf, runnable, evalConds, planOf, heldSet, enchOf, mgefOf, razorImmune, dawnbreakerBurst, C } };
 };

@@ -1,5 +1,33 @@
 [
   {
+    "title": "PvP: warriors and archers stand a chance against mages",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Why",
+        "items": [
+          "A week of PvP showed a mage downing someone in about 5 seconds, a warrior in about 17, and a mage downing a heavily armoured player in under 3 seconds, because armour did nothing against spells. Archery caused almost no PvP downs. Magic is not made weaker by any of this: a mage against a mage, or against someone in robes or light armour, is exactly as before."
+        ]
+      },
+      {
+        "heading": "Against another player",
+        "items": [
+          "Heavy and medium armour now turns part of a spell, a staff's blast or a scroll: up to 35% for full heavy plate worn by a master of Defense, less for lighter sets, lower Defense or a partial set. Light armour and robes turn none.",
+          "Blocking with a shield toward a fire, frost or shock spell halves it, as the Block skill's Elemental Protection does.",
+          "Swords, axes, maces and other weapon blows land 25% harder, and arrows 35% harder. Spells, staves, fists and beast claws are unchanged."
+        ]
+      },
+      {
+        "heading": "Measured",
+        "items": [
+          "Every PvP hit is now logged with what turned it, so the next balance pass is measured, not guessed."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Blackreach chests and boss loot",
     "date": "2026-10-31",
     "version": "Server update",

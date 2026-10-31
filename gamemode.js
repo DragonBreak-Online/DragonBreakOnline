@@ -8494,6 +8494,53 @@ const defenseDamageMult = (targetId) => {
   const kept = (rating) => 1 - Math.min(rating * scale, cap) / 100;
   return kept(counted) / kept(bare);
 };
+// The plate turns the flame (Nat, 31 Oct; _work/pvp-balance-1031.md P1): between players, worn heavy and medium armour takes a
+// share off a spell's, a staff's or a scroll's blow, by its counted rating as the hit counts it (Defense tier, tempering, wear,
+// worn Fortify Armor): share x min(1, rating / fullAt), so full heavy plate at Master Defense turns the whole share. Light
+// pieces count only when armorWear names them medium (__dboArmourClassOf). It joins the target side under racial.js
+// reductionCap. Config "pvp.spellArmour": { enabled, share, fullAt }
+const PVP_SPELL_ARMOUR = Object.assign({ enabled: true, share: 0.35, fullAt: 300 }, (cfg.pvp || {}).spellArmour || {});
+const spellSourceCache = globalThis.__dboSpellSource instanceof Map ? globalThis.__dboSpellSource : (globalThis.__dboSpellSource = new Map());
+const isMagicSource = (src) => {
+  if (spellSourceCache.has(src)) return spellSourceCache.get(src);
+  const r = recordOf(src >>> 0); const t = r ? String(r.record.type) : '';
+  const yes = t === 'SPEL' || t === 'ENCH' || t === 'SCRL';
+  spellSourceCache.set(src, yes);
+  return yes;
+};
+const spellArmourRating = (targetId) => {
+  const pm = defensePieceMult(targetId), gm = gearArmorMult(targetId);
+  let counted = 0;
+  for (const w of wornWithHealth(targetId)) {
+    const p = armorPieceOf(w.baseId); if (!p || p.clothing) continue;
+    let klass = ''; try { klass = typeof globalThis.__dboArmourClassOf === 'function' ? String(globalThis.__dboArmourClassOf(w.baseId) || '') : ''; } catch (e) { klass = ''; }
+    if (p.heavy || klass === 'medium') counted += armorCountOf(p, w.health, w.cond, pm, gm);
+  }
+  return counted * (1 + potionBonus(targetId, 'armor'));
+};
+// A raised shield turns the elements (Nat, 31 Oct; P2, vanilla's Elemental Protection: blocking with a shield, 50% less fire,
+// frost and shock): a player blocking with a shield toward a player's fire, frost or shock spell takes pvp.shieldElements.mult of
+// it, read the way Spellbreaker reads the guard (gearench.js guardFacing). Joins the target side under racial.js reductionCap
+const PVP_SHIELD = Object.assign({ enabled: true, mult: 0.5 }, (cfg.pvp || {}).shieldElements || {});
+const shieldWorn = (a) => {
+  try {
+    const eq = mp.get(a, 'equipment'); const entries = eq && eq.inv && Array.isArray(eq.inv.entries) ? eq.inv.entries : [];
+    return entries.some((e) => { if (!e || !e.wornLeft) return false; const r = recordOf(Number(e.baseId) >>> 0); const b = r && String(r.record.type) === 'ARMO' ? fieldsOf(r, 'BOD2')[0] : null; return !!b && b.data.byteLength >= 4 && (u32At(b, 0) & 0x200) !== 0; });
+  } catch (e) { return false; }
+};
+const pvpShieldElementMult = (agg, tgt, src, flags) => {
+  if (!PVP_SHIELD.enabled || agg === tgt || !(flags && flags.spell) || profileOf(agg) < 0 || profileOf(tgt) < 0) return 1;
+  const res = sourceResistsOf(src >>> 0);
+  if (!Object.values(ELEMENT_RESIST).some((v) => res.has(v)) || !shieldWorn(tgt)) return 1;
+  try { if (!gearEnch || typeof gearEnch.guardFacing !== 'function' || !gearEnch.guardFacing(tgt, agg)) return 1; } catch (e) { return 1; }
+  return Math.max(0, Math.min(1, Number(PVP_SHIELD.mult)));
+};
+const pvpSpellArmourMult = (agg, tgt, src) => {
+  if (!PVP_SPELL_ARMOUR.enabled || agg === tgt || profileOf(agg) < 0 || profileOf(tgt) < 0 || !isMagicSource(src)) return 1;
+  let rating = 0; try { rating = spellArmourRating(tgt); } catch (e) { return 1; }
+  const share = Math.max(0, Math.min(0.9, Number(PVP_SPELL_ARMOUR.share) || 0));
+  return 1 - share * Math.min(1, rating / Math.max(1, Number(PVP_SPELL_ARMOUR.fullAt) || 300));
+};
 // Alteration's Flesh spells (Oakflesh 40, Stoneflesh 60, Ironflesh 80, Ebonyflesh 100, for 60 s) raise the caster's
 // armour rating while they last; the engine's hit formula (TES5DamageFormula) reads worn armour only, so they did nothing
 // server-side (Nate, 3 Oct: "they must count"). A self-delivered fire-and-forget spell whose visible effects raise
@@ -8590,7 +8637,15 @@ const fleshDamageMult = (targetId, sourceId) => {
 const rankHook = (hook, ...args) => { try { const m = typeof globalThis[hook] === 'function' ? Number(globalThis[hook](...args)) : 1; return Number.isFinite(m) && m > 0 ? m : 1; } catch (e) { return 1; } };
 const huntDamageMult = (agg, tgt) => rankHook('__dboHuntDamageMult', agg, tgt) * rankHook('__dboBloodDamageMult', agg, tgt);
 // Every player-on-player hit, after skills and armor; config "pvp": { "damageMult" }
-const PVP = Object.assign({ damageMult: 1 }, cfg.pvp || {});
+const PVP = Object.assign({ damageMult: 1, weaponMult: 1, arrowMult: 1 }, cfg.pvp || {});
+// Non-mages in PvP (Nat, 31 Oct: "do what you recommend"; _work/pvp-balance-1031.md P3, P4): a weapon's blow (Blade, Blunt)
+// and an arrow land harder between players, on top of damageMult; spells, staves, fists and a beast's claws keep damageMult alone
+const pvpSourceMult = (src, beast) => {
+  if (beast) return 1;
+  const skill = weaponSkillOf(src);
+  if (skill === 'blade' || skill === 'blunt') return Number(PVP.weaponMult) || 1;
+  return skill === 'archery' ? Number(PVP.arrowMult) || 1 : 1;
+};
 // A vampire burns under fire and silver, a werewolf in beast form under silver and poison (supernatural.js
 // __dboSuperDamageMult): the extra comes off after the engine's hit, measured from what landed once the mastery chain
 // (Defense, a blessing, the race, capped together at racial.js reductionCap) had its say. A weakness is a separate
@@ -9032,7 +9087,7 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     let beastAgg = false; try { const b = mp.get(agg, 'private.beast'); beastAgg = !!(b && b.form); } catch (e) { /* not an actor */ }
     // The target's side (Defense, a blessing, the race's resistance) is capped together: racial.js reductionCap
     // Worn resistances join the race's, a potion's and a blessing's under racial.js reductionCap (gearench.js resistMult)
-    let targetSide = defenseDamageMult(tgt) * fleshDamageMult(tgt, src) * blessingTargetMult(tgt, src) * potionResistMult(tgt, src) * gearResistMult(tgt, src);
+    let targetSide = defenseDamageMult(tgt) * fleshDamageMult(tgt, src) * blessingTargetMult(tgt, src) * potionResistMult(tgt, src) * gearResistMult(tgt, src) * pvpSpellArmourMult(agg, tgt, src) * pvpShieldElementMult(agg, tgt, src, flags);
     // Spellbreaker's ward while its wearer blocks a spell from the front (gearench.js), under the same cap as a racial ward
     try { if (gearEnch) targetSide *= gearEnch.spellbreakerMult(agg, tgt, src, dmg, flags); } catch (e) { log('spellbreaker failed', e.message); }
     // A Briarheart's poison and frost resistance and fire weakness (briarheart.js), under the same cap as the race's
@@ -9040,7 +9095,7 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     if (racial) { try { targetSide = racial.capTargetSide(targetSide * racial.targetMult(agg, tgt, src, dmg)); } catch (e) { log('racial target failed', e.message); } }
     let raceAtk = 1;
     if (racial && !beastAgg) { try { raceAtk = racial.attackMult(agg, tgt, src, dmg, flags); } catch (e) { log('racial attack failed', e.message); } }
-    let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * potionTakenMult(tgt, flags) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp;
+    let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * potionTakenMult(tgt, flags) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp * (agg !== tgt && profileOf(agg) >= 0 && profileOf(tgt) >= 0 ? pvpSourceMult(src, beastAgg) : 1);
     if (!beastAgg) mult *= gearAttackMult(agg, src);
     // A Hagraven's Destruction (hagraven.js), by her stage
     try { if (globalThis.__dboHagravenAttackMult) mult *= Number(globalThis.__dboHagravenAttackMult(agg, src)) || 1; } catch (e) { log('hagraven attack failed', e.message); }
@@ -9058,6 +9113,18 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     try { if (globalThis.__dboBossDamageMult) mult *= Number(globalThis.__dboBossDamageMult(agg, tgt)) || 1; } catch (e) { log('boss damage failed', e.message); }
     // An enemy of a claimed dungeon by the lease's difficulty, and any NPC's spell (npcDamage.byDifficulty, spellMult)
     mult *= npcDifficultyDamageMult(agg, tgt, dmg, flags);
+    // PvP measurement (Nat, 31 Oct; _work/pvp-balance-1031.md section 4): each player-on-player hit, with what the logs lacked:
+    // the target's spell reductions (armour, shield, worn and potion resists), the attacker's stamina on a power attack, and
+    // the attacker's rank in the skill that dealt it. Config pvp.logHits
+    if (PVP.logHits !== false && agg !== tgt && dmg > 0 && profileOf(agg) >= 0 && profileOf(tgt) >= 0) {
+      try {
+        const magic = isMagicSource(src >>> 0), skill = magic ? 'arcane' : (weaponSkillOf(src >>> 0) || 'other');
+        const rec = masteryOf(agg); const rank = rec && Array.isArray(rec.order) && rec.order.includes(skill) ? Number(((rec.skills || {})[skill] || {}).rank) || 0 : -1;
+        let sta = ''; if (flags && flags.power) { const pc = mp.get(agg, 'percentages'); sta = ` stamina=${pc ? Number(pc.stamina).toFixed(2) : '?'}`; }
+        const r = (x) => Number(x).toFixed(2);
+        log(`pvp hit ${display(agg)} -> ${display(tgt)} kind=${magic ? 'magic' : skill} rank=${skill}:${rank} dmg=${Number(dmg).toFixed(1)} mult=${r(mult)} armour=${r(pvpSpellArmourMult(agg, tgt, src))} shield=${r(pvpShieldElementMult(agg, tgt, src, flags))} resist=${r(gearResistMult(tgt, src) * potionResistMult(tgt, src))}${flags && flags.power ? ' power' : ''}${flags && flags.blocked ? ' blocked' : ''}${sta}`);
+      } catch (e) { /* the measurement is optional */ }
+    }
     // A family of creatures by race, on a player (npcToughness.kinds.<kind>.dealt; the draugr, 17 Oct)
     if (toughness) { try { mult *= toughness.dealtMult(agg, tgt, dmg); } catch (e) { log('toughness dealt failed', e.message); } }
     // A player's summon takes less by its owner's Conjuration rank (summonBuff.takenByTier)
