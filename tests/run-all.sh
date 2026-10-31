@@ -113,6 +113,7 @@ declare -A NEEDS=(
   [mastery-rate]=server:skymp5-server/ts/systems/masterySystem.ts
   [skill-waning]=server:skymp5-server/ts/systems/masterySystem.ts
   [summon-race]=server:skymp5-server/ts/systems/espmMagic.ts
+  [conjure-power]=server:skymp5-server/ts/systems/conjurationSystem.ts
   [spawn-refill]=server:skymp5-server/ts/systems/npcSpawnSystem.ts
   [spawn-slots]=server:skymp5-server/ts/systems/npcSpawnSystem.ts
   [spawn-heading]=server:skymp5-server/ts/systems/npcSpawnSystem.ts
