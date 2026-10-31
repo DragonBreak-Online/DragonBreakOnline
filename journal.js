@@ -133,6 +133,8 @@ module.exports = (api) => {
       if (top[0] && top[0].level >= min) out.push({ id: 'adventurer', label: `${rankWord(top[0].level, false)} ${TITLES.adventurer || 'Adventurer'}`, epithet: String((SKILLS.get(top[0].id) || {}).title || '') });
       else out.push({ id: 'wanderer', label: TITLES.wanderer || 'Wanderer', epithet: '' });
     }
+    // A month's honour the heralds named (heralds.js): a title of its own while it lasts
+    try { const h = typeof globalThis.__dboHonourTitles === 'function' ? globalThis.__dboHonourTitles(a) : []; for (const t of Array.isArray(h) ? h : []) if (t && t.id && t.label) out.push({ id: String(t.id), label: String(t.label), epithet: String(t.epithet || '') }); } catch (e) { /* no honours */ }
     return out;
   };
 
