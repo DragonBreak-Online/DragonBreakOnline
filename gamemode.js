@@ -6013,7 +6013,8 @@ const templeZoneOf = (a) => {
 };
 // ---- /unstuck: walk out to the respawn temple of the area you are in ------------------------------
 // Anyone, every 30 minutes and never in a fight, PvE included (Nate, 13 Oct)
-const UNSTUCK = Object.assign({ cooldownMinutes: 30, combatSeconds: 60 }, cfg.unstuck || {});
+// 35 minutes, and not for pvpSeconds after a PvP blow, the combat logout timer's 2 minutes (Nat, 31 Oct)
+const UNSTUCK = Object.assign({ cooldownMinutes: 35, combatSeconds: 60, pvpSeconds: 120 }, cfg.unstuck || {});
 const pvpAt = globalThis.__dboPvpAt = globalThis.__dboPvpAt || new Map(); // actorId -> last PvP hit given or taken
 // actorId -> last landed blow a player gave or took, NPCs included: rest.js keeps Sleep waiting its combatSeconds after one
 const combatAt = globalThis.__dboCombatAt = globalThis.__dboCombatAt || new Map();
@@ -6069,6 +6070,22 @@ const inLoginGrace = (a) => {
 };
 // Staff (admins, and Trial GMs since 12 Oct: TRIAL_CAN unstuck) skip the cooldown, the jail and the PvP wait, and may name
 // a player to send back: by is who typed it, a is who moves
+// The nearest town or village to a player, by its map marker (territories.json), in the world they stand in or last stood
+// outside of: { name, world, pos, rotZ }, or null (another world, no markers), when the temple is used as before
+const UNSTUCK_TOWNS = (() => { try { return (JSON.parse(fs.readFileSync(path.resolve('territories.json'), 'utf8')).territories || []).filter((x) => ['capital', 'town', 'village'].includes(x.kind) && x.marker && Array.isArray(x.marker.pos)); } catch (e) { log('unstuck: territories.json unreadable; the temple it is', e.message); return []; } })();
+globalThis.__dboUnstuckTown = (a) => {
+  let world = '', pos = null;
+  try { world = String(mp.get(a, 'worldOrCellDesc') || ''); pos = mp.get(a, 'pos'); } catch (e) { return null; }
+  if (!isWorldspace(world)) { const l = mp.get(a, 'private.lastOutside'); if (!l || !l.world || !Array.isArray(l.pos)) return null; world = String(l.world); pos = l.pos; }
+  if (!Array.isArray(pos)) return null;
+  let best = null, bestD = Infinity;
+  for (const x of UNSTUCK_TOWNS) {
+    if (normPlace(x.marker.world) !== normPlace(world)) continue;
+    const d = Math.hypot(x.marker.pos[0] - pos[0], x.marker.pos[1] - pos[1]);
+    if (d < bestD) { bestD = d; best = x; }
+  }
+  return best ? { name: best.name, world: best.marker.world, pos: best.marker.pos.slice(0, 3), rotZ: 0 } : null;
+};
 const unstuckActor = (a, by, refs = '') => {
   const admin = staffCan(by, 'unstuck');
   // Staff may move an offline character (Jake, 28 Oct): its temple comes from where it was saved, and only staff are told
@@ -6090,13 +6107,19 @@ const unstuckActor = (a, by, refs = '') => {
   const combatMs = (Number(UNSTUCK.combatSeconds ?? UNSTUCK.pvpCombatSeconds) || 0) * 1000;
   const fought = Date.now() - Math.max(pvpAt.get(a) || 0, combatAt.get(a >>> 0) || 0);
   if (!admin && fought < combatMs) return personal(by, `You cannot use /unstuck in combat. Try again in ${Math.ceil((combatMs - fought) / 1000)} seconds.`);
+  // Never a way out of a pursuit: a PvP blow keeps it shut as long as a logout would leave the body (Nat, 31 Oct)
+  const pvpMs = (Number(UNSTUCK.pvpSeconds) || 0) * 1000, sincePvp = Date.now() - (pvpAt.get(a) || 0);
+  if (!admin && sincePvp < pvpMs) return personal(by, `You cannot use /unstuck so soon after a fight with another player. Try again in ${Math.ceil((pvpMs - sincePvp) / 1000)} seconds.`);
   const last = Number(mp.get(a, 'private.unstuckAt')) || 0;
   const wait = last + UNSTUCK.cooldownMinutes * 60000 - Date.now();
   if (!admin && wait > 0) return personal(by, `/unstuck is ready again in ${Math.ceil(wait / 60000)} minute${Math.ceil(wait / 60000) === 1 ? '' : 's'}.`);
+  // A player's own: the nearest town (Nat, 31 Oct; the temple was a way out of a pursuit). Staff moves keep the temple
+  let town = null;
+  try { if (by === a && typeof globalThis.__dboUnstuckTown === 'function') town = globalThis.__dboUnstuckTown(a); } catch (e) { town = null; }
   // A place with no zone, or a zone with no temple, goes to Bruma's, as it always has
-  const found = templeZoneOf(a), fellBack = !found || !templeFor(found);
-  const zone = fellBack ? 'bruma' : found;
-  const t = templeFor(zone);
+  const found = templeZoneOf(a), fellBack = !town && (!found || !templeFor(found));
+  const zone = town ? town.name : fellBack ? 'bruma' : found;
+  const t = town || templeFor(zone);
   if (!t) return personal(by, 'There is no respawn point for this area. Ask a GM for help.');
   // Read before the move: read after it, every line named the respawn's world (the Bleak-Frost Mine report, 4 Oct)
   let from = '?';
@@ -6106,12 +6129,12 @@ const unstuckActor = (a, by, refs = '') => {
     mp.set(a, 'locationalData', { cellOrWorldDesc: t.world, pos: t.pos, rot: [0, 0, Number(t.rotZ) || 0] });
     if (by === a) mp.set(a, 'private.unstuckAt', Date.now()); else staffMoved(a);
   } catch (e) { log('unstuck failed', e.message); return personal(by, 'That did not work. Ask a GM for help.'); }
-  if (online) personal(a, by === a ? `You find your way back to safety. /unstuck is ready again in ${UNSTUCK.cooldownMinutes} minutes.` : `${display(by)} brings you back to safety.`);
+  if (online) personal(a, by === a ? `You find your way ${town ? `to ${town.name}` : 'back to safety'}. /unstuck is ready again in ${UNSTUCK.cooldownMinutes} minutes.` : `${display(by)} brings you back to safety.`);
   const why = fellBack ? ` (where it was resolves to no temple of its own, so Bruma's, as /unstuck always does there)` : '';
   if (by !== a) personal(by, online ? `${display(a)} is back at the ${zone} respawn${why}.`
     : `${display(a)} (offline, was in ${from}) will wake at the ${zone} respawn at their next login${why}.`);
   const off = online ? '' : ', offline';
-  audit(`UNSTUCK ${who(a)} from ${from} to the ${zone} respawn${by !== a ? ` by staff ${who(by)}${off}` : ''}${refs}${remoteBy()}`);
+  audit(`UNSTUCK ${who(a)} from ${from} to ${town ? town.name : `the ${zone} respawn`}${by !== a ? ` by staff ${who(by)}${off}` : ''}${refs}${remoteBy()}`);
 };
 // A late crash forgiveness (downed.js) puts a character back where they fell, which would undo a staff move (review U7)
 const staffMoved = (t) => { try { if (typeof globalThis.__dboDownedStaffMoved === 'function') globalThis.__dboDownedStaffMoved(t); } catch (e) { /* downed.js is optional */ } };

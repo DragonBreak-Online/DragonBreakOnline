@@ -1674,7 +1674,7 @@ gamemode.js <expr> 06af3bb2 parsed
 gamemode.js <expr> 81ff2a3c parsed
 gamemode.js READ 10c2287e clean
 gamemode.js WELL ecdbc739 clean
-gamemode.js UNSTUCK 5a11009e clean
+gamemode.js UNSTUCK 306aceb0 clean
 gamemode.js UNSTUCK cd5a4afa clean
 gamemode.js SKINNING-MISMATCH 25473bc6 clean
 gamemode.js BODY 5e5a70cb excluded

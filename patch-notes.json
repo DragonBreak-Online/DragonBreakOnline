@@ -1,5 +1,22 @@
 [
   {
+    "title": "/unstuck: the nearest town, and no way out of a fight",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "/unstuck",
+        "items": [
+          "/unstuck now takes you to the nearest town or village instead of the temple. Inside, it is the town nearest to where you last stood outside.",
+          "It can be used every 35 minutes per character (was 30).",
+          "It cannot be used for 2 minutes after a blow given or taken in a fight with another player, the same as the combat logout timer, so it is never a way out of a pursuit.",
+          "Staff moves are unchanged."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Vampires: the Feral hunger and Molag Bal's path",
     "date": "2026-10-31",
     "version": "Server update",
