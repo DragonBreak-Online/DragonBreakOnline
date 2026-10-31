@@ -120,7 +120,7 @@ module.exports = (api) => {
   };
   const waitLine = (a, st, now = Date.now()) => {
     const at = st && st.lost ? Number(st.lost[String(a >>> 0)]) || 0 : 0;
-    if (!at || now - at >= coolMs()) return '';
+    if (!at) return '';   // noteLosses has pruned a wait that has run out
     const days = Math.ceil((at + coolMs() - now) / 86400000);
     return `${nameOfActor(a)} left an office ${Math.floor((now - at) / 86400000)} day(s) ago. After losing an office, a character waits ${C.cooldownDays} days before taking another: ${days} more day(s).`;
   };
