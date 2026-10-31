@@ -146,3 +146,5 @@ DivineAndDaedricRobes.esp
 DragonBreak KotN Patch.esp
 MagicalBlackreach.esp
 DragonBreak Blackreach Actors-v2.esp
+mihailmmaminotaur.esp
+DragonBreak Minotaur Patch.esp
