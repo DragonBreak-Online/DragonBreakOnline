@@ -172,6 +172,7 @@ player-guilds.json
 # leadership.js: when each character holding two leadership seats was told to step down
 leadership-doubles.json
 leadership-cooldowns.json
+faction-violations.json
 guard-posts.json
 jail-doors.json
 bosses-state.json

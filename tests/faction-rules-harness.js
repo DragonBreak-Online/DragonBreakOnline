@@ -32,7 +32,7 @@ const names = { [LEAD]: 'Lead', [ALT1]: 'Alt One', [ALT2]: 'Alt Two', [OTHER]: '
   [MAGE]: 'Mage', [PRIMATE]: 'Primate', [KNIGHT]: 'Knight', [VIG]: 'Vigilant' };
 const PROFILE = { [ALT1]: 7, [ALT2]: 7 };   // two characters of one account; everyone else their own
 const chars = new Map(Object.entries(names).map(([k, v]) => [Number(k), v]));
-const said = [], commands = {}, handlers = {}, props = new Map();
+const said = [], commands = {}, handlers = {}, props = new Map(), packets = [];
 const api = {
   mp: { get: (id, k) => props.get(`${id}|${k}`), set: (id, k, v) => props.set(`${id}|${k}`, v) },
   log: () => {}, personal: (a, t) => said.push({ a, t }), system: () => {}, audit: () => {},
@@ -43,6 +43,7 @@ const api = {
   findByName: (q) => [...chars.entries()].find(([, n]) => n.toLowerCase() === String(q).toLowerCase())?.[0] || 0,
   who: (a) => `${chars.get(a)} (profile ${PROFILE[a] || a})`, cfg: CFG, profileOf: (a) => PROFILE[a] || a,
   accountActors: (pid) => [...chars.keys()].filter((a) => (PROFILE[a] || a) === pid),
+  sendPacket: (a, p) => packets.push([a, p]), violationSweep: false, violationsPath: path.join(dir, 'faction-violations.json'),
 };
 // The Jarl rules Whiterun (leadership.js's view of court offices)
 globalThis.__dboLeadershipOf = (a) => (a === JARL ? [{ kind: 'hold', id: 'whiterun', name: 'Jarl of Whiterun', actor: JARL }] : []);
@@ -114,6 +115,47 @@ r = invite(FIGHTER, ALT2, 'fighters-guild');
 ok('enabled false: the account rule is off', !r.error || !/same account/.test(r.error), r);
 r = invite(FIGHTER, JARL, 'fighters-guild');
 ok('...and the hold rule', !r.error || !/hold first/.test(r.error), r);
+
+// ---- the current breakers told to choose (Nat, 31 Oct: "tell them to pick one") ----------------------------------------
+{
+  // Live's three cases: a steward in the Dawnguard, two characters of one account in a faction; plus a Thief in a guild
+  load(CFG, {
+    dawnguard: { [JARL]: { rank: 3, name: 'Jarl', tag: 'T23', since: 1 } },
+    'college-of-whispers': { [ALT1]: { rank: 3, name: 'Alt One', tag: 'T20', since: 1 }, [ALT2]: { rank: 3, name: 'Alt Two', tag: 'T21', since: 1 } },
+    'thieves-guild': { [THIEF]: { rank: 3, name: 'Thief', tag: 'T24', since: 1 } },
+    'fighters-guild': { [THIEF]: { rank: 3, name: 'Thief', tag: 'T24', since: 1 } },
+  });
+  try { fs.rmSync(path.join(dir, 'faction-violations.json')); } catch (e) { /* none yet */ }
+  const list = globalThis.__dboFactionViolations();
+  const rules = list.map((v) => v.rule).sort().join();
+  ok('the three kinds of case are found: a hold leader elsewhere, an account twice in one faction, a secret member elsewhere', rules === 'account,hold,secret', list.map((v) => [v.rule, v.actors, v.fids]));
+  let now = Date.now(); const realNow = Date.now; Date.now = () => now;
+  said.length = 0; packets.length = 0;
+  globalThis.__dboFactionViolationSweep(now);
+  const toldTo = (a) => said.filter((x) => x.a === a).map((x) => x.t).join(' | ');
+  const due = new Date(now + 7 * 86400000).toISOString().slice(0, 10);
+  ok('the steward is told the rule, both ways out and a deadline 7 days on', /Faction rules now say that a hold's leader may keep only the hold and a college or a church\. You hold Jarl of Whiterun and serve the Dawnguard: step down from your office, or leave with \/faction leave <faction>, by /.test(toldTo(JARL)) && toldTo(JARL).includes(due) && /staff will settle it/.test(toldTo(JARL)), toldTo(JARL));
+  ok('...both characters of the account are told, naming the faction to leave', /one character per account may be in a faction\. Alt One and Alt Two are all in the College of Whispers: keep one there, the others leave with \/faction leave college-of-whispers/.test(toldTo(ALT1)) && toldTo(ALT2).length > 0, [toldTo(ALT1), toldTo(ALT2)]);
+  ok('...the Thief too', /You serve the Thieves Guild and the Fighters Guild: keep one with \/faction leave <faction>/.test(toldTo(THIEF)), toldTo(THIEF));
+  ok('...each by the banner as well', [JARL, ALT1, ALT2, THIEF].every((a) => packets.some(([x, p]) => x === a && p.customPacketType === 'dboBanner' && p.text.includes(due))), packets.map(([x, p]) => [x, p.customPacketType]));
+  said.length = 0; now += 3600000; globalThis.__dboFactionViolationSweep(now);
+  ok('not again an hour later', said.length === 0, said);
+  now += 5 * 3600000 + 1000; globalThis.__dboFactionViolationSweep(now);
+  ok('...but again after 6 hours, with the same deadline', toldTo(JARL).includes(due), toldTo(JARL));
+  ok('nobody is removed by any of it', inF('dawnguard', JARL) && inF('college-of-whispers', ALT1) && inF('college-of-whispers', ALT2) && inF('fighters-guild', THIEF));
+  // /faction leave by name settles a case at the next look
+  said.length = 0; const lv = chat(ALT2, 'leave College of Whispers');
+  ok('/faction leave <name> takes the character out', /You have left College of Whispers/.test(lv) && !inF('college-of-whispers', ALT2), lv);
+  now += 60000; globalThis.__dboFactionViolationSweep(now);
+  ok('...and the account case is gone at the next look, its record dropped', !globalThis.__dboFactionViolations().some((v) => v.rule === 'account') && !Object.keys(JSON.parse(fs.readFileSync(path.join(dir, 'faction-violations.json'), 'utf8'))).some((k) => k.startsWith('account:')));
+  // The staff readout
+  ok('/faction violations is staff only', /Staff only/.test(chat(FIGHTER, 'violations')));
+  now += 7 * 86400000;
+  chat(LEAD, 'violations');
+  const read = said.map((x) => x.t).join(' | ');
+  ok('/faction violations lists each case with when it was seen, its deadline, PAST once it has run out', /2 case\(s\)/.test(read) && /\[hold\] Jarl/.test(read) && /\[secret\] Thief/.test(read) && /deadline \d{4}-\d\d-\d\d \(PAST\)/.test(read), read);
+  Date.now = realNow;
+}
 
 // ---- the wait after losing an office (leadership.js) ----------------------------------------------------------------
 const COOL = path.join(dir, 'leadership-cooldowns.json');
