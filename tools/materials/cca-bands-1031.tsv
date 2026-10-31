@@ -1,0 +1,52 @@
+desc	edid	type	slot	keyword	family	tier	band	rating	target	value	targetValue	action
+000905:Common Clothes and Armors.esp	CCA_Steel_Salvaged	Heavy	body	ArmorMaterialSteel	steel	2	29-31	29	29	220	220	in band
+0008d3:Common Clothes and Armors.esp	CCA_Dwarven_Salvaged	Heavy	body	ArmorMaterialDwarven	dwarven	3	32-35	33	33	320	320	in band
+0008d4:Common Clothes and Armors.esp	CCA_Fur_Makeshift	Light	body	ArmorMaterialHide	hide	1	20-26	22	22	45	45	in band
+0008d5:Common Clothes and Armors.esp	CCA_Fur_RagsDark	Light	body	ArmorMaterialHide	hide	1	20-26	16	20	25	125	patch
+0008d6:Common Clothes and Armors.esp	CCA_Fur_RagsPale	Light	body	ArmorMaterialHide	hide	1	20-26	16	20	25	125	patch
+0008d7:Common Clothes and Armors.esp	CCA_Fur_RobesDark	Light	body	ArmorMaterialHide	hide	1	20-26	18	20	30	125	patch
+0008d8:Common Clothes and Armors.esp	CCA_Fur_RobesPale	Light	body	ArmorMaterialHide	hide	1	20-26	18	20	30	125	patch
+0008d9:Common Clothes and Armors.esp	CCA_Fur_Rugged	Light	body	ArmorMaterialHide	hide	1	20-26	22	22	45	45	in band
+0008da:Common Clothes and Armors.esp	CCA_Fur_TatteredDark	Light	body	ArmorMaterialHide	hide	1	20-26	22	22	45	45	in band
+0008db:Common Clothes and Armors.esp	CCA_Fur_TatteredPale	Light	body	ArmorMaterialHide	hide	1	20-26	22	22	45	45	in band
+0008dc:Common Clothes and Armors.esp	CCA_Fur_Vagabond	Light	body	ArmorMaterialHide	hide	1	20-26	18	20	30	125	patch
+0008dd:Common Clothes and Armors.esp	CCA_Hide_Furs	Light	body	ArmorMaterialHide	hide	1	20-26	24	24	65	65	in band
+0008de:Common Clothes and Armors.esp	CCA_Hide_FursStudded	Light	body	ArmorMaterialHide	hide	1	20-26	24	24	65	65	in band
+0008df:Common Clothes and Armors.esp	CCA_Hide_Scrap	Light	body	ArmorMaterialHide	hide	1	20-26	20	20	35	35	in band
+0008e0:Common Clothes and Armors.esp	CCA_Hide_ScrapFur	Light	body	ArmorMaterialHide	hide	1	20-26	21	21	40	40	in band
+0008e1:Common Clothes and Armors.esp	CCA_Hide_ScrapMakeshift	Light	body	ArmorMaterialHide	hide	1	20-26	21	21	40	40	in band
+0008e2:Common Clothes and Armors.esp	CCA_Hide_ScrapRobes	Light	body	ArmorMaterialHide	hide	1	20-26	21	21	40	40	in band
+0008e3:Common Clothes and Armors.esp	CCA_Hide_ScrapRugged	Light	body	ArmorMaterialHide	hide	1	20-26	21	21	40	40	in band
+0008e4:Common Clothes and Armors.esp	CCA_Hide_ScrapTattered	Light	body	ArmorMaterialHide	hide	1	20-26	20	20	35	35	in band
+0008e5:Common Clothes and Armors.esp	CCA_Hide_Vagabond	Light	body	ArmorMaterialHide	hide	1	20-26	19	20	30	125	patch
+0008e6:Common Clothes and Armors.esp	CCA_Hide_VagabondHeavyFurs	Light	body	ArmorMaterialHide	hide	1	20-26	25	25	80	80	in band
+0008e7:Common Clothes and Armors.esp	CCA_Hide_VagabondRobesDark	Light	body	ArmorMaterialHide	hide	1	20-26	19	20	30	125	patch
+0008e8:Common Clothes and Armors.esp	CCA_Hide_VagabondRobesPale	Light	body	ArmorMaterialHide	hide	1	20-26	19	20	30	125	patch
+0008e9:Common Clothes and Armors.esp	CCA_Hide_VagabondRoughspunTunic	Light	body	ArmorMaterialHide	hide	1	20-26	17	20	25	125	patch
+0008ea:Common Clothes and Armors.esp	CCA_Imperial_Tattered	Light	body	ArmorMaterialImperialLight	imperial	2	26-28	24	26	75	275	patch
+0008eb:Common Clothes and Armors.esp	CCA_Iron_DarkRobes	Heavy	body	ArmorMaterialIron	iron	1	25-28	23	25	120	125	patch
+0008ec:Common Clothes and Armors.esp	CCA_Iron_Furs	Heavy	body	ArmorMaterialIron	iron	1	25-28	26	26	115	115	in band
+0008ed:Common Clothes and Armors.esp	CCA_Iron_Makeshift	Heavy	body	ArmorMaterialIron	iron	1	25-28	26	26	115	115	in band
+0008ee:Common Clothes and Armors.esp	CCA_Iron_PaleRobes	Heavy	body	ArmorMaterialIron	iron	1	25-28	23	25	120	125	patch
+0008ef:Common Clothes and Armors.esp	CCA_Iron_Vagabond	Heavy	body	ArmorMaterialIron	iron	1	25-28	27	27	145	145	in band
+0008f0:Common Clothes and Armors.esp	CCA_Iron_VagabondBraced	Heavy	body	ArmorMaterialIron	iron	1	25-28	27	27	145	145	in band
+0008f1:Common Clothes and Armors.esp	CCA_Leather_Boiled	Light	body	ArmorMaterialLeather	leather	1	20-26	26.5	26	100	125	patch
+0008f2:Common Clothes and Armors.esp	CCA_Leather_Rugged	Light	body	ArmorMaterialLeather	leather	1	20-26	26	26	90	90	in band
+0008f3:Common Clothes and Armors.esp	CCA_Leather_RuggedDark	Light	body	ArmorMaterialLeather	leather	1	20-26	26	26	90	90	in band
+0008f4:Common Clothes and Armors.esp	CCA_Leather_RuggedPale	Light	body	ArmorMaterialLeather	leather	1	20-26	26	26	90	90	in band
+0008f5:Common Clothes and Armors.esp	CCA_Leather_Vagabond	Light	body	ArmorMaterialLeather	leather	1	20-26	26	26	90	90	in band
+0008f6:Common Clothes and Armors.esp	CCA_Mail_Hide	Light	body	ArmorMaterialStudded	steel	2	26-28	28.5	28	145	275	patch
+0008f7:Common Clothes and Armors.esp	CCA_Mail_HideOiled	Light	body	ArmorMaterialStudded	steel	2	26-28	28.5	28	145	275	patch
+0008f8:Common Clothes and Armors.esp	CCA_Mail_JackedLeather	Light	body	ArmorMaterialStudded	steel	2	26-28	29	28	160	275	patch
+0008f9:Common Clothes and Armors.esp	CCA_Mail_Jacket	Light	body	ArmorMaterialStudded	steel	2	26-28	30	28	190	275	patch
+0008fa:Common Clothes and Armors.esp	CCA_Mail_JacketOiled	Light	body	ArmorMaterialStudded	steel	2	26-28	30	28	190	275	patch
+0008fb:Common Clothes and Armors.esp	CCA_Mail_Robes	Light	body	ArmorMaterialStudded	steel	2	26-28	29	28	160	275	patch
+0008fc:Common Clothes and Armors.esp	CCA_Mail_RuggedLeather	Light	body	ArmorMaterialStudded	steel	2	26-28	29	28	160	275	patch
+0008fd:Common Clothes and Armors.esp	CCA_Mail_RuggedLeatherPauldrons	Light	body	ArmorMaterialStudded	steel	2	26-28	29	28	160	275	patch
+0008fe:Common Clothes and Armors.esp	CCA_Mail_Surcoat	Light	body	ArmorMaterialStudded	steel	2	26-28	29	28	160	275	patch
+0008ff:Common Clothes and Armors.esp	CCA_Mail_SurcoatLeather	Light	body	ArmorMaterialStudded	steel	2	26-28	29	28	160	275	patch
+000900:Common Clothes and Armors.esp	CCA_Mail_Tunic	Light	body	ArmorMaterialStudded	steel	2	26-28	28	28	140	140	in band
+000901:Common Clothes and Armors.esp	CCA_Mail_TunicOiled	Light	body	ArmorMaterialStudded	steel	2	26-28	28	28	140	140	in band
+000902:Common Clothes and Armors.esp	CCA_SteelPlate_Fur	Heavy	body	ArmorMaterialSteelPlate	steelplate	5	40-42	37	40	625	1300	patch
+000903:Common Clothes and Armors.esp	CCA_SteelPlate_RobesAndFur	Heavy	body	ArmorMaterialSteelPlate	steelplate	5	40-42	37	40	625	1300	patch
+000904:Common Clothes and Armors.esp	CCA_Steel_Braced	Heavy	body	ArmorMaterialSteel	steel	2	29-31	30	30	240	240	in band
