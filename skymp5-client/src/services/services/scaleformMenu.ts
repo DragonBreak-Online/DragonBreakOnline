@@ -51,6 +51,9 @@ export const NATIVE_CAPS = [
   // Worker 6's pigeon coop (dbo_pigeon, widget 34). All its keys are dbo:*, and its typed input goes back to
   // the browser coop with browser: 1, so the cap is the whole of the client's part.
   "native:pigeon",
+  // Worker 6's business ledger (dbo_ledger, widget 64: the public page and shop, the staff's tabs). Its keys are
+  // dbo:bizLedger and dbo:bizLedgerClose
+  "native:businessLedger",
 ];
 export const CAPS_RETRY_MS = 5000;
 
