@@ -2,6 +2,7 @@
 #include <catch2/catch_all.hpp>
 #include <chrono>
 
+#include "CropRegeneration.h"
 #include "GetBaseActorValues.h"
 #include "PacketParser.h"
 #include "libespm/Loader.h"
@@ -82,7 +83,7 @@ TEST_CASE("OnChangeValues call is cropping percentage values",
   float expectedHealth = baseValues.healRate * baseValues.healRateMult *
     elapsedTime.count() / 10000.0f;
   float expectedMagicka = baseValues.magickaRate * baseValues.magickaRateMult *
-    elapsedTime.count() / 10000.0f;
+    kMagickaRegenSlack * elapsedTime.count() / 10000.0f;
   float expectedStamina = baseValues.staminaRate * baseValues.staminaRateMult *
     elapsedTime.count() / 10000.0f;
 
@@ -313,7 +314,7 @@ TEST_CASE("A server stamina drain does not shrink the magicka allowance",
   std::chrono::duration<float> elapsedTime =
     std::chrono::steady_clock::now() - past;
   float expectedMagicka = 0.2f +
-    baseValues.magickaRate * baseValues.magickaRateMult *
+    baseValues.magickaRate * baseValues.magickaRateMult * kMagickaRegenSlack *
       elapsedTime.count() / 10000.0f;
 
   float magicka = ac.GetChangeForm().actorValues.magickaPercentage;
