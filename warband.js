@@ -707,6 +707,25 @@ module.exports = (api) => {
   // The charge looks again every 3 s; the body clock above has no need to
   if (typeof api.every === 'function') api.every('warbandCharge', 3000, () => { for (const gm of [...S.charging]) { try { chargePass(gm); } catch (e) { /* next pass */ } } });
   if (typeof api.every === 'function') api.every('warbandGuard', 2000, () => { for (const gm of [...S.guards.keys()]) { try { guardPass(gm); } catch (e) { /* next pass */ } } });
+  // Staff are never fought (Nat, 28 Oct: a GM's band kept swinging at another GM, every hit refused): each GM leading a band
+  // is told the staff online, companionSpare { ids }, when the list changes and at least every minute; the owner's client
+  // leaves any companion's own fight with one of them (client companionPvp.ts). A client without the handler ignores it
+  if (!(S.spareSent instanceof Map)) S.spareSent = new Map();   // GM actor -> { key, at }
+  const spareTick = () => {
+    if (typeof api.sendPacket !== 'function') return;
+    const online = onlineActors();
+    const staff = online.filter((x) => isAdmin(x)).map((x) => x >>> 0).sort((x, y) => x - y);
+    const key = staff.join(',');
+    const now = Date.now();
+    for (const gm of online) {
+      if (!band(gm).length) { S.spareSent.delete(gm >>> 0); continue; }
+      const last = S.spareSent.get(gm >>> 0);
+      if (last && last.key === key && now - last.at < 60000) continue;
+      try { api.sendPacket(gm, { customPacketType: 'companionSpare', ids: staff }); S.spareSent.set(gm >>> 0, { key, at: now }); } catch (e) { log('warband: spare packet failed', e.message); }
+    }
+  };
+  globalThis.__dboWarbandSpareTick = spareTick;
+  if (typeof api.every === 'function') api.every('warbandSpare', 10000, () => { try { spareTick(); } catch (e) { log('warband: spare failed', e.message); } });
 
   // gamemode.js hit hook, before companionSystem's: true refuses the hit. See the header for the rules.
   globalThis.__dboWarbandRefusesHit = (aggressorId, targetId) => {
