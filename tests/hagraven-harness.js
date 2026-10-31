@@ -159,6 +159,7 @@ const done = run('briarheart', REACHMAN, 'confirm forever') || run('briarheart',
 ok(/char20 presses the briar into your chest/.test(done), 'the Hagraven is the one who presses the briar in', done);
 ok(audits.some((t) => /took the briar heart at a Hagraven altar, from the Hagraven who20/.test(t)), 'the audit names her');
 ok(said.some(([a, t]) => a === WITCH && /You press the briar into char27's chest/.test(t)), 'and she is told');
+ok((P(REACHMAN, 'private.dboBriarheart') || {}).by === 'who20', 'the Briarheart\'s record names the Hagraven who made him', P(REACHMAN, 'private.dboBriarheart'));
 B.end(REACHMAN, 'test');
 B = loadB({ briarheart: { enabled: true, hagravenRequired: true } }); B.data();
 setP(WITCH, 'locationalData', { cellOrWorldDesc: WORLD, pos: [900, 0, 0], rot: [0, 0, 0] });
