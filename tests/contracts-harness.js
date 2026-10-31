@@ -377,7 +377,7 @@ const hunterBefore = goldOf(HUNTER);
 beast(0x910, 'wolf', 'Skyrim.esm:Tamriel');
 for (let i = 0; i < 5; i++) killOf(0x910, HUNTER);
 check('wolves felled in another hold do not count', (tk('13') || {}).progress === 0 && goldOf(HUNTER) === hunterBefore, JSON.stringify(tk('13')));
-beast(0x911, 'wolf', '1234:SomeCave.esp');
+beast(0x911, 'wolf', '1234:SomeCave.esp'); // verify-formids: ignore (a made-up cave for the test)
 for (let i = 0; i < 5; i++) killOf(0x911, HUNTER);
 check('...nor on ground no hold claims', (tk('13') || {}).progress === 0 && goldOf(HUNTER) === hunterBefore, JSON.stringify(tk('13')));
 beast(0x912, 'wolf');
@@ -510,6 +510,17 @@ check('dismiss is Lead GM and above', /'dismiss'/.test(leadOnly));
   await wait(500);
   check('payback: holdShare 0 claims nothing', claimed.length === 0, JSON.stringify(claimed));
   delete globalThis.__dboClaimPelts;
+  // A champion counts double by design (championWorth 2), and the hunter is told so (#bugs, 28 Oct: taken for a miscount)
+  clear(); inv(CHEST, 100); load(NOFLOOR);
+  run(COUNT, 'post wolf 3 24'); run(HUNTER, 'take 1');
+  beast(0x970, 'wolf'); set(0x970, 'private.dboChampion', true);
+  out.personal.length = 0;
+  killOf(0x970, HUNTER);
+  check('a champion counts for 2, and the progress line says why', out.personal.some((p) => p.a === HUNTER && /^Contract: 2\/3 wolves \(a champion counts for 2\)\.$/.test(p.t)), JSON.stringify(out.personal));
+  beast(0x971, 'wolf');
+  out.personal.length = 0;
+  killOf(0x971, HUNTER);
+  check('...a plain kill after it completes the 3 and says nothing of champions', out.personal.some((p) => p.a === HUNTER && /^Contract complete: 3 wolves\./.test(p.t)) && !out.personal.some((p) => /champion/.test(p.t)), JSON.stringify(out.personal));
   console.log(failures ? `${failures} failure(s)` : 'all passed');
   process.exit(failures ? 1 : 0);
 })();
