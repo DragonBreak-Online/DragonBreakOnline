@@ -5447,14 +5447,16 @@ globalThis.__dboReadBook = (targetId, casterId) => {
   let rec = null; try { rec = mp.lookupEspmRecordById(mp.getIdFromDesc(String(mp.get(targetId, 'baseDesc')))); } catch (e) { return false; }
   if (!rec || !rec.record || String(rec.record.type) !== 'BOOK') return false;
   const baseId = (() => { try { return mp.getIdFromDesc(String(mp.get(targetId, 'baseDesc'))) >>> 0; } catch (e) { return 0; } })();
-  // Bethesda's placeholder books (Skyrim.esm d7866 "Dummy Book": no name, no model) are no reading: copied, they were an
-  // invisible item shown as Unknown at the ledgers (22 Oct, #bugs "Dummy Books?")
-  if (/dummy|placeholder/i.test(String(rec.record.editorId || ''))) return false;
-  const title = humanize(rec.record.editorId);
+  // Bethesda's placeholder book (Skyrim.esm d7866 "Dummy Book", no name) fills shelves: 79 in Windhelm's bookshop, 118 in
+  // Kvatch's Coastal Curiosities. It reads like any book, under a plain title, but is never copied: a copy was an item shown
+  // as Unknown at the ledgers (22 Oct, #bugs "Dummy Books?"). Refusing the reading outright left those shelves dead (27 Oct,
+  // #bugs "Windhelm Bookstore books are NOT READABLE")
+  const placeholder = /dummy|placeholder/i.test(String(rec.record.editorId || ''));
+  const title = placeholder ? 'A Worn Book' : humanize(rec.record.editorId);
   // BOOK DATA flags (byte 0): 0x01 teaches a skill, 0x02 cannot be taken, 0x04 teaches a spell
   const bookData = (rec.record.fields || []).find((f) => f && f.type === 'DATA' && f.data instanceof Uint8Array && f.data.byteLength);
   // A smithing manual is never copied by the reading: its copies come from a Scholar who learned it (manuals.js)
-  const copyable = !!bookData && (bookData.data[0] & 0x07) === 0 && !(globalThis.__dboManualsIsManual && globalThis.__dboManualsIsManual(baseId));
+  const copyable = !placeholder && !!bookData && (bookData.data[0] & 0x07) === 0 && !(globalThis.__dboManualsIsManual && globalThis.__dboManualsIsManual(baseId));
   // Anyone may read; the work is banked toward Scholar until it is taken up, and reads at Novice until then
   const tier = Math.max(0, scholarTier(casterId));
   const deny = (text) => { if (Date.now() - (readDeny.get(casterId) || 0) > 1500) { readDeny.set(casterId, Date.now()); personal(casterId, text); } return true; };
@@ -9381,6 +9383,13 @@ try {
   delete require.cache[GRANDHEALING_JS];
   require(GRANDHEALING_JS)({ mp, log, recordOf, onlineActors, profileOf, display, cfg });
 } catch (e) { log('grandhealing.js failed to load:', e.stack || e.message); globalThis.__dboGrandHealCast = null; globalThis.__dboGrandHealHit = null; }
+
+// ---- /f and /p: word by runner to a faction and among a party (server\dispatches.js, config "dispatches") ----------
+try {
+  const DISPATCHES_JS = path.resolve('dispatches.js');
+  delete require.cache[DISPATCHES_JS];
+  require(DISPATCHES_JS)({ mp, log, personal, deliver, registerChatCommand, onlineActors, nameOf, zoneOfActor, cfg });
+} catch (e) { log('dispatches.js failed to load:', e.stack || e.message); }
 
 // ---- /monitor: the dbo-monitor service's view for staff (server\monitor.js; tooling/dbo-monitor) -----------------
 try {
