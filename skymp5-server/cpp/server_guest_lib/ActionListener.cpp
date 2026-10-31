@@ -2219,6 +2219,33 @@ void ActionListener::OnCustomEvent(const RawMessageData& rawMsgData,
   }
 }
 
+// The magicka slack lets a client regenerate past the server's own rate; one that stays past twice it for 10 reports
+// in a row is named for anticheat, at most once a minute
+void ActionListener::WatchMagickaRegen(MpActor* actor, float reported,
+                                       float held, float seconds,
+                                       SteadyTime now)
+{
+  constexpr float kWatchRatio = 2.f;
+  constexpr int kWatchStreak = 10;
+  constexpr auto kWatchEvery = std::chrono::seconds(60);
+  const float perSecond = MagickaRegenPerSecond(actor);
+  if (!(seconds > 0.5f) || !(perSecond > 0.f) || held >= 1.f) {
+    return;
+  }
+  const float ratio = (reported - held) / (perSecond * seconds);
+  auto& watch = regenWatch[actor->GetFormId()];
+  if (ratio <= kWatchRatio) {
+    watch.streak = 0;
+    return;
+  }
+  if (++watch.streak >= kWatchStreak && now - watch.loggedAt >= kWatchEvery) {
+    watch.loggedAt = now;
+    spdlog::info("[regen-watch] {:x} magicka rose at {:.1f}x the server's "
+                 "rate for {} reports in a row",
+                 actor->GetFormId(), ratio, watch.streak);
+  }
+}
+
 void ActionListener::OnChangeValues(const RawMessageData& rawMsgData,
                                     const ChangeValuesMessage& msg)
 {
@@ -2276,6 +2303,8 @@ void ActionListener::OnChangeValues(const RawMessageData& rawMsgData,
       newVal =
         CropHealthRegeneration(newVal, timeAfterHealthRegeneration, actor);
     } else if (av == espm::ActorValue::Magicka) {
+      WatchMagickaRegen(actor, newVal, currentVal,
+                        timeAfterMagickaRegeneration, now);
       newVal =
         CropMagickaRegeneration(newVal, timeAfterMagickaRegeneration, actor);
     } else if (av == espm::ActorValue::Stamina) {

@@ -83,7 +83,7 @@ TEST_CASE("OnChangeValues call is cropping percentage values",
   float expectedHealth = baseValues.healRate * baseValues.healRateMult *
     elapsedTime.count() / 10000.0f;
   float expectedMagicka = baseValues.magickaRate * baseValues.magickaRateMult *
-    kMagickaRegenSlack * elapsedTime.count() / 10000.0f;
+    p.worldState.magickaRegenSlack * elapsedTime.count() / 10000.0f;
   float expectedStamina = baseValues.staminaRate * baseValues.staminaRateMult *
     elapsedTime.count() / 10000.0f;
 
@@ -314,7 +314,8 @@ TEST_CASE("A server stamina drain does not shrink the magicka allowance",
   std::chrono::duration<float> elapsedTime =
     std::chrono::steady_clock::now() - past;
   float expectedMagicka = 0.2f +
-    baseValues.magickaRate * baseValues.magickaRateMult * kMagickaRegenSlack *
+    baseValues.magickaRate * baseValues.magickaRateMult *
+      partOne.worldState.magickaRegenSlack *
       elapsedTime.count() / 10000.0f;
 
   float magicka = ac.GetChangeForm().actorValues.magickaPercentage;

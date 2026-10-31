@@ -24,6 +24,20 @@ float GetServerRegenMultiplier(MpActor* actor)
   return worldState ? worldState->regenerationMultiplier : 1.f;
 }
 
+// Live clients regenerated magicka at 1.3 to 3 times the server's rate (perks and worn enchantments the server does
+// not model), and 25-60% of each tick was clawed back (31 Oct). The slack scales the rate, so a 0 mult still freezes
+float GetMagickaRegenSlack(MpActor* actor)
+{
+  auto worldState = actor->GetParent();
+  return worldState ? std::max(1.f, worldState->magickaRegenSlack) : 1.f;
+}
+
+float MagickaRateOf(MpActor* actor, const BaseActorValues& baseValues)
+{
+  return std::max(baseValues.magickaRate, actor->GetActorValues().magickaRate) *
+    GetServerRegenMultiplier(actor);
+}
+
 // The rate mult the ceiling should use.
 //
 // This was std::max(base, current), which floored the ceiling at the race's base and so made every debuff
@@ -113,8 +127,7 @@ float CropMagickaRegeneration(float newAttributeValue,
   const BaseActorValues baseValues = GetValues(actor);
   const ActorValues& actorValues = actor->GetActorValues();
   const float rate =
-    std::max(baseValues.magickaRate, actorValues.magickaRate) *
-    GetServerRegenMultiplier(actor) * kMagickaRegenSlack;
+    MagickaRateOf(actor, baseValues) * GetMagickaRegenSlack(actor);
   const float rateMult =
     ResolveRateMult(actorValues.magickaRateMult, baseValues.magickaRateMult);
   const float oldPercentage = actorValues.magickaPercentage;
@@ -138,6 +151,15 @@ float CropStaminaRegeneration(float newAttributeValue,
   const bool hasActiveMagicEffects = !actor->GetActiveMagicEffects().Empty();
   return CropRegeneration(newAttributeValue, secondsAfterLastRegen, rate,
                           rateMult, oldPercentage, hasActiveMagicEffects);
+}
+
+float MagickaRegenPerSecond(MpActor* actor)
+{
+  const BaseActorValues baseValues = GetValues(actor);
+  const float rateMult = ResolveRateMult(actor->GetActorValues().magickaRateMult,
+                                         baseValues.magickaRateMult);
+  return MathUtils::PercentToFloat(MagickaRateOf(actor, baseValues)) *
+    MathUtils::PercentToFloat(rateMult);
 }
 
 float CropPeriodAfterLastRegen(float secondsAfterLastRegen,

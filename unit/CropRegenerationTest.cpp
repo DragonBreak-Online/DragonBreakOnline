@@ -128,7 +128,7 @@ TEST_CASE("CropHealthRegeneration, CropMagickaRegeneration and "
   float expectedHealth =
     baseValues.healRate * baseValues.healRateMult * time / 10000.0f;
   float expectedMagicka = baseValues.magickaRate * baseValues.magickaRateMult *
-    kMagickaRegenSlack * time / 10000.0f;
+    p.worldState.magickaRegenSlack * time / 10000.0f;
   float expectedStamina =
     baseValues.staminaRate * baseValues.staminaRateMult * time / 10000.0f;
 
@@ -249,10 +249,16 @@ TEST_CASE("The magicka ceiling leaves room for a client's own boosts, and a 0 ra
   REQUIRE(base.magickaRate > 0.f);
   REQUIRE(base.magickaRateMult > 0.f);
 
-  // A Recovery-perked mage: 2.5 times the base rate for one second
-  const float boosted = .5f + 2.5f * base.magickaRate * base.magickaRateMult / 10000.f;
+  // The default slack, and a Recovery-perked mage at 2.2 times the base rate for one second
+  REQUIRE(p.worldState.magickaRegenSlack == 2.5f);
+  const float boosted = .5f + 2.2f * base.magickaRate * base.magickaRateMult / 10000.f;
   ac.SetActorValue(espm::ActorValue::MagickaRateMult_or_CombatHealthRegenMultPowerMod, base.magickaRateMult);
   REQUIRE_THAT(CropMagickaRegeneration(boosted, 1.0f, &ac), Catch::Matchers::WithinAbs(boosted, 1e-6));
+
+  // server-settings magickaRegenSlack 1 is the old ceiling
+  p.worldState.magickaRegenSlack = 1.f;
+  REQUIRE(CropMagickaRegeneration(boosted, 1.0f, &ac) < boosted);
+  p.worldState.magickaRegenSlack = 2.5f;
 
   // Far past the slack is still cropped
   const float cheat = .5f + 10.f * base.magickaRate * base.magickaRateMult / 10000.f;
