@@ -715,6 +715,21 @@ module.exports = (api) => {
     personal(a, `War is ${C.enabled ? 'open' : 'closed (war.enabled is off)'}. Staff: /war owner <territory> <faction id>, /war end <war id>, /war seat <faction id> [clear | <territory id>]`);
   }, { admin: true, help: '[owner <territory> <faction> | end <id> | seat <faction> [clear | <territory>]] territories, owners, wars and capitals' });
 
+  // ---- the realm's places on Skyrim's own M map (_work/mmap-build-1026.md) --------------------------------------------------
+  // map-markers.json lists the map marker that stands for each place ({ id, kind, name, desc }); the client reveals each with
+  // addToMap and draws the legend (mapRealmService). It is sent once per connection, when the client announces its caps.
+  const MAP_KIND = { capital: 'seat', town: 'town', village: 'village', fort: 'fort', stronghold: 'stronghold', boss: 'boss' };
+  const mapMarkers = () => {
+    let file;
+    try { file = JSON.parse(fs.readFileSync(path.resolve('map-markers.json'), 'utf8')); } catch (e) { return []; }
+    return (Array.isArray(file.markers) ? file.markers : []).filter((m) => m && MAP_KIND[m.kind] && typeof m.desc === 'string' && m.name)
+      .map((m) => ({ desc: m.desc, kind: MAP_KIND[m.kind], name: String(m.name) }));
+  };
+  onUi('uiCaps', (a) => {
+    const markers = mapMarkers();
+    if (markers.length) sendPacket(a, { customPacketType: 'dboMapRealm', markers });
+  });
+
   every('realm', C.tickMs, () => { try { tick(); } catch (e) { log('realm: tick failed', e.message); } });
   log(`realm loaded: ${territories().length} territories, ${live().length} war(s) under way, war ${C.enabled ? 'OPEN' : 'closed (war.enabled false)'}`);
   return { declare, startWar, endWar, answerDeath, proposePeace, answerPeace, surrender, tick, ownerOf, territoryAt, realmView, declareRefusal, windowChoices, setOwner, offerTreaty, answerTreaty, seatOf, musterRefusal, setCapital, holdCapital };
