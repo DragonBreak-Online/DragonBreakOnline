@@ -99,7 +99,7 @@ const ACCESS = E('owner', 'key', 'assignee', 'shared', 'manager', 'staff', 'lock
 const TIER = E('senior', 'developer', 'leadgm', 'gm', 'trialgm', 'none');
 const SIDE = O({ hits: 'int', dmg: 'num', by: A(NAME, 8) });
 const REFUSAL_REASONS = ['god', 'ethereal', 'offline_body', 'login_grace', 'bound', 'paralysed', 'armour_change', 'damage_cap',
-  'spell_rate', 'dungeon_ally', 'briarheart_spared', 'warband', 'companion_pvp', 'silver', 'recovering', 'downed', 'shout_not_given',
+  'spell_rate', 'dungeon_ally', 'briarheart_spared', 'warband', 'party_companion', 'companion_pvp', 'silver', 'recovering', 'downed', 'shout_not_given',
   'friendly_lethal', 'duel_pause', 'duel_rules', 'duel_beaten', 'duel_scaled', 'duel_outsider', 'anticheat', 'asylum', 'in_editor', 'silver_test', 'frenzy_downed', 'frenzy_spared', 'unknown'];
 
 // The anticheat kinds a sec.signal may carry (anticheat.js acFlag and the fork's onAnticheat through it; ANTI-CHEAT DESIGN

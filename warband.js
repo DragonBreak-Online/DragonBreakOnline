@@ -753,21 +753,36 @@ module.exports = (api) => {
   // The charge looks again every 3 s; the body clock above has no need to
   if (typeof api.every === 'function') api.every('warbandCharge', 3000, () => { for (const gm of [...S.charging]) { try { chargePass(gm); } catch (e) { /* next pass */ } } });
   if (typeof api.every === 'function') api.every('warbandGuard', 2000, () => { for (const gm of [...S.guards.keys()]) { try { guardPass(gm); } catch (e) { /* next pass */ } } });
-  // Staff are never fought (Nat, 28 Oct: a GM's band kept swinging at another GM, every hit refused): each GM leading a band
-  // is told the staff online, companionSpare { ids }, when the list changes and at least every minute; the owner's client
-  // leaves any companion's own fight with one of them (client companionPvp.ts). A client without the handler ignores it
-  if (!(S.spareSent instanceof Map)) S.spareSent = new Map();   // GM actor -> { key, at }
+  // Who a player's companions never fight, companionSpare { ids }, sent to each owner when the list changes and at least
+  // every minute; the owner's client leaves any companion's own fight with one of them, whatever its kind (client
+  // companionPvp.ts, from client-final-1026; an older client ignores it). One sender, as the client keeps the last list:
+  //   - the owner's own companions, their party members and those members' companions (Nat, 31 Oct: "make sure party
+  //     summons can't fight each other"; the hit chain refuses those blows, gamemode.js partyCompanionSpares);
+  //   - for a GM leading a band, the staff online too (Nat, 28 Oct: a GM's band kept swinging at another GM).
+  if (!(S.spareSent instanceof Map)) S.spareSent = new Map();   // owner actor -> { key, at }
+  const companionsOf = (a) => { try { return (comp().list(a) || []).map((c) => c.id >>> 0); } catch (e) { return []; } };
+  const leaderOf = (a) => { try { const l = typeof globalThis.__dboPartyLeaderOf === 'function' ? globalThis.__dboPartyLeaderOf(a) : null; return l === undefined ? null : l; } catch (e) { return null; } };
   const spareTick = () => {
-    if (typeof api.sendPacket !== 'function') return;
-    const online = onlineActors();
-    const staff = online.filter((x) => isAdmin(x)).map((x) => x >>> 0).sort((x, y) => x - y);
-    const key = staff.join(',');
+    if (typeof api.sendPacket !== 'function' || !comp()) return;
+    const online = onlineActors().map((x) => x >>> 0);
+    const staff = online.filter((x) => isAdmin(x));
+    const owned = new Map(online.map((x) => [x, companionsOf(x)]));
+    const byParty = new Map();
+    for (const x of online) { const l = leaderOf(x); if (l !== null) { if (!byParty.has(l)) byParty.set(l, []); byParty.get(l).push(x); } }
     const now = Date.now();
-    for (const gm of online) {
-      if (!band(gm).length) { S.spareSent.delete(gm >>> 0); continue; }
-      const last = S.spareSent.get(gm >>> 0);
+    for (const a of online) {
+      const mine = owned.get(a);
+      if (!mine.length) { S.spareSent.delete(a); continue; }
+      const l = leaderOf(a);
+      const mates = l === null ? [] : (byParty.get(l) || []).filter((x) => x !== a);
+      const ids = new Set(mine);
+      for (const m of mates) { ids.add(m); for (const c of owned.get(m) || []) ids.add(c); }
+      if (band(a).length) for (const s of staff) ids.add(s);
+      const list = [...ids].sort((x, y) => x - y);
+      const key = list.join(',');
+      const last = S.spareSent.get(a);
       if (last && last.key === key && now - last.at < 60000) continue;
-      try { api.sendPacket(gm, { customPacketType: 'companionSpare', ids: staff }); S.spareSent.set(gm >>> 0, { key, at: now }); } catch (e) { log('warband: spare packet failed', e.message); }
+      try { api.sendPacket(a, { customPacketType: 'companionSpare', ids: list }); S.spareSent.set(a, { key, at: now }); } catch (e) { log('warband: spare packet failed', e.message); }
     }
   };
   globalThis.__dboWarbandSpareTick = spareTick;

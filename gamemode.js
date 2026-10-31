@@ -8745,6 +8745,26 @@ const potionPoisonHit = (agg, tgt, src, dmg, flags) => {
 };
 // An enchanted weapon's effects on a landed blow (gearench.js weaponAttempt); never fails the hit
 const gearWeaponHit = (agg, tgt, src, dmg, flags) => { try { if (gearEnch && dmg > 0) gearEnch.weaponAttempt(agg, tgt, src, dmg, flags); } catch (e) { log('gear enchantment failed', e.message); } };
+// The player a companion (any kind: a summon, a raised corpse, a follower, a GM's band) fights for, from ff_companionOf
+const playerSideOf = (a) => {
+  if (profileOf(a) >= 0) return a;
+  try { const o = Number(mp.get(a, 'ff_companionOf')) >>> 0; return o && profileOf(o) >= 0 ? o : 0; } catch (e) { return 0; }
+};
+// One party (dungeons.js parties) or one owner: a companion of either never hurts the other side or what fights for it
+// (Nat, 31 Oct: "make sure party summons can't fight each other"). The live log of 29-31 Oct had 421 companion-on-companion
+// blows of one owner and 220 of two owners, each a fight the AI kept on while the fork refused it. Two players in a duel
+// fight with all they have (duel.js). Config companions.partySpare false turns it off.
+const partyCompanionSpares = (agg, tgt) => {
+  if (agg === tgt || profileOf(agg) >= 0 || (cfg.companions || {}).partySpare === false) return false;
+  const a = playerSideOf(agg); if (!a) return false;
+  const t = playerSideOf(tgt); if (!t) return false;
+  if (a === t) return true;
+  try { if (typeof globalThis.__dboDuelPair === 'function' && globalThis.__dboDuelPair(a, t)) return false; } catch (e) { /* duel.js not loaded */ }
+  let la = null, lt = null;
+  try { la = typeof globalThis.__dboPartyLeaderOf === 'function' ? globalThis.__dboPartyLeaderOf(a) : null; lt = la === null || la === undefined ? null : globalThis.__dboPartyLeaderOf(t); } catch (e) { return false; }
+  return la !== null && la !== undefined && la === lt;
+};
+globalThis.__dboPartyCompanionSpares = partyCompanionSpares;
 const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => {
   const agg = Number(aggressorId) >>> 0;
   const tgt = Number(targetId) >>> 0;
@@ -8823,6 +8843,9 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
   globalThis.__dboHitRefusal = 'warband';
   try { if (agg !== tgt && typeof globalThis.__dboWarbandRefusesHit === 'function' && globalThis.__dboWarbandRefusesHit(agg, tgt)) return false; } catch (e) { log('warband hit check failed', e.message); }
   // 2e. An accepted silver test's strike gives its result and lands no damage (silvertest.js)
+  // 2d'. A companion never hurts its own owner's side or a party member's, nor what fights for them (partyCompanionSpares)
+  globalThis.__dboHitRefusal = 'party_companion';
+  if (dmg > 0 && partyCompanionSpares(agg, tgt)) return false;
   globalThis.__dboHitRefusal = 'silver_test';
   try { if (agg !== tgt && typeof globalThis.__dboSilverTestStrike === 'function' && globalThis.__dboSilverTestStrike(agg, tgt, src, dmg, flags)) return false; } catch (e) { log('silver test hit failed', e.message); }
   // past the gameplay's own gates: a refusal from here on is the fork chain's or the summon guard's, unnamed
@@ -8942,6 +8965,7 @@ const companionRefusalWhy = (agg, tgt) => {
   if ((paralysedUntil.get(agg) || 0) > Date.now()) why.push('paralysed');
   try { if (dungeonAllies(agg, tgt)) why.push('dungeon allies'); } catch (e) { /* ignore */ }
   try { if (typeof globalThis.__dboWarbandRefusesHit === 'function' && globalThis.__dboWarbandRefusesHit(agg, tgt)) why.push('warband'); } catch (e) { /* ignore */ }
+  try { if (partyCompanionSpares(agg, tgt)) why.push('one party or owner'); } catch (e) { /* ignore */ }
   const side = Number(get(tgt, 'ff_companionOf')) >>> 0;
   const tag = String(get(tgt, 'private.npcSpawner') || '');
   const target = `target ${tgt.toString(16)} ${String(get(tgt, 'baseDesc') || '?')}${tag ? ' ' + tag : ''}${side ? ` fights for ${side.toString(16)}` : ''}${get(tgt, 'isDead') === true ? ' DEAD' : ''}`;
