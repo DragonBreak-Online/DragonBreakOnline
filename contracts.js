@@ -545,7 +545,9 @@ module.exports = (api) => {
       counted++;
       if (counted === 1) claimForHold(npcId, w.zone, killerId);
       w.progress = (Number(w.progress) || 0) + worth;
-      if (w.progress < w.count) { personal(killerId, `Contract: ${w.progress}/${w.count} ${plural(w.kind)}.`); continue; }
+      // A champion counts double by design (championWorth); said, so it is not taken for a miscount (#bugs, 28 Oct)
+      const champ = worth > 1 ? ` (a champion counts for ${worth})` : '';
+      if (w.progress < w.count) { personal(killerId, `Contract: ${w.progress}/${w.count} ${plural(w.kind)}${champ}.`); continue; }
       const zone = zoneById(w.zone);
       // The hunter's share was set aside when they took the notice; a copy that holds none (one migrated while the
       // treasury was short) is paid now if the hold can, else it waits
