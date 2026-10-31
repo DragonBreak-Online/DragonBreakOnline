@@ -88,6 +88,11 @@ The other names `gfxfontlib.swf` exports are `$DragonFont`, `$SkyrimBooks`, `$Ha
   - Rows are left-aligned. Only messagebox-style buttons are centred.
   - A number key hint (`1`, `2`, `3`) goes left of the row in `$EverywhereBoldFont` 20 in `C_SECOND`.
 - **DBO:** at most 9 rows on screen. Longer lists scroll by a page (PAGE_UP/PAGE_DOWN) and by the wheel, as BSScrollingList does.
+- **DBO (Nat, 31 Oct):** every scrolling list also carries the draggable scrollbar from `lib/dbo-scroll.as`:
+  - **Setup:** add `dbo-scroll.as` to the menu's `lib.txt` and call `scrollbar(parent, name, depth, x, y, h, area)` at the list's right edge.
+  - **Look:** 6 px wide, a stone track at 60 %, an aqua thumb sized to the visible share (24 px at least).
+  - **Input:** drag the thumb, click the track to page, wheel over `area`.
+  - **Wiring:** call `bar.set(total, visible, offset)` after each redraw; `bar.onScroll(offset)` is the panel's, called only on a change. The bar hides when the list fits.
 
 ## 6. Motion
 
