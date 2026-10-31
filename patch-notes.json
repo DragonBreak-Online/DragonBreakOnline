@@ -1,5 +1,21 @@
 [
   {
+    "title": "Grand Healing reaches the people around you",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Restoration",
+        "items": [
+          "Grand Healing now heals every hurt player within about 8.5 metres of you (600 units), not only those a step or two away.",
+          "Each player is healed once per cast, by the spell's 200 health; you heal yourself as before.",
+          "Vampires still cannot be healed by it, and someone who is down still needs to be raised."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Closed helmets and masks hide your face",
     "date": "2026-10-31",
     "version": "Server update",
