@@ -41,6 +41,16 @@ module.exports = (api) => {
   const dead = (a) => { try { return mp.get(a, 'isDead') === true; } catch (e) { return true; } };
   const downed = (a) => { try { return typeof globalThis.__dboIsDowned === 'function' && !!globalThis.__dboIsDowned(a); } catch (e) { return false; } };
   const beastFormOf = (a) => { try { const b = mp.get(a, 'private.beast'); return b && b.form ? String(b.form) : null; } catch (e) { return null; } };
+  // A vampire's Feral (vampirepath.js, Nat 31 Oct) is the same frenzy in mortal shape: kind 'vampire', held while they are one
+  const isVampire = (a) => { try { return typeof globalThis.__dboSuperKind === 'function' && globalThis.__dboSuperKind(a) === 'vampire'; } catch (e) { return false; } };
+  const stillKind = (w, kind) => (kind === 'vampire' ? isVampire(w) : beastFormOf(w) === 'werewolf');
+  const WORDS = {
+    werewolf: { start: 'The beast\'s hunger swallows you whole. You are no longer in command of your body.', end: 'The frenzy drains out of you. Your limbs are heavy, and your breath will be slow to come back.',
+      fell: 'the werewolf fell', out: 'out of the beast', killed: 'killed in a werewolf frenzy', downedR: 'downed someone in a werewolf frenzy', killedR: 'killed someone in a werewolf frenzy', kill: 'werewolf frenzy' },
+    vampire: { start: 'The thirst takes you. You are no longer in command of your body.', end: 'The red haze lifts. You are sated and slow, and your breath will be slow to come back.',
+      fell: 'the vampire fell', out: 'no longer a vampire', killed: 'killed by a feral vampire', downedR: 'downed someone while feral', killedR: 'killed someone while feral', kill: 'feral vampire' },
+  };
+  const words = (kind) => WORDS[kind === 'vampire' ? 'vampire' : 'werewolf'];
   const sideOf = (a) => { try { const o = Number(mp.get(a, 'ff_companionOf')) >>> 0; return o || a; } catch (e) { return a; } };
   const partyOf = (a) => { try { return typeof globalThis.__dboPartyLeaderOf === 'function' ? globalThis.__dboPartyLeaderOf(a) : null; } catch (e) { return null; } };
   const sameParty = (a, b) => { const p = partyOf(a); return p !== null && p !== undefined && p === partyOf(b); };
@@ -109,24 +119,30 @@ module.exports = (api) => {
     return true;
   };
 
-  const start = (w, by) => {
+  // opts.kind: 'werewolf' (in beast form) or 'vampire' (any shape); unnamed, whichever the player is. opts.seconds: the
+  // vampire's Feral sets its own length
+  const start = (w, by, opts) => {
     w = Number(w) >>> 0;
+    const o = opts || {};
     if (S.active.has(w)) return 'already in a frenzy';
-    if (beastFormOf(w) !== 'werewolf') return 'not in beast form';
+    const kind = o.kind || (beastFormOf(w) === 'werewolf' ? 'werewolf' : isVampire(w) ? 'vampire' : '');
+    if (kind === 'werewolf' && beastFormOf(w) !== 'werewolf') return 'not in beast form';
+    if (kind === 'vampire' && !isVampire(w)) return 'not a vampire';
+    if (!kind) return 'not in beast form';
     if (dead(w) || downed(w)) return 'down or dead';
     const lo = Math.max(1, Number(C.minSeconds) || 20), hi = Math.max(lo, Number(C.maxSeconds) || lo);
-    const secs = Math.round(lo + Math.random() * (hi - lo));
-    const f = { at: Date.now(), until: Date.now() + secs * 1000, target: 0, skip: new Set(), targets: new Set(), acked: false, by: by || 'the beast', downed: new Map(), falls: 0 };
+    const secs = Number(o.seconds) > 0 ? Math.round(Number(o.seconds)) : Math.round(lo + Math.random() * (hi - lo));
+    const f = { kind, at: Date.now(), until: Date.now() + secs * 1000, target: 0, skip: new Set(), targets: new Set(), acked: false, by: by || (kind === 'vampire' ? 'the thirst' : 'the beast'), downed: new Map(), falls: 0 };
     const t = pickTarget(w, f.skip);
     if (!t) { log(`frenzy: ${display(w)} would frenzy but nothing is in reach`); return 'nothing in reach'; }
     f.target = t; f.targets.add(t);
     S.active.set(w, f);
     S.cooldown.set(pidOf(w), Date.now() + Math.max(0, Number(C.cooldownMinutes) || 0) * 60000);
     send(w, f);
-    const text = 'The beast\'s hunger swallows you whole. You are no longer in command of your body.';
+    const text = words(kind).start;
     sendPacket(w, { customPacketType: 'dboBanner', text, seconds: 4 });
     personal(w, text);
-    audit(`FRENZY ${who(w)} for ${secs} s, first on ${who(t)} (${f.by})`);
+    audit(`FRENZY ${who(w)} for ${secs} s, first on ${who(t)} (${f.by}${kind === 'vampire' ? ', feral vampire' : ''})`);
     return '';
   };
   const end = (w, why) => {
@@ -138,9 +154,11 @@ module.exports = (api) => {
     if (real) {
       S.exhausted.set(w, Date.now() + Math.max(0, Number(C.exhaustedMinutes) || 0) * 60000);
       try { if (typeof globalThis.__dboNeedsRefresh === 'function') globalThis.__dboNeedsRefresh(w); } catch (e) { /* no needs */ }
-      personal(w, 'The frenzy drains out of you. Your limbs are heavy, and your breath will be slow to come back.');
+      personal(w, words(f.kind).end);
     }
     audit(`FRENZY end ${who(w)}: ${why} after ${Math.round((Date.now() - f.at) / 1000)} s, ${f.targets.size} target(s), ${f.falls} player(s) brought down`);
+    // vampirepath.js ends its Feral with the frenzy, whichever way it ended
+    if (f.kind === 'vampire' && typeof globalThis.__dboFeralFrenzyEnded === 'function') { try { globalThis.__dboFeralFrenzyEnded(w, why); } catch (e) { log('frenzy: feral end hook failed', e.message); } }
     return true;
   };
 
@@ -155,6 +173,16 @@ module.exports = (api) => {
       try { const why = start(a, 'a forced change'); if (why) log(`frenzy: ${display(a)} did not frenzy: ${why}`); } catch (e) { log('frenzy: start failed', e.message); }
     }, Math.max(0, Number(C.startDelaySeconds) || 0) * 1000);
     return true;
+  };
+  // vampirepath.js: a vampire's Feral, at once (its own warning came first), for `seconds`. '' when it started, else why not.
+  // The same switch as the werewolf's (werewolfFrenzy.enabled): one off switch for every AI-driven body. No chance roll and no
+  // cooldown check: the Feral decides when.
+  globalThis.__dboFrenzyVampire = (a, opts) => {
+    a = Number(a) >>> 0;
+    if (C.enabled !== true) return 'frenzy off';
+    if (!isPlayer(a)) return 'not a player';
+    const o = opts || {};
+    return start(a, String(o.by || 'the thirst'), { kind: 'vampire', seconds: Number(o.seconds) || 0 });
   };
   globalThis.__dboFrenzyActive = (a) => S.active.has(Number(a) >>> 0);
   globalThis.__dboFrenzyEnd = (a, why) => end(a, why || 'ended');
@@ -187,8 +215,8 @@ module.exports = (api) => {
     for (const [w, u] of S.exhausted) if (now >= u) { S.exhausted.delete(w); try { if (typeof globalThis.__dboNeedsRefresh === 'function') globalThis.__dboNeedsRefresh(w); } catch (e) { /* no needs */ } }
     for (const [w, f] of [...S.active]) {
       if (!online(w)) { end(w, 'logout'); continue; }
-      if (dead(w) || downed(w)) { end(w, 'the werewolf fell'); continue; }
-      if (beastFormOf(w) !== 'werewolf') { end(w, 'out of the beast'); continue; }
+      if (dead(w) || downed(w)) { end(w, words(f.kind).fell); continue; }
+      if (!stillKind(w, f.kind)) { end(w, words(f.kind).out); continue; }
       if (now >= f.until) { end(w, 'time'); continue; }
       if (!f.acked && now - f.at > Math.max(1, Number(C.ackSeconds) || 5) * 1000) { end(w, 'the client never answered'); continue; }
       if (!validTarget(w, f.target)) { retarget(w, f, 'the last one is gone'); continue; }
@@ -214,8 +242,8 @@ module.exports = (api) => {
     }
   }
   // ---- a player the frenzied werewolf downs puts a bounty on it ------------------------------------------------------
-  const bounty = (w, victim) => {
-    const reason = C.lethalToPlayers === false ? 'downed someone in a werewolf frenzy' : 'killed someone in a werewolf frenzy';
+  const bounty = (w, victim, kind) => {
+    const reason = C.lethalToPlayers === false ? words(kind).downedR : words(kind).killedR;
     if (typeof globalThis.__dboExposureBounty === 'function') {
       let set = false; try { set = !!globalThis.__dboExposureBounty(w, victim, reason); } catch (e) { log('frenzy: exposure bounty failed', e.message); }
       if (set) audit(`FRENZY bounty: ${who(w)} for bringing down ${who(victim)} (exposure.js)`);
@@ -231,23 +259,29 @@ module.exports = (api) => {
     return set;
   };
   // The frenzy's kill: an ordinary death unless permadeath says so, and only if they are still down (not raised meanwhile)
-  const kill = (w, x) => {
+  // A feral vampire's kill is a meal (vampirepath.js __dboFeralKilled): it drinks, and the thirst lets go
+  const fedOnKill = (w, x, kind) => {
+    if (kind !== 'vampire' || typeof globalThis.__dboFeralKilled !== 'function') return;
+    try { globalThis.__dboFeralKilled(w, x); } catch (e) { log('frenzy: feral kill hook failed', e.message); }
+  };
+  const kill = (w, x, kind) => {
     if (!downed(x) && !dead(x)) return false;
     if (C.permadeath === true && typeof globalThis.__dboPermaKill === 'function') {
       audit(`FRENZY permadeath: ${who(x)} killed by ${who(w)}`);
-      globalThis.__dboPermaKill(x, 'killed in a werewolf frenzy');
+      globalThis.__dboPermaKill(x, words(kind).killed);
+      fedOnKill(w, x, kind);
       return true;
     }
     const k = globalThis.__dboDownedKill;
     if (typeof k !== 'function') return false;
-    const done = !!k(x, w, 'werewolf frenzy');
-    if (done) log(`frenzy: ${display(w)} killed ${display(x)}`);
+    const done = !!k(x, w, words(kind).kill);
+    if (done) { log(`frenzy: ${display(w)} killed ${display(x)}`); fedOnKill(w, x, kind); }
     return done;
   };
-  const killLater = (w, x) => {
+  const killLater = (w, x, kind) => {
     const ms = Math.max(0, Number(C.killDelaySeconds) || 0) * 1000;
-    if (!ms) return kill(w, x);
-    setTimeout(() => { try { kill(w, x); } catch (e) { log('frenzy: kill failed', e.message); } }, ms);
+    if (!ms) return kill(w, x, kind);
+    setTimeout(() => { try { kill(w, x, kind); } catch (e) { log('frenzy: kill failed', e.message); } }, ms);
     return true;
   };
   {
@@ -260,10 +294,10 @@ module.exports = (api) => {
           // one bounty per fall: the same death reported twice within 10 s counts once
           if (f && w !== x && isPlayer(x) && Date.now() - (f.downed.get(x) || 0) > 10000) {
             f.downed.set(x, Date.now()); f.falls++;
-            bounty(w, x);
-            if (C.lethalToPlayers !== false) killLater(w, x);
+            bounty(w, x, f.kind);
+            if (C.lethalToPlayers !== false) killLater(w, x, f.kind);
           }
-          if (S.active.has(x)) end(x, 'the werewolf fell');
+          if (S.active.has(x)) end(x, words(S.active.get(x).kind).fell);
         } catch (e) { log('frenzy: death hook failed', e.message); }
         return out;
       };

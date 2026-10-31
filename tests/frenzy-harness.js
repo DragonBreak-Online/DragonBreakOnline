@@ -206,6 +206,42 @@ const wolf = () => setProp(W, 'private.beast', { form: 'werewolf', original: {} 
   // a GM who is not lead staff cannot use it
   ok(cmds.get('frenzy')(P1, 'wolf start') === undefined && /Only lead staff/.test(said[said.length - 1][1]), '/frenzy is lead staff only');
 
+  // ---- a feral vampire (vampirepath.js, Nat 31 Oct): the same frenzy in mortal shape, under the same switch
+  {
+    const vampSet = new Set([W]);
+    globalThis.__dboSuperKind = (a) => (vampSet.has(a) ? 'vampire' : null);
+    const feralEnded = [], feralKilled = [];
+    globalThis.__dboFeralFrenzyEnded = (a, why) => feralEnded.push([a, why]);
+    globalThis.__dboFeralKilled = (a, x) => feralKilled.push([a, x]);
+    setProp(W, 'private.beast', null);
+    load({ enabled: false });
+    ok(globalThis.__dboFrenzyVampire(W, { seconds: 40 }) === 'frenzy off', 'vampire: werewolfFrenzy.enabled false is the off switch for the Feral\'s frenzy too');
+    load({ enabled: true, killDelaySeconds: 0 }); kills.length = 0; permas.length = 0;
+    ok(globalThis.__dboFrenzyVampire(P1, { seconds: 40 }) === 'not a vampire', 'only a vampire can be frenzied as one');
+    ok(globalThis.__dboFrenzyVampire(W, { seconds: 40, by: 'thirst stage 4' }) === '', 'a vampire in mortal shape frenzies (no beast form needed)');
+    const fv = globalThis.__dboFrenzy.active.get(W);
+    ok(fv && fv.kind === 'vampire' && Math.abs(fv.until - Date.now() - 40000) < 2000, 'kind vampire, for the Feral\'s own seconds', fv && { kind: fv.kind, left: fv.until - Date.now() });
+    ok(lastFrenzy() && lastFrenzy().on === true && said.some(([a, t]) => a === W && /thirst takes you/.test(t)), 'the client is driven, and told in a vampire\'s words');
+    ok(audits.some((t) => /^FRENZY #ff000101 for 40 s, .*feral vampire\)/.test(t)), 'audited as a feral vampire');
+    globalThis.__dboFrenzyReport(W, { phase: 'on' });
+    downedSet.add(P1); mp.onDeath(P1, W); downedSet.delete(P1);
+    ok(kills.length === 1 && kills[0][0] === P1 && /feral vampire/.test(kills[0][2]) && feralKilled.length === 1 && feralKilled[0][1] === P1, 'lethal as the werewolf\'s (Nat): the kill is made, and told to vampirepath.js as a meal', { kills, feralKilled });
+    vampSet.delete(W); tick();
+    ok(!globalThis.__dboFrenzyActive(W) && feralEnded.length === 1 && /no longer a vampire/.test(feralEnded[0][1]), 'no longer a vampire (cured): the frenzy ends and vampirepath.js hears why', feralEnded);
+    vampSet.add(W);
+    load({ enabled: true });
+    globalThis.__dboFrenzyVampire(W, { seconds: 30 });
+    globalThis.__dboFrenzyEnd(W, 'test');
+    ok(feralEnded.length === 2, 'any end of a vampire frenzy reaches vampirepath.js');
+    // the werewolf path is untouched: a vampire is not a beast-form werewolf for a forced change's frenzy
+    load({ enabled: true, chance: 1, startDelaySeconds: 0 });
+    cmds.get('frenzy')(STAFF, 'wolf start');
+    ok(globalThis.__dboFrenzy.active.get(W) && globalThis.__dboFrenzy.active.get(W).kind === 'vampire', 'staff /frenzy start on a vampire runs the vampire\'s frenzy (for the dev test)');
+    globalThis.__dboFrenzyEnd(W, 'test');
+    vampSet.clear(); globalThis.__dboSuperKind = undefined; globalThis.__dboFeralFrenzyEnded = undefined; globalThis.__dboFeralKilled = undefined;
+    wolf();
+  }
+
   // ---- wiring in supernatural.js and gamemode.js
   const sup = fs.readFileSync(path.join(SERVER, 'supernatural.js'), 'utf8');
   const fc = sup.slice(sup.indexOf('const forcedChange = '), sup.indexOf('let lastHour'));
