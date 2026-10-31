@@ -81,6 +81,35 @@ export class ConjurationSystem implements System {
     if (Number.isFinite(scrollSec) && scrollSec > 0) this.spiderScrollSec = scrollSec;
     this.hook("onSpellCast", (casterId, spellId) => this.onSpellCast(casterId, spellId));
     this.hook("onSpellHit", (aggressorId, targetId, spellId) => this.onSpellHit(aggressorId, targetId, spellId));
+    this.exposePowerHook();
+  }
+
+  // A Power cast from the Shout key fires no onSpellCast (the client relays it as dboBeastPower to the gameplay layer), so
+  // the gameplay layer conjures that power's summon through this hook after its own checks; true when a summon was placed
+  exposePowerHook(): void {
+    (globalThis as any).__dboConjurePower = (casterId: unknown, spellId: unknown): boolean => {
+      try {
+        return this.summonFor(Number(casterId) >>> 0, Number(spellId) >>> 0);
+      } catch (e) {
+        this.log(`ConjurationSystem: __dboConjurePower failed: ${e}`);
+        return false;
+      }
+    };
+  }
+
+  private summonFor(casterId: number, spellId: number): boolean {
+    if (!isPlayerActor(this.mp, casterId)) return false;
+    return this.summon(casterId, spellId, spellEffects(this.mp, spellId));
+  }
+
+  // The first summon effect is the unperked one; perk conditions are not evaluated server-side. A spell with one summon
+  // per caster race (Summon Skeleton) conjures the caster's (pickSummon)
+  private summon(casterId: number, spellId: number, effects: SpellEffect[]): boolean {
+    const summons = effects.filter((e) => e.archetype === MgefArchetype.SummonCreature && e.assocId);
+    const pick = pickSummon(summons, () => (this.summonRaceVariants ? this.casterRace(casterId) : NORD_RACE));
+    if (!pick) return false;
+    this.companions.spawn(casterId, pick.effect.assocId, { kind: "summon", durationSec: this.duration(pick.timed, casterId, "summon"), source: spellId });
+    return true;
   }
 
   disconnect(userId: number, ctx: SystemContext): void {
@@ -118,14 +147,7 @@ export class ConjurationSystem implements System {
   private onSpellCast(casterId: number, spellId: number): void {
     if (!isPlayerActor(this.mp, casterId)) return;
     const effects = spellEffects(this.mp, spellId);
-    // The first summon effect is the unperked one; perk conditions are not evaluated server-side. A spell with one summon
-    // per caster race (Summon Skeleton) conjures the caster's (pickSummon)
-    const summons = effects.filter((e) => e.archetype === MgefArchetype.SummonCreature && e.assocId);
-    const pick = pickSummon(summons, () => (this.summonRaceVariants ? this.casterRace(casterId) : NORD_RACE));
-    if (pick) {
-      this.companions.spawn(casterId, pick.effect.assocId, { kind: "summon", durationSec: this.duration(pick.timed, casterId, "summon"), source: spellId });
-      return;
-    }
+    if (this.summon(casterId, spellId, effects)) return;
     const placed = this.placedNpc(spellId, effects);
     if (placed) {
       if (Date.now() - (this.lastPlaceHit.get(casterId) ?? 0) <= PLACE_HIT_FIRST_MS) return;
