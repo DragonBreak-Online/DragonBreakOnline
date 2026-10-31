@@ -3699,9 +3699,16 @@ const stageFor = (hunger) => { let s = NEEDS_STAGES[0] || { at: 0, name: 'Sated'
 const NEEDS_RATE_BASE = Number(NEEDS.baseRateMult) > 0 ? Number(NEEDS.baseRateMult) : 100;
 // An unchanged rate is still re-sent this often, so a value the game itself reset (a race change, a respawn) comes back
 const NEEDS_REAPPLY_MS = (Number(NEEDS.reapplyMinutes) > 0 ? Number(NEEDS.reapplyMinutes) : 10) * 60000;
+// The last value each actor value was set to, per actor (/regendiag, regendiag.js): since rc-1027-regen SetActorValue
+// also sets the server's own copy of the rates and rate mults, which the regeneration ceiling reads. Kept over a reload;
+// a restart empties it, and then the server holds the race's base
+const AV_SENT = globalThis.__dboAvSent instanceof Map ? globalThis.__dboAvSent : (globalThis.__dboAvSent = new Map());
 const setActorValue = (a, av, value) => {
   try {
     mp.callPapyrusFunction('method', 'Actor', 'SetActorValue', { type: 'form', desc: mp.getDescFromId(a) }, [av, value]);
+    let sent = AV_SENT.get(a);
+    if (!sent) { if (AV_SENT.size > 2000) AV_SENT.clear(); AV_SENT.set(a, (sent = {})); }
+    sent[av] = { value, at: Date.now() };
     return true;
   } catch (e) { log('SetActorValue failed', av, value, e.message); return false; }
 };
@@ -9281,6 +9288,13 @@ try {
   delete require.cache[DEBUGSNAP_JS];
   require(DEBUGSNAP_JS)({ mp, log, every, personal, registerChatCommand, onlineActors, display, tagOf, profileOf, isAdmin, staffCan, cfg });
 } catch (e) { log('debugsnap.js failed to load:', e.stack || e.message); }
+
+// ---- /regendiag: why a player's bars come back as fast as they do (server\regendiag.js) ---------------------------
+try {
+  const REGENDIAG_JS = path.resolve('regendiag.js');
+  delete require.cache[REGENDIAG_JS];
+  require(REGENDIAG_JS)({ mp, log, personal, registerChatCommand, findByName, display });
+} catch (e) { log('regendiag.js failed to load:', e.stack || e.message); }
 
 // ---- /monitor: the dbo-monitor service's view for staff (server\monitor.js; tooling/dbo-monitor) -----------------
 try {
