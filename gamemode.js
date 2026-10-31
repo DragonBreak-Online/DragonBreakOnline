@@ -4215,9 +4215,10 @@ const sendPacket = (a, payload) => {
 // each action's answer re-sends it, and the module's own closeWidget closes the custom menu
 // shrinePanel, courierHandover: supernatural.js widget 74 and couriers.js 81; their Escape is the router's close, which both read
 // playerMenu: the U panel (widget 52); menuRun closes it as for the browser
+// birthsignPicker: birthsigns.js widget 163 (dbo:birthsignPick/birthsignClose); a pick closes it through closeWidget
 const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_journal', deityPicker: 'dbo_deity', rite: 'dbo_rite', dungeonGate: 'dbo_dungeon', labour: 'dbo_labour', pigeon: 'dbo_pigeon', bank: 'dbo_bank',
   businessLedger: 'dbo_ledger', propertyMarket: 'dbo_market', keyRing: 'dbo_keyring', tomeShop: 'dbo_tomes',
-  shrinePanel: 'dbo_shrine', courierHandover: 'dbo_courier', playerMenu: 'dbo_menu' };
+  shrinePanel: 'dbo_shrine', courierHandover: 'dbo_courier', playerMenu: 'dbo_menu', birthsignPicker: 'dbo_birthsign' };
 // The client's custom menu takes a payload of at most this many characters (scaleformMenu.ts MAX_PAYLOAD_CHARS) and draws
 // a bigger one blank, so a widget past it (a staff player menu, a long ledger) goes to the browser instead
 const NATIVE_MAX_CHARS = 60000;
