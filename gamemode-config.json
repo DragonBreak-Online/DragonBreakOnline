@@ -1590,6 +1590,20 @@
    "merged": { "great-faiths": { "into": "imperial-cult", "at": "2026-10-25" } },
    "_addRanks": "Ranks added to a faction (guilds.js): guild-defs has them, and a faction whose ranks were rewritten in game (guild-overrides.json) gets them inserted after the named rank at load, once, audited; members keep their titles. Nat, 25 Oct: the Imperial Cult's Vestment Keeper, a tailor, so the Cult can make the Eight's robes.",
    "addRanks": { "imperial-cult": [{ "title": "Vestment Keeper", "role": "tailor", "after": "Disciple" }] },
+   "rules": {
+    "_comment": "No double dipping (Nat, 31 Oct; guilds.js rulesProblem, leadership.js cooldownDays). Every faction's class is hold, college, church, militant, guild or secret: classes names those set by hand, the rest go by kind (hold, stronghold: hold), the college flag (college), the secret flag (secret), else guild, chartered factions and risings included. On a NEW membership that counts (a hold's citizens and guards, role member, do not): no two characters of one account in one faction; a hold's court officer or ruler joins only a class in alongside (a college or a church) besides the hold; a secret faction's member is in that one only, alongside apart. The one leadership seat per character and the wait after losing an office (leadership.cooldownDays, 14) are leadership.js's. Nobody is removed: what someone held before stands. A Lead GM's /faction override lifts a refusal once. enabled false turns these off (the limits and leadership stay).",
+    "enabled": true,
+    "alongside": [
+     "college",
+     "church"
+    ],
+    "classes": {
+     "bards-college": "college",
+     "imperial-cult": "church",
+     "knights-of-the-nine": "militant",
+     "vigil-of-stendarr": "militant"
+    }
+   },
    "limits": {
     "_comment": "Faction membership limits (server\\guilds.js, Nate 6 Oct): at most one faction per category, per character; ids listed by name, never from guild-defs kind. allegiance counts a hold's or county's court officials only (officialsOnly + exemptRoles: a Citizen or Guard takes no slot), so a Legion soldier may live in a hold but not sit in its court. conflicts: refused whatever the category (supernatural: refused for that kind too, supernatural.js). The six Orc stronghold clans, the Imperial Civil Commission and the Penitus Oculatus are allegiances (Nate, 19 Oct), any member. Unplaced, so unlimited: the Silver Hand, the four vampire clans, the two Hircine packs, charter factions. Checked on a new membership or a rank that newly takes a slot; nobody is removed. A Lead GM lifts it once with /faction override <player> <id> (audited).",
     "enabled": true,

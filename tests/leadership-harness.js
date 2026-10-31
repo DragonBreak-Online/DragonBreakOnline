@@ -11,6 +11,8 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const LEADERSHIP = path.join(ROOT, 'leadership.js');
+// The wait after losing an office keeps its state here, never in the checkout
+const COOL_FILE = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'claude-nate-leadership-')), 'leadership-cooldowns.json');
 const GUILDS = path.join(ROOT, 'guilds.js');
 if (!fs.existsSync(LEADERSHIP)) { require('./expect')('leadership', 'there is no leadership.js'); console.log('ok   skipped: no leadership.js'); process.exit(0); }
 
@@ -50,7 +52,7 @@ const api = {
     { zone: 'riften', zoneName: 'Riften', rank: 'steward', pid: 99, actor: STEWARD }],
   cfg: {},
 };
-const load = (leadership) => { delete require.cache[LEADERSHIP]; return require(LEADERSHIP)(Object.assign({}, api, { leadershipSweep: false, cfg: { leadership } })); };
+const load = (leadership) => { delete require.cache[LEADERSHIP]; return require(LEADERSHIP)(Object.assign({}, api, { leadershipSweep: false, cooldownStatePath: COOL_FILE, cfg: { leadership } })); };
 load({});
 
 ok('a guild leader holds leadership', globalThis.__dboLeadershipOf(MAGISTER).length === 1 && /Master of Whispers of College of Whispers/.test(globalThis.__dboLeadershipOf(MAGISTER)[0].name), globalThis.__dboLeadershipOf(MAGISTER));
