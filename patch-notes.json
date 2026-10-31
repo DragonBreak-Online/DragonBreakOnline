@@ -1,5 +1,40 @@
 [
   {
+    "title": "The armour rebalance, part two: wearing armour takes Defense",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "What this is",
+        "items": [
+          "This finishes the armour rebalance Nat promised in #ooc-general. Armour follows its smithing tier: higher tiers protect more, and now wearing them takes Defense."
+        ]
+      },
+      {
+        "heading": "Wearing armour takes Defense",
+        "items": [
+          "Each tier of armour needs a Defense level to put on, the same for light and heavy: tier 2 needs 15, tier 3 30, tier 4 45, tier 5 60, Ebony and the other tier 6 sets 75, Daedric and Dragon 90. Tier 1 (Iron, Hide, Leather and the like) needs none.",
+          "Put on a piece above your Defense and it comes straight off, with a line saying the level it needs.",
+          "Whatever you are wearing when this update arrives stays on until you take it off. After that, you need the level to put it back on.",
+          "Faction and guard gear is still gated by your faction, not by Defense. Clothing and jewellery have no requirement."
+        ]
+      },
+      {
+        "heading": "The armour number in your inventory",
+        "items": [
+          "It is now exactly what a blow meets: it includes your armour's wear, worn Fortify Armor and an armour potion."
+        ]
+      },
+      {
+        "heading": "Dwemer Mantis armour",
+        "items": [
+          "It still cannot be obtained. A chassis someone already has now counts as tier 3 Dwarven armour."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Weapon poisons no longer come back or unequip your weapon",
     "date": "2026-10-31",
     "version": "Server update",
