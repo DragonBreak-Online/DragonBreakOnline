@@ -47,6 +47,10 @@ export const NATIVE_WIDGETS: Readonly<Record<string, string>> = {
 export const SHARED_WITH_GAMEPLAY: ReadonlyArray<string> = ["contextMenu"];
 
 export const HANDOFF_KEY = "native:handoff";
+// A panel's "On the map" (the journal's Realm): [place, owner, x, y]. The panel closes itself; the client then says where the
+// place lies and opens the M map. SkyrimPlatform cannot centre the map on a spot (no such call in the typings), so the line
+// is what finds it: the owner's land, and a compass point and distance from where the player stands.
+export const SHOW_MAP_KEY = "native:showMap";
 export const CLOSE_KEY = "close";
 export const DBO_PREFIX = "dbo:";
 // What the owning service is told when its native panel could not be drawn, so it can open its own browser
@@ -90,6 +94,7 @@ export type Replay =
   | { do: "owner"; key: string; args: unknown[] }
   | { do: "close" }
   | { do: "handoff"; type: string; mode: string }
+  | { do: "showMap"; args: unknown[] }
   | { do: "report"; text: string };
 
 // What a key coming out of a native panel means. ONE table for both kinds of panel, so a gamemode panel and
@@ -105,6 +110,8 @@ export type Replay =
 export const replayFor = (key: string, args: unknown[], hasOwner?: boolean): Replay[] => {
   const k = String(key || "");
   if (!k) return [{ do: "report", text: "a native panel sent an empty key" }];
+
+  if (k === SHOW_MAP_KEY) return [{ do: "showMap", args }];
 
   const handoff = handoffOf(k, args);
   if (handoff) return [{ do: "handoff", type: handoff.type, mode: handoff.mode }];
@@ -140,6 +147,34 @@ export const replayFor = (key: string, args: unknown[], hasOwner?: boolean): Rep
     do: "report",
     text: `a native panel sent '${k}', which has no ${DBO_PREFIX} prefix and no service owns it: the browser path drops such a key silently, so this would do nothing`,
   }];
+};
+
+// ---- "On the map": where a place lies from the player ------------------------------------------------------
+
+const COMPASS = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"];
+// Game units per kilometre: 70 units to the metre (the Creation Kit's own scale)
+const UNITS_PER_KM = 70000;
+
+// The compass point from the player to a place: +y is north and +x east in a worldspace
+export const compassOf = (dx: number, dy: number): string => {
+  const deg = (Math.atan2(dx, dy) * 180) / Math.PI;
+  return COMPASS[Math.round(((deg + 360) % 360) / 45) % 8];
+};
+
+// The line shown as the map opens. from: the player's position outdoors, or null indoors (no direction can be given)
+export const mapLine = (args: unknown[], from: { x: number; y: number } | null): string => {
+  const name = String(args[0] || "The place");
+  const owner = String(args[1] || "");
+  const x = Number(args[2]);
+  const y = Number(args[3]);
+  const land = owner ? `, in ${owner}'s land` : "";
+  if (!from || !Number.isFinite(x) || !Number.isFinite(y)) return `${name}${land}: look for it on the map.`;
+  const dx = x - from.x;
+  const dy = y - from.y;
+  const km = Math.sqrt(dx * dx + dy * dy) / UNITS_PER_KM;
+  if (km < 0.2) return `${name}${land}: you are there.`;
+  const far = km < 1 ? `${Math.round(km * 10) * 100} m` : `${Math.round(km * 10) / 10} km`;
+  return `${name}${land}: ${far} to the ${compassOf(dx, dy)}.`;
 };
 
 // ---- delivering a hand-off only once the panel has really gone ---------------------------------------------

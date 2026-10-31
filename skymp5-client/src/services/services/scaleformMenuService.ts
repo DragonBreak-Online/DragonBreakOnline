@@ -9,7 +9,7 @@ import {
   parseUiEvent, planClose, planOpen, planReady, planRefresh, planTick, readyFrameOf, summary,
 } from "./scaleformMenu";
 import {
-  CLOSE_KEY, FAILED_KEY, HANDOFF_KEY, PendingHandoff, Replay, handoffDue, replayFor, swfFor,
+  CLOSE_KEY, FAILED_KEY, HANDOFF_KEY, PendingHandoff, Replay, handoffDue, mapLine, replayFor, swfFor,
 } from "./nativeWidgets";
 
 // What a client-side service passes to openNative. onKey receives the panel's own namespaced keys verbatim,
@@ -189,8 +189,27 @@ export class ScaleformMenuService extends ClientListener {
       this.pendingHandoff = { type: r.type, mode: r.mode, at: Date.now() };
       return;
     }
+    if (r.do === "showMap") {
+      // The panel closes itself; the map opens once it has really gone (a menu over the MapMenu would take the keys)
+      this.pendingMap = { args: r.args, at: Date.now() };
+      return;
+    }
     logTrace(this, "Scaleform panel", r.text);
     this.note(r.text);
+  }
+
+  // "On the map": the place's line, then the M map by its own control (controlmap.txt "Quick Map", M by default)
+  private showMap(args: unknown[]): void {
+    try {
+      const player = this.sp.Game.getPlayer();
+      const outdoors = !!player && !!player.getWorldSpace();
+      const from = outdoors && player ? { x: player.getPositionX(), y: player.getPositionY() } : null;
+      this.sp.Debug.notification(mapLine(args, from));
+      const key = this.sp.Input.getMappedKey("Quick Map", 0);
+      this.sp.Input.tapKey(key > 0 && key < 255 ? key : 0x32);
+    } catch (e) {
+      logError(this, "could not open the map for a panel", e);
+    }
   }
 
   // A client-side service drawing its own panel natively instead of calling openFormMenu. The service keeps
@@ -303,6 +322,14 @@ export class ScaleformMenuService extends ClientListener {
             logError(this, `the service owning '${o.type}' threw on the hand-off`, e);
           }
         }
+      }
+    }
+    if (this.pendingMap) {
+      const due = handoffDue({ type: "map", mode: "", at: this.pendingMap.at }, this.menuIsOpen(), Date.now());
+      if (due !== "wait") {
+        const m = this.pendingMap;
+        this.pendingMap = null;
+        this.showMap(m.args);
       }
     }
     if (this.state.phase === "closed") return;
@@ -426,6 +453,8 @@ export class ScaleformMenuService extends ClientListener {
   private owner: { type: string; onKey: (key: string, args: unknown[]) => void } | null = null;
   // A hand-off waiting for the panel to actually close (handoffDue decides when)
   private pendingHandoff: PendingHandoff | null = null;
+  // A panel's "On the map", held until the panel has gone
+  private pendingMap: { args: unknown[]; at: number } | null = null;
   // Types whose panel could not be drawn this session. An array, not a Set: the client targets es2019 but the
   // rest of this file stays to the plainest shapes, and this list is never longer than the registry.
   private failedTypes: string[] = [];

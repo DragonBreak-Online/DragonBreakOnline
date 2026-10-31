@@ -61,9 +61,17 @@ const view = (t, name) => { for (let i = 0; i < 6; i++) t.press(33); press(t, na
   check('the views: Members (shown), Realm, War with its count, Treasury', btn(t, 'Members')._alpha === 100 && !!btn(t, 'Realm') && !!btn(t, 'War (1)') && !!btn(t, 'Treasury') && !btn(t, 'Guild'));
   view(t, 'Realm');
   let tx = everyPage(t);
-  check('Realm: the land by owner with its kind', /House of Bruma\|Bruma\|City\|Pell\|Village/.test(tx) && /House of Chorrol\|Chorrol\|City\|Weye\|Fort/.test(tx), tx);
+  check('Realm: the land by owner with its kind, each On the map', /House of Bruma\|Bruma\|City\|On the map\|Pell\|Village/.test(tx) && /House of Chorrol\|Chorrol\|City\|On the map\|Weye\|Fort/.test(tx), tx);
   check('...capitals, the leader\'s capital, the circle\'s secrets, the wars', /Capitals\|House of Bruma\|Territory: Bruma/.test(tx) && /House of Bruma: capital Bruma/.test(tx) && /Known only to your circle\|The Hollow\|shrine  ·  Moonshadow/.test(tx) && /1 war under way: see War\./.test(tx), tx);
   check('no browser hand-off', !msgs(t, 'dbo:journalTab').some((m) => m.args[3] === 'browser'));
+  {
+    const m = S.boot('dbo_journal');
+    m.push(hub(fac()));
+    view(m, 'Realm');
+    buttonsOf(m).filter((b) => b.label.text === 'On the map')[1].onRelease();
+    const sm = last(m, 'native:showMap');
+    check('On the map sends the place, its owner and where it is, and closes the journal', sm && sm.args.join('|') === 'Pell|House of Bruma|0|0' && msgs(m, 'dbo:journalClose').length === 1 && m.closed(), sm);
+  }
   press(t, 'Move the capital...');
   check('Move the capital: the choices, the current marked; the current cannot be picked', !!btn(t, 'Bruma (now)') && btn(t, 'Make it the capital').disabled === true);
   press(t, 'Bruma (now)');

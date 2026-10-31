@@ -1,6 +1,7 @@
 // The Faction tab's other views (guilds.js payload: realm, economy, band, rebellion, and the staff view), drawn natively in
 // place of the browser journal's: Realm (the land by owner, capitals and the leaders' control of theirs; a list, since the
-// browser's painted map needs its terrain art), War (each war with its answers, peace and surrender, treaties, declaring and
+// browser's painted map needs its terrain art; On the map closes the journal and opens the M map with a line saying where the
+// place lies: native:showMap [place, owner, x, y]), War (each war with its answers, peace and surrender, treaties, declaring and
 // raiding), Treasury (tax, wages, the last reckoning), Guild, Rebellion and, for staff, every faction with its members and
 // ranks. Typed and chosen input is a form in place of the tab (ctx.form). Every action carries the faction menu's own
 // nonce, through facSend, as the browser faction panel's act does.
@@ -86,7 +87,8 @@ function facRealm(s, ctx, off)
       {
          if (ts[i].owner == owners[o][0])
          {
-            flowRow(String(ts[i].name), REALM_KIND[ts[i].kind] != undefined ? REALM_KIND[ts[i].kind] : String(ts[i].kind));
+            var e = flowEntry(String(ts[i].name), [["On the map", function() { facShowMap(this._parent.place); }]], REALM_KIND[ts[i].kind] != undefined ? REALM_KIND[ts[i].kind] : String(ts[i].kind));
+            e.place = ts[i];
          }
       }
    }
@@ -118,6 +120,14 @@ function facRealm(s, ctx, off)
    {
       flowHint(wars.length + " war" + (wars.length > 1 ? "s" : "") + " under way: see War.");
    }
+}
+
+// The journal goes and the M map opens; the client says where the place lies from the player (scaleformMenuService showMap)
+function facShowMap(t)
+{
+   dboSound("UIMenuOK");
+   send("native:showMap", [String(t.name), String(t.ownerName), Number(t.x), Number(t.y)]);
+   closeJournal();
 }
 
 // A leader moves the capital: one of the faction's territories, or (not for a hold) where they stand

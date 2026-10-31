@@ -13,6 +13,7 @@
 // an unverified premise, so premises are asserted against the real source.
 'use strict';
 const fs = require('fs');
+// ("On the map" checks are near the end)
 const os = require('os');
 const path = require('path');
 const M = require(path.resolve(process.argv[2] || path.join(os.tmpdir(), 'nw', 'nativeWidgets.js')));
@@ -321,6 +322,18 @@ check("a late hand-off is said out loud, not delivered silently",
   () => /did not close in time, handing off anyway/.test(SERVICE));
 check("closeNative drops a waiting hand-off, so it cannot reopen a composer nobody is looking at",
   () => /this\.pendingHandoff = null;\s*\n\s*this\.owner = null;/.test(SERVICE));
+
+// ---- "On the map" (native:showMap): the router's replay and the line the player reads ----
+check('native:showMap replays as showMap with its arguments, for any panel', () => { const r = M.replayFor('native:showMap', ['Pell', 'House of Bruma', 10, 20]); return r.length === 1 && r[0].do === 'showMap' && r[0].args.join('|') === 'Pell|House of Bruma|10|20'; });
+check('compass points: north is +y, east is +x, each the nearest of eight', () => M.compassOf(0, 5) === 'north' && M.compassOf(5, 0) === 'east' && M.compassOf(0, -5) === 'south' && M.compassOf(-5, 0) === 'west' && M.compassOf(5, 5) === 'north-east' && M.compassOf(-5, -5) === 'south-west'
+  && M.compassOf(Math.sin(40 * Math.PI / 180), Math.cos(40 * Math.PI / 180)) === 'north-east' && M.compassOf(Math.sin(20 * Math.PI / 180), Math.cos(20 * Math.PI / 180)) === 'north');
+check('the line gives the owner, the distance and the way', () => M.mapLine(['Pell', 'House of Bruma', 140000, 0], { x: 0, y: 0 }) === "Pell, in House of Bruma's land: 2 km to the east.", M.mapLine(['Pell', 'House of Bruma', 140000, 0], { x: 0, y: 0 }));
+check('under a kilometre it is metres', () => M.mapLine(['Pell', '', 0, -35000], { x: 0, y: 0 }) === 'Pell: 500 m to the south.', M.mapLine(['Pell', '', 0, -35000], { x: 0, y: 0 }));
+check('standing at it says so', () => M.mapLine(['Pell', 'X', 100, 100], { x: 0, y: 0 }) === "Pell, in X's land: you are there.");
+check('indoors (no worldspace) no direction is given', () => M.mapLine(['Pell', 'House of Bruma', 140000, 0], null) === "Pell, in House of Bruma's land: look for it on the map.");
+check('the service holds On the map until the panel has gone (before the closed-phase return), then opens it by Quick Map',
+  () => /this\.pendingMap = \{ args: r\.args/.test(SERVICE) && /if \(this\.pendingMap\)[\s\S]*?handoffDue[\s\S]*?if \(this\.state\.phase === "closed"\) return;/.test(SERVICE)
+    && /getMappedKey\("Quick Map", 0\)/.test(SERVICE) && /this\.pendingMap = null;\s*\n\s*this\.showMap\(m\.args\);/.test(SERVICE));
 
 console.log(failures ? `${failures} failed` : `all passed${skipped ? ` (${skipped} skipped)` : ""}`);
 process.exit(failures ? 1 : 0);
