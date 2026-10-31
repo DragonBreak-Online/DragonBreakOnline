@@ -1668,6 +1668,44 @@ registerChatCommand('sign', (a, args) => {
   personal(a, `Your next letter will be signed "${want}", in a hand not your own.`);
 }, { help: 'unsigned | <a name> | clear: how your next pigeon letter is signed' });
 
+// ---- the faction's own birds (Nat, 31 Oct, in-game-over-discord B) --------------------------------------------------
+// Between two of one faction (player guilds included) or one party a pigeon flies free, knows the way without a meeting,
+// and waits kin.cooldownMinutes per recipient instead of the sender's 35 minutes; it does not use up that wait.
+// /circular sends one letter to every member of a faction, offline ones included, by its leaders and officers only.
+// gamemode-config.json pigeons.kin: { enabled, cooldownMinutes: 5, fee: 0, circularMinutes: 30 }
+const PIGEON_KIN = Object.assign({ enabled: true, cooldownMinutes: 5, fee: 0, circularMinutes: 30 }, (cfg.pigeons || {}).kin || {});
+const KIN_COOLDOWN_MS = Math.max(0, Number(PIGEON_KIN.cooldownMinutes) || 0) * 60000;
+const kinLastSent = globalThis.__dboPigeonKinSent instanceof Map ? globalThis.__dboPigeonKinSent : (globalThis.__dboPigeonKinSent = new Map()); // "profile|actor" -> ms
+const factionsOfKin = (a) => { try { const l = typeof globalThis.__dboGuildsOf === 'function' ? globalThis.__dboGuildsOf(Number(a) >>> 0, { bands: true }) : []; return Array.isArray(l) ? l : []; } catch (e) { return []; } };
+const partyOfKin = (a) => { try { return typeof globalThis.__dboPartyLeaderOf === 'function' ? globalThis.__dboPartyLeaderOf(Number(a) >>> 0) : null; } catch (e) { return null; } };
+// The faction (or 'party') two characters share, '' when none
+const kinOf = (a, to) => {
+  if (PIGEON_KIN.enabled === false) return '';
+  const theirs = new Set(factionsOfKin(to).map((g) => g.id));
+  const f = factionsOfKin(a).find((g) => theirs.has(g.id));
+  if (f) return f.name;
+  const pa = partyOfKin(a);
+  return pa !== null && pa !== undefined && pa === partyOfKin(to) ? 'party' : '';
+};
+// Every member of the sender's factions, offline included, and the party: the birds know them all
+const kinContactsOf = (a) => {
+  if (PIGEON_KIN.enabled === false) return [];
+  const out = new Set();
+  for (const g of factionsOfKin(a)) { try { for (const id of (typeof globalThis.__dboGuildMembers === 'function' ? globalThis.__dboGuildMembers(g.id) : [])) out.add(Number(id) >>> 0); } catch (e) { /* no roster */ } }
+  const pa = partyOfKin(a);
+  if (pa !== null && pa !== undefined) for (const t of onlineActors()) if (partyOfKin(t) === pa) out.add(t >>> 0);
+  out.delete(Number(a) >>> 0);
+  return [...out];
+};
+const kinKey = (p, to) => `${p}|${Number(to) >>> 0}`;
+const noteKinSent = (p, to) => {
+  const now = Date.now(); kinLastSent.set(kinKey(p, to), now);
+  if (kinLastSent.size > 2000) for (const [k, t] of kinLastSent) if (now - t > KIN_COOLDOWN_MS) kinLastSent.delete(k);
+};
+// sendPigeon and openPigeonCoop reach the above through one object (circular: the faction's name while /circular sends)
+globalThis.__dboPigeonKin = { kinOf, contactsOf: kinContactsOf, left: (p, to) => KIN_COOLDOWN_MS - (Date.now() - (kinLastSent.get(kinKey(p, to)) || 0)),
+  note: noteKinSent, fee: () => Math.max(0, Math.floor(Number(PIGEON_KIN.fee) || 0)), circular: '' };
+
 // A letter may carry a parcel (post.js): gold and goods leave the sender with the flight, plus the parcel's tax, and wait
 // in the letter until the reader collects them at a board. goldRaw/itemsRaw are the window's; none is a plain letter.
 const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
@@ -1684,10 +1722,15 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
   if (!text && !prep) return { ok: false, text: 'Write something for the pigeon to carry.' };
   if (text.length > PIGEON_MAX_TEXT) return { ok: false, text: `Pigeons carry at most ${PIGEON_MAX_TEXT} characters.` };
   const admin = isAdmin(a);
-  const p = profileOf(a); const left = PIGEON_COOLDOWN_MS - (Date.now() - (pigeonLastSent.get(p) || 0));
-  if (left > 0 && !admin) return { ok: false, text: `Your pigeon is still out. Next one in ${Math.ceil(left / 60000)} min.` };
+  // The faction's own birds (in-game-over-discord B): free, no meeting, a short wait per recipient; /circular has none
+  const KIN = globalThis.__dboPigeonKin || null;
+  const circular = KIN && KIN.circular ? String(KIN.circular) : '';
   if (!to || to === a) return { ok: false, text: 'Choose who the letter is for.' };
-  if (!admin && !pigeonContactsOf(a).includes(to >>> 0)) return { ok: false, text: 'Your pigeon does not know the way to someone you have never met.' };
+  const kin = KIN ? circular || KIN.kinOf(a, to) : '';
+  const p = profileOf(a);
+  const left = kin ? (circular ? 0 : KIN.left(p, to)) : PIGEON_COOLDOWN_MS - (Date.now() - (pigeonLastSent.get(p) || 0));
+  if (left > 0 && !admin) return { ok: false, text: kin ? `Your last bird to ${ownNameOf(to)} has only just flown. Next one in ${Math.ceil(left / 60000)} min.` : `Your pigeon is still out. Next one in ${Math.ceil(left / 60000)} min.` };
+  if (!admin && !kin && !pigeonContactsOf(a).includes(to >>> 0)) return { ok: false, text: 'Your pigeon does not know the way to someone you have never met.' };
   if (prep && typeof globalThis.__dboFormGone === 'function' && globalThis.__dboFormGone(to)) return { ok: false, text: 'Your pigeon finds no one there to take a parcel.' };
   try {
     // Every letter lands at the notice boards and waits there; nobody reads a pigeon in the field
@@ -1698,7 +1741,7 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
     const isBlocked = Array.isArray(blocked) && blocked.includes(p);
     // A blocked sender's parcel is never lost to the void: the bird will not take it
     if (isBlocked && prep) return { ok: false, text: 'Your pigeon will not carry a parcel to them.' };
-    const price = admin ? 0 : pigeonFee();
+    const price = admin ? 0 : kin ? KIN.fee() : pigeonFee();
     const charges = prep ? prep.gold + prep.tax + prep.fee : 0;
     if (price + charges > 0 && !takeGold(a, price + charges)) {
       return { ok: false, text: prep ? `The flight costs ${price} gold, the parcel's tax ${prep.tax + prep.fee}${prep.gold ? `, and you send ${prep.gold}` : ''}: ${price + charges} gold in all, and you do not have it.` : `A pigeon to ${ownNameOf(to)} costs ${price} gold, and you do not have it.` };
@@ -1709,7 +1752,7 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
       if (!items) { giveItem(a, GOLD_BASE, price + charges); return { ok: false, text: 'The goods are no longer in your pack. Your gold is returned.' }; }
     }
     const taxed = price + (prep ? prep.tax + prep.fee : 0);
-    notePigeonSent(p);
+    if (kin) { if (!circular) KIN.note(p, to); } else notePigeonSent(p);
     if (isBlocked) { if (taxed > 0) depositToTreasury(zoneId, taxed, { income: 'postage' }); return { ok: true, text: 'Your pigeon flew off and never came back.' }; }
     const at = Date.now();
     const sig = nextSignature.get(a);
@@ -1717,7 +1760,8 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
     // Signed with the own name, never a beast's, and a mask's only while rosterPrivacy.masks is off; /sign leaves a
     // letter unsigned or forges one
     let from = ownDisplay(a);
-    if (sig && sig.unsigned) from = 'Unsigned';
+    if (circular) from = `${ownDisplay(a)}, to all of ${circular}`;
+    else if (sig && sig.unsigned) from = 'Unsigned';
     else if (sig && sig.name) from = sig.name + (Math.random() < (Number(FORGE.tellChance[sig.tier]) || 0) ? ' (the hand does not quite match)' : '');
     const letter = { id: `${at.toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`, from, fromProfile: p, text, at, read: false };
     if (prep) letter.parcel = { gold: prep.gold, items };
@@ -1748,13 +1792,18 @@ const openPigeonCoop = (a, result, resultKind, view) => {
   const online = new Set(onlineActors());
   const price = admin ? 0 : pigeonFee();
   const contacts = [];
-  for (const id of pigeonContactsOf(a)) {
+  const KIN = globalThis.__dboPigeonKin || null;
+  const kinFee = admin || !KIN ? 0 : KIN.fee();
+  const kinIds = new Set(KIN ? KIN.contactsOf(a) : []);
+  for (const id of new Set(pigeonContactsOf(a).concat([...kinIds]))) {
     try { if (!mp.get(id, 'appearance')) continue; } catch (e) { continue; }
     // Who they met: a contact behind a mask or in a beast form keeps their own name here
-    contacts.push({ id, name: ownNameOf(id), tag: tagOf(id), online: presenceShown(a, id, online), shared: presenceMutual(a, id), price });
+    contacts.push({ id, name: ownNameOf(id), tag: tagOf(id), online: presenceShown(a, id, online), shared: presenceMutual(a, id), price: kinIds.has(id) && KIN.kinOf(a, id) ? kinFee : price });
   }
   contacts.sort((x, y) => x.name.localeCompare(y.name));
-  const left = PIGEON_COOLDOWN_MS - (Date.now() - (pigeonLastSent.get(profileOf(a)) || 0));
+  // The window holds its Send button while the pigeon is out: with kin to write to, it stays open and the server answers
+  // a letter to anyone else with the wait (a per-contact wait in the window is a front change)
+  const left = kinIds.size ? 0 : PIGEON_COOLDOWN_MS - (Date.now() - (pigeonLastSent.get(profileOf(a)) || 0));
   const nonce = `${a.toString(16)}-${Date.now().toString(36)}`;
   pigeonNonces.set(a, nonce);
   openWidget(a, {
@@ -1781,6 +1830,35 @@ registerChatCommand('pigeonblock', (a, args) => {
     mp.set(a, 'private.pigeonBlock', list);
   } catch (e) { personal(a, 'Failed: ' + e.message); }
 }, { help: '<name|#TAG> toggle ignoring someone\'s pigeons' });
+// /circular [<faction>:] <text>: one letter to every member of a faction, from a notice board, by its leaders and officers
+const circularAt = globalThis.__dboCircularAt instanceof Map ? globalThis.__dboCircularAt : (globalThis.__dboCircularAt = new Map()); // "profile|faction" -> ms
+registerChatCommand('circular', (a, args) => {
+  const raw = String(args || '').trim();
+  const mine = factionsOfKin(a).filter((g) => g.role === 'leader' || g.role === 'officer');
+  if (!mine.length) return personal(a, 'Only a faction\'s leaders and officers send a circular to all its members.');
+  let f = mine[0], text = raw;
+  const m = raw.match(/^([^:]{2,40}):\s*([\s\S]*)$/);
+  if (m && mine.length > 1) {
+    const key = m[1].trim().toLowerCase();
+    const hit = mine.find((g) => String(g.id).toLowerCase() === key || String(g.name || '').toLowerCase().split(/\s+/).some((w) => w.startsWith(key)));
+    if (hit) { f = hit; text = m[2]; }
+  }
+  text = text.trim();
+  if (!text) return personal(a, `/circular <text> sends a letter to every member of ${f.name}${mine.length > 1 ? '; /circular <faction>: <text> for another' : ''}.`);
+  const zoneId = boardZoneNear(a);
+  if (!zoneId) return personal(a, 'A circular goes out from a notice board.');
+  const key = `${profileOf(a)}|${f.id}`;
+  const wait = Math.max(0, Number(PIGEON_KIN.circularMinutes) || 0) * 60000 - (Date.now() - (circularAt.get(key) || 0));
+  if (wait > 0 && !isAdmin(a)) return personal(a, `Your last circular to ${f.name} has only just gone out. Next one in ${Math.ceil(wait / 60000)} min.`);
+  const members = (typeof globalThis.__dboGuildMembers === 'function' ? globalThis.__dboGuildMembers(f.id) : []).map((x) => Number(x) >>> 0).filter((t) => t !== (a >>> 0));
+  let sent = 0, full = 0;
+  const KIN = globalThis.__dboPigeonKin;
+  KIN.circular = f.name;
+  try { for (const t of members) { const r = sendPigeon(a, t, text, zoneId); if (r && r.ok) sent++; else full++; } } finally { KIN.circular = ''; }
+  if (sent) circularAt.set(key, Date.now());
+  audit(`CIRCULAR ${who(a)} to ${f.name}: ${sent} of ${members.length}`);
+  personal(a, sent ? `The faction's birds carry your circular to ${sent} of ${f.name}${full ? `; ${full} could not take it (a full coop)` : ''}.` : `None of ${f.name} could take a circular just now.`);
+}, { help: '[<faction>:] <text>: a letter to every member of your faction, from a notice board (leaders and officers)' });
 
 // ---- incoming chat -------------------------------------------------------------------------
 const quoteSay = (name, verb, body, color) => `#{${color}}${name} ${verb}: "${body}"`;
@@ -3892,6 +3970,14 @@ mp.onEatItem = eatHook;
 // module that fails to load simply contributes nothing. Re-registering on a hot reload replaces the old line.
 const statusParts = globalThis.__dboStatusParts = globalThis.__dboStatusParts || new Map(); // key -> { order, fn }
 globalThis.__dboRegisterStatus = (key, order, fn) => { if (typeof fn === 'function') statusParts.set(String(key), { order: Number(order) || 0, fn }); };
+// Who has written, in /status and the journal's Status (in-game-over-discord B): the letters are still read at a board
+const agoText = (ms) => { const m = Math.max(0, Math.round(ms / 60000)); return m < 60 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
+statusParts.set('letters', { order: 36, fn: (a) => {
+  const waiting = lettersOf(a).filter((m) => !m.read || (m.parcel && !parcelUnbearable(a, m))).sort((x, y) => (y.at || 0) - (x.at || 0));
+  if (!waiting.length) return null;
+  const shown = waiting.slice(0, 4).map((m) => `${m.from} (${agoText(Date.now() - (Number(m.at) || 0))}${m.parcel ? ', a parcel' : ''})`);
+  return `Letters ${waiting.length} waiting at the boards: ${shown.join(', ')}${waiting.length > 4 ? ` and ${waiting.length - 4} more` : ''}`;
+} });
 registerChatCommand('status', (a) => {
   const lines = [];
   for (const [key, part] of [...statusParts].sort((x, y) => x[1].order - y[1].order)) {
