@@ -119,6 +119,10 @@ module.exports = (api) => {
   const isFullMoon = () => { try { return !!(globalThis.__dboClock && typeof globalThis.__dboClock.isFullMoon === 'function' && globalThis.__dboClock.isFullMoon()); } catch (e) { return false; } };
   function standing(b) {
     if (b.event) { const ev = G.events.get(b.id); return !!ev && ev.until > Date.now(); }
+    // A roaming boss waits out its respawn before it stands at its next spot (#bugs 26 Oct, "the Warlord in Pale Pass road is
+    // like respawning maybe 10 seconds after it's killed"; live 27-31 Oct: 74 of 92 kills rose again within 10 min, median
+    // 68 s). Moving the zone to the next spot made the spawner place it at once; a fixed boss keeps its zone and its timer
+    if (b.roam && b.spots.length > 1) { const k = Number(state().kills[b.id]) || 0; if (k && Date.now() - k < (Number(b.respawnSeconds) || 10800) * 1000) return false; }
     const moon = own(b).fullMoon !== undefined ? own(b).fullMoon === true : b.fullMoon === true;
     if (moon) { const f = G.fights.get(b.id); return (isNight() && isFullMoon()) || !!(f && f.boss && f.startedAt); }
     if (b.night) { const f = G.fights.get(b.id); return isNight() || !!(f && f.boss && f.startedAt); }

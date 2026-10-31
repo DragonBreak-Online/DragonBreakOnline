@@ -210,8 +210,15 @@ tick([B]);
 const before = zones().find((x) => x.Name === 'boss:palewarlord:boss').POS.join();
 hit(P3, B, 100, 0.3);
 globalThis.__dboBossDeath(B, P3);
-const after = zones().find((x) => x.Name === 'boss:palewarlord:boss').POS.join();
-ok(before !== after && after === copy.bosses.find((b) => b.id === 'palewarlord').spots[1].pos.join(), 'the Warlord of the Pale Pass rises at his next camp', [before, after]);
+// #bugs 26 Oct: "respawning maybe 10 seconds after it's killed". The zone moved at once and the spawner placed him again
+ok(!zones().some((x) => x.Name.startsWith('boss:palewarlord:')), 'after a kill the roaming Warlord stands nowhere (no zones) while his respawn runs', zones().filter((x) => x.Name.startsWith('boss:palewarlord:')).map((x) => x.Name));
+const respawnMs = copy.bosses.find((b) => b.id === 'palewarlord').respawnSeconds * 1000;
+now += respawnMs - 60000; tick([]);
+ok(!zones().some((x) => x.Name.startsWith('boss:palewarlord:')), '...still nowhere a minute before it ends');
+now += 61000; tick([]);
+const back = zones().find((x) => x.Name === 'boss:palewarlord:boss');
+const after = back ? back.POS.join() : '';
+ok(before !== after && after === copy.bosses.find((b) => b.id === 'palewarlord').spots[1].pos.join(), '...and once it has run he rises at his next camp', [before, after]);
 ok(JSON.parse(fs.readFileSync(path.join(dir, 'bosses-state.json'), 'utf8')).spot.palewarlord === 1, '...kept in bosses-state.json');
 
 // ---- each boss's own config block (Nat, 25 Oct: they go live one by one) ----
