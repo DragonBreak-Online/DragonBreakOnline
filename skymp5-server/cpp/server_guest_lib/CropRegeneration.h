@@ -1,9 +1,5 @@
 #pragma once
 #include "WorldState.h"
-// Headroom on the magicka ceiling for boosts the client applies natively and the server does not model (perks, worn
-// enchantments): live clients regenerated 1.3 to 3 times the server's rate (31 Oct). A 0 rate mult stays a freeze
-constexpr float kMagickaRegenSlack = 3.f;
-
 float CropRegeneration(float newAttributeValue, float secondsAfterLastRegen,
                        float attributeRate, float attributeRateMult,
                        float oldAttributeValue, bool hasActiveMagicEffects);
@@ -16,6 +12,9 @@ float CropMagickaRegeneration(float newAttributeValue,
 
 float CropStaminaRegeneration(float newAttributeValue,
                               float secondsAfterLastRegen, MpActor* actor);
+
+// The share of the magicka bar a second the server's own numbers allow, before magickaRegenSlack
+float MagickaRegenPerSecond(MpActor* actor);
 
 // Clients report vitals about every second, so longer gaps are capped
 float CropPeriodAfterLastRegen(float secondsAfterLastRegen,

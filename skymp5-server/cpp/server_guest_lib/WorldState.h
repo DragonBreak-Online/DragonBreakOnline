@@ -318,6 +318,8 @@ public:
   NpcSettingsEntry defaultSetting;
   bool enableConsoleCommandsForAll = false;
   float regenerationMultiplier = 1.f;
+  // server-settings magickaRegenSlack: headroom on the magicka regen ceiling for boosts only the client applies
+  float magickaRegenSlack = 2.5f;
   MovementLimits movementLimits;
 
   // server-settings spellSync: what of a spell the server delivers beyond its Health damage

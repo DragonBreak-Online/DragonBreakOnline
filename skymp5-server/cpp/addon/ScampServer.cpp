@@ -325,6 +325,23 @@ ScampServer::ScampServer(const Napi::CallbackInfo& info)
       }
     }
 
+    if (serverSettings.find("magickaRegenSlack") != serverSettings.end()) {
+      if (serverSettings.at("magickaRegenSlack").is_number()) {
+        const float slack = serverSettings["magickaRegenSlack"].get<float>();
+        if (slack >= 1.f && slack <= 10.f) {
+          partOne->worldState.magickaRegenSlack = slack;
+        } else {
+          spdlog::error("magickaRegenSlack {} is outside 1 to 10, keeping {}",
+                        slack, partOne->worldState.magickaRegenSlack);
+        }
+      } else {
+        spdlog::error(
+          "Unexpected value of magickaRegenSlack, should be a number");
+      }
+    }
+    spdlog::info("magickaRegenSlack is {}",
+                 partOne->worldState.magickaRegenSlack);
+
     std::string saveIntervalWarning;
     auto saveIntervalMs =
       DatabaseFactory::GetSaveIntervalMs(serverSettings, &saveIntervalWarning);

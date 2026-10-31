@@ -296,6 +296,15 @@ private:
   std::map<std::tuple<uint32_t, uint32_t, uint32_t>, SteadyTime> riderHits;
   // (caster << 32 | target): when that caster's explosion may hold that target again
   std::unordered_map<uint64_t, SteadyTime> explosionHoldReady;
+  // Reports in a row of magicka rising past 2x the server's own rate, and the last [regen-watch] line, per actor
+  struct RegenWatch
+  {
+    int streak = 0;
+    SteadyTime loggedAt{};
+  };
+  std::unordered_map<uint32_t, RegenWatch> regenWatch;
+  void WatchMagickaRegen(MpActor* actor, float reported, float held,
+                         float seconds, SteadyTime now);
   void RecordSpellCast(uint32_t casterId, uint32_t spellId);
   bool CastRecently(uint32_t casterId, uint32_t spellId);
   bool TakeRiderHit(uint32_t casterId, uint32_t spellId, uint32_t targetId);
