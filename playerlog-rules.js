@@ -1661,6 +1661,7 @@ gamemode.js PIGEON 08c63dcc excluded
 gamemode.js CIRCULAR 2d44fcde clean
 heralds.js HERALD 9eb0fce9 excluded
 heralds.js HERALD c8376150 excluded
+heralds.js HERALD e710e773 excluded
 gamemode.js POST 2a604861 parsed
 gamemode.js GM 90ebebeb parsed
 gamemode.js TREASURY 0cdffe5e clean
