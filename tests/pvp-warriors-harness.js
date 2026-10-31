@@ -41,9 +41,9 @@ const runSpell = (src, world) => {
   const recordOf = (id) => { if (SPELLS[id]) return { record: { type: SPELLS[id][0], fields: [] } }; const p = byId(id); return p ? { record: { type: 'ARMO', fields: [{ type: 'BOD2', data: u32(p[2]) }] } } : null; };
   globalThis.__dboArmourClassOf = (id) => ((byId(id) || [])[3] ? 'medium' : 'light');
   delete globalThis.__dboSpellSource;
-  return new Function('PVP', 'mp', 'recordOf', 'fieldsOf', 'u32At', 'profileOf', 'sourceResistsOf', 'ELEMENT_RESIST', 'gearEnch', 'defensePieceMult', 'gearArmorMult',
+  return new Function('cfg', 'PVP', 'mp', 'recordOf', 'fieldsOf', 'u32At', 'profileOf', 'sourceResistsOf', 'ELEMENT_RESIST', 'gearEnch', 'defensePieceMult', 'gearArmorMult',
     'wornWithHealth', 'armorPieceOf', 'armorCountOf', 'potionBonus', src)(
-    CFG.pvp, { get: (a, k) => (k === 'equipment' ? { inv: { entries: (world.worn[a] || []).map((id) => ({ baseId: id, worn: true, wornLeft: byId(id)[2] === 0x200 })) } } : null) },
+    { pvp: CFG.pvp }, CFG.pvp, { get: (a, k) => (k === 'equipment' ? { inv: { entries: (world.worn[a] || []).map((id) => ({ baseId: id, worn: true, wornLeft: byId(id)[2] === 0x200 })) } } : null) },
     recordOf, (r, t) => (r.record.fields || []).filter((f) => f.type === t), (f, o) => new DataView(f.data.buffer).getUint32(o, true),
     (a) => (a >= 100 ? 1 : -1), (id) => new Set((SPELLS[id] || [, []])[1]), { fire: 41, shock: 42, frost: 43 },
     { guardFacing: (tgt) => !!world.guard[tgt] }, () => ({ heavy: 1, light: 1 }), () => ({ heavy: 1, light: 1 }),
