@@ -3598,6 +3598,8 @@ const onCharacterReady = (userId, a) => {
     sendMailState(a);
     // What the heralds have cried near you (heralds.js)
     try { if (typeof globalThis.__dboHeraldLogin === 'function') globalThis.__dboHeraldLogin(a); } catch (e) { log('herald login line failed', e.message); }
+    // The standing orders of the character's factions (rosters.js)
+    try { if (typeof globalThis.__dboRosterLogin === 'function') globalThis.__dboRosterLogin(a); } catch (e) { log('orders login line failed', e.message); }
     try { pushHud(a, needsOf(a), true); } catch (e) { /* hud later */ }
     try { if (globalThis.__dboPartyLogin) globalThis.__dboPartyLogin(a); } catch (e) { log('party login failed', e.message); }
     sendFavorites(a);
@@ -9508,6 +9510,13 @@ try {
   delete require.cache[HERALDS_JS];
   require(HERALDS_JS)({ mp, log, personal, system, registerChatCommand, onlineActors, profileOf, nameOf, zoneById, takeGold, depositToTreasury, every, audit, isAdmin, zoneOfActor, giveItem, GOLD_BASE, cfg });
 } catch (e) { log('heralds.js failed to load:', e.stack || e.message); globalThis.__dboHeraldLogin = null; }
+
+// ---- a faction's roll and standing orders: /roster, /orders (server\rosters.js, config "rosters") -------------------
+try {
+  const ROSTERS_JS = path.resolve('rosters.js');
+  delete require.cache[ROSTERS_JS];
+  require(ROSTERS_JS)({ log, personal, registerChatCommand, onlineActors, nameOf, zoneOfActor, zoneById, every, audit, cfg });
+} catch (e) { log('rosters.js failed to load:', e.stack || e.message); globalThis.__dboRosterLogin = null; }
 
 // ---- /monitor: the dbo-monitor service's view for staff (server\monitor.js; tooling/dbo-monitor) -----------------
 try {

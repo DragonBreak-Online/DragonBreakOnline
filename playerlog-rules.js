@@ -466,6 +466,8 @@ excluded('VAMPATH', 'reasons can name a GM; the drain\'s permadeath logs as PERM
 clean_('CIRCULAR');
 // MUSTER (heralds.js, 31 Oct): a faction's muster pay, the faction and counts only
 clean_('MUSTER');
+// ORDERS (rosters.js, 31 Oct): who set or took down a faction's standing orders; never their text
+clean_('ORDERS');
 // HONOURS (heralds.js, 31 Oct): the month's named by their own names, cried to all; the title shows in the journal
 excluded('HONOURS', 'own names of the month\'s honoured, a public cry');
 // HERALD (heralds.js, 31 Oct): the gathering's title is the player's own words, as /event's broadcast text is
@@ -1668,6 +1670,8 @@ heralds.js HERALD c8376150 excluded
 heralds.js HERALD e710e773 excluded
 heralds.js MUSTER ee506967 clean
 heralds.js HONOURS d87bd03b excluded
+rosters.js ORDERS 1619f997 clean
+rosters.js ORDERS 0a76e0c8 clean
 gamemode.js POST 2a604861 parsed
 gamemode.js GM 90ebebeb parsed
 gamemode.js TREASURY 0cdffe5e clean
