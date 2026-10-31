@@ -113,5 +113,17 @@ ok(last().customPacketType === 'dboScaleform' && last().swf === 'dbo_labour', 'a
 closeWidget(E, 55);
 ok(last().customPacketType === 'dboScaleform' && last().close === true, 'labourCancel\'s closeWidget closes the custom menu', last());
 
+// The bank (bank.js: widget 48), native for a client with native:bank (fork native-bank-1031)
+const F = 0xff000006;
+openWidget(F, { type: 'bank', id: 48, nonce: 'b1', balance: 10, carried: 5 });
+ok(last().customPacketType === 'dboWidget', 'the bank without native:bank stays in the browser', last());
+setCaps(F, ['native:bank']);
+openWidget(F, { type: 'bank', id: 48, nonce: 'b1', balance: 10, carried: 5 });
+ok(last().customPacketType === 'dboScaleform' && last().swf === 'dbo_bank' && last().widget === 48, 'with native:bank it goes to dbo_bank', last());
+openWidget(F, { type: 'bank', id: 48, nonce: 'b1', balance: 5, carried: 10, result: 'You deposit 5 gold.', resultKind: 'ok' });
+ok(last().customPacketType === 'dboScaleform' && last().payload.result === 'You deposit 5 gold.', 'an action\'s answer re-sends it to the same panel', last());
+closeWidget(F, 48);
+ok(last().customPacketType === 'dboScaleform' && last().close === true, 'bankClose\'s closeWidget closes the custom menu', last());
+
 console.log(fails ? `\n${fails} failed` : '\nall passed');
 process.exit(fails ? 1 : 0);
