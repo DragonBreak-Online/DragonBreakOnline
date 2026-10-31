@@ -37,7 +37,7 @@ export const DBO_PREFIX = "dbo:";
 // the shell can land before all fifteen are drawn (Worker 1, 26 Oct). Profile and Settings stay in the
 // browser deliberately and have no cap.
 export const JOURNAL_TABS = [
-  "stats", "world", "wanted", "keys", "deity", "magic", "skills", "supernatural",
+  "profile", "stats", "world", "wanted", "keys", "deity", "magic", "skills", "supernatural",
   "citizen", "referrals", "notes", "thalmor", "nobility", "court", "faction",
 ];
 

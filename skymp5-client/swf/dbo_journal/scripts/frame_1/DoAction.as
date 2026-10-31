@@ -1,6 +1,6 @@
 // The Character Journal (F3, widget 50) as a native panel, drawn from the hub payload journal.js sends. The server routes
-// here only the tabs this swf draws (the client's native:journalTab:<id> caps); Profile, Settings and the rest are the
-// browser journal's, so a click on one of them asks the server, which moves the journal there.
+// here only the tabs this swf draws (the client's native:journalTab:<id> caps); Settings and the rest are the browser
+// journal's, so a click on one of them asks the server, which moves the journal there.
 // A tab's typed input is a form drawn in place of the tab (ctx.form), typed in boxes on their own rows (dboInput); a tab
 // whose typing is not native yet, or a game that cannot type, still hands it to the browser journal for that tab:
 // journalTab [nonce, tab, focus, "browser"].
@@ -26,6 +26,8 @@ var busy = false;
 var busyAt = 0;
 var pages = {};
 var asking = null;
+// tabTick: a tab's own clock, set as it draws (Profile's powers): true when the page should be drawn again this frame
+var tabTick = null;
 var builtAt = getTimer();
 
 function send(key, args)
@@ -179,6 +181,7 @@ function drawBody()
    var b = clear("body", 40);
    flowStart(b, 1, PAD, bodyTop);
    formBegin();
+   tabTick = null;
    if (forming != null)
    {
       ctx.busy = busy;
@@ -434,6 +437,10 @@ _root.onEnterFrame = function()
    {
       busy = false;
       showResult();
+   }
+   if (tabTick != null && data != null && forming == null && asking == null && tabTick())
+   {
+      draw();
    }
 };
 

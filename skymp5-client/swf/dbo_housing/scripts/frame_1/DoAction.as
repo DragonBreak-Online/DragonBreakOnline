@@ -1,7 +1,7 @@
 // The property menu as a native panel (client housingService's widget, the same object the browser menu gets).
 // Events go out as the widget's own keys (events.*), which the client router replays as the browser would. "Rename..." types
-// the name in the panel (dboInput); "Type in the browser instead" hands the name box to the browser (native:handoff), and is
-// all there is on a game that cannot take typed input.
+// the name in the panel (dboInput); only a game that cannot take typed input hands the name box to the browser
+// (native:handoff).
 
 var DBO_SWF_VERSION = "housing-2";
 var STAGE_W = 1280;
@@ -281,12 +281,6 @@ function drawRename()
       dboSound("UIMenuCancel");
       endRename();
       draw();
-   });
-   button(l, "browser", 12, RIGHT_X, ACT_TOP + 156, 290, "Type in the browser instead", F_MEDIUM, 18, A_ROW_REST, function()
-   {
-      endRename();
-      dboSound("UIMenuOK");
-      dboSend("native:handoff", ["housing", "rename"]);
    });
    return 1;
 }

@@ -47,10 +47,9 @@ const rooms = (t) => Object.keys(P(t).right.kids).filter((n) => /^r\d$/.test(n))
   const rn = msgs(t, 'housing:rename');
   check('Save sends the rename event with the trimmed name, gives the keys back, and leaves the box', rn.length === 1 && rn[0].args[0] === 'Thorn Hall' && !P(t).right.box && held(t) === 0, rn);
   btn(t, 'Rename...').onRelease();
-  P(t).right.browser.onRelease();
-  const h = msgs(t, 'native:handoff');
-  check('Type in the browser instead hands the name box to the browser', h.length === 1 && h[0].args.join('|') === 'housing|rename' && !closed(t), h);
-  check('...and gives the keys back', held(t) === 0, held(t));
+  check('a game that can type is offered no browser name box', !P(t).right.browser && !msgs(t, 'native:handoff').length);
+  t.press(27);
+  check('...and Escape gives the keys back', held(t) === 0, held(t));
   btn(t, 'Rename...').onRelease();
   t.press(27);
   check('Escape leaves the name box, not the menu', !P(t).right.box && !closed(t));
@@ -62,7 +61,7 @@ const rooms = (t) => Object.keys(P(t).right.kids).filter((n) => /^r\d$/.test(n))
   check('...and Escape after it gives them back', held(t) === 0, held(t));
   {
     // every way out of the name box after N re-publishes: held once, given back once, never below zero
-    const ways = { 'Escape': (c) => c.press(27), 'Save': (c) => P(c).right.save.onRelease(), 'the browser': (c) => P(c).right.browser.onRelease(), 'Close': (c) => P(c).foot.close.onRelease() };
+    const ways = { 'Escape': (c) => c.press(27), 'Save': (c) => P(c).right.save.onRelease(), 'Close': (c) => P(c).foot.close.onRelease() };
     for (const [way, out] of Object.entries(ways)) {
       const c = S.boot('dbo_housing');
       c.push(base);

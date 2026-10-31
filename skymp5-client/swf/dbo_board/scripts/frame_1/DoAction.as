@@ -1,7 +1,7 @@
 // The notice board as a native panel (client bountyBoardService's widget, the same object the browser board gets).
 // Events go out as the widget's own keys (events.post/remove/close) and dbo:* hand-overs; the client router replays them as
-// the browser would. "Write a notice..." types in the panel (dboInput); "Type in the browser instead" hands the composer
-// to the browser (native:handoff), and is all there is on a game that cannot take typed input.
+// the browser would. "Write a notice..." types in the panel (dboInput); only a game that cannot take typed input hands the
+// composer to the browser (native:handoff).
 
 var DBO_SWF_VERSION = "board-2";
 var STAGE_W = 1280;
@@ -319,10 +319,6 @@ function drawCompose()
       endCompose();
       draft = "";
       draw();
-   });
-   button(l, "browser", 12, PANEL_W - PAD - 290, LIST_TOP + 306, 290, "Type in the browser instead", F_MEDIUM, 18, A_ROW_REST, function()
-   {
-      toBrowser();
    });
    return 1;
 }

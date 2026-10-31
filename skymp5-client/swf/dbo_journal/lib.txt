@@ -3,6 +3,7 @@ dbo-controls.as
 dbo-flow.as
 dbo-form.as
 ../dbo_journal/tabs.as
+../dbo_journal/tabs/profile.as
 ../dbo_journal/tabs/stats.as
 ../dbo_journal/tabs/world.as
 ../dbo_journal/tabs/wanted.as

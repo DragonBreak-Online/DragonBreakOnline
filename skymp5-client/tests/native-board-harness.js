@@ -170,9 +170,8 @@ const closed = (t) => t.closed();
   t.press(27);
   check('Escape leaves the composer, not the board, and gives the keys back', !P(t).list.box && !t.sent.some((m) => m.e === 'closeMenu') && held(t) === 0, held(t));
   P(t).foot.write.onRelease();
-  P(t).list.browser.onRelease();
-  const h = msgs(t, 'native:handoff');
-  check('Type in the browser instead hands the composer for this tab to the browser', h.length === 1 && h[0].args.join('|') === 'bountyBoard|compose:shop', h);
+  check('a game that can type is offered no browser composer', !P(t).list.browser && !msgs(t, 'native:handoff').length);
+  t.press(27);
   const n = S.boot('dbo_board', false, { noTyping: true });
   n.push(board);
   P(n).head.tab1.onRelease();
@@ -188,7 +187,6 @@ const closed = (t) => t.closed();
     'another tab': (c) => P(c).head.tab0.onRelease(),
     'a hand-over (Letters)': (c) => P(c).head.ho0.onRelease(),
     'a footer hand-over': (c) => P(c).foot.f0.onRelease(),
-    'Type in the browser instead': (c) => P(c).list.browser.onRelease(),
     'our notice pinned': (c) => { P(c).list.box.text = 'Mead'; P(c).list.box.onChanged(); P(c).list.post.onRelease(); c.push(mine); },
   };
   for (const [way, out] of Object.entries(ways)) {
