@@ -83,7 +83,16 @@ EDID_FIRST = [(r'AncientImperial', 'ancient_imperial'), (r'GlacialCrystal', 'gla
               (r'^0WHPiecesBearCapeBigReward$', 'hide'), (r'FishingRod', 'tool'), (r'^MCEArmorGiant', 'hide'), (r'^MCEArmorTsun', 'artifact'),
               # the Skyrim release (15 Oct): Ancient Imperial Armor SE's 1AnIm* pieces carry Iron keywords; the Adamantium
               # Addon's pieces, copied into DragonBreak Armory.esp (DBOArm_AdamArmor*), carry none
-              (r'^1AnIm', 'ancient_imperial'), (r'^DBOArm_AdamArmor', 'adamantium')]
+              (r'^1AnIm', 'ancient_imperial'), (r'^DBOArm_AdamArmor', 'adamantium'),
+              # Journey to Baan Malur's Great House weapons (Worker 6's smithing report, 31 Oct): they carry no
+              # material keyword and came out unclassified, so the Dunmer weapon tab was nearly empty. Their own
+              # sharpening-wheel tempers are the only statement of material - steel plus malachite for Telvanni and
+              # Indoril, steel plus orichalcum for Dres - and the forge recipes added in Nexus Patches gate on
+              # GlassSmithing and OrcishSmithing to match, so the families follow the same reading. Bonemold (tier 3)
+              # would have left a weapon needing the glass perk to forge but counting as two tiers lower here.
+              # RedoranGuardSabre is already bonemold by keyword and is left alone: it is the one real bonemold piece.
+              (r'^(TelvanniLongsword|TelvanniRoundaxe|IndorilSword|IndorilGlaive)$', 'glass'),
+              (r'^(DresBastardBlade|DresBattleaxe|DresBroadsword)$', 'orcish')]
 # Sets named by editor id whose metal pieces borrow another material's keyword (the Ayleid gear Elven, the Goblin gear
 # Iron or Leather); their robes and staves stay clothing and staves
 SET_BY_NAME = [(r'Ayleid', 'ayleid'), (r'Goblin', 'goblin'),
