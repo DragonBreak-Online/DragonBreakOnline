@@ -89,7 +89,7 @@ const scenarios = (src, live) => {
   check(same(d, e) && d.speed === -43 && d.regen === 0.53 && d.cost === 1.48, 'full tier 7 heavy at Defense 0: speed -43 (30 over-tier + 13 heavy), stamina recovery x0.53, costs x1.48', [d, e]);
   const p = r.packets.find((x) => x.customPacketType === 'dboArmourWear');
   check(!!p && p.speedMult === -43 && p.staminaCostMult === 1.48 && p.staminaRegenMult === 0.53, '...sent to the client as dboArmourWear', p);
-  check(r.told.length === 1 && /needs Defense 90, you have 0 \(and 3 more pieces above you\): you'll feel the weight/.test(r.told[0]) && /move 43% slower/.test(r.told[0]) && /stamina 47% slower/.test(r.told[0]) && /48% more stamina/.test(r.told[0]) && /protects you fully/.test(r.told[0]), '...and the player is told once why, with the gap', r.told);
+  check(r.told.length === 1 && /needs Defense 90, you have 0 \(and 3 more pieces above you\): you'll feel the weight/.test(r.told[0]) && /move 43% slower/.test(r.told[0]) && /stamina 47% slower/.test(r.told[0]) && !/more stamina/.test(r.told[0]) && /protects you fully/.test(r.told[0]), '...and the player is told once why, with the gap (not the stamina costs, which nothing applies yet)', r.told);
   check(globalThis.__dboWearRegenMult(a, 'stamina') === 0.53 && globalThis.__dboWearRegenMult(a, 'magicka') === 1, 'racial.js reads the stamina factor (magicka untouched)');
   r = s.equip(a, FULL7);
   check(r.told.length === 0 && r.packets.length === 0, 'the same outfit again: no repeat, no packet');

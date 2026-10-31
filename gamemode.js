@@ -7652,7 +7652,7 @@ const WEAR_DEBUFF = Object.assign({
   slotWeights: { body: 0.5, head: 0.15, hands: 0.15, feet: 0.15, shield: 0.05 },
   scale: 'gap', gapForFull: 45, caps: { speed: -30, staminaRegen: -50, staminaCost: 50 },
   speed: [0, -10, -20, -30], staminaRegen: [0, -15, -30, -50], staminaCost: [0, 15, 30, 50],
-  heavySlow: -15, heavySlowUntilDefense: 75, mediumSlowShare: 0.5, maxSlow: -45, recheckSeconds: 30,
+  heavySlow: -15, heavySlowUntilDefense: 75, mediumSlowShare: 0.5, maxSlow: -45, recheckSeconds: 30, costApplied: false,
   t1Min: { heavy: 25, light: 20 }, t2Max: { heavy: 31, light: 28 },
   slotShare: { heavy: { body: 1, head: 0.47, hands: 0.36, feet: 0.36, shield: 0.7 }, light: { body: 1, head: 0.42, hands: 0.29, feet: 0.29, shield: 0.7 } },
   headCosmetic: 'circlet|hood|cowl|mask|crown|diadem|veil|\\bhat\\b|scarf|bandana', allow: [],
@@ -7719,7 +7719,8 @@ const wearParts = (a, d) => {
   const client = hasUiCap(a, WEAR_CAP); const parts = [];
   if (client && d.speed < 0) parts.push(`you move ${-d.speed}% slower`);
   if (d.regen < 1) parts.push(`recover stamina ${Math.round((1 - d.regen) * 100)}% slower`);
-  if (client && d.cost > 1) parts.push(`power attacks and sprinting cost ${Math.round((d.cost - 1) * 100)}% more stamina`);
+  // The cost is computed and sent but applied nowhere yet: scaling the stamina GMSTs on a client would change every NPC it hosts
+  if (client && d.cost > 1 && WEAR_DEBUFF.costApplied === true) parts.push(`power attacks and sprinting cost ${Math.round((d.cost - 1) * 100)}% more stamina`);
   return parts;
 };
 // racial.js regen tick: stamina recovery while worn (1 = none)
