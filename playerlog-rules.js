@@ -99,7 +99,7 @@ const ACCESS = E('owner', 'key', 'assignee', 'shared', 'manager', 'staff', 'lock
 const TIER = E('senior', 'developer', 'leadgm', 'gm', 'trialgm', 'none');
 const SIDE = O({ hits: 'int', dmg: 'num', by: A(NAME, 8) });
 const REFUSAL_REASONS = ['god', 'ethereal', 'offline_body', 'login_grace', 'bound', 'paralysed', 'armour_change', 'damage_cap',
-  'spell_rate', 'dungeon_ally', 'warband', 'companion_pvp', 'silver', 'recovering', 'downed', 'shout_not_given',
+  'spell_rate', 'dungeon_ally', 'briarheart_spared', 'warband', 'companion_pvp', 'silver', 'recovering', 'downed', 'shout_not_given',
   'friendly_lethal', 'duel_pause', 'duel_rules', 'duel_beaten', 'duel_scaled', 'duel_outsider', 'anticheat', 'asylum', 'in_editor', 'silver_test', 'frenzy_downed', 'frenzy_spared', 'unknown'];
 
 // The anticheat kinds a sec.signal may carry (anticheat.js acFlag and the fork's onAnticheat through it; ANTI-CHEAT DESIGN
@@ -683,6 +683,7 @@ excluded('GUILD', 'player guild names, a GM\'s reason');
 excluded('BOUNTY', 'the reason a ruler gave for a bounty');
 excluded('FACTION-RANK FACTION-MERGE', 'config-run faction upkeep at load (guilds.js addRanks, mergeRosters): faction names, rank titles and stored member names, no who()');
 excluded('EXPOSURE', 'staff only: who was seen changing into a beast, its witnesses and a GM\'s reason');
+excluded('FACTION-RULES', 'staff only: the faction rules\' open and settled cases, by character list and faction id; the player is told in chat');
 excluded('LEADERSHIP', 'staff only: a double still seated days after the step-down notice; its seats are rank titles a faction\'s leader or a Lead GM renames, player-named charters and risings, and office names staff can rename');
 excluded('REBELLION', 'player-named risings and a secret petition\'s code');
 excluded('REFERRAL', 'staff only: profiles by number, staff reasons, PC sharing');
@@ -1715,6 +1716,8 @@ greenpact.js PARTAKE 6dd41892 clean
 guilds.js FACTION-LIMIT 80aca6c8 parsed
 guilds.js FACTION-LIMIT ae8015bc parsed
 guilds.js FACTION-RANK 77565f59 excluded
+guilds.js FACTION-RULES e92176bb excluded
+guilds.js FACTION-RULES 2c8df581 excluded
 guilds.js FACTION-MERGE 03cc2a6a excluded
 guilds.js FACTION-MERGE 2062ec33 excluded
 guilds.js FACTION f8d4e175 parsed

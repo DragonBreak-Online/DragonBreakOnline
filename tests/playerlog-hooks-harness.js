@@ -89,7 +89,7 @@ ok(reasons.length >= 14 && reasons.every(([, r]) => R.REFUSAL_REASONS.includes(r
 // other harnesses read), in order, and clears it before the fork chain and the summon guard, whose refusals stay unnamed
 const hook = gm.slice(gm.indexOf('const hitDamageAttemptHook ='), gm.indexOf('const hitDamageAttemptLogged ='));
 const marks = [...hook.matchAll(/globalThis\.__dboHitRefusal = (?:'([a-z_]+)'|null);/g)].map((m) => [m[1] || null, m.index]);
-const order = ['shout_not_given', 'ethereal', 'asylum', 'offline_body', 'in_editor', 'login_grace', 'bound', 'paralysed', 'armour_change', 'damage_cap', 'spell_rate', 'dungeon_ally', 'warband', 'silver_test', null];
+const order = ['shout_not_given', 'ethereal', 'asylum', 'offline_body', 'in_editor', 'login_grace', 'bound', 'paralysed', 'armour_change', 'damage_cap', 'spell_rate', 'dungeon_ally', 'briarheart_spared', 'warband', 'silver_test', null];
 ok(JSON.stringify(marks.map(([r]) => r)) === JSON.stringify(order), 'gamemode\'s hit hook: a reason for each gate, in order, then cleared', marks.map(([r]) => r));
 const firstGate = hook.indexOf('return false');
 const prevAt = hook.indexOf('const prev = globalThis.__dboPrevHitDamageAttempt');
