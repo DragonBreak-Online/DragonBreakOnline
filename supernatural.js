@@ -406,7 +406,9 @@ module.exports = (api) => {
     const G = C.goblinEyes || {}; const desc = String((on ? G.txst : G.txstMortal) || '');
     if (!desc || !G.node) return false;
     try {
-      mp.callPapyrusFunction('global', 'NetImmerse', 'SetNodeTextureSet', null, [{ type: 'form', desc: mp.getDescFromId(a >>> 0) }, String(G.node), { type: 'form', desc }, false]);
+      // The texture set is a base record (TXST): 'espm', which the server's SetNodeTextureSet reads with GetRecordPtr. As
+      // 'form' it was looked up among world forms and threw "Form with id ... doesn't exist" (266 lines on live, sweep a4)
+      mp.callPapyrusFunction('global', 'NetImmerse', 'SetNodeTextureSet', null, [{ type: 'form', desc: mp.getDescFromId(a >>> 0) }, String(G.node), { type: 'espm', desc }, false]);
       log(`supernatural: ${display(a)}'s goblin eyes ${on ? 'glow' : 'are their own again'}`);
       return true;
     } catch (e) { log(`supernatural: goblin eyes for ${display(a)} failed: ${e.message}`); return false; }
