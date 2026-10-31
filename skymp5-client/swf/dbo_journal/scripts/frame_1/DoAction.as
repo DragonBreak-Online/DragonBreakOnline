@@ -97,8 +97,10 @@ function closeJournal()
 }
 
 // A form in place of the tab, for typed input. build(vals) returns {title, hint, fields, buttons}, where a field is
-// {key, label, kind: "text" | "number" | "choice" | "note", max, hint, options: [[value, label], ...], empty, text} and a
-// button [label, onSubmit(vals), ready, danger]; vals are what the player typed and chose, by key. A button that is ready
+// {key, label, kind: "text" | "number" | "choice" | "multi" | "note" | "buttons", max, hint, options: [[value, label], ...],
+// empty, text, items} and a button [label, onSubmit(vals), ready, danger]; vals are what the player typed and chose, by key.
+// A "multi" field keeps an array of the values picked (at most max); a "buttons" field's items [label, fn(vals), disabled,
+// danger] change vals in place and redraw (a draft's Up, Remove, Add) without closing the form. A button that is ready
 // closes the form and runs; Cancel and Escape close it.
 function form(build, vals)
 {
@@ -196,6 +198,68 @@ function drawForm()
       {
          flowHint(String(f.text));
       }
+      else if (f.kind == "buttons")
+      {
+         var items = listOf(f.items);
+         var ib = [];
+         for (var m = 0; m < items.length; m++)
+         {
+            ib.push([String(items[m][0]), function() { this.fn(forming.vals); dboSound("UIMenuFocus"); draw(); }, items[m][3] == true ? C_RED : undefined, items[m][2] == true]);
+         }
+         if (ib.length)
+         {
+            var ir = flowButtons(ib);
+            for (var w = 0; w < items.length; w++)
+            {
+               ir["btn" + w].fn = items[w][1];
+            }
+         }
+      }
+      else if (f.kind == "multi")
+      {
+         flowText(String(f.label), 16, C_SECOND);
+         var mo = listOf(f.options);
+         if (!mo.length)
+         {
+            flowHint(f.empty != undefined ? String(f.empty) : "Nothing to choose from.");
+            continue;
+         }
+         var picked = listOf(vals[f.key]);
+         var mc = [];
+         for (var x = 0; x < mo.length; x++)
+         {
+            var on = formHas(picked, mo[x][0]);
+            mc.push([String(mo[x][1]), function()
+            {
+               var cur = listOf(forming.vals[this.key]).slice();
+               var at = -1;
+               for (var y = 0; y < cur.length; y++)
+               {
+                  if (String(cur[y]) == String(this.v))
+                  {
+                     at = y;
+                  }
+               }
+               if (at >= 0)
+               {
+                  cur.splice(at, 1);
+               }
+               else
+               {
+                  cur.push(this.v);
+               }
+               forming.vals[this.key] = cur;
+               dboSound("UIMenuFocus");
+               draw();
+            }, undefined, !on && f.max != undefined && picked.length >= f.max, on]);
+         }
+         var mr = flowButtons(mc);
+         for (var z = 0; z < mo.length; z++)
+         {
+            mr["btn" + z].key = String(f.key);
+            mr["btn" + z].v = mo[z][0];
+         }
+      }
       else if (f.kind == "choice")
       {
          flowText(String(f.label), 16, C_SECOND);
@@ -251,6 +315,18 @@ function drawForm()
    {
       bar["btn" + n].go = list[n][1];
    }
+}
+
+function formHas(list, v)
+{
+   for (var i = 0; i < list.length; i++)
+   {
+      if (String(list[i]) == String(v))
+      {
+         return true;
+      }
+   }
+   return false;
 }
 
 // A whole number typed in a form, or -1 when it is not one

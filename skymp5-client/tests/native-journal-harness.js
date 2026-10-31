@@ -461,7 +461,7 @@ const firstPage = (t) => { for (let i = 0; i < 6; i++) t.press(33); };
   const t = S.boot('dbo_journal');
   t.push(hub('faction', { tabs: T7, faction: fac }));
   let tx = allPages(t);
-  check('Faction: the sub-tabs drawn by the browser, an invitation, the hold household pointed to Court', /Realm\.\.\.\|War \(2\)\.\.\.\|Found a faction/.test(tx), tx);
+  check('Faction: its views as a row (Members first), an invitation, the hold household pointed to Court', /Members\|Realm\|War \(2\)\|Found a faction/.test(tx), tx);
   firstPage(t);
   tx = texts(t).join('|');
   check('...an invite with Join, the court household left to Court, your faction open', /Gemma invites you to Mages Guild/.test(tx) && /Your hold's household is on the Court tab\./.test(tx) && /Fighters Guild\|Guild  -  you are Champion/.test(tx) && !btn(t, 'House of Bruma (Retainer)'), tx);
@@ -484,10 +484,10 @@ const firstPage = (t) => { for (let i = 0; i < 6; i++) t.press(33); };
   btn(t, 'Found a faction').onRelease();
   check('Found a faction opens the charter in the panel', msgs(t, 'dbo:menuFind').pop().args.join('|') === 'charter');
   pageWith('Invite someone...').onRelease();
-  check('inviting by name hands the tab to the browser', msgs(t, 'dbo:journalTab').pop().args[3] === 'browser');
+  check('inviting by name is a form here, not a hand-off to the browser', !msgs(t, 'dbo:journalTab').some((m) => m.args[3] === 'browser') && /Invite someone to Fighters Guild/.test(texts(t).join('|')));
   const st = S.boot('dbo_journal');
   st.push(hub('faction', { tabs: T7, faction: Object.assign({}, fac, { staff: true }) }));
-  check('staff get the staff view in the browser', btn(st, 'Staff view...') && !btn(st, 'Join'));
+  check('staff get every faction here, not the browser', btn(st, 'Every faction') && !btn(st, 'Staff view...') && !btn(st, 'Join'));
 }
 
 

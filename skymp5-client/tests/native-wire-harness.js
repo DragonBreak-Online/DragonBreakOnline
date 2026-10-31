@@ -175,7 +175,8 @@ if (SERVER) {
   const src = fs.readdirSync(path.resolve(__dirname, '..', 'swf/dbo_journal/tabs')).map((f) => read(`swf/dbo_journal/tabs/${f}`)).concat(read('swf/dbo_journal/scripts/frame_1/DoAction.as')).join('\n');
   const keys = [...new Set([...src.matchAll(/"dbo:([A-Za-z]+)"|act\("([A-Za-z]+)"/g)].map((m) => m[1] || m[2]))];
   const all = fs.readdirSync(SERVER).filter((f) => f.endsWith('.js')).map((f) => fs.readFileSync(path.join(SERVER, f), 'utf8')).join('\n');
-  const missing = keys.filter((k) => !new RegExp(`onUi\\('${k}'`).test(all));
+  // playerguilds.js and rebellion.js (the Faction tab's Guild and Rebellion views) register through their own tab() around onUi
+  const missing = keys.filter((k) => !new RegExp(`(onUi|tab)\\('${k}'`).test(all));
   check(`dbo_journal: the server handles every event its ${keys.length} keys name`, keys.length > 20 && !missing.length, missing);
 }
 

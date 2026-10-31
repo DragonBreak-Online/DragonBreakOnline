@@ -1,13 +1,15 @@
 // Faction (guilds.js, the faction menu inside the journal): invitations, your factions and the open one's members with their
 // rank and Remove, Leave and Found a faction. Its actions carry the faction menu's own nonce (dbo:faction* [faction nonce, ...]).
-// Inviting by name and the rank editor are typed, and the Realm map, War, Treasury, Guild and Rebellion and the staff view
-// are drawn by the browser journal, so each of those opens this tab there
+// A row of views picks Members, Realm, War, Treasury, Guild or Rebellion (tabs/factionviews.as draws all but Members);
+// staff get every faction. Inviting by name and the rank editor are forms in place of the tab (ctx.form)
 var FACTION_KIND = {hold: "Hold", stronghold: "Stronghold", guild: "Guild", cult: "Cult"};
 var facSelected = "";
 var facPicked = "";
 var facNonce = "";
 var facRanking = "";
 var facOf = "";
+// facView: the view shown, "" for Members, else realm, war, treasury, guild or rebellion
+var facView = "";
 
 function facSend(s, ctx, key, args)
 {
@@ -39,6 +41,7 @@ JT.faction = function(s, ctx)
    {
       facOf = cacheOf;
       facPicked = "";
+      facView = "";
    }
    if (s.selected != undefined && s.selected != "" && s.selected != facSelected)
    {
@@ -49,32 +52,72 @@ JT.faction = function(s, ctx)
    {
       flowText(s.result, 17, s.resultKind == "refused" ? C_RED : C_TEXT);
    }
-   var subs = [];
-   subs.push(["Realm...", function() { ctx.browser(); }]);
+   var views = [[s.staff == true ? "Every faction" : "Members", ""], ["Realm", "realm"]];
    var realm = s.realm;
    var wars = realm != undefined && realm != null ? listOf(realm.wars).length : 0;
-   subs.push(["War" + (wars ? " (" + wars + ")" : "") + "...", function() { ctx.browser(); }]);
+   views.push(["War" + (wars ? " (" + wars + ")" : ""), "war"]);
    if (s.economy != undefined && s.economy != null && listOf(s.economy.factions).length)
    {
-      subs.push(["Treasury...", function() { ctx.browser(); }]);
+      views.push(["Treasury", "treasury"]);
    }
    if (s.band != undefined && s.band != null && s.staff != true)
    {
-      subs.push(["Guild" + (listOf(s.band.invites).length ? " (" + s.band.invites.length + ")" : "") + "...", function() { ctx.browser(); }]);
+      views.push(["Guild" + (listOf(s.band.invites).length ? " (" + s.band.invites.length + ")" : ""), "guild"]);
    }
    if (s.rebellion != undefined && s.rebellion != null && s.staff != true)
    {
-      subs.push(["Rebellion...", function() { ctx.browser(); }]);
+      views.push(["Rebellion", "rebellion"]);
+   }
+   var shownView = "";
+   for (var sv = 0; sv < views.length; sv++)
+   {
+      if (views[sv][1] == facView)
+      {
+         shownView = facView;
+      }
+   }
+   var subs = [];
+   for (var vi = 0; vi < views.length; vi++)
+   {
+      subs.push([views[vi][0], function() { facView = this.view; pages[tab] = 0; dboSound("UIMenuPrevNext"); draw(); }, undefined, false, views[vi][1] == shownView]);
    }
    if (s.charters == true && s.staff != true)
    {
       subs.push(["Found a faction", function() { dboSound("UIMenuOK"); send("dbo:menuFind", ["charter"]); }]);
    }
-   flowButtons(subs);
+   var vb = flowButtons(subs);
+   for (var vq = 0; vq < views.length; vq++)
+   {
+      vb["btn" + vq].view = views[vq][1];
+   }
+   if (shownView == "realm")
+   {
+      facRealm(s, ctx, off);
+      return;
+   }
+   if (shownView == "war")
+   {
+      facWar(s, ctx, off);
+      return;
+   }
+   if (shownView == "treasury")
+   {
+      facTreasury(s, ctx, off);
+      return;
+   }
+   if (shownView == "guild")
+   {
+      facGuild(s, ctx, off);
+      return;
+   }
+   if (shownView == "rebellion")
+   {
+      facRebellion(s, ctx, off);
+      return;
+   }
    if (s.staff == true)
    {
-      flowHint("The staff view of every faction is in the browser journal.");
-      flowButtons([["Staff view...", function() { ctx.browser(); }]]);
+      facStaff(s, ctx, off);
       return;
    }
    var invites = listOf(s.invites);
@@ -181,11 +224,11 @@ JT.faction = function(s, ctx)
    var more = [];
    if (f.canInvite == true)
    {
-      more.push(["Invite someone...", function() { ctx.browser(); }, undefined, off]);
+      more.push(["Invite someone...", function() { facInvite(s, ctx, f); }, undefined, off]);
    }
    if (f.canRename == true)
    {
-      more.push(["Ranks and names...", function() { ctx.browser(); }, undefined, off]);
+      more.push(["Ranks and names...", function() { facRanks(s, ctx, f); }, undefined, off]);
    }
    if (f.myRank >= 0)
    {

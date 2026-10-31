@@ -17,3 +17,4 @@ dbo-flow.as
 ../dbo_journal/tabs/nobility.as
 ../dbo_journal/tabs/court.as
 ../dbo_journal/tabs/faction.as
+../dbo_journal/tabs/factionviews.as
