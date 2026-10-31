@@ -19,7 +19,13 @@ PartOne& GetPartOne();
 // The timings are PartOne members so this runs in milliseconds, and Timings restores them in its destructor so
 // a REQUIRE that aborts a test cannot leave the shared instance set to milliseconds for everything after it.
 // The sweep needs two passes to release: the first stamps hostSeenSince for a hoster with no movement stamp
-// yet, the second sees the age.
+// yet, the second sees the age. staleHostSweepEvery is therefore 0 and not 1 ms: TickStaleHosts returns early
+// when it swept less than staleHostSweepEvery ago, and the first Tick of a pair lands within a millisecond of
+// the sweep that released the NPC in the step before, so a 1 ms interval swallowed that Tick. One pass then
+// only stamped hostSeenSince and never saw an age, and the destroy-and-recreate case failed about one run in
+// three - in the full suite, where its own timings put it close to the previous sweep, and never alone.
+// The server keeps 1000 ms against staleHostAfter 5000 ms, so there a swallowed sweep costs a second, not a
+// release; this is the harness being too tight, not the sweep being wrong.
 
 namespace {
 
@@ -48,7 +54,7 @@ struct Timings
     , sweep(p_.staleHostSweepEvery)
   {
     p.staleHostAfter = std::chrono::milliseconds(40);
-    p.staleHostSweepEvery = std::chrono::milliseconds(1);
+    p.staleHostSweepEvery = std::chrono::milliseconds(0); // every Tick sweeps
     p.staleReleaseCooldown = cool;
   }
   ~Timings()
