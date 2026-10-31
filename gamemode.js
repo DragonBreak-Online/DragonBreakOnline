@@ -7773,6 +7773,21 @@ const armorReport = (a) => {
   return lines;
 };
 if (typeof registerChatCommand === 'function') registerChatCommand('armor', (a) => { if (!ARMOR_WEAR.enabled || typeof globalThis.__dboWearTier !== 'function') return personal(a, 'The armour rule is off.'); for (const l of armorReport(a)) personal(a, l); }, { help: 'Your worn armour: class, tier, the Defense each piece needs, and what it costs you' });
+// /testmenu itemcard|mapmenu (staff): arms a one-shot client probe for the next item menu or M map (_work/itemcard-route-1031.md,
+// _work/mmap-build-1026.md); the client's findings come back as the UI events below, into the log and to the tester
+const MENU_TESTS = { itemcard: ['dboItemCardTest', 'Open your inventory and highlight an armour piece. Watch the line under the armour value: it should read "Tier 3 · Medium · Defense 30" in yellow for a second.'],
+  mapmenu: ['dboMapTest', 'Open the M map, keep it still for a moment, then pan it.'] };
+if (typeof registerChatCommand === 'function') registerChatCommand('testmenu', (a, args) => {
+  const t = MENU_TESTS[String(args || '').trim().toLowerCase()];
+  if (!t) return personal(a, `Usage: /testmenu ${Object.keys(MENU_TESTS).join('|')}`);
+  sendPacket(a, { customPacketType: t[0] });
+  personal(a, `Armed for 10 minutes. ${t[1]}`);
+}, { admin: true, help: 'Staff: arm a one-shot client menu probe (itemcard, mapmenu)' });
+if (typeof onUi === 'function') for (const ev of ['itemCardTest', 'mapTest']) onUi(ev, (a, args) => {
+  const res = JSON.stringify((args || [])[0] || {}).slice(0, 1500);
+  log(`menu test ${ev} from ${display(a)}: ${res}`);
+  personal(a, `${ev}: ${res}`);
+});
 const equipHook = (actorId, equipment, isAllowed, ...rest) => {
   // The client reports its equipment while it is still dressing after login (an empty or naked
   // report), and the engine has already stored that. Keep our own copy of the last outfit that
