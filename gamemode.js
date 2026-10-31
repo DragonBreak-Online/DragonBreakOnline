@@ -4230,7 +4230,7 @@ const nativeSwfFor = (a, widget) => {
   if (!c || !c.has('native:' + widget.type)) return '';
   // browser: 1 hands a native panel's typed input to the browser panel, until the module publishes it unmarked again
   if (widget.browser) return '';
-  // The journal is native per hub tab, for each tab the client's swf draws (Settings stays in the browser)
+  // The journal is native per hub tab, for each tab the client's swf draws (Settings opens the overlay's own sections in the browser)
   if (widget.type === 'journal' && !(widget.hub && c.has('native:journalTab:' + widget.tab))) return '';
   try { if (JSON.stringify(widget).length > NATIVE_MAX_CHARS) return ''; } catch (e) { return ''; }
   return swf;
