@@ -1786,6 +1786,7 @@ manuals.js MANUAL d08c753a clean
 manuals.js MANUAL 53f416fb clean
 manuals.js MANUAL d753d3eb clean
 manuals.js SKILLBOOK a5403e71 clean
+skillbooks.js SKILLBOOK 5758ba1f clean
 manuals.js SCHEMATIC 121a751a clean
 manuals.js SCHEMATIC 3ecb4848 clean
 manuals.js MANUAL 9ff5ff92 clean

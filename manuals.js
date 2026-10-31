@@ -248,6 +248,9 @@ module.exports = (api) => {
     if (!C.enabled || !isPlayer(a)) return undefined;
     const m = BY_BOOK.get(bookId >>> 0);
     if (m) return readManual(a, m, true) === false ? false : undefined;
+    // Every skill book is studied through skillbooks.js once the fork's study hook has shipped; until then its answer is null
+    const studied = typeof globalThis.__dboSkillBookRead === 'function' ? globalThis.__dboSkillBookRead(a, bookId >>> 0) : null;
+    if (studied !== null && studied !== undefined) { if (studied) personal(a, studied); return undefined; }
     const line = skillBook(a, bookId >>> 0);
     if (line) personal(a, `${line[0].toUpperCase()}${line.slice(1)}.`);
     return undefined;
@@ -257,6 +260,8 @@ module.exports = (api) => {
     if (!C.enabled || !isPlayer(a)) return '';
     const m = BY_BOOK.get(bookId >>> 0);
     if (m) { const r = knows(a, m) ? null : readManual(a, m, false); return r === true ? `you learn to work ${m.name}` : ''; }
+    const studied = typeof globalThis.__dboSkillBookRead === 'function' ? globalThis.__dboSkillBookRead(a, bookId >>> 0) : null;
+    if (studied !== null && studied !== undefined) return studied ? `${studied.charAt(0).toLowerCase()}${studied.slice(1).replace(/\.$/, '')}` : '';
     return skillBook(a, bookId >>> 0);
   };
   // The reading's copy roll leaves manuals alone: copies of a manual come only from a Scholar who learned it
