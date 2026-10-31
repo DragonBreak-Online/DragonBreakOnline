@@ -23,6 +23,7 @@ module.exports = (api) => {
   const findAnyByName = typeof api.findAnyByName === 'function' ? api.findAnyByName : findByName;
   // Every character of an account (the account rule of factions.rules); an older gamemode passes none and the rule is skipped
   const accountActors = typeof api.accountActors === 'function' ? api.accountActors : null;
+  const sendPacket = typeof api.sendPacket === 'function' ? api.sendPacket : () => {};
   // Rosters, invitations and the news of who joined or leads name people by their own name, never a beast's, and a
   // mask's only while rosterPrivacy.masks is off (gamemode.js ownNameOf; tracker 1559074270959640676): a pack's leader
   // won by a challenge was written in as "Werewolf"
@@ -572,6 +573,80 @@ module.exports = (api) => {
     return other ? `${nameOf(Number(t) >>> 0)} serves ${theName(FACTIONS.get(other.fid).name)}. A hold's leader puts the hold first: besides it, only a college or a church. They leave it first.` : '';
   };
   globalThis.__dboFactionClassOf = (fid) => classOf(String(fid));
+
+  // ---- who breaks factions.rules today, told to choose (Nat, 31 Oct: "tell them to pick one") -------------------------
+  // [{ key, rule: 'hold'|'secret'|'account', actors, fids, text(actor, by) }] from the live rosters. Each is told at login and
+  // every notice.everyHours while online, by a chat line and the banner, with a deadline notice.deadlineDays after it was
+  // first seen (faction-violations.json { key: { since } }, gitignored). Nothing is removed: after the deadline staff settle
+  // it (/faction violations lists every case and how long it has run). A case that is put right drops out at the next look.
+  const VN = Object.assign({ enabled: true, deadlineDays: 7, everyHours: 6, sweepSeconds: 60 }, RULES.notice || {});
+  const VIOL_PATH = api.violationsPath || path.resolve('faction-violations.json');
+  const readViol = () => { try { const v = JSON.parse(fs.readFileSync(VIOL_PATH, 'utf8')); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } };
+  const writeViol = (o) => { try { fs.writeFileSync(VIOL_PATH, JSON.stringify(o, null, 1)); } catch (e) { log('faction-violations.json write failed', e.message); } };
+  const countsOf = (t) => membershipsOf(t >>> 0).filter((m) => !isBand(m.fid) && counts(m.fid, m.e.rank));
+  const fname = (fid) => theName(FACTIONS.get(fid).name);
+  const violations = () => {
+    if (RULES.enabled === false) return [];
+    const out = [];
+    const ids = new Set(); for (const r of Object.values(ST.members)) for (const k of Object.keys(r || {})) ids.add(Number(k) >>> 0);
+    const byAccount = new Map();
+    for (const t of ids) {
+      const mine = countsOf(t);
+      const office = holdOffices(t)[0];
+      const outside = mine.filter((m) => classOf(m.fid) !== 'hold' && !freeBeside(m.fid));
+      if (office && outside.length) {
+        out.push({ key: `hold:${t}`, rule: 'hold', actors: [t], fids: outside.map((m) => m.fid),
+          what: `a hold's leader may keep only the hold and a college or a church. You hold ${office.name} and serve ${outside.map((m) => fname(m.fid)).join(' and ')}: step down from your office, or leave with /faction leave <faction>` });
+      }
+      const secret = mine.find((m) => classOf(m.fid) === 'secret');
+      const besides = secret ? mine.filter((m) => m.fid !== secret.fid && !freeBeside(m.fid) && !(FACTIONS.get(secret.fid).kind === 'pack' && FACTIONS.get(m.fid).kind === 'pack')) : [];
+      if (secret && besides.length) {
+        out.push({ key: `secret:${t}`, rule: 'secret', actors: [t], fids: [secret.fid].concat(besides.map((m) => m.fid)),
+          what: `a secret faction's member may keep only that faction and a college or a church. You serve ${fname(secret.fid)} and ${besides.map((m) => fname(m.fid)).join(' and ')}: keep one with /faction leave <faction>` });
+      }
+      let pid = -1; try { pid = Number(profileOf(t)); } catch (e) { pid = -1; }
+      if (pid >= 0) for (const m of mine) { const k = `${pid}|${m.fid}`; if (!byAccount.has(k)) byAccount.set(k, []); byAccount.get(k).push(t); }
+    }
+    for (const [k, actors] of byAccount) {
+      if (actors.length < 2) continue;
+      const [pid, fid] = k.split('|');
+      out.push({ key: `account:${pid}:${fid}`, rule: 'account', actors, fids: [fid], pid: Number(pid),
+        what: `one character per account may be in a faction. ${actors.map((x) => ownNameOf(x)).join(' and ')} are all in ${fname(fid)}: keep one there, the others leave with /faction leave ${fid}` });
+    }
+    return out;
+  };
+  const dateOf = (ms) => new Date(ms).toISOString().slice(0, 10);
+  const noticeOf = (v, since) => `Faction rules now say that ${v.what}, by ${dateOf(since + VN.deadlineDays * 86400000)}. After that, staff will settle it.`;
+  // One look: new cases dated, settled ones dropped, online breakers told at login (first look online) and every everyHours
+  ST.violTold = ST.violTold instanceof Map ? ST.violTold : new Map();   // actor -> when told; dropped when they go offline
+  const violSweep = (now = Date.now()) => {
+    if (VN.enabled === false || RULES.enabled === false) return 0;
+    const st = readViol(); let dirty = false; let told = 0;
+    const list = violations(); const live = new Set(list.map((v) => v.key));
+    for (const v of list) if (!st[v.key]) { st[v.key] = { since: now, rule: v.rule }; dirty = true; audit(`FACTION-RULES ${v.rule} case opened: ${v.actors.map((x) => who(x)).join(', ')} (${v.fids.join(', ')})`); }
+    for (const k of Object.keys(st)) if (!live.has(k)) { audit(`FACTION-RULES case settled: ${k}`); delete st[k]; dirty = true; }
+    if (dirty) writeViol(st);
+    const online = new Set(onlineActors().map((x) => x >>> 0));
+    for (const a of [...ST.violTold.keys()]) if (!online.has(a)) ST.violTold.delete(a);
+    for (const v of list) for (const a of v.actors) {
+      if (!online.has(a >>> 0)) continue;
+      const last = ST.violTold.get(a >>> 0);
+      if (last && now - last < Math.max(1, Number(VN.everyHours) || 6) * 3600000) continue;
+      const text = noticeOf(v, Number(st[v.key].since) || now);
+      personal(a, text);
+      try { sendPacket(a, { customPacketType: 'dboBanner', text: `Faction rules: choose by ${dateOf((Number(st[v.key].since) || now) + VN.deadlineDays * 86400000)}. See chat.`, seconds: 8 }); } catch (e) { /* the chat line is enough */ }
+      ST.violTold.set(a >>> 0, now); told++;
+    }
+    return told;
+  };
+  globalThis.__dboFactionViolations = () => { const st = readViol(); return violations().map((v) => Object.assign({ since: (st[v.key] || {}).since || null }, v)); };
+  globalThis.__dboFactionViolationSweep = violSweep;
+  if (globalThis.__dboFactionViolTimer) { clearInterval(globalThis.__dboFactionViolTimer); globalThis.__dboFactionViolTimer = null; }
+  if (api.violationSweep !== false && VN.enabled !== false) {
+    const t = setInterval(() => { try { violSweep(); } catch (e) { log('faction violations sweep failed', e.message); } }, Math.max(10, Number(VN.sweepSeconds) || 60) * 1000);
+    if (t && typeof t.unref === 'function') t.unref();
+    globalThis.__dboFactionViolTimer = t;
+  }
   // { text, hidden } or null. viewer: who reads the refusal; hidden when it would tell them of a secret membership or of
   // the character's nature (an invite then goes out, and the character is refused at accept, in their own words).
   const limitProblem = (t, fid, rank, viewer) => {
@@ -1490,6 +1565,26 @@ module.exports = (api) => {
       return openMenu(a);
     }
     if (s === 'list') return personal(a, [...FACTIONS.values()].filter((f) => !f.secret || isAdmin(a) || entryOf(f.id, a)).map((f) => `${f.id} (${f.name})`).join(', '));
+    // /faction leave <faction>: by id or name, the Faction tab's Leave by chat (the rules notice names it)
+    if (s === 'leave') {
+      const q = rest.join(' ').trim().toLowerCase().replace(/^the /, '');
+      const m = membershipsOf(a).find((x) => x.fid === q || FACTIONS.get(x.fid).name.toLowerCase().replace(/^the /, '') === q);
+      if (!q || !m) return personal(a, `Usage: /faction leave <faction>. You are in: ${membershipsOf(a).map((x) => `${x.fid} (${FACTIONS.get(x.fid).name})`).join(', ') || 'nothing'}.`);
+      leave(a, m.fid);
+      return personal(a, `You have left ${FACTIONS.get(m.fid).name}.`);
+    }
+    // /faction violations: staff, everyone breaking factions.rules today, how long ago it was first seen, and the deadline
+    if (s === 'violations') {
+      if (!isAdmin(a)) return personal(a, 'Staff only.');
+      const list = globalThis.__dboFactionViolations();
+      if (!list.length) return personal(a, 'Nobody breaks the faction rules (factions.rules).');
+      personal(a, `${list.length} case(s) breaking the faction rules. Nothing is removed by the server; past the deadline, staff settle it:`);
+      for (const v of list) {
+        const since = Number(v.since) || Date.now(); const due = since + VN.deadlineDays * 86400000;
+        personal(a, `  [${v.rule}] ${v.actors.map((x) => `${ownNameOf(x)} (${who(x)})`).join(' + ')}: ${v.fids.map((f) => FACTIONS.get(f).name).join(', ')}; seen ${dateOf(since)}, deadline ${dateOf(due)}${Date.now() > due ? ' (PAST)' : ''}`);
+      }
+      return undefined;
+    }
     // Where a faction is seated. A hall the player cannot reach is not worth naming, so only Bruma shows while
     // the playtest is locked there.
     // A leader records where the faction keeps its things. Access is the leader's business: housing locks it and
