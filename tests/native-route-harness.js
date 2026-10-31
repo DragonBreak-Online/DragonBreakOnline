@@ -144,8 +144,8 @@ setCaps(H, ['native:keyRing']);
 openWidget(H, { type: 'businessLedger', id: 64, nonce: 'x' });
 ok(last().customPacketType === 'dboWidget', 'one panel\'s cap does not route another', last());
 
-// The shrine, the courier handover and the player menu, each native for a client that names it (fork native-social-1031)
-const SOCIAL = [['shrinePanel', 74, 'dbo_shrine'], ['courierHandover', 81, 'dbo_courier'], ['playerMenu', 52, 'dbo_menu']];
+// The shrine, the courier handover, the player menu and the spellbook, each native for a client that names it (fork native-social-1031)
+const SOCIAL = [['shrinePanel', 74, 'dbo_shrine'], ['courierHandover', 81, 'dbo_courier'], ['playerMenu', 52, 'dbo_menu'], ['spellbook', 58, 'dbo_spellbook']];
 SOCIAL.forEach(([type, id, swf], i) => {
   const G = 0xff000030 + i;
   openWidget(G, { type, id, nonce: 's' + i });

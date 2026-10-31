@@ -4217,7 +4217,7 @@ const sendPacket = (a, payload) => {
 // playerMenu: the U panel (widget 52); menuRun closes it as for the browser
 const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_journal', deityPicker: 'dbo_deity', rite: 'dbo_rite', dungeonGate: 'dbo_dungeon', labour: 'dbo_labour', pigeon: 'dbo_pigeon', bank: 'dbo_bank',
   businessLedger: 'dbo_ledger', propertyMarket: 'dbo_market', keyRing: 'dbo_keyring', tomeShop: 'dbo_tomes',
-  shrinePanel: 'dbo_shrine', courierHandover: 'dbo_courier', playerMenu: 'dbo_menu' };
+  shrinePanel: 'dbo_shrine', courierHandover: 'dbo_courier', playerMenu: 'dbo_menu', spellbook: 'dbo_spellbook' };
 // The client's custom menu takes a payload of at most this many characters (scaleformMenu.ts MAX_PAYLOAD_CHARS) and draws
 // a bigger one blank, so a widget past it (a staff player menu, a long ledger) goes to the browser instead
 const NATIVE_MAX_CHARS = 60000;
@@ -4230,7 +4230,7 @@ const nativeSwfFor = (a, widget) => {
   if (!c || !c.has('native:' + widget.type)) return '';
   // browser: 1 hands a native panel's typed input to the browser panel, until the module publishes it unmarked again
   if (widget.browser) return '';
-  // The journal is native per hub tab, for each tab the client's swf draws; Profile and Settings stay in the browser
+  // The journal is native per hub tab, for each tab the client's swf draws (Settings stays in the browser)
   if (widget.type === 'journal' && !(widget.hub && c.has('native:journalTab:' + widget.tab))) return '';
   try { if (JSON.stringify(widget).length > NATIVE_MAX_CHARS) return ''; } catch (e) { return ''; }
   return swf;
