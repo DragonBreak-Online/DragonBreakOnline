@@ -126,7 +126,7 @@ ok(!craft('orc', YOKU_SHIELD, R_YOKU) && !craft('nord', YOKU_SHIELD, R_YOKU), '.
 ok(craft('nord', YOKU_SHIELD, R_YOKU_TEMPER), '...tempering it is open (no province gate on tempering either)');
 ok(craft('nord', ADAM, R_ADAM) && craft('breton', ADAM, R_ADAM) && craft('orc', ADAM, R_ADAM), 'the Adamantium Addon is every race\'s (README 14: the Orc pair removed)');
 ok(!craft('goblin', MANTIS, R_ADAM) && !craft('staff', MANTIS, R_ADAM), 'the Dwemer Mantis armour is never forged, staff included (forgeNever)');
-ok(said.some(([, t]) => /Game Masters/.test(t)), '...and the smith hears the GMs give it out', said);
+ok(said.some(([, t]) => /cannot be obtained/.test(t)), '...and the smith hears it cannot be obtained at all (Nat, 31 Oct)', said);
 ok(!craft('nord', GOBLIN_ARMOUR, R_GOBLIN_ARMOUR) && craft('goblin', GOBLIN_ARMOUR, R_GOBLIN_ARMOUR), 'Armory goblin armour: Goblins only (edid rule)');
 ok(craft('nord', BEAR_CUIRASS, R_BEAR), 'Black Bear: a Nord forges it in Skyrim');
 ok(!craft('breton', BEAR_CUIRASS, R_BEAR), '...a Breton cannot');
@@ -206,7 +206,7 @@ ok(['800:Civil War Battlemage Armors.esp', '804:Civil War Battlemage Armors.esp'
 ok(Object.keys(fg).filter((k) => k.endsWith(':LEITEUHTThalmor.esp') && fg[k].factions.includes('thalmor')).length === 14, 'faction-gear: the 14 Dominion Thalmor pieces are the Thalmor\'s');
 
 // ---- smithing.js: a people's own family -----------------------------------------------------------------------------
-fs.writeFileSync('loot-materials.json', JSON.stringify({ items: { '800:black bear ancient nord armor.esp': 'black_bear' } }));
+fs.writeFileSync('loot-materials.json', JSON.stringify({ items: { '800:black bear ancient nord armor.esp': 'black_bear' } })); // verify-formids: ignore (a stand-in item for the test's own loot map)
 fs.writeFileSync('faction-gear.json', JSON.stringify({ items: {} }));
 const told = [], timers = [];
 const realSetInterval = global.setInterval;
