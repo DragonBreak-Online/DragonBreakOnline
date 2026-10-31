@@ -1,5 +1,20 @@
 [
   {
+    "title": "Combat logout",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Combat",
+        "items": [
+          "Leaving the game during a fight no longer saves you: your body stays in the world, fightable, for 60 seconds after you go.",
+          "The first blow of a fight between players tells both of you so."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Faction rules",
     "date": "2026-10-31",
     "version": "Server update",
