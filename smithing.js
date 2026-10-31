@@ -10,8 +10,8 @@
 // unless /smithing test.
 // Apprenticeship: a smith who lacks a technique forges under a supervising Blacksmith who knows it, is online, within
 // apprenticeRange, has the craft tier, and (Orcish) the supervisorRace; apprenticeCrafts such crafts teach it for good.
-// Upgrade cap (craftedExtrasSystem.ts asks __dboTemperCap): an item of family tier T improves to at most
-// min(T+2, 5, the smith's craft tier) tier steps, one improvement level per step; T5-T7 items never improve.
+// Upgrade cap (craftedExtrasSystem.ts asks __dboTemperCap): an item of any family tier improves 2 levels (Superior), by
+// a smith whose craft tier is at least the item's (Nat, 31 Oct); before, T1-T3 got 2, T4 1 and T5-T7 none.
 // Faction gear (faction-gear.json) instead improves one level per craft tier of the smith's, up to Legendary.
 // The F3 Blacksmith tab reads __dboSmithView(actorId) (shape agreed with Worker G, 9 Oct).
 'use strict';
@@ -151,14 +151,15 @@ module.exports = (api) => {
   // the Legion's swords were classed Steel (T2, so Superior at most) or Ebony (T6, never) and only the Imperial family
   // was exempt, and that exemption meant no cap at all
   const FACTION_TEMPER_LEVELS = 6;
+  const TEMPER_LEVELS = 2;
   globalThis.__dboTemperCap = (actorId, baseId) => {
     if (!C.enabled) return 16;
     if (FACTION_GEAR.has(normDesc(descOf(baseId)))) return 10 + Math.max(0, Math.min(FACTION_TEMPER_LEVELS, craftTier(actorId >>> 0)));
     const fam = familyOfItem(baseId);
     if (!fam) return 16;
-    if (fam.tier >= 5) return 10;
-    const reach = Math.min(fam.tier + 2, 5, craftTier(actorId >>> 0));
-    return 10 + Math.max(0, reach - fam.tier);
+    // Every tier the same TEMPER_LEVELS, by a smith of its tier or above (Nat, 31 Oct): with the top tiers barred, a
+    // tempered Orcish set beat Ebony and Dragonplate (_work/armor-balance-1031.md)
+    return 10 + (craftTier(actorId >>> 0) >= fam.tier ? TEMPER_LEVELS : 0);
   };
 
   // ---- the F3 Blacksmith tab ----------------------------------------------------------------------------------------
