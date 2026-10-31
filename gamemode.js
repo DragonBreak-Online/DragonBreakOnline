@@ -1449,7 +1449,8 @@ registerChatCommand('tp', (a, args) => {
 // by name, and 'private.pigeons' (unread mail). One pigeon per player every PIGEON_COOLDOWN_MS, only to a
 // character the sender's character has met, for a flat fee (PIGEON_PRICE) paid into the treasury of the hold it is sent from.
 const PIGEON_COOLDOWN_MS = 35 * 60 * 1000;
-const PIGEON_MAX_TEXT = 240;
+// Nat, 31 Oct (sweep: "Letter from journal" at 240): a letter carries up to 1,000 characters. The coop panel reads it as maxText
+const PIGEON_MAX_TEXT = 1000;
 const PIGEON_MAX_UNREAD = 20;
 // One fee for every flight. It was 5 plus 10 a km to where the recipient stood, so three boards' fees placed them (L2-2)
 const PIGEON_PRICE = Object.assign({ baseFee: 5 }, cfg.pigeons || {});

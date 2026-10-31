@@ -1,5 +1,19 @@
 [
   {
+    "title": "Longer pigeon letters",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Pigeons",
+        "items": [
+          "A pigeon letter can now hold up to 1,000 characters (it was 240), from the coop and from the journal alike."
+        ]
+      }
+    ]
+  },
+  {
     "title": "/unstuck: the nearest town, and no way out of a fight",
     "date": "2026-10-31",
     "version": "Server update",
