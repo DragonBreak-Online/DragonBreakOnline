@@ -9359,6 +9359,13 @@ try {
   require(GRANDHEALING_JS)({ mp, log, recordOf, onlineActors, profileOf, display, cfg });
 } catch (e) { log('grandhealing.js failed to load:', e.stack || e.message); globalThis.__dboGrandHealCast = null; globalThis.__dboGrandHealHit = null; }
 
+// ---- /f and /p: word by runner to a faction and among a party (server\dispatches.js, config "dispatches") ----------
+try {
+  const DISPATCHES_JS = path.resolve('dispatches.js');
+  delete require.cache[DISPATCHES_JS];
+  require(DISPATCHES_JS)({ mp, log, personal, deliver, registerChatCommand, onlineActors, nameOf, zoneOfActor, cfg });
+} catch (e) { log('dispatches.js failed to load:', e.stack || e.message); }
+
 // ---- /monitor: the dbo-monitor service's view for staff (server\monitor.js; tooling/dbo-monitor) -----------------
 try {
   const MONITOR_JS = path.resolve('monitor.js');
