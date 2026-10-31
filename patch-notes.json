@@ -1,5 +1,20 @@
 [
   {
+    "title": "Your faction's roll and its standing orders",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Factions",
+        "items": [
+          "/roster shows your faction's members by rank, with when and where each was last seen: 'seen in Bruma within the hour', 'seen on the road today', 'last seen 3 days ago'. Never an exact place, and nothing of where someone is while they go masked or in a beast form.",
+          "Leaders and officers can set the faction's standing orders with /orders <text> (/orders clear takes them down). Every member reads them when they come into the land and in their journal's Status; /orders alone reads them again."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The heralds name the month's honoured",
     "date": "2026-10-31",
     "version": "Server update",
