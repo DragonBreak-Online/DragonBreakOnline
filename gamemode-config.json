@@ -593,7 +593,7 @@
    "ArmorMaterialDragonplate": 0.3
   }
  },
- "armorWear": { "_comment": "Armour by Defense level (Nat, 31 Oct): a piece of craft tier t needs Defense defenseLevels[t-1] to put on, the same for light and heavy; faction and guard gear, clothing and jewellery have no rule; what a character already wore is kept until taken off (gamemode.js wearCheck)", "enabled": true, "defenseLevels": [0, 15, 30, 45, 60, 75, 90] },
+ "armorWear": { "_comment": "Armour by Defense level (Nat, 31 Oct): a piece of craft tier t needs Defense defenseLevels[t-1] to put on, the same for light and heavy; faction and guard gear, clothing and jewellery have no rule; what a character already wore is kept until taken off (gamemode.js wearCheck)", "enabled": true, "defenseLevels": [0, 15, 30, 45, 60, 75, 90], "_mode": "Nat, 31 Oct: debuff (anyone wears anything; above your Defense tier it costs move speed, stamina recovery and power attack and sprint stamina, weighted by slot; heavy armour slows less as Defense rises, none from 75). block = the hard refusal of 31 Oct, the rollback (hot reload). debuff: gamemode.js WEAR_DEBUFF defaults (speed, staminaRegen, staminaCost by tiers over; slotWeights; heavySlow; allow = editor ids staff exempt as cosmetic)", "mode": "debuff", "debuff": { "allow": [] } },
  "armorMaterials": {
   "_comment": "Rating an armor material counts for, by slot, when higher than its records give (gamemode.js armorPieceOf). The engine keeps the record's rating; the server counts this one where Defense and tempering count (the hit's armor reduction) and shows it in the inventory. Nate, 2026-09-29: Dragonbone and Dragonscale above Ebony. Dragonplate (Update.esm) already beats Ebony piece for piece (46/17/17/22/34 against 43/16/16/21/32); Dragonscale (41/12/12/17/29, light) now counts one above Ebony on every piece. Daedric stays on top (49/18/18/23/36).",
   "enabled": true,
@@ -1616,7 +1616,7 @@
   "enabled": true,
   "_beastRate": "Anything done in werewolf or Vampire Lord form trains no skill, a staff award excepted (Nate, 5 Oct); 0..5.",
   "beastRate": 0,
-  "rates": {
+  "rates": { "defense": 1.25, "_defense": "Nat, 31 Oct: Defense levels about 25% faster (it was already the most-credited skill: 13,368 points over 25-31 Oct)",
    "miner": 2,
    "skinner": { "default": 1.5, "kill": 0, "_kill": "Skinner trains from skinning (and tanning) only, never from killing an animal (Nate, 5 Oct; #bugs 1555559825541169253)" },
    "priest": 1,
