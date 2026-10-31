@@ -60,6 +60,10 @@ export const NATIVE_CAPS = [
   "native:keyRing",
   // Worker 6's spell tome shop (dbo_tomes). Its keys are dbo:tomeBuy and dbo:tomeClose
   "native:tomeShop",
+  // Worker 6's shrine panel (dbo_shrine, widget 74). Its keys are dbo:shrine*
+  "native:shrinePanel",
+  // Worker 6's courier handover (dbo_courier, widget 81). Its keys are dbo:courierAnswer/DropIn/Dismiss
+  "native:courierHandover",
 ];
 export const CAPS_RETRY_MS = 5000;
 
