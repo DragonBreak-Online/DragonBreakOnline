@@ -99,7 +99,15 @@ JT.citizen = function(s, ctx)
    }
    flowHeading("Staff: a character's citizenships");
    var l = s.lookup;
-   var look = [["Look up a character...", function() { ctx.browser(); }, undefined, off]];
+   var look = [["Look up a character...", function()
+   {
+      ctx.form(function(v)
+      {
+         var q = v.q != undefined ? String(v.q) : "";
+         return {title: "Look up a character", hint: "Their citizenships, and what holds a faction's or a court's.", fields: [{key: "q", label: "Who", kind: "text", max: 40, hint: "Name or #TAG"}],
+            buttons: [["Look up", function(vals) { J("lookup", "", [String(vals.q)]); }, q != ""]]};
+      });
+   }, undefined, off]];
    if (l != undefined && l != null)
    {
       look.push(["Clear", function() { J("lookup", "", [""]); }, undefined, off]);

@@ -75,8 +75,8 @@ const closed = (t) => t.closed();
   t.push(hub('wanted', { nonce: 'n2', result: 'The bounty on Bram is lifted.', resultKind: 'ok', wanted: { hold: { id: 'bruma', name: 'Bruma' }, mine, wanted: [], canDeclare: true, max: 5000, goldPerMinute: 10 } }));
   check('a new nonce ends busy; the answer is in the footer and the list redraws', P(t).foot.result.text === 'The bounty on Bram is lifted.' && /Nobody is wanted here/.test(texts(t).join('|')));
   btn(t, 'Set a bounty...').onRelease();
-  const h = msgs(t, 'dbo:journalTab').pop();
-  check('Set a bounty hands this tab to the browser journal', h.args[0] === 'n2' && h.args[1] === 'wanted' && h.args[2] === null && h.args[3] === 'browser', h);
+  check('Set a bounty is a form in the journal, not a hand-off', !msgs(t, 'dbo:journalTab').some((m) => m.args[3] === 'browser') && /Set a bounty in Bruma/.test(texts(t).join('|')));
+  btn(t, 'Cancel').onRelease();
   t.push(hub('wanted', { nonce: 'n3', result: 'No such hold.', resultKind: 'refused' }));
   check('a refusal shows red', P(t).foot.result.textColor === 0xB23A3A);
   const r = S.boot('dbo_journal');
@@ -316,7 +316,7 @@ const firstPage = (t) => { for (let i = 0; i < 6; i++) t.press(33); };
   const tx = allPages(t);
   check('Referrals: the link and code, the friends, the boosts with time left, the carry weight', /Your link\|https:\/\/dragonbreakonline\.com\/r\/ABCD1234\|Your code\|ABCD1234/.test(tx) && /Friends \(1 counted\)\|Gemma counted/.test(tx) && /1\. First friend: \+50% skill progress\|3 h 5 m of play left, running/.test(tx) && /2\. Friend: \+25% skill progress\|1 h 0 m of play left, queued/.test(tx) && /it arrives with a coming update/.test(tx), tx);
   btn(t, 'Enter a code...').onRelease();
-  check('Enter a code hands the tab to the browser', msgs(t, 'dbo:journalTab').pop().args.join('|') === 'n1|referrals||browser');
+  check('Enter a code is a form in the journal, not a hand-off', !msgs(t, 'dbo:journalTab').some((m) => m.args[3] === 'browser') && /Did a friend invite you\?/.test(texts(t).join('|')));
 }
 
 // ---- Notes ----
@@ -332,7 +332,8 @@ const firstPage = (t) => { for (let i = 0; i < 6; i++) t.press(33); };
   btn(t, 'Travels (1)').onRelease();
   check('a folder shows only its entries, and offers to remove it', !/A dream/.test(texts(t).join('|')) && btn(t, 'Remove the folder Travels'));
   btn(t, 'New entry...').onRelease();
-  check('New entry hands the tab to the browser', msgs(t, 'dbo:journalTab').pop().args[3] === 'browser');
+  check('New entry is a form in the journal, not a hand-off', !msgs(t, 'dbo:journalTab').some((m) => m.args[3] === 'browser') && /A new entry/.test(texts(t).join('|')));
+  btn(t, 'Cancel').onRelease();
   buttonsOf(t).filter((b) => b.label.text === 'Open')[0].onRelease();
   const o = msgs(t, 'dbo:journalTab').pop();
   check('Open asks the server for the page, as a tab switch with a focus', o.args[1] === 'notes' && o.args[2].entry === 'e1' && o.args.length === 3, o);
@@ -344,8 +345,8 @@ const firstPage = (t) => { for (let i = 0; i < 6; i++) t.press(33); };
   check('writing it out unsigned sends write with no signature', msgs(t, 'dbo:journalNotes').pop().args.join('|') === 'n1|write|e1|note|');
   t.push(hub('notes', { nonce: 'n2', tabs: T5, notes: Object.assign({}, base, { open: { kind: 'entry', id: 'e1', title: 'The pass', text: 'Snow to the knees.', at: 1790000000000, folder: 'f1' } }) }));
   btn(t, 'Edit...').onRelease();
-  const e = msgs(t, 'dbo:journalTab').pop();
-  check('Edit hands the open entry to the browser', e.args[2].entry === 'e1' && e.args[3] === 'browser', e);
+  check('Edit is a form with the entry in it, not a hand-off', !msgs(t, 'dbo:journalTab').some((m) => m.args[3] === 'browser') && /Change The pass/.test(texts(t).join('|')));
+  btn(t, 'Cancel').onRelease();
   btn(t, 'Back to the list').onRelease();
   check('Back goes to the list', btn(t, 'All entries (2)'));
   t.push(hub('notes', { nonce: 'n3', tabs: T5, notes: Object.assign({}, base, { open: { kind: 'received', id: 'r1', title: 'A letter', text: 'Come home.', at: 0, itemKind: 'Letter', author: 'Gemma' } }) }));
@@ -370,7 +371,7 @@ const firstPage = (t) => { for (let i = 0; i < 6; i++) t.press(33); };
   check('Strike sends the key and the note time', msgs(t, 'dbo:thalmorStrike').pop().args.join('|') === `n1|k1|${Date.UTC(2026, 9, 25, 9, 0)}`);
   t.push(hub('thalmor', { nonce: 'n2', tabs: tabsWith('thalmor', 'Thalmor'), thalmor: thal }));
   btn(t, 'A note on Bram...').onRelease();
-  check('a note is typed: it hands the tab to the browser', msgs(t, 'dbo:journalTab').pop().args[3] === 'browser');
+  check('a note is a form in the journal, not a hand-off', !msgs(t, 'dbo:journalTab').some((m) => m.args[3] === 'browser') && /A note on Bram/.test(texts(t).join('|')));
 }
 
 // ---- Nobility ----

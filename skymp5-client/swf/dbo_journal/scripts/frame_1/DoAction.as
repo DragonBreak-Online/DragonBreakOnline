@@ -31,6 +31,8 @@ var forming = null;
 // fbox: the form field whose typing box is open; fboxField its text field
 var fbox = "";
 var fboxField = null;
+// fboxLines: the open box is a page of several lines, where Enter types a new line
+var fboxLines = false;
 var builtAt = getTimer();
 
 function send(key, args)
@@ -97,8 +99,9 @@ function closeJournal()
 }
 
 // A form in place of the tab, for typed input. build(vals) returns {title, hint, fields, buttons}, where a field is
-// {key, label, kind: "text" | "number" | "choice" | "multi" | "note" | "buttons", max, hint, options: [[value, label], ...],
-// empty, text, items} and a button [label, onSubmit(vals), ready, danger]; vals are what the player typed and chose, by key.
+// {key, label, kind: "text" | "number" | "choice" | "multi" | "note" | "buttons", max, hint, lines, restrict, options:
+// [[value, label], ...], empty, text, items} and a button [label, onSubmit(vals), ready, danger]; vals are what the player
+// typed and chose, by key. A text field with lines is a page of that many lines (Enter is a new line, Done takes it).
 // A "multi" field keeps an array of the values picked (at most max); a "buttons" field's items [label, fn(vals), disabled,
 // danger] change vals in place and redraw (a draft's Up, Remove, Add) without closing the form. A button that is ready
 // closes the form and runs; Cancel and Escape close it.
@@ -126,11 +129,14 @@ function endFormTyping()
    }
    fbox = "";
    fboxField = null;
+   fboxLines = false;
 }
 
 function takeFormTyped()
 {
-   var text = fboxField != null ? String(fboxField.text).split("\r").join(" ").split("\n").join(" ") : "";
+   var raw = fboxField != null ? String(fboxField.text) : "";
+   // a page keeps its lines (the field's own breaks are \r); a one-line box has none
+   var text = fboxLines ? raw.split("\r\n").join("\n").split("\r").join("\n") : raw.split("\r").join(" ").split("\n").join(" ");
    while (text.charAt(0) == " ")
    {
       text = text.substr(1);
@@ -148,7 +154,9 @@ function takeFormTyped()
 // A typed field's row: its label, the value or a box to type it in
 function formField(f, vals)
 {
-   var at = flowNeed(42);
+   var lines = f.lines != undefined && f.lines > 1 ? f.lines : 1;
+   var tall = lines > 1 ? lines * 24 + 12 : 32;
+   var at = flowNeed(tall + 10);
    var c = at.clip.createEmptyMovieClip(at.name, fd());
    c._y = at.y;
    var l = dboText(c, "label", 1, 0, 8, 300, 26, dboFmt(F_MEDIUM, 16, C_SECOND, 0.5), false);
@@ -156,16 +164,21 @@ function formField(f, vals)
    var value = vals[f.key] != undefined ? String(vals[f.key]) : "";
    if (fbox == f.key)
    {
-      fboxField = dboInput(c, "box", 2, 310, 4, BODY_W - 310 - 108, 32, dboFmt(F_PLAIN, 18, C_TEXT, 0.5), f.max != undefined ? f.max : 40, false);
+      fboxField = dboInput(c, "box", 2, 310, 4, BODY_W - 310 - 108, tall, dboFmt(F_PLAIN, 18, C_TEXT, 0.5), f.max != undefined ? f.max : 40, lines > 1);
+      fboxLines = lines > 1;
       if (f.kind == "number")
       {
          fboxField.restrict = "0-9";
+      }
+      else if (f.restrict != undefined)
+      {
+         fboxField.restrict = f.restrict;
       }
       fboxField.text = value;
       button(c, "done", 10, BODY_W - 100, 6, 92, "Done", F_MEDIUM, 17, A_BUTTON_REST, function() { takeFormTyped(); });
       return;
    }
-   var v = dboText(c, "value", 2, 310, 8, BODY_W - 310 - 108, 26, dboFmt(F_MEDIUM, 17, value != "" ? C_TEXT : C_SECOND, 0.5), false);
+   var v = dboText(c, "value", 2, 310, 8, BODY_W - 310 - 108, lines > 1 ? tall : 26, dboFmt(F_MEDIUM, 17, value != "" ? C_TEXT : C_SECOND, 0.5), lines > 1);
    v.text = value != "" ? value : f.hint != undefined ? String(f.hint) : "";
    if (dboCanType())
    {
@@ -615,11 +628,11 @@ keys.onKeyDown = function()
          endFormTyping();
          draw();
       }
-      else if (code == 13)
+      else if (code == 13 && !fboxLines)
       {
          takeFormTyped();
       }
-      // every other key is typing while the box is open
+      // every other key is typing while the box is open (Enter too, in a page of several lines)
       return;
    }
    if (code == 27)

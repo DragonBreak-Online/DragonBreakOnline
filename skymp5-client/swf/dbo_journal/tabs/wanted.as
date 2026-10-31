@@ -50,7 +50,25 @@ JT.wanted = function(s, ctx)
    if (s.canDeclare == true && s.hold != null)
    {
       flowHeading("Set a bounty in " + s.hold.name);
-      flowHint("A name, the gold (up to " + s.max + ") and the reason are typed in the browser journal.");
-      flowButtons([["Set a bounty...", function() { ctx.browser(); }, undefined, ctx.busy || ctx.readOnly]]);
+      flowButtons([["Set a bounty...", function()
+      {
+         var hold = s.hold.name;
+         var max = s.max;
+         ctx.form(function(v)
+         {
+            var who = v.who != undefined ? String(v.who) : "";
+            var why = v.why != undefined ? String(v.why) : "";
+            var n = ctx.number(v, "gold");
+            return {title: "Set a bounty in " + hold, fields: [{key: "who", label: "Who", kind: "text", max: 40, hint: "Name or #TAG"},
+               {key: "gold", label: "Gold, up to " + max, kind: "number", max: String(max).length}, {key: "why", label: "Reason", kind: "text", max: 120}],
+               buttons: [["Set bounty", function(vals)
+               {
+                  var w = String(vals.who);
+                  var g = ctx.number(vals, "gold");
+                  var r = String(vals.why);
+                  ctx.ask("Put " + g + " gold on " + w + "?", "Set bounty", function() { ctx.act("dbo:outlawJ", ["set", w, g, r]); });
+               }, who != "" && why != "" && n >= 1 && n <= max]]};
+         });
+      }, undefined, ctx.busy || ctx.readOnly]]);
    }
 };

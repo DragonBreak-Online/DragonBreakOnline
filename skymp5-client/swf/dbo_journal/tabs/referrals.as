@@ -1,5 +1,7 @@
 // Referrals (referrals.js): your link and code, the friends who joined with it, the boost queue and the carry weight. A
-// friend's code is typed, so entering one opens this tab in the browser journal (where the link can also be copied)
+// friend's code is typed in a form in place of the tab (ctx.form); Copy puts the link on the clipboard where the game's
+// Scaleform has one (System.setClipboard), and the link is shown to read out otherwise
+var refCopied = "";
 var REF_KIND = {first: "First friend", later: "Friend", welcome: "Welcome"};
 
 function refPct(m)
@@ -23,7 +25,19 @@ JT.referrals = function(s, ctx)
       + r.boostHours + " hours. Your friend gets " + refPct(r.welcomeMult) + " for their first " + r.boostHours + " hours.");
    flowRow("Your link", s.link);
    flowRow("Your code", s.code);
-   flowButtons([["Copy the link...", function() { ctx.browser(); }]]);
+   var sys = _global.System;
+   if (sys != undefined && sys.setClipboard != undefined)
+   {
+      flowButtons([["Copy the link", function() { _global.System.setClipboard(String(s.link)); refCopied = String(s.link); dboSound("UIMenuOK"); draw(); }]]);
+      if (refCopied == s.link)
+      {
+         flowHint("Sent to the clipboard: paste it where you share it.");
+      }
+   }
+   else
+   {
+      flowHint("Give a friend the link or the code above.");
+   }
    flowHeading("Friends (" + s.counted + " counted)");
    var friends = listOf(s.friends);
    if (!friends.length)
@@ -54,6 +68,14 @@ JT.referrals = function(s, ctx)
    {
       flowHeading("Did a friend invite you?");
       flowHint("Enter their code once, in your first " + (r.commandWindowHours != undefined && r.commandWindowHours ? r.commandWindowHours : 24) + " hours of play.");
-      flowButtons([["Enter a code...", function() { ctx.browser(); }, undefined, ctx.busy || ctx.readOnly]]);
+      flowButtons([["Enter a code...", function()
+      {
+         ctx.form(function(v)
+         {
+            var code = v.code != undefined ? String(v.code).toUpperCase() : "";
+            return {title: "Did a friend invite you?", hint: "Their code is eight letters and numbers.", fields: [{key: "code", label: "Their code", kind: "text", max: 8, restrict: "A-Za-z0-9", hint: "CODE"}],
+               buttons: [["Enter code", function(vals) { ctx.act("referralCode", [String(vals.code).toUpperCase()]); }, code.length == 8]]};
+         });
+      }, undefined, ctx.busy || ctx.readOnly]]);
    }
 };

@@ -81,7 +81,7 @@ JT.thalmor = function(s, ctx)
    {
       if (s.canWrite == true)
       {
-         flowButtons([["A new dossier...", function() { ctx.browser(); }, undefined, ctx.busy || ctx.readOnly]]);
+         flowButtons([["A new dossier...", function() { thalNote(s, ctx, null); }, undefined, ctx.busy || ctx.readOnly]]);
       }
       else
       {
@@ -100,6 +100,27 @@ JT.thalmor = function(s, ctx)
    }
    if (s.canWrite == true)
    {
-      flowButtons([["A note on " + shown.name + "...", function() { ctx.browser(); }, undefined, ctx.busy || ctx.readOnly]]);
+      var nb = flowButtons([["A note on " + shown.name + "...", function() { thalNote(s, ctx, this.dossier); }, undefined, ctx.busy || ctx.readOnly]]);
+      nb.btn0.dossier = shown;
    }
 };
+
+// A note in a dossier, or a new dossier with its first note: thalmorNote [subject (a name or #TAG for a new one, else the
+// dossier's key), text], the text held to the limit the server sends
+function thalNote(s, ctx, dossier)
+{
+   var max = s.limits != undefined && s.limits.noteMax != undefined ? s.limits.noteMax : 500;
+   ctx.form(function(v)
+   {
+      var subject = v.subject != undefined ? String(v.subject) : "";
+      var text = v.text != undefined ? String(v.text) : "";
+      var fields = [];
+      if (dossier == null)
+      {
+         fields.push({key: "subject", label: "Name or #TAG", kind: "text", max: 60});
+      }
+      fields.push({key: "text", label: dossier == null ? "The first note" : "The note", kind: "text", max: max, lines: 4});
+      return {title: dossier == null ? "A new dossier" : "A note on " + dossier.name, fields: fields,
+         buttons: [["Write it down", function(vals) { ctx.act("thalmorNote", [dossier == null ? String(vals.subject) : dossier.key, String(vals.text)]); }, (dossier != null || subject != "") && text != ""]]};
+   });
+}

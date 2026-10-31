@@ -62,7 +62,7 @@ function notesListView(s, ctx)
    }
    if (notesFilter == "all" || notesFilter == "folder")
    {
-      flowButtons([["New entry...", function() { ctx.browser(); }, undefined, off || entries.length >= L.entriesMax], ["Folders...", function() { ctx.browser(); }, undefined, off]]);
+      flowButtons([["New entry...", function() { notesEdit(s, ctx, null); }, undefined, off || entries.length >= L.entriesMax], ["Folders...", function() { notesFolders(s, ctx); }, undefined, off]]);
       var n = 0;
       for (var i = 0; i < entries.length; i++)
       {
@@ -123,7 +123,7 @@ function notesPage(s, o, ctx)
    flowText(o.text, 18, C_TEXT);
    if (o.kind == "entry")
    {
-      flowButtons([["Edit...", function() { ctx.browser({entry: o.id}); }, undefined, off], ["Tear out", function()
+      flowButtons([["Edit...", function() { notesEdit(s, ctx, o); }, undefined, off], ["Tear out", function()
       {
          ctx.ask("Tear out " + o.title + "?", "Tear it out", function() { ctx.act("dbo:journalNotes", ["delete", o.id]); notesList = true; }, true);
       }, C_RED, off]]);
@@ -196,3 +196,68 @@ JT.notes = function(s, ctx)
       notesListView(s, ctx);
    }
 };
+
+// An entry written or changed: its title, its page and its folder, as the browser's editor: journalNotes ["save", id ("" for a
+// new one), folder, title, text]. A new entry goes in the folder being looked at
+function notesEdit(s, ctx, o)
+{
+   var L = s.limits;
+   var folders = listOf(s.folders);
+   var opts = [["", "None"]];
+   for (var i = 0; i < folders.length; i++)
+   {
+      opts.push([folders[i].id, folders[i].name]);
+   }
+   var init = o != null ? {title: o.title, text: o.text, folder: o.folder != undefined ? o.folder : ""} : {folder: notesFilter == "folder" ? notesFolder : ""};
+   ctx.form(function(v)
+   {
+      var text = v.text != undefined ? String(v.text) : "";
+      return {title: o != null ? "Change " + o.title : "A new entry", fields: [{key: "title", label: "Title", kind: "text", max: L.titleMax},
+         {key: "text", label: "Page", kind: "text", max: L.entryMax, lines: 8}, {key: "folder", label: "Folder", kind: "choice", options: opts}],
+         buttons: [["Save", function(vals)
+         {
+            ctx.act("dbo:journalNotes", ["save", o != null ? o.id : "", String(vals.folder != undefined ? vals.folder : ""), String(vals.title != undefined ? vals.title : ""), String(vals.text)]);
+         }, text != ""]]};
+   }, init);
+}
+
+// The folders: a new one, and the one being looked at renamed (Remove the folder is on the list itself)
+function notesFolders(s, ctx)
+{
+   var L = s.limits;
+   var folders = listOf(s.folders);
+   var sel = null;
+   for (var i = 0; i < folders.length; i++)
+   {
+      if (notesFilter == "folder" && folders[i].id == notesFolder)
+      {
+         sel = folders[i];
+      }
+   }
+   ctx.form(function(v)
+   {
+      var made = v.made != undefined ? String(v.made) : "";
+      var named = v.named != undefined ? String(v.named) : "";
+      var fields = [];
+      var b = [];
+      if (folders.length < L.foldersMax)
+      {
+         fields.push({key: "made", label: "A new folder", kind: "text", max: L.folderNameMax});
+         b.push(["Make", function(vals) { ctx.act("dbo:journalNotes", ["folderAdd", String(vals.made)]); }, made != ""]);
+      }
+      else
+      {
+         fields.push({kind: "note", text: "You keep " + L.foldersMax + " folders at most."});
+      }
+      if (sel != null)
+      {
+         fields.push({key: "named", label: "Rename " + sel.name, kind: "text", max: L.folderNameMax});
+         b.push(["Rename", function(vals) { ctx.act("dbo:journalNotes", ["folderRename", sel.id, String(vals.named)]); }, named != ""]);
+      }
+      else
+      {
+         fields.push({kind: "note", text: "Look at a folder to rename it; its own page removes it."});
+      }
+      return {title: "Folders", fields: fields, buttons: b};
+   });
+}
