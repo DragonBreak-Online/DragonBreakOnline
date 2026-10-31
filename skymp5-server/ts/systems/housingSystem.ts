@@ -64,6 +64,10 @@ const PLACE_PLAN_MAX_TRIES = 10;
 // The key serial of a granted way in whose old record cannot be read: far past any serial a claim reaches by re-keying
 const GRANT_SERIAL = 1000;
 const OWNER_INDEX_PROP = "private.indexed.housingOwner";
+// Ambient, server -> client: { customPacketType: "homeCells", cells: [<cell form id>, ...] }, at login and on
+// any ownership change. The client owns those cells so Skyrim stops calling a player's own barrels theft; an
+// old client ignores a packet type it does not know.
+const HOME_CELLS_TYPE = "homeCells";
 const REGISTRY_FILE = "./housing.json";
 // Written once the claimed storage that was open on 12 Oct is locked, listing it, so the lock never runs twice
 const STORAGE_LOCK_FILE = "./housing-storage-locked.json";
@@ -449,6 +453,7 @@ export class HousingSystem implements System {
   }
 
   async updateAsync(ctx: SystemContext): Promise<void> {
+    this.flushHomeCells(ctx);
     const now = Date.now();
     // Records read as null on the first ticks after boot, so the plan waits, and tries again while nothing is readable
     if ((this.placeMigration !== "off" || this.placeRestore) && !this.placePlanDone && now - this.initAtMs >= PLACE_PLAN_DELAY_MS && now - this.placePlanTriedMs >= PLACE_PLAN_DELAY_MS) {
@@ -480,9 +485,66 @@ export class HousingSystem implements System {
   // A fresh actor needs the full picture: names and locks for every claim.
   private onActorAssigned(ctx: SystemContext, userId: number): void {
     this.pushDecor(ctx, userId);
+    this.sendHomeCells(ctx, userId);
     const actorId = this.actorOf(ctx, userId);
     if (actorId) {
       try { if (this.keyRing) this.ringAtLogin(ctx, actorId); else this.migrateKeys(ctx, actorId); } catch (e) { this.log(`[housing] key migration failed: ${e}`); }
+    }
+  }
+
+  // Every cell a profile owns outright. Both halves of each door pair are offered, because either side can be
+  // the interior - holdOf tries primary then partner for exactly that reason - and the server cannot always
+  // tell which. The client refuses a cell that is not an interior, so an exterior id here is harmless.
+  private homeCellsOf(ctx: SystemContext, profileId: number): number[] {
+    if (!profileId) return [];
+    const mp = ctx.svr as Mp;
+    let refs: number[] = [];
+    try {
+      refs = ((mp as any).findFormsByPropertyValue(OWNER_INDEX_PROP, String(profileId)) || []) as number[];
+    } catch {
+      return [];
+    }
+    const cells = new Set<number>();
+    for (const refId of refs) {
+      const primary = Number(refId) >>> 0;
+      if (!primary) continue;
+      // the index can outlive a record, and giving a place up leaves an ownerless stub: only a live owner counts
+      const rec = this.read(ctx, primary);
+      if (!rec || rec.owner !== profileId) continue;
+      const own = this.cellOf(ctx, primary);
+      if (own) cells.add(own);
+      const partner = this.partnerOf(ctx, primary);
+      if (partner) {
+        const far = this.cellOf(ctx, partner);
+        if (far) cells.add(far);
+      }
+    }
+    return [...cells];
+  }
+
+  private sendHomeCells(ctx: SystemContext, userId: number): void {
+    const actorId = this.actorOf(ctx, userId);
+    if (!actorId) return;
+    const profileId = this.profileOf(ctx, actorId);
+    if (!profileId) return;
+    this.send(ctx, userId, { customPacketType: HOME_CELLS_TYPE, cells: this.homeCellsOf(ctx, profileId) });
+  }
+
+  // Marked rather than sent inline, so a packet never goes out in the middle of a claim or a transfer, and two
+  // changes in one tick cost one packet. Place members are not marked: a member sits in the same cells as its
+  // root, so inheriting an owner never changes the list.
+  private markHomeCells(profileId: number): void {
+    if (profileId) this.homeCellsDirty.add(profileId >>> 0);
+  }
+
+  private flushHomeCells(ctx: SystemContext): void {
+    if (!this.homeCellsDirty.size) return;
+    const want = this.homeCellsDirty;
+    this.homeCellsDirty = new Set<number>();
+    for (const userId of this.onlineUsers(ctx)) {
+      const actorId = this.actorOf(ctx, userId);
+      if (!actorId) continue;
+      if (want.has(this.profileOf(ctx, actorId) >>> 0)) this.sendHomeCells(ctx, userId);
     }
   }
 
@@ -2480,6 +2542,7 @@ export class HousingSystem implements System {
     delete rec.keyAliases;
     delete rec.memberOf; delete rec.ownerOnly;
     this.reKey(ctx, primary, rec);
+    this.markHomeCells(rec.owner);
     rec.owner = 0;
     delete rec.ownerChar;
     rec.ownerName = "";
@@ -2934,7 +2997,9 @@ export class HousingSystem implements System {
 
   private setOwner(ctx: SystemContext, rec: PropertyRecord, actorId: number, profileId: number): void {
     if (rec.owner !== 0 && (rec.owner !== profileId || (actorId && (rec.ownerChar || 0) !== (actorId >>> 0)))) this.changedHands(rec);
+    this.markHomeCells(rec.owner);
     rec.owner = profileId;
+    this.markHomeCells(profileId);
     if (actorId) rec.ownerChar = actorId >>> 0; else delete rec.ownerChar;
     rec.ownerName = this.nameOf(ctx, actorId);
   }
@@ -3173,6 +3238,8 @@ export class HousingSystem implements System {
   private roleCfg: AdminRoleConfig = readAdminRoleConfig(null);
   private zones!: Zones;
   private zoneCache = new Map<number, string | null>();
+  // Profiles whose owned-cell list changed and has not been sent yet
+  private homeCellsDirty = new Set<number>();
   private maxClaims = DEFAULT_MAX_CLAIMS;
   private placeCap = 1;
   private placeCapPerAccount = 2;
