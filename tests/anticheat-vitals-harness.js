@@ -219,8 +219,37 @@ for (const minCost of [30, 10]) {
   ok(W.mp.onHitDamageAttempt(A, B, id('Fireball'), 30, { spell: true }) === false && globalThis.__dboHitRefusal === 'anticheat' && calls.attempt === n, '...a spell hit from them is refused, named anticheat for the player log');
   ok(W.mp.onHitDamageAttempt(A, B, SWORD, 12, { spell: false }) === true && calls.attempt === n + 1, '...a weapon hit goes through');
   ok(W.mp.onHitDamageAttempt(B, A, id('Fireball'), 30, { spell: true }) === true, '...and anyone else\'s spell hits too');
+  // The refusals are audited once a minute per caster, naming both, the spell and the time left
+  H.clock.t += 5000;
+  ok(W.mp.onHitDamageAttempt(A, B, id('Fireball'), 30, { spell: true }) === false, '...a second spell hit in the same minute is refused too');
+  const refused = H.audits.filter((l) => l.startsWith('ANTICHEAT-REFUSED '));
+  ok(refused.length === 1 && /^ANTICHEAT-REFUSED Casterly #C4ST \(profile 1\): spell hit on Selene #K2QX with Fireball refused \(magicka_free, 10 min left\)$/.test(refused[0]), '...the refusal is audited once for the two hits in the same minute', refused);
+  H.clock.t += 61000;
+  W.mp.onHitDamageAttempt(A, B, id('Fireball'), 30, { spell: true });
+  ok(H.audits.filter((l) => l.startsWith('ANTICHEAT-REFUSED ')).length === 2, '...and again a minute later');
   H.clock.t += 11 * 60000; H.run('acSpeedWatch');
   ok(W.mp.onHitDamageAttempt(A, B, id('Fireball'), 30, { spell: true }) === true, '...for 10 minutes only');
+}
+{
+  // Staff are flagged, never refused: an event GM's spells must land (refuseStaff false, the default)
+  const { W, H } = setup({ magicka: { refuseHits: true } });
+  H.players.get(A).tier = 'gm';
+  const t0 = H.clock.t; H.t0 = t0;
+  const ev = []; for (let i = 0; i < 12; i++) ev.push([t0 + 500 + i * 3000, A, id('Fireball')]);
+  playTo(H, W, t0 + 80000, ev);
+  ok(acLines(H).some((l) => /magicka_free Casterly #C4ST \(profile 1, staff\).*server: flag only \(staff\)$/.test(l)), 'a staff caster frozen at full magicka is flagged, flag only (staff)', acLines(H).filter((l) => /magicka_free/.test(l)));
+  ok(W.mp.onHitDamageAttempt(A, B, id('Fireball'), 30, { spell: true }) === true && !H.audits.some((l) => l.startsWith('ANTICHEAT-REFUSED ')), '...and their spell hits still land');
+  const { W: W2, H: H2 } = setup({ magicka: { refuseHits: true, refuseStaff: true } });
+  H2.players.get(A).tier = 'gm';
+  const t1 = H2.clock.t; H2.t0 = t1;
+  const ev2 = []; for (let i = 0; i < 12; i++) ev2.push([t1 + 500 + i * 3000, A, id('Fireball')]);
+  playTo(H2, W2, t1 + 80000, ev2);
+  ok(W2.mp.onHitDamageAttempt(A, B, id('Fireball'), 30, { spell: true }) === false, 'refuseStaff true: a staff caster is refused too');
+}
+{
+  // The live config ships it on, with staff spared
+  const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'gamemode-config.json'), 'utf8')).anticheat.magicka;
+  ok(cfg.refuseHits === true && cfg.refuseStaff === false && cfg.refuseMinutes === 10, 'gamemode-config.json: refuseHits on, refuseStaff off, 10 min', cfg);
 }
 
 F.done();

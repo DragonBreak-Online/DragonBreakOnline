@@ -1082,7 +1082,7 @@ const STAFF_HELP = [
   { key: 'magic', title: 'Magic and crafts', items: ['schools', 'shoutclean', 'classteacher', 'preacher', 'manual', 'smithing', 'tailoring', 'enchant'] },
   { key: 'law', title: 'Law', items: ['jail', ['jaildoors', 'a menu: assign the next door you use as a jail door of this hold, or unassign one (GM+, and the hold\'s ruler, Steward, Commander or Captain of the Guard)'], ['concordat', '[races]: Concordat arrests standing, or the Thalmor outside the race rule'],
     ['dossier', 'list | read <name|#TAG> | reports | add <name|#TAG> <text> | strike <name|#TAG> <n>: the Thalmor dossiers and informant reports (add and strike: Lead GM)']] },
-  { key: 'world', title: 'World', items: ['settime', 'setweather', 'timescale', 'region', ['dungeon end', '<dungeon id|name>: end a dungeon claim now'],
+  { key: 'world', title: 'World', items: ['settime', 'setweather', 'timescale', 'region', 'clearcorpses', ['dungeon end', '<dungeon id|name>: end a dungeon claim now'],
     'placed', 'placeundo', 'placeexport', 'worldedits', 'worldhide', 'worldshow', 'masktest', 'couriers', 'traps', 'leverpuzzle', 'bossevent',
     ['guardpost', 'add [npc desc] | list | remove <hold> <n> | auto <hold>: stand where a guard should be and add places that hold\'s own guard there (an id like abe18:Skyrim.esm picks another). auto fills a hold with the posts its guards held in the old days']] },  // verify-formids: ignore, the desc is an example in help text and 'items' here is the command list
   { key: 'debug', title: 'Server and debugging', items: ['monitor', 'load', 'selftest', 'npc', 'mv', 'driftset', 'driftspawn', 'driftrepair',
@@ -9911,6 +9911,13 @@ try {
   delete require.cache[ORPHANS_JS];
   require(ORPHANS_JS)({ mp, log, audit, every, profileOf, userOf, cfg });
 } catch (e) { log('orphans.js failed to load:', e.stack || e.message); globalThis.__dboOrphanRemove = null; }
+
+// ---- /clearcorpses: staff take away the dead NPC bodies around them (server\clearcorpses.js) ----------------------------
+try {
+  const CLEARCORPSES_JS = path.resolve('clearcorpses.js');
+  delete require.cache[CLEARCORPSES_JS];
+  require(CLEARCORPSES_JS)({ mp, log, audit, personal, who, profileOf, userOf, registerChatCommand, cfg });
+} catch (e) { log('clearcorpses.js failed to load:', e.stack || e.message); }
 
 // ---- Rob in the X menu: the victim answers in a panel (server\robbery.js) ---------------------------------------------
 try {
