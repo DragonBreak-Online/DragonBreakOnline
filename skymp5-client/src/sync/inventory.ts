@@ -361,8 +361,15 @@ const getBaseContainerAsInventory = (refr: ObjectReference): Inventory => {
   if (baseIsPlayers(refr)) {
     return { entries: [] };
   }
+  // The as ActorBase cast hides a null: a reference whose base has gone throws on getFormID instead
+  // (_work\sweep-1031.md a2, 16 players). An empty inventory is what the caller already expects for a
+  // base it cannot read.
+  const baseObject = refr.getBaseObject();
+  if (baseObject === null) {
+    return { entries: [] };
+  }
   return {
-    entries: getContainer((refr.getBaseObject() as ActorBase).getFormID()),
+    entries: getContainer((baseObject as ActorBase).getFormID()),
   };
 };
 

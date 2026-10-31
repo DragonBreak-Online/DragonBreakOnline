@@ -126,8 +126,14 @@ export const applyTints = (actor: Actor | null, appearance: Appearance): void =>
   // After this the copy's base carries the player's base id. SkyrimPlatform packs a form into a Papyrus handle from its
   // formID and resolves the handle by id on every call, so any later call on this base, through getBaseObject() or
   // Game.getFormEx of its own id alike, reaches the LOCAL PLAYER's base. Use baseIsPlayers before writing to one.
-  if (actor)
-    TESModPlatform.setFormIdUnsafe(actor.getBaseObject(), playerBaseId);
+  // The actor guard was not enough: getBaseObject itself returns null for an actor whose base has gone, and
+  // setFormIdUnsafe then takes a nullptr (_work\sweep-1031.md a2, 10 players).
+  if (actor) {
+    const tintsActorBase = actor.getBaseObject();
+    if (tintsActorBase) {
+      TESModPlatform.setFormIdUnsafe(tintsActorBase, playerBaseId);
+    }
+  }
 };
 
 // True when a copy's stored base can no longer be placed: gone, or aliased by applyTints to the player's own id, which

@@ -33,8 +33,18 @@ export class HitService extends ClientListener {
             return this.traceNonActorHit(e, aggressor);
         }
 
-        const base = e.target.getBaseObject();
-        const type = base?.getType();
+        // The target can be gone by the time its hit arrives. getBaseObject then fails natively with
+        // "Bad call result 4" instead of returning null, so base?. cannot help and the handler throws:
+        // 640 lines from about 110 players in 6 days (_work\sweep-1031.md a1). The hit is dropped either
+        // way, so this is noise rather than a gameplay loss.
+        let base: Form | null = null;
+        let type: FormType | undefined = undefined;
+        try {
+            base = e.target.getBaseObject();
+            type = base?.getType();
+        } catch (targetBaseUnreadable) {
+            return;
+        }
 
         if (type === FormType.Static || type === FormType.MovableStatic) {
             return;
