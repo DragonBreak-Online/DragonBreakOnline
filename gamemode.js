@@ -9456,7 +9456,7 @@ try {
 try {
   const HERALDS_JS = path.resolve('heralds.js');
   delete require.cache[HERALDS_JS];
-  require(HERALDS_JS)({ mp, log, personal, system, registerChatCommand, onlineActors, profileOf, nameOf, zoneById, takeGold, depositToTreasury, every, audit, isAdmin, zoneOfActor, cfg });
+  require(HERALDS_JS)({ mp, log, personal, system, registerChatCommand, onlineActors, profileOf, nameOf, zoneById, takeGold, depositToTreasury, every, audit, isAdmin, zoneOfActor, giveItem, GOLD_BASE, cfg });
 } catch (e) { log('heralds.js failed to load:', e.stack || e.message); globalThis.__dboHeraldLogin = null; }
 
 // ---- /monitor: the dbo-monitor service's view for staff (server\monitor.js; tooling/dbo-monitor) -----------------

@@ -464,6 +464,8 @@ excluded('DECOR', 'cost JSON; off until Nat switches it on');
 excluded('VAMPATH', 'reasons can name a GM; the drain\'s permadeath logs as PERMADEATH');
 // CIRCULAR (gamemode.js /circular, 31 Oct): the officer, the faction and counts; the letters themselves log as letters
 clean_('CIRCULAR');
+// MUSTER (heralds.js, 31 Oct): a faction's muster pay, the faction and counts only
+clean_('MUSTER');
 // HERALD (heralds.js, 31 Oct): the gathering's title is the player's own words, as /event's broadcast text is
 excluded('HERALD', 'player-written gathering titles; the command wrapper records the use');
 AUDIT_VERBS.FEED.roles = R_BY([[/ asked $/, 'target'], [/ let $/, 'target'], [/ refused $/, 'target'], [/ feed on $/, 'target']]);
@@ -1662,6 +1664,7 @@ gamemode.js CIRCULAR 2d44fcde clean
 heralds.js HERALD 9eb0fce9 excluded
 heralds.js HERALD c8376150 excluded
 heralds.js HERALD e710e773 excluded
+heralds.js MUSTER ee506967 clean
 gamemode.js POST 2a604861 parsed
 gamemode.js GM 90ebebeb parsed
 gamemode.js TREASURY 0cdffe5e clean

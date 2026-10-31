@@ -14,22 +14,28 @@
 // in the gathering's hold is counted a minute at a time. When the window closes, if at least attendance.minAttendees
 // stood there attendance.minMinutes or more, each of them has their work go easier, attendance.boostMult for
 // attendance.boostMinutes (skillrates.js __dboGatheringSkillRate, normal play only), once per gathering.
+// A gathering cried by a faction's leader is that faction's muster (Leader, 31 Oct: "weekly faction treasury pay for
+// turning up"): each of its members among those who stayed is paid attendance.musterPay.perMember gold out of the
+// faction's own treasury (bank.js __dboTreasury.spend, never minted), at most once every musterPay.days per member and
+// faction, at most musterPay.maxPerMuster in all, and never more than the treasury holds.
 //
 // gamemode-config.json "heralds": { enabled, fee: 50, maxText: 200, minAheadMinutes: 10, maxAheadDays: 7,
 //   maxActivePerPoster: 2, reminderMinutes: 30, keepHours: 6,
-//   attendance: { enabled: true, windowMinutes: 60, minMinutes: 20, minAttendees: 5, boostMult: 1.1, boostMinutes: 60 } }
+//   attendance: { enabled: true, windowMinutes: 60, minMinutes: 20, minAttendees: 5, boostMult: 1.1, boostMinutes: 60,
+//     musterPay: { enabled: true, perMember: 25, maxPerMuster: 300, days: 7 } } }
 'use strict';
 const fs = require('fs');
 const path = require('path');
 
 module.exports = (api) => {
-  const { mp, log, personal, system, registerChatCommand, onlineActors, profileOf, nameOf, zoneById, takeGold, depositToTreasury, every, audit, isAdmin, zoneOfActor, cfg } = api;
+  const { mp, log, personal, system, registerChatCommand, onlineActors, profileOf, nameOf, zoneById, takeGold, depositToTreasury, every, audit, isAdmin, zoneOfActor, giveItem, GOLD_BASE, cfg } = api;
   const C = Object.assign({ enabled: true, fee: 50, maxText: 200, minAheadMinutes: 10, maxAheadDays: 7, maxActivePerPoster: 2, reminderMinutes: 30, keepHours: 6 }, cfg.heralds || {});
   const ON = C.enabled !== false;
   const AT = Object.assign({ enabled: true, windowMinutes: 60, minMinutes: 20, minAttendees: 5, boostMult: 1.1, boostMinutes: 60 }, C.attendance || {});
   const BOOST = 'private.dboGatheringBoost';
+  const PAY = Object.assign({ enabled: true, perMember: 25, maxPerMuster: 300, days: 7 }, AT.musterPay || {});
   const FILE = path.resolve('heralds.json');
-  const S = (() => { try { const j = JSON.parse(fs.readFileSync(FILE, 'utf8')); return { seq: Number(j.seq) || 0, events: Array.isArray(j.events) ? j.events : [] }; } catch (e) { return { seq: 0, events: [] }; } })();
+  const S = (() => { try { const j = JSON.parse(fs.readFileSync(FILE, 'utf8')); return { seq: Number(j.seq) || 0, events: Array.isArray(j.events) ? j.events : [], paid: j.paid && typeof j.paid === 'object' ? j.paid : {} }; } catch (e) { return { seq: 0, events: [], paid: {} }; } })();
   const save = () => { try { fs.writeFileSync(FILE, JSON.stringify(S)); } catch (e) { log('heralds: save failed', e.message); } };
   const call = (name, ...args) => { try { const f = globalThis[name]; return typeof f === 'function' ? f(...args) : undefined; } catch (e) { return undefined; } };
   const ownName = (a) => { const m = call('__dboMaskOf', a >>> 0); return (m && m.real) || nameOf(a); };
@@ -88,7 +94,7 @@ module.exports = (api) => {
     if (fee) depositToTreasury(zoneId, fee, { income: 'heralds' });
     const zone = zoneById(zoneId);
     const e = { id: ++S.seq, title, at, place: zone ? zone.name : String(zoneId), zoneId, province: provinceOf(a), by: ownName(a), byProfile: p,
-      faction: leader ? leader.name : '', rsvps: [p], posted: now, reminded: false, begun: false };
+      faction: leader ? leader.name : '', factionId: leader ? leader.id : '', rsvps: [p], posted: now, reminded: false, begun: false };
     S.events.push(e);
     S.events = S.events.filter((x) => !x.cancelled && now < x.at + C.keepHours * 3600000);
     save();
@@ -150,7 +156,29 @@ module.exports = (api) => {
       personal(t, `Having joined ${e.title}, your work comes easier for the next ${AT.boostMinutes} minutes.`);
     }
     audit(`HERALD #${e.id} "${e.title}" closed: ${came.length} stayed, ${given} rewarded (x${AT.boostMult} for ${AT.boostMinutes} min)`);
+    musterPay(e, came, now);
     return true;
+  };
+  // The faction's muster pay, out of its own treasury, to its members who stayed
+  const musterPay = (e, came, now) => {
+    const T = globalThis.__dboTreasury;
+    if (PAY.enabled === false || !e.factionId || !T || typeof T.spend !== 'function') return;
+    const per = Math.max(0, Math.floor(Number(PAY.perMember) || 0));
+    if (!per) return;
+    const members = onlineActors().filter((t) => came.includes(String(profileOf(t))) && factionsOf(t).some((g) => g.id === e.factionId));
+    let paid = 0, waited = 0, short = false;
+    for (const t of members) {
+      const pr = String(profileOf(t));
+      const key = `${e.factionId}|${pr}`;
+      if (now - (Number(S.paid[key]) || 0) < PAY.days * 86400000) { waited++; continue; }
+      if (paid + per > PAY.maxPerMuster) { short = true; break; }
+      if (!T.spend(e.factionId, per, 'muster pay')) { short = true; break; }
+      try { giveItem(t, GOLD_BASE, per); } catch (err) { log('heralds: muster pay give failed', err.message); continue; }
+      S.paid[key] = now; paid += per;
+      personal(t, `The ${e.faction}'s purser pays you ${per} gold for answering the muster.`);
+    }
+    for (const [k, at] of Object.entries(S.paid)) if (now - at > PAY.days * 86400000) delete S.paid[k];
+    if (members.length) audit(`MUSTER ${e.faction}: ${paid} gold to ${paid / per} of ${members.length} members who came${waited ? `, ${waited} paid this week already` : ''}${short ? ', the treasury or the cap ran short' : ''}`);
   };
   globalThis.__dboGatheringSkillRate = (a) => {
     let b = null; try { b = mp.get(a >>> 0, BOOST); } catch (e) { return 1; }

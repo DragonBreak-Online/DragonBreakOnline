@@ -1,5 +1,20 @@
 [
   {
+    "title": "Musters pay those who answer them",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Factions",
+        "items": [
+          "A gathering your faction's leader has a herald cry is your faction's muster. If it draws enough people (five who stay 20 minutes of its first hour), each member of the faction who came is paid 25 gold by the faction's purser, out of the faction's own treasury.",
+          "Once a week per member and faction, at most 300 gold a muster, and never more than the treasury holds."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Gatherings reward those who come",
     "date": "2026-10-31",
     "version": "Server update",
