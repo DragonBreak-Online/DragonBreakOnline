@@ -3203,32 +3203,39 @@
     "death": "The Minotaur Lord of Minotaur's Rest is dead."
    },
    "_note": "Drops (proposed, 25 Oct): Minotaur Horn x2 and Minotaur Hide (BSAssets, the beast's own), gold, Steel Plate 5%. Minotaur's Rest's own spawns are undead today (ownedSpawns.replace minotaur); if the Lord fights, Nat may want its minotaurs back as his adds",
-   "_adds": "Nat, 25 Oct: the minotaurs come back at Minotaur's Rest as his adds; each gets its war axe back in its inventory (rearmAdds), as the Lord's test 2 does",
-   "_rearmNote": "Nat 26 Oct: the two dev tests (minotaurtest1, minotaurtest2) stood under this boss's own name, which put two 'The Minotaur Lord' plates up at once; both kept the axe at spawn (dev 26 Oct 03:49, 6026df), so the Lord takes test 2's set-up (rearmEdid, which puts the axe back if it is ever lost) and the tests are gone",
    "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
-   "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D2453, templated on the original with every flag) in DragonBreak_Bosses.ini",
-   "rearm": "6026df:BSAssets.esm",
-   "rearmAdds": "6026e6:BSAssets.esm",
+   "_mihail": "The Leader, 31 Oct: Mihail's High Minotaurs (Nexus 34392, mihailmmaminotaur.esp, appended last, then DragonBreak Minotaur Patch.esp). His Minotaur Lord (813) on the humanoid graph, which attacks where Beyond Skyrim's never did, with his Minotaurs (811) and a Shaman (81F) as adds. They carry their own hammers, so no rearm. Off (gamemode-config bosses.only) until an in-game check that they attack. TrueHUD's bar named the old DLE copy 1D2453; rename it in DragonBreak_Bosses.ini when he goes live.",
    "boss": {
-    "edid": "DBO_Boss_minotaurlord",
-    "desc": "1d2453:DragonBreak Online Edits.esp",
+    "edid": "mihailminotaurcommonLORD",
+    "desc": "813:mihailmmaminotaur.esp",
     "options": [
      [
-      44,
-      "1d2453:DragonBreak Online Edits.esp",
-      "DBO_Boss_minotaurlord"
+      30,
+      "813:mihailmmaminotaur.esp",
+      "mihailminotaurcommonLORD"
      ]
     ]
    },
    "adds": [
     {
-     "edid": "CYREncMinotaur",
-     "desc": "8b600:BSHeartland.esm",
+     "edid": "mihailminotaurcommon",
+     "desc": "811:mihailmmaminotaur.esp",
      "options": [
       [
-       24,
-       "8b600:BSHeartland.esm",
-       "CYREncMinotaur"
+       25,
+       "811:mihailmmaminotaur.esp",
+       "mihailminotaurcommon"
+      ]
+     ]
+    },
+    {
+     "edid": "mihailminotaurcommonSHAMAN",
+     "desc": "81f:mihailmmaminotaur.esp",
+     "options": [
+      [
+       30,
+       "81f:mihailmmaminotaur.esp",
+       "mihailminotaurcommonSHAMAN"
       ]
      ]
     }
