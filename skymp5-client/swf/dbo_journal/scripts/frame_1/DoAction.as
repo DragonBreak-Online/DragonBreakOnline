@@ -26,13 +26,6 @@ var busy = false;
 var busyAt = 0;
 var pages = {};
 var asking = null;
-// forming: the form drawn in place of the tab, {build, vals}; build(vals) gives {title, hint, fields, buttons} each draw
-var forming = null;
-// fbox: the form field whose typing box is open; fboxField its text field
-var fbox = "";
-var fboxField = null;
-// fboxLines: the open box is a page of several lines, where Enter types a new line
-var fboxLines = false;
 var builtAt = getTimer();
 
 function send(key, args)
@@ -98,256 +91,13 @@ function closeJournal()
    dboClose();
 }
 
-// A form in place of the tab, for typed input. build(vals) returns {title, hint, fields, buttons}, where a field is
-// {key, label, kind: "text" | "number" | "choice" | "multi" | "note" | "buttons", max, hint, lines, restrict, options:
-// [[value, label], ...], empty, text, items} and a button [label, onSubmit(vals), ready, danger]; vals are what the player
-// typed and chose, by key. A text field with lines is a page of that many lines (Enter is a new line, Done takes it).
-// A "multi" field keeps an array of the values picked (at most max); a "buttons" field's items [label, fn(vals), disabled,
-// danger] change vals in place and redraw (a draft's Up, Remove, Add) without closing the form. A button that is ready
-// closes the form and runs; Cancel and Escape close it.
-function form(build, vals)
-{
-   endFormTyping();
-   dboSound("UIMenuOK");
-   asking = null;
-   forming = {build: build, vals: vals != undefined ? vals : {}};
-   pages[tab] = 0;
-   draw();
-}
-
-function closeForm()
-{
-   endFormTyping();
-   forming = null;
-}
-
-function endFormTyping()
-{
-   if (fbox != "")
-   {
-      dboInputEnd();
-   }
-   fbox = "";
-   fboxField = null;
-   fboxLines = false;
-}
-
-function takeFormTyped()
-{
-   var raw = fboxField != null ? String(fboxField.text) : "";
-   // a page keeps its lines (the field's own breaks are \r); a one-line box has none
-   var text = fboxLines ? raw.split("\r\n").join("\n").split("\r").join("\n") : raw.split("\r").join(" ").split("\n").join(" ");
-   while (text.charAt(0) == " ")
-   {
-      text = text.substr(1);
-   }
-   while (text.charAt(text.length - 1) == " ")
-   {
-      text = text.substr(0, text.length - 1);
-   }
-   forming.vals[fbox] = text;
-   endFormTyping();
-   dboSound("UIMenuOK");
-   draw();
-}
-
-// A typed field's row: its label, the value or a box to type it in
-function formField(f, vals)
-{
-   var lines = f.lines != undefined && f.lines > 1 ? f.lines : 1;
-   var tall = lines > 1 ? lines * 24 + 12 : 32;
-   var at = flowNeed(tall + 10);
-   var c = at.clip.createEmptyMovieClip(at.name, fd());
-   c._y = at.y;
-   var l = dboText(c, "label", 1, 0, 8, 300, 26, dboFmt(F_MEDIUM, 16, C_SECOND, 0.5), false);
-   l.text = String(f.label);
-   var value = vals[f.key] != undefined ? String(vals[f.key]) : "";
-   if (fbox == f.key)
-   {
-      fboxField = dboInput(c, "box", 2, 310, 4, BODY_W - 310 - 108, tall, dboFmt(F_PLAIN, 18, C_TEXT, 0.5), f.max != undefined ? f.max : 40, lines > 1);
-      fboxLines = lines > 1;
-      if (f.kind == "number")
-      {
-         fboxField.restrict = "0-9";
-      }
-      else if (f.restrict != undefined)
-      {
-         fboxField.restrict = f.restrict;
-      }
-      fboxField.text = value;
-      button(c, "done", 10, BODY_W - 100, 6, 92, "Done", F_MEDIUM, 17, A_BUTTON_REST, function() { takeFormTyped(); });
-      return;
-   }
-   var v = dboText(c, "value", 2, 310, 8, BODY_W - 310 - 108, lines > 1 ? tall : 26, dboFmt(F_MEDIUM, 17, value != "" ? C_TEXT : C_SECOND, 0.5), lines > 1);
-   v.text = value != "" ? value : f.hint != undefined ? String(f.hint) : "";
-   if (dboCanType())
-   {
-      var t = button(c, "type", 10, BODY_W - 100, 6, 92, "Type...", F_MEDIUM, 17, A_ROW_REST, function()
-      {
-         endFormTyping();
-         fbox = this.key;
-         dboSound("UIMenuOK");
-         draw();
-      });
-      t.key = String(f.key);
-   }
-}
-
-function drawForm()
-{
-   var vals = forming.vals;
-   var spec = forming.build(vals);
-   flowHeading(String(spec.title));
-   if (spec.hint != undefined && spec.hint != "")
-   {
-      flowHint(String(spec.hint));
-   }
-   var fields = listOf(spec.fields);
-   var typed = false;
-   for (var i = 0; i < fields.length; i++)
-   {
-      var f = fields[i];
-      if (f.kind == "note")
-      {
-         flowHint(String(f.text));
-      }
-      else if (f.kind == "buttons")
-      {
-         var items = listOf(f.items);
-         var ib = [];
-         for (var m = 0; m < items.length; m++)
-         {
-            ib.push([String(items[m][0]), function() { this.fn(forming.vals); dboSound("UIMenuFocus"); draw(); }, items[m][3] == true ? C_RED : undefined, items[m][2] == true]);
-         }
-         if (ib.length)
-         {
-            var ir = flowButtons(ib);
-            for (var w = 0; w < items.length; w++)
-            {
-               ir["btn" + w].fn = items[w][1];
-            }
-         }
-      }
-      else if (f.kind == "multi")
-      {
-         flowText(String(f.label), 16, C_SECOND);
-         var mo = listOf(f.options);
-         if (!mo.length)
-         {
-            flowHint(f.empty != undefined ? String(f.empty) : "Nothing to choose from.");
-            continue;
-         }
-         var picked = listOf(vals[f.key]);
-         var mc = [];
-         for (var x = 0; x < mo.length; x++)
-         {
-            var on = formHas(picked, mo[x][0]);
-            mc.push([String(mo[x][1]), function()
-            {
-               var cur = listOf(forming.vals[this.key]).slice();
-               var at = -1;
-               for (var y = 0; y < cur.length; y++)
-               {
-                  if (String(cur[y]) == String(this.v))
-                  {
-                     at = y;
-                  }
-               }
-               if (at >= 0)
-               {
-                  cur.splice(at, 1);
-               }
-               else
-               {
-                  cur.push(this.v);
-               }
-               forming.vals[this.key] = cur;
-               dboSound("UIMenuFocus");
-               draw();
-            }, undefined, !on && f.max != undefined && picked.length >= f.max, on]);
-         }
-         var mr = flowButtons(mc);
-         for (var z = 0; z < mo.length; z++)
-         {
-            mr["btn" + z].key = String(f.key);
-            mr["btn" + z].v = mo[z][0];
-         }
-      }
-      else if (f.kind == "choice")
-      {
-         flowText(String(f.label), 16, C_SECOND);
-         var opts = listOf(f.options);
-         if (!opts.length)
-         {
-            flowHint(f.empty != undefined ? String(f.empty) : "Nothing to choose from.");
-            continue;
-         }
-         var chips = [];
-         for (var k = 0; k < opts.length; k++)
-         {
-            chips.push([String(opts[k][1]), function() { forming.vals[this.key] = this.v; dboSound("UIMenuFocus"); draw(); }, undefined, false, String(vals[f.key]) == String(opts[k][0])]);
-         }
-         var row = flowButtons(chips);
-         for (var q = 0; q < opts.length; q++)
-         {
-            row["btn" + q].key = String(f.key);
-            row["btn" + q].v = opts[q][0];
-         }
-      }
-      else
-      {
-         typed = true;
-         formField(f, vals);
-      }
-   }
-   if (typed && !dboCanType())
-   {
-      flowHint("This game cannot take typed input in a panel: the browser journal has this form.");
-   }
-   flowGap(6);
-   var bs = [];
-   var list = listOf(spec.buttons);
-   for (var j = 0; j < list.length; j++)
-   {
-      bs.push([String(list[j][0]), function()
-      {
-         var go = this.go;
-         var v = forming.vals;
-         closeForm();
-         go(v);
-         draw();
-      }, list[j][3] == true ? C_RED : undefined, busy || data.readOnly == 1 || list[j][2] != true]);
-   }
-   if (typed && !dboCanType())
-   {
-      bs.push(["In the browser...", function() { closeForm(); toBrowser(); draw(); }]);
-   }
-   bs.push(["Cancel", function() { dboSound("UIMenuCancel"); closeForm(); draw(); }]);
-   var bar = flowButtons(bs);
-   for (var n = 0; n < list.length; n++)
-   {
-      bar["btn" + n].go = list[n][1];
-   }
-}
-
-function formHas(list, v)
-{
-   for (var i = 0; i < list.length; i++)
-   {
-      if (String(list[i]) == String(v))
-      {
-         return true;
-      }
-   }
-   return false;
-}
-
-// A whole number typed in a form, or -1 when it is not one
-function formNumber(vals, key)
-{
-   var t = vals[key] != undefined ? String(vals[key]) : "";
-   return t != "" && !isNaN(Number(t)) ? Math.floor(Number(t)) : -1;
-}
+// Typed input is a form in place of the tab, drawn by lib/dbo-form.as; these are the journal's hooks into it
+formHost.busy = function() { return busy; };
+formHost.readOnly = function() { return data != null && data.readOnly == 1; };
+formHost.redraw = function() { draw(); };
+formHost.fallback = function() { toBrowser(); };
+formHost.fallbackText = "the browser journal";
+formHost.onOpen = function() { asking = null; pages[tab] = 0; };
 
 var ctx = {act: act, openTab: openTab, browser: toBrowser, ask: ask, form: form, number: formNumber};
 
@@ -428,17 +178,12 @@ function drawBody()
 {
    var b = clear("body", 40);
    flowStart(b, 1, PAD, bodyTop);
-   var typedText = fbox != "" && fboxField != null ? String(fboxField.text) : null;
-   fboxField = null;
+   formBegin();
    if (forming != null)
    {
       ctx.busy = busy;
       ctx.readOnly = data.readOnly == 1;
       drawForm();
-      if (typedText != null && fboxField != null)
-      {
-         fboxField.text = typedText;
-      }
    }
    else if (asking != null)
    {
@@ -480,11 +225,7 @@ function drawBody()
          JT[tab](s, ctx);
       }
    }
-   // a box whose field is gone (the form closed, or rebuilt without it) gives the keys back
-   if (fbox != "" && fboxField == null)
-   {
-      endFormTyping();
-   }
+   formEnd();
    var n = flowShow(pages[tab] != undefined ? pages[tab] : 0);
    pages[tab] = flow.shown;
    return n;
@@ -620,30 +361,12 @@ var keys = {};
 keys.onKeyDown = function()
 {
    var code = dboKey();
-   if (fbox != "")
+   if (formKey(code))
    {
-      if (code == 27)
-      {
-         dboSound("UIMenuCancel");
-         endFormTyping();
-         draw();
-      }
-      else if (code == 13 && !fboxLines)
-      {
-         takeFormTyped();
-      }
-      // every other key is typing while the box is open (Enter too, in a page of several lines)
       return;
    }
    if (code == 27)
    {
-      if (forming != null)
-      {
-         dboSound("UIMenuCancel");
-         closeForm();
-         draw();
-         return;
-      }
       if (asking != null)
       {
          dboSound("UIMenuCancel");

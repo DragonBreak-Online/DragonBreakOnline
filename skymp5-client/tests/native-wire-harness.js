@@ -85,7 +85,11 @@ const drive = {
     row('Ann').onRelease(); P().right.burn.onRelease(); P().right.burn.onRelease(); again('letters');
     row('Bob').onRelease(); P().right.collect.onRelease(); again('letters');
     row('Bob').onRelease(); P().right.ignore.onRelease(); again('send');
-    P().right.write.onRelease(); again('send');
+    // the letter is a form in the coop now (lib/dbo-form.as): typed, then sent
+    const inForm = (label) => { const out = []; const walk = (c) => { for (const k of Object.values(c.kids || {})) { if (k.label && k.onRelease && k.label.text === label) out.push(k); if (k.kids) walk(k); } }; walk(P().right); return out[0]; };
+    P().right.write.onRelease(); inForm('Type...').onRelease();
+    (() => { let f = null; const walk = (c) => { for (const k of Object.values(c.kids || {})) { if (k.type === 'input') f = k; if (k.kids) walk(k); } }; walk(P().right); f.text = 'Hello'; })();
+    inForm('Done').onRelease(); inForm('Send the pigeon').onRelease(); again('send');
     P().right.signNone.onRelease(); again('supply');
     row('Ore').onRelease(); P().right.deliver.onRelease(); again('supply');
     row('Wheat').onRelease(); P().right.cancel.onRelease(); P().right.cancel.onRelease(); again('courier');
@@ -169,7 +173,7 @@ for (const menu of Object.keys(fixtures)) {
 
 // The journal's tabs send many module events (dbo:court*, journalMagic...): each key in its source has a handler in some server module
 check('dbo_labour: its sessions send all four labour keys', ['dbo:labour', 'dbo:labourCancel', 'dbo:struggle', 'dbo:struggleCancel'].every((k) => (seen.dbo_labour || []).includes(k)), seen.dbo_labour);
-check('dbo_pigeon: the drive sends every key the coop has', ['dbo:pigeonRead', 'dbo:pigeonDelete', 'dbo:pigeonCollect', 'dbo:pigeonBlockLetter', 'dbo:pigeonCompose', 'dbo:pigeonSign', 'dbo:supplyDeliver', 'dbo:supplyCancel', 'dbo:courierTake', 'dbo:courierDeliver', 'dbo:courierOpen', 'dbo:courierCancel', 'dbo:pigeonClose'].every((k) => (seen.dbo_pigeon || []).includes(k)), [...new Set(seen.dbo_pigeon || [])]);
+check('dbo_pigeon: the drive sends every key the coop has', ['dbo:pigeonRead', 'dbo:pigeonDelete', 'dbo:pigeonCollect', 'dbo:pigeonBlockLetter', 'dbo:pigeonSend', 'dbo:pigeonSign', 'dbo:supplyDeliver', 'dbo:supplyCancel', 'dbo:courierTake', 'dbo:courierDeliver', 'dbo:courierOpen', 'dbo:courierCancel', 'dbo:pigeonClose'].every((k) => (seen.dbo_pigeon || []).includes(k)), [...new Set(seen.dbo_pigeon || [])]);
 
 if (SERVER) {
   const src = fs.readdirSync(path.resolve(__dirname, '..', 'swf/dbo_journal/tabs')).map((f) => read(`swf/dbo_journal/tabs/${f}`)).concat(read('swf/dbo_journal/scripts/frame_1/DoAction.as')).join('\n');

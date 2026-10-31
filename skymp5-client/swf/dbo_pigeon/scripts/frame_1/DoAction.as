@@ -1,7 +1,10 @@
 // The pigeon coop as a native panel (gamemode.js openPigeonCoop, widget 34, the same object the browser coop gets): a port
-// of skymp5-front features/pigeon and its Courier tab, same tabs, words and messages. A native panel has no text box, so
-// writing a letter, posting a supply order and posting a courier job hand their composer to the browser coop:
-// dbo:pigeonCompose [nonce, mode, to] ('send', 'supply', 'courier'); the server brings the native coop back when it is done.
+// of skymp5-front features/pigeon and its Courier tab, same tabs, words and messages. Writing a letter, posting a supply
+// order and posting a courier job are forms in the panel (lib/dbo-form.as), typed in its own boxes:
+//   Letter:   dbo:pigeonSend [nonce, recipient, text, gold, itemsJson]; signing dbo:pigeonSign [nonce, 'clear' | 'unsigned' | a name]
+//   Supply:   dbo:supplySearch [nonce, query] | supplyPost [nonce, desc, count, reward]
+//   Courier:  dbo:courierPost [nonce, destKey, recipient, pay, insured, itemsJson]
+// A game that cannot type hands the composer to the browser coop instead: dbo:pigeonCompose [nonce, mode, to].
 //   Letters:  dbo:pigeonRead | pigeonDelete | pigeonCollect | pigeonBlockLetter [nonce, letterId]
 //   Send:     dbo:pigeonSign [nonce, 'clear' | 'unsigned']
 //   Supply:   dbo:supplyDeliver [nonce, orderId, count] | supplyCancel [nonce, orderId]
@@ -38,7 +41,17 @@ var asked = "";
 var busy = false;
 var busyAt = 0;
 var pageCount = 1;
+// composing: the composer open as a form ('send', 'supply', 'courier' or 'sign'), the letter's recipient, the form's page
+var composing = "";
+var composeTo = 0;
+var formPage = 0;
 var builtAt = getTimer();
+
+formHost.busy = function() { return busy; };
+formHost.redraw = function() { draw(); };
+formHost.fallback = function() { compose(composing == "sign" ? "send" : composing, composeTo); };
+formHost.fallbackText = "the browser coop";
+formHost.onOpen = function() { formPage = 0; };
 
 function num(v, fallback)
 {
@@ -137,6 +150,7 @@ function compose(mode, to)
 
 function closeCoop()
 {
+   endFormTyping();
    dboSound("UIMenuCancel");
    dboSend("dbo:pigeonClose", [nonce]);
    dboClose();
@@ -163,6 +177,17 @@ function confirmLabel(key, args, label, ask)
 
 function turnPage(d)
 {
+   if (forming != null)
+   {
+      var fp = Math.max(0, Math.min(pageCount - 1, formPage + d));
+      if (fp != formPage)
+      {
+         dboSound("UIMenuPrevNext");
+         formPage = fp;
+         draw();
+      }
+      return;
+   }
    var to = Math.max(0, Math.min(pageCount - 1, page + d));
    if (to == page)
    {
@@ -183,7 +208,225 @@ function setView(v)
    view = v;
    page = 0;
    asked = "";
+   closeForm();
+   composing = "";
    draw();
+}
+
+// ---- the composers (forms) ----
+
+function openForm(mode, to, build, vals)
+{
+   composing = mode;
+   composeTo = to;
+   asked = "";
+   form(build, vals);
+}
+
+// The goods a parcel or a courier carries: a multi-choice of what can go (at most maxStacks kinds) and, for each picked, how
+// many (1 until typed), as the browser's packed list; listOf the goods and their [baseId, count] list come back in a parcel
+function goodsFields(fields, v, goods, maxStacks, what)
+{
+   var opts = [];
+   for (var i = 0; i < goods.length; i++)
+   {
+      opts.push([goods[i].baseId, goods[i].name + " x" + goods[i].count]);
+   }
+   fields.push({key: "goods", label: "The goods (up to " + maxStacks + " kinds)", kind: "multi", options: opts, max: maxStacks, empty: "You carry nothing a " + what + " can take."});
+   var picked = listOf(v.goods);
+   var list = [];
+   var ok = true;
+   for (var k = 0; k < picked.length; k++)
+   {
+      var g = null;
+      for (var q = 0; q < goods.length; q++)
+      {
+         if (String(goods[q].baseId) == String(picked[k]))
+         {
+            g = goods[q];
+         }
+      }
+      var key = "n:" + picked[k];
+      var n = v[key] != undefined && String(v[key]) != "" ? Number(v[key]) : 1;
+      fields.push({key: key, label: (g != null ? g.name : String(picked[k])) + ", of " + (g != null ? g.count : 0), kind: "number", max: 5, hint: "1"});
+      if (g == null || !(n >= 1) || n > Number(g.count))
+      {
+         ok = false;
+      }
+      if (n > 0)
+      {
+         list.push([Number(picked[k]), n, g]);
+      }
+   }
+   return {list: list, ok: ok};
+}
+
+function packedOf(list)
+{
+   var out = [];
+   for (var i = 0; i < list.length; i++)
+   {
+      out.push([list[i][0], list[i][1]]);
+   }
+   return out;
+}
+
+function writeLetter(to)
+{
+   openForm("send", to, function(v)
+   {
+      var chosen = null;
+      var cs = contacts();
+      for (var i = 0; i < cs.length; i++)
+      {
+         if (cs[i].id == composeTo)
+         {
+            chosen = cs[i];
+         }
+      }
+      var max = num(data.maxText, 500);
+      var waiting = num(data.cooldownMinutes, 0) > 0;
+      var fields = [];
+      if (chosen == null)
+      {
+         fields.push({kind: "note", text: "Choose who the letter is for."});
+      }
+      fields.push({key: "text", label: chosen != null ? "A letter for " + chosen.name : "The letter", kind: "text", max: max, lines: 6, count: true});
+      fields.push({kind: "buttons", items: [["Sign with your name", function() { act("dbo:pigeonSign", ["clear"]); }, busy], ["Unsigned", function() { act("dbo:pigeonSign", ["unsigned"]); }, busy]]});
+      var rules = data.parcel != undefined && data.parcel != null && data.parcel.enabled == true ? data.parcel : null;
+      var goldSent = 0;
+      var packed = {list: [], ok: true};
+      if (rules != null)
+      {
+         fields.push({key: "gold", label: "Gold (" + Math.round(num(rules.taxRate, 0) * 100) + "% tax, " + rules.itemFee + " a kind of goods)", kind: "number", max: 7, hint: "0"});
+         goldSent = Math.max(0, formNumber(v, "gold"));
+         packed = goodsFields(fields, v, listOf(data.sendable), num(rules.maxStacks, 0), "pigeon");
+      }
+      var text = v.text != undefined ? String(v.text) : "";
+      var price = chosen != null ? num(chosen.price, 0) : 0;
+      var stacks = packed.list.length;
+      var tax = rules != null ? Math.ceil(goldSent * num(rules.taxRate, 0)) + stacks * num(rules.itemFee, 0) : 0;
+      var hasParcel = goldSent > 0 || stacks > 0;
+      var total = price + (hasParcel ? goldSent + tax : 0);
+      var canAfford = num(data.gold, 0) >= total;
+      var label = waiting ? "Pigeon is out" : chosen == null ? "Choose someone" : !packed.ok ? "Not that many" : !canAfford ? "Not enough gold" : "Send the pigeon";
+      fields.push({kind: "note", text: waiting ? "Your pigeon is still out. The next one can fly in " + data.cooldownMinutes + " min."
+         : chosen != null ? (hasParcel ? "Flight " + price + ", parcel tax " + tax + (goldSent ? ", gold sent " + goldSent : "") + ": " + total + " gold. You carry " + data.gold + "." : "A pigeon to " + chosen.name + " costs " + price + " gold. You carry " + data.gold + " gold.")
+         : "The farther the bird flies, the more it costs."});
+      return {title: "A letter", fields: fields, buttons: [[label, function(vals)
+      {
+         act("dbo:pigeonSend", [chosen.id, text, goldSent, dboJson(packedOf(packed.list))]);
+      }, chosen != null && (text != "" || hasParcel) && !waiting && canAfford && packed.ok]]};
+   });
+}
+
+function openSign()
+{
+   openForm("sign", selectedId == null ? 0 : selectedId, function(v)
+   {
+      var name = v.name != undefined ? String(v.name) : "";
+      return {title: "Sign as another name", hint: "Your letters are signed with it until you change it.", fields: [{key: "name", label: "The name", kind: "text", max: 40}],
+         buttons: [["Use it", function(vals) { act("dbo:pigeonSign", [String(vals.name)]); }, name != ""]]};
+   });
+}
+
+function openSupply()
+{
+   openForm("supply", 0, function(v)
+   {
+      var s = supply();
+      if (s == null)
+      {
+         return {title: "Post a supply order", fields: [{kind: "note", text: "Supply orders are closed here."}], buttons: []};
+      }
+      var q = v.q != undefined ? String(v.q) : "";
+      var results = listOf(s.results);
+      var opts = [];
+      for (var i = 0; i < results.length; i++)
+      {
+         opts.push([results[i].desc, results[i].name]);
+      }
+      var picked = false;
+      for (var k = 0; k < opts.length; k++)
+      {
+         picked = picked || opts[k][0] == v.pick;
+      }
+      var count = formNumber(v, "count");
+      var reward = formNumber(v, "reward");
+      var fee = Math.max(num(s.minFee, 0), Math.ceil(Math.max(0, reward) * num(s.feeShare, 0)));
+      var fields = [{key: "q", label: "Search for an item", kind: "text", max: 40},
+         {kind: "buttons", items: [["Search", function(vals) { act("dbo:supplySearch", [String(vals.q)]); }, busy || q.length < 2]]},
+         {key: "pick", label: "The item", kind: "choice", options: opts, empty: "Search for the item to order."},
+         {key: "count", label: "How many, up to " + s.maxCount, kind: "number", max: 5}, {key: "reward", label: "The whole reward", kind: "number", max: 7},
+         {kind: "note", text: reward > 0 ? "Reward " + reward + " and " + fee + " to post: " + (reward + fee) + " gold. You carry " + data.gold + "." : "Set how many and the whole reward."},
+         {kind: "note", text: "Up to " + s.maxCount + "; open " + s.openDays + " days; " + Math.round(num(s.feeShare, 0) * 100) + "% to post, at least " + s.minFee + "."}];
+      return {title: "Post a supply order", fields: fields, buttons: [["Post order", function(vals) { act("dbo:supplyPost", [String(vals.pick), formNumber(vals, "count"), formNumber(vals, "reward")]); },
+         picked && count >= 1 && count <= num(s.maxCount, 0) && reward >= count && num(data.gold, 0) >= reward + fee]]};
+   });
+}
+
+function openCourier()
+{
+   openForm("courier", 0, function(v)
+   {
+      var c = courier();
+      if (c == null || c.enabled != true)
+      {
+         return {title: "Send goods by courier", fields: [{kind: "note", text: "No courier takes work here yet."}], buttons: []};
+      }
+      var dests = listOf(c.destinations);
+      var dopts = [];
+      var dest = null;
+      for (var i = 0; i < dests.length; i++)
+      {
+         dopts.push([dests[i].key, dests[i].name]);
+         if (dests[i].key == v.dest)
+         {
+            dest = dests[i];
+         }
+      }
+      var inPerson = dest != null && dest.kind == "person";
+      var ropts = inPerson ? [] : [[0, "Yourself"]];
+      var cs = contacts();
+      for (var k = 0; k < cs.length; k++)
+      {
+         ropts.push([cs[k].id, cs[k].name + " #" + cs[k].tag]);
+      }
+      if (inPerson && Number(v.to) == 0 && cs.length)
+      {
+         v.to = cs[0].id;
+      }
+      var recipient = inPerson && Number(v.to) == 0 ? null : Number(v.to);
+      var fields = [{key: "dest", label: "Where it goes", kind: "choice", options: dopts}];
+      if (dest != null && dest.hint != undefined && dest.hint != "")
+      {
+         fields.push({kind: "note", text: "The courier hands it in " + dest.hint + "; the goods wait in the mailbox."});
+      }
+      fields.push({key: "to", label: "Who receives it", kind: "choice", options: ropts, empty: "A parcel in person goes to someone you have met."});
+      var packed = goodsFields(fields, v, listOf(c.goods), num(c.rules.maxStacks, 0), "courier");
+      var value = 0;
+      for (var g = 0; g < packed.list.length; g++)
+      {
+         value += packed.list[g][2] != null ? num(packed.list[g][2].value, 0) * packed.list[g][1] : 0;
+      }
+      fields.push({key: "pay", label: "The courier's pay (" + c.rules.minPay + " to " + c.rules.maxPay + ")", kind: "number", max: 7});
+      fields.push({key: "insure", label: "Insure for (worth " + value + ")", kind: "number", max: 7, hint: "0"});
+      var pay = Math.max(0, formNumber(v, "pay"));
+      var insure = Math.min(Math.max(0, formNumber(v, "insure")), value);
+      var fee = Math.max(num(c.rules.minFee, 0), Math.ceil(pay * num(c.rules.feeShare, 0)));
+      var premium = insure > 0 ? Math.ceil(insure * num(c.rules.premiumRate, 0)) : 0;
+      var total = pay + fee + premium;
+      var days = num(c.rules.limitGameDays, 1);
+      fields.push({kind: "note", text: (pay ? "Pay " + pay + ", " + fee + " to post" + (premium ? ", " + premium + " insurance" : "") + ": " + total + " gold. You carry " + data.gold + "."
+         : Math.round(num(c.rules.feeShare, 0) * 100) + "% of the pay to post (at least " + c.rules.minFee + "); insurance " + Math.round(num(c.rules.premiumRate, 0) * 100) + "% of the value, paid by " + (c.place != undefined && c.place != "" ? c.place : "the hold") + " if it is robbed.")
+         + " Up to " + c.rules.maxStacks + " kinds; the courier has " + days + " " + (days == 1 ? "day" : "days") + "."});
+      var packedOk = packed.list.length > 0 && packed.ok;
+      var label = !packedOk ? "Choose the goods" : recipient == null ? "Choose who receives it" : num(data.gold, 0) < total ? "Not enough gold" : "Post the job";
+      return {title: "Send goods by courier", fields: fields, buttons: [[label, function(vals)
+      {
+         act("dbo:courierPost", [String(vals.dest), recipient, pay, insure, dboJson(packedOf(packed.list))]);
+      }, dest != null && recipient != null && packedOk && pay >= num(c.rules.minPay, 0) && pay <= num(c.rules.maxPay, 0) && num(data.gold, 0) >= total]]};
+   }, {to: 0});
 }
 
 // ---- drawing helpers ----
@@ -411,11 +654,11 @@ function drawSend(r)
    {
       txt(r, "who", 1, RIGHT_X, TOP, RIGHT_W, 30, 22, C_TEXT, "A letter for " + chosen.name);
    }
-   txt(r, "how", 2, RIGHT_X, TOP + 36, RIGHT_W, 70, 16, C_SECOND, "A letter is written in the coop's window: what it says, how it is signed, and any gold or goods it carries.", true);
+   txt(r, "how", 2, RIGHT_X, TOP + 36, RIGHT_W, 70, 16, C_SECOND, "Write the letter here: what it says, how it is signed, and any gold or goods it carries.", true);
    var label = waiting ? "Pigeon is out" : chosen == null ? "Choose someone" : "Write to " + chosen.name + "...";
    act2(r, "write", 10, RIGHT_X, TOP + 110, RIGHT_W, label, function()
    {
-      compose("send", selectedId);
+      writeLetter(selectedId);
    }, undefined, waiting || chosen == null);
    txt(r, "signLabel", 3, RIGHT_X, TOP + 168, 120, 26, 16, C_SECOND, "Sign as");
    act2(r, "signOwn", 11, RIGHT_X + 120, TOP + 162, 200, "Your name", function()
@@ -428,9 +671,9 @@ function drawSend(r)
    });
    act2(r, "signOther", 13, RIGHT_X + 120, TOP + 204, 420, "Another name...", function()
    {
-      compose("send", selectedId == null ? 0 : selectedId);
+      openSign();
    });
-   txt(r, "signHint", 4, RIGHT_X, TOP + 248, RIGHT_W, 40, 16, C_SECOND, "Another name is typed in the coop's window, even while your pigeon is out.", true);
+   txt(r, "signHint", 4, RIGHT_X, TOP + 248, RIGHT_W, 40, 16, C_SECOND, "Another name can be set even while your pigeon is out.", true);
 }
 
 function supplyOrders()
@@ -513,7 +756,7 @@ function drawSupply(r)
       txt(r, "how", 2, RIGHT_X, TOP + 36, RIGHT_W, 70, 16, C_SECOND, "Post an order and the board holds your reward. You are sent the goods; whoever brings them is paid.", true);
       act2(r, "post", 10, RIGHT_X, TOP + 110, RIGHT_W, "Post an order...", function()
       {
-         compose("supply", 0);
+         openSupply();
       });
       txt(r, "rules", 3, RIGHT_X, TOP + 156, RIGHT_W, 40, 16, C_SECOND, "Up to " + s.maxCount + "; open " + s.openDays + " days; " + Math.round(num(s.feeShare, 0) * 100) + "% to post, at least " + s.minFee + ".", true);
       return;
@@ -682,7 +925,7 @@ function drawCourier(r)
       txt(r, "how", 2, RIGHT_X, TOP + 36, RIGHT_W, 70, 16, C_SECOND, Math.round(num(c.rules.feeShare, 0) * 100) + "% of the pay to post (at least " + c.rules.minFee + "); insurance " + Math.round(num(c.rules.premiumRate, 0) * 100) + "% of the value, paid by " + (c.place != undefined && c.place != "" ? c.place : "the hold") + " if it is robbed. Up to " + c.rules.maxStacks + " kinds; the courier has " + days + " " + (days == 1 ? "day" : "days") + ".", true);
       act2(r, "post", 10, RIGHT_X, TOP + 120, RIGHT_W, "Send a parcel by courier...", function()
       {
-         compose("courier", 0);
+         openCourier();
       });
       return;
    }
@@ -806,7 +1049,18 @@ function draw()
    drawTabs();
    var r = clear("right", 40);
    var s = shown();
-   if (s == "letters")
+   if (forming != null)
+   {
+      BODY_W = PANEL_W - PAD * 2;
+      BODY_H = PANEL_H - TOP - 80;
+      flowStart(r, 1, PAD, TOP);
+      formBegin();
+      drawForm();
+      formEnd();
+      pageCount = flowShow(formPage);
+      formPage = flow.shown;
+   }
+   else if (s == "letters")
    {
       drawLetters(r);
    }
@@ -913,6 +1167,10 @@ var keys = {};
 keys.onKeyDown = function()
 {
    var code = dboKey();
+   if (formKey(code))
+   {
+      return;
+   }
    if (code == 27)
    {
       if (data != null)

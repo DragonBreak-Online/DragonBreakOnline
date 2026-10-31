@@ -218,6 +218,7 @@ const view = (t, name) => { firstPage(t); press(t, name); };
   view(t, 'Hunting');
   check('posting: the budget left and today\'s posts', /150 of 200 gold left\); you may post 2 more today\./.test(everyPage(t)), everyPage(t));
   press(t, 'Post a hunt...');
+  check('a form opens on its first page', Object.values(P(t).body.flowClip.kids)[0]._visible === true);
   check('Post a hunt: the beasts with their pay, the first chosen', btn(t, 'Wolves (15 a kill)')._alpha === 100 && !!btn(t, 'Trolls (80 a kill)'));
   typeOn(t, 'How many', '3');
   check('the reward\'s most is the count times the pay', /Reward, up to 45/.test(texts(t)));
