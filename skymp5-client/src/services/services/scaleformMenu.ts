@@ -64,6 +64,8 @@ export const NATIVE_CAPS = [
   "native:shrinePanel",
   // Worker 6's courier handover (dbo_courier, widget 81). Its keys are dbo:courierAnswer/DropIn/Dismiss
   "native:courierHandover",
+  // Worker 6's player menu (dbo_menu, widget 52). Its keys are dbo:menuRun/Close/SwitchChar
+  "native:playerMenu",
 ];
 export const CAPS_RETRY_MS = 5000;
 
