@@ -83,7 +83,9 @@ EDID_FIRST = [(r'AncientImperial', 'ancient_imperial'), (r'GlacialCrystal', 'gla
               (r'^0WHPiecesBearCapeBigReward$', 'hide'), (r'FishingRod', 'tool'), (r'^MCEArmorGiant', 'hide'), (r'^MCEArmorTsun', 'artifact'),
               # the Skyrim release (15 Oct): Ancient Imperial Armor SE's 1AnIm* pieces carry Iron keywords; the Adamantium
               # Addon's pieces, copied into DragonBreak Armory.esp (DBOArm_AdamArmor*), carry none
-              (r'^1AnIm', 'ancient_imperial'), (r'^DBOArm_AdamArmor', 'adamantium')]
+              (r'^1AnIm', 'ancient_imperial'), (r'^DBOArm_AdamArmor', 'adamantium'),
+              # Common Clothes and Armors' Mail (chain over leather) carries ArmorMaterialStudded; it is Steel, tier 2 (Leader, 31 Oct)
+              (r'^CCA_Mail_', 'steel')]
 # Sets named by editor id whose metal pieces borrow another material's keyword (the Ayleid gear Elven, the Goblin gear
 # Iron or Leather); their robes and staves stay clothing and staves
 SET_BY_NAME = [(r'Ayleid', 'ayleid'), (r'Goblin', 'goblin'),

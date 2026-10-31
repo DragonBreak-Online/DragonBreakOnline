@@ -1,5 +1,33 @@
 [
   {
+    "title": "New clothes and armour: Common Clothes and Armors",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "What's new",
+        "items": [
+          "Commoners, miners and merchants now wear a wide range of new everyday clothes, and bandits wear new hide, fur, leather, mail, iron, steel and plate armour.",
+          "All of it can be found, bought and made in every province: the armour at a forge, the clothes at a loom."
+        ]
+      },
+      {
+        "heading": "Where each set sits",
+        "items": [
+          "Fur, hide, leather and iron pieces are tier 1. Mail and steel are tier 2 (Defense 15 to wear). The Salvaged Dwarven cuirass is tier 3 (Defense 30), and the brigand Steel Plate is tier 5 (Defense 60).",
+          "Each piece counts at its tier's armour rating, tempers two levels like everything else, and is made with the same materials as its vanilla counterpart."
+        ]
+      },
+      {
+        "heading": "Credits",
+        "items": [
+          "Common Clothes and Armors by Franklin Zunge and thetrader, uploaded by ProbablyManuel (Nexus Mods, Skyrim Special Edition 21305). All its meshes and textures are Franklin Zunge's, built on resources by BaronDavid, Nernie, Donker316, LordOfWar, FrankDema and Cabal120, defunkt, exray catt, hothtrooper44, CaBaL, BryanWee20 and Northborn. Thank you."
+        ]
+      }
+    ]
+  },
+  {
     "title": "New minotaurs that fight",
     "date": "2026-10-31",
     "version": "Server update",
