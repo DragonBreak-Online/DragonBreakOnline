@@ -179,6 +179,7 @@ const WB_FULL = A && Object.assign({}, A.WB, { members: Array.from({ length: 7 }
 const ADMIN_SETUPS = !A ? [] : [
   ['admin-debug', adminScene({})],
   ['admin-players-roster', adminScene({ players: A.ROSTER, me: { a: 'ff00012a' } }, then(tab(1)))],
+  ['admin-players-empty', adminScene({ players: [], me: { a: 'ff00012a' } }, then(tab(1)))],
   ['admin-players-punish', adminScene({ players: A.ROSTER, bans: [{ id: 'b1', profileId: 99, name: 'Griefer', ip: '1.2.3.4', until: Date.now() + 86400000, reason: '', by: 'nat', at: 0 }], me: { a: 'ff00012a' } }, then(tab(1), (t) => { t.press(51); t.serve(); }, tap('sub1')))],
   ['admin-players-care', adminScene({ players: A.ROSTER, me: { a: 'ff00012a' }, masteryTarget: A.MASTERY_T('') }, then(tab(1), tap('sub2')))],
   ['admin-players-mastery', adminScene({ players: A.ROSTER, me: { a: 'ff00012a' }, masteryTarget: A.MASTERY_T(''), mastery: { profession: null, label: '', rank: 0, rankName: '', hours: 2 } }, then(tab(1), tap('sub3')))],
@@ -255,7 +256,19 @@ if (process.env.CHECK) {
     setup.drive(t);
     t.st.time += 2000; t.tick();
     const hits = overlaps(textBoxes(t.root));
-    console.log(`${hits.length ? 'FAIL' : 'ok  '} ${name}: ${hits.length ? hits.join('; ') : 'no texts overlap'}`);
+    // the panel's ground inside what each screen shape shows (Nat's admin panel ran off the top and bottom, 31 Oct)
+    for (const [an, aspect] of ASPECTS.concat([['32x9', 32 / 9]])) {
+      const v = visibleFor(aspect);
+      const u = S.boot(setup.swf, false, { visible: v });
+      setup.drive(u);
+      u.st.time += 2000; u.tick();
+      const p = u.root.dboPanel, g = p && p.bg && p.bg.fills[0];
+      if (!g || !u.root.dboFitWatch) continue;
+      const xs = g.pts.map((q) => q[0]), ys = g.pts.map((q) => q[1]), s = (p._xscale === undefined ? 100 : p._xscale) / 100;
+      const l = p._x + Math.min(...xs) * s, r = p._x + Math.max(...xs) * s, tp = p._y + Math.min(...ys) * s, b = p._y + Math.max(...ys) * s;
+      if (l < v.left - 0.5 || r > v.right + 0.5 || tp < v.top - 0.5 || b > v.bottom + 0.5) hits.push(`off the ${an} screen (${Math.round(l)},${Math.round(tp)} to ${Math.round(r)},${Math.round(b)})`);
+    }
+    console.log(`${hits.length ? 'FAIL' : 'ok  '} ${name}: ${hits.length ? hits.join('; ') : 'no texts overlap, on screen at every shape'}`);
     n += hits.length;
   }
   process.exit(n ? 1 : 0);

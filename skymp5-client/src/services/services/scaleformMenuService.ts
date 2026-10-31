@@ -327,6 +327,17 @@ export class ScaleformMenuService extends ClientListener {
     this.failover("the panel never reported ready");
   }
 
+  // "<width>x<height>" from the game's own settings (SkyrimPrefs.ini [Display] iSize W / iSize H), or "" when they read 0.
+  // Display Tweaks can set its own resolution over them; the panel then fits by the smaller of this and visibleRect.
+  private screenSize(): string {
+    try {
+      const w = this.sp.Utility.getINIInt("iSize W:Display"), h = this.sp.Utility.getINIInt("iSize H:Display");
+      return w > 0 && h > 0 ? `${w}x${h}` : "";
+    } catch (e) {
+      return "";
+    }
+  }
+
   // Queued, not run: the caller may be outside the update tick, where no native can be called.
   private enqueue(actions: Action[]): void {
     for (const a of actions) this.queue.push(a);
@@ -341,6 +352,9 @@ export class ScaleformMenuService extends ClientListener {
           this.sp.Ui.openCustomMenu(a.swf, 0);
           logTrace(this, "openCustomMenu", a.swf);
         } else if (a.do === "push") {
+          // the screen's size first, so the panel can fit itself even where Stage.visibleRect misleads (lib dboFit)
+          const screen = this.screenSize();
+          if (screen) this.sp.Ui.invokeString(MENU_NAME, "_root.dboScreen", screen);
           this.sp.Ui.invokeString(MENU_NAME, "_root.dboData", a.json);
         } else if (a.do === "close") {
           this.sp.Ui.closeCustomMenu();

@@ -70,7 +70,9 @@ function drawRoster(c, x, y, w, h, P)
    var rows = P.rows instanceof Array ? P.rows : [];
    if (!rows.length)
    {
-      empty(c, "none", 40, x, top + 30, w, "No players found");
+      // the roster leaves your own row out, and offline players come from the backend: alone on a server with none,
+      // there is nobody to list, which is not a fault (Nat's dev screenshot, 31 Oct)
+      empty(c, "none", 40, x, top + 30, w, Number(P.all) > 0 ? "No players match" : "No one else is online, and this server lists no offline players");
    }
    var ly = rowList(c, "r", 50, x, top + 24, w, rows, function(pl)
    {
@@ -91,7 +93,11 @@ function drawRoster(c, x, y, w, h, P)
    {
       return pl.p == ui.selected;
    });
-   pager(c, "pg", 70, x, ly + 4, Number(P.page), Number(P.pages), Number(P.total), "player");
+   // with no rows the pager's count would sit on the empty line
+   if (rows.length)
+   {
+      pager(c, "pg", 70, x, ly + 4, Number(P.page), Number(P.pages), Number(P.total), "player");
+   }
    var sel = P.selected;
    var live = sel != null && sel != undefined && sel.online == true && sel.a != "";
    var ay = CB - 84;
