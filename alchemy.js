@@ -449,6 +449,21 @@ module.exports = (api) => {
     for (const k of [...LEDGER.keys()]) if (k.startsWith(head) && k.endsWith(tail)) LEDGER.delete(k);
   };
   let poisonSwept = 0;
+  // The client spends a charge on the blow but reports it up to 10 s later (craftedExtrasService USE_REPORT_MS), and it
+  // re-applies the server's inventory every 5 s: the spent coat came back, unequipped, and struck for nothing (sweep 31 Oct).
+  // So the server's copy spends the charge at the judged blow. left: the charges after it; 0 takes the coat off
+  const sameExtras = (x, y) => { const k = (e) => JSON.stringify(Object.assign({}, e, { count: 0 })); return k(x) === k(y); };
+  const spendOnCopy = (agg, entries, copy, left) => {
+    const i = entries.indexOf(copy);
+    if (i < 0) return false;
+    const spent = Object.assign({}, copy, { count: 1 });
+    if (left > 0) spent.poisonCount = left; else { delete spent.poisonId; delete spent.poisonCount; }
+    const next = entries.slice();
+    if ((Number(copy.count) || 1) > 1) next[i] = Object.assign({}, copy, { count: Number(copy.count) - 1 }); else next.splice(i, 1);
+    const same = next.findIndex((e) => e && sameExtras(e, spent));
+    if (same >= 0) next[same] = Object.assign({}, next[same], { count: (Number(next[same].count) || 0) + 1 }); else next.push(spent);
+    try { mp.set(agg, 'inventory', { entries: next }); return true; } catch (e) { log(`alchemy: spending a poison charge for ${display(agg)} failed: ${e.message}`); return false; }
+  };
   // From gamemode.js's hit judge for a landed, unblocked weapon hit. Returns what it did (for the log and the harness)
   globalThis.__dboPoisonHit = (aggressor, target, source, flags) => {
     if (POISON.judge !== true) return null;
@@ -465,16 +480,17 @@ module.exports = (api) => {
     if (now - poisonSwept > 60000) { poisonSwept = now; for (const [k, v] of LEDGER) if (now - v.at > Math.max(1, Number(POISON.ledgerMinutes) || 360) * 60000) LEDGER.delete(k); }
     if (!copies.length) { for (const k of [...LEDGER.keys()]) if (k.startsWith(`${agg}|${src}|`)) LEDGER.delete(k); return null; }
     // The first judged coat with a charge left; the count never goes above what the copy holds ("poison down to" reports)
-    let poisonId = 0, p = null, key = '', left = 0;
+    let poisonId = 0, p = null, key = '', left = 0, chosen = null;
     for (const c of copies) {
       const id = Number(c.poisonId) >>> 0, judged = poisonOf(id);
       if (!judged) continue;
       const k = `${agg}|${src}|${id}`, have = LEDGER.get(k), most = Math.max(1, Math.floor(Number(c.poisonCount) || 1));
       const n = have ? Math.min(have.left, most) : most;
-      if (n > 0) { poisonId = id; p = judged; key = k; left = n; break; }
+      if (n > 0) { poisonId = id; p = judged; key = k; left = n; chosen = c; break; }
     }
     if (!p) return null;
     LEDGER.set(key, { left: left - 1, at: now });
+    if (POISON.spendOnServer !== false) spendOnCopy(agg, entries, chosen, left - 1);
     later(() => {
       try {
         const q = pctOf(tgt);

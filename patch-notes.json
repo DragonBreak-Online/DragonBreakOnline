@@ -1,5 +1,20 @@
 [
   {
+    "title": "Weapon poisons no longer come back or unequip your weapon",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Alchemy",
+        "items": [
+          "A poisoned weapon could unequip itself a few seconds after the poison was used, and show the poison again although it was spent, so the next blow did nothing.",
+          "The server now spends the poison on the blow that uses it, so your weapon stays in your hand and shows what is really left on it."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Armour balance: every tier in its place",
     "date": "2026-10-31",
     "version": "Server update",
