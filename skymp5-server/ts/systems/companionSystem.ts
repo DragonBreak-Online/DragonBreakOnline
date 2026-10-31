@@ -53,6 +53,10 @@ interface Companion extends CompanionInfo {
   // Command Daedra: the owner it goes back to, and when (0: never)
   lentBy: number;
   returnAt: number;
+  // Last placed beside the owner because the owner's client reported it missing (regroup)
+  regroupedAt?: number;
+  // Disabled by regroup, waiting for check() to enable it
+  regroupPending?: boolean;
 }
 
 interface Stored {
@@ -91,6 +95,11 @@ const SPAWN_LIFT = 16;
 const FOLLOW_OFFSET = -128;
 // Farther than this from the owner, or in another cell, the companion is moved behind them
 const FOLLOW_TELEPORT_DISTANCE = 2500;
+// A companion the owner's client reports missing is placed beside the owner again at most this often
+const REGROUP_MIN_MS = 30000;
+// The enable that resubscribes waits this long after the disable: the client queues Actor::Disable, and a recreate before it
+// runs reads a deleted actor (the 12-17 Oct crashes, platform-actor-disable-guard-1017 not merged)
+const REGROUP_ENABLE_MS = 1000;
 const COMMAND_RANGE = 4096;
 const TARGET_KEEP_RANGE = 6144;
 const DEFEND_RETARGET_MS = 3000;
@@ -452,7 +461,35 @@ export class CompanionSystem implements System {
       attack: (id: unknown, targetId: unknown) => this.orderAttack(Number(id) >>> 0, Number(targetId) >>> 0),
       list: (ownerId: unknown) => this.list(Number(ownerId) >>> 0),
       release: (id: unknown, hostile: unknown) => this.releaseToWorld(Number(id) >>> 0, hostile === true),
+      regroup: (id: unknown) => this.regroup(Number(id) >>> 0),
     };
+  }
+
+  // The owner's client reports the companion missing (gameplay npcDrift): it is placed beside the owner and disabled, and
+  // check() enables it REGROUP_ENABLE_MS later, which resubscribes every listener so the owner's client is sent it afresh
+  private regroup(id: number): string {
+    const c = this.companions.get(id);
+    if (!c) return "not a companion";
+    if (c.staying) return "staying";
+    if (userOf(this.mp, c.ownerId) < 0) return "owner offline";
+    const now = Date.now();
+    if (c.regroupedAt && now - c.regroupedAt < REGROUP_MIN_MS) return "too soon";
+    c.regroupedAt = now;
+    const mp = this.mp;
+    const loc = this.locationNear(c.ownerId, FOLLOW_OFFSET);
+    mp.set(c.id, "locationalData", loc);
+    mp.set(c.id, "spawnPoint", loc);
+    mp.set(c.id, "isDisabled", true);
+    c.regroupPending = true;
+    this.log(`CompanionSystem: ${c.kind} ${hex(c.id)} placed beside ${hex(c.ownerId)} again (missing on the owner's client)`);
+    return "placed";
+  }
+
+  // A companion never stays disabled by regroup: enabled when due, or before it ends or waits for its owner's next login
+  private endRegroup(c: Companion): void {
+    if (!c.regroupPending) return;
+    c.regroupPending = false;
+    try { this.mp.set(c.id, "isDisabled", false); } catch (e) { this.log(`CompanionSystem: enable of ${hex(c.id)} after regroup failed: ${e}`); }
   }
 
   private toInfo(c: Companion): CompanionInfo {
@@ -587,6 +624,7 @@ export class CompanionSystem implements System {
       this.sendState(c.ownerId);
       return;
     }
+    if (c.regroupPending && now - (c.regroupedAt ?? 0) >= REGROUP_ENABLE_MS) this.endRegroup(c);
     if (dead) return this.end(c, "died", true);
     if (c.expiresAt && now >= c.expiresAt) return this.end(c, "expired", false);
     if (c.returnAt && now >= c.returnAt) return this.giveBack(c);
@@ -611,6 +649,7 @@ export class CompanionSystem implements System {
   private end(c: Companion, reason: string, died: boolean): void {
     const mp = this.mp;
     const rules = KIND_RULES[c.kind];
+    this.endRegroup(c);
     this.companions.delete(c.id);
     try { mp.set(c.id, COMPANION_OF_PROP, 0); } catch { }
     try {
@@ -637,6 +676,7 @@ export class CompanionSystem implements System {
   // The owner left: persistent companions wait for the next login, the rest end
   private release(c: Companion): void {
     if (!c.persistent) return this.end(c, "owner left", false);
+    this.endRegroup(c);
     this.companions.delete(c.id);
     this.stored.push({ ownerId: c.ownerId, baseDesc: c.baseDesc, kind: c.kind });
     try { this.mp.destroyActor(c.id); } catch (e) { this.log(`CompanionSystem: destroyActor ${hex(c.id)} failed when stored: ${e}`); }
