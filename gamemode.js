@@ -9711,6 +9711,13 @@ try {
   require(ROSTERS_JS)({ log, personal, registerChatCommand, onlineActors, nameOf, zoneOfActor, zoneById, every, audit, cfg });
 } catch (e) { log('rosters.js failed to load:', e.stack || e.message); globalThis.__dboRosterLogin = null; }
 
+// ---- /bandage: binding wounds with a bandage or a linen wrap (server\bandages.js, config "bandages") ---------------
+try {
+  const BANDAGES_JS = path.resolve('bandages.js');
+  delete require.cache[BANDAGES_JS];
+  require(BANDAGES_JS)({ mp, log, personal, registerChatCommand, sendPacket, every, cfg });
+} catch (e) { log('bandages.js failed to load:', e.stack || e.message); }
+
 // ---- /monitor: the dbo-monitor service's view for staff (server\monitor.js; tooling/dbo-monitor) -----------------
 try {
   const MONITOR_JS = path.resolve('monitor.js');

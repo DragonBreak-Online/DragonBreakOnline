@@ -1,5 +1,22 @@
 [
   {
+    "title": "Bandages",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Binding wounds",
+        "items": [
+          "Type /bandage to bind your wounds with a Bandage or a Linen Wrap from your pack. One is used up.",
+          "A Bandage gives back 30% of your health over 10 seconds, a Linen Wrap 20%. You move slowly while you bind.",
+          "A blow given or taken ends the binding early. In a fight with another player it is a hasty binding: half as much.",
+          "Once a minute, and not at full health or while down."
+        ]
+      }
+    ]
+  },
+  {
     "title": "PvP: warriors and archers stand a chance against mages",
     "date": "2026-10-31",
     "version": "Server update",
