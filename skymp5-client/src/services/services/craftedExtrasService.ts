@@ -48,6 +48,10 @@ const isCraft = (g: Entry, sources: Entry[]): boolean =>
   healthStep(g.health) > Math.max(10, ...sources.map((s) => healthStep(s.health))) ||
   (!!g.poisonId && !sources.some((s) => s.poisonId === g.poisonId));
 
+// A poison charge spent: reported at once, or the 5 s re-apply put the server's coated copy back unequipped (sweep 31 Oct)
+const spendsPoison = (g: Entry, sources: Entry[]): boolean =>
+  sources.some((s) => !!s.poisonId && (s.poisonId !== g.poisonId || (g.poisonCount || 0) < (s.poisonCount || 0)));
+
 // Local copies with extras the server lacks, the server copies the player no longer has, and charge that changed
 export const getCraftReport = (server: Inventory, local: Inventory): CraftReport | null => {
   const diff = getDiff(server, local, true, "exact").entries;
@@ -65,7 +69,7 @@ export const getCraftReport = (server: Inventory, local: Inventory): CraftReport
       continue;
     }
     gained.push(withoutWorn(g));
-    urgent = urgent || isCraft(g, sources);
+    urgent = urgent || isCraft(g, sources) || spendsPoison(g, sources);
   }
 
   for (const l of local.entries) {
