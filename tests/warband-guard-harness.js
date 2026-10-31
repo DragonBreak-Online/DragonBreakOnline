@@ -173,6 +173,21 @@ check('/warband follow ends it too', all((c) => !c.targetId && !c.staying));
   check('...but again every 30 s', logs.filter((l) => / member /.test(l)).length === 3);
   run('stay');
 }
+// ---- staff are never fought: the GM leading a band is told the staff online (client companionPvp.ts) ------------------------
+{
+  const spares = () => packets.filter(([, pk]) => pk.customPacketType === 'companionSpare');
+  packets.length = 0;
+  timers.get('warbandSpare')();
+  const sp = spares();
+  check('a GM leading a band is sent companionSpare with the staff online (the GM and the other staff member), sorted', sp.length === 1 && sp[0][0] === GM && sp[0][1].ids.join() === [GM, STAFF].sort((x, y) => x - y).join(), sp);
+  packets.length = 0; timers.get('warbandSpare')();
+  check('...not again while the list is the same', spares().length === 0, spares());
+  online = online.filter((x) => x !== STAFF);
+  packets.length = 0; timers.get('warbandSpare')();
+  check('...but again when it changes (a staff member left)', spares().length === 1 && spares()[0][1].ids.join() === String(GM), spares());
+  online.push(STAFF);
+  check('...and nobody without a band is sent it', !spares().some(([a]) => a !== GM));
+}
 check('help names defend', /defend \[radius\]/.test(run('nonsense')));
 
 process.chdir(home);
