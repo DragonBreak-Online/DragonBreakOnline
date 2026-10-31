@@ -593,6 +593,7 @@
    "ArmorMaterialDragonplate": 0.3
   }
  },
+ "armorWear": { "_comment": "Armour by Defense level (Nat, 31 Oct): a piece of craft tier t needs Defense defenseLevels[t-1] to put on, the same for light and heavy; faction and guard gear, clothing and jewellery have no rule; what a character already wore is kept until taken off (gamemode.js wearCheck)", "enabled": true, "defenseLevels": [0, 15, 30, 45, 60, 75, 90] },
  "armorMaterials": {
   "_comment": "Rating an armor material counts for, by slot, when higher than its records give (gamemode.js armorPieceOf). The engine keeps the record's rating; the server counts this one where Defense and tempering count (the hit's armor reduction) and shows it in the inventory. Nate, 2026-09-29: Dragonbone and Dragonscale above Ebony. Dragonplate (Update.esm) already beats Ebony piece for piece (46/17/17/22/34 against 43/16/16/21/32); Dragonscale (41/12/12/17/29, light) now counts one above Ebony on every piece. Daedric stays on top (49/18/18/23/36).",
   "enabled": true,
@@ -602,6 +603,10 @@
   "_ratingByEditorId": "One piece counted at this rating outright, lower too (gamemode.js armorPieceOf). Nate, 16 Oct: Black Bear Ancient Nord (craft tier 3) was above the other tier 3 sets; its light pieces (35/10/10/20) beat Scaled (32/9/9/14) and the tier 4 Apex Khajiit light set, close to Glass, and its heavy cuirass (43) sits above the approved Nordic 41 (tools/materials/ladder.tsv). Counted at Scaled's numbers (light) and Nordic's (heavy cuirass) here; the PC patches the same values into DragonBreak Nexus Patches.esp, after which these entries change nothing. Yokudan (Yoku Armory, craft tier 3) the same day: every piece above the tier 3 ladder (light 32/9/9/14, heavy 41/15/15/20) is counted at it; its Ebony-family Heavy pieces are tier 5 and keep their numbers. Hot reload.",
   "_ratingByEditorIdBands": "Nat, 31 Oct (_work/armor-balance-1031.md, yes to all four): every non-vanilla, non-faction set whose body rating is outside its smithing tier's band is counted at the band, piece by piece (body band times vanilla's slot ratio). Bands, body: heavy T1 25-28, T2 29-31, T3 32-35, T4 36-41, T5 40-42, T6 43-45, T7 46-49; light T1 20-26, T2 26-28, T3 29-31, T4 32-34, T5 35-38, T6 39-41, T7 42-44. Plus the approved 30 Sep ladder's vanilla rows (Stalhrim Heavy 44/16/16/21, Nordic 41). The PC's plugin pass (DragonBreak Nexus Patches, DLE) writes the same values from _work/armor-bands-targets-1031.tsv; then these entries change nothing and are removed.",
   "ratingByEditorId": {
+   "DBOArm_MantisArmorDwarvenAngelChassis": 73,
+   "DBOArm_MantisArmorDwarvenAngelChassiscrossbow": 73,
+   "DBOArm_MantisArmorDwarvenAngelChassisLight": 60,
+   "DBOArm_MantisArmorDwarvenAngelChassiscrossbowLight": 60,
    "BlackBearAncientNordCuirass": 41,
    "BlackBearAncientNordCuirassLight": 32, "BlackBearAncientNordCuirassBerserker": 32,
    "BlackBearAncientNordGauntletsLight": 9, "BlackBearAncientNordGauntletsBerserker": 9,

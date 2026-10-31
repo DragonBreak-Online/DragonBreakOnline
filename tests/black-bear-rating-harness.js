@@ -71,7 +71,8 @@ ok(piece(ID.BlackBearAncientNordCuirass).counted > piece(ID.ArmorOrcishCuirass).
 
 // ---- the hit counts it ----------------------------------------------------------------------------------------------
 {
-  const a = gm.indexOf('const defenseDamageMult = '), b = gm.indexOf('\n};', a);
+  // From armorCountOf (31 Oct: the piece count the hit and the inventory share) to the end of defenseDamageMult
+  const a = gm.indexOf('const armorCountOf = '), b = gm.indexOf('\n};', gm.indexOf('const defenseDamageMult = ', a));
   const dsrc = gm.slice(a, b + 3);
   // gearArmorMult: worn Fortify Heavy/Light Armor (gearench.js), none here
   const mult = (worn, gear = { heavy: 1, light: 1 }) => new Function('defensePieceMult', 'wornWithHealth', 'armorPieceOf', 'temperBonus', 'potionBonus', 'gmstFloat', 'gearArmorMult', `${dsrc}\nreturn defenseDamageMult;`)(

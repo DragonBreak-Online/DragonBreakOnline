@@ -161,6 +161,13 @@ module.exports = (api) => {
     // tempered Orcish set beat Ebony and Dragonplate (_work/armor-balance-1031.md)
     return 10 + (craftTier(actorId >>> 0) >= fam.tier ? TEMPER_LEVELS : 0);
   };
+  // The craft tier an item is worn at (gamemode.js armorWear asks it for the Defense level it needs), 0 for no rule: no
+  // family, or faction and guard gear, which its faction gates instead (Nat, 31 Oct). Read whether smithing is on or not
+  globalThis.__dboWearTier = (baseId) => {
+    if (FACTION_GEAR.has(normDesc(descOf(baseId)))) return 0;
+    const fam = familyOfItem(baseId);
+    return !fam || fam.factionExempt || fam.id === 'guard' ? 0 : fam.tier;
+  };
 
   // ---- the F3 Blacksmith tab ----------------------------------------------------------------------------------------
   let recipesByFamily = null;   // family -> [[inputs]], forge recipes, read once

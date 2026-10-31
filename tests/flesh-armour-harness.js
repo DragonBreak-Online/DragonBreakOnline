@@ -51,7 +51,8 @@ const gmstFloat = (id, fb) => fb;
 const g = {};
 // gearArmorMult: worn Fortify Heavy/Light Armor (gearench.js), none here
 const fn = new Function('recordOf', 'fieldsOf', 'u32At', 'globalAt', 'wornWithHealth', 'armorPieceOf', 'temperBonus', 'defensePieceMult', 'gmstFloat', 'cfg', 'Date', 'globalThis', 'gearArmorMult',
-  src.slice(a, b) + '\nreturn { fleshOfSpell, fleshCast, fleshArmorOf, fleshDamageMult };');
+  // armorCountOf: one worn piece as the hit counts it (31 Oct, shared with the inventory number)
+  src.slice(src.indexOf('const armorCountOf = '), src.indexOf('\n', src.indexOf('const armorCountOf = '))) + '\n' + src.slice(a, b) + '\nreturn { fleshOfSpell, fleshCast, fleshArmorOf, fleshDamageMult };');
 const F = fn(recordOf, fieldsOf, u32At, globalAt, wornWithHealth, armorPieceOf, temperBonus, defensePieceMult, gmstFloat, {}, Date2, g, () => ({ heavy: 1, light: 1 }));
 
 let fails = 0, n = 0;

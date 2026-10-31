@@ -86,8 +86,9 @@ if (i > 0 && j > i) {
     ok(sc.rating === SCALE[slot], `...the engine keeps Dragonscale ${slot}'s own rating`, sc.rating);
   }
 }
-ok(/counted \+= \(\(p\.counted \|\| p\.rating\) \+ temperBonus/.test(gm), 'the hit counts armor at its counted rating');
-ok(/value: Math\.round\(\(\(p\.counted \|\| p\.rating\) \+ temper\)/.test(gm), 'the inventory shows it');
+// Both read armorCountOf since 31 Oct (tests/armor-wear-harness.js runs the two against each other)
+ok(/const armorCountOf = \(p, health, cond, pm, gm\) => \(\(p\.counted \|\| p\.rating\) \+ temperBonus/.test(gm) && /counted \+= armorCountOf\(p, w\.health, w\.cond, pm, gm\);/.test(gm), 'the hit counts armor at its counted rating');
+ok(/value: Math\.round\(armorCountOf\(p, /.test(gm), 'the inventory shows it');
 const pn = JSON.parse(fs.readFileSync(path.join(ROOT, 'patch-notes.json'), 'utf8'));
 ok(pn.some((e) => JSON.stringify(e).includes('Dragonscale')), 'a patch note tells players');
 

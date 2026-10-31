@@ -7467,6 +7467,50 @@ const raceEquipCheck = (a, equipment) => {
     log(`raceEquip: ${display(a)} (${race}) cannot wear ${(Number(w.baseId) >>> 0).toString(16)}; taken off`);
   }
 };
+// Armour worn by Defense level (Nat, 31 Oct: "I just want it to matter for leveling defense"): a piece of craft tier t
+// (smithing.js __dboWearTier, the same for light and heavy) needs Defense defenseLevels[t - 1] (private.mastery
+// skills.defense.level, 0-100), and one put on below it comes off with a line naming the level. Faction and guard gear
+// (gated by faction), clothing, jewellery and pieces of no family have no rule. Grandfathered: what a character wore when
+// the rule first saw them (their private.lastWorn) is kept in private.dboWearKept until it comes off. The login's
+// reports, the server's own re-dress and a beast form neither check nor drop anything, and nor does a naked report, so a
+// death's or a login's empty outfit never costs a kept piece. Config armorWear: { enabled, defenseLevels }
+const ARMOR_WEAR = Object.assign({ enabled: true, defenseLevels: [0, 15, 30, 45, 60, 75, 90] }, cfg.armorWear || {});
+const WEAR_KEPT = 'private.dboWearKept';
+const wearNeedOf = (baseId) => {
+  const p = armorPieceOf(baseId >>> 0);
+  if (!p || p.clothing || !(p.rating > 0) || typeof globalThis.__dboWearTier !== 'function') return 0;
+  let t = 0; try { t = Number(globalThis.__dboWearTier(baseId >>> 0)) || 0; } catch (e) { t = 0; }
+  return t > 0 ? Math.max(0, Number((ARMOR_WEAR.defenseLevels || [])[t - 1]) || 0) : 0;
+};
+const defenseLevelOf = (a) => { const r = masteryOf(a); return Math.max(0, Number((((r && r.skills) || {}).defense || {}).level) || 0); };
+const wearSaid = new Map();
+const wearCheck = (a, equipment, settling) => {
+  // Without smithing.js no piece has a tier: seeding then would keep nothing, and strip everyone once it loads
+  if (!ARMOR_WEAR.enabled || typeof globalThis.__dboWearTier !== 'function') return;
+  const worn = wornOf(equipment).map((w) => w.baseId);
+  let kept = null; try { kept = mp.get(a, WEAR_KEPT); } catch (e) { kept = null; }
+  let changed = !Array.isArray(kept);
+  if (changed) {
+    let last = null; try { last = mp.get(a, 'private.lastWorn'); } catch (e) { last = null; }
+    kept = (Array.isArray(last) && last.length ? last.map((x) => Number(Array.isArray(x) ? x[0] : x) >>> 0) : worn).filter((id) => wearNeedOf(id) > 0);
+  }
+  kept = kept.map((id) => Number(id) >>> 0);
+  if (!settling && worn.length) {
+    const still = kept.filter((id) => worn.includes(id));
+    if (still.length !== kept.length) { kept = still; changed = true; }
+    const lvl = defenseLevelOf(a);
+    for (const id of worn) {
+      const need = wearNeedOf(id);
+      if (!(need > lvl) || kept.includes(id)) continue;
+      setTimeout(() => { try { mp.callPapyrusFunction('method', 'Actor', 'UnequipItem', { type: 'form', desc: mp.getDescFromId(a) }, [{ type: 'espm', desc: mp.getDescFromId(id) }, false, true]); } catch (e) { log('armorWear: UnequipItem failed', e.message); } }, 200);
+      let name = ''; try { name = adminItemName(mp.getDescFromId(id)) || ''; } catch (e) { name = ''; }
+      const line = `${name || 'That armour'} needs Defense ${need} to wear; yours is ${Math.floor(lvl)}.`;
+      if (Date.now() - (wearSaid.get(a) || 0) > 3000) { wearSaid.set(a, Date.now()); personal(a, line); try { sendPacket(a, { customPacketType: 'dboNotice', text: line }); } catch (e) { /* chat is enough */ } }
+      log(`armorWear: ${display(a)} (Defense ${Math.floor(lvl)}) cannot wear ${id.toString(16)} (needs ${need}); taken off`);
+    }
+  }
+  if (changed) { try { mp.set(a, WEAR_KEPT, kept); } catch (e) { log('armorWear: kept save failed', e.message); } }
+};
 const equipHook = (actorId, equipment, isAllowed, ...rest) => {
   // The client reports its equipment while it is still dressing after login (an empty or naked
   // report), and the engine has already stored that. Keep our own copy of the last outfit that
@@ -7493,6 +7537,8 @@ const equipHook = (actorId, equipment, isAllowed, ...rest) => {
     const fresh = first || Date.now() - conn < WORN_GRACE_MS || Date.now() - (firstEquipAt.get(a) || 0) < LOGIN_BURST_MS;
     // A beast form's outfit (the Vampire Lord's robes) is not the character's: a revert re-dresses from lastWorn
     let beast = null; try { beast = mp.get(a, 'private.beast'); } catch (e) { /* not an actor */ }
+    // Before lastWorn below takes this outfit: a first sight keeps the one worn before it
+    if (isAllowed) { try { wearCheck(a, equipment, fresh || !!(beast && beast.form) || creationPending(a) || Date.now() - (redressAt.get(a) || 0) < 5000 || !!(spawnWatch && spawnWatch.holding(a))); } catch (e) { log('armor wear failed', e.message); } }
     if (isAllowed && worn.length && !fresh && !(beast && beast.form) && !(spawnWatch && spawnWatch.holding(a))) mp.set(a, 'private.lastWorn', worn.map((w) => [w.baseId, w.left ? 1 : 0]));
     // Armour changed in a fight costs time (armourswap.js); the login re-dress is the server's own
     if (isAllowed && armourSwap) armourSwap.onEquip(a, worn, fresh || creationPending(a) || Date.now() - (redressAt.get(a) || 0) < 5000);
@@ -8080,12 +8126,12 @@ const armorPieceOf = (baseId) => {
 // tempering the way the game does").
 const temperBonus = (health, chest) => { const q = Math.round((Number(health) - 1) * 10); return q > 0 ? (3.6 * q - 1.6) * (chest ? 1 : 0.5) : 0; };
 // Worn entries with their tempering; the engine keeps it as the entry's health
+// What wear leaves of an inventory entry (durability.js; 1 when it is not loaded)
+const wearCondOf = (a, e) => { try { const m = typeof globalThis.__dboDurabilityMult === 'function' ? Number(globalThis.__dboDurabilityMult(a, Number(e.baseId) >>> 0, !!e.wornLeft, e.name || '')) : 1; return Number.isFinite(m) && m > 0 ? m : 1; } catch (err) { return 1; } };
 const wornWithHealth = (a) => {
   let entries = [];
   try { const eq = mp.get(a, 'equipment'); entries = eq && eq.inv && Array.isArray(eq.inv.entries) ? eq.inv.entries : []; } catch (e) { return []; }
-  // cond: what wear leaves of the piece (durability.js; 1 when it is not loaded)
-  const cond = (e) => { try { const m = typeof globalThis.__dboDurabilityMult === 'function' ? Number(globalThis.__dboDurabilityMult(a, Number(e.baseId) >>> 0, !!e.wornLeft, e.name || '')) : 1; return Number.isFinite(m) && m > 0 ? m : 1; } catch (err) { return 1; } };
-  return entries.filter((e) => e && (e.worn || e.wornLeft)).map((e) => ({ baseId: Number(e.baseId) >>> 0, health: Number(e.health) || 1, cond: cond(e) }));
+  return entries.filter((e) => e && (e.worn || e.wornLeft)).map((e) => ({ baseId: Number(e.baseId) >>> 0, health: Number(e.health) || 1, cond: wearCondOf(a, e) }));
 };
 // A tempered weapon's blow: base damage plus the game's tempering bonus, over base damage
 const temperDamageMult = (aggressorId, sourceId) => {
@@ -8188,6 +8234,10 @@ const defensePieceMult = (targetId) => {
 // rating, and tempering adds the game's bonus to it (the engine reads the bare rating only)
 // Worn Fortify Heavy and Light Armor: that weight's pieces count a capped share more (gearench.js bonus)
 const gearArmorMult = (targetId) => { const b = globalThis.__dboGearBonus; try { return typeof b === 'function' ? { heavy: 1 + (Number(b(targetId, 'heavy')) || 0), light: 1 + (Number(b(targetId, 'light')) || 0) } : { heavy: 1, light: 1 }; } catch (e) { return { heavy: 1, light: 1 }; } };
+// One piece as the server counts it: its counted rating plus tempering, by Defense, wear and worn Fortify Armor. The hit
+// (defenseDamageMult, fleshDamageMult) and the inventory number (statItemsFor) both read this, so the rating the
+// inventory shows is the one a blow meets (Nat, 31 Oct: the shown rating must be accurate)
+const armorCountOf = (p, health, cond, pm, gm) => ((p.counted || p.rating) + temperBonus(health, p.chest)) * (p.heavy ? pm.heavy * gm.heavy : pm.light * gm.light) * (cond || 1);
 const defenseDamageMult = (targetId) => {
   const pm = defensePieceMult(targetId), gm = gearArmorMult(targetId);
   let bare = 0, counted = 0;
@@ -8195,7 +8245,7 @@ const defenseDamageMult = (targetId) => {
     for (const w of wornWithHealth(targetId)) {
       const p = armorPieceOf(w.baseId); if (!p) continue;
       bare += p.rating;
-      counted += ((p.counted || p.rating) + temperBonus(w.health, p.chest)) * (p.heavy ? pm.heavy : pm.light) * (w.cond || 1) * (p.heavy ? gm.heavy : gm.light);
+      counted += armorCountOf(p, w.health, w.cond, pm, gm);
     }
   } catch (e) { return 1; }
   // A Fortify Armor potion (alchemy.js, hook armor): the worn armour counts for that much more while it lasts
@@ -8289,7 +8339,7 @@ const fleshDamageMult = (targetId, sourceId) => {
   try {
     for (const w of wornWithHealth(targetId)) {
       const p = armorPieceOf(w.baseId); if (!p) continue;
-      counted += ((p.counted || p.rating) + temperBonus(w.health, p.chest)) * (p.heavy ? pm.heavy : pm.light) * (w.cond || 1) * (p.heavy ? gm.heavy : gm.light);
+      counted += armorCountOf(p, w.health, w.cond, pm, gm);
     }
   } catch (e) { counted = 0; }
   const scale = gmstFloat(0x21a72, 0.12), cap = gmstFloat(0x37deb, 80);
@@ -8863,9 +8913,10 @@ const statItemsFor = (a) => {
   for (const e of entries) {
     if (!e || !(Number(e.count) > 0)) continue;
     const id = Number(e.baseId) >>> 0, worn = !!(e.worn || e.wornLeft), have = byId.get(id);
-    if (!have || (worn && !have.worn)) byId.set(id, { health: Number(e.health) || 1, worn });
+    if (!have || (worn && !have.worn)) byId.set(id, { health: Number(e.health) || 1, worn, entry: e });
   }
-  const pm = defensePieceMult(a), out = [];
+  // Armor as a blow meets it: worn Fortify Armor, the copy's wear and a Fortify Armor potion too (defenseDamageMult)
+  const pm = defensePieceMult(a), gm = gearArmorMult(a), potion = 1 + potionBonus(a, 'armor'), out = [];
   for (const [id, e] of byId) {
     if (out.length >= STAT_DISPLAY.maxItems) break;
     const base = recordDamageOf(id, 'WEAP');
@@ -8879,7 +8930,7 @@ const statItemsFor = (a) => {
     const p = armorPieceOf(id);
     if (!p || p.clothing || !(p.rating > 0)) continue;
     const temper = temperBonus(e.health, p.chest);
-    out.push({ id, kind: 'armor', skill: p.heavy ? 'HeavyArmor' : 'LightArmor', temper: Math.round(temper * 100) / 100, value: Math.round(((p.counted || p.rating) + temper) * (p.heavy ? pm.heavy : pm.light) * 100) / 100 });
+    out.push({ id, kind: 'armor', skill: p.heavy ? 'HeavyArmor' : 'LightArmor', temper: Math.round(temper * 100) / 100, value: Math.round(armorCountOf(p, e.health, wearCondOf(a, e.entry), pm, gm) * potion * 100) / 100 });
   }
   return out;
 };

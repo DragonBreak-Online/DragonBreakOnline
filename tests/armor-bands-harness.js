@@ -17,7 +17,8 @@ const head = rows.shift().split('\t');
 const col = (r, k) => r.split('\t')[head.indexOf(k)];
 const BODY = { Heavy: { 1: [25, 28], 2: [29, 31], 3: [32, 35], 4: [36, 41], 5: [40, 42], 6: [43, 45], 7: [46, 49] },
   Light: { 1: [20, 26], 2: [26, 28], 3: [29, 31], 4: [32, 34], 5: [35, 38], 6: [39, 41], 7: [42, 44] } };
-const RATIO = { Heavy: { body: 1, head: 0.47, hands: 0.36, feet: 0.36 }, Light: { body: 1, head: 0.42, hands: 0.29, feet: 0.29 } };
+// full: one piece over body, head, hands and feet (the Dwemer Mantis chassis), the four slots' sum
+const RATIO = { Heavy: { body: 1, head: 0.47, hands: 0.36, feet: 0.36, full: 2.19 }, Light: { body: 1, head: 0.42, hands: 0.29, feet: 0.29, full: 2 } };
 const missing = rows.filter((r) => Number(table[col(r, 'edid')]) !== Number(col(r, 'target')));
 ok(rows.length > 300 && missing.length === 0, `every one of the ${rows.length} band targets is counted by editor id at its value`, missing.slice(0, 3));
 const outside = rows.filter((r) => {
@@ -37,6 +38,8 @@ ok(fam.dwarven === 3 && fam.elven === 3 && fam.orcish === 4 && fam.scaled === 4 
 const MANTIS = ['81d', '81e', '81f', '820', '821', '822', '823', '824'].map((x) => `${x}:DragonBreak Armory.esp`);
 const never = JSON.parse(read('loot-overrides.json')).never;
 ok(MANTIS.every((d) => never[d]), 'the Dwemer Mantis armour is never loot (all 8 pieces)');
+// In its tier band too (Leader, 31 Oct: no exception), so a chassis already held counts as tier 3 Dwarven
+ok(table.DBOArm_MantisArmorDwarvenAngelChassis === 73 && table.DBOArm_MantisArmorDwarvenAngelChassisLight === 60, '...and a chassis already held counts in the tier 3 band (73 heavy, 60 light, from 87 and 78)');
 const catalogue = read('admin-items.json');
 ok(MANTIS.every((d) => !catalogue.includes(`"${d}"`)), '...is out of the staff item catalogue');
 ok(MANTIS.every((d) => JSON.parse(read('regions-overrides.json')).forgeNever[d]), '...is never forged');
