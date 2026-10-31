@@ -54,6 +54,9 @@ const phases = {
   pcdata: new Stat(),
   forms: new Stat(),
   clones: new Stat(),
+  // per FORM, not per tick: n is how many forms were gated/drawn in the window
+  nickgate: new Stat(),
+  nicknode: new Stat(),
 };
 
 export type PhaseName = keyof typeof phases;
@@ -163,6 +166,7 @@ export const endTick = (entry: number): void => {
       `gate ${phases.gate.render()} worldcell ${phases.worldcell.render()} ` +
       `model ${phases.model.render()} pcdata ${phases.pcdata.render()} ` +
       `forms ${phases.forms.render()} clones ${phases.clones.render()} | ` +
+      `nickgate n=${phases.nickgate.n} ${phases.nickgate.render()} nicknode n=${phases.nicknode.n} ${phases.nicknode.render()} | ` +
       `nforms=${forms.lastCount} worstform ${worst} ` +
       `new=${forms.created} gone=${forms.destroyed} reindexed=${forms.replaced}`
   );
