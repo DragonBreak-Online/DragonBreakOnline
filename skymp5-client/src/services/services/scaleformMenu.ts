@@ -66,6 +66,8 @@ export const NATIVE_CAPS = [
   "native:courierHandover",
   // Worker 6's player menu (dbo_menu, widget 52). Its keys are dbo:menuRun/Close/SwitchChar
   "native:playerMenu",
+  // the spellbook (spells.js openBook, /spells): dbo_spellbook
+  "native:spellbook",
 ];
 export const CAPS_RETRY_MS = 5000;
 

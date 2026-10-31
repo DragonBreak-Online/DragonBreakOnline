@@ -1,0 +1,6 @@
+dboData
+dbo:spellbookPrepare
+Put away
+SendModEvent
+$EverywhereMediumFont
+dboOut
