@@ -1,5 +1,22 @@
 [
   {
+    "title": "Bandages",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Binding wounds",
+        "items": [
+          "Type /bandage to bind your wounds with a Bandage or a Linen Wrap from your pack, then keep still for 7 seconds.",
+          "A Bandage gives back 30% of your health when the binding is done, a Linen Wrap 20%. One is used up.",
+          "Moving, casting or a blow, given or taken, undoes the binding, and you keep the cloth. In a fight with another player it is a hasty binding: half as much.",
+          "Not at full health or while down."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Archery back to its old strength in PvP",
     "date": "2026-10-31",
     "version": "Server update",

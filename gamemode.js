@@ -7489,6 +7489,8 @@ const asylumHit = (agg, tgt) => {
 };
 const castHook = (casterId, spellId, ...rest) => {
   try { if (racial) racial.onCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('racial cast failed', e.message); }
+  // bandages.js: a cast undoes a binding in progress
+  try { if (typeof globalThis.__dboBandageCast === 'function') globalThis.__dboBandageCast(casterId); } catch (e) { log('bandage cast failed', e.message); }
   try { if (globalThis.__dboBeastCast) globalThis.__dboBeastCast(casterId, spellId); } catch (e) { log('beast cast failed', e.message); }
   // hagraven.js: the Hagraven Form power, cast from the Powers menu, takes or leaves the Hagraven body
   try { if (typeof globalThis.__dboHagravenCast === 'function') globalThis.__dboHagravenCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('hagraven cast failed', e.message); }
@@ -9851,6 +9853,13 @@ try {
   delete require.cache[ROSTERS_JS];
   require(ROSTERS_JS)({ log, personal, registerChatCommand, onlineActors, nameOf, zoneOfActor, zoneById, every, audit, cfg });
 } catch (e) { log('rosters.js failed to load:', e.stack || e.message); globalThis.__dboRosterLogin = null; }
+
+// ---- /bandage: binding wounds with a bandage or a linen wrap (server\bandages.js, config "bandages") ---------------
+try {
+  const BANDAGES_JS = path.resolve('bandages.js');
+  delete require.cache[BANDAGES_JS];
+  require(BANDAGES_JS)({ mp, log, personal, registerChatCommand, sendPacket, every, cfg });
+} catch (e) { log('bandages.js failed to load:', e.stack || e.message); }
 
 // ---- /monitor: the dbo-monitor service's view for staff (server\monitor.js; tooling/dbo-monitor) -----------------
 try {
