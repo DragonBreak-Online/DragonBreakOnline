@@ -6963,6 +6963,7 @@ const deathHook = (actorId, killerId, ...rest) => {
   try { if (globalThis.__dboBossDeath) globalThis.__dboBossDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('boss death failed', e.message); }
   try { if (globalThis.__dboSuperDeath) globalThis.__dboSuperDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('supernatural death failed', e.message); }
   try { if (globalThis.__dboContractKill && killerId) globalThis.__dboContractKill(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('contract kill failed', e.message); }
+  try { if (globalThis.__dboConsequenceDeath && killerId) globalThis.__dboConsequenceDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('consequence death failed', e.message); }
   try { if (globalThis.__dboBlackreachDeath) globalThis.__dboBlackreachDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('blackreach death failed', e.message); }
   try { if (globalThis.__dboTrimCorpse) globalThis.__dboTrimCorpse(Number(actorId) >>> 0); } catch (e) { log('corpse trim failed', e.message); }
   try { if (globalThis.__dboStatsDeath) globalThis.__dboStatsDeath(Number(actorId) >>> 0, Number(killerId) >>> 0); } catch (e) { log('journal stats death failed', e.message); }
@@ -8931,6 +8932,13 @@ try {
   delete require.cache[BOSSES_JS];
   require(BOSSES_JS)({ mp, log, personal, audit, display, who, cfg, giveItem, registerChatCommand, sendPacket, onlineActors, every, stopTimer, profileOf, zoneOfActor, isLeadStaff });
 } catch (e) { log('bosses.js failed to load:', e.stack || e.message); globalThis.__dboBossHit = null; globalThis.__dboBossDeath = null; globalThis.__dboBossDamageMult = null; globalThis.__dboBossAllies = null; }
+
+// ---- Dynamic Consequences, phase 1: pressure per hold and force, measured only (server\consequences.js) ---------------
+try {
+  const CONSEQUENCES_JS = path.resolve('consequences.js');
+  delete require.cache[CONSEQUENCES_JS];
+  require(CONSEQUENCES_JS)({ mp, log, personal, registerChatCommand, onlineActors, every, profileOf, zoneOfActor, isAdmin, cfg });
+} catch (e) { log('consequences.js failed to load:', e.stack || e.message); globalThis.__dboConsequenceDeath = null; globalThis.__dboConsequenceDeed = null; }
 
 // ---- mining and woodcutting mini-games (server\labour.js, config "labour") ---------------------
 try {
