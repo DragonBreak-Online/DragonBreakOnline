@@ -2060,7 +2060,7 @@
   "only": "all"
  },
  "anticheat": {
-  "_comment": "Anti-cheat flags (anticheat.js; Jake 17 Oct: infinite stamina, infinite magicka and speed running were not flagged). Flags only: no kick, no ban, nothing to the flagged player. A flag is one '[gamemode] ANTICHEAT <kind> [shadow ]<Name> #TAG (profile N[, staff]): ...' server-log line (dbo-monitor posts it to #server-monitor), a sec.signal in the player log and an admin-tab line to online GM+ at most once per 10 min. Kinds or kind:tier in shadowKinds only log (the measurement week). Instant off: /anticheat off <all|alerts|speed|rubberband|vitals|magicka|stamina|refusehits|fork> (Lead GM+, until a restart), or enabled false + hot reload. rubberBand and refuseHits stay false until their gates (24-48 h with no honest alert; refuseHits only with Jake's or Nate's GO).",
+  "_comment": "Anti-cheat flags (anticheat.js; Jake 17 Oct: infinite stamina, infinite magicka and speed running were not flagged). Flags only: no kick, no ban, nothing to the flagged player. A flag is one '[gamemode] ANTICHEAT <kind> [shadow ]<Name> #TAG (profile N[, staff]): ...' server-log line (dbo-monitor posts it to #server-monitor), a sec.signal in the player log and an admin-tab line to online GM+ at most once per 10 min. Kinds or kind:tier in shadowKinds only log (the measurement week). Instant off: /anticheat off <all|alerts|speed|rubberband|vitals|magicka|stamina|refusehits|fork> (Lead GM+, until a restart), or enabled false + hot reload. rubberBand stays false until its gate (24-48 h with no honest alert). refuseHits is on (Nat's GO, 31 Oct, after a player cast on infinite magicka for 10 days: 221 of the 231 magicka_free flags of 18-31 Oct were that one profile, the other 10 a staff member, no one else): a flagged caster's spell hits land on no one for refuseMinutes; staff are flagged but never refused (refuseStaff false); each refused hit is audited ANTICHEAT-REFUSED at most once a minute per caster.",
   "enabled": true,
   "alerts": { "staffInGame": true, "minTier": "gm", "staffEveryMinutes": 10, "logPerMinute": 1 },
   "shadowKinds": ["speed_sustained:foot", "speed_sustained:pulse", "speed_sustained60", "speed_blink", "speed_slow", "stamina_free", "magicka_debt", "stamina_debt", "power_unmatched", "spellhit_nocast",
@@ -2078,7 +2078,7 @@
   "magicka": {
    "_comment": "magicka_free (interim until the fork's vitals budget): costly casts (SPIT cost >= minCost) at stored magicka >= fullAt after which it never went below dropBelow within holdMs (15 s for concentration; longer while the stored value is unchanged to the bit, the client's own report hold, up to heldMaxMs). Flag at flagCount in flagWindowMs with flagMinCost summed. Skipped: 6 s after eating something that can raise magicka (an ingredient: its first effect), a well, a refill; Fortify gear or a potion of the school.",
    "enabled": true, "minCost": 30, "fullAt": 0.995, "dropBelow": 0.99, "holdMs": 6000, "concentrationHoldMs": 15000, "heldMaxMs": 30000,
-   "refillSkipMs": 6000, "flagCount": 8, "flagWindowMs": 600000, "flagMinCost": 1200, "refuseHits": false, "refuseMinutes": 10
+   "refillSkipMs": 6000, "flagCount": 8, "flagWindowMs": 600000, "flagMinCost": 1200, "refuseHits": true, "refuseMinutes": 10, "refuseStaff": false
   },
   "stamina": { "enabled": true, "sprintSpeed": 500, "sprintSeconds": 20, "windowSeconds": 30, "fullAt": 0.95, "dropBy": 0.02 },
   "fork": {},
