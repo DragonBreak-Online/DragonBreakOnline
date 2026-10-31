@@ -533,6 +533,13 @@ module.exports = (api) => {
     const combat = !keepsInCombat && fighting(a) ? Math.max(0, num(COMBAT[stat], 1)) : 1;
     return ((raceValue(a, stat) / 100) * REGEN_MULT * chain * combat + blessing) * chill * (f - 1);
   };
+  // /regendiag (regendiag.js): this chain's view of one bar, nothing written
+  globalThis.__dboRacialRegenDiag = (a, stat) => {
+    a = Number(a) >>> 0;
+    const f = regenFactor(a, stat);
+    return { race: raceOf(a) || '', sign: signOf(a) || '', raceRate: raceValue(a, stat), factor: f, extraPerSecond: extraPerSecond(a, stat, f),
+      fighting: fighting(a), combatMult: num(COMBAT[stat], 1), castHeld: castHeld(a), regenMult: REGEN_MULT, overhaul: on() };
+  };
   const TICK_MS = Math.max(250, Math.round(num(C.tickSeconds, 0.25) * 1000));
   const STATS = ['health', 'magicka', 'stamina'];
   const regenTick = (now = Date.now()) => {
