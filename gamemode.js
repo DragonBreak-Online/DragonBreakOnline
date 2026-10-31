@@ -9695,7 +9695,15 @@ try {
   delete require.cache[FRENZY_JS];
   require(FRENZY_JS)({ mp, log, personal, sendPacket, audit, who, display, profileOf, onlineActors, every, registerChatCommand, cfg,
     isAdmin, isLeadStaff, findByName, zoneOfActor, ownNameOf, inEditor, creationPending, inLoginGrace });
-} catch (e) { log('frenzy.js failed to load:', e.stack || e.message); for (const k of ['__dboFrenzyForced', '__dboFrenzyActive', '__dboFrenzyEnd', '__dboFrenzyLeave', '__dboFrenzyRateMult', '__dboFrenzyReport']) globalThis[k] = null; }
+} catch (e) { log('frenzy.js failed to load:', e.stack || e.message); for (const k of ['__dboFrenzyForced', '__dboFrenzyVampire', '__dboFrenzyActive', '__dboFrenzyEnd', '__dboFrenzyLeave', '__dboFrenzyRateMult', '__dboFrenzyReport']) globalThis[k] = null; }
+// ---- the vampire's path: Feral, Molag Bal's devotion, Elders and the Crown hunt (server\vampirepath.js, config "vampirePath";
+// Nat, 31 Oct): after supernatural.js, bloodranks.js and frenzy.js, which ask it through these hooks ----
+try {
+  const VAMPIREPATH_JS = path.resolve('vampirepath.js');
+  delete require.cache[VAMPIREPATH_JS];
+  require(VAMPIREPATH_JS)({ mp, log, personal, audit, who, display, sendPacket, onlineActors, every, registerChatCommand, profileOf, cfg,
+    isLeadStaff, findByName, inEditor });
+} catch (e) { log('vampirepath.js failed to load:', e.stack || e.message); for (const k of ['__dboSafeZone', '__dboFeralFrenzyEnded', '__dboFeralKilled', '__dboVampFed', '__dboVampAggMult', '__dboVampSunMult', '__dboVampPrayed', '__dboVampEmbraceRefusal', '__dboVampPowerUsed', '__dboVampDrainSeconds', '__dboVampDrainStarted', '__dboVampDrainBroken', '__dboVampDrainDone']) globalThis[k] = null; }
 // ---- province rules for crafting and the tome shop (server\regions.js, config "regions"): before spells.js, which asks it ----
 try {
   const REGIONS_JS = path.resolve('regions.js');

@@ -205,6 +205,10 @@ module.exports = (api) => {
     .map(([m, v]) => [idOf(`${m}:Skyrim.esm`), idOf(`${v}:Skyrim.esm`)]).filter(([m, v]) => m && v));
   const MORTAL_RACES = new Map([...VAMPIRE_RACES].map(([m, v]) => [v, m]));
 
+  // vampirepath.js (Nat, 31 Oct: Feral, Molag Bal's path, the Crown hunt) answers through these hooks; without it, or when a
+  // hook throws, nothing here changes
+  const vampPath = (hook, ...args) => { try { return typeof globalThis[hook] === 'function' ? globalThis[hook](...args) : undefined; } catch (e) { log(`supernatural: ${hook} failed: ${e.message}`); return undefined; } };
+  const vampPathMult = (hook, ...args) => { const v = Number(vampPath(hook, ...args)); return Number.isFinite(v) && v >= 0 ? v : 1; };
   const clock = () => globalThis.__dboClock || null;
   const gameDays = () => { const c = clock(); return c ? c.gameDays() : Date.now() / 86400000 * 6; };
 
@@ -759,6 +763,7 @@ module.exports = (api) => {
   };
   // gamemode's onSpellHit: a vampire's drain gives back some of what it takes (the server applies only the damage)
   const VAMP_DRAIN_SET = new Set(VAMP_DRAIN.filter(Boolean));
+  const VAMP_POWER_SET = new Set([...VAMP_DRAIN, ...VAMP_THRALL, VAMP_SEDUCTION].filter(Boolean));
   // PlayerWerewolfFeedVictimSpell: a werewolf's feeding hold on a body is its feed (wolfFeedHold, below)
   const WW_FEED_HOLD = idOf('106396:Skyrim.esm');
   // ---- Restoration's healing and the undead (Nate, 11 Oct; a house rule, not TES canon) ----------------------
@@ -857,6 +862,9 @@ module.exports = (api) => {
   };
   globalThis.__dboSuperSpellHit = (agg, tgt, spellId) => {
     try { vampHealHit(Number(agg) >>> 0, Number(tgt) >>> 0, Number(spellId) >>> 0); } catch (e) { log('supernatural: healing check failed', e.message); }
+    // vampirepath.js: a vampire's power landing on someone is a use of Molag Bal's gifts, and may cost the devout (backlash).
+    // Only powers that land on another are seen here; Vampire's Sight and Embrace of Shadows are cast on the caster alone.
+    if (agg !== tgt && VAMP_POWER_SET.has(Number(spellId) >>> 0) && isPlayer(agg) && kindOf(agg) === 'vampire') vampPath('__dboVampPowerUsed', Number(agg) >>> 0, Number(spellId) >>> 0);
     // Vampiric Seduction calms a player for the vampire who cast it: the next feed on them needs no asking (Onny, 22 Oct:
     // "bite people over and over again, but it doesn't actually count as feeding"; the bite was vanilla's, in the caster's game only)
     if (VAMP_SEDUCTION && (Number(spellId) >>> 0) === VAMP_SEDUCTION && agg !== tgt && isPlayer(tgt) && kindOf(agg) === 'vampire') {
@@ -1487,6 +1495,9 @@ module.exports = (api) => {
       if (s.kind === 'vampire' && s.pure) return { reason: 'Your blood is already his.' };
       if (s.kind === 'werewolf') return { reason: 'Molag Bal will not take what Hircine has marked. Be cured first.' };
       if (riteLegacySafe(a)) return { reason: legacyDeclined("Molag Bal's Embrace") };
+      // vampirepath.js (Nat, 31 Oct): the Embrace is the last step of his path, offered only to his Devout vampires
+      const gate = vampPath('__dboVampEmbraceRefusal', a >>> 0);
+      if (typeof gate === 'string' && gate) return { reason: gate };
       return { type: 'embrace', title: "Molag Bal's Embrace", confirm: 'Kneel', warning: "Molag Bal's Embrace makes a pure-blood of those who survive it. Many do not, and some never wake again." };
     }
     if (deity === 'hircine') {
@@ -1770,6 +1781,8 @@ module.exports = (api) => {
     return `${FAITH_NAMES.get(String(deityId)) || 'This god'} will cure the ${diseaseName(s.disease.kind)} in your blood if you pray here. Pray again within a minute to go on.`;
   };
   globalThis.__dboSuperPrayed = (a, deityId, where) => {
+    // vampirepath.js: a prayer at Molag Bal's shrine is devotion for his sworn
+    vampPath('__dboVampPrayed', a >>> 0, String(deityId), where || null);
     if (!DIVINE.has(String(deityId)) || (where && where.atShrine === false)) return;
     prayWarned.delete(a >>> 0);
     const god = FAITH_NAMES.get(String(deityId)) || 'The god';
@@ -1831,6 +1844,8 @@ module.exports = (api) => {
         personal(a, 'Blood smears your mouth and chin. Wash it off in water before anyone sees what you are.');
       }
       if (typeof globalThis.__dboBloodFed === 'function') { try { globalThis.__dboBloodFed(a, t, onCorpse, killedBy.get(t) || 0, o.long ? Number(C.feed.longBloodMult) : 1); } catch (e) { log('supernatural: blood rank feed failed', e.message); } }
+      // vampirepath.js: blood ends a Feral (or its warning), and a living victim is devotion for Molag Bal's sworn
+      vampPath('__dboVampFed', a >>> 0, t >>> 0, onCorpse ? 'body' : 'living');
       return true;
     }
     if (s.kind === 'werewolf' || beastForm(a) === 'werewolf') {
@@ -1861,8 +1876,11 @@ module.exports = (api) => {
     if (wasUnfed) refreshRates(a >>> 0);
     if (needsFeed) try { needsFeed(a >>> 0); } catch (e) { /* hunger off */ }
     personal(a >>> 0, wasUnfed ? lines[0] : lines[1]);
+    vampPath('__dboVampFed', a >>> 0, 0, 'bottle');
     return true;
   };
+  // vampirepath.js: a feral vampire's kill is a meal, as a bottle's is (nobody fed on alive, so no blood rank, no smear)
+  globalThis.__dboSuperFeralMeal = (a) => bloodMeal(a, ['Blood, at last. The withering lifts, and your gifts wake in you.', 'You drink from what you brought down. The red haze lifts, and the thirst lets go.']);
   globalThis.__dboSuperBloodPotion = (a) => bloodMeal(a, ['Blood, at last, if only from a bottle. The withering lifts, and your gifts wake in you.', 'The bottled blood is thin, but the thirst recedes.']);
   // The Bloodstone Chalice on the shrine of Molag Bal in Castle Volkihar's great hall (Dawnguard's
   // DLC1BloodChaliceActivatorEmpty 141a1, on JK's shrine base 6d6; Nate, 24 Oct, fac-0336: "make them work"). Its vanilla use
@@ -2019,16 +2037,20 @@ module.exports = (api) => {
     if (feeds.has(a)) { personal(a, 'You are already feeding.'); return false; }
     if (feedingOn(t)) { personal(a, 'Someone is already feeding there.'); return false; }
     const beast = beastForm(a) === 'werewolf';
-    const seconds = beast ? Number(C.feed.werewolfSeconds) : feedSeconds(a, !!o.long);
+    // vampirepath.js: an Elder feeding on the downed holder of the Blood Crown drains them (drain.seconds; on completion the
+    // holder is ended for good and the Crown passes). 0 means an ordinary feed.
+    const drainSeconds = !beast && o.onCorpse ? Math.max(0, Number(vampPath('__dboVampDrainSeconds', a, t)) || 0) : 0;
+    const seconds = beast ? Number(C.feed.werewolfSeconds) : drainSeconds || feedSeconds(a, !!o.long);
     const lying = !beast && o.onCorpse && isDownedPlayer(t);
     const standing = !beast && !o.onCorpse;
     const ev = beast ? C.feedAnims.werewolf : o.onCorpse ? (lying ? C.feedAnims.lying : C.feedAnims.corpse) : '';
     const p = health(a);
-    feeds.set(a, { t, onCorpse: !!o.onCorpse, long: !!o.long, willing: !!o.willing, seduced: !!o.seduced, lying, beast, ev, hp: p ? p.health : null, at: Date.now(), until: Date.now() + seconds * 1000 });
+    feeds.set(a, { t, onCorpse: !!o.onCorpse, long: !!o.long, willing: !!o.willing, seduced: !!o.seduced, lying, beast, ev, hp: p ? p.health : null, at: Date.now(), until: Date.now() + seconds * 1000, drain: drainSeconds > 0 });
     if (standing && feedPairOn()) sendFeedPair(a, t);
     if (o.onCorpse) { fedOn.add(t); if (fedOn.size > 2048) fedOn.clear(); }
     playAnim(a, ev);
-    try { sendPacket(a, { customPacketType: 'dboBanner', text: o.long ? 'Feeding deeply...' : 'Feeding...', seconds: Math.ceil(seconds) }); } catch (e) { /* old client */ }
+    try { sendPacket(a, { customPacketType: 'dboBanner', text: drainSeconds ? 'Draining the Crown\'s blood...' : o.long ? 'Feeding deeply...' : 'Feeding...', seconds: Math.ceil(seconds) }); } catch (e) { /* old client */ }
+    if (drainSeconds) vampPath('__dboVampDrainStarted', a, t);
     // A seduced victim offered nothing: they hear the bite plainly, not the willing line (review R2, 23 Oct)
     if (!o.onCorpse) personal(t, o.willing && !o.seduced ? `${nameTo(t, a)} drinks from your neck.` : `${nameTo(t, a)} sinks their teeth into your neck.`);
     else if (lying) personal(t, `${nameTo(t, a)} bends over you and drinks.`);
@@ -2108,12 +2130,15 @@ module.exports = (api) => {
     personal(a, `Your feeding is broken: ${why}.`);
     if (!f.onCorpse && onlineActors().includes(f.t)) personal(f.t, 'The teeth leave your neck.');
     log(`supernatural: ${display(a)} stopped feeding on ${display(f.t)}: ${why}`);
+    if (f.drain) vampPath('__dboVampDrainBroken', a, f.t, why);
   };
   const finishFeed = (a, f) => {
     feeds.delete(a);
     stopFeedAnim(a, f);
     if (!feed(a, f.t, f.onCorpse, { long: f.long, willing: f.willing })) { if (f.onCorpse) fedOn.delete(f.t); return; }
     if (!f.onCorpse) livingFedAt.set(f.t, gameDays());
+    // The drain held to the end: vampirepath.js ends the holder for good and the Crown passes (__dboSuperTakeCrown)
+    if (f.drain) vampPath('__dboVampDrainDone', a, f.t);
   };
   every('superFeed', Number(C.feed.tickMs), () => {
     for (const [a, f] of [...feeds]) {
@@ -2453,6 +2478,19 @@ module.exports = (api) => {
   // After an identity reroll a vampire wears the vampire variant of the race just chosen
   globalThis.__dboSuperReapplyLook = (a) => { if (kindOf(a) === 'vampire') setLookRace(a, true); };
   globalThis.__dboSuperCrownHolder = () => crownHolder();
+  // For vampirepath.js (Nat, 31 Oct): what it reads and the few changes it makes, all through this file's own paths
+  globalThis.__dboSuperCrownSince = () => (crownHolder() && G.crown ? Number(G.crown.since) || 0 : 0);
+  globalThis.__dboSuperVampState = (a) => { const s = stateOf(Number(a) >>> 0); return s ? { kind: s.kind, stage: Number(s.stage) || 0, pure: !!s.pure, unfed: !!s.unfed } : null; };
+  globalThis.__dboSuperSetThirst = (a, n, why) => {
+    const s = stateOf(Number(a) >>> 0); if (!s || s.kind !== 'vampire') return false;
+    const stage = Math.max(1, Math.min(4, Math.floor(Number(n)) || 1));
+    const rate = Math.max(1e-6, Number(bloodRate(Number(a) >>> 0, '__dboBloodThirstRate')) || 1);
+    Object.assign(s, { stage, lastFed: gameDays() - (stage - 1 + 0.01) / rate, sated: null });
+    saveState(Number(a) >>> 0, s); syncVampSpells(Number(a) >>> 0, s); flushStageSpells(Number(a) >>> 0, s, String(why || 'thirst changed')); showTells(Number(a) >>> 0, stateOf(Number(a) >>> 0));
+    return true;
+  };
+  globalThis.__dboSuperTakeCrown = (a, how) => { const s = stateOf(Number(a) >>> 0); if (!s || s.kind !== 'vampire') return false; if (!s.pure) { s.pure = true; saveState(Number(a) >>> 0, s); } takeCrown(Number(a) >>> 0, String(how || 'took it')); return true; };
+  globalThis.__dboSuperHurt = (a, share) => { const p = health(Number(a) >>> 0); if (!p || !(p.health > 0)) return false; setHealth(Number(a) >>> 0, Math.max(0.05, p.health - Math.max(0, Number(share) || 0))); return true; };
 
   // ---- the skills menu's Werewolf and Vampire tab (K) --------------------------------------------------------------
   // Nate 2026-09-30: a werewolf or a vampire sees their progression beside their skills. The client asks for the skills
@@ -2853,7 +2891,9 @@ module.exports = (api) => {
   };
   const vampireDamageMult = globalThis.__dboSuperDamageMult;
   globalThis.__dboSuperDamageMult = (agg, tgt, src) => {
-    const m = vampireDamageMult(agg, tgt, src);
+    // vampirepath.js: a feral vampire hits harder, and Molag Bal's devout drain harder (their Drain spells)
+    const m = vampireDamageMult(agg, tgt, src) * (isPlayer(agg) && kindOf(agg) === 'vampire'
+      ? vampPathMult('__dboVampAggMult', agg >>> 0, VAMP_DRAIN_SET.has(Number(src) >>> 0)) : 1);
     if (!isPlayer(tgt)) return m;
     const f = feverOf(tgt);
     return f && share(f.fx.fireTaken, 0) > 0 && isFireSource(src) ? m * (1 + share(f.fx.fireTaken, 0)) : m;
@@ -2935,6 +2975,8 @@ module.exports = (api) => {
     return [{ label: 'How it takes you', value: FEVER_STAGE_NAMES[st - 1].replace(/^./, (c) => c.toUpperCase()), hint: FEVER_FEEL[s.disease.kind][st - 1] + restless }];
   };
   try { if (typeof globalThis.__dboRegisterStatus === 'function') globalThis.__dboRegisterStatus('fever', 26, (a) => { const s = stateOf(a); const st = feverStage(s); return st ? `Feverish (${FEVER_STAGE_NAMES[st - 1]})` : null; }); } catch (e) { /* gamemode older than /status */ }
+  const SUN_BURN_AT = globalThis.__dboSuperSunBurnMap instanceof Map ? globalThis.__dboSuperSunBurnMap : (globalThis.__dboSuperSunBurnMap = new Map());
+  globalThis.__dboSuperSunBurnAt = (a) => SUN_BURN_AT.get(Number(a) >>> 0) || 0;
   every('superSun', 10000, () => {
     const c = clock(); if (!c || c.isNight()) return;
     for (const a of onlineActors()) {
@@ -2943,7 +2985,9 @@ module.exports = (api) => {
       const shade = kind === 0 ? 1 : kind === 1 ? 0.5 : 0.25;
       const p = health(a); if (!p || p.health <= C.sunFloor) continue;
       const cover = coverOf(a);
-      setHealth(a, Math.max(C.sunFloor, p.health - C.sunPerStage * penaltyStage(a, s) * shade * (s.pure ? 0.5 : 1) * (1 - C.sunCoverMax * cover) * bloodRate(a, '__dboBloodSunMult')));
+      setHealth(a, Math.max(C.sunFloor, p.health - C.sunPerStage * penaltyStage(a, s) * shade * (s.pure ? 0.5 : 1) * (1 - C.sunCoverMax * cover) * bloodRate(a, '__dboBloodSunMult') * vampPathMult('__dboVampSunMult', a)));
+      // vampirepath.js: the sun burning a vampire makes the Feral likelier (its tick reads when it last burned)
+      SUN_BURN_AT.set(a >>> 0, Date.now());
       // the player log: the sun's toll is no unexplained loss of health (playerlog.js)
       try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('effect', a, 'sun', 0); } catch (e) { /* the player log is optional */ }
       const last = sunWarned.get(a) || 0;

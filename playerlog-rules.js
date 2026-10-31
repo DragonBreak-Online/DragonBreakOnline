@@ -459,6 +459,9 @@ clean_('MILL');
 // cost JSON; review each for clean (with a cut for the reason) when it goes live
 excluded('BRIARHEART HAGRAVEN', 'staff-written reasons; off until Nat switches them on');
 excluded('DECOR', 'cost JSON; off until Nat switches it on');
+// VAMPATH (vampirepath.js, Nat 31 Oct): a GM's /vampath names them in the reason; the one lasting act, the drain's end of a
+// character, is logged by supernatural.js's own PERMADEATH line
+excluded('VAMPATH', 'reasons can name a GM; the drain\'s permadeath logs as PERMADEATH');
 AUDIT_VERBS.FEED.roles = R_BY([[/ asked $/, 'target'], [/ let $/, 'target'], [/ refused $/, 'target'], [/ feed on $/, 'target']]);
 AUDIT_VERBS.ROPE.roles = R_BY([[/ cut $/, 'target'], [/ of $/, 'captor']]);
 AUDIT_VERBS.STRUGGLE.roles = R_BY([[/ of $/, 'captor']]);
@@ -1631,7 +1634,7 @@ guards.js GUARDS 393970fa clean
 guards.js GUARDS 64f64081 clean
 guards.js GUARDS 89ac5f53 clean
 guards.js GUARDS c54052ef clean
-frenzy.js FRENZY 317ea9b7 clean
+frenzy.js FRENZY d97b8d47 clean
 frenzy.js FRENZY b5c35900 clean
 frenzy.js FRENZY d855ce67 clean
 frenzy.js FRENZY 1d2c9d85 clean
@@ -2142,6 +2145,19 @@ decor.js DECOR e716fb8f excluded
 decor.js DECOR c4970c1e excluded
 decor.js DECOR 44e37985 excluded
 decor.js DECOR 8acd9a0c excluded
+vampirepath.js VAMPATH 284e5b78 excluded
+vampirepath.js VAMPATH 2cbacecb excluded
+vampirepath.js VAMPATH 2fe1ad39 excluded
+vampirepath.js VAMPATH 3c4509ee excluded
+vampirepath.js VAMPATH 4c28fcf5 excluded
+vampirepath.js VAMPATH 6103f501 excluded
+vampirepath.js VAMPATH 7bfbbb05 excluded
+vampirepath.js VAMPATH 89370019 excluded
+vampirepath.js VAMPATH 91672f33 excluded
+vampirepath.js VAMPATH a0e54af4 excluded
+vampirepath.js VAMPATH b9913fc3 excluded
+vampirepath.js VAMPATH e239a18c excluded
+vampirepath.js VAMPATH e33c6de6 excluded
 decor.js DECOR 78b19505 excluded
 decor.js DECOR 58dabe15 excluded
 decor.js DECOR 9650b7e1 excluded
