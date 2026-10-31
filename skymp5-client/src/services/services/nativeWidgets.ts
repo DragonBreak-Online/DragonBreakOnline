@@ -27,6 +27,9 @@ export const NATIVE_WIDGETS: Readonly<Record<string, string>> = {
   // it needs no SHARED_WITH_GAMEPLAY entry. adminMenuService keeps the catalogs in TS and answers the SWF
   // one paged tab at a time through admin::ui, because the whole catalogue is far over MAX_PAYLOAD_CHARS.
   adminPanel: "dbo_admin",
+  // The player-to-player trade window (tradeService, widget 14). The invite prompt stays in the browser: it waits
+  // without the keyboard, and a CustomMenu takes it.
+  trade: "dbo_trade",
   // No emoteWheel entry, deliberately. The emote wheel stays on the CEF overlay: it is a hold-and-flick
   // wheel, and a CustomMenu is modal and pauses the game, which is the wrong shape for it (the Leader,
   // 26 Oct, agreeing with the original split). emoteService may keep its openNative call - with no entry here

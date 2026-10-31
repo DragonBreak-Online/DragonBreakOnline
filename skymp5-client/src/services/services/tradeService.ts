@@ -9,6 +9,9 @@ import { BrowserMessageEvent, ButtonEvent, DxScanCode, Form, FormType, InputDevi
 import { getInventory, Entry, EnchantmentEffect, effectsKey, isBoundItem, PROPERTY_KEY_BASE_ID } from "../../sync/inventory";
 import { logTrace } from "../../logging";
 import { EmoteService } from "./emoteService";
+import { ScaleformMenuService } from "./scaleformMenuService";
+import { CLOSE_KEY, FAILED_KEY } from "./nativeWidgets";
+import { MAX_PAYLOAD_CHARS } from "./scaleformMenu";
 
 // A finished trade: the hands take what was handed over (Skyrim.esm IDLE IdleTake, a one-shot)
 const TRADE_DONE_IDLE = "IdleTake";
@@ -305,7 +308,33 @@ export class TradeService extends ClientListener {
     if (typeof key !== "string" || key.indexOf("trade:") !== 0) {
       return;
     }
+    this.onKey(key, Array.prototype.slice.call(e.arguments, 1));
+  }
 
+  // The native window's keys (the router's onKey): its own trade: events, plus the router's failed and close
+  private handleNativeKey(key: string, args: unknown[]): void {
+    if (key === FAILED_KEY) {
+      // dbo_trade could not be drawn: the browser window for the rest of this trade
+      this.native = false;
+      this.noNative = true;
+      this.controller.once("update", () => this.renderWidget());
+      return;
+    }
+    if (key === CLOSE_KEY) {
+      // Gone without Cancel (the game closed it): the trade ends as a cancel, else the partner's next move reopens it
+      if (!this.native) return;
+      this.native = false;
+      if (this.state) {
+        sendCustomPacket(this.controller, { customPacketType: "tradeCancel" });
+        this.closeAll();
+      }
+      return;
+    }
+    if (key.indexOf("trade:") === 0) this.onKey(key, args);
+  }
+
+  // The window's keys from the browser or the native panel alike; args exclude the key
+  private onKey(key: string, args: unknown[]): void {
     switch (key) {
       case events.inviteAccept:
         sendCustomPacket(this.controller, { customPacketType: "tradeRespond", accept: true });
@@ -317,12 +346,12 @@ export class TradeService extends ClientListener {
         break;
       case events.add: {
         // Browser messages arrive in tick context; inventory natives need update
-        const [lineId, count] = [String(e.arguments[1]), Number(e.arguments[2])];
+        const [lineId, count] = [String(args[0]), Number(args[1])];
         this.controller.once("update", () => this.changeOffer(lineId, count, +1));
         break;
       }
       case events.remove: {
-        const [lineId, count] = [String(e.arguments[1]), Number(e.arguments[2])];
+        const [lineId, count] = [String(args[0]), Number(args[1])];
         this.controller.once("update", () => this.changeOffer(lineId, count, -1));
         break;
       }
@@ -618,6 +647,9 @@ export class TradeService extends ClientListener {
       stackPromptThreshold: STACK_PROMPT_THRESHOLD,
       events,
     };
+    if (this.showNative()) {
+      return;
+    }
     this.sp.browser.executeJavaScript(
       new FunctionInfo(this.tradeWidgetSetter).getText({ tradeData, WIDGET_ID })
     );
@@ -625,6 +657,38 @@ export class TradeService extends ClientListener {
     this.sp.browser.setVisible(true);
     this.sp.browser.setFocused(true);
     this.windowOpen = true;
+  }
+
+  // The native window (swf/dbo_trade) when the client has it, else false and the browser draws it. A window too big for a
+  // Scaleform payload (MAX_PAYLOAD_CHARS: a very full inventory) goes to the browser for the rest of the trade.
+  private showNative(): boolean {
+    if (this.noNative) return false;
+    const scaleform = this.controller.lookupListener(ScaleformMenuService);
+    if (!scaleform) return false;
+    const widget = Object.assign({ type: "trade", id: WIDGET_ID }, tradeData);
+    if (JSON.stringify(widget).length > MAX_PAYLOAD_CHARS) {
+      logTrace(this, "trade window too big for the native panel, using the browser");
+      this.noNative = true;
+      if (this.native) {
+        this.native = false;
+        scaleform.closeNative("trade");
+      }
+      return false;
+    }
+    if (this.native && scaleform.isNativeOpen("trade")) {
+      scaleform.refreshNative(widget, WIDGET_ID);
+      return true;
+    }
+    if (!scaleform.openNative({ type: "trade", widget, widgetId: WIDGET_ID, onKey: (k, a) => this.handleNativeKey(k, a) })) {
+      return false;
+    }
+    this.native = true;
+    // An answered invite may have handed its browser focus on to the window; the native one takes the keys itself
+    if (this.windowOpen) {
+      this.windowOpen = false;
+      this.sp.browser.setFocused(false);
+    }
+    return true;
   }
 
   // Passive invite: shown without seizing input focus (like chat); a System-tab notification points at it.
@@ -658,6 +722,11 @@ export class TradeService extends ClientListener {
   private closeAll(): void {
     this.state = null;
     this.lockPending = false;
+    if (this.native) {
+      this.native = false;
+      this.controller.lookupListener(ScaleformMenuService).closeNative("trade");
+    }
+    this.noNative = false;
     this.closeWidget();
     this.closeInvite();
     // Only surrender focus we actually took (the invite never grabs it).
@@ -693,6 +762,9 @@ export class TradeService extends ClientListener {
   private state: TradeState | null = null;
   private lockPending = false;
   private windowOpen = false;
+  // native: the window is dbo_trade; noNative: this trade stays in the browser (the panel failed, or was too big)
+  private native = false;
+  private noNative = false;
   private invitePending = false;
   private inviteFocused = false;
   private interactKey: number = DxScanCode.X;
