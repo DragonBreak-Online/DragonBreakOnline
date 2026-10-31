@@ -1,6 +1,6 @@
 // Nobility (nobility.js): two views, Holds (a hold's fiefs and roll of nobles, Revoke for its ruler or a Lead GM) and Your
-// titles (with your fief's treasury and buildings). Granting a title is typed (a name, an estate), so the ruler's Grant opens
-// this tab in the browser journal. Revoke is nobilityRevoke [nonce, hold, actor]
+// titles (with your fief's treasury and buildings). The ruler's Grant is a form in place of the tab (nobGrant), sending
+// nobilityGrant [nonce, hold, name, title, fief or estate]. Revoke is nobilityRevoke [nonce, hold, actor]
 var nobView = "holds";
 var nobHold = "";
 var nobSelected = "";
@@ -61,8 +61,66 @@ function nobHoldPane(h, ctx)
    {
       flowHeading("Grant a title");
       flowHint("A title is proclaimed to all by your decree. Giving someone a new title here replaces the one they hold.");
-      flowButtons([["Grant a title...", function() { ctx.browser(); }, undefined, ctx.busy || ctx.readOnly]]);
+      var g = flowButtons([["Grant a title...", function() { nobGrant(this.hold, ctx); }, undefined, ctx.busy || ctx.readOnly]]);
+      g.btn0.hold = h;
    }
+}
+
+// The ruler's decree as a form: a character by name or #TAG, a title, and its fief (a vacant one) or estate, as the
+// browser's GrantForm: nobilityGrant [hold, name, title, fief or estate or ""]
+function nobGrant(h, ctx)
+{
+   var titles = listOf(h.titles);
+   var vacant = [];
+   var fiefs = listOf(h.fiefs);
+   for (var i = 0; i < fiefs.length; i++)
+   {
+      if (fiefs[i].holder == null || fiefs[i].holder == undefined)
+      {
+         vacant.push([fiefs[i].id, fiefs[i].name]);
+      }
+   }
+   ctx.form(function(v)
+   {
+      var t = null;
+      var options = [];
+      for (var k = 0; k < titles.length; k++)
+      {
+         options.push([titles[k].id, titles[k].label]);
+         if (titles[k].id == v.title)
+         {
+            t = titles[k];
+         }
+      }
+      var fields = [{key: "name", label: "Who", kind: "text", max: 40, hint: "Name or #TAG"}, {key: "title", label: "Title", kind: "choice", options: options}];
+      var extra = "";
+      if (t != null && t.needs == "fief")
+      {
+         var free = false;
+         for (var f = 0; f < vacant.length; f++)
+         {
+            if (vacant[f][0] == v.fief)
+            {
+               free = true;
+            }
+         }
+         if (!free)
+         {
+            v.fief = vacant.length ? vacant[0][0] : "";
+         }
+         fields.push(vacant.length ? {key: "fief", label: "Fief", kind: "choice", options: vacant} : {kind: "note", text: "Every fief is held. Revoke a title to free one."});
+         extra = v.fief != undefined ? String(v.fief) : "";
+      }
+      else if (t != null && t.needs == "estate")
+      {
+         fields.push({key: "estate", label: "The estate's name", kind: "text", max: 40});
+         extra = v.estate != undefined ? String(v.estate) : "";
+      }
+      var name = v.name != undefined ? String(v.name) : "";
+      var ready = name != "" && t != null && (t.needs == undefined || t.needs == "" || extra != "");
+      return {title: "Grant a title", hint: "A title is proclaimed to all by your decree. Giving someone a new title here replaces the one they hold.", fields: fields,
+         buttons: [["Proclaim", function(vals) { ctx.act("dbo:nobilityGrant", [h.id, name, t.id, extra]); }, ready]]};
+   }, {title: titles.length ? titles[0].id : ""});
 }
 
 function nobMine(mine, share)

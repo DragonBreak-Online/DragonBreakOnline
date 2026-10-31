@@ -1,7 +1,8 @@
 // Court (court.js): the courts you serve, are offered a post in, or (staff) every zone, with four views: Court (offers to you,
 // the treasury and tax, Step down, beasts seen, offers waiting), Offices (holders with Move and Dismiss), Household (members
 // with their rank and Remove) and Hunting (the contract terms and the work posted by hand). Every number, name and search
-// is typed, so Appoint, Invite, Rename, the tax, wages, terms and posting open this tab in the browser journal.
+// is typed in a form in place of the tab (ctx.form): the tax, wages, Appoint and Offer, Invite, renaming an office or a
+// rank, the contract terms, posting a hunt and commissioning goods, as the browser court's controls.
 // Actions are dbo:court* with the nonce first
 var courtZone = "";
 var courtView = "court";
@@ -26,6 +27,44 @@ function courtUntil(t)
    return d ? d + "d " + h + "h" : h ? h + "h " + m + "m" : m + "m";
 }
 
+// A whole number set with its own form, as the browser's NumberSet: refused when empty, out of bounds or unchanged
+function courtNumber(ctx, title, hint, label, current, min, max, onSet)
+{
+   ctx.form(function(v)
+   {
+      var n = ctx.number(v, "n");
+      return {title: title, hint: hint, fields: [{key: "n", label: label, kind: "number", max: String(max).length, hint: "now " + current + ", " + min + " to " + max}],
+         buttons: [["Set", function(vals) { onSet(ctx.number(vals, "n")); }, n >= min && n <= max && n != current]]};
+   });
+}
+
+// A Lead GM's rename of an office or a rank: courtRename [court, kind, id, name]; Default (an empty name) is its own button
+function courtRename(ctx, c, kind, id, title)
+{
+   ctx.form(function(v)
+   {
+      var name = v.name != undefined ? String(v.name) : "";
+      return {title: "Rename " + title, fields: [{key: "name", label: "New name", kind: "text", max: 40, hint: title}],
+         buttons: [["Save", function(vals) { ctx.act("dbo:courtRename", [c.id, kind, id, String(vals.name)]); }, name != "" && name != title]]};
+   });
+}
+
+// Appointing or offering a post by name; Appoint outright only where the payload allows it (court.js outright)
+function courtAppoint(ctx, c, of, outright)
+{
+   ctx.form(function(v)
+   {
+      var name = v.name != undefined ? String(v.name) : "";
+      var b = [["Offer the post", function(vals) { ctx.act("dbo:courtOffer", [c.id, String(vals.name), of.rank]); }, name != ""]];
+      if (outright)
+      {
+         b.push(["Appoint", function(vals) { ctx.act("dbo:courtAppoint", [c.id, String(vals.name), of.rank]); }, name != ""]);
+      }
+      return {title: of.title + " of " + c.name, hint: outright ? "Appoint fills the post at once; an offer waits for their answer." : "They answer the offer in their journal.",
+         fields: [{key: "name", label: "Who", kind: "text", max: 40, hint: "Name or #TAG"}], buttons: b};
+   });
+}
+
 function courtOverview(c, s, ctx, off)
 {
    var hh = c.household;
@@ -42,7 +81,12 @@ function courtOverview(c, s, ctx, off)
    }
    if (c.tax != null && c.tax != undefined)
    {
-      flowEntry("Tax: " + c.tax.pct + "% of every rent and, each week, of every property's value", c.tax.canSet == true ? [["Set...", function() { ctx.browser(); }, undefined, off]] : []);
+      var tx = flowEntry("Tax: " + c.tax.pct + "% of every rent and, each week, of every property's value", c.tax.canSet == true ? [["Set...", function()
+      {
+         var t = this._parent.tax;
+         courtNumber(ctx, "The tax of " + c.name, "Taken from every rent and, each week, from every property's value.", "Percent", t.pct, 0, t.max, function(n) { ctx.act("dbo:courtTax", [c.id, n]); });
+      }, undefined, off]] : []);
+      tx.tax = c.tax;
    }
    if (c.keepsBooks == true)
    {
@@ -77,7 +121,6 @@ function courtOffices(c, s, ctx, off)
 {
    var offices = listOf(c.offices);
    var appointable = listOf(c.appointable);
-   var typed = false;
    for (var i = 0; i < offices.length; i++)
    {
       var of = offices[i];
@@ -86,9 +129,36 @@ function courtOffices(c, s, ctx, off)
       if (of.wage != undefined)
       {
          flowHint(of.wage ? of.wage + " gold a week" : "Unpaid");
-         typed = typed || c.keepsBooks == true;
       }
-      typed = typed || c.canName == true || (of.canAppoint == true && !(of.seats != null && of.seats != undefined && holders.length >= of.seats));
+      var tools = [];
+      if (of.canAppoint == true && !(of.seats != null && of.seats != undefined && holders.length >= of.seats))
+      {
+         tools.push(["Appoint...", function() { courtAppoint(ctx, c, this.office, s.outright == true); }, undefined, off]);
+      }
+      if (of.wage != undefined && c.keepsBooks == true)
+      {
+         tools.push(["Wage...", function()
+         {
+            var o = this.office;
+            courtNumber(ctx, "The wage of " + o.title, "Paid every Sunday from the treasury into the holder's bank account.", "Gold a week", Number(o.wage) || 0, 0, 100000, function(n) { ctx.act("dbo:courtWage", [c.id, o.rank, n]); });
+         }, undefined, off]);
+      }
+      if (c.canName == true)
+      {
+         tools.push(["Rename...", function() { courtRename(ctx, c, "office", this.office.rank, this.office.title); }, undefined, off]);
+         if (of.named == true && of["default"] != undefined)
+         {
+            tools.push(["Default", function() { ctx.act("dbo:courtRename", [c.id, "office", this.office.rank, ""]); }, undefined, off]);
+         }
+      }
+      if (tools.length)
+      {
+         var tb = flowButtons(tools);
+         for (var tq = 0; tq < tools.length; tq++)
+         {
+            tb["btn" + tq].office = of;
+         }
+      }
       if (!holders.length)
       {
          flowHint("    Vacant.");
@@ -143,12 +213,6 @@ function courtOffices(c, s, ctx, off)
             }
          }
       }
-   }
-   if (typed)
-   {
-      flowGap(6);
-      flowHint("Appointing and offering a post (by name), wages and office names are typed in the browser journal.");
-      flowButtons([["Appoint, wages, names...", function() { ctx.browser(); }, undefined, off]]);
    }
 }
 
@@ -219,9 +283,32 @@ function courtHousehold(c, s, ctx, off)
       flowHint("Invited: " + names.join(", "));
    }
    flowHint("An office sets its holder's rank here; giving up the office returns them to the lowest rank.");
-   if (hh.canInvite == true || c.canName == true)
+   if (hh.canInvite == true)
    {
-      flowButtons([[hh.canInvite == true ? "Invite someone..." : "Rank names...", function() { ctx.browser(); }, undefined, off]]);
+      flowButtons([["Invite someone...", function()
+      {
+         ctx.form(function(v)
+         {
+            var name = v.name != undefined ? String(v.name) : "";
+            return {title: "Invite someone to " + hh.name, fields: [{key: "name", label: "Who", kind: "text", max: 40, hint: "someone online: name or #TAG"}],
+               buttons: [["Invite", function(vals) { ctx.act("dbo:courtInvite", [c.id, String(vals.name)]); }, name != ""]]};
+         });
+      }, undefined, off]]);
+   }
+   if (c.canName == true)
+   {
+      flowHeading("Rank names");
+      for (var n = 0; n < ranks.length; n++)
+      {
+         var rb = [["Rename...", function() { courtRename(ctx, c, "rank", this._parent.rankIndex, this._parent.rankTitle); }, undefined, off]];
+         if (ranks[n].canon != undefined && ranks[n].canon != "")
+         {
+            rb.push(["Default", function() { ctx.act("dbo:courtRename", [c.id, "rank", this._parent.rankIndex, ""]); }, undefined, off]);
+         }
+         var re = flowEntry(ranks[n].title + (ranks[n].canon != undefined && ranks[n].canon != "" ? " (" + ranks[n].canon + ")" : ""), rb);
+         re.rankIndex = n;
+         re.rankTitle = ranks[n].title;
+      }
    }
 }
 
@@ -236,20 +323,52 @@ function courtHunting(c, s, ctx, off)
    var tiers = listOf(t.tiers);
    for (var i = 0; i < tiers.length; i++)
    {
-      flowRow(tiers[i].name.charAt(0).toUpperCase() + tiers[i].name.substr(1), tiers[i].price + " gold a kill", listOf(tiers[i].kinds).join(", "));
+      var label = tiers[i].name.charAt(0).toUpperCase() + tiers[i].name.substr(1);
+      if (t.canSet == true)
+      {
+         var pe = flowEntry(label + ": " + tiers[i].price + " gold a kill", [["Set...", function()
+         {
+            var tr = this._parent.tier;
+            courtNumber(ctx, "Pay per kill: " + tr.name, "Contracts already taken keep their pay.", "Gold a kill", tr.price, t.bounds.min, t.bounds.max, function(n) { ctx.act("dbo:courtContractPrice", [c.id, tr.tier, n]); });
+         }, undefined, off]], listOf(tiers[i].kinds).join(", "));
+         pe.tier = tiers[i];
+      }
+      else
+      {
+         flowRow(label, tiers[i].price + " gold a kill", listOf(tiers[i].kinds).join(", "));
+      }
    }
-   flowRow("Weekly budget", t.budget + " gold");
+   if (t.canSet == true)
+   {
+      flowEntry("Weekly budget: " + t.budget + " gold", [["Set...", function()
+      {
+         courtNumber(ctx, "The weekly budget", "What standing contracts may pay out in a week.", "Gold a week", t.budget, 0, t.budgetMax, function(n) { ctx.act("dbo:courtContractBudget", [c.id, n]); });
+      }, undefined, off]]);
+   }
+   else
+   {
+      flowRow("Weekly budget", t.budget + " gold");
+   }
    flowEntry("Standing contracts: " + (t.standing == true ? "On" : "Stopped by its officials"), t.canSet == true ? [[t.standing == true ? "Stop them" : "Post them again", function() { ctx.act("dbo:courtContractStanding", [c.id, t.standing == true ? "off" : "on"]); }, undefined, off]] : []);
    flowHint("This week: " + t.spent + " gold spent, " + t.left + " left. It renews Monday 00:00 UTC, in " + courtUntil(t.resetsAt) + ".");
    flowHint((t.citizensOnly == true ? "Citizens of " + c.name + " only." : "Open to every hunter.") + " Work an official posts by hand is open to all.");
    if (t.postBudget != undefined)
    {
-      flowRow("Posted work a week", t.postBudget + " gold", t.postLeft + " left this week");
+      if (t.canSet == true)
+      {
+         flowEntry("Posted work a week: " + t.postBudget + " gold", [["Set...", function()
+         {
+            courtNumber(ctx, "Posted work a week", "What officials may post by hand in a week.", "Gold a week", t.postBudget, 0, t.budgetMax, function(n) { ctx.act("dbo:courtContractPostBudget", [c.id, n]); });
+         }, undefined, off]], t.postLeft + " left this week");
+      }
+      else
+      {
+         flowRow("Posted work a week", t.postBudget + " gold", t.postLeft + " left this week");
+      }
    }
-   if (t.canSet == true || t.canPost == true)
+   if (t.canPost == true)
    {
-      flowHint("Pay, budgets, posting a hunt and commissioning goods are typed in the browser journal.");
-      flowButtons([["Terms and posting...", function() { ctx.browser(); }, undefined, off]]);
+      courtPostWork(c, t, ctx, off);
    }
    else if (t.fauna != undefined)
    {
@@ -270,6 +389,95 @@ function courtHunting(c, s, ctx, off)
       var e = flowEntry((w.type == "commission" ? "Commission: " : "") + w.what, w.canWithdraw == true ? [["Take down", function() { ctx.act("dbo:courtContractWithdraw", [c.id, this._parent.postId]); }, undefined, off]] : [],
          "by " + (w.by != undefined && w.by != "" ? w.by : "an official") + ", " + w.held + " gold held, " + w.hoursLeft + "h left");
       e.postId = w.id;
+   }
+}
+
+// An official posts a hunt for the hold's own beasts, or commissions goods (searched first), out of the week's posting
+// budget: courtContractPost [court, kind, count, reward], courtCommissionSearch [court, query], courtCommissionPost [court,
+// goods, count, gold each], with the browser's limits (a reward up to count x the beast's pay, a price up to the goods' most)
+function courtPostWork(c, t, ctx, off)
+{
+   flowText("Post work", 19, C_TEXT);
+   flowHint("Paid from the treasury, out of this week's posting budget (" + t.postLeft + " of " + t.postBudget + " gold left)"
+      + (t.postsLeftToday != null && t.postsLeftToday != undefined ? "; you may post " + t.postsLeftToday + " more today" : "") + ".");
+   var fauna = listOf(t.fauna);
+   var row = [];
+   if (fauna.length)
+   {
+      row.push(["Post a hunt...", function()
+      {
+         var opts = [];
+         for (var i = 0; i < fauna.length; i++)
+         {
+            opts.push([fauna[i].kind, fauna[i].name + " (" + fauna[i].perKill + " a kill)"]);
+         }
+         ctx.form(function(v)
+         {
+            var beast = null;
+            for (var k = 0; k < fauna.length; k++)
+            {
+               if (fauna[k].kind == v.kind)
+               {
+                  beast = fauna[k];
+               }
+            }
+            var count = ctx.number(v, "count");
+            var reward = ctx.number(v, "reward");
+            var most = beast != null && count > 0 ? count * beast.perKill : 0;
+            return {title: "Post a hunt in " + c.name, fields: [{key: "kind", label: "The beast", kind: "choice", options: opts},
+               {key: "count", label: "How many", kind: "number", max: 5}, {key: "reward", label: most ? "Reward, up to " + most : "Reward", kind: "number", max: 6}],
+               buttons: [["Post hunt", function(vals) { ctx.act("dbo:courtContractPost", [c.id, String(vals.kind), ctx.number(vals, "count"), ctx.number(vals, "reward")]); },
+                  beast != null && count > 0 && reward > 0 && !(most > 0 && reward > most)]]};
+         }, {kind: fauna[0].kind});
+      }, undefined, off]);
+   }
+   else
+   {
+      flowHint("No dangerous beasts are known to roam " + c.name + ".");
+   }
+   row.push(["Commission goods...", function()
+   {
+      ctx.form(function(v)
+      {
+         var q = v.q != undefined ? String(v.q) : "";
+         return {title: "Commission goods", hint: "Search what a hold buys: pelt, iron ingot, firewood...", fields: [{key: "q", label: "Search", kind: "text", max: 40}],
+            buttons: [["Search", function(vals) { ctx.act("dbo:courtCommissionSearch", [c.id, String(vals.q)]); }, q != ""]]};
+      });
+   }, undefined, off]);
+   var found = t.search != undefined && t.search != null ? listOf(t.search.items) : [];
+   if (found.length)
+   {
+      row.push(["Commission " + (found.length == 1 ? "it" : "one of " + found.length) + "...", function()
+      {
+         var opts = [];
+         for (var i = 0; i < found.length; i++)
+         {
+            opts.push([found[i].desc, found[i].name + " (worth " + found[i].value + ", up to " + found[i].maxPrice + " each)"]);
+         }
+         ctx.form(function(v)
+         {
+            var picked = null;
+            for (var k = 0; k < found.length; k++)
+            {
+               if (found[k].desc == v.item)
+               {
+                  picked = found[k];
+               }
+            }
+            var want = ctx.number(v, "want");
+            var price = ctx.number(v, "price");
+            return {title: "Commission goods", fields: [{key: "item", label: "The goods", kind: "choice", options: opts},
+               {key: "want", label: t.commissionMaxCount != undefined ? "How many, up to " + t.commissionMaxCount : "How many", kind: "number", max: 5},
+               {key: "price", label: picked != null ? "Gold each, up to " + picked.maxPrice : "Gold each", kind: "number", max: 6}],
+               buttons: [["Commission", function(vals) { ctx.act("dbo:courtCommissionPost", [c.id, String(vals.item), ctx.number(vals, "want"), ctx.number(vals, "price")]); },
+                  picked != null && want > 0 && price > 0 && price <= picked.maxPrice && (t.commissionMaxCount == undefined || want <= t.commissionMaxCount)]]};
+         });
+      }, undefined, off]);
+   }
+   flowButtons(row);
+   if (t.search != undefined && t.search != null && !found.length)
+   {
+      flowHint("Nothing a hold buys matches \"" + t.search.query + "\".");
    }
 }
 
