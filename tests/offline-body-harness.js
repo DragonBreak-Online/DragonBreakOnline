@@ -33,21 +33,21 @@ ok(g.gate(WOLF) === false, 'a creature is not a protected body');
 ok(g.gate(PLAYER) === false, 'a player who is playing is not protected');
 ok(g.gate(BODY) === true, 'a logged-out body is protected, even with no logout on record (after a restart)');
 
-g.combatAt.set(BODY, now - 90000); g.note(BODY);
-ok(g.gate(BODY) === true, 'logging out a minute and a half after a fight leaves the body protected');
+g.combatAt.set(BODY, now - 150000); g.note(BODY);
+ok(g.gate(BODY) === true, 'logging out two and a half minutes after a fight leaves the body protected');
 
 now += 1000; g.combatAt.set(BODY, now - 10000); g.note(BODY);
 ok(g.gate(BODY) === false, 'logging out 10 s after a blow leaves the body open (combat logging)');
-ok(logs.some((l) => /logged out within 60 s of a fight/.test(l)), 'and that is logged (the combat logout timer is 60 s by default, Nat 31 Oct)');
-g.combatAt.set(BODY, now - 45000); g.note(BODY);
-ok(g.gate(BODY) === false, '45 s after a blow is still inside the 60 s timer');
+ok(logs.some((l) => /logged out within 120 s of a fight/.test(l)), 'and that is logged (the combat logout timer is 2 minutes by default, Nat 31 Oct)');
+g.combatAt.set(BODY, now - 110000); g.note(BODY);
+ok(g.gate(BODY) === false, '110 s after a blow is still inside the 2 minute timer');
 g.combatAt.set(BODY, now + 5000);
 ok(g.gate(BODY) === false, 'blows on the body afterwards do not change the decision');
 
 // The warning: told on the first PvP blow after a quiet minute, not on every blow of the fight
 said.length = 0;
-g.warn(PLAYER, undefined); g.warn(PLAYER, now - 120000); g.warn(PLAYER, now - 5000);
-ok(said.length === 2 && said.every(([a, t]) => a === PLAYER && /In combat: if you log out or change character in the next 60 seconds/.test(t)), 'a PvP fight starting is told the combat logout timer once, not on every blow', said);
+g.warn(PLAYER, undefined); g.warn(PLAYER, now - 180000); g.warn(PLAYER, now - 5000);
+ok(said.length === 2 && said.every(([a, t]) => a === PLAYER && /In combat: if you log out or change character in the next 2 minutes,/.test(t)), 'a PvP fight starting is told the combat logout timer once, not on every blow', said);
 g = lift({ offlineBody: { combatLogSeconds: 0 } });
 g.combatAt.set(BODY, now - 1000); g.note(BODY);
 ok(g.gate(BODY) === true, 'combatLogSeconds 0 makes every logged-out body safe');
