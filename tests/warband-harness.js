@@ -13,8 +13,8 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-nate-warband-'));
 const home = process.cwd();
 process.chdir(dir);
 fs.writeFileSync('admin-placeables.json', JSON.stringify({ categories: [
-  { id: 'npc', label: 'NPCs', kind: 'npc', items: [['1e7e2:Skyrim.esm', 'Bandit Melee 1H Nord', 'Skyrim.esm'], ['1e7e3:Skyrim.esm', 'Bandit Melee 1H Imperial', 'Skyrim.esm'], ['3ba1:Skyrim.esm', 'Bandit Chief', 'Skyrim.esm']] },
-  { id: 'obj', label: 'Objects', kind: 'object', items: [['aa:Skyrim.esm', 'Bandit Tent', 'Skyrim.esm']] },
+  { id: 'npc', label: 'NPCs', kind: 'npc', items: [['1e7e2:Skyrim.esm', 'Bandit Melee 1H Nord', 'Skyrim.esm'], ['1e7e3:Skyrim.esm', 'Bandit Melee 1H Imperial', 'Skyrim.esm'], ['3ba1:Skyrim.esm', 'Bandit Chief', 'Skyrim.esm']] },   // verify-formids: ignore - harness fixture, a mock catalog
+  { id: 'obj', label: 'Objects', kind: 'object', items: [['aa:Skyrim.esm', 'Bandit Tent', 'Skyrim.esm']] },   // verify-formids: ignore - harness fixture, a mock catalog
 ] }));
 
 const GM = 1, PLAYER = 2, TARGET = 3;
@@ -43,7 +43,7 @@ require(MODULE)({
     lookupEspmRecordById: () => ({ record: { type: 'NPC_', fields: [{ type: 'AIDT', data: new Uint8Array([0]) }] }, toGlobalRecordId: (x) => x }),
   },
   log: () => {}, personal: (a, t) => said.push([a, t]), audit: () => {}, who: (a) => `#${a}`, isAdmin: (a) => a === GM,
-  registerChatCommand: (n, fn) => { commands[n] = fn; }, findByName: (q) => (q === 'Target' ? TARGET : 0), cfg: {},
+  registerChatCommand: (n, fn) => { commands[n] = fn; }, findByName: (q) => (q === 'Target' ? TARGET : 0), cfg: { warband: { raidMax: 99, raidGapSeconds: 0, maxHostile: 999 } },   // the raid limits: warband-raid-limits-harness.js
   onUi: (ev, fn) => { ui[ev] = fn; },
 });
 

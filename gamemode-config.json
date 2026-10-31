@@ -1314,7 +1314,12 @@
   "maxRaise": 25,
   "onLogout": "dismiss",
   "viewRadius": 4200,
-  "presetsMax": 40
+  "presetsMax": 40,
+  "_raids": "Nat, 31 Oct, after the 31 Oct 02:30-03:05 crash burst (128 game crashes, each wave seconds after a raid; _work/crash-burst-1031.md): raidMax NPCs per unleash (the rest stay with the GM), raidGapSeconds between one GM's raids (by profile), maxHostile live unleashed raiders for the whole server (followers and garrisons stay under maxLive 40), bodySeconds before a dead raider or garrison NPC is removed (was 300). ROLLBACK: raise them.",
+  "raidMax": 10,
+  "raidGapSeconds": 60,
+  "maxHostile": 25,
+  "bodySeconds": 60
  },
  "thievery": {
   "_comment": "Thievery and burglary, phase 1 (thievery.js; #staff-suggestions, Nate 20 Oct). Only members of a thief faction in factions (or approved in game with /burglary approve <id>, Lead GM) break into players' homes: crouch + use a locked load door or a chest they have no access to, forceSeconds at the lock (players within noticeRadius units and the owner are told; a blow, a step past moveTolerance or anyone else using the door stops it), then the lockpick game at lockLevel (0 Novice..4 Master); idleKey is the interactionIdles crouch held while forcing (\"\" for none). A won lock is a breach for breachMinutes: the doors take the thief through without unlocking, the chests open the steal panel, at most takeTypes kinds (a stack is one) per takeWindowHours per thief; never keys, artifacts, worn things, or gold unless goldStealable. requireOwnerOnline: only while one of the owner's characters is online. homeCooldownHours between breaches of one home. Faction halls (hallsNeedPermit) and protectedRefs (hex primaries) need /burglary permit by a GM. Fence Chest (/fence mark <faction>, Lead GM): stolen goods fenced there pay payShare of their base value after fenceDays, to whoever fenced them; recoverable until then. Guard raids: /fence report (private.dboLawful) -> #gm-approval-requests -> /fence approve freezes the fence and warns the faction; /fence won|lost after noticeHours; an unruled freeze lifts after freezeMaxHours. /stolen [seize] <name>: guards take stolen goods off a bound, downed or jailed thief. Stolen goods go back to their owners at their next login. State thievery.json (runtime). Hot reload. ROLLBACK: enabled false (fences stay shut).",

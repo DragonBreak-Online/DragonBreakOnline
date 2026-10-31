@@ -41,7 +41,11 @@ module.exports = (api) => {
   // Nat, 25 Oct (the Place tab's Warband view made intuitive): maxRaise (config 25) the whole band in one press; viewRadius, how
   // far the panel looks for targets and the GM's raiders; onLogout, what a GM's followers do when the GM leaves (dismiss, or
   // settle the calm ones); presetsMax, saved bands per server
-  const C = Object.assign({ maxBand: 25, maxRaise: 10, maxLive: 40, spawnBatch: 10, spawnStepMs: 500, ringRadius: 160, bodySeconds: 300, chargeRange: 4096, avoidGmHost: true,
+  // Raids (Nat, 31 Oct, after the 31 Oct 02:30-03:05 crash burst: 128 crashes, each wave seconds after a raid, "yes enforce
+  // those"): raidMax NPCs per unleash, raidGapSeconds between one GM's raids, maxHostile live unleashed raiders for the whole
+  // server (followers and garrisons stay under maxLive), and the dead removed bodySeconds after they fell
+  const C = Object.assign({ maxBand: 25, maxRaise: 10, maxLive: 40, spawnBatch: 10, spawnStepMs: 500, ringRadius: 160, bodySeconds: 60, chargeRange: 4096, avoidGmHost: true,
+    raidMax: 10, raidGapSeconds: 60, maxHostile: 25,
     viewRadius: 4200, onLogout: 'dismiss', presetsMax: 40, guardRadius: 1500, guardLeash: 500, guardWalkSeconds: 20, patrolResendSeconds: 30, guardReportSeconds: 30 }, cfg.warband || {});
   // Every answer is said in chat as before, and kept as the last line the panel shows (W3)
   const lastSaid = globalThis.__dboWarbandSaid instanceof Map ? globalThis.__dboWarbandSaid : (globalThis.__dboWarbandSaid = new Map());
@@ -59,6 +63,8 @@ module.exports = (api) => {
   if (!(S.onLogout instanceof Map)) S.onLogout = new Map();
   // guards: GM actor -> { radius, profile, centre, where, posts: npc id -> { pos, rot }, outside: npc id -> since past the leash }
   if (!(S.guards instanceof Map)) S.guards = new Map();
+  // lastRaid: GM profile (or actor when it has none) -> when its last raid was unleashed
+  if (!(S.lastRaid instanceof Map)) S.lastRaid = new Map();
   const comp = () => globalThis.__dboCompanions || null;
   // Vanilla PlayerFaction, as companionService.ts prepare() puts the GM's own followers in on the GM's screen
   const PLAYER_FACTION = 0xdb1;
@@ -290,15 +296,34 @@ module.exports = (api) => {
     return out;
   };
 
+  // Live unleashed raiders of every GM
+  const liveHostile = () => S.released.reduce((n, r) => n + (r.hostile && alive(r.id) ? 1 : 0), 0);
+  const clock = (ms) => new Date(ms).toISOString().slice(11, 19);
+  const bodyTime = () => (C.bodySeconds < 120 ? `${Math.round(C.bodySeconds)} s` : `${Math.round(C.bodySeconds / 60)} min`);
   const release = (a, hostile) => {
     const mine = band(a);
     if (!mine.length) return tell(a, 'You lead no warband.');
+    const profile = profileOf(a);
+    const raidKey = profile !== undefined && profile >= 0 ? `p${profile}` : `a${a >>> 0}`;
+    // A raid: no sooner than raidGapSeconds after this GM's last, at most raidMax, and the server's live raiders under maxHostile
+    let allowed = Infinity;
+    if (hostile) {
+      const gap = Math.max(0, Number(C.raidGapSeconds) || 0) * 1000;
+      const last = S.lastRaid.get(raidKey) || 0;
+      if (gap && Date.now() - last < gap) {
+        const at = last + gap;
+        return tell(a, `One raid a minute: your next can be unleashed in ${Math.ceil((at - Date.now()) / 1000)} s (at ${clock(at)} UTC). Your warband waits with you.`);
+      }
+      const room = Math.max(0, Number(C.maxHostile) || 0) - liveHostile();
+      if (room <= 0) return tell(a, `The server holds ${C.maxHostile} live raiders already (every GM's). Your next raid can go when some of them fall, or after /raid clear.`);
+      allowed = Math.min(Math.max(1, Number(C.raidMax) || 1), room);
+    }
     S.charging.delete(a >>> 0);
     let done = 0;
-    const kept = [], unread = [];
-    const profile = profileOf(a);
+    const kept = [], unread = [], waiting = [];
     const gone = [];
     for (const c of mine) {
+      if (hostile && done >= allowed) { waiting.push(c.id); continue; }
       // One raised before the guard loaded goes away instead of into the world
       if (crashy(c.baseId) && !(CRASHY && CRASHY.testing(profile))) { try { comp().dismiss(c.id); } catch (e) { /* gone */ } S.owners.delete(c.id >>> 0); gone.push(nameOfNpc(c.id)); continue; }
       // An aggression that cannot be read (AI data from a leveled-list template, or no readable record) is not trusted
@@ -313,6 +338,7 @@ module.exports = (api) => {
       S.owners.set(id, { gm: a >>> 0, profile, by: who(a), released: true, hostile });
       done++;
     }
+    if (hostile && done) S.lastRaid.set(raidKey, Date.now());
     if (hostile) { try { syncRaidFactions(); } catch (e) { log('warband: raid factions failed', e.message); } }
     audit(`WARBAND ${who(a)} ${hostile ? 'UNLEASHED a raid of' : 'settled'} ${done} NPC(s)${gone.length ? `; dismissed ${gone.length} (crashyCreatures)` : ''}`);
     if (gone.length) tell(a, `Dismissed ${gone.length} (${[...new Set(gone)].join(', ')}) instead. ${CRASHY ? CRASHY.message : ''}`.trim());
@@ -321,9 +347,12 @@ module.exports = (api) => {
       log(`warband: ${who(a)} kept ${kept.length} aggressive NPC(s) in the warband instead of settling them (${names})`);
     }
     if (unread.length) log(`warband: ${who(a)} kept ${unread.length} NPC(s) whose aggression could not be read in the warband (${[...new Set(unread)].join(', ')})`);
-    const bodies = Math.round(C.bodySeconds / 60);
+    const bodies = bodyTime();
+    const held = waiting.length
+      ? ` ${waiting.length} stay with you: ${done === allowed && done < Math.max(1, Number(C.raidMax) || 1) ? `the server holds ${C.maxHostile} live raiders at most` : `a raid is ${C.raidMax} at most`}. The next raid can go at ${clock(Date.now() + Math.max(0, Number(C.raidGapSeconds) || 0) * 1000)} UTC.`
+      : '';
     tell(a, hostile
-      ? `Your warband of ${done} is unleashed. They are hostile NPCs now, but never to you; /raid shows who still stands, /raid clear removes yours. The dead are removed after ${bodies} min.`
+      ? `Your warband of ${done} is unleashed. They are hostile NPCs now, but never to you; /raid shows who still stands, /raid clear removes yours. The dead are removed after ${bodies}.${held}`
       : `${done ? `Your warband of ${done} stays here as friendly NPCs until the next restart; /raid clear removes them sooner.` : 'Nobody was settled.'}`
         + (kept.length ? ` ${kept.length} (${[...new Set(kept)].join(', ')}) are aggressive by nature and would turn on players once settled, so they stay in your warband: dismiss them, or unleash them as a raid.` : '')
         + (unread.length ? ` ${unread.length} (${[...new Set(unread)].join(', ')}) could not be checked (no readable AI data, as when it comes from a leveled list), so they stay in your warband too.` : ''));
@@ -686,7 +715,7 @@ module.exports = (api) => {
     const t = tally(list);
     const others = S.released.length - list.length;
     tell(a, (t.raiders + t.settled + t.bodies
-      ? `${t.raiders} raider(s) and ${t.settled} settled NPC(s) still stand${t.bodies ? `, ${t.bodies} lie dead (removed ${Math.round(C.bodySeconds / 60)} min after they fell)` : ''}. /raid clear removes yours.`
+      ? `${t.raiders} raider(s) and ${t.settled} settled NPC(s) still stand${t.bodies ? `, ${t.bodies} lie dead (removed ${bodyTime()} after they fell)` : ''}. /raid clear removes yours.`
       : 'None of yours stand.') + (others ? ` Other GMs have ${others} more (/raid all).` : ''));
   };
   registerChatCommand('raid', raidCmd, { admin: true, help: '[all | clear [raiders|garrison|<id>] | clear all]: your unleashed raiders, settled warbands and their dead; all for every GM\'s' });
