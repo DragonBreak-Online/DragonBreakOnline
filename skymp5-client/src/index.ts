@@ -80,6 +80,7 @@ import { CastSelfService } from "./services/services/castSelfService";
 import { NightEyeService } from "./services/services/nightEyeService";
 import { CatReflexesService } from "./services/services/catReflexesService";
 import { ArmourWearService } from "./services/services/armourWearService";
+import { ItemCardProbeService } from "./services/services/itemCardProbeService";
 import { PaleCoatService } from "./services/services/paleCoatService";
 import { AppearanceExtrasService } from "./services/services/appearanceExtrasService";
 import { RestraintService } from "./services/services/restraintService";
@@ -245,6 +246,7 @@ const main = () => {
       new NightEyeService(sp, controller),
       new CatReflexesService(sp, controller),
       new ArmourWearService(sp, controller),
+      new ItemCardProbeService(sp, controller),
       new PaleCoatService(sp, controller),
       new AppearanceExtrasService(sp, controller),
       new RestraintService(sp, controller),
