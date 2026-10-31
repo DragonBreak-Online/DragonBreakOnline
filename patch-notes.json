@@ -1,5 +1,21 @@
 [
   {
+    "title": "Runners carry word to your faction and party",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Dispatches",
+        "items": [
+          "/f <text> sends a sealed dispatch by runner to every member of your faction who is in the land, signed with your rank and name. If you serve more than one, /f <faction>: <text> picks which. Player guilds have runners too.",
+          "C:/Program Files/Git/p <text> passes word among your party.",
+          "Runners take time: a few seconds within your hold, half a minute across the province, a minute and a half beyond it. No runner reaches a jail cell."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The armour rebalance, part two: wearing armour takes Defense",
     "date": "2026-10-31",
     "version": "Server update",
