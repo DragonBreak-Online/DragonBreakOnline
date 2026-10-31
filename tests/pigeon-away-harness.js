@@ -39,5 +39,8 @@ ok(r2.ok && !/away/.test(r2.text), 'to someone in the land: no away note', r2.te
 ok(told.some(([a, t]) => a === HERE && /A pigeon has brought you a letter/.test(t)) && mailState.includes(HERE), '...and they are told at once');
 ok(/const waiting = pigeonsWaiting\(a\);\n\s*if \(waiting\) personal\(a, `\$\{waiting\} unread letter/.test(gm), 'the login line that tells the absent one is still there');
 
+// Nat, 31 Oct (sweep): a letter carries 1,000 characters; the coop panel takes the number from the server (maxText)
+ok(/\nconst PIGEON_MAX_TEXT = 1000;/.test(gm) && /maxText: PIGEON_MAX_TEXT/.test(gm) && /text\.length > PIGEON_MAX_TEXT/.test(gm), 'gamemode.js: letters up to 1,000 characters, checked on send and sent to the panel as maxText');
+
 console.log(fails ? `${fails} FAILED` : 'all checks passed');
 process.exit(fails ? 1 : 0);
