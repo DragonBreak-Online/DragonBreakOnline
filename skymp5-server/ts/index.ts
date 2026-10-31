@@ -57,18 +57,27 @@ const gamemodeCache = new Map<string, string>();
 function requireTemp(module: string) {
   // https://blog.mastykarz.nl/create-temp-directory-app-node-js/
   let tmpDir;
+  let tempPath;
   const appPrefix = 'skymp5-server';
   try {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), appPrefix));
 
     const contents = fs.readFileSync(module, 'utf8');
-    const tempPath = path.join(tmpDir, Math.random() + '-' + Date.now() + '.js');
+    tempPath = path.join(tmpDir, Math.random() + '-' + Date.now() + '.js');
     fs.writeFileSync(tempPath, contents);
 
     require(tempPath);
   } catch (e) {
     console.error(e.stack);
   } finally {
+    if (tempPath) {
+      const mod = require.cache[tempPath];
+      delete require.cache[tempPath];
+      if (mod && mod.parent && Array.isArray(mod.parent.children)) {
+        const idx = mod.parent.children.indexOf(mod);
+        if (idx >= 0) mod.parent.children.splice(idx, 1);
+      }
+    }
     try {
       if (tmpDir) {
         fs.rmSync(tmpDir, { recursive: true });
