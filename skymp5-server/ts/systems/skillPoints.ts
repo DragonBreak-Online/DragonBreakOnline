@@ -270,7 +270,7 @@ export type GainOutcome = {
   gained: number;              // levels gained by the skill that worked
   units: number;               // units the bucket and the caps actually allowed
   tookFrom: Array<{ id: string; units: number; levels: number }>;
-  refused?: "bucket" | "daily" | "cap" | "pool" | "lock";
+  refused?: "bucket" | "daily" | "cap" | "pool" | "lock" | "ceiling";
   retryInMs?: number;          // on a "bucket" refusal, how long until the bucket can pay for one unit again
 };
 
@@ -321,11 +321,19 @@ export const applyGain = (rec: PointRecord, id: string, rawUnits: number, cfg: P
   s.spentToday = (s.spentToday || 0) + units;
   rec.spentToday = (rec.spentToday || 0) + units;
   s.lastPointAt = now;
+  return growWithin(rec, id, units, cfg, boost, rate, MAX_LEVEL);
+};
 
+// Steps 3 and 4 of a gain, after the bucket and the day's caps have had their say: the structural ceiling (and `top`,
+// a study's own), then the pool and its donors
+const growWithin = (rec: PointRecord, id: string, units: number, cfg: PointConfig, boost: number, rate: number, top: number): GainOutcome => {
+  const s = rec.skills[id];
   // 3. the ceiling this skill may rise to right now
   const levels: SkillLevels = {};
   for (const [k, v] of Object.entries(rec.skills)) levels[k] = v.level;
-  const cap = structuralCap(levels, id, cfg);
+  const structural = structuralCap(levels, id, cfg);
+  if (s.level >= top && top < structural) return { gained: 0, units: 0, tookFrom: [], refused: "ceiling" };
+  const cap = Math.min(structural, top);
   if (s.level >= cap) return { gained: 0, units, tookFrom: [], refused: "cap" };
 
   // 4. the pool: a gain past it has to come from somewhere
@@ -358,6 +366,22 @@ export const applyGain = (rec: PointRecord, id: string, rawUnits: number, cfg: P
   }
   s.level = grown.level; s.xp = grown.xp;
   return { gained: grown.level - before, units, tookFrom };
+};
+
+// A book studied (gameplay skillbooks.js through masterySystem's __alduinakMasteryStudy): `levels` of the skill at its
+// own band (at most one), outside the hourly bucket and the day's caps, which pace work rather than learning, never past
+// `top` (a book teaches no further than Expert). The lock, the structural cap and the pool hold as for any gain.
+export const STUDY_CEILING = 75;
+export const studyUnits = (level: number, levels: number): number => Math.max(0, Math.min(1, levels)) * XP_PER_LEVEL / xpPerUnitAt(level);
+export const applyStudy = (rec: PointRecord, id: string, levels: number, cfg: PointConfig, now: number, top = STUDY_CEILING): GainOutcome => {
+  const s = rec.skills[id];
+  if (!s || !(s.level >= 1)) return { gained: 0, units: 0, tookFrom: [], refused: "lock" };
+  if (s.lock === "lower" || s.lock === "hold") return { gained: 0, units: 0, tookFrom: [], refused: "lock" };
+  const ceiling = Math.max(1, Math.min(STUDY_CEILING, Math.floor(Number(top)) || STUDY_CEILING));
+  const units = studyUnits(s.level, levels);
+  if (!(units > 0)) return { gained: 0, units: 0, tookFrom: [], refused: "cap" };
+  s.lastPointAt = now;
+  return growWithin(rec, id, units, cfg, 1, 1, ceiling);
 };
 
 /**
