@@ -41,7 +41,7 @@ module.exports = (api) => {
   // Nat, 25 Oct (the Place tab's Warband view made intuitive): maxRaise (config 25) the whole band in one press; viewRadius, how
   // far the panel looks for targets and the GM's raiders; onLogout, what a GM's followers do when the GM leaves (dismiss, or
   // settle the calm ones); presetsMax, saved bands per server
-  const C = Object.assign({ maxBand: 25, maxRaise: 10, ringRadius: 160, bodySeconds: 300, chargeRange: 4096, avoidGmHost: true,
+  const C = Object.assign({ maxBand: 25, maxRaise: 10, maxLive: 40, spawnBatch: 10, spawnStepMs: 500, ringRadius: 160, bodySeconds: 300, chargeRange: 4096, avoidGmHost: true,
     viewRadius: 4200, onLogout: 'dismiss', presetsMax: 40, guardRadius: 1500, guardLeash: 500, guardWalkSeconds: 20, patrolResendSeconds: 30, guardReportSeconds: 30 }, cfg.warband || {});
   // Every answer is said in chat as before, and kept as the last line the panel shows (W3)
   const lastSaid = globalThis.__dboWarbandSaid instanceof Map ? globalThis.__dboWarbandSaid : (globalThis.__dboWarbandSaid = new Map());
@@ -171,6 +171,10 @@ module.exports = (api) => {
     return rec;
   };
 
+  // Live warband NPCs of every GM: followers, unleashed raiders and settled garrisons still standing. The Bruma event (31 Oct
+  // 02:50-03:00, 65-72 online) reached about 89 at once; 759 NPC hits a minute, and 5775 of 6187 host attempts in three
+  // minutes were warband NPCs passed between nearby players. maxLive (40) caps them for the whole server
+  const liveCount = () => { let n = 0; for (const [id] of S.owners) if (alive(id)) n++; return n; };
   const raise = (a, rest) => {
     const m = rest.match(/^(.*?)(?:\s+(\d+))?$/);
     const found = findNpc(m[1]);
@@ -178,7 +182,9 @@ module.exports = (api) => {
     const want = Math.max(1, Math.min(C.maxRaise, parseInt(m[2], 10) || 1));
     const room = C.maxBand - band(a).length;
     if (room <= 0) return tell(a, `Your warband is full (${C.maxBand}).`);
-    const n = Math.min(want, room);
+    const free = C.maxLive - liveCount();
+    if (free <= 0) return tell(a, `The server holds ${C.maxLive} warband NPCs already (every GM's followers, raids and garrisons); /raid clear or dismiss some first.`);
+    const n = Math.min(want, room, free);
     let me, angle;
     try { me = mp.get(a, 'pos'); angle = Number((mp.get(a, 'angle') || [])[2]) || 0; } catch (e) { return tell(a, 'Your position is not known yet.'); }
     const baseId = mp.getIdFromDesc(found.n.desc) >>> 0;
@@ -190,26 +196,37 @@ module.exports = (api) => {
       audit(`WARBAND ${who(a)} REFUSED ${found.n.name} (${found.n.desc}): crashyCreatures`);
       return tell(a, `${found.n.name} cannot be raised. ${bad.message}`);
     }
-    let made = 0;
-    for (let i = 0; i < n; i++) {
+    const spawnOne = (i) => {
       // In a ring around the GM, starting in front, so a group does not spawn inside itself
       const rad = ((angle + (360 / n) * i) * Math.PI) / 180;
       const pos = [me[0] + C.ringRadius * Math.sin(rad), me[1] + C.ringRadius * Math.cos(rad), me[2] + 16];
       let id = null;
       try { id = comp().spawn(a, baseId, { kind: 'companion', pos }); } catch (e) { log('warband: spawn failed', e.message); }
-      if (!id) continue;
+      if (!id) return false;
       id >>>= 0;
       S.names.set(id, found.n.name);
       if (test && CRASHY.testGuard) { try { mp.set(id, 'ff_flyerGuard', CRASHY.testGuard); } catch (e) { log('warband: ff_flyerGuard failed', e.message); } }
       S.owners.set(id, { gm: a >>> 0, profile, by: who(a), released: false, hostile: false });
       // No side: one of the player faction on every screen, so no other band takes it for an enemy
       if (!sideOf(profile)) { try { mp.set(id, 'ff_factions', FRIENDLY_FACTIONS); } catch (e) { log('warband: ff_factions failed', e.message); } }
-      made++;
-    }
+      return true;
+    };
+    // A big raise comes spawnBatch at a time, spawnStepMs apart, so the spawns and their first host grants are spread over
+    // ticks instead of all landing in one (31 Oct: raises of 15 and 25 at the Bruma event)
+    const batch = Math.max(1, Number(C.spawnBatch) || 1);
+    let made = 0;
+    for (let i = 0; i < Math.min(n, batch); i++) if (spawnOne(i)) made++;
     if (!made) return tell(a, `${found.n.name} could not be raised; see the server log.`);
+    for (let from = batch; from < n; from += batch) {
+      setTimeout(() => {
+        try { for (let i = from; i < Math.min(n, from + batch); i++) if (liveCount() < C.maxLive && band(a).length < C.maxBand) spawnOne(i); } catch (e) { log('warband: staggered spawn failed', e.message); }
+      }, (from / batch) * C.spawnStepMs);
+    }
+    const later = n - made > 0 && n > batch ? n - Math.min(n, batch) : 0;
     audit(`WARBAND ${who(a)} raised ${made} x ${found.n.name} (${found.n.desc})${sideOf(profile) ? ` for ${sideOf(profile)}` : ''}${test ? `, a crashyCreatures TEST (ff_flyerGuard ${CRASHY.testGuard})` : ''}`);
     if (test) tell(a, `TEST: ${found.n.name} is one of the creatures that crash nearby players' games (crashyCreatures); switches ${CRASHY.testGuard}. Keep everyone away, and /warband dismiss when done.`);
-    tell(a, `${made} ${found.n.name} follow you${made < want ? ` (the warband holds ${C.maxBand})` : ''}. Your warband: ${band(a).length}.`);
+    const capped = n < want ? (n === free && free < room ? ` (the server holds ${C.maxLive} warband NPCs at most)` : ` (the warband holds ${C.maxBand})`) : '';
+    tell(a, `${made} ${found.n.name} follow you${later ? `, ${later} more over the next ${Math.ceil((later / batch) * C.spawnStepMs / 1000)} s` : ''}${capped}. Your warband: ${band(a).length}.`);
   };
 
   // A settled NPC is rebuilt as an ordinary one with its own AI data. It is given the player faction (FRIENDLY_FACTIONS), so

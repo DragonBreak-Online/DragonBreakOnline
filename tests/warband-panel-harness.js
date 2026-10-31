@@ -41,7 +41,7 @@ require(MODULE)({
     lookupEspmRecordById: (id) => records[id] || null,
   },
   log: () => {}, personal: (a, t) => said.push(t), audit: () => {}, who: (a) => `P${a.toString(16)}`, isAdmin: (a) => a === GM || a === OTHER_GM,
-  registerChatCommand: (n, f) => { commands[n] = f; }, findByName: () => 0, cfg: { warband: { maxRaise: 25 } }, onUi: (n, f) => { ui[n] = f; },
+  registerChatCommand: (n, f) => { commands[n] = f; }, findByName: () => 0, cfg: { warband: { maxRaise: 25, spawnBatch: 25 } }, onUi: (n, f) => { ui[n] = f; },
   onlineActors: () => [GM, OTHER_GM, PLAYER], sendPacket: (a, p) => { packets.push([a, p]); return true; },
   runChat: (a, line) => { const m = line.match(/^\/(\w+)\s*(.*)$/); commands[m[1]](a, m[2]); },
 });
