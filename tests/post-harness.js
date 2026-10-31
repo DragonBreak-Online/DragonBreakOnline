@@ -133,14 +133,20 @@ reset();
 o = ui('supplySearch', A, 'steel');
 let v = P.view(A);
 check('search "steel" finds the Steel Sword, not the house key', v.supply.results.length === 1 && v.supply.results[0].name === 'Steel Sword', v.supply.results);
+// gamemode.js pigeonHandoffDone: a posted order ends the native coop's supply composer. Set here: the sendPigeon block
+// above runs gamemode.js's own, which installs the real one
+const handoffDone = [];
+globalThis.__dboPigeonHandoffDone = (a, mode) => handoffDone.push([a, mode]);
 o = ui('supplyPost', A, `${SWORD.toString(16)}:Skyrim.esm`, 6, 300);
 check('post: 6 Steel Swords for 300', o.kind === 'sent', o);
+check('...and it ends the native coop\'s supply composer (pigeonHandoffDone)', handoffDone.length === 1 && handoffDone[0][0] === A && handoffDone[0][1] === 'supply', handoffDone);
 check('...A paid 300 and the fee of 30 (10%, never below the parcel tax)', count(A, GOLD) === 1000 - 330, count(A, GOLD));
 check('...Bruma got the fee', treasury.bruma === 30, treasury);
 const id = P.view(A).supply.orders[0].id;
 check('...the board lists it, marked mine for A', P.view(A).supply.orders[0].mine === true && P.view(B).supply.orders[0].mine === false);
 o = ui('supplyPost', A, `${KEY.toString(16)}:Skyrim.esm`, 1, 10);
 check('post: a key cannot be ordered', o.kind === 'refused');
+check('...and a refused order leaves the composer up', handoffDone.length === 1, handoffDone);
 o = ui('supplyPost', B, `${SWORD.toString(16)}:Skyrim.esm`, 6, 3);
 check('post: below 1 gold an item is refused', o.kind === 'refused');
 o = ui('supplyDeliver', C, id, 6);

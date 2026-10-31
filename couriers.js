@@ -669,7 +669,12 @@ module.exports = (api) => {
     if (typeof globalThis.__dboOpenPigeonCoop === 'function') globalThis.__dboOpenPigeonCoop(a, r.text, r.ok ? 'sent' : 'refused', 'courier');
     else personal(a, r.text);
   });
-  act('courierPost', (a, place, [dest, to, pay, insured, items]) => post(a, place, dest, to, pay, insured, items));
+  // A posted job answers the native coop's courier composer (gamemode.js pigeonHandoff)
+  act('courierPost', (a, place, [dest, to, pay, insured, items]) => {
+    const r = post(a, place, dest, to, pay, insured, items);
+    if (r && r.ok && typeof globalThis.__dboPigeonHandoffDone === 'function') globalThis.__dboPigeonHandoffDone(a, 'courier');
+    return r;
+  });
   act('courierTake', (a, place, [id]) => take(a, place, id));
   act('courierDeliver', (a, place, [id]) => deliver(a, place, id));
   act('courierOpen', (a, place, [id]) => openBroken(a, id));
