@@ -1,5 +1,19 @@
 [
   {
+    "title": "Gatherings reward those who come",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Heralds",
+        "items": [
+          "Come to a gathering a herald has cried and stay a while: if at least five people stood in its hold for 20 minutes or more of its first hour, each of them has their skill work go 10% faster for the next hour."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Heralds cry what is to come",
     "date": "2026-10-31",
     "version": "Server update",

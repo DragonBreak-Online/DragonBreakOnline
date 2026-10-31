@@ -28,8 +28,10 @@ let now = Date.UTC(2026, 10, 1, 18, 0);
 const realNow = Date.now; Date.now = () => now;
 const told = [], cried = [], audits = [], timers = {}, cmds = {}, treasury = [];
 const gold = new Map([[PLAIN, 60], [LEAD, 0], [HOST, 0]]);
+const props = new Map();
+const HOLD = { [LEAD]: 'bruma', [PLAIN]: 'bruma', [NEAR]: 'bruma', [FAR]: 'whiterun', [HOST]: 'bruma' };
 const load = (cfgH) => require(path.resolve(ROOT, 'heralds.js'))({
-  mp: { get: () => undefined }, log: () => {}, personal: (a, t) => told.push([a, t]), system: (a, t) => cried.push([a, t]),
+  mp: { get: (a, k) => props.get(`${a}|${k}`), set: (a, k, v) => props.set(`${a}|${k}`, v) }, log: () => {}, zoneOfActor: (a) => HOLD[a], personal: (a, t) => told.push([a, t]), system: (a, t) => cried.push([a, t]),
   registerChatCommand: (n, f) => { cmds[n] = f; }, onlineActors: () => [LEAD, PLAIN, NEAR, FAR, HOST], profileOf: (a) => a & 0xff, nameOf: (a) => NAMES[a],
   zoneById: () => ({ name: 'Bruma' }), takeGold: (a, n) => { const g = gold.get(a) || 0; if (g < n) return false; gold.set(a, g - n); return true; },
   depositToTreasury: (z, n) => { treasury.push([z, n]); return n; }, every: (k, ms, f) => { timers[k] = f; }, audit: (t) => audits.push(t), isAdmin: () => false,
@@ -115,9 +117,31 @@ ok(statusParts.get('events')(FAR) === null, '...and nothing for one far away who
 const disk = JSON.parse(fs.readFileSync(path.join(dir, 'heralds.json'), 'utf8'));
 ok(disk.seq === 4 && Array.isArray(disk.events), 'heralds.json keeps them over a restart', disk.seq);
 
+// Attendance (in-game-over-discord incentives): the feast (#1) began at 20:00; four stood in Bruma through its hour, one
+// in Whiterun. Four is fewer than minAttendees 5: no reward
+const boosted = (a) => props.get(`${a}|private.dboGatheringBoost`);
+const minutes = (n) => { for (let i = 0; i < n; i++) { now += 60000; timers.heralds(); } };
+minutes(61);
+ok(![LEAD, PLAIN, NEAR, HOST].some(boosted), 'four who stayed, fewer than minAttendees 5: no reward', [LEAD, PLAIN, NEAR, HOST].map(boosted));
+// A smaller gathering's rule: minAttendees 3, so the four who stay through the hour are rewarded, not the one in Whiterun
+load({ attendance: { minAttendees: 3 } });
+reset();
+cmds.herald(LEAD, '+15m A muster at the castle');
+minutes(16);
+ok(cried.some(([, t]) => /A muster at the castle begins now/.test(t)), 'the muster begins');
+minutes(61);
+ok([LEAD, PLAIN, NEAR, HOST].every((a) => boosted(a) && boosted(a).mult === 1.1) && !boosted(FAR), 'each who stood there 20 min or more works x1.1, not the one in Whiterun', [LEAD, PLAIN, NEAR, HOST, FAR].map(boosted));
+ok(told.some(([a, t]) => a === NEAR && /Having joined A muster at the castle, your work comes easier for the next 60 minutes/.test(t)), '...and is told so');
+ok(audits.some((t) => /HERALD #\d+ "A muster at the castle" closed: 4 stayed, 4 rewarded \(x1\.1 for 60 min\)/.test(t)), '...with an audit line', audits.slice(-2));
+ok(globalThis.__dboGatheringSkillRate(NEAR) === 1.1 && globalThis.__dboGatheringSkillRate(FAR) === 1, 'skillrates reads x1.1 for the attendee, x1 for anyone else');
+now += 61 * 60000;
+ok(globalThis.__dboGatheringSkillRate(NEAR) === 1, '...and x1 again once its hour is over');
+const sr = fs.readFileSync(path.join(ROOT, 'skillrates.js'), 'utf8');
+ok(/kind !== 'award' && typeof globalThis\.__dboGatheringSkillRate === 'function'/.test(sr), 'skillrates.js applies it to normal play, never a staff award');
+
 // Wiring and config
 const gm = fs.readFileSync(path.join(ROOT, 'gamemode.js'), 'utf8');
-ok(/require\(HERALDS_JS\)\(\{ mp, log, personal, system, registerChatCommand, onlineActors, profileOf, nameOf, zoneById, takeGold, depositToTreasury, every, audit, isAdmin, cfg \}\)/.test(gm), 'gamemode.js loads heralds.js');
+ok(/require\(HERALDS_JS\)\(\{ mp, log, personal, system, registerChatCommand, onlineActors, profileOf, nameOf, zoneById, takeGold, depositToTreasury, every, audit, isAdmin, zoneOfActor, cfg \}\)/.test(gm), 'gamemode.js loads heralds.js');
 ok(/globalThis\.__dboHeraldLogin\(a\)/.test(gm), '...and the login line runs it');
 const cfgFile = JSON.parse(fs.readFileSync(path.join(ROOT, 'gamemode-config.json'), 'utf8')).heralds || {};
 ok(cfgFile.enabled === true && cfgFile.fee === 50 && cfgFile.reminderMinutes === 30, 'gamemode-config.json heralds: on, 50 gold, reminder 30 min', cfgFile);
