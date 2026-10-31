@@ -63,6 +63,20 @@ public:
   void AddListener(std::shared_ptr<Listener> listener);
   bool IsConnected(Networking::UserId userId) const;
   void Tick();
+
+  // TickStaleHosts' timings. Settable so a test can drive the sweep in milliseconds instead of waiting
+  // staleHostAfter of real time; changing them for the server needs a native rebuild.
+  // staleHostAfter: no movement for this long and the hoster loses the NPC.
+  // staleReleaseCooldown: the shortest gap between REPEAT releases of the SAME NPC. The first release is always
+  // immediate, so the cases this sweep exists for - a hoster that unloaded an NPC, the ogre that would not fight
+  // back - are rescued as fast as before. It is the second and later releases of one NPC that are rate-limited,
+  // because that is the loop: an NPC standing still never moves, so before this it was released every
+  // staleHostAfter, which set its host to 0 and made every nearby client ask for it again (measured at Nat's
+  // Bruma event: 4.7 releases/min x ~65-94 clients, the 441.8 host attempts and 306.9 "not a hoster" errors a
+  // minute in _work\perf-1031\NOTE.md).
+  std::chrono::milliseconds staleHostAfter{ 5000 };
+  std::chrono::milliseconds staleReleaseCooldown{ 30000 };
+  std::chrono::milliseconds staleHostSweepEvery{ 1000 };
   FormCallbacks CreateFormCallbacks();
   ActionListener& GetActionListener();
   const std::vector<std::shared_ptr<Listener>>& GetListeners() const;
@@ -167,6 +181,9 @@ private:
   std::unordered_map<uint32_t,
                      std::pair<uint32_t, std::chrono::system_clock::time_point>>
     hostSeenSince;
+  // NPC -> when the sweep last took it from a hoster for staleness, for the repeat-release cooldown
+  std::unordered_map<uint32_t, std::chrono::system_clock::time_point>
+    staleReleasedAt;
 
   // Takes remote from its hoster: HostStop to the hoster's user, isHostedByOther=false to the players who see it
   void ReleaseHost(MpObjectReference& remote, const std::string& reason);

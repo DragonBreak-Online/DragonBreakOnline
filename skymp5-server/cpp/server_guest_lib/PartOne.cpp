@@ -186,8 +186,8 @@ void PartOne::Tick()
 // to stop and the NPC is marked unhosted, which every listener sees as isHostedByOther=false and asks for it.
 void PartOne::TickStaleHosts()
 {
-  constexpr auto kSweepEvery = std::chrono::seconds(1);
-  constexpr auto kStaleHostSeconds = std::chrono::seconds(5);
+  const auto kSweepEvery = staleHostSweepEvery;
+  const auto kStaleHostSeconds = staleHostAfter;
   const auto now = std::chrono::system_clock::now();
   if (now - lastStaleHostSweep < kSweepEvery) {
     return;
@@ -220,6 +220,14 @@ void PartOne::TickStaleHosts()
       last = *worldState.lastMovUpdateByIdx[idx];
     }
     if (now - last > kStaleHostSeconds) {
+      // The first release of an NPC is immediate; a repeat release of the same one waits staleReleaseCooldown.
+      // A standing NPC never moves, so without this it was taken from its hoster every kStaleHostSeconds for as
+      // long as it stood there, and every release made every nearby client ask for it at once.
+      auto released = staleReleasedAt.find(remoteId);
+      if (released != staleReleasedAt.end() &&
+          now - released->second < staleReleaseCooldown) {
+        continue;
+      }
       stale.push_back({ remoteId, hosterId });
     }
   }
@@ -230,8 +238,9 @@ void PartOne::TickStaleHosts()
     if (!remote) {
       continue;
     }
-    ReleaseHost(*remote, fmt::format("no movement for {} s",
-                                     kStaleHostSeconds.count()));
+    staleReleasedAt[remoteId] = now;
+    ReleaseHost(*remote,
+                fmt::format("no movement for {} ms", kStaleHostSeconds.count()));
   }
 }
 
@@ -341,6 +350,7 @@ void PartOne::BeforeRefrDestroy(MpObjectReference& refr)
     worldState.hosters.erase(it);
   }
   hostSeenSince.erase(formId);
+  staleReleasedAt.erase(formId);
   if (pImpl->actionListener) {
     pImpl->actionListener->ForgetForm(formId);
   }
