@@ -54,6 +54,8 @@ export const NATIVE_CAPS = [
   // Worker 6's business ledger (dbo_ledger, widget 64: the public page and shop, the staff's tabs). Its keys are
   // dbo:bizLedger and dbo:bizLedgerClose
   "native:businessLedger",
+  // Worker 6's property market (dbo_market, widget 82). Its keys are dbo:propertyMarketAct and dbo:propertyMarketClose
+  "native:propertyMarket",
 ];
 export const CAPS_RETRY_MS = 5000;
 
