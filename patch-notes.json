@@ -8,7 +8,7 @@
       {
         "heading": "Combat",
         "items": [
-          "Leaving the game during a fight no longer saves you: your body stays in the world, fightable, for 60 seconds after you go.",
+          "Leaving the game, or switching character, within 60 seconds of a blow no longer saves you: your body stays in the world and can still be attacked until it fades.",
           "The first blow of a fight between players tells both of you so."
         ]
       }
