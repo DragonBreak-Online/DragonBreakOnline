@@ -64,14 +64,9 @@ check('...in different directions from the centre, not one line', new Set(dirs).
     /const XMARKER = 0x00003b;/.test(src) && /getFormFromFile\(XMARKER, "Skyrim\.esm"\)/.test(src) && /marker\.setPosition\(point\[0\], point\[1\], point\[2\]\)\.then\(/.test(src) && /a\.pathToReference\(m, 0\.5\)/.test(src));
   check('a new connection drops the patrol and its markers', /this\.setCompanions\(\[\]\);\s*this\.patrol = null;\s*this\.clearPatrolMarkers\(\);/.test(src));
 
-  // Held still while holding (Nat: "some move some don't": a member whose own package sandboxes walked off a hold)
-  check('a holding member is frozen with setDontMove, except while a patrol walk frees it', /this\.patrolStep\(actor, c, state, now, player\);[^\n]*\n\s*this\.setFrozen\(actor, state, now >= \(state\.walkUntil \|\| 0\)\);/.test(src));
-  check('...a patrol walk unfreezes it before pathToReference, for most of the interval', /state\.walkUntil = now \+ PATROL_EVERY_MS - 1000;\s*this\.setFrozen\(actor, state, false\);[\s\S]{0,400}a\.pathToReference\(m, 0\.5\)/.test(src));
-  const unfreezes = (src.match(/this\.setFrozen\(actor, state, false\);/g) || []).length;
-  check('...and every other branch (fight, combat, driven, follow) unfreezes it', unfreezes >= 5, unfreezes);
-  check('...setDontMove is called only when the state changes', /if \(!!state\.frozen === on\) return;\s*actor\.setDontMove\(on\);\s*state\.frozen = on;/.test(src));
-  check('a member that leaves the list frozen (dismiss, settle, unleash, a new connection) is freed on the next update',
-    /if \(gone && gone\.frozen\) this\.pendingUnfreeze\.push\(gone\.localId\);/.test(src) && /for \(const id of this\.pendingUnfreeze\.splice\(0\)\) \{\s*try \{ Actor\.from\(this\.sp\.Game\.getFormEx\(id\)\)\?\.setDontMove\(false\); \}/.test(src));
+  // No freeze (W4, 31 Oct): a held NPC that sends no movement is released by the server every 5 s (PartOne::TickStaleHosts),
+  // so setDontMove(true) on a holding member would churn its host for good; only the setup's setDontMove(false) remains
+  check("nothing freezes a companion: the only setDontMove is the setup's (false)", (src.match(/setDontMove\(/g) || []).length === 1 && /actor\.setDontMove\(false\);/.test(src), (src.match(/setDontMove\([^)]*\)/g) || []));
 
   // Staff are never fought: any companion's own fight with a staff member the server names is left
   check('companionSpare from the server sets the staff to spare', /content\["customPacketType"\] === "companionSpare"\) \{\s*this\.spare = parseSpare\(content\);/.test(src));

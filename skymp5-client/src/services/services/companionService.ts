@@ -11,7 +11,7 @@ import { buttonKeyCode } from "./mouseKeys";
 import { isMenuKeyPressBlocked, readMenuKeyCode } from "./widgetMenuUtil";
 import { getViewFromStorage, isRemoteHostedByMe, isRemotePlayerCharacter, localIdToRemoteId, remoteIdToLocalId } from "../../view/worldViewMisc";
 import { leavesPlayerFight, leavesSparedFight, orderedTarget, parseSpare } from "./companionPvp";
-import { PATROL_EVERY_MS, Patrol, parsePatrol, patrolDue, patrolPoint } from "./companionPatrol";
+import { Patrol, parsePatrol, patrolDue, patrolPoint } from "./companionPatrol";
 import { COMPANION_IDS_KEY, isOwnCompanion, isAnyCompanion } from "../../sync/ownCompanions";
 import { applyMovement, settleTranslation } from "../../sync/movementApply";
 import { ObjectReferenceEx } from "../../extensions/objectReferenceEx";
@@ -104,10 +104,6 @@ interface LocalState {
   // Defending an area (companionPatrol.ts): when this member last set out for a point, and how many it has walked to
   patrolAt?: number;
   patrolN?: number;
-  // Held still with setDontMove while it holds (a member whose own package sandboxes walked off a hold), and until when a
-  // patrol walk keeps it free
-  frozen?: boolean;
-  walkUntil?: number;
 }
 
 export class CompanionService extends ClientListener {
@@ -211,7 +207,6 @@ export class CompanionService extends ClientListener {
       if (!list.some((c) => c.id === id)) {
         const gone = this.local.get(id);
         if (gone && gone.aliasSlot) this.pendingAliasClear.push(gone.aliasSlot);
-        if (gone && gone.frozen) this.pendingUnfreeze.push(gone.localId);
         this.local.delete(id);
       }
     });
@@ -284,9 +279,6 @@ export class CompanionService extends ClientListener {
     for (const slot of this.pendingAliasClear.splice(0)) {
       try { this.aliasByName(slot)?.clear(); } catch { /* quest gone */ }
     }
-    for (const id of this.pendingUnfreeze.splice(0)) {
-      try { Actor.from(this.sp.Game.getFormEx(id))?.setDontMove(false); } catch { /* gone */ }
-    }
     this.recordTrail(player);
     this.assist(player, now);
     this.publishHud(now);
@@ -346,14 +338,12 @@ export class CompanionService extends ClientListener {
       if (target && !target.isDead() && !this.fightProgress(c.id, actor, target, state, now)) target = null;
       if (!target) state.stall = null;
       if (target && !target.isDead()) {
-        this.setFrozen(actor, state, false);
         if (state.driven) {
           state.driven = false;
           settleTranslation(actor);
         }
         this.fight(actor, target, state);
       } else if (actor.isInCombat()) {
-        this.setFrozen(actor, state, false);
         if (state.driven) {
           state.driven = false;
           settleTranslation(actor);
@@ -364,13 +354,10 @@ export class CompanionService extends ClientListener {
       } else if (c.staying) {
         this.stay(actor, state, player);
         try { this.patrolStep(actor, c, state, now, player); } catch (e) { state.followResult = "patrol failed"; }
-        this.setFrozen(actor, state, now >= (state.walkUntil || 0));
       } else if (state.driven) {
-        this.setFrozen(actor, state, false);
         // applyMovement throws on a cell mismatch; a throw here would break every companion this tick
         try { this.drive(actor, player, state); } catch (e) { state.followResult = "drive failed"; }
       } else {
-        this.setFrozen(actor, state, false);
         this.follow(actor, player, state);
       }
       // A throw here would break every companion this tick, so the driven path is contained
@@ -853,21 +840,12 @@ export class CompanionService extends ClientListener {
     const marker = this.patrolMarker(c.id, player);
     if (!marker) return;
     const point = patrolPoint(p, c.id, n);
-    state.walkUntil = now + PATROL_EVERY_MS - 1000;
-    this.setFrozen(actor, state, false);
     const actorId = actor.getFormID(), markerId = marker.getFormID();
     marker.setPosition(point[0], point[1], point[2]).then(() => {
       const a = Actor.from(this.sp.Game.getFormEx(actorId)), m = ObjectReference.from(this.sp.Game.getFormEx(markerId));
       if (a && m && !a.isInCombat()) a.pathToReference(m, 0.5).catch(() => { /* interrupted */ });
     }).catch(() => { /* marker gone */ });
     state.followResult = "patrolling";
-  }
-
-  // Actor.setDontMove, changed only when it differs, so the call is not made every tick
-  private setFrozen(actor: Actor, state: LocalState, on: boolean): void {
-    if (!!state.frozen === on) return;
-    actor.setDontMove(on);
-    state.frozen = on;
   }
 
   private patrolMarker(id: number, player: Actor): ObjectReference | null {
@@ -988,8 +966,6 @@ export class CompanionService extends ClientListener {
   private patrol: Patrol | null = null;
   // Staff online, never fought (companionPvp.ts parseSpare): remote ids
   private spare = new Set<number>();
-  // Local ids of members that left the list frozen, freed on the next update
-  private pendingUnfreeze: number[] = [];
   private patrolMarkers = new Map<number, number>();
   private lastAssistMs = 0;
   private questStartAsked = false;
