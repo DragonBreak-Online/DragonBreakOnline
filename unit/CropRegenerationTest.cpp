@@ -127,8 +127,8 @@ TEST_CASE("CropHealthRegeneration, CropMagickaRegeneration and "
 
   float expectedHealth =
     baseValues.healRate * baseValues.healRateMult * time / 10000.0f;
-  float expectedMagicka =
-    baseValues.magickaRate * baseValues.magickaRateMult * time / 10000.0f;
+  float expectedMagicka = baseValues.magickaRate * baseValues.magickaRateMult *
+    kMagickaRegenSlack * time / 10000.0f;
   float expectedStamina =
     baseValues.staminaRate * baseValues.staminaRateMult * time / 10000.0f;
 
@@ -221,6 +221,46 @@ TEST_CASE("An unusable rate mult falls back to the race's base, not to zero",
   ac.SetActorValue(espm::ActorValue::StaminaRateMult,
                    std::numeric_limits<float>::quiet_NaN());
   REQUIRE(CropStaminaRegeneration(1.0f, 1.0f, &ac) == atBase);
+
+  p.DestroyActor(0xff000000);
+  DoDisconnect(p, 0);
+}
+
+// Nat, 31 Oct: "magic regen doesn't actually regen properly". Live clients regenerated 1.3 to 3 times the server's
+// magicka rate (perks and worn enchantments the server does not model), and 25-60% of every tick was clawed back
+TEST_CASE("The magicka ceiling leaves room for a client's own boosts, and a 0 rate mult still freezes it",
+          "[CropRegeneration]")
+{
+  PartOne& p = GetPartOne();
+  DoConnect(p, 0);
+  p.CreateActor(0xff000000, { 0, 0, 0 }, 0, 0x3c);
+  p.SetUserActor(0, 0xff000000);
+  auto& ac = p.worldState.GetFormAt<MpActor>(0xff000000);
+
+  ActorValues half;
+  half.healthPercentage = .5f;
+  half.magickaPercentage = .5f;
+  half.staminaPercentage = .5f;
+  ac.SetPercentages(half);
+
+  auto appearance = ac.GetAppearance();
+  const BaseActorValues base = GetBaseActorValues(
+    &p.worldState, ac.GetBaseId(), appearance ? appearance->raceId : 0, {});
+  REQUIRE(base.magickaRate > 0.f);
+  REQUIRE(base.magickaRateMult > 0.f);
+
+  // A Recovery-perked mage: 2.5 times the base rate for one second
+  const float boosted = .5f + 2.5f * base.magickaRate * base.magickaRateMult / 10000.f;
+  ac.SetActorValue(espm::ActorValue::MagickaRateMult_or_CombatHealthRegenMultPowerMod, base.magickaRateMult);
+  REQUIRE_THAT(CropMagickaRegeneration(boosted, 1.0f, &ac), Catch::Matchers::WithinAbs(boosted, 1e-6));
+
+  // Far past the slack is still cropped
+  const float cheat = .5f + 10.f * base.magickaRate * base.magickaRateMult / 10000.f;
+  REQUIRE(CropMagickaRegeneration(cheat, 1.0f, &ac) < cheat);
+
+  // The chill's freeze holds
+  ac.SetActorValue(espm::ActorValue::MagickaRateMult_or_CombatHealthRegenMultPowerMod, 0.f);
+  REQUIRE(CropMagickaRegeneration(boosted, 1.0f, &ac) == .5f);
 
   p.DestroyActor(0xff000000);
   DoDisconnect(p, 0);

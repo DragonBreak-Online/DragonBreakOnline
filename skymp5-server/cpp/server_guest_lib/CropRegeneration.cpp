@@ -114,7 +114,7 @@ float CropMagickaRegeneration(float newAttributeValue,
   const ActorValues& actorValues = actor->GetActorValues();
   const float rate =
     std::max(baseValues.magickaRate, actorValues.magickaRate) *
-    GetServerRegenMultiplier(actor);
+    GetServerRegenMultiplier(actor) * kMagickaRegenSlack;
   const float rateMult =
     ResolveRateMult(actorValues.magickaRateMult, baseValues.magickaRateMult);
   const float oldPercentage = actorValues.magickaPercentage;

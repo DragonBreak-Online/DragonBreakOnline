@@ -2283,7 +2283,11 @@ void ActionListener::OnChangeValues(const RawMessageData& rawMsgData,
         CropStaminaRegeneration(newVal, timeAfterStaminaRegeneration, actor);
     }
 
-    if (!MathUtils::IsNearlyEqual(newVal, *inputVal)) {
+    // A full bar reported above 1 is a client buff past its percentage base: kept at 1 here, not clawed back there
+    constexpr float kFull = 0.999f;
+    const bool fullAndOver =
+      currentVal >= kFull && *inputVal > 1.f && newVal >= kFull;
+    if (!MathUtils::IsNearlyEqual(newVal, *inputVal) && !fullAndOver) {
       outVal = newVal;
       sendOutMsg = true;
       // Only a big clawback is worth a line. Ordinary per-tick cropping differs by a rounding, whereas a

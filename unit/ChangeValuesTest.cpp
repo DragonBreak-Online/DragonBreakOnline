@@ -2,6 +2,7 @@
 #include <catch2/catch_all.hpp>
 #include <chrono>
 
+#include "CropRegeneration.h"
 #include "GetBaseActorValues.h"
 #include "PacketParser.h"
 #include "libespm/Loader.h"
@@ -82,7 +83,7 @@ TEST_CASE("OnChangeValues call is cropping percentage values",
   float expectedHealth = baseValues.healRate * baseValues.healRateMult *
     elapsedTime.count() / 10000.0f;
   float expectedMagicka = baseValues.magickaRate * baseValues.magickaRateMult *
-    elapsedTime.count() / 10000.0f;
+    kMagickaRegenSlack * elapsedTime.count() / 10000.0f;
   float expectedStamina = baseValues.staminaRate * baseValues.staminaRateMult *
     elapsedTime.count() / 10000.0f;
 
@@ -313,7 +314,7 @@ TEST_CASE("A server stamina drain does not shrink the magicka allowance",
   std::chrono::duration<float> elapsedTime =
     std::chrono::steady_clock::now() - past;
   float expectedMagicka = 0.2f +
-    baseValues.magickaRate * baseValues.magickaRateMult *
+    baseValues.magickaRate * baseValues.magickaRateMult * kMagickaRegenSlack *
       elapsedTime.count() / 10000.0f;
 
   float magicka = ac.GetChangeForm().actorValues.magickaPercentage;
@@ -366,6 +367,47 @@ TEST_CASE("Stamina the server sends to the client restarts the stamina "
   REQUIRE_THAT(ac.GetChangeForm().actorValues.staminaPercentage,
                Catch::Matchers::WithinAbs(0.2f, 0.01f));
   REQUIRE(partOne.Messages().size() == 1);
+
+  partOne.DestroyActor(0xff000000);
+  DoDisconnect(partOne, 0);
+}
+
+// Live, 25-31 Oct: 13,594 reports of a bar above 1 were cropped to 1 and sent back, and the client then took the
+// excess off a full bar every second (a buff past the percentage base never lasted)
+TEST_CASE("A full bar reported above 1 is kept at 1 without a correction, a rise from below is still cropped",
+          "[ChangeValues]")
+{
+  PartOne& partOne = GetPartOne();
+  DoConnect(partOne, 0);
+  partOne.CreateActor(0xff000000, { 0, 0, 0 }, 0, 0x3c);
+  partOne.SetUserActor(0, 0xff000000);
+  auto& ac = partOne.worldState.GetFormAt<MpActor>(0xff000000);
+
+  ac.SetPercentages({ 1.0f, 1.0f, 1.0f });
+  ac.SetLastAttributesPercentagesUpdate(std::chrono::steady_clock::now() - 1s);
+  partOne.Messages().clear();
+
+  nlohmann::json j = nlohmann::json{
+    { "t", MsgType::ChangeValues },
+    { "data",
+      { { "health", 1.4f }, { "magicka", 1.066f }, { "stamina", 1.066f } } }
+  };
+  DoMessage(partOne, 0, j);
+
+  REQUIRE(partOne.Messages().size() == 0);
+  auto values = ac.GetChangeForm().actorValues;
+  REQUIRE(values.healthPercentage == 1.0f);
+  REQUIRE(values.magickaPercentage == 1.0f);
+  REQUIRE(values.staminaPercentage == 1.0f);
+
+  ac.SetPercentages({ 0.5f, 1.0f, 1.0f });
+  ac.SetLastAttributesPercentagesUpdate(std::chrono::steady_clock::now() - 1s);
+  partOne.Messages().clear();
+  j["data"] = { { "health", 1.4f } };
+  DoMessage(partOne, 0, j);
+
+  REQUIRE(partOne.Messages().size() == 1);
+  REQUIRE(ac.GetChangeForm().actorValues.healthPercentage < 1.0f);
 
   partOne.DestroyActor(0xff000000);
   DoDisconnect(partOne, 0);
