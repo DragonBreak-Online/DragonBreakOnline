@@ -40,7 +40,7 @@ const mp = {
 const V = 0x2f6;
 const papyrus = [];
 const cfg = { goblinRace: cfgFile.goblinRace, snowElfRace: cfgFile.snowElfRace, racial: { enabled: true, overhaul: true },
-  supernatural: { goblinEyes: { node: 'mesh001:1:2:3:3', txst: 'aaa:DragonBreak Online Edits.esp', txstMortal: 'bbb:DragonBreak Online Edits.esp' } } };
+  supernatural: { goblinEyes: { node: 'mesh001:1:2:3:3', txst: 'aaa:DragonBreak Online Edits.esp', txstMortal: 'bbb:DragonBreak Online Edits.esp' } } };   // verify-formids: ignore - made-up texture sets for the stub
 const eyeCalls = () => papyrus.filter((x) => x[1] === 'NetImmerse' && x[2] === 'SetNodeTextureSet').map((x) => `${x[4][1]}=${x[4][2].desc}`);
 const api = {
   mp, log: noop, audit: noop, personal: (a, t) => told.push({ a, t }), system: noop, registerChatCommand: (n, f) => { cmds[n] = f; },
@@ -71,7 +71,7 @@ cmds.curse(V, 'me vampire');
 ok((app().raceId >>> 0) === GOBV, 'turned, the goblin wears DBOGoblinRaceVampire', app().raceId.toString(16));
 ok(packets.some((p) => p.customPacketType === 'dboBeast' && (p.race >>> 0) === GOBV && p.beast === false), 'the client is sent the vampire race');
 ok(!!sup().unfed && sup().look && sup().look.skinOnly === true, 'unfed, the tells are laid as skin only', sup().look);
-ok(sup().look.eyeGlow === true && eyeCalls().join() === 'mesh001:1:2:3:3=aaa:DragonBreak Online Edits.esp', '...and the eyes glow: the eye shape takes the glowing texture set (20 Oct)', eyeCalls());
+ok(sup().look.eyeGlow === true && eyeCalls().join() === 'mesh001:1:2:3:3=aaa:DragonBreak Online Edits.esp', '...and the eyes glow: the eye shape takes the glowing texture set (20 Oct)', eyeCalls());   // verify-formids: ignore - made-up texture sets for the stub
 ok((app().skinColor >>> 0) !== SKIN && (app().tints[0].argb >>> 0) !== (TONE >>> 0), 'the skin colour and the skin tone tint go pale', [app().skinColor.toString(16), (app().tints[0].argb >>> 0).toString(16)]);
 ok(Array.isArray(app().headpartIds) && app().headpartIds.length === 0, 'no head part is added (no eyes on a goblin)', app().headpartIds);
 const paled = app().skinColor;
@@ -91,7 +91,7 @@ ok(globalThis.__dboTellsRetake(V, JSON.parse(JSON.stringify(app()))) === true &&
 // Cured: the race and the colour come back
 cmds.curse(V, 'me cure');
 ok((app().raceId >>> 0) === GOB, 'cured, the goblin is DBOGoblinRace again', app().raceId.toString(16));
-ok(eyeCalls().slice(-1)[0] === 'mesh001:1:2:3:3=bbb:DragonBreak Online Edits.esp', 'cured, the eye shape takes its own texture set back', eyeCalls());
+ok(eyeCalls().slice(-1)[0] === 'mesh001:1:2:3:3=bbb:DragonBreak Online Edits.esp', 'cured, the eye shape takes its own texture set back', eyeCalls());   // verify-formids: ignore - made-up texture sets for the stub
 ok((app().skinColor >>> 0) === SKIN && (app().tints[0].argb >>> 0) === (TONE >>> 0), 'cured, the goblin has its own colour back', [app().skinColor.toString(16), (app().tints[0].argb >>> 0).toString(16)]);
 
 // A goblin werewolf shows no tells and keeps its look
@@ -100,6 +100,11 @@ const before = JSON.stringify(app());
 cmds.curse(V, 'me werewolf');
 timers.superSlow();
 ok(JSON.stringify(app()) === before, 'a goblin werewolf shows nothing (no eyes)', app());
+
+// The texture set is a base record: the server reads it with GetRecordPtr, so it must travel as 'espm'. As 'form' the server
+// looks it up among world forms and throws "Form with id ... doesn't exist" (266 lines on live, sweep 31 Oct a4)
+const eyeArgs = papyrus.filter((x) => x[1] === 'NetImmerse' && x[2] === 'SetNodeTextureSet');
+ok(eyeArgs.length > 0 && eyeArgs.every((x) => x[4][0].type === 'form' && x[4][2].type === 'espm'), 'SetNodeTextureSet: the goblin as a form, the texture set as an espm record', eyeArgs.map((x) => [x[4][0].type, x[4][2].type]));
 
 console.log(fail ? `${fail} failed` : 'all checks passed');
 process.exit(fail ? 1 : 0);
