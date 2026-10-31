@@ -1,5 +1,20 @@
 [
   {
+    "title": "The heralds name the month's honoured",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Honours",
+        "items": [
+          "At the turn of each month the heralds cry to the whole land who sent the most letters (at least 10) and whose gatherings drew the most people (at least 10 in all).",
+          "Each holds a title of it through the month after, to choose on your journal's Profile: Correspondent of Frostfall, Host of Frostfall, and so on through the Tamrielic months. /honours shows last month's and who leads this one."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Musters pay those who answer them",
     "date": "2026-10-31",
     "version": "Server update",

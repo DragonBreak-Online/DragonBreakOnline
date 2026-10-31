@@ -1776,6 +1776,8 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
     if (prep) audit(`POST ${who(a)} sent ${who(to)} ${[prep.gold ? `${prep.gold} gold` : '', P.itemsText(items)].filter(Boolean).join(', ')} (tax ${prep.tax + prep.fee}, flight ${price})`);
     // the player log: that a letter went, its parcel and how it was signed; never the text or the signature
     try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('letter', a, to, { gold: prep ? prep.gold : 0, items, signed: sig ? (sig.unsigned ? 'unsigned' : 'forged') : 'own' }); } catch (e) { /* the player log is optional */ }
+    // The month's letters for the heralds' honours (heralds.js); a circular counts once, at /circular
+    try { const h = globalThis.__dboHonourLetter; if (typeof h === 'function' && !circular) h(a); } catch (e) { /* no honours */ }
     if (online) { personal(to, prep ? 'A pigeon has brought you a letter with a parcel. Collect it at any notice board.' : 'A pigeon has brought you a letter. Read it at any notice board.'); sendMailState(to); }
     const zone = zoneId ? zoneById(zoneId) : null;
     log(`pigeon ${who(a)} -> ${nameOf(to)} #${tagOf(to)}${taxed > 0 ? ` (${taxed} gold, ${paid ? zoneId + ' treasury' : 'no treasury'})` : ''}: ${text}`);
@@ -1855,7 +1857,7 @@ registerChatCommand('circular', (a, args) => {
   const KIN = globalThis.__dboPigeonKin;
   KIN.circular = f.name;
   try { for (const t of members) { const r = sendPigeon(a, t, text, zoneId); if (r && r.ok) sent++; else full++; } } finally { KIN.circular = ''; }
-  if (sent) circularAt.set(key, Date.now());
+  if (sent) { circularAt.set(key, Date.now()); try { if (typeof globalThis.__dboHonourLetter === 'function') globalThis.__dboHonourLetter(a); } catch (e) { /* no honours */ } }
   audit(`CIRCULAR ${who(a)} to ${f.name}: ${sent} of ${members.length}`);
   personal(a, sent ? `The faction's birds carry your circular to ${sent} of ${f.name}${full ? `; ${full} could not take it (a full coop)` : ''}.` : `None of ${f.name} could take a circular just now.`);
 }, { help: '[<faction>:] <text>: a letter to every member of your faction, from a notice board (leaders and officers)' });

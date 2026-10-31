@@ -159,6 +159,32 @@ ok(paidGold.length === 1 && TREASURY['county-bruma'] === 5 && audits.some((t) =>
 const sr = fs.readFileSync(path.join(ROOT, 'skillrates.js'), 'utf8');
 ok(/kind !== 'award' && typeof globalThis\.__dboGatheringSkillRate === 'function'/.test(sr), 'skillrates.js applies it to normal play, never a staff award');
 
+// The month's honours: Brynja wrote 12 letters, Cyrus 3; Aldric's musters drew 4 who came each, three times (12)
+for (let i = 0; i < 12; i++) globalThis.__dboHonourLetter(PLAIN);
+for (let i = 0; i < 3; i++) globalThis.__dboHonourLetter(NEAR);
+reset();
+cmds.honours(NEAR, '');
+ok(/This month of Sun's Dusk: letters Brynja 12, Cyrus 3; came to gatherings Aldric 12, Erandur 4\./.test(saidTo(NEAR)), '/honours shows this month (Sun\'s Dusk) and who leads it', saidTo(NEAR));
+ok(globalThis.__dboHonourTitles(PLAIN).length === 0, 'no title before the month has turned');
+// The turn of the month: the heralds cry them to everyone, and each holds a title for the month after
+now = Date.UTC(2026, 11, 1, 0, 1);
+reset();
+timers.heralds();
+const crier = cried.find(([, t]) => /the month of Sun's Dusk is ended/.test(t));
+ok(crier && /names Brynja the Correspondent of Sun's Dusk, for 12 letters, and Aldric the Host of Sun's Dusk, for 12 who came to their gatherings\./.test(crier[1]) && cried.filter(([, t]) => /month of Sun's Dusk is ended/.test(t)).length === 5, 'at the turn of the month the heralds cry the honours to everyone in the land', cried);
+ok(globalThis.__dboHonourTitles(PLAIN).some((t) => t.label === "Correspondent of Sun's Dusk") && globalThis.__dboHonourTitles(LEAD).some((t) => t.label === "Host of Sun's Dusk"), '...and each holds the title in the journal', [globalThis.__dboHonourTitles(PLAIN), globalThis.__dboHonourTitles(LEAD)]);
+ok(globalThis.__dboHonourTitles(NEAR).length === 0, 'Cyrus\'s 3 letters were too few (at least 10)');
+ok(audits.some((t) => /^HONOURS Sun's Dusk: Brynja the Correspondent/.test(t)), '...with an audit line');
+reset();
+timers.heralds();
+ok(!cried.some(([, t]) => /month of/.test(t)), 'the honours are cried once');
+now = Date.UTC(2027, 0, 1, 0, 1);
+timers.heralds();
+ok(globalThis.__dboHonourTitles(PLAIN).length === 0, 'the title lasts the month after, then goes');
+const jr = fs.readFileSync(path.join(ROOT, 'journal.js'), 'utf8');
+ok(/globalThis\.__dboHonourTitles\(a\)/.test(jr), 'journal.js offers the honour as a title on the Profile');
+ok(/globalThis\.__dboHonourLetter; if \(typeof h === 'function' && !circular\) h\(a\)/.test(fs.readFileSync(path.join(ROOT, 'gamemode.js'), 'utf8')), 'gamemode.js counts each letter for the honours, a circular once');
+
 // Wiring and config
 const gm = fs.readFileSync(path.join(ROOT, 'gamemode.js'), 'utf8');
 ok(/require\(HERALDS_JS\)\(\{ mp, log, personal, system, registerChatCommand, onlineActors, profileOf, nameOf, zoneById, takeGold, depositToTreasury, every, audit, isAdmin, zoneOfActor, giveItem, GOLD_BASE, cfg \}\)/.test(gm), 'gamemode.js loads heralds.js');

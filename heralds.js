@@ -19,10 +19,17 @@
 // faction's own treasury (bank.js __dboTreasury.spend, never minted), at most once every musterPay.days per member and
 // faction, at most musterPay.maxPerMuster in all, and never more than the treasury holds.
 //
+// The month's honours (in-game-over-discord incentives): the heralds count each character's letters (gamemode.js, a
+// circular once) and how many stayed at the gatherings each one had cried. At the turn of the month (UTC, named by the
+// Tamrielic calendar) they cry who sent the most letters and who drew the most, at least honours.minLetters and
+// honours.minAttendees, and each holds a title of it for the month after: "Correspondent of Frostfall", "Host of
+// Frostfall" (journal.js __dboHonourTitles, chosen on the Profile). /honours shows them and this month's leaders.
+//
 // gamemode-config.json "heralds": { enabled, fee: 50, maxText: 200, minAheadMinutes: 10, maxAheadDays: 7,
 //   maxActivePerPoster: 2, reminderMinutes: 30, keepHours: 6,
 //   attendance: { enabled: true, windowMinutes: 60, minMinutes: 20, minAttendees: 5, boostMult: 1.1, boostMinutes: 60,
-//     musterPay: { enabled: true, perMember: 25, maxPerMuster: 300, days: 7 } } }
+//     musterPay: { enabled: true, perMember: 25, maxPerMuster: 300, days: 7 } },
+//   honours: { enabled: true, minLetters: 10, minAttendees: 10 } }
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -35,7 +42,7 @@ module.exports = (api) => {
   const BOOST = 'private.dboGatheringBoost';
   const PAY = Object.assign({ enabled: true, perMember: 25, maxPerMuster: 300, days: 7 }, AT.musterPay || {});
   const FILE = path.resolve('heralds.json');
-  const S = (() => { try { const j = JSON.parse(fs.readFileSync(FILE, 'utf8')); return { seq: Number(j.seq) || 0, events: Array.isArray(j.events) ? j.events : [], paid: j.paid && typeof j.paid === 'object' ? j.paid : {} }; } catch (e) { return { seq: 0, events: [], paid: {} }; } })();
+  const S = (() => { try { const j = JSON.parse(fs.readFileSync(FILE, 'utf8')); return { seq: Number(j.seq) || 0, events: Array.isArray(j.events) ? j.events : [], paid: j.paid && typeof j.paid === 'object' ? j.paid : {}, honours: j.honours && typeof j.honours === 'object' ? j.honours : null }; } catch (e) { return { seq: 0, events: [], paid: {}, honours: null }; } })();
   const save = () => { try { fs.writeFileSync(FILE, JSON.stringify(S)); } catch (e) { log('heralds: save failed', e.message); } };
   const call = (name, ...args) => { try { const f = globalThis[name]; return typeof f === 'function' ? f(...args) : undefined; } catch (e) { return undefined; } };
   const ownName = (a) => { const m = call('__dboMaskOf', a >>> 0); return (m && m.real) || nameOf(a); };
@@ -157,6 +164,7 @@ module.exports = (api) => {
     }
     audit(`HERALD #${e.id} "${e.title}" closed: ${came.length} stayed, ${given} rewarded (x${AT.boostMult} for ${AT.boostMinutes} min)`);
     musterPay(e, came, now);
+    noteHosted(e, came.length, now);
     return true;
   };
   // The faction's muster pay, out of its own treasury, to its members who stayed
@@ -184,11 +192,71 @@ module.exports = (api) => {
     let b = null; try { b = mp.get(a >>> 0, BOOST); } catch (e) { return 1; }
     return b && Number(b.until) > Date.now() && Number(b.mult) >= 1 ? Math.min(2, Number(b.mult)) : 1;
   };
+  // ---- the month's honours ----------------------------------------------------------------------------------------
+  const HON = Object.assign({ enabled: true, minLetters: 10, minAttendees: 10 }, C.honours || {});
+  const MONTHS = ['Morning Star', "Sun's Dawn", 'First Seed', "Rain's Hand", 'Second Seed', 'Midyear', "Sun's Height", 'Last Seed', 'Hearthfire', 'Frostfall', "Sun's Dusk", 'Evening Star'];
+  const monthKey = (t) => { const d = new Date(t); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`; };
+  const monthName = (key) => MONTHS[(Number(String(key).slice(5)) || 1) - 1];
+  const H = () => {
+    const now = Date.now();
+    if (!S.honours || typeof S.honours !== 'object') S.honours = { month: monthKey(now), letters: {}, hosted: {}, names: {}, last: null };
+    return S.honours;
+  };
+  const tally = (kind, a, n, now) => {
+    if (HON.enabled === false) return;
+    turnMonth(now);
+    const h = H(); const p = String(profileOf(a));
+    h[kind][p] = (Number(h[kind][p]) || 0) + n;
+    h.names[p] = ownName(a);
+    save();
+  };
+  globalThis.__dboHonourLetter = (a) => tally('letters', a >>> 0, 1, Date.now());
+  const noteHosted = (e, n, now) => {
+    if (HON.enabled === false || !(n > 0)) return;
+    turnMonth(now);
+    const h = H(); const p = String(e.byProfile);
+    h.hosted[p] = (Number(h.hosted[p]) || 0) + n;
+    h.names[p] = e.by;
+  };
+  const best = (map, min) => { let top = null; for (const [p, n] of Object.entries(map || {})) if (Number(n) >= min && (!top || Number(n) > top.n)) top = { p, n: Number(n) }; return top; };
+  // At the first look in a new month: name last month's, cry them to everyone, start the count again
+  const turnMonth = (now) => {
+    const h = H(); const key = monthKey(now);
+    if (h.month === key) return false;
+    const name = monthName(h.month);
+    const writer = best(h.letters, HON.minLetters), host = best(h.hosted, HON.minAttendees);
+    h.last = { month: h.month, name, until: key,
+      writer: writer ? { profile: writer.p, name: h.names[writer.p] || '?', n: writer.n } : null,
+      host: host ? { profile: host.p, name: h.names[host.p] || '?', n: host.n } : null };
+    h.month = key; h.letters = {}; h.hosted = {}; h.names = {};
+    const words = [writer ? `${h.last.writer.name} the Correspondent of ${name}, for ${writer.n} letters` : '', host ? `${h.last.host.name} the Host of ${name}, for ${host.n} who came to their gatherings` : ''].filter(Boolean);
+    if (words.length) { for (const t of onlineActors()) system(t, `A herald cries: the month of ${name} is ended, and the realm names ${words.join(', and ')}.`); audit(`HONOURS ${name}: ${words.join('; ')}`); }
+    save();
+    return true;
+  };
+  globalThis.__dboHonourTitles = (a) => {
+    if (HON.enabled === false) return [];
+    const h = S.honours; const l = h && h.last;
+    if (!l || l.until !== monthKey(Date.now())) return [];
+    const p = String(profileOf(a)); const out = [];
+    if (l.writer && l.writer.profile === p) out.push({ id: 'honour-writer', label: `Correspondent of ${l.name}`, epithet: 'the heralds\' honour' });
+    if (l.host && l.host.profile === p) out.push({ id: 'honour-host', label: `Host of ${l.name}`, epithet: 'the heralds\' honour' });
+    return out;
+  };
+  registerChatCommand('honours', (a) => {
+    if (HON.enabled === false) return personal(a, 'The heralds name no honours just now.');
+    turnMonth(Date.now());
+    const h = H(); const l = h.last;
+    const top = (map) => Object.entries(map || {}).sort((x, y) => y[1] - x[1]).slice(0, 3).map(([p, n]) => `${h.names[p] || '?'} ${n}`).join(', ') || 'no one yet';
+    const lastWords = l ? [l.writer ? `${l.writer.name}, Correspondent of ${l.name}` : '', l.host ? `${l.host.name}, Host of ${l.name}` : ''].filter(Boolean).join('; ') : '';
+    personal(a, `${lastWords ? `The heralds named ${lastWords}. ` : ''}This month of ${monthName(h.month)}: letters ${top(h.letters)}; came to gatherings ${top(h.hosted)}. At least ${HON.minLetters} letters, or ${HON.minAttendees} who came, to be named.`);
+  }, { help: 'who the heralds named last month, and who leads this one' });
+
   // Reminders and the start, once a minute
   every('heralds', 60000, () => {
     if (!ON) return;
     const now = Date.now();
-    let changed = false;
+    let changed = turnMonth(now);
     for (const e of live(now)) {
       if (!e.reminded && e.at - now <= C.reminderMinutes * 60000 && e.at > now) { e.reminded = true; changed = true; const w = `${e.title}, at ${e.place}, ${fromNow(e.at - now)}.`; cry(e, w); tellComing(e, `it begins ${fromNow(e.at - now)} at ${e.place}.`); }
       if (!e.begun && now >= e.at) { e.begun = true; changed = true; cry(e, `${e.title} begins now, at ${e.place}.`); tellComing(e, `it begins now, at ${e.place}.`); }
