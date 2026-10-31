@@ -1,5 +1,29 @@
 [
   {
+    "title": "Blackreach chests and boss loot",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Blackreach chests",
+        "items": [
+          "Blackreach's chests give about half as many Glass and Amber pieces as before, and a quarter fewer Dwarven and honed Falmer pieces. The top tier should be earned, not farmed, with PvP in mind.",
+          "Each piece that no longer drops is a gem or Dwemer scrap instead, so a chest is still worth the fight."
+        ]
+      },
+      {
+        "heading": "Boss loot",
+        "items": [
+          "Every world boss now pays each fighter who earned a share: 100 to 150 gold, its own signature material, and two picks from a pool themed on the boss and its land.",
+          "Two uncommon rolls each: a flawless gem, a filled soul gem or the boss's rare reagent in bulk.",
+          "Each boss's schematic stays the rare chase, and each boss now has a named trophy (coming with a later plugin update).",
+          "Boss drops no longer include mined ores or ingots above steel. Mine and craft those. The Centurion Master gives Dwemer scrap, and the Heart Stone now comes from Karstaag only."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Armour: wear anything, but it weighs on you",
     "date": "2026-10-31",
     "version": "Server update",

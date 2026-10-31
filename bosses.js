@@ -402,6 +402,8 @@ module.exports = (api) => {
         if (s.given) { got.push(s.name); personal(p, `Among the remains you find ${s.name}.`); }
       }
       for (const [desc, chance, n] of dr.extra || []) if (Math.random() < (Number(chance) || 0) && giveDesc(p, desc, Number(n) || 1)) got.push(`${Number(n) || 1}x ${desc} (rare)`);
+      // The boss's named trophy (boss-loot-1031): a 0-value misc to show off or set in a home; skipped until its record exists
+      if (dr.trophy && dr.trophy.desc && Math.random() < (Number(dr.trophy.chance) || 0) && giveDesc(p, dr.trophy.desc, 1)) got.push(`${dr.trophy.name || dr.trophy.desc} (trophy)`);
       for (const [desc, n] of poolPicks(dr.pool)) if (giveDesc(p, desc, n)) got.push(`${n}x ${desc}`);
       if (shards > 0 && giveDesc(p, dr.shards.desc, shards)) got.push(`${shards}x ${dr.shards.desc}`);
       (state().lockouts[b.id] = state().lockouts[b.id] || {})[pid] = now + lock;

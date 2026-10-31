@@ -28,7 +28,12 @@ module.exports = (api) => {
     // The steel ceiling (loottiers.js, 1 Oct) is lifted for these chests only (Nate, 15 Oct): Glass and Amber, and the honed
     // Falmer and Dwarven gear of their tier, over the steel cap. Ebony, Daedric, Stalhrim, Orcish, dragon materials and
     // artifacts stay out (loottiers.js NEVER, dungeons.js BANNED_LOOT, ARTIFACT, DRAGON_LOOT), and so do the ingots above steel
-    lootCap: { cap: 'steel', add: ['glass', 'amber', 'falmer_honed', 'dwarven'] } }, cfg.blackreach || {});
+    lootCap: { cap: 'steel', add: ['glass', 'amber', 'falmer_honed', 'dwarven'] },
+    // Of each piece of these families a chest rolls, this share stays; the rest becomes a gem (gemShare) or Dwemer scrap. The
+    // live chests of 18-31 Oct gave 0.83 Glass or Amber pieces a chest (755 Glass, 472 Amber in 1,483), the top PvP tier,
+    // while every other chest stops at steel (Nat, 31 Oct). Ingots and ores above steel stay out as before.
+    gearThin: { glass: 0.5, amber: 0.5, dwarven: 0.75, falmer_honed: 0.75 }, gemShare: 0.5,
+    scrap: [['c886a:Skyrim.esm', 1, 2], ['c886c:Skyrim.esm', 1, 2], ['c886e:Skyrim.esm', 1, 1], ['c8870:Skyrim.esm', 1, 1], ['c8868:Skyrim.esm', 1, 1], ['aebf1:Skyrim.esm', 1, 1]] }, cfg.blackreach || {});
   const readJson = (file, fallback) => { try { return JSON.parse(fs.readFileSync(path.resolve(file), 'utf8')); } catch (e) { return fallback; } };
   const DATA = readJson('blackreach.json', { spots: [], chests: [] });
   const SPAWNED_IDS_FILE = path.resolve('zone-spawns.json');
@@ -157,6 +162,30 @@ module.exports = (api) => {
     const list = [].concat(LOOT.armor || [], LOOT.weapons || []).filter((it) => THEME.test(String(it.name || '')) && !banned.test(String(it.name || '')) && lootable(it.id) && inProvince(it, C.province));
     return list.length ? list[Math.floor(Math.random() * list.length)] : null;
   };
+  // The family of a piece (loot-materials.json, as loottiers.js reads it), for gearThin
+  const FAMILY = (readJson('loot-materials.json', { items: {} }).items) || {};
+  const familyOf = (baseId) => { let d = ''; try { d = String(mp.getDescFromId(baseId >>> 0)); } catch (e) { return ''; } return String(FAMILY[normDesc(d)] || ''); };
+  const pickOne = (list) => list[Math.floor(Math.random() * list.length)];
+  const swapFor = () => {
+    const inProvince = typeof globalThis.__dboLootInProvince === 'function' ? globalThis.__dboLootInProvince : () => true;
+    const gems = (LOOT.gems || []).filter((it) => inProvince(it, C.province));
+    if (gems.length && Math.random() < (Number(C.gemShare) || 0)) { const g = pickOne(gems); const id = idOf(g.id); if (id) return { baseId: id, count: 1, name: g.name }; }
+    const scrap = Array.isArray(C.scrap) ? C.scrap.filter((s) => Array.isArray(s) && s[0]) : [];
+    if (!scrap.length) return null;
+    const s = pickOne(scrap); const id = idOf(s[0]);
+    const lo = Math.max(1, Number(s[1]) || 1), hi = Math.max(lo, Number(s[2]) || lo);
+    return id ? { baseId: id, count: lo + Math.floor(Math.random() * (hi - lo + 1)) } : null;
+  };
+  const thin = (out) => {
+    const keep = C.gearThin && typeof C.gearThin === 'object' ? C.gearThin : {};
+    return out.map((e) => {
+      const f = familyOf(e.baseId);
+      const k = Object.prototype.hasOwnProperty.call(keep, f) ? Math.max(0, Math.min(1, Number(keep[f]))) : 1;
+      if (k >= 1 || Math.random() < k) return e;
+      return swapFor();
+    }).filter(Boolean);
+  };
+  globalThis.__dboBlackreachThin = thin;
   const roll = (entry) => {
     if (typeof globalThis.__dboOpenWorldLoot !== 'function') return null;
     // Every chest rolls as a boss chest (allBoss, Nate: the loot really worth it); allBoss false leaves TreasFalmerChest a plain one
@@ -164,7 +193,7 @@ module.exports = (api) => {
     if (!Array.isArray(entries)) return null;
     const out = entries.map((e) => ({ baseId: Number(e.baseId) >>> 0, count: Number(e.count) || 0 })).filter((e) => e.baseId && e.count > 0);
     if (Math.random() < C.themeChance) { const it = themePiece(); const id = it ? idOf(it.id) : 0; if (id) out.push({ baseId: id, count: 1, name: it.name }); }
-    return out;
+    return thin(out);
   };
 
   // ---- the chest ---------------------------------------------------------------------------------

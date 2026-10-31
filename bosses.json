@@ -80,6 +80,10 @@
    "drops": {
     "always": [
      [
+      "f:Skyrim.esm",
+      100
+     ],
+     [
       "3ad5f:Skyrim.esm",
       2
      ]
@@ -90,38 +94,27 @@
       [
        "3ad6a:Skyrim.esm",
        4,
-       2,
-       "IceWraithTeeth"
-      ],
-      [
-       "3ad5f:Skyrim.esm",
-       3,
-       2,
-       "FrostSalts"
+       3
       ],
       [
        "34d32:Skyrim.esm",
-       2,
        3,
-       "FrostMirriam"
+       5
       ],
       [
-       "63b44:Skyrim.esm",
-       2,
-       1,
-       "GemSapphire"
-      ],
-      [
-       "68523:Skyrim.esm",
-       1,
-       1,
-       "GemSapphireFlawless"
+       "3ad75:Skyrim.esm",
+       3,
+       2
       ],
       [
        "2e4f4:Skyrim.esm",
+       2,
+       1
+      ],
+      [
+       "63b44:Skyrim.esm",
        1,
-       1,
-       "SoulGemGreater"
+       1
       ]
      ]
     },
@@ -133,9 +126,27 @@
     },
     "schematic": {
      "family": "glacial_crystal",
-     "chance": 0.03,
+     "chance": 0.04,
      "knownBonus": 2
-    }
+    },
+    "extra": [
+     [
+      "68523:Skyrim.esm",
+      0.12,
+      1
+     ],
+     [
+      "2e4ff:Skyrim.esm",
+      0.08,
+      1
+     ]
+    ],
+    "trophy": {
+     "name": "Hrimkald's Frozen Heart",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    }
   },
   {
@@ -612,48 +623,41 @@
    "drops": {
     "always": [
      [
+      "f:Skyrim.esm",
+      100
+     ],
+     [
       "3ad61:Skyrim.esm",
-      1
+      2
      ]
     ],
     "pool": {
      "picks": 2,
      "items": [
       [
-       "3ad61:Skyrim.esm",
-       4,
-       1,
-       "BriarHeart"
-      ],
-      [
        "3ad66:Skyrim.esm",
-       3,
-       2,
-       "HagravenFeathers"
+       4,
+       3
       ],
       [
        "6b689:Skyrim.esm",
        3,
-       1,
-       "HagravenClaw"
+       2
       ],
       [
-       "63b45:Skyrim.esm",
+       "63b5f:Skyrim.esm",
        2,
-       1,
-       "GemGarnet"
+       3
       ],
       [
        "5acdf:Skyrim.esm",
        2,
-       3,
-       "OreSilver"
+       3
       ],
       [
-       "2e4e6:Skyrim.esm",
+       "63b45:Skyrim.esm",
        1,
-       1,
-       "SoulGemCommon"
+       1
       ]
      ]
     },
@@ -661,7 +665,25 @@
      "family": "nordic",
      "chance": 0.05,
      "knownBonus": 0
-    }
+    },
+    "extra": [
+     [
+      "68521:Skyrim.esm",
+      0.12,
+      1
+     ],
+     [
+      "2e4fb:Skyrim.esm",
+      0.08,
+      1
+     ]
+    ],
+    "trophy": {
+     "name": "Vorgun's Crown of Briars",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    }
   },
   {
@@ -751,53 +773,65 @@
     }
    ],
    "drops": {
-    "always": [],
+    "always": [
+     [
+      "f:Skyrim.esm",
+      100
+     ],
+     [
+      "f11c0:Skyrim.esm",
+      3
+     ]
+    ],
     "extra": [
      [
-      "17749:Dragonborn.esm",
-      0.05,
-      1,
-      "DLC2HeartStone"
+      "6851e:Skyrim.esm",
+      0.12,
+      1
+     ],
+     [
+      "2e4ff:Skyrim.esm",
+      0.08,
+      1
      ]
     ],
     "pool": {
      "picks": 2,
      "items": [
       [
-       "db8a2:Skyrim.esm",
-       4,
-       3,
-       "IngotDwarven"
-      ],
-      [
-       "f11c0:Skyrim.esm",
-       3,
-       2,
-       "DwarvenOil"
-      ],
-      [
        "c8868:Skyrim.esm",
-       2,
-       1,
-       "DwarvenGyro"
+       4,
+       2
+      ],
+      [
+       "3ad73:Skyrim.esm",
+       3,
+       2
       ],
       [
        "f4983:Skyrim.esm",
        2,
-       1,
-       "DwarvenCenturionDynamo"
+       1
       ],
       [
-       "5ace2:Skyrim.esm",
+       "63b46:Skyrim.esm",
        2,
-       2,
-       "OreQuicksilver"
+       1
       ],
       [
        "2e4fc:Skyrim.esm",
        1,
-       1,
-       "SoulGemGrand"
+       1
+      ],
+      [
+       "c886a:Skyrim.esm",
+       3,
+       2
+      ],
+      [
+       "c886c:Skyrim.esm",
+       3,
+       2
       ]
      ]
     },
@@ -809,7 +843,13 @@
     "extraSchematic": {
      "family": "mithril",
      "chance": 0.01
-    }
+    },
+    "trophy": {
+     "name": "The Sentinel's Animunculus Core",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    }
   },
   {
@@ -1602,46 +1642,39 @@
      [
       "f:Skyrim.esm",
       150
+     ],
+     [
+      "5ace5:Skyrim.esm",
+      3
      ]
     ],
     "pool": {
      "picks": 2,
      "items": [
       [
-       "5ace5:Skyrim.esm",
-       4,
-       3,
-       "IngotSteel"
-      ],
-      [
        "5ad93:Skyrim.esm",
+       4,
+       2
+      ],
+      [
+       "d51bb:BSHeartland.esm",
        3,
-       2,
-       "IngotCorundum"
-      ],
-      [
-       "5ace0:Skyrim.esm",
-       2,
-       2,
-       "OreMoonstone"
-      ],
-      [
-       "63b42:Skyrim.esm",
-       2,
-       1,
-       "GemRuby"
+       2
       ],
       [
        "200ba:Skyrim.esm",
-       1,
-       1,
-       "ImperialWarHorn"
+       2,
+       1
       ],
       [
        "2e4f4:Skyrim.esm",
+       2,
+       1
+      ],
+      [
+       "63b42:Skyrim.esm",
        1,
-       1,
-       "SoulGemGreater"
+       1
       ]
      ]
     },
@@ -1653,7 +1686,25 @@
     "extraSchematic": {
      "family": "ancient_imperial",
      "chance": 0.03
-    }
+    },
+    "extra": [
+     [
+      "68522:Skyrim.esm",
+      0.12,
+      1
+     ],
+     [
+      "5ad9e:Skyrim.esm",
+      0.08,
+      2
+     ]
+    ],
+    "trophy": {
+     "name": "Kaszar's Pale Warbanner",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    }
   },
   {
@@ -1856,49 +1907,41 @@
    "drops": {
     "always": [
      [
+      "f:Skyrim.esm",
+      100
+     ],
+     [
       "3ad57:Skyrim.esm",
-      3,
-      "ChaurusChitin"
+      2
      ]
     ],
     "pool": {
      "picks": 2,
      "items": [
       [
-       "3ad57:Skyrim.esm",
-       4,
-       2,
-       "ChaurusChitin"
-      ],
-      [
        "3ad56:Skyrim.esm",
-       3,
-       3,
-       "ChaurusEggs"
+       4,
+       3
       ],
       [
        "3ad5d:Skyrim.esm",
        3,
-       2,
-       "FalmerEar"
+       3
       ],
       [
        "183b7:Dawnguard.esm",
+       3,
+       3
+      ],
+      [
+       "3ad73:Skyrim.esm",
        2,
-       2,
-       "DLC01ChaurusHunterAntennae"
+       2
       ],
       [
        "63b46:Skyrim.esm",
-       2,
        1,
-       "GemAmethyst"
-      ],
-      [
-       "2e4f4:Skyrim.esm",
-       1,
-       1,
-       "SoulGemGreater"
+       1
       ]
      ]
     },
@@ -1906,7 +1949,25 @@
      "family": "falmer_honed",
      "chance": 0.06,
      "knownBonus": 0
-    }
+    },
+    "extra": [
+     [
+      "6851e:Skyrim.esm",
+      0.12,
+      1
+     ],
+     [
+      "2e500:Skyrim.esm",
+      0.08,
+      1
+     ]
+    ],
+    "trophy": {
+     "name": "The Warmonger's Eyeless Mask",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    }
   },
   {
@@ -2303,49 +2364,41 @@
    "drops": {
     "always": [
      [
+      "f:Skyrim.esm",
+      100
+     ],
+     [
       "3ad76:Skyrim.esm",
-      3,
-      "vampireDust"
+      2
      ]
     ],
     "pool": {
      "picks": 2,
      "items": [
       [
-       "3ad76:Skyrim.esm",
+       "34cdd:Skyrim.esm",
        4,
-       2,
-       "vampireDust"
+       3
       ],
       [
-       "34cdd:Skyrim.esm",
+       "2f44c:Skyrim.esm",
        3,
-       3,
-       "BoneMeal"
+       3
       ],
       [
        "b18cd:Skyrim.esm",
        2,
-       1,
-       "HumanHeart"
+       1
       ],
       [
        "63b42:Skyrim.esm",
        2,
-       1,
-       "GemRuby"
-      ],
-      [
-       "5ad9d:Skyrim.esm",
-       1,
-       1,
-       "IngotEbony"
+       1
       ],
       [
        "2e500:Skyrim.esm",
        1,
-       1,
-       "SoulGemBlack"
+       1
       ]
      ]
     },
@@ -2353,7 +2406,25 @@
      "family": "EBONY",
      "chance": 0.06,
      "knownBonus": 0
-    }
+    },
+    "extra": [
+     [
+      "2e504:Skyrim.esm",
+      0.1,
+      1
+     ],
+     [
+      "68522:Skyrim.esm",
+      0.1,
+      1
+     ]
+    ],
+    "trophy": {
+     "name": "Movarth's Bloodied Signet",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    }
   },
   {
@@ -2524,7 +2595,11 @@
     "always": [
      [
       "f:Skyrim.esm",
-      60
+      100
+     ],
+     [
+      "60194d:BSAssets.esm",
+      2
      ]
     ],
     "pool": {
@@ -2533,38 +2608,27 @@
       [
        "5ace4:Skyrim.esm",
        4,
+       4
+      ],
+      [
+       "601428:BSAssets.esm",
        3,
-       "IngotIron"
+       3
       ],
       [
        "34cdd:Skyrim.esm",
        3,
-       2,
-       "BoneMeal"
-      ],
-      [
-       "516c8:Skyrim.esm",
-       2,
-       2,
-       "deathBell"
-      ],
-      [
-       "5ace1:Skyrim.esm",
-       2,
-       2,
-       "OreMalachite"
-      ],
-      [
-       "63b45:Skyrim.esm",
-       2,
-       1,
-       "GemGarnet"
+       2
       ],
       [
        "2e4e6:Skyrim.esm",
+       2,
+       1
+      ],
+      [
+       "63b45:Skyrim.esm",
        1,
-       1,
-       "SoulGemCommon"
+       1
       ]
      ]
     },
@@ -2572,7 +2636,25 @@
      "family": "elven",
      "chance": 0.05,
      "knownBonus": 0
-    }
+    },
+    "extra": [
+     [
+      "68521:Skyrim.esm",
+      0.12,
+      1
+     ],
+     [
+      "2e4fb:Skyrim.esm",
+      0.08,
+      1
+     ]
+    ],
+    "trophy": {
+     "name": "Gnashrot's Totem Skull",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    }
   },
   {
@@ -2694,52 +2776,40 @@
     "always": [
      [
       "f:Skyrim.esm",
-      200
+      150
      ],
      [
       "3ad5b:Skyrim.esm",
-      1,
-      "DaedraHeart"
+      1
      ]
     ],
     "pool": {
      "picks": 2,
      "items": [
       [
-       "3ad5b:Skyrim.esm",
-       3,
-       1,
-       "DaedraHeart"
-      ],
-      [
-       "3ad60:Skyrim.esm",
-       3,
-       2,
-       "VoidSalts"
+       "601fba:BSAssets.esm",
+       4,
+       3
       ],
       [
        "3ad5e:Skyrim.esm",
        3,
-       2,
-       "FireSalts"
+       2
       ],
       [
-       "5ada1:Skyrim.esm",
-       2,
-       2,
-       "IngotMalachite"
+       "3ad60:Skyrim.esm",
+       3,
+       2
       ],
       [
-       "63b47:Skyrim.esm",
-       1,
-       1,
-       "GemDiamond"
+       "80a:ccBGSSSE037-Curios.esl",
+       2,
+       1
       ],
       [
-       "2e4fc:Skyrim.esm",
-       1,
-       1,
-       "SoulGemGrand"
+       "80b:ccBGSSSE037-Curios.esl",
+       2,
+       1
       ]
      ]
     },
@@ -2747,7 +2817,25 @@
      "family": "glass",
      "chance": 0.03,
      "knownBonus": 0
-    }
+    },
+    "extra": [
+     [
+      "63b47:Skyrim.esm",
+      0.1,
+      1
+     ],
+     [
+      "2e4ff:Skyrim.esm",
+      0.1,
+      1
+     ]
+    ],
+    "trophy": {
+     "name": "Sigil of the Great Gate",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    }
   },
   {
@@ -2828,53 +2916,41 @@
    "drops": {
     "always": [
      [
-      "3ad5f:Skyrim.esm",
-      2
+      "f:Skyrim.esm",
+      150
      ],
      [
-      "2b06b:Dragonborn.esm",
-      3,
-      "DLC2OreStalhrim"
+      "3ad5f:Skyrim.esm",
+      2
      ]
     ],
     "pool": {
      "picks": 2,
      "items": [
       [
-       "2b06b:Dragonborn.esm",
-       4,
-       2,
-       "DLC2OreStalhrim"
-      ],
-      [
-       "3ad5f:Skyrim.esm",
-       3,
-       2,
-       "FrostSalts"
-      ],
-      [
        "3ad6a:Skyrim.esm",
-       2,
-       2,
-       "IceWraithTeeth"
+       4,
+       3
       ],
       [
        "17749:Dragonborn.esm",
-       2,
-       1,
-       "DLC2HeartStone"
+       3,
+       1
       ],
       [
-       "68523:Skyrim.esm",
-       1,
-       1,
-       "GemSapphireFlawless"
+       "3ad54:Skyrim.esm",
+       2,
+       1
       ],
       [
        "2e4fc:Skyrim.esm",
+       2,
+       1
+      ],
+      [
+       "63b44:Skyrim.esm",
        1,
-       1,
-       "SoulGemGrand"
+       1
       ]
      ]
     },
@@ -2882,7 +2958,25 @@
      "family": "stalhrim",
      "chance": 0.05,
      "knownBonus": 0
-    }
+    },
+    "extra": [
+     [
+      "68523:Skyrim.esm",
+      0.12,
+      1
+     ],
+     [
+      "17749:Dragonborn.esm",
+      0.08,
+      3
+     ]
+    ],
+    "trophy": {
+     "name": "Karstaag's Frost-Rimed Skull",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    }
   },
   {
@@ -3007,45 +3101,43 @@
     }
    ],
    "drops": {
-    "always": [],
+    "always": [
+     [
+      "f:Skyrim.esm",
+      100
+     ],
+     [
+      "3ad63:Skyrim.esm",
+      3
+     ]
+    ],
     "pool": {
      "picks": 2,
      "items": [
       [
-       "3ad63:Skyrim.esm",
-       4,
-       3,
-       "Ectoplasm"
-      ],
-      [
        "34cdd:Skyrim.esm",
-       3,
-       2,
-       "BoneMeal"
+       4,
+       3
       ],
       [
-       "5ad99:Skyrim.esm",
-       2,
-       2,
-       "IngotOrichalcum"
+       "601425:BSAssets.esm",
+       3,
+       3
       ],
       [
        "3ad73:Skyrim.esm",
        2,
-       1,
-       "glowDust"
+       2
       ],
       [
        "63b43:Skyrim.esm",
        2,
-       1,
-       "GemEmerald"
+       1
       ],
       [
        "2e500:Skyrim.esm",
        1,
-       1,
-       "SoulGemBlack"
+       1
       ]
      ]
     },
@@ -3053,7 +3145,25 @@
      "family": "adamantium",
      "chance": 0.03,
      "knownBonus": 0
-    }
+    },
+    "extra": [
+     [
+      "2e504:Skyrim.esm",
+      0.1,
+      1
+     ],
+     [
+      "68520:Skyrim.esm",
+      0.1,
+      1
+     ]
+    ],
+    "trophy": {
+     "name": "The Legate's Tarnished Eagle",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    }
   },
   {
@@ -3146,53 +3256,36 @@
      ],
      [
       "6026e4:BSAssets.esm",
-      2,
-      "CYRMinotaurHorn"
-     ],
-     [
-      "6026e2:BSAssets.esm",
-      1,
-      "CYRMinotaurHide"
+      1
      ]
     ],
     "pool": {
      "picks": 2,
      "items": [
       [
-       "5ace0:Skyrim.esm",
+       "6026e2:BSAssets.esm",
        4,
-       2,
-       "OreMoonstone"
-      ],
-      [
-       "5ad9f:Skyrim.esm",
-       3,
-       1,
-       "IngotIMoonstone"
+       2
       ],
       [
        "34cdd:Skyrim.esm",
        3,
-       2,
-       "BoneMeal"
+       3
       ],
       [
-       "63b43:Skyrim.esm",
+       "5ef6c:BSHeartland.esm",
        2,
-       1,
-       "GemEmerald"
-      ],
-      [
-       "68520:Skyrim.esm",
-       1,
-       1,
-       "GemEmeraldFlawless"
+       1
       ],
       [
        "2e4f4:Skyrim.esm",
+       2,
+       1
+      ],
+      [
+       "63b43:Skyrim.esm",
        1,
-       1,
-       "SoulGemGreater"
+       1
       ]
      ]
     },
@@ -3200,7 +3293,25 @@
      "family": "ayleid",
      "chance": 0.05,
      "knownBonus": 0
-    }
+    },
+    "extra": [
+     [
+      "68520:Skyrim.esm",
+      0.1,
+      1
+     ],
+     [
+      "6026e4:BSAssets.esm",
+      0.1,
+      3
+     ]
+    ],
+    "trophy": {
+     "name": "Asterion's Broken Horn",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    }
   },
   {
@@ -3320,17 +3431,11 @@
     "always": [
      [
       "f:Skyrim.esm",
-      150
+      100
      ],
      [
       "fe6a9:Skyrim.esm",
-      1,
-      "WerewolfPelt"
-     ],
-     [
-      "3ad74:Skyrim.esm",
-      3,
-      "WolfPelt"
+      1
      ]
     ],
     "pool": {
@@ -3339,38 +3444,27 @@
       [
        "3ad74:Skyrim.esm",
        4,
-       2,
-       "WolfPelt"
+       3
+      ],
+      [
+       "6bc04:Skyrim.esm",
+       3,
+       3
       ],
       [
        "5acdf:Skyrim.esm",
        3,
-       3,
-       "OreSilver"
-      ],
-      [
-       "6bc04:Skyrim.esm",
-       2,
-       2,
-       "SabrecatTooth"
+       3
       ],
       [
        "3ad52:Skyrim.esm",
        2,
-       1,
-       "BearPelt"
+       1
       ],
       [
-       "3ad6d:Skyrim.esm",
+       "3ad6e:Skyrim.esm",
        2,
-       1,
-       "SabreCatPelt"
-      ],
-      [
-       "2e4f4:Skyrim.esm",
-       1,
-       1,
-       "SoulGemGreater"
+       1
       ]
      ]
     },
@@ -3378,7 +3472,25 @@
      "family": "silver",
      "chance": 0.05,
      "knownBonus": 0
-    }
+    },
+    "extra": [
+     [
+      "5ace3:Skyrim.esm",
+      0.12,
+      3
+     ],
+     [
+      "2e4fb:Skyrim.esm",
+      0.08,
+      1
+     ]
+    ],
+    "trophy": {
+     "name": "Gorefang's Hunt-Torn Hide",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    }
   },
   {
@@ -3490,57 +3602,40 @@
     "always": [
      [
       "f:Skyrim.esm",
-      250
+      150
      ],
      [
       "3ad64:Skyrim.esm",
-      2,
-      "GiantToes"
-     ],
-     [
-      "3ad6c:Skyrim.esm",
-      2,
-      "MammothTusk"
+      1
      ]
     ],
     "pool": {
      "picks": 2,
      "items": [
       [
-       "3ad64:Skyrim.esm",
-       4,
-       1,
-       "GiantToes"
-      ],
-      [
-       "3ad6c:Skyrim.esm",
-       4,
-       1,
-       "MammothTusk"
-      ],
-      [
        "7e8c1:Skyrim.esm",
-       3,
-       3,
-       "GiantLichen"
+       4,
+       3
       ],
       [
        "6bc10:Skyrim.esm",
-       2,
-       2,
-       "PowderedMammothTusk"
+       3,
+       3
       ],
       [
-       "63b47:Skyrim.esm",
-       1,
-       1,
-       "GemDiamond"
+       "3ad6c:Skyrim.esm",
+       3,
+       1
+      ],
+      [
+       "3ad54:Skyrim.esm",
+       2,
+       1
       ],
       [
        "2e4fc:Skyrim.esm",
        1,
-       1,
-       "SoulGemGrand"
+       1
       ]
      ]
     },
@@ -3548,7 +3643,25 @@
      "family": "steelplate",
      "chance": 0.05,
      "knownBonus": 0
-    }
+    },
+    "extra": [
+     [
+      "63b47:Skyrim.esm",
+      0.08,
+      1
+     ],
+     [
+      "3ad6c:Skyrim.esm",
+      0.12,
+      2
+     ]
+    ],
+    "trophy": {
+     "name": "Gromm's Stone Fist",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    }
   }
  ]

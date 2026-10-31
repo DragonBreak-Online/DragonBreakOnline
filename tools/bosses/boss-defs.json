@@ -54,6 +54,10 @@
    "drops": {
     "always": [
      [
+      "f:Skyrim.esm",
+      100
+     ],
+     [
       "3ad5f:Skyrim.esm",
       2
      ]
@@ -66,44 +70,57 @@
     },
     "schematic": {
      "family": "glacial_crystal",
-     "chance": 0.03,
+     "chance": 0.04,
      "knownBonus": 2
     },
     "pool": {
      "picks": 2,
-     "edids": [
+     "items": [
       [
-       "IceWraithTeeth",
+       "3ad6a:Skyrim.esm",
        4,
-       2
+       3
       ],
       [
-       "FrostSalts",
+       "34d32:Skyrim.esm",
+       3,
+       5
+      ],
+      [
+       "3ad75:Skyrim.esm",
        3,
        2
       ],
       [
-       "FrostMirriam",
-       2,
-       3
-      ],
-      [
-       "GemSapphire",
+       "2e4f4:Skyrim.esm",
        2,
        1
       ],
       [
-       "GemSapphireFlawless",
-       1,
-       1
-      ],
-      [
-       "SoulGemGreater",
+       "63b44:Skyrim.esm",
        1,
        1
       ]
      ]
-    }
+    },
+    "extra": [
+     [
+      "68523:Skyrim.esm",
+      0.12,
+      1
+     ],
+     [
+      "2e4ff:Skyrim.esm",
+      0.08,
+      1
+     ]
+    ],
+    "trophy": {
+     "name": "Hrimkald's Frozen Heart",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    },
    "_enabledNote": "Nat 26 Oct: every boss ships complete; its shard (DBO_OreGlacialCrystal, DLE 1D2201) is in the production DLE ed7afac9",
    "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
@@ -175,8 +192,12 @@
    "drops": {
     "always": [
      [
+      "f:Skyrim.esm",
+      100
+     ],
+     [
       "3ad61:Skyrim.esm",
-      1
+      2
      ]
     ],
     "schematic": {
@@ -186,39 +207,52 @@
     },
     "pool": {
      "picks": 2,
-     "edids": [
+     "items": [
       [
-       "BriarHeart",
+       "3ad66:Skyrim.esm",
        4,
-       1
+       3
       ],
       [
-       "HagravenFeathers",
+       "6b689:Skyrim.esm",
        3,
        2
       ],
       [
-       "HagravenClaw",
-       3,
-       1
-      ],
-      [
-       "GemGarnet",
-       2,
-       1
-      ],
-      [
-       "OreSilver",
+       "63b5f:Skyrim.esm",
        2,
        3
       ],
       [
-       "SoulGemCommon",
+       "5acdf:Skyrim.esm",
+       2,
+       3
+      ],
+      [
+       "63b45:Skyrim.esm",
        1,
        1
       ]
      ]
-    }
+    },
+    "extra": [
+     [
+      "68521:Skyrim.esm",
+      0.12,
+      1
+     ],
+     [
+      "2e4fb:Skyrim.esm",
+      0.08,
+      1
+     ]
+    ],
+    "trophy": {
+     "name": "Vorgun's Crown of Briars",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    },
    "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
    "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D244C, templated on the original with every flag) in DragonBreak_Bosses.ini"
@@ -275,7 +309,16 @@
     "death": "The Centurion Master of Blackreach is still."
    },
    "drops": {
-    "always": [],
+    "always": [
+     [
+      "f:Skyrim.esm",
+      100
+     ],
+     [
+      "f11c0:Skyrim.esm",
+      3
+     ]
+    ],
     "schematic": {
      "family": "dwarven",
      "chance": 0.08,
@@ -285,49 +328,65 @@
      "family": "mithril",
      "chance": 0.01
     },
-    "extraEdid": [
-     [
-      "DLC2HeartStone",
-      0.05,
-      1
-     ]
-    ],
     "_extra": "A Heart Stone, rare (Nat, 25 Oct: the Dwemer tapped the Heart of Lorkhan; Heart Stones feed the staff crafting Nat is opening)",
     "pool": {
      "picks": 2,
-     "edids": [
+     "items": [
       [
-       "IngotDwarven",
+       "c8868:Skyrim.esm",
        4,
-       3
+       2
       ],
       [
-       "DwarvenOil",
+       "3ad73:Skyrim.esm",
        3,
        2
       ],
       [
-       "DwarvenGyro",
+       "f4983:Skyrim.esm",
        2,
        1
       ],
       [
-       "DwarvenCenturionDynamo",
+       "63b46:Skyrim.esm",
        2,
        1
       ],
       [
-       "OreQuicksilver",
-       2,
+       "2e4fc:Skyrim.esm",
+       1,
+       1
+      ],
+      [
+       "c886a:Skyrim.esm",
+       3,
        2
       ],
       [
-       "SoulGemGrand",
-       1,
-       1
+       "c886c:Skyrim.esm",
+       3,
+       2
       ]
      ]
-    }
+    },
+    "extra": [
+     [
+      "6851e:Skyrim.esm",
+      0.12,
+      1
+     ],
+     [
+      "2e4ff:Skyrim.esm",
+      0.08,
+      1
+     ]
+    ],
+    "trophy": {
+     "name": "The Sentinel's Animunculus Core",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    },
    "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
    "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D244D, templated on the original with every flag) in DragonBreak_Bosses.ini"
@@ -398,6 +457,10 @@
      [
       "f:Skyrim.esm",
       150
+     ],
+     [
+      "5ace5:Skyrim.esm",
+      3
      ]
     ],
     "schematic": {
@@ -411,39 +474,52 @@
     },
     "pool": {
      "picks": 2,
-     "edids": [
+     "items": [
       [
-       "IngotSteel",
+       "5ad93:Skyrim.esm",
        4,
-       3
+       2
       ],
       [
-       "IngotCorundum",
+       "d51bb:BSHeartland.esm",
        3,
        2
       ],
       [
-       "OreMoonstone",
-       2,
-       2
-      ],
-      [
-       "GemRuby",
+       "200ba:Skyrim.esm",
        2,
        1
       ],
       [
-       "ImperialWarHorn",
-       1,
+       "2e4f4:Skyrim.esm",
+       2,
        1
       ],
       [
-       "SoulGemGreater",
+       "63b42:Skyrim.esm",
        1,
        1
       ]
      ]
-    }
+    },
+    "extra": [
+     [
+      "68522:Skyrim.esm",
+      0.12,
+      1
+     ],
+     [
+      "5ad9e:Skyrim.esm",
+      0.08,
+      2
+     ]
+    ],
+    "trophy": {
+     "name": "Kaszar's Pale Warbanner",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    },
    "_spots": "Nat, 25 Oct, from the CK shots in _work/palewarlord-spots-1025: SE first, ST the roaming alternative (roam: the next spot after each kill); SR at Snowstone Rest's door dropped",
    "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
@@ -514,12 +590,6 @@
     "death": "The Falmer Warmonger of Blackreach is dead."
    },
    "drops": {
-    "alwaysEdid": [
-     [
-      "ChaurusChitin",
-      3
-     ]
-    ],
     "schematic": {
      "family": "falmer_honed",
      "chance": 0.06,
@@ -527,39 +597,62 @@
     },
     "pool": {
      "picks": 2,
-     "edids": [
+     "items": [
       [
-       "ChaurusChitin",
+       "3ad56:Skyrim.esm",
        4,
-       2
+       3
       ],
       [
-       "ChaurusEggs",
+       "3ad5d:Skyrim.esm",
        3,
        3
       ],
       [
-       "FalmerEar",
+       "183b7:Dawnguard.esm",
        3,
-       2
+       3
       ],
       [
-       "DLC01ChaurusHunterAntennae",
+       "3ad73:Skyrim.esm",
        2,
        2
       ],
       [
-       "GemAmethyst",
-       2,
-       1
-      ],
-      [
-       "SoulGemGreater",
+       "63b46:Skyrim.esm",
        1,
        1
       ]
      ]
-    }
+    },
+    "always": [
+     [
+      "f:Skyrim.esm",
+      100
+     ],
+     [
+      "3ad57:Skyrim.esm",
+      2
+     ]
+    ],
+    "extra": [
+     [
+      "6851e:Skyrim.esm",
+      0.12,
+      1
+     ],
+     [
+      "2e500:Skyrim.esm",
+      0.08,
+      1
+     ]
+    ],
+    "trophy": {
+     "name": "The Warmonger's Eyeless Mask",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    },
    "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
    "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D244F, templated on the original with every flag) in DragonBreak_Bosses.ini"
@@ -616,12 +709,6 @@
     "death": "The Master of Movarth's Lair is ash."
    },
    "drops": {
-    "alwaysEdid": [
-     [
-      "VampireDust",
-      3
-     ]
-    ],
     "schematic": {
      "family": "EBONY",
      "chance": 0.06,
@@ -629,39 +716,62 @@
     },
     "pool": {
      "picks": 2,
-     "edids": [
+     "items": [
       [
-       "vampireDust",
+       "34cdd:Skyrim.esm",
        4,
-       2
+       3
       ],
       [
-       "BoneMeal",
+       "2f44c:Skyrim.esm",
        3,
        3
       ],
       [
-       "HumanHeart",
+       "b18cd:Skyrim.esm",
        2,
        1
       ],
       [
-       "GemRuby",
+       "63b42:Skyrim.esm",
        2,
        1
       ],
       [
-       "IngotEbony",
-       1,
-       1
-      ],
-      [
-       "SoulGemBlack",
+       "2e500:Skyrim.esm",
        1,
        1
       ]
      ]
-    }
+    },
+    "always": [
+     [
+      "f:Skyrim.esm",
+      100
+     ],
+     [
+      "3ad76:Skyrim.esm",
+      2
+     ]
+    ],
+    "extra": [
+     [
+      "2e504:Skyrim.esm",
+      0.1,
+      1
+     ],
+     [
+      "68522:Skyrim.esm",
+      0.1,
+      1
+     ]
+    ],
+    "trophy": {
+     "name": "Movarth's Bloodied Signet",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    },
    "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
    "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D2473, templated on the original with every flag) in DragonBreak_Bosses.ini"
@@ -731,7 +841,11 @@
     "always": [
      [
       "f:Skyrim.esm",
-      60
+      100
+     ],
+     [
+      "60194d:BSAssets.esm",
+      2
      ]
     ],
     "schematic": {
@@ -741,39 +855,52 @@
     },
     "pool": {
      "picks": 2,
-     "edids": [
+     "items": [
       [
-       "IngotIron",
+       "5ace4:Skyrim.esm",
        4,
+       4
+      ],
+      [
+       "601428:BSAssets.esm",
+       3,
        3
       ],
       [
-       "BoneMeal",
+       "34cdd:Skyrim.esm",
        3,
        2
       ],
       [
-       "deathBell",
-       2,
-       2
-      ],
-      [
-       "OreMalachite",
-       2,
-       2
-      ],
-      [
-       "GemGarnet",
+       "2e4e6:Skyrim.esm",
        2,
        1
       ],
       [
-       "SoulGemCommon",
+       "63b45:Skyrim.esm",
        1,
        1
       ]
      ]
-    }
+    },
+    "extra": [
+     [
+      "68521:Skyrim.esm",
+      0.12,
+      1
+     ],
+     [
+      "2e4fb:Skyrim.esm",
+      0.08,
+      1
+     ]
+    ],
+    "trophy": {
+     "name": "Gnashrot's Totem Skull",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    },
    "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
    "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D2450, templated on the original with every flag) in DragonBreak_Bosses.ini"
@@ -841,12 +968,6 @@
     "death": "The Valkynaz of the Great Gate is banished."
    },
    "drops": {
-    "alwaysEdid": [
-     [
-      "DaedraHeart",
-      1
-     ]
-    ],
     "schematic": {
      "family": "glass",
      "chance": 0.03,
@@ -855,45 +976,62 @@
     "always": [
      [
       "f:Skyrim.esm",
-      200
+      150
+     ],
+     [
+      "3ad5b:Skyrim.esm",
+      1
      ]
     ],
     "_note": "No Ebony: it is never loot (dungeons.js BANNED_LOOT; its schematic only from a Master Scholar's reading)",
     "pool": {
      "picks": 2,
-     "edids": [
+     "items": [
       [
-       "DaedraHeart",
-       3,
-       1
+       "601fba:BSAssets.esm",
+       4,
+       3
       ],
       [
-       "VoidSalts",
-       3,
-       2
-      ],
-      [
-       "FireSalts",
+       "3ad5e:Skyrim.esm",
        3,
        2
       ],
       [
-       "IngotMalachite",
+       "3ad60:Skyrim.esm",
+       3,
+       2
+      ],
+      [
+       "80a:ccBGSSSE037-Curios.esl",
        2,
-       2
-      ],
-      [
-       "GemDiamond",
-       1,
        1
       ],
       [
-       "SoulGemGrand",
-       1,
+       "80b:ccBGSSSE037-Curios.esl",
+       2,
        1
       ]
      ]
-    }
+    },
+    "extra": [
+     [
+      "63b47:Skyrim.esm",
+      0.1,
+      1
+     ],
+     [
+      "2e4ff:Skyrim.esm",
+      0.1,
+      1
+     ]
+    ],
+    "trophy": {
+     "name": "Sigil of the Great Gate",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    },
    "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
    "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D2451, templated on the original with every flag) in DragonBreak_Bosses.ini"
@@ -950,13 +1088,11 @@
     "death": "Karstaag falls, for now."
    },
    "drops": {
-    "alwaysEdid": [
-     [
-      "DLC2OreStalhrim",
-      3
-     ]
-    ],
     "always": [
+     [
+      "f:Skyrim.esm",
+      150
+     ],
      [
       "3ad5f:Skyrim.esm",
       2
@@ -970,39 +1106,52 @@
     },
     "pool": {
      "picks": 2,
-     "edids": [
+     "items": [
       [
-       "DLC2OreStalhrim",
+       "3ad6a:Skyrim.esm",
        4,
-       2
+       3
       ],
       [
-       "FrostSalts",
+       "17749:Dragonborn.esm",
        3,
-       2
+       1
       ],
       [
-       "IceWraithTeeth",
-       2,
-       2
-      ],
-      [
-       "DLC2HeartStone",
+       "3ad54:Skyrim.esm",
        2,
        1
       ],
       [
-       "GemSapphireFlawless",
-       1,
+       "2e4fc:Skyrim.esm",
+       2,
        1
       ],
       [
-       "SoulGemGrand",
+       "63b44:Skyrim.esm",
        1,
        1
       ]
      ]
-    }
+    },
+    "extra": [
+     [
+      "68523:Skyrim.esm",
+      0.12,
+      1
+     ],
+     [
+      "17749:Dragonborn.esm",
+      0.08,
+      3
+     ]
+    ],
+    "trophy": {
+     "name": "Karstaag's Frost-Rimed Skull",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    },
    "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)"
   },
@@ -1069,39 +1218,62 @@
     },
     "pool": {
      "picks": 2,
-     "edids": [
+     "items": [
       [
-       "Ectoplasm",
+       "34cdd:Skyrim.esm",
        4,
        3
       ],
       [
-       "BoneMeal",
+       "601425:BSAssets.esm",
        3,
-       2
+       3
       ],
       [
-       "IngotOrichalcum",
+       "3ad73:Skyrim.esm",
        2,
        2
       ],
       [
-       "glowDust",
+       "63b43:Skyrim.esm",
        2,
        1
       ],
       [
-       "GemEmerald",
-       2,
-       1
-      ],
-      [
-       "SoulGemBlack",
+       "2e500:Skyrim.esm",
        1,
        1
       ]
      ]
-    }
+    },
+    "always": [
+     [
+      "f:Skyrim.esm",
+      100
+     ],
+     [
+      "3ad63:Skyrim.esm",
+      3
+     ]
+    ],
+    "extra": [
+     [
+      "2e504:Skyrim.esm",
+      0.1,
+      1
+     ],
+     [
+      "68520:Skyrim.esm",
+      0.1,
+      1
+     ]
+    ],
+    "trophy": {
+     "name": "The Legate's Tarnished Eagle",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    },
    "_note": "Nat, 25 Oct: Sancre Tor stays undead (an Imperial fort town; no Ayleid undead, Nate 9 Oct): an undead legion from Sancre Tor's own pools (gamemode-config ownedSpawns.replace minotaur: CYREncSkeleton01 lines and BSKEncZombie02). Adamantium's home, so its schematic stays here",
    "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
@@ -1160,20 +1332,14 @@
     "death": "The Minotaur Lord of Minotaur's Rest is dead."
    },
    "drops": {
-    "alwaysEdid": [
-     [
-      "CYRMinotaurHorn",
-      2
-     ],
-     [
-      "CYRMinotaurHide",
-      1
-     ]
-    ],
     "always": [
      [
       "f:Skyrim.esm",
       100
+     ],
+     [
+      "6026e4:BSAssets.esm",
+      1
      ]
     ],
     "schematic": {
@@ -1183,39 +1349,52 @@
     },
     "pool": {
      "picks": 2,
-     "edids": [
+     "items": [
       [
-       "OreMoonstone",
+       "6026e2:BSAssets.esm",
        4,
        2
       ],
       [
-       "IngotIMoonstone",
+       "34cdd:Skyrim.esm",
        3,
-       1
+       3
       ],
       [
-       "BoneMeal",
-       3,
-       2
-      ],
-      [
-       "GemEmerald",
+       "5ef6c:BSHeartland.esm",
        2,
        1
       ],
       [
-       "GemEmeraldFlawless",
-       1,
+       "2e4f4:Skyrim.esm",
+       2,
        1
       ],
       [
-       "SoulGemGreater",
+       "63b43:Skyrim.esm",
        1,
        1
       ]
      ]
-    }
+    },
+    "extra": [
+     [
+      "68520:Skyrim.esm",
+      0.1,
+      1
+     ],
+     [
+      "6026e4:BSAssets.esm",
+      0.1,
+      3
+     ]
+    ],
+    "trophy": {
+     "name": "Asterion's Broken Horn",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    },
    "_note": "Drops (proposed, 25 Oct): Minotaur Horn x2 and Minotaur Hide (BSAssets, the beast's own), gold, Steel Plate 5%. Minotaur's Rest's own spawns are undead today (ownedSpawns.replace minotaur); if the Lord fights, Nat may want its minotaurs back as his adds",
    "rearmAddsEdid": "BSKMinotaurWarAxe",
@@ -1291,20 +1470,14 @@
     "death": "The Behemoth of Hircine's Hunt is dead, and the pack scatters."
    },
    "drops": {
-    "alwaysEdid": [
-     [
-      "WerewolfPelt",
-      1
-     ],
-     [
-      "WolfPelt",
-      3
-     ]
-    ],
     "always": [
      [
       "f:Skyrim.esm",
-      150
+      100
+     ],
+     [
+      "fe6a9:Skyrim.esm",
+      1
      ]
     ],
     "schematic": {
@@ -1314,39 +1487,52 @@
     },
     "pool": {
      "picks": 2,
-     "edids": [
+     "items": [
       [
-       "WolfPelt",
+       "3ad74:Skyrim.esm",
        4,
-       2
+       3
       ],
       [
-       "OreSilver",
+       "6bc04:Skyrim.esm",
        3,
        3
       ],
       [
-       "SabrecatTooth",
-       2,
-       2
+       "5acdf:Skyrim.esm",
+       3,
+       3
       ],
       [
-       "BearPelt",
-       2,
-       1
-      ],
-      [
-       "SabreCatPelt",
+       "3ad52:Skyrim.esm",
        2,
        1
       ],
       [
-       "SoulGemGreater",
-       1,
+       "3ad6e:Skyrim.esm",
+       2,
        1
       ]
      ]
-    }
+    },
+    "extra": [
+     [
+      "5ace3:Skyrim.esm",
+      0.12,
+      3
+     ],
+     [
+      "2e4fb:Skyrim.esm",
+      0.08,
+      1
+     ]
+    ],
+    "trophy": {
+     "name": "Gorefang's Hunt-Torn Hide",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    },
    "_note": "Proposed 25 Oct (the Leader for Nat): vanilla's top werewolf boss (EncWerewolf06Boss, Dawnguard's ladder) named and rim-lit; the server's SetScale is a stub, so the boss is its own NPC_ on the Behemoth race (DLE 1D2207, Nat 25 Oct: 1.3x the pack: race 1.30 x NAM6 1.13 = 1.47 against the adds' 1.13). Pack: a werewolf and two wolves at the start, then 3 and 4 more (werewolf, wolf, wolf in turn). Drops: a Werewolf Pelt (Hothtrooper's werewolf fur and leather recipes take it) and three wolf pelts, gold, Silver 5% (the hunter's metal, Hircine's joke), Glass 1%. Every zone is hostile, player werewolves included. fullMoon true (here or in its config block) keeps it to full-moon nights",
    "bossDesc": "1d2207:DragonBreak Online Edits.esp",
@@ -1417,20 +1603,14 @@
     "death": "The Chieftain of Blizzard Rest is dead, and his bull with him."
    },
    "drops": {
-    "alwaysEdid": [
-     [
-      "GiantToes",
-      2
-     ],
-     [
-      "MammothTusk",
-      2
-     ]
-    ],
     "always": [
      [
       "f:Skyrim.esm",
-      250
+      150
+     ],
+     [
+      "3ad64:Skyrim.esm",
+      1
      ]
     ],
     "schematic": {
@@ -1440,39 +1620,52 @@
     },
     "pool": {
      "picks": 2,
-     "edids": [
+     "items": [
       [
-       "GiantToes",
+       "7e8c1:Skyrim.esm",
        4,
-       1
+       3
       ],
       [
-       "MammothTusk",
-       4,
-       1
-      ],
-      [
-       "GiantLichen",
+       "6bc10:Skyrim.esm",
        3,
        3
       ],
       [
-       "PowderedMammothTusk",
-       2,
-       2
-      ],
-      [
-       "GemDiamond",
-       1,
+       "3ad6c:Skyrim.esm",
+       3,
        1
       ],
       [
-       "SoulGemGrand",
+       "3ad54:Skyrim.esm",
+       2,
+       1
+      ],
+      [
+       "2e4fc:Skyrim.esm",
        1,
        1
       ]
      ]
-    }
+    },
+    "extra": [
+     [
+      "63b47:Skyrim.esm",
+      0.08,
+      1
+     ],
+     [
+      "3ad6c:Skyrim.esm",
+      0.12,
+      2
+     ]
+    ],
+    "trophy": {
+     "name": "Gromm's Stone Fist",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    },
    "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Effective health = base / (1 - toughness): people and daedra 0.9 (10x), big creatures 0.85 (6.7x); every guardian shields 0.95 (20x) while it lives; enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
    "_bossBarNote": "Nat 26 Oct: TrueHUD's boss bar names this copy (DLE 1D2454, templated on the original with every flag) in DragonBreak_Bosses.ini"

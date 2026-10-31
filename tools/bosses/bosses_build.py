@@ -223,6 +223,9 @@ def build(lo, defs):
                 bad.append(f"{who}: no item '{e}' in this load order")
                 continue
             drops.setdefault('extra', []).append([lo.desc(hit[0]), chance, n, hit[2]])
+        # Desc-form rolls (boss-loot-1031): [desc, chance, count], each desc checked against the load order
+        for d, chance, n in dr.get('extra', []):
+            if item(d, who): drops.setdefault('extra', []).append([item(d, who), chance, n])
         # The boss's own loot pool (Nat 26 Oct: "their own loot pools"): each fighter draws pool.picks items by weight, without
         # repeats, from [edid, weight, count]
         if dr.get('pool'):
@@ -233,10 +236,15 @@ def build(lo, defs):
                     bad.append(f"{who}: no pool item '{e}' in this load order")
                     continue
                 items.append([lo.desc(hit[0]), wgt, n, hit[2]])
+            for d, wgt, n in dr['pool'].get('items', []):
+                if item(d, who): items.append([item(d, who), wgt, n])
             drops['pool'] = {'picks': int(dr['pool'].get('picks', 1)), 'items': items}
         if 'shards' in dr:
             drops['shards'] = dict(dr['shards'], desc=item(dr['shards'].get('desc'), who, dr['shards'].get('confirmedBy', '')) or '')
         for key in ('schematic', 'extraSchematic'):
+            if key in dr:
+                drops[key] = dr[key]
+        for key in ('trophy', '_loot1031'):
             if key in dr:
                 drops[key] = dr[key]
         o['drops'] = drops
