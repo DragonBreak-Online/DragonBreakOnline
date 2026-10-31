@@ -7686,6 +7686,8 @@ const wearInfoOf = (baseId) => {
   else if (slot === 'head' && rating <= Number((WEAR_DEBUFF.t2Max || {})[kind]) * share && headCosmeticRx.test(`${edid} ${wearNameOf(baseId)}`)) info.cosmetic = true;
   return info;
 };
+// light, medium or heavy, for PvP's spell armour (pvp.spellArmour counts heavy and medium); '' for clothing and the untiered
+globalThis.__dboArmourClassOf = (baseId) => { try { const w = wearInfoOf(Number(baseId) >>> 0); return w ? w.klass : ''; } catch (e) { return ''; } };
 // A piece's share of the full cost (0..1) at this Defense: by the gap, or (scale "tiers") by tiers over
 const wearShareOf = (w, defense) => {
   if (WEAR_DEBUFF.scale === 'tiers') { const n = Math.min(3, w.tier - wearerTierOf(defense)); return n > 0 ? n / 3 : 0; }
