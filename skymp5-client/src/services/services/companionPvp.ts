@@ -22,6 +22,15 @@ export const orderedTarget = (order: CompanionOrder, isPlayer: (remoteId: number
   return order.pvp || !pvpRuled(order) || !isPlayer(order.target) ? order.target : 0;
 };
 
+// Staff are never fought (Nat, 28 Oct: a GM's warband kept swinging at another GM): the server's warband.js sends the GM
+// leading a band { customPacketType: "companionSpare", ids } with the remote ids of the staff online, and any companion's
+// own fight with one of them is left, whatever its kind. An older server sends none, and nothing changes
+export const parseSpare = (content: Record<string, unknown>): Set<number> => {
+  const ids = content["ids"];
+  return new Set(Array.isArray(ids) ? ids.filter((x) => typeof x === "number" && x > 0).map((x) => (x as number) >>> 0) : []);
+};
+export const leavesSparedFight = (combatTarget: number, spare: Set<number>): boolean => !!combatTarget && spare.has(combatTarget >>> 0);
+
 // The engine is fighting a player (combatTarget, a remote id; 0 for none) that the server has not named for this companion
 export const leavesPlayerFight = (combatTarget: number, order: CompanionOrder, isPlayer: (remoteId: number) => boolean): boolean => {
   if (!combatTarget || !pvpRuled(order) || !isPlayer(combatTarget)) return false;

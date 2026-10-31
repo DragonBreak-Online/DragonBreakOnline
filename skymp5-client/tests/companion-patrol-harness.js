@@ -63,6 +63,29 @@ check('...in different directions from the centre, not one line', new Set(dirs).
   check('it walks with pathToReference to the member\'s own XMarker (Skyrim.esm 00003B), moved to the point first',
     /const XMARKER = 0x00003b;/.test(src) && /getFormFromFile\(XMARKER, "Skyrim\.esm"\)/.test(src) && /marker\.setPosition\(point\[0\], point\[1\], point\[2\]\)\.then\(/.test(src) && /a\.pathToReference\(m, 0\.5\)/.test(src));
   check('a new connection drops the patrol and its markers', /this\.setCompanions\(\[\]\);\s*this\.patrol = null;\s*this\.clearPatrolMarkers\(\);/.test(src));
+
+  // Held still while holding (Nat: "some move some don't": a member whose own package sandboxes walked off a hold)
+  check('a holding member is frozen with setDontMove, except while a patrol walk frees it', /this\.patrolStep\(actor, c, state, now, player\);[^\n]*\n\s*this\.setFrozen\(actor, state, now >= \(state\.walkUntil \|\| 0\)\);/.test(src));
+  check('...a patrol walk unfreezes it before pathToReference, for most of the interval', /state\.walkUntil = now \+ PATROL_EVERY_MS - 1000;\s*this\.setFrozen\(actor, state, false\);[\s\S]{0,400}a\.pathToReference\(m, 0\.5\)/.test(src));
+  const unfreezes = (src.match(/this\.setFrozen\(actor, state, false\);/g) || []).length;
+  check('...and every other branch (fight, combat, driven, follow) unfreezes it', unfreezes >= 5, unfreezes);
+  check('...setDontMove is called only when the state changes', /if \(!!state\.frozen === on\) return;\s*actor\.setDontMove\(on\);\s*state\.frozen = on;/.test(src));
+  check('a member that leaves the list frozen (dismiss, settle, unleash, a new connection) is freed on the next update',
+    /if \(gone && gone\.frozen\) this\.pendingUnfreeze\.push\(gone\.localId\);/.test(src) && /for \(const id of this\.pendingUnfreeze\.splice\(0\)\) \{\s*try \{ Actor\.from\(this\.sp\.Game\.getFormEx\(id\)\)\?\.setDontMove\(false\); \}/.test(src));
+
+  // Staff are never fought: any companion's own fight with a staff member the server names is left
+  check('companionSpare from the server sets the staff to spare', /content\["customPacketType"\] === "companionSpare"\) \{\s*this\.spare = parseSpare\(content\);/.test(src));
+  check('...and an engine fight with one of them is left like an unnamed player fight', /leavesPlayerFight\(localIdToRemoteId\(engineTargetLocal\), c, isRemotePlayerCharacter\) \|\| leavesSparedFight\(localIdToRemoteId\(engineTargetLocal\), this\.spare\)\)\) \{\s*actor\.stopCombat\(\);/.test(src));
+  check('...cleared on a new connection', /this\.clearPatrolMarkers\(\);\s*this\.spare = new Set<number>\(\);/.test(src));
+}
+
+function runPvp(v) {
+  const spare = v.parseSpare({ customPacketType: 'companionSpare', ids: [0xff000101, 0xff000102, 'x', -3] });
+  check('parseSpare keeps the numeric remote ids only', spare.size === 2 && spare.has(0xff000101) && spare.has(0xff000102), [...spare]);
+  check('...an older server\'s missing list spares nobody', v.parseSpare({ customPacketType: 'companionSpare' }).size === 0);
+  check('leavesSparedFight: a fight with a spared staff member is left', v.leavesSparedFight(0xff000101, spare) === true);
+  check('...a fight with anyone else is not, nor no fight', v.leavesSparedFight(0xff000199, spare) === false && v.leavesSparedFight(0, spare) === false);
+  check('...whatever the companion\'s kind (a warband follower\'s own player fights are otherwise its own)', v.pvpRuled({ target: 0, pvp: false, kind: 'companion' }) === false && v.leavesSparedFight(0xff000102, spare));
 }
 
 async function main() {
@@ -72,6 +95,10 @@ async function main() {
     await esbuild.build({ entryPoints: [path.resolve(__dirname, '../src/services/services/companionPatrol.ts')], bundle: true,
       platform: 'node', format: 'cjs', outfile: out, logLevel: 'error' });
     run(require(out));
+    const outPvp = path.join(tmp, 'companionPvp.js');
+    await esbuild.build({ entryPoints: [path.resolve(__dirname, '../src/services/services/companionPvp.ts')], bundle: true,
+      platform: 'node', format: 'cjs', outfile: outPvp, logLevel: 'error' });
+    runPvp(require(outPvp));
   } finally {
     try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) { /* left for the OS */ }
   }
