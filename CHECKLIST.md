@@ -1,5 +1,36 @@
 # DragonBreak Online checklist (2026-09-14)
 
+## Open engine question: is the NAVI navmesh info map last-wins, or merged? (Worker 3, 31 Oct)
+
+Raised while building `DragonBreak Minotaur Patch.esp`, recorded here on the Leader's instruction and
+**deliberately not measured now** - nobody reports pathing collapse in DLE dungeons or strongholds.
+
+There is one NAVI record in the game, `skyrim.esm:012FB4`, and **58 plugins in the 148-plugin order
+override it**. An override is not the accumulated map: it holds only what that plugin's CK session
+wrote. Measured - 48 list a mix of their own navmeshes and some of their masters', 1 only its own, 9
+only their masters'. The counts are wildly uneven:
+
+| plugin | NVMI entries | its own |
+|---|---|---|
+| `MagicalBlackreach.esp` (wins today) | 64 | 7 |
+| `DragonBreak Online Edits.esp` | 612 | 157 |
+| `arnima.esm` | ~52,000 | most |
+
+**If this record is plain last-wins, the live game is already running on 64 entries** and has already
+dropped the DLE's own 157 - our dungeon and stronghold navmesh info. It visibly has not collapsed, so
+the engine most likely merges NAVI or rebuilds it from the NAVM records at load. Which of those is true
+is unverified, and guessing at an engine fact is against the rules here.
+
+**The test that would settle it:** walk a DLE dungeon and an Orc stronghold with the server running the
+current order, and watch whether NPCs path normally across cell boundaries and through doors - the
+places an info-map entry, not the navmesh itself, is what carries portals and preferred paths. If they
+path fine, the engine merges and nothing needs doing. If they do not, every plugin after the DLE needs
+a merged NAVI and that is a large job.
+
+What does NOT depend on the answer: the minotaur patch carries the displaced winner's 64 entries plus
+Mihail's 4, so it is a strict improvement either way. See
+`_notes-to-server/staged-20261031-minotaur-patch/NOTE.md`.
+
 ## 27 Oct - regeneration: the server never saw the gameplay layer's rates (Worker 4, PC)
 
 **`rc-1027-regen` @ `db824264`, off `d728be8e`. Unit tests green on the homeserver dev box: [Papyrus] 798
