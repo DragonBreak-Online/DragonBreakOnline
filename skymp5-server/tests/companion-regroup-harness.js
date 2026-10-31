@@ -1,9 +1,11 @@
 // A companion its owner's client reports missing is sent to that client again (the live log 29-31 Oct: 803 of 14,834 owner
 // reports said the companion did not exist there, for up to about 3 minutes each). The gameplay calls
-// __dboCompanions.regroup(id) after two such reports in a row; the system places the companion beside its owner, then
-// disables and enables it, which unsubscribes and resubscribes every listener (MpObjectReference Disable/Enable), so the
-// owner's client is sent it afresh. Checks: placed behind the owner and disabled then enabled, in that order; a "stay"
-// companion, an offline owner and a non-companion are left alone; a second call within the cooldown is refused. It bundles
+// __dboCompanions.regroup(id) after two such reports in a row; the system places the companion beside its owner and
+// disables it, and its 500 ms check enables it a second later, which resubscribes every listener (MpObjectReference
+// Disable/Enable), so the owner's client is sent it afresh. Not in one tick: the client queues Actor::Disable, and a
+// recreate before it runs is the 12-17 Oct crash family (Worker 4). Checks: placed behind the owner and disabled; enabled
+// only after a second; never left disabled when it ends or its owner leaves; a "stay" companion, an offline owner and a
+// non-companion are left alone; a second call within the cooldown is refused. It bundles
 // companionSystem.ts with esbuild (settings and placement stubbed). Run it from skymp5-server with node_modules present:
 //
 //   node tests/companion-regroup-harness.js
@@ -93,7 +95,15 @@ const PLAYER_BASE = 0x7, SUMMON_BASE = 0x640b5;
   check('...behind its owner (128 units back, in the owner\'s cell)', JSON.stringify(mine[0]) === JSON.stringify(['locationalData', [1000, 1872, 16]]) && get(S, 'locationalData').cellOrWorldDesc === '3c:Skyrim.esm', mine);
   check('...its spawn point too', mine.some(([k]) => k === 'spawnPoint'), mine);
   const dis = mine.map(([k, v]) => (k === 'isDisabled' ? v : null)).filter((x) => x !== null);
-  check('...then disabled and enabled, in that order, after the move (a fresh subscription at the new spot)', JSON.stringify(dis) === '[true,false]' && mine.findIndex(([k]) => k === 'isDisabled') > mine.findIndex(([k]) => k === 'locationalData'), mine);
+  check('...then disabled after the move, and not enabled in the same tick', JSON.stringify(dis) === '[true]' && mine.findIndex(([k]) => k === 'isDisabled') > mine.findIndex(([k]) => k === 'locationalData'), mine);
+  const comp = (id) => sys.companions.get(id >>> 0);
+  writes.length = 0; now += 999; sys.check(comp(S), now);
+  check('...still disabled 999 ms later', !writes.some(([id, k]) => id === S && k === 'isDisabled') && get(S, 'isDisabled') === true, writes);
+  now += 1; sys.check(comp(S), now);
+  check('...enabled by the check a second after the disable (the fresh subscription)', get(S, 'isDisabled') === false, writes);
+  writes.length = 0; now += 500; sys.check(comp(S), now);
+  check('...and only once', !writes.some(([id, k]) => id === S && k === 'isDisabled'), writes);
+  now -= 1500;
   check('...and logged', logs.some((l) => /placed beside ff000101 again \(missing on the owner's client\)/.test(l)), logs.slice(-2));
 
   writes.length = 0;
@@ -103,12 +113,24 @@ const PLAYER_BASE = 0x7, SUMMON_BASE = 0x640b5;
   check('...after 30 s it may be placed again', api.regroup(S) === 'placed');
 
   now += 31000;
-  api.stay(T);
+  // A companion whose owner leaves while it waits is enabled before it is put away for the next login
+  sys.companions.get(T >>> 0).persistent = true;
+  check('T placed', api.regroup(T) === 'placed' && get(T, 'isDisabled') === true);
+  sys.release(sys.companions.get(T >>> 0));
+  check('...released while waiting: enabled first, never left disabled', get(T, 'isDisabled') === false);
+  const T2 = sys.spawn(B, SUMMON_BASE, { kind: 'summon' });
+  now += 31000;
+  check('T2 placed', api.regroup(T2) === 'placed' && get(T2, 'isDisabled') === true);
+  sys.dismiss(T2, 'dismissed');
+  check('...dismissed while waiting: enabled before it goes', writes.some(([id, k, v]) => id === T2 && k === 'isDisabled' && v === false));
+  now += 31000;
+  const T3 = sys.spawn(B, SUMMON_BASE, { kind: 'summon' });
+  api.stay(T3);
   writes.length = 0;
-  check('a "stay" companion is left where it was told to stay', api.regroup(T) === 'staying' && !writes.some(([id]) => id === T), writes);
-  api.follow(T);
+  check('a "stay" companion is left where it was told to stay', api.regroup(T3) === 'staying' && !writes.some(([id]) => id === T3), writes);
+  api.follow(T3);
   users.delete(B);
-  check('an owner who is offline: left alone', api.regroup(T) === 'owner offline');
+  check('an owner who is offline: left alone', api.regroup(T3) === 'owner offline');
   check('not a companion: left alone', api.regroup(0xff0009ff) === 'not a companion' && api.regroup(A) === 'not a companion');
 
   Date.now = realNow;
