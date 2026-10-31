@@ -9265,7 +9265,9 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
         const rec = masteryOf(agg); const rank = rec && Array.isArray(rec.order) && rec.order.includes(skill) ? Number(((rec.skills || {})[skill] || {}).rank) || 0 : -1;
         let sta = ''; if (flags && flags.power) { const pc = mp.get(agg, 'percentages'); sta = ` stamina=${pc ? Number(pc.stamina).toFixed(2) : '?'}`; }
         const r = (x) => Number(x).toFixed(2);
-        log(`pvp hit ${display(agg)} -> ${display(tgt)} kind=${magic ? 'magic' : skill} rank=${skill}:${rank} dmg=${Number(dmg).toFixed(1)} mult=${r(mult)} armour=${r(pvpSpellArmourMult(agg, tgt, src))} shield=${r(pvpShieldElementMult(agg, tgt, src, flags))} resist=${r(gearResistMult(tgt, src) * potionResistMult(tgt, src))}${flags && flags.power ? ' power' : ''}${flags && flags.blocked ? ' blocked' : ''}${sta}`);
+        // src names the source (an "other" kind was unreadable on 31 Oct); sneak marks the engine's sneak hit
+        const srcRec = recordOf(src >>> 0); const srcName = srcRec ? String(srcRec.record.editorId || '') || (src >>> 0).toString(16) : (src >>> 0).toString(16);
+        log(`pvp hit ${display(agg)} -> ${display(tgt)} kind=${magic ? 'magic' : skill} src=${srcName}${flags && flags.sneak ? ' sneak' : ''} rank=${skill}:${rank} dmg=${Number(dmg).toFixed(1)} mult=${r(mult)} armour=${r(pvpSpellArmourMult(agg, tgt, src))} shield=${r(pvpShieldElementMult(agg, tgt, src, flags))} resist=${r(gearResistMult(tgt, src) * potionResistMult(tgt, src))}${flags && flags.power ? ' power' : ''}${flags && flags.blocked ? ' blocked' : ''}${sta}`);
       } catch (e) { /* the measurement is optional */ }
     }
     // A family of creatures by race, on a player (npcToughness.kinds.<kind>.dealt; the draugr, 17 Oct)
