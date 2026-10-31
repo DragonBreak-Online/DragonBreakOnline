@@ -17,7 +17,7 @@ const ok = (c, what, got) => { console.log(`${c ? 'ok  ' : 'FAIL'}  ${what}${!c 
 // ---- the world ---------------------------------------------------------------------------------------------------------
 const WORLD = '3c:Skyrim.esm';
 const RACES = { 1: 'DBOReachmanRace', 2: 'NordRace' };
-const ID = { '3ad66:Skyrim.esm': 0x3ad66, '6b689:Skyrim.esm': 0x6b689, '2e4ff:Skyrim.esm': 0x2e4ff, '3ad61:Skyrim.esm': 0x3ad61, '2e504:Skyrim.esm': 0x2e504 };
+const ID = { '3ad66:Skyrim.esm': 0x3ad66, '6b689:Skyrim.esm': 0x6b689, '2e4ff:Skyrim.esm': 0x2e4ff, '3ad61:Skyrim.esm': 0x3ad61, '2e504:Skyrim.esm': 0x2e504, '43599:Skyrim.esm': 0x43599 };
 const FEATHER = 0x3ad66, CLAW = 0x6b689, GRAND = 0x2e4ff, HEART = 0x3ad61;
 const props = new Map();
 const P = (a, k) => props.get(`${a >>> 0}|${k}`);
@@ -201,6 +201,26 @@ ok(audits.some((t) => /set who20 to stage 3 \(Hagraven\): coven event/.test(t)),
 ok(/no more/.test(run('hagraven', LEAD, 'revoke witch done')) && globalThis.__dboHagravenStage(WITCH) === 0, 'and revokes it');
 ok(/char20 \(Crone-touched\)/.test((run('hagraven', LEAD, 'grant witch again'), run('hagraven', LEAD, 'list'))), '/hagraven list names the online ones and their stage');
 
+// ---- the Forsworn's own (31 Oct): the faction joined, their hits refused unless she struck first ------------------------------------
+const FW = actor(0x30, 2, false, 'reach', [50, 0, 0], []);
+globalThis.__dboIsForsworn = (id) => (id >>> 0) === FW;
+H = loadH({ hagraven: { enabled: true, forswornFriendly: true, provokeSeconds: 60 } });
+papyrusCalls.length = 0;
+run('hagraven', LEAD, 'revoke witch reset'); run('hagraven', LEAD, 'grant witch kin test');
+ok(papyrusCalls.some((c) => c.method === 'AddToFaction' && c.args[0] === '43599:Skyrim.esm'), 'the pact puts her in ForswornFaction');
+const sp = globalThis.__dboHagravenSpares;
+ok(sp(FW, WITCH) === true, 'a Forsworn\'s hit on her is refused');
+ok(sp(FW, REACHMAN) === false && sp(PASSER, WITCH) === false, '...not on anyone else, and not anyone else\'s hit');
+ok(sp(WITCH, FW) === false && sp(FW, WITCH) === false, 'once she strikes that Forsworn, it may answer');
+papyrusCalls.length = 0;
+run('hagraven', LEAD, 'revoke witch kin over');
+ok(papyrusCalls.some((c) => c.method === 'RemoveFromFaction' && c.args[0] === '43599:Skyrim.esm') && sp(FW, WITCH) === false, 'the pact ended: out of the faction, and no hit is refused');
+H = loadH({ hagraven: { enabled: true, forswornFriendly: false } });
+run('hagraven', LEAD, 'grant witch kin off');
+ok(globalThis.__dboHagravenSpares(FW, WITCH) === false, 'forswornFriendly false: no hit is refused');
+delete globalThis.__dboIsForsworn;
+H = loadH(CFG);
+
 // ---- the hooks in the other modules ----------------------------------------------------------------------------------------------------
 const src = (f) => fs.readFileSync(path.resolve(__dirname, '..', f), 'utf8');
 ok(/require\(HAGRAVEN_JS\)/.test(src('gamemode.js')) && /__dboHagravenAttackMult\(agg, src\)/.test(src('gamemode.js')) && /__dboHagravenLogin\(a\)/.test(src('gamemode.js')) && /const sourceSkillsOf = /.test(src('gamemode.js')), 'gamemode.js loads it, reads the schools, asks the attacker side, and calls the login');
@@ -218,6 +238,8 @@ ok(/__dboHagravenCast\(Number\(casterId\) >>> 0, Number\(spellId\) >>> 0\)/.test
 const D = 'DragonBreak Online Edits.esp';
 ok(gcfg.hagraven.display && gcfg.hagraven.display[1] === `1d222e:${D}` && gcfg.hagraven.display[2] === `1d222f:${D}` && gcfg.hagraven.display[3] === `1d2230:${D}`, 'the shipped config: the three stage displays', gcfg.hagraven.display);
 ok(gcfg.hagraven.form && gcfg.hagraven.form.enabled === false && gcfg.hagraven.powerSpell === '', 'the shipped config: the Hagraven body off and no Form power while it is on hold', gcfg.hagraven.form);
+ok(/__dboHagravenSpares\(agg, tgt\)\) return false;/.test(src('gamemode.js')) && /globalThis\.__dboIsForsworn = /.test(src('briarheart.js')), 'gamemode.js refuses a Forsworn\'s hit through hagraven.js, which asks briarheart.js who is Forsworn');
+ok(gcfg.hagraven.forswornFriendly === true && gcfg.hagraven.forswornFaction === '43599:Skyrim.esm', 'the shipped config: the Forsworn\'s own (acting once the pact is on)');
 
 process.chdir(cwd);
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');

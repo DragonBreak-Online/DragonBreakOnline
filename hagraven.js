@@ -60,6 +60,10 @@ module.exports = (api) => {
     knownOnSight: true, knownOnSightExemptHolds: ['markarth'], witnessRadius: 2000, witnessEveryMinutes: 10,
     cureDeities: ['kynareth'], cureItem: '2e4ff:Skyrim.esm',  // a filled grand soul gem
     visual: { enabled: false, stages: { 1: '', 2: '', 3: '' } },
+    // The Forsworn's own (lore: Reach witches lead and are revered by them): from the pact she joins ForswornFaction, and a
+    // Forsworn's or a hagraven's hit on her is refused unless she struck that one in the last provokeSeconds (briarheart.js's
+    // test of who is Forsworn, __dboIsForsworn)
+    forswornFriendly: false, forswornFaction: '43599:Skyrim.esm', provokeSeconds: 60,
   }, (cfg && cfg.hagraven) || {});
   C.form = Object.assign({ enabled: true, cooldownSeconds: 60 }, (cfg && cfg.hagraven && cfg.hagraven.form) || {});
   // What she is, in Magic > Active Effects (Nat, 25 Oct): one display ability per stage (a DLE SPEL, type Ability, whose
@@ -116,9 +120,15 @@ module.exports = (api) => {
     for (const k of [1, 2, 3]) { const d = String(C.display[k] || ''); if (d && idOf(d)) papyrus(a, k === st ? 'AddSpell' : 'RemoveSpell', k === st ? [spellArg(d), false] : [spellArg(d)]); }
     const p = C.powerSpell; if (p && idOf(p)) papyrus(a, st >= 3 && C.form.enabled !== false ? 'AddSpell' : 'RemoveSpell', st >= 3 && C.form.enabled !== false ? [spellArg(p), false] : [spellArg(p)]);
   };
+  const forsworn = (a, on, why) => {
+    if (!isOnline(a) || !idOf(C.forswornFaction)) return;
+    papyrus(a, on ? 'AddToFaction' : 'RemoveFromFaction', [{ type: 'espm', desc: String(C.forswornFaction) }]);
+    log(`hagraven: ${on ? 'AddToFaction' : 'RemoveFromFaction'} ${C.forswornFaction} on ${display(a)} (${why})`);
+  };
   const applyStage = (a, why) => {
     const st = stageOf(a); if (!st || !isOnline(a)) return;
     showStage(a, st);
+    if (C.forswornFriendly) forsworn(a, true, why);
     if (st >= 2 && Number(C.speedMult) > 0 && Number(C.speedMult) !== 100) {
       papyrus(a, 'SetActorValue', ['SpeedMult', Number(C.speedMult)]);
       log(`hagraven: SpeedMult ${C.speedMult} on ${display(a)} (${why}, stage ${st})`);
@@ -130,6 +140,22 @@ module.exports = (api) => {
   const undoStage = (a, stageWas) => {
     if (isOnline(a) && stageWas >= 2 && Number(C.speedMult) > 0 && Number(C.speedMult) !== 100) papyrus(a, 'SetActorValue', ['SpeedMult', 100]);
     showStage(a, 0);
+    if (C.forswornFriendly) forsworn(a, false, 'the pact ended');
+  };
+  // gamemode.js onHitDamageAttempt: true refuses a Forsworn's (or a hagraven's) hit on a pact-holder. Her own hit on one
+  // of them marks it provoked, and a provoked one may answer for provokeSeconds
+  if (!(S.provoked instanceof Map)) S.provoked = new Map();
+  globalThis.__dboHagravenSpares = (agg, tgt) => {
+    agg = Number(agg) >>> 0; tgt = Number(tgt) >>> 0;
+    if (!C.enabled || !C.forswornFriendly || agg === tgt || !fn('__dboIsForsworn')) return false;
+    const now = Date.now(), ms = Math.max(0, Number(C.provokeSeconds) || 0) * 1000;
+    if (stageOf(agg) && call('__dboIsForsworn', tgt)) {
+      S.provoked.set(tgt, now);
+      if (S.provoked.size > 256) for (const [k, t] of S.provoked) if (now - t > ms) S.provoked.delete(k);
+      return false;
+    }
+    if (!stageOf(tgt) || !call('__dboIsForsworn', agg)) return false;
+    return now - (S.provoked.get(agg) || 0) >= ms;
   };
   // Stage 2+: every citizenship but keepHolds is taken and barred for barDays, once a day while she is one
   const lapseCitizenship = (a, why) => {
@@ -179,7 +205,7 @@ module.exports = (api) => {
     const no = pactRefusal(a); if (no) return no;
     S.pending.set(a >>> 0, Date.now());
     audit(`HAGRAVEN ${who(a)} asked for the pact and was told its price`);
-    return `You would trade your humanity for the witch's power. Your spells will burn hotter, and grow hotter still; the Divines will turn from you (Kynareth alone may still hear you). In time you will slow, the holds will strip you of your citizenship, and as a Hagraven you will be known on sight outside the Reach, hunted and bountied. Only Kyne can undo it. Say /hagraven confirm within ${C.confirmMinutes} minutes to give yourself to the coven.`;
+    return `You would trade your humanity for the witch's power. Your spells will burn hotter, and grow hotter still; the Divines will turn from you (Kynareth alone may still hear you). In time you will slow, the holds will strip you of your citizenship, and as a Hagraven you will be known on sight outside the Reach, hunted and bountied.${C.forswornFriendly ? ' The Forsworn will know you for one of the witches they follow.' : ''} Only Kyne can undo it. Say /hagraven confirm within ${C.confirmMinutes} minutes to give yourself to the coven.`;
   };
   const confirm = (a) => {
     const t0 = S.pending.get(a >>> 0); S.pending.delete(a >>> 0);
@@ -188,7 +214,7 @@ module.exports = (api) => {
     if (!takeEach(a, (C.pactItems || []).map(idOf))) return 'The coven asks for a Hagraven Feather and a Hagraven Claw.';
     become(a, 'pact', '', 1);
     audit(`HAGRAVEN ${who(a)} made the pact at a Hagraven altar (stage 1, Crone-touched)`);
-    return 'The coven takes the feather and the claw, and something of you with them. The witchcraft wakes in your hands. You are Crone-touched.';
+    return 'The coven takes the feather and the claw, and something of you with them. The witchcraft wakes in your hands. You are Crone-touched.' + (C.forswornFriendly ? ' The Forsworn will not raise a blade to you, so long as you raise none to them.' : '');
   };
 
   // ---- the cure: Kyne's alone ------------------------------------------------------------------------------------------------
@@ -210,7 +236,7 @@ module.exports = (api) => {
     if (now > was) {
       audit(`HAGRAVEN ${who(a)} became ${NAMES[now]} (stage ${now}, ${Math.round(r.played / HOUR)} h played)`);
       personal(a >>> 0, now === 2 ? 'Feathers push through your skin. Your step grows heavy, and the holds have heard of you: their citizenship is no longer yours.'
-        : 'The pact is complete. You are a Hagraven: the briar answers your hands, and outside the Reach every guard will know you on sight.');
+        : `The pact is complete. You are a Hagraven: the briar answers your hands, and outside the Reach every guard will know you on sight.${C.canRiteBriarhearts ? ' Stand at a Hagraven altar when a Reachman comes for the briar, and it is your hand that sets it in his chest.' : ''}`);
       applyStage(a, `stage ${now}`);
     } else if (now >= 2) lapseCitizenship(a, 'daily');
   };

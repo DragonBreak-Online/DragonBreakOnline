@@ -610,6 +610,8 @@ module.exports = (api) => {
     const edid = r && r.record ? String(r.record.editorId || '') : '';
     try { return !!edid && new RegExp(String(C.forswornMatch), 'i').test(edid); } catch (e) { return false; }
   };
+  // hagraven.js: the same test of who counts as Forsworn (or a hagraven), for a pact-holder
+  globalThis.__dboIsForsworn = (id) => isForsworn(Number(id) >>> 0);
   globalThis.__dboBriarheartSpares = (agg, tgt) => {
     agg = Number(agg) >>> 0; tgt = Number(tgt) >>> 0;
     if (!C.enabled || !C.forswornFriendly || agg === tgt) return false;
