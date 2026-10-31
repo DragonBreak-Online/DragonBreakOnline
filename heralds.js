@@ -10,16 +10,24 @@
 // cry also goes to Discord (stafftools.js, the /event post), so word flows from the game out and not the other way.
 // The login line and /status (the journal's Status) name what is cried near you. Kept in heralds.json.
 //
+// Those who come are rewarded (in-game-over-discord incentives): for attendance.windowMinutes from the start, each player
+// in the gathering's hold is counted a minute at a time. When the window closes, if at least attendance.minAttendees
+// stood there attendance.minMinutes or more, each of them has their work go easier, attendance.boostMult for
+// attendance.boostMinutes (skillrates.js __dboGatheringSkillRate, normal play only), once per gathering.
+//
 // gamemode-config.json "heralds": { enabled, fee: 50, maxText: 200, minAheadMinutes: 10, maxAheadDays: 7,
-//   maxActivePerPoster: 2, reminderMinutes: 30, keepHours: 6 }
+//   maxActivePerPoster: 2, reminderMinutes: 30, keepHours: 6,
+//   attendance: { enabled: true, windowMinutes: 60, minMinutes: 20, minAttendees: 5, boostMult: 1.1, boostMinutes: 60 } }
 'use strict';
 const fs = require('fs');
 const path = require('path');
 
 module.exports = (api) => {
-  const { mp, log, personal, system, registerChatCommand, onlineActors, profileOf, nameOf, zoneById, takeGold, depositToTreasury, every, audit, isAdmin, cfg } = api;
+  const { mp, log, personal, system, registerChatCommand, onlineActors, profileOf, nameOf, zoneById, takeGold, depositToTreasury, every, audit, isAdmin, zoneOfActor, cfg } = api;
   const C = Object.assign({ enabled: true, fee: 50, maxText: 200, minAheadMinutes: 10, maxAheadDays: 7, maxActivePerPoster: 2, reminderMinutes: 30, keepHours: 6 }, cfg.heralds || {});
   const ON = C.enabled !== false;
+  const AT = Object.assign({ enabled: true, windowMinutes: 60, minMinutes: 20, minAttendees: 5, boostMult: 1.1, boostMinutes: 60 }, C.attendance || {});
+  const BOOST = 'private.dboGatheringBoost';
   const FILE = path.resolve('heralds.json');
   const S = (() => { try { const j = JSON.parse(fs.readFileSync(FILE, 'utf8')); return { seq: Number(j.seq) || 0, events: Array.isArray(j.events) ? j.events : [] }; } catch (e) { return { seq: 0, events: [] }; } })();
   const save = () => { try { fs.writeFileSync(FILE, JSON.stringify(S)); } catch (e) { log('heralds: save failed', e.message); } };
@@ -120,6 +128,34 @@ module.exports = (api) => {
     personal(a, `The heralds cry: ${list.slice(0, 8).map((e) => describe(e, now, a)).join(' ')} /events attend <n> to say you will come.`);
   }, { help: '[attend <n>]: what the heralds cry, and say you will come' });
 
+  // Attendance: a minute counted for each player in the gathering's hold while its window runs, the reward when it closes.
+  // true when the gathering changed
+  const holdOf = (a) => { try { const z = typeof zoneOfActor === 'function' ? zoneOfActor(a) : null; return z ? String(z) : ''; } catch (e) { return ''; } };
+  const attend = (e, now) => {
+    if (AT.enabled === false || e.rewarded || now < e.at) return false;
+    const end = e.at + AT.windowMinutes * 60000;
+    e.present = e.present && typeof e.present === 'object' ? e.present : {};
+    if (now < end) {
+      for (const t of onlineActors()) if (holdOf(t) === String(e.zoneId)) { const p = String(profileOf(t)); e.present[p] = (e.present[p] || 0) + 1; }
+      return true;
+    }
+    e.rewarded = true;
+    const came = Object.keys(e.present).filter((p) => e.present[p] >= AT.minMinutes);
+    if (came.length < AT.minAttendees) { log(`heralds: #${e.id} closed, ${came.length} stayed (fewer than ${AT.minAttendees}): no reward`); return true; }
+    const until = now + AT.boostMinutes * 60000;
+    let given = 0;
+    for (const t of onlineActors()) {
+      if (!came.includes(String(profileOf(t)))) continue;
+      try { mp.set(t, BOOST, { mult: AT.boostMult, until, from: e.id }); given++; } catch (err) { continue; }
+      personal(t, `Having joined ${e.title}, your work comes easier for the next ${AT.boostMinutes} minutes.`);
+    }
+    audit(`HERALD #${e.id} "${e.title}" closed: ${came.length} stayed, ${given} rewarded (x${AT.boostMult} for ${AT.boostMinutes} min)`);
+    return true;
+  };
+  globalThis.__dboGatheringSkillRate = (a) => {
+    let b = null; try { b = mp.get(a >>> 0, BOOST); } catch (e) { return 1; }
+    return b && Number(b.until) > Date.now() && Number(b.mult) >= 1 ? Math.min(2, Number(b.mult)) : 1;
+  };
   // Reminders and the start, once a minute
   every('heralds', 60000, () => {
     if (!ON) return;
@@ -128,6 +164,7 @@ module.exports = (api) => {
     for (const e of live(now)) {
       if (!e.reminded && e.at - now <= C.reminderMinutes * 60000 && e.at > now) { e.reminded = true; changed = true; const w = `${e.title}, at ${e.place}, ${fromNow(e.at - now)}.`; cry(e, w); tellComing(e, `it begins ${fromNow(e.at - now)} at ${e.place}.`); }
       if (!e.begun && now >= e.at) { e.begun = true; changed = true; cry(e, `${e.title} begins now, at ${e.place}.`); tellComing(e, `it begins now, at ${e.place}.`); }
+      if (attend(e, now)) changed = true;
     }
     const before = S.events.length;
     S.events = S.events.filter((x) => !x.cancelled && now < x.at + C.keepHours * 3600000);

@@ -168,6 +168,10 @@ module.exports = (api) => {
     if (rate > 0 && kind !== 'award' && typeof globalThis.__dboReferralSkillRate === 'function') {
       try { const r = Number(globalThis.__dboReferralSkillRate(actorId >>> 0)); if (Number.isFinite(r) && r >= 1 && r <= 3) rate *= r; } catch (e) { /* no referral boost */ }
     }
+    // Having joined a gathering the heralds cried (heralds.js), the same way: normal play only, at most double
+    if (rate > 0 && kind !== 'award' && typeof globalThis.__dboGatheringSkillRate === 'function') {
+      try { const r = Number(globalThis.__dboGatheringSkillRate(actorId >>> 0)); if (Number.isFinite(r) && r >= 1 && r <= 2) rate *= r; } catch (e) { /* no gathering boost */ }
+    }
     if (kind !== 'award' || typeof globalThis.__dboSchoolsAwardRate !== 'function') return rate;
     let k = 1;
     try { k = Number(globalThis.__dboSchoolsAwardRate(actorId >>> 0, skillId, kind, detail)); } catch (e) { k = 1; }
