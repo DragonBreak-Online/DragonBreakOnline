@@ -1,5 +1,21 @@
 [
   {
+    "title": "The faction's own birds",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Pigeons",
+        "items": [
+          "A pigeon to someone of your own faction, guild or party now flies free, needs no meeting first, and waits only 5 minutes before you can write to that same person again. It does not use up your 35-minute wait for other letters.",
+          "Leaders and officers can send a circular from any notice board: /circular <text> sends one letter to every member of the faction, those away included. One circular every 30 minutes.",
+          "Your journal's Status (and /status) now shows who has written to you and when. The letters are still read at a notice board."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Runners carry word to your faction and party",
     "date": "2026-10-31",
     "version": "Server update",
