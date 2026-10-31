@@ -56,6 +56,8 @@ export const NATIVE_CAPS = [
   "native:businessLedger",
   // Worker 6's property market (dbo_market, widget 82). Its keys are dbo:propertyMarketAct and dbo:propertyMarketClose
   "native:propertyMarket",
+  // Worker 6's key ring (dbo_keyring, widget 91). Its keys are dbo:keyRingGive/Cut/Take/Answer/Close
+  "native:keyRing",
 ];
 export const CAPS_RETRY_MS = 5000;
 
