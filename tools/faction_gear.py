@@ -31,7 +31,12 @@ SETS = [
     ('Imperial Legion', ['imperial-legion'], r"^(Imperial (?!City Stew)|Heroic Imperial|General Tullius)", None),
     # Nate 9 Oct: the Penitus Oculatus is its own faction; the Legion keeps the set (his 28 Sep tie) and the Oculatus wears it
     ('Penitus Oculatus', ['imperial-legion', 'penitus-oculatus'], r"^Penitus Oculatus", None),
-    ('Stormcloaks', ['stormcloaks'], r"^(Stormcloak|Heroic Stormcloak|Ulfric's)", None),
+    # Eastmarch and the Stormcloaks share one pool (Nate, 31 Oct). The base game never made an Eastmarch guard
+    # cuirass and dresses Windhelm's guards in Stormcloak ones, so the hold had only its helmet, shield and cloak
+    # to craft: 2 items against 4 to 8 for every other hold, the lowest of the nine. Their WAR UNIFORMS stay
+    # separate (UNIFORM_EXTRA below), so a Stormcloak regular and a Windhelm city guard still read differently
+    # at a standard.
+    ('Stormcloaks', ['stormcloaks', 'hold-windhelm'], r"^(Stormcloak|Heroic Stormcloak|Ulfric's)", None),
     ('Dawnguard', ['dawnguard'], r"^Dawng(ua|au)rd", None),
     ('Blades', ['blades'], r"^(Blades |Akaviri Samurai|Dragonguard)", None),
     ('Companions', ['companions'], r"^(Wolf (Armor|Boots|Gauntlets|Helmet|Shield)|(Heavy|Light) Skyforge Shield)$", None),
@@ -57,8 +62,20 @@ SETS = [
     # The Knights of the Nine's kit (Nat, 25 Oct: a lore faction on the live server): no Knights of the Nine or Crusader
     # gear is in the load order, so the order wears the Knight-Errant set (knighterrant.esp), which no faction held
     ('Knights of the Nine', ['knights-of-the-nine'], r"^Knight-Errant ", lambda n, e, p: p == 'knighterrant.esp'),
+    # Immersive Armors' Nord kit, to the same shared pool (Nate, 31 Oct: "make sure to use immersive armor stuff
+    # too"). Einherjar, Nord Mail, Primitive Nord, Snow Bear and Stormlord: 41 pieces, none claimed by another
+    # faction today. Scoped to Hothtrooper44_ArmorCompilation.esp so a name cannot catch another mod's gear, the
+    # same discipline as the Vigilants and Silver Hand entries. Deliberately NOT gated: Barbarian, Vagabond, Fur,
+    # Hide and Dragonhide, which are generic Nord-world gear rather than anyone's uniform, and gating them would
+    # stop every other smith making furs.
+    ('Nord (Immersive Armors)', ['stormcloaks', 'hold-windhelm'],
+     r"^(Einherjar|Stormlord|Snow Bear|Nord Mail|Primitive Nord)",
+     lambda n, e, p: p == 'Hothtrooper44_ArmorCompilation.esp'),
     # Modded silver only: Immersive Weapons' silver weapons and Immersive Armors' mantles, not the base game's
-    ('Silver Hand', ['silver-hand'], r"(Silver (Longsword|Battle Staff|War Axe|Battleaxe|Scimitar|Nodachi|Katana|Wakizashi|Tanto|Hawk Bow|Sword)|Mantle of the Silver Hand)$",
+    # The Dawnguard keeps silver too: 17 of these carried ["silver-hand","dawnguard"] by hand and a regen
+    # recomputed them to silver-hand alone. Vampire hunters making silver weapons is the obvious intent, so it
+    # lives in the SET now rather than in an edit a regen eats (Worker 4, 31 Oct).
+    ('Silver Hand', ['silver-hand', 'dawnguard'], r"(Silver (Longsword|Battle Staff|War Axe|Battleaxe|Scimitar|Nodachi|Katana|Wakizashi|Tanto|Hawk Bow|Sword)|Mantle of the Silver Hand)$",
      lambda n, e, p: p in ('Immersive Weapons.esp', 'Hothtrooper44_ArmorCompilation.esp')),
 ]
 HOLD_RX = re.compile(r"^(%s) Guard('s (Armor|Helmet|Shield)| Cloak)$" % '|'.join(HOLDS))
