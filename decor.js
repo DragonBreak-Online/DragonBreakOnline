@@ -48,9 +48,9 @@ const DEFAULTS = {
   study: { maxPerHome: 3, minForStudy: 2, books: 10, booksKept: false, minBookValue: 5,
     kinds: [{ id: 'arcane', name: 'Arcane Study Bookshelf' }, { id: 'priest', name: 'Priest Study Bookshelf' }] },
   // Planters: plant one of Hearthfire's crops, it ripens after growHours real hours (rareHours for the rare ones), a pick
-  // is one Harvesting roll (skills.json harvesting: chance and multiplier by tier) on baseYield, missYield if it fails;
+  // yields within commonYield or rareYield [min, max] by one Harvesting roll (skills.json harvesting: chance and multiplier by tier);
   // then the planter is empty again. showZ raises the soil and the crop to the planter's bed. tickSeconds: the ripening check.
-  planter: { maxPerHome: 4, growHours: 24, rareHours: 48, baseYield: 2, missYield: 1, showZ: 30, tickSeconds: 60 },
+  planter: { maxPerHome: 4, growHours: 24, rareHours: 48, commonYield: [2, 4], rareYield: [1, 2], baseYield: 2, missYield: 1, showZ: 30, tickSeconds: 60 },
   // The Lumber Pile (Nat 26 Oct, a home's saw): a Woodcutter of minTier (0 based; 1 Apprentice) saws carried firewood into
   // Sawn Logs, firewoodPerLogByTier firewood a log by tier, at most logsPerUse logs a use, then cooldownMinutes per player
   // per pile. Who may decorate the home may use it. The piece is one per home (its station keyword) and takes a workbench slot.
@@ -726,12 +726,22 @@ module.exports = (api) => {
     audit(`DECOR plant ${who(a)} ${crop.item} in planter ${it.ref} place ${hex(found.root)} ripe ${new Date(it.crop.ripeAt).toISOString()}`);
     return personal(a, `You plant ${itemName(crop.item)}. It ripens in ${hoursOf(crop)} hours.`);
   };
-  // a pick is one Harvesting roll (skills.json harvesting, as a wild plant rolls) on baseYield; missYield if it fails
+  // A pick yields within the crop's range (Nat, 31 Oct: 2-4 a common crop, 1-2 a rare one, after "1 ash yam per 24 h"): one
+  // Harvesting roll (skills.json harvesting, as a wild plant rolls); a miss gives the range's floor, a hit at least one more,
+  // up to the top for a Master (min + max(1, round((max - min) x the tier's multiplier / 2)))
+  const yieldRange = (crop) => {
+    const r = crop && crop.rare ? C.planter.rareYield : C.planter.commonYield;
+    const lo = Math.max(0, Math.floor(Number(Array.isArray(r) ? r[0] : NaN))), hi = Math.floor(Number(Array.isArray(r) ? r[1] : NaN));
+    if (Number.isFinite(lo) && Number.isFinite(hi) && hi >= lo) return [lo, hi];
+    // an older config without the ranges: the old numbers
+    return [Math.max(0, Number(C.planter.missYield) || 0), Math.max(1, Number(C.planter.baseYield) || 1) * 2];
+  };
   const pick = (a, found) => {
     const it = found.item, crop = it.crop, H = harvesting(), tier = skillRank(a, 'harvesting');
     const chance = tier >= 0 ? Number((H.yieldChanceByTier || [])[tier]) || 1 : Number((H.unskilled || {}).yieldChance) || 0.25;
     const mult = tier >= 0 ? Number((H.yieldMultiplierByTier || [])[tier]) || 1 : Number((H.unskilled || {}).yieldMultiplier) || 0.5;
-    const n = Math.random() < chance ? Math.max(1, Math.round((Number(C.planter.baseYield) || 1) * mult)) : Math.max(0, Number(C.planter.missYield) || 0);
+    const [lo, hi] = yieldRange(cropFor(crop.item) || crop);
+    const n = Math.random() < chance ? Math.min(hi, lo + Math.max(1, Math.round((hi - lo) * mult / 2))) : lo;
     // the record goes first and is saved before anything is given, so no path can pick the same crop twice
     delete it.crop; showCrop(it, null); save();
     if (n > 0) giveItem(a, idOf(crop.item), n);

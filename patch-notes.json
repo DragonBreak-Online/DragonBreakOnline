@@ -1,5 +1,20 @@
 [
   {
+    "title": "Planters yield more",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Home planters",
+        "items": [
+          "A harvest now gives 2 to 4 of a common crop and 1 to 2 of a rare one, such as Moon Sugar or Deathbell. Growing times are unchanged.",
+          "A failed Harvesting roll gives the lowest amount instead of a single plant; a skilled harvester reaches the most."
+        ]
+      }
+    ]
+  },
+  {
     "title": "/unstuck: the nearest town, and no way out of a fight",
     "date": "2026-10-31",
     "version": "Server update",
