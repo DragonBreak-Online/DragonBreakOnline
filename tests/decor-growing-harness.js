@@ -167,7 +167,7 @@ setp(OWNER, 'private.mastery', { order: ['harvesting'], skills: { harvesting: { 
 roll = 0.99;
 const cab0 = held(OWNER, CABBAGE), cropShow = parseInt(pl.show, 16);
 use(pl.ref, OWNER);
-ok(held(OWNER, CABBAGE) === cab0 + 4 && !pl.crop && !pl.show && deleted.includes(cropShow), 'a Master picks 4 (baseYield 2 x 2, chance 1), the planter empties', { got: held(OWNER, CABBAGE) - cab0 });
+ok(held(OWNER, CABBAGE) === cab0 + 4 && !pl.crop && !pl.show && deleted.includes(cropShow), 'a Master picks 4, the top of a common crop\'s 2-4 (chance 1), the planter empties', { got: held(OWNER, CABBAGE) - cab0 });
 ok(events.some((e) => e.kind === 'activate' && e.a === OWNER && e.detail.refrId === parseInt(pl.ref, 16)), 'the pick sends Harvesting\'s activate event for the planter', events);
 ok(audits.some((t) => /^DECOR pick Olaf 64b3f:Skyrim.esm x4 from planter/.test(t)) && audits.some((t) => /^DECOR plant Olaf/.test(t)), 'audit lines for plant and pick');
 const cab1 = held(OWNER, CABBAGE);
@@ -178,7 +178,23 @@ setp(OWNER, 'private.mastery', { order: [], skills: {} });
 roll = 0.3;
 const cab2 = held(OWNER, CABBAGE);
 use(pl.ref, OWNER);
-ok(held(OWNER, CABBAGE) === cab2 + 1 && /You pick 1/.test(last(OWNER)), 'unskilled, the roll misses (0.3 over 0.25): missYield 1', last(OWNER));
+ok(held(OWNER, CABBAGE) === cab2 + 2 && /You pick 2/.test(last(OWNER)), 'unskilled, the roll misses (0.3 over 0.25): the floor of a common crop, 2 (Nat, 31 Oct: never 1 a day)', last(OWNER));
+// The ranges directly (yield 2-4 common, 1-2 rare): a Novice's hit is 3 of a common crop, 2 of a rare one; a miss the floor
+{
+  const R = T.yieldRange || null;
+  const pickWith = (crop, rank, r) => {
+    setp(OWNER, 'private.mastery', rank === null ? { order: [], skills: {} } : { order: ['harvesting'], skills: { harvesting: { rank } } });
+    const p = items().find((i) => i.kind === 'planter'); p.crop = { item: crop.item, at: clock, ripeAt: clock - 1, ripe: true, by: 7 };
+    const before = held(OWNER, crop.id); roll = r; use(p.ref, OWNER); return held(OWNER, crop.id) - before;
+  };
+  const common = { item: d(CABBAGE), id: CABBAGE }, rare = { item: d(DEATHBELL), id: DEATHBELL };
+  ok(pickWith(common, 0, 0.1) === 3, 'a Novice\'s hit on a common crop: 3', R);
+  ok(pickWith(rare, 0, 0.1) === 2 && pickWith(rare, 4, 0.1) === 2, 'a rare crop (Deathbell): a hit is 2, never more, a Master\'s too');
+  ok(pickWith(rare, null, 0.9) === 1, '...and a miss on a rare crop is 1');
+  setp(OWNER, 'private.mastery', { order: [], skills: {} });
+  // the Deathbells picked here are eaten, so the sections below start from the pack they expect
+  setp(OWNER, 'inventory', { entries: getp(OWNER, 'inventory').entries.filter((e) => e.baseId !== DEATHBELL) });
+}
 
 // ---- several crops: the list and /decor plant -----------------------------------------------------------------------------
 giveItem(OWNER, DEATHBELL, 1);

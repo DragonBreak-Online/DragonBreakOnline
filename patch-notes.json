@@ -1,5 +1,20 @@
 [
   {
+    "title": "Planters yield more",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Home planters",
+        "items": [
+          "A harvest now gives 2 to 4 of a common crop and 1 to 2 of a rare one, such as Moon Sugar or Deathbell. Growing times are unchanged.",
+          "A failed Harvesting roll gives the lowest amount instead of a single plant; a skilled harvester reaches the most."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Vampires: the Feral hunger and Molag Bal's path",
     "date": "2026-10-31",
     "version": "Server update",
@@ -17,7 +32,7 @@
         "items": [
           "Prayer, living feeds and offerings to Molag Bal raise a vampire through Sworn, Devout and Chosen.",
           "Each step tames the Feral hunger and strengthens a vampire's powers, at the risk of a backlash on use.",
-          "Only a Devout vampire may give the Embrace."
+          "Molag Bal's Embrace is now offered only to a Devout vampire."
         ]
       },
       {
