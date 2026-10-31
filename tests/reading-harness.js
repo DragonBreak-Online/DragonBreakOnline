@@ -22,7 +22,9 @@ Date.now = () => wallClock;
 
 const READER = 0x14;
 // Any real record will do as a book's base: the mock says every lookup is a BOOK, and only the plugin matters.
-const SKYRIM_BOOK = 0x5001, CYRODIIL_BOOK = 0x5002, TOME_BOOK = 0x5003, SKILL_BOOK = 0x5004;
+const SKYRIM_BOOK = 0x5001, CYRODIIL_BOOK = 0x5002, TOME_BOOK = 0x5003, SKILL_BOOK = 0x5004, SHELF_BOOK = 0x5005;
+// Bethesda's placeholder book (Skyrim.esm d7866 DummyBook) that fills bookshop shelves (Windhelm's, Kvatch's)
+const EDID = { 0xd7866: 'DummyBook' };
 // BOOK DATA byte 0 by base: SpellTomeFlames 9cd51 teaches a spell (0x04), SkillOneHanded1 1afe3 a skill (0x01)
 const BOOK_FLAGS = { 0x9cd51: 0x04, 0x1afe3: 0x01 };
 const props = new Map([
@@ -30,6 +32,7 @@ const props = new Map([
   [CYRODIIL_BOOK + '|baseDesc', '61b52:BSHeartland.esm'],
   [TOME_BOOK + '|baseDesc', '9cd51:Skyrim.esm'],
   [SKILL_BOOK + '|baseDesc', '1afe3:Skyrim.esm'],
+  [SHELF_BOOK + '|baseDesc', 'd7866:Skyrim.esm'],
   [READER + '|private.mastery', { order: ['scholar'], skills: { scholar: { rank: 0 } } }],
 ]);
 const out = { widgets: [], closed: 0, personals: [], events: [], audits: [], logs: [] };
@@ -40,7 +43,7 @@ const stubs = {
     get: (id, p) => props.get(id + '|' + p),
     set: (id, p, v) => props.set(id + '|' + p, v),
     getIdFromDesc: (d) => parseInt(String(d).split(':')[0], 16) >>> 0,
-    lookupEspmRecordById: (id) => ({ record: { type: 'BOOK', editorId: 'BookTestVolume', fields: [{ type: 'DATA', data: new Uint8Array([BOOK_FLAGS[id] || 0, 0, 0, 0]) }] } }),
+    lookupEspmRecordById: (id) => ({ record: { type: 'BOOK', editorId: EDID[id] || 'BookTestVolume', fields: [{ type: 'DATA', data: new Uint8Array([BOOK_FLAGS[id] || 0, 0, 0, 0]) }] } }),
   },
   cfg: {},
   fs, path,
@@ -215,6 +218,12 @@ check('an abandoned round expires and the book opens again', out.widgets.length 
   check('...but never copied (the Synod sells tomes one a week)', !out.given.includes(0x9cd51), out.given);
   readThrough(SKILL_BOOK);
   check('a skill book is never copied', !out.given.includes(0x1afe3), out.given);
+  // A shelf of placeholder books reads (27 Oct, #bugs "Windhelm Bookstore books are NOT READABLE") but is never copied
+  // (22 Oct, #bugs "Dummy Books?": the copy was an item shown as Unknown)
+  const shelf = open(SHELF_BOOK);
+  check('a placeholder shelf book opens a reading round, under a plain title', !!shelf && shelf.type === 'reading' && shelf.title === 'A Worn Book', shelf && shelf.title);
+  const sr = readThrough(SHELF_BOOK);
+  check('...read through, it is won and never copied', sr.resultKind === 'win' && !out.given.includes(0xd7866), [sr.resultKind, out.given]);
   for (let i = 0; i < 9; i++) readThrough(SKYRIM_BOOK);
   const copies = out.given.filter((id) => id === 0xf).length;
   check('an ordinary book is copied at most 6 times a day', copies === 6, copies);

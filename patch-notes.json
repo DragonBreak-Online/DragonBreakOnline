@@ -1,5 +1,20 @@
 [
   {
+    "title": "Bookshop shelves can be read again",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Reading",
+        "items": [
+          "The shelves of plain books in Windhelm's bookshop and museum, Kvatch's Coastal Curiosities, the Bruma Fighters Guild, Solitude's docks and elsewhere could not be read since the 22 October fix for invisible book copies.",
+          "They read again as \"A Worn Book\", for Scholar progress and finds like any other book. They are still never copied into your pack."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The armour rebalance, part two: wearing armour takes Defense",
     "date": "2026-10-31",
     "version": "Server update",
