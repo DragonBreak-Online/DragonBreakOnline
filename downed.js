@@ -925,7 +925,7 @@ module.exports = (api) => {
   if (POTION) {
     const inner = mp.onEatItem;
     if (typeof inner === 'function') {
-      mp.onEatItem = function (actorId, baseId, ...rest) {
+      const eatHook = function (actorId, baseId, ...rest) {
         const out = inner.call(this, actorId, baseId, ...rest);
         const a = Number(actorId) >>> 0;
         try {
@@ -939,6 +939,8 @@ module.exports = (api) => {
         } catch (e) { log(`downed: revive potion failed: ${e.message}`); }
         return out;
       };
+      eatHook.__dbo = true;
+      mp.onEatItem = eatHook;
     }
   }
 
