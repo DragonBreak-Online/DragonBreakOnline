@@ -93,6 +93,7 @@ The other names `gfxfontlib.swf` exports are `$DragonFont`, `$SkyrimBooks`, `$Ha
   - **Look:** 6 px wide, a stone track at 60 %, an aqua thumb sized to the visible share (24 px at least).
   - **Input:** drag the thumb, click the track to page, wheel over `area`.
   - **Wiring:** call `bar.set(total, visible, offset)` after each redraw; `bar.onScroll(offset)` is the panel's, called only on a change. The bar hides when the list fits.
+  - **Make it once**, in `build()`, outside any clip the panel clears: a bar made per redraw adds a wheel listener each time, and one wheel turn then moves the list several rows.
 
 ## 6. Motion
 

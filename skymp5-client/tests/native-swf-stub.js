@@ -23,6 +23,11 @@ const clip = (name) => {
   c.moveTo = (x, y) => { if (c._fill) c._fill.pts.push([x, y]); };
   c.lineTo = (x, y) => { if (c._fill) c._fill.pts.push([x, y]); };
   c.endFill = () => { if (c._fill) c.fills.push(c._fill); c._fill = null; };
+  // line art (a birthsign's emblem) is counted, not drawn: strokes and curves only record that they happened
+  c.strokes = 0;
+  c.lineStyle = () => {};
+  c.curveTo = (cx, cy, x, y) => { if (c._fill) c._fill.pts.push([x, y]); else c.strokes++; };
+  c.hitTest = () => true;
   c.clear = () => { c.fills = []; };
   return c;
 };
@@ -40,7 +45,7 @@ const boot = (menu, late, extra) => {
     flash: { external: { ExternalInterface: { call: (fn, uid, name) => sounds.push(fn + ':' + name) } } },
     TextFormat: function TextFormat() {},
     Key: { listeners: [], addListener(l) { this.listeners.push(l); }, getCode: () => st.code },
-    Mouse: { listeners: [], addListener(l) { this.listeners.push(l); } },
+    Mouse: { listeners: [], addListener(l) { this.listeners.push(l); }, removeListener(l) { this.listeners = this.listeners.filter((x) => x !== l); } },
     Selection: { focused: null, setFocus(t) { this.focused = t; } },
     // the visible stage area; extra.visible simulates a screen that crops it (21:9, 16:10)
     Stage: { visibleRect: (extra && extra.visible) || { left: 0, top: 0, right: 1280, bottom: 720 }, listeners: [], addListener(l) { this.listeners.push(l); } },
