@@ -26,6 +26,8 @@
 // Masks (H key, dbo event "maskToggle"): lends a face covering (by race: maskItemByRace, else maskItem) and shows
 // "Masked Person" instead of the name; the real name is kept in maskName. Pressing H again takes it off and back.
 // Logging out or switching characters always unmasks, so the character list never shows the mask.
+// A face covered by what is worn masks without H (Nat, 31 Oct): a closed helmet or a mask, an ARMO whose slots take the
+// Head (30) or the face (44) and not the body (32, the skins). Taking it off shows the face again; H cannot lift it.
 //
 // Real names (/realnames, Jake 14 Oct): a staff mode (GM and above, and Trial GMs through staffCan 'realnames') that
 // shows the staff member every player by their own name instead of "Stranger", and "Aldric (masked)" / "Aldric (Werewolf
@@ -91,6 +93,11 @@ module.exports = (api) => {
   const isMaskName = (n) => String(n || '').trim().toLowerCase() === String(C.maskName || '').trim().toLowerCase();
   const realName = (a) => { const v = String(get(a, MASK_PROP, '') || ''); return v && !isMaskName(v) ? v : ''; };
   const isMasked = (a) => !!String(get(a, MASK_PROP, '') || '');
+  // Masked by a closed helmet or a mask worn (autoMask), not by H: the face item's base id
+  const AUTO_PROP = 'private.maskAuto';
+  const isAutoMasked = (a) => !!(Number(get(a, AUTO_PROP, 0)) >>> 0) && isMasked(a);
+  // When each character came in (autoMask is quiet just after)
+  const readyAt = globalThis.__dboMaskReadyAt instanceof Map ? globalThis.__dboMaskReadyAt : (globalThis.__dboMaskReadyAt = new Map());
   // Court Mages, Shamans and Wisewomen hold office without guard powers
   const UNLAWFUL_RANKS = new Set(['courtmage', 'shaman', 'wisewoman']);
   // Faction ranks that arrest too (Nate, 6 Oct; guilds.js __dboGuildsOf, the rank's own title and role): an allegiance's
@@ -367,7 +374,7 @@ module.exports = (api) => {
     if (!Array.isArray(v)) { try { mp.set(a, KNOWN_PROP, []); } catch (e) { /* not ready */ } }
   };
   const introduce = (a, t) => {
-    if (isMasked(a)) return personal(a, 'Take your mask off (H) before you introduce yourself.');
+    if (isMasked(a)) return personal(a, isAutoMasked(a) ? 'Take off what covers your face before you introduce yourself.' : 'Take your mask off (H) before you introduce yourself.');
     const list = knownBy(t);
     if (list.includes(a >>> 0)) return personal(a, `${nameFor(a, t)} already knows who you are.`);
     // To a staff member with real names on (or with the marker still in place) the introduction joins the true list, the stash
@@ -605,6 +612,9 @@ module.exports = (api) => {
   };
   const unmask = (a, quiet) => {
     const stored = String(get(a, MASK_PROP, '') || '');
+    // Masked by what is worn (autoMask below): nothing was lent, so nothing is taken back
+    const auto = Number(get(a, AUTO_PROP, 0)) >>> 0;
+    if (auto) { try { mp.set(a, AUTO_PROP, 0); } catch (e) { /* isAutoMasked needs the mask on too */ } }
     if (!stored) return;
     const real = realName(a);
     // A stored mask name is no real name: the name is left as it is (staff /rename), never set to the mask's again
@@ -612,6 +622,11 @@ module.exports = (api) => {
     else log(`playermenu: ${display(a)} had the mask name kept as the real name; cleared, staff can /rename`);
     try { mp.set(a, MASK_PROP, ''); } catch (e) { /* ignore */ }
     refreshLabels();
+    if (auto) {
+      if (!quiet) personal(a, real ? 'Your face shows again.' : 'Your own name was lost behind the mask. Please send a /bug so staff can give it back to you.');
+      try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('mask', a, false); } catch (e) { /* the player log is optional */ }
+      return;
+    }
     const itemId = (Number(get(a, 'private.maskItemId', 0)) >>> 0) || maskItemFor(a);
     if (itemId) {
       try { papyrus('UnequipItem', a, itemId); } catch (e) { /* not worn */ }
@@ -631,8 +646,62 @@ module.exports = (api) => {
     if (maskToggledAt.size > 2000) for (const [k, t] of maskToggledAt) if (now - t > MASK_TOGGLE_MS) maskToggledAt.delete(k);
     // The beast wears no mask, and a mask put on or off now would write a human name over the beast's
     if (beastName(a)) return personal(a, 'You cannot handle a mask in this form.');
+    if (isAutoMasked(a)) return personal(a, 'What you wear hides your face. Take it off to show your face.');
     if (isMasked(a)) unmask(a, false); else mask(a);
   });
+
+  // ---- a face covered by what is worn (Nat, 31 Oct: "a closed helmet, or a mask, counts as masked automatically") ----
+  // An ARMO counts when its slot mask (BOD2's first u32, else BODT's) takes one of autoMask.slots, the Head (30) or the
+  // face (44), and not the body (32): the naked, sea elf, snow elf and goblin skins take 30 and 32. In the 31 Oct load
+  // order that is every vanilla full helmet and mask (Daedric, Ebony, Dwarven, Steel Plate, the full guard helmets,
+  // Nightingale, the dragon priest masks) and none of the open ones (Iron, Steel, Imperial, the hoods): _work\masks-1031.md.
+  // include / exclude (descs) settle a piece the slots get wrong. gamemode.js equipHook calls __dboPlayerMenuEquip with
+  // every allowed equipment report; the H loan is untouched (a lent mask goes on while H's mask already is).
+  // gamemode-config.json playerMenu.autoMask: { enabled: true, slots: [30, 44], include: [], exclude: [] }; hot reload
+  const AM = Object.assign({ enabled: true, slots: [30, 44], include: [], exclude: [] }, C.autoMask && typeof C.autoMask === 'object' ? C.autoMask : {});
+  const AM_ON = AM.enabled !== false;
+  const AM_BITS = (Array.isArray(AM.slots) ? AM.slots : []).reduce((m, s) => (Number.isInteger(s) && s >= 30 && s <= 61 ? (m | (1 << (s - 30))) >>> 0 : m), 0);
+  const BODY_SLOT = 1 << 2;
+  const descSet = (l) => new Set((Array.isArray(l) ? l : []).map(idOf).filter(Boolean));
+  const AM_INCLUDE = descSet(AM.include), AM_EXCLUDE = descSet(AM.exclude);
+  const slotCache = new Map();
+  const slotsOf = (id) => {
+    if (slotCache.has(id)) return slotCache.get(id);
+    let m = 0;
+    try {
+      const r = mp.lookupEspmRecordById(id); const rec = r && r.record;
+      if (rec && String(rec.type) === 'ARMO') {
+        const f = (rec.fields || []).find((x) => x && (x.type === 'BOD2' || x.type === 'BODT') && x.data && x.data.byteLength >= 4);
+        if (f) m = new DataView(f.data.buffer, f.data.byteOffset, f.data.byteLength).getUint32(0, true);
+      }
+    } catch (e) { m = 0; }
+    slotCache.set(id, m); return m;
+  };
+  const coversFace = (id) => !AM_EXCLUDE.has(id) && (AM_INCLUDE.has(id) || ((slotsOf(id) & AM_BITS) !== 0 && (slotsOf(id) & BODY_SLOT) === 0));
+  const faceItemOf = (equipment) => {
+    const entries = equipment && equipment.inv && Array.isArray(equipment.inv.entries) ? equipment.inv.entries : [];
+    for (const e of entries) { const id = Number(e && e.baseId) >>> 0; if (id && (e.worn || e.wornLeft) && coversFace(id)) return id; }
+    return 0;
+  };
+  // Quiet for a while after the login: the client reports a naked outfit, then the dressed one
+  const AM_QUIET_MS = 15000;
+  const autoMask = (a, itemId, quiet) => {
+    const real = nameOf(a);
+    if (isMaskName(real)) return log(`playermenu: ${display(a)} shows the mask name with no real name kept; auto mask skipped, staff can /rename`);
+    if (!setAppearanceName(a, C.maskName)) return;
+    try { mp.set(a, MASK_PROP, real); mp.set(a, AUTO_PROP, itemId); } catch (e) { /* kept in memory only */ }
+    refreshLabels();
+    if (!quiet) personal(a, 'What you wear hides your face. Others see a Masked Person until you take it off.');
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('mask', a, true); } catch (e) { /* the player log is optional */ }
+  };
+  globalThis.__dboPlayerMenuEquip = (a, equipment) => {
+    a = Number(a) >>> 0;
+    if (!AM_ON || beastName(a)) return;
+    const face = faceItemOf(equipment);
+    const quiet = Date.now() - (readyAt.get(a) || 0) < AM_QUIET_MS;
+    if (face && !isMasked(a)) autoMask(a, face, quiet);
+    else if (!face && isAutoMasked(a)) unmask(a, quiet);
+  };
 
   // Admin fitting room: /masktest wears the next candidate covering, /masktest <n> a given one, /masktest off
   // takes the test piece away. Pick one per race into gamemode-config.json playerMenu.maskItemByRace.
@@ -682,7 +751,7 @@ module.exports = (api) => {
   };
   // appearance.js: the editor keeps the character's own name, never the mask's (#VKRS, 17 Oct)
   globalThis.__dboMaskOf = (a) => ({ masked: isMasked(Number(a) >>> 0), real: realName(Number(a) >>> 0), shown: String(C.maskName || ''), isMaskName });
-  globalThis.__dboPlayerMenuReady = (a) => { try { unmask(a, true); realNamesOn.delete(Number(a) >>> 0); ensureKnown(a); refreshLawful(a); } catch (e) { log('player menu login failed', e.message); } };
+  globalThis.__dboPlayerMenuReady = (a) => { try { if (readyAt.size > 2000) readyAt.clear(); readyAt.set(Number(a) >>> 0, Date.now()); unmask(a, true); realNamesOn.delete(Number(a) >>> 0); ensureKnown(a); refreshLawful(a); } catch (e) { log('player menu login failed', e.message); } };
   // At arrival (gamemode.js onUserAssignActor with assigned, then onCharacterReady), not 8 s later; assigned leaves a mode still on alone (the same character picked again)
   globalThis.__dboRealNamesLogin = (a, assigned) => { try { a = Number(a) >>> 0; if (assigned && revealing(a)) return; realNamesOn.delete(a); restoreLeftover(a, get(a, KNOWN_PROP, null)); } catch (e) { log('realnames: login check failed', e.message); } };
   // A reload keeps the mode only for a staff member still online, still holding the right and still carrying the marker;
@@ -696,6 +765,8 @@ module.exports = (api) => {
     } catch (e) { log('real names reload check failed', e.message); }
   }
   for (const a of onlineActors()) { ensureKnown(a); refreshLawful(a); }
+  // autoMask switched off: a helmet's mask comes off at the reload
+  if (!AM_ON) for (const a of onlineActors()) { try { if (isAutoMasked(a)) unmask(a, false); } catch (e) { log('auto unmask failed', e.message); } }
 
   log(`player menu on: mask by race ${JSON.stringify(C.maskItemByRace || {})}, default mask item ${C.maskItem} (${idOf(C.maskItem) ? 'found' : 'NOT FOUND'}), introductions and lawful flags for ${onlineActors().length} online, real names ${RN_ON ? `on for ${realNamesOn.size} staff` : 'switched off'}`);
 };

@@ -1,5 +1,21 @@
 [
   {
+    "title": "Closed helmets and masks hide your face",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Masks",
+        "items": [
+          "A closed helmet or a mask now hides your face by itself: others see a Masked Person while you wear it, without pressing H.",
+          "Taking it off shows your face and your name again. H cannot lift it; take the helmet or mask off instead.",
+          "Open helmets, hoods and circlets show your face as before. H still lends a mask when you wear nothing over your face."
+        ]
+      }
+    ]
+  },
+  {
     "title": "/unstuck: the nearest town, and no way out of a fight",
     "date": "2026-10-31",
     "version": "Server update",
