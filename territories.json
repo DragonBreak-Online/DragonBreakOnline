@@ -713,7 +713,7 @@
         ],
         "radius": 1500
       },
-      "icon": 6
+      "icon": 28
     }
   ],
   "_worldAliasesComment": "worldAliases: a worldspace whose points count as another's for territories (the nearest land marker, standing at a marker, a seat outdoors). The five walled cities of Skyrim (Whiterun, Riften, Solitude, Windhelm, Markarth) are child worldspaces of Tamriel drawn in its coordinates, as zones.json already treats them.",

@@ -61,14 +61,16 @@
         "heading": "No more refused armour",
         "items": [
           "You can put on any armour again, whatever your Defense. It protects you fully, and the rating you see is the one a blow meets.",
-          "Armour above your Defense tier costs you instead (tier 2 needs Defense 15, tier 3 30, tier 4 45, tier 5 60, tier 6 75, tier 7 90). For each piece, by how many tiers above you it is: 1 tier, 10% slower movement, 15% slower stamina recovery and 15% more stamina for power attacks and sprinting; 2 tiers, 20%, 30% and 30%; 3 or more, 30%, 50% and 50%. The body piece counts for half; head, hands and feet for 15% each.",
-          "You are told once, when you put it on, what it costs you."
+          "Each tier needs a Defense level: tier 2 needs 15, tier 3 30, tier 4 45, tier 5 60, tier 6 75, tier 7 90. Wearing a piece above your Defense costs you, and the further short you are, the more: two levels short you barely notice it; 45 or more levels short is the full weight.",
+          "The full weight of a piece: 30% slower movement and 50% slower stamina recovery. The body piece counts for half of that; head, hands and feet for 15% each.",
+          "When you put a piece on, you are told what it needs and what you have. Type /armor to see every piece you wear: its class, tier, the Defense it needs and how far short you are."
         ]
       },
       {
-        "heading": "Heavy armour",
+        "heading": "Heavy and medium armour",
         "items": [
-          "A full set of heavy armour slows you by 15% at Defense 0, less as your Defense rises, and not at all from Defense 75. Part of a set slows you by its share. Light armour does not slow you."
+          "A full set of heavy armour slows you by 15% at Defense 0, less as your Defense rises, and not at all from Defense 75. Part of a set slows you by its share.",
+          "Medium armour slows you half as much: Scaled, Orcish, Blades, Wolf, Falmer, Stormcloak Officer, Bonemold, Carved Nordic, Chitin Heavy, Stalhrim Light, Dawnguard Heavy, Amber and Golden Saint. Light armour does not slow you."
         ]
       },
       {
@@ -86,7 +88,7 @@
       {
         "heading": "When it applies",
         "items": [
-          "Slower stamina recovery applies now. Slower movement and the higher power attack and sprint costs arrive with the next client update."
+          "Slower stamina recovery applies now. Slower movement arrives with the next client update."
         ]
       }
     ]
