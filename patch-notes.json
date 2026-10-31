@@ -1,5 +1,21 @@
 [
   {
+    "title": "Heralds cry what is to come",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Heralds",
+        "items": [
+          "At any notice board, /herald <when> <what> has a herald cry a gathering to the whole province: a feast, a market, a tourney, a muster. When is +30m, +2h, +1d, or HH:MM UTC; it is always shown as how long from now.",
+          "A faction's leader or an event host has it cried for nothing; anyone else pays the herald 50 gold, which goes to that town's treasury. Two gatherings at a time each.",
+          "The herald cries it again 30 minutes before and when it begins. /events lists what is cried; /events attend <n> says you will come, and word reaches you wherever you are. Your journal's Status and your login show what is cried near you."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The faction's own birds",
     "date": "2026-10-31",
     "version": "Server update",

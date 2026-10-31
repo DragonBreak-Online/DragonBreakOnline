@@ -3594,6 +3594,8 @@ const onCharacterReady = (userId, a) => {
     const waiting = pigeonsWaiting(a);
     if (waiting) personal(a, `${waiting} unread letter${waiting === 1 ? '' : 's'} wait${waiting === 1 ? 's' : ''} for you at the notice boards.`);
     sendMailState(a);
+    // What the heralds have cried near you (heralds.js)
+    try { if (typeof globalThis.__dboHeraldLogin === 'function') globalThis.__dboHeraldLogin(a); } catch (e) { log('herald login line failed', e.message); }
     try { pushHud(a, needsOf(a), true); } catch (e) { /* hud later */ }
     try { if (globalThis.__dboPartyLogin) globalThis.__dboPartyLogin(a); } catch (e) { log('party login failed', e.message); }
     sendFavorites(a);
@@ -9449,6 +9451,13 @@ try {
   delete require.cache[DISPATCHES_JS];
   require(DISPATCHES_JS)({ mp, log, personal, deliver, registerChatCommand, onlineActors, nameOf, zoneOfActor, cfg });
 } catch (e) { log('dispatches.js failed to load:', e.stack || e.message); }
+
+// ---- heralds cry gatherings: /herald, /events (server\heralds.js, config "heralds") ---------------------------------
+try {
+  const HERALDS_JS = path.resolve('heralds.js');
+  delete require.cache[HERALDS_JS];
+  require(HERALDS_JS)({ mp, log, personal, system, registerChatCommand, onlineActors, profileOf, nameOf, zoneById, takeGold, depositToTreasury, every, audit, isAdmin, cfg });
+} catch (e) { log('heralds.js failed to load:', e.stack || e.message); globalThis.__dboHeraldLogin = null; }
 
 // ---- /monitor: the dbo-monitor service's view for staff (server\monitor.js; tooling/dbo-monitor) -----------------
 try {

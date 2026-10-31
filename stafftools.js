@@ -74,6 +74,9 @@ module.exports = (api) => {
   };
   // Not admin-flagged, so a role-only host passes the chat gate; announce checks the right itself. Hidden from player /help
   registerChatCommand('event', (a, args) => announce(a, args), { hidden: true, help: '<message> announce an event to every online player (staff, event hosts)' });
+  // heralds.js: who hosts events, and the same Discord post for an event a herald cries
+  globalThis.__dboIsEventHost = (a) => isStaff(a) || isHost(a);
+  globalThis.__dboEventPostDiscord = (text, host) => { try { post(text, host); } catch (e) { log('events: discord post failed', e.message); } };
 
   // ---- /chars #TAG -----------------------------------------------------------------------------------------------------
   const live = (id) => !(typeof globalThis.__dboFormGone === 'function' && globalThis.__dboFormGone(id));
