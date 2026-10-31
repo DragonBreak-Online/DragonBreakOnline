@@ -4213,8 +4213,14 @@ const sendPacket = (a, payload) => {
 // pigeon: the coop window (openPigeonCoop, post.js, couriers.js); its typed input goes to the browser (pigeonHandoff)
 // businessLedger, propertyMarket, keyRing, tomeShop: business.js widget 64, tenancy.js 82, keyring.js 91 and the spells.js shop;
 // each action's answer re-sends it, and the module's own closeWidget closes the custom menu
+// shrinePanel, courierHandover: supernatural.js widget 74 and couriers.js 81; their Escape is the router's close, which both read
+// playerMenu: the U panel (widget 52); menuRun closes it as for the browser
 const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_journal', deityPicker: 'dbo_deity', rite: 'dbo_rite', dungeonGate: 'dbo_dungeon', labour: 'dbo_labour', pigeon: 'dbo_pigeon', bank: 'dbo_bank',
-  businessLedger: 'dbo_ledger', propertyMarket: 'dbo_market', keyRing: 'dbo_keyring', tomeShop: 'dbo_tomes' };
+  businessLedger: 'dbo_ledger', propertyMarket: 'dbo_market', keyRing: 'dbo_keyring', tomeShop: 'dbo_tomes',
+  shrinePanel: 'dbo_shrine', courierHandover: 'dbo_courier', playerMenu: 'dbo_menu' };
+// The client's custom menu takes a payload of at most this many characters (scaleformMenu.ts MAX_PAYLOAD_CHARS) and draws
+// a bigger one blank, so a widget past it (a staff player menu, a long ledger) goes to the browser instead
+const NATIVE_MAX_CHARS = 60000;
 // nativeOpen: actor -> the widget id on the custom menu; browserOpen: actor -> a widget of these types last sent to the browser
 const nativeState = () => { const p = globalThis.__dboPanelState || (globalThis.__dboPanelState = { caps: new Map(), nonces: new Map() }); if (!p.native) p.native = new Map(); if (!p.nativeOpen) p.nativeOpen = new Map(); if (!p.browserOpen) p.browserOpen = new Map(); return p; };
 const nativeSwfFor = (a, widget) => {
@@ -4226,6 +4232,7 @@ const nativeSwfFor = (a, widget) => {
   if (widget.browser) return '';
   // The journal is native per hub tab, for each tab the client's swf draws; Profile and Settings stay in the browser
   if (widget.type === 'journal' && !(widget.hub && c.has('native:journalTab:' + widget.tab))) return '';
+  try { if (JSON.stringify(widget).length > NATIVE_MAX_CHARS) return ''; } catch (e) { return ''; }
   return swf;
 };
 // A widget that moves between the custom menu and the browser (the journal changing tab) closes where it was first

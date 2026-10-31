@@ -144,5 +144,26 @@ setCaps(H, ['native:keyRing']);
 openWidget(H, { type: 'businessLedger', id: 64, nonce: 'x' });
 ok(last().customPacketType === 'dboWidget', 'one panel\'s cap does not route another', last());
 
+// The shrine, the courier handover and the player menu, each native for a client that names it (fork native-social-1031)
+const SOCIAL = [['shrinePanel', 74, 'dbo_shrine'], ['courierHandover', 81, 'dbo_courier'], ['playerMenu', 52, 'dbo_menu']];
+SOCIAL.forEach(([type, id, swf], i) => {
+  const G = 0xff000030 + i;
+  openWidget(G, { type, id, nonce: 's' + i });
+  ok(last().customPacketType === 'dboWidget', `${type} without native:${type} stays in the browser`, last());
+  setCaps(G, ['native:' + type]);
+  openWidget(G, { type, id, nonce: 's' + i });
+  ok(last().customPacketType === 'dboScaleform' && last().swf === swf && last().widget === id, `with native:${type} it goes to ${swf}`, last());
+  closeWidget(G, id);
+  ok(last().customPacketType === 'dboScaleform' && last().close === true, `${type}: the module's closeWidget closes the custom menu`, last());
+});
+// A payload the custom menu cannot take goes to the browser, and moving there closes the custom menu it had
+const BIG = 0xff000040;
+setCaps(BIG, ['native:playerMenu']);
+openWidget(BIG, { type: 'playerMenu', id: 52, nonce: 'm', tabs: [] });
+ok(last().customPacketType === 'dboScaleform', 'a small player menu goes native', last());
+openWidget(BIG, { type: 'playerMenu', id: 52, nonce: 'm', tabs: [{ key: 'staff', title: 'Staff', hints: [], entries: [{ name: 'x', label: 'X', desc: 'y'.repeat(60001) }] }] });
+ok(last().customPacketType === 'dboWidget', 'one past the custom menu\'s limit goes to the browser', last());
+ok(sent.slice(-2).some((s) => s[1].customPacketType === 'dboScaleform' && s[1].close === true), '...and the custom menu it was in is closed', sent.slice(-3));
+
 console.log(fails ? `\n${fails} failed` : '\nall passed');
 process.exit(fails ? 1 : 0);
