@@ -20,3 +20,4 @@ dbo-form.as
 ../dbo_journal/tabs/court.as
 ../dbo_journal/tabs/faction.as
 ../dbo_journal/tabs/factionviews.as
+../dbo_journal/tabs/settings.as

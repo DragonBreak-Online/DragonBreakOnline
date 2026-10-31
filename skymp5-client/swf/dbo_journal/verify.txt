@@ -28,3 +28,6 @@ JT.faction
 dbo:nobilityRevoke
 dbo:courtDismiss
 dbo:factionSetRank
+JT.settings
+journalReport
+are kept by the overlay

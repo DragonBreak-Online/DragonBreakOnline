@@ -275,17 +275,17 @@ check('a junk setting falls back to announcing all rather than nothing',
   () => M.capsFor('yes').length === ALL && M.capsFor(7).length === ALL);
 
 // The journal switches surfaces per tab, so each tab is its own cap; turning the journal off has to take its
-// tabs with it, or the server is told about sixteen tabs of a shell that is on the browser.
-check('every journal tab has its own cap', () => M.JOURNAL_TABS.length === 16
+// tabs with it, or the server is told about seventeen tabs of a shell that is on the browser.
+check('every journal tab has its own cap', () => M.JOURNAL_TABS.length === 17
   && M.JOURNAL_TABS.every((t) => M.NATIVE_CAPS.indexOf(`native:journalTab:${t}`) >= 0), M.JOURNAL_TABS);
 check('one journal tab can be turned off on its own', () => {
   const c = M.capsFor({ 'journalTab:notes': false });
   return c.length === ALL - 1 && c.indexOf('native:journalTab:notes') < 0
     && c.indexOf('native:journalTab:court') >= 0 && c.indexOf('native:journal') >= 0;
 }, M.capsFor({ 'journalTab:notes': false }).length);
-check('turning the journal off takes all sixteen tabs with it', () => {
+check('turning the journal off takes all seventeen tabs with it', () => {
   const c = M.capsFor({ journal: false });
-  return c.length === ALL - 17 && !c.some((x) => x.indexOf('native:journal') === 0);
+  return c.length === ALL - 18 && !c.some((x) => x.indexOf('native:journal') === 0);
 }, M.capsFor({ journal: false }).filter((x) => x.indexOf('native:journal') === 0));
 check('...and it leaves the unrelated panels alone',
   () => M.capsFor({ journal: false }).indexOf('native:prayer') >= 0);

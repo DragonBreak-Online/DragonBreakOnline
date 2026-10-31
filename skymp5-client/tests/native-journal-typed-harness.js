@@ -25,10 +25,11 @@ const field = (t, label) => { for (let i = 0; i < 6; i++) t.press(33); for (let 
 const typeOn = (t, label, text, keepOpen) => { const r = field(t, label); if (!r) throw new Error('no field ' + label); r.onRelease(); boxOf(t).text = text; if (!keepOpen) t.press(13); };
 const noHandoff = (t) => !msgs(t, 'dbo:journalTab').some((m) => m.args[3] === 'browser');
 
-// no tab hands its typing to the browser any more: the source says so
+// no tab hands its typing to the browser any more: the source says so. Settings opens the overlay's own sections (this
+// PC's settings, kept by the browser page) there, which is no typing
 {
   const dir = path.resolve(__dirname, '..', 'swf/dbo_journal/tabs');
-  const left = fs.readdirSync(dir).filter((f) => /ctx\.browser\(/.test(fs.readFileSync(path.join(dir, f), 'utf8')));
+  const left = fs.readdirSync(dir).filter((f) => f !== 'settings.as' && /ctx\.browser\(/.test(fs.readFileSync(path.join(dir, f), 'utf8')));
   check('no journal tab calls ctx.browser any more', left.length === 0, left);
 }
 

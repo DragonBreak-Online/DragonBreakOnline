@@ -1,6 +1,6 @@
 // The Character Journal (F3, widget 50) as a native panel, drawn from the hub payload journal.js sends. The server routes
-// here only the tabs this swf draws (the client's native:journalTab:<id> caps); Settings and the rest are the browser
-// journal's, so a click on one of them asks the server, which moves the journal there.
+// here only the tabs this swf draws (the client's native:journalTab:<id> caps); any other is the browser journal's, so a
+// click on one of them asks the server, which moves the journal there.
 // A tab's typed input is a form drawn in place of the tab (ctx.form), typed in boxes on their own rows (dboInput); a tab
 // whose typing is not native yet, or a game that cannot type, still hands it to the browser journal for that tab:
 // journalTab [nonce, tab, focus, "browser"].
