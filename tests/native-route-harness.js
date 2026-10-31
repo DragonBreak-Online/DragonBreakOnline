@@ -125,5 +125,24 @@ ok(last().customPacketType === 'dboScaleform' && last().payload.result === 'You 
 closeWidget(F, 48);
 ok(last().customPacketType === 'dboScaleform' && last().close === true, 'bankClose\'s closeWidget closes the custom menu', last());
 
+// The ledger, the property market, the key ring and the tome shop, each native for a client that names it (fork native-commerce-1031)
+const COMMERCE = [['businessLedger', 64, 'dbo_ledger'], ['propertyMarket', 82, 'dbo_market'], ['keyRing', 91, 'dbo_keyring'], ['tomeShop', 60, 'dbo_tomes']];
+COMMERCE.forEach(([type, id, swf], i) => {
+  const G = 0xff000010 + i;
+  openWidget(G, { type, id, nonce: 'c' + i });
+  ok(last().customPacketType === 'dboWidget', `${type} without native:${type} stays in the browser`, last());
+  setCaps(G, ['native:' + type]);
+  openWidget(G, { type, id, nonce: 'c' + i, result: '' });
+  ok(last().customPacketType === 'dboScaleform' && last().swf === swf && last().widget === id, `with native:${type} it goes to ${swf}`, last());
+  openWidget(G, { type, id, nonce: 'c' + i, result: 'Done.' });
+  ok(last().customPacketType === 'dboScaleform' && last().payload.result === 'Done.', `${type}: an action's answer re-sends it to the same panel`, last());
+  closeWidget(G, id);
+  ok(last().customPacketType === 'dboScaleform' && last().close === true, `${type}: the module's closeWidget closes the custom menu`, last());
+});
+const H = 0xff000020;
+setCaps(H, ['native:keyRing']);
+openWidget(H, { type: 'businessLedger', id: 64, nonce: 'x' });
+ok(last().customPacketType === 'dboWidget', 'one panel\'s cap does not route another', last());
+
 console.log(fails ? `\n${fails} failed` : '\nall passed');
 process.exit(fails ? 1 : 0);

@@ -4211,7 +4211,10 @@ const sendPacket = (a, payload) => {
 // labour: mining, woodcutting and the bound-hands struggle (labour.js, struggle.js), both the sweep and the pick round
 // bank: the account, treasuries and the vault (bank.js, widget 48); every action re-sends it with the result
 // pigeon: the coop window (openPigeonCoop, post.js, couriers.js); its typed input goes to the browser (pigeonHandoff)
-const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_journal', deityPicker: 'dbo_deity', rite: 'dbo_rite', dungeonGate: 'dbo_dungeon', labour: 'dbo_labour', pigeon: 'dbo_pigeon', bank: 'dbo_bank' };
+// businessLedger, propertyMarket, keyRing, tomeShop: business.js widget 64, tenancy.js 82, keyring.js 91 and the spells.js shop;
+// each action's answer re-sends it, and the module's own closeWidget closes the custom menu
+const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_journal', deityPicker: 'dbo_deity', rite: 'dbo_rite', dungeonGate: 'dbo_dungeon', labour: 'dbo_labour', pigeon: 'dbo_pigeon', bank: 'dbo_bank',
+  businessLedger: 'dbo_ledger', propertyMarket: 'dbo_market', keyRing: 'dbo_keyring', tomeShop: 'dbo_tomes' };
 // nativeOpen: actor -> the widget id on the custom menu; browserOpen: actor -> a widget of these types last sent to the browser
 const nativeState = () => { const p = globalThis.__dboPanelState || (globalThis.__dboPanelState = { caps: new Map(), nonces: new Map() }); if (!p.native) p.native = new Map(); if (!p.nativeOpen) p.nativeOpen = new Map(); if (!p.browserOpen) p.browserOpen = new Map(); return p; };
 const nativeSwfFor = (a, widget) => {
