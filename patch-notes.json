@@ -1,5 +1,219 @@
 [
   {
+    "title": "PvP: warriors and archers stand a chance against mages",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Why",
+        "items": [
+          "A week of PvP showed a mage downing someone in about 5 seconds, a warrior in about 17, and a mage downing a heavily armoured player in under 3 seconds, because armour did nothing against spells. Archery caused almost no PvP downs. Magic is not made weaker by any of this: a mage against a mage, or against someone in robes or light armour, is exactly as before."
+        ]
+      },
+      {
+        "heading": "Against another player",
+        "items": [
+          "Heavy and medium armour now turns part of a spell, a staff's blast or a scroll: up to 35% for full heavy plate worn by a master of Defense, less for lighter sets, lower Defense or a partial set. Light armour and robes turn none.",
+          "Blocking with a shield toward a fire, frost or shock spell halves it, as the Block skill's Elemental Protection does.",
+          "Swords, axes, maces and other weapon blows land 25% harder, and arrows 35% harder. Spells, staves, fists and beast claws are unchanged."
+        ]
+      },
+      {
+        "heading": "Measured",
+        "items": [
+          "Every PvP hit is now logged with what turned it, so the next balance pass is measured, not guessed."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Blackreach chests and boss loot",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Blackreach chests",
+        "items": [
+          "Blackreach's chests give about half as many Glass and Amber pieces as before, and a quarter fewer Dwarven and honed Falmer pieces. The top tier should be earned, not farmed, with PvP in mind.",
+          "Each piece that no longer drops is a gem or Dwemer scrap instead, so a chest is still worth the fight."
+        ]
+      },
+      {
+        "heading": "Boss loot",
+        "items": [
+          "Every world boss now pays each fighter who earned a share: 100 to 150 gold, its own signature material, and two picks from a pool themed on the boss and its land.",
+          "Two uncommon rolls each: a flawless gem, a filled soul gem or the boss's rare reagent in bulk.",
+          "Each boss's schematic stays the rare chase, and each boss now has a named trophy (coming with a later plugin update).",
+          "Boss drops no longer include mined ores or ingots above steel. Mine and craft those. The Centurion Master gives Dwemer scrap, and the Heart Stone now comes from Karstaag only."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Armour: wear anything, but it weighs on you",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "No more refused armour",
+        "items": [
+          "You can put on any armour again, whatever your Defense. It protects you fully, and the rating you see is the one a blow meets.",
+          "Armour above your Defense tier costs you instead (tier 2 needs Defense 15, tier 3 30, tier 4 45, tier 5 60, tier 6 75, tier 7 90). For each piece, by how many tiers above you it is: 1 tier, 10% slower movement, 15% slower stamina recovery and 15% more stamina for power attacks and sprinting; 2 tiers, 20%, 30% and 30%; 3 or more, 30%, 50% and 50%. The body piece counts for half; head, hands and feet for 15% each.",
+          "You are told once, when you put it on, what it costs you."
+        ]
+      },
+      {
+        "heading": "Heavy armour",
+        "items": [
+          "A full set of heavy armour slows you by 15% at Defense 0, less as your Defense rises, and not at all from Defense 75. Part of a set slows you by its share. Light armour does not slow you."
+        ]
+      },
+      {
+        "heading": "Roleplay pieces",
+        "items": [
+          "Clothing, jewellery, very light pieces, and circlets, hoods, cowls, masks and hats no stronger than a tier 2 helmet never cost anything. Staff can exempt other costume pieces."
+        ]
+      },
+      {
+        "heading": "Defense levels faster",
+        "items": [
+          "Defense now levels about 25% faster."
+        ]
+      },
+      {
+        "heading": "When it applies",
+        "items": [
+          "Slower stamina recovery applies now. Slower movement and the higher power attack and sprint costs arrive with the next client update."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Your faction's roll and its standing orders",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Factions",
+        "items": [
+          "/roster shows your faction's members by rank, with when and where each was last seen: 'seen in Bruma within the hour', 'seen on the road today', 'last seen 3 days ago'. Never an exact place, and nothing of where someone is while they go masked or in a beast form.",
+          "Leaders and officers can set the faction's standing orders with /orders <text> (/orders clear takes them down). Every member reads them when they come into the land and in their journal's Status; /orders alone reads them again."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "The heralds name the month's honoured",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Honours",
+        "items": [
+          "At the turn of each month the heralds cry to the whole land who sent the most letters (at least 10) and whose gatherings drew the most people (at least 10 in all).",
+          "Each holds a title of it through the month after, to choose on your journal's Profile: Correspondent of Frostfall, Host of Frostfall, and so on through the Tamrielic months. /honours shows last month's and who leads this one."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Musters pay those who answer them",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Factions",
+        "items": [
+          "A gathering your faction's leader has a herald cry is your faction's muster. If it draws enough people (five who stay 20 minutes of its first hour), each member of the faction who came is paid 25 gold by the faction's purser, out of the faction's own treasury.",
+          "Once a week per member and faction, at most 300 gold a muster, and never more than the treasury holds."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Gatherings reward those who come",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Heralds",
+        "items": [
+          "Come to a gathering a herald has cried and stay a while: if at least five people stood in its hold for 20 minutes or more of its first hour, each of them has their skill work go 10% faster for the next hour."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Heralds cry what is to come",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Heralds",
+        "items": [
+          "At any notice board, /herald <when> <what> has a herald cry a gathering to the whole province: a feast, a market, a tourney, a muster. When is +30m, +2h, +1d, or HH:MM UTC; it is always shown as how long from now.",
+          "A faction's leader or an event host has it cried for nothing; anyone else pays the herald 50 gold, which goes to that town's treasury. Two gatherings at a time each.",
+          "The herald cries it again 30 minutes before and when it begins. /events lists what is cried; /events attend <n> says you will come, and word reaches you wherever you are. Your journal's Status and your login show what is cried near you."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "The faction's own birds",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Pigeons",
+        "items": [
+          "A pigeon to someone of your own faction, guild or party now flies free, needs no meeting first, and waits only 5 minutes before you can write to that same person again. It does not use up your 35-minute wait for other letters.",
+          "Leaders and officers can send a circular from any notice board: /circular <text> sends one letter to every member of the faction, those away included. One circular every 30 minutes.",
+          "Your journal's Status (and /status) now shows who has written to you and when. The letters are still read at a notice board."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Runners carry word to your faction and party",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Dispatches",
+        "items": [
+          "/f <text> sends a sealed dispatch by runner to every member of your faction who is in the land, signed with your rank and name. If you serve more than one, /f <faction>: <text> picks which. Player guilds have runners too.",
+          "C:/Program Files/Git/p <text> passes word among your party.",
+          "Runners take time: a few seconds within your hold, half a minute across the province, a minute and a half beyond it. No runner reaches a jail cell."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Bookshop shelves can be read again",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Reading",
+        "items": [
+          "The shelves of plain books in Windhelm's bookshop and museum, Kvatch's Coastal Curiosities, the Bruma Fighters Guild, Solitude's docks and elsewhere could not be read since the 22 October fix for invisible book copies.",
+          "They read again as \"A Worn Book\", for Scholar progress and finds like any other book. They are still never copied into your pack."
+        ]
+      }
+    ]
+  },
+  {
     "title": "The armour rebalance, part two: wearing armour takes Defense",
     "date": "2026-10-31",
     "version": "Server update",

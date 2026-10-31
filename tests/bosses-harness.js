@@ -24,7 +24,7 @@ ok(def('valkynaz').guardian.options[0][2] === 'mihailhighclannfear_NPC' && def('
   '...with a High Clannfear guardian, Clannfear and scamps (Nat 26 Oct: "nor Clennifar or the scamp minions with it")');
 ok(def('falmerwarmonger').spots.length === 1 && def('falmerwarmonger').spots[0].id === 'BE' && def('falmerwarmonger').spots[0].pos[2] > 1040,
   'the Warmonger stands on the dry shore east of the city (BE, above the lakes at 1000), not by the wild Falmer anchors where the arrival froze a client');
-ok(!JSON.stringify(def('valkynaz').drops).includes('IngotEbony') && def('valkynaz').drops.always.some((x) => x[2] === 'DaedraHeart'), 'the Valkynaz drops a daedra heart and no Ebony (never loot)');
+ok(!JSON.stringify(def('valkynaz').drops).includes('IngotEbony') && def('valkynaz').drops.always.some((x) => x[0] === '3ad5b:Skyrim.esm'), 'the Valkynaz drops a daedra heart and no Ebony (never loot)');
 ok(!def('palewarlord').devOnly && def('palewarlord').spots.map((s) => s.id).join() === 'SE,ST' && def('palewarlord').roam === true,
   'the Warlord of the Pale Pass: live since 26 Oct, at SE (under the Sentinel) roaming to ST (Serpent’s Trail)');
 ok(def('icecap').enabled === true && def('briarheartking').enabled && def('centurion').enabled, 'the Wraith is on (its shard is in the production DLE); the King and the Centurion are on');
@@ -44,11 +44,12 @@ ok(def('icecap').boss.options[0][2] === 'DBO_Boss_icecap' && def('icecap').spots
 ok(def('briarheartking').boss.options.slice(-1)[0][2] === 'DBO_Boss_briarheartking' && def('briarheartking').guardian.options[0][2] === 'EncHagraven', 'the King: the strongest Forsworn boss shaman (his copy is templated on EncForsworn06BossMagicBretonM03), his Hagraven beside him');
 ok(REAL.bosses.every((b) => b.spots.every((s) => s.ref && s.anchorDist < 5000)), 'every spot has an anchor within 5000 units (Sancre Tor\'s and Minotaur\'s Rest\'s are the ones Nate\'s own zones there use)');
 ok(def('karstaag').enabled === false && /Solstheim/.test(def('karstaag').waitingOn) && def('karstaag').boss.options[0][2] === 'DLC2dunKarstaag', 'Karstaag is defined and off until Solstheim opens');
-ok(def('minotaurlord').enabled === true && def('minotaurlord').rearm === '6026df:BSAssets.esm' && def('minotaurlord').drops.always.some((x) => x[2] === 'CYRMinotaurHorn'),
+ok(def('minotaurlord').enabled === true && def('minotaurlord').rearm === '6026df:BSAssets.esm' && def('minotaurlord').drops.always.some((x) => x[0] === '6026e4:BSAssets.esm'),
   'the Minotaur Lord is on, re-arming his axe (the dev tests kept it at spawn), his drop the beast\'s own horn and hide');
 ok(def('risenlegate').enabled === true && !def('risenlegate').devOnly && def('risenlegate').boss.options[0][2] === 'DBO_Boss_risenlegate' && def('risenlegate').adds.length === 5 && def('risenlegate').drops.schematic.family === 'adamantium',
   'Sancre Tor stays undead: the Risen Legate is a full boss with an undead legion of Sancre Tor\'s own pools, Adamantium 3%');
-ok(def('centurion').drops.extra.some((x) => x[0] === '17749:Dragonborn.esm' && x[1] === 0.05 && x[3] === 'DLC2HeartStone'), 'the Centurion Master drops a Heart Stone at 5%');
+ok(!JSON.stringify(def('centurion').drops).includes('17749:Dragonborn.esm') && def('karstaag').drops.extra.some((x) => x[0] === '17749:Dragonborn.esm') && def('centurion').drops.pool.items.some((x) => x[0] === 'c886a:Skyrim.esm'),
+  'the Heart Stone (Solstheim) is Karstaag\'s now, not the Centurion\'s; the Centurion gives Dwemer scrap (boss-loot-1031)');
 
 // ---- a scratch folder and a test copy where every boss is on ----
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-nate-bosses-'));
@@ -279,7 +280,7 @@ ok(!hasZone('boss:valkynaz:boss'), 'the Valkynaz stands nowhere until an event')
 const ww = def('werewolfbehemoth');
 ok(ww && !ww.devOnly && ww.night === true && ww.hold === 'falkreath' && ww.spots.length === 2 && !ww.spots.some((s) => s.id === 'HM') && ww.boss.options.length && ww.adds.length === 3,
   'the Behemoth of Hircine\'s Hunt: a live night boss of Falkreath, two spots (BMG, GC; not Half-Moon Mill, a settlement), a werewolf and two wolves for its pack');
-ok(ww.drops.always.some((x) => x[2] === 'WerewolfPelt') && ww.drops.always.some((x) => x[2] === 'WolfPelt') && ww.drops.schematic.family === 'silver' && !ww.drops.extraSchematic,
+ok(ww.drops.always.some((x) => x[0] === 'fe6a9:Skyrim.esm') && ww.drops.pool.items.some((x) => x[0] === '3ad74:Skyrim.esm') && ww.drops.schematic.family === 'silver' && !ww.drops.extraSchematic,
   '...it drops a Werewolf Pelt and wolf pelts, and Silver (the hunter\'s metal) is its own schematic');
 ok(ww.boss.options.length === 1 && ww.boss.options[0][1] === '1d2207:DragonBreak Online Edits.esp' && ww.boss.edid === 'DBO_EncWerewolfBehemothBoss' && ww.boss.options[0][0] === 42,
   '...the boss is its own NPC on the Behemoth race, DLE 1D2207 (the merge by Worker 3, 1.3x the pack), level 42 as its template');
@@ -326,7 +327,7 @@ put(CT, 'private.npcSpawner', 'boss:centurion:boss'); put(CT, 'percentages', { h
 tick([CT]); hit(P3, CT, 100, 0.2);
 given.length = 0; rnd = 0.01;
 globalThis.__dboBossDeath(CT, P3);
-ok(given.some((g) => g[0] === P3 && g[1] === idOf('17749:Dragonborn.esm') && g[2] === 1), 'the Centurion Master: a Heart Stone at a lucky roll', given);
+ok(given.some((g) => g[0] === P3 && g[1] === idOf('6851e:Skyrim.esm') && g[2] === 1) && given.some((g) => g[0] === P3 && g[1] === 0xf && g[2] === 100), 'the Centurion Master: 100 gold, and a Flawless Amethyst at a lucky roll (boss-loot-1031)', given);
 
 // ---- manuals.js: the boss-only schematic hook ----
 const msrc = fs.readFileSync(path.join(ROOT, 'manuals.js'), 'utf8');

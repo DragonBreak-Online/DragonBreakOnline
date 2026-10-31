@@ -179,12 +179,13 @@ check('/warband follow ends it too', all((c) => !c.targetId && !c.staying));
   packets.length = 0;
   timers.get('warbandSpare')();
   const sp = spares();
-  check('a GM leading a band is sent companionSpare with the staff online (the GM and the other staff member), sorted', sp.length === 1 && sp[0][0] === GM && sp[0][1].ids.join() === [GM, STAFF].sort((x, y) => x - y).join(), sp);
+  const bandIds = globalThis.__dboCompanions.list(GM).map((c) => c.id >>> 0);
+  check('a GM leading a band is sent companionSpare with the staff online (the GM and the other staff member) and the band itself, sorted', sp.length === 1 && sp[0][0] === GM && sp[0][1].ids.join() === [GM, STAFF, ...bandIds].sort((x, y) => x - y).join(), sp);
   packets.length = 0; timers.get('warbandSpare')();
   check('...not again while the list is the same', spares().length === 0, spares());
   online = online.filter((x) => x !== STAFF);
   packets.length = 0; timers.get('warbandSpare')();
-  check('...but again when it changes (a staff member left)', spares().length === 1 && spares()[0][1].ids.join() === String(GM), spares());
+  check('...but again when it changes (a staff member left)', spares().length === 1 && spares()[0][1].ids.join() === [GM, ...bandIds].sort((x, y) => x - y).join(), spares());
   online.push(STAFF);
   check('...and nobody without a band is sent it', !spares().some(([a]) => a !== GM));
 }

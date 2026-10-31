@@ -37,6 +37,9 @@ module.exports = (api) => {
     bookBreakdownBases: ['BookBreakdown'],
     smithLedgerBases: ['BlacksmithLedger'],
     paper: '7cba1:BSHeartland.esm', leatherStrips: '800e4:Skyrim.esm', bookPaper: 2, bookStrips: 1, notePaper: 1,
+    // Said wherever a capped metal comes back as another: Dwarven ingots come only from Dwemer scrap (Nate, 4 Oct; the
+    // Leader, 31 Oct: players read the steel as a bug)
+    capNotes: { 'db8a2:Skyrim.esm': "Dwarven metal can't be reclaimed from finished gear; salvage Dwemer scrap for ingots." },
   }, cfg.salvage || {});
   // A number: the client relay drops a widget whose id is not a positive number (dboRelayService.ts:202), so the
   // string 'dboSalvage' this had was never drawn (Nate, 2026-09-28: the Scholars' Ledger and the smelter showed nothing)
@@ -90,6 +93,10 @@ module.exports = (api) => {
     } catch (e) { if (capMap === null) log('salvage: gear-swap.json unreadable, metals not capped', e.message); capMap = capMap || new Map(); }
     return capMap;
   };
+  const capNoteOf = (d) => { const k = norm(d); const hit = Object.entries(CFG.capNotes || {}).find(([x]) => norm(x) === k); return hit ? String(hit[1]) : ''; };
+  // The notes of these yields, once each, as one sentence run; no closing stop, as the lines they join end without one
+  const notesOf = (yields) => [...new Set(yields.flatMap((g) => (g && g.notes) || []))].join(' ').replace(/\.$/, '');
+  const withNotes = (text, yields) => { const n = notesOf(yields); return n ? `${text}. ${n}` : text; };
   const descOf = (id) => { try { return String(mp.getDescFromId(id >>> 0)); } catch (e) { return ''; } };
   const idOf = (d) => { try { return mp.getIdFromDesc(String(d)) >>> 0; } catch (e) { return 0; } };
   const nameOf = (d) => itemName(d) || 'something';
@@ -184,13 +191,18 @@ module.exports = (api) => {
       .filter(([d, n]) => n > 0 && !dragonMaterials().has(norm(d)));
     // Above the cap becomes its capped metal, merged with any of it already there (moonstone and steel: all steel)
     const out = [];
+    const notes = new Set();
+    const capTo = (d) => { const to = capped().get(norm(d)); if (to && capNoteOf(d)) notes.add(capNoteOf(d)); return to || d; };
+    // A metal that rounds to none says nothing: nothing was turned into another
     for (const [d, n] of raw) {
-      const to = capped().get(norm(d)) || d;
+      const to = capTo(d);
       const have = out.find(([x]) => norm(x) === norm(to));
       if (have) have[1] += n; else out.push([to, n]);
     }
     // The lifted main is its own entry, by its capped name, after the certain ones
-    if (main && !dragonMaterials().has(norm(main[0]))) out.push([capped().get(norm(main[0])) || main[0], 1, share]);
+    if (main && !dragonMaterials().has(norm(main[0]))) out.push([capTo(main[0]), 1, share]);
+    // Why a capped metal came back as another, said on the panel and in the result (capNotes)
+    out.notes = [...notes];
     return out.length ? out : null;
   };
 
@@ -258,7 +270,8 @@ module.exports = (api) => {
     S.pending.set(a >>> 0, { target: target >>> 0, station: station.id, page: p });
     openWidget(a, {
       type: 'contextMenu', id: WIDGET_ID, mode: 'menu',
-      targetName: note || `Break down at the ${station.label} (${TIER_NAMES[rank] || 'Novice'}): choose an item`,
+      // The cap's note when a row on this page gives a capped metal (Dwarven gear gives steel, and says why)
+      targetName: note || withNotes(`Break down at the ${station.label} (${TIER_NAMES[rank] || 'Novice'}): choose an item`, list.slice(p * size, p * size + size).map((it) => it.gives)),
       actions, events: { action: 'dbo:salvageChoose', close: 'dbo:salvageClose' },
     }, true);
     return list.length;
@@ -363,7 +376,7 @@ module.exports = (api) => {
     openWidget(a, {
       type: 'contextMenu', id: WIDGET_ID, mode: 'menu',
       // The enchantment is gone with the item: the materials are the plain ones, so the panel says it before the break
-      targetName: `${note ? `${note}. ` : ''}${name}${it.count > 1 ? ` (${it.count})` : ''}${worth > 0 ? `, worth ${worth} gold${it.count > 1 ? ' each' : ''}` : ''}${it.ench ? '. Your enchantment is lost with it' : ''}`,
+      targetName: `${note ? `${note}. ` : ''}${name}${it.count > 1 ? ` (${it.count})` : ''}${worth > 0 ? `, worth ${worth} gold${it.count > 1 ? ' each' : ''}` : ''}${it.ench ? '. Your enchantment is lost with it' : ''}${note ? '' : notesOf([it.gives]) ? `. ${notesOf([it.gives])}` : ''}`,
       actions, events: { action: 'dbo:salvageChoose', close: 'dbo:salvageClose' },
     }, true);
     return it.count;
@@ -478,9 +491,11 @@ module.exports = (api) => {
       try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('salvage', a, { baseId, count: 1 }, station.label, rank + 1, got.map(([d, n]) => ({ baseId: idOf(d), count: n })).filter((x) => x.baseId)); } catch (e) { /* the player log is optional */ }
     }
     if (!done) { openPanel(a, p.target, station, p.page, `You no longer have that ${name} to break down.`); return; }
-    const gotText = total.size ? givesText([...total]) : 'nothing came back';
+    // The smelter's line says why Dwarven gear gave steel (capNotes)
+    const gotRaw = total.size ? givesText([...total]) : 'nothing came back';
+    const gotText = withNotes(gotRaw, [gives]);
     const what = done > 1 ? `${done} ${name}` : name;
-    log(`salvage: ${who(a)} broke down ${what} (${descOf(baseId)}) at the ${station.label}, ${TIER_NAMES[rank]}: ${gotText}`);
+    log(`salvage: ${who(a)} broke down ${what} (${descOf(baseId)}) at the ${station.label}, ${TIER_NAMES[rank]}: ${gotRaw}`);
     const left = openItem(a, p.target, station, p.page, baseId, `${what} broken down: ${gotText}`, ench);
     if (!left && !breakable(a, station, rank).length) { closePanel(a); personal(a, `${what} broken down: ${gotText}. Nothing else here to break down.`); }
   });

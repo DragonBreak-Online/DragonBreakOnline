@@ -99,7 +99,7 @@ const ACCESS = E('owner', 'key', 'assignee', 'shared', 'manager', 'staff', 'lock
 const TIER = E('senior', 'developer', 'leadgm', 'gm', 'trialgm', 'none');
 const SIDE = O({ hits: 'int', dmg: 'num', by: A(NAME, 8) });
 const REFUSAL_REASONS = ['god', 'ethereal', 'offline_body', 'login_grace', 'bound', 'paralysed', 'armour_change', 'damage_cap',
-  'spell_rate', 'dungeon_ally', 'briarheart_spared', 'warband', 'companion_pvp', 'silver', 'recovering', 'downed', 'shout_not_given',
+  'spell_rate', 'dungeon_ally', 'briarheart_spared', 'warband', 'party_companion', 'companion_pvp', 'silver', 'recovering', 'downed', 'shout_not_given',
   'friendly_lethal', 'duel_pause', 'duel_rules', 'duel_beaten', 'duel_scaled', 'duel_outsider', 'anticheat', 'asylum', 'in_editor', 'silver_test', 'frenzy_downed', 'frenzy_spared', 'unknown'];
 
 // The anticheat kinds a sec.signal may carry (anticheat.js acFlag and the fork's onAnticheat through it; ANTI-CHEAT DESIGN
@@ -462,6 +462,16 @@ excluded('DECOR', 'cost JSON; off until Nat switches it on');
 // VAMPATH (vampirepath.js, Nat 31 Oct): a GM's /vampath names them in the reason; the one lasting act, the drain's end of a
 // character, is logged by supernatural.js's own PERMADEATH line
 excluded('VAMPATH', 'reasons can name a GM; the drain\'s permadeath logs as PERMADEATH');
+// CIRCULAR (gamemode.js /circular, 31 Oct): the officer, the faction and counts; the letters themselves log as letters
+clean_('CIRCULAR');
+// MUSTER (heralds.js, 31 Oct): a faction's muster pay, the faction and counts only
+clean_('MUSTER');
+// ORDERS (rosters.js, 31 Oct): who set or took down a faction's standing orders; never their text
+clean_('ORDERS');
+// HONOURS (heralds.js, 31 Oct): the month's named by their own names, cried to all; the title shows in the journal
+excluded('HONOURS', 'own names of the month\'s honoured, a public cry');
+// HERALD (heralds.js, 31 Oct): the gathering's title is the player's own words, as /event's broadcast text is
+excluded('HERALD', 'player-written gathering titles; the command wrapper records the use');
 AUDIT_VERBS.FEED.roles = R_BY([[/ asked $/, 'target'], [/ let $/, 'target'], [/ refused $/, 'target'], [/ feed on $/, 'target']]);
 AUDIT_VERBS.ROPE.roles = R_BY([[/ cut $/, 'target'], [/ of $/, 'captor']]);
 AUDIT_VERBS.STRUGGLE.roles = R_BY([[/ of $/, 'captor']]);
@@ -1654,6 +1664,14 @@ gamemode.js GM 6fbbe634 parsed
 gamemode.js GM c3aa528e parsed
 gamemode.js GM 806c63e4 parsed
 gamemode.js PIGEON 08c63dcc excluded
+gamemode.js CIRCULAR 2d44fcde clean
+heralds.js HERALD 9eb0fce9 excluded
+heralds.js HERALD c8376150 excluded
+heralds.js HERALD e710e773 excluded
+heralds.js MUSTER ee506967 clean
+heralds.js HONOURS d87bd03b excluded
+rosters.js ORDERS 1619f997 clean
+rosters.js ORDERS 0a76e0c8 clean
 gamemode.js POST 2a604861 parsed
 gamemode.js GM 90ebebeb parsed
 gamemode.js TREASURY 0cdffe5e clean
@@ -1768,6 +1786,7 @@ manuals.js MANUAL d08c753a clean
 manuals.js MANUAL 53f416fb clean
 manuals.js MANUAL d753d3eb clean
 manuals.js SKILLBOOK a5403e71 clean
+skillbooks.js SKILLBOOK 5758ba1f clean
 manuals.js SCHEMATIC 121a751a clean
 manuals.js SCHEMATIC 3ecb4848 clean
 manuals.js MANUAL 9ff5ff92 clean
@@ -2135,12 +2154,20 @@ briarheart.js BRIARHEART 3a054391 excluded
 briarheart.js BRIARHEART 3f114ea4 excluded
 briarheart.js BRIARHEART b46479a3 excluded
 briarheart.js BRIARHEART e7b4144f excluded
-briarheart.js BRIARHEART 88ac4a79 excluded
 briarheart.js BRIARHEART 06672576 excluded
 briarheart.js BRIARHEART 170469e8 excluded
 briarheart.js BRIARHEART 6e5a4fdc excluded
 briarheart.js BRIARHEART 05129113 excluded
 briarheart.js BRIARHEART 1cedb469 excluded
+hagraven.js HAGRAVEN 28a94cd1 excluded
+hagraven.js HAGRAVEN 26e85e16 excluded
+hagraven.js HAGRAVEN 4c68d96d excluded
+hagraven.js HAGRAVEN d5b0e848 excluded
+briarheart.js BRIARHEART 56814f5c excluded
+hagraven.js HAGRAVEN 145e24b9 excluded
+hagraven.js HAGRAVEN fd10af1b excluded
+hagraven.js HAGRAVEN d397150f excluded
+hagraven.js HAGRAVEN 0660b547 excluded
 decor.js DECOR b3fa102b excluded
 decor.js DECOR 1799b5db excluded
 decor.js DECOR f0797531 excluded

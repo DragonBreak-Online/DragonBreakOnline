@@ -133,6 +133,8 @@ module.exports = (api) => {
       if (top[0] && top[0].level >= min) out.push({ id: 'adventurer', label: `${rankWord(top[0].level, false)} ${TITLES.adventurer || 'Adventurer'}`, epithet: String((SKILLS.get(top[0].id) || {}).title || '') });
       else out.push({ id: 'wanderer', label: TITLES.wanderer || 'Wanderer', epithet: '' });
     }
+    // A month's honour the heralds named (heralds.js): a title of its own while it lasts
+    try { const h = typeof globalThis.__dboHonourTitles === 'function' ? globalThis.__dboHonourTitles(a) : []; for (const t of Array.isArray(h) ? h : []) if (t && t.id && t.label) out.push({ id: String(t.id), label: String(t.label), epithet: String(t.epithet || '') }); } catch (e) { /* no honours */ }
     return out;
   };
 
@@ -195,7 +197,7 @@ module.exports = (api) => {
   // What /status reports (gamemode.js statusParts), as journal rows: each module's line split into its name and the rest
   // of its /status wording. NAMES gives the names a line starts with; a line without one (blood, hunt: a rank) gets LABEL.
   const NAMES = { level: ['Level'], hunger: ['Hunger'], rest: ['Well Rested', 'Well Fed'], chill: ["Death's Chill"], sentence: ['Sentence'],
-    rerolls: ['Rerolls'], boost: ['Skill boost'] };
+    rerolls: ['Rerolls'], boost: ['Skill boost'], letters: ['Letters'], events: ['Heralds cry'], orders: ['Orders'] };
   const LABEL = { blood: 'Vampire rank', hunt: 'Great Hunt', racialPower: 'Racial Power', racialGifts: 'Racial Gifts' };
   const racialPowerView = (a) => { try { return typeof globalThis.__dboRacialPowerView === 'function' ? globalThis.__dboRacialPowerView(a) : null; } catch (e) { log('journal: racial power view failed', e.message); return null; } };
   const chillHint = () => {

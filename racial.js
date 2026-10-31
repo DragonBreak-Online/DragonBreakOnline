@@ -472,14 +472,19 @@ module.exports = (api) => {
   globalThis.__dboCastHeld = castHeld;
   // The race's and the sign's factor on one bar's regeneration now (1 = none), capped by the rule for its kind
   const regenFactor = (a, stat) => {
+    // A Hagraven's magicka (hagraven.js) is hers whatever her race, and joins the race's gift
+    let hag = 1; try { if (typeof globalThis.__dboHagravenRegenMult === 'function') hag = Math.max(1, Number(globalThis.__dboHagravenRegenMult(a, stat)) || 1); } catch (e) { hag = 1; }
     // A Briarheart's briar skin (briarheart.js) quickens stamina whatever the race, and joins the race's gift
     let briar = 1; try { if (typeof globalThis.__dboBriarRegenMult === 'function') briar = Math.max(1, Number(globalThis.__dboBriarRegenMult(a, stat)) || 1); } catch (e) { briar = 1; }
+    // Armour worn above the wearer's Defense slows stamina recovery (gamemode.js armorWear debuff mode); a slowing factor,
+    // after every cap, like the Atronach's magicka
+    const wear = Math.min(1, hook('__dboWearRegenMult', a, stat));
     const race = raceOf(a); const sg = signOf(a);
-    if (!race && !sg) return briar;
+    if (!race && !sg) return hag * briar * wear;
     const passive = signRegen(race, a, stat, race ? passiveRegen(race, a, stat) : 1, sg);
     // A power's factor is timed (conditionalRegenCap) and stands in for the gift's while it runs, never on top of it
     const p = race ? buff(a, `${stat}Regen`) : 0;
-    return (p > 1 ? Math.max(passive, capOf(p, true)) : passive) * briar;
+    return (p > 1 ? Math.max(passive, capOf(p, true)) : passive) * hag * briar * wear;
   };
   // The sign's factor joins the race's under one cap, conditional when either part is (the Ritual's low health, the
   // Argonian's, the Nord's cold); a slowing factor (the Atronach's magicka) is applied after the cap
@@ -549,7 +554,7 @@ module.exports = (api) => {
     try {
       for (const a of onlineActors()) {
         here.add(a);
-        if (!raceOf(a) && !signOf(a)) { S.owed.delete(a); continue; }
+        if (!raceOf(a) && !signOf(a) && !(hook('__dboWearRegenMult', a, 'stamina') < 1)) { S.owed.delete(a); continue; }
         let owed = S.owed.get(a);
         if (!owed) { owed = { at: now - TICK_MS, health: 0, magicka: 0, stamina: 0 }; S.owed.set(a, owed); }
         // Just after a cast the server still holds the bars from before it: a write now would hand the spell's magicka back

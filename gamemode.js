@@ -1026,8 +1026,8 @@ const HELP_BY_OBJECT = new Set(['bank', 'board', 'business', 'faction', 'deity',
   'ledger', 'chill', 'sentence', 'hunger', 'rest', 'tokens', 'whoami', 'pigeonblock', 'sign', 'level', 'spells',
   'teach', 'reroll', 'offer', 'contract', 'commission', 'wildlife', 'champions', 'whereami', 'playtest', 'dungeon', 'ping',
   'expedition', 'expeditions', 'blackreach', 'shop',
-  // Off until Nat switches it on; it gets its topic entry then
-  'decor']);
+  // Off until Nat switches each on; each gets its topic entry then
+  'decor', 'hagraven']);
 const helpRoleOk = (a, role) => {
   if (!role) return true;
   try {
@@ -1668,6 +1668,44 @@ registerChatCommand('sign', (a, args) => {
   personal(a, `Your next letter will be signed "${want}", in a hand not your own.`);
 }, { help: 'unsigned | <a name> | clear: how your next pigeon letter is signed' });
 
+// ---- the faction's own birds (Nat, 31 Oct, in-game-over-discord B) --------------------------------------------------
+// Between two of one faction (player guilds included) or one party a pigeon flies free, knows the way without a meeting,
+// and waits kin.cooldownMinutes per recipient instead of the sender's 35 minutes; it does not use up that wait.
+// /circular sends one letter to every member of a faction, offline ones included, by its leaders and officers only.
+// gamemode-config.json pigeons.kin: { enabled, cooldownMinutes: 5, fee: 0, circularMinutes: 30 }
+const PIGEON_KIN = Object.assign({ enabled: true, cooldownMinutes: 5, fee: 0, circularMinutes: 30 }, (cfg.pigeons || {}).kin || {});
+const KIN_COOLDOWN_MS = Math.max(0, Number(PIGEON_KIN.cooldownMinutes) || 0) * 60000;
+const kinLastSent = globalThis.__dboPigeonKinSent instanceof Map ? globalThis.__dboPigeonKinSent : (globalThis.__dboPigeonKinSent = new Map()); // "profile|actor" -> ms
+const factionsOfKin = (a) => { try { const l = typeof globalThis.__dboGuildsOf === 'function' ? globalThis.__dboGuildsOf(Number(a) >>> 0, { bands: true }) : []; return Array.isArray(l) ? l : []; } catch (e) { return []; } };
+const partyOfKin = (a) => { try { return typeof globalThis.__dboPartyLeaderOf === 'function' ? globalThis.__dboPartyLeaderOf(Number(a) >>> 0) : null; } catch (e) { return null; } };
+// The faction (or 'party') two characters share, '' when none
+const kinOf = (a, to) => {
+  if (PIGEON_KIN.enabled === false) return '';
+  const theirs = new Set(factionsOfKin(to).map((g) => g.id));
+  const f = factionsOfKin(a).find((g) => theirs.has(g.id));
+  if (f) return f.name;
+  const pa = partyOfKin(a);
+  return pa !== null && pa !== undefined && pa === partyOfKin(to) ? 'party' : '';
+};
+// Every member of the sender's factions, offline included, and the party: the birds know them all
+const kinContactsOf = (a) => {
+  if (PIGEON_KIN.enabled === false) return [];
+  const out = new Set();
+  for (const g of factionsOfKin(a)) { try { for (const id of (typeof globalThis.__dboGuildMembers === 'function' ? globalThis.__dboGuildMembers(g.id) : [])) out.add(Number(id) >>> 0); } catch (e) { /* no roster */ } }
+  const pa = partyOfKin(a);
+  if (pa !== null && pa !== undefined) for (const t of onlineActors()) if (partyOfKin(t) === pa) out.add(t >>> 0);
+  out.delete(Number(a) >>> 0);
+  return [...out];
+};
+const kinKey = (p, to) => `${p}|${Number(to) >>> 0}`;
+const noteKinSent = (p, to) => {
+  const now = Date.now(); kinLastSent.set(kinKey(p, to), now);
+  if (kinLastSent.size > 2000) for (const [k, t] of kinLastSent) if (now - t > KIN_COOLDOWN_MS) kinLastSent.delete(k);
+};
+// sendPigeon and openPigeonCoop reach the above through one object (circular: the faction's name while /circular sends)
+globalThis.__dboPigeonKin = { kinOf, contactsOf: kinContactsOf, left: (p, to) => KIN_COOLDOWN_MS - (Date.now() - (kinLastSent.get(kinKey(p, to)) || 0)),
+  note: noteKinSent, fee: () => Math.max(0, Math.floor(Number(PIGEON_KIN.fee) || 0)), circular: '' };
+
 // A letter may carry a parcel (post.js): gold and goods leave the sender with the flight, plus the parcel's tax, and wait
 // in the letter until the reader collects them at a board. goldRaw/itemsRaw are the window's; none is a plain letter.
 const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
@@ -1684,10 +1722,15 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
   if (!text && !prep) return { ok: false, text: 'Write something for the pigeon to carry.' };
   if (text.length > PIGEON_MAX_TEXT) return { ok: false, text: `Pigeons carry at most ${PIGEON_MAX_TEXT} characters.` };
   const admin = isAdmin(a);
-  const p = profileOf(a); const left = PIGEON_COOLDOWN_MS - (Date.now() - (pigeonLastSent.get(p) || 0));
-  if (left > 0 && !admin) return { ok: false, text: `Your pigeon is still out. Next one in ${Math.ceil(left / 60000)} min.` };
+  // The faction's own birds (in-game-over-discord B): free, no meeting, a short wait per recipient; /circular has none
+  const KIN = globalThis.__dboPigeonKin || null;
+  const circular = KIN && KIN.circular ? String(KIN.circular) : '';
   if (!to || to === a) return { ok: false, text: 'Choose who the letter is for.' };
-  if (!admin && !pigeonContactsOf(a).includes(to >>> 0)) return { ok: false, text: 'Your pigeon does not know the way to someone you have never met.' };
+  const kin = KIN ? circular || KIN.kinOf(a, to) : '';
+  const p = profileOf(a);
+  const left = kin ? (circular ? 0 : KIN.left(p, to)) : PIGEON_COOLDOWN_MS - (Date.now() - (pigeonLastSent.get(p) || 0));
+  if (left > 0 && !admin) return { ok: false, text: kin ? `Your last bird to ${ownNameOf(to)} has only just flown. Next one in ${Math.ceil(left / 60000)} min.` : `Your pigeon is still out. Next one in ${Math.ceil(left / 60000)} min.` };
+  if (!admin && !kin && !pigeonContactsOf(a).includes(to >>> 0)) return { ok: false, text: 'Your pigeon does not know the way to someone you have never met.' };
   if (prep && typeof globalThis.__dboFormGone === 'function' && globalThis.__dboFormGone(to)) return { ok: false, text: 'Your pigeon finds no one there to take a parcel.' };
   try {
     // Every letter lands at the notice boards and waits there; nobody reads a pigeon in the field
@@ -1698,7 +1741,7 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
     const isBlocked = Array.isArray(blocked) && blocked.includes(p);
     // A blocked sender's parcel is never lost to the void: the bird will not take it
     if (isBlocked && prep) return { ok: false, text: 'Your pigeon will not carry a parcel to them.' };
-    const price = admin ? 0 : pigeonFee();
+    const price = admin ? 0 : kin ? KIN.fee() : pigeonFee();
     const charges = prep ? prep.gold + prep.tax + prep.fee : 0;
     if (price + charges > 0 && !takeGold(a, price + charges)) {
       return { ok: false, text: prep ? `The flight costs ${price} gold, the parcel's tax ${prep.tax + prep.fee}${prep.gold ? `, and you send ${prep.gold}` : ''}: ${price + charges} gold in all, and you do not have it.` : `A pigeon to ${ownNameOf(to)} costs ${price} gold, and you do not have it.` };
@@ -1709,7 +1752,7 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
       if (!items) { giveItem(a, GOLD_BASE, price + charges); return { ok: false, text: 'The goods are no longer in your pack. Your gold is returned.' }; }
     }
     const taxed = price + (prep ? prep.tax + prep.fee : 0);
-    notePigeonSent(p);
+    if (kin) { if (!circular) KIN.note(p, to); } else notePigeonSent(p);
     if (isBlocked) { if (taxed > 0) depositToTreasury(zoneId, taxed, { income: 'postage' }); return { ok: true, text: 'Your pigeon flew off and never came back.' }; }
     const at = Date.now();
     const sig = nextSignature.get(a);
@@ -1717,7 +1760,8 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
     // Signed with the own name, never a beast's, and a mask's only while rosterPrivacy.masks is off; /sign leaves a
     // letter unsigned or forges one
     let from = ownDisplay(a);
-    if (sig && sig.unsigned) from = 'Unsigned';
+    if (circular) from = `${ownDisplay(a)}, to all of ${circular}`;
+    else if (sig && sig.unsigned) from = 'Unsigned';
     else if (sig && sig.name) from = sig.name + (Math.random() < (Number(FORGE.tellChance[sig.tier]) || 0) ? ' (the hand does not quite match)' : '');
     const letter = { id: `${at.toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`, from, fromProfile: p, text, at, read: false };
     if (prep) letter.parcel = { gold: prep.gold, items };
@@ -1732,6 +1776,8 @@ const sendPigeon = (a, to, rawText, zoneId, goldRaw, itemsRaw) => {
     if (prep) audit(`POST ${who(a)} sent ${who(to)} ${[prep.gold ? `${prep.gold} gold` : '', P.itemsText(items)].filter(Boolean).join(', ')} (tax ${prep.tax + prep.fee}, flight ${price})`);
     // the player log: that a letter went, its parcel and how it was signed; never the text or the signature
     try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('letter', a, to, { gold: prep ? prep.gold : 0, items, signed: sig ? (sig.unsigned ? 'unsigned' : 'forged') : 'own' }); } catch (e) { /* the player log is optional */ }
+    // The month's letters for the heralds' honours (heralds.js); a circular counts once, at /circular
+    try { const h = globalThis.__dboHonourLetter; if (typeof h === 'function' && !circular) h(a); } catch (e) { /* no honours */ }
     if (online) { personal(to, prep ? 'A pigeon has brought you a letter with a parcel. Collect it at any notice board.' : 'A pigeon has brought you a letter. Read it at any notice board.'); sendMailState(to); }
     const zone = zoneId ? zoneById(zoneId) : null;
     log(`pigeon ${who(a)} -> ${nameOf(to)} #${tagOf(to)}${taxed > 0 ? ` (${taxed} gold, ${paid ? zoneId + ' treasury' : 'no treasury'})` : ''}: ${text}`);
@@ -1755,13 +1801,18 @@ const openPigeonCoop = (a, result, resultKind, view) => {
   const online = new Set(onlineActors());
   const price = admin ? 0 : pigeonFee();
   const contacts = [];
-  for (const id of pigeonContactsOf(a)) {
+  const KIN = globalThis.__dboPigeonKin || null;
+  const kinFee = admin || !KIN ? 0 : KIN.fee();
+  const kinIds = new Set(KIN ? KIN.contactsOf(a) : []);
+  for (const id of new Set(pigeonContactsOf(a).concat([...kinIds]))) {
     try { if (!mp.get(id, 'appearance')) continue; } catch (e) { continue; }
     // Who they met: a contact behind a mask or in a beast form keeps their own name here
-    contacts.push({ id, name: ownNameOf(id), tag: tagOf(id), online: presenceShown(a, id, online), shared: presenceMutual(a, id), price });
+    contacts.push({ id, name: ownNameOf(id), tag: tagOf(id), online: presenceShown(a, id, online), shared: presenceMutual(a, id), price: kinIds.has(id) && KIN.kinOf(a, id) ? kinFee : price });
   }
   contacts.sort((x, y) => x.name.localeCompare(y.name));
-  const left = PIGEON_COOLDOWN_MS - (Date.now() - (pigeonLastSent.get(profileOf(a)) || 0));
+  // The window holds its Send button while the pigeon is out: with kin to write to, it stays open and the server answers
+  // a letter to anyone else with the wait (a per-contact wait in the window is a front change)
+  const left = kinIds.size ? 0 : PIGEON_COOLDOWN_MS - (Date.now() - (pigeonLastSent.get(profileOf(a)) || 0));
   const nonce = `${a.toString(16)}-${Date.now().toString(36)}`;
   pigeonNonces.set(a, nonce);
   openWidget(a, {
@@ -1789,6 +1840,35 @@ registerChatCommand('pigeonblock', (a, args) => {
     mp.set(a, 'private.pigeonBlock', list);
   } catch (e) { personal(a, 'Failed: ' + e.message); }
 }, { help: '<name|#TAG> toggle ignoring someone\'s pigeons' });
+// /circular [<faction>:] <text>: one letter to every member of a faction, from a notice board, by its leaders and officers
+const circularAt = globalThis.__dboCircularAt instanceof Map ? globalThis.__dboCircularAt : (globalThis.__dboCircularAt = new Map()); // "profile|faction" -> ms
+registerChatCommand('circular', (a, args) => {
+  const raw = String(args || '').trim();
+  const mine = factionsOfKin(a).filter((g) => g.role === 'leader' || g.role === 'officer');
+  if (!mine.length) return personal(a, 'Only a faction\'s leaders and officers send a circular to all its members.');
+  let f = mine[0], text = raw;
+  const m = raw.match(/^([^:]{2,40}):\s*([\s\S]*)$/);
+  if (m && mine.length > 1) {
+    const key = m[1].trim().toLowerCase();
+    const hit = mine.find((g) => String(g.id).toLowerCase() === key || String(g.name || '').toLowerCase().split(/\s+/).some((w) => w.startsWith(key)));
+    if (hit) { f = hit; text = m[2]; }
+  }
+  text = text.trim();
+  if (!text) return personal(a, `/circular <text> sends a letter to every member of ${f.name}${mine.length > 1 ? '; /circular <faction>: <text> for another' : ''}.`);
+  const zoneId = boardZoneNear(a);
+  if (!zoneId) return personal(a, 'A circular goes out from a notice board.');
+  const key = `${profileOf(a)}|${f.id}`;
+  const wait = Math.max(0, Number(PIGEON_KIN.circularMinutes) || 0) * 60000 - (Date.now() - (circularAt.get(key) || 0));
+  if (wait > 0 && !isAdmin(a)) return personal(a, `Your last circular to ${f.name} has only just gone out. Next one in ${Math.ceil(wait / 60000)} min.`);
+  const members = (typeof globalThis.__dboGuildMembers === 'function' ? globalThis.__dboGuildMembers(f.id) : []).map((x) => Number(x) >>> 0).filter((t) => t !== (a >>> 0));
+  let sent = 0, full = 0;
+  const KIN = globalThis.__dboPigeonKin;
+  KIN.circular = f.name;
+  try { for (const t of members) { const r = sendPigeon(a, t, text, zoneId); if (r && r.ok) sent++; else full++; } } finally { KIN.circular = ''; }
+  if (sent) { circularAt.set(key, Date.now()); try { if (typeof globalThis.__dboHonourLetter === 'function') globalThis.__dboHonourLetter(a); } catch (e) { /* no honours */ } }
+  audit(`CIRCULAR ${who(a)} to ${f.name}: ${sent} of ${members.length}`);
+  personal(a, sent ? `The faction's birds carry your circular to ${sent} of ${f.name}${full ? `; ${full} could not take it (a full coop)` : ''}.` : `None of ${f.name} could take a circular just now.`);
+}, { help: '[<faction>:] <text>: a letter to every member of your faction, from a notice board (leaders and officers)' });
 
 // ---- incoming chat -------------------------------------------------------------------------
 const quoteSay = (name, verb, body, color) => `#{${color}}${name} ${verb}: "${body}"`;
@@ -3515,6 +3595,8 @@ const onCharacterReady = (userId, a) => {
     // Spells taken out of the game (spells.js removedSpells: Transmute) leave whoever knows them
     try { if (globalThis.__dboSpellsStripRemoved) globalThis.__dboSpellsStripRemoved(a); } catch (e) { log('removed spells strip failed', e.message); }
     needsOnConnect(a);
+    // The armour debuff (debuff mode) is told to this client again by the next re-check
+    try { if (globalThis.__dboWearConnect) globalThis.__dboWearConnect(a); } catch (e) { log('armour wear connect failed', e.message); }
     if (globalThis.__dboPlayerMenuReady) globalThis.__dboPlayerMenuReady(a);
     // A lease that ended while the player was offline never told this client to stop glowing
     try { if (globalThis.__dboGlowClear) globalThis.__dboGlowClear(a); } catch (e) { log('glow clear failed', e.message); }
@@ -3530,6 +3612,10 @@ const onCharacterReady = (userId, a) => {
     const waiting = pigeonsWaiting(a);
     if (waiting) personal(a, `${waiting} unread letter${waiting === 1 ? '' : 's'} wait${waiting === 1 ? 's' : ''} for you at the notice boards.`);
     sendMailState(a);
+    // What the heralds have cried near you (heralds.js)
+    try { if (typeof globalThis.__dboHeraldLogin === 'function') globalThis.__dboHeraldLogin(a); } catch (e) { log('herald login line failed', e.message); }
+    // The standing orders of the character's factions (rosters.js)
+    try { if (typeof globalThis.__dboRosterLogin === 'function') globalThis.__dboRosterLogin(a); } catch (e) { log('orders login line failed', e.message); }
     try { pushHud(a, needsOf(a), true); } catch (e) { /* hud later */ }
     try { if (globalThis.__dboPartyLogin) globalThis.__dboPartyLogin(a); } catch (e) { log('party login failed', e.message); }
     sendFavorites(a);
@@ -3541,6 +3627,7 @@ const onCharacterReady = (userId, a) => {
     // A shrine blessing still running is cast on the player again: the client's effect did not survive the logout (prayer.js)
     try { if (globalThis.__dboPrayerLogin) globalThis.__dboPrayerLogin(a); } catch (e) { log('prayer login failed', e.message); }
     try { if (globalThis.__dboBriarheartLogin) globalThis.__dboBriarheartLogin(a); } catch (e) { log('briarheart login failed', e.message); }
+    try { if (globalThis.__dboHagravenLogin) globalThis.__dboHagravenLogin(a); } catch (e) { log('hagraven login failed', e.message); }
     // The first spell: a mage at Arcane Arts 25 with no school is offered the choice, one with a school and no spell gets its starter (schools.js)
     try { if (globalThis.__dboSchoolsLogin) globalThis.__dboSchoolsLogin(a); } catch (e) { log('schools login failed', e.message); }
     // The election notice of the current phase for a citizen of a hold that is choosing its Jarl, once per character (citizenship.js)
@@ -3906,6 +3993,14 @@ mp.onEatItem = eatHook;
 // module that fails to load simply contributes nothing. Re-registering on a hot reload replaces the old line.
 const statusParts = globalThis.__dboStatusParts = globalThis.__dboStatusParts || new Map(); // key -> { order, fn }
 globalThis.__dboRegisterStatus = (key, order, fn) => { if (typeof fn === 'function') statusParts.set(String(key), { order: Number(order) || 0, fn }); };
+// Who has written, in /status and the journal's Status (in-game-over-discord B): the letters are still read at a board
+const agoText = (ms) => { const m = Math.max(0, Math.round(ms / 60000)); return m < 60 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
+statusParts.set('letters', { order: 36, fn: (a) => {
+  const waiting = lettersOf(a).filter((m) => !m.read || (m.parcel && !parcelUnbearable(a, m))).sort((x, y) => (y.at || 0) - (x.at || 0));
+  if (!waiting.length) return null;
+  const shown = waiting.slice(0, 4).map((m) => `${m.from} (${agoText(Date.now() - (Number(m.at) || 0))}${m.parcel ? ', a parcel' : ''})`);
+  return `Letters ${waiting.length} waiting at the boards: ${shown.join(', ')}${waiting.length > 4 ? ` and ${waiting.length - 4} more` : ''}`;
+} });
 registerChatCommand('status', (a) => {
   const lines = [];
   for (const [key, part] of [...statusParts].sort((x, y) => x[1].order - y[1].order)) {
@@ -4559,6 +4654,27 @@ every('driftLogSummary', 60000, () => {
   driftSeen.clear();
   if (rows.length) log(`npcDrift sampled (last 60 s, 1 in ${DRIFT_LOG.sample} of the chatty kinds): ${rows.join(' | ')}`);
 });
+// A companion its owner's own client reports missing twice in a row (npcDrift companion { exists: false }; 803 of 14,834
+// owner reports on 29-31 Oct, up to about 3 minutes each) is placed beside the owner and sent to that client again (fork
+// companionSystem regroup, branch companion-regroup-1031: stay companions and offline owners are left alone; until that
+// server build, regroup is missing and nothing happens). Config companions.regroup false turns it off.
+const companionMissing = globalThis.__dboCompanionMissing instanceof Map ? globalThis.__dboCompanionMissing : (globalThis.__dboCompanionMissing = new Map());
+const companionReport = (a, r) => {
+  if ((cfg.companions || {}).regroup === false) return '';
+  const id = parseInt(String(r.remoteId || ''), 16) >>> 0;
+  if (!id) return '';
+  if (r.exists !== false) { companionMissing.delete(id); return ''; }
+  let owner = 0; try { owner = Number(mp.get(id, 'ff_companionOf')) >>> 0; } catch (e) { return ''; }
+  if (owner !== (a >>> 0)) return '';
+  const n = (companionMissing.get(id) || 0) + 1;
+  if (n < 2) { if (companionMissing.size > 2048) companionMissing.clear(); companionMissing.set(id, n); return ''; }
+  companionMissing.delete(id);
+  const api = globalThis.__dboCompanions;
+  if (!api || typeof api.regroup !== 'function') return '';
+  let res = ''; try { res = String(api.regroup(id)); } catch (e) { log('companion regroup failed', e.message); return ''; }
+  log(`companion ${id.toString(16)} of ${display(a)} missing on the owner's client twice: ${res}`);
+  return res;
+};
 onUi('npcDrift', (a, args) => {
   const r = args[0] && typeof args[0] === 'object' ? args[0] : {};
   let note = '';
@@ -4571,6 +4687,7 @@ onUi('npcDrift', (a, args) => {
   driftSeen.set(kind, seen);
   if (keep) log(`npcDrift ${display(a)} ${kind}: ${JSON.stringify(r).slice(0, 900)}${note}`);
   if (r.kind === 'heartbeat' && globalThis.__dboDoorSync) { try { globalThis.__dboDoorSync.heartbeat(a, r); } catch (e) { log('door sync failed', e.message); } }
+  if (r.kind === 'companion') { try { companionReport(a, r); } catch (e) { log('companion report failed', e.message); } }
 });
 // The staff trace (client staffHit.ts): a window the server opens for one player, by /staffdiag or at login while
 // config staffHitDiag.enabled; each staff shot arrives as one line, at most STAFF_DIAG_MAX_LINES a window
@@ -5513,14 +5630,16 @@ globalThis.__dboReadBook = (targetId, casterId) => {
   let rec = null; try { rec = mp.lookupEspmRecordById(mp.getIdFromDesc(String(mp.get(targetId, 'baseDesc')))); } catch (e) { return false; }
   if (!rec || !rec.record || String(rec.record.type) !== 'BOOK') return false;
   const baseId = (() => { try { return mp.getIdFromDesc(String(mp.get(targetId, 'baseDesc'))) >>> 0; } catch (e) { return 0; } })();
-  // Bethesda's placeholder books (Skyrim.esm d7866 "Dummy Book": no name, no model) are no reading: copied, they were an
-  // invisible item shown as Unknown at the ledgers (22 Oct, #bugs "Dummy Books?")
-  if (/dummy|placeholder/i.test(String(rec.record.editorId || ''))) return false;
-  const title = humanize(rec.record.editorId);
+  // Bethesda's placeholder book (Skyrim.esm d7866 "Dummy Book", no name) fills shelves: 79 in Windhelm's bookshop, 118 in
+  // Kvatch's Coastal Curiosities. It reads like any book, under a plain title, but is never copied: a copy was an item shown
+  // as Unknown at the ledgers (22 Oct, #bugs "Dummy Books?"). Refusing the reading outright left those shelves dead (27 Oct,
+  // #bugs "Windhelm Bookstore books are NOT READABLE")
+  const placeholder = /dummy|placeholder/i.test(String(rec.record.editorId || ''));
+  const title = placeholder ? 'A Worn Book' : humanize(rec.record.editorId);
   // BOOK DATA flags (byte 0): 0x01 teaches a skill, 0x02 cannot be taken, 0x04 teaches a spell
   const bookData = (rec.record.fields || []).find((f) => f && f.type === 'DATA' && f.data instanceof Uint8Array && f.data.byteLength);
   // A smithing manual is never copied by the reading: its copies come from a Scholar who learned it (manuals.js)
-  const copyable = !!bookData && (bookData.data[0] & 0x07) === 0 && !(globalThis.__dboManualsIsManual && globalThis.__dboManualsIsManual(baseId));
+  const copyable = !placeholder && !!bookData && (bookData.data[0] & 0x07) === 0 && !(globalThis.__dboManualsIsManual && globalThis.__dboManualsIsManual(baseId));
   // Anyone may read; the work is banked toward Scholar until it is taken up, and reads at Novice until then
   const tier = Math.max(0, scholarTier(casterId));
   const deny = (text) => { if (Date.now() - (readDeny.get(casterId) || 0) > 1500) { readDeny.set(casterId, Date.now()); personal(casterId, text); } return true; };
@@ -7342,6 +7461,8 @@ const asylumHit = (agg, tgt) => {
 const castHook = (casterId, spellId, ...rest) => {
   try { if (racial) racial.onCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('racial cast failed', e.message); }
   try { if (globalThis.__dboBeastCast) globalThis.__dboBeastCast(casterId, spellId); } catch (e) { log('beast cast failed', e.message); }
+  // hagraven.js: the Hagraven Form power, cast from the Powers menu, takes or leaves the Hagraven body
+  try { if (typeof globalThis.__dboHagravenCast === 'function') globalThis.__dboHagravenCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('hagraven cast failed', e.message); }
   // A vampire's Restoration healing (supernatural.js vampireRestoration) is refused for the gameplay: no skill or school
   // credit, no chain. The C++ applies the heal after this hook whatever it returns, so supernatural.js takes it back
   try { if (typeof globalThis.__dboVampHealCast === 'function' && globalThis.__dboVampHealCast(Number(casterId) >>> 0, Number(spellId) >>> 0)) return false; } catch (e) { log('vampire healing cast failed', e.message); }
@@ -7554,6 +7675,7 @@ const wearSaid = new Map();
 const wearCheck = (a, equipment, settling) => {
   // Without smithing.js no piece has a tier: seeding then would keep nothing, and strip everyone once it loads
   if (!ARMOR_WEAR.enabled || typeof globalThis.__dboWearTier !== 'function') return;
+  if (ARMOR_WEAR.mode === 'debuff') return wearDebuffUpdate(a, wornOf(equipment).map((w) => w.baseId), settling);
   const worn = wornOf(equipment).map((w) => w.baseId);
   let kept = null; try { kept = mp.get(a, WEAR_KEPT); } catch (e) { kept = null; }
   let changed = !Array.isArray(kept);
@@ -7578,6 +7700,103 @@ const wearCheck = (a, equipment, settling) => {
   }
   if (changed) { try { mp.set(a, WEAR_KEPT, kept); } catch (e) { log('armorWear: kept save failed', e.message); } }
 };
+// Debuff mode (Nat, 31 Oct: "anyone may wear any armour"; armorWear.mode "debuff", "block" above stays the rollback). Nothing
+// comes off and nothing is grandfathered: the armour protects in full (the shown rating stays the hit's), but each piece
+// worn above the wearer's Defense tier costs, weighted by slot (debuff.slotWeights, the body most), by how many tiers over
+// (1, 2, 3+): move speed, stamina recovery, and the stamina a power attack or a sprint costs. On top, heavy armour slows by
+// heavySlow at Defense 0, less as Defense rises, none from heavySlowUntilDefense (athny's idea, Nat 31 Oct), by the heavy
+// pieces' weight. Cosmetic pieces cost nothing: clothing and jewellery, a piece under its slot's tier 1 band, a head piece
+// named as a circlet, hood, cowl, mask, crown or hat no stronger than tier 2's head band, and debuff.allow (editor ids, staff).
+// Where each lands: stamina recovery on the server (racial.js regen tick, __dboWearRegenMult: a slowing factor it already
+// takes back, as the Atronach's magicka; a client SetActorValue below base never bites, the regen ceiling keeps the larger);
+// speed and the power attack and sprint costs on the player's own client (dboArmourWear packet, a client with the
+// 'armourWear' UI capability: SpeedMult beside the timed slows, the two stamina GMSTs scaled). Told once when it worsens.
+const WEAR_DEBUFF = Object.assign({
+  slotWeights: { body: 0.5, head: 0.15, hands: 0.15, feet: 0.15, shield: 0.05 },
+  speed: [0, -10, -20, -30], staminaRegen: [0, -15, -30, -50], staminaCost: [0, 15, 30, 50],
+  heavySlow: -15, heavySlowUntilDefense: 75, maxSlow: -45, recheckSeconds: 30,
+  t1Min: { heavy: 25, light: 20 }, t2Max: { heavy: 31, light: 28 },
+  slotShare: { heavy: { body: 1, head: 0.47, hands: 0.36, feet: 0.36, shield: 0.7 }, light: { body: 1, head: 0.42, hands: 0.29, feet: 0.29, shield: 0.7 } },
+  headCosmetic: 'circlet|hood|cowl|mask|crown|diadem|veil|\\bhat\\b|scarf|bandana', allow: [],
+}, ARMOR_WEAR.debuff || {});
+const WEAR_CAP = 'armourWear';
+const wearState = globalThis.__dboWearState instanceof Map ? globalThis.__dboWearState : (globalThis.__dboWearState = new Map());
+const headCosmeticRx = (() => { try { return new RegExp(String(WEAR_DEBUFF.headCosmetic), 'i'); } catch (e) { return /circlet|hood|cowl|mask/i; } })();
+const wearAllow = new Set((WEAR_DEBUFF.allow || []).map((e) => String(e).toLowerCase()));
+// The highest tier the wearer's Defense opens (1 at Defense 0)
+const wearerTierOf = (defense) => { let t = 1; (ARMOR_WEAR.defenseLevels || []).forEach((need, i) => { if (defense >= Number(need)) t = Math.max(t, i + 1); }); return t; };
+const wearSlotOf = (baseId) => { const r = recordOf(baseId); const b = r ? fieldsOf(r, 'BOD2')[0] : null; return b && b.data.byteLength >= 4 ? slotOfMask(u32At(b, 0)) : ''; };
+// { tier, slot, weight, heavy, edid } of a piece the debuff counts, or null (cosmetic, no family, faction or guard gear)
+const wearPieceOf = (baseId) => {
+  const p = armorPieceOf(baseId >>> 0);
+  if (!p || p.clothing || !(p.rating > 0)) return null;
+  let tier = 0; try { tier = Number(globalThis.__dboWearTier(baseId >>> 0)) || 0; } catch (e) { tier = 0; }
+  const slot = wearSlotOf(baseId >>> 0); const weight = Number((WEAR_DEBUFF.slotWeights || {})[slot]) || 0;
+  if (!(tier > 0) || !(weight > 0)) return null;
+  const r = recordOf(baseId >>> 0); const edid = String((r && r.record.editorId) || '');
+  if (wearAllow.has(edid.toLowerCase())) return null;
+  const kind = p.heavy ? 'heavy' : 'light', share = Number(((WEAR_DEBUFF.slotShare || {})[kind] || {})[slot]) || 1, rating = p.counted || p.rating;
+  if (rating < Number((WEAR_DEBUFF.t1Min || {})[kind]) * share) return null;
+  if (slot === 'head' && rating <= Number((WEAR_DEBUFF.t2Max || {})[kind]) * share) {
+    let name = ''; try { name = adminItemName(mp.getDescFromId(baseId >>> 0)) || ''; } catch (e) { name = ''; }
+    if (headCosmeticRx.test(`${edid} ${name}`)) return null;
+  }
+  return { tier, slot, weight, heavy: p.heavy, edid };
+};
+// The debuff for these worn pieces at this Defense: { speed (SpeedMult points, <= 0), regen (stamina recovery factor),
+// cost (stamina cost factor), over: [{ id, tier }] }
+const wearDebuffOf = (worn, defense) => {
+  const mine = wearerTierOf(defense);
+  let speed = 0, regen = 0, cost = 0, heavyW = 0; const over = [];
+  for (const id of worn) {
+    const w = wearPieceOf(id); if (!w) continue;
+    if (w.heavy) heavyW += w.weight;
+    const n = Math.min(3, w.tier - mine); if (!(n > 0)) continue;
+    over.push({ id: id >>> 0, tier: w.tier });
+    speed += w.weight * (Number(WEAR_DEBUFF.speed[n]) || 0);
+    regen += w.weight * (Number(WEAR_DEBUFF.staminaRegen[n]) || 0);
+    cost += w.weight * (Number(WEAR_DEBUFF.staminaCost[n]) || 0);
+  }
+  const until = Number(WEAR_DEBUFF.heavySlowUntilDefense) || 75;
+  const heavy = (Number(WEAR_DEBUFF.heavySlow) || 0) * Math.min(1, heavyW) * Math.max(0, 1 - defense / until);
+  return { speed: Math.max(Number(WEAR_DEBUFF.maxSlow) || -45, Math.round(speed + heavy)), heavy: Math.round(heavy),
+    regen: Math.max(0, Math.round((1 + regen / 100) * 100) / 100), cost: Math.round((1 + cost / 100) * 100) / 100, over };
+};
+// racial.js regen tick: stamina recovery while worn (1 = none)
+globalThis.__dboWearRegenMult = (a, stat) => { if (stat !== 'stamina' || ARMOR_WEAR.mode !== 'debuff') return 1; const s = wearState.get(a >>> 0); return s ? s.regen : 1; };
+const wearDebuffUpdate = (a, worn, settling, quiet) => {
+  const defense = defenseLevelOf(a);
+  const d = wearDebuffOf(worn, defense);
+  const prev = wearState.get(a) || { speed: 0, regen: 1, cost: 1 };
+  const key = `${d.speed}|${d.regen}|${d.cost}`;
+  if (prev.key === key) return d;
+  wearState.set(a, Object.assign({ key, worn: worn.slice() }, d));
+  try { sendPacket(a, { customPacketType: 'dboArmourWear', speedMult: d.speed, staminaCostMult: d.cost, staminaRegenMult: d.regen }); } catch (e) { /* offline */ }
+  log(`armorWear: ${display(a)} (Defense ${Math.floor(defense)}) speed ${d.speed} regen x${d.regen} cost x${d.cost}${d.over.length ? `, over: ${d.over.map((o) => `${o.id.toString(16)} T${o.tier}`).join(' ')}` : ''}`);
+  // Told once when it worsens by a piece put on, never by the login's re-dress or the periodic re-check
+  const worse = d.speed < (prev.speed || 0) || d.regen < (prev.regen || 1) || d.cost > (prev.cost || 1);
+  if (worse && !settling && !quiet) {
+    const client = hasUiCap(a, WEAR_CAP);
+    const parts = [];
+    if (client && d.speed < 0) parts.push(`you move ${-d.speed}% slower`);
+    if (d.regen < 1) parts.push(`recover stamina ${Math.round((1 - d.regen) * 100)}% slower`);
+    if (client && d.cost > 1) parts.push(`power attacks and sprinting cost ${Math.round((d.cost - 1) * 100)}% more stamina`);
+    if (parts.length) {
+      const why = d.over.length ? `Armour above your Defense (${Math.floor(defense)})` : 'Heavy armour';
+      const heavyNote = d.heavy < 0 ? ` Heavy armour weighs on you less as your Defense rises, and not at all from ${Number(WEAR_DEBUFF.heavySlowUntilDefense) || 75}.` : '';
+      const line = `${why}: ${parts.join(', ')}. It still protects you fully.${heavyNote}`;
+      if (Date.now() - (wearSaid.get(a) || 0) > 3000) { wearSaid.set(a, Date.now()); personal(a, line); try { sendPacket(a, { customPacketType: 'dboNotice', text: line }); } catch (e) { /* chat is enough */ } }
+    }
+  }
+  return d;
+};
+// Defense rises as it is used, and a login needs the client told again: every recheckSeconds each online player's worn
+// armour is weighed again (quiet), and a connect re-sends
+if (typeof every === "function") every('armourWear', Math.max(5, Number(WEAR_DEBUFF.recheckSeconds) || 30) * 1000, () => {
+  if (!ARMOR_WEAR.enabled || ARMOR_WEAR.mode !== 'debuff' || typeof globalThis.__dboWearTier !== 'function') return;
+  for (const a of onlineActors()) { try { wearDebuffUpdate(a, wornWithHealth(a).map((w) => w.baseId), true, true); } catch (e) { log('armorWear recheck failed', e.message); } }
+});
+globalThis.__dboWearConnect = (a) => { wearState.delete(a >>> 0); };
 const equipHook = (actorId, equipment, isAllowed, ...rest) => {
   // The client reports its equipment while it is still dressing after login (an empty or naked
   // report), and the engine has already stored that. Keep our own copy of the last outfit that
@@ -7847,6 +8066,26 @@ const sourceResistsOf = (sourceId) => {
   return out;
 };
 const fitsElement = (element, sourceId) => ELEMENT_RESIST[element] !== undefined && sourceResistsOf(sourceId).has(ELEMENT_RESIST[element]);
+// The magic schools of a hit's source (a Set of actor value indexes: MGEF DATA magic skill, i32 at 12; Destruction 20,
+// Conjuration 19, read off Firebolt's and Conjure Familiar's effects), read once per source (hagraven.js)
+const sourceSkillCache = new Map();
+const sourceSkillsOf = (sourceId) => {
+  if (sourceSkillCache.has(sourceId)) return sourceSkillCache.get(sourceId);
+  const out = new Set();
+  const r = recordOf(sourceId);
+  const skillOf = (m) => { const d = m && String(m.record.type) === 'MGEF' && (m.record.fields || []).find((x) => x && x.type === 'DATA' && x.data instanceof Uint8Array && x.data.byteLength >= 16); return d ? new DataView(d.data.buffer, d.data.byteOffset, d.data.byteLength).getInt32(12, true) : null; };
+  if (r && String(r.record.type) === 'MGEF') { const k = skillOf(r); if (k !== null) out.add(k); }
+  if (r && ['SPEL', 'ENCH', 'SCRL'].includes(String(r.record.type))) {
+    for (const f of r.record.fields || []) {
+      if (!f || f.type !== 'EFID' || !(f.data instanceof Uint8Array) || f.data.byteLength < 4) continue;
+      const local = new DataView(f.data.buffer, f.data.byteOffset, f.data.byteLength).getUint32(0, true);
+      const k = skillOf(recordOf(typeof r.toGlobalRecordId === 'function' ? r.toGlobalRecordId(local) >>> 0 : local));
+      if (k !== null) out.add(k);
+    }
+  }
+  sourceSkillCache.set(sourceId, out);
+  return out;
+};
 // ---- The sun burns the undead: a Restoration sun spell does more to what should not be walking ------------------------
 // Nate, 15 Oct. Restoration's one bite is its sun, and it had none here: the server decides every hit from armour and
 // the multipliers below, and the conditions a vanilla sun effect carries ("more against the undead") are never evaluated
@@ -8322,6 +8561,53 @@ const defenseDamageMult = (targetId) => {
   const kept = (rating) => 1 - Math.min(rating * scale, cap) / 100;
   return kept(counted) / kept(bare);
 };
+// The plate turns the flame (Nat, 31 Oct; _work/pvp-balance-1031.md P1): between players, worn heavy and medium armour takes a
+// share off a spell's, a staff's or a scroll's blow, by its counted rating as the hit counts it (Defense tier, tempering, wear,
+// worn Fortify Armor): share x min(1, rating / fullAt), so full heavy plate at Master Defense turns the whole share. Light
+// pieces count only when armorWear names them medium (__dboArmourClassOf). It joins the target side under racial.js
+// reductionCap. Config "pvp.spellArmour": { enabled, share, fullAt }
+const PVP_SPELL_ARMOUR = Object.assign({ enabled: true, share: 0.35, fullAt: 300 }, (cfg.pvp || {}).spellArmour || {});
+const spellSourceCache = globalThis.__dboSpellSource instanceof Map ? globalThis.__dboSpellSource : (globalThis.__dboSpellSource = new Map());
+const isMagicSource = (src) => {
+  if (spellSourceCache.has(src)) return spellSourceCache.get(src);
+  const r = recordOf(src >>> 0); const t = r ? String(r.record.type) : '';
+  const yes = t === 'SPEL' || t === 'ENCH' || t === 'SCRL';
+  spellSourceCache.set(src, yes);
+  return yes;
+};
+const spellArmourRating = (targetId) => {
+  const pm = defensePieceMult(targetId), gm = gearArmorMult(targetId);
+  let counted = 0;
+  for (const w of wornWithHealth(targetId)) {
+    const p = armorPieceOf(w.baseId); if (!p || p.clothing) continue;
+    let klass = ''; try { klass = typeof globalThis.__dboArmourClassOf === 'function' ? String(globalThis.__dboArmourClassOf(w.baseId) || '') : ''; } catch (e) { klass = ''; }
+    if (p.heavy || klass === 'medium') counted += armorCountOf(p, w.health, w.cond, pm, gm);
+  }
+  return counted * (1 + potionBonus(targetId, 'armor'));
+};
+// A raised shield turns the elements (Nat, 31 Oct; P2, vanilla's Elemental Protection: blocking with a shield, 50% less fire,
+// frost and shock): a player blocking with a shield toward a player's fire, frost or shock spell takes pvp.shieldElements.mult of
+// it, read the way Spellbreaker reads the guard (gearench.js guardFacing). Joins the target side under racial.js reductionCap
+const PVP_SHIELD = Object.assign({ enabled: true, mult: 0.5 }, (cfg.pvp || {}).shieldElements || {});
+const shieldWorn = (a) => {
+  try {
+    const eq = mp.get(a, 'equipment'); const entries = eq && eq.inv && Array.isArray(eq.inv.entries) ? eq.inv.entries : [];
+    return entries.some((e) => { if (!e || !e.wornLeft) return false; const r = recordOf(Number(e.baseId) >>> 0); const b = r && String(r.record.type) === 'ARMO' ? fieldsOf(r, 'BOD2')[0] : null; return !!b && b.data.byteLength >= 4 && (u32At(b, 0) & 0x200) !== 0; });
+  } catch (e) { return false; }
+};
+const pvpShieldElementMult = (agg, tgt, src, flags) => {
+  if (!PVP_SHIELD.enabled || agg === tgt || !(flags && flags.spell) || profileOf(agg) < 0 || profileOf(tgt) < 0) return 1;
+  const res = sourceResistsOf(src >>> 0);
+  if (!Object.values(ELEMENT_RESIST).some((v) => res.has(v)) || !shieldWorn(tgt)) return 1;
+  try { if (!gearEnch || typeof gearEnch.guardFacing !== 'function' || !gearEnch.guardFacing(tgt, agg)) return 1; } catch (e) { return 1; }
+  return Math.max(0, Math.min(1, Number(PVP_SHIELD.mult)));
+};
+const pvpSpellArmourMult = (agg, tgt, src) => {
+  if (!PVP_SPELL_ARMOUR.enabled || agg === tgt || profileOf(agg) < 0 || profileOf(tgt) < 0 || !isMagicSource(src)) return 1;
+  let rating = 0; try { rating = spellArmourRating(tgt); } catch (e) { return 1; }
+  const share = Math.max(0, Math.min(0.9, Number(PVP_SPELL_ARMOUR.share) || 0));
+  return 1 - share * Math.min(1, rating / Math.max(1, Number(PVP_SPELL_ARMOUR.fullAt) || 300));
+};
 // Alteration's Flesh spells (Oakflesh 40, Stoneflesh 60, Ironflesh 80, Ebonyflesh 100, for 60 s) raise the caster's
 // armour rating while they last; the engine's hit formula (TES5DamageFormula) reads worn armour only, so they did nothing
 // server-side (Nate, 3 Oct: "they must count"). A self-delivered fire-and-forget spell whose visible effects raise
@@ -8418,7 +8704,15 @@ const fleshDamageMult = (targetId, sourceId) => {
 const rankHook = (hook, ...args) => { try { const m = typeof globalThis[hook] === 'function' ? Number(globalThis[hook](...args)) : 1; return Number.isFinite(m) && m > 0 ? m : 1; } catch (e) { return 1; } };
 const huntDamageMult = (agg, tgt) => rankHook('__dboHuntDamageMult', agg, tgt) * rankHook('__dboBloodDamageMult', agg, tgt);
 // Every player-on-player hit, after skills and armor; config "pvp": { "damageMult" }
-const PVP = Object.assign({ damageMult: 1 }, cfg.pvp || {});
+const PVP = Object.assign({ damageMult: 1, weaponMult: 1, arrowMult: 1 }, cfg.pvp || {});
+// Non-mages in PvP (Nat, 31 Oct: "do what you recommend"; _work/pvp-balance-1031.md P3, P4): a weapon's blow (Blade, Blunt)
+// and an arrow land harder between players, on top of damageMult; spells, staves, fists and a beast's claws keep damageMult alone
+const pvpSourceMult = (src, beast) => {
+  if (beast) return 1;
+  const skill = weaponSkillOf(src);
+  if (skill === 'blade' || skill === 'blunt') return Number(PVP.weaponMult) || 1;
+  return skill === 'archery' ? Number(PVP.arrowMult) || 1 : 1;
+};
 // A vampire burns under fire and silver, a werewolf in beast form under silver and poison (supernatural.js
 // __dboSuperDamageMult): the extra comes off after the engine's hit, measured from what landed once the mastery chain
 // (Defense, a blessing, the race, capped together at racial.js reductionCap) had its say. A weakness is a separate
@@ -8724,6 +9018,26 @@ const potionPoisonHit = (agg, tgt, src, dmg, flags) => {
 };
 // An enchanted weapon's effects on a landed blow (gearench.js weaponAttempt); never fails the hit
 const gearWeaponHit = (agg, tgt, src, dmg, flags) => { try { if (gearEnch && dmg > 0) gearEnch.weaponAttempt(agg, tgt, src, dmg, flags); } catch (e) { log('gear enchantment failed', e.message); } };
+// The player a companion (any kind: a summon, a raised corpse, a follower, a GM's band) fights for, from ff_companionOf
+const playerSideOf = (a) => {
+  if (profileOf(a) >= 0) return a;
+  try { const o = Number(mp.get(a, 'ff_companionOf')) >>> 0; return o && profileOf(o) >= 0 ? o : 0; } catch (e) { return 0; }
+};
+// One party (dungeons.js parties) or one owner: a companion of either never hurts the other side or what fights for it
+// (Nat, 31 Oct: "make sure party summons can't fight each other"). The live log of 29-31 Oct had 421 companion-on-companion
+// blows of one owner and 220 of two owners, each a fight the AI kept on while the fork refused it. Two players in a duel
+// fight with all they have (duel.js). Config companions.partySpare false turns it off.
+const partyCompanionSpares = (agg, tgt) => {
+  if (agg === tgt || profileOf(agg) >= 0 || (cfg.companions || {}).partySpare === false) return false;
+  const a = playerSideOf(agg); if (!a) return false;
+  const t = playerSideOf(tgt); if (!t) return false;
+  if (a === t) return true;
+  try { if (typeof globalThis.__dboDuelPair === 'function' && globalThis.__dboDuelPair(a, t)) return false; } catch (e) { /* duel.js not loaded */ }
+  let la = null, lt = null;
+  try { la = typeof globalThis.__dboPartyLeaderOf === 'function' ? globalThis.__dboPartyLeaderOf(a) : null; lt = la === null || la === undefined ? null : globalThis.__dboPartyLeaderOf(t); } catch (e) { return false; }
+  return la !== null && la !== undefined && la === lt;
+};
+globalThis.__dboPartyCompanionSpares = partyCompanionSpares;
 const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => {
   const agg = Number(aggressorId) >>> 0;
   const tgt = Number(targetId) >>> 0;
@@ -8796,12 +9110,16 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
   // 2c'. The Forsworn spare a Briarheart unless provoked (briarheart.js); the hosting client's AI may still swing
   globalThis.__dboHitRefusal = 'briarheart_spared';
   try { if (dmg > 0 && globalThis.__dboBriarheartSpares && globalThis.__dboBriarheartSpares(agg, tgt)) return false; } catch (e) { log('briarheart spare failed', e.message); }
+  try { if (dmg > 0 && globalThis.__dboHagravenSpares && globalThis.__dboHagravenSpares(agg, tgt)) return false; } catch (e) { log('hagraven spare failed', e.message); }
 
   // 2d. GM warbands (warband.js): an NPC a GM raised never harms that GM, after a raid or settle too, and the NPCs of two
   // friendly GMs never harm each other. Before companionSystem's hook, so a refused hit sets no band on anyone.
   globalThis.__dboHitRefusal = 'warband';
   try { if (agg !== tgt && typeof globalThis.__dboWarbandRefusesHit === 'function' && globalThis.__dboWarbandRefusesHit(agg, tgt)) return false; } catch (e) { log('warband hit check failed', e.message); }
   // 2e. An accepted silver test's strike gives its result and lands no damage (silvertest.js)
+  // 2d'. A companion never hurts its own owner's side or a party member's, nor what fights for them (partyCompanionSpares)
+  globalThis.__dboHitRefusal = 'party_companion';
+  if (dmg > 0 && partyCompanionSpares(agg, tgt)) return false;
   globalThis.__dboHitRefusal = 'silver_test';
   try { if (agg !== tgt && typeof globalThis.__dboSilverTestStrike === 'function' && globalThis.__dboSilverTestStrike(agg, tgt, src, dmg, flags)) return false; } catch (e) { log('silver test hit failed', e.message); }
   // past the gameplay's own gates: a refusal from here on is the fork chain's or the summon guard's, unnamed
@@ -8836,7 +9154,7 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     let beastAgg = false; try { const b = mp.get(agg, 'private.beast'); beastAgg = !!(b && b.form); } catch (e) { /* not an actor */ }
     // The target's side (Defense, a blessing, the race's resistance) is capped together: racial.js reductionCap
     // Worn resistances join the race's, a potion's and a blessing's under racial.js reductionCap (gearench.js resistMult)
-    let targetSide = defenseDamageMult(tgt) * fleshDamageMult(tgt, src) * blessingTargetMult(tgt, src) * potionResistMult(tgt, src) * gearResistMult(tgt, src);
+    let targetSide = defenseDamageMult(tgt) * fleshDamageMult(tgt, src) * blessingTargetMult(tgt, src) * potionResistMult(tgt, src) * gearResistMult(tgt, src) * pvpSpellArmourMult(agg, tgt, src) * pvpShieldElementMult(agg, tgt, src, flags);
     // Spellbreaker's ward while its wearer blocks a spell from the front (gearench.js), under the same cap as a racial ward
     try { if (gearEnch) targetSide *= gearEnch.spellbreakerMult(agg, tgt, src, dmg, flags); } catch (e) { log('spellbreaker failed', e.message); }
     // A Briarheart's poison and frost resistance and fire weakness (briarheart.js), under the same cap as the race's
@@ -8844,8 +9162,10 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     if (racial) { try { targetSide = racial.capTargetSide(targetSide * racial.targetMult(agg, tgt, src, dmg)); } catch (e) { log('racial target failed', e.message); } }
     let raceAtk = 1;
     if (racial && !beastAgg) { try { raceAtk = racial.attackMult(agg, tgt, src, dmg, flags); } catch (e) { log('racial attack failed', e.message); } }
-    let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * potionTakenMult(tgt, flags) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp;
+    let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * potionTakenMult(tgt, flags) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp * (agg !== tgt && profileOf(agg) >= 0 && profileOf(tgt) >= 0 ? pvpSourceMult(src, beastAgg) : 1);
     if (!beastAgg) mult *= gearAttackMult(agg, src);
+    // A Hagraven's Destruction (hagraven.js), by her stage
+    try { if (globalThis.__dboHagravenAttackMult) mult *= Number(globalThis.__dboHagravenAttackMult(agg, src)) || 1; } catch (e) { log('hagraven attack failed', e.message); }
     // The Shrouded Gloves double a one-handed sneak attack (gearench.js backstabMult)
     try { if (gearEnch && !beastAgg) mult *= gearEnch.backstabMult(agg, src, flags); } catch (e) { log('backstab failed', e.message); }
     // Tired blows, fists into armour, staves through it, the fist's stamina drain and disarm (martial.js)
@@ -8860,6 +9180,18 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     try { if (globalThis.__dboBossDamageMult) mult *= Number(globalThis.__dboBossDamageMult(agg, tgt)) || 1; } catch (e) { log('boss damage failed', e.message); }
     // An enemy of a claimed dungeon by the lease's difficulty, and any NPC's spell (npcDamage.byDifficulty, spellMult)
     mult *= npcDifficultyDamageMult(agg, tgt, dmg, flags);
+    // PvP measurement (Nat, 31 Oct; _work/pvp-balance-1031.md section 4): each player-on-player hit, with what the logs lacked:
+    // the target's spell reductions (armour, shield, worn and potion resists), the attacker's stamina on a power attack, and
+    // the attacker's rank in the skill that dealt it. Config pvp.logHits
+    if (PVP.logHits !== false && agg !== tgt && dmg > 0 && profileOf(agg) >= 0 && profileOf(tgt) >= 0) {
+      try {
+        const magic = isMagicSource(src >>> 0), skill = magic ? 'arcane' : (weaponSkillOf(src >>> 0) || 'other');
+        const rec = masteryOf(agg); const rank = rec && Array.isArray(rec.order) && rec.order.includes(skill) ? Number(((rec.skills || {})[skill] || {}).rank) || 0 : -1;
+        let sta = ''; if (flags && flags.power) { const pc = mp.get(agg, 'percentages'); sta = ` stamina=${pc ? Number(pc.stamina).toFixed(2) : '?'}`; }
+        const r = (x) => Number(x).toFixed(2);
+        log(`pvp hit ${display(agg)} -> ${display(tgt)} kind=${magic ? 'magic' : skill} rank=${skill}:${rank} dmg=${Number(dmg).toFixed(1)} mult=${r(mult)} armour=${r(pvpSpellArmourMult(agg, tgt, src))} shield=${r(pvpShieldElementMult(agg, tgt, src, flags))} resist=${r(gearResistMult(tgt, src) * potionResistMult(tgt, src))}${flags && flags.power ? ' power' : ''}${flags && flags.blocked ? ' blocked' : ''}${sta}`);
+      } catch (e) { /* the measurement is optional */ }
+    }
     // A family of creatures by race, on a player (npcToughness.kinds.<kind>.dealt; the draugr, 17 Oct)
     if (toughness) { try { mult *= toughness.dealtMult(agg, tgt, dmg); } catch (e) { log('toughness dealt failed', e.message); } }
     // A player's summon takes less by its owner's Conjuration rank (summonBuff.takenByTier)
@@ -8921,6 +9253,7 @@ const companionRefusalWhy = (agg, tgt) => {
   if ((paralysedUntil.get(agg) || 0) > Date.now()) why.push('paralysed');
   try { if (dungeonAllies(agg, tgt)) why.push('dungeon allies'); } catch (e) { /* ignore */ }
   try { if (typeof globalThis.__dboWarbandRefusesHit === 'function' && globalThis.__dboWarbandRefusesHit(agg, tgt)) why.push('warband'); } catch (e) { /* ignore */ }
+  try { if (partyCompanionSpares(agg, tgt)) why.push('one party or owner'); } catch (e) { /* ignore */ }
   const side = Number(get(tgt, 'ff_companionOf')) >>> 0;
   const tag = String(get(tgt, 'private.npcSpawner') || '');
   const target = `target ${tgt.toString(16)} ${String(get(tgt, 'baseDesc') || '?')}${tag ? ' ' + tag : ''}${side ? ` fights for ${side.toString(16)}` : ''}${get(tgt, 'isDead') === true ? ' DEAD' : ''}`;
@@ -9424,6 +9757,27 @@ try {
   require(GRANDHEALING_JS)({ mp, log, recordOf, onlineActors, profileOf, display, cfg });
 } catch (e) { log('grandhealing.js failed to load:', e.stack || e.message); globalThis.__dboGrandHealCast = null; globalThis.__dboGrandHealHit = null; }
 
+// ---- /f and /p: word by runner to a faction and among a party (server\dispatches.js, config "dispatches") ----------
+try {
+  const DISPATCHES_JS = path.resolve('dispatches.js');
+  delete require.cache[DISPATCHES_JS];
+  require(DISPATCHES_JS)({ mp, log, personal, deliver, registerChatCommand, onlineActors, nameOf, zoneOfActor, cfg });
+} catch (e) { log('dispatches.js failed to load:', e.stack || e.message); }
+
+// ---- heralds cry gatherings: /herald, /events (server\heralds.js, config "heralds") ---------------------------------
+try {
+  const HERALDS_JS = path.resolve('heralds.js');
+  delete require.cache[HERALDS_JS];
+  require(HERALDS_JS)({ mp, log, personal, system, registerChatCommand, onlineActors, profileOf, nameOf, zoneById, takeGold, depositToTreasury, every, audit, isAdmin, zoneOfActor, giveItem, GOLD_BASE, cfg });
+} catch (e) { log('heralds.js failed to load:', e.stack || e.message); globalThis.__dboHeraldLogin = null; }
+
+// ---- a faction's roll and standing orders: /roster, /orders (server\rosters.js, config "rosters") -------------------
+try {
+  const ROSTERS_JS = path.resolve('rosters.js');
+  delete require.cache[ROSTERS_JS];
+  require(ROSTERS_JS)({ log, personal, registerChatCommand, onlineActors, nameOf, zoneOfActor, zoneById, every, audit, cfg });
+} catch (e) { log('rosters.js failed to load:', e.stack || e.message); globalThis.__dboRosterLogin = null; }
+
 // ---- /monitor: the dbo-monitor service's view for staff (server\monitor.js; tooling/dbo-monitor) -----------------
 try {
   const MONITOR_JS = path.resolve('monitor.js');
@@ -9900,7 +10254,14 @@ try {
   const BRIARHEART_JS = path.resolve('briarheart.js');
   delete require.cache[BRIARHEART_JS];
   require(BRIARHEART_JS)({ mp, log, personal, audit, who, display, cfg, registerChatCommand, onlineActors, isLeadStaff, findByName, every, giveItem, sourceResistsOf, recordOf });
-} catch (e) { log('briarheart.js failed to load:', e.stack || e.message); for (const k of ['__dboIsBriarheart', '__dboBriarheartVitalBonus', '__dboBriarheartTargetMult', '__dboBriarheartRefusesDivine', '__dboBriarheartFaithLock', '__dboBriarheartLogin', '__dboBriarheartMenuEntries', '__dboBriarheartMenuAction', '__dboBriarheartEquip', '__dboBriarheartActivate', '__dboBriarheartSpares']) globalThis[k] = null; }
+} catch (e) { log('briarheart.js failed to load:', e.stack || e.message); for (const k of ['__dboIsBriarheart', '__dboIsForsworn', '__dboBriarheartVitalBonus', '__dboBriarheartTargetMult', '__dboBriarheartRefusesDivine', '__dboBriarheartFaithLock', '__dboBriarheartLogin', '__dboBriarheartMenuEntries', '__dboBriarheartMenuAction', '__dboBriarheartEquip', '__dboBriarheartActivate', '__dboBriarheartSpares']) globalThis[k] = null; }
+// ---- the Hagraven's pact for the women of the Reach (server\hagraven.js, config "hagraven"): after briarheart.js (its altars)
+// and exposure.js (known on sight) ----
+try {
+  const HAGRAVEN_JS = path.resolve('hagraven.js');
+  delete require.cache[HAGRAVEN_JS];
+  require(HAGRAVEN_JS)({ mp, log, personal, audit, who, display, cfg, registerChatCommand, onlineActors, isLeadStaff, findByName, every, giveItem, sourceSkillsOf, zoneOfActor });
+} catch (e) { log('hagraven.js failed to load:', e.stack || e.message); for (const k of ['__dboHagravenStage', '__dboHagravenAttackMult', '__dboHagravenRegenMult', '__dboHagravenRefusesDeity', '__dboHagravenRiteAt', '__dboHagravenLogin', '__dboHagravenCast', '__dboHagravenSpares']) globalThis[k] = null; }
 // ---- the hold's watch: NPC guards at staff-placed posts, no loot or skill from them, jail by them (server\guards.js, config "guards") ----
 try {
   const GUARDS_JS = path.resolve('guards.js');
@@ -9959,6 +10320,13 @@ try {
   delete require.cache[MANUALS_JS];
   require(MANUALS_JS)({ mp, log, personal, audit, who, display, cfg, giveItem, takeGold, depositToTreasury, registerChatCommand, onlineActors, every, findByName, notify });
 } catch (e) { log('manuals.js failed to load:', e.stack || e.message); for (const k of ['__dboManualsRead', '__dboManualsReadWon', '__dboManualsIsManual', '__dboManualsBossLoot', '__dboManualsShop', '__dboManualsBuy', '__dboManualsCopyList', '__dboManualsCopyRefusal', '__dboManualsCopy', '__dboManualsLeave', '__dboManualsSmithShop', '__dboManualsSmithBuy']) globalThis[k] = null; }
+
+// ---- skill books, studied, train our skills (serverskillbooks.js, config "skillBooks"); inert until the fork's study hook ---
+try {
+  const SKILLBOOKS_JS = path.resolve('skillbooks.js');
+  delete require.cache[SKILLBOOKS_JS];
+  require(SKILLBOOKS_JS)({ mp, log, personal, audit, who, cfg });
+} catch (e) { log('skillbooks.js failed to load:', e.stack || e.message); globalThis.__dboSkillBookRead = null; }
 // ---- the Blacksmith's craft tiers, techniques and upgrade caps (server\smithing.js, smithing.json, config "smithing"): after manuals.js ----
 try {
   const SMITHING_JS = path.resolve('smithing.js');

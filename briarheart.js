@@ -96,6 +96,8 @@ module.exports = (api) => {
     races: ['DBOReachmanRace'], faiths: ['reach'],
     heartItem: '3ad61:Skyrim.esm',            // Briar Heart (INGR)
     altarRadius: 400, confirmMinutes: 5, altarBase: '6aeed:Skyrim.esm', altarName: 'Hagraven Altar',
+    // A full Hagraven (hagraven.js, stage 3) at the altar performs the rite and is named in the audit; true: the rite waits for one
+    hagravenRequired: false,
     // As hard as the werewolf's road (Nat, 26 Oct): Reachmen only, three Hagraven Feathers and two Hagraven Claws beside the
     // heart (all taken at the rite, whether or not the briar takes), and only by night (worldclock.js; 'fullmoon' or 'any')
     sexes: ['male'], riteAt: 'night',
@@ -433,6 +435,7 @@ module.exports = (api) => {
     if (!C.enabled) return 'The Hagravens are not taking hearts.';
     if (isBriar(a)) return 'A briar heart already beats in your chest.';
     if (isStaff(a)) return 'Staff take no rite.';
+    if (call('__dboHagravenStage', a >>> 0) > 0) return 'You have made the Hagravens\' pact yourself. The briar is for others.';
     const k = superKind(a); if (k) return k === 'vampire' ? 'The dead have no heart to give. Be cured first.' : 'Hircine has marked you. The Hagravens will not take his beast. Be cured first.';
     if (superState(a).disease) return 'A fever holds you. The Hagravens want a heart that is your own: be cured first.';
     const race = raceEdid(a);
@@ -443,6 +446,8 @@ module.exports = (api) => {
     const failed = Number(get(a, FAILED, 0)) || 0, wait = failed + C.failCooldownHours * HOUR - Date.now();
     if (wait > 0) return `The altar is cold to you since the briar would not take. Try again in ${waitText(wait)}.`;
     if (!altarNear(a)) return 'The rite is made at a Hagraven altar in the Reach.';
+    // A Hagraven (hagraven.js) at the altar presses the briar in; with hagravenRequired the rite waits for one
+    if (C.hagravenRequired && !call('__dboHagravenRiteAt', altarNear(a), a >>> 0)) return 'No Hagraven tends this altar. The rite waits for one.';
     if (!hasOne(a, idOf(C.heartItem))) return 'The rite needs a Briar Heart to set in your chest.';
     const lacking = components().filter((c) => countOf(a, c.id) < c.count);
     if (lacking.length) return `The Hagraven wants ${components().map((c) => `${c.count} ${c.name}`).join(' and ')} beside the Briar Heart. You lack ${lacking.map((c) => `${c.count - Math.min(c.count, countOf(a, c.id))} ${c.name}`).join(' and ')}.`;
@@ -489,9 +494,12 @@ module.exports = (api) => {
       set(a, 'isDead', true);
       return 'The briar does not take, and your own heart is gone. You die on the altar, and wake again.';
     }
-    become(a, 'rite', '');
-    audit(`BRIARHEART ${who(a)} took the briar heart at a Hagraven altar`);
-    return 'The Hagraven presses the briar into your chest. It takes root, as it did in Faolan, the Red Eagle, the first of you. Like Lorkh, you have given your heart. You feel the Reach in your blood, and nothing of the Divines.' + skinLine();
+    // A full Hagraven (hagraven.js) at the altar presses the briar in and is named in the audit
+    const hag = call('__dboHagravenRiteAt', altarNear(a), a >>> 0) || 0;
+    become(a, 'rite', hag ? who(hag) : '');
+    audit(`BRIARHEART ${who(a)} took the briar heart at a Hagraven altar${hag ? `, from the Hagraven ${who(hag)}` : ''}`);
+    if (hag && isOnline(hag)) personal(hag >>> 0, `You press the briar into ${display(a)}'s chest. It takes root.`);
+    return `${hag ? `${display(hag)} presses` : 'The Hagraven presses'} the briar into your chest. It takes root, as it did in Faolan, the Red Eagle, the first of you. Like Lorkh, you have given your heart. You feel the Reach in your blood, and nothing of the Divines.` + skinLine();
   };
 
   // ---- the cure ---------------------------------------------------------------------------------------------------------
@@ -567,6 +575,8 @@ module.exports = (api) => {
   };
   // prayer.js: a Divine's blessing does not rest on a briar heart; a Briarheart keeps the Old Gods
   globalThis.__dboBriarheartRefusesDivine = (a) => (C.enabled && C.noDivineBlessings && isBriar(Number(a) >>> 0) ? 'The briar in your chest belongs to the Hagravens. No Divine\'s blessing reaches it.' : '');
+  // hagraven.js: the pact is made at the same altars (the altar the character stands at, or null)
+  globalThis.__dboBriarheartAltarNear = (a) => altarNear(Number(a) >>> 0);
   globalThis.__dboBriarheartFaithLock = (a) => (C.enabled && C.faithLocked && isBriar(Number(a) >>> 0) ? 'The briar binds you to the Old Gods of the Reach. While it beats, you turn to no other.' : '');
   // gamemode.js at login: the spells, faction and look come back with the character
   globalThis.__dboBriarheartLogin = (a) => {
@@ -600,6 +610,8 @@ module.exports = (api) => {
     const edid = r && r.record ? String(r.record.editorId || '') : '';
     try { return !!edid && new RegExp(String(C.forswornMatch), 'i').test(edid); } catch (e) { return false; }
   };
+  // hagraven.js: the same test of who counts as Forsworn (or a hagraven), for a pact-holder
+  globalThis.__dboIsForsworn = (id) => isForsworn(Number(id) >>> 0);
   globalThis.__dboBriarheartSpares = (agg, tgt) => {
     agg = Number(agg) >>> 0; tgt = Number(tgt) >>> 0;
     if (!C.enabled || !C.forswornFriendly || agg === tgt) return false;
