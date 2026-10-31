@@ -69,7 +69,7 @@ module.exports = (api) => {
   const state = () => {
     if (G.state) return G.state;
     G.state = readJson(STATE_FILE, {});
-    for (const k of ['lockouts', 'spot', 'kills']) if (!G.state[k] || typeof G.state[k] !== 'object') G.state[k] = {};
+    for (const k of ['lockouts', 'spot', 'kills', 'firstKill']) if (!G.state[k] || typeof G.state[k] !== 'object') G.state[k] = {};
     return G.state;
   };
   const saveState = () => { try { fs.writeFileSync(STATE_FILE + '.tmp', JSON.stringify(state(), null, 1)); fs.renameSync(STATE_FILE + '.tmp', STATE_FILE); } catch (e) { log('bosses: state save failed', e.message); } };
@@ -197,10 +197,70 @@ module.exports = (api) => {
   };
   const fightOf = (b) => { let f = G.fights.get(b.id); if (!f) { f = { boss: 0, guardian: 0, health: 1, damage: new Map(), startedAt: 0, enraged: false, waves: 0, waveZones: [] }; G.fights.set(b.id, f); } return f; };
   const toughnessOf = (b, f) => {
-    if (f.enraged && b.enrage) return Number(b.enrage.toughness) || 0;
+    // Staggered in its warning: open, no give-back (Nat, 31 Oct)
+    if ((Number(f.exposedUntil) || 0) > Date.now()) return 0;
+    const less = f.lastStand ? Math.max(0, Number(PH.lastStandToughness) || 0) : 0;
+    if (f.enraged && b.enrage) return Math.max(0, (Number(b.enrage.toughness) || 0) - less);
     if (b.guardian && f.guardian) return Number(b.guardian.bossToughnessWhileAlive) || Number(b.toughness) || 0;
-    return Number(b.toughness) || 0;
+    return Math.max(0, (Number(b.toughness) || 0) - less);
   };
+
+  // ---- better fights at the same strength (Nat, 31 Oct: "don't nerf the bosses, just make them better") ---------------
+  // The server cannot see an attack wind up, so a telegraph is a window it times: every telegraph.everySeconds (a fifth either
+  // way) the fighters near the boss (range) are warned by a line and the banner, warnSeconds later its hits land at hitMult for
+  // windowSeconds, and a blocked one at blockedMult. A bash or a power attack on the boss during the warning staggers it: no
+  // window, and no give-back for exposedSeconds. Phases: at each share in phases.at the boss calls its guardian back (or an
+  // elite add), and at the last it makes a last stand (its hits x lastStandMult, its give-back less by lastStandToughness).
+  // Waves grow with the fighters. A kill pays extra pool picks: enraged, flawless (no rewarded fighter went down) and the
+  // first of the day. Config bosses.telegraph and bosses.phases, and each boss's bosses.<id>.telegraph (its line).
+  // Cost: one shared timer (bossFights, in the ticks log) that runs only while a fight is on and does a few comparisons per
+  // fight; the fighters near are looked up only when a warning goes out; nothing runs for a boss that is not up.
+  const TG = Object.assign({ enabled: true, everySeconds: 25, warnSeconds: 2, windowSeconds: 3, hitMult: 1.25, blockedMult: 0.25, range: 3000, exposedSeconds: 5, stagger: true }, C.telegraph || {});
+  const PH = Object.assign({ enabled: true, at: [0.66, 0.33], lastStandMult: 1.2, lastStandToughness: 0.1, waveGrowth: true }, C.phases || {});
+  const teleOf = (b) => { const t = Object.assign({}, TG, own(b).telegraph || {}); return t.enabled !== false && TG.enabled !== false ? t : null; };
+  const posOf = (id) => { const p = get(id, 'pos'); return Array.isArray(p) ? p : null; };
+  // The online players within r of the boss, in its world or cell
+  const near = (f, r) => {
+    const bp = posOf(f.boss); const where = String(get(f.boss, 'worldOrCellDesc') || '');
+    if (!bp) return [];
+    return onlineActors().filter((a) => { if (!isPlayer(a) || String(get(a, 'worldOrCellDesc') || '') !== where) return false; const p = posOf(a); return !!p && Math.hypot(p[0] - bp[0], p[1] - bp[1], p[2] - bp[2]) <= r; });
+  };
+  const sayNear = (f, r, text, banner) => {
+    for (const a of near(f, r)) {
+      personal(a, text);
+      if (banner) { try { sendPacket(a, { customPacketType: 'dboBanner', text: banner, seconds: 2.5 }); } catch (e) { /* the line is enough */ } }
+    }
+  };
+  const nextIn = (T) => Math.max(5, Number(T.everySeconds) || 25) * 1000 * (0.8 + 0.4 * Math.random());
+  const teleStep = (b, f, T, now) => {
+    if (!f.tele) { f.tele = { state: 'idle', at: now + nextIn(T) }; return; }
+    if (now < f.tele.at) return;
+    if (f.tele.state === 'idle') {
+      f.tele = { state: 'warn', at: now + Math.max(0.5, Number(T.warnSeconds) || 2) * 1000 };
+      const line = String(T.line || `${titled(b.name)} gathers itself for a mighty blow.`);
+      sayNear(f, Number(T.range) || 3000, `${line} Block it, or stagger it with a bash or a power attack!`, line);
+    } else if (f.tele.state === 'warn') f.tele = { state: 'window', at: now + Math.max(0.5, Number(T.windowSeconds) || 3) * 1000 };
+    else f.tele = { state: 'idle', at: now + nextIn(T) };
+  };
+  // A rewarded fighter going down spoils a flawless kill; looked at once a second, and only while a fight is on
+  const downStep = (f, now) => {
+    if (f.anyDown || now - (Number(f.downAt) || 0) < 1000 || typeof globalThis.__dboIsDowned !== 'function') return;
+    f.downAt = now;
+    for (const p of f.damage.keys()) { try { if (globalThis.__dboIsDowned(p)) { f.anyDown = true; return; } } catch (e) { /* not loaded */ } }
+  };
+  const fightTick = () => {
+    const now = Date.now(); let active = 0;
+    for (const [id, f] of G.fights) {
+      if (!f.boss || !f.startedAt) continue;
+      const b = byId.get(id); if (!b) continue;
+      active++;
+      const T = teleOf(b); if (T) teleStep(b, f, T, now);
+      downStep(f, now);
+    }
+    if (!active) { G.fightTimer = false; if (typeof stopTimer === 'function') stopTimer('bossFights'); }
+  };
+  const fightTimer = () => { if (G.fightTimer) return; G.fightTimer = true; every('bossFights', Math.max(100, Number(C.fightTickMs) || 250), fightTick); };
+  G.fightTick = fightTick;
   const endFight = (b, why) => {
     const f = G.fights.get(b.id);
     if (!f) return;
@@ -318,7 +378,7 @@ module.exports = (api) => {
     const b = byId.get(who2.boss); const f = b && G.fights.get(b.id);
     if (!b || !f) return;
     const p = creditedTo(agg >>> 0);
-    if (isPlayer(p)) { f.damage.set(p, (f.damage.get(p) || 0) + Math.max(0, Number(dealt) || 0)); if (!f.startedAt) f.startedAt = Date.now(); }
+    if (isPlayer(p)) { f.damage.set(p, (f.damage.get(p) || 0) + Math.max(0, Number(dealt) || 0)); if (!f.startedAt) { f.startedAt = Date.now(); fightTimer(); } }
     if (who2.role !== 'boss') return;
     const now = healthOf(tgt);
     if (now === null || now <= 0) { f.health = 0; return; }
@@ -333,19 +393,58 @@ module.exports = (api) => {
       const [, n] = waves[f.waves];
       const sp = spotOf(b);
       let pos = sp.pos; try { const q = mp.get(tgt, 'pos'); if (Array.isArray(q)) pos = q; } catch (e) { /* the spot */ }
-      for (let i = 0; i < Number(n); i++) { const id = addOf(b, f.waves + i); if (id) f.waveZones.push(zone(b, `w${f.waves}-${i}`, ring(pos, i, Number(n), 450), id, 1e9, sp.heading)); }
+      // Waves grow with the fighters: one more for every two past three
+      const count = Number(n) + (PH.waveGrowth !== false ? Math.floor(Math.max(0, f.damage.size - 3) / 2) : 0);
+      for (let i = 0; i < count; i++) { const id = addOf(b, f.waves + i); if (id) f.waveZones.push(zone(b, `w${f.waves}-${i}`, ring(pos, i, count, 450), id, 1e9, sp.heading)); }
       for (const pl of f.damage.keys()) personal(pl, `${titled(b.name)} calls for help.`);
       f.waves++; wrote = true;
     }
+    // Phases: the guardian (or an elite add) called back at each share but the last; the last stand at the last
+    const at = PH.enabled !== false && Array.isArray(PH.at) ? PH.at.map(Number).filter((x) => x > 0 && x < 1).sort((x, y) => y - x) : [];
+    while ((Number(f.phase) || 0) < at.length && h <= at[Number(f.phase) || 0]) {
+      const k = Number(f.phase) || 0; f.phase = k + 1;
+      if (k === at.length - 1) {
+        f.lastStand = true;
+        sayNear(f, Number((teleOf(b) || TG).range) || 3000, `${titled(b.name)} makes a last stand!`, `${titled(b.name)} makes a last stand!`);
+        log(`bosses: ${b.id} last stand`);
+      } else {
+        const sp = spotOf(b);
+        let pos = sp.pos; try { const q = mp.get(tgt, 'pos'); if (Array.isArray(q)) pos = q; } catch (e) { /* the spot */ }
+        const g = b.guardian && b.guardian.options && !f.guardian ? pickHigh(b.guardian.options) : null;
+        const elite = g || ((b.adds || [])[0] ? pickHigh(b.adds[0].options) : null);
+        if (elite) { f.waveZones.push(zone(b, `p${k}`, ring(pos, 0, 1, 500), elite, 1e9, sp.heading)); wrote = true; }
+        for (const pl of f.damage.keys()) personal(pl, g ? `${titled(b.name)} calls ${b.guardian.name || 'its guardian'} back to its side.` : `${titled(b.name)} calls its champion.`);
+        log(`bosses: ${b.id} phase ${k + 1}${elite ? `, ${g ? 'guardian' : 'champion'} called` : ''}`);
+      }
+    }
     if (wrote) writeZones();
   };
-  globalThis.__dboBossDamageMult = (agg, tgt) => {
+  // gamemode.js onHitDamageAttempt, a blow ON a boss: a bash or a power attack in its warning staggers it
+  globalThis.__dboBossStruck = (agg, tgt, src, flags) => {
+    const w = G.byActor.get(tgt >>> 0);
+    if (!w || w.role !== 'boss') return;
+    const b = byId.get(w.boss); const f = b && G.fights.get(b.id);
+    const T = b && teleOf(b);
+    if (!f || !T || T.stagger === false || !f.tele || f.tele.state !== 'warn') return;
+    if (!isPlayer(creditedTo(agg >>> 0)) || !flags || !(flags.bash || flags.power)) return;
+    const now = Date.now();
+    f.tele = { state: 'idle', at: now + nextIn(T) };
+    f.exposedUntil = now + Math.max(1, Number(T.exposedSeconds) || 5) * 1000;
+    sayNear(f, Number(T.range) || 3000, `${titled(b.name)} is staggered! It is open for ${Math.round(Number(T.exposedSeconds) || 5)} seconds.`, `${titled(b.name)} is staggered!`);
+    log(`bosses: ${b.id} staggered by ${display(agg >>> 0)}`);
+  };
+  globalThis.__dboBossDamageMult = (agg, tgt, src, flags) => {
     const w = G.byActor.get(agg >>> 0);
     if (!w || w.role !== 'boss' || !isPlayer(tgt >>> 0)) return 1;
     const b = byId.get(w.boss); const f = b && G.fights.get(b.id);
     if (!b) return 1;
-    const m = f && f.enraged && b.enrage ? Number(b.enrage.damageMult) : Number(b.damageMult);
-    return m > 0 ? m : 1;
+    let m = f && f.enraged && b.enrage ? Number(b.enrage.damageMult) : Number(b.damageMult);
+    m = m > 0 ? m : 1;
+    if (f && f.lastStand) m *= Number(PH.lastStandMult) || 1;
+    // The telegraphed window: its blows land harder, a blocked one far lighter
+    const T = teleOf(b);
+    if (f && T && f.tele && f.tele.state === 'window') m *= flags && flags.blocked ? (Number(T.blockedMult) || 0.25) : (Number(T.hitMult) || 1);
+    return m;
   };
 
   // ---- the reward ---------------------------------------------------------------------------------------------------
@@ -381,6 +480,10 @@ module.exports = (api) => {
       fighters = fighters.filter((x) => { try { return !globalThis.__dboIsBriarheart(x); } catch (e) { return true; } });
     }
     const top = fighters.slice().sort((x, y) => (f.damage.get(y) || 0) - (f.damage.get(x) || 0))[0];
+    // Extra picks from the pool for the harder way: enraged, flawless, the first of the day
+    const today = new Date().toISOString().slice(0, 10);
+    const bonus = [f.enraged ? 'enraged' : '', !f.anyDown && fighters.length ? 'flawless' : '', state().firstKill[b.id] !== today ? 'the first of the day' : ''].filter(Boolean);
+    if (C.bonusPicks !== false) state().firstKill[b.id] = today;
     const now = Date.now(), lock = Math.max(0, Number(C.lockoutHours) || 20) * 3600000;
     const dr = b.drops || {};
     const names = [];
@@ -403,6 +506,10 @@ module.exports = (api) => {
       }
       for (const [desc, chance, n] of dr.extra || []) if (Math.random() < (Number(chance) || 0) && giveDesc(p, desc, Number(n) || 1)) got.push(`${Number(n) || 1}x ${desc} (rare)`);
       for (const [desc, n] of poolPicks(dr.pool)) if (giveDesc(p, desc, n)) got.push(`${n}x ${desc}`);
+      if (C.bonusPicks !== false && bonus.length && dr.pool) {
+        for (const [desc, n] of poolPicks(Object.assign({}, dr.pool, { picks: bonus.length }))) if (giveDesc(p, desc, n)) got.push(`${n}x ${desc} (bonus)`);
+        personal(p, `Bonus from the pool: ${bonus.join(', ')}.`);
+      }
       if (shards > 0 && giveDesc(p, dr.shards.desc, shards)) got.push(`${shards}x ${dr.shards.desc}`);
       (state().lockouts[b.id] = state().lockouts[b.id] || {})[pid] = now + lock;
       personal(p, `${titled(b.name)} falls.${got.length ? ' Your share is in your pack.' : ''}`);
@@ -460,6 +567,7 @@ module.exports = (api) => {
   }, { help: 'the bosses, and when each can reward you again' });
 
   const zonesWritten = writeZones();
+  G.fightTimer = false; if ([...G.fights.values()].some((f) => f.boss && f.startedAt)) fightTimer();
   if (BOSSES.length) every('bosses', Math.max(1, Number(C.pollSeconds) || 2) * 1000, () => { try { sweep(); } catch (e) { log('bosses: sweep failed', e.message); } try { sendLabels(); } catch (e) { log('bosses: labels failed', e.message); } });
   else if (typeof stopTimer === 'function') stopTimer('bosses');
   log(`bosses ${C.enabled ? 'on' : 'off'}: ${BOSSES.length} of ${DEFS.length} (${BOSSES.map((b) => b.id).join(', ') || 'none'}), ${zonesWritten} zones, lockout ${C.lockoutHours} h${DEFS.filter((b) => b.enabled === false).map((b) => `; ${b.id} waits on ${b.waitingOn || 'Nat'}`).join('')}`);

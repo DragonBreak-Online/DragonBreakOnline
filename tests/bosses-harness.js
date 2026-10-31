@@ -143,7 +143,8 @@ KB.waves.forEach(([share, n], i) => {
   ok(h <= share && w.length === n && w.every((x) => x.Respawn === 1e9), `below ${Math.round(share * 100)}%: wave ${i + 1}, ${n} beside him, never respawning`, [h, zones().filter((x) => x.Name.includes(':w')).map((x) => x.Name)]);
 });
 now += KB.enrageSeconds * 1000 + 1000; tick([K]);
-ok(globalThis.__dboBossDamageMult(K, P1) === KB.enrage.damageMult && /grows furious/.test(toldTo(P2)), `${KB.enrageSeconds / 60} minutes after the first blow he is enraged: x${KB.enrage.damageMult}`);
+// Under 33% he is also in his last stand (bosses.phases.lastStandMult 1.2, Nat 31 Oct)
+ok(Math.abs(globalThis.__dboBossDamageMult(K, P1) - KB.enrage.damageMult * 1.2) < 1e-9 && /grows furious/.test(toldTo(P2)), `${KB.enrageSeconds / 60} minutes after the first blow he is enraged: x${KB.enrage.damageMult}`);
 hit(BRIAR, K, 400, 0.1);
 hit(FAR, K, 20, 0.05);   // under 10% of the damage
 given.length = 0; said.length = 0; rnd = 0.01;
@@ -186,7 +187,7 @@ ok(shards(P2) === 5 + 2 + 2 && !gotBy(P2).some((g) => g[1] === 0x7000), 'a smith
   const ic = withPool.bosses.find((b) => b.id === 'icecap');
   ic.drops = { pool: POOLS.get('icecap') };
   fs.writeFileSync(path.join(dir, 'bosses.json'), JSON.stringify(withPool));
-  load({});
+  load({ bosses: { bonusPicks: false } });   // the plain draw; the bonus picks are boss-telegraph-harness.js's
   const WP = 0xff700001;
   put(WP, 'private.npcSpawner', 'boss:icecap:boss'); put(WP, 'percentages', { health: 1, magicka: 1, stamina: 1 });
   tick([WP]);
@@ -332,7 +333,7 @@ ok(given.some((g) => g[0] === P3 && g[1] === idOf('17749:Dragonborn.esm') && g[2
 const msrc = fs.readFileSync(path.join(ROOT, 'manuals.js'), 'utf8');
 ok(/globalThis\.__dboSchematicBook = \(family\) =>/.test(msrc) && /!x\.staffOnly && !x\.withheld/.test(msrc) && /globalThis\.__dboKnowsFamily = /.test(msrc), 'manuals.js hands a family\'s schematic to a boss (never a staff-only or withheld one) and says whether a smith knows it');
 const gsrc = fs.readFileSync(path.join(ROOT, 'gamemode.js'), 'utf8');
-ok(/__dboBossDeath\(Number\(actorId\)/.test(gsrc) && /__dboBossHit\(agg, tgt, dealt\)/.test(gsrc) && /__dboBossDamageMult\(agg, tgt\)/.test(gsrc) && /require\(BOSSES_JS\)/.test(gsrc), 'gamemode.js loads bosses.js and calls its death, hit and damage hooks');
+ok(/__dboBossDeath\(Number\(actorId\)/.test(gsrc) && /__dboBossHit\(agg, tgt, dealt\)/.test(gsrc) && /__dboBossDamageMult\(agg, tgt, src, flags\)/.test(gsrc) && /__dboBossStruck\(agg, tgt, src, flags\)/.test(gsrc) && /require\(BOSSES_JS\)/.test(gsrc), 'gamemode.js loads bosses.js and calls its death, hit and damage hooks');
 
 Date.now = realNow; Math.random = realRandom;
 // ---- boss nameplates: the names go to the players near a boss, once, and are cleared at its death ----

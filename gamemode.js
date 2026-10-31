@@ -8662,8 +8662,8 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     mult *= npcPowerHitMult(agg, tgt, flags, dmg);
     // A kind of creature's or NPC's hits on a player (npcDamage.byKind)
     mult *= npcKindDamageMult(agg, tgt, dmg);
-    // A boss's hits on a player, more once it is enraged (bosses.js)
-    try { if (globalThis.__dboBossDamageMult) mult *= Number(globalThis.__dboBossDamageMult(agg, tgt)) || 1; } catch (e) { log('boss damage failed', e.message); }
+    // A boss's hits on a player (enraged, its telegraphed window, its last stand); a bash or power attack in its warning staggers it (bosses.js)
+    try { if (globalThis.__dboBossDamageMult) mult *= Number(globalThis.__dboBossDamageMult(agg, tgt, src, flags)) || 1; if (dmg > 0 && globalThis.__dboBossStruck) globalThis.__dboBossStruck(agg, tgt, src, flags); } catch (e) { log('boss damage failed', e.message); }
     // An enemy of a claimed dungeon by the lease's difficulty, and any NPC's spell (npcDamage.byDifficulty, spellMult)
     mult *= npcDifficultyDamageMult(agg, tgt, dmg, flags);
     // A family of creatures by race, on a player (npcToughness.kinds.<kind>.dealt; the draugr, 17 Oct)
@@ -8930,7 +8930,7 @@ try {
   const BOSSES_JS = path.resolve('bosses.js');
   delete require.cache[BOSSES_JS];
   require(BOSSES_JS)({ mp, log, personal, audit, display, who, cfg, giveItem, registerChatCommand, sendPacket, onlineActors, every, stopTimer, profileOf, zoneOfActor, isLeadStaff });
-} catch (e) { log('bosses.js failed to load:', e.stack || e.message); globalThis.__dboBossHit = null; globalThis.__dboBossDeath = null; globalThis.__dboBossDamageMult = null; globalThis.__dboBossAllies = null; }
+} catch (e) { log('bosses.js failed to load:', e.stack || e.message); globalThis.__dboBossHit = null; globalThis.__dboBossDeath = null; globalThis.__dboBossDamageMult = null; globalThis.__dboBossAllies = null; globalThis.__dboBossStruck = null; }
 
 // ---- mining and woodcutting mini-games (server\labour.js, config "labour") ---------------------
 try {
