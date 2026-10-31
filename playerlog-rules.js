@@ -462,6 +462,10 @@ excluded('DECOR', 'cost JSON; off until Nat switches it on');
 // VAMPATH (vampirepath.js, Nat 31 Oct): a GM's /vampath names them in the reason; the one lasting act, the drain's end of a
 // character, is logged by supernatural.js's own PERMADEATH line
 excluded('VAMPATH', 'reasons can name a GM; the drain\'s permadeath logs as PERMADEATH');
+// CIRCULAR (gamemode.js /circular, 31 Oct): the officer, the faction and counts; the letters themselves log as letters
+clean_('CIRCULAR');
+// HERALD (heralds.js, 31 Oct): the gathering's title is the player's own words, as /event's broadcast text is
+excluded('HERALD', 'player-written gathering titles; the command wrapper records the use');
 AUDIT_VERBS.FEED.roles = R_BY([[/ asked $/, 'target'], [/ let $/, 'target'], [/ refused $/, 'target'], [/ feed on $/, 'target']]);
 AUDIT_VERBS.ROPE.roles = R_BY([[/ cut $/, 'target'], [/ of $/, 'captor']]);
 AUDIT_VERBS.STRUGGLE.roles = R_BY([[/ of $/, 'captor']]);
@@ -1654,6 +1658,9 @@ gamemode.js GM 6fbbe634 parsed
 gamemode.js GM c3aa528e parsed
 gamemode.js GM 806c63e4 parsed
 gamemode.js PIGEON 08c63dcc excluded
+gamemode.js CIRCULAR 2d44fcde clean
+heralds.js HERALD 9eb0fce9 excluded
+heralds.js HERALD c8376150 excluded
 gamemode.js POST 2a604861 parsed
 gamemode.js GM 90ebebeb parsed
 gamemode.js TREASURY 0cdffe5e clean
