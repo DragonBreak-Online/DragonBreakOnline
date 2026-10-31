@@ -1,5 +1,35 @@
 [
   {
+    "title": "Vampires: the Feral hunger and Molag Bal's path",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "Feral",
+        "items": [
+          "A vampire deep in thirst can turn Feral: a warning comes first, then the hunger takes over for a short while and hunts whatever is near, players included.",
+          "Feeding, restraint or an offered black soul gem calms it. The holder of the Blood Crown is never Feral."
+        ]
+      },
+      {
+        "heading": "Molag Bal's path",
+        "items": [
+          "Prayer, living feeds and offerings to Molag Bal raise a vampire through Sworn, Devout and Chosen.",
+          "Each step tames the Feral hunger and strengthens a vampire's powers, at the risk of a backlash on use.",
+          "Only a Devout vampire may give the Embrace."
+        ]
+      },
+      {
+        "heading": "Elders and the Blood Crown",
+        "items": [
+          "A pure-blood Master Vampire is an Elder, and feels the Blood Crown grow near: far, closer, close. The Lord feels the hunt too.",
+          "An Elder who drains the downed Lord takes the Crown. Never in a temple, inn, home or jail, and a new Lord is safe for 48 hours."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Combat logout",
     "date": "2026-10-31",
     "version": "Server update",
