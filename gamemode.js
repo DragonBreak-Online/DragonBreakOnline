@@ -5998,7 +5998,13 @@ const combatAt = globalThis.__dboCombatAt = globalThis.__dboCombatAt || new Map(
 // the middle of a fight, the combat logger: a blow landed on or by them in the last combatLogSeconds before the
 // logout leaves the body open until it fades. Decided once, at the logout, so blows on the body afterwards change
 // nothing.
-const OFFLINE_BODY = Object.assign({ combatLogSeconds: 30 }, cfg.offlineBody || {});
+const OFFLINE_BODY = Object.assign({ combatLogSeconds: 60 }, cfg.offlineBody || {});
+// The combat logout timer (Nat, 31 Oct): a player struck in PvP after a quiet spell is told that leaving now keeps the body
+const combatLogWarn = (a, last) => {
+  const s = Math.max(0, Number(OFFLINE_BODY.combatLogSeconds) || 0);
+  if (!s || Date.now() - (last || 0) <= s * 1000) return;
+  personal(a, `In combat: if you log out or change character in the next ${s} seconds, your body stays in the world and can still be fought until it fades.`);
+};
 const logoutAt = globalThis.__dboLogoutAt instanceof Map ? globalThis.__dboLogoutAt : (globalThis.__dboLogoutAt = new Map()); // actorId -> { at, fighting }
 globalThis.__dboNoteLogout = (a) => {
   const now = Date.now();
@@ -8613,7 +8619,7 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
   }
 
   // PvP combat: both sides are marked
-  if (dmg > 0 && agg !== tgt && profileOf(agg) >= 0 && profileOf(tgt) >= 0) { const now = Date.now(); pvpAt.set(agg, now); pvpAt.set(tgt, now); }
+  if (dmg > 0 && agg !== tgt && profileOf(agg) >= 0 && profileOf(tgt) >= 0) { const now = Date.now(); combatLogWarn(agg, pvpAt.get(agg)); combatLogWarn(tgt, pvpAt.get(tgt)); pvpAt.set(agg, now); pvpAt.set(tgt, now); }
   // Any combat, NPCs included: /unstuck waits combatSeconds after it, Sleep 5 minutes (rest.js), as a logout leaves the body that long
   if (dmg > 0 && agg !== tgt) { const now = Date.now(); if (profileOf(agg) >= 0) combatAt.set(agg >>> 0, now); if (profileOf(tgt) >= 0) combatAt.set(tgt >>> 0, now); }
   // An NPC in a fight stays with its host for a moment (hostcooldown.js)
