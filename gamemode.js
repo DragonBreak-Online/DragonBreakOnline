@@ -4214,6 +4214,24 @@ const onUi = (event, fn) => {
   list.push(fn);
   globalThis.__dboUiEvents.set(event, list);
 };
+// /testmenu itemcard|mapmenu (staff): arms a one-shot client probe for the next item menu or M map (_work/itemcard-route-1031.md,
+// _work/mmap-build-1026.md); the client's findings come back as the UI events below, into the log and to the tester
+const MENU_TESTS = { itemcard: ['dboItemCardTest', 'Open your inventory and highlight an armour piece. Watch the line under the armour value: it should read "Tier 3 · Medium · Defense 30" in yellow for a second.'],
+  mapmenu: ['dboMapTest', 'Open the M map, keep it still for a moment, then pan it.'] };
+registerChatCommand('testmenu', (a, args) => {
+  const t = MENU_TESTS[String(args || '').trim().toLowerCase()];
+  if (!t) return personal(a, `Usage: /testmenu ${Object.keys(MENU_TESTS).join('|')}`);
+  sendPacket(a, { customPacketType: t[0] });
+  personal(a, `Armed for 10 minutes. ${t[1]}`);
+}, { admin: true, help: 'Staff: arm a one-shot client menu probe (itemcard, mapmenu)' });
+// onUi's registry is rebuilt on every reload (globalThis.__dboUiEvents), so these never stack
+const menuTestReport = (ev) => (a, args) => {
+  const res = JSON.stringify((args || [])[0] || {}).slice(0, 1500);
+  log(`menu test ${ev} from ${display(a)}: ${res}`);
+  personal(a, `${ev}: ${res}`);
+};
+onUi('itemCardTest', menuTestReport('itemCardTest'));
+onUi('mapTest', menuTestReport('mapTest'));
 // ---- a name of its own before the world (server\naming.js), loaded here because it registers with onUi -------------
 // ---- /appearance: a player reopens the appearance editor for gold (server\appearance.js, config "appearance") ----
 try {
@@ -7641,65 +7659,95 @@ const wearCheck = (a, equipment, settling) => {
 };
 // Debuff mode (Nat, 31 Oct: "anyone may wear any armour"; armorWear.mode "debuff", "block" above stays the rollback). Nothing
 // comes off and nothing is grandfathered: the armour protects in full (the shown rating stays the hit's), but each piece
-// worn above the wearer's Defense tier costs, weighted by slot (debuff.slotWeights, the body most), by how many tiers over
-// (1, 2, 3+): move speed, stamina recovery, and the stamina a power attack or a sprint costs. On top, heavy armour slows by
-// heavySlow at Defense 0, less as Defense rises, none from heavySlowUntilDefense (athny's idea, Nat 31 Oct), by the heavy
-// pieces' weight. Cosmetic pieces cost nothing: clothing and jewellery, a piece under its slot's tier 1 band, a head piece
-// named as a circlet, hood, cowl, mask, crown or hat no stronger than tier 2's head band, and debuff.allow (editor ids, staff).
-// Where each lands: stamina recovery on the server (racial.js regen tick, __dboWearRegenMult: a slowing factor it already
-// takes back, as the Atronach's magicka; a client SetActorValue below base never bites, the regen ceiling keeps the larger);
-// speed and the power attack and sprint costs on the player's own client (dboArmourWear packet, a client with the
-// 'armourWear' UI capability: SpeedMult beside the timed slows, the two stamina GMSTs scaled). Told once when it worsens.
+// worn above the wearer's Defense costs, weighted by slot (debuff.slotWeights, the body most): move speed, stamina recovery,
+// and the stamina a power attack or a sprint costs. The cost grows with the gap between the piece's Defense and the
+// wearer's, from 0 at no gap to the caps (speed, staminaRegen, staminaCost) at gapForFull (Marcus, #ooc-general: 2 levels
+// short barely feels it; scale "tiers" is the step table of the first build, 1/2/3+ tiers over). On top, heavy armour
+// slows by heavySlow at Defense 0, less as Defense rises, none from heavySlowUntilDefense (athny's idea), by the heavy
+// pieces' weight; medium armour (debuff.medium, editor-id patterns of the sets players call medium; otome's list, Nat
+// 31 Oct) by mediumSlowShare of it. Cosmetic pieces cost nothing: clothing and jewellery, a piece under its slot's tier 1
+// band, a head piece named as a circlet, hood, cowl, mask, crown or hat no stronger than tier 2's head band, and
+// debuff.allow (editor ids, staff). Where each lands: stamina recovery on the server (racial.js regen tick,
+// __dboWearRegenMult: a slowing factor it already takes back, as the Atronach's magicka; a client SetActorValue below base
+// never bites, the regen ceiling keeps the larger); speed and the power attack and sprint costs on the player's own client
+// (dboArmourWear packet, a client with the 'armourWear' UI capability: SpeedMult beside the timed slows, the two stamina
+// GMSTs scaled). Told once when it worsens, with the piece's Defense and the wearer's; /armor shows every worn piece.
 const WEAR_DEBUFF = Object.assign({
   slotWeights: { body: 0.5, head: 0.15, hands: 0.15, feet: 0.15, shield: 0.05 },
+  scale: 'gap', gapForFull: 45, caps: { speed: -30, staminaRegen: -50, staminaCost: 50 },
   speed: [0, -10, -20, -30], staminaRegen: [0, -15, -30, -50], staminaCost: [0, 15, 30, 50],
-  heavySlow: -15, heavySlowUntilDefense: 75, maxSlow: -45, recheckSeconds: 30,
+  heavySlow: -15, heavySlowUntilDefense: 75, mediumSlowShare: 0.5, maxSlow: -45, recheckSeconds: 30, costApplied: false,
   t1Min: { heavy: 25, light: 20 }, t2Max: { heavy: 31, light: 28 },
   slotShare: { heavy: { body: 1, head: 0.47, hands: 0.36, feet: 0.36, shield: 0.7 }, light: { body: 1, head: 0.42, hands: 0.29, feet: 0.29, shield: 0.7 } },
   headCosmetic: 'circlet|hood|cowl|mask|crown|diadem|veil|\\bhat\\b|scarf|bandana', allow: [],
+  // otome's medium sets as our records name them (31 Oct); Daedric Mail, Dwarven Mail and Studded Dragonscale are in no plugin we load
+  medium: ['^ArmorScaled', '^ArmorOrcish', '^ArmorBlades', '^ArmorCompanions', '^(DLC1)?ArmorFalmer', 'StormcloakBear', 'Bonemold', '^DLC2ArmorNordic',
+    '^DLC2ArmorChitinHeavy', '^DLC2ArmorStalhrimLight', '^DLC1ArmorDawnguard.*Heavy', '^ccBGSSSE025_ArmorAmber', '^ccBGSSSE025_ArmorGoldenSaint'],
 }, ARMOR_WEAR.debuff || {});
 const WEAR_CAP = 'armourWear';
 const wearState = globalThis.__dboWearState instanceof Map ? globalThis.__dboWearState : (globalThis.__dboWearState = new Map());
 const headCosmeticRx = (() => { try { return new RegExp(String(WEAR_DEBUFF.headCosmetic), 'i'); } catch (e) { return /circlet|hood|cowl|mask/i; } })();
 const wearAllow = new Set((WEAR_DEBUFF.allow || []).map((e) => String(e).toLowerCase()));
+const mediumRx = (WEAR_DEBUFF.medium || []).map((x) => { try { return new RegExp(String(x), 'i'); } catch (e) { log(`armorWear: bad medium pattern ${x}`); return null; } }).filter(Boolean);
+const wearNameOf = (baseId) => { try { return adminItemName(mp.getDescFromId(baseId >>> 0)) || ''; } catch (e) { return ''; } };
 // The highest tier the wearer's Defense opens (1 at Defense 0)
 const wearerTierOf = (defense) => { let t = 1; (ARMOR_WEAR.defenseLevels || []).forEach((need, i) => { if (defense >= Number(need)) t = Math.max(t, i + 1); }); return t; };
 const wearSlotOf = (baseId) => { const r = recordOf(baseId); const b = r ? fieldsOf(r, 'BOD2')[0] : null; return b && b.data.byteLength >= 4 ? slotOfMask(u32At(b, 0)) : ''; };
-// { tier, slot, weight, heavy, edid } of a piece the debuff counts, or null (cosmetic, no family, faction or guard gear)
-const wearPieceOf = (baseId) => {
+// What a worn piece is to the rule: { tier, need, slot, weight, klass: light|medium|heavy, edid, cosmetic } (cosmetic: costs
+// nothing), or null (not armour, no family, faction or guard gear)
+const wearInfoOf = (baseId) => {
   const p = armorPieceOf(baseId >>> 0);
   if (!p || p.clothing || !(p.rating > 0)) return null;
   let tier = 0; try { tier = Number(globalThis.__dboWearTier(baseId >>> 0)) || 0; } catch (e) { tier = 0; }
   const slot = wearSlotOf(baseId >>> 0); const weight = Number((WEAR_DEBUFF.slotWeights || {})[slot]) || 0;
   if (!(tier > 0) || !(weight > 0)) return null;
   const r = recordOf(baseId >>> 0); const edid = String((r && r.record.editorId) || '');
-  if (wearAllow.has(edid.toLowerCase())) return null;
+  const klass = mediumRx.some((rx) => rx.test(edid)) ? 'medium' : p.heavy ? 'heavy' : 'light';
+  const need = Math.max(0, Number((ARMOR_WEAR.defenseLevels || [])[tier - 1]) || 0);
+  const info = { tier, need, slot, weight, klass, edid, cosmetic: false };
   const kind = p.heavy ? 'heavy' : 'light', share = Number(((WEAR_DEBUFF.slotShare || {})[kind] || {})[slot]) || 1, rating = p.counted || p.rating;
-  if (rating < Number((WEAR_DEBUFF.t1Min || {})[kind]) * share) return null;
-  if (slot === 'head' && rating <= Number((WEAR_DEBUFF.t2Max || {})[kind]) * share) {
-    let name = ''; try { name = adminItemName(mp.getDescFromId(baseId >>> 0)) || ''; } catch (e) { name = ''; }
-    if (headCosmeticRx.test(`${edid} ${name}`)) return null;
-  }
-  return { tier, slot, weight, heavy: p.heavy, edid };
+  if (wearAllow.has(edid.toLowerCase()) || rating < Number((WEAR_DEBUFF.t1Min || {})[kind]) * share) info.cosmetic = true;
+  else if (slot === 'head' && rating <= Number((WEAR_DEBUFF.t2Max || {})[kind]) * share && headCosmeticRx.test(`${edid} ${wearNameOf(baseId)}`)) info.cosmetic = true;
+  return info;
 };
-// The debuff for these worn pieces at this Defense: { speed (SpeedMult points, <= 0), regen (stamina recovery factor),
-// cost (stamina cost factor), over: [{ id, tier }] }
+// light, medium or heavy, for PvP's spell armour (pvp.spellArmour counts heavy and medium); '' for clothing and the untiered
+globalThis.__dboArmourClassOf = (baseId) => { try { const w = wearInfoOf(Number(baseId) >>> 0); return w ? w.klass : ''; } catch (e) { return ''; } };
+// A piece's share of the full cost (0..1) at this Defense: by the gap, or (scale "tiers") by tiers over
+const wearShareOf = (w, defense) => {
+  if (WEAR_DEBUFF.scale === 'tiers') { const n = Math.min(3, w.tier - wearerTierOf(defense)); return n > 0 ? n / 3 : 0; }
+  return Math.max(0, Math.min(1, (w.need - defense) / Math.max(1, Number(WEAR_DEBUFF.gapForFull) || 45)));
+};
+// The tier step table's value for a share (scale "tiers"), else the cap times the share
+const wearPart = (key, capKey, share) => {
+  if (WEAR_DEBUFF.scale === 'tiers') return Number((WEAR_DEBUFF[key] || [])[Math.round(share * 3)]) || 0;
+  return (Number((WEAR_DEBUFF.caps || {})[capKey]) || 0) * share;
+};
+// The debuff for these worn pieces at this Defense: { speed (SpeedMult points, <= 0), heavy (its armour-weight part), regen
+// (stamina recovery factor), cost (stamina cost factor), over: [{ id, tier, need, gap, share }] }
 const wearDebuffOf = (worn, defense) => {
-  const mine = wearerTierOf(defense);
-  let speed = 0, regen = 0, cost = 0, heavyW = 0; const over = [];
+  let speed = 0, regen = 0, cost = 0, weightW = 0; const over = [];
   for (const id of worn) {
-    const w = wearPieceOf(id); if (!w) continue;
-    if (w.heavy) heavyW += w.weight;
-    const n = Math.min(3, w.tier - mine); if (!(n > 0)) continue;
-    over.push({ id: id >>> 0, tier: w.tier });
-    speed += w.weight * (Number(WEAR_DEBUFF.speed[n]) || 0);
-    regen += w.weight * (Number(WEAR_DEBUFF.staminaRegen[n]) || 0);
-    cost += w.weight * (Number(WEAR_DEBUFF.staminaCost[n]) || 0);
+    const w = wearInfoOf(id); if (!w || w.cosmetic) continue;
+    if (w.klass === 'heavy') weightW += w.weight; else if (w.klass === 'medium') weightW += w.weight * (Number(WEAR_DEBUFF.mediumSlowShare) || 0);
+    const share = wearShareOf(w, defense); if (!(share > 0)) continue;
+    over.push({ id: id >>> 0, tier: w.tier, need: w.need, gap: Math.ceil(w.need - defense), share, weight: w.weight });
+    speed += w.weight * wearPart('speed', 'speed', share);
+    regen += w.weight * wearPart('staminaRegen', 'staminaRegen', share);
+    cost += w.weight * wearPart('staminaCost', 'staminaCost', share);
   }
   const until = Number(WEAR_DEBUFF.heavySlowUntilDefense) || 75;
-  const heavy = (Number(WEAR_DEBUFF.heavySlow) || 0) * Math.min(1, heavyW) * Math.max(0, 1 - defense / until);
+  const heavy = (Number(WEAR_DEBUFF.heavySlow) || 0) * Math.min(1, weightW) * Math.max(0, 1 - defense / until);
   return { speed: Math.max(Number(WEAR_DEBUFF.maxSlow) || -45, Math.round(speed + heavy)), heavy: Math.round(heavy),
     regen: Math.max(0, Math.round((1 + regen / 100) * 100) / 100), cost: Math.round((1 + cost / 100) * 100) / 100, over };
+};
+// What the cost does, in words, for what this client applies
+const wearParts = (a, d) => {
+  const client = hasUiCap(a, WEAR_CAP); const parts = [];
+  if (client && d.speed < 0) parts.push(`you move ${-d.speed}% slower`);
+  if (d.regen < 1) parts.push(`recover stamina ${Math.round((1 - d.regen) * 100)}% slower`);
+  // The cost is computed and sent but applied nowhere yet: scaling the stamina GMSTs on a client would change every NPC it hosts
+  if (client && d.cost > 1 && WEAR_DEBUFF.costApplied === true) parts.push(`power attacks and sprinting cost ${Math.round((d.cost - 1) * 100)}% more stamina`);
+  return parts;
 };
 // racial.js regen tick: stamina recovery while worn (1 = none)
 globalThis.__dboWearRegenMult = (a, stat) => { if (stat !== 'stamina' || ARMOR_WEAR.mode !== 'debuff') return 1; const s = wearState.get(a >>> 0); return s ? s.regen : 1; };
@@ -7711,19 +7759,18 @@ const wearDebuffUpdate = (a, worn, settling, quiet) => {
   if (prev.key === key) return d;
   wearState.set(a, Object.assign({ key, worn: worn.slice() }, d));
   try { sendPacket(a, { customPacketType: 'dboArmourWear', speedMult: d.speed, staminaCostMult: d.cost, staminaRegenMult: d.regen }); } catch (e) { /* offline */ }
-  log(`armorWear: ${display(a)} (Defense ${Math.floor(defense)}) speed ${d.speed} regen x${d.regen} cost x${d.cost}${d.over.length ? `, over: ${d.over.map((o) => `${o.id.toString(16)} T${o.tier}`).join(' ')}` : ''}`);
+  log(`armorWear: ${display(a)} (Defense ${Math.floor(defense)}) speed ${d.speed} regen x${d.regen} cost x${d.cost}${d.over.length ? `, over: ${d.over.map((o) => `${o.id.toString(16)} needs ${o.need}`).join(' ')}` : ''}`);
   // Told once when it worsens by a piece put on, never by the login's re-dress or the periodic re-check
   const worse = d.speed < (prev.speed || 0) || d.regen < (prev.regen || 1) || d.cost > (prev.cost || 1);
   if (worse && !settling && !quiet) {
-    const client = hasUiCap(a, WEAR_CAP);
-    const parts = [];
-    if (client && d.speed < 0) parts.push(`you move ${-d.speed}% slower`);
-    if (d.regen < 1) parts.push(`recover stamina ${Math.round((1 - d.regen) * 100)}% slower`);
-    if (client && d.cost > 1) parts.push(`power attacks and sprinting cost ${Math.round((d.cost - 1) * 100)}% more stamina`);
+    const parts = wearParts(a, d);
     if (parts.length) {
-      const why = d.over.length ? `Armour above your Defense (${Math.floor(defense)})` : 'Heavy armour';
-      const heavyNote = d.heavy < 0 ? ` Heavy armour weighs on you less as your Defense rises, and not at all from ${Number(WEAR_DEBUFF.heavySlowUntilDefense) || 75}.` : '';
-      const line = `${why}: ${parts.join(', ')}. It still protects you fully.${heavyNote}`;
+      // The piece that weighs most names the gap
+      const top = d.over.slice().sort((x, y) => y.share * y.weight - x.share * x.weight)[0];
+      const more = d.over.length > 1 ? ` (and ${d.over.length - 1} more piece${d.over.length > 2 ? 's' : ''} above you)` : '';
+      const why = top ? `${wearNameOf(top.id) || 'This armour'} needs Defense ${top.need}, you have ${Math.floor(defense)}${more}: you'll feel the weight` : 'Heavy armour weighs on you';
+      const heavyNote = d.heavy < 0 ? ` Heavy armour weighs less as your Defense rises, and not at all from ${Number(WEAR_DEBUFF.heavySlowUntilDefense) || 75}.` : '';
+      const line = `${why}. Right now ${parts.join(', ')}. It still protects you fully.${heavyNote} /armor shows each piece.`;
       if (Date.now() - (wearSaid.get(a) || 0) > 3000) { wearSaid.set(a, Date.now()); personal(a, line); try { sendPacket(a, { customPacketType: 'dboNotice', text: line }); } catch (e) { /* chat is enough */ } }
     }
   }
@@ -7736,6 +7783,22 @@ if (typeof every === "function") every('armourWear', Math.max(5, Number(WEAR_DEB
   for (const a of onlineActors()) { try { wearDebuffUpdate(a, wornWithHealth(a).map((w) => w.baseId), true, true); } catch (e) { log('armorWear recheck failed', e.message); } }
 });
 globalThis.__dboWearConnect = (a) => { wearState.delete(a >>> 0); };
+// /armor: each worn piece's class, tier, the Defense it needs and the wearer's gap, then what it all costs now
+const armorReport = (a) => {
+  const defense = defenseLevelOf(a), worn = wornWithHealth(a).map((w) => w.baseId);
+  const lines = [`Your Defense: ${Math.floor(defense)}.`];
+  for (const id of worn) {
+    const w = wearInfoOf(id); if (!w) continue;
+    const klass = w.klass[0].toUpperCase() + w.klass.slice(1);
+    const gap = w.need - defense;
+    const state = w.cosmetic ? 'costs nothing (cosmetic)' : gap > 0 ? `you are ${Math.ceil(gap)} short` : 'within your Defense';
+    lines.push(`${wearNameOf(id) || 'A piece'}: ${klass}, Tier ${w.tier}, Defense ${w.need}, ${state}.`);
+  }
+  if (lines.length === 1) lines.push('You wear no armour the rule counts.');
+  if (ARMOR_WEAR.mode === 'debuff') { const parts = wearParts(a, wearDebuffOf(worn, defense)); lines.push(parts.length ? `Right now ${parts.join(', ')}.` : 'It costs you nothing right now.'); }
+  return lines;
+};
+if (typeof registerChatCommand === 'function') registerChatCommand('armor', (a) => { if (!ARMOR_WEAR.enabled || typeof globalThis.__dboWearTier !== 'function') return personal(a, 'The armour rule is off.'); for (const l of armorReport(a)) personal(a, l); }, { help: 'Your worn armour: class, tier, the Defense each piece needs, and what it costs you' });
 const equipHook = (actorId, equipment, isAllowed, ...rest) => {
   // The client reports its equipment while it is still dressing after login (an empty or naked
   // report), and the engine has already stored that. Keep our own copy of the last outfit that
