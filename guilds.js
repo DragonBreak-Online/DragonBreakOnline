@@ -21,6 +21,8 @@ module.exports = (api) => {
   // Online first, then offline characters too (Add member); an older gamemode passes only findByName
   const isAdmin = (a) => isStaff(a) || factionManager(a);
   const findAnyByName = typeof api.findAnyByName === 'function' ? api.findAnyByName : findByName;
+  // Every character of an account (the account rule of factions.rules); an older gamemode passes none and the rule is skipped
+  const accountActors = typeof api.accountActors === 'function' ? api.accountActors : null;
   // Rosters, invitations and the news of who joined or leads name people by their own name, never a beast's, and a
   // mask's only while rosterPrivacy.masks is off (gamemode.js ownNameOf; tracker 1559074270959640676): a pack's leader
   // won by a challenge was written in as "Werewolf"
@@ -492,11 +494,90 @@ module.exports = (api) => {
   };
   // For thalmor.js and staff: '' when the character fits the faction's race rule at that rank
   globalThis.__dboFactionRaceBreak = (t, fid, rank) => raceBreak(Number(t) >>> 0, String(fid), Number(rank));
+  // ---- no double dipping (Nat, 31 Oct): config factions.rules --------------------------------------------------------
+  // Every faction has a class: hold (holds, the county, the strongholds), college, church, militant, guild or secret, from
+  // factions.rules.classes, else by its kind and flags (kind hold or stronghold: hold; the college flag: college; the
+  // secret flag: secret; anything else, chartered factions and risings included: guild). On a NEW membership that counts (a
+  // hold's citizens and guards, role member, are not counted, as the limits' exemptRoles):
+  //   - no two characters of one account in one faction (the other character is named to staff only)
+  //   - one who holds a hold's court office (leadership.js) joins only a college or a church besides the hold
+  //   - a member of a secret faction is in that one only, a college or a church apart; the refusal never names the secret
+  //     faction to someone outside it
+  // The one-leadership-seat rule and the two-week wait after losing an office are leadership.js's. Nobody is removed: a
+  // character who broke a rule before it existed keeps what they hold. A Lead GM's /faction override lifts it once.
+  const RULES = Object.assign({ enabled: true, classes: {}, alongside: ['college', 'church'] }, (cfg.factions || {}).rules || {});
+  const classOf = (fid) => {
+    const own = (RULES.classes || {})[fid]; if (own) return String(own);
+    const f = FACTIONS.get(String(fid)); if (!f) return 'guild';
+    if (f.kind === 'hold' || f.kind === 'stronghold') return 'hold';
+    if (f.college === true) return 'college';
+    if (f.secret === true) return 'secret';
+    return 'guild';
+  };
+  const freeBeside = (fid) => (RULES.alongside || []).map(String).includes(classOf(fid));
+  // A membership that counts: anything but a hold's member-role rank (a citizen, a guard)
+  const counts = (fid, rank) => { const f = FACTIONS.get(fid); return !!f && !(classOf(fid) === 'hold' && ((f.ranks[rank] || {}).role || 'member') === 'member'); };
+  const holdOffices = (t) => { try { return typeof globalThis.__dboLeadershipOf === 'function' ? (globalThis.__dboLeadershipOf(t >>> 0) || []).filter((s) => s.kind === 'hold') : []; } catch (e) { return []; } };
+  const accountMates = (t) => {
+    let pid = -1; try { pid = Number(profileOf(t >>> 0)); } catch (e) { pid = -1; }
+    if (!(pid >= 0) || typeof accountActors !== 'function') return [];
+    try { return (accountActors(pid) || []).map((x) => Number(x) >>> 0).filter((x) => x && x !== (t >>> 0)); } catch (e) { return []; }
+  };
+  const rulesProblem = (t, fid, rank, viewer) => {
+    if (RULES.enabled === false) return null;
+    const f = FACTIONS.get(fid); if (!f || f.kind === BAND_KIND) return null;
+    t = t >>> 0;
+    const had = entryOf(fid, t);
+    if (!counts(fid, rank) || (had && counts(fid, had.rank))) return null;
+    const self = viewer !== null && viewer !== undefined && (viewer >>> 0) === t;
+    const staffSees = viewer !== null && viewer !== undefined && isAdmin(viewer);
+    const name = nameOf(t);
+    // No two characters of one account in one faction
+    const mate = accountMates(t).find((m) => { const e = entryOf(fid, m); return e && counts(fid, e.rank); });
+    if (mate !== undefined) {
+      return { text: self ? `Another of your characters is already in ${theName(f.name)}. One character per account in a faction.`
+        : `${name} cannot join ${theName(f.name)}: another character of the same account is in it${staffSees ? ` (${nameOf(mate)})` : ''}. One character per account in a faction.`, hidden: !!f.secret && !staffSees, rule: 'account' };
+    }
+    // A player guild (band) keeps its own rules; one pack per werewolf is the pack rule's (setMember), with its own words
+    const samePack = (m) => f.kind === 'pack' && (FACTIONS.get(m.fid) || {}).kind === 'pack';
+    const mine = membershipsOf(t).filter((m) => m.fid !== fid && !isBand(m.fid) && !samePack(m) && counts(m.fid, m.e.rank));
+    // A hold's leader: the hold, and a college or a church
+    if (classOf(fid) !== 'hold' && !freeBeside(fid)) {
+      const office = holdOffices(t)[0];
+      if (office) return { text: self ? `You hold ${office.name}. A hold's leader puts the hold first: besides it, only a college or a church.` : `${name} holds ${office.name}. A hold's leader puts the hold first: besides it, only a college or a church.`, hidden: false, rule: 'hold' };
+    }
+    // A secret faction is the only one, a college or a church apart
+    if (!freeBeside(fid)) {
+      const secretHeld = mine.find((m) => classOf(m.fid) === 'secret');
+      if (secretHeld) {
+        const hf = FACTIONS.get(secretHeld.fid);
+        const sees = self || staffSees || (viewer !== null && viewer !== undefined && !!entryOf(hf.id, viewer));
+        return { text: self ? `You serve ${theName(hf.name)}, and a secret faction is its members' only one: besides it, only a college or a church.` : `${name} cannot join ${theName(f.name)}.`, hidden: !sees, rule: 'secret' };
+      }
+      if (classOf(fid) === 'secret') {
+        const other = mine.find((m) => !freeBeside(m.fid));
+        if (other) {
+          const of = FACTIONS.get(other.fid);
+          return { text: self ? `${TheName(f.name)} takes no one who serves another faction: you are in ${theName(of.name)}. Besides a secret faction, only a college or a church.` : `${name} serves ${theName(of.name)}, and ${theName(f.name)} takes no one who serves another faction (a college or a church apart).`, hidden: !!of.secret && !self && !staffSees, rule: 'secret' };
+        }
+      }
+    }
+    return null;
+  };
+  // For leadership.js: the line refusing a hold's court office to one who holds a membership other than the hold, a college
+  // or a church (zoneId: the hold being seated, whose own faction is not counted)
+  globalThis.__dboFactionRulesHoldSeat = (t, zoneId) => {
+    if (RULES.enabled === false) return '';
+    const other = membershipsOf(Number(t) >>> 0).find((m) => counts(m.fid, m.e.rank) && classOf(m.fid) !== 'hold' && !freeBeside(m.fid));
+    return other ? `${nameOf(Number(t) >>> 0)} serves ${theName(FACTIONS.get(other.fid).name)}. A hold's leader puts the hold first: besides it, only a college or a church. They leave it first.` : '';
+  };
+  globalThis.__dboFactionClassOf = (fid) => classOf(String(fid));
   // { text, hidden } or null. viewer: who reads the refusal; hidden when it would tell them of a secret membership or of
   // the character's nature (an invite then goes out, and the character is refused at accept, in their own words).
   const limitProblem = (t, fid, rank, viewer) => {
     { const rp = raceProblem(t, fid, rank, viewer); if (rp) return rp; }
-    if (LIM.enabled !== true) return null;
+    // The limits first, so their wording stands where both apply; then the no-double-dipping rules (factions.rules)
+    if (LIM.enabled !== true) return rulesProblem(t, fid, rank, viewer);
     const f = FACTIONS.get(fid); if (!f) return null;
     t = t >>> 0;
     const had = entryOf(fid, t);
@@ -514,7 +595,7 @@ module.exports = (api) => {
       const m = mine.find((x) => CAT_OF.get(x.fid) === cat && takesSlot(x.fid, x.e.rank));
       if (m) return say(FACTIONS.get(m.fid), holds(m.fid));
     }
-    if (had) return null;
+    if (had) return rulesProblem(t, fid, rank, viewer);
     // A church takes only a follower of one of its gods (factions.limits.requiresFaith; Nate, 19 Oct): checked when they
     // join, from the god chosen at a shrine (prayer.js private.dboDeity)
     const req = (LIM.requiresFaith || {})[fid];
@@ -535,7 +616,7 @@ module.exports = (api) => {
         return { text: self ? `${TheName(f.name)} will never take a ${c.supernatural}.` : `${name} cannot join ${f.name}.`, hidden: !self && !(viewer !== null && isAdmin(viewer)) };
       }
     }
-    return null;
+    return rulesProblem(t, fid, rank, viewer);
   };
   // A Lead GM's override: one change for one character and faction, within OVERRIDE_MS
   const OVERRIDE_MS = 10 * 60000;

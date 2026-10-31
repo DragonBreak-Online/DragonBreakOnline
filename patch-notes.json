@@ -1,5 +1,39 @@
 [
   {
+    "title": "Faction rules",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Factions and offices",
+        "items": [
+          "Nobody may lead two factions.",
+          "A hold's ruler and officers serve the hold first: alongside it they may join a college or a church, nothing else. The Knights of the Nine are a militant order, not a church.",
+          "Two characters of one account may not share a faction.",
+          "A secret faction is the only faction its members belong to, besides a college or a church.",
+          "Losing or leaving every office starts a two-week wait before taking another.",
+          "These apply to new memberships and appointments; nobody has been removed."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Bosses: the Pale Pass Warlord stays dead; the Minotaur Lord rests",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Bosses",
+        "items": [
+          "The Pale Pass Warlord no longer rises again a minute after he falls, and his loot pays out as it should.",
+          "The Minotaur Lord is away for now: his minotaurs would not fight back. He returns with new minotaurs."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Announcements show across the screen",
     "date": "2026-10-28",
     "version": "Server update",

@@ -49,7 +49,7 @@ module.exports = (api) => {
   const C = Object.assign({
     enabled: true, rulerRanks: ['jarl', 'count', 'chieftain'], staffOverride: false,
     officers: true, officerRoles: ['officer'], courtSeats: ['steward', 'captain', 'guardcaptain', 'commander', 'bane', 'strongholdcommander'],
-    perAccount: false,
+    perAccount: false, cooldownDays: 14,
   }, (cfg && cfg.leadership) || {});
   const N = Object.assign({ enabled: true, everyHours: 24, staffAfterDays: 7, sweepMinutes: 5 }, C.doublesNotice || {});
   const low = (xs) => (Array.isArray(xs) ? xs : []).map((r) => String(r).toLowerCase());
@@ -96,6 +96,34 @@ module.exports = (api) => {
   };
 
   const nameOfActor = (a) => { try { return display(a >>> 0); } catch (e) { return 'They'; } };
+  // ---- the wait after losing an office (Nat, 31 Oct: "anyone dethroned or removed from an office waits two weeks before
+  // taking another") ----
+  // leadership-cooldowns.json { held: [actor], lost: { actor: at } }: who held a seat at the last look, and when each
+  // character last went from holding a seat to holding none, however it went (dethroned, dismissed, demoted, stepped down;
+  // a move between seats keeps one). Looked at on every seating and every sweep. cooldownDays 0 turns the wait off.
+  const COOL = api.cooldownStatePath || path.resolve('leadership-cooldowns.json');
+  const readCool = () => { try { const v = JSON.parse(fs.readFileSync(COOL, 'utf8')); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } };
+  const coolMs = () => Math.max(0, Number(C.cooldownDays) || 0) * 86400000;
+  const noteLosses = (now = Date.now()) => {
+    if (C.enabled !== true || !coolMs()) return null;
+    // guilds.js not up yet reads as nobody holding anything: never record that as everyone losing their seat
+    if (!guildSeats().length) return null;
+    const st = readCool(); st.lost = st.lost && typeof st.lost === 'object' ? st.lost : {};
+    const now_ = new Set(allSeats().map((r) => Number(r.actor) >>> 0).filter((x) => x));
+    let dirty = false;
+    if (Array.isArray(st.held)) for (const a of st.held) if (!now_.has(Number(a) >>> 0)) { st.lost[String(a)] = now; dirty = true; log(`leadership: ${a.toString(16)} holds no seat now; ${C.cooldownDays} days before another`); }
+    for (const [a, at] of Object.entries(st.lost)) if (now - Number(at) >= coolMs() || now_.has(Number(a) >>> 0)) { delete st.lost[a]; dirty = true; }
+    const held = [...now_].sort((x, y) => x - y);
+    if (JSON.stringify(held) !== JSON.stringify(st.held)) { st.held = held; dirty = true; }
+    if (dirty) { try { fs.writeFileSync(COOL, JSON.stringify(st, null, 1)); } catch (e) { log('leadership-cooldowns.json write failed', e.message); } }
+    return st;
+  };
+  const waitLine = (a, st, now = Date.now()) => {
+    const at = st && st.lost ? Number(st.lost[String(a >>> 0)]) || 0 : 0;
+    if (!at) return '';   // noteLosses has pruned a wait that has run out
+    const days = Math.ceil((at + coolMs() - now) / 86400000);
+    return `${nameOfActor(a)} left an office ${Math.floor((now - at) / 86400000)} day(s) ago. After losing an office, a character waits ${C.cooldownDays} days before taking another: ${days} more day(s).`;
+  };
   // '' when the character may take a new seat, else the line to show whoever is seating them.
   // skip is the seat being replaced: the same faction (a promotion or transfer inside it) or the same court (a re-seat or
   // a move), never counted
@@ -104,7 +132,16 @@ module.exports = (api) => {
     const sk = skip && skip.id ? { kind: String(skip.kind || ''), id: String(skip.id) } : null;
     const all = C.perAccount === true ? accountSeats(a) : leadershipOf(a);
     const held = all.filter((h) => !(sk && h.id === sk.id && (!sk.kind || h.kind === sk.kind)));
-    if (!held.length) return '';
+    if (!held.length) {
+      // No seat now: the wait after losing one, then a hold's leader is the hold's first (guilds.js factions.rules)
+      let st = null; try { st = noteLosses(); } catch (e) { st = null; }
+      const wait = all.length ? '' : waitLine(a, st);
+      if (wait) return wait;
+      if (sk && sk.kind === 'hold' && typeof globalThis.__dboFactionRulesHoldSeat === 'function') {
+        try { const no = globalThis.__dboFactionRulesHoldSeat(a >>> 0, sk.id); if (no) return no; } catch (e) { /* guilds.js reloading */ }
+      }
+      return '';
+    }
     const who = nameOfActor(a);
     const list = held.map((h) => (h.actor !== (a >>> 0) ? `${h.name} (as ${nameOfActor(h.actor)})` : h.name)).join(' and ');
     if (C.perAccount === true) return `${who}'s account already holds ${list}. One leadership seat per account, leader or officer, in any faction or court: step down from that first.`;
@@ -210,8 +247,11 @@ module.exports = (api) => {
     return out;
   };
   if (globalThis.__dboLeadershipTimer) { clearInterval(globalThis.__dboLeadershipTimer); globalThis.__dboLeadershipTimer = null; }
-  if (api.leadershipSweep !== false && C.enabled === true && N.enabled !== false) {
-    const t = setInterval(() => { try { sweep(); } catch (e) { log('leadership sweep failed', e.message); } }, Math.max(1, Number(N.sweepMinutes) || 5) * 60000);
+  if (api.leadershipSweep !== false && C.enabled === true) {
+    const t = setInterval(() => {
+      try { noteLosses(); } catch (e) { log('leadership cooldown look failed', e.message); }
+      if (N.enabled !== false) { try { sweep(); } catch (e) { log('leadership sweep failed', e.message); } }
+    }, Math.max(1, Number(N.sweepMinutes) || 5) * 60000);
     if (t && typeof t.unref === 'function') t.unref();
     globalThis.__dboLeadershipTimer = t;
   }
@@ -241,5 +281,5 @@ module.exports = (api) => {
   }, { admin: true, help: 'audit: characters (and accounts) holding more than one leadership seat' });
 
   log(`leadership on: one seat per ${C.perAccount === true ? 'account' : 'character'} ${C.enabled === true ? 'enforced' : 'OFF'}, rulers ${[...RULER].join('/')}${C.officers === true ? `, officers (${[...ROLES].filter((r) => r !== 'leader').join('/')}; ${low(C.courtSeats).join('/')})` : ''}${C.staffOverride === true ? ', a Lead GM may override' : ''}`);
-  return { leadershipOf, refusal, doubles, accountDoubles, sweep, isRole, isOffice };
+  return { leadershipOf, refusal, doubles, accountDoubles, sweep, isRole, isOffice, noteLosses };
 };

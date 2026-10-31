@@ -163,7 +163,10 @@ chars.set(FG + 0x100, 'Hunter'); names[FG + 0x100] = 'Hunter'; put('dawnguard', 
 r = invite(VOLK, FG + 0x100, 'clan-volkihar');
 ok('Clan Volkihar inviting a Dawnguard: refused openly (Dawnguard is not secret)', r.error && /Clan Volkihar will never take one who serves the Dawnguard; Hunter must leave it first/.test(r.error), r);
 r = invite(VIG, THIEF, 'vigil-of-stendarr');
-ok('a Thief may join the Vigil (secret + guild, no conflict)', !r.error && /You are now/.test(accept(THIEF, 'vigil-of-stendarr')), r);
+// Nat, 31 Oct (factions.rules): a secret faction is its members' only one, a college or a church apart. The Vigil's
+// inviter is not told (the Thieves Guild is secret); the Thief is refused at accept, in their own words
+const thiefAccept = !r.error ? accept(THIEF, 'vigil-of-stendarr') : '';
+ok('a Thief may not join the Vigil now (a secret faction is its members\' only one); the inviter is not told why', !r.error && /You serve the Thieves Guild, and a secret faction is its members' only one/.test(thiefAccept), [r, thiefAccept]);
 
 // ---- staff: Add member, the override, /faction leader ---------------------------------------------------------------
 globalThis.__dboGuildState.nonces.set(LEAD, 'n');
