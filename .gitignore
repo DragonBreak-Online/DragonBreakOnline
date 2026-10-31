@@ -51,6 +51,7 @@ _*/
 server-settings-*.json
 contracts.json
 pigeon-cooldowns.json
+heralds.json
 
 # Stray launcher stdout/stderr from a failed run-logged.cmd invocation
 _launch-*.txt
