@@ -1,5 +1,19 @@
 [
   {
+    "title": "Archery back to its old strength in PvP",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "PvP",
+        "items": [
+          "The extra PvP damage given to arrows earlier today is taken back out: archery was already strong. Melee keeps its boost."
+        ]
+      }
+    ]
+  },
+  {
     "title": "PvP: warriors and archers stand a chance against mages",
     "date": "2026-10-31",
     "version": "Server update",

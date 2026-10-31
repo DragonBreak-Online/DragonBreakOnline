@@ -444,7 +444,7 @@
   "damageMult": 1.25,
   "_sources": "Nat, 31 Oct (P3, P4 of _work/pvp-balance-1031.md): weaponMult multiplies a Blade or Blunt weapon's PvP blow, arrowMult an arrow's, on top of damageMult; spells, staves, fists and beast claws keep damageMult alone. Measured 24-31 Oct: fair 1v1 time to down spells 4.8 s, melee 16.8 s; archery 0.5% of PvP downs.",
   "weaponMult": 1.25,
-  "arrowMult": 1.35,
+  "arrowMult": 1.0,
   "spellArmour": { "_comment": "P1 (Nat, 31 Oct): between players, worn heavy and medium armour takes share x min(1, counted rating / fullAt) off a spell, staff or scroll blow, under racial.reductionCap. Counted as the hit counts armour (Defense tier, tempering, wear, Fortify Armor): full heavy plate at Master Defense reaches fullAt.", "enabled": true, "share": 0.35, "fullAt": 300 },
   "shieldElements": { "_comment": "P2 (Nat, 31 Oct; vanilla Elemental Protection): a player blocking with a shield toward a player's fire, frost or shock spell takes mult of it (the guard read as Spellbreaker reads it), under racial.reductionCap.", "enabled": true, "mult": 0.5 }
  },
