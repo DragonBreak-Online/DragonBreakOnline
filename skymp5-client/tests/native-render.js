@@ -114,6 +114,9 @@ const decor = { type: 'decor', id: 171, nonce: 'p1', view: 'catalog', home: "Ola
   rows: Array.from({ length: 8 }, (_, i) => ({ key: `k${i}`, name: `Bed ${i + 1}`, cost: [{ name: 'Firewood', n: 4, have: 6 }], why: '' })) };
 const prayer = { type: 'prayer', id: 35, nonce: 'n1', mode: 'pick', deity: 'Mara', kind: 'divine', shrine: 'Shrine of Mara', sphere: 'Love and compassion', verses: [{ lines: ['Mother of all, hear me', 'Mother of storms, hear me', 'Mother of none, hear me'] }, { lines: ['a', 'b', 'c'] }], right: [0, 0], slips: 2, totalMs: 120000, minPickMs: 300, judge: 'client' };
 
+// The birthsign picker (dbo_birthsign): birthsigns.js's payload, the three Guardians, their charges, the Serpent
+const bsign = (id, name, guardian) => ({ id, name, guardian, lore: `Born under ${name}, you carry its star. The old almanacs say those so born walk a certain way, and the stars remember.`, effect: `${name}: a gift that lasts a lifetime.` });
+const birthsign = { type: 'birthsignPicker', id: 163, nonce: 'b1', signs: [bsign('warrior', 'The Warrior', ''), bsign('mage', 'The Mage', ''), bsign('thief', 'The Thief', ''), bsign('lady', 'The Lady', 'warrior'), bsign('steed', 'The Steed', 'warrior'), bsign('lord', 'The Lord', 'warrior'), bsign('apprentice', 'The Apprentice', 'mage'), bsign('atronach', 'The Atronach', 'mage'), bsign('ritual', 'The Ritual', 'mage'), bsign('lover', 'The Lover', 'thief'), bsign('shadow', 'The Shadow', 'thief'), bsign('tower', 'The Tower', 'thief'), bsign('serpent', 'The Serpent', 'none')] };
 const deity = { type: 'deityPicker', id: 36, nonce: 'd1', current: '', first: true, daysLeft: 0, cooldownDays: 7, canChoose: true, notice: '', noticeKind: '',
   choices: ['Akatosh', 'Arkay', 'Dibella', 'Julianos', 'Kynareth', 'Mara', 'Stendarr', 'Talos', 'Zenithar', 'Auri-El'].map((n) => ({ id: n.toLowerCase().replace('-', ''), name: n, kind: 'divine', sphere: 'Love, compassion and the bonds between people. The Mother of Mankind, she blesses marriages.', boon: 'Restoration spells cost 10% less.', reachable: n !== 'Talos', lawful: n !== 'Talos', aspectOf: n === 'Auri-El' ? 'akatosh' : '' }))
     .concat(Array.from({ length: 16 }, (_, i) => ({ id: 'p' + i, name: 'Prince ' + i, kind: 'daedra', sphere: '', boon: '', reachable: true, lawful: false, aspectOf: '' }))) };
@@ -152,6 +155,8 @@ const SETUPS = [
   ['decor', { swf: 'dbo_decor', drive: (t) => t.push(decor) }],
   ['prayer', { swf: 'dbo_prayer', drive: (t) => t.push(prayer) }],
   ['deity', { swf: 'dbo_deity', drive: (t) => { t.push(deity); t.press(51); } }],
+  ['birthsign', { swf: 'dbo_birthsign', drive: (t) => { t.push(birthsign); t.root.dboPanel.list.r6.onRelease(); } }],
+  ['birthsign-ask', { swf: 'dbo_birthsign', drive: (t) => { t.push(Object.assign({}, birthsign, { notice: 'The stars wait for your choice.' })); t.root.dboPanel.list.r6.onRelease(); t.root.dboPanel.foot.take.onRelease(); } }],
   ['deity-turn', { swf: 'dbo_deity', drive: (t) => { t.push(Object.assign({}, deity, { current: 'mara', first: false, canChoose: true, notice: 'You now follow Mara. Her shrines will hear you, and her blessing rests on you; you may turn again in seven days.', noticeKind: 'taken' })); t.press(39); t.press(49); t.root.dboPanel.foot.take.onRelease(); } }],
   ['rite', { swf: 'dbo_rite', drive: (t) => t.push(rite) }],
   ['rite-pick-yield', { swf: 'dbo_rite', drive: (t) => { t.push(Object.assign({}, rite, { mode: 'pick', spots: [[20, 40, 0.3], [50, 60, 0.9], [80, 30, 0.5]], cue: 'pulse', minPickMs: 300 })); t.press(27); } }],

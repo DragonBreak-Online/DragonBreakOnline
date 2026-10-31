@@ -1,0 +1,8 @@
+dboData
+dbo:birthsignPick
+dbo:birthsignClose
+SendModEvent
+$EverywhereMediumFont
+PlaySound
+dboOut
+scrollThumbH
