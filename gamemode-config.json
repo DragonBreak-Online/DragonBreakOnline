@@ -1243,6 +1243,8 @@
    "OrcRace": "849:Sentinel.esp"
   }
  },
+ "_grandHealing": "Nat via the Leader, 31 Oct: Grand Healing's record reaches 15 ft, so after a cast every hurt player within range units (600, about 8.5 m) of the caster in the same cell or world is healed once by the spell's area health (200), unless the engine already healed them in that cast. Never the caster, the dead or downed, or a heal the vampire rules refuse. grandhealing.js. Hot reload.",
+ "grandHealing": { "enabled": true, "range": 600, "spells": ["b62ee:Skyrim.esm"] },
  "rosterPrivacy": {
   "_masks": "Off (false, the shipped value; a missing key is off too) keeps masks as before 12 Oct: rosters and records name a character behind a mask by the mask's name ('Masked Person'). True names them by their own name in every roster and record (Court and Nobility tabs, /officials, factions, the party, ledger and pigeon contacts, letters, notices, jobs, leases, businesses) beside the #TAG the client draws under the mask, so anyone who reads one can tell who is behind a mask they see. With true every player can read a masked noble's own name and #TAG in the Nobility tab, and the decree of a title granted to a masked character announces their own name to the whole server, even though the ruler named them by the #TAG under the mask. Either way a beast form is never named in a roster (the own name is), /players and the answer to a lookup keep the mask, no name finds a masked or beast character (only the #TAG), and nobody gains a ledger or pigeon contact by standing near someone in disguise. Off until Nate rules. Hot reload.",
   "masks": false

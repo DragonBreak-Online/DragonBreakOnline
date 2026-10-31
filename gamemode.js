@@ -7315,6 +7315,8 @@ const castHook = (casterId, spellId, ...rest) => {
   if (verdict !== false && typeof globalThis.__dboFleshCast === 'function') { try { globalThis.__dboFleshCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('flesh cast failed', e.message); } }
   if (verdict !== false) { try { potionRestorationCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('restoration potion failed', e.message); } }
   if (verdict !== false) { try { asylumCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('asylum cast failed', e.message); } }
+  // Grand Healing heals the players around the caster the engine's 15 ft did not reach (grandhealing.js)
+  if (verdict !== false && typeof globalThis.__dboGrandHealCast === 'function') { try { globalThis.__dboGrandHealCast(casterId, spellId); } catch (e) { log('grand healing cast failed', e.message); } }
   return verdict;
 };
 castHook.__dbo = true;
@@ -7412,6 +7414,7 @@ const spellHitHook = (aggressorId, targetId, spellId, ...rest) => {
     if (globalThis.__dboSuperSpellHit) globalThis.__dboSuperSpellHit(Number(aggressorId) >>> 0, tgt, Number(spellId) >>> 0);
     // Force Rune and the like stagger instead of pushing (combat.js staggerSpells)
     if (combat) combat.onSpellHit(Number(aggressorId) >>> 0, tgt, Number(spellId) >>> 0);
+    if (typeof globalThis.__dboGrandHealHit === 'function') globalThis.__dboGrandHealHit(agg, tgt, spell);
     if ((seconds > 0 || held > 0) && !paralysisRefused(agg, tgt, now)) {
       paralysedUntil.set(tgt, now + Math.max(seconds, held) * 1000);
       if (paralysedUntil.size > 256) for (const [id, until] of paralysedUntil) if (until <= now) paralysedUntil.delete(id);
@@ -9292,6 +9295,13 @@ try {
   delete require.cache[REGENDIAG_JS];
   require(REGENDIAG_JS)({ mp, log, personal, registerChatCommand, findByName, display });
 } catch (e) { log('regendiag.js failed to load:', e.stack || e.message); }
+
+// ---- Grand Healing reaches the players around the caster (server\grandhealing.js, config "grandHealing") ---------
+try {
+  const GRANDHEALING_JS = path.resolve('grandhealing.js');
+  delete require.cache[GRANDHEALING_JS];
+  require(GRANDHEALING_JS)({ mp, log, recordOf, onlineActors, profileOf, display, cfg });
+} catch (e) { log('grandhealing.js failed to load:', e.stack || e.message); globalThis.__dboGrandHealCast = null; globalThis.__dboGrandHealHit = null; }
 
 // ---- /monitor: the dbo-monitor service's view for staff (server\monitor.js; tooling/dbo-monitor) -----------------
 try {
