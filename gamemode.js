@@ -5998,12 +5998,13 @@ const combatAt = globalThis.__dboCombatAt = globalThis.__dboCombatAt || new Map(
 // the middle of a fight, the combat logger: a blow landed on or by them in the last combatLogSeconds before the
 // logout leaves the body open until it fades. Decided once, at the logout, so blows on the body afterwards change
 // nothing.
-const OFFLINE_BODY = Object.assign({ combatLogSeconds: 60 }, cfg.offlineBody || {});
+const OFFLINE_BODY = Object.assign({ combatLogSeconds: 120 }, cfg.offlineBody || {});
 // The combat logout timer (Nat, 31 Oct): a player struck in PvP after a quiet spell is told that leaving now keeps the body
 const combatLogWarn = (a, last) => {
   const s = Math.max(0, Number(OFFLINE_BODY.combatLogSeconds) || 0);
   if (!s || Date.now() - (last || 0) <= s * 1000) return;
-  personal(a, `In combat: if you log out or change character in the next ${s} seconds, your body stays in the world and can still be fought until it fades.`);
+  const span = s % 60 ? `${s} seconds` : `${s / 60} minute${s === 60 ? '' : 's'}`;
+  personal(a, `In combat: if you log out or change character in the next ${span}, your body stays in the world and can still be fought until it fades.`);
 };
 const logoutAt = globalThis.__dboLogoutAt instanceof Map ? globalThis.__dboLogoutAt : (globalThis.__dboLogoutAt = new Map()); // actorId -> { at, fighting }
 globalThis.__dboNoteLogout = (a) => {
