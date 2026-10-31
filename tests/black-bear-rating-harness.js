@@ -35,7 +35,8 @@ const PEERS = [['ArmorScaledCuirass', 32, false, 0x4], ['ArmorScaledGauntlets', 
 const table = (cfg.armorMaterials || {}).ratingByEditorId || {};
 const named = Object.keys(table).filter((k) => /^BlackBearAncientNord/.test(k));
 ok(named.length === 9 && named.every((k) => BEAR.some(([e, r, , , want]) => e === k && want !== r && table[k] === want)), 'config names the 9 Black Bear pieces that change, each at its new rating', table);
-ok(Object.keys(table).every((k) => /^(BlackBearAncientNord|0_)/.test(k)), '...and nothing but Black Bear and Yokudan (0_) pieces');
+// Since 31 Oct the table also holds the tier bands (gamemode-config.json _ratingByEditorIdBands), none of them a Black Bear piece
+ok(Object.keys(table).filter((k) => /^BlackBearAncientNord/.test(k)).length === 9, '...and no band entry adds or changes a Black Bear piece');
 
 // ---- the lifted armorPieceOf --------------------------------------------------------------------------------------
 const i = gm.indexOf('const ARMOR_MATERIALS = '), j = gm.indexOf('  armorPieceCache.set(baseId, piece);\n  return piece;\n};', i);

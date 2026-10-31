@@ -1,7 +1,7 @@
 // Faction gear tempers without a family cap (Nate, 11 Oct): every item in faction-gear.json improves one level per craft
 // tier of the smith's own (Fine at T1 .. Legendary at T6), whatever loot-materials.json classes it as. The player report:
 // the Legion's Officer's Sword and Penitus Oculatus Sword (classed Steel, T2) stopped at Superior and the General's Sword
-// (classed Ebony, T6) never improved. Other items keep min(T+2, 5, craft tier); T5+ never improve.
+// (classed Ebony, T6) never improved. Other items improve 2 levels by a smith of their tier or above (Nat, 31 Oct).
 // Loads the real smithing.js with the real smithing.json, loot-materials.json and faction-gear.json in a scratch folder.
 //   node tests/faction-temper-harness.js   (from server/)
 'use strict';
@@ -49,8 +49,9 @@ for (const [pts, t] of byTier) {
   smith(pts);
   const want = 10 + Math.min(6, t);
   ok(cap(OFFICER) === want && cap(OCULATUS) === want && cap(GENERAL) === want, `craft tier ${t}: the three Legion swords reach step ${want}`, [cap(OFFICER), cap(OCULATUS), cap(GENERAL)]);
-  ok(cap(STEEL) === 10 + Math.max(0, Math.min(4, 5, t) - 2), `craft tier ${t}: a Steel sword keeps min(T+2, 5, tier)`, cap(STEEL));
-  ok(cap(GLASS) === 10, `craft tier ${t}: a Glass sword (T5) never improves`, cap(GLASS));
+  // Nat, 31 Oct: every tier improves 2 levels, by a smith of its tier or above
+  ok(cap(STEEL) === 10 + (t >= 2 ? 2 : 0), `craft tier ${t}: a Steel sword (T2) improves 2 levels from a tier 2 smith`, cap(STEEL));
+  ok(cap(GLASS) === 10 + (t >= 5 ? 2 : 0), `craft tier ${t}: a Glass sword (T5) improves 2 levels from a tier 5 smith, none below`, cap(GLASS));
 }
 smith(91);
 ok(cap(OFFICER) === 16 && cap(GENERAL) === 16, "a tier 7 smith takes the Officer's and General's Swords to Legendary (16)");

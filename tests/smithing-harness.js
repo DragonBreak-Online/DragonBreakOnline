@@ -121,7 +121,7 @@ ok(props.get(`${A}|private.dboSmithApprentice`).count === 9 && /9 of 10/.test(la
 ok(craft(A, STEEL, R_STEEL) === true && props.get(`${A}|private.dboManuals`).steel.how === 'apprentice' && !props.get(`${A}|private.dboSmithApprentice`), 'the tenth supervised craft teaches Steel for good');
 put(SUP, 'pos', [9000, 0, 0]);
 ok(craft(A, STEEL, R_STEEL) === true, '...and it needs no supervisor after');
-smith(A, 35);
+smith(A, 45);   // tier 4: Orcish is a tier 4 family since 31 Oct
 props.set(`${SUP}|private.dboManuals`, { steel: { at: 1 }, orcish: { at: 1 } }); put(SUP, 'pos', [300, 0, 0]);
 ok(craft(A, ORC, R_ORC) === false, 'Orcish under a non-Orc supervisor who knows it: refused (Orc Blacksmiths only)');
 smith(ORCSMITH, 74); props.set(`${ORCSMITH}|private.dboManuals`, { orcish: { at: 1 } });
@@ -133,9 +133,10 @@ ok(craft(A, ORC, R_ORC) === true && props.get(`${A}|private.dboSmithApprentice`)
 smith(A, 35);   // tier 3
 ok(globalThis.__dboTemperCap(A, IRON) === 12, 'T1 item, smith tier 3: two levels (Superior, 12)');
 smith(A, 20);   // tier 2
-ok(globalThis.__dboTemperCap(A, IRON) === 11 && globalThis.__dboTemperCap(A, ORC) === 10, 'smith tier 2: T1 item one level, a T3 item none (above the smith)');
+ok(globalThis.__dboTemperCap(A, IRON) === 12 && globalThis.__dboTemperCap(A, ORC) === 10, 'smith tier 2: a T1 item two levels, a T4 item none (above the smith)');
 smith(A, 95);
-ok(globalThis.__dboTemperCap(A, ORC) === 12 && globalThis.__dboTemperCap(A, DWARF) === 11 && globalThis.__dboTemperCap(A, GLASS) === 10, 'tier 7 smith: T3 +2, T4 +1 (never past 5), T5 none');
+// Nat, 31 Oct: every tier the same two levels, the top tiers too, so a tempered low tier never passes a tempered high one
+ok(globalThis.__dboTemperCap(A, ORC) === 12 && globalThis.__dboTemperCap(A, DWARF) === 12 && globalThis.__dboTemperCap(A, GLASS) === 12, 'tier 7 smith: T3, T4 and T5 items all two levels');
 ok(globalThis.__dboTemperCap(A, ODD) === 16, 'an unclassified item keeps the Wheel cap');
 
 // The F3 view
@@ -182,7 +183,7 @@ ok(craft(A, ANC_SHIELD, R_ANC2) === false, '...each piece of the family');
 ok(craft(A, LEGION_HELM, R_LEGION) !== false, 'plain Imperial (Legion faction gear) is not gated here');
 ok(craft(A, COLOVIAN_BOW, R_COLOVIAN) === false && /Steel technique/.test(lastTold(A)), 'an Imperial piece that is not faction gear (a Colovian bow) needs the Steel technique', lastTold(A));
 props.set(`${A}|private.dboManuals`, { ancient_imperial: { at: 1, how: 'book' } });
-ok(craft(A, ANC_HELM, R_ANC) !== false && globalThis.__dboTemperCap(A, ANC_HELM) === 10 && globalThis.__dboTemperCap(A, LEGION_HELM) === 12, 'with the technique: crafted; tempered as T2 (no level at smith tier 2); the Legion piece, faction gear, one level per craft tier (11 Oct)');
+ok(craft(A, ANC_HELM, R_ANC) !== false && globalThis.__dboTemperCap(A, ANC_HELM) === 12 && globalThis.__dboTemperCap(A, LEGION_HELM) === 12, 'with the technique: crafted; tempered as T2 (two levels at smith tier 2, 31 Oct); the Legion piece, faction gear, one level per craft tier (11 Oct)');
 const ai = globalThis.__dboSmithView(A).families.find((f) => f.id === 'ancient_imperial');
 ok(ai && ai.tier === 2 && ai.recipes.includes('Ancient Imperial Shield') && !ai.recipes.includes('Imperial Helmet'), 'the view lists Ancient Imperial at T2 with its own recipes', ai);
 rec(0xb0004, 'BOOK', 'DBO_SchematicsAncientImperial', [{ type: 'DATA', data: bookData() }]);
@@ -244,7 +245,7 @@ ok(JSON.stringify(globalThis.__dboSmithBookNeeds('adamantium')) === JSON.stringi
   ok(n > 0 && r.steel && r.dwarven && r.elven && r.nordic && !r.glass && !r.orcish && !r.brass && !r.imperial && !r.artifact, 'craft tier 4: every T2-T4 technique, none above, no Orcish for a Nord, none for free or shared families', Object.keys(r));
   ok(r.steel.how === 'staff' && r.steel.from === 'carry-over' && props.get(`${OLD}|private.dboSmithCarried`).tier === 4 && audits.some((t) => /carried over/.test(t)), 'recorded as carried over, marked, audited');
   ok(carry(OLD) === 0, 'once only');
-  ok(carry(ORCOLD) > 0 && props.get(`${ORCOLD}|private.dboManuals`).orcish && !props.get(`${ORCOLD}|private.dboManuals`).dwarven, 'an Orc at tier 3 keeps Orcish, nothing of tier 4');
+  ok(carry(ORCOLD) > 0 && !props.get(`${ORCOLD}|private.dboManuals`).orcish && props.get(`${ORCOLD}|private.dboManuals`).dwarven, 'an Orc at tier 3: Dwarven (tier 3 since 31 Oct), not yet Orcish (tier 4)');
   ok(carry(NEW) === 0 && !props.get(`${NEW}|private.dboSmithCarried`), 'no Blacksmith skill: nothing, not marked (they get it if they take it up)');
 }
 

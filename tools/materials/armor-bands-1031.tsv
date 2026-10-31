@@ -1,0 +1,317 @@
+desc	edid	plugin	set	type	slot	tier	family	rating	target	value	targetValue
+29125:DragonPriestArmor.esp	DPA_DragonPriestArmorAhzidalLight	DragonPriestArmor.esp	Ahzidal's Light	Light	body	7	DRAGON	41.0	42	1500	3000
+2328a:Hothtrooper44_ArmorCompilation.esp	IAAlduinCuirass	Hothtrooper44_ArmorCompilation.esp	Alduin Scale	Heavy	body	7	DRAGON	52.0	49	3750	3000
+23289:Hothtrooper44_ArmorCompilation.esp	IAAlduinBoots	Hothtrooper44_ArmorCompilation.esp	Alduin Scale	Heavy	feet	7	DRAGON	20.0	18	3125	1050
+2328b:Hothtrooper44_ArmorCompilation.esp	IAAlduinGauntlets	Hothtrooper44_ArmorCompilation.esp	Alduin Scale	Heavy	hands	7	DRAGON	20.0	18	2925	1050
+2328c:Hothtrooper44_ArmorCompilation.esp	IAAlduinHelmet	Hothtrooper44_ArmorCompilation.esp	Alduin Scale	Heavy	head	7	DRAGON	25.0	23	3225	1500
+bc3:ccBGSSSE025-AdvDSGS.esm	ccBGSSSE025_ArmorAmberCuirass	ccBGSSSE025-AdvDSGS.esm	Amber	Light	body	5	amber	43.0	38	1750	1300
+bc4:ccBGSSSE025-AdvDSGS.esm	ccBGSSSE025_ArmorAmberBoots	ccBGSSSE025-AdvDSGS.esm	Amber	Light	feet	5	amber	13.5	11	400	455
+bc2:ccBGSSSE025-AdvDSGS.esm	ccBGSSSE025_ArmorAmberGauntlets	ccBGSSSE025-AdvDSGS.esm	Amber	Light	hands	5	amber	13.5	11	400	455
+bc1:ccBGSSSE025-AdvDSGS.esm	ccBGSSSE025_ArmorAmberHelmet	ccBGSSSE025-AdvDSGS.esm	Amber	Light	head	5	amber	18.0	16	900	650
+801:1AncArgArm.esl	1AAAcuirass	1AncArgArm.esl	Ancient Argonian	Heavy	body	1	iron	43.0	28	2500	125
+802:1AncArgArm.esl	1AAAgauntlets	1AncArgArm.esl	Ancient Argonian	Heavy	hands	1	iron	16.0	10	575	44
+17c4b1:WindhelmSSE.esp	DLC1IvoryCuirassAlternatePlayable	WindhelmSSE.esp	Ancient Falmer	Light	body	3	elven	38.0	31	50	600
+85e:DragonBreak Armory.esp	DBOArm_SEA_ArmorSnowElvenHeavyCuirass	DragonBreak Armory.esp	Ancient Falmer Heavy	Heavy	body	3	elven	40.0	35	1500	600
+85d:DragonBreak Armory.esp	DBOArm_SEA_ArmorSnowElvenHeavyBoots	DragonBreak Armory.esp	Ancient Falmer Heavy	Heavy	feet	3	elven	16.0	13	275	210
+85f:DragonBreak Armory.esp	DBOArm_SEA_ArmorSnowElvenHeavyGauntlets	DragonBreak Armory.esp	Ancient Falmer Heavy	Heavy	hands	3	elven	16.0	13	275	210
+860:DragonBreak Armory.esp	DBOArm_SEA_ArmorSnowElvenHeavyHelmet	DragonBreak Armory.esp	Ancient Falmer Heavy	Heavy	head	3	elven	21.0	16	750	300
+85c:DragonBreak Armory.esp	DBOArm_SEA_ArmorSnowElvenNobleCuirass	DragonBreak Armory.esp	Ancient Falmer Noble	Light	body	3	elven	38.0	31	900	600
+859:DragonBreak Armory.esp	DBOArm_SEA_ArmorSnowElvenNobleBoots	DragonBreak Armory.esp	Ancient Falmer Noble	Light	feet	3	elven	11.0	9	190	210
+85a:DragonBreak Armory.esp	DBOArm_SEA_ArmorSnowElvenNobleGauntlets	DragonBreak Armory.esp	Ancient Falmer Noble	Light	hands	3	elven	11.0	9	190	210
+85b:DragonBreak Armory.esp	DBOArm_SEA_ArmorSnowElvenNobleHelmet	DragonBreak Armory.esp	Ancient Falmer Noble	Light	head	3	elven	16.0	13	450	300
+858:DragonBreak Armory.esp	DBOArm_SEA_ArmorSnowElvenScoutCuirass	DragonBreak Armory.esp	Ancient Falmer Scout	Light	body	3	elven	38.0	31	900	600
+855:DragonBreak Armory.esp	DBOArm_SEA_ArmorSnowElvenScoutBoots	DragonBreak Armory.esp	Ancient Falmer Scout	Light	feet	3	elven	11.0	9	190	210
+856:DragonBreak Armory.esp	DBOArm_SEA_ArmorSnowElvenScoutGauntlets	DragonBreak Armory.esp	Ancient Falmer Scout	Light	hands	3	elven	11.0	9	190	210
+857:DragonBreak Armory.esp	DBOArm_SEA_ArmorSnowElvenScoutHelmet	DragonBreak Armory.esp	Ancient Falmer Scout	Light	head	3	elven	16.0	13	450	300
+7:1AncientImperial.esp	1AnImCuirassLight	1AncientImperial.esp	Ancient Imperial	Light	body	2	ancient_imperial	23.0	26	175	275
+8:1AncientImperial.esp	1AnImBootsLight	1AncientImperial.esp	Ancient Imperial	Light	feet	2	ancient_imperial	9.0	8	35	96
+6:1AncientImperial.esp	1AnImLightGauntlets	1AncientImperial.esp	Ancient Imperial	Light	hands	2	ancient_imperial	9.0	8	35	96
+4:1AncientImperial.esp	1AnImLightHelmet	1AncientImperial.esp	Ancient Imperial	Light	head	2	ancient_imperial	13.0	12	60	138
+3:1AncientImperial.esp	1AnImCuirassHeavy	1AncientImperial.esp	Ancient Imperial Heavy	Heavy	body	2	ancient_imperial	27.0	29	175	275
+1:1AncientImperial.esp	1AnImHeavyHelmet	1AncientImperial.esp	Ancient Imperial Heavy	Heavy	head	2	ancient_imperial	16.0	15	60	138
+423f0a:WindhelmSSE.esp	ArmorDraugrCuirassWHVampKnightRED	WindhelmSSE.esp	Ancient Vampire	Heavy	body	7	DAEDRIC	25.0	46	125	3000
+dd920:WindhelmSSE.esp	ArmorDraugrCuirassWHVampKnight	WindhelmSSE.esp	Ancient Vampire	Heavy	body	7	DAEDRIC	25.0	46	125	3000
+b64f:Hothtrooper44_ArmorCompilation.esp	IAApotheusCuirass	Hothtrooper44_ArmorCompilation.esp	Apotheus	Light	body	4	scaled	35.0	34	650	900
+b64d:Hothtrooper44_ArmorCompilation.esp	IAApotheusHelm	Hothtrooper44_ArmorCompilation.esp	Apotheus	Light	head	4	scaled	15.0	14	270	450
+4356:Hothtrooper44_ArmorCompilation.esp	IAApotheusHood	Hothtrooper44_ArmorCompilation.esp	Apotheus	Light	head	4	scaled	10.0	13	195	450
+e562e:Journey to Baan Malur.esp	AshlanderCuirass01	Journey to Baan Malur.esp	Ashlander	Light	body	1	leather	28.0	26	160	125
+e562f:Journey to Baan Malur.esp	AshlanderCuirass02	Journey to Baan Malur.esp	Ashlander	Light	body	1	leather	28.0	26	160	125
+837:Armors of the Velothi.esp	AshlanderSeerCuirass	Armors of the Velothi.esp	Ashlander Seer Robes	Light	body	3	chitin	27.0	29	200	600
+864:Armors of the Velothi Pt2.esp	ArmorAshWarriorCuirass	Armors of the Velothi Pt2.esp	Ashlander Warrior	Heavy	body	3	chitin	45.0	35	650	600
+867:Armors of the Velothi Pt2.esp	ArmorAshWarriorBoots	Armors of the Velothi Pt2.esp	Ashlander Warrior	Heavy	feet	3	chitin	15.0	13	135	210
+866:Armors of the Velothi Pt2.esp	ArmorAshWarriorGauntlets	Armors of the Velothi Pt2.esp	Ashlander Warrior	Heavy	hands	3	chitin	16.0	13	135	210
+882:Armors of the Velothi Pt2.esp	ArmorAshWarriorHelmetNew	Armors of the Velothi Pt2.esp	Ashlander Warrior	Heavy	head	3	chitin	21.0	16	135	300
+865:Armors of the Velothi Pt2.esp	ArmorAshWarriorHelmet	Armors of the Velothi Pt2.esp	Ashlander Warrior	Heavy	head	3	chitin	21.0	16	135	300
+869:Armors of the Velothi Pt2.esp	ArmorAshWarriorHelmetDUPLICATE001	Armors of the Velothi Pt2.esp	Ashlander Warrior	Heavy	head	3	chitin	21.0	16	135	300
+8f4:YokuWeapons.esp	0_BadoArmaA	YokuWeapons.esp	Bado Gedhay Robes	Light	body	3	yoku	28.0	29	625	600
+918:YokuWeapons.esp	0_BadoGrayArmaA	YokuWeapons.esp	Bado Gedhay Robes(Gray)	Light	body	3	yoku	28.0	29	625	600
+912:YokuWeapons.esp	0_BadoGreenArmaA	YokuWeapons.esp	Bado Gedhay Robes(Green)	Light	body	3	yoku	28.0	29	625	600
+916:YokuWeapons.esp	0_BadoPurpleArmaA	YokuWeapons.esp	Bado Gedhay Robes(Purple)	Light	body	3	yoku	28.0	29	625	600
+914:YokuWeapons.esp	0_BadoWhiteArmaA	YokuWeapons.esp	Bado Gedhay Robes(White)	Light	body	3	yoku	28.0	29	625	600
+232f4:Hothtrooper44_ArmorCompilation.esp	IABoiledChitinHCuirass	Hothtrooper44_ArmorCompilation.esp	Boiled Chitin Heavy	Heavy	body	3	chitin	40.0	35	650	600
+232df:Hothtrooper44_ArmorCompilation.esp	IABoiledChitinHBoots	Hothtrooper44_ArmorCompilation.esp	Boiled Chitin Heavy	Heavy	feet	3	chitin	14.0	13	135	210
+232e0:Hothtrooper44_ArmorCompilation.esp	IABoiledChitinHGauntlets	Hothtrooper44_ArmorCompilation.esp	Boiled Chitin Heavy	Heavy	hands	3	chitin	14.0	13	135	210
+232e1:Hothtrooper44_ArmorCompilation.esp	IABoiledChitinHHelmet	Hothtrooper44_ArmorCompilation.esp	Boiled Chitin Heavy	Heavy	head	3	chitin	19.0	16	135	300
+84f49:Hothtrooper44_ArmorCompilation.esp	IABoiledChitinLCuirass	Hothtrooper44_ArmorCompilation.esp	Boiled Chitin Light	Light	body	3	elven	32.0	31	350	600
+84f4b:Hothtrooper44_ArmorCompilation.esp	IABoiledChitinLHelmet	Hothtrooper44_ArmorCompilation.esp	Boiled Chitin Light	Light	head	3	elven	14.0	13	175	300
+19d72:Journey to Baan Malur.esp	NetchLeatherPlate	Journey to Baan Malur.esp	Boiled Netch Leather	Light	body	1	leather	30.0	26	225	125
+19d76:Journey to Baan Malur.esp	NetchLeatherMask	Journey to Baan Malur.esp	Boiled Netch Leather	Light	head	1	leather	14.0	11	180	62
+83e:Armors of the Velothi.esp	BonepriestBlueCuirass	Armors of the Velothi.esp	Bonepriest Blue Robes	Light	body	3	bonemold	22.0	29	180	600
+83b:Armors of the Velothi.esp	BonepriestCuirass	Armors of the Velothi.esp	Bonepriest Robes	Light	body	3	bonemold	22.0	29	180	600
+878:Armors of the Velothi Pt2.esp	ArmorBonesaintCuirass	Armors of the Velothi Pt2.esp	Bonesaint	Heavy	body	3	bonemold	43.0	35	290	600
+87d:Armors of the Velothi Pt2.esp	ArmorBonesaintCuirassDUPLICATE001	Armors of the Velothi Pt2.esp	Bonesaint	Heavy	body	3	bonemold	43.0	35	290	600
+87e:Armors of the Velothi Pt2.esp	ArmorBonesaintCuirassDUPLICATE002	Armors of the Velothi Pt2.esp	Bonesaint	Heavy	body	3	bonemold	43.0	35	290	600
+87f:Armors of the Velothi Pt2.esp	ArmorBonesaintCuirassDUPLICATE003	Armors of the Velothi Pt2.esp	Bonesaint	Heavy	body	3	bonemold	43.0	35	290	600
+87c:Armors of the Velothi Pt2.esp	ArmorBonesaintBoots	Armors of the Velothi Pt2.esp	Bonesaint	Heavy	feet	3	bonemold	15.0	13	60	210
+879:Armors of the Velothi Pt2.esp	ArmorBonesaintGauntlets	Armors of the Velothi Pt2.esp	Bonesaint	Heavy	hands	3	bonemold	15.0	13	60	210
+87a:Armors of the Velothi Pt2.esp	ArmorBonesaintHelmet	Armors of the Velothi Pt2.esp	Bonesaint	Heavy	head	3	bonemold	26.5	16	135	300
+881:Armors of the Velothi Pt2.esp	ArmorBonesaintHelmetPlume	Armors of the Velothi Pt2.esp	Bonesaint	Heavy	head	3	bonemold	26.5	16	135	300
+846:Sentinel.esp	TH_Bos1Cuirass	Sentinel.esp	Bosmer	Light	body	2	guard	29.0	28	225	275
+848:Sentinel.esp	TH_Bos1Helmet	Sentinel.esp	Bosmer	Light	head	2	guard	13.0	12	110	138
+84d:Sentinel.esp	TH_Bos2Cuirass	Sentinel.esp	Bosmer Plate	Heavy	body	2	guard	34.0	31	400	275
+84c:Sentinel.esp	TH_Bos2Boots	Sentinel.esp	Bosmer Plate	Heavy	feet	2	guard	13.0	11	85	96
+84e:Sentinel.esp	TH_Bos2Gauntlets	Sentinel.esp	Bosmer Plate	Heavy	hands	2	guard	13.0	11	85	96
+84f:Sentinel.esp	TH_Bos2Helmet	Sentinel.esp	Bosmer Plate	Heavy	head	2	guard	18.0	15	200	138
+238ec:Hothtrooper44_ArmorCompilation.esp	IABosmerHeavyBoots	Hothtrooper44_ArmorCompilation.esp	Bosmer Reinforced	Heavy	feet	2	steel	14.0	11	180	96
+238ee:Hothtrooper44_ArmorCompilation.esp	IABosmerHeavyCuirass	Hothtrooper44_ArmorCompilation.esp	Bosmer Reinforced	Heavy	body	2	steel	36.0	31	500	275
+238ef:Hothtrooper44_ArmorCompilation.esp	IABosmerHeavyGauntlets	Hothtrooper44_ArmorCompilation.esp	Bosmer Reinforced	Heavy	hands	2	steel	14.0	11	160	96
+238f0:Hothtrooper44_ArmorCompilation.esp	IABosmerHeavyHelmet	Hothtrooper44_ArmorCompilation.esp	Bosmer Reinforced	Heavy	head	2	steel	19.0	15	230	138
+802:Armors of the Velothi Pt2.esp	CamonnaCuirass	Armors of the Velothi Pt2.esp	Camonna Tong	Light	body	3	bonemold	32.0	31	290	600
+80c:Armors of the Velothi Pt2.esp	CamonnaCuirass1	Armors of the Velothi Pt2.esp	Camonna Tong	Light	body	3	bonemold	32.0	31	290	600
+80d:Armors of the Velothi Pt2.esp	CamonnaCuirass2	Armors of the Velothi Pt2.esp	Camonna Tong	Light	body	3	bonemold	32.0	31	290	600
+80e:Armors of the Velothi Pt2.esp	CamonnaCuirass3	Armors of the Velothi Pt2.esp	Camonna Tong	Light	body	3	bonemold	32.0	31	290	600
+80f:Armors of the Velothi Pt2.esp	CamonnaCuirass4	Armors of the Velothi Pt2.esp	Camonna Tong	Light	body	3	bonemold	32.0	31	290	600
+800:Armors of the Velothi Pt2.esp	CamonnaBoots	Armors of the Velothi Pt2.esp	Camonna Tong	Light	feet	3	bonemold	11.0	9	60	210
+803:Armors of the Velothi Pt2.esp	CamonnaGauntlets	Armors of the Velothi Pt2.esp	Camonna Tong	Light	hands	3	bonemold	11.0	9	60	210
+805:Armors of the Velothi Pt2.esp	CamonnaHelmetHood	Armors of the Velothi Pt2.esp	Camonna Tong	Light	head	3	bonemold	16.0	13	135	300
+300006:BSHeartland.esm	CYRArmorChainmailCuirass	BSHeartland.esm	Chainmail	Light	body	2	steel	30.0	28	240	275
+30000b:BSHeartland.esm	CYRArmorChainmailBoots	BSHeartland.esm	Chainmail	Light	feet	2	steel	8.5	8	50	96
+30000d:BSHeartland.esm	CYRArmorChainmailGauntlets	BSHeartland.esm	Chainmail	Light	hands	2	steel	8.5	8	50	96
+30000f:BSHeartland.esm	CYRArmorChainmailHelmet	BSHeartland.esm	Chainmail	Light	head	2	steel	13.5	12	125	138
+904:Sentinel.esp	TH_ComAketon	Sentinel.esp	Common Aketon	Light	body	2	guard	23.0	26	50	275
+905:Sentinel.esp	TH_ComBrigandine	Sentinel.esp	Common Brigandine	Light	body	2	guard	23.0	26	50	275
+907:Sentinel.esp	TH_ComChainMail	Sentinel.esp	Common Chain Mail	Heavy	body	2	guard	25.0	29	125	275
+906:Sentinel.esp	TH_ComGambeson	Sentinel.esp	Common Gambeson	Light	body	2	guard	23.0	26	50	275
+90b:Sentinel.esp	TH_ComLamellar	Sentinel.esp	Common Lamellar	Light	body	2	guard	24.0	26	75	275
+90a:Sentinel.esp	TH_ComTunicLamellar	Sentinel.esp	Common Lamellar Tunic	Light	body	2	guard	24.0	26	75	275
+908:Sentinel.esp	TH_ComTunicMail	Sentinel.esp	Common Mail Tunic	Heavy	body	2	guard	25.0	29	125	275
+909:Sentinel.esp	TH_ComTunicPadded	Sentinel.esp	Common Padded Tunic	Light	body	2	guard	24.0	26	75	275
+8dc:Sentinel.esp	TH_Wolf1Cuirass	Sentinel.esp	Companion	Heavy	body	1	hide	31.0	28	55	125
+8db:Sentinel.esp	TH_Wolf1Boots	Sentinel.esp	Companion	Heavy	feet	1	hide	12.0	10	11	44
+8de:Sentinel.esp	TH_Wolf1Gauntlets	Sentinel.esp	Companion	Heavy	hands	1	hide	12.0	10	11	44
+8df:Sentinel.esp	TH_Wolf1Helmet	Sentinel.esp	Companion	Heavy	head	1	hide	17.0	13	125	62
+2393a:Hothtrooper44_ArmorCompilation.esp	IADaedricLordBoots	Hothtrooper44_ArmorCompilation.esp	Daedric Lord	Heavy	feet	7	DAEDRIC	20.0	18	2900	1050
+2393b:Hothtrooper44_ArmorCompilation.esp	IADaedricLordCuirass	Hothtrooper44_ArmorCompilation.esp	Daedric Lord	Heavy	body	7	DAEDRIC	50.0	49	3500	3000
+2393c:Hothtrooper44_ArmorCompilation.esp	IADaedricLordGauntlets	Hothtrooper44_ArmorCompilation.esp	Daedric Lord	Heavy	hands	7	DAEDRIC	20.0	18	2600	1050
+9f310:arnima.esm	ArnimaknightchestAFaction	arnima.esm	Damaged Ebony Coat of Plates	Heavy	body	6	EBONY	38.0	43	500	1800
+873:ccBGSSSE025-AdvDSGS.esm	ccBGSSSE025_ArmorDarkSeducerCuirass	ccBGSSSE025-AdvDSGS.esm	Dark Seducer	Light	body	7	DAEDRIC	36.0	42	650	3000
+874:ccBGSSSE025-AdvDSGS.esm	ccBGSSSE025_ArmorDarkSeducerBoots	ccBGSSSE025-AdvDSGS.esm	Dark Seducer	Light	feet	7	DAEDRIC	10.0	12	90	1050
+872:ccBGSSSE025-AdvDSGS.esm	ccBGSSSE025_ArmorDarkSeducerGauntlets	ccBGSSSE025-AdvDSGS.esm	Dark Seducer	Light	hands	7	DAEDRIC	10.0	12	90	1050
+871:ccBGSSSE025-AdvDSGS.esm	ccBGSSSE025_ArmorDarkSeducerHelmet	ccBGSSSE025-AdvDSGS.esm	Dark Seducer	Light	head	7	DAEDRIC	14.0	18	195	1500
+54578:Druadach.esm	DrV_ArmorBlackElvenCuirass	Druadach.esm	Dominion	Light	body	3	elven	39.0	31	565	600
+54573:Druadach.esm	DrV_ArmorBlackElvenArmorBoots	Druadach.esm	Dominion	Light	feet	3	elven	11.0	9	110	210
+54574:Druadach.esm	DrV_ArmorBlackElvenArmorGauntlets	Druadach.esm	Dominion	Light	hands	3	elven	11.0	9	110	210
+54576:Druadach.esm	DrV_ArmorBlackElvenArmorHelmet	Druadach.esm	Dominion	Light	head	3	elven	16.0	13	275	300
+68b0a:Druadach.esm	DRV_ArmorBlackElvenArmorLightCuirass	Druadach.esm	Dominion Light	Light	body	3	elven	32.0	31	405	600
+68b07:Druadach.esm	DrV_ArmorBlackElvenArmorLightHelmet	Druadach.esm	Dominion Light	Light	head	3	elven	14.0	13	200	300
+4f3c:Hothtrooper44_ArmorCompilation.esp	IADragonhideHeavyRobe	Hothtrooper44_ArmorCompilation.esp	Dragonhide Heavy Robe	Heavy	body	7	DRAGON	45.0	46	3500	3000
+23298:Hothtrooper44_ArmorCompilation.esp	IADragonhideLRobe	Hothtrooper44_ArmorCompilation.esp	Dragonhide Light Robe	Light	body	7	DRAGON	40.0	42	3000	3000
+11c29:arnima.esm	ArnimaRedguardBootsA	arnima.esm	Dragonstar	Heavy	feet	2	steel	12.0	11	20	96
+11c28:arnima.esm	ArnimaredguardCuirass	arnima.esm	Dragonstar	Heavy	body	2	steel	38.0	31	100	275
+11c2b:arnima.esm	ArnimaRedguardHandsA	arnima.esm	Dragonstar	Heavy	hands	2	steel	12.0	11	200	96
+e63d2:Journey to Baan Malur.esp	DresSlaversCuirass	Journey to Baan Malur.esp	Dres Robes	Light	body	1	hide	13.0	20	457	125
+29126:DragonPriestArmor.esp	DPA_DragonPriestArmorDukaanLight	DragonPriestArmor.esp	Dukaan's Light	Light	body	7	DRAGON	41.0	42	1500	3000
+fa59:arnima.esm	ArnimaknightchestA	arnima.esm	Ebony Coat of Plates	Heavy	body	6	EBONY	54.0	45	500	1800
+1451aa:arnima.esm	ArnimaknightchestAwhite	arnima.esm	Ebony Coat of Plates (Dyed)	Heavy	body	6	EBONY	90.0	45	500	1800
+2394c:Hothtrooper44_ArmorCompilation.esp	IAEbonyMageLightRobe	Hothtrooper44_ArmorCompilation.esp	Ebony Mage Light Robe	Light	body	6	EBONY	35.0	39	1700	1800
+8aa069:summersetisles.esp	ArmorDaedricCuirassSSIEpic	summersetisles.esp	Elder Daedric	Heavy	body	7	DAEDRIC	69.0	49	32000	3000
+8aa060:summersetisles.esp	ArmorDaedricBootsSSIEpic	summersetisles.esp	Elder Daedric	Heavy	feet	7	DAEDRIC	28.0	18	6250	1050
+2bb32d:summersetisles.esp	ArmorDaedricGauntletsSSIEpic	summersetisles.esp	Elder Daedric	Heavy	hands	7	DAEDRIC	28.0	18	6250	1050
+8aa06c:summersetisles.esp	ArmorDaedricHelmetSSIEpic	summersetisles.esp	Elder Daedric	Heavy	head	7	DAEDRIC	33.0	23	16000	1500
+9aaf9:Druadach.esm	DrV_ArmorOrcishEliteCuirassBlue	Druadach.esm	Elite Orcish	Heavy	body	4	orcish	43.0	41	190	900
+9aafb:Druadach.esm	DrV_ArmorOrcishEliteBoots	Druadach.esm	Elite Orcish	Heavy	feet	4	orcish	16.0	15	30	315
+9aaf8:Druadach.esm	DrV_ArmorOrcishEliteGauntlets	Druadach.esm	Elite Orcish	Heavy	hands	4	orcish	16.0	15	30	315
+9aaf6:Druadach.esm	DrV_ArmorOrcishEliteHelmetBlue	Druadach.esm	Elite Orcish	Heavy	head	4	orcish	21.0	19	90	450
+9aaf7:Druadach.esm	DrV_ArmorOrcishEliteHelmetRed	Druadach.esm	Elite Orcish	Heavy	head	4	orcish	21.0	19	90	450
+16cdc:Druadach.esm	DRV_ArmorElvenSteelCuirass	Druadach.esm	Elven Steel	Light	body	3	elven	43.0	31	1500	600
+22462:Druadach.esm	DRV_ArmorElvenSteelBoots	Druadach.esm	Elven Steel	Light	feet	3	elven	16.0	9	275	210
+22461:Druadach.esm	DRV_ArmorElvenSteelHelmet	Druadach.esm	Elven Steel	Light	head	3	elven	21.0	13	750	300
+d64:Hothtrooper44_ArmorCompilation.esp	IAFalkreathCuirass	Hothtrooper44_ArmorCompilation.esp	Falkreath	Heavy	body	5	steelplate	38.0	40	625	1300
+d62:Hothtrooper44_ArmorCompilation.esp	IAFalkreathBoots	Hothtrooper44_ArmorCompilation.esp	Falkreath	Heavy	feet	5	steelplate	13.5	14	240	455
+d63:Hothtrooper44_ArmorCompilation.esp	IAFalkreathCrown	Hothtrooper44_ArmorCompilation.esp	Falkreath	Heavy	head	5	steelplate	17.0	19	1000	650
+d65:Hothtrooper44_ArmorCompilation.esp	IAFalkreathGauntlets	Hothtrooper44_ArmorCompilation.esp	Falkreath	Heavy	hands	5	steelplate	13.0	14	240	455
+d66:Hothtrooper44_ArmorCompilation.esp	IAFalkreathHelmet	Hothtrooper44_ArmorCompilation.esp	Falkreath	Heavy	head	5	steelplate	18.5	19	320	650
+3525e3:summersetisles.esp	ArmorFineElvenCuirass	summersetisles.esp	Fine Elven	Light	body	3	elven	36.0	31	450	600
+3525e2:summersetisles.esp	ArmorFineElvenBoots	summersetisles.esp	Fine Elven	Light	feet	3	elven	10.0	9	100	210
+3525e4:summersetisles.esp	ArmorFineElvenGauntlets	summersetisles.esp	Fine Elven	Light	hands	3	elven	10.0	9	100	210
+3525e5:summersetisles.esp	ArmorFineElvenHelmet	summersetisles.esp	Fine Elven	Light	head	3	elven	16.0	13	220	300
+3525e6:summersetisles.esp	ArmorFineElvenLightCuirass	summersetisles.esp	Fine Elven Light	Light	body	3	elven	34.0	31	250	600
+232f6:Hothtrooper44_ArmorCompilation.esp	IAGlacialCrystalHCuirass	Hothtrooper44_ArmorCompilation.esp	Glacial Crystal Heavy	Heavy	body	5	glacial_crystal	46.0	42	2000	1300
+232e3:Hothtrooper44_ArmorCompilation.esp	IAGlacialCrystalHBoots	Hothtrooper44_ArmorCompilation.esp	Glacial Crystal Heavy	Heavy	feet	5	glacial_crystal	17.0	15	700	455
+232e4:Hothtrooper44_ArmorCompilation.esp	IAGlacialCrystalHGauntlets	Hothtrooper44_ArmorCompilation.esp	Glacial Crystal Heavy	Heavy	hands	5	glacial_crystal	17.0	15	500	455
+232e5:Hothtrooper44_ArmorCompilation.esp	IAGlacialCrystalHHelmet	Hothtrooper44_ArmorCompilation.esp	Glacial Crystal Heavy	Heavy	head	5	glacial_crystal	22.0	20	1065	650
+84f4e:Hothtrooper44_ArmorCompilation.esp	IAGlacialCrystalLCuirass	Hothtrooper44_ArmorCompilation.esp	Glacial Crystal Light	Light	body	5	glacial_crystal	40.0	38	2000	1300
+84f4d:Hothtrooper44_ArmorCompilation.esp	IAGlacialCrystalLBoots	Hothtrooper44_ArmorCompilation.esp	Glacial Crystal Light	Light	feet	5	glacial_crystal	12.0	11	700	455
+84f4f:Hothtrooper44_ArmorCompilation.esp	IAGlacialCrystalLGauntlets	Hothtrooper44_ArmorCompilation.esp	Glacial Crystal Light	Light	hands	5	glacial_crystal	11.5	11	500	455
+84f50:Hothtrooper44_ArmorCompilation.esp	IAGlacialCrystalLHelmet	Hothtrooper44_ArmorCompilation.esp	Glacial Crystal Light	Light	head	5	glacial_crystal	16.5	16	1065	650
+877:ccBGSSSE025-AdvDSGS.esm	ccBGSSSE025_ArmorGoldenSaintCuirass	ccBGSSSE025-AdvDSGS.esm	Golden Saint	Heavy	body	7	DAEDRIC	42.0	46	1250	3000
+878:ccBGSSSE025-AdvDSGS.esm	ccBGSSSE025_ArmorGoldenSaintBoots	ccBGSSSE025-AdvDSGS.esm	Golden Saint	Heavy	feet	7	DAEDRIC	15.0	17	240	1050
+876:ccBGSSSE025-AdvDSGS.esm	ccBGSSSE025_ArmorGoldenSaintGauntlets	ccBGSSSE025-AdvDSGS.esm	Golden Saint	Heavy	hands	7	DAEDRIC	15.0	17	240	1050
+875:ccBGSSSE025-AdvDSGS.esm	ccBGSSSE025_ArmorGoldenSaintHelmet	ccBGSSSE025-AdvDSGS.esm	Golden Saint	Heavy	head	7	DAEDRIC	20.0	22	650	1500
+d63:GVLT_Gryphonknight.esp	ArmorBaronCuirass	GVLT_Gryphonknight.esp	Gryphonknight	Heavy	body	5	steelplate	44.0	42	600	1300
+801:GVLT_Gryphonknight.esp	ArmorBaronBoots	GVLT_Gryphonknight.esp	Gryphonknight	Heavy	feet	5	steelplate	13.0	14	280	455
+803:GVLT_Gryphonknight.esp	ArmorBaronGauntlets	GVLT_Gryphonknight.esp	Gryphonknight	Heavy	hands	5	steelplate	13.0	14	350	455
+808:GVLT_Gryphonknight.esp	ArmorBaronHelmet	GVLT_Gryphonknight.esp	Gryphonknight	Heavy	head	5	steelplate	18.0	19	450	650
+8dd:Sentinel.esp	TH_Wolf1CuirassA	Sentinel.esp	Harbinger	Heavy	body	1	hide	40.0	28	1500	125
+29127:DragonPriestArmor.esp	DPA_DragonPriestArmorHevnoraakLight	DragonPriestArmor.esp	Hevnoraak's Light	Light	body	7	DRAGON	41.0	42	1500	3000
+2327c:Hothtrooper44_ArmorCompilation.esp	IABrigandHighwayChain	Hothtrooper44_ArmorCompilation.esp	Highwayman Mail	Light	body	1	leather	27.0	26	90	125
+8d7:Sentinel.esp	TH_ImpMageCuirass	Sentinel.esp	Imperial Battlemage Robes	Heavy	body	2	imperial	25.0	29	100	275
+830:Armors of the Velothi.esp	IndorilWayfarerCuirass1	Armors of the Velothi.esp	Indoril Wayfarer	Light	body	3	bonemold	37.0	31	300	600
+805:Armors of the Velothi.esp	IndorilWayfarerCuirass	Armors of the Velothi.esp	Indoril Wayfarer	Light	body	3	bonemold	37.0	31	300	600
+804:Armors of the Velothi.esp	IndorilWayfarerBoots	Armors of the Velothi.esp	Indoril Wayfarer	Light	feet	3	bonemold	10.0	9	60	210
+817:Armors of the Velothi.esp	IndorilWayfarerGauntlets	Armors of the Velothi.esp	Indoril Wayfarer	Light	hands	3	bonemold	10.0	9	60	210
+861:Armors of the Velothi.esp	IndorilWayfarerHelmet	Armors of the Velothi.esp	Indoril Wayfarer	Light	head	3	bonemold	16.0	13	150	300
+8ce:Apex_Khajiit.esp	KhajiitiApexBootsDroziraHeavy	Apex_Khajiit.esp	Khajiiti Heavy - Dro'Zira	Heavy	feet	6	EBONY	17.0	16	620	630
+8cd:Apex_Khajiit.esp	KhajiitiApexCuirassDroZiraHeavy	Apex_Khajiit.esp	Khajiiti Heavy - Dro'Zira	Heavy	body	6	EBONY	48.0	45	3200	1800
+8cc:Apex_Khajiit.esp	KhajiitiApexGauntletsDroziraHeavy	Apex_Khajiit.esp	Khajiiti Heavy - Dro'Zira	Heavy	hands	6	EBONY	17.0	16	615	630
+8cb:Apex_Khajiit.esp	KhajiitiApexHelmetDroziraHeavy	Apex_Khajiit.esp	Khajiiti Heavy - Dro'Zira	Heavy	head	6	EBONY	22.0	21	1500	900
+8c2:Apex_Khajiit.esp	KhajiitiApexCuirassWarmSandsHeavy	Apex_Khajiit.esp	Khajiiti Heavy - Warm Sands	Heavy	body	4	apex_khajiit	35.0	36	320	900
+29128:DragonPriestArmor.esp	DPA_DragonPriestArmorKonahrikLight	DragonPriestArmor.esp	Konahrik's Light	Light	body	7	DRAGON	41.0	42	1500	3000
+fb5b:DragonPriestArmor.esp	DPA_DragonPriestArmorKrosisLight	DragonPriestArmor.esp	Krosis' Light	Light	body	7	DRAGON	41.0	42	1500	3000
+88b:YokuWeapons.esp	0_HeavyArma2	YokuWeapons.esp	Lifida	Heavy	body	6	EBONY	42.0	43	1600	1800
+bbe:ccBGSSSE025-AdvDSGS.esm	ccBGSSSE025_ArmorMadnessCuirass	ccBGSSSE025-AdvDSGS.esm	Madness	Heavy	body	7	madness	52.0	49	4100	3000
+bbf:ccBGSSSE025-AdvDSGS.esm	ccBGSSSE025_ArmorMadnessBoots	ccBGSSSE025-AdvDSGS.esm	Madness	Heavy	feet	7	madness	19.0	18	850	1050
+bbd:ccBGSSSE025-AdvDSGS.esm	ccBGSSSE025_ArmorMadnessGauntlets	ccBGSSSE025-AdvDSGS.esm	Madness	Heavy	hands	7	madness	19.0	18	850	1050
+bbc:ccBGSSSE025-AdvDSGS.esm	ccBGSSSE025_ArmorMadnessHelmet	ccBGSSSE025-AdvDSGS.esm	Madness	Heavy	head	7	madness	24.0	23	1900	1500
+adb1:King of the Murkmire.esp	AnWamasuLeatherCuirass	King of the Murkmire.esp	Masu Skin Leather	Light	body	1	leather	29.0	26	125	125
+5a0a:Hothtrooper44_ArmorCompilation.esp	IAMercenaryCuirass	Hothtrooper44_ArmorCompilation.esp	Mercenary	Light	body	4	scaled	31.0	32	300	900
+5a0b:Hothtrooper44_ArmorCompilation.esp	IAMercenaryGauntlets	Hothtrooper44_ArmorCompilation.esp	Mercenary	Light	hands	4	scaled	8.5	9	100	315
+300007:BSHeartland.esm	CYRArmorMithrilCuirass	BSHeartland.esm	Mithril	Light	body	4	mithril	27.0	32	300	900
+30000c:BSHeartland.esm	CYRArmorMithrilBoots	BSHeartland.esm	Mithril	Light	feet	4	mithril	8.0	9	35	315
+30000e:BSHeartland.esm	CYRArmorMithrilGauntlets	BSHeartland.esm	Mithril	Light	hands	4	mithril	8.0	9	40	315
+862:Armors of the Velothi Pt2.esp	MTGrandmasterCuirass	Armors of the Velothi Pt2.esp	Morag Tong Grandmaster	Heavy	body	3	chitin	40.0	35	240	600
+861:Armors of the Velothi Pt2.esp	MTGrandmasterBoots	Armors of the Velothi Pt2.esp	Morag Tong Grandmaster	Heavy	feet	3	chitin	15.0	13	50	210
+863:Armors of the Velothi Pt2.esp	MTGrandmasterGauntlets	Armors of the Velothi Pt2.esp	Morag Tong Grandmaster	Heavy	hands	3	chitin	15.0	13	50	210
+845:Armors of the Velothi Pt2.esp	MTGrandmasterHelmet	Armors of the Velothi Pt2.esp	Morag Tong Grandmaster	Heavy	head	3	chitin	20.0	16	125	300
+fb5c:DragonPriestArmor.esp	DPA_DragonPriestArmorMorokeiLight	DragonPriestArmor.esp	Morokei's Light	Light	body	7	DRAGON	41.0	42	1500	3000
+2912b:DragonPriestArmor.esp	DPA_DragonPriestArmorNahkriinLight	DragonPriestArmor.esp	Nahkriin's Light	Light	body	7	DRAGON	41.0	42	1500	3000
+829:Armors of the Velothi.esp	NarsisWatchmanCuirass	Armors of the Velothi.esp	Narsis Watchman	Light	body	3	bonemold	33.0	31	260	600
+82b:Armors of the Velothi.esp	NarsisWatchmanHelmet	Armors of the Velothi.esp	Narsis Watchman	Light	head	3	bonemold	15.0	13	135	300
+14c6a:Journey to Baan Malur.esp	NetchLeatherArmour	Journey to Baan Malur.esp	Netch Leather	Light	body	1	leather	28.0	26	160	125
+19d70:Journey to Baan Malur.esp	NetchLeatherArmourRed	Journey to Baan Malur.esp	Netch Leather	Light	body	1	leather	28.0	26	180	125
+87d:Sentinel.esp	TH_Nord1Cuirass	Sentinel.esp	Nordic Carved	Heavy	body	4	nordic	43.0	41	1600	900
+881:Sentinel.esp	TH_Nord2Cuirass	Sentinel.esp	Nordic Carved	Heavy	body	4	nordic	43.0	41	1600	900
+5eb4:DIS_Heavy_Legion.esp	DIS_Old_Cuirass	DIS_Heavy_Legion.esp	Old	Heavy	body	1	iron	29.0	28	250	125
+5eb2:DIS_Heavy_Legion.esp	DIS_Old_Boots	DIS_Heavy_Legion.esp	Old	Heavy	feet	1	iron	12.0	10	25	44
+5eb6:DIS_Heavy_Legion.esp	DIS_Old_Gauntlets	DIS_Heavy_Legion.esp	Old	Heavy	hands	1	iron	12.0	10	25	44
+5ebb:DIS_Heavy_Legion.esp	DIS_Old_Helmet	DIS_Heavy_Legion.esp	Old	Heavy	head	1	iron	15.0	13	55	62
+3fde3:Druadach.esm	DrV_ArmorOrcishLightCuirass	Druadach.esm	Orcish	Heavy	body	4	orcish	34.0	36	625	900
+9726f:Druadach.esm	DrV_ArmorOrcishCuirassBarbarian	Druadach.esm	Orcish Barbarian	Light	body	4	orcish	22.0	32	100	900
+97269:Druadach.esm	DrV_ArmorOrcishCuirassChain	Druadach.esm	Orcish Chain	Heavy	body	4	orcish	35.0	36	670	900
+9726d:Druadach.esm	DrV_ArmorOrcishCuirassForgemaster	Druadach.esm	Orcish Forgemaster	Light	body	4	orcish	28.0	32	300	900
+878:Sentinel.esp	TH_Orc1Cuirass	Sentinel.esp	Orcish Hide	Light	body	4	orcish	26.0	32	125	900
+877:Sentinel.esp	TH_Orc1Boots	Sentinel.esp	Orcish Hide	Light	feet	4	orcish	7.0	9	25	315
+87a:Sentinel.esp	TH_Orc1Gauntlets	Sentinel.esp	Orcish Hide	Light	hands	4	orcish	7.0	9	25	315
+87b:Sentinel.esp	TH_Orc1Helmet	Sentinel.esp	Orcish Hide	Light	head	4	orcish	12.0	13	60	450
+7f17:Druadach.esm	DrV_ArmorOrcishIronCuirass	Druadach.esm	Orcish Iron	Heavy	body	4	orcish	26.0	36	135	900
+7f18:Druadach.esm	DrV_ArmorOrcishIronBoots	Druadach.esm	Orcish Iron	Heavy	feet	4	orcish	11.0	13	30	315
+7f19:Druadach.esm	DrV_ArmorOrcishIronGauntlets	Druadach.esm	Orcish Iron	Heavy	hands	4	orcish	11.0	13	30	315
+7f1a:Druadach.esm	DrV_ArmorOrcishIronHelmet	Druadach.esm	Orcish Iron	Heavy	head	4	orcish	16.0	17	75	450
+7f14:Druadach.esm	DrV_ArmorOrcishSteelCuirass	Druadach.esm	Orcish Steel	Heavy	body	4	orcish	34.0	36	325	900
+3fde7:Druadach.esm	DrV_ArmorOrcishLightSteelCuirass	Druadach.esm	Orcish Steel	Heavy	body	4	orcish	34.0	36	625	900
+7f15:Druadach.esm	Drv_ArmorOrcishSteelBoots	Druadach.esm	Orcish Steel	Heavy	feet	4	orcish	12.0	13	75	315
+7f16:Druadach.esm	DrV_ArmorOrcishSteelGauntlets	Druadach.esm	Orcish Steel	Heavy	hands	4	orcish	12.0	13	75	315
+879:Sentinel.esp	TH_Orc1CuirassStudded	Sentinel.esp	Orcish Studded	Light	body	4	orcish	29.0	32	225	900
+2912c:DragonPriestArmor.esp	DPA_DragonPriestArmorOtarLight	DragonPriestArmor.esp	Otar's Light	Light	body	7	DRAGON	41.0	42	1500	3000
+28dda1:Journey to Baan Malur.esp	RogueBonemoldBoots	Journey to Baan Malur.esp	Plated Netch Leather	Light	feet	3	bonemold	10.0	9	60	210
+28dda2:Journey to Baan Malur.esp	RogueBonemoldCuirass	Journey to Baan Malur.esp	Plated Netch Leather	Light	body	3	bonemold	28.0	29	290	600
+5a3e:Hothtrooper44_ArmorCompilation.esp	IAPrimitiveNordHeavyCuirass	Hothtrooper44_ArmorCompilation.esp	Primitive Nord Heavy	Heavy	body	5	steelplate	39.0	40	375	1300
+5a41:Hothtrooper44_ArmorCompilation.esp	IAPrimitiveNordLightBoots	Hothtrooper44_ArmorCompilation.esp	Primitive Nord Light	Light	feet	2	steel	8.5	8	165	96
+5a42:Hothtrooper44_ArmorCompilation.esp	IAPrimitiveNordLightCuirass	Hothtrooper44_ArmorCompilation.esp	Primitive Nord Light	Light	body	2	steel	30.0	28	375	275
+823:YokuWeapons.esp	0_HeavyArma	YokuWeapons.esp	Ra-Gada	Heavy	body	3	EBONY	42.0	35	1600	600
+833:YokuWeapons.esp	0_HeavyBoots	YokuWeapons.esp	Ra-Gada	Heavy	feet	3	yoku	16.0	13	375	210
+822:YokuWeapons.esp	0_HeavyHelm	YokuWeapons.esp	Ra-Gada	Heavy	head	3	yoku	20.0	16	780	300
+2912d:DragonPriestArmor.esp	DPA_DragonPriestArmorRahgotLight	DragonPriestArmor.esp	Rahgot's Light	Light	body	7	DRAGON	41.0	42	1500	3000
+5a6f:Hothtrooper44_ArmorCompilation.esp	IARangerCuirass	Hothtrooper44_ArmorCompilation.esp	Ranger	Light	body	1	leather	27.0	26	125	125
+5a71:Hothtrooper44_ArmorCompilation.esp	IARangerHood	Hothtrooper44_ArmorCompilation.esp	Ranger	Light	head	1	leather	12.0	11	85	62
+933a1:Druadach.esm	DrV_RHArmorDraugrCuirass	Druadach.esm	Ravenheart	Heavy	body	7	DAEDRIC	25.0	46	125	3000
+e03e7:Journey to Baan Malur.esp	ReaverCuirass04	Journey to Baan Malur.esp	Reaver's Garb	Light	body	1	leather	28.0	26	160	125
+e03e4:Journey to Baan Malur.esp	ReaverCuirass01	Journey to Baan Malur.esp	Reaver's Garb	Light	body	1	leather	28.0	26	160	125
+e03e5:Journey to Baan Malur.esp	ReaverCuirass02	Journey to Baan Malur.esp	Reaver's Garb	Light	body	1	leather	28.0	26	160	125
+e03e8:Journey to Baan Malur.esp	ReaverCuirass05	Journey to Baan Malur.esp	Reaver's Garb	Light	body	1	leather	28.0	26	160	125
+e03e6:Journey to Baan Malur.esp	ReaverCuirass03	Journey to Baan Malur.esp	Reaver's Garb	Light	body	1	leather	28.0	26	160	125
+d70:Hothtrooper44_ArmorCompilation.esp	IARedguardKnightHeavyCuirass	Hothtrooper44_ArmorCompilation.esp	Redguard Knight Heavy Mail	Heavy	body	2	steel	34.0	31	275	275
+802:Armors of the Velothi.esp	RedoranExileCuirass	Armors of the Velothi.esp	Redoran Exile	Light	body	3	bonemold	33.0	31	260	600
+800:Armors of the Velothi.esp	RedoranExileHelmet	Armors of the Velothi.esp	Redoran Exile	Light	head	3	bonemold	15.0	13	140	300
+822:Armors of the Velothi.esp	RedoranWatchmanCuirass	Armors of the Velothi.esp	Redoran Watchman	Light	body	3	chitin	37.0	31	300	600
+821:Armors of the Velothi.esp	RedoranWatchmanBoots	Armors of the Velothi.esp	Redoran Watchman	Light	feet	3	chitin	10.0	9	60	210
+823:Armors of the Velothi.esp	RedoranWatchmanBracers	Armors of the Velothi.esp	Redoran Watchman	Light	hands	3	chitin	10.0	9	60	210
+824:Armors of the Velothi.esp	RedoranWatchmanHelmet	Armors of the Velothi.esp	Redoran Watchman	Light	head	3	chitin	16.0	13	150	300
+826:Armors of the Velothi.esp	RedoranWatchmanHelmet1	Armors of the Velothi.esp	Redoran Watchman	Light	head	3	chitin	16.0	13	150	300
+827:Armors of the Velothi.esp	RedoranWatchmanHelmet2	Armors of the Velothi.esp	Redoran Watchman	Light	head	3	chitin	16.0	13	150	300
+81f:Armors of the Velothi.esp	RhinoBeetleCuirass	Armors of the Velothi.esp	Rhino Beetle	Heavy	body	3	chitin	44.0	35	715	600
+81a:Armors of the Velothi.esp	RhinoBeetleCuirass1	Armors of the Velothi.esp	Rhino Beetle	Heavy	body	3	chitin	44.0	35	715	600
+819:Armors of the Velothi.esp	RhinoBeetleBoots	Armors of the Velothi.esp	Rhino Beetle	Heavy	feet	3	chitin	15.0	13	150	210
+81b:Armors of the Velothi.esp	RhinoBeetleGauntlets	Armors of the Velothi.esp	Rhino Beetle	Heavy	hands	3	chitin	16.0	13	150	210
+81c:Armors of the Velothi.esp	RhinoBeetleHelmet	Armors of the Velothi.esp	Rhino Beetle	Heavy	head	3	chitin	19.0	16	150	300
+21f8d:Hothtrooper44_ArmorCompilation.esp	IARitualBoethiahCuirass	Hothtrooper44_ArmorCompilation.esp	Ritual of Boethiah	Light	body	7	DRAGON	41.0	42	2500	3000
+21f8f:Hothtrooper44_ArmorCompilation.esp	IARitualBoethiahHelm	Hothtrooper44_ArmorCompilation.esp	Ritual of Boethiah	Light	head	7	DRAGON	17.0	18	1350	1500
+5945:DIS_Heavy_Legion.esp	DIS_Rust_Cuirass	DIS_Heavy_Legion.esp	Rust	Heavy	body	1	iron	23.0	25	50	125
+3fde6:Druadach.esm	DrV_ArmorOrcishLightRustCuirass	Druadach.esm	Rusted Orcish	Heavy	body	4	orcish	25.0	36	100	900
+82c:Druadach.esm	DrV_ArmorOrcishRustBootsDUPLICATE001	Druadach.esm	Rusted Orcish	Heavy	feet	4	orcish	10.0	13	20	315
+82d:Druadach.esm	DrV_ArmorOrcishRustedGauntlets	Druadach.esm	Rusted Orcish	Heavy	hands	4	orcish	10.0	13	20	315
+548b4:Druadach.esm	DrV_ArmorOrcishRustMaskedHelmet	Druadach.esm	Rusted Orcish	Heavy	head	4	orcish	15.0	17	48	450
+859:Armors of the Velothi Pt2.esp	ArmorSaltplainsCuirass1	Armors of the Velothi Pt2.esp	Saltplains	Light	body	3	chitin	28.0	29	290	600
+85c:Armors of the Velothi Pt2.esp	ArmorSaltplainsCuirassDUPLICATE002	Armors of the Velothi Pt2.esp	Saltplains	Light	body	3	chitin	28.0	29	290	600
+85d:Armors of the Velothi Pt2.esp	ArmorSaltplainsCuirassDUPLICATE003	Armors of the Velothi Pt2.esp	Saltplains	Light	body	3	chitin	28.0	29	290	600
+85e:Armors of the Velothi Pt2.esp	ArmorSaltplainsCuirassDUPLICATE004	Armors of the Velothi Pt2.esp	Saltplains	Light	body	3	chitin	28.0	29	290	600
+858:Armors of the Velothi Pt2.esp	ArmorSaltplainsBoots	Armors of the Velothi Pt2.esp	Saltplains	Light	feet	3	chitin	11.0	9	60	210
+85a:Armors of the Velothi Pt2.esp	ArmorSaltplainsBracers	Armors of the Velothi Pt2.esp	Saltplains	Light	hands	3	chitin	12.0	9	60	210
+857:Armors of the Velothi Pt2.esp	ArmorSaltplainsHelmet3	Armors of the Velothi Pt2.esp	Saltplains	Light	head	3	chitin	16.0	13	135	300
+85b:Armors of the Velothi Pt2.esp	ArmorSaltplainsHelmet	Armors of the Velothi Pt2.esp	Saltplains	Light	head	3	chitin	16.0	13	135	300
+85f:Armors of the Velothi Pt2.esp	ArmorSaltplainsHelmetDUPLICATE001	Armors of the Velothi Pt2.esp	Saltplains	Light	head	3	chitin	16.0	13	135	300
+855:Armors of the Velothi Pt2.esp	ArmorSaltplainsHelmet2	Armors of the Velothi Pt2.esp	Saltplains	Light	head	3	chitin	16.0	13	135	300
+856:Armors of the Velothi Pt2.esp	ArmorSaltplainsHelmetDUPLICATE003	Armors of the Velothi Pt2.esp	Saltplains	Light	head	3	chitin	16.0	13	135	300
+860:Armors of the Velothi Pt2.esp	ArmorSaltplainsHelmetDUPLICATE002	Armors of the Velothi Pt2.esp	Saltplains	Light	head	3	chitin	16.0	13	135	300
+8f8:King of the Murkmire.esp	SaxhleelArmorNoPauldon	King of the Murkmire.esp	Saxhleel Leather	Light	body	1	leather	38.0	26	150	125
+8fa:King of the Murkmire.esp	SaxhleelArmorLPauldron	King of the Murkmire.esp	Saxhleel Leather	Light	body	1	leather	38.0	26	150	125
+8fc:King of the Murkmire.esp	SaxhleelArmorRPauldron	King of the Murkmire.esp	Saxhleel Leather	Light	body	1	leather	38.0	26	150	125
+d63:King of the Murkmire.esp	SaxhleelArmor	King of the Murkmire.esp	Saxhleel Leather	Light	body	1	leather	38.0	26	150	125
+ad634:King of the Murkmire.esp	SaxhleelArmorSleeve01	King of the Murkmire.esp	Saxhleel Leather	Light	body	1	leather	38.0	26	150	125
+933a7:Druadach.esm	DrV_RHArmorImperialCuirass	Druadach.esm	Scrapped Imperial	Heavy	body	2	imperial	25.0	29	100	275
+933aa:Druadach.esm	DrV_RHScrappedImperialHelmet	Druadach.esm	Scrapped Imperial	Heavy	head	2	imperial	18.0	15	30	138
+811:Skaal Heavy Armor SE.esp	DLC2ClothesSkaalHCoat	Skaal Heavy Armor SE.esp	Skaal Heavy	Heavy	body	1	hide	40.0	28	500	125
+802:Skaal Heavy Armor SE.esp	DLC2ClothesSkaalHBoots	Skaal Heavy Armor SE.esp	Skaal Heavy	Heavy	feet	1	hide	14.0	10	330	44
+803:Skaal Heavy Armor SE.esp	DLC2ClothesSkaalHGloves	Skaal Heavy Armor SE.esp	Skaal Heavy	Heavy	hands	1	hide	13.0	10	330	44
+814:Skaal Heavy Armor SE.esp	DLC2ClothesSkaalHHat	Skaal Heavy Armor SE.esp	Skaal Heavy	Heavy	head	1	hide	14.5	13	350	62
+232f5:Hothtrooper44_ArmorCompilation.esp	IASnowBearCuirass	Hothtrooper44_ArmorCompilation.esp	Snow Bear	Light	body	4	scaled	36.0	34	540	900
+232f7:Hothtrooper44_ArmorCompilation.esp	IASnowBearBoots	Hothtrooper44_ArmorCompilation.esp	Snow Bear	Light	feet	4	scaled	10.5	10	185	315
+232f9:Hothtrooper44_ArmorCompilation.esp	IASnowBearHelmet	Hothtrooper44_ArmorCompilation.esp	Snow Bear	Light	head	4	scaled	15.0	14	235	450
+d79:SteelheartArmors.esp	ArmorSteelHeartHeavyCuirass	SteelheartArmors.esp	Steelheart Insulated Mail	Heavy	body	2	steel	34.0	31	275	275
+819:MoreCraftableEquipment.esp	MCEArmorTsunCuirassPlayer	MoreCraftableEquipment.esp	Tsun's	Heavy	body	7	artifact	31.0	46	550	3000
+81a:MoreCraftableEquipment.esp	MCEArmorTsunBootsPlayer	MoreCraftableEquipment.esp	Tsun's	Heavy	feet	7	artifact	12.0	17	110	1050
+81b:MoreCraftableEquipment.esp	MCEArmorTsunGauntletsPlayer	MoreCraftableEquipment.esp	Tsun's	Heavy	hands	7	artifact	12.0	17	110	1050
+2912e:DragonPriestArmor.esp	DPA_DragonPriestArmorVahlokLight	DragonPriestArmor.esp	Vahlok's Light	Light	body	7	DRAGON	41.0	42	1500	3000
+d1908:Journey to Baan Malur.esp	ArmorDaedricBootsMarkynaz	Journey to Baan Malur.esp	Valkynaz	Heavy	feet	7	DAEDRIC	20.0	18	1250	1050
+d1909:Journey to Baan Malur.esp	ArmorDaedricCuirassMarkynaz	Journey to Baan Malur.esp	Valkynaz	Heavy	body	7	DAEDRIC	53.0	49	6400	3000
+d190a:Journey to Baan Malur.esp	ArmorDaedricGauntletsMarkynaz	Journey to Baan Malur.esp	Valkynaz	Heavy	hands	7	DAEDRIC	23.0	18	1250	1050
+d190b:Journey to Baan Malur.esp	ArmorDaedricHelmetMarkynaz	Journey to Baan Malur.esp	Valkynaz	Heavy	head	7	DAEDRIC	26.0	23	3200	1500
+2912f:DragonPriestArmor.esp	DPA_DragonPriestArmorVokunLight	DragonPriestArmor.esp	Vokun's Light	Light	body	7	DRAGON	41.0	42	1500	3000
+fb7a:DragonPriestArmor.esp	DPA_DragonPriestArmorVolsungLight	DragonPriestArmor.esp	Volsung's Light	Light	body	7	DRAGON	41.0	42	1500	3000
+232fc:Hothtrooper44_ArmorCompilation.esp	IAVvardenfellGlassCuirass	Hothtrooper44_ArmorCompilation.esp	Vvardenfell Glass	Light	body	5	glass	39.0	38	1100	1300
+232fe:Hothtrooper44_ArmorCompilation.esp	IAVvardenfellGlassHelmet	Hothtrooper44_ArmorCompilation.esp	Vvardenfell Glass	Light	head	5	glass	16.5	16	450	650
+d8b:Hothtrooper44_ArmorCompilation.esp	IAWarchiefLightBulwark	Hothtrooper44_ArmorCompilation.esp	Warchief Light Bulwark	Light	body	4	orcish	36.0	34	950	900
+8901d:arnima.esm	arnimaWayrestcuirass	arnima.esm	Wayrest Chestpiece	Heavy	body	1	leather	43.0	28	400	125
+851:Sentinel.esp	TH_Bos3Cuirass	Sentinel.esp	Wild Hunt	Light	body	2	guard	38.0	28	900	275
+850:Sentinel.esp	TH_Bos3Boots	Sentinel.esp	Wild Hunt	Light	feet	2	guard	11.0	8	190	96
+852:Sentinel.esp	TH_Bos3Gauntlets	Sentinel.esp	Wild Hunt	Light	hands	2	guard	11.0	8	190	96
+853:Sentinel.esp	TH_Bos3Helmet	Sentinel.esp	Wild Hunt	Light	head	2	guard	16.0	12	450	138
+238f8:Hothtrooper44_ArmorCompilation.esp	IABosmerHuntLightCuirass	Hothtrooper44_ArmorCompilation.esp	Wild Hunt Light	Light	body	7	DRAGON	40.0	42	1500	3000
+238f9:Hothtrooper44_ArmorCompilation.esp	IABosmerHuntLightGauntlets	Hothtrooper44_ArmorCompilation.esp	Wild Hunt Light	Light	hands	7	DRAGON	11.5	12	365	1050
+238fa:Hothtrooper44_ArmorCompilation.esp	IABosmerHuntLightHood	Hothtrooper44_ArmorCompilation.esp	Wild Hunt Light	Light	head	7	DRAGON	16.0	18	650	1500
+c765b:Journey to Baan Malur.esp	DaedricBootsXivkyn	Journey to Baan Malur.esp	Xivkyn	Light	feet	7	DAEDRIC	18.0	13	125	1050
+c765c:Journey to Baan Malur.esp	DaedricCuirassXivkyn	Journey to Baan Malur.esp	Xivkyn	Light	body	7	DAEDRIC	49.0	44	640	3000
+c765d:Journey to Baan Malur.esp	DaedricGauntletsXivkyn	Journey to Baan Malur.esp	Xivkyn	Light	hands	7	DAEDRIC	18.0	13	125	1050
+c765e:Journey to Baan Malur.esp	DaedricHelmetXivkyn	Journey to Baan Malur.esp	Xivkyn	Light	head	7	DAEDRIC	23.0	18	1600	1500
+f29:YokuWeapons.esp	0_HeroicArmorS	YokuWeapons.esp	Yokudan Lion-Robes	Light	body	3	yoku	32.0	31	3625	600
+29131:DragonPriestArmor.esp	DPA_DragonPriestArmorZahkriisosLight	DragonPriestArmor.esp	Zahkriisos' Light	Light	body	7	DRAGON	41.0	42	1500	3000

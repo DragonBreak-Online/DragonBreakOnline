@@ -7,6 +7,9 @@ module.exports = (api) => {
     onlineActors, isLeadStaff, isAdmin, giveItem, registerChatCommand } = api;
 
   const descOf = (id) => { try { return String(mp.getDescFromId(id >>> 0)); } catch (e) { return ''; } };
+  // Never given, as never forged (regions-overrides.json forgeNever) nor looted (loot-overrides.json): the Dwemer Mantis
+  // armour, DragonBreak Armory 81D-824 (Nat, 31 Oct: "keep dwarven mantis out of being able to get obtained")
+  const UNOBTAINABLE = new Set(['81d', '81e', '81f', '820', '821', '822', '823', '824'].map((x) => `${x}:dragonbreak armory.esp`));
   const idOf = (desc) => {
     try {
       if (typeof desc === 'number') return desc >>> 0;
@@ -178,6 +181,7 @@ module.exports = (api) => {
     const tgt = resolveTarget(targetQuery);
     if (!tgt) return personal(caller, `Could not find player '${targetQuery}'.`);
 
+    if (UNOBTAINABLE.has(descOf(it.id).toLowerCase())) return personal(caller, `${it.name} cannot be obtained by anyone, staff gifts included (Nat, 31 Oct).`);
     if (tgt.online && tgt.actor) {
       const ok = giveItem(tgt.actor, it.id, count);
       if (!ok) return personal(caller, `Failed to give ${it.name} to ${tgt.name}.`);

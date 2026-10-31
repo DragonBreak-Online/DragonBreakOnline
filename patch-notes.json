@@ -1,5 +1,39 @@
 [
   {
+    "title": "Armour balance: every tier in its place",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Tempering",
+        "items": [
+          "Every armour and weapon tier can now be improved two levels (to Superior) by a smith of its tier or above, Ebony, Stalhrim, Daedric and Dragon included.",
+          "Before, only the lower tiers could be tempered, so a tempered Orcish set out-armoured untempered Ebony and Dragonplate."
+        ]
+      },
+      {
+        "heading": "Ratings by tier",
+        "items": [
+          "Each smithing tier now has an armour band, and about 130 armour sets from mods that sat far above or below their tier now count at their tier's numbers (some sets matched Ebony while being tier 1). Faction armour keeps its own rules.",
+          "Stalhrim Heavy counts 44 and Nordic Carved 41, as the approved ladder set them."
+        ]
+      },
+      {
+        "heading": "Tiers",
+        "items": [
+          "Dwarven and Elven are now tier 3, and Orcish, Scaled and Nordic tier 4, so the tiers follow how strong each material is. Orc smiths reach Orcish at tier 4."
+        ]
+      },
+      {
+        "heading": "Dwemer Mantis armour",
+        "items": [
+          "The Dwemer Mantis armour can no longer be obtained in any way: never found, forged or given."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Grand Healing reaches the people around you",
     "date": "2026-10-31",
     "version": "Server update",
