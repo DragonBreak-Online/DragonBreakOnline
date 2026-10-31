@@ -7471,6 +7471,8 @@ const equipHook = (actorId, equipment, isAllowed, ...rest) => {
     if (isAllowed) { try { raceEquipCheck(a, equipment); } catch (e) { log('race equip failed', e.message); } }
     // briarheart.js: a Briarheart's bare chest shows the briar body; their own armour takes its place
     if (isAllowed && typeof globalThis.__dboBriarheartEquip === 'function') { try { globalThis.__dboBriarheartEquip(a, equipment); } catch (e) { log('briarheart equip failed', e.message); } }
+    // playermenu.js: a closed helmet or a mask worn masks the face, taking it off unmasks
+    if (isAllowed && typeof globalThis.__dboPlayerMenuEquip === 'function') { try { globalThis.__dboPlayerMenuEquip(a, equipment); } catch (e) { log('auto mask failed', e.message); } }
     // spawnwatch.js: the game has loaded, so its arrival report is due; until it comes its outfit is not remembered
     const spawnWatch = globalThis.__dboSpawnWatch;
     if (spawnWatch) { try { spawnWatch.report(a); } catch (e) { log('spawn watch report failed', e.message); } }
@@ -9377,7 +9379,7 @@ try {
   const runCommand = (a, name, argStr) => { const c = commands.get(name); if (c && (!c.admin || isAdmin(a))) c.fn(a, argStr); };
   require(PLAYERMENU_JS)({ mp, log, personal, system, registerChatCommand, onUi, sendPacket, display, nameOf, tagOf, profileOf, onlineActors, isAdmin, isLeadStaff, staffCan, ranksOf, giveItem, makeProp, runCommand, zones: ZONES, zoneOfActor, cfg, every });
 } catch (e) {
-  log('playermenu.js failed to load:', e.stack || e.message); globalThis.__dboPlayerMenuLeave = null; globalThis.__dboPlayerMenuReady = null; globalThis.__dboInstantRestraint = null;
+  log('playermenu.js failed to load:', e.stack || e.message); globalThis.__dboPlayerMenuLeave = null; globalThis.__dboPlayerMenuReady = null; globalThis.__dboPlayerMenuEquip = null; globalThis.__dboInstantRestraint = null;
   globalThis.__dboRealNamesLogin = null; // the arrival hook goes with the login hook
   // Chat, /players and the U panel then name everyone as before real names
   globalThis.__dboRealNamesOn = null; globalThis.__dboRealNamesLabel = null; globalThis.__dboRealNamesDisplay = null; globalThis.__dboRealNamesSet = null;
