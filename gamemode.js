@@ -10179,6 +10179,13 @@ try {
   delete require.cache[MANUALS_JS];
   require(MANUALS_JS)({ mp, log, personal, audit, who, display, cfg, giveItem, takeGold, depositToTreasury, registerChatCommand, onlineActors, every, findByName, notify });
 } catch (e) { log('manuals.js failed to load:', e.stack || e.message); for (const k of ['__dboManualsRead', '__dboManualsReadWon', '__dboManualsIsManual', '__dboManualsBossLoot', '__dboManualsShop', '__dboManualsBuy', '__dboManualsCopyList', '__dboManualsCopyRefusal', '__dboManualsCopy', '__dboManualsLeave', '__dboManualsSmithShop', '__dboManualsSmithBuy']) globalThis[k] = null; }
+
+// ---- skill books, studied, train our skills (serverskillbooks.js, config "skillBooks"); inert until the fork's study hook ---
+try {
+  const SKILLBOOKS_JS = path.resolve('skillbooks.js');
+  delete require.cache[SKILLBOOKS_JS];
+  require(SKILLBOOKS_JS)({ mp, log, personal, audit, who, cfg });
+} catch (e) { log('skillbooks.js failed to load:', e.stack || e.message); globalThis.__dboSkillBookRead = null; }
 // ---- the Blacksmith's craft tiers, techniques and upgrade caps (server\smithing.js, smithing.json, config "smithing"): after manuals.js ----
 try {
   const SMITHING_JS = path.resolve('smithing.js');
