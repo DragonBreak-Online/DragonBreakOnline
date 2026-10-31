@@ -619,6 +619,9 @@ module.exports = (api) => {
   const REGEN = Object.assign({ enabled: true, tickSeconds: 0.25, minStep: 0.002, payoutSeconds: 1 }, CFG.blessingRegen || {});
   const REGEN_TICK_MS = Math.max(250, Math.round((Number(REGEN.tickSeconds) || 1) * 1000));
   const REGEN_MIN_STEP = Math.max(0, Number(REGEN.minStep) || 0);
+  // Bars whose ceiling has room for the client's own regen (fork regen-ceiling-1031 magickaRegenSlack): the client already
+  // shows its blessing and its worn enchantments there, and the server paying them again would count them twice
+  const CLIENT_STATS = new Set(Array.isArray(REGEN.clientStats) ? REGEN.clientStats.map(String) : []);
   // libespm ActorValue.h: index -> [the bar, a rate or a Mult]
   const REGEN_AV = { 27: ['health', 'rate'], 28: ['magicka', 'rate'], 29: ['stamina', 'rate'], 155: ['health', 'mult'], 156: ['magicka', 'mult'], 157: ['stamina', 'mult'] };
   const REGEN_AV_BY_NAME = { HealRate: 27, MagickaRate: 28, StaminaRate: 29, HealRateMult: 155, MagickaRateMult: 156, StaminaRateMult: 157 };
@@ -741,7 +744,7 @@ module.exports = (api) => {
         if (gear > 0) per += Math.min(gear, gearRegenCapOf() * raceRateOf(a, stat) / 100 * REGEN_MULT);
         const chill = chillOf(a, stat);
         per *= chill;
-        if (!(next[stat] < 1) || !(per > 0)) { owed[stat] = 0; continue; }
+        if (!(next[stat] < 1) || !(per > 0) || CLIENT_STATS.has(stat)) { owed[stat] = 0; continue; }
         const own = raceRateOf(a, stat) / 100 * REGEN_MULT * chill; // the bar's own regen a second
         const step = Math.max(REGEN_MIN_STEP, own * Math.max(0, Number(REGEN.payoutSeconds) || 0));
         // Owed stops at a step plus 1.5 s of gift: a pause (a menu, a held spell) is not paid as one jump

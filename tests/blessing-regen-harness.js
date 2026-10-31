@@ -230,6 +230,17 @@ gearList = [{ av: 'HealRateMult', stat: 'health', kind: 'mult', mag: 25 }];
 check('...an entry not marked gear is never taken from the gear hook', (() => { props.delete(ACTOR + '|private.dboBlessing'); globalThis.__dboBlessingRegenOwed.delete(ACTOR); setPc(0.5, 0.5, 0.5); out.sets.length = 0; run(3); return out.sets.length === 0; })());
 delete globalThis.__dboGearRegen;
 
+// blessingRegen.clientStats (31 Oct, fork regen-ceiling-1031): once the magicka ceiling has room for the client's own
+// regen, the client shows its blessing and worn enchantments itself, and the server paying them too counts them twice
+api.cfg = { prayer: { blessingRegen: Object.assign({ clientStats: ['magicka'] }, BASE) } };
+load();
+gearList = [{ av: 'MagickaRateMult', stat: 'magicka', kind: 'mult', mag: 75, gear: true }];
+globalThis.__dboGearRegen = () => gearList;
+check('clientStats magicka: Akatosh and worn Magicka Rate gear add nothing to magicka on the server', (() => { bless('akatosh'); setPc(0.5, 0.2, 0.5); out.sets.length = 0; run(3); return near(pc().magicka, 0.2) && out.sets.length === 0; })(), JSON.stringify(pc()));
+check('...while Hircine\'s stamina is still paid', near(gained('hircine', 'stamina', 2), 0.2, 1e-4), JSON.stringify(pc()));
+delete globalThis.__dboGearRegen;
+api.cfg = { prayer: { blessingRegen: BASE } };
+
 console.log('');
 console.log('deity      bar      server rate/s   during the blessing   after it ends');
 for (const [deity, stat, perSec, secs, got] of table) console.log(`${deity.padEnd(10)} ${stat.padEnd(8)} ${String(perSec).padEnd(15)} +${got.toFixed(4)} in ${String(secs).padEnd(2)} s    +0`);
