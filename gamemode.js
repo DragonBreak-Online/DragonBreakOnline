@@ -4228,10 +4228,12 @@ const sendPacket = (a, payload) => {
 // playerMenu: the U panel (widget 52); menuRun closes it as for the browser
 // birthsignPicker: birthsigns.js widget 163 (dbo:birthsignPick/birthsignClose); a pick closes it through closeWidget
 // lockpick: lockpick.js widget 46 (dbo:lockpickResult/lockpickAuto/lockpickCancel); the cap also makes it a tumbler lock
+// skinning: widget 33 (dbo:skinning/skinningCancel), the blade and the pick rounds as the browser draws them
 const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_journal', deityPicker: 'dbo_deity', rite: 'dbo_rite', dungeonGate: 'dbo_dungeon', labour: 'dbo_labour', pigeon: 'dbo_pigeon', bank: 'dbo_bank',
   businessLedger: 'dbo_ledger', propertyMarket: 'dbo_market', keyRing: 'dbo_keyring', tomeShop: 'dbo_tomes',
   shrinePanel: 'dbo_shrine', courierHandover: 'dbo_courier', playerMenu: 'dbo_menu', spellbook: 'dbo_spellbook', studyMagic: 'dbo_study',
-  classLectern: 'dbo_lectern', birthsignPicker: 'dbo_birthsign', lockpick: 'dbo_lockpick' };
+  classLectern: 'dbo_lectern', birthsignPicker: 'dbo_birthsign', lockpick: 'dbo_lockpick',
+  skinning: 'dbo_skinning' };
 // The client's custom menu takes a payload of at most this many characters (scaleformMenu.ts MAX_PAYLOAD_CHARS) and draws
 // a bigger one blank, so a widget past it (a staff player menu, a long ledger) goes to the browser instead
 const NATIVE_MAX_CHARS = 60000;
