@@ -39,7 +39,9 @@ const TIER_OF = {
   steelplate: 3, adamantium: 3, scaled: 3, elven_gilded: 3, nordic: 3,
   glass: 4, amber: 4, glacial_crystal: 4,
 };
-const NEVER = new Set(['DRAGON', 'DAEDRIC', 'madness', 'EBONY', 'stalhrim', 'orcish', 'golden', 'aetherium']);
+// Artifacts (staff only; the named uniques re-filed by the weapon bands, Nat 1 Nov) are never loot by family too, as
+// artifacts.json already makes them by editor id
+const NEVER = new Set(['DRAGON', 'DAEDRIC', 'madness', 'EBONY', 'stalhrim', 'orcish', 'golden', 'aetherium', 'artifact']);
 const UNIFORM = new Set(['stormcloak', 'guard', 'penitus', 'thievesguild', 'dawnguard', 'blades']);
 const TRINKET = new Set(['clothing', 'staff']);
 // Kept out of loot, never swapped: the metals players mine and their ingots (Skyrim.esm's five, from the Recipe<Ingot>

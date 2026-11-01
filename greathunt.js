@@ -27,6 +27,8 @@
 
 module.exports = (api) => {
   const { mp, log, personal, audit, who, sendPacket, onlineActors, profileOf, registerChatCommand, zoneOfActor, zoneById, isWorldspace, cfg } = api;
+  // by geography (gamemode.js holdOfActor: the nearest capital, never a stronghold), so a howl carries across the whole hold
+  const holdOfActor = typeof api.holdOfActor === 'function' ? api.holdOfActor : zoneOfActor;
   const isLeadStaff = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
   const findByName = typeof api.findByName === 'function' ? api.findByName : () => null;
   const G = cfg.greatHunt || {};
@@ -165,13 +167,13 @@ module.exports = (api) => {
     if (Date.now() - last < C.howlEverySeconds * 1000) return;
     S.howledAt.set(a, Date.now());
     let place = null, here = null;
-    try { here = zoneKey(zoneOfActor(a)); const zone = here ? zoneById(here) : null; place = zone ? zone.name : null; } catch (e) { /* unknown */ }
+    try { here = zoneKey(holdOfActor(a)); const zone = here ? zoneById(here) : null; place = zone ? zone.name : null; } catch (e) { /* unknown */ }
     const text = `A howl echoes through ${place || 'the wilds'}.`;
     // Only the howler's hold hears it. With no hold known, only those in the same worldspace or cell do.
     const world = here ? null : worldOf(a);
     for (const o of onlineActors()) {
       if (o === a) continue;
-      try { if (here ? zoneKey(zoneOfActor(o)) !== here : !world || !sameWorld(worldOf(o), world)) continue; } catch (e) { continue; }
+      try { if (here ? zoneKey(holdOfActor(o)) !== here : !world || !sameWorld(worldOf(o), world)) continue; } catch (e) { continue; }
       personal(o, text);
     }
     audit(`HUNT ${who(a)} howled (${name || 'a howl'}) in ${place || 'the wilds'}`);

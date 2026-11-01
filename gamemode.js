@@ -4227,10 +4227,14 @@ const sendPacket = (a, payload) => {
 // shrinePanel, courierHandover: supernatural.js widget 74 and couriers.js 81; their Escape is the router's close, which both read
 // playerMenu: the U panel (widget 52); menuRun closes it as for the browser
 // birthsignPicker: birthsigns.js widget 163 (dbo:birthsignPick/birthsignClose); a pick closes it through closeWidget
+// lockpick: lockpick.js widget 46 (dbo:lockpickResult/lockpickAuto/lockpickCancel); the cap also makes it a tumbler lock
+// skinning: widget 33 (dbo:skinning/skinningCancel), the blade and the pick rounds as the browser draws them
+// reading: widget 30 (dbo:reading/readingCancel), the Scholar's candle and pick rounds as the browser draws them
 const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_journal', deityPicker: 'dbo_deity', rite: 'dbo_rite', dungeonGate: 'dbo_dungeon', labour: 'dbo_labour', pigeon: 'dbo_pigeon', bank: 'dbo_bank',
   businessLedger: 'dbo_ledger', propertyMarket: 'dbo_market', keyRing: 'dbo_keyring', tomeShop: 'dbo_tomes',
   shrinePanel: 'dbo_shrine', courierHandover: 'dbo_courier', playerMenu: 'dbo_menu', spellbook: 'dbo_spellbook', studyMagic: 'dbo_study',
-  classLectern: 'dbo_lectern', birthsignPicker: 'dbo_birthsign' };
+  classLectern: 'dbo_lectern', birthsignPicker: 'dbo_birthsign', lockpick: 'dbo_lockpick',
+  skinning: 'dbo_skinning', reading: 'dbo_reading' };
 // The client's custom menu takes a payload of at most this many characters (scaleformMenu.ts MAX_PAYLOAD_CHARS) and draws
 // a bigger one blank, so a widget past it (a staff player menu, a long ledger) goes to the browser instead
 const NATIVE_MAX_CHARS = 60000;
@@ -6184,7 +6188,9 @@ const isWorldspace = (desc) => {
   if (!worldKind.has(key)) { let w = false; try { const r = recordOf(mp.getIdFromDesc(desc)); w = !!(r && String(r.record.type) === 'WRLD'); } catch (e) { /* unknown */ } worldKind.set(key, w); }
   return worldKind.get(key);
 };
-const zoneAtPlace = (world, pos) => {
+// The hold a place lies in by geography: a region by its worldspace, an interior by zone-cells.json, else the hold whose
+// capital is nearest. What weather, temples, who hears a howl and how far a runner goes are about (holdOfActor)
+const holdAtPlace = (world, pos) => {
   const w = normPlace(world);
   for (const r of ZONES.regions || []) if ((r.worldspaces || []).map(normPlace).includes(w)) return r.id;
   if (!isWorldspace(world)) return zoneOfCell(world);
@@ -6192,6 +6198,23 @@ const zoneAtPlace = (world, pos) => {
   let best = null, bestD = Infinity;
   for (const h of ZONES.holds || []) { if (!Array.isArray(h.capital)) continue; const d = Math.hypot(pos[0] - h.capital[0], pos[1] - h.capital[1]); if (d < bestD) { bestD = d; best = h.id; } }
   return best;
+};
+// The zone a place belongs to, as the fork's zoneAt (zones.ts) decides it, so guards, citizenship and consequences agree
+// with property, locks and Hold Notices (Nat, 1 Nov): inside a stronghold's radius the stronghold, while zones.json's
+// sovereignty.strongholdsOverrideHolds is not false, the first listed winning where two overlap; otherwise holdAtPlace
+const zoneAtPlace = (world, pos) => {
+  const hold = holdAtPlace(world, pos);
+  if (!hold || !(ZONES.holds || []).some((h) => h.id === hold) || !Array.isArray(pos)) return hold;
+  if (ZONES.sovereignty && ZONES.sovereignty.strongholdsOverrideHolds === false) return hold;
+  const x = Number(pos[0]), y = Number(pos[1]);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return hold;
+  for (const s of ZONES.strongholds || []) {
+    const r = Number(s.radius);
+    if (!Array.isArray(s.center) || !(r > 0)) continue;
+    const dx = x - Number(s.center[0]), dy = y - Number(s.center[1]);
+    if (dx * dx + dy * dy <= r * r) return s.id;
+  }
+  return hold;
 };
 // Only a worldspace that has a zone counts as the last outdoor spot. Blackreach, ShadowgreenCavernWorld (the Solitude
 // Sewers exit) and AlftandWorld are worldspaces with none, and recording them overwrote the real one, so a death there
@@ -6209,16 +6232,19 @@ every('outside', 10000, () => {
 });
 // The zone a player is in: by worldspace or nearest hold capital outdoors, by zone-cells.json or owning plugin
 // indoors, else where they last stood outside
-const zoneOfActor = (a) => {
+const placeOfActor = (a, at) => {
   let world = '', pos = null;
   try { world = String(mp.get(a, 'worldOrCellDesc') || ''); pos = mp.get(a, 'pos'); } catch (e) { return null; }
   let zone = null;
-  if (isWorldspace(world)) zone = zoneAtPlace(world, pos);
+  if (isWorldspace(world)) zone = at(world, pos);
   else zone = zoneOfCell(world);
   if (!zone) zone = REGION_PLUGINS[normPlace(world).split(':')[1]] || null;
-  if (!zone) { let last = null; try { last = mp.get(a, 'private.lastOutside'); } catch (e) { /* none */ } if (last && last.world) zone = zoneAtPlace(last.world, last.pos); }
+  if (!zone) { let last = null; try { last = mp.get(a, 'private.lastOutside'); } catch (e) { /* none */ } if (last && last.world) zone = at(last.world, last.pos); }
   return zone;
 };
+const zoneOfActor = (a) => placeOfActor(a, zoneAtPlace);
+// By geography: the hold around a stronghold rather than the stronghold (holdAtPlace)
+const holdOfActor = (a) => placeOfActor(a, holdAtPlace);
 // The zone whose temple a player wakes at or /unstuck walks to: in Skyrim, the hold the watch reads there (guards.js
 // __dboHoldHere: a hold-jails.json cell, else the realm.js territory of the place or of the last place outside), when it
 // is a hold with a temple. Ivarstead is nearer Whiterun's capital but is the Rift's (#bugs, 23 Oct). Cyrodiil, Solstheim
@@ -6226,7 +6252,8 @@ const zoneOfActor = (a) => {
 const isHoldZone = (z) => (ZONES.holds || []).some((h) => h.id === z);
 const templeZoneOf = (a) => {
   try { globalThis.__dboTempleFor = templeFor; globalThis.__dboTempleZoneOf = templeZoneOf; } catch (e) {}
-  const zone = zoneOfActor(a);
+  // a stronghold keeps no temple: its people wake at the temple of the hold around it
+  const zone = holdOfActor(a);
   if (zone && !isHoldZone(zone)) return zone;
   let hold = '';
   try { hold = typeof globalThis.__dboHoldHere === 'function' ? String(globalThis.__dboHoldHere(a) || '') : ''; } catch (e) { hold = ''; }
@@ -7883,6 +7910,8 @@ const equipHook = (actorId, equipment, isAllowed, ...rest) => {
     // durability.js: a piece taken off gets its wear in its name; a Broken one put on comes off
     if (isAllowed && typeof globalThis.__dboDurabilityEquip === 'function') { try { globalThis.__dboDurabilityEquip(a, equipment); } catch (e) { log('durability equip failed', e.message); } }
     if (isAllowed) { try { raceEquipCheck(a, equipment); } catch (e) { log('race equip failed', e.message); } }
+    // A creature's weapon (weaponBands.creature) comes off a player
+    if (isAllowed) { try { creatureWeaponCheck(a, equipment); } catch (e) { log('creature weapon check failed', e.message); } }
     // briarheart.js: a Briarheart's bare chest shows the briar body; their own armour takes its place
     if (isAllowed && typeof globalThis.__dboBriarheartEquip === 'function') { try { globalThis.__dboBriarheartEquip(a, equipment); } catch (e) { log('briarheart equip failed', e.message); } }
     // playermenu.js: a closed helmet or a mask worn masks the face, taking it off unmasks
@@ -7920,6 +7949,26 @@ const equipHook = (actorId, equipment, isAllowed, ...rest) => {
   try { return prev(actorId, equipment, isAllowed, ...rest) !== false; } catch (e) { return true; }
 };
 equipHook.__dbo = true;
+// The inventory's item card (Nat, 1 Nov: the armour's tier, class and Defense in the item info, not a separate card): the
+// client asks for the highlighted piece and draws the line on SkyUI's card. The answer is wearInfoOf's, as /armor's, so the
+// card and the rule never disagree; none for anything the rule does not count (clothing, faction or guard gear, no family).
+//   Client -> Server: dbo armourInfo [baseId]     Server -> Client: dboArmourInfo { id, none } | { id, tier, klass, need, cosmetic, defense }
+const armourInfoAsked = globalThis.__dboArmourInfoAsked instanceof Map ? globalThis.__dboArmourInfoAsked : (globalThis.__dboArmourInfoAsked = new Map());
+const armourInfoFor = (a, id) => {
+  const w = ARMOR_WEAR.enabled && typeof globalThis.__dboWearTier === 'function' ? wearInfoOf(id) : null;
+  if (!w) return { customPacketType: 'dboArmourInfo', id, none: true };
+  return { customPacketType: 'dboArmourInfo', id, tier: w.tier, klass: w.klass, need: w.need, cosmetic: !!w.cosmetic, defense: Math.floor(defenseLevelOf(a)) };
+};
+onUi('armourInfo', (a, args) => {
+  const id = (args || [])[0];
+  if (typeof id !== 'number' || !Number.isInteger(id) || id <= 0 || id >= 0xff000000) return;
+  // A held arrow key moves the highlight every frame: at most 20 answers a second
+  const now = Date.now(), last = armourInfoAsked.get(a >>> 0) || { at: 0, n: 0 };
+  const n = now - last.at < 1000 ? last.n + 1 : 1;
+  armourInfoAsked.set(a >>> 0, { at: n === 1 ? now : last.at, n });
+  if (n > 20) return;
+  sendPacket(a, armourInfoFor(a, id >>> 0));
+});
 mp.onUpdateEquipmentAttempt = equipHook;
 
 // Host assignment policy
@@ -8182,6 +8231,8 @@ const sunSourceIds = () => {
   }
   return sunSources;
 };
+// supernatural.js: a sun hit on a vampire player burns by the vampire's stage
+globalThis.__dboIsSunSource = (src) => sunSourceIds().has(Number(src) >>> 0);
 const undeadCache = new Map();   // base id -> true/false
 // The race of this actor's base carries the undead keyword
 const isUndead = (id) => {
@@ -8279,9 +8330,37 @@ const recordDamageOf = (baseId, type) => {
   recordDamageCache.set(key, damage);
   return damage;
 };
+// Weapon bands (Nat, 1 Nov: "yes start with weapon bands"; _work/ladder-review-1031.md step 2): a weapon above the best
+// ordinary vanilla weapon of its type at its tier counts at that ceiling, by editor id (tools/materials/weapon-bands-1031.tsv,
+// e.g. the Antique Nordic Sword, tier 2, 25 to 12). Only ever lowers. The engine still swings the record's damage, so the
+// hit is scaled by banded over record, for every attacker, PvE and PvP; the arrow, tempering and the inventory read the
+// banded damage too. Weapons only a creature or an NPC holds (giant clubs, sphere crossbows) are no player's: one put
+// on comes off. Config weaponBands: { enabled, damageByEditorId: { WEAP editor id: damage }, creature: [regex], line }
+const WEAPON_BANDS = Object.assign({ enabled: true, damageByEditorId: {}, creature: [], line: 'That weapon is not made for a person to wield.' }, cfg.weaponBands || {});
+const CREATURE_WEAPONS = (Array.isArray(WEAPON_BANDS.creature) ? WEAPON_BANDS.creature : [])
+  .map((p) => { try { return new RegExp(String(p)); } catch (e) { log(`weaponBands: bad pattern ${p}`); return null; } }).filter(Boolean);
+const weaponEdidOf = (baseId) => { const r = recordOf(baseId >>> 0); return r && String(r.record.type) === 'WEAP' ? String(r.record.editorId || '') : ''; };
+const bandedDamageOf = (baseId) => {
+  const raw = recordDamageOf(baseId, 'WEAP');
+  if (!WEAPON_BANDS.enabled || !(raw > 0)) return raw;
+  const t = Number((WEAPON_BANDS.damageByEditorId || {})[weaponEdidOf(baseId)]);
+  return t > 0 && t < raw ? t : raw;
+};
+const weaponBandMult = (sourceId) => { const raw = recordDamageOf(sourceId, 'WEAP'); return raw > 0 ? bandedDamageOf(sourceId) / raw : 1; };
+const isCreatureWeapon = (baseId) => { const e = weaponEdidOf(baseId); return !!e && CREATURE_WEAPONS.some((rx) => rx.test(e)); };
+const creatureWeaponSaid = new Map();
+const creatureWeaponCheck = (a, equipment) => {
+  if (!WEAPON_BANDS.enabled || !CREATURE_WEAPONS.length || !(profileOf(a) >= 0)) return;
+  for (const w of wornOf(equipment)) {
+    if (!isCreatureWeapon(Number(w.baseId) >>> 0)) continue;
+    setTimeout(() => { try { mp.callPapyrusFunction('method', 'Actor', 'UnequipItem', { type: 'form', desc: mp.getDescFromId(a) }, [{ type: 'espm', desc: mp.getDescFromId(Number(w.baseId) >>> 0) }, false, true]); } catch (e) { log('weaponBands: UnequipItem failed', e.message); } }, 200);
+    if (Date.now() - (creatureWeaponSaid.get(a) || 0) > 3000) { creatureWeaponSaid.set(a, Date.now()); personal(a, WEAPON_BANDS.line); try { sendPacket(a, { customPacketType: 'dboNotice', text: WEAPON_BANDS.line }); } catch (e) { /* chat is enough */ } }
+    log(`weaponBands: ${display(a)} cannot wield ${(Number(w.baseId) >>> 0).toString(16)} (${weaponEdidOf(Number(w.baseId) >>> 0)}); taken off`);
+  }
+};
 const arrowDamageMult = (aggressorId, sourceId) => {
   if (!ARROWS.enabled || weaponSkillOf(sourceId) !== 'archery') return 1;
-  const bow = recordDamageOf(sourceId, 'WEAP');
+  const bow = bandedDamageOf(sourceId);
   if (!(bow > 0)) return 1;
   let arrow = 0;
   try { for (const w of wornOf(mp.get(aggressorId, 'equipment'))) arrow = Math.max(arrow, recordDamageOf(w.baseId, 'AMMO')); } catch (e) { return 1; }
@@ -8515,7 +8594,7 @@ const wornWithHealth = (a) => {
 };
 // A tempered weapon's blow: base damage plus the game's tempering bonus, over base damage
 const temperDamageMult = (aggressorId, sourceId) => {
-  const base = recordDamageOf(sourceId, 'WEAP');
+  const base = bandedDamageOf(sourceId);
   if (!(base > 0)) return 1;
   const w = wornWithHealth(aggressorId).find((e) => e.baseId === (sourceId >>> 0));
   const bonus = w ? temperBonus(w.health, false) : 0;
@@ -9135,6 +9214,8 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
   // attacker's claws and Drain landed while nothing could land on them (combat review, 2026-09-29)
   globalThis.__dboHitRefusal = 'ethereal';
   try { if (globalThis.__dboBeastEthereal && (globalThis.__dboBeastEthereal(tgt) || (agg !== tgt && globalThis.__dboBeastEthereal(agg)))) return false; } catch (e) { /* not loaded */ }
+  // A Keerilth vampire's mist (vampirepath.js /mist) is the same: untouched, touching nothing
+  try { if (globalThis.__dboVampMist && (globalThis.__dboVampMist(tgt) || (agg !== tgt && globalThis.__dboVampMist(agg)))) return false; } catch (e) { /* not loaded */ }
   // 0b. A caster under Arcane Asylum takes nothing, until their own blow ends it (asylumHit, above)
   globalThis.__dboHitRefusal = 'asylum';
   if (asylumHit(agg, tgt)) return false;
@@ -9241,13 +9322,17 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     try { if (gearEnch) targetSide *= gearEnch.spellbreakerMult(agg, tgt, src, dmg, flags); } catch (e) { log('spellbreaker failed', e.message); }
     // A Briarheart's poison and frost resistance and fire weakness (briarheart.js), under the same cap as the race's
     try { if (globalThis.__dboBriarheartTargetMult) targetSide *= Number(globalThis.__dboBriarheartTargetMult(agg, tgt, src)) || 1; } catch (e) { log('briarheart target failed', e.message); }
+    // A vampire line's resistance (vampirepath.js bloodlines: the Volkihar's frost), under the same cap as the race's
+    try { if (globalThis.__dboBloodlineTargetMult) { const b = Number(globalThis.__dboBloodlineTargetMult(agg, tgt, src)); if (b >= 0) targetSide *= b; } } catch (e) { log('bloodline target failed', e.message); }
     if (racial) { try { targetSide = racial.capTargetSide(targetSide * racial.targetMult(agg, tgt, src, dmg)); } catch (e) { log('racial target failed', e.message); } }
     let raceAtk = 1;
     if (racial && !beastAgg) { try { raceAtk = racial.attackMult(agg, tgt, src, dmg, flags); } catch (e) { log('racial attack failed', e.message); } }
-    let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * potionTakenMult(tgt, flags) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp * (agg !== tgt && profileOf(agg) >= 0 && profileOf(tgt) >= 0 ? pvpSourceMult(src, beastAgg) * pvpArcheryMult(agg, src, beastAgg) : 1);
+    let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * potionTakenMult(tgt, flags) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * weaponBandMult(src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp * (agg !== tgt && profileOf(agg) >= 0 && profileOf(tgt) >= 0 ? pvpSourceMult(src, beastAgg) * pvpArcheryMult(agg, src, beastAgg) : 1);
     if (!beastAgg) mult *= gearAttackMult(agg, src);
     // A Hagraven's Destruction (hagraven.js), by her stage
     try { if (globalThis.__dboHagravenAttackMult) mult *= Number(globalThis.__dboHagravenAttackMult(agg, src)) || 1; } catch (e) { log('hagraven attack failed', e.message); }
+    // A vampire line's blows (vampirepath.js bloodlines: the Berne's sneak attacks, fists and spells; Ravenwatch's Drain and night)
+    try { if (globalThis.__dboBloodlineAttackMult) { const b = Number(globalThis.__dboBloodlineAttackMult(agg, tgt, src, flags)); if (b >= 0) mult *= b; } } catch (e) { log('bloodline attack failed', e.message); }
     // The Shrouded Gloves double a one-handed sneak attack (gearench.js backstabMult)
     try { if (gearEnch && !beastAgg) mult *= gearEnch.backstabMult(agg, src, flags); } catch (e) { log('backstab failed', e.message); }
     // Tired blows, fists into armour, staves through it, the fist's stamina drain and disarm (martial.js)
@@ -9403,7 +9488,7 @@ const statItemsFor = (a) => {
   const pm = defensePieceMult(a), gm = gearArmorMult(a), potion = 1 + potionBonus(a, 'armor'), out = [];
   for (const [id, e] of byId) {
     if (out.length >= STAT_DISPLAY.maxItems) break;
-    const base = recordDamageOf(id, 'WEAP');
+    const base = bandedDamageOf(id);
     if (base > 0) {
       const skill = DISPLAY_SKILL[weaponAnimOf(id)];
       if (!skill) continue;
@@ -9541,7 +9626,7 @@ try {
 try {
   const BOSSES_JS = path.resolve('bosses.js');
   delete require.cache[BOSSES_JS];
-  require(BOSSES_JS)({ mp, log, personal, audit, display, who, cfg, giveItem, registerChatCommand, sendPacket, onlineActors, every, stopTimer, profileOf, zoneOfActor, isLeadStaff });
+  require(BOSSES_JS)({ mp, log, personal, audit, display, who, cfg, giveItem, registerChatCommand, sendPacket, onlineActors, every, stopTimer, profileOf, zoneOfActor, holdOfActor, isLeadStaff });
 } catch (e) { log('bosses.js failed to load:', e.stack || e.message); globalThis.__dboBossHit = null; globalThis.__dboBossDeath = null; globalThis.__dboBossDamageMult = null; globalThis.__dboBossAllies = null; }
 
 // ---- Dynamic Consequences, phase 1: pressure per hold and force, measured only (server\consequences.js) ---------------
@@ -9845,14 +9930,14 @@ try {
 try {
   const DISPATCHES_JS = path.resolve('dispatches.js');
   delete require.cache[DISPATCHES_JS];
-  require(DISPATCHES_JS)({ mp, log, personal, deliver, registerChatCommand, onlineActors, nameOf, zoneOfActor, cfg });
+  require(DISPATCHES_JS)({ mp, log, personal, deliver, registerChatCommand, onlineActors, nameOf, zoneOfActor, holdOfActor, cfg });
 } catch (e) { log('dispatches.js failed to load:', e.stack || e.message); }
 
 // ---- heralds cry gatherings: /herald, /events (server\heralds.js, config "heralds") ---------------------------------
 try {
   const HERALDS_JS = path.resolve('heralds.js');
   delete require.cache[HERALDS_JS];
-  require(HERALDS_JS)({ mp, log, personal, system, registerChatCommand, onlineActors, profileOf, nameOf, zoneById, takeGold, depositToTreasury, every, audit, isAdmin, zoneOfActor, giveItem, GOLD_BASE, cfg });
+  require(HERALDS_JS)({ mp, log, personal, system, registerChatCommand, onlineActors, profileOf, nameOf, zoneById, takeGold, depositToTreasury, every, audit, isAdmin, zoneOfActor, holdOfActor, giveItem, GOLD_BASE, cfg });
 } catch (e) { log('heralds.js failed to load:', e.stack || e.message); globalThis.__dboHeraldLogin = null; }
 
 // ---- a faction's roll and standing orders: /roster, /orders (server\rosters.js, config "rosters") -------------------
@@ -10170,7 +10255,7 @@ registerChatCommand('announce', (a, args) => {
 try {
   const WORLDCLOCK_JS = path.resolve('worldclock.js');
   delete require.cache[WORLDCLOCK_JS];
-  require(WORLDCLOCK_JS)({ mp, log, personal, system, registerChatCommand, sendPacket, onlineActors, every, zoneOfActor, audit, who, cfg,
+  require(WORLDCLOCK_JS)({ mp, log, personal, system, registerChatCommand, sendPacket, onlineActors, every, zoneOfActor, holdOfActor, audit, who, cfg,
     inCreator: (a) => creationPending(a) || (creation.has(a >>> 0) && inHub(a)) });
 } catch (e) { log('worldclock.js failed to load:', e.stack || e.message); globalThis.__dboClock = null; }
 
@@ -10288,7 +10373,7 @@ try {
 try {
   const GREATHUNT_JS = path.resolve('greathunt.js');
   delete require.cache[GREATHUNT_JS];
-  require(GREATHUNT_JS)({ mp, log, personal, audit, who, sendPacket, onlineActors, profileOf, registerChatCommand, zoneOfActor, zoneById, isWorldspace, cfg, isLeadStaff, findByName });
+  require(GREATHUNT_JS)({ mp, log, personal, audit, who, sendPacket, onlineActors, profileOf, registerChatCommand, zoneOfActor, holdOfActor, zoneById, isWorldspace, cfg, isLeadStaff, findByName });
 } catch (e) { log('greathunt.js failed to load:', e.stack || e.message); for (const k of ['__dboHuntFed', '__dboHuntKill', '__dboHuntChanged', '__dboHuntBeastSeconds', '__dboHuntFeedSeconds', '__dboHuntChangesPerDay', '__dboHuntForcedMult', '__dboHuntDamageMult', '__dboHuntReset', '__dboHuntHowled', '__dboHuntView']) globalThis[k] = null; }
 
 // ---- vampire ranks: blood from feeding on people (server\bloodranks.js) -----------------------------------------------
@@ -10391,8 +10476,8 @@ try {
   const VAMPIREPATH_JS = path.resolve('vampirepath.js');
   delete require.cache[VAMPIREPATH_JS];
   require(VAMPIREPATH_JS)({ mp, log, personal, audit, who, display, sendPacket, onlineActors, every, registerChatCommand, profileOf, cfg,
-    isLeadStaff, findByName, inEditor });
-} catch (e) { log('vampirepath.js failed to load:', e.stack || e.message); for (const k of ['__dboSafeZone', '__dboFeralFrenzyEnded', '__dboFeralKilled', '__dboVampFed', '__dboVampAggMult', '__dboVampSunMult', '__dboVampPrayed', '__dboVampEmbraceRefusal', '__dboVampPowerUsed', '__dboVampDrainSeconds', '__dboVampDrainStarted', '__dboVampDrainBroken', '__dboVampDrainDone']) globalThis[k] = null; }
+    isLeadStaff, findByName, inEditor, fitsElement, isMagicSource });
+} catch (e) { log('vampirepath.js failed to load:', e.stack || e.message); for (const k of ['__dboSafeZone', '__dboFeralFrenzyEnded', '__dboFeralKilled', '__dboVampFed', '__dboVampAggMult', '__dboVampSunMult', '__dboVampPrayed', '__dboVampEmbraceRefusal', '__dboVampPowerUsed', '__dboVampDrainSeconds', '__dboVampDrainStarted', '__dboVampDrainBroken', '__dboVampDrainDone', '__dboBloodlineAttackMult', '__dboBloodlineTargetMult', '__dboVampTakenMult', '__dboVampTellsShift', '__dboVampBloodMult', '__dboVampFeedRefusal', '__dboVampCrownRefusal', '__dboVampJoinRefusal', '__dboVampMist']) globalThis[k] = null; }
 // ---- province rules for crafting and the tome shop (server\regions.js, config "regions"): before spells.js, which asks it ----
 try {
   const REGIONS_JS = path.resolve('regions.js');

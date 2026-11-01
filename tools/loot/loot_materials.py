@@ -94,7 +94,13 @@ EDID_FIRST = [(r'AncientImperial', 'ancient_imperial'), (r'GlacialCrystal', 'gla
               # would have left a weapon needing the glass perk to forge but counting as two tiers lower here.
               # RedoranGuardSabre is already bonemold by keyword and is left alone: it is the one real bonemold piece.
               (r'^(TelvanniLongsword|TelvanniRoundaxe|IndorilSword|IndorilGlaive)$', 'glass'),
-              (r'^(DresBastardBlade|DresBattleaxe|DresBroadsword)$', 'orcish')]
+              (r'^(DresBastardBlade|DresBattleaxe|DresBroadsword)$', 'orcish'),
+              # named uniques filed under a material at the wrong tier (weapon bands, Nat 1 Nov): the Blade of Woe, Umbra,
+              # Miraak's swords, Tsun's axe, Dragonbane, the Gray Fox Cowl relics and the hub's RP_ weapons were steel,
+              # honed Ancient Nord, Ebony or Daedric. Chillrend (glass) and Wuuthrad (Ebony) already sit at their tier, and
+              # Immersive Weapons' forgeable replicas (IWCBladeOfWoe...) keep their material
+              (r'^(DBBladeOfWoe|DLC2MKMiraak(Fight)?Sword|MQ203AkaviriKatana|MQ304DraugrBattleAxeTsun|RP_'
+               r'|manny_GF_Weapon_(BladesSwordGuardian|ScorchOfTheUndead|Umbra))', 'artifact')]
 # Sets named by editor id whose metal pieces borrow another material's keyword (the Ayleid gear Elven, the Goblin gear
 # Iron or Leather); their robes and staves stay clothing and staves
 SET_BY_NAME = [(r'Ayleid', 'ayleid'), (r'Goblin', 'goblin'),

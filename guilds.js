@@ -322,6 +322,10 @@ module.exports = (api) => {
         if (!e) continue;
         const was = e.title || (oldRanks[e.rank] || {}).title || `rank ${e.rank}`;
         if (entryOf(into.id, Number(k))) { audit(`FACTION-MERGE ${e.name || k} left ${from} (${was}); already in ${into.name}, kept as they were`); continue; }
+        // A merge into a clan or pack moves only its kind (the kind guard; setMember's rule, as this write skips it). fits,
+        // below, is not yet defined when this runs at load: the same test, inline
+        const kindOk = isLeadStaff(Number(k)) || (typeof globalThis.__dboSuperKind === 'function' && globalThis.__dboSuperKind(Number(k)) === into.requires);
+        if (into.requires && !kindOk) { audit(`FACTION-MERGE ${e.name || k} left ${from} (${was}); not a ${into.requires}, so not moved into ${into.name}`); continue; }
         // the same title where the faction joined has it (an Acolyte stays an Acolyte), else a rank of the same role
         const same = into.ranks.findIndex((r) => r.title.toLowerCase() === String(was).toLowerCase());
         const rank = same >= 0 && into.ranks[same].role !== 'leader' ? same : rankFor(String((oldRanks[e.rank] || {}).role || 'member'));
@@ -357,6 +361,16 @@ module.exports = (api) => {
   // opts.alpha: a pack challenge, which seats the Alpha as it always has (Nate, 23 Oct: "Keep pack alphas the same")
   const setMember = (fid, a, rank, by, opts) => {
     const f = FACTIONS.get(fid);
+    // vampirepath.js bloodlines: the Blood Crown's holder may not join House Ravenwatch
+    if (f && !entryOf(fid, a)) { try { const no = typeof globalThis.__dboVampJoinRefusal === 'function' ? globalThis.__dboVampJoinRefusal(a >>> 0, fid) : ''; if (no) return String(no); } catch (e) { /* vampirepath not loaded */ } }
+    // A clan or pack takes only its kind (guild-defs "requires"; Nat, 1 Nov: "only vampires can join vampire clans and
+    // werewolves can only join packs"). Here, at the one write every join goes through, so no path - an invite, /faction
+    // leader, a staff add or override, a charter, a pack challenge, another module - seats anyone else. A staff character
+    // stays exempt (fits), and /faction override lifts the limits only, never this
+    if (f && f.requires && !entryOf(fid, a) && !fits(a, f)) return `${nameOf(a)} could never belong to ${f.name}: it takes only a ${f.requires}.`;
+    // A faction's own size limit (guild-defs maxMembers; Nat, 1 Nov: House Ravenwatch takes at most five vampires), counted
+    // with its leader, at the one write every join goes through
+    if (f && Number(f.maxMembers) > 0 && !entryOf(fid, a) && Object.keys(rosterOf(fid)).length >= Number(f.maxMembers)) return `${f.name} is full: it takes at most ${Number(f.maxMembers)}, its leader included.`;
     if (f && f.kind === 'pack' && !entryOf(fid, a) && packFull(fid)) return `${f.name} is full: a pack runs ${Math.max(1, Number(PACKS.maxMembers) || 5)} strong, its Alpha included.`;
     // One pack per werewolf (Nate, 23 Oct: pack control): a member of another pack is refused until they leave it
     if (f && f.kind === 'pack' && !entryOf(fid, a)) {
@@ -1351,6 +1365,25 @@ module.exports = (api) => {
     return true;
   };
   globalThis.__dboGuildLeave = (a, fid) => leave(a >>> 0, String(fid));
+  // supernatural.js, once a character's kind has changed (a cure, a turning): every clan or pack they no longer fit lets them
+  // go, with a line to them and one to its leader. Returns the factions left
+  const kindSweep = (a, why) => {
+    a = a >>> 0;
+    const left = [];
+    for (const m of membershipsOf(a)) {
+      const f = FACTIONS.get(m.fid);
+      if (!f || !f.requires || fits(a, f)) continue;
+      if (!leave(a, m.fid)) continue;
+      left.push(f.name);
+      // leave() has audited the leave (FACTION, which the player log parses); this says why
+      audit(`KINDGUARD ${who(a)} no longer a ${f.requires}, so out of ${f.name} (${why})`);
+      if (isOnline(a)) system(a, `You are no longer a ${f.requires}, and ${f.name} is no longer yours.`);
+      const lead = leaderOf(m.fid);
+      if (lead && lead !== a && isOnline(lead)) system(lead, `${nameOf(a)} is no longer a ${f.requires}, and has left ${f.name}.`);
+    }
+    return left;
+  };
+  globalThis.__dboGuildKindSweep = (a, why) => kindSweep(a, String(why || 'kind changed'));
   onUi('factionLeave', (a, args) => {
     if (!fresh(a, args)) return;
     const fid = String(args[1] || ''); const f = FACTIONS.get(fid);

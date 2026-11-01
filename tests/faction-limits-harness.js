@@ -159,7 +159,8 @@ r = invite(DG, VAMP, 'dawnguard');
 ok('the Dawnguard inviting a vampire: the invite goes out (nature not told)', !r.error, r);
 t = accept(VAMP, 'dawnguard');
 ok('the vampire is refused at accept', /^The Dawnguard will never take a vampire\.$/.test(t) && !inF('dawnguard', VAMP), t);
-chars.set(FG + 0x100, 'Hunter'); names[FG + 0x100] = 'Hunter'; put('dawnguard', FG + 0x100, 0);
+// A vampire, so the kind guard (Clan Volkihar takes only vampires, 1 Nov) passes and the Dawnguard conflict is what refuses
+chars.set(FG + 0x100, 'Hunter'); names[FG + 0x100] = 'Hunter'; put('dawnguard', FG + 0x100, 0); kinds[FG + 0x100] = 'vampire';
 r = invite(VOLK, FG + 0x100, 'clan-volkihar');
 ok('Clan Volkihar inviting a Dawnguard: refused openly (Dawnguard is not secret)', r.error && /Clan Volkihar will never take one who serves the Dawnguard; Hunter must leave it first/.test(r.error), r);
 r = invite(VIG, THIEF, 'vigil-of-stendarr');

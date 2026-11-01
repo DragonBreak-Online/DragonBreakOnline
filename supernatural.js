@@ -68,6 +68,9 @@ module.exports = (api) => {
     // half for a pure-blood. The server's damage formula reads no resistance (TES5DamageFormula reads DamageResist only),
     // so it is made here; the vampire races themselves carry no fire weakness.
     fireWeaknessPerStage: 0.25,
+    // Restoration's sun (Sun Fire, Vampire's Bane, Stendarr's Aura, Auriel's Bow) burns a vampire player by stage as fire does,
+    // half for a pure-blood: x2 at stage 4, the undead NPCs' elements.sun.undeadMult (Nat, 1 Nov). 0 turns it off
+    vampireSunWeaknessPerStage: 0.25,
     // A vampire NPC (its race carries the Vampire keyword) takes this much more from fire and from silver: the damage
     // formula reads no resistance, so without it a dungeon's vampires shrugged off Flames (Nate, 11 Oct). 0 turns it off
     npcVampireFireWeakness: 0.5,
@@ -269,6 +272,7 @@ module.exports = (api) => {
   const hasKeyword = (id, kw) => !!kw && keywordsOf(id).includes(kw);
   const effectsOf = (id) => fieldIds(recordOf(id), 'EFID').map((e) => globalOf(id, e));
   const isFireSource = (id) => effectsOf(id).some((e) => hasKeyword(e, KW.fire));
+  const isSunSource = (id) => { try { return typeof globalThis.__dboIsSunSource === 'function' && !!globalThis.__dboIsSunSource(Number(id) >>> 0); } catch (e) { return false; } };
   const SILVER_EXTRA = new Set((Array.isArray(C.silverWeapons) ? C.silverWeapons : []).map((d) => idOf(String(d))).filter(Boolean));
   const isSilverSource = (id) => SILVER_EXTRA.has(Number(id) >>> 0) || hasKeyword(id, KW.silver);
   // Poison as the racial resistances read it (gamemode.js sourceResistsOf, racial.js): a spell whose effect PoisonResist
@@ -451,10 +455,12 @@ module.exports = (api) => {
   // Nate, 14 Oct ("everyone can see my vampiric eyes even when well fed"): a newly turned vampire, GM-made included, shows the
   // tells until their first blood, as designed, but nothing said so, and a full stomach (needs: Sated) read as fed
   const UNFED_TELLS_LINE = 'Until your first taste of blood, your eyes and your colour give you away. Food will not hide them: feed on blood, and you will pass for mortal.';
-  const tellsShown = (s) => s.kind !== 'vampire' || !!s.unfed || (Number(s.stage) || 1) >= (Number(C.vampireTellsStage) || 1);
+  // vampirepath.js __dboVampTellsShift: a line that passes for mortal some stages longer (bloodlines, the Cyrodiilic)
+  const tellsStage = (a) => (Number(C.vampireTellsStage) || 1) + (a ? Math.max(0, Math.floor(Number(vampPath('__dboVampTellsShift', a >>> 0)) || 0)) : 0);
+  const tellsShown = (s, a) => s.kind !== 'vampire' || !!s.unfed || (Number(s.stage) || 1) >= tellsStage(a);
   const showTells = (a, s) => {
     if (!s || !s.kind) return;
-    if (tellsShown(s)) {
+    if (tellsShown(s, a)) {
       const had = !!s.look;
       ensureTells(a, s);
       if (!had && s.look && s.kind === 'vampire') personal(a, s.unfed ? UNFED_TELLS_LINE : 'Your thirst shows: your eyes and your colour give you away until you feed.');
@@ -544,7 +550,7 @@ module.exports = (api) => {
     let app = null; try { app = mp.get(a, 'appearance'); } catch (e) { return 'no appearance'; }
     if (!app || !Array.isArray(app.headpartIds)) return 'no appearance';
     const ids = app.headpartIds.map((h) => Number(h) >>> 0);
-    const showing = s.kind === 'vampire' && tellsShown(s);
+    const showing = s.kind === 'vampire' && tellsShown(s, a);
     // The tells are due: the eyes are right, but the eyes they hide must be the character's own for the next feed
     if (showing) {
       if (s.look && s.look.eye && isVampEye(s.look.prevEye)) {
@@ -639,7 +645,7 @@ module.exports = (api) => {
     }
     { const own = eyeIn(mortal); if (own && !isVampEye(own)) s.ownEye = own; }
     let next = mortal;
-    if (tellsShown(s)) {
+    if (tellsShown(s, a)) {
       const { fam, want } = tellEyeFor(mortal, s);
       const laid = want ? (!mortal.headpartIds.includes(want) ? layTells(mortal, s, fam, want) : null) : (skinOnly(fam, s) ? layTells(mortal, s, fam, 0) : null);
       if (laid) { s.look = laid.look; next = laid.next; }
@@ -765,6 +771,7 @@ module.exports = (api) => {
   };
   // gamemode's onSpellHit: a vampire's drain gives back some of what it takes (the server applies only the damage)
   const VAMP_DRAIN_SET = new Set(VAMP_DRAIN.filter(Boolean));
+  globalThis.__dboVampIsDrain = (src) => VAMP_DRAIN_SET.has(Number(src) >>> 0);
   const VAMP_POWER_SET = new Set([...VAMP_DRAIN, ...VAMP_THRALL, VAMP_SEDUCTION].filter(Boolean));
   // PlayerWerewolfFeedVictimSpell: a werewolf's feeding hold on a body is its feed (wolfFeedHold, below)
   const WW_FEED_HOLD = idOf('106396:Skyrim.esm');
@@ -773,8 +780,8 @@ module.exports = (api) => {
   // rejects them. Healing magic cast by anyone else does nothing for a vampire, and the caster is told once. A vampire
   // cannot read, buy or be taught a healing tome (spells.js asks __dboVampHealRefusal); one already known stays in the
   // spellbook. Potions still heal. Restoration's spells against the undead (Turn Undead, Sun Fire, Vampire's Bane,
-  // Stendarr's Aura, Bane of the Undead) are hostile effects, not healing, and burn a vampire as before: nothing here
-  // touches them.
+  // Stendarr's Aura, Bane of the Undead) are hostile effects, not healing: the sun ones burn a vampire player by stage
+  // (vampireSunWeaknessPerStage, __dboSuperDamageMult) and an undead NPC x2 (gamemode.js elements.sun).
   // The healing spells: restoration-healing.json (tools/spells/healing_spells.py, from the load order's SPEL/MGEF records).
   // How a heal is stopped, as the fork's C++ does it (ActionListener.cpp): the server applies every heal itself, the
   // caster's own and a concentration channel's in OnSpellCast and Heal Other's and an area share in OnSpellHit, right
@@ -1114,7 +1121,10 @@ module.exports = (api) => {
     washBlood(a, 'the curse ended');
     if (globalThis.__dboSuperFeeds instanceof Map) globalThis.__dboSuperFeeds.delete(a >>> 0);
     refreshRates(a);
+    // guilds.js: a cure lets go every clan or pack they no longer fit; a turning sweeps after its new kind is saved
+    if (!/^became a /.test(String(why))) kindSweep(a, why);
   };
+  const kindSweep = (a, why) => { try { if (typeof globalThis.__dboGuildKindSweep === 'function') globalThis.__dboGuildKindSweep(a >>> 0, why); } catch (e) { log(`supernatural: kind sweep for ${display(a)} failed: ${e.message}`); } };
   // The popups when an incubation completes (Nate, 18 Oct)
   const FEVER_TURNED = {
     vampire: 'You feel a profound change within your body. The warmth of life fades as an insatiable hunger awakens within you. The transformation is complete. You have become a Vampire.',
@@ -1130,9 +1140,12 @@ module.exports = (api) => {
     else personal(a, pure ? 'You rise from Molag Bal\'s embrace a pure-blood.' : 'The fever passes, and a cold hunger takes its place. You are a vampire.');
     if (!pure) personal(a, `Your gifts sleep until you have fed. Find blood within ${C.firstMealHours} hours, or your body begins to wither: a fresh body, or a captive who cannot fight you off.`);
     audit(`SUPERNATURAL ${who(a)} became a ${pure ? 'pure-blood ' : ''}vampire`);
-    if (pure && !crownHolder()) takeCrown(a, 'claimed the vacant Blood Crown');
+    const crownNo = pure ? String(vampPath('__dboVampCrownRefusal', a >>> 0) || '') : '';
+    if (pure && !crownHolder() && crownNo) personal(a, crownNo);
+    else if (pure && !crownHolder()) takeCrown(a, 'claimed the vacant Blood Crown');
     else if (pure && crownHolder() !== (a >>> 0)) personal(a, crownLine(a));
     flushStageSpells(a, stateOf(a), 'became a vampire');
+    kindSweep(a, 'became a vampire');
   };
   const becomeWerewolf = (a, blessed, fromFever) => {
     endCurse(a, 'became a werewolf');
@@ -1143,6 +1156,7 @@ module.exports = (api) => {
     if (fromFever) { onScreen(a, FEVER_TURNED.werewolf, 8); personal(a, how); }
     else personal(a, blessed ? 'Hircine marks you as his own. The beast answers when you call, and only then.' : `The fever breaks into a howl. You are a werewolf. ${how}`);
     audit(`SUPERNATURAL ${who(a)} became a ${blessed ? 'Hircine-blessed ' : ''}werewolf`);
+    kindSweep(a, 'became a werewolf');
   };
   // Across the middle of the screen (dboBanner, client 0.3.26+), Skyrim's notification for older clients, and chat
   const onScreen = (a, text, seconds) => {
@@ -1677,7 +1691,7 @@ module.exports = (api) => {
   };
   const beastForm = (a) => { try { const b = mp.get(a, 'private.beast'); return b && b.form ? b.form : null; } catch (e) { return null; } };
 
-  // Extra damage multiplier for the target of a hit: fire and silver on a vampire (any form), silver and poison on a
+  // Extra damage multiplier for the target of a hit: sun, fire and silver on a vampire (any form), silver and poison on a
   // werewolf in beast form (Nate, 4 Oct). Players only. gamemode.js applies it after the engine's hit, on what landed,
   // apart from the target side's 75% reduction cap (racial.js reductionCap): a weakness is never a reduction, so it is
   // never capped and never eats into the cap; it multiplies whatever Defense, a blessing and the race let through.
@@ -1727,6 +1741,7 @@ module.exports = (api) => {
     if (!s || !s.kind) return beast;
     const share = (v) => Math.max(0, Number(v) || 0);
     if (s.kind === 'vampire') {
+      if (share(C.vampireSunWeaknessPerStage) > 0 && isSunSource(src)) return beast * (1 + share(C.vampireSunWeaknessPerStage) * penaltyStage(tgt, s) * (s.pure ? 0.5 : 1));
       if (isFireSource(src)) return beast * (1 + share(C.fireWeaknessPerStage) * penaltyStage(tgt, s) * (s.pure ? 0.5 : 1));
       if (share(C.vampireSilverWeakness) > 0 && isSilverSource(src)) return beast * (1 + share(C.vampireSilverWeakness));
       return beast;
@@ -1801,7 +1816,9 @@ module.exports = (api) => {
     if (deathAt.size > 2048) for (const [k, t] of deathAt) if (Date.now() - t > 3600000) { deathAt.delete(k); killedBy.delete(k); }
     if (killer && typeof globalThis.__dboHuntKill === 'function') { try { globalThis.__dboHuntKill(killer >>> 0, victim >>> 0); } catch (e) { log('supernatural: hunt kill failed', e.message); } }
     if (!isPlayer(victim)) return;
-    if (crownHolder() === victim && killer && isPlayer(killer) && kindOf(killer) === 'vampire') {
+    const crownNo = crownHolder() === victim && killer && isPlayer(killer) ? String(vampPath('__dboVampCrownRefusal', killer >>> 0) || '') : '';
+    if (crownNo && kindOf(killer) === 'vampire') personal(killer, crownNo);
+    else if (crownHolder() === victim && killer && isPlayer(killer) && kindOf(killer) === 'vampire') {
       const ks = stateOf(killer); ks.pure = true; saveState(killer, ks);
       takeCrown(killer, `slew ${nameOf(victim)} for it`);
     }
@@ -1846,7 +1863,7 @@ module.exports = (api) => {
       if (Math.random() < (Number(odds[Math.min(rank, odds.length - 1)]) || 0) && applyBlood(a)) {
         personal(a, 'Blood smears your mouth and chin. Wash it off in water before anyone sees what you are.');
       }
-      if (typeof globalThis.__dboBloodFed === 'function') { try { globalThis.__dboBloodFed(a, t, onCorpse, killedBy.get(t) || 0, o.long ? Number(C.feed.longBloodMult) : 1); } catch (e) { log('supernatural: blood rank feed failed', e.message); } }
+      if (typeof globalThis.__dboBloodFed === 'function') { try { globalThis.__dboBloodFed(a, t, onCorpse, killedBy.get(t) || 0, (o.long ? Number(C.feed.longBloodMult) : 1) * vampPathMult('__dboVampBloodMult', a >>> 0)); } catch (e) { log('supernatural: blood rank feed failed', e.message); } }
       // vampirepath.js: blood ends a Feral (or its warning), and a living victim is devotion for Molag Bal's sworn
       vampPath('__dboVampFed', a >>> 0, t >>> 0, onCorpse ? 'body' : 'living');
       return true;
@@ -2040,6 +2057,8 @@ module.exports = (api) => {
     if (feeds.has(a)) { personal(a, 'You are already feeding.'); return false; }
     if (feedingOn(t)) { personal(a, 'Someone is already feeding there.'); return false; }
     const beast = beastForm(a) === 'werewolf';
+    // vampirepath.js bloodlines: a line that may not drink here (Ravenwatch's code) is told why, and nothing starts
+    if (!beast) { const no = vampPath('__dboVampFeedRefusal', a, t, { onCorpse: !!o.onCorpse, willing: !!o.willing, seduced: !!o.seduced, long: !!o.long }); if (no) { personal(a, String(no)); return false; } }
     // vampirepath.js: an Elder feeding on the downed holder of the Blood Crown drains them (drain.seconds; on completion the
     // holder is ended for good and the Crown passes). 0 means an ordinary feed.
     const drainSeconds = !beast && o.onCorpse ? Math.max(0, Number(vampPath('__dboVampDrainSeconds', a, t)) || 0) : 0;
@@ -2582,7 +2601,7 @@ module.exports = (api) => {
     const holder = crownHolder();
     const lord = holder === (a >>> 0) || (() => { try { return mp.get(a, 'private.vampireLordGrant') === true; } catch (e) { return false; } })();
     // lastFed is stamped when the curse goes on, so before the first meal it is the turning, not a feed (Nate, 14 Oct)
-    const shown = tellsShown(s);
+    const shown = tellsShown(s, a);
     const rows = [
       s.unfed ? {
         label: 'Thirst', value: 'Not fed yet',
@@ -2594,8 +2613,8 @@ module.exports = (api) => {
       {
         label: 'Your look', value: shown ? 'Gives you away' : 'Passes for mortal',
         hint: s.unfed ? 'Your eyes and your colour show what you are until your first taste of blood.'
-          : shown ? `Your thirst shows in your eyes and your colour from stage ${Number(C.vampireTellsStage) || 1}: feed, and you pass for mortal again.`
-          : `Fed, you keep your own eyes and colour. From stage ${Number(C.vampireTellsStage) || 1} of thirst they give you away until you feed.`,
+          : shown ? `Your thirst shows in your eyes and your colour from stage ${tellsStage(a)}: feed, and you pass for mortal again.`
+          : `Fed, you keep your own eyes and colour. From stage ${tellsStage(a)} of thirst they give you away until you feed.`,
       },
       firstMealRow(a, s, 'Activate a fresh body, or choose Feed on a bound captive or on anyone who lets you, to drink for the first time.'),
       ...(s.unfed ? [{
@@ -2898,8 +2917,10 @@ module.exports = (api) => {
     const m = vampireDamageMult(agg, tgt, src) * (isPlayer(agg) && kindOf(agg) === 'vampire'
       ? vampPathMult('__dboVampAggMult', agg >>> 0, VAMP_DRAIN_SET.has(Number(src) >>> 0)) : 1);
     if (!isPlayer(tgt)) return m;
+    // vampirepath.js bloodlines: a line's weakness (the Cyrodiilic's fire, the Keerilth's every blow), only ever more
+    const lm = kindOf(tgt) === 'vampire' ? Math.max(1, vampPathMult('__dboVampTakenMult', tgt >>> 0, agg >>> 0, Number(src) >>> 0, isFireSource(src))) : 1;
     const f = feverOf(tgt);
-    return f && share(f.fx.fireTaken, 0) > 0 && isFireSource(src) ? m * (1 + share(f.fx.fireTaken, 0)) : m;
+    return (f && share(f.fx.fireTaken, 0) > 0 && isFireSource(src) ? m * (1 + share(f.fx.fireTaken, 0)) : m) * lm;
   };
   // rest.js: no Well Rested while feverish
   globalThis.__dboFeverRestless = (a) => FD.noWellRested !== false && !!feverOf(a);
@@ -3217,7 +3238,7 @@ module.exports = (api) => {
     let app = null; try { app = mp.get(t, 'appearance'); } catch (e) { /* unreadable */ }
     const ids = app && Array.isArray(app.headpartIds) ? app.headpartIds.map((h) => Number(h) >>> 0) : [];
     const v = ids.find((h) => isVampEye(h));
-    const showing = s.kind === 'vampire' && tellsShown(s);
+    const showing = s.kind === 'vampire' && tellsShown(s, t);
     const kept = s.look ? Number(s.look.prevEye) >>> 0 : 0;
     const verdict = !v ? (kept && isVampEye(kept) ? 'tells hide vampire eyes' : 'ok')
       : showing ? (kept && isVampEye(kept) ? 'tells hide vampire eyes' : 'ok (tells due)')

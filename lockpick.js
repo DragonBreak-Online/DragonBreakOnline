@@ -25,6 +25,15 @@
 // three things that froze it are fixed for it: two identical miss answers in a row (now numbered), a try for a tumbler
 // that is not the loose one (now answered), and the relay's close (now ends the lock instead of leaving it busy 60 s).
 // lockpick.clientJudged false stops new client locks; one already issued is still accepted until it times out.
+//
+// Tumblers (Nat, 1 Nov: an Oblivion-style lock as our own native panel, _work/lockpick-native-1031.md). A client naming
+// 'native:lockpick' (the only panel that plays it) gets a lock where every pin has its own rise (rises: [ms]) and the misses
+// are decided by the timing, so nothing is rolled in advance and no snap list is sent: a set inside the hang is a set, a
+// set within softMs of it drops the set pins, anything further breaks the pick and drops them too. The widget reports
+// its tries [tumbler, pushMs, setMs] as before; the server's replay is the verdict, whatever the report claims, and a
+// claim the replay does not bear out is audited. An auto attempt (dbo lockpickAuto [nonce, triesJson, startMs, endMs])
+// judges the tries so far, then rolls tumbler.auto.chanceByTier[tier + 1][level]: a win opens the lock, a loss breaks a
+// pick and deals a fresh lock. Config lockpick.tumbler.
 
 module.exports = (api) => {
   const { mp, log, personal, audit, who, openWidget, closeWidget, onUi, cfg, hasUiCap, display } = api;
@@ -60,6 +69,19 @@ module.exports = (api) => {
     // Tumblers per lock level, Novice to Master (Nate, 9 Oct: "higher the lock, more pins you have to do")
     tumblersByLevel: [1, 2, 3, 4, 5],
   }, cfg.lockpick || {});
+  // The floors come from /testmenu fps on Nat's dev copy (1 Nov): 30 fps in the menu and a 47 ms key lag, so no window
+  // under about 150 ms and no rise under 250 ms (8 drawn positions)
+  const TUMBLER = Object.assign({ enabled: true, riseMsByLevel: [560, 500, 440, 380, 320], riseMsPerTier: 25, riseJitter: 0.25, riseMin: 250,
+    holdMin: 150, softMs: 80, softMsPerTier: 15, maxTries: 200 }, C.tumbler || {});
+  const AUTO = Object.assign({ enabled: true, chanceByTier: [[0.25, 0.15, 0.08, 0.04, 0.02], [0.35, 0.25, 0.15, 0.08, 0.04], [0.5, 0.38, 0.25, 0.15, 0.08],
+    [0.65, 0.52, 0.4, 0.28, 0.18], [0.78, 0.66, 0.54, 0.42, 0.3], [0.9, 0.8, 0.68, 0.54, 0.4]] }, TUMBLER.auto || {});
+  const TUMBLER_CAP = 'native:lockpick';
+  const autoChanceOf = (L) => {
+    const rows = Array.isArray(AUTO.chanceByTier) ? AUTO.chanceByTier : [];
+    const row = rows[Math.max(0, Math.min(rows.length - 1, L.tier + 1))];
+    const c = MG.byTier(Array.isArray(row) ? row : [], L.level, 0);
+    return Math.max(0, Math.min(1, c));
+  };
   // Whole numbers 1-12 only; anything else is the old one per level
   const tumblersOf = (level) => { const n = MG.byTier(C.tumblersByLevel, level, level + 1); return Number.isInteger(n) && n >= 1 && n <= 12 ? n : level + 1; };
   // "Find where the pins give" (Nate, 4-5 Oct: no timing mini-games): a client lock for a UI that also names MG.PICK_CAP has
@@ -145,6 +167,10 @@ module.exports = (api) => {
       notice: text, noticeKind: noticeKind || '', done: noticeKind === 'win' || noticeKind === 'fail', seq: L.seq,
     };
     if (L.mode === 'client') Object.assign(w, { judge: 'client', graceMs: C.graceMs, snaps: L.snaps.map((x) => (x ? 1 : 0)), maxTries: L.maxTries });
+    if (L.tumbler) {
+      delete w.snaps;
+      Object.assign(w, { mode: 'tumbler', rises: L.rises, softMs: L.softMs, auto: L.auto });
+    }
     // A pick lock has no rise or hang: the positions of every try instead
     if (L.pick) {
       for (const k of ['riseMs', 'fallMs', 'holds', 'graceMs']) delete w[k];
@@ -182,7 +208,17 @@ module.exports = (api) => {
       L.snaps = Array.from({ length: L.maxTries }, () => Math.random() < snapChanceOf(L));
       L.sentAt = nowMs();
       L.picksAtBegin = picksOf(a);
-      if (PICK.enabled !== false && hasUiCap(a, MG.PICK_CAP)) {
+      if (TUMBLER.enabled !== false && hasUiCap(a, TUMBLER_CAP)) {
+        L.tumbler = true;
+        L.maxTries = Math.max(1, Math.floor(Number(TUMBLER.maxTries) || 200));
+        L.snaps = [];
+        const rise = (Number(MG.byTier(TUMBLER.riseMsByLevel, level, 440)) || 440) + (Number(TUMBLER.riseMsPerTier) || 0) * (tier + 1);
+        L.rises = L.holds.map(() => Math.round(Math.max(Number(TUMBLER.riseMin) || 250, rise * (1 + (Math.random() * 2 - 1) * (Number(TUMBLER.riseJitter) || 0)))));
+        L.holds = L.holds.map((h) => Math.max(Number(TUMBLER.holdMin) || 0, h));
+        // A birthsign's steady hand (the Tower) widens the soft band by as much as it would have spared picks
+        L.softMs = Math.round(((Number(TUMBLER.softMs) || 0) + (Number(TUMBLER.softMsPerTier) || 0) * (tier + 1)) * (2 - signSnap(a)));
+        L.auto = AUTO.enabled !== false ? autoChanceOf(L) : 0;
+      } else if (PICK.enabled !== false && hasUiCap(a, MG.PICK_CAP)) {
         L.pick = true;
         L.maxTries = Math.max(1, Math.floor(Number(PICK.maxTries) || 60));
         L.snaps = L.snaps.slice(0, L.maxTries);
@@ -191,7 +227,7 @@ module.exports = (api) => {
       }
     }
     S.set(a, L);
-    if (L.mode === 'client') verdictLine(L, 'issue', ` judge=client${L.pick ? ` pick spots=${L.steps[0].length}` : ''} tumblers=${L.holds.length} picks=${L.picksAtBegin}`);
+    if (L.mode === 'client') verdictLine(L, 'issue', ` judge=client${L.pick ? ` pick spots=${L.steps[0].length}` : ''}${L.tumbler ? ` tumbler rises=[${L.rises.join(',')}] holds=[${L.holds.join(',')}] soft=${L.softMs} auto=${L.auto}` : ''} tumblers=${L.holds.length} picks=${L.picksAtBegin}`);
     return openWidget(a, payload(L), true);
   };
   // A birthsign's steady hand (birthsigns.js __dboBirthsignSnapMult; the Tower snaps 25% fewer picks, Nat 26 Oct) scales the chance
@@ -393,6 +429,93 @@ module.exports = (api) => {
     }
     return r;
   };
+  // A tumbler lock's tries, [tumbler, pushMs, setMs] with an optional claimed landed: inside the hang sets the pin, within
+  // softMs of it drops the set pins, further out breaks the pick and drops them. The same fields as replay()
+  const replayTumbler = (L, list, picks) => {
+    const r = { bad: '', outcome: 'cancel', set: L.holds.map(() => false), snapped: 0, misses: 0, soft: 0, mismatch: 0, tooFast: 0, held: [] };
+    let prev = -Infinity;
+    for (let k = 0; k < list.length; k++) {
+      const t = list[k];
+      if (!Array.isArray(t) || (t.length !== 3 && t.length !== 4) || (t.length === 4 && ![true, false, 1, 0].includes(t[3]))) { r.bad = 'shape'; return r; }
+      const i = MG.ms(t[0]), push = MG.ms(t[1]), set = MG.ms(t[2]);
+      if (![i, push, set].every(Number.isFinite) || push > set || push < prev) { r.bad = 'shape'; return r; }
+      prev = set;
+      if (r.outcome !== 'cancel') { r.bad = 'extra'; return r; }
+      if (i !== r.set.indexOf(false)) { r.bad = 'replay'; return r; }
+      const held = set - push, lo = L.rises[i] - C.graceMs, hi = L.rises[i] + L.holds[i] + C.graceMs;
+      const landed = held >= lo && held <= hi;
+      if (t.length === 4 && landed !== (t[3] === true || t[3] === 1)) r.mismatch++;
+      if (landed) {
+        r.set[i] = true;
+        r.held.push(held);
+        if (r.set.every(Boolean)) r.outcome = 'win';
+      } else {
+        r.misses++;
+        r.set = r.set.map(() => false);
+        if (held >= lo - L.softMs && held <= hi + L.softMs) r.soft++;
+        else {
+          r.snapped++;
+          if (r.snapped >= picks) { r.outcome = 'fail'; r.failWhy = 'picks'; }
+        }
+      }
+      if (r.outcome === 'cancel' && k + 1 >= L.maxTries) { r.outcome = 'fail'; r.failWhy = 'tries'; }
+    }
+    return r;
+  };
+  // A tumbler lock's win, shared by its report and its auto attempt
+  const tumblerWin = (L, a, closed, how) => {
+    markPaid(L);
+    audit(`LOCK ${who(a)} picked ${/^[AEIOU]/.test(LEVELS[L.level]) ? 'an' : 'a'} ${LEVELS[L.level]} ${L.label.toLowerCase()} ${L.target ? mp.getDescFromId(L.target) : ''}${how ? ` (${how})` : ''}`.trim());
+    try { if (L.onSuccess) L.onSuccess(a); } catch (e) { log('lockpick: success handler failed', e.stack || e.message); }
+    try { if (typeof globalThis.__alduinakMasteryEvent === 'function') globalThis.__alduinakMasteryEvent('lock', a, { refrId: L.target, level: L.level }); } catch (e) { /* no skill system */ }
+    if (!closed) openWidget(a, payload(L, `The ${LEVELS[L.level]} lock gives way.`, 'win'), false);
+    else personal(a, `The ${LEVELS[L.level]} lock gives way.`);
+  };
+  onUi('lockpickAuto', (a, args) => {
+    const L = S.get(a);
+    if (!L || String(args[0]) !== L.nonce || !L.tumbler) { if (ignored(a, nowMs())) log(`lockpick ignored ${name(a)}: an auto attempt with no tumbler lock`); return; }
+    end(L);
+    spentLocks.set(L.nonce, Date.now());
+    let list = null;
+    try { list = typeof args[1] === 'string' && args[1].length <= 16384 ? JSON.parse(args[1]) : []; } catch (e) { list = null; }
+    const picksBefore = picksOf(a);
+    const r = Array.isArray(list) && list.length <= L.maxTries ? replayTumbler(L, list, Math.max(1, L.picksAtBegin)) : { bad: 'shape', snapped: 0, misses: 0, soft: 0, mismatch: 0, held: [] };
+    for (let k = 0; k < (r.snapped || 0); k++) takePick(a);
+    if (r.mismatch) audit(`LOCKPICK-MISMATCH ${who(a)} ${LEVELS[L.level]} ${String(L.label).toLowerCase()} ${r.mismatch} tr${r.mismatch === 1 ? 'y' : 'ies'} the hang times do not bear out`);
+    const tail = ` tries=${Array.isArray(list) ? list.length : '-'} misses=${r.misses} soft=${r.soft} snaps=${r.snapped} auto=${L.auto} xc=${r.mismatch}`;
+    if (r.bad || r.outcome !== 'cancel') {
+      verdictLine(L, r.bad ? `refused(${r.bad})` : 'refused(over)', ` judge=server auto${tail} picks=${picksBefore}->${picksOf(a)}`);
+      openWidget(a, payload(L, 'The lock holds.', 'fail'), false);
+      return;
+    }
+    if (!picksOf(a)) {
+      verdictLine(L, 'fail', ` judge=server auto${tail} (no pick left)`);
+      openWidget(a, payload(L, 'You have no lockpick left.', 'fail'), false);
+      return;
+    }
+    if (L.target && !near(a, L.target)) {
+      verdictLine(L, 'refused(far)', ` judge=server auto${tail}`);
+      openWidget(a, payload(L, 'You have stepped away from the lock.', 'fail'), false);
+      return;
+    }
+    if (superseded(L)) {
+      verdictLine(L, 'refused(superseded)', ` judge=server auto${tail}`);
+      openWidget(a, payload(L, 'This lock has already been picked.', 'fail'), false);
+      return;
+    }
+    if (Math.random() < L.auto) {
+      verdictLine(L, 'win', ` judge=server auto${tail} picks=${picksBefore}->${picksOf(a)}`);
+      tumblerWin(L, a, false, 'auto attempt');
+      return;
+    }
+    takePick(a);
+    verdictLine(L, 'fail', ` judge=server auto${tail} picks=${picksBefore}->${picksOf(a)} (auto lost)`);
+    if (!picksOf(a)) { openWidget(a, payload(L, 'The pick snaps, and it was your last.', 'fail'), false); return; }
+    // A fresh lock, drawn again, for the hand or another try
+    begin(a, { target: L.target, level: L.level, label: L.label, onSuccess: L.onSuccess });
+    const N = S.get(a);
+    if (N) openWidget(a, payload(N, 'The pick snaps. The tumblers fall back.', 'snap'), false);
+  });
   onUi('lockpickResult', (a, args) => {
     const nonce = String(args[0]);
     let L = S.get(a);
@@ -411,7 +534,7 @@ module.exports = (api) => {
     if (S.get(a) === L) end(L);
     spentLocks.set(nonce, Date.now());
     while (spentLocks.size > 500) spentLocks.delete(spentLocks.keys().next().value);
-    const outcome = String(args[1]);
+    let outcome = String(args[1]);
     let list = null;
     try { list = typeof args[2] === 'string' && args[2].length <= 16384 ? JSON.parse(args[2]) : null; } catch (e) { list = null; }
     const startMs = MG.ms(args[3]), endMs = MG.ms(args[4]);
@@ -420,15 +543,20 @@ module.exports = (api) => {
     let r = { bad: '', outcome: 'cancel', set: [], snapped: 0, misses: 0, mismatch: 0, tooFast: 0, held: [] };
     if (!['win', 'fail', 'cancel'].includes(outcome) || !Array.isArray(list) || list.length > L.maxTries) bad = 'shape';
     else {
-      r = (L.pick ? replayPick : replay)(L, list, Math.max(1, L.picksAtBegin));
+      r = (L.pick ? replayPick : L.tumbler ? replayTumbler : replay)(L, list, Math.max(1, L.picksAtBegin));
       bad = r.bad;
+    }
+    // A tumbler lock is what its tries add up to, whatever the report says; a different claim is audited
+    if (L.tumbler && !bad && outcome !== r.outcome) {
+      audit(`LOCKPICK-MISMATCH ${who(a)} ${LEVELS[L.level]} ${String(L.label).toLowerCase()} claimed ${outcome}, the tries add up to ${r.outcome}`);
+      outcome = r.outcome;
     }
     // Every snapped pick is taken, whatever else the report says, a cancel included
     let taken = 0;
     for (let k = 0; k < r.snapped; k++) if (takePick(a)) taken++;
     const own = Number.isFinite(startMs) && Number.isFinite(endMs) ? endMs - startMs : NaN;
     const sinceSent = nowMs() - (Number(L.sentAt) || nowMs());
-    const minMs = L.pick ? MG.pickMinMs(L.holds.length, L.minPickMs) : L.holds.length * Math.max(0, C.riseMs - C.graceMs);
+    const minMs = L.pick ? MG.pickMinMs(L.holds.length, L.minPickMs) : L.tumbler ? L.rises.reduce((n, x) => n + Math.max(0, x - C.graceMs), 0) : L.holds.length * Math.max(0, C.riseMs - C.graceMs);
     const sus = [];
     if (r.mismatch) sus.push('mismatch');
     if (closed) sus.push('after-close');
@@ -447,7 +575,12 @@ module.exports = (api) => {
     const win = !bad && outcome === 'win' && picksOf(a) > 0;
     const verdict = bad ? `refused(${bad})` : win ? 'win' : outcome === 'win' ? 'fail' : outcome;
     verdictLine(L, verdict, MG.tail({ judge: 'client', own, lag: Number.isFinite(own) ? Math.round(sinceSent - own) : NaN, min: minMs, sus })
-      + ` tries=${Array.isArray(list) ? list.length : '-'} misses=${r.misses} snaps=${r.snapped} held=[${r.held.join(',')}] picks=${picksBefore}->${picksOf(a)} xc=${r.mismatch}`);
+      + ` tries=${Array.isArray(list) ? list.length : '-'} misses=${r.misses}${L.tumbler ? ` soft=${r.soft}` : ''} snaps=${r.snapped} held=[${r.held.join(',')}] picks=${picksBefore}->${picksOf(a)} xc=${r.mismatch}`);
+    if (win && L.tumbler) {
+      if (r.misses === 0 && L.level >= 3) audit(`LOCKPICK-PERFECT ${who(a)} ${LEVELS[L.level]} ${String(L.label).toLowerCase()} won with no miss in ${own} ms`);
+      tumblerWin(L, a, closed);
+      return;
+    }
     if (win) {
       markPaid(L);
       audit(`LOCK ${who(a)} picked ${/^[AEIOU]/.test(LEVELS[L.level]) ? 'an' : 'a'} ${LEVELS[L.level]} ${L.label.toLowerCase()} ${L.target ? mp.getDescFromId(L.target) : ''}`.trim());

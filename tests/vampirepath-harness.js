@@ -58,6 +58,8 @@ Object.assign(globalThis, {
   __dboSuperCrownSince: () => crownSince,
   __dboBloodRank: (a) => ranks.get(a) || 0,
   __dboBloodThirstRate: () => 1,
+  // every vampire here is of a clan (Volkihar, whose line leaves the path alone): bloodlines has its own harness
+  __dboGuildsOf: (a) => (vampires.has(a) ? [{ id: 'clan-volkihar' }] : []),
   __dboFaithOf: (a) => (patrons.has(a) ? { faith: 'daedric', patron: patrons.get(a) } : null),
   __dboIsDowned: (a) => downedSet.has(a),
   __dboInDuel: (a) => duels.has(a),

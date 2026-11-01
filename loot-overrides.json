@@ -710,6 +710,27 @@
     "821:DragonBreak Armory.esp": "Dwemer Mantis armour: never obtainable, not looted, forged nor given (Nat, 31 Oct: \"keep dwarven mantis out of being able to get obtained\")",
     "822:DragonBreak Armory.esp": "Dwemer Mantis armour: never obtainable, not looted, forged nor given (Nat, 31 Oct: \"keep dwarven mantis out of being able to get obtained\")",
     "823:DragonBreak Armory.esp": "Dwemer Mantis armour: never obtainable, not looted, forged nor given (Nat, 31 Oct: \"keep dwarven mantis out of being able to get obtained\")",
-    "824:DragonBreak Armory.esp": "Dwemer Mantis armour: never obtainable, not looted, forged nor given (Nat, 31 Oct: \"keep dwarven mantis out of being able to get obtained\")"
+    "824:DragonBreak Armory.esp": "Dwemer Mantis armour: never obtainable, not looted, forged nor given (Nat, 31 Oct: \"keep dwarven mantis out of being able to get obtained\")",
+    "10f9c6:Skyrim.esm": "MGRKeeningNonPlayable: a creature's or NPC's weapon (damage 8), no player's; never loot, and one put on comes off (gamemode-config.json weaponBands.creature; Nat, 1 Nov 2026)",
+    "10ec8a:Skyrim.esm": "crDwarvenSphereCrossbow02: a creature's or NPC's weapon (damage 35), no player's; never loot, and one put on comes off (gamemode-config.json weaponBands.creature; Nat, 1 Nov 2026)",
+    "deed8:Skyrim.esm": "NightingaleBowNPC: a creature's or NPC's weapon (damage 25), no player's; never loot, and one put on comes off (gamemode-config.json weaponBands.creature; Nat, 1 Nov 2026)",
+    "deed7:Skyrim.esm": "NightingaleBladeNPC: a creature's or NPC's weapon (damage 15), no player's; never loot, and one put on comes off (gamemode-config.json weaponBands.creature; Nat, 1 Nov 2026)",
+    "7f6df:Skyrim.esm": "crDwarvenSphereCrossbow: a creature's or NPC's weapon (damage 35), no player's; never loot, and one put on comes off (gamemode-config.json weaponBands.creature; Nat, 1 Nov 2026)",
+    "10762:Dawnguard.esm": "DLC1TrapCrossbowWeapon06: a creature's or NPC's weapon (damage 35), no player's; never loot, and one put on comes off (gamemode-config.json weaponBands.creature; Nat, 1 Nov 2026)",
+    "10761:Dawnguard.esm": "DLC1TrapCrossbowWeapon05: a creature's or NPC's weapon (damage 30), no player's; never loot, and one put on comes off (gamemode-config.json weaponBands.creature; Nat, 1 Nov 2026)",
+    "10760:Dawnguard.esm": "DLC1TrapCrossbowWeapon04: a creature's or NPC's weapon (damage 25), no player's; never loot, and one put on comes off (gamemode-config.json weaponBands.creature; Nat, 1 Nov 2026)",
+    "1075f:Dawnguard.esm": "DLC1TrapCrossbowWeapon03: a creature's or NPC's weapon (damage 20), no player's; never loot, and one put on comes off (gamemode-config.json weaponBands.creature; Nat, 1 Nov 2026)",
+    "1075e:Dawnguard.esm": "DLC1TrapCrossbowWeapon02: a creature's or NPC's weapon (damage 15), no player's; never loot, and one put on comes off (gamemode-config.json weaponBands.creature; Nat, 1 Nov 2026)",
+    "14f0d:Dawnguard.esm": "DLC1LD_AetheriumCrestNP: a creature's or NPC's weapon (damage 8), no player's; never loot, and one put on comes off (gamemode-config.json weaponBands.creature; Nat, 1 Nov 2026)",
+    "cfb5:Dawnguard.esm": "DLC1LD_KatriaBowNP: a creature's or NPC's weapon (damage 12), no player's; never loot, and one put on comes off (gamemode-config.json weaponBands.creature; Nat, 1 Nov 2026)",
+    "cfb4:Dawnguard.esm": "DLC1LD_SkyforgeSteelDaggerNP: a creature's or NPC's weapon (damage 8), no player's; never loot, and one put on comes off (gamemode-config.json weaponBands.creature; Nat, 1 Nov 2026)",
+    "37e5:Dawnguard.esm": "DLC1TrapCrossbowWeapon01: a creature's or NPC's weapon (damage 10), no player's; never loot, and one put on comes off (gamemode-config.json weaponBands.creature; Nat, 1 Nov 2026)",
+    "1e112:Dragonborn.esm": "DLC2CrBenthicLurkerWeapon: a creature's or NPC's weapon (damage 60), no player's; never loot, and one put on comes off (gamemode-config.json weaponBands.creature; Nat, 1 Nov 2026)",
+    "6026df:BSAssets.esm": "BSKMinotaurLordAxe: a creature's or NPC's weapon (damage 21), no player's; never loot, and one put on comes off (gamemode-config.json weaponBands.creature; Nat, 1 Nov 2026)",
+    "6026e6:BSAssets.esm": "BSKMinotaurWarAxe: a creature's or NPC's weapon (damage 19), no player's; never loot, and one put on comes off (gamemode-config.json weaponBands.creature; Nat, 1 Nov 2026)",
+    "6c732:WindhelmSSE.esp": "DLC2AshSpawnBattleAxeWH: a creature's or NPC's weapon (damage 22), no player's; never loot, and one put on comes off (gamemode-config.json weaponBands.creature; Nat, 1 Nov 2026)",
+    "6c733:WindhelmSSE.esp": "DLC2AshSpawnWarAxeWH: a creature's or NPC's weapon (damage 9), no player's; never loot, and one put on comes off (gamemode-config.json weaponBands.creature; Nat, 1 Nov 2026)",
+    "6c734:WindhelmSSE.esp": "DLC2AshSpawnBattleAxeWHNoEnch: a creature's or NPC's weapon (damage 22), no player's; never loot, and one put on comes off (gamemode-config.json weaponBands.creature; Nat, 1 Nov 2026)",
+    "6c735:WindhelmSSE.esp": "DLC2AshSpawnWarAxeWHNoEnch: a creature's or NPC's weapon (damage 9), no player's; never loot, and one put on comes off (gamemode-config.json weaponBands.creature; Nat, 1 Nov 2026)"
   }
 }

@@ -145,7 +145,8 @@ module.exports = (api) => {
 
   // Attendance: a minute counted for each player in the gathering's hold while its window runs, the reward when it closes.
   // true when the gathering changed
-  const holdOf = (a) => { try { const z = typeof zoneOfActor === 'function' ? zoneOfActor(a) : null; return z ? String(z) : ''; } catch (e) { return ''; } };
+  // by geography (gamemode.js holdOfActor), so a gathering counts those in its hold's stronghold lands too
+  const holdOf = (a) => { try { const f = typeof api.holdOfActor === 'function' ? api.holdOfActor : zoneOfActor; const z = typeof f === 'function' ? f(a) : null; return z ? String(z) : ''; } catch (e) { return ''; } };
   const attend = (e, now) => {
     if (AT.enabled === false || e.rewarded || now < e.at) return false;
     const end = e.at + AT.windowMinutes * 60000;

@@ -1,5 +1,39 @@
 [
   {
+    "title": "House Ravenwatch",
+    "date": "2026-11-01",
+    "version": "Server update",
+    "tag": "Changed",
+    "sections": [
+      {
+        "heading": "The clans",
+        "items": [
+          "House Ravenwatch keeps its numbers few: it takes at most five vampires, its leader among them."
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Vampire bloodlines",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "New",
+    "sections": [
+      {
+        "heading": "The clans and their blood",
+        "items": [
+          "A vampire's clan now gives its bloodline. Leave the clan and you lose its blood; join one and it is yours at once. /bloodline shows yours.",
+          "Clan Volkihar: your bite leaves the living chilled and slow, and frost hurts you less.",
+          "The Cyrodiil Vampyrum Order: you pass for mortal a stage of thirst longer, but the sun and fire hurt you more.",
+          "The Bloodmist Clan (Keerilth): /mist makes you untouchable for a few seconds every few minutes, but blows land on you a little harder.",
+          "The Crimson Scars (Berne): your sneak attacks and bare fists land harder, and your spells softer.",
+          "House Ravenwatch: the house keeps a code against Molag Bal. Its vampires drink only from one who offers their neck or from an outlaw, never to the kill, and take none of his gifts: no tiers of his path, no Embrace, no Crown, and the blood's gifts at half. While they keep the code, the thirst never turns them Feral. Break it and the thirst, the sun and the red haze come for a day; break it twice in a week and the house casts them out.",
+          "A vampire of no clan is a bloodfiend: no bloodline, the red haze takes them more often, and Molag Bal raises them no further than Sworn. A clan, or a cure, ends it."
+        ]
+      }
+    ]
+  },
+  {
     "title": "PvP: arrows from skilled archers hit a little less hard",
     "date": "2026-10-31",
     "version": "Server update",

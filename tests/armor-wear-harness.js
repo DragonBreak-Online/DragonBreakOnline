@@ -158,7 +158,7 @@ for (const [name, from, to] of MUTANTS) {
   const deps = { defensePieceMult: () => ({ heavy: 1.5, light: 1.2 }), gearArmorMult: () => ({ heavy: 1.13, light: 1.05 }), potionBonus: (a, h) => (h === 'armor' ? 0.1 : 0),
     wornWithHealth: () => W, armorPieceOf: (id) => recs[id] || null, gmstFloat: (id, d) => (id === 0x37deb ? 1e9 : d), temperBonus: (h, chest) => { const q = Math.round((Number(h) - 1) * 10); return q > 0 ? (3.6 * q - 1.6) * (chest ? 1 : 0.5) : 0; },
     wearCondOf: (a, e) => (e && e.baseId === P.EBONY ? 0.8 : 1), mp: { get: () => ({ entries: W.map((w) => ({ baseId: w.baseId, count: 1, health: w.health, worn: true })) }) },
-    STAT_DISPLAY: { maxItems: 250 }, recordDamageOf: () => 0, DISPLAY_SKILL: {}, weaponAnimOf: () => 0, masteryDamageMult: () => 1, materialDamageMult: () => 1 };
+    STAT_DISPLAY: { maxItems: 250 }, recordDamageOf: () => 0, bandedDamageOf: () => 0, DISPLAY_SKILL: {}, weaponAnimOf: () => 0, masteryDamageMult: () => 1, materialDamageMult: () => 1 };
   const names = Object.keys(deps);
   let shown = 0, met = 0, err = '';
   try {

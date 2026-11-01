@@ -412,14 +412,14 @@ const parsed = (verb, def) => { AUDIT_VERBS[verb] = Object.assign({ cls: 'parsed
 // C: clean. Every interpolation of every site is identity, a number, an enum, a config name or a record name (the reviewer
 // confirms each site; tests/playerlog-audit-harness.js pins them and fails a clean site whose template holds a quote)
 clean_(`SCHOOLS MANUAL SKILLBOOK SCHEMATIC READ CONTRACT CHAMPION CHILL REVIVE FEED BEAST BLOODCROWN BLOOD
-  HUNT RITE SILVER DUNGEON CHESTGOLD MINE CHOP ALCHEMY SMELT TAILOR REGION FORGENEVER ARTIFACT ORCISH RACECRAFT FACTIONGEAR DRAGON LOCK
+  HUNT RITE SILVER DUNGEON CHESTGOLD MINE CHOP ALCHEMY SMELT TAILOR REGION FORGENEVER ARTIFACT ORCISH RACECRAFT FACTIONGEAR DRAGON
   UNSTUCK JAIL CONCORDAT EXECUTION OFFERING PRAYER REST WELL CAMP PLAYTIME PLAYTEST REROLL TICKET CRASH-DOWN CRASHLOOP
   RUINBUTTON TAX SUPPLY BOOST STAFF APPEARANCE RECIPE BREW TREASURY ENCH-RESTORE ENCH-LEARNED-REPAIR CLOCK SPELL
   CITIZEN ELECTION BLACKREACH PURSE BIRTHSIGN CONSEQUENCES`);
 // Name #TAG parties with no profile (display()): resolved by name and tag, never by the tag alone
 clean_('LEVEL ROPE STRUGGLE', { display: true });
 // The client-judged minigame mismatches: clean, and a security signal
-clean_('LABOUR-MISMATCH LOCKPICK-MISMATCH PRAYER-MISMATCH RITE-MISMATCH SKINNING-MISMATCH STRUGGLE-MISMATCH', { signal: 'mismatch', display: true });
+clean_('LABOUR-MISMATCH PRAYER-MISMATCH RITE-MISMATCH SKINNING-MISMATCH STRUGGLE-MISMATCH', { signal: 'mismatch', display: true });
 // The role maps (Appendix A: "the first party is the actor" is wrong for these)
 AUDIT_VERBS.SMITH = { cls: 'clean', roles: R_BY([[/ made $/, 'target'], [/ (?:by|from) (?:staff )?$/, 'staff']]) };
 AUDIT_VERBS.SPELL.roles = R_BY([[/ taught $/, 'student']]);
@@ -462,6 +462,7 @@ excluded('DECOR', 'cost JSON; off until Nat switches it on');
 // VAMPATH (vampirepath.js, Nat 31 Oct): a GM's /vampath names them in the reason; the one lasting act, the drain's end of a
 // character, is logged by supernatural.js's own PERMADEATH line
 excluded('VAMPATH', 'reasons can name a GM; the drain\'s permadeath logs as PERMADEATH');
+excluded('KINDGUARD', 'the kind guard (guilds.js kindSweep): why a cured or turned character left a clan or pack; the leave itself is the parsed FACTION line');
 // CIRCULAR (gamemode.js /circular, 31 Oct): the officer, the faction and counts; the letters themselves log as letters
 clean_('CIRCULAR');
 // MUSTER (heralds.js, 31 Oct): a faction's muster pay, the faction and counts only
@@ -667,6 +668,15 @@ clean_('TRAPS', { display: true });
 
 // X: excluded (no event from the audit tap; a direct hook covers the action, without the text)
 excluded('JOIN LEAVE', 'the session hooks');
+// lockpick.js: a lock's label can be "Lock of <home>", a player-chosen property name (thievery.js homeLabel). Its win is the
+// lock hook's social.lock (verdictLine, every verdict), and the perfect-win line is for the server log's review
+excluded('LOCK LOCKPICK-PERFECT', 'the lock hook: every verdict as social.lock; the label can name a player\'s home');
+// LOCKPICK-MISMATCH <who> <level> <label> ...: everything after the picker goes, the label with it; the security signal stays
+parsed('LOCKPICK-MISMATCH', {
+  display: true,
+  cut: (text) => text.replace(/^(LOCKPICK-MISMATCH (?:[^\s#()]+ ){0,5}?[^\s#()]+ #[A-Z0-9?]{4} \(profile -?\d{1,9}(?:, <@\d{1,22}>)?\)) .*$/, '$1'),
+  parse: (text, P) => (P.length ? [ev('sec.signal', 0, { kind: 'mismatch', game: 'lockpick' })] : []),
+});
 excluded('PIGEON', 'the letter: social.letter comes from the A2 hook');
 excluded('BODY', 'items by custom name: the A2 loot hook');
 excluded('ANNOUNCE', 'broadcast text: the command wrapper');
@@ -1762,6 +1772,8 @@ guilds.js FACTION bdc6897e parsed
 guilds.js FACTION-RANK 77565f59 excluded
 guilds.js FACTION-MERGE 03cc2a6a excluded
 guilds.js FACTION-MERGE 2062ec33 excluded
+guilds.js FACTION-MERGE 18bb5af2 excluded
+guilds.js KINDGUARD 5eaac980 excluded
 jail.js JAIL 9a6540c2 clean
 jail.js JAIL 9a6540c2 clean
 jail.js JAIL 0e8664e2 clean
@@ -1785,9 +1797,13 @@ ledgersale.js LEDGERSALE 57e2baf4 parsed
 leverpuzzles.js LEVERPUZZLE 44a72fc8 clean
 leverpuzzles.js LEVERPUZZLE 02bcc12b clean
 leverpuzzles.js LEVERPUZZLE eb03d283 clean
-lockpick.js LOCK 24f728b1 clean
-lockpick.js LOCKPICK-MISMATCH 280b5b3c clean
-lockpick.js LOCK 24f728b1 clean
+lockpick.js LOCK 24f728b1 excluded
+lockpick.js LOCKPICK-MISMATCH 280b5b3c parsed
+lockpick.js LOCK 151f0f35 excluded
+lockpick.js LOCKPICK-MISMATCH ac2435d8 parsed
+lockpick.js LOCKPICK-MISMATCH 280b5b3c parsed
+lockpick.js LOCKPICK-PERFECT e906b849 excluded
+lockpick.js LOCK 24f728b1 excluded
 manuals.js MANUAL c367d194 clean
 manuals.js MANUAL d08c753a clean
 manuals.js MANUAL 53f416fb clean
@@ -2195,6 +2211,9 @@ vampirepath.js VAMPATH a0e54af4 excluded
 vampirepath.js VAMPATH b9913fc3 excluded
 vampirepath.js VAMPATH e239a18c excluded
 vampirepath.js VAMPATH e33c6de6 excluded
+vampirepath.js VAMPATH 54ec3363 excluded
+vampirepath.js VAMPATH 560790b6 excluded
+vampirepath.js VAMPATH 4f692cd2 excluded
 decor.js DECOR 78b19505 excluded
 decor.js DECOR 58dabe15 excluded
 decor.js DECOR 9650b7e1 excluded
