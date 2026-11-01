@@ -1,0 +1,143 @@
+// The native HUD (route H): nativeHud.ts's decisions against the browser HUD's own rules (the front's vitalsShown and
+// cornerShown, read from skymp5-front features/hud and run side by side), the payload, the swf's loading and fallback, and
+// swf/dbo_hud drawing that payload on the stub stage. Plus the wiring: the relay marks the hud widget native, the front
+// leaves its corner and bars out then and forwards V.
+//   node tests/native-hud-harness.js [<tmp>/nativeHud.js]   (with no argument it compiles nativeHud.ts itself)
+'use strict';
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { execFileSync } = require('child_process');
+const S = require('./native-swf-stub');
+const T = S.checker();
+const check = T.check;
+const ROOT = path.resolve(__dirname, '..');
+
+const built = () => {
+  const out = path.join(os.tmpdir(), 'dbo-nativehud');
+  execFileSync(process.execPath, [path.join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc'), path.join(ROOT, 'src', 'services', 'services', 'nativeHud.ts'),
+    '--outDir', out, '--module', 'commonjs', '--target', 'es2019'], { stdio: 'pipe' });
+  return path.join(out, 'nativeHud.js');
+};
+const H = require(path.resolve(process.argv[2] || built()));
+
+// ---- the settings, as the front reads them ----
+check('no settings file yet: today\'s look (always, classic)', JSON.stringify(H.uiFromFile(null)) === JSON.stringify({ vitals: 'always', vitalsStyle: 'classic', vitalsFadeSeconds: 5 }));
+check('a file with no ui block: the defaults (fade, quiet, 5 s)', JSON.stringify(H.uiFromFile({ fontSize: 16 })) === JSON.stringify({ vitals: 'fade', vitalsStyle: 'quiet', vitalsFadeSeconds: 5 }));
+check('the player\'s choice wins', JSON.stringify(H.uiFromFile({ ui: { vitals: 'hidden', vitalsStyle: 'classic', vitalsFadeSeconds: 10 } })) === JSON.stringify({ vitals: 'hidden', vitalsStyle: 'classic', vitalsFadeSeconds: 10 }));
+check('...junk values fall back to the defaults', JSON.stringify(H.uiFromFile({ ui: { vitals: 'sometimes', vitalsStyle: 3, vitalsFadeSeconds: 7 } })) === JSON.stringify({ vitals: 'fade', vitalsStyle: 'quiet', vitalsFadeSeconds: 5 }));
+
+// ---- the fade rules are the front's, run side by side ----
+const front = fs.readFileSync(path.join(ROOT, '..', 'skymp5-front', 'src', 'features', 'hud', 'index.tsx'), 'utf8').replace(/\r\n/g, '\n');
+const frontFn = (name) => {
+  const m = front.match(new RegExp(`export const ${name} = \\(([^)]*)\\): boolean =>\\s*([\\s\\S]*?);\\n`));
+  if (!m) throw new Error('front ' + name + ' not found');
+  return new Function(...m[1].split(',').map((p) => p.split(':')[0].trim()), `return (${m[2]});`);
+};
+const fVit = frontFn('vitalsShown'), fCorner = frontFn('cornerShown');
+let same = 0, total = 0, firstDiff = null;
+for (const vitals of ['always', 'fade', 'hidden']) for (const secs of [3, 5, 10]) for (const since of [0, 2999, 3000, 4999, 5000, 9999, 10000, 60000]) {
+  const ui = { vitals, vitalsStyle: 'quiet', vitalsFadeSeconds: secs };
+  for (const full of [true, false]) { total++; if (fVit(ui, full, since) === H.vitalsShown(ui, full, since)) same++; else firstDiff = firstDiff || ['vitals', ui, full, since]; }
+  for (const talking of [true, false]) for (const stage of ['sated', 'peckish', 'hungry', 'starving', '']) { total++; if (fCorner(ui, talking, since, stage) === H.cornerShown(ui, talking, since, stage)) same++; else firstDiff = firstDiff || ['corner', ui, talking, since, stage]; }
+}
+check(`the native fade rules agree with the browser HUD's in every case (${total})`, same === total, firstDiff);
+
+// ---- the payload ----
+const server = { hunger: 30, stage: 'Peckish', hungerOn: true, vitalsOn: true, gold: 1240.4, goldOn: true };
+const FADE = { vitals: 'fade', vitalsStyle: 'quiet', vitalsFadeSeconds: 5 };
+let clock = H.newClock(0);
+let p = H.payloadOf(server, { h: 50, m: 100, s: 100 }, 'shout', false, FADE, clock, 1000);
+check('bars: the vitals, the style, shown while one is not full', p.bars.on && p.bars.shown && p.bars.quiet && p.bars.h === 50 && p.bars.m === 100, p.bars);
+check('hunger: the stage\'s label and how fed', p.hunger.label === 'Peckish' && p.hunger.stage === 'peckish' && p.hunger.fed === 70, p.hunger);
+check('gold rounded; voice range; no power', p.gold === 1240 && p.voice.mode === 'shout' && !p.voice.talking && p.power === null, [p.gold, p.voice, p.power]);
+check('the corner shows on a change', p.corner.shown === true);
+p = H.payloadOf(server, { h: 100, m: 100, s: 100 }, 'shout', false, FADE, clock, 2000);
+check('full bars still show for the fade seconds after the last change', p.bars.shown === true);
+p = H.payloadOf(server, { h: 100, m: 100, s: 100 }, 'shout', false, FADE, clock, 7001);
+check('...then fade; the corner fades too, nothing having changed', p.bars.shown === false && p.corner.shown === false, [p.bars, p.corner]);
+p = H.payloadOf(server, { h: 100, m: 100, s: 100 }, 'shout', true, FADE, clock, 7002);
+check('talking brings the corner back', p.corner.shown === true);
+p = H.payloadOf(Object.assign({}, server, { stage: 'Hungry' }), { h: 100, m: 100, s: 100 }, 'shout', false, FADE, clock, 30000);
+check('hungry keeps the corner up; its label', p.corner.shown === true && p.hunger.label === 'Hungry', p);
+H.payloadOf(server, { h: 100, m: 100, s: 100 }, 'talk', false, FADE, clock, 40000);
+p = H.payloadOf(server, { h: 100, m: 100, s: 100 }, 'talk', false, FADE, clock, 50000);
+check('peckish and still: the corner fades', p.corner.shown === false);
+p = H.payloadOf(server, { h: 100, m: 100, s: 100 }, 'shout', false, FADE, clock, 50001);
+check('a change of voice range alone shows it again', p.corner.shown === true);
+H.payloadOf(server, { h: 80, m: 100, s: 100 }, 'shout', false, FADE, clock, 60000);
+p = H.payloadOf(server, { h: 100, m: 100, s: 100 }, 'shout', false, FADE, clock, 61000);
+check('bars back to full count their fade from the moment they filled', p.bars.shown === true);
+p = H.payloadOf(Object.assign({}, server, { goldOn: false, hungerOn: false }), null, 'mumble', false, { vitals: 'hidden', vitalsStyle: 'classic', vitalsFadeSeconds: 5 }, H.newClock(0), 100);
+check('hidden: no bars, the corner only while talking; no gold or hunger when off; an unknown range reads Normal; no vitals yet reads full', !p.bars.on && !p.corner.shown && p.gold === null && p.hunger === null && p.voice.mode === 'talk' && p.bars.h === 100 && !p.bars.quiet, p);
+p = H.payloadOf(Object.assign({}, server, { gold: undefined }), { h: -5, m: 250, s: 33.6 }, 'talk', false, { vitals: 'always', vitalsStyle: 'quiet', vitalsFadeSeconds: 5 }, H.newClock(0), 100000);
+check('always: everything shown, values clamped, no gold row without a count', p.bars.shown && p.corner.shown && p.bars.h === 0 && p.bars.m === 100 && p.bars.s === 34 && p.gold === null, p);
+p = H.payloadOf(Object.assign({}, server, { racialPower: { name: 'Battle Cry', endsAt: 10500 } }), null, 'talk', false, FADE, H.newClock(0), 1000);
+check('the racial power\'s seconds left, rounded up', p.power && p.power.name === 'Battle Cry' && p.power.left === 10, p.power);
+check('...and none once it ends', H.payloadOf(Object.assign({}, server, { racialPower: { name: 'Battle Cry', endsAt: 10500 } }), null, 'talk', false, FADE, H.newClock(0), 10500).power === null);
+check('nothing to draw before the server\'s hud arrives', H.payloadOf(null, null, 'talk', false, FADE, H.newClock(0), 0) === null);
+const j = H.changedJson(p, '');
+check('changedJson: the JSON when new, null when the same or nothing', j === JSON.stringify(p) && H.changedJson(p, j) === null && H.changedJson(null, '') === null);
+
+// ---- loading the swf, and the fallback ----
+{
+  const st = H.newLoad();
+  check('nothing while the HUD Menu is closed', H.loadStep(st, false, false) === '' && st.phase === 'idle');
+  check('the HUD up: inject', H.loadStep(st, true, false) === 'inject' && st.phase === 'loading' && st.tries === 1);
+  check('...wait while it loads', H.loadStep(st, true, false) === '');
+  check('...up once it says it is alive', H.loadStep(st, true, true) === 'up' && st.phase === 'up' && st.tries === 0);
+  check('...nothing while it stays alive', H.loadStep(st, true, true) === '');
+  check('the HUD closing (a loading screen) changes nothing', H.loadStep(st, false, false) === '' && st.phase === 'up');
+  check('back with the clip gone: lost, then inject again', H.loadStep(st, true, false) === 'lost' && H.loadStep(st, true, false) === 'inject');
+  const f = H.newLoad();
+  const steps = [];
+  for (let i = 0; i < H.ALIVE_FRAMES * H.MAX_TRIES + H.MAX_TRIES + 5; i++) steps.push(H.loadStep(f, true, false));
+  check(`never alive: ${H.MAX_TRIES} tries of ${H.ALIVE_FRAMES} frames each, then fail, once`, steps.filter((s) => s === 'inject').length === H.MAX_TRIES && steps.filter((s) => s === 'fail').length === 1 && f.phase === 'failed', [steps.filter((s) => s === 'inject').length, steps.filter((s) => s === 'fail').length, f.phase]);
+  check('...and failed stays failed: the browser HUD keeps it', H.loadStep(f, true, true) === '' && f.phase === 'failed');
+}
+
+// ---- swf/dbo_hud on the stub stage ----
+const t = S.boot('dbo_hud', true);
+const R = t.root;
+check('the swf says it is alive, its version', R.dboAlive === 'yes' && R.dboVersion === 'hud-1');
+check('it locks its root first (it runs inside the HUD Menu)', t.ctx._lockroot === true);
+check('nothing shows before the first data', R.bars._alpha === 0 && R.corner._alpha === 0);
+const wide = (c) => { const f = c.fills[c.fills.length - 1]; return f ? Math.max(...f.pts.map((q) => q[0])) - Math.min(...f.pts.map((q) => q[0])) : 0; };
+const pay = (o) => Object.assign({ bars: { on: true, shown: true, quiet: false, h: 50, m: 100, s: 25 }, corner: { shown: true }, power: { name: 'Battle Cry', left: 9 }, gold: 1240,
+  hunger: { label: 'Hungry', stage: 'hungry', fed: 40 }, voice: { mode: 'shout', talking: true } }, o || {});
+t.push(pay());
+check('the bars fill to the vitals', wide(R.bars.row0.fill) === 110 && wide(R.bars.row1.fill) === 220 && wide(R.bars.row2.fill) === 55, [wide(R.bars.row0.fill), wide(R.bars.row1.fill), wide(R.bars.row2.fill)]);
+check('...each a little further right, as the browser\'s', R.bars.row1._x === 14 && R.bars.row2._x === 28);
+check('the corner: the power\'s countdown, gold, hunger and its meter', R.corner.power.label.text === 'Battle Cry' && R.corner.power.value.text === '9s' && R.corner.gold.value.text === '1240'
+  && R.corner.hunger.label.text === 'Hungry' && R.corner.hunger.value.text === '40%' && wide(R.corner.hunger.meter) === Math.round(210 * 0.4), [R.corner.hunger.value.text, wide(R.corner.hunger.meter)]);
+check('a hungry label takes the hungry colour', R.corner.hunger.label.textColor === 0xE8D6A0);
+check('the voice range lit, "On air" while V is held', R.corner.voice.m2.textColor === 0x8FD3D0 && R.corner.voice.m0.textColor !== 0x8FD3D0 && R.corner.voice.hint.text === 'On air');
+check('the cards stack up from the voice box: hunger, gold, then the power', R.corner.voice._y > R.corner.hunger._y && R.corner.hunger._y > R.corner.gold._y && R.corner.gold._y > R.corner.power._y, [R.corner.voice._y, R.corner.hunger._y, R.corner.gold._y, R.corner.power._y]);
+for (let i = 0; i < 20; i++) t.tick();
+check('both fade in over some frames', R.bars._alpha === 100 && R.corner._alpha === 100);
+t.push(pay({ bars: { on: true, shown: false, quiet: true, h: 100, m: 100, s: 100 }, corner: { shown: false }, power: null, gold: null, voice: { mode: 'whisper', talking: false } }));
+t.tick();
+check('fading out takes some frames', R.bars._alpha > 0 && R.bars._alpha < 100);
+for (let i = 0; i < 20; i++) t.tick();
+check('...then gone', R.bars._alpha === 0 && R.corner._alpha === 0);
+check('no power, no gold: those cards hidden, hunger moves down', !R.corner.power._visible && !R.corner.gold._visible && R.corner.hunger._visible && R.corner.voice.hint.text === 'L-Alt' && R.corner.voice.m0.textColor === 0x8FD3D0);
+check('the quiet bars are thinner', (() => { const f = R.bars.row0.fill.fills[R.bars.row0.fill.fills.length - 1]; return Math.max(...f.pts.map((q) => q[1])) === 6; })());
+t.push(pay({ bars: { on: false, shown: true, quiet: false, h: 1, m: 1, s: 1 }, hunger: null }));
+check('bars off (hidden, or the server\'s vitalsOn false): not drawn; no hunger card', R.bars._visible === false && !R.corner.hunger._visible);
+check('...a hidden card takes no room: gold sits right above the voice box', R.corner.gold._y === R.corner.voice._y - 34, [R.corner.gold._y, R.corner.voice._y]);
+const before = R.corner.gold.value.text;
+let threw = false;
+try { t.push({ bars: {} }); } catch (e) { threw = true; }
+check('an unreadable payload changes nothing', !threw && R.corner.gold.value.text === before && R.corner.gold._visible === true && R.corner.voice.hint.text === 'On air');
+
+// ---- the wiring ----
+const src = (p2) => fs.readFileSync(path.join(ROOT, p2), 'utf8').replace(/\r\n/g, '\n');
+const relay = src('src/services/services/dboRelayService.ts');
+check('the relay marks both hud widget builds native while the native HUD is up', (relay.match(/\.\.\.this\.hudNative\(\),/g) || []).length === 2 && /return hudShared\.nativeUp \? \{ native: true \} : \{\};/.test(relay));
+check('...and leaves the native HUD the server\'s fields and the vitals', /hudShared\.server = this\.hudData \?/.test(relay) && /hudShared\.vitals = \{ h, m, s \};/.test(relay));
+check('the voice service leaves the range', /hudShared\.voiceMode = key;/.test(src('src/services/services/voiceService.ts')));
+check('the service is started', /new NativeHudService\(sp, controller\),/.test(src('src/index.ts')));
+check('the front leaves out its corner and bars while native, keeping the watermark', /\{data\.native \? null : <Corner/.test(front) && /\{data\.native \? null : <Vitals data=\{data\} ui=\{ui\} \/>\}/.test(front) && /<Watermark on=/.test(front));
+check('...and forwards V to the client', /sendMessage\('dbo:voicePtt', on\)/.test(front));
+
+T.done();

@@ -29,6 +29,8 @@ export interface HudData {
   goldOn?: boolean;
   // A racial power while it lasts (racial.js; the client turns the server's ms into an end on the game's own clock)
   racialPower?: { name: string; endsAt: number };
+  // The client draws the corner and the bars itself, in the HUD Menu (NativeHudService, swf/dbo_hud): this page leaves them out
+  native?: boolean;
 }
 
 const clampPct = (v: unknown): number => Math.max(0, Math.min(100, Number(v) || 0));
@@ -100,7 +102,13 @@ const useVoice = (): { mode: string; talking: boolean } => {
   const [talking, setTalking] = useState(false);
   useEffect(() => {
     const onMode = (e: Event) => setMode(String((e as CustomEvent).detail || ''));
-    const onPtt = (e: Event) => setTalking(!!(e as CustomEvent).detail);
+    const onPtt = (e: Event) => {
+      const on = !!(e as CustomEvent).detail;
+      setTalking(on);
+      // The native HUD's "On air" (NativeHudService): only this page knows when V is held
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      try { (window as any).skyrimPlatform.sendMessage('dbo:voicePtt', on); } catch { /* no bridge */ }
+    };
     window.addEventListener('dbo:voiceMode', onMode);
     window.addEventListener('dbo:voicePtt', onPtt);
     return () => { window.removeEventListener('dbo:voiceMode', onMode); window.removeEventListener('dbo:voicePtt', onPtt); };
@@ -218,7 +226,7 @@ const Hud = ({ data }: { data: HudData }) => {
   return (
     <>
       <Watermark on={data.watermarkOn !== false} />
-      <Corner ui={ui} talking={talking} watch={`${stage}|${voice}|${data.goldOn !== false ? gold : ''}|${data.racialPower ? data.racialPower.endsAt : ''}`} stage={stage}>
+      {data.native ? null : <Corner ui={ui} talking={talking} watch={`${stage}|${voice}|${data.goldOn !== false ? gold : ''}|${data.racialPower ? data.racialPower.endsAt : ''}`} stage={stage}>
         {data.racialPower && data.racialPower.name ? <PowerRow power={data.racialPower} /> : null}
         {data.goldOn !== false && data.gold !== undefined && (
           <div className="dboStatus">
@@ -240,8 +248,8 @@ const Hud = ({ data }: { data: HudData }) => {
           </div>
         )}
         <Voice mode={voice} talking={talking} />
-      </Corner>
-      <Vitals data={data} ui={ui} />
+      </Corner>}
+      {data.native ? null : <Vitals data={data} ui={ui} />}
     </>
   );
 };
