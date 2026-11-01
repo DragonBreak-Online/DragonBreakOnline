@@ -111,6 +111,7 @@ The other names `gfxfontlib.swf` exports are `$DragonFont`, `$SkyrimBooks`, `$Ha
 
 **DBO:**
 - Fade a panel in over **0.3 s** and out over **0.3 s**, linear on `_alpha`.
+- A panel a key press opens for a quick choice (the X menus: `dbo_context`, `dbo_housing`) fades in over **0.1 s** (`FADE_KEY_MS`): at 0.3 s it read as a delay after the key (Nat, 1 Nov).
 - Fade a row's focus change in **0.08 s**.
 - No slides, bounces or easing curves on a panel.
 - A panel fully works during its fade-in; input is never blocked by an animation.

@@ -63,7 +63,14 @@ const run = (lib, live) => {
 check('the live parser reads everything exactly', run(LIB, true) === 0);
 
 // Cost: the parser as it was (the branch's base) against this one, on the 44 KB answer
-const base = (() => { try { return execFileSync('git', ['show', 'HEAD:skymp5-client/swf/lib/dbo.as'], { cwd: ROOT, encoding: 'utf8' }).replace(/\r\n/g, '\n'); } catch (e) { return ''; } })();
+// the parser as it was before the run reader came in: the parent of the first commit that holds dboJsonBs
+const base = (() => {
+  try {
+    const git = (...a) => execFileSync('git', a, { cwd: ROOT, encoding: 'utf8' });
+    const first = git('log', '--format=%H', '--reverse', '-S', 'dboJsonBs', '--', 'swf/lib/dbo.as').split('\n')[0].trim();
+    return first ? git('show', `${first}^:skymp5-client/swf/lib/dbo.as`).replace(/\r\n/g, '\n') : '';
+  } catch (e) { return ''; }
+})();
 if (base && base !== LIB) {
   const before = charAts(base, BIG), after = charAts(LIB, BIG);
   console.log(`     ${BIG.length} characters: ${before} charAt steps before, ${after} now (${(before / after).toFixed(1)}x fewer)`);

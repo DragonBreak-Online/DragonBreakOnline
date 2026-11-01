@@ -31,6 +31,7 @@ var A_ROW_REST = 50;
 var A_BUTTON_REST = 80;
 var A_FOCUS = 100;
 var FADE_MS = 300;
+var FADE_KEY_MS = 100;
 
 // _global.skse does not exist on frame 1 (Worker 4, measured 26 Oct): nothing touches it until dboBoot sees it
 var dboBooted = false;
@@ -709,13 +710,15 @@ function dboWash(c, on)
 }
 
 // Linear alpha fade over FADE_MS; input is never blocked while it runs
-function dboFadeIn(clip)
+// ms: a shorter fade for a panel a key press opens (default FADE_MS)
+function dboFadeIn(clip, ms)
 {
    clip._alpha = 0;
    clip.fadeFrom = getTimer();
+   clip.fadeMs = ms > 0 ? ms : FADE_MS;
    clip.onEnterFrame = function()
    {
-      var k = (getTimer() - this.fadeFrom) / FADE_MS;
+      var k = (getTimer() - this.fadeFrom) / this.fadeMs;
       if (k >= 1)
       {
          this._alpha = 100;
