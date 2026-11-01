@@ -51,6 +51,8 @@ export const NATIVE_CAPS = [
   // The tumbler lock (dbo_lockpick, widget 46; dbo:lockpickResult/lockpickAuto/lockpickCancel). The server gives a
   // tumbler lock only to a client naming this cap, so withholding it falls back to the browser pick round
   "native:lockpick",
+  // Skinning a kill (dbo_skinning, widget 33; dbo:skinning/skinningCancel), the blade and the pick rounds
+  "native:skinning",
   // Worker 6's pigeon coop (dbo_pigeon, widget 34). All its keys are dbo:*, and its typed input goes back to
   // the browser coop with browser: 1, so the cap is the whole of the client's part.
   "native:pigeon",
