@@ -4273,7 +4273,7 @@ const onUi = (event, fn) => {
 // _work/mmap-build-1026.md); the client's findings come back as the UI events below, into the log and to the tester
 const MENU_TESTS = { itemcard: ['dboItemCardTest', 'Open your inventory and highlight an armour piece. Watch the line under the armour value: it should read "Tier 3 · Medium · Defense 30" in yellow for a second.'],
   mapmenu: ['dboMapTest', 'Open the M map, keep it still for a moment, then pan it.'],
-  hud: ['dboHudTest', 'Stay in the world with no menu open. An aqua bar should show on the left of your screen for about five seconds, then go.'] };
+  hud: ['dboHudTest', 'Stay in the world with no menu open. Two bars should show on the left of your screen for about ten seconds, aqua over amber: while they do, press a few keys, move the mouse and click once. Say which bars you saw.'] };
 registerChatCommand('testmenu', (a, args) => {
   const t = MENU_TESTS[String(args || '').trim().toLowerCase()];
   if (!t) return personal(a, `Usage: /testmenu ${Object.keys(MENU_TESTS).join('|')}`);
