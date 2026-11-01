@@ -2,16 +2,26 @@
 // UNFOCUSED_CLOSE_MS, and its key closes it again (karta.gina, 10 Oct: the wheel "in my face for the next 5 minutes",
 // "couldn't even click on it"). Plus source checks that emoteService.ts uses both. Run it from skymp5-client:
 //
-//   ./node_modules/typescript/bin/tsc src/services/services/emoteWheelWatch.ts --outDir /tmp/dbo-emotewatch --module commonjs --target es2019
-//   node tests/emote-wheel-watch-harness.js /tmp/dbo-emotewatch/emoteWheelWatch.js
+//   ./node_modules/typescript/bin/tsc src/services/services/emoteWheelWatch.ts --outDir <tmp> --module commonjs --target es2019
+//   node tests/emote-wheel-watch-harness.js <tmp>/emoteWheelWatch.js
+// With no argument it compiles the module itself into the system temp folder, so a suite can run it on any machine.
 'use strict';
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const { execFileSync } = require('child_process');
 let failures = 0;
 const check = (name, ok, got) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${!ok && got !== undefined ? '   ' + JSON.stringify(got) : ''}`); if (!ok) failures++; };
 
+const built = () => {
+  const out = path.join(os.tmpdir(), 'dbo-emotewatch');
+  const root = path.resolve(__dirname, '..');
+  execFileSync(process.execPath, [path.join(root, 'node_modules', 'typescript', 'bin', 'tsc'), path.join(root, 'src', 'services', 'services', 'emoteWheelWatch.ts'),
+    '--outDir', out, '--module', 'commonjs', '--target', 'es2019'], { stdio: 'pipe' });
+  return path.join(out, 'emoteWheelWatch.js');
+};
 let mod = null;
-try { mod = require(path.resolve(process.argv[2] || '/tmp/dbo-emotewatch/emoteWheelWatch.js')); } catch (e) { check('emoteWheelWatch.js loads', false, String(e.message).slice(0, 120)); }
+try { mod = require(path.resolve(process.argv[2] || built())); } catch (e) { check('emoteWheelWatch.js loads', false, String(e.message).slice(0, 120)); }
 if (mod) {
   const { wheelWatch, wheelKeyAction, OPEN_GRACE_MS, UNFOCUSED_CLOSE_MS } = mod;
   const run = (ticks) => { let since = 0, out = 'keep', at = -1; for (const t of ticks) { const r = wheelWatch(Object.assign({ unfocusedSince: since }, t)); since = r.unfocusedSince; if (r.action === 'close' && at < 0) { out = 'close'; at = t.now; } } return { out, at }; };
@@ -33,7 +43,7 @@ if (mod) {
 }
 
 // emoteService.ts uses both
-const svc = fs.readFileSync(path.join(__dirname, '..', 'src/services/services/emoteService.ts'), 'utf8');
+const svc = fs.readFileSync(path.join(__dirname, '..', 'src/services/services/emoteService.ts'), 'utf8').replace(/\r\n/g, '\n');
 check('emoteService no longer ignores its key while the wheel is open', !/code !== this\.menuKey \|\| !e\.isDown \|\| this\.menuOpen/.test(svc));
 check('emoteService closes on its key through wheelKeyAction', /wheelKeyAction\(this\.menuOpen\) === "close"/.test(svc));
 check('emoteService watches the open wheel every update', /controller\.on\("update", \(\) => this\.watchWheel\(\)\)/.test(svc) && /wheelWatch\(\{/.test(svc));
