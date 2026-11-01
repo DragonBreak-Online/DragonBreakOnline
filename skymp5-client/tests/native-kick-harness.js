@@ -1,7 +1,7 @@
 // The kick screen as a native panel (swf/dbo_kick, kickService), against the browser's form (widget 28): the caption, the
 // reason, the seconds until the game closes counting down, Quit game sending kick:quit once, Escape doing nothing, the
-// client's words (Russian too); and the service using the panel only while the world runs, the browser form over the main
-// menu or when the panel fails.
+// words it is given; and the service using the panel only in English (the game's fonts have no Cyrillic) and while the world
+// runs, the browser form in Russian, over the main menu or when the panel fails.
 //   node tests/native-kick-harness.js   (from skymp5-client)
 'use strict';
 const fs = require('fs');
@@ -35,8 +35,8 @@ const EN = { disconnected: 'Disconnected', closing: 'The game will close in {s} 
 }
 {
   const t = S.boot('dbo_kick');
-  t.push({ type: 'kick', reason: '', seconds: 9, strings: { disconnected: 'Отключено', closing: 'Игра закроется через {s} с. Перезапустите её, чтобы вернуться.', quit: 'Выйти из игры' } });
-  check('the client\'s own words (Russian), no empty reason line', /Игра закроется через 9 с\./.test(textsOf(P(t))) && buttons(t).some((b) => b.label.text === 'Выйти из игры') && !/\|\|/.test(textsOf(P(t))));
+  t.push({ type: 'kick', reason: '', seconds: 9, strings: { disconnected: 'Gone', closing: 'Closing in {s} seconds.', quit: 'Leave' } });
+  check('the panel draws the words it is given, no empty reason line', /Closing in 9 seconds\./.test(textsOf(P(t))) && buttons(t).some((b) => b.label.text === 'Leave') && !/\|\|/.test(textsOf(P(t))));
   const n = S.boot('dbo_kick');
   n.push({ type: 'death' });
   check('a payload that is not a kick is refused', n.logs.some((l) => /kick: unreadable payload/.test(l)));
@@ -47,8 +47,8 @@ const EN = { disconnected: 'Disconnected', closing: 'The game will close in {s} 
 // ---- the service ----
 const SVC = read('src/services/services/kickService.ts');
 check('nativeWidgets: kick is a client-service panel, dbo_kick', /\n  kick: "dbo_kick",\n/.test(read('src/services/services/nativeWidgets.ts')));
-check('the panel only while the world runs ("update" within 500 ms); the browser form otherwise', /const WORLD_RUNNING_MS = 500;/.test(SVC)
-  && /this\.native = Date\.now\(\) - this\.updatedAt < WORLD_RUNNING_MS && this\.openNative\(\);\s*if \(!this\.native\) openFormMenu\(/.test(SVC)
+check('the panel only in English and while the world runs ("update" within 500 ms); the browser form otherwise', /const WORLD_RUNNING_MS = 500;/.test(SVC)
+  && /this\.native = strings === translations\.en && Date\.now\(\) - this\.updatedAt < WORLD_RUNNING_MS && this\.openNative\(\);\s*if \(!this\.native\) openFormMenu\(/.test(SVC)
   && /this\.controller\.on\("update", \(\) => \{ this\.updatedAt = Date\.now\(\); \}\);/.test(SVC));
 check('the panel gets the reason, the seconds and the client\'s words', /widget: \{ type: "kick", reason, seconds: this\.shownSeconds, strings \}/.test(SVC));
 check('kick:quit closes the game as the browser\'s Quit does', /if \(key === "kick:quit" && this\.exitAt\) \{ this\.quitGame\(\); return; \}/.test(SVC));

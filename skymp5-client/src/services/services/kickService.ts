@@ -70,7 +70,8 @@ export class KickService extends ClientListener {
     this.exitAt = Date.now() + EXIT_DELAY_MS;
     this.shownSeconds = this.secondsLeft();
     closing = strings.closing.replace('{s}', String(this.shownSeconds));
-    this.native = Date.now() - this.updatedAt < WORLD_RUNNING_MS && this.openNative();
+    // English only: the fonts the game loads (gfxfontlib.swf) have no Cyrillic, so Russian keeps the browser form (W1)
+    this.native = strings === translations.en && Date.now() - this.updatedAt < WORLD_RUNNING_MS && this.openNative();
     if (!this.native) openFormMenu(this.sp, this.browsersideWidgetSetter, { reason, closing, strings, events, WIDGET_ID }, this.controller);
   }
 
