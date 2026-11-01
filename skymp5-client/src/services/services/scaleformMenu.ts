@@ -92,6 +92,8 @@ export const NATIVE_CAPS = [
   // Worker 6's Expeditions and Hunting Contracts board (dbo_expedition, widget 63). Its keys are the widget's own
   // events.* (dbo:expeditionPick/Close, dbo:contractTake/Abandon/Deliver); dungeons.js opens it for this cap too
   "native:expeditionBoard",
+  // Worker 6's name prompt (dbo_naming, widget 68). Its keys are dbo:nameChoose and dbo:nameBrowser (a game that cannot type)
+  "native:namePrompt",
 ];
 // What the client does itself, told to the server with the native panels so it no longer needs the browser HUD for it
 // (dbo:uiCaps from hud/index.tsx UI_CAPS used to be the only list). Not panels, and not governed by nativePanels:

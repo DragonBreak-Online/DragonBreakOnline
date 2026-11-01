@@ -23,7 +23,7 @@ check('the service pushes to the function the panels define', SVC.includes('"_ro
 // struggle, post, couriers) together. Dropping either half stops checking that those panels' keys have a
 // handler at all, which is the one thing this file is for.
 const server = SERVER ? ['decor.js', 'prayer.js', 'gamemode.js', 'citizenship.js', 'keyring.js', 'tenancy.js',
-  'dungeons.js', 'supernatural.js', 'labour.js', 'struggle.js', 'post.js', 'couriers.js', 'lockpick.js', 'contracts.js'].map((f) => fs.readFileSync(path.join(SERVER, f), 'utf8')).join('\n') : '';
+  'dungeons.js', 'supernatural.js', 'labour.js', 'struggle.js', 'post.js', 'couriers.js', 'lockpick.js', 'contracts.js', 'naming.js'].map((f) => fs.readFileSync(path.join(SERVER, f), 'utf8')).join('\n') : '';
 // post.js and couriers.js register through their own act() wrappers around onUi
 const handled = (ev) => new RegExp(`(onUi|panelAct|act)\\('${ev}'`).test(server);
 
@@ -161,7 +161,16 @@ const drive = {
     find('Read', 'Varsa').onRelease(); find('Gather your party').onRelease();
     t.root.dboPanel.foot.close.onRelease();
   },
+  // Worker 6's name prompt: a name taken, refused, mended and taken again, then Escape (the plain close)
+  dbo_naming: (t) => {
+    const box = t.root.dboPanel.box;
+    box.text = 'Aela Stone'; box.onChanged(); t.press(13);
+    t.push(Object.assign({}, fixtures.dbo_naming, { nonce: 'm2', error: 'Someone already carries that name.' }));
+    box.text = 'Aela Holt'; box.onChanged(); t.press(13);
+    t.press(27);
+  },
 };
+fixtures.dbo_naming = { type: 'namePrompt', id: 68, nonce: 'm1', error: '', maxLength: 30, maxWords: 3, events: { choose: 'dbo:nameChoose' } };
 fixtures.dbo_expedition = { type: 'expeditionBoard', id: 63, hall: 'the Synod Conclave', bossReturnMinutes: 10, leaseMinutes: 60, tab: 'expeditions',
   expeditions: [{ id: 'varsa', name: 'Varsa Ruins', county: '', kind: 'Ayleid ruin', status: 'open', state: 'open', masters: [] }],
   contracts: { enabled: true, zone: 'Bruma', treasury: 100, note: '', held: { id: 'w2', what: 'a troll', zone: 'Bruma', progress: 0, count: 1, reward: 300, hoursLeft: 2 }, maxActive: 3, canPost: false,
