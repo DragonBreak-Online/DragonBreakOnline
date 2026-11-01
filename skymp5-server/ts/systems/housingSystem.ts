@@ -1,4 +1,5 @@
 import * as fs from "fs";
+import * as crypto from "crypto";
 import { Settings } from "../settings";
 import { System, Log, SystemContext, Content } from "./system";
 import { espmRefrFieldId, toFormId } from "./formIdUtil";
@@ -71,6 +72,11 @@ const HOME_CELLS_TYPE = "homeCells";
 const REGISTRY_FILE = "./housing.json";
 // Written once the claimed storage that was open on 12 Oct is locked, listing it, so the lock never runs twice
 const STORAGE_LOCK_FILE = "./housing-storage-locked.json";
+// What the plugins say about a reference never changes for a load order: its teleport partner, its base's type, its cell, that
+// it is gone. Kept across boots, keyed by the load order, because the first look at each costs a native load: the interior
+// behind a door, seconds cold (1 Nov profile: 26 s of hall-door lookups right after a boot)
+const ESPM_CACHE_FILE = "./housing-espm-cache.json";
+const ESPM_SAVE_MS = 30000;
 
 // A key credential, "(80B5EAC)" or "(80B5EAC-2)": the only alias matched as a suffix
 const CREDENTIAL_RE = /^\([0-9A-F]+(-\d+)?\)$/;
@@ -244,6 +250,7 @@ export class HousingSystem implements System {
   async initAsync(ctx: SystemContext): Promise<void> {
     const s = await Settings.get();
     const all = s.allSettings as Record<string, unknown> | null;
+    this.loadEspmCache(all?.["loadOrder"]);
 
     const placeCap = Number(all?.["housingPlaceCap"]);
     if (Number.isFinite(placeCap) && placeCap >= 1) this.placeCap = Math.floor(placeCap);
@@ -459,6 +466,7 @@ export class HousingSystem implements System {
   async updateAsync(ctx: SystemContext): Promise<void> {
     this.flushHomeCells(ctx);
     const now = Date.now();
+    this.saveEspmCache(now);
     // Records read as null on the first ticks after boot, so the plan waits, and tries again while nothing is readable
     if ((this.placeMigration !== "off" || this.placeRestore) && !this.placePlanDone && now - this.initAtMs >= PLACE_PLAN_DELAY_MS && now - this.placePlanTriedMs >= PLACE_PLAN_DELAY_MS) {
       this.placePlanTriedMs = now;
@@ -1239,8 +1247,8 @@ export class HousingSystem implements System {
   private placeAt(ctx: SystemContext, refrId: number): { root: number; rec: PropertyRecord } | null {
     const index = this.placeIndex(ctx);
     if (!index.size) return null;
-    let cell = "";
-    try { cell = String((ctx.svr as Mp).get(refrId, "worldOrCellDesc") || ""); } catch { return null; }
+    const cell = this.cellDescOf(ctx, refrId);
+    if (!cell) return null;
     const root = index.get(cell);
     if (!root) return null;
     const rec = this.read(ctx, root);
@@ -1291,7 +1299,14 @@ export class HousingSystem implements System {
   // ── Places (N3): building and carrying ─────────────────────────────────────
 
   private cellDescOf(ctx: SystemContext, refrId: number): string {
-    try { return String((ctx.svr as Mp).get(refrId, "worldOrCellDesc") || ""); } catch { return ""; }
+    const id = refrId >>> 0;
+    const cached = this.cellCache.get(id);
+    if (cached !== undefined) return cached;
+    let desc = "";
+    try { desc = String((ctx.svr as Mp).get(id, "worldOrCellDesc") || ""); } catch { return ""; }
+    // A plugin reference never changes cell; a dynamic one (0xff...) is reassigned every run
+    if (desc && id < 0xff000000) this.rememberEspm(this.cellCache, id, desc);
+    return desc;
   }
 
   private isWorldDesc(ctx: SystemContext, desc: string): boolean {
@@ -2499,6 +2514,32 @@ export class HousingSystem implements System {
   private rememberEspm<T>(cache: Map<number, T>, refrId: number, value: T): void {
     if (cache.size >= MAX_ESPM_CACHE) cache.clear();
     cache.set(refrId, value);
+    this.espmDirty = true;
+  }
+
+  private loadEspmCache(loadOrder: unknown): void {
+    this.espmKey = crypto.createHash("sha1").update(JSON.stringify(Array.isArray(loadOrder) ? loadOrder : [])).digest("hex");
+    try {
+      const c = JSON.parse(fs.readFileSync(ESPM_CACHE_FILE, "utf8"));
+      if (!c || c.key !== this.espmKey) { this.log(`[housing] ${ESPM_CACHE_FILE} is for another load order: starting empty`); return; }
+      const fill = <T>(m: Map<number, T>, o: Record<string, T> | undefined) => { for (const [k, v] of Object.entries(o || {})) m.set(Number(k) >>> 0, v); };
+      fill(this.partnerCache, c.partner); fill(this.baseTypeCache, c.baseType); fill(this.cellCache, c.cell);
+      for (const g of Array.isArray(c.gone) ? c.gone : []) this.gone.add(Number(g) >>> 0);
+      this.espmDirty = false;
+      this.log(`[housing] ${ESPM_CACHE_FILE}: ${this.partnerCache.size} partners, ${this.baseTypeCache.size} base types, ${this.cellCache.size} cells, ${this.gone.size} gone`);
+    } catch { /* first boot of this load order */ }
+  }
+
+  // Off the game loop, one write in flight, at most every ESPM_SAVE_MS
+  private saveEspmCache(now: number): void {
+    if (!this.espmDirty || this.espmSaving || now - this.espmSavedMs < ESPM_SAVE_MS) return;
+    this.espmDirty = false; this.espmSaving = true; this.espmSavedMs = now;
+    const obj = (m: Map<number, unknown>) => Object.fromEntries([...m].map(([k, v]) => [String(k), v]));
+    const body = JSON.stringify({ key: this.espmKey, partner: obj(this.partnerCache), baseType: obj(this.baseTypeCache), cell: obj(this.cellCache), gone: [...this.gone] });
+    const tmp = ESPM_CACHE_FILE + ".tmp";
+    fs.promises.writeFile(tmp, body).then(() => fs.promises.rename(tmp, ESPM_CACHE_FILE))
+      .catch((e) => { this.espmDirty = true; this.log(`[housing] ${ESPM_CACHE_FILE} write failed: ${e}`); })
+      .finally(() => { this.espmSaving = false; });
   }
 
   // A reference a plugin update deleted throws "doesn't exist"; a record not yet loaded after boot reads as null instead
@@ -2522,6 +2563,7 @@ export class HousingSystem implements System {
     if (!/doesn't exist/.test(String((reason as Error)?.message ?? reason))) return false;
     if (this.gone.size >= MAX_ESPM_CACHE) this.gone.clear();
     this.gone.add(refrId);
+    this.espmDirty = true;
     return true;
   }
 
@@ -3316,6 +3358,11 @@ export class HousingSystem implements System {
   private placePlanTries = 0;
   private placeCells: Map<string, number> | null = null;
   private worldDescs = new Map<string, boolean>();
+  private cellCache = new Map<number, string>();
+  private espmKey = "";
+  private espmDirty = false;
+  private espmSaving = false;
+  private espmSavedMs = 0;
   private placeCellsDirty = true;
   private maxDistance = DEFAULT_MAX_DISTANCE;
   private openClaims = false;
