@@ -159,6 +159,11 @@ once("update", () => {
   Utility.setINIBool("bAlwaysActive:General", true);
   Game.setGameSettingInt("iDeathDropWeaponChance", 0);
   Utility.setINIFloat("fAutoVanityModeDelay:Camera", 3600);
+  // The world map straight down and held there (Nat, 1 Nov: the hold borders are read top-down). The pitch the map opens
+  // at is the worldspace's own (WRLD MNAM, 90 in our patch plugin); these keep the mouse from tilting it away. The same two
+  // lines sit in Data\DragonBreak Nexus Patches.ini, which did not take on Nat's copy, so the client sets them itself.
+  Utility.setINIFloat("fMapWorldMinPitch:MapMenu", 90);
+  Utility.setINIFloat("fMapWorldMaxPitch:MapMenu", 90);
   setGoldWeight();
 });
 // Native calls from an event handler can refuse to run in that context, so the load hands over to the next frame
