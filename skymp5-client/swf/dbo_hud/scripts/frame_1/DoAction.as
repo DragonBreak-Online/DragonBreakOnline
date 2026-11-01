@@ -8,6 +8,9 @@
 // The hourglass watermark top right as the browser HUD draws it (the browser leaves its own out while this one is up).
 // prompt: { kicker, title, text, yes, no, left, frac, answered, idle } | null: downed, feeding, robbery, a trade request
 // or a consent, answered with Y and N (the client hears the keys; nativePrompt.ts), drawn centre screen, a little low.
+// interact: { verb, label } | null: the activate wording beside the game's key glyph (49.5% across, 62% down), as the
+// browser's interactPrompt. mail: { markers: [{ x, y, scale }], unread } | null: a sealed letter over each notice board
+// holding mail, at its screen fraction, as the browser's mailMarkers.
 // The party list sits at the left, where the browser's party panel opens; it is passive (no cursor in the HUD Menu).
 // It says it is alive in _root.dboAlive, which the client reads with Ui.getString.
 
@@ -33,6 +36,8 @@ var cornerWant = 0;
 var party;
 var mark;
 var prompt;
+var interact;
+var mail;
 
 // The stage the player sees (visibleRect where the HUD has one)
 function area()
@@ -116,6 +121,73 @@ function build()
    prompt._x = a.left + ((a.right - a.left) - PROMPT_W) / 2;
    prompt._y = a.top + (a.bottom - a.top) * 0.56;
    prompt._visible = false;
+   interact = _root.createEmptyMovieClip("interact", 45);
+   interact._x = a.left + (a.right - a.left) * 0.495;
+   interact._y = a.top + (a.bottom - a.top) * 0.62;
+   interact.verb = dboText(interact, "verb", 1, 0, -24, 400, 26, dboFmt(F_MEDIUM, 21, C_TEXT, 2.0), false);
+   interact.label = dboText(interact, "label", 2, 0, 0, 400, 24, dboFmt(F_MEDIUM, 18, C_ACCENT, 0.9), false);
+   interact._visible = false;
+   mail = _root.createEmptyMovieClip("mail", 15);
+   mail._visible = false;
+}
+
+// A filled circle from eight arcs
+function disc(c, cx, cy, r, color, alpha)
+{
+   c.beginFill(color, alpha);
+   c.moveTo(cx + r, cy);
+   for (var i = 1; i <= 8; i++)
+   {
+      var a1 = i * Math.PI / 4;
+      var am = a1 - Math.PI / 8;
+      var k = r / Math.cos(Math.PI / 8);
+      c.curveTo(cx + Math.cos(am) * k, cy + Math.sin(am) * k, cx + Math.cos(a1) * r, cy + Math.sin(a1) * r);
+   }
+   c.endFill();
+}
+
+// The activate wording: the verb, then the label in the accent; a load door has no verb, so its label moves up
+function drawInteract(p)
+{
+   interact._visible = p != null && p != undefined && p.label != undefined && String(p.label) != "";
+   if (!interact._visible)
+   {
+      return;
+   }
+   var verb = String(p.verb == undefined ? "" : p.verb);
+   interact.verb.text = verb.toUpperCase();
+   interact.label.text = String(p.label);
+   interact.label._y = verb != "" ? 0 : -12;
+}
+
+// A sealed letter on a dark disc over each board with mail, bottom-centred on its point, sized by nearness
+function drawMail(m, a)
+{
+   mail._visible = m != null && m != undefined && m.markers instanceof Array && m.markers.length > 0;
+   if (!mail._visible)
+   {
+      return;
+   }
+   var all = mail.createEmptyMovieClip("all", 1);
+   for (var i = 0; i < m.markers.length; i++)
+   {
+      var k = m.markers[i];
+      var c = all.createEmptyMovieClip("m" + i, 1 + i);
+      c._x = a.left + (a.right - a.left) * Number(k.x);
+      c._y = a.top + (a.bottom - a.top) * Number(k.y);
+      c._xscale = Number(k.scale) * 100;
+      c._yscale = Number(k.scale) * 100;
+      disc(c, 0, -14, 14, C_ACCENT, 85);
+      disc(c, 0, -14, 12.5, C_GROUND, 95);
+      dboBox(c, -7, -19, 14, 10, 0xE9D9AE, 100);
+      dboBox(c, -1, -15, 3, 3, 0xB23A3A, 100);
+      if (Number(m.unread) > 1)
+      {
+         disc(c, 10, -24, 6, 0xB23A3A, 100);
+         var n = dboText(c, "count", 20, 4, -32, 12, 16, dboFmt(F_MEDIUM, 11, 0xFFFFFF, 0, "center"), false);
+         n.text = String(m.unread);
+      }
+   }
 }
 
 // The prompt card: kicker, title, the text, the clock, then the two keys and what no answer means
@@ -258,6 +330,8 @@ function draw()
    drawParty(data.party);
    mark._visible = data.watermark == true;
    drawPrompt(data.prompt);
+   drawInteract(data.interact);
+   drawMail(data.mail, area());
    layoutCorner();
    cornerWant = data.corner.shown == true ? 100 : 0;
 }

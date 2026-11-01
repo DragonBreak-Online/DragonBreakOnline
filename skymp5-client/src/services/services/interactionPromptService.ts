@@ -10,6 +10,7 @@ import { ObjectReferenceEx } from "../../extensions/objectReferenceEx";
 import { logError } from "../../logging";
 import { changedDecorNames } from "./refDecorNames";
 import { revealLabelFor } from "../../view/realNamesMarker";
+import { hudShared } from "./nativeHud";
 
 // for the browser-side widget setter (executed inside the CEF browser)
 declare const window: any;
@@ -141,11 +142,20 @@ export class InteractionPromptService extends ClientListener {
       this.clearPrompt();
       return;
     }
-    if (this.promptShown && next.verb === prompt.verb && next.label === prompt.label) {
+    // While the native HUD is up it draws the wording (dbo_hud); the poll moves it across when the HUD comes or goes
+    const native = hudShared.nativeUp;
+    if (this.promptShown && this.shownNative === native && next.verb === prompt.verb && next.label === prompt.label) {
       return;
     }
     prompt = next;
     this.promptShown = true;
+    if (native) {
+      if (!this.shownNative) closeWidget(this.sp, WIDGET_ID);
+      this.shownNative = true;
+      hudShared.interact = { verb: prompt.verb, label: prompt.label };
+      return;
+    }
+    if (this.shownNative) { this.shownNative = false; hudShared.interact = null; }
     this.sp.browser.executeJavaScript(new FunctionInfo(this.promptWidgetSetter).getText({ prompt, WIDGET_ID }));
     if (!isUiHidden(this.controller)) {
       this.sp.browser.setVisible(true);
@@ -155,6 +165,7 @@ export class InteractionPromptService extends ClientListener {
   private clearPrompt(): void {
     if (!this.promptShown) return;
     this.promptShown = false;
+    if (this.shownNative) { this.shownNative = false; hudShared.interact = null; return; }
     closeWidget(this.sp, WIDGET_ID);
   }
 
@@ -382,6 +393,7 @@ export class InteractionPromptService extends ClientListener {
 
   private enabled = true;
   private promptShown = false;
+  private shownNative = false;
   private browserFocused = false;
   private boardBaseIds: Set<number> | undefined = undefined;
   private expeditionBaseIds: Set<number> | undefined = undefined;

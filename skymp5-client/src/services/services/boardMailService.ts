@@ -6,6 +6,7 @@ import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { FunctionInfo } from "../../lib/functionInfo";
 import { ObjectReference, worldPointToScreenPoint } from "skyrimPlatform";
 import { logError } from "../../logging";
+import { hudShared } from "./nativeHud";
 
 declare const window: any;
 
@@ -48,11 +49,20 @@ export class BoardMailService extends ClientListener {
     this.lastPollMs = now;
     try {
       const next = unread > 0 && !isUiHidden(this.controller) && !isGameInputBlocked(this.sp, this.controller) ? this.visibleMarkers() : [];
-      const key = next.map((m) => `${m.x.toFixed(3)},${m.y.toFixed(3)}`).join(";") + `|${unread}`;
+      // While the native HUD is up it draws the letters (dbo_hud); a HUD that comes or goes changes the key, so they move across
+      const native = hudShared.nativeUp;
+      const key = next.map((m) => `${m.x.toFixed(3)},${m.y.toFixed(3)}`).join(";") + `|${unread}|${native}`;
       if (key === this.lastKey) return;
       this.lastKey = key;
       markers = next;
-      if (!markers.length) { closeWidget(this.sp, WIDGET_ID); return; }
+      if (native) {
+        hudShared.mail = markers.length ? { markers, unread } : null;
+        if (this.inBrowser) { this.inBrowser = false; closeWidget(this.sp, WIDGET_ID); }
+        return;
+      }
+      hudShared.mail = null;
+      if (!markers.length) { this.inBrowser = false; closeWidget(this.sp, WIDGET_ID); return; }
+      this.inBrowser = true;
       this.sp.browser.executeJavaScript(new FunctionInfo(this.markerWidgetSetter).getText({ markers, unread, WIDGET_ID }));
     } catch (e) {
       if (!this.errorLogged) { this.errorLogged = true; logError(this, `update failed: ${e}`); }
@@ -75,6 +85,8 @@ export class BoardMailService extends ClientListener {
     }
     return out;
   }
+
+  private inBrowser = false;
 
   private markerWidgetSetter = () => {
     const widget = { type: "mailMarkers", id: WIDGET_ID, markers, unread };
