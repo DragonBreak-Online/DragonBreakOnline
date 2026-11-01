@@ -23,7 +23,7 @@ check('the service pushes to the function the panels define', SVC.includes('"_ro
 // struggle, post, couriers) together. Dropping either half stops checking that those panels' keys have a
 // handler at all, which is the one thing this file is for.
 const server = SERVER ? ['decor.js', 'prayer.js', 'gamemode.js', 'citizenship.js', 'keyring.js', 'tenancy.js',
-  'dungeons.js', 'supernatural.js', 'labour.js', 'struggle.js', 'post.js', 'couriers.js'].map((f) => fs.readFileSync(path.join(SERVER, f), 'utf8')).join('\n') : '';
+  'dungeons.js', 'supernatural.js', 'labour.js', 'struggle.js', 'post.js', 'couriers.js', 'lockpick.js'].map((f) => fs.readFileSync(path.join(SERVER, f), 'utf8')).join('\n') : '';
 // post.js and couriers.js register through their own act() wrappers around onUi
 const handled = (ev) => new RegExp(`(onUi|panelAct|act)\\('${ev}'`).test(server);
 
@@ -35,6 +35,8 @@ const fixtures = {
     place: { root: 1, name: 'H', here: 0, more: 0, rooms: [{ ref: 11, label: 'Chest', kind: 'chest', assigned: null, shared: false, other: null }, { ref: 12, label: 'Box', kind: 'chest', assigned: 'B', shared: true, other: null }] },
     events: { claim: 'housing:claim', abandon: 'housing:abandon', revoke: 'housing:revoke', lock: 'housing:lock', unlock: 'housing:unlock', transfer: 'housing:transfer', rename: 'housing:rename', createKey: 'housing:createkey', revokeKeys: 'housing:revokekeys', grantContainer: 'housing:grantcontainer', assign: 'housing:assign', unassign: 'housing:unassign', share: 'housing:share', unshare: 'housing:unshare', cancel: 'housing:cancel' } },
   dbo_labour: { type: 'labour', id: 55, nonce: 'n1', kind: 'mining', title: 'Iron Seam', strikes: 1, band: 8, bands: [50], sweepMs: 1400, totalMs: 30000, hitMs: 250, missMs: 600, judge: 'client' },
+  dbo_lockpick: { type: 'lockpick', id: 46, nonce: 'k1', title: 'Chest (Adept lock)', level: 'Adept', fallMs: 650, holds: [380, 380], set: [false, false], picks: 2, notice: '', noticeKind: '', done: false, judge: 'client', graceMs: 70, maxTries: 200, mode: 'tumbler', rises: [440, 460], softMs: 80, auto: 0.08 },
+  'dbo_lockpick#auto': null,
   'dbo_labour#struggle': { type: 'labour', id: 55, nonce: 'n2', kind: 'struggle', event: 'struggle', strikes: 1, band: 8, bands: [50], sweepMs: 1400, sweeps: [1400], failOnMiss: true, totalMs: 30000, hitMs: 0, missMs: 0, judge: 'client' },
   dbo_pigeon: { type: 'pigeon', id: 34, nonce: 'p1', boardName: 'Bruma', gold: 100, cooldownMinutes: 0, maxText: 240, view: 'letters',
     contacts: [{ id: 11, name: 'Bob', tag: 'BOBB', online: true, price: 5 }],
@@ -76,6 +78,9 @@ const drive = {
   },
   // a pull outside the band ends the struggle (failOnMiss), then Escape walks away
   'dbo_labour#struggle': (t) => { t.tick(); t.press(32); t.press(27); },
+  // a pin set in its hang, then Escape reports the lock as a cancel; a second session asks for an auto attempt and leaves
+  dbo_lockpick: (t) => { t.press(87); t.st.time += 630; t.press(32); t.press(27); },
+  'dbo_lockpick#auto': (t) => { t.press(65); t.press(27); },
   // The coop waits for the server's answer (a new nonce) after each action, so the drive answers between them
   dbo_pigeon: (t) => {
     let n = 1;
@@ -140,6 +145,7 @@ const fixtureOf = (menu) => fixtures[menu] || fixtures[swfOf(menu)];
 // panel that only ever sends two, and the check would fail for a panel that is working.
 const MIN_EVENTS = {
   dbo_labour: 3, 'dbo_labour#struggle': 3,
+  dbo_lockpick: 2, 'dbo_lockpick#auto': 3,
   dbo_dungeon: 2, 'dbo_dungeon#back': 2,
 };
 const seen = {};

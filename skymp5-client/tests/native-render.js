@@ -126,6 +126,7 @@ const gate = { type: 'dungeonGate', id: 60, nonce: 'g1', name: 'Bleak Falls Barr
   difficulties: [{ id: 'story', label: 'Novice', blurb: 'Ordinary foes, fewer of them. Modest loot, no locked chests.' }, { id: 'normal', label: 'Adept', blurb: 'As Bethesda placed them. Fair loot, a few locked chests.' }, { id: 'hard', label: 'Expert', blurb: 'The strongest of each kind, more of them. Better loot.' }, { id: 'nightmare', label: 'Master', blurb: 'The strongest, half again as many, most chests locked. The best loot.' }] };
 const ctxMenu = { targetName: 'Lydia', mode: 'menu', lines: [], events: { action: 'pa:action', close: 'pa:close' },
   actions: [{ id: 'trade', label: 'Trade' }, { id: 'party', label: 'Invite to party' }, { id: 'search', label: 'Search' }, { id: 'capture', label: 'Arrest' }, { id: 'pickpocket', label: 'Pickpocket' }, { id: 'super:feed', label: 'Feed' }] };
+const lockpick = { type: 'lockpick', id: 46, nonce: 'k1', title: 'Chest (Adept lock)', level: 'Adept', fallMs: 650, holds: [380, 380, 380], set: [false, false, false], picks: 2, notice: '', noticeKind: '', done: false, judge: 'client', graceMs: 70, maxTries: 200, mode: 'tumbler', rises: [440, 460, 420], softMs: 80, auto: 0.08 };
 const labour = { type: 'labour', id: 55, nonce: 'l1', kind: 'mining', title: 'Iron Seam', strikes: 3, band: 8, bands: [50, 62, 38], sweepMs: 1400, totalMs: 30000, hitMs: 250, missMs: 600, judge: 'client' };
 const labourPick = { type: 'labour', id: 55, nonce: 'l2', kind: 'chopping', title: 'Chopping Block', mode: 'pick', strikes: 3, slips: 2, totalMs: 90000, minPickMs: 300, judge: 'client',
   steps: [[[18, 40, 0.2], [42, 62, 0.9], [66, 35, 0.4], [86, 58, 0.3]]] };
@@ -164,6 +165,9 @@ const SETUPS = [
   ['context', { swf: 'dbo_context', drive: (t) => t.push(ctxMenu) }],
   ['labour', { swf: 'dbo_labour', drive: (t) => { t.push(labour); t.st.time += 2100; t.tick(); t.press(32); } }],
   ['labour-pick', { swf: 'dbo_labour', drive: (t) => t.push(labourPick) }],
+  ['lockpick', { swf: 'dbo_lockpick', drive: (t) => { t.push(lockpick); t.press(87); t.st.time += 300; t.tick(); } }],
+  ['lockpick-master', { swf: 'dbo_lockpick', drive: (t) => t.push(Object.assign({}, lockpick, { title: 'Cell door (Master lock)', holds: [150, 150, 150, 150, 150], rises: [320, 300, 340, 310, 330], picks: 12, auto: 0.4 })) }],
+  ['lockpick-done', { swf: 'dbo_lockpick', drive: (t) => { t.push(lockpick); t.push(Object.assign({}, lockpick, { notice: 'The pick snaps, and it was your last.', noticeKind: 'fail', done: true, picks: 0 })); } }],
   ['pigeon-letters', { swf: 'dbo_pigeon', drive: (t) => { t.push(pigeon); t.root.dboPanel.list.r0.onRelease(); } }],
   ['pigeon-send', { swf: 'dbo_pigeon', drive: (t) => t.push(Object.assign({}, pigeon, { view: 'send', result: 'Your pigeon flies to Elsilda Farseer.', resultKind: 'sent' })) }],
   ['pigeon-supply', { swf: 'dbo_pigeon', drive: (t) => { t.push(Object.assign({}, pigeon, { view: 'supply' })); t.root.dboPanel.list.r1.onRelease(); } }],
