@@ -404,7 +404,9 @@ export class FormView {
         this.applyHostility(actor, model);
       }
       if (this.flyer && !this.flyerFirstApply) { this.flyerFirstApply = true; this.noteFlyer(this.refrId, "pre-first-apply"); }
+      const t0ApplyAll = perf.now();
       this.applyAll(refr, model);
+      perf.addPhase("applyall", perf.now() - t0ApplyAll);
 
       const gamemodeUpdateService = SpApiInteractor.getControllerInstance().lookupListener(GamemodeUpdateService);
       gamemodeUpdateService.updateNeighbor(refr, model, this.state);
@@ -578,7 +580,11 @@ export class FormView {
       this.flyerAi = flyer.ai;
       ac.enableAI(flyer.ai);
     }
-    if (ac && !model.appearance) this.updateAggroWindow(ac, model, alreadyHosted);
+    if (ac && !model.appearance) {
+      const t0Aggro = perf.now();
+      this.updateAggroWindow(ac, model, alreadyHosted);
+      perf.addPhase("aggro", perf.now() - t0Aggro);
+    }
     if (ac && !model.appearance && alreadyHosted && huntedPlayers.spots.length) this.updateHuntedGuard(ac, model);
     if (refr.is3DLoaded()) {
       if (!this.movState.havokSeated) {
@@ -788,7 +794,9 @@ export class FormView {
       this.animState.useAnimOverrides = false;
     }
 
+    const t0Invis = perf.now();
     this.applyAdminInvisibility(refr, model);
+    perf.addPhase("invis", perf.now() - t0Invis);
 
 
     if (model.appearance) {
@@ -882,7 +890,11 @@ export class FormView {
 
     if (this.weaponWanted && Date.now() >= this.weaponCheckAt) {
       this.weaponCheckAt = Date.now() + FormView.weaponCheckMs;
-      if (refr.is3DLoaded()) this.ensureWeapon(refr);
+      if (refr.is3DLoaded()) {
+        const t0Weapon = perf.now();
+        this.ensureWeapon(refr);
+        perf.addPhase("weapon", perf.now() - t0Weapon);
+      }
     }
 
     if (FormView.isDisplayingNicknames && this.refrId && model.appearance?.name) {

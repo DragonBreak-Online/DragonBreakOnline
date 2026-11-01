@@ -63,6 +63,13 @@ const phases = {
   forms: new Stat(),
   clones: new Stat(),
   // per FORM, not per tick: n is how many forms were gated/drawn in the window
+  // Inside the per-form loop, so n counts FORMS, not ticks. applyAll is the bulk of update(); aggro runs
+  // for every npc and reads three positions; invis does a getActorValue("Invisibility") by string per form;
+  // ensureWeapon makes 8 unconditional native calls behind only an is3DLoaded check.
+  applyall: new Stat(),
+  aggro: new Stat(),
+  invis: new Stat(),
+  weapon: new Stat(),
   nickgate: new Stat(),
   nicknode: new Stat(),
 };
@@ -197,6 +204,8 @@ export const endTick = (entry: number): void => {
       `gate ${phases.gate.render()} worldcell ${phases.worldcell.render()} ` +
       `model ${phases.model.render()} pcdata ${phases.pcdata.render()} ` +
       `forms ${phases.forms.render()} clones ${phases.clones.render()} | ` +
+      `applyall n=${phases.applyall.n} ${phases.applyall.render()} aggro n=${phases.aggro.n} ${phases.aggro.render()} ` +
+      `invis n=${phases.invis.n} ${phases.invis.render()} weapon n=${phases.weapon.n} ${phases.weapon.render()} | ` +
       `nickgate n=${phases.nickgate.n} ${phases.nickgate.render()} nicknode n=${phases.nicknode.n} ${phases.nicknode.render()} | ` +
       `live=${forms.lastLive} named=${forms.lastNamed} slots=${forms.lastSlots} worstform ${worst} ` +
       `new=${forms.created} gone=${forms.destroyed} reindexed=${forms.replaced}`
