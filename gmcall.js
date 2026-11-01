@@ -255,8 +255,11 @@ module.exports = (api) => {
     }
     say(a, lines.join('\n'));
   };
+  // The staff rules (staffguard.js callRefusal): a Trial GM takes over, releases or closes no call another holds
+  const guardSays = (a, c, op) => { try { const g = globalThis.__dboStaffGuard; return g && typeof g.callRefusal === 'function' ? String(g.callRefusal(a, c, op) || '') : ''; } catch (e) { return ''; } };
   const take = (a, c, quietly) => {
     if (c.takenBy && c.takenBy.profile === Number(profileOf(a))) { if (!quietly) say(a, `You already have GM call #${c.n}.`); return true; }
+    const no = guardSays(a, c, 'take'); if (no) { say(a, no); return false; }
     const was = c.takenBy ? c.takenBy.name : '';
     c.takenBy = { name: staffName(a), profile: Number(profileOf(a)), at: Date.now() };
     save();
@@ -290,6 +293,7 @@ module.exports = (api) => {
   };
   const release = (a, c) => {
     if (!c.takenBy) return say(a, `Nobody has GM call #${c.n}.`);
+    const no = guardSays(a, c, 'release'); if (no) return say(a, no);
     const was = c.takenBy.name;
     c.takenBy = null; c.lastAlert = Date.now();
     save();
@@ -299,6 +303,7 @@ module.exports = (api) => {
     mirror(c);
   };
   const closeBy = (a, c, note) => {
+    const no = guardSays(a, c, 'close'); if (no) return say(a, no);
     const n = clean(note).slice(0, 300);
     close(c, 'closed', staffName(a), n);
     audit(`GMCALL #${c.n} closed by ${who(a)}${n ? `: ${n}` : ''}`);

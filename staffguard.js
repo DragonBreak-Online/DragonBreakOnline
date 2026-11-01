@@ -150,6 +150,12 @@ module.exports = (api) => {
   // The reference a command line carried, for the action it runs; the function returned puts the previous one back
   const enter = (a, ref) => { const prev = S.ambient; S.ambient = ref ? { a: a >>> 0, ref } : null; return () => { S.ambient = prev; }; };
   const withRef = (a, ref, fn) => { const end = enter(a, ref); try { return fn(); } finally { end(); } };
+  // /gm take, release or close <n> and the F7 GM Calls tab (gmcall.js): a Trial GM acts on no call another staff member
+  // holds. Taking one over made them its holder, after which goto and /tp passed and reached that player (1 Nov)
+  const callRefusal = (a, c, op) => {
+    if (!ON || !TRIAL.enabled || !trialOf(a) || exempt(a) || !c || !c.takenBy || Number(c.takenBy.profile) === pidOf(a)) return '';
+    return `GM call #${c.n} is held by ${c.takenBy.name}. A Trial GM does not ${op === 'take' ? 'take over' : op} a call another staff member holds.`;
+  };
   // /gm goto <n> (gmcall.js), before it moves anyone
   const gotoRefusal = (a, c) => {
     if (!ON) return '';
@@ -292,7 +298,7 @@ module.exports = (api) => {
     }, { admin: true, help: '<call number|ticket id> <player|#TAG>: the GM call (a number of up to 6 digits) or ticket your staff changes to that player run under (faction, rank, office, rename, citizenship)' });
   }
 
-  const G = { powersOn, rightOk, command, enter, withRef, target, gotoRefusal, adminGate, setStaffChar, isStaffChar, exempt, NOT_HERE };
+  const G = { powersOn, rightOk, command, enter, withRef, target, gotoRefusal, callRefusal, adminGate, setStaffChar, isStaffChar, exempt, NOT_HERE };
   globalThis.__dboStaffGuard = G;
   globalThis.__dboAdminGate = adminGate;
   globalThis.__dboStaffCharSet = (a, t, on) => setStaffChar(Number(a) >>> 0, Number(t) >>> 0, on !== false);
