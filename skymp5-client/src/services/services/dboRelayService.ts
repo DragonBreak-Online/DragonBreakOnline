@@ -10,6 +10,7 @@ import { Actor, BrowserMessageEvent, ButtonEvent, DxScanCode, InputDeviceType, M
 import { COMPANION_HUD_KEY } from "./companionService";
 import { remoteIdToLocalId } from "../../view/worldViewMisc";
 import { withClientUiCaps } from "../../lib/clientUiCaps";
+import { hudShared } from "./nativeHud";
 
 const HUD_WIDGET_ID = 29;
 const PARTY_WIDGET_ID = 32;
@@ -63,6 +64,11 @@ export class DboRelayService extends ClientListener {
   //   { customPacketType: "dboParty", members: [{ id, name, leader }], self }
   private onUpdate(): void {
     this.hideVanillaMeters();
+    // The native HUD (NativeHudService) draws from the same fields the hud widget carries
+    hudShared.server = this.hudData ? {
+      hunger: Number(this.hudData["hunger"]) || 0, stage: String(this.hudData["stage"] || ""), hungerOn: this.hudData["hungerOn"] !== false,
+      vitalsOn: this.hudData["vitalsOn"] !== false, ...this.hudGold(), ...this.hudPower(),
+    } : null;
     // Vitals (health / magicka / stamina) are polled every frame and pushed immediately when they
     // change — combat makes them move fast and a 1 s lag feels broken.
     try { this.pushVitals(); } catch { /* keep the tick alive */ }
@@ -91,6 +97,7 @@ export class DboRelayService extends ClientListener {
     const p = this.sp.Game.getPlayer();
     const pct = (av: string): number => { try { return p ? Math.round(p.getActorValuePercentage(av) * 100) : 100; } catch { return 100; } };
     const h = pct("Health"), m = pct("Magicka"), s = pct("Stamina");
+    hudShared.vitals = { h, m, s };
     if (
       Math.abs(h - this.lastH) < VITALS_CHANGE_THRESHOLD &&
       Math.abs(m - this.lastM) < VITALS_CHANGE_THRESHOLD &&
@@ -107,6 +114,7 @@ export class DboRelayService extends ClientListener {
       watermarkOn: this.hudData["watermarkOn"] !== false,
       ...this.hudGold(),
       ...this.hudPower(),
+      ...this.hudNative(),
     };
     const key = JSON.stringify(w);
     if (key === this.hudKey) return;
@@ -126,6 +134,7 @@ export class DboRelayService extends ClientListener {
       watermarkOn: this.hudData["watermarkOn"] !== false,
       ...this.hudGold(),
       ...this.hudPower(),
+      ...this.hudNative(),
     };
     const key = JSON.stringify(w);
     // Identical JSON is re-sent every 5 s so a widget dropped from the browser comes back
@@ -147,6 +156,12 @@ export class DboRelayService extends ClientListener {
   private hudPower(): { racialPower?: { name: string; endsAt: number } } {
     const p = this.hudPowerEnd;
     return p && p.endsAt > now() ? { racialPower: { name: p.name, endsAt: p.endsAt } } : {};
+  }
+
+  // While the native HUD is drawn (NativeHudService), the browser HUD leaves out its corner and bars; the field is left out
+  // otherwise, so an older front sees the widget as before
+  private hudNative(): { native?: boolean } {
+    return hudShared.nativeUp ? { native: true } : {};
   }
 
   private pushParty(): void {

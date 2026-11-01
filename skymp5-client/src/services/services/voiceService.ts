@@ -7,6 +7,7 @@ import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { RemoteServer } from "./remoteServer";
 import { BrowserMessageEvent, ButtonEvent, DxScanCode, InputDeviceType, Menu } from "skyrimPlatform";
 import { logTrace } from "../../logging";
+import { hudShared } from "./nativeHud";
 import { IdentityMap, parseIdentityMap, peerKey } from "./voicePeerKey";
 import { adminViewOfModes, viewerRankOf } from "../../view/adminCopyPolicy";
 import { buttonKeyCode, isMouseKey, mouseKeyButton } from "./mouseKeys";
@@ -194,6 +195,7 @@ export class VoiceService extends ClientListener {
 
   // The HUD status panel shows the mode; a front reload asks again through the same global.
   private announceMode(key: string): void {
+    hudShared.voiceMode = key;
     this.sp.browser.executeJavaScript(
       `window.__dboVoiceMode=${JSON.stringify(key)};window.dispatchEvent(new CustomEvent('dbo:voiceMode',{detail:${JSON.stringify(key)}}))`
     );
