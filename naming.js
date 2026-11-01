@@ -22,6 +22,9 @@
 const fs = require('fs');
 const path = require('path');
 
+// The client's caps as gamemode.js keeps them (hasUiCap: the browser's list, the client's own, native:<panel> for the panel),
+// or this module's own uiCaps map (either one: a harness or an older gamemode.js may keep only one of them)
+const uiCap = (a, cap, own) => (typeof globalThis.__dboHasUiCap === 'function' && globalThis.__dboHasUiCap(a, cap)) || ((own && own.get(a >>> 0)) || new Set()).has(cap);
 module.exports = (api) => {
   const { mp, log, personal, audit, who, display, registerChatCommand, onlineActors, every, profileOf, inCreation, onUi, openWidget, closeWidget, inHub } = api;
   const PANEL_ID = 68;
@@ -33,7 +36,7 @@ module.exports = (api) => {
   // Both outlive a reload: which clients draw the panel, and the nonce of the panel open for each character
   const caps = globalThis.__dboNamingCaps instanceof Map ? globalThis.__dboNamingCaps : (globalThis.__dboNamingCaps = new Map());
   const nonces = globalThis.__dboNamingNonces instanceof Map ? globalThis.__dboNamingNonces : (globalThis.__dboNamingNonces = new Map());
-  const hasPanel = (a) => typeof openWidget === 'function' && (caps.get(a >>> 0) || new Set()).has('namePrompt');
+  const hasPanel = (a) => typeof openWidget === 'function' && uiCap(a, 'namePrompt', caps);
 
   const nameOf = (a) => { try { return String((mp.get(a, 'appearance') || {}).name || '').trim(); } catch (e) { return ''; } };
   const isDefault = (name) => DEFAULTS.has(String(name || '').trim().toLowerCase());

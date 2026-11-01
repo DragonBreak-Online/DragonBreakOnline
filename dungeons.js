@@ -27,6 +27,9 @@ const path = require('path');
 // it. One door a tick makes the worst tick one lookup, and 351 doors take a couple of minutes to count.
 const DOOR_CENSUS_EVERY_MS = 250;
 
+// The client's caps as gamemode.js keeps them (hasUiCap: the browser's list, the client's own, native:<panel> for the panel),
+// or this module's own uiCaps map (either one: a harness or an older gamemode.js may keep only one of them)
+const uiCap = (a, cap, own) => (typeof globalThis.__dboHasUiCap === 'function' && globalThis.__dboHasUiCap(a, cap)) || ((own && own.get(a >>> 0)) || new Set()).has(cap);
 module.exports = (api) => {
   const { mp, log, personal, system, registerChatCommand, onUi, openWidget, closeWidget, sendPacket, findByName, display, who, audit, profileOf, nameOf, onlineActors, isAdmin, giveItem, cfg, every } = api;
   // The party's roster names its members by their own name, never a beast's, and a mask's only while
@@ -1937,7 +1940,7 @@ module.exports = (api) => {
   // unknown widget opened with focus would leave an invisible panel holding the keys. An older client gets the list menu.
   const uiCaps = globalThis.__dboExpeditionCaps instanceof Map ? globalThis.__dboExpeditionCaps : (globalThis.__dboExpeditionCaps = new Map());
   onUi('uiCaps', (a, args) => { uiCaps.set(a >>> 0, new Set((args || []).map(String))); });
-  const boardCaps = { has: (a) => (uiCaps.get(a >>> 0) || new Set()).has('expeditionBoard') };
+  const boardCaps = { has: (a) => uiCap(a, 'expeditionBoard', uiCaps) };
   // Which boards post expeditions (Nat, 27 Oct: the boards in the Skyrim holds show contracts and the rest, "NOT expeditions",
   // Skyrim having no ruin to send a party to yet). dungeons.boards { expeditions: { <province>: bool }, refs: { <board desc>:
   // { expeditions, province } } }: a ref's own setting wins, then its province's (by the board's cell, else the reader's, as

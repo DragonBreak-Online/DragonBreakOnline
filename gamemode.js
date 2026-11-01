@@ -4460,11 +4460,19 @@ const panelSearchOnly = (a) => {
 };
 const panelOffered = (a) => new Set(panelTabsFor(a).flatMap((t) => t.entries.map((e) => e.name)).concat(panelSearchOnly(a).map((e) => e.name)));
 const panelState = globalThis.__dboPanelState || (globalThis.__dboPanelState = { caps: new Map(), nonces: new Map() });
-const hasPlayerMenu = (a) => { const c = panelState.caps.get(a >>> 0); return !!c && c.has('playerMenu'); };
+const hasPlayerMenu = (a) => hasUiCap(a, 'playerMenu');
 // Any other capability the client's UI named in dbo:uiCaps (hud UI_CAPS): lockpick.js asks for 'lockpickLocal' and
 // supernatural.js for 'riteJudge' before they issue a round the widget judges itself, since an older widget given one
 // would hang or be judged wrongly (DESIGN.md 3.2)
-const hasUiCap = (a, cap) => { const c = panelState.caps.get(a >>> 0), n = nativeState().native.get(a >>> 0); return (!!c && c.has(String(cap))) || (!!n && n.has(String(cap))); };
+// A native panel counts as the panel itself: a client that draws 'native:bank' draws the bank, so every module's gate
+// passes without the browser page's list (Worker 1, 1 Nov: the client announces its own caps in nativeCaps)
+const hasUiCap = (a, cap) => {
+  const c = panelState.caps.get(a >>> 0), n = nativeState().native.get(a >>> 0), k = String(cap);
+  return (!!c && c.has(k)) || (!!n && (n.has(k) || n.has('native:' + k)));
+};
+// Modules that keep their own uiCaps map ask this first (bank, business, couriers, keyring, spells, downed, robbery,
+// naming, dungeons, supernatural); it is set here, at load, before any of them can be asked
+globalThis.__dboHasUiCap = (a, cap) => hasUiCap(a, cap);
 const openPlayerMenu = (a, tab, search) => {
   const nonce = `${(a >>> 0).toString(16)}-${Date.now().toString(36)}`;
   panelState.nonces.set(a >>> 0, nonce);
@@ -4473,8 +4481,9 @@ const openPlayerMenu = (a, tab, search) => {
 };
 const closePlayerMenu = (a) => { panelState.nonces.delete(a >>> 0); closeWidget(a, PANEL_WIDGET_ID); };
 onUi('uiCaps', (a, args) => { panelState.caps.set(a >>> 0, new Set((args || []).map(String))); });
-// The client's native panels, kept apart from the browser's caps so neither list replaces the other
-onUi('nativeCaps', (a, args) => { nativeState().native.set(a >>> 0, new Set((args || []).map(String).filter((c) => c.startsWith('native:')))); });
+// The client's own caps: its native panels (native:*) and what the client does itself (dboIdle, beastBody, nightEye,
+// the client-judged rounds), kept apart from the browser's caps so neither list replaces the other
+onUi('nativeCaps', (a, args) => { nativeState().native.set(a >>> 0, new Set((args || []).map(String))); });
 onUi('close', (a, args, widgetId) => { for (const m of [nativeState().nativeOpen, nativeState().browserOpen]) if (m.get(a >>> 0) === widgetId) m.delete(a >>> 0); });
 onUi('menuOpen', (a, args) => {
   if (!hasPlayerMenu(a)) return;
@@ -10041,7 +10050,7 @@ try {
 try {
   const IDLES_JS = path.resolve('idles.js');
   delete require.cache[IDLES_JS];
-  require(IDLES_JS)({ mp, log, sendPacket, cfg, hasCap: (a, cap) => { const c = panelState.caps.get(a >>> 0); return !!c && c.has(cap); } });
+  require(IDLES_JS)({ mp, log, sendPacket, cfg, hasCap: (a, cap) => hasUiCap(a, cap) });
 } catch (e) { log('idles.js failed to load:', e.stack || e.message); globalThis.__dboInteractionIdle = null; globalThis.__dboChestHold = null; }
 
 // ---- X interaction menu, introductions, inspect, party invites, masks (server\playermenu.js) ---
@@ -10276,7 +10285,7 @@ try {
   const JOURNAL_JS = path.resolve('journal.js');
   delete require.cache[JOURNAL_JS];
   const journal = require(JOURNAL_JS)({ mp, log, display, nameOf, personal, openWidget, closeWidget, onUi, sendPacket, every, onlineActors, cfg, isAdmin,
-    skills: SKILLS_DEF.skills || [], hasCap: (a, cap) => { const c = panelState.caps.get(a >>> 0); return !!c && c.has(cap); } });
+    skills: SKILLS_DEF.skills || [], hasCap: (a, cap) => hasUiCap(a, cap) });
   // guilds.js: rank titles a leader writes pass the journal's prose filter
   globalThis.__dboProseProblem = journal && typeof journal.proseProblem === 'function' ? journal.proseProblem : null;
 } catch (e) { log('journal.js failed to load:', e.stack || e.message); globalThis.__dboJournalRequest = null; globalThis.__dboJournalFaction = null; globalThis.__dboProseProblem = null; }

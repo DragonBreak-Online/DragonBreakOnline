@@ -24,7 +24,10 @@ const A = 0xff000001, B = 0xff000002;
 openWidget(A, { type: 'decor', id: 171, nonce: 'x' }, true);
 ok(last().customPacketType === 'dboWidget', 'without nativeCaps the browser widget is sent', last());
 setCaps(A, ['native:decor', 'native:prayer', 'bank']);
-ok(nativeState().native.get(A).has('native:decor') && !nativeState().native.get(A).has('bank'), 'nativeCaps keeps only native: names');
+// The client's own caps ride along since B1 (Worker 1, 1 Nov): kept, but a bare name routes nothing (nativeSwfFor asks native:<type>)
+ok(nativeState().native.get(A).has('native:decor') && nativeState().native.get(A).has('bank'), "nativeCaps keeps the native panels and the client's own caps");
+openWidget(A, { type: 'bank', id: 48, nonce: 'b' }, true);
+ok(last().customPacketType === 'dboWidget', 'a bare bank cap does not route the bank native (no native:bank)', last());
 openWidget(A, { type: 'decor', id: 171, nonce: 'x' }, true);
 ok(last().customPacketType === 'dboScaleform' && last().swf === 'dbo_decor' && last().widget === 171 && last().payload.nonce === 'x', 'with it, dboScaleform carries the swf, the widget id and the payload', last());
 openWidget(A, { type: 'prayer', id: 35, nonce: 'p' }, true);

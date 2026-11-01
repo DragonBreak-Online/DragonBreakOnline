@@ -42,13 +42,15 @@ const userOf = (a) => a;
 const handleChat = (userId, text) => chatted.push({ userId, text });
 const isTrialStaff = () => false;
 const args = ['personal', 'isAdmin', 'deliver', 'C', 'profileOf', 'ranksOf', 'openWidget', 'closeWidget', 'onUi', 'userOf', 'handleChat', 'isTrialStaff',
-  'require', 'path', 'log', 'LEAD_ONLY', 'isLeadStaff', 'onlineActors', 'display', 'tagOf'];
+  'require', 'path', 'log', 'LEAD_ONLY', 'isLeadStaff', 'onlineActors', 'display', 'tagOf',
+  // gamemode.js nativeState: the client's own caps, which the panel's gate (hasUiCap) also reads
+  'nativeState'];
 // The panel's forms, staff topics and names (gamemode.js): the real parser, a Lead GM list, two players online
 const ONLINE = [PLAYER, STAFF];
 const api = new Function(...args, section + panelSection + '\nreturn { commands, registerChatCommand, aliasChatCommand, helpGroupsFor, panelTabsFor, openPlayerMenu };')(
   personal, isAdmin, deliver, C, profileOf, ranksOf, openWidget, closeWidget, onUi, userOf, handleChat, isTrialStaff,
   require, { resolve: (f) => path.resolve(__dirname, '..', f) }, () => {}, new Set(['curse']), (a) => a === STAFF, () => ONLINE,
-  (a) => `P${a} #T${a}`, (a) => `T${a}`);
+  (a) => `P${a} #T${a}`, (a) => `T${a}`, () => ({ native: new Map() }));
 const { commands, registerChatCommand, aliasChatCommand, helpGroupsFor, panelTabsFor, openPlayerMenu } = api;
 const ui = (event, a, ...rest) => (uiHandlers.get(event) || []).forEach((fn) => fn(a, rest));
 registerChatCommand('players', () => {}, { admin: true, help: 'who is online' });

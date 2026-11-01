@@ -16,6 +16,9 @@
 
 const fs = require('fs');
 
+// The client's caps as gamemode.js keeps them (hasUiCap: the browser's list, the client's own, native:<panel> for the panel),
+// or this module's own uiCaps map (either one: a harness or an older gamemode.js may keep only one of them)
+const uiCap = (a, cap, own) => (typeof globalThis.__dboHasUiCap === 'function' && globalThis.__dboHasUiCap(a, cap)) || ((own && own.get(a >>> 0)) || new Set()).has(cap);
 module.exports = (api) => {
   const { mp, log, personal, sendPacket, audit, who, display, profileOf, nameOf, onlineActors, every, registerChatCommand, cfg, openWidget, closeWidget, onUi, redress } = api;
   // The name a player sees for another: their name once introduced, else Stranger, or Masked Person (playermenu.js).
@@ -354,7 +357,7 @@ module.exports = (api) => {
   if (typeof onUi === 'function') onUi('uiCaps', (a, args) => { caps.set(a >>> 0, new Set((args || []).map(String))); });
   const giveUpLeft = (d) => Math.max(0, Math.ceil((Number(d.at) + C.giveUpAfterSeconds * 1000 - Date.now()) / 1000));
   const openPanel = (a, d) => {
-    if (typeof openWidget !== 'function' || !(caps.get(a >>> 0) || new Set()).has('downed')) {
+    if (typeof openWidget !== 'function' || !uiCap(a, 'downed', caps)) {
       banner(a, `You are down. You wake at the temple in ${C.bleedoutSeconds} seconds, or say /respawn to go now.`, 8,
         "A Priest's healing or a Draught of Revival can bring you back where you fell.");
       return;

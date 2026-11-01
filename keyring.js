@@ -12,6 +12,9 @@
 // widgets (MENU_ID): the ring with an open offer, your keys and the copies of your own locks from /keys; the keys to hand over
 // from "Give a key". Each menu's rows are kept here by id, so a row id the server never sent does nothing.
 
+// The client's caps as gamemode.js keeps them (hasUiCap: the browser's list, the client's own, native:<panel> for the panel),
+// or this module's own uiCaps map (either one: a harness or an older gamemode.js may keep only one of them)
+const uiCap = (a, cap, own) => (typeof globalThis.__dboHasUiCap === 'function' && globalThis.__dboHasUiCap(a, cap)) || ((own && own.get(a >>> 0)) || new Set()).has(cap);
 module.exports = (api) => {
   const { log, personal, audit, who, openWidget, closeWidget, onUi, registerChatCommand } = api;
   const WIDGET_ID = 91;
@@ -20,7 +23,7 @@ module.exports = (api) => {
   S.menus = S.menus || new Map(); // actor -> { nonce, rows: Map(row id -> what it does) }, the open contextMenu (reload keeps it)
   const housing = () => globalThis.__dboHousing || null;
   const on = () => { const H = housing(); return !!H && typeof H.keyRingOn === 'function' && H.keyRingOn(); };
-  const hasPanel = (a) => { const c = S.caps.get(a >>> 0); return !!c && c.has('keyRing'); };
+  const hasPanel = (a) => uiCap(a, 'keyRing', S.caps);
 
   const openPanel = (a, result, kind) => {
     const nonce = `${(a >>> 0).toString(16)}-${Date.now().toString(36)}`;
