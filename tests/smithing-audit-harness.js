@@ -44,20 +44,22 @@ require(path.join(SERVER, 'smithing.js'))({ mp, log: () => {}, personal: (a, t) 
 const craft = (item) => globalThis.__dboSmithCraft(A, item, RECIPE);
 const fresh = () => globalThis.__dboSmithState.told.clear();
 
-// The craft tier: a tier 1 smith at Glass (tier 5)
+// A family's tier as smithing.json has it (Orcish was 3 until the 31 Oct re-tier): the lines name whatever the table says
+const tierOf = (id) => JSON.parse(fs.readFileSync('smithing.json', 'utf8')).families.find((f) => f.id === id).tier;
+// The craft tier: a tier 1 smith at Glass
 smith(0); fresh();
 ok(craft(GLASS) === false && told.length === 1, 'a tier 1 smith is refused Glass and told why, as before');
-ok(audits.length === 1 && /^SMITH refused Smith #Tff000301 Glass \(tier 5, crafter tier 1\): below its tier$/.test(audits[0]), 'and the refusal is audited: who, the family, both tiers and the reason', audits);
+ok(audits.length === 1 && new RegExp(`^SMITH refused Smith #Tff000301 Glass \\(tier ${tierOf('glass')}, crafter tier 1\\): below its tier$`).test(audits[0]), 'and the refusal is audited: who, the family, both tiers and the reason', audits);
 ok(craft(GLASS) === false && audits.length === 1 && told.length === 1, 'a second refusal within 3 s is neither told nor audited (the notice throttle)', audits.length);
 
 // An unknown technique: a tier 7 smith, not an Orc, with no Orcish technique and no teacher near
 smith(91); fresh();
-ok(craft(ORCISH) === false && audits.length === 2 && /^SMITH refused Smith #Tff000301 Orcish \(tier 3, crafter tier 7\): technique unknown$/.test(audits[1]),
+ok(craft(ORCISH) === false && audits.length === 2 && new RegExp(`^SMITH refused Smith #Tff000301 Orcish \\(tier ${tierOf('orcish')}, crafter tier 7\\): technique unknown$`).test(audits[1]),
   'an unknown technique is audited', audits[1]);
 
 // A people's own work: a tier 7 smith who is not a Redguard at Yokudan
 fresh();
-ok(craft(YOKU) === false && audits.length === 3 && /^SMITH refused Smith #Tff000301 Yokudan \(tier 3, crafter tier 7\): race only$/.test(audits[2]), 'a people\'s own work is audited', audits[2]);
+ok(craft(YOKU) === false && audits.length === 3 && new RegExp(`^SMITH refused Smith #Tff000301 Yokudan \\(tier ${tierOf('yoku')}, crafter tier 7\\): race only$`).test(audits[2]), 'a people\'s own work is audited', audits[2]);
 
 // An allowed craft writes nothing: Steel needs no technique
 smith(15); fresh();
