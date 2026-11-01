@@ -27,6 +27,7 @@ import { holdsRelayedRagdoll, niNodeWaitsForRagdoll } from "./ragdollHold";
 import { ragdolledAtOf } from "./npcLifetimeRuntime";
 import { ObjectReferenceEx } from "../extensions/objectReferenceEx";
 import { PlayerCharacterDataHolder } from "./playerCharacterDataHolder";
+import * as perf from "./viewPerf";
 import { dropCopyNiNodeWork, queueCopyNiNodeUpdate } from "./niNodeQueue";
 import { onScreenRebuildDue, OnScreenRebuildState } from "./onScreenRebuild";
 import { lastTryHost, tryHost } from "./hostAttempts";
@@ -884,6 +885,7 @@ export class FormView {
       // Staff with real names on see a hooded player and a labelled beast; every other rule holds for them too
       const known = FormView.ownerKnownIds();
       const revealing = revealMarkerOf(known) !== null;
+      const nickGateStart = perf.now();
       const isVisibleByPlayer = !model.movement?.isSneaking
         && playerActor.getDistance(refr) <= maxNicknameDrawDistance
         && playerActor.hasLOS(refr)
@@ -894,13 +896,16 @@ export class FormView {
         // A werewolf or Vampire Lord is not recognisable: no name and no #TAG over a beast, even to those who know the
         // player (#bugs 'werewolf shows nametag of player', 2026-09-26)
         && (!this.isBeastCopy(model) || (revealing && revealLabelFor(known, this.getRemoteRefrId()) !== ""));
+      perf.addPhase("nickgate", perf.now() - nickGateStart);
       if (isVisibleByPlayer) {
+        const nickNodeStart = perf.now();
         const headScreenPos = worldPointToScreenPoint([
           NetImmerse.getNodeWorldPositionX(refr, headPart, false),
           NetImmerse.getNodeWorldPositionY(refr, headPart, false),
           NetImmerse.getNodeWorldPositionZ(refr, headPart, false) + 32
         ])[0];
         const resolution = getScreenResolution();
+        perf.addPhase("nicknode", perf.now() - nickNodeStart);
         const textXPos = Math.round(headScreenPos[0] * resolution.width);
         // Head + 32 is where TrueHUD draws the health bar (fInfoBarOffsetZ 30); the name and #TAG stack above it
         const barYPos = Math.round((1 - headScreenPos[1]) * resolution.height);

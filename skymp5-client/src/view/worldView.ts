@@ -8,6 +8,7 @@ import { logTrace } from "../logging";
 import { SinglePlayerService } from "../services/services/singlePlayerService";
 import { RemoteServer } from "../services/services/remoteServer";
 import { FormViewGate, GATE_FALLBACK_SECONDS } from "./formViewGate";
+import * as perf from "./viewPerf";
 
 const diagNote = (kind: string, text: string): void => {
   try { const note = (globalThis as { __dboDiagNote?: (k: string, t: string) => void }).__dboDiagNote; if (typeof note === "function") note(kind, text); } catch { /* diagnostics only */ }
@@ -59,14 +60,33 @@ export class WorldView extends ClientListener {
   }
 
   private onUpdate() {
+    // Measure-only, see viewPerf.ts. beginTick records the gap since the previous entry, which is the one
+    // number that says whether a freeze happened inside this update or somewhere else in the event loop.
+    const entry = perf.beginTick();
+    let mark = entry;
+
     this.openGateIfDue();
+    let t = perf.now();
+    perf.addPhase("gate", t - mark);
+    mark = t;
+
+    // Four native reads every tick (getPlayer, getWorldSpace, getParentCell, getFormID), timed on their own
+    // because a native reference read here is not cheap
     this.resetAllFormViewsIfPlayerChangedWorld();
+    t = perf.now();
+    perf.addPhase("worldcell", t - mark);
+    mark = t;
 
     const singlePlayerService = this.controller.lookupListener(SinglePlayerService);
     if (!singlePlayerService.isSinglePlayer) {
       const modelSource = this.controller.lookupListener(RemoteServer);
-      this.updateWorld(modelSource.getWorldModel());
+      const model = modelSource.getWorldModel();
+      t = perf.now();
+      perf.addPhase("model", t - mark);
+      this.updateWorld(model);
     }
+
+    perf.endTick(entry);
   }
 
   private onceUpdate() {
@@ -150,15 +170,25 @@ export class WorldView extends ClientListener {
     const showMe = settings['skymp5-client']['show-me'];
     const showClones = settings['skymp5-client']['show-clones'];
 
+    perf.noteForms(model.forms.length);
+    let mark = perf.now();
+
     PlayerCharacterDataHolder.updateData();
+    let t = perf.now();
+    perf.addPhase("pcdata", t - mark);
+    mark = t;
 
     state.formViews.updateAll(model, !!showMe, false);
+    t = perf.now();
+    perf.addPhase("forms", t - mark);
+    mark = t;
 
     if (showClones) {
       state.cloneFormViews.updateAll(model, false, true);
     } else {
       state.cloneFormViews.resize(0);
     }
+    perf.addPhase("clones", perf.now() - mark);
   }
 
   private makeEmptyState() {

@@ -5,6 +5,7 @@ import { FormModel, WorldModel } from "./model";
 import { NiPoint3 } from "../sync/movement";
 import { SpApiInteractor } from "../services/spApiInteractor";
 import { GamemodeUpdateService } from "../services/services/gamemodeUpdateService";
+import * as perf from "./viewPerf";
 
 export class FormViewArray {
   updateForm(form: FormModel, i: number) {
@@ -15,10 +16,12 @@ export class FormViewArray {
     if (view && form.refrId !== undefined && view.getRemoteRefrId() !== form.refrId) {
       view.destroy();
       this.formViews[i] = new FormView(form.refrId);
+      perf.noteReplaced();
       return;
     }
     if (!view) {
       this.formViews[i] = new FormView(form.refrId);
+      perf.noteCreated();
     } else {
       view.update(form);
     }
@@ -32,6 +35,7 @@ export class FormViewArray {
 
     formView.destroy();
     this.formViews[i] = undefined;
+    perf.noteDestroyed();
   }
 
   resize(newSize: number) {
@@ -82,12 +86,18 @@ export class FormViewArray {
           const backup = form.isHostedByOther;
           form.isHostedByOther = true;
           // TODO: Explain why do not GamemodeApiSupport.setI(i); here
+          const cloneStart = perf.now();
           this.updateForm(form, i);
+          perf.noteFormMs(perf.now() - cloneStart, i, form.refrId || 0);
           form.isHostedByOther = backup;
         }
       } else {
         gamemodeUpdateService.setI(i);
+        // Only forms costing a whole millisecond or more register here; that is deliberate, a form implicated
+        // in a freeze would cost tens or hundreds
+        const formStart = perf.now();
         this.updateForm(form, i);
+        perf.noteFormMs(perf.now() - formStart, i, form.refrId || 0);
       }
 
       if (offset && form.movement && realPos) {
