@@ -8185,6 +8185,8 @@ const sunSourceIds = () => {
   }
   return sunSources;
 };
+// supernatural.js: a sun hit on a vampire player burns by the vampire's stage
+globalThis.__dboIsSunSource = (src) => sunSourceIds().has(Number(src) >>> 0);
 const undeadCache = new Map();   // base id -> true/false
 // The race of this actor's base carries the undead keyword
 const isUndead = (id) => {

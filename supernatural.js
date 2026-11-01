@@ -68,6 +68,9 @@ module.exports = (api) => {
     // half for a pure-blood. The server's damage formula reads no resistance (TES5DamageFormula reads DamageResist only),
     // so it is made here; the vampire races themselves carry no fire weakness.
     fireWeaknessPerStage: 0.25,
+    // Restoration's sun (Sun Fire, Vampire's Bane, Stendarr's Aura, Auriel's Bow) burns a vampire player by stage as fire does,
+    // half for a pure-blood: x2 at stage 4, the undead NPCs' elements.sun.undeadMult (Nat, 1 Nov). 0 turns it off
+    vampireSunWeaknessPerStage: 0.25,
     // A vampire NPC (its race carries the Vampire keyword) takes this much more from fire and from silver: the damage
     // formula reads no resistance, so without it a dungeon's vampires shrugged off Flames (Nate, 11 Oct). 0 turns it off
     npcVampireFireWeakness: 0.5,
@@ -269,6 +272,7 @@ module.exports = (api) => {
   const hasKeyword = (id, kw) => !!kw && keywordsOf(id).includes(kw);
   const effectsOf = (id) => fieldIds(recordOf(id), 'EFID').map((e) => globalOf(id, e));
   const isFireSource = (id) => effectsOf(id).some((e) => hasKeyword(e, KW.fire));
+  const isSunSource = (id) => { try { return typeof globalThis.__dboIsSunSource === 'function' && !!globalThis.__dboIsSunSource(Number(id) >>> 0); } catch (e) { return false; } };
   const SILVER_EXTRA = new Set((Array.isArray(C.silverWeapons) ? C.silverWeapons : []).map((d) => idOf(String(d))).filter(Boolean));
   const isSilverSource = (id) => SILVER_EXTRA.has(Number(id) >>> 0) || hasKeyword(id, KW.silver);
   // Poison as the racial resistances read it (gamemode.js sourceResistsOf, racial.js): a spell whose effect PoisonResist
@@ -776,8 +780,8 @@ module.exports = (api) => {
   // rejects them. Healing magic cast by anyone else does nothing for a vampire, and the caster is told once. A vampire
   // cannot read, buy or be taught a healing tome (spells.js asks __dboVampHealRefusal); one already known stays in the
   // spellbook. Potions still heal. Restoration's spells against the undead (Turn Undead, Sun Fire, Vampire's Bane,
-  // Stendarr's Aura, Bane of the Undead) are hostile effects, not healing, and burn a vampire as before: nothing here
-  // touches them.
+  // Stendarr's Aura, Bane of the Undead) are hostile effects, not healing: the sun ones burn a vampire player by stage
+  // (vampireSunWeaknessPerStage, __dboSuperDamageMult) and an undead NPC x2 (gamemode.js elements.sun).
   // The healing spells: restoration-healing.json (tools/spells/healing_spells.py, from the load order's SPEL/MGEF records).
   // How a heal is stopped, as the fork's C++ does it (ActionListener.cpp): the server applies every heal itself, the
   // caster's own and a concentration channel's in OnSpellCast and Heal Other's and an area share in OnSpellHit, right
@@ -1687,7 +1691,7 @@ module.exports = (api) => {
   };
   const beastForm = (a) => { try { const b = mp.get(a, 'private.beast'); return b && b.form ? b.form : null; } catch (e) { return null; } };
 
-  // Extra damage multiplier for the target of a hit: fire and silver on a vampire (any form), silver and poison on a
+  // Extra damage multiplier for the target of a hit: sun, fire and silver on a vampire (any form), silver and poison on a
   // werewolf in beast form (Nate, 4 Oct). Players only. gamemode.js applies it after the engine's hit, on what landed,
   // apart from the target side's 75% reduction cap (racial.js reductionCap): a weakness is never a reduction, so it is
   // never capped and never eats into the cap; it multiplies whatever Defense, a blessing and the race let through.
@@ -1737,6 +1741,7 @@ module.exports = (api) => {
     if (!s || !s.kind) return beast;
     const share = (v) => Math.max(0, Number(v) || 0);
     if (s.kind === 'vampire') {
+      if (share(C.vampireSunWeaknessPerStage) > 0 && isSunSource(src)) return beast * (1 + share(C.vampireSunWeaknessPerStage) * penaltyStage(tgt, s) * (s.pure ? 0.5 : 1));
       if (isFireSource(src)) return beast * (1 + share(C.fireWeaknessPerStage) * penaltyStage(tgt, s) * (s.pure ? 0.5 : 1));
       if (share(C.vampireSilverWeakness) > 0 && isSilverSource(src)) return beast * (1 + share(C.vampireSilverWeakness));
       return beast;
