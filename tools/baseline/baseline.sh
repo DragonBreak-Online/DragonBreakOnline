@@ -157,12 +157,20 @@ for f in $FILES; do
   fi
 done
 
-# The overlay puts LIVE PLAYER DATA inside a git worktree, and .gitignore does not cover all of it. Measured
-# on 1 Nov: all 16 overlaid files are untracked, 14 are gitignored, and 2 - housing-storage-locked.json and
-# name-table.json - are neither, so `git add -A --dry-run` in that worktree offers to stage exactly those two.
-# The remote is PUBLIC and this script deliberately KEEPS the worktree afterwards for inspection, so the
-# exposure outlasts the run. Undo the overlay on any exit. (The durable fix is to add those two names to the
-# repo's .gitignore, which is a shared file and somebody else's call; this cleanup does not depend on it.)
+# The overlay puts LIVE PLAYER DATA inside a git worktree, and this script deliberately KEEPS that worktree
+# afterwards for inspection, so whatever it leaves behind outlasts the run. Undo the overlay on any exit.
+#
+# History, because it explains why this is belt AND braces: measured 1 Nov, all 16 overlaid files were
+# untracked, 14 were gitignored, and 2 - housing-storage-locked.json and name-table.json - were neither, so
+# `git add -A --dry-run` in that worktree offered to stage exactly those two onto a PUBLIC remote. Both names
+# were added to the repo's .gitignore the same day (eda4d17d), so that specific hole is closed upstream.
+#
+# This cleanup stays anyway, and not out of superstition:
+#   - .gitignore is a shared file that can be rewritten, and the overlay list grows as runtime files appear;
+#     a new name is exposed again by default, and nothing would say so.
+#   - being gitignored stops a commit, not the exposure. 16 files of live player balances, housing and staff
+#     actions sitting in a kept worktree is still live player data at rest on a workstation.
+# So the trap removes all of them, ignored or not, rather than trusting the ignore list to be complete.
 cleanup_overlay() {
   for f in $FILES; do
     [ -f "$TREE/$f" ] || continue
