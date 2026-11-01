@@ -91,12 +91,63 @@ for (const diff of DIFFS.slice(1)) {
 ok(typeof globalThis.__dboLeaseStartedAt === 'function', 'dungeons.js exposes __dboLeaseStartedAt');
 ok(leaseSeen && startedFor.inside === leaseSeen.startedAt && startedFor.inside > 0, 'inside a claimed dungeon: the claim\'s start', startedFor);
 ok(startedFor.outside === 0, 'outside it: 0', startedFor);
+// ---- 3: the coin purse, run rather than read --------------------------------------------------------------------------
+// gamemode.js's own __dboCoinPurse, evaluated with stubs for what it reaches for, so the checks follow its behaviour, not its
+// layout (25 Oct: the hold's share moved Imperial Luck onto the kept gold, and a check of the old block shape failed for
+// nothing). Each mutant below must break at least one check, so the checks still catch what they guard.
 const GM = fs.readFileSync(path.join(ROOT, 'gamemode.js'), 'utf8');
-const purse = GM.slice(GM.indexOf('globalThis.__dboCoinPurse = '), GM.indexOf('// ---- Beyond Skyrim activators'));
-ok(/__dboLeaseStartedAt\(casterId\)/.test(purse) && /until - PURSE\.restMinutes \* 60000 < leaseAt/.test(purse) && /until > Date\.now\(\) && !emptiedBeforeClaim/.test(purse),
-  'gamemode.js: a purse emptied before the claim began is full again for the new party');
-
-ok(/if \(giveItem\(casterId, 0xf, gold\)\) \{[\s\S]*?globalThis\.__dboRaceGold\(casterId, gold, 'a coin purse'\)[\s\S]*?\n  \}/.test(purse),
-  'gamemode.js: a purse that paid pays Imperial Luck on its gold (racial.js goldBonus), only once it was handed over');
+const PURSE_SRC = GM.slice(GM.indexOf('globalThis.__dboCoinPurse = '), GM.indexOf('// ---- Beyond Skyrim activators'));
+const NOW = Date.now(), REST_MIN = 60;
+const openPurse = (src, o) => {
+  const calls = [];
+  const env = {
+    PURSE: { enabled: true, restMinutes: REST_MIN, goldMin: 10, goldMax: 10, unskilledChance: 1, unskilledMult: 1, holdShare: o.holdShare || 0, refuseCells: [] },
+    isGoldFlora: () => false, purseDeny: new Map(), personal: (a, t) => calls.push(['say', t]),
+    isCoinPurse: () => true, isPurseBase: () => true, baseIdOf: () => 1, normPlace: (x) => String(x || ''),
+    mp: { get: (id, k) => (k === 'worldOrCellDesc' ? 'w' : k === 'pos' ? [0, 0, 0] : undefined) },
+    restUntil: () => o.until || 0, purseRest: new Map(), harvestingTier: () => -1, HARVESTING: {}, setRest: () => { },
+    zoneAtPlace: () => (o.hold ? 'h' : null), zoneById: () => (o.hold ? { id: 'h', name: 'Hold', treasury: true } : null),
+    giveItem: (a, base, n) => { calls.push(['give', n]); return o.giveOk !== false; },
+    depositToTreasury: (id, n) => { calls.push(['deposit', n]); return n; },
+    log: () => { }, who: () => 'P', audit: () => { },
+  };
+  const keep = { lease: globalThis.__dboLeaseStartedAt, race: globalThis.__dboRaceGold, purse: globalThis.__dboCoinPurse, rnd: Math.random };
+  globalThis.__dboLeaseStartedAt = () => o.leaseAt || 0;
+  globalThis.__dboRaceGold = (a, n) => calls.push(['race', n]);
+  Math.random = () => 0;   // goldMin = goldMax: a purse holds 10, and the yield roll always pays
+  try {
+    new Function(...Object.keys(env), src)(...Object.values(env));
+    globalThis.__dboCoinPurse(0x500, A);
+  } finally {
+    globalThis.__dboLeaseStartedAt = keep.lease; globalThis.__dboRaceGold = keep.race; globalThis.__dboCoinPurse = keep.purse; Math.random = keep.rnd;
+  }
+  return calls;
+};
+const at = (calls, kind) => calls.findIndex((c) => c[0] === kind);
+const races = (calls) => calls.filter((c) => c[0] === 'race').map((c) => c[1]);
+const PURSE_CHECKS = [
+  ['a purse that paid pays Imperial Luck once on its gold, after handing it over', (src) => {
+    const c = openPurse(src, {}); return races(c).join() === '10' && at(c, 'give') >= 0 && at(c, 'give') < at(c, 'race'); }],
+  ['a purse whose gold could not be handed over pays no Imperial Luck', (src) => races(openPurse(src, { giveOk: false })).length === 0],
+  ["with a hold's share, Imperial Luck is paid on what the opener keeps (10 - 2 to the treasury)", (src) => {
+    const c = openPurse(src, { hold: true, holdShare: 0.25 }); return races(c).join() === '8' && c.some((x) => x[0] === 'deposit' && x[1] === 2); }],
+  ['in a claimed dungeon, a purse emptied before the claim began is full again for the new party', (src) => {
+    const c = openPurse(src, { until: NOW + 30 * 60000, leaseAt: NOW - 10 * 60000 }); return at(c, 'give') >= 0; }],
+  ['...one emptied after the claim began stays empty', (src) => at(openPurse(src, { until: NOW + 30 * 60000, leaseAt: NOW - 50 * 60000 }), 'give') < 0],
+  ['...and outside a claim a resting purse stays empty', (src) => at(openPurse(src, { until: NOW + 30 * 60000 }), 'give') < 0],
+];
+const purseResults = (src) => PURSE_CHECKS.map(([, f]) => { try { return !!f(src); } catch (e) { return false; } });
+const real = purseResults(PURSE_SRC);
+PURSE_CHECKS.forEach(([what], i) => ok(real[i], 'gamemode.js: ' + what));
+const RACE_LINE = "try { if (typeof globalThis.__dboRaceGold === 'function') globalThis.__dboRaceGold(casterId, kept, 'a coin purse'); } catch (e) { log('racial gold failed', e.message); }";
+const MUTANTS = [
+  ['Imperial Luck paid before the hand-over', (s) => s.includes(RACE_LINE) && s.replace(RACE_LINE, '').replace('  if (giveItem(casterId, 0xf, mine)) {', "  globalThis.__dboRaceGold(casterId, gold, 'a coin purse');\n  if (giveItem(casterId, 0xf, mine)) {")],
+  ['Imperial Luck on the whole purse, the treasury share included', (s) => s.includes('__dboRaceGold(casterId, kept,') && s.replace('__dboRaceGold(casterId, kept,', '__dboRaceGold(casterId, gold,')],
+  ['the claim refill dropped', (s) => s.includes(' && !emptiedBeforeClaim') && s.replace(' && !emptiedBeforeClaim', '')],
+];
+for (const [what, mutate] of MUTANTS) {
+  const m = mutate(PURSE_SRC);
+  ok(typeof m === 'string' && purseResults(m).some((r) => !r), `mutant caught: ${what}`, typeof m === 'string' ? 'all checks still passed' : 'the mutation no longer applies (the purse code moved): update this mutant');
+}
 console.log(fails ? `\n${fails} failed` : '\nall passed');
 process.exit(fails ? 1 : 0);
