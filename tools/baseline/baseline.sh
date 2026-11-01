@@ -135,6 +135,26 @@ for f in $FILES; do
   fi
 done
 
+# The overlay puts LIVE PLAYER DATA inside a git worktree, and .gitignore does not cover all of it. Measured
+# on 1 Nov: all 16 overlaid files are untracked, 14 are gitignored, and 2 - housing-storage-locked.json and
+# name-table.json - are neither, so `git add -A --dry-run` in that worktree offers to stage exactly those two.
+# The remote is PUBLIC and this script deliberately KEEPS the worktree afterwards for inspection, so the
+# exposure outlasts the run. Undo the overlay on any exit. (The durable fix is to add those two names to the
+# repo's .gitignore, which is a shared file and somebody else's call; this cleanup does not depend on it.)
+cleanup_overlay() {
+  for f in $FILES; do
+    [ -f "$TREE/$f" ] || continue
+    if git -C "$TREE" cat-file -e "HEAD:$f" 2>/dev/null; then
+      git -C "$TREE" checkout -q -- "$f" 2>/dev/null
+    else
+      # ${VAR:?} so an unset or empty TREE/f makes the shell stop with an error rather than running
+      # `rm -f /`. The trap can fire from an interrupt at any point, including before TREE is assigned.
+      rm -f "${TREE:?}/${f:?}"
+    fi
+  done
+}
+trap cleanup_overlay EXIT INT TERM
+
 # --- 4. provenance, before the number, so the number is never quoted without it ----------------------------
 # The fork sits beside the MAIN checkout, not beside the worktree. `cd ..` from here would be the scratchpad,
 # where there is no fork at all: run-all.sh then finds no esbuild, skips every harness that needs a bundle,
