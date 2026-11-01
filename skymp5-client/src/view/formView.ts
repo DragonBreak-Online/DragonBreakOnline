@@ -30,6 +30,7 @@ import { PlayerCharacterDataHolder } from "./playerCharacterDataHolder";
 import * as perf from "./viewPerf";
 import { dropCopyNiNodeWork, queueCopyNiNodeUpdate } from "./niNodeQueue";
 import { onScreenRebuildDue, OnScreenRebuildState } from "./onScreenRebuild";
+import { newVampireHeadState, putVampireHead, vampireHeadDue, VampireHeadState } from "../sync/vampireHead";
 import { lastTryHost, tryHost } from "./hostAttempts";
 import { GHOST_ALPHA, GHOST_SHADER_ID, INVIS_ABILITY_IDS, INVIS_ABILITY_SHADER_IDS, INVIS_SHIMMER_SHADER_ID } from "../lib/ghostLook";
 import { AdminView, keepNoCopy, nextHiddenAt, seesInvisible, viewerRankOf } from "./adminCopyPolicy";
@@ -841,6 +842,12 @@ export class FormView {
             }
           }
         }
+        // A copy on a vampire race: the look's face and eyes over the race's own (sync/vampireHead.ts; pk-0573)
+        const now = Date.now();
+        if (vampireHeadDue(this.vampireHead, now, loaded, Number(model.appearance.raceId) >>> 0, this.isBeastCopy(model), this.rebuild.lastMs)) {
+          noteActorCall("vampireHead", this.refrId);
+          putVampireHead(this.vampireHead, actor, model.appearance, now);
+        }
       }
     }
 
@@ -1533,6 +1540,8 @@ export class FormView {
   private leveledBaseId = 0;
   // The face-tint 3D rebuild (onScreenRebuild.ts): on screen, when last, and whether done for the current 3D
   private rebuild: OnScreenRebuildState = { isOnScreen: false, lastMs: 0, doneThisLoad: false };
+  // A vampire race copy's face and eyes (sync/vampireHead.ts)
+  private vampireHead: VampireHeadState = newVampireHeadState();
   // A head at the camera (a carried player inside their carrier) flickers on and off screen; each rebuild is a hitch
   private static readonly niNodeUpdateMinIntervalMs = 5000;
   private lastPcWorldOrCell = 0;

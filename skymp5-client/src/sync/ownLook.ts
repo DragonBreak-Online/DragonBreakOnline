@@ -1,6 +1,6 @@
 // The server's look for the player's own character arrives in tick context, so it waits here and goes on from an update
 import { Game, Race, Ui } from "skyrimPlatform";
-import { Appearance, applyAppearanceToPlayer, applyNameToPlayer, dropLiveHeadParts, liveHeadPartsWanted, ownLookOnBase, sameLookButName } from "./appearance";
+import { Appearance, applyAppearanceToPlayer, applyNameToPlayer, dropLiveHeadParts, isVampireRaceId, liveHeadPartsWanted, ownLookOnBase, sameLookButName } from "./appearance";
 import { isBeastRaceId, isGuardedActor } from "./beastRaces";
 import { driftConfig } from "./driftConfig";
 import { trace } from "../lib/clientDiag";
@@ -183,7 +183,11 @@ export const tickLiveHeadParts = (): void => {
   if (!wanted) return;
   const now = Date.now();
   if (now - wanted.at < LIVE_HEAD_AFTER_MS) return;
-  if (now - wanted.at > LIVE_HEAD_GIVE_UP_MS) { dropLiveHeadParts(); trace(`own head drop=late why=${wanted.why}`); return; }
+  // A vampire race's look never gives up (vampire-eyes 1 Nov: a long load or a slow settle left the race's eyes on all
+  // session); a look on another race still does
+  const early = ownLookOnBase();
+  const vampireLook = !!early && isVampireRaceId(Number(early.look.raceId) >>> 0);
+  if (now - wanted.at > LIVE_HEAD_GIVE_UP_MS && !vampireLook) { dropLiveHeadParts(); trace(`own head drop=late why=${wanted.why}`); return; }
   const g = globalThis as any;
   if ((Number(g.__dboRaceSwitches) || 0) > 0 || now - (Number(g.__dboRaceSwitchAt) || 0) < OWN_LOOK_AFTER_RACE_MS) return;
   if (Ui.isMenuOpen("RaceSex Menu")) return;

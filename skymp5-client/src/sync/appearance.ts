@@ -281,6 +281,26 @@ export const putLiveHeadParts = (appearance: Appearance, why: string): number =>
   return put;
 };
 
+// Any actor's live head (a remote copy, sync/vampireHead.ts): the look's face and eyes with changeHeadPart, always, since a
+// copy's base already lists them and only the live mesh shows the race's. Returns how many parts went on
+export const putHeadPartsOn = (actor: Actor, appearance: Appearance, why: string): number => {
+  let put = 0;
+  const notes: string[] = [];
+  for (const type of [HEADPART_FACE, HEADPART_EYES]) {
+    const want = partOfType(appearance, type);
+    if (!want) continue;
+    try {
+      actor.changeHeadPart(want);
+      put++;
+      notes.push(`${type === HEADPART_EYES ? "eyes" : "face"} ${(want.getFormID() >>> 0).toString(16)}`);
+    } catch { /* not on this platform build */ }
+  }
+  let id = 0; try { id = actor.getFormID() >>> 0; } catch { id = 0; }
+  trace(`head ${why} ${id.toString(16)} put=${put}${notes.length ? " " + notes.join(" ") : ""}`);
+  try { writeLogs("dbo-diag", `live head of ${why} ${id.toString(16)}: ${put} part(s) put on${notes.length ? ": " + notes.join(", ") : ""}`); } catch { /* no writeLogs */ }
+  return put;
+};
+
 // The live head keeps its eyes when only the base's head part list changes, so a vampire's tells came and went at relog only.
 // Swapped only on a look change in session (liveEyes) and only when the eyes differ: rebuilding the head during a load is
 // the same risk as the torch put-out that crashed logins (9 Oct)
@@ -295,9 +315,13 @@ export const applyAppearanceToPlayer = (appearance: Appearance, liveEyes = false
   // A race change asked for the face and eyes to go on the live head (requestLiveHeadParts): done here, in session, in
   // place of the eyes-only swap. A spawn or load leaves it for OwnLookQueue's update (tickLiveHeadParts), never mid-load
   const wanted = liveHeadWanted;
-  if (liveEyes && wanted) {
+  // On a vampire race every look in session ends with the face and eyes put on, after the head is regenerated (below):
+  // the race's own parts (vampire eyes, the fangs) won on the owner's screen whatever the look said, a fed vampire's
+  // included (Nat, 1 Nov: "the eyes are constantly the unfed ones despite being fed"; pk-0573)
+  const vampireHead = liveEyes && isVampireRaceId(appearance.raceId);
+  if (liveEyes && wanted && !vampireHead) {
     putLiveHeadParts(appearance, wanted.why);
-  } else if (liveEyes && eyes && lastEyesId && eyesId !== lastEyesId) {
+  } else if (liveEyes && !vampireHead && eyes && lastEyesId && eyesId !== lastEyesId) {
     try { (Game.getPlayer() as Actor).changeHeadPart(eyes); } catch { /* not on this platform build */ }
   }
   if (eyesId) lastEyesId = eyesId;
@@ -305,6 +329,7 @@ export const applyAppearanceToPlayer = (appearance: Appearance, liveEyes = false
   if (!liveEyes && (event === "spawn" || event === "load") && isVampireRaceId(appearance.raceId)) requestLiveHeadParts(event);
   applyTints(null, appearance);
   regeneratePlayerHead(appearance);
+  if (vampireHead) putLiveHeadParts(appearance, wanted ? wanted.why : event);
   traceOwnLook(event, appearance);
   queuePlayerNiNodeUpdate();
   // The NiNode update recolours the body but keeps a goblin's head piece (skin slot 30) as it was
