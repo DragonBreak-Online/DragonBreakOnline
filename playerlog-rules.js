@@ -415,7 +415,7 @@ clean_(`SCHOOLS MANUAL SKILLBOOK SCHEMATIC READ CONTRACT CHAMPION CHILL REVIVE F
   HUNT RITE SILVER DUNGEON CHESTGOLD MINE CHOP ALCHEMY SMELT TAILOR REGION FORGENEVER ARTIFACT ORCISH RACECRAFT FACTIONGEAR DRAGON LOCK
   UNSTUCK JAIL CONCORDAT EXECUTION OFFERING PRAYER REST WELL CAMP PLAYTIME PLAYTEST REROLL TICKET CRASH-DOWN CRASHLOOP
   RUINBUTTON TAX SUPPLY BOOST STAFF APPEARANCE RECIPE BREW TREASURY ENCH-RESTORE ENCH-LEARNED-REPAIR CLOCK SPELL
-  CITIZEN ELECTION BLACKREACH PURSE BIRTHSIGN`);
+  CITIZEN ELECTION BLACKREACH PURSE BIRTHSIGN CONSEQUENCES`);
 // Name #TAG parties with no profile (display()): resolved by name and tag, never by the tag alone
 clean_('LEVEL ROPE STRUGGLE', { display: true });
 // The client-judged minigame mismatches: clean, and a security signal
@@ -1569,6 +1569,7 @@ console.js REMOTE ffdec0aa excluded
 console.js REMOTE e4fec94b excluded
 console.js REMOTE 1ef926f8 excluded
 console.js REMOTE 04d3b66a excluded
+consequences.js CONSEQUENCES 56016f21 clean
 contracts.js CONTRACT 5686a09a clean
 contracts.js CONTRACT b6341078 clean
 contracts.js CONTRACT 1c58c02d clean
@@ -1637,6 +1638,7 @@ economy.js ECONOMY e93056cd parsed
 economy.js ECONOMY c11d4c54 parsed
 economy.js ECONOMY 2cdbb30f parsed
 economy.js ECONOMY 8e9b5f21 parsed
+economy.js ECONOMY 9021fdbe parsed
 execution.js EXECUTION e5653509 clean
 execution.js EXECUTION 4c691b64 clean
 execution.js EXECUTION 151542a7 clean
