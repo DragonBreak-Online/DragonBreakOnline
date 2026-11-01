@@ -109,6 +109,8 @@ module.exports = (api) => {
     personal(a, `The herald will cry it${fee ? ` (${fee} gold to the ${e.place} treasury)` : ''}: ${describe(e, now, a)} /events lists what is cried.`);
     if (free) call('__dboEventPostDiscord', `${title}, at ${e.place}, <t:${Math.floor(at / 1000)}:F> (<t:${Math.floor(at / 1000)}:R>)`, e.by);
     audit(`HERALD ${nameOf(a)} cried #${e.id} "${title}" at ${e.place} for ${new Date(at).toISOString()}${fee ? ` (${fee} gold)` : ''}`);
+    // a gathering cried by one of a court's officials is that court's business (consequences.js)
+    call('__dboCourtBusinessBy', a, 'herald');
   };
   const cancel = (a, n) => {
     const e = S.events.find((x) => x.id === Number(n) && !x.cancelled);

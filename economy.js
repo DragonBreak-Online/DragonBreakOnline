@@ -386,6 +386,17 @@ module.exports = (api) => {
     clearHoldIncome(incomes);
     // The Dominion's stipend, before wages so they can be paid from it
     if (T) payStipend(T, report);
+    // The other courts' censure of a hold that harbours the creatures of the night (consequences.js, phase 2): a share of
+    // its week's tax income goes unpaid, out of the treasury before wages; gold that leaves the world, paid to nobody
+    if (T && fn('__dboHoldCensureShare')) {
+      for (const [fid, r] of Object.entries(reports)) {
+        try {
+          const share = Number(fn('__dboHoldCensureShare')(fid)) || 0;
+          const gold = Math.min(Math.floor((Number(r.income) || 0) * share), Math.max(0, T.balance(fid)));
+          if (gold > 0 && T.spend(fid, gold, 'the courts\' censure')) { r.censure = gold; audit(`ECONOMY ${nameOfFaction(fid)}: ${gold} gold of tax withheld by the courts' censure`); }
+        } catch (e) { log(`economy: the censure of ${nameOfFaction(fid)} failed, skipped this week`, e.message); }
+      }
+    }
     // Wages: owed first, then this week's
     if (T) {
       const holds = [];
@@ -441,7 +452,7 @@ module.exports = (api) => {
       d.balanceAfter[fid] = r.balance;
       d.reports[fid] = r;
       audit(`ECONOMY ${nameOfFaction(fid)}: taxes ${r.income} gold from ${r.taxed} properties, ${r.overdue.length} overdue;${r.stipend ? ` stipend ${r.stipend} from ${r.stipendFrom};` : ''} wages ${r.wagesPaid} paid, ${r.owed} owed; treasury ${r.balance}`);
-      for (const a of onlineActors()) if (leads(a, fid)) personal(a, `The week's reckoning for ${nameOfFaction(fid)}: ${r.income} gold in taxes${r.fiefShares ? ` (and ${r.fiefShares} gold to its fiefs' treasuries)` : ''}${r.tithesIn ? `, ${r.tithesIn} gold in Imperial tithes` : ''}${r.tithe || r.titheOwed ? `, ${r.tithe} gold Imperial tithe to ${r.titheTo}${r.titheOther ? ` (${Math.round((r.titheRate || 0) * 100)}% of ${r.titheTax} gold in property tax and ${r.titheOther} gold in other income: ${kindsText(r.titheOtherKinds)})` : ''}${r.titheOwed ? ` (${r.titheOwed} gold still owed)` : ''}` : ''}${r.stipend ? `, ${r.stipend} gold stipend from ${r.stipendFrom}` : ''}, ${r.wagesPaid} gold in wages${r.owed ? `, ${r.owed} gold of wages owed` : ''}${r.capped ? ` (wages take at most ${Math.round(C.wageIncomeShare * 100)}% of the week's income and ${Math.round(C.wageShare * 100)}% of the treasury: ${r.wageBudget} gold this week)` : ''}${r.overdue.length ? `, ${r.overdue.length} properties overdue` : ''}. The treasury holds ${r.balance} gold.`);
+      for (const a of onlineActors()) if (leads(a, fid)) personal(a, `The week's reckoning for ${nameOfFaction(fid)}: ${r.income} gold in taxes${r.fiefShares ? ` (and ${r.fiefShares} gold to its fiefs' treasuries)` : ''}${r.tithesIn ? `, ${r.tithesIn} gold in Imperial tithes` : ''}${r.tithe || r.titheOwed ? `, ${r.tithe} gold Imperial tithe to ${r.titheTo}${r.titheOther ? ` (${Math.round((r.titheRate || 0) * 100)}% of ${r.titheTax} gold in property tax and ${r.titheOther} gold in other income: ${kindsText(r.titheOtherKinds)})` : ''}${r.titheOwed ? ` (${r.titheOwed} gold still owed)` : ''}` : ''}${r.stipend ? `, ${r.stipend} gold stipend from ${r.stipendFrom}` : ''}${r.censure ? `, ${r.censure} gold of tax withheld by the other courts' censure` : ''}, ${r.wagesPaid} gold in wages${r.owed ? `, ${r.owed} gold of wages owed` : ''}${r.capped ? ` (wages take at most ${Math.round(C.wageIncomeShare * 100)}% of the week's income and ${Math.round(C.wageShare * 100)}% of the treasury: ${r.wageBudget} gold this week)` : ''}${r.overdue.length ? `, ${r.overdue.length} properties overdue` : ''}. The treasury holds ${r.balance} gold.`);
     }
     save();
     return reports;
@@ -524,6 +535,7 @@ module.exports = (api) => {
     if (gold > 0 && holdsRank(a, fid, rank)) return { ok: false, text: `You hold the rank of ${rank} yourself, and nobody sets their own wage.` };
     data().wages[fid] = data().wages[fid] || {}; data().wages[fid][rank] = gold; save();
     audit(`ECONOMY ${who(a)} set ${nameOfFaction(fid)}'s weekly wage for ${rank} to ${gold}`);
+    if (fn('__dboCourtBusinessFaction')) fn('__dboCourtBusinessFaction')(fid, 'wage');
     return { ok: true, text: `${rank}: ${gold} gold a week.` };
   };
   globalThis.__dboEconomySetWage = setWage;

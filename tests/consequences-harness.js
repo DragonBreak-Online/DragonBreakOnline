@@ -82,7 +82,7 @@ ok(!fs.existsSync('NPC-Spawns.json'), 'phase 1 writes no spawn zones');
 // The readout and its rights live in the command options; a restart reads the state back
 said.length = 0;
 cmds.consequences(GM, '');
-ok(/phase 1: measured only/.test(said[0][1]) && said.some(([, t]) => /Falkreath: the Blight/.test(t)), 'the readout lists the holds by pressure', said.map((x) => x[1]));
+ok(/^Dynamic Consequences\. Last sample .*Phase 2: writs, unrest, pressure, idleRuler\./.test(said[0][1]) && said.some(([, t]) => /Falkreath: the Blight/.test(t)), 'the readout lists the holds by pressure', said.map((x) => x[1]));
 const saved = JSON.stringify(T.data().holds);
 T = load();
 ok(JSON.stringify(T.data().holds) === saved, 'a restart reads the pressures back from consequences.json');

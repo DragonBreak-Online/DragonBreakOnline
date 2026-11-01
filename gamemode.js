@@ -1641,8 +1641,10 @@ const BOARD_REFS = (() => {
   } catch (e) { log('notice-board-spots.json unreadable, no letter markers', e.message); return []; }
 })();
 const sendMailState = (a) => sendPacket(a, { customPacketType: 'dboMail', unread: pigeonsWaiting(a), boards: BOARD_REFS });
-globalThis.__dboBoardOpened = (actorId) => {
+globalThis.__dboBoardOpened = (actorId, zoneId) => {
   sendMailState(Number(actorId) >>> 0);
+  // What the world has nailed up in this hold: hunters' writs, the courts' censure (consequences.js, phase 2)
+  try { if (zoneId && typeof globalThis.__dboConsequenceBoardLines === 'function') for (const t of globalThis.__dboConsequenceBoardLines(String(zoneId)) || []) system(Number(actorId) >>> 0, `Nailed over the notices: ${t}`); } catch (e) { log('board consequence lines failed', e.message); }
   // The reader's hand goes to the chin (idles.js)
   try { if (typeof globalThis.__dboInteractionIdle === 'function') globalThis.__dboInteractionIdle(Number(actorId) >>> 0, 'board'); } catch (e) { log('board idle failed', e.message); }
 };
@@ -5178,6 +5180,8 @@ const seatOfficial = (z, rank, tg, by) => {
   audit(`${by.staff ? 'GM' : 'OFFICIAL'} ${by.who} appointed ${tg.who} ${rankTitle(rank, z.id)} of ${z.name}${tg.online ? '' : ' (offline)'}${by.via || ''}${by.overridden ? ` (Jarl rule overridden by an Owner: ${by.overridden})` : ''}`);
   if (had) courtOfficeSync(z, tg, had, false);
   courtOfficeSync(z, tg, rank, true);
+  // an appointment is the court's business (consequences.js); staff seating someone is not
+  if (!by.staff && typeof globalThis.__dboCourtBusiness === 'function') globalThis.__dboCourtBusiness(z.id, 'appointment');
   return { text: `${tg.label} is now ${rankTitle(rank, z.id)} of ${z.name}.${tg.online ? '' : ' They are offline and were not told.'}` };
 };
 // Removes tg's rank in z, if a may dismiss it. { error } or { text, had }
@@ -5192,6 +5196,7 @@ const unseatOfficial = (a, z, tg) => {
   if (tg.online) system(tg.online, `You are no longer ${rankTitle(had, z.id)} of ${z.name}.`);
   audit(`${isAdmin(a) ? 'GM' : 'OFFICIAL'} ${who(a)} dismissed ${tg.who} as ${rankTitle(had, z.id)} of ${z.name}${tg.online ? '' : ' (offline)'}`);
   courtOfficeSync(z, tg, had, false);
+  if (!isAdmin(a) && typeof globalThis.__dboCourtBusiness === 'function') globalThis.__dboCourtBusiness(z.id, 'dismissal');
   return { had, text: `${tg.label} is no longer ${rankTitle(had, z.id)} of ${z.name}.${tg.online ? '' : ' They are offline and were not told.'}` };
 };
 // Removes tg's rank in z for a process rather than a person (citizenship.js: an elected court replaces whoever held the
@@ -9543,7 +9548,7 @@ try {
 try {
   const CONSEQUENCES_JS = path.resolve('consequences.js');
   delete require.cache[CONSEQUENCES_JS];
-  require(CONSEQUENCES_JS)({ mp, log, personal, registerChatCommand, onlineActors, every, profileOf, zoneOfActor, isAdmin, cfg });
+  require(CONSEQUENCES_JS)({ mp, log, personal, registerChatCommand, onlineActors, every, profileOf, zoneOfActor, isAdmin, cfg, audit, giveItem, readOfficials });
 } catch (e) { log('consequences.js failed to load:', e.stack || e.message); globalThis.__dboConsequenceDeath = null; globalThis.__dboConsequenceDeed = null; }
 
 // ---- mining and woodcutting mini-games (server\labour.js, config "labour") ---------------------
