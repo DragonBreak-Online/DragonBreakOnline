@@ -227,6 +227,30 @@ fork_head() {
   echo "*** UNREADABLE - record it by hand before quoting this run ***"
 }
 say " fork HEAD   $(fork_head "$FORK" | cut -c1-96)"
+# HOW STALE IS THE FORK? This script already refuses a stale snapshot and resolves the tree from ls-remote,
+# and then measured the suite against a fork checkout 1052 commits behind origin/main without a word. The
+# cost was not abstract: spawn-reach failed two assertions and crashed on `sys.prespawnZones is not a
+# function`, a method that exists on origin/main and not in that checkout. Bundled from the tip it passes
+# all seven. It was reported as a real server-side failure on the strength of the stale tree.
+# Worse, the Windows and Linux runs used DIFFERENT forks (a local checkout vs dbo-dev's /opt/alduinak), so
+# every "platform artifact" drawn from comparing them was confounded by fork staleness as well.
+fork_behind() {
+  local d=$1 tip
+  tip=$(git -C "$d" ls-remote origin main 2>/dev/null | cut -f1) || return 1
+  [ -n "$tip" ] || { sudo -n git -C "$d" ls-remote origin main >/dev/null 2>&1 || return 1; }
+  [ -n "$tip" ] || return 1
+  git -C "$d" rev-list --count "HEAD..$tip" 2>/dev/null
+}
+BEHIND=$(fork_behind "$FORK")
+if [ -z "$BEHIND" ]; then
+  say " fork age    (could not reach origin to compare - record it by hand)"
+elif [ "$BEHIND" -eq 0 ]; then
+  say " fork age    at origin/main"
+elif [ "$BEHIND" -lt 25 ]; then
+  say " fork age    $BEHIND commit(s) behind origin/main"
+else
+  say " fork age    *** $BEHIND COMMITS BEHIND origin/main - failures below may be the fork, not the code ***"
+fi
 say " fork-server $FORK_SERVER"
 [ "$FORK_SERVER" = "$FORK" ] || say " fs HEAD     $(fork_head "$FORK_SERVER" | cut -c1-96)"
 # esbuild is what actually decides whether the bundle-taking harnesses run at all. Without it they SKIP and
