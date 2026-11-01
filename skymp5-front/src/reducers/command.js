@@ -4,18 +4,6 @@ export const commandReducer = (state = defaultState, action) => {
   switch (action.type) {
     case "COMMAND": {
       switch (action.data.commandType) {
-        case "SHOW_ANIMLIST": {
-          setTimeout(() => {
-            window.storage.dispatch({
-              type: "UPDATE_ANIMLIST_SHOW",
-              data: {
-                show: true,
-                list: action.data.commandArgs.anims,
-              },
-            });
-          }, 1);
-          break;
-        }
         default:
           setTimeout(() => {
             if (!Array.isArray(action.data.alter)) {

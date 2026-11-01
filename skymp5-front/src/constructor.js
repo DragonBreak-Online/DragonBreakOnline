@@ -12,8 +12,6 @@ import CheckBox from './constructorComponents/checkbox';
 import Text from './constructorComponents/text';
 import Chat from './constructorComponents/chat';
 import DeathScreen from './constructorComponents/death';
-import SkillsMenu from './features/skillsMenu';
-import TestMenu from './features/testMenu';
 import Trade from './features/trade';
 import AdminPanel from './features/adminPanel';
 import ContextMenu from './features/contextMenu';
@@ -253,9 +251,7 @@ const Constructor = props => {
     case 'chat':
       return (
         <>
-        <SkillsMenu send={rend.send}/>
         <Chat messages={rend.messages} send={rend.send} placeholder={rend.placeholder} isInputHidden={rend.isInputHidden} />
-        <TestMenu send={rend.send}/>
         </>
       );
     case 'trade':

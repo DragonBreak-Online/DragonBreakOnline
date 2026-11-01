@@ -2,10 +2,7 @@ import React from 'react';
 import { connect } from 'react-redux';
 
 import Chat from './constructorComponents/chat';
-import AnimList from './features/animList';
 import Constructor from './constructor';
-import SkillsMenu from './features/skillsMenu';
-import TestMenu from './features/testMenu';
 import { stableOrder } from './utils/widgetOrder';
 
 class App extends React.Component {
@@ -87,10 +84,7 @@ class App extends React.Component {
     if (this.state.isLoggined) {
       return (
         <div className={`App ${!window.hasOwnProperty('skyrimPlatform') ? 'bg' : ''}`}>
-          <AnimList />
           <Chat />
-          <SkillsMenu />
-          <TestMenu />
         </div>
       );
     } else if (this.state.widgets) {
