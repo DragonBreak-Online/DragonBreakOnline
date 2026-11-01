@@ -8781,6 +8781,14 @@ const pvpSourceMult = (src, beast) => {
   if (skill === 'blade' || skill === 'blunt') return Number(PVP.weaponMult) || 1;
   return skill === 'archery' ? Number(PVP.arrowMult) || 1 : 1;
 };
+// An arrow between players: the archery tier's bonus on the bow's damage only (Nat, 31 Oct: archery felt too strong). The
+// hit adds the arrow's damage to the bow's (arrowDamageMult a = 1 + arrow / bow) and the tier multiplied the sum (m), so a
+// Master archer doubled the arrow too; this turns m x a into m + a - 1. PvE keeps both. Config pvp.archeryTierOnBowOnly
+const pvpArcheryMult = (agg, src, beast) => {
+  if (beast || PVP.archeryTierOnBowOnly === false || weaponSkillOf(src) !== 'archery') return 1;
+  const m = masteryDamageMult(agg, src), a = arrowDamageMult(agg, src);
+  return m > 1 && a > 1 ? (m + a - 1) / (m * a) : 1;
+};
 // A vampire burns under fire and silver, a werewolf in beast form under silver and poison (supernatural.js
 // __dboSuperDamageMult): the extra comes off after the engine's hit, measured from what landed once the mastery chain
 // (Defense, a blessing, the race, capped together at racial.js reductionCap) had its say. A weakness is a separate
@@ -9230,7 +9238,7 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     if (racial) { try { targetSide = racial.capTargetSide(targetSide * racial.targetMult(agg, tgt, src, dmg)); } catch (e) { log('racial target failed', e.message); } }
     let raceAtk = 1;
     if (racial && !beastAgg) { try { raceAtk = racial.attackMult(agg, tgt, src, dmg, flags); } catch (e) { log('racial attack failed', e.message); } }
-    let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * potionTakenMult(tgt, flags) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp * (agg !== tgt && profileOf(agg) >= 0 && profileOf(tgt) >= 0 ? pvpSourceMult(src, beastAgg) : 1);
+    let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * potionTakenMult(tgt, flags) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp * (agg !== tgt && profileOf(agg) >= 0 && profileOf(tgt) >= 0 ? pvpSourceMult(src, beastAgg) * pvpArcheryMult(agg, src, beastAgg) : 1);
     if (!beastAgg) mult *= gearAttackMult(agg, src);
     // A Hagraven's Destruction (hagraven.js), by her stage
     try { if (globalThis.__dboHagravenAttackMult) mult *= Number(globalThis.__dboHagravenAttackMult(agg, src)) || 1; } catch (e) { log('hagraven attack failed', e.message); }
