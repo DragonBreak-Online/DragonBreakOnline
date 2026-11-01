@@ -59,6 +59,23 @@ globalThis.__dboBaseValue = (id) => ({ [SWORD]: 100, [CUIRASS]: 200 })[id] || 10
 let smithTier = 1;
 globalThis.__dboSmithCraftTier = () => smithTier;
 globalThis.__dboSmithItemTier = () => 2;
+// Live config ships it switched off (Nate 19 Oct, until the population is higher): off, nothing wears. The rest runs it on.
+const liveOn = !!(api.cfg.durability && api.cfg.durability.enabled);
+api.cfg = JSON.parse(JSON.stringify(api.cfg));
+api.cfg.durability = Object.assign({}, api.cfg.durability, { enabled: false });
+require(path.join(SERVER, 'durability.js'))(api);
+put(0xff0000ee, 'profileId', 2);
+put(0xff0000ee, 'equipment', { inv: { entries: [{ baseId: SWORD, count: 1, worn: true }, { baseId: CUIRASS, count: 1, worn: true }] } });
+globalThis.__dboDurabilityEquip(0xff0000ee, mp.get(0xff0000ee, 'equipment'));
+for (let i = 0; i < 400; i++) { globalThis.__dboDurabilityHit(0xff0000ee, 0xff000020, SWORD, {}); globalThis.__dboDurabilityHit(0xff000020, 0xff0000ee, 0x1f4, {}); }
+globalThis.__dboDurabilityDeath(0xff0000ee);
+ok(!Object.keys(mp.get(0xff0000ee, 'private.dboWear') || {}).length && globalThis.__dboDurabilityMult(0xff0000ee, SWORD, false, '') === 1,
+  `switched off, 400 blows, 400 hits taken and a death wear nothing (live config: ${liveOn ? 'on' : 'off'})`, mp.get(0xff0000ee, 'private.dboWear'));
+put(0xff0000ee, 'private.dboWear', { [`${SWORD}|`]: 300 });
+globalThis.__dboDurability.ledgers.delete(0xff0000ee); // the module keeps a ledger read for 50 ms
+ok(globalThis.__dboDurabilityMult(0xff0000ee, SWORD, false, '') === 1, '...and wear kept from before costs nothing while it is off');
+delete require.cache[path.join(SERVER, 'durability.js')];
+api.cfg.durability.enabled = true;
 const D = require(path.join(SERVER, 'durability.js'))(api);
 const lastSaid = () => (said[said.length - 1] || [])[1] || '';
 const lastWidget = () => (widgets[widgets.length - 1] || {}).w || {};
@@ -88,6 +105,20 @@ globalThis.__dboDurabilityEquip(P, mp.get(P, 'equipment'));
   // A death: every worn piece a whole tier; the sword, Worn already, is Damaged
   globalThis.__dboDurabilityDeath(P);
   ok(globalThis.__dboDurabilityMult(P, SWORD, false, '') === 0.75 && globalThis.__dboDurabilityMult(P, CUIRASS, false, '') === 0.75, 'a death drops every worn piece a tier (Damaged, 0.75)');
+  // gamemode.js reads that wear into its damage math: its own helpers, lifted, against the Damaged sword and cuirass
+  {
+    const gm = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8').replace(/\r\n/g, '\n');
+    const lift = (start) => { const i = gm.indexOf(start); if (i < 0) return ''; const one = gm.indexOf('\n', i); const head = gm.slice(i, one); return /;\s*$/.test(head) ? head : gm.slice(i, gm.indexOf('\n};\n', i) + 3); };
+    const src = ['const temperBonus = ', 'const wearCondOf = ', 'const wornWithHealth = ', 'const temperDamageMult = ', 'const armorCountOf = '].map(lift);
+    let got = null;
+    try {
+      got = new Function('mp', 'bandedDamageOf', `${src.join('\n')}\nreturn { worn: wornWithHealth(${P}), weapon: temperDamageMult(${P}, ${SWORD}), counts: armorCountOf };`)(mp, () => 10);
+    } catch (e) { got = { error: e.message }; }
+    const cuirass = got && got.worn && got.worn.find((w) => w.baseId === CUIRASS);
+    const unit = { heavy: 1, light: 1 }, piece = { rating: 20, heavy: true };
+    ok(src.every(Boolean) && got && !got.error && cuirass && cuirass.cond === 0.75 && got.weapon === 0.75 && got.counts(piece, 1, cuirass.cond, unit, unit) === 15,
+      'gamemode.js: the Damaged sword strikes at 0.75 and the Damaged cuirass counts 0.75 of its rating', got && (got.error || { worn: got.worn, weapon: got.weapon }));
+  }
   // Taking the sword off writes its tier into its name
   dress([{ baseId: SWORD, count: 1 }, { baseId: CUIRASS, count: 1, worn: true }, { baseId: BOOTS, count: 1, worn: true }, { baseId: SHIELD, count: 1, wornLeft: true }, { baseId: GOLD, count: 100 }]);
   globalThis.__dboDurabilityEquip(P, mp.get(P, 'equipment'));
@@ -170,7 +201,7 @@ globalThis.__dboDurabilityEquip(P, mp.get(P, 'equipment'));
     const KIT = 0x777, given = [];
     api.giveItem = (a, id, n) => { given.push([id, n]); return true; };
     api.cfg = JSON.parse(JSON.stringify(api.cfg));
-    api.cfg.durability = Object.assign({}, api.cfg.durability, { fieldKits: { '777:Skyrim.esm': { kind: 'weapon', maxTier: 1 } } });
+    api.cfg.durability = Object.assign({}, api.cfg.durability, { fieldKits: { '777:Skyrim.esm': { kind: 'weapon', maxTier: 1 } } }); // verify-formids: ignore (fake kit ids)
     const reload = () => { delete require.cache[path.join(SERVER, 'durability.js')]; require(path.join(SERVER, 'durability.js'))(api); };
     reload();
     const realRandom = Math.random;
@@ -203,7 +234,7 @@ globalThis.__dboDurabilityEquip(P, mp.get(P, 'equipment'));
     await wait(60);
     ok(use(KIT, 0) === true && given.some(([id]) => id === KIT) && /needs a smith/.test(lastSaid()), 'a Damaged sword is beyond a tool: handed back', lastSaid());
     // Grades and kinds
-    api.cfg.durability.fieldKits = { '781:Skyrim.esm': { kind: 'light', maxTier: 1 }, '782:Skyrim.esm': { kind: 'heavy', maxTier: 1 }, '783:Skyrim.esm': { kind: 'any', maxTier: 1, gearTier: 1 } };
+    api.cfg.durability.fieldKits = { '781:Skyrim.esm': { kind: 'light', maxTier: 1 }, '782:Skyrim.esm': { kind: 'heavy', maxTier: 1 }, '783:Skyrim.esm': { kind: 'any', maxTier: 1, gearTier: 1 } }; // verify-formids: ignore (fake kit ids)
     reload();
     RECORDS[0x9001] = { type: 'ARMO', editorId: 'ArmorLeatherCuirass', fields: [(() => { const b = new Uint8Array(8); new DataView(b.buffer).setUint32(0, 0x4, true); new DataView(b.buffer).setUint32(4, 0, true); return { type: 'BOD2', data: b }; })()] };
     RECORDS[0x9002] = { type: 'ARMO', editorId: 'ArmorSteelCuirass', fields: [(() => { const b = new Uint8Array(8); new DataView(b.buffer).setUint32(0, 0x4, true); new DataView(b.buffer).setUint32(4, 1, true); return { type: 'BOD2', data: b }; })()] };
@@ -226,8 +257,8 @@ globalThis.__dboDurabilityEquip(P, mp.get(P, 'equipment'));
   }
   // ---- gamemode.js wiring -----------------------------------------------------------------------------------------
   const gm = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
-  ok(/__dboDurabilityMult\(a, Number\(e\.baseId\) >>> 0, !!e\.wornLeft, e\.name \|\| ''\)/.test(gm) && (gm.match(/\* \(w\.cond \|\| 1\);/g) || []).length === 2 && /\* \(\(w && w\.cond\) \|\| 1\)/.test(gm),
-    'gamemode.js: wear counts in the armour math (Defense and Flesh) and in the weapon\'s damage');
+  ok(['defenseDamageMult', 'fleshDamageMult'].every((f) => { const i = gm.indexOf(`const ${f} = `); return i >= 0 && gm.slice(i, gm.indexOf('\n};', i)).includes('armorCountOf(p, w.health, w.cond, pm, gm)'); }),
+    'gamemode.js: Defense and Flesh count each worn piece through armorCountOf, with its wear');
   ok(/__dboDurabilityHit\(agg >>> 0, tgt >>> 0, src >>> 0, flags\)/.test(gm) && /__dboDurabilityDeath\(Number\(actorId\)/.test(gm) && /__dboDurabilityEquip\(a, equipment\)/.test(gm)
     && /__dboRepairActivate\(targetId >>> 0, casterId >>> 0\)/.test(gm) && /__dboDurabilityLeave\(a\)/.test(gm), 'gamemode.js: hits, deaths, equipment, the activate chain and logout reach it');
   console.log(fails ? `${fails} failed` : 'all passed');
