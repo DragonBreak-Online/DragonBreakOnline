@@ -241,6 +241,53 @@ ok(gcfg.hagraven.form && gcfg.hagraven.form.enabled === false && gcfg.hagraven.p
 ok(/__dboHagravenSpares\(agg, tgt\)\) return false;/.test(src('gamemode.js')) && /globalThis\.__dboIsForsworn = /.test(src('briarheart.js')), 'gamemode.js refuses a Forsworn\'s hit through hagraven.js, which asks briarheart.js who is Forsworn');
 ok(gcfg.hagraven.forswornFriendly === true && gcfg.hagraven.forswornFaction === '43599:Skyrim.esm', 'the shipped config: the Forsworn\'s own (acting once the pact is on)');
 
+// ---- the looks and the crows: DBO_HagravenLooks.esp (Worker 3, 1 Nov) ---------------------------------------------------------
+const L = 'DBO_HagravenLooks.esp', FCROWN = 0xa2000800, BCROWN = 0xa2000801, CROWS = 0xa2000802, BREAD = 0x64b31;
+const loaded = (on) => { for (const [d, id] of [[`800:${L}`, FCROWN], [`801:${L}`, BCROWN], [`802:${L}`, CROWS]]) { if (on) ID[d] = id; else delete ID[d]; } };
+const LCFG = { hagraven: { enabled: true, visual: { enabled: true, stages: { 2: `800:${L}`, 3: `801:${L}` } }, crowsSpell: `802:${L}`, form: { enabled: false } }, briarheart: { enabled: true } };
+loaded(true); loadB(LCFG); H = loadH(LCFG);
+const calls = (method, desc) => papyrusCalls.filter((c) => c.method === method && c.self === mp.getDescFromId(WITCH) && c.args[0] === desc);
+const fresh = () => { papyrusCalls.length = 0; given.length = 0; };
+const holding = (...ids) => setP(WITCH, 'inventory', { entries: [{ baseId: BREAD, count: 2 }, ...ids.map((baseId) => ({ baseId, count: 1 }))] });
+run('hagraven', LEAD, 'revoke witch looks reset');
+fresh(); holding();
+run('hagraven', LEAD, 'grant witch looks test');
+ok(globalThis.__dboHagravenStage(WITCH) === 1 && !given.length && !calls('EquipItem', `800:${L}`).length && !calls('AddSpell', `802:${L}`).length, 'stage 1: no crown and no Crow Bringer', { given, papyrusCalls });
+fresh();
+run('hagraven', LEAD, 'stage witch 2 looks test');
+ok(given.some(([a, id]) => a === WITCH && id === FCROWN) && calls('EquipItem', `800:${L}`).length === 1, 'stage 2: the Feathered Crown is given and equipped', { given });
+ok(!calls('AddSpell', `802:${L}`).length && calls('RemoveSpell', `802:${L}`).length >= 1, 'stage 2: no Crow Bringer');
+fresh(); holding(FCROWN);
+run('hagraven', LEAD, 'stage witch 3 looks test');
+ok(inv(WITCH, FCROWN) === 0 && inv(WITCH, BREAD) === 2, 'stage 3: the Feathered Crown is taken back, nothing else', P(WITCH, 'inventory'));
+ok(given.some(([a, id]) => a === WITCH && id === BCROWN) && calls('EquipItem', `801:${L}`).length === 1, 'stage 3: the Hagraven\'s Crown is given and equipped', { given });
+ok(calls('AddSpell', `802:${L}`).length === 1 && calls('AddSpell', `802:${L}`)[0].args[1] === false, 'stage 3: Crow Bringer is added, quietly, though the body is off');
+fresh(); holding(BCROWN);
+run('hagraven', LEAD, 'stage witch 3 looks again');
+ok(inv(WITCH, BCROWN) === 1 && !given.some(([, id]) => id === BCROWN), 'stage 3 again with the crown held: kept, not given twice');
+fresh(); holding(BCROWN);
+run('hagraven', LEAD, 'stage witch 2 looks down');
+ok(inv(WITCH, BCROWN) === 0 && inv(WITCH, BREAD) === 2 && calls('RemoveSpell', `802:${L}`).length >= 1, 'back to stage 2: the Hagraven\'s Crown and Crow Bringer are taken back');
+fresh(); holding(FCROWN, BCROWN);
+run('hagraven', LEAD, 'revoke witch looks over');
+ok(globalThis.__dboHagravenStage(WITCH) === 0 && inv(WITCH, FCROWN) === 0 && inv(WITCH, BCROWN) === 0 && inv(WITCH, BREAD) === 2, 'the pact ends: both crowns are taken back, the rest stays', P(WITCH, 'inventory'));
+ok(calls('RemoveSpell', `802:${L}`).length >= 1, 'the pact ends: Crow Bringer is taken back');
+// Looks switched off: what she holds is still taken back, nothing is given
+loadB(LCFG); H = loadH({ hagraven: Object.assign({}, LCFG.hagraven, { visual: { enabled: false, stages: LCFG.hagraven.visual.stages } }), briarheart: { enabled: true } });
+run('hagraven', LEAD, 'grant witch looks off');
+fresh(); holding(FCROWN);
+run('hagraven', LEAD, 'stage witch 3 looks off');
+ok(inv(WITCH, FCROWN) === 0 && !given.length && !calls('EquipItem', `801:${L}`).length, 'visual off: no crown given, a held one taken back');
+run('hagraven', LEAD, 'revoke witch looks off');
+// The plugin not in the load order: the descs resolve to nothing, and nothing is called or given
+loaded(false); loadB(LCFG); H = loadH(LCFG);
+run('hagraven', LEAD, 'grant witch unloaded');
+fresh(); holding();
+run('hagraven', LEAD, 'stage witch 3 unloaded');
+ok(globalThis.__dboHagravenStage(WITCH) === 3 && !given.length && !papyrusCalls.some((c) => c.args.some((x) => String(x).endsWith(L))), 'without DBO_HagravenLooks loaded: no crown, no Crow Bringer, no call naming it', papyrusCalls);
+run('hagraven', LEAD, 'revoke witch unloaded');
+ok(gcfg.hagraven.visual && gcfg.hagraven.visual.enabled === true && gcfg.hagraven.visual.stages[2] === `800:${L}` && gcfg.hagraven.visual.stages[3] === `801:${L}` && !gcfg.hagraven.visual.stages[1] && gcfg.hagraven.crowsSpell === `802:${L}`, 'the shipped config: the crowns at stages 2 and 3, Crow Bringer, by plugin name', gcfg.hagraven);
+
 process.chdir(cwd);
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
 process.exit(fails ? 1 : 0);

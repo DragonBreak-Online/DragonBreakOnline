@@ -4,8 +4,10 @@
 //
 // A curse on the character's own humanoid race, never a race change or a beast form: the vanilla HagravenRace (Skyrim
 // 0131FB) is not playable (DATA flags 0x8900, a non-humanoid HagravenProject.hkx graph), and a non-humanoid caster is the
-// known path to watcher crashes (server memory remote-vampire-lord-crashes-watchers). The look (H5) and the crows (H3) wait
-// for Nat's models: config visual holds one armour per stage, empty until then.
+// known path to watcher crashes (server memory remote-vampire-lord-crashes-watchers). The look (H5) and the crows (H3) are
+// DBO_HagravenLooks.esp (Worker 3, 1 Nov): config visual holds one non-playable crown per stage (2 Feathered, 3 Hagraven),
+// crowsSpell the Crow Bringer power at stage 3. Descs name the plugin, so they resolve wherever it sits in the order, and
+// resolve to nothing (inert) while it is not loaded.
 // Not a supernatural.js kind (that would make her a beast to gamemode.js, guilds.js and beastform.js): the record is its own
 // (private.dboHagraven) and refuses, and is refused by, a vampire, a werewolf, a fever and a Briarheart.
 //
@@ -72,6 +74,8 @@ module.exports = (api) => {
   // Descs, empty until the records are in the load order: display { 1, 2, 3 }, powerSpell
   C.display = Object.assign({ 1: '', 2: '', 3: '' }, (cfg && cfg.hagraven && cfg.hagraven.display) || {});
   C.powerSpell = String((cfg && cfg.hagraven && cfg.hagraven.powerSpell) || '');
+  // Crow Bringer (H3): a Lesser Power she holds at stage 3, whatever the body's switch says
+  C.crowsSpell = String((cfg && cfg.hagraven && cfg.hagraven.crowsSpell) || '');
   const PROP = 'private.dboHagraven';
   const MIN = 60000, HOUR = 3600000, DAY = 86400000;
   const NAMES = ['', 'Crone-touched', 'Feathered', 'Hagraven'];
@@ -119,6 +123,19 @@ module.exports = (api) => {
     if (!isOnline(a)) return;
     for (const k of [1, 2, 3]) { const d = String(C.display[k] || ''); if (d && idOf(d)) papyrus(a, k === st ? 'AddSpell' : 'RemoveSpell', k === st ? [spellArg(d), false] : [spellArg(d)]); }
     const p = C.powerSpell; if (p && idOf(p)) papyrus(a, st >= 3 && C.form.enabled !== false ? 'AddSpell' : 'RemoveSpell', st >= 3 && C.form.enabled !== false ? [spellArg(p), false] : [spellArg(p)]);
+    const c = C.crowsSpell; if (c && idOf(c)) papyrus(a, st >= 3 ? 'AddSpell' : 'RemoveSpell', st >= 3 ? [spellArg(c), false] : [spellArg(c)]);
+  };
+  // The crowns of the stages she is not at (all of them at the end) leave her inventory: each is non-playable, so she could
+  // never drop or sell it, and a crown kept from stage 2 would sit beside stage 3's. Taken whatever visual.enabled says, so
+  // turning the looks off takes them back at the next stage change or login.
+  const dropLooks = (a, keepStage) => {
+    const stages = (C.visual && C.visual.stages) || {};
+    const drop = new Set([1, 2, 3].filter((k) => k !== keepStage).map((k) => String(stages[k] || '')).filter(Boolean).map(idOf).filter(Boolean));
+    const entries = invOf(a);
+    if (!drop.size || !entries.some((e) => drop.has(Number(e.baseId) >>> 0))) return false;
+    set(a, 'inventory', { entries: entries.filter((e) => !drop.has(Number(e.baseId) >>> 0)) });
+    log(`hagraven: took back the crown(s) of other stages from ${display(a)} (stage ${keepStage || 'none'})`);
+    return true;
   };
   const forsworn = (a, on, why) => {
     if (!isOnline(a) || !idOf(C.forswornFaction)) return;
@@ -134,12 +151,15 @@ module.exports = (api) => {
       log(`hagraven: SpeedMult ${C.speedMult} on ${display(a)} (${why}, stage ${st})`);
     }
     if (st >= 2) lapseCitizenship(a, why);
+    dropLooks(a, st);
     const look = C.visual && C.visual.enabled && C.visual.stages ? String(C.visual.stages[st] || '') : '';
     if (look) { const id = idOf(look); if (id && !hasOne(a, id) && giveItem) giveItem(a >>> 0, id, 1); if (id) papyrus(a, 'EquipItem', [{ type: 'espm', desc: look }, false, true]); }
   };
-  const undoStage = (a, stageWas) => {
+  // restaging: a staff stage change, which applyStage follows at once (its dropLooks keeps the new stage's crown)
+  const undoStage = (a, stageWas, restaging) => {
     if (isOnline(a) && stageWas >= 2 && Number(C.speedMult) > 0 && Number(C.speedMult) !== 100) papyrus(a, 'SetActorValue', ['SpeedMult', 100]);
     showStage(a, 0);
+    if (!restaging) dropLooks(a, 0);
     if (C.forswornFriendly) forsworn(a, false, 'the pact ended');
   };
   // gamemode.js onHitDamageAttempt: true refuses a Forsworn's (or a hagraven's) hit on a pact-holder. Her own hit on one
@@ -387,7 +407,7 @@ module.exports = (api) => {
         if (!stageOf(t)) return personal(a, `${display(t)} has made no pact.`);
         const r = recOf(t); r.stage = st; r.played = st >= 3 ? Number(C.stageHours[1]) * HOUR : st === 2 ? Number(C.stageHours[0]) * HOUR : 0; set(t, PROP, r);
         if (st < 3) leaveForm(t, 'no longer a Hagraven');
-        undoStage(t, 3); applyStage(t, `staff stage ${st}`);
+        undoStage(t, 3, true); applyStage(t, `staff stage ${st}`);
         audit(`HAGRAVEN ${who(a)} set ${who(t)} to stage ${st} (${NAMES[st]}): ${why}`);
         return personal(a, `${display(t)} is ${NAMES[st]}.`);
       }
