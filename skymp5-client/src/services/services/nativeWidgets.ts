@@ -32,6 +32,8 @@ export const NATIVE_WIDGETS: Readonly<Record<string, string>> = {
   trade: "dbo_trade",
   // The death screen (deathScreenService): the countdown and the three choices; the browser widget if the panel fails
   death: "dbo_death",
+  // The kick screen (kickService), only while the world runs: over the main menu no panel can open
+  kick: "dbo_kick",
   // No emoteWheel entry, deliberately. The emote wheel stays on the CEF overlay: it is a hold-and-flick
   // wheel, and a CustomMenu is modal and pauses the game, which is the wrong shape for it (the Leader,
   // 26 Oct, agreeing with the original split). emoteService may keep its openNative call - with no entry here
