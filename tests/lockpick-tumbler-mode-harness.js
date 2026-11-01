@@ -19,7 +19,7 @@ const scenarios = (src, live) => {
   try {
     let mono = 1000000;
     globalThis.performance = { now: () => mono };
-    const caps = new Set(['lockpickLocal', 'pickRound', 'lockpickTumbler']);
+    const caps = new Set(['lockpickLocal', 'pickRound', 'native:lockpick']);
     const props = new Map();
     const set = (id, k, v) => props.set(id + '|' + k, v);
     const get = (id, k) => props.get(id + '|' + k);
@@ -48,7 +48,7 @@ const scenarios = (src, live) => {
     picks(3);
     let w = begin(2);
     t(w.mode === 'tumbler' && Array.isArray(w.rises) && w.rises.length === 3 && w.snaps === undefined && w.softMs > 0 && w.auto > 0,
-      'a client naming lockpickTumbler gets a tumbler lock: a rise per pin, a soft band, the auto chance, and no snap list', w);
+      'a client naming native:lockpick gets a tumbler lock: a rise per pin, a soft band, the auto chance, and no snap list', w);
     t(w.rises.every((r) => r >= 250) && w.holds.every((h) => h >= 150), 'no rise under 250 ms and no hang under 150 ms (30 fps in the menu)', [w.rises, w.holds]);
     report(w, 'win', [good(w, 0, 0), good(w, 1, 2000), good(w, 2, 4000)]);
     t(opened === 1 && pickCount() === 3 && last().noticeKind === 'win', 'three pins set in their hang open the lock, no pick lost', [opened, pickCount(), last().noticeKind]);
@@ -120,10 +120,10 @@ const scenarios = (src, live) => {
     delete globalThis.__dboBirthsignSnapMult;
     t(tower === Math.round(plain * 1.25), 'the Tower widens the soft band by a quarter', [plain, tower]);
 
-    caps.delete('lockpickTumbler');
+    caps.delete('native:lockpick');
     w = begin(2);
     t(w.mode === 'pick' && w.rises === undefined, 'without the tumbler cap the pick round is unchanged', w.mode);
-    caps.add('lockpickTumbler');
+    caps.add('native:lockpick');
     load({ lockpick: { enabled: true, tumbler: { enabled: false } } });
     picks(3);
     w = begin(2);

@@ -4227,7 +4227,7 @@ const sendPacket = (a, payload) => {
 // shrinePanel, courierHandover: supernatural.js widget 74 and couriers.js 81; their Escape is the router's close, which both read
 // playerMenu: the U panel (widget 52); menuRun closes it as for the browser
 // birthsignPicker: birthsigns.js widget 163 (dbo:birthsignPick/birthsignClose); a pick closes it through closeWidget
-// lockpick: lockpick.js widget 46 (dbo:lockpickResult/lockpickAuto/lockpickCancel); a tumbler lock for a client naming lockpickTumbler
+// lockpick: lockpick.js widget 46 (dbo:lockpickResult/lockpickAuto/lockpickCancel); the cap also makes it a tumbler lock
 const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_journal', deityPicker: 'dbo_deity', rite: 'dbo_rite', dungeonGate: 'dbo_dungeon', labour: 'dbo_labour', pigeon: 'dbo_pigeon', bank: 'dbo_bank',
   businessLedger: 'dbo_ledger', propertyMarket: 'dbo_market', keyRing: 'dbo_keyring', tomeShop: 'dbo_tomes',
   shrinePanel: 'dbo_shrine', courierHandover: 'dbo_courier', playerMenu: 'dbo_menu', spellbook: 'dbo_spellbook', studyMagic: 'dbo_study',

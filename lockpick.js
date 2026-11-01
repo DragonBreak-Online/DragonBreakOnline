@@ -26,8 +26,8 @@
 // that is not the loose one (now answered), and the relay's close (now ends the lock instead of leaving it busy 60 s).
 // lockpick.clientJudged false stops new client locks; one already issued is still accepted until it times out.
 //
-// Tumblers (Nat, 1 Nov: an Oblivion-style lock as our own native panel, _work/lockpick-native-1031.md). A UI that names
-// 'lockpickTumbler' (the native dbo_lockpick) gets a lock where every pin has its own rise (rises: [ms]) and the misses
+// Tumblers (Nat, 1 Nov: an Oblivion-style lock as our own native panel, _work/lockpick-native-1031.md). A client naming
+// 'native:lockpick' (the only panel that plays it) gets a lock where every pin has its own rise (rises: [ms]) and the misses
 // are decided by the timing, so nothing is rolled in advance and no snap list is sent: a set inside the hang is a set, a
 // set within softMs of it drops the set pins, anything further breaks the pick and drops them too. The widget reports
 // its tries [tumbler, pushMs, setMs] as before; the server's replay is the verdict, whatever the report claims, and a
@@ -75,7 +75,7 @@ module.exports = (api) => {
     holdMin: 150, softMs: 80, softMsPerTier: 15, maxTries: 200 }, C.tumbler || {});
   const AUTO = Object.assign({ enabled: true, chanceByTier: [[0.25, 0.15, 0.08, 0.04, 0.02], [0.35, 0.25, 0.15, 0.08, 0.04], [0.5, 0.38, 0.25, 0.15, 0.08],
     [0.65, 0.52, 0.4, 0.28, 0.18], [0.78, 0.66, 0.54, 0.42, 0.3], [0.9, 0.8, 0.68, 0.54, 0.4]] }, TUMBLER.auto || {});
-  const TUMBLER_CAP = 'lockpickTumbler';
+  const TUMBLER_CAP = 'native:lockpick';
   const autoChanceOf = (L) => {
     const rows = Array.isArray(AUTO.chanceByTier) ? AUTO.chanceByTier : [];
     const row = rows[Math.max(0, Math.min(rows.length - 1, L.tier + 1))];
