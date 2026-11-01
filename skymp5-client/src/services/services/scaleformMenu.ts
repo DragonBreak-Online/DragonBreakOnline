@@ -53,6 +53,8 @@ export const NATIVE_CAPS = [
   "native:lockpick",
   // Skinning a kill (dbo_skinning, widget 33; dbo:skinning/skinningCancel), the blade and the pick rounds
   "native:skinning",
+  // The Scholar's reading (dbo_reading, widget 30; dbo:reading/readingCancel), the candle and the pick rounds
+  "native:reading",
   // Worker 6's pigeon coop (dbo_pigeon, widget 34). All its keys are dbo:*, and its typed input goes back to
   // the browser coop with browser: 1, so the cap is the whole of the client's part.
   "native:pigeon",
