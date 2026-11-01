@@ -42,8 +42,11 @@ const DG_DOORS = hallDoors('dawnguard').map(idOf);
 let unreadable = new Set();
 const grants = [];
 let grantErr = '';
+let rootOfKnownCalls = 0;
 const H = {
   primaryOf: (ref) => memberOf.get(Number(ref) >>> 0) || (Number(ref) >>> 0),
+  // housing's restart-B rootOfKnown: the same answer, without reading a door no claim owns
+  rootOfKnown(ref) { rootOfKnownCalls++; return this.primaryOf(ref); },
   recordOf: (ref) => (unreadable.has(Number(ref) >>> 0) ? null : recs.get(Number(ref) >>> 0) || null),
   grant: (ref, actor) => {
     if (grantErr) return grantErr;
@@ -98,6 +101,7 @@ const castleRefs = [CASTLE, CASTLE_FAR];
 // The roots are built in the background (1 Nov: a cold build inside the first login froze the loop 28 s), never by a caller
 ok(globalThis.__dboHallLeader(castleRefs, COUNTESS) === false, 'before the background build the root is not known yet, and asking does not build it');
 ok(globalThis.__dboHallRootsBuild().has(CASTLE), 'the roots build: the root 6c473 of Castle Bruma carries its listed doors');
+ok(rootOfKnownCalls > 0, 'the build asks housing rootOfKnown when the fork has it (no cold read of unclaimed hall doors)', rootOfKnownCalls);
 ok(globalThis.__dboHallLeader(castleRefs, COUNTESS) === true, 'the Countess holds Castle Bruma by its root (6c473), through its listed doors');
 ok(globalThis.__dboHallLeader([SPIRE, 0], 0xff000303) === false, 'the College of Whispers has no leader in this roster, so no one holds the Spire');
 ok(globalThis.__dboHallLeader([FG, 0], STIBBONS) === true, 'Stibbons holds the Fighters Guild (root eeb is a listed door, as before)');
