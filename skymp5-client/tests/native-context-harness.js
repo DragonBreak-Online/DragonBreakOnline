@@ -55,6 +55,13 @@ const nativeOrder = (t) => Object.keys(B(t).kids).filter((n) => /^(head\d+|r\d)$
   check('hover focuses', u.root.dboPanel.body.r0._alpha === 100);
   u.root.dboPanel.body.r0.onRelease();
   check('another widget\'s events are used verbatim', msgs(u, 'salvage:break').length === 1 && msgs(u, 'pa:action').length === 0);
+  // A module's menu from the server (gamemode.js routes focused contextMenus here): its dbo: events, the row id alone
+  const g = S.boot('dbo_context');
+  g.push({ targetName: 'Smelter', mode: 'menu', actions: [{ id: 'n7|iron', label: 'Iron Ingot' }, { id: 'n7|steel', label: 'Steel Ingot' }], events: { action: 'dbo:salvageChoose', close: 'dbo:salvageClose' } });
+  g.root.dboPanel.body.r1.onRelease();
+  check('a server menu sends its own dbo: action with the row id', JSON.stringify(msgs(g, 'dbo:salvageChoose').map((m) => m.args)) === JSON.stringify([['n7|steel']]) && !msgs(g, 'pa:action').length, g.msgs());
+  g.root.dboPanel.body.close.onRelease();
+  check('...and Close sends its dbo: close and shuts the menu', msgs(g, 'dbo:salvageClose').length === 1 && !msgs(g, 'pa:close').length && closed(g));
   const c = S.boot('dbo_context');
   c.push(guardMenu);
   c.root.dboPanel.body.close.onRelease();

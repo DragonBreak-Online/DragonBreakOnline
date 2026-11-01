@@ -5,7 +5,7 @@ import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { parseCustomPacket, sendCustomPacket } from "./customPacketUtil";
 import {
-  Action, CAPS_RETRY_MS, MENU_NAME, MenuState, OUT_VAR, UiEvent, capsFor, isNew, newState, parseOutbox,
+  Action, CAPS_RETRY_MS, CLIENT_CAPS, MENU_NAME, MenuState, OUT_VAR, UiEvent, capsFor, isNew, newState, parseOutbox,
   escapeTargetFor, parseUiEvent, planClose, planOpen, planReady, planRefresh, planTick, readyFrameOf, summary,
 } from "./scaleformMenu";
 import { buttonKeyCode } from "./mouseKeys";
@@ -65,7 +65,7 @@ export class ScaleformMenuService extends ClientListener {
     try {
       const caps = capsFor(this.nativePanelsSetting());
       sendCustomPacket(this.controller, {
-        customPacketType: "dbo", event: "nativeCaps", args: caps, widget: 0,
+        customPacketType: "dbo", event: "nativeCaps", args: [...caps, ...CLIENT_CAPS], widget: 0,
       });
       this.announcedAt = Date.now();
       this.announces++;
