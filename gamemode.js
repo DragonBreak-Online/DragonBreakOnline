@@ -6188,13 +6188,28 @@ const isWorldspace = (desc) => {
   if (!worldKind.has(key)) { let w = false; try { const r = recordOf(mp.getIdFromDesc(desc)); w = !!(r && String(r.record.type) === 'WRLD'); } catch (e) { /* unknown */ } worldKind.set(key, w); }
   return worldKind.get(key);
 };
-// The hold a place lies in by geography: a region by its worldspace, an interior by zone-cells.json, else the hold whose
-// capital is nearest. What weather, temples, who hears a howl and how far a runner goes are about (holdOfActor)
+// The hold of the cell holding (x, y) in the fork's hold-cells table (zones.ts cellHold, same arithmetic), or null outside it
+const cellHoldOf = (t, x, y) => {
+  const i = Math.floor(x / 4096) - t.c0, j = t.c0 + t.n - 1 - Math.floor(y / 4096);
+  if (!(i >= 0 && i < t.n && j >= 0 && j < t.n)) return null;
+  const ch = t.rows[j][i];
+  return ch === '.' ? null : t.holds[parseInt(ch, 36)] || null;
+};
+// The hold a place lies in by geography: a region by its worldspace, an interior by zone-cells.json, else its cell's hold
+// from the game's own data when the fork has loaded hold-cells.json (zones.json sovereignty.holdsFromCells; the fork
+// publishes the table as globalThis.__dboHoldCells and this reads that object, never the file, so the two cannot disagree
+// and a restart switches both at once), else the hold whose capital is nearest. What weather, temples, who hears a howl and
+// how far a runner goes are about (holdOfActor)
 const holdAtPlace = (world, pos) => {
   const w = normPlace(world);
   for (const r of ZONES.regions || []) if ((r.worldspaces || []).map(normPlace).includes(w)) return r.id;
   if (!isWorldspace(world)) return zoneOfCell(world);
   if (!TAMRIEL_FRAME.has(w) || !Array.isArray(pos)) return null;
+  const cells = globalThis.__dboHoldCells;
+  if (cells && Array.isArray(cells.rows) && Number.isFinite(Number(pos[0])) && Number.isFinite(Number(pos[1]))) {
+    const id = cellHoldOf(cells, Number(pos[0]), Number(pos[1]));
+    if (id && (ZONES.holds || []).some((h) => h.id === id)) return id;
+  }
   let best = null, bestD = Infinity;
   for (const h of ZONES.holds || []) { if (!Array.isArray(h.capital)) continue; const d = Math.hypot(pos[0] - h.capital[0], pos[1] - h.capital[1]); if (d < bestD) { bestD = d; best = h.id; } }
   return best;
