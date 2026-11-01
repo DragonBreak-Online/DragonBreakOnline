@@ -47,6 +47,6 @@ ok(JSON.stringify(countsFor()) === '[3,3,3,3,3]', 'a shorter list holds its last
 load({ tumblersByLevel: [0, 2.5, 'x', 40, -1] });
 ok(JSON.stringify(countsFor()) === '[1,2,3,4,5]', 'a 0, a fraction, text, too many or a negative falls back to one per level', countsFor());
 const SRC = fs.readFileSync(MODULE, 'utf8');
-ok(!/length: level \+ 1/.test(SRC) && /MG\.pickMinMs\(L\.holds\.length, L\.minPickMs\) : L\.holds\.length \* /.test(SRC), "the client lock's least time counts the lock's own tumblers, not level + 1");
+ok(!/length: level \+ 1/.test(SRC) && /MG\.pickMinMs\(L\.holds\.length, L\.minPickMs\) : (L\.tumbler \? L\.rises\.reduce\([^;]*\) : )?L\.holds\.length \* /.test(SRC), "the client lock's least time counts the lock's own tumblers, not level + 1");
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
 process.exit(fails ? 1 : 0);
