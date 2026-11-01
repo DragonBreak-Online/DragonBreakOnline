@@ -24,6 +24,7 @@ enum Section : uint8_t
   kWorld,        // WorldState::Tick
   kMoveValidate, // UpdateMovement: MovementValidation::Validate
   kMoveSetPos,   // UpdateMovement: SetPos and SetAngle (grid moves, listener changes)
+  kRelayClassify, // MovementRelay::Classify (a mover's listeners sorted into tiers; inside relaySubmit)
   kSectionCount
 };
 
