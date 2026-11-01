@@ -33,6 +33,7 @@ const sent = [];
 const R = new Function('sendPacket', 'log', `${code}\nreturn { NATIVE_SWF, nativeSwfFor, openWidget, nativeState };`)((a, p) => { sent.push(p); return true; }, () => {});
 globalThis.__dboPanelState = undefined;
 ok(R.NATIVE_SWF.citizenBoard === 'dbo_citizen' && R.NATIVE_SWF.expeditionBoard === 'dbo_expedition', 'NATIVE_SWF routes both boards to their swfs');
+ok(R.NATIVE_SWF.namePrompt === 'dbo_naming', '...and the name prompt to dbo_naming (Round 2)');
 const A = 0x14;
 R.nativeState().native.set(A, new Set(['native:citizenBoard', 'native:expeditionBoard']));
 const board = { type: 'citizenBoard', id: 84, nonce: 'n1', tab: 'citizenship' };

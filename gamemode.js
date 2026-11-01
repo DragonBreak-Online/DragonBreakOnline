@@ -4241,7 +4241,9 @@ const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_jou
   // Worker 6: the notice board's Citizenship and Voting (citizenship.js, widget 84)
   citizenBoard: 'dbo_citizen',
   // Worker 6: the Expeditions and Hunting Contracts board (dungeons.js openExpeditions, widget 63)
-  expeditionBoard: 'dbo_expedition' };
+  expeditionBoard: 'dbo_expedition',
+  // Worker 6: the name prompt for a character made without a name (naming.js, widget 68)
+  namePrompt: 'dbo_naming' };
 // The client's custom menu takes a payload of at most this many characters (scaleformMenu.ts MAX_PAYLOAD_CHARS) and draws
 // a bigger one blank, so a widget past it (a staff player menu, a long ledger) goes to the browser instead
 const NATIVE_MAX_CHARS = 60000;
