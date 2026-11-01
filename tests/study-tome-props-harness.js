@@ -37,7 +37,9 @@ check('a spell tome a player dropped (a dynamic ref) can still be picked up', M.
 // ---- reading one: the reading round never copies a spell tome ----
 const copyLine = srcLine('const copyable = ');
 check('the reading round still decides copies by the BOOK flags', /\(bookData\.data\[0\] & 0x07\) === 0/.test(copyLine), copyLine);
-const copyable = (rec) => { const bookData = rec.record.fields.find((f) => f && f.type === 'DATA'); return new Function('bookData', 'baseId', `${copyLine}\nreturn copyable;`)(bookData, 0); };
+// copyable reads placeholder (a dummy or placeholder book is never copied), the line before it
+const placeholderLine = srcLine('const placeholder = ');
+const copyable = (rec) => { const bookData = rec.record.fields.find((f) => f && f.type === 'DATA'); return new Function('bookData', 'baseId', 'rec', `${placeholderLine}\n${copyLine}\nreturn copyable;`)(bookData, 0, rec); };
 check('a placed Healing Hands or Fast Healing tome read through is never copied', !copyable(RECS[0x0a271e]) && !copyable(RECS[0x0a271d]));
 const readStart = src.indexOf('globalThis.__dboReadBook = (targetId, casterId) => {');
 check('placed refs only reach the reading round (dynamic refs go to the engine and spells.js\'s tome gate)', readStart > 0 && /if \(!READ\.enabled \|\| targetId >= 0xff000000\) return false;/.test(src.slice(readStart, readStart + 200)));
