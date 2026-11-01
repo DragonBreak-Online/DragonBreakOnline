@@ -83,6 +83,9 @@ export const NATIVE_CAPS = [
   "native:bank",
   // Worker 1's character panels: the birthsign picker (dbo_birthsign, widget 163; dbo:birthsignPick/birthsignClose)
   "native:birthsignPicker",
+  // Every module's choice menu (beds, mines, repair, jail, salvage, duels, spells...) on dbo_context, the X menu's own panel.
+  // The server sends only focused ones; each names its dbo: events, and one that names none closes to dbo:close
+  "native:contextMenu",
 ];
 // What the client does itself, told to the server with the native panels so it no longer needs the browser HUD for it
 // (dbo:uiCaps from hud/index.tsx UI_CAPS used to be the only list). Not panels, and not governed by nativePanels:
