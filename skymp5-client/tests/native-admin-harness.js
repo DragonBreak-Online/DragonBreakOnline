@@ -617,4 +617,34 @@ for (const N of [0, 3]) {
   check('switching tab while typing gives the keys back once', held(t) === 0 && lowest(t) === 0 && !!B(t).m0, [held(t), lowest(t)]);
 }
 
+// ---- Nat's dev screenshot (31 Oct): an empty roster, the fit, the backing ----
+{
+  // alone on dev: the server leaves your own row out and has no backend for offline rows
+  const t = open(panel({ players: [], me: { a: 'ff00012a' } }));
+  P(t).rail.t1.onRelease(); t.serve();
+  check('an empty roster says why, with no pager count on top of it', /No one else is online, and this server lists no offline players/.test(B(t).none.text) && !B(t).pgwhere, [B(t).none.text, B(t).pgwhere && B(t).pgwhere.text]);
+  const s = open(panel({ players: ROSTER, me: { a: 'ff00012a' } }));
+  P(s).rail.t1.onRelease(); s.serve();
+  typeInto(s, B(s).search, 'nobody by this name');
+  check('...a search with no match says so', B(s).none && B(s).none.text === 'No players match' && !B(s).pgwhere, B(s).none && B(s).none.text);
+  // 21:9 where visibleRect reads the whole stage: the client's screen size still fits the panel
+  const w = open(panel(), { visible: { left: 0, top: 0, right: 1280, bottom: 720 } });
+  check('at the whole stage the panel is at full size', P(w)._yscale === 100, P(w)._yscale);
+  w.ctx._root.dboScreen('3440x1440');
+  const h = 1280 / (3440 / 1440);
+  check('told 3440x1440, it fits the 21:9 crop (height and top inside)', P(w)._yscale / 100 * 640 <= h - 31 && P(w)._y >= (720 - h) / 2, [P(w)._yscale, P(w)._y]);
+  // visibleRect read one way while building and another once shown: the panel follows it
+  const v = open(panel(), { visible: { left: 0, top: 0, right: 1280, bottom: 720 } });
+  v.ctx.Stage.visibleRect = { left: 0, top: 86, right: 1280, bottom: 634 };
+  v.tick();
+  check('a visibleRect that changes after the build is fitted on the next frame', P(v)._yscale / 100 * 640 <= 548 - 31 && P(v)._y >= 86, [P(v)._yscale, P(v)._y]);
+  check('...and the fit says so in the log', v.logs.some((l) => /fit: now 0,86,1280,634/.test(l)), v.logs.filter((l) => /fit/.test(l)));
+  const bad = open(panel());
+  bad.ctx._root.dboScreen('nonsense');
+  check('a screen size that does not read changes nothing', P(bad)._yscale === 100);
+  // the ground has a solid backing, so the HUD's notices do not read through it
+  const g = P(open(panel())).bg.fills[0];
+  check('the ground starts with a solid black backing', g && g.color === 0 && g.alpha === 100 && !g.gradient, g);
+}
+
 T.done();

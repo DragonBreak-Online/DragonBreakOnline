@@ -403,18 +403,42 @@ function dboText(parent, name, depth, x, y, w, h, format, multi)
 
 // The stage area the player actually sees (Scaleform's Stage.visibleRect, as SkyUI's map lays out by): at 21:9 or 16:10 a
 // 1280 x 720 stage is cropped top and bottom or left and right, so a panel is scaled into this and centred in it
+// The screen's width / height as the client read it from the game's settings (ScaleformMenuService, _root.dboScreen);
+// 0 until it says. A second opinion: on Nat's screen (31 Oct) the admin panel overflowed top and bottom, so the
+// visibleRect it was fitted by did not describe what he saw
+var dboScreenAspect = 0;
+var dboFits = [];
+
 function dboVisible()
 {
+   var v = {left: 0, top: 0, width: 1280, height: 720};
    var r = Stage.visibleRect;
    if (r != undefined && r.right > r.left && r.bottom > r.top)
    {
-      return {left: r.left, top: r.top, width: r.right - r.left, height: r.bottom - r.top};
+      v = {left: r.left, top: r.top, width: r.right - r.left, height: r.bottom - r.top};
    }
-   return {left: 0, top: 0, width: 1280, height: 720};
+   // what no-border scaling of 1280 x 720 shows of a screen this shape; the smaller of the two wins
+   if (dboScreenAspect > 0)
+   {
+      var cw = dboScreenAspect >= 16 / 9 ? 1280 : 720 * dboScreenAspect;
+      var ch = dboScreenAspect >= 16 / 9 ? 1280 / dboScreenAspect : 720;
+      if (ch < v.height - 0.5 || cw < v.width - 0.5)
+      {
+         v = {left: (1280 - cw) / 2, top: (720 - ch) / 2, width: cw, height: ch};
+      }
+   }
+   return v;
+}
+
+function dboVisibleKey()
+{
+   var r = Stage.visibleRect;
+   return (r != undefined ? r.left + "," + r.top + "," + r.right + "," + r.bottom : "none") + "|" + dboScreenAspect;
 }
 
 // Fits a panel w x h into the visible area with a margin: never larger than designed, smaller where the screen crops it.
-// Done again whenever the stage changes size
+// Done again whenever the stage changes size, the client names the screen, or visibleRect reads differently: a reading
+// taken while the menu is still being built need not be the one it is shown with
 function dboFit(clip, w, h)
 {
    var place = function()
@@ -428,10 +452,40 @@ function dboFit(clip, w, h)
       clip._y = v.top + (v.height - h * s) / 2;
    };
    place();
+   dboFits.push(place);
    var l = {};
    l.onResize = place;
    Stage.addListener(l);
+   var seen = dboVisibleKey();
+   dboLog("fit: visibleRect " + seen + ", stage " + Stage.width + " x " + Stage.height + ", scale " + Math.round(clip._xscale));
+   var watch = _root.createEmptyMovieClip("dboFitWatch", 9989);
+   watch.onEnterFrame = function()
+   {
+      var k = dboVisibleKey();
+      if (k != seen)
+      {
+         seen = k;
+         place();
+         dboLog("fit: now " + k + ", scale " + Math.round(clip._xscale));
+      }
+   };
 }
+
+// The client's reading of the screen, "<width>x<height>" (ScaleformMenuService, before the first dboData)
+_root.dboScreen = function(s)
+{
+   var p = String(s).split("x");
+   var sw = Number(p[0]);
+   var sh = Number(p[1]);
+   if (p.length == 2 && sw > 0 && sh > 0 && !isNaN(sw) && !isNaN(sh))
+   {
+      dboScreenAspect = sw / sh;
+      for (var i = 0; i < dboFits.length; i++)
+      {
+         dboFits[i]();
+      }
+   }
+};
 
 // Typed input in a native panel, as SkyUI's own search box takes it (skyui SearchWidget): an input field, the focus, and
 // skse.AllowTextInput(true) so the game stops reading the keys. dboInputEnd gives the keys back; call it before leaving.
@@ -552,6 +606,8 @@ function dboCorner(clip, x, y, sx, sy)
 // inside it, and the four corner pieces. Replaces the plain black box every panel had
 function dboGround(clip, w, h)
 {
+   // a solid black backing: through the teal alone (90-94%) the HUD's notices read behind the panel (Nat, 31 Oct)
+   dboBox(clip, 0, 0, w, h, 0x000000, 100);
    dboGradientBox(clip, 0, 0, w, h, [C_GROUND, C_GROUND_2, C_GROUND], [93, 90, 94], [0, 150, 255], Math.PI / 2);
    var line = function(x, y, lw, lh, color, alpha)
    {

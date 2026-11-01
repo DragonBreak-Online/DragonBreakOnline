@@ -5,3 +5,4 @@ SendModEvent
 $EverywhereMediumFont
 PlaySound
 dboOut
+dboScreen
