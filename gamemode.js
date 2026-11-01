@@ -7946,6 +7946,26 @@ const equipHook = (actorId, equipment, isAllowed, ...rest) => {
   try { return prev(actorId, equipment, isAllowed, ...rest) !== false; } catch (e) { return true; }
 };
 equipHook.__dbo = true;
+// The inventory's item card (Nat, 1 Nov: the armour's tier, class and Defense in the item info, not a separate card): the
+// client asks for the highlighted piece and draws the line on SkyUI's card. The answer is wearInfoOf's, as /armor's, so the
+// card and the rule never disagree; none for anything the rule does not count (clothing, faction or guard gear, no family).
+//   Client -> Server: dbo armourInfo [baseId]     Server -> Client: dboArmourInfo { id, none } | { id, tier, klass, need, cosmetic, defense }
+const armourInfoAsked = globalThis.__dboArmourInfoAsked instanceof Map ? globalThis.__dboArmourInfoAsked : (globalThis.__dboArmourInfoAsked = new Map());
+const armourInfoFor = (a, id) => {
+  const w = ARMOR_WEAR.enabled && typeof globalThis.__dboWearTier === 'function' ? wearInfoOf(id) : null;
+  if (!w) return { customPacketType: 'dboArmourInfo', id, none: true };
+  return { customPacketType: 'dboArmourInfo', id, tier: w.tier, klass: w.klass, need: w.need, cosmetic: !!w.cosmetic, defense: Math.floor(defenseLevelOf(a)) };
+};
+onUi('armourInfo', (a, args) => {
+  const id = (args || [])[0];
+  if (typeof id !== 'number' || !Number.isInteger(id) || id <= 0 || id >= 0xff000000) return;
+  // A held arrow key moves the highlight every frame: at most 20 answers a second
+  const now = Date.now(), last = armourInfoAsked.get(a >>> 0) || { at: 0, n: 0 };
+  const n = now - last.at < 1000 ? last.n + 1 : 1;
+  armourInfoAsked.set(a >>> 0, { at: n === 1 ? now : last.at, n });
+  if (n > 20) return;
+  sendPacket(a, armourInfoFor(a, id >>> 0));
+});
 mp.onUpdateEquipmentAttempt = equipHook;
 
 // Host assignment policy
