@@ -15,6 +15,11 @@ const ROOT = path.resolve(process.argv[2] || process.env.FORK || path.join(os.ho
 const SRC = path.join(ROOT, 'skymp5-client/src');
 const DIR = path.join(SRC, 'services/services');
 if (!fs.existsSync(path.join(DIR, 'placementService.ts'))) { console.log(`skipped: no placementService.ts in ${ROOT}`); process.exit(0); }
+// The client is built from the client line (client-0NNN, client-rc-*), never fork main, whose skymp5-client is far behind
+// and predates the Place tab rework: a run against main measures nothing (run-all.sh's FORK is the client line, FORK_SERVER
+// fork main). The client line stamps its version in lib/clientDiag.ts; main has none
+const DIAG = path.join(SRC, 'lib/clientDiag.ts');
+if (!fs.existsSync(DIAG) || !/DBO_CLIENT_VERSION = /.test(fs.readFileSync(DIAG, 'utf8'))) { console.log(`skipped: ${ROOT} is not a client line (no DBO_CLIENT_VERSION in lib/clientDiag.ts); give it a client-0NNN or client-rc checkout (FORK=<client line>)`); process.exit(0); }
 const ESBUILD = process.env.ESBUILD || path.join(os.homedir(), 'dragonbreak/fork/skymp5-server/node_modules/.bin/esbuild');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-nate-browsertick-'));
 const names = new Set();
@@ -82,7 +87,7 @@ frames();
 ok(place.isActive() === true && place.edit && place.edit.id === 'p1' && calls.includes('Game.getPlayer'), '...and the edit starts on the next frame', { edit: place.edit, calls });
 outside.length = 0; calls.length = 0;
 answers['Game.getFormFromFile'] = null;
-message(place, ['admin::place', JSON.stringify({ desc: '99999:Missing.esp', kind: 'object', name: 'a ghost' })]);
+message(place, ['admin::place', JSON.stringify({ desc: '99999:Missing.esp', kind: 'object', name: 'a ghost' })]); // verify-formids: ignore (a plugin missing on purpose)
 frames();
 ok(outside.length === 0 && place.isActive() === false && calls.includes('Debug.notification'), 'a pick missing from the load order is refused on the frame, with its notice', { outside, calls });
 answers['Game.getFormFromFile'] = { getFormID: () => 0x12345 };

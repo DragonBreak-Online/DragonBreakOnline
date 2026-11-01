@@ -29,10 +29,12 @@ const SKILLS = JSON.parse(fs.readFileSync(path.join(SERVER, 'skills.json'), 'utf
 // Akatosh's regeneration, named in the deity itself so the record readers are not this test's subject
 SKILLS.deities.choices.push({ id: 'regentest', name: 'Regen Test', kind: 'faith', shrines: [], prayAnywhere: true, boon: 'x', sphere: 'x', blessingRegen: { MagickaRateMult: 10 } });
 
-// The fix is judged against the tick it replaces: origin/server's prayer.js, beside this one so its requires resolve
+// The fix is judged against the tick it replaces: prayer.js as it was before the fix (the parent of 308795048; origin/server's
+// was the fixed one once the fix merged, so the before checks failed), beside this one so its requires resolve
+const BEFORE_REV = '308795048^:prayer.js';
 const BEFORE = path.join(SERVER, '.prayer-before.harness.js');
 let before = null;
-try { before = execFileSync('git', ['show', 'origin/server:prayer.js'], { cwd: SERVER, encoding: 'utf8', maxBuffer: 1 << 26 }); } catch (e) { before = null; }
+try { before = execFileSync('git', ['show', BEFORE_REV], { cwd: SERVER, encoding: 'utf8', maxBuffer: 1 << 26 }); } catch (e) { before = null; }
 
 const simulate = (module, o) => {
   const lat = o.lat == null ? 100 : o.lat;
@@ -133,7 +135,7 @@ if (before) {
     check('BEFORE the fix: the blessing pulled the bar back in at least one timing (the report)', old.some((r) => r.pulls > 0), fmt(worst));
     check('...and the refill was no faster, or slower, than with no blessing at all in at least one timing', old.some((r) => r.ratio < 1.02), fmt(worst));
   } finally { try { fs.unlinkSync(BEFORE); } catch (e) { /* gone */ } }
-} else console.log('SKIP  the before run: origin/server:prayer.js could not be read from git');
+} else console.log(`SKIP  the before run: ${BEFORE_REV} could not be read from git`);
 
 const now = run(path.join(SERVER, 'prayer.js'));
 const slowest = now.reduce((w, r) => (r.ratio < w.ratio ? r : w), now[0]);

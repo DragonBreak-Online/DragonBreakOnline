@@ -65,9 +65,10 @@ ok(crusader.every(([, v]) => v.factions.length === 1 && v.recipes.length && v.re
   "the order's alone, each with the KotN or KotN Patch recipe that makes it");
 ok(crusader.filter(([, v]) => v.role === 'tailor').map(([, v]) => v.name).join() === 'Cape of the Crusader' && crusader.filter(([, v]) => v.role === 'blacksmith').length === 15,
   "the plain cape is the Clothier's (tanning rack), the rest the Armorer's (forge)");
-// The Talos robe and hood (Divine and Daedric Robes) are shared with the Stormcloaks
+// The Talos robe and hood (Divine and Daedric Robes) are shared with the Stormcloaks, and so with Windhelm, whose armour
+// pool is theirs (Nat, 31 Oct, 93ccf7291)
 const talos = mine.filter(([, v]) => v.set === 'Robes of Talos');
-ok(talos.length === 2 && talos.every(([, v]) => v.role === 'tailor' && JSON.stringify(v.factions) === '["knights-of-the-nine","stormcloaks"]'), "the Talos robe and hood are its tailors' and the Stormcloaks'");
+ok(talos.length === 2 && talos.every(([, v]) => v.role === 'tailor' && JSON.stringify(v.factions) === '["knights-of-the-nine","stormcloaks","hold-windhelm"]'), "the Talos robe and hood are its tailors', the Stormcloaks' and Windhelm's", talos.map(([, v]) => v.factions));
 ok(mine.length === errant.length + crusader.length + talos.length, 'nothing else is its gear', mine.length);
 ok(!Object.values(GEAR.items).some((v) => /^Knight-Errant /.test(v.name) && !v.factions.includes(ID)), 'no other faction holds a Knight-Errant piece');
 

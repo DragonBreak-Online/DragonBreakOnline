@@ -31,7 +31,8 @@ const of = (name) => (gear[named(name)] || {}).factions || [];
 check('the Eight: the Imperial Cult (the Great Faiths joined it, 25 Oct)', ['Akatosh', 'Arkay', 'Dibella', 'Julianos', 'Kynareth', 'Mara', 'Zenithar']
   .every((g) => JSON.stringify(of(`${g} Robes`)) === '["imperial-cult"]' && JSON.stringify(of(`${g} Hood`)) === '["imperial-cult"]'));
 check("Stendarr's also the Vigil's", JSON.stringify(of('Stendarr Robes')) === '["imperial-cult","vigil-of-stendarr"]');
-check("Talos's the Knights of the Nine's and the Stormcloaks'", JSON.stringify(of('Talos Robes')) === '["knights-of-the-nine","stormcloaks"]');
+// Windhelm shares the Stormcloaks' armour pool (Nat, 31 Oct, 93ccf7291)
+check("Talos's the Knights of the Nine's, the Stormcloaks' and Windhelm's", JSON.stringify(of('Talos Robes')) === '["knights-of-the-nine","stormcloaks","hold-windhelm"]', of('Talos Robes'));
 check("Malacath's the six Orc clans'", of('Malacath Robes').length === 6 && of('Malacath Robes').every((f) => f.startsWith('clan-')));
 const cults = { Azura: 'azura', Boethiah: 'boethiah', 'Clavicus Vile': 'clavicus-vile', 'Hermaeous Mora': 'hermaeus-mora', Hircine: 'hircine',
   'Mehrunes Dagon': 'mehrunes-dagon', Mephala: 'mephala', Meridia: 'meridia', 'Molag Bal': 'molag-bal', Namira: 'namira', Nocturnal: 'nocturnal',
