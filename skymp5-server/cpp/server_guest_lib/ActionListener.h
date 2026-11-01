@@ -340,6 +340,9 @@ public:
   // Called from PartOne::Tick: sends the coalesced positions that are due
   void TickMovementRelay();
 
+  // The relay, once the first movement created it (null while it is off); for unit tests
+  const MovementRelay* GetMovementRelay() const { return movementRelay.get(); }
+
   // TODO: inverse dependency
   std::shared_ptr<CraftService> craftService;
   std::shared_ptr<SweetHidePlayerNamesService> sweetHidePlayerNamesService;

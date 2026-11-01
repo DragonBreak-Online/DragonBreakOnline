@@ -17,15 +17,20 @@ constexpr uint32_t kFarIntervalMs = 2000;  // 0.5/s in the rest of the block
 constexpr uint64_t kCombatPinMs = 10000;
 constexpr uint64_t kFlushEveryMs = 100;
 constexpr uint64_t kWindowMs = 1000;
-constexpr uint64_t kForgetMs = 10000;
-// Flush runs every tick (about 100 a second at load); the prune covers the pending map in this many calls
-constexpr size_t kPruneSlicesPerSecond = 100;
+// About one tier decision per four client packets (130 ms each)
+constexpr uint64_t kClassifyMs = 500;
+// An entry no classification renewed this long is dropped (the mover stopped or left)
+constexpr uint64_t kEntryStaleMs = 3000;
+// Much longer than kEntryStaleMs, so no entry still points at a forgotten mover
+constexpr uint64_t kEmitterForgetMs = 10000;
 // About 32 movers at the clients' 130 ms send rate
 constexpr uint32_t kFullSendsPerSecond = 250;
 constexpr uint32_t kCoalescedSendsPerSecond = 200;
 // Each flush spends an even slice of the per-second budget, so one flush can't take a whole second's worth
 constexpr uint32_t kCoalescedPerFlush =
   (kCoalescedSendsPerSecond * kFlushEveryMs + kWindowMs - 1) / kWindowMs;
+
+uint64_t (*g_clockForTest)() = nullptr;
 
 uint64_t PairKey(uint32_t a, uint32_t b)
 {
@@ -44,8 +49,16 @@ MovementRelay::MovementRelay(PartOne& partOne_)
 {
 }
 
+void MovementRelay::SetClockForTest(uint64_t (*clock)())
+{
+  g_clockForTest = clock;
+}
+
 uint64_t MovementRelay::NowMs()
 {
+  if (g_clockForTest) {
+    return g_clockForTest();
+  }
   return static_cast<uint64_t>(
     std::chrono::duration_cast<std::chrono::milliseconds>(
       std::chrono::steady_clock::now().time_since_epoch())
@@ -58,6 +71,13 @@ void MovementRelay::NoteCombat(uint32_t formIdA, uint32_t formIdB)
   combat[PairKey(formIdA, formIdB)] = now;
   combatAt[formIdA] = now;
   combatAt[formIdB] = now;
+  // Both sides re-sort on their next packet
+  for (uint32_t id : { formIdA, formIdB }) {
+    auto it = emitters.find(id);
+    if (it != emitters.end()) {
+      it->second.nextClassifyMs = 0;
+    }
+  }
 }
 
 bool MovementRelay::InCombat(uint32_t a, uint32_t b, uint64_t now) const
@@ -72,6 +92,35 @@ void MovementRelay::Send(Networking::UserId userId, const unsigned char* data,
   partOne.GetSendTarget().Send(userId, data, length, false);
 }
 
+MovementRelay::ListenerState& MovementRelay::Listener(
+  Networking::UserId userId, uint64_t now)
+{
+  auto& ls = listeners[userId];
+  if (ls.fullRadius2 <= 0.f) {
+    ls.userId = userId;
+    ls.fullRadius2 = kFullRateUnits * kFullRateUnits;
+    // Listeners flush on staggered slots, so one tick doesn't carry them all
+    ls.nextFlushMs =
+      now + (static_cast<uint64_t>(userId) * 37) % kFlushEveryMs;
+  }
+  return ls;
+}
+
+void MovementRelay::RemoveEntry(ListenerState& ls, uint32_t emitterId)
+{
+  auto it = ls.index.find(emitterId);
+  if (it == ls.index.end()) {
+    return;
+  }
+  const uint32_t i = it->second;
+  ls.index.erase(it);
+  if (i + 1 != ls.coalesced.size()) {
+    ls.coalesced[i] = ls.coalesced.back();
+    ls.index[ls.coalesced[i].emitterId] = i;
+  }
+  ls.coalesced.pop_back();
+}
+
 void MovementRelay::Submit(MpActor& emitter, Networking::UserId senderUserId,
                            bool skipSender, Networking::PacketData data,
                            size_t length)
@@ -79,71 +128,92 @@ void MovementRelay::Submit(MpActor& emitter, Networking::UserId senderUserId,
   TickProfile::Scope profile(TickProfile::kRelaySubmit);
   const uint64_t now = NowMs();
   const uint32_t emitterId = emitter.GetFormId();
+  auto& es = emitters[emitterId];
+  es.data.assign(data, data + length);
+  ++es.seq;
+  es.touchedMs = now;
+
+  // A listener set that changed size means someone streamed in or out
+  if (now >= es.nextClassifyMs ||
+      emitter.GetActorListeners().size() != es.listenerCount) {
+    Classify(es, emitter, now);
+  }
+
+  for (const auto& f : es.full) {
+    if (skipSender && f.userId == senderUserId) {
+      continue;
+    }
+    MpActor* listener = partOne.serverState.ActorByUser(f.userId);
+    if (!listener || listener->GetFormId() != f.listenerFormId) {
+      continue;
+    }
+    Send(f.userId, data, length);
+    ++Listener(f.userId, now).fullThisWindow;
+  }
+}
+
+void MovementRelay::Classify(Emitter& es, MpActor& emitter, uint64_t now)
+{
+  TickProfile::Scope profile(TickProfile::kRelayClassify);
+  const uint32_t emitterId = emitter.GetFormId();
   const auto& emitterPos = emitter.GetPos();
-  // Pair lookups only for an emitter that fought in the last kCombatPinMs; most packets come from movers that didn't
   auto combatIt = combatAt.find(emitterId);
   const bool emitterFought =
     combatIt != combatAt.end() && now - combatIt->second < kCombatPinMs;
-  // Stored on every packet, one copy, so a waiting entry is always sent the emitter's newest position, even after its
-  // listener received newer ones at full rate
-  {
-    auto& l = latest[emitterId];
-    l.data.assign(data, data + length);
-    l.touchedMs = now;
-  }
 
-  for (auto listener : emitter.GetActorListeners()) {
+  const auto& actorListeners = emitter.GetActorListeners();
+  es.full.clear();
+  es.listenerCount = actorListeners.size();
+  // Staggered, so a crowd that arrived together does not re-sort together
+  es.nextClassifyMs = now + kClassifyMs - (emitterId * 7) % 50;
+
+  for (auto listener : actorListeners) {
+    ++classifyVisits;
     const auto userId = partOne.serverState.UserByActor(listener);
-    if (userId == Networking::InvalidUserId ||
-        (skipSender && userId == senderUserId)) {
+    if (userId == Networking::InvalidUserId) {
       continue;
     }
-
-    auto& ls = listeners[userId];
-    if (ls.fullRadius2 <= 0.f) {
-      ls.fullRadius2 = kFullRateUnits * kFullRateUnits;
-      // Listeners flush on staggered slots, so one tick doesn't carry them all
-      ls.nextFlushMs = now + (static_cast<uint64_t>(userId) * 37) % kFlushEveryMs;
-    }
-
+    auto& ls = Listener(userId, now);
     const float dist2 = (listener->GetPos() - emitterPos).SqrLength();
     const bool full = listener == &emitter || dist2 <= ls.fullRadius2 ||
       (emitterFought && InCombat(listener->GetFormId(), emitterId, now));
 
-    // A full send leaves any waiting entry alone: Flush always sends the emitter's newest packet, so the worst case is
-    // one repeat of a position the listener already has, never an older one
     if (full) {
-      Send(userId, data, length);
-      ++ls.fullThisWindow;
+      es.full.push_back({ userId, listener->GetFormId() });
+      // A waiting coalesced position would only repeat an older one
+      RemoveEntry(ls, emitterId);
       continue;
     }
 
-    const uint64_t key = (static_cast<uint64_t>(userId) << 32) | emitterId;
-
-    // Coalesced: only the newest position waits, overwriting the last. Flush sends it, oldest-waiting first, so arrival
-    // order can't decide who gets the budget
-    auto [slot, created] = pending.try_emplace(key);
-    if (created) {
-      ++ls.pendingCount;
-    }
-    auto& p = slot->second;
-    p.userId = userId;
-    p.emitterId = emitterId;
-    p.lastTouchedMs = now;
-    p.intervalMs = dist2 <= kGridSquareUnits * kGridSquareUnits
+    const uint32_t interval = dist2 <= kGridSquareUnits * kGridSquareUnits
       ? kMidIntervalMs
       : kFarIntervalMs;
-    p.dirty = true;
-    if (!p.queued) {
-      p.queued = true;
-      ls.waiting.push_back(&p);
+    auto [it, created] = ls.index.try_emplace(
+      emitterId, static_cast<uint32_t>(ls.coalesced.size()));
+    if (created) {
+      Entry e;
+      e.emitter = &es;
+      e.emitterId = emitterId;
+      // Owed the current packet, since a live seq is never 0
+      e.sentSeq = 0;
+      ls.coalesced.push_back(e);
     }
+    auto& e = ls.coalesced[it->second];
+    e.emitter = &es;
+    e.intervalMs = interval;
+    e.seenMs = now;
   }
 }
 
 void MovementRelay::RetuneWindow(uint64_t now)
 {
-  for (auto& [userId, ls] : listeners) {
+  for (auto it = listeners.begin(); it != listeners.end();) {
+    auto& ls = it->second;
+    // Kept while it hears full-rate movers, or its radius would reset every second in a crowd
+    if (ls.coalesced.empty() && ls.fullThisWindow == 0) {
+      it = listeners.erase(it);
+      continue;
+    }
     const float max2 = kFullRateUnits * kFullRateUnits;
     const float min2 = kMinFullRateUnits * kMinFullRateUnits;
     // Shrink fast when over the full-rate allowance, regrow gently while clearly under it. Regrowing only below 60%
@@ -156,57 +226,18 @@ void MovementRelay::RetuneWindow(uint64_t now)
     }
     ls.fullThisWindow = 0;
     ls.coalescedSentThisSecond = 0;
-  }
-  // A listener with no pending entry is dropped; Submit recreates it with the full radius
-  for (auto it = listeners.begin(); it != listeners.end();) {
-    it = it->second.pendingCount ? std::next(it) : listeners.erase(it);
+    ++it;
   }
   for (auto it = combat.begin(); it != combat.end();) {
-    if (now - it->second > kCombatPinMs) {
-      it = combat.erase(it);
-    } else {
-      ++it;
-    }
+    it = now - it->second > kCombatPinMs ? combat.erase(it) : std::next(it);
   }
   for (auto it = combatAt.begin(); it != combatAt.end();) {
     it = now - it->second > kCombatPinMs ? combatAt.erase(it) : std::next(it);
   }
-  // One entry per mover, so this pass is small; a waiting entry whose packet is gone is dropped by FlushListener
-  for (auto it = latest.begin(); it != latest.end();) {
-    it = now - it->second.touchedMs > kForgetMs ? latest.erase(it) : std::next(it);
-  }
-}
-
-// Forgets entries untouched for kForgetMs, a slice of the map's buckets per call so the whole map is covered about once
-// a second without one tick paying for it (a full pass in RetuneWindow cost 50-63 ms once a second, 500 crowded).
-// Queued entries are kept: their listener's waiting list points at them, and Flush sends or drops them first
-void MovementRelay::PrunePendingSlice(uint64_t now)
-{
-  const size_t buckets = pending.bucket_count();
-  if (!buckets || pending.empty()) {
-    return;
-  }
-  const size_t slice = std::max<size_t>(1, buckets / kPruneSlicesPerSecond);
-  pruneScratch.clear();
-  for (size_t i = 0; i < slice; ++i) {
-    const size_t b = (pruneCursor + i) % buckets;
-    for (auto it = pending.begin(b); it != pending.end(b); ++it) {
-      if (!it->second.queued && now - it->second.lastTouchedMs > kForgetMs) {
-        pruneScratch.push_back(it->first);
-      }
-    }
-  }
-  pruneCursor = (pruneCursor + slice) % buckets;
-  for (uint64_t key : pruneScratch) {
-    auto it = pending.find(key);
-    if (it == pending.end()) {
-      continue;
-    }
-    auto ls = listeners.find(it->second.userId);
-    if (ls != listeners.end() && ls->second.pendingCount) {
-      --ls->second.pendingCount;
-    }
-    pending.erase(it);
+  // Safe: entries naming these went stale at kEntryStaleMs and were dropped by their listener's flush
+  for (auto it = emitters.begin(); it != emitters.end();) {
+    it = now - it->second.touchedMs > kEmitterForgetMs ? emitters.erase(it)
+                                                       : std::next(it);
   }
 }
 
@@ -218,7 +249,6 @@ void MovementRelay::Flush()
     windowStartMs = now;
     RetuneWindow(now);
   }
-  PrunePendingSlice(now);
   for (auto& [userId, ls] : listeners) {
     if (now < ls.nextFlushMs) {
       continue;
@@ -233,24 +263,25 @@ void MovementRelay::Flush()
 
 void MovementRelay::FlushListener(ListenerState& ls, uint64_t now)
 {
-  // Due positions for this listener; when there are more than the budget allows, the ones that waited longest go
-  // first, and each one sent goes to the back of the line: round-robin, so a crowd slows everyone instead of freezing
-  // a fixed tail. Entries not due yet, or over budget, stay waiting
-  auto& due = dueScratch;
-  due.clear();
-  size_t keep = 0;
-  for (Pending* p : ls.waiting) {
-    if (!p->dirty) {
-      p->queued = false; // sent at full rate since it was queued
-      continue;
-    }
-    if (now - p->lastSentMs >= p->intervalMs) {
-      due.push_back(p);
+  // Stale entries go first: removal moves entries, and the due list holds pointers into the vector
+  for (size_t i = 0; i < ls.coalesced.size();) {
+    if (now - ls.coalesced[i].seenMs > kEntryStaleMs) {
+      RemoveEntry(ls, ls.coalesced[i].emitterId); // the last entry moves into i
     } else {
-      ls.waiting[keep++] = p;
+      ++i;
     }
   }
-  ls.waiting.resize(keep);
+
+  // Due positions for this listener; when there are more than the budget allows, the ones that waited longest go
+  // first, and each one sent goes to the back of the line: round-robin, so a crowd slows everyone instead of freezing
+  // a fixed tail
+  auto& due = dueScratch;
+  due.clear();
+  for (auto& e : ls.coalesced) {
+    if (e.sentSeq != e.emitter->seq && now - e.lastSentMs >= e.intervalMs) {
+      due.push_back(&e);
+    }
+  }
   if (due.empty()) {
     return;
   }
@@ -261,23 +292,16 @@ void MovementRelay::FlushListener(ListenerState& ls, uint64_t now)
                          kCoalescedSendsPerSecond - ls.coalescedSentThisSecond);
   if (due.size() > left) {
     std::nth_element(due.begin(), due.begin() + left, due.end(),
-                     [](const Pending* a, const Pending* b) {
+                     [](const Entry* a, const Entry* b) {
                        return a->lastSentMs < b->lastSentMs;
                      });
   }
   const size_t sendCount = std::min<size_t>(due.size(), left);
   for (size_t i = 0; i < sendCount; ++i) {
-    Pending* p = due[i];
-    auto l = latest.find(p->emitterId);
-    if (l != latest.end()) {
-      Send(p->userId, l->second.data.data(), l->second.data.size());
-    }
+    Entry* e = due[i];
+    Send(ls.userId, e->emitter->data.data(), e->emitter->data.size());
     ++ls.coalescedSentThisSecond;
-    p->lastSentMs = now;
-    p->dirty = false;
-    p->queued = false;
-  }
-  for (size_t i = sendCount; i < due.size(); ++i) {
-    ls.waiting.push_back(due[i]);
+    e->lastSentMs = now;
+    e->sentSeq = e->emitter->seq;
   }
 }
