@@ -6,8 +6,8 @@ import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { ButtonEvent, InputDeviceType, Menu } from "skyrimPlatform";
 import { logError, logTrace } from "../../logging";
 import {
-  LABELS_PER_TICK, MAP_MENU, MARKER_CLIP, MARKER_COUNT, RealmMarker, WIDGET_ID,
-  descParts, keyAction, kindIndex, legendRows, readMarkers, wantedScale,
+  LABELS_PER_TICK, LEGEND_HOST, LEGEND_SWF, MAP_MENU, MARKER_CLIP, MARKER_COUNT, RealmMarker, WIDGET_ID,
+  descParts, keyAction, kindIndex, legendJson, legendReset, legendRows, legendStep, newLegendLoad, readMarkers, wantedScale,
 } from "./mapRealm";
 
 // for the browser-side widget setter (executed inside the CEF browser)
@@ -54,6 +54,7 @@ export class MapRealmService extends ClientListener {
 
   private onMapClose(): void {
     this.open = false;
+    legendReset(this.legendLoad);
     if (widget) { widget = null; closeWidget(this.sp, WIDGET_ID); }
     if (this.test) this.finishTests("the map closed");
   }
@@ -77,9 +78,10 @@ export class MapRealmService extends ClientListener {
     if (!this.open) return;
     this.ticksOpen++;
     try {
-      // browserService hides the browser for the map; the legend needs it shown (unfocused: the map keeps the keys)
-      if ((this.markers.length || this.test) && this.ticksOpen <= 3) this.sp.browser.setVisible(true);
+      // browserService hides the browser for the map; a browser legend needs it shown (unfocused: the map keeps the keys)
+      if (((this.markers.length && this.legendLoad.phase === "off") || this.test) && this.ticksOpen <= 3) this.sp.browser.setVisible(true);
       if (this.markers.length) {
+        this.loadLegend();
         this.readLabels();
         this.applyFilter();
         if (this.ticksOpen === 2 || this.ticksOpen % 30 === 0) this.publish();
@@ -127,12 +129,38 @@ export class MapRealmService extends ClientListener {
     }
   }
 
+  // The legend inside the map (dbo_maplegend): loaded each opening, the browser's only if it never comes alive
+  private loadLegend(): void {
+    const ui = this.sp.Ui;
+    let alive = false;
+    try { alive = this.legendLoad.phase === "loading" && ui.getString(MAP_MENU, `${LEGEND_HOST}.dboAlive`) === "yes"; } catch { alive = false; }
+    const step = legendStep(this.legendLoad, alive);
+    if (step === "inject") {
+      try {
+        ui.invokeStringA(MAP_MENU, "_root.createEmptyMovieClip", ["dboMapLegend", "9991"]);
+        ui.invokeString(MAP_MENU, `${LEGEND_HOST}.loadMovie`, LEGEND_SWF);
+      } catch (err) { logError(this, "the map legend could not be loaded", err); }
+    } else if (step === "up") {
+      logTrace(this, "map legend drawn in the map");
+      this.publish();
+    } else if (step === "fail") {
+      logTrace(this, "the map legend never came alive in the map: the browser draws it this session");
+      this.sp.browser.setVisible(true);
+      this.publish();
+    }
+  }
+
   private publish(): void {
     if (!this.open) return;
-    widget = {
-      type: "mapRealm", id: WIDGET_ID, mapMode: true, shown: this.legendShown,
-      rows: legendRows(this.labels.map((l) => (typeof l === "string" ? l : null)), this.index, this.hidden),
-    };
+    const rows = legendRows(this.labels.map((l) => (typeof l === "string" ? l : null)), this.index, this.hidden);
+    if (this.legendLoad.phase === "up") {
+      if (widget) { widget = null; closeWidget(this.sp, WIDGET_ID); }
+      try { this.sp.Ui.invokeString(MAP_MENU, `${LEGEND_HOST}.dboData`, legendJson(this.legendShown, rows)); } catch (err) { logError(this, "map legend data failed", err); }
+      return;
+    }
+    // still loading: nothing yet (the swf or, failing it, the browser follows within a second)
+    if (this.legendLoad.phase !== "off") return;
+    widget = { type: "mapRealm", id: WIDGET_ID, mapMode: true, shown: this.legendShown, rows };
     refreshFormMenu(this.sp, this.browsersideWidgetSetter, { widget });
   }
 
@@ -193,6 +221,7 @@ export class MapRealmService extends ClientListener {
   private mounted = false;
   private testArmed = false;
   private test: MapTest | null = null;
+  private legendLoad = newLegendLoad();
 }
 
 interface MapTest { tick: number; samples: number[]; results: Record<string, unknown> }

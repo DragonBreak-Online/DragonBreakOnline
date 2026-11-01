@@ -79,3 +79,27 @@ export const legendRows = (labels: Array<string | null>, index: Map<string, stri
 // The scale each marker clip should have: 0 when its kind is hidden, 100 otherwise; null for a label not read yet
 export const wantedScale = (label: string | null, index: Map<string, string>, hidden: Set<string>): number | null =>
   label === null ? null : hidden.has(kindOf(index, label)) ? 0 : 100;
+
+// ---- the legend drawn inside the MapMenu (swf/dbo_maplegend) ----
+// Loaded into a clip of the map each time it opens, as dbo_hud is into the HUD Menu. One that never says it is alive
+// within LEGEND_ALIVE_FRAMES leaves the legend to the browser for the rest of the session, as before
+export const LEGEND_HOST = "_root.dboMapLegend";
+export const LEGEND_SWF = "dbo_maplegend.swf";
+export const LEGEND_ALIVE_FRAMES = 60;
+export interface LegendLoad { phase: "idle" | "loading" | "up" | "off"; frames: number }
+export const newLegendLoad = (): LegendLoad => ({ phase: "idle", frames: 0 });
+// One frame while the map is open: "inject" (make the clip and load the swf), "up", "fail" (the browser from now on) or ""
+export const legendStep = (st: LegendLoad, alive: boolean): string => {
+  if (st.phase === "off" || st.phase === "up") return "";
+  if (st.phase === "idle") { st.phase = "loading"; st.frames = 0; return "inject"; }
+  if (alive) { st.phase = "up"; return "up"; }
+  if (++st.frames >= LEGEND_ALIVE_FRAMES) { st.phase = "off"; return "fail"; }
+  return "";
+};
+// The map closed and its clip with it: the next opening loads it again, unless the session gave up on it
+export const legendReset = (st: LegendLoad): void => {
+  if (st.phase !== "off") { st.phase = "idle"; st.frames = 0; }
+};
+// What the swf draws (its dboData), the browser widget's fields
+export const legendJson = (shown: boolean, rows: Array<{ id: string; label: string; key: string; count: number; shown: boolean }>): string =>
+  JSON.stringify({ shown, rows });
