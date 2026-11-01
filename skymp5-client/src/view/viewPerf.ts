@@ -67,6 +67,9 @@ const phases = {
   // for every npc and reads three positions; invis does a getActorValue("Invisibility") by string per form;
   // ensureWeapon makes 8 unconditional native calls behind only an is3DLoaded check.
   applyall: new Stat(),
+  // movement is the part that CANNOT be skipped: a form that misses it stops moving
+  movement: new Stat(),
+  anim: new Stat(),
   aggro: new Stat(),
   invis: new Stat(),
   weapon: new Stat(),
@@ -204,7 +207,9 @@ export const endTick = (entry: number): void => {
       `gate ${phases.gate.render()} worldcell ${phases.worldcell.render()} ` +
       `model ${phases.model.render()} pcdata ${phases.pcdata.render()} ` +
       `forms ${phases.forms.render()} clones ${phases.clones.render()} | ` +
-      `applyall n=${phases.applyall.n} ${phases.applyall.render()} aggro n=${phases.aggro.n} ${phases.aggro.render()} ` +
+      `applyall n=${phases.applyall.n} ${phases.applyall.render()} ` +
+      `MOVEMENT n=${phases.movement.n} ${phases.movement.render()} anim n=${phases.anim.n} ${phases.anim.render()} ` +
+      `aggro n=${phases.aggro.n} ${phases.aggro.render()} ` +
       `invis n=${phases.invis.n} ${phases.invis.render()} weapon n=${phases.weapon.n} ${phases.weapon.render()} | ` +
       `nickgate n=${phases.nickgate.n} ${phases.nickgate.render()} nicknode n=${phases.nicknode.n} ${phases.nicknode.render()} | ` +
       `live=${forms.lastLive} named=${forms.lastNamed} slots=${forms.lastSlots} worstform ${worst} ` +
