@@ -160,3 +160,4 @@ mihailnordicsentinel.esp
 mihailhiveguardians.esp
 mihailelementalgolems.esp
 DragonBreak Creature Patch.esp
+DBO_HagravenLooks.esp
