@@ -56,6 +56,9 @@ export const HANDOFF_KEY = "native:handoff";
 export const SHOW_MAP_KEY = "native:showMap";
 export const CLOSE_KEY = "close";
 export const DBO_PREFIX = "dbo:";
+// A key for a client service that keeps this PC's own settings, from a panel the gamemode opened (the journal's Settings,
+// settingsNativeService): it never goes to the server
+export const LOCAL_PREFIX = "set:";
 // What the owning service is told when its native panel could not be drawn, so it can open its own browser
 // menu instead. The service must treat this as "draw it yourself", not as a close.
 export const FAILED_KEY = "native:failed";
@@ -98,6 +101,7 @@ export type Replay =
   | { do: "close" }
   | { do: "handoff"; type: string; mode: string }
   | { do: "showMap"; args: unknown[] }
+  | { do: "local"; key: string; args: unknown[] }
   | { do: "report"; text: string };
 
 // What a key coming out of a native panel means. ONE table for both kinds of panel, so a gamemode panel and
@@ -142,6 +146,8 @@ export const replayFor = (key: string, args: unknown[], hasOwner?: boolean): Rep
   if (k.indexOf(DBO_PREFIX) === 0) {
     return [{ do: "server", event: k.slice(DBO_PREFIX.length), args }];
   }
+
+  if (k.indexOf(LOCAL_PREFIX) === 0) return [{ do: "local", key: k, args }];
 
   // The service's own namespaced key, handed back to it untouched.
   if (hasOwner) return [{ do: "owner", key: k, args }];

@@ -51,6 +51,11 @@ export class FovService extends ClientListener {
   // browserMessage arrives as a tick task, where Papyrus natives (Utility.wait and setINIFloat, Ui.isMenuOpen, the SKSE
   // Camera natives) throw "can't be called in this context", so "set" and "reset" run on the next update, as the
   // admin menu's refresh does. Steps that arrive before that update are applied once, with the newest value.
+  // The native journal's Settings (settingsNativeService): the page's message, handled as the page's
+  public fromNative(args: unknown[]): void {
+    this.onBrowserMessage({ arguments: args } as unknown as BrowserMessageEvent);
+  }
+
   private onBrowserMessage(e: BrowserMessageEvent): void {
     if (e.arguments[0] !== FOV_MESSAGE) return;
     const what = String(e.arguments[1] ?? "");
@@ -88,8 +93,12 @@ export class FovService extends ClientListener {
     });
   }
 
+  public state(): { value: number | null; launcher: number | null; camera: string; min: number; max: number } {
+    return { value: this.world, launcher: this.launcherWorld, camera: this.camera().kind, min: FOV_MIN, max: FOV_MAX };
+  }
+
   private tellPage(): void {
-    const state = { value: this.world, launcher: this.launcherWorld, camera: this.camera().kind, min: FOV_MIN, max: FOV_MAX };
+    const state = this.state();
     try {
       this.sp.browser.executeJavaScript(`window.__dboFov = ${JSON.stringify(state)}; window.dispatchEvent(new CustomEvent('dbo:fov'));`);
     } catch (e) {

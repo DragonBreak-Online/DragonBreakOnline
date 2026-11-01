@@ -26,6 +26,11 @@ export class MouseFreeService extends ClientListener {
     this.controller.on("browserMessage", (e) => this.onBrowserMessage(e));
   }
 
+  // The native journal's Settings (settingsNativeService): the page's message, handled as the page's
+  public fromNative(args: unknown[]): void {
+    this.onBrowserMessage({ arguments: args } as unknown as BrowserMessageEvent);
+  }
+
   // The F3 choice; the page writes the settings file itself
   private onBrowserMessage(e: BrowserMessageEvent): void {
     if (e.arguments[0] !== MOUSE_MESSAGE || e.arguments[1] !== "set") return;

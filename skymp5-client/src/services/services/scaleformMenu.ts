@@ -249,6 +249,8 @@ export type Action =
   | { do: "open"; swf: string }
   | { do: "push"; json: string }
   | { do: "close" }
+  // a client service's call into the panel on screen, made only while that swf is up and ready
+  | { do: "invoke"; swf: string; target: string; arg: string }
   | { do: "report"; text: string };
 
 // A payload the server never sent is the silent failure that cost the 26 Oct 05:02 session: the panel opened,

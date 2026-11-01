@@ -207,6 +207,19 @@ export class ScaleformMenuService extends ClientListener {
       this.pendingHandoff = { type: r.type, mode: r.mode, at: Date.now() };
       return;
     }
+    if (r.do === "local") {
+      const h = this.localKeys;
+      if (!h) {
+        logTrace(this, "a client-local panel key arrived with no service for it", r.key);
+        return;
+      }
+      try {
+        h(r.key, r.args);
+      } catch (e) {
+        logError(this, `the client-local key '${r.key}' threw`, e);
+      }
+      return;
+    }
     if (r.do === "showMap") {
       // The panel closes itself; the map opens once it has really gone (a menu over the MapMenu would take the keys)
       this.pendingMap = { args: r.args, at: Date.now() };
@@ -299,6 +312,17 @@ export class ScaleformMenuService extends ClientListener {
     if (this.state.phase === "closed") return false;
     const t = String(type || "");
     return !t || (!!this.owner && this.owner.type === t);
+  }
+
+  // The service that answers the panels' 'set:' keys (this PC's settings); one only
+  public onLocalKeys(handler: (key: string, args: unknown[]) => void): void {
+    this.localKeys = handler;
+  }
+
+  // A client service's call into a panel, when that swf is the one up; dropped otherwise
+  public invokeOnPanel(swf: string, target: string, arg: string): void {
+    if (this.state.phase === "closed" || this.state.swf !== swf) return;
+    this.enqueue([{ do: "invoke", swf, target, arg }]);
   }
 
   // New contents for a panel already on screen, for a service whose state changed.
@@ -404,6 +428,8 @@ export class ScaleformMenuService extends ClientListener {
           this.sp.Ui.invokeString(MENU_NAME, "_root.dboData", a.json);
         } else if (a.do === "close") {
           this.sp.Ui.closeCustomMenu();
+        } else if (a.do === "invoke") {
+          if (this.state.phase === "ready" && this.state.swf === a.swf) this.sp.Ui.invokeString(MENU_NAME, a.target, a.arg);
         } else {
           logTrace(this, "Scaleform panel", a.text);
           this.note(a.text);
@@ -496,4 +522,5 @@ export class ScaleformMenuService extends ClientListener {
   private announcedAt = 0;
   private lastTick = 0;
   private queue: Action[] = [];
+  private localKeys: ((key: string, args: unknown[]) => void) | null = null;
 }
