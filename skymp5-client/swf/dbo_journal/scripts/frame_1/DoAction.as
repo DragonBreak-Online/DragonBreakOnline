@@ -29,6 +29,9 @@ var asking = null;
 // tabTick: a tab's own clock, set as it draws (Profile's powers): true when the page should be drawn again this frame
 var tabTick = null;
 var builtAt = getTimer();
+// when a tab was asked of the server, so the log can say how long its answer took to come (server build and transport)
+var askedTab = "";
+var askedAt = 0;
 
 function send(key, args)
 {
@@ -65,6 +68,8 @@ function openTab(id, focusArg)
    tab = id;
    asking = null;
    closeForm();
+   askedTab = id;
+   askedAt = getTimer();
    send("dbo:journalTab", focusArg == undefined ? [data.nonce, id] : [data.nonce, id, focusArg]);
    draw();
 }
@@ -360,7 +365,9 @@ _root.dboData = function(json)
    data = p;
    tab = String(p.tab);
    draw();
-   dboLog("journal data " + String(json).length + "ch parse " + (t1 - t0) + "ms draw " + (getTimer() - t1) + "ms tab " + tab);
+   var waited = askedTab == tab && askedAt > 0 ? " waited " + (t0 - askedAt) + "ms" : "";
+   askedTab = "";
+   dboLog("journal data " + String(json).length + "ch" + waited + " parse " + (t1 - t0) + "ms draw " + (getTimer() - t1) + "ms tab " + tab);
 };
 
 var keys = {};
