@@ -53,7 +53,20 @@ ok(notArt.length === 0, 'the named uniques are filed as artifacts, not steel, ho
 ok(fam['f8318:skyrim.esm'] === 'glass' && fam['956b5:skyrim.esm'] === 'EBONY' && fam['478ce:immersive weapons.esp'] === 'DAEDRIC',
   'Chillrend (glass) and Wuuthrad (Ebony) keep their family, and so does the forgeable Immersive Weapons Blade of Woe');
 const py = read('tools/loot/loot_materials.py');
-ok(/\(r'\^\(DBBladeOfWoe\|DLC2MKMiraak\(Fight\)\?Sword\|MQ203AkaviriKatana\|MQ304DraugrBattleAxeTsun\|RP_'/.test(py), 'loot_materials.py files the same uniques as artifacts, so a regeneration keeps them');
+// The generator's EDID_FIRST rules that file as 'artifact', joined from their r'...' parts, run on the uniques' editor ids
+const artifactRules = (() => {
+  const body = py.slice(py.indexOf('EDID_FIRST = ['), py.indexOf(']\n', py.indexOf('EDID_FIRST = [')) + 1);
+  const out = [];
+  for (const m of body.matchAll(/\((r'(?:[^']|'\s*r')*'(?:\s*r'[^']*')*)\s*,\s*'artifact'\)/g)) {
+    const src = [...m[1].matchAll(/r'([^']*)'/g)].map((x) => x[1]).join('');
+    try { out.push(new RegExp(src)); } catch (e) { /* a Python-only pattern: not one of these */ }
+  }
+  return out;
+})();
+const filedAsArtifact = (edid) => artifactRules.some((rx) => rx.test(edid));
+const REFILED_EDIDS = ['DBBladeOfWoeReward', 'manny_GF_Weapon_Umbra', 'DLC2MKMiraakSword3', 'MQ304DraugrBattleAxeTsun04', 'MQ203AkaviriKatana5', 'manny_GF_Weapon_BladesSwordGuardian', 'RP_SaarthalsVengeance'];
+ok(REFILED_EDIDS.every(filedAsArtifact) && !['IWCBladeOfWoe', 'TG07Chillrend006', 'C06BladeOfYsgramor', 'IronSword'].some(filedAsArtifact),
+  'loot_materials.py files the same uniques as artifacts (not the forgeable replicas, Chillrend or Wuuthrad), so a regeneration keeps them', REFILED_EDIDS.filter((e) => !filedAsArtifact(e)));
 
 // ---- the wiring ----
 const SECTION = cut('// Weapon bands (Nat, 1 Nov', 'const arrowDamageMult');
