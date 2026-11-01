@@ -25,7 +25,8 @@ module.exports = (api) => {
   const ownName = (a) => { const m = call('__dboMaskOf', a >>> 0); return (m && m.real) || nameOf(a); };
   const knownAs = (viewer, a) => { const n = call('__dboNameFor', viewer, a); return n ? String(n) : nameOf(a); };
   const provinceOf = (a) => { const r = globalThis.__dboRegions; try { return r && typeof r.provinceAt === 'function' ? String((r.provinceAt(a) || {}).province || '') : ''; } catch (e) { return ''; } };
-  const holdOf = (a) => { try { const z = typeof zoneOfActor === 'function' ? zoneOfActor(a) : null; return z ? String(z) : ''; } catch (e) { return ''; } };
+  // by geography (gamemode.js holdOfActor): a runner's road is no shorter for a stronghold's ring
+  const holdOf = (a) => { try { const f = typeof api.holdOfActor === 'function' ? api.holdOfActor : zoneOfActor; const z = typeof f === 'function' ? f(a) : null; return z ? String(z) : ''; } catch (e) { return ''; } };
   // How long the runner takes from one to the other, in ms. An unknown place counts as far
   const delayMs = (from, to) => {
     const h = holdOf(from);

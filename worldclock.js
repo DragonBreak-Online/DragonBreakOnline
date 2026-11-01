@@ -11,6 +11,8 @@ module.exports = (api) => {
   const fs = require('fs');
   const path = require('path');
   const { mp, log, personal, system, registerChatCommand, sendPacket, onlineActors, every, zoneOfActor, audit, who, cfg } = api;
+  // by geography (gamemode.js holdOfActor: the nearest capital, never a stronghold), so the weather does not change at a stronghold's ring
+  const holdOfActor = typeof api.holdOfActor === 'function' ? api.holdOfActor : zoneOfActor;
 
   const C = Object.assign({
     timeScale: 6,               // game minutes per real minute: a game day every 4 real hours
@@ -109,7 +111,7 @@ module.exports = (api) => {
     return w;
   };
   const weatherOf = (zone) => stateOf(zone).kind;
-  const zoneOf = (a) => { try { return zoneOfActor(a); } catch (e) { return null; } };
+  const zoneOf = (a) => { try { return holdOfActor(a); } catch (e) { return null; } };
   const weatherFor = (a) => weatherOf(zoneOf(a));
   const weatherIdFor = (a) => stateOf(zoneOf(a)).id || '';
 
@@ -150,7 +152,7 @@ module.exports = (api) => {
     const [kindName, hours] = String(args || '').trim().split(/\s+/);
     const kind = KINDS.indexOf(String(kindName || '').toLowerCase());
     if (kind < 0) return personal(a, `Usage: /setweather <${KINDS.join('|')}> [game hours]`);
-    let z = null; try { z = zoneOfActor(a); } catch (e) { /* default */ }
+    let z = null; try { z = holdOfActor(a); } catch (e) { /* default */ }
     const key = keyOf(z);
     ST.weather[key] = { kind, id: idFor(key, kind), untilDays: gameDays() + (Number(hours) > 0 ? Number(hours) : 3) / 24, forced: true }; save(); broadcast();
     audit(`CLOCK ${who(a)} set the ${key} weather to ${KINDS[kind]}`); personal(a, `${KINDS[kind]} over ${key} for ${Number(hours) > 0 ? Number(hours) : 3} game hours.`);

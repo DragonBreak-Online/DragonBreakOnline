@@ -41,6 +41,8 @@ const path = require('path');
 
 module.exports = (api) => {
   const { mp, log, personal, audit, display, who, cfg, giveItem, registerChatCommand, sendPacket, onlineActors, every, stopTimer, profileOf, zoneOfActor } = api;
+  // by geography (gamemode.js holdOfActor: the nearest capital, never a stronghold), so the whole hold hears its boss
+  const holdOfActor = typeof api.holdOfActor === 'function' ? api.holdOfActor : zoneOfActor;
   // Starting an event boss is a spawn: Lead GM and above (TIER_CAPS.spawn), as /spawn is
   const isLeadStaff = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
   const C = Object.assign({ enabled: true, creditShare: 0.1, lockoutHours: 20, pollSeconds: 2, only: null, off: [] }, cfg.bosses || {});
@@ -157,7 +159,7 @@ module.exports = (api) => {
   const healthOf = (id) => { const p = get(id, 'percentages'); return p && typeof p.health === 'number' ? p.health : null; };
   const setHealth = (id, h) => { const p = get(id, 'percentages'); if (!p) return; try { mp.set(id, 'percentages', { health: clamp(h, 0, 1), magicka: p.magicka, stamina: p.stamina }); } catch (e) { log('bosses: heal failed', e.message); } };
   const hearers = (b) => onlineActors().filter((a) => {
-    if (b.hold) { let z = ''; try { const v = zoneOfActor(a); z = v ? String(v.id || v) : ''; } catch (e) { z = ''; } return z === b.hold; }
+    if (b.hold) { let z = ''; try { const v = holdOfActor(a); z = v ? String(v.id || v) : ''; } catch (e) { z = ''; } return z === b.hold; }
     return String(get(a, 'worldOrCellDesc') || '').toLowerCase() === String(b.world).toLowerCase();
   });
   const tell = (b, text) => { if (text) for (const a of hearers(b)) personal(a, text); };

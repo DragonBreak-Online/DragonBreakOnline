@@ -6185,7 +6185,9 @@ const isWorldspace = (desc) => {
   if (!worldKind.has(key)) { let w = false; try { const r = recordOf(mp.getIdFromDesc(desc)); w = !!(r && String(r.record.type) === 'WRLD'); } catch (e) { /* unknown */ } worldKind.set(key, w); }
   return worldKind.get(key);
 };
-const zoneAtPlace = (world, pos) => {
+// The hold a place lies in by geography: a region by its worldspace, an interior by zone-cells.json, else the hold whose
+// capital is nearest. What weather, temples, who hears a howl and how far a runner goes are about (holdOfActor)
+const holdAtPlace = (world, pos) => {
   const w = normPlace(world);
   for (const r of ZONES.regions || []) if ((r.worldspaces || []).map(normPlace).includes(w)) return r.id;
   if (!isWorldspace(world)) return zoneOfCell(world);
@@ -6193,6 +6195,23 @@ const zoneAtPlace = (world, pos) => {
   let best = null, bestD = Infinity;
   for (const h of ZONES.holds || []) { if (!Array.isArray(h.capital)) continue; const d = Math.hypot(pos[0] - h.capital[0], pos[1] - h.capital[1]); if (d < bestD) { bestD = d; best = h.id; } }
   return best;
+};
+// The zone a place belongs to, as the fork's zoneAt (zones.ts) decides it, so guards, citizenship and consequences agree
+// with property, locks and Hold Notices (Nat, 1 Nov): inside a stronghold's radius the stronghold, while zones.json's
+// sovereignty.strongholdsOverrideHolds is not false, the first listed winning where two overlap; otherwise holdAtPlace
+const zoneAtPlace = (world, pos) => {
+  const hold = holdAtPlace(world, pos);
+  if (!hold || !(ZONES.holds || []).some((h) => h.id === hold) || !Array.isArray(pos)) return hold;
+  if (ZONES.sovereignty && ZONES.sovereignty.strongholdsOverrideHolds === false) return hold;
+  const x = Number(pos[0]), y = Number(pos[1]);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return hold;
+  for (const s of ZONES.strongholds || []) {
+    const r = Number(s.radius);
+    if (!Array.isArray(s.center) || !(r > 0)) continue;
+    const dx = x - Number(s.center[0]), dy = y - Number(s.center[1]);
+    if (dx * dx + dy * dy <= r * r) return s.id;
+  }
+  return hold;
 };
 // Only a worldspace that has a zone counts as the last outdoor spot. Blackreach, ShadowgreenCavernWorld (the Solitude
 // Sewers exit) and AlftandWorld are worldspaces with none, and recording them overwrote the real one, so a death there
@@ -6210,16 +6229,19 @@ every('outside', 10000, () => {
 });
 // The zone a player is in: by worldspace or nearest hold capital outdoors, by zone-cells.json or owning plugin
 // indoors, else where they last stood outside
-const zoneOfActor = (a) => {
+const placeOfActor = (a, at) => {
   let world = '', pos = null;
   try { world = String(mp.get(a, 'worldOrCellDesc') || ''); pos = mp.get(a, 'pos'); } catch (e) { return null; }
   let zone = null;
-  if (isWorldspace(world)) zone = zoneAtPlace(world, pos);
+  if (isWorldspace(world)) zone = at(world, pos);
   else zone = zoneOfCell(world);
   if (!zone) zone = REGION_PLUGINS[normPlace(world).split(':')[1]] || null;
-  if (!zone) { let last = null; try { last = mp.get(a, 'private.lastOutside'); } catch (e) { /* none */ } if (last && last.world) zone = zoneAtPlace(last.world, last.pos); }
+  if (!zone) { let last = null; try { last = mp.get(a, 'private.lastOutside'); } catch (e) { /* none */ } if (last && last.world) zone = at(last.world, last.pos); }
   return zone;
 };
+const zoneOfActor = (a) => placeOfActor(a, zoneAtPlace);
+// By geography: the hold around a stronghold rather than the stronghold (holdAtPlace)
+const holdOfActor = (a) => placeOfActor(a, holdAtPlace);
 // The zone whose temple a player wakes at or /unstuck walks to: in Skyrim, the hold the watch reads there (guards.js
 // __dboHoldHere: a hold-jails.json cell, else the realm.js territory of the place or of the last place outside), when it
 // is a hold with a temple. Ivarstead is nearer Whiterun's capital but is the Rift's (#bugs, 23 Oct). Cyrodiil, Solstheim
@@ -6227,7 +6249,8 @@ const zoneOfActor = (a) => {
 const isHoldZone = (z) => (ZONES.holds || []).some((h) => h.id === z);
 const templeZoneOf = (a) => {
   try { globalThis.__dboTempleFor = templeFor; globalThis.__dboTempleZoneOf = templeZoneOf; } catch (e) {}
-  const zone = zoneOfActor(a);
+  // a stronghold keeps no temple: its people wake at the temple of the hold around it
+  const zone = holdOfActor(a);
   if (zone && !isHoldZone(zone)) return zone;
   let hold = '';
   try { hold = typeof globalThis.__dboHoldHere === 'function' ? String(globalThis.__dboHoldHere(a) || '') : ''; } catch (e) { hold = ''; }
@@ -9580,7 +9603,7 @@ try {
 try {
   const BOSSES_JS = path.resolve('bosses.js');
   delete require.cache[BOSSES_JS];
-  require(BOSSES_JS)({ mp, log, personal, audit, display, who, cfg, giveItem, registerChatCommand, sendPacket, onlineActors, every, stopTimer, profileOf, zoneOfActor, isLeadStaff });
+  require(BOSSES_JS)({ mp, log, personal, audit, display, who, cfg, giveItem, registerChatCommand, sendPacket, onlineActors, every, stopTimer, profileOf, zoneOfActor, holdOfActor, isLeadStaff });
 } catch (e) { log('bosses.js failed to load:', e.stack || e.message); globalThis.__dboBossHit = null; globalThis.__dboBossDeath = null; globalThis.__dboBossDamageMult = null; globalThis.__dboBossAllies = null; }
 
 // ---- Dynamic Consequences, phase 1: pressure per hold and force, measured only (server\consequences.js) ---------------
@@ -9884,14 +9907,14 @@ try {
 try {
   const DISPATCHES_JS = path.resolve('dispatches.js');
   delete require.cache[DISPATCHES_JS];
-  require(DISPATCHES_JS)({ mp, log, personal, deliver, registerChatCommand, onlineActors, nameOf, zoneOfActor, cfg });
+  require(DISPATCHES_JS)({ mp, log, personal, deliver, registerChatCommand, onlineActors, nameOf, zoneOfActor, holdOfActor, cfg });
 } catch (e) { log('dispatches.js failed to load:', e.stack || e.message); }
 
 // ---- heralds cry gatherings: /herald, /events (server\heralds.js, config "heralds") ---------------------------------
 try {
   const HERALDS_JS = path.resolve('heralds.js');
   delete require.cache[HERALDS_JS];
-  require(HERALDS_JS)({ mp, log, personal, system, registerChatCommand, onlineActors, profileOf, nameOf, zoneById, takeGold, depositToTreasury, every, audit, isAdmin, zoneOfActor, giveItem, GOLD_BASE, cfg });
+  require(HERALDS_JS)({ mp, log, personal, system, registerChatCommand, onlineActors, profileOf, nameOf, zoneById, takeGold, depositToTreasury, every, audit, isAdmin, zoneOfActor, holdOfActor, giveItem, GOLD_BASE, cfg });
 } catch (e) { log('heralds.js failed to load:', e.stack || e.message); globalThis.__dboHeraldLogin = null; }
 
 // ---- a faction's roll and standing orders: /roster, /orders (server\rosters.js, config "rosters") -------------------
@@ -10209,7 +10232,7 @@ registerChatCommand('announce', (a, args) => {
 try {
   const WORLDCLOCK_JS = path.resolve('worldclock.js');
   delete require.cache[WORLDCLOCK_JS];
-  require(WORLDCLOCK_JS)({ mp, log, personal, system, registerChatCommand, sendPacket, onlineActors, every, zoneOfActor, audit, who, cfg,
+  require(WORLDCLOCK_JS)({ mp, log, personal, system, registerChatCommand, sendPacket, onlineActors, every, zoneOfActor, holdOfActor, audit, who, cfg,
     inCreator: (a) => creationPending(a) || (creation.has(a >>> 0) && inHub(a)) });
 } catch (e) { log('worldclock.js failed to load:', e.stack || e.message); globalThis.__dboClock = null; }
 
@@ -10327,7 +10350,7 @@ try {
 try {
   const GREATHUNT_JS = path.resolve('greathunt.js');
   delete require.cache[GREATHUNT_JS];
-  require(GREATHUNT_JS)({ mp, log, personal, audit, who, sendPacket, onlineActors, profileOf, registerChatCommand, zoneOfActor, zoneById, isWorldspace, cfg, isLeadStaff, findByName });
+  require(GREATHUNT_JS)({ mp, log, personal, audit, who, sendPacket, onlineActors, profileOf, registerChatCommand, zoneOfActor, holdOfActor, zoneById, isWorldspace, cfg, isLeadStaff, findByName });
 } catch (e) { log('greathunt.js failed to load:', e.stack || e.message); for (const k of ['__dboHuntFed', '__dboHuntKill', '__dboHuntChanged', '__dboHuntBeastSeconds', '__dboHuntFeedSeconds', '__dboHuntChangesPerDay', '__dboHuntForcedMult', '__dboHuntDamageMult', '__dboHuntReset', '__dboHuntHowled', '__dboHuntView']) globalThis[k] = null; }
 
 // ---- vampire ranks: blood from feeding on people (server\bloodranks.js) -----------------------------------------------
