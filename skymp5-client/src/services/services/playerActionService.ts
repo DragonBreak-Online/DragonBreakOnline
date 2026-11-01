@@ -188,6 +188,7 @@ export class PlayerActionService extends ClientListener {
     // The gamemode decides the entries (guard and official actions, restraint state) and answers with dboPlayerMenu
     this.playerTarget = remoteId;
     logTrace(this, `Asking for the player menu on`, remoteId.toString(16));
+    this.askedAt = Date.now();
     sendCustomPacket(this.controller, { customPacketType: "dbo", event: "playerMenu", args: [remoteId] });
   }
 
@@ -275,9 +276,11 @@ export class PlayerActionService extends ClientListener {
   // The native dbo_context panel, given the same widget object the browser gets; false when the client has it off
   private openNativeMenu(): boolean {
     const widget = { type: "contextMenu", id: WIDGET_ID, targetName, actions: menuActions, lines: menuLines, mode: menuMode, events };
+    const askedAt = this.askedAt;
+    this.askedAt = 0;
     try {
       return this.controller.lookupListener(ScaleformMenuService).openNative({
-        type: "contextMenu", widget, widgetId: WIDGET_ID, onKey: (key, args) => this.onNativeKey(key, args),
+        type: "contextMenu", widget, widgetId: WIDGET_ID, onKey: (key, args) => this.onNativeKey(key, args), askedAt,
       });
     } catch {
       return false;
@@ -333,6 +336,7 @@ export class PlayerActionService extends ClientListener {
   private menuOpen = false;
   private native = false;
   private playerTarget = 0;
+  private askedAt = 0;
   private lastMaskToggle = 0;
   private lastRangeCheck = 0;
 }

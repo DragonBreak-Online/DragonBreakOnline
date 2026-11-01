@@ -696,7 +696,7 @@ keys.onKeyDown = function()
       strike();
    }
 };
-Key.addListener(keys);
+dboKeys(keys);
 
 // Each frame: the marker moves, the clock runs down, a blow's word fades, and the round ends when the time runs out
 _root.onEnterFrame = function()

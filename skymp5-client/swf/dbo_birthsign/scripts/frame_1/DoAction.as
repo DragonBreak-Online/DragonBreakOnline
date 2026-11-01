@@ -426,7 +426,7 @@ keys.onKeyDown = function()
       scrollBy(MAX_ROWS);
    }
 };
-Key.addListener(keys);
+dboKeys(keys);
 
 _root.onEnterFrame = function()
 {

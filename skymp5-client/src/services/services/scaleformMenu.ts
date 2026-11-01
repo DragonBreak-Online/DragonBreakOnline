@@ -231,12 +231,14 @@ export interface MenuState {
   viaOutbox: number;
   viaModEvent: number;
   foreignEvents: number;
+  // when a client service asked the server for this panel's content (a key press), 0 when not known
+  askedAt: number;
 }
 
 export const newState = (): MenuState => ({
   phase: "closed", swf: "", json: "null", widgetId: 0,
   openedAt: 0, readyAt: 0, readyFrame: 0, sent: 0, foreignEvents: 0,
-  outRead: 0, lastSeq: 0, viaOutbox: 0, viaModEvent: 0,
+  outRead: 0, lastSeq: 0, viaOutbox: 0, viaModEvent: 0, askedAt: 0,
 });
 
 export type Action =
@@ -354,13 +356,20 @@ export const isNew = (s: MenuState, m: UiEvent): boolean => {
   return s.lastSeq === 0;
 };
 
+// Escape for the panel on screen (Nat, 1 Nov: "allow us to click the Esc key for closing out the F7 and F3 panels"): the
+// game may keep the key from the movie, so the client hands it to lib/dbo.as's _root.dboEscape, which runs the panel's
+// own key handler (a form or a typing box backs out first, as the panel's own Escape does). Only a panel that is up.
+export const ESCAPE_TARGET = "_root.dboEscape";
+export const escapeTargetFor = (s: MenuState): string => (s.phase === "ready" ? ESCAPE_TARGET : "");
+
 export const summary = (s: MenuState): string => {
   // readyAt, not openedAt: testing a timestamp for truthiness makes the line claim "never became ready"
   // about a panel that did, and a diagnostic that lies is worse than none.
   const opened = s.readyAt > 0
     ? `${s.readyAt - s.openedAt}ms to ready on frame ${s.readyFrame}`
     : "never became ready";
-  return `swf=${s.swf} phase=${s.phase} ${opened} payload=${s.json.length}ch sent=${s.sent} ` +
+  const asked = s.askedAt > 0 && s.openedAt >= s.askedAt ? ` asked ${s.openedAt - s.askedAt}ms before the open` : "";
+  return `swf=${s.swf} phase=${s.phase} ${opened}${asked} payload=${s.json.length}ch sent=${s.sent} ` +
     `in=${s.viaOutbox}outbox/${s.viaModEvent}modevent` +
     (s.foreignEvents ? ` (ignored ${s.foreignEvents} mod events from elsewhere)` : "");
 };

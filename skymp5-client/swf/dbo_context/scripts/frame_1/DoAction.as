@@ -331,7 +331,7 @@ function build()
    panel._x = STAGE_W / 2 + GAP;
    panel._y = 200;
    panel.createEmptyMovieClip("bg", 1);
-   dboFadeIn(panel);
+   dboFadeIn(panel, FADE_KEY_MS);
 }
 
 // A re-send (the salvage menu after every breakdown) redraws in place
@@ -402,7 +402,7 @@ keys.onKeyDown = function()
       turnPage(1);
    }
 };
-Key.addListener(keys);
+dboKeys(keys);
 
 var wheel = {};
 wheel.onMouseWheel = function(delta)

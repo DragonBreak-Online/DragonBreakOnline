@@ -13,7 +13,9 @@ const S = require('./native-swf-stub');
 const OUT = path.resolve(process.argv[2] || 'render-out');
 const EDGE = process.argv[3] || 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
 const FONT = path.resolve(__dirname, '../../skymp5-front/src/img/skyrim/Fonts/Futura Condensed Light.ttf').replace(/\\/g, '/');
-fs.mkdirSync(OUT, { recursive: true });
+// required by another harness for its scenes (tests/native-escape-harness.js): no pictures, no folder
+const asModule = require.main !== module;
+if (!asModule) fs.mkdirSync(OUT, { recursive: true });
 
 // The stage area a screen of this aspect shows under no-border scaling of 1280 x 720
 const visibleFor = (aspect) => {
@@ -255,7 +257,9 @@ const overlaps = (boxes) => {
   return hits;
 };
 
+module.exports = { SETUPS };
 const only = process.env.ONLY ? new RegExp(process.env.ONLY) : null;
+if (asModule) return;
 if (process.env.CHECK) {
   // node tests/native-render.js --check: no pictures, every scene's overlapping texts listed; exits 1 on any
   let n = 0;

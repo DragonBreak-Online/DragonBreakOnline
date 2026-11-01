@@ -416,7 +416,7 @@ keys.onKeyDown = function()
       actions[focus].onPick();
    }
 };
-Key.addListener(keys);
+dboKeys(keys);
 
 var wheel = {};
 wheel.onMouseWheel = function(delta)

@@ -1235,7 +1235,7 @@ keys.onKeyDown = function()
       turnPage(1);
    }
 };
-Key.addListener(keys);
+dboKeys(keys);
 
 var wheel = {};
 wheel.onMouseWheel = function(delta)

@@ -202,6 +202,7 @@ export class HousingService extends ClientListener {
     }
     targetLabel = (ref.getName() || "Property").trim() || "Property";
     logTrace(this, `Requesting property info for`, targetLabel, `(${this.target})`);
+    this.askedAt = Date.now();
     sendCustomPacket(this.controller, { customPacketType: "propertyInfoRequest", target: this.target });
   }
 
@@ -346,7 +347,9 @@ export class HousingService extends ClientListener {
         hasKeys: info.hasKeys, canGrantContainers: info.canGrantContainers, ownerName: info.ownerName, place: info.place,
         placeName: info.placeName, assignedToYou: info.assignedToYou, keyRing: info.keyRing, events,
       };
-      if (scaleform && scaleform.openNative({ type: "housing", widget, widgetId: WIDGET_ID, onKey: (k, a) => this.handleKey(k, a) })) {
+      const askedAt = this.askedAt;
+      this.askedAt = 0;
+      if (scaleform && scaleform.openNative({ type: "housing", widget, widgetId: WIDGET_ID, onKey: (k, a) => this.handleKey(k, a), askedAt })) {
         this.native = true;
         return;
       }
@@ -404,5 +407,6 @@ export class HousingService extends ClientListener {
   private noNative = false;
   private renamed = false;
   private target = 0;
+  private askedAt = 0;
   private pendingRecipient: { action: string; target: number; ref: number; expiresAt: number } | null = null;
 }

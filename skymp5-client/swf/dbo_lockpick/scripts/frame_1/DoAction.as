@@ -510,7 +510,7 @@ keys.onKeyDown = function()
       tryAuto();
    }
 };
-Key.addListener(keys);
+dboKeys(keys);
 
 // Each frame: the loose pin rises, hangs and falls on the lock's own clock, and a word fades
 _root.onEnterFrame = function()

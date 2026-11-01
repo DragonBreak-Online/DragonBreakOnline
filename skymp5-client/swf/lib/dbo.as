@@ -31,6 +31,7 @@ var A_ROW_REST = 50;
 var A_BUTTON_REST = 80;
 var A_FOCUS = 100;
 var FADE_MS = 300;
+var FADE_KEY_MS = 100;
 
 // _global.skse does not exist on frame 1 (Worker 4, measured 26 Oct): nothing touches it until dboBoot sees it
 var dboBooted = false;
@@ -98,12 +99,56 @@ var DBO_CLOSE_FRAMES = 6;
 var dboClosing = false;
 var dboTyping = false;
 
+// Escape also comes from the client (scaleformMenuService calls _root.dboEscape), since the game may keep it from the movie;
+// a second copy of one press, from the other source within DBO_ESC_GAP_MS, is dropped
+var DBO_ESC_GAP_MS = 250;
+var dboKeyHandlers = [];
+var dboForcedKey = 0;
+var dboEscAt = -100000;
+var dboEscBy = "";
+
+// A panel's key listener: the game's keys, and the client's Escape
+function dboKeys(listener)
+{
+   Key.addListener(listener);
+   dboKeyHandlers.push(listener);
+}
+
 // Key.getCode() with the numpad digits read as the row digits 1-9
 function dboKey()
 {
+   if (dboForcedKey > 0)
+   {
+      return dboForcedKey;
+   }
    var code = Key.getCode();
+   if (code == 27)
+   {
+      if (dboEscBy == "client" && getTimer() - dboEscAt < DBO_ESC_GAP_MS)
+      {
+         return 0;
+      }
+      dboEscBy = "key";
+      dboEscAt = getTimer();
+   }
    return code >= 97 && code <= 105 ? code - 48 : code;
 }
+
+_root.dboEscape = function()
+{
+   if (dboEscBy == "key" && getTimer() - dboEscAt < DBO_ESC_GAP_MS)
+   {
+      return;
+   }
+   dboEscBy = "client";
+   dboEscAt = getTimer();
+   dboForcedKey = 27;
+   for (var i = 0; i < dboKeyHandlers.length; i++)
+   {
+      dboKeyHandlers[i].onKeyDown();
+   }
+   dboForcedKey = 0;
+};
 
 function dboClose()
 {
@@ -709,13 +754,15 @@ function dboWash(c, on)
 }
 
 // Linear alpha fade over FADE_MS; input is never blocked while it runs
-function dboFadeIn(clip)
+// ms: a shorter fade for a panel a key press opens (default FADE_MS)
+function dboFadeIn(clip, ms)
 {
    clip._alpha = 0;
    clip.fadeFrom = getTimer();
+   clip.fadeMs = ms > 0 ? ms : FADE_MS;
    clip.onEnterFrame = function()
    {
-      var k = (getTimer() - this.fadeFrom) / FADE_MS;
+      var k = (getTimer() - this.fadeFrom) / this.fadeMs;
       if (k >= 1)
       {
          this._alpha = 100;

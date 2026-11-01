@@ -1,13 +1,14 @@
 import { ClientListener, CombinedController, Sp } from "./clientListener";
-import { ModEvent } from "skyrimPlatform";
+import { ButtonEvent, DxScanCode, ModEvent } from "skyrimPlatform";
 import { logError, logTrace } from "../../logging";
 import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { parseCustomPacket, sendCustomPacket } from "./customPacketUtil";
 import {
   Action, CAPS_RETRY_MS, MENU_NAME, MenuState, OUT_VAR, UiEvent, capsFor, isNew, newState, parseOutbox,
-  parseUiEvent, planClose, planOpen, planReady, planRefresh, planTick, readyFrameOf, summary,
+  escapeTargetFor, parseUiEvent, planClose, planOpen, planReady, planRefresh, planTick, readyFrameOf, summary,
 } from "./scaleformMenu";
+import { buttonKeyCode } from "./mouseKeys";
 import {
   CLOSE_KEY, FAILED_KEY, HANDOFF_KEY, PendingHandoff, Replay, handoffDue, mapLine, replayFor, swfFor,
 } from "./nativeWidgets";
@@ -19,6 +20,8 @@ export interface NativeOpen {
   widget: unknown;
   widgetId?: number;
   onKey: (key: string, args: unknown[]) => void;
+  // Date.now() when the service asked the server for this content, so the diag line can show the wait
+  askedAt?: number;
 }
 import { withClientUiCaps } from "../../lib/clientUiCaps";
 
@@ -38,7 +41,21 @@ export class ScaleformMenuService extends ClientListener {
     this.controller.emitter.on("customPacketMessage", (e) => this.onCustomPacketMessage(e));
     this.controller.on("modEvent", (e) => this.onModEvent(e));
     this.controller.on("update", () => this.onUpdate());
+    this.controller.on("buttonEvent", (e) => this.onButtonEvent(e));
     this.controller.emitter.on("connectionAccepted", () => this.announce("connected"));
+  }
+
+  // Escape goes to the panel on screen, whose own handler backs out a layer or closes it
+  private onButtonEvent(e: ButtonEvent): void {
+    if (!e.isDown || buttonKeyCode(e) !== DxScanCode.Escape) return;
+    const target = escapeTargetFor(this.state);
+    if (!target) return;
+    try {
+      this.sp.Ui.invokeString(MENU_NAME, target, "");
+      logTrace(this, "escape handed to", this.state.swf);
+    } catch (e) {
+      logError(this, "escape to the panel failed", e);
+    }
   }
 
   // The server gates each native panel on the client naming it, and falls back to the browser widget or to
@@ -68,6 +85,7 @@ export class ScaleformMenuService extends ClientListener {
         this.enqueue(planClose(this.state));
         return;
       }
+      this.state.askedAt = 0;
       this.enqueue(planOpen(this.state, content["swf"], content["payload"], content["widget"], Date.now()));
     } catch (e) {
       logError(this, "dboScaleform packet failed", e);
@@ -255,6 +273,7 @@ export class ScaleformMenuService extends ClientListener {
       const id = Math.max(0, Math.round(Number(opts.widgetId) || 0));
       this.owner = { type, onKey: opts.onKey };
       logTrace(this, "opening a native panel for a client service", type, swf);
+      this.state.askedAt = Math.max(0, Number(opts.askedAt) || 0);
       this.enqueue(planOpen(this.state, swf, opts.widget, id, Date.now()));
       return true;
     } catch (e) {

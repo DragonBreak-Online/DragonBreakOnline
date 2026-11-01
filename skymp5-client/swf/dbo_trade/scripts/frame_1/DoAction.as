@@ -67,7 +67,7 @@ function weightText(n)
 
 function ev(name)
 {
-   return data.events != undefined && data.events[name] != undefined ? String(data.events[name]) : "trade:" + name;
+   return data != null && data.events != undefined && data.events[name] != undefined ? String(data.events[name]) : "trade:" + name;
 }
 
 function send(name, args)
@@ -961,7 +961,7 @@ keys.onKeyDown = function()
       draw();
    }
 };
-Key.addListener(keys);
+dboKeys(keys);
 
 function pageCount()
 {

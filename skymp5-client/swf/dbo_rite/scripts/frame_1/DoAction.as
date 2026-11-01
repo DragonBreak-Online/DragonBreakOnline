@@ -446,7 +446,7 @@ keys.onKeyDown = function()
       }
    }
 };
-Key.addListener(keys);
+dboKeys(keys);
 
 // The marker moves on this panel's own clock; the round's limit runs out here, not on the server's
 _root.onEnterFrame = function()

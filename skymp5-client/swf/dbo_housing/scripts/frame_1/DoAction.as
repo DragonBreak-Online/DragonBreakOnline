@@ -387,7 +387,7 @@ function build()
    var bg = panel.createEmptyMovieClip("bg", 1);
    dboGround(bg, PANEL_W, PANEL_H);
    dboWatermark(panel, 5, PANEL_W - 50, 150, 280);
-   dboFadeIn(panel);
+   dboFadeIn(panel, FADE_KEY_MS);
 }
 
 _root.dboData = function(json)
@@ -453,7 +453,7 @@ keys.onKeyDown = function()
       draw();
    }
 };
-Key.addListener(keys);
+dboKeys(keys);
 
 _root.onEnterFrame = function()
 {
