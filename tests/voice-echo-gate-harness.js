@@ -23,8 +23,17 @@ check('the notice is for off and failed only, not while the loop connects', G.va
 // ---- 2. VoiceManager.js against a stubbed page ----
 const FORK = process.env.FORK, FORK_SERVER = process.env.FORK_SERVER;
 const src = FORK && path.join(FORK, 'skymp5-front/src/utils/VoiceManager.js');
-const esbuild = FORK_SERVER && path.join(FORK_SERVER, 'skymp5-server/node_modules/.bin/esbuild');
+// The package's own bin script, NOT node_modules/.bin/esbuild. That shim is `#!/bin/sh`, and execFileSync on
+// Windows cannot run it: it throws ENOENT and this harness failed for that alone, with nothing wrong in the
+// code it tests. esbuild/bin/esbuild is `#!/usr/bin/env node`, so running it through process.execPath works
+// on every platform (verified 0.28.1 on Windows, where the shim fails).
+const esbuild = FORK_SERVER && path.join(FORK_SERVER, 'skymp5-server/node_modules/esbuild/bin/esbuild');
 const PARTS_2_3 = 41; // checks in parts 2 and 3
+// Read sources with their line endings normalised. The checked-out client sources are CRLF on Windows, and
+// every regex below is written against \n: without this, two assertions failed while quoting matched text
+// with \r\n in it, which looks like a code change and is not one. Also matters for `split('\n')`, which
+// otherwise leaves a stray \r at the end of every line.
+const readLF = (p) => fs.readFileSync(p, 'utf8').split('\r\n').join('\n');
 const why = !src ? 'FORK is not set' : !fs.existsSync(path.join(FORK, 'skymp5-front/src/utils/voiceEchoGate.js')) ? `${FORK} has no voiceEchoGate.js`
   : !esbuild || !fs.existsSync(esbuild) ? 'no esbuild in FORK_SERVER' : '';
 let skipped = 0;
@@ -33,7 +42,7 @@ let finished = false;
 
 // ---- 2a. No automatic gain control on the mic (#bugs 2 Oct: the voice chat raised a headset's input gain to max) ----
 if (src && fs.existsSync(src)) {
-  const vmSrc = fs.readFileSync(src, 'utf8');
+  const vmSrc = readLF(src);
   if (!/MIC_CAPTURE/.test(vmSrc)) {
     require('./expect')('voice-no-agc', `${FORK} has no MIC_CAPTURE`);
     console.log(`SKIP  the automatic gain control checks: ${FORK} has no MIC_CAPTURE`);
@@ -52,7 +61,7 @@ if (why) {
   console.log(`SKIP  ${PARTS_2_3} of the harness's checks (VoiceManager.js and the client relay): ${why}`);
 } else (async () => {
   const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'claude-nate-voice-')), 'vm.js');
-  execFileSync(esbuild, [src, '--bundle', '--platform=node', '--format=cjs', '--external:livekit-client', '--loader:.png=empty', '--loader:.svg=empty', `--outfile=${out}`, '--log-level=error']);
+  execFileSync(process.execPath, [esbuild, src, '--bundle', '--platform=node', '--format=cjs', '--external:livekit-client', '--loader:.png=empty', '--loader:.svg=empty', `--outfile=${out}`, '--log-level=error']);
   const sent = [];
   const el = () => ({ style: {}, appendChild() {}, remove() {}, play: () => Promise.resolve(), setAttribute() {}, addEventListener() {} });
   globalThis.window = { skyrimPlatform: { sendMessage: (...a) => sent.push(a) }, addEventListener() {}, dispatchEvent() {}, localStorage: { getItem: () => null, setItem() {} } };
@@ -171,14 +180,14 @@ if (why) {
   vm.ptt = false; vm.room = null;
   check('no room: the line counts no mics', /^mics 0, aec \?/.test(vm.micSummary()));
   check('the notice tells a player on speakers to use headphones', /use headphones/.test(G.BLOCKED_NOTICE) && /push-to-talk only for now/.test(G.BLOCKED_NOTICE));
-  const vmSrc = fs.readFileSync(src, 'utf8');
+  const vmSrc = readLF(src);
   const codeLines = vmSrc.split('\n').filter((l) => !/^\s*\/\//.test(l));
   check('the chosen activation is written only by the defaults and setPrefs', codeLines.filter((l) => /activation:/.test(l)).length === 2 && !codeLines.some((l) => /prefs\.activation\s*=/.test(l)));
   check('every loop outcome goes through setEcho (none left calling sendToGame for it directly)', (vmSrc.match(/sendToGame\('voice::echoLoop'/g) || []).length === 1 && /this\.setEcho\('on'/.test(vmSrc) && /this\.setEcho\('off'/.test(vmSrc) && /this\.setEcho\('failed'/.test(vmSrc) && /this\.setEcho\('elements'/.test(vmSrc) && /this\.setEcho\('pending'/.test(vmSrc));
 
   // ---- 3. the client relay ----
   const LIVE_SHAPE = 'mics 1, aec on, cap live, ctx running, mix none, loop none';
-  const vs = fs.readFileSync(path.join(FORK, 'skymp5-client/src/services/services/voiceService.ts'), 'utf8');
+  const vs = readLF(path.join(FORK, 'skymp5-client/src/services/services/voiceService.ts'));
   const block = vs.slice(vs.indexOf('kind === "voice::echoLoop"'), vs.indexOf('kind === "voice::error"'));
   const shape = block.match(/const raw = [^\n]*\n\s*const echo = [^\n]*/);
   const cut = shape ? new Function('e', `${shape[0]}\nreturn echo;`) : null;
