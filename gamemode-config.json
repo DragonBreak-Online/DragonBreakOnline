@@ -934,6 +934,7 @@
   "issueUnits": 1500
  },
  "prayer": {
+   "blessingRegen": { "clientStats": ["magicka"] },
   "_comment": "Prayer at a shrine (server\\prayer.js; the verses, odds and rests are in skills.json praying). Only the client-judged settings are kept here; every other default in prayer.js stands.",
   "_clientJudged": "Jake, 2026-09-30: lag refused 7 of 31 perfect holds as late since 30 Sep. The widget judges the hold on the player's machine and the server accepts its verdict, keeping only checks latency cannot fail (nonce, one report, the worshipper within nearMeters of the shrine when the report lands, plus 10 m for every second of that report's own lag up to 120 m more, or within it when their close arrived; no shorter than the verses, rests and blessings). An old widget is judged from its spans without the late and future checks. roundTimeoutMs cleans up a prayer nobody reports. replayCheck: 'log' lets a claimed hold its own spans do not bear out stand with a PRAYER-MISMATCH audit line, 'refuse' refuses it. ROLLBACK: commit clientJudged false to this file on origin/server and ship it (a release, or dev-server.sh deploy-gameplay --hotfix); today's judging (lagGraceMs, the 60 s wait) comes back for every client. Not as a live-only edit: every release and hotfix copies this file over the live one and keeps only admins, so a live edit lasts only until the next deploy.",
   "clientJudged": true,
