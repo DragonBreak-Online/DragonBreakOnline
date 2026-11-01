@@ -71,6 +71,14 @@ const uiTimed = (event, a, fn) => {
   }
 };
 const stopTimer = (name) => { const t = TIMERS.get(name); if (!t) return; clearTimeout(t.start); clearInterval(t.interval); TIMERS.delete(name); };
+// One-shot startup delays (seedTreasuries, starterKitReload, updates.js logVersion) are tracked by name too, so rapid
+// hot reloads inside their 1-5 s window replace the waiting timeout instead of pinning every generation's 30 MB closure
+const once = (name, ms, fn) => {
+  stopTimer(name);
+  const t = { start: null, interval: null }; const body = timed(name, fn);
+  t.start = setTimeout(() => { t.start = null; TIMERS.delete(name); body(); }, ms);
+  TIMERS.set(name, t);
+};
 // Start offsets are spread over the first second so timers made in one load do not fire together
 let timerSlot = 0;
 const every = (name, ms, fn) => {
@@ -101,6 +109,7 @@ every('tickSummary', 60000, () => {
   loopDelay.reset();
   rows.push(`gc ${gcStats.n}x max ${gcStats.max.toFixed(1)} total ${gcStats.total.toFixed(1)}`);
   gcStats.n = 0; gcStats.total = 0; gcStats.max = 0;
+  try { const m = process.memoryUsage(); rows.push(`mem rss ${Math.round(m.rss / 1048576)}MB heap ${Math.round(m.heapUsed / 1048576)}/${Math.round(m.heapTotal / 1048576)}MB`); } catch (e) { /* no memoryUsage */ }
   log(`ticks (ms, last 60 s, ${onlineActors().length} online): ${rows.join(' | ')}`);
 });
 
@@ -2625,7 +2634,7 @@ const seedTreasuries = () => {
   }
   log(`bank treasuries: ${seeded} seeded, ${kept} already funded${known ? `, ${known} known from an earlier load` : ''}`);
 };
-setTimeout(seedTreasuries, 3000);
+once('seedTreasuries', 3000, seedTreasuries);
 
 // ---- events --------------------------------------------------------------------------------
 // The reload's clear() resets properties but never removes mp.on listeners, so every hot reload
@@ -3386,7 +3395,7 @@ const chooseGod = (a) => {
   setTimeout(() => leaveRealm(a), DEITY_STEP_MAX_MS);
 };
 // The original is stored once so a hot reload re-wraps the same function instead of stacking.
-if (!globalThis.__dboAppearanceHookPrev) {
+if (typeof globalThis.__dboAppearanceHookPrev === 'undefined') {
   const cur = typeof mp.onUpdateAppearanceAttempt === 'function' ? mp.onUpdateAppearanceAttempt : null;
   globalThis.__dboAppearanceHookPrev = cur && !cur.__dbo ? cur : null;
 }
@@ -3697,7 +3706,7 @@ const giveStarterKit = (a) => {
   if (given.length) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('grant', a, 'kit', STARTER_KIT.filter((k) => given.includes(k.name))); } catch (e) { /* the player log is optional */ } }
 };
 // Players already online when this file reloads get theirs at once (giveItem is defined further down; this runs after load).
-setTimeout(() => { for (const a of onlineActors()) { try { giveStarterKit(a); pushHud(a, needsOf(a), true); } catch (e) { log('starter kit failed', e.message); } } }, 1000);
+once('starterKitReload', 1000, () => { for (const a of onlineActors()) { try { giveStarterKit(a); pushHud(a, needsOf(a), true); } catch (e) { log('starter kit failed', e.message); } } });
 globalThis.__dboHandlers.disconnect = (userId) => {
   const a = actorOf(userId); if (a) audit(`LEAVE ${who(a)}`);
   // The body stays a while after a logout; whether it may still be harmed is decided now (offlineBodyProtected)
@@ -3973,7 +3982,7 @@ const creditMeal = (a, items) => {
   log(`${display(a)} ate ${names.join(', ')}: hunger ${Math.round(before)} -> ${Math.round(n.hunger)}`);
 };
 // Chain onto the server's eat event (masterySystem wraps it first; the original is stored once).
-if (!globalThis.__dboPrevEat) {
+if (typeof globalThis.__dboPrevEat === 'undefined') {
   const cur = typeof mp.onEatItem === 'function' ? mp.onEatItem : null;
   globalThis.__dboPrevEat = cur && !cur.__dbo ? cur : null;
 }
@@ -9778,7 +9787,7 @@ try {
   const UPDATES_JS = path.resolve('updates.js');
   delete require.cache[UPDATES_JS];
   const auth = serverSettings.discordAuth || {};
-  require(UPDATES_JS)({ log, personal, audit, who, tagOf, onlineActors, every, registerChatCommand, isAdmin, tierOf, cfg,
+  require(UPDATES_JS)({ log, personal, audit, who, tagOf, onlineActors, every, once, registerChatCommand, isAdmin, tierOf, cfg,
     sayAll: (text) => { for (const x of onlineActors()) system(x, text); },
     token: (cfg.discord || {}).botToken || auth.botToken, channelId: ((cfg.updates || {}).channelId) || (cfg.discord || {}).channelId });
 } catch (e) { log('updates.js failed to load:', e.stack || e.message); }
