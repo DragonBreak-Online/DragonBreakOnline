@@ -1,5 +1,62 @@
 # DragonBreak Online checklist (2026-09-14)
 
+## Added 2026-10-31: the 31 Oct window - two RCs ready, three things blocked on a native build (PC session, Worker 4)
+
+**Ready and pushed. Nothing here is deployed; the release step is the Local Leader's.**
+
+| Branch | What | Verified |
+|---|---|---|
+| fork `rc-1031-hostchurn` @ f1a152f6 | host-churn stale-release cooldown (C++), W2's regen ceiling, home-cells server half, W6's companion regroup, W2's mastery study, W7's spriggan power hook | unit 423/423 (~478k assertions, 3 runs), tsc clean, every harness green |
+| fork `client-rc-1031` @ 2e6c3919 | W6's 15 native panels + bank + trade, W1's armour wear, the three probes (itemcard, mapmenu, hud), home-cells client half | tsc clean, 108/108 runnable harnesses, all 28 dbo_*.swf build and self-verify |
+| fork `client-platform-guards-1031` @ ccdcc0b2 | the 5 skyrim-platform crash guards (actor Disable, FaceGen, login-save FormIDArray) | cherry-picked clean; **cannot be built here** |
+| fork `client-worldview-perf-1031` @ d3649b52 | measure-only instrumentation for the Bruma lag | tsc clean, in the bundle |
+
+**Blocked, and all on the same thing: a native build this PC cannot do.** cmake is not installed (cl.exe 14.44
+and SDK 10.0.22621 are), `DRAGONBREAK_GH_TOKEN` is absent so CI cannot be fired, and `fork\build\` on this PC is
+the live 247-file client bucket that must stay byte-exact. So the manager's Native (C++) button or CI with a
+token. This blocks: the platform guards, the RC's C++ half, and therefore the fix for a crash family that has
+been open to players for five weeks.
+
+**The platform crash guards have never been merged.** None of `platform-actor-disable-guard-1017`,
+`platform-facegen-guard-1017` or `platform-native-create-1018` is an ancestor of `origin/main`, and the
+`SkyrimPlatform.dll` players run in 0.3.109 is byte-identical to a 23-September build. The fixes exist and are
+not live. Anything that deliberately destroys and recreates a client copy is riding that race unprotected -
+`companionSystem.ts` lines 431 and 583 still toggle `isDisabled` true then false in one tick, on `origin/main`.
+Worth a ticket once a guarded DLL ships.
+
+**Bruma event lag: instrumented, not yet answered.** The leading candidate is the nametag path
+(`formView.ts`:880), the only hot work that scales with PLAYER count rather than NPC count - about 8 native
+crossings per nearby player per frame to decide whether to draw a name (including a `hasLOS` raycast and two
+string-keyed lookups, `Keyword.getKeyword('SweetHidePerson')` and `getActorValue("Invisibility")`), and about 12
+per name drawn. 108 native call sites were counted on the per-form per-tick path. That is a count and an
+argument, not a timing: the instrumented build settles it and needs one crowded play session. Its decisive
+number is `gap` against `total` - gap is onUpdate entry-to-entry, so a 6-7 s gap with a small total means the
+event loop is blocked elsewhere and the view is a victim.
+W6's six native panels are **not** implicated: all three branches add zero `on("update")` listeners between them.
+
+**`__dboDiagNote` does not exist.** It is read in five places in the client and assigned in none, so every
+`diagNote` call - including `worldView`'s own `fv:gate` notes - has always been a no-op. Any investigation that
+waited on `fv:gate` output was reading silence, not evidence. Use `printConsole`.
+
+**Two traps that cost hours today, both now in the memory notes:**
+- The C++ unit binary must be run **from `build/`**, not `build/unit/`. `SaveStorageTest.cpp` hardcodes
+  `auto directory = "unit/data"` relative to cwd, so running it from its own directory fails 13 SaveStorage and
+  3 MigrationDatabase assertions **on a clean tree**. That phantom was reported as 14-15 real failures and then
+  chased into a baseline-against-main exercise before W2's 420/420 from `build/` exposed it.
+- A `build/` configured with clang-15 on the dev box **cannot be cmake-reconfigured**: clang-15 has no OpenMP
+  runtime installed and `directxtex` and `bsa` both `find_dependency(OpenMP)`, so OpenMP is cached NOTFOUND and
+  any regen fails. A branch switch inside such a tree moves the CMakeLists mtimes, ninja tries to regen, and
+  the build dies until the content is back and `build/build.ninja` is re-stamped. One `apt install libomp-15-dev`
+  would end it, which is Nat's call.
+
+**Go-live notes carried for the Leader:** set `prayer.blessingRegen.clientStats ["magicka"]` with the regen
+ceiling; `skills.json` and settings need `restart skymp --yes`, not just `deploy-gameplay`; the server RC is TS
+**and** C++ so it needs `build-ts`, a native build and a restart, and is not a hot release; W7's spriggan hook
+ships inert (nothing calls `__dboConjurePower` yet) so its harness is the only gate; W2's gameplay
+`skillbooks-1031` stays inert until the server RC ships. The client RC needs **both** halves installed - the
+bundle to `Data\Platform\Plugins\` and all 28 panels to `Data\Interface\` - or the panels do nothing.
+
+
 ## 27 Oct - regeneration: the server never saw the gameplay layer's rates (Worker 4, PC)
 
 **`rc-1027-regen` @ `db824264`, off `d728be8e`. Unit tests green on the homeserver dev box: [Papyrus] 798
