@@ -441,12 +441,16 @@ ok(out.length === 0, '...a line the cut cannot read (a name of seven words) keep
 // word for word, a ticket's id never, so a reworded reference fails here
 {
   const ssrc = fs.readFileSync(path.join(ROOT, 'staffguard.js'), 'utf8');
-  const rt = ssrc.match(/const refText = \(r\) => \(r\.kind === 'call' \? `([^`]*)` : `([^`]*)`\);/);
+  const rt = ssrc.match(/const refText = \(r\) => \(r\.kind === 'call' \? `([^`]*)` : r\.kind === 'reason' \? `([^`]*)` : `([^`]*)`\);/);
   const hd = ssrc.match(/return held \? \{ text: `([^`]*)` \} : null;/);
-  const refs = rt && hd ? [[rt[1].replace('${r.n}', '12'), true], [hd[1].replace('${held.n}', '5'), true], [rt[2].replace('${r.id}', `${CANARY}-x`), false]] : [];
+  const refs = rt && hd ? [[rt[1].replace('${r.n}', '12'), true], [hd[1].replace('${held.n}', '5'), true], [rt[3].replace('${r.id}', `${CANARY}-x`), false]] : [];
   const bad = refs.filter(([ref, keep]) => actOf(`STAFFREF ${ROWAN} works on ${SELENE} under ${ref} for 60 minutes`, 'STAFFREF', 1) !== `works on Selene #K2QX under ${keep ? ref : 'a ticket'} for 60 minutes`
     || actOf(`STAFFREF ${ROWAN} citizenship on ${SELENE} under ${ref}`, 'STAFFREF', 1) !== `citizenship on Selene #K2QX under ${keep ? ref : 'a ticket'}`);
   ok(refs.length === 3 && !refs.some(([r]) => r.includes('${')) && bad.length === 0, `...each reference staffguard.js writes (${refs.length} of 3) passes the cut: a call word for word, a ticket's id never`, bad);
+  // a Lead GM's reason (lead-gm-factions-1101) is free text: none of it passes the cut, whatever its shape
+  const reason = rt ? rt[2].replace('${r.text}', `${CANARY} spoke for the clan`) : '';
+  const rcut = [actOf(`STAFFREF ${ROWAN} faction on ${SELENE} under ${reason}`, 'STAFFREF', 1), actOf(`STAFFREF ${ROWAN} works on ${SELENE} under ${reason} for 60 minutes`, 'STAFFREF', 1)];
+  ok(!!reason && !reason.includes('${') && rcut.every((x) => !String(x || '').includes(CANARY)), '...and a Lead GM\'s reason text never passes it', rcut);
 }
 // STAFF <staff> gave|queued gift|took <n>x <item> ..., granted|removed spell <spell> (0x<id>) to|from <target> (staffitemspells.js,
 // Jake's Dragon Baron tools): the ticket's text is what staff typed after ticket: or call:, so it goes and "a ticket" stands

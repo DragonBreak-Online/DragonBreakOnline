@@ -1297,6 +1297,15 @@ module.exports = (api) => {
     const fid = String(args[1] || ''); ST.invites.set(a >>> 0, invitesOf(a).filter((i) => i.fid !== fid));
     reply(a, 'Invitation declined.', '', false);
   });
+  // A rank by its title (whole, or the start of it) or its place in the list from 1 (the top); -1 when none
+  const rankFrom = (f, q) => {
+    const s = String(q || '').trim().toLowerCase();
+    if (/^\d+$/.test(s)) { const i = Number(s) - 1; return i >= 0 && i < f.ranks.length ? i : -1; }
+    const exact = f.ranks.findIndex((r) => r.title.toLowerCase() === s);
+    if (exact >= 0) return exact;
+    const starts = f.ranks.map((r, i) => (r.title.toLowerCase().startsWith(s) ? i : -1)).filter((i) => i >= 0);
+    return s && starts.length === 1 ? starts[0] : -1;
+  };
   // Kick and set rank, shared by the faction panel and the Court tab's household (court.js): { error } or { text }
   const kickMember = (a, fid, t) => {
     const f = FACTIONS.get(fid);
@@ -1737,13 +1746,67 @@ module.exports = (api) => {
       const lim = limitProblem(t, fid, lowestRank(fid), a);
       return personal(a, `The faction limits are lifted once for ${nameOf(t)} and ${f.name} for the next ten minutes.${lim ? ` They would have been refused: ${lim.text}` : ' Nothing would refuse them now.'}`);
     }
+    // Lead GM faction editing in chat (Nat, 1 Nov: "allow Lead GMs to edit factions so they can add players etc."): each goes
+    // through addMember / setRankOf / kickMember and so setMember (the kind guard, a faction's size), with staffguard's
+    // selfTarget and staff-account rules; a Lead GM gives reason: <why> in place of the call or ticket (staffguard callRef)
+    if (s === 'add') {
+      if (!isLeadStaff(a)) return personal(a, 'Only a Lead GM or above adds members.');
+      const fid = rest[1] || ''; const f = FACTIONS.get(fid);
+      if (!f || !rest[0]) return personal(a, 'Usage: /faction add <player|#TAG> <faction id> [rank] reason: <why>   (/faction list)');
+      const rank = rest.length > 2 ? rankFrom(f, rest.slice(2).join(' ')) : lowestRank(fid);
+      if (rank < 0) return personal(a, `No rank "${rest.slice(2).join(' ')}" in ${f.name}: ${f.ranks.map((r, i) => `${i + 1} ${r.title}`).join(', ')}`);
+      const r = addMember(a, fid, rest[0]);
+      if (r.error) return personal(a, r.error);
+      if (rank === lowestRank(fid)) return personal(a, r.text);
+      const t = findAnyByName(rest[0]);
+      const rr = setRankOf(a, fid, t, rank);
+      return personal(a, rr.error ? `${r.text} The rank was not set: ${rr.error}` : `${r.text} ${rr.text || ''}`.trim());
+    }
+    if (s === 'rank') {
+      if (!isLeadStaff(a)) return personal(a, 'Use the faction menu (F3) to set ranks.');
+      const fid = rest[1] || ''; const f = FACTIONS.get(fid); const id = f ? findMember(fid, rest[0]) : 0;
+      if (!f || !id || rest.length < 3) return personal(a, 'Usage: /faction rank <name|#TAG> <faction id> <rank> reason: <why>');
+      const rank = rankFrom(f, rest.slice(2).join(' '));
+      if (rank < 0) return personal(a, `No rank "${rest.slice(2).join(' ')}" in ${f.name}: ${f.ranks.map((x, i) => `${i + 1} ${x.title}`).join(', ')}`);
+      const rr = setRankOf(a, fid, id, rank);
+      return personal(a, rr.error || rr.text || `${nameOf(id)} is now ${shownAt(f, rank)} of ${f.name}.`);
+    }
     if (s === 'remove') {
       if (!isLeadStaff(a)) return personal(a, 'Use the faction menu (F3) to remove members.');
-      const fid = rest[1] || ''; const id = findMember(fid, rest[0]); if (!FACTIONS.get(fid) || !id) return personal(a, 'Usage: /faction remove <name|#TAG> <faction id>');
+      const fid = rest[1] || ''; const id = findMember(fid, rest[0]); if (!FACTIONS.get(fid) || !id) return personal(a, 'Usage: /faction remove <name|#TAG> <faction id> reason: <why>');
       { const no = staffNo(a, id); if (no) return personal(a, no); }
       removeMember(fid, id); try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('faction', 'kick', a, id); } catch (e) { /* the player log is optional */ } return personal(a, 'Removed.');
     }
-    personal(a, 'Usage: /faction [menu|list|accept [id]|invite <player> [id]]  admins: /faction leader <player> <id>, /faction remove <name> <id>, /faction override <player> <id> (lifts the limits once), /faction hallmark|hallunmark <id> (at a building\'s door)');
+    // /faction purge <id> <reason>: every member out, with a reason, after a second /faction purge <id> confirm within a minute
+    // (Nat, 1 Nov). Each member goes through kickMember, so the selfTarget and staff-account rules hold per member: one
+    // refused is left and named
+    if (s === 'purge') {
+      if (!isLeadStaff(a)) return personal(a, 'Only a Lead GM or above purges a faction.');
+      const fid = rest[0] || ''; const f = FACTIONS.get(fid);
+      if (!f) return personal(a, 'Usage: /faction purge <faction id> <reason>, then /faction purge <faction id> confirm');
+      const members = Object.keys(rosterOf(fid)).map(Number);
+      const P = ST.purges || (ST.purges = new Map());
+      const amb = (() => { const sg = globalThis.__dboStaffGuard; const am = sg && globalThis.__dboStaffGuardState && globalThis.__dboStaffGuardState.ambient; return am && am.a === (a >>> 0) && am.ref && am.ref.kind === 'reason' ? am.ref.text : ''; })();
+      if ((rest[1] || '').toLowerCase() !== 'confirm') {
+        const why = amb || rest.slice(1).join(' ').trim();
+        if (!why) return personal(a, `Give the reason: /faction purge ${fid} <reason>.`);
+        P.set(a >>> 0, { fid, why: why.slice(0, 200), until: Date.now() + 60000 });
+        return personal(a, `This removes all ${members.length} member${members.length === 1 ? '' : 's'} of ${f.name} (${why.slice(0, 200)}). To do it, type /faction purge ${fid} confirm within a minute.`);
+      }
+      const p = P.get(a >>> 0);
+      if (!p || p.fid !== fid || p.until < Date.now()) return personal(a, `Nothing to confirm: type /faction purge ${fid} <reason> first.`);
+      P.delete(a >>> 0);
+      // each removal runs under the purge's reason, as one typed with reason: would
+      const sg = globalThis.__dboStaffGuard;
+      const end = sg && typeof sg.enter === 'function' ? sg.enter(a, { kind: 'reason', text: p.why }) : null;
+      const left = [], kept = [];
+      try {
+        for (const id of members) { const r = kickMember(a, fid, id); if (r.error) kept.push(`${nameOf(id)} (${r.error})`); else left.push(id); }
+      } finally { if (end) end(); }
+      audit(`FACTION-PURGE ${who(a)} purged ${f.name}: ${left.length} removed, ${kept.length} kept (${p.why})`);
+      return personal(a, `${f.name} purged: ${left.length} removed.${kept.length ? ` Kept: ${kept.join('; ')}.` : ''}`);
+    }
+    personal(a, 'Usage: /faction [menu|list|accept [id]|invite <player> [id]]  Lead GM (end with reason: <why>, or call:/ticket:): /faction add <player> <id> [rank], /faction rank <name> <id> <rank>, /faction leader <player> <id>, /faction remove <name> <id>, /faction purge <id> <reason>, /faction override <player> <id> (lifts the limits once), /faction hallmark|hallunmark <id> (at a building\'s door)');
   }, { help: '[menu|list|accept|invite] your factions (F3 opens the menu)' });
 
   // ---- packs: the leader runs with the pale coat, and a packmate who kills them in beast form takes the pack
