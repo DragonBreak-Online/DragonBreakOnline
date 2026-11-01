@@ -844,8 +844,13 @@ module.exports = (api) => {
       ...(result || !((cfg.charters || {}).enabled) ? { result: result || '', resultKind: resultKind || '' } : { result: CHARTER_HINT, resultKind: 'info' }),
     };
   };
-  // While the Character Journal is open its Faction tab is redrawn instead of panel 37
+  // While the Character Journal is open its Faction tab is redrawn instead of panel 37. A journal client with it closed
+  // has the journal opened on that tab first (panel 37 stays for fronts without one); the payload is built after, so its
+  // nonce is the one the tab holds
+  const journalFor = (a) => { try { return typeof globalThis.__dboJournalHasTab === 'function' && globalThis.__dboJournalHasTab(a >>> 0, 'faction'); } catch (e) { return false; } };
+  const journalOpen = (a) => { try { return typeof globalThis.__dboJournalIsOpen === 'function' && globalThis.__dboJournalIsOpen(a >>> 0); } catch (e) { return false; } };
   const openMenu = (a, result, resultKind, focusFid) => {
+    if (!journalOpen(a) && journalFor(a)) { try { globalThis.__dboJournalOpenTab(a >>> 0, 'faction'); } catch (e) { log('guilds: journal open failed', e.message); } }
     const p = menuPayload(a, result, resultKind, focusFid, false);
     try { if (typeof globalThis.__dboJournalFaction === 'function' && globalThis.__dboJournalFaction(a >>> 0, p)) return; } catch (e) { log('guilds: journal redraw failed', e.message); }
     openWidget(a, p, true);
@@ -862,7 +867,8 @@ module.exports = (api) => {
       courtMember: ms.filter((m) => courtKind(m.fid)).length, courtInvites: inv.filter((i) => courtKind(i.fid)).length, staff: !!isAdmin(a >>> 0) };
   };
   // realm.js: redraws an open panel with the result of a war action (true when one was open), and checks its nonce
-  globalThis.__dboFactionRefresh = (a, text, ok) => { if (!ST.nonces.has(a >>> 0)) return false; openMenu(a >>> 0, text, ok ? 'ok' : 'refused'); return true; };
+  // A journal client whose journal has closed gets the answer in the chat; it is not opened again for it
+  globalThis.__dboFactionRefresh = (a, text, ok) => { if (!ST.nonces.has(a >>> 0) || (journalFor(a) && !journalOpen(a))) return false; openMenu(a >>> 0, text, ok ? 'ok' : 'refused'); return true; };
   globalThis.__dboFactionNonceOk = (a, nonce) => ST.nonces.get(a >>> 0) === String(nonce || '');
   // ledger.js: the factions a character belongs to (offline ones too), and whether an id names a faction
   const hallOf = (f) => {
