@@ -118,7 +118,6 @@ declare -A NEEDS=(
   [spawn-slots]=server:skymp5-server/ts/systems/npcSpawnSystem.ts
   [spawn-heading]=server:skymp5-server/ts/systems/npcSpawnSystem.ts
   [spawn-stray]=server:skymp5-server/ts/systems/npcSpawnSystem.ts
-  [spawn-reach]=server:skymp5-server/ts/systems/npcSpawnSystem.ts
   [name-release]=server:skymp5-server/ts/systems/spawn.ts
   [playtime-slot]=server:skymp5-server/ts/systems/spawn.ts
   [trial-gm-slot]=server:skymp5-server/ts/systems/spawn.ts
