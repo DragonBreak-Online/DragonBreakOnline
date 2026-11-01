@@ -16,8 +16,9 @@ let fails = 0;
 const ok = (c, what, got) => { console.log(`${c ? 'ok  ' : 'FAIL'}  ${what}${c || got === undefined ? '' : '   ' + JSON.stringify(got).slice(0, 300)}`); if (!c) fails++; };
 const cut = (from, to) => { const i = GM.indexOf(from), j = GM.indexOf(to, i); return i >= 0 && j > i ? GM.slice(i, j) : ''; };
 
-ok(CFG.pvp.damageMult === 1.25 && CFG.pvp.weaponMult === 1.25 && CFG.pvp.arrowMult === 1.35 && CFG.pvp.spellArmour.share === 0.35 && CFG.pvp.spellArmour.fullAt === 300 && CFG.pvp.shieldElements.mult === 0.5,
-  'live config: damageMult 1.25, weaponMult 1.25, arrowMult 1.35, spellArmour 0.35 at 300, shield 0.5');
+// The numbers are Nat's to tune (arrowMult went back to 1 on 31 Oct): the checks read them, they never pin them
+const W = Number(CFG.pvp.weaponMult) || 1, AR = Number(CFG.pvp.arrowMult) || 1, SH = Number(CFG.pvp.spellArmour.share), FULL = Number(CFG.pvp.spellArmour.fullAt), SE = Number(CFG.pvp.shieldElements.mult);
+ok(W >= 1 && AR >= 1 && SH > 0 && SH < 1 && FULL > 0 && SE > 0 && SE <= 1, 'live config sane: weaponMult and arrowMult at least 1, spellArmour share under 1, shield mult in (0, 1]', CFG.pvp);
 
 // ---- P3, P4 ----
 const SRC_SECTION = cut('const pvpSourceMult = (src, beast) => {', '\n};\n') + '\n};\nreturn pvpSourceMult;';
@@ -29,7 +30,9 @@ ok(/const guardFacing = \(tgt, agg\) => blocking\(tgt\) && facing\(tgt, agg\);/.
 ok(/log\(`pvp hit \$\{display\(agg\)\} -> \$\{display\(tgt\)\} kind=.* rank=\$\{skill\}:\$\{rank\} .*armour=.*shield=.*resist=.*\$\{sta\}`\)/.test(GM), 'one measurement line per PvP hit: kind, rank, armour, shield, resist, stamina on a power attack');
 
 const SKILL = { 0x10: 'blade', 0x11: 'blunt', 0x12: 'archery', 0x1f4: 'unarmed', 0x13: '' };
-const runSource = (src) => new Function('PVP', 'weaponSkillOf', src)(CFG.pvp, (id) => SKILL[id] || '');
+// The source factor's logic, on test multipliers of its own: the live ones may sit at 1, where a mutant cannot show
+const TEST_PVP = { weaponMult: 1.25, arrowMult: 1.35 };
+const runSource = (src) => new Function('PVP', 'weaponSkillOf', src)(TEST_PVP, (id) => SKILL[id] || '');
 // Spell-side stubs: pieces [rating, heavy, slot mask, medium]
 const PIECES = { HEAVY_BODY: [150, true, 0x4], HEAVY_HEAD: [75, true, 0x1002], HEAVY_HANDS: [37.5, true, 0x8], HEAVY_FEET: [37.5, true, 0x80],
   LIGHT_BODY: [40, false, 0x4], MEDIUM_LIGHT_BODY: [40, false, 0x4, true], SHIELD: [30, true, 0x200] };
@@ -41,9 +44,9 @@ const runSpell = (src, world) => {
   const recordOf = (id) => { if (SPELLS[id]) return { record: { type: SPELLS[id][0], fields: [] } }; const p = byId(id); return p ? { record: { type: 'ARMO', fields: [{ type: 'BOD2', data: u32(p[2]) }] } } : null; };
   globalThis.__dboArmourClassOf = (id) => ((byId(id) || [])[3] ? 'medium' : 'light');
   delete globalThis.__dboSpellSource;
-  return new Function('PVP', 'mp', 'recordOf', 'fieldsOf', 'u32At', 'profileOf', 'sourceResistsOf', 'ELEMENT_RESIST', 'gearEnch', 'defensePieceMult', 'gearArmorMult',
+  return new Function('cfg', 'PVP', 'mp', 'recordOf', 'fieldsOf', 'u32At', 'profileOf', 'sourceResistsOf', 'ELEMENT_RESIST', 'gearEnch', 'defensePieceMult', 'gearArmorMult',
     'wornWithHealth', 'armorPieceOf', 'armorCountOf', 'potionBonus', src)(
-    CFG.pvp, { get: (a, k) => (k === 'equipment' ? { inv: { entries: (world.worn[a] || []).map((id) => ({ baseId: id, worn: true, wornLeft: byId(id)[2] === 0x200 })) } } : null) },
+    { pvp: CFG.pvp }, CFG.pvp, { get: (a, k) => (k === 'equipment' ? { inv: { entries: (world.worn[a] || []).map((id) => ({ baseId: id, worn: true, wornLeft: byId(id)[2] === 0x200 })) } } : null) },
     recordOf, (r, t) => (r.record.fields || []).filter((f) => f.type === t), (f, o) => new DataView(f.data.buffer).getUint32(o, true),
     (a) => (a >= 100 ? 1 : -1), (id) => new Set((SPELLS[id] || [, []])[1]), { fire: 41, shock: 42, frost: 43 },
     { guardFacing: (tgt) => !!world.guard[tgt] }, () => ({ heavy: 1, light: 1 }), () => ({ heavy: 1, light: 1 }),
@@ -56,16 +59,16 @@ const scenarios = (srcSec, spellSec, live) => {
   let bad = 0;
   const t = (c, what, got) => { if (!c) bad++; if (live) ok(c, what, got); };
   const src = runSource(srcSec);
-  t(src(0x10) === 1.25 && src(0x11) === 1.25, 'P3: a Blade or Blunt blow between players x1.25', [src(0x10), src(0x11)]);
-  t(src(0x12) === 1.35, 'P4: an arrow x1.35', src(0x12));
+  t(src(0x10) === 1.25 && src(0x11) === 1.25, 'P3: a Blade or Blunt blow between players takes weaponMult (test 1.25)', [src(0x10), src(0x11)]);
+  t(src(0x12) === 1.35, 'P4: an arrow takes arrowMult (test 1.35)', src(0x12));
   t(src(0x51) === 1 && src(0x1f4) === 1 && src(0x13) === 1, '...a spell, a fist or a staff unchanged');
   t(src(0x10, true) === 1, '...and a beast\'s claws unchanged');
   const world = { worn: { [B]: [ID.HEAVY_BODY, ID.HEAVY_HEAD, ID.HEAVY_HANDS, ID.HEAVY_FEET] }, guard: {} };
   const s = runSpell(spellSec, world);
-  t(Math.abs(s.pvpSpellArmourMult(A, B, 0x51) - 0.65) < 1e-9, 'P1: full heavy at counted 300 takes 35% off a fire bolt', s.pvpSpellArmourMult(A, B, 0x51));
+  t(Math.abs(s.pvpSpellArmourMult(A, B, 0x51) - (1 - SH * Math.min(1, 300 / FULL))) < 1e-9 && s.pvpSpellArmourMult(A, B, 0x51) < 1, 'P1: full heavy plate (counted 300) takes the share off a fire bolt', s.pvpSpellArmourMult(A, B, 0x51));
   world.worn[B] = [ID.HEAVY_BODY];
-  t(Math.abs(s.pvpSpellArmourMult(A, B, 0x51) - 0.825) < 1e-9, '...a heavy body alone (150) half of it', s.pvpSpellArmourMult(A, B, 0x51));
-  t(Math.abs(s.pvpSpellArmourMult(A, B, 0x53) - 0.825) < 1e-9, '...a staff\'s enchantment too');
+  t(Math.abs(s.pvpSpellArmourMult(A, B, 0x51) - (1 - SH * Math.min(1, 150 / FULL))) < 1e-9, '...a heavy body alone (150) less', s.pvpSpellArmourMult(A, B, 0x51));
+  t(Math.abs(s.pvpSpellArmourMult(A, B, 0x53) - (1 - SH * Math.min(1, 150 / FULL))) < 1e-9, '...a staff\'s enchantment too');
   t(s.pvpSpellArmourMult(A, B, 0x54) === 1, '...never a weapon\'s blow (armour already counts there)');
   t(s.pvpSpellArmourMult(NPC, B, 0x51) === 1, '...and never an NPC\'s spell (PvP only)');
   world.worn[B] = [ID.LIGHT_BODY];
@@ -73,7 +76,7 @@ const scenarios = (srcSec, spellSec, live) => {
   world.worn[B] = [ID.MEDIUM_LIGHT_BODY];
   t(s.pvpSpellArmourMult(A, B, 0x51) < 1, '...a light piece armorWear names medium does');
   world.worn[B] = [ID.HEAVY_BODY, ID.SHIELD]; world.guard[B] = true;
-  t(s.pvpShieldElementMult(A, B, 0x51, { spell: true }) === 0.5 && s.pvpShieldElementMult(A, B, 0x53, { spell: true }) === 0.5, 'P2: a raised shield toward a fire spell or a shock staff halves it');
+  t(s.pvpShieldElementMult(A, B, 0x51, { spell: true }) === SE && s.pvpShieldElementMult(A, B, 0x53, { spell: true }) === SE, 'P2: a raised shield toward a fire spell or a shock staff takes its mult');
   t(s.pvpShieldElementMult(A, B, 0x52, { spell: true }) === 1, '...not a non-elemental spell');
   t(s.pvpShieldElementMult(A, B, 0x54, { spell: false }) === 1, '...not a weapon');
   world.guard[B] = false;
