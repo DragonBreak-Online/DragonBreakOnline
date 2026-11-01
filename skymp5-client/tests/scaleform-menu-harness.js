@@ -432,5 +432,15 @@ check('a refresh keeps the widget id when the caller does not name one, so repli
   return t.widgetId === 7;
 });
 
+// The X menus' wait (Nat, 1 Nov: "delays in the UI with the X menu"): the time from the key's request to the open
+check('the summary shows how long the panel waited for the server when a service says when it asked', () => {
+  const t = M.newState(); t.askedAt = 1000; M.planOpen(t, 'dbo_context', {}, 30, 1180); M.planReady(t, 1, 1240);
+  return / 60ms to ready on frame 1 asked 180ms before the open /.test(M.summary(t));
+}, (() => { const t = M.newState(); t.askedAt = 1000; M.planOpen(t, 'dbo_context', {}, 30, 1180); M.planReady(t, 1, 1240); return M.summary(t); })());
+check('...and nothing when it is not known', () => {
+  const t = M.newState(); M.planOpen(t, 'dbo_journal', {}, 50, 1180); M.planReady(t, 1, 1240);
+  return !/asked/.test(M.summary(t));
+});
+
 console.log(failures ? `${failures} failed` : 'all passed');
 process.exit(failures ? 1 : 0);

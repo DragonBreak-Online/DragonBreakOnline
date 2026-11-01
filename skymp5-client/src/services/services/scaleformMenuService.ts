@@ -19,6 +19,8 @@ export interface NativeOpen {
   widget: unknown;
   widgetId?: number;
   onKey: (key: string, args: unknown[]) => void;
+  // Date.now() when the service asked the server for this content, so the diag line can show the wait
+  askedAt?: number;
 }
 import { withClientUiCaps } from "../../lib/clientUiCaps";
 
@@ -68,6 +70,7 @@ export class ScaleformMenuService extends ClientListener {
         this.enqueue(planClose(this.state));
         return;
       }
+      this.state.askedAt = 0;
       this.enqueue(planOpen(this.state, content["swf"], content["payload"], content["widget"], Date.now()));
     } catch (e) {
       logError(this, "dboScaleform packet failed", e);
@@ -255,6 +258,7 @@ export class ScaleformMenuService extends ClientListener {
       const id = Math.max(0, Math.round(Number(opts.widgetId) || 0));
       this.owner = { type, onKey: opts.onKey };
       logTrace(this, "opening a native panel for a client service", type, swf);
+      this.state.askedAt = Math.max(0, Number(opts.askedAt) || 0);
       this.enqueue(planOpen(this.state, swf, opts.widget, id, Date.now()));
       return true;
     } catch (e) {

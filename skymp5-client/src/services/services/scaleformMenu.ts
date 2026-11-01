@@ -231,12 +231,14 @@ export interface MenuState {
   viaOutbox: number;
   viaModEvent: number;
   foreignEvents: number;
+  // when a client service asked the server for this panel's content (a key press), 0 when not known
+  askedAt: number;
 }
 
 export const newState = (): MenuState => ({
   phase: "closed", swf: "", json: "null", widgetId: 0,
   openedAt: 0, readyAt: 0, readyFrame: 0, sent: 0, foreignEvents: 0,
-  outRead: 0, lastSeq: 0, viaOutbox: 0, viaModEvent: 0,
+  outRead: 0, lastSeq: 0, viaOutbox: 0, viaModEvent: 0, askedAt: 0,
 });
 
 export type Action =
@@ -360,7 +362,8 @@ export const summary = (s: MenuState): string => {
   const opened = s.readyAt > 0
     ? `${s.readyAt - s.openedAt}ms to ready on frame ${s.readyFrame}`
     : "never became ready";
-  return `swf=${s.swf} phase=${s.phase} ${opened} payload=${s.json.length}ch sent=${s.sent} ` +
+  const asked = s.askedAt > 0 && s.openedAt >= s.askedAt ? ` asked ${s.openedAt - s.askedAt}ms before the open` : "";
+  return `swf=${s.swf} phase=${s.phase} ${opened}${asked} payload=${s.json.length}ch sent=${s.sent} ` +
     `in=${s.viaOutbox}outbox/${s.viaModEvent}modevent` +
     (s.foreignEvents ? ` (ignored ${s.foreignEvents} mod events from elsewhere)` : "");
 };
