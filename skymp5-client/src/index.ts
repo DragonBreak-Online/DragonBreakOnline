@@ -81,6 +81,7 @@ import { NightEyeService } from "./services/services/nightEyeService";
 import { CatReflexesService } from "./services/services/catReflexesService";
 import { ArmourWearService } from "./services/services/armourWearService";
 import { ItemCardProbeService } from "./services/services/itemCardProbeService";
+import { ArmourCardService } from "./services/services/armourCardService";
 import { HudProbeService } from "./services/services/hudProbeService";
 import { NativeHudService } from "./services/services/nativeHudService";
 import { PaleCoatService } from "./services/services/paleCoatService";
@@ -250,6 +251,7 @@ const main = () => {
       new CatReflexesService(sp, controller),
       new ArmourWearService(sp, controller),
       new ItemCardProbeService(sp, controller),
+      new ArmourCardService(sp, controller),
       new HudProbeService(sp, controller),
       new NativeHudService(sp, controller),
       new PaleCoatService(sp, controller),
