@@ -50,7 +50,16 @@ if (!hasGuard) {
   check('the 0.3.75 crash case (deleted a moment ago, deferred, 3d=false) is skipped', L.deletePlan(facts({ handedToDelete: true, defer: true, is3DLoaded: false }), now) === 'skip');
   check('a ref already waiting (disabled by safeDelete) is skipped', L.deletePlan(facts({ queued: true }), now) === 'skip' && L.deletePlan(facts({ queued: true, defer: true }), now) === 'skip');
   check('a ref that reads as deleted is skipped', L.deletePlan(facts({ deleted: true, defer: true }), now) === 'skip');
-  check('a non-actor ref: deleted at once, or disabled first when deferred', L.deletePlan(facts({ state: null }), now) === 'delete' && L.deletePlan(facts({ state: null, defer: true }), now) === 'defer');
+  // DO NOT "FIX" THIS BY MAKING A NON-ACTOR DELETE AT ONCE AGAIN. It used to, and on 16 Oct 2026 that
+  // crashed the game: a torch (RemovableTorch01) deleted while the player stood in its flame freed the
+  // hazard's physics body under a live trap hit (TESTrapListener, SkyrimSE 26034+0x1C1). Commit 7d2b083a
+  // changed `if (!f.state) return f.defer ? "defer" : "delete";` to `if (!f.state) return "defer";` so the
+  // ref is disabled first and leaves the physics world before it is deleted. A non-actor with its 3D is
+  // ALWAYS deferred now, asked for deferred or not - that is the protection, not an oversight.
+  check('a non-actor ref is always disabled first, never deleted outright (the 16 Oct torch/hazard crash)',
+    L.deletePlan(facts({ state: null }), now) === 'defer' && L.deletePlan(facts({ state: null, defer: true }), now) === 'defer');
+  // ...and it is the 3D that makes it dangerous: with none there is no physics body to free, so it still goes at once.
+  check('...but a non-actor with no 3D is still deleted outright', L.deletePlan(facts({ state: null, is3DLoaded: false }), now) === 'delete');
 
   const r = new L.RecentDeletes();
   const id = 0xff001426;
@@ -82,7 +91,28 @@ if (!hasGuard) {
   check('safeDelete takes the defer option through deleteNow', /export const safeDelete = \(refr: ObjectReference, opts\?: \{ defer\?: boolean \}\)/.test(rt) && /deleteNow\(stateOf\(ac, id\), Date\.now\(\), !!\(opts && opts\.defer\)\)/.test(rt));
   finish(0);
 }
-check('safeDelete takes the defer option through deletePlan', /export const safeDelete = \(refr: ObjectReference, opts\?: \{ defer\?: boolean \}\)/.test(rt) && /deletePlan\(\{[\s\S]*?defer: !!\(opts && opts\.defer\),[\s\S]*?\}, now\)/.test(rt));
+// Behaviour, not shape. This used to require safeDelete's exact signature - `opts?: { defer?: boolean }` -
+// and a literal `deletePlan({ ... defer: !!(opts && opts.defer), ... }, now)` inside it. Both moved for good
+// reasons: the options gained urgent and tag, and the deletePlan call went into a helper when deletes
+// started going through the copy budget (dd355f0c). What must stay true is that safeDelete takes a defer
+// option and the plan is decided with that value, so follow the call rather than pinning the layout.
+const sdBody = (rt.match(/export const safeDelete = [\s\S]*?\n\};/) || [''])[0];
+const sdTakesDefer = /export const safeDelete = \(refr: ObjectReference, opts\?: \{[^}]*\bdefer\?: boolean\b/.test(rt);
+// the helper it hands the flag to, when it no longer calls deletePlan itself
+const sdHandOff = (sdBody.match(/([A-Za-z_$][\w$]*)\(\s*[A-Za-z_$][\w$]*\s*,\s*!!\s*(?:opts\?\.defer|\(opts && opts\.defer\))\s*\)/) || [, ''])[1];
+const sdInline = /deletePlan\(/.test(sdBody);
+const sdDecider = sdInline ? sdBody
+  : sdHandOff ? (rt.match(new RegExp('const ' + sdHandOff + ' = \\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\};')) || [, ''])[1] : '';
+// The plan must be given the real flag, not a literal. `defer: false` would type-check, read plausibly and
+// silently ignore what the caller asked for, so a bare true/false there fails this check deliberately.
+// Read the value and compare it, rather than using a lookahead: /defer:\s*(?!false\b)/ does NOT work,
+// because \s* can match zero characters and the lookahead then sits before the space instead of before
+// "false", so the pattern matches the very thing it is meant to reject. (It did, until a mutant caught it.)
+const sdDeferVal = (sdDecider.match(/\bdefer:\s*([^,\n]+)/) || [, ''])[1].trim();
+const sdPassesFlag = /\n\s*defer,/.test(sdDecider) || (sdDeferVal !== '' && sdDeferVal !== 'false' && sdDeferVal !== 'true');
+check('safeDelete takes a defer option, and the plan is decided with it',
+  sdTakesDefer && /deletePlan\(\{/.test(sdDecider) && sdPassesFlag,
+  { takesDefer: sdTakesDefer, passesFlag: sdPassesFlag, via: sdInline ? 'inline' : sdHandOff || 'NOT FOUND' });
 const guardAt = wc.indexOf('if (isHandedToDelete(actorId))');
 check('the cleaner leaves an id handed to delete alone, before any call of its own that queues something',
   guardAt > 0 && guardAt < wc.indexOf('actor.disableNoWait(true)') && guardAt < wc.indexOf('actor.disableNoWait(false)') && guardAt < wc.indexOf('safeDelete(actor, { defer: true })'));
@@ -95,12 +125,19 @@ const os = require('os');
 const esbuildDir = [process.env.FORK_SERVER, FORK].filter(Boolean).map((f) => path.join(f, 'skymp5-server', 'node_modules', 'esbuild')).find((p) => fs.existsSync(p))
   || path.join(process.env.HOME, 'dragonbreak', 'fork', 'skymp5-server', 'node_modules', 'esbuild');
 const esbuild = require(esbuildDir);
+// The stub registers "tick" as well as "update". npcLifetimeRuntime increments its frame counter on the
+// engine's tick, and since deletes started going through the copy budget (dd355f0c) that counter is what
+// lets work out of the queue - copyWork.drain and copyBudget.take are both keyed on it. A stub that
+// registered only "update" left the frame at 0 for ever, so nothing drained and whole scenarios recorded no
+// calls at all, which reads as the delete path being broken rather than as the stub missing an engine hook.
+// (Keep comments about the stub OUT here: the stub source below is a template literal, and a backtick or a
+// ${...} inside it breaks the harness.)
 const fakeSp = `
 const W = globalThis.__wcFakeWorld;
 const Game = { getFormEx: (id) => W.refs.get(id) || null, getPlayer: () => null };
 const ObjectReference = { from: (f) => f || null };
 const Actor = { from: (f) => (f && f.actor ? f : null) };
-const on = (ev, fn) => { if (ev === 'update') W.update.push(fn); };
+const on = (ev, fn) => { if (ev === 'update') W.update.push(fn); else if (ev === 'tick') W.tick.push(fn); };
 const Ui = { isMenuOpen: (m) => W.menus.has(m) };
 module.exports = { Game, ObjectReference, Actor, Ui, on, writeLogs: (_p, line) => W.log.push(line) };`;
 const stubPlugin = {
@@ -111,7 +148,7 @@ const stubPlugin = {
   },
 };
 (async () => {
-  const W = { refs: new Map(), update: [], log: [], calls: [], tasks: [], menus: new Set() };
+  const W = { refs: new Map(), update: [], tick: [], log: [], calls: [], tasks: [], menus: new Set() };
   // The runtime counts time outside loading screens (client-safedelete-loadwait): a frame is 16 ms of a fake clock
   let clock = Date.now();
   Date.now = () => clock;
@@ -151,7 +188,7 @@ const stubPlugin = {
     W.refs.set(id, ref);
     return ref;
   };
-  const frame = () => { clock += 16; for (const t of W.tasks.splice(0)) t(); for (const fn of W.update) fn(); };
+  const frame = () => { clock += 16; for (const fn of W.tick) fn(); for (const t of W.tasks.splice(0)) t(); for (const fn of W.update) fn(); };
   const callsOn = (id, kind) => W.calls.filter((c) => c[1] === id && (!kind || c[0] === kind)).length;
 
   // Johann, 4 Oct 00:10:55: FormView.destroy deletes the copy, and the cleaner reaches it in the same frame and 79 ms later

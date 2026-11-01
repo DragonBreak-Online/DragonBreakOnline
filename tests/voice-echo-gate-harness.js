@@ -23,8 +23,17 @@ check('the notice is for off and failed only, not while the loop connects', G.va
 // ---- 2. VoiceManager.js against a stubbed page ----
 const FORK = process.env.FORK, FORK_SERVER = process.env.FORK_SERVER;
 const src = FORK && path.join(FORK, 'skymp5-front/src/utils/VoiceManager.js');
-const esbuild = FORK_SERVER && path.join(FORK_SERVER, 'skymp5-server/node_modules/.bin/esbuild');
+// The package's own bin script, NOT node_modules/.bin/esbuild. That shim is `#!/bin/sh`, and execFileSync on
+// Windows cannot run it: it throws ENOENT and this harness failed for that alone, with nothing wrong in the
+// code it tests. esbuild/bin/esbuild is `#!/usr/bin/env node`, so running it through process.execPath works
+// on every platform (verified 0.28.1 on Windows, where the shim fails).
+const esbuild = FORK_SERVER && path.join(FORK_SERVER, 'skymp5-server/node_modules/esbuild/bin/esbuild');
 const PARTS_2_3 = 41; // checks in parts 2 and 3
+// Read sources with their line endings normalised. The checked-out client sources are CRLF on Windows, and
+// every regex below is written against \n: without this, two assertions failed while quoting matched text
+// with \r\n in it, which looks like a code change and is not one. Also matters for `split('\n')`, which
+// otherwise leaves a stray \r at the end of every line.
+const readLF = (p) => fs.readFileSync(p, 'utf8').split('\r\n').join('\n');
 const why = !src ? 'FORK is not set' : !fs.existsSync(path.join(FORK, 'skymp5-front/src/utils/voiceEchoGate.js')) ? `${FORK} has no voiceEchoGate.js`
   : !esbuild || !fs.existsSync(esbuild) ? 'no esbuild in FORK_SERVER' : '';
 let skipped = 0;
@@ -33,7 +42,7 @@ let finished = false;
 
 // ---- 2a. No automatic gain control on the mic (#bugs 2 Oct: the voice chat raised a headset's input gain to max) ----
 if (src && fs.existsSync(src)) {
-  const vmSrc = fs.readFileSync(src, 'utf8');
+  const vmSrc = readLF(src);
   if (!/MIC_CAPTURE/.test(vmSrc)) {
     require('./expect')('voice-no-agc', `${FORK} has no MIC_CAPTURE`);
     console.log(`SKIP  the automatic gain control checks: ${FORK} has no MIC_CAPTURE`);
@@ -52,7 +61,7 @@ if (why) {
   console.log(`SKIP  ${PARTS_2_3} of the harness's checks (VoiceManager.js and the client relay): ${why}`);
 } else (async () => {
   const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'claude-nate-voice-')), 'vm.js');
-  execFileSync(esbuild, [src, '--bundle', '--platform=node', '--format=cjs', '--external:livekit-client', '--loader:.png=empty', '--loader:.svg=empty', `--outfile=${out}`, '--log-level=error']);
+  execFileSync(process.execPath, [esbuild, src, '--bundle', '--platform=node', '--format=cjs', '--external:livekit-client', '--loader:.png=empty', '--loader:.svg=empty', `--outfile=${out}`, '--log-level=error']);
   const sent = [];
   const el = () => ({ style: {}, appendChild() {}, remove() {}, play: () => Promise.resolve(), setAttribute() {}, addEventListener() {} });
   globalThis.window = { skyrimPlatform: { sendMessage: (...a) => sent.push(a) }, addEventListener() {}, dispatchEvent() {}, localStorage: { getItem: () => null, setItem() {} } };
@@ -171,15 +180,40 @@ if (why) {
   vm.ptt = false; vm.room = null;
   check('no room: the line counts no mics', /^mics 0, aec \?/.test(vm.micSummary()));
   check('the notice tells a player on speakers to use headphones', /use headphones/.test(G.BLOCKED_NOTICE) && /push-to-talk only for now/.test(G.BLOCKED_NOTICE));
-  const vmSrc = fs.readFileSync(src, 'utf8');
+  const vmSrc = readLF(src);
   const codeLines = vmSrc.split('\n').filter((l) => !/^\s*\/\//.test(l));
   check('the chosen activation is written only by the defaults and setPrefs', codeLines.filter((l) => /activation:/.test(l)).length === 2 && !codeLines.some((l) => /prefs\.activation\s*=/.test(l)));
   check('every loop outcome goes through setEcho (none left calling sendToGame for it directly)', (vmSrc.match(/sendToGame\('voice::echoLoop'/g) || []).length === 1 && /this\.setEcho\('on'/.test(vmSrc) && /this\.setEcho\('off'/.test(vmSrc) && /this\.setEcho\('failed'/.test(vmSrc) && /this\.setEcho\('elements'/.test(vmSrc) && /this\.setEcho\('pending'/.test(vmSrc));
 
   // ---- 3. the client relay ----
   const LIVE_SHAPE = 'mics 1, aec on, cap live, ctx running, mix none, loop none';
-  const vs = fs.readFileSync(path.join(FORK, 'skymp5-client/src/services/services/voiceService.ts'), 'utf8');
-  const block = vs.slice(vs.indexOf('kind === "voice::echoLoop"'), vs.indexOf('kind === "voice::error"'));
+  const vs = readLF(path.join(FORK, 'skymp5-client/src/services/services/voiceService.ts'));
+  // A handler's own block, bounded by the NEXT handler rather than by a named sibling. Slicing from one
+  // kind to `voice::error` worked only while error happened to come last: reorder the handlers and the
+  // slice silently stops spanning the code it is checking, which is how two checks here came to fail with
+  // nothing wrong in the client.
+  const handlerBlock = (kind) => {
+    const at = vs.indexOf(`kind === "voice::${kind}"`);
+    if (at < 0) return '';
+    const after = vs.slice(at + 1);
+    const next = after.search(/kind === "voice::/);
+    return next < 0 ? vs.slice(at) : vs.slice(at, at + 1 + next);
+  };
+  // The one method that files a voice diag line. The handlers used to call note() inline and now hand the
+  // line to this, so find it by what it does - the method whose body contains the note() call - rather than
+  // by name or position.
+  const diagFiler = (() => {
+    const at = vs.indexOf('note("voice", line)');
+    if (at < 0) return '';
+    // The LAST method declared before the note() call is the one containing it. Take it with matchAll:
+    // a single match with a greedy `[\s\S]*$` on the end does NOT give the last declaration, because the
+    // leftmost starting position still wins - that returned "constructor" until a diagnostic showed it.
+    const decls = [...vs.slice(0, at).matchAll(/\n  (?:private |public |protected )?(\w+)\s*\([^)]*\)[^{\n]*\{/g)];
+    return decls.length ? decls[decls.length - 1][1] : '';
+  })();
+  // "files a diag line" means: the handler reaches the filer, and the filer is what calls note().
+  const files = (b) => !!diagFiler && new RegExp(`this\\.${diagFiler}\\(`).test(b);
+  const block = handlerBlock('echoLoop');
   const shape = block.match(/const raw = [^\n]*\n\s*const echo = [^\n]*/);
   const cut = shape ? new Function('e', `${shape[0]}\nreturn echo;`) : null;
   const relayed = (text) => (cut ? cut({ arguments: ['voice::echoLoop', text] }) : null);
@@ -190,10 +224,18 @@ if (why) {
   const micOk = (t) => (MIC_SHAPE ? MIC_SHAPE.test(t) : null);
   check('the relay passes the mic summary in its one shape', micOk(LIVE_SHAPE) === true && micOk('mics 2, aec off, cap ended, ctx suspended, mix interrupted, loop disconnected') === true && micOk('mics 0, aec ?') === true && /MIC_SHAPE\.test\(mic\)/.test(block), !!MIC_SHAPE);
   check('...and drops anything else', micOk('mics 1, aec on; Jane\'s AirPods') === false && micOk('mics 1, aec on, cap Jane') === false && micOk('') === false);
-  const loadBlock = vs.slice(vs.indexOf('kind === "voice::loading"'), vs.indexOf('kind === "voice::error"'));
-  check('the loading line passes only two mic summaries, and files a dboDiag "voice" line', /if \(!MIC_SHAPE\.test\(before\) \|\| !MIC_SHAPE\.test\(after\)\) return;/.test(loadBlock) && /note\("voice", line\)/.test(loadBlock), loadBlock.slice(0, 200));
+  const loadBlock = handlerBlock('loading');
+  check('the loading line passes only two mic summaries, and files a dboDiag "voice" line',
+    /if \(!MIC_SHAPE\.test\(before\) \|\| !MIC_SHAPE\.test\(after\)\) return;/.test(loadBlock) && files(loadBlock),
+    { guard: /MIC_SHAPE\.test\(before\)/.test(loadBlock), filesVia: diagFiler || 'NOT FOUND' });
   check('the client tells the page as a loading screen opens and closes', /on\("menuOpen", \(e\) => \{ if \(e\.name === Menu\.Loading\) this\.markLoading\(true\); \}\)/.test(vs) && /on\("menuClose", \(e\) => \{ if \(e\.name === Menu\.Loading\) this\.markLoading\(false\); \}\)/.test(vs));
-  check('voiceService files a dboDiag "voice" line with the loop, the chosen and the used activation', /note\("voice", line\)/.test(block) && /activation \$\{chosen \|\| "\?"\}\$\{used && used !== chosen \? ` \(using \$\{used\}\)` : ""\}/.test(block), block.slice(0, 300));
+  check('voiceService files a dboDiag "voice" line with the loop, the chosen and the used activation',
+    files(block) && /activation \$\{chosen \|\| "\?"\}\$\{used && used !== chosen \? ` \(using \$\{used\}\)` : ""\}/.test(block),
+    { filesVia: diagFiler || 'NOT FOUND', hasActivation: /activation \$\{chosen \|\| "\?"\}/.test(block) });
+  // The filer is the single place a voice line reaches dboDiag; if that moves, the two checks above stop
+  // meaning anything, so assert it directly rather than relying on them.
+  check('...and exactly one place files voice diag lines, through __dboDiagNote',
+    (vs.match(/note\("voice", line\)/g) || []).length === 1 && /__dboDiagNote/.test(vs), { filer: diagFiler || 'NOT FOUND' });
 })().then(finish, (e) => { console.log(`FAIL  parts 2-3 threw: ${e && e.stack}`); failures++; finish(); });
 if (why) finish();
 
