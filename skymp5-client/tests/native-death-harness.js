@@ -53,7 +53,11 @@ const headText = (t) => { const out = []; const walk = (c) => { for (const x of 
   t.push({ type: 'death', seconds: 30, nonce: 2 });
   check('a new death starts afresh: its own countdown and the choices again', /in 30 seconds\./.test(all(t)) && btn(t, 'Resurrect Here') && btn(t, 'Resurrect Here').disabled !== true, all(t));
   t.st.time += 31000; t.tick();
-  check('the countdown stops at 0', /in 0 seconds\./.test(all(t)));
+  check('the countdown stops at 0', /in 0 seconds\./.test(all(t)) && !t.sent.some((m) => m.e === 'closeMenu'));
+  t.st.time += 13000; t.tick();
+  check('...the panel stays through the service\'s 15 s grace', !t.sent.some((m) => m.e === 'closeMenu'));
+  t.st.time += 2000;
+  check('...and closes itself after it, so a hide that cannot arrive never strands the player', t.closed() && t.logs.some((l) => /death: 15 s past the countdown with no hide, closing/.test(l)));
 }
 {
   const t = S.boot('dbo_death');

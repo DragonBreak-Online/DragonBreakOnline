@@ -3,7 +3,7 @@
 // service, which tells the server (deathChoice); the server or the countdown's end takes the panel down. Escape backs out
 // of a confirm and never closes the screen: death has no way out but these.
 
-var DBO_SWF_VERSION = "death-1";
+var DBO_SWF_VERSION = "death-2";
 var PANEL_W = 900;
 var PANEL_H = 600;
 var PAD = 32;
@@ -12,6 +12,8 @@ var BODY_TOP = 112;
 BODY_H = PANEL_H - 70 - BODY_TOP;
 var NO_DATA_CLOSE_MS = 8000;
 var C_RED = 0xB23A3A;
+// deathScreenService FAILSAFE_GRACE_MS
+var SELF_CLOSE_GRACE_S = 15;
 
 // constructorComponents/death CHOICES, word for word
 var CHOICES = [
@@ -218,6 +220,14 @@ _root.onEnterFrame = function()
          delete _root.onEnterFrame;
          dboClose();
       }
+      return;
+   }
+   // the client's failsafe in the panel itself: a hide that cannot reach a paused game never leaves the player here
+   if (getTimer() - startedAt >= (seconds() + SELF_CLOSE_GRACE_S) * 1000)
+   {
+      dboLog("death: " + SELF_CLOSE_GRACE_S + " s past the countdown with no hide, closing");
+      delete _root.onEnterFrame;
+      dboClose();
       return;
    }
    // the countdown runs on its own; the server respawns the player when it ends
