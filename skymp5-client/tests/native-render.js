@@ -128,6 +128,8 @@ const gate = { type: 'dungeonGate', id: 60, nonce: 'g1', name: 'Bleak Falls Barr
   difficulties: [{ id: 'story', label: 'Novice', blurb: 'Ordinary foes, fewer of them. Modest loot, no locked chests.' }, { id: 'normal', label: 'Adept', blurb: 'As Bethesda placed them. Fair loot, a few locked chests.' }, { id: 'hard', label: 'Expert', blurb: 'The strongest of each kind, more of them. Better loot.' }, { id: 'nightmare', label: 'Master', blurb: 'The strongest, half again as many, most chests locked. The best loot.' }] };
 const ctxMenu = { targetName: 'Lydia', mode: 'menu', lines: [], events: { action: 'pa:action', close: 'pa:close' },
   actions: [{ id: 'trade', label: 'Trade' }, { id: 'party', label: 'Invite to party' }, { id: 'search', label: 'Search' }, { id: 'capture', label: 'Arrest' }, { id: 'pickpocket', label: 'Pickpocket' }, { id: 'super:feed', label: 'Feed' }] };
+const reading = { type: 'reading', id: 30, nonce: 'r1', title: 'The Lusty Argonian Maid', words: ['run', 'the', 'has', 'ink'], seconds: 30, endsInMs: 30000, locked: [], attempt: 0, judge: 'client', candleMs: 30000, penaltyMs: 8000 };
+const readingLong = { type: 'reading', id: 30, nonce: 'r2', title: 'The Real Barenziah, Volume One', words: ['the', 'queen', 'of', 'Mournhold', 'walked', 'alone', 'beneath', 'the', 'red', 'moons', 'of', 'Morrowind'], seconds: 90, endsInMs: 90000, locked: [], attempt: 0, judge: 'client', candleMs: 90000, penaltyMs: 8000 };
 const skinning = { type: 'skinning', id: 33, nonce: 's1', name: 'Wolf', cuts: 2, misses: 1, seam: 0.2, seams: [0.5, 0.25], sweepMs: 1000, reachMs: 0, totalMs: 15000, judge: 'client' };
 const skinningPick = { type: 'skinning', id: 33, nonce: 'p1', name: 'Fox', mode: 'pick', cuts: 2, misses: 1, totalMs: 60000, minPickMs: 150, judge: 'client', steps: [[[20, 50, 0.3], [60, 50, 0.9], [80, 50, 0.4]], [[30, 50, 0.95], [50, 50, 0.2]]] };
 const lockpick = { type: 'lockpick', id: 46, nonce: 'k1', title: 'Chest (Adept lock)', level: 'Adept', fallMs: 650, holds: [380, 380, 380], set: [false, false, false], picks: 2, notice: '', noticeKind: '', done: false, judge: 'client', graceMs: 70, maxTries: 200, mode: 'tumbler', rises: [440, 460, 420], softMs: 80, auto: 0.08 };
@@ -169,6 +171,10 @@ const SETUPS = [
   ['context', { swf: 'dbo_context', drive: (t) => t.push(ctxMenu) }],
   ['labour', { swf: 'dbo_labour', drive: (t) => { t.push(labour); t.st.time += 2100; t.tick(); t.press(32); } }],
   ['labour-pick', { swf: 'dbo_labour', drive: (t) => t.push(labourPick) }],
+  ['reading', { swf: 'dbo_reading', drive: (t) => { t.push(reading); t.root.dboPanel.pool.w1.onRelease(); t.root.dboPanel.pool.w3.onRelease(); } }],
+  ['reading-long', { swf: 'dbo_reading', drive: (t) => { t.push(readingLong); for (const i of [0, 1, 2, 3, 4]) t.root.dboPanel.pool['w' + i].onRelease(); } }],
+  ['reading-wrong', { swf: 'dbo_reading', drive: (t) => { t.push(reading); t.push(Object.assign({}, reading, { attempt: 1, locked: [1, 3], feedback: 'The words do not sit right. Two of them are where they belong.' })); } }],
+  ['reading-done', { swf: 'dbo_reading', drive: (t) => { t.push(reading); t.push(Object.assign({}, reading, { locked: [1, 3, 2, 0], result: 'The candle gutters before you can make sense of it.', resultKind: 'lose', answer: 'the ink has run' })); } }],
   ['skinning', { swf: 'dbo_skinning', drive: (t) => { t.push(skinning); t.st.time += 500; t.tick(); t.press(32); } }],
   ['skinning-pick', { swf: 'dbo_skinning', drive: (t) => t.push(skinningPick) }],
   ['skinning-done', { swf: 'dbo_skinning', drive: (t) => { t.push(skinning); t.push(Object.assign({}, skinning, { result: 'You take a fine wolf pelt.', resultKind: 'win' })); } }],

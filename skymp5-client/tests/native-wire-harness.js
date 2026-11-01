@@ -35,6 +35,7 @@ const fixtures = {
     place: { root: 1, name: 'H', here: 0, more: 0, rooms: [{ ref: 11, label: 'Chest', kind: 'chest', assigned: null, shared: false, other: null }, { ref: 12, label: 'Box', kind: 'chest', assigned: 'B', shared: true, other: null }] },
     events: { claim: 'housing:claim', abandon: 'housing:abandon', revoke: 'housing:revoke', lock: 'housing:lock', unlock: 'housing:unlock', transfer: 'housing:transfer', rename: 'housing:rename', createKey: 'housing:createkey', revokeKeys: 'housing:revokekeys', grantContainer: 'housing:grantcontainer', assign: 'housing:assign', unassign: 'housing:unassign', share: 'housing:share', unshare: 'housing:unshare', cancel: 'housing:cancel' } },
   dbo_labour: { type: 'labour', id: 55, nonce: 'n1', kind: 'mining', title: 'Iron Seam', strikes: 1, band: 8, bands: [50], sweepMs: 1400, totalMs: 30000, hitMs: 250, missMs: 600, judge: 'client' },
+  dbo_reading: { type: 'reading', id: 30, nonce: 'r1', title: 'The Lusty Argonian Maid', words: ['run', 'the', 'has', 'ink'], seconds: 30, endsInMs: 30000, locked: [], attempt: 0, judge: 'client', candleMs: 30000, penaltyMs: 8000 },
   dbo_skinning: { type: 'skinning', id: 33, nonce: 's1', name: 'Wolf', cuts: 2, misses: 1, seam: 0.2, seams: [0.5, 0.25], sweepMs: 1000, reachMs: 0, totalMs: 15000, judge: 'client' },
   'dbo_skinning#pick': { type: 'skinning', id: 33, nonce: 'p1', name: 'Fox', mode: 'pick', cuts: 2, misses: 1, totalMs: 60000, minPickMs: 150, judge: 'client', steps: [[[20, 50, 0.3], [60, 50, 0.9], [80, 50, 0.4]], [[30, 50, 0.95], [50, 50, 0.2]]] },
   dbo_lockpick: { type: 'lockpick', id: 46, nonce: 'k1', title: 'Chest (Adept lock)', level: 'Adept', fallMs: 650, holds: [380, 380], set: [false, false], picks: 2, notice: '', noticeKind: '', done: false, judge: 'client', graceMs: 70, maxTries: 200, mode: 'tumbler', rises: [440, 460], softMs: 80, auto: 0.08 },
@@ -83,6 +84,8 @@ const drive = {
   // a pin set in its hang, then Escape reports the lock as a cancel; a second session asks for an auto attempt and leaves
   dbo_lockpick: (t) => { t.press(87); t.st.time += 630; t.press(32); t.press(27); },
   // a clean cut on the seam, then Escape stops; a pick round picks the clear point and leaves
+  // the four words in order and read out, then Escape gives up
+  dbo_reading: (t) => { for (const i of [1, 3, 2, 0]) t.root.dboPanel.pool['w' + i].onRelease(); t.press(13); t.press(27); },
   dbo_skinning: (t) => { t.st.time += 500; t.tick(); t.press(32); t.press(27); },
   'dbo_skinning#pick': (t) => { t.st.time += 400; t.tick(); t.press(50); t.press(27); },
   'dbo_lockpick#auto': (t) => { t.press(65); t.press(27); },
@@ -152,6 +155,7 @@ const MIN_EVENTS = {
   dbo_labour: 3, 'dbo_labour#struggle': 3,
   dbo_lockpick: 2, 'dbo_lockpick#auto': 3,
   dbo_skinning: 2, 'dbo_skinning#pick': 2,
+  dbo_reading: 2,
   dbo_dungeon: 2, 'dbo_dungeon#back': 2,
 };
 const seen = {};
