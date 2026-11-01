@@ -361,7 +361,12 @@ const hp = (a) => S.get(a).percentages.health;
   check('sourceResistsOf takes a magic effect as its own source', /ownData = r && String\(r\.record\.type\) === 'MGEF'/.test(gm));
   check('racial.js counts a magic effect as magic', /\['SPEL', 'ENCH', 'SCRL', 'MGEF'\]/.test(read('racial.js')));
   // briarheart.js's target multiplier also sits before the cap (hagraven-1025), so the window between them is wider
-  check('item 2: worn resistances join the target side, before racial.js caps it', /potionResistMult\(tgt, src\) \* gearResistMult\(tgt, src\);[\s\S]{0,700}if \(racial\) \{ try \{ targetSide = racial\.capTargetSide/.test(gm));
+  {
+    // The target side's own statement carries the worn resistances, and that is what racial.js's cap is handed afterwards
+    const at = gm.indexOf('let targetSide = '), stmt = at >= 0 ? gm.slice(at, gm.indexOf(';\n', at)) : '';
+    const cap = gm.indexOf('racial.capTargetSide(targetSide', at);
+    check('item 2: worn resistances join the target side, before racial.js caps it', /\bgearResistMult\(tgt, src\)/.test(stmt) && cap > at, stmt.slice(0, 200));
+  }
   // item 3: potionTakenMult, lifted out of gamemode.js with a worn Fortify Health 50 and no potion
   {
     const from = gm.indexOf('// Worn Fortify Health counts the same way'), to = gm.indexOf('const potionAttackMult =');
@@ -373,7 +378,18 @@ const hp = (a) => S.get(a).percentages.health;
   }
   check('item 5: a staff ENCH paralyses through explosionParalysisOf, capped for players by playerParalysis', /else if \(spell && spell\.record\.type === 'ENCH'\) seconds = paralysisIn\(spell\);/.test(gm) && /gearEnch\.playerParalysis\(tgt, seconds, isEnch\)/.test(gm));
   check('...the spell hit hands a staff to staffSpellHit (slow, drains)', /gearEnch\.staffSpellHit\(agg, tgt, spell\)/.test(gm));
-  check('item 7: worn Heavy and Light Armor scale their own pieces in Defense and the Flesh spells', (gm.match(/\* \(w\.cond \|\| 1\) \* \(p\.heavy \? gm\.heavy : gm\.light\)/g) || []).length === 2);
+  {
+    // A piece's count (armorCountOf, shared by Defense and the Flesh spells since 31 Oct): worn Heavy Armor scales heavy pieces,
+    // Light Armor light ones, and the piece's wear multiplies; run on a 40-rating piece
+    const line = (head) => { const i = gm.indexOf(head); return i < 0 ? '' : gm.slice(i, gm.indexOf('\n', i)); };
+    const count = new Function(`${line('const temperBonus = ')}\n${line('const armorCountOf = ')}\nreturn armorCountOf;`)();
+    const pm = { heavy: 1, light: 1 }, gmul = { heavy: 1.2, light: 1.1 };
+    const heavy = count({ rating: 40, heavy: true }, 1, 1, pm, gmul), light = count({ rating: 40, heavy: false }, 1, 1, pm, gmul), worn = count({ rating: 40, heavy: true }, 1, 0.5, pm, gmul);
+    const body = (head) => { const i = gm.indexOf(head); return i < 0 ? '' : gm.slice(i, gm.indexOf('\n};\n', i)); };
+    const usesIt = (head) => /armorCountOf\(p, w\.health, w\.cond, pm, gm\)/.test(body(head));
+    check('item 7: worn Heavy and Light Armor scale their own pieces in Defense and the Flesh spells',
+      near(heavy, 48) && near(light, 44) && near(worn, 24) && usesIt('const defenseDamageMult = ') && usesIt('const fleshDamageMult = '), { heavy, light, worn });
+  }
   check('...Fortify Block adds to the block potion in combat.js', /1 - Math\.min\(1, blockPotion \+ blockGear\)/.test(read('combat.js')));
   check('...Fortify Pickpocket adds to the thief\'s chance in pickpocket.js', /chanceFor\(tier, g, drawn, a\)/.test(read('pickpocket.js')) && /b\(thief, 'pickpocket'\)/.test(read('pickpocket.js')));
   check('...Fortify Unarmed shares gearFortify (AV 35)', /35: 'unarmed'/.test(gm));
