@@ -272,6 +272,86 @@ void InstallTrapTargetHook()
   spdlog::info("TrapTargetUpdate: hook installed");
 }
 
+// ActorKnowledge::NotifyListeners (AE id 42710, reached only from 42703+0x2b) walks knowledge->listeners
+// (+0x28 data, +0x38 size) with a raw element cursor. A listener callback that starts combat appends a
+// CombatGroupDetectionListener to that same array; past capacity the array reallocates and frees the buffer the
+// cursor points into, and the removal path then subtracts the new base from the stale cursor. Two crashes on
+// Nat's client, 42710+0x124 (31 Oct 22:29:58) and 42710+0x168 in memmove (1 Nov 00:00:05), are that
+// subtraction; both had the invalidated flag set (+0x40 bit 0, R13 = 1 in each log).
+//
+// An invalidated knowledge is one the detection job has already given up on - its owner or target stopped
+// resolving, or was disabled or deleted - and 42710's only job for it is to strip the listeners. So when the
+// flag is set, or either actor has gone, the call is skipped and the flag is set in place.
+//
+// DELIBERATELY NOT DONE HERE: tearing the listener array down, and pre-growing it through engine allocator
+// 68169 on the live path. Both were on gemini-actor-knowledge-guard-1101 and are reviewed in
+// _work\gemini-1101\REVIEW-w4-detection-guard.md. They need 68169's prototype, the vtable-4 unregister slot and
+// the engine's release semantics read out of the binary first: if the engine's unregister already drops the
+// array's reference, releasing again is a use-after-free on a path that runs for every actor in combat, which
+// would be worse than the crash. Skipping the call prevents both observed crashes on its own. The cost is that
+// an invalidated knowledge keeps its listeners and is re-queued and skipped again - a bounded leak on an actor
+// that has already departed.
+namespace ActorKnowledgeGuard {
+// owner at +0x10 and target at +0x14 are 32-bit handles. CommonLibSSE-NG is fetched by the build rather than
+// checked in, so the compiler verifies the width here: if ActorHandle ever stops being 4 bytes these two reads
+// would silently land on the wrong fields, and this fails the build instead.
+static_assert(sizeof(RE::ActorHandle) == sizeof(std::uint32_t),
+              "ActorKnowledge owner/target are 32-bit handles at +0x10 and +0x14");
+
+bool ActorGone(RE::ActorHandle handle)
+{
+  auto actor = handle.get().get();
+  if (!actor || actor->IsDeleted() || actor->IsDisabled()) {
+    return true;
+  }
+  const auto formId = actor->GetFormID();
+  return formId == 0 || RE::TESForm::LookupByID(formId) != actor;
+}
+}
+
+struct ActorKnowledgeNotify
+{
+  static void thunk(void* knowledge)
+  {
+    if (!knowledge) {
+      return;
+    }
+    const auto raw = reinterpret_cast<std::uintptr_t>(knowledge);
+    auto* const flags = reinterpret_cast<std::uint32_t*>(raw + 0x40);
+    const auto owner = *reinterpret_cast<RE::ActorHandle*>(raw + 0x10);
+    const auto target = *reinterpret_cast<RE::ActorHandle*>(raw + 0x14);
+    if ((*flags & 1u) != 0 || ActorKnowledgeGuard::ActorGone(owner) ||
+        ActorKnowledgeGuard::ActorGone(target)) {
+      // In place, not a written-back stale read: the detection job sets bit 1 (0x2) on this same field, and
+      // `*flags = earlier | 1u` would drop that if it landed in between.
+      *flags |= 1u;
+      return;
+    }
+    func(knowledge);
+  };
+  static inline REL::Relocation<decltype(&thunk)> func;
+};
+
+// AE 1.6.1170 only: 42703's one call to 42710, checked before it is patched
+void InstallActorKnowledgeNotifyHook()
+{
+  if (!REL::Module::IsAE()) {
+    return;
+  }
+  const auto site = REL::ID(42703).address() + 0x2b;
+  const auto notify = REL::ID(42710).address();
+  const auto bytes = reinterpret_cast<const std::uint8_t*>(site);
+  const auto target =
+    site + 5 + *reinterpret_cast<const std::int32_t*>(bytes + 1);
+  if (bytes[0] != 0xE8 || target != notify) {
+    spdlog::warn(
+      "ActorKnowledgeNotify: call site not found, hook not installed");
+    return;
+  }
+  Hooks::write_thunk_call<ActorKnowledgeNotify>(site);
+  spdlog::info("ActorKnowledgeNotify: hook installed");
+}
+
 void BindNativeMethod(RE::BSScript::Internal::VirtualMachine* thisArg,
                       RE::BSScript::IFunction* func);
 
@@ -346,6 +426,7 @@ void Hooks::Install()
   InstallFaceMorphJobHook();
   InstallTrapTargetHook();
   InstallAnimLoadJobHook();
+  InstallActorKnowledgeNotifyHook();
   HookVirtualMachineBind();
 
   logger::info("CommonLib hooks installed.");
