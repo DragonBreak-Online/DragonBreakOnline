@@ -95,10 +95,10 @@ BaseActorValues GetBaseActorValues(WorldState* worldState, uint32_t baseId,
   actorValues.magicka =
     raceData.startingMagicka + attributesNpcData.magickaOffset;
   if (actorValues.magicka < 0) { // zero magicka is ok, negative isn't
-    spdlog::warn("GetBaseActorValues {:x} {:x} - Negative Magicka found: "
-                 "startingMagicka={}, magickaOffset={}, defaulting to 100",
-                 baseId, raceIdOverride, raceData.startingMagicka,
-                 attributesNpcData.magickaOffset);
+    spdlog::trace("GetBaseActorValues {:x} {:x} - Negative Magicka found: "
+                  "startingMagicka={}, magickaOffset={}, defaulting to 100",
+                  baseId, raceIdOverride, raceData.startingMagicka,
+                  attributesNpcData.magickaOffset);
     actorValues.magicka = 100.f;
   }
 

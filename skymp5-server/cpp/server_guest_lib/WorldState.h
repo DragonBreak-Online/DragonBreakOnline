@@ -174,13 +174,17 @@ public:
     if (!typedForm) {
       if constexpr (std::is_same_v<F, MpActor>) {
         if (auto ref = std::dynamic_pointer_cast<MpObjectReference>(form)) {
-          auto pos = ref->GetPos();
-          spdlog::warn(
-            "Specified Form is ObjectReference, but we tried to treat it as "
-            "Actor, likely because of a client bug. formId={:#x}, "
-            "baseId={:#x}, pos is {:.2f} {:.2f} {:.2f} at {}",
-            formId, ref->GetBaseId(), pos.x, pos.y, pos.z,
-            ref->GetCellOrWorld().ToString());
+          static std::set<uint32_t> warnedNonActorRefs;
+          if (warnedNonActorRefs.size() < 4096 &&
+              warnedNonActorRefs.insert(formId).second) {
+            auto pos = ref->GetPos();
+            spdlog::warn(
+              "Specified Form is ObjectReference, but we tried to treat it as "
+              "Actor, likely because of a client bug. formId={:#x}, "
+              "baseId={:#x}, pos is {:.2f} {:.2f} {:.2f} at {}",
+              formId, ref->GetBaseId(), pos.x, pos.y, pos.z,
+              ref->GetCellOrWorld().ToString());
+          }
         }
       }
       throw std::runtime_error(
