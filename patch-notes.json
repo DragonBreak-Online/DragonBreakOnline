@@ -1,5 +1,19 @@
 [
   {
+    "title": "Bandages from linen",
+    "date": "2026-11-01",
+    "version": "Server update",
+    "tag": "Improved",
+    "sections": [
+      {
+        "heading": "Crafting",
+        "items": [
+          "Bandages can be made at a tanning rack from a linen wrap."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Vampire bloodlines",
     "date": "2026-10-31",
     "version": "Server update",
