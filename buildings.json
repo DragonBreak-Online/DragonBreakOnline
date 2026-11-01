@@ -84398,7 +84398,7 @@
 ]
 },
 {
-"id":"ed21:DragonBreak.esp",
+"id":"9ce8:DragonBreak Strongholds Fix.esp",
 "name":"DuskgourdMine",
 "world":"3c:Skyrim.esm",
 "cells":[
@@ -84406,7 +84406,7 @@
 ],
 "entrances":[
 {
-"door":"ed21:DragonBreak.esp",
+"door":"9ce8:DragonBreak Strongholds Fix.esp",
 "inside":"ed37:DragonBreak.esp",
 "cell":"ed22:DragonBreak.esp"
 }
