@@ -195,6 +195,23 @@ for (const diff of DIFFS) {
 // The ordinary dungeons' value is held without their coin: coin was cut on purpose on 4 Oct (gold-cut-1004, about 60% less a
 // clear; tests/gold-cut-harness.js holds it), and in a small dungeon it was a fifth of the value (Freezewind Hollow 0.75)
 const goods = (m) => (Number(m.value) || 0) - (Number(m.gold) || 0);
+// Fingerbowl Cave is held at its own measured 2.80 instead of the flat 2.5 (Nat, 1 Nov). This is a
+// pin on one dungeon, on purpose: the check must fail if Fingerbowl gets richer than it is today,
+// and every other ordinary dungeon keeps 2.5.
+//   Why it sits so high: 55% of a clear's items come off enemies there (11.3 of 23.3 a clear are the
+//   zone masters'), while the frozen baseline counts container loot - so a cave of 4 containers whose
+//   enemies carry the gear cannot be measured against a bound fitted to container-heavy ruins. The
+//   per-clear shares are the src block below, not the body/master columns, which are per-instance
+//   averages ("how much is on one corpse") and read 75% if mistaken for shares.
+//   Why it is a pin and not a formula: a shape-scaled ceiling was measured and rejected. Enemy share
+//   explains the fleet well (ratio = 0.83 + 2.72 x share, R2 0.90 over 22 dungeons; 0.92 on enemy
+//   over container items), but leave-one-out - each dungeon's ceiling fitted from the other 21 -
+//   puts Fingerbowl over a fit+3sd ceiling by +0.40, while all 21 others sit 0.15 to 0.82 below. A
+//   formulation that admitted it would have been fitted to the one point it had to admit.
+//   Why it is not a design trim: Boreal Stone Cave has the same shape (50% enemy, 50% master) and a
+//   baseline within 4% of Fingerbowl's, and sits at 1.87. Shape does not separate them; Fingerbowl's
+//   enemies simply drop richer gear, and Nat chose to keep that rather than trim it.
+const CEILING = { CYRFingerbowlCaveLocation: 2.8 };
 for (const d of ORD) {
   const now = DIFFS.reduce((n, diff) => n + goods(rows.find((r) => r.d === d && r.diff === diff).m), 0);
   const was = DIFFS.reduce((n, diff) => n + goods(BEFORE[`${d.raw.id}|${diff}`] || {}), 0);
@@ -202,7 +219,9 @@ for (const d of ORD) {
   // containers gains about 1.9x from its bodies' gear), a little less in torches; the whole set is held tighter below.
   // Gems were cut on purpose on 25 Oct (Nat: "gems are a grind to get"; a chest 5%, was 15%, a boss chest 35%, was 60%), and
   // in a dungeon of many containers they were a fifth of the goods (Frostfire Glade 0.77, Beasts Maw 0.72), so the floor is 0.65
-  if (was > 0) check(`${d.name} (ordinary, ${(d.raw.chests || []).length} containers), all difficulties: ${f0(now)} of ${f0(was)} (${(now / was).toFixed(2)})`, now > was * 0.65 && now < was * 2.5);
+  const ceiling = CEILING[d.raw.id] || 2.5;
+  const held = CEILING[d.raw.id] ? ` against its own ${ceiling} ceiling, not the flat 2.5` : '';
+  if (was > 0) check(`${d.name} (ordinary, ${(d.raw.chests || []).length} containers), all difficulties: ${f0(now)} of ${f0(was)} (${(now / was).toFixed(2)})${held}`, now > was * 0.65 && now < was * ceiling);
 }
 for (const diff of DIFFS) {
   const now = ORD.reduce((n, d) => n + goods(rows.find((r) => r.d === d && r.diff === diff).m), 0);
