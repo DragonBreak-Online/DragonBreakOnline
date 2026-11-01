@@ -148,3 +148,15 @@ MagicalBlackreach.esp
 DragonBreak Blackreach Actors-v2.esp
 mihailmmaminotaur.esp
 DragonBreak Minotaur Patch.esp
+mihaildeadrapack.esp
+mihailicetitansandseagiants.esp
+mihailskeletalrevenants.esp
+mihailgrahlsandfrostgiants.esp
+mihailgiantfamily.esp
+mihailundeadsnowelf.esp
+mihailvampirelordsandbeasts.esp
+mihailfleshatronach.esp
+mihailnordicsentinel.esp
+mihailhiveguardians.esp
+mihailelementalgolems.esp
+DragonBreak Creature Patch.esp
