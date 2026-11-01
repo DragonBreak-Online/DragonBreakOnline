@@ -148,14 +148,14 @@ _root.onEnterFrame = function()
 var keys = {};
 keys.onKeyDown = function()
 {
-   if (Key.getCode() == 27)
+   if (dboKey() == 27)
    {
       finishIfDone();
       dboSend("close", []);
       dboClose();
    }
 };
-Key.addListener(keys);
+dboKeys(keys);
 
 _root.dboReady = true;
 _root.dboVersion = DBO_SWF_VERSION;

@@ -99,12 +99,56 @@ var DBO_CLOSE_FRAMES = 6;
 var dboClosing = false;
 var dboTyping = false;
 
+// Escape also comes from the client (scaleformMenuService calls _root.dboEscape), since the game may keep it from the movie;
+// a second copy of one press, from the other source within DBO_ESC_GAP_MS, is dropped
+var DBO_ESC_GAP_MS = 250;
+var dboKeyHandlers = [];
+var dboForcedKey = 0;
+var dboEscAt = -100000;
+var dboEscBy = "";
+
+// A panel's key listener: the game's keys, and the client's Escape
+function dboKeys(listener)
+{
+   Key.addListener(listener);
+   dboKeyHandlers.push(listener);
+}
+
 // Key.getCode() with the numpad digits read as the row digits 1-9
 function dboKey()
 {
+   if (dboForcedKey > 0)
+   {
+      return dboForcedKey;
+   }
    var code = Key.getCode();
+   if (code == 27)
+   {
+      if (dboEscBy == "client" && getTimer() - dboEscAt < DBO_ESC_GAP_MS)
+      {
+         return 0;
+      }
+      dboEscBy = "key";
+      dboEscAt = getTimer();
+   }
    return code >= 97 && code <= 105 ? code - 48 : code;
 }
+
+_root.dboEscape = function()
+{
+   if (dboEscBy == "key" && getTimer() - dboEscAt < DBO_ESC_GAP_MS)
+   {
+      return;
+   }
+   dboEscBy = "client";
+   dboEscAt = getTimer();
+   dboForcedKey = 27;
+   for (var i = 0; i < dboKeyHandlers.length; i++)
+   {
+      dboKeyHandlers[i].onKeyDown();
+   }
+   dboForcedKey = 0;
+};
 
 function dboClose()
 {

@@ -122,7 +122,7 @@ keys.onKeyDown = function()
       keyLag.push(getTimer() - lastFrameAt);
    }
 };
-Key.addListener(keys);
+dboKeys(keys);
 
 _root.dboReady = false;
 _root.dboVersion = DBO_SWF_VERSION;

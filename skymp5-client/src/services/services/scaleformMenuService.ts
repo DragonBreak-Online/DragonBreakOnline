@@ -1,13 +1,14 @@
 import { ClientListener, CombinedController, Sp } from "./clientListener";
-import { ModEvent } from "skyrimPlatform";
+import { ButtonEvent, DxScanCode, ModEvent } from "skyrimPlatform";
 import { logError, logTrace } from "../../logging";
 import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { parseCustomPacket, sendCustomPacket } from "./customPacketUtil";
 import {
   Action, CAPS_RETRY_MS, MENU_NAME, MenuState, OUT_VAR, UiEvent, capsFor, isNew, newState, parseOutbox,
-  parseUiEvent, planClose, planOpen, planReady, planRefresh, planTick, readyFrameOf, summary,
+  escapeTargetFor, parseUiEvent, planClose, planOpen, planReady, planRefresh, planTick, readyFrameOf, summary,
 } from "./scaleformMenu";
+import { buttonKeyCode } from "./mouseKeys";
 import {
   CLOSE_KEY, FAILED_KEY, HANDOFF_KEY, PendingHandoff, Replay, handoffDue, mapLine, replayFor, swfFor,
 } from "./nativeWidgets";
@@ -40,7 +41,21 @@ export class ScaleformMenuService extends ClientListener {
     this.controller.emitter.on("customPacketMessage", (e) => this.onCustomPacketMessage(e));
     this.controller.on("modEvent", (e) => this.onModEvent(e));
     this.controller.on("update", () => this.onUpdate());
+    this.controller.on("buttonEvent", (e) => this.onButtonEvent(e));
     this.controller.emitter.on("connectionAccepted", () => this.announce("connected"));
+  }
+
+  // Escape goes to the panel on screen, whose own handler backs out a layer or closes it
+  private onButtonEvent(e: ButtonEvent): void {
+    if (!e.isDown || buttonKeyCode(e) !== DxScanCode.Escape) return;
+    const target = escapeTargetFor(this.state);
+    if (!target) return;
+    try {
+      this.sp.Ui.invokeString(MENU_NAME, target, "");
+      logTrace(this, "escape handed to", this.state.swf);
+    } catch (e) {
+      logError(this, "escape to the panel failed", e);
+    }
   }
 
   // The server gates each native panel on the client naming it, and falls back to the browser widget or to

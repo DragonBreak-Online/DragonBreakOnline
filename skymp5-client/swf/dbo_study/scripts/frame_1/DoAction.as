@@ -252,7 +252,7 @@ keys.onKeyDown = function()
       draw();
    }
 };
-Key.addListener(keys);
+dboKeys(keys);
 
 _root.onEnterFrame = function()
 {

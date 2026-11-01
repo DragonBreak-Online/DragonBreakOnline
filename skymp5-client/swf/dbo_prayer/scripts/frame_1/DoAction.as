@@ -389,7 +389,7 @@ keys.onKeyDown = function()
       standUp();
    }
 };
-Key.addListener(keys);
+dboKeys(keys);
 
 // A prayer left unspoken ends at the round's limit
 var NO_DATA_CLOSE_MS = 8000;

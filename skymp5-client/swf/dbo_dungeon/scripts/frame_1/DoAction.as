@@ -170,7 +170,7 @@ keys.onKeyDown = function()
       actions[focus].onPick();
    }
 };
-Key.addListener(keys);
+dboKeys(keys);
 
 _root.onEnterFrame = function()
 {

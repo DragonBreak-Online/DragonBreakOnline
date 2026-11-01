@@ -90,14 +90,14 @@ function build()
 var keys = {};
 keys.onKeyDown = function()
 {
-   if (Key.getCode() == 27)
+   if (dboKey() == 27)
    {
       dboInputEnd();
       dboSend("close", []);
       dboClose();
    }
 };
-Key.addListener(keys);
+dboKeys(keys);
 
 _root.dboData = function(json)
 {

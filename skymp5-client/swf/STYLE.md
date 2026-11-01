@@ -148,6 +148,7 @@ The other names `gfxfontlib.swf` exports are `$DragonFont`, `$SkyrimBooks`, `$Ha
 
 **DBO, for every panel:**
 - UP/DOWN (and W/S) move the focus. ENTER/E choose. Escape closes (or backs out one layer). Tab does nothing: it is Skyrim's menu key, and a reflex press must never cost the player a round or a panel.
+- **Escape reaches every panel through the client too** (Nat, 1 Nov: Esc closes F7 and F3). The game may keep Escape from the movie, so `scaleformMenuService` hands each press to `_root.dboEscape` (lib/dbo.as), which runs the panel's own key handler; one press seen by both counts once. So a panel registers its listener with `dboKeys(keys)`, never `Key.addListener`, and reads keys with `dboKey()`, never `Key.getCode()`. Escape backs out one layer at a time: a typing box (releasing text input), then a form or an Ask, then the panel. A rite only asks, since yielding forfeits it. `tests/native-escape-harness.js` checks every panel.
 - Number keys take the numpad too (codes 97-105 as 49-57).
 - Number keys 1-9 choose a row directly.
 - The mouse always works: hover focuses, click chooses.

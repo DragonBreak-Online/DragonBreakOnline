@@ -432,6 +432,13 @@ check('a refresh keeps the widget id when the caller does not name one, so repli
   return t.widgetId === 7;
 });
 
+// Escape goes to a panel only once it is up (Nat, 1 Nov: Esc closes F7 and F3)
+check('Escape is handed to a ready panel and to nothing while closed or still opening', () => {
+  const t = M.newState(); const closed = M.escapeTargetFor(t); M.planOpen(t, 'dbo_journal', {}, 50, 0); const opening = M.escapeTargetFor(t);
+  M.planReady(t, 1, 10);
+  return closed === '' && opening === '' && M.escapeTargetFor(t) === '_root.dboEscape';
+});
+
 // The X menus' wait (Nat, 1 Nov: "delays in the UI with the X menu"): the time from the key's request to the open
 check('the summary shows how long the panel waited for the server when a service says when it asked', () => {
   const t = M.newState(); t.askedAt = 1000; M.planOpen(t, 'dbo_context', {}, 30, 1180); M.planReady(t, 1, 1240);

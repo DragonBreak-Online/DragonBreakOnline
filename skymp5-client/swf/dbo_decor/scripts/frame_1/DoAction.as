@@ -490,7 +490,7 @@ keys.onKeyDown = function()
       tabStep(1);
    }
 };
-Key.addListener(keys);
+dboKeys(keys);
 
 _root.onEnterFrame = function()
 {

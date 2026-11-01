@@ -356,6 +356,12 @@ export const isNew = (s: MenuState, m: UiEvent): boolean => {
   return s.lastSeq === 0;
 };
 
+// Escape for the panel on screen (Nat, 1 Nov: "allow us to click the Esc key for closing out the F7 and F3 panels"): the
+// game may keep the key from the movie, so the client hands it to lib/dbo.as's _root.dboEscape, which runs the panel's
+// own key handler (a form or a typing box backs out first, as the panel's own Escape does). Only a panel that is up.
+export const ESCAPE_TARGET = "_root.dboEscape";
+export const escapeTargetFor = (s: MenuState): string => (s.phase === "ready" ? ESCAPE_TARGET : "");
+
 export const summary = (s: MenuState): string => {
   // readyAt, not openedAt: testing a timestamp for truthiness makes the line claim "never became ready"
   // about a panel that did, and a diagnostic that lies is worse than none.
