@@ -5,6 +5,7 @@ import { MsgType } from "../../messages";
 import { FormView, getScreenResolution } from "../../view/formView";
 import { isGameInputBlocked, readMenuKeyCode, isMenuKeyPressBlocked } from "./widgetMenuUtil";
 import { buttonKeyCode } from "./mouseKeys";
+import { parseFile } from "./settingsLocal";
 
 declare const window: any;
 
@@ -409,6 +410,21 @@ export class ChatService extends ClientListener {
   }
 
   // Persist settings sent from the chat UI to disk so they survive a relaunch.
+  // The settings file as saved; null when it cannot be read
+  public readSettingsFile(): Record<string, unknown> | null {
+    try {
+      // @ts-expect-error (TODO: Remove in 2.10.0)
+      return parseFile(this.sp.getPluginSourceCode(this.pluginChatSettingsName, "PluginsNoLoad"));
+    } catch {
+      return null;
+    }
+  }
+
+  // The native journal's Settings save through the same writer as the page
+  public saveSettingsFile(file: Record<string, unknown>): void {
+    this.writeChatSettings(JSON.stringify(file));
+  }
+
   private writeChatSettings(json: string): void {
     if (!json) return;
     try {

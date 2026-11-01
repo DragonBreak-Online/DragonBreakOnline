@@ -41,6 +41,7 @@ import { DisableSkillAdvanceService } from "./services/services/disableSkillAdva
 import { DisableFastTravelService } from "./services/services/disableFastTravelService";
 import { DisableDifficultySelectionService } from "./services/services/disableDifficultySelectionService";
 import { MouseFreeService } from "./services/services/mouseFreeService";
+import { SettingsNativeService } from "./services/services/settingsNativeService";
 import { WorldCleanerService } from "./services/services/worldCleanerService";
 import { CompanionService } from "./services/services/companionService";
 import { LoadOrderVerificationService } from "./services/services/loadOrderVerificationService";
@@ -229,6 +230,7 @@ const main = () => {
       new BrowserService(sp, controller),
       new UiScaleService(sp, controller),
       new KeybindsService(sp, controller),
+      new SettingsNativeService(sp, controller),
       new AuthService(sp, controller),
       new CharacterSelectService(sp, controller),
       new CharCreatorService(sp, controller),

@@ -5,7 +5,7 @@
 // whose typing is not native yet, or a game that cannot type, still hands it to the browser journal for that tab:
 // journalTab [nonce, tab, focus, "browser"].
 
-var DBO_SWF_VERSION = "journal-1";
+var DBO_SWF_VERSION = "journal-2";
 var STAGE_W = 1280;
 var PANEL_W = 1180;
 var PANEL_H = 664;
@@ -28,6 +28,8 @@ var pages = {};
 var asking = null;
 // tabTick: a tab's own clock, set as it draws (Profile's powers): true when the page should be drawn again this frame
 var tabTick = null;
+// tabKey: a tab's own keys, set as it draws (Settings: a section backs out on Escape, a key capture takes every key); true when taken
+var tabKey = null;
 var builtAt = getTimer();
 // when a tab was asked of the server, so the log can say how long its answer took to come (server build and transport)
 var askedTab = "";
@@ -187,6 +189,7 @@ function drawBody()
    flowStart(b, 1, PAD, bodyTop);
    formBegin();
    tabTick = null;
+   tabKey = null;
    if (forming != null)
    {
       ctx.busy = busy;
@@ -375,6 +378,10 @@ keys.onKeyDown = function()
 {
    var code = dboKey();
    if (formKey(code))
+   {
+      return;
+   }
+   if (forming == null && asking == null && tabKey != null && tabKey(code))
    {
       return;
    }

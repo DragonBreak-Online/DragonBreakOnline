@@ -43,6 +43,11 @@ export class KeybindsService extends ClientListener {
     this.sp.browser.executeJavaScript(`window.dispatchEvent(new CustomEvent('dbo:keybindMouse', { detail: ${code} }))`);
   }
 
+  // The native journal's Settings (settingsNativeService): the page's message, handled as the page's
+  public fromNative(args: unknown[]): void {
+    this.onBrowserMessage({ arguments: args } as unknown as BrowserMessageEvent);
+  }
+
   private onBrowserMessage(e: BrowserMessageEvent): void {
     const key = e.arguments[0];
     if (key === "cef::keybinds:get") { this.tellPage(); return; }
@@ -100,10 +105,14 @@ export class KeybindsService extends ClientListener {
     return DxScanCode.T;
   }
 
-  private tellPage(): void {
+  public state(): { live: Record<string, number>; next: Record<string, number> } {
     const next: Record<string, number> = {};
     for (const name of Object.keys(MENU_KEYS)) next[name] = this.keyOf(name, true);
-    const state = JSON.stringify({ live: this.live, next });
+    return { live: this.live, next };
+  }
+
+  private tellPage(): void {
+    const state = JSON.stringify(this.state());
     this.sp.browser.executeJavaScript(`window.__dboKeybinds = ${state}; window.dispatchEvent(new CustomEvent('dbo:keybinds'));`);
   }
 
