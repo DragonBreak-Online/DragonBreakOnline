@@ -1434,7 +1434,7 @@
    },
    {
     "id": "azura",
-    "prayNear": [{"ref": "33dcb:Skyrim.esm", "world": "3c:Skyrim.esm", "pos": [110514, 79564, 2286], "meters": 30, "name": "the Shrine of Azura"}],
+    "prayNear": [{"ref": "33dcb:Skyrim.esm", "world": "3c:Skyrim.esm", "pos": [110514, 79564, 2286], "meters": 30, "name": "the Shrine of Azura"}, {"ref": "d83:man_DaedricShrines.esp", "world": "3c:Skyrim.esm", "pos": [172671, 35350, -8547], "meters": 12, "name": "the statue of Azura in the far east of Skyrim"}],
     "_prayNear": "Nat, 25 Oct (Skyrim shrines): a Skyrim lore statue that cannot be activated, prayed at with /pray within its meters (prayer.js prayNear), as Meridia's in Bruma. Vanilla or man_DaedricShrines.esp (in the live order). Census in _work/skyrim-shrines-1025.",
     "name": "Azura",
     "kind": "daedra",
@@ -1520,6 +1520,8 @@
    },
    {
     "id": "molagbal",
+    "prayNear": [{"ref": "8ef:man_DaedricShrines.esp", "world": "803:Dawnguard.esm", "pos": [-858, -2416, 7491], "meters": 10, "name": "the statue of Molag Bal in Castle Volkihar"}, {"ref": "8eb:man_DaedricShrines.esp", "world": "19dfe:Dawnguard.esm", "pos": [1126, 1879, 9038], "meters": 10, "name": "the statue of Molag Bal in Castle Volkihar"}, {"ref": "8f3:man_DaedricShrines.esp", "world": "1526f:Skyrim.esm", "pos": [3910, 3205, 5269], "meters": 10, "name": "the statue of Molag Bal in Movarth's Lair"}],
+    "_prayNear": "1 Nov (after SMJ's Namira report): man_DaedricShrines.esp statues are STATs the engine never activates, prayed at with /pray within their meters (prayer.js prayNear). Census in _work/namira-shrine-1101.md.",
     "name": "Molag Bal",
     "kind": "daedra",
     "shrines": ["ec970:Skyrim.esm", "dee7e:Skyrim.esm", 
@@ -1669,7 +1671,7 @@
    },
    {
     "id": "hermaeusmora",
-    "prayNear": [{"ref": "867:man_DaedricShrines.esp", "world": "3c:Skyrim.esm", "pos": [126176, 152044, -13237], "meters": 12, "name": "the statue of Hermaeus Mora by Septimus Signus' outpost"}],
+    "prayNear": [{"ref": "867:man_DaedricShrines.esp", "world": "3c:Skyrim.esm", "pos": [126176, 152044, -13237], "meters": 12, "name": "the statue of Hermaeus Mora by Septimus Signus' outpost"}, {"ref": "865:man_DaedricShrines.esp", "world": "19cd7:Dragonborn.esm", "pos": [-884, -327, -1384], "meters": 10, "name": "the statue of Hermaeus Mora in the Temple of Miraak"}, {"ref": "866:man_DaedricShrines.esp", "world": "142ee:Dragonborn.esm", "pos": [-3571, 1145, 296], "meters": 10, "name": "the statue of Hermaeus Mora in Kolbjorn Barrow"}],
     "_prayNear": "Nat, 25 Oct (Skyrim shrines): a Skyrim lore statue that cannot be activated, prayed at with /pray within its meters (prayer.js prayNear), as Meridia's in Bruma. Vanilla or man_DaedricShrines.esp (in the live order). Census in _work/skyrim-shrines-1025.",
     "blessingDisplay": "1ac97b:DragonBreak Online Edits.esp",
     "name": "Hermaeus Mora",

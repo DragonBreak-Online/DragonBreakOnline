@@ -1050,36 +1050,48 @@ console.log('pick prayers:');
   check('...and the statue counts as touched for /deity Meridia', /You now follow Meridia|Meridia/.test(say('deity', 'Meridia')) && (props.get(ACTOR + '|private.dboDeity') || {}).id === 'meridia', JSON.stringify(props.get(ACTOR + '|private.dboDeity')));
 }
 
-// ---- Namira's cave in the Reach (SMJ, 1 Nov: "the shrine of Namira in the Reach does not allow you to pray") ----
-// man_DaedricShrines.esp's aaaManNamiraShrine (cell 8c4) holds aaaman_NamiraStatue, a STAT the engine never activates, on a
-// ledge above the cave floor; /pray on the floor beside it is the touch
+// ---- man_DaedricShrines.esp's statues that no shrine of ours covered (SMJ, 1 Nov: "the shrine of Namira in the Reach does not
+// allow you to pray") ----
+// Every statue the mod places is a STAT the engine never activates; these seven had neither a prayNear spot nor a DLE
+// activator over them (_work/namira-shrine-1101.md). /pray beside each is the touch. Each statue's own place in the
+// plugin is written out here, so its checks fail on their own without its spot
 {
   api.cfg = { prayer: { clientJudged: true, pick: { enabled: false } } };
   pickUi = false;
   load();
-  // The statue's own place in the plugin, so the checks below fail on their own without the spot
-  const STATUE = 0xdf5, WORLD = '8c4:man_DaedricShrines.esp', POS = [1598, 1889, 269];
-  const spot = (choiceOf('namira').prayNear || []).find((s) => s.ref === 'df5:man_DaedricShrines.esp');
-  check('skills.json: Namira is prayed near her statue in the Reach cave (df5, in cell 8c4)', !!spot && spot.world === WORLD && JSON.stringify(spot.pos) === JSON.stringify(POS), JSON.stringify(choiceOf('namira').prayNear));
-  {
-    const FLOOR = 40; // the cave floor, the bones and the blood bowl at z 33-58; the statue stands at 269
-    const stand = (x, y, world) => { props.set(ACTOR + '|worldOrCellDesc', world || WORLD); props.set(ACTOR + '|pos', [x, y, FLOOR]); };
-    const prayNear = () => { wallClock += 61 * 60000; virtual += 1000000; const said = say('pray'); return { said, w: out.widgets.find((x) => x && x.nonce), log: out.logs.join(' | ') }; };
-    props.set(ACTOR + '|private.dboDeity', { id: 'namira', name: 'Namira', kind: 'daedra', at: wallClock - 30 * 86400000 });
+  const STATUES = [
+    { god: 'namira', ref: 'df5:man_DaedricShrines.esp', world: '8c4:man_DaedricShrines.esp', pos: [1598, 1889, 269], where: 'her cave in the Reach', z: 40, near: 'the statue of Namira in her cave in the Reach' },
+    { god: 'molagbal', ref: '8ef:man_DaedricShrines.esp', world: '803:Dawnguard.esm', pos: [-858, -2416, 7491], where: 'Castle Volkihar\'s guildhall', near: 'the statue of Molag Bal in Castle Volkihar' },
+    { god: 'molagbal', ref: '8eb:man_DaedricShrines.esp', world: '19dfe:Dawnguard.esm', pos: [1126, 1879, 9038], where: 'Castle Volkihar\'s boss room' },
+    { god: 'molagbal', ref: '8f3:man_DaedricShrines.esp', world: '1526f:Skyrim.esm', pos: [3910, 3205, 5269], where: 'Movarth\'s Lair' },
+    { god: 'hermaeusmora', ref: '865:man_DaedricShrines.esp', world: '19cd7:Dragonborn.esm', pos: [-884, -327, -1384], where: 'the Temple of Miraak' },
+    { god: 'hermaeusmora', ref: '866:man_DaedricShrines.esp', world: '142ee:Dragonborn.esm', pos: [-3571, 1145, 296], where: 'Kolbjorn Barrow' },
+    { god: 'azura', ref: 'd83:man_DaedricShrines.esp', world: '3c:Skyrim.esm', pos: [172671, 35350, -8547], where: 'her second shrine, in Tamriel' },
+  ];
+  const prayNear = () => { wallClock += 61 * 60000; virtual += 1000000; const said = say('pray'); return { said, w: out.widgets.find((x) => x && x.nonce), log: out.logs.join(' | ') }; };
+  nearM = Infinity;
+  for (const st of STATUES) {
+    const d = choiceOf(st.god);
+    const spot = (d.prayNear || []).find((s) => s.ref === st.ref);
+    check(`skills.json: ${d.name} is prayed near the statue in ${st.where} (${st.ref})`, !!spot && spot.world === st.world && JSON.stringify(spot.pos) === JSON.stringify(st.pos), JSON.stringify(d.prayNear));
+    // beside it: 2 m off, on the floor (Namira's statue stands on a ledge 3 m above hers) or level with it
+    const stand = (dx, world) => { props.set(ACTOR + '|worldOrCellDesc', world || st.world); props.set(ACTOR + '|pos', [st.pos[0] + dx, st.pos[1], st.z == null ? st.pos[2] : st.z]); };
+    props.set(ACTOR + '|private.dboDeity', { id: d.id, name: d.name, kind: 'daedra', at: wallClock - 30 * 86400000 });
     props.delete(ACTOR + '|private.prayedShrines');
-    nearM = Infinity;
-    stand(800, -400);
-    let m = prayNear();
-    check('at the cave mouth (30 m off), /pray says where to stand', !m.w && /Stand beside the statue of Namira in her cave in the Reach and say \/pray/.test(m.said), m.said);
-    stand(POS[0] - 140, POS[1], '3c:Skyrim.esm');
-    m = prayNear();
-    check('the same coordinates in Tamriel are not her cave', !m.w, m.said);
-    stand(POS[0] - 140, POS[1]);
-    m = prayNear();
-    check('on the cave floor beside the statue, /pray opens a prayer to Namira', !!m.w && /Namira/i.test(String(m.w.deity)) && /shrine touch .* Namira/.test(m.log), m.said + ' | ' + m.log);
-    res = playC(m);
-    check('...and it is held', verdictOf(res.log) === 'held' && res.events.length === 1, res.log);
-    check('...the rest is kept on the statue itself', restOf(STATUE) > wallClock, String(restOf(STATUE)));
+    if (st.near) {
+      stand(2100);
+      const far = prayNear();
+      check(`...30 m from it, /pray says where to stand`, !far.w && far.said.includes(`Stand beside ${st.near} and say /pray`), far.said);
+    }
+    stand(140, st.world === '3c:Skyrim.esm' ? '1:Skyrim.esm' : '3c:Skyrim.esm');   // verify-formids: ignore - another world, on purpose
+    const elsewhere = prayNear();
+    check('...the same coordinates in another world are not the statue', !elsewhere.w, elsewhere.said);
+    stand(140);
+    const m = prayNear();
+    check(`...beside it, /pray opens a prayer to ${d.name}`, !!m.w && new RegExp(d.name, 'i').test(String(m.w.deity)) && new RegExp(`shrine touch .* ${d.name}`).test(m.log), m.said + ' | ' + m.log);
+    // no prayer opened: nothing to hold (the check above failed already)
+    res = m.w ? playC(m) : { log: '', events: [] };
+    check('...and it is held, its rest kept on the statue', verdictOf(res.log) === 'held' && res.events.length === 1 && restOf(idOf(st.ref)) > wallClock, res.log);
   }
 }
 
