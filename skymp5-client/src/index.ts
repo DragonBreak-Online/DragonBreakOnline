@@ -141,6 +141,9 @@ import { LearnedEnchantmentsService } from "./services/services/learnedEnchantme
 import { CameraShakeService } from "./services/services/cameraShakeService";
 import { FrenzyService } from "./services/services/frenzyService";
 import { ClientDiagService } from "./services/services/clientDiagService";
+import { rotateDiagLogs } from "./services/services/diagLogRotate";
+// Node fs is available in this runtime (authService, profilingService and sweetCameraEnforcementService use it)
+import * as fsModule from "fs";
 
 // Gold weighs 0.02 a coin (Nate, 2026-09-26), so a fortune is worth taking to the bank: 1,000 gold weighs 20.
 // SKSE's Form.SetWeight changes the base form in memory, so no plugin changes; it is set again after every game load.
@@ -166,6 +169,10 @@ on("loadGame", () => once("update", setGoldWeight));
 
 const main = () => {
   try {
+    // Before any service, because the first writeLogs call is what truncates the live log: keep the previous
+    // session's copy so a relaunch to reproduce a problem stops destroying the evidence of it (31 Oct, twice).
+    try { rotateDiagLogs(fsModule); } catch (e) { /* diagnostics never stop the client starting */ }
+
     const controller = SpApiInteractor.getControllerInstance();
 
     const listeners = [
