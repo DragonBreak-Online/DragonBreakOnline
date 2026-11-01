@@ -361,7 +361,9 @@
   ],
   "sovereignty": {
     "_comment": "Inside a stronghold radius only that stronghold's officials (and admins) manage property, locks and Hold Notices. Hold officials have no rights there and stronghold officials none outside.",
-    "strongholdsOverrideHolds": true
+    "strongholdsOverrideHolds": true,
+    "_holdsFromCellsComment": "true: outside the strongholds a Tamriel place takes its cell's hold from hold-cells.json beside this file (the game's own cell locations; private, not in git), read by the fork at boot and followed by the gamemode; a missing table, or false, means the nearest capital. Takes effect at a restart. Nat, 1 Nov: real borders at restart B.",
+    "holdsFromCells": true
   },
   "rankTitles": {
     "jarl": "Jarl",
