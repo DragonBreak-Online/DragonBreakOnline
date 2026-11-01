@@ -7883,6 +7883,8 @@ const equipHook = (actorId, equipment, isAllowed, ...rest) => {
     // durability.js: a piece taken off gets its wear in its name; a Broken one put on comes off
     if (isAllowed && typeof globalThis.__dboDurabilityEquip === 'function') { try { globalThis.__dboDurabilityEquip(a, equipment); } catch (e) { log('durability equip failed', e.message); } }
     if (isAllowed) { try { raceEquipCheck(a, equipment); } catch (e) { log('race equip failed', e.message); } }
+    // A creature's weapon (weaponBands.creature) comes off a player
+    if (isAllowed) { try { creatureWeaponCheck(a, equipment); } catch (e) { log('creature weapon check failed', e.message); } }
     // briarheart.js: a Briarheart's bare chest shows the briar body; their own armour takes its place
     if (isAllowed && typeof globalThis.__dboBriarheartEquip === 'function') { try { globalThis.__dboBriarheartEquip(a, equipment); } catch (e) { log('briarheart equip failed', e.message); } }
     // playermenu.js: a closed helmet or a mask worn masks the face, taking it off unmasks
@@ -8279,9 +8281,37 @@ const recordDamageOf = (baseId, type) => {
   recordDamageCache.set(key, damage);
   return damage;
 };
+// Weapon bands (Nat, 1 Nov: "yes start with weapon bands"; _work/ladder-review-1031.md step 2): a weapon above the best
+// ordinary vanilla weapon of its type at its tier counts at that ceiling, by editor id (tools/materials/weapon-bands-1031.tsv,
+// e.g. the Antique Nordic Sword, tier 2, 25 to 12). Only ever lowers. The engine still swings the record's damage, so the
+// hit is scaled by banded over record, for every attacker, PvE and PvP; the arrow, tempering and the inventory read the
+// banded damage too. Weapons only a creature or an NPC holds (giant clubs, sphere crossbows) are no player's: one put
+// on comes off. Config weaponBands: { enabled, damageByEditorId: { WEAP editor id: damage }, creature: [regex], line }
+const WEAPON_BANDS = Object.assign({ enabled: true, damageByEditorId: {}, creature: [], line: 'That weapon is not made for a person to wield.' }, cfg.weaponBands || {});
+const CREATURE_WEAPONS = (Array.isArray(WEAPON_BANDS.creature) ? WEAPON_BANDS.creature : [])
+  .map((p) => { try { return new RegExp(String(p)); } catch (e) { log(`weaponBands: bad pattern ${p}`); return null; } }).filter(Boolean);
+const weaponEdidOf = (baseId) => { const r = recordOf(baseId >>> 0); return r && String(r.record.type) === 'WEAP' ? String(r.record.editorId || '') : ''; };
+const bandedDamageOf = (baseId) => {
+  const raw = recordDamageOf(baseId, 'WEAP');
+  if (!WEAPON_BANDS.enabled || !(raw > 0)) return raw;
+  const t = Number((WEAPON_BANDS.damageByEditorId || {})[weaponEdidOf(baseId)]);
+  return t > 0 && t < raw ? t : raw;
+};
+const weaponBandMult = (sourceId) => { const raw = recordDamageOf(sourceId, 'WEAP'); return raw > 0 ? bandedDamageOf(sourceId) / raw : 1; };
+const isCreatureWeapon = (baseId) => { const e = weaponEdidOf(baseId); return !!e && CREATURE_WEAPONS.some((rx) => rx.test(e)); };
+const creatureWeaponSaid = new Map();
+const creatureWeaponCheck = (a, equipment) => {
+  if (!WEAPON_BANDS.enabled || !CREATURE_WEAPONS.length || !(profileOf(a) >= 0)) return;
+  for (const w of wornOf(equipment)) {
+    if (!isCreatureWeapon(Number(w.baseId) >>> 0)) continue;
+    setTimeout(() => { try { mp.callPapyrusFunction('method', 'Actor', 'UnequipItem', { type: 'form', desc: mp.getDescFromId(a) }, [{ type: 'espm', desc: mp.getDescFromId(Number(w.baseId) >>> 0) }, false, true]); } catch (e) { log('weaponBands: UnequipItem failed', e.message); } }, 200);
+    if (Date.now() - (creatureWeaponSaid.get(a) || 0) > 3000) { creatureWeaponSaid.set(a, Date.now()); personal(a, WEAPON_BANDS.line); try { sendPacket(a, { customPacketType: 'dboNotice', text: WEAPON_BANDS.line }); } catch (e) { /* chat is enough */ } }
+    log(`weaponBands: ${display(a)} cannot wield ${(Number(w.baseId) >>> 0).toString(16)} (${weaponEdidOf(Number(w.baseId) >>> 0)}); taken off`);
+  }
+};
 const arrowDamageMult = (aggressorId, sourceId) => {
   if (!ARROWS.enabled || weaponSkillOf(sourceId) !== 'archery') return 1;
-  const bow = recordDamageOf(sourceId, 'WEAP');
+  const bow = bandedDamageOf(sourceId);
   if (!(bow > 0)) return 1;
   let arrow = 0;
   try { for (const w of wornOf(mp.get(aggressorId, 'equipment'))) arrow = Math.max(arrow, recordDamageOf(w.baseId, 'AMMO')); } catch (e) { return 1; }
@@ -8515,7 +8545,7 @@ const wornWithHealth = (a) => {
 };
 // A tempered weapon's blow: base damage plus the game's tempering bonus, over base damage
 const temperDamageMult = (aggressorId, sourceId) => {
-  const base = recordDamageOf(sourceId, 'WEAP');
+  const base = bandedDamageOf(sourceId);
   if (!(base > 0)) return 1;
   const w = wornWithHealth(aggressorId).find((e) => e.baseId === (sourceId >>> 0));
   const bonus = w ? temperBonus(w.health, false) : 0;
@@ -9248,7 +9278,7 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     if (racial) { try { targetSide = racial.capTargetSide(targetSide * racial.targetMult(agg, tgt, src, dmg)); } catch (e) { log('racial target failed', e.message); } }
     let raceAtk = 1;
     if (racial && !beastAgg) { try { raceAtk = racial.attackMult(agg, tgt, src, dmg, flags); } catch (e) { log('racial attack failed', e.message); } }
-    let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * potionTakenMult(tgt, flags) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp * (agg !== tgt && profileOf(agg) >= 0 && profileOf(tgt) >= 0 ? pvpSourceMult(src, beastAgg) * pvpArcheryMult(agg, src, beastAgg) : 1);
+    let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * potionTakenMult(tgt, flags) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * weaponBandMult(src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp * (agg !== tgt && profileOf(agg) >= 0 && profileOf(tgt) >= 0 ? pvpSourceMult(src, beastAgg) * pvpArcheryMult(agg, src, beastAgg) : 1);
     if (!beastAgg) mult *= gearAttackMult(agg, src);
     // A Hagraven's Destruction (hagraven.js), by her stage
     try { if (globalThis.__dboHagravenAttackMult) mult *= Number(globalThis.__dboHagravenAttackMult(agg, src)) || 1; } catch (e) { log('hagraven attack failed', e.message); }
@@ -9409,7 +9439,7 @@ const statItemsFor = (a) => {
   const pm = defensePieceMult(a), gm = gearArmorMult(a), potion = 1 + potionBonus(a, 'armor'), out = [];
   for (const [id, e] of byId) {
     if (out.length >= STAT_DISPLAY.maxItems) break;
-    const base = recordDamageOf(id, 'WEAP');
+    const base = bandedDamageOf(id);
     if (base > 0) {
       const skill = DISPLAY_SKILL[weaponAnimOf(id)];
       if (!skill) continue;
