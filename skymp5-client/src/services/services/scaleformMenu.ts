@@ -83,6 +83,12 @@ export const NATIVE_CAPS = [
   "native:bank",
   // Worker 1's character panels: the birthsign picker (dbo_birthsign, widget 163; dbo:birthsignPick/birthsignClose)
   "native:birthsignPicker",
+  // Worker 6's notice-board Citizenship and Voting (dbo_citizen, widget 84). Its keys are dbo:citizenAct/Back/Close; a
+  // game that cannot type sends citizenAct "browser" and the server sends the panel to the browser
+  "native:citizenBoard",
+  // Worker 6's Expeditions and Hunting Contracts board (dbo_expedition, widget 63). Its keys are the widget's own
+  // events.* (dbo:expeditionPick/Close, dbo:contractTake/Abandon/Deliver); dungeons.js opens it for this cap too
+  "native:expeditionBoard",
 ];
 export const CAPS_RETRY_MS = 5000;
 
