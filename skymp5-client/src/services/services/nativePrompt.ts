@@ -18,6 +18,7 @@ export interface PromptSpec {
   // the two answers' labels; "" when there is no such answer (downed has only Give up)
   yes: string;
   no: string;
+  // 0: no clock (a menu that waits for the player, the level-up offer)
   seconds: number;
   // Y opens only after this many seconds (downed's Give up)
   lockSeconds?: number;
@@ -81,15 +82,17 @@ export interface HudPrompt {
 
 export const promptView = (p: PromptState | null, now: number): HudPrompt | null => {
   if (!p) return null;
+  const timed = Number(p.seconds) > 0;
   const total = Math.max(1, Number(p.seconds) || 1);
-  const left = Math.max(0, Math.ceil(total - (now - p.shownAt) / 1000));
+  const left = timed ? Math.max(0, Math.ceil(total - (now - p.shownAt) / 1000)) : 0;
   const lock = lockLeft(p, now);
   return {
     kicker: p.kicker, title: p.title, text: p.text,
     yes: p.yes ? `Y  ${p.yes}${lock > 0 ? ` (${lock})` : ""}` : "",
     no: p.no ? `N  ${p.no}` : "",
-    left, frac: Math.round((left / total) * 1000) / 1000, answered: p.answered,
-    idle: p.answered ? "Answered." : `${left} s.${p.idle ? ` ${p.idle}` : ""}`,
+    // frac -1: no clock bar
+    left, frac: timed ? Math.round((left / total) * 1000) / 1000 : -1, answered: p.answered,
+    idle: p.answered ? "Answered." : timed ? `${left} s.${p.idle ? ` ${p.idle}` : ""}` : p.idle || "",
   };
 };
 
@@ -151,3 +154,17 @@ export const tradePrompt = (id: number, from: string, seconds: number): PromptSp
 export const consentPrompt = (id: number, caption: string, text: string, seconds: number): PromptSpec => ({
   id, kicker: caption, title: caption, text: text || "Allow this?", yes: "Allow", no: "Refuse", seconds, idle: "No answer refuses.",
 });
+
+// A choice menu the server sent without focus (charlevel's level-up offer): a card with no clock while the native HUD is up.
+// Y opens the menu itself, focused (DboRelayService opens it in dbo_context); N sends its close, when it has one
+export const menuCard = (w: Record<string, unknown>): PromptSpec | null => {
+  const id = Number(w["id"]);
+  const actions = Array.isArray(w["actions"]) ? (w["actions"] as Array<Record<string, unknown>>) : [];
+  if (w["type"] !== "contextMenu" || w["mode"] === "inspect" || !Number.isFinite(id) || id <= 0 || !actions.length) return null;
+  const events = (w["events"] && typeof w["events"] === "object" ? w["events"] : {}) as Record<string, unknown>;
+  return {
+    id, kicker: "Waiting for you", title: String(w["targetName"] || "A choice"),
+    text: actions.map((a) => String(a["label"] || "")).filter(Boolean).join("   "),
+    yes: "Choose", no: typeof events["close"] === "string" && String(events["close"]).indexOf("dbo:") === 0 ? "Not now" : "", seconds: 0,
+  };
+};

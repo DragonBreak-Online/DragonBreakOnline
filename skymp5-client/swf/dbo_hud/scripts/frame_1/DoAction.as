@@ -207,8 +207,12 @@ function drawPrompt(p)
    title.text = String(p.title);
    var body = dboText(c, "body", 4, 18, 64, PROMPT_W - 36, 84, dboFmt(F_PLAIN, 15, C_SECOND, 0.2), true);
    body.text = String(p.text);
-   dboBox(c, 18, 152, PROMPT_W - 36, 3, 0x000000, 55);
-   dboBox(c, 18, 152, Math.round((PROMPT_W - 36) * Math.max(0, Math.min(1, Number(p.frac)))), 3, C_ACCENT, 85);
+   // frac -1: a card with no clock
+   if (Number(p.frac) >= 0)
+   {
+      dboBox(c, 18, 152, PROMPT_W - 36, 3, 0x000000, 55);
+      dboBox(c, 18, 152, Math.round((PROMPT_W - 36) * Math.max(0, Math.min(1, Number(p.frac)))), 3, C_ACCENT, 85);
+   }
    var yes = dboText(c, "yes", 5, 18, 164, (PROMPT_W - 36) / 2, 24, dboFmt(F_MEDIUM, 17, p.answered == true ? C_SECOND : C_ACCENT, 0.4), false);
    yes.text = String(p.yes);
    var no = dboText(c, "no", 6, PROMPT_W / 2, 164, (PROMPT_W - 36) / 2, 24, dboFmt(F_MEDIUM, 17, p.answered == true ? C_SECOND : C_TEXT, 0.4, "right"), false);

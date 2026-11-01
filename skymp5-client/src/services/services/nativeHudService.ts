@@ -3,6 +3,7 @@ import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { logError, logTrace } from "../../logging";
 import { KEY_NO, KEY_YES, handBack, hudPrompt, pressKey, promptView } from "./nativePrompt";
 import { buttonKeyCode } from "./mouseKeys";
+import { isMenuHotkeyBlocked } from "./widgetMenuUtil";
 import { ALIVE_FRAMES, HudClock, mailOf, LoadState, UiChoice, changedJson, hudShared, loadStep, newClock, newLoad, payloadOf, uiFromFile } from "./nativeHud";
 
 // The native HUD (route H, _work/native-everything-1031.md; the /testmenu hud probe showed our own swf loads and runs in
@@ -39,8 +40,10 @@ export class NativeHudService extends ClientListener {
     if (!e.isDown || !hudShared.nativeUp || !hudPrompt.current) return;
     const code = buttonKeyCode(e);
     if (code !== KEY_YES && code !== KEY_NO) return;
+    // Never under a game menu (inventory, map, crafting: the HUD and its card are hidden there), the console, the chat or a
+    // browser panel, a native panel, or a hidden interface
     try {
-      if (this.sp.browser.isFocused() || this.sp.Ui.isMenuOpen(Menu.Console) || this.sp.Ui.isMenuOpen("CustomMenu" as Menu)) return;
+      if (isMenuHotkeyBlocked(this.sp, this.controller) || this.sp.Ui.isMenuOpen(Menu.Console) || this.sp.Ui.isMenuOpen("CustomMenu" as Menu)) return;
     } catch { return; }
     try {
       if (pressKey(code, Date.now())) { this.last = ""; logTrace(this, "HUD prompt answered with", code === KEY_YES ? "Y" : "N"); }
