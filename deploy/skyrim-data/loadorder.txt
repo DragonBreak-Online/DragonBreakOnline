@@ -159,5 +159,6 @@ mihailfleshatronach.esp
 mihailnordicsentinel.esp
 mihailhiveguardians.esp
 mihailelementalgolems.esp
+1FleshColossus.esp
 DragonBreak Creature Patch.esp
 DBO_HagravenLooks.esp
