@@ -1079,7 +1079,12 @@ module.exports = (api) => {
     while (b.i < b.descs.length) {
       const d = b.descs[b.i++];
       let id = 0, root = 0;
-      try { id = Number(mp.getIdFromDesc(spelledDoor(d))) >>> 0; root = id ? Number(H.primaryOf(id)) >>> 0 : 0; } catch (e) { id = 0; }
+      // rootOfKnown (housing, restart B) answers as primaryOf without reading a door no claim owns, the last cold load of
+      // this build after a boot (1 Nov profile: 13.5 s); an older fork without it still gets primaryOf
+      try {
+        id = Number(mp.getIdFromDesc(spelledDoor(d))) >>> 0;
+        root = id ? Number(typeof H.rootOfKnown === 'function' ? H.rootOfKnown(id) : H.primaryOf(id)) >>> 0 : 0;
+      } catch (e) { id = 0; }
       if (root && root !== id) b.out.set(root, (b.out.get(root) || []).concat([d]));
       if (Date.now() - t0 >= budgetMs) break;
     }
