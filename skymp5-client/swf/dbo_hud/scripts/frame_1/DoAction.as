@@ -3,7 +3,10 @@
 // bottom right the racial power's countdown, gold, hunger with its meter, and the voice range with "On air" while V is held.
 // The client decides everything (the F3 Interface choice, the fade rules) and calls _root.dboData(json) with:
 //   { bars: { on, shown, quiet, h, m, s }, corner: { shown }, power: { name, left } | null, gold: n | null,
-//     hunger: { label, stage, fed } | null, voice: { mode, talking } }
+//     hunger: { label, stage, fed } | null, voice: { mode, talking },
+//     party: { title, rows: [{ name, leader, self, dead, far, pct, tag, clock }] } | null, watermark: bool }
+// The hourglass watermark top right as the browser HUD draws it (the browser leaves its own out while this one is up).
+// The party list sits at the left, where the browser's party panel opens; it is passive (no cursor in the HUD Menu).
 // It says it is alive in _root.dboAlive, which the client reads with Ui.getString.
 
 var DBO_SWF_VERSION = "hud-1";
@@ -16,12 +19,16 @@ var BAR_COLORS = {classic: [0xB8433B, 0x4A74B8, 0x6E9A4F], quiet: [0x8E3B36, 0x3
 var STAGE_COLORS = {sated: 0x7FB8AE, peckish: 0x8FCFC0, hungry: 0xD9A860, starving: 0xD8503C};
 var STAGE_TEXT = {hungry: 0xE8D6A0, starving: 0xE8907F};
 var FADE_PER_FRAME = 8;
+var PARTY_W = 240;
+var PARTY_ROW = 30;
 
 var data = null;
 var bars;
 var corner;
 var barsWant = 0;
 var cornerWant = 0;
+var party;
+var mark;
 
 // The stage the player sees (visibleRect where the HUD has one)
 function area()
@@ -92,6 +99,54 @@ function build()
    }
    v.hint = dboText(v, "hint", 20, CARD_W - 64, 5, 56, 22, dboFmt(F_MEDIUM, 13, C_SECOND, 0.3, "right"), false);
    corner._alpha = 0;
+   party = _root.createEmptyMovieClip("party", 30);
+   party._x = a.left + (a.right - a.left) * 0.023;
+   party._y = a.top + (a.bottom - a.top) * 0.417;
+   party._visible = false;
+   // the browser's box: 7% of the width (72 to 140 px on a 1280 stage), the art 420 x 520, 2.4% down and 1.8% in
+   var markW = Math.max(72, Math.min(140, (a.right - a.left) * 0.07));
+   mark = dboWatermark(_root, 40, a.right - (a.right - a.left) * 0.018, a.top + (a.bottom - a.top) * 0.024, markW * 520 / 420);
+   mark._alpha = 62;
+   mark._visible = false;
+}
+
+// The party list, drawn afresh each time it changes: a title with the count, then a name and a bar a row
+function drawParty(p)
+{
+   party._visible = p != null && p != undefined && p.rows instanceof Array && p.rows.length > 0;
+   if (!party._visible)
+   {
+      return;
+   }
+   var list = party.createEmptyMovieClip("list", 1);
+   var h = 26 + p.rows.length * PARTY_ROW + 6;
+   dboBox(list, 0, 0, PARTY_W, h, C_GROUND, 70);
+   dboBox(list, 0, 0, PARTY_W, 2, C_ACCENT, 70);
+   var title = dboText(list, "title", 2, 10, 4, PARTY_W - 60, 20, dboFmt(F_MEDIUM, 14, C_SECOND, 1.2), false);
+   title.text = String(p.title).toUpperCase();
+   var count = dboText(list, "count", 3, PARTY_W - 50, 4, 40, 20, dboFmt(F_MEDIUM, 14, C_SECOND, 0.4, "right"), false);
+   count.text = String(p.rows.length);
+   for (var i = 0; i < p.rows.length; i++)
+   {
+      var r = p.rows[i];
+      var row = list.createEmptyMovieClip("r" + i, 10 + i);
+      row._y = 26 + i * PARTY_ROW;
+      row._alpha = r.dead == true ? 45 : 100;
+      // the leader's mark is drawn, not a character: the game's font has no star glyph
+      if (r.leader == true)
+      {
+         dboDiamond(row, 15, 10, 4);
+      }
+      var name = dboText(row, "name", 1, r.leader == true ? 24 : 10, 0, PARTY_W - 80, 20, dboFmt(F_MEDIUM, 15, r.self == true ? C_ACCENT : C_TEXT, 0.3), false);
+      name.text = String(r.name) + (r.tag != "" ? "  " + String(r.tag) : "");
+      var right = dboText(row, "right", 2, PARTY_W - 70, 0, 60, 20, dboFmt(F_MEDIUM, 13, C_SECOND, 0.3, "right"), false);
+      right.text = r.far == true ? "far" : String(r.clock);
+      if (r.far != true)
+      {
+         dboBox(row, 10, 21, PARTY_W - 20, 4, 0x000000, 50);
+         dboBox(row, 10, 21, Math.round((PARTY_W - 20) * Number(r.pct) / 100), 4, BAR_COLORS.classic[0], 90);
+      }
+   }
 }
 
 // The corner's cards stack upward from its bottom edge, the voice box lowest, as the browser's column does
@@ -165,6 +220,8 @@ function draw()
       hu.fed = Number(data.hunger.fed);
    }
    drawVoice(data.voice);
+   drawParty(data.party);
+   mark._visible = data.watermark == true;
    layoutCorner();
    cornerWant = data.corner.shown == true ? 100 : 0;
 }

@@ -74,7 +74,7 @@ export class NativeHudService extends ClientListener {
     if (this.load.phase !== "up") return;
     const now = Date.now();
     if (now - this.pushedAt < PUSH_MS) return;
-    const p = payloadOf(hudShared.server, hudShared.vitals, hudShared.voiceMode, hudShared.talking, this.ui, this.clock, now);
+    const p = payloadOf(hudShared.server, hudShared.vitals, hudShared.voiceMode, hudShared.talking, this.ui, this.clock, now, hudShared.party);
     const json = changedJson(p, this.last);
     if (json === null) return;
     try {
