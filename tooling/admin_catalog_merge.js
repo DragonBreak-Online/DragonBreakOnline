@@ -95,6 +95,20 @@ const mergePowers = () => {
   out.spells = spells;
   const sources = {}; for (const s of spells) sources[pluginOf(s[0])] = (sources[pluginOf(s[0])] || 0) + 1;
   out.spellSources = Object.fromEntries(Object.entries(sources).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])));
+  // The staff-only list (/givespell; the Leader, 1 Nov): castable spells no tome teaches, never the held ones - a removed
+  // spell is taken from its holder at the next login and a suspended one is held for a crash or a desync (gamemode-config.json
+  // spells); old rows the generator no longer makes are kept, as everywhere here
+  if (Array.isArray(gen.staffSpells)) {
+    const staff = gen.staffSpells.filter((s) => { const held = SPELLS_HELD.has(String(s[0]).toLowerCase()); if (held) note(file, 'staffSpells', 'left out: removed or suspended (gamemode-config.json spells)', s); return !held; });
+    const inStaff = new Set(staff.map((s) => s[0]));
+    for (const s of old.staffSpells || []) if (!inStaff.has(s[0]) && inOrder(pluginOf(s[0]))) { staff.push(s); inStaff.add(s[0]); note(file, 'staffSpells', 'kept: not produced by the generator', s); }
+    staff.sort((x, y) => String(x[1]).toLowerCase().localeCompare(String(y[1]).toLowerCase()) || String(x[0]).localeCompare(String(y[0])));
+    // after spells, as the generator writes it
+    const keys = Object.keys(out); const at = keys.indexOf('spells') + 1;
+    const ordered = {}; keys.slice(0, at).forEach((k) => { ordered[k] = out[k]; }); ordered.staffSpells = staff; keys.slice(at).forEach((k) => { if (k !== 'staffSpells') ordered[k] = out[k]; });
+    for (const k of Object.keys(out)) delete out[k];
+    Object.assign(out, ordered);
+  }
   if (Array.isArray(old.shoutsGate)) {
     const gate = new Set((gen.shouts || []).map((s) => s.shout));
     for (const s of old.shoutsGate) if (!gate.has(s.shout)) note(file, 'shoutsGate', 'kept: not produced by the generator', s.shout);
