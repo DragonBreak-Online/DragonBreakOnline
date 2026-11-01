@@ -173,9 +173,12 @@ module.exports = (api) => {
       return Math.hypot(p[0] - spot.pos[0], p[1] - spot.pos[1], p[2] - spot.pos[2]) / 70;
     } catch (e) { return Infinity; }
   };
+  // The nearest spot in reach, not the first: at Bruma's shrine of the Princes the statues stand a few metres apart, so
+  // two spots' reach can overlap (Clavicus Vile's and Meridia's, 1 Nov)
   const spotNear = (a) => {
-    for (const [refId, spot] of SPOTS) if (spotMeters(a, spot) <= spot.meters) return { refId, spot };
-    return null;
+    let best = null, bestM = Infinity;
+    for (const [refId, spot] of SPOTS) { const m = spotMeters(a, spot); if (m <= spot.meters && m < bestM) { best = { refId, spot }; bestM = m; } }
+    return best;
   };
   // Metres from the worshipper to the shrine they knelt at: the spot's own position for a shrine prayed near
   const shrineMeters = (a, refId) => (SPOTS.has(refId) ? spotMeters(a, SPOTS.get(refId)) : distanceMeters(a, refId));

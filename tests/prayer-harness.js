@@ -1067,6 +1067,12 @@ console.log('pick prayers:');
     { god: 'hermaeusmora', ref: '865:man_DaedricShrines.esp', world: '19cd7:Dragonborn.esm', pos: [-884, -327, -1384], where: 'the Temple of Miraak' },
     { god: 'hermaeusmora', ref: '866:man_DaedricShrines.esp', world: '142ee:Dragonborn.esm', pos: [-3571, 1145, 296], where: 'Kolbjorn Barrow' },
     { god: 'azura', ref: 'd83:man_DaedricShrines.esp', world: '3c:Skyrim.esm', pos: [172671, 35350, -8547], where: 'her second shrine, in Tamriel' },
+    // Talking activators (TACT), which the server never loads: a touch on one never arrives (1 Nov)
+    { god: 'clavicusvile', ref: '125bf9:DragonBreak Online Edits.esp', world: 'a764b:BSHeartland.esm', pos: [94522, 193548, 2329], where: 'the shrine of the Princes by Bruma', near: 'the statue of Clavicus Vile at the shrine of the Princes by Bruma' },
+    { god: 'clavicusvile', ref: 'fe531:Skyrim.esm', world: '216bb:Skyrim.esm', pos: [1576, -4435, 6991], where: "Haemar's Shame" },
+    { god: 'clavicusvile', ref: '17489:Druadach.esm', world: '16d49:Druadach.esm', pos: [517, -2989, -2583], where: 'the Drenched Caverns' },
+    { god: 'namira', ref: '2c361:Skyrim.esm', world: '15227:Skyrim.esm', pos: [-896, -5664, -192], where: 'Reachcliff Cave' },
+    { god: 'molagbal', ref: 'defe8:Skyrim.esm', world: '18be9:Skyrim.esm', pos: [-407, 2075, -518], where: "Markarth's abandoned house (the talking altar)" },
   ];
   const prayNear = () => { wallClock += 61 * 60000; virtual += 1000000; const said = say('pray'); return { said, w: out.widgets.find((x) => x && x.nonce), log: out.logs.join(' | ') }; };
   nearM = Infinity;
@@ -1093,6 +1099,13 @@ console.log('pick prayers:');
     res = m.w ? playC(m) : { log: '', events: [] };
     check('...and it is held, its rest kept on the statue', verdictOf(res.log) === 'held' && res.events.length === 1 && restOf(idOf(st.ref)) > wallClock, res.log);
   }
+  // At Bruma's shrine of the Princes, Clavicus Vile's statue stands 9 m from Meridia's: 2 m from his, toward hers, is inside
+  // both their reaches (6 m and 8 m), and the nearer statue is the one prayed at
+  props.set(ACTOR + '|worldOrCellDesc', 'a764b:BSHeartland.esm'); props.set(ACTOR + '|pos', [94609, 193438, 2329]);
+  props.set(ACTOR + '|private.dboDeity', { id: 'clavicusvile', name: 'Clavicus Vile', kind: 'daedra', at: wallClock - 30 * 86400000 });
+  const both = prayNear();
+  check("where Clavicus Vile's and Meridia's reach overlap at Bruma, /pray is at the nearer statue (his)", !!both.w && /Clavicus Vile/.test(String(both.w.deity)), both.said + ' | ' + both.log);
+  if (both.w) playC(both);
 }
 
 Date.now = realNow;
