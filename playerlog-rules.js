@@ -2053,7 +2053,7 @@ staffenchant.js STAFF 9a94a0c4 clean
 staffitemspells.js STAFF 899023ba clean
 staffitemspells.js STAFF a2632566 clean
 staffitemspells.js STAFF fb0bc2f8 clean
-staffitemspells.js STAFF bc1fa213 clean
+staffitemspells.js STAFF c19f6b27 clean
 staffitemspells.js STAFF 949ee421 clean
 staffguard.js STAFFREF 793dd536 clean
 staffguard.js STAFFGUARD 486826c9 clean
