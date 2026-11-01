@@ -280,7 +280,12 @@ run('hagraven', LEAD, 'stage witch 3 looks off');
 ok(inv(WITCH, FCROWN) === 0 && !given.length && !calls('EquipItem', `801:${L}`).length, 'visual off: no crown given, a held one taken back');
 run('hagraven', LEAD, 'revoke witch looks off');
 // The plugin not in the load order: the descs resolve to nothing, and nothing is called or given
-loaded(false); loadB(LCFG); H = loadH(LCFG);
+const inertLines = () => logs.filter((t) => /not in the load order; the crowns and Crow Bringer stay inert/.test(t));
+ok(!inertLines().length, 'the plugin loaded: no inert line');
+loaded(false); delete globalThis.__dboHagravenUnresolved; logs.length = 0; loadB(LCFG); H = loadH(LCFG);
+ok(inertLines().length === 1 && [`800:${L}`, `801:${L}`, `802:${L}`].every((d) => inertLines()[0].includes(d)), 'not loaded: one log line names all three', inertLines());
+loadB(LCFG); H = loadH(LCFG);
+ok(inertLines().length === 1, 'a hot reload does not say it again');
 run('hagraven', LEAD, 'grant witch unloaded');
 fresh(); holding();
 run('hagraven', LEAD, 'stage witch 3 unloaded');

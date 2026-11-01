@@ -418,6 +418,13 @@ module.exports = (api) => {
     return personal(a, 'Usage: /hagraven [status] | pact | confirm | form | cure; staff: grant|revoke <name> <reason> | stage <name> <1-3> <reason> | list');
   }, { help: 'the Hagraven pact: [status] | pact (at a Hagraven altar) | confirm | form (a Hagraven: the body, and back) | cure (at Kynareth); staff: grant | revoke | stage | list' });
 
+  // The looks and Crow Bringer are inert until DBO_HagravenLooks.esp is in the load order (restart B): said once per server
+  // process and desc, not on every hot reload
+  if (!(globalThis.__dboHagravenUnresolved instanceof Set)) globalThis.__dboHagravenUnresolved = new Set();
+  const looksDescs = [...[1, 2, 3].map((k) => String((C.visual && C.visual.stages && C.visual.stages[k]) || '')), C.crowsSpell].filter(Boolean);
+  const unresolved = looksDescs.filter((d) => !idOf(d) && !globalThis.__dboHagravenUnresolved.has(d));
+  for (const d of unresolved) globalThis.__dboHagravenUnresolved.add(d);
+  if (unresolved.length) log(`hagraven: ${unresolved.join(', ')} not in the load order; the crowns and Crow Bringer stay inert until it is`);
   log(`hagraven: ${C.enabled ? 'on' : 'off'}, stages at ${(C.stageHours || []).join('/')} h, exempt from known-on-sight: ${(C.knownOnSightExemptHolds || []).join(', ') || 'none'}; the body ${C.form.enabled === false ? 'off' : `on (${C.form.cooldownSeconds} s between changes, polymorph hook ${fn('__dboPolymorphAs') ? 'present' : 'absent'})`}`);
   return { pactRefusal, pact, confirm, cure, tick, advance, witnessed, become, end, stageOf, form, takeForm, leaveForm, inForm, formTick, formBreak, C };
 };
