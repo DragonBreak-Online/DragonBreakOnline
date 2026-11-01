@@ -72,6 +72,8 @@ export const NATIVE_CAPS = [
   "native:studyMagic",
   // the class and sermon lecterns (schools.js makeLectern): dbo_lectern
   "native:classLectern",
+  // Worker 6's bank (dbo_bank, widget 48: the account, treasuries and the vault). All its keys are dbo:bank*
+  "native:bank",
 ];
 export const CAPS_RETRY_MS = 5000;
 
