@@ -7,6 +7,7 @@ import { ChatService } from "./chatService";
 import { KeybindsService } from "./keybindsService";
 import { FovService } from "./fovService";
 import { MouseFreeService } from "./mouseFreeService";
+import { NativeHudService } from "./nativeHudService";
 import {
   Json, PAGE_MESSAGE, PEER_OPS, SCALES, captureOf, cleanChat, cleanUi, cleanVoice, keyNamesFor, micLevelJs, pageActJs, pageQueryJs,
   pageSyncJs, readChat, readUi, withChat, withUi,
@@ -153,6 +154,8 @@ export class SettingsNativeService extends ClientListener {
     const next = change(file);
     if (!next) return;
     chat.saveSettingsFile(next.file);
+    // The native HUD rereads only on a save it hears of; the page's save never comes for this one
+    this.service(NativeHudService, (h) => h.settingsSaved(next.file));
     this.page(pageSyncJs(next.file, next.chat));
     this.push();
   }
