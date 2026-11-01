@@ -78,6 +78,11 @@ require(path.join(SERVER, 'guards.js'))({ mp, log: () => {}, personal: () => {},
   registerChatCommand: () => {}, zoneOfActor: G.zoneOfActor, zoneById });
 ok(typeof globalThis.__dboRealmTerritoryAt === 'function', 'realm.js publishes its territory lookup');
 ok(typeof globalThis.__dboHoldHere === 'function', 'guards.js publishes the hold it reads (holdHere) for the temple code');
+// A player's own /unstuck goes to the nearest town first (Nat, 31 Oct, 24c4f8c65); the temple stays its fallback where the
+// world has no town marker, and the staff move. The cases below test the temple, so the finder is off until its own section
+const townFinder = globalThis.__dboUnstuckTown;
+ok(typeof townFinder === 'function', 'gamemode.js publishes the nearest-town finder /unstuck asks first');
+globalThis.__dboUnstuckTown = () => null;
 
 const T = (z) => G.templeFor(z);
 const same = (loc, t) => !!loc && !!t && loc.cellOrWorldDesc === t.world && JSON.stringify(loc.pos) === JSON.stringify(t.pos);
@@ -198,6 +203,26 @@ ok(asToday(), 'a guards.js that throws changes nothing either');
 globalThis.__dboHoldHere = holdHere;
 stand(TAMRIEL, IVARSTEAD);
 ok(same(die(), T('riften')), 'with both back, Ivarstead is the Rift\'s again', nameOf(mp.get(A, 'spawnPoint')));
+
+console.log('-- a player\'s own /unstuck: the nearest town, the temple only where there is none (Nat, 31 Oct)');
+globalThis.__dboUnstuckTown = townFinder;
+const townAt = (name) => { const t = JSON.parse(fs.readFileSync(path.join(SERVER, 'territories.json'), 'utf8')).territories.find((x) => x.name === name); return t && t.marker; };
+const atTown = (loc, name) => { const m = townAt(name); return !!loc && !!m && loc.cellOrWorldDesc === m.world && JSON.stringify(loc.pos) === JSON.stringify(m.pos.slice(0, 3)); };
+stand(TAMRIEL, IVARSTEAD);
+u = unstick();
+ok(atTown(u.loc, 'Ivarstead') && /to Ivarstead$/.test(u.audit), '/unstuck at Ivarstead goes to Ivarstead itself', { to: u.loc, audit: u.audit });
+stand(TAMRIEL, [79476, -62330, -2000]); at('6ccbb:Skyrim.esm', [100, 200, -300]);
+u = unstick();
+ok(atTown(u.loc, 'Ivarstead'), '/unstuck in Shroud Hearth Barrow goes to the town nearest where they last stood outside (Ivarstead)', u.loc);
+stand(HEARTLAND, [54211, 204105, 7500]);
+u = unstick();
+ok(atTown(u.loc, 'Bruma'), '/unstuck in Bruma (Cyrodiil) goes to Bruma\'s marker', u.loc);
+stand(BLACKREACH, [10000, 20000, -3000]);
+u = unstick();
+ok(!!u.loc && / respawn$/.test(u.audit), 'Blackreach has no town marker: the temple, as before', u.audit);
+stand(TAMRIEL, IVARSTEAD); put(A, 'locationalData', null); audits.length = 0;
+stubs.unstuck(STAFF, 'Bear Bait');
+ok(same(mp.get(A, 'locationalData'), T('riften')), 'a staff /unstuck still goes to the temple (Riften from Ivarstead)', nameOf(mp.get(A, 'locationalData')));
 
 console.log(fails ? `\n${fails} check(s) FAILED` : '\nall checks passed');
 process.exit(fails ? 1 : 0);

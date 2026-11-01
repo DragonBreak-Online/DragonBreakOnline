@@ -1599,7 +1599,7 @@ module.exports = (api) => {
     }, true);
   };
   globalThis.__dboShrinePanel = (a, targetId, shrine) => {
-    if (!shrine || !RITE_SHRINES.has(shrine.id) || !shrineCaps.get(a >>> 0)) return false;
+    if (!shrine || !RITE_SHRINES.has(shrine.id) || !((typeof hasUiCap === 'function' && hasUiCap(a, 'shrinePanel')) || shrineCaps.get(a >>> 0))) return false;
     const st = { nonce: `${(a >>> 0).toString(16)}-${Date.now().toString(36)}`, targetId: targetId >>> 0, deity: shrine.id, name: shrine.name, shrineName: shrine.shrineName, at: Date.now(), confirming: false };
     shrinePanels.set(a >>> 0, st);
     // A rite chosen on an earlier panel is dropped with it; one said with /rite still waits for /rite confirm
@@ -2251,7 +2251,7 @@ module.exports = (api) => {
   const ASK = globalThis.__dboSuperAsk || (globalThis.__dboSuperAsk = { pending: new Map(), askedAt: new Map(), refused: new Map(), caps: new Map() });
   const refusedRecently = (a, t) => Date.now() - (ASK.refused.get(`${a >>> 0}:${t >>> 0}`) || 0) < Number(C.ask.refusedMinutes) * 60000;
   onUi('uiCaps', (a, args) => { ASK.caps.set(a >>> 0, new Set((args || []).map(String))); });
-  const canAnswer = (t) => { const c = ASK.caps.get(t >>> 0); return !!c && c.has('feedPrompt'); };
+  const canAnswer = (t) => { if (typeof hasUiCap === 'function' && hasUiCap(t, 'feedPrompt')) return true; const c = ASK.caps.get(t >>> 0); return !!c && c.has('feedPrompt'); };
   const canWash = (a) => canAnswer(a);
   // A person who could be asked: awake, not a beast, not a vampire (their blood is dead), not in a rite
   const askable = (a, t) => {

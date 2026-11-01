@@ -22,7 +22,7 @@ let fails = 0;
 const ok = (c, what, got) => { console.log(`${c ? 'ok  ' : 'FAIL'}  ${what}${c || got === undefined ? '' : '   ' + JSON.stringify(got)}`); if (!c) fails++; };
 const BANK = '130040:DragonBreak Online Edits.esp';
 const BRUMA = 'a764b:BSHeartland.esm';
-const JERALL_INN = '6c3d7:BSHeartland.esm';        // any BSHeartland interior
+const JERALL_INN = '6c3d7:BSHeartland.esm';        // any BSHeartland interior (fixture: verify-formids: ignore)
 const WHITERUN = '3c:Skyrim.esm';
 // The tree before the change, when git can show it; else the before-checks are skipped and the rest run new-only. A
 // before tree that already holds the change (BEFORE pointed at a later commit) is skipped the same way, and says so.
@@ -62,7 +62,7 @@ p = R.placeOf(BANK);
 ok(p.province === 'cyrodiil' && p.source === 'override', '...and after a hot reload over that state', p);
 ok(R.placeOf(BANK.toLowerCase()).province === 'cyrodiil', 'the key matches whatever case the desc comes in');
 ok(R.placeOf(JERALL_INN).province === 'cyrodiil' && R.placeOf(BRUMA).province === 'cyrodiil', 'Bruma itself and its other interiors are unchanged (Cyrodiil)');
-ok(R.placeOf('1f2c8:Skyrim.esm').province === 'skyrim' && R.placeOf('12345:DragonBreak Online Edits.esp').province === 'skyrim', 'Skyrim cells, and other interiors of the same plugin, are unchanged');
+ok(R.placeOf('1f2c8:Skyrim.esm').province === 'skyrim' && R.placeOf('12345:DragonBreak Online Edits.esp').province === 'skyrim', 'Skyrim cells, and other interiors of the same plugin, are unchanged'); // verify-formids: ignore (fixture id)
 Date.now = realNow;
 
 // ---- the zone: gamemode.js zoneOfActor ----
@@ -105,22 +105,19 @@ put(A, JERALL_INN, [0, 0, 0], null);
 ok(Z.zoneOfActor(A) === 'bruma', "Bruma's other interiors are unchanged (by their plugin)");
 put(A, WHITERUN, [20000, -10000, 0], null);
 ok(Z.zoneOfActor(A) === 'whiterun', 'a Tamriel position still goes to its nearest hold');
-put(A, '12345:DragonBreak Online Edits.esp', [0, 0, 0], { world: WHITERUN, pos: [20000, -10000, 0] });
+put(A, '12345:DragonBreak Online Edits.esp', [0, 0, 0], { world: WHITERUN, pos: [20000, -10000, 0] }); // verify-formids: ignore (fixture id)
 ok(Z.zoneOfActor(A) === 'whiterun', 'another interior of the same plugin still falls back to where you last stood outside');
 
 // ---- the doors ----
 const doors = JSON.parse(fs.readFileSync(path.join(SERVER, 'doors.json'), 'utf8')).doors;
 ok(doors['1300aa:DragonBreak Online Edits.esp'] === 'Bruma', 'the bank door inside reads "Bruma" (it leads out to Bruma)');
 ok(doors['1300d7:DragonBreak Online Edits.esp'] === 'Bank of Bruma', 'the bank door in Bruma reads "Bank of Bruma" (the cell\'s own name)');
-const oldDoors = before('doors.json');
-if (oldDoors) {
-  const o = JSON.parse(oldDoors).doors;
-  const added = Object.keys(doors).filter((k) => !(k in o));
-  // Names of existing doors may change later (door-names-harness.js owns them); the bank change added exactly its two
-  ok(['1300aa:DragonBreak Online Edits.esp', '1300d7:DragonBreak Online Edits.esp'].every((k) => added.includes(k)) && Object.keys(o).every((k) => k in doors), 'the bank change added its two doors to doors.json and removed none', { added: added.slice(0, 5) });
-}
+// (A diff of doors.json against the tree before the change was a point-in-time check of one commit; the two names above are
+// the lasting rule, and door-names-harness.js owns the rest of the file.)
 ok(JSON.parse(fs.readFileSync(path.join(SERVER, 'zone-cells.json'), 'utf8'))[BANK] === 'bruma', 'zone-cells.json gives the bank cell to Bruma');
-if (oldZones) ok(fs.readFileSync(path.join(SERVER, 'zones.json'), 'utf8') === oldZones, 'zones.json is unchanged since before the change (restart-only: the fork reads it at boot)');
+// The lasting rule behind the old "zones.json unchanged" check: the bank's zone lives in the hot-reloadable zone-cells.json, never in
+// zones.json, which the fork reads only at boot (a change there would need a restart)
+ok(!fs.readFileSync(path.join(SERVER, 'zones.json'), 'utf8').toLowerCase().includes(BANK.toLowerCase().split(':')[0] + ':dragonbreak online edits.esp'), 'zones.json does not place the bank cell (its zone comes from zone-cells.json, no restart needed)');
 // A zone-cells.json that is missing or broken leaves the old fallback, and says so
 fs.writeFileSync(path.join(dir, 'zone-cells.json'), '{ broken');
 const logs = [];

@@ -13,8 +13,9 @@ const idOf = (d) => ({ '10272e:Skyrim.esm': 0x10272e, '4c6d8:Skyrim.esm': 0x4c6d
 const glow = (o) => Object.assign({ customPacketType: 'dboGlow', refs: [1, 2], on: true }, o);
 
 const cfg = JSON.parse(fs.readFileSync(path.join(SERVER, 'gamemode-config.json'), 'utf8'));
-// On since 70b05810 (7 Oct, Nate: outlines on lootable containers in dungeons); the off path below is tested explicitly
-ok(cfg.glow && cfg.glow.membrane === true, 'gamemode-config ships with glow.membrane on', cfg.glow);
+// On from 70b05810 (7 Oct, Nate: outlines on lootable containers in dungeons), off again from 00d487a1 (10 Oct, a dungeon
+// FPS test, Nate); both paths are tested explicitly below, whatever ships
+ok(cfg.glow && cfg.glow.membrane === false, 'gamemode-config ships with glow.membrane off (00d487a1, the dungeon FPS test)', cfg.glow);
 ok(cfg.glow.shaders.loot === '10272e:Skyrim.esm' && cfg.glow.shaders.locked === '4c6d8:Skyrim.esm', 'the membrane shaders are ready to switch on: MG02WallShader for loot, TurnUnFXShader for locked', cfg.glow.shaders);
 
 // off: nothing changes
@@ -39,7 +40,7 @@ ok(/membrane shaders loot 10272e, locked 4c6d8/.test(f.state), 'on: the boot lin
 
 // a shader that is not in the load order: that kind keeps the client's default, and it says so
 const logs = [];
-f = make({ glow: { membrane: true, shaders: { loot: 'bad:Nowhere.esp', locked: '4c6d8:Skyrim.esm' } } }, idOf, (m) => logs.push(m));
+f = make({ glow: { membrane: true, shaders: { loot: 'bad:Nowhere.esp', locked: '4c6d8:Skyrim.esm' } } }, idOf, (m) => logs.push(m)); // verify-formids: ignore (deliberately not in the load order)
 ok(!('shader' in f(glow({ kind: 'loot' }))) && f(glow({ kind: 'locked' })).shader === 0x4c6d8, 'an unresolvable shader leaves only its kind to the client default');
 ok(logs.some((l) => /bad:Nowhere\.esp for loot is not in the load order/.test(l)), '...and is named in the log', logs);
 f = make({}, idOf);

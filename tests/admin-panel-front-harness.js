@@ -34,12 +34,16 @@ const players = [
 const data = (extra) => Object.assign({ players, locations: [], modes: [], events, admin: true, tier: 'leadgm', caps: { ban: false, spawn: true }, me: { a: 'ff000010' },
   mastery: { profession: null, label: '', rank: 0, rankName: '', hours: 0 }, bans: [] }, extra || {});
 
-// The panel opens on Debug; the rail is there for staff, with every tab
+// The rail's labels as drawn, top to bottom
+const railOf = (h) => (h.match(/class="admin-panel__railitem[^"]*">([^<]+)</g) || []).map((x) => x.replace(/.*>/, '').replace('<', ''));
+// The panel opens on Debug; staff with no tab list from the server see every tab the panel has, once each, Debug first
 let html = render(AdminPanel, { data: data() });
-check('the tabs are a left rail', /admin-panel__rail/.test(html) && !/admin-panel__tabs"/.test(html) && (html.match(/class="admin-panel__railitem/g) || []).length === 9, (html.match(/class="admin-panel__railitem/g) || []).length);
+const ALL = railOf(html);
+check('the tabs are a left rail', /admin-panel__rail/.test(html) && !/admin-panel__tabs"/.test(html) && ALL.length > 1, ALL);
+check('staff with no caps.tabs see every tab, once each, Debug first', ALL[0] === 'Debug' && new Set(ALL).size === ALL.length && ['Players', 'GM Calls', 'Modes'].every((l) => ALL.includes(l)), ALL);
 check('Debug shows no Acting on strip', !/Acting on/.test(text(html)));
 html = render(AdminPanel, { data: data({ admin: false }) });
-check('a player sees only Debug', (html.match(/class="admin-panel__railitem/g) || []).length === 1, text(html).slice(0, 200));
+check('a player sees only Debug', JSON.stringify(railOf(html)) === '["Debug"]', railOf(html));
 
 // The Players tab's care: the PlayerCare part, rendered as the Players tab would
 const detail = { skills: [], tierNames: [], tierHours: [], maxChosen: 3, schools: [
@@ -82,11 +86,19 @@ check('fuzzyFilter: empty text keeps the list as it is', fuzzyFilter(list, '  ',
 // A Trial GM (11 Oct): the server's caps.tabs and caps.actions decide what is drawn. A front from before it skips this part
 if (/allowedActions/.test(SRC)) {
   const trialCaps = { ban: false, spawn: false, trial: true, tabs: ['debug', 'players', 'modes'], actions: ['teleportTo', 'rename'] };
+  // The rule: Debug, the tabs the gamemode answers itself (GM Calls: gmcall.js checks each action's rights), and the tabs
+  // the server's caps.tabs names, in the panel's own order; anything else is hidden
+  const expect = (labels) => ALL.filter((l) => l === 'Debug' || (ALL.includes('GM Calls') && l === 'GM Calls') || labels.includes(l));
   html = render(AdminPanel, { data: data({ tier: 'trialgm', caps: trialCaps, mastery: null }) });
-  const rail = (html.match(/class="admin-panel__railitem[^"]*">([^<]+)</g) || []).map((x) => x.replace(/.*>/, '').replace('<', ''));
-  check('a Trial GM sees only the Debug, Players and Modes tabs', rail.join() === 'Debug,Players,Modes', rail);
+  check('a Trial GM sees Debug, GM Calls and the tabs caps.tabs names (Players, Modes), in the panel\'s order', JSON.stringify(railOf(html)) === JSON.stringify(expect(['Players', 'Modes'])), railOf(html));
+  html = render(AdminPanel, { data: data({ tier: 'trialgm', caps: Object.assign({}, trialCaps, { tabs: [] }), mastery: null }) });
+  check('...an empty caps.tabs leaves Debug and GM Calls only', JSON.stringify(railOf(html)) === JSON.stringify(expect([])), railOf(html));
+  html = render(AdminPanel, { data: data({ tier: 'trialgm', caps: Object.assign({}, trialCaps, { tabs: ['debug', 'players', 'no-such-tab'] }), mastery: null }) });
+  check('...a tab id the panel does not have is ignored', JSON.stringify(railOf(html)) === JSON.stringify(expect(['Players'])), railOf(html));
   html = render(AdminPanel, { data: data({ tier: 'leadgm' }) });
-  check('...staff without caps.tabs still see all nine', (html.match(/class="admin-panel__railitem/g) || []).length === 9);
+  check('...staff without caps.tabs still see every tab', JSON.stringify(railOf(html)) === JSON.stringify(ALL));
+  html = render(AdminPanel, { data: data({ admin: false, caps: trialCaps }) });
+  check('...and a player with a tab list still sees only Debug', JSON.stringify(railOf(html)) === '["Debug"]', railOf(html));
 } else {
   console.log('note  no Trial GM part to test: this front predates it');
 }

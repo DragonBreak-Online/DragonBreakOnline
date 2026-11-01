@@ -1,5 +1,19 @@
 [
   {
+    "title": "Chest outlines back in two dungeons",
+    "date": "2026-11-01",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Dungeons",
+        "items": [
+          "Treasure chests glow again in Bruma Caverns and Fort Cutpurse. The outline was switched off there for a performance test, which has ended."
+        ]
+      }
+    ]
+  },
+  {
     "title": "House Ravenwatch",
     "date": "2026-11-01",
     "version": "Server update",

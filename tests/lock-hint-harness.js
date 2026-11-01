@@ -10,7 +10,9 @@ const path = require('path');
 
 const src = fs.readFileSync(path.resolve(__dirname, '..', 'gamemode.js'), 'utf8');
 const a = src.indexOf('// A key holder walking through a locked property');
-const b = src.indexOf('// NPCs open doors but never close them', a);
+// The hint ends where the held-shut gates begin (heldClosedDoors, 31 Oct), else at the NPC door rule as before
+const held = src.indexOf('// Gates held shut', a), npcDoors = src.indexOf('// NPCs open doors but never close them', a);
+const b = held > a && (npcDoors < 0 || held < npcDoors) ? held : npcDoors;
 let failures = 0;
 const check = (name, ok, got) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${got !== undefined ? '   ' + JSON.stringify(got) : ''}`); if (!ok) failures++; };
 if (a < 0 || b < 0) { check('the locked-property hint is in gamemode.js', false); console.log('1 failure'); process.exit(1); }

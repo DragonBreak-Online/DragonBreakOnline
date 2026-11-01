@@ -4230,19 +4230,23 @@ const sendPacket = (a, payload) => {
 // lockpick: lockpick.js widget 46 (dbo:lockpickResult/lockpickAuto/lockpickCancel); the cap also makes it a tumbler lock
 // skinning: widget 33 (dbo:skinning/skinningCancel), the blade and the pick rounds as the browser draws them
 // reading: widget 30 (dbo:reading/readingCancel), the Scholar's candle and pick rounds as the browser draws them
+// contextMenu: every module's choice menu (beds, mines, repair, jail, salvage, duels, spells, ...; dbo_context, the X menu's
+// panel), each with its own events; only a focused one, since a CustomMenu takes the keys and an unfocused menu (a level-up
+// note, the alchemy list beside the lab) is shown while the player does something else
 const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_journal', deityPicker: 'dbo_deity', rite: 'dbo_rite', dungeonGate: 'dbo_dungeon', labour: 'dbo_labour', pigeon: 'dbo_pigeon', bank: 'dbo_bank',
   businessLedger: 'dbo_ledger', propertyMarket: 'dbo_market', keyRing: 'dbo_keyring', tomeShop: 'dbo_tomes',
   shrinePanel: 'dbo_shrine', courierHandover: 'dbo_courier', playerMenu: 'dbo_menu', spellbook: 'dbo_spellbook', studyMagic: 'dbo_study',
   classLectern: 'dbo_lectern', birthsignPicker: 'dbo_birthsign', lockpick: 'dbo_lockpick',
-  skinning: 'dbo_skinning', reading: 'dbo_reading' };
+  skinning: 'dbo_skinning', reading: 'dbo_reading', contextMenu: 'dbo_context' };
 // The client's custom menu takes a payload of at most this many characters (scaleformMenu.ts MAX_PAYLOAD_CHARS) and draws
 // a bigger one blank, so a widget past it (a staff player menu, a long ledger) goes to the browser instead
 const NATIVE_MAX_CHARS = 60000;
 // nativeOpen: actor -> the widget id on the custom menu; browserOpen: actor -> a widget of these types last sent to the browser
 const nativeState = () => { const p = globalThis.__dboPanelState || (globalThis.__dboPanelState = { caps: new Map(), nonces: new Map() }); if (!p.native) p.native = new Map(); if (!p.nativeOpen) p.nativeOpen = new Map(); if (!p.browserOpen) p.browserOpen = new Map(); return p; };
-const nativeSwfFor = (a, widget) => {
+const nativeSwfFor = (a, widget, focus) => {
   const swf = widget && NATIVE_SWF[widget.type];
   if (!swf || (widget.type === 'prayer' && widget.mode !== 'pick')) return '';
+  if (widget.type === 'contextMenu' && !focus) return '';
   const c = nativeState().native.get(a >>> 0);
   if (!c || !c.has('native:' + widget.type)) return '';
   // browser: 1 hands a native panel's typed input to the browser panel, until the module publishes it unmarked again
@@ -4254,12 +4258,14 @@ const nativeSwfFor = (a, widget) => {
 };
 // A widget that moves between the custom menu and the browser (the journal changing tab) closes where it was first
 const openWidget = (a, widget, focus) => {
-  const swf = nativeSwfFor(a, widget);
+  const swf = nativeSwfFor(a, widget, focus);
   const st = nativeState(), id = a >>> 0;
   if (swf) {
     if (st.browserOpen.get(id) === widget.id) { st.browserOpen.delete(id); sendPacket(a, { customPacketType: 'dboWidget', close: widget.id }); }
     st.nativeOpen.set(id, widget.id);
-    return sendPacket(a, { customPacketType: 'dboScaleform', swf, payload: widget, widget: widget.id });
+    // A menu that names no events (an inspect list) closes to the server's own close, not to the X menu's pa:close
+    const payload = widget.type === 'contextMenu' && !(widget.events && widget.events.close) ? Object.assign({}, widget, { events: Object.assign({ action: 'dbo:close' }, widget.events || {}, { close: 'dbo:close' }) }) : widget;
+    return sendPacket(a, { customPacketType: 'dboScaleform', swf, payload, widget: widget.id });
   }
   if (widget && NATIVE_SWF[widget.type]) {
     if (st.nativeOpen.get(id) === widget.id) { st.nativeOpen.delete(id); sendPacket(a, { customPacketType: 'dboScaleform', close: true }); focus = true; }
@@ -4460,11 +4466,19 @@ const panelSearchOnly = (a) => {
 };
 const panelOffered = (a) => new Set(panelTabsFor(a).flatMap((t) => t.entries.map((e) => e.name)).concat(panelSearchOnly(a).map((e) => e.name)));
 const panelState = globalThis.__dboPanelState || (globalThis.__dboPanelState = { caps: new Map(), nonces: new Map() });
-const hasPlayerMenu = (a) => { const c = panelState.caps.get(a >>> 0); return !!c && c.has('playerMenu'); };
+const hasPlayerMenu = (a) => hasUiCap(a, 'playerMenu');
 // Any other capability the client's UI named in dbo:uiCaps (hud UI_CAPS): lockpick.js asks for 'lockpickLocal' and
 // supernatural.js for 'riteJudge' before they issue a round the widget judges itself, since an older widget given one
 // would hang or be judged wrongly (DESIGN.md 3.2)
-const hasUiCap = (a, cap) => { const c = panelState.caps.get(a >>> 0), n = nativeState().native.get(a >>> 0); return (!!c && c.has(String(cap))) || (!!n && n.has(String(cap))); };
+// A native panel counts as the panel itself: a client that draws 'native:bank' draws the bank, so every module's gate
+// passes without the browser page's list (Worker 1, 1 Nov: the client announces its own caps in nativeCaps)
+const hasUiCap = (a, cap) => {
+  const c = panelState.caps.get(a >>> 0), n = nativeState().native.get(a >>> 0), k = String(cap);
+  return (!!c && c.has(k)) || (!!n && (n.has(k) || n.has('native:' + k)));
+};
+// Modules that keep their own uiCaps map ask this first (bank, business, couriers, keyring, spells, downed, robbery,
+// naming, dungeons, supernatural); it is set here, at load, before any of them can be asked
+globalThis.__dboHasUiCap = (a, cap) => hasUiCap(a, cap);
 const openPlayerMenu = (a, tab, search) => {
   const nonce = `${(a >>> 0).toString(16)}-${Date.now().toString(36)}`;
   panelState.nonces.set(a >>> 0, nonce);
@@ -4473,8 +4487,9 @@ const openPlayerMenu = (a, tab, search) => {
 };
 const closePlayerMenu = (a) => { panelState.nonces.delete(a >>> 0); closeWidget(a, PANEL_WIDGET_ID); };
 onUi('uiCaps', (a, args) => { panelState.caps.set(a >>> 0, new Set((args || []).map(String))); });
-// The client's native panels, kept apart from the browser's caps so neither list replaces the other
-onUi('nativeCaps', (a, args) => { nativeState().native.set(a >>> 0, new Set((args || []).map(String).filter((c) => c.startsWith('native:')))); });
+// The client's own caps: its native panels (native:*) and what the client does itself (dboIdle, beastBody, nightEye,
+// the client-judged rounds), kept apart from the browser's caps so neither list replaces the other
+onUi('nativeCaps', (a, args) => { nativeState().native.set(a >>> 0, new Set((args || []).map(String))); });
 onUi('close', (a, args, widgetId) => { for (const m of [nativeState().nativeOpen, nativeState().browserOpen]) if (m.get(a >>> 0) === widgetId) m.delete(a >>> 0); });
 onUi('menuOpen', (a, args) => {
   if (!hasPlayerMenu(a)) return;
@@ -9868,7 +9883,7 @@ try {
 try {
   const STAFFGUARD_JS = path.resolve('staffguard.js');
   delete require.cache[STAFFGUARD_JS];
-  require(STAFFGUARD_JS)({ mp, log, audit, who, display, personal, profileOf, tierOf, staffTierOf, isLeadStaff, staffCharOf, accountRankOf, rankRefusal: rankRefusalOf, authorRefusal: authorRefusalOf,
+  require(STAFFGUARD_JS)({ mp, log, audit, who, display, personal, profileOf, tierOf, staffTierOf, isLeadStaff, staffCharOf, accountRankOf, rankRefusal: rankRefusalOf, authorRefusal: authorRefusalOf, staffLog,
     findByName, offlineByTag, registerChatCommand, onlineActors, cfg });
 } catch (e) {
   log('staffguard.js failed to load:', e.stack || e.message);
@@ -10041,7 +10056,7 @@ try {
 try {
   const IDLES_JS = path.resolve('idles.js');
   delete require.cache[IDLES_JS];
-  require(IDLES_JS)({ mp, log, sendPacket, cfg, hasCap: (a, cap) => { const c = panelState.caps.get(a >>> 0); return !!c && c.has(cap); } });
+  require(IDLES_JS)({ mp, log, sendPacket, cfg, hasCap: (a, cap) => hasUiCap(a, cap) });
 } catch (e) { log('idles.js failed to load:', e.stack || e.message); globalThis.__dboInteractionIdle = null; globalThis.__dboChestHold = null; }
 
 // ---- X interaction menu, introductions, inspect, party invites, masks (server\playermenu.js) ---
@@ -10276,7 +10291,7 @@ try {
   const JOURNAL_JS = path.resolve('journal.js');
   delete require.cache[JOURNAL_JS];
   const journal = require(JOURNAL_JS)({ mp, log, display, nameOf, personal, openWidget, closeWidget, onUi, sendPacket, every, onlineActors, cfg, isAdmin,
-    skills: SKILLS_DEF.skills || [], hasCap: (a, cap) => { const c = panelState.caps.get(a >>> 0); return !!c && c.has(cap); } });
+    skills: SKILLS_DEF.skills || [], hasCap: (a, cap) => hasUiCap(a, cap) });
   // guilds.js: rank titles a leader writes pass the journal's prose filter
   globalThis.__dboProseProblem = journal && typeof journal.proseProblem === 'function' ? journal.proseProblem : null;
 } catch (e) { log('journal.js failed to load:', e.stack || e.message); globalThis.__dboJournalRequest = null; globalThis.__dboJournalFaction = null; globalThis.__dboProseProblem = null; }

@@ -187,7 +187,8 @@ ok(/globalThis\.__dboHonourLetter; if \(typeof h === 'function' && !circular\) h
 
 // Wiring and config
 const gm = fs.readFileSync(path.join(ROOT, 'gamemode.js'), 'utf8');
-ok(/require\(HERALDS_JS\)\(\{ mp, log, personal, system, registerChatCommand, onlineActors, profileOf, nameOf, zoneById, takeGold, depositToTreasury, every, audit, isAdmin, zoneOfActor, giveItem, GOLD_BASE, cfg \}\)/.test(gm), 'gamemode.js loads heralds.js');
+// holdOfActor since deece6d5 (stronghold zones, 1 Nov): a gathering counts the hold around a stronghold, not the ring
+ok(/require\(HERALDS_JS\)\(\{ mp, log, personal, system, registerChatCommand, onlineActors, profileOf, nameOf, zoneById, takeGold, depositToTreasury, every, audit, isAdmin, zoneOfActor, holdOfActor, giveItem, GOLD_BASE, cfg \}\)/.test(gm), 'gamemode.js loads heralds.js, with holdOfActor');
 ok(/globalThis\.__dboHeraldLogin\(a\)/.test(gm), '...and the login line runs it');
 const cfgFile = JSON.parse(fs.readFileSync(path.join(ROOT, 'gamemode-config.json'), 'utf8')).heralds || {};
 ok(cfgFile.enabled === true && cfgFile.fee === 50 && cfgFile.reminderMinutes === 30, 'gamemode-config.json heralds: on, 50 gold, reminder 30 min', cfgFile);

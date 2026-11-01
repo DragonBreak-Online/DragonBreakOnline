@@ -199,7 +199,7 @@ if (!J.JOURNAL_TABS || !J.JOURNAL_TABS.deity) {
   const far = render(Journal, { data: dData(deity({ choices: deity().choices.map((c) => (c.id === 'vaermina' ? Object.assign({}, c, { inBruma: 0, reachable: false }) : c)) })) });
   check('...a god with no shrine in reach is dimmed and says so (none is today: every god has one in Bruma or needs none)', /jdeity__row jdeity__row--far/.test(far) && /Vaermina.{0,30}no shrine within reach/.test(text(far)) && !/jdeity__row--far/.test(html));
   check('...the god shown first is your own, with its sphere, boon, shrines and law', /jdeity__title">Mara</.test(html) && /Boon/.test(t) && /2 shrines in Bruma\./.test(t) && /Lawful throughout the Empire\./.test(t));
-  check('...and your state: the days until you may turn again, the Turn button held', /You follow Mara\. You may turn to another god in 3 days\./.test(t) && /Mara is your god\./.test(t));
+  check('...and your state: you follow Mara, another faith in 3 days', /You follow Mara\./.test(t) && /\b3 days\./.test(t) && /Mara is your god\./.test(t), t.slice(t.indexOf('You follow'), t.indexOf('You follow') + 120));
   check('no native select anywhere on the tab', !/<select/.test(html));
   // Talos shown: a component state, so the page is rendered for a player whose god he is
   html = render(Journal, { data: dData(deity({ current: 'talos', daysLeft: 0, canChoose: true })) });
@@ -211,8 +211,33 @@ if (!J.JOURNAL_TABS || !J.JOURNAL_TABS.deity) {
   t = text(html);
   check('no god yet: the first choice is free, and the button reads Take', /Your first choice is free and needs no shrine\./.test(t) && /<button[^>]*journal__button--primary[^>]*>Take Akatosh</.test(html), (html.match(/<button[^>]*primary[^>]*>[^<]*/g) || []));
   check('a faith needs no shrine (its shrines line)', J.JOURNAL_TABS.deity && /kneel anywhere/.test(text(render(J.JOURNAL_TABS.deity.component, { section: deity({ choices: deity().choices.filter((c) => c.id === 'hist'), current: 'hist' }), sections: {}, nonce: 'd', busy: false, act: () => {}, openTab: () => {} }))));
-  const dsrc = FRONT_SRC('features/journal/tabs/DeityTab.tsx');
-  if (dsrc) check('Turn asks once more, then sends journalDeity with the god\'s id', /onClick=\{\(\) => setConfirm\(true\)\}/.test(dsrc) && /onClick=\{\(\) => act\('journalDeity', shown\.id\)\}/.test(dsrc));
+  // Clicks, with no DOM: the tab runs as a function inside a driver component, so its hooks are the driver's. A click is
+  // a state update made during render, which makes React render the driver again; each pass makes the next click.
+  const elementsOf = (n, out = []) => {
+    if (Array.isArray(n)) { n.forEach((c) => elementsOf(c, out)); return out; }
+    if (n && typeof n === 'object' && n.props) { out.push(n); elementsOf(n.props.children, out); }
+    return out;
+  };
+  const textOf = (n) => (Array.isArray(n) ? n.map(textOf).join('') : n && typeof n === 'object' && n.props ? textOf(n.props.children) : n == null || typeof n === 'boolean' ? '' : String(n));
+  const button = (tree, re) => elementsOf(tree).find((e) => e.type === 'button' && re.test(textOf(e.props.children)));
+  const clicks = (section, steps) => {
+    const sent = [], seen = [];
+    let i = 0;
+    const Driver = () => {
+      const tree = J.JOURNAL_TABS.deity.component({ section, sections: {}, nonce: 'd', busy: false, act: (...a) => sent.push(a), openTab: () => {} });
+      if (i < steps.length) { const step = steps[i++]; seen.push(step(tree, sent.slice())); }
+      return tree;
+    };
+    return { html: render(Driver, {}), sent, seen };
+  };
+  const pickAkatosh = (tree) => { const row = elementsOf(tree).find((e) => typeof e.props.onPick === 'function'); if (row) row.props.onPick('akatosh'); return !!row; };
+  const pressTurn = (tree) => { const b = button(tree, /^Turn to Akatosh$/); if (b && !b.props.disabled) b.props.onClick(); return b ? (b.props.disabled ? 'held' : 'pressed') : 'none'; };
+  let run = clicks(deity({ daysLeft: 0, canChoose: true }), [pickAkatosh, pressTurn, (tree, sent) => ({ asks: /Leave Mara for Akatosh\?/.test(textOf(tree)), sentBefore: sent.length, yes: pressTurn(tree) })]);
+  const asked = run.seen[2] || {}; // no third pass: the second press changed nothing on the page
+  check('Turn to another god asks once more and sends nothing until the second press', run.seen[1] === 'pressed' && asked.asks === true && asked.sentBefore === 0, { seen: run.seen, sent: run.sent });
+  check('...then sends journalDeity with the god\'s id', asked.yes === 'pressed' &&JSON.stringify(run.sent) === JSON.stringify([['journalDeity', 'akatosh']]), run.sent);
+  run = clicks(deity({ daysLeft: 3 }), [pickAkatosh, pressTurn]);
+  check('while the wait runs the Turn button is held and sends nothing', run.seen[1] === 'held' && !run.sent.length && /You may turn again in 3 days/.test(run.html), run.seen);
 }
 
 // ---- the Settings tab (piece H3; General and Voice come with H4 and H5) ----------------------------------------------

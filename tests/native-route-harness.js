@@ -24,7 +24,10 @@ const A = 0xff000001, B = 0xff000002;
 openWidget(A, { type: 'decor', id: 171, nonce: 'x' }, true);
 ok(last().customPacketType === 'dboWidget', 'without nativeCaps the browser widget is sent', last());
 setCaps(A, ['native:decor', 'native:prayer', 'bank']);
-ok(nativeState().native.get(A).has('native:decor') && !nativeState().native.get(A).has('bank'), 'nativeCaps keeps only native: names');
+// The client's own caps ride along since B1 (Worker 1, 1 Nov): kept, but a bare name routes nothing (nativeSwfFor asks native:<type>)
+ok(nativeState().native.get(A).has('native:decor') && nativeState().native.get(A).has('bank'), "nativeCaps keeps the native panels and the client's own caps");
+openWidget(A, { type: 'bank', id: 48, nonce: 'b' }, true);
+ok(last().customPacketType === 'dboWidget', 'a bare bank cap does not route the bank native (no native:bank)', last());
 openWidget(A, { type: 'decor', id: 171, nonce: 'x' }, true);
 ok(last().customPacketType === 'dboScaleform' && last().swf === 'dbo_decor' && last().widget === 171 && last().payload.nonce === 'x', 'with it, dboScaleform carries the swf, the widget id and the payload', last());
 openWidget(A, { type: 'prayer', id: 35, nonce: 'p' }, true);
@@ -165,6 +168,24 @@ ok(last().customPacketType === 'dboScaleform', 'a small player menu goes native'
 openWidget(BIG, { type: 'playerMenu', id: 52, nonce: 'm', tabs: [{ key: 'staff', title: 'Staff', hints: [], entries: [{ name: 'x', label: 'X', desc: 'y'.repeat(60001) }] }] });
 ok(last().customPacketType === 'dboWidget', 'one past the custom menu\'s limit goes to the browser', last());
 ok(sent.slice(-2).some((s) => s[1].customPacketType === 'dboScaleform' && s[1].close === true), '...and the custom menu it was in is closed', sent.slice(-3));
+
+// ---- the modules' choice menus on dbo_context (Worker 1, 1 Nov) ----
+const CTX = 0xff000003;
+setCaps(CTX, ['native:contextMenu']);
+const salvage = { type: 'contextMenu', id: 120, mode: 'menu', targetName: 'Smelter', actions: [{ id: 'a', label: 'Iron Ingot' }], events: { action: 'dbo:salvageChoose', close: 'dbo:salvageClose' } };
+openWidget(CTX, salvage, true);
+ok(last().customPacketType === 'dboScaleform' && last().swf === 'dbo_context' && last().widget === 120 && last().payload.events.action === 'dbo:salvageChoose' && last().payload.events.close === 'dbo:salvageClose',
+  'a focused choice menu goes to dbo_context with its own events', last());
+openWidget(CTX, Object.assign({}, salvage, { id: 121 }), false);
+ok(last().customPacketType === 'dboWidget' && last().widget.id === 121, 'an unfocused one (a level-up note, a list beside a lab) stays a browser panel', last());
+openWidget(A, Object.assign({}, salvage, { id: 122 }), true);
+ok(last().customPacketType === 'dboWidget', 'a client without native:contextMenu gets the browser menu', last());
+const inspect = { type: 'contextMenu', id: 123, mode: 'inspect', targetName: 'You can brew', lines: ['x'] };
+openWidget(CTX, inspect, true);
+ok(last().customPacketType === 'dboScaleform' && ((last().payload || {}).events || {}).close === 'dbo:close' && !inspect.events,
+  'a menu that names no events closes to the server\'s dbo:close, not the X menu\'s pa:close (and the module\'s object is untouched)', last().payload && last().payload.events);
+closeWidget(CTX, 123);
+ok(last().customPacketType === 'dboScaleform' && last().close === true, 'its module\'s closeWidget closes the custom menu', last());
 
 console.log(fails ? `\n${fails} failed` : '\nall passed');
 process.exit(fails ? 1 : 0);

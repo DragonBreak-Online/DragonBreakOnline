@@ -463,6 +463,7 @@ excluded('DECOR', 'cost JSON; off until Nat switches it on');
 // character, is logged by supernatural.js's own PERMADEATH line
 excluded('VAMPATH', 'reasons can name a GM; the drain\'s permadeath logs as PERMADEATH');
 excluded('KINDGUARD', 'the kind guard (guilds.js kindSweep): why a cured or turned character left a clan or pack; the leave itself is the parsed FACTION line');
+excluded('FACTION-PURGE', 'a Lead GM emptying a faction (guilds.js /faction purge): its reason is free text; each member\'s leave is the parsed FACTION line kickMember writes');
 // CIRCULAR (gamemode.js /circular, 31 Oct): the officer, the faction and counts; the letters themselves log as letters
 clean_('CIRCULAR');
 // MUSTER (heralds.js, 31 Oct): a faction's muster pay, the faction and counts only
@@ -1773,6 +1774,7 @@ guilds.js FACTION-RANK 77565f59 excluded
 guilds.js FACTION-MERGE 03cc2a6a excluded
 guilds.js FACTION-MERGE 2062ec33 excluded
 guilds.js FACTION-MERGE 18bb5af2 excluded
+guilds.js FACTION-PURGE 88f1e2eb excluded
 guilds.js KINDGUARD 5eaac980 excluded
 jail.js JAIL 9a6540c2 clean
 jail.js JAIL 9a6540c2 clean
@@ -2050,6 +2052,7 @@ staffguard.js STAFFREF 793dd536 clean
 staffguard.js STAFFGUARD 486826c9 clean
 staffguard.js STAFFCHAR 25cceb6f clean
 staffguard.js STAFFREF 44dc317b clean
+staffguard.js STAFFREF 2cf22f19 clean
 stafftools.js EVENT 90e88695 excluded
 struggle.js STRUGGLE-MISMATCH c97bbac2 clean
 struggle.js STRUGGLE 4292b3ed clean

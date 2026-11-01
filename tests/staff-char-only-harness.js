@@ -150,7 +150,7 @@ const cut = (from, to) => { const a = src.indexOf(from), b = src.indexOf(to, a +
 
 // ---- wiring ----
 check('gamemode.js loads staffguard.js with the rank helpers (and the rank and record-author rules for panel bans and unbans, 25 Oct), and drops its globals when the load fails',
-  /require\(STAFFGUARD_JS\)\(\{ mp, log, audit, who, display, personal, profileOf, tierOf, staffTierOf, isLeadStaff, staffCharOf, accountRankOf, rankRefusal: rankRefusalOf, authorRefusal: authorRefusalOf,\s*findByName, offlineByTag, registerChatCommand, onlineActors, cfg \}\)/.test(src)
+  /require\(STAFFGUARD_JS\)\(\{ mp, log, audit, who, display, personal, profileOf, tierOf, staffTierOf, isLeadStaff, staffCharOf, accountRankOf, rankRefusal: rankRefusalOf, authorRefusal: authorRefusalOf, staffLog,\s*findByName, offlineByTag, registerChatCommand, onlineActors, cfg \}\)/.test(src)
   && /for \(const k of \['__dboStaffGuard', '__dboAdminGate', '__dboStaffCharSet', '__dboIsStaffCharacter'\]\) delete globalThis\[k\]/.test(src));
 check('gamemode.js: a staff member on another character is told at login that staff powers are off there', /else if \(staffTierOf\(a\)\) \{ try \{ const g = staffGuard\(\); if \(g && !g\.powersOn\(a\)\) personal\(a, `This is not your staff character/.test(src));
 check('gamemode.js: the journal\'s command route asks the rules too', /if \(r && r\.refuse\) return \[r\.refuse\];/.test(src));

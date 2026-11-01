@@ -30,6 +30,9 @@
 const fs = require('fs');
 const path = require('path');
 
+// The client's caps as gamemode.js keeps them (hasUiCap: the browser's list, the client's own, native:<panel> for the panel),
+// or this module's own uiCaps map (either one: a harness or an older gamemode.js may keep only one of them)
+const uiCap = (a, cap, own) => (typeof globalThis.__dboHasUiCap === 'function' && globalThis.__dboHasUiCap(a, cap)) || ((own && own.get(a >>> 0)) || new Set()).has(cap);
 module.exports = (api) => {
   const { mp, log, personal, audit, who, display, cfg, openWidget, closeWidget, onUi, registerChatCommand, onlineActors,
     profileOf, findByName, takeGold, giveGold, depositToTreasury, zoneOfActor, zoneById, ranksOf, distanceMeters, isAdmin } = api;
@@ -676,9 +679,9 @@ module.exports = (api) => {
   // ---- the ledger's panel (front businessLedger, widget 64) -------------------------------------------
   const caps = S.caps instanceof Map ? S.caps : (S.caps = new Map());
   onUi('uiCaps', (a, args) => { caps.set(a >>> 0, new Set((args || []).map(String))); });
-  const hasPanel = (a) => (caps.get(a >>> 0) || new Set()).has('businessLedger');
+  const hasPanel = (a) => uiCap(a, 'businessLedger', caps);
   // A front whose ledger panel draws the shop's pages (front businessLedger with the Buy and Shop pages)
-  const hasShopPanel = (a) => (caps.get(a >>> 0) || new Set()).has('playerShop');
+  const hasShopPanel = (a) => uiCap(a, 'playerShop', caps);
   const panels = S.panels instanceof Map ? S.panels : (S.panels = new Map()); // actor -> { claim, nonce }
   const takings = (b, days) => { const since = Date.now() - days * 24 * HOUR; return (b.income || []).filter((e) => e.at >= since).reduce((n, e) => n + (Number(e.gold) || 0), 0); };
   const sendPanel = (a, claim, b, res) => {

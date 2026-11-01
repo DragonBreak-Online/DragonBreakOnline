@@ -48,6 +48,10 @@ module.exports = (api) => {
     commands: ['rename', 'faction', 'appoint', 'dismiss', 'citizenship', 'staffref'],
     // the kinds of staff action on another player that need one (the callers name the kind)
     kinds: ['rename', 'faction', 'office', 'citizenship'],
+    // kinds a Lead GM or above does on a short reason instead (reason: <why> in the command, or /staffref <player> reason:
+    // <why> for the panels), audited and sent to the staff log (Nat, 1 Nov: "allow Lead GMs to edit factions so they can add
+    // players etc."). A GM still needs the call or the ticket
+    leadExemptKinds: ['faction'],
   });
   const TRIAL = part('trialLimits', { enabled: true });
   const EXEMPT_TIERS = new Set(Array.isArray(RAW.exemptTiers) ? RAW.exemptTiers.map(String) : ['senior']);
@@ -61,6 +65,9 @@ module.exports = (api) => {
   const NOT_HERE = 'Staff powers work only on your staff character. GM calls, the admin chat and /bugs still reach you here.';
   const SELF_NO = 'Staff tools never act on your own characters. Ask another member of staff.';
   const REF_NO = 'This needs an open GM call or a ticket: add call:<n> or ticket:<id> to the command, take the player\'s GM call (/gm take <n>), or use /staffref first.';
+  const REASON_NO = 'Give a short reason: end the command with reason: <why> (or /staffref <player|#TAG> reason: <why> for the panels). A GM call or ticket works too.';
+  const LEAD_EXEMPT = new Set(Array.isArray(REF.leadExemptKinds) ? REF.leadExemptKinds.map(String) : []);
+  const staffLog = typeof api.staffLog === 'function' ? api.staffLog : null;
 
   const pidOf = (a) => { const p = Number(profileOf(a)); return Number.isSafeInteger(p) ? p : -1; };
   const exempt = (a) => { try { return EXEMPT_PROFILES.has(pidOf(a)) || EXEMPT_TIERS.has(String(tierOf(a))); } catch (e) { return false; } };
@@ -81,18 +88,21 @@ module.exports = (api) => {
     if (m[1].toLowerCase() === 'call') return /^\d+$/.test(m[2]) ? { kind: 'call', n: Number(m[2]) } : null;
     return /^[A-Za-z0-9_\-#./]+$/.test(m[2]) ? { kind: 'ticket', id: m[2] } : null;
   };
-  const refText = (r) => (r.kind === 'call' ? `GM call #${r.n}` : `ticket ${r.id}`);
+  const refText = (r) => (r.kind === 'call' ? `GM call #${r.n}` : r.kind === 'reason' ? `reason "${r.text}"` : `ticket ${r.id}`);
+  // "reason: <why>" and the rest of the line, as a Lead GM's reference ({ kind: 'reason', text }), or null
+  const REASON_RE = /(?:^|\s)reason:\s*(\S.*)$/i;
+  const parseReason = (line) => { const m = REASON_RE.exec(String(line || '')); return m ? { ref: { kind: 'reason', text: m[1].trim().slice(0, 200) }, at: m.index } : null; };
   // { text } for the reference this action runs under, { error } for a named call that is not open, null for none
   const refFor = (a, pt) => {
     const amb = S.ambient;
     if (amb && amb.a === (a >>> 0)) {
       if (amb.ref.kind === 'call' && !openCall(amb.ref.n)) return { error: `GM call #${amb.ref.n} is not open.` };
-      return { text: refText(amb.ref) };
+      return { text: refText(amb.ref), reason: amb.ref.kind === 'reason' };
     }
     const b = S.binds.get(`${pidOf(a)}:${pt}`);
     if (b && b.until > Date.now()) {
       if (b.ref.kind === 'call' && !openCall(b.ref.n)) S.binds.delete(`${pidOf(a)}:${pt}`);
-      else return { text: refText(b.ref) };
+      else return { text: refText(b.ref), reason: b.ref.kind === 'reason' };
     }
     const held = heldCallFor(a, pt);
     return held ? { text: `GM call #${held.n} (held)` } : null;
@@ -119,10 +129,15 @@ module.exports = (api) => {
     }
     const label = tActor ? who(tActor) : `profile ${pt}`;
     if (REF.enabled && Array.isArray(REF.kinds) && REF.kinds.includes(kind)) {
-      const r = refFor(a, pt);
-      if (!r) return REF_NO;
+      // A Lead GM's own reason stands for the call or ticket in a lead-exempt kind (faction); for anyone else, or any other
+      // kind, a reason is no reference at all
+      const leadOk = LEAD_EXEMPT.has(kind) && isLeadStaff(a);
+      let r = refFor(a, pt);
+      if (r && r.reason && !leadOk) r = null;
+      if (!r) return leadOk ? REASON_NO : REF_NO;
       if (r.error) return r.error;
       audit(`STAFFREF ${who(a)} ${kind} on ${label} under ${r.text}`);
+      if (r.reason && staffLog) { try { staffLog(display(a), staffTierOf(a), `${kind} (Lead GM, no ticket)`, `${who(a)}: ${kind} on ${label}, ${r.text}`); } catch (e) { log('staffguard: staff log failed', e.message); } }
     }
     if (staffAccount) audit(`STAFFGUARD ${who(a)} used a staff tool (${kind}) on the staff account of ${label}`);
     return '';
@@ -144,12 +159,22 @@ module.exports = (api) => {
     }
     if (!REF.enabled || !has(REF.commands, cmd, sub)) return null;
     let ref = null;
-    const words = String(body || '').split(/\s+/).filter((w) => { const r = parseRef(w); if (r && !ref) { ref = r; return false; } return !r; });
+    let line = String(body || '');
+    // reason: <why> to the end of the line, a Lead GM's reference (target decides whether it stands); never for /staffref,
+    // which reads its own reason: after the player
+    if (cmd !== 'staffref') { const pr = parseReason(line); if (pr) { ref = pr.ref; line = line.slice(0, pr.at); } }
+    const words = line.split(/\s+/).filter((w) => { const r = parseRef(w); if (r && !ref) { ref = r; return false; } return !r; });
     return ref ? { body: words.join(' '), ref } : null;
   };
   // The reference a command line carried, for the action it runs; the function returned puts the previous one back
   const enter = (a, ref) => { const prev = S.ambient; S.ambient = ref ? { a: a >>> 0, ref } : null; return () => { S.ambient = prev; }; };
   const withRef = (a, ref, fn) => { const end = enter(a, ref); try { return fn(); } finally { end(); } };
+  // /gm take, release or close <n> and the F7 GM Calls tab (gmcall.js): a Trial GM acts on no call another staff member
+  // holds. Taking one over made them its holder, after which goto and /tp passed and reached that player (1 Nov)
+  const callRefusal = (a, c, op) => {
+    if (!ON || !TRIAL.enabled || !trialOf(a) || exempt(a) || !c || !c.takenBy || Number(c.takenBy.profile) === pidOf(a)) return '';
+    return `GM call #${c.n} is held by ${c.takenBy.name}. A Trial GM does not ${op === 'take' ? 'take over' : op} a call another staff member holds.`;
+  };
   // /gm goto <n> (gmcall.js), before it moves anyone
   const gotoRefusal = (a, c) => {
     if (!ON) return '';
@@ -273,6 +298,17 @@ module.exports = (api) => {
     }, { admin: true, help: '[set|clear <name|#TAG>] | list | seed: mark the staff characters, where staff powers work (Lead GM+)' });
 
     registerChatCommand('staffref', (a, args) => {
+      // A Lead GM's reason for the panels: /staffref <player|#TAG> reason: <why>
+      const pr = parseReason(args);
+      if (pr) {
+        if (!isLeadStaff(a)) return personal(a, 'Only a Lead GM or above works on a reason; a GM needs the call or the ticket.');
+        const t = findChar(String(args).slice(0, pr.at).trim());
+        if (!t) return personal(a, 'Use /staffref <player|#TAG> reason: <why>');
+        const mins = Math.max(1, Number(REF.bindMinutes) || 60);
+        S.binds.set(`${pidOf(a)}:${pidOf(t)}`, { ref: pr.ref, until: Date.now() + mins * 60000 });
+        audit(`STAFFREF ${who(a)} works on ${who(t)} under ${refText(pr.ref)} for ${mins} minutes`);
+        return personal(a, `For ${mins} minutes your faction changes to ${display(t)}'s account run under ${refText(pr.ref)}. (A reason covers faction changes only; the rest still need the call or the ticket.)`);
+      }
       const words = String(args || '').trim().split(/\s+/).filter(Boolean);
       const amb = S.ambient && S.ambient.a === (a >>> 0) ? S.ambient.ref : null;
       const ref = amb || (words.length ? parseRef(words[0]) || parseRef(/^\d{1,6}$/.test(words[0]) ? `call:${words[0]}` : `ticket:${words[0]}`) : null);
@@ -292,7 +328,7 @@ module.exports = (api) => {
     }, { admin: true, help: '<call number|ticket id> <player|#TAG>: the GM call (a number of up to 6 digits) or ticket your staff changes to that player run under (faction, rank, office, rename, citizenship)' });
   }
 
-  const G = { powersOn, rightOk, command, enter, withRef, target, gotoRefusal, adminGate, setStaffChar, isStaffChar, exempt, NOT_HERE };
+  const G = { powersOn, rightOk, command, enter, withRef, target, gotoRefusal, callRefusal, adminGate, setStaffChar, isStaffChar, exempt, NOT_HERE };
   globalThis.__dboStaffGuard = G;
   globalThis.__dboAdminGate = adminGate;
   globalThis.__dboStaffCharSet = (a, t, on) => setStaffChar(Number(a) >>> 0, Number(t) >>> 0, on !== false);

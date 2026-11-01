@@ -102,13 +102,21 @@ check('no client source still uses the frame cap', !src(file('skymp5-client/src'
 const esbuildDir = [process.env.FORK_SERVER, FORK].filter(Boolean).map((f) => path.join(f, 'skymp5-server', 'node_modules', 'esbuild')).find((x) => fs.existsSync(x))
   || path.join(process.env.HOME, 'dragonbreak', 'fork', 'skymp5-server', 'node_modules', 'esbuild');
 const esbuild = require(esbuildDir);
+// The stub registers "tick" as well as "update". npcLifetimeRuntime increments its frame counter on the
+// engine's tick, and since deletes started going through the copy budget (dd355f0c) that counter is what
+// lets work out of the queue - copyWork.drain and copyBudget.take are both keyed on it. Registering only
+// "update" left the frame at 0 for ever, so nothing drained and every scenario here recorded no calls,
+// which read as the delete path being broken when it was the stub missing an engine hook. All six failures
+// in this harness had that single cause.
+// (Keep notes about the stub OUT here: the stub source below is a template literal, so a backtick or a
+// ${...} inside it breaks the harness.)
 const fakeSp = `
 const W = globalThis.__sdlwFakeWorld;
 const Game = { getFormEx: (id) => W.refs.get(id) || null, getPlayer: () => null };
 const ObjectReference = { from: (f) => f || null };
 const Actor = { from: (f) => (f && f.actor ? f : null) };
 const Ui = { isMenuOpen: (m) => { if (W.menuThrows) throw new Error('not in update'); return W.menus.has(m); } };
-const on = (ev, fn) => { if (ev === 'update') W.update.push(fn); };
+const on = (ev, fn) => { if (ev === 'update') W.update.push(fn); else if (ev === 'tick') W.tick.push(fn); };
 module.exports = { Game, ObjectReference, Actor, Ui, on, writeLogs: (_p, line) => W.log.push(line) };`;
 const stubPlugin = {
   name: 'stubs',
@@ -118,7 +126,7 @@ const stubPlugin = {
   },
 };
 (async () => {
-  const W = { refs: new Map(), update: [], log: [], calls: [], tasks: [], menus: new Set(), menuThrows: false };
+  const W = { refs: new Map(), update: [], tick: [], log: [], calls: [], tasks: [], menus: new Set(), menuThrows: false };
   globalThis.__sdlwFakeWorld = W;
   let clock = 1_790_000_000_000;
   Date.now = () => clock;
@@ -154,7 +162,7 @@ const stubPlugin = {
     W.refs.set(id, ref);
     return ref;
   };
-  const frame = (ms) => { clock += ms || 8; for (const t of W.tasks.splice(0)) t(); for (const fn of W.update) fn(); };
+  const frame = (ms) => { clock += ms || 8; for (const fn of W.tick) fn(); for (const t of W.tasks.splice(0)) t(); for (const fn of W.update) fn(); };
   const frames = (n, ms) => { for (let i = 0; i < n; i++) frame(ms); };
   const callsOn = (id, kind) => W.calls.filter((c) => c[1] === id && (!kind || c[0] === kind));
 

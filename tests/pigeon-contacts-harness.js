@@ -21,6 +21,7 @@ ok(!pigeonContactsOf(A).includes(D), 'one-way introduction (D to A only) is not 
 ok(pigeonContactsOf(C).includes(A), 'and it works from both sides');
 props.set(`${D}|ff_knownIds`, { marker: true });
 ok(pigeonContactsOf(D).length === 0, 'a staff real-names marker is not a list');
-ok(/!pigeonContactsOf\(a\)\.includes\(to >>> 0\)/.test(gm) && /for \(const id of pigeonContactsOf\(a\)\)/.test(gm), 'sendPigeon and the coop window both use it');
+// The coop window lists the contacts and, since the family pigeons, a character's kin beside them
+ok(/!pigeonContactsOf\(a\)\.includes\(to >>> 0\)/.test(gm) && /for \(const id of (new Set\()?pigeonContactsOf\(a\)/.test(gm), 'sendPigeon and the coop window both use it');
 console.log(fails ? `${fails} FAILED` : 'all passed');
 process.exit(fails ? 1 : 0);

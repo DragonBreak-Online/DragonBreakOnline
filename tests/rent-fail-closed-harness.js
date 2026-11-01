@@ -228,6 +228,9 @@ if (i >= 0 && j > i) {
     log: (...x) => logs.push(x.join(' ')), personal: (a, t) => told.push([a >>> 0, t]), system: () => {},
     profileOf: (a) => PROFILE[a] ?? -1, lastPickupDeny: new Map(), treasuryRefused: () => false, distanceMeters: () => 1,
     blockPlacedPickup: () => false, gateOf: () => null, TAMRIEL: '3c',
+    // joined the chain since (as in playtest-autodoor-reach-harness.js): placedGoldRefused (16 Oct); the court lever block's
+    // ZONES, officials and seat lookups (17 Oct)
+    placedGoldRefused: () => false, ZONES: { holds: [], regions: [] }, readOfficials: () => ({}), userOf: () => -1, isAdmin: () => false,
   };
   sb.globalThis = sb;
   const fcSrc = i >= 0 && j > i ? gm.slice(i, j + 2) : 'function businessFailClosed() { return false; }';
@@ -259,6 +262,10 @@ if (i >= 0 && j > i) {
   // The fork systems' chain (housing locks, mastery) throwing is theirs to decide: allowed as before, now logged
   sb.__dboPrevActivate = boom;
   ok(engine(DOORX, CUST) === true && logs.some((l) => /the systems chain threw/.test(l)), "the fork systems' chain throwing keeps the fork's own rule (allowed) and is logged", logs);
+  // A name the chain reaches for and this sandbox lacks throws ReferenceError inside it, which the chain then logs as a hook
+  // throwing: every check above would fail for the sandbox, not the code (1 Nov: placedGoldRefused). Say so by name instead
+  const missing = [...new Set(logs.map((l) => (/ReferenceError: (\w+) is not defined/.exec(l) || [])[1]).filter(Boolean))];
+  ok(!missing.length, 'the sandbox stands in for every name the chain reaches for (if not: add a stand-in to sb)', missing);
 }
 
 console.log(fails ? `${fails} FAILED` : 'all checks passed');

@@ -11,11 +11,14 @@ const { ROOT, CAST, load, call, check, done } = require('./lib/staffguard-fakes'
 const { OWNER, LEAD, GM, MIRA, MIRA_ALT, BOB } = Object.fromEntries(Object.entries(CAST).map(([k, v]) => [k, v.id]));
 
 const NEED = /^This needs an open GM call or a ticket/;
+// A Lead GM's faction change asks for a reason instead (leadExemptKinds; lead-gm-factions-1101): still refused without one
+const ASK = /^Give a short reason: end the command with reason: <why>/;
+const NEED_OF = (a, kind) => (a === LEAD && kind === 'faction' ? ASK : NEED);
 let f = load({});
 const G = f.G;
 
 for (const kind of ['rename', 'faction', 'office', 'citizenship']) {
-  check(`${kind} on a player without a reference is refused`, NEED.test(G.target(LEAD, MIRA, kind)), G.target(LEAD, MIRA, kind));
+  check(`${kind} on a player without a reference is refused`, NEED_OF(LEAD, kind).test(G.target(LEAD, MIRA, kind)), G.target(LEAD, MIRA, kind));
 }
 check('items, skills and appearance need no reference', ['items', 'skills', 'appearance', 'hall'].every((k) => G.target(LEAD, MIRA, k) === ''));
 check('nothing is audited for a refusal', f.audits.length === 0, f.audits);
@@ -30,7 +33,7 @@ f.audits.length = 0;
 check('the player\'s call held by the staff member is the reference', G.target(LEAD, MIRA, 'faction') === '');
 check('...for every character of that account (an offline alt too)', G.target(LEAD, MIRA_ALT, 'rename') === '');
 check('...and goes into the audit', /^STAFFREF GM Leda #LEAD \(profile 20\) faction on Mira #MIRA \(profile 50\) under GM call #5 \(held\)$/.test(f.audits[0] || ''), f.audits);
-check('...but not for another player', NEED.test(G.target(LEAD, BOB, 'faction')));
+check('...but not for another player', ASK.test(G.target(LEAD, BOB, 'faction')));
 
 // ---- call:<n> / ticket:<id> in the command ----
 f = load({});
@@ -60,7 +63,7 @@ const line = (a, cmd, body) => f.G.command(a, cmd, `${cmd} ${(body.split(/\s+/)[
   check('...audited', f.audits.some((l) => /^STAFFREF GM Gemma #GEMM \(profile 30\) works on Mira #MIRA \(profile 50\) under GM call #12 for 60 minutes$/.test(l)), f.audits);
   check('...and the F3 faction panel\'s change is allowed under it', f.G.target(GM, MIRA, 'faction') === '' && /faction on Mira #MIRA \(profile 50\) under GM call #12$/.test(f.audits.slice(-1)[0]));
   check('...for that account only', NEED.test(f.G.target(GM, BOB, 'faction')));
-  check('...and that staff member only', NEED.test(f.G.target(LEAD, MIRA, 'faction')));
+  check('...and that staff member only', ASK.test(f.G.target(LEAD, MIRA, 'faction')));
   globalThis.__dboGmCalls.open.length = 0;
   check('once the call closes, the binding ends', NEED.test(f.G.target(GM, MIRA, 'faction')));
   const t = f.run(GM, 'staffref 1561234 Bob');
