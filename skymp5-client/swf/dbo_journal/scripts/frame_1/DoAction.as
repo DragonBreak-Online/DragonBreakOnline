@@ -326,7 +326,9 @@ function build()
 
 _root.dboData = function(json)
 {
+   var t0 = getTimer();
    var p = dboParse(json);
+   var t1 = getTimer();
    if (p == null || p.hub != 1 || !(p.tabs instanceof Array) || p.nonce == undefined)
    {
       dboLog("journal: unreadable payload");
@@ -358,6 +360,7 @@ _root.dboData = function(json)
    data = p;
    tab = String(p.tab);
    draw();
+   dboLog("journal data " + String(json).length + "ch parse " + (t1 - t0) + "ms draw " + (getTimer() - t1) + "ms tab " + tab);
 };
 
 var keys = {};

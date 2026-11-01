@@ -235,6 +235,7 @@ function dboJson(v)
 
 var dboJsonSrc;
 var dboJsonAt;
+var dboJsonBs;
 
 function dboJsonWs()
 {
@@ -303,46 +304,56 @@ function dboJsonValue()
    }
    if (c == "\"")
    {
+      // Runs between escapes are taken whole with native indexOf and substring; the next backslash is found once
       var s = "";
       dboJsonAt++;
       while (dboJsonAt < dboJsonSrc.length)
       {
-         var ch = dboJsonSrc.charAt(dboJsonAt++);
-         if (ch == "\"")
+         if (dboJsonBs < dboJsonAt)
          {
+            dboJsonBs = dboJsonSrc.indexOf("\\", dboJsonAt);
+            if (dboJsonBs < 0)
+            {
+               dboJsonBs = dboJsonSrc.length;
+            }
+         }
+         var q = dboJsonSrc.indexOf("\"", dboJsonAt);
+         if (q < 0)
+         {
+            q = dboJsonSrc.length;
+         }
+         if (q <= dboJsonBs)
+         {
+            s += dboJsonSrc.substring(dboJsonAt, q);
+            dboJsonAt = q + 1;
             return s;
          }
-         if (ch == "\\")
+         s += dboJsonSrc.substring(dboJsonAt, dboJsonBs);
+         dboJsonAt = dboJsonBs + 1;
+         var esc = dboJsonSrc.charAt(dboJsonAt++);
+         if (esc == "n")
          {
-            var esc = dboJsonSrc.charAt(dboJsonAt++);
-            if (esc == "n")
-            {
-               s += "\n";
-            }
-            else if (esc == "t")
-            {
-               s += "\t";
-            }
-            else if (esc == "r")
-            {
-               s += "\r";
-            }
-            else if (esc == "b" || esc == "f")
-            {
-            }
-            else if (esc == "u")
-            {
-               s += String.fromCharCode(parseInt(dboJsonSrc.substr(dboJsonAt, 4), 16));
-               dboJsonAt += 4;
-            }
-            else
-            {
-               s += esc;
-            }
+            s += "\n";
+         }
+         else if (esc == "t")
+         {
+            s += "\t";
+         }
+         else if (esc == "r")
+         {
+            s += "\r";
+         }
+         else if (esc == "b" || esc == "f")
+         {
+         }
+         else if (esc == "u")
+         {
+            s += String.fromCharCode(parseInt(dboJsonSrc.substr(dboJsonAt, 4), 16));
+            dboJsonAt += 4;
          }
          else
          {
-            s += ch;
+            s += esc;
          }
       }
       return s;
@@ -374,6 +385,7 @@ function dboParse(s)
 {
    dboJsonSrc = String(s);
    dboJsonAt = 0;
+   dboJsonBs = -1;
    return dboJsonValue();
 }
 
