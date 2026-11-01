@@ -16,6 +16,9 @@
 // gamemode-config.json "robbery" (every key optional); enabled: false takes Rob off the menu.
 'use strict';
 
+// The client's caps as gamemode.js keeps them (hasUiCap: the browser's list, the client's own, native:<panel> for the panel),
+// or this module's own uiCaps map (either one: a harness or an older gamemode.js may keep only one of them)
+const uiCap = (a, cap, own) => (typeof globalThis.__dboHasUiCap === 'function' && globalThis.__dboHasUiCap(a, cap)) || ((own && own.get(a >>> 0)) || new Set()).has(cap);
 module.exports = (api) => {
   const { mp, log, personal, audit, who, onlineActors, recordOf, adminItemName, openWidget, closeWidget, onUi, sendPacket, every, cfg } = api;
   const C = Object.assign({
@@ -47,7 +50,7 @@ module.exports = (api) => {
   const sameParty = (a, t) => {
     try { const of = globalThis.__dboPartyLeaderOf; if (typeof of !== 'function') return false; const la = of(a); return la !== null && la !== undefined && la === of(t); } catch (e) { return false; }
   };
-  const hasPanel = (a) => { const c = S.caps.get(a >>> 0); return !!c && c.has('robPrompt'); };
+  const hasPanel = (a) => uiCap(a, 'robPrompt', S.caps);
   const within = (map, a, minutes) => Date.now() - (map.get(a >>> 0) || 0) < minutes * 60000;
   const contestBy = (robber, victim) => { const c = S.contests.get(victim >>> 0); return c && c.robber === (robber >>> 0) && Date.now() < c.until ? c : null; };
   const pendingFor = (a) => { for (const p of S.pending.values()) if (p.robber === (a >>> 0) || p.victim === (a >>> 0)) return p; return null; };

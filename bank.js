@@ -41,6 +41,9 @@
 const fs = require('fs');
 const path = require('path');
 
+// The client's caps as gamemode.js keeps them (hasUiCap: the browser's list, the client's own, native:<panel> for the panel),
+// or this module's own uiCaps map (either one: a harness or an older gamemode.js may keep only one of them)
+const uiCap = (a, cap, own) => (typeof globalThis.__dboHasUiCap === 'function' && globalThis.__dboHasUiCap(a, cap)) || ((own && own.get(a >>> 0)) || new Set()).has(cap);
 module.exports = (api) => {
   const { mp, log, personal, audit, who, cfg, openWidget, closeWidget, onUi, registerChatCommand, takeGold, giveItem,
     goldOf, depositToTreasury, zoneById, zoneList, zoneOfActor, ranksOf, profileOf, distanceMeters, every } = api;
@@ -1107,9 +1110,9 @@ module.exports = (api) => {
   }, { admin: true, help: '<name|#TAG> a character\'s vaults, read only; seized, restore <key> (Lead GM+)' });
 
   // ---- the panel and the chat bank -------------------------------------------------------------------------------------
-  const hasPanel = (a) => { const c = S.caps.get(a >>> 0); return !!c && c.has('bank'); };
+  const hasPanel = (a) => uiCap(a, 'bank', S.caps);
   // A panel that draws vaults says 'bankVault'; vaults are used only there, and any other client is told it needs the update
-  const hasVaultPanel = (a) => { const c = S.caps.get(a >>> 0); return !!c && c.has('bankVault'); };
+  const hasVaultPanel = (a) => uiCap(a, 'bankVault', S.caps);
   const vaultPanelOnly = 'Vaults for your goods open in the bank window, which needs the latest client update.';
   // While the vaults are closed, a holder still sees theirs (to pay and take out); nobody else is shown them
   const showVault = (a) => hasVaultPanel(a) && (V.enabled || Object.keys(vaultsOf(a)).length > 0);

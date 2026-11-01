@@ -725,10 +725,14 @@ module.exports = (api) => {
     return (Array.isArray(file.markers) ? file.markers : []).filter((m) => m && MAP_KIND[m.kind] && typeof m.desc === 'string' && m.name)
       .map((m) => ({ desc: m.desc, kind: MAP_KIND[m.kind], name: String(m.name) }));
   };
-  onUi('uiCaps', (a) => {
+  // The client is up when it names its caps: the browser page's (uiCaps) or the client's own (nativeCaps), so the
+  // markers come without the page
+  const sendMarkers = (a) => {
     const markers = mapMarkers();
     if (markers.length) sendPacket(a, { customPacketType: 'dboMapRealm', markers });
-  });
+  };
+  onUi('uiCaps', sendMarkers);
+  onUi('nativeCaps', sendMarkers);
 
   every('realm', C.tickMs, () => { try { tick(); } catch (e) { log('realm: tick failed', e.message); } });
   log(`realm loaded: ${territories().length} territories, ${live().length} war(s) under way, war ${C.enabled ? 'OPEN' : 'closed (war.enabled false)'}`);

@@ -42,6 +42,9 @@
 const fs = require('fs');
 const path = require('path');
 
+// The client's caps as gamemode.js keeps them (hasUiCap: the browser's list, the client's own, native:<panel> for the panel),
+// or this module's own uiCaps map (either one: a harness or an older gamemode.js may keep only one of them)
+const uiCap = (a, cap, own) => (typeof globalThis.__dboHasUiCap === 'function' && globalThis.__dboHasUiCap(a, cap)) || ((own && own.get(a >>> 0)) || new Set()).has(cap);
 module.exports = (api) => {
   const { mp, log, personal, audit, who, nameOf, tagOf, profileOf, discordOf, onlineActors, every, cfg, onUi, takeGold, giveItem,
     goldOf, GOLD_BASE, recordOf, depositToTreasury, zoneById, zoneList, boardZoneNear, metOf, isAdmin, registerChatCommand,
@@ -549,8 +552,7 @@ module.exports = (api) => {
     if (S.hand.has(t)) { personal(a, 'They are already being handed something.'); return true; }
     const h = { job: j.id, courier: a, recipient: t, nonce: `${a.toString(16)}-${t.toString(16)}-${Date.now().toString(36)}`, until: Date.now() + C.handoverSeconds * 1000,
       courierName: nameFor ? nameFor(t, a) : j.courierName };
-    const caps = S.caps.get(t);
-    if (!caps || !caps.has('courierHandover')) { finishHand(h, 'mailbox'); return true; }
+    if (!uiCap(t, 'courierHandover', S.caps)) { finishHand(h, 'mailbox'); return true; }
     S.hand.set(t, h);
     openWidget(t, { type: 'courierHandover', id: WIDGET_ID, mode: 'person', nonce: h.nonce, from: h.courierName, sender: j.senderName, goods: itemsText(j.items), seconds: C.handoverSeconds }, true);
     personal(a, `You offer ${nameFor ? nameFor(a, t) : j.recipientName} the parcel.`);
@@ -582,8 +584,7 @@ module.exports = (api) => {
         if (!here.length || distance(p, d.world, d.pos) > d.radius) continue;
         if (now - (S.dropAsked.get(`${a}:${d.id}`) || 0) < C.dropAskSeconds * 1000) continue;
         S.dropAsked.set(`${a}:${d.id}`, now);
-        const caps = S.caps.get(a >>> 0);
-        if (caps && caps.has('courierHandover')) askDrop(a, here, d);
+        if (uiCap(a, 'courierHandover', S.caps)) askDrop(a, here, d);
         else personal(a, `You stand at ${d.name}. Type /courier deliver to hand in the parcel.`);
       }
     }

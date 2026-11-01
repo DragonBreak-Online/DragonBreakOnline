@@ -41,6 +41,9 @@
 const fs = require('fs');
 const path = require('path');
 
+// The client's caps as gamemode.js keeps them (hasUiCap: the browser's list, the client's own, native:<panel> for the panel),
+// or this module's own uiCaps map (either one: a harness or an older gamemode.js may keep only one of them)
+const uiCap = (a, cap, own) => (typeof globalThis.__dboHasUiCap === 'function' && globalThis.__dboHasUiCap(a, cap)) || ((own && own.get(a >>> 0)) || new Set()).has(cap);
 module.exports = (api) => {
   const { mp, log, personal, system, audit, display, who, cfg, openWidget, closeWidget, onUi, registerChatCommand,
     onlineActors, distanceMeters, takeGold, giveItem, depositToTreasury } = api;
@@ -591,7 +594,7 @@ module.exports = (api) => {
   // widget opened with focus would leave an invisible panel holding the keys. An older client gets the book in chat.
   const caps = globalThis.__dboSpellbookCaps instanceof Map ? globalThis.__dboSpellbookCaps : (globalThis.__dboSpellbookCaps = new Map());
   onUi('uiCaps', (a, args) => { caps.set(a >>> 0, new Set((args || []).map(String))); });
-  const hasPanel = (a) => (caps.get(a >>> 0) || new Set()).has('spellbook');
+  const hasPanel = (a) => uiCap(a, 'spellbook', caps);
   const bookInChat = (a, result) => {
     const name = (id) => (classifySpell(id) || { name: descOf(id) }).name;
     const prep = preparedIds(a);
