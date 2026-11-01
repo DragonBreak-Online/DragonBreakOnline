@@ -1675,9 +1675,19 @@ module.exports = (api) => {
   // player frozen until a relog: /bug 2026-10-01 01:43, Plundered Mine). So a refusal there also steps the player back
   // onto the entrance's outside marker, which gives the load somewhere to land. Read from the door's own base record.
   const autoBase = globalThis.__dboAutoDoorBases instanceof Map ? globalThis.__dboAutoDoorBases : (globalThis.__dboAutoDoorBases = new Map());
+  // The door's base from its own plugin record (NAME), as housing's espmRefrFieldId reads XTEL: mp.get of a reference is a
+  // native load of it, hundreds of ms cold, and the census below did one per entrance door after every boot (11 s, 1 Nov
+  // profile). A reference no plugin places (a dynamic one) still asks the server
+  const baseOfRef = (refId) => {
+    try {
+      const r = mp.lookupEspmRecordById(refId >>> 0);
+      const f = r && r.record && String(r.record.type) === 'REFR' ? (r.record.fields || []).find((x) => x && x.type === 'NAME' && x.data && x.data.length >= 4) : null;
+      if (f && typeof r.toGlobalRecordId === 'function') return r.toGlobalRecordId((f.data[0] | (f.data[1] << 8) | (f.data[2] << 16) | (f.data[3] << 24)) >>> 0) >>> 0;
+    } catch (e) { /* not a plugin reference */ }
+    try { return mp.getIdFromDesc(String(mp.get(refId >>> 0, 'baseDesc') || '')) >>> 0; } catch (e) { return 0; }
+  };
   const isAutomaticDoor = (refId) => {
-    let base = 0;
-    try { base = mp.getIdFromDesc(String(mp.get(refId >>> 0, 'baseDesc') || '')) >>> 0; } catch (e) { return false; }
+    const base = baseOfRef(refId);
     if (!base) return false;
     if (!autoBase.has(base)) {
       let auto = false;
