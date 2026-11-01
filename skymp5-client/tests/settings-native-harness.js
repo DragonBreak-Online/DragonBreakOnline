@@ -98,6 +98,22 @@ const page = (extra) => {
   bad.run(L.pageActJs('voice', [{}]));
   check('...and a page without a voice manager is left alone', bad.calls.length === 0);
 
+  // ---- the native HUD follows a save made here, without a restart (W1's review) ----
+  {
+    const H = load('nativeHud');
+    const server = { stage: 'sated', gold: 10 };
+    const file0 = { fontSize: 16, ui: { vitals: 'always', vitalsStyle: 'classic' } };
+    const before = H.payloadOf(server, { h: 100, m: 100, s: 100 }, 'talk', false, H.uiFromFile(file0), H.newClock(0), 1000);
+    // what settingsNativeService saves for "Show the bars: Hidden", read as NativeHudService.settingsSaved reads it
+    const saved = L.withUi(file0, L.cleanUi({ vitals: 'hidden' }));
+    const after = H.payloadOf(server, { h: 100, m: 100, s: 100 }, 'talk', false, H.uiFromFile(saved), H.newClock(0), 1000);
+    check("Show the bars: Hidden, saved by the native journal, turns the HUD's bars off", before.bars.on === true && after.bars.on === false && after.corner.shown === false, { before: before.bars, after: after.bars });
+    const HUD = read('src/services/services/nativeHudService.ts');
+    check('NativeHudService.settingsSaved rereads the choice and forces a push', /public settingsSaved\(file: unknown\): void \{\s*this\.ui = uiFromFile\(file\);\s*this\.last = "";/.test(HUD));
+    check("...the page's own save goes through it too", /if \(key === "cef::chat:saveSettings"\) \{\s*try \{ this\.settingsSaved\(JSON\.parse/.test(HUD));
+    check("the native journal's save tells the HUD, with the file it wrote, right after writing it", /chat\.saveSettingsFile\(next\.file\);\s*(\/\/[^\n]*\n\s*)?this\.service\(NativeHudService, \(h\) => h\.settingsSaved\(next\.file\)\);/.test(read('src/services/services/settingsNativeService.ts')));
+  }
+
   // ---- the wiring ----
   const SVC = read('src/services/services/settingsNativeService.ts');
   const MENU = read('src/services/services/scaleformMenuService.ts');

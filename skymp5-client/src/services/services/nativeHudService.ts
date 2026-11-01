@@ -34,12 +34,17 @@ export class NativeHudService extends ClientListener {
     const key = e.arguments[0];
     // The page saved the F3 settings: read the Interface choice again
     if (key === "cef::chat:saveSettings") {
-      try { this.ui = uiFromFile(JSON.parse(String(e.arguments[1] ?? ""))); } catch { /* the file read next time */ }
-      this.last = "";
+      try { this.settingsSaved(JSON.parse(String(e.arguments[1] ?? ""))); } catch { this.last = ""; }
       return;
     }
     // The browser's voice manager: V held or let go (features/hud forwards its dbo:voicePtt)
     if (key === "dbo:voicePtt") { hudShared.talking = !!e.arguments[1]; return; }
+  }
+
+  // The F3 settings file as just saved, by the page or by the native journal's Settings (settingsNativeService)
+  public settingsSaved(file: unknown): void {
+    this.ui = uiFromFile(file);
+    this.last = "";
   }
 
   private readUi(): UiChoice {
