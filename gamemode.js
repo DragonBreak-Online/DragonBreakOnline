@@ -4230,19 +4230,23 @@ const sendPacket = (a, payload) => {
 // lockpick: lockpick.js widget 46 (dbo:lockpickResult/lockpickAuto/lockpickCancel); the cap also makes it a tumbler lock
 // skinning: widget 33 (dbo:skinning/skinningCancel), the blade and the pick rounds as the browser draws them
 // reading: widget 30 (dbo:reading/readingCancel), the Scholar's candle and pick rounds as the browser draws them
+// contextMenu: every module's choice menu (beds, mines, repair, jail, salvage, duels, spells, ...; dbo_context, the X menu's
+// panel), each with its own events; only a focused one, since a CustomMenu takes the keys and an unfocused menu (a level-up
+// note, the alchemy list beside the lab) is shown while the player does something else
 const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_journal', deityPicker: 'dbo_deity', rite: 'dbo_rite', dungeonGate: 'dbo_dungeon', labour: 'dbo_labour', pigeon: 'dbo_pigeon', bank: 'dbo_bank',
   businessLedger: 'dbo_ledger', propertyMarket: 'dbo_market', keyRing: 'dbo_keyring', tomeShop: 'dbo_tomes',
   shrinePanel: 'dbo_shrine', courierHandover: 'dbo_courier', playerMenu: 'dbo_menu', spellbook: 'dbo_spellbook', studyMagic: 'dbo_study',
   classLectern: 'dbo_lectern', birthsignPicker: 'dbo_birthsign', lockpick: 'dbo_lockpick',
-  skinning: 'dbo_skinning', reading: 'dbo_reading' };
+  skinning: 'dbo_skinning', reading: 'dbo_reading', contextMenu: 'dbo_context' };
 // The client's custom menu takes a payload of at most this many characters (scaleformMenu.ts MAX_PAYLOAD_CHARS) and draws
 // a bigger one blank, so a widget past it (a staff player menu, a long ledger) goes to the browser instead
 const NATIVE_MAX_CHARS = 60000;
 // nativeOpen: actor -> the widget id on the custom menu; browserOpen: actor -> a widget of these types last sent to the browser
 const nativeState = () => { const p = globalThis.__dboPanelState || (globalThis.__dboPanelState = { caps: new Map(), nonces: new Map() }); if (!p.native) p.native = new Map(); if (!p.nativeOpen) p.nativeOpen = new Map(); if (!p.browserOpen) p.browserOpen = new Map(); return p; };
-const nativeSwfFor = (a, widget) => {
+const nativeSwfFor = (a, widget, focus) => {
   const swf = widget && NATIVE_SWF[widget.type];
   if (!swf || (widget.type === 'prayer' && widget.mode !== 'pick')) return '';
+  if (widget.type === 'contextMenu' && !focus) return '';
   const c = nativeState().native.get(a >>> 0);
   if (!c || !c.has('native:' + widget.type)) return '';
   // browser: 1 hands a native panel's typed input to the browser panel, until the module publishes it unmarked again
@@ -4254,12 +4258,14 @@ const nativeSwfFor = (a, widget) => {
 };
 // A widget that moves between the custom menu and the browser (the journal changing tab) closes where it was first
 const openWidget = (a, widget, focus) => {
-  const swf = nativeSwfFor(a, widget);
+  const swf = nativeSwfFor(a, widget, focus);
   const st = nativeState(), id = a >>> 0;
   if (swf) {
     if (st.browserOpen.get(id) === widget.id) { st.browserOpen.delete(id); sendPacket(a, { customPacketType: 'dboWidget', close: widget.id }); }
     st.nativeOpen.set(id, widget.id);
-    return sendPacket(a, { customPacketType: 'dboScaleform', swf, payload: widget, widget: widget.id });
+    // A menu that names no events (an inspect list) closes to the server's own close, not to the X menu's pa:close
+    const payload = widget.type === 'contextMenu' && !(widget.events && widget.events.close) ? Object.assign({}, widget, { events: Object.assign({ action: 'dbo:close' }, widget.events || {}, { close: 'dbo:close' }) }) : widget;
+    return sendPacket(a, { customPacketType: 'dboScaleform', swf, payload, widget: widget.id });
   }
   if (widget && NATIVE_SWF[widget.type]) {
     if (st.nativeOpen.get(id) === widget.id) { st.nativeOpen.delete(id); sendPacket(a, { customPacketType: 'dboScaleform', close: true }); focus = true; }
