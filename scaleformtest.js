@@ -45,12 +45,25 @@ module.exports = (api) => {
       sendPacket(a, { customPacketType: 'dboScaleform', swf: 'dbo_mapprobe', payload: { paths: MAP_PATHS, waitMs: 6000 }, widget: 0 });
       return personal(a, 'Opening the map image probe: each line says whether that path loaded. Close it when every line has an answer.');
     }
+    // One-shot client probes, armed for the next chance (_work/itemcard-route-1031.md, _work/native-everything-1031.md)
+    if (sub === 'itemcard') {
+      sendPacket(a, { customPacketType: 'dboItemCardTest' });
+      return personal(a, 'Item card test armed for 10 minutes. Open your inventory and highlight an armour piece. Watch the line under the armour value: it should read "Tier 3 \u00b7 Medium \u00b7 Defense 30" in yellow for a second.');
+    }
+    if (sub === 'hud') {
+      sendPacket(a, { customPacketType: 'dboHudTest' });
+      return personal(a, 'HUD test armed. Stay in the world with no menu open. Two bars should show on the left of your screen for about ten seconds, aqua over amber: while they do, press a few keys, move the mouse and click once. Say which bars you saw.');
+    }
+    if (sub === 'fps') {
+      sendPacket(a, { customPacketType: 'dboScaleform', swf: 'dbo_fpsprobe', payload: { probe: 'fps', frames: 600 }, widget: 0 });
+      return personal(a, 'Opening the frame probe: leave it open about ten seconds while you press a few keys; it closes itself and reports.');
+    }
     if (sub === 'wide') return show(a, 'Width test', [new Array(12).fill('wide').join(' ')]);
     if (sub === 'many') return show(a, 'Row cap test', new Array(30).fill(0).map((_, i) => `row ${i + 1} of 30`));
     show(a, 'DBO test panel', ROWS);
     personal(a, 'Opening the test panel. It pauses the game; click Close to come back. /testmenu many and /testmenu wide are the other two.');
     log(`scaleform test panel opened by ${who(a)}`);
-  }, { admin: true, hidden: true, help: '[many|wide|map|mapmenu|ui|close] open the Scaleform test panel (hagtest2 client only)' });
+  }, { admin: true, hidden: true, help: '[many|wide|map|mapmenu|ui|itemcard|hud|fps|close] open the Scaleform test panel or arm a client probe' });
 
   // A row click. The panel sends "dbo:testRow" with [index] on the shared panel wire, so the client turns it
   // into the same { customPacketType: 'dbo', event, args, widget } packet a browser widget sends and it
@@ -81,6 +94,17 @@ module.exports = (api) => {
     log(`scaleform mapmenu test from ${who(a)}: ${text}`);
     if (isAdmin(a)) personal(a, `Map tests: ${text}`);
   });
+
+  // The item card, HUD overlay and frame probes' answers, as their clients send them
+  const report = (ev, label) => onUi(ev, (a, args) => {
+    const r = Array.isArray(args) && args[0] && typeof args[0] === 'object' ? args[0] : {};
+    const text = JSON.stringify(r).slice(0, 1500);
+    log(`scaleform ${label} from ${who(a)}: ${text}`);
+    if (isAdmin(a)) personal(a, `${label}: ${text}`);
+  });
+  report('itemCardTest', 'item card test');
+  report('hudTest', 'HUD test');
+  report('fpsProbe', 'frame probe');
 
   // The UI probe's answers: whether this game can type in a panel, what was typed, and whether the filters stayed
   onUi('uiProbe', (a, args) => {

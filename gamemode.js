@@ -4269,26 +4269,6 @@ const onUi = (event, fn) => {
   list.push(fn);
   globalThis.__dboUiEvents.set(event, list);
 };
-// /testmenu itemcard|mapmenu|hud (staff): arms a one-shot client probe for the next item menu, M map or HUD overlay (_work/itemcard-route-1031.md,
-// _work/mmap-build-1026.md); the client's findings come back as the UI events below, into the log and to the tester
-const MENU_TESTS = { itemcard: ['dboItemCardTest', 'Open your inventory and highlight an armour piece. Watch the line under the armour value: it should read "Tier 3 · Medium · Defense 30" in yellow for a second.'],
-  mapmenu: ['dboMapTest', 'Open the M map, keep it still for a moment, then pan it.'],
-  hud: ['dboHudTest', 'Stay in the world with no menu open. Two bars should show on the left of your screen for about ten seconds, aqua over amber: while they do, press a few keys, move the mouse and click once. Say which bars you saw.'] };
-registerChatCommand('testmenu', (a, args) => {
-  const t = MENU_TESTS[String(args || '').trim().toLowerCase()];
-  if (!t) return personal(a, `Usage: /testmenu ${Object.keys(MENU_TESTS).join('|')}`);
-  sendPacket(a, { customPacketType: t[0] });
-  personal(a, `Armed for 10 minutes. ${t[1]}`);
-}, { admin: true, help: 'Staff: arm a one-shot client menu probe (itemcard, mapmenu)' });
-// onUi's registry is rebuilt on every reload (globalThis.__dboUiEvents), so these never stack
-const menuTestReport = (ev) => (a, args) => {
-  const res = JSON.stringify((args || [])[0] || {}).slice(0, 1500);
-  log(`menu test ${ev} from ${display(a)}: ${res}`);
-  personal(a, `${ev}: ${res}`);
-};
-onUi('itemCardTest', menuTestReport('itemCardTest'));
-onUi('mapTest', menuTestReport('mapTest'));
-onUi('hudTest', menuTestReport('hudTest'));
 // ---- a name of its own before the world (server\naming.js), loaded here because it registers with onUi -------------
 // ---- /appearance: a player reopens the appearance editor for gold (server\appearance.js, config "appearance") ----
 try {
