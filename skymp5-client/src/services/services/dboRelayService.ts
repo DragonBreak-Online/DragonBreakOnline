@@ -14,6 +14,7 @@ import { PartyRow, hudShared } from "./nativeHud";
 import { SERVER_PROMPT_TYPES, clearPrompt, menuCard, serverPrompt, showPrompt } from "./nativePrompt";
 import { ScaleformMenuService } from "./scaleformMenuService";
 import { FAILED_KEY } from "./nativeWidgets";
+import { NativeMenuListService } from "./nativeMenuListService";
 
 const HUD_WIDGET_ID = 29;
 const PARTY_WIDGET_ID = 32;
@@ -270,6 +271,7 @@ export class DboRelayService extends ClientListener {
     const closeId = Number(content["close"]);
     if (Number.isFinite(closeId) && closeId > 0) {
       clearPrompt(closeId);
+      try { this.controller.lookupListener(NativeMenuListService).close(closeId); } catch (e) { /* not started */ }
       if (this.cardMenuId === closeId) { this.cardMenuId = 0; try { this.controller.lookupListener(ScaleformMenuService).closeNative("contextMenu"); } catch (e) { /* gone */ } }
       if (this.focusedId === closeId) { this.focusedId = 0; closeFormMenu(this.sp, closeId); }
       else closeWidget(this.sp, closeId);
@@ -290,6 +292,10 @@ export class DboRelayService extends ClientListener {
   // Downed, a vampire's feeding and a robbery go to the native HUD while it is up, answered with Y and N (nativePrompt.ts):
   // each answer is the packet the front's button sends, and a HUD that goes down hands the prompt back to the browser
   private nativePrompt(w: Record<string, unknown>, wid: number, focus: boolean): boolean {
+    // A list shown beside a game menu (alchemy's) is drawn inside that menu (NativeMenuListService), the browser's as a fallback
+    if (!focus && w["type"] === "contextMenu" && w["mode"] === "inspect") {
+      try { return this.controller.lookupListener(NativeMenuListService).offer(w, wid, () => refreshFormMenu(this.sp, this.browsersideWidgetSetter, { widget: w, id: wid })); } catch (e) { return false; }
+    }
     if (hudShared.nativeUp && !focus && w["type"] === "contextMenu") return this.menuCard(w, wid);
     if (!hudShared.nativeUp || SERVER_PROMPT_TYPES.indexOf(String(w["type"])) < 0) return false;
     const p = serverPrompt(w);
