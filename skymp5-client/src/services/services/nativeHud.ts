@@ -8,6 +8,7 @@ export interface HudServerState {
   hunger: number; stage: string; hungerOn: boolean; vitalsOn: boolean;
   gold?: number; goldOn?: boolean;
   racialPower?: { name: string; endsAt: number };
+  watermarkOn?: boolean;
 }
 export const hudShared: {
   server: HudServerState | null;
@@ -16,7 +17,33 @@ export const hudShared: {
   talking: boolean;
   // true while the native HUD is drawn: the browser HUD then leaves out its corner and bars
   nativeUp: boolean;
-} = { server: null, vitals: null, voiceMode: "", talking: false, nativeUp: false };
+  // the party list as DboRelayService builds it for the browser's party widget (null: no party and no companions)
+  party: { rows: PartyRow[]; self: number } | null;
+} = { server: null, vitals: null, voiceMode: "", talking: false, nativeUp: false, party: null };
+
+// One party row as the relay builds it: a member (server id) or an own summon or companion
+export interface PartyRow {
+  id: number; name: string; leader?: boolean; far?: boolean; dead?: boolean; health?: number;
+  summon?: boolean; leftSec?: number; staying?: boolean;
+}
+
+// The party as dbo_hud draws it, decided as the browser's features/party draws it: Party while a player is in it, else
+// Companions; a member's bar from its health, "far" when it is not loaded; a summon's stay tag and m:ss left. Passive: no
+// Leave button and no dragging in the HUD Menu (no cursor there), so leaving stays /leave
+export interface HudPartyRow { name: string; leader: boolean; self: boolean; dead: boolean; far: boolean; pct: number; tag: string; clock: string }
+export const partyOf = (party: { rows: PartyRow[]; self: number } | null): { title: string; rows: HudPartyRow[] } | null => {
+  if (!party || !Array.isArray(party.rows) || !party.rows.length) return null;
+  const clock = (sec: number): string => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+  return {
+    title: party.rows.some((r) => !r.summon) ? "Party" : "Companions",
+    rows: party.rows.map((r) => ({
+      name: String(r.name || "?"), leader: !!r.leader, self: r.id === party.self && !r.summon, dead: !!r.dead, far: !!r.far,
+      pct: Math.max(0, Math.min(100, Number(r.health) || 0)),
+      tag: r.summon && r.staying ? "stay" : "",
+      clock: r.summon && r.leftSec ? clock(Math.max(0, Math.floor(Number(r.leftSec)))) : "",
+    })),
+  };
+};
 
 export type VitalsMode = "always" | "fade" | "hidden";
 export type VitalsStyle = "classic" | "quiet";
@@ -61,6 +88,9 @@ export interface HudPayload {
   gold: number | null;
   hunger: { label: string; stage: string; fed: number } | null;
   voice: { mode: string; talking: boolean };
+  party: { title: string; rows: HudPartyRow[] } | null;
+  // the hourglass top right, unless the server switched it off (dboHud watermarkOn false)
+  watermark: boolean;
 }
 
 // The two change clocks the fade rules count from, kept between frames as the front's refs keep them
@@ -68,7 +98,7 @@ export interface HudClock { barsKey: string; barsAt: number; cornerKey: string; 
 export const newClock = (now: number): HudClock => ({ barsKey: "", barsAt: now, cornerKey: "", cornerAt: now });
 
 export const payloadOf = (server: HudServerState | null, vitals: { h: number; m: number; s: number } | null, voiceMode: string, talking: boolean,
-  ui: UiChoice, clock: HudClock, now: number): HudPayload | null => {
+  ui: UiChoice, clock: HudClock, now: number, party: { rows: PartyRow[]; self: number } | null = null): HudPayload | null => {
   if (!server) return null;
   const h = vitals ? pct(vitals.h) : 100, m = vitals ? pct(vitals.m) : 100, s = vitals ? pct(vitals.s) : 100;
   const barsKey = `${h}|${m}|${s}`;
@@ -90,6 +120,8 @@ export const payloadOf = (server: HudServerState | null, vitals: { h: number; m:
     gold,
     hunger: server.hungerOn !== false ? { label: STAGE_LABEL[stage] || String(server.stage || "") || "Well fed", stage: stage || "sated", fed: 100 - pct(server.hunger) } : null,
     voice: { mode, talking },
+    party: partyOf(party),
+    watermark: server.watermarkOn !== false,
   };
 };
 

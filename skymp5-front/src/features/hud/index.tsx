@@ -225,7 +225,7 @@ const Hud = ({ data }: { data: HudData }) => {
   const gold = Math.max(0, Math.round(Number(data.gold) || 0));
   return (
     <>
-      <Watermark on={data.watermarkOn !== false} />
+      <Watermark on={data.watermarkOn !== false && !data.native} />
       {data.native ? null : <Corner ui={ui} talking={talking} watch={`${stage}|${voice}|${data.goldOn !== false ? gold : ''}|${data.racialPower ? data.racialPower.endsAt : ''}`} stage={stage}>
         {data.racialPower && data.racialPower.name ? <PowerRow power={data.racialPower} /> : null}
         {data.goldOn !== false && data.gold !== undefined && (

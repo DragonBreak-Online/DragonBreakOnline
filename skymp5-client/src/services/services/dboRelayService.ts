@@ -10,7 +10,7 @@ import { Actor, BrowserMessageEvent, ButtonEvent, DxScanCode, InputDeviceType, M
 import { COMPANION_HUD_KEY } from "./companionService";
 import { remoteIdToLocalId } from "../../view/worldViewMisc";
 import { withClientUiCaps } from "../../lib/clientUiCaps";
-import { hudShared } from "./nativeHud";
+import { PartyRow, hudShared } from "./nativeHud";
 
 const HUD_WIDGET_ID = 29;
 const PARTY_WIDGET_ID = 32;
@@ -67,7 +67,7 @@ export class DboRelayService extends ClientListener {
     // The native HUD (NativeHudService) draws from the same fields the hud widget carries
     hudShared.server = this.hudData ? {
       hunger: Number(this.hudData["hunger"]) || 0, stage: String(this.hudData["stage"] || ""), hungerOn: this.hudData["hungerOn"] !== false,
-      vitalsOn: this.hudData["vitalsOn"] !== false, ...this.hudGold(), ...this.hudPower(),
+      vitalsOn: this.hudData["vitalsOn"] !== false, watermarkOn: this.hudData["watermarkOn"] !== false, ...this.hudGold(), ...this.hudPower(),
     } : null;
     // Vitals (health / magicka / stamina) are polled every frame and pushed immediately when they
     // change — combat makes them move fast and a 1 s lag feels broken.
@@ -171,7 +171,7 @@ export class DboRelayService extends ClientListener {
     const members = this.partyData && Array.isArray(this.partyData["members"]) ? this.partyData["members"] as Array<Record<string, unknown>> : [];
     // "none" marks the panel removed: a fresh dboParty resets the key to "" to force a redraw, so testing the key for
     // truth never removed the panel once a player left (party panel still up after leaving, 2026-09-25)
-    if (!members.length && !companions.length) { if (this.partyKey !== "none") { this.partyKey = "none"; this.removeWidget(PARTY_WIDGET_ID); } return; }
+    if (!members.length && !companions.length) { hudShared.party = null; if (this.partyKey !== "none") { this.partyKey = "none"; this.removeWidget(PARTY_WIDGET_ID); } return; }
     const selfId = this.partyData ? Number(this.partyData["self"]) || 0 : 0;
     const rows = members.map((m) => {
       const remoteId = Number(m["id"]) || 0;
@@ -192,6 +192,10 @@ export class DboRelayService extends ClientListener {
       rows.push(row);
     }
     const w = { type: "party", id: PARTY_WIDGET_ID, members: rows, self: this.partyData ? Number(this.partyData["self"]) || 0 : 0 };
+    // The native HUD draws the list while it is up (dbo_hud, nativeHud.ts partyOf), so the browser widget goes; a HUD that
+    // goes down brings it back on the next tick, since the key no longer matches
+    hudShared.party = { rows: rows as unknown as PartyRow[], self: w.self };
+    if (hudShared.nativeUp) { if (this.partyKey !== "native") { this.partyKey = "native"; this.removeWidget(PARTY_WIDGET_ID); } return; }
     const key = JSON.stringify(w);
     if (key === this.partyKey && now() - this.partySentAt < 5000) return;
     this.partyKey = key; this.partySentAt = now();

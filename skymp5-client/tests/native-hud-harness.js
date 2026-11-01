@@ -130,6 +130,49 @@ let threw = false;
 try { t.push({ bars: {} }); } catch (e) { threw = true; }
 check('an unreadable payload changes nothing', !threw && R.corner.gold.value.text === before && R.corner.gold._visible === true && R.corner.voice.hint.text === 'On air');
 
+// ---- the party list (Worker 1, 1 Nov: the browser's party panel into the HUD) ----
+const SELF = 0x10, ANA = 0x11;
+const crew = { self: SELF, rows: [{ id: SELF, name: 'Aela', leader: true, health: 80, far: false }, { id: ANA, name: 'Ana', health: 130, far: false, dead: true },
+  { id: 0x12, name: 'Bo', far: true }, { id: 0xff0001, name: 'Wolf', summon: true, staying: true, leftSec: 65, health: 40, far: false }] };
+const po = H.partyOf(crew);
+check('partyOf: none for no party and no companions', H.partyOf(null) === null && H.partyOf({ self: 1, rows: [] }) === null);
+check('partyOf: a party with players is titled Party; summons alone are Companions', po.title === 'Party' && H.partyOf({ self: 1, rows: [crew.rows[3]] }).title === 'Companions');
+check('partyOf: the leader, yourself, the dead and the far are marked, health clamped to 100',
+  po.rows[0].leader && po.rows[0].self && po.rows[0].pct === 80 && po.rows[1].dead && po.rows[1].pct === 100 && !po.rows[1].self && po.rows[2].far, po.rows);
+check('partyOf: a summon shows "stay" and its time left as m:ss', po.rows[3].tag === 'stay' && po.rows[3].clock === '1:05' && !po.rows[3].self && po.rows[0].clock === '' && po.rows[0].tag === '', po.rows[3]);
+const withParty = H.payloadOf({ hunger: 0, stage: 'sated', hungerOn: true, vitalsOn: true }, null, 'talk', false, H.UI_DEFAULTS, H.newClock(0), 0, crew);
+check('the payload carries the party, and none when there is none', JSON.stringify(withParty.party) === JSON.stringify(po)
+  && H.payloadOf({ hunger: 0, stage: 'sated', hungerOn: true, vitalsOn: true }, null, 'talk', false, H.UI_DEFAULTS, H.newClock(0), 0).party === null);
+const p2 = S.boot('dbo_hud', true);
+p2.push(pay({ party: null }));
+check('dbo_hud: no party, no list', p2.root.party._visible === false);
+p2.push(pay({ party: po }));
+const L = p2.root.party.list;
+check('dbo_hud: the list at the left, titled PARTY with its count', !!L && p2.root.party._visible === true && L.title.text === 'PARTY' && L.count.text === '4' && p2.root.party._x < 640, L && [L.title.text, L.count.text]);
+if (!L) T.done();
+check('...a row a member: names, the summon\'s tag and time, "far" for one not loaded',
+  L.r0.name.text === 'Aela' && L.r3.name.text === 'Wolf  stay' && L.r3.right.text === '1:05' && L.r2.right.text === 'far', [L.r0.name.text, L.r3.name.text, L.r3.right.text, L.r2.right.text]);
+check('...yourself in the accent colour, the dead dimmed', L.r0.name.textColor === 0x8FD3D0 && L.r1.name.textColor !== 0x8FD3D0 && L.r1._alpha === 45 && L.r0._alpha === 100);
+const barOf = (row) => { const f = row.fills[row.fills.length - 1]; return f ? Math.max(...f.pts.map((q) => q[0])) - Math.min(...f.pts.map((q) => q[0])) : -1; };
+check('...health bars to scale; no bar for the far one', barOf(L.r0) === Math.round(220 * 0.8) && barOf(L.r3) === Math.round(220 * 0.4) && !L.r2.fills.length, [barOf(L.r0), barOf(L.r3), L.r2.fills.length]);
+check('...the leader marked by a drawn diamond, not a character the game\'s font lacks', L.r0.fills.length > L.r3.fills.length && L.r0.name._x === 24 && L.r3.name._x === 10
+  && !/[^\x00-\x7f]/.test(fs.readFileSync(path.join(ROOT, 'swf', 'dbo_hud', 'scripts', 'frame_1', 'DoAction.as'), 'utf8')));
+p2.push(pay({ party: null }));
+check('dbo_hud: the list goes when the party does', p2.root.party._visible === false);
+
+// ---- the watermark: the browser's hourglass, top right ----
+const srv = { hunger: 0, stage: 'sated', hungerOn: true, vitalsOn: true };
+check('the payload carries the watermark unless the server switched it off', H.payloadOf(srv, null, 'talk', false, H.UI_DEFAULTS, H.newClock(0), 0).watermark === true
+  && H.payloadOf(Object.assign({}, srv, { watermarkOn: false }), null, 'talk', false, H.UI_DEFAULTS, H.newClock(0), 0).watermark === false);
+const w3 = S.boot('dbo_hud', true);
+check('dbo_hud: no watermark before the first data', !!w3.root.dboMark && w3.root.dboMark._visible === false);
+w3.push(pay({ watermark: true }));
+const pic = w3.root.dboMark && w3.root.dboMark.pic;
+check('dbo_hud: the hourglass top right at the browser\'s 62%, 2.4% down', w3.root.dboMark._visible === true && w3.root.dboMark._alpha === 62 && !!pic && /dbo-hourglass/.test(pic._image || '')
+  && pic._x > 1000 && Math.abs(pic._y - 720 * 0.024) < 1, pic && [pic._image, pic._x, pic._y]);
+w3.push(pay({ watermark: false }));
+check('...and gone when the server switches it off', w3.root.dboMark._visible === false);
+
 // ---- the wiring ----
 const src = (p2) => fs.readFileSync(path.join(ROOT, p2), 'utf8').replace(/\r\n/g, '\n');
 const relay = src('src/services/services/dboRelayService.ts');
@@ -137,7 +180,7 @@ check('the relay marks both hud widget builds native while the native HUD is up'
 check('...and leaves the native HUD the server\'s fields and the vitals', /hudShared\.server = this\.hudData \?/.test(relay) && /hudShared\.vitals = \{ h, m, s \};/.test(relay));
 check('the voice service leaves the range', /hudShared\.voiceMode = key;/.test(src('src/services/services/voiceService.ts')));
 check('the service is started', /new NativeHudService\(sp, controller\),/.test(src('src/index.ts')));
-check('the front leaves out its corner and bars while native, keeping the watermark', /\{data\.native \? null : <Corner/.test(front) && /\{data\.native \? null : <Vitals data=\{data\} ui=\{ui\} \/>\}/.test(front) && /<Watermark on=/.test(front));
+check('the front leaves out its corner, bars and watermark while native (dbo_hud draws them)', /\{data\.native \? null : <Corner/.test(front) && /\{data\.native \? null : <Vitals data=\{data\} ui=\{ui\} \/>\}/.test(front) && /<Watermark on=\{data\.watermarkOn !== false && !data\.native\} \/>/.test(front));
 check('...and forwards V to the client', /sendMessage\('dbo:voicePtt', on\)/.test(front));
 
 T.done();
