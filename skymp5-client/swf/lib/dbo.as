@@ -278,159 +278,171 @@ function dboJson(v)
    return "{" + parts.join(",") + "}";
 }
 
-var dboJsonSrc;
+// The reader never indexes into the whole payload. On 1 Nov Nat's F3 tabs still took 3.2 s (court, 46 KB) and 4.8 s
+// (faction, 60 KB) to parse after strings were read in runs, while deity (41 KB of long strings) took 1 s: the time
+// follows the charAt calls made deep into one long string, about 80 us each. So the payload is cut once at every quote
+// by native split, and charAt only ever reads the short pieces between strings (punctuation, numbers, true/false/null).
+var dboJsonKind; // per token: one of { } [ ] : , or "s" (a string) or "v" (a number, true, false or null)
+var dboJsonVal;
 var dboJsonAt;
-var dboJsonBs;
 
-function dboJsonWs()
+// A string's text with its escapes read; most strings have none and are returned as they are
+function dboJsonUnescape(s)
 {
-   while (dboJsonAt < dboJsonSrc.length)
+   var bs = s.indexOf("\\");
+   if (bs < 0)
    {
-      var c = dboJsonSrc.charAt(dboJsonAt);
-      if (c != " " && c != "\t" && c != "\n" && c != "\r")
+      return s;
+   }
+   var out = "";
+   var at = 0;
+   while (bs >= 0)
+   {
+      out += s.substring(at, bs);
+      var esc = s.charAt(bs + 1);
+      at = bs + 2;
+      if (esc == "n")
       {
-         return;
+         out += "\n";
       }
-      dboJsonAt++;
+      else if (esc == "t")
+      {
+         out += "\t";
+      }
+      else if (esc == "r")
+      {
+         out += "\r";
+      }
+      else if (esc == "b" || esc == "f")
+      {
+      }
+      else if (esc == "u")
+      {
+         out += String.fromCharCode(parseInt(s.substr(at, 4), 16));
+         at += 4;
+      }
+      else
+      {
+         out += esc;
+      }
+      bs = s.indexOf("\\", at);
+   }
+   return out + s.substring(at);
+}
+
+// Whether a piece cut at a quote ends inside an escape: an odd run of backslashes before that quote
+function dboJsonEscapedEnd(s)
+{
+   var n = 0;
+   var i = s.length - 1;
+   while (i >= 0 && s.charAt(i) == "\\")
+   {
+      n++;
+      i--;
+   }
+   return n % 2 == 1;
+}
+
+// One piece between strings: its punctuation and its bare values, as tokens
+function dboJsonPunct(p)
+{
+   var lit = "";
+   for (var i = 0; i <= p.length; i++)
+   {
+      var c = i < p.length ? p.charAt(i) : " ";
+      if (c == "{" || c == "}" || c == "[" || c == "]" || c == ":" || c == "," || c == " " || c == "\t" || c == "\n" || c == "\r")
+      {
+         if (lit.length)
+         {
+            dboJsonKind.push("v");
+            dboJsonVal.push(lit == "true" ? true : lit == "false" ? false : lit == "null" ? null : Number(lit));
+            lit = "";
+         }
+         if (c != " " && c != "\t" && c != "\n" && c != "\r")
+         {
+            dboJsonKind.push(c);
+            dboJsonVal.push(null);
+         }
+      }
+      else
+      {
+         lit += c;
+      }
    }
 }
 
 function dboJsonValue()
 {
-   dboJsonWs();
-   var c = dboJsonSrc.charAt(dboJsonAt);
-   if (c == "{")
+   var k = dboJsonKind[dboJsonAt];
+   var v = dboJsonVal[dboJsonAt];
+   dboJsonAt++;
+   if (k == "{")
    {
       var o = {};
-      dboJsonAt++;
-      dboJsonWs();
-      if (dboJsonSrc.charAt(dboJsonAt) == "}")
+      if (dboJsonKind[dboJsonAt] == "}")
       {
          dboJsonAt++;
          return o;
       }
-      while (dboJsonAt < dboJsonSrc.length)
+      while (dboJsonAt < dboJsonKind.length)
       {
-         dboJsonWs();
-         var key = dboJsonValue();
-         dboJsonWs();
-         dboJsonAt++;
+         var key = dboJsonVal[dboJsonAt];
+         dboJsonAt += 2;
          o[key] = dboJsonValue();
-         dboJsonWs();
-         var e = dboJsonSrc.charAt(dboJsonAt++);
-         if (e != ",")
+         if (dboJsonKind[dboJsonAt++] != ",")
          {
             return o;
          }
       }
       return o;
    }
-   if (c == "[")
+   if (k == "[")
    {
       var a = [];
-      dboJsonAt++;
-      dboJsonWs();
-      if (dboJsonSrc.charAt(dboJsonAt) == "]")
+      if (dboJsonKind[dboJsonAt] == "]")
       {
          dboJsonAt++;
          return a;
       }
-      while (dboJsonAt < dboJsonSrc.length)
+      while (dboJsonAt < dboJsonKind.length)
       {
          a.push(dboJsonValue());
-         dboJsonWs();
-         var e2 = dboJsonSrc.charAt(dboJsonAt++);
-         if (e2 != ",")
+         if (dboJsonKind[dboJsonAt++] != ",")
          {
             return a;
          }
       }
       return a;
    }
-   if (c == "\"")
-   {
-      // Runs between escapes are taken whole with native indexOf and substring; the next backslash is found once
-      var s = "";
-      dboJsonAt++;
-      while (dboJsonAt < dboJsonSrc.length)
-      {
-         if (dboJsonBs < dboJsonAt)
-         {
-            dboJsonBs = dboJsonSrc.indexOf("\\", dboJsonAt);
-            if (dboJsonBs < 0)
-            {
-               dboJsonBs = dboJsonSrc.length;
-            }
-         }
-         var q = dboJsonSrc.indexOf("\"", dboJsonAt);
-         if (q < 0)
-         {
-            q = dboJsonSrc.length;
-         }
-         if (q <= dboJsonBs)
-         {
-            s += dboJsonSrc.substring(dboJsonAt, q);
-            dboJsonAt = q + 1;
-            return s;
-         }
-         s += dboJsonSrc.substring(dboJsonAt, dboJsonBs);
-         dboJsonAt = dboJsonBs + 1;
-         var esc = dboJsonSrc.charAt(dboJsonAt++);
-         if (esc == "n")
-         {
-            s += "\n";
-         }
-         else if (esc == "t")
-         {
-            s += "\t";
-         }
-         else if (esc == "r")
-         {
-            s += "\r";
-         }
-         else if (esc == "b" || esc == "f")
-         {
-         }
-         else if (esc == "u")
-         {
-            s += String.fromCharCode(parseInt(dboJsonSrc.substr(dboJsonAt, 4), 16));
-            dboJsonAt += 4;
-         }
-         else
-         {
-            s += esc;
-         }
-      }
-      return s;
-   }
-   if (dboJsonSrc.substr(dboJsonAt, 4) == "true")
-   {
-      dboJsonAt += 4;
-      return true;
-   }
-   if (dboJsonSrc.substr(dboJsonAt, 5) == "false")
-   {
-      dboJsonAt += 5;
-      return false;
-   }
-   if (dboJsonSrc.substr(dboJsonAt, 4) == "null")
-   {
-      dboJsonAt += 4;
-      return null;
-   }
-   var start = dboJsonAt;
-   while (dboJsonAt < dboJsonSrc.length && "+-0123456789.eE".indexOf(dboJsonSrc.charAt(dboJsonAt)) >= 0)
-   {
-      dboJsonAt++;
-   }
-   return Number(dboJsonSrc.substring(start, dboJsonAt));
+   return v;
 }
 
 function dboParse(s)
 {
-   dboJsonSrc = String(s);
+   var parts = String(s).split("\"");
+   dboJsonKind = [];
+   dboJsonVal = [];
    dboJsonAt = 0;
-   dboJsonBs = -1;
+   var i = 0;
+   while (i < parts.length)
+   {
+      dboJsonPunct(parts[i]);
+      i++;
+      if (i >= parts.length)
+      {
+         break;
+      }
+      // a string: the pieces up to the quote that is not escaped
+      var str = parts[i];
+      while (dboJsonEscapedEnd(str) && i + 1 < parts.length)
+      {
+         i++;
+         str += "\"" + parts[i];
+      }
+      dboJsonKind.push("s");
+      dboJsonVal.push(dboJsonUnescape(str));
+      i++;
+   }
    return dboJsonValue();
 }
 
@@ -557,6 +569,30 @@ function dboInput(parent, name, depth, x, y, w, h, format, maxChars, multi)
    tf.backgroundColor = 0x101010;
    tf.border = true;
    tf.borderColor = 0x5A5A5A;
+   // Typed text must carry the box's own format. On 1 Nov Nat's typing came out as black boxes: the characters took the
+   // field's default format (black, a font the game's library does not have), not the one setNewTextFormat gave it.
+   // Callers set onChanged for their own use, so a keeper clip puts the format back on the frame the text changes.
+   tf.setTextFormat(format);
+   var keep = parent.createEmptyMovieClip(name + "_fmt", depth + 16000);
+   keep.box = tf;
+   keep.fmt = format;
+   keep.seen = String(tf.text);
+   keep.onEnterFrame = function()
+   {
+      // the box went with a redraw: nothing left to keep
+      if (this.box == undefined || this.box.text == undefined)
+      {
+         delete this.onEnterFrame;
+         return;
+      }
+      var now = String(this.box.text);
+      if (now != this.seen)
+      {
+         this.seen = now;
+         this.box.setTextFormat(this.fmt);
+         this.box.setNewTextFormat(this.fmt);
+      }
+   };
    Selection.setFocus(tf);
    // SKSE counts AllowTextInput (GameInput.cpp: true ++, false --), so a redraw must never take a second count
    if (!dboTyping && dboCanType())

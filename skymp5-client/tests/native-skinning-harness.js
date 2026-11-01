@@ -27,6 +27,13 @@ const run = (src, live) => {
   const real = fs.readFileSync(SRC_FILE, 'utf8');
   fs.writeFileSync(SRC_FILE, src);
   try {
+    // The reach window: a press 150 ms after the blade crossed the seam is clean with reachMs 200, a slip with none
+    for (const [reach, want] of [[200, /A clean line\./], [0, /The blade snags\./]]) {
+      const w = S.boot('dbo_skinning'); w.st.time = 1000;
+      w.push(blade({ reachMs: reach }));
+      at(w, onSeam(0.5, 1000) + 150); w.press(32);
+      c(want.test(w.root.dboPanel.lineTf.text), `a press 150 ms past the seam with reachMs ${reach} is ${reach ? 'clean' : 'a slip'}`, w.root.dboPanel.lineTf.text);
+    }
     let t = S.boot('dbo_skinning'); t.st.time = 1000;
     t.push(blade());
     c(/Two clean cuts free the pelt; the hide will bear one slip\./.test(t.root.dboPanel.lineTf.text), 'the opening line is the browser\'s', t.root.dboPanel.lineTf.text);

@@ -14,7 +14,7 @@ const sourceOf = (menu) => {
 const clip = (name) => {
   const c = { _name: name, _x: 0, _y: 0, _alpha: 100, _visible: true, kids: {} };
   c.createEmptyMovieClip = (n) => { if (c.kids[n]) delete c.kids[n]; const k = clip(n); k._parent = c; c[n] = k; c.kids[n] = k; return k; };
-  c.createTextField = (n, d, x, y, w, h) => { const t = { text: '', textColor: 0, _alpha: 100, _x: x || 0, _y: y || 0, _width: w || 0, _height: h || 0, setNewTextFormat(f) { this.fmt = f; this.textColor = f.color; } }; c[n] = t; c.kids[n] = t; };
+  c.createTextField = (n, d, x, y, w, h) => { const t = { text: '', textColor: 0, _alpha: 100, _x: x || 0, _y: y || 0, _width: w || 0, _height: h || 0, setNewTextFormat(f) { this.fmt = f; this.textColor = f.color; }, setTextFormat(f) { this.applied = f; } }; c[n] = t; c.kids[n] = t; };
   c.removeMovieClip = () => { if (c._parent) { delete c._parent[c._name]; delete c._parent.kids[c._name]; } };
   // fills are recorded so tests/native-render.js can draw the panel
   c.fills = [];
