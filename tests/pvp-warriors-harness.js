@@ -24,7 +24,7 @@ ok(W >= 1 && AR >= 1 && SH > 0 && SH < 1 && FULL > 0 && SE > 0 && SE <= 1, 'live
 const SRC_SECTION = cut('const pvpSourceMult = (src, beast) => {', '\n};\n') + '\n};\nreturn pvpSourceMult;';
 const SPELL_SECTION = cut('// The plate turns the flame', "// Alteration's Flesh spells") + '\nreturn { pvpShieldElementMult, pvpSpellArmourMult, isMagicSource };';
 ok(SRC_SECTION.length > 60 && SPELL_SECTION.length > 200, 'gamemode.js has the PvP source and spell sections');
-ok(/\* huntDamageMult\(agg, tgt\) \* pvp \* \(agg !== tgt && profileOf\(agg\) >= 0 && profileOf\(tgt\) >= 0 \? pvpSourceMult\(src, beastAgg\) : 1\);/.test(GM), 'the hit multiplies the source factor, between players only');
+ok(/\* huntDamageMult\(agg, tgt\) \* pvp \* \(agg !== tgt && profileOf\(agg\) >= 0 && profileOf\(tgt\) >= 0 \? pvpSourceMult\(src, beastAgg\) \* pvpArcheryMult\(agg, src, beastAgg\) : 1\);/.test(GM), 'the hit multiplies the source factor and the archery tier fix, between players only');
 ok(/\* gearResistMult\(tgt, src\) \* pvpSpellArmourMult\(agg, tgt, src\) \* pvpShieldElementMult\(agg, tgt, src, flags\);/.test(GM), 'the target side takes P1 and P2 (so racial.js reductionCap caps them with the rest)');
 ok(/const guardFacing = \(tgt, agg\) => blocking\(tgt\) && facing\(tgt, agg\);/.test(GE) && /spellbreakerMult, backstabMult, guardFacing,/.test(GE), 'gearench.js gives the guard as Spellbreaker reads it');
 ok(/log\(`pvp hit \$\{display\(agg\)\} -> \$\{display\(tgt\)\} kind=.* rank=\$\{skill\}:\$\{rank\} .*armour=.*shield=.*resist=.*\$\{sta\}`\)/.test(GM), 'one measurement line per PvP hit: kind, rank, armour, shield, resist, stamina on a power attack');
@@ -104,6 +104,35 @@ for (const [name, from, to] of MUTANTS) {
   const inSrc = SRC_SECTION.includes(from), inSpell = SPELL_SECTION.includes(from);
   if (!inSrc && !inSpell) { ok(false, `mutant "${name}": its line is in the sections`); continue; }
   let bad = 0; try { bad = scenarios(inSrc ? SRC_SECTION.replace(from, to) : SRC_SECTION, inSpell ? SPELL_SECTION.replace(from, to) : SPELL_SECTION, false); } catch (e) { bad = 1; }
+  ok(bad > 0, `mutant "${name}" is caught (${bad} failing)`);
+}
+// ---- the archery tier on the bow only (Nat, 31 Oct: archery felt too strong) ----
+const ARCH_SECTION = cut('const pvpArcheryMult = (agg, src, beast) => {', '\n};\n') + '\n};\nreturn pvpArcheryMult;';
+ok(ARCH_SECTION.length > 60, 'gamemode.js has the archery tier fix');
+ok(CFG.pvp.archeryTierOnBowOnly === true, 'live config: archeryTierOnBowOnly on');
+const archScenarios = (src, live) => {
+  let bad = 0;
+  const t = (c, what, got) => { if (!c) bad++; if (live) ok(c, what, got); };
+  // A Daedric bow (19) with Daedric arrows (24) at Master archery (x2): (19 + 24) x 2 = 86 before, 19 x 2 + 24 = 62 after
+  const run = (pvp, m, a, skill) => new Function('PVP', 'weaponSkillOf', 'masteryDamageMult', 'arrowDamageMult', src)(pvp, () => skill, () => m, () => a);
+  const A = 1 + 24 / 19;
+  const f = run({ archeryTierOnBowOnly: true }, 2, A, 'archery')(1, 0x12, false);
+  t(Math.abs(86 * f - 62) < 1e-9, 'Master archer, Daedric bow and arrows: 86 becomes 62 (the tier on the bow\'s 19 only)', 86 * f);
+  t(run({}, 1, A, 'archery')(1, 0x12, false) === 1, '...no tier, no change');
+  t(run({}, 2, 1, 'archery')(1, 0x12, false) === 1, '...no arrow counted, no change');
+  t(run({}, 2, A, 'blade')(1, 0x10, false) === 1, '...never a sword');
+  t(run({}, 2, A, 'archery')(1, 0x12, true) === 1, '...never a beast');
+  t(run({ archeryTierOnBowOnly: false }, 2, A, 'archery')(1, 0x12, false) === 1, '...and off with the config');
+  return bad;
+};
+archScenarios(ARCH_SECTION, true);
+for (const [name, from, to] of [
+  ['tier on the arrow too', 'return m > 1 && a > 1 ? (m + a - 1) / (m * a) : 1;', 'return 1;'],
+  ['config ignored', "PVP.archeryTierOnBowOnly === false || ", ''],
+  ['every skill', "|| weaponSkillOf(src) !== 'archery'", ''],
+]) {
+  if (!ARCH_SECTION.includes(from)) { ok(false, `mutant "${name}": its line is in the section`); continue; }
+  let bad = 0; try { bad = archScenarios(ARCH_SECTION.replace(from, to), false); } catch (e) { bad = 1; }
   ok(bad > 0, `mutant "${name}" is caught (${bad} failing)`);
 }
 console.log(fails ? `${fails} failed` : 'all passed');

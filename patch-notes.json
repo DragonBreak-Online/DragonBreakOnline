@@ -1,5 +1,21 @@
 [
   {
+    "title": "PvP: arrows from skilled archers hit a little less hard",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "Balance",
+    "sections": [
+      {
+        "heading": "Archery against other players",
+        "items": [
+          "Your Archery tier now strengthens the bow's own damage only, not the arrow's on top of it. Before, a Master archer doubled both, so one arrow could land far harder than a sword blow.",
+          "A Master archer with a Daedric bow and Daedric arrows now deals 62 before armour instead of 86. A beginner's arrows are unchanged.",
+          "Only player against player: against creatures and NPCs, archery is exactly as before."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Bandages",
     "date": "2026-10-31",
     "version": "Server update",
