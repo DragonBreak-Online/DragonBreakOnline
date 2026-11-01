@@ -734,6 +734,7 @@ module.exports = (api) => {
     notePost(a);
     saveNow();
     audit(`CONTRACT ${who(a)} posted ${c.count} ${plural(c.kind)} for ${zone.name} at ${c.reward} gold`);
+    try { if (typeof globalThis.__dboCourtBusiness === 'function') globalThis.__dboCourtBusiness(zone.id, 'contract'); } catch (e) { /* consequences.js is optional */ }
     return { text: `Posted: ${describe(c)}. The reward is set aside from the treasury; each hunter who takes it is paid from this week's budget for posted work.` };
   };
 
@@ -785,6 +786,7 @@ module.exports = (api) => {
     notePost(a);
     saveNow();
     audit(`CONTRACT ${who(a)} commissioned ${count} ${g.name} (${g.desc}) for ${zone.name} at ${price} gold each (${reward} held)`);
+    try { if (typeof globalThis.__dboCourtBusiness === 'function') globalThis.__dboCourtBusiness(zone.id, 'commission'); } catch (e) { /* consequences.js is optional */ }
     return { text: `Commission posted: ${count} ${g.name} at ${price} gold each for ${zone.name}. ${reward} gold is set aside; hunters and crafters hand them in at the board.` };
   };
   // A plain stack only (no name, enchantment, tempering or worn state) is taken: a commission buys the goods, not keepsakes
@@ -913,6 +915,7 @@ module.exports = (api) => {
     h.by = ownName(a); h.at = Date.now();
     saveNow();
     audit(`CONTRACT ${who(a)} set ${zone.name} ${what} ${args.join(' ')}: ${text}`);
+    try { if (typeof globalThis.__dboCourtBusiness === 'function') globalThis.__dboCourtBusiness(zone.id, 'contract terms'); } catch (e) { /* consequences.js is optional */ }
     refresh();
     return { text };
   };

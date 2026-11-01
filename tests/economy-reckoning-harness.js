@@ -137,6 +137,19 @@ check('only the leader forgives owed wages', /Only the leader/.test(replies[repl
 handlers.get('econForgive')(0x40, ['nonce', 'fighters-guild']);
 check('the leader forgives them, and it is audited', /Forgiven: 500/.test(replies[replies.length - 1].text) && !state().owed['fighters-guild'].a65 && audits.some((t) => /forgave 500 gold/.test(t)));
 
+// ---- the other courts' censure (consequences.js, phase 2): a share of a censured hold faction's week's tax goes unpaid ----
+globalThis.__dboHoldCensureShare = (f) => (f === 'fighters-guild' ? 0.25 : 0);
+props.set(`${0x20}|private.bankGold`, 5000);
+const beforeCensure = treasuries['fighters-guild'];
+now = SUNDAY + 8 * 7 * 86400000; tick();
+const rc = state().reports['fighters-guild'];
+check('censured: a quarter of the week\'s tax income leaves the treasury, audited', rc.income > 0 && rc.censure === Math.floor(rc.income * 0.25) && audits.some((t) => /tax withheld by the courts' censure/.test(t)), [rc.income, rc.censure, beforeCensure, treasuries['fighters-guild']]);
+check('...a faction not censured loses nothing', !state().reports['county-bruma'] || !state().reports['county-bruma'].censure, state().reports['county-bruma']);
+globalThis.__dboHoldCensureShare = () => 0;
+now = SUNDAY + 9 * 7 * 86400000; tick();
+check('...and once lifted, nothing is withheld', !state().reports['fighters-guild'].censure, state().reports['fighters-guild']);
+delete globalThis.__dboHoldCensureShare;
+
 // ---- guilds.js does not empty the rosters when the check itself is broken ----
 const saveGet = mp.get;
 mp.get = () => { throw new Error('everything fails'); };

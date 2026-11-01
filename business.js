@@ -904,6 +904,7 @@ module.exports = (api) => {
     taxes()[zone] = { rate, by: byName, at: Date.now(), log: ((t && t.log) || []).concat([entry]).slice(-50) };
     saveTaxes();
     audit(`TAX ${byWho} set ${zoneName(zone)} tax to ${Math.round(rate * 100)}% (was ${was}%)`);
+    try { if (typeof globalThis.__dboCourtBusiness === 'function') globalThis.__dboCourtBusiness(zone, 'tax'); } catch (e) { /* consequences.js is optional */ }
     return rate;
   };
   // Who may set it: the hold's taxRanks (Jarl, Count, Steward) and staff, from /tax, the Court tab and the faction panel

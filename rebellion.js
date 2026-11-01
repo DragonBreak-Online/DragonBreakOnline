@@ -154,9 +154,12 @@ module.exports = (api) => {
   const risingById = (id) => data().risings.find((r) => r.id === Number(id)) || null;
   // The signatures that still stand: a character that exists, is still a citizen, not of the court, not on a cooldown
   const validSigners = (p) => p.signers.filter((s) => exists(s.actor) && !signRefusal(s.actor, p.zone));
+  // A hold in unrest (consequences.js, phase 2: it harbours the creatures of the night) needs fewer signatures, never under one
   const needed = (zid) => {
     const citizens = Number(call('__dboCitizenAccountCount', zid)) || 0;
-    return { min: Math.max(1, Math.floor(Number(C.minSignatures) || 0)), share: Math.max(1, Math.ceil((Number(C.minShare) || 0) * citizens)), citizens };
+    const u = call('__dboHoldUnrest', zid);
+    const keep = 1 - Math.max(0, Math.min(0.9, Number(u && u.cut) || 0));
+    return { min: Math.max(1, Math.ceil(Math.floor(Number(C.minSignatures) || 0) * keep)), share: Math.max(1, Math.ceil((Number(C.minShare) || 0) * citizens * keep)), citizens, cut: 1 - keep };
   };
   const thresholdMet = (p) => {
     const n = new Set(validSigners(p).map((s) => s.pid)).size; const need = needed(p.zone);

@@ -524,5 +524,23 @@ ok(M.votingView(V1, WR).seats.find((s) => s.id === 'commander').label === 'Lord 
   delete globalThis.__dboCitizen; M = load();
 }
 
+// ---- a vote of no confidence (consequences.js, phase 2: a court that does no business) ------------------------------
+{
+  const NC = globalThis.__dboCitizenNoConfidence;
+  ok(/holds no election/.test(NC('bruma', 'test').error || ''), 'no confidence: Bruma, which holds no election, cannot call one');
+  const mo = M.data().elections.morthal;
+  ok(/already running/.test(NC('morthal', 'test').error || '') && M.data().elections.morthal === mo, '...a hold whose election is running keeps it', mo && mo.phase);
+  const E = M.data().elections.whiterun;
+  ok(E && E.phase === 'seated', 'setup: Whiterun has seated its court', E && E.phase);
+  ok(!NC('whiterun', 'test', true).error && M.data().elections.whiterun === E, '...a dry call says it could, and changes nothing');
+  const r = NC('whiterun', 'a vote of no confidence: the court did no business for 7 days');
+  const E2 = M.data().elections.whiterun;
+  ok(!r.error && E2 !== E && E2.phase === 'registration' && !E2.firstEver, '...a real one opens registration for a new court, as an election after its first', [r, E2 && E2.phase]);
+  ok(/already running/.test(NC('whiterun', 'again').error || ''), '...and cannot be called again while it runs');
+  const before = (M.data().courtNotices.whiterun || []).length;
+  globalThis.__dboCitizenCourtNotice('whiterun', 'A test word to the court.');
+  ok((M.data().courtNotices.whiterun || []).length === before + 1 || said.some((x) => /A test word to the court\./.test(x[1] || x)), 'a court notice reaches the ruler, or waits for them');
+}
+
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
 process.exit(fails ? 1 : 0);

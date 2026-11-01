@@ -2124,5 +2124,50 @@
   "holdNpcOnly": ["solitude", "whiterun", "riften", "windhelm", "winterhold", "falkreath", "markarth", "dawnstar", "morthal"],
   "npcByHold": {"bruma": "6daba:BSHeartland.esm", "whiterun": "1d21f9:DragonBreak Online Edits.esp", "solitude": "1d21f8:DragonBreak Online Edits.esp", "riften": "1d21fa:DragonBreak Online Edits.esp", "windhelm": "1d21fb:DragonBreak Online Edits.esp", "winterhold": "1d21fc:DragonBreak Online Edits.esp", "falkreath": "1d21fd:DragonBreak Online Edits.esp", "markarth": "1d21fe:DragonBreak Online Edits.esp", "dawnstar": "1d21ff:DragonBreak Online Edits.esp", "morthal": "1d2200:DragonBreak Online Edits.esp"},
   "_npcByHold": "Each hold's own DBO guard, merged into the DLE 25 Oct as 1D21F8-1D2200 (full ids 491D21F8+, DLE at index 0x49): DBO_Guard<Hold> (Use Inventory and Use AI Packages clear, own hold outfit, hold factions, no CW*, no packages). The child's own ids are 000800-000808 and merge_into_dle renumbers them, so set the DLE ids here when the merge reports them; holdNpcOnly does nothing useful until then. Until the swap, these are the vanilla bases (23 Oct): GuardWhiterunHoldImperialGeneric, GuardSolitudeImperialBase, GuardRiftenImperialBase, GuardWindhelmSons, GuardWinterholdImperial, GuardFalkreathImperial, GuardMarkarthImperialExterior, GuardDawnstarImperialNoShift, GuardHjaalmarchImperial; Bruma CYRGuardBrumaTemplate. Chosen for no or one AI package, so a guard stays near its post."
+ },
+ "consequences": {
+  "_comment": "Dynamic Consequences (consequences.js). Phase 1 measures each force's pressure per hold on the code's defaults. phase2 answers a hold that harbours the Blight or the Hunt: hunters' writs (open at writs.at, gold per kill to members of writs.factions, capPerDay each), unrest (from unrest.at, a rising's petition needs up to maxCut fewer signatures at unrest.full; rebellion.enabled must be on for it to matter), the courts' censure (from pressure.at, censure of its weekly tax income withheld) and a court idle for idleRuler.days (warned warnDays before, then a vote of no confidence through citizenship). Each part has its own enabled switch.",
+  "phase2": {
+   "harbour": [
+    "blight",
+    "hunt"
+   ],
+   "writs": {
+    "enabled": true,
+    "at": 50,
+    "factions": [
+     "vigil-of-stendarr",
+     "dawnguard",
+     "silver-hand"
+    ],
+    "bounty": {
+     "blight": 15,
+     "hunt": 20
+    },
+    "creatures": {
+     "blight": "vampire(?!.*thrall)",
+     "hunt": "werewolf|werebear"
+    },
+    "capPerDay": 20,
+    "players": false,
+    "playerBounty": 100
+   },
+   "unrest": {
+    "enabled": true,
+    "at": 40,
+    "full": 90,
+    "maxCut": 0.4
+   },
+   "pressure": {
+    "enabled": true,
+    "at": 75,
+    "censure": 0.2
+   },
+   "idleRuler": {
+    "enabled": true,
+    "days": 7,
+    "warnDays": 2
+   }
+  }
  }
 }

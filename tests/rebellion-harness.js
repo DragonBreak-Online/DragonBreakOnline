@@ -247,6 +247,20 @@ ok('threshold, any: either one will do', reb.thresholdMet(P()).met);
 ok('a reload over the old state keeps the petition and its word', P() && P().code === CODE && P().signers.length === 10);
 setCfg({ enabled: true });
 load();
+// A hold in unrest (consequences.js, phase 2) needs fewer signatures: 40% fewer of 10 accounts and of 25% of 17 citizens
+globalThis.__dboHoldUnrest = (z) => (z === 'whiterun' ? { stability: 10, cut: 0.4 } : { stability: 100, cut: 0 });
+t = reb.thresholdMet(P());
+ok('unrest: a cut of 40% needs 6 accounts and 3 of the share, never fewer than one', t.need.min === 6 && t.need.share === 3 && t.met, t);
+setCfg({ enabled: true, minSignatures: 30 });
+load();
+globalThis.__dboHoldUnrest = () => ({ stability: 0, cut: 0.95 });
+ok('...a cut past 90% is held at 90%: 30 accounts need 3, not 2', reb.thresholdMet(P()).need.min === 3, reb.thresholdMet(P()).need);
+globalThis.__dboHoldUnrest = () => ({ stability: 0, cut: 5 });
+ok('...however large the cut, never fewer than one of the share', reb.thresholdMet(P()).need.share === 1, reb.thresholdMet(P()).need);
+setCfg({ enabled: true });
+load();
+delete globalThis.__dboHoldUnrest;
+ok('...and with no unrest the thresholds are the config\'s',reb.thresholdMet(P()).need.min === 10);
 
 // ---- the leader, the claimant, the name -----------------------------------------------------------------------------------
 ok('only the starter hands on the leadership', /Only the one who began/.test(cmd(C[1], 'leader Citizen3')));

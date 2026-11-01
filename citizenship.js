@@ -156,6 +156,8 @@ module.exports = (api) => {
   // ---- holds ---------------------------------------------------------------------------------------------------------
   const grants = (z) => !!z && (C.rulerOffices || []).includes((z.officials || [])[0]);
   const holdOf = (id) => { const z = zoneById(String(id || '')); return grants(z) ? z : null; };
+  // A decision of the hold's court is its business (consequences.js counts the days a court does none); staff's is not
+  const courtBusiness = (by, z, kind) => { try { if (!isAdmin(by) && typeof globalThis.__dboCourtBusiness === 'function') globalThis.__dboCourtBusiness(z.id, kind); } catch (e) { log('citizenship: court business failed', e.message); } };
   const holds = () => zoneList().filter(grants);
   const rulerOffice = (z) => (z.officials || [])[0];
   const seated = (z, office) => (((readOfficials() || {})[z.id] || {})[office] || []).map(Number);
@@ -284,6 +286,7 @@ module.exports = (api) => {
     if (chk.error) return { error: `${r.name} cannot take it now: ${chk.error.replace(/^You are/, 'they are').replace(/^You /, 'they ')}` };
     addHold(actor, z, `granted by ${who(by)}`);
     audit(`CITIZEN ${who(by)} granted ${r.name} (character ${hex(actor)}) the citizenship of ${z.name}`);
+    courtBusiness(by, z, 'citizenship granted');
     tell(actor, `You are now a citizen of ${ofPlace(z.name)}, granted by ${nameNow(by)}.${COOLDOWN_LINE()}`);
     return { text: `${r.name} is now a citizen of ${ofPlace(z.name)}.` };
   };
@@ -294,6 +297,7 @@ module.exports = (api) => {
     { const no = staffNo(by, z, actor); if (no) return { error: no }; }
     data().requests = data().requests.filter((x) => x !== r); save();
     audit(`CITIZEN ${who(by)} declined ${r.name}'s request for the citizenship of ${z.name}`);
+    courtBusiness(by, z, 'citizenship declined');
     tell(actor, `Your request for the citizenship of ${ofPlace(z.name)} was declined.`);
     return { text: `You declined ${r.name}'s request.` };
   };
@@ -469,6 +473,7 @@ module.exports = (api) => {
     }
     data().policies[z.id] = { policy: p, fee: f, by: who(by), at: Date.now() }; save();
     audit(`CITIZEN ${who(by)} set the citizenship of ${z.name} to ${p}${f ? ` at ${f} gold` : ''}`);
+    courtBusiness(by, z, 'citizenship policy');
     return { text: p === 'paid' ? `The citizenship of ${ofPlace(z.name)} now costs ${f} gold, paid into its treasury.` : p === 'free' ? `The citizenship of ${ofPlace(z.name)} is now free.` : `The citizenship of ${ofPlace(z.name)} is now granted only by you or the Steward, on request.` };
   };
 
@@ -1417,6 +1422,23 @@ module.exports = (api) => {
   // again until `until`, and any request there withdrawn. A citizenship through a faction or court based in the hold (auto)
   // is no entry on the rolls and lasts while that membership does. { removed, auto }
   globalThis.__dboCitizenAccountCount = (zid) => { if (!C.enabled) return 0; const z = holdOf(zid); return z ? countedPids(z).size : 0; };
+  // consequences.js (phase 2): a court that does no business for its days is answered by a vote of no confidence, a new
+  // election as staff's restart starts one, in a hold that holds elections, has the citizens to begin one and is running
+  // none. dry: only whether it could. { text } or { error }
+  globalThis.__dboCitizenNoConfidence = (zid, why, dry) => {
+    if (!C.enabled) return { error: 'citizenship is off' };
+    const z = holdOf(zid); if (!z || !electing(z)) return { error: 'the hold holds no election' };
+    const E = elOf(z.id);
+    if (E && E.phase === 'held') return { error: 'its election is held by staff' };
+    if (E && E.phase !== 'seated') return { error: 'an election is already running' };
+    if (citizenAccounts(z) < EL.threshold) return { error: `it has fewer than ${EL.threshold} citizens to begin one` };
+    if (dry) return { text: 'it can' };
+    delete data().elections[z.id]; save();
+    startElection(z, String(why || 'a vote of no confidence'));
+    return { text: `A vote of no confidence opens registration in ${ofPlace(z.name)}.` };
+  };
+  // A word to the hold's ruler and Stewards, kept for the next of them to log in (consequences.js)
+  globalThis.__dboCitizenCourtNotice = (zid, text) => { const z = holdOf(zid); if (z && text) courtNotice(z, String(text)); };
   globalThis.__dboCitizenOutlaw = (actor, zid, until, why) => {
     const a = Number(actor) >>> 0; const z = holdOf(zid);
     if (!C.enabled || !z || !a) return { removed: false, auto: false };
