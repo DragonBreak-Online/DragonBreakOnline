@@ -86,6 +86,12 @@ export const NATIVE_CAPS = [
   // Every module's choice menu (beds, mines, repair, jail, salvage, duels, spells...) on dbo_context, the X menu's own panel.
   // The server sends only focused ones; each names its dbo: events, and one that names none closes to dbo:close
   "native:contextMenu",
+  // Worker 6's notice-board Citizenship and Voting (dbo_citizen, widget 84). Its keys are dbo:citizenAct/Back/Close; a
+  // game that cannot type sends citizenAct "browser" and the server sends the panel to the browser
+  "native:citizenBoard",
+  // Worker 6's Expeditions and Hunting Contracts board (dbo_expedition, widget 63). Its keys are the widget's own
+  // events.* (dbo:expeditionPick/Close, dbo:contractTake/Abandon/Deliver); dungeons.js opens it for this cap too
+  "native:expeditionBoard",
 ];
 // What the client does itself, told to the server with the native panels so it no longer needs the browser HUD for it
 // (dbo:uiCaps from hud/index.tsx UI_CAPS used to be the only list). Not panels, and not governed by nativePanels:

@@ -23,7 +23,7 @@ check('the service pushes to the function the panels define', SVC.includes('"_ro
 // struggle, post, couriers) together. Dropping either half stops checking that those panels' keys have a
 // handler at all, which is the one thing this file is for.
 const server = SERVER ? ['decor.js', 'prayer.js', 'gamemode.js', 'citizenship.js', 'keyring.js', 'tenancy.js',
-  'dungeons.js', 'supernatural.js', 'labour.js', 'struggle.js', 'post.js', 'couriers.js', 'lockpick.js'].map((f) => fs.readFileSync(path.join(SERVER, f), 'utf8')).join('\n') : '';
+  'dungeons.js', 'supernatural.js', 'labour.js', 'struggle.js', 'post.js', 'couriers.js', 'lockpick.js', 'contracts.js'].map((f) => fs.readFileSync(path.join(SERVER, f), 'utf8')).join('\n') : '';
 // post.js and couriers.js register through their own act() wrappers around onUi
 const handled = (ev) => new RegExp(`(onUi|panelAct|act)\\('${ev}'`).test(server);
 
@@ -141,7 +141,36 @@ const drive = {
   dbo_context: (t) => {
     t.press(49); t.push(fixtures.dbo_context); t.root.dboPanel.body.r2.onRelease(); t.push(fixtures.dbo_context); t.press(27);
   },
+  // Worker 6's notice-board Citizenship and Voting: join, the Voting tab, then back to the board; a second session closes
+  dbo_citizen: (t) => {
+    const find = (label) => { let f = null; const walk = (c) => { for (const k of Object.values(c.kids || {})) { if (k.label && k.onRelease && k.label.text === label) f = f || k; if (k.kids) walk(k); } }; walk(t.root.dboPanel); return f; };
+    find('Become a citizen').onRelease(); t.push(fixtures.dbo_citizen);
+    t.root.dboPanel.head.t1.onRelease(); t.push(fixtures.dbo_citizen);
+    t.root.dboPanel.foot.back.onRelease();
+  },
+  'dbo_citizen#close': (t) => { t.root.dboPanel.foot.close.onRelease(); },
+  // Worker 6's Expeditions and Hunting Contracts: give up the held contract, take one, hand in a commission, gather a party,
+  // then close; every key is the fixture's events.* value
+  dbo_expedition: (t) => {
+    const find = (label, row) => { let f = null; const walk = (c) => { for (const k of Object.values(c.kids || {})) { if (k.label && k.onRelease && k.label.text === label && (!row || (k._parent.label && k._parent.label.text.indexOf(row) === 0))) f = f || k; if (k.kids) walk(k); } }; walk(t.root.dboPanel); return f; };
+    t.root.dboPanel.head.t1.onRelease();
+    find('Give up').onRelease();
+    find('Read', '3 wolves').onRelease(); find('Take the contract').onRelease();
+    find('Read', 'Iron ore').onRelease(); find('Hand in 2 for 40 gold').onRelease();
+    t.root.dboPanel.head.t0.onRelease();
+    find('Read', 'Varsa').onRelease(); find('Gather your party').onRelease();
+    t.root.dboPanel.foot.close.onRelease();
+  },
 };
+fixtures.dbo_expedition = { type: 'expeditionBoard', id: 63, hall: 'the Synod Conclave', bossReturnMinutes: 10, leaseMinutes: 60, tab: 'expeditions',
+  expeditions: [{ id: 'varsa', name: 'Varsa Ruins', county: '', kind: 'Ayleid ruin', status: 'open', state: 'open', masters: [] }],
+  contracts: { enabled: true, zone: 'Bruma', treasury: 100, note: '', held: { id: 'w2', what: 'a troll', zone: 'Bruma', progress: 0, count: 1, reward: 300, hoursLeft: 2 }, maxActive: 3, canPost: false,
+    list: [{ id: 'w1', what: '3 wolves', count: 3, reward: 90, danger: 1, hoursLeft: 5, state: 'open' }, { id: 'c1', what: 'Iron ore', count: 5, reward: 100, danger: 0, hoursLeft: 9, state: 'open', type: 'commission', item: 'iron ore', price: 20, have: 2 }] },
+  events: { pick: 'dbo:expeditionPick', close: 'dbo:expeditionClose', contractTake: 'dbo:contractTake', contractAbandon: 'dbo:contractAbandon', contractDeliver: 'dbo:contractDeliver' } };
+fixtures.dbo_citizen = { type: 'citizenBoard', id: 84, nonce: 'c1', tab: 'citizenship', result: '', resultKind: '', hold: 'solitude', name: 'Haafingar', grants: true,
+  citizenship: { hold: 'solitude', name: 'Haafingar', ruler: 'Jarl', hasRuler: true, policy: 'free', fee: 0, citizen: false, primary: false, auto: false, holds: [], maxHolds: 2, cooldownUntil: 0, requested: false, can: 'free', why: '' },
+  voting: { hold: 'solitude', name: 'Haafingar', electing: true, threshold: 6, registrationHours: 48, votingHours: 24, seats: [{ id: 'jarl', label: 'Jarl' }], citizens: 1, phase: 'none' } };
+fixtures['dbo_citizen#close'] = null;
 
 fixtures['dbo_dungeon#back'] = fixtures.dbo_dungeon;
 
@@ -157,6 +186,7 @@ const MIN_EVENTS = {
   dbo_skinning: 2, 'dbo_skinning#pick': 2,
   dbo_reading: 2,
   dbo_dungeon: 2, 'dbo_dungeon#back': 2,
+  'dbo_citizen#close': 2,
 };
 const seen = {};
 for (const menu of Object.keys(fixtures)) {
