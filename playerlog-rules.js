@@ -462,6 +462,7 @@ excluded('DECOR', 'cost JSON; off until Nat switches it on');
 // VAMPATH (vampirepath.js, Nat 31 Oct): a GM's /vampath names them in the reason; the one lasting act, the drain's end of a
 // character, is logged by supernatural.js's own PERMADEATH line
 excluded('VAMPATH', 'reasons can name a GM; the drain\'s permadeath logs as PERMADEATH');
+excluded('KINDGUARD', 'the kind guard (guilds.js kindSweep): why a cured or turned character left a clan or pack; the leave itself is the parsed FACTION line');
 // CIRCULAR (gamemode.js /circular, 31 Oct): the officer, the faction and counts; the letters themselves log as letters
 clean_('CIRCULAR');
 // MUSTER (heralds.js, 31 Oct): a faction's muster pay, the faction and counts only
@@ -1771,6 +1772,8 @@ guilds.js FACTION bdc6897e parsed
 guilds.js FACTION-RANK 77565f59 excluded
 guilds.js FACTION-MERGE 03cc2a6a excluded
 guilds.js FACTION-MERGE 2062ec33 excluded
+guilds.js FACTION-MERGE 18bb5af2 excluded
+guilds.js KINDGUARD 5eaac980 excluded
 jail.js JAIL 9a6540c2 clean
 jail.js JAIL 9a6540c2 clean
 jail.js JAIL 0e8664e2 clean

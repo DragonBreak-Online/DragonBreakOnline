@@ -1438,6 +1438,7 @@
       "id": "clan-volkihar",
       "name": "Clan Volkihar",
       "kind": "guild",
+      "requires": "vampire",
       "secret": true,
       "ranks": [
         {

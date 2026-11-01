@@ -1117,7 +1117,10 @@ module.exports = (api) => {
     washBlood(a, 'the curse ended');
     if (globalThis.__dboSuperFeeds instanceof Map) globalThis.__dboSuperFeeds.delete(a >>> 0);
     refreshRates(a);
+    // guilds.js: a cure lets go every clan or pack they no longer fit; a turning sweeps after its new kind is saved
+    if (!/^became a /.test(String(why))) kindSweep(a, why);
   };
+  const kindSweep = (a, why) => { try { if (typeof globalThis.__dboGuildKindSweep === 'function') globalThis.__dboGuildKindSweep(a >>> 0, why); } catch (e) { log(`supernatural: kind sweep for ${display(a)} failed: ${e.message}`); } };
   // The popups when an incubation completes (Nate, 18 Oct)
   const FEVER_TURNED = {
     vampire: 'You feel a profound change within your body. The warmth of life fades as an insatiable hunger awakens within you. The transformation is complete. You have become a Vampire.',
@@ -1138,6 +1141,7 @@ module.exports = (api) => {
     else if (pure && !crownHolder()) takeCrown(a, 'claimed the vacant Blood Crown');
     else if (pure && crownHolder() !== (a >>> 0)) personal(a, crownLine(a));
     flushStageSpells(a, stateOf(a), 'became a vampire');
+    kindSweep(a, 'became a vampire');
   };
   const becomeWerewolf = (a, blessed, fromFever) => {
     endCurse(a, 'became a werewolf');
@@ -1148,6 +1152,7 @@ module.exports = (api) => {
     if (fromFever) { onScreen(a, FEVER_TURNED.werewolf, 8); personal(a, how); }
     else personal(a, blessed ? 'Hircine marks you as his own. The beast answers when you call, and only then.' : `The fever breaks into a howl. You are a werewolf. ${how}`);
     audit(`SUPERNATURAL ${who(a)} became a ${blessed ? 'Hircine-blessed ' : ''}werewolf`);
+    kindSweep(a, 'became a werewolf');
   };
   // Across the middle of the screen (dboBanner, client 0.3.26+), Skyrim's notification for older clients, and chat
   const onScreen = (a, text, seconds) => {
