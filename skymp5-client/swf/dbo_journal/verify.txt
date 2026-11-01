@@ -30,4 +30,7 @@ dbo:courtDismiss
 dbo:factionSetRank
 JT.settings
 journalReport
-are kept by the overlay
+are kept on this PC
+set:get
+set:keyCapture
+dboLocal
