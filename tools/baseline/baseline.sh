@@ -100,7 +100,11 @@ if [ "$REFRESH" = "1" ] || [ ! -f "$STAMP" ]; then
   # eighteen connections and eighteen sshd auths for ~100 KB of JSON, which is rude to a server that also has
   # players on it. tar picks the files that exist remotely (a missing one must not fail the archive) and the
   # whole set comes back down a single stream.
-  remote='cd '"$(printf '%q' "$dir")"' || exit 1; for f in '"$FILES"'; do [ -f "$f" ] && printf "%s\n" "$f"; done | tar -cf - -T - 2>/dev/null'
+  # $FILES is written over several lines for legibility, so it begins with a newline. Interpolated raw, the
+  # remote shell sees `for f in` followed by a line break - a syntax error, and the snapshot comes back empty.
+  # Unquoted $(echo ...) word-splits it and rejoins it on one line, which is what the remote needs.
+  oneline=$(echo $FILES)
+  remote='cd '"$(printf '%q' "$dir")"' || exit 1; for f in '"$oneline"'; do [ -f "$f" ] && printf "%s\n" "$f"; done | tar -cf - -T - 2>/dev/null'
   if ! ssh -o BatchMode=yes "$host" "$remote" | tar -xf - -C "$CACHE" 2>/dev/null; then
     echo "snapshot: the transfer from $SOURCE failed - refusing to report a baseline" >&2
     exit 1
@@ -132,8 +136,19 @@ for f in $FILES; do
 done
 
 # --- 4. provenance, before the number, so the number is never quoted without it ----------------------------
-FORK_DEFAULT=$(cd .. 2>/dev/null && pwd)/fork
+# The fork sits beside the MAIN checkout, not beside the worktree. `cd ..` from here would be the scratchpad,
+# where there is no fork at all: run-all.sh then finds no esbuild, skips every harness that needs a bundle,
+# and still prints a total - a number that looks like a result and is not one. --git-common-dir resolves to
+# the main repo's .git however deep the worktree is, so the fork is its grandparent's `fork`.
+COMMON=$(git rev-parse --git-common-dir 2>/dev/null)
+case "$COMMON" in /*|[A-Za-z]:*) ;; *) COMMON="$REPO/$COMMON" ;; esac
+MAIN_REPO=$(cd "$(dirname "$COMMON")" 2>/dev/null && pwd)
+FORK_DEFAULT=$(cd "$MAIN_REPO/.." 2>/dev/null && pwd)/fork
 FORK=${FORK_ARG:-$FORK_DEFAULT}
+if [ ! -d "$FORK" ]; then
+  echo "the fork is not at $FORK - pass --fork <dir>; without it run-all.sh skips every harness that needs a bundle and still prints a total" >&2
+  exit 2
+fi
 FORK_SERVER=${FORK_SERVER_ARG:-$FORK}
 say ""
 say "=============== baseline inputs ==============="
@@ -142,6 +157,15 @@ say " snapshot    $(date -u -d "@$TAKEN" '+%Y-%m-%d %H:%M:%SZ' 2>/dev/null || ec
 say " overlaid    $overlaid file(s)${missing:+; absent on the source:$missing}"
 say " fork        $FORK"
 say " fork-server $FORK_SERVER"
+# esbuild is what actually decides whether the bundle-taking harnesses run at all. Without it they SKIP and
+# the suite still prints a cheerful total, so it is stated here next to the number rather than left implied.
+ESB="$FORK_SERVER/skymp5-server/node_modules/.bin/esbuild"
+[ -x "$ESB" ] || ESB="$FORK/skymp5-server/node_modules/.bin/esbuild"
+if [ -x "$ESB" ]; then
+  say " esbuild     $ESB"
+else
+  say " esbuild     *** MISSING - every harness needing a bundle will SKIP; the total below is not a baseline ***"
+fi
 say " platform    $(uname -s)"
 case "$(uname -s)" in
   MINGW*|MSYS*|CYGWIN*)
@@ -150,6 +174,11 @@ case "$(uname -s)" in
     say "  - front widget harnesses fail at the bundling step (Could not resolve \"react\"): run-all snapshots"
     say "    the fork and symlinks node_modules into it, which does not come good here. ~25 harnesses."
     say "  - a POSIX file-mode assertion cannot pass: Windows reports 0666 where 0600 is expected."
+    say "  - 8 harnesses shell out to \`python3\`, which on this PC is the Microsoft Store alias stub: it prints"
+    say "    \"Python was not found\" and EXITS 0, so they fail with empty output rather than an obvious error."
+    say "    Real Python here is \`py\` (3.14.6), which is what CLAUDE.md uses for the generators. Affected:"
+    say "    alchemy-records-apply, ayleid-loot, buildings-map, door-names, faction-gear-generator,"
+    say "    faction-gear-rerun, salvage-coverage, spell-tome-schools."
     say "  - the C++ unit binary is unrelated to this script, but must be run from build/, not build/unit/."
     ;;
   Linux)
