@@ -1071,6 +1071,8 @@ console.log('pick prayers:');
     { god: 'clavicusvile', ref: '125bf9:DragonBreak Online Edits.esp', world: 'a764b:BSHeartland.esm', pos: [94522, 193548, 2329], where: 'the shrine of the Princes by Bruma', near: 'the statue of Clavicus Vile at the shrine of the Princes by Bruma' },
     { god: 'clavicusvile', ref: 'fe531:Skyrim.esm', world: '216bb:Skyrim.esm', pos: [1576, -4435, 6991], where: "Haemar's Shame" },
     { god: 'clavicusvile', ref: '17489:Druadach.esm', world: '16d49:Druadach.esm', pos: [517, -2989, -2583], where: 'the Drenched Caverns' },
+    { god: 'azura', ref: '77f35e:summersetisles.esp', world: 'ae416d:summersetisles.esp', pos: [55444, -52025, 4467], where: 'Summerset' },
+    { god: 'sheogorath', ref: '14c894:summersetisles.esp', world: '4dda1:summersetisles.esp', pos: [423, -1373, -1508], where: 'a cave on Summerset', near: 'the shrine of Sheogorath in a cave on Summerset' },
     { god: 'namira', ref: '2c361:Skyrim.esm', world: '15227:Skyrim.esm', pos: [-896, -5664, -192], where: 'Reachcliff Cave' },
     { god: 'molagbal', ref: 'defe8:Skyrim.esm', world: '18be9:Skyrim.esm', pos: [-407, 2075, -518], where: "Markarth's abandoned house (the talking altar)" },
   ];
