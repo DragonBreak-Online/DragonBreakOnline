@@ -1059,23 +1059,41 @@ module.exports = (api) => {
   // 726f2 are members of it, so the Count and the Legion's leader never matched it. For a leader, a building is also the hall
   // whose listed doors belong to it (housingSystem.ts primaryOf: a door of a place answers with the place's root). Members
   // still match by the listed doors alone, as before. Rebuilt at most once a minute; empty until the housing system is up.
-  let ROOTS = null, ROOTS_AT = 0;
-  const hallRoots = () => {
-    if (ROOTS && Date.now() - ROOTS_AT < 60000) return ROOTS;
-    const out = new Map();
-    const H = globalThis.__dboHousing;
-    if (H && typeof H.primaryOf === 'function') {
-      const descs = new Set(HALL_DOORS.keys());
-      for (const m of Object.values(readMarks())) for (const d of ((m && m.doors) || [])) descs.add(String(d).toLowerCase());
-      for (const d of descs) {
-        let id = 0, root = 0;
-        try { id = Number(mp.getIdFromDesc(spelledDoor(d))) >>> 0; root = id ? Number(H.primaryOf(id)) >>> 0 : 0; } catch (e) { continue; }
-        if (root && root !== id) out.set(root, (out.get(root) || []).concat([d]));
-      }
-    }
-    ROOTS = out; ROOTS_AT = Date.now();
-    return out;
+  // The rebuild runs in the background, a 15 ms slice every 100 ms, never inside a caller (1 Nov: right after a boot each
+  // door's lookup is a cold native load, and the whole build ran inside the first login's refDecor, 28 s on dev). Callers
+  // get the last finished map; for the first seconds after a boot a leader matched only by the root waits for it.
+  const RS = globalThis.__dboHallRootsState || (globalThis.__dboHallRootsState = { roots: null, at: 0, build: null });
+  const hallDescs = () => {
+    const descs = new Set(HALL_DOORS.keys());
+    for (const m of Object.values(readMarks())) for (const d of ((m && m.doors) || [])) descs.add(String(d).toLowerCase());
+    return [...descs];
   };
+  const stepRoots = (budgetMs) => {
+    const H = globalThis.__dboHousing;
+    if (!H || typeof H.primaryOf !== 'function') return;
+    if (!RS.build) {
+      if (RS.roots && Date.now() - RS.at < 60000) return;
+      RS.build = { descs: hallDescs(), i: 0, out: new Map() };
+    }
+    const b = RS.build, t0 = Date.now();
+    while (b.i < b.descs.length) {
+      const d = b.descs[b.i++];
+      let id = 0, root = 0;
+      try { id = Number(mp.getIdFromDesc(spelledDoor(d))) >>> 0; root = id ? Number(H.primaryOf(id)) >>> 0 : 0; } catch (e) { id = 0; }
+      if (root && root !== id) b.out.set(root, (b.out.get(root) || []).concat([d]));
+      if (Date.now() - t0 >= budgetMs) break;
+    }
+    if (b.i >= b.descs.length) { RS.roots = b.out; RS.at = Date.now(); RS.build = null; }
+  };
+  if (globalThis.__dboHallRootsTimer) { clearInterval(globalThis.__dboHallRootsTimer); globalThis.__dboHallRootsTimer = null; }
+  {
+    const t = setInterval(() => { try { stepRoots(15); } catch (e) { log('guild halls: roots step failed', e.message); } }, 100);
+    if (t && typeof t.unref === 'function') t.unref();
+    globalThis.__dboHallRootsTimer = t;
+  }
+  // The whole build in one call, for the harnesses and for staff after a hall edit
+  globalThis.__dboHallRootsBuild = () => { RS.build = null; RS.roots = null; stepRoots(Infinity); return RS.roots || new Map(); };
+  const hallRoots = () => RS.roots || new Map();
   // A hall several factions list, all but one marked shared (Bruma Castle: the County's seat, shared by the Legion, the
   // Commission and the Penitus Oculatus): the shared ones' leaders use it as its owner does but do not hold it. A staff mark
   // (/faction hallmark) is never a shared one.
@@ -1154,7 +1172,7 @@ module.exports = (api) => {
         let err = '';
         try { err = String(H.grant(id, leader) || ''); } catch (e) { err = e.message || 'failed'; }
         if (err) { sayOnce(`${f.id}|${d}`, `guild halls: ${h.name} (${f.name}) door ${d} not granted to ${who(leader)}: ${err}`); continue; }
-        ROOTS = null;
+        RS.at = 0;   // the background rebuild starts on its next step; the old map serves until it is done
         hallSyncMsg.delete(`${f.id}|${d}`);
         done.push({ fid: f.id, door: d, leader });
         audit(`FACTION hall ${h.name} (door ${d}) granted to ${who(leader)}, leader of ${f.name}: it was unowned`);
