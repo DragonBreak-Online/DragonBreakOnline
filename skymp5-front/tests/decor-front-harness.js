@@ -44,7 +44,7 @@ export const render = (data) => renderToStaticMarkup(React.createElement(Decor, 
   let h = render(P.catalog), t = texts(h);
   ok(t.includes(P.catalog.home), 'the title is the home', P.catalog.home);
   ok(count(h, 'decor__meter') === P.catalog.budget.length && P.catalog.budget.every((m) => t.includes(`${m.used}/${m.of}`)), 'one meter per budget line, with used/of');
-  ok(t.includes('Catalogue') && t.includes('Placed') && t.includes('People'), 'the owner has three tabs');
+  ok(t.includes('Catalogue') && t.includes('Placed') && t.includes('Carpenters'), 'the owner has three tabs');
   ok(count(h, 'decor__chip') === P.catalog.groups.length && /decor__chip decor__chip--on/.test(h), 'one chip per group, the open one marked');
   ok(/placeholder="Search every group"/.test(h), 'a search box on the catalogue');
   ok(count(h, 'decor__row') === P.catalog.rows.length && P.catalog.rows.every((r) => t.includes(r.name)), 'one row per piece');
@@ -71,9 +71,14 @@ export const render = (data) => renderToStaticMarkup(React.createElement(Decor, 
 
   // ---- people ----
   h = render(P.people); t = texts(h);
-  ok(t.includes('Stray') && t.includes('Revoke'), 'a named decorator with Revoke');
-  ok(P.people.nearby.length === 0 || (t.includes('Here now') && t.includes('Grant')), 'who is here, with Grant');
-  ok(!texts(render(Object.assign({}, P.catalog, { owner: false }))).includes('People'), 'no People tab for someone who is not the owner');
+  ok(t.includes('Stray') && t.includes('Dismiss'), 'a hired carpenter with Dismiss');
+  ok(P.people.nearby.length === 0 || (t.includes('Here now') && t.includes('Hire')), 'who is here, with Hire');
+  const r0 = P.people.rows[0];
+  ok(r0.tier && t.includes(`${r0.tier} woodworker, ${r0.refund}% back`), "each carpenter's woodworking rank and refund share", `${r0.tier} ${r0.refund}`);
+  ok(P.people.own && t.some((x) => x.indexOf(`Your own: ${P.people.own.tier}, ${P.people.own.refund}% back.`) >= 0), "the owner's own share to compare with");
+  ok(t.some((x) => /comes back to you, at their/.test(x)), "the line saying a carpenter's takedowns come back to the owner");
+  ok(texts(render(Object.assign({}, P.people, { rows: [{ key: '9', name: 'Away', online: false, tier: '', refund: null }] }))).includes('offline'), 'an offline carpenter shows as offline, not a rank');
+  ok(!texts(render(Object.assign({}, P.catalog, { owner: false }))).includes('Carpenters'), 'no Carpenters tab for someone who is not the owner');
 
   // ---- paging and robustness ----
   h = render(Object.assign({}, P.catalog, { page: 1, pages: 3 }));
