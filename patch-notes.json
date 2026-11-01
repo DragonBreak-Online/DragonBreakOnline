@@ -1,5 +1,19 @@
 [
   {
+    "title": "Namira's shrine in the Reach",
+    "date": "2026-11-01",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Faith",
+        "items": [
+          "Namira's statue in her cave in the Reach can be prayed at: stand beside it and say /pray. It is a statue the game never lets you touch, so the prayer starts from /pray instead."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Chest outlines back in two dungeons",
     "date": "2026-11-01",
     "version": "Server update",

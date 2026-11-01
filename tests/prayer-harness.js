@@ -1050,6 +1050,39 @@ console.log('pick prayers:');
   check('...and the statue counts as touched for /deity Meridia', /You now follow Meridia|Meridia/.test(say('deity', 'Meridia')) && (props.get(ACTOR + '|private.dboDeity') || {}).id === 'meridia', JSON.stringify(props.get(ACTOR + '|private.dboDeity')));
 }
 
+// ---- Namira's cave in the Reach (SMJ, 1 Nov: "the shrine of Namira in the Reach does not allow you to pray") ----
+// man_DaedricShrines.esp's aaaManNamiraShrine (cell 8c4) holds aaaman_NamiraStatue, a STAT the engine never activates, on a
+// ledge above the cave floor; /pray on the floor beside it is the touch
+{
+  api.cfg = { prayer: { clientJudged: true, pick: { enabled: false } } };
+  pickUi = false;
+  load();
+  // The statue's own place in the plugin, so the checks below fail on their own without the spot
+  const STATUE = 0xdf5, WORLD = '8c4:man_DaedricShrines.esp', POS = [1598, 1889, 269];
+  const spot = (choiceOf('namira').prayNear || []).find((s) => s.ref === 'df5:man_DaedricShrines.esp');
+  check('skills.json: Namira is prayed near her statue in the Reach cave (df5, in cell 8c4)', !!spot && spot.world === WORLD && JSON.stringify(spot.pos) === JSON.stringify(POS), JSON.stringify(choiceOf('namira').prayNear));
+  {
+    const FLOOR = 40; // the cave floor, the bones and the blood bowl at z 33-58; the statue stands at 269
+    const stand = (x, y, world) => { props.set(ACTOR + '|worldOrCellDesc', world || WORLD); props.set(ACTOR + '|pos', [x, y, FLOOR]); };
+    const prayNear = () => { wallClock += 61 * 60000; virtual += 1000000; const said = say('pray'); return { said, w: out.widgets.find((x) => x && x.nonce), log: out.logs.join(' | ') }; };
+    props.set(ACTOR + '|private.dboDeity', { id: 'namira', name: 'Namira', kind: 'daedra', at: wallClock - 30 * 86400000 });
+    props.delete(ACTOR + '|private.prayedShrines');
+    nearM = Infinity;
+    stand(800, -400);
+    let m = prayNear();
+    check('at the cave mouth (30 m off), /pray says where to stand', !m.w && /Stand beside the statue of Namira in her cave in the Reach and say \/pray/.test(m.said), m.said);
+    stand(POS[0] - 140, POS[1], '3c:Skyrim.esm');
+    m = prayNear();
+    check('the same coordinates in Tamriel are not her cave', !m.w, m.said);
+    stand(POS[0] - 140, POS[1]);
+    m = prayNear();
+    check('on the cave floor beside the statue, /pray opens a prayer to Namira', !!m.w && /Namira/i.test(String(m.w.deity)) && /shrine touch .* Namira/.test(m.log), m.said + ' | ' + m.log);
+    res = playC(m);
+    check('...and it is held', verdictOf(res.log) === 'held' && res.events.length === 1, res.log);
+    check('...the rest is kept on the statue itself', restOf(STATUE) > wallClock, String(restOf(STATUE)));
+  }
+}
+
 Date.now = realNow;
 console.log('');
 console.log(failures ? `${failures} FAILURES` : 'all checks passed');

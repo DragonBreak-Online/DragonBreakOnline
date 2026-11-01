@@ -1692,6 +1692,8 @@
    },
    {
     "id": "namira",
+    "prayNear": [{"ref": "df5:man_DaedricShrines.esp", "world": "8c4:man_DaedricShrines.esp", "pos": [1598, 1889, 269], "meters": 10, "name": "the statue of Namira in her cave in the Reach"}],
+    "_prayNear": "1 Nov (SMJ: the shrine of Namira in the Reach does not allow you to pray): man_DaedricShrines.esp's own Namira cave (aaaManNamiraShrine, cell 8c4) holds aaaman_NamiraStatue, a STAT, which the engine never lets a player activate, and no shrine of ours stood over it. /pray within its meters (prayer.js prayNear), as the other man_DaedricShrines statues. Vanilla Reachcliff Cave's shrine (ac9ab) stays an activator.",
     "name": "Namira",
     "kind": "daedra",
     "shrines": ["ac9ab:Skyrim.esm", 
