@@ -174,7 +174,18 @@ say ""
 say "=============== baseline inputs ==============="
 say " tree        $TIP  (origin/server, per ls-remote)"
 say " snapshot    $(date -u -d "@$TAKEN" '+%Y-%m-%d %H:%M:%SZ' 2>/dev/null || echo "@$TAKEN"), ${AGE_H}h old, from $SOURCE$STALE"
-say " overlaid    $overlaid file(s)${missing:+; absent on the source:$missing}"
+# Two names are expected to be absent and must not read as a warning, or the next person goes looking for
+# them. Checked 1 Nov: zone-spawns.json is a symlink into the world-state folder on the live server, not a
+# server-root file, and the only harnesses about it (spawn-reach, spawn-stray) write their own copy in a
+# scratch folder and never touch the real one. gearstrip-state.json is named by exactly three harnesses
+# (bank-vault, foreign-guard-armor, giant-club) and all three pass without it.
+EXPECTED_ABSENT="zone-spawns.json gearstrip-state.json"
+unexpected=""
+expected=""
+for f in $missing; do
+  case " $EXPECTED_ABSENT " in *" $f "*) expected="$expected $f" ;; *) unexpected="$unexpected $f" ;; esac
+done
+say " overlaid    $overlaid file(s)${expected:+; expected absent:$expected}${unexpected:+; *** UNEXPECTEDLY absent:$unexpected ***}"
 say " fork        $FORK"
 # The fork's HEAD belongs in the record: on a shared box it is a moving target (dbo-dev's /opt/alduinak is
 # rebuilt between profile runs), so a number without it cannot be reproduced. run-all prints this too, but
