@@ -4217,7 +4217,8 @@ const sendPacket = (a, payload) => {
 // playerMenu: the U panel (widget 52); menuRun closes it as for the browser
 const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_journal', deityPicker: 'dbo_deity', rite: 'dbo_rite', dungeonGate: 'dbo_dungeon', labour: 'dbo_labour', pigeon: 'dbo_pigeon', bank: 'dbo_bank',
   businessLedger: 'dbo_ledger', propertyMarket: 'dbo_market', keyRing: 'dbo_keyring', tomeShop: 'dbo_tomes',
-  shrinePanel: 'dbo_shrine', courierHandover: 'dbo_courier', playerMenu: 'dbo_menu', spellbook: 'dbo_spellbook' };
+  shrinePanel: 'dbo_shrine', courierHandover: 'dbo_courier', playerMenu: 'dbo_menu', spellbook: 'dbo_spellbook', studyMagic: 'dbo_study',
+  classLectern: 'dbo_lectern' };
 // The client's custom menu takes a payload of at most this many characters (scaleformMenu.ts MAX_PAYLOAD_CHARS) and draws
 // a bigger one blank, so a widget past it (a staff player menu, a long ledger) goes to the browser instead
 const NATIVE_MAX_CHARS = 60000;
