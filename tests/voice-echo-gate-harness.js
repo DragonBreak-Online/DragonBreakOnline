@@ -188,7 +188,32 @@ if (why) {
   // ---- 3. the client relay ----
   const LIVE_SHAPE = 'mics 1, aec on, cap live, ctx running, mix none, loop none';
   const vs = readLF(path.join(FORK, 'skymp5-client/src/services/services/voiceService.ts'));
-  const block = vs.slice(vs.indexOf('kind === "voice::echoLoop"'), vs.indexOf('kind === "voice::error"'));
+  // A handler's own block, bounded by the NEXT handler rather than by a named sibling. Slicing from one
+  // kind to `voice::error` worked only while error happened to come last: reorder the handlers and the
+  // slice silently stops spanning the code it is checking, which is how two checks here came to fail with
+  // nothing wrong in the client.
+  const handlerBlock = (kind) => {
+    const at = vs.indexOf(`kind === "voice::${kind}"`);
+    if (at < 0) return '';
+    const after = vs.slice(at + 1);
+    const next = after.search(/kind === "voice::/);
+    return next < 0 ? vs.slice(at) : vs.slice(at, at + 1 + next);
+  };
+  // The one method that files a voice diag line. The handlers used to call note() inline and now hand the
+  // line to this, so find it by what it does - the method whose body contains the note() call - rather than
+  // by name or position.
+  const diagFiler = (() => {
+    const at = vs.indexOf('note("voice", line)');
+    if (at < 0) return '';
+    // The LAST method declared before the note() call is the one containing it. Take it with matchAll:
+    // a single match with a greedy `[\s\S]*$` on the end does NOT give the last declaration, because the
+    // leftmost starting position still wins - that returned "constructor" until a diagnostic showed it.
+    const decls = [...vs.slice(0, at).matchAll(/\n  (?:private |public |protected )?(\w+)\s*\([^)]*\)[^{\n]*\{/g)];
+    return decls.length ? decls[decls.length - 1][1] : '';
+  })();
+  // "files a diag line" means: the handler reaches the filer, and the filer is what calls note().
+  const files = (b) => !!diagFiler && new RegExp(`this\\.${diagFiler}\\(`).test(b);
+  const block = handlerBlock('echoLoop');
   const shape = block.match(/const raw = [^\n]*\n\s*const echo = [^\n]*/);
   const cut = shape ? new Function('e', `${shape[0]}\nreturn echo;`) : null;
   const relayed = (text) => (cut ? cut({ arguments: ['voice::echoLoop', text] }) : null);
@@ -199,10 +224,18 @@ if (why) {
   const micOk = (t) => (MIC_SHAPE ? MIC_SHAPE.test(t) : null);
   check('the relay passes the mic summary in its one shape', micOk(LIVE_SHAPE) === true && micOk('mics 2, aec off, cap ended, ctx suspended, mix interrupted, loop disconnected') === true && micOk('mics 0, aec ?') === true && /MIC_SHAPE\.test\(mic\)/.test(block), !!MIC_SHAPE);
   check('...and drops anything else', micOk('mics 1, aec on; Jane\'s AirPods') === false && micOk('mics 1, aec on, cap Jane') === false && micOk('') === false);
-  const loadBlock = vs.slice(vs.indexOf('kind === "voice::loading"'), vs.indexOf('kind === "voice::error"'));
-  check('the loading line passes only two mic summaries, and files a dboDiag "voice" line', /if \(!MIC_SHAPE\.test\(before\) \|\| !MIC_SHAPE\.test\(after\)\) return;/.test(loadBlock) && /note\("voice", line\)/.test(loadBlock), loadBlock.slice(0, 200));
+  const loadBlock = handlerBlock('loading');
+  check('the loading line passes only two mic summaries, and files a dboDiag "voice" line',
+    /if \(!MIC_SHAPE\.test\(before\) \|\| !MIC_SHAPE\.test\(after\)\) return;/.test(loadBlock) && files(loadBlock),
+    { guard: /MIC_SHAPE\.test\(before\)/.test(loadBlock), filesVia: diagFiler || 'NOT FOUND' });
   check('the client tells the page as a loading screen opens and closes', /on\("menuOpen", \(e\) => \{ if \(e\.name === Menu\.Loading\) this\.markLoading\(true\); \}\)/.test(vs) && /on\("menuClose", \(e\) => \{ if \(e\.name === Menu\.Loading\) this\.markLoading\(false\); \}\)/.test(vs));
-  check('voiceService files a dboDiag "voice" line with the loop, the chosen and the used activation', /note\("voice", line\)/.test(block) && /activation \$\{chosen \|\| "\?"\}\$\{used && used !== chosen \? ` \(using \$\{used\}\)` : ""\}/.test(block), block.slice(0, 300));
+  check('voiceService files a dboDiag "voice" line with the loop, the chosen and the used activation',
+    files(block) && /activation \$\{chosen \|\| "\?"\}\$\{used && used !== chosen \? ` \(using \$\{used\}\)` : ""\}/.test(block),
+    { filesVia: diagFiler || 'NOT FOUND', hasActivation: /activation \$\{chosen \|\| "\?"\}/.test(block) });
+  // The filer is the single place a voice line reaches dboDiag; if that moves, the two checks above stop
+  // meaning anything, so assert it directly rather than relying on them.
+  check('...and exactly one place files voice diag lines, through __dboDiagNote',
+    (vs.match(/note\("voice", line\)/g) || []).length === 1 && /__dboDiagNote/.test(vs), { filer: diagFiler || 'NOT FOUND' });
 })().then(finish, (e) => { console.log(`FAIL  parts 2-3 threw: ${e && e.stack}`); failures++; finish(); });
 if (why) finish();
 
