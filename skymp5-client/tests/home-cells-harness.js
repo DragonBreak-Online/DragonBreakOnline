@@ -30,7 +30,11 @@ const load = (src) => {
   return mod;
 };
 
-const planSrc = fs.readFileSync(path.join(svc, 'homeCellsPlan.ts'), 'utf8');
+// Line endings normalised before anything is matched. The mutants below replace exact source text, and git
+// checks these files out with CRLF, so a harness that matched a bare newline passed in the worktree where
+// the files were written with LF and failed the moment a fresh worktree checked them out.
+const LF = (s) => s.split(String.fromCharCode(13) + String.fromCharCode(10)).join(String.fromCharCode(10));
+const planSrc = LF(fs.readFileSync(path.join(svc, 'homeCellsPlan.ts'), 'utf8'));
 const plan = load(planSrc);
 
 // ---- parseHomeCells: whatever arrives on the wire ----
@@ -87,7 +91,7 @@ check('an empty owned set restores everything we hold and claims nothing',
 
 // ---- the service's wiring, read out of its source ----
 const srcPath = path.join(svc, 'homeCellsService.ts');
-const src = fs.readFileSync(srcPath, 'utf8');
+const src = LF(fs.readFileSync(srcPath, 'utf8'));
 check('registered for cellFullyLoaded', /controller\.on\("cellFullyLoaded"/.test(src));
 check('listens for the custom packet', /customPacketMessage/.test(src) && /"homeCells"/.test(src));
 check('covers the spawn race through createActorMessage isMe', /createActorMessage/.test(src) && /isMe/.test(src));
