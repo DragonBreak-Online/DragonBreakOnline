@@ -96,6 +96,10 @@ const MAX_ESPM_CACHE = 4096;
 const DEFAULT_MAX_CLAIMS = 8;
 const DEFAULT_MAX_DISTANCE = 512;
 const DECOR_PUSH_INTERVAL_MS = 4000;
+// A full refresh costs every claim per viewer, so a sweep sends one viewer at a time this far apart
+const DECOR_SWEEP_STEP_MS = 50;
+// More changed claims than this in one tick (a migration, a bulk lock) go out as a full sweep instead of a delta
+const DECOR_DELTA_MAX = 32;
 const REQUEST_COOLDOWN_MS = 500;
 const CHANGE_FAILED = "That cannot be changed right now.";
 const NOT_GRANTED = "Property here is granted by its ruler (Jarl, Baron or Count) or their Steward.";
@@ -474,6 +478,17 @@ export class HousingSystem implements System {
       this.storageLockTriedMs = now;
       try { this.storageLockDone = this.lockOpenStorage(ctx, ++this.storageLockTries >= PLACE_PLAN_MAX_TRIES); }
       catch (e) { this.storageLockDone = true; this.log(`[housing] storage lock failed: ${e}`); }
+    }
+    if (this.decorChanged.size) {
+      const changed = Array.from(this.decorChanged);
+      this.decorChanged.clear();
+      this.decorSnapshot = null;
+      if (changed.length > DECOR_DELTA_MAX) this.pushDecorToAll(ctx);
+      else this.pushDecorDelta(ctx, changed);
+    }
+    if (this.decorSweep.length && now - this.lastSweepMs >= DECOR_SWEEP_STEP_MS) {
+      this.lastSweepMs = now;
+      this.sweepStep(ctx);
     }
     if (now - this.lastDecorMs < DECOR_PUSH_INTERVAL_MS) return;
     this.lastDecorMs = now;
@@ -2277,23 +2292,69 @@ export class HousingSystem implements System {
   // ── refDecor ────────────────────────────────────────────────────────────────
 
   private pushDecorToAll(ctx: SystemContext): void {
-    const refs = this.keyRing ? null : this.decorRefs(ctx);
-    for (const userId of this.onlineUsers(ctx)) {
-      if (refs) this.sendDecor(ctx, userId, refs);
-      else this.pushDecor(ctx, userId);
+    if (!this.keyRing) {
+      const refs = this.decorRefs(ctx);
+      for (const userId of this.onlineUsers(ctx)) this.sendDecor(ctx, userId, refs);
+      return;
     }
+    // Per-viewer lists cost every claim for each viewer, so they go out one viewer per sweep step
+    this.decorSnapshot = null;
+    this.decorSweep = this.onlineUsers(ctx);
   }
 
-  private pushDecor(ctx: SystemContext, userId: number): void {
+  private sweepStep(ctx: SystemContext): void {
+    const userId = this.decorSweep.shift();
+    if (userId === undefined) return;
+    if (!this.decorSnapshot) this.decorSnapshot = this.liveClaims(ctx);
+    this.pushDecor(ctx, userId, this.decorSnapshot);
+    if (!this.decorSweep.length) this.decorSnapshot = null;
+  }
+
+  private pushDecor(ctx: SystemContext, userId: number, live?: Array<{ primary: number; rec: PropertyRecord }>): void {
     const actorId = this.keyRing ? this.actorOf(ctx, userId) : 0;
-    this.sendDecor(ctx, userId, this.decorRefs(ctx, actorId ? this.viewerAccess(ctx, actorId) : undefined));
+    this.sendDecor(ctx, userId, this.decorRefs(ctx, actorId ? this.viewerAccess(ctx, actorId) : undefined, live));
+  }
+
+  // A write changes only its own claim's entries (and, for a place's root, its members' names), so only those go out
+  private pushDecorDelta(ctx: SystemContext, changed: number[]): void {
+    const entries: Array<{ primary: number; rec: PropertyRecord | null; name: string | null }> = [];
+    const seen = new Set<number>();
+    const add = (primary: number, rec: PropertyRecord | null, name: string | null) => {
+      if (seen.has(primary)) return;
+      seen.add(primary);
+      entries.push({ primary, rec, name });
+    };
+    for (const primary of changed) {
+      const rec = this.read(ctx, primary);
+      if (!rec || rec.owner === 0) { add(primary, rec, null); continue; }
+      const root = rec.memberOf && this.placesOn() ? this.read(ctx, rec.memberOf) : null;
+      const name = (root && root.owner !== 0 && root.name) || rec.name;
+      add(primary, rec, name);
+      if (rec.place && this.placesOn()) for (const m of this.membersOf(ctx, primary)) add(m.ref, m.rec, rec.name || m.rec.name);
+    }
+    const build = (v?: ViewerAccess) => {
+      const refs: Array<Record<string, unknown>> = [];
+      for (const { primary, rec, name } of entries) {
+        const live = !!rec && rec.owner !== 0;
+        const locked = live && !!rec && rec.locked && !(v && this.hasAccessWith(ctx, primary, rec, v));
+        refs.push({ refId: primary, name: live ? name : null, locked });
+        if (rec && rec.partner) refs.push({ refId: rec.partner, name: live ? name : null, locked });
+      }
+      return refs;
+    };
+    const shared = this.keyRing ? null : build();
+    for (const userId of this.onlineUsers(ctx)) {
+      const actorId = this.actorOf(ctx, userId);
+      if (!actorId) continue;
+      this.send(ctx, userId, { customPacketType: "refDecor", refs: shared || build(this.viewerAccess(ctx, actorId)) });
+    }
   }
 
   // A locked claim is locked for every viewer, so one list serves everyone; with housingKeyRing it shows unlocked to whoever
   // may walk in. A member of a place carries the place's name, so a rename shows on every door pair of it (Nate, 3 Oct)
-  private decorRefs(ctx: SystemContext, v?: ViewerAccess): Array<Record<string, unknown>> {
+  private decorRefs(ctx: SystemContext, v?: ViewerAccess, snapshot?: Array<{ primary: number; rec: PropertyRecord }>): Array<Record<string, unknown>> {
     const refs: Array<Record<string, unknown>> = [];
-    const live = this.liveClaims(ctx);
+    const live = snapshot || this.liveClaims(ctx);
     const names = new Map<number, string | null>(live.map((c) => [c.primary, c.rec.name]));
     for (const { primary, rec } of live) {
       const name = this.shownName(rec, names);
@@ -2516,8 +2577,7 @@ export class HousingSystem implements System {
     if (rec.owner !== 0) this.remember(primary); else this.forget(primary);
     this.placeCellsDirty = true;
     // Lock changes reach every client on the next tick, not the next decor interval
-    this.decorDirty = true;
-    this.lastDecorMs = 0;
+    this.decorChanged.add(primary);
     return true;
   }
 
@@ -3265,4 +3325,8 @@ export class HousingSystem implements System {
   private storageLockTries = 0;
   private decorDirty = false;
   private lastDecorMs = 0;
+  private decorChanged = new Set<number>();
+  private decorSweep: number[] = [];
+  private decorSnapshot: Array<{ primary: number; rec: PropertyRecord }> | null = null;
+  private lastSweepMs = 0;
 }
