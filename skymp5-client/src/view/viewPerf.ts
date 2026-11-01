@@ -63,8 +63,12 @@ export type PhaseName = keyof typeof phases;
 
 // The form loop's own counters, reset with the phases
 const forms = {
-  // forms seen in the model on the last update, not a total
-  lastCount: 0,
+  // the last update's counts, not totals. slots is model.forms.length, which INCLUDES freed slots that cost
+  // nothing; live is the ones actually there; named is the ones carrying an appearance name, which is what the
+  // nametag path runs for, so named=0 means that path was never exercised rather than that it is cheap.
+  lastSlots: 0,
+  lastLive: 0,
+  lastNamed: 0,
   // the slowest single updateForm in the window, and which form it was
   worstMs: 0,
   worstIdx: -1,
@@ -105,8 +109,10 @@ export const addPhase = (name: PhaseName, ms: number): void => {
   phases[name].add(ms);
 };
 
-export const noteForms = (count: number): void => {
-  forms.lastCount = count;
+export const noteForms = (slots: number, live: number, named: number): void => {
+  forms.lastSlots = slots;
+  forms.lastLive = live;
+  forms.lastNamed = named;
 };
 
 export const noteFormMs = (ms: number, idx: number, refrId: number): void => {
@@ -167,7 +173,7 @@ export const endTick = (entry: number): void => {
       `model ${phases.model.render()} pcdata ${phases.pcdata.render()} ` +
       `forms ${phases.forms.render()} clones ${phases.clones.render()} | ` +
       `nickgate n=${phases.nickgate.n} ${phases.nickgate.render()} nicknode n=${phases.nicknode.n} ${phases.nicknode.render()} | ` +
-      `nforms=${forms.lastCount} worstform ${worst} ` +
+      `live=${forms.lastLive} named=${forms.lastNamed} slots=${forms.lastSlots} worstform ${worst} ` +
       `new=${forms.created} gone=${forms.destroyed} reindexed=${forms.replaced}`
   );
 

@@ -170,7 +170,16 @@ export class WorldView extends ClientListener {
     const showMe = settings['skymp5-client']['show-me'];
     const showClones = settings['skymp5-client']['show-clones'];
 
-    perf.noteForms(model.forms.length);
+    // Counted here rather than in the loop so the number is of the model this tick, whatever the loop then skips
+    let liveForms = 0;
+    let namedForms = 0;
+    for (let i = 0; i < model.forms.length; ++i) {
+      const f = model.forms[i];
+      if (!f) continue;
+      liveForms++;
+      if (f.appearance && f.appearance.name) namedForms++;
+    }
+    perf.noteForms(model.forms.length, liveForms, namedForms);
     let mark = perf.now();
 
     PlayerCharacterDataHolder.updateData();
