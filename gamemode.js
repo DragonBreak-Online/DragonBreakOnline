@@ -4237,7 +4237,11 @@ const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_jou
   businessLedger: 'dbo_ledger', propertyMarket: 'dbo_market', keyRing: 'dbo_keyring', tomeShop: 'dbo_tomes',
   shrinePanel: 'dbo_shrine', courierHandover: 'dbo_courier', playerMenu: 'dbo_menu', spellbook: 'dbo_spellbook', studyMagic: 'dbo_study',
   classLectern: 'dbo_lectern', birthsignPicker: 'dbo_birthsign', lockpick: 'dbo_lockpick',
-  skinning: 'dbo_skinning', reading: 'dbo_reading', contextMenu: 'dbo_context' };
+  skinning: 'dbo_skinning', reading: 'dbo_reading', contextMenu: 'dbo_context',
+  // Worker 6: the notice board's Citizenship and Voting (citizenship.js, widget 84)
+  citizenBoard: 'dbo_citizen',
+  // Worker 6: the Expeditions and Hunting Contracts board (dungeons.js openExpeditions, widget 63)
+  expeditionBoard: 'dbo_expedition' };
 // The client's custom menu takes a payload of at most this many characters (scaleformMenu.ts MAX_PAYLOAD_CHARS) and draws
 // a bigger one blank, so a widget past it (a staff player menu, a long ledger) goes to the browser instead
 const NATIVE_MAX_CHARS = 60000;

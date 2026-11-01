@@ -1266,9 +1266,11 @@ module.exports = (api) => {
       requests: liveRequests().filter((r) => r.zone === z.id).map((r) => ({ actor: hex(r.actor), name: r.name, tag: tagSafe(r.actor), at: r.at })) };
     return v;
   };
-  const boardPayload = (a, zid, nonce, tab, text, kind) => {
+  const boardPayload = (a, zid, nonce, tab, text, kind, browser) => {
     const z = holdOf(zid) || zoneById(zid);
     const w = { type: 'citizenBoard', id: PANEL_ID, nonce, tab: tab === 'voting' ? 'voting' : 'citizenship', result: text || '', resultKind: kind || '' };
+    // the native panel (dbo_citizen) hands a game that cannot type to the browser panel for the rest of this visit
+    if (browser) w.browser = 1;
     if (!z || !grants(z)) return Object.assign(w, { hold: zid, name: z ? z.name : '', grants: false, why: 'This land grants no citizenship: its people answer to their clan or to no one.' });
     return Object.assign(w, { hold: z.id, name: z.name, grants: true, citizenship: citizenshipView(a, z), voting: votingView(a, z) });
   };
@@ -1277,7 +1279,7 @@ module.exports = (api) => {
   const sendBoard = (a, text, kind) => {
     const p = S.panels.get(a >>> 0); if (!p) return;
     p.nonce = `${(a >>> 0).toString(36)}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-    openWidget(a, boardPayload(a, p.zone, p.nonce, p.tab, text, kind), true);
+    openWidget(a, boardPayload(a, p.zone, p.nonce, p.tab, text, kind, p.browser), true);
   };
   onUi('citizenOpen', (a, args) => {
     if (!C.enabled) return;
@@ -1316,6 +1318,7 @@ module.exports = (api) => {
     if (!p || !p.nonce || String((args || [])[0] || '') !== p.nonce) return;
     if (boardZoneNear(a) !== p.zone) { S.panels.delete(a >>> 0); closeWidget(a, PANEL_ID); return personal(a, 'You have walked away from the notice board.'); }
     if (String(args[1]) === 'tab') { p.tab = String(args[2]) === 'voting' ? 'voting' : 'citizenship'; return sendBoard(a); }
+    if (String(args[1]) === 'browser') { p.browser = true; return sendBoard(a); }
     const r = run(a, p.zone, args.slice(1));
     sendBoard(a, r.error || r.text || '', r.error ? 'refused' : 'ok');
   });
