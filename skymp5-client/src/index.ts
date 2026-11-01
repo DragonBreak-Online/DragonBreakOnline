@@ -124,6 +124,7 @@ import { KickService } from "./services/services/kickService";
 import { MenuMediaService } from "./services/services/menuMediaService";
 import { CharacterProgressService } from "./services/services/characterProgressService";
 import { StaticRefsService } from "./services/services/staticRefsService";
+import { HomeCellsService } from "./services/services/homeCellsService";
 import { DeadCritterService } from "./services/services/deadCritterService";
 import { LipSyncService } from "./services/services/lipSyncService";
 import { RacemenuPresetService } from "./services/services/racemenuPresetService";
@@ -258,6 +259,7 @@ const main = () => {
       new LipSyncService(sp, controller),
       new RacemenuPresetService(sp, controller),
       new StaticRefsService(sp, controller),
+      new HomeCellsService(sp, controller),
       new DeadCritterService(sp, controller),
       new AdminMenuService(sp, controller),
       new PersonalMenuService(sp, controller),
