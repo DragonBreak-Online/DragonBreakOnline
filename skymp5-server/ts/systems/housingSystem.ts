@@ -3205,15 +3205,19 @@ export class HousingSystem implements System {
     }
   }
 
-  // Write through a temp file so an interrupted write cannot truncate the index.
+  // Write through a temp file so an interrupted write cannot truncate the index; off the game loop, one write in flight,
+  // and a change made while one is in flight is written by one more pass after it
   private saveRegistry(): void {
+    if (this.registrySaving) { this.registryAgain = true; return; }
+    this.registrySaving = true;
     const tmp = REGISTRY_FILE + ".tmp";
-    try {
-      fs.writeFileSync(tmp, JSON.stringify(this.claimed));
-      fs.renameSync(tmp, REGISTRY_FILE);
-    } catch (e) {
-      this.log(`[housing] registry write failed: ${e}`);
-    }
+    fs.promises.writeFile(tmp, JSON.stringify(this.claimed))
+      .then(() => fs.promises.rename(tmp, REGISTRY_FILE))
+      .catch((e) => this.log(`[housing] registry write failed: ${e}`))
+      .finally(() => {
+        this.registrySaving = false;
+        if (this.registryAgain) { this.registryAgain = false; this.saveRegistry(); }
+      });
   }
 
   private remember(primary: number): void {
@@ -3329,4 +3333,6 @@ export class HousingSystem implements System {
   private decorSweep: number[] = [];
   private decorSnapshot: Array<{ primary: number; rec: PropertyRecord }> | null = null;
   private lastSweepMs = 0;
+  private registrySaving = false;
+  private registryAgain = false;
 }
