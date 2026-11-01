@@ -12,6 +12,8 @@ import { EmoteService } from "./emoteService";
 import { ScaleformMenuService } from "./scaleformMenuService";
 import { CLOSE_KEY, FAILED_KEY } from "./nativeWidgets";
 import { MAX_PAYLOAD_CHARS } from "./scaleformMenu";
+import { hudShared } from "./nativeHud";
+import { clearPrompt, showPrompt, tradePrompt } from "./nativePrompt";
 
 // A finished trade: the hands take what was handed over (Skyrim.esm IDLE IdleTake, a one-shot)
 const TRADE_DONE_IDLE = "IdleTake";
@@ -691,8 +693,21 @@ export class TradeService extends ClientListener {
     return true;
   }
 
-  // Passive invite: shown without seizing input focus (like chat); a System-tab notification points at it.
+  // Passive invite: shown without seizing input focus (like chat); a System-tab notification points at it. While the native
+  // HUD is up it is a HUD prompt answered with Y and N (nativePrompt.ts), and the same tradeRespond goes either way
   private openInvite(): void {
+    if (hudShared.nativeUp) {
+      showPrompt(tradePrompt(INVITE_WIDGET_ID, inviteFrom, Math.round(INVITE_LOCAL_TTL_MS / 1000)),
+        (yes) => this.onKey(yes ? events.inviteAccept : events.inviteDecline, []), Date.now(), () => this.openInviteInBrowser());
+      this.invitePending = true;
+      inviteWaitingSince = Date.now();
+      notifyNextUpdate(this.controller, this.sp, inviteFrom + " wants to trade with you. Press Y to accept, N to decline.");
+      return;
+    }
+    this.openInviteInBrowser();
+  }
+
+  private openInviteInBrowser(): void {
     this.sp.browser.executeJavaScript(
       new FunctionInfo(this.inviteWidgetSetter).getText({ events, inviteFrom, inviteKey, INVITE_WIDGET_ID })
     );
@@ -710,6 +725,7 @@ export class TradeService extends ClientListener {
   // keepFocus: the trade window opens next and takes over the focus the invite held, with no release in between
   // (a release landing after the window's own focus loses the cursor, as the inn prompt did on 2026-09-25)
   private closeInvite(keepFocus = false): void {
+    clearPrompt(INVITE_WIDGET_ID);
     this.invitePending = false;
     inviteWaitingSince = 0;
     closeWidget(this.sp, INVITE_WIDGET_ID);

@@ -1,6 +1,8 @@
-import { BrowserMessageEvent } from "skyrimPlatform";
+import { BrowserMessageEvent, ButtonEvent, Menu } from "skyrimPlatform";
 import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { logError, logTrace } from "../../logging";
+import { KEY_NO, KEY_YES, handBack, hudPrompt, pressKey, promptView } from "./nativePrompt";
+import { buttonKeyCode } from "./mouseKeys";
 import { ALIVE_FRAMES, HudClock, LoadState, UiChoice, changedJson, hudShared, loadStep, newClock, newLoad, payloadOf, uiFromFile } from "./nativeHud";
 
 // The native HUD (route H, _work/native-everything-1031.md; the /testmenu hud probe showed our own swf loads and runs in
@@ -28,6 +30,21 @@ export class NativeHudService extends ClientListener {
     this.ui = this.readUi();
     this.controller.on("update", () => this.onUpdate());
     this.controller.on("browserMessage", (e) => this.onBrowserMessage(e));
+    this.controller.on("buttonEvent", (e) => this.onButtonEvent(e));
+  }
+
+  // Y and N answer the prompt up (nativePrompt.ts), and only while one is: never while the chat or a browser panel has the
+  // keys, the console is open, or a native panel is up (it may be taking typed text)
+  private onButtonEvent(e: ButtonEvent): void {
+    if (!e.isDown || !hudShared.nativeUp || !hudPrompt.current) return;
+    const code = buttonKeyCode(e);
+    if (code !== KEY_YES && code !== KEY_NO) return;
+    try {
+      if (this.sp.browser.isFocused() || this.sp.Ui.isMenuOpen(Menu.Console) || this.sp.Ui.isMenuOpen("CustomMenu" as Menu)) return;
+    } catch { return; }
+    try {
+      if (pressKey(code, Date.now())) { this.last = ""; logTrace(this, "HUD prompt answered with", code === KEY_YES ? "Y" : "N"); }
+    } catch (err) { logError(this, "HUD prompt answer failed", err); }
   }
 
   private onBrowserMessage(e: BrowserMessageEvent): void {
@@ -80,6 +97,7 @@ export class NativeHudService extends ClientListener {
     const now = Date.now();
     if (now - this.pushedAt < PUSH_MS) return;
     const p = payloadOf(hudShared.server, hudShared.vitals, hudShared.voiceMode, hudShared.talking, this.ui, this.clock, now, hudShared.party);
+    if (p) p.prompt = promptView(hudPrompt.current, now);
     const json = changedJson(p, this.last);
     if (json === null) return;
     try {
@@ -92,5 +110,6 @@ export class NativeHudService extends ClientListener {
     if (hudShared.nativeUp !== up) logTrace(this, `native HUD ${up ? "up" : "down"}:`, why);
     hudShared.nativeUp = up;
     this.last = "";
+    if (!up) handBack();
   }
 }
