@@ -4,7 +4,10 @@
 # saw `for f in` followed by a newline. A visual preview of the command looked fine to me, which is exactly
 # why this script runs `sh -n` on it and then executes it against a fake directory.
 set -uo pipefail
-HERE=$(cd "$(dirname "$0")" && pwd)
+# Scratch goes outside the repo, same rule baseline.sh enforces for the snapshot: a script that litters the
+# working tree when it is interrupted is a script someone will commit the litter from.
+HERE=${TMPDIR:-/tmp}/dbo-baseline-remotecmd
+mkdir -p "$HERE" || exit 2
 dir="/opt/alduinak/build/dist/server"
 
 # Same list and same construction as baseline.sh.
