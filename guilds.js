@@ -357,6 +357,8 @@ module.exports = (api) => {
   // opts.alpha: a pack challenge, which seats the Alpha as it always has (Nate, 23 Oct: "Keep pack alphas the same")
   const setMember = (fid, a, rank, by, opts) => {
     const f = FACTIONS.get(fid);
+    // vampirepath.js bloodlines: the Blood Crown's holder may not join House Ravenwatch
+    if (f && !entryOf(fid, a)) { try { const no = typeof globalThis.__dboVampJoinRefusal === 'function' ? globalThis.__dboVampJoinRefusal(a >>> 0, fid) : ''; if (no) return String(no); } catch (e) { /* vampirepath not loaded */ } }
     if (f && f.kind === 'pack' && !entryOf(fid, a) && packFull(fid)) return `${f.name} is full: a pack runs ${Math.max(1, Number(PACKS.maxMembers) || 5)} strong, its Alpha included.`;
     // One pack per werewolf (Nate, 23 Oct: pack control): a member of another pack is refused until they leave it
     if (f && f.kind === 'pack' && !entryOf(fid, a)) {

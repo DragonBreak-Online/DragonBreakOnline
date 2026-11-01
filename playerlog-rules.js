@@ -2195,6 +2195,9 @@ vampirepath.js VAMPATH a0e54af4 excluded
 vampirepath.js VAMPATH b9913fc3 excluded
 vampirepath.js VAMPATH e239a18c excluded
 vampirepath.js VAMPATH e33c6de6 excluded
+vampirepath.js VAMPATH 54ec3363 excluded
+vampirepath.js VAMPATH 560790b6 excluded
+vampirepath.js VAMPATH 4f692cd2 excluded
 decor.js DECOR 78b19505 excluded
 decor.js DECOR 58dabe15 excluded
 decor.js DECOR 9650b7e1 excluded

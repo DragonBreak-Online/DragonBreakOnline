@@ -9135,6 +9135,8 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
   // attacker's claws and Drain landed while nothing could land on them (combat review, 2026-09-29)
   globalThis.__dboHitRefusal = 'ethereal';
   try { if (globalThis.__dboBeastEthereal && (globalThis.__dboBeastEthereal(tgt) || (agg !== tgt && globalThis.__dboBeastEthereal(agg)))) return false; } catch (e) { /* not loaded */ }
+  // A Keerilth vampire's mist (vampirepath.js /mist) is the same: untouched, touching nothing
+  try { if (globalThis.__dboVampMist && (globalThis.__dboVampMist(tgt) || (agg !== tgt && globalThis.__dboVampMist(agg)))) return false; } catch (e) { /* not loaded */ }
   // 0b. A caster under Arcane Asylum takes nothing, until their own blow ends it (asylumHit, above)
   globalThis.__dboHitRefusal = 'asylum';
   if (asylumHit(agg, tgt)) return false;
@@ -9241,6 +9243,8 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     try { if (gearEnch) targetSide *= gearEnch.spellbreakerMult(agg, tgt, src, dmg, flags); } catch (e) { log('spellbreaker failed', e.message); }
     // A Briarheart's poison and frost resistance and fire weakness (briarheart.js), under the same cap as the race's
     try { if (globalThis.__dboBriarheartTargetMult) targetSide *= Number(globalThis.__dboBriarheartTargetMult(agg, tgt, src)) || 1; } catch (e) { log('briarheart target failed', e.message); }
+    // A vampire line's resistance (vampirepath.js bloodlines: the Volkihar's frost), under the same cap as the race's
+    try { if (globalThis.__dboBloodlineTargetMult) { const b = Number(globalThis.__dboBloodlineTargetMult(agg, tgt, src)); if (b >= 0) targetSide *= b; } } catch (e) { log('bloodline target failed', e.message); }
     if (racial) { try { targetSide = racial.capTargetSide(targetSide * racial.targetMult(agg, tgt, src, dmg)); } catch (e) { log('racial target failed', e.message); } }
     let raceAtk = 1;
     if (racial && !beastAgg) { try { raceAtk = racial.attackMult(agg, tgt, src, dmg, flags); } catch (e) { log('racial attack failed', e.message); } }
@@ -9248,6 +9252,8 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     if (!beastAgg) mult *= gearAttackMult(agg, src);
     // A Hagraven's Destruction (hagraven.js), by her stage
     try { if (globalThis.__dboHagravenAttackMult) mult *= Number(globalThis.__dboHagravenAttackMult(agg, src)) || 1; } catch (e) { log('hagraven attack failed', e.message); }
+    // A vampire line's blows (vampirepath.js bloodlines: the Berne's sneak attacks, fists and spells; Ravenwatch's Drain and night)
+    try { if (globalThis.__dboBloodlineAttackMult) { const b = Number(globalThis.__dboBloodlineAttackMult(agg, tgt, src, flags)); if (b >= 0) mult *= b; } } catch (e) { log('bloodline attack failed', e.message); }
     // The Shrouded Gloves double a one-handed sneak attack (gearench.js backstabMult)
     try { if (gearEnch && !beastAgg) mult *= gearEnch.backstabMult(agg, src, flags); } catch (e) { log('backstab failed', e.message); }
     // Tired blows, fists into armour, staves through it, the fist's stamina drain and disarm (martial.js)
@@ -10391,8 +10397,8 @@ try {
   const VAMPIREPATH_JS = path.resolve('vampirepath.js');
   delete require.cache[VAMPIREPATH_JS];
   require(VAMPIREPATH_JS)({ mp, log, personal, audit, who, display, sendPacket, onlineActors, every, registerChatCommand, profileOf, cfg,
-    isLeadStaff, findByName, inEditor });
-} catch (e) { log('vampirepath.js failed to load:', e.stack || e.message); for (const k of ['__dboSafeZone', '__dboFeralFrenzyEnded', '__dboFeralKilled', '__dboVampFed', '__dboVampAggMult', '__dboVampSunMult', '__dboVampPrayed', '__dboVampEmbraceRefusal', '__dboVampPowerUsed', '__dboVampDrainSeconds', '__dboVampDrainStarted', '__dboVampDrainBroken', '__dboVampDrainDone']) globalThis[k] = null; }
+    isLeadStaff, findByName, inEditor, fitsElement, isMagicSource });
+} catch (e) { log('vampirepath.js failed to load:', e.stack || e.message); for (const k of ['__dboSafeZone', '__dboFeralFrenzyEnded', '__dboFeralKilled', '__dboVampFed', '__dboVampAggMult', '__dboVampSunMult', '__dboVampPrayed', '__dboVampEmbraceRefusal', '__dboVampPowerUsed', '__dboVampDrainSeconds', '__dboVampDrainStarted', '__dboVampDrainBroken', '__dboVampDrainDone', '__dboBloodlineAttackMult', '__dboBloodlineTargetMult', '__dboVampTakenMult', '__dboVampTellsShift', '__dboVampBloodMult', '__dboVampFeedRefusal', '__dboVampCrownRefusal', '__dboVampJoinRefusal', '__dboVampMist']) globalThis[k] = null; }
 // ---- province rules for crafting and the tome shop (server\regions.js, config "regions"): before spells.js, which asks it ----
 try {
   const REGIONS_JS = path.resolve('regions.js');

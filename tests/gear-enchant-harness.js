@@ -377,7 +377,8 @@ const hp = (a) => S.get(a).percentages.health;
   check('...Fortify Block adds to the block potion in combat.js', /1 - Math\.min\(1, blockPotion \+ blockGear\)/.test(read('combat.js')));
   check('...Fortify Pickpocket adds to the thief\'s chance in pickpocket.js', /chanceFor\(tier, g, drawn, a\)/.test(read('pickpocket.js')) && /b\(thief, 'pickpocket'\)/.test(read('pickpocket.js')));
   check('...Fortify Unarmed shares gearFortify (AV 35)', /35: 'unarmed'/.test(gm));
-  check('item 8: Spellbreaker joins the target side before the cap', /targetSide \*= gearEnch\.spellbreakerMult\(agg, tgt, src, dmg, flags\);[\s\S]{0,600}racial\.capTargetSide/.test(gm));
+  // the vampire line's target multiplier (vampirepath.js bloodlines) also sits before the cap, after briarheart's
+  check('item 8: Spellbreaker joins the target side before the cap', /targetSide \*= gearEnch\.spellbreakerMult\(agg, tgt, src, dmg, flags\);[\s\S]{0,900}racial\.capTargetSide/.test(gm));
   check('...the Shrouded Gloves multiply the blow, never a beast\'s', /if \(gearEnch && !beastAgg\) mult \*= gearEnch\.backstabMult\(agg, src, flags\)/.test(gm));
   console.log(failed ? `${failed} failed` : 'all checks passed');
   process.exit(failed ? 1 : 0);
