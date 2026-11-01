@@ -9,6 +9,13 @@ import * as path from "path";
 // to a stronghold when inside its radius, otherwise to the nearest hold capital.
 // Interiors have no zone unless a region claims their worldspace.
 //
+// With zones.json's sovereignty.holdsFromCells true, a Tamriel position outside every stronghold takes its cell's hold
+// from hold-cells.json beside it: each exterior cell's hold from the game's own data (the cell's location up its parent
+// locations to WhiterunHoldLocation and the rest; _work/map-borders/tools/hold_cells.py), the table the world map's
+// borders are drawn from. A cell the table leaves out, or a missing table, falls back to the nearest capital. The table is
+// read at boot with zones.json and published as globalThis.__dboHoldCells; the gamemode's zoneAtPlace uses that very
+// object and nothing else, so the two never disagree, and a restart switches both at once.
+//
 // officials.json (same place) says who holds a rank in a zone, by profile id:
 //   { "whiterun": { "jarl": [1], "steward": [2, 3] }, "gol-kharzum": { "chieftain": [4] } }
 // It is written by the gamemode's /appoint and /dismiss commands and re-read on change.
@@ -31,6 +38,7 @@ export interface Zone {
 const ZONES_FILE = "zones.json";
 const OFFICIALS_FILE = "officials.json";
 const SEATS_FILE = "officials-seats.json";
+const HOLD_CELLS_FILE = "hold-cells.json";
 const TAMRIEL_DESCS = ["3c:skyrim.esm"];
 // City worldspaces share Tamriel's coordinate frame, so a board in WhiterunWorld resolves like one outside the walls.
 const CITY_WORLD_DESCS = ["1a26f:skyrim.esm", "1691d:skyrim.esm", "16bb4:skyrim.esm", "16d71:skyrim.esm", "37edf:skyrim.esm"];
@@ -42,6 +50,33 @@ const cityOf = (v: any): Zone["majorCity"] => {
   const center = numList(v && v.center);
   const radius = Number(v && v.radius);
   return center.length >= 2 && radius > 0 ? { center, radius } : undefined;
+};
+
+// hold-cells.json: the cell grid c0..c0+n-1 on both axes, rows north first, one character per cell west to east, the
+// index of its hold in holds ("0".."9", then "a".."z"), "." for a cell with none
+export interface HoldCells { version: number; c0: number; n: number; holds: string[]; rows: string[] }
+
+// The table if it is whole and names only holds zones.json has; null otherwise
+export const parseHoldCells = (raw: any, holdIds: string[]): HoldCells | null => {
+  if (!raw || typeof raw !== "object") return null;
+  const c0 = Number(raw.c0), n = Number(raw.n);
+  const holds = Array.isArray(raw.holds) ? raw.holds.map(String) : [];
+  const rows = Array.isArray(raw.rows) ? raw.rows.map(String) : [];
+  if (!Number.isInteger(c0) || !Number.isInteger(n) || n <= 0 || rows.length !== n || !holds.length || holds.length > 36) return null;
+  if (holds.some((h: string) => holdIds.indexOf(h) === -1)) return null;
+  for (const r of rows) {
+    if (r.length !== n) return null;
+    for (const ch of r) if (ch !== "." && !(parseInt(ch, 36) < holds.length)) return null;
+  }
+  return { version: Number(raw.version) || 0, c0, n, holds, rows };
+};
+
+// The hold id of the cell holding (x, y) in Tamriel's frame, or null outside the table
+export const cellHold = (t: HoldCells, x: number, y: number): string | null => {
+  const i = Math.floor(x / 4096) - t.c0, j = t.c0 + t.n - 1 - Math.floor(y / 4096);
+  if (!(i >= 0 && i < t.n && j >= 0 && j < t.n)) return null;
+  const ch = t.rows[j][i];
+  return ch === "." ? null : t.holds[parseInt(ch, 36)] || null;
 };
 
 // "0x1A26F:Skyrim.esm", "1a26f:Skyrim.esm" and "01A26F:skyrim.esm" are one worldspace.
@@ -80,6 +115,17 @@ export class Zones {
       }
       this.rankTitles = raw.rankTitles && typeof raw.rankTitles === "object" ? raw.rankTitles : {};
       this.strongholdsOverride = !(raw.sovereignty && raw.sovereignty.strongholdsOverrideHolds === false);
+      this.holdCells = null;
+      if (raw.sovereignty && raw.sovereignty.holdsFromCells === true) {
+        const cellsFile = path.join(dir, HOLD_CELLS_FILE);
+        let rawCells: any = null;
+        try { rawCells = JSON.parse(fs.readFileSync(cellsFile, "utf8")); } catch { /* reported below */ }
+        this.holdCells = parseHoldCells(rawCells, this.zones.filter((z) => z.kind === "hold").map((z) => z.id));
+        this.log(this.holdCells
+          ? `[zones] holds by cell from ${cellsFile} (version ${this.holdCells.version}, ${this.holdCells.n}x${this.holdCells.n} cells)`
+          : `[zones] sovereignty.holdsFromCells is on but ${cellsFile} is missing or unreadable; holds by nearest capital`);
+      }
+      (globalThis as any).__dboHoldCells = this.holdCells;
       this.officialsPath = path.join(dir, OFFICIALS_FILE);
       this.dataDir = dir;
       this.log(`[zones] ${this.zones.length} zones from ${file}`);
@@ -87,6 +133,9 @@ export class Zones {
     }
     this.log(`[zones] ${ZONES_FILE} not found next to the server; nothing has a zone`);
   }
+
+  // hold-cells.json while sovereignty.holdsFromCells is on and the table is whole, else null (nearest capital)
+  holdCells: HoldCells | null = null;
 
   get all(): Zone[] { return this.zones; }
   // The folder zones.json was found in; sidecar files (officials, notice boards) live there too.
@@ -124,6 +173,11 @@ export class Zones {
         const dx = x - z.center[0], dy = y - z.center[1];
         if (dx * dx + dy * dy <= z.radius * z.radius) return z;
       }
+    }
+    if (this.holdCells) {
+      const id = cellHold(this.holdCells, x, y);
+      const z = id ? this.byId(id) : null;
+      if (z) return z;
     }
     let best: Zone | null = null, bestD2 = Infinity;
     for (const z of this.zones) {
