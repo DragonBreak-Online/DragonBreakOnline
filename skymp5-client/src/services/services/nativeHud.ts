@@ -21,7 +21,10 @@ export const hudShared: {
   nativeUp: boolean;
   // the party list as DboRelayService builds it for the browser's party widget (null: no party and no companions)
   party: { rows: PartyRow[]; self: number } | null;
-} = { server: null, vitals: null, voiceMode: "", talking: false, nativeUp: false, party: null };
+  // the activate wording beside the crosshair (InteractionPromptService), and the letters over boards (BoardMailService)
+  interact: { verb: string; label: string } | null;
+  mail: { markers: Array<{ x: number; y: number; near: number }>; unread: number } | null;
+} = { server: null, vitals: null, voiceMode: "", talking: false, nativeUp: false, party: null, interact: null, mail: null };
 
 // One party row as the relay builds it: a member (server id) or an own summon or companion
 export interface PartyRow {
@@ -95,7 +98,17 @@ export interface HudPayload {
   watermark: boolean;
   // the prompt up, answered with Y and N (nativePrompt.ts promptView); set by NativeHudService
   prompt?: HudPrompt | null;
+  // the activate wording, and the mail letters at screen fractions (x from the left, y from the top); set by NativeHudService
+  interact?: { verb: string; label: string } | null;
+  mail?: { markers: Array<{ x: number; y: number; scale: number }>; unread: number } | null;
 }
+
+// The letters over boards as dbo_hud draws them: the browser's scale (0.6 far, 1.2 at the board), a count past one letter
+export const mailOf = (m: { markers: Array<{ x: number; y: number; near: number }>; unread: number } | null): { markers: Array<{ x: number; y: number; scale: number }>; unread: number } | null => {
+  if (!m || !Array.isArray(m.markers) || !m.markers.length || !(m.unread > 0)) return null;
+  const r3 = (v: number): number => Math.round(v * 1000) / 1000;
+  return { unread: m.unread, markers: m.markers.map((k) => ({ x: r3(k.x), y: r3(k.y), scale: r3(0.6 + 0.6 * Math.max(0, Math.min(1, Number(k.near) || 0))) })) };
+};
 
 // The two change clocks the fade rules count from, kept between frames as the front's refs keep them
 export interface HudClock { barsKey: string; barsAt: number; cornerKey: string; cornerAt: number }

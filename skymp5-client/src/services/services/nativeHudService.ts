@@ -3,7 +3,7 @@ import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { logError, logTrace } from "../../logging";
 import { KEY_NO, KEY_YES, handBack, hudPrompt, pressKey, promptView } from "./nativePrompt";
 import { buttonKeyCode } from "./mouseKeys";
-import { ALIVE_FRAMES, HudClock, LoadState, UiChoice, changedJson, hudShared, loadStep, newClock, newLoad, payloadOf, uiFromFile } from "./nativeHud";
+import { ALIVE_FRAMES, HudClock, mailOf, LoadState, UiChoice, changedJson, hudShared, loadStep, newClock, newLoad, payloadOf, uiFromFile } from "./nativeHud";
 
 // The native HUD (route H, _work/native-everything-1031.md; the /testmenu hud probe showed our own swf loads and runs in
 // the HUD Menu): the vitals, the racial power, gold, hunger and the voice range, drawn by Data\Interface\dbo_hud.swf loaded
@@ -97,7 +97,7 @@ export class NativeHudService extends ClientListener {
     const now = Date.now();
     if (now - this.pushedAt < PUSH_MS) return;
     const p = payloadOf(hudShared.server, hudShared.vitals, hudShared.voiceMode, hudShared.talking, this.ui, this.clock, now, hudShared.party);
-    if (p) p.prompt = promptView(hudPrompt.current, now);
+    if (p) { p.prompt = promptView(hudPrompt.current, now); p.interact = hudShared.interact; p.mail = mailOf(hudShared.mail); }
     const json = changedJson(p, this.last);
     if (json === null) return;
     try {

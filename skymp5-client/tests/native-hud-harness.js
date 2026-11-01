@@ -183,6 +183,26 @@ check('the service is started', /new NativeHudService\(sp, controller\),/.test(s
 check('the front leaves out its corner, bars and watermark while native (dbo_hud draws them)', /\{data\.native \? null : <Corner/.test(front) && /\{data\.native \? null : <Vitals data=\{data\} ui=\{ui\} \/>\}/.test(front) && /<Watermark on=\{data\.watermarkOn !== false && !data\.native\} \/>/.test(front));
 check('...and forwards V to the client', /sendMessage\('dbo:voicePtt', on\)/.test(front));
 
+// ---- the activate wording and the mail letters (Worker 1, 1 Nov) ----
+const mo = H.mailOf({ unread: 3, markers: [{ x: 0.25, y: 0.4, near: 0 }, { x: 0.5123456, y: 0.3, near: 1 }, { x: 0.7, y: 0.5, near: 2 }] });
+check('mailOf: none without letters or without unread mail', H.mailOf(null) === null && H.mailOf({ unread: 0, markers: [{ x: 0.5, y: 0.5, near: 1 }] }) === null && H.mailOf({ unread: 2, markers: [] }) === null);
+check('mailOf: the browser\'s scale, 0.6 far to 1.2 at the board (clamped), and screen fractions kept', mo.unread === 3 && mo.markers[0].scale === 0.6 && mo.markers[1].scale === 1.2 && mo.markers[2].scale === 1.2
+  && mo.markers[1].x === 0.512 && mo.markers[0].y === 0.4, mo);
+const m4 = S.boot('dbo_hud', true);
+m4.push(pay({ interact: null, mail: null }));
+check('dbo_hud: no wording and no letters before there are any', m4.root.interact._visible === false && m4.root.mail._visible === false);
+m4.push(pay({ interact: { verb: 'Open', label: 'Iron Door' }, mail: mo }));
+const IA = m4.root.interact;
+check('dbo_hud: the wording beside the crosshair, the verb in capitals over the label', IA._visible === true && IA.verb.text === 'OPEN' && IA.label.text === 'Iron Door' && IA.label._y === 0
+  && Math.abs(IA._x - 1280 * 0.495) < 1 && Math.abs(IA._y - 720 * 0.62) < 1, [IA.verb.text, IA.label.text, IA._x, IA._y]);
+const MA = m4.root.mail.all;
+check('dbo_hud: a letter at each board\'s screen point, sized by nearness, the count past one letter', !!MA && !!MA.m0 && !!MA.m2 && Math.abs(MA.m0._x - 320) < 1 && Math.abs(MA.m0._y - 288) < 1
+  && MA.m0._xscale === 60 && MA.m1._xscale === 120 && MA.m1.count && MA.m1.count.text === '3', MA && MA.m0 && [MA.m0._x, MA.m0._y, MA.m0._xscale]);
+m4.push(pay({ interact: { verb: '', label: 'Bleak Falls Barrow' }, mail: Object.assign({}, mo, { unread: 1 }) }));
+check('dbo_hud: a load door\'s name alone, moved up; one letter carries no count', m4.root.interact.verb.text === '' && m4.root.interact.label._y === -12 && !m4.root.mail.all.m0.count);
+m4.push(pay({ interact: null, mail: null }));
+check('dbo_hud: both go when the crosshair leaves and the mail is read', m4.root.interact._visible === false && m4.root.mail._visible === false);
+
 // ---- mutants of nativeHud.ts's party and watermark decisions: each altered copy must fail (Worker 4, 1 Nov: a mutant
 // run by hand protects nothing later, so they live here) ----
 const partyChecks = (M) => {
@@ -194,6 +214,8 @@ const partyChecks = (M) => {
   c(q && q.rows[0].leader && q.rows[0].self && q.rows[0].pct === 80 && q.rows[1].dead && q.rows[1].pct === 100 && !q.rows[1].self && q.rows[2].far);
   c(q && q.rows[3].tag === 'stay' && q.rows[3].clock === '1:05' && !q.rows[3].self);
   const s0 = { hunger: 0, stage: 'sated', hungerOn: true, vitalsOn: true };
+  const mm = M.mailOf({ unread: 3, markers: [{ x: 0.25, y: 0.4, near: 0 }, { x: 0.5, y: 0.3, near: 2 }] });
+  c(M.mailOf({ unread: 0, markers: [{ x: 0.5, y: 0.5, near: 1 }] }) === null && mm && mm.markers[0].scale === 0.6 && mm.markers[1].scale === 1.2);
   c(M.payloadOf(s0, null, 'talk', false, M.UI_DEFAULTS, M.newClock(0), 0).watermark === true && M.payloadOf(Object.assign({}, s0, { watermarkOn: false }), null, 'talk', false, M.UI_DEFAULTS, M.newClock(0), 0).watermark === false);
   return bad;
 };
@@ -215,6 +237,8 @@ check('the mutant checks pass on nativeHud.ts as it is', partyChecks(H) === 0);
   ['no summon clock', 'clock: r.summon && r.leftSec ?', 'clock: false ?'],
   ['health not clamped', 'pct: Math.max(0, Math.min(100, Number(r.health) || 0)),', 'pct: Number(r.health) || 0,'],
   ['the watermark ignores the server', 'watermark: server.watermarkOn !== false,', 'watermark: true,'],
+  ['letters drawn with no unread mail', '|| !(m.unread > 0)) return null;', ') return null;'],
+  ['letters not clamped at the board', 'scale: r3(0.6 + 0.6 * Math.max(0, Math.min(1, Number(k.near) || 0)))', 'scale: r3(0.6 + 0.6 * (Number(k.near) || 0))'],
 ].forEach(([name, a, b], i) => {
   if (!HUD_SRC.includes(a)) { check(`mutant "${name}": its line is in nativeHud.ts`, false, a); return; }
   let bad = 0;
