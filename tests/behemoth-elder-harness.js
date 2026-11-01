@@ -1,8 +1,8 @@
 // The Werewolf Behemoth (DLE race 1d1f9e, 1.3x) is the form of an Elder of the Great Hunt only (Nate, 15 Oct), behind
-// config beastform.behemoth.enabled, which ships OFF until client 0.3.100 (its watcher guard) is out and a live two-player
-// test passes. Loads the real greathunt.js and beastform.js: with the switch on an Elder changes into the Behemoth (own
+// config beastform.behemoth.enabled, ON since 27 Oct (Nat tested it live: 'behemoth form works perfectly'; it shipped
+// off until then). Loads the real greathunt.js and beastform.js: with the switch on an Elder changes into the Behemoth (own
 // client and watchers' dboBeastBody), a Blood-Howler and a Fledgling keep the vanilla werewolf; with it off nobody gets it;
-// the shipped config has it off. Vampire Lords never do.
+// the shipped config has it on. Vampire Lords never do.
 //   node tests/behemoth-elder-harness.js   (from server/)
 'use strict';
 const fs = require('fs');
@@ -50,10 +50,10 @@ const change = (a) => { globalThis.__dboBeastRevert(a, 'test'); packets.length =
 
 const cfgFile = JSON.parse(fs.readFileSync(path.join(ROOT, 'gamemode-config.json'), 'utf8'));
 const shipped = (cfgFile.beastform || {}).behemoth || {};
-ok(shipped.enabled === false && shipped.race === '1d1f9e:DragonBreak Online Edits.esp' && shipped.rank === 'Elder', 'shipped config: the Behemoth is off, race 1d1f9e, for the Elder', shipped);
+ok(shipped.enabled === true && shipped.race === '1d1f9e:DragonBreak Online Edits.esp' && shipped.rank === 'Elder', 'shipped config: the Behemoth is on (27 Oct), race 1d1f9e, for the Elder', shipped);
 
-// The switch as shipped (off)
-load(shipped);
+// Switched off
+load(Object.assign({}, shipped, { enabled: false }));
 ok(globalThis.__dboHuntRank(ELDER).name === 'Elder' && globalThis.__dboHuntRank(HOWLER).name === 'Blood-Howler', 'greathunt ranks: 1600 renown is Elder, 900 Blood-Howler');
 ok(change(ELDER) && ownRace(ELDER) === WEREWOLF, 'switch off: an Elder takes the vanilla werewolf', ownRace(ELDER).toString(16));
 ok(!props.get(`${ELDER}|private.beast`).race, '...and no race is kept on the beast state');

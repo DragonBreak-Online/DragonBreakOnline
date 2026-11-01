@@ -95,7 +95,8 @@ online = [A, B, C, D, E];
 
 // Wiring and config
 const gm = fs.readFileSync(path.join(ROOT, 'gamemode.js'), 'utf8');
-ok(/require\(DISPATCHES_JS\)\(\{ mp, log, personal, deliver, registerChatCommand, onlineActors, nameOf, zoneOfActor, cfg \}\)/.test(gm), 'gamemode.js loads dispatches.js');
+// holdOfActor since deece6d5 (stronghold zones, 1 Nov): a runner's reach is the hold around a stronghold, not the ring
+ok(/require\(DISPATCHES_JS\)\(\{ mp, log, personal, deliver, registerChatCommand, onlineActors, nameOf, zoneOfActor, holdOfActor, cfg \}\)/.test(gm), 'gamemode.js loads dispatches.js, with holdOfActor');
 const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'gamemode-config.json'), 'utf8')).dispatches || {};
 ok(cfg.enabled === true && cfg.delays && cfg.delays.hold === 5 && cfg.delays.province === 30 && cfg.delays.far === 90, 'gamemode-config.json dispatches: on, 5/30/90 s', cfg);
 
