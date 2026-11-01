@@ -74,6 +74,8 @@ export const NATIVE_CAPS = [
   "native:classLectern",
   // Worker 6's bank (dbo_bank, widget 48: the account, treasuries and the vault). All its keys are dbo:bank*
   "native:bank",
+  // Worker 1's character panels: the birthsign picker (dbo_birthsign, widget 163; dbo:birthsignPick/birthsignClose)
+  "native:birthsignPicker",
 ];
 export const CAPS_RETRY_MS = 5000;
 
