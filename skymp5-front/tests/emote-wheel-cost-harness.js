@@ -23,15 +23,16 @@ const rules = (sel) => {
 };
 const has = (body, prop) => new RegExp(`(^|[;\\s])${prop}\\s*:`).test(body);
 
-// The boxes the preview gif sits inside: none may carry a filter or backdrop-filter of its own
-for (const sel of ['.emote-wheel', '.emote-wheel__stage', '.emote-wheel__preview']) {
+// The boxes that cover the screen: none may carry a filter or backdrop-filter of its own (the GIF preview is gone since
+// 26 Oct, but every hover still repaints the ring inside them)
+for (const sel of ['.emote-wheel', '.emote-wheel__fade', '.emote-wheel__stage']) {
   const body = rules(sel);
-  check(`${sel} has no filter (a gif inside it repaints it every frame)`, !has(body, 'filter'), body);
+  check(`${sel} exists`, body.length > 0);
+  check(`${sel} has no filter (anything inside it repaints it on every hover)`, !has(body, 'filter'), body);
   check(`${sel} has no backdrop-filter`, !has(body, 'backdrop-filter'), body);
 }
 // The ring keeps its own shadow, so the look stays
 check('the ring keeps its drop-shadow', /drop-shadow/.test(rules('.emote-wheel__svg')));
-check('the preview frame keeps its box-shadow', has(rules('.emote-wheel__preview-frame'), 'box-shadow'));
 
 console.log(failures ? `${failures} FAILED` : 'all passed');
 process.exit(failures ? 1 : 0);
