@@ -49,7 +49,19 @@ check('no dboIdle sets serverIdle before the idle plays', !/this\.serverIdle = a
 const fs2 = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'services', 'services', 'factionService.ts'), 'utf8');
 check('F3 says it is opening the journal', /"Opening your journal…"/.test(fs2) && !/Opening your factions/.test(fs2));
 check('a held idle is not cut to 10 s', /public playActionIdle\(anim: string, seconds: number, endsItself: boolean, hold = false, fromServer = false\): void \{\s*const held = hold \? seconds : Math\.min\(MAX_IDLE_SECONDS/.test(es));
-check('the player\'s own wheel choice is never the server\'s idle', /if \(key === events\.play\) \{\s*const anim = [^\n]*\n\s*\/\/[^\n]*\n\s*this\.serverIdle = "";/.test(es));
+// Behaviour, not layout: the play key routes somewhere that clears the server's idle before closing the
+// menu. It used to be inlined in the events.play branch; the native and browser wheels now share one
+// handler, so pinning the old inline shape only broke when that was done properly.
+const playTarget = (es.match(/if \(key === events\.play\) \{\s*(?:this\.)?([A-Za-z_$][\w$]*)\s*\(/) || [, ''])[1];
+const playHandler = playTarget
+  // The modifier is REQUIRED: without it this matches the call site rather than the declaration, and the
+  // captured "body" is nine characters of argument list.
+  ? (es.match(new RegExp('(?:private|public|protected) ' + playTarget + '\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n  \\}')) || [, ''])[1]
+  : (es.match(/if \(key === events\.play\) \{([\s\S]*?)\n    \}/) || [, ''])[1];
+check('the player\'s own wheel choice is never the server\'s idle',
+  /this\.serverIdle = "";/.test(playHandler) &&
+  playHandler.indexOf('this.serverIdle = ""') < playHandler.indexOf('this.closeMenu('),
+  { via: playTarget || 'inline', clears: /this\.serverIdle = "";/.test(playHandler) });
 check('the limits come from idleControl, not a second copy', /import \{ MIN_IDLE_SECONDS, MAX_IDLE_SECONDS, idleRequest, stopsIdle \} from "\.\/idleControl";/.test(es) && !/^const MAX_IDLE_SECONDS/m.test(es));
 
 // ---- the auto-move clear ----
