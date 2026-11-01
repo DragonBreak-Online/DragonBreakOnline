@@ -83,6 +83,7 @@ import { ArmourWearService } from "./services/services/armourWearService";
 import { ItemCardProbeService } from "./services/services/itemCardProbeService";
 import { HudProbeService } from "./services/services/hudProbeService";
 import { NativeHudService } from "./services/services/nativeHudService";
+import { NativeEmoteWheelService } from "./services/services/nativeEmoteWheelService";
 import { PaleCoatService } from "./services/services/paleCoatService";
 import { AppearanceExtrasService } from "./services/services/appearanceExtrasService";
 import { RestraintService } from "./services/services/restraintService";
@@ -259,6 +260,7 @@ const main = () => {
       new ItemCardProbeService(sp, controller),
       new HudProbeService(sp, controller),
       new NativeHudService(sp, controller),
+      new NativeEmoteWheelService(sp, controller),
       new PaleCoatService(sp, controller),
       new AppearanceExtrasService(sp, controller),
       new RestraintService(sp, controller),

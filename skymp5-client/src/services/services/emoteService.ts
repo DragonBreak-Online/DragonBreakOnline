@@ -13,6 +13,8 @@ import { BrowserMessageEvent, ButtonEvent, DxScanCode, InputDeviceType } from "s
 import { logTrace } from "../../logging";
 import { MIN_IDLE_SECONDS, MAX_IDLE_SECONDS, idleRequest, stopsIdle } from "./idleControl";
 import { WHEEL_RELEASE_EVENT, wheelWatch, wheelKeyAction, wheelReleaseAction } from "./emoteWheelWatch";
+import { NativeEmoteWheelService } from "./nativeEmoteWheelService";
+import { newWheel, openWheel, closeWheel, moveMouse, pointStick, tickWheel, pointedAnim, numberedAnim, stepGroup, payloadOf } from "./nativeEmoteWheel";
 
 // for the browser-side widget setter (executed inside the CEF browser)
 declare const window: any;
@@ -180,10 +182,14 @@ export class EmoteService extends ClientListener {
     this.controller.emitter.on("gameLoad", () => { this.activeEmote = ""; this.chainId++; this.seatedChain++; });
     this.controller.emitter.on("customPacketMessage", (e) => this.onCustomPacketMessage(e));
     // A front reload drops the widget without an emote:close message.
-    this.controller.emitter.on("browserWindowLoaded", () => { this.menuOpen = false; });
+    this.controller.emitter.on("browserWindowLoaded", () => { if (!this.nativeOpen) this.menuOpen = false; });
     this.controller.emitter.on("uiHiddenChanged", (e) => { if (e.hidden && this.menuOpen) this.closeMenu("interface hidden"); });
-    // A wheel still drawn after the browser lost the cursor is taken down (emoteWheelWatch.ts)
-    this.controller.on("update", () => this.watchWheel());
+    // A wheel still drawn after the browser lost the cursor is taken down (emoteWheelWatch.ts); the native one is drawn and
+    // pointed each frame instead
+    this.controller.on("update", () => { if (this.nativeOpen) this.tickNative(); else this.watchWheel(); });
+    // The native wheel is pointed by the mouse's own movement or the right stick: no cursor, no menu
+    this.controller.on("mouseMove", (e) => { if (this.nativeOpen) moveMouse(this.native, e.inputX, e.inputY); });
+    this.controller.on("thumbstickEvent", (e) => { if (this.nativeOpen && !e.isLeft) pointStick(this.native, e.inputX, e.inputY); });
 
     this.menuKey = readMenuKeyCode(this.sp, "emoteWheelKeyCode", DxScanCode.B);
     // Gamepad: the modifier (Back) held with the left stick click (Sneak alone)
@@ -225,6 +231,7 @@ export class EmoteService extends ClientListener {
   }
 
   private onButtonEvent(e: ButtonEvent): void {
+    if (this.nativeOpen && e.isDown && this.onNativeButton(e)) return;
     // The key's scan code, or 256 + the button for a bindable mouse button (mouseKeys.ts); a gamepad chord stands in
     // for its key
     const code = buttonKeyCode(e) ?? (isGamepadChord(this.sp, e, this.menuPad) ? this.menuKey : null);
@@ -268,6 +275,11 @@ export class EmoteService extends ClientListener {
     this.heldFrom = 0;
     if (wheelReleaseAction(this.menuOpen, heldFrom, Date.now()) !== "commit") return;
     emoteNote(`wheel key released after ${Date.now() - heldFrom} ms: the pointed emote`);
+    if (this.nativeOpen) {
+      const anim = pointedAnim(this.native, GROUPS);
+      if (anim) this.chooseFromWheel(anim); else this.closeMenu("its key released on no emote");
+      return;
+    }
     this.controller.once("update", () => {
       try {
         this.sp.browser.executeJavaScript(`window.dispatchEvent(new CustomEvent(${JSON.stringify(WHEEL_RELEASE_EVENT)}));`);
@@ -315,41 +327,47 @@ export class EmoteService extends ClientListener {
       return;
     }
     if (key === events.play) {
-      const anim = typeof e.arguments[1] === "string" ? (e.arguments[1] as string) : "";
-      // The player's own choice is never the server's idle, even when it is the same clip
-      this.serverIdle = "";
-      this.closeMenu(`a choice (${anim || "?"})`);
-      emoteNote(`play ${anim || "?"} (active ${this.activeEmote || "none"})`);
-      if (!this.allowedAnims.has(anim)) {
-        logTrace(this, `Emote not in the catalog`, anim);
-        emoteNote(`refused ${anim || "?"}: not in the catalog`);
-        return;
-      }
-      if (this.isPoseLocked()) {
-        notifyNextUpdate(this.controller, this.sp, "You cannot use emotes while restrained.");
-        emoteNote(`refused ${anim}: restrained`);
-        return;
-      }
-      // Browser messages arrive in tick context, where every Papyrus native throws "can't be called in this context"
-      // and EventsApi swallows the error: idleBlocker() (Game.getPlayer, isWeaponDrawn...) called here threw and
-      // playEmote never ran, so no wheel emote played from 5bdf7282 (23 Sep) on. The blocker check and the emote go
-      // on the next frame, where natives work; the checks above are JS only and stay here.
-      this.controller.once("update", () => {
-        try {
-          const blocker = this.idleBlocker();
-          if (blocker) {
-            notifyNextUpdate(this.controller, this.sp, blocker);
-            logTrace(this, `Emote refused`, anim, blocker);
-            emoteNote(`refused ${anim}: ${blocker}`);
-            return;
-          }
-          this.playEmote(anim);
-        } catch (err) {
-          logTrace(this, `Emote failed`, anim, err);
-          emoteNote(`refused ${anim}: ${err}`);
-        }
-      });
+      this.chooseFromWheel(typeof e.arguments[1] === "string" ? (e.arguments[1] as string) : "");
     }
+  }
+
+  // An emote chosen on either wheel
+  private chooseFromWheel(anim: string): void {
+    // The player's own choice is never the server's idle, even when it is the same clip
+    this.serverIdle = "";
+    this.closeMenu(`a choice (${anim || "?"})`);
+    emoteNote(`play ${anim || "?"} (active ${this.activeEmote || "none"})`);
+    if (!this.allowedAnims.has(anim)) {
+      logTrace(this, `Emote not in the catalog`, anim);
+      emoteNote(`refused ${anim || "?"}: not in the catalog`);
+      return;
+    }
+    // Edged on the wheel next time, which opens on its group
+    this.native.last = anim;
+    if (this.isPoseLocked()) {
+      notifyNextUpdate(this.controller, this.sp, "You cannot use emotes while restrained.");
+      emoteNote(`refused ${anim}: restrained`);
+      return;
+    }
+    // Browser messages arrive in tick context, where every Papyrus native throws "can't be called in this context"
+    // and EventsApi swallows the error: idleBlocker() (Game.getPlayer, isWeaponDrawn...) called here threw and
+    // playEmote never ran, so no wheel emote played from 5bdf7282 (23 Sep) on. The blocker check and the emote go
+    // on the next frame, where natives work; the checks above are JS only and stay here.
+    this.controller.once("update", () => {
+      try {
+        const blocker = this.idleBlocker();
+        if (blocker) {
+          notifyNextUpdate(this.controller, this.sp, blocker);
+          logTrace(this, `Emote refused`, anim, blocker);
+          emoteNote(`refused ${anim}: ${blocker}`);
+          return;
+        }
+        this.playEmote(anim);
+      } catch (err) {
+        logTrace(this, `Emote failed`, anim, err);
+        emoteNote(`refused ${anim}: ${err}`);
+      }
+    });
   }
 
   /**
@@ -637,6 +655,10 @@ export class EmoteService extends ClientListener {
     this.menuOpen = true;
     this.openedAt = Date.now();
     this.unfocusedSince = 0;
+    if (this.nativeReady()) {
+      this.openNative();
+      return;
+    }
     openFormMenu(this.sp, this.emoteWidgetSetter, { GROUPS, events, WIDGET_ID }, this.controller);
     emoteNote("wheel open");
   }
@@ -646,10 +668,99 @@ export class EmoteService extends ClientListener {
     this.menuOpen = false;
     this.unfocusedSince = 0;
     this.heldFrom = 0;
-    closeFormMenu(this.sp, WIDGET_ID);
+    if (this.nativeOpen) this.closeNative(); else closeFormMenu(this.sp, WIDGET_ID);
     // How long it was up, and what took it down: the server log's [dboDiag] emote lines
     if (wasOpen && this.openedAt) emoteNote(`wheel closed after ${Date.now() - this.openedAt} ms by ${why}`);
     this.openedAt = 0;
+  }
+
+  private nativeWheel(): NativeEmoteWheelService {
+    return this.controller.lookupListener(NativeEmoteWheelService);
+  }
+
+  // Whether the native wheel can be opened; without its service (a harness, a client built without it) it cannot
+  private nativeReady(): boolean {
+    try { return this.nativeWheel().ready(); } catch { return false; }
+  }
+
+  // The HUD's own wheel (swf/dbo_emotewheel): no menu and no cursor, so the game keeps running around it. Looking (the mouse
+  // and right stick turn the wheel's pointer, not the camera), fighting (a click picks), activate (A picks), the Tween
+  // menu and the journal (Esc closes the wheel) are turned off while it is up, and only the ones that were on: another
+  // service's own turned-off controls are left to it.
+  private openNative(): void {
+    openWheel(this.native, GROUPS);
+    this.nativeOpen = true;
+    const gen = ++this.nativeGen;
+    this.controller.once("update", () => {
+      if (gen !== this.nativeGen || !this.nativeOpen) return;
+      try {
+        const G = this.sp.Game;
+        const off = { fighting: G.isFightingControlsEnabled(), looking: G.isLookingControlsEnabled(), menu: G.isMenuControlsEnabled(), activate: G.isActivateControlsEnabled(), journal: G.isJournalControlsEnabled() };
+        G.disablePlayerControls(false, off.fighting, false, off.looking, false, off.menu, off.activate, off.journal, 0);
+        this.ctlOff = off;
+      } catch (err) {
+        logTrace(this, `Native wheel controls not turned off`, err);
+      }
+    });
+    this.nativeWheel().show(JSON.stringify(payloadOf(this.native, GROUPS)));
+    emoteNote("wheel open (native)");
+  }
+
+  private closeNative(): void {
+    closeWheel(this.native);
+    this.nativeOpen = false;
+    this.nativeGen++;
+    try { this.nativeWheel().hide(); } catch (err) { logTrace(this, `Native wheel not hidden`, err); }
+    // After the open's own update callback, so whatever it turned off is turned on again
+    this.controller.once("update", () => {
+      const off = this.ctlOff;
+      this.ctlOff = null;
+      if (!off) return;
+      try { this.sp.Game.enablePlayerControls(false, off.fighting, false, off.looking, false, off.menu, off.activate, off.journal, 0); } catch (err) { logTrace(this, `Native wheel controls not turned on`, err); }
+    });
+  }
+
+  // Each frame while the native wheel is up: the group dwell, the drawing, and a game menu opened over it takes it down
+  private tickNative(): void {
+    const now = Date.now();
+    tickWheel(this.native, GROUPS, now);
+    try { this.nativeWheel().draw(JSON.stringify(payloadOf(this.native, GROUPS))); } catch (err) { logTrace(this, `Native wheel not drawn`, err); }
+    if (now - this.lastWatch < 250) return;
+    this.lastWatch = now;
+    if (this.gameMenuOpen()) this.closeMenu("a game menu");
+    else if (!this.nativeReady()) this.closeMenu("the HUD losing the wheel");
+  }
+
+  // A press while the native wheel is up; true when the wheel took it. The browser wheel's clicks and keys, without a cursor:
+  // click or A picks the pointed emote (anything else closes), right click or B closes, the mouse wheel, the arrows, the
+  // shoulders and the d-pad turn the groups, 1..9 pick from the shown group. Esc and the wheel key are handled as before.
+  private onNativeButton(e: ButtonEvent): boolean {
+    const pick = (anim: string, why: string) => { if (anim) this.chooseFromWheel(anim); else this.closeMenu(why); };
+    if (e.device === InputDeviceType.Mouse) {
+      if (e.code === 0) pick(pointedAnim(this.native, GROUPS), "a click on no emote");
+      else if (e.code === 1) this.closeMenu("right click");
+      else if (e.code === 8) stepGroup(this.native, GROUPS, -1);
+      else if (e.code === 9) stepGroup(this.native, GROUPS, 1);
+      else return false;
+      return true;
+    }
+    if (e.device === InputDeviceType.Gamepad) {
+      if (e.code === GamepadButton.A) pick(pointedAnim(this.native, GROUPS), "A on no emote");
+      else if (e.code === GamepadButton.B) this.closeMenu("the gamepad's B");
+      else if (e.code === GamepadButton.LeftShoulder || e.code === GamepadButton.DPadLeft) stepGroup(this.native, GROUPS, -1);
+      else if (e.code === GamepadButton.RightShoulder || e.code === GamepadButton.DPadRight) stepGroup(this.native, GROUPS, 1);
+      else return false;
+      return true;
+    }
+    if (e.device !== InputDeviceType.Keyboard) return false;
+    if (e.code === DxScanCode.LeftArrow) stepGroup(this.native, GROUPS, -1);
+    else if (e.code === DxScanCode.RightArrow) stepGroup(this.native, GROUPS, 1);
+    else if (e.code >= DxScanCode.N1 && e.code <= DxScanCode.N9) {
+      const anim = numberedAnim(this.native, GROUPS, e.code - DxScanCode.N1 + 1);
+      if (!anim) return true;
+      this.chooseFromWheel(anim);
+    } else return false;
+    return true;
   }
 
   // Four times a second while the wheel is up: drawn without the cursor for UNFOCUSED_CLOSE_MS, it is taken down
@@ -682,6 +793,11 @@ export class EmoteService extends ClientListener {
   private menuPad: number = GamepadButton.LeftThumb;
   private menuOpen = false;
   private openedAt = 0;
+  // The native wheel (nativeEmoteWheel.ts): its state, whether it is the one up, and the controls it turned off
+  private native = newWheel();
+  private nativeOpen = false;
+  private nativeGen = 0;
+  private ctlOff: { fighting: boolean; looking: boolean; menu: boolean; activate: boolean; journal: boolean } | null = null;
   // When the wheel key opened the wheel and is still down, 0 once released
   private heldFrom = 0;
   private unfocusedSince = 0;

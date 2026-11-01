@@ -1,0 +1,6 @@
+dboData
+dboShow
+dboAlive
+emotewheel-1
+_lockroot
+$EverywhereMediumFont

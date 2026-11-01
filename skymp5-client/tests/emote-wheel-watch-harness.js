@@ -57,9 +57,9 @@ if (mod) {
 const svc = fs.readFileSync(path.join(__dirname, '..', 'src/services/services/emoteService.ts'), 'utf8').replace(/\r\n/g, '\n');
 check('emoteService no longer ignores its key while the wheel is open', !/code !== this\.menuKey \|\| !e\.isDown \|\| this\.menuOpen/.test(svc));
 check('emoteService closes on its key through wheelKeyAction', /wheelKeyAction\(this\.menuOpen\) === "close"/.test(svc));
-check('emoteService watches the open wheel every update', /controller\.on\("update", \(\) => this\.watchWheel\(\)\)/.test(svc) && /wheelWatch\(\{/.test(svc));
+check('emoteService watches the open browser wheel every update (the native one is drawn instead)', /controller\.on\("update", \(\) => \{ if \(this\.nativeOpen\) this\.tickNative\(\); else this\.watchWheel\(\); \}\)/.test(svc) && /wheelWatch\(\{/.test(svc));
 check('emoteService sends the release on its key\'s up, through wheelReleaseAction', /code === this\.menuKey && e\.isUp/.test(svc) && /wheelReleaseAction\(this\.menuOpen, heldFrom, Date\.now\(\)\) !== "commit"/.test(svc) && /dispatchEvent\(new CustomEvent\(\$\{JSON\.stringify\(WHEEL_RELEASE_EVENT\)\}\)\)/.test(svc));
-check('the hold is timed from the key press that opened the wheel, and cleared on close', /this\.openMenu\(\);\r?\n    this\.heldFrom = Date\.now\(\);/.test(svc) && /this\.heldFrom = 0;\r?\n    closeFormMenu/.test(svc));
+check('the hold is timed from the key press that opened the wheel, and cleared on close', /this\.openMenu\(\);\r?\n    this\.heldFrom = Date\.now\(\);/.test(svc) && /this\.heldFrom = 0;\r?\n    if \(this\.nativeOpen\) this\.closeNative\(\); else closeFormMenu/.test(svc));
 check('the wheel says how long it was open and what closed it', /wheel closed after \$\{Date\.now\(\) - this\.openedAt\} ms by/.test(svc));
 
 console.log(failures ? `${failures} FAILED` : 'all passed');
