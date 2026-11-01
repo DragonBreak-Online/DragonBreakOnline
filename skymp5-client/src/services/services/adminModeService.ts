@@ -45,21 +45,18 @@ export class AdminModeService extends ClientListener {
   }
 
   // Admin panel "all shouts": the server has no shout storage, so it sends the list at the grant and again 15s
-  // after every login (adminSystem.ts 130). desc is "hex:Plugin.esm". Only a word not yet unlocked is taught
-  // and unlocked, and only a shout not yet held is added, so after the first grant this loop does nothing and
-  // says nothing.
+  // after every login (adminSystem.ts 130). desc is "hex:Plugin.esm". Only a word not yet unlocked is unlocked,
+  // and only a shout not yet held is added. The engine keeps no word state across a login here (no save), so
+  // the resend at login unlocks them all again.
   //
-  // This comment used to claim "each call shows its own popup", which is why Nat's wall of them was blamed on
-  // the natives. That is NOT established and the vanilla scripts contradict it: PlayerWerewolfChangeScript and
-  // C03RampageQuest both call UnlockWord three times plus AddShout with no message at all (becoming a werewolf
-  // does not flash three popups), and QF_MQ104B calls TeachWord as a "failsafe - player should have it from
-  // Bleak Falls" and then authors its own LearnShoutMsg.Show() fourteen lines later in the SAME fragment - a
-  // native that popped its own message would double-message every player who already had Fus.
-  //
-  // Our own path has only ever produced one line each side: adminSystem replies once, and this sends one
-  // showSystemNotification, which is a chat System-tab line, not a corner popup. Even the original (95d8af5e)
-  // summarised. So if a wall is still seen, it is neither of those and wants ONE measurement before anything
-  // here is changed: grant all shouts to a fresh character and count what appears.
+  // Silently: UnlockWord and AddShout only, never TeachWord (Nat, 1 Nov: "I still get these shout announcements
+  // from learning them, can't it just be silent?"). TeachWord is what raises the engine's centred "Word of Power
+  // Learned" banner with the runes (GMST sShoutAdded): a word wall's own script (WordWallTriggerScript.StartFX)
+  // does nothing but play its effects and call game.teachWord(myWord), and that banner is what a word wall
+  // shows. UnlockWord with AddShout is how vanilla grants a shout with no message and makes it usable without the
+  // word ever being taught: PlayerWerewolfChangeScript (203-206) and C03RampageQuest (148-151), the werewolf's
+  // howls. (QF_MQ104B's LearnShoutMsg after its TeachWord is a separate tutorial message box, not this banner.)
+  // Every login re-ran TeachWord on every word, so the banner came back at each login: hence Nat's "still".
   private teachShouts(shouts: Array<{ shout: string; words: string[] }>): void {
     const player = this.sp.Game.getPlayer();
     if (!player) return;
@@ -76,7 +73,6 @@ export class AdminModeService extends ClientListener {
         if (!word) continue;
         try {
           if (this.sp.Game.isWordUnlocked(word)) continue;
-          this.sp.Game.teachWord(word);
           this.sp.Game.unlockWord(word);
           wordsUnlocked++;
         } catch { /* not a word in this load order */ }

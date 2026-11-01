@@ -381,7 +381,9 @@ export class BeastFormService extends ClientListener {
     if (current && current.getFormID() === shout.getFormID()) return;
     try {
       const word = WordOfPower.from(this.sp.Game.getFormEx(entry.word || 0));
-      if (word) { this.sp.Game.teachWord(word); this.sp.Game.unlockWord(word); }
+      // UnlockWord without TeachWord, as the vanilla werewolf script does: TeachWord raises the "Word of Power Learned"
+      // banner, here at every howl equip (adminModeService.teachShouts)
+      if (word && !this.sp.Game.isWordUnlocked(word)) this.sp.Game.unlockWord(word);
       player.addShout(shout);
       player.equipShout(shout);
     } catch (e) { logError(this, "howl equip failed", e); }

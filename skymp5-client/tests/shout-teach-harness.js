@@ -1,7 +1,7 @@
-// adminModeService.teachShouts: the server re-sends the "all shouts" list at every login, and each TeachWord, UnlockWord and
-// AddShout shows its own popup, so re-teaching it all made a wall of popups at every login (Nat, 25 Oct). Only a word not yet
-// unlocked is taught and unlocked, only a shout not yet held is added, and the summary counts what was really new or says
-// nothing. The method is cut from the source and transpiled on its own, then run against a fake game. Run from skymp5-client:
+// adminModeService.teachShouts: the server re-sends the "all shouts" list at every login, and re-teaching it all made a wall
+// of popups at every login (Nat, 25 Oct). Only a word not yet unlocked is unlocked, only a shout not yet held is added, and the
+// summary counts what was really new or says nothing. No word is ever taught: TeachWord raises the engine's "Word of Power
+// Learned" banner, and UnlockWord with AddShout is the vanilla werewolf's silent grant (shout-silent-1101; Nat, 1 Nov). The method is cut from the source and transpiled on its own, then run against a fake game. Run from skymp5-client:
 //
 //   node tests/shout-teach-harness.js
 'use strict';
@@ -51,7 +51,7 @@ const LIST = [
 let g = game(new Set(), new Set());
 notes.length = 0;
 g.t.teachShouts(LIST);
-check('a first grant teaches and unlocks every word', g.calls.teach === 6 && g.calls.unlock === 6, g.calls);
+check('a first grant unlocks every word and teaches none (no "Word of Power Learned" banner)', g.calls.teach === 0 && g.calls.unlock === 6, g.calls);
 check('...adds both shouts', g.calls.add === 2, g.calls);
 check('...and says so with the real counts', notes.length === 1 && notes[0] === 'Learned 2 shouts (6 words).', notes);
 
@@ -67,7 +67,7 @@ check('...and shows no summary', notes.length === 0, notes);
 g = game(new Set([0x602a3, 0x602a4, 0x602a5]), new Set([0x13e07]));
 notes.length = 0;
 g.t.teachShouts(LIST);
-check('only the new shout\'s words are taught', g.calls.teach === 3 && g.calls.unlock === 3, g.calls);
+check('only the new shout\'s words are unlocked, none taught', g.calls.teach === 0 && g.calls.unlock === 3, g.calls);
 check('...only the new shout is added', g.calls.add === 1, g.calls);
 check('...and the summary counts only them', notes[0] === 'Learned 1 shouts (3 words).', notes);
 
@@ -75,7 +75,11 @@ check('...and the summary counts only them', notes[0] === 'Learned 1 shouts (3 w
 g = game(new Set(), new Set());
 notes.length = 0;
 g.t.teachShouts([{ shout: '13e07:Skyrim.esm', words: ['1:Missing.esp', '602a3:Skyrim.esm'] }]);
-check('a word not in the load order is skipped', g.calls.teach === 1 && notes[0] === 'Learned 1 shouts (1 words).', [g.calls, notes]);
+check('a word not in the load order is skipped', g.calls.unlock === 1 && g.calls.teach === 0 && notes[0] === 'Learned 1 shouts (1 words).', [g.calls, notes]);
+// The beast form's howl (beastFormService.equipShout) unlocks its word the same way, once, never teaching it
+const beastSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'services', 'beastFormService.ts'), 'utf8');
+check('the beast form\'s howl unlocks its word without teaching it', /if \(word && !this\.sp\.Game\.isWordUnlocked\(word\)\) this\.sp\.Game\.unlockWord\(word\);/.test(beastSrc) && !/teachWord\(/.test(beastSrc));
+check('no teachWord call is left in the client', !fs.readdirSync(path.join(__dirname, '..', 'src', 'services', 'services')).some((f) => /\.ts$/.test(f) && /this\.sp\.Game\.teachWord\(|Game\.teachWord\(/.test(fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'services', f), 'utf8').replace(/^\s*\/\/.*$/gm, ''))));
 
 console.log(failures ? `${failures} FAILED` : 'all passed');
 process.exit(failures ? 1 : 0);
