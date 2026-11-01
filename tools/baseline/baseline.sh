@@ -176,7 +176,18 @@ say " tree        $TIP  (origin/server, per ls-remote)"
 say " snapshot    $(date -u -d "@$TAKEN" '+%Y-%m-%d %H:%M:%SZ' 2>/dev/null || echo "@$TAKEN"), ${AGE_H}h old, from $SOURCE$STALE"
 say " overlaid    $overlaid file(s)${missing:+; absent on the source:$missing}"
 say " fork        $FORK"
+# The fork's HEAD belongs in the record: on a shared box it is a moving target (dbo-dev's /opt/alduinak is
+# rebuilt between profile runs), so a number without it cannot be reproduced. run-all prints this too, but
+# with 2>/dev/null - an unreadable .git there silently becomes "()" and the record is lost. /opt is
+# root-owned, so try plain git, then a non-interactive sudo, then say outright that it is unknown.
+fork_head() {
+  git -C "$1" log --oneline -1 2>/dev/null && return 0
+  sudo -n git -C "$1" log --oneline -1 2>/dev/null && return 0
+  echo "*** UNREADABLE - record it by hand before quoting this run ***"
+}
+say " fork HEAD   $(fork_head "$FORK" | cut -c1-96)"
 say " fork-server $FORK_SERVER"
+[ "$FORK_SERVER" = "$FORK" ] || say " fs HEAD     $(fork_head "$FORK_SERVER" | cut -c1-96)"
 # esbuild is what actually decides whether the bundle-taking harnesses run at all. Without it they SKIP and
 # the suite still prints a cheerful total, so it is stated here next to the number rather than left implied.
 ESB="$FORK_SERVER/skymp5-server/node_modules/.bin/esbuild"
