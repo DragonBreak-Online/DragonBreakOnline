@@ -3,7 +3,7 @@
 // Bundle first, then run from this folder's parent:
 //
 //   ./node_modules/.bin/esbuild ts/systems/npcSpawnSystem.ts --bundle --platform=node --format=cjs --outfile=<out>
-//   node tests\spawn-refill-harness.js <out>
+//   node tests\spawn-reach-harness.js <out>
 //
 // Runs in a scratch folder, so the real zone-spawns.json and npc-fallen-spots.json are never touched.
 'use strict';
@@ -34,7 +34,7 @@ const check = (name, ok, got) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}
 
 // ---- mock world --------------------------------------------------------------------------------------------------
 const WORLD = 'a764b:bsheartland.esm';
-const CAVE = '1234:skyrim.esm';
+const CAVE = '1234:skyrim.esm';   // verify-formids: ignore - harness fixture, a made-up cave cell
 const worldIds = { [WORLD]: 0x0800a764b, [CAVE]: 0x1234 };
 const PLAYER = 0x14;
 const actors = new Map();   // id -> { pos, world, dead, props }
