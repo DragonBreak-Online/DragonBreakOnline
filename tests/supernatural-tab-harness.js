@@ -48,6 +48,11 @@ store.set(`${VAMP}|private.supernatural`, { kind: 'vampire', stage: 2, lastFed: 
 store.set(`${VAMP}|private.bloodRanks`, { blood: 20, fedOn: {} });
 const wolf = globalThis.__dboSuperProgress(WOLF);
 const vamp = globalThis.__dboSuperProgress(VAMP);
+// A cursed werewolf calls the beast only with supernatural.voluntaryWerewolf (off since Nate, 23 Oct: the beast takes them).
+// The module reads its config at load, so it is loaded again with the switch on, for the daily change it then counts.
+delete require.cache[path.resolve(__dirname, '..', 'supernatural.js')];
+require(path.resolve(__dirname, '..', 'supernatural.js'))(Object.assign({}, api, { cfg: { supernatural: { voluntaryWerewolf: true } } }));
+const wolfCalls = globalThis.__dboSuperProgress(WOLF);
 
 // ---- the skills menu, as masterySystem sends it ----
 const EVENTS = { choose: 'mastery:choose', drop: 'mastery:drop', lock: 'mastery:lock', takeUp: 'mastery:takeUp', close: 'mastery:close' };
@@ -76,8 +81,12 @@ t = text(renderToStaticMarkup(createElement(CurseStage, { curse: wolf })));
 check("the werewolf's tab: its title and creed", /Prowler of the Hunt/.test(t) && /Hircine's blood runs in you/.test(t), t);
 check('...where they stand: 130 renown, Prowler, 170 more to Hunter', /130 renown Prowler/.test(t) && /170 more renown to Hunter\./.test(t), t);
 check('...how renown is earned', /an animal 5/.test(t), t);
-check('...each fact with its hint', /Pack Lone Wolf You belong to no pack and hunt alone\. A pack takes you in only by invitation\./.test(t) && /Beast form today 1 of 1 used The beast stirs again/.test(t) && /The beast within Restless/.test(t), t);
-check('...and the powers', /Powers Beast Form Become the werewolf/.test(t) && /Howl of Terror/.test(t), t);
+check('...each fact with its hint', /Pack Lone Wolf You belong to no pack and hunt alone\. A pack takes you in only by invitation\./.test(t) && /Beast form When it takes you You cannot call the beast\./.test(t) && /The beast within Restless/.test(t), t);
+check('...and the powers: Beast Form comes when the beast will', /Powers Beast Form The beast comes when it will, not when you call/.test(t) && /Howl of Terror/.test(t), t);
+t = text(renderToStaticMarkup(createElement(CurseStage, { curse: wolfCalls })));
+check('a werewolf who may call the beast: the daily change counted', /Beast form today 1 of 1 used The beast stirs again/.test(t) && !/When it takes you/.test(t), t);
+check('...and Beast Form is theirs to call', /Powers Beast Form Become the werewolf/.test(t), t);
+t = text(renderToStaticMarkup(createElement(CurseStage, { curse: wolf })));
 const bar = renderToStaticMarkup(createElement(CurseStage, { curse: wolf })).match(/mastery__level-bar"><i style="width:([\d.]+)%/);
 check('the bar is 15% of the way from Prowler (100) to Hunter (300)', !!bar && Math.abs(Number(bar[1]) - 15) < 0.01, bar && bar[1]);
 t = text(renderToStaticMarkup(createElement(CurseRanks, { ladder: wolf.ladder })));

@@ -52,8 +52,12 @@ check('Skills: the tab draws in the journal body, in the violet', /journal__body
 check('...the Wheel: 44 / 300 spokes', /44 \/ 300/.test(t) && /spokes of the Wheel/.test(t), t.slice(0, 200));
 check('...the groups and every skill in the list', /Combat/.test(t) && /Professions/.test(t) && (html.match(/class="mastery__item[ "]/g) || []).length === 5);
 check('...the first held skill opens: name, epithet, lore line and rule apart', /Defense/.test(t) && /The Iron Wall/.test(t) && /journal-skills__lore">The shield-wall/.test(html) && /journal-skills__rules">Defense rule text/.test(html), t.slice(0, 400));
-check('...level of its ceiling, the tier and the three moons', /52 of 100/.test(t) && /Waxing/.test(t) && /Held/.test(t) && /Waning/.test(t) && /mastery__lock mastery__lock--on[^>]*>[^<]*<span class="mastery__lock-glyph">●/.test(html));
-check('...the floor line from the server (nothing falls below 25)', /nothing falls below 25/.test(t));
+const locks = html.match(/<button[^>]*class="mastery__lock[ "][\s\S]*?<\/button>/g) || [];
+const lockOn = locks.filter((b) => /mastery__lock--on/.test(b)).map(text);
+check('...level of its ceiling, the tier, and its three modes with the one it is set to lit', /52 of 100/.test(t) && /Adept/.test(t) && locks.length === 3 && lockOn.length === 1 && /Hold/.test(lockOn[0]), { locks: locks.map(text), lockOn });
+const raised = text(render(hub('skills', { skills: menu({ points: Object.assign({}, menu().points, { waningFloor: 10, held: [{ id: 'defense', level: 52, xp: 40, tier: 2, lock: 'raise' }] }) }) })));
+check('...a raised skill gives both floors from the server (Lower down to 10, raised down to 25); a held one neither',
+  /Lower \(down to 10\), then from a raised skill \(down to 25\)/.test(raised) && !/down to 25\)/.test(t), raised.slice(raised.indexOf('Using it'), raised.indexOf('Using it') + 200));
 check('...five tiers, Adept for tier 3, with its line, the current marked and the higher dimmed', /Adept/.test(t) && /mastery__rank-lore">Adept line/.test(html) && (html.match(/mastery__rank--reached/g) || []).length === 3 && /mastery__rank--current/.test(html) && !/Journeyman/.test(t));
 check('...the epigraph once', (t.match(/Time broke over Nirn/g) || []).length === 1);
 html = render(hub('skills', { skills: menu({ focus: 'archery' }) }));
