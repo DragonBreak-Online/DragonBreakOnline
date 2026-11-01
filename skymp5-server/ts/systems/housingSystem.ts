@@ -100,6 +100,9 @@ const DECOR_PUSH_INTERVAL_MS = 4000;
 const DECOR_SWEEP_STEP_MS = 50;
 // More changed claims than this in one tick (a migration, a bulk lock) go out as a full sweep instead of a delta
 const DECOR_DELTA_MAX = 32;
+// The first read of each claim after a boot is a native ref load; read in a burst by the first login's refDecor it froze the
+// loop 26 s (dev, 676 claims, 1 Nov). They are read after boot instead, a slice per sweep step, so the first login finds them warm
+const WARM_BUDGET_MS = 15;
 const REQUEST_COOLDOWN_MS = 500;
 const CHANGE_FAILED = "That cannot be changed right now.";
 const NOT_GRANTED = "Property here is granted by its ruler (Jarl, Baron or Count) or their Steward.";
@@ -478,6 +481,12 @@ export class HousingSystem implements System {
       this.storageLockTriedMs = now;
       try { this.storageLockDone = this.lockOpenStorage(ctx, ++this.storageLockTries >= PLACE_PLAN_MAX_TRIES); }
       catch (e) { this.storageLockDone = true; this.log(`[housing] storage lock failed: ${e}`); }
+    }
+    if (this.warmIdx < this.claimed.length && now - this.initAtMs >= PLACE_PLAN_DELAY_MS && now - this.lastWarmMs >= DECOR_SWEEP_STEP_MS) {
+      this.lastWarmMs = now;
+      if (this.warmIdx === 0) this.warmFromMs = now;
+      while (this.warmIdx < this.claimed.length && Date.now() - now < WARM_BUDGET_MS) this.read(ctx, this.claimed[this.warmIdx++]);
+      if (this.warmIdx >= this.claimed.length) this.log(`[housing] ${this.claimed.length} claims read after boot in ${Date.now() - this.warmFromMs} ms, a slice per ${DECOR_SWEEP_STEP_MS} ms`);
     }
     if (this.decorChanged.size) {
       const changed = Array.from(this.decorChanged);
@@ -3333,6 +3342,9 @@ export class HousingSystem implements System {
   private decorSweep: number[] = [];
   private decorSnapshot: Array<{ primary: number; rec: PropertyRecord }> | null = null;
   private lastSweepMs = 0;
+  private warmIdx = 0;
+  private warmFromMs = 0;
+  private lastWarmMs = 0;
   private registrySaving = false;
   private registryAgain = false;
 }
