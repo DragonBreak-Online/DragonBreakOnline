@@ -33,6 +33,6 @@
     "dushnikh-yal": {"marker": "1623e:Skyrim.esm", "by": "Skyrim.esm", "world": "Tamriel", "name": "Dushnikh Yal", "tnam": 28, "pos": [-145543, -22742, -1052], "nearestCapital": "markarth"},
     "mor-khazgur": {"marker": "16287:Skyrim.esm", "by": "Skyrim.esm", "world": "Tamriel", "name": "Mor Khazgur", "tnam": 28, "pos": [-151658, 81847, -5581], "nearestCapital": "markarth"},
     "gol-kharzum": {"marker": "2063:DragonBreak.esp", "by": "DragonBreak Online Edits.esp", "world": "Tamriel", "name": "Gol-Kharzum", "tnam": 28, "pos": [-74648, -44610, 1689], "nearestCapital": "falkreath"},
-    "cracked-tusk-keep": {"marker": "1625b:Skyrim.esm", "by": "Skyrim.esm", "world": "Tamriel", "name": "Cracked Tusk Keep", "tnam": 6, "pos": [-55070, -87686, -2352], "nearestCapital": "falkreath"}
+    "cracked-tusk-keep": {"marker": "1625b:Skyrim.esm", "by": "CrackedTuskKeepExpanded.esp", "world": "Tamriel", "name": "Cracked Tusk Keep", "tnam": 28, "pos": [-55070, -87686, -2352], "nearestCapital": "falkreath"}
   }
 }

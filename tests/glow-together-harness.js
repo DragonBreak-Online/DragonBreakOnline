@@ -42,7 +42,9 @@ const common = { mp, log: () => {}, personal: () => {}, system: () => {}, audit:
 globalThis.__dboDungeons = undefined;
 require(path.join(ROOT, 'dungeons.js'))(Object.assign({}, common, {
   onUi: (n, fn) => { const l = ui.get(n) || []; l.push(fn); ui.set(n, l); }, openWidget: () => true, closeWidget: () => true,
-  findByName: () => 0, nameOf: () => 'P', cfg: { dungeons: cfg.dungeons || {} }, every: (name, ms, fn) => timers.set(name, fn),
+  // without dungeons.glow: the shipped config carries the 9 Oct FPS A/B (glow.offIn lists Bruma Caverns, this harness's
+  // dungeon), which would keep its chests dark; this harness is about the two modules sharing one glow set
+  findByName: () => 0, nameOf: () => 'P', cfg: { dungeons: Object.fromEntries(Object.entries(cfg.dungeons || {}).filter(([k]) => k !== 'glow' && k !== '_glow')) }, every: (name, ms, fn) => timers.set(name, fn),
 }));
 globalThis.__dboWildFactionAudit = ' (skipped in the harness)';
 require(path.join(ROOT, 'wildlife.js'))(Object.assign({}, common, { cfg: {} }));
