@@ -68,6 +68,10 @@ export const NATIVE_CAPS = [
   "native:playerMenu",
   // the spellbook (spells.js openBook, /spells): dbo_spellbook
   "native:spellbook",
+  // Study Magic, a school's next spell, Priest Studies, Take an Apprentice (schools.js): dbo_study
+  "native:studyMagic",
+  // the class and sermon lecterns (schools.js makeLectern): dbo_lectern
+  "native:classLectern",
 ];
 export const CAPS_RETRY_MS = 5000;
 

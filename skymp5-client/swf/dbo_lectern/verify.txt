@@ -1,0 +1,7 @@
+dboData
+dbo:lecternStart
+Begin the class
+Keep teaching
+SendModEvent
+$EverywhereMediumFont
+dboOut

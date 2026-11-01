@@ -1,0 +1,7 @@
+dboData
+dbo:schoolChoose
+Close the books
+units of study
+SendModEvent
+$EverywhereMediumFont
+dboOut
