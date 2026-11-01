@@ -304,6 +304,8 @@ export class HousingSystem implements System {
     };
     (globalThis as any).__dboHousing = {
       primaryOf: (ref: unknown) => primary(ref),
+      // primaryOf's answer without reading the ref itself when no claim owns it (guilds.js hall roots, right after a boot)
+      rootOfKnown: (ref: unknown) => this.rootOfKnown(ctx, Number(ref) >>> 0),
       recordOf: (ref: unknown) => { const p = primary(ref); return p ? this.read(ctx, p) : null; },
       holdOf: (ref: unknown) => { const p = primary(ref); return p ? this.holdOf(ctx, p) : ""; },
       // Whether a claim is property: a building, never a chest or an inner door (Nate, 5 Oct); all claims before the place rules
@@ -2600,6 +2602,43 @@ export class HousingSystem implements System {
     }
   }
 
+  // Every claim and its teleport partner (which carries the { primary } pointer), to the claim: the refs that have a record
+  private claimIndex(ctx: SystemContext): Map<number, number> {
+    const key = `${this.claimed.length}:${this.claimIndexVer}`;
+    if (this.claimIndexCache && this.claimIndexKey === key) return this.claimIndexCache;
+    const idx = new Map<number, number>();
+    for (const c of this.claimed) {
+      idx.set(c >>> 0, c >>> 0);
+      const r = this.read(ctx, c);
+      if (r && r.partner) idx.set(r.partner >>> 0, c >>> 0);
+    }
+    this.claimIndexCache = idx; this.claimIndexKey = key;
+    return idx;
+  }
+
+  // The exposed primaryOf's answer, but a ref no claim owns is never read: whether it has a record comes from the claim index,
+  // because the first read of a door nobody claimed is a native load of it, seconds cold right after a boot (1 Nov profile:
+  // guilds.js hall roots, 13.5 s). Its partner and cells come from the espm cache. A claim the registry lost reads as unclaimed
+  // here, which for hall roots only means its leader waits for primaryOf's answer elsewhere
+  private rootOfKnown(ctx: SystemContext, refrId: number): number {
+    const id = refrId >>> 0;
+    if (!id || this.gone.has(id)) return 0;
+    const idx = this.claimIndex(ctx);
+    let p = idx.get(id) || 0;
+    if (!p) {
+      if (!this.isClaimable(ctx, id)) return 0;
+      const partner = this.partnerOf(ctx, id);
+      p = partner && idx.has(partner) ? (idx.get(partner) as number) : (partner && partner < id ? partner : id);
+    }
+    if (!this.placesOn()) return p;
+    if (idx.get(p) === p) {
+      const r = this.read(ctx, p);
+      if (r && r.owner !== 0) return r.memberOf && r.memberOf !== p ? r.memberOf : p;
+    }
+    const place = this.placeOfRef(ctx, p);
+    return place ? place.root : p;
+  }
+
   private write(ctx: SystemContext, primary: number, rec: PropertyRecord): boolean {
     const mp = ctx.svr as Mp;
     try {
@@ -2618,6 +2657,7 @@ export class HousingSystem implements System {
     }
     if (rec.owner !== 0) this.remember(primary); else this.forget(primary);
     this.placeCellsDirty = true;
+    this.claimIndexVer++;
     // Lock changes reach every client on the next tick, not the next decor interval
     this.decorChanged.add(primary);
     return true;
@@ -3327,6 +3367,9 @@ export class HousingSystem implements System {
   }
 
   private claimed: number[] = [];
+  private claimIndexCache: Map<number, number> | null = null;
+  private claimIndexKey = "";
+  private claimIndexVer = 0;
   private buildings: { mtime: number; byCell: Map<string, string[]> } | null = null;
   private doorNames: { mtime: number; byDesc: Map<string, string> } | null = null;
   // The ref a property request was made at, while it runs
