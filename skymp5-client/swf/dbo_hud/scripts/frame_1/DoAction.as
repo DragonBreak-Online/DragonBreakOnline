@@ -6,6 +6,8 @@
 //     hunger: { label, stage, fed } | null, voice: { mode, talking },
 //     party: { title, rows: [{ name, leader, self, dead, far, pct, tag, clock }] } | null, watermark: bool }
 // The hourglass watermark top right as the browser HUD draws it (the browser leaves its own out while this one is up).
+// prompt: { kicker, title, text, yes, no, left, frac, answered, idle } | null: downed, feeding, robbery, a trade request
+// or a consent, answered with Y and N (the client hears the keys; nativePrompt.ts), drawn centre screen, a little low.
 // The party list sits at the left, where the browser's party panel opens; it is passive (no cursor in the HUD Menu).
 // It says it is alive in _root.dboAlive, which the client reads with Ui.getString.
 
@@ -21,6 +23,7 @@ var STAGE_TEXT = {hungry: 0xE8D6A0, starving: 0xE8907F};
 var FADE_PER_FRAME = 8;
 var PARTY_W = 240;
 var PARTY_ROW = 30;
+var PROMPT_W = 480;
 
 var data = null;
 var bars;
@@ -29,6 +32,7 @@ var barsWant = 0;
 var cornerWant = 0;
 var party;
 var mark;
+var prompt;
 
 // The stage the player sees (visibleRect where the HUD has one)
 function area()
@@ -108,6 +112,37 @@ function build()
    mark = dboWatermark(_root, 40, a.right - (a.right - a.left) * 0.018, a.top + (a.bottom - a.top) * 0.024, markW * 520 / 420);
    mark._alpha = 62;
    mark._visible = false;
+   prompt = _root.createEmptyMovieClip("prompt", 50);
+   prompt._x = a.left + ((a.right - a.left) - PROMPT_W) / 2;
+   prompt._y = a.top + (a.bottom - a.top) * 0.56;
+   prompt._visible = false;
+}
+
+// The prompt card: kicker, title, the text, the clock, then the two keys and what no answer means
+function drawPrompt(p)
+{
+   prompt._visible = p != null && p != undefined && p.title != undefined;
+   if (!prompt._visible)
+   {
+      return;
+   }
+   var c = prompt.createEmptyMovieClip("card", 1);
+   dboBox(c, 0, 0, PROMPT_W, 214, C_GROUND, 88);
+   dboBox(c, 0, 0, PROMPT_W, 2, C_ACCENT, 90);
+   var kick = dboText(c, "kicker", 2, 18, 12, PROMPT_W - 36, 20, dboFmt(F_MEDIUM, 13, C_SECOND, 1.4), false);
+   kick.text = String(p.kicker).toUpperCase();
+   var title = dboText(c, "title", 3, 18, 32, PROMPT_W - 36, 28, dboFmt(F_MEDIUM, 21, C_TEXT, 0.3), false);
+   title.text = String(p.title);
+   var body = dboText(c, "body", 4, 18, 64, PROMPT_W - 36, 84, dboFmt(F_PLAIN, 15, C_SECOND, 0.2), true);
+   body.text = String(p.text);
+   dboBox(c, 18, 152, PROMPT_W - 36, 3, 0x000000, 55);
+   dboBox(c, 18, 152, Math.round((PROMPT_W - 36) * Math.max(0, Math.min(1, Number(p.frac)))), 3, C_ACCENT, 85);
+   var yes = dboText(c, "yes", 5, 18, 164, (PROMPT_W - 36) / 2, 24, dboFmt(F_MEDIUM, 17, p.answered == true ? C_SECOND : C_ACCENT, 0.4), false);
+   yes.text = String(p.yes);
+   var no = dboText(c, "no", 6, PROMPT_W / 2, 164, (PROMPT_W - 36) / 2, 24, dboFmt(F_MEDIUM, 17, p.answered == true ? C_SECOND : C_TEXT, 0.4, "right"), false);
+   no.text = String(p.no);
+   var idle = dboText(c, "idle", 7, 18, 188, PROMPT_W - 36, 20, dboFmt(F_PLAIN, 13, C_SECOND, 0.2), false);
+   idle.text = String(p.idle);
 }
 
 // The party list, drawn afresh each time it changes: a title with the count, then a name and a bar a row
@@ -222,6 +257,7 @@ function draw()
    drawVoice(data.voice);
    drawParty(data.party);
    mark._visible = data.watermark == true;
+   drawPrompt(data.prompt);
    layoutCorner();
    cornerWant = data.corner.shown == true ? 100 : 0;
 }

@@ -11,6 +11,7 @@ import { COMPANION_HUD_KEY } from "./companionService";
 import { remoteIdToLocalId } from "../../view/worldViewMisc";
 import { withClientUiCaps } from "../../lib/clientUiCaps";
 import { PartyRow, hudShared } from "./nativeHud";
+import { SERVER_PROMPT_TYPES, clearPrompt, serverPrompt, showPrompt } from "./nativePrompt";
 
 const HUD_WIDGET_ID = 29;
 const PARTY_WIDGET_ID = 32;
@@ -266,6 +267,7 @@ export class DboRelayService extends ClientListener {
     // playerActionService owns one.
     const closeId = Number(content["close"]);
     if (Number.isFinite(closeId) && closeId > 0) {
+      clearPrompt(closeId);
       if (this.focusedId === closeId) { this.focusedId = 0; closeFormMenu(this.sp, closeId); }
       else closeWidget(this.sp, closeId);
       return;
@@ -274,11 +276,28 @@ export class DboRelayService extends ClientListener {
     if (!w || typeof w !== "object") return;
     const wid = Number((w as any).id);
     if (!Number.isFinite(wid) || wid <= 0) return;
+    if (this.nativePrompt(w as Record<string, unknown>, wid, !!content["focus"])) return;
     if (content["focus"]) {
       this.drawInBrowser(w, wid);
     } else {
       refreshFormMenu(this.sp, this.browsersideWidgetSetter, { widget: w, id: wid });
     }
+  }
+
+  // Downed, a vampire's feeding and a robbery go to the native HUD while it is up, answered with Y and N (nativePrompt.ts):
+  // each answer is the packet the front's button sends, and a HUD that goes down hands the prompt back to the browser
+  private nativePrompt(w: Record<string, unknown>, wid: number, focus: boolean): boolean {
+    if (!hudShared.nativeUp || SERVER_PROMPT_TYPES.indexOf(String(w["type"])) < 0) return false;
+    const p = serverPrompt(w);
+    if (!p) return false;
+    showPrompt(p.spec, (yes) => {
+      const a = yes ? p.yes : p.no;
+      if (a) sendCustomPacket(this.controller, { customPacketType: "dbo", event: a.event, args: withClientUiCaps(a.event, a.args), widget: wid });
+    }, now(), () => {
+      if (focus) this.drawInBrowser(w, wid);
+      else refreshFormMenu(this.sp, this.browsersideWidgetSetter, { widget: w, id: wid });
+    });
+    return true;
   }
 
   // The browser overlay drawing a focused widget.

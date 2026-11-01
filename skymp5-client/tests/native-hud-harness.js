@@ -183,4 +183,44 @@ check('the service is started', /new NativeHudService\(sp, controller\),/.test(s
 check('the front leaves out its corner, bars and watermark while native (dbo_hud draws them)', /\{data\.native \? null : <Corner/.test(front) && /\{data\.native \? null : <Vitals data=\{data\} ui=\{ui\} \/>\}/.test(front) && /<Watermark on=\{data\.watermarkOn !== false && !data\.native\} \/>/.test(front));
 check('...and forwards V to the client', /sendMessage\('dbo:voicePtt', on\)/.test(front));
 
+// ---- mutants of nativeHud.ts's party and watermark decisions: each altered copy must fail (Worker 4, 1 Nov: a mutant
+// run by hand protects nothing later, so they live here) ----
+const partyChecks = (M) => {
+  let bad = 0;
+  const c = (ok) => { if (!ok) bad++; };
+  const q = M.partyOf(crew);
+  c(M.partyOf(null) === null && M.partyOf({ self: 1, rows: [] }) === null);
+  c(q && q.title === 'Party' && M.partyOf({ self: 1, rows: [crew.rows[3]] }).title === 'Companions');
+  c(q && q.rows[0].leader && q.rows[0].self && q.rows[0].pct === 80 && q.rows[1].dead && q.rows[1].pct === 100 && !q.rows[1].self && q.rows[2].far);
+  c(q && q.rows[3].tag === 'stay' && q.rows[3].clock === '1:05' && !q.rows[3].self);
+  const s0 = { hunger: 0, stage: 'sated', hungerOn: true, vitalsOn: true };
+  c(M.payloadOf(s0, null, 'talk', false, M.UI_DEFAULTS, M.newClock(0), 0).watermark === true && M.payloadOf(Object.assign({}, s0, { watermarkOn: false }), null, 'talk', false, M.UI_DEFAULTS, M.newClock(0), 0).watermark === false);
+  return bad;
+};
+const HUD_SRC = fs.readFileSync(path.join(ROOT, 'src', 'services', 'services', 'nativeHud.ts'), 'utf8');
+const PROMPT_SRC = fs.readFileSync(path.join(ROOT, 'src', 'services', 'services', 'nativePrompt.ts'), 'utf8');
+const mutDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dbo-nativehud-mut-'));
+const compiledFrom = (src, i) => {
+  const d = path.join(mutDir, `m${i}`);
+  fs.mkdirSync(d, { recursive: true });
+  fs.writeFileSync(path.join(d, 'nativeHud.ts'), src);
+  fs.writeFileSync(path.join(d, 'nativePrompt.ts'), PROMPT_SRC);
+  execFileSync(process.execPath, [path.join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc'), path.join(d, 'nativeHud.ts'), '--outDir', d, '--module', 'commonjs', '--target', 'es2019'], { stdio: 'pipe' });
+  return require(path.join(d, 'nativeHud.js'));
+};
+check('the mutant checks pass on nativeHud.ts as it is', partyChecks(H) === 0);
+[
+  ['always titled Party', 'title: party.rows.some((r) => !r.summon) ? "Party" : "Companions",', 'title: "Party",'],
+  ['yourself never marked', 'self: r.id === party.self && !r.summon,', 'self: false,'],
+  ['no summon clock', 'clock: r.summon && r.leftSec ?', 'clock: false ?'],
+  ['health not clamped', 'pct: Math.max(0, Math.min(100, Number(r.health) || 0)),', 'pct: Number(r.health) || 0,'],
+  ['the watermark ignores the server', 'watermark: server.watermarkOn !== false,', 'watermark: true,'],
+].forEach(([name, a, b], i) => {
+  if (!HUD_SRC.includes(a)) { check(`mutant "${name}": its line is in nativeHud.ts`, false, a); return; }
+  let bad = 0;
+  try { bad = partyChecks(compiledFrom(HUD_SRC.replace(a, b), i)); } catch (e) { bad = 1; }
+  check(`mutant caught: ${name}`, bad > 0);
+});
+try { fs.rmSync(mutDir, { recursive: true, force: true }); } catch (e) { /* the OS */ }
+
 T.done();

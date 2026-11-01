@@ -4,6 +4,8 @@ import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { sendCustomPacket, parseCustomPacket, notifyNextUpdate } from "./customPacketUtil";
 import { openFormMenu, closeFormMenu, releaseFocusBeforeVanillaMenu } from "./widgetMenuUtil";
 import { TimersService } from "./timersService";
+import { hudShared } from "./nativeHud";
+import { clearPrompt, consentPrompt, showPrompt } from "./nativePrompt";
 import { Actor, BrowserMessageEvent, DxScanCode } from "skyrimPlatform";
 import { remoteIdToLocalId } from "../../view/worldViewMisc";
 import { getInventory } from "../../sync/inventory";
@@ -90,7 +92,11 @@ export class SearchService extends ClientListener {
     if (typeof key !== "string" || !key.startsWith("search:") || !this.promptOpen) {
       return;
     }
-    const accepted = key === events.yes;
+    this.answer(key === events.yes);
+  }
+
+  // Allow or Refuse, from the browser buttons or the native HUD's Y and N alike
+  private answer(accepted: boolean): void {
     if (this.pendingRequestId !== null) {
       sendCustomPacket(this.controller, {
         customPacketType: "searchConsentResult",
@@ -158,7 +164,14 @@ export class SearchService extends ClientListener {
   private openPrompt(): void {
     this.controller.once("update", () => {
       this.promptOpen = true;
-      openFormMenu(this.sp, this.browsersideWidgetSetter, { events, promptText, WIDGET_ID }, this.controller);
+      // While the native HUD is up the request is a HUD prompt answered with Y and N (nativePrompt.ts)
+      if (hudShared.nativeUp) {
+        this.native = true;
+        showPrompt(consentPrompt(WIDGET_ID, "Search Request", promptText, Math.round(CONSENT_TIMEOUT_MS / 1000)), (yes) => this.answer(yes), Date.now(), () => {
+          this.native = false;
+          if (this.promptOpen) openFormMenu(this.sp, this.browsersideWidgetSetter, { events, promptText, WIDGET_ID }, this.controller);
+        });
+      } else openFormMenu(this.sp, this.browsersideWidgetSetter, { events, promptText, WIDGET_ID }, this.controller);
       const timers = this.controller.lookupListener(TimersService);
       if (this.expiryTimer !== undefined) {
         timers.clearTimeout(this.expiryTimer);
@@ -177,6 +190,9 @@ export class SearchService extends ClientListener {
       this.expiryTimer = undefined;
     }
     this.promptOpen = false;
+    clearPrompt(WIDGET_ID);
+    // a prompt the native HUD drew never opened the browser's, and closing that would hand the keys away
+    if (this.native) { this.native = false; return; }
     closeFormMenu(this.sp, WIDGET_ID);
   }
 
@@ -197,6 +213,7 @@ export class SearchService extends ClientListener {
   };
 
   private promptOpen = false;
+  private native = false;
   private pendingRequestId: number | null = null;
   private expiryTimer?: number;
   private searchWindowOpen = false;

@@ -2,6 +2,8 @@
 // the HUD Menu): what it shows, decided as the browser HUD decides it (skymp5-front features/hud), so a player's F3,
 // Settings, Interface choice holds on either. No game calls here, so tests/native-hud-harness.js runs it as is.
 
+import { HudPrompt } from "./nativePrompt";
+
 // What the other services leave for the native HUD: DboRelayService the server's dboHud fields and the player's vitals,
 // VoiceService the voice range, the browser's voice manager (through a page message) whether V is held
 export interface HudServerState {
@@ -91,6 +93,8 @@ export interface HudPayload {
   party: { title: string; rows: HudPartyRow[] } | null;
   // the hourglass top right, unless the server switched it off (dboHud watermarkOn false)
   watermark: boolean;
+  // the prompt up, answered with Y and N (nativePrompt.ts promptView); set by NativeHudService
+  prompt?: HudPrompt | null;
 }
 
 // The two change clocks the fade rules count from, kept between frames as the front's refs keep them
