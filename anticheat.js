@@ -86,6 +86,13 @@ const DEFAULTS = {
     refillSkipMs: 6000,
     flagCount: 8, flagWindowMs: 600000, flagMinCost: 1200,
     refuseHits: false, refuseMinutes: 10,
+    // Staff are flagged like anyone but never refused: an event GM's own spells (profile 94 was flagged 10 times in 14 days
+    // of live, 18-31 Oct; no other player but the cheat) must still land
+    refuseStaff: false,
+    // Refused only when sustained: this many flag minutes within the window (Leader, 31 Oct: "never a single burst")
+    refuseAfterFlags: 3, refuseFlagWindowMs: 600000,
+    // Only their spell hits on players are refused; NPCs still take them (false refuses every spell hit, as before)
+    refusePlayersOnly: true,
   },
   stamina: { enabled: true, sprintSpeed: 500, sprintSeconds: 20, windowSeconds: 30, fullAt: 0.95, dropBy: 0.02 },
   // pushed as-is (only the keys present) to mp.setAnticheatConfig on every load; /anticheat off fork|all pushes enabled false
@@ -566,11 +573,25 @@ module.exports = (api) => {
     const names = [];
     for (const e of st.pinned) { cost += e.cost; lo = Math.min(lo, e.min); hi = Math.max(hi, e.max); if (names.length < 4 && !names.includes(e.spell)) names.push(e.spell); }
     if (st.pinned.length < MG.flagCount || cost < MG.flagMinCost) return;
-    const action = isOn('refusehits') ? `refusing their spell hits for ${MG.refuseMinutes} min` : 'flag only';
+    // Sustained, never a burst: refused only at the refuseAfterFlags-th flag minute within refuseFlagWindowMs (each one
+    // already 8+ costly casts in 10 min at pinned magicka). Replayed on the 231 flags of 18-31 Oct: 3 in 10 min refuses the
+    // one cheat 18 times and no one else; the one staff member flagged is spared by refuseStaff
+    if (!st.flagMinutes) st.flagMinutes = [];
+    if (!st.flagMinutes.length || t - st.flagMinutes[st.flagMinutes.length - 1] >= 60000) st.flagMinutes.push(t);
+    const win = num(MG.refuseFlagWindowMs, 600000);
+    while (st.flagMinutes.length && t - st.flagMinutes[0] > win) st.flagMinutes.shift();
+    const need = Math.max(1, num(MG.refuseAfterFlags, 3));
+    const spared = MG.refuseStaff !== true && isStaff(a);
+    const refuse = isOn('refusehits') && !SHADOW.has('magicka_free') && !spared && st.flagMinutes.length >= need;
+    const whom = MG.refusePlayersOnly === false ? 'spell hits' : 'spell hits on players';
+    const action = refuse ? `refusing their ${whom} for ${MG.refuseMinutes} min`
+      : !isOn('refusehits') ? 'flag only'
+        : spared ? 'flag only (staff)'
+          : `flag only (${st.flagMinutes.length} of ${need} in ${Math.round(win / 60000)} min before refusal)`;
     const text = `${st.pinned.length} costly casts in ${Math.round(MG.flagWindowMs / 60000)} min at full magicka with no drop after (${names.join(', ')}; ${cost} spell cost in all), `
       + `stored magicka ${lo.toFixed(3)}-${hi.toFixed(3)} through each, no Fortify gear of the school worn, ${st.gearSkipped || 0} casts skipped for gear; server: ${action}`;
     const sent = acFlag(a, 'magicka_free', { casts: st.pinned.length, cost }, text, { action });
-    if (sent && isOn('refusehits') && !SHADOW.has('magicka_free')) ST.refuse.set(a, t + MG.refuseMinutes * 60000);
+    if (sent && refuse) ST.refuse.set(a, t + MG.refuseMinutes * 60000);
   };
   // canPin false while a stall hold runs: the stored value is still watched (a drop clears a cast), nothing is pinned
   const castTick = (st, a, t, canPin) => {
@@ -868,7 +889,19 @@ module.exports = (api) => {
           const until = ST.refuse.size ? ST.refuse.get(Number(aggressorId) >>> 0) : 0;
           if (until && until > now() && isOn('refusehits')) {
             const isSpell = (flags && typeof flags === 'object' && flags.spell === true) || spellInfo(Number(sourceId) >>> 0).rtype === 'SPEL';
-            if (isSpell) { globalThis.__dboHitRefusal = 'anticheat'; return false; }
+            const onPlayer = MG.refusePlayersOnly === false || profileOf(Number(targetId) >>> 0) >= 0;
+            if (isSpell && onPlayer) {
+              globalThis.__dboHitRefusal = 'anticheat';
+              // Audited once a minute per caster (a barrage is dozens of hits): who, on whom, with what, how long it lasts
+              const a = Number(aggressorId) >>> 0, t = now();
+              if (!ST.refusedAt) ST.refusedAt = new Map();
+              if (t - (ST.refusedAt.get(a) || 0) >= 60000) {
+                ST.refusedAt.set(a, t);
+                const s = spellInfo(Number(sourceId) >>> 0);
+                audit(`ANTICHEAT-REFUSED ${display(a)} (profile ${profileOf(a)}): spell hit on ${display(Number(targetId) >>> 0)} with ${s.edid || (Number(sourceId) >>> 0).toString(16)} refused (magicka_free, ${Math.ceil((until - t) / 60000)} min left)`);
+              }
+              return false;
+            }
           }
         } catch (e) { err('refuse hits', e); }
         return inner.call(this, aggressorId, targetId, sourceId, damage, flags, ...rest);

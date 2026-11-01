@@ -20,7 +20,7 @@ const https = require('https');
 const { execFile } = require('child_process');
 
 module.exports = (api) => {
-  const { log, personal, audit, who, onlineActors, every, registerChatCommand, isAdmin, tierOf, sayAll, token, channelId, cfg } = api;
+  const { log, personal, audit, who, onlineActors, every, once, registerChatCommand, isAdmin, tierOf, sayAll, token, channelId, cfg } = api;
   const C = Object.assign({ enabled: true, repo: '/opt/alduinak', news: '/opt/alduinak/skymp5-backend/data/news.live.json',
     files: '/opt/alduinak/skymp5-backend/data/files-version.json', ops: '/opt/dragonbreak-ops/ops', holdFile: '/opt/skymp-dev-hold',
     forceFile: '/opt/skymp-force-update', tiers: ['senior', 'developer'], warnMinutes: [60, 30, 15, 10, 5, 2, 1], minReason: 5, maxHours: 24 * 14 },
@@ -101,7 +101,8 @@ module.exports = (api) => {
     finally { S.posting = false; }
   };
   // Shortly after load, so the deploy stamp and news are in place
-  setTimeout(() => { logVersion(); }, 5000);
+  if (typeof once === 'function') once('updatesVersionLog', 5000, () => { logVersion(); });
+  else setTimeout(() => { logVersion(); }, 5000);
 
   // ---- schedules -----------------------------------------------------------------------------------
   const schedules = () => { const s = readJson(SCHED_FILE, { next: 1, list: [] }); if (!Array.isArray(s.list)) s.list = []; return s; };

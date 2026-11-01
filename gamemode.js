@@ -71,6 +71,14 @@ const uiTimed = (event, a, fn) => {
   }
 };
 const stopTimer = (name) => { const t = TIMERS.get(name); if (!t) return; clearTimeout(t.start); clearInterval(t.interval); TIMERS.delete(name); };
+// One-shot startup delays (seedTreasuries, starterKitReload, updates.js logVersion) are tracked by name too, so rapid
+// hot reloads inside their 1-5 s window replace the waiting timeout instead of pinning every generation's 30 MB closure
+const once = (name, ms, fn) => {
+  stopTimer(name);
+  const t = { start: null, interval: null }; const body = timed(name, fn);
+  t.start = setTimeout(() => { t.start = null; TIMERS.delete(name); body(); }, ms);
+  TIMERS.set(name, t);
+};
 // Start offsets are spread over the first second so timers made in one load do not fire together
 let timerSlot = 0;
 const every = (name, ms, fn) => {
@@ -101,6 +109,7 @@ every('tickSummary', 60000, () => {
   loopDelay.reset();
   rows.push(`gc ${gcStats.n}x max ${gcStats.max.toFixed(1)} total ${gcStats.total.toFixed(1)}`);
   gcStats.n = 0; gcStats.total = 0; gcStats.max = 0;
+  try { const m = process.memoryUsage(); rows.push(`mem rss ${Math.round(m.rss / 1048576)}MB heap ${Math.round(m.heapUsed / 1048576)}/${Math.round(m.heapTotal / 1048576)}MB`); } catch (e) { /* no memoryUsage */ }
   log(`ticks (ms, last 60 s, ${onlineActors().length} online): ${rows.join(' | ')}`);
 });
 
@@ -1082,7 +1091,7 @@ const STAFF_HELP = [
   { key: 'magic', title: 'Magic and crafts', items: ['schools', 'shoutclean', 'classteacher', 'preacher', 'manual', 'smithing', 'tailoring', 'enchant'] },
   { key: 'law', title: 'Law', items: ['jail', ['jaildoors', 'a menu: assign the next door you use as a jail door of this hold, or unassign one (GM+, and the hold\'s ruler, Steward, Commander or Captain of the Guard)'], ['concordat', '[races]: Concordat arrests standing, or the Thalmor outside the race rule'],
     ['dossier', 'list | read <name|#TAG> | reports | add <name|#TAG> <text> | strike <name|#TAG> <n>: the Thalmor dossiers and informant reports (add and strike: Lead GM)']] },
-  { key: 'world', title: 'World', items: ['settime', 'setweather', 'timescale', 'region', ['dungeon end', '<dungeon id|name>: end a dungeon claim now'],
+  { key: 'world', title: 'World', items: ['settime', 'setweather', 'timescale', 'region', 'clearcorpses', ['dungeon end', '<dungeon id|name>: end a dungeon claim now'],
     'placed', 'placeundo', 'placeexport', 'worldedits', 'worldhide', 'worldshow', 'masktest', 'couriers', 'traps', 'leverpuzzle', 'bossevent',
     ['guardpost', 'add [npc desc] | list | remove <hold> <n> | auto <hold>: stand where a guard should be and add places that hold\'s own guard there (an id like abe18:Skyrim.esm picks another). auto fills a hold with the posts its guards held in the old days']] },  // verify-formids: ignore, the desc is an example in help text and 'items' here is the command list
   { key: 'debug', title: 'Server and debugging', items: ['monitor', 'load', 'selftest', 'npc', 'mv', 'driftset', 'driftspawn', 'driftrepair',
@@ -2625,7 +2634,7 @@ const seedTreasuries = () => {
   }
   log(`bank treasuries: ${seeded} seeded, ${kept} already funded${known ? `, ${known} known from an earlier load` : ''}`);
 };
-setTimeout(seedTreasuries, 3000);
+once('seedTreasuries', 3000, seedTreasuries);
 
 // ---- events --------------------------------------------------------------------------------
 // The reload's clear() resets properties but never removes mp.on listeners, so every hot reload
@@ -3386,7 +3395,7 @@ const chooseGod = (a) => {
   setTimeout(() => leaveRealm(a), DEITY_STEP_MAX_MS);
 };
 // The original is stored once so a hot reload re-wraps the same function instead of stacking.
-if (!globalThis.__dboAppearanceHookPrev) {
+if (typeof globalThis.__dboAppearanceHookPrev === 'undefined') {
   const cur = typeof mp.onUpdateAppearanceAttempt === 'function' ? mp.onUpdateAppearanceAttempt : null;
   globalThis.__dboAppearanceHookPrev = cur && !cur.__dbo ? cur : null;
 }
@@ -3697,7 +3706,7 @@ const giveStarterKit = (a) => {
   if (given.length) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('grant', a, 'kit', STARTER_KIT.filter((k) => given.includes(k.name))); } catch (e) { /* the player log is optional */ } }
 };
 // Players already online when this file reloads get theirs at once (giveItem is defined further down; this runs after load).
-setTimeout(() => { for (const a of onlineActors()) { try { giveStarterKit(a); pushHud(a, needsOf(a), true); } catch (e) { log('starter kit failed', e.message); } } }, 1000);
+once('starterKitReload', 1000, () => { for (const a of onlineActors()) { try { giveStarterKit(a); pushHud(a, needsOf(a), true); } catch (e) { log('starter kit failed', e.message); } } });
 globalThis.__dboHandlers.disconnect = (userId) => {
   const a = actorOf(userId); if (a) audit(`LEAVE ${who(a)}`);
   // The body stays a while after a logout; whether it may still be harmed is decided now (offlineBodyProtected)
@@ -3973,7 +3982,7 @@ const creditMeal = (a, items) => {
   log(`${display(a)} ate ${names.join(', ')}: hunger ${Math.round(before)} -> ${Math.round(n.hunger)}`);
 };
 // Chain onto the server's eat event (masterySystem wraps it first; the original is stored once).
-if (!globalThis.__dboPrevEat) {
+if (typeof globalThis.__dboPrevEat === 'undefined') {
   const cur = typeof mp.onEatItem === 'function' ? mp.onEatItem : null;
   globalThis.__dboPrevEat = cur && !cur.__dbo ? cur : null;
 }
@@ -4209,8 +4218,20 @@ const sendPacket = (a, payload) => {
 // Native Scaleform panels (client scaleformMenuService, fork swf/): a widget of these types goes to a client that sent
 // nativeCaps naming it as a dboScaleform packet instead; the payload is the same object the browser widget gets
 // labour: mining, woodcutting and the bound-hands struggle (labour.js, struggle.js), both the sweep and the pick round
+// bank: the account, treasuries and the vault (bank.js, widget 48); every action re-sends it with the result
 // pigeon: the coop window (openPigeonCoop, post.js, couriers.js); its typed input goes to the browser (pigeonHandoff)
-const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_journal', deityPicker: 'dbo_deity', rite: 'dbo_rite', dungeonGate: 'dbo_dungeon', labour: 'dbo_labour', pigeon: 'dbo_pigeon' };
+// businessLedger, propertyMarket, keyRing, tomeShop: business.js widget 64, tenancy.js 82, keyring.js 91 and the spells.js shop;
+// each action's answer re-sends it, and the module's own closeWidget closes the custom menu
+// shrinePanel, courierHandover: supernatural.js widget 74 and couriers.js 81; their Escape is the router's close, which both read
+// playerMenu: the U panel (widget 52); menuRun closes it as for the browser
+// birthsignPicker: birthsigns.js widget 163 (dbo:birthsignPick/birthsignClose); a pick closes it through closeWidget
+const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_journal', deityPicker: 'dbo_deity', rite: 'dbo_rite', dungeonGate: 'dbo_dungeon', labour: 'dbo_labour', pigeon: 'dbo_pigeon', bank: 'dbo_bank',
+  businessLedger: 'dbo_ledger', propertyMarket: 'dbo_market', keyRing: 'dbo_keyring', tomeShop: 'dbo_tomes',
+  shrinePanel: 'dbo_shrine', courierHandover: 'dbo_courier', playerMenu: 'dbo_menu', spellbook: 'dbo_spellbook', studyMagic: 'dbo_study',
+  classLectern: 'dbo_lectern', birthsignPicker: 'dbo_birthsign' };
+// The client's custom menu takes a payload of at most this many characters (scaleformMenu.ts MAX_PAYLOAD_CHARS) and draws
+// a bigger one blank, so a widget past it (a staff player menu, a long ledger) goes to the browser instead
+const NATIVE_MAX_CHARS = 60000;
 // nativeOpen: actor -> the widget id on the custom menu; browserOpen: actor -> a widget of these types last sent to the browser
 const nativeState = () => { const p = globalThis.__dboPanelState || (globalThis.__dboPanelState = { caps: new Map(), nonces: new Map() }); if (!p.native) p.native = new Map(); if (!p.nativeOpen) p.nativeOpen = new Map(); if (!p.browserOpen) p.browserOpen = new Map(); return p; };
 const nativeSwfFor = (a, widget) => {
@@ -4220,8 +4241,9 @@ const nativeSwfFor = (a, widget) => {
   if (!c || !c.has('native:' + widget.type)) return '';
   // browser: 1 hands a native panel's typed input to the browser panel, until the module publishes it unmarked again
   if (widget.browser) return '';
-  // The journal is native per hub tab, for each tab the client's swf draws; Profile and Settings stay in the browser
+  // The journal is native per hub tab, for each tab the client's swf draws (Settings opens the overlay's own sections in the browser)
   if (widget.type === 'journal' && !(widget.hub && c.has('native:journalTab:' + widget.tab))) return '';
+  try { if (JSON.stringify(widget).length > NATIVE_MAX_CHARS) return ''; } catch (e) { return ''; }
   return swf;
 };
 // A widget that moves between the custom menu and the browser (the journal changing tab) closes where it was first
@@ -7460,6 +7482,8 @@ const asylumHit = (agg, tgt) => {
 };
 const castHook = (casterId, spellId, ...rest) => {
   try { if (racial) racial.onCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('racial cast failed', e.message); }
+  // bandages.js: a cast undoes a binding in progress
+  try { if (typeof globalThis.__dboBandageCast === 'function') globalThis.__dboBandageCast(casterId); } catch (e) { log('bandage cast failed', e.message); }
   try { if (globalThis.__dboBeastCast) globalThis.__dboBeastCast(casterId, spellId); } catch (e) { log('beast cast failed', e.message); }
   // hagraven.js: the Hagraven Form power, cast from the Powers menu, takes or leaves the Hagraven body
   try { if (typeof globalThis.__dboHagravenCast === 'function') globalThis.__dboHagravenCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('hagraven cast failed', e.message); }
@@ -7702,65 +7726,95 @@ const wearCheck = (a, equipment, settling) => {
 };
 // Debuff mode (Nat, 31 Oct: "anyone may wear any armour"; armorWear.mode "debuff", "block" above stays the rollback). Nothing
 // comes off and nothing is grandfathered: the armour protects in full (the shown rating stays the hit's), but each piece
-// worn above the wearer's Defense tier costs, weighted by slot (debuff.slotWeights, the body most), by how many tiers over
-// (1, 2, 3+): move speed, stamina recovery, and the stamina a power attack or a sprint costs. On top, heavy armour slows by
-// heavySlow at Defense 0, less as Defense rises, none from heavySlowUntilDefense (athny's idea, Nat 31 Oct), by the heavy
-// pieces' weight. Cosmetic pieces cost nothing: clothing and jewellery, a piece under its slot's tier 1 band, a head piece
-// named as a circlet, hood, cowl, mask, crown or hat no stronger than tier 2's head band, and debuff.allow (editor ids, staff).
-// Where each lands: stamina recovery on the server (racial.js regen tick, __dboWearRegenMult: a slowing factor it already
-// takes back, as the Atronach's magicka; a client SetActorValue below base never bites, the regen ceiling keeps the larger);
-// speed and the power attack and sprint costs on the player's own client (dboArmourWear packet, a client with the
-// 'armourWear' UI capability: SpeedMult beside the timed slows, the two stamina GMSTs scaled). Told once when it worsens.
+// worn above the wearer's Defense costs, weighted by slot (debuff.slotWeights, the body most): move speed, stamina recovery,
+// and the stamina a power attack or a sprint costs. The cost grows with the gap between the piece's Defense and the
+// wearer's, from 0 at no gap to the caps (speed, staminaRegen, staminaCost) at gapForFull (Marcus, #ooc-general: 2 levels
+// short barely feels it; scale "tiers" is the step table of the first build, 1/2/3+ tiers over). On top, heavy armour
+// slows by heavySlow at Defense 0, less as Defense rises, none from heavySlowUntilDefense (athny's idea), by the heavy
+// pieces' weight; medium armour (debuff.medium, editor-id patterns of the sets players call medium; otome's list, Nat
+// 31 Oct) by mediumSlowShare of it. Cosmetic pieces cost nothing: clothing and jewellery, a piece under its slot's tier 1
+// band, a head piece named as a circlet, hood, cowl, mask, crown or hat no stronger than tier 2's head band, and
+// debuff.allow (editor ids, staff). Where each lands: stamina recovery on the server (racial.js regen tick,
+// __dboWearRegenMult: a slowing factor it already takes back, as the Atronach's magicka; a client SetActorValue below base
+// never bites, the regen ceiling keeps the larger); speed and the power attack and sprint costs on the player's own client
+// (dboArmourWear packet, a client with the 'armourWear' UI capability: SpeedMult beside the timed slows, the two stamina
+// GMSTs scaled). Told once when it worsens, with the piece's Defense and the wearer's; /armor shows every worn piece.
 const WEAR_DEBUFF = Object.assign({
   slotWeights: { body: 0.5, head: 0.15, hands: 0.15, feet: 0.15, shield: 0.05 },
+  scale: 'gap', gapForFull: 45, caps: { speed: -30, staminaRegen: -50, staminaCost: 50 },
   speed: [0, -10, -20, -30], staminaRegen: [0, -15, -30, -50], staminaCost: [0, 15, 30, 50],
-  heavySlow: -15, heavySlowUntilDefense: 75, maxSlow: -45, recheckSeconds: 30,
+  heavySlow: -15, heavySlowUntilDefense: 75, mediumSlowShare: 0.5, maxSlow: -45, recheckSeconds: 30, costApplied: false,
   t1Min: { heavy: 25, light: 20 }, t2Max: { heavy: 31, light: 28 },
   slotShare: { heavy: { body: 1, head: 0.47, hands: 0.36, feet: 0.36, shield: 0.7 }, light: { body: 1, head: 0.42, hands: 0.29, feet: 0.29, shield: 0.7 } },
   headCosmetic: 'circlet|hood|cowl|mask|crown|diadem|veil|\\bhat\\b|scarf|bandana', allow: [],
+  // otome's medium sets as our records name them (31 Oct); Daedric Mail, Dwarven Mail and Studded Dragonscale are in no plugin we load
+  medium: ['^ArmorScaled', '^ArmorOrcish', '^ArmorBlades', '^ArmorCompanions', '^(DLC1)?ArmorFalmer', 'StormcloakBear', 'Bonemold', '^DLC2ArmorNordic',
+    '^DLC2ArmorChitinHeavy', '^DLC2ArmorStalhrimLight', '^DLC1ArmorDawnguard.*Heavy', '^ccBGSSSE025_ArmorAmber', '^ccBGSSSE025_ArmorGoldenSaint'],
 }, ARMOR_WEAR.debuff || {});
 const WEAR_CAP = 'armourWear';
 const wearState = globalThis.__dboWearState instanceof Map ? globalThis.__dboWearState : (globalThis.__dboWearState = new Map());
 const headCosmeticRx = (() => { try { return new RegExp(String(WEAR_DEBUFF.headCosmetic), 'i'); } catch (e) { return /circlet|hood|cowl|mask/i; } })();
 const wearAllow = new Set((WEAR_DEBUFF.allow || []).map((e) => String(e).toLowerCase()));
+const mediumRx = (WEAR_DEBUFF.medium || []).map((x) => { try { return new RegExp(String(x), 'i'); } catch (e) { log(`armorWear: bad medium pattern ${x}`); return null; } }).filter(Boolean);
+const wearNameOf = (baseId) => { try { return adminItemName(mp.getDescFromId(baseId >>> 0)) || ''; } catch (e) { return ''; } };
 // The highest tier the wearer's Defense opens (1 at Defense 0)
 const wearerTierOf = (defense) => { let t = 1; (ARMOR_WEAR.defenseLevels || []).forEach((need, i) => { if (defense >= Number(need)) t = Math.max(t, i + 1); }); return t; };
 const wearSlotOf = (baseId) => { const r = recordOf(baseId); const b = r ? fieldsOf(r, 'BOD2')[0] : null; return b && b.data.byteLength >= 4 ? slotOfMask(u32At(b, 0)) : ''; };
-// { tier, slot, weight, heavy, edid } of a piece the debuff counts, or null (cosmetic, no family, faction or guard gear)
-const wearPieceOf = (baseId) => {
+// What a worn piece is to the rule: { tier, need, slot, weight, klass: light|medium|heavy, edid, cosmetic } (cosmetic: costs
+// nothing), or null (not armour, no family, faction or guard gear)
+const wearInfoOf = (baseId) => {
   const p = armorPieceOf(baseId >>> 0);
   if (!p || p.clothing || !(p.rating > 0)) return null;
   let tier = 0; try { tier = Number(globalThis.__dboWearTier(baseId >>> 0)) || 0; } catch (e) { tier = 0; }
   const slot = wearSlotOf(baseId >>> 0); const weight = Number((WEAR_DEBUFF.slotWeights || {})[slot]) || 0;
   if (!(tier > 0) || !(weight > 0)) return null;
   const r = recordOf(baseId >>> 0); const edid = String((r && r.record.editorId) || '');
-  if (wearAllow.has(edid.toLowerCase())) return null;
+  const klass = mediumRx.some((rx) => rx.test(edid)) ? 'medium' : p.heavy ? 'heavy' : 'light';
+  const need = Math.max(0, Number((ARMOR_WEAR.defenseLevels || [])[tier - 1]) || 0);
+  const info = { tier, need, slot, weight, klass, edid, cosmetic: false };
   const kind = p.heavy ? 'heavy' : 'light', share = Number(((WEAR_DEBUFF.slotShare || {})[kind] || {})[slot]) || 1, rating = p.counted || p.rating;
-  if (rating < Number((WEAR_DEBUFF.t1Min || {})[kind]) * share) return null;
-  if (slot === 'head' && rating <= Number((WEAR_DEBUFF.t2Max || {})[kind]) * share) {
-    let name = ''; try { name = adminItemName(mp.getDescFromId(baseId >>> 0)) || ''; } catch (e) { name = ''; }
-    if (headCosmeticRx.test(`${edid} ${name}`)) return null;
-  }
-  return { tier, slot, weight, heavy: p.heavy, edid };
+  if (wearAllow.has(edid.toLowerCase()) || rating < Number((WEAR_DEBUFF.t1Min || {})[kind]) * share) info.cosmetic = true;
+  else if (slot === 'head' && rating <= Number((WEAR_DEBUFF.t2Max || {})[kind]) * share && headCosmeticRx.test(`${edid} ${wearNameOf(baseId)}`)) info.cosmetic = true;
+  return info;
 };
-// The debuff for these worn pieces at this Defense: { speed (SpeedMult points, <= 0), regen (stamina recovery factor),
-// cost (stamina cost factor), over: [{ id, tier }] }
+// light, medium or heavy, for PvP's spell armour (pvp.spellArmour counts heavy and medium); '' for clothing and the untiered
+globalThis.__dboArmourClassOf = (baseId) => { try { const w = wearInfoOf(Number(baseId) >>> 0); return w ? w.klass : ''; } catch (e) { return ''; } };
+// A piece's share of the full cost (0..1) at this Defense: by the gap, or (scale "tiers") by tiers over
+const wearShareOf = (w, defense) => {
+  if (WEAR_DEBUFF.scale === 'tiers') { const n = Math.min(3, w.tier - wearerTierOf(defense)); return n > 0 ? n / 3 : 0; }
+  return Math.max(0, Math.min(1, (w.need - defense) / Math.max(1, Number(WEAR_DEBUFF.gapForFull) || 45)));
+};
+// The tier step table's value for a share (scale "tiers"), else the cap times the share
+const wearPart = (key, capKey, share) => {
+  if (WEAR_DEBUFF.scale === 'tiers') return Number((WEAR_DEBUFF[key] || [])[Math.round(share * 3)]) || 0;
+  return (Number((WEAR_DEBUFF.caps || {})[capKey]) || 0) * share;
+};
+// The debuff for these worn pieces at this Defense: { speed (SpeedMult points, <= 0), heavy (its armour-weight part), regen
+// (stamina recovery factor), cost (stamina cost factor), over: [{ id, tier, need, gap, share }] }
 const wearDebuffOf = (worn, defense) => {
-  const mine = wearerTierOf(defense);
-  let speed = 0, regen = 0, cost = 0, heavyW = 0; const over = [];
+  let speed = 0, regen = 0, cost = 0, weightW = 0; const over = [];
   for (const id of worn) {
-    const w = wearPieceOf(id); if (!w) continue;
-    if (w.heavy) heavyW += w.weight;
-    const n = Math.min(3, w.tier - mine); if (!(n > 0)) continue;
-    over.push({ id: id >>> 0, tier: w.tier });
-    speed += w.weight * (Number(WEAR_DEBUFF.speed[n]) || 0);
-    regen += w.weight * (Number(WEAR_DEBUFF.staminaRegen[n]) || 0);
-    cost += w.weight * (Number(WEAR_DEBUFF.staminaCost[n]) || 0);
+    const w = wearInfoOf(id); if (!w || w.cosmetic) continue;
+    if (w.klass === 'heavy') weightW += w.weight; else if (w.klass === 'medium') weightW += w.weight * (Number(WEAR_DEBUFF.mediumSlowShare) || 0);
+    const share = wearShareOf(w, defense); if (!(share > 0)) continue;
+    over.push({ id: id >>> 0, tier: w.tier, need: w.need, gap: Math.ceil(w.need - defense), share, weight: w.weight });
+    speed += w.weight * wearPart('speed', 'speed', share);
+    regen += w.weight * wearPart('staminaRegen', 'staminaRegen', share);
+    cost += w.weight * wearPart('staminaCost', 'staminaCost', share);
   }
   const until = Number(WEAR_DEBUFF.heavySlowUntilDefense) || 75;
-  const heavy = (Number(WEAR_DEBUFF.heavySlow) || 0) * Math.min(1, heavyW) * Math.max(0, 1 - defense / until);
+  const heavy = (Number(WEAR_DEBUFF.heavySlow) || 0) * Math.min(1, weightW) * Math.max(0, 1 - defense / until);
   return { speed: Math.max(Number(WEAR_DEBUFF.maxSlow) || -45, Math.round(speed + heavy)), heavy: Math.round(heavy),
     regen: Math.max(0, Math.round((1 + regen / 100) * 100) / 100), cost: Math.round((1 + cost / 100) * 100) / 100, over };
+};
+// What the cost does, in words, for what this client applies
+const wearParts = (a, d) => {
+  const client = hasUiCap(a, WEAR_CAP); const parts = [];
+  if (client && d.speed < 0) parts.push(`you move ${-d.speed}% slower`);
+  if (d.regen < 1) parts.push(`recover stamina ${Math.round((1 - d.regen) * 100)}% slower`);
+  // The cost is computed and sent but applied nowhere yet: scaling the stamina GMSTs on a client would change every NPC it hosts
+  if (client && d.cost > 1 && WEAR_DEBUFF.costApplied === true) parts.push(`power attacks and sprinting cost ${Math.round((d.cost - 1) * 100)}% more stamina`);
+  return parts;
 };
 // racial.js regen tick: stamina recovery while worn (1 = none)
 globalThis.__dboWearRegenMult = (a, stat) => { if (stat !== 'stamina' || ARMOR_WEAR.mode !== 'debuff') return 1; const s = wearState.get(a >>> 0); return s ? s.regen : 1; };
@@ -7772,19 +7826,18 @@ const wearDebuffUpdate = (a, worn, settling, quiet) => {
   if (prev.key === key) return d;
   wearState.set(a, Object.assign({ key, worn: worn.slice() }, d));
   try { sendPacket(a, { customPacketType: 'dboArmourWear', speedMult: d.speed, staminaCostMult: d.cost, staminaRegenMult: d.regen }); } catch (e) { /* offline */ }
-  log(`armorWear: ${display(a)} (Defense ${Math.floor(defense)}) speed ${d.speed} regen x${d.regen} cost x${d.cost}${d.over.length ? `, over: ${d.over.map((o) => `${o.id.toString(16)} T${o.tier}`).join(' ')}` : ''}`);
+  log(`armorWear: ${display(a)} (Defense ${Math.floor(defense)}) speed ${d.speed} regen x${d.regen} cost x${d.cost}${d.over.length ? `, over: ${d.over.map((o) => `${o.id.toString(16)} needs ${o.need}`).join(' ')}` : ''}`);
   // Told once when it worsens by a piece put on, never by the login's re-dress or the periodic re-check
   const worse = d.speed < (prev.speed || 0) || d.regen < (prev.regen || 1) || d.cost > (prev.cost || 1);
   if (worse && !settling && !quiet) {
-    const client = hasUiCap(a, WEAR_CAP);
-    const parts = [];
-    if (client && d.speed < 0) parts.push(`you move ${-d.speed}% slower`);
-    if (d.regen < 1) parts.push(`recover stamina ${Math.round((1 - d.regen) * 100)}% slower`);
-    if (client && d.cost > 1) parts.push(`power attacks and sprinting cost ${Math.round((d.cost - 1) * 100)}% more stamina`);
+    const parts = wearParts(a, d);
     if (parts.length) {
-      const why = d.over.length ? `Armour above your Defense (${Math.floor(defense)})` : 'Heavy armour';
-      const heavyNote = d.heavy < 0 ? ` Heavy armour weighs on you less as your Defense rises, and not at all from ${Number(WEAR_DEBUFF.heavySlowUntilDefense) || 75}.` : '';
-      const line = `${why}: ${parts.join(', ')}. It still protects you fully.${heavyNote}`;
+      // The piece that weighs most names the gap
+      const top = d.over.slice().sort((x, y) => y.share * y.weight - x.share * x.weight)[0];
+      const more = d.over.length > 1 ? ` (and ${d.over.length - 1} more piece${d.over.length > 2 ? 's' : ''} above you)` : '';
+      const why = top ? `${wearNameOf(top.id) || 'This armour'} needs Defense ${top.need}, you have ${Math.floor(defense)}${more}: you'll feel the weight` : 'Heavy armour weighs on you';
+      const heavyNote = d.heavy < 0 ? ` Heavy armour weighs less as your Defense rises, and not at all from ${Number(WEAR_DEBUFF.heavySlowUntilDefense) || 75}.` : '';
+      const line = `${why}. Right now ${parts.join(', ')}. It still protects you fully.${heavyNote} /armor shows each piece.`;
       if (Date.now() - (wearSaid.get(a) || 0) > 3000) { wearSaid.set(a, Date.now()); personal(a, line); try { sendPacket(a, { customPacketType: 'dboNotice', text: line }); } catch (e) { /* chat is enough */ } }
     }
   }
@@ -7797,6 +7850,22 @@ if (typeof every === "function") every('armourWear', Math.max(5, Number(WEAR_DEB
   for (const a of onlineActors()) { try { wearDebuffUpdate(a, wornWithHealth(a).map((w) => w.baseId), true, true); } catch (e) { log('armorWear recheck failed', e.message); } }
 });
 globalThis.__dboWearConnect = (a) => { wearState.delete(a >>> 0); };
+// /armor: each worn piece's class, tier, the Defense it needs and the wearer's gap, then what it all costs now
+const armorReport = (a) => {
+  const defense = defenseLevelOf(a), worn = wornWithHealth(a).map((w) => w.baseId);
+  const lines = [`Your Defense: ${Math.floor(defense)}.`];
+  for (const id of worn) {
+    const w = wearInfoOf(id); if (!w) continue;
+    const klass = w.klass[0].toUpperCase() + w.klass.slice(1);
+    const gap = w.need - defense;
+    const state = w.cosmetic ? 'costs nothing (cosmetic)' : gap > 0 ? `you are ${Math.ceil(gap)} short` : 'within your Defense';
+    lines.push(`${wearNameOf(id) || 'A piece'}: ${klass}, Tier ${w.tier}, Defense ${w.need}, ${state}.`);
+  }
+  if (lines.length === 1) lines.push('You wear no armour the rule counts.');
+  if (ARMOR_WEAR.mode === 'debuff') { const parts = wearParts(a, wearDebuffOf(worn, defense)); lines.push(parts.length ? `Right now ${parts.join(', ')}.` : 'It costs you nothing right now.'); }
+  return lines;
+};
+if (typeof registerChatCommand === 'function') registerChatCommand('armor', (a) => { if (!ARMOR_WEAR.enabled || typeof globalThis.__dboWearTier !== 'function') return personal(a, 'The armour rule is off.'); for (const l of armorReport(a)) personal(a, l); }, { help: 'Your worn armour: class, tier, the Defense each piece needs, and what it costs you' });
 const equipHook = (actorId, equipment, isAllowed, ...rest) => {
   // The client reports its equipment while it is still dressing after login (an empty or naked
   // report), and the engine has already stored that. Keep our own copy of the last outfit that
@@ -8713,6 +8782,14 @@ const pvpSourceMult = (src, beast) => {
   if (skill === 'blade' || skill === 'blunt') return Number(PVP.weaponMult) || 1;
   return skill === 'archery' ? Number(PVP.arrowMult) || 1 : 1;
 };
+// An arrow between players: the archery tier's bonus on the bow's damage only (Nat, 31 Oct: archery felt too strong). The
+// hit adds the arrow's damage to the bow's (arrowDamageMult a = 1 + arrow / bow) and the tier multiplied the sum (m), so a
+// Master archer doubled the arrow too; this turns m x a into m + a - 1. PvE keeps both. Config pvp.archeryTierOnBowOnly
+const pvpArcheryMult = (agg, src, beast) => {
+  if (beast || PVP.archeryTierOnBowOnly === false || weaponSkillOf(src) !== 'archery') return 1;
+  const m = masteryDamageMult(agg, src), a = arrowDamageMult(agg, src);
+  return m > 1 && a > 1 ? (m + a - 1) / (m * a) : 1;
+};
 // A vampire burns under fire and silver, a werewolf in beast form under silver and poison (supernatural.js
 // __dboSuperDamageMult): the extra comes off after the engine's hit, measured from what landed once the mastery chain
 // (Defense, a blessing, the race, capped together at racial.js reductionCap) had its say. A weakness is a separate
@@ -9162,7 +9239,7 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
     if (racial) { try { targetSide = racial.capTargetSide(targetSide * racial.targetMult(agg, tgt, src, dmg)); } catch (e) { log('racial target failed', e.message); } }
     let raceAtk = 1;
     if (racial && !beastAgg) { try { raceAtk = racial.attackMult(agg, tgt, src, dmg, flags); } catch (e) { log('racial attack failed', e.message); } }
-    let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * potionTakenMult(tgt, flags) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp * (agg !== tgt && profileOf(agg) >= 0 && profileOf(tgt) >= 0 ? pvpSourceMult(src, beastAgg) : 1);
+    let mult = (beastAgg ? 1 : masteryDamageMult(agg, src) * potionAttackMult(agg, src)) * potionTakenMult(tgt, flags) * arcaneDamageMult(agg, src) * materialDamageMult(agg, src) * temperDamageMult(agg, src) * arrowDamageMult(agg, src) * targetSide * blessingAttackMult(agg, src) * raceAtk * huntDamageMult(agg, tgt) * pvp * (agg !== tgt && profileOf(agg) >= 0 && profileOf(tgt) >= 0 ? pvpSourceMult(src, beastAgg) * pvpArcheryMult(agg, src, beastAgg) : 1);
     if (!beastAgg) mult *= gearAttackMult(agg, src);
     // A Hagraven's Destruction (hagraven.js), by her stage
     try { if (globalThis.__dboHagravenAttackMult) mult *= Number(globalThis.__dboHagravenAttackMult(agg, src)) || 1; } catch (e) { log('hagraven attack failed', e.message); }
@@ -9189,7 +9266,9 @@ const hitDamageAttemptHook =(aggressorId, targetId, sourceId, damage, flags) => 
         const rec = masteryOf(agg); const rank = rec && Array.isArray(rec.order) && rec.order.includes(skill) ? Number(((rec.skills || {})[skill] || {}).rank) || 0 : -1;
         let sta = ''; if (flags && flags.power) { const pc = mp.get(agg, 'percentages'); sta = ` stamina=${pc ? Number(pc.stamina).toFixed(2) : '?'}`; }
         const r = (x) => Number(x).toFixed(2);
-        log(`pvp hit ${display(agg)} -> ${display(tgt)} kind=${magic ? 'magic' : skill} rank=${skill}:${rank} dmg=${Number(dmg).toFixed(1)} mult=${r(mult)} armour=${r(pvpSpellArmourMult(agg, tgt, src))} shield=${r(pvpShieldElementMult(agg, tgt, src, flags))} resist=${r(gearResistMult(tgt, src) * potionResistMult(tgt, src))}${flags && flags.power ? ' power' : ''}${flags && flags.blocked ? ' blocked' : ''}${sta}`);
+        // src names the source (an "other" kind was unreadable on 31 Oct); sneak marks the engine's sneak hit
+        const srcRec = recordOf(src >>> 0); const srcName = srcRec ? String(srcRec.record.editorId || '') || (src >>> 0).toString(16) : (src >>> 0).toString(16);
+        log(`pvp hit ${display(agg)} -> ${display(tgt)} kind=${magic ? 'magic' : skill} src=${srcName}${flags && flags.sneak ? ' sneak' : ''} rank=${skill}:${rank} dmg=${Number(dmg).toFixed(1)} mult=${r(mult)} armour=${r(pvpSpellArmourMult(agg, tgt, src))} shield=${r(pvpShieldElementMult(agg, tgt, src, flags))} resist=${r(gearResistMult(tgt, src) * potionResistMult(tgt, src))}${flags && flags.power ? ' power' : ''}${flags && flags.blocked ? ' blocked' : ''}${sta}`);
       } catch (e) { /* the measurement is optional */ }
     }
     // A family of creatures by race, on a player (npcToughness.kinds.<kind>.dealt; the draugr, 17 Oct)
@@ -9719,7 +9798,7 @@ try {
   const UPDATES_JS = path.resolve('updates.js');
   delete require.cache[UPDATES_JS];
   const auth = serverSettings.discordAuth || {};
-  require(UPDATES_JS)({ log, personal, audit, who, tagOf, onlineActors, every, registerChatCommand, isAdmin, tierOf, cfg,
+  require(UPDATES_JS)({ log, personal, audit, who, tagOf, onlineActors, every, once, registerChatCommand, isAdmin, tierOf, cfg,
     sayAll: (text) => { for (const x of onlineActors()) system(x, text); },
     token: (cfg.discord || {}).botToken || auth.botToken, channelId: ((cfg.updates || {}).channelId) || (cfg.discord || {}).channelId });
 } catch (e) { log('updates.js failed to load:', e.stack || e.message); }
@@ -9777,6 +9856,13 @@ try {
   delete require.cache[ROSTERS_JS];
   require(ROSTERS_JS)({ log, personal, registerChatCommand, onlineActors, nameOf, zoneOfActor, zoneById, every, audit, cfg });
 } catch (e) { log('rosters.js failed to load:', e.stack || e.message); globalThis.__dboRosterLogin = null; }
+
+// ---- /bandage: binding wounds with a bandage or a linen wrap (server\bandages.js, config "bandages") ---------------
+try {
+  const BANDAGES_JS = path.resolve('bandages.js');
+  delete require.cache[BANDAGES_JS];
+  require(BANDAGES_JS)({ mp, log, personal, registerChatCommand, sendPacket, every, cfg });
+} catch (e) { log('bandages.js failed to load:', e.stack || e.message); }
 
 // ---- /monitor: the dbo-monitor service's view for staff (server\monitor.js; tooling/dbo-monitor) -----------------
 try {
@@ -9909,6 +9995,13 @@ try {
   delete require.cache[ORPHANS_JS];
   require(ORPHANS_JS)({ mp, log, audit, every, profileOf, userOf, cfg });
 } catch (e) { log('orphans.js failed to load:', e.stack || e.message); globalThis.__dboOrphanRemove = null; }
+
+// ---- /clearcorpses: staff take away the dead NPC bodies around them (server\clearcorpses.js) ----------------------------
+try {
+  const CLEARCORPSES_JS = path.resolve('clearcorpses.js');
+  delete require.cache[CLEARCORPSES_JS];
+  require(CLEARCORPSES_JS)({ mp, log, audit, personal, who, profileOf, userOf, registerChatCommand, cfg });
+} catch (e) { log('clearcorpses.js failed to load:', e.stack || e.message); }
 
 // ---- Rob in the X menu: the victim answers in a panel (server\robbery.js) ---------------------------------------------
 try {

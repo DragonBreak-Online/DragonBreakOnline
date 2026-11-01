@@ -99,21 +99,72 @@ closeWidget(D, 60);
 ok(last().customPacketType === 'dboScaleform' && last().close === true, 'the gate closes the custom menu', last());
 openWidget(D, { type: 'contextMenu', id: 70, actions: [] }, true);
 ok(last().customPacketType === 'dboWidget', 'a gameplay context menu stays in the browser (it has no NATIVE_SWF route)', last());
-{
 // The labour panel (labour.js, struggle.js: widget 55), the sweep and the pick round alike
-const D = 0xff000004;
-openWidget(D, { type: 'labour', id: 55, nonce: 'l1', kind: 'mining' });
+const E = 0xff000005;
+openWidget(E, { type: 'labour', id: 55, nonce: 'l1', kind: 'mining' });
 ok(last().customPacketType === 'dboWidget', 'labour without native:labour stays in the browser', last());
-setCaps(D, ['native:labour']);
-openWidget(D, { type: 'labour', id: 55, nonce: 'l1', kind: 'mining' });
+setCaps(E, ['native:labour']);
+openWidget(E, { type: 'labour', id: 55, nonce: 'l1', kind: 'mining' });
 ok(last().customPacketType === 'dboScaleform' && last().swf === 'dbo_labour' && last().widget === 55, 'with native:labour a sweep round goes to dbo_labour', last());
-openWidget(D, { type: 'labour', id: 55, nonce: 'l1', kind: 'mining', result: 'You free 2 Iron Ore.' });
+openWidget(E, { type: 'labour', id: 55, nonce: 'l1', kind: 'mining', result: 'You free 2 Iron Ore.' });
 ok(last().customPacketType === 'dboScaleform' && last().payload.result === 'You free 2 Iron Ore.', 'the server\'s verdict for the same round goes to the same panel', last());
-openWidget(D, { type: 'labour', id: 55, nonce: 's1', kind: 'struggle', event: 'struggle', mode: 'pick' });
+openWidget(E, { type: 'labour', id: 55, nonce: 's1', kind: 'struggle', event: 'struggle', mode: 'pick' });
 ok(last().customPacketType === 'dboScaleform' && last().swf === 'dbo_labour', 'a struggle and a pick round too', last());
-closeWidget(D, 55);
+closeWidget(E, 55);
 ok(last().customPacketType === 'dboScaleform' && last().close === true, 'labourCancel\'s closeWidget closes the custom menu', last());
-}
+
+// The bank (bank.js: widget 48), native for a client with native:bank (fork native-bank-1031)
+const F = 0xff000006;
+openWidget(F, { type: 'bank', id: 48, nonce: 'b1', balance: 10, carried: 5 });
+ok(last().customPacketType === 'dboWidget', 'the bank without native:bank stays in the browser', last());
+setCaps(F, ['native:bank']);
+openWidget(F, { type: 'bank', id: 48, nonce: 'b1', balance: 10, carried: 5 });
+ok(last().customPacketType === 'dboScaleform' && last().swf === 'dbo_bank' && last().widget === 48, 'with native:bank it goes to dbo_bank', last());
+openWidget(F, { type: 'bank', id: 48, nonce: 'b1', balance: 5, carried: 10, result: 'You deposit 5 gold.', resultKind: 'ok' });
+ok(last().customPacketType === 'dboScaleform' && last().payload.result === 'You deposit 5 gold.', 'an action\'s answer re-sends it to the same panel', last());
+closeWidget(F, 48);
+ok(last().customPacketType === 'dboScaleform' && last().close === true, 'bankClose\'s closeWidget closes the custom menu', last());
+
+// The ledger, the property market, the key ring and the tome shop, each native for a client that names it (fork native-commerce-1031)
+const COMMERCE = [['businessLedger', 64, 'dbo_ledger'], ['propertyMarket', 82, 'dbo_market'], ['keyRing', 91, 'dbo_keyring'], ['tomeShop', 60, 'dbo_tomes']];
+COMMERCE.forEach(([type, id, swf], i) => {
+  const G = 0xff000010 + i;
+  openWidget(G, { type, id, nonce: 'c' + i });
+  ok(last().customPacketType === 'dboWidget', `${type} without native:${type} stays in the browser`, last());
+  setCaps(G, ['native:' + type]);
+  openWidget(G, { type, id, nonce: 'c' + i, result: '' });
+  ok(last().customPacketType === 'dboScaleform' && last().swf === swf && last().widget === id, `with native:${type} it goes to ${swf}`, last());
+  openWidget(G, { type, id, nonce: 'c' + i, result: 'Done.' });
+  ok(last().customPacketType === 'dboScaleform' && last().payload.result === 'Done.', `${type}: an action's answer re-sends it to the same panel`, last());
+  closeWidget(G, id);
+  ok(last().customPacketType === 'dboScaleform' && last().close === true, `${type}: the module's closeWidget closes the custom menu`, last());
+});
+const H = 0xff000020;
+setCaps(H, ['native:keyRing']);
+openWidget(H, { type: 'businessLedger', id: 64, nonce: 'x' });
+ok(last().customPacketType === 'dboWidget', 'one panel\'s cap does not route another', last());
+
+// The shrine, the courier handover, the player menu, the spellbook, study and the lectern, each native for a client that names it (fork native-social-1031)
+const SOCIAL = [['shrinePanel', 74, 'dbo_shrine'], ['courierHandover', 81, 'dbo_courier'], ['playerMenu', 52, 'dbo_menu'], ['spellbook', 58, 'dbo_spellbook'],
+  ['studyMagic', 73, 'dbo_study'], ['studyMagic', 75, 'dbo_study'], ['classLectern', 72, 'dbo_lectern'], ['classLectern', 76, 'dbo_lectern']];
+SOCIAL.forEach(([type, id, swf], i) => {
+  const G = 0xff000030 + i;
+  openWidget(G, { type, id, nonce: 's' + i });
+  ok(last().customPacketType === 'dboWidget', `${type} without native:${type} stays in the browser`, last());
+  setCaps(G, ['native:' + type]);
+  openWidget(G, { type, id, nonce: 's' + i });
+  ok(last().customPacketType === 'dboScaleform' && last().swf === swf && last().widget === id, `with native:${type} it goes to ${swf}`, last());
+  closeWidget(G, id);
+  ok(last().customPacketType === 'dboScaleform' && last().close === true, `${type}: the module's closeWidget closes the custom menu`, last());
+});
+// A payload the custom menu cannot take goes to the browser, and moving there closes the custom menu it had
+const BIG = 0xff000040;
+setCaps(BIG, ['native:playerMenu']);
+openWidget(BIG, { type: 'playerMenu', id: 52, nonce: 'm', tabs: [] });
+ok(last().customPacketType === 'dboScaleform', 'a small player menu goes native', last());
+openWidget(BIG, { type: 'playerMenu', id: 52, nonce: 'm', tabs: [{ key: 'staff', title: 'Staff', hints: [], entries: [{ name: 'x', label: 'X', desc: 'y'.repeat(60001) }] }] });
+ok(last().customPacketType === 'dboWidget', 'one past the custom menu\'s limit goes to the browser', last());
+ok(sent.slice(-2).some((s) => s[1].customPacketType === 'dboScaleform' && s[1].close === true), '...and the custom menu it was in is closed', sent.slice(-3));
 
 console.log(fails ? `\n${fails} failed` : '\nall passed');
 process.exit(fails ? 1 : 0);

@@ -678,10 +678,13 @@ excluded('ROLENAME', 'staff-written titles: the command wrapper');
 excluded('PLACE', 'staff-written set names: the command wrapper');
 excluded('LEDGER', 'ledger names: the command wrapper');
 excluded('ORPHAN', 'staff only');
+excluded('CLEARCORPSES', 'staff only: the bodies a GM cleared around them, by base and count');
 excluded('DISCORD', 'roles: session.perm');
 // anticheat.js: a Lead GM's /anticheat off|on <part> (the part and the word from fixed lists) is clean; the daily counts
 // name no player
 clean_('ANTICHEAT', { display: true });
+// a flagged caster's refused spell hit (magicka refuseHits): both names by display(), the spell's editor id, minutes left
+clean_('ANTICHEAT-REFUSED', { display: true });
 excluded('ANTICHEAT-DAILY', 'counts per kind only, no player');
 excluded('WWBREAKER VLBREAKER', 'the beastform breaker names who dropped');
 excluded('REMOTE', 'the remote staff console (console.js): staff command text and a Discord handle; the command wrapper records the run (route console)');
@@ -1409,6 +1412,7 @@ alchemy.js ENCH-RESTORE 76a26bc3 clean
 alchemy.js ENCH-LEARNED-REPAIR 1b77b634 clean
 anticheat.js ANTICHEAT-DAILY 1c03c505 excluded
 anticheat.js ANTICHEAT ae791c2e clean
+anticheat.js ANTICHEAT-REFUSED 4a9ed60d clean
 appearance.js APPEARANCE 856fcf43 clean
 appearance.js APPEARANCE d9f800c2 clean
 appearance.js APPEARANCE 2163cbb1 clean
@@ -1551,6 +1555,7 @@ citizenship.js ELECTION 8ca5a5d0 clean
 citizenship.js ELECTION 3e5d350b clean
 citizenship.js CITIZEN e6f03eeb clean
 citizenship.js ELECTION 9607cadb clean
+clearcorpses.js CLEARCORPSES 559976b3 excluded
 commissions.js COMMISSION 49e86f26 parsed
 commissions.js COMMISSION 150fc5bd parsed
 commissions.js COMMISSION af1c554e parsed

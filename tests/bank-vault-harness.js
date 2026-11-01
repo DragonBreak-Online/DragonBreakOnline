@@ -58,7 +58,7 @@ const goldOf = (a) => count(a, GOLD);
 for (const b of [BANK_WR, BANK_SOL, BANK_DAWN, BANK_NOWHERE, BANK_OUT, BANK_F7, BANK_F7_IN]) set(b, 'baseDesc', '5:DragonBreak.esp');
 // Each teller's own cell (or worldspace and position); the player's zoneOfActor is deliberately wrong at some of them
 set(BANK_WR, 'worldOrCellDesc', '1a97:DragonBreak.esp'); set(BANK_SOL, 'worldOrCellDesc', '6053:DragonBreak.esp');
-set(BANK_DAWN, 'worldOrCellDesc', '1b5f3f:DragonBreak Online Edits.esp'); set(BANK_NOWHERE, 'worldOrCellDesc', 'abcd:Someone Else.esp');
+set(BANK_DAWN, 'worldOrCellDesc', '1b5f3f:DragonBreak Online Edits.esp'); set(BANK_NOWHERE, 'worldOrCellDesc', 'abcd:Someone Else.esp');   // verify-formids: ignore - harness fixture, a plugin of nobody's
 set(BANK_OUT, 'worldOrCellDesc', '3c:Skyrim.esm'); set(BANK_OUT, 'pos', [1000, 2000, 0]);
 set(BANK_F7, 'worldOrCellDesc', '3c:Skyrim.esm'); set(BANK_F7, 'pos', [1000, 2000, 0]);
 set(BANK_F7_IN, 'worldOrCellDesc', '6053:DragonBreak.esp');
@@ -309,7 +309,8 @@ check('every bank cell is pinned to its hold, and every hold named exists in zon
   Object.entries(BANK_CELLS).filter(([c, z]) => CELLS[c] !== z || !zoneIds.has(z)));
 const CFG = JSON.parse(fs.readFileSync(path.join(SERVER, 'gamemode-config.json'), 'utf8')).bank.storage;
 check('gamemode-config.json: three tiers at a gold per weight, seizure after 30 days', CFG.tiers.map((t) => `${t.weight}:${t.weekly}`).join(',') === '100:100,250:250,500:500' && CFG.seizeAfterDays === 30);
-check('gamemode-config.json ships the vaults closed, arrears to 5 weeks, debt-only seizures (bank review R2)', CFG.enabled === false && CFG.arrearsCapWeeks === 5 && CFG.seizeCredit === 'debt' && CFG.arrearsCapWeeks >= Math.ceil(CFG.seizeAfterDays / 7));
+// The vaults shipped closed (bank review R2, 16 Oct) and are open in the live config now; enabled false is the rollback
+check('gamemode-config.json: the vaults open, arrears to 5 weeks, debt-only seizures (bank review R2)', CFG.enabled === true && CFG.arrearsCapWeeks === 5 && CFG.seizeCredit === 'debt' && CFG.arrearsCapWeeks >= Math.ceil(CFG.seizeAfterDays / 7));
 
 // ---- the bank review of 16 Oct (claude-jake): its required changes, scenario by scenario ------------------------------------
 const P = globalThis.__dboPostApi;
