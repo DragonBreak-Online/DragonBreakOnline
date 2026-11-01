@@ -96,6 +96,15 @@ if [ "$REFRESH" = "1" ] || [ ! -f "$STAMP" ]; then
   say "snapshot: refreshing from $SOURCE"
   host=${SOURCE%%:*}
   dir=${SOURCE#*:}
+  # A LOCAL source, for when the runner is executed ON a server rather than against one. Without this,
+  # running on dbo-dev would ssh to `dragonbreak-dev` - which is CT115, production, the wrong box entirely.
+  # Local means: an absolute path, no colon at all, or a one-character "host" - that is a Windows drive
+  # letter, never a hostname. (A `[A-Za-z]:[/\\]*` glob looks right and does NOT match here; tested.)
+  case "$SOURCE" in
+    /*) host=""; dir="$SOURCE" ;;
+    *:*) [ ${#host} -le 1 ] && { host=""; dir="$SOURCE"; } ;;
+    *) host=""; dir="$SOURCE" ;;
+  esac
   # ONE ssh round trip, not one per file. The source is the live production box: eighteen scp calls meant
   # eighteen connections and eighteen sshd auths for ~100 KB of JSON, which is rude to a server that also has
   # players on it. tar picks the files that exist remotely (a missing one must not fail the archive) and the
@@ -105,15 +114,28 @@ if [ "$REFRESH" = "1" ] || [ ! -f "$STAMP" ]; then
   # Unquoted $(echo ...) word-splits it and rejoins it on one line, which is what the remote needs.
   oneline=$(echo $FILES)
   remote='cd '"$(printf '%q' "$dir")"' || exit 1; for f in '"$oneline"'; do [ -f "$f" ] && printf "%s\n" "$f"; done | tar -cf - -T - 2>/dev/null'
-  if ! ssh -o BatchMode=yes "$host" "$remote" | tar -xf - -C "$CACHE" 2>/dev/null; then
-    echo "snapshot: the transfer from $SOURCE failed - refusing to report a baseline" >&2
-    exit 1
+  if [ -n "$host" ]; then
+    if ! ssh -o BatchMode=yes "$host" "$remote" | tar -xf - -C "$CACHE" 2>/dev/null; then
+      echo "snapshot: the transfer from $SOURCE failed - refusing to report a baseline" >&2
+      exit 1
+    fi
+  else
+    # Local. The live dir is usually root-owned (/opt), and reading it is within a worker's remit, so fall
+    # back to a non-interactive sudo rather than silently producing an empty snapshot.
+    say "snapshot: local source $dir"
+    if ! sh -c "$remote" | tar -xf - -C "$CACHE" 2>/dev/null; then
+      if ! sudo -n sh -c "$remote" | tar -xf - -C "$CACHE" 2>/dev/null; then
+        echo "snapshot: could not read $dir, with or without sudo - refusing to report a baseline" >&2
+        exit 1
+      fi
+      say "snapshot: needed sudo to read $dir"
+    fi
   fi
   got=0
   for f in $FILES; do [ -f "$CACHE/$f" ] && got=$((got + 1)); done
   [ "$got" -gt 0 ] || { echo "snapshot: copied nothing from $SOURCE - refusing to report a baseline" >&2; exit 1; }
   date -u +%s > "$STAMP"
-  say "snapshot: $got file(s) from $host in one transfer"
+  say "snapshot: $got file(s) from ${host:-$dir} in one transfer"
 fi
 
 TAKEN=$(cat "$STAMP" 2>/dev/null || echo 0)
