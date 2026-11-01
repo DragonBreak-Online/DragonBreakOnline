@@ -569,6 +569,30 @@ function dboInput(parent, name, depth, x, y, w, h, format, maxChars, multi)
    tf.backgroundColor = 0x101010;
    tf.border = true;
    tf.borderColor = 0x5A5A5A;
+   // Typed text must carry the box's own format. On 1 Nov Nat's typing came out as black boxes: the characters took the
+   // field's default format (black, a font the game's library does not have), not the one setNewTextFormat gave it.
+   // Callers set onChanged for their own use, so a keeper clip puts the format back on the frame the text changes.
+   tf.setTextFormat(format);
+   var keep = parent.createEmptyMovieClip(name + "_fmt", depth + 16000);
+   keep.box = tf;
+   keep.fmt = format;
+   keep.seen = String(tf.text);
+   keep.onEnterFrame = function()
+   {
+      // the box went with a redraw: nothing left to keep
+      if (this.box == undefined || this.box.text == undefined)
+      {
+         delete this.onEnterFrame;
+         return;
+      }
+      var now = String(this.box.text);
+      if (now != this.seen)
+      {
+         this.seen = now;
+         this.box.setTextFormat(this.fmt);
+         this.box.setNewTextFormat(this.fmt);
+      }
+   };
    Selection.setFocus(tf);
    // SKSE counts AllowTextInput (GameInput.cpp: true ++, false --), so a redraw must never take a second count
    if (!dboTyping && dboCanType())
