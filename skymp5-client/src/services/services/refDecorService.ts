@@ -4,6 +4,7 @@ import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { remoteIdToLocalId } from "../../view/worldViewMisc";
 import { Container, Door, ObjectReference } from "skyrimPlatform";
 import { logTrace } from "../../logging";
+import { pickSweep } from "./refDecorSweep";
 
 const MASTER_LOCK_LEVEL = 100;
 const APPLY_EVERY_N_UPDATES = 30;
@@ -36,12 +37,18 @@ export class RefDecorService extends ClientListener {
     this.controller.emitter.on("customPacketMessage", (e) => this.onCustomPacketMessage(e));
     this.controller.on("update", () => this.onUpdate());
     this.controller.emitter.on("gameLoad", () => this.onGameLoad());
+    // Walking into an area changes which refs are loaded: resolve everything once, during the load, rather
+    // than discovering it a cursor step at a time afterwards
+    this.controller.on("cellFullyLoaded", () => { this.fullSweep = true; });
   }
 
   // A save load resets every engine lock and display name
   private onGameLoad(): void {
     this.applied.clear();
     this.loadedTicks.clear();
+    this.hot.clear();
+    this.sweepCursor = 0;
+    this.fullSweep = true;
     this.updateCounter = APPLY_EVERY_N_UPDATES;
   }
 
@@ -78,7 +85,9 @@ export class RefDecorService extends ClientListener {
       });
       this.applied.delete(refId);
     }
-    // Apply on the next update rather than the next slow tick
+    // Apply on the next update rather than the next slow tick, and look at everything: the refs that just
+    // changed are wherever they are in the id order, not necessarily under the cursor
+    this.fullSweep = true;
     this.updateCounter = APPLY_EVERY_N_UPDATES;
   }
 
@@ -88,7 +97,20 @@ export class RefDecorService extends ClientListener {
     }
     this.updateCounter = 0;
     const stats = { names: 0, locks: 0, errors: 0, notLoaded: 0, firstError: "" };
-    this.decor.forEach((d) => this.apply(d, stats));
+    // Not every ref every sweep: see refDecorSweep.ts. The whole set is ~1,700 refs and nearly all of them
+    // are in cells that are not loaded, so resolving them all cost one frame in thirty about 3,400 native
+    // calls to throw almost all of the answers away.
+    const pick = pickSweep(Array.from(this.decor.keys()), { hot: this.hot, cursor: this.sweepCursor, full: this.fullSweep });
+    this.sweepCursor = pick.cursor;
+    if (pick.covered) {
+      this.fullSweep = false;
+    }
+    for (const refId of pick.ids) {
+      const d = this.decor.get(refId);
+      if (d) {
+        this.apply(d, stats);
+      }
+    }
     if (stats.names || stats.locks || stats.errors) {
       logTrace(this, `applied names=${stats.names} locks=${stats.locks} errors=${stats.errors} notloaded=${stats.notLoaded}${stats.firstError ? " | " + stats.firstError : ""}`);
     }
@@ -108,8 +130,12 @@ export class RefDecorService extends ClientListener {
     if (!refr) {
       stats.notLoaded++;
       this.loadedTicks.delete(d.refId);
-      return; // not loaded yet; retried on a later tick
+      this.hot.delete(d.refId);
+      return; // not loaded yet; retried on a later sweep
     }
+    // It resolved, so it is near the player: visited on every sweep from now on, which keeps a chest's
+    // CHEST_SETTLE_TICKS counting at the rate it always did
+    this.hot.add(d.refId);
 
     const prev = this.applied.get(d.refId) || {};
     // SKSE's SetDisplayName on a ref with no extra data yet writes through a null pointer (skse64+42EC, Frostcrag Spire's
@@ -172,6 +198,10 @@ export class RefDecorService extends ClientListener {
   }
 
   private decor = new Map<number, RefDecor>();
+  // refs that resolved to a real reference last time they were looked at
+  private hot = new Set<number>();
+  private sweepCursor = 0;
+  private fullSweep = true;
   private applied = new Map<number, { name?: string }>();
   private loadedTicks = new Map<number, number>();
   private updateCounter = 0;
