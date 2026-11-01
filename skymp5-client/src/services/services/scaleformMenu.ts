@@ -84,6 +84,16 @@ export const NATIVE_CAPS = [
   // Worker 1's character panels: the birthsign picker (dbo_birthsign, widget 163; dbo:birthsignPick/birthsignClose)
   "native:birthsignPicker",
 ];
+// What the client does itself, told to the server with the native panels so it no longer needs the browser HUD for it
+// (dbo:uiCaps from hud/index.tsx UI_CAPS used to be the only list). Not panels, and not governed by nativePanels:
+//   dboIdle      the server's interaction idles (emoteService dboIdle; idles.js holds a chest for the crouch)
+//   beastBody    another player's beast body built here (sync/beastBody.ts; beastform.js)
+//   nightEye     the Khajiit's Night Eye (nightEyeService.ts; racial.js)
+//   catReflexes  the Khajiit's Cat-like Reflexes (catReflexesService.ts; racial.js)
+//   riteJudge    dbo_rite judges a client rite round (judge 'client'; supernatural.js)
+//   pickRound    the pick rounds the native rite, labour, skinning and reading panels draw (minigames.js PICK_CAP)
+// lockpickLocal stays the browser's: dbo_lockpick draws only the tumbler lock, which native:lockpick asks for.
+export const CLIENT_CAPS = ["dboIdle", "beastBody", "nightEye", "catReflexes", "riteJudge", "pickRound"];
 export const CAPS_RETRY_MS = 5000;
 
 // sp.settings["skymp5-client"]["nativePanels"]: true or absent announces them all, false announces none, and
