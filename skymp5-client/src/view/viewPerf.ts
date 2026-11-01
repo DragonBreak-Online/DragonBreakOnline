@@ -18,6 +18,8 @@ import { printConsole } from "@skyrim-platform/skyrim-platform";
 const REPORT_MS = 5000;
 // A tick slower than this is counted separately: 60 fps is 16 ms, so this is "the player felt it"
 const SLOW_TICK_MS = 100;
+// A gap this long is worth one native call to ask whether a menu explains it
+const GAP_EXPLAIN_MS = 250;
 
 class Stat {
   n = 0;
@@ -45,8 +47,14 @@ class Stat {
   }
 }
 
+// A gap only means "the loop was blocked" when the game was ticking. A loading screen or an open menu stops
+// SkyrimPlatform's update event while timers and rAF carry on, which looks identical in `gap` alone and is a
+// completely different finding - see the header. gapPaused holds the gaps a menu explains; gapBlocked holds
+// the ones nothing explains, and those are the only ones worth chasing.
 const phases = {
   gap: new Stat(),
+  gapPaused: new Stat(),
+  gapBlocked: new Stat(),
   total: new Stat(),
   gate: new Stat(),
   worldcell: new Stat(),
@@ -137,10 +145,24 @@ export const noteReplaced = (): void => {
 
 // Called at the top of onUpdate. Returns the entry time so the caller can measure `total` without a second
 // clock read, and records the gap since the previous entry.
-export const beginTick = (): number => {
+// Returns true when a menu or loading screen was open, so the caller's one native call stays in worldView
+export type MenuProbe = () => boolean;
+
+export const beginTick = (menuOpen?: MenuProbe): number => {
   const t = Date.now();
   if (lastEntry) {
-    phases.gap.add(t - lastEntry);
+    const gap = t - lastEntry;
+    phases.gap.add(gap);
+    if (gap >= GAP_EXPLAIN_MS) {
+      // one native call, only on a hitch
+      let paused = false;
+      try {
+        paused = menuOpen ? menuOpen() : false;
+      } catch {
+        paused = false;
+      }
+      (paused ? phases.gapPaused : phases.gapBlocked).add(gap);
+    }
   }
   lastEntry = t;
   if (!windowStart) {
@@ -168,7 +190,10 @@ export const endTick = (entry: number): void => {
   report(
     "fv:perf",
     `ticks=${phases.total.n} over ${t - windowStart}ms slow>=${SLOW_TICK_MS}ms=${slowTicks} | ` +
-      `gap ${phases.gap.render()} total ${phases.total.render()} | ` +
+      `gap ${phases.gap.render()} ` +
+      `paused n=${phases.gapPaused.n} ${phases.gapPaused.render()} ` +
+      `BLOCKED n=${phases.gapBlocked.n} ${phases.gapBlocked.render()} ` +
+      `total ${phases.total.render()} | ` +
       `gate ${phases.gate.render()} worldcell ${phases.worldcell.render()} ` +
       `model ${phases.model.render()} pcdata ${phases.pcdata.render()} ` +
       `forms ${phases.forms.render()} clones ${phases.clones.render()} | ` +

@@ -62,7 +62,15 @@ export class WorldView extends ClientListener {
   private onUpdate() {
     // Measure-only, see viewPerf.ts. beginTick records the gap since the previous entry, which is the one
     // number that says whether a freeze happened inside this update or somewhere else in the event loop.
-    const entry = perf.beginTick();
+    // The probe runs only when viewPerf has seen a hitch, so this costs nothing on a normal frame. Same
+    // menus openGateIfDue already asks about.
+    const entry = perf.beginTick(() => {
+      const ui = this.sp.Ui;
+      return ui.isMenuOpen("Loading Menu") || ui.isMenuOpen("Dialogue Menu") || ui.isMenuOpen("Journal Menu") ||
+        ui.isMenuOpen("InventoryMenu") || ui.isMenuOpen("MagicMenu") || ui.isMenuOpen("MapMenu") ||
+        ui.isMenuOpen("ContainerMenu") || ui.isMenuOpen("BarterMenu") || ui.isMenuOpen("RaceSex Menu") ||
+        ui.isMenuOpen("Console") || ui.isMenuOpen("Crafting Menu") || ui.isMenuOpen("TweenMenu");
+    });
     let mark = entry;
 
     this.openGateIfDue();
