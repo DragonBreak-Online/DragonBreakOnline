@@ -430,8 +430,12 @@ check('birthsigns.js: one hot-reload-safe state, ui events registered through on
 const notes = JSON.parse(fs.readFileSync(path.join(SERVER, 'patch-notes.json'), 'utf8'));
 const list = Array.isArray(notes) ? notes : notes.notes || notes.entries || [];
 const note = list.find((n) => /birthsign/i.test(JSON.stringify(n)));
-// Among the newest few rather than first: a release carries several new features' notes, and only one can be on top
-check('patch-notes.json: a Birthsigns note, among the newest', !!note && list.indexOf(note) >= 0 && list.indexOf(note) < 10, note);
+// The note must exist and be dated - NOT be near the top. "Among the newest 10" was true the week Birthsigns
+// shipped and rots by design: every later release pushes it down, and on 1 Nov 2026 it sat at index 34 of 441,
+// failing in every tree, overlay or no overlay. That one assertion is why a worktree run looked like it had
+// real failures. Dated-or-SHIP_DATE is the convention the other sixteen note checks already use (npcmood:144).
+check('patch-notes.json: a Birthsigns note, dated SHIP_DATE or a date',
+  !!note && (note.date === 'SHIP_DATE' || /^\d{4}-\d{2}-\d{2}$/.test(note.date)), note && note.date);
 
 // ---- the Steed's carry weight: the DLE's DBO_ReferralCarry ability (+50, 1D1FA7), given by AddSpell like the Maormer's ----
 {
