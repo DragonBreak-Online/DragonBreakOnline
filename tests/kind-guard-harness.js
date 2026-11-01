@@ -123,6 +123,27 @@ globalThis.__dboGuildKindSweep(ELDER, 'became a vampire');
 ok('a vampire still a vampire (a pure-blood\'s Embrace) keeps the clan', elderBefore && inF('clan-volkihar', ELDER));
 ok('a staff character is never swept', globalThis.__dboGuildKindSweep(LEAD, 'cured').length === 0 && inF('clan-volkihar', LEAD));
 
+// ---- House Ravenwatch takes at most five (guild-defs maxMembers; Nat, 1 Nov) ----------------------------------------------
+ok(((defs.factions || defs).find((f) => f.id === 'house-ravenwatch') || {}).maxMembers === 5, 'guild-defs.json: House Ravenwatch maxMembers 5');
+const RW = [0x30, 0x31, 0x32, 0x33, 0x34, 0x35];
+RW.forEach((id, i) => { chars.set(id, `Raven${i}`); KIND.set(id, 'vampire'); onlineSet.add(id); });
+load();
+faction(LEAD, 'leader Raven0 house-ravenwatch');
+for (let i = 1; i < 5; i++) add('house-ravenwatch', `Raven${i}`);
+ok(RW.slice(0, 5).every((id) => inF('house-ravenwatch', id)), 'five vampires join, its leader among them');
+add('house-ravenwatch', 'Raven5');
+ok(!inF('house-ravenwatch', 0x35), 'a sixth is refused: the house is full');
+const full = globalThis.__dboGuildInvite(0x30, 0x35, 'house-ravenwatch');
+told.length = 0; faction(0x35, 'accept house-ravenwatch');
+ok(!inF('house-ravenwatch', 0x35) && (/is full: it takes at most 5, its leader included\./.test(last(0x35)) || !!full.error), 'an invite and its accept are refused too', [full, last(0x35)]);
+faction(LEAD, 'override Raven5 house-ravenwatch'); add('house-ravenwatch', 'Raven5');
+ok(!inF('house-ravenwatch', 0x35), '/faction override lifts the limits, never the size');
+globalThis.__dboGuildLeave(0x34, 'house-ravenwatch');
+add('house-ravenwatch', 'Raven5');
+ok(inF('house-ravenwatch', 0x35), 'one leaves: a place opens');
+add('clan-volkihar', 'Raven4');
+ok(inF('clan-volkihar', 0x34), 'the other clans keep no such limit');
+
 // ---- supernatural.js: when the sweep runs -------------------------------------------------------------------------------
 const sn = fs.readFileSync(path.join(ROOT, 'supernatural.js'), 'utf8');
 const end = sn.slice(sn.indexOf('const endCurse = '), sn.indexOf('const FEVER_TURNED'));

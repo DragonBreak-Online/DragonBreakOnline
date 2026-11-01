@@ -368,6 +368,9 @@ module.exports = (api) => {
     // leader, a staff add or override, a charter, a pack challenge, another module - seats anyone else. A staff character
     // stays exempt (fits), and /faction override lifts the limits only, never this
     if (f && f.requires && !entryOf(fid, a) && !fits(a, f)) return `${nameOf(a)} could never belong to ${f.name}: it takes only a ${f.requires}.`;
+    // A faction's own size limit (guild-defs maxMembers; Nat, 1 Nov: House Ravenwatch takes at most five vampires), counted
+    // with its leader, at the one write every join goes through
+    if (f && Number(f.maxMembers) > 0 && !entryOf(fid, a) && Object.keys(rosterOf(fid)).length >= Number(f.maxMembers)) return `${f.name} is full: it takes at most ${Number(f.maxMembers)}, its leader included.`;
     if (f && f.kind === 'pack' && !entryOf(fid, a) && packFull(fid)) return `${f.name} is full: a pack runs ${Math.max(1, Number(PACKS.maxMembers) || 5)} strong, its Alpha included.`;
     // One pack per werewolf (Nate, 23 Oct: pack control): a member of another pack is refused until they leave it
     if (f && f.kind === 'pack' && !entryOf(fid, a)) {

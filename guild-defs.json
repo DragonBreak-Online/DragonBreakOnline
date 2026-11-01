@@ -1587,6 +1587,7 @@
       "kind": "guild",
       "secret": true,
       "requires": "vampire",
+      "maxMembers": 5,
       "note": "Nate, 21 Oct (UESP Lore:House_Ravenwatch): a noble house of Rivenspire, High Rock, secretly vampires, founded by Count Verandis Ravenwatch, who forsook killing: they feed only on willing servants or outlaws and never to excess, try to redeem other vampires and kill only grave threats. No hall yet",
       "ranks": [
         {

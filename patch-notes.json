@@ -1,5 +1,19 @@
 [
   {
+    "title": "House Ravenwatch",
+    "date": "2026-11-01",
+    "version": "Server update",
+    "tag": "Changed",
+    "sections": [
+      {
+        "heading": "The clans",
+        "items": [
+          "House Ravenwatch keeps its numbers few: it takes at most five vampires, its leader among them."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Vampire bloodlines",
     "date": "2026-10-31",
     "version": "Server update",
