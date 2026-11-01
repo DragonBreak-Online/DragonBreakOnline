@@ -59,7 +59,7 @@ const li = dj.indexOf('const pool = (name, maxValue, ok) =>');
 const LOOT = readJson('loot.json', { pools: {} }).pools || {};
 // The material tiers are tested in loot-tiers-harness.js; here they pass everything
 // (and the ceiling's ingots and arrows, likewise passed)
-const pool = new Function('LOOT', 'BANNED_LOOT', 'ARTIFACT', 'DRAGON_LOOT', 'GEAR_POOLS', 'TIERS', 'CAP_KIND', `${dj.slice(li, dj.indexOf('\n', li))}\nreturn pool;`)(LOOT, /Ebony|Daedric/i, ARTIFACT, DRAGON_LOOT, new Set(), { lootable: () => true, aboveCap: () => null }, {});
+const pool = new Function('LOOT', 'BANNED_LOOT', 'ARTIFACT', 'DRAGON_LOOT', 'GEAR_POOLS', 'TIERS', 'CAP_KIND', `${dj.slice(li, dj.indexOf('\n', li))}\nreturn pool;`)(LOOT, /Ebony|Daedric/i, ARTIFACT, DRAGON_LOOT, new Set(), { lootable: () => true, aboveCap: () => null, classOf: () => ({ kind: 'normal', tier: 1 }) }, {});
 const inPools = ['DBSilverRing', 'DLC1nVampireBloodMagicRingBeast', 'DLC2ArmorAcolyteMaskShock'];
 const had = inPools.filter((n) => Object.values(LOOT).some((l) => (l || []).some((it) => it.name === n)));
 const still = inPools.filter((n) => Object.keys(LOOT).some((k) => pool(k, 0, undefined).some((it) => it.name === n)));
@@ -80,15 +80,15 @@ const REC = {
   '2146e:Hothtrooper44_ArmorCompilation.esp': 'IARShieldYsgramor', '2146f:Hothtrooper44_ArmorCompilation.esp': 'IAShieldYsgramor',
   '81a:MoreCraftableEquipment.esp': 'MCERecipeArmorTsunCuirass', '819:MoreCraftableEquipment.esp': 'MCEArmorTsunCuirassPlayer',
   '575b:Dawnguard.esm': 'DLC1LD_RecipeAetherialCrown', '575a:Dawnguard.esm': 'DLC1LD_AetherialCrown',
-  '2a000:DragonPriestArmor.esp': 'DPA_DowngradeDragonPriestArmorMiraakHeavy', '39d22:Dragonborn.esm': 'DLC2MKMiraakRobes3',
-  '2a001:DragonPriestArmor.esp': 'DPA_UpgradeDragonPriestArmorKonahrikHeavy', 'fb75:DragonPriestArmor.esp': 'DPA_DragonPriestArmorKonahrikHeavy',
+  '333eb:DragonPriestArmor.esp': 'DPA_DowngradeDragonPriestArmorMiraakHeavy', '39d22:Dragonborn.esm': 'DLC2MKMiraakRobes3',
+  'aa45:DragonPriestArmor.esp': 'DPA_UpgradeDragonPriestArmorKonahrikHeavy', 'fb75:DragonPriestArmor.esp': 'DPA_DragonPriestArmorKonahrikHeavy',
   '2a002:Skyrim.esm': 'TemperWeaponDawnbreaker', '4e4ee:Skyrim.esm': 'DA09Dawnbreaker',
   'a30c3:Skyrim.esm': 'RecipeIngotIron', '5ace4:Skyrim.esm': 'IngotIron',
   '21470:Hothtrooper44_ArmorCompilation.esp': 'IATShieldYsgramor',   // tempers the shield at the armor table, no "Temper" in its name
   '88105:Skyrim.esm': 'CraftingSmithingForge', '88108:Skyrim.esm': 'CraftingSmithingSharpeningWheel', 'adb78:Skyrim.esm': 'CraftingSmithingArmorTable',
 };
 // Each recipe's workbench keyword (BNAM): tempering is told by the bench, never by the name
-const BENCH = { '2a002:Skyrim.esm': '88108:Skyrim.esm', '21470:Hothtrooper44_ArmorCompilation.esp': 'adb78:Skyrim.esm' };
+const BENCH = { '2a002:Skyrim.esm': '88108:Skyrim.esm', '21470:Hothtrooper44_ArmorCompilation.esp': 'adb78:Skyrim.esm' };   // verify-formids: ignore - a recipe and its bench keyword; the checker reads "Armor" in the key's plugin name and expects an ARMO
 const ids = new Map(), descs = new Map(); let nextId = 0x0a000001;
 for (const d of Object.keys(REC)) { ids.set(d.toLowerCase(), nextId); descs.set(nextId, d); nextId++; }
 const cid = (d) => { const k = String(d).toLowerCase(); if (!ids.has(k)) { ids.set(k, nextId); descs.set(nextId, d); nextId++; } return ids.get(k); };
@@ -122,7 +122,7 @@ for (const [r, p, what] of [
   ['2146e:Hothtrooper44_ArmorCompilation.esp', '2146f:Hothtrooper44_ArmorCompilation.esp', "Immersive Armors' Shield of Ysgramor"],
   ['81a:MoreCraftableEquipment.esp', '819:MoreCraftableEquipment.esp', "More Craftable Equipment's Tsun's armour"],
   ['575b:Dawnguard.esm', '575a:Dawnguard.esm', 'the Aetherial Crown'],
-  ['2a000:DragonPriestArmor.esp', '39d22:Dragonborn.esm', "Dragon Priest Armor's downgrade that makes Miraak's Robes"],
+  ['333eb:DragonPriestArmor.esp', '39d22:Dragonborn.esm', "Dragon Priest Armor's downgrade that makes Miraak's Robes"],
 ]) ok(craft(r, p) === false, `${what} is refused at the forge`);
 ok(!credits.length, 'a refused craft earns no mastery credit', credits);
 ok(said.some((t) => /not made by any craftsman/.test(t) && /materials come back/.test(t)) && audits.some((t) => /ARTIFACT craft refused Pff000014 recipe IWRecipeWeaponDawnbreaker -> IWCDawnbreaker/.test(t)),
@@ -130,7 +130,7 @@ ok(said.some((t) => /not made by any craftsman/.test(t) && /materials come back/
 credits.length = 0;
 ok(craft('2a002:Skyrim.esm', '4e4ee:Skyrim.esm') !== false, 'tempering Dawnbreaker (a staff grant a player holds) at the sharpening wheel still works');
 ok(craft('21470:Hothtrooper44_ArmorCompilation.esp', '2146f:Hothtrooper44_ArmorCompilation.esp') !== false, 'tempering a granted Shield of Ysgramor at the armor table still works, though its recipe is not named Temper (Worker A)');
-ok(craft('2a001:DragonPriestArmor.esp', 'fb75:DragonPriestArmor.esp') !== false, "Dragon Priest Armor's own Konahrik set is ordinary gear and still made");
+ok(craft('aa45:DragonPriestArmor.esp', 'fb75:DragonPriestArmor.esp') !== false, "Dragon Priest Armor's own Konahrik set is ordinary gear and still made");
 ok(craft('a30c3:Skyrim.esm', '5ace4:Skyrim.esm') !== false && credits.length === 4, 'an iron ingot is made and credited as always');
 
 console.log(fails ? `${fails} failed` : 'all passed');

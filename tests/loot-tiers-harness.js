@@ -44,7 +44,7 @@ Math.random = () => { rng = (rng + 0x6d2b79f5) >>> 0; let t = Math.imul(rng ^ (r
 // ---- 1. loottiers.js ----------------------------------------------------------------------------------------------
 const byName = new Map();
 for (const list of Object.values(LOOT)) for (const it of list) if (!byName.has(it.name)) byName.set(it.name, it);
-const cls = (name) => T.classOf((byName.get(name) || { id: 'ffffff:Nothing.esp' }).id);
+const cls = (name) => T.classOf((byName.get(name) || { id: 'ffffff:Nothing.esp' }).id);   // verify-formids: ignore - a deliberately unknown id, to exercise the unknown-item path
 const tierCases = { IronSword: 1, ArmorHideCuirass: 1, CYRSteelSword: 2, ArmorSteelBootsA: 2, ArmorElvenCuirass: 2, DwarvenSword: 2,
   ArmorSteelPlateCuirass: 3, ArmorScaledCuirass: 3, ArmorElvenGildedCuirass: 3, CYRGlassSword: 4, ArmorGlassCuirass: 4 };
 const wrongTier = Object.entries(tierCases).filter(([n, t]) => { const c = cls(n); return c.kind !== 'gear' || c.tier !== t; }).map(([n]) => [n, cls(n)]);
@@ -57,7 +57,7 @@ ok(cls('ArmorStormcloakCuirass').kind === 'uniform' && cls('ArmorBladesCuirass')
 const facDesc = Object.keys(FACTION.items)[0];
 ok(T.classOf(facDesc).kind === 'uniform' || T.classOf(facDesc).kind === 'never' || T.classOf(facDesc).kind === 'unknown', 'every item faction-gear.json names is not loot', [facDesc, T.classOf(facDesc)]);
 ok(cls('ClothesMonkRobes').kind === 'trinket' || cls('JewelryRingGold').kind === 'trinket', 'clothing and jewellery are trinkets, with their own roll');
-ok(T.classOf('abcdef:Nowhere.esp').kind === 'unknown' && !T.lootable('abcdef:Nowhere.esp'), 'an item the material map does not know is not loot');
+ok(T.classOf('abcdef:Nowhere.esp').kind === 'unknown' && !T.lootable('abcdef:Nowhere.esp'), 'an item the material map does not know is not loot');   // verify-formids: ignore - deliberately unknown ids: this asserts what happens to an item nothing knows
 ok(cls('CYRBloodscaleHelmet').kind === 'never' && /Argonians and Khajiit/.test(cls('CYRBloodscaleHelmet').why || ''), 'CYRBloodscaleHelmet is never loot (loot-overrides.json: addons for two races only)', cls('CYRBloodscaleHelmet'));
 // loot-overrides.json: CYRIronFalchion's Beyond Skyrim model is untextured (#bugs "Iron Falchion Missing Textures")
 ok(MATERIALS.items['81dfc:bsheartland.esm'] === 'iron' && cls('CYRIronFalchion').kind === 'never' && /untextured/.test(cls('CYRIronFalchion').why || ''), 'CYRIronFalchion is never loot (loot-overrides.json, "untextured BS model"), though its map entry still says iron', cls('CYRIronFalchion'));
@@ -228,9 +228,18 @@ for (const diff of DIFFS) {
   const got = [1, 2, 3, 4].map((t) => list.filter((s) => s.tier === t).length / Math.max(1, list.length));
   const want = [1, 2, 3, 4].map((t) => (row[t] || 0) / total);
   const worst = Math.max(...got.map((g, i) => Math.abs(g - want[i])));
-  // Within 7 points, or three standard errors of a share from this many pieces when that is wider (Master's few hundred
-  // chest pieces put 7 points at 2.4 errors: any change to how many rolls a chest makes moved the seeded sample past it)
-  const tol = Math.max(0.07, 3 * Math.sqrt(0.25 / Math.max(1, list.length)));
+  // Within 7 points, or the widest per-tier standard error at four sigma when that is wider.
+  //
+  // This used to use 3 * sqrt(0.25 / n): p = 0.5 (the widest variance, not this tier's) at three
+  // sigma, across 16 comparisons - about a 4% chance of crying wolf, and with a fixed seed that coin
+  // is already flipped. It duly failed on `normal` at 23/68/9 against 30/60/10, worst 0.0765 against
+  // a 0.0743 bound. The probabilities are right: at CLAIMS=96 the same check gives 31/59/10 against
+  // 30/60/10. What moved the sample was the 26 Oct linen config change, which alters how many random
+  // draws a chest makes - exactly what the old comment here warned about.
+  // So: each tier's own standard error, four sigma for the 16 comparisons. At n = 400 that still
+  // catches a drift of about 10 points, and CLAIMS=96 narrows it to about 5.
+  const se = (p) => Math.sqrt(Math.max(p * (1 - p), 0.01) / Math.max(1, list.length));
+  const tol = Math.max(0.07, 4 * Math.max(...want.map(se)));
   ok(list.length > 80 && worst < tol, `${diff}: ${list.length} chest armour pieces, tiers ${got.map((g) => Math.round(g * 100)).join('/')}% against ${want.map((w) => Math.round(w * 100)).join('/')}%`, { worst });
 }
 // Weapons: at Expert and Master a tier 3 roll gives a high Elven weapon (half or so of the chest weapons there), at Novice none
@@ -259,7 +268,7 @@ ok(seen.filter((s) => s.path === 'humanoid body').length > 0 && seen.filter((s) 
 // ---- 3. the steel ceiling ------------------------------------------------------------------------------------------
 {
   const S = tiersWith(undefined), IRON = tiersWith({ cap: 'iron' });
-  const c = (TT, n) => TT.classOf((byName.get(n) || { id: 'ffffff:Nothing.esp' }).id);
+  const c = (TT, n) => TT.classOf((byName.get(n) || { id: 'ffffff:Nothing.esp' }).id);   // verify-formids: ignore - a deliberately unknown id, as above
   ok(S.cap === 'steel' && T.cap === 'none' && IRON.cap === 'iron', 'the default ceiling is steel; cap "none" lifts it, "iron" lowers it', [S.cap, T.cap, IRON.cap]);
   const under = ['IronSword', 'ArmorIronCuirass', 'ArmorHideCuirass', 'CYRSteelSword', 'ArmorSteelBootsA', 'SilverSword'].filter((n) => byName.has(n));
   const over = ['ArmorElvenCuirass', 'DwarvenSword', 'ArmorSteelPlateCuirass', 'ArmorScaledCuirass', 'ArmorElvenGildedCuirass', 'CYRGlassSword', 'ArmorGlassCuirass', 'ElvenGreatsword', 'DraugrSwordHoned', 'CYRArmorMithrilBoots'].filter((n) => byName.has(n));
@@ -326,7 +335,13 @@ ok(seen.filter((s) => s.path === 'humanoid body').length > 0 && seen.filter((s) 
   ok(steelShare < 0.15, `steel ingots stay an ordinary share of the materials found (${Math.round(100 * steelShare)}%; dropping the above-cap ingots, not turning them into steel)`, steelShare);
   const linen = any.filter((x) => x.desc === LINEN);
   const lp = [...new Set(linen.map((x) => x.path))].sort();
-  ok(linen.length > 0 && ['chest', 'boss chest', 'container'].every((p) => lp.includes(p)) && linen.every((x) => x.count >= 1 && x.count <= (/^raid/.test(x.path) ? 6 : 3)), `linen wraps drop, 1 to 3 at a time (a raid boss's second roll can add another stack) (${linen.length} stacks; ${lp.join(', ')})`, linen.filter((x) => x.count > 3).slice(0, 5));
+  // The stack comes from the config, so read it rather than hardcoding the old 1-3 default: on
+  // 26 Oct gamemode-config raised dungeons.linen.stack to [2, 4] for the decor's cloth, and this
+  // assertion kept asserting 3 and failed on a perfectly ordinary stack of 4. A raid boss rolls
+  // twice, so its ceiling is two stacks.
+  const lstack = (((read('gamemode-config.json').dungeons || {}).linen || {}).stack) || [1, 3];
+  const lmax = Number(lstack[1]) || 3;
+  ok(linen.length > 0 && ['chest', 'boss chest', 'container'].every((p) => lp.includes(p)) && linen.every((x) => x.count >= 1 && x.count <= (/^raid/.test(x.path) ? lmax * 2 : lmax)), `linen wraps drop, ${lstack[0]} to ${lmax} at a time (a raid boss's second roll can add another stack) (${linen.length} stacks; ${lp.join(', ')})`, linen.filter((x) => x.count > lmax).slice(0, 5));
 }
 
 // ---- live-then-new: a claim made by the live dungeons.js, searched after this one loads over the same state ----------

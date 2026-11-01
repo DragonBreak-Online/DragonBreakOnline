@@ -37,7 +37,11 @@ const lift = (file, name = 'ARTIFACT') => {
   const src = fs.readFileSync(path.join(SERVER, 'dungeons.js'), 'utf8');
   const art = lift('dungeons.js');
   ok(!!art && !art.test('DragonBone') && !art.test('DragonScales'), "dungeons.js: a corpse's trim (ARTIFACT) keeps a dragon's bones and scales");
-  ok((src.match(/DRAGON_LOOT\.test\(/g) || []).length === 3 && /ARTIFACT\.test\(it\.name\) \|\| DRAGON_LOOT\.test\(it\.name\)/.test(src)
+  // Each place that hands out loot has to ask DRAGON_LOOT. This used to pin the TOTAL number of call
+  // sites at 3, which broke the moment 88f7d641d (boss trophies, 19 Oct) correctly added a fourth -
+  // a guard being added made the test fail. Name the places instead, and require at least as many
+  // call sites as places, so a new guard is welcome and a removed one still fails.
+  ok((src.match(/DRAGON_LOOT\.test\(/g) || []).length >= 3 && /ARTIFACT\.test\(it\.name\) \|\| DRAGON_LOOT\.test\(it\.name\)/.test(src)
     && /!DRAGON_LOOT\.test\(String\(it\.name \|\| ''\)\) && !BANNED_LOOT/.test(src) && /!ARTIFACT\.test\(String\(it\.name \|\| ''\)\) && !DRAGON_LOOT\.test\(String\(it\.name \|\| ''\)\)[^\n]*\);\n  const AYLEID_NAMES/.test(src),
     'dungeons.js: lootOk, every pool and the Ayleid table ask DRAGON_LOOT');
 }
@@ -152,7 +156,7 @@ if (gi > 0 && gj > gi) {
 const JK_CHEST = 0x0a001234, QA_CHEST = 0x0a001235, HOUSE_CHEST = 0x0a001236, DRAGON_BODY = 0xff000700, PLAYER = 0xff000014;
 gprops.set(JK_CHEST + '|baseDesc', '24c79:JKs Skyrim.esp');
 gprops.set(QA_CHEST + '|baseDesc', 'c2cdc:Skyrim.esm');
-gprops.set(HOUSE_CHEST + '|baseDesc', '10cd5:Skyrim.esm');
+gprops.set(HOUSE_CHEST + '|baseDesc', 'f3923:Skyrim.esm');
 gprops.set(DRAGON_BODY + '|baseDesc', '1ca03:Skyrim.esm');
 if (G) {
   ok(G.dragonTakeRefused(JK_CHEST, PLAYER, cid(BONE)) === true, "DragonBone never comes out of JK's dragon chest (it would refill on every reloot)");

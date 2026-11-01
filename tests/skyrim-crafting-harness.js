@@ -201,7 +201,9 @@ for (const [f, race, tier] of [['yoku', 'RedguardRace', 3], ['black_bear', 'Nord
   ok(x.book === 'race' && (x.raceFree || []).includes(race) && x.tier === tier && !x.bookId, `smithing.json: ${f} T${tier}, known to ${race}, no book`, x);
 }
 const fg = readJson('faction-gear.json').items;
-ok(['800:Civil War Battlemage Armors.esp', '804:Civil War Battlemage Armors.esp', '808:Civil War Battlemage Armors.esp'].map((k) => (fg[k] || {}).factions + '').join('|') === 'imperial-legion|stormcloaks|thalmor',
+// A piece can belong to more than one faction: the Stormcloak set gained hold-windhelm, which this
+// used to fail on because it stringified the whole array and demanded exactly one name.
+ok([['800:Civil War Battlemage Armors.esp', 'imperial-legion'], ['804:Civil War Battlemage Armors.esp', 'stormcloaks'], ['808:Civil War Battlemage Armors.esp', 'thalmor']].every(([k, f]) => ((fg[k] || {}).factions || []).includes(f)),
   'faction-gear: the Civil War battlemages are the Legion\'s, the Stormcloaks\' and the Thalmor\'s');
 ok(Object.keys(fg).filter((k) => k.endsWith(':LEITEUHTThalmor.esp') && fg[k].factions.includes('thalmor')).length === 14, 'faction-gear: the 14 Dominion Thalmor pieces are the Thalmor\'s');
 
