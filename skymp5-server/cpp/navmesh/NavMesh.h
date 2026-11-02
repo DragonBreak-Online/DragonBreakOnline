@@ -74,6 +74,8 @@ public:
                 const Vec3& extents = { 256.f, 256.f, 512.f });
 
 private:
+  dtNavMeshQuery* Query();
+
   float tileSize;
   bool interior;
   dtNavMesh* mesh = nullptr;

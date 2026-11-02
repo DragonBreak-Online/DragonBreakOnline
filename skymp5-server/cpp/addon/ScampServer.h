@@ -2,6 +2,7 @@
 
 #include "GamemodeApi.h"
 #include "LocalizationProvider.h"
+#include "NavService.h"
 #include "NetworkingMock.h"
 #include "PartOne.h"
 #include "ScampServerListener.h"
@@ -83,6 +84,14 @@ public:
   Napi::Value RequestPacketHistoryPlayback(const Napi::CallbackInfo& info);
 
   Napi::Value GetPrometheusMetrics(const Napi::CallbackInfo& info);
+  // Server pathfinding over navmeshFiles, loaded at boot only: navWorlds() lists the worlds; navFindPath(world,
+  // from, to) is null or { points (Detour's straightened corners), length, partial: a partial path must not be
+  // walked as if it arrives }; navNearest(world, pos, radius) is null beyond radius; navFloor(world, from, to,
+  // step) gives the floor height (or null) every step along the line
+  Napi::Value NavWorlds(const Napi::CallbackInfo& info);
+  Napi::Value NavFindPath(const Napi::CallbackInfo& info);
+  Napi::Value NavNearest(const Napi::CallbackInfo& info);
+  Napi::Value NavFloor(const Napi::CallbackInfo& info);
 
   Napi::Value FindFormsByPropertyValue(const Napi::CallbackInfo& info);
 
@@ -120,6 +129,7 @@ private:
   GamemodeApi::State gamemodeApiState;
   Napi::Reference<Napi::Value> parsedServerSettings;
   std::shared_ptr<prometheus::Registry> promRegistry;
+  navmesh::NavService nav;
 
   std::map<std::string, std::shared_ptr<LocalizationProvider>>
     localizationProviders;

@@ -362,12 +362,6 @@ NavWorld::NavWorld(float tileSize_, int maxTiles, int maxPolys, bool interior_)
   if (!mesh || dtStatusFailed(mesh->init(&params))) {
     dtFreeNavMesh(mesh);
     mesh = nullptr;
-    return;
-  }
-  query = dtAllocNavMeshQuery();
-  if (!query || dtStatusFailed(query->init(mesh, 4096))) {
-    dtFreeNavMeshQuery(query);
-    query = nullptr;
   }
 }
 
@@ -379,7 +373,20 @@ NavWorld::~NavWorld()
 
 bool NavWorld::IsValid() const
 {
-  return mesh && query;
+  return mesh != nullptr;
+}
+
+// The query's node pool is made on first use, so a thousand loaded interiors cost nothing until one is searched
+dtNavMeshQuery* NavWorld::Query()
+{
+  if (!query && mesh) {
+    query = dtAllocNavMeshQuery();
+    if (query && dtStatusFailed(query->init(mesh, 4096))) {
+      dtFreeNavMeshQuery(query);
+      query = nullptr;
+    }
+  }
+  return query;
 }
 
 bool NavWorld::AddTile(const std::vector<uint8_t>& data, std::string* error)
@@ -479,7 +486,8 @@ int NavWorld::TileCount() const
 std::optional<Vec3> NavWorld::NearestWalkable(const Vec3& point,
                                               const Vec3& extents)
 {
-  if (!IsValid()) {
+  dtNavMeshQuery* query = Query();
+  if (!query) {
     return std::nullopt;
   }
   float p[3], ext[3] = { extents.x, extents.z, extents.y }, nearest[3];
@@ -498,7 +506,8 @@ bool NavWorld::FindPath(const Vec3& from, const Vec3& to,
   if (partial) {
     *partial = false;
   }
-  if (!IsValid()) {
+  dtNavMeshQuery* query = Query();
+  if (!query) {
     return false;
   }
   float a[3], b[3], ext[3] = { extents.x, extents.z, extents.y };

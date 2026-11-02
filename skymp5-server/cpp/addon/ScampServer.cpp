@@ -31,6 +31,9 @@
 #include <antigo/ResolvedContext.h>
 #include <cassert>
 #include <cctype>
+#include <chrono>
+#include <fstream>
+#include <iterator>
 #include <database_drivers/DatabaseFactory.h>
 #include <memory>
 #include <napi.h>
@@ -145,6 +148,10 @@ Napi::Object ScampServer::Init(Napi::Env env, Napi::Object exports)
                      &ScampServer::FindFormsByPropertyValue),
       InstanceMethod("getPrometheusMetrics",
                      &ScampServer::GetPrometheusMetrics),
+      InstanceMethod("navWorlds", &ScampServer::NavWorlds),
+      InstanceMethod("navFindPath", &ScampServer::NavFindPath),
+      InstanceMethod("navNearest", &ScampServer::NavNearest),
+      InstanceMethod("navFloor", &ScampServer::NavFloor),
       InstanceMethod("_sp3ListClasses", &ScampServer::SP3ListClasses),
       InstanceMethod("_sp3GetBaseClass", &ScampServer::SP3GetBaseClass),
       InstanceMethod("_sp3ListStaticFunctions",
@@ -383,6 +390,33 @@ ScampServer::ScampServer(const Napi::CallbackInfo& info)
     logger->info("Hot reload is {} for Papyrus",
                  partOne->worldState.isPapyrusHotReloadEnabled ? "enabled"
                                                                : "disabled");
+
+    // Navmesh tiles are built here at boot only; a world that fails to load is skipped, never built later
+    if (serverSettings.contains("navmeshFiles") &&
+        serverSettings["navmeshFiles"].is_array()) {
+      for (const auto& entry : serverSettings["navmeshFiles"]) {
+        if (!entry.is_string()) {
+          continue;
+        }
+        const std::string path = entry.get<std::string>();
+        const auto t0 = std::chrono::steady_clock::now();
+        std::ifstream f(path, std::ios::binary);
+        std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(f)), {});
+        std::vector<std::string> loaded;
+        std::string error;
+        if (!f || bytes.empty()) {
+          logger->error("navmesh: cannot read '{}'", path);
+        } else if (!nav.Load(bytes, &loaded, &error)) {
+          logger->error("navmesh: '{}' not loaded: {}", path, error);
+        } else {
+          logger->info(
+            "navmesh: '{}' loaded {} world(s) in {} ms", path, loaded.size(),
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::steady_clock::now() - t0)
+              .count());
+        }
+      }
+    }
 
     if (serverSettings["dataDir"] != nullptr) {
       dataDir = serverSettings["dataDir"];
@@ -1792,6 +1826,89 @@ Napi::Value ScampServer::GetPrometheusMetrics(const Napi::CallbackInfo& info)
 {
   try {
     return Napi::String::New(info.Env(), promRegistry->serialize());
+  } catch (std::exception& e) {
+    throw Napi::Error::New(info.Env(), std::string(e.what()));
+  }
+}
+
+namespace {
+navmesh::Vec3 NavPoint(const Napi::Value& v, const char* argName)
+{
+  const NiPoint3 p = NapiHelper::ExtractNiPoint3(v, argName);
+  return { p.x, p.y, p.z };
+}
+
+Napi::Array NavArray(Napi::Env env, const navmesh::Vec3& p)
+{
+  auto res = Napi::Array::New(env, 3);
+  res.Set(0u, Napi::Number::New(env, p.x));
+  res.Set(1u, Napi::Number::New(env, p.y));
+  res.Set(2u, Napi::Number::New(env, p.z));
+  return res;
+}
+}
+
+Napi::Value ScampServer::NavWorlds(const Napi::CallbackInfo& info)
+{
+  const auto worlds = nav.Worlds();
+  auto res = Napi::Array::New(info.Env(), worlds.size());
+  for (size_t i = 0; i < worlds.size(); ++i) {
+    res.Set(static_cast<uint32_t>(i), Napi::String::New(info.Env(), worlds[i]));
+  }
+  return res;
+}
+
+Napi::Value ScampServer::NavFindPath(const Napi::CallbackInfo& info)
+{
+  try {
+    const auto world = NapiHelper::ExtractString(info[0], "world");
+    const auto r = nav.FindPath(world, NavPoint(info[1], "from"),
+                                NavPoint(info[2], "to"));
+    if (!r) {
+      return info.Env().Null();
+    }
+    auto points = Napi::Array::New(info.Env(), r->points.size());
+    for (size_t i = 0; i < r->points.size(); ++i) {
+      points.Set(static_cast<uint32_t>(i), NavArray(info.Env(), r->points[i]));
+    }
+    auto res = Napi::Object::New(info.Env());
+    res.Set("points", points);
+    res.Set("length", Napi::Number::New(info.Env(), r->length));
+    res.Set("partial", Napi::Boolean::New(info.Env(), r->partial));
+    return res;
+  } catch (std::exception& e) {
+    throw Napi::Error::New(info.Env(), std::string(e.what()));
+  }
+}
+
+Napi::Value ScampServer::NavNearest(const Napi::CallbackInfo& info)
+{
+  try {
+    const auto world = NapiHelper::ExtractString(info[0], "world");
+    const auto p = nav.Nearest(world, NavPoint(info[1], "pos"),
+                               NapiHelper::ExtractFloat(info[2], "radius"));
+    return p ? static_cast<Napi::Value>(NavArray(info.Env(), *p))
+             : info.Env().Null();
+  } catch (std::exception& e) {
+    throw Napi::Error::New(info.Env(), std::string(e.what()));
+  }
+}
+
+Napi::Value ScampServer::NavFloor(const Napi::CallbackInfo& info)
+{
+  try {
+    const auto world = NapiHelper::ExtractString(info[0], "world");
+    const auto heights =
+      nav.FloorAlong(world, NavPoint(info[1], "from"), NavPoint(info[2], "to"),
+                     NapiHelper::ExtractFloat(info[3], "step"));
+    auto res = Napi::Array::New(info.Env(), heights.size());
+    for (size_t i = 0; i < heights.size(); ++i) {
+      res.Set(static_cast<uint32_t>(i),
+              heights[i] ? static_cast<Napi::Value>(
+                             Napi::Number::New(info.Env(), *heights[i]))
+                         : info.Env().Null());
+    }
+    return res;
   } catch (std::exception& e) {
     throw Napi::Error::New(info.Env(), std::string(e.what()));
   }

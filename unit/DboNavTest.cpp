@@ -1,4 +1,5 @@
 #include "DboNav.h"
+#include "NavService.h"
 #include <catch2/catch_all.hpp>
 #include <cmath>
 #include <cstring>
@@ -290,6 +291,81 @@ TEST_CASE("DboNav: W3's fixtures read as its manifest says", "[DboNav]")
     REQUIRE_FALSE(ReadFixture(bad, f, &error));
     REQUIRE_FALSE(error.empty());
   }
+}
+
+TEST_CASE("NavService: worlds load at once and answer by key", "[DboNav]")
+{
+  // A slope: z rises 1 per 4 units eastward across cell 0,0
+  auto slope = SquareMesh(0, 0, "w.esp:000001");
+  for (auto& v : slope.verts) {
+    v.z = v.x / 4.f;
+  }
+  const auto ext = Write("Test.esp:00003C", { Tile(0, 0, { slope }), Tile(1, 0, { SquareMesh(1, 0, "w.esp:000002") }) });
+  NavService nav;
+  std::vector<std::string> loaded;
+  std::string error;
+  INFO(error);
+  REQUIRE(nav.Load(ext, &loaded, &error));
+  REQUIRE(loaded == std::vector<std::string>{ "test.esp:00003c" });
+  REQUIRE(nav.HasWorld("TEST.esp:00003c"));
+
+  // Nothing is loaded on demand: an unknown world answers nothing
+  REQUIRE_FALSE(nav.FindPath("other.esp:00003c", { 100, 100, 25 }, { 200, 200, 50 }));
+  REQUIRE_FALSE(nav.Nearest("other.esp:00003c", { 100, 100, 25 }, 100));
+  REQUIRE(nav.FloorAlong("other.esp:00003c", { 0, 0, 0 }, { 10, 0, 0 }, 1).empty());
+
+  // A path with its length, straight across flat ground
+  auto r = nav.FindPath("test.esp:00003c", { kS + 100, 100, 0 }, { kS + 100, 3100, 0 });
+  REQUIRE(r);
+  REQUIRE_FALSE(r->partial);
+  REQUIRE(r->points.size() == 2);
+  REQUIRE(std::fabs(r->length - 3000.f) < 2.f);
+
+  // The nearest floor only within the radius
+  REQUIRE_FALSE(nav.Nearest("test.esp:00003c", { -300, 2000, 0 }, 100));
+  auto near = nav.Nearest("test.esp:00003c", { -300, 2000, 0 }, 500);
+  REQUIRE(near);
+  REQUIRE(std::fabs(near->x) < 1.f);
+
+  // Floor heights along a leg follow the slope, and stop where the mesh does
+  const auto h = nav.FloorAlong("test.esp:00003c", { 400, 1000, 300 }, { 2000, 1000, 300 }, 400);
+  REQUIRE(h.size() == 5);
+  for (size_t i = 0; i < h.size(); ++i) {
+    INFO(i);
+    REQUIRE(h[i]);
+    REQUIRE(std::fabs(*h[i] - (400.f + 400.f * i) / 4.f) < 1.f);
+  }
+  const auto off = nav.FloorAlong("test.esp:00003c", { 2000, -2000, 0 }, { 2000, 0, 0 }, 1000);
+  REQUIRE(off.size() == 3);
+  REQUIRE_FALSE(off[0]);
+  REQUIRE(off[2]);
+}
+
+TEST_CASE("NavService: interiors load one world per cell, and refused plugins load nothing", "[DboNav]")
+{
+  SynthTile hall = Tile(0, 0, { SquareMesh(0, 0, "a.esp:000010") });
+  hall.cellDesc = "Skyrim.esm:000AAA";
+  SynthTile cave = Tile(0, 0, { SquareMesh(0, 0, "a.esp:000011") });
+  cave.cellDesc = "skyrim.esm:000bbb";
+  SynthTile isle = Tile(0, 0, { SquareMesh(0, 0, "summersetisles.esp:000012") });
+  isle.cellDesc = "SummersetIsles.esp:000CCC";
+  const auto interiors = Write("interiors", { hall, cave, isle });
+  NavService nav;
+  std::vector<std::string> loaded;
+  std::string error;
+  INFO(error);
+  REQUIRE(nav.Load(interiors, &loaded, &error));
+  REQUIRE(loaded == std::vector<std::string>{ "skyrim.esm:000aaa", "skyrim.esm:000bbb" });
+  REQUIRE_FALSE(nav.HasWorld("summersetisles.esp:000ccc"));
+  REQUIRE(nav.FindPath("skyrim.esm:000aaa", { 100, 100, 0 }, { 3000, 3000, 0 }));
+
+  REQUIRE(NavService::IsExcluded("Druadach.esm:000D62"));
+  REQUIRE(NavService::IsExcluded("king of the murkmire.esp:001234"));
+  REQUIRE_FALSE(NavService::IsExcluded("skyrim.esm:00003c"));
+  const auto druadach = Write("druadach.esm:000d62", { Tile(0, 0, { SquareMesh(0, 0, "druadach.esm:000001") }) });
+  REQUIRE_FALSE(nav.Load(druadach, &loaded, &error));
+  REQUIRE(error.find("refused") != std::string::npos);
+  REQUIRE_FALSE(nav.HasWorld("druadach.esm:000d62"));
 }
 
 TEST_CASE("DboNav: a damaged file is refused with a reason", "[DboNav]")
