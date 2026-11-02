@@ -2068,7 +2068,9 @@ staffitemspells.js STAFF c19f6b27 clean
 staffitemspells.js STAFF 949ee421 clean
 staffguard.js STAFFREF 793dd536 clean
 staffguard.js STAFFGUARD 486826c9 clean
-staffguard.js GMEVENTZONE 5c22a0d7 excluded
+staffguard.js GMEVENTZONE 96db1178 excluded
+staffguard.js GMEVENTZONE 06d0fc5b excluded
+staffguard.js GMEVENTZONE cd74b764 excluded
 staffguard.js GMEVENTZONE 3afaf8a0 excluded
 staffguard.js STAFFCHAR 25cceb6f clean
 staffguard.js STAFFREF 44dc317b clean
@@ -2174,7 +2176,7 @@ updates.js SCHEDULE 316703ad excluded
 updates.js SCHEDULE 931bc6c2 excluded
 updates.js SCHEDULE 970eb794 excluded
 updates.js SCHEDULE b78035ce excluded
-warband.js EVENT 1157a2f8 excluded
+warband.js EVENT 1fe564cc excluded
 warband.js EVENT fbac3d5c excluded
 warband.js EVENT 521b2e42 excluded
 warband.js EVENT dbad3910 excluded

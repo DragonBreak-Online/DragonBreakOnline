@@ -210,6 +210,27 @@ check('the event is recorded as ended', evByName('Paced').state === 'ended');
 check('...and its outcome and who ended it are kept', evByName('Paced').endedBy === 'GM One'
   && !!evByName('Paced').outcome, evByName('Paced').outcome);
 
+// ---- 6. an event's NPC zones go with it (staffguard.js, 2 Nov; event-zones-1102-harness.js) -------
+// The F7 NPC Zones tab adds a zone only for the adder's open event (__dboWarbandEventOf), and ending the event
+// removes them (__dboEventZonesEnd)
+reset();
+W = load({ eventsMax: 4 });
+const zonesEnded = [];
+globalThis.__dboEventZonesEnd = (id) => { zonesEnded.push(id); return ['gm-wolves', 'gm-bears']; };
+check('a GM with no event has none to add zones for', globalThis.__dboWarbandEventOf(GM1) === null);
+W.commands.event(GM1, 'new raid Zoned');
+const zoned = evByName('Zoned').id;
+check('...their draft event is the one, and not another GM\'s', (globalThis.__dboWarbandEventOf(GM1) || {}).id === zoned && globalThis.__dboWarbandEventOf(GM2) === null);
+W.commands.event(GM1, 'start');
+check('...still once it runs', (globalThis.__dboWarbandEventOf(GM1) || {}).id === zoned);
+W.commands.event(GM1, `end ${zoned}`);
+check('ending it removes its zones, once, and says so', zonesEnded.join() === zoned && audits.some((t) => new RegExp(`EVENT ${zoned} ended .*2 NPC zone\\(s\\) removed`).test(t)), audits);
+check('...after which the GM has no event', globalThis.__dboWarbandEventOf(GM1) === null);
+delete globalThis.__dboEventZonesEnd;
+W.commands.event(GM1, 'new raid Unhooked');
+W.commands.event(GM1, `end ${evByName('Unhooked').id}`);
+check('without staffguard.js an event still ends', evByName('Unhooked').state === 'ended');
+
 // ---- 6. any staff may end another GM's event ----------------------------------------------------
 reset();
 W = load({ eventsMax: 4, eventMinutes: 60, eventRetirePerTick: 4 });

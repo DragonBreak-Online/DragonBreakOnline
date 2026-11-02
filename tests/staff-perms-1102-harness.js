@@ -24,13 +24,15 @@ const realNow = Date.now;
 Date.now = () => now;
 
 let f = load({});
+// NPC zones need the adder's open /event since 2 Nov (event-zones-1102-harness.js); here every staff member has one
+globalThis.__dboWarbandEventOf = (a) => ({ id: `raid-${a}` });
 const gate = () => globalThis.__dboAdminGate;
 const zone = (Name, ...counts) => ({ Name, ID: 'a764b:BSHeartland.esm', POS: [0, 0, 0], NPC: counts.map((count, i) => ({ id: `${i + 1}:Skyrim.esm`, count })) });
 const add = (a, z) => gate()(a, 'npcZoneAdd', { zone: z, zoneName: z.Name });
 const del = (a, name) => gate()(a, 'npcZoneDelete', { zoneName: name });
 
 // ---- event zones ----
-check('a GM adds an event zone of 3 NPCs, audited', add(GM, zone('gm-wolves', 2, 1)) === '' && f.audits.some((t) => /^GMEVENTZONE GM Gemma .* added 'gm-wolves' with 3 NPC\(s\)$/.test(t)), f.audits);
+check('a GM adds an event zone of 3 NPCs, audited', add(GM, zone('gm-wolves', 2, 1)) === '' && f.audits.some((t) => /^GMEVENTZONE GM Gemma .* added 'gm-wolves' with 3 NPC\(s\) for event raid-48$/.test(t)), f.audits);
 now += 1000;
 check('...another within the cooldown is refused, with the wait', /One event zone every 30 s: try again in 29 s/.test(add(GM, zone('gm-bandits', 1))));
 now += 30000;

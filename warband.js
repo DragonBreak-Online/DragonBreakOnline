@@ -896,12 +896,15 @@ module.exports = (api) => {
 
   const endEvent = (ev, byText, outcome, why) => {
     const n = sweepEvent(ev, why);
+    // The NPC zones added for it in the F7 NPC Zones tab go with it (staffguard.js)
+    let zones = [];
+    try { zones = typeof globalThis.__dboEventZonesEnd === 'function' ? globalThis.__dboEventZonesEnd(ev.id) || [] : []; } catch (e) { log(`warband: event ${ev.id} zones not removed`, e.message); }
     ev.state = 'ended';
     ev.endedAt = Date.now();
     ev.outcome = outcome || ev.outcome || 'abandoned';
     ev.endedBy = byText;
     saveEvents();
-    audit(`EVENT ${ev.id} ended by ${byText} (${ev.outcome}, ${why}); ${n} NPC(s) queued for removal`);
+    audit(`EVENT ${ev.id} ended by ${byText} (${ev.outcome}, ${why}); ${n} NPC(s) queued for removal${zones.length ? `, ${zones.length} NPC zone(s) removed` : ''}`);
     return n;
   };
 
@@ -938,6 +941,8 @@ module.exports = (api) => {
   };
   const myEvent = (a) => myEvents(a).sort((x, y) => y.createdAt - x.createdAt)[0] || null;
   const byId = (id) => S.events.get(String(id || '').toLowerCase()) || null;
+  // staffguard.js: the F7 NPC Zones tab adds a zone only for the adder's open event
+  globalThis.__dboWarbandEventOf = (a) => { loadEvents(); return myEvent(a); };
   const running = () => Array.from(S.events.values()).filter((ev) => ev.state !== 'ended');
 
   // ---- the change-form census, and orphaned raiders ---------------------------------------------

@@ -59,8 +59,11 @@ module.exports = (api) => {
   });
   const TRIAL = part('trialLimits', { enabled: true });
   // A GM's event spawns from the F7 NPC Zones tab (Nat, 2 Nov): a few NPCs a zone, a cooldown, a cap on zones held, never a
-  // system zone, and only their own zones to delete or reset. Lead GM and above are not limited here
-  const EVENTS = part('gmEventZones', { maxNpcs: 5, cooldownSeconds: 30, maxZones: 6, systemPrefixes: ['wild:', 'guard:', 'boss:', 'dungeon:', 'placed:'] });
+  // system zone, and only their own zones to delete or reset. Lead GM and above are not limited here.
+  // needEvent (Nat, 2 Nov: "the only way to bring NPCs is the warbands and those systems"): an NPC zone of any tier, system
+  // zones aside, needs the adder's own open /event (warband.js __dboWarbandEventOf); it belongs to that event and goes when
+  // the event ends (__dboEventZonesEnd)
+  const EVENTS = part('gmEventZones', { maxNpcs: 5, cooldownSeconds: 30, maxZones: 6, needEvent: true, systemPrefixes: ['wild:', 'guard:', 'boss:', 'dungeon:', 'placed:'] });
   const EXEMPT_TIERS = new Set(Array.isArray(RAW.exemptTiers) ? RAW.exemptTiers.map(String) : ['senior']);
   const EXEMPT_PROFILES = new Set((Array.isArray(RAW.exemptProfiles) ? RAW.exemptProfiles : []).map(Number).filter(Number.isFinite));
   // The staff characters named by the review of 23 Oct; /staffchar seed marks them once
@@ -232,17 +235,37 @@ module.exports = (api) => {
   const ezRead = () => { if (!S.eventZones) { try { S.eventZones = JSON.parse(fs.readFileSync(EZ_FILE, 'utf8')) || {}; } catch (e) { S.eventZones = {}; } } return S.eventZones; };
   const ezSave = () => { try { fs.writeFileSync(EZ_FILE + '.tmp', JSON.stringify(ezRead(), null, 1)); fs.renameSync(EZ_FILE + '.tmp', EZ_FILE); } catch (e) { log('staffguard: gm-event-zones.json write failed', e.message); } };
   if (!(S.eventAt instanceof Map)) S.eventAt = new Map();
+  const isSystemZone = (name) => (EVENTS.systemPrefixes || []).some((p) => name.toLowerCase().startsWith(String(p).toLowerCase()));
+  // The adder's open event (draft or running), or null; without warband.js there is none
+  const eventOf = (a) => { const f = globalThis.__dboWarbandEventOf; try { return typeof f === 'function' ? f(a) || null : null; } catch (e) { return null; } };
   const eventZoneRefusal = (a, action, info) => {
     let tier = null; try { tier = tierOf(a); } catch (e) { tier = null; }
     if (tier === null) return 'NPC zones are for a GM and above.';
-    if (tier !== 'gm') return '';
     const me = pidOf(a);
     const zones = ezRead();
+    let ev = null;
+    if (action === 'npcZoneAdd' && EVENTS.needEvent !== false) {
+      const z = info.zone && typeof info.zone === 'object' ? info.zone : null;
+      const name = String((z && z.Name) || '');
+      if (name && !isSystemZone(name)) {
+        ev = eventOf(a);
+        if (!ev || !ev.id) return 'NPC zones belong to an event: start one with /event new <raid|siege|invasion|defence> first. Its zones go when it ends.';
+      }
+    }
+    if (tier !== 'gm') {
+      if (ev && action === 'npcZoneAdd') {
+        const name = String(info.zone.Name);
+        zones[name] = { profile: me, at: Date.now(), event: ev.id }; ezSave();
+        audit(`GMEVENTZONE ${who(a)} added '${name}' for event ${ev.id}`);
+      }
+      if (action === 'npcZoneDelete' && zones[String(info.zoneName || '')]) { delete zones[String(info.zoneName)]; ezSave(); }
+      return '';
+    }
     if (action === 'npcZoneAdd') {
       const z = info.zone && typeof info.zone === 'object' ? info.zone : null;
       if (!z) return 'The zone could not be read, so it was not added.';
       const name = String(z.Name || '');
-      if (!name || (EVENTS.systemPrefixes || []).some((p) => name.toLowerCase().startsWith(String(p).toLowerCase()))) return 'A GM names an event zone of their own; system zones (wild:, guard:, boss:, dungeon:, placed:) are for a Lead GM and above.';
+      if (!name || isSystemZone(name)) return 'A GM names an event zone of their own; system zones (wild:, guard:, boss:, dungeon:, placed:) are for a Lead GM and above.';
       if (zones[name] && zones[name].profile !== me) return 'Another GM holds a zone by that name. Pick another name.';
       const npcs = (Array.isArray(z.NPC) ? z.NPC : []).reduce((n, e) => n + Math.max(0, Number(e && e.count) || 0), 0);
       if (npcs < 1) return 'The zone names no NPCs.';
@@ -252,8 +275,8 @@ module.exports = (api) => {
       const left = (S.eventAt.get(me) || 0) + EVENTS.cooldownSeconds * 1000 - Date.now();
       if (left > 0) return `One event zone every ${EVENTS.cooldownSeconds} s: try again in ${Math.ceil(left / 1000)} s.`;
       S.eventAt.set(me, Date.now());
-      zones[name] = { profile: me, at: Date.now() }; ezSave();
-      audit(`GMEVENTZONE ${who(a)} added '${name}' with ${npcs} NPC(s)`);
+      zones[name] = Object.assign({ profile: me, at: Date.now() }, ev ? { event: ev.id } : {}); ezSave();
+      audit(`GMEVENTZONE ${who(a)} added '${name}' with ${npcs} NPC(s)${ev ? ` for event ${ev.id}` : ''}`);
       return '';
     }
     const name = String(info.zoneName || '');
@@ -381,6 +404,31 @@ module.exports = (api) => {
   const G = { powersOn, rightOk, command, enter, withRef, target, gotoRefusal, callRefusal, adminGate, setStaffChar, isStaffChar, exempt, NOT_HERE };
   globalThis.__dboStaffGuard = G;
   globalThis.__dboAdminGate = adminGate;
+  // warband.js endEvent: the zones added for that event leave NPC-Spawns.json (npcSpawnSystem takes their NPCs away when it
+  // reloads the file) and gm-event-zones.json. Re-read and written in one synchronous call, as every writer of that file.
+  // Returns the names removed.
+  globalThis.__dboEventZonesEnd = (eventId) => {
+    const zones = ezRead();
+    const names = Object.keys(zones).filter((k) => zones[k] && zones[k].event === String(eventId));
+    if (!names.length) return [];
+    const file = path.resolve('NPC-Spawns.json');
+    try {
+      const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+      const key = Array.isArray(parsed) ? null : Object.keys(parsed).find((k) => k.toLowerCase() === 'zones') || 'zones';
+      const list = key ? (Array.isArray(parsed[key]) ? parsed[key] : []) : parsed;
+      const drop = new Set(names);
+      const kept = list.filter((z) => !drop.has(String((z && (z.Name || z.name)) || '')));
+      if (kept.length !== list.length) {
+        const payload = key ? Object.assign({}, parsed, { [key]: kept }) : kept;
+        fs.writeFileSync(file + '.eventzones.tmp', JSON.stringify(payload, null, 1));
+        fs.renameSync(file + '.eventzones.tmp', file);
+      }
+    } catch (e) { log('staffguard: event zones not removed from NPC-Spawns.json', e.message); return []; }
+    for (const k of names) delete zones[k];
+    ezSave();
+    audit(`GMEVENTZONE event ${eventId} ended: removed ${names.length} zone(s) (${names.join(', ')})`);
+    return names;
+  };
   globalThis.__dboStaffCharSet = (a, t, on) => setStaffChar(Number(a) >>> 0, Number(t) >>> 0, on !== false);
   globalThis.__dboIsStaffCharacter = (a) => isStaffChar(Number(a) >>> 0);
   log(`staffguard: ${ON ? 'on' : 'off'} (staff characters ${CHAR.enabled ? 'on' : 'off'}, own account ${SELF.enabled ? 'on' : 'off'}, call or ticket ${REF.enabled ? 'on' : 'off'}, Trial GM limits ${TRIAL.enabled ? 'on' : 'off'})`);
