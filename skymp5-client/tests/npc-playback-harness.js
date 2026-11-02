@@ -87,6 +87,7 @@ const run = (M, hz, opts) => {
   // every run its own copy: the module keeps a playback state per id
   const copy = makeCopy(0xff000a00 + (++runs));
   copy.pos = truePos(0);
+  const gapOf = modelGap();
   let nextPacket = 0, standFrames = 0, walkFrames = 0, maxJump = 0, lagSum = 0, frames = 0;
   try {
     for (let i = 0; i < o.seconds * FPS; i++) {
@@ -98,7 +99,7 @@ const run = (M, hz, opts) => {
       if (t >= nextPacket - 1e-9 && !paused && !stalled) {
         const tt = o.pauseAt >= 0 && t >= o.pauseAt + o.pauseFor ? t - o.pauseFor : t;
         M.applyMovement(copy, { worldOrCell: 0x3c, pos: truePos(tt), rot: [0, 0, heading(tt)], runMode: 'Walking', direction: 0, speed: WALK,
-          isInJumpState: false, isSneaking: false, isBlocking: false, isWeapDrawn: false, isDead: false, healthPercentage: 1 }, false, o.isNpc);
+          isInJumpState: false, isSneaking: false, isBlocking: false, isWeapDrawn: false, isDead: false, healthPercentage: 1 }, false, o.isNpc, { gapMs: gapOf(clock) });
         nextPacket += 1 / hz;
       }
       if (paused && t >= nextPacket) nextPacket = o.pauseAt + o.pauseFor;
@@ -135,6 +136,8 @@ const guardRun = (M, hz, mode) => {
   const walkT = (t) => (t < STAND_AT ? t : t < STAND_AT + STAND_FOR ? STAND_AT : t - STAND_FOR);
   const standing = (t) => t >= STAND_AT && t < STAND_AT + STAND_FOR;
   copy.pos = truePos(0);
+  const gapOf = modelGap();
+  let gap;
   let nextPacket = 0, nextSparse = STAND_AT, lastApply = -1e9, afterLag = 0, afterFrames = 0, steadyLag = 0, steadyFrames = 0, playbackAfter = 0;
   const mv = (t, stand) => ({ worldOrCell: 0x3c, pos: truePos(walkT(t)), rot: [0, 0, heading(walkT(t))], runMode: stand ? 'Standing' : 'Walking', direction: 0,
     speed: stand ? 0 : WALK, isInJumpState: false, isSneaking: false, isBlocking: false, isWeapDrawn: false, isDead: false, healthPercentage: 1 });
@@ -143,11 +146,11 @@ const guardRun = (M, hz, mode) => {
       const t = i * dt;
       if (t >= nextPacket - 1e-9) {
         nextPacket += 1 / hz;
-        if (!((silent || sparse) && standing(t))) { M.applyMovement(copy, mv(t, standing(t)), false, true); lastApply = t; }
+        if (!((silent || sparse) && standing(t))) { gap = gapOf(clock); M.applyMovement(copy, mv(t, standing(t)), false, true, { gapMs: gap }); lastApply = t; }
       }
-      if (sparse && standing(t) && t >= nextSparse - 1e-9) { nextSparse += 1; M.applyMovement(copy, mv(t, true), false, true); lastApply = t; }
+      if (sparse && standing(t) && t >= nextSparse - 1e-9) { nextSparse += 1; gap = gapOf(clock); M.applyMovement(copy, mv(t, true), false, true, { gapMs: gap }); lastApply = t; }
       // formView: no new movement for 2 s, the last one applied as standing
-      if (silent && standing(t) && t - lastApply >= 2) { M.applyMovement(copy, mv(t, true), false, true); lastApply = t; }
+      if (silent && standing(t) && t - lastApply >= 2) { M.applyMovement(copy, mv(t, true), false, true, { gapMs: gap }); lastApply = t; }
       copy.frame(dt);
       clock += 1000 / FPS;
       const lag = Math.hypot(copy.pos[0] - truePos(walkT(t))[0], copy.pos[1] - truePos(walkT(t))[1]);
@@ -158,6 +161,9 @@ const guardRun = (M, hz, mode) => {
   } finally { Date.now = realNow; }
   return { hz, mode, steady: Math.round(steadyLag / steadyFrames), after: Math.round(afterLag / afterFrames), playbackAfter: Math.round(playbackAfter * 1000) / 1000 };
 };
+
+// remoteServer: the gap smoothed over every packet that arrives (model.movementGapMs), passed as applyMovement's gapMs
+const modelGap = () => { let at = 0, gap = 0; return (now) => { if (at) { const g = now - at; gap = gap ? gap * 0.7 + g * 0.3 : g; } at = now; return gap || undefined; }; };
 
 const PER_FRAME = WALK / 60; // 2 units a frame at walking pace
 const checksOf = (M, c, report) => {
@@ -196,6 +202,7 @@ const checksOf = (M, c, report) => {
     ['a stand counts as a slow stream', 'moving && s.moving && gap <= PLAYBACK_GAP_MAX_MS ? gap : 0', 'gap <= PLAYBACK_GAP_MAX_MS ? gap : 0'],
     ['the gap across a stand counts', 'moving && s.moving && gap <= PLAYBACK_GAP_MAX_MS ? gap : 0', 'moving && gap <= PLAYBACK_GAP_MAX_MS ? gap : 0'],
     ['a long gap counts as a slow stream', 'moving && s.moving && gap <= PLAYBACK_GAP_MAX_MS ? gap : 0', 'moving && s.moving ? gap : 0'],
+    ['an NPC uses the gap the model smooths over all packets (standing ones too)', 's.playbackS = nextPlayback(s.playbackS, moving && s.moving && gap <= PLAYBACK_GAP_MAX_MS ? gap : 0);', 's.playbackS = nextPlayback(s.playbackS, gapMs || 0);'],
     ['players played back too', '  if (isNpc) {\n    const s = stateOf(refr.getFormID());', '  if (true) {\n    const s = stateOf(refr.getFormID());'],
   ];
   for (let i = 0; i < MUTANTS.length; i++) {
