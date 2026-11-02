@@ -65,12 +65,16 @@ check('writing out switched off: no write-out row', !/Write it out/.test(t));
 const carried = [{ id: 'W1', title: 'A letter to Hadvar', author: 'Lydia', itemKind: 'Letter', kept: false }];
 t = text(render(hub(base({ carried, open: { kind: 'work', id: 'W1', title: 'A letter to Hadvar', text: 'Meet me at the inn.', author: 'Lydia', itemKind: 'Letter', at: 1, kept: false } }))));
 check('a carried work shows its author and Keep a copy', /Writings you carry \(1\)/.test(t) && /Letter · Lydia/.test(t) && /Meet me at the inn/.test(t) && /Keep a copy in my journal/.test(t), t.slice(0, 900));
+// mod-0602: a carried writing can be burned, behind the same confirm as Tear out (an older front has no Burn and is said)
+if (/["']burn["']/.test(SRC)) check('...and Burn it, which asks before it sends', /Burn it/.test(t) && /["']burn["'], ?\w+\.id, ?["']yes["']/.test(SRC), t.slice(0, 900));
+else console.log('ok   skipped: this front has no Burn for carried writings');
 t = text(render(hub(base({ carried: [Object.assign({}, carried[0], { kept: true })], open: { kind: 'work', id: 'W1', title: 'A letter to Hadvar', text: 'x', author: 'Unsigned', itemKind: 'Letter', at: 1, kept: true } }))));
 check('...kept already: it says where the copy is', /under Received/.test(t) && !/Keep a copy in my journal/.test(t) && /Unsigned/.test(t));
 html = render(hub(base({ received: [{ id: 'r1', title: 'A letter to Hadvar', author: 'Lydia', itemKind: 'Letter', at: 1 }],
   open: { kind: 'received', id: 'r1', title: 'A letter to Hadvar', text: 'Meet me at the inn.', author: 'Lydia', itemKind: 'Letter', at: 1 } })));
 t = text(html);
 check('a received writing can be removed, never edited, and counts in the list', /Remove from my journal/.test(t) && /Received \(1\)/.test(t) && !/>Edit</.test(html), t.slice(0, 900));
+check('...and is never offered Burn (it is a journal page, not an item)', !/Burn it/.test(t));
 
 console.log(failures ? `${failures} FAILED` : 'all ok');
 process.exit(failures ? 1 : 0);
