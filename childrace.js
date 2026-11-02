@@ -65,5 +65,7 @@ module.exports = ({ mp, log, personal, display, settleMs = SETTLE_MS }) => {
     return true;
   };
   globalThis.__dboChildRaceGuard = guard;
+  // guardduty.js refuses a guard whose base is of a child race (Nat: "no children, ever")
+  globalThis.__dboIsChildRace = isChildRace;
   return { guard, isChildRace, adultFor, raceInfo };
 };

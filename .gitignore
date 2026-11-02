@@ -6,6 +6,10 @@ server-settings.*.json
 .env
 *.env
 
+# Derived data that must never be public (the Leader, 2 Nov): schedules and routes read out of vanilla and mod AI packages
+# (guardduty.js reads them from private-data/guard-duty/)
+private-data/
+
 # Runtime state written by the server
 world/
 zone-spawns.json

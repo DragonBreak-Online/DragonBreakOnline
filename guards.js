@@ -84,7 +84,9 @@ module.exports = (api) => {
       const posts = readPosts().filter((p) => p.hold === hold).sort((x, y) => Number(x.n) - Number(y.n));
       (Array.isArray(list) ? list : []).forEach((npc, i) => { if (posts[i]) patrolOf.set(`${hold}:${posts[i].n}`, npc); });
     }
-    const npcOf = (p) => patrolOf.get(`${p.hold}:${p.n}`) || npcOrDefault(p);
+    // A post guardduty.js manages is staffed by whoever's shift it is: its desc, '' for nobody (no zone), undefined when not managed
+    const dutyOf = (p) => { try { return typeof globalThis.__dboGuardDutyAt === 'function' ? globalThis.__dboGuardDutyAt(p.hold, p.n) : undefined; } catch (e) { return undefined; } };
+    const npcOf = (p) => { const d = dutyOf(p); return d !== undefined ? d : patrolOf.get(`${p.hold}:${p.n}`) || npcOrDefault(p); };
     // onlyHolds: when set, only those holds' posts spawn; the rest stay saved (23 Oct: Skyrim's guards crashed a client
     // fighting a Stormcloak NPC; Bruma's Cyrodiil guards stay on)
     const active = (p) => !Array.isArray(C.onlyHolds) || C.onlyHolds.includes(p.hold);
@@ -106,6 +108,8 @@ module.exports = (api) => {
     return tag.startsWith(PREFIX) ? (tag.split(':')[1] || '') : '';
   };
   globalThis.__dboIsWatchGuard = (a) => !!watchHoldOf(a);
+  // guardduty.js at a shift change
+  globalThis.__dboGuardsRewrite = writeZones;
 
   // Any NPC guard, not only the watch's (Nat, 25 Oct: "no xp from hitting or killing guards"): a city guard of a plugin,
   // another zone or another system is known by its base's editor id. "guard" in it, once the words that only contain it

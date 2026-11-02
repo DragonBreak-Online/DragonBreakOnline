@@ -10499,7 +10499,13 @@ try {
   const GUARDS_JS = path.resolve('guards.js');
   delete require.cache[GUARDS_JS];
   require(GUARDS_JS)({ mp, log, personal, audit, who, display, cfg, registerChatCommand, zoneOfActor, zoneById });
-} catch (e) { log('guards.js failed to load:', e.stack || e.message); globalThis.__dboWatchActivate = null; globalThis.__dboWatchNoSkill = null; globalThis.__dboGuardsOnDeath = null; globalThis.__dboHoldHere = null; }
+} catch (e) { log('guards.js failed to load:', e.stack || e.message); globalThis.__dboWatchActivate = null; globalThis.__dboWatchNoSkill = null; globalThis.__dboGuardsOnDeath = null; globalThis.__dboHoldHere = null; globalThis.__dboGuardsRewrite = null; }
+// ---- the watch's duty day: shifts at managed guard posts, their patrol timelines (serverguardduty.js, config "guardDuty"): after guards.js ----
+try {
+  const GUARDDUTY_JS = path.resolve('guardduty.js');
+  delete require.cache[GUARDDUTY_JS];
+  require(GUARDDUTY_JS)({ mp, log, personal, audit, who, cfg, registerChatCommand, every });
+} catch (e) { log('guardduty.js failed to load:', e.stack || e.message); globalThis.__dboGuardDutyAt = null; globalThis.__dboGuardRouteAt = null; }
 // ---- apiaries and beehives: honey on a timer (server\apiaries.js, config "apiaries") ----
 try {
   const APIARIES_JS = path.resolve('apiaries.js');
