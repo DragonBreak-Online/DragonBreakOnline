@@ -5,7 +5,8 @@
 // leather and hide at the tanning rack (Skinner), cloth at the loom (Tailor), books at a writing desk or ledger
 // (Scholar). Using the station opens a panel listing what the player carries that it can take apart, and what each
 // gives back. The first row works the station as usual: it arms one pass, and the next use goes to the engine, the way
-// rest.js's "Lie down" does. A player without the skill, or with nothing to break down, never sees the panel.
+// rest.js's "Lie down" does. A player without the skill, or with nothing to break down, never sees the panel. The loom's
+// panel also carries the recipes the server weaves itself (loomweave.js; Nat, 2 Nov), and opens for them alone.
 // Nate's book breakdown ledger (BookBreakdown, config bookBreakdownBases) first asks: "Your spellbook" (anyone; spells.js
 // lets spells be prepared beside a ledger) or "Break down books" (a Scholar, told why when nothing can be done). Where
 // spells.js keeps its tome shop (the Synod Conclave) it also offers "Buy spell tomes" (Nate, 10 Oct, in place of /tomes).
@@ -253,6 +254,8 @@ module.exports = (api) => {
     } catch (e) { log('salvage: take failed', e.message); return false; }
   };
 
+  // Loom recipes the server weaves itself (loomweave.js): rows weave:<product desc>, shown on every page of the loom panel
+  const weaveRows = (a, station) => { if (station.id !== 'loom') return []; try { return typeof globalThis.__dboLoomWeaveRows === 'function' ? (globalThis.__dboLoomWeaveRows(a) || []) : []; } catch (e) { return []; } };
   const givesText = (gives) => gives.map(([d, n, chance]) => `${n} ${nameOf(d)}${chance !== undefined ? ` (${Math.round(chance * 100)}% chance)` : ''}`).join(', ');
   // What a breakdown actually gives: a chance entry is rolled
   const rollGives = (gives) => gives.filter(([, , chance]) => chance === undefined || Math.random() < chance).map(([d, n]) => [d, n]);
@@ -263,6 +266,7 @@ module.exports = (api) => {
     const pages = Math.max(1, Math.ceil(list.length / size));
     const p = ((page % pages) + pages) % pages;
     const actions = station.dedicated ? [] : [{ id: 'use', label: station.id === 'desk' ? 'Sit at the desk (use it again)' : `Work the ${station.label} (use it again)` }];
+    actions.push(...weaveRows(a, station));
     for (const it of list.slice(p * size, p * size + size)) {
       actions.push({ id: `b${it.ench ? 'e' : ''}:${it.baseId}`, label: `${nameOf(descOf(it.baseId))}${it.ench ? ' (enchanted)' : ''}${it.count > 1 ? ` (${it.count})` : ''}: ${givesText(it.gives)}` });
     }
@@ -271,7 +275,8 @@ module.exports = (api) => {
     openWidget(a, {
       type: 'contextMenu', id: WIDGET_ID, mode: 'menu',
       // The cap's note when a row on this page gives a capped metal (Dwarven gear gives steel, and says why)
-      targetName: note || withNotes(`Break down at the ${station.label} (${TIER_NAMES[rank] || 'Novice'}): choose an item`, list.slice(p * size, p * size + size).map((it) => it.gives)),
+      targetName: note || (list.length ? withNotes(`Break down at the ${station.label} (${TIER_NAMES[rank] || 'Novice'}): choose an item`, list.slice(p * size, p * size + size).map((it) => it.gives))
+        : `Weave at the ${station.label} (${TIER_NAMES[rank] || 'Novice'})`),
       actions, events: { action: 'dbo:salvageChoose', close: 'dbo:salvageClose' },
     }, true);
     return list.length;
@@ -353,7 +358,7 @@ module.exports = (api) => {
     }
     if (station.dedicated) { openLedgerMenu(caster, target, station); return true; }
     const rank = rankIn(caster, station.skill);
-    if (rank < 0 || !breakable(caster, station, rank).length) return false;
+    if ((rank < 0 || !breakable(caster, station, rank).length) && !weaveRows(caster, station).length) return false;
     openPanel(caster, target, station, 0);
     return true;
   };
@@ -468,6 +473,12 @@ module.exports = (api) => {
       return;
     }
     if (id === 'list') { openPanel(a, p.target, station, p.page); return; }
+    if (id.startsWith('weave:') && station.id === 'loom') {
+      try { if (distanceMeters(a, p.target) > CFG.reachMeters) { closePanel(a); personal(a, `You walked away from the ${station.label}.`); return; } } catch (e) { /* no position */ }
+      const r = typeof globalThis.__dboLoomWeave === 'function' ? globalThis.__dboLoomWeave(a, id.slice(6)) : { ok: false, text: 'Nothing is woven here just now.' };
+      openPanel(a, p.target, station, p.page, r.text);
+      return;
+    }
     const m = /^(b|x1|xa)(e?):(\d+)$/.exec(id);
     if (!m) return;
     // The panel stays open while the player walks; the station must still be in reach
