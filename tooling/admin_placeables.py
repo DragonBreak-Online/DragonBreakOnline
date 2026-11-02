@@ -37,13 +37,25 @@ except Exception as e:  # no vanilla BSAs here: localized names fall back to edi
 LOCALIZED = 0x80
 
 def desc(canon): src, loc = canon.rsplit(":", 1); return "%x:%s" % (int(loc, 16), src)
-def full(p, sub):
-    v = sub.get(b"FULL", b"")
+def readable(s):
+    """A name a player can read: printable, at least one ASCII letter or digit, not only question marks (2 Nov: 30 rows
+    were raw bytes, and vanilla's font-test books are mojibake)"""
+    return bool(s) and s.isprintable() and "�" not in s and re.search(r"[A-Za-z0-9]", s) is not None and re.fullmatch(r"[?\s]+", s) is None
+lstr = {}  # canonical id -> raw FULL of the last localized plugin that named it
+def full(p, sub, c=None):
+    v = bytes(sub.get(b"FULL", b""))
     if not v: return ""
     if p.hflags & LOCALIZED:
-        if STRINGS is None or len(bytes(v)) != 4: return ""
-        return (STRINGS.text(p.name, struct.unpack("<I", bytes(v))[0]) or "").strip()
-    return bytes(v).rstrip(b"\0").decode("cp1252", "replace").strip()
+        if len(v) != 4: return ""
+        if c: lstr[c] = v
+        if STRINGS is None: return ""
+        text = (STRINGS.text(p.name, struct.unpack("<I", v)[0]) or "").strip()
+        return text if readable(text) else ""
+    # A normal plugin that copied a localized master's record keeps its 4-byte string id as FULL, and the game shows that
+    # id as text (DragonBreak Creature Patch.esp, 2 Nov): no name of its own, so the last readable one stands
+    if c and lstr.get(c) == v: return ""
+    text = v.rstrip(b"\0").decode("cp1252", "replace").strip()
+    return text if readable(text) else ""
 def humanize(e):
     e = re.sub(r"^(DLC0?[12]|CYR|BSK|BS|CC[A-Z]{3}SSE\d+_?)", "", e or "")
     e = re.sub(r"([a-z])([A-Z])", r"\1 \2", e)
@@ -60,7 +72,7 @@ for p in lo.plugins:
         if fl & 0x20: recs.pop(c, None); continue  # deleted by a later plugin
         sub = lo.subrecords(p, off, sz, fl)
         e = esplib.edid_of(lo.body(p, off, sz, fl)) or ""
-        name = full(p, sub) or (recs.get(c, {}).get("name") if recs.get(c, {}).get("named") else "")
+        name = full(p, sub, c) or (recs.get(c, {}).get("name") if recs.get(c, {}).get("named") else "")
         recs[c] = {"t": t, "edid": e, "name": name or humanize(e), "named": bool(name),
                    "model": b"MODL" in sub, "src": c.rsplit(":", 1)[0]}
 
