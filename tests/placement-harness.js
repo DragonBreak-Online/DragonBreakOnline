@@ -322,6 +322,19 @@ reset(); ui.placeSets(PLAYER, []);
 check('a player gets no sets', out.packets.length === 0);
 set(GM, 'worldOrCellDesc', 'a764b:BSHeartland.esm'); set(GM, 'pos', [1000, 2000, 300]);
 
+// A catalogue synced onto a running server (written aside, then renamed over) is read on the next use, without a restart
+{
+  const cat = JSON.parse(fs.readFileSync('admin-placeables.json', 'utf8'));
+  cat.categories.push({ id: 'Furniture', label: 'Furniture', kind: 'object', items: [['c0ffe:Skyrim.esm', 'Synced Bench', 'Skyrim.esm']] }); // verify-formids: ignore (Place catalog row)
+  fs.writeFileSync('admin-placeables.json.new', JSON.stringify(cat));
+  fs.renameSync('admin-placeables.json.new', 'admin-placeables.json');
+  reset(); ui.placeCatalog(GM, []);
+  check('a catalogue replaced on disk is read again', out.packets.length === 1 && out.packets[0][1].categories.some((c) => c.id === 'Furniture'), out.packets[0] && out.packets[0][1].categories.map((c) => c.id).join(','));
+  check('...and logged as a fresh read', out.log.some((l) => /catalog of \d+ placeables in 4 categories/.test(l)), out.log.join(' | '));
+  reset(); ui.placeCatalog(GM, []);
+  check('an unchanged catalogue is not read again', !out.log.some((l) => /catalog of/.test(l)), out.log.join(' | '));
+}
+
 process.chdir(home);
 fs.rmSync(dir, { recursive: true, force: true });
 console.log('');
