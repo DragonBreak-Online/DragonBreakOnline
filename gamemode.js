@@ -10715,7 +10715,7 @@ try {
 try {
   const STAFFITEMSPELLS_JS = path.resolve('staffitemspells.js');
   delete require.cache[STAFFITEMSPELLS_JS];
-  require(STAFFITEMSPELLS_JS)({ mp, log, personal, audit, who, display, nameOf, tagOf, profileOf, onlineActors, isLeadStaff, isAdmin, giveItem, registerChatCommand, officialTarget });
+  require(STAFFITEMSPELLS_JS)({ mp, log, personal, audit, who, display, nameOf, tagOf, profileOf, onlineActors, isLeadStaff, isAdmin, giveItem, registerChatCommand, officialTarget, cfg });
 } catch (e) { log('staffitemspells.js failed to load:', e.stack || e.message); }
 
 // ---- ticket mod-0422: a one-shot restore of a player's goods from the Bruma Castle containers (server\mod0422restore.js;

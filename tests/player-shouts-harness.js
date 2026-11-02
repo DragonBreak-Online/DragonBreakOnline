@@ -104,8 +104,9 @@ ok(!!powers.werewolf && !!powers.vampirelord, 'the werewolf and Vampire Lord pow
 
   // spellSources lets give-all be narrowed by source plugin from config without regenerating
   const give = powers.spellsMeasureFirst || powers.spells || [];
-  // 252 on 25 Oct; 307 on 26 Oct: Tomebound, tome-taught powers, the live order, without held spells (admin_powers.py)
-  ok(Array.isArray(give) && give.length === 307, `the tome-taught catalogue is the 307 (${give.length})`);
+  // 252 on 25 Oct; 307 on 26 Oct: Tomebound, tome-taught powers, the live order, without held spells (admin_powers.py);
+  // 308 on 1 Nov: window-1101's order, merged so the 14 the generator no longer makes stay (tooling/admin_catalog_merge.js)
+  ok(Array.isArray(give) && give.length === 308, `the tome-taught catalogue is the 308 (${give.length})`);
   ok(powers.spellSources && typeof powers.spellSources === 'object', 'admin-powers.json carries spellSources');
   const fromDescs = new Set(give.map((r) => String(r[0]).split(':')[1]));
   const listed = new Set(Object.keys(powers.spellSources || {}));
