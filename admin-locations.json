@@ -20112,6 +20112,22 @@
     0,
     0.0
    ]
+  },
+  {
+   "name": "Boss: Bellowsback, the brass-grafted bull, Blackreach",
+   "region": "Bosses",
+   "world": "1ee62:Skyrim.esm",
+   "worldName": "Blackreach",
+   "pos": [
+    3979,
+    -5642,
+    258
+   ],
+   "rot": [
+    0,
+    0,
+    0.0
+   ]
   }
  ]
 }
