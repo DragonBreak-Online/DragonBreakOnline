@@ -252,12 +252,26 @@ const anchorSet = (cam, zr) => {
   check('a shape reaching behind the camera is left out', M.projectDrawing({ fills: [{ rgb: 1, alpha: 1, rects: [0, 0, 10, 10] }], lines: [], owners: [] }, behind, { kx: 1, ky: 1, left: 0, top: 0 }).fills.length === 0);
 }
 
+// ---- on the paper maps (Nat, 2 Nov: "a little muted for some", the tans almost gone into the parchment) ----
+{
+  const dist = (c) => Math.hypot(c[0] - M.PAPER[0], c[1] - M.PAPER[1], c[2] - M.PAPER[2]);
+  const tans = [[172, 150, 108], [214, 170, 48], [226, 150, 44], [188, 168, 40]];
+  check('a colour near the parchment is pushed off it (Largashbur, Bruma, Falkreath, Mor Khazgur)', tans.every((c) => dist(M.paperTint(c)) > dist(c) + 30), tans.map((c) => [dist(c), dist(M.paperTint(c))].map(Math.round)));
+  check('...a colour already far from it is left as it is', JSON.stringify(M.paperTint([58, 102, 186])) === JSON.stringify([58, 102, 186]));
+  const w = { world: '3c:Skyrim.esm', aliases: [], territories: [{ id: 'a', owner: 'o', x: 0, y: 0 }, { id: 'b', owner: 'p', x: 50000, y: 0 }] };
+  const fac = { o: { name: 'O', rgb: [172, 150, 108] }, p: { name: 'P', rgb: [58, 102, 186] } };
+  const plain = M.drawingOf(w, fac, 30000, 45000), paper = M.drawingOf(w, fac, 30000, 45000, true);
+  check('the paper drawing tints stronger and in the pushed colour; the 3D map\'s is as before', M.PAPER_TINT_ALPHA > M.TINT_ALPHA
+    && plain.fills.every((x) => x.alpha === M.TINT_ALPHA / 2) && paper.fills.every((x) => x.alpha === M.PAPER_TINT_ALPHA / 2)
+    && plain.fills[0].rgb === ((172 << 16) | (150 << 8) | 108) && paper.fills[0].rgb !== plain.fills[0].rgb && paper.lines.length === plain.lines.length, [plain.fills[0], paper.fills[0]]);
+}
+
 const MUTANTS = [
   ['the bisector on the wrong side', [['s = clip(s, nx, ny, c, j);', 's = clip(s, -nx, -ny, -c, j);']]],
   ['the cut edge keeps the old label', [['by.push(da <= 0 ? label : s.by[i]);', 'by.push(s.by[i]);']]],
   ['a hairline between territories of one owner', [['if (j <= i || ts[j].owner === ts[i].owner)', 'if (j <= i)']]],
   ['the hairline drawn from both sides', [['if (j <= i || ts[j].owner', 'if (j === i || ts[j].owner']]],
-  ['an unclaimed territory tinted grey', [['factions[owner] ? factions[owner].rgb : null', 'factions[owner] ? factions[owner].rgb : GREY']]],
+  ['an unclaimed territory tinted grey', [['factions[owner].rgb) : factions[owner].rgb) : null', 'factions[owner].rgb) : factions[owner].rgb) : GREY']]],
   ['a mirrored fit kept', [['if (fx[0] * fy[1] - fx[1] * fy[0] >= 0)', 'if (false)']]],
   ['the split\'s turns swapped', [['rotation: ((a2 + a1) / 2) * DEG', 'rotation: ((a2 - a1) / 2) * DEG'], ['inner: ((a2 - a1) / 2) * DEG', 'inner: ((a2 + a1) / 2) * DEG']]],
   ['any fit holds', [['f.rms <= exports.MAX_FIT_RMS', 'true']]],

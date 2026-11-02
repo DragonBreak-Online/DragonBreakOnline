@@ -30,6 +30,30 @@ const CIRCLE_SIDES = 64;
 // The tint and the hairline, as W6's C2 (tint 0.22, line 0.45)
 export const TINT_ALPHA = 22;
 export const LINE_ALPHA = 45;
+// On a paper map (a flat world) the parchment is light and warm, so the tint is stronger and a colour near the paper's own
+// is pushed off it (Nat, 2 Nov: "a little muted for some", the tans of the Reach and Whiterun almost gone): more saturated,
+// and no lighter than PAPER_MAX_L. PAPER is the parchment as the Tamriel sheet shows it.
+export const PAPER_TINT_ALPHA = 50;
+export const PAPER: [number, number, number] = [224, 202, 164];
+const PAPER_NEAR = 150;
+const PAPER_MAX_L = 0.36;
+const toHsl = (c: [number, number, number]): [number, number, number] => {
+  const r = c[0] / 255, g = c[1] / 255, b = c[2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+  if (mx === mn) return [0, 0, l];
+  const d = mx - mn, s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+  const h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h / 6, s, l];
+};
+const fromHsl = (h: number, s: number, l: number): [number, number, number] => {
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
+  const f = (t: number) => { t = (t + 1) % 1; return t < 1 / 6 ? p + (q - p) * 6 * t : t < 1 / 2 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p; };
+  return [Math.round(f(h + 1 / 3) * 255), Math.round(f(h) * 255), Math.round(f(h - 1 / 3) * 255)];
+};
+export const paperTint = (c: [number, number, number]): [number, number, number] => {
+  if (Math.hypot(c[0] - PAPER[0], c[1] - PAPER[1], c[2] - PAPER[2]) >= PAPER_NEAR) return c;
+  const [h, sat, l] = toHsl(c);
+  return fromHsl(h, Math.min(1, sat + 0.3), Math.min(l, PAPER_MAX_L));
+};
 // A fit worse than this (stage px, root mean square) hides the overlay rather than drawing it in the wrong place
 export const MAX_FIT_RMS = 12;
 // Markers read per frame for the fit
@@ -200,11 +224,12 @@ export const ownerAt = (w: OwnersWorld, x: number, y: number): { t: number; d: n
 // The holds by cell: each cell takes its centre's hold and the nearest of that hold's territories (the strongholds are drawn
 // over them as their own circles), tinted within reach of any marker and fading out by fade; a hairline runs along every
 // cell edge between two owners
-const cellDrawing = (w: OwnersWorld, factions: Record<string, Faction>, reach: number, fade: number): Drawing => {
+const cellDrawing = (w: OwnersWorld, factions: Record<string, Faction>, reach: number, fade: number, paper = false): Drawing => {
+  const tint = paper ? PAPER_TINT_ALPHA : TINT_ALPHA;
   const t = w.cells as HoldCells;
   const ts = w.territories;
   const holdsOnly: OwnersWorld = { world: w.world, aliases: w.aliases, territories: ts, cells: t };
-  const colour = (owner: string): [number, number, number] | null => (factions[owner] ? factions[owner].rgb : null);
+  const colour = (owner: string): [number, number, number] | null => (factions[owner] ? (paper ? paperTint(factions[owner].rgb) : factions[owner].rgb) : null);
   const n = t.n, S = t.size;
   const own: number[] = new Array(n * n).fill(-1), lvl: number[] = new Array(n * n).fill(0);
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
@@ -238,7 +263,7 @@ const cellDrawing = (w: OwnersWorld, factions: Record<string, Faction>, reach: n
     }
   }
   const fills: Drawing["fills"] = [];
-  groups.forEach((g) => fills.push({ rgb: g.rgb, alpha: TINT_ALPHA / 2, rects: g.rects }));
+  groups.forEach((g) => fills.push({ rgb: g.rgb, alpha: tint / 2, rects: g.rects }));
   // hairlines: where two neighbouring cells have different owners, merged along a run of cell edges of one colour
   const lines: Drawing["lines"] = [];
   const ownerOf = (i: number, j: number) => (i >= 0 && i < n && j >= 0 && j < n && own[j * n + i] >= 0 ? ts[own[j * n + i]].owner : "");
@@ -279,25 +304,26 @@ const cellDrawing = (w: OwnersWorld, factions: Record<string, Faction>, reach: n
     if (!rgb) continue;
     const ring: Pt[] = [];
     for (let k = 0; k <= CIRCLE_SIDES; k++) { const a = (k / CIRCLE_SIDES) * Math.PI * 2; ring.push([sh.x + sh.r * Math.cos(a), sh.y + sh.r * Math.sin(a)]); }
-    fills.push({ rgb: rgbOf(rgb), alpha: TINT_ALPHA, pts: flat(ring) });
+    fills.push({ rgb: rgbOf(rgb), alpha: tint, pts: flat(ring) });
     lines.push({ rgb: rgbOf(darker(rgb)), alpha: LINE_ALPHA, pts: flat(ring) });
   }
   return { fills, lines, owners: Array.from(new Set(ts.map((x) => x.owner))) };
 };
 
-export const drawingOf = (w: OwnersWorld, factions: Record<string, Faction>, reach: number, fade: number): Drawing => {
-  if (w.cells) return cellDrawing(w, factions, reach, fade);
+export const drawingOf = (w: OwnersWorld, factions: Record<string, Faction>, reach: number, fade: number, paper = false): Drawing => {
+  if (w.cells) return cellDrawing(w, factions, reach, fade, paper);
+  const tint = paper ? PAPER_TINT_ALPHA : TINT_ALPHA;
   const ts = w.territories;
   const fills: Drawing["fills"] = [], lines: Drawing["lines"] = [];
   // an owner with no colour (unclaimed) is not tinted, but its marker still shapes its neighbours
-  const colour = (owner: string): [number, number, number] | null => (factions[owner] ? factions[owner].rgb : null);
+  const colour = (owner: string): [number, number, number] | null => (factions[owner] ? (paper ? paperTint(factions[owner].rgb) : factions[owner].rgb) : null);
   for (let i = 0; i < ts.length; i++) {
     const rgb = colour(ts[i].owner);
     // the soft ring to fade, then the core to reach over it: the core shows both halves of the tint
     const outer = cellOf(ts, i, fade);
-    if (rgb && outer.pts.length >= 3) fills.push({ rgb: rgbOf(rgb), alpha: TINT_ALPHA / 2, pts: flat(outer.pts) });
+    if (rgb && outer.pts.length >= 3) fills.push({ rgb: rgbOf(rgb), alpha: tint / 2, pts: flat(outer.pts) });
     const inner = cellOf(ts, i, reach);
-    if (rgb && inner.pts.length >= 3) fills.push({ rgb: rgbOf(rgb), alpha: TINT_ALPHA / 2, pts: flat(inner.pts) });
+    if (rgb && inner.pts.length >= 3) fills.push({ rgb: rgbOf(rgb), alpha: tint / 2, pts: flat(inner.pts) });
     // a hairline on each edge shared with another owner's territory, drawn once (from the lower index)
     for (let k = 0; k < outer.pts.length; k++) {
       const j = outer.by[k];

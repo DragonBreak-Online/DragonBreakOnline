@@ -322,7 +322,7 @@ export class MapRealmService extends ClientListener {
       this.drawnKey = key;
       this.worldOwners = new Set(world.territories.map((t) => t.owner)).size;
       this.flash.redraws++;
-      this.drawing = drawingOf(world, this.owners.factions, this.owners.reach, this.owners.fade);
+      this.drawing = drawingOf(world, this.owners.factions, this.owners.reach, this.owners.fade, world.flat === true);
       this.drawnFit = null;
       this.flatSent = false;
       this.publish();
