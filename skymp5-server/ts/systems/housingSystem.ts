@@ -2603,14 +2603,15 @@ export class HousingSystem implements System {
   }
 
   // Every claim and its teleport partner (which carries the { primary } pointer), to the claim: the refs that have a record
+  // The partner comes from the plugins (partnerOf, cached across boots), never a record read: the first read of every claim was a 78 s boot block (2 Nov)
   private claimIndex(ctx: SystemContext): Map<number, number> {
     const key = `${this.claimed.length}:${this.claimIndexVer}`;
     if (this.claimIndexCache && this.claimIndexKey === key) return this.claimIndexCache;
     const idx = new Map<number, number>();
     for (const c of this.claimed) {
       idx.set(c >>> 0, c >>> 0);
-      const r = this.read(ctx, c);
-      if (r && r.partner) idx.set(r.partner >>> 0, c >>> 0);
+      const partner = this.partnerOf(ctx, c >>> 0);
+      if (partner) idx.set(partner >>> 0, c >>> 0);
     }
     this.claimIndexCache = idx; this.claimIndexKey = key;
     return idx;
