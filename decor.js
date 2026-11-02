@@ -47,10 +47,13 @@ const DEFAULTS = {
   // study rate at a home shelf is schools.js's study.homeRate.
   study: { maxPerHome: 3, minForStudy: 2, books: 10, booksKept: false, minBookValue: 5,
     kinds: [{ id: 'arcane', name: 'Arcane Study Bookshelf' }, { id: 'priest', name: 'Priest Study Bookshelf' }] },
-  // Planters: plant one of Hearthfire's crops, it ripens after growHours real hours (rareHours for the rare ones), a pick
-  // yields within commonYield or rareYield [min, max] by one Harvesting roll (skills.json harvesting: chance and multiplier by tier);
-  // then the planter is empty again. showZ raises the soil and the crop to the planter's bed. tickSeconds: the ripening check.
-  planter: { maxPerHome: 4, growHours: 24, rareHours: 48, commonYield: [2, 4], rareYield: [1, 2], baseYield: 2, missYield: 1, showZ: 30, tickSeconds: 60 },
+  // Planters: plant one of Hearthfire's crops, it ripens after growGameDays IN-GAME days (rareGameDays for the rare ones;
+  // Nat, 2 Nov: "increase the rate for growth based off of in-game day"), read from the world clock's live timeScale - at the
+  // live 6 a game day is 4 real hours, so a common crop is 4 h and a rare one 8 h. growHours/rareHours are the real-hour
+  // fallback used only when the world clock has not loaded. A pick yields within commonYield or rareYield [min, max] by one
+  // Harvesting roll (skills.json harvesting: chance and multiplier by tier); then the planter is empty again. showZ raises the
+  // soil and the crop to the planter's bed. tickSeconds: the ripening check.
+  planter: { maxPerHome: 4, growGameDays: 1, rareGameDays: 2, growHours: 24, rareHours: 48, commonYield: [2, 4], rareYield: [1, 2], baseYield: 2, missYield: 1, showZ: 30, tickSeconds: 60 },
   // The Lumber Pile (Nat 26 Oct, a home's saw): a Woodcutter of minTier (0 based; 1 Apprentice) saws carried firewood into
   // Sawn Logs, firewoodPerLogByTier firewood a log by tier, at most logsPerUse logs a use, then cooldownMinutes per player
   // per pile. Who may decorate the home may use it. The piece is one per home (its station keyword) and takes a workbench slot.
@@ -718,6 +721,49 @@ module.exports = (api) => {
   };
   const cropFor = (item) => { growing(); return S.cropOf.get(String(item || '').toLowerCase()) || null; };
   const hoursOf = (crop) => Number(crop && crop.rare ? C.planter.rareHours : C.planter.growHours) || 24;
+  const daysOf = (crop) => Number(crop && crop.rare ? C.planter.rareGameDays : C.planter.growGameDays) || (crop && crop.rare ? 2 : 1);
+  // Real ms in one in-game day, from the world clock's LIVE timeScale: timeScale is game minutes per real minute, so a game
+  // day is 24/timeScale real hours (4 at the live 6). Read per call rather than cached, because /timescale changes it while
+  // the server runs. null when the clock has not loaded, and then planters count growHours/rareHours real hours as before.
+  const msPerGameDay = () => {
+    try {
+      const c = globalThis.__dboClock;
+      const s = c && typeof c.summary === 'function' ? Number(c.summary().timeScale) : NaN;
+      return s > 0 ? (24 / s) * 3600000 : null;
+    } catch (e) { return null; }
+  };
+  const gameDaysNow = () => {
+    try {
+      const c = globalThis.__dboClock;
+      const d = c && typeof c.gameDays === 'function' ? Number(c.gameDays()) : NaN;
+      return Number.isFinite(d) ? d : null;
+    } catch (e) { return null; }
+  };
+  // Real ms left before a planted crop ripens. Three cases, in order:
+  //   ripeDay  - planted since this change: a point on the world clock, so an admin's /timescale makes standing crops ripen
+  //              sooner or later. A game day is the unit Nat asked for, not a fixed stretch of real time.
+  //   at       - planted BEFORE this change, so it has no ripeDay: count game days from its own planted time. It keeps `at`
+  //              and simply ripens sooner, which is what the Leader asked for; nothing rewrites stored crops.
+  //   ripeAt   - no world clock at all: the old real-time target.
+  const leftOf = (rec) => {
+    const per = msPerGameDay();
+    if (per) {
+      const day = Number(rec && rec.ripeDay);
+      const now = gameDaysNow();
+      if (Number.isFinite(day) && now !== null) return (day - now) * per;
+      const at = Number(rec && rec.at);
+      if (Number.isFinite(at)) return at + daysOf(cropFor(rec && rec.item)) * per - Date.now();
+    }
+    return Number(rec && rec.ripeAt) - Date.now();
+  };
+  // A span of real ms said in in-game hours, which is the unit a planter now counts in; real minutes or hours when the clock
+  // is absent, since in-game hours would be a lie then.
+  const growWords = (ms) => {
+    const per = msPerGameDay();
+    if (!per) return inWords(ms);
+    const h = Math.max(1, Math.ceil((ms / per) * 24));
+    return `${h} in-game ${h === 1 ? 'hour' : 'hours'}`;
+  };
   // the planter's model: soil while a crop grows, the crop once ripe, nothing when empty; made at the planter itself, so
   // ripening needs nobody there
   const showCrop = (it, desc) => {
@@ -730,11 +776,18 @@ module.exports = (api) => {
   const plant = (a, found, crop) => {
     const it = found.item;
     if (!takeAll(a, { [crop.item]: 1 })) return personal(a, `You have no ${itemName(crop.item)} to plant.`);
-    it.crop = { item: crop.item, at: Date.now(), ripeAt: Date.now() + hoursOf(crop) * 3600000, by: profile(a) };
+    const per = msPerGameDay();
+    const day = gameDaysNow();
+    // ripeAt is kept either way: it is the audit line's real-time estimate and the fallback if the clock later goes away
+    it.crop = { item: crop.item, at: Date.now(), ripeAt: Date.now() + (per ? daysOf(crop) * per : hoursOf(crop) * 3600000), by: profile(a) };
+    if (per && day !== null) it.crop.ripeDay = day + daysOf(crop);
     showCrop(it, (growing().soil || {}).desc);
     save();
-    audit(`DECOR plant ${who(a)} ${crop.item} in planter ${it.ref} place ${hex(found.root)} ripe ${new Date(it.crop.ripeAt).toISOString()}`);
-    return personal(a, `You plant ${itemName(crop.item)}. It ripens in ${hoursOf(crop)} hours.`);
+    audit(`DECOR plant ${who(a)} ${crop.item} in planter ${it.ref} place ${hex(found.root)} ripe ${new Date(it.crop.ripeAt).toISOString()}${it.crop.ripeDay ? ` gameDay ${it.crop.ripeDay.toFixed(2)}` : ''}`);
+    const n = daysOf(crop);
+    return personal(a, per
+      ? `You plant ${itemName(crop.item)}. It ripens in ${n === 1 ? 'one in-game day' : `${n} in-game days`}.`
+      : `You plant ${itemName(crop.item)}. It ripens in ${hoursOf(crop)} hours.`);
   };
   // A pick yields within the crop's range (Nat, 31 Oct: 2-4 a common crop, 1-2 a rare one, after "1 ash yam per 24 h"): one
   // Harvesting roll (skills.json harvesting, as a wild plant rolls); a miss gives the range's floor, a hit at least one more,
@@ -791,13 +844,13 @@ module.exports = (api) => {
       S.plantFor.set(a >>> 0, { ref: it.ref, list: held.map((c) => c.item), at: Date.now() });
       return personal(a, `Plant what? ${held.map((c, i) => `${i + 1}. ${itemName(c.item)}${c.rare ? ' (slow)' : ''}`).join(', ')}. Say /decor plant <n>.`);
     }
-    if (!it.crop.ripe && Date.now() < it.crop.ripeAt) return personal(a, `The ${itemName(it.crop.item)} is growing; ready in ${inWords(it.crop.ripeAt - Date.now())}.`);
+    if (!it.crop.ripe && leftOf(it.crop) > 0) return personal(a, `The ${itemName(it.crop.item)} is growing; ready in ${growWords(leftOf(it.crop))}.`);
     return pick(a, found);
   };
   const ripen = () => {
-    const now = Date.now(); let changed = false;
+    let changed = false;
     for (const p of Object.values(reg().places)) for (const it of p.items) {
-      if (it.kind !== 'planter' || !it.crop || it.crop.ripe || now < it.crop.ripeAt) continue;
+      if (it.kind !== 'planter' || !it.crop || it.crop.ripe || leftOf(it.crop) > 0) continue;
       const crop = cropFor(it.crop.item);
       showCrop(it, crop && crop.desc);
       it.crop.ripe = true; changed = true;
@@ -883,8 +936,8 @@ module.exports = (api) => {
   const planterState = (it) => {
     if (it.kind !== 'planter') return '';
     if (!it.crop) return 'empty';
-    const left = Number(it.crop.ripeAt) - Date.now();
-    return it.crop.ripe || left <= 0 ? 'ripe' : `growing, ${inWords(left)} left`;
+    const left = leftOf(it.crop);
+    return it.crop.ripe || left <= 0 ? 'ripe' : `growing, ${growWords(left)} left`;
   };
   const undoLeft = (a) => {
     const l = S.undo.get(a >>> 0) || [], st = l[l.length - 1];
@@ -1084,5 +1137,5 @@ module.exports = (api) => {
   }, { help: 'decorate your home: find, place, list, move, remove, undo, grant, revoke, plant, stored, putback' });
 
   // test hooks (tests/decor-harness.js)
-  return { _test: { placeOfCell, panelFor, openPanel, refundOf, takeAll, costOf, budgetProblem, spotProblem, confirm, scanOwners, recallBlocked, reg, S, C, usePlanter, plant, pick, ripen, showPos } };
+  return { _test: { placeOfCell, panelFor, openPanel, refundOf, takeAll, costOf, budgetProblem, spotProblem, confirm, scanOwners, recallBlocked, reg, S, C, usePlanter, plant, pick, ripen, showPos, daysOf, leftOf, growWords, msPerGameDay, planterState } };
 };
