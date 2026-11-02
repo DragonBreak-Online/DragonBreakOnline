@@ -143,11 +143,16 @@ module.exports = (api) => {
   // GMs are friends unless both chose a side and the sides differ
   const friends = (p1, p2) => p1 === p2 || !sideOf(p1) || !sideOf(p2) || sideOf(p1).toLowerCase() === sideOf(p2).toLowerCase();
 
+  // Re-read when the file changes on disk, so a synced catalogue needs no restart
   const catalog = () => {
-    if (S.npcs) return S.npcs;
+    const file = path.resolve('admin-placeables.json');
+    let stamp = '';
+    try { const st = fs.statSync(file); stamp = `${st.ino}:${st.size}:${st.mtimeMs}`; } catch (e) { /* unreadable below */ }
+    if (S.npcs && S.npcsStamp === stamp) return S.npcs;
+    S.npcsStamp = stamp;
     S.npcs = [];
     try {
-      for (const c of JSON.parse(fs.readFileSync(path.resolve('admin-placeables.json'), 'utf8')).categories || []) {
+      for (const c of JSON.parse(fs.readFileSync(file, 'utf8')).categories || []) {
         if (c.kind !== 'npc') continue;
         for (const it of c.items || []) S.npcs.push({ desc: String(it[0]), name: String(it[1]), lower: String(it[1]).toLowerCase() });
       }

@@ -96,6 +96,18 @@ check('the tab shows the raid like the command', said.length === 1);
 said.length = 0; ui.warband(PLAYER, ['raise bandit chief']);
 check('a player cannot use the tab either', /Only staff/.test(said.map((x) => x[1]).join(' | ')));
 
+// A catalogue synced onto a running server (written aside, then renamed over) is read on the next raise, without a restart
+check('an NPC not yet in the catalogue is refused', /No NPC in the catalog matches/.test(run(GM, 'raise flesh colossus')));
+{
+  const cat = JSON.parse(fs.readFileSync('admin-placeables.json', 'utf8'));
+  cat.categories[0].items.push(['805:1FleshColossus.esp', 'Flesh Colossus', '1FleshColossus.esp']);   // verify-formids: ignore - harness fixture, a mock catalog
+  fs.writeFileSync('admin-placeables.json.new', JSON.stringify(cat));
+  fs.renameSync('admin-placeables.json.new', 'admin-placeables.json');
+}
+r = run(GM, 'raise flesh colossus');
+check('...and raised once the catalogue on disk has it', /Flesh Colossus follows? you/.test(r), r);
+run(GM, 'dismiss');
+
 process.chdir(home);
 // The buttons go through the chat handler when the gamemode passes one, so a GM meets the Lead GM gate and the staff
 // log exactly as when typing (2026-09-30)

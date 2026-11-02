@@ -166,8 +166,12 @@ module.exports = (api) => {
   const CRASHY = (() => { try { const p = path.resolve('crashycreatures.js'); delete require.cache[p]; return require(p)(mp, api.cfg || {}, log); } catch (e) { log('placement: crashycreatures.js failed to load', e.message); return null; } })();
   const crashy = (desc) => { try { return CRASHY ? CRASHY.check(desc) : null; } catch (e) { return null; } };
 
+  const fileStamp = (f) => { try { const st = fs.statSync(f); return `${st.ino}:${st.size}:${st.mtimeMs}`; } catch (e) { return ''; } };
+  // Re-read when the file changes on disk, so a synced catalogue needs no restart
   const loadCatalog = () => {
-    if (S.catalog) return S.catalog;
+    const stamp = fileStamp(CATALOG);
+    if (S.catalog && S.catalogStamp === stamp) return S.catalog;
+    S.catalogStamp = stamp;
     try {
       S.catalog = JSON.parse(fs.readFileSync(CATALOG, 'utf8')).categories || [];
       S.kinds = new Map();
@@ -182,6 +186,7 @@ module.exports = (api) => {
       S.catalog = [];
       S.kinds = new Map();
       S.rows = [];
+      S.objectRows = null;
     }
     return S.catalog;
   };
