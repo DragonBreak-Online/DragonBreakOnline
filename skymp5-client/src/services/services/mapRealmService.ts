@@ -104,9 +104,9 @@ export class MapRealmService extends ClientListener {
     if (!this.open || !e.isDown || e.device !== InputDeviceType.Keyboard) return;
     // another CustomMenu over the map (a server panel; ours is the only other): its keys, not the map's (W5, 2 Nov)
     let panelUp = false;
-    try { panelUp = !this.legendMenuOpen && this.sp.Ui.isMenuOpen(LEGEND_MENU); } catch { panelUp = false; }
+    try { panelUp = (this.overlay || !this.legendMenuOpen) && this.sp.Ui.isMenuOpen(LEGEND_MENU); } catch { panelUp = false; }
     if (panelUp) return;
-    if (this.legendMenuOpen && MAP_CLOSE_KEYS.includes(e.code)) {
+    if (this.legendMenuOpen && !this.overlay && MAP_CLOSE_KEYS.includes(e.code)) {
       this.closeLegendMenu();
       this.passTabAt = this.ticksOpen + 2;
       return;
@@ -169,13 +169,13 @@ export class MapRealmService extends ClientListener {
     // an opening whose map has not shown yet is waiting for it (its open event can come first), not closed
     if (this.open && this.mapSeen) { logTrace(this, "the map closed without telling us; closing its opening"); this.onMapClose(); }
     let ours = false;
-    try { ours = ui.isMenuOpen(LEGEND_MENU) && /^maplegend/.test(String(ui.getString(LEGEND_MENU, "_root.dboVersion") || "")); } catch { ours = false; }
+    try { ours = ui.isMenuOpen(this.menu) && /^maplegend/.test(String(ui.getString(this.menu, "_root.dboVersion") || "")); } catch { ours = false; }
     if (!ours) return;
     this.legendMenuOpen = false;
     this.orphans++;
     // once in the log per session and then every 100th, with the trace of the opening it outlived
     if (this.orphans === 1 || this.orphans % 100 === 0) logTrace(this, "our map legend was open with no map: closed", String(this.orphans));
-    try { ui.closeCustomMenu(); } catch (err) { logError(this, "the orphaned map legend could not be closed", err); }
+    try { this.closeMenu(); } catch (err) { logError(this, "the orphaned map legend could not be closed", err); }
   }
 
   // Once per session, a few a frame: Papyrus calls can only be made in the update tick
@@ -248,18 +248,18 @@ export class MapRealmService extends ClientListener {
     // legend's opened on frame 1 loaded its swf but its script never answered (04:32Z). "menu" is that moment in its trace
     try { seen.menu = ui.isMenuOpen(MAP_MENU) && this.ticksOpen >= LEGEND_OPEN_FRAME && this.labels.length > 0; } catch { seen.menu = false; }
     let busy = false;
-    try { busy = st.phase === "idle" && ui.isMenuOpen(LEGEND_MENU); } catch { busy = false; }
+    try { busy = st.phase === "idle" && !this.overlay && ui.isMenuOpen(LEGEND_MENU); } catch { busy = false; }
     if (busy) return;
     if (st.phase === "loading" || st.phase === "up") {
-      try { seen.clip = ui.isMenuOpen(LEGEND_MENU); } catch { seen.clip = false; }
-      try { seen.url = ui.getString(LEGEND_MENU, "_root._url") || ""; } catch { seen.url = ""; }
+      try { seen.clip = ui.isMenuOpen(this.menu); } catch { seen.clip = false; }
+      try { seen.url = ui.getString(this.menu, "_root._url") || ""; } catch { seen.url = ""; }
       // read back as "Yes" from a CustomMenu though the movie sets "yes" (Nat, 05:05Z: its script had run, and the exact
       // compare called it dead), so any case counts
-      try { seen.alive = /^yes$/i.test(String(ui.getString(LEGEND_MENU, "_root.dboAlive") || "")); } catch { seen.alive = false; }
+      try { seen.alive = /^yes$/i.test(String(ui.getString(this.menu, "_root.dboAlive") || "")); } catch { seen.alive = false; }
     }
     const step = swfStep(st, this.ticksOpen, seen, LEGEND_SWF, 1);
     if (step === "inject") {
-      try { ui.openCustomMenu(LEGEND_SWF.replace(/\.swf$/i, ""), 0); this.legendMenuOpen = true; } catch (err) { logError(this, "the map legend menu could not be opened", err); }
+      try { this.openMenu(LEGEND_SWF.replace(/\.swf$/i, "")); this.legendMenuOpen = true; } catch (err) { logError(this, "the map legend menu could not be opened", err); }
       return;
     }
     if (step === "up") {
@@ -278,8 +278,8 @@ export class MapRealmService extends ClientListener {
   // What our CustomMenu's movie is doing: its frame, frames loaded and the version its script sets (empty if it never ran)
   private legendMenuState(): string {
     const ui = this.sp.Ui;
-    const get = (path: string) => { try { return ui.getString(LEGEND_MENU, path); } catch (e) { return "ERR"; } };
-    const n = (path: string) => { try { return ui.getFloat(LEGEND_MENU, path); } catch (e) { return NaN; } };
+    const get = (path: string) => { try { return ui.getString(this.menu, path); } catch (e) { return "ERR"; } };
+    const n = (path: string) => { try { return ui.getFloat(this.menu, path); } catch (e) { return NaN; } };
     return `frame ${n("_root._currentframe")}/${n("_root._framesloaded")}, version "${get("_root.dboVersion")}", alive "${get("_root.dboAlive")}"`;
   }
 
@@ -295,7 +295,7 @@ export class MapRealmService extends ClientListener {
     this.tracked = false;
     this.layerAt = {};
     if (this.ownersSwf.phase === "up") this.ownersSwf.phase = "idle";
-    try { this.sp.Ui.closeCustomMenu(); } catch (err) { logError(this, "the map legend menu could not be closed", err); }
+    try { this.closeMenu(); } catch (err) { logError(this, "the map legend menu could not be closed", err); }
     if (reopenable && this.legendSwf.phase === "up") { this.legendSwf.phase = "idle"; this.legendSwf.frames = 0; this.legendSwf.tries = 0; }
   }
 
@@ -312,7 +312,7 @@ export class MapRealmService extends ClientListener {
     }
     const world = this.mapWorld > 0 ? worldFor(this.owners, (d) => this.formIdOf(d), this.mapWorld) : null;
     const layer = `${OWNERS_LAYER}`;
-    if (!world) { ui.setBool(LEGEND_MENU, `${layer}._visible`, false); this.layerShown = false; return; }
+    if (!world) { ui.setBool(this.menu, `${layer}._visible`, false); this.layerShown = false; return; }
     // Shown from the start only on a flat map (over the 3D relief no fit from the markers holds: Nat, 2 Nov); T turns
     // them on or off anywhere, and that choice stays with the world for the session
     const chosen = this.ownersChoice.get(this.mapWorld);
@@ -332,7 +332,7 @@ export class MapRealmService extends ClientListener {
       const g = (menu: string, path: string) => { try { return ui.getFloat(menu, path); } catch (e) { return 0; } };
       this.stage = {
         mapW: g(MAP_MENU, "_root.WorldMap._mapWidth"), mapH: g(MAP_MENU, "_root.WorldMap._mapHeight"),
-        ours: { left: g(LEGEND_MENU, "_root.dboStageL"), top: g(LEGEND_MENU, "_root.dboStageT"), width: g(LEGEND_MENU, "_root.dboStageW") || 1280, height: g(LEGEND_MENU, "_root.dboStageH") || 720 },
+        ours: { left: g(this.menu, "_root.dboStageL"), top: g(this.menu, "_root.dboStageT"), width: g(this.menu, "_root.dboStageW") || 1280, height: g(this.menu, "_root.dboStageH") || 720 },
       };
       st.t.url = `map ${this.stage.mapW}x${this.stage.mapH}, ours ${this.stage.ours.width}x${this.stage.ours.height} at ${this.stage.ours.left},${this.stage.ours.top}`;
     }
@@ -346,7 +346,7 @@ export class MapRealmService extends ClientListener {
     if (this.ownersShown) { if (!fit) fl.noFit++; else if (holds) fl.held++; else fl.failed++; }
     if (fit && fl.lastHolds !== null && fl.lastHolds !== holds) fl.flips++;
     if (fit) fl.lastHolds = holds;
-    try { if (!this.sp.Ui.isMenuOpen(LEGEND_MENU)) fl.menuGone++; } catch { /* counted only when readable */ }
+    try { if (!this.sp.Ui.isMenuOpen(this.menu)) fl.menuGone++; } catch { /* counted only when readable */ }
     if (holds && fit) this.goodFit = fit;
     const good = this.goodFit;
     if (this.ownersShown && good && this.drawing) {
@@ -354,8 +354,8 @@ export class MapRealmService extends ClientListener {
       if (shift > LAYER_STILL && this.ticksOpen - this.drawnAt >= REDRAW_FRAMES) {
         const o = this.stage.ours;
         const k = { kx: o.width / (this.stage.mapW > 0 ? this.stage.mapW : o.width), ky: o.height / (this.stage.mapH > 0 ? this.stage.mapH : o.height), left: o.left, top: o.top };
-        try { ui.invokeString(LEGEND_MENU, "_root.dboOwners", JSON.stringify(projectDrawing(this.drawing, good, k))); } catch (err) { logError(this, "map owners data failed", err); }
-        if (!this.drawnFit) { for (const [p, v] of LAYER_FLAT) ui.setFloat(LEGEND_MENU, `${layer}${p}`, v); }
+        try { ui.invokeString(this.menu, "_root.dboOwners", JSON.stringify(projectDrawing(this.drawing, good, k))); } catch (err) { logError(this, "map owners data failed", err); }
+        if (!this.drawnFit) { for (const [p, v] of LAYER_FLAT) ui.setFloat(this.menu, `${layer}${p}`, v); }
         if (this.drawnFit) fl.maxStep.px = Math.max(fl.maxStep.px || 0, Math.round(shift * 10) / 10);
         this.drawnFit = good;
         this.drawnAt = this.ticksOpen;
@@ -364,7 +364,7 @@ export class MapRealmService extends ClientListener {
       }
     }
     const show = this.ownersShown && !!this.drawnFit;
-    if (show !== this.layerShown) { ui.setBool(LEGEND_MENU, `${layer}._visible`, show); this.layerShown = show; if (show) fl.shown++; else fl.hidden++; }
+    if (show !== this.layerShown) { ui.setBool(this.menu, `${layer}._visible`, show); this.layerShown = show; if (show) fl.shown++; else fl.hidden++; }
     if (fit) this.lastFit = { n: fit.n, rms: fit.rms, affine: this.lastAffine };
     if (holds && st.t.fit < 0) st.t.fit = this.ticksOpen;
   }
@@ -377,11 +377,11 @@ export class MapRealmService extends ClientListener {
     const st = this.ownersSwf;
     const fl = this.flash;
     if (!this.ownersShown || !this.drawing || !this.stage) {
-      if (this.layerShown) { ui.setBool(LEGEND_MENU, `${layer}._visible`, false); this.layerShown = false; fl.hidden++; }
+      if (this.layerShown) { ui.setBool(this.menu, `${layer}._visible`, false); this.layerShown = false; fl.hidden++; }
       return;
     }
     if (!this.flatSent) {
-      try { ui.invokeString(LEGEND_MENU, "_root.dboOwners", JSON.stringify(this.drawing)); } catch (err) { logError(this, "map owners data failed", err); }
+      try { ui.invokeString(this.menu, "_root.dboOwners", JSON.stringify(this.drawing)); } catch (err) { logError(this, "map owners data failed", err); }
       this.flatSent = true;
       this.layerAt = {};
       if (st.t.drawn < 0) st.t.drawn = this.ticksOpen;
@@ -407,7 +407,7 @@ export class MapRealmService extends ClientListener {
         const was = this.layerAt[p];
         if (was !== undefined && Math.abs(was - v) < LAYER_STILL / 10) continue;
         if (was !== undefined) fl.maxStep[p] = Math.max(fl.maxStep[p] || 0, Math.round(Math.abs(was - v) * 10) / 10);
-        ui.setFloat(LEGEND_MENU, `${layer}${p}`, v);
+        ui.setFloat(this.menu, `${layer}${p}`, v);
         this.layerAt[p] = v;
         wrote = true;
       }
@@ -416,7 +416,7 @@ export class MapRealmService extends ClientListener {
       if (st.t.fit < 0) st.t.fit = this.ticksOpen;
     }
     const show = this.tracked;
-    if (show !== this.layerShown) { ui.setBool(LEGEND_MENU, `${layer}._visible`, show); this.layerShown = show; if (show) fl.shown++; else fl.hidden++; }
+    if (show !== this.layerShown) { ui.setBool(this.menu, `${layer}._visible`, show); this.layerShown = show; if (show) fl.shown++; else fl.hidden++; }
     if (t) this.lastFit = { n: t.n, rms: t.rms, affine: this.lastAffine };
   }
 
@@ -476,7 +476,7 @@ export class MapRealmService extends ClientListener {
     if (this.owners && this.drawnKey) rows = rows.concat([legendRow(this.ownersShown, this.worldOwners, keyName(this.ownersKey))]);
     if (this.legendSwf.phase === "up") {
       if (widget) { widget = null; closeWidget(this.sp, WIDGET_ID); }
-      try { this.sp.Ui.invokeString(LEGEND_MENU, "_root.dboData", legendJson(this.legendShown, rows)); } catch (err) { logError(this, "map legend data failed", err); }
+      try { this.sp.Ui.invokeString(this.menu, "_root.dboData", legendJson(this.legendShown, rows)); } catch (err) { logError(this, "map legend data failed", err); }
       return;
     }
     // still loading: nothing yet (the swf, or after its last try the browser)
@@ -534,7 +534,7 @@ export class MapRealmService extends ClientListener {
     p.samples.push(`${box} | ${marks}`);
     if (t === 360) {
       let custom = false, map = false;
-      try { custom = ui.isMenuOpen(LEGEND_MENU); map = ui.isMenuOpen(MAP_MENU); } catch (e) { /* both false */ }
+      try { custom = ui.isMenuOpen(this.menu); map = ui.isMenuOpen(MAP_MENU); } catch (e) { /* both false */ }
       p.r.menu = `legend menu ${this.legendSwf.phase} (open ${custom}${custom ? `, ${this.legendMenuState()}` : ""}), map open ${map}`;
     }
     if (t >= 1200) this.sendProbe("done");
@@ -620,6 +620,16 @@ export class MapRealmService extends ClientListener {
   private sampledAt = 0;
   private layerShown = false;
   private passTabAt = 0;
+
+  // SkyrimPlatform's overlay menu (no input taken, so the map keeps WASD and the wheel) when this build has it, else SKSE's
+  // modal CustomMenu
+  private get overlay(): boolean {
+    const o = (this.sp as any).overlayMenu;
+    return !!o && typeof o.open === "function" && typeof o.menuName === "string";
+  }
+  private get menu(): string { return this.overlay ? (this.sp as any).overlayMenu.menuName : LEGEND_MENU; }
+  private openMenu(swf: string): void { if (this.overlay) (this.sp as any).overlayMenu.open(swf); else this.sp.Ui.openCustomMenu(swf, 0); }
+  private closeMenu(): void { if (this.overlay) (this.sp as any).overlayMenu.close(); else this.sp.Ui.closeCustomMenu(); }
   private mapShutTicks = 0;
   private mapSeen = false;
   private orphans = 0;

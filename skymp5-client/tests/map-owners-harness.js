@@ -369,14 +369,14 @@ const src = fs.readFileSync(path.join(ROOT, 'src/services/services/mapRealmServi
 const fn = (name) => { const i = src.indexOf(`  private ${name}(`); return i < 0 ? '' : src.slice(i, src.indexOf('\n  }\n', i)); };
 const fo = fn('followOwners');
 check('the colours ride on the legend\'s CustomMenu over the map: nothing until it is up, nothing made inside the map', fo.includes('if (this.legendSwf.phase !== "up" || !this.owners) return;')
-  && fo.includes('ui.invokeString(LEGEND_MENU, "_root.dboOwners",') && !fo.includes('MAP_MENU, `${layer}') && !/createEmptyMovieClip|loadMovie/.test(fo + fn('loadLegend')) && M.OWNERS_LAYER === '_root.owners.layer');
+  && fo.includes('ui.invokeString(this.menu, "_root.dboOwners",') && !fo.includes('MAP_MENU, `${layer}') && !/createEmptyMovieClip|loadMovie/.test(fo + fn('loadLegend')) && M.OWNERS_LAYER === '_root.owners.layer');
 check('drawn again only when the world or an owner changes, or the menu comes back', /if \(key !== this\.drawnKey\)/.test(fo) && /world\.territories\.map\(\(t\) => t\.owner\)/.test(fo) && fn('closeLegendMenu').includes('this.drawnKey = "";'));
 check('shown once a fit has held and been drawn (the last that held kept, so a bad frame never hides it), written only on a change; hidden where no world has owners', fo.includes('const holds = this.ownersShown && homHolds(fit);') && fo.includes('if (holds && fit) this.goodFit = fit;')
-  && fo.includes('const show = this.ownersShown && !!this.drawnFit;') && fo.includes('if (show !== this.layerShown) { ui.setBool(LEGEND_MENU, `${layer}._visible`, show); this.layerShown = show;')
-  && fo.includes('if (!world) { ui.setBool(LEGEND_MENU, `${layer}._visible`, false); this.layerShown = false; return; }'));
+  && fo.includes('const show = this.ownersShown && !!this.drawnFit;') && fo.includes('if (show !== this.layerShown) { ui.setBool(this.menu, `${layer}._visible`, show); this.layerShown = show;')
+  && fo.includes('if (!world) { ui.setBool(this.menu, `${layer}._visible`, false); this.layerShown = false; return; }'));
 check('the drawing is projected to our menu\'s stage (SkyUI\'s _mapWidth/_mapHeight, our dboStage*) and sent only when the fit would move it', fo.includes('JSON.stringify(projectDrawing(this.drawing, good, k))')
   && fo.includes('"_root.WorldMap._mapWidth"') && fo.includes('"_root.dboStageW"') && fo.includes('if (shift > LAYER_STILL && this.ticksOpen - this.drawnAt >= REDRAW_FRAMES) {'));
-check('the layer itself is set flat once, when first drawn (the points are already on the stage)', fo.includes('if (!this.drawnFit) { for (const [p, v] of LAYER_FLAT) ui.setFloat(LEGEND_MENU, `${layer}${p}`, v); }')
+check('the layer itself is set flat once, when first drawn (the points are already on the stage)', fo.includes('if (!this.drawnFit) { for (const [p, v] of LAYER_FLAT) ui.setFloat(this.menu, `${layer}${p}`, v); }')
   && !/clipTransform|fitToStage/.test(fo));
 check('the marker positions read in the root\'s units (MarkerClips\' own offset and scale applied), every anchor the map shows', /seen\.push\(\{ sx: bx \+ ui\.getFloat\(MAP_MENU, `\$\{clip\}\._x`\) \* kx, sy: by \+ ui\.getFloat\(MAP_MENU, `\$\{clip\}\._y`\) \* ky/.test(fn('fitNow')) && /\._visible`\)\) continue;/.test(fn('fitNow')) && fn('fitNow').includes('for (const { i, a } of clips) {'));
 check('the toggle key is read like the other hotkeys: mapColoursKeyCode, else T', M.TOGGLE_SETTING === 'mapColoursKeyCode' && M.TOGGLE_KEY === 20
