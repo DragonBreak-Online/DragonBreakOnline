@@ -1766,6 +1766,18 @@
   "_comment": "Places (N3, fork housingSystem.ts): staff profiles whose claims the place migration leaves exactly as they are and the one-place cap never counts (Nate, 3 Oct: storage lent to players). Read when the migration plan runs; no restart needed.",
   "staffProfiles": [4],
   "uncappedProfiles": [],
+  "_seats": "Each hold's seat, its ruler's by office (fork housingSystem.ts seatExempt; the Leader, 2 Nov, after fac-0498): the hold's Jarl or Count holds it outside the one-building cap, so it never counts toward their own and taking it back is never refused by it. A steward manages it but does not hold it. The interior side of each way in to the world, from the window-1102 order (2 Nov); either side works. Read again when this file changes.",
+  "seats": {
+   "whiterun": ["16707:Skyrim.esm", "46b84:Skyrim.esm"],
+   "solitude": ["16b2a:Skyrim.esm"],
+   "windhelm": ["c0e2c:Skyrim.esm", "c0e2b:Skyrim.esm"],
+   "riften": ["16cfe:Skyrim.esm"],
+   "markarth": ["7f65e:Skyrim.esm", "98272:Skyrim.esm"],
+   "morthal": ["173c6:Skyrim.esm", "f89:COTN - Morthal.esp"],
+   "dawnstar": ["13d31:Skyrim.esm"],
+   "falkreath": ["14070:Skyrim.esm", "1e1f08:COTN - Falkreath.esp", "1e1f09:COTN - Falkreath.esp"],
+   "winterhold": ["e9c10:COTN - Winterhold.esp"]
+  },
   "_uncapped": "Owners the one-place cap never counts, otherwise ordinary: their buildings become places and their chests join them (fork housingSystem.ts overCap; Nate, 10 Oct: Lord Elion, who bought Mountain Watch from the Countess). Read on each ask.",
   "_grants": "Buildings the place migration gives whole (fork housingSystem.ts placeGrants, Nate 4 Oct): a way in nobody holds becomes the profile's and their claims inside join it; cells, when given, are all the building's interior cells (more rooms than the walk takes). Refused and listed for a door someone else holds or a staff profile. Read when the migration plan runs.",
   "grants": [
