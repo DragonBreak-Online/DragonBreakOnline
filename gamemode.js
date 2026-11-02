@@ -2586,6 +2586,13 @@ const activateAllowed = (caster) => {
   };
 }
 every('activatePrune', 60000, () => { const now = Date.now(); for (const [k, b] of activateBuckets) if (now - b.at > 120000) activateBuckets.delete(k); });
+// Deleted characters leave the court (gamemode.js pruneGoneSeats) and the faction rosters (guilds.js) within the quarter
+// hour, not at the weekly reckoning (mod-0602)
+every('goneCharacters', 15 * 60000, () => {
+  for (const k of ['__dboPruneGoneSeats', '__dboGuildPrune']) {
+    try { if (typeof globalThis[k] === 'function') globalThis[k](); } catch (e) { log(`${k} failed`, e.message); }
+  }
+});
 // Doors that start open (2026-10-17). The server keeps every door's open state itself and never reads a reference's "open by
 // default" (ONAM), so a door it has not seen before starts closed. Each listed door is opened once and marked
 // private.dboStartedOpen; after that its state belongs to the players and the levers, and is kept over restarts.
@@ -5266,6 +5273,26 @@ const unseatOfficialBy = (z, tg, byWho) => {
   courtOfficeSync(z, tg, had, false);
   return { had, text: `${tg.label} is no longer ${rankTitle(had, z.id)} of ${z.name}.` };
 };
+// A seat bound to a deleted character (a PK, character select, /wipechars) is vacated: nothing tells the gameplay of a
+// deletion, so the office stood under the dead name and no other character of the account could use it (mod-0602)
+const pruneGoneSeats = () => {
+  const gone = (id) => { try { return typeof globalThis.__dboFormGone === 'function' && !!globalThis.__dboFormGone(id); } catch (e) { return false; } };
+  let n = 0;
+  for (const [zid, offices] of Object.entries(readSeats())) {
+    const z = zoneById(zid);
+    for (const [rank, byPid] of Object.entries(offices || {})) for (const [pid, actor] of Object.entries(byPid || {})) {
+      const dead = Number(actor) >>> 0;
+      if (!dead || !gone(dead)) continue;
+      const tg = { pid: Number(pid), actor: 0, online: 0, label: `profile ${pid}`, who: `profile ${pid} (character ${dead.toString(16)})` };
+      const r = z ? unseatOfficialBy(z, tg, 'the server (the seated character no longer exists)') : { error: 'no zone' };
+      if (r.error) bindSeat(zid, null, Number(pid), 0);
+      log(`officials: ${zid} ${rank} of profile ${pid} vacated: character ${dead.toString(16)} no longer exists${r.error ? ` (${r.error})` : ''}`);
+      n++;
+    }
+  }
+  return n;
+};
+globalThis.__dboPruneGoneSeats = pruneGoneSeats;
 // A ruler's appointment is an offer the target accepts on the Court tab (Nate, 3 Oct, Q4); staff seat outright
 const appointFrom = (a, z, rank, tg, override) => {
   const chk = appointCheck(a, z, rank, tg, override);
