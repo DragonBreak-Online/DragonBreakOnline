@@ -4,6 +4,7 @@
 #include "BrowserApiNirnLab.h"
 #include "CallNativeApi.h"
 #include "ConsoleApi.h"
+#include "DboMenuApi.h"
 #include "DumpFunctions.h"
 #include "EventHandler.h"
 #include "EventManager.h"
@@ -215,6 +216,7 @@ DLLEXPORT bool SKSEAPI SKSEPlugin_Load_Impl(const SKSE::LoadInterface* skse)
     [](SKSE::MessagingInterface::Message* a_msg) {
       EventHandler::HandleSKSEMessage(a_msg);
       BrowserApiNirnLab::GetInstance().HandleSkseMessage(a_msg);
+      DboMenuApi::HandleSkseMessage(a_msg);
     });
 
   Hooks::Install();

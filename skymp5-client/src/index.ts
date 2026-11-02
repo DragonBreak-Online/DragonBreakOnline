@@ -41,6 +41,7 @@ import { DisableSkillAdvanceService } from "./services/services/disableSkillAdva
 import { DisableFastTravelService } from "./services/services/disableFastTravelService";
 import { DisableDifficultySelectionService } from "./services/services/disableDifficultySelectionService";
 import { MouseFreeService } from "./services/services/mouseFreeService";
+import { DboMenuProbeService } from "./services/services/dboMenuProbeService";
 import { WorldCleanerService } from "./services/services/worldCleanerService";
 import { CompanionService } from "./services/services/companionService";
 import { LoadOrderVerificationService } from "./services/services/loadOrderVerificationService";
@@ -204,6 +205,7 @@ const main = () => {
       new DisableFastTravelService(sp, controller),
       new DisableDifficultySelectionService(sp, controller),
       new MouseFreeService(sp, controller),
+      new DboMenuProbeService(sp, controller),
       new WorldCleanerService(sp, controller),
       new CompanionService(sp, controller),
       new LoadOrderVerificationService(sp, controller),

@@ -56,6 +56,16 @@ export declare function loadGame(pos: number[], angle: number[], worldOrCell: nu
 
 export declare function worldPointToScreenPoint(...args: number[][]): number[][]
 
+// A Scaleform menu of our own (DboMenuApi.cpp), usable from "tick": the main menu, before the world loads. One at a time.
+// flags: UI_MENU_FLAGS bits (1 PausesGame, 4 UsesCursor, 8 UsesMenuContext, 16 Modal...); depth: the menu's depthPriority
+export declare function dboMenuOpen(swf: string, flags?: number, depth?: number): void
+export declare function dboMenuClose(): void
+export declare function dboMenuIsOpen(): boolean
+// Calls target ("_root.dboData") with one string, on the UI thread
+export declare function dboMenuInvoke(target: string, arg?: string): void
+// What the movie passed to _global.dboNative(...) since the last poll, its arguments joined by 
+export declare function dboMenuPoll(): string[]
+
 export type PacketType = 'message' | 'disconnect' | 'connectionAccepted' | 'connectionFailed' | 'connectionDenied'
 
 // Available only if multiplayer is installed on user's machine
