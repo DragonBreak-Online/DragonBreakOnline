@@ -9803,6 +9803,12 @@ try {
   require(SALVAGE_JS)({ mp, log, personal, who, cfg, openWidget, closeWidget, onUi, masteryOf, recordOf, fieldsOf, giveItem, distanceMeters,
     itemName: (d) => adminItemName(d) });
 } catch (e) { log('salvage.js failed to load:', e.stack || e.message); globalThis.__dboSalvageActivate = null; }
+// ---- loom recipes the server weaves itself, from a private sidecar (server\loomweave.js, loom-recipes.private.json) ----
+try {
+  const LOOMWEAVE_JS = path.resolve('loomweave.js');
+  delete require.cache[LOOMWEAVE_JS];
+  require(LOOMWEAVE_JS)({ mp, log, who, isAdmin, masteryOf, giveItem, raceEdidOf, itemName: (d) => adminItemName(d) });
+} catch (e) { log('loomweave.js failed to load:', e.stack || e.message); globalThis.__dboLoomWeaveRows = null; globalThis.__dboLoomWeave = null; }
 // ---- weapon and armour wear, repair at the wheel and the bench (server\durability.js, config "durability") -----------
 try {
   const DURABILITY_JS = path.resolve('durability.js');
