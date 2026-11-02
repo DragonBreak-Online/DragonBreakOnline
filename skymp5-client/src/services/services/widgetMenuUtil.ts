@@ -155,9 +155,9 @@ export function isGameInputBlocked(sp: Sp, controller: CombinedController): bool
   }
 }
 
-// Menu hotkeys are also inert while the interface is hidden.
+// Menu hotkeys are also inert while the interface is hidden, or while one of our native panels (a CustomMenu) is up
 export function isMenuHotkeyBlocked(sp: Sp, controller: CombinedController): boolean {
-  return isUiHidden(controller) || isGameInputBlocked(sp, controller);
+  return isUiHidden(controller) || isCustomMenuOpen(sp) || isGameInputBlocked(sp, controller);
 }
 
 // The same for the press of a menu key. A mouse-button key types nothing, so an open chat or window (the browser focus)
@@ -165,7 +165,7 @@ export function isMenuHotkeyBlocked(sp: Sp, controller: CombinedController): boo
 // hides mouse buttons from the game while the browser has focus; a SkyrimPlatform change lets the side buttons through.)
 export function isMenuKeyPressBlocked(sp: Sp, controller: CombinedController, e: ButtonEvent): boolean {
   if (e.device !== InputDeviceType.Mouse) return isMenuHotkeyBlocked(sp, controller);
-  if (isUiHidden(controller) || isConsoleOpen(sp)) return true;
+  if (isUiHidden(controller) || isConsoleOpen(sp) || isCustomMenuOpen(sp)) return true;
   try {
     return controller.lookupListener(BrowserService).isBlockingMenuOpen();
   } catch {
@@ -179,6 +179,7 @@ export function menuKeyBlockReason(sp: Sp, controller: CombinedController, e: Bu
   if (isUiHidden(controller)) why.push("interface hidden");
   if (e.device !== InputDeviceType.Mouse && sp.browser.isFocused()) why.push("browser focused");
   if (isConsoleOpen(sp)) why.push("console open");
+  if (isCustomMenuOpen(sp)) why.push("a native panel (CustomMenu) open");
   let menus: string[] = [];
   try {
     menus = controller.lookupListener(BrowserService).recordedBlockingMenus();
@@ -200,6 +201,15 @@ export function menuKeyBlockReason(sp: Sp, controller: CombinedController, e: Bu
 export function isConsoleOpen(sp: Sp): boolean {
   try {
     return sp.Ui.isMenuOpen(Menu.Console) || sp.Ui.isMenuOpen(Menu.ConsoleNativeUI);
+  } catch {
+    return false;
+  }
+}
+
+// Live query: our native panels run as the engine's one CustomMenu, which takes the keys without a tracked menuOpen event
+export function isCustomMenuOpen(sp: Sp): boolean {
+  try {
+    return sp.Ui.isMenuOpen("CustomMenu" as Menu);
   } catch {
     return false;
   }
