@@ -27,6 +27,12 @@
 //            settle [calm|unleashrest|dismissrest] | dismiss [id] | side [name|none] | preset list|save|raise|delete <name> |
 //            onlogout dismiss|settle
 //   /raid [all | clear [raiders|garrison|<id>] | clear all]
+//   /event list | new <raid|siege|invasion|defence> [name] | info | side <name> | deadline <minutes> |
+//          attach | start | sweep | end [held|fell] [id]
+// An event (phase 1, Nat 1 Nov, design _work\warband-revamp-1101.md) is a record with a type, a place, an
+// owner, sides and a deadline. Its NPCs carry private.dboEvent, so ending it clears them even after a
+// restart or a GM crash, and a watchdog ends it if nobody does. Waves, the density budget and host pinning
+// are phase 2; coin, the court trail and the consequence deed are phase 4.
 // The Place tab's Warband view sends the same text as dbo warband [text] and dbo raid [text], and asks dbo warbandView for
 // its roster, targets, settle plan, presets and last answer (packet adminWarbandView, after every panel step too).
 //
@@ -46,6 +52,9 @@ module.exports = (api) => {
   // server (followers and garrisons stay under maxLive), and the dead removed bodySeconds after they fell
   const C = Object.assign({ maxBand: 25, maxRaise: 10, maxLive: 40, spawnBatch: 10, spawnStepMs: 500, ringRadius: 160, bodySeconds: 60, chargeRange: 4096, avoidGmHost: true,
     raidMax: 10, raidGapSeconds: 60, maxHostile: 25,
+    // Events (phase 1, 1 Nov): eventsMax running at once, eventMinutes the default deadline, eventRadius the
+    // area an event names, eventRetirePerTick how many of its NPCs are destroyed a second when it ends
+    eventsMax: 8, eventMinutes: 120, eventRadius: 3000, eventRetirePerTick: 4,
     viewRadius: 4200, onLogout: 'dismiss', presetsMax: 40, guardRadius: 1500, guardLeash: 500, guardWalkSeconds: 20, patrolResendSeconds: 30, guardReportSeconds: 30 }, cfg.warband || {});
   // Every answer is said in chat as before, and kept as the last line the panel shows (W3)
   const lastSaid = globalThis.__dboWarbandSaid instanceof Map ? globalThis.__dboWarbandSaid : (globalThis.__dboWarbandSaid = new Map());
@@ -65,6 +74,8 @@ module.exports = (api) => {
   if (!(S.guards instanceof Map)) S.guards = new Map();
   // lastRaid: GM profile (or actor when it has none) -> when its last raid was unleashed
   if (!(S.lastRaid instanceof Map)) S.lastRaid = new Map();
+  // events: id -> the event record; retire: NPCs queued for paced destruction. Both are made in the event
+  // section below, which runs after this one on every reload.
   const comp = () => globalThis.__dboCompanions || null;
   // Vanilla PlayerFaction, as companionService.ts prepare() puts the GM's own followers in on the GM's screen
   const PLAYER_FACTION = 0xdb1;
@@ -816,6 +827,258 @@ module.exports = (api) => {
     const o = S.owners.get(Number(npcId) >>> 0);
     return o && o.released && o.hostile ? o.gm : 0;
   };
+
+  // ---- GM events, phase 1: the noun, the tag, the sweep and the watchdog -----------------------
+  // Nat, 1 Nov (through the Leader): an event is a thing with a lifecycle, not a verb applied to a band.
+  // Design _work\warband-revamp-1101.md. Phase 1 gives an event a record, tags its NPCs so clean-up can
+  // find them after a restart or a GM crash, sweeps them on demand, and ends itself if nobody does.
+  //
+  // What is deliberately NOT here: waves, the player-density budget and host pinning are phase 2, because
+  // their numbers wait on W5's relay runs; coin, the court trail and the Dynamic Consequences deed are
+  // phase 4 (consequences has no config on live, so a deed posted today would be inert). The event records
+  // its outcome now so both can hang off it later without a migration.
+  //
+  // Why a member is stored as a desc and not an id: a dynamic actor's runtime id is reassigned every run,
+  // but its change form keeps a stable formDesc - measured on live, a bare dynamic index like 'db41' with
+  // no plugin - and getIdFromDesc resolves it in the new run. So the roster survives a restart without
+  // reading the 129,748 files in world/changeForms. companionSystem's own boot sweep over that directory
+  // (taggedLeftovers, which collects anything carrying private.dboCompanion and no profileId) stays the
+  // backstop for whatever an event never knew about.
+  const EVENTS_FILE = path.join(stateDir(), 'warband-events.json');
+  const EVENT_TAG = 'private.dboEvent';
+  const EVENT_TYPES = ['raid', 'siege', 'invasion', 'defence'];
+  if (!(S.events instanceof Map)) S.events = new Map();
+  // retire: [{ eventId, desc }], drained a few per tick. Never all at once: ActorKnowledge::NotifyListeners
+  // is 45 of 294 client crashes in two weeks (W4), and both logged instances came from actors departing
+  // while combat ran - which is exactly an event tearing down.
+  if (!Array.isArray(S.retire)) S.retire = [];
+  if (!S.eventsLoaded) S.eventsLoaded = false;
+
+  const refDescOf = (id) => { try { return String(mp.getDescFromId(id >>> 0) || ''); } catch (e) { return ''; } };
+  const idOfDesc = (desc) => { try { return desc ? mp.getIdFromDesc(String(desc)) >>> 0 : 0; } catch (e) { return 0; } };
+  const tagOf = (id) => { try { return String(mp.get(id >>> 0, EVENT_TAG) || ''); } catch (e) { return ''; } };
+
+  const saveEvents = () => {
+    try {
+      const doc = { events: Array.from(S.events.values()) };
+      fs.writeFileSync(EVENTS_FILE + '.tmp', JSON.stringify(doc, null, 1));
+      fs.renameSync(EVENTS_FILE + '.tmp', EVENTS_FILE);
+    } catch (e) { log('warband: saving warband-events.json failed', e.message); }
+  };
+
+  // A member is live only if its desc still resolves AND the actor still carries this event's tag. The tag
+  // check is what stops a sweep destroying an actor that happens to have inherited a recycled id.
+  const memberId = (ev, m) => {
+    const id = m.id && tagOf(m.id) === ev.id ? m.id >>> 0 : idOfDesc(m.desc);
+    if (!id) return 0;
+    if (tagOf(id) !== ev.id) return 0;
+    m.id = id;
+    return id;
+  };
+  const liveMembers = (ev) => (ev.members || []).map((m) => memberId(ev, m)).filter((id) => id);
+
+  // Queue every member for paced destruction. Idempotent: a member already queued is not queued twice, and
+  // a member whose tag has gone is simply dropped.
+  const sweepEvent = (ev, why) => {
+    const queued = new Set(S.retire.filter((r) => r.eventId === ev.id).map((r) => r.desc));
+    let n = 0;
+    for (const m of ev.members || []) {
+      if (!memberId(ev, m) || queued.has(m.desc)) continue;
+      S.retire.push({ eventId: ev.id, desc: m.desc });
+      n++;
+    }
+    if (n) log(`warband: event ${ev.id} queued ${n} NPC(s) for removal (${why}), ${C.eventRetirePerTick}/s`);
+    return n;
+  };
+
+  const endEvent = (ev, byText, outcome, why) => {
+    const n = sweepEvent(ev, why);
+    ev.state = 'ended';
+    ev.endedAt = Date.now();
+    ev.outcome = outcome || ev.outcome || 'abandoned';
+    ev.endedBy = byText;
+    saveEvents();
+    audit(`EVENT ${ev.id} ended by ${byText} (${ev.outcome}, ${why}); ${n} NPC(s) queued for removal`);
+    return n;
+  };
+
+  // Read the file once per process. A hot reload keeps S.events, so this only runs after a restart - which
+  // is where an event would otherwise be orphaned with its NPCs standing.
+  const loadEvents = () => {
+    if (S.eventsLoaded) return;
+    S.eventsLoaded = true;
+    let doc = null;
+    try { doc = JSON.parse(fs.readFileSync(EVENTS_FILE, 'utf8')); } catch (e) { return; }
+    const now = Date.now();
+    for (const ev of (doc && doc.events) || []) {
+      if (!ev || !ev.id) continue;
+      S.events.set(ev.id, ev);
+      if (ev.state === 'ended') continue;
+      // Across a restart the stored ids are meaningless, so re-resolve from the descs and drop whatever the
+      // boot sweep (or death, or a clear) already took.
+      const before = (ev.members || []).length;
+      ev.members = (ev.members || []).filter((m) => { m.id = 0; return memberId(ev, m); });
+      const left = ev.members.length;
+      if (!left || !ev.deadlineAt || ev.deadlineAt <= now) {
+        endEvent(ev, 'the watchdog', left ? 'abandoned' : (ev.outcome || 'held'),
+          !left ? 'nothing of it was left after the restart' : 'its deadline had passed');
+      } else {
+        audit(`EVENT ${ev.id} recovered after a restart: ${left} of ${before} NPC(s) still standing, ends at ${clock(ev.deadlineAt)} UTC`);
+      }
+    }
+    saveEvents();
+  };
+
+  const myEvents = (a) => {
+    const p = profileOf(a);
+    return Array.from(S.events.values()).filter((ev) => ev.state !== 'ended' && ev.owner && ev.owner.profile === p);
+  };
+  const myEvent = (a) => myEvents(a).sort((x, y) => y.createdAt - x.createdAt)[0] || null;
+  const byId = (id) => S.events.get(String(id || '').toLowerCase()) || null;
+  const running = () => Array.from(S.events.values()).filter((ev) => ev.state !== 'ended');
+
+  const placeOf = (a) => {
+    const place = { world: '', pos: [0, 0, 0], radius: Math.max(200, Number(C.eventRadius) || 3000) };
+    try { place.world = String(mp.get(a, 'worldOrCellDesc') || ''); } catch (e) { /* kept blank */ }
+    try { const p = mp.getActorPos(a); place.pos = [Number(p[0]) || 0, Number(p[1]) || 0, Number(p[2]) || 0]; } catch (e) { /* kept at origin */ }
+    return place;
+  };
+
+  const describe = (ev) => {
+    const live = liveMembers(ev).length;
+    const left = ev.state === 'ended' ? '' : `, ends ${clock(ev.deadlineAt)} UTC`;
+    return `${ev.id} (${ev.type}${ev.name ? ` "${ev.name}"` : ''}): ${ev.state}, ${live} NPC(s)${ev.sides && ev.sides.length ? `, sides ${ev.sides.join(' v ')}` : ''}${left}, by ${ev.owner ? ev.owner.by : 'someone'}`;
+  };
+
+  const eventCmd = (a, rest) => {
+    if (!isAdmin(a)) return tell(a, 'Only staff run events.');
+    loadEvents();
+    const parts = String(rest || '').trim().split(/\s+/).filter((x) => x);
+    const cmd = (parts.shift() || '').toLowerCase();
+    const arg = parts.join(' ');
+
+    if (!cmd || cmd === 'list') {
+      const all = running();
+      if (!all.length) return tell(a, 'No event is running. /event new <raid|siege|invasion|defence> [name] starts one.');
+      return tell(a, `${all.length} event(s): ${all.map(describe).join(' | ')}`);
+    }
+
+    if (cmd === 'new') {
+      const type = (parts[0] || '').toLowerCase();
+      if (!EVENT_TYPES.includes(type)) return tell(a, `Usage: /event new <${EVENT_TYPES.join('|')}> [name].`);
+      if (running().length >= Math.max(1, Number(C.eventsMax) || 8)) return tell(a, `${C.eventsMax} events are already running; end one first.`);
+      const mins = Math.max(1, Number(C.eventMinutes) || 120);
+      const id = `${type}-${new Date().toISOString().slice(5, 10).replace('-', '')}${Math.random().toString(36).slice(2, 5)}`;
+      const ev = { id, type, name: parts.slice(1).join(' '), place: placeOf(a), owner: { profile: profileOf(a), by: who(a), actor: a >>> 0 },
+        sides: [], state: 'draft', createdAt: Date.now(), startedAt: 0, endedAt: 0, deadlineAt: Date.now() + mins * 60000, outcome: '', members: [] };
+      S.events.set(id, ev);
+      saveEvents();
+      audit(`EVENT ${id} created by ${who(a)} (${type}${ev.name ? ` "${ev.name}"` : ''}) at ${ev.place.world || 'an unknown cell'}, ends ${clock(ev.deadlineAt)} UTC`);
+      return tell(a, `Event ${id} drafted here (${type}, ${meters(ev.place.radius)} m, ends ${clock(ev.deadlineAt)} UTC). /event attach puts your warband in it, /event start begins it, /event end ends and clears it.`);
+    }
+
+    const ev = arg && byId(arg) ? byId(arg) : myEvent(a);
+    if (!ev) return tell(a, 'You have no event. /event new <type> [name] starts one, or name one: /event ' + cmd + ' <id>.');
+
+    if (cmd === 'info') return tell(a, describe(ev));
+
+    if (cmd === 'side') {
+      const name = parts.join(' ').trim();
+      if (!name) return tell(a, `Event ${ev.id} sides: ${ev.sides.length ? ev.sides.join(' v ') : 'none named'}. /event side <name> adds one.`);
+      if (ev.sides.includes(name)) return tell(a, `${name} is already a side of ${ev.id}.`);
+      ev.sides.push(name);
+      saveEvents();
+      audit(`EVENT ${ev.id} side added by ${who(a)}: ${name}`);
+      return tell(a, `Event ${ev.id} sides: ${ev.sides.join(' v ')}.`);
+    }
+
+    if (cmd === 'deadline') {
+      const mins = Number(parts[0]);
+      if (!(mins >= 1 && mins <= 1440)) return tell(a, 'Usage: /event deadline <minutes>, 1 to 1440.');
+      ev.deadlineAt = Date.now() + mins * 60000;
+      saveEvents();
+      audit(`EVENT ${ev.id} deadline set by ${who(a)} to ${clock(ev.deadlineAt)} UTC`);
+      return tell(a, `Event ${ev.id} now ends at ${clock(ev.deadlineAt)} UTC.`);
+    }
+
+    if (cmd === 'attach') {
+      // Phase 1 attaches what the GM already raised: the band, and their own released raiders and garrison.
+      // Phase 2 places an event's own NPCs through npcSpawnSystem instead, so no GM has to walk a column.
+      const ids = new Set();
+      for (const c of band(a)) ids.add(c.id >>> 0);
+      for (const r of S.released) if (r.profile === profileOf(a) && alive(r.id)) ids.add(r.id >>> 0);
+      let added = 0, already = 0;
+      for (const id of ids) {
+        const was = tagOf(id);
+        if (was === ev.id) { already++; continue; }
+        if (was) continue;                       // another event owns it; never steal
+        const desc = refDescOf(id);
+        if (!desc) { log(`warband: event ${ev.id} could not read a desc for ${id.toString(16)}, not attached`); continue; }
+        try { mp.set(id, EVENT_TAG, ev.id); } catch (e) { log(`warband: event tag failed for ${id.toString(16)}`, e.message); continue; }
+        ev.members.push({ desc, id, name: nameOfNpc(id) });
+        added++;
+      }
+      saveEvents();
+      audit(`EVENT ${ev.id} attached ${added} NPC(s) by ${who(a)} (${already} already in it)`);
+      return tell(a, added || already
+        ? `Event ${ev.id} holds ${liveMembers(ev).length} NPC(s) (${added} added${already ? `, ${already} already in it` : ''}). They carry its tag, so ending it clears them even after a restart.`
+        : `Nothing to attach: raise a warband first, or your NPCs already belong to another event.`);
+    }
+
+    if (cmd === 'start') {
+      if (ev.state === 'running') return tell(a, `Event ${ev.id} is already running.`);
+      ev.state = 'running';
+      ev.startedAt = Date.now();
+      saveEvents();
+      audit(`EVENT ${ev.id} started by ${who(a)} with ${liveMembers(ev).length} NPC(s)`);
+      return tell(a, `Event ${ev.id} is running: ${liveMembers(ev).length} NPC(s), ends ${clock(ev.deadlineAt)} UTC unless you end it.`);
+    }
+
+    // Nat, 1 Nov: the creating GM owns an event, and ANY staff can end it. A stuck event is worse than a
+    // rude one, so this is deliberately not restricted to its owner.
+    if (cmd === 'end') {
+      const n = endEvent(ev, who(a), parts[0] === 'held' || parts[0] === 'fell' ? parts[0] : 'abandoned', 'ended by staff');
+      return tell(a, `Event ${ev.id} ended. ${n} NPC(s) queued for removal at ${C.eventRetirePerTick}/s; its tag means a restart cannot leave them standing.`);
+    }
+
+    if (cmd === 'sweep') {
+      const n = sweepEvent(ev, `swept by ${who(a)}`);
+      saveEvents();
+      audit(`EVENT ${ev.id} swept by ${who(a)}: ${n} NPC(s) queued`);
+      return tell(a, n ? `${n} NPC(s) of ${ev.id} queued for removal at ${C.eventRetirePerTick}/s.` : `Nothing of ${ev.id} is left to remove.`);
+    }
+
+    return tell(a, 'Usage: /event list | new <type> [name] | info | side <name> | deadline <minutes> | attach | start | sweep | end [held|fell] [id].');
+  };
+
+  registerChatCommand('event', eventCmd, { admin: true, help: 'list | new <raid|siege|invasion|defence> [name] | info | side <name> | deadline <minutes> | attach | start | sweep | end [held|fell]: a GM event with a deadline, tagged NPCs and a clean-up that survives a restart' });
+
+  // Every second: drain a few retirements, then end any event whose deadline has passed. One named timer,
+  // no new mp.on - a hot reload replaces it instead of stacking another.
+  const eventTick = () => {
+    loadEvents();
+    const per = Math.max(1, Number(C.eventRetirePerTick) || 4);
+    let done = 0;
+    while (S.retire.length && done < per) {
+      const r = S.retire.shift();
+      const ev = byId(r.eventId);
+      if (!ev) continue;
+      const m = (ev.members || []).find((x) => x.desc === r.desc);
+      if (!m) continue;
+      const id = memberId(ev, m);
+      // Gone already (died and had its body taken, or the boot sweep got it): drop it from the roster.
+      if (!id) { ev.members = ev.members.filter((x) => x.desc !== r.desc); continue; }
+      try { mp.destroyActor(id); done++; } catch (e) { log(`warband: event ${ev.id} could not remove ${id.toString(16)}`, e.message); }
+      ev.members = ev.members.filter((x) => x.desc !== r.desc);
+    }
+    if (done) saveEvents();
+    const now = Date.now();
+    for (const ev of running()) {
+      if (ev.deadlineAt && ev.deadlineAt <= now) endEvent(ev, 'the watchdog', ev.outcome || 'abandoned', 'its deadline passed');
+    }
+  };
+  globalThis.__dboWarbandEventTick = eventTick;
+  if (typeof api.every === 'function') api.every('warbandEvents', 1000, () => { try { eventTick(); } catch (e) { log('warband: event tick failed', e.message); } });
 
   // The Place tab's Warband view: the same commands, sent from buttons through the chat handler, so a button passes the
   // same Lead GM gate and staff log as typing it (a GM's button skipped both, 2026-09-30)
