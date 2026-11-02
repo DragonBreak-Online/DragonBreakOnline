@@ -127,5 +127,22 @@ check('a guild leader\'s panel shows its rank titles', globalThis.__dboEconomyVi
 load();
 check('after a reload the settings stand', globalThis.__dboEconomyView(1).factions[0].rate === 0.1);
 
+// The tax coverage pass reads every owned building at once (a 20 s boot stall, 2 Nov): only when taxCoverageOnLoad asks
+{
+  const realSetTimeout = global.setTimeout;
+  const armed = [];
+  global.setTimeout = (fn, ms) => { if (ms === 90000) armed.push(fn); return { unref() {} }; };
+  try {
+    load();
+    check('tax coverage is not run after a load by default', armed.length === 0, armed.length);
+    check('...and is still there to run on demand', typeof globalThis.__dboEconomyTaxCoverage === 'function');
+    const was = api.cfg.economy.taxCoverageOnLoad;
+    api.cfg.economy.taxCoverageOnLoad = true;
+    load();
+    check('taxCoverageOnLoad true runs it 90 s after a load, as before', armed.length === 1, armed.length);
+    api.cfg.economy.taxCoverageOnLoad = was;
+  } finally { global.setTimeout = realSetTimeout; }
+}
+
 console.log(failures ? `${failures} failure(s)` : 'all passed');
 process.exit(failures ? 1 : 0);

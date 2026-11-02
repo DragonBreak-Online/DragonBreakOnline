@@ -488,7 +488,10 @@ module.exports = (api) => {
     return rows;
   };
   globalThis.__dboEconomyTaxCoverage = taxCoverage;
-  { const tc = setTimeout(() => { try { taxCoverage(); } catch (e) { log('economy: tax coverage failed', e.message); } }, 90000); if (tc && typeof tc.unref === 'function') tc.unref(); }
+  // Only when asked (economy.taxCoverageOnLoad): it reads every owned building at once, which on live and dev boots was a
+  // 20 s stall (2 Nov) and would take the housing plans' place as the first full read once they are skipped. On demand:
+  // __dboEconomyTaxCoverage()
+  if (C.taxCoverageOnLoad === true) { const tc = setTimeout(() => { try { taxCoverage(); } catch (e) { log('economy: tax coverage failed', e.message); } }, 90000); if (tc && typeof tc.unref === 'function') tc.unref(); }
 
   every('economy', 60000, () => {
     if (!C.enabled) return;
