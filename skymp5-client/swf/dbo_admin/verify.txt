@@ -8,3 +8,6 @@ dboOut
 dboScreen
 giveSpell
 removeSpell
+adminVitalsSet
+adminVitalsReset
+drawVitals

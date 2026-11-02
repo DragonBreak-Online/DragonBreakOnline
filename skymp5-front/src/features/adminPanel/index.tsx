@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 import Button from '../../constructorComponents/button';
 import './styles.scss';
-import { PlayerPunish, DeityReset, SkillsTab, ItemsTab, PowersTab, TeleportTab, PlaceTab, PlayerCare, TargetPicker, PanelBan, MasteryTarget, TargetOption, BeastState, creatureLabel, PolymorphInfo, PolymorphedRow, PanelPlacements, PlaceMeta, PlaceResults, PlaceSet, WarbandView } from './extraTabs';
+import { PlayerPunish, DeityReset, SkillsTab, ItemsTab, PowersTab, TeleportTab, PlaceTab, PlayerCare, BossVitals, TargetPicker, PanelBan, MasteryTarget, TargetOption, BeastState, creatureLabel, PolymorphInfo, PolymorphedRow, PanelPlacements, PlaceMeta, PlaceResults, PlaceSet, WarbandView } from './extraTabs';
 import { SearchBar, fuzzyFilter } from '../../components/SearchBar/SearchBar';
 import { GmCallsTab, EnchantTab } from './staffTabs';
 import { ThieveryTab } from './thieveryTab';
@@ -527,6 +527,7 @@ const AdminPanel = ({ data }: { data: AdminPanelData }) => {
             {ev.request && !trial ? (
               <PlayerCare events={ev} who={actingOn} selfId={selfId} name={acting ? acting.label : ''} masteryTarget={data.masteryTarget || null} canSpawn={canSpawn} />
             ) : null}
+            {ev.request && !trial ? <BossVitals events={ev} who={actingOn} name={acting ? acting.label : ''} /> : null}
             {selectedPlayer && !trial ? (
               <DeityReset actor={selectedPlayer.online && selectedPlayer.a ? selectedPlayer.a : null} name={selectedPlayer.n || ''} profile={selectedPlayer.p} canSpawn={canSpawn} />
             ) : null}

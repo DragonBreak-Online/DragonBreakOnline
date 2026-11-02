@@ -241,6 +241,40 @@ export const SkillsTab = ({ events, masteryTarget, who, canSpawn }: {
 
 // ---- the Players tab's character care: the diseases (L1) and the school levels (N7), Lead GM and above -------------
 const SCHOOL_ORDER = ['Alteration', 'Conjuration', 'Destruction', 'Illusion', 'Restoration'];
+// An event boss's raised Health, Magicka and Stamina (gamemode bossvitals.js): amounts added to the usual maximum of the
+// one acted on, or the staff member's own. A blank box leaves that one as it is, 0 clears it; the server holds the rules
+// (a GM: themselves or a player inside an open event's area) and says what it did in chat
+const VITAL_FIELDS: Array<[string, string]> = [['health', 'Health'], ['magicka', 'Magicka'], ['stamina', 'Stamina']];
+export const BossVitals = ({ events, who, name }: { events: Record<string, string>; who: string; name: string }) => {
+  const [vals, setVals] = useState<Record<string, string>>({});
+  const [keep, setKeep] = useState(false);
+  useEffect(() => { setVals({}); }, [who]);
+  const given = VITAL_FIELDS.map(([k]) => (vals[k] || '').trim()).filter((t) => t !== '');
+  const valid = given.length > 0 && given.every((t) => /^\d+$/.test(t));
+  return (
+    <div className="admin-panel__power">
+      <span className="admin-panel__label">Vitals <span className="admin-panel__hint">for {name || 'you'}: added to their usual maximum; blank leaves one as it is, 0 clears it. Cleared at logout and when the event ends unless kept</span></span>
+      <div className="admin-panel__actions">
+        {VITAL_FIELDS.map(([k, label]) => (
+          <label key={k} className="admin-panel__field">
+            {label}
+            <input className="admin-panel__input admin-panel__input--short" value={vals[k] || ''} maxLength={5}
+              onChange={(e) => setVals(Object.assign({}, vals, { [k]: e.target.value }))} />
+          </label>
+        ))}
+        <label className="admin-panel__field">
+          <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} /> Keep after the event
+        </label>
+        <Button text="Set" width={80} height={32} disabled={!valid} onClick={() => {
+          adminRequest(events, 'adminVitalsSet', { target: who, health: (vals.health || '').trim(), magicka: (vals.magicka || '').trim(), stamina: (vals.stamina || '').trim(), keep });
+          setVals({});
+        }} />
+        <Confirm text="Reset" width={100} onConfirm={() => adminRequest(events, 'adminVitalsReset', { target: who })} />
+      </div>
+    </div>
+  );
+};
+
 export const PlayerCare = ({ events, who, selfId, name, masteryTarget, canSpawn }: {
   events: Record<string, string>; who: string; selfId: string; name: string; masteryTarget: MasteryTarget | null; canSpawn: boolean;
 }) => {

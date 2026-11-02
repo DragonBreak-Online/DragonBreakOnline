@@ -60,7 +60,7 @@ const events = {
 const PANEL_REQUESTS = new Set(["adminItemsRequest", "adminMasteryRequest", "adminLocationsRequest", "adminPlaceablesRequest",
   "adminPlacementsRequest", "adminPlacementRemove", "adminPlacementGoto", "adminPlaceMeta", "adminPlaceSearch", "adminPlaceUndo",
   "adminPlaceSets", "adminPlaceSetSave", "adminPlaceSetPlace", "adminPlaceSetDelete", "adminPlaceGroupClear", "adminWarband", "adminRaid", "adminWarbandView",
-  "adminClearInventory"]);
+  "adminClearInventory", "adminVitalsSet", "adminVitalsReset"]);
 
 interface DebugServer {
   name: string;
@@ -554,6 +554,9 @@ export class AdminMenuService extends ClientListener {
         adminWarbandView: ["warbandView", []],
         // The Debug tab's Clear my inventory (gamemode.js clearOwnInventory: the staff member's own, a second press confirms)
         adminClearInventory: ["clearInventory", []],
+        // The Players tab's Vitals view (gamemode bossvitals.js): an event boss's raised maximum, the same rules as /vitals
+        adminVitalsSet: ["vitalsSet", ["target", "health", "magicka", "stamina", "keep"]],
+        adminVitalsReset: ["vitalsReset", ["target"]],
       };
       if (PLACE_EVENTS[type]) {
         let f: Record<string, unknown> = {};
