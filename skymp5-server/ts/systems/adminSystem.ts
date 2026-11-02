@@ -1020,7 +1020,23 @@ export class AdminSystem implements System {
   // spells and shouts have been empty since 17 Oct, with the real lists parked in spellsGiveAllOff and shoutsGate; the
   // readers below take the live key first and fall back, so the data flip and the code flip stay independent
   private powers(): { spells?: Array<[string, string]>; spellsGiveAllOff?: Array<[string, string]>; shouts: Array<{ shout: string; name: string; words: string[] }>; shoutsGate?: Array<{ shout: string; name: string; words: string[] }>; werewolf: string; vampirelord?: string } | null {
-    try { return JSON.parse(fs.readFileSync(path.resolve("admin-powers.json"), "utf8")); } catch { return null; }
+    let p: any;
+    try { p = JSON.parse(fs.readFileSync(path.resolve("admin-powers.json"), "utf8")); } catch { return null; }
+    // The rows of mods whose authors forbid AI work live in the gitignored admin-powers.private.json beside it (the server
+    // branch's privaterows.js; Nat, 2 Nov): { lists: { spells: [{ at, row }], staffSpells: [...] } }, each row put back at its
+    // index in the whole list. Without the file the panel works on the public rows.
+    try {
+      const side = JSON.parse(fs.readFileSync(path.resolve("admin-powers.private.json"), "utf8"));
+      for (const key of ["spells", "staffSpells"]) {
+        const rows = (side && side.lists && Array.isArray(side.lists[key]) ? side.lists[key] : [])
+          .filter((r: any) => r && Array.isArray(r.row) && Number.isInteger(r.at)).sort((a: any, b: any) => a.at - b.at);
+        if (!rows.length) continue;
+        const list: unknown[] = Array.isArray(p[key]) ? p[key].slice() : [];
+        for (const r of rows) list.splice(Math.min(r.at, list.length), 0, r.row);
+        p[key] = list;
+      }
+    } catch { /* no sidecar here: public rows only */ }
+    return p;
   }
 
   // Give all spells: the tome-taught catalogue, narrowed by source plugin when the gameplay layer says so
