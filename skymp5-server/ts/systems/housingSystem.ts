@@ -49,8 +49,10 @@ type Mp = any;
 const HOUSING_PROP = "private.housing";
 // N3 places: the migration plan written by the dry run, for review (runtime, beside housing.json)
 const PLACE_PLAN_FILE = "./housing-places-plan.json";
-// Written when a place plan finds nothing left to apply; while it exists a boot skips the plan (housingPlaceReplan true plans again)
+// Written when a place plan finds nothing left to apply, with the plan's inputs; a boot with the same inputs skips the plan
 const PLACE_SETTLED_FILE = "./housing-places-settled.json";
+// Raise when the place rules or the plan change what a migration would build, so every settled marker plans again
+const PLACE_RULES_VERSION = 1;
 const PLACE_BACKUP_PREFIX = "./housing-places-backup-";
 // Property per character: the owner migration's plan, for review, and its backups (runtime, beside housing.json)
 const OWNER_PLAN_FILE = "./housing-owners-plan.json";
@@ -271,11 +273,6 @@ export class HousingSystem implements System {
     this.placeMigration = mode === "off" ? "off" : mode === "apply" ? "apply" : "dryrun";
     // A migration backup to put back at the plan's tick, instead of the plan (S3 of the review)
     this.placeRestore = typeof all?.["housingPlaceRestore"] === "string" ? String(all!["housingPlaceRestore"]) : "";
-    // A settled migration is not planned again at boot: the plan's reads of every claim blocked the loop ~120 s for nothing (2 Nov)
-    if (this.placeMigration === "apply" && !this.placeRestore && all?.["housingPlaceReplan"] !== true && fs.existsSync(PLACE_SETTLED_FILE)) {
-      this.placePlanDone = true;
-      this.log(`[housing] place plan skipped: the migration is settled (${PLACE_SETTLED_FILE}); housingPlaceReplan true plans again`);
-    }
     // Property per character (Nate, 10 Oct): off (the default) keeps it the account's; the owner migration names each claim's
     // character, "dryrun" (the default) writes only its plan, "apply" writes ownerChar into the records once, after a backup
     this.perCharacter = all?.["housingOwnerPerCharacter"] === true;
@@ -284,6 +281,13 @@ export class HousingSystem implements System {
     this.keyRing = all?.["housingKeyRing"] === true;
     // Key items cut before a property's last change of owner or tenant stop opening it (Nate, 23 Oct); false turns it off
     this.staleItemKeys = all?.["housingStaleItemKeys"] !== false;
+    // A settled migration is not planned again at boot unless its inputs changed: the plan's reads of every claim blocked the loop ~120 s for nothing (2 Nov)
+    this.placeInputs = this.placePlanInputs(all);
+    if (this.placeMigration === "apply" && !this.placeRestore) {
+      const why = all?.["housingPlaceReplan"] === true ? "housingPlaceReplan is true" : this.placeSettledChange(this.placeInputs);
+      if (why) this.log(`[housing] place plan runs: ${why}`);
+      else { this.placePlanDone = true; this.log(`[housing] place plan skipped: settled with these inputs (${PLACE_SETTLED_FILE}); housingPlaceReplan true plans again`); }
+    }
     this.initAtMs = Date.now();
 
     this.roleCfg = readAdminRoleConfig(all);
@@ -1513,6 +1517,29 @@ export class HousingSystem implements System {
   // Staff profiles, whose claims the place migration leaves exactly as they are and the place cap never counts (Nate,
   // 3 Oct). Owners are offline at boot, so the Discord roles cannot say; the list is gamemode-config.json
   // housingPlaces.staffProfiles (read when the plan runs, so an edit needs no restart) and the setting housingStaffProfiles.
+  // A place plan's inputs besides the claims, which the live rules place as they come (12 boots of new claims planned nothing)
+  private placePlanInputs(all: Record<string, unknown> | null): Record<string, string> {
+    const hash = (v: unknown) => crypto.createHash("sha256").update(JSON.stringify(v ?? null)).digest("hex").slice(0, 16);
+    let grants: unknown = [];
+    try { const cfg = JSON.parse(fs.readFileSync(GAMEMODE_CONFIG_FILE, "utf8")); grants = cfg && cfg.housingPlaces ? cfg.housingPlaces.grants : []; } catch { grants = null; }
+    return {
+      rules: String(PLACE_RULES_VERSION),
+      loadOrder: hash(all?.["loadOrder"]),
+      grants: hash(grants),
+      caps: hash([this.placeCap, this.placeCapPerAccount, this.perCharacter]),
+      staff: hash([...this.staffProfiles()].sort((a, b) => a - b)),
+    };
+  }
+
+  // Why a boot must plan again: no settled marker, or the inputs it was settled with differ; "" when it may skip
+  private placeSettledChange(now: Record<string, string>): string {
+    let was: Record<string, string> | null = null;
+    try { was = JSON.parse(fs.readFileSync(PLACE_SETTLED_FILE, "utf8")).inputs || null; } catch { return "not settled yet"; }
+    if (!was) return "settled before its inputs were recorded";
+    const changed = Object.keys(now).filter((k) => was![k] !== now[k]);
+    return changed.length ? `changed since it settled: ${changed.join(", ")}` : "";
+  }
+
   private staffProfiles(): Set<number> {
     const out = new Set<number>(this.staffSetting);
     try {
@@ -2881,7 +2908,7 @@ export class HousingSystem implements System {
       .filter(({ p, d }) => !!d && !d.notApplied && d.cells.length > 0 && !(granted.has(p.root) ? grantTaken(p) : built(p.root)) && !d.members.some(built));
     if (!todo.length) {
       this.log(`[housing] place migration: nothing to apply`);
-      try { fs.writeFileSync(PLACE_SETTLED_FILE, JSON.stringify({ at: new Date().toISOString(), claims: this.claimed.length, places: places.length }, null, 1)); }
+      try { fs.writeFileSync(PLACE_SETTLED_FILE, JSON.stringify({ at: new Date().toISOString(), claims: this.claimed.length, places: places.length, inputs: this.placeInputs }, null, 1)); }
       catch (e) { this.log(`[housing] ${PLACE_SETTLED_FILE} write failed: ${e}`); }
       return;
     }
@@ -3409,6 +3436,7 @@ export class HousingSystem implements System {
   private staffSetting: number[] = [];
   private initAtMs = 0;
   private placePlanDone = false;
+  private placeInputs: Record<string, string> = {};
   private placePlanTriedMs = 0;
   private placePlanTries = 0;
   private placeCells: Map<string, number> | null = null;
