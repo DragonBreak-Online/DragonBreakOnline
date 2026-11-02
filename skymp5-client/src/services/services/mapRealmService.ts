@@ -9,6 +9,10 @@ import {
   LABELS_PER_TICK, LEGEND_HOST, LEGEND_SWF, MAP_MENU, MARKER_CLIP, MARKER_COUNT, RealmMarker, WIDGET_ID,
   descParts, keyAction, kindIndex, legendJson, legendReset, legendRows, legendStep, newLegendLoad, readMarkers, wantedScale,
 } from "./mapRealm";
+import {
+  ANCHORS_PER_FRAME, OWNERS_ALIVE_FRAMES, OWNERS_HOST, OWNERS_SWF, OwnersData, TOGGLE_KEY,
+  anchorClips, clipTransform, drawingOf, fitHolds, fitOf, anchorIndex, legendRow, readOwners, worldFor, Anchor, Fit, Seen,
+} from "./mapOwners";
 
 // for the browser-side widget setter (executed inside the CEF browser)
 declare const window: any;
@@ -36,6 +40,11 @@ export class MapRealmService extends ClientListener {
       this.index = kindIndex(this.markers);
       this.toReveal = this.markers.slice();
       logTrace(this, "realm markers", String(this.markers.length));
+    } else if (content["customPacketType"] === "dboMapOwners") {
+      this.owners = readOwners(content);
+      this.anchors = anchorIndex(this.owners ? this.owners.anchors : []);
+      this.drawnKey = "";
+      logTrace(this, "map owners", this.owners ? `${this.owners.worlds.length} world(s), ${this.owners.anchors.length} anchors` : "unreadable");
     } else if (content["customPacketType"] === "dboMapTest") {
       this.testArmed = true;
       logTrace(this, "map tests armed for the next opening of the map");
@@ -49,6 +58,11 @@ export class MapRealmService extends ClientListener {
     this.applied = [];
     this.mounted = false;
     this.ticksOpen = 0;
+    this.ownersLoad = { phase: "idle", frames: 0 };
+    this.drawnKey = "";
+    this.fitLogged = false;
+    this.lastFit = null;
+    this.mapWorld = 0;
     if (this.testArmed) { this.testArmed = false; this.test = { tick: 0, samples: [], results: {} }; }
   }
 
@@ -61,7 +75,13 @@ export class MapRealmService extends ClientListener {
 
   // Digits toggle a kind and R the legend, while the map is open; the map keeps its own keys, nothing is focused
   private onButton(e: ButtonEvent): void {
-    if (!this.open || !e.isDown || e.device !== InputDeviceType.Keyboard || !this.markers.length) return;
+    if (!this.open || !e.isDown || e.device !== InputDeviceType.Keyboard) return;
+    if (e.code === TOGGLE_KEY && this.owners) {
+      this.ownersShown = !this.ownersShown;
+      this.publish();
+      return;
+    }
+    if (!this.markers.length) return;
     const a = keyAction(e.code);
     if (!a) return;
     if (a.legend) this.legendShown = !this.legendShown;
@@ -86,6 +106,7 @@ export class MapRealmService extends ClientListener {
         this.applyFilter();
         if (this.ticksOpen === 2 || this.ticksOpen % 30 === 0) this.publish();
       }
+      if (this.owners) this.followOwners();
       if (this.test) this.runTests();
     } catch (err) {
       logError(this, "map frame failed", err);
@@ -150,9 +171,98 @@ export class MapRealmService extends ClientListener {
     }
   }
 
+  // ---- who owns what (mapOwners.ts): loaded like the legend, drawn once per world, lined up with the markers each frame ----
+  private followOwners(): void {
+    const ui = this.sp.Ui;
+    const st = this.ownersLoad;
+    if (st.phase === "idle") {
+      st.phase = "loading";
+      try {
+        ui.invokeStringA(MAP_MENU, "_root.createEmptyMovieClip", ["dboMapOwners", "9989"]);
+        ui.invokeString(MAP_MENU, `${OWNERS_HOST}.loadMovie`, OWNERS_SWF);
+      } catch (err) { logError(this, "the map owners overlay could not be loaded", err); st.phase = "off"; }
+      return;
+    }
+    if (st.phase === "loading") {
+      let alive = false;
+      try { alive = ui.getString(MAP_MENU, `${OWNERS_HOST}.dboAlive`) === "yes"; } catch { alive = false; }
+      if (alive) { st.phase = "up"; logTrace(this, "map owners overlay drawn in the map"); }
+      else if (++st.frames >= OWNERS_ALIVE_FRAMES) { st.phase = "off"; logTrace(this, "the map owners overlay never came alive in the map"); }
+      return;
+    }
+    if (st.phase !== "up" || !this.owners) return;
+    // the world this map shows: the player's (an interior has none, so no colours there)
+    if (!this.mapWorld) {
+      try { const w = this.sp.Game.getPlayer()?.getWorldSpace(); this.mapWorld = w ? w.getFormID() >>> 0 : -1; } catch { this.mapWorld = -1; }
+    }
+    const world = this.mapWorld > 0 ? worldFor(this.owners, (d) => this.formIdOf(d), this.mapWorld) : null;
+    const layer = `${OWNERS_HOST}.layer`;
+    if (!world) { ui.setBool(MAP_MENU, `${layer}._visible`, false); return; }
+    const key = world.world + "#" + world.territories.map((t) => t.owner).join("|");
+    if (key !== this.drawnKey) {
+      this.drawnKey = key;
+      this.worldOwners = new Set(world.territories.map((t) => t.owner)).size;
+      try { ui.invokeString(MAP_MENU, `${OWNERS_HOST}.dboData`, JSON.stringify(drawingOf(world, this.owners.factions, this.owners.reach, this.owners.fade))); } catch (err) { logError(this, "map owners data failed", err); }
+      this.publish();
+    }
+    const fit = this.ownersShown ? this.fitNow() : null;
+    const holds = this.ownersShown && fitHolds(fit);
+    ui.setBool(MAP_MENU, `${layer}._visible`, holds);
+    if (holds && fit) {
+      const t = clipTransform(fit);
+      ui.setFloat(MAP_MENU, `${layer}._x`, t.x);
+      ui.setFloat(MAP_MENU, `${layer}._y`, t.y);
+      ui.setFloat(MAP_MENU, `${layer}._xscale`, t.xscale);
+      ui.setFloat(MAP_MENU, `${layer}._yscale`, t.yscale);
+      ui.setFloat(MAP_MENU, `${layer}._rotation`, t.rotation);
+      ui.setFloat(MAP_MENU, `${layer}.shapes._rotation`, t.inner);
+    }
+    if (fit) this.lastFit = fit;
+    // once an opening, after three seconds: how well the markers fit, so the alignment is measured, not judged by eye alone
+    if (!this.fitLogged && this.ticksOpen >= 180) {
+      this.fitLogged = true;
+      const f = this.lastFit;
+      const report = { world: world.world, anchors: this.anchorsSeen, fit: f ? { n: f.n, rms: Math.round(f.rms * 100) / 100, m: [f.m00, f.m01, f.m10, f.m11], turn: Math.round(clipTransform(f).rotation + clipTransform(f).inner) } : null, holds: fitHolds(f) };
+      logTrace(this, "map owners fit", JSON.stringify(report));
+      sendCustomPacket(this.controller, { customPacketType: "dbo", event: "mapOwnersFit", args: [report], widget: 0 });
+    }
+  }
+
+  // The markers the server named, where the map has put them this frame, in the root's own units
+  private fitNow(): Fit | null {
+    const ui = this.sp.Ui;
+    const clips = anchorClips(this.labels, this.anchors);
+    this.anchorsSeen = clips.length;
+    if (clips.length < 2) return null;
+    const box = "_root.MarkerClips";
+    const bx = ui.getFloat(MAP_MENU, `${box}._x`) || 0, by = ui.getFloat(MAP_MENU, `${box}._y`) || 0;
+    const kx = (ui.getFloat(MAP_MENU, `${box}._xscale`) || 100) / 100, ky = (ui.getFloat(MAP_MENU, `${box}._yscale`) || 100) / 100;
+    const seen: Seen[] = [];
+    // a different slice each frame when there are more than a frame's worth
+    const start = clips.length > ANCHORS_PER_FRAME ? (this.ticksOpen * ANCHORS_PER_FRAME) % clips.length : 0;
+    for (let n = 0; n < Math.min(ANCHORS_PER_FRAME, clips.length); n++) {
+      const { i, a } = clips[(start + n) % clips.length];
+      const clip = MARKER_CLIP(i);
+      if (!ui.getBool(MAP_MENU, `${clip}._visible`)) continue;
+      seen.push({ sx: bx + ui.getFloat(MAP_MENU, `${clip}._x`) * kx, sy: by + ui.getFloat(MAP_MENU, `${clip}._y`) * ky, x: a.x, y: a.y });
+    }
+    return fitOf(seen);
+  }
+
+  private formIdOf(desc: string): number {
+    const cached = this.worldIds.get(desc);
+    if (cached !== undefined) return cached;
+    const p = descParts(desc);
+    let id = 0;
+    try { const f = p ? this.sp.Game.getFormFromFile(p.id, p.file) : null; id = f ? f.getFormID() >>> 0 : 0; } catch { id = 0; }
+    this.worldIds.set(desc, id);
+    return id;
+  }
+
   private publish(): void {
     if (!this.open) return;
-    const rows = legendRows(this.labels.map((l) => (typeof l === "string" ? l : null)), this.index, this.hidden);
+    let rows = legendRows(this.labels.map((l) => (typeof l === "string" ? l : null)), this.index, this.hidden);
+    if (this.owners && this.drawnKey) rows = rows.concat([legendRow(this.ownersShown, this.worldOwners)]);
     if (this.legendLoad.phase === "up") {
       if (widget) { widget = null; closeWidget(this.sp, WIDGET_ID); }
       try { this.sp.Ui.invokeString(MAP_MENU, `${LEGEND_HOST}.dboData`, legendJson(this.legendShown, rows)); } catch (err) { logError(this, "map legend data failed", err); }
@@ -222,6 +332,17 @@ export class MapRealmService extends ClientListener {
   private testArmed = false;
   private test: MapTest | null = null;
   private legendLoad = newLegendLoad();
+  private owners: OwnersData | null = null;
+  private anchors = new Map<string, Anchor>();
+  private ownersShown = true;
+  private ownersLoad: { phase: "idle" | "loading" | "up" | "off"; frames: number } = { phase: "idle", frames: 0 };
+  private drawnKey = "";
+  private worldOwners = 0;
+  private mapWorld = 0;
+  private worldIds = new Map<string, number>();
+  private anchorsSeen = 0;
+  private fitLogged = false;
+  private lastFit: Fit | null = null;
 }
 
 interface MapTest { tick: number; samples: number[]; results: Record<string, unknown> }

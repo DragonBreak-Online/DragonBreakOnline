@@ -6,7 +6,7 @@
 // _root.dboAlive, which the client reads with Ui.getString. Each kind's glyph is the panel's diamond, not the browser's
 // line drawings.
 
-var DBO_SWF_VERSION = "maplegend-1";
+var DBO_SWF_VERSION = "maplegend-2";
 var VH = 7.2;
 var PANEL_W = 300;
 var ROW_H = 25;
@@ -103,7 +103,7 @@ function draw(p)
       y += ROW_H;
    }
    var hint = dboText(body, "hint", 40, 27, y + 8, PANEL_W - 60, 60, dboFmt(F_PLAIN, 12, C_SECOND, 0.2), true);
-   hint.text = "A number shows or hides its places. The realm's places are the map's own markers, so they zoom, turn and fast-travel as every other does.";
+   hint.text = "A number shows or hides its places, T the territory colours. The realm's places are the map's own markers, so they zoom, turn and fast-travel as every other does.";
    for (var q = 0; q < realm.length; q++)
    {
       body["r" + q]._x = 27;

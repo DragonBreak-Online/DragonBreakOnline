@@ -25,7 +25,7 @@ const compile = (source, name) => {
 // ---- the swf ----
 const t = S.boot('dbo_maplegend', true);
 const R = t.root;
-check('the swf says it is alive, its version, and locks its root (it runs inside the MapMenu)', R.dboAlive === 'yes' && R.dboVersion === 'maplegend-1' && t.ctx._lockroot === true);
+check('the swf says it is alive, its version, and locks its root (it runs inside the MapMenu)', R.dboAlive === 'yes' && R.dboVersion === 'maplegend-2' && t.ctx._lockroot === true);
 check('nothing shows before the first data', R.legend._visible === false && R.bar._visible === false);
 const rows = [{ id: 'seat', label: 'Seats', key: '1', count: 1, shown: true }, { id: 'fort', label: 'Forts', key: '4', count: 2, shown: false },
   { id: 'other', label: 'Everything else', key: '0', count: 7, shown: true }];
@@ -35,6 +35,11 @@ check('the panel at the top right: THE REALM, a row a kind with its key, label a
   && B.r1.count.text === '2' && R.legend._x === 1280 - 300 && Math.abs(R.legend._y - 6.7 * 7.2) < 0.01, B && [B.title.text, B.r0.label.text, B.r1.count.text]);
 check('...a hidden kind greyed, the rest full', B.r1._alpha === 40 && B.r0._alpha === 100);
 check('...everything else last, under its own rule, with 0', B.r2.key.text === '0' && B.r2.label.text === 'Everything else' && B.r2._y > B.r1._y);
+check('the hint names T for the territory colours', /T the territory colours/.test(B.hint.text), B.hint.text);
+t.push({ shown: true, rows: rows.slice(0, 2).concat([{ id: 'territories', label: 'Territory colours', key: 'T', count: 4, shown: false }], rows.slice(2)) });
+const B2 = R.legend.body;
+check('the colours\' row (MapRealmService adds it) drawn with the realm\'s, before everything else, greyed when off', B2.r2.key.text === 'T' && B2.r2.label.text === 'Territory colours' && B2.r2._alpha === 40 && B2.r3.label.text === 'Everything else');
+t.push({ shown: true, rows });
 check('the R Realm bar at the bottom', R.bar._visible === true && R.bar.key.text === 'R' && R.bar.label.text === 'Realm' && R.bar._y > 600);
 t.push({ shown: false, rows });
 check('R hides the panel; the bar stays', R.legend._visible === false && R.bar._visible === true);
