@@ -4247,8 +4247,9 @@ const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_jou
 // The client's custom menu takes a payload of at most this many characters (scaleformMenu.ts MAX_PAYLOAD_CHARS) and draws
 // a bigger one blank, so a widget past it (a staff player menu, a long ledger) goes to the browser instead
 const NATIVE_MAX_CHARS = 60000;
-// nativeOpen: actor -> the widget id on the custom menu; browserOpen: actor -> a widget of these types last sent to the browser
-const nativeState = () => { const p = globalThis.__dboPanelState || (globalThis.__dboPanelState = { caps: new Map(), nonces: new Map() }); if (!p.native) p.native = new Map(); if (!p.nativeOpen) p.nativeOpen = new Map(); if (!p.browserOpen) p.browserOpen = new Map(); return p; };
+// nativeOpen: actor -> the widget id on the custom menu; browserOpen: actor -> a widget of these types last sent to the browser;
+// closedAt: actor -> when the server last closed their custom menu (a move waits on it)
+const nativeState = () => { const p = globalThis.__dboPanelState || (globalThis.__dboPanelState = { caps: new Map(), nonces: new Map() }); if (!p.native) p.native = new Map(); if (!p.nativeOpen) p.nativeOpen = new Map(); if (!p.browserOpen) p.browserOpen = new Map(); if (!p.closedAt) p.closedAt = new Map(); return p; };
 const nativeSwfFor = (a, widget, focus) => {
   const swf = widget && NATIVE_SWF[widget.type];
   if (!swf || (widget.type === 'prayer' && widget.mode !== 'pick')) return '';
@@ -4278,7 +4279,7 @@ const openWidget = (a, widget, focus) => {
     return sendPacket(a, { customPacketType: 'dboScaleform', swf, payload, widget: widget.id });
   }
   if (widget && NATIVE_SWF[widget.type]) {
-    if (st.nativeOpen.get(id) === widget.id) { st.nativeOpen.delete(id); sendPacket(a, { customPacketType: 'dboScaleform', close: true }); focus = true; }
+    if (st.nativeOpen.get(id) === widget.id) { st.nativeOpen.delete(id); nativeState().closedAt.set(id, Date.now()); sendPacket(a, { customPacketType: 'dboScaleform', close: true }); focus = true; }
     st.browserOpen.set(id, widget.id);
   }
   const sent = sendPacket(a, { customPacketType: 'dboWidget', widget, focus: !!focus });
@@ -4290,9 +4291,40 @@ const openWidget = (a, widget, focus) => {
 const closeWidget = (a, id) => {
   const open = nativeState().nativeOpen;
   if (nativeState().browserOpen.get(a >>> 0) === id) nativeState().browserOpen.delete(a >>> 0);
-  if (open.get(a >>> 0) === id) { open.delete(a >>> 0); return sendPacket(a, { customPacketType: 'dboScaleform', close: true }); }
+  if (open.get(a >>> 0) === id) { open.delete(a >>> 0); nativeState().closedAt.set(a >>> 0, Date.now()); return sendPacket(a, { customPacketType: 'dboScaleform', close: true }); }
   return sendPacket(a, { customPacketType: 'dboWidget', close: id });
 };
+// A move while a native panel is up, or in the frames after the server closed it, leaves the client on a black screen
+// (Nat, 2 Nov: the expedition board's claim moved him and his client never followed; the CustomMenu pauses the game and
+// closes only on the client's next update). So the panel goes first and the move follows NATIVE_MOVE_GAP_MS after the
+// close. Every mp.set of a player's locationalData passes through here, from any module.
+const NATIVE_MOVE_GAP_MS = 500;
+globalThis.__dboPanelMoveHook = (actor, apply) => {
+  const st = nativeState(), id = actor >>> 0;
+  if (st.nativeOpen.has(id)) {
+    st.nativeOpen.delete(id);
+    nativeState().closedAt.set(id, Date.now());
+    sendPacket(id, { customPacketType: 'dboScaleform', close: true });
+  }
+  const left = NATIVE_MOVE_GAP_MS - (Date.now() - (nativeState().closedAt.get(id) || 0));
+  if (left <= 0) return false;
+  log(`panel move: ${display(id)} is moved ${left} ms from now, after their native panel closes`);
+  setTimeout(() => { try { apply(); } catch (e) { log('panel move: the held move failed', e.message); } }, left);
+  return true;
+};
+// Wrapped once for the process (a hot reload must not wrap it twice); the hook above is replaced on each reload
+if (!globalThis.__dboMpSetWrapped && typeof mp !== 'undefined' && mp && typeof mp.set === 'function') {
+  globalThis.__dboMpSetWrapped = true;
+  const set = mp.set;
+  mp.set = function (actor, prop, value) {
+    if (prop === 'locationalData' && typeof globalThis.__dboPanelMoveHook === 'function') {
+      let held = false;
+      try { held = globalThis.__dboPanelMoveHook(actor, () => set.call(this, actor, prop, value)); } catch (e) { held = false; }
+      if (held) return;
+    }
+    return set.call(this, actor, prop, value);
+  };
+}
 // How big each native panel's payload gets (census Round 2, W6 item 3: page the ones over NATIVE_MAX_CHARS): per type, and per
 // tab for the journal, the count, the largest and how many went to the browser for size. An oversize one is logged at once
 // (one line per type a minute); the table is logged every hour as "[native-size]" lines. Kept across hot reloads.
