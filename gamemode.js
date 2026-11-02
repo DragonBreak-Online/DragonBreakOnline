@@ -4268,9 +4268,11 @@ const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_jou
   expeditionBoard: 'dbo_expedition',
   // Worker 6: the name prompt for a character made without a name (naming.js, widget 68)
   namePrompt: 'dbo_naming' };
-// The client's custom menu takes a payload of at most this many characters (scaleformMenu.ts MAX_PAYLOAD_CHARS) and draws
-// a bigger one blank, so a widget past it (a staff player menu, a long ledger) goes to the browser instead
+// The client's custom menu takes a payload of at most this many characters in one call, so a widget past it (a staff player
+// menu, a long ledger) goes to the browser instead. A client that announces nativeChunked (scaleformMenu.ts CLIENT_CAPS)
+// sends a bigger payload in pieces the panel puts back together, up to NATIVE_CHUNKED_MAX_CHARS (its MAX_PAYLOAD_CHARS).
 const NATIVE_MAX_CHARS = 60000;
+const NATIVE_CHUNKED_MAX_CHARS = 400000;
 // nativeOpen: actor -> the widget id on the custom menu; browserOpen: actor -> a widget of these types last sent to the browser
 const nativeState = () => { const p = globalThis.__dboPanelState || (globalThis.__dboPanelState = { caps: new Map(), nonces: new Map() }); if (!p.native) p.native = new Map(); if (!p.nativeOpen) p.nativeOpen = new Map(); if (!p.browserOpen) p.browserOpen = new Map(); return p; };
 const nativeSwfFor = (a, widget, focus) => {
@@ -4286,8 +4288,9 @@ const nativeSwfFor = (a, widget, focus) => {
   let size = 0;
   try { size = JSON.stringify(widget).length; } catch (e) { return ''; }
   // typeof: a harness that cuts this function out runs it without the measuring below
-  if (typeof noteNativeSize === 'function') noteNativeSize(a, widget, size);
-  if (size > NATIVE_MAX_CHARS) return '';
+  const max = c.has('nativeChunked') ? NATIVE_CHUNKED_MAX_CHARS : NATIVE_MAX_CHARS;
+  if (typeof noteNativeSize === 'function') noteNativeSize(a, widget, size, max);
+  if (size > max) return '';
   return swf;
 };
 // A widget that moves between the custom menu and the browser (the journal changing tab) closes where it was first
@@ -4321,15 +4324,15 @@ const closeWidget = (a, id) => {
 // tab for the journal, the count, the largest and how many went to the browser for size. An oversize one is logged at once
 // (one line per type a minute); the table is logged every hour as "[native-size]" lines. Kept across hot reloads.
 const nativeSizes = () => globalThis.__dboNativeSizes || (globalThis.__dboNativeSizes = { since: Date.now(), types: new Map(), warned: new Map() });
-const noteNativeSize = (a, widget, size) => {
+const noteNativeSize = (a, widget, size, max = NATIVE_MAX_CHARS) => {
   try {
     const key = widget.type === 'journal' ? `journal:${widget.tab || '?'}` : String(widget.type);
     const s = nativeSizes(), t = s.types.get(key) || { n: 0, max: 0, sum: 0, over: 0 };
     t.n++; t.sum += size; if (size > t.max) t.max = size;
-    if (size > NATIVE_MAX_CHARS) {
+    if (size > max) {
       t.over++;
       const last = s.warned.get(key) || 0;
-      if (Date.now() - last > 60000) { s.warned.set(key, Date.now()); log(`[native-size] ${key} ${size} chars, over ${NATIVE_MAX_CHARS}: sent to the browser (profile ${profileOf(a)})`); }
+      if (Date.now() - last > 60000) { s.warned.set(key, Date.now()); log(`[native-size] ${key} ${size} chars, over ${max}: sent to the browser (profile ${profileOf(a)})`); }
     }
     s.types.set(key, t);
   } catch (e) { /* measuring never breaks a panel */ }
@@ -4548,6 +4551,13 @@ onUi('uiCaps', (a, args) => { panelState.caps.set(a >>> 0, new Set((args || []).
 // The client's own caps: its native panels (native:*) and what the client does itself (dboIdle, beastBody, nightEye,
 // the client-judged rounds), kept apart from the browser's caps so neither list replaces the other
 onUi('nativeCaps', (a, args) => { nativeState().native.set(a >>> 0, new Set((args || []).map(String))); });
+// A native panel's report of a big delivery (lib dbo.as dboTimingReport): its version, the characters, how many pieces, the
+// AS2 parse and the panel's drawing in ms (-1 when not measured), so a session shows what a big panel costs
+onUi('nativeTiming', (a, args) => {
+  const [ver, chars, pieces, parseMs, drawMs] = (args || []).slice(0, 5);
+  const n = (v) => (Number.isFinite(Number(v)) ? Math.round(Number(v)) : -1);
+  log(`[native-timing] ${String(ver || '?').slice(0, 40)} ${n(chars)} chars in ${n(pieces)} piece(s): parse ${n(parseMs)} ms, draw ${n(drawMs)} ms (profile ${profileOf(a)})`);
+});
 onUi('close', (a, args, widgetId) => { for (const m of [nativeState().nativeOpen, nativeState().browserOpen]) if (m.get(a >>> 0) === widgetId) m.delete(a >>> 0); });
 onUi('menuOpen', (a, args) => {
   if (!hasPlayerMenu(a)) return;
