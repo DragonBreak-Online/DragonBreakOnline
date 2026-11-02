@@ -47,6 +47,29 @@ ok(again.nativeSizes().types.get('keyRing').n === 5, 'the table survives a hot r
 const broken = new Function('sendPacket', 'log', 'every', 'profileOf', block + '\nreturn { nativeSwfFor, nativeState };')(() => true, () => { throw new Error('log down'); }, () => {}, () => 7);
 broken.nativeState().native.set(A, new Set(['native:keyRing']));
 ok(broken.nativeSwfFor(A, { type: 'keyRing', id: 91, pad: big(R.NATIVE_MAX_CHARS + 1) }) === '' && broken.nativeSwfFor(A, { type: 'keyRing', id: 91 }) === 'dbo_keyring', 'measuring never breaks routing (a failing log)');
+// A client that sends big payloads in pieces (nativeChunked) gets them natively up to NATIVE_CHUNKED_MAX_CHARS: Nat's staff
+// Faction tab, 63,411 characters, fell back to the browser at 60,000 (2 Nov)
+const C2 = new Function('sendPacket', 'log', 'every', 'profileOf', block + '\nreturn { nativeSwfFor, nativeState, NATIVE_CHUNKED_MAX_CHARS };')(() => true, (...x) => logs.push(x.join(' ')), () => {}, () => 2);
+const B = 0x15, O = 0x16;
+C2.nativeState().native.set(B, new Set(['native:journal', 'native:journalTab:faction', 'nativeChunked']));
+C2.nativeState().native.set(O, new Set(['native:journal', 'native:journalTab:faction']));
+const faction = { type: 'journal', id: 50, hub: true, tab: 'faction', pad: big(63411) };
+ok(C2.nativeSwfFor(B, faction) === 'dbo_journal', 'a 63k Faction tab goes native to a client that sends payloads in pieces');
+ok(C2.nativeSwfFor(O, faction) === '', '...and to the browser for one that does not, as before');
+ok(C2.NATIVE_CHUNKED_MAX_CHARS === 400000 && C2.nativeSwfFor(B, Object.assign({}, faction, { pad: big(400001) })) === '', 'past the piece ceiling it goes to the browser too');
+logs.length = 0;
+now += 61000;
+C2.nativeSwfFor(B, Object.assign({}, faction, { tab: 'faction', pad: big(400010) }));
+ok(logs.some((l) => /over 400000: sent to the browser \(profile 2\)/.test(l)), 'the oversize line names the ceiling that applied', logs);
+// dbo:nativeTiming, the panel's own report of a big delivery, as one [native-timing] line
+const handlers = {};
+const onUiSrc = src.slice(src.indexOf("onUi('nativeTiming'"), src.indexOf('\n});\n', src.indexOf("onUi('nativeTiming'")) + 5);
+new Function('onUi', 'log', 'profileOf', onUiSrc)((e, f) => { handlers[e] = f; }, (...x) => logs.push(x.join(' ')), () => 2);
+logs.length = 0;
+handlers.nativeTiming && handlers.nativeTiming(B, ['journal-14', 63411, 2, 180.4, 95]);
+ok(logs[0] === '[native-timing] journal-14 63411 chars in 2 piece(s): parse 180 ms, draw 95 ms (profile 2)', 'a panel timing report is logged with its numbers', logs);
+handlers.nativeTiming && handlers.nativeTiming(B, [{ x: 1 }, 'lots', null]);
+ok(/ -1 chars in 0 piece\(s\): parse -1 ms, draw -1 ms \(profile 2\)$/.test(logs[1]), 'nonsense numbers are logged as -1 (a missing one as 0), never thrown on', logs[1]);
 Date.now = realNow;
 console.log(fails ? `\n${fails} failed` : `\nall passed (${oks})`);
 process.exit(fails ? 1 : 0);
