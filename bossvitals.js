@@ -16,9 +16,11 @@
 
 module.exports = (api) => {
   const { mp, log, personal, audit, who, display, registerChatCommand, findByName, staffTierOf, isLeadStaff, every, cfg } = api;
-  const C = Object.assign({ cap: 1000 }, (cfg && cfg.bossVitals) || {});
-  // MpActor::AddLevelBonus clamps each vital's whole bonus to 0..1000
-  const NATIVE_MAX = 1000;
+  // nativeMax: what MpActor::AddLevelBonus counts of a vital's whole bonus, 1000 until the fork's boss-vitals-clamp-1104
+  // (10000) is live; cap: the most one raise may be, at most nativeMax. Both go to 10000 in config once it is
+  const C = Object.assign({ nativeMax: 1000 }, (cfg && cfg.bossVitals) || {});
+  const NATIVE_MAX = Math.max(0, Number(C.nativeMax) || 1000);
+  if (C.cap === undefined) C.cap = NATIVE_MAX;
   const PROP = 'private.dboBossVitals';
   const VITALS = { health: 'Health', magicka: 'Magicka', stamina: 'Stamina' };
   const CAP = Math.max(0, Math.min(NATIVE_MAX, Number(C.cap) || 0));

@@ -19,7 +19,7 @@ const TIER = { [GM]: 'gm', [GM_RP]: 'gm', [LEAD]: 'leadgm', [TRIAL]: 'trialgm' }
 const NAMES = { boss: BOSS, bystander: BYSTANDER, '#gemm': GM };
 let n = 0;
 
-const run = (src, check) => {
+const run = (src, check, cfg) => {
   const props = new Map();
   const get = (a, k) => props.get(`${a >>> 0}|${k}`);
   // Every character has spent one level point on Health (+25)
@@ -33,7 +33,7 @@ const run = (src, check) => {
   globalThis.__dboStaffGuard = { powersOn: (a) => (a >>> 0) !== GM_RP, NOT_HERE: 'Staff powers work only on your staff character.' };
   for (const k of ['__dboRaceVitalBonus', '__dboBriarheartVitalBonus', '__dboBossVitalBonus', '__dboCharLevelSyncBonus']) delete globalThis[k];
   const api = {
-    mp, cfg: {}, log: (...x) => logs.push(x.join(' ')), personal: (a, t) => said.push([a >>> 0, t]), system: () => {}, audit: (t) => audits.push(t),
+    mp, cfg: cfg || {}, log: (...x) => logs.push(x.join(' ')), personal: (a, t) => said.push([a >>> 0, t]), system: () => {}, audit: (t) => audits.push(t),
     who: (a) => `P${(a >>> 0).toString(16)}`, display: (a) => `P${(a >>> 0).toString(16)}`, openWidget: () => {}, closeWidget: () => {},
     onUi: (ev, fn) => { ui[ev] = fn; }, registerChatCommand: (name, fn, o) => { cmds[name] = { fn, o }; }, onlineActors: () => [GM, LEAD, BOSS, BYSTANDER],
     every: (name, ms, fn) => { timers[name] = fn; }, sendPacket: (a, p) => packets.push([a >>> 0, p]), isAdmin: (a) => !!TIER[a >>> 0], findByName: (q) => NAMES[String(q).toLowerCase()] || 0,
@@ -59,9 +59,12 @@ const run = (src, check) => {
   check('...but may raise one standing inside it, tied to that event', bonus(BOSS).health === 925 && get(BOSS, 'private.dboBossVitals').event === 'raid-1102abc' && /until raid-1102abc ends or they log out/.test(r), [bonus(BOSS), r]);
   check('...audited, and the boss is told', audits.some((t) => /^VITALS Pff000001 set Pff000005 health \+900, until raid-1102abc ends or they log out$/.test(t)) && /raised your Health/.test(last(BOSS)), audits);
   check('a Lead GM may raise anyone', /Magicka \+300/.test(v(LEAD, 'bystander magicka 300')) && bonus(BYSTANDER).magicka === 300);
-  check('the cap is the server\'s 1000', /At most \+1000/.test(v(LEAD, 'bystander stamina 1001')) && !bonus(BYSTANDER).stamina);
-  r = v(LEAD, 'bystander health 990');
-  check('...and a raise that, with their own bonus, goes past it says the server counts 1000', /server counts \+1000 for health/.test(r), r);
+  r = '';
+  if (!cfg) {
+    check('the cap is the server\'s 1000', /At most \+1000/.test(v(LEAD, 'bystander stamina 1001')) && !bonus(BYSTANDER).stamina);
+    r = v(LEAD, 'bystander health 990');
+    check('...and a raise that, with their own bonus, goes past it says the server counts 1000', /server counts \+1000 for health/.test(r), r);
+  } else v(LEAD, 'bystander health 990');
   check('/vitals show reads it back', /\+990 Health, \+300 Magicka/.test(v(LEAD, 'bystander show')), last(LEAD));
   // The panel: [target, health, magicka, stamina, keep], a blank leaves that one
   ui.vitalsSet(GM, [BOSS.toString(16), '', '200', '', true]);
@@ -87,12 +90,19 @@ const run = (src, check) => {
   ui.vitalsReset(GM, [BOSS.toString(16)]);
   check('the panel\'s Reset clears a kept raise, audited', !get(BOSS, 'private.dboBossVitals') && bonus(BOSS).health === 25 && audits.some((t) => /^VITALS Pff000005 back to their own maximum \(reset by Pff000001\)/.test(t)));
   check('/vitals <player> health 0 clears that one', (v(LEAD, 'boss health 300'), v(LEAD, 'boss health 0'), !get(BOSS, 'private.dboBossVitals')));
+  if (cfg) {
+    // With the fork's 10000 live (bossVitals.nativeMax): a real boss pool
+    r = v(LEAD, 'boss health 9000');
+    check('with nativeMax 10000 a raise of 9000 counts in full', bonus(BOSS).health === 9025 && !/server counts/.test(r), [bonus(BOSS), r]);
+    check('...and the cap follows it', /At most \+10000/.test(v(LEAD, 'boss stamina 10001')));
+  }
   for (const k of ['__dboWarbandEventAt', '__dboWarbandEventOpen', '__dboStaffGuard']) delete globalThis[k];
 };
 
 let failures = 0;
 const check = (name, ok, got) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${!ok && got !== undefined ? '   ' + JSON.stringify(got).slice(0, 300) : ''}`); if (!ok) failures++; };
 run(SRC, check);
+run(SRC, (name, ok, got) => check(`(nativeMax 10000) ${name}`, ok, got), { bossVitals: { nativeMax: 10000 } });
 const MUTANTS = [
   ['a GM raises anyone', "if ((t >>> 0) !== (a >>> 0) && !eventAt(t) && !isLeadStaff(a))", 'if (false)'],
   ['any character will do', "if (g && typeof g.powersOn === 'function' && !g.powersOn(a)) return g.NOT_HERE;", ''],
