@@ -203,6 +203,37 @@ check('but a mod event is accepted when the outbox has delivered nothing', () =>
   const t = M.newState(); M.planOpen(t, 'x', {}, 1, 0);
   return M.isNew(t, { key: 'ready', args: [], frame: 2, seq: 0 }) === true;
 });
+// fmenu-freeze-1102: every panel's "ready" ran twice, its mod event copy first (lastSeq still 0) and then its outbox
+// copy as seq 1, and each pushed the payload: menu-1's 68,404 characters parsed twice on every F
+check('a message by mod event first is handled once: its outbox copy (seq 1) is the duplicate', () => {
+  const t = M.newState(); M.planOpen(t, 'x', {}, 1, 0);
+  return M.isNew(t, { key: 'ready', args: [], frame: 2, seq: 0 }) === true && M.isNew(t, { key: 'ready', args: [], frame: 2, seq: 1 }) === false;
+});
+check('...and the next outbox message after it is new (nothing real is swallowed)', () => {
+  const t = M.newState(); M.planOpen(t, 'x', {}, 1, 0);
+  M.isNew(t, { key: 'ready', args: [], frame: 2, seq: 0 }); M.isNew(t, { key: 'ready', args: [], frame: 2, seq: 1 });
+  return M.isNew(t, { key: 'trade:add', args: [], frame: 0, seq: 2 }) === true;
+});
+check('two messages by mod event first: both outbox copies are skipped, the third message is new', () => {
+  const t = M.newState(); M.planOpen(t, 'x', {}, 1, 0);
+  const m = (seq, key) => M.isNew(t, { key, args: [], frame: 0, seq });
+  const got = [m(0, 'ready'), m(0, 'click'), m(1, 'ready'), m(2, 'click'), m(3, 'other')];
+  return JSON.stringify(got) === JSON.stringify([true, true, false, false, true]);
+});
+check('with no mod events (SendModEvent absent) every outbox message is new', () => {
+  const t = M.newState(); M.planOpen(t, 'x', {}, 1, 0);
+  return M.isNew(t, { key: 'ready', args: [], frame: 0, seq: 1 }) && M.isNew(t, { key: 'a', args: [], frame: 0, seq: 2 });
+});
+check('a new open forgets the mod-event count, so its own first outbox message is not skipped', () => {
+  const t = M.newState(); M.planOpen(t, 'x', {}, 1, 0); M.isNew(t, { key: 'ready', args: [], frame: 2, seq: 0 });
+  M.planClose(t); M.planOpen(t, 'x', {}, 1, 10);
+  return t.modFirst === 0 && M.isNew(t, { key: 'ready', args: [], frame: 2, seq: 1 }) === true;
+});
+check('a second ready pushes nothing: the payload goes once per open', () => {
+  const t = M.newState(); M.planOpen(t, 'x', { a: 1 }, 1, 0);
+  const first = M.planReady(t, 1, 10), second = M.planReady(t, 1, 26);
+  return first.length === 1 && first[0].do === 'push' && second.length === 0 && t.readyAt === 10;
+});
 check('the cursor resets on a new open, so a second panel does not skip its own messages', () => {
   const t = M.newState(); M.planOpen(t, 'x', {}, 1, 0); t.outRead = 500; t.lastSeq = 9;
   M.planClose(t); M.planOpen(t, 'x', {}, 1, 10);
@@ -239,7 +270,7 @@ check('exec is reachable ONLY from onUpdate', () => {
   let found = 0, m;
   const re = /this\.exec\(/g;
   while ((m = re.exec(SVC)) !== null) { found++; if (m.index < up || m.index > next) return false; }
-  return found === 2;
+  return found === 3;   // the queue, the deferred open (planDeferred) and the throttled tick
 });
 // Order, not proximity: a distance-based regex here broke the moment an unrelated line was added between
 // the two, while the invariant it guards was perfectly intact.
@@ -371,22 +402,66 @@ check('...and does not touch the state either, or the next open would inherit a 
 // Worker 1 found this on 26 Oct: s.swf was overwritten before the phase was tested, so a journal arriving
 // while decor was ready pushed the journal's JSON into dbo_decor and s.swf then named a movie not on screen.
 // These four exist because the mutant pass showed the fix had no test at all.
-check('a DIFFERENT swf while one is ready closes the old panel and opens the new one', () => {
+// The open comes a later update than the close (fmenu-freeze-1102): planOpen closes, planDeferred opens. The update
+// that runs the queued close calls planDeferred too, which waits; the next one opens.
+check('a DIFFERENT swf while one is ready closes the old panel, and opens the new one a later update', () => {
   const t = M.newState();
   M.planOpen(t, 'dbo_decor', { a: 1 }, 1, 0); M.planReady(t, 2, 10);
   const r = M.planOpen(t, 'dbo_journal', { tab: 'stats' }, 2, 20);
-  return r.length === 2 && r[0].do === 'close' && r[1].do === 'open' && r[1].swf === 'dbo_journal';
+  const same = M.planDeferred(t, 21), next = M.planDeferred(t, 22);
+  return r.length === 1 && r[0].do === 'close' && same.length === 0 && next.length === 1 && next[0].do === 'open' && next[0].swf === 'dbo_journal';
 }, (() => { const t = M.newState(); M.planOpen(t, 'dbo_decor', { a: 1 }, 1, 0); M.planReady(t, 2, 10); return M.planOpen(t, 'dbo_journal', { tab: 'stats' }, 2, 20); })());
 check('...and it NEVER pushes the new payload into the panel already on screen', () => {
   const t = M.newState();
   M.planOpen(t, 'dbo_decor', { a: 1 }, 1, 0); M.planReady(t, 2, 10);
   return !M.planOpen(t, 'dbo_journal', { tab: 'stats' }, 2, 20).some((x) => x.do === 'push');
 });
-check('...the close comes BEFORE the open, since only one CustomMenu exists at a time', () => {
+check('...the close and the open are never in the same plan, since only one CustomMenu exists at a time', () => {
   const t = M.newState();
   M.planOpen(t, 'dbo_decor', { a: 1 }, 1, 0); M.planReady(t, 2, 10);
   const r = M.planOpen(t, 'dbo_journal', { tab: 'stats' }, 2, 20);
-  return r.findIndex((x) => x.do === 'close') < r.findIndex((x) => x.do === 'open');
+  return r.some((x) => x.do === 'close') && !r.some((x) => x.do === 'open');
+});
+check('...the ready timeout counts from the real open, not the close', () => {
+  const t = M.newState();
+  M.planOpen(t, 'dbo_decor', { a: 1 }, 1, 0); M.planReady(t, 2, 10);
+  M.planOpen(t, 'dbo_journal', { tab: 'stats' }, 2, 20); M.planDeferred(t, 21); M.planDeferred(t, 40);
+  return t.openedAt === 40 && M.planDeferred(t, 41).length === 0;
+});
+check('...a close before the deferred open runs cancels it', () => {
+  const t = M.newState();
+  M.planOpen(t, 'dbo_decor', { a: 1 }, 1, 0); M.planReady(t, 2, 10);
+  M.planOpen(t, 'dbo_journal', { tab: 'stats' }, 2, 20); M.planClose(t);
+  return M.planDeferred(t, 21).length === 0 && M.planDeferred(t, 22).length === 0;
+});
+check('...and a fresh open right after that close opens at once, not held behind the cancelled one', () => {
+  const t = M.newState();
+  M.planOpen(t, 'dbo_decor', { a: 1 }, 1, 0); M.planReady(t, 2, 10);
+  M.planOpen(t, 'dbo_journal', { tab: 'stats' }, 2, 20); M.planClose(t);
+  const r = M.planOpen(t, 'dbo_board', { rows: 1 }, 3, 21);
+  return r.length === 1 && r[0].do === 'open' && r[0].swf === 'dbo_board';
+});
+check('...a third panel asked for meanwhile takes its place: no second close, no early open', () => {
+  const t = M.newState();
+  M.planOpen(t, 'dbo_decor', { a: 1 }, 1, 0); M.planReady(t, 2, 10);
+  M.planOpen(t, 'dbo_journal', { tab: 'stats' }, 2, 20);
+  const r = M.planOpen(t, 'dbo_board', { rows: 1 }, 3, 21);
+  M.planDeferred(t, 22); const o = M.planDeferred(t, 23);
+  return r.length === 0 && o.length === 1 && o[0].swf === 'dbo_board' && JSON.parse(t.json).rows === 1;
+});
+check('...and asking again for the same panel while it waits does not open it early', () => {
+  const t = M.newState();
+  M.planOpen(t, 'dbo_decor', { a: 1 }, 1, 0); M.planReady(t, 2, 10);
+  M.planOpen(t, 'dbo_journal', { tab: 'stats' }, 2, 20);
+  return M.planOpen(t, 'dbo_journal', { tab: 'skills' }, 2, 21).length === 0;
+});
+check('the service calls planDeferred every update, after the queue and before the throttled tick', () => {
+  const up = SVC.indexOf('private onUpdate()');
+  const drain = SVC.indexOf('this.exec(q);', up);
+  const def = SVC.indexOf('planDeferred(this.state', up);
+  const tick = SVC.indexOf('planTick(this.state', up);
+  const throttle = SVC.indexOf('now - this.lastTick < 250', up);
+  return drain > 0 && def > drain && def < throttle && def < tick;
 });
 check('...and the phase goes back to opening, so the ready timeout guards the new panel', () => {
   const t = M.newState();
@@ -400,11 +475,12 @@ check('the SAME swf while ready still only replaces the contents, with no close/
   const r = M.planOpen(t, 'dbo_decor', { a: 2 }, 1, 20);
   return r.length === 1 && r[0].do === 'push' && JSON.parse(r[0].json).a === 2;
 }, (() => { const t = M.newState(); M.planOpen(t, 'dbo_decor', { a: 1 }, 1, 0); M.planReady(t, 2, 10); return M.planOpen(t, 'dbo_decor', { a: 2 }, 1, 20); })());
-check('a different swf while still OPENING also closes first, since that menu may be up already', () => {
+check('a different swf while still OPENING also closes first, since that menu may be up already, and opens later', () => {
   const t = M.newState();
   M.planOpen(t, 'dbo_decor', { a: 1 }, 1, 0);
   const r = M.planOpen(t, 'dbo_journal', { a: 1 }, 2, 5);
-  return r.length === 2 && r[0].do === 'close' && r[1].do === 'open';
+  M.planDeferred(t, 6); const o = M.planDeferred(t, 7);
+  return r.length === 1 && r[0].do === 'close' && o.length === 1 && o[0].do === 'open' && o[0].swf === 'dbo_journal';
 }, (() => { const t = M.newState(); M.planOpen(t, 'dbo_decor', { a: 1 }, 1, 0); return M.planOpen(t, 'dbo_journal', { a: 1 }, 2, 5); })());
 check('the FIRST open of all emits no close, there being nothing to close', () => {
   const r = M.planOpen(M.newState(), 'dbo_decor', { a: 1 }, 1, 0);

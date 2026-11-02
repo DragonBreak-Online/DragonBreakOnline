@@ -6,7 +6,7 @@ import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { parseCustomPacket, sendCustomPacket } from "./customPacketUtil";
 import {
   Action, CAPS_RETRY_MS, CLIENT_CAPS, MENU_NAME, MenuState, OUT_VAR, UiEvent, capsFor, chunkArgs, isNew, newState, parseOutbox,
-  escapeTargetFor, parseUiEvent, planClose, planOpen, planReady, planRefresh, planTick, readyFrameOf, summary,
+  escapeTargetFor, parseUiEvent, planClose, planDeferred, planOpen, planReady, planRefresh, planTick, readyFrameOf, summary,
 } from "./scaleformMenu";
 import { buttonKeyCode } from "./mouseKeys";
 import {
@@ -376,6 +376,10 @@ export class ScaleformMenuService extends ClientListener {
       }
     }
     if (this.state.phase === "closed") return;
+    // The open planOpen held back after a close, a later update than the close's (planDeferred). Not on the throttled
+    // tick below, whose actions mean a failover
+    const deferred = planDeferred(this.state, Date.now());
+    if (deferred.length) this.exec(deferred);
     // Every tick, not throttled: a click must not wait a quarter of a second to be noticed.
     if (this.state.phase === "ready") this.drainOutbox();
     const now = Date.now();
