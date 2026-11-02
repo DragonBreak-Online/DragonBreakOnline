@@ -108,6 +108,7 @@ export class MapRealmService extends ClientListener {
     }
     if (this.ownersKey && e.code === this.ownersKey && this.owners) {
       this.ownersShown = !this.ownersShown;
+      if (this.mapWorld > 0) this.ownersChoice.set(this.mapWorld, this.ownersShown);
       this.publish();
       return;
     }
@@ -304,6 +305,10 @@ export class MapRealmService extends ClientListener {
     const world = this.mapWorld > 0 ? worldFor(this.owners, (d) => this.formIdOf(d), this.mapWorld) : null;
     const layer = `${OWNERS_LAYER}`;
     if (!world) { ui.setBool(LEGEND_MENU, `${layer}._visible`, false); this.layerShown = false; return; }
+    // Shown from the start only on a flat map (over the 3D relief no fit from the markers holds: Nat, 2 Nov); T turns
+    // them on or off anywhere, and that choice stays with the world for the session
+    const chosen = this.ownersChoice.get(this.mapWorld);
+    this.ownersShown = chosen !== undefined ? chosen : world.flat === true;
     const key = world.world + "#" + world.territories.map((t) => t.owner).join("|");
     if (key !== this.drawnKey) {
       this.drawnKey = key;
@@ -528,6 +533,7 @@ export class MapRealmService extends ClientListener {
   private owners: OwnersData | null = null;
   private anchors = new Map<string, Anchor>();
   private ownersShown = true;
+  private ownersChoice = new Map<number, boolean>();
   private ownersKey: number = TOGGLE_KEY;
   private drawnKey = "";
   private worldOwners = 0;

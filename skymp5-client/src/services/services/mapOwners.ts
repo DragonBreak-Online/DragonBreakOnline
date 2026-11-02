@@ -45,7 +45,8 @@ export interface Territory { id: string; owner: string; zone: string; x: number;
 export interface HoldCells { c0: number; n: number; size: number; holds: string[]; rows: string[] }
 // A stronghold's radius, which wins over the holds (zones.ts strongholdsOverrideHolds)
 export interface Stronghold { zone: string; x: number; y: number; r: number }
-export interface OwnersWorld { world: string; aliases: string[]; territories: Territory[]; cells?: HoldCells; strongholds?: Stronghold[] }
+// flat: the server's word that this world's map is flat and top-down (war.mapFlatWorlds), where the colours start shown
+export interface OwnersWorld { world: string; aliases: string[]; territories: Territory[]; cells?: HoldCells; strongholds?: Stronghold[]; flat?: boolean }
 export interface Faction { name: string; rgb: [number, number, number] }
 export interface Anchor { name: string; x: number; y: number; z: number }
 export interface OwnersData { worlds: OwnersWorld[]; factions: Record<string, Faction>; anchors: Anchor[]; reach: number; fade: number }
@@ -90,6 +91,7 @@ export const readOwners = (raw: Record<string, unknown>): OwnersData | null => {
     const aliases = (Array.isArray(o.aliases) ? o.aliases : []).filter((a): a is string => typeof a === "string" && DESC.test(a));
     if (!territories.length) continue;
     const out: OwnersWorld = { world: o.world, aliases, territories };
+    if (o.flat === true) out.flat = true;
     const cells = readCells(o.cells);
     if (cells) out.cells = cells;
     const strongholds: Stronghold[] = [];
