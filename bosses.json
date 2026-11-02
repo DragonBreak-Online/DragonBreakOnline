@@ -3675,7 +3675,7 @@
    "id": "netchbull",
    "name": "Bellowsback, the brass-grafted bull",
    "plateName": "Bellowsback",
-   "enabled": false,
+   "enabled": true,
    "waitingOn": "Nat's look at the spot (Blackreach, or the Ashlands in _altSpot) and the name",
    "hold": "",
    "world": "1ee62:Skyrim.esm",
