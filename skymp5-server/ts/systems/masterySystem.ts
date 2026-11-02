@@ -288,6 +288,11 @@ export class MasterySystem implements System {
       try { return this.award(ctx, Number(actorId) >>> 0, String(skillId), Number(weight), Number(key) >>> 0); }
       catch (e) { this.log(`[skills] award to ${skillId} failed: ${e}`); return 0; }
     };
+    // A book studied (gameplay skillbooks.js): `levels` of a held skill at its own band, outside the Wheel's pacing, never past Expert
+    (globalThis as any).__alduinakMasteryStudy = (actorId: number, skillId: string, levels: number, key: number): { units: number; gained: number; level: number; refused?: string } => {
+      try { return this.study(ctx, Number(actorId) >>> 0, String(skillId), Number(levels), Number(key) >>> 0); }
+      catch (e) { this.log(`[skills] study of ${skillId} failed: ${e}`); return { units: 0, gained: 0, level: 0, refused: "error" }; }
+    };
     this.registerJournalHooks(ctx);
     this.hookNativeEvents(ctx);
   }
@@ -735,6 +740,30 @@ export class MasterySystem implements System {
       this.rateOf(actorId, skillId, "award", { key: key >>> 0 }));
     this.write(ctx, actorId, rec);
     return units;
+  }
+
+  // A book studied: what gameplay asks for is `levels` (half a level, a little more for a Scholar) at the skill's own band.
+  // The once-per-book rule, the places and the day's limit are the gameplay's (skillbooks.js); this applies it.
+  private study(ctx: SystemContext, actorId: number, skillId: string, levels: number, key: number): { units: number; gained: number; level: number; refused?: string } {
+    if (!this.points || !this.isPlayer(ctx, actorId) || !this.def(skillId) || !(levels > 0)) return { units: 0, gained: 0, level: 0, refused: "unknown" };
+    const rec = this.read(ctx, actorId); if (!rec) return { units: 0, gained: 0, level: 0, refused: "unknown" };
+    const prog = rec.skills[skillId];
+    if (!prog || !(prog.level >= 1)) return { units: 0, gained: 0, level: 0, refused: "unheld" };
+    const out = P.applyStudy(rec as unknown as P.PointRecord, skillId, levels, this.points, Date.now());
+    const userId = this.userOf(ctx, actorId);
+    if (out.units > 0) this.creditStats.credits.set(skillId, (this.creditStats.credits.get(skillId) || 0) + out.units);
+    if (out.gained > 0) {
+      this.notice(ctx, userId, `Your ${this.labelOf(skillId)} rises to ${prog.level}.`);
+      this.syncRank(ctx, actorId, rec, skillId, userId);
+    }
+    for (const taken of out.tookFrom) {
+      if (taken.levels <= 0) continue;
+      this.noticeFell(ctx, userId, taken.id, rec.skills[taken.id].level);
+      this.syncRank(ctx, actorId, rec, taken.id, userId);
+    }
+    this.write(ctx, actorId, rec);
+    this.log(`[skills] study ${actorId.toString(16)} ${skillId} book ${(key >>> 0).toString(16)}: +${out.units.toFixed(1)} units, level ${prog.level}${out.refused ? ` (${out.refused})` : ""}`);
+    return { units: out.units, gained: out.gained, level: prog.level, refused: out.refused };
   }
 
   // The same target, station or recipe again and again is worth less; this is the key the ring counts.
@@ -1199,15 +1228,16 @@ export class MasterySystem implements System {
   }
 
   // K. A client that has the F3 journal asks with preferJournal: when the gameplay's hub journal (the shell's
-  // __dboJournalLimited, and journalskills.js's Skills section) opens on Skills, the answer is { journal: true } and the
-  // client opens nothing. An older client never asks, an older server ignores the flag, an older journal has no Skills
-  // tab, and a journal that refuses (in a fight) stays shut: widget 25 opens in every one of those cases.
+  // __dboJournalLimited, and journalskills.js's Skills section) takes the request, the answer is { journal: true } and the
+  // client opens nothing. A journal that refuses (in a fight, downed, bound) has said why in the chat, as F3 does, and
+  // stays shut: the browser's widget 25 no longer opens behind it (1 Nov, the native census). An older client never
+  // asks, an older server ignores the flag, and an older journal has no Skills tab: widget 25 opens in those cases.
   private onInfoRequest(ctx: SystemContext, userId: number, content: Content): void {
     if (content && (content as Record<string, unknown>)["preferJournal"] === true && this.journalHasSkills()) {
       const actorId = this.actorOf(ctx, userId);
       const g = globalThis as any;
       let taken = false;
-      try { taken = !!actorId && g.__dboJournalOpenTab(actorId, "skills") === true && (typeof g.__dboJournalIsOpen !== "function" || g.__dboJournalIsOpen(actorId) === true); }
+      try { taken = !!actorId && g.__dboJournalOpenTab(actorId, "skills") === true; }
       catch (e) { this.log(`[skills] journal open failed: ${e}`); taken = false; }
       if (taken) { this.send(ctx, userId, { customPacketType: "masteryMenu", journal: true }); return; }
     }

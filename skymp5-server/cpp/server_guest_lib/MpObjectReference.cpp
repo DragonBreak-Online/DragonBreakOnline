@@ -28,10 +28,10 @@
 #include "script_storages/IScriptStorage.h"
 #include <ScopedTask.h>
 #include <TimeUtils.h>
-#include <chrono>
 #include <algorithm>
 #include <antigo/Context.h>
 #include <antigo/ResolvedContext.h>
+#include <chrono>
 #include <map>
 #include <numeric>
 #include <optional>
@@ -463,9 +463,11 @@ void MpObjectReference::Activate(MpObjectReference& activationSource,
   }
 
   if (auto worldState = activationSource.GetParent(); worldState->HasEspm()) {
-    // Not for the closing activation: it only frees the activator's own seat or container (ProcessActivateSecond), and
-    // it often arrives after the player walked through a door, where this check threw it away and the seat stayed held
-    // (a Bruma tanning rack, 2026-09-25: the close at 18:01:58.546 was refused with 'WorldSpace doesn't match')
+    // Not for the closing activation: it only frees the activator's own seat
+    // or container (ProcessActivateSecond), and it often arrives after the
+    // player walked through a door, where this check threw it away and the
+    // seat stayed held (a Bruma tanning rack, 2026-09-25: the close at
+    // 18:01:58.546 was refused with 'WorldSpace doesn't match')
     if (!isSecondActivation) {
       CheckInteractionAbility(activationSource);
     }
@@ -551,8 +553,7 @@ void MpObjectReference::Enable()
   }
 }
 
-std::pair<int16_t, int16_t> MpObjectReference::GridPosOf(
-  const NiPoint3& pos)
+std::pair<int16_t, int16_t> MpObjectReference::GridPosOf(const NiPoint3& pos)
 {
   auto* worldState = GetParent();
   if (worldState &&
@@ -670,7 +671,8 @@ void MpObjectReference::PutItem(MpActor& ac, const Inventory::Entry& e)
     throw std::runtime_error(err.str());
   }
 
-  // The occupant passed this check when it opened the container; only a teleport out of its cell in the last 10 s excuses a put
+  // The occupant passed this check when it opened the container; only a
+  // teleport out of its cell in the last 10 s excuses a put
   try {
     CheckInteractionAbility(ac);
   } catch (std::exception& err) {
@@ -708,7 +710,8 @@ void MpObjectReference::TakeItem(MpActor& ac, const Inventory::Entry& e)
 }
 
 // Grants/revokes PutItem/TakeItem access without a container activation.
-// Lets the gamemode allow one player to search another's inventory (SearchSystem).
+// Lets the gamemode allow one player to search another's inventory
+// (SearchSystem).
 void MpObjectReference::SetOccupant(MpActor* newOccupant)
 {
   if (this->occupant == newOccupant) {
@@ -806,10 +809,13 @@ void MpObjectReference::UpdateHoster(uint32_t newHosterId)
 {
   auto hostedMsg = CreatePropertyMessage_(this, "isHostedByOther", "true");
   auto notHostedMsg = CreatePropertyMessage_(this, "isHostedByOther", "false");
-  // Players only, each told directly. An NPC listener has no user: GetActorToSendTo() forwards its messages to that
-  // NPC's hoster, and the test below compares with the NPC's own id, so a hoster was told once per hosted NPC nearby
-  // that its own NPC was hosted by someone else. Its client then played the NPC back from the server instead of
-  // letting its AI drive it: walking in place, fighting only what stood in front (playtest 2026-09-25)
+  // Players only, each told directly. An NPC listener has no user:
+  // GetActorToSendTo() forwards its messages to that NPC's hoster, and the
+  // test below compares with the NPC's own id, so a hoster was told once per
+  // hosted NPC nearby that its own NPC was hosted by someone else. Its client
+  // then played the NPC back from the server instead of letting its AI drive
+  // it: walking in place, fighting only what stood in front (playtest
+  // 2026-09-25)
   for (auto listener : this->GetActorListeners()) {
     if (listener->GetUserId() == Networking::InvalidUserId) {
       continue;
@@ -1494,8 +1500,8 @@ void MpObjectReference::GivePickupItemsToActivationSource(
       std::max(kCountDefault, std::max(countRecord, countChangeForm));
 
     if (pImpl->pickupExtras) {
-      activationSource.AddItems(
-        { Inventory::Entry(resultItem, resultingCount, *pImpl->pickupExtras) });
+      activationSource.AddItems({ Inventory::Entry(resultItem, resultingCount,
+                                                   *pImpl->pickupExtras) });
     } else {
       activationSource.AddItem(resultItem, resultingCount);
     }
@@ -1803,8 +1809,9 @@ bool MpObjectReference::CheckIfObjectCanStartOccupyThis(
 }
 
 namespace {
-// When each occupant last sat on each furniture (reference id, actor id): TryOccupyFurniture tells an occupant's retry
-// from the burst of repeats a single gathering sit sends
+// When each occupant last sat on each furniture (reference id, actor id):
+// TryOccupyFurniture tells an occupant's retry from the burst of repeats a
+// single gathering sit sends
 std::map<std::pair<uint32_t, uint32_t>, std::chrono::steady_clock::time_point>
   g_furnitureSeatedAt;
 constexpr auto kFurnitureReseatAfter = std::chrono::milliseconds(1500);
@@ -1830,12 +1837,14 @@ bool MpObjectReference::TryOccupyFurniture(MpActor& actor,
   occupants.erase(std::remove_if(occupants.begin(), occupants.end(), isStale),
                   occupants.end());
 
-  // The occupant activating it again sits down again. The seat is freed by the client's closing activation, which
-  // it only sends after seeing the player sit and then stand; a sit that never happened on its screen left the seat
-  // held, and the occupant's own retries were refused here forever (a Bruma tanning rack, 32 refusals, 2026-09-25).
-  // Only a retry counts: a gathering sit arrives 3-4 times within milliseconds (Papyrus Activate from the chopping
-  // block or vein), and those repeats are still refused, or the player would be seated 4 times in one frame
-  // (review 2026-09-25)
+  // The occupant activating it again sits down again. The seat is freed by the
+  // client's closing activation, which it only sends after seeing the player
+  // sit and then stand; a sit that never happened on its screen left the seat
+  // held, and the occupant's own retries were refused here forever (a Bruma
+  // tanning rack, 32 refusals, 2026-09-25). Only a retry counts: a gathering
+  // sit arrives 3-4 times within milliseconds (Papyrus Activate from the
+  // chopping block or vein), and those repeats are still refused, or the
+  // player would be seated 4 times in one frame (review 2026-09-25)
   const auto seatKey = std::make_pair(GetFormId(), actor.GetFormId());
   const auto now = std::chrono::steady_clock::now();
   if (std::find(occupants.begin(), occupants.end(), actor.GetFormId()) !=
@@ -2041,8 +2050,10 @@ void MpObjectReference::InitScripts()
     // 1. GetStage in OnTrigger
     // 2. Unable to determine Actor for 'Game.GetPlayer' in 'OnLoad'
     // 3. USSEP OnActivate empties the shelf into the activator
-    // 4. An endless server-side loop placing dust explosions; clients run their own copy
-    // 5. Mining and notice boards are the gameplay layer's (labour.js, BountyBoardSystem)
+    // 4. An endless server-side loop placing dust explosions; clients run
+    // their own copy
+    // 5. Mining and notice boards are the gameplay layer's (labour.js,
+    // BountyBoardSystem)
     const bool isRemoveNeeded =
       !Utils::stricmp(val.data(), "DA06PreRitualSceneTriggerScript") ||
       !Utils::stricmp(val.data(), "CritterSpawn") ||
@@ -2148,10 +2159,12 @@ std::vector<espm::CONT::ContainerObject> GetInventoryObjects(
 {
   auto& compressedFieldsCache = worldState->GetEspmCache();
 
-  // CNTO ids are local to the plugin that holds the record; AddContainerObject looks them up as load-order
-  // ids, so they are converted here, like the outfit ids below. A plugin whose master list is not a prefix
-  // of the load order (BSAssets.esm, one master) otherwise had its self-index 01 read as Update.esm, and
-  // every Beyond Skyrim goblin built from a BSAssets template spawned without its weapon (2026-09-25).
+  // CNTO ids are local to the plugin that holds the record; AddContainerObject
+  // looks them up as load-order ids, so they are converted here, like the
+  // outfit ids below. A plugin whose master list is not a prefix of the load
+  // order (BSAssets.esm, one master) otherwise had its self-index 01 read as
+  // Update.esm, and every Beyond Skyrim goblin built from a BSAssets template
+  // spawned without its weapon (2026-09-25).
   auto toGlobal = [](const espm::LookupResult& res,
                      std::vector<espm::CONT::ContainerObject> objects) {
     for (auto& object : objects) {
@@ -2273,7 +2286,8 @@ void MpObjectReference::CheckInteractionAbility(MpObjectReference& refr)
     const char* targetWorldName =
       targetWorld ? targetWorld->GetEditorId(compressedFieldsCache) : "<null>";
 
-    // Both form ids, so a container or door with a wrong cell can be found from the log alone
+    // Both form ids, so a container or door with a wrong cell can be found
+    // from the log alone
     throw std::runtime_error(fmt::format(
       "WorldSpace doesn't match: caster is in {} ({:#x}), target is in "
       "{} ({:#x}); caster {:x}, target {:x}",
@@ -2282,9 +2296,11 @@ void MpObjectReference::CheckInteractionAbility(MpObjectReference& refr)
   }
 }
 
-// Players only, each told directly. An NPC listener has no user and GetActorToSendTo() forwarded to its hoster, so a
-// hoster got the message once more per hosted NPC in range, and a hoster out of range of this reference got messages
-// about a form its client does not have. The NPC's own hoster still gets them as one of its listeners
+// Players only, each told directly. An NPC listener has no user and
+// GetActorToSendTo() forwarded to its hoster, so a hoster got the message once
+// more per hosted NPC in range, and a hoster out of range of this reference
+// got messages about a form its client does not have. The NPC's own hoster
+// still gets them as one of its listeners
 void MpObjectReference::SendMessageToActorListeners(const IMessageBase& msg,
                                                     bool reliable) const
 {

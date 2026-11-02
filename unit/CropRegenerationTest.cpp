@@ -127,8 +127,8 @@ TEST_CASE("CropHealthRegeneration, CropMagickaRegeneration and "
 
   float expectedHealth =
     baseValues.healRate * baseValues.healRateMult * time / 10000.0f;
-  float expectedMagicka =
-    baseValues.magickaRate * baseValues.magickaRateMult * time / 10000.0f;
+  float expectedMagicka = baseValues.magickaRate * baseValues.magickaRateMult *
+    p.worldState.magickaRegenSlack * time / 10000.0f;
   float expectedStamina =
     baseValues.staminaRate * baseValues.staminaRateMult * time / 10000.0f;
 
@@ -143,12 +143,14 @@ TEST_CASE("CropHealthRegeneration, CropMagickaRegeneration and "
   DoDisconnect(p, 0);
 }
 
-// Nat, 27 Oct: hunger and cold must really slow regeneration. The ceiling used to take
-// std::max(base, current), so anything below the race's base was ignored and both the needs system's hunger
-// and the chill system's StaminaRateMult 0 did nothing at all. The assertion that catches a regression here
-// is "slowed < atBase" - under std::max those two are equal.
-TEST_CASE("The regeneration ceiling follows the actor's rate mult in both directions",
-          "[CropRegeneration]")
+// Nat, 27 Oct: hunger and cold must really slow regeneration. The ceiling used
+// to take std::max(base, current), so anything below the race's base was
+// ignored and both the needs system's hunger and the chill system's
+// StaminaRateMult 0 did nothing at all. The assertion that catches a
+// regression here is "slowed < atBase" - under std::max those two are equal.
+TEST_CASE(
+  "The regeneration ceiling follows the actor's rate mult in both directions",
+  "[CropRegeneration]")
 {
   PartOne& p = GetPartOne();
   DoConnect(p, 0);
@@ -166,32 +168,36 @@ TEST_CASE("The regeneration ceiling follows the actor's rate mult in both direct
   const BaseActorValues base = GetBaseActorValues(
     &p.worldState, ac.GetBaseId(), appearance ? appearance->raceId : 0, {});
 
-  // Without a positive base there is nothing to be above or below, and every case below collapses together.
+  // Without a positive base there is nothing to be above or below, and every
+  // case below collapses together.
   REQUIRE(base.staminaRateMult > 0.f);
 
   const float kOld = .5f;
   auto ceilingWith = [&](float mult) {
     ac.SetActorValue(espm::ActorValue::StaminaRateMult, mult);
-    return CropStaminaRegeneration(1.0f, 1.0f, &ac); // the client claims a full bar
+    return CropStaminaRegeneration(1.0f, 1.0f,
+                                   &ac); // the client claims a full bar
   };
 
   const float atBase = ceilingWith(base.staminaRateMult);
   const float slowed = ceilingWith(base.staminaRateMult * .25f); // hungry
-  const float frozen = ceilingWith(0.f);                         // chilled to a standstill
+  const float frozen = ceilingWith(0.f); // chilled to a standstill
   const float hastened = ceilingWith(base.staminaRateMult * 4.f); // blessed
 
-  REQUIRE(atBase > kOld);       // a plain actor still regenerates
-  REQUIRE(slowed < atBase);     // hunger bites. Equal to atBase under the old std::max
-  REQUIRE(slowed > kOld);       // but is a slowdown, not a stop
-  REQUIRE(frozen == kOld);      // a chill freeze means exactly no regeneration
-  REQUIRE(hastened > atBase);   // and a blessing still helps
+  REQUIRE(atBase > kOld); // a plain actor still regenerates
+  REQUIRE(slowed <
+          atBase); // hunger bites. Equal to atBase under the old std::max
+  REQUIRE(slowed > kOld);     // but is a slowdown, not a stop
+  REQUIRE(frozen == kOld);    // a chill freeze means exactly no regeneration
+  REQUIRE(hastened > atBase); // and a blessing still helps
 
   p.DestroyActor(0xff000000);
   DoDisconnect(p, 0);
 }
 
-// The guard Nat asked for: a value nothing has written must read as the race's base, never as a freeze.
-// Zero is deliberately NOT treated as unset - zero is the chill.
+// The guard Nat asked for: a value nothing has written must read as the race's
+// base, never as a freeze. Zero is deliberately NOT treated as unset - zero is
+// the chill.
 TEST_CASE("An unusable rate mult falls back to the race's base, not to zero",
           "[CropRegeneration]")
 {
@@ -221,6 +227,62 @@ TEST_CASE("An unusable rate mult falls back to the race's base, not to zero",
   ac.SetActorValue(espm::ActorValue::StaminaRateMult,
                    std::numeric_limits<float>::quiet_NaN());
   REQUIRE(CropStaminaRegeneration(1.0f, 1.0f, &ac) == atBase);
+
+  p.DestroyActor(0xff000000);
+  DoDisconnect(p, 0);
+}
+
+// Nat, 31 Oct: "magic regen doesn't actually regen properly". Live clients
+// regenerated 1.3 to 3 times the server's magicka rate (perks and worn
+// enchantments the server does not model), and 25-60% of every tick was clawed
+// back
+TEST_CASE("The magicka ceiling leaves room for a client's own boosts, and a 0 "
+          "rate mult still freezes it",
+          "[CropRegeneration]")
+{
+  PartOne& p = GetPartOne();
+  DoConnect(p, 0);
+  p.CreateActor(0xff000000, { 0, 0, 0 }, 0, 0x3c);
+  p.SetUserActor(0, 0xff000000);
+  auto& ac = p.worldState.GetFormAt<MpActor>(0xff000000);
+
+  ActorValues half;
+  half.healthPercentage = .5f;
+  half.magickaPercentage = .5f;
+  half.staminaPercentage = .5f;
+  ac.SetPercentages(half);
+
+  auto appearance = ac.GetAppearance();
+  const BaseActorValues base = GetBaseActorValues(
+    &p.worldState, ac.GetBaseId(), appearance ? appearance->raceId : 0, {});
+  REQUIRE(base.magickaRate > 0.f);
+  REQUIRE(base.magickaRateMult > 0.f);
+
+  // The default slack, and a Recovery-perked mage at 2.2 times the base rate
+  // for one second
+  REQUIRE(p.worldState.magickaRegenSlack == 2.5f);
+  const float boosted =
+    .5f + 2.2f * base.magickaRate * base.magickaRateMult / 10000.f;
+  ac.SetActorValue(
+    espm::ActorValue::MagickaRateMult_or_CombatHealthRegenMultPowerMod,
+    base.magickaRateMult);
+  REQUIRE_THAT(CropMagickaRegeneration(boosted, 1.0f, &ac),
+               Catch::Matchers::WithinAbs(boosted, 1e-6));
+
+  // server-settings magickaRegenSlack 1 is the old ceiling
+  p.worldState.magickaRegenSlack = 1.f;
+  REQUIRE(CropMagickaRegeneration(boosted, 1.0f, &ac) < boosted);
+  p.worldState.magickaRegenSlack = 2.5f;
+
+  // Far past the slack is still cropped
+  const float cheat =
+    .5f + 10.f * base.magickaRate * base.magickaRateMult / 10000.f;
+  REQUIRE(CropMagickaRegeneration(cheat, 1.0f, &ac) < cheat);
+
+  // The chill's freeze holds
+  ac.SetActorValue(
+    espm::ActorValue::MagickaRateMult_or_CombatHealthRegenMultPowerMod, 0.f);
+  REQUIRE(CropMagickaRegeneration(boosted, 1.0f, &ac) == .5f);
 
   p.DestroyActor(0xff000000);
   DoDisconnect(p, 0);

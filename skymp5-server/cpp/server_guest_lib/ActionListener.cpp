@@ -14,18 +14,18 @@
 #include "Overloaded.h"
 #include "WeaponHitGate.h"
 #include "WorldState.h"
+#include "formulas/TES5DamageFormula.h"
 #include "gamemode_events/CustomEvent.h"
 #include "gamemode_events/EatItemEvent.h"
 #include "gamemode_events/UpdateAppearanceAttemptEvent.h"
 #include "gamemode_events/UpdateEquipmentAttemptEvent.h"
-#include "formulas/TES5DamageFormula.h"
-#include "script_objects/EspmGameObject.h"
 #include "libespm/RecordHeaderAccess.h"
+#include "script_objects/EspmGameObject.h"
 #include <chrono>
-#include <optional>
 #include <cstring>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
+#include <optional>
 #include <spdlog/spdlog.h>
 #include <unordered_map>
 #include <unordered_set>
@@ -132,7 +132,8 @@ std::vector<espm::Effects::Effect> GetRestorativeEffects(
   return result;
 }
 
-// Whether a spell has a hostile or detrimental effect of its own (no area), which on a self spell lands on the caster
+// Whether a spell has a hostile or detrimental effect of its own (no area),
+// which on a self spell lands on the caster
 bool HasHarmfulEffectOnTarget(WorldState* worldState, uint32_t spellId)
 {
   const auto spellLookup =
@@ -147,9 +148,10 @@ bool HasHarmfulEffectOnTarget(WorldState* worldState, uint32_t spellId)
         effect.effectItem->areaOfEffect != 0) {
       continue;
     }
-    const auto data = espm::GetData<espm::MGEF>(
-                        spellLookup.ToGlobalId(effect.effectFormId), worldState)
-                        .data;
+    const auto data =
+      espm::GetData<espm::MGEF>(spellLookup.ToGlobalId(effect.effectFormId),
+                                worldState)
+        .data;
     if (data.IsFlagSet(espm::MGEF::Flags::Hostile) ||
         data.IsFlagSet(espm::MGEF::Flags::Detrimental)) {
       return true;
@@ -174,7 +176,8 @@ std::vector<uint32_t> GetKnownSpells(const MpActor& actor)
   return spells;
 }
 
-// Calls callback(effectItem, mgefData, mgefLookup) for each effect of a SPEL, SCRL or ENCH, effectItem may be null
+// Calls callback(effectItem, mgefData, mgefLookup) for each effect of a SPEL,
+// SCRL or ENCH, effectItem may be null
 template <class Callback>
 void ForEachEffectData(WorldState* worldState,
                        const espm::LookupResult& itemLookup,
@@ -206,13 +209,15 @@ void ForEachSpellEffectData(WorldState* worldState, uint32_t spellId,
 {
   const auto spellLookup =
     worldState->GetEspm().GetBrowser().LookupById(spellId);
-  // A scroll's effects work like its spell's (SCRL carries the same SPIT and EFID/EFIT)
+  // A scroll's effects work like its spell's (SCRL carries the same SPIT and
+  // EFID/EFIT)
   if (espm::IsSpellItem(spellLookup.rec)) {
     ForEachEffectData(worldState, spellLookup, callback);
   }
 }
 
-// ForEachEffectData for a SPEL, SCRL or ENCH (a staff's hit names its enchantment)
+// ForEachEffectData for a SPEL, SCRL or ENCH (a staff's hit names its
+// enchantment)
 template <class Callback>
 void ForEachHitEffectData(WorldState* worldState, uint32_t sourceId,
                           const Callback& callback)
@@ -225,7 +230,8 @@ void ForEachHitEffectData(WorldState* worldState, uint32_t sourceId,
   }
 }
 
-// Calls callback(effectType, associatedItem, projectile) with global ids for each effect of a SPEL
+// Calls callback(effectType, associatedItem, projectile) with global ids for
+// each effect of a SPEL
 template <class Callback>
 void ForEachSpellEffect(WorldState* worldState, uint32_t spellId,
                         const Callback& callback)
@@ -255,16 +261,19 @@ bool IsWardSpell(WorldState* worldState, uint32_t spellId)
   return isWard;
 }
 
-// What a spell does to its target beyond Health, which only the game hosting the target applies
+// What a spell does to its target beyond Health, which only the game hosting
+// the target applies
 struct SpellRiders
 {
-  // Longest visible Paralysis, hidden perk riders need conditions the server does not evaluate
+  // Longest visible Paralysis, hidden perk riders need conditions the server
+  // does not evaluate
   uint32_t paralysisSeconds = 0;
   // Calm, Demoralize, Frenzy, Turn Undead, Rally
   bool ai = false;
   bool staggerAny = false;
   bool slowAny = false;
-  // Unconditional stagger and SpeedMult slow, which the server may apply apart from the spell
+  // Unconditional stagger and SpeedMult slow, which the server may apply apart
+  // from the spell
   bool stagger = false;
   float slow = 0.f;
   uint32_t slowSeconds = 0;
@@ -273,7 +282,8 @@ struct SpellRiders
   bool commands = false;
 };
 
-// Calm, Demoralize, Frenzy, Turn Undead, Rally: only the game hosting an NPC applies them
+// Calm, Demoralize, Frenzy, Turn Undead, Rally: only the game hosting an NPC
+// applies them
 bool IsAiRiderEffect(espm::MGEF::EffectType type)
 {
   using Type = espm::MGEF::EffectType;
@@ -323,18 +333,19 @@ void AddSpellRider(SpellRiders& riders, const espm::SPEL::EFIT& effectItem,
 SpellRiders GetSpellRiders(WorldState* worldState, uint32_t spellId)
 {
   SpellRiders riders;
-  ForEachHitEffectData(
-    worldState, spellId,
-    [&](const espm::SPEL::EFIT* effectItem, const espm::MGEF::DATA& data,
-        const espm::LookupResult&) {
-      if (effectItem) {
-        AddSpellRider(riders, *effectItem, data);
-      }
-    });
+  ForEachHitEffectData(worldState, spellId,
+                       [&](const espm::SPEL::EFIT* effectItem,
+                           const espm::MGEF::DATA& data,
+                           const espm::LookupResult&) {
+                         if (effectItem) {
+                           AddSpellRider(riders, *effectItem, data);
+                         }
+                       });
   return riders;
 }
 
-// Riders of the enchantments a spell's explosions apply: on the effect, or on its projectile (a rune's)
+// Riders of the enchantments a spell's explosions apply: on the effect, or on
+// its projectile (a rune's)
 SpellRiders GetExplosionRiders(WorldState* worldState, uint32_t spellId)
 {
   SpellRiders riders;
@@ -356,14 +367,14 @@ SpellRiders GetExplosionRiders(WorldState* worldState, uint32_t spellId)
     if (!espm::Convert<espm::ENCH>(enchantmentLookup.rec)) {
       return;
     }
-    ForEachEffectData(
-      worldState, enchantmentLookup,
-      [&](const espm::SPEL::EFIT* effectItem, const espm::MGEF::DATA& data,
-          const espm::LookupResult&) {
-        if (effectItem) {
-          AddSpellRider(riders, *effectItem, data);
-        }
-      });
+    ForEachEffectData(worldState, enchantmentLookup,
+                      [&](const espm::SPEL::EFIT* effectItem,
+                          const espm::MGEF::DATA& data,
+                          const espm::LookupResult&) {
+                        if (effectItem) {
+                          AddSpellRider(riders, *effectItem, data);
+                        }
+                      });
   };
   ForEachSpellEffectData(
     worldState, spellId,
@@ -383,7 +394,8 @@ SpellRiders GetExplosionRiders(WorldState* worldState, uint32_t spellId)
   return riders;
 }
 
-// The effects of a SPEL, SCRL or ENCH with global MGEF ids; harmsHealth and commands as in SpellRiders
+// The effects of a SPEL, SCRL or ENCH with global MGEF ids; harmsHealth and
+// commands as in SpellRiders
 struct EffectList
 {
   struct Entry
@@ -426,10 +438,13 @@ EffectList GetEffectList(WorldState* worldState,
   return result;
 }
 
-// A spell carrying an enchantment's AI riders, which DoCombatSpellApply can replay (Staff of Calm: VampireCharm). For
-// each AI effect of the enchantment it has one of the same type, no wider; it harms no Health and commands nothing.
-// The closest at or below the enchantment's magnitudes wins (Nate: balance everything), then the same magic effect,
-// then the fewest unshared effects, then the lower form id; the weakest above only when none is at or below
+// A spell carrying an enchantment's AI riders, which DoCombatSpellApply can
+// replay (Staff of Calm: VampireCharm). For each AI effect of the enchantment
+// it has one of the same type, no wider; it harms no Health and commands
+// nothing. The closest at or below the enchantment's magnitudes wins (Nate:
+// balance everything), then the same magic effect, then the fewest unshared
+// effects, then the lower form id; the weakest above only when none is at or
+// below
 uint32_t StandInSpellOf(WorldState* worldState, uint32_t enchantmentId)
 {
   using Type = espm::MGEF::EffectType;
@@ -473,7 +488,8 @@ uint32_t StandInSpellOf(WorldState* worldState, uint32_t enchantmentId)
     }
   }
 
-  // stronger, magnitude distance, other magic effects, unshared effects, form id
+  // stronger, magnitude distance, other magic effects, unshared effects, form
+  // id
   using Rank = std::tuple<bool, float, int, int, uint32_t>;
   std::optional<Rank> best;
   const auto candidatesIt = aiEffects.empty()
@@ -548,8 +564,8 @@ uint32_t StandInSpellOf(WorldState* worldState, uint32_t enchantmentId)
   return spellId;
 }
 
-// Absorb Health's part of a spell's damage on target, counted like the damage formula counts it (visible effects
-// first, damage over time whole on an NPC)
+// Absorb Health's part of a spell's damage on target, counted like the damage
+// formula counts it (visible effects first, damage over time whole on an NPC)
 float AbsorbHealthShare(WorldState* worldState, uint32_t spellId,
                         const MpActor& target)
 {
@@ -566,8 +582,7 @@ float AbsorbHealthShare(WorldState* worldState, uint32_t spellId,
         return;
       }
       const bool isVisible = !data.IsFlagSet(espm::MGEF::Flags::HideInUI);
-      const bool isAbsorb =
-        data.effectType == espm::MGEF::EffectType::Absorb;
+      const bool isAbsorb = data.effectType == espm::MGEF::EffectType::Absorb;
       const float magnitude =
         EffectDamageMagnitude(*effectItem, data, wholeDamageOverTime);
       total += magnitude;
@@ -581,7 +596,8 @@ float AbsorbHealthShare(WorldState* worldState, uint32_t spellId,
   return total > 0.f ? absorbTotal / total : 0.f;
 }
 
-// The argument naming target in a snippet run by executor: its own player is 0x14 there
+// The argument naming target in a snippet run by executor: its own player is
+// 0x14 there
 SpSnippetObjectArgument SnippetActorArgument(WorldState* worldState,
                                              const MpActor& executor,
                                              const MpActor& target,
@@ -598,8 +614,10 @@ SpSnippetObjectArgument SnippetActorArgument(WorldState* worldState,
 using SnippetArgs = std::vector<std::optional<
   std::variant<bool, double, std::string, SpSnippetObjectArgument>>>;
 
-// Damage at the start, restore at the end: a restore never lifts SpeedMult past its base, so a copy that never took
-// the slow is left as it was. The engine re-reads movement speed only after a carry weight change (paralysisService.ts)
+// Damage at the start, restore at the end: a restore never lifts SpeedMult
+// past its base, so a copy that never took the slow is left as it was. The
+// engine re-reads movement speed only after a carry weight change
+// (paralysisService.ts)
 void ChangeSpeedMultOn(MpActor& executor, uint32_t targetId, double amount,
                        bool slow)
 {
@@ -617,14 +635,16 @@ void ChangeSpeedMultOn(MpActor& executor, uint32_t targetId, double amount,
   }
 }
 
-// Bound weapon spells equip a weapon (and the bound arrow) the inventory never holds
+// Bound weapon spells equip a weapon (and the bound arrow) the inventory never
+// holds
 bool IsGrantedBoundItem(const MpActor& actor, uint32_t itemId)
 {
   WorldState* worldState = actor.GetParent();
   if (!worldState || !worldState->HasEspm()) {
     return false;
   }
-  const auto itemLookup = worldState->GetEspm().GetBrowser().LookupById(itemId);
+  const auto itemLookup =
+    worldState->GetEspm().GetBrowser().LookupById(itemId);
   const auto ammo = espm::Convert<espm::AMMO>(itemLookup.rec);
   if (!ammo && !espm::Convert<espm::WEAP>(itemLookup.rec)) {
     return false;
@@ -656,7 +676,8 @@ bool IsGrantedBoundItem(const MpActor& actor, uint32_t itemId)
   return false;
 }
 
-// A shout casts one of its words' spells (SHOU SNAM: word, spell, recovery time), not the shout itself
+// A shout casts one of its words' spells (SHOU SNAM: word, spell, recovery
+// time), not the shout itself
 std::vector<uint32_t> ShoutWordSpells(const espm::LookupResult& lookup,
                                       espm::CompressedFieldsCache& cache)
 {
@@ -676,9 +697,10 @@ std::vector<uint32_t> ShoutWordSpells(const espm::LookupResult& lookup,
   return out;
 }
 
-// Every spell a shout's words cast, across the load order, read once. A player's equipped shout never reaches the
-// server (the client's voice slot reads a spell, and a shout is not one), so a player may cast and hit with any
-// shout's words (Nate, 2026-09-28: shouts did nothing to anyone).
+// Every spell a shout's words cast, across the load order, read once. A
+// player's equipped shout never reaches the server (the client's voice slot
+// reads a spell, and a shout is not one), so a player may cast and hit with
+// any shout's words (Nate, 2026-09-28: shouts did nothing to anyone).
 bool IsShoutWordSpell(WorldState* worldState, uint32_t spellId)
 {
   struct ShoutWords
@@ -715,7 +737,8 @@ bool IsShoutWordSpell(WorldState* worldState, uint32_t spellId)
   return shoutWords.spells.count(spellId) > 0;
 }
 
-// The host's engine rolls leveled templates on its own, so any spell in the base's template tree is valid
+// The host's engine rolls leveled templates on its own, so any spell in the
+// base's template tree is valid
 bool IsSpellInTemplateTree(const MpActor& actor, uint32_t spellId)
 {
   WorldState* worldState = actor.GetParent();
@@ -736,7 +759,8 @@ bool IsSpellInTemplateTree(const MpActor& actor, uint32_t spellId)
       continue;
     }
     const auto lookup = browser.LookupById(formId);
-    // A shout in the list (a draugr's Unrelenting Force) is known through the spells its words cast
+    // A shout in the list (a draugr's Unrelenting Force) is known through the
+    // spells its words cast
     if (lookup.rec && lookup.rec->GetType() == "SHOU") {
       for (uint32_t word :
            ShoutWordSpells(lookup, worldState->GetEspmCache())) {
@@ -769,8 +793,9 @@ bool IsSpellInTemplateTree(const MpActor& actor, uint32_t spellId)
   return false;
 }
 
-// Hosted NPCs keep no spell equipment on the server, their spell list is the gate
-// A scroll the actor holds in a hand and still has in its inventory (read once, see OnSpellCast)
+// Hosted NPCs keep no spell equipment on the server, their spell list is the
+// gate A scroll the actor holds in a hand and still has in its inventory (read
+// once, see OnSpellCast)
 bool IsHeldScroll(const MpActor& actor, uint32_t spellId)
 {
   if (actor.GetInventory().GetItemCount(spellId) < 1) {
@@ -784,7 +809,7 @@ bool IsHeldScroll(const MpActor& actor, uint32_t spellId)
   return false;
 }
 
-}  // namespace
+} // namespace
 
 namespace SpellCastRules {
 
@@ -793,25 +818,30 @@ bool CanCastSpell(const MpActor& actor, uint32_t spellId)
   if (actor.GetEquipment().IsSpellEquipped(spellId)) {
     return true;
   }
-  // Scrolls are items, not equipped spells: every scroll cast was refused here and the scroll never left the
-  // inventory, so it came back after each cast (2026-09-25)
+  // Scrolls are items, not equipped spells: every scroll cast was refused here
+  // and the scroll never left the inventory, so it came back after each cast
+  // (2026-09-25)
   if (IsHeldScroll(actor, spellId)) {
     return true;
   }
-  // A shout word the server itself taught (a werewolf's howls, learned for the form by beastform.js) may be cast
+  // A shout word the server itself taught (a werewolf's howls, learned for the
+  // form by beastform.js) may be cast
   if (actor.GetProfileId() != -1 && actor.IsSpellLearned(spellId) &&
       IsShoutWordSpell(actor.GetParent(), spellId)) {
     return true;
   }
-  // No shout word is accepted here for a player: the server cannot see which shout they hold, and an accepted cast is
-  // relayed to neighbours before the gamemode is asked (and keepAlive casts never ask it), so a modified client could
-  // make its victims replay any word's paralysis, fear or damage over time (review A4-1, 2026-09-28). A shout's hits
-  // still land through CanHitWithSpell, where the gamemode's shout gate (combat.js shoutAllowed) judges them.
+  // No shout word is accepted here for a player: the server cannot see which
+  // shout they hold, and an accepted cast is relayed to neighbours before the
+  // gamemode is asked (and keepAlive casts never ask it), so a modified client
+  // could make its victims replay any word's paralysis, fear or damage over
+  // time (review A4-1, 2026-09-28). A shout's hits still land through
+  // CanHitWithSpell, where the gamemode's shout gate (combat.js shoutAllowed)
+  // judges them.
   return actor.GetProfileId() == -1 &&
     (actor.IsSpellLearned(spellId) || IsSpellInTemplateTree(actor, spellId));
 }
 
-}  // namespace SpellCastRules
+} // namespace SpellCastRules
 
 namespace {
 
@@ -831,8 +861,10 @@ void ForEachFieldUint32(WorldState* worldState, const espm::RecordHeader* rec,
     worldState->GetEspmCache());
 }
 
-// The spells of the hazards an impact data set's impacts leave (IPDS PNAM: material, IPCT; IPCT NAM2: HAZD), global ids.
-// A wall's burning ground comes this way, not from a Spawn Hazard effect: Wall of Flames' MAGFlamesBarrierImpact. Cached
+// The spells of the hazards an impact data set's impacts leave (IPDS PNAM:
+// material, IPCT; IPCT NAM2: HAZD), global ids. A wall's burning ground comes
+// this way, not from a Spawn Hazard effect: Wall of Flames'
+// MAGFlamesBarrierImpact. Cached
 const std::vector<uint32_t>& ImpactHazardSpells(WorldState* worldState,
                                                 uint32_t impactDataSetId)
 {
@@ -886,8 +918,9 @@ const std::vector<uint32_t>& ImpactHazardSpells(WorldState* worldState,
   return cache.emplace(impactDataSetId, std::move(spells)).first->second;
 }
 
-// Cloaks and hazards (Blizzard, and the burning ground of a wall) hit with a spell they grant, not the spell that was
-// cast. The parent is a SPEL, a SCRL or a staff's ENCH
+// Cloaks and hazards (Blizzard, and the burning ground of a wall) hit with a
+// spell they grant, not the spell that was cast. The parent is a SPEL, a SCRL
+// or a staff's ENCH
 bool IsSpellGrantedBy(WorldState* worldState, uint32_t parentSpellId,
                       uint32_t sourceId)
 {
@@ -943,8 +976,9 @@ bool IsSpellGrantedBy(WorldState* worldState, uint32_t parentSpellId,
 
 uint32_t StaffEnchantmentOf(WorldState* worldState, uint32_t weaponId);
 
-// A creature's melee carries an attack spell from its attack data (ATKD at 8): the race's (a Flame Atronach's fire, a
-// spider's poison) or the NPC_'s own, which replaces it (a vampire's AAAFrostTouch)
+// A creature's melee carries an attack spell from its attack data (ATKD at 8):
+// the race's (a Flame Atronach's fire, a spider's poison) or the NPC_'s own,
+// which replaces it (a vampire's AAAFrostTouch)
 bool IsAttackDataSpell(const MpActor& actor, uint32_t spellId)
 {
   WorldState* worldState = actor.GetParent();
@@ -1005,7 +1039,8 @@ bool CanHitWithSpell(const MpActor& actor, uint32_t spellId)
       return true;
     }
   }
-  // A staff's wall leaves burning ground too (Forelhost's Dragon Priest staff): a staff in hand, or one a hosted NPC carries
+  // A staff's wall leaves burning ground too (Forelhost's Dragon Priest
+  // staff): a staff in hand, or one a hosted NPC carries
   const auto grantedByStaff = [&](uint32_t weaponId) {
     const uint32_t enchantmentId =
       StaffEnchantmentOf(actor.GetParent(), weaponId);
@@ -1027,7 +1062,8 @@ bool CanHitWithSpell(const MpActor& actor, uint32_t spellId)
   return false;
 }
 
-// The enchantment of a staff (WEAP with staff animation), as a global id; 0 for anything else
+// The enchantment of a staff (WEAP with staff animation), as a global id; 0
+// for anything else
 uint32_t StaffEnchantmentOf(WorldState* worldState, uint32_t weaponId)
 {
   const auto lookup = worldState->GetEspm().GetBrowser().LookupById(weaponId);
@@ -1044,7 +1080,8 @@ uint32_t StaffEnchantmentOf(WorldState* worldState, uint32_t weaponId)
   return lookup.ToGlobalId(data.enchantmentFormId);
 }
 
-// The charge a dropped weapon copy keeps: the lower charge the dropping client reports, never more than the server holds
+// The charge a dropped weapon copy keeps: the lower charge the dropping client
+// reports, never more than the server holds
 std::optional<float> DroppedCharge(WorldState* worldState,
                                    const Inventory::Entry& held,
                                    const std::optional<float>& reported)
@@ -1054,7 +1091,8 @@ std::optional<float> DroppedCharge(WorldState* worldState,
       held.count != 1 || !worldState->HasEspm()) {
     return std::nullopt;
   }
-  const auto lookup = worldState->GetEspm().GetBrowser().LookupById(held.baseId);
+  const auto lookup =
+    worldState->GetEspm().GetBrowser().LookupById(held.baseId);
   const auto weapon = espm::Convert<espm::WEAP>(lookup.rec);
   if (!weapon) {
     return std::nullopt;
@@ -1083,8 +1121,10 @@ std::optional<float> DroppedCharge(WorldState* worldState,
   return std::max(*reported, kMinCharge);
 }
 
-// A hosted NPC's staff comes from its base: its inventory and outfit, its template's when it uses that inventory, leveled items
-// Breadth-first so its own inventory comes before a template's leveled actors (review S1); cached per base and enchantment
+// A hosted NPC's staff comes from its base: its inventory and outfit, its
+// template's when it uses that inventory, leveled items Breadth-first so its
+// own inventory comes before a template's leveled actors (review S1); cached
+// per base and enchantment
 bool IsStaffInTemplateTree(const MpActor& actor, uint32_t enchantmentId)
 {
   struct StaffAnswers
@@ -1155,7 +1195,8 @@ bool IsStaffInTemplateTree(const MpActor& actor, uint32_t enchantmentId)
   return found;
 }
 
-// A staff hit names the staff's enchantment: a staff in either hand, or for a hosted NPC one its base carries
+// A staff hit names the staff's enchantment: a staff in either hand, or for a
+// hosted NPC one its base carries
 bool CanHitWithStaffEnchantment(const MpActor& actor, uint32_t enchantmentId)
 {
   WorldState* worldState = actor.GetParent();
@@ -1173,12 +1214,9 @@ bool CanHitWithStaffEnchantment(const MpActor& actor, uint32_t enchantmentId)
 }
 }
 
-MpActor* ActionListener::SendToNeighbours(uint32_t idx,
-                                          Networking::UserId userId,
-                                          Networking::PacketData data,
-                                          size_t length, bool reliable,
-                                          bool checkOnly,
-                                          bool echoHostedToSender)
+MpActor* ActionListener::SendToNeighbours(
+  uint32_t idx, Networking::UserId userId, Networking::PacketData data,
+  size_t length, bool reliable, bool checkOnly, bool echoHostedToSender)
 {
   MpActor* myActor = partOne.serverState.ActorByUser(userId);
   // The old behavior is doing nothing in that case. This is covered by tests
@@ -1251,12 +1289,15 @@ MpActor* ActionListener::SendToNeighbours(uint32_t idx,
                           echoHostedToSender);
 }
 
-// The server owns where an NPC is (Nat, 2026-09-25). A hoster's copy that jumps further in one update than any
-// NPC can move (1024 units, or 2500 units/s since the last accepted update) is not relayed and not applied, and
-// the hoster's copy is teleported back to the server's position, at most once a second. The playtest showed
-// hosted copies jumping 450-4300 units back to stale spots and every watcher seeing them rubber-band. If the
-// hoster insists for 3 s its position wins, so an NPC that really moved (a fall, a slip in the server's own
-// copy) is never frozen, which is why NPC moves used to be relayed before any check.
+// The server owns where an NPC is (Nat, 2026-09-25). A hoster's copy that
+// jumps further in one update than any NPC can move (1024 units, or 2500
+// units/s since the last accepted update) is not relayed and not applied, and
+// the hoster's copy is teleported back to the server's position, at most once
+// a second. The playtest showed hosted copies jumping 450-4300 units back to
+// stale spots and every watcher seeing them rubber-band. If the hoster insists
+// for 3 s its position wins, so an NPC that really moved (a fall, a slip in
+// the server's own copy) is never frozen, which is why NPC moves used to be
+// relayed before any check.
 bool ActionListener::RefuseNpcJump(MpActor& actor, const NiPoint3& newPos)
 {
   constexpr float kMinJump = 1024.f;
@@ -1268,8 +1309,7 @@ bool ActionListener::RefuseNpcJump(MpActor& actor, const NiPoint3& newPos)
 
   const auto now = std::chrono::steady_clock::now();
   auto& st = npcJumps[actor.GetFormId()];
-  const float dtSec =
-    st.lastAccepted.time_since_epoch().count() == 0
+  const float dtSec = st.lastAccepted.time_since_epoch().count() == 0
     ? kMaxDtSec
     : std::min(kMaxDtSec,
                std::chrono::duration<float>(now - st.lastAccepted).count());
@@ -1288,9 +1328,9 @@ bool ActionListener::RefuseNpcJump(MpActor& actor, const NiPoint3& newPos)
   if (now - st.disagreeSince >= kInsistFor) {
     st.disagreeing = false;
     st.lastAccepted = now;
-    partOne.GetLogger().info(
-      "NpcJump {:x}: the hoster held a position {:.0f} away for 3 s, taking it",
-      actor.GetFormId(), step);
+    partOne.GetLogger().info("NpcJump {:x}: the hoster held a position {:.0f} "
+                             "away for 3 s, taking it",
+                             actor.GetFormId(), step);
     return false;
   }
   if (now - st.lastCorrection >= kCorrectEvery) {
@@ -1316,7 +1356,8 @@ void ActionListener::ForgetForm(uint32_t formId)
   npcJumps.erase(formId);
   ForgetScrollReads(formId);
   recentCasts.erase(formId);
-  // A reused form id must not inherit a rider interval, a rune cooldown or a running hold or slow
+  // A reused form id must not inherit a rider interval, a rune cooldown or a
+  // running hold or slow
   std::erase_if(riderHits, [&](const auto& entry) {
     return std::get<0>(entry.first) == formId ||
       std::get<2>(entry.first) == formId;
@@ -1325,8 +1366,9 @@ void ActionListener::ForgetForm(uint32_t formId)
     return static_cast<uint32_t>(entry.first >> 32) == formId ||
       static_cast<uint32_t>(entry.first) == formId;
   });
-  std::erase_if(hostEffects,
-                [&](const auto& entry) { return entry.first.first == formId; });
+  std::erase_if(hostEffects, [&](const auto& entry) {
+    return entry.first.first == formId;
+  });
 }
 
 void ActionListener::ForgetScrollReads(uint32_t casterId)
@@ -1380,7 +1422,8 @@ void ActionListener::RelayMovement(uint32_t idx,
     SendToNeighbours(idx, rawMsgData);
     return;
   }
-  // As SendToNeighbours: a hosted NPC's own hoster is not told, a player's own movement is echoed back
+  // As SendToNeighbours: a hosted NPC's own hoster is not told, a player's own
+  // movement is echoed back
   const bool skipSender = idx != myActor->GetIdx();
   movementRelay->Submit(*actor, rawMsgData.userId, skipSender,
                         rawMsgData.unparsed, rawMsgData.unparsedLength);
@@ -1423,9 +1466,9 @@ void ActionListener::OnUpdateMovement(const RawMessageData& rawMsgData,
       FormDesc::FromFormId(msg.data.worldOrCell,
                            actor->GetParent()->espmFiles);
     if (sameWorld && !actor->GetTeleportFlag() &&
-        RefuseNpcJump(*actor,
-                      NiPoint3{ msg.data.pos[0], msg.data.pos[1],
-                                msg.data.pos[2] })) {
+        RefuseNpcJump(
+          *actor,
+          NiPoint3{ msg.data.pos[0], msg.data.pos[1], msg.data.pos[2] })) {
       return;
     }
     // Right after a server teleport the next packet is refused below
@@ -1471,7 +1514,8 @@ void ActionListener::OnUpdateMovement(const RawMessageData& rawMsgData,
       actor->ResetBlockCount();
     }
 
-    // SetPos does not move an actor between cells, and SetCellOrWorld moves its grid subscription
+    // SetPos does not move an actor between cells, and SetCellOrWorld moves
+    // its grid subscription
     const FormDesc newCellOrWorld =
       FormDesc::FromFormId(msg.data.worldOrCell, espmFiles);
     if (!(actor->GetCellOrWorld() == newCellOrWorld)) {
@@ -1520,9 +1564,11 @@ void ActionListener::OnUpdateAnimation(const RawMessageData& rawMsgData,
     return;
   }
 
-  // A hoster got every animation of its NPC back; its client only skipped them (formView, alreadyHosted), and a
-  // replay restarts swings and can turn collision off. Movement is still echoed: formView re-seats a hosted copy on
-  // the last relayed position once they are 3000 units apart, so without the echo it would snap back
+  // A hoster got every animation of its NPC back; its client only skipped them
+  // (formView, alreadyHosted), and a replay restarts swings and can turn
+  // collision off. Movement is still echoed: formView re-seats a hosted copy
+  // on the last relayed position once they are 3000 units apart, so without
+  // the echo it would snap back
   constexpr bool kEchoHostedToSender = false;
   auto targetActor =
     SendToNeighbours(msg.idx, rawMsgData, false, false, kEchoHostedToSender);
@@ -1531,8 +1577,9 @@ void ActionListener::OnUpdateAnimation(const RawMessageData& rawMsgData,
     return;
   }
 
-  // For the power/bash measurement in OnWeaponHit: when an actor (player or hosted NPC) last started a power attack or
-  // a bash, as its own client reported it
+  // For the power/bash measurement in OnWeaponHit: when an actor (player or
+  // hosted NPC) last started a power attack or a bash, as its own client
+  // reported it
   NoteForcefulAnim(targetActor->GetFormId(), msg.data.animEventName);
 
   // Only process animation system and set last anim event for player's actor
@@ -1626,7 +1673,8 @@ void ActionListener::OnUpdateEquipment(const RawMessageData& rawMsgData,
 
   const auto& inventory = actor->GetInventory();
   for (auto& entry : equipmentInv.entries) {
-    // Only worn items matter; validating the whole inventory would strip the player bare via the unequip path below
+    // Only worn items matter; validating the whole inventory would strip the
+    // player bare via the unequip path below
     if (entry.GetWorn() == Inventory::Worn::None) {
       continue;
     }
@@ -1735,7 +1783,8 @@ void ActionListener::OnUpdateEquipment(const RawMessageData& rawMsgData,
   }
 
   if (isAllowed) {
-    // An unlearned spell strips just that slot; weapons/armor still reach neighbours (avoids silent desync)
+    // An unlearned spell strips just that slot; weapons/armor still reach
+    // neighbours (avoids silent desync)
     if (anySpellStripped || extrasReplaced) {
       if (spellIdsToRemove[static_cast<size_t>(SpellSlotId::Left)]) {
         sanitizedMsg.data.leftSpell = std::nullopt;
@@ -1760,7 +1809,8 @@ void ActionListener::OnUpdateEquipment(const RawMessageData& rawMsgData,
   } else {
     actor->SendInventoryUpdate();
 
-    // Worn items the server equipment lacks or the inventory lacks are unequipped
+    // Worn items the server equipment lacks or the inventory lacks are
+    // unequipped
     {
       const auto& currentEquip = actor->GetEquipment().inv;
 
@@ -1868,7 +1918,8 @@ void ActionListener::OnActivate(const RawMessageData& rawMsgData,
                             : partOne.worldState.GetFormAt<MpObjectReference>(
                                 static_cast<uint32_t>(msg.data.caster)),
     kDefaultProcessingOnlyFalse, msg.data.isSecondActivation);
-  // Every activation by a hosted NPC re-equipped it and broadcast UpdateEquipment; only one with no weapon in hand
+  // Every activation by a hosted NPC re-equipped it and broadcast
+  // UpdateEquipment; only one with no weapon in hand
   if (hosterId) {
     auto actor =
       std::dynamic_pointer_cast<MpActor>(partOne.worldState.LookupFormById(
@@ -1908,8 +1959,9 @@ void ActionListener::OnPutItem(const RawMessageData& rawMsgData,
 
   const auto owned = actor->GetInventory().FindEntriesFor(entry);
   if (owned.empty()) {
-    spdlog::warn("ActionListener::OnPutItem - actor {:x} does not own baseId {:x}",
-                 actor->GetFormId(), entry.baseId);
+    spdlog::warn(
+      "ActionListener::OnPutItem - actor {:x} does not own baseId {:x}",
+      actor->GetFormId(), entry.baseId);
     return;
   }
   for (const auto& e : owned) {
@@ -1943,7 +1995,8 @@ void ActionListener::OnTakeItem(const RawMessageData& rawMsgData,
   static_cast<Inventory::ExtraData&>(entry) =
     static_cast<const Inventory::ExtraData&>(msg);
 
-  // A searched body's local copy holds plain stacks, so a take may stand for copies with extras
+  // A searched body's local copy holds plain stacks, so a take may stand for
+  // copies with extras
   const auto stored = ref.GetInventory().FindEntriesFor(entry, true);
   if (stored.empty()) {
     return ref.TakeItem(*actor, entry);
@@ -1995,23 +2048,28 @@ void ActionListener::OnDropItem(const RawMessageData& rawMsgData,
     entry.HasIdentityExtras() || (entry.name && !entry.name->empty());
   const auto owned = ac->GetInventory().FindEntriesFor(entry, !reportedExtras);
 
-  // Named items DO drop (Nat, 26 Oct). They were refused for a while, because the ground deletes a dropped
-  // item after two minutes and a made item lost that way is unrecoverable - the ticket was Sylvia's
-  // Greatsword. What changed is that the loss itself is fixed: MpActor::DropItem now carries the extras onto
-  // the ground object and keeps a named or enchanted drop alive across the two-minute sweep and the queue
-  // cap, so refusing the drop is no longer the only way to protect it. Nat would rather be able to put a made
-  // item down.
+  // Named items DO drop (Nat, 26 Oct). They were refused for a while, because
+  // the ground deletes a dropped item after two minutes and a made item lost
+  // that way is unrecoverable - the ticket was Sylvia's Greatsword. What
+  // changed is that the loss itself is fixed: MpActor::DropItem now carries
+  // the extras onto the ground object and keeps a named or enchanted drop
+  // alive across the two-minute sweep and the queue cap, so refusing the drop
+  // is no longer the only way to protect it. Nat would rather be able to put a
+  // made item down.
   //
-  // So nothing here tests the name any more. reportedExtras above still does, but for a different reason:
-  // it decides how strictly FindEntriesFor matches, not whether the drop is allowed.
+  // So nothing here tests the name any more. reportedExtras above still does,
+  // but for a different reason: it decides how strictly FindEntriesFor
+  // matches, not whether the drop is allowed.
 
   if (owned.empty()) {
-    // The assembled entry, not a bare one: a bare entry loses every extra, and DropItem then skips
-    // SetPickupExtras because the entry matches a bare one, so the item used to hit the ground stripped
+    // The assembled entry, not a bare one: a bare entry loses every extra, and
+    // DropItem then skips SetPickupExtras because the entry matches a bare
+    // one, so the item used to hit the ground stripped
     return ac->DropItem(baseId, entry);
   }
   for (const auto& e : owned) {
-    // Charge used since the last report would come back full on pickup, so the copy takes the dropping client's charge first
+    // Charge used since the last report would come back full on pickup, so the
+    // copy takes the dropping client's charge first
     if (auto charge = DroppedCharge(worldState, e, msg.chargePercent)) {
       Inventory::Entry used = e;
       used.chargePercent = *charge;
@@ -2129,21 +2187,26 @@ void ActionListener::OnHostAttempt(const RawMessageData& rawMsgData,
     throw std::runtime_error("Unable to host without actor attached");
   }
 
-  // A client can still ask for an NPC the server has removed, such as a cleared corpse
+  // A client can still ask for an NPC the server has removed, such as a
+  // cleared corpse
   const auto& remoteForm = partOne.worldState.LookupFormById(remoteId);
   MpObjectReference* remotePtr =
     remoteForm ? remoteForm->AsObjectReference() : nullptr;
   if (!remoteForm) {
-    // That client missed the DestroyActor and kept asking (the 1 Oct ghost NPCs): it is told again, by the index it knows
+    // That client missed the DestroyActor and kept asking (the 1 Oct ghost
+    // NPCs): it is told again, by the index it knows
     if (const auto idx = partOne.worldState.DestroyedFormIdx(remoteId)) {
-      // An index is reused about 10 s after its form goes, and a client can keep asking for tens of
-      // minutes, so by now a live form may hold this index - and that client may have been sent that
-      // form at it. Dropping by index would then remove the live NPC from its screen. With the index
-      // taken, say nothing, as a gone form does above (review, Worker D).
+      // An index is reused about 10 s after its form goes, and a client can
+      // keep asking for tens of minutes, so by now a live form may hold this
+      // index - and that client may have been sent that form at it. Dropping
+      // by index would then remove the live NPC from its screen. With the
+      // index taken, say nothing, as a gone form does above (review, Worker
+      // D).
       if (partOne.worldState.LookupFormByIdx(static_cast<int>(*idx))) {
-        spdlog::info("ActionListener::OnHostAttempt - {:#x} is gone, but idx {} "
-                     "is in use again; user {} is told nothing",
-                     remoteId, *idx, rawMsgData.userId);
+        spdlog::info(
+          "ActionListener::OnHostAttempt - {:#x} is gone, but idx {} "
+          "is in use again; user {} is told nothing",
+          remoteId, *idx, rawMsgData.userId);
         return;
       }
       DestroyActorMessage drop;
@@ -2188,8 +2251,9 @@ void ActionListener::OnHostAttempt(const RawMessageData& rawMsgData,
   if (hoster == 0 || !lastRemoteUpdate ||
       std::chrono::system_clock::now() - *lastRemoteUpdate >
         hostResetTimeout) {
-    // The grant (HostStart, HostStop to the old hoster, listeners, stamp, health resync) is shared with the
-    // gamemode's mp.setHoster, so a server-chosen host and a requested one behave the same
+    // The grant (HostStart, HostStop to the old hoster, listeners, stamp,
+    // health resync) is shared with the gamemode's mp.setHoster, so a
+    // server-chosen host and a requested one behave the same
     partOne.AssignHoster(remoteId, me->GetFormId());
   }
 }
@@ -2216,6 +2280,34 @@ void ActionListener::OnCustomEvent(const RawMessageData& rawMsgData,
   for (auto& listener : partOne.GetListeners()) {
     CustomEvent customEvent(ac->GetFormId(), msg.eventName, jsonArrayDump);
     listener->OnMpApiEvent(customEvent);
+  }
+}
+
+// The magicka slack lets a client regenerate past the server's own rate; one
+// that stays past twice it for 10 reports in a row is named for anticheat, at
+// most once a minute
+void ActionListener::WatchMagickaRegen(MpActor* actor, float reported,
+                                       float held, float seconds,
+                                       SteadyTime now)
+{
+  constexpr float kWatchRatio = 2.f;
+  constexpr int kWatchStreak = 10;
+  constexpr auto kWatchEvery = std::chrono::seconds(60);
+  const float perSecond = MagickaRegenPerSecond(actor);
+  if (!(seconds > 0.5f) || !(perSecond > 0.f) || held >= 1.f) {
+    return;
+  }
+  const float ratio = (reported - held) / (perSecond * seconds);
+  auto& watch = regenWatch[actor->GetFormId()];
+  if (ratio <= kWatchRatio) {
+    watch.streak = 0;
+    return;
+  }
+  if (++watch.streak >= kWatchStreak && now - watch.loggedAt >= kWatchEvery) {
+    watch.loggedAt = now;
+    spdlog::info("[regen-watch] {:x} magicka rose at {:.1f}x the server's "
+                 "rate for {} reports in a row",
+                 actor->GetFormId(), ratio, watch.streak);
   }
 }
 
@@ -2263,10 +2355,11 @@ void ActionListener::OnChangeValues(const RawMessageData& rawMsgData,
       outVal = currentVal;
       sendOutMsg = true;
       actor->SetLastPercentageUpdate(av, now);
-      // Pairs with [restore] in MpActor.cpp: what the client reported against what we echo back.
-      spdlog::info("[restore] {:x} av={} echo: client reported {}, server holds {}",
-                   actor->GetFormId(), static_cast<int>(av), *inputVal,
-                   currentVal);
+      // Pairs with [restore] in MpActor.cpp: what the client reported against
+      // what we echo back.
+      spdlog::info(
+        "[restore] {:x} av={} echo: client reported {}, server holds {}",
+        actor->GetFormId(), static_cast<int>(av), *inputVal, currentVal);
       return;
     }
 
@@ -2276,6 +2369,8 @@ void ActionListener::OnChangeValues(const RawMessageData& rawMsgData,
       newVal =
         CropHealthRegeneration(newVal, timeAfterHealthRegeneration, actor);
     } else if (av == espm::ActorValue::Magicka) {
+      WatchMagickaRegen(actor, newVal, currentVal,
+                        timeAfterMagickaRegeneration, now);
       newVal =
         CropMagickaRegeneration(newVal, timeAfterMagickaRegeneration, actor);
     } else if (av == espm::ActorValue::Stamina) {
@@ -2283,11 +2378,17 @@ void ActionListener::OnChangeValues(const RawMessageData& rawMsgData,
         CropStaminaRegeneration(newVal, timeAfterStaminaRegeneration, actor);
     }
 
-    if (!MathUtils::IsNearlyEqual(newVal, *inputVal)) {
+    // A full bar reported above 1 is a client buff past its percentage base:
+    // kept at 1 here, not clawed back there
+    constexpr float kFull = 0.999f;
+    const bool fullAndOver =
+      currentVal >= kFull && *inputVal > 1.f && newVal >= kFull;
+    if (!MathUtils::IsNearlyEqual(newVal, *inputVal) && !fullAndOver) {
       outVal = newVal;
       sendOutMsg = true;
-      // Only a big clawback is worth a line. Ordinary per-tick cropping differs by a rounding, whereas a
-      // potion being undone takes a visible slice of the bar back, which is the thing being chased.
+      // Only a big clawback is worth a line. Ordinary per-tick cropping
+      // differs by a rounding, whereas a potion being undone takes a visible
+      // slice of the bar back, which is the thing being chased.
       constexpr float kInterestingClawback = 0.02f;
       if (*inputVal - newVal > kInterestingClawback) {
         spdlog::info("[crop] {:x} av={} clawed back: client {} -> {}",
@@ -2478,7 +2579,8 @@ bool ShouldBeBlocked(const MpActor& aggressor, const MpActor& target)
 {
   NiPoint3 targetViewDirection = target.GetViewDirection();
   NiPoint3 aggressorDirection = aggressor.GetPos() - target.GetPos();
-  // A block faces the attacker around, not up or down: height must not decide it (review SCH2-5)
+  // A block faces the attacker around, not up or down: height must not decide
+  // it (review SCH2-5)
   aggressorDirection.z = 0;
   if (targetViewDirection * aggressorDirection <= 0) {
     return false;
@@ -2488,7 +2590,8 @@ bool ShouldBeBlocked(const MpActor& aggressor, const MpActor& target)
   if (lengths <= 0.f) {
     return false;
   }
-  // Guard: rounding could put the cosine of a dead-on facing above 1, where acos is NaN (not seen in the unit test)
+  // Guard: rounding could put the cosine of a dead-on facing above 1, where
+  // acos is NaN (not seen in the unit test)
   const float cosine = std::clamp(
     (targetViewDirection * aggressorDirection) / lengths, -1.f, 1.f);
   return std::acos(cosine) < 1;
@@ -2552,7 +2655,8 @@ void ActionListener::OnHit(const RawMessageData& rawMsgData,
   // shows one (LHF/Tarhiel, 10 Oct: his old character's body, orphaned on his
   // own screen by a character switch, took his blows for two hours after it
   // was disabled) must not land hits on it, nor a disabled actor on anyone.
-  // Logged at most once per aggressor every 10 s: such a client keeps swinging.
+  // Logged at most once per aggressor every 10 s: such a client keeps
+  // swinging.
   if (targetRef->IsDisabled() || aggressor->IsDisabled()) {
     static std::unordered_map<uint32_t, std::chrono::steady_clock::time_point>
       lastDisabledHitLog;
@@ -2654,16 +2758,20 @@ void ActionListener::OnHit(const RawMessageData& rawMsgData,
 
   const auto equipment = aggressor->GetEquipment();
 
-  // A scroll's hit is a spell hit. It went to OnWeaponHit (a held scroll is equipment) and threw 'Expected record to be
-  // WEAP, but found SCRL', so a scroll was used up and did nothing (review SCH-1, 2026-09-26). Only a scroll the server
-  // just used up for this caster may hit, a few times, for a short while.
+  // A scroll's hit is a spell hit. It went to OnWeaponHit (a held scroll is
+  // equipment) and threw 'Expected record to be WEAP, but found SCRL', so a
+  // scroll was used up and did nothing (review SCH-1, 2026-09-26). Only a
+  // scroll the server just used up for this caster may hit, a few times, for a
+  // short while.
   if (isSourceScroll) {
     bool landed =
       TakeScrollHit(aggressor->GetFormId(), hitData.source, hitData.target);
-    // The cast of a last scroll can be lost before it reaches the server. Its first hit then stands in for the cast,
-    // when the caster still holds one: the scroll is used up here once, and later hits of that read land as usual.
-    // Only with no read of it in kScrollLastReadKept: a repeated hit on one target, one past a read's target budget, or a
-    // rune going off after kScrollHitWindow is refused as before and never costs a second scroll
+    // The cast of a last scroll can be lost before it reaches the server. Its
+    // first hit then stands in for the cast, when the caster still holds one:
+    // the scroll is used up here once, and later hits of that read land as
+    // usual. Only with no read of it in kScrollLastReadKept: a repeated hit on
+    // one target, one past a read's target budget, or a rune going off after
+    // kScrollHitWindow is refused as before and never costs a second scroll
     if (!landed &&
         !ScrollReadRecently(aggressor->GetFormId(), hitData.source) &&
         aggressor->GetInventory().GetItemCount(hitData.source) >= 1) {
@@ -2685,7 +2793,8 @@ void ActionListener::OnHit(const RawMessageData& rawMsgData,
     return;
   }
 
-  // A staff's hit is its enchantment's (client-staff-hits): only a staff the aggressor holds, at the staff's own pace
+  // A staff's hit is its enchantment's (client-staff-hits): only a staff the
+  // aggressor holds, at the staff's own pace
   if (isSourceEnchantment) {
     if (!CanHitWithStaffEnchantment(*aggressor, hitData.source)) {
       spdlog::info("ActionListener::OnHit - {:x} holds no staff with "
@@ -2724,10 +2833,13 @@ void ActionListener::OnHit(const RawMessageData& rawMsgData,
     return;
   }
 
-  // An NPC switches weapons in its host's game, which never reports it: a weapon it carries may hit too. Never for a
-  // player's character, online or logged out (base 0x7: a host of an offline body must not swing its whole inventory),
-  // and never a weapon whose base damage is above every weapon the server has the NPC wearing, so a host cannot arm a
-  // hosted NPC with the loot it carries (review 12 Oct; the Conjure Boneman's sword and bow are both 8)
+  // An NPC switches weapons in its host's game, which never reports it: a
+  // weapon it carries may hit too. Never for a player's character, online or
+  // logged out (base 0x7: a host of an offline body must not swing its whole
+  // inventory), and never a weapon whose base damage is above every weapon the
+  // server has the NPC wearing, so a host cannot arm a hosted NPC with the
+  // loot it carries (review 12 Oct; the Conjure Boneman's sword and bow are
+  // both 8)
   const bool isNpc = !aggressor->IsCreatedAsPlayer() &&
     partOne.serverState.UserByActor(aggressor) == Networking::InvalidUserId;
   if (isNpc && sourceInEspm.rec &&
@@ -2782,7 +2894,8 @@ void ActionListener::OnUpdateAnimVariables(
 }
 
 namespace {
-// The castRelayBlockedRaces gate; an NPC whose race cannot be resolved is relayed as before
+// The castRelayBlockedRaces gate; an NPC whose race cannot be resolved is
+// relayed as before
 bool IsCastRelayBlocked(MpActor& caster)
 {
   WorldState* worldState = caster.GetParent();
@@ -2793,7 +2906,7 @@ bool IsCastRelayBlocked(MpActor& caster)
     return worldState->IsCastRelayBlockedRace(caster.GetRaceId());
   } catch (std::exception& e) {
     spdlog::debug("IsCastRelayBlocked - race of {:x} not resolved: {}",
-                 caster.GetFormId(), e.what());
+                  caster.GetFormId(), e.what());
     return false;
   }
 }
@@ -2835,11 +2948,13 @@ void ActionListener::OnSpellCast(const RawMessageData& rawMsgData,
     spellCastData.target = myActor->GetFormId();
   }
 
-  // A watcher's copy of a non-humanoid NPC takes the humanoid caster variables into its graph and crashes (1 Oct)
+  // A watcher's copy of a non-humanoid NPC takes the humanoid caster variables
+  // into its graph and crashes (1 Oct)
   const bool relay = caster == myActor || !IsCastRelayBlocked(*caster);
 
-  // Stops are relayed before the death, equipment and denylist gates so none is dropped
-  // Relays are reliable so observers get casts, keep-alives and stops in order
+  // Stops are relayed before the death, equipment and denylist gates so none
+  // is dropped Relays are reliable so observers get casts, keep-alives and
+  // stops in order
   if (spellCastData.interruptCast) {
     if (relay) {
       SendToNeighbours(myActor->idx, rawMsgData, true);
@@ -2915,10 +3030,12 @@ void ActionListener::OnSpellCast(const RawMessageData& rawMsgData,
                       nlohmann::json::array({ spellCastData.spell }));
   }
 
-  // A scroll is read once: one leaves the caster's inventory per cast, and its hits may land for a short while
-  // (TakeScrollHit). The restorative handling below is for spells the caster knows, so a scroll stops here.
+  // A scroll is read once: one leaves the caster's inventory per cast, and its
+  // hits may land for a short while (TakeScrollHit). The restorative handling
+  // below is for spells the caster knows, so a scroll stops here.
   if (scrollCast) {
-    if (!spellCastData.keepAlive && IsHeldScroll(*caster, spellCastData.spell)) {
+    if (!spellCastData.keepAlive &&
+        IsHeldScroll(*caster, spellCastData.spell)) {
       caster->RemoveItem(spellCastData.spell, 1, nullptr);
       RecordScrollRead(caster->GetFormId(), spellCastData.spell);
       spdlog::info("ActionListener::OnSpellCast - {:x} read scroll {:x}",
@@ -2930,7 +3047,8 @@ void ActionListener::OnSpellCast(const RawMessageData& rawMsgData,
   const auto targetRef = std::dynamic_pointer_cast<MpObjectReference>(
     partOne.worldState.LookupFormById(spellCastData.target));
 
-  // Restorative (non-hostile) effects apply here; hostile damage stays on the OnSpellHit path
+  // Restorative (non-hostile) effects apply here; hostile damage stays on the
+  // OnSpellHit path
   const auto spellData =
     espm::GetData<espm::SPEL>(spellCastData.spell, &partOne.worldState);
 
@@ -2938,7 +3056,8 @@ void ActionListener::OnSpellCast(const RawMessageData& rawMsgData,
   const bool selfDelivery = spellData.spellItem &&
     spellData.spellItem->delivery == espm::SPEL::Delivery::Self;
 
-  // The cast event's target is always the caster, fire-and-forget heals on others land in OnSpellHit
+  // The cast event's target is always the caster, fire-and-forget heals on
+  // others land in OnSpellHit
   if (!selfDelivery && spellData.spellItem &&
       spellData.spellItem->castType == espm::SPEL::CastType::FireAndForget) {
     return;
@@ -2973,7 +3092,8 @@ void ActionListener::OnSpellCast(const RawMessageData& rawMsgData,
   auto restoreEffects = GetRestorativeEffects(
     &partOne.worldState, spellCastData.spell, false, ownSelfCast);
 
-  // A self spell that also costs its caster is left whole to the caster's game, its gain is never applied apart from its cost
+  // A self spell that also costs its caster is left whole to the caster's
+  // game, its gain is never applied apart from its cost
   if (selfDelivery && !restoreEffects.empty() &&
       HasHarmfulEffectOnTarget(&partOne.worldState, spellCastData.spell)) {
     if (!spellCastData.keepAlive) {
@@ -2984,7 +3104,8 @@ void ActionListener::OnSpellCast(const RawMessageData& rawMsgData,
     return;
   }
 
-  // A hosted NPC heals itself at npcSelfHealMult of the spell (enemy mages healed to full on Adept+)
+  // A hosted NPC heals itself at npcSelfHealMult of the spell (enemy mages
+  // healed to full on Adept+)
   if (NpcSelfHeal::Applies(caster == myActor, targetActor == caster)) {
     const float mult = partOne.worldState.GetNpcSelfHealMult();
     const size_t scaled = NpcSelfHeal::ScaleRestores(
@@ -3009,7 +3130,8 @@ void ActionListener::OnSpellCast(const RawMessageData& rawMsgData,
     auto existing = restorationChannels.find(casterId);
     const bool hadChannel = existing != restorationChannels.end();
 
-    // Concentration heals accrue per second of channel so a tap heals a tap's worth
+    // Concentration heals accrue per second of channel so a tap heals a tap's
+    // worth
     if (!isConcentration && !spellCastData.keepAlive) {
       targetActor->ApplyMagicEffects(restoreEffects, hasSweetpie);
       spdlog::info("ActionListener::OnSpellCast - applied {} restorative "
@@ -3018,20 +3140,23 @@ void ActionListener::OnSpellCast(const RawMessageData& rawMsgData,
                    targetActor->GetFormId());
     }
 
-    // Concentration restoratives heal per second until a stop, a failed check or a missed keep-alive
+    // Concentration restoratives heal per second until a stop, a failed check
+    // or a missed keep-alive
     if (isConcentration) {
       const auto now = std::chrono::steady_clock::now();
       RestorationChannel channel;
       channel.spellId = spellCastData.spell;
-      // Keep-alives resend the caster as target, a beam hit's retarget must survive them
+      // Keep-alives resend the caster as target, a beam hit's retarget must
+      // survive them
       const bool keepsTarget = hadChannel && spellCastData.keepAlive &&
         existing->second.spellId == spellCastData.spell;
-      channel.targetId = keepsTarget ? existing->second.targetId
-                                     : targetActor->GetFormId();
+      channel.targetId =
+        keepsTarget ? existing->second.targetId : targetActor->GetFormId();
       channel.effects = restoreEffects;
       channel.hasSweetpie = hasSweetpie;
       channel.lastRefresh = now;
-      // A live channel keeps its generation and accrual so its timer chain carries on
+      // A live channel keeps its generation and accrual so its timer chain
+      // carries on
       channel.generation = hadChannel ? existing->second.generation
                                       : ++restorationChannelGeneration;
       channel.lastApplied = hadChannel ? existing->second.lastApplied : now;
@@ -3055,8 +3180,7 @@ void ActionListener::TickRestorationChannel(uint32_t casterId,
 {
   auto it = restorationChannels.find(casterId);
   // A different generation means this chain belongs to a replaced channel
-  if (it == restorationChannels.end() ||
-      it->second.generation != generation) {
+  if (it == restorationChannels.end() || it->second.generation != generation) {
     return;
   }
   auto& channel = it->second;
@@ -3170,14 +3294,14 @@ void ActionListener::OnSpellHit(MpActor* aggressor,
   damage = damage <= 0.f ? 0.f : damage;
 
   const bool wardBlocked = IsWardBlocking(*aggressor, *targetActorPtr);
-  // A fully blocked attack still asks the gamemode, so god mode and companions see it
+  // A fully blocked attack still asks the gamemode, so god mode and companions
+  // see it
   const bool blockedAttack = wardBlocked && damage > 0.f;
-  const nlohmann::json spellFlags = { { "spell", true },
-                                      { "blocked", wardBlocked },
-                                      { "power", false },
-                                      { "bash", false },
-                                      { "sneak", false },
-                                      { "unblockedDamage", damage } };
+  const nlohmann::json spellFlags = {
+    { "spell", true },  { "blocked", wardBlocked },
+    { "power", false }, { "bash", false },
+    { "sneak", false }, { "unblockedDamage", damage }
+  };
   if (wardBlocked) {
     damage *= kBlockedHitDamageMult;
     spdlog::info("OnSpellHit - ward of {:x} blocked spell {:x} of {:x}",
@@ -3191,7 +3315,8 @@ void ActionListener::OnSpellHit(MpActor* aggressor,
     return;
   }
 
-  // A refused hit fires no events, a ward-blocked one reaches scripts as blocked and triggers no spell effect
+  // A refused hit fires no events, a ward-blocked one reaches scripts as
+  // blocked and triggers no spell effect
   HitData firedHitData = hitData;
   firedHitData.isHitBlocked = wardBlocked;
   SendPapyrusOnHitEvent(aggressor, targetRef, firedHitData);
@@ -3221,13 +3346,13 @@ void ActionListener::OnSpellHit(MpActor* aggressor,
   FireHitDamageEvent("onHitDamage", aggressor, targetActorPtr, hitData.source,
                      damage, false, &spellFlags);
 
-  // Absorb Health gives the caster what the target lost; the caster's own game gained it locally only
+  // Absorb Health gives the caster what the target lost; the caster's own game
+  // gained it locally only
   if (partOne.worldState.spellSync.absorb && targetActorPtr != aggressor &&
       !aggressor->IsDead()) {
-    const float dealt = (healthBefore - targetActorValues.healthPercentage) *
-      targetBaseHealth;
-    const float absorbed =
-      dealt *
+    const float dealt =
+      (healthBefore - targetActorValues.healthPercentage) * targetBaseHealth;
+    const float absorbed = dealt *
       AbsorbHealthShare(&partOne.worldState, hitData.source, *targetActorPtr);
     if (absorbed > 0.f) {
       aggressor->RestoreActorValue(espm::ActorValue::Health, absorbed);
@@ -3244,7 +3369,8 @@ void ActionListener::OnSpellHit(MpActor* aggressor,
     ApplySpellRiders(*aggressor, *targetActorPtr, hitData.source);
   }
 
-  // Heal Other and the area share of self heals (Grand Healing) restore their target here, the caster heals on cast
+  // Heal Other and the area share of self heals (Grand Healing) restore their
+  // target here, the caster heals on cast
   if (targetActorPtr == aggressor || targetActorPtr->IsDead()) {
     return;
   }
@@ -3310,7 +3436,8 @@ void ActionListener::OnWeaponHit(MpActor* aggressor,
     std::chrono::duration<double>(currentHitTime.time_since_epoch()).count();
   auto& hitMemory = weaponHitMemory[aggressor->GetFormId()];
 
-  // The actor's last-hit record is the source of truth: a write that did not come through here (a test, a reused form id) re-seeds the memory
+  // The actor's last-hit record is the source of truth: a write that did not
+  // come through here (a test, a reused form id) re-seeds the memory
   const auto lastAny = aggressor->GetLastHitTime(std::nullopt);
   const double lastAnySec = lastAny == std::chrono::steady_clock::time_point()
     ? -std::numeric_limits<double>::infinity()
@@ -3330,13 +3457,12 @@ void ActionListener::OnWeaponHit(MpActor* aggressor,
   }
 
   std::optional<double> swingInterval;
-  const auto verdict =
-    hitMemory.Judge(targetActor.GetFormId(), now, [&] {
-      if (!swingInterval) {
-        swingInterval = GetSwingInterval(*aggressor, hitData);
-      }
-      return *swingInterval;
-    });
+  const auto verdict = hitMemory.Judge(targetActor.GetFormId(), now, [&] {
+    if (!swingInterval) {
+      swingInterval = GetSwingInterval(*aggressor, hitData);
+    }
+    return *swingInterval;
+  });
 
   switch (verdict) {
     case WeaponHitGate::Verdict::Land:
@@ -3387,13 +3513,16 @@ void ActionListener::OnWeaponHit(MpActor* aggressor,
 
   float healthPercentage = currentActorValues.healthPercentage;
 
-  // The server decides whether a hit was blocked, from the target's own block state below: the attacker's client
-  // cannot claim a block it never met (review SCH-2; combat.js drains the blocker's stamina on a block)
+  // The server decides whether a hit was blocked, from the target's own block
+  // state below: the attacker's client cannot claim a block it never met
+  // (review SCH-2; combat.js drains the blocker's stamina on a block)
   hitData.isHitBlocked = false;
 
-  // A hosted NPC's block reaches the server only as its IsBlocking animation variable (its host's movement packet;
-  // animationSystem skips hosted NPCs), and a player's blockStart travels unreliable: either one counts. Both come
-  // from the target's side, so the attacker still cannot forge a block (review SCH2-1, SCH2-2).
+  // A hosted NPC's block reaches the server only as its IsBlocking animation
+  // variable (its host's movement packet; animationSystem skips hosted NPCs),
+  // and a player's blockStart travels unreliable: either one counts. Both come
+  // from the target's side, so the attacker still cannot forge a block (review
+  // SCH2-1, SCH2-2).
   const bool targetBlocking = targetActor.IsBlockActive() ||
     targetActor.GetAnimationVariableBool("IsBlocking");
   if (targetBlocking) {
@@ -3443,11 +3572,13 @@ void ActionListener::OnWeaponHit(MpActor* aggressor,
     }
   }
 
-  // Power attacks and bashes stagger (combat.js). The flags come from the attacker's client, so one attacker gets at
-  // most one such hit on one target per kForcefulHitInterval, and a modified client cannot stagger-lock anyone (SCH-2)
-  // Measurement for review SCH2-4, log only: a power or bash flag with no attackPower*/bash* start from the attacker in
-  // the last 2 s. The client sends only the newest animation per tick, so some real ones will show up here too; the
-  // counts decide whether a hard gate is possible.
+  // Power attacks and bashes stagger (combat.js). The flags come from the
+  // attacker's client, so one attacker gets at most one such hit on one target
+  // per kForcefulHitInterval, and a modified client cannot stagger-lock anyone
+  // (SCH-2) Measurement for review SCH2-4, log only: a power or bash flag with
+  // no attackPower*/bash* start from the attacker in the last 2 s. The client
+  // sends only the newest animation per tick, so some real ones will show up
+  // here too; the counts decide whether a hard gate is possible.
   CountUnmatchedForcefulFlag(aggressor->GetFormId(), hitData.isPowerAttack,
                              hitData.isBashAttack, currentHitTime);
 
@@ -3474,16 +3605,18 @@ void ActionListener::OnWeaponHit(MpActor* aggressor,
 
   float damage = partOne.CalculateDamage(*aggressor, targetActor, hitData);
   damage = damage < 0.f ? 0.f : damage;
-  // The target's full health and stamina, the base a hit is measured against, so the gamemode can turn points into the
-  // percentages it sets (block chip, block stamina): the gamemode cannot read maxima server-side
+  // The target's full health and stamina, the base a hit is measured against,
+  // so the gamemode can turn points into the percentages it sets (block chip,
+  // block stamina): the gamemode cannot read maxima server-side
   const BaseActorValues targetMax = targetActor.GetMaximumValues();
-  // What the hit would have done unblocked, so the gamemode can let part of a blocked blow through (chip damage)
+  // What the hit would have done unblocked, so the gamemode can let part of a
+  // blocked blow through (chip damage)
   float unblockedDamage = damage;
   if (hitData.isHitBlocked) {
     HitData unblocked = hitData;
     unblocked.isHitBlocked = false;
-    unblockedDamage =
-      std::max(0.f, partOne.CalculateDamage(*aggressor, targetActor, unblocked));
+    unblockedDamage = std::max(
+      0.f, partOne.CalculateDamage(*aggressor, targetActor, unblocked));
   }
   const nlohmann::json weaponFlags = {
     { "spell", false },
@@ -3495,7 +3628,8 @@ void ActionListener::OnWeaponHit(MpActor* aggressor,
     { "targetMaxHealth", targetMax.health },
     { "targetMaxStamina", targetMax.stamina }
   };
-  // A fully blocked attack still asks the gamemode, so god mode and companions see it
+  // A fully blocked attack still asks the gamemode, so god mode and companions
+  // see it
   if (!FireHitDamageEvent("onHitDamageAttempt", aggressor, &targetActor,
                           hitData.source, damage, hitData.isHitBlocked,
                           &weaponFlags)) {
@@ -3504,9 +3638,10 @@ void ActionListener::OnWeaponHit(MpActor* aggressor,
   // A refused hit fires no events, a blocked one reaches scripts as blocked
   SendPapyrusOnHitEvent(aggressor, targetRef, hitData);
 
-  // The gamemode may have changed the target's values inside onHitDamageAttempt (combat.js: block chip, the blocker's
-  // stamina), and a script's OnHit may too. Read them again, or NetSetPercentages below writes the earlier snapshot back
-  // over them (review SCH2-3, SCH3-4).
+  // The gamemode may have changed the target's values inside
+  // onHitDamageAttempt (combat.js: block chip, the blocker's stamina), and a
+  // script's OnHit may too. Read them again, or NetSetPercentages below writes
+  // the earlier snapshot back over them (review SCH2-3, SCH3-4).
   currentActorValues = targetActor.GetChangeForm().actorValues;
   healthPercentage = currentActorValues.healthPercentage;
 
@@ -3524,7 +3659,7 @@ void ActionListener::OnWeaponHit(MpActor* aggressor,
     std::vector<espm::ActorValue>{ espm::ActorValue::Health });
   aggressor->SetLastHitTime(targetActor.GetFormId(), currentHitTime);
   weaponHitMemory[aggressor->GetFormId()].Record(targetActor.GetFormId(), now,
-                                                verdict);
+                                                 verdict);
   if (weaponHitMemory.size() > 4096) {
     std::erase_if(weaponHitMemory, [&](const auto& entry) {
       return now - entry.second.LastHitTime() > 10.0;
@@ -3617,7 +3752,8 @@ bool ActionListener::IsWardBlocking(const MpActor& aggressor,
   return &aggressor != &target && ShouldBeBlocked(aggressor, target);
 }
 
-// The caster's engine paralyses only its own copy of the target, so the target's client applies the spell too
+// The caster's engine paralyses only its own copy of the target, so the
+// target's client applies the spell too
 void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
                                       uint32_t spellId)
 {
@@ -3631,8 +3767,9 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
   // A staff hit names its enchantment, which DoCombatSpellApply cannot take
   const bool isEnchantment = static_cast<bool>(espm::Convert<espm::ENCH>(
     partOne.GetEspm().GetBrowser().LookupById(spellId).rec));
-  // A rune's paralysis sits on its explosion's enchantment (Ash Rune), a staff's on its own: an NPC is held on the
-  // server and kept still on its host. Players get dboParalyse from the gamemode
+  // A rune's paralysis sits on its explosion's enchantment (Ash Rune), a
+  // staff's on its own: an NPC is held on the server and kept still on its
+  // host. Players get dboParalyse from the gamemode
   const uint64_t holdKey =
     (static_cast<uint64_t>(aggressor.GetFormId()) << 32) | target.GetFormId();
   const auto now = std::chrono::steady_clock::now();
@@ -3658,27 +3795,31 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
       !riders.damagesHealth && !riders.commands;
     replayId = replayAi ? StandInSpellOf(worldState, spellId) : 0;
   }
-  // Replaying a spell that also damages Health on the target's game would damage it twice. A player's own client
-  // takes the stagger and slow from the clone replay already, and the base game applies AI effects to NPCs only
+  // Replaying a spell that also damages Health on the target's game would
+  // damage it twice. A player's own client takes the stagger and slow from the
+  // clone replay already, and the base game applies AI effects to NPCs only
   const bool replaySpell = isEnchantment
     ? replayId != 0
     : !riders.damagesHealth && !riders.commands &&
       (spellHoldSeconds > 0 ||
        (ridersOn && !isPlayer &&
         (riders.staggerAny || riders.slowAny || riders.ai)));
-  // Such a spell's unconditional stagger and slow go to an NPC's host on their own, as do an enchantment's not replayed
+  // Such a spell's unconditional stagger and slow go to an NPC's host on their
+  // own, as do an enchantment's not replayed
   const bool applyApart = ridersOn && !isPlayer &&
     (riders.damagesHealth || (isEnchantment && !replaySpell)) &&
     (riders.stagger || riders.slow > 0.f);
   if (!replaySpell && !applyApart && hostHoldSeconds == 0) {
     return;
   }
-  // A paralysis staff on an NPC already held sends nothing, its push included (the re-hold gap leaves holdSeconds at 0)
+  // A paralysis staff on an NPC already held sends nothing, its push included
+  // (the re-hold gap leaves holdSeconds at 0)
   if ((holdSeconds > 0 || (isEnchantment && riders.paralysisSeconds > 0)) &&
       IsParalyzed(target)) {
     return;
   }
-  // Only a hit of a spell the caster cast lately or of a staff it holds, at most once a kRiderHitInterval per target
+  // Only a hit of a spell the caster cast lately or of a staff it holds, at
+  // most once a kRiderHitInterval per target
   const bool sourceUsed = isEnchantment
     ? CanHitWithStaffEnchantment(aggressor, spellId)
     : CastRecently(aggressor.GetFormId(), spellId);
@@ -3689,7 +3830,8 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
                  spellId, aggressor.GetFormId(), target.GetFormId());
     return;
   }
-  // God mode refuses paralysis like it refuses damage; a damaging spell's hit already asked
+  // God mode refuses paralysis like it refuses damage; a damaging spell's hit
+  // already asked
   if (!riders.damagesHealth &&
       !FireHitDamageEvent("onHitDamageAttempt", &aggressor, &target, spellId,
                           0.f, true)) {
@@ -3719,7 +3861,8 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
 
   // A player's own client, or the host of an NPC
   MpActor& executor = target.GetActorToSendTo();
-  // The client that reported the hit already applied the spell to its real actor
+  // The client that reported the hit already applied the spell to its real
+  // actor
   if (&executor == &aggressor.GetActorToSendTo()) {
     return;
   }
@@ -3751,9 +3894,10 @@ void ActionListener::ApplySpellRiders(MpActor& aggressor, MpActor& target,
     return;
   }
 
-  // DoCombatSpellApply takes a Spell; a Scroll is another form type in Papyrus, so a scroll's riders are kept on the
-  // server only (review SCH1-R4)
-  const auto replayLookup = partOne.GetEspm().GetBrowser().LookupById(replayId);
+  // DoCombatSpellApply takes a Spell; a Scroll is another form type in
+  // Papyrus, so a scroll's riders are kept on the server only (review SCH1-R4)
+  const auto replayLookup =
+    partOne.GetEspm().GetBrowser().LookupById(replayId);
   if (!espm::Convert<espm::SPEL>(replayLookup.rec)) {
     spdlog::info("OnSpellHit - riders of {:x} on {:x} are not replayed on "
                  "{:x}'s client (not a SPEL)",
@@ -3814,7 +3958,8 @@ void ActionListener::ResendHostEffects(uint32_t targetId, MpActor& newHost)
   }
 }
 
-// The effect ends on every client that took it, which kept its copy of the target changed until then
+// The effect ends on every client that took it, which kept its copy of the
+// target changed until then
 void ActionListener::EndHostEffect(uint32_t targetId, HostEffect effect)
 {
   auto it = hostEffects.find(std::make_pair(targetId, effect));
@@ -3823,11 +3968,14 @@ void ActionListener::EndHostEffect(uint32_t targetId, HostEffect effect)
   }
   const auto now = std::chrono::steady_clock::now();
   if (now < it->second.until) {
-    // Extended by a later start, or this (system clock) timer fired before the steady deadline: end it then
-    const auto left = std::chrono::ceil<std::chrono::milliseconds>(
-      it->second.until - now);
+    // Extended by a later start, or this (system clock) timer fired before the
+    // steady deadline: end it then
+    const auto left =
+      std::chrono::ceil<std::chrono::milliseconds>(it->second.until - now);
     partOne.worldState.SetTimer(left).Then(
-      [this, targetId, effect](Viet::Void) { EndHostEffect(targetId, effect); });
+      [this, targetId, effect](Viet::Void) {
+        EndHostEffect(targetId, effect);
+      });
     return;
   }
   const TimedHostEffect ended = it->second;
@@ -3924,7 +4072,8 @@ bool ActionListener::ScrollReadRecently(uint32_t casterId, uint32_t scrollId)
     std::chrono::steady_clock::now() - it->second <= kScrollLastReadKept;
 }
 
-// Scroll reads per caster: kept kScrollHitWindow, at most kScrollReadsPerCaster (the oldest goes first)
+// Scroll reads per caster: kept kScrollHitWindow, at most
+// kScrollReadsPerCaster (the oldest goes first)
 void ActionListener::RecordScrollRead(uint32_t casterId, uint32_t scrollId)
 {
   auto& reads = scrollHits[casterId];
@@ -3933,9 +4082,11 @@ void ActionListener::RecordScrollRead(uint32_t casterId, uint32_t scrollId)
   const auto now = std::chrono::steady_clock::now();
   read.until = now + kScrollHitWindow;
   reads.push_back(std::move(read));
-  // At the cap: the stale entries go first; if that frees nothing, one arbitrary entry goes, since the container is
-  // unordered and begin() is bucket order, not the oldest (review, Worker D). Only ever with kScrollLastReadMax live
-  // caster+scroll pairs inside kScrollLastReadKept, so the fallback is as good as never reached.
+  // At the cap: the stale entries go first; if that frees nothing, one
+  // arbitrary entry goes, since the container is unordered and begin() is
+  // bucket order, not the oldest (review, Worker D). Only ever with
+  // kScrollLastReadMax live caster+scroll pairs inside kScrollLastReadKept, so
+  // the fallback is as good as never reached.
   if (scrollLastRead.size() >= kScrollLastReadMax) {
     std::erase_if(scrollLastRead, [&](const auto& entry) {
       return now - entry.second > kScrollLastReadKept;
@@ -3963,8 +4114,9 @@ void PruneScrollReads(Map& scrollHits)
 }
 }
 
-// A scroll's hit counts only on a scroll the server used up for this caster lately: each actor once per read, up to
-// kScrollTargetsPerRead actors (an area scroll touches several). Review SCH1-R1/R2.
+// A scroll's hit counts only on a scroll the server used up for this caster
+// lately: each actor once per read, up to kScrollTargetsPerRead actors (an
+// area scroll touches several). Review SCH1-R1/R2.
 bool ActionListener::TakeScrollHit(uint32_t casterId, uint32_t scrollId,
                                    uint32_t targetId)
 {
@@ -3986,10 +4138,12 @@ bool ActionListener::TakeScrollHit(uint32_t casterId, uint32_t scrollId,
   return false;
 }
 
-// The spell a wall or cloak scroll grants ticks on whoever stands in it. The client reports every tick, faster than the
-// gamemode's once-a-second limit on concentration spells, so a raw hit budget ran dry in seconds (review SCH3-1): each
-// target is credited at most once a second, for up to kScrollGrantedSecondsPerTarget seconds, on up to
-// kScrollTargetsPerRead targets. A tick inside the same second is refused.
+// The spell a wall or cloak scroll grants ticks on whoever stands in it. The
+// client reports every tick, faster than the gamemode's once-a-second limit on
+// concentration spells, so a raw hit budget ran dry in seconds (review
+// SCH3-1): each target is credited at most once a second, for up to
+// kScrollGrantedSecondsPerTarget seconds, on up to kScrollTargetsPerRead
+// targets. A tick inside the same second is refused.
 bool ActionListener::TakeScrollGrantedHit(uint32_t casterId, uint32_t spellId,
                                           uint32_t targetId)
 {
@@ -4022,8 +4176,9 @@ bool ActionListener::TakeScrollGrantedHit(uint32_t casterId, uint32_t spellId,
   return false;
 }
 
-// A staff fires no faster than it can: a concentration staff ticks once per kStaffTickInterval per target, a
-// fire-and-forget staff one volley per kStaffVolleyInterval, which hits each target once within kStaffVolleySpread
+// A staff fires no faster than it can: a concentration staff ticks once per
+// kStaffTickInterval per target, a fire-and-forget staff one volley per
+// kStaffVolleyInterval, which hits each target once within kStaffVolleySpread
 bool ActionListener::TakeStaffHit(uint32_t casterId, uint32_t enchantmentId,
                                   uint32_t targetId)
 {
@@ -4036,18 +4191,17 @@ bool ActionListener::TakeStaffHit(uint32_t casterId, uint32_t enchantmentId,
       return now - entry.second.firstAt > std::chrono::seconds(5);
     });
   }
-  const auto lookup =
-    partOne.GetEspm().GetBrowser().LookupById(enchantmentId);
+  const auto lookup = partOne.GetEspm().GetBrowser().LookupById(enchantmentId);
   const auto enchantment = espm::Convert<espm::ENCH>(lookup.rec);
   if (!enchantment) {
     return false;
   }
   const auto* enchantedItem =
-    enchantment->GetSpellData(partOne.worldState.GetEspmCache())
-      .enchantedItem;
+    enchantment->GetSpellData(partOne.worldState.GetEspmCache()).enchantedItem;
   if (enchantedItem &&
       enchantedItem->castType == espm::SPEL::CastType::Concentration) {
-    auto& last = staffTicks[(static_cast<uint64_t>(casterId) << 32) | targetId];
+    auto& last =
+      staffTicks[(static_cast<uint64_t>(casterId) << 32) | targetId];
     if (now - last < kStaffTickInterval) {
       return false;
     }
@@ -4108,8 +4262,8 @@ void ActionListener::CountUnmatchedForcefulFlag(
   }
   const auto it = forcefulAnims.find(aggressorId);
   const auto window = std::chrono::seconds(2);
-  const bool powerMatched = it != forcefulAnims.end() &&
-    now - it->second.powerAt <= window;
+  const bool powerMatched =
+    it != forcefulAnims.end() && now - it->second.powerAt <= window;
   const bool bashMatched =
     it != forcefulAnims.end() && now - it->second.bashAt <= window;
   if (power) {
@@ -4124,17 +4278,19 @@ void ActionListener::CountUnmatchedForcefulFlag(
       ++forcefulFlagCounts.bashUnmatched;
     }
   }
-  // One line a minute, not one per hit: a hosted NPC's animation events never reach the server, so its power hits
-  // never match and logged 22000 lines a day (10 Oct)
+  // One line a minute, not one per hit: a hosted NPC's animation events never
+  // reach the server, so its power hits never match and logged 22000 lines a
+  // day (10 Oct)
   if ((power && !powerMatched) || (bash && !bashMatched)) {
     ++forcefulFlagCounts.sinceLog;
     if (now - forcefulFlagCounts.loggedAt >= std::chrono::seconds(60)) {
-      spdlog::info("OnWeaponHit - {} hits with a forceful flag and no matching "
-                   "animation in 2 s in the last minute, latest {:x} (power {}/{} "
-                   "unmatched, bash {}/{})",
-                   forcefulFlagCounts.sinceLog, aggressorId,
-                   forcefulFlagCounts.powerUnmatched, forcefulFlagCounts.power,
-                   forcefulFlagCounts.bashUnmatched, forcefulFlagCounts.bash);
+      spdlog::info(
+        "OnWeaponHit - {} hits with a forceful flag and no matching "
+        "animation in 2 s in the last minute, latest {:x} (power {}/{} "
+        "unmatched, bash {}/{})",
+        forcefulFlagCounts.sinceLog, aggressorId,
+        forcefulFlagCounts.powerUnmatched, forcefulFlagCounts.power,
+        forcefulFlagCounts.bashUnmatched, forcefulFlagCounts.bash);
       forcefulFlagCounts.sinceLog = 0;
       forcefulFlagCounts.loggedAt = now;
     }

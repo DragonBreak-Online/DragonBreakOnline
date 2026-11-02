@@ -11,7 +11,8 @@ constexpr float kHealthPerLevel = 5.f;
 // Points a class's attribute weights share out each level
 constexpr float kClassPointsPerLevel = 10.f;
 
-// Health gained above level 1: the level bonus plus the class's health share (UESP Skyrim:Health, CLAS DATA)
+// Health gained above level 1: the level bonus plus the class's health share
+// (UESP Skyrim:Health, CLAS DATA)
 float LevelHealth(WorldState* worldState, const espm::NPC_::Data& npc)
 {
   const int level = (npc.acbsFlags & kAcbsPcLevelMult)
@@ -80,7 +81,8 @@ BaseActorValues GetBaseActorValues(WorldState* worldState, uint32_t baseId,
 
   actorValues.health =
     raceData.startingHealth + attributesNpcData.healthOffset;
-  // A negative offset only balances the health a level brings, which is left out above (a Timber Wolf: 12 - 16)
+  // A negative offset only balances the health a level brings, which is left
+  // out above (a Timber Wolf: 12 - 16)
   if (actorValues.health <= 0) {
     actorValues.health += LevelHealth(worldState, attributesNpcData);
   }
@@ -95,10 +97,10 @@ BaseActorValues GetBaseActorValues(WorldState* worldState, uint32_t baseId,
   actorValues.magicka =
     raceData.startingMagicka + attributesNpcData.magickaOffset;
   if (actorValues.magicka < 0) { // zero magicka is ok, negative isn't
-    spdlog::warn("GetBaseActorValues {:x} {:x} - Negative Magicka found: "
-                 "startingMagicka={}, magickaOffset={}, defaulting to 100",
-                 baseId, raceIdOverride, raceData.startingMagicka,
-                 attributesNpcData.magickaOffset);
+    spdlog::trace("GetBaseActorValues {:x} {:x} - Negative Magicka found: "
+                  "startingMagicka={}, magickaOffset={}, defaulting to 100",
+                  baseId, raceIdOverride, raceData.startingMagicka,
+                  attributesNpcData.magickaOffset);
     actorValues.magicka = 100.f;
   }
 

@@ -1,4 +1,5 @@
 import * as fs from "fs";
+import * as crypto from "crypto";
 import { Settings } from "../settings";
 import { System, Log, SystemContext, Content } from "./system";
 import { espmRefrFieldId, toFormId } from "./formIdUtil";
@@ -64,9 +65,18 @@ const PLACE_PLAN_MAX_TRIES = 10;
 // The key serial of a granted way in whose old record cannot be read: far past any serial a claim reaches by re-keying
 const GRANT_SERIAL = 1000;
 const OWNER_INDEX_PROP = "private.indexed.housingOwner";
+// Ambient, server -> client: { customPacketType: "homeCells", cells: [<cell form id>, ...] }, at login and on
+// any ownership change. The client owns those cells so Skyrim stops calling a player's own barrels theft; an
+// old client ignores a packet type it does not know.
+const HOME_CELLS_TYPE = "homeCells";
 const REGISTRY_FILE = "./housing.json";
 // Written once the claimed storage that was open on 12 Oct is locked, listing it, so the lock never runs twice
 const STORAGE_LOCK_FILE = "./housing-storage-locked.json";
+// What the plugins say about a reference never changes for a load order: its teleport partner, its base's type, its cell, that
+// it is gone. Kept across boots, keyed by the load order, because the first look at each costs a native load: the interior
+// behind a door, seconds cold (1 Nov profile: 26 s of hall-door lookups right after a boot)
+const ESPM_CACHE_FILE = "./housing-espm-cache.json";
+const ESPM_SAVE_MS = 30000;
 
 // A key credential, "(80B5EAC)" or "(80B5EAC-2)": the only alias matched as a suffix
 const CREDENTIAL_RE = /^\([0-9A-F]+(-\d+)?\)$/;
@@ -92,6 +102,10 @@ const MAX_ESPM_CACHE = 4096;
 const DEFAULT_MAX_CLAIMS = 8;
 const DEFAULT_MAX_DISTANCE = 512;
 const DECOR_PUSH_INTERVAL_MS = 4000;
+// A full refresh costs every claim per viewer, so a sweep sends one viewer at a time this far apart
+const DECOR_SWEEP_STEP_MS = 50;
+// More changed claims than this in one tick (a migration, a bulk lock) go out as a full sweep instead of a delta
+const DECOR_DELTA_MAX = 32;
 const REQUEST_COOLDOWN_MS = 500;
 const CHANGE_FAILED = "That cannot be changed right now.";
 const NOT_GRANTED = "Property here is granted by its ruler (Jarl, Baron or Count) or their Steward.";
@@ -236,6 +250,7 @@ export class HousingSystem implements System {
   async initAsync(ctx: SystemContext): Promise<void> {
     const s = await Settings.get();
     const all = s.allSettings as Record<string, unknown> | null;
+    this.loadEspmCache(all?.["loadOrder"]);
 
     const placeCap = Number(all?.["housingPlaceCap"]);
     if (Number.isFinite(placeCap) && placeCap >= 1) this.placeCap = Math.floor(placeCap);
@@ -289,6 +304,8 @@ export class HousingSystem implements System {
     };
     (globalThis as any).__dboHousing = {
       primaryOf: (ref: unknown) => primary(ref),
+      // primaryOf's answer without reading the ref itself when no claim owns it (guilds.js hall roots, right after a boot)
+      rootOfKnown: (ref: unknown) => this.rootOfKnown(ctx, Number(ref) >>> 0),
       recordOf: (ref: unknown) => { const p = primary(ref); return p ? this.read(ctx, p) : null; },
       holdOf: (ref: unknown) => { const p = primary(ref); return p ? this.holdOf(ctx, p) : ""; },
       // Whether a claim is property: a building, never a chest or an inner door (Nate, 5 Oct); all claims before the place rules
@@ -449,7 +466,9 @@ export class HousingSystem implements System {
   }
 
   async updateAsync(ctx: SystemContext): Promise<void> {
+    this.flushHomeCells(ctx);
     const now = Date.now();
+    this.saveEspmCache(now);
     // Records read as null on the first ticks after boot, so the plan waits, and tries again while nothing is readable
     if ((this.placeMigration !== "off" || this.placeRestore) && !this.placePlanDone && now - this.initAtMs >= PLACE_PLAN_DELAY_MS && now - this.placePlanTriedMs >= PLACE_PLAN_DELAY_MS) {
       this.placePlanTriedMs = now;
@@ -470,6 +489,17 @@ export class HousingSystem implements System {
       try { this.storageLockDone = this.lockOpenStorage(ctx, ++this.storageLockTries >= PLACE_PLAN_MAX_TRIES); }
       catch (e) { this.storageLockDone = true; this.log(`[housing] storage lock failed: ${e}`); }
     }
+    if (this.decorChanged.size) {
+      const changed = Array.from(this.decorChanged);
+      this.decorChanged.clear();
+      this.decorSnapshot = null;
+      if (changed.length > DECOR_DELTA_MAX) this.pushDecorToAll(ctx);
+      else this.pushDecorDelta(ctx, changed);
+    }
+    if (this.decorSweep.length && now - this.lastSweepMs >= DECOR_SWEEP_STEP_MS) {
+      this.lastSweepMs = now;
+      this.sweepStep(ctx);
+    }
     if (now - this.lastDecorMs < DECOR_PUSH_INTERVAL_MS) return;
     this.lastDecorMs = now;
     if (!this.decorDirty) return;
@@ -480,9 +510,66 @@ export class HousingSystem implements System {
   // A fresh actor needs the full picture: names and locks for every claim.
   private onActorAssigned(ctx: SystemContext, userId: number): void {
     this.pushDecor(ctx, userId);
+    this.sendHomeCells(ctx, userId);
     const actorId = this.actorOf(ctx, userId);
     if (actorId) {
       try { if (this.keyRing) this.ringAtLogin(ctx, actorId); else this.migrateKeys(ctx, actorId); } catch (e) { this.log(`[housing] key migration failed: ${e}`); }
+    }
+  }
+
+  // Every cell a profile owns outright. Both halves of each door pair are offered, because either side can be
+  // the interior - holdOf tries primary then partner for exactly that reason - and the server cannot always
+  // tell which. The client refuses a cell that is not an interior, so an exterior id here is harmless.
+  private homeCellsOf(ctx: SystemContext, profileId: number): number[] {
+    if (!profileId) return [];
+    const mp = ctx.svr as Mp;
+    let refs: number[] = [];
+    try {
+      refs = ((mp as any).findFormsByPropertyValue(OWNER_INDEX_PROP, String(profileId)) || []) as number[];
+    } catch {
+      return [];
+    }
+    const cells = new Set<number>();
+    for (const refId of refs) {
+      const primary = Number(refId) >>> 0;
+      if (!primary) continue;
+      // the index can outlive a record, and giving a place up leaves an ownerless stub: only a live owner counts
+      const rec = this.read(ctx, primary);
+      if (!rec || rec.owner !== profileId) continue;
+      const own = this.cellOf(ctx, primary);
+      if (own) cells.add(own);
+      const partner = this.partnerOf(ctx, primary);
+      if (partner) {
+        const far = this.cellOf(ctx, partner);
+        if (far) cells.add(far);
+      }
+    }
+    return [...cells];
+  }
+
+  private sendHomeCells(ctx: SystemContext, userId: number): void {
+    const actorId = this.actorOf(ctx, userId);
+    if (!actorId) return;
+    const profileId = this.profileOf(ctx, actorId);
+    if (!profileId) return;
+    this.send(ctx, userId, { customPacketType: HOME_CELLS_TYPE, cells: this.homeCellsOf(ctx, profileId) });
+  }
+
+  // Marked rather than sent inline, so a packet never goes out in the middle of a claim or a transfer, and two
+  // changes in one tick cost one packet. Place members are not marked: a member sits in the same cells as its
+  // root, so inheriting an owner never changes the list.
+  private markHomeCells(profileId: number): void {
+    if (profileId) this.homeCellsDirty.add(profileId >>> 0);
+  }
+
+  private flushHomeCells(ctx: SystemContext): void {
+    if (!this.homeCellsDirty.size) return;
+    const want = this.homeCellsDirty;
+    this.homeCellsDirty = new Set<number>();
+    for (const userId of this.onlineUsers(ctx)) {
+      const actorId = this.actorOf(ctx, userId);
+      if (!actorId) continue;
+      if (want.has(this.profileOf(ctx, actorId) >>> 0)) this.sendHomeCells(ctx, userId);
     }
   }
 
@@ -1162,8 +1249,8 @@ export class HousingSystem implements System {
   private placeAt(ctx: SystemContext, refrId: number): { root: number; rec: PropertyRecord } | null {
     const index = this.placeIndex(ctx);
     if (!index.size) return null;
-    let cell = "";
-    try { cell = String((ctx.svr as Mp).get(refrId, "worldOrCellDesc") || ""); } catch { return null; }
+    const cell = this.cellDescOf(ctx, refrId);
+    if (!cell) return null;
     const root = index.get(cell);
     if (!root) return null;
     const rec = this.read(ctx, root);
@@ -1214,7 +1301,14 @@ export class HousingSystem implements System {
   // ── Places (N3): building and carrying ─────────────────────────────────────
 
   private cellDescOf(ctx: SystemContext, refrId: number): string {
-    try { return String((ctx.svr as Mp).get(refrId, "worldOrCellDesc") || ""); } catch { return ""; }
+    const id = refrId >>> 0;
+    const cached = this.cellCache.get(id);
+    if (cached !== undefined) return cached;
+    let desc = "";
+    try { desc = String((ctx.svr as Mp).get(id, "worldOrCellDesc") || ""); } catch { return ""; }
+    // A plugin reference never changes cell; a dynamic one (0xff...) is reassigned every run
+    if (desc && id < 0xff000000) this.rememberEspm(this.cellCache, id, desc);
+    return desc;
   }
 
   private isWorldDesc(ctx: SystemContext, desc: string): boolean {
@@ -2215,23 +2309,69 @@ export class HousingSystem implements System {
   // ── refDecor ────────────────────────────────────────────────────────────────
 
   private pushDecorToAll(ctx: SystemContext): void {
-    const refs = this.keyRing ? null : this.decorRefs(ctx);
-    for (const userId of this.onlineUsers(ctx)) {
-      if (refs) this.sendDecor(ctx, userId, refs);
-      else this.pushDecor(ctx, userId);
+    if (!this.keyRing) {
+      const refs = this.decorRefs(ctx);
+      for (const userId of this.onlineUsers(ctx)) this.sendDecor(ctx, userId, refs);
+      return;
     }
+    // Per-viewer lists cost every claim for each viewer, so they go out one viewer per sweep step
+    this.decorSnapshot = null;
+    this.decorSweep = this.onlineUsers(ctx);
   }
 
-  private pushDecor(ctx: SystemContext, userId: number): void {
+  private sweepStep(ctx: SystemContext): void {
+    const userId = this.decorSweep.shift();
+    if (userId === undefined) return;
+    if (!this.decorSnapshot) this.decorSnapshot = this.liveClaims(ctx);
+    this.pushDecor(ctx, userId, this.decorSnapshot);
+    if (!this.decorSweep.length) this.decorSnapshot = null;
+  }
+
+  private pushDecor(ctx: SystemContext, userId: number, live?: Array<{ primary: number; rec: PropertyRecord }>): void {
     const actorId = this.keyRing ? this.actorOf(ctx, userId) : 0;
-    this.sendDecor(ctx, userId, this.decorRefs(ctx, actorId ? this.viewerAccess(ctx, actorId) : undefined));
+    this.sendDecor(ctx, userId, this.decorRefs(ctx, actorId ? this.viewerAccess(ctx, actorId) : undefined, live));
+  }
+
+  // A write changes only its own claim's entries (and, for a place's root, its members' names), so only those go out
+  private pushDecorDelta(ctx: SystemContext, changed: number[]): void {
+    const entries: Array<{ primary: number; rec: PropertyRecord | null; name: string | null }> = [];
+    const seen = new Set<number>();
+    const add = (primary: number, rec: PropertyRecord | null, name: string | null) => {
+      if (seen.has(primary)) return;
+      seen.add(primary);
+      entries.push({ primary, rec, name });
+    };
+    for (const primary of changed) {
+      const rec = this.read(ctx, primary);
+      if (!rec || rec.owner === 0) { add(primary, rec, null); continue; }
+      const root = rec.memberOf && this.placesOn() ? this.read(ctx, rec.memberOf) : null;
+      const name = (root && root.owner !== 0 && root.name) || rec.name;
+      add(primary, rec, name);
+      if (rec.place && this.placesOn()) for (const m of this.membersOf(ctx, primary)) add(m.ref, m.rec, rec.name || m.rec.name);
+    }
+    const build = (v?: ViewerAccess) => {
+      const refs: Array<Record<string, unknown>> = [];
+      for (const { primary, rec, name } of entries) {
+        const live = !!rec && rec.owner !== 0;
+        const locked = live && !!rec && rec.locked && !(v && this.hasAccessWith(ctx, primary, rec, v));
+        refs.push({ refId: primary, name: live ? name : null, locked });
+        if (rec && rec.partner) refs.push({ refId: rec.partner, name: live ? name : null, locked });
+      }
+      return refs;
+    };
+    const shared = this.keyRing ? null : build();
+    for (const userId of this.onlineUsers(ctx)) {
+      const actorId = this.actorOf(ctx, userId);
+      if (!actorId) continue;
+      this.send(ctx, userId, { customPacketType: "refDecor", refs: shared || build(this.viewerAccess(ctx, actorId)) });
+    }
   }
 
   // A locked claim is locked for every viewer, so one list serves everyone; with housingKeyRing it shows unlocked to whoever
   // may walk in. A member of a place carries the place's name, so a rename shows on every door pair of it (Nate, 3 Oct)
-  private decorRefs(ctx: SystemContext, v?: ViewerAccess): Array<Record<string, unknown>> {
+  private decorRefs(ctx: SystemContext, v?: ViewerAccess, snapshot?: Array<{ primary: number; rec: PropertyRecord }>): Array<Record<string, unknown>> {
     const refs: Array<Record<string, unknown>> = [];
-    const live = this.liveClaims(ctx);
+    const live = snapshot || this.liveClaims(ctx);
     const names = new Map<number, string | null>(live.map((c) => [c.primary, c.rec.name]));
     for (const { primary, rec } of live) {
       const name = this.shownName(rec, names);
@@ -2376,6 +2516,32 @@ export class HousingSystem implements System {
   private rememberEspm<T>(cache: Map<number, T>, refrId: number, value: T): void {
     if (cache.size >= MAX_ESPM_CACHE) cache.clear();
     cache.set(refrId, value);
+    this.espmDirty = true;
+  }
+
+  private loadEspmCache(loadOrder: unknown): void {
+    this.espmKey = crypto.createHash("sha1").update(JSON.stringify(Array.isArray(loadOrder) ? loadOrder : [])).digest("hex");
+    try {
+      const c = JSON.parse(fs.readFileSync(ESPM_CACHE_FILE, "utf8"));
+      if (!c || c.key !== this.espmKey) { this.log(`[housing] ${ESPM_CACHE_FILE} is for another load order: starting empty`); return; }
+      const fill = <T>(m: Map<number, T>, o: Record<string, T> | undefined) => { for (const [k, v] of Object.entries(o || {})) m.set(Number(k) >>> 0, v); };
+      fill(this.partnerCache, c.partner); fill(this.baseTypeCache, c.baseType); fill(this.cellCache, c.cell);
+      for (const g of Array.isArray(c.gone) ? c.gone : []) this.gone.add(Number(g) >>> 0);
+      this.espmDirty = false;
+      this.log(`[housing] ${ESPM_CACHE_FILE}: ${this.partnerCache.size} partners, ${this.baseTypeCache.size} base types, ${this.cellCache.size} cells, ${this.gone.size} gone`);
+    } catch { /* first boot of this load order */ }
+  }
+
+  // Off the game loop, one write in flight, at most every ESPM_SAVE_MS
+  private saveEspmCache(now: number): void {
+    if (!this.espmDirty || this.espmSaving || now - this.espmSavedMs < ESPM_SAVE_MS) return;
+    this.espmDirty = false; this.espmSaving = true; this.espmSavedMs = now;
+    const obj = (m: Map<number, unknown>) => Object.fromEntries([...m].map(([k, v]) => [String(k), v]));
+    const body = JSON.stringify({ key: this.espmKey, partner: obj(this.partnerCache), baseType: obj(this.baseTypeCache), cell: obj(this.cellCache), gone: [...this.gone] });
+    const tmp = ESPM_CACHE_FILE + ".tmp";
+    fs.promises.writeFile(tmp, body).then(() => fs.promises.rename(tmp, ESPM_CACHE_FILE))
+      .catch((e) => { this.espmDirty = true; this.log(`[housing] ${ESPM_CACHE_FILE} write failed: ${e}`); })
+      .finally(() => { this.espmSaving = false; });
   }
 
   // A reference a plugin update deleted throws "doesn't exist"; a record not yet loaded after boot reads as null instead
@@ -2399,6 +2565,7 @@ export class HousingSystem implements System {
     if (!/doesn't exist/.test(String((reason as Error)?.message ?? reason))) return false;
     if (this.gone.size >= MAX_ESPM_CACHE) this.gone.clear();
     this.gone.add(refrId);
+    this.espmDirty = true;
     return true;
   }
 
@@ -2435,6 +2602,43 @@ export class HousingSystem implements System {
     }
   }
 
+  // Every claim and its teleport partner (which carries the { primary } pointer), to the claim: the refs that have a record
+  private claimIndex(ctx: SystemContext): Map<number, number> {
+    const key = `${this.claimed.length}:${this.claimIndexVer}`;
+    if (this.claimIndexCache && this.claimIndexKey === key) return this.claimIndexCache;
+    const idx = new Map<number, number>();
+    for (const c of this.claimed) {
+      idx.set(c >>> 0, c >>> 0);
+      const r = this.read(ctx, c);
+      if (r && r.partner) idx.set(r.partner >>> 0, c >>> 0);
+    }
+    this.claimIndexCache = idx; this.claimIndexKey = key;
+    return idx;
+  }
+
+  // The exposed primaryOf's answer, but a ref no claim owns is never read: whether it has a record comes from the claim index,
+  // because the first read of a door nobody claimed is a native load of it, seconds cold right after a boot (1 Nov profile:
+  // guilds.js hall roots, 13.5 s). Its partner and cells come from the espm cache. A claim the registry lost reads as unclaimed
+  // here, which for hall roots only means its leader waits for primaryOf's answer elsewhere
+  private rootOfKnown(ctx: SystemContext, refrId: number): number {
+    const id = refrId >>> 0;
+    if (!id || this.gone.has(id)) return 0;
+    const idx = this.claimIndex(ctx);
+    let p = idx.get(id) || 0;
+    if (!p) {
+      if (!this.isClaimable(ctx, id)) return 0;
+      const partner = this.partnerOf(ctx, id);
+      p = partner && idx.has(partner) ? (idx.get(partner) as number) : (partner && partner < id ? partner : id);
+    }
+    if (!this.placesOn()) return p;
+    if (idx.get(p) === p) {
+      const r = this.read(ctx, p);
+      if (r && r.owner !== 0) return r.memberOf && r.memberOf !== p ? r.memberOf : p;
+    }
+    const place = this.placeOfRef(ctx, p);
+    return place ? place.root : p;
+  }
+
   private write(ctx: SystemContext, primary: number, rec: PropertyRecord): boolean {
     const mp = ctx.svr as Mp;
     try {
@@ -2453,9 +2657,9 @@ export class HousingSystem implements System {
     }
     if (rec.owner !== 0) this.remember(primary); else this.forget(primary);
     this.placeCellsDirty = true;
+    this.claimIndexVer++;
     // Lock changes reach every client on the next tick, not the next decor interval
-    this.decorDirty = true;
-    this.lastDecorMs = 0;
+    this.decorChanged.add(primary);
     return true;
   }
 
@@ -2480,6 +2684,7 @@ export class HousingSystem implements System {
     delete rec.keyAliases;
     delete rec.memberOf; delete rec.ownerOnly;
     this.reKey(ctx, primary, rec);
+    this.markHomeCells(rec.owner);
     rec.owner = 0;
     delete rec.ownerChar;
     rec.ownerName = "";
@@ -2934,7 +3139,9 @@ export class HousingSystem implements System {
 
   private setOwner(ctx: SystemContext, rec: PropertyRecord, actorId: number, profileId: number): void {
     if (rec.owner !== 0 && (rec.owner !== profileId || (actorId && (rec.ownerChar || 0) !== (actorId >>> 0)))) this.changedHands(rec);
+    this.markHomeCells(rec.owner);
     rec.owner = profileId;
+    this.markHomeCells(profileId);
     if (actorId) rec.ownerChar = actorId >>> 0; else delete rec.ownerChar;
     rec.ownerName = this.nameOf(ctx, actorId);
   }
@@ -3080,15 +3287,19 @@ export class HousingSystem implements System {
     }
   }
 
-  // Write through a temp file so an interrupted write cannot truncate the index.
+  // Write through a temp file so an interrupted write cannot truncate the index; off the game loop, one write in flight,
+  // and a change made while one is in flight is written by one more pass after it
   private saveRegistry(): void {
+    if (this.registrySaving) { this.registryAgain = true; return; }
+    this.registrySaving = true;
     const tmp = REGISTRY_FILE + ".tmp";
-    try {
-      fs.writeFileSync(tmp, JSON.stringify(this.claimed));
-      fs.renameSync(tmp, REGISTRY_FILE);
-    } catch (e) {
-      this.log(`[housing] registry write failed: ${e}`);
-    }
+    fs.promises.writeFile(tmp, JSON.stringify(this.claimed))
+      .then(() => fs.promises.rename(tmp, REGISTRY_FILE))
+      .catch((e) => this.log(`[housing] registry write failed: ${e}`))
+      .finally(() => {
+        this.registrySaving = false;
+        if (this.registryAgain) { this.registryAgain = false; this.saveRegistry(); }
+      });
   }
 
   private remember(primary: number): void {
@@ -3156,6 +3367,9 @@ export class HousingSystem implements System {
   }
 
   private claimed: number[] = [];
+  private claimIndexCache: Map<number, number> | null = null;
+  private claimIndexKey = "";
+  private claimIndexVer = 0;
   private buildings: { mtime: number; byCell: Map<string, string[]> } | null = null;
   private doorNames: { mtime: number; byDesc: Map<string, string> } | null = null;
   // The ref a property request was made at, while it runs
@@ -3173,6 +3387,8 @@ export class HousingSystem implements System {
   private roleCfg: AdminRoleConfig = readAdminRoleConfig(null);
   private zones!: Zones;
   private zoneCache = new Map<number, string | null>();
+  // Profiles whose owned-cell list changed and has not been sent yet
+  private homeCellsDirty = new Set<number>();
   private maxClaims = DEFAULT_MAX_CLAIMS;
   private placeCap = 1;
   private placeCapPerAccount = 2;
@@ -3185,6 +3401,11 @@ export class HousingSystem implements System {
   private placePlanTries = 0;
   private placeCells: Map<string, number> | null = null;
   private worldDescs = new Map<string, boolean>();
+  private cellCache = new Map<number, string>();
+  private espmKey = "";
+  private espmDirty = false;
+  private espmSaving = false;
+  private espmSavedMs = 0;
   private placeCellsDirty = true;
   private maxDistance = DEFAULT_MAX_DISTANCE;
   private openClaims = false;
@@ -3198,4 +3419,10 @@ export class HousingSystem implements System {
   private storageLockTries = 0;
   private decorDirty = false;
   private lastDecorMs = 0;
+  private decorChanged = new Set<number>();
+  private decorSweep: number[] = [];
+  private decorSnapshot: Array<{ primary: number; rec: PropertyRecord }> | null = null;
+  private lastSweepMs = 0;
+  private registrySaving = false;
+  private registryAgain = false;
 }

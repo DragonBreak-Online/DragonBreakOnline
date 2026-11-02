@@ -332,7 +332,11 @@ VarValue VirtualMachine::CallMethod(
   e += base;
   e += (base[0] ? "." : "") + std::string(methodName) + "'";
 
-  spdlog::error("VirtualMachine::CallMethod - {}", e);
+  static std::set<std::string> loggedMissingMethods;
+  if (loggedMissingMethods.size() < 1024 &&
+      loggedMissingMethods.insert(e).second) {
+    spdlog::error("VirtualMachine::CallMethod - {}", e);
+  }
 
   return VarValue::None();
 }
