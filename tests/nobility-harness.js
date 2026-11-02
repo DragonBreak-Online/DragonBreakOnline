@@ -150,11 +150,27 @@ ok('on: the tab is registered as Nobility', !!globalThis.__dboJournalSections.no
 
 // ---- where a fief is ----------------------------------------------------------------------------------------------------
 const N = globalThis.__dboNobility;
-ok('the fiefs are the four towns of the Bruma lock (Greenwood since Nate\'s go), all Bruma\'s, and Underarch Harbor, Haafingar\'s',
-  FIEFS.map((f) => f.id).sort().join() === 'aleswell,applewatch,greenwood,mountain-watch,underarch-harbor'
-  && FIEFS.filter((f) => f.id !== 'underarch-harbor').every((f) => f.hold === 'bruma') && FIEFS.every((f) => f.cells.length && f.grid.length) && UH.hold === 'solitude');
-// The Bruma fiefs exactly as they were before Underarch Harbor was added (sha1 of each entry's compact JSON)
-const BEFORE = {"applewatch": "78f8195397e4e41ef90f0c501d023613f2dfce3c", "aleswell": "2c0142e282c1a4bdbd0c0cab250ef0fecae8eda6", "mountain-watch": "a7724e015f30c3da39d43437a804e4f39fa9f957", "greenwood": "04bc8b82c444cf84dbd371ece8c0bdd605b1ed05"};
+// Nat, 2 Nov: a fief in every Skyrim hold but Winterhold (ticket mod-0602). Bruma's four and the harbor stay.
+ok('the fiefs are the four Bruma towns plus 13 in Skyrim, one or two a hold, Winterhold none',
+  FIEFS.map((f) => f.id).sort().join() === 'aleswell,angas-mill,applewatch,darkwater-crossing,dragon-bridge,greenwood,halfmoon-mill,ivarstead,karthwasten,kynesgrove,mountain-watch,old-hroldan,riverwood,rorikstead,shors-stone,stonehills,underarch-harbor'
+  && FIEFS.every((f) => f.cells.length && f.grid.length) && UH.hold === 'solitude');
+ok('every fief has at least one building: a fief with none cannot be stewarded', FIEFS.every((f) => f.buildings.length > 0),
+  FIEFS.filter((f) => !f.buildings.length).map((f) => f.id));
+ok('each Skyrim hold but Winterhold has a fief, and Bruma keeps four', (() => {
+  const by = {};
+  for (const f of FIEFS) by[f.hold] = (by[f.hold] || 0) + 1;
+  return by.bruma === 4 && !by.winterhold
+    && ['whiterun', 'riften', 'solitude', 'windhelm', 'markarth', 'falkreath', 'morthal', 'dawnstar'].every((h) => by[h] >= 1);
+})());
+ok('no two fiefs claim the same exterior cell, or "which fief is this in" has two answers', (() => {
+  const seen = new Set();
+  for (const f of FIEFS) for (const g of f.grid) { const k = `${f.world}|${g[0]},${g[1]}`; if (seen.has(k)) return false; seen.add(k); }
+  return true;
+})());
+// The Bruma fiefs, pinned by sha1 of each entry's compact JSON, so a regeneration cannot change them unnoticed.
+// mountain-watch moved on 2 Nov: it gained CYRFrostironmine01, because origin's buildings.json no longer flags
+// that mine "dungeon" while the older local copy still does. Restoring the flag there takes it back to a7724e01.
+const BEFORE = {"applewatch": "78f8195397e4e41ef90f0c501d023613f2dfce3c", "aleswell": "2c0142e282c1a4bdbd0c0cab250ef0fecae8eda6", "mountain-watch": "5587bf1e1213430270676b060d7dea31b0dcb94b", "greenwood": "04bc8b82c444cf84dbd371ece8c0bdd605b1ed05"};
 for (const [id, sha] of Object.entries(BEFORE)) {
   const f = FIEFS.find((x) => x.id === id);
   ok(`${id} is unchanged by the harbor`, !!f && crypto.createHash('sha1').update(JSON.stringify(f)).digest('hex') === sha);
@@ -318,7 +334,10 @@ Object.assign(officials, { falkreath: { jarl: [30], steward: [31] }, solstheim: 
 for (const [id, pid, n] of [[FJARL, 30, 'Siddgeir'], [FSTEW, 31, 'Nenya'], [SGUARD, 32, 'Gjalund'], [CHIEF, 33, 'Burguk']]) chars.set(id, { pid, name: n, female: false, online: true });
 const holdOf = (a, zid) => SEC.view(a).holds.find((h) => h.id === zid);
 ok('the Jarl of Falkreath sees his hold, with no fiefs or nobles yet, as its ruler', !!holdOf(FJARL, 'falkreath') && holdOf(FJARL, 'falkreath').isRuler, SEC.view(FJARL).holds.map((h) => h.id));
-ok('...but his Steward and everyone else do not', !holdOf(FSTEW, 'falkreath') && !holdOf(OUT, 'falkreath'));
+// Falkreath has a fief since 2 Nov (Halfmoon Mill), and nobility.js lists any hold that has one, so the hold
+// is now visible to everyone. What still separates them is isRuler.
+ok('...his Steward sees the hold now it has a fief, but does not rule it',
+  !!holdOf(FSTEW, 'falkreath') && !holdOf(FSTEW, 'falkreath').isRuler);
 ok('a guard of Solstheim (its only office) is not shown Solstheim as a hold he rules', !holdOf(SGUARD, 'solstheim'), holdOf(SGUARD, 'solstheim'));
 ok('nor an orc chieftain his stronghold', !holdOf(CHIEF, 'dushnikh'), holdOf(CHIEF, 'dushnikh'));
 zones.splice(zones.length - EXTRA_ZONES.length, EXTRA_ZONES.length);

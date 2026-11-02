@@ -1,0 +1,17 @@
+{
+  "title": "Every hold has land to grant",
+  "date": "2026-11-02",
+  "version": "Server update",
+  "tag": "Change",
+  "sections": [
+    {
+      "heading": "Nobility",
+      "items": [
+        "Jarls across Skyrim can now appoint lords and ladies. Until today only Bruma and Haafingar had fiefs, so every other Jarl was told that all fiefs were claimed.",
+        "Thirteen holdings join Underarch Harbor: Riverwood and Rorikstead in Whiterun Hold; Shor's Stone and Ivarstead in the Rift; Dragon Bridge in Haafingar; Kynesgrove and Darkwater Crossing in Eastmarch; Karthwasten and Old Hroldan in the Reach; Halfmoon Mill in Falkreath; Stonehills in Hjaalmarch; Anga's Mill in the Pale.",
+        "A holding's lord manages its buildings as a steward does, assesses and rents property there, and their own house there does not count against the one-building limit.",
+        "Winterhold has no holding to grant. The Great Collapse took its villages, and its Jarl grants the honour of Thane instead."
+      ]
+    }
+  ]
+}

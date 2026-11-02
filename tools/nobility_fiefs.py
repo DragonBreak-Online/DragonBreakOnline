@@ -49,6 +49,25 @@ FIEFS = {
         'world': 'Skyrim.esm:00003C',
         'grid': [[-16, 23], [-15, 23], [-16, 24], [-15, 24], [-14, 24], [-16, 25], [-15, 25], [-14, 25], [-14, 26],
                  [-14, 27], [-13, 27], [-14, 28], [-13, 28], [-14, 29], [-13, 29], [-13, 30]]}),
+    # Skyrim, Nat 2 Nov (ticket mod-0602: every Jarl outside Haafingar was told "all fiefs are claimed").
+    # One or two a hold, the hold being the one the real borders of 15:00 give the town: taken from each
+    # town's LCTN parent chain, which is what hold-cells.json is built from, and agreeing with that file
+    # for all 57 town-like Tamriel locations. Capitals are not fiefs, nor are the four Orc strongholds
+    # (their own system), the College, the Dark Brotherhood sanctuary or one-house farms.
+    # Winterhold gets none on purpose: its only candidate came from a third-party mod, and the Great
+    # Collapse left it no villages. Its Jarl grants Thane honours only.
+    'riverwood': ('Riverwood', 'RiverwoodLocation', 'whiterun', {'world': 'Skyrim.esm:00003C'}),
+    'rorikstead': ('Rorikstead', 'RoriksteadLocation', 'whiterun', {'world': 'Skyrim.esm:00003C'}),
+    'shors-stone': ("Shor's Stone", 'ShorsStoneLocation', 'riften'),
+    'ivarstead': ('Ivarstead', 'IvarsteadLocation', 'riften'),
+    'dragon-bridge': ('Dragon Bridge', 'DragonBridgeLocation', 'solitude'),
+    'kynesgrove': ('Kynesgrove', 'KynesgroveLocation', 'windhelm'),
+    'darkwater-crossing': ('Darkwater Crossing', 'DarkwaterCrossingLocation', 'windhelm'),
+    'karthwasten': ('Karthwasten', 'KarthwastenLocation', 'markarth'),
+    'old-hroldan': ('Old Hroldan', 'OldHroldanLocation', 'markarth'),
+    'halfmoon-mill': ('Halfmoon Mill', 'HalfmoonMillLocation', 'falkreath'),
+    'stonehills': ('Stonehills', 'StonehillsLocation', 'morthal'),
+    'angas-mill': ("Anga's Mill", 'AngasMillLocation', 'dawnstar'),
 }
 CELL = 4096
 TOWNISH = ('LocTypeTown', 'LocTypeCity', 'LocTypeSettlement', 'LocTypeHabitation')
@@ -101,8 +120,14 @@ for fid, spec in FIEFS.items():
         ext = sorted([int(g[0]), int(g[1])] for g in opts['grid'])
         worlds = [opts['world']]
     else:
-        ext = sorted(C['grid'] for C in cells.values() if C.get('world') and C.get('loc') == loc and C.get('grid'))
-        worlds = sorted({C['world'] for C in cells.values() if C.get('world') and C.get('loc') == loc})
+        # 'world' alone narrows a town whose location also tags cells in a test worldspace: Riverwood and
+        # Rorikstead each have copies in CWTestHold (Skyrim.esm:01B44A), the Civil War test hold, which
+        # made them span two worlds and be dropped.
+        want = opts.get('world')
+        sel = [C for C in cells.values() if C.get('world') and C.get('loc') == loc and C.get('grid')
+               and (not want or C['world'] == want)]
+        ext = sorted(C['grid'] for C in sel)
+        worlds = sorted({C['world'] for C in sel})
     if len(worlds) != 1: print('fief', fid, 'spans worlds', worlds); continue
     world = desc(worlds[0])
     fb, fcells = [], set()
