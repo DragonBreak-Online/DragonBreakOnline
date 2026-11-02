@@ -49,34 +49,43 @@
     transition: fill $dbo-fast, stroke $dbo-fast;
   }
 
-  &__group {
-    .emote-wheel__glyph {
-      fill: none;
-      stroke: $dbo-text-dim;
-      stroke-width: 1.6;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      pointer-events: none;
-      transition: stroke $dbo-fast;
-    }
-
-    &.is-hot .emote-wheel__seg { fill: rgba(22, 56, 61, 0.9); stroke: dbo-accent(0.6); }
-
-    &.is-active {
-      .emote-wheel__seg { fill: dbo-accent-deep(0.62); stroke: dbo-accent(0.85); }
-      .emote-wheel__glyph { stroke: $dbo-silver; }
-      .emote-wheel__group-label { fill: $dbo-silver; }
-    }
+  // The groups as tabs under the wheel (one ring, Nat's pick 2 Nov): click one, or the mouse wheel or Left / Right
+  &__tabs {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    max-width: min(92vw, 900px);
   }
 
-  &__group-label {
-    fill: $dbo-text-dim;
-    font-size: 11px;
-    letter-spacing: 0.05em;
+  &__tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border: 1px solid dbo-accent(0.25);
+    background: rgba(12, 34, 38, 0.82);
+    color: $dbo-text-dim;
+    font-family: inherit;
+    font-size: max(12px, calc(1.45 * var(--dbo-vh)));
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    text-anchor: middle;
-    dominant-baseline: middle;
-    pointer-events: none;
+    cursor: pointer;
+    transition: color $dbo-fast, border-color $dbo-fast;
+
+    &:hover { color: $dbo-silver; border-color: dbo-accent(0.6); }
+
+    &.is-active { background: dbo-accent-deep(0.62); border-color: dbo-accent(0.85); color: $dbo-silver; }
+  }
+
+  &__tab-glyph {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
 
   &__emote {

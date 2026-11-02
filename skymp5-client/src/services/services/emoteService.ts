@@ -14,7 +14,7 @@ import { logTrace } from "../../logging";
 import { MIN_IDLE_SECONDS, MAX_IDLE_SECONDS, idleRequest, stopsIdle } from "./idleControl";
 import { WHEEL_RELEASE_EVENT, wheelWatch, wheelKeyAction, wheelReleaseAction } from "./emoteWheelWatch";
 import { NativeEmoteWheelService } from "./nativeEmoteWheelService";
-import { newWheel, openWheel, closeWheel, moveMouse, pointStick, tickWheel, pointedAnim, numberedAnim, stepGroup, payloadOf } from "./nativeEmoteWheel";
+import { newWheel, openWheel, closeWheel, moveMouse, pointStick, pointedAnim, numberedAnim, stepGroup, payloadOf, wheelGroups, notePlayed, WheelGroup } from "./nativeEmoteWheel";
 
 // for the browser-side widget setter (executed inside the CEF browser)
 declare const window: any;
@@ -276,7 +276,7 @@ export class EmoteService extends ClientListener {
     if (wheelReleaseAction(this.menuOpen, heldFrom, Date.now()) !== "commit") return;
     emoteNote(`wheel key released after ${Date.now() - heldFrom} ms: the pointed emote`);
     if (this.nativeOpen) {
-      const anim = pointedAnim(this.native, GROUPS);
+      const anim = pointedAnim(this.native, this.wheelGroups());
       if (anim) this.chooseFromWheel(anim); else this.closeMenu("its key released on no emote");
       return;
     }
@@ -342,8 +342,8 @@ export class EmoteService extends ClientListener {
       emoteNote(`refused ${anim || "?"}: not in the catalog`);
       return;
     }
-    // Edged on the wheel next time, which opens on its group
-    this.native.last = anim;
+    // Edged on the wheel next time, and first in its Recent group
+    notePlayed(this.native, anim);
     if (this.isPoseLocked()) {
       notifyNextUpdate(this.controller, this.sp, "You cannot use emotes while restrained.");
       emoteNote(`refused ${anim}: restrained`);
@@ -659,7 +659,7 @@ export class EmoteService extends ClientListener {
       this.openNative();
       return;
     }
-    openFormMenu(this.sp, this.emoteWidgetSetter, { GROUPS, events, WIDGET_ID }, this.controller);
+    openFormMenu(this.sp, this.emoteWidgetSetter, { GROUPS: this.wheelGroups(), events, WIDGET_ID }, this.controller);
     emoteNote("wheel open");
   }
 
@@ -672,6 +672,11 @@ export class EmoteService extends ClientListener {
     // How long it was up, and what took it down: the server log's [dboDiag] emote lines
     if (wasOpen && this.openedAt) emoteNote(`wheel closed after ${Date.now() - this.openedAt} ms by ${why}`);
     this.openedAt = 0;
+  }
+
+  // The groups the wheel shows: Recent (this session's emotes, newest first) when there are any, then the catalogue
+  private wheelGroups(): WheelGroup[] {
+    return wheelGroups(this.native, GROUPS);
   }
 
   private nativeWheel(): NativeEmoteWheelService {
@@ -688,7 +693,7 @@ export class EmoteService extends ClientListener {
   // menu and the journal (Esc closes the wheel) are turned off while it is up, and only the ones that were on: another
   // service's own turned-off controls are left to it.
   private openNative(): void {
-    openWheel(this.native, GROUPS);
+    openWheel(this.native, this.wheelGroups());
     this.nativeOpen = true;
     const gen = ++this.nativeGen;
     this.controller.once("update", () => {
@@ -702,7 +707,7 @@ export class EmoteService extends ClientListener {
         logTrace(this, `Native wheel controls not turned off`, err);
       }
     });
-    this.nativeWheel().show(JSON.stringify(payloadOf(this.native, GROUPS)));
+    this.nativeWheel().show(JSON.stringify(payloadOf(this.native, this.wheelGroups())));
     emoteNote("wheel open (native)");
   }
 
@@ -720,11 +725,10 @@ export class EmoteService extends ClientListener {
     });
   }
 
-  // Each frame while the native wheel is up: the group dwell, the drawing, and a game menu opened over it takes it down
+  // Each frame while the native wheel is up: the drawing, and a game menu opened over it takes it down
   private tickNative(): void {
     const now = Date.now();
-    tickWheel(this.native, GROUPS, now);
-    try { this.nativeWheel().draw(JSON.stringify(payloadOf(this.native, GROUPS))); } catch (err) { logTrace(this, `Native wheel not drawn`, err); }
+    try { this.nativeWheel().draw(JSON.stringify(payloadOf(this.native, this.wheelGroups()))); } catch (err) { logTrace(this, `Native wheel not drawn`, err); }
     if (now - this.lastWatch < 250) return;
     this.lastWatch = now;
     if (this.gameMenuOpen()) this.closeMenu("a game menu");
@@ -737,26 +741,26 @@ export class EmoteService extends ClientListener {
   private onNativeButton(e: ButtonEvent): boolean {
     const pick = (anim: string, why: string) => { if (anim) this.chooseFromWheel(anim); else this.closeMenu(why); };
     if (e.device === InputDeviceType.Mouse) {
-      if (e.code === 0) pick(pointedAnim(this.native, GROUPS), "a click on no emote");
+      if (e.code === 0) pick(pointedAnim(this.native, this.wheelGroups()), "a click on no emote");
       else if (e.code === 1) this.closeMenu("right click");
-      else if (e.code === 8) stepGroup(this.native, GROUPS, -1);
-      else if (e.code === 9) stepGroup(this.native, GROUPS, 1);
+      else if (e.code === 8) stepGroup(this.native, this.wheelGroups(), -1);
+      else if (e.code === 9) stepGroup(this.native, this.wheelGroups(), 1);
       else return false;
       return true;
     }
     if (e.device === InputDeviceType.Gamepad) {
-      if (e.code === GamepadButton.A) pick(pointedAnim(this.native, GROUPS), "A on no emote");
+      if (e.code === GamepadButton.A) pick(pointedAnim(this.native, this.wheelGroups()), "A on no emote");
       else if (e.code === GamepadButton.B) this.closeMenu("the gamepad's B");
-      else if (e.code === GamepadButton.LeftShoulder || e.code === GamepadButton.DPadLeft) stepGroup(this.native, GROUPS, -1);
-      else if (e.code === GamepadButton.RightShoulder || e.code === GamepadButton.DPadRight) stepGroup(this.native, GROUPS, 1);
+      else if (e.code === GamepadButton.LeftShoulder || e.code === GamepadButton.DPadLeft) stepGroup(this.native, this.wheelGroups(), -1);
+      else if (e.code === GamepadButton.RightShoulder || e.code === GamepadButton.DPadRight) stepGroup(this.native, this.wheelGroups(), 1);
       else return false;
       return true;
     }
     if (e.device !== InputDeviceType.Keyboard) return false;
-    if (e.code === DxScanCode.LeftArrow) stepGroup(this.native, GROUPS, -1);
-    else if (e.code === DxScanCode.RightArrow) stepGroup(this.native, GROUPS, 1);
+    if (e.code === DxScanCode.LeftArrow) stepGroup(this.native, this.wheelGroups(), -1);
+    else if (e.code === DxScanCode.RightArrow) stepGroup(this.native, this.wheelGroups(), 1);
     else if (e.code >= DxScanCode.N1 && e.code <= DxScanCode.N9) {
-      const anim = numberedAnim(this.native, GROUPS, e.code - DxScanCode.N1 + 1);
+      const anim = numberedAnim(this.native, this.wheelGroups(), e.code - DxScanCode.N1 + 1);
       if (!anim) return true;
       this.chooseFromWheel(anim);
     } else return false;

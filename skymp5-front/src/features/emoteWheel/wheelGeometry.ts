@@ -4,19 +4,15 @@
 export const VIEW = 640;
 export const CENTER = VIEW / 2;
 export const HUB_R = 78;
-export const GROUP_INNER = 86;
-export const GROUP_OUTER = 158;
-export const EMOTE_INNER = 166;
+// One ring (Nat's pick, 2 Nov: _work/emote-wheel-1102.md option A): the shown group's emotes from the hub to the edge, every
+// emote one motion from the hub; the groups are tabs under the wheel, switched by a click, the mouse wheel or Left / Right
+export const EMOTE_INNER = 86;
 export const EMOTE_OUTER = 300;
-// Past the group ring's middle gap the pointer reads the emote ring, however far out it goes (a flick overshoots)
-const RING_SPLIT = (GROUP_OUTER + EMOTE_INNER) / 2;
-// The pointer must rest this long on a group before the outer ring changes, so a flick across it to an emote does not
-export const GROUP_DWELL_MS = 200;
 // The wheel key held at least this long is a hold: its release plays the emote under the pointer
 export const HOLD_MS = 220;
 const GAP_DEG = 1.2;
 
-export type Ring = 'hub' | 'group' | 'emote';
+export type Ring = 'hub' | 'emote';
 
 export interface Pick {
   ring: Ring;
@@ -35,24 +31,9 @@ export const indexAt = (angle: number, count: number): number => {
 };
 
 // dx, dy: the pointer from the wheel's centre, in wheel units
-export const pickAt = (dx: number, dy: number, groups: number, emotes: number): Pick => {
-  const r = Math.hypot(dx, dy);
-  if (r < HUB_R) return { ring: 'hub', index: -1 };
-  const a = angleOf(dx, dy);
-  if (r < RING_SPLIT) return { ring: 'group', index: indexAt(a, groups) };
-  return { ring: 'emote', index: indexAt(a, emotes) };
-};
-
-export interface Dwell {
-  candidate: number;
-  since: number;
-}
-
-// The group the outer ring shows: a hovered group takes over once it has been held GROUP_DWELL_MS
-export const dwellStep = (d: Dwell, hovered: number, now: number, current: number): { dwell: Dwell; group: number } => {
-  if (hovered < 0) return { dwell: { candidate: -1, since: 0 }, group: current };
-  const dwell = hovered === d.candidate ? d : { candidate: hovered, since: now };
-  return { dwell, group: now - dwell.since >= GROUP_DWELL_MS ? hovered : current };
+export const pickAt = (dx: number, dy: number, emotes: number): Pick => {
+  if (Math.hypot(dx, dy) < HUB_R) return { ring: 'hub', index: -1 };
+  return { ring: 'emote', index: indexAt(angleOf(dx, dy), emotes) };
 };
 
 // What a release of the held wheel key does: play the emote under the pointer, or close
