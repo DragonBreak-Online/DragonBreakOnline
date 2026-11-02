@@ -213,6 +213,28 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   S.customOpen = false;
   ok(!S.errors.length, 'no frame failed', S.errors);
 
+  // ---- a label SkyUI fills late is read again (Nat, 2 Nov: stored empties left 10 of 388 counted, none of the realm's) ----
+  const h5 = {};
+  S.widgets.length = 0; S.custom = []; S.customOpen = false; S.legendWorks = false;
+  const applewatch = S.props['_root.MarkerClips.Marker1.label'];
+  S.props['_root.MarkerClips.Marker1.label'] = '';
+  S.props['_root.MarkerClips.Marker6.label'] = '';
+  let reads6 = 0;
+  const getString0 = sp.Ui.getString;
+  sp.Ui.getString = (m, p) => { if (p === '_root.MarkerClips.Marker6.label') reads6++; return getString0(m, p); };
+  new MapRealmService(sp, { on: (ev, fn) => { h5[ev] = fn; }, emitter: { on: (ev, fn) => { h5['emit:' + ev] = fn; } } });
+  h5['emit:customPacketMessage']({ customPacketType: 'dboMapRealm', markers });
+  h5.menuOpen({ name: 'MapMenu' });
+  for (let i = 0; i < 3; i++) h5.update();
+  S.props['_root.MarkerClips.Marker1.label'] = applewatch;
+  for (let i = 0; i < 300; i++) h5.update();
+  const w5 = S.widgets.filter((x) => x.rows).slice(-1)[0];
+  ok(w5 && w5.rows.find((r) => r.id === 'town').count === 1, 'a label read empty at first and filled later is counted (Applewatch, a town)', w5 && w5.rows);
+  ok(reads6 === 10, 'a clip that never gets a label is read ten times, then left alone', reads6);
+  sp.Ui.getString = getString0;
+  S.props['_root.MarkerClips.Marker6.label'] = LABELS[6];
+  h5.menuClose({ name: 'MapMenu' });
+
   // ---- the map probe: once a session, on the first opening ----
   const h3 = {};
   S.packets.length = 0; S.custom = []; S.customOpen = false; S.legendWorks = true;
