@@ -11,7 +11,10 @@ import { COMPANION_HUD_KEY } from "./companionService";
 import { remoteIdToLocalId } from "../../view/worldViewMisc";
 import { withClientUiCaps } from "../../lib/clientUiCaps";
 import { PartyRow, hudShared } from "./nativeHud";
-import { SERVER_PROMPT_TYPES, clearPrompt, serverPrompt, showPrompt } from "./nativePrompt";
+import { SERVER_PROMPT_TYPES, clearPrompt, menuCard, serverPrompt, showPrompt } from "./nativePrompt";
+import { ScaleformMenuService } from "./scaleformMenuService";
+import { FAILED_KEY } from "./nativeWidgets";
+import { NativeMenuListService } from "./nativeMenuListService";
 
 const HUD_WIDGET_ID = 29;
 const PARTY_WIDGET_ID = 32;
@@ -268,6 +271,8 @@ export class DboRelayService extends ClientListener {
     const closeId = Number(content["close"]);
     if (Number.isFinite(closeId) && closeId > 0) {
       clearPrompt(closeId);
+      try { this.controller.lookupListener(NativeMenuListService).close(closeId); } catch (e) { /* not started */ }
+      if (this.cardMenuId === closeId) { this.cardMenuId = 0; try { this.controller.lookupListener(ScaleformMenuService).closeNative("contextMenu"); } catch (e) { /* gone */ } }
       if (this.focusedId === closeId) { this.focusedId = 0; closeFormMenu(this.sp, closeId); }
       else closeWidget(this.sp, closeId);
       return;
@@ -287,6 +292,11 @@ export class DboRelayService extends ClientListener {
   // Downed, a vampire's feeding and a robbery go to the native HUD while it is up, answered with Y and N (nativePrompt.ts):
   // each answer is the packet the front's button sends, and a HUD that goes down hands the prompt back to the browser
   private nativePrompt(w: Record<string, unknown>, wid: number, focus: boolean): boolean {
+    // A list shown beside a game menu (alchemy's) is drawn inside that menu (NativeMenuListService), the browser's as a fallback
+    if (!focus && w["type"] === "contextMenu" && w["mode"] === "inspect") {
+      try { return this.controller.lookupListener(NativeMenuListService).offer(w, wid, () => refreshFormMenu(this.sp, this.browsersideWidgetSetter, { widget: w, id: wid })); } catch (e) { return false; }
+    }
+    if (hudShared.nativeUp && !focus && w["type"] === "contextMenu") return this.menuCard(w, wid);
     if (!hudShared.nativeUp || SERVER_PROMPT_TYPES.indexOf(String(w["type"])) < 0) return false;
     const p = serverPrompt(w);
     if (!p) return false;
@@ -297,6 +307,32 @@ export class DboRelayService extends ClientListener {
       if (focus) this.drawInBrowser(w, wid);
       else refreshFormMenu(this.sp, this.browsersideWidgetSetter, { widget: w, id: wid });
     });
+    return true;
+  }
+
+  // A choice menu sent without focus (the level-up offer) waits as a card in the native HUD: Y opens the menu itself in
+  // dbo_context, focused, whose dbo: choices go to the server as the browser's would; N sends the menu's close
+  private menuCard(w: Record<string, unknown>, wid: number): boolean {
+    const spec = menuCard(w);
+    if (!spec) return false;
+    const events = (w["events"] || {}) as Record<string, unknown>;
+    const browser = () => refreshFormMenu(this.sp, this.browsersideWidgetSetter, { widget: w, id: wid });
+    showPrompt(spec, (yes) => {
+      clearPrompt(wid);
+      if (!yes) {
+        const close = String(events["close"] || "");
+        if (close.indexOf("dbo:") === 0) sendCustomPacket(this.controller, { customPacketType: "dbo", event: close.slice(4), args: [], widget: wid });
+        return;
+      }
+      let opened = false;
+      try {
+        opened = this.controller.lookupListener(ScaleformMenuService).openNative({
+          type: "contextMenu", widget: w, widgetId: wid,
+          onKey: (key) => { if (key === FAILED_KEY && this.cardMenuId === wid) { this.cardMenuId = 0; this.drawInBrowser(w, wid); } },
+        });
+      } catch (e) { opened = false; }
+      if (opened) this.cardMenuId = wid; else this.drawInBrowser(w, wid);
+    }, now(), browser);
     return true;
   }
 
@@ -349,6 +385,8 @@ export class DboRelayService extends ClientListener {
   };
 
   private focusedId = 0;
+  // a menu the HUD card opened in dbo_context, closed with the server's close of its widget
+  private cardMenuId = 0;
   private hudData: Record<string, unknown> | null = null;
   private hudPowerEnd: { name: string; endsAt: number } | null = null;
   private partyData: Record<string, unknown> | null = null;

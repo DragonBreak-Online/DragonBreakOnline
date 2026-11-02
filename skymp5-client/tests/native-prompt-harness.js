@@ -78,6 +78,19 @@ const decisions = (P, check) => {
   check('robbery: Y accepts being robbed, N fights', JSON.stringify(rob.yes) === JSON.stringify({ event: 'robAnswer', args: ['r1', 'accept'] }) && JSON.stringify(rob.no) === JSON.stringify({ event: 'robAnswer', args: ['r1', 'fight'] })
     && /20%/.test(rob.spec.text) && /parcel/.test(rob.spec.text), rob);
   check('a widget without a nonce or of another type is not a prompt', P.serverPrompt({ type: 'feedPrompt', id: 71 }) === null && P.serverPrompt({ type: 'bank', id: 48, nonce: 'x' }) === null);
+  // a choice menu sent without focus (charlevel's level-up offer): a card with no clock, Y Choose, N Not now
+  const lv = { type: 'contextMenu', id: 120, mode: 'menu', targetName: 'Level 5: 2 points to spend', actions: [{ id: 'health', label: '+10 Health (now +0)' }, { id: 'stamina', label: '+10 Stamina (now +10)' }],
+    events: { action: 'dbo:levelChoose', close: 'dbo:levelClose' } };
+  const card = P.menuCard(lv);
+  check('menuCard: the offer as a card, its choices listed, Y Choose and N Not now, no clock', card && card.title === 'Level 5: 2 points to spend' && /\+10 Health/.test(card.text) && /\+10 Stamina/.test(card.text)
+    && card.yes === 'Choose' && card.no === 'Not now' && card.seconds === 0, card);
+  check('menuCard: no N for a menu without a dbo: close; none for an inspect list or an empty menu',
+    P.menuCard(Object.assign({}, lv, { events: { action: 'dbo:levelChoose' } })).no === '' && P.menuCard(Object.assign({}, lv, { mode: 'inspect', lines: ['x'] })) === null
+    && P.menuCard(Object.assign({}, lv, { actions: [] })) === null);
+  P.showPrompt(card, () => {}, T0);
+  const cv = P.promptView(P.hudPrompt.current, T0 + 600000);
+  check('an untimed card: no clock bar, no countdown, ten minutes on', cv.frac === -1 && cv.left === 0 && cv.idle === '' && cv.yes === 'Y  Choose' && cv.no === 'N  Not now', cv);
+  check('...and Y still answers it', P.pressKey(Y, T0 + 600000) === true);
   P.hudPrompt.current = null;
 };
 
@@ -108,6 +121,11 @@ const clockW = (() => { const f = C && C.fills[C.fills.length - 1]; return f ? M
 check('dbo_hud: the clock bar shows the time left (15 of 20 s)', clockW === Math.round(444 * 0.75), clockW);
 t.push(pay({ prompt: null }));
 check('dbo_hud: the card goes with the prompt', t.root.prompt._visible === false);
+P.showPrompt(P.menuCard({ type: 'contextMenu', id: 120, mode: 'menu', targetName: 'Level 5', actions: [{ id: 'h', label: '+10 Health' }], events: { close: 'dbo:levelClose' } }), () => {}, 0);
+t.push(pay({ prompt: P.promptView(P.hudPrompt.current, 5000) }));
+const C2 = t.root.prompt.card;
+check('dbo_hud: an untimed card draws no clock bar (only its ground and accent line)', !!C2 && C2.fills.length === 2 && C2.yes.text === 'Y  Choose' && C2.idle.text === '', C2 && C2.fills.length);
+P.hudPrompt.current = null;
 check('dbo_hud carries no character the game\'s font lacks', !/[^\x00-\x7f]/.test(fs.readFileSync(path.join(ROOT, 'swf', 'dbo_hud', 'scripts', 'frame_1', 'DoAction.as'), 'utf8')));
 P.hudPrompt.current = null;
 
@@ -121,6 +139,9 @@ const MUTANTS = [
   ['any close takes the prompt down', 'if (hudPrompt.current && hudPrompt.current.id === id) hudPrompt.current = null;', 'hudPrompt.current = null;'],
   ['an answered prompt is handed back', 'if (p && !p.answered && p.fallback) p.fallback();', 'if (p && p.fallback) p.fallback();'],
   ['the lock is not shown', '${lock > 0 ? ` (${lock})` : ""}', ''],
+  ['an untimed card shows a clock', '    left, frac: timed ? Math.round((left / total) * 1000) / 1000 : -1,', '    left, frac: Math.round((left / total) * 1000) / 1000,'],
+  ['an inspect list becomes a card', 'w["mode"] === "inspect" || ', ''],
+  ['N offered without a close', 'no: typeof events["close"] === "string" && String(events["close"]).indexOf("dbo:") === 0 ? "Not now" : "",', 'no: "Not now",'],
 ];
 MUTANTS.forEach(([name, a, b], i) => {
   if (!SOURCE.includes(a)) { check(`mutant "${name}": its line is in nativePrompt.ts`, false, a); return; }
