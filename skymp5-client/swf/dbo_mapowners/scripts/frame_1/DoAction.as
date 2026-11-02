@@ -57,7 +57,10 @@ function draw(p)
          shapes.beginFill(Number(f.rgb), Number(f.alpha));
          for (var r = 0; r + 3 < f.rects.length; r += 4)
          {
-            var x0 = Number(f.rects[r]), y0 = Number(f.rects[r + 1]), x1 = Number(f.rects[r + 2]), y1 = Number(f.rects[r + 3]);
+            var x0 = Number(f.rects[r]);
+            var y0 = Number(f.rects[r + 1]);
+            var x1 = Number(f.rects[r + 2]);
+            var y1 = Number(f.rects[r + 3]);
             shapes.moveTo(x0, y0);
             shapes.lineTo(x1, y0);
             shapes.lineTo(x1, y1);
