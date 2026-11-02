@@ -104,7 +104,9 @@ export const NATIVE_CAPS = [
 //   riteJudge    dbo_rite judges a client rite round (judge 'client'; supernatural.js)
 //   pickRound    the pick rounds the native rite, labour, skinning and reading panels draw (minigames.js PICK_CAP)
 // lockpickLocal stays the browser's: dbo_lockpick draws only the tumbler lock, which native:lockpick asks for.
-export const CLIENT_CAPS = ["dboIdle", "beastBody", "nightEye", "catReflexes", "riteJudge", "pickRound"];
+//   nativeChunked  a native payload over CHUNK_CHARS comes in pieces the panel puts back together (lib dbo.as dboChunk), so
+//                  the server sends up to MAX_PAYLOAD_CHARS natively instead of 60000
+export const CLIENT_CAPS = ["dboIdle", "beastBody", "nightEye", "catReflexes", "riteJudge", "pickRound", "nativeChunked"];
 export const CAPS_RETRY_MS = 5000;
 
 // sp.settings["skymp5-client"]["nativePanels"]: true or absent announces them all, false announces none, and
@@ -135,7 +137,21 @@ export const capsFor = (setting: unknown): string[] => {
   });
 };
 
-export const MAX_PAYLOAD_CHARS = 60000;
+// The most one payload may be, whole or in pieces. The one-call ceiling of invokeString was never measured (fd033fda capped
+// it at 60000 to be safe), so anything over CHUNK_CHARS goes as pieces of at most that size instead.
+export const MAX_PAYLOAD_CHARS = 400000;
+export const CHUNK_CHARS = 50000;
+const CHUNK_SEP = String.fromCharCode(1);
+
+// The invokeString arguments for _root.dboChunk: "id|i|n" CHUNK_SEP slice for each piece, or none when the payload fits
+// one call. JSON.stringify escapes control characters, so CHUNK_SEP never occurs inside a slice.
+export const chunkArgs = (json: string, id: number, size: number = CHUNK_CHARS): string[] => {
+  if (json.length <= size) return [];
+  const n = Math.ceil(json.length / size);
+  const out: string[] = [];
+  for (let i = 0; i < n; i++) out.push(`${id}|${i}|${n}${CHUNK_SEP}${json.slice(i * size, (i + 1) * size)}`);
+  return out;
+};
 // openCustomMenu queues a UI message, so the menu is not there when the call returns. If ready never
 // arrives within this, the open failed and saying so is the result.
 export const READY_TIMEOUT_MS = 5000;

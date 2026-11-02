@@ -15,7 +15,8 @@ const ROOT = path.resolve(__dirname, '..');
 const LIB = fs.readFileSync(path.join(ROOT, 'swf/lib/dbo.as'), 'utf8').replace(/\r\n/g, '\n');
 
 const parserOf = (src) => {
-  const ctx = { Math, String, Number, isNaN, isFinite, parseInt, _root: {}, _global: {} };
+  // getTimer is Flash's own; dboSend is the lib's, outside this slice: the parse is timed and a big one reported (dboParse)
+  const ctx = { Math, String, Number, isNaN, isFinite, parseInt, _root: {}, _global: {}, getTimer: () => 0, dboSend: () => true };
   vm.createContext(ctx);
   vm.runInContext(src.slice(src.indexOf('// ---- JSON ----'), src.indexOf('// ---- drawing ----')), ctx);
   return ctx;

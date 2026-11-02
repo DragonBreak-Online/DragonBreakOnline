@@ -417,7 +417,92 @@ function dboJsonValue()
    return v;
 }
 
+// A payload over the client's one-call size comes as pieces "id|i|n" DBO_SEP slice (scaleformMenuService, chunkArgs); the
+// last piece hands the whole JSON to the panel's own _root.dboData. A piece of an older set, out of range or seen twice
+// is dropped. Each delivery this size or larger is timed and reported to the server as dbo:nativeTiming (the AS2 parse,
+// and the panel's drawing after it), so one session measures what a big panel costs.
+var DBO_TIMING_MIN = 20000;
+var dboChunkId = -1;
+var dboChunkN = 0;
+var dboChunkGot = 0;
+var dboChunkParts = [];
+var dboChunkActive = false;
+var dboParseMs = -1;
+
+function dboTimingReport(chars, chunks, parseMs, drawMs)
+{
+   var ver = _root.dboVersion != undefined ? String(_root.dboVersion) : "?";
+   dboSend("dbo:nativeTiming", [ver, chars, chunks, parseMs, drawMs]);
+}
+
+_root.dboChunk = function(piece)
+{
+   var str = String(piece);
+   var sep = str.indexOf(DBO_SEP);
+   if (sep < 0)
+   {
+      return;
+   }
+   var h = str.substring(0, sep).split("|");
+   var id = Number(h[0]);
+   var i = Number(h[1]);
+   var n = Number(h[2]);
+   if (isNaN(id) || isNaN(i) || isNaN(n) || n < 1 || i < 0 || i >= n || i != Math.floor(i))
+   {
+      return;
+   }
+   if (id != dboChunkId)
+   {
+      // a newer set replaces an unfinished one; an older set's late piece is dropped
+      if (id < dboChunkId)
+      {
+         return;
+      }
+      dboChunkId = id;
+      dboChunkN = n;
+      dboChunkGot = 0;
+      dboChunkParts = [];
+   }
+   if (n != dboChunkN || dboChunkParts[i] != undefined)
+   {
+      return;
+   }
+   dboChunkParts[i] = str.substring(sep + 1);
+   dboChunkGot++;
+   if (dboChunkGot < dboChunkN)
+   {
+      return;
+   }
+   var full = dboChunkParts.join("");
+   dboChunkParts = [];
+   dboChunkGot = 0;
+   dboChunkActive = true;
+   dboParseMs = -1;
+   var t0 = getTimer();
+   if (_root.dboData != undefined)
+   {
+      _root.dboData(full);
+   }
+   var total = getTimer() - t0;
+   dboChunkActive = false;
+   dboTimingReport(full.length, dboChunkN, dboParseMs, dboParseMs >= 0 ? total - dboParseMs : total);
+};
+
 function dboParse(s)
+{
+   var t0 = getTimer();
+   var v = dboParseRaw(s);
+   dboParseMs = getTimer() - t0;
+   var chars = String(s).length;
+   // a payload sent whole: its parse is reported here (no drawing time), one sent in pieces by dboChunk with its drawing
+   if (!dboChunkActive && chars >= DBO_TIMING_MIN)
+   {
+      dboTimingReport(chars, 1, dboParseMs, -1);
+   }
+   return v;
+}
+
+function dboParseRaw(s)
 {
    var parts = String(s).split("\"");
    dboJsonKind = [];
