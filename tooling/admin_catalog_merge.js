@@ -8,6 +8,7 @@
 // The generated name wins for every row both sides have. Reasons and counts are printed per file and category.
 // What the tracked files hold out on purpose stays out, read from where the code keeps it:
 //   - an item no one may obtain (staffitemspells.js UNOBTAINABLE, the Dwemer Mantis armour) is never offered;
+//   - a piece that crashes games once placed (decor.js blockBases, the Bruma Banner) is never on the Place tab;
 //   - a removed or suspended spell (gamemode-config.json spells.removedSpells, suspendedSpells) is never given;
 //   - admin-powers.json keeps its own layout: shouts stays as tracked (empty since 17 Oct), the generated shouts go into
 //     shoutsGate (combat.js's player shout gate), every other key and the _comment are kept, spellSources is recounted.
@@ -32,6 +33,14 @@ const UNOBTAINABLE = (() => {
   const m = src.match(/const UNOBTAINABLE = new Set\(\[([^\]]*)\]\.map\(\(x\) => `\$\{x\}:([^`]+)`\)\)/);
   if (!m) throw new Error('staffitemspells.js UNOBTAINABLE not found in its known shape: read it before merging');
   return new Set(m[1].split(',').map((x) => `${x.trim().replace(/['"]/g, '')}:${m[2]}`.toLowerCase()));
+})();
+// Pieces whose model crashes every game that loads it once placed (decor.js blockBases: the Bruma Banner, 28 Oct): never
+// offered on the Place tab, which has no check of its own for objects (window-1101's merge put the banner back)
+const CRASH_BASES = (() => {
+  const src = fs.readFileSync(path.resolve('decor.js'), 'utf8');
+  const m = src.match(/blockBases: \[([^\]]*)\]/);
+  if (!m) throw new Error('decor.js blockBases not found in its known shape: read it before merging');
+  return new Set(m[1].split(',').map((x) => x.trim().replace(/['"]/g, '').toLowerCase()).filter(Boolean));
 })();
 const SPELLS_HELD = (() => {
   const s = (read(path.resolve('gamemode-config.json')).spells) || {};
@@ -72,6 +81,7 @@ const mergeCategories = (file, leftOut) => {
     }
   }
   if (file === 'admin-items.json') for (const c of gen.categories) c.items = c.items.filter((it) => { const out = UNOBTAINABLE.has(String(it[0]).toLowerCase()); if (out) note(file, c.id, 'left out: no one may obtain it (staffitemspells.js UNOBTAINABLE)', it); return !out; });
+  if (file === 'admin-placeables.json') for (const c of gen.categories) c.items = c.items.filter((it) => { const out = CRASH_BASES.has(String(it[0]).toLowerCase()); if (out) note(file, c.id, 'left out: crashes the games that load it once placed (decor.js blockBases)', it); return !out; });
   for (const c of gen.categories) c.items.sort((x, y) => String(x[1]).toLowerCase().localeCompare(String(y[1]).toLowerCase()) || String(x[0]).localeCompare(String(y[0])));
   return gen;
 };
