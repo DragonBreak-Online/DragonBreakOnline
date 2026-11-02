@@ -104,7 +104,9 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   ok(!S.custom.length, 'the map\'s open event alone opens nothing: it waits for the map to be open', S.custom);
   S.menuOpen = true;
   frames(2);
-  ok(JSON.stringify(S.custom) === JSON.stringify([['open', 'dbo_maplegend', 0]]), 'opening the map opens dbo_maplegend as our own CustomMenu over it', S.custom);
+  ok(!S.custom.length, '...nor while the map settles: our menu opened on frame 1 never came alive (04:32Z)', S.custom);
+  frames(55);
+  ok(JSON.stringify(S.custom) === JSON.stringify([['open', 'dbo_maplegend', 0]]), 'from frame 60, with the markers there, the map opens dbo_maplegend as our own CustomMenu over it', S.custom);
   ok(!S.invoked.some((x) => /createEmptyMovieClip|loadMovie/.test(x[0])), '...and makes nothing inside the map, neither the legend nor the owners overlay', S.invoked);
   ok(!S.widgets.length && !S.visible.length, 'while it loads, no browser legend and the browser left hidden', [S.widgets, S.visible]);
   frames(240);
@@ -137,8 +139,8 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   h.menuClose({ name: 'MapMenu' });
   ok(S.widgets[S.widgets.length - 1].closed === 210, 'closing the map closes the legend');
   const rep = (S.packets.find((p) => p.event === 'mapSwf') || { args: [{}] }).args[0];
-  ok(rep.legend && rep.legend.last === 'clip' && rep.legend.phase === 'off' && rep.legend.tries === 1 && rep.legend.menu === 4 && rep.legend.inject.length === 1 && rep.legend.loaded === -1 && rep.owners === null,
-    'closing sends one mapSwf line: the map seen at frame 4, one open, our menu there, its swf never loaded', rep);
+  ok(rep.legend && rep.legend.last === 'clip' && rep.legend.phase === 'off' && rep.legend.tries === 1 && rep.legend.menu === 60 && /\[frame [0-9]+\/[0-9]+, version "", alive ""\]$/.test(rep.legend.url) && rep.legend.inject.length === 1 && rep.legend.loaded === -1 && rep.owners === null,
+    'closing sends one mapSwf line: opened at frame 60, our menu there, its swf never loaded, and what its movie was doing', rep);
   const before = S.props['_root.MarkerClips.Marker3._xscale'];
   key(5);
   ok(S.props['_root.MarkerClips.Marker3._xscale'] === before, 'with the map closed a digit does nothing');
@@ -179,7 +181,7 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   new MapRealmService(sp, { on: (ev, fn) => { h2[ev] = fn; }, emitter: { on: (ev, fn) => { h2['emit:' + ev] = fn; } } });
   h2['emit:customPacketMessage']({ customPacketType: 'dboMapRealm', markers });
   h2.menuOpen({ name: 'MapMenu' });
-  for (let i = 0; i < 4; i++) h2.update();
+  for (let i = 0; i < 62; i++) h2.update();
   const last = () => S.legendData[S.legendData.length - 1];
   ok(S.legendData.length >= 1 && last().shown === true && last().rows.find((r) => r.id === 'fort').count === 2 && last().rows.map((r) => r.key).join('') === '1234560',
     'alive: the legend goes to our menu over the map, the same rows and counts', last());
@@ -190,7 +192,7 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   h2.buttonEvent({ isDown: true, device: 0, code: 19 });
   ok(S.custom[S.custom.length - 1][0] === 'close' && !S.customOpen, 'R closes our menu: if it ever held the map\'s input, R always takes it away', S.custom);
   h2.buttonEvent({ isDown: true, device: 0, code: 19 });
-  h2.update(); h2.update();
+  for (let i = 0; i < 62; i++) h2.update();
   ok(S.custom.filter((x) => x[0] === 'open').length === 2 && S.customOpen, '...and R again opens it again', S.custom);
   h2.menuClose({ name: 'MapMenu' });
   const rep2 = (S.packets.find((p) => p.event === 'mapSwf') || { args: [{}] }).args[0];
@@ -198,13 +200,13 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   ok(!S.customOpen, 'closing the map closes our menu with it');
   S.custom = [];
   h2.menuOpen({ name: 'MapMenu' });
-  for (let i = 0; i < 4; i++) h2.update();
+  for (let i = 0; i < 62; i++) h2.update();
   ok(JSON.stringify(S.custom) === JSON.stringify([['open', 'dbo_maplegend', 0]]) && !S.widgets.length, 'the next opening opens it over the new map again', S.custom);
   h2.menuClose({ name: 'MapMenu' });
   // another CustomMenu already up (a server panel): ours waits rather than replace it
   S.custom = []; S.customOpen = true;
   h2.menuOpen({ name: 'MapMenu' });
-  for (let i = 0; i < 4; i++) h2.update();
+  for (let i = 0; i < 62; i++) h2.update();
   ok(!S.custom.length, 'another CustomMenu already up: ours is not opened over it', S.custom);
   h2.menuClose({ name: 'MapMenu' });
   ok(!S.custom.length, '...nor closed: it is not ours', S.custom);
@@ -229,7 +231,7 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   ok(probes().length === 1 && pr.end === 'probe done at frame 1200', 'the first opening runs the probe for twenty seconds and reports it once, as the mapTest event', S.packets);
   ok(/^POSITIONS of Bruma, Applewatch, Sancre Tor, Pale Pass, Fort Caractacus, Wraith's Barrow: at 120 [-0-9.]+,[-0-9.]+ x[0-9.]+ \| 300,200 301,201 302,202/.test(pr.t1 || ''), 'T1: the first six markers\' labels and positions at frame 120, MarkerClips\' offset first', pr.t1);
   ok(pr.t2 && pr.t2.frames === 10 && pr.t2.panning === 2 && pr.t2.still === 7, 'T2: ten samples, the markers moved between two of them (the pan) and stood still between the rest', pr.t2);
-  ok(/^legend menu up \(open true\), map open true$/.test(pr.t3 || ''), 'T3: our legend menu up over the open map at frame 240', pr.t3);
+  ok(/^legend menu up \(open true, frame [0-9]+\/[0-9]+, version "[^"]*", alive "yes"\), map open true$/.test(pr.t3 || ''), 'T3: our legend menu up over the open map at frame 360, with what its movie was doing', pr.t3);
   ok(/: 199 mouse moves, 1 clicks$/.test(pr.t4 || ''), 'T4: the mouse moves and clicks the client still heard while our menu was up', pr.t4);
   h3.menuClose({ name: 'MapMenu' });
   S.packets.length = 0;

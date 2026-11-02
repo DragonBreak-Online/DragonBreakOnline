@@ -92,6 +92,8 @@ const swfLoader = (M) => {
   c(M.swfStep(st, 2, Object.assign({}, no, { menu: true }), SWF) === 'inject' && st.t.menu === 2 && JSON.stringify(st.t.inject) === '[2]');
   c(M.swfStep(st, 3, { menu: true, clip: true, url: 'Interface/map.swf', alive: false }, SWF) === '' && st.t.clip === 3 && st.t.loaded === -1);
   c(M.lastSwfStep(st.t) === 'clip');
+  // Scaleform escapes the url (Nat, 04:33Z: Interface/dbo%5Fmaplegend.swf): it still names the swf
+  c(M.urlNames('Interface/dbo%5Fmaplegend.swf', 'dbo_maplegend.swf') && !M.urlNames('Interface/map.swf', 'dbo_maplegend.swf') && M.urlNames('bad %E0 url/dbo_maplegend.swf', 'dbo_maplegend.swf'));
   c(M.swfStep(st, 9, { menu: true, clip: true, url: 'Interface/DBO_MapLegend.swf', alive: false }, SWF) === '' && st.t.loaded === 9 && M.lastSwfStep(st.t) === 'loaded');
   c(M.swfStep(st, 10, { menu: true, clip: true, url: 'Interface/dbo_maplegend.swf', alive: true }, SWF) === 'up' && st.t.alive === 10 && M.lastSwfStep(st.t) === 'alive');
   st.t.drawn = 11; c(M.lastSwfStep(st.t) === 'drawn');
@@ -120,7 +122,8 @@ check('...240 frames a try and three tries, the HUD\'s numbers (nativeHud.ts)', 
   ['loads before the menu is open', '    if (!seen.menu) return "";\n', ''],
   ['one try only', 'if (st.tries < tries) {', 'if (false) {'],
   ['a CustomMenu tried again', 'swf: string, tries = MAP_SWF_TRIES): string => {', 'swf: string, tries = MAP_SWF_TRIES): string => { tries = MAP_SWF_TRIES;'],
-  ['loaded read from any url', 'if (seen.url.toLowerCase().endsWith(swf.toLowerCase()) && t.loaded < 0)', 'if (seen.url && t.loaded < 0)'],
+  ['loaded read from any url', 'if (urlNames(seen.url, swf) && t.loaded < 0)', 'if (seen.url && t.loaded < 0)'],
+  ['the url read escaped', 'try { u = decodeURIComponent(u); }', 'try { }'],
   ['the last step skips a gap', 'if (!at[s]) break; last = s;', 'if (!at[s]) continue; last = s;'],
 ].forEach(([name, a, b], i) => {
   if (!SRC.includes(a)) { check(`mutant "${name}": its line is in mapRealm.ts`, false, a); return; }
