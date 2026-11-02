@@ -56,7 +56,11 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
     ObjectReference: { from: (f) => (f ? { addToMap: (ft) => S.revealed.push([f.k, ft]) } : null) },
     browser: { setVisible: (v) => S.visible.push(v) },
     Ui: {
-      isMenuOpen: () => S.menuOpen !== false,
+      isMenuOpen: (m) => (m === 'CustomMenu' ? !!S.customOpen : S.menuOpen !== false),
+      // T5's CustomMenu (the map probe): opened and closed are recorded
+      openCustomMenu: (swf, flags) => { S.custom = (S.custom || []).concat([['open', swf, flags]]); S.customOpen = true; },
+      closeCustomMenu: () => { S.custom = (S.custom || []).concat([['close']]); S.customOpen = false; },
+      setBool: (m, p, v) => { S.props[p] = v; }, setString: (m, p, v) => { S.props[p] = v; },
       getInt: (m, p) => S.props[p] | 0, getString: (m, p) => (S.props[p] === undefined ? '' : String(S.props[p])), getFloat: (m, p) => Number(S.props[p] === undefined ? 100 : S.props[p]),
       setFloat: (m, p, v) => { S.props[p] = v; }, invokeStringA: (m, p, a) => { S.invoked.push([p, a]); if (p === '_root.createEmptyMovieClip') S.props[`_root.${a[0]}._name`] = a[0]; },
       // the legend swf (dbo_maplegend): alive after its loadMovie only when S.legendWorks; its dboData is recorded
@@ -193,6 +197,40 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   for (let i = 0; i < 4; i++) h2.update();
   ok(S.invoked.filter((x) => x[0] === '_root.dboMapLegend.loadMovie').length === 1 && !S.widgets.length, 'the next opening loads it into the new map again');
   ok(!S.errors.length, 'no frame failed', S.errors);
+
+  // ---- the map probe: once a session, on the first opening ----
+  const h3 = {};
+  S.packets.length = 0; S.invoked.length = 0; S.custom = []; S.customOpen = false;
+  new MapRealmService(sp, { on: (ev, fn) => { h3[ev] = fn; }, emitter: { on: (ev, fn) => { h3['emit:' + ev] = fn; } } });
+  h3['emit:customPacketMessage']({ customPacketType: 'dboMapRealm', markers });
+  h3.menuOpen({ name: 'MapMenu' });
+  for (let i = 0; i < 260; i++) h3.update();
+  const probes = () => S.packets.filter((p) => p.event === 'mapTest');
+  const pr = (probes()[0] || { args: [{}] }).args[0];
+  ok(probes().length === 1 && pr.end === 'probe done at frame 250', 'the first opening runs the probe and reports it once, as the mapTest event the server logs', S.packets);
+  ok(/READS root .* MarkerClips .*; 7 markers; Bruma@[0-9]+,/.test(pr.t1 || '') && /Applewatch@101/.test(pr.t1 || ''), 'T1 carries the reads: names, the marker count and the first clips\' labels at their positions', pr.t1);
+  ok(['_root', '_root.WorldMap', '_root.MarkerClips'].every((t, k) => S.invoked.some((x) => x[0] === `${t}.createEmptyMovieClip` && x[1][0] === `dboProbe${k}`)) && /CLIPS _root: name "dboProbe0"/.test(pr.t1 || ''),
+    '...a clip asked for on three targets, each read back by name', pr.t1);
+  ok(/^T5 CustomMenu open true, map still open true/.test(pr.t3 || '') && /after closing it the map open true/.test(pr.t3 || ''), 'T3 carries T5: our CustomMenu opened over the map, the map stayed open, and after', pr.t3);
+  ok(JSON.stringify(S.custom) === JSON.stringify([['open', 'dbo_testmenu', 0], ['close']]), '...opened once and closed again by the probe', S.custom);
+  ok(/^_root\.dboProbeVar 42$/.test(pr.t4 || ''), 'T4 carries the variable written and read back', pr.t4);
+  h3.menuClose({ name: 'MapMenu' });
+  S.packets.length = 0;
+  h3.menuOpen({ name: 'MapMenu' });
+  for (let i = 0; i < 260; i++) h3.update();
+  h3.menuClose({ name: 'MapMenu' });
+  ok(!probes().length, 'a second opening runs no probe');
+  // closed early: what it has, and our CustomMenu closed with the map
+  const h4 = {};
+  S.packets.length = 0; S.custom = []; S.customOpen = false;
+  new MapRealmService(sp, { on: (ev, fn) => { h4[ev] = fn; }, emitter: { on: (ev, fn) => { h4['emit:' + ev] = fn; } } });
+  h4['emit:customPacketMessage']({ customPacketType: 'dboMapRealm', markers });
+  h4.menuOpen({ name: 'MapMenu' });
+  for (let i = 0; i < 70; i++) h4.update();
+  h4.menuClose({ name: 'MapMenu' });
+  const early = (probes()[0] || { args: [{}] }).args[0];
+  ok(probes().length === 1 && /^probe the map closed early/.test(early.end || '') && /READS root/.test(early.t1 || '') && JSON.stringify(S.custom) === JSON.stringify([['open', 'dbo_testmenu', 0], ['close']]),
+    'a map closed during the probe still reports what it has, and takes our CustomMenu down', [early, S.custom]);
 
   fs.rmSync(TMP, { recursive: true, force: true });
   console.log(fails ? `\n${fails} failed` : '\nall passed');
