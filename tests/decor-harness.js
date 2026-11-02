@@ -130,6 +130,22 @@ ok(items().length === 2 && held(STRANGER, WOOD) === 6, 'granted: the decorator p
 cmd(OWNER, 'revoke Stray');
 cmd(STRANGER, 'find wardrobe'); cmd(STRANGER, 'place 1');
 ok(/Only the owner/.test(last(STRANGER)), 'revoked: refused again', last(STRANGER));
+// fac-0553 (the Leader, 2 Nov): a faction's leader and officers build in its hall, whoever owns the building
+let hallAsked = null;
+globalThis.__dboHallOfficer = (refs, a) => { hallAsked = refs; return a === STRANGER; };
+giveItem(STRANGER, WOOD, 4); giveItem(STRANGER, IRON, 1);
+const auditsBefore = audits.length, deletedBefore = deleted.length;
+placeAt(STRANGER, 'bed');
+ok(items().length === 3 && items()[2].name === 'Bed', "the hall's leader or officer builds there", items().map((i) => i.name));
+ok(Array.isArray(hallAsked) && hallAsked.includes(DOOR) && hallAsked.includes(OUTDOOR), '...asked by both sides of its door', hallAsked);
+ok(audits.slice(auditsBefore).some((t) => /^DECOR place Stray Bed /.test(t)), '...and the piece is audited as any other', audits.slice(auditsBefore));
+cmd(STRANGER, 'undo');
+ok(items().length === 2 && deleted.length === deletedBefore + 1, '(undone, so the budget below is as before)', items().map((i) => i.name));
+deleted.splice(deletedBefore);   // the deletion checks below count from here
+globalThis.__dboHallOfficer = () => false;
+cmd(STRANGER, 'find bed'); cmd(STRANGER, 'place 1');
+ok(/Only the owner/.test(last(STRANGER)) && /officer of the faction whose hall this is/.test(last(STRANGER)), 'an ordinary member of the faction is refused, and told who may', last(STRANGER));
+delete globalThis.__dboHallOfficer;
 
 // ---- stations and budget ----------------------------------------------------------------------------------------------
 cmd(OWNER, 'find alchemy'); cmd(OWNER, 'place 1');

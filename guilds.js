@@ -1129,6 +1129,12 @@ module.exports = (api) => {
   globalThis.__dboHallOf = (refs) => hallFactionsOf(refs);
   // The owner's powers: the leader of a faction that holds the hall, never of one that only shares it
   globalThis.__dboHallLeader = (refs, actor) => { const a = Number(actor) >>> 0; return !!a && leadsAt(refs, a, false); };
+  // Who builds in a hall (decor.js; the Leader, 2 Nov, fac-0553: "nothing can be built in a faction HQ"): the leader or an
+  // officer of a faction that holds it, never of one that only shares it, whoever owns the building
+  globalThis.__dboHallOfficer = (refs, actor) => {
+    const a = Number(actor) >>> 0;
+    return !!a && hallsLedAt(refs).some((h) => !h.shared && ['leader', 'officer'].includes((rankOf(h.fid, a) || {}).role));
+  };
   // A building may also name offices whose holders share it, "<zone>:<office>" (Nate, 4 Oct: Castle Bruma and Bruma's
   // Steward, whoever holds it): gamemode-config.json housingPlaces.shares { door desc: [office] } and the staff marks
   // ("@offices", "@officesOff" in faction-halls.json). Read live from officials.json, so a new Steward takes over at once.

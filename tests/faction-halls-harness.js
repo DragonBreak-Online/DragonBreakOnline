@@ -125,6 +125,13 @@ ok(globalThis.__dboHallMember([SPIRE], 501, OUTSIDER) === false, '...someone out
 // The hall follows the faction's current leader, whoever owns the building (Nate, 10 Oct)
 ok(globalThis.__dboHallMember([SPIRE], 502, MEMBER) === true && globalThis.__dboHallOf([SPIRE], 502).length === 1, 'held by someone who does not lead the College it is still its hall while the College has a leader');
 ok(globalThis.__dboHallLeader([SPIRE], LEADER) === true && globalThis.__dboHallLeader([SPIRE], MEMBER) === false, "...and the leader's character holds the owner's powers over it, a member does not");
+// Who builds in the hall (decor.js; the Leader, 2 Nov, fac-0553): its leader and officers, whoever owns the building
+ok(globalThis.__dboHallOfficer([SPIRE], LEADER) === true && globalThis.__dboHallOfficer([SPIRE], MEMBER) === false, 'the leader builds in the hall, an ordinary member does not');
+const officerAt = (rank) => { globalThis.__dboGuildState.members['college-of-whispers'][String(MEMBER)].rank = rank; return globalThis.__dboHallOfficer([SPIRE], MEMBER); };
+ok(officerAt(1) === true, '...an officer (Keeper of Secrets) does too');
+ok(officerAt(4) === false && officerAt(2) === false, '...a blacksmith or a sergeant rank does not');
+setMemberLow('college-of-whispers', MEMBER);
+ok(globalThis.__dboHallOfficer([SPIRE], OUTSIDER) === false && globalThis.__dboHallOfficer([SHOP], LEADER) === false && globalThis.__dboHallOfficer([SPIRE], 0) === false, 'nobody outside the College, nor in a building that is not its hall');
 setMemberLow('college-of-whispers', LEADER);
 ok(globalThis.__dboHallMember([SPIRE], 501, MEMBER) === false && globalThis.__dboHallOf([SPIRE], 501).length === 0 && globalThis.__dboHallLeader([SPIRE], LEADER) === false, 'with no leader the College shares no hall, and its old leader has no hall powers');
 setLeader('college-of-whispers', MEMBER);

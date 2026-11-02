@@ -203,7 +203,17 @@ module.exports = (api) => {
     return rec && Number(rec.owner) > 0 ? { root: hit.root, cells: hit.cells, rec } : null;
   };
   const owns = (a, rec) => { try { const h = globalThis.__dboHousing; if (h && typeof h.ownsRecord === 'function') return h.ownsRecord(rec, a) === true; } catch (e) { /* the account's */ } return Number(rec && rec.owner) === profile(a); };
-  const mayDecorate = (a, pl) => !!pl && (owns(a, pl.rec) || (placeEntry(pl.root, pl.rec).decorators || []).includes(profile(a)));
+  // A faction's hall is built in by its leader and officers too (guilds.js __dboHallOfficer; the Leader, 2 Nov, fac-0553),
+  // with the place's own budget, and each piece is audited as any other is
+  const hallOfficer = (a, pl) => {
+    try {
+      const f = globalThis.__dboHallOfficer;
+      if (typeof f !== 'function') return false;
+      const partner = Number(pl.rec && pl.rec.partner) >>> 0;
+      return f([pl.root].concat(partner ? [partner] : []), a >>> 0) === true;
+    } catch (e) { return false; }
+  };
+  const mayDecorate = (a, pl) => !!pl && (owns(a, pl.rec) || (placeEntry(pl.root, pl.rec).decorators || []).includes(profile(a)) || hallOfficer(a, pl));
   const here = (a) => placeOfCell(idOf(get(a, 'worldOrCellDesc', '')));
   const budgetOf = (pl) => { const b = C.budgets || DEFAULTS.budgets; return b[Math.min(b.length, Math.max(1, pl.cells.length)) - 1]; };
   const usage = (p) => {
@@ -471,7 +481,7 @@ module.exports = (api) => {
     if (BLOCKED.has(String(piece.desc).toLowerCase())) return personal(a, 'That is not in the catalogue.');
     const pl = here(a);
     if (!pl) return personal(a, 'Stand inside your own home to decorate it.');
-    if (!mayDecorate(a, pl)) return personal(a, 'Only the owner, or someone the owner named with /decor grant, decorates here.');
+    if (!mayDecorate(a, pl)) return personal(a, 'Only the owner, someone the owner named with /decor grant, or the leader or an officer of the faction whose hall this is, decorates here.');
     const why = budgetProblem(pl, piece, a);
     if (why) return personal(a, why);
     const short = shortOf(a, costOf(piece));
