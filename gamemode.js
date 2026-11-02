@@ -4998,6 +4998,39 @@ onUi('close', (a, args, widgetId) => { if (widgetId === PIGEON_WIDGET_ID) pigeon
 const goldChanged = (a) => { try { if (userOf(a) >= 0) pushHud(a, needsOf(a)); } catch (e) { /* not a player yet */ } };
 // Send the HUD now when something it shows changed outside the needs and the gold (racial.js: a power's countdown)
 globalThis.__dboHudRefresh = (a) => { try { if (userOf(a) >= 0) pushHud(a, needsOf(a)); } catch (e) { /* not a player yet */ } };
+
+// ---- a staff member clears their own inventory (Nat, 2 Nov): the F7 Debug tab's button (dbo clearInventory) and /clearinv.
+// GM and above, on the staff character (staffguard.js staffCharOnly), never anyone else's. The first press says what would
+// go; a second within CLEAR_INV_CONFIRM_MS clears it, through the server's inventory, so it holds after a relog. Worn items
+// and keys stay; gold goes and its amount is in the audit line ----
+const CLEAR_INV_CONFIRM_MS = 5000;
+const clearInvAsked = globalThis.__dboClearInvAsked instanceof Map ? globalThis.__dboClearInvAsked : (globalThis.__dboClearInvAsked = new Map());
+const clearInvKeeps = (e) => !!(e.worn || e.wornLeft) || (() => { const r = recordOf(Number(e.baseId) >>> 0); return !!r && String(r.record.type) === 'KEYM'; })();
+const clearOwnInventory = (a) => {
+  a >>>= 0;
+  if (!['senior', 'developer', 'leadgm', 'gm'].includes(staffTierOf(a))) return personal(a, 'Only a GM or above clears their inventory this way.');
+  const g = globalThis.__dboStaffGuard;
+  if (g && typeof g.powersOn === 'function' && !g.powersOn(a)) return personal(a, g.NOT_HERE);
+  let inv = null; try { inv = mp.get(a, 'inventory'); } catch (e) { inv = null; }
+  const entries = (inv && Array.isArray(inv.entries) ? inv.entries : []).filter((e) => e && (Number(e.count) || 0) > 0);
+  const gone = entries.filter((e) => !clearInvKeeps(e));
+  const gold = gone.filter((e) => (Number(e.baseId) >>> 0) === GOLD_BASE).reduce((n, e) => n + (Number(e.count) || 0), 0);
+  const items = gone.filter((e) => (Number(e.baseId) >>> 0) !== GOLD_BASE).reduce((n, e) => n + (Number(e.count) || 0), 0);
+  const what = `${items} item(s)${gold ? ` and ${gold} gold` : ''}`;
+  if (!gone.length) { clearInvAsked.delete(a); return personal(a, 'Nothing to clear: you carry only worn items and keys.'); }
+  const asked = clearInvAsked.get(a) || 0;
+  if (!asked || Date.now() - asked > CLEAR_INV_CONFIRM_MS) {
+    clearInvAsked.set(a, Date.now());
+    return personal(a, `Clear ${what}? Worn items and keys stay. Click again within ${CLEAR_INV_CONFIRM_MS / 1000} s.`);
+  }
+  clearInvAsked.delete(a);
+  try { mp.set(a, 'inventory', { entries: entries.filter(clearInvKeeps) }); } catch (e) { log(`clearinv: ${who(a)} failed`, e.message); return personal(a, 'Your inventory could not be cleared; see the server log.'); }
+  if (gold) goldChanged(a);
+  audit(`STAFF ${who(a)} cleared their own inventory: ${items} item(s) in ${gone.filter((e) => (Number(e.baseId) >>> 0) !== GOLD_BASE).length} stack(s), ${gold} gold`);
+  personal(a, `Cleared ${what}.`);
+};
+onUi('clearInventory', (a) => clearOwnInventory(a));
+registerChatCommand('clearinv', (a) => clearOwnInventory(a), { admin: true, help: 'clear your own inventory, worn items and keys aside (GM+; run it twice within 5 s)' });
 // An entry with nothing but its base and count: a new item joins only such a stack. Loot merged into any stack of the
 // same base, so a looted copy took the tempering or enchantment of one the player kept (economy review, 2026-09-29).
 const plainEntry = (e) => Object.keys(e).every((k) => k === 'baseId' || k === 'count' || e[k] === undefined || e[k] === null || ((k === 'worn' || k === 'wornLeft') && !e[k]));
