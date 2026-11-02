@@ -1794,6 +1794,7 @@ jail.js JAIL ab248e05 clean
 jail.js JAIL cca6b801 clean
 jail.js JAIL 93c7d6d9 clean
 journalnotes.js WRITTEN baf0dce7 excluded
+journalnotes.js WRITTEN 1f758233 excluded
 keyring.js KEYRING b2ad5fc1 parsed
 keyring.js KEYRING 0b8be016 parsed
 keyring.js KEYRING 0b8be016 parsed

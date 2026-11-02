@@ -161,7 +161,7 @@ const inv = (a) => (getp(a, 'inventory') || {}).entries || [];
   act(AUTHOR, 'write', eid, 'note', '1');
   check('with no blank records the player is told', /no blank notes/.test(result(AUTHOR)), result(AUTHOR));
   check('...and the tab says how many are free', notes(AUTHOR).write.kinds.find((k) => k.id === 'note').free === 0 && notes(AUTHOR).write.atDesk === true);
-  fs.writeFileSync(BASES, JSON.stringify({ note: ['a01:Test.esp', 'a99:Test.esp', 'a02:Test.esp', 'bad'], book: ['b01:Test.esp'] }));
+  fs.writeFileSync(BASES, JSON.stringify({ note: ['a01:Test.esp', 'a99:Test.esp', 'a02:Test.esp', 'bad'], book: ['b01:Test.esp'] })); // verify-formids: ignore - Test.esp is the harness's own fake pool plugin
   act(AUTHOR, 'write', eid, 'note', '1');
   check('without paper it is refused', /takes 1 paper; you carry 0/.test(result(AUTHOR)), result(AUTHOR));
   check('...two free notes (a MISC and a bad desc skipped)', notes(AUTHOR).write.kinds.find((k) => k.id === 'note').free === 2, notes(AUTHOR).write.kinds);
@@ -183,13 +183,31 @@ const inv = (a) => (getp(a, 'inventory') || {}).entries || [];
   act(AUTHOR, 'write', eid, 'note', '');
   check('...and the pool runs out', /no blank notes/.test(result(AUTHOR)) && inv(AUTHOR).find((e) => e.baseId === PAPER).count === 2, result(AUTHOR));
   setp(AUTHOR, 'failSet', true);
-  fs.writeFileSync(BASES, JSON.stringify({ note: ['a01:Test.esp', 'a02:Test.esp', 'a03:Test.esp'] }));
+  fs.writeFileSync(BASES, JSON.stringify({ note: ['a01:Test.esp', 'a02:Test.esp', 'a03:Test.esp'] })); // verify-formids: ignore - the same fake pool
   act(AUTHOR, 'write', eid, 'note', '');
   setp(AUTHOR, 'failSet', false);
   check('a failed inventory write spends nothing and frees the record', /Nothing was spent/.test(result(AUTHOR)) && notes(AUTHOR).write.kinds.find((k) => k.id === 'note').free === 1, result(AUTHOR));
   await tick();
   const reg = JSON.parse(fs.readFileSync(REG, 'utf8'));
   check('the registry on disk has both works with their text', Object.keys(reg.works).length === 2 && reg.works.W1.text === 'Seen near the eastern gate.' && reg.works.W1.signed === true && reg.works.W2.signed === false, reg);
+
+  // ---- burning (mod-0602) ----
+  setp(AUTHOR, 'inventory', { entries: inv(AUTHOR).concat([{ baseId: 0x05000a02, count: 1 }]) });
+  act(AUTHOR, 'burn', 'W2');
+  check('burning without the confirm burns nothing and asks', /Burn ".*"\? It cannot be undone/.test(result(AUTHOR)) && inv(AUTHOR).filter((e) => e.baseId === 0x05000a02).reduce((s, e) => s + e.count, 0) === 2, inv(AUTHOR));
+  audits.length = 0;
+  act(AUTHOR, 'burn', 'W2', 'yes');
+  check('confirmed, one copy goes into the fire', /goes into the fire/.test(result(AUTHOR)) && inv(AUTHOR).filter((e) => e.baseId === 0x05000a02).reduce((s, e) => s + e.count, 0) === 1, inv(AUTHOR));
+  check('...audited, saying a copy is left', audits.some((t) => /^WRITTEN .* burned note W2 on a02:Test\.esp .*another copy still carried/.test(t)), audits);
+  act(AUTHOR, 'burn', 'W2', 'yes');
+  check('...the last copy burns and the work leaves the carried list', !inv(AUTHOR).some((e) => e.baseId === 0x05000a02) && !notes(AUTHOR).carried.some((c) => c.id === 'W2') && notes(AUTHOR).carried.length === 1, notes(AUTHOR).carried);
+  act(AUTHOR, 'burn', 'W2', 'yes');
+  check('a work not carried cannot be burned', /do not carry/.test(result(AUTHOR)) && last(AUTHOR).resultKind === 'refused');
+  setp(AUTHOR, 'failSet', true);
+  act(AUTHOR, 'burn', 'W1', 'yes');
+  setp(AUTHOR, 'failSet', false);
+  check('a failed inventory write burns nothing', /Nothing was burned/.test(result(AUTHOR)) && inv(AUTHOR).some((e) => e.baseId === 0x05000a01), result(AUTHOR));
+  check('...and the registry keeps the burned work for any other copy', !!globalThis.__dboWrittenWork('W2'));
 
   // ---- the receiver ----
   setp(AUTHOR, 'inventory', { entries: inv(AUTHOR).filter((e) => e.baseId !== 0x05000a01) });
@@ -209,7 +227,7 @@ const inv = (a) => (getp(a, 'inventory') || {}).entries || [];
   check('a work not carried cannot be kept', /do not carry/.test(result(READER)));
   check('...and the work shows as kept', notes(READER).carried[0].kept === true);
   globalThis.__dboJournalRedraw(AUTHOR, 'notes');
-  check('the author no longer carries the given note', notes(AUTHOR).carried.length === 1);
+  check('the author no longer carries the given note', !notes(AUTHOR).carried.some((c) => c.id === 'W1'), notes(AUTHOR).carried);
 
   // ---- reload and restart ----
   load(false);

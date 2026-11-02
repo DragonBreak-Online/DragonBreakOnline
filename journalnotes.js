@@ -16,7 +16,7 @@
 //   Client -> server: journalNotes [nonce, op, ...]
 //     save [id|'', folder, title, text]   delete [id]   move [id, folder]
 //     folderAdd [name]   folderRename [id, name]   folderDelete [id] (its entries go to no folder)
-//     keep [work]   forget [receivedId]   write [entryId, kind, signed '1'|'']
+//     keep [work]   forget [receivedId]   write [entryId, kind, signed '1'|'']   burn [work, 'yes' once confirmed]
 //   Opening an entry is a tab switch with a focus: journalTab [nonce, 'notes', { entry | received | work | none }].
 //
 // Files: journal/notes/<journal key>.json per character (the key journalstats.js keeps on the character), read and written
@@ -332,6 +332,28 @@ module.exports = (api) => {
       return ['Removed from your journal.', true];
     },
     write: (a, d, k, args) => writeOut(a, d, String(args[0] || ''), String(args[1] || ''), String(args[2] || '') === '1'),
+    burn: (a, d, k, args) => burnOut(a, String(args[0] || ''), String(args[1] || '') === 'yes'),
+  };
+  // A carried work burned (the Leader, 2 Nov, mod-0602: letters written and never sent could not be got rid of): one copy
+  // leaves the pack for good. The front asks first and sends 'yes'; the registry keeps the text for any other copy
+  const burnOut = (a, workId, sure) => {
+    const w = carriedOf(a).find((x) => x.id === workId);
+    if (!w) return ['You do not carry that writing.', false];
+    if (!sure) return [`Burn "${w.title}"? It cannot be undone.`, false];
+    const base = idOf(w.base);
+    const after = entriesOf(a);
+    const e = after.find((x) => Number(x.count) > 0 && (Number(x.baseId) >>> 0) === base);
+    if (!e) return ['You do not carry that writing.', false];
+    e.count = Number(e.count) - 1;
+    try { mp.set(a >>> 0, 'inventory', { entries: after.filter((x) => Number(x.count) > 0) }); } catch (err) {
+      log('journal notes: inventory write failed', err.message);
+      return ['It would not catch. Nothing was burned; try again.', false];
+    }
+    const left = carriedOf(a).some((x) => x.id === w.id);
+    const f = N.focus.get(a >>> 0);
+    if (!left && f && f.kind === 'work' && f.id === w.id) N.focus.delete(a >>> 0);
+    audit(`WRITTEN ${who(a)} burned ${w.kind} ${w.id} on ${w.base} "${w.title}"${left ? ', another copy still carried' : ''}`);
+    return [`"${w.title}" goes into the fire.`, true];
   };
   // An entry made into a physical item: a free pool record of that kind, the paper spent, the work in the registry first,
   // then one inventory write (paper out, work in); a write that fails takes the work out of the registry again
