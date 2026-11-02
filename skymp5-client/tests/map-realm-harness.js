@@ -60,7 +60,7 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
       // our CustomMenu (the legend over the map): opened and closed are recorded; dbo_maplegend comes alive in it when S.legendWorks
       openCustomMenu: (swf, flags) => {
         S.custom = (S.custom || []).concat([['open', swf, flags]]); S.customOpen = true;
-        if (swf === 'dbo_maplegend' && S.legendWorks) { S.props['_root._url'] = 'Interface/dbo_maplegend.swf'; S.props['_root.dboAlive'] = 'yes'; }
+        if (swf === 'dbo_maplegend' && S.legendWorks) { S.props['_root._url'] = 'Interface/dbo%5Fmaplegend.swf'; S.props['_root.dboAlive'] = 'Yes'; } // as the game read them back (Nat, 05:05Z): escaped, capitalised
       },
       closeCustomMenu: () => { S.custom = (S.custom || []).concat([['close']]); S.customOpen = false; delete S.props['_root._url']; delete S.props['_root.dboAlive']; },
       setBool: (m, p, v) => { S.props[p] = v; }, setString: (m, p, v) => { S.props[p] = v; },
@@ -196,7 +196,7 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   ok(S.custom.filter((x) => x[0] === 'open').length === 2 && S.customOpen, '...and R again opens it again', S.custom);
   h2.menuClose({ name: 'MapMenu' });
   const rep2 = (S.packets.find((p) => p.event === 'mapSwf') || { args: [{}] }).args[0];
-  ok(rep2.legend && rep2.legend.last === 'alive' && rep2.legend.phase === 'up' && rep2.legend.loaded >= 1 && /dbo_maplegend\.swf$/.test(rep2.legend.url), 'alive: the line says loaded and alive, with the url it came from', rep2);
+  ok(rep2.legend && rep2.legend.last === 'alive' && rep2.legend.phase === 'up' && rep2.legend.loaded >= 1 && /dbo(_|%5F)maplegend\.swf$/i.test(rep2.legend.url), 'alive (read back as "Yes", the url escaped, as the game gives them): the line says loaded and alive, with the url it came from', rep2);
   ok(!S.customOpen, 'closing the map closes our menu with it');
   S.custom = [];
   h2.menuOpen({ name: 'MapMenu' });
@@ -291,7 +291,7 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   ok(probes().length === 1 && pr.end === 'probe done at frame 1200', 'the first opening runs the probe for twenty seconds and reports it once, as the mapTest event', S.packets);
   ok(/^POSITIONS of Bruma, Applewatch, Sancre Tor, Pale Pass, Fort Caractacus, Wraith's Barrow: at 120 [-0-9.]+,[-0-9.]+ x[0-9.]+ \| 300,200 301,201 302,202/.test(pr.t1 || ''), 'T1: the first six markers\' labels and positions at frame 120, MarkerClips\' offset first', pr.t1);
   ok(pr.t2 && pr.t2.frames === 10 && pr.t2.panning === 2 && pr.t2.still === 7, 'T2: ten samples, the markers moved between two of them (the pan) and stood still between the rest', pr.t2);
-  ok(/^legend menu up \(open true, frame [0-9]+\/[0-9]+, version "[^"]*", alive "yes"\), map open true$/.test(pr.t3 || ''), 'T3: our legend menu up over the open map at frame 360, with what its movie was doing', pr.t3);
+  ok(/^legend menu up \(open true, frame [0-9]+\/[0-9]+, version "[^"]*", alive "Yes"\), map open true$/.test(pr.t3 || ''), 'T3: our legend menu up over the open map at frame 360, with what its movie was doing', pr.t3);
   ok(/: 199 mouse moves, 1 clicks$/.test(pr.t4 || ''), 'T4: the mouse moves and clicks the client still heard while our menu was up', pr.t4);
   h3.menuClose({ name: 'MapMenu' });
   S.packets.length = 0;
