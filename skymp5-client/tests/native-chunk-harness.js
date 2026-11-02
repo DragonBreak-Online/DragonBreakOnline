@@ -10,7 +10,12 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const S = require('./native-swf-stub');
-const M = require(path.resolve(process.argv[2] || path.join(os.tmpdir(), 'claude-nate-chunk', 'scaleformMenu.js')));
+const MOD = path.resolve(process.argv[2] || path.join(os.tmpdir(), 'claude-nate-chunk', 'scaleformMenu.js'));
+if (!fs.existsSync(MOD)) {
+  console.log('usage: compile scaleformMenu.ts first, then pass it:\n  ./node_modules/typescript/bin/tsc src/services/services/scaleformMenu.ts --outDir <tmp> --module commonjs --target es2019\n  node tests/native-chunk-harness.js <tmp>/scaleformMenu.js');
+  process.exit(2);
+}
+const M = require(MOD);
 const T = S.checker();
 const check = T.check;
 const read = (f) => fs.readFileSync(path.resolve(__dirname, '..', f), 'utf8').replace(/\r\n/g, '\n');

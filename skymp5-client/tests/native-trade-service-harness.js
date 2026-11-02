@@ -143,7 +143,8 @@ const state = (extra) => Object.assign({ customPacketType: 'tradeState', partner
   w = world(true);
   new TradeService(w.sp, w.controller);
   w.packet(state());
-  for (let i = 0; i < 700; i++) w.S.inv.push({ baseId: 0x100000 + i, count: 1, name: 'A very long and rather unlikely item name, number ' + i });
+  // past MAX_PAYLOAD_CHARS, which is 400,000 since big payloads go in pieces (native-chunked-1102): about 0.7 million here
+  for (let i = 0; i < 3000; i++) w.S.inv.push({ baseId: 0x100000 + i, count: 1, name: 'A very long and rather unlikely item name, one of a great many in a merchant\'s pack, number ' + i + ' of a very full inventory' });
   w.packet(state());
   ok(w.S.native.pop().close === 'trade' && w.tradeWidgets().length === 1, 'a trade grown past a Scaleform payload moves to the browser');
   w.packet(state());
