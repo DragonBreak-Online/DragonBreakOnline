@@ -192,6 +192,11 @@ interface ApplyState {
   grade: number;
   // Times settleTranslation stopped a running translation or cleared a keep-offset that was not already clear
   settles: number[];
+  // An NPC copy's playback: when its last movement was applied, and the seconds each move now takes (nextPlayback)
+  packetAt: number;
+  playbackS: number;
+  // whether that last movement was a moving one (only the gap between two moving packets is a stream's)
+  moving: boolean;
 }
 // Per copy: the last keep-offset order and translateTo target this client gave, read by the drift sampler
 const applyStates = new Map<number, ApplyState>();
@@ -199,7 +204,7 @@ const SETTLE_WINDOW_MS = 2000;
 
 const stateOf = (refrId: number): ApplyState => {
   let s = applyStates.get(refrId);
-  if (!s) applyStates.set(refrId, s = { offset: "none", target: null, targetAt: 0, grade: 0, settles: [] });
+  if (!s) applyStates.set(refrId, s = { offset: "none", target: null, targetAt: 0, grade: 0, settles: [], packetAt: 0, playbackS: 0, moving: false });
   return s;
 };
 
@@ -213,6 +218,7 @@ export const getApplyState = (refrId: number) => {
     targetAgeMs: s && s.targetAt ? now - s.targetAt : -1,
     grade: s ? s.grade : 0,
     settles2s: s ? s.settles.filter((at) => now - at <= SETTLE_WINDOW_MS).length : 0,
+    playbackS: s ? s.playbackS : 0,
   };
 };
 
@@ -283,6 +289,22 @@ export const forgetLocalCopy = (localId: number): void => {
 // arrive with the next report, with no look-ahead. Guessing ahead by speed and a slope estimate overshot on uneven
 // ground and made watched creatures bob, sink and pop out (playtest 2026-09-25). Players keep the look-ahead.
 const NPC_PLAYBACK_S = 0.13;
+// ...but no shorter than the gap between its packets: at a fixed 0.13 s a slower stream (the server driving the NPC itself,
+// _work/server-npc-movement-1102.md, or a host that reports less often) reaches each point early and stands until the next,
+// a walk that stops and starts. The gap, smoothed and clamped: 0.13 s for any stream of 7.7 a second or more, as before;
+// never past NPC_PLAYBACK_MAX_S, so the first move after a pause does not crawl
+export const NPC_PLAYBACK_MAX_S = 0.6;
+const PLAYBACK_SMOOTHING = 0.3;
+// Only the gap between two moving packets, this close together, counts: a guard standing 40 s at its marker (its stand
+// refreshed by formView every 2 s, or by the server's own standing packets) is a pause, not a slow stream, and the gap
+// before its first step reaches back into that pause, so it must not set off at a crawl
+export const PLAYBACK_GAP_MAX_MS = 1000;
+export const nextPlayback = (prevS: number, gapMs: number): number => {
+  const clamp = (v: number): number => Math.min(NPC_PLAYBACK_MAX_S, Math.max(NPC_PLAYBACK_S, v));
+  if (!(gapMs > 0)) return prevS > 0 ? prevS : NPC_PLAYBACK_S;
+  const gap = clamp(gapMs / 1000);
+  return clamp(prevS > 0 ? prevS * (1 - PLAYBACK_SMOOTHING) + gap * PLAYBACK_SMOOTHING : gap);
+};
 
 // The interpolation window follows the update rate when updates come clearly slower than the clients' 130 ms (a far
 // mover under the server's interest management, at 2/s or 0.5/s): the copy then glides over the whole gap instead of
@@ -291,8 +313,21 @@ const MAX_WINDOW_S = 2.0;
 const windowFor = (base: number, gapMs?: number): number =>
   gapMs && gapMs > base * 1500 ? Math.min(MAX_WINDOW_S, gapMs / 1000) : base;
 
+// Two regimes. A player copy's window follows gapMs, the gap the model smooths over all its packets (windowFor). An NPC
+// copy keeps its own measure (nextPlayback) and ignores gapMs on purpose: that gap counts standing packets, and a guard who
+// stood 40 s at its marker would then set off at a crawl (_work/server-npc-movement-1102.md, tests/npc-playback-harness.js)
 const translateTo = (refr: ObjectReference, m: Movement, isNpc = false, gapMs?: number) => {
-  let time = windowFor(isNpc ? NPC_PLAYBACK_S : 0.2, gapMs);
+  let time = windowFor(0.2, gapMs);
+  if (isNpc) {
+    const s = stateOf(refr.getFormID());
+    const now = Date.now();
+    const gap = s.packetAt ? now - s.packetAt : 0;
+    const moving = m.runMode !== "Standing";
+    s.playbackS = nextPlayback(s.playbackS, moving && s.moving && gap <= PLAYBACK_GAP_MAX_MS ? gap : 0);
+    s.packetAt = now;
+    s.moving = moving;
+    time = s.playbackS;
+  }
 
   const groundGrade = getGroundGrade(refr.getFormID(), m);
 
