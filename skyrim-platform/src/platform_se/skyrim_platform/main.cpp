@@ -370,8 +370,7 @@ public:
     }
 
     // Start the repeat timer on key-down (key-up is cleared above).
-    if (down && virtualKeyCode >= 0 &&
-        virtualKeyCode < vkCodeDownDur.size()) {
+    if (down && virtualKeyCode >= 0 && virtualKeyCode < vkCodeDownDur.size()) {
       vkCodeDownDur[virtualKeyCode] = clock();
       vkCodeLastRepeat[virtualKeyCode] = clock();
     }
@@ -673,7 +672,8 @@ private:
   bool switchLayoutDownWas = false;
 };
 
-// Keeps the game window in front so DirectInput stays acquired; own thread, so a paused game loop cannot stall it
+// Keeps the game window in front so DirectInput stays acquired; own thread, so
+// a paused game loop cannot stall it
 class ForegroundGuard
 {
 public:
@@ -762,18 +762,20 @@ private:
     }
     lastLog = now;
     const WindowInfo info = Describe(window);
-    spdlog::info("ForegroundGuard: game window {} class '{}' pid {} ({})", what,
-                 info.className, info.pid, ImageName(info));
+    spdlog::info("ForegroundGuard: game window {} class '{}' pid {} ({})",
+                 what, info.className, info.pid, ImageName(info));
   }
 
-  // Other Chromium apps (Discord, browsers) use the same window classes, so only the pid and the CEF subprocess count
+  // Other Chromium apps (Discord, browsers) use the same window classes, so
+  // only the pid and the CEF subprocess count
   static bool IsOwnWindow(const WindowInfo& info)
   {
     return info.pid == GetCurrentProcessId() ||
       std::wcsstr(info.image, L"SkyrimPlatformCEF") != nullptr;
   }
 
-  // Fallback for the swap chain window: the game's own top-level window by class
+  // Fallback for the swap chain window: the game's own top-level window by
+  // class
   static BOOL CALLBACK FindGameWindow(HWND window, LPARAM out)
   {
     DWORD pid = 0;
@@ -1124,7 +1126,8 @@ private:
     }
     const bool own = IsOwnWindow(info);
     if (!own && everForeground) {
-      // A real switch to another program; the input idle time tells an alt-tab from a theft
+      // A real switch to another program; the input idle time tells an alt-tab
+      // from a theft
       LASTINPUTINFO lastInput = { sizeof(LASTINPUTINFO), 0 };
       const DWORD idleMs =
         GetLastInputInfo(&lastInput) ? GetTickCount() - lastInput.dwTime : 0;
@@ -1173,7 +1176,8 @@ private:
     }
     const int cap = everForeground ? kOwnWindowAttempts : kStartupAttempts;
     if (attempts >= cap) {
-      // Own windows never belong in front, so past the burst they are retried every couple of seconds
+      // Own windows never belong in front, so past the burst they are retried
+      // every couple of seconds
       if (!own || (attempts++ - cap) % kSlowRetryTicks != 0) {
         return;
       }
@@ -1189,8 +1193,8 @@ private:
   {
     const DWORD frontThread = GetWindowThreadProcessId(foreground, nullptr);
     const DWORD ownThread = GetCurrentThreadId();
-    const bool attached =
-      frontThread != ownThread && AttachThreadInput(frontThread, ownThread, TRUE);
+    const bool attached = frontThread != ownThread &&
+      AttachThreadInput(frontThread, ownThread, TRUE);
     SetForegroundWindow(game);
     BringWindowToTop(game);
     if (attached) {
@@ -1198,7 +1202,8 @@ private:
     }
   }
 
-  // No window in front (e.g. after the launcher chain exits) lets the game take the foreground; the grace lets alt-tab pass
+  // No window in front (e.g. after the launcher chain exits) lets the game
+  // take the foreground; the grace lets alt-tab pass
   void ReclaimFromNothing()
   {
     ++nullTicks;

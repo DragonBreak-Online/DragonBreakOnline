@@ -2,9 +2,9 @@
 #include "BrowserApi.h"    // APIs for register in CommonExecutionListener
 #include "CallNativeApi.h" // CallNativeApi::NativeCallRequirements
 #include "CameraApi.h"
-#include "DboMenuApi.h"
 #include "ConsoleApi.h" // CommonExecutionListener
 #include "ConstEnumApi.h"
+#include "DboMenuApi.h"
 #include "DevApi.h"
 #include "DirectoryMonitor.h"
 #include "EncodingApi.h"
@@ -332,7 +332,10 @@ private:
     settingsByPluginNameCache.reset();
   }
 
-  JsEngine* GetJsEngine() { return JsEngine::GetSingleton(); }
+  JsEngine* GetJsEngine()
+  {
+    return JsEngine::GetSingleton();
+  }
 
   std::vector<std::filesystem::path> GetPathsToLoad(
     const std::filesystem::path& directory)
