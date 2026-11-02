@@ -22,6 +22,9 @@ declare const window: any;
 let widget: Record<string, unknown> | null = null;
 
 // The realm on Skyrim's M map; see mapRealm.ts for the contract and the reasons
+// How often a marker clip that reads no label is read again before it is taken as having none
+const LABEL_TRIES = 10;
+
 export class MapRealmService extends ClientListener {
   constructor(private sp: Sp, private controller: CombinedController) {
     super();
@@ -58,6 +61,7 @@ export class MapRealmService extends ClientListener {
   private onMapOpen(): void {
     this.open = true;
     this.labels = [];
+    this.labelTries = [];
     this.applied = [];
     this.mounted = false;
     this.ticksOpen = 0;
@@ -144,8 +148,12 @@ export class MapRealmService extends ClientListener {
     let read = 0;
     for (let i = 0; i < n && read < LABELS_PER_TICK; i++) {
       if (typeof this.labels[i] === "string") continue;
-      this.labels[i] = ui.getString(MAP_MENU, `${MARKER_CLIP(i)}.label`) || "";
+      const label = ui.getString(MAP_MENU, `${MARKER_CLIP(i)}.label`) || "";
       read++;
+      // A clip SkyUI has made but not labelled yet reads empty: kept unread and tried again (Nat, 2 Nov: a legend that
+      // stored those empties counted 10 of 388 markers and none of the realm's), up to LABEL_TRIES times for one with none
+      const tries = (this.labelTries[i] || 0) + 1;
+      if (label || tries >= LABEL_TRIES) this.labels[i] = label; else this.labelTries[i] = tries;
     }
   }
 
@@ -430,6 +438,7 @@ export class MapRealmService extends ClientListener {
   private open = false;
   private ticksOpen = 0;
   private labels: Array<string | undefined> = [];
+  private labelTries: number[] = [];
   private applied: number[] = [];
   private mounted = false;
   private testArmed = false;
