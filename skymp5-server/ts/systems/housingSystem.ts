@@ -118,6 +118,8 @@ const NOT_GRANTED = "Property here is granted by its ruler (Jarl, Baron or Count
 // A fief's holder (a Baron or Baroness, a Skyrim Lord or Lady of a holding; gameplay nobility.js) manages the property of
 // their own fief the same way, and nowhere else; their own buildings there are not counted by the one-building cap.
 const MANAGER_RANKS = ["jarl", "baron", "steward", "chieftain", "bane", "count"];
+// The ranks that rule a hold, and so hold its seat by office (a steward manages it, but does not hold it)
+const RULER_RANKS = ["jarl", "baron", "chieftain", "bane", "count"];
 // Actions on any door or chest of a place that act on the whole place (its root)
 const PLACE_WIDE = ["abandon", "revoke", "rename", "createkey", "revokekeys", "takekey", "transfer", "assign", "unassign", "share", "unshare"];
 // Keys of a place's inner doors and chests are their own (Nate, 5 Oct): only its exterior doors share the place's key
@@ -1601,9 +1603,48 @@ export class HousingSystem implements System {
   private fiefExempt(ctx: SystemContext, primary: number, profileId: number, actorId: number): boolean {
     if (!primary) return false;
     if (this.hallExempt(ctx, primary, actorId)) return true;
+    if (this.seatExempt(ctx, primary, profileId, actorId)) return true;
     if (this.notHome(ctx, primary)) return true;
     const h = this.fiefHolderOf(ctx, primary);
     return !!h && h.profile === profileId && (!actorId || h.actor === (actorId >>> 0));
+  }
+
+  // A hold's seat held by that hold's ruler is held by office, outside the one-building cap (the Leader, 2 Nov, after
+  // fac-0498: Windhelm's Jarl, whose account holds other houses, could not take the Palace of Kings back after giving it
+  // up). The ruler is the record's own character when the office is bound to one (zones.rankOf), else the account, and
+  // the backend's hold rows count for a character that is online.
+  private seatExempt(ctx: SystemContext, primary: number, profileId: number, actorId: number): boolean {
+    if (!primary || !(profileId > 0)) return false;
+    const zone = this.seatZoneOf(ctx, primary);
+    if (!zone) return false;
+    const rank = this.zones.rankOf(profileId, zone, actorId || undefined);
+    if (rank && RULER_RANKS.indexOf(rank) !== -1) return true;
+    return !!actorId && this.holdRanks(ctx, actorId).some((r) => r.hold === zone && RULER_RANKS.indexOf(r.rank) !== -1);
+  }
+
+  // The hold whose seat this way in is: gamemode-config.json housingPlaces.seats { "<zone id>": ["<door desc>", ...] },
+  // either side of the door; read again when the file changes
+  private seatZoneOf(ctx: SystemContext, primary: number): string | null {
+    let mtime = 0;
+    try { mtime = fs.statSync(GAMEMODE_CONFIG_FILE).mtimeMs; } catch { return null; }
+    if (!this.seatDoors || this.seatDoors.mtime !== mtime) {
+      const byRef = new Map<number, string>();
+      try {
+        const cfg = JSON.parse(fs.readFileSync(GAMEMODE_CONFIG_FILE, "utf8"));
+        const seats = cfg && cfg.housingPlaces && cfg.housingPlaces.seats && typeof cfg.housingPlaces.seats === "object" ? cfg.housingPlaces.seats : {};
+        for (const [zone, doors] of Object.entries(seats)) {
+          if (zone.startsWith("_") || !Array.isArray(doors)) continue;
+          for (const door of doors) {
+            let id = 0;
+            try { id = (ctx.svr as Mp).getIdFromDesc(String(door)) >>> 0; } catch { id = 0; }
+            if (!id) { this.log(`[housing] housingPlaces.seats: ${zone} door ${door} is not in the load order`); continue; }
+            for (const ref of [id, this.primaryOf(ctx, id), this.partnerOf(ctx, id)]) if (ref) byRef.set(ref >>> 0, zone);
+          }
+        }
+      } catch (e) { this.log(`[housing] housingPlaces.seats unreadable: ${e}`); }
+      this.seatDoors = { mtime, byRef };
+    }
+    return this.seatDoors.byRef.get(primary >>> 0) || this.seatDoors.byRef.get(this.partnerOf(ctx, primary) >>> 0) || null;
   }
 
   // A hall this character leads (guilds.js __dboHallLeader) is outside the one-building cap
@@ -3387,6 +3428,8 @@ export class HousingSystem implements System {
   private roleCfg: AdminRoleConfig = readAdminRoleConfig(null);
   private zones!: Zones;
   private zoneCache = new Map<number, string | null>();
+  // housingPlaces.seats, resolved: a seat's door (either side) -> its hold
+  private seatDoors: { mtime: number; byRef: Map<number, string> } | null = null;
   // Profiles whose owned-cell list changed and has not been sent yet
   private homeCellsDirty = new Set<number>();
   private maxClaims = DEFAULT_MAX_CLAIMS;
