@@ -170,9 +170,20 @@ module.exports = ({ mp, log, every, cfg, state } = {}) => {
   };
   globalThis.__dboServerHostSkips = (id) => directorSkips(id);
 
-  // Its own pass, like the director's. Nothing here moves an NPC: it tags, watches and logs.
-  if (on && typeof every === 'function') {
+  // Its own passes, like the director's. Nothing here moves an NPC: it tags, watches and logs.
+  //
+  // REGISTERED IN EVERY MODE, off included, and the body returns early instead. This was the third hole in the
+  // 2 Nov stranding and W5 found it live: gamemode.js's every() calls stopTimer(name) first, so re-registering
+  // replaces the previous generation's timer - but `if (on && ...)` meant that in mode off we never called
+  // every() at all, so we never stopped anything either. The timers from the load BEFORE the reload kept
+  // firing, with their old closure and their old mode, and kept re-tagging through apply(). Heartbeats still
+  // said "observe" after the config said "off". W5 had to stop them by name on the live box.
+  //
+  // A pass that costs nothing is worse than a pass that does nothing, when its absence leaves the previous
+  // generation's pass running. Two timers doing a boolean check cost less than one orphan tagging NPCs.
+  if (typeof every === 'function') {
     every('serverHostPin', 1000, () => {
+      if (!on) return;
       const now = Date.now();
       apply();
       const ev = poll(now);
@@ -183,6 +194,7 @@ module.exports = ({ mp, log, every, cfg, state } = {}) => {
       }
     });
     every('serverHostPinSummary', C.logEveryMs, () => {
+      if (!on) return;
       const s = { mode: C.mode, zone: zone || undefined, npc: npc ? npc.toString(16) : undefined, watching: S.ids.size, changes: S.changes, refused: S.refused };
       say(`serverHostPin: ${JSON.stringify(s)}`);
     });

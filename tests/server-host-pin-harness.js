@@ -94,8 +94,23 @@ const world = (opts) => {
   check('off: nothing is refused', p.refuses(1, NPC) === false);
   check('off: the director is not told to skip', p.directorSkips(NPC) === false);
   check('off: polling says nothing', p.poll(1000) === null);
-  check('off: no timed pass is registered, so it costs the server nothing',
-    every.calls.length === 0, every.calls.map((c) => c.name));
+  // This assertion used to require ZERO passes, and that was the third hole in the 2 Nov stranding (W5 found
+  // it live). gamemode.js's every() calls stopTimer(name) first, so registering replaces the previous
+  // generation's timer - but not registering leaves it running, with its old closure and its old mode, still
+  // re-tagging through apply(). After the reload to off, heartbeats still said "observe".
+  // So: both passes are registered in every mode, and their bodies return early. A pass that costs nothing is
+  // worse than a pass that does nothing, when its absence leaves an orphan behind.
+  check('off: both passes ARE registered, so a reload replaces the old timers rather than orphaning them',
+    every.calls.length === 2 && every.calls[0].name === 'serverHostPin'
+    && every.calls[1].name === 'serverHostPinSummary', every.calls.map((c) => c.name));
+  check('off: and running them does nothing at all - no tag, no log',
+    (() => {
+      const before = JSON.stringify([...mp.props]);
+      const lines = [];
+      const { every: e2, lines: l2 } = start(mod, 'off', mp, {});
+      e2.calls.forEach((c) => c.cb());
+      return JSON.stringify([...mp.props]) === before && l2.length === 0 && lines.length === 0;
+    })());
   check('off: the global refuser still answers, and answers false',
     typeof globalThis.__dboServerHostRefuses === 'function' && globalThis.__dboServerHostRefuses(1, NPC) === false);
 }
@@ -106,7 +121,7 @@ const world = (opts) => {
   const { p, every } = start(mod, 'pin', mp, {}, { zone: '' });
   p.apply();
   check('pin with neither zone nor npc: refuses nothing', p.refuses(1, NPC) === false && p.refuses(1, OTHER) === false);
-  check('...and registers no pass', every.calls.length === 0);
+  check('...but the passes are still registered, so a reload cannot orphan an older timer', every.calls.length === 2);
 }
 
 // ---- the zone is the identity: npcSpawner decides, not an id ----
@@ -332,12 +347,20 @@ const scenarios = (M) => {
   c(p.directorSkips(NPC) === true);
   c(globalThis.__dboServerHostRefuses(0x14, NPC) === true);
   c(every.calls.length === 2);
-  const { p: off, every: every2 } = start(M, 'off', world(), {});
+  const mpOff = world();
+  const beforeOff = JSON.stringify([...mpOff.props]);
+  const { p: off, every: every2, lines: linesOff } = start(M, 'off', mpOff, {});
   off.apply();
   c(off.tagged(NPC) === false);
   c(off.refuses(0x14, NPC) === false);
   c(globalThis.__dboServerHostRefuses(0x14, NPC) === false);
-  c(every2.calls.length === 0);
+  c(every2.calls.length === 2);
+  // off must be inert THROUGH the passes, not merely at the API: running both bodies must change no property
+  // both survive - they did, on the first attempt at this fix.
+  c(off.poll(1000) === null);
+  every2.calls.forEach((x) => x.cb());
+  c(JSON.stringify([...mpOff.props]) === beforeOff);
+  c(linesOff.length === 0);
   const mp3 = world();
   const { p: ob } = start(M, 'observe', mp3, {});
   ob.isTarget(NPC); ob.isTarget(MATE);
@@ -367,9 +390,15 @@ const scenarios = (M) => {
   // isTarget already refuses everything without one, so dropping the `(!!zone || !!npc)` from `on` changes
   // only whether two timed passes run every second with nothing to watch. That is a real difference on a
   // live server and it is the only thing that makes that mutant non-equivalent.
-  const { p: neither, every: every3 } = start(M, 'pin', world(), {}, { zone: '' });
+  const { p: neither, every: every3, lines: linesNeither } = start(M, 'pin', world(), {}, { zone: '' });
   c(neither.refuses(0x14, NPC) === false);
-  c(every3.calls.length === 0);
+  c(every3.calls.length === 2);
+  // A half-filled config must also be SILENT. Dropping the zone-or-id term from `on` leaves it logging a
+  // watching:0 summary every logEveryMs on a live server - noise, and misleading. Now that the passes register
+  // in every mode, that log line is the only thing that makes the mutant non-equivalent, which I checked by
+  // diffing every output of both versions rather than reasoning about it.
+  every3.calls.forEach((x) => x.cb());
+  c(linesNeither.length === 0);
   return bad;
 };
 check('the scenarios pass on serverhostpin.js as it is', scenarios(mod) === 0);
@@ -389,8 +418,13 @@ const MUTANTS = [
   ['the change gap is not measured', "const gap = S.at[f] ? now - S.at[f] : 0;", "const gap = 0;"],
   ['the gap is global, not per NPC', "const gap = S.at[f] ? now - S.at[f] : 0;", "const gap = S.lastAny ? now - S.lastAny : 0;"],
   ['the global refuser never refuses', "const no = refuses(requester, id);", "const no = false;"],
-  ['the timed passes are registered even when off', "if (on && typeof every === 'function') {", "if (typeof every === 'function') {"],
+  ['off registers no pass, orphaning the previous generation timer', "if (typeof every === 'function') {", "if (on && typeof every === 'function') {"],
 ];
+// Also deliberately NOT a mutant: dropping `if (!on) return;` from the 1 s pass. EQUIVALENT, checked by
+// running both versions in off mode and diffing every output (scratchpad\probe-equiv2.js): apply() and poll()
+// each guard on `on` themselves, so the pass body changes nothing without it. The guard stays as defence in
+// depth - it is one line and it makes the intent local - but it is not load-bearing and a mutant of it would
+// be a standing FAIL for the next person to re-derive.
 // Deliberately NOT a mutant: dropping the `!f` guard from isTarget(). It is EQUIVALENT rather than surviving
 // - form 0 carries no properties, so spawnerOf(0) is '' with or without the guard and no behaviour changes. A
 // mutant that cannot alter behaviour proves nothing about the checks, and leaving it in the list would be a
