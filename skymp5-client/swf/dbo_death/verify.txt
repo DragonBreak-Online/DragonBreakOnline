@@ -1,0 +1,7 @@
+dboData
+death:choice
+You have died!
+Permanent Death
+SendModEvent
+$EverywhereMediumFont
+dboOut

@@ -5,13 +5,17 @@ import { openFormMenu, refreshFormMenu, readMenuLanguage } from "./widgetMenuUti
 import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { NetworkingService } from "./networkingService";
-import { logTrace } from "../../logging";
+import { logError, logTrace } from "../../logging";
+import { ScaleformMenuService } from "./scaleformMenuService";
+import { FAILED_KEY } from "./nativeWidgets";
 
 // for browsersideWidgetSetter (executed inside the CEF browser)
 declare const window: any;
 
 const WIDGET_ID = 28;
 const EXIT_DELAY_MS = 10000;
+// The world is running (and a native panel can open) if "update" ran this recently; the main menu runs only "tick"
+const WORLD_RUNNING_MS = 500;
 
 const events = {
   quit: 'kicked:quit',
@@ -46,8 +50,9 @@ export class KickService extends ClientListener {
     this.controller.on("browserMessage", (e) => this.onBrowserMessage(e));
     // "tick" keeps firing while a pausing menu is open, unlike "update"
     this.controller.on("tick", () => this.onTick());
+    this.controller.on("update", () => { this.updatedAt = Date.now(); });
     // The hide UI key drops focus; the dialog must be clickable again once shown
-    this.controller.emitter.on("uiHiddenChanged", (e) => { if (!e.hidden && this.exitAt) this.sp.browser.setFocused(true); });
+    this.controller.emitter.on("uiHiddenChanged", (e) => { if (!e.hidden && this.exitAt && !this.native) this.sp.browser.setFocused(true); });
 
     const lang = readMenuLanguage(this.sp);
     if (lang in translations) {
@@ -65,7 +70,29 @@ export class KickService extends ClientListener {
     this.exitAt = Date.now() + EXIT_DELAY_MS;
     this.shownSeconds = this.secondsLeft();
     closing = strings.closing.replace('{s}', String(this.shownSeconds));
-    openFormMenu(this.sp, this.browsersideWidgetSetter, { reason, closing, strings, events, WIDGET_ID }, this.controller);
+    // English only: the fonts the game loads (gfxfontlib.swf) have no Cyrillic, so Russian keeps the browser form (W1)
+    this.native = strings === translations.en && Date.now() - this.updatedAt < WORLD_RUNNING_MS && this.openNative();
+    if (!this.native) openFormMenu(this.sp, this.browsersideWidgetSetter, { reason, closing, strings, events, WIDGET_ID }, this.controller);
+  }
+
+  private openNative(): boolean {
+    try {
+      return this.controller.lookupListener(ScaleformMenuService).openNative({
+        type: "kick", widget: { type: "kick", reason, seconds: this.shownSeconds, strings }, onKey: (key) => this.onNativeKey(key),
+      });
+    } catch (e) {
+      logError(this, `the native kick screen could not open: ${e}`);
+      return false;
+    }
+  }
+
+  private onNativeKey(key: string): void {
+    if (key === "kick:quit" && this.exitAt) { this.quitGame(); return; }
+    if (key === FAILED_KEY && this.native && this.exitAt) {
+      this.native = false;
+      closing = strings.closing.replace('{s}', String(this.secondsLeft()));
+      openFormMenu(this.sp, this.browsersideWidgetSetter, { reason, closing, strings, events, WIDGET_ID }, this.controller);
+    }
   }
 
   private onTick(): void {
@@ -75,6 +102,7 @@ export class KickService extends ClientListener {
     if (seconds === this.shownSeconds) return;
     this.shownSeconds = seconds;
     closing = strings.closing.replace('{s}', String(seconds));
+    if (this.native) return;
     refreshFormMenu(this.sp, this.browsersideWidgetSetter, { reason, closing, strings, events, WIDGET_ID });
   }
 
@@ -117,5 +145,7 @@ export class KickService extends ClientListener {
   };
 
   private exitAt = 0;
+  private updatedAt = 0;
+  private native = false;
   private shownSeconds = 0;
 }
