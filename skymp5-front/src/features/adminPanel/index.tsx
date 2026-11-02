@@ -85,7 +85,7 @@ export interface AdminPanelData {
   debug?: DebugData | null;
   npcZones?: PanelNpcZone[]; // absent on older clients
   npcZonesAt?: number; // Date.now() when npcZones arrived, the countdown base
-  caps?: { ban?: boolean }; // server-resolved tier capabilities, absent on older servers
+  caps?: { ban?: boolean; tempBan?: boolean }; // server-resolved tier capabilities, absent on older servers
   tier?: string; // "senior" | "developer" | "gm", absent on older servers
   mastery?: PanelMastery | null; // the admin's own standing, absent on older servers
   bans?: PanelBan[]; // admin-bans.json entries (temp and ip bans)
@@ -288,6 +288,8 @@ const AdminPanel = ({ data }: { data: AdminPanelData }) => {
   const actionsEnabled = !!(selectedPlayer && selectedPlayer.online && selectedPlayer.a);
   // Hidden rather than greyed so a tier without ban never sees a dead button; the server enforces it anyway
   const canBan = !data.caps || data.caps.ban !== false;
+  // A GM temp bans (up to 72 h, the server holds them to it) but bans for good, by IP or unbans not
+  const canTempBan = canBan || !!(data.caps && data.caps.tempBan);
 
   const act = (key: string): void => {
     if (selectedPlayer && selectedPlayer.a) send(key, selectedPlayer.a);
@@ -423,6 +425,7 @@ const AdminPanel = ({ data }: { data: AdminPanelData }) => {
                 target={actionsEnabled && selectedPlayer && selectedPlayer.a ? selectedPlayer.a : null}
                 name={selectedPlayer ? selectedPlayer.n : ''}
                 canBan={canBan}
+                canTempBan={canTempBan}
                 bans={data.bans || []}
               />
             ) : null}
