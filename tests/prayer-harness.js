@@ -66,7 +66,7 @@ const api = {
   who: () => 'Tester #ABCD (profile 1)',
   // The cases up to "client-judged" are today's server-judged rules: they run with the rollback switch, which so proves
   // prayer.clientJudged false behaves exactly as before. The client-judged cases are at the end.
-  cfg: { prayer: { clientJudged: false, faiths: false } },
+  cfg: { prayer: { clientJudged: false, faiths: false, pick: { enabled: false } } },
   distanceMeters: () => nearM,
   openWidget: (a, w) => { out.widgets.push(w); return true; },
   closeWidget: () => true,
@@ -620,7 +620,7 @@ check('no blessing, no boon', globalThis.__dboBlessedWith(ACTOR, 'scholarBoon') 
 console.log('');
 console.log('client-judged:');
 const NET = require(path.join(__dirname, 'lib', 'netsim.js'));
-api.cfg = { prayer: { clientJudged: true } };
+api.cfg = { prayer: { clientJudged: true, pick: { enabled: false } } };
 load();
 props.set(ACTOR + '|private.dboDeity', { id: 'akatosh', name: 'Akatosh', at: wallClock - 30 * 86400000 });
 props.delete(ACTOR + '|private.prayedShrines');
@@ -754,12 +754,12 @@ check("replayCheck 'log' (default): a claimed hold its spans do not bear out sta
 f = freshC();
 res = playC(f, { claim: claimC({ win: false, why: 'released' }) });
 check("the widget's own loss stands even when its spans replay to a hold", verdictOf(res.log) === 'released' && /mismatch/.test(susOfP(res.log)) && res.events.length === 0, res.log);
-api.cfg = { prayer: { clientJudged: true, replayCheck: 'refuse' } };
+api.cfg = { prayer: { clientJudged: true, replayCheck: 'refuse', pick: { enabled: false } } };
 load();
 f = freshC();
 res = playC(f, { spans: [[0, 7000], [8000, f.w.totalMs]] });
 check("replayCheck 'refuse': the mismatched hold is refused", verdictOf(res.log) === 'mismatch' && res.events.length === 0, res.log);
-api.cfg = { prayer: { clientJudged: true } };
+api.cfg = { prayer: { clientJudged: true, pick: { enabled: false } } };
 load();
 
 // Still at the shrine
@@ -905,7 +905,7 @@ playC(f, { noStart: true, reportArrive: f.start + 20000 });
 }
 
 // Rollback: clientJudged false refuses on lag exactly as before
-api.cfg = { prayer: { clientJudged: false } };
+api.cfg = { prayer: { clientJudged: false, pick: { enabled: false } } };
 load();
 f = freshC();
 res = playC(f, { reportArrive: f.start + 1000 + f.w.totalMs + 4000 });
@@ -914,7 +914,8 @@ f = freshC();
 check('...and the widget is not told it judges', f.w.judge === undefined);
 playC(f);
 
-// ---- "Speak the verses": a UI that names 'pickRound' gets a prayer with no hold, every other UI today's held prayer -----
+// ---- "Speak the verses": every UI gets a prayer with no hold (the held one retired, 1 Nov); the cases above run with ---
+// ---- prayer.pick.enabled false, the way back to it ------------------------------------------------------------------
 console.log('');
 console.log('pick prayers:');
 {
@@ -924,8 +925,7 @@ console.log('pick prayers:');
   const TIMING_KEYS = 'type,id,nonce,deity,kind,shrine,verses,totalMs,startOnPress,judge,slackMs,startGraceMs,waitMs';
   pickUi = false;
   let f = freshC();
-  check('a UI without the capability gets exactly the held prayer', Object.keys(f.w).join(',') === TIMING_KEYS, Object.keys(f.w).join(','));
-  playC(f);
+  check('a UI without the capability gets the pick prayer too: the held one is retired', f.w.mode === 'pick', Object.keys(f.w).join(','));
   pickUi = true;
   f = freshC();
   check('a UI with it gets three verses of three lines, the true one marked, no verse windows', f.w.mode === 'pick' && f.w.verses.length === 3 && f.w.verses.every((v) => v.lines.length === 3 && v.startMs === undefined) && f.w.right.length === 3 && f.w.slips === 2 && f.w.totalMs === 120000, Object.keys(f.w).join(','));
