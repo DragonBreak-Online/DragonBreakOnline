@@ -52,7 +52,7 @@ const scenarios = (src, c) => {
       lookupEspmRecordById: (id) => RECORDS.get(id) || null,
     },
     log: (...x) => logs.push(x.join(' ')), personal: () => {}, system: () => {}, audit: () => {}, who: (a) => `P${a}`, display: (a) => `P${a}`,
-    cfg: { war: { mapTints: { 'fighters-guild': [1, 2, 3] } } }, onUi: (ev, fn) => handlers.set(ev, fn), registerChatCommand: () => {},
+    cfg: { war: { mapTints: { 'fighters-guild': [1, 2, 3] }, mapFlatWorlds: ['A764B:BSHeartland.esm'] } }, onUi: (ev, fn) => handlers.set(ev, fn), registerChatCommand: () => {},
     isAdmin: () => false, onlineActors: () => online.slice(), every: () => {}, sendPacket: (a, p) => { sent.push([a, p]); return true; },
     ranksOf: () => [], profileOf: (a) => a, zoneById: () => null, readOfficials: () => ({}), writeOfficials: () => {},
   };
@@ -66,6 +66,7 @@ const scenarios = (src, c) => {
     const p = pk[1];
     const tam = p.worlds.find((w) => w.world === '3c:Skyrim.esm'), bru = p.worlds.find((w) => w.world === 'a764b:BSHeartland.esm');
     const withMarker = TERRITORIES.territories.filter((t) => t.marker && Array.isArray(t.marker.pos));
+    c('a world on war.mapFlatWorlds is marked flat (any case), the others not', !!tam && !!bru && bru.flat === true && tam.flat === false, [tam && tam.flat, bru && bru.flat]);
     c('Tamriel and Bruma, each territory once, at its marker', !!tam && !!bru && p.worlds.length === 2 && tam.territories.length + bru.territories.length === withMarker.length
       && withMarker.every((t) => p.worlds.some((w) => w.territories.some((x) => x.id === t.id && x.x === t.marker.pos[0] && x.y === t.marker.pos[1]))), p.worlds.map((w) => [w.world, w.territories.length]));
     c('the walled cities\' worlds are Tamriel\'s aliases, and a territory in one is drawn in Tamriel\'s', !!tam && tam.territories.some((t) => t.id === 'harness-city') &&JSON.stringify(tam.aliases.slice().sort()) === JSON.stringify(Object.keys(TERRITORIES.worldAliases).sort()) && bru.aliases.length === 0, tam && tam.aliases);

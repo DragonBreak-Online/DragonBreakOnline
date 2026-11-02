@@ -771,11 +771,15 @@ module.exports = (api) => {
     const target = (w) => { const hit = aliases.find(([from]) => { try { return (mp.getIdFromDesc(from) >>> 0) === (mp.getIdFromDesc(w) >>> 0); } catch (e) { return from === w; } }); return hit ? hit[1] : w; };
     const worlds = new Map();
     const factions = {};
+    // The worlds whose M map is flat and top-down (war.mapFlatWorlds, world descs): only there does a fit from the markers
+    // hold, so only there does the client show the colours unless the player turns them on with T (Nat, 2 Nov: over the 3D
+    // relief they warp; a homography from 17 markers still missed by 15 px)
+    const flat = new Set((Array.isArray(C.mapFlatWorlds) ? C.mapFlatWorlds : []).map((d) => String(d).toLowerCase()));
     for (const t of territories()) {
       if (!Array.isArray(t.marker.pos) || typeof t.marker.world !== 'string') continue;
       const w = target(t.marker.world);
       const key = String(w).toLowerCase();
-      if (!worlds.has(key)) worlds.set(key, { world: w, aliases: aliases.filter(([, to]) => String(to).toLowerCase() === key).map(([from]) => from), territories: [] });
+      if (!worlds.has(key)) worlds.set(key, { world: w, aliases: aliases.filter(([, to]) => String(to).toLowerCase() === key).map(([from]) => from), territories: [], flat: flat.has(key) });
       const owner = ownerOf(t.id) || 'unclaimed';
       worlds.get(key).territories.push({ id: t.id, owner, zone: String(t.zone || ''), x: t.marker.pos[0], y: t.marker.pos[1] });
       if (owner !== 'unclaimed' && !factions[owner]) factions[owner] = { name: nameOfFaction(owner), rgb: tintOf(owner) };
