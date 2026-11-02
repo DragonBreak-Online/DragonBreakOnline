@@ -74,6 +74,8 @@ export class MapRealmService extends ClientListener {
     this.goodFit = null;
     this.drawnFit = null;
     this.drawnAt = 0;
+    this.samplesSent = 0;
+    this.sampledAt = 0;
     this.layerShown = false;
     this.passTabAt = 0;
     this.mapSeen = false;
@@ -370,7 +372,24 @@ export class MapRealmService extends ClientListener {
     }
     const H = homographyOf(seen);
     if (H) { this.lastSeen = seen; const af = fitOf(seen); this.lastAffine = af ? Math.round(af.rms * 100) / 100 : -1; }
+    if (H) this.sampleFit(H, seen);
     return H;
+  }
+
+  // A few whole marker sets a map opening, for checking the fit on the real map (Leader, 2 Nov): the first fit and then one
+  // every SAMPLE_EVERY frames, SAMPLES at most, each its own mapOwnersFit line (the server logs 400 characters of it): the
+  // homography and its rms, the affine rms on the same set, and up to SAMPLE_POINTS anchors as world x, y and screen x, y
+  private sampleFit(H: Homography, seen: Seen[]): void {
+    if (this.samplesSent >= SAMPLES || (this.samplesSent > 0 && this.ticksOpen - this.sampledAt < SAMPLE_EVERY)) return;
+    this.samplesSent++;
+    this.sampledAt = this.ticksOpen;
+    const r1 = (v: number) => Math.round(v * 10) / 10;
+    const sample = {
+      t: this.ticksOpen, n: H.n, rms: r1(H.rms), affine: this.lastAffine,
+      h: H.h.map((v) => Number(v.toPrecision(5))),
+      p: seen.slice(0, SAMPLE_POINTS).map((s) => [Math.round(s.x), Math.round(s.y), r1(s.sx), r1(s.sy)]),
+    };
+    sendCustomPacket(this.controller, { customPacketType: "dbo", event: "mapOwnersFit", args: [sample], widget: 0 });
   }
 
   private formIdOf(desc: string): number {
@@ -522,6 +541,8 @@ export class MapRealmService extends ClientListener {
   private drawing: Drawing | null = null;
   private lastSeen: Seen[] = [];
   private lastAffine = -1;
+  private samplesSent = 0;
+  private sampledAt = 0;
   private layerShown = false;
   private passTabAt = 0;
   private mapShutTicks = 0;
@@ -539,6 +560,10 @@ const newFlash = (): Flash => ({ at: Date.now(), held: 0, failed: 0, noFit: 0, f
 // While the map moves, one redraw every REDRAW_FRAMES frames at most (each sends the projected drawing to the movie). The
 // layer itself stays flat: the points are already on our stage
 const REDRAW_FRAMES = 2;
+// Marker sets sent for checking the fit: SAMPLES an opening, SAMPLE_EVERY frames apart, SAMPLE_POINTS anchors each
+const SAMPLES = 4;
+const SAMPLE_EVERY = 600;
+const SAMPLE_POINTS = 7;
 const LAYER_FLAT: [string, number][] = [["._x", 0], ["._y", 0], ["._xscale", 100], ["._yscale", 100], ["._rotation", 0], [".shapes._rotation", 0]];
 // A redraw that would move the colours by less than this (stage px) is not sent: the fit wobbles by that much
 const LAYER_STILL = 0.5;
