@@ -21,7 +21,11 @@ if "--server" in sys.argv:
 else:
     DATA = r"E:\DragonBreak Online Dev files\Skyrim Special Edition - dev\Data"
     ORDER = r"E:\DragonBreak Online Dev files\server\plugins.server.txt"
-OUT = os.path.join(ROOT, "server", "admin-placeables.json")
+# DBO_DATA / DBO_PLUGINS / DBO_CATALOG_OUT: another Data folder, order and output folder (ck-mcp admin_catalog.py's; the
+# window-1101 build, 1 Nov)
+DATA = os.environ.get("DBO_DATA", DATA)
+ORDER = os.environ.get("DBO_PLUGINS", ORDER)
+OUT = os.path.join(os.environ.get("DBO_CATALOG_OUT", os.path.join(ROOT, "server")), "admin-placeables.json")
 
 lo = core.LoadOrder(DATA, ORDER)
 try:
