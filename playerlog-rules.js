@@ -689,6 +689,8 @@ excluded('ROLENAME', 'staff-written titles: the command wrapper');
 excluded('PLACE', 'staff-written set names: the command wrapper');
 excluded('LEDGER', 'ledger names: the command wrapper');
 excluded('ORPHAN', 'staff only');
+// staffguard.js gmEventZones (2 Nov): a GM's F7 event zone added, deleted or reset; the zone name is staff-typed and quoted
+excluded('GMEVENTZONE', 'staff only: a GM\'s event zone by its staff-typed name');
 excluded('CLEARCORPSES', 'staff only: the bodies a GM cleared around them, by base and count');
 excluded('DISCORD', 'roles: session.perm');
 // anticheat.js: a Lead GM's /anticheat off|on <part> (the part and the word from fixed lists) is clean; the daily counts
@@ -2055,6 +2057,8 @@ staffitemspells.js STAFF bc1fa213 clean
 staffitemspells.js STAFF 949ee421 clean
 staffguard.js STAFFREF 793dd536 clean
 staffguard.js STAFFGUARD 486826c9 clean
+staffguard.js GMEVENTZONE 5c22a0d7 excluded
+staffguard.js GMEVENTZONE 3afaf8a0 excluded
 staffguard.js STAFFCHAR 25cceb6f clean
 staffguard.js STAFFREF 44dc317b clean
 staffguard.js STAFFREF 2cf22f19 clean
