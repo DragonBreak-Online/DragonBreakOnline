@@ -11,7 +11,7 @@ import {
   descParts, keyAction, kindIndex, legendJson, legendRows, readMarkers, wantedScale, SwfLoad, newSwfLoad, swfStep, swfReport,
 } from "./mapRealm";
 import {
-  ANCHORS_PER_FRAME, OWNERS_HOST, OWNERS_IN_MAP, OWNERS_SWF, OwnersData, TOGGLE_KEY, TOGGLE_SETTING,
+  ANCHORS_PER_FRAME, OWNERS_LAYER, StageArea, fitToStage, OwnersData, TOGGLE_KEY, TOGGLE_SETTING,
   anchorClips, clipTransform, drawingOf, fitHolds, fitOf, anchorIndex, legendRow, readOwners, worldFor, Anchor, Fit, Seen,
 } from "./mapOwners";
 
@@ -117,9 +117,8 @@ export class MapRealmService extends ClientListener {
         this.applyFilter();
         if (this.ticksOpen === 2 || this.ticksOpen % 30 === 0) this.publish();
       }
-      // The owners overlay is not loaded into the map any more: the 2 Nov probe showed no clip can be made inside SkyUI's
-      // map. It waits for the probe's position reads before it is drawn in our own menu instead
-      if (this.owners && OWNERS_IN_MAP) this.followOwners();
+      // Who owns what is drawn in our legend menu over the map (nothing can be made inside SkyUI's map: the 2 Nov probe)
+      if (this.owners) this.followOwners();
       if (this.test) this.runTests();
       if (!this.probe.done) this.runProbe();
     } catch (err) {
@@ -166,26 +165,6 @@ export class MapRealmService extends ClientListener {
       ui.setFloat(MAP_MENU, `${MARKER_CLIP(i)}._yscale`, want);
       this.applied[i] = want;
     }
-  }
-
-  // A swf into the MapMenu by the HUD's rule, every step timed (mapRealm.ts swfStep); "inject", "up", "fail" or ""
-  private loadSwf(st: SwfLoad, host: string, name: string, depth: string, swf: string): string {
-    const ui = this.sp.Ui;
-    const seen = { menu: false, clip: false, url: "", alive: false };
-    try { seen.menu = ui.isMenuOpen(MAP_MENU); } catch { seen.menu = false; }
-    if (st.phase === "loading" || st.phase === "up") {
-      try { seen.clip = ui.getString(MAP_MENU, `${host}._name`) === name; } catch { seen.clip = false; }
-      try { seen.url = ui.getString(MAP_MENU, `${host}._url`) || ""; } catch { seen.url = ""; }
-      try { seen.alive = ui.getString(MAP_MENU, `${host}.dboAlive`) === "yes"; } catch { seen.alive = false; }
-    }
-    const step = swfStep(st, this.ticksOpen, seen, swf);
-    if (step === "inject") {
-      try {
-        ui.invokeStringA(MAP_MENU, "_root.createEmptyMovieClip", [name, depth]);
-        ui.invokeString(MAP_MENU, `${host}.loadMovie`, swf);
-      } catch (err) { logError(this, `${swf} could not be loaded into the map`, err); }
-    }
-    return step;
   }
 
   // One line a map opening to the server log: how far each swf got, at which frames, and the fit
@@ -252,6 +231,9 @@ export class MapRealmService extends ClientListener {
   private closeLegendMenu(reopenable = false): void {
     if (!this.legendMenuOpen) return;
     this.legendMenuOpen = false;
+    // the colours went with the menu: drawn again when it is back
+    this.drawnKey = "";
+    if (this.ownersSwf.phase === "up") this.ownersSwf.phase = "idle";
     try { this.sp.Ui.closeCustomMenu(); } catch (err) { logError(this, "the map legend menu could not be closed", err); }
     if (reopenable && this.legendSwf.phase === "up") { this.legendSwf.phase = "idle"; this.legendSwf.frames = 0; this.legendSwf.tries = 0; }
   }
@@ -260,36 +242,44 @@ export class MapRealmService extends ClientListener {
   private followOwners(): void {
     const ui = this.sp.Ui;
     const st = this.ownersSwf;
-    const step = this.loadSwf(st, OWNERS_HOST, "dboMapOwners", "9989", OWNERS_SWF);
-    if (step === "up") logTrace(this, "map owners overlay drawn in the map");
-    else if (step === "fail") logTrace(this, "the map owners overlay never came alive in the map");
-    if (st.phase !== "up" || !this.owners) return;
+    // It rides on the legend's CustomMenu (one CustomMenu at a time): nothing until that is up; its trace says when
+    if (this.legendSwf.phase !== "up" || !this.owners) return;
+    if (st.phase !== "up") { st.phase = "up"; st.t.menu = this.ticksOpen; st.t.alive = this.ticksOpen; this.stage = null; }
     // the world this map shows: the player's (an interior has none, so no colours there)
     if (!this.mapWorld) {
       try { const w = this.sp.Game.getPlayer()?.getWorldSpace(); this.mapWorld = w ? w.getFormID() >>> 0 : -1; } catch { this.mapWorld = -1; }
     }
     const world = this.mapWorld > 0 ? worldFor(this.owners, (d) => this.formIdOf(d), this.mapWorld) : null;
-    const layer = `${OWNERS_HOST}.layer`;
-    if (!world) { ui.setBool(MAP_MENU, `${layer}._visible`, false); return; }
+    const layer = `${OWNERS_LAYER}`;
+    if (!world) { ui.setBool(LEGEND_MENU, `${layer}._visible`, false); return; }
     const key = world.world + "#" + world.territories.map((t) => t.owner).join("|");
     if (key !== this.drawnKey) {
       this.drawnKey = key;
       this.worldOwners = new Set(world.territories.map((t) => t.owner)).size;
-      try { ui.invokeString(MAP_MENU, `${OWNERS_HOST}.dboData`, JSON.stringify(drawingOf(world, this.owners.factions, this.owners.reach, this.owners.fade))); } catch (err) { logError(this, "map owners data failed", err); }
+      try { ui.invokeString(LEGEND_MENU, "_root.dboOwners", JSON.stringify(drawingOf(world, this.owners.factions, this.owners.reach, this.owners.fade))); } catch (err) { logError(this, "map owners data failed", err); }
       if (st.t.drawn < 0) st.t.drawn = this.ticksOpen;
       this.publish();
     }
+    // the two stages, read once an opening: the map's visible size (SkyUI's _mapWidth/_mapHeight) and our menu's
+    if (!this.stage) {
+      const g = (menu: string, path: string) => { try { return ui.getFloat(menu, path); } catch (e) { return 0; } };
+      this.stage = {
+        mapW: g(MAP_MENU, "_root.WorldMap._mapWidth"), mapH: g(MAP_MENU, "_root.WorldMap._mapHeight"),
+        ours: { left: g(LEGEND_MENU, "_root.dboStageL"), top: g(LEGEND_MENU, "_root.dboStageT"), width: g(LEGEND_MENU, "_root.dboStageW") || 1280, height: g(LEGEND_MENU, "_root.dboStageH") || 720 },
+      };
+      st.t.url = `map ${this.stage.mapW}x${this.stage.mapH}, ours ${this.stage.ours.width}x${this.stage.ours.height} at ${this.stage.ours.left},${this.stage.ours.top}`;
+    }
     const fit = this.ownersShown ? this.fitNow() : null;
     const holds = this.ownersShown && fitHolds(fit);
-    ui.setBool(MAP_MENU, `${layer}._visible`, holds);
+    ui.setBool(LEGEND_MENU, `${layer}._visible`, holds);
     if (holds && fit) {
-      const t = clipTransform(fit);
-      ui.setFloat(MAP_MENU, `${layer}._x`, t.x);
-      ui.setFloat(MAP_MENU, `${layer}._y`, t.y);
-      ui.setFloat(MAP_MENU, `${layer}._xscale`, t.xscale);
-      ui.setFloat(MAP_MENU, `${layer}._yscale`, t.yscale);
-      ui.setFloat(MAP_MENU, `${layer}._rotation`, t.rotation);
-      ui.setFloat(MAP_MENU, `${layer}.shapes._rotation`, t.inner);
+      const t = clipTransform(fitToStage(fit, this.stage.mapW, this.stage.mapH, this.stage.ours));
+      ui.setFloat(LEGEND_MENU, `${layer}._x`, t.x);
+      ui.setFloat(LEGEND_MENU, `${layer}._y`, t.y);
+      ui.setFloat(LEGEND_MENU, `${layer}._xscale`, t.xscale);
+      ui.setFloat(LEGEND_MENU, `${layer}._yscale`, t.yscale);
+      ui.setFloat(LEGEND_MENU, `${layer}._rotation`, t.rotation);
+      ui.setFloat(LEGEND_MENU, `${layer}.shapes._rotation`, t.inner);
     }
     if (fit) this.lastFit = fit;
     if (holds && st.t.fit < 0) st.t.fit = this.ticksOpen;
@@ -445,6 +435,7 @@ export class MapRealmService extends ClientListener {
   private test: MapTest | null = null;
   private legendSwf: SwfLoad = newSwfLoad();
   private legendMenuOpen = false;
+  private stage: { mapW: number; mapH: number; ours: StageArea } | null = null;
   private ownersSwf: SwfLoad = newSwfLoad();
   private openings = 0;
   private probe: { done: boolean; r: Record<string, string>; samples: string[]; mouseMoves: number; clicks: number } = { done: false, r: {}, samples: [], mouseMoves: 0, clicks: 0 };

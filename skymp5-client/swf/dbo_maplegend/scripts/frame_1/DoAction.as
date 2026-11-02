@@ -6,12 +6,18 @@
 // _root.dboAlive, which the client reads with Ui.getString. Each kind's glyph is the panel's diamond, not the browser's
 // line drawings.
 
-var DBO_SWF_VERSION = "maplegend-2";
+// Since 2 Nov this is our own CustomMenu over the map (nothing can be made inside SkyUI's map), and it also carries who owns
+// what: "owners" holds the territories' tint and hairlines under the panel, drawn once by _root.dboOwners(json) in world
+// units over the client's DRAW_SCALE (mapOwners.ts) and lined up each frame by the client setting "owners.layer"'s _x, _y,
+// scales and _rotation and its "shapes" child's _rotation. The visible area goes to _root.dboStageL/T/W/H, which the
+// client needs to carry the map's marker positions over to this movie's stage.
+var DBO_SWF_VERSION = "maplegend-3";
 var VH = 7.2;
 var PANEL_W = 300;
 var ROW_H = 25;
 
 var panel;
+var oshapes;
 var bar;
 
 function area()
@@ -24,8 +30,77 @@ function area()
    return {left: 0, top: 0, right: Stage.width, bottom: Stage.height};
 }
 
+// One shape from a flat list of points
+function oshape(pts)
+{
+   oshapes.moveTo(Number(pts[0]), Number(pts[1]));
+   for (var i = 2; i + 1 < pts.length; i += 2)
+   {
+      oshapes.lineTo(Number(pts[i]), Number(pts[i + 1]));
+   }
+}
+
+// The owners' tint and hairlines: fills of one polygon (pts) or of many cells (rects, all in one fill), lines as hairlines
+function drawOwners(p)
+{
+   oshapes.clear();
+   var i;
+   for (i = 0; i < p.fills.length; i++)
+   {
+      var f = p.fills[i];
+      oshapes.lineStyle();
+      if (f.rects instanceof Array && f.rects.length >= 4)
+      {
+         oshapes.beginFill(Number(f.rgb), Number(f.alpha));
+         for (var r = 0; r + 3 < f.rects.length; r += 4)
+         {
+            var x0 = Number(f.rects[r]);
+            var y0 = Number(f.rects[r + 1]);
+            var x1 = Number(f.rects[r + 2]);
+            var y1 = Number(f.rects[r + 3]);
+            oshapes.moveTo(x0, y0);
+            oshapes.lineTo(x1, y0);
+            oshapes.lineTo(x1, y1);
+            oshapes.lineTo(x0, y1);
+            oshapes.lineTo(x0, y0);
+         }
+         oshapes.endFill();
+         continue;
+      }
+      if (!(f.pts instanceof Array) || f.pts.length < 6)
+      {
+         continue;
+      }
+      oshapes.beginFill(Number(f.rgb), Number(f.alpha));
+      oshape(f.pts);
+      oshapes.lineTo(Number(f.pts[0]), Number(f.pts[1]));
+      oshapes.endFill();
+   }
+   for (i = 0; i < p.lines.length; i++)
+   {
+      var l = p.lines[i];
+      if (!(l.pts instanceof Array) || l.pts.length < 4)
+      {
+         continue;
+      }
+      // thickness 0 is a hairline at any scale, which the layer's scaling needs
+      oshapes.lineStyle(0, Number(l.rgb), Number(l.alpha));
+      oshape(l.pts);
+   }
+}
+
 function build()
 {
+   // the owners layer first, so the legend panel and bar draw over it
+   var owners = _root.createEmptyMovieClip("owners", 5);
+   var olayer = owners.createEmptyMovieClip("layer", 1);
+   oshapes = olayer.createEmptyMovieClip("shapes", 1);
+   olayer._visible = false;
+   var va = area();
+   _root.dboStageL = va.left;
+   _root.dboStageT = va.top;
+   _root.dboStageW = va.right - va.left;
+   _root.dboStageH = va.bottom - va.top;
    var a = area();
    panel = _root.createEmptyMovieClip("legend", 10);
    panel._x = a.right - PANEL_W;
@@ -123,6 +198,17 @@ _root.dboData = function(json)
       return;
    }
    draw(p);
+};
+
+_root.dboOwners = function(json)
+{
+   var p = dboParse(json);
+   if (p == null || !(p.fills instanceof Array) || !(p.lines instanceof Array))
+   {
+      dboLog("maplegend: unreadable owners payload");
+      return;
+   }
+   drawOwners(p);
 };
 
 build();

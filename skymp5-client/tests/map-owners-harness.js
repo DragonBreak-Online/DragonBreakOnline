@@ -182,6 +182,20 @@ const scenarios = (M, c) => {
     if (!(got.every((row, i) => row.every((v, j) => Math.abs(v - want[i][j]) < 1e-9 * Math.max(1, Math.abs(want[i][j])))) && t.x === 10 && t.y === 20)) splitOk = false;
   }
   c('the clips\' turn, scale and turn rebuild the fit exactly, at any angle', splitOk);
+  // the map's stage to our menu's: the same screen fraction of each one's visible area
+  if (M.fitToStage) {
+    const F0 = Object.assign(affine(0.3, 0.002, -0.002, 400, 300), { rms: 2, n: 5 });
+    const ours = { left: 100, top: 20, width: 1280, height: 720 };
+    const G0 = M.fitToStage(F0, 640, 360, ours);
+    let stageOk = true;
+    for (const [x, y] of [[0, 0], [50000, -20000], [-80000, 60000]]) {
+      const a = toScreen(F0, x, y), b = toScreen(G0, x, y);
+      if (Math.abs(b.sx - (100 + (a.sx / 640) * 1280)) > 1e-6 || Math.abs(b.sy - (20 + (a.sy / 360) * 720)) > 1e-6) stageOk = false;
+    }
+    c('a point the map shows at a fraction of its visible area lands at the same fraction of our menu\'s', stageOk && G0.n === 5 && Math.abs(G0.rms - 4) < 1e-9, G0);
+    const same = M.fitToStage(F0, 0, 0, { left: 0, top: 0, width: 1280, height: 720 });
+    c('...a map size that does not read is taken as ours, so the same stage changes nothing', ['m00', 'm01', 'm10', 'm11', 'tx', 'ty'].every((k) => Math.abs(same[k] - F0[k]) < 1e-9), same);
+  } else c('fitToStage exists', false);
 
   // ---- which markers anchor it ----
   const idx = M.anchorIndex([{ name: 'Whiterun', x: 1, y: 2, z: 0 }, { name: 'Fort Twice', x: 0, y: 0, z: 0 }, { name: 'fort  twice', x: 9, y: 9, z: 0 }]);
@@ -207,6 +221,8 @@ const MUTANTS = [
   ['a mirrored fit kept', [['if (fx[0] * fy[1] - fx[1] * fy[0] >= 0)', 'if (false)']]],
   ['the split\'s turns swapped', [['rotation: ((a2 + a1) / 2) * DEG', 'rotation: ((a2 - a1) / 2) * DEG'], ['inner: ((a2 - a1) / 2) * DEG', 'inner: ((a2 + a1) / 2) * DEG']]],
   ['any fit holds', [['f.rms <= exports.MAX_FIT_RMS', 'true']]],
+  ['our menu\'s offset left out', [['tx: ours.left + f.tx * kx', 'tx: f.tx * kx']]],
+  ['the map\'s size read the wrong way up', [['const kx = ours.width / (mapWidth > 0 ? mapWidth : ours.width)', 'const kx = (mapWidth > 0 ? mapWidth : ours.width) / ours.width']]],
   ['a stronghold does not win over the cells', [['for (const s of w.strongholds || [])', 'for (const s of [])']]],
   ['a cell takes the nearest marker of any hold', [['if (t.zone !== zone)', 'if (false)']]],
   ['the fork\'s row order upside down', [['j = t.c0 + t.n - 1 - Math.floor(y / t.size);', 'j = Math.floor(y / t.size) - t.c0;']]],
@@ -279,10 +295,13 @@ check('a map with no MarkerClips: it stays where it was put, and says so', !swap
 const src = fs.readFileSync(path.join(ROOT, 'src/services/services/mapRealmService.ts'), 'utf8').replace(/\r\n/g, '\n');
 const fn = (name) => { const i = src.indexOf(`  private ${name}(`); return i < 0 ? '' : src.slice(i, src.indexOf('\n  }\n', i)); };
 const fo = fn('followOwners');
-check('the overlay is loaded into a clip of the map each opening, by the traced loader the legend uses', fo.includes('this.loadSwf(st, OWNERS_HOST, "dboMapOwners", "9989", OWNERS_SWF)')
-  && fn('loadSwf').includes('"_root.createEmptyMovieClip", [name, depth]') && fn('loadSwf').includes('.loadMovie`, swf)') && fn('onMapOpen').includes('this.ownersSwf = newSwfLoad();'));
-check('drawn again only when the world or an owner changes', /if \(key !== this\.drawnKey\)/.test(fo) && /world\.territories\.map\(\(t\) => t\.owner\)/.test(fo));
-check('shown only while the player wants it and the fit holds; hidden where no world has owners', /const holds = this\.ownersShown && fitHolds\(fit\);/.test(fo) && /setBool\(MAP_MENU, `\$\{layer\}\._visible`, holds\)/.test(fo) && /if \(!world\) \{ ui\.setBool\(MAP_MENU, `\$\{layer\}\._visible`, false\); return; \}/.test(fo));
+check('the colours ride on the legend\'s CustomMenu over the map: nothing until it is up, nothing made inside the map', fo.includes('if (this.legendSwf.phase !== "up" || !this.owners) return;')
+  && fo.includes('ui.invokeString(LEGEND_MENU, "_root.dboOwners",') && !fo.includes('MAP_MENU, `${layer}') && !/createEmptyMovieClip|loadMovie/.test(fo + fn('loadLegend')) && M.OWNERS_LAYER === '_root.owners.layer');
+check('drawn again only when the world or an owner changes, or the menu comes back', /if \(key !== this\.drawnKey\)/.test(fo) && /world\.territories\.map\(\(t\) => t\.owner\)/.test(fo) && fn('closeLegendMenu').includes('this.drawnKey = "";'));
+check('shown only while the player wants it and the fit holds; hidden where no world has owners', fo.includes('const holds = this.ownersShown && fitHolds(fit);') && fo.includes('ui.setBool(LEGEND_MENU, `${layer}._visible`, holds);')
+  && fo.includes('if (!world) { ui.setBool(LEGEND_MENU, `${layer}._visible`, false); return; }'));
+check('the fit is carried from the map\'s stage to our menu\'s (SkyUI\'s _mapWidth/_mapHeight, our dboStage*) before it is set', fo.includes('clipTransform(fitToStage(fit, this.stage.mapW, this.stage.mapH, this.stage.ours))')
+  && fo.includes('"_root.WorldMap._mapWidth"') && fo.includes('"_root.dboStageW"'));
 check('the six transform values set each frame it holds', ['_x', '_y', '_xscale', '_yscale', '_rotation'].every((k) => src.includes('`${layer}.' + k + '`')) && src.includes('`${layer}.shapes._rotation`, t.inner'));
 check('the marker positions read in the root\'s units (MarkerClips\' own offset and scale applied)', /seen\.push\(\{ sx: bx \+ ui\.getFloat\(MAP_MENU, `\$\{clip\}\._x`\) \* kx, sy: by \+ ui\.getFloat\(MAP_MENU, `\$\{clip\}\._y`\) \* ky/.test(fn('fitNow')) && /\._visible`\)\) continue;/.test(fn('fitNow')));
 check('the toggle key is read like the other hotkeys: mapColoursKeyCode, else T', M.TOGGLE_SETTING === 'mapColoursKeyCode' && M.TOGGLE_KEY === 20

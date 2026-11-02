@@ -213,6 +213,44 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   S.customOpen = false;
   ok(!S.errors.length, 'no frame failed', S.errors);
 
+  // ---- who owns what, drawn in our legend menu over the map and lined up with the markers ----
+  const h6 = {};
+  S.widgets.length = 0; S.custom = []; S.customOpen = false; S.legendWorks = true; S.invoked.length = 0;
+  const game0 = sp.Game;
+  sp.Game = Object.assign({}, game0, {
+    getPlayer: () => ({ getWorldSpace: () => ({ getFormID: () => 0x3c }) }),
+    getFormFromFile: (id, file) => (id === 0x3c && /skyrim\.esm/i.test(file) ? { getFormID: () => 0x3c } : game0.getFormFromFile(id, file)),
+  });
+  sp.Ui.getBool = (m, p) => S.props[p] !== false;
+  // the map shows world (x, y) at screen (640 + x / 500, 360 - y / 500); four realm markers at known places
+  const anchorsAt = [['Bruma', 0, 0], ['Applewatch', 50000, 0], ['Sancre Tor', 0, 50000], ['Pale Pass', -40000, -30000]];
+  anchorsAt.forEach(([name, x, y]) => { const i = LABELS.indexOf(name); S.props[`_root.MarkerClips.Marker${i}._x`] = 640 + x / 500; S.props[`_root.MarkerClips.Marker${i}._y`] = 360 - y / 500; });
+  S.props['_root.MarkerClips._x'] = 0; S.props['_root.MarkerClips._y'] = 0;
+  S.props['_root.WorldMap._mapWidth'] = 1280; S.props['_root.WorldMap._mapHeight'] = 720;
+  S.props['_root.dboStageL'] = 0; S.props['_root.dboStageT'] = 0; S.props['_root.dboStageW'] = 1280; S.props['_root.dboStageH'] = 720;
+  new MapRealmService(sp, { on: (ev, fn) => { h6[ev] = fn; }, emitter: { on: (ev, fn) => { h6['emit:' + ev] = fn; } } });
+  h6['emit:customPacketMessage']({ customPacketType: 'dboMapRealm', markers });
+  h6['emit:customPacketMessage']({ customPacketType: 'dboMapOwners', worlds: [{ world: '3c:Skyrim.esm', aliases: [], territories: [{ id: 'a', owner: 'hold-a', x: 0, y: 0 }, { id: 'b', owner: 'hold-b', x: 50000, y: 0 }] }],
+    factions: { 'hold-a': { name: 'A', rgb: [200, 0, 0] }, 'hold-b': { name: 'B', rgb: [0, 200, 0] } }, anchors: anchorsAt.map(([name, x, y]) => ({ name, x, y, z: 0 })), reach: 30000, fade: 45000 });
+  h6.menuOpen({ name: 'MapMenu' });
+  for (let i = 0; i < 70; i++) h6.update();
+  const drawn = S.invoked.filter((x) => x[0] === '_root.dboOwners');
+  ok(drawn.length === 1 && JSON.parse(drawn[0][1][0]).fills.length === 4, 'the owners are drawn once into our legend menu (two territories, two layers each)', drawn.length);
+  ok(S.props['_root.owners.layer._visible'] === true, '...the layer shown once the markers fit', S.props['_root.owners.layer._visible']);
+  // the layer's transform maps a world point to where the map shows it: world (0, 0) at 640,360, one drawing unit (64) at 64/500
+  ok(Math.abs(S.props['_root.owners.layer._x'] - 640) < 1e-6 && Math.abs(S.props['_root.owners.layer._y'] - 360) < 1e-6 && Math.abs(Math.abs(S.props['_root.owners.layer._xscale']) - (64 / 500) * 100) < 1e-6,
+    '...placed where the map shows the world, at its zoom', [S.props['_root.owners.layer._x'], S.props['_root.owners.layer._y'], S.props['_root.owners.layer._xscale']]);
+  const legendRows = S.legendData.length ? S.legendData[S.legendData.length - 1].rows : [];
+  ok(legendRows.some((r) => r.id === 'territories' && r.key === 'T' && r.count === 2), 'the legend gets the colours\' row, T and two owners', legendRows);
+  h6.buttonEvent({ isDown: true, device: 0, code: 20 });
+  h6.update();
+  ok(S.props['_root.owners.layer._visible'] === false, 'T hides the colours', S.props['_root.owners.layer._visible']);
+  h6.menuClose({ name: 'MapMenu' });
+  sp.Game = game0;
+  delete sp.Ui.getBool;
+  anchorsAt.forEach(([name], k) => { const i = LABELS.indexOf(name); S.props[`_root.MarkerClips.Marker${i}._x`] = 100 + i; delete S.props[`_root.MarkerClips.Marker${i}._y`]; });
+  ok(!S.errors.length, 'no frame failed', S.errors);
+
   // ---- a label SkyUI fills late is read again (Nat, 2 Nov: stored empties left 10 of 388 counted, none of the realm's) ----
   const h5 = {};
   S.widgets.length = 0; S.custom = []; S.customOpen = false; S.legendWorks = false;
