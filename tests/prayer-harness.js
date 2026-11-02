@@ -1050,6 +1050,66 @@ console.log('pick prayers:');
   check('...and the statue counts as touched for /deity Meridia', /You now follow Meridia|Meridia/.test(say('deity', 'Meridia')) && (props.get(ACTOR + '|private.dboDeity') || {}).id === 'meridia', JSON.stringify(props.get(ACTOR + '|private.dboDeity')));
 }
 
+// ---- man_DaedricShrines.esp's statues that no shrine of ours covered (SMJ, 1 Nov: "the shrine of Namira in the Reach does not
+// allow you to pray") ----
+// Every statue the mod places is a STAT the engine never activates; these seven had neither a prayNear spot nor a DLE
+// activator over them (_work/namira-shrine-1101.md). /pray beside each is the touch. Each statue's own place in the
+// plugin is written out here, so its checks fail on their own without its spot
+{
+  api.cfg = { prayer: { clientJudged: true, pick: { enabled: false } } };
+  pickUi = false;
+  load();
+  const STATUES = [
+    { god: 'namira', ref: 'df5:man_DaedricShrines.esp', world: '8c4:man_DaedricShrines.esp', pos: [1598, 1889, 269], where: 'her cave in the Reach', z: 40, near: 'the statue of Namira in her cave in the Reach' },
+    { god: 'molagbal', ref: '8ef:man_DaedricShrines.esp', world: '803:Dawnguard.esm', pos: [-858, -2416, 7491], where: 'Castle Volkihar\'s guildhall', near: 'the statue of Molag Bal in Castle Volkihar' },
+    { god: 'molagbal', ref: '8eb:man_DaedricShrines.esp', world: '19dfe:Dawnguard.esm', pos: [1126, 1879, 9038], where: 'Castle Volkihar\'s boss room' },
+    { god: 'molagbal', ref: '8f3:man_DaedricShrines.esp', world: '1526f:Skyrim.esm', pos: [3910, 3205, 5269], where: 'Movarth\'s Lair' },
+    { god: 'hermaeusmora', ref: '865:man_DaedricShrines.esp', world: '19cd7:Dragonborn.esm', pos: [-884, -327, -1384], where: 'the Temple of Miraak' },
+    { god: 'hermaeusmora', ref: '866:man_DaedricShrines.esp', world: '142ee:Dragonborn.esm', pos: [-3571, 1145, 296], where: 'Kolbjorn Barrow' },
+    { god: 'azura', ref: 'd83:man_DaedricShrines.esp', world: '3c:Skyrim.esm', pos: [172671, 35350, -8547], where: 'her second shrine, in Tamriel' },
+    // Talking activators (TACT), which the server never loads: a touch on one never arrives (1 Nov)
+    { god: 'clavicusvile', ref: '125bf9:DragonBreak Online Edits.esp', world: 'a764b:BSHeartland.esm', pos: [94522, 193548, 2329], where: 'the shrine of the Princes by Bruma', near: 'the statue of Clavicus Vile at the shrine of the Princes by Bruma' },
+    { god: 'clavicusvile', ref: 'fe531:Skyrim.esm', world: '216bb:Skyrim.esm', pos: [1576, -4435, 6991], where: "Haemar's Shame" },
+    { god: 'clavicusvile', ref: '17489:Druadach.esm', world: '16d49:Druadach.esm', pos: [517, -2989, -2583], where: 'the Drenched Caverns' },
+    { god: 'azura', ref: '77f35e:summersetisles.esp', world: 'ae416d:summersetisles.esp', pos: [55444, -52025, 4467], where: 'Summerset' },
+    { god: 'sheogorath', ref: '14c894:summersetisles.esp', world: '4dda1:summersetisles.esp', pos: [423, -1373, -1508], where: 'a cave on Summerset', near: 'the shrine of Sheogorath in a cave on Summerset' },
+    { god: 'namira', ref: '2c361:Skyrim.esm', world: '15227:Skyrim.esm', pos: [-896, -5664, -192], where: 'Reachcliff Cave' },
+    { god: 'molagbal', ref: 'defe8:Skyrim.esm', world: '18be9:Skyrim.esm', pos: [-407, 2075, -518], where: "Markarth's abandoned house (the talking altar)" },
+  ];
+  const prayNear = () => { wallClock += 61 * 60000; virtual += 1000000; const said = say('pray'); return { said, w: out.widgets.find((x) => x && x.nonce), log: out.logs.join(' | ') }; };
+  nearM = Infinity;
+  for (const st of STATUES) {
+    const d = choiceOf(st.god);
+    const spot = (d.prayNear || []).find((s) => s.ref === st.ref);
+    check(`skills.json: ${d.name} is prayed near the statue in ${st.where} (${st.ref})`, !!spot && spot.world === st.world && JSON.stringify(spot.pos) === JSON.stringify(st.pos), JSON.stringify(d.prayNear));
+    // beside it: 2 m off, on the floor (Namira's statue stands on a ledge 3 m above hers) or level with it
+    const stand = (dx, world) => { props.set(ACTOR + '|worldOrCellDesc', world || st.world); props.set(ACTOR + '|pos', [st.pos[0] + dx, st.pos[1], st.z == null ? st.pos[2] : st.z]); };
+    props.set(ACTOR + '|private.dboDeity', { id: d.id, name: d.name, kind: 'daedra', at: wallClock - 30 * 86400000 });
+    props.delete(ACTOR + '|private.prayedShrines');
+    if (st.near) {
+      stand(2100);
+      const far = prayNear();
+      check(`...30 m from it, /pray says where to stand`, !far.w && far.said.includes(`Stand beside ${st.near} and say /pray`), far.said);
+    }
+    stand(140, st.world === '3c:Skyrim.esm' ? '1:Skyrim.esm' : '3c:Skyrim.esm');   // verify-formids: ignore - another world, on purpose
+    const elsewhere = prayNear();
+    check('...the same coordinates in another world are not the statue', !elsewhere.w, elsewhere.said);
+    stand(140);
+    const m = prayNear();
+    check(`...beside it, /pray opens a prayer to ${d.name}`, !!m.w && new RegExp(d.name, 'i').test(String(m.w.deity)) && new RegExp(`shrine touch .* ${d.name}`).test(m.log), m.said + ' | ' + m.log);
+    // no prayer opened: nothing to hold (the check above failed already)
+    res = m.w ? playC(m) : { log: '', events: [] };
+    check('...and it is held, its rest kept on the statue', verdictOf(res.log) === 'held' && res.events.length === 1 && restOf(idOf(st.ref)) > wallClock, res.log);
+  }
+  // At Bruma's shrine of the Princes, Clavicus Vile's statue stands 9 m from Meridia's: 2 m from his, toward hers, is inside
+  // both their reaches (6 m and 8 m), and the nearer statue is the one prayed at
+  props.set(ACTOR + '|worldOrCellDesc', 'a764b:BSHeartland.esm'); props.set(ACTOR + '|pos', [94609, 193438, 2329]);
+  props.set(ACTOR + '|private.dboDeity', { id: 'clavicusvile', name: 'Clavicus Vile', kind: 'daedra', at: wallClock - 30 * 86400000 });
+  const both = prayNear();
+  check("where Clavicus Vile's and Meridia's reach overlap at Bruma, /pray is at the nearer statue (his)", !!both.w && /Clavicus Vile/.test(String(both.w.deity)), both.said + ' | ' + both.log);
+  if (both.w) playC(both);
+}
+
 Date.now = realNow;
 console.log('');
 console.log(failures ? `${failures} FAILURES` : 'all checks passed');
