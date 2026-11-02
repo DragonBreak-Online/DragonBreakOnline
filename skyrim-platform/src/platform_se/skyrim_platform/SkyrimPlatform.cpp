@@ -18,6 +18,7 @@
 #include "MagicApi.h"
 #include "MpClientPluginApi.h"
 #include "ObjectReferenceApi.h"
+#include "OverlayMenuApi.h"
 #include "Sp3Api.h"
 #include "TextApi.h"
 #include "ThreadPoolWrapper.h"
@@ -282,6 +283,7 @@ private:
       DevApi::Register(env, e, {}, GetFileDirs());
       EventsApi::Register(env, e);
       BrowserApi::Register(env, e);
+      OverlayMenuApi::Register(env, e);
       Win32Api::Register(env, e);
       FileInfoApi::Register(env, e);
       TextApi::Register(env, e);
