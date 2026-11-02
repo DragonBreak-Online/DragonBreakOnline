@@ -198,6 +198,10 @@ module.exports = (api) => {
   const insideDoors = new Map();     // inside door refId -> { d, entrance }
   const cellToDungeon = new Map();   // normalized cell desc -> dungeon
   const chestRefs = new Map();       // dungeon container refId -> { d, chest }
+  // Generated ruins are exterior cells of their plugin's worldspace (the CK only auto-navmeshes exteriors, Worker 3,
+  // 2 Nov), so such a ruin names its world, and a place in it is that world plus the 4096-unit grid square
+  const exteriorWorlds = new Set();
+  const gridOfEdid = (edid) => { const m = /X(N?)(\d+)Y(N?)(\d+)$/.exec(String(edid || '')); return m ? `${(m[1] ? -1 : 1) * Number(m[2])},${(m[3] ? -1 : 1) * Number(m[4])}` : ''; };
   for (const d of DATA.dungeons || []) {
     byId.set(d.id, d);
     d.bigChestIds = []; d.chestIds = [];
@@ -207,11 +211,15 @@ module.exports = (api) => {
       if (i) insideDoors.set(i, { d, entrance: e });
     }
     for (const c of d.cells || []) cellToDungeon.set(normDesc(c.desc), d);
+    if (d.world) {
+      exteriorWorlds.add(normDesc(d.world));
+      for (const c of d.cells || []) { const g = gridOfEdid(c.edid); if (g) cellToDungeon.set(`${normDesc(d.world)}@${g}`, d); }
+    }
     for (const ch of d.chests || []) { const id = idOf(ch.ref); if (!id) continue; chestRefs.set(id, { d, chest: ch }); d.chestIds.push(id); if (ch.big) d.bigChestIds.push(id); }
   }
 
   // gamemode.js leaves containers in these cells alone (dungeons.js fills them per lease).
-  globalThis.__dboDungeonCells = new Set(cellToDungeon.keys());
+  globalThis.__dboDungeonCells = new Set([...cellToDungeon.keys(), ...exteriorWorlds]);
 
   // ---- state (survives hot reloads) -------------------------------------------------------------
   const ST = globalThis.__dboDungeons = globalThis.__dboDungeons || { leases: new Map(), parties: new Map(), memberOf: new Map(), invites: new Map(), pending: new Map() };
@@ -242,7 +250,13 @@ module.exports = (api) => {
   };
   const setCooldown = (a, dungeonId, until) => { const c = cooldownsOf(a); for (const k of Object.keys(c)) if (Number(c[k]) < Date.now()) delete c[k]; c[dungeonId] = until; try { mp.set(a, 'private.dungeonCooldowns', c); } catch (e) { log('cooldown save failed', e.message); } };
   const whereIs = (a) => { try { return normDesc(mp.get(a, 'worldOrCellDesc')); } catch (e) { return ''; } };
-  const dungeonAround = (a) => cellToDungeon.get(whereIs(a)) || null;
+  // A generated ruin's place is its world plus the grid square the actor stands in
+  const placeOf = (a) => {
+    const w = whereIs(a);
+    if (!exteriorWorlds.has(w)) return w;
+    try { const p = mp.get(a, 'pos'); return `${w}@${Math.floor(p[0] / 4096)},${Math.floor(p[1] / 4096)}`; } catch (e) { return w; }
+  };
+  const dungeonAround = (a) => cellToDungeon.get(placeOf(a)) || null;
   // At the entrance: near the door, or for an expedition anywhere in the hall it leaves from
   const atEntrance = (a, e) => (e && e.expedition && Array.isArray(e.startCells) ? e.startCells.includes(whereIs(a)) : distance(a, e.doorPos || e.pos, e.world || e.cell) <= C.entranceReach);
   const distance = (a, pos, world) => { try { if (world && normDesc(mp.get(a, 'worldOrCellDesc')) !== normDesc(world)) return Infinity; const p = mp.get(a, 'pos'); return Math.hypot(p[0] - pos[0], p[1] - pos[1], p[2] - pos[2]); } catch (e) { return Infinity; } };
@@ -2015,7 +2029,7 @@ module.exports = (api) => {
   // /expedition leave: home from anywhere in the ruin (Nate, 2026-09-28: the main door is easy to miss, and nothing
   // marks it as the way back). Not while down: the fallen wait for a revive or give up, as anywhere else.
   const leaveExpedition = (a) => {
-    const d = cellToDungeon.get(whereIs(a));
+    const d = cellToDungeon.get(placeOf(a));
     if (!d || !d.expedition) return personal(a, 'You are not on an expedition. In an Ayleid ruin, /expedition leave takes you home.');
     if (typeof globalThis.__dboIsDowned === 'function' && globalThis.__dboIsDowned(a)) return personal(a, 'Not while you are down.');
     expeditionHome(a, d, d.entrances[0]);
