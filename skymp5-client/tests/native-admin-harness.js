@@ -43,6 +43,18 @@ const { EVENTS, DEBUG, ZONES, panel, open, P, B, sentOf, click, kids, railLabels
   check('...no data yet: Waiting for game data', /Waiting for game data/.test(B(n).waiting.text));
 }
 
+// ---- Debug: Clear my inventory (staff; gamemode.js clearOwnInventory confirms on a second press) ----
+{
+  const a = open(panel());
+  check('Debug: an admin has Clear my inventory', !!B(a).clearInv);
+  if (B(a).clearInv) B(a).clearInv.onRelease();
+  check('...a press asks the server, through adminMenuService (admin::request adminClearInventory)', preq(a, 'adminClearInventory').length === 1, a.msgs());
+  const p = open(panel({ admin: false, caps: undefined, tier: '' }));
+  check('...a player who is not staff has none', !B(p).clearInv);
+  const svc = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'services', 'services', 'adminMenuService.ts'), 'utf8');
+  check('...and the service lets it through as the gameplay event clearInventory', /PANEL_REQUESTS = new Set\(\[[^\]]*"adminClearInventory"/.test(svc) && /adminClearInventory: \["clearInventory", \[\]\]/.test(svc));
+}
+
 // ---- Modes ----
 {
   const t = open(panel());
