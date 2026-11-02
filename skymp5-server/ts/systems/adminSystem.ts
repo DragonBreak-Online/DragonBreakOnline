@@ -100,6 +100,8 @@ const SPAWN_ACTIONS = new Set(["kill", "deleteCharacter", "masteryGrant", "maste
   "giveItem", "giveSpells", "giveShouts", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm", "polymorphSelf", "npcZoneAdd", "npcZoneDelete", "npcZoneReset",
   "giveSpell", "removeSpell"]);
 const SPAWN_MODES = new Set(["smite", "healhit"]);
+// An NPC zone needs the adder's open /event (staffguard.js), so without a working gate it is refused, never let through
+const EVENT_GATED_ACTIONS = new Set(["npcZoneAdd"]);
 // Panel actions whose missing target means the staff member themself (resolveTarget)
 const SELF_TARGETED = new Set(["masterySetTier", "masteryDrop", "giveItem", "giveSpells", "giveShouts", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm"]);
 // Give all spells and Give all shouts are batched across ticks and capped.
@@ -596,6 +598,10 @@ export class AdminSystem implements System {
       return;
     }
     // A Lead GM's bans lean on the gameplay's rank rule (staffguard.js): without it they are refused, never let through
+    if (EVENT_GATED_ACTIONS.has(action) && typeof (globalThis as any).__dboAdminGate !== "function") {
+      this.reply(mp, userId, false, "The staff rules are not loaded, so the NPC zone was not added. Try again in a minute.");
+      return;
+    }
     if (BAN_ACTIONS.has(action) && tier === "leadgm" && typeof (globalThis as any).__dboAdminGate !== "function") {
       this.reply(mp, userId, false, "The staff rules are not loaded, so a Lead GM's ban is refused. Try again in a minute.");
       return;
@@ -1165,6 +1171,7 @@ export class AdminSystem implements System {
       // staffguard is the rank rule for a ban at EVERY tier, so a gate that throws has to refuse: '' here would let the
       // ban through with no rank check at all, which is the one thing the missing-gate guard above exists to prevent
       if (BAN_ACTIONS.has(action)) return "The staff rules could not be read, so the ban is refused. Try again in a minute.";
+      if (EVENT_GATED_ACTIONS.has(action)) return "The staff rules could not be read, so the NPC zone was not added. Try again in a minute.";
       return "";
     }
   }
