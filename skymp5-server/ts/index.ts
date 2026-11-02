@@ -57,18 +57,26 @@ const gamemodeCache = new Map<string, string>();
 function requireTemp(module: string) {
   // https://blog.mastykarz.nl/create-temp-directory-app-node-js/
   let tmpDir;
+  let tempPath = '';
   const appPrefix = 'skymp5-server';
   try {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), appPrefix));
 
     const contents = fs.readFileSync(module, 'utf8');
-    const tempPath = path.join(tmpDir, Math.random() + '-' + Date.now() + '.js');
+    tempPath = path.join(tmpDir, Math.random() + '-' + Date.now() + '.js');
     fs.writeFileSync(tempPath, contents);
 
     require(tempPath);
   } catch (e) {
     console.error(e.stack);
   } finally {
+    // Node's module tables would otherwise keep every gamemode generation alive across hot reloads
+    const loaded = tempPath ? require.cache[tempPath] : undefined;
+    if (loaded) {
+      delete require.cache[tempPath];
+      const parent = (loaded as NodeModule & { parent?: NodeModule }).parent || require.main;
+      if (parent) parent.children = parent.children.filter((c) => c !== loaded);
+    }
     try {
       if (tmpDir) {
         fs.rmSync(tmpDir, { recursive: true });
