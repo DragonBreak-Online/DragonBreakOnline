@@ -133,7 +133,7 @@ check('a purge not confirmed within a minute does nothing', /Nothing to confirm/
 
 // ---- the wiring ---------------------------------------------------------------------------------------------------
 const src = (fl) => fs.readFileSync(path.join(ROOT, fl), 'utf8');
-check('gamemode-config.json staffPowers.callRef.leadExemptKinds is ["faction"]', JSON.stringify((JSON.parse(src('gamemode-config.json')).staffPowers || {}).callRef.leadExemptKinds) === '["faction"]');
+check('gamemode-config.json staffPowers.callRef.leadExemptKinds names faction (spells too since 1 Nov, lead-gm-spells-harness)', ((JSON.parse(src('gamemode-config.json')).staffPowers || {}).callRef.leadExemptKinds || []).includes('faction'));
 check('gamemode.js hands staffguard.js the staff log', /require\(STAFFGUARD_JS\)\(\{[^}]*authorRefusal: authorRefusalOf, staffLog,/.test(src('gamemode.js')));
 
 process.chdir(ROOT);

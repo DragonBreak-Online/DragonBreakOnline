@@ -266,15 +266,22 @@ module.exports = (api) => {
     }
   }, { admin: true, help: '<#TAG|name> <item> [count] [ticket:<id>]: take an item from an online player' });
 
+  // A single spell given or taken by staff (kind "spells"): a GM or Trial GM needs a GM call or ticket (call:<n> / ticket:<id>), a
+  // Lead GM or above a short reason (reason: <why>) instead, audited and sent to the staff log (the Leader, 1 Nov). staffguard.js
+  // takes those words out of the line before the command runs
+  const spellsNo = (a, t) => {
+    try { const g = globalThis.__dboStaffGuard; return g ? String(g.target(a, t, 'spells') || '') : ''; } catch (e) { log('staffitemspells: staff check failed', e.message); return ''; }
+  };
+
   // 3. /givespell
   registerChatCommand('givespell', (caller, args) => {
     if (!isLeadStaff(caller) && !isAdmin(caller)) {
       return personal(caller, 'Only a Lead GM or above manages player spells.');
     }
     const raw = String(args || '').trim();
-    if (!raw) return personal(caller, 'Usage: /givespell <#TAG|name> <spell name or id> [ticket:<id>]');
+    if (!raw) return personal(caller, 'Usage: /givespell <#TAG|name> <spell name or id> call:<n> | ticket:<id> | reason: <why> (Lead GM+)');
     const parts = raw.split(/\s+/);
-    if (parts.length < 2) return personal(caller, 'Usage: /givespell <#TAG|name> <spell name or id> [ticket:<id>]');
+    if (parts.length < 2) return personal(caller, 'Usage: /givespell <#TAG|name> <spell name or id> call:<n> | ticket:<id> | reason: <why> (Lead GM+)');
 
     const targetQuery = parts[0];
     let spellParts = [];
@@ -292,6 +299,7 @@ module.exports = (api) => {
     if (!tgt || !tgt.online || !tgt.actor) {
       return personal(caller, `Player '${targetQuery}' must be online to learn spells.`);
     }
+    { const no = spellsNo(caller, tgt.actor); if (no) return personal(caller, no); }
 
     try {
       const selfForm = { type: 'form', desc: descOf(tgt.actor) };
@@ -308,7 +316,7 @@ module.exports = (api) => {
     } catch (e) {
       return personal(caller, `Failed to grant spell: ${e.message}`);
     }
-  }, { admin: true, help: '<#TAG|name> <spell> [ticket:<id>]: grant a spell to an online player' });
+  }, { admin: true, help: '<#TAG|name> <spell> call:<n>|ticket:<id> (GM) or reason: <why> (Lead GM+): grant a spell to an online player' });
 
   // 4. /removespell
   registerChatCommand('removespell', (caller, args) => {
@@ -316,9 +324,9 @@ module.exports = (api) => {
       return personal(caller, 'Only a Lead GM or above manages player spells.');
     }
     const raw = String(args || '').trim();
-    if (!raw) return personal(caller, 'Usage: /removespell <#TAG|name> <spell name or id> [ticket:<id>]');
+    if (!raw) return personal(caller, 'Usage: /removespell <#TAG|name> <spell name or id> call:<n> | ticket:<id> | reason: <why> (Lead GM+)');
     const parts = raw.split(/\s+/);
-    if (parts.length < 2) return personal(caller, 'Usage: /removespell <#TAG|name> <spell name or id> [ticket:<id>]');
+    if (parts.length < 2) return personal(caller, 'Usage: /removespell <#TAG|name> <spell name or id> call:<n> | ticket:<id> | reason: <why> (Lead GM+)');
 
     const targetQuery = parts[0];
     let spellParts = [];
@@ -336,6 +344,7 @@ module.exports = (api) => {
     if (!tgt || !tgt.online || !tgt.actor) {
       return personal(caller, `Player '${targetQuery}' must be online to remove spells.`);
     }
+    { const no = spellsNo(caller, tgt.actor); if (no) return personal(caller, no); }
 
     try {
       const selfForm = { type: 'form', desc: descOf(tgt.actor) };
@@ -378,7 +387,7 @@ module.exports = (api) => {
     } catch (e) {
       return personal(caller, `Failed to remove spell: ${e.message}`);
     }
-  }, { admin: true, help: '<#TAG|name> <spell> [ticket:<id>]: remove a spell from an online player' });
+  }, { admin: true, help: '<#TAG|name> <spell> call:<n>|ticket:<id> (GM) or reason: <why> (Lead GM+): remove a spell from an online player' });
 
   log('staffitemspells: loaded (/giveitem, /takeitem, /givespell, /removespell registered; /unstuck stays gamemode.js)');
 };

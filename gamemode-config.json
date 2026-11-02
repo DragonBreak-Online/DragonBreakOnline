@@ -2168,7 +2168,7 @@
   "staffCharOnly": { "enabled": false, "clearModes": true },
   "_selfTarget": "ownAccount off (Nate, 24 Oct: remove \"staff tools never act on your own characters\"; Lead GM Aussiepie was refused every grant to his own characters). Another staff member's account still takes a Lead GM, audited. ROLLBACK: ownAccount true, hot reload.",
   "selfTarget": { "enabled": true, "ownAccount": false, "staffNeedsLead": true },
-  "callRef": { "enabled": true, "bindMinutes": 60, "leadExemptKinds": ["faction"] },
+  "callRef": { "enabled": true, "bindMinutes": 60, "leadExemptKinds": ["faction", "spells"] },
   "trialLimits": { "enabled": true }
  },
  "staffEnchant": {
