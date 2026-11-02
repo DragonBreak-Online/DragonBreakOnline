@@ -92,6 +92,15 @@ check('/armor names a piece\'s enchantment capacity as enchanting.js rules it: l
 check('...and nothing with the enchanting rule off', !!off && off('heavy') === null);
 check('...the report asks for it per piece, by the piece\'s own light or heavy', /__dboEnchantShareOf\(p\.heavy \? 'heavy' : 'light'\)/.test(GM) && /Holds \$\{Math\.round\(share \* 100\)\}% of an enchantment's power\./.test(GM));
 
+// gamemode-config.json: when the descs are filled, every step the block can show has one, and nothing else
+const CFG_DISPLAY = ((JSON.parse(fs.readFileSync(path.join(SERVER, 'gamemode-config.json'), 'utf8')).armorWear || {}).debuff || {}).display;
+if (CFG_DISPLAY) {
+  const keys = (o) => Object.keys(o || {}).sort((a, b) => a - b).join(',');
+  const descs = [...Object.values(CFG_DISPLAY.slow || {}), ...Object.values(CFG_DISPLAY.wind || {})];
+  check('config: a desc for every speed step 5..45 and every recovery step 10..50, each a distinct id:plugin', keys(CFG_DISPLAY.slow) === '5,10,15,20,25,30,35,40,45'
+    && keys(CFG_DISPLAY.wind) === '10,20,30,40,50' && new Set(descs).size === 14 && descs.every((d) => /^[0-9a-f]{1,6}:[^:]+\.es[pml]$/.test(d)), [keys(CFG_DISPLAY.slow), keys(CFG_DISPLAY.wind)]);
+}
+
 const MUTANTS = [
   ['speed rounded down, not to the nearest', 'Math.round(v / step) * step', 'Math.floor(v / step) * step'],
   ['the old step is not taken back', '    for (const k of [\'slow\', \'wind\']) if (prev[k] && prev[k] !== want[k]) remove.add(prev[k]);\n', '\n'],
