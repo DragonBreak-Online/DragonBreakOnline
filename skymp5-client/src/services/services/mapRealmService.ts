@@ -70,6 +70,10 @@ export class MapRealmService extends ClientListener {
     this.ownersSwf = newSwfLoad();
     this.drawnKey = "";
     this.lastFit = null;
+    this.goodFit = null;
+    this.layerShown = false;
+    this.layerAt = {};
+    this.passTabAt = 0;
     this.mapWorld = 0;
     if (this.testArmed) { this.testArmed = false; this.test = { tick: 0, samples: [], results: {} }; }
   }
@@ -87,6 +91,11 @@ export class MapRealmService extends ClientListener {
   private onButton(e: ButtonEvent): void {
     if (this.open && this.legendMenuOpen && !this.probe.done && e.isDown && e.device === InputDeviceType.Mouse) this.probe.clicks++;
     if (!this.open || !e.isDown || e.device !== InputDeviceType.Keyboard) return;
+    if (this.legendMenuOpen && MAP_CLOSE_KEYS.includes(e.code)) {
+      this.closeLegendMenu();
+      this.passTabAt = this.ticksOpen + 2;
+      return;
+    }
     if (this.ownersKey && e.code === this.ownersKey && this.owners) {
       this.ownersShown = !this.ownersShown;
       this.publish();
@@ -109,6 +118,8 @@ export class MapRealmService extends ClientListener {
     if (!this.open) return;
     this.ticksOpen++;
     try {
+      // our menu had the key, so the map never heard it: Tab now closes the map (only while it is still open)
+      if (this.passTabAt && this.ticksOpen >= this.passTabAt) { this.passTabAt = 0; this.sp.Input.tapKey(TAB); }
       // browserService hides the browser for the map; a browser legend needs it shown (unfocused: the map keeps the keys)
       if (this.test && this.ticksOpen <= 3) this.sp.browser.setVisible(true);
       if (this.markers.length) {
@@ -235,6 +246,8 @@ export class MapRealmService extends ClientListener {
     this.legendMenuOpen = false;
     // the colours went with the menu: drawn again when it is back
     this.drawnKey = "";
+    this.layerShown = false;
+    this.layerAt = {};
     if (this.ownersSwf.phase === "up") this.ownersSwf.phase = "idle";
     try { this.sp.Ui.closeCustomMenu(); } catch (err) { logError(this, "the map legend menu could not be closed", err); }
     if (reopenable && this.legendSwf.phase === "up") { this.legendSwf.phase = "idle"; this.legendSwf.frames = 0; this.legendSwf.tries = 0; }
@@ -271,17 +284,23 @@ export class MapRealmService extends ClientListener {
       };
       st.t.url = `map ${this.stage.mapW}x${this.stage.mapH}, ours ${this.stage.ours.width}x${this.stage.ours.height} at ${this.stage.ours.left},${this.stage.ours.top}`;
     }
+    // Each frame fits a different slice of the markers, and a slice that does not hold must not hide the colours: Nat saw
+    // them flash on 2 Nov (fit n 4, rms 38.5). The last fit that held stays until a better one comes, so the layer is
+    // shown once and moved only when the fit changes (a pan or a zoom).
     const fit = this.ownersShown ? this.fitNow() : null;
     const holds = this.ownersShown && fitHolds(fit);
-    ui.setBool(LEGEND_MENU, `${layer}._visible`, holds);
-    if (holds && fit) {
-      const t = clipTransform(fitToStage(fit, this.stage.mapW, this.stage.mapH, this.stage.ours));
-      ui.setFloat(LEGEND_MENU, `${layer}._x`, t.x);
-      ui.setFloat(LEGEND_MENU, `${layer}._y`, t.y);
-      ui.setFloat(LEGEND_MENU, `${layer}._xscale`, t.xscale);
-      ui.setFloat(LEGEND_MENU, `${layer}._yscale`, t.yscale);
-      ui.setFloat(LEGEND_MENU, `${layer}._rotation`, t.rotation);
-      ui.setFloat(LEGEND_MENU, `${layer}.shapes._rotation`, t.inner);
+    if (holds && fit) this.goodFit = fit;
+    const show = this.ownersShown && !!this.goodFit;
+    if (show !== this.layerShown) { ui.setBool(LEGEND_MENU, `${layer}._visible`, show); this.layerShown = show; }
+    if (show && holds && this.goodFit) {
+      const t = clipTransform(fitToStage(this.goodFit, this.stage.mapW, this.stage.mapH, this.stage.ours));
+      const parts: [string, number][] = [["_x", t.x], ["_y", t.y], ["_xscale", t.xscale], ["_yscale", t.yscale], ["_rotation", t.rotation], [".shapes._rotation", t.inner]];
+      for (const [p, v] of parts) {
+        const was = this.layerAt[p];
+        if (was !== undefined && Math.abs(was - v) < LAYER_STILL) continue;
+        ui.setFloat(LEGEND_MENU, p[0] === "." ? `${layer}${p}` : `${layer}.${p}`, v);
+        this.layerAt[p] = v;
+      }
     }
     if (fit) this.lastFit = fit;
     if (holds && st.t.fit < 0) st.t.fit = this.ticksOpen;
@@ -451,7 +470,17 @@ export class MapRealmService extends ClientListener {
   private worldIds = new Map<string, number>();
   private anchorsSeen = 0;
   private lastFit: Fit | null = null;
+  private goodFit: Fit | null = null;
+  private layerShown = false;
+  private layerAt: Record<string, number> = {};
+  private passTabAt = 0;
 }
+
+// A layer move smaller than this (a pixel, a percent of scale, a degree) is not written: the fit wobbles by that much
+const LAYER_STILL = 0.5;
+// Tab and Esc close the map; our CustomMenu takes the keys while it is up (2 Nov, Nat: Tab only worked after R)
+const MAP_CLOSE_KEYS = [0x0f, 0x01];
+const TAB = 0x0f;
 
 interface MapTest { tick: number; samples: number[]; results: Record<string, unknown> }
 
