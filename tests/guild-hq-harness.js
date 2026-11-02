@@ -82,7 +82,12 @@ st['imperial-legion'][String(SOLDIER)] = { rank: 3, name: 'Soldier', tag: 'D', s
 st.dawnguard[String(AYLIN)] = { rank: 0, name: 'Aylin Jes', tag: 'E', since: 1 };
 st['fighters-guild'][String(STIBBONS)] = { rank: 0, name: 'Stibbons', tag: 'F', since: 1 };
 fs.writeFileSync('guilds.json', JSON.stringify(st));
+// guilds.js's background timers, kept so the roots step can be fired by hand
+const timers = [];
+const realSetInterval = global.setInterval;
+global.setInterval = (fn, ms) => { timers.push(fn); return realSetInterval(fn, ms); };
 require(GUILDS)(api);
+global.setInterval = realSetInterval;
 if (globalThis.__dboHallSyncTimer) clearTimeout(globalThis.__dboHallSyncTimer);
 
 let fail = 0, n = 0;
@@ -100,6 +105,20 @@ ok(!hallOf('county-bruma').doors.map((d) => d.toLowerCase()).includes('6c473:bsh
 const castleRefs = [CASTLE, CASTLE_FAR];
 // The roots are built in the background (1 Nov: a cold build inside the first login froze the loop 28 s), never by a caller
 ok(globalThis.__dboHallLeader(castleRefs, COUNTESS) === false, 'before the background build the root is not known yet, and asking does not build it');
+// The background build waits for housing's claim warm-up (2 Nov profile: the first pass over every claim stalled 78 s)
+const rootsTick = timers.find((fn) => /stepRoots\(15\)/.test(String(fn)));
+ok(typeof rootsTick === 'function', 'guilds.js runs the roots build on a background timer');
+const RS = globalThis.__dboHallRootsState;
+H.isWarm = () => false; rootOfKnownCalls = 0;
+for (let i = 0; i < 5; i++) rootsTick();
+ok(rootOfKnownCalls === 0 && !RS.roots && !RS.build, 'while housing is not warm, the background step asks housing nothing and builds nothing', { rootOfKnownCalls, roots: !!RS.roots });
+H.isWarm = () => true;
+for (let i = 0; i < 50 && !RS.roots; i++) rootsTick();
+ok(rootOfKnownCalls > 0 && !!RS.roots && RS.roots.has(CASTLE), 'once warm, the background step builds the roots', { rootOfKnownCalls });
+delete H.isWarm; RS.roots = null; RS.build = null; rootOfKnownCalls = 0;
+for (let i = 0; i < 50 && !RS.roots; i++) rootsTick();
+ok(!!RS.roots && RS.roots.has(CASTLE), 'a fork without isWarm builds at once, as before');
+RS.roots = null; RS.build = null; rootOfKnownCalls = 0;
 ok(globalThis.__dboHallRootsBuild().has(CASTLE), 'the roots build: the root 6c473 of Castle Bruma carries its listed doors');
 ok(rootOfKnownCalls > 0, 'the build asks housing rootOfKnown when the fork has it (no cold read of unclaimed hall doors)', rootOfKnownCalls);
 ok(globalThis.__dboHallLeader(castleRefs, COUNTESS) === true, 'the Countess holds Castle Bruma by its root (6c473), through its listed doors');
