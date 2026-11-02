@@ -85,6 +85,14 @@ export interface Browser {
 }
 export declare let browser: Browser
 
+export interface OverlayMenu {
+  menuName: string
+  open(swfPath: string): void
+  close(): void
+  isOpen(): boolean
+}
+export declare let overlayMenu: OverlayMenu
+
 export interface Win32 {
   loadUrl(url: string): void
   exitProcess(): void

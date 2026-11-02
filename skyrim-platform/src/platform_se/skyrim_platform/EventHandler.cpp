@@ -2,6 +2,7 @@
 #include "EventManager.h"
 #include "EventsApi.h"
 #include "JsUtils.h"
+#include "OverlayMenuApi.h"
 #include "SkyrimPlatform.h"
 #include "TickHandler.h"
 
@@ -69,6 +70,7 @@ void EventHandler::HandleSKSEMessage(SKSE::MessagingInterface::Message* msg)
       TickHandler::GetSingleton()->Update();
 
       EventManager::Init();
+      OverlayMenuApi::RegisterMenu();
       SendSimpleEventOnTick("skyrimLoaded");
     } break;
     case SKSE::MessagingInterface::kNewGame:
