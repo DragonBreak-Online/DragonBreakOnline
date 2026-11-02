@@ -92,6 +92,18 @@ const check = (name, ok, got) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}$
   check('a key not on the ring cannot be given', H.ringGive(B, bKey, C) !== '');
   const rl = H.ringView(C);
   check('the ring list says what each key opens and who stands near', rl.keys[0].place === 'Elions House' && rl.keys[0].opens === true && rl.near.length === 3, rl);
+  // fac-0553 (31 Oct): an invisible GM beside you was named in these lists
+  const nearNames = (a) => H.ringView(a).near.map((n) => n.name).sort().join();
+  mp.set(D, 'ff_adminModes', { invis: true, ghost: false, rank: 2 });
+  check('an invisible GM beside you is not offered a key', nearNames(C) === 'Bera,Nat', nearNames(C));
+  mp.set(D, 'ff_adminModes', { invis: false, ghost: true, rank: 2 });
+  check('...nor one in Ghost mode', nearNames(C) === 'Bera,Nat', nearNames(C));
+  mp.set(D, 'ff_adminModes', null); mp.set(D, 'ff_spellInvis', { on: true, n: 2 });
+  check('...nor a player under an Invisibility spell', nearNames(C) === 'Bera,Nat', nearNames(C));
+  mp.set(D, 'ff_adminModes', { invis: true, ghost: false, rank: 2 }); mp.set(C, 'ff_adminModes', { invis: false, ghost: false, rank: 3 });
+  check('a staff member sees them, as their client draws them', nearNames(C) === 'Bera,Dagny,Nat', nearNames(C));
+  mp.set(C, 'ff_adminModes', null); mp.set(D, 'ff_adminModes', null); mp.set(D, 'ff_spellInvis', { on: false, n: 3 });
+  check('...and once visible again Dagny is listed for everyone', nearNames(C) === 'Bera,Dagny,Nat', nearNames(C));
 
   check('the owner\'s ring view lists their lock\'s copies', H.ringView(OWNER).owned[0].copies.find((c) => c.name === bKey).holder === 'Cato');
   check('only the owner takes a key back from the panel', H.ringTakeBack(C, HOUSE, bKey) !== '' && ring(C).length === 1);

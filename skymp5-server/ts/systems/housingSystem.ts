@@ -2235,6 +2235,22 @@ export class HousingSystem implements System {
     this.notice(ctx, this.userOf(ctx, casterId), `You take ${moved.join(", ")} onto your key ring.`);
   }
 
+  // Who the Key Ring may name beside a player (fac-0553, 31 Oct: menus listed invisible GMs): never a staff member in
+  // Invisible or Ghost mode (ff_adminModes) nor a player under an Invisibility spell (ff_spellInvis), as the client never
+  // draws them; staff, whose own mirror carries a rank, are shown everyone. The gameplay layer's listable.js is the same rule.
+  private listableTo(ctx: SystemContext, viewer: number, other: number): boolean {
+    const mp = ctx.svr as Mp;
+    const prop = (id: number, key: string): Record<string, unknown> | null => {
+      try { const v = mp.get(id, key); return v && typeof v === "object" ? v as Record<string, unknown> : null; } catch { return null; }
+    };
+    const mine = prop(viewer, "ff_adminModes");
+    if (mine && Number(mine["rank"]) > 0) return true;
+    const modes = prop(other, "ff_adminModes");
+    if (modes && (modes["invis"] === true || modes["ghost"] === true)) return false;
+    const spell = prop(other, "ff_spellInvis");
+    return !(spell && spell["on"] === true);
+  }
+
   // What another player is called on screen: the masked name when masked, as everyone else sees it
   private shownNameOf(ctx: SystemContext, actorId: number): string {
     try {
@@ -2255,7 +2271,7 @@ export class HousingSystem implements System {
     const near: Array<{ actor: number; name: string }> = [];
     for (const u of this.onlineUsers(ctx)) {
       const other = this.actorOf(ctx, u);
-      if (other && other !== actorId && this.withinReach(ctx, actorId, other)) near.push({ actor: other, name: this.shownNameOf(ctx, other) });
+      if (other && other !== actorId && this.withinReach(ctx, actorId, other) && this.listableTo(ctx, actorId, other)) near.push({ actor: other, name: this.shownNameOf(ctx, other) });
     }
     const owned: Array<{ ref: number; place: string; copies: Array<{ name: string; holder: string }> }> = [];
     for (const p of this.claimed) {
