@@ -34,6 +34,9 @@ module.exports = (api) => {
     bodySeconds: 3,        // the first take from a body, which has no activation to gate
     takeSeconds: 0.4,      // between takes
     graceSeconds: 30,      // a searched container reopens freely for this long
+    autoOpen: true,        // the server opens it when the bar fills; false goes back to a second click
+    reopenGuardMs: 800,    // after an auto-open, the player's own click is swallowed for this long
+                           // (a SkyMP container takes a second, closing activation)
     exemptOwnHome: true,
     widget: true,
     tellSeconds: 8,        // at most one "you are searching" line this often per player
@@ -44,6 +47,7 @@ module.exports = (api) => {
   // Reload-safe: the beats in flight outlive a hot reload, so a player mid-search is not sent back to the start
   const S = globalThis.__dboActionDelayState || (globalThis.__dboActionDelayState = {
     beat: new Map(), done: new Map(), nextTake: new Map(), told: new Map(), shown: new Map(),
+    opened: new Map(), timers: new Map(),
   });
   const sweep = () => {
     const now = Date.now(), keep = MS(C.graceSeconds) + 600000;
@@ -110,6 +114,36 @@ module.exports = (api) => {
     try { if (typeof globalThis.__dboItemResync === 'function') globalThis.__dboItemResync(a); } catch (e) { log('action delays: resync failed', e.message); }
   };
 
+  // Opens the container as if the player had activated it again. Activate is registered server-side and
+  // runs MpObjectReference::Activate, not an SpSnippet, so this is the real activation and the container
+  // opens through SendOpenContainer. It re-enters our own chain, which is why done is set first.
+  const openFor = (a, t) => {
+    try {
+      mp.callPapyrusFunction('method', 'ObjectReference', 'Activate', { type: 'form', desc: mp.getDescFromId(t) },
+        [{ type: 'form', desc: mp.getDescFromId(a) }, false]);
+      return true;
+    } catch (e) {
+      // out of range, dead, gone: CheckInteractionAbility throws and the player can still click again
+      log(`action delays: opening ${mp.getDescFromId(t)} for ${mp.getDescFromId(a)} failed: ${e.message}`);
+      return false;
+    }
+  };
+  // Fired when the bar fills. Everything is re-checked, because the player has had searchSeconds to move,
+  // log out, or open something else.
+  const finishSearch = (a, t, key, startedAt) => {
+    S.timers.delete(key);
+    if (S.beat.get(key) !== startedAt) return;        // a newer beat, or it was already finished by a click
+    const now = Date.now();
+    S.beat.delete(key);
+    S.done.set(key, now);
+    S.nextTake.set(a, now + MS(C.takeSeconds));
+    hide(a);
+    const searched = () => { try { personal(a, 'You have searched it. Open it again.'); } catch (e) { /* offline */ } };
+    if (C.autoOpen === false) { searched(); return; }
+    if (!openFor(a, t)) { searched(); return; }
+    S.opened.set(key, now);
+  };
+
   // ---- the search beat on a container's activation --------------------------------------------------------------------
   // undefined: no opinion, the activation stands. false: refused, the container does not open.
   const searchGate = (targetId, casterId) => {
@@ -121,6 +155,9 @@ module.exports = (api) => {
     if (ownHome(t, a)) return undefined;
     const now = Date.now();
     const key = `${a}:${t}`;
+    // The server has just opened this for them: swallow their own click, or the container's second
+    // activation would close the window they waited for
+    if (now - (S.opened.get(key) || 0) < Math.max(0, Number(C.reopenGuardMs) || 0)) return false;
     if (now - (S.done.get(key) || 0) < MS(C.graceSeconds)) return undefined;
     const started = S.beat.get(key) || 0;
     // A beat older than its own time plus the grace is stale (the player wandered off and came back)
@@ -128,10 +165,19 @@ module.exports = (api) => {
       S.beat.set(key, now);
       sweep();
       show(a, ms, 'Searching');
-      tell(a, 'search', 'You search it. Give it a moment, then open it again.');
+      tell(a, 'search', C.autoOpen === false
+        ? 'You search it. Give it a moment, then open it again.'
+        : 'You search it. It opens in a moment.');
+      const prev = S.timers.get(key);
+      if (prev) { try { clearTimeout(prev); } catch (e) { /* gone */ } }
+      S.timers.set(key, setTimeout(() => {
+        try { finishSearch(a, t, key, now); } catch (e) { log('action delays: finishing the search failed', e.message); }
+      }, ms + 50));
       return false;
     }
     if (now - started < ms) return false;
+    const pending = S.timers.get(key);
+    if (pending) { try { clearTimeout(pending); } catch (e) { /* gone */ } S.timers.delete(key); }
     S.beat.delete(key);
     S.done.set(key, now);
     // the search paid for the first take; the next one still waits takeSeconds

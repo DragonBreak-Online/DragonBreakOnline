@@ -18,6 +18,7 @@ const PROFILE = { [PLAYER]: 7, [OTHER]: 9 };          // NPC has none
 const BASES = { [CHEST]: 'c0:Skyrim.esm', [CHEST2]: 'c1:Skyrim.esm', [DOOR]: 'd0:Skyrim.esm', [HOMECHEST]: 'c2:Skyrim.esm', [KEYCHEST]: 'c3:Skyrim.esm' };  // verify-formids: ignore (made-up base descs: this harness never touches the load order)
 const TYPES = { 'c0:Skyrim.esm': 'CONT', 'c1:Skyrim.esm': 'CONT', 'c2:Skyrim.esm': 'CONT', 'c3:Skyrim.esm': 'CONT', 'd0:Skyrim.esm': 'DOOR' };  // verify-formids: ignore (made-up base descs: this harness never touches the load order)
 
+let throwOnActivate = false;
 let fails = 0;
 const ok = (cond, what, got) => {
   if (cond) { console.log(`ok    ${what}`); return; }
@@ -25,6 +26,13 @@ const ok = (cond, what, got) => {
   console.log(`FAIL  ${what}${got === undefined ? '' : `   ${JSON.stringify(got)}`}`);
 };
 
+// setTimeout is taken over so the bar's completion can be fired on demand: with the real one the timer
+// lands long after this process has exited, which is why the first version of these checks proved nothing.
+const pending = [];
+global.setTimeout = (fn, ms) => { const h = { fn, ms, dead: false }; pending.push(h); return h; };
+global.clearTimeout = (h) => { if (h) h.dead = true; };
+const fireTimers = () => { const due = pending.splice(0); let n = 0; for (const h of due) if (!h.dead) { n++; h.fn(); } return n; };
+const papyrus = [];
 const props = new Map();
 const setp = (id, k, v) => props.set(`${id >>> 0}|${k}`, v);
 const said = [], widgets = [], closed = [], resyncs = [], logs = [];
@@ -36,6 +44,8 @@ const mp = {
   },
   set: setp,
   getIdFromDesc: (d) => { const [h] = String(d).split(':'); return parseInt(h, 16) >>> 0; },
+  getDescFromId: (id) => `${(id >>> 0).toString(16)}:x`,
+  callPapyrusFunction: (...x) => { papyrus.push(x); if (throwOnActivate && x[2] === 'Activate') throw new Error('out of range'); return null; },
   lookupEspmRecordById: (id) => {
     const desc = Object.keys(TYPES).find((d) => mp.getIdFromDesc(d) === (id >>> 0));
     return desc ? { record: { type: TYPES[desc] } } : null;
@@ -155,6 +165,46 @@ ok(T2.S === kept, 'a hot reload reuses the state, so a beat in flight is not res
 clock += 2 * SEC;
 ok(T2.searchGate(CHEST, PLAYER) === undefined, '...and the beat finishes across the reload');
 
+// ---- the bar opens it when it fills (Nat on dev: "the bar loads fully but doesn't open the container") -------------
+T = load({});
+papyrus.length = 0; pending.length = 0; closed.length = 0;
+ok(T.searchGate(CHEST, PLAYER) === false, 'the first activation still starts the beat');
+ok(pending.length === 1 && pending[0].ms >= 2000, '...and arms a timer for the beat', pending.map((p) => p.ms));
+ok(/opens in a moment/.test(last()), '...and the wording promises it will open', last());
+clock += 2.1 * SEC;
+ok(fireTimers() === 1, 'the timer fires when the bar fills');
+const act = papyrus.find((c) => c[2] === 'Activate');
+ok(!!act && act[1] === 'ObjectReference', '...calling ObjectReference.Activate', act);
+ok(!!act && act[3].desc === `${CHEST.toString(16)}:x`, '...on the container', act && act[3]);
+ok(!!act && act[4][0].desc === `${PLAYER.toString(16)}:x` && act[4][1] === false,
+  '...with the player as the activator and default processing off', act && act[4]);
+ok(closed.some((x) => x.id === 170), '...and the bar is taken down', closed);
+ok(T.searchGate(CHEST, PLAYER) === false, 'their own click just after is swallowed, so it does not close the window');
+clock += 1 * SEC;
+ok(T.searchGate(CHEST, PLAYER) === undefined, '...and past the guard it opens as usual (the grace)');
+
+// a click that beats the timer cancels it, so it cannot fire into an already open container
+T = load({}); papyrus.length = 0; pending.length = 0;
+T.searchGate(CHEST2, PLAYER);
+clock += 2.1 * SEC;
+ok(T.searchGate(CHEST2, PLAYER) === undefined, 'a click after the beat opens it by hand');
+ok(fireTimers() === 0, '...and the armed timer is cancelled, not left to fire', pending.length);
+
+// autoOpen false: the old two-click behaviour, said plainly
+T = load({ actionDelays: { autoOpen: false } }); papyrus.length = 0; pending.length = 0; said.length = 0;
+T.searchGate(CHEST, PLAYER);
+ok(/open it again/.test(last()), 'autoOpen false says to open it again', last());
+clock += 2.1 * SEC; fireTimers();
+ok(!papyrus.some((c) => c[2] === 'Activate'), '...and nothing is opened for them', papyrus);
+ok(/open it again/i.test(last()), '...they are told it is searched', last());
+
+// if the activation throws (out of range, logged out) they are told, not left staring at a full bar
+T = load({}); papyrus.length = 0; pending.length = 0; said.length = 0; throwOnActivate = true;
+T.searchGate(CHEST, PLAYER);
+clock += 2.1 * SEC; fireTimers();
+ok(/open it again/i.test(last()), 'an activation that throws falls back to telling them to open it', last());
+throwOnActivate = false;
+
 // ---- mutants ---------------------------------------------------------------------------------------------------------
 // Each must break at least one check. A mutation that no longer applies means the code moved: that is reported, not passed.
 const SRC = fs.readFileSync(MODULE, 'utf8');
@@ -167,6 +217,14 @@ const MUTANTS = [
   ['every container counts as your own home (the exemption swallows everything)', (s) => s.replace('const ownHome = (ref, a) => {', 'const ownHome = (ref, a) => { if (true) return true;')],
   ['nothing is your own home (the exemption is lost)', (s) => s.replace('const ownHome = (ref, a) => {', 'const ownHome = (ref, a) => { if (true) return false;')],
   ['doors are delayed too (the CONT check is dropped)', (s) => s.replace("if (recordType(t) !== 'CONT') return undefined;", '')],
+  ['the bar never opens it (no timer armed)', (s) => s.replace('      S.timers.set(key, setTimeout(', '      ((x) => x)(setTimeout(')],
+  ['the reopen guard is gone, so their own click shuts the window again', (s) => s.replace('if (now - (S.opened.get(key) || 0) < Math.max(0, Number(C.reopenGuardMs) || 0)) return false;', '')],
+  ['done is set AFTER the open, so the gate refuses its own activation', (s) => {
+    const at = s.indexOf('const searched = ()');
+    const tgt = 'S.done.set(key, now);';
+    const j = at < 0 ? -1 : s.lastIndexOf(tgt, at);
+    return j < 0 ? s : s.slice(0, j) + s.slice(j + tgt.length);
+  }],
   ['the grace is ignored, so a chest re-beats every time', (s) => s.replace('if (now - (S.done.get(key) || 0) < MS(C.graceSeconds)) return undefined;', '')],
 ];
 // The first version of this battery let three mutants through, all for one reason: it only drove the "fresh beat" and
@@ -182,9 +240,17 @@ const battery = (M) => {
   out.push(M.searchGate(DOOR, PLAYER) === undefined);                    // a door is never delayed
   out.push(M.searchGate(HOMECHEST, PLAYER) === undefined);               // own home exempt
   out.push(M.searchGate(HOMECHEST, OTHER) === false);                    // but not for others
-  clock += 2 * SEC;
-  out.push(M.searchGate(CHEST, PLAYER) === undefined);                   // the beat completes
-  out.push(M.searchGate(CHEST, PLAYER) === undefined);                   // and the grace holds
+  // the bar must open it, and the open must not be refused by our own re-entrant gate
+  const p0 = papyrus.length;
+  clock += 2.1 * SEC;
+  fireTimers();
+  const opened = papyrus.slice(p0).filter((c) => c[2] === 'Activate');
+  out.push(opened.length === 1);                                         // exactly one activation
+  out.push(!!opened[0] && opened[0][3].desc === `${CHEST.toString(16)}:x`
+    && opened[0][4][0].desc === `${PLAYER.toString(16)}:x`);             // the container, by the player
+  out.push(M.searchGate(CHEST, PLAYER) === false);                       // their own click is swallowed
+  clock += 1 * SEC;
+  out.push(M.searchGate(CHEST, PLAYER) === undefined);                   // and the grace holds after
   let r = resyncs.length;
   out.push(M.takeGate(BODY, PLAYER) === false);                          // a body's first take waits
   out.push(resyncs.length > r);                                           // and resyncs
