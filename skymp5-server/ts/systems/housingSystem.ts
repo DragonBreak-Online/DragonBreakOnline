@@ -1343,7 +1343,7 @@ export class HousingSystem implements System {
   // The interior behind a house's door, and the rooms reachable only through it: a cell with a door of its own to the world
   // is another building and stops the walk; so does a door someone else holds (staff included), and a cell any of whose
   // doors someone else holds, which is theirs (an inn room claimed off a granted hall, review H); more than
-  // MAX_PLACE_CELLS (a dungeon below) keeps the first interior alone
+  // MAX_PLACE_CELLS (a dungeon below) keeps the first interior and only its closed rooms (closedRoomsFrom)
   private placeCellsFrom(ctx: SystemContext, inner: string, owner: OwnerRef): string[] {
     const others = (ref: number) => { const p = this.primaryOf(ctx, ref); const r = p ? this.read(ctx, p) : null; return !!r && r.owner !== 0 && !this.sameOwner(r, owner); };
     // A building in the map is whole as the map says, but for a room behind a door someone else holds (a dungeon or an
@@ -1358,8 +1358,34 @@ export class HousingSystem implements System {
         const farDoors = this.doorsOut(ctx, d.farCell);
         if (farDoors.some((o) => this.isWorldDesc(ctx, o.farCell) || others(o.ref))) continue;
         cells.push(d.farCell);
-        if (cells.length > MAX_PLACE_CELLS) return [inner];
+        if (cells.length > MAX_PLACE_CELLS) return this.closedRoomsFrom(ctx, inner, others);
       }
+    }
+    return cells;
+  }
+
+  // Past MAX_PLACE_CELLS the walk kept the first interior alone, so a building with one way down into a dungeon lost its
+  // other rooms too. The Palace of Kings (fac-0498, 28 Oct): its cellar (DragonBreak.esp SSewersWHpalaceCellar) opens on
+  // Windhelm's sewers, and the palace became its hall only, without the two upstairs cells, their bedroom doors and 34
+  // chests. Now each branch behind one of the first interior's doors is walked without passing back through it. It joins
+  // whole when it has no door to the world, no door someone else holds, and fits under the cap with the rest. A branch that
+  // leads on (the cellar into the sewers, the Bloodworks to its street door) stays out, as the whole building did before.
+  private closedRoomsFrom(ctx: SystemContext, inner: string, others: (ref: number) => boolean): string[] {
+    const cells = [inner];
+    for (const d of this.doorsOut(ctx, inner)) {
+      if (cells.length >= MAX_PLACE_CELLS) break;
+      if (!d.farCell || this.isWorldDesc(ctx, d.farCell) || cells.indexOf(d.farCell) !== -1 || others(d.ref)) continue;
+      const pocket = [d.farCell];
+      let open = false;
+      for (let i = 0; i < pocket.length && !open; i++) {
+        for (const o of this.doorsOut(ctx, pocket[i])) {
+          if (others(o.ref)) { open = true; break; }
+          if (!o.farCell || o.farCell === inner || pocket.indexOf(o.farCell) !== -1) continue;
+          if (this.isWorldDesc(ctx, o.farCell) || cells.indexOf(o.farCell) !== -1 || cells.length + pocket.length >= MAX_PLACE_CELLS) { open = true; break; }
+          pocket.push(o.farCell);
+        }
+      }
+      if (!open) cells.push(...pocket);
     }
     return cells;
   }
@@ -2745,7 +2771,51 @@ export class HousingSystem implements System {
       if (unreadable.length) this.log(`[housing] place migration NOT applied: ${unreadable.length} of ${this.claimed.length} claims are still unreadable`);
       else this.applyPlaces(ctx, plan.places, details, new Set(grants.filter((g) => !!g.claim).map((g) => g.ref)));
     }
+    if (!unreadable.length) this.widenPlaces(ctx, details);
     return true;
+  }
+
+  // A place built from its first cell alone, because the walk passed MAX_PLACE_CELLS before closedRoomsFrom (fac-0498: the
+  // Palace of Kings, built 28 Oct as its hall only), widens to the cells the plan now gives it. Only those places (one cell
+  // stored), only cells refinePlaces left free (no other owner's place or door to the world), never fewer; the owner's own
+  // claims in the new cells join it. In dryrun it is logged only; in apply the records are backed up first, as the
+  // migration's are, and each widening is logged.
+  private widenPlaces(ctx: SystemContext, details: Map<number, PlaceDetail>): void {
+    const hex = (n: number) => (n >>> 0).toString(16);
+    const todo: Array<{ d: PlaceDetail; root: PropertyRecord; add: string[] }> = [];
+    for (const d of details.values()) {
+      if (d.notApplied || !d.cells.length) continue;
+      const root = this.read(ctx, d.root);
+      if (!root || !root.place || root.owner !== d.owner || root.place.cells.length !== 1) continue;
+      const add = d.cells.filter((c) => root.place!.cells.indexOf(c) === -1);
+      if (add.length) todo.push({ d, root, add });
+    }
+    if (!todo.length) return;
+    if (this.placeMigration !== "apply") {
+      for (const { d, root, add } of todo) this.log(`[housing] place plan: ${root.ownerName} (${root.owner}) ${hex(d.root)} "${root.name || ""}" would widen by ${add.join(",")} (built from its first cell alone)`);
+      return;
+    }
+    const mp = ctx.svr as Mp;
+    const backup: Record<string, unknown> = {};
+    const keep = (ref: number) => { let v: unknown = null; try { v = mp.get(ref, HOUSING_PROP); } catch { v = null; } backup[hex(ref)] = v === undefined ? null : v; };
+    for (const { d } of todo) for (const ref of [d.root, ...d.members]) keep(ref);
+    const file = `${PLACE_BACKUP_PREFIX}widen-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+    try { fs.writeFileSync(file, JSON.stringify({ version: 2, widened: todo.map(({ d, add }) => ({ root: hex(d.root), added: add })), records: backup }, null, 1)); } catch (e) { this.log(`[housing] places NOT widened: the backup ${file} could not be written: ${e}`); return; }
+    for (const { d, root, add } of todo) {
+      root.place = { cells: root.place!.cells.concat(add), builtAt: root.place!.builtAt };
+      if (!this.write(ctx, d.root, root)) { this.log(`[housing] place ${hex(d.root)} NOT widened: write failed`); continue; }
+      let joined = 0;
+      for (const ref of d.members) {
+        if (ref === d.root) continue;
+        const r = this.read(ctx, ref);
+        if (!r || r.memberOf || r.place || !this.sameOwner(r, root)) continue;
+        r.memberOf = d.root;
+        if (this.write(ctx, ref, r)) joined++;
+      }
+      // The owner's client owns the new cells too (home cells: their own chests there are no theft)
+      this.markHomeCells(root.owner);
+      this.log(`[housing] place widened: ${root.ownerName} (${root.owner}) ${hex(d.root)} "${root.name || ""}" + ${add.join(",")}, ${joined} own claim(s) joined; backup ${file}`);
+    }
   }
 
   // Buildings the migration grants (Nate, 4 Oct: Sylvia is given the Cathedral of St Martin her claims stand in):
