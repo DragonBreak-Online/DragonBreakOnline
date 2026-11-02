@@ -143,6 +143,7 @@ module.exports = (api) => {
     owners().history.push({ at: Date.now(), territory: tid, from: prev, to: fid, why });
     if (owners().history.length > 500) owners().history = owners().history.slice(-500);
     writeJson(OWNERS, owners());
+    if (prev !== fid) ownersChanged();
     audit(`REALM ${territory(tid) ? territory(tid).name : tid} passes from ${nameOfFaction(prev)} to ${nameOfFaction(fid)} (${why})`);
     const t = territory(tid);
     if (quiet || !t || prev === fid || (holdCapital(t.zone) || {}).id !== t.id) return;
@@ -730,7 +731,73 @@ module.exports = (api) => {
   const sendMarkers = (a) => {
     const markers = mapMarkers();
     if (markers.length) sendPacket(a, { customPacketType: 'dboMapRealm', markers });
+    try { sendPacket(a, ownersPacket()); } catch (e) { log('realm: map owners not sent', e.message); }
   };
+
+  // ---- who owns what, over the M map (Nat, 2 Nov: the borders as an overlay on every world's map, toggled with T) ----------
+  // Each world's territories with their owner and marker, the owners' colours, and the realm markers' true positions, which
+  // the client lines its drawing up with (client mapOwners.ts). A point belongs to the nearest marker in its worldspace, as
+  // territoryAt says, and the client draws exactly that. Colours: war.mapTints, else W6's C2 palette (owner-tints.json).
+  const MAP_TINTS = {
+    'hold-solitude': [176, 52, 48], 'hold-morthal': [206, 118, 150], 'hold-whiterun': [160, 26, 54], 'hold-windhelm': [58, 102, 186],
+    'hold-riften': [62, 146, 70], 'hold-falkreath': [226, 150, 44], 'hold-markarth': [186, 92, 30], 'hold-winterhold': [72, 164, 182],
+    'hold-dawnstar': [122, 92, 176], 'county-bruma': [214, 170, 48], 'imperial-legion': [150, 34, 40], 'clan-gol-kharzum': [46, 112, 60],
+    'clan-mor-khazgur': [188, 168, 40], 'clan-dushnikh-yal': [118, 30, 52], 'clan-largashbur': [172, 150, 108], 'clan-narzulbur': [64, 62, 74],
+    'clan-cracked-tusk': [150, 58, 40],
+  };
+  // A faction with no colour of its own gets a steady one from its id, so a new player faction still shows
+  const tintOf = (fid) => {
+    const own = (C.mapTints && C.mapTints[fid]) || MAP_TINTS[fid];
+    if (Array.isArray(own) && own.length === 3) return own.map((c) => Math.max(0, Math.min(255, Math.round(Number(c) || 0))));
+    let h = 0; for (const ch of String(fid)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const hue = (h % 360) / 60, x = Math.round(150 * (1 - Math.abs((hue % 2) - 1))) + 50;
+    return [[200, x, 50], [x, 200, 50], [50, 200, x], [50, x, 200], [x, 50, 200], [200, 50, x]][Math.floor(hue) % 6];
+  };
+  // A map marker REFR's position (DATA: position then rotation, six floats), from the plugin, so no client reads it
+  const refPos = (desc) => {
+    try {
+      const r = mp.lookupEspmRecordById(mp.getIdFromDesc(desc));
+      const d = r && r.record && (r.record.fields || []).find((x) => x.type === 'DATA' && x.data instanceof Uint8Array && x.data.byteLength >= 12);
+      if (!d) return null;
+      const v = new DataView(d.data.buffer, d.data.byteOffset, 12);
+      const p = [v.getFloat32(0, true), v.getFloat32(4, true), v.getFloat32(8, true)];
+      return p.every(Number.isFinite) ? p : null;
+    } catch (e) { return null; }
+  };
+  const ownersPacket = () => {
+    const f = territoryFile();
+    const aliases = Object.entries(f.worldAliases || {});
+    // a walled city's territories are Tamriel's: keyed by the world they alias to
+    const target = (w) => { const hit = aliases.find(([from]) => { try { return (mp.getIdFromDesc(from) >>> 0) === (mp.getIdFromDesc(w) >>> 0); } catch (e) { return from === w; } }); return hit ? hit[1] : w; };
+    const worlds = new Map();
+    const factions = {};
+    for (const t of territories()) {
+      if (!Array.isArray(t.marker.pos) || typeof t.marker.world !== 'string') continue;
+      const w = target(t.marker.world);
+      const key = String(w).toLowerCase();
+      if (!worlds.has(key)) worlds.set(key, { world: w, aliases: aliases.filter(([, to]) => String(to).toLowerCase() === key).map(([from]) => from), territories: [] });
+      const owner = ownerOf(t.id) || 'unclaimed';
+      worlds.get(key).territories.push({ id: t.id, owner, x: t.marker.pos[0], y: t.marker.pos[1] });
+      if (owner !== 'unclaimed' && !factions[owner]) factions[owner] = { name: nameOfFaction(owner), rgb: tintOf(owner) };
+    }
+    const anchors = [];
+    for (const m of mapMarkers()) { const p = refPos(m.desc); if (p) anchors.push({ name: m.name, x: p[0], y: p[1], z: p[2] }); }
+    return { customPacketType: 'dboMapOwners', worlds: [...worlds.values()], factions, anchors, reach: Number(C.mapTintReach) || 30000, fade: Number(C.mapTintFade) || 45000 };
+  };
+  // An owner changed: everyone's map is told, once for a burst of changes (a war's end passes several territories)
+  function ownersChanged() {
+    if (S.ownersTimer) return;
+    S.ownersTimer = setTimeout(() => {
+      S.ownersTimer = null;
+      let p; try { p = ownersPacket(); } catch (e) { log('realm: map owners not built', e.message); return; }
+      for (const a of onlineActors()) { try { sendPacket(a, p); } catch (e) { /* gone */ } }
+    }, 1000);
+  }
+  // The client's measure of how well its drawing sits on the map, once a map opening (mapRealmService followOwners)
+  onUi('mapOwnersFit', (a, args) => {
+    const r = Array.isArray(args) && args[0] && typeof args[0] === 'object' ? args[0] : {};
+    log(`realm: map owners fit from ${who(a)}: ${JSON.stringify(r).slice(0, 400)}`);
+  });
   onUi('uiCaps', sendMarkers);
   onUi('nativeCaps', sendMarkers);
 
