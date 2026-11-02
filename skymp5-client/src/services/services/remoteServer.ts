@@ -62,6 +62,7 @@ import { ConnectionMessage } from '../events/connectionMessage';
 import { SetInventoryMessage } from '../messages/setInventoryMessage';
 import { CreateActorMessage, CreateActorMessageAdditionalProps } from '../messages/createActorMessage';
 import { DestroyActorMessage } from '../messages/destroyActorMessage';
+import { noteRemotePlayerCreated, noteRemotePlayerDestroyed } from '../../sync/playerBaseProbe';
 import { dropStaleEntry, previousOwnIdx } from '../../sync/staleEntry';
 import { SetRaceMenuOpenMessage } from '../messages/setRaceMenuOpenMessage';
 import { UpdatePropertyMessage } from '../messages/updatePropertyMessage';
@@ -572,6 +573,8 @@ export class RemoteServer extends ClientListener {
 
   private onCreateActorMessage(event: ConnectionMessage<CreateActorMessage>): void {
     const msg = event.message;
+    // another player's character: counted for the player-base probe (sync/playerBaseProbe.ts)
+    if (msg.appearance && !msg.isMe) noteRemotePlayerCreated();
     if (this.skipFormViewCreation(msg)) {
       const refrId = msg.refrId!;
       this.onceLoad(refrId, (refr: ObjectReference) => {
@@ -967,6 +970,8 @@ export class RemoteServer extends ClientListener {
     // The server sends no HostStop for a form it destroys and gives its id to a later form: a stale entry would
     // make this client drive that NPC as its own without a grant
     const destroyedRefrId = i >= 0 ? this.worldModel.forms[i]?.refrId : undefined;
+    const destroyed = i >= 0 ? this.worldModel.forms[i] : undefined;
+    if (destroyed && destroyed.appearance && !destroyed.isMyClone) noteRemotePlayerDestroyed(Date.now());
     if (destroyedRefrId) {
       this.forgetHosted(destroyedRefrId);
     }

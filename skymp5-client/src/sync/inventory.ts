@@ -1,3 +1,4 @@
+import { notePlayerBaseNull } from "./playerBaseProbe";
 import {
   getExtraContainerChanges,
   getContainer,
@@ -366,6 +367,9 @@ const getBaseContainerAsInventory = (refr: ObjectReference): Inventory => {
   // base it cannot read.
   const baseObject = refr.getBaseObject();
   if (baseObject === null) {
+    // the player's own base reading null is reported (sync/playerBaseProbe.ts); the empty base is right for the player,
+    // whose base (Player, 7) holds no items in the live order (DragonBreak Online Edits overrides Skyrim.esm's 16 with none)
+    notePlayerBaseNull('inventory', refr.getFormID());
     return { entries: [] };
   }
   return {

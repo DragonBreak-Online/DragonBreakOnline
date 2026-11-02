@@ -1,3 +1,4 @@
+import { noteFormIdSwap } from "./playerBaseProbe";
 import {
   Actor,
   ActorBase,
@@ -132,6 +133,8 @@ export const applyTints = (actor: Actor | null, appearance: Appearance): void =>
     const tintsActorBase = actor.getBaseObject();
     if (tintsActorBase) {
       TESModPlatform.setFormIdUnsafe(tintsActorBase, playerBaseId);
+      // counted for the player-base probe (sync/playerBaseProbe.ts): when, and how often, a base took the player's id
+      noteFormIdSwap(Date.now());
     }
   }
 };
