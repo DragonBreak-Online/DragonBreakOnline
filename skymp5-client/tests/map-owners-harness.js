@@ -151,10 +151,19 @@ const scenarios = (M, c) => {
   for (let j = 0; j + 1 < N; j++) for (let i = 0; i < N; i++) { const a = cellOwner(i, j), b = cellOwner(i, j + 1); if (a && b && a !== b) edges++; }
   const lineLen = cellLines.reduce((s, l) => s + Math.hypot((l.pts[2] - l.pts[0]) * S0, (l.pts[3] - l.pts[1]) * S0), 0);
   c('...and together they cover every such cell edge exactly once', Math.abs(lineLen - edges * 4096) < 4096 * 0.01, [lineLen / 4096, edges]);
-  // its cells already carry its colour: the stronghold adds only its edge, no disc over them (Nat, 2 Nov: a grey blot)
+  // a stronghold over cells of other holds: its own colour once, filled, and a ring stronger than a hairline (Nat, 2 Nov: a
+  // bare ring left it uncoloured on the paper)
   const ring = cd.lines.find((l) => l.pts.length > 4);
-  c('the stronghold drawn as its edge only: a ring in its owner\'s darker colour, stronger than a hairline, and no filled disc', !!ring && ring.alpha === M.RING_ALPHA && M.RING_ALPHA > M.LINE_ALPHA
-    && ring.rgb === Math.round(200 * 0.55) && !cd.fills.some((f) => f.pts), [ring && [ring.rgb, ring.alpha], cd.fills.filter((f) => f.pts).length]);
+  const disc = cd.fills.filter((f) => f.pts);
+  c('a stronghold over other holds\' cells: filled once in its owner\'s colour, ringed in its darker colour, stronger than a hairline', !!ring && ring.alpha === M.RING_ALPHA && M.RING_ALPHA > M.LINE_ALPHA
+    && ring.rgb === Math.round(200 * 0.55) && disc.length === 1 && disc[0].rgb === 200 && disc[0].alpha === M.TINT_ALPHA, [ring && [ring.rgb, ring.alpha], disc]);
+  // a stronghold whose cells are already its owner's at full strength: no second tint over them, only the ring
+  const shOver = (owner) => M.drawingOf({ world: WORLD, aliases: [], cells: M.readCells({ c0: -2, n: 4, holds: ['east'], rows: ['0000', '0000', '0000', '0000'] }),
+    strongholds: [{ zone: 'clan', x: 0, y: 0, r: 6000 }], territories: [{ id: 'e1', owner: 'hold-a', zone: 'east', x: 0, y: 0 }, { id: 'c1', owner, zone: 'clan', x: 0, y: 0 }] },
+    Object.assign({ 'hold-c': { name: 'C', rgb: [0, 0, 200] } }, factions), 30000, 45000);
+  const own = shOver('hold-a'), other = shOver('hold-c');
+  c('...over cells already its owner\'s: only the ring, never tinted twice', !own.fills.some((f) => f.pts) && own.lines.some((l) => l.pts.length > 4), own.fills.filter((f) => f.pts));
+  c('...the same place held by another owner: filled', other.fills.filter((f) => f.pts).length === 1, other.fills.filter((f) => f.pts).length);
   c('no table: the same world is drawn by its markers', M.drawingOf(Object.assign({}, cw, { cells: undefined }), factions, 30000, 45000).fills.every((f) => f.pts && !f.rects));
 
   // ---- lining it up ----
