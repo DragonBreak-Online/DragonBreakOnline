@@ -1,18 +1,19 @@
 // The native emote wheel (client EmoteService with nativeEmoteWheel.ts), drawn in the HUD Menu with no menu opened and no
-// cursor: the browser wheel's rings (skymp5-front features/emoteWheel), the hub, the groups round it and the shown group's
-// emotes outside, in the wheel's own units (a 640 square, the hub at its centre, angle 0 at the top, clockwise). The client
-// points it (the mouse's movement or the right stick) and decides everything; it calls _root.dboShow("1" / "0") and
-// _root.dboData(json) with:
-//   { groups: [label], group: n, emotes: [label], hover: { ring: "hub" | "group" | "emote", index }, last: n,
-//     pointer: [x, y], title }
+// cursor: the browser wheel's layout (skymp5-front features/emoteWheel), the hub and the shown group's emotes round it, one
+// ring out to the edge, and the groups as tabs under the wheel (Nat's pick, 2 Nov: _work/emote-wheel-1102.md option A), in
+// the wheel's own units (a 640 square, the hub at its centre, angle 0 at the top, clockwise). The client points it (the
+// mouse's movement or the right stick) and decides everything; it calls _root.dboShow("1" / "0") and _root.dboData(json):
+//   { groups: [label], group: n, emotes: [label], hover: { ring: "hub" | "emote", index }, last: n, pointer: [x, y],
+//     title, hint }
 // It says it is alive in _root.dboAlive, which the client reads with Ui.getString.
 
-var DBO_SWF_VERSION = "emotewheel-1";
+var DBO_SWF_VERSION = "emotewheel-2";
 var HUB_R = 78;
-var GROUP_INNER = 86;
-var GROUP_OUTER = 158;
-var EMOTE_INNER = 166;
+var EMOTE_INNER = 86;
 var EMOTE_OUTER = 300;
+// The tabs and the hint under the wheel
+var TAB_Y = EMOTE_OUTER + 26;
+var TAB_GAP = 10;
 var GAP_DEG = 0.8;
 var ARC_STEPS = 24;
 // The share of the visible height the wheel takes, as the browser wheel's 78vh
@@ -126,21 +127,36 @@ function buildLabels()
    wheel.labels = wheel.createEmptyMovieClip("labels", 3);
    var L = wheel.labels;
    var i;
+   // The tabs, centred under the wheel, each as wide as its name
    var ng = data.groups.length;
+   var widths = [];
+   var total = 0;
    for (i = 0; i < ng; i++)
    {
-      L["g" + i] = label(L, "g" + i, 10 + i, (GROUP_INNER + GROUP_OUTER) / 2, i * 360 / ng, 96, 11, C_SECOND);
-      L["g" + i].text = String(data.groups[i]).toUpperCase();
+      widths[i] = String(data.groups[i]).length * 9 + 24;
+      total += widths[i] + (i > 0 ? TAB_GAP : 0);
    }
+   var x = -total / 2;
+   for (i = 0; i < ng; i++)
+   {
+      var t = dboText(L, "g" + i, 10 + i, x, TAB_Y, widths[i], 22, dboFmt(F_MEDIUM, 13, C_SECOND, 1.2, "center"), false);
+      t.text = String(data.groups[i]).toUpperCase();
+      t.tabX = x;
+      t.tabW = widths[i];
+      L["g" + i] = t;
+      x += widths[i] + TAB_GAP;
+   }
+   L.hint = dboText(L, "hint", 300, -EMOTE_OUTER, TAB_Y + 28, EMOTE_OUTER * 2, 20, dboFmt(F_PLAIN, 12, C_STONE_LIGHT, 0.3, "center"), false);
+   L.hint.text = data.hint != undefined ? String(data.hint) : "";
    var ne = data.emotes.length;
    for (i = 0; i < ne; i++)
    {
       var deg = i * 360 / ne;
-      L["e" + i] = label(L, "e" + i, 100 + i, (EMOTE_INNER + EMOTE_OUTER) / 2 + 8, deg, 130, 15, C_SILVER);
+      L["e" + i] = label(L, "e" + i, 100 + i, (EMOTE_INNER + EMOTE_OUTER) / 2 + 24, deg, 170, 16, C_SILVER);
       L["e" + i].text = String(data.emotes[i]);
       if (i < 9)
       {
-         L["k" + i] = label(L, "k" + i, 200 + i, EMOTE_INNER + 20, deg, 24, 11, C_STONE_LIGHT);
+         L["k" + i] = label(L, "k" + i, 200 + i, EMOTE_INNER + 26, deg, 24, 12, C_STONE_LIGHT);
          L["k" + i].text = String(i + 1);
       }
    }
@@ -154,12 +170,18 @@ function draw()
    var hover = data.hover;
    var ng = data.groups.length;
    var i;
+   // The tabs: the shown group lit, the others dim
    for (i = 0; i < ng; i++)
    {
-      var gHot = hover.ring == "group" && hover.index == i;
-      var color = i == data.group ? C_ACTIVE : (gHot ? C_SEG_HOT : C_SEG);
-      segment(R, GROUP_INNER, GROUP_OUTER, i, ng, color, i == data.group ? 62 : (gHot ? 90 : 82));
-      wheel.labels["g" + i].textColor = i == data.group || gHot ? C_SILVER : C_SECOND;
+      var tab = wheel.labels["g" + i];
+      R.beginFill(i == data.group ? C_ACTIVE : C_SEG, i == data.group ? 70 : 82);
+      R.moveTo(tab.tabX, TAB_Y - 2);
+      R.lineTo(tab.tabX + tab.tabW, TAB_Y - 2);
+      R.lineTo(tab.tabX + tab.tabW, TAB_Y + 22);
+      R.lineTo(tab.tabX, TAB_Y + 22);
+      R.lineTo(tab.tabX, TAB_Y - 2);
+      R.endFill();
+      tab.textColor = i == data.group ? C_SILVER : C_SECOND;
    }
    var ne = data.emotes.length;
    for (i = 0; i < ne; i++)
