@@ -70,13 +70,15 @@ const planRoute = (route, speed, idleDefault) => {
     const d = Math.hypot(b.pos[0] - a.pos[0], b.pos[1] - a.pos[1], b.pos[2] - a.pos[2]);
     if (d > 0) { segs.push({ kind: 'walk', at: t, s: d / speed, from: a.pos, to: b.pos, point: order[(k + 1) % order.length] }); t += d / speed; }
   }
-  return t > 0 ? { segs, period: t, points: pts.length } : null;
+  return t > 0 ? { segs, period: t, points: pts.length, speed } : null;
 };
 
 // Heading in degrees as Skyrim reads an angle about z: 0 is north (+y), 90 east (+x)
 const headingOf = (from, to) => ((Math.atan2(to[0] - from[0], to[1] - from[1]) * 180) / Math.PI + 360) % 360;
 
-// Where a guard is t seconds into its plan: position, heading, walking or standing, and the point it walks to or stands at
+// Where a guard is t seconds into its plan: position, heading, walking or standing, the point it walks to or stands at,
+// speed (units a second, 0 standing: the movement packet's own field) and nextAt (ms to the next arrival or end of an idle,
+// so the mover can send on a change rather than at a fixed rate)
 const routeAt = (plan, t) => {
   if (!plan) return null;
   const at = ((t % plan.period) + plan.period) % plan.period;
@@ -85,7 +87,8 @@ const routeAt = (plan, t) => {
   const f = seg.s > 0 ? Math.min(1, Math.max(0, (at - seg.at) / seg.s)) : 1;
   const pos = seg.from.map((v, i) => v + (seg.to[i] - v) * f);
   const walkSeg = seg.kind === 'walk' ? seg : plan.segs.find((s) => s.kind === 'walk' && s.at >= seg.at) || plan.segs.find((s) => s.kind === 'walk');
-  return { pos, heading: walkSeg ? headingOf(walkSeg.from, walkSeg.to) : 0, moving: seg.kind === 'walk', point: seg.point };
+  return { pos, heading: walkSeg ? headingOf(walkSeg.from, walkSeg.to) : 0, moving: seg.kind === 'walk', speed: seg.kind === 'walk' ? plan.speed : 0, point: seg.point,
+    nextAt: Math.max(0, (seg.at + seg.s - at) * 1000) };
 };
 
 // ---- the module ----

@@ -113,9 +113,9 @@ const checks = (modFile, check) => {
   const plan = planRoute(ROUTES[`${T}:000A01`], 100, 10);
   check('a loop\'s period is its idles plus its legs at the walking speed', Math.abs(plan.period - (10 + 8 + 5 + 8 + Math.hypot(800, 800) / 100)) < 1e-9, plan.period);
   let r = routeAt(plan, 5);
-  check('...at 5 s it stands at the first point', !r.moving && r.point === 0 && r.pos.join() === '0,0,0', r);
+  check('...at 5 s it stands at the first point, speed 0, 5 s to go', !r.moving && r.speed === 0 && r.point === 0 && r.pos.join() === '0,0,0' && Math.abs(r.nextAt - 5000) < 1e-6, r);
   r = routeAt(plan, 14);
-  check('...at 14 s it is halfway to the second, heading east (90)', r.moving && r.point === 1 && Math.abs(r.pos[0] - 400) < 1e-9 && Math.abs(r.heading - 90) < 1e-9, r);
+  check('...at 14 s it is halfway to the second, heading east (90), at the walking speed, 4 s from arriving', r.moving && r.speed === 100 && r.point === 1 && Math.abs(r.pos[0] - 400) < 1e-9 && Math.abs(r.heading - 90) < 1e-9 && Math.abs(r.nextAt - 4000) < 1e-6, r);
   r = routeAt(plan, 27);
   check('...at 27 s it walks north (0) to the third', r.moving && r.point === 2 && Math.abs(r.heading) < 1e-9, r);
   r = routeAt(plan, plan.period + 5);
@@ -147,6 +147,8 @@ const MUTANTS = [
   ['a shift change never rewrites the zones', "    if (typeof globalThis.__dboGuardsRewrite === 'function') globalThis.__dboGuardsRewrite();\n  };", '  };'],
   ['the earlier guard keeps an overlap', 'shiftAge(hour, from) < best.age', 'shiftAge(hour, from) > best.age'],
   ['out and back is a loop', "  if (route.closes_loop !== true) for", '  if (false) for'],
+  ['a standing guard reports the walking speed', "speed: seg.kind === 'walk' ? plan.speed : 0", 'speed: plan.speed'],
+  ['nextAt counts from the segment start', '(seg.at + seg.s - at) * 1000', 'seg.s * 1000'],
   ['the heading is off by a quarter turn', 'Math.atan2(to[0] - from[0], to[1] - from[1])', 'Math.atan2(to[1] - from[1], to[0] - from[0])'],
 ];
 for (const [name, from, to] of MUTANTS) {
