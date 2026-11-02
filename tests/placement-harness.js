@@ -53,6 +53,8 @@ require(MODULE)({
   mp, log: (...xs) => out.log.push(xs.join(' ')), personal: (a, t) => out.personal.push(t), audit: (t) => out.audit.push(t), who: (a) => 'P' + (a >>> 0).toString(16),
   onUi: (ev, fn) => { ui[ev] = fn; }, sendPacket: (a, p) => { out.packets.push([a, p]); return true; },
   isAdmin: (a) => !!TIERS[a], tierOf: (a) => TIERS[a] || null, registerChatCommand: (n, fn) => { commands[n] = fn; },
+  // NPCs from the Place tab are off by default since 2 Nov (placement-no-npcs-harness.js); this file tests them switched on
+  cfg: { placement: { npcs: true } },
 });
 
 let failures = 0;

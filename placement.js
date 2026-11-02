@@ -46,6 +46,11 @@
 // Hostile). They never despawn and a killed one stays dead until a restart. Their list entries have zone: true and a key
 // ('n...', never a hex reference id); the actor the zone places is found by its private.npcSpawner name. Placements from
 // before (an actor made with PlaceAtMe, tagged private.dboPlaced) keep working as they are.
+//
+// No NPCs from the Place tab (Nat, 2 Nov: "the only way to bring NPCs is the warbands and those systems"): with config
+// placement.npcs not true, placing an NPC is refused for every tier (sets and Undo included) and the NPC categories are
+// left out of the catalog, the search and placeMeta. NPCs placed before stay listed and removable.
+// A one-shot purge of placed NPCs runs from the run file placement-purge.json (see purge below).
 
 const fs = require('fs');
 const path = require('path');
@@ -108,7 +113,7 @@ const searchCatalog = (rows, query, category, plugin) => {
 };
 
 module.exports = (api) => {
-  const { mp, log, personal, audit, who, onUi, sendPacket, isAdmin, registerChatCommand } = api;
+  const { mp, log, personal, audit, who, onUi, sendPacket, isAdmin, registerChatCommand, every } = api;
   const P = (api.cfg || {}).placement || {};
   // Categories kept out of the whole-catalog packet older clients ask for. The whole catalog is 3.1 MB and the Place tab
   // never showed it (2026-09-25); without the 27,000 Statics it is 1.1 MB. The search below has every category.
@@ -149,6 +154,8 @@ module.exports = (api) => {
   // radius: a player this near makes it appear; despawn: seconds after the last one left (0 = it stays)
   const NPC_ZONE = Object.assign({ radius: 4000, despawn: 0 }, P.npcZone || {});
   const AS_ZONES = P.npcZones !== false;
+  const NPCS = P.npcs === true;
+  const NO_NPCS = 'NPCs are not placed with the Place tab: they come from the warband and event tools (/event, the NPC Zones tab).';
   // 'n' + time + random, base 36: 'n' is not a hex digit, so a key is never read as a reference id
   const newKey = () => `n${Date.now().toString(36)}${Math.floor(Math.random() * 46656).toString(36).padStart(3, '0')}`;
 
@@ -164,6 +171,7 @@ module.exports = (api) => {
       S.catalog = JSON.parse(fs.readFileSync(CATALOG, 'utf8')).categories || [];
       S.kinds = new Map();
       S.rows = [];
+      S.objectRows = null;
       for (const c of S.catalog) for (const it of c.items || []) {
         S.kinds.set(String(it[0]).toLowerCase(), { kind: c.kind, name: it[1] });
         S.rows.push({ desc: String(it[0]), name: String(it[1]), plugin: String(it[2] || ''), cat: c.id, kind: c.kind, hay: (it[1] + ' ' + it[0]).toLowerCase() });
@@ -177,6 +185,9 @@ module.exports = (api) => {
     }
     return S.catalog;
   };
+  // What the Place tab offers: without placement.npcs, no NPC category and no NPC row
+  const shown = (c) => NPCS || c.kind !== 'npc';
+  const searchRows = () => (NPCS ? S.rows : S.objectRows || (S.objectRows = S.rows.filter(shown)));
 
   const registry = () => {
     if (S.registry) return S.registry;
@@ -281,6 +292,7 @@ module.exports = (api) => {
     const known = S.kinds.get(desc.toLowerCase());
     if (!known) return { ok: false, text: 'That is not in the placement catalog.' };
     if (known.kind !== kind) return { ok: false, text: 'The catalog lists that as a different kind of thing.' };
+    if (kind === 'npc' && !NPCS) return { ok: false, text: NO_NPCS };
     const where = String(mp.get(a, 'worldOrCellDesc') || '');
     const me = mp.get(a, 'pos');
     if (!where || !Array.isArray(me)) return { ok: false, text: 'Your position is not known yet.' };
@@ -331,6 +343,14 @@ module.exports = (api) => {
   // briarheart.js: an object placed through the Place tool on a module's behalf (as if actor a placed it: its cell, its
   // name in the audit), so it is listed, saved with the world and removable like any placement
   globalThis.__dboPlaceAs = (a, desc, pos, rot) => { loadCatalog(); return place(Number(a) >>> 0, String(desc), 'object', pos, rot || [0, 0, 0], false, { undo: false, anyReach: true }); };
+  // NPC zone entries off the list and their zones out of NPC-Spawns.json, one write each; npcSpawnSystem takes the NPCs
+  // away when it reloads the file
+  const dropZones = (entries) => {
+    const list = registry();
+    for (const e of entries) { const at = list.indexOf(e); if (at >= 0) list.splice(at, 1); }
+    saveRegistry();
+    writeZones();
+  };
   const remove = (a, idHex, opts = {}) => {
     const target = resolveTarget(idHex);
     if (!target.ref && !target.entry) return { ok: false, text: String(idHex || '') ? 'Only things placed with the Place tab can be removed this way.' : 'Aim at something first.' };
@@ -338,11 +358,7 @@ module.exports = (api) => {
     let refWhere = ''; try { refWhere = target.ref ? String(mp.get(target.ref, 'worldOrCellDesc') || '') : ''; } catch (e) { /* gone */ }
     if (!mayChange(a, listed || (target.tag ? { by: Number(target.tag.by), where: refWhere } : null))) return { ok: false, text: `Another GM placed that; changing their placements is ${needs('others')}.` };
     if (listed && listed.zone) {
-      // The zone goes from NPC-Spawns.json and npcSpawnSystem takes its NPC away on reload
-      const list = registry();
-      list.splice(list.indexOf(listed), 1);
-      saveRegistry();
-      writeZones();
+      dropZones([listed]);
       if (opts.undo !== false) pushUndo(a, { op: 'removed', entry: Object.assign({}, listed) });
       audit(`PLACE ${who(a)} removed ${listed.name} (${listed.base}), zone ${ZONE_PREFIX}${listed.id}`);
       return { ok: true, text: `Removed ${listed.name}.` };
@@ -524,12 +540,74 @@ module.exports = (api) => {
     return { ok: true, text: `Removed the group: ${removed.length} placement(s).` };
   };
 
+  // The one-shot purge of placed NPCs (2 Nov: 128 hostile NPCs a GM placed around Bruma came back after an edit of
+  // NPC-Spawns.json alone, because writeZones rewrites the placed:* zones from the list). Run file placement-purge.json:
+  //   { "mode": "dryrun" | "apply" | "off", "hostile": true | false (either when absent), "by": [profileId, ...] (anyone
+  //     when absent), "keep": ["<list id>", ...], "confirm": "<the dryrun's code; apply only>" }
+  // Every placed NPC matches unless a filter leaves it out (Nat, 2 Nov: remove all of them); placed objects never do.
+  // dryrun changes nothing: it logs each match and the NPC placements that stay, writes them to placement-purge-report.json
+  // and gives a code for that exact set. apply runs only when the code still matches: it copies placements.json and
+  // NPC-Spawns.json to <file>.bak-purge-<time> (no copy, no apply), writes one audit line each, destroys the actor of a
+  // PlaceAtMe placement and drops the set through dropZones. A file runs once per content and process; after a restart an
+  // apply finds a different set (none) and is refused. Delete the file or set "off" to stop.
+  const PURGE_FILE = path.resolve('placement-purge.json');
+  const PURGE_REPORT = path.resolve('placement-purge-report.json');
+  const purgeCode = (rows) => require('crypto').createHash('sha256').update(rows.map((e) => e.id).sort().join(',')).digest('hex').slice(0, 8);
+  const purgeLine = (e) => `${e.id} ${e.name} (${e.base}), ${e.hostile ? 'hostile' : 'friendly'}, by ${e.by} at ${(e.pos || []).map(Math.round).join(', ')} in ${e.where}`;
+  const purge = () => {
+    let text;
+    try { text = fs.readFileSync(PURGE_FILE, 'utf8'); } catch (e) { return null; }
+    if (S.purgeRan === text) return null;
+    S.purgeRan = text;
+    let spec;
+    try { spec = JSON.parse(text); } catch (e) { log('placement purge: placement-purge.json unreadable', e.message); return null; }
+    const mode = String((spec && spec.mode) || '');
+    if (mode !== 'dryrun' && mode !== 'apply') { log(`placement purge: mode "${mode}", nothing done`); return null; }
+    const keep = new Set((Array.isArray(spec.keep) ? spec.keep : []).map((k) => String(k).toLowerCase().replace(/^placed:/, '')));
+    const by = Array.isArray(spec.by) ? new Set(spec.by.map(Number)) : null;
+    const npcs = registry().filter((e) => e && e.kind === 'npc');
+    const rows = npcs.filter((e) => !keep.has(String(e.id)) && (typeof spec.hostile !== 'boolean' || !!e.hostile === spec.hostile) && (!by || by.has(Number(e.by))));
+    const stay = npcs.filter((e) => !rows.includes(e));
+    const code = purgeCode(rows);
+    const report = { mode, at: new Date().toISOString(), code, matched: rows.map(purgeLine), stay: stay.map(purgeLine) };
+    if (mode === 'dryrun') {
+      for (const e of rows) log(`placement purge dryrun: would remove ${purgeLine(e)}`);
+      for (const e of stay) log(`placement purge dryrun: stays ${purgeLine(e)}`);
+      log(`placement purge dryrun: ${rows.length} NPC placement(s) would go, ${stay.length} stay; apply with "confirm": "${code}"`);
+    } else if (String(spec.confirm || '') !== code) {
+      report.refused = `confirm "${String(spec.confirm || '')}" is not this set's code`;
+      log(`placement purge: apply REFUSED: confirm "${String(spec.confirm || '')}" does not match the code of the ${rows.length} matching placement(s), ${code}; run a dryrun`);
+    } else {
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      try {
+        report.backups = [REGISTRY, SPAWNS_FILE].filter((f) => fs.existsSync(f)).map((f) => { const b = `${f}.bak-purge-${stamp}`; fs.copyFileSync(f, b); return b; });
+      } catch (e) {
+        report.refused = `backup failed: ${e.message}`;
+        log(`placement purge: apply REFUSED: the backup failed (${e.message}); nothing removed`);
+      }
+      if (!report.refused) {
+        for (const e of rows) {
+          audit(`PLACE purge removed ${e.name} (${e.base}), ${e.hostile ? 'hostile' : 'friendly'}, placed by ${e.by} at ${(e.pos || []).map(Math.round).join(', ')} in ${e.where}, ${e.zone ? `zone ${ZONE_PREFIX}` : 'ref '}${e.id}`);
+          if (e.zone) continue;
+          const id = parseInt(e.id, 16) >>> 0;
+          try { if (mp.get(id, TAG)) mp.destroyActor(id); } catch (err) { log(`placement purge: actor ${e.id} not destroyed`, err.message); }
+        }
+        dropZones(rows);
+        report.removed = rows.length;
+        log(`placement purge: removed ${rows.length} NPC placement(s) (code ${code}), ${stay.length} stay; backups ${report.backups.join(', ')}`);
+      }
+    }
+    try { fs.writeFileSync(PURGE_REPORT, JSON.stringify(report, null, 1)); } catch (e) { log('placement purge: report not written', e.message); }
+    return report;
+  };
+  if (typeof every === 'function') every('placementPurge', 5000, purge);
+
   // The file follows the list, also after a hot reload or a restore of the list
   if (AS_ZONES) writeZones();
 
   onUi('placeCatalog', (a) => {
     if (!isAdmin(a)) return;
-    const categories = loadCatalog().filter((c) => !HIDDEN.has(c.id));
+    const categories = loadCatalog().filter((c) => !HIDDEN.has(c.id) && shown(c));
     const ok = sendPacket(a, { customPacketType: 'adminPlaceables', categories });
     log(`placement: catalog ${ok ? 'sent' : 'NOT sent'} to ${who(a)}: ${categories.reduce((n, c) => n + (c.items || []).length, 0)} placeables in ${categories.length} categories, ${JSON.stringify(categories).length} bytes`);
   });
@@ -610,9 +688,9 @@ module.exports = (api) => {
     const plugins = [...new Set(S.rows.map((r) => r.plugin).filter(Boolean))].sort((x, y) => x.localeCompare(y));
     sendPacket(a, {
       customPacketType: 'adminPlaceMeta',
-      categories: S.catalog.map((c) => ({ id: c.id, label: c.label || c.id, kind: c.kind, count: (c.items || []).length })),
+      categories: S.catalog.filter(shown).map((c) => ({ id: c.id, label: c.label || c.id, kind: c.kind, count: (c.items || []).length })),
       plugins,
-      rights: { place: can(a, 'place'), hostile: can(a, 'hostile'), others: can(a, 'others'), world: can(a, 'world'), tier: TIER_LABEL[tierOf(a)] || '', placeNeeds: needs('place') },
+      rights: { place: can(a, 'place'), npcs: NPCS, hostile: NPCS && can(a, 'hostile'), others: can(a, 'others'), world: can(a, 'world'), tier: TIER_LABEL[tierOf(a)] || '', placeNeeds: needs('place') },
     });
   });
 
@@ -624,7 +702,7 @@ module.exports = (api) => {
     const category = String(args[1] || '');
     const plugin = String(args[2] || '');
     const offset = Math.max(0, Math.floor(Number(args[3]) || 0));
-    const { hits, counts } = searchCatalog(S.rows, query, category, plugin);
+    const { hits, counts } = searchCatalog(searchRows(), query, category, plugin);
     const packet = {
       customPacketType: 'adminPlaceResults', query, category, plugin, offset, total: hits.length,
       items: hits.slice(offset, offset + PAGE).map((r) => [r.desc, r.name, r.plugin, r.cat, r.kind]),
