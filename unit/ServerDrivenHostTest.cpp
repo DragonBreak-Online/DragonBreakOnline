@@ -196,6 +196,96 @@ TEST_CASE("A server-driven NPC is never handed to a client, and its neighbour "
   DoDisconnect(p, 0);
 }
 
+// PartOne::SendServerMovement is the primitive the gameplay layer calls to
+// move an NPC the server drives. What must hold, and why each one is here
+// rather than taken on trust:
+//
+//   - a subscribed player is sent the movement, with the NPC's own idx and the
+//     position asked for. That is the whole point;
+//   - the SERVER's copy moves too. Without it, zone membership, the director's
+//     distances and reach checks on a blow landed against this NPC would all
+//     still see it at its spawn point while clients watched it walk away;
+//   - the cell on the wire is the ACTOR's. There is no cell parameter at all,
+//     because an NPC's cell is not updated by movement and an update that
+//     disagrees with it is dropped, after which every hit on it is refused;
+//   - an NPC that is not tagged server-driven is refused. That guard is what
+//     makes this safe to hand to hot-reloadable JS: a typo in a module must
+//     not be able to drive an NPC a client is hosting;
+//   - lastMovUpdateByIdx is NOT stamped. It is the "a client's movement was
+//     accepted" clock and there is no client here. TickStaleHosts skips
+//     server-driven NPCs outright, so nothing needs it - and stamping it would
+//     quietly make the stale sweep's own exemption untestable.
+TEST_CASE("The server moves an NPC it drives, and only one it drives",
+          "[PartOne][Host][ServerDriven][ServerMovement][espm]")
+{
+  PartOne& p = GetPartOne();
+
+  p.CreateActor(kNpc, { 100.f, 0.f, 0.f }, 0.f, 0x3c);
+  p.CreateActor(kPlain, { 200.f, 0.f, 0.f }, 0.f, 0x3c);
+  MarkServerDriven(p, kNpc, true);
+
+  DoConnect(p, 0);
+  p.CreateActor(kPlayer, { 0.f, 0.f, 0.f }, 0.f, 0x3c);
+  p.SetUserActor(0, kPlayer);
+  // Subscribed, or there is nobody to send to - see the note in the case above
+  Ref(p, kNpc).ForceSubscriptionsUpdate();
+
+  // An NPC that is not server-driven is refused, so a gameplay typo cannot
+  // drive one a client is hosting
+  UpdateMovementMessage::Data plain;
+  plain.pos = { 201.f, 0.f, 0.f };
+  REQUIRE_THROWS(p.SendServerMovement(kPlain, plain));
+
+  const auto cellBefore = Ref(p, kNpc).GetCellOrWorld();
+  const auto idx = Ref(p, kNpc).GetIdx();
+
+  p.Messages().clear();
+  UpdateMovementMessage::Data data;
+  data.pos = { 150.f, 25.f, 8420.f };
+  data.rot = { 0.f, 0.f, 90.f };
+  data.speed = 80.f;
+  data.runMode = "Walking";
+  // Deliberately filled with a cell the caller would like: it must be ignored
+  data.worldOrCell = 0xdeadbeef;
+  p.SendServerMovement(kNpc, data);
+
+  const UpdateMovementMessage* sent = nullptr;
+  for (auto& m : p.Messages()) {
+    if (auto* mv = dynamic_cast<UpdateMovementMessage*>(m.message.get())) {
+      if (mv->idx == idx) {
+        sent = mv;
+      }
+    }
+  }
+  REQUIRE(sent);
+  REQUIRE(sent->data.pos[0] == 150.f);
+  REQUIRE(sent->data.pos[1] == 25.f);
+  REQUIRE(sent->data.pos[2] == 8420.f);
+  REQUIRE(sent->data.rot[2] == 90.f);
+  REQUIRE(sent->data.speed == 80.f);
+  REQUIRE(sent->data.runMode == "Walking");
+  // The caller's 0xdeadbeef is gone: the cell is the actor's own
+  REQUIRE(sent->data.worldOrCell ==
+          cellBefore.ToFormId(p.worldState.espmFiles));
+  REQUIRE(sent->data.worldOrCell != 0xdeadbeef);
+
+  // The server's own copy moved, and its cell did not
+  REQUIRE(Ref(p, kNpc).GetPos() == NiPoint3{ 150.f, 25.f, 8420.f });
+  REQUIRE(Ref(p, kNpc).GetAngle() == NiPoint3{ 0.f, 0.f, 90.f });
+  REQUIRE(Ref(p, kNpc).GetCellOrWorld() == cellBefore);
+
+  // Not stamped: there is no client movement here
+  const auto i = static_cast<size_t>(idx);
+  const bool stamped = p.worldState.lastMovUpdateByIdx.size() > i &&
+    p.worldState.lastMovUpdateByIdx[i].has_value();
+  REQUIRE_FALSE(stamped);
+
+  p.DestroyActor(kPlain);
+  p.DestroyActor(kNpc);
+  p.DestroyActor(kPlayer);
+  DoDisconnect(p, 0);
+}
+
 TEST_CASE("A watcher is told a server-driven NPC is hosted by someone else",
           "[PartOne][Host][ServerDriven][espm]")
 {
