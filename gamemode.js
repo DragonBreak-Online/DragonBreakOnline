@@ -2539,6 +2539,18 @@ mp.onActivate = (targetId, casterId) => {
     return activateBeforeNpcDoors(targetId, casterId);
   };
 }
+// Searching someone else's container takes a moment (server\actiondelays.js, config "actionDelays"). The activation is
+// refused while the beat runs, as a locked container is on a retry; activating again when the bar fills opens it. Your
+// own home and anywhere you hold a key are exempt, and the bank is never a container in the world.
+{
+  const activateBeforeSearch = mp.onActivate;
+  mp.onActivate = (targetId, casterId) => {
+    const allowed = activateBeforeSearch(targetId, casterId);
+    if (allowed === false) return allowed;
+    try { if (typeof globalThis.__dboActionDelaySearch === 'function' && globalThis.__dboActionDelaySearch(targetId, casterId) === false) return false; } catch (e) { log('action delay search gate failed', e.message); }
+    return allowed;
+  };
+}
 // TEMPORARY door trace (2026-09-16, Applewatch house doors would not open): every door activation and its answer
 {
   const activateCore = mp.onActivate;
@@ -7487,6 +7499,9 @@ const takeHook = (sourceId, actorId, baseId, count, ...rest) => {
   // Gear, ingots, ores and arrows above the loot cap taken from an NPC's body become their replacement (gearswap.js). Dormant:
   // no take from a body reaches the server today (the engine needs an occupant, the client blocks activating actors)
   try { if (typeof globalThis.__dboGearSwapTake === 'function' && globalThis.__dboGearSwapTake(Number(sourceId) >>> 0, Number(actorId) >>> 0, Number(baseId) >>> 0, Number(count) || 0) === true) return false; } catch (e) { log('gearswap take check failed', e.message); }
+  // server\actiondelays.js: a body's first take waits bodySeconds, every take after waits takeSeconds. Refused takes
+  // are resynced by the module, because the client has already moved the item.
+  try { if (typeof globalThis.__dboActionDelayTake === 'function' && globalThis.__dboActionDelayTake(Number(sourceId) >>> 0, Number(actorId) >>> 0) === false) return false; } catch (e) { log('action delay take check failed', e.message); }
   const prev = globalThis.__dboPrevTake;
   let verdict;
   if (prev) { try { verdict = prev(sourceId, actorId, baseId, count, ...rest); } catch (e) { log('take chain failed', e.message); } }
@@ -9870,6 +9885,17 @@ try {
   delete require.cache[LOCKPICK_JS];
   require(LOCKPICK_JS)({ mp, log, personal, audit, who, openWidget, closeWidget, onUi, cfg, hasUiCap, display });
 } catch (e) { log('lockpick.js failed to load:', e.stack || e.message); globalThis.__dboLockpick = null; }
+
+// ---- searching and looting take a moment (server\actiondelays.js, config "actionDelays") ------------------------
+// Loaded after itemguards.js so __dboItemResync is there for a refused take to resync with.
+try {
+  const ACTIONDELAYS_JS = path.resolve('actiondelays.js');
+  delete require.cache[ACTIONDELAYS_JS];
+  require(ACTIONDELAYS_JS)({ mp, log, personal, cfg, profileOf, openWidget, closeWidget });
+} catch (e) {
+  log('actiondelays.js failed to load:', e.stack || e.message);
+  globalThis.__dboActionDelaySearch = null; globalThis.__dboActionDelayTake = null;
+}
 
 // ---- Discord roles from the game: skills and homes (server\discordroles.js, config "discordRoles") ------------------
 try {
