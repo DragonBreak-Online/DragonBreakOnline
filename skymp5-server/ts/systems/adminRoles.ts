@@ -11,12 +11,14 @@ const TIER_ORDER: AdminTier[] = ["senior", "developer", "leadgm", "gm"];
 // account of the caller's rank or higher). del: deleting a character, kept to Senior and Developer.
 // tempBan and eventZones (Nat, 2 Nov): a GM's temp ban up to 72 h and small event zones, held to the gameplay's rules
 // (staffguard.js banRefusal and gmEventZones, discipline.js for an offline #TAG), refused when those are not loaded
-export interface TierCaps { ban: boolean; spawn: boolean; del: boolean; tempBan: boolean; eventZones: boolean }
+// property (Nat, 2 Nov): granting, transferring and revoking someone else's property and its lock and key actions;
+// opening or entering it as its owner stays spawn (HousingSystem isAdmin)
+export interface TierCaps { ban: boolean; spawn: boolean; del: boolean; tempBan: boolean; eventZones: boolean; property: boolean }
 export const TIER_CAPS: Record<AdminTier, TierCaps> = {
-  senior: { ban: true, spawn: true, del: true, tempBan: true, eventZones: true },
-  developer: { ban: true, spawn: true, del: true, tempBan: true, eventZones: true },
-  leadgm: { ban: true, spawn: true, del: false, tempBan: true, eventZones: true },
-  gm: { ban: false, spawn: false, del: false, tempBan: true, eventZones: true },
+  senior: { ban: true, spawn: true, del: true, tempBan: true, eventZones: true, property: true },
+  developer: { ban: true, spawn: true, del: true, tempBan: true, eventZones: true, property: true },
+  leadgm: { ban: true, spawn: true, del: false, tempBan: true, eventZones: true, property: true },
+  gm: { ban: false, spawn: false, del: false, tempBan: true, eventZones: true, property: true },
 };
 
 export interface AdminRoleConfig {

@@ -342,7 +342,7 @@ export class HousingSystem implements System {
       // What a load door's prompt should call it, or "" to keep the destination's name (gamemode.js dboDoorName)
       doorName: (ref: unknown): string => { try { return this.doorName(ctx, Number(ref) >>> 0); } catch { return ""; } },
       // Hold-wide managers only (staff, a hold's officials): what assesses, rents and taxes; a fief's holder is isFiefHolder
-      isManager: (actorId: unknown, ref: unknown) => { const p = primary(ref); return !!p && (this.isAdmin(ctx, Number(actorId) >>> 0) || this.isHoldManager(ctx, Number(actorId) >>> 0, p)); },
+      isManager: (actorId: unknown, ref: unknown) => { const p = primary(ref); return !!p && (this.isStaffOverride(ctx, Number(actorId) >>> 0) || this.isHoldManager(ctx, Number(actorId) >>> 0, p)); },
       isFiefHolder: (actorId: unknown, ref: unknown) => { const p = primary(ref); return !!p && this.isFiefHolder(ctx, Number(actorId) >>> 0, p); },
       grant: (ref: unknown, actorId: unknown): string => {
         const p = primary(ref); if (!p) return "That is not a property.";
@@ -661,21 +661,29 @@ export class HousingSystem implements System {
       else if (place && action === "unlock") { this.notice(ctx, userId, "That is not locked."); return; }
     }
     const isOwner = this.ownsAs(rec, this.profileOf(ctx, actorId), actorId) || this.leadsHall(ctx, primary, rec, actorId);
-    const isManager = this.isManager(ctx, actorId, primary) && !this.sharesByOffice(ctx, primary, rec, actorId);
+    const isManager = this.isManager(ctx, actorId, primary, rec.owner) && !this.sharesByOffice(ctx, primary, rec, actorId);
     const lockFix = !isOwner && !isManager && rec.owner !== 0 && LOCK_FIX_ACTIONS.indexOf(action) !== -1 && this.isLockFixer(ctx, actorId, rec);
     // A GM's key goes to the owner only: onto their ring (housingKeyRing), or not at all; refused before anything is logged
     if (lockFix && action === "createkey" && !this.keyForOwner(ctx, userId, rec, content["recipient"])) return;
+    // A GM's override (TIER_CAPS.property without spawn) manages but never opens: its keys go to the owner only, and it never
+    // hands the property to the GM's own account (Nat, 2 Nov)
+    const gmOverride = !isOwner && rec.owner !== 0 && isManager && !this.isAdmin(ctx, actorId) && !this.isHoldManager(ctx, actorId, primary) && !this.isFiefHolder(ctx, actorId, primary);
+    if (gmOverride && action === "createkey" && !this.keyForOwner(ctx, userId, rec, content["recipient"])) return;
+    if (gmOverride && (action === "transfer" || action === "grantcontainer") && this.profileOf(ctx, toFormId(content["recipient"])) === this.profileOf(ctx, actorId)) {
+      this.notice(ctx, userId, "Staff tools never hand a property to your own account.");
+      return;
+    }
     if (lockFix) {
       try { (globalThis as any).__alduinakAdminLog?.(`HOUSING gm lock fix: actor ${actorId.toString(16)} (profile ${this.profileOf(ctx, actorId)}) ${action} on ${primary.toString(16)}, owner profile ${rec.owner}${rec.ownerChar ? ` character ${rec.ownerChar.toString(16)}` : ""}`); } catch { /* no log */ }
     }
     // Every staff override of someone else's property goes to the admin log (review A3-1)
     if (!isOwner && rec.owner !== 0 && isManager && !this.isHoldManager(ctx, actorId, primary) && STAFF_LOGGED.indexOf(String(action)) !== -1) {
-      const fief = !this.isAdmin(ctx, actorId);
+      const fief = !this.isStaffOverride(ctx, actorId, rec.owner);
       try { (globalThis as any).__alduinakAdminLog?.(`HOUSING ${fief ? "fief holder" : "staff override"}: actor ${actorId.toString(16)} (profile ${this.profileOf(ctx, actorId)}) ${action} on ${primary.toString(16)}, owner profile ${rec.owner}${rec.ownerChar ? ` character ${rec.ownerChar.toString(16)}` : ""}`); } catch { /* no log */ }
     }
 
     const before = { ...rec };
-    const role = isOwner ? "owner" : this.isAdmin(ctx, actorId) ? "staff" : this.isHoldManager(ctx, actorId, primary) ? "official"
+    const role = isOwner ? "owner" : this.isStaffOverride(ctx, actorId, rec.owner) ? "staff" : this.isHoldManager(ctx, actorId, primary) ? "official"
       : this.isFiefHolder(ctx, actorId, primary) ? "fief holder" : rec.owner !== 0 && this.hasAccess(ctx, primary, rec, actorId) ? "member" : "other";
     const extra = [["recipient", content["recipient"]], ["ref", content["ref"]], ["name", content["name"]]]
       .filter(([, v]) => v !== undefined && v !== null && v !== "").map(([k, v]) => `${k} ${JSON.stringify(v)}`);
@@ -687,8 +695,8 @@ export class HousingSystem implements System {
         case "claim": this.doClaim(ctx, userId, actorId, primary, rec, isManager); break;
         case "abandon": this.doAbandon(ctx, userId, actorId, primary, rec, isOwner, isManager); break;
         case "revoke": this.doRevoke(ctx, userId, actorId, primary, rec, isManager); break;
-        case "lock": this.doLock(ctx, userId, actorId, primary, rec, true, lockFix); break;
-        case "unlock": this.doLock(ctx, userId, actorId, primary, rec, false, lockFix); break;
+        case "lock": this.doLock(ctx, userId, actorId, primary, rec, true, lockFix || isManager); break;
+        case "unlock": this.doLock(ctx, userId, actorId, primary, rec, false, lockFix || isManager); break;
         case "rename": this.doRename(ctx, userId, primary, rec, isOwner, isManager, content["name"]); break;
         case "createkey": this.doCreateKey(ctx, userId, actorId, primary, rec, isOwner || isManager || lockFix, content["recipient"]); break;
         case "takekey": this.doTakeKey(ctx, userId, actorId, primary, rec, isOwner || isManager || lockFix, content["name"]); break;
@@ -960,7 +968,7 @@ export class HousingSystem implements System {
     const owned = !!rec && rec.owner !== 0;
     const profileId = this.profileOf(ctx, actorId);
     const isOwner = owned && (this.ownsAs(rec!, profileId, actorId) || this.leadsHall(ctx, primary, rec!, actorId));
-    const isManager = !!primary && this.isManager(ctx, actorId, primary) && !(owned && this.sharesByOffice(ctx, primary, rec!, actorId));
+    const isManager = !!primary && this.isManager(ctx, actorId, primary, owned ? rec!.owner : 0) && !(owned && this.sharesByOffice(ctx, primary, rec!, actorId));
 
     const holdsKey = owned && !isOwner && !isManager && this.hasAccess(ctx, primary, rec!, actorId);
 
@@ -1243,7 +1251,7 @@ export class HousingSystem implements System {
   // An office holder a building names as sharing it (Nate, 4 Oct: Castle Bruma's Steward; guilds.js __dboHallOffice) uses it as
   // its owner does but does not manage it, even where the office manages the hold's property: staff (admin) still do
   private sharesByOffice(ctx: SystemContext, primary: number, rec: PropertyRecord, actorId: number): boolean {
-    if (!this.placesOn() || rec.owner === 0 || this.isAdmin(ctx, actorId)) return false;
+    if (!this.placesOn() || rec.owner === 0 || this.isStaffOverride(ctx, actorId, rec.owner)) return false;
     const root = rec.place ? primary : rec.memberOf || 0;
     const rootRec = root ? (root === primary ? rec : this.read(ctx, root)) : null;
     const office = (globalThis as any).__dboHallOffice;
@@ -1648,8 +1656,9 @@ export class HousingSystem implements System {
     };
   }
 
-  private isManager(ctx: SystemContext, actorId: number, primary: number): boolean {
-    return this.isAdmin(ctx, actorId) || this.isHoldManager(ctx, actorId, primary) || this.isFiefHolder(ctx, actorId, primary);
+  // owner: the property's owner profile when known, for the staff rules' own-account check
+  private isManager(ctx: SystemContext, actorId: number, primary: number, owner?: number): boolean {
+    return this.isStaffOverride(ctx, actorId, owner) || this.isHoldManager(ctx, actorId, primary) || this.isFiefHolder(ctx, actorId, primary);
   }
 
   // ── Fiefs (gameplay nobility.js __dboNobility; off there, nobody holds one) ──
@@ -1761,9 +1770,11 @@ export class HousingSystem implements System {
     return true;
   }
 
-  // Staff who override housing claims: Lead GM and above (TIER_CAPS.spawn). A GM observes; opening, transferring, revoking
-  // or cutting keys for someone else's property is not theirs (claude-jake's review A3-1, 2026-09-28). Only on a staff
-  // character: the gameplay's staff rules (staffguard.js __dboAdminGate 'housing') refuse the override on any other one
+  // Staff who open or enter someone else's property as its owner (doors, storage): Lead GM and above (TIER_CAPS.spawn).
+  // Granting, transferring, revoking and every lock and key action are any admin tier's (TIER_CAPS.property, isStaffOverride;
+  // Nat, 2 Nov, which lifts claude-jake's review A3-1 of 2026-09-28 for those). Only on a staff character: the gameplay's
+  // staff rules (staffguard.js __dboAdminGate 'housing') refuse the override on any other one, and on a property of the
+  // staff member's own account where the owner is named
   // A GM (any admin tier; a Trial GM has none) fixing someone else's lock (LOCK_FIX_ACTIONS), on a staff character and
   // never on their own account where the staff rules say so (staffguard.js __dboAdminGate 'housingLockFix')
   private isLockFixer(ctx: SystemContext, actorId: number, rec: PropertyRecord): boolean {
@@ -1784,9 +1795,20 @@ export class HousingSystem implements System {
   private isAdmin(ctx: SystemContext, actorId: number): boolean {
     const tier = adminTierOf(ctx.svr as Mp, actorId, this.roleCfg);
     if (tier === null || !TIER_CAPS[tier].spawn) return false;
+    return this.housingGate(actorId, undefined);
+  }
+
+  private isStaffOverride(ctx: SystemContext, actorId: number, owner?: number): boolean {
+    const tier = adminTierOf(ctx.svr as Mp, actorId, this.roleCfg);
+    if (tier === null || !TIER_CAPS[tier].property) return false;
+    return this.housingGate(actorId, owner);
+  }
+
+  // The gameplay's staff rules on a housing override; ownerProfile only when the owner is known and someone
+  private housingGate(actorId: number, owner: number | undefined): boolean {
     const gate = (globalThis as any).__dboAdminGate;
     if (typeof gate !== "function") return true;
-    try { return !gate(actorId, "housing", {}); } catch { return true; }
+    try { return !gate(actorId, "housing", owner ? { ownerProfile: owner } : {}); } catch { return true; }
   }
 
   // officials.json (via zones) first, then the backend faction rows "hold:<slug>:<rank>".

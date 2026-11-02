@@ -535,7 +535,7 @@ export class AdminSystem implements System {
     }
     // A Trial GM goes on as a GM with no ban and no spawn; only what trialMay let through reaches the code below
     const tier = (trial ? "gm" : this.tierOf(mp, myActorId)) as AdminTier;
-    const caps = trial ? { ban: false, spawn: false, del: false, tempBan: false, eventZones: false } : TIER_CAPS[tier];
+    const caps = trial ? { ban: false, spawn: false, del: false, tempBan: false, eventZones: false, property: false } : TIER_CAPS[tier];
 
     let adminProfile = 0;
     try { adminProfile = Number(mp.get(myActorId, "profileId")) || 0; } catch { }
