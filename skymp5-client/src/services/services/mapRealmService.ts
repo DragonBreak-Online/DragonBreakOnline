@@ -12,7 +12,8 @@ import {
 } from "./mapRealm";
 import {
   ANCHORS_PER_FRAME, OWNERS_LAYER, StageArea, fitToStage, OwnersData, TOGGLE_KEY, TOGGLE_SETTING,
-  anchorClips, clipTransform, drawingOf, fitHolds, anchorIndex, legendRow, readOwners, worldFor, Anchor, Fit, FitTracker, SeenAt,
+  anchorClips, drawingOf, fitOf, anchorIndex, legendRow, readOwners, worldFor, Anchor, Drawing, Homography, HOM_MIN, MAX_FIT_RMS, Seen,
+  homographyOf, homHolds, homShift, projectDrawing,
 } from "./mapOwners";
 
 // for the browser-side widget setter (executed inside the CEF browser)
@@ -71,9 +72,9 @@ export class MapRealmService extends ClientListener {
     this.drawnKey = "";
     this.lastFit = null;
     this.goodFit = null;
-    this.tracker = new FitTracker();
+    this.drawnFit = null;
+    this.drawnAt = 0;
     this.layerShown = false;
-    this.layerAt = {};
     this.passTabAt = 0;
     this.mapSeen = false;
     this.flash = newFlash();
@@ -220,7 +221,7 @@ export class MapRealmService extends ClientListener {
       owners: this.owners ? swfReport(this.ownersSwf) : null,
       world: this.mapWorld, anchors: this.anchorsSeen,
       flash: Object.assign({}, this.flash, { lastHolds: undefined, seconds: Math.round((Date.now() - this.flash.at) / 100) / 10 }),
-      fit: f ? { n: f.n, rms: Math.round(f.rms * 100) / 100, holds: fitHolds(f), turn: Math.round(clipTransform(f).rotation + clipTransform(f).inner) } : null,
+      fit: f ? { n: f.n, rms: Math.round(f.rms * 100) / 100, affine: f.affine, holds: f.n >= HOM_MIN && f.rms <= MAX_FIT_RMS } : null,
     };
     logTrace(this, "map swfs", JSON.stringify(report));
     sendCustomPacket(this.controller, { customPacketType: "dbo", event: "mapSwf", args: [report], widget: 0 });
@@ -281,7 +282,7 @@ export class MapRealmService extends ClientListener {
     // the colours went with the menu: drawn again when it is back
     this.drawnKey = "";
     this.layerShown = false;
-    this.layerAt = {};
+    this.drawnFit = null;
     if (this.ownersSwf.phase === "up") this.ownersSwf.phase = "idle";
     try { this.sp.Ui.closeCustomMenu(); } catch (err) { logError(this, "the map legend menu could not be closed", err); }
     if (reopenable && this.legendSwf.phase === "up") { this.legendSwf.phase = "idle"; this.legendSwf.frames = 0; this.legendSwf.tries = 0; }
@@ -306,8 +307,8 @@ export class MapRealmService extends ClientListener {
       this.drawnKey = key;
       this.worldOwners = new Set(world.territories.map((t) => t.owner)).size;
       this.flash.redraws++;
-      try { ui.invokeString(LEGEND_MENU, "_root.dboOwners", JSON.stringify(drawingOf(world, this.owners.factions, this.owners.reach, this.owners.fade))); } catch (err) { logError(this, "map owners data failed", err); }
-      if (st.t.drawn < 0) st.t.drawn = this.ticksOpen;
+      this.drawing = drawingOf(world, this.owners.factions, this.owners.reach, this.owners.fade);
+      this.drawnFit = null;
       this.publish();
     }
     // the two stages, read once an opening: the map's visible size (SkyUI's _mapWidth/_mapHeight) and our menu's
@@ -319,41 +320,41 @@ export class MapRealmService extends ClientListener {
       };
       st.t.url = `map ${this.stage.mapW}x${this.stage.mapH}, ours ${this.stage.ours.width}x${this.stage.ours.height} at ${this.stage.ours.left},${this.stage.ours.top}`;
     }
-    // Each frame fits a different slice of the markers, and a slice that does not hold must not hide the colours: Nat saw
-    // them flash on 2 Nov (fit n 4, rms 38.5). The last fit that held stays until a better one comes, so the layer is
-    // shown once and moved only when the fit changes (a pan or a zoom).
+    // Each frame fits a homography to every anchor the map shows; one that does not hold leaves the colours where they
+    // were (never hidden: Nat saw them flash on 2 Nov). The drawing is projected and sent again only when the fit would
+    // move it by more than LAYER_STILL px, at most every REDRAW_FRAMES frames while the map moves: a still map sends nothing.
     const fit = this.ownersShown ? this.fitNow() : null;
-    const holds = this.ownersShown && fitHolds(fit);
+    const holds = this.ownersShown && homHolds(fit);
     const fl = this.flash;
     if (this.ownersShown) { if (!fit) fl.noFit++; else if (holds) fl.held++; else fl.failed++; }
     if (fit && fl.lastHolds !== null && fl.lastHolds !== holds) fl.flips++;
     if (fit) fl.lastHolds = holds;
     try { if (!this.sp.Ui.isMenuOpen(LEGEND_MENU)) fl.menuGone++; } catch { /* counted only when readable */ }
     if (holds && fit) this.goodFit = fit;
-    const show = this.ownersShown && !!this.goodFit;
-    if (show !== this.layerShown) { ui.setBool(LEGEND_MENU, `${layer}._visible`, show); this.layerShown = show; if (show) fl.shown++; else fl.hidden++; }
-    if (show && holds && this.goodFit) {
-      const t = clipTransform(fitToStage(this.goodFit, this.stage.mapW, this.stage.mapH, this.stage.ours));
-      const parts: [string, number][] = [["_x", t.x], ["_y", t.y], ["_xscale", t.xscale], ["_yscale", t.yscale], ["_rotation", t.rotation], [".shapes._rotation", t.inner]];
-      let wrote = false;
-      for (const [p, v] of parts) {
-        const was = this.layerAt[p];
-        if (was !== undefined && Math.abs(was - v) < LAYER_STILL) continue;
-        if (was !== undefined) fl.maxStep[p] = Math.max(fl.maxStep[p] || 0, Math.round(Math.abs(was - v) * 10) / 10);
-        // a sign or half-turn change is the same placement drawn another way: mid-write it would show the layer elsewhere
-        if (was !== undefined && (/scale$/.test(p) ? Math.sign(was) !== Math.sign(v) : /rotation$/.test(p) && Math.abs(was - v) > 90)) fl.signFlips++;
-        wrote = true;
-        ui.setFloat(LEGEND_MENU, p[0] === "." ? `${layer}${p}` : `${layer}.${p}`, v);
-        this.layerAt[p] = v;
+    const good = this.goodFit;
+    if (this.ownersShown && good && this.drawing) {
+      const shift = this.drawnFit ? homShift(this.drawnFit, good, this.lastSeen) : Infinity;
+      if (shift > LAYER_STILL && this.ticksOpen - this.drawnAt >= REDRAW_FRAMES) {
+        const o = this.stage.ours;
+        const k = { kx: o.width / (this.stage.mapW > 0 ? this.stage.mapW : o.width), ky: o.height / (this.stage.mapH > 0 ? this.stage.mapH : o.height), left: o.left, top: o.top };
+        try { ui.invokeString(LEGEND_MENU, "_root.dboOwners", JSON.stringify(projectDrawing(this.drawing, good, k))); } catch (err) { logError(this, "map owners data failed", err); }
+        if (!this.drawnFit) { for (const [p, v] of LAYER_FLAT) ui.setFloat(LEGEND_MENU, `${layer}${p}`, v); }
+        if (this.drawnFit) fl.maxStep.px = Math.max(fl.maxStep.px || 0, Math.round(shift * 10) / 10);
+        this.drawnFit = good;
+        this.drawnAt = this.ticksOpen;
+        fl.moves++;
+        if (st.t.drawn < 0) st.t.drawn = this.ticksOpen;
       }
-      if (wrote) fl.moves++;
     }
-    if (fit) this.lastFit = fit;
+    const show = this.ownersShown && !!this.drawnFit;
+    if (show !== this.layerShown) { ui.setBool(LEGEND_MENU, `${layer}._visible`, show); this.layerShown = show; if (show) fl.shown++; else fl.hidden++; }
+    if (fit) this.lastFit = { n: fit.n, rms: fit.rms, affine: this.lastAffine };
     if (holds && st.t.fit < 0) st.t.fit = this.ticksOpen;
   }
 
-  // The markers the server named, where the map has put them this frame, in the root's own units
-  private fitNow(): Fit | null {
+  // Every anchor the map shows this frame, in the root's own units; the affine rms on the same set is kept for the report,
+  // so a line from the game says how much the homography gains on that map
+  private fitNow(): Homography | null {
     const ui = this.sp.Ui;
     const clips = anchorClips(this.labels, this.anchors);
     this.anchorsSeen = clips.length;
@@ -361,16 +362,15 @@ export class MapRealmService extends ClientListener {
     const box = "_root.MarkerClips";
     const bx = ui.getFloat(MAP_MENU, `${box}._x`) || 0, by = ui.getFloat(MAP_MENU, `${box}._y`) || 0;
     const kx = (ui.getFloat(MAP_MENU, `${box}._xscale`) || 100) / 100, ky = (ui.getFloat(MAP_MENU, `${box}._yscale`) || 100) / 100;
-    const seen: SeenAt[] = [];
-    // a different slice each frame when there are more than a frame's worth
-    const start = clips.length > ANCHORS_PER_FRAME ? (this.ticksOpen * ANCHORS_PER_FRAME) % clips.length : 0;
-    for (let n = 0; n < Math.min(ANCHORS_PER_FRAME, clips.length); n++) {
-      const { i, a } = clips[(start + n) % clips.length];
+    const seen: Seen[] = [];
+    for (const { i, a } of clips) {
       const clip = MARKER_CLIP(i);
       if (!ui.getBool(MAP_MENU, `${clip}._visible`)) continue;
-      seen.push({ i, sx: bx + ui.getFloat(MAP_MENU, `${clip}._x`) * kx, sy: by + ui.getFloat(MAP_MENU, `${clip}._y`) * ky, x: a.x, y: a.y });
+      seen.push({ sx: bx + ui.getFloat(MAP_MENU, `${clip}._x`) * kx, sy: by + ui.getFloat(MAP_MENU, `${clip}._y`) * ky, x: a.x, y: a.y });
     }
-    return this.tracker.step(this.ticksOpen, seen, clips.length, ANCHORS_PER_FRAME);
+    const H = homographyOf(seen);
+    if (H) { this.lastSeen = seen; const af = fitOf(seen); this.lastAffine = af ? Math.round(af.rms * 100) / 100 : -1; }
+    return H;
   }
 
   private formIdOf(desc: string): number {
@@ -515,11 +515,14 @@ export class MapRealmService extends ClientListener {
   private mapWorld = 0;
   private worldIds = new Map<string, number>();
   private anchorsSeen = 0;
-  private lastFit: Fit | null = null;
-  private goodFit: Fit | null = null;
-  private tracker = new FitTracker();
+  private lastFit: { n: number; rms: number; affine: number } | null = null;
+  private goodFit: Homography | null = null;
+  private drawnFit: Homography | null = null;
+  private drawnAt = 0;
+  private drawing: Drawing | null = null;
+  private lastSeen: Seen[] = [];
+  private lastAffine = -1;
   private layerShown = false;
-  private layerAt: Record<string, number> = {};
   private passTabAt = 0;
   private mapShutTicks = 0;
   private mapSeen = false;
@@ -533,7 +536,11 @@ export class MapRealmService extends ClientListener {
 interface Flash { at: number; held: number; failed: number; noFit: number; flips: number; lastHolds: boolean | null; shown: number; hidden: number; moves: number; maxStep: Record<string, number>; signFlips: number; redraws: number; closes: number[]; menuGone: number }
 const newFlash = (): Flash => ({ at: Date.now(), held: 0, failed: 0, noFit: 0, flips: 0, lastHolds: null, shown: 0, hidden: 0, moves: 0, maxStep: {}, signFlips: 0, redraws: 0, closes: [], menuGone: 0 });
 
-// A layer move smaller than this (a pixel, a percent of scale, a degree) is not written: the fit wobbles by that much
+// While the map moves, one redraw every REDRAW_FRAMES frames at most (each sends the projected drawing to the movie). The
+// layer itself stays flat: the points are already on our stage
+const REDRAW_FRAMES = 2;
+const LAYER_FLAT: [string, number][] = [["._x", 0], ["._y", 0], ["._xscale", 100], ["._yscale", 100], ["._rotation", 0], [".shapes._rotation", 0]];
+// A redraw that would move the colours by less than this (stage px) is not sent: the fit wobbles by that much
 const LAYER_STILL = 0.5;
 // Tab and Esc close the map; our CustomMenu takes the keys while it is up (2 Nov, Nat: Tab only worked after R)
 const MAP_CLOSE_KEYS = [0x0f, 0x01];

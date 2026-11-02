@@ -170,7 +170,7 @@ export const cellOf = (ts: Territory[], i: number, r: number): Shape => {
 // What dbo_mapowners draws, in drawing units (world / DRAW_SCALE, y as the world's: the clip's negative y scale flips it)
 export interface Drawing {
   // a fill is one polygon (pts) or many rectangles in one fill (rects: x0, y0, x1, y1, ...), so cells show no seams
-  fills: Array<{ rgb: number; alpha: number; pts?: number[]; rects?: number[] }>;
+  fills: Array<{ rgb: number; alpha: number; pts?: number[]; rects?: number[]; quads?: number[] }>;
   lines: Array<{ rgb: number; alpha: number; pts: number[] }>;
   owners: string[];
 }
@@ -356,52 +356,95 @@ export const fitOf = (seen: Seen[]): Fit | null => {
   return { m00: fx[0], m01: fx[1], m10: fy[0], m11: fy[1], tx: fx[2], ty: fy[2], rms: Math.sqrt(e / seen.length), n: seen.length };
 };
 
-// The map's shape (its turn and its x/y proportions) never changes in an opening; only its zoom and pan do. Fitting all six
-// values from the few markers a frame reads made the colours shake (Nat, 2 Nov: n 4 each frame, a different 4, and the
-// layer's two turns swinging, -105 one opening and 8 the next, because a near-uniform matrix splits into them any way).
-// So the shape is fitted once from every anchor read while the map is still, and kept unless a later still fit has a
-// smaller rms; each frame then only solves zoom and pan (screen = s * shape * world + t) from what it read: from the
-// whole still snapshot once the map has settled, so a still map gives the same answer every frame.
-export type SeenAt = Seen & { i: number };
-export const MOVE_PX = 0.5;
-export const similarityOf = (shape: Fit, seen: Seen[]): Fit | null => {
-  if (seen.length < 2) return null;
-  const P = seen.map((s) => [shape.m00 * s.x + shape.m01 * s.y, shape.m10 * s.x + shape.m11 * s.y]);
-  const n = seen.length;
-  let px = 0, py = 0, qx = 0, qy = 0;
-  seen.forEach((s, k) => { px += P[k][0]; py += P[k][1]; qx += s.sx; qy += s.sy; });
-  px /= n; py /= n; qx /= n; qy /= n;
-  let num = 0, den = 0;
-  seen.forEach((s, k) => { const dx = P[k][0] - px, dy = P[k][1] - py; num += dx * (s.sx - qx) + dy * (s.sy - qy); den += dx * dx + dy * dy; });
-  if (den < 1e-9) return null;
-  const k = num / den;
-  if (!(k > 0)) return null;
-  const tx = qx - k * px, ty = qy - k * py;
-  let e = 0;
-  seen.forEach((s, j) => { e += (k * P[j][0] + tx - s.sx) ** 2 + (k * P[j][1] + ty - s.sy) ** 2; });
-  return { m00: shape.m00 * k, m01: shape.m01 * k, m10: shape.m10 * k, m11: shape.m11 * k, tx, ty, rms: Math.sqrt(e / n), n };
-};
-export class FitTracker {
-  shape: Fit | null = null;
-  private at = new Map<number, Seen & { tick: number }>();
-  private movedAt = 0;
-  // settled: no marker has moved for a whole round of reads (every anchor read once since) and a little more
-  step(tick: number, seen: SeenAt[], anchors: number, perFrame: number): Fit | null {
-    for (const s of seen) {
-      const was = this.at.get(s.i);
-      if (was && Math.hypot(was.sx - s.sx, was.sy - s.sy) > MOVE_PX) this.movedAt = tick;
-      this.at.set(s.i, { sx: s.sx, sy: s.sy, x: s.x, y: s.y, tick });
-    }
-    const settled = tick - this.movedAt >= Math.ceil(anchors / Math.max(1, perFrame)) + 2;
-    const still = settled ? Array.from(this.at.values()).filter((e) => e.tick >= this.movedAt) : [];
-    if (settled) {
-      const full = fitOf(still);
-      if (fitHolds(full) && full && (!this.shape || full.rms < this.shape.rms)) this.shape = full;
-    }
-    if (!this.shape) return fitOf(seen);
-    return similarityOf(this.shape, settled ? still : seen);
+// Skyrim's map is a tilted perspective camera, so cells near the bottom of the screen show bigger than at the top, and no
+// affine fit holds across the view (Nat, 2 Nov: rms 38, the colours warping as he panned; a simulated camera at his tilt
+// gives an affine rms of 34 px and a homography's 0, or 4.5 px with 3,000 units of terrain height). A homography maps the
+// ground plane to the screen exactly: screen = (H * [x, y, 1]) / w. It is fitted each frame from every anchor the map
+// shows (at least HOM_MIN), with the world coordinates normalised first so the least squares stays well conditioned.
+export const HOM_MIN = 5;
+export interface Homography { h: number[]; rms: number; n: number }
+const solveLS = (rows: number[][], b: number[]): number[] | null => {
+  const n = rows[0].length;
+  const M = Array.from({ length: n }, () => new Array(n + 1).fill(0));
+  rows.forEach((r, k) => { for (let i = 0; i < n; i++) { for (let j = 0; j < n; j++) M[i][j] += r[i] * r[j]; M[i][n] += r[i] * b[k]; } });
+  for (let i = 0; i < n; i++) {
+    let p = i;
+    for (let r = i + 1; r < n; r++) if (Math.abs(M[r][i]) > Math.abs(M[p][i])) p = r;
+    if (Math.abs(M[p][i]) < 1e-12) return null;
+    [M[i], M[p]] = [M[p], M[i]];
+    for (let r = 0; r < n; r++) if (r !== i) { const f = M[r][i] / M[i][i]; for (let c = i; c <= n; c++) M[r][c] -= f * M[i][c]; }
   }
-}
+  return M.map((r, i) => r[n] / r[i]);
+};
+export const project = (H: Homography, x: number, y: number): [number, number, number] => {
+  const h = H.h, w = h[6] * x + h[7] * y + h[8];
+  return [(h[0] * x + h[1] * y + h[2]) / w, (h[3] * x + h[4] * y + h[5]) / w, w];
+};
+export const homographyOf = (seen: Seen[]): Homography | null => {
+  if (seen.length < 4) return null;
+  const n = seen.length;
+  const mx = seen.reduce((a, s) => a + s.x, 0) / n, my = seen.reduce((a, s) => a + s.y, 0) / n;
+  const md = seen.reduce((a, s) => a + Math.hypot(s.x - mx, s.y - my), 0) / n;
+  if (!(md > 0)) return null;
+  const k = Math.SQRT2 / md;
+  const rows: number[][] = [], b: number[] = [];
+  for (const s of seen) {
+    const X = (s.x - mx) * k, Y = (s.y - my) * k;
+    rows.push([X, Y, 1, 0, 0, 0, -s.sx * X, -s.sx * Y]); b.push(s.sx);
+    rows.push([0, 0, 0, X, Y, 1, -s.sy * X, -s.sy * Y]); b.push(s.sy);
+  }
+  const g = solveLS(rows, b);
+  if (!g) return null;
+  // H = G * T, T taking world to the normalised coordinates
+  const G = [g[0], g[1], g[2], g[3], g[4], g[5], g[6], g[7], 1];
+  const h: number[] = [];
+  for (let r = 0; r < 3; r++) h.push(G[r * 3] * k, G[r * 3 + 1] * k, G[r * 3 + 2] - G[r * 3] * k * mx - G[r * 3 + 1] * k * my);
+  const H: Homography = { h, rms: 0, n };
+  let e = 0, ahead = true;
+  for (const s of seen) { const [u, v, w] = project(H, s.x, s.y); if (!(w > 0)) ahead = false; e += (u - s.sx) ** 2 + (v - s.sy) ** 2; }
+  if (!ahead) return null;
+  H.rms = Math.sqrt(e / n);
+  return H;
+};
+export const homHolds = (H: Homography | null): boolean => !!H && H.n >= HOM_MIN && H.rms <= MAX_FIT_RMS;
+// The drawing (world / DRAW_SCALE) carried to our menu's stage through H: a rectangle becomes a quad, a polygon's or a
+// line's points are projected (a straight edge on the ground stays straight). A shape reaching behind the camera is left out.
+export interface StageScale { kx: number; ky: number; left: number; top: number }
+export const projectDrawing = (d: Drawing, H: Homography, st: StageScale): Drawing => {
+  const p = (x: number, y: number): [number, number] | null => {
+    const [u, v, w] = project(H, x * DRAW_SCALE, y * DRAW_SCALE);
+    return w > 0 ? [Math.round((st.left + u * st.kx) * 10) / 10, Math.round((st.top + v * st.ky) * 10) / 10] : null;
+  };
+  const pts = (a: number[]): number[] | null => {
+    const out: number[] = [];
+    for (let i = 0; i + 1 < a.length; i += 2) { const q = p(a[i], a[i + 1]); if (!q) return null; out.push(q[0], q[1]); }
+    return out;
+  };
+  const fills: Drawing["fills"] = [];
+  for (const f of d.fills) {
+    if (f.rects) {
+      const quads: number[] = [];
+      for (let r = 0; r + 3 < f.rects.length; r += 4) {
+        const [x0, y0, x1, y1] = f.rects.slice(r, r + 4);
+        const q = pts([x0, y0, x1, y0, x1, y1, x0, y1]);
+        if (q) quads.push(...q);
+      }
+      if (quads.length) fills.push({ rgb: f.rgb, alpha: f.alpha, quads });
+    } else if (f.pts) {
+      const q = pts(f.pts);
+      if (q) fills.push({ rgb: f.rgb, alpha: f.alpha, pts: q });
+    }
+  }
+  const lines: Drawing["lines"] = [];
+  for (const l of d.lines) { const q = pts(l.pts); if (q) lines.push({ rgb: l.rgb, alpha: l.alpha, pts: q }); }
+  return { fills, lines, owners: d.owners };
+};
+// How far the drawing would move between two fits, in stage px, judged at the anchors' own places
+export const homShift = (a: Homography, b: Homography, at: Seen[]): number => {
+  let m = 0;
+  for (const s of at) { const [u, v] = project(a, s.x, s.y), [u2, v2] = project(b, s.x, s.y); m = Math.max(m, Math.hypot(u - u2, v - v2)); }
+  return m;
+};
 
 // A clip can only scale and then turn (Flash's _xscale, _yscale, _rotation), so the fit's matrix, per drawing unit, is
 // split as R(outer) * S * R(inner): the "layer" clip turns by outer and scales, its "shapes" child turns by inner

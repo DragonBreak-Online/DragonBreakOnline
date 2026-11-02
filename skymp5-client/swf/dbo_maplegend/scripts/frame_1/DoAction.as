@@ -11,7 +11,7 @@
 // units over the client's DRAW_SCALE (mapOwners.ts) and lined up each frame by the client setting "owners.layer"'s _x, _y,
 // scales and _rotation and its "shapes" child's _rotation. The visible area goes to _root.dboStageL/T/W/H, which the
 // client needs to carry the map's marker positions over to this movie's stage.
-var DBO_SWF_VERSION = "maplegend-3";
+var DBO_SWF_VERSION = "maplegend-4";
 var VH = 7.2;
 var PANEL_W = 300;
 var ROW_H = 25;
@@ -63,6 +63,21 @@ function drawOwners(p)
             oshapes.lineTo(x1, y1);
             oshapes.lineTo(x0, y1);
             oshapes.lineTo(x0, y0);
+         }
+         oshapes.endFill();
+         continue;
+      }
+      // quads: the client's cells projected through the map's perspective (x0, y0 .. x3, y3 each), all in one fill
+      if (f.quads instanceof Array && f.quads.length >= 8)
+      {
+         oshapes.beginFill(Number(f.rgb), Number(f.alpha));
+         for (var q = 0; q + 7 < f.quads.length; q += 8)
+         {
+            oshapes.moveTo(Number(f.quads[q]), Number(f.quads[q + 1]));
+            oshapes.lineTo(Number(f.quads[q + 2]), Number(f.quads[q + 3]));
+            oshapes.lineTo(Number(f.quads[q + 4]), Number(f.quads[q + 5]));
+            oshapes.lineTo(Number(f.quads[q + 6]), Number(f.quads[q + 7]));
+            oshapes.lineTo(Number(f.quads[q]), Number(f.quads[q + 1]));
          }
          oshapes.endFill();
          continue;

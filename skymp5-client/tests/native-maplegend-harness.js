@@ -25,7 +25,7 @@ const compile = (source, name) => {
 // ---- the swf ----
 const t = S.boot('dbo_maplegend', true);
 const R = t.root;
-check('the swf says it is alive, its version, and locks its root (it runs inside the MapMenu)', R.dboAlive === 'yes' && R.dboVersion === 'maplegend-3' && t.ctx._lockroot === true);
+check('the swf says it is alive, its version, and locks its root (it runs inside the MapMenu)', R.dboAlive === 'yes' && R.dboVersion === 'maplegend-4' && t.ctx._lockroot === true);
 check('nothing shows before the first data', R.legend._visible === false && R.bar._visible === false);
 const rows = [{ id: 'seat', label: 'Seats', key: '1', count: 1, shown: true }, { id: 'fort', label: 'Forts', key: '4', count: 2, shown: false },
   { id: 'other', label: 'Everything else', key: '0', count: 7, shown: true }];
@@ -60,6 +60,10 @@ ownersPush({ fills: [{ rgb: 0xc80000, alpha: 11, pts: [0, 0, 10, 0, 10, 10] }, {
 check('dboOwners draws each polygon closed, the cells of one owner in one fill, in their colours', osh.fills.length === 2 && osh.fills[0].color === 0xc80000 && JSON.stringify(osh.fills[0].pts) === '[[0,0],[10,0],[10,10],[0,0]]'
   && osh.fills[1].color === 0x0000c8 && osh.fills[1].pts.length === 10, osh.fills);
 check('...and each line as a hairline (thickness 0, thin at any zoom)', ostrokes.filter((x) => x.w === 0).length === 1 && JSON.stringify(ostrokes.filter((x) => x.w === 0)[0].pts) === '[[0,0],[10,10]]', ostrokes);
+// cells projected through the map's perspective arrive as quads: each one closed, all in one fill
+ownersPush({ fills: [{ rgb: 0x00c800, alpha: 11, quads: [0, 0, 4, 0, 3, 2, 1, 2, 4, 0, 8, 0, 7, 2, 3, 2] }], lines: [] });
+check('dboOwners draws projected cells (quads) closed, in one fill', osh.fills.length === 1 && osh.fills[0].color === 0x00c800
+  && JSON.stringify(osh.fills[0].pts) === '[[0,0],[4,0],[3,2],[1,2],[0,0],[4,0],[8,0],[7,2],[3,2],[4,0]]', osh.fills);
 ownersPush({ fills: [], lines: [] });
 check('...a new payload clears the old', osh.fills.length === 0);
 let othrew = false;

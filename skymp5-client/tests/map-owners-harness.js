@@ -212,54 +212,44 @@ scenarios(M, check);
 
 // ---- mutants: altered copies of the compiled module ----
 const M_SRC = fs.readFileSync(M_FILE, 'utf8');
-// ---- the shape fitted once, zoom and pan each frame (Nat, 2 Nov: "shakey", and off the holds while moving) ----
-// A map like Nat's: 40 anchors, a quarter of them visible, 16 read a frame (so about 4), each marker's clip a few px off
-// its true spot (the label's anchor, fixed per marker), a turned and stretched projection. Run as the service runs it.
-const trackerRun = (Mod, useTracker) => {
-  const A = { m00: 0.0021, m01: -0.0006, m10: -0.0005, m11: -0.0019 };
-  const anchors = Array.from({ length: 40 }, (_, i) => ({ i, x: ((i * 7919) % 100000) - 50000, y: ((i * 104729) % 90000) - 45000, ox: ((i * 37) % 11) - 5, oy: ((i * 53) % 13) - 6, vis: i % 4 === 0 }));
-  const T = new Mod.FitTracker();
+// ---- the map's perspective (Nat, 2 Nov: the colours warp and slide as he pans; his fits read rms 6 to 38) ----
+// A camera like Skyrim's map, pitched 50 degrees, over anchors spread like the realm's, with and without terrain height
+const camera = (pitchDeg, panX) => {
+  const p = (pitchDeg * Math.PI) / 180, foc = 640 / Math.tan(Math.PI / 6), dist = 120000;
+  return (x, y, z) => { const dy = y, zc = dy * Math.cos(p) - z * Math.sin(p) + dist, yc = dy * Math.sin(p) + z * Math.cos(p); return [640 + (foc * (x - panX)) / zc, 360 - (foc * yc) / zc]; };
+};
+const anchorSet = (cam, zr) => {
   const out = [];
-  let pan = 0, zoom = 1;
-  for (let tick = 1; tick <= 400; tick++) {
-    if (tick > 150 && tick <= 190) pan += 4; // a pan of 160 px over 40 frames
-    if (tick > 250 && tick <= 270) zoom *= 1.01; // a zoom of 22%
-    const truth = (a) => ({ sx: 640 + pan + zoom * (A.m00 * a.x + A.m01 * a.y), sy: 360 + zoom * (A.m10 * a.x + A.m11 * a.y) });
-    const start = (tick * 16) % 40;
-    const seen = [];
-    for (let k = 0; k < 16; k++) { const a = anchors[(start + k) % 40]; if (!a.vis) continue; const t = truth(a); seen.push({ i: a.i, sx: t.sx + a.ox, sy: t.sy + a.oy, x: a.x, y: a.y }); }
-    const fit = useTracker ? T.step(tick, seen, 40, 16) : Mod.fitOf(seen);
-    // where the fit puts world (0, 0) against where it truly is, and the layer's turns
-    const t0 = truth({ x: 0, y: 0 });
-    const ct = fit && Mod.fitHolds(fit) ? Mod.clipTransform(fit) : null;
-    out.push({ tick, err: fit && Mod.fitHolds(fit) ? Math.hypot(fit.tx - t0.sx, fit.ty - t0.sy) : null, ct });
+  for (let i = 0; out.length < 10 && i < 500; i++) {
+    const x = ((i * 7919) % 140000) - 70000, y = ((i * 104729) % 80000) - 40000, z = zr ? ((i * 31) % 100) / 100 * zr : 0;
+    const [sx, sy] = cam(x, y, z);
+    if (sx > 0 && sx < 1280 && sy > 0 && sy < 720) out.push({ x, y, sx, sy });
   }
   return out;
 };
-const trackerChecks = (Mod, c) => {
-  const run = trackerRun(Mod, true);
-  const at = (a, b) => run.filter((r) => r.tick >= a && r.tick <= b);
-  const still = at(100, 150);
-  const moved = (rs) => rs.slice(1).filter((r, k) => r.ct && rs[k].ct && ['x', 'y', 'xscale', 'yscale', 'rotation', 'inner'].some((p) => Math.abs(r.ct[p] - rs[k].ct[p]) >= 0.5)).length;
-  c('a still map: the layer is not moved at all, frame after frame (no shaking)', still.every((r) => r.ct) && moved(still) === 0, moved(still));
-  c('...and sits within a few px of the true spot', still.every((r) => r.err !== null && r.err < 4), Math.max(...still.map((r) => r.err || 99)));
-  const panning = at(152, 190);
-  c('while panning it follows: within 8 px of where the map has world (0, 0), every frame', panning.every((r) => r.err !== null && r.err < 8), Math.max(...panning.map((r) => (r.err === null ? 99 : r.err))));
-  const zooming = at(252, 270);
-  c('while zooming too', zooming.every((r) => r.err !== null && r.err < 8), Math.max(...zooming.map((r) => (r.err === null ? 99 : r.err))));
-  const after = at(300, 400);
-  c('settled again after the zoom: still, and back within a few px', moved(after) === 0 && after.every((r) => r.err < 4), [moved(after), Math.max(...after.map((r) => r.err || 99))]);
-  const turns = run.filter((r) => r.ct && r.tick >= 100).map((r) => r.ct.rotation);
-  c("once the shape is fitted, the layer's turn never swings (only zoom and pan change)", Math.max(...turns) - Math.min(...turns) < 1, [Math.min(...turns), Math.max(...turns)]);
-  const shape0 = (() => { const T = new Mod.FitTracker(); return T; })();
-  void shape0;
-};
-trackerChecks(M, check);
-// what it replaced, the same map fitted afresh each frame: shown to shake, so the checks above can tell
 {
-  const old = trackerRun(M, false).filter((r) => r.tick >= 100 && r.tick <= 150);
-  const jumps = old.slice(1).filter((r, k) => r.ct && old[k].ct && Math.abs(r.ct.x - old[k].ct.x) >= 0.5).length;
-  check('(the old per-frame fit on the same still map moves the layer most frames: the checks above can fail)', jumps > 10, jumps);
+  const cam = camera(50, 0);
+  const flat = anchorSet(cam, 0), hilly = anchorSet(cam, 3000);
+  const hf = M.homographyOf(flat), hh = M.homographyOf(hilly), af = M.fitOf(flat), ah = M.fitOf(hilly);
+  check('a tilted map: an affine fit misses by tens of px, as Nat\'s did', af && af.rms > 15 && ah && ah.rms > 15, [af && af.rms, ah && ah.rms]);
+  check('...a homography fits flat ground exactly', hf && hf.n === 10 && hf.rms < 0.01, hf && hf.rms);
+  check('...and holds with 3,000 units of terrain height', hh && M.homHolds(hh) && hh.rms < 8, hh && hh.rms);
+  check('fewer than HOM_MIN anchors never hold (four points fit any four)', !M.homHolds(M.homographyOf(flat.slice(0, 4))), M.HOM_MIN);
+  // the drawing carried through it: a rectangle's corners land where the camera shows them, as one quad
+  const d = { fills: [{ rgb: 1, alpha: 0.2, rects: [0, 0, 100, 100] }, { rgb: 2, alpha: 0.2, pts: [0, 0, 50, 0, 0, 50] }], lines: [{ rgb: 3, alpha: 1, pts: [0, 0, 100, 0] }], owners: ['a'] };
+  const pd = M.projectDrawing(d, hf, { kx: 1, ky: 1, left: 0, top: 0 });
+  const want = [[0, 0], [100, 0], [100, 100], [0, 100]].map(([x, y]) => cam(x * M.DRAW_SCALE, y * M.DRAW_SCALE, 0));
+  const q = pd.fills[0] && pd.fills[0].quads;
+  check('a cell becomes a quad at its four projected corners (it shrinks toward the north)', q && q.length === 8 && want.every(([u, v], k) => Math.abs(q[k * 2] - u) < 0.2 && Math.abs(q[k * 2 + 1] - v) < 0.2) && Math.abs(q[2] - q[0]) > Math.abs(q[4] - q[6]), [q, want]);
+  check('...polygons and lines are projected point by point', pd.fills[1].pts.length === 6 && pd.lines[0].pts.length === 4 && Math.abs(pd.lines[0].pts[2] - want[1][0]) < 0.2, pd.lines[0]);
+  const st = M.projectDrawing(d, hf, { kx: 2, ky: 0.5, left: 10, top: 20 });
+  check('...and carried to our menu\'s stage', Math.abs(st.fills[0].quads[0] - (10 + q[0] * 2)) < 0.2 && Math.abs(st.fills[0].quads[1] - (20 + q[1] * 0.5)) < 0.2, st.fills[0].quads.slice(0, 2));
+  // a pan moves every anchor; the shift between the two fits is the pan, and a still map's is none
+  const moved = M.homographyOf(anchorSet(cam, 0).map((a) => ({ ...a, sx: a.sx + 37 })));
+  check('the shift between fits is how far the colours would move: 37 px for a 37 px pan, none when still', Math.abs(M.homShift(hf, moved, flat) - 37) < 0.1 && M.homShift(hf, M.homographyOf(flat), flat) < 1e-6, M.homShift(hf, moved, flat));
+  // a shape the fit puts behind the camera is left out rather than drawn wrapped across the screen
+  const behind = { h: [1, 0, 0, 0, 1, 0, 0, -0.01, 1], rms: 0, n: 9 };
+  check('a shape reaching behind the camera is left out', M.projectDrawing({ fills: [{ rgb: 1, alpha: 1, rects: [0, 0, 10, 10] }], lines: [], owners: [] }, behind, { kx: 1, ky: 1, left: 0, top: 0 }).fills.length === 0);
 }
 
 const MUTANTS = [
@@ -348,14 +338,14 @@ const fo = fn('followOwners');
 check('the colours ride on the legend\'s CustomMenu over the map: nothing until it is up, nothing made inside the map', fo.includes('if (this.legendSwf.phase !== "up" || !this.owners) return;')
   && fo.includes('ui.invokeString(LEGEND_MENU, "_root.dboOwners",') && !fo.includes('MAP_MENU, `${layer}') && !/createEmptyMovieClip|loadMovie/.test(fo + fn('loadLegend')) && M.OWNERS_LAYER === '_root.owners.layer');
 check('drawn again only when the world or an owner changes, or the menu comes back', /if \(key !== this\.drawnKey\)/.test(fo) && /world\.territories\.map\(\(t\) => t\.owner\)/.test(fo) && fn('closeLegendMenu').includes('this.drawnKey = "";'));
-check('shown while the player wants it once a fit has held (the last that held kept, so a bad frame never hides it), written only on a change; hidden where no world has owners', fo.includes('const holds = this.ownersShown && fitHolds(fit);') && fo.includes('if (holds && fit) this.goodFit = fit;')
-  && fo.includes('const show = this.ownersShown && !!this.goodFit;') && fo.includes('if (show !== this.layerShown) { ui.setBool(LEGEND_MENU, `${layer}._visible`, show); this.layerShown = show;')
+check('shown once a fit has held and been drawn (the last that held kept, so a bad frame never hides it), written only on a change; hidden where no world has owners', fo.includes('const holds = this.ownersShown && homHolds(fit);') && fo.includes('if (holds && fit) this.goodFit = fit;')
+  && fo.includes('const show = this.ownersShown && !!this.drawnFit;') && fo.includes('if (show !== this.layerShown) { ui.setBool(LEGEND_MENU, `${layer}._visible`, show); this.layerShown = show;')
   && fo.includes('if (!world) { ui.setBool(LEGEND_MENU, `${layer}._visible`, false); this.layerShown = false; return; }'));
-check('the fit is carried from the map\'s stage to our menu\'s (SkyUI\'s _mapWidth/_mapHeight, our dboStage*) before it is set', fo.includes('clipTransform(fitToStage(this.goodFit, this.stage.mapW, this.stage.mapH, this.stage.ours))')
-  && fo.includes('"_root.WorldMap._mapWidth"') && fo.includes('"_root.dboStageW"'));
-check('the six transform values set when the fit holds, each only when it moved', ['_x', '_y', '_xscale', '_yscale', '_rotation'].every((k) => fo.includes('["' + k + '", t.' + k.slice(1) + ']')) && fo.includes('[".shapes._rotation", t.inner]')
-  && fo.includes('Math.abs(was - v) < LAYER_STILL) continue;'));
-check('the marker positions read in the root\'s units (MarkerClips\' own offset and scale applied)', /seen\.push\(\{ i, sx: bx \+ ui\.getFloat\(MAP_MENU, `\$\{clip\}\._x`\) \* kx, sy: by \+ ui\.getFloat\(MAP_MENU, `\$\{clip\}\._y`\) \* ky/.test(fn('fitNow')) && /\._visible`\)\) continue;/.test(fn('fitNow')));
+check('the drawing is projected to our menu\'s stage (SkyUI\'s _mapWidth/_mapHeight, our dboStage*) and sent only when the fit would move it', fo.includes('JSON.stringify(projectDrawing(this.drawing, good, k))')
+  && fo.includes('"_root.WorldMap._mapWidth"') && fo.includes('"_root.dboStageW"') && fo.includes('if (shift > LAYER_STILL && this.ticksOpen - this.drawnAt >= REDRAW_FRAMES) {'));
+check('the layer itself is set flat once, when first drawn (the points are already on the stage)', fo.includes('if (!this.drawnFit) { for (const [p, v] of LAYER_FLAT) ui.setFloat(LEGEND_MENU, `${layer}${p}`, v); }')
+  && !/clipTransform|fitToStage/.test(fo));
+check('the marker positions read in the root\'s units (MarkerClips\' own offset and scale applied), every anchor the map shows', /seen\.push\(\{ sx: bx \+ ui\.getFloat\(MAP_MENU, `\$\{clip\}\._x`\) \* kx, sy: by \+ ui\.getFloat\(MAP_MENU, `\$\{clip\}\._y`\) \* ky/.test(fn('fitNow')) && /\._visible`\)\) continue;/.test(fn('fitNow')) && fn('fitNow').includes('for (const { i, a } of clips) {'));
 check('the toggle key is read like the other hotkeys: mapColoursKeyCode, else T', M.TOGGLE_SETTING === 'mapColoursKeyCode' && M.TOGGLE_KEY === 20
   && /this\.ownersKey = readMenuKeyCode\(this\.sp, TOGGLE_SETTING, TOGGLE_KEY\);/.test(src));
 check('that key toggles the colours, with or without the realm\'s markers; 0 turns it off', /if \(this\.ownersKey && e\.code === this\.ownersKey && this\.owners\) \{\n      this\.ownersShown = !this\.ownersShown;/.test(fn('onButton'))
