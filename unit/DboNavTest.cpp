@@ -10,8 +10,10 @@ using namespace navmesh;
 namespace {
 
 constexpr float kS = 4096.f;
+constexpr uint32_t kFileVersion = 2;
+constexpr size_t kDesc = 96;
 
-// A test-side DBONAV v1 writer, so the reader is checked against the layout and not against itself
+// A test-side DBONAV v2 writer, so the reader is checked against the layout and not against itself
 class Writer
 {
 public:
@@ -63,8 +65,8 @@ std::vector<uint8_t> Write(const std::string& world,
 {
   Writer w;
   w.Text("DBONAV", 8);
-  w.U32(1);
-  w.Text(world, 64);
+  w.U32(kFileVersion);
+  w.Text(world, kDesc);
   w.U32(static_cast<uint32_t>(tiles.size()));
   uint32_t meshes = 0;
   for (const auto& t : tiles) {
@@ -78,13 +80,13 @@ std::vector<uint8_t> Write(const std::string& world,
   for (const auto& t : tiles) {
     w.U32(static_cast<uint32_t>(t.x));
     w.U32(static_cast<uint32_t>(t.y));
-    w.Text(t.cellDesc, 64);
+    w.Text(t.cellDesc, kDesc);
     for (int i = 0; i < 6; ++i) {
       w.F32(0.f);
     }
     w.U32(static_cast<uint32_t>(t.meshes.size()));
     for (const auto& m : t.meshes) {
-      w.Text(m.desc, 40);
+      w.Text(m.desc, kDesc);
       w.U32(static_cast<uint32_t>(m.verts.size()));
       w.U32(static_cast<uint32_t>(m.tris.size()));
       w.U32(static_cast<uint32_t>(m.links.size()));
@@ -303,7 +305,7 @@ TEST_CASE("DboNav: a damaged file is refused with a reason", "[DboNav]")
   REQUIRE(error.find("not a DBONAV") != std::string::npos);
 
   auto version = good;
-  version[8] = 2;
+  version[8] = static_cast<uint8_t>(kFileVersion + 1);
   REQUIRE_FALSE(ReadDboNav(version.data(), version.size(), file, &error));
   REQUIRE(error.find("version") != std::string::npos);
 
@@ -334,7 +336,7 @@ TEST_CASE("DboNav: a damaged file is refused with a reason", "[DboNav]")
 
   // A huge count in a short file is refused before anything is allocated for it
   auto huge = good;
-  const size_t tilesAt = 8 + 4 + 64;
+  const size_t tilesAt = 8 + 4 + kDesc;
   huge[tilesAt + 3] = 0x7f;
   REQUIRE_FALSE(ReadDboNav(huge.data(), huge.size(), file, &error));
 }

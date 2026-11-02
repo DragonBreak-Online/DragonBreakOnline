@@ -12,7 +12,7 @@ namespace navmesh {
 constexpr uint16_t kPolyWalk = 0x01;
 constexpr uint16_t kPolyDoor = 0x02;
 
-// DBONAV v1 (W3's navmesh extraction, _work/navmesh-1102/FORMAT.md): one file per worldspace, little-endian
+// DBONAV v2 (W3's navmesh extraction, _work/navmesh-1102/FORMAT.md): one file per worldspace, little-endian
 struct DboNavLink
 {
   uint32_t type = 0;

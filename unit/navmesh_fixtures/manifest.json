@@ -27,7 +27,7 @@
    "links": 0,
    "doorTris": []
   },
-  "bytes": 336
+  "bytes": 456
  },
  "multi-mesh-tile.dbonav": {
   "worldspace": "test.esm:00003c",
@@ -51,7 +51,7 @@
    ]
   },
   "note": "no two meshes share a vertex: a weld must join nothing",
-  "bytes": 600
+  "bytes": 832
  },
  "interior.dbonav": {
   "worldspace": "interiors",
@@ -74,7 +74,7 @@
     3.0
    ]
   },
-  "bytes": 336
+  "bytes": 456
  },
  "doors.dbonav": {
   "worldspace": "test.esm:00003c",
@@ -91,7 +91,7 @@
    ]
   },
   "note": "triangle 0 flags 0x0800 is not a door; triangle 1 flags 0x0C00 is",
-  "bytes": 336
+  "bytes": 456
  },
  "linked-pair.dbonav": {
   "worldspace": "test.esm:00003c",
@@ -121,7 +121,7 @@
    }
   },
   "note": "targetMesh is a flat index over all tiles in order; dropped=3 is header-only",
-  "bytes": 592
+  "bytes": 800
  },
  "empty-mesh.dbonav": {
   "worldspace": "test.esm:00003c",
@@ -151,7 +151,7 @@
    "links": 0,
    "doorTris": []
   },
-  "bytes": 256
+  "bytes": 376
  },
  "extreme-cells.dbonav": {
   "worldspace": "test.esm:00003c",
@@ -171,7 +171,7 @@
    "meshes": 1
   },
   "note": "negative cell coordinates are signed i32, not unsigned",
-  "bytes": 568
+  "bytes": 776
  },
  "_mustRefuse": {
   "bad-magic.dbonav": {
@@ -182,7 +182,7 @@
   "bad-version.dbonav": {
    "mustRefuse": true,
    "pythonRefused": true,
-   "why": "version 2, expected 1"
+   "why": "version 3, expected 2"
   },
   "truncated.dbonav": {
    "mustRefuse": true,

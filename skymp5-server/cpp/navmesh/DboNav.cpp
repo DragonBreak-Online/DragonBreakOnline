@@ -6,7 +6,8 @@ namespace navmesh {
 namespace {
 
 constexpr char kMagic[8] = { 'D', 'B', 'O', 'N', 'A', 'V', 0, 0 };
-constexpr uint32_t kVersion = 1;
+constexpr uint32_t kVersion = 2;
+constexpr size_t kDescLen = 96;
 constexpr uint16_t kDoorBit = 0x0400;
 
 // Bounds-checked little-endian reads over the file
@@ -118,7 +119,7 @@ bool ReadDboNav(const uint8_t* data, size_t size, DboNavFile& out,
   if (!r.U32(version) || version != kVersion) {
     return Fail(error, "unsupported DBONAV version");
   }
-  if (!r.Text(out.worldspace, 64) || !r.U32(tiles) || !r.U32(out.meshCount) ||
+  if (!r.Text(out.worldspace, kDescLen) || !r.U32(tiles) || !r.U32(out.meshCount) ||
       !r.U32(out.dropped)) {
     return Fail(error, "DBONAV header is truncated");
   }
@@ -129,15 +130,15 @@ bool ReadDboNav(const uint8_t* data, size_t size, DboNavFile& out,
   }
 
   uint32_t meshesSeen = 0;
-  constexpr size_t kTileHeader = 4 + 4 + 64 + 24 + 4;
-  constexpr size_t kMeshHeader = 40 + 12;
+  constexpr size_t kTileHeader = 4 + 4 + kDescLen + 24 + 4;
+  constexpr size_t kMeshHeader = kDescLen + 12;
   if (!r.Fits(tiles, kTileHeader)) {
     return Fail(error, "DBONAV tile count is larger than the file");
   }
   out.tiles.resize(tiles);
   for (auto& tile : out.tiles) {
     uint32_t meshes = 0;
-    if (!r.I32(tile.cellX) || !r.I32(tile.cellY) || !r.Text(tile.cellDesc, 64) ||
+    if (!r.I32(tile.cellX) || !r.I32(tile.cellY) || !r.Text(tile.cellDesc, kDescLen) ||
         !r.Vec(tile.bmin) || !r.Vec(tile.bmax) || !r.U32(meshes)) {
       return Fail(error, "DBONAV tile is truncated");
     }
@@ -147,7 +148,7 @@ bool ReadDboNav(const uint8_t* data, size_t size, DboNavFile& out,
     tile.meshes.resize(meshes);
     for (auto& mesh : tile.meshes) {
       uint32_t verts = 0, tris = 0, links = 0;
-      if (!r.Text(mesh.desc, 40) || !r.U32(verts) || !r.U32(tris) ||
+      if (!r.Text(mesh.desc, kDescLen) || !r.U32(verts) || !r.U32(tris) ||
           !r.U32(links)) {
         return Fail(error, "DBONAV mesh is truncated");
       }
