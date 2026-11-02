@@ -806,7 +806,16 @@ module.exports = (api) => {
       for (const a of onlineActors()) { try { sendPacket(a, p); } catch (e) { /* gone */ } }
     }, 1000);
   }
-  // The client's measure of how well its drawing sits on the map, once a map opening (mapRealmService followOwners)
+  // One line a map opening (client mapRealmService.reportSwfs): how far the legend and the overlay got loading into the
+  // MapMenu (the last step reached, the frame of each step, the tries, the url the swf came from) and the fit
+  onUi('mapSwf', (a, args) => {
+    const r = Array.isArray(args) && args[0] && typeof args[0] === 'object' ? args[0] : {};
+    const part = (x) => (x && typeof x === 'object'
+      ? `${x.last} (${x.phase}, tries ${x.tries}; menu ${x.menu}, inject ${JSON.stringify(x.inject)}, clip ${x.clip}, loaded ${x.loaded}, alive ${x.alive}, drawn ${x.drawn}, fit ${x.fit}; url ${JSON.stringify(x.url)})`
+      : 'none');
+    log(`realm: map swfs from ${who(a)}: opening ${r.opening}, ${r.frames} frames; legend ${part(r.legend)}; owners ${part(r.owners)}; world ${r.world}, anchors ${r.anchors}, fit ${JSON.stringify(r.fit)}`.slice(0, 900));
+  });
+  // The client's measure of how well its drawing sits on the map, once a map opening (clients before the mapSwf line)
   onUi('mapOwnersFit', (a, args) => {
     const r = Array.isArray(args) && args[0] && typeof args[0] === 'object' ? args[0] : {};
     log(`realm: map owners fit from ${who(a)}: ${JSON.stringify(r).slice(0, 400)}`);

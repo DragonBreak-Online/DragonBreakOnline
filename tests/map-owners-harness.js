@@ -108,7 +108,9 @@ const scenarios = (src, c) => {
     while (timers.length) timers.shift()();
     c('the same owner again sends nothing', !sent.some((x) => x[1].customPacketType === 'dboMapOwners'));
     handlers.get('mapOwnersFit')(7, [{ world: '3c:Skyrim.esm', fit: { n: 5, rms: 2.1 } }]);
-    c('the client\'s fit report is logged', logs.some((l) => /map owners fit from P7: .*"rms":2.1/.test(l)), logs.slice(-2));
+    handlers.get('mapSwf')(7, [{ opening: 2, frames: 900, legend: { last: 'clip', phase: 'off', tries: 3, menu: 4, inject: [4, 244, 484], clip: 5, loaded: -1, alive: -1, drawn: -1, fit: -1, url: 'Interface/map.swf' }, owners: null, world: 60, anchors: 3, fit: null }]);
+    c('the mapSwf line names the last step, each step\'s frame, the tries and the url', logs.some((l) => /map swfs from P7: opening 2, 900 frames; legend clip \(off, tries 3; menu 4, inject \[4,244,484\], clip 5, loaded -1, alive -1.*url "Interface\/map\.swf"\); owners none/.test(l)), logs.slice(-1));
+    c('the client\'s fit report is logged',logs.some((l) => /map owners fit from P7: .*"rms":2.1/.test(l)), logs.slice(-2));
   } finally {
     global.setTimeout = realSetTimeout;
   }
