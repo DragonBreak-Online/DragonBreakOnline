@@ -141,5 +141,24 @@ check('a teacher named under the old list but no officer may not hold a class', 
 check('...staff can still clear the old naming from the menu', labels(GM, OUTSIDER).includes('Remove as class teacher') && (act(GM, 'schools:teacheroff', OUTSIDER), teacher(OUTSIDER) === null));
 check('unrelated menu ids fall through to the other handlers', globalThis.__dboSchoolsMenuAction(GM, 'trade', MAGE) === false);
 
+// A cell given to one house (classes.lecternCells, map-0596): Riften's Honorhall Orphanage is House Telvanni's
+const HONORHALL = '16bd3:Skyrim.esm';
+globalThis.__dboGuildInfo = (id) => (id === 'house-telvanni' ? { id, name: 'House Telvanni' } : null);
+check('the tracked config gives Honorhall to House Telvanni', CONFIG.schools.classes.lecternCells[HONORHALL] === 'house-telvanni', CONFIG.schools.classes.lecternCells);
+const HH_LECTERN = 0xff0000aa;
+put(HH_LECTERN, 'baseDesc', LECTERN_BASE); put(HH_LECTERN, 'worldOrCellDesc', HONORHALL); put(HH_LECTERN, 'pos', [0, 0, 0]);
+const hhLectern = (a) => { put(a, 'worldOrCellDesc', HONORHALL); globalThis.__dboSchoolsActivate(HH_LECTERN, a); const x = out.widgets.filter((y) => y.a === a && y.w.type === 'classLectern').pop(); put(a, 'worldOrCellDesc', SYNOD); return x ? x.w : {}; };
+put(MAGE, 'private.dboGuilds', [{ id: 'house-telvanni', role: 'officer' }]);
+check('a Telvanni officer may hold a class at the box staff set in Honorhall', hhLectern(MAGE).canTeach === true, hhLectern(MAGE));
+put(MAGE, 'private.dboGuilds', [{ id: 'house-telvanni', role: 'member' }]);
+w = hhLectern(MAGE);
+check('...a plain Telvanni member may not, and the lectern names House Telvanni', w.canTeach === false && /belongs to House Telvanni: a class here is held by its leader or an officer/.test(w.whyNot), w);
+put(MAGE, 'private.dboGuilds', [{ id: 'synod', role: 'officer' }]);
+w = hhLectern(MAGE);
+check('a Synod officer may not hold a class in House Telvanni\'s room', w.canTeach === false && /House Telvanni/.test(w.whyNot), w);
+check('...but still may at the Synod\'s own lectern', lectern(MAGE).canTeach === true);
+w = hhLectern(OUTSIDER);
+check('someone in no faction is told whose lectern it is', w.canTeach === false && /House Telvanni/.test(w.whyNot), w);
+
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');
 process.exit(failures ? 1 : 0);
