@@ -21,9 +21,7 @@ export interface AnimationVariables {
   speed: number;
 }
 
-// isServerDriven: the server itself moves this actor (the server-hosted NPC slice, _work/server-npc-movement-1102.md), set on
-// every movement it sends and absent from a client's, so a player who takes the actor over (a fight) clears it
-export type Movement = Transform & AnimationVariables & { isServerDriven?: boolean };
+export type Movement = Transform & AnimationVariables;
 
 // // This doesn't work in SkyrimPlatform 0.5.0:
 // export * from './movementApply';

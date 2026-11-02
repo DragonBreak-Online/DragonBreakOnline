@@ -1021,7 +1021,6 @@ export class RemoteServer extends ClientListener {
     }
 
     form.movement = msg.data;
-    form.isServerDriven = msg.data.isServerDriven === true;
     const arrivedAt = Date.now();
     if (form.movementAt) {
       const gap = arrivedAt - form.movementAt;

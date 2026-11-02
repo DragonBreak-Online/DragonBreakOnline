@@ -68,7 +68,13 @@ decisions(live, check);
 const fv = fs.readFileSync(path.join(ROOT, 'src', 'view', 'formView.ts'), 'utf8');
 check('formView asks hostAsk at all five places', ['mayAskOnSight(model', 'mayAskSilent(model', 'mayAskResync(model', 'seatsUndriven(model', 'playsBack(model'].every((k) => fv.includes(k)));
 const rs = fs.readFileSync(path.join(ROOT, 'src', 'services', 'services', 'remoteServer.ts'), 'utf8');
-check('the model learns isServerDriven from every movement (a player\'s packet clears it)', /form\.isServerDriven = msg\.data\.isServerDriven === true;/.test(rs));
+// isServerDriven is a property like isHostedByOther (W4, 2 Nov: the wire format is positional, so a movement field would be a
+// protocol change): both property paths must put any name on the model, and the movement handler must never touch it, or
+// every server movement would clear the property the server just set
+const movementHandler = rs.slice(rs.indexOf('private onUpdateMovementMessage'), rs.indexOf('private onUpdateAnimationMessage'));
+check('isServerDriven reaches the model as a property: UpdateProperty and CreateActor props both set any name on it',
+  /\(form as Record<string, unknown>\)\[msg\.propName\] = msgData;/.test(rs) && /for \(const propName in msg\.props\) \{\s*\(form as Record<string, unknown>\)\[propName\] = msg\.props\[propName/.test(rs));
+check('...and no movement ever sets or clears it', movementHandler.length > 100 && !/isServerDriven/.test(movementHandler));
 
 const source = fs.readFileSync(SRC, 'utf8');
 const MUTANTS = [

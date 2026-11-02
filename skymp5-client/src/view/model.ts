@@ -15,7 +15,10 @@ export interface FormModel extends CreateActorMessageAdditionalProps, CreateActo
   // Smoothed ms between movement updates for this form: ~130 at full rate, longer when the server's interest management
   // sends a far mover less often (sync/movementApply.ts stretches its interpolation to match)
   movementGapMs?: number;
-  // The server drives this actor (its last movement said so): no client may ask to host it, whatever isHostedByOther says
+  // The server drives this actor: no client may ask to host it, whatever isHostedByOther says. A property like isHostedByOther
+  // (the server sends both from UpdateHoster at the same moment, and in CreateActor props for a client that arrives later;
+  // the generic property paths in remoteServer put it here). Never set from movement: the wire format is positional, so a
+  // field there would change the protocol (W4, 2 Nov), and a movement without it would clear the property
   isServerDriven?: boolean;
   numAppearanceChanges?: number;
   isMyClone?: boolean;
