@@ -200,7 +200,9 @@ export class MapRealmService extends ClientListener {
     if (st.phase === "loading" || st.phase === "up") {
       try { seen.clip = ui.isMenuOpen(LEGEND_MENU); } catch { seen.clip = false; }
       try { seen.url = ui.getString(LEGEND_MENU, "_root._url") || ""; } catch { seen.url = ""; }
-      try { seen.alive = ui.getString(LEGEND_MENU, "_root.dboAlive") === "yes"; } catch { seen.alive = false; }
+      // read back as "Yes" from a CustomMenu though the movie sets "yes" (Nat, 05:05Z: its script had run, and the exact
+      // compare called it dead), so any case counts
+      try { seen.alive = /^yes$/i.test(String(ui.getString(LEGEND_MENU, "_root.dboAlive") || "")); } catch { seen.alive = false; }
     }
     const step = swfStep(st, this.ticksOpen, seen, LEGEND_SWF, 1);
     if (step === "inject") {
