@@ -18,6 +18,7 @@ public:
 
 private:
   void OnFireSuccess(WorldState* worldState) override;
+  void OnFireBlocked(WorldState* worldState) override;
 
   MpActor* actor = 0;
   MpObjectReference* sourceRefr = 0;

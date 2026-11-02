@@ -33,10 +33,7 @@ void UpdateEquipmentAttemptEvent::OnFireSuccess(WorldState* worldState)
 {
 }
 
-void UpdateEquipmentAttemptEvent::OnFireBlocked(WorldState* worldState)
+void UpdateEquipmentAttemptEvent::OnFireBlocked(WorldState*)
 {
-  spdlog::warn(
-    "UpdateEquipmentAttemptEvent::OnFireBlocked - Not implemented. Please "
-    "consider never blocking {} event in gamemode",
-    GetName());
+  // Nothing to undo: OnUpdateEquipment honours the block itself.
 }

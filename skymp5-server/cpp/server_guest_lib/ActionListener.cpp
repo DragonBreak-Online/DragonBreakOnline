@@ -1734,6 +1734,14 @@ void ActionListener::OnUpdateEquipment(const RawMessageData& rawMsgData,
     extrasReplaced = true;
   }
 
+  // Fired before the change is applied, so a refusal is honoured below.
+  // Only an explicit false blocks; undefined and errors allow.
+  UpdateEquipmentAttemptEvent updateEquipmentAttemptEvent(actor, data,
+                                                          isAllowed);
+  if (!updateEquipmentAttemptEvent.Fire(actor->GetParent())) {
+    isAllowed = false;
+  }
+
   if (isAllowed) {
     // An unlearned spell strips just that slot; weapons/armor still reach neighbours (avoids silent desync)
     if (anySpellStripped || extrasReplaced) {
@@ -1823,10 +1831,6 @@ void ActionListener::OnUpdateEquipment(const RawMessageData& rawMsgData,
     SpSnippet("Actor", "RemoveSpell", args, actor->GetFormId())
       .Execute(actor, SpSnippetMode::kNoReturnResult);
   }
-
-  UpdateEquipmentAttemptEvent updateEquipmentAttemptEvent(actor, data,
-                                                          isAllowed);
-  updateEquipmentAttemptEvent.Fire(actor->GetParent());
 }
 
 void ActionListener::OnActivate(const RawMessageData& rawMsgData,

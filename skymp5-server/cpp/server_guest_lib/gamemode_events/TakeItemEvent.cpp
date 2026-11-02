@@ -35,3 +35,9 @@ void TakeItemEvent::OnFireSuccess(WorldState*)
 {
   sourceRefr->RemoveItems({ entry }, actor);
 }
+
+void TakeItemEvent::OnFireBlocked(WorldState*)
+{
+  // The client already moved the item: a refusal must put it back.
+  actor->SendInventoryUpdate();
+}

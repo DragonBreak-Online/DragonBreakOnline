@@ -37,3 +37,9 @@ void PutItemEvent::OnFireSuccess(WorldState*)
   stored.SetWorn(Inventory::Worn::None);
   sourceRefr->AddItems({ stored });
 }
+
+void PutItemEvent::OnFireBlocked(WorldState*)
+{
+  // The client already moved the item: a refusal must put it back.
+  actor->SendInventoryUpdate();
+}
