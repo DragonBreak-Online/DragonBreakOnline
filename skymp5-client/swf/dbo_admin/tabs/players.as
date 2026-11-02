@@ -1,10 +1,12 @@
-// Players: everything the browser's Players tab holds, in four views so it fits one screen. Roster (search, online only,
+// Players: everything the browser's Players tab holds, in five views so it fits one screen. Roster (search, online only,
 // the list, TP / Summon / Kick / Ban and Rename for the picked row), Punish (Kill, Delete character, IP ban, a temp ban,
-// the ban list, Reset deity), Care (disease, curse, vampire stage, the schools, on the one acted on) and Mastery (hours
-// and the craft). A Trial GM gets the roster with their own actions only, as the browser shows them.
+// the ban list, Reset deity), Care (disease, curse, vampire stage, the schools, on the one acted on), Mastery (hours
+// and the craft) and Vitals (an event boss's raised Health, Magicka and Stamina, gameplay bossvitals.js). A Trial GM gets
+// the roster with their own actions only, as the browser shows them.
 var BAN_LENGTHS = [["1 hour", 1], ["6 hours", 6], ["1 day", 24], ["3 days", 72], ["1 week", 168], ["30 days", 720]];
 var MAX_GRANT_HOURS = 1000;
-var playersLocal = {rename: "", hours: "24", grant: "1", levels: {}};
+var playersLocal = {rename: "", hours: "24", grant: "1", levels: {}, vit: {health: "", magicka: "", stamina: ""}, vitKeep: false};
+var VITAL_NAMES = [["health", "Health"], ["magicka", "Magicka"], ["stamina", "Stamina"]];
 
 function canDo(action)
 {
@@ -44,8 +46,71 @@ function playersSubs()
       {
          list.push(["mastery", "Mastery"]);
       }
+      list.push(["vitals", "Vitals"]);
    }
    return list;
+}
+
+// Vitals: the amounts added to the picked player's usual maximum, or the staff member's own with nobody picked. A blank
+// box leaves that one as it is, 0 clears it. The server holds the rules (bossvitals.js) and says what it did in chat
+function drawVitals(c, x, y, w, h, P)
+{
+   var sel = P.selected;
+   var live = sel != null && sel != undefined && sel.online == true && sel.a != "";
+   var target = live ? sel.a : "";
+   label(c, "vitWho", 20, x, y, w, live ? "Raising " + cut(sel.n, 28) : "Nobody picked: your own character", 18, C_TEXT);
+   hint(c, "vitHint", 21, x, y + 28, w, "Amounts are added to their usual maximum (up to the server's limit). Blank leaves one as it is; 0 clears it.");
+   var fy = y + 66;
+   var ok = false;
+   var bad = false;
+   for (var i = 0; i < VITAL_NAMES.length; i++)
+   {
+      var k = VITAL_NAMES[i][0];
+      var fx = x + i * 220;
+      hint(c, "vitL" + i, 22 + i * 2, fx, fy + 4, 80, VITAL_NAMES[i][1]);
+      field(c, "vit_" + k, 23 + i * 2, fx + 80, fy, 120, playersLocal.vit[k], "", 5, makeVitalCommit(k));
+      var t = trimText(playersLocal.vit[k]);
+      if (t != "")
+      {
+         if (isWhole(t) && Number(t) >= 0)
+         {
+            ok = true;
+         }
+         else
+         {
+            bad = true;
+         }
+      }
+   }
+   var by = fy + 48;
+   btn(c, "vitKeep", 30, x, by, 0, "Keep after the event: " + (playersLocal.vitKeep ? "On" : "Off"), function()
+   {
+      dboSound("UIMenuFocus");
+      playersLocal.vitKeep = !playersLocal.vitKeep;
+      draw();
+   });
+   btn(c, "vitSet", 31, x + 320, by, 100, "Set", function()
+   {
+      dboSound("UIMenuOK");
+      var v = playersLocal.vit;
+      req("adminVitalsSet", {target: target, health: trimText(v.health), magicka: trimText(v.magicka), stamina: trimText(v.stamina), keep: playersLocal.vitKeep});
+      playersLocal.vit = {health: "", magicka: "", stamina: ""};
+      draw();
+   }, !ok || bad);
+   confirmBtn(c, "vitReset", 32, x + 430, by, 0, "Reset", "vitreset:" + target, function()
+   {
+      dboSound("UIMenuOK");
+      req("adminVitalsReset", {target: target});
+   });
+   hint(c, "vitRules", 33, x, by + 48, w, "GM: yourself, or a player inside an open event's area. Anyone else: Lead GM. Cleared at logout and when the event ends unless kept.");
+}
+
+function makeVitalCommit(k)
+{
+   return function(text)
+   {
+      playersLocal.vit[k] = text;
+   };
 }
 
 function drawRoster(c, x, y, w, h, P)
@@ -437,6 +502,10 @@ TABS.players = {
       else if (sub == "mastery")
       {
          drawMastery(c, x, y, w, h, P);
+      }
+      else if (sub == "vitals")
+      {
+         drawVitals(c, x, y, w, h, P);
       }
       else
       {

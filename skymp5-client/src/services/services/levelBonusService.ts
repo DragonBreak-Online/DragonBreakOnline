@@ -5,6 +5,8 @@ import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 
 const VITALS = ["health", "magicka", "stamina"] as const;
+// The most one gain may add: the server counts up to 10000 a vital (MpActor kMaxVitalBonus; an event boss, gamemode bossvitals.js)
+const MAX_GAIN = 10000;
 
 /**
  * Character level-ups raise a maximum mid-session. The server already counts the bonus (private.dboAvBonus),
@@ -26,7 +28,7 @@ export class LevelBonusService extends ClientListener {
       if (!player) return;
       for (const av of VITALS) {
         const gain = Number(content[av]);
-        if (gain > 0 && gain <= 1000) player.setActorValue(av, player.getBaseActorValue(av) + gain);
+        if (gain > 0 && gain <= MAX_GAIN) player.setActorValue(av, player.getBaseActorValue(av) + gain);
       }
     });
   }
