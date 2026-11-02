@@ -56,12 +56,13 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
     ObjectReference: { from: (f) => (f ? { addToMap: (ft) => S.revealed.push([f.k, ft]) } : null) },
     browser: { setVisible: (v) => S.visible.push(v) },
     Ui: {
+      isMenuOpen: () => S.menuOpen !== false,
       getInt: (m, p) => S.props[p] | 0, getString: (m, p) => (S.props[p] === undefined ? '' : String(S.props[p])), getFloat: (m, p) => Number(S.props[p] === undefined ? 100 : S.props[p]),
       setFloat: (m, p, v) => { S.props[p] = v; }, invokeStringA: (m, p, a) => { S.invoked.push([p, a]); if (p === '_root.createEmptyMovieClip') S.props[`_root.${a[0]}._name`] = a[0]; },
       // the legend swf (dbo_maplegend): alive after its loadMovie only when S.legendWorks; its dboData is recorded
       invokeString: (m, p, arg) => {
         S.invoked.push([p, [arg]]);
-        if (p === '_root.dboMapLegend.loadMovie' && S.legendWorks) S.props['_root.dboMapLegend.dboAlive'] = 'yes';
+        if (p === '_root.dboMapLegend.loadMovie' && S.legendWorks) { S.props['_root.dboMapLegend._url'] = 'Interface/dbo_maplegend.swf'; S.props['_root.dboMapLegend.dboAlive'] = 'yes'; }
         if (p === '_root.dboMapLegend.dboData') S.legendData.push(JSON.parse(arg));
       },
     },
@@ -90,13 +91,21 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   ok(S.revealed.length === 5 && S.revealed.every((r) => r[1] === false), 'the realm markers are revealed with addToMap, fast travel off; a bad desc or kind is dropped, a missing form skipped', S.revealed);
 
   // ---- a legend swf that never comes alive in the map: the browser draws the legend, as before ----
+  // the HUD's rule (nativeHud.ts): nothing is loaded until the menu itself is open
+  S.menuOpen = false;
   h.menuOpen({ name: 'MapMenu' });
+  frames(3);
+  ok(!S.invoked.some((x) => x[0] === '_root.createEmptyMovieClip'), 'the map\'s open event alone loads nothing: it waits for the menu to be open', S.invoked);
+  S.menuOpen = true;
   frames(2);
   ok(S.invoked.some((x) => x[0] === '_root.createEmptyMovieClip' && x[1][0] === 'dboMapLegend') && S.invoked.some((x) => x[0] === '_root.dboMapLegend.loadMovie' && x[1][0] === 'dbo_maplegend.swf'),
     'opening the map loads dbo_maplegend into a clip of the map', S.invoked);
   ok(!S.widgets.length && !S.visible.length, 'while it loads, no browser legend and the browser left hidden', [S.widgets, S.visible]);
-  frames(60);
-  ok(S.visible.length >= 1 && S.visible.every((v) => v === true), 'one that never comes alive in a second: the browser is shown for the map', S.visible);
+  frames(238);
+  ok(!S.widgets.length && S.invoked.filter((x) => x[0] === '_root.dboMapLegend.loadMovie').length === 1, 'a try waits 240 frames, as the HUD\'s does');
+  frames(2 * 240 + 2);
+  ok(S.invoked.filter((x) => x[0] === '_root.dboMapLegend.loadMovie').length === 3, '...then tries again, three tries in all', S.invoked.filter((x) => x[0] === '_root.dboMapLegend.loadMovie').length);
+  ok(S.visible.length >= 1 && S.visible.every((v) => v === true), 'one that never comes alive after its last try: the browser is shown for the map', S.visible);
   const w = S.widgets[S.widgets.length - 1];
   const row = (id) => w.rows.find((r) => r.id === id);
   ok(w.type === 'mapRealm' && w.id === 210 && w.mapMode === true && w.shown === true, 'the legend widget is published in map mode', w);
@@ -119,8 +128,12 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   ok(S.widgets[S.widgets.length - 1].shown === false, 'R hides the legend');
   key(30);
   ok(S.widgets[S.widgets.length - 1].shown === false && S.widgets.length > 0, 'another key is not ours');
+  S.packets.length = 0;
   h.menuClose({ name: 'MapMenu' });
   ok(S.widgets[S.widgets.length - 1].closed === 210, 'closing the map closes the legend');
+  const rep = (S.packets.find((p) => p.event === 'mapSwf') || { args: [{}] }).args[0];
+  ok(rep.legend && rep.legend.last === 'clip' && rep.legend.phase === 'off' && rep.legend.tries === 3 && rep.legend.menu === 4 && rep.legend.inject.length === 3 && rep.legend.loaded === -1 && rep.owners === null,
+    'closing sends one mapSwf line: the menu seen at frame 4, three load calls, the clip there, never loaded', rep);
   const before = S.props['_root.MarkerClips.Marker3._xscale'];
   key(5);
   ok(S.props['_root.MarkerClips.Marker3._xscale'] === before, 'with the map closed a digit does nothing');
@@ -148,7 +161,8 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   h.menuOpen({ name: 'MapMenu' });
   frames(3);
   h.menuClose({ name: 'MapMenu' });
-  ok(S.packets.length === 1 && S.packets[0].args[0].end === 'the map closed', 'closing the map early still reports, and says why');
+  const tests = S.packets.filter((p) => p.event === 'mapTest');
+  ok(tests.length === 1 && tests[0].args[0].end === 'the map closed', 'closing the map early still reports, and says why', S.packets);
   ok(!S.legendData.length, 'a legend that failed this session is never sent to the map', S.legendData.length);
   ok(!S.errors.length, 'no frame failed', S.errors);
 
@@ -165,11 +179,14 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   ok(S.legendData.length >= 1 && last().shown === true && last().rows.find((r) => r.id === 'fort').count === 2 && last().rows.map((r) => r.key).join('') === '1234560',
     'alive: the legend goes to the swf in the map, the same rows and counts', last());
   ok(!S.widgets.length && !S.visible.length, '...and no browser legend, the browser left hidden', [S.widgets, S.visible]);
+  S.packets.length = 0;
   h2.buttonEvent({ isDown: true, device: 0, code: 5 });
   ok(last().rows.find((r) => r.id === 'fort').shown === false, 'a digit greys its kind in the map\'s legend');
   h2.buttonEvent({ isDown: true, device: 0, code: 19 });
   ok(last().shown === false, 'R hides the map\'s legend');
   h2.menuClose({ name: 'MapMenu' });
+  const rep2 = (S.packets.find((p) => p.event === 'mapSwf') || { args: [{}] }).args[0];
+  ok(rep2.legend && rep2.legend.last === 'alive' && rep2.legend.phase === 'up' && rep2.legend.loaded >= 1 && /dbo_maplegend\.swf$/.test(rep2.legend.url), 'alive: the line says loaded and alive, with the url it came from', rep2);
   delete S.props['_root.dboMapLegend.dboAlive'];
   S.invoked.length = 0;
   h2.menuOpen({ name: 'MapMenu' });

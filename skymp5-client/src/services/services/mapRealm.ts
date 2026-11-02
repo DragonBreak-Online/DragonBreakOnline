@@ -103,3 +103,48 @@ export const legendReset = (st: LegendLoad): void => {
 // What the swf draws (its dboData), the browser widget's fields
 export const legendJson = (shown: boolean, rows: Array<{ id: string; label: string; key: string; count: number; shown: boolean }>): string =>
   JSON.stringify({ shown, rows });
+
+// ---- loading a swf into the MapMenu, step by step (Leader, 2 Nov) ----
+// The legend and the owners overlay never came alive in the map on Nat's dev copy, and whether a clip can be put into
+// SkyUI's map.swf at all is unproven (_work/mmap-feasibility-1026.md). So each is loaded by the HUD's own rule (nativeHud.ts:
+// only once the menu is open, ALIVE frames a try, MAX tries) and every step is timed: the menu seen open, each load call,
+// the host clip there, our swf loaded into it (its _url names the swf), its script run (dboAlive), the first draw and the
+// first fit. On close, one line a map opening goes to the server log, naming the last step reached.
+export const MAP_SWF_ALIVE_FRAMES = 240;
+export const MAP_SWF_TRIES = 3;
+export interface SwfTrace { menu: number; inject: number[]; clip: number; loaded: number; alive: number; drawn: number; fit: number; url: string }
+export interface SwfLoad { phase: "idle" | "loading" | "up" | "off"; frames: number; tries: number; t: SwfTrace }
+export const newSwfLoad = (): SwfLoad => ({ phase: "idle", frames: 0, tries: 0, t: { menu: -1, inject: [], clip: -1, loaded: -1, alive: -1, drawn: -1, fit: -1, url: "" } });
+// What one frame shows: the menu open, the host clip there, its _url, our swf's dboAlive
+export interface SwfSeen { menu: boolean; clip: boolean; url: string; alive: boolean }
+// One frame, at tick (frames since the map opened): "inject" (make the clip and load the swf), "up", "fail" or ""
+export const swfStep = (st: SwfLoad, tick: number, seen: SwfSeen, swf: string): string => {
+  const t = st.t;
+  if (seen.menu && t.menu < 0) t.menu = tick;
+  if (st.phase === "loading" || st.phase === "up") {
+    if (seen.clip && t.clip < 0) t.clip = tick;
+    if (seen.url) t.url = seen.url;
+    if (seen.url.toLowerCase().endsWith(swf.toLowerCase()) && t.loaded < 0) t.loaded = tick;
+    if (seen.alive && t.alive < 0) t.alive = tick;
+  }
+  if (st.phase === "idle") {
+    if (!seen.menu) return "";
+    st.phase = "loading"; st.tries = 1; st.frames = 0; t.inject.push(tick);
+    return "inject";
+  }
+  if (st.phase !== "loading") return "";
+  if (seen.alive) { st.phase = "up"; return "up"; }
+  if (++st.frames < MAP_SWF_ALIVE_FRAMES) return "";
+  if (st.tries < MAP_SWF_TRIES) { st.tries++; st.frames = 0; t.inject.push(tick); return "inject"; }
+  st.phase = "off";
+  return "fail";
+};
+// The steps in order, and the last one this opening reached
+export const SWF_STEPS = ["opened", "menu", "inject", "clip", "loaded", "alive", "drawn", "fit"];
+export const lastSwfStep = (t: SwfTrace): string => {
+  const at: Record<string, boolean> = { opened: true, menu: t.menu >= 0, inject: t.inject.length > 0, clip: t.clip >= 0, loaded: t.loaded >= 0, alive: t.alive >= 0, drawn: t.drawn >= 0, fit: t.fit >= 0 };
+  let last = "opened";
+  for (const s of SWF_STEPS) { if (!at[s]) break; last = s; }
+  return last;
+};
+export const swfReport = (st: SwfLoad) => ({ last: lastSwfStep(st.t), phase: st.phase, tries: st.tries, menu: st.t.menu, inject: st.t.inject, clip: st.t.clip, loaded: st.t.loaded, alive: st.t.alive, drawn: st.t.drawn, fit: st.t.fit, url: st.t.url.slice(-80) });
