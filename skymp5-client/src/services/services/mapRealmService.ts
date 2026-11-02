@@ -12,7 +12,7 @@ import {
 } from "./mapRealm";
 import {
   ANCHORS_PER_FRAME, OWNERS_LAYER, StageArea, fitToStage, OwnersData, TOGGLE_KEY, TOGGLE_SETTING,
-  anchorClips, clipTransform, drawingOf, fitHolds, fitOf, anchorIndex, legendRow, readOwners, worldFor, Anchor, Fit, Seen,
+  anchorClips, clipTransform, drawingOf, fitHolds, anchorIndex, legendRow, readOwners, worldFor, Anchor, Fit, FitTracker, SeenAt,
 } from "./mapOwners";
 
 // for the browser-side widget setter (executed inside the CEF browser)
@@ -71,6 +71,7 @@ export class MapRealmService extends ClientListener {
     this.drawnKey = "";
     this.lastFit = null;
     this.goodFit = null;
+    this.tracker = new FitTracker();
     this.layerShown = false;
     this.layerAt = {};
     this.passTabAt = 0;
@@ -360,16 +361,16 @@ export class MapRealmService extends ClientListener {
     const box = "_root.MarkerClips";
     const bx = ui.getFloat(MAP_MENU, `${box}._x`) || 0, by = ui.getFloat(MAP_MENU, `${box}._y`) || 0;
     const kx = (ui.getFloat(MAP_MENU, `${box}._xscale`) || 100) / 100, ky = (ui.getFloat(MAP_MENU, `${box}._yscale`) || 100) / 100;
-    const seen: Seen[] = [];
+    const seen: SeenAt[] = [];
     // a different slice each frame when there are more than a frame's worth
     const start = clips.length > ANCHORS_PER_FRAME ? (this.ticksOpen * ANCHORS_PER_FRAME) % clips.length : 0;
     for (let n = 0; n < Math.min(ANCHORS_PER_FRAME, clips.length); n++) {
       const { i, a } = clips[(start + n) % clips.length];
       const clip = MARKER_CLIP(i);
       if (!ui.getBool(MAP_MENU, `${clip}._visible`)) continue;
-      seen.push({ sx: bx + ui.getFloat(MAP_MENU, `${clip}._x`) * kx, sy: by + ui.getFloat(MAP_MENU, `${clip}._y`) * ky, x: a.x, y: a.y });
+      seen.push({ i, sx: bx + ui.getFloat(MAP_MENU, `${clip}._x`) * kx, sy: by + ui.getFloat(MAP_MENU, `${clip}._y`) * ky, x: a.x, y: a.y });
     }
-    return fitOf(seen);
+    return this.tracker.step(this.ticksOpen, seen, clips.length, ANCHORS_PER_FRAME);
   }
 
   private formIdOf(desc: string): number {
@@ -516,6 +517,7 @@ export class MapRealmService extends ClientListener {
   private anchorsSeen = 0;
   private lastFit: Fit | null = null;
   private goodFit: Fit | null = null;
+  private tracker = new FitTracker();
   private layerShown = false;
   private layerAt: Record<string, number> = {};
   private passTabAt = 0;

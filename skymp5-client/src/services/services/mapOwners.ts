@@ -356,6 +356,53 @@ export const fitOf = (seen: Seen[]): Fit | null => {
   return { m00: fx[0], m01: fx[1], m10: fy[0], m11: fy[1], tx: fx[2], ty: fy[2], rms: Math.sqrt(e / seen.length), n: seen.length };
 };
 
+// The map's shape (its turn and its x/y proportions) never changes in an opening; only its zoom and pan do. Fitting all six
+// values from the few markers a frame reads made the colours shake (Nat, 2 Nov: n 4 each frame, a different 4, and the
+// layer's two turns swinging, -105 one opening and 8 the next, because a near-uniform matrix splits into them any way).
+// So the shape is fitted once from every anchor read while the map is still, and kept unless a later still fit has a
+// smaller rms; each frame then only solves zoom and pan (screen = s * shape * world + t) from what it read: from the
+// whole still snapshot once the map has settled, so a still map gives the same answer every frame.
+export type SeenAt = Seen & { i: number };
+export const MOVE_PX = 0.5;
+export const similarityOf = (shape: Fit, seen: Seen[]): Fit | null => {
+  if (seen.length < 2) return null;
+  const P = seen.map((s) => [shape.m00 * s.x + shape.m01 * s.y, shape.m10 * s.x + shape.m11 * s.y]);
+  const n = seen.length;
+  let px = 0, py = 0, qx = 0, qy = 0;
+  seen.forEach((s, k) => { px += P[k][0]; py += P[k][1]; qx += s.sx; qy += s.sy; });
+  px /= n; py /= n; qx /= n; qy /= n;
+  let num = 0, den = 0;
+  seen.forEach((s, k) => { const dx = P[k][0] - px, dy = P[k][1] - py; num += dx * (s.sx - qx) + dy * (s.sy - qy); den += dx * dx + dy * dy; });
+  if (den < 1e-9) return null;
+  const k = num / den;
+  if (!(k > 0)) return null;
+  const tx = qx - k * px, ty = qy - k * py;
+  let e = 0;
+  seen.forEach((s, j) => { e += (k * P[j][0] + tx - s.sx) ** 2 + (k * P[j][1] + ty - s.sy) ** 2; });
+  return { m00: shape.m00 * k, m01: shape.m01 * k, m10: shape.m10 * k, m11: shape.m11 * k, tx, ty, rms: Math.sqrt(e / n), n };
+};
+export class FitTracker {
+  shape: Fit | null = null;
+  private at = new Map<number, Seen & { tick: number }>();
+  private movedAt = 0;
+  // settled: no marker has moved for a whole round of reads (every anchor read once since) and a little more
+  step(tick: number, seen: SeenAt[], anchors: number, perFrame: number): Fit | null {
+    for (const s of seen) {
+      const was = this.at.get(s.i);
+      if (was && Math.hypot(was.sx - s.sx, was.sy - s.sy) > MOVE_PX) this.movedAt = tick;
+      this.at.set(s.i, { sx: s.sx, sy: s.sy, x: s.x, y: s.y, tick });
+    }
+    const settled = tick - this.movedAt >= Math.ceil(anchors / Math.max(1, perFrame)) + 2;
+    const still = settled ? Array.from(this.at.values()).filter((e) => e.tick >= this.movedAt) : [];
+    if (settled) {
+      const full = fitOf(still);
+      if (fitHolds(full) && full && (!this.shape || full.rms < this.shape.rms)) this.shape = full;
+    }
+    if (!this.shape) return fitOf(seen);
+    return similarityOf(this.shape, settled ? still : seen);
+  }
+}
+
 // A clip can only scale and then turn (Flash's _xscale, _yscale, _rotation), so the fit's matrix, per drawing unit, is
 // split as R(outer) * S * R(inner): the "layer" clip turns by outer and scales, its "shapes" child turns by inner
 export interface ClipTransform { x: number; y: number; rotation: number; xscale: number; yscale: number; inner: number }
