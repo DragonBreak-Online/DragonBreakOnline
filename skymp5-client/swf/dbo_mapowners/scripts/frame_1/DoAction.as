@@ -4,7 +4,8 @@
 // frame by setting "layer"'s _x, _y, scales and _rotation and its "shapes" child's _rotation (mapOwners.ts clipTransform),
 // so nothing is drawn again while the map pans, zooms or turns.
 // The clip moves itself under the map's markers, so the colours lie on the land and every marker stays on top.
-// The client calls _root.dboData(json) with { fills: [{ rgb, alpha, pts: [x, y, ...] }], lines: [same] }; it says it is
+// The client calls _root.dboData(json) with { fills: [{ rgb, alpha, pts: [x, y, ...] or rects: [x0, y0, x1, y1, ...] }],
+// lines: [{ rgb, alpha, pts }] }; it says it is
 // alive in _root.dboAlive, which the client reads with Ui.getString. Display only: the map keeps its keys and mouse.
 
 var DBO_SWF_VERSION = "mapowners-1";
@@ -49,6 +50,23 @@ function draw(p)
    for (i = 0; i < p.fills.length; i++)
    {
       var f = p.fills[i];
+      if (f.rects instanceof Array && f.rects.length >= 4)
+      {
+         // the cells of one owner: every rectangle in one fill, so neighbouring cells show no seam
+         shapes.lineStyle();
+         shapes.beginFill(Number(f.rgb), Number(f.alpha));
+         for (var r = 0; r + 3 < f.rects.length; r += 4)
+         {
+            var x0 = Number(f.rects[r]), y0 = Number(f.rects[r + 1]), x1 = Number(f.rects[r + 2]), y1 = Number(f.rects[r + 3]);
+            shapes.moveTo(x0, y0);
+            shapes.lineTo(x1, y0);
+            shapes.lineTo(x1, y1);
+            shapes.lineTo(x0, y1);
+            shapes.lineTo(x0, y0);
+         }
+         shapes.endFill();
+         continue;
+      }
       if (!(f.pts instanceof Array) || f.pts.length < 6)
       {
          continue;

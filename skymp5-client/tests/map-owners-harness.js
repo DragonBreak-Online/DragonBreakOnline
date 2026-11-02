@@ -105,6 +105,56 @@ const scenarios = (M, c) => {
   c('one owner everywhere: no hairline at all', same.lines.length === 0 && same.fills.length === ts.length * 2);
   c('the owners drawn, once each', JSON.stringify(dr.owners.slice().sort()) === '["hold-a","hold-b","hold-c"]');
 
+  // ---- the holds by cell (sovereignty.holdsFromCells): the fork's table, strongholds first, then the hold's nearest ----
+  c('a table is read only whole, as zones.ts checks it', !!M.readCells({ c0: 0, n: 2, holds: ['a'], rows: ['0.', '00'] }) && M.readCells({ c0: 0, n: 2, holds: ['a'], rows: ['0.', '0'] }) === null
+    && M.readCells({ c0: 0, n: 2, holds: ['a'], rows: ['01', '00'] }) === null && M.readCells({ c0: 0.5, n: 2, holds: ['a'], rows: ['0.', '00'] }) === null);
+  // the fork's own arithmetic (zones.ts cellHold), written out again here
+  const forkCellHold = (t, x, y) => { const i = Math.floor(x / 4096) - t.c0, j = t.c0 + t.n - 1 - Math.floor(y / 4096); if (!(i >= 0 && i < t.n && j >= 0 && j < t.n)) return null; const ch = t.rows[j][i]; return ch === '.' ? null : t.holds[parseInt(ch, 36)] || null; };
+  const N = 12, C0 = -6;
+  const rowsOf = () => Array.from({ length: N }, (_, j) => Array.from({ length: N }, (_, i) => (i + j < 3 ? '.' : i < 5 ? '0' : j < 6 ? '1' : '2')).join(''));
+  const table = M.readCells({ c0: C0, n: N, holds: ['east', 'west', 'north'], rows: rowsOf() });
+  let ch = 0, chTotal = 0;
+  for (let k = 0; k < 600; k++) { const x = (r() - 0.5) * N * 4096 * 1.2, y = (r() - 0.5) * N * 4096 * 1.2; chTotal++; if (M.cellHold(table, x, y) === forkCellHold(table, x, y)) ch++; }
+  c(`every point's hold is the fork's (${chTotal})`, !!table && ch === chTotal);
+  const cw = { world: WORLD, aliases: [], cells: table, strongholds: [{ zone: 'clan', x: 2 * 4096, y: -2 * 4096, r: 6000 }], territories: [
+    { id: 'e1', owner: 'hold-a', zone: 'east', x: -4 * 4096, y: 4 * 4096 }, { id: 'e2', owner: 'hold-b', zone: 'east', x: -4 * 4096, y: -4 * 4096 },
+    { id: 'w1', owner: 'hold-b', zone: 'west', x: 4 * 4096, y: 4 * 4096 }, { id: 'n1', owner: 'hold-a', zone: 'north', x: 1 * 4096, y: -5 * 4096 },
+    { id: 'c1', owner: 'hold-c', zone: 'clan', x: 2 * 4096, y: -2 * 4096 },
+  ] };
+  const at = (x, y) => { const o = M.ownerAt(cw, x, y); return o ? cw.territories[o.t].id : null; };
+  c('inside a stronghold\'s radius the stronghold, whatever the cell says', at(2 * 4096 + 100, -2 * 4096) === 'c1');
+  c('...else the cell\'s hold, then the nearest of that hold\'s own markers (a nearer marker of another hold does not count)', at(-4 * 4096 + 10, 3 * 4096) === 'e1' && at(-1 * 4096, -1 * 4096 + 10) !== 'w1' && at(4 * 4096 - 10, 3 * 4096) === 'w1');
+  c('...and nothing where the table has no hold', at((C0 + 0.5) * 4096, (C0 + N - 0.5) * 4096) === null);
+  const cd = M.drawingOf(cw, Object.assign({ 'hold-c': { name: 'C', rgb: [0, 0, 200] } }, factions), 30000, 45000);
+  const cellOwner = (i, j) => { const x = (C0 + i + 0.5) * 4096, y = (C0 + N - 1 - j + 0.5) * 4096; const o = M.ownerAt({ world: WORLD, aliases: [], cells: table, territories: cw.territories }, x, y); return o && o.d <= 45000 ? cw.territories[o.t].owner : null; };
+  const rectFills = cd.fills.filter((f) => f.rects);
+  const covering = (x, y, layerAlpha) => rectFills.filter((f) => { for (let k = 0; k < f.rects.length; k += 4) { const [x0, y0, x1, y1] = f.rects.slice(k, k + 4).map((v) => v * S0); if (x > x0 && x < x1 && y > y0 && y < y1) return true; } return false; });
+  let cover = 0, coverBad = null;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const x = (C0 + i + 0.5) * 4096, y = (C0 + N - 1 - j + 0.5) * 4096;
+    const want = cellOwner(i, j), wantRgb = want && factions[want] ? factions[want].rgb : null;
+    const got = covering(x, y);
+    // the outer layer once, the core again where within reach
+    const ok = wantRgb ? got.length >= 1 && got.length <= 2 && got.every((f) => f.rgb === ((wantRgb[0] << 16) | (wantRgb[1] << 8) | wantRgb[2])) : got.length === 0;
+    if (ok) cover++; else coverBad = coverBad || { i, j, want, got: got.map((f) => f.rgb) };
+  }
+  c('every cell tinted in its owner\'s colour, once or twice (fade and reach), and an unowned cell not at all', cover === N * N, coverBad);
+  const cellLines = cd.lines.filter((l) => l.pts.length === 4);
+  const sideOwners = (l) => {
+    const [x0, y0, x1, y1] = l.pts.map((v) => v * S0), mx = (x0 + x1) / 2, my = (y0 + y1) / 2, vert = Math.abs(x0 - x1) < 1;
+    const p = vert ? [[mx - 100, my], [mx + 100, my]] : [[mx, my - 100], [mx, my + 100]];
+    return p.map(([x, y]) => { const i = Math.floor(x / 4096) - C0, j = C0 + N - 1 - Math.floor(y / 4096); return cellOwner(i, j); });
+  };
+  c('every cell hairline runs between two different owners', cellLines.length > 0 && cellLines.every((l) => { const [a, b] = sideOwners(l); return a && b && a !== b; }), cellLines.length);
+  let edges = 0;
+  for (let j = 0; j < N; j++) for (let i = 0; i + 1 < N; i++) { const a = cellOwner(i, j), b = cellOwner(i + 1, j); if (a && b && a !== b) edges++; }
+  for (let j = 0; j + 1 < N; j++) for (let i = 0; i < N; i++) { const a = cellOwner(i, j), b = cellOwner(i, j + 1); if (a && b && a !== b) edges++; }
+  const lineLen = cellLines.reduce((s, l) => s + Math.hypot((l.pts[2] - l.pts[0]) * S0, (l.pts[3] - l.pts[1]) * S0), 0);
+  c('...and together they cover every such cell edge exactly once', Math.abs(lineLen - edges * 4096) < 4096 * 0.01, [lineLen / 4096, edges]);
+  const ringFill = cd.fills.find((f) => f.pts && f.alpha === M.TINT_ALPHA);
+  c('the stronghold drawn over the holds: its own colour, a little stronger, with a hairline ring', !!ringFill && ringFill.rgb === 200 && cd.lines.some((l) => l.pts.length > 4));
+  c('no table: the same world is drawn by its markers', M.drawingOf(Object.assign({}, cw, { cells: undefined }), factions, 30000, 45000).fills.every((f) => f.pts && !f.rects));
+
   // ---- lining it up ----
   const affine = (rot, sx, sy, tx, ty) => { const cr = Math.cos(rot), sr = Math.sin(rot); return { m00: cr * sx, m01: -sr * sy, m10: sr * sx, m11: cr * sy, tx, ty }; };
   const toScreen = (A, x, y) => ({ sx: A.m00 * x + A.m01 * y + A.tx, sy: A.m10 * x + A.m11 * y + A.ty });
@@ -156,11 +206,16 @@ const MUTANTS = [
   ['a mirrored fit kept', [['if (fx[0] * fy[1] - fx[1] * fy[0] >= 0)', 'if (false)']]],
   ['the split\'s turns swapped', [['rotation: ((a2 + a1) / 2) * DEG', 'rotation: ((a2 - a1) / 2) * DEG'], ['inner: ((a2 - a1) / 2) * DEG', 'inner: ((a2 + a1) / 2) * DEG']]],
   ['any fit holds', [['f.rms <= exports.MAX_FIT_RMS', 'true']]],
+  ['a stronghold does not win over the cells', [['for (const s of w.strongholds || [])', 'for (const s of [])']]],
+  ['a cell takes the nearest marker of any hold', [['if (t.zone !== zone)', 'if (false)']]],
+  ['the fork\'s row order upside down', [['j = t.c0 + t.n - 1 - Math.floor(y / t.size);', 'j = Math.floor(y / t.size) - t.c0;']]],
+  ['a run of cells runs on into another owner', [['ts[own[j * n + e]].owner === ownerName && lvl', 'lvl']]],
+  ['a cell hairline between two cells of one owner', [['const differ = (a, b) => a !== "" && b !== "" && a !== b;', 'const differ = (a, b) => a !== "" && b !== "";']]],
   ['a twice-listed name still anchors', [['twice.forEach((k) => m.delete(k));', '']]],
 ];
 for (const [name, edits] of MUTANTS) {
   let src = M_SRC, missing = null;
-  for (const [a, b] of edits) { if (!src.includes(a)) { missing = a; break; } src = src.replace(a, b); }
+  for (const [a, b] of edits) { if (!src.includes(a)) { missing = a; break; } src = src.split(a).join(b); }
   if (missing) { check(`mutant "${name}": its text is in the compiled module`, false, missing); continue; }
   const file = path.join(path.dirname(M_FILE), 'mapOwners.mutant.js');
   fs.writeFileSync(file, src);
@@ -191,8 +246,28 @@ check('each fill drawn, closed, in its colour and alpha; a fill of one point ski
   && JSON.stringify(sh.fills[0].pts) === '[[0,0],[10,0],[10,10],[0,0]]', sh.fills);
 const hl = strokes.filter((s) => s.w === 0);
 check('each line a hairline (thickness 0, so it stays thin at any zoom), in its colour', hl.length === 1 && hl[0].col === 0x111111 && hl[0].a === 45 && JSON.stringify(hl[0].pts) === '[[0,0],[10,10]]', strokes);
+t.push({ fills: [{ rgb: 0x0000c8, alpha: 11, rects: [0, 0, 2, 1, 2, 0, 4, 1] }], lines: [] });
+check('the cells of one owner: every rectangle in one fill, so neighbours show no seam', sh.fills.length === 1 && sh.fills[0].color === 0x0000c8
+  && JSON.stringify(sh.fills[0].pts) === '[[0,0],[2,0],[2,1],[0,1],[0,0],[2,0],[4,0],[4,1],[2,1],[2,0]]', sh.fills);
 t.push({ fills: [], lines: [] });
 check('a new payload clears the old drawing', sh.fills.length === 0);
+
+// ---- the real table, when it is here (private data: DBO_HOLD_CELLS and DBO_TERRITORIES name the files; skipped without) ----
+const HC = process.env.DBO_HOLD_CELLS, TF = process.env.DBO_TERRITORIES;
+if (HC && TF && fs.existsSync(HC) && fs.existsSync(TF)) {
+  const cells = M.readCells(Object.assign({ size: 4096 }, JSON.parse(fs.readFileSync(HC, 'utf8'))));
+  const terr = JSON.parse(fs.readFileSync(TF, 'utf8')).territories.filter((x) => x.marker && /^3c:/i.test(x.marker.world));
+  const world = { world: WORLD, aliases: [], cells, strongholds: [], territories: terr.map((x) => ({ id: x.id, owner: x.owner || 'hold-' + x.zone, zone: x.zone, x: x.marker.pos[0], y: x.marker.pos[1] })) };
+  const pal = {};
+  for (const tt of world.territories) pal[tt.owner] = { name: tt.owner, rgb: [100, 100, 100] };
+  const t0 = Date.now();
+  const dw = M.drawingOf(world, pal, 30000, 45000);
+  const json = JSON.stringify(dw);
+  console.log(`info real table: ${cells ? cells.n + 'x' + cells.n : 'unreadable'} cells, ${world.territories.length} territories, ${dw.fills.length} fills, ${dw.lines.length} lines, ${json.length} chars, ${Date.now() - t0} ms`);
+  check('the real Tamriel table draws, and its payload stays under 400,000 characters', !!cells && dw.fills.length > 0 && dw.lines.length > 0 && json.length < 400000, json.length);
+} else {
+  console.log('SKIP the real table: set DBO_HOLD_CELLS and DBO_TERRITORIES to measure the payload');
+}
 let threw = false;
 try { t.push({ fills: 'x' }); } catch (e) { threw = true; }
 check('an unreadable payload is logged and changes nothing', !threw && t.ctx.dboQueue.some((q) => q[0] === 'log' && /unreadable/.test(q[1])));

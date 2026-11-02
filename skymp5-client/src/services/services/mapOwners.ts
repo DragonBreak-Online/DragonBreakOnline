@@ -32,14 +32,41 @@ export const ANCHORS_PER_FRAME = 16;
 // T, as a DirectX scan code
 export const TOGGLE_KEY = 20;
 
-export interface Territory { id: string; owner: string; x: number; y: number }
-export interface OwnersWorld { world: string; aliases: string[]; territories: Territory[] }
+export interface Territory { id: string; owner: string; zone: string; x: number; y: number }
+// With zones.json sovereignty.holdsFromCells on, Tamriel's holds by cell: the fork's hold-cells table (zones.ts), rows north
+// first, one character a cell west to east, a hold's index in holds ("0".."9", "a".."z") or "." for none
+export interface HoldCells { c0: number; n: number; size: number; holds: string[]; rows: string[] }
+// A stronghold's radius, which wins over the holds (zones.ts strongholdsOverrideHolds)
+export interface Stronghold { zone: string; x: number; y: number; r: number }
+export interface OwnersWorld { world: string; aliases: string[]; territories: Territory[]; cells?: HoldCells; strongholds?: Stronghold[] }
 export interface Faction { name: string; rgb: [number, number, number] }
 export interface Anchor { name: string; x: number; y: number; z: number }
 export interface OwnersData { worlds: OwnersWorld[]; factions: Record<string, Faction>; anchors: Anchor[]; reach: number; fade: number }
 
 const DESC = /^[0-9a-f]+:[^:]+\.es[mpl]$/i;
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+
+// The table if it is whole, as zones.ts parseHoldCells checks it; null otherwise (the world is then drawn by its markers)
+export const readCells = (raw: unknown): HoldCells | null => {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const c0 = Number(o.c0), n = Number(o.n), size = Number(o.size) || 4096;
+  const holds = Array.isArray(o.holds) ? o.holds.map(String) : [];
+  const rows = Array.isArray(o.rows) ? o.rows.map(String) : [];
+  if (!Number.isInteger(c0) || !Number.isInteger(n) || n <= 0 || rows.length !== n || !holds.length || holds.length > 36) return null;
+  for (const r of rows) {
+    if (r.length !== n) return null;
+    for (let i = 0; i < r.length; i++) if (r[i] !== "." && !(parseInt(r[i], 36) < holds.length)) return null;
+  }
+  return { c0, n, size, holds, rows };
+};
+// The hold of the cell holding (x, y), zones.ts cellHold's own arithmetic, or null outside the table
+export const cellHold = (t: HoldCells, x: number, y: number): string | null => {
+  const i = Math.floor(x / t.size) - t.c0, j = t.c0 + t.n - 1 - Math.floor(y / t.size);
+  if (!(i >= 0 && i < t.n && j >= 0 && j < t.n)) return null;
+  const ch = t.rows[j][i];
+  return ch === "." ? null : t.holds[parseInt(ch, 36)] || null;
+};
 
 export const readOwners = (raw: Record<string, unknown>): OwnersData | null => {
   const worlds: OwnersWorld[] = [];
@@ -51,10 +78,21 @@ export const readOwners = (raw: Record<string, unknown>): OwnersData | null => {
     for (const t of Array.isArray(o.territories) ? o.territories : []) {
       const r = (t || {}) as Record<string, unknown>;
       const x = num(r.x), y = num(r.y);
-      if (typeof r.id === "string" && r.id && typeof r.owner === "string" && r.owner && x !== null && y !== null) territories.push({ id: r.id, owner: r.owner, x, y });
+      if (typeof r.id === "string" && r.id && typeof r.owner === "string" && r.owner && x !== null && y !== null) territories.push({ id: r.id, owner: r.owner, zone: typeof r.zone === "string" ? r.zone : "", x, y });
     }
     const aliases = (Array.isArray(o.aliases) ? o.aliases : []).filter((a): a is string => typeof a === "string" && DESC.test(a));
-    if (territories.length) worlds.push({ world: o.world, aliases, territories });
+    if (!territories.length) continue;
+    const out: OwnersWorld = { world: o.world, aliases, territories };
+    const cells = readCells(o.cells);
+    if (cells) out.cells = cells;
+    const strongholds: Stronghold[] = [];
+    for (const z of Array.isArray(o.strongholds) ? o.strongholds : []) {
+      const r = (z || {}) as Record<string, unknown>;
+      const x = num(r.x), y = num(r.y), rad = num(r.r);
+      if (typeof r.zone === "string" && r.zone && x !== null && y !== null && rad !== null && rad > 0) strongholds.push({ zone: r.zone, x, y, r: rad });
+    }
+    if (cells) out.strongholds = strongholds;
+    worlds.push(out);
   }
   const factions: Record<string, Faction> = {};
   const f = raw.factions && typeof raw.factions === "object" ? (raw.factions as Record<string, unknown>) : {};
@@ -124,7 +162,8 @@ export const cellOf = (ts: Territory[], i: number, r: number): Shape => {
 
 // What dbo_mapowners draws, in drawing units (world / DRAW_SCALE, y as the world's: the clip's negative y scale flips it)
 export interface Drawing {
-  fills: Array<{ rgb: number; alpha: number; pts: number[] }>;
+  // a fill is one polygon (pts) or many rectangles in one fill (rects: x0, y0, x1, y1, ...), so cells show no seams
+  fills: Array<{ rgb: number; alpha: number; pts?: number[]; rects?: number[] }>;
   lines: Array<{ rgb: number; alpha: number; pts: number[] }>;
   owners: string[];
 }
@@ -137,7 +176,108 @@ const flat = (pts: Pt[]): number[] => {
   return out;
 };
 
+// Who owns (x, y) with the hold-cells table: a stronghold's radius first, else the cell's hold, then the nearest of that
+// zone's territories; null outside the table or for a zone with no territory. d: the distance to that territory's marker
+export const ownerAt = (w: OwnersWorld, x: number, y: number): { t: number; d: number } | null => {
+  let zone: string | null = null;
+  for (const s of w.strongholds || []) if (Math.hypot(x - s.x, y - s.y) <= s.r) { zone = s.zone; break; }
+  if (zone === null && w.cells) zone = cellHold(w.cells, x, y);
+  if (zone === null) return null;
+  let best = -1, bd = Infinity;
+  w.territories.forEach((t, i) => { if (t.zone !== zone) return; const d = Math.hypot(x - t.x, y - t.y); if (d < bd) { bd = d; best = i; } });
+  return best < 0 ? null : { t: best, d: bd };
+};
+
+// The holds by cell: each cell takes its centre's hold and the nearest of that hold's territories (the strongholds are drawn
+// over them as their own circles), tinted within reach of any marker and fading out by fade; a hairline runs along every
+// cell edge between two owners
+const cellDrawing = (w: OwnersWorld, factions: Record<string, Faction>, reach: number, fade: number): Drawing => {
+  const t = w.cells as HoldCells;
+  const ts = w.territories;
+  const holdsOnly: OwnersWorld = { world: w.world, aliases: w.aliases, territories: ts, cells: t };
+  const colour = (owner: string): [number, number, number] | null => (factions[owner] ? factions[owner].rgb : null);
+  const n = t.n, S = t.size;
+  const own: number[] = new Array(n * n).fill(-1), lvl: number[] = new Array(n * n).fill(0);
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const x = (t.c0 + i + 0.5) * S, y = (t.c0 + n - 1 - j + 0.5) * S;
+    const o = ownerAt(holdsOnly, x, y);
+    // the table runs out to sea and into Cyrodiil, so the tint fades by the distance to any marker: a hold's own far
+    // corner stays tinted as long as some marker is near, and only the province's edge fades
+    let near = Infinity;
+    for (const m of ts) near = Math.min(near, Math.hypot(x - m.x, y - m.y));
+    if (!o || near > fade) continue;
+    own[j * n + i] = o.t;
+    lvl[j * n + i] = near <= reach ? 2 : 1;
+  }
+  const u = (v: number) => Math.round((v / DRAW_SCALE) * 10) / 10;
+  // one fill per owner and layer: every run of cells of that owner in a row is a rectangle of it
+  const groups = new Map<string, { rgb: number; rects: number[] }>();
+  for (const layer of [1, 2]) for (let j = 0; j < n; j++) {
+    let i = 0;
+    while (i < n) {
+      const k = own[j * n + i];
+      const ownerName = k >= 0 ? ts[k].owner : "";
+      const rgb = k >= 0 ? colour(ownerName) : null;
+      if (!rgb || lvl[j * n + i] < layer) { i++; continue; }
+      let e = i + 1;
+      while (e < n && own[j * n + e] >= 0 && ts[own[j * n + e]].owner === ownerName && lvl[j * n + e] >= layer) e++;
+      const key = layer + "#" + ownerName;
+      if (!groups.has(key)) groups.set(key, { rgb: rgbOf(rgb), rects: [] });
+      const yTop = (t.c0 + n - j) * S, yBottom = (t.c0 + n - 1 - j) * S;
+      (groups.get(key) as { rects: number[] }).rects.push(u((t.c0 + i) * S), u(yBottom), u((t.c0 + e) * S), u(yTop));
+      i = e;
+    }
+  }
+  const fills: Drawing["fills"] = [];
+  groups.forEach((g) => fills.push({ rgb: g.rgb, alpha: TINT_ALPHA / 2, rects: g.rects }));
+  // hairlines: where two neighbouring cells have different owners, merged along a run of cell edges of one colour
+  const lines: Drawing["lines"] = [];
+  const ownerOf = (i: number, j: number) => (i >= 0 && i < n && j >= 0 && j < n && own[j * n + i] >= 0 ? ts[own[j * n + i]].owner : "");
+  const lineColour = (a: string, b: string) => rgbOf(darker(colour(a) || colour(b) || GREY));
+  const differ = (a: string, b: string) => a !== "" && b !== "" && a !== b;
+  // vertical edges: between column i and i + 1, running down the rows
+  for (let i = 0; i + 1 < n; i++) {
+    let j = 0;
+    while (j < n) {
+      const a = ownerOf(i, j), b = ownerOf(i + 1, j);
+      if (!differ(a, b)) { j++; continue; }
+      const c = lineColour(a, b);
+      let e = j + 1;
+      while (e < n && differ(ownerOf(i, e), ownerOf(i + 1, e)) && lineColour(ownerOf(i, e), ownerOf(i + 1, e)) === c) e++;
+      const x = (t.c0 + i + 1) * S;
+      lines.push({ rgb: c, alpha: LINE_ALPHA, pts: [u(x), u((t.c0 + n - j) * S), u(x), u((t.c0 + n - e) * S)] });
+      j = e;
+    }
+  }
+  // horizontal edges: between row j and j + 1, running east
+  for (let j = 0; j + 1 < n; j++) {
+    let i = 0;
+    while (i < n) {
+      const a = ownerOf(i, j), b = ownerOf(i, j + 1);
+      if (!differ(a, b)) { i++; continue; }
+      const c = lineColour(a, b);
+      let e = i + 1;
+      while (e < n && differ(ownerOf(e, j), ownerOf(e, j + 1)) && lineColour(ownerOf(e, j), ownerOf(e, j + 1)) === c) e++;
+      const y = (t.c0 + n - 1 - j) * S;
+      lines.push({ rgb: c, alpha: LINE_ALPHA, pts: [u((t.c0 + i) * S), u(y), u((t.c0 + e) * S), u(y)] });
+      i = e;
+    }
+  }
+  // each stronghold over the holds: its own territory's colour, a little stronger, ringed by a hairline
+  for (const sh of w.strongholds || []) {
+    const o = ownerAt({ world: w.world, aliases: w.aliases, territories: ts, strongholds: [sh] }, sh.x, sh.y);
+    const rgb = o ? colour(ts[o.t].owner) : null;
+    if (!rgb) continue;
+    const ring: Pt[] = [];
+    for (let k = 0; k <= CIRCLE_SIDES; k++) { const a = (k / CIRCLE_SIDES) * Math.PI * 2; ring.push([sh.x + sh.r * Math.cos(a), sh.y + sh.r * Math.sin(a)]); }
+    fills.push({ rgb: rgbOf(rgb), alpha: TINT_ALPHA, pts: flat(ring) });
+    lines.push({ rgb: rgbOf(darker(rgb)), alpha: LINE_ALPHA, pts: flat(ring) });
+  }
+  return { fills, lines, owners: Array.from(new Set(ts.map((x) => x.owner))) };
+};
+
 export const drawingOf = (w: OwnersWorld, factions: Record<string, Faction>, reach: number, fade: number): Drawing => {
+  if (w.cells) return cellDrawing(w, factions, reach, fade);
   const ts = w.territories;
   const fills: Drawing["fills"] = [], lines: Drawing["lines"] = [];
   // an owner with no colour (unclaimed) is not tinted, but its marker still shapes its neighbours
