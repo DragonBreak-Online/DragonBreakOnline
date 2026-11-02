@@ -52,6 +52,24 @@ cd build
    CI flatrim build to regenerate the .dlls or any other workflow/rebuild step
    after a patch. Say which artifacts are affected.
 
+6) A harness that tolerates a behaviour as "known" must name the commit or
+   version it dates from and who owns it. Without both it is a plain failure.
+   A tolerated case with no provenance is how a bug lives in plain sight: the
+   realm map panel showed the wrong place's tooltip at zoom 1.35 from 0.3.100
+   until 1 Nov 2026, demonstrated by its own harness the whole time. Do not
+   sweep existing harnesses for this; fix each as it is touched.
+
+7) C++ here is clang-format ColumnLimit 79, far narrower than this project's
+   JS. The Formatting check runs on every push and names file, line and column.
+   Format before pushing: the npm clang-format package's win32 binary works,
+   though it is version 15 against CI's 21.1.8 and the two differ on a lambda
+   in a braced initializer list and on a short function 15 splits that 21
+   keeps. The repo's own linter SKIPS the clang-format check on Windows and
+   still exits with a summary, so a local linter pass means nothing about
+   formatting. A C++ file that was never formatted gets its own commit, never
+   the feature's: CI checks only files changed against main, so a long
+   unformatted file is first checked by whichever branch happens to touch it.
+
 ## Deployment reality (read before promising a fix works)
 
 A change only reaches players after the right rebuild. Getting this wrong is the
