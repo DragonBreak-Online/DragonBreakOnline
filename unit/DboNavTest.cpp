@@ -181,22 +181,18 @@ TEST_CASE("DboNav: a file reads back with its tiles, meshes, flags and links",
 
 TEST_CASE("DboNav: tiles from a file make a world a path crosses", "[DboNav]")
 {
+  // A second, separate mesh in cell 0,1: an island, not joined
+  SynthMesh island;
+  island.desc = "d";
+  island.verts = { { 100, kS + 100, 900 },
+                   { 300, kS + 100, 900 },
+                   { 300, kS + 300, 900 } };
+  island.tris = { { 0, 1, 2, 0xffff, 0xffff, 0xffff, 0x0800, 0 } };
   // The east cell's west edge is 6 units off, like the worst real one
-  const auto bytes = Write(
-    "test.esp:00003c",
-    { Tile(0, 0, { SquareMesh(0, 0, "a") }),
-      Tile(1, 0, { SquareMesh(1, 0, "b", 6.f) }),
-      Tile(0, 1,
-           { SquareMesh(0, 1, "c"), [] {
-              // A second, separate mesh in the cell: an island, not joined
-              SynthMesh m;
-              m.desc = "d";
-              m.verts = { { 100, kS + 100, 900 },
-                          { 300, kS + 100, 900 },
-                          { 300, kS + 300, 900 } };
-              m.tris = { { 0, 1, 2, 0xffff, 0xffff, 0xffff, 0x0800, 0 } };
-              return m;
-            }() }) });
+  const auto bytes = Write("test.esp:00003c",
+                           { Tile(0, 0, { SquareMesh(0, 0, "a") }),
+                             Tile(1, 0, { SquareMesh(1, 0, "b", 6.f) }),
+                             Tile(0, 1, { SquareMesh(0, 1, "c"), island }) });
   DboNavFile file;
   REQUIRE(ReadDboNav(bytes.data(), bytes.size(), file));
   NavWorld world;
