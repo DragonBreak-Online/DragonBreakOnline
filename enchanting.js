@@ -59,6 +59,10 @@ module.exports = (api) => {
     return { m: share(ITEM[kind]) * soulShare / VANILLA_APPAREL_SOUL[soul], item: kind, soul, soulShare };
   };
 
+  // /armor (gamemode.js armorReport): how much of a new enchantment an item of this kind holds ('light', 'heavy', 'clothing'),
+  // or null with the rule off
+  globalThis.__dboEnchantShareOf = (kind) => (C.enabled ? share(ITEM[kind] === undefined ? ITEM.unknown : ITEM[kind]) : null);
+
   globalThis.__dboEnchantScale = (actorId, info) => {
     if (!C.enabled || !info || !Array.isArray(info.effects)) return null;
     const base = baseShare(info);
