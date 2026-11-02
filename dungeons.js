@@ -400,7 +400,7 @@ module.exports = (api) => {
     for (let i = 0; i < zs.length; i++) for (let j = i + 1; j < zs.length; j++) {
       if (normCell(zs[i].ID) === normCell(zs[j].ID) && dist3(zs[i].POS, zs[j].POS) <= gr) parent[find(i)] = find(j);
     }
-    const landings = (d.entrances || []).filter((e) => e && Array.isArray(e.insidePos)).map((e) => ({ cell: normCell(e.insideCell), pos: e.insidePos }));
+    const landings = (d.entrances || []).filter((e) => e && Array.isArray(e.insidePos)).map((e) => ({ cell: normCell(e.insideWorld || e.insideCell), pos: e.insidePos }));
     const nearLanding = (z) => landings.some((l) => l.cell === normCell(z.ID) && dist3(l.pos, z.POS) <= reach);
     const awake = new Set();
     zs.forEach((z, i) => { if (out.bosses.includes(z.Name) || nearLanding(z)) awake.add(find(i)); });
@@ -459,7 +459,7 @@ module.exports = (api) => {
         const boss = npc.boss === true || named !== undefined || !!(entry && entry.boss);
         const id = pickScaled(opts, scale.lvl, diff, boss, raid);
         if (!id || !Array.isArray(npc.pos)) continue;
-        if (!boss) escortsFrom.push({ cell: z.cell, pos: npc.pos, opts, kind });
+        if (!boss) escortsFrom.push({ cell: z.world || z.cell, pos: npc.pos, opts, kind });
         const m = diff.mult * partyCountMult(scale.n) * (raid ? Math.max(1, Number(RAID.countMult) || 1) : 1);
         if (!boss && m < 1 && Math.random() > m) continue;                                  // fewer of them; never the boss
         const extra = boss ? 0 : Math.max(0, m - 1);
@@ -469,7 +469,7 @@ module.exports = (api) => {
         // PlaceAtMe spawn, so it waits for somebody within AMBUSH_REACH instead of standing in the open
         const ambush = isAmbusher(npc.ref);
         if (ambush) ambushed++;
-        const zone = { Name: `${ZONE_PREFIX}${d.id}:${n++}`, ID: z.cell, POS: npc.pos, Size: ambush ? AMBUSH_REACH : 100000, NPC: [{ id, count }], Despawn: 0, Respawn: 0, Kind: kind, Prespawn: !ambush, Ambush: ambush };
+        const zone = { Name: `${ZONE_PREFIX}${d.id}:${n++}`, ID: z.world || z.cell, POS: npc.pos, Size: ambush ? AMBUSH_REACH : 100000, NPC: [{ id, count }], Despawn: 0, Respawn: 0, Kind: kind, Prespawn: !ambush, Ambush: ambush };
         // Anchor ref is optional — if it resolves, the spawn appears exactly on that ref; if not, it falls
         // back to the baked POS which is still Bethesda's placement coordinate.
         // Placed: Bethesda's placement, for its template's factions (factionCheck) whether or not the server loads it
@@ -881,7 +881,8 @@ module.exports = (api) => {
   };
   const noteEntry = (lease, d) => { if (staggered(d)) lease.nextEntryAt = Math.max(Number(lease.nextEntryAt) || 0, Date.now() + entryGap()); };
   const goIn = (a, lease, d, diff, entrance) => {
-    if (!teleport(a, entrance.insideCell, entrance.insidePos, entrance.insideRot || [0, 0, 0])) return false;
+    // A ruin in an exterior world is entered by its world (a cell desc there gives the client nothing to load)
+    if (!teleport(a, entrance.insideWorld || entrance.insideCell, entrance.insidePos, entrance.insideRot || [0, 0, 0])) return false;
     noteEntry(lease, d);
     system(a, arrivalLine(d, lease, diff));
     glowLease(a, lease, d);
@@ -1741,7 +1742,7 @@ module.exports = (api) => {
             try { if (globalThis.__dboRuinArrived) globalThis.__dboRuinArrived(d.id, casterId); } catch (e) { log('ruin arrival failed', e.message); }
             return true;
           }
-          teleport(casterId, entrance.insideCell, entrance.insidePos, entrance.insideRot || [0, 0, 0]);
+          teleport(casterId, entrance.insideWorld || entrance.insideCell, entrance.insidePos, entrance.insideRot || [0, 0, 0]);
           system(casterId, `You set out to join your party in ${d.name}.`);
           // What the party opened before they came (a ruin's stair) is shown to them too (ruinbuttons.js)
           try { if (globalThis.__dboRuinArrived) globalThis.__dboRuinArrived(d.id, casterId); } catch (e) { log('ruin arrival failed', e.message); }
