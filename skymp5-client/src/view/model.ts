@@ -15,6 +15,8 @@ export interface FormModel extends CreateActorMessageAdditionalProps, CreateActo
   // Smoothed ms between movement updates for this form: ~130 at full rate, longer when the server's interest management
   // sends a far mover less often (sync/movementApply.ts stretches its interpolation to match)
   movementGapMs?: number;
+  // The server drives this actor (its last movement said so): no client may ask to host it, whatever isHostedByOther says
+  isServerDriven?: boolean;
   numAppearanceChanges?: number;
   isMyClone?: boolean;
 }
