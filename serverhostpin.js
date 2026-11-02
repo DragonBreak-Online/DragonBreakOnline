@@ -197,6 +197,18 @@ module.exports = ({ mp, log, every, cfg, state } = {}) => {
       if (!on) return;
       const s = { mode: C.mode, zone: zone || undefined, npc: npc ? npc.toString(16) : undefined, watching: S.ids.size, changes: S.changes, refused: S.refused };
       say(`serverHostPin: ${JSON.stringify(s)}`);
+      // The watchdog for the 2 Nov stranding. In pin the NPC is refused to every client, so if nothing is
+      // driving it, it stands with no owner and only a player notices. guardmover.js stamps
+      // __dboGuardMoverBeat on every packet it sends, so a stale or missing beat while pinning is the bad
+      // state, and it says so in the log rather than waiting to be seen in game.
+      if (!pinning || !S.ids.size) return;
+      const beat = Number(globalThis.__dboGuardMoverBeat) || 0;
+      const age = beat ? Date.now() - beat : Infinity;
+      if (age > 5000) {
+        say(`serverHostPin: WARNING ${S.ids.size} NPC(s) pinned in ${zone || 'id ' + npc.toString(16)} and ` +
+          `nothing has driven them for ${beat ? age + ' ms' : 'ever'}: no client may host them, so they are ` +
+          'standing with no owner. Start guardmover, or set mode to observe and clearTag them.');
+      }
     });
   }
 
