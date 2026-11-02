@@ -61,7 +61,7 @@ const MapRealm = ({ data }: { data: MapRealmData }) => {
               </div>
             </>
           ) : null}
-          <div className="mapRealm__hint">A number shows or hides its places. The realm's places are the map's own markers, so they zoom, turn and fast-travel as every other does.</div>
+          <div className="mapRealm__hint">A number shows or hides its places, T the territory colours. The realm's places are the map's own markers, so they zoom, turn and fast-travel as every other does.</div>
         </div>
       ) : null}
       <div className="mapRealm__bar"><span className="mapRealm__barkey">R</span>Realm</div>
