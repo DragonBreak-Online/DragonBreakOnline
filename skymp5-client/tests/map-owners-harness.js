@@ -172,6 +172,13 @@ const scenarios = (M, c) => {
   const flat3d = M.drawingOf(cw, fac2, 10000, 45000), onPaper = M.drawingOf(cw, fac2, 10000, 45000, true);
   c('on paper every tinted cell is at full strength (both layers), no pale edge, over the same cells the 3D map tints', area(onPaper) > 0 && area(flat3d) < area(onPaper) && area(flat3d) > area(onPaper) / 2,
     [area(flat3d), area(onPaper)]);
+  // W6's fallback grid: a cell whose hold is only the nearest capital's is left clear, the rest drawn as before
+  const fbRows = rowsOf().map((r, j) => r.split('').map((ch, i) => (j === 4 && i === 7 ? '1' : '.')).join(''));
+  const fbTable = M.readCells({ c0: C0, n: N, holds: ['east', 'west', 'north'], rows: rowsOf(), fallback: fbRows });
+  const fbd = M.drawingOf(Object.assign({}, cw, { cells: fbTable }), Object.assign({ 'hold-c': { name: 'C', rgb: [0, 0, 200] } }, factions), 30000, 45000);
+  const tintedAt = (d, i, j) => { const x = (C0 + i + 0.5) * 4096, y = (C0 + N - 1 - j + 0.5) * 4096; return d.fills.some((f) => f.rects && (() => { for (let k = 0; k < f.rects.length; k += 4) { const [x0, y0, x1, y1] = f.rects.slice(k, k + 4).map((v) => v * S0); if (x > x0 && x < x1 && y > y0 && y < y1) return true; } return false; })()); };
+  c('a fallback cell (hold only from the nearest capital) is left clear; its neighbours are drawn as before', !!fbTable && !!fbTable.fallback && tintedAt(cd, 7, 4) && !tintedAt(fbd, 7, 4) && tintedAt(fbd, 6, 4) && tintedAt(fbd, 8, 4), [tintedAt(cd, 7, 4), tintedAt(fbd, 7, 4)]);
+  c('...a fallback grid of the wrong size is ignored', M.readCells({ c0: C0, n: N, holds: ['east', 'west', 'north'], rows: rowsOf(), fallback: ['1'] }).fallback === undefined);
   c('no table: the same world is drawn by its markers', M.drawingOf(Object.assign({}, cw, { cells: undefined }), factions, 30000, 45000).fills.every((f) => f.pts && !f.rects));
 
   // ---- lining it up ----
