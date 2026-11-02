@@ -239,6 +239,12 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   h6.menuOpen({ name: 'MapMenu' });
   for (let i = 0; i < 70; i++) h6.update();
   const owners = () => S.invoked.filter((x) => x[0] === '_root.dboOwners').map((x) => JSON.parse(x[1][0]));
+  // the marker sets for checking the fit in the game: one at the first fit, its points the anchors as the map showed them
+  const fitLines = S.packets.filter((p) => p.event === 'mapOwnersFit').map((p) => p.args[0]);
+  const fs0 = fitLines[0] || {};
+  const bruma = (fs0.p || []).find((q) => q[0] === 0 && q[1] === 0);
+  ok(fitLines.length === 1 && fs0.n === 6 && fs0.rms < 0.5 && fs0.h.length === 9 && fs0.p.length === 6 && bruma && Math.abs(bruma[2] - 640) < 0.1 && Math.abs(bruma[3] - 360) < 0.1 && JSON.stringify(fs0).length < 400,
+    'one marker set sent at the first fit: the homography, its rms, the affine rms, world and screen xy, short enough for the log', fs0);
   const drawn = owners();
   ok(drawn.length === 1 && drawn[0].fills.length === 4, 'the owners are drawn once into our legend menu (two territories, two layers each)', drawn.length);
   ok(S.props['_root.owners.layer._visible'] === true, '...the layer shown once the markers fit', S.props['_root.owners.layer._visible']);
