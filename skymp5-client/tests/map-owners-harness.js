@@ -164,6 +164,14 @@ const scenarios = (M, c) => {
   const own = shOver('hold-a'), other = shOver('hold-c');
   c('...over cells already its owner\'s: only the ring, never tinted twice', !own.fills.some((f) => f.pts) && own.lines.some((l) => l.pts.length > 4), own.fills.filter((f) => f.pts));
   c('...the same place held by another owner: filled', other.fills.filter((f) => f.pts).length === 1, other.fills.filter((f) => f.pts).length);
+  // on paper one strength: every tinted cell carries both layers (no pale fading edge read as another owner), the same
+  // cells as on the 3D map (Nat, 2 Nov: "some of the colours don't match for a hold")
+  const fac2 = Object.assign({ 'hold-c': { name: 'C', rgb: [0, 0, 200] } }, factions);
+  const area = (d) => d.fills.filter((f) => f.rects).reduce((t, f) => { for (let q = 0; q < f.rects.length; q += 4) t += (f.rects[q + 2] - f.rects[q]) * (f.rects[q + 3] - f.rects[q + 1]); return t; }, 0);
+  // a short reach, so the 3D map has a fading edge: one layer there, two at the core
+  const flat3d = M.drawingOf(cw, fac2, 10000, 45000), onPaper = M.drawingOf(cw, fac2, 10000, 45000, true);
+  c('on paper every tinted cell is at full strength (both layers), no pale edge, over the same cells the 3D map tints', area(onPaper) > 0 && area(flat3d) < area(onPaper) && area(flat3d) > area(onPaper) / 2,
+    [area(flat3d), area(onPaper)]);
   c('no table: the same world is drawn by its markers', M.drawingOf(Object.assign({}, cw, { cells: undefined }), factions, 30000, 45000).fills.every((f) => f.pts && !f.rects));
 
   // ---- lining it up ----
