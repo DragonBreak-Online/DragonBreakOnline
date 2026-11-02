@@ -190,6 +190,7 @@ const scenarios = (M, c) => {
   c('...nor a label the map shows twice', clips.length === 0);
   const one = M.anchorClips(['Riverwood', ' whiterun', undefined], idx);
   c('a label the map shows once, matched however it is spaced or cased', one.length === 1 && one[0].i === 1 && one[0].a.x === 1);
+  c('a rebound key names the row', M.legendRow(true, 2, 'Y').key === 'Y');
   c('the legend row: T, the owners on this map', JSON.stringify(M.legendRow(false, 4)) === JSON.stringify({ id: 'territories', label: 'Territory colours', key: 'T', count: 4, shown: false }));
 };
 
@@ -283,8 +284,11 @@ check('drawn again only when the world or an owner changes', /if \(key !== this\
 check('shown only while the player wants it and the fit holds; hidden where no world has owners', /const holds = this\.ownersShown && fitHolds\(fit\);/.test(fo) && /setBool\(MAP_MENU, `\$\{layer\}\._visible`, holds\)/.test(fo) && /if \(!world\) \{ ui\.setBool\(MAP_MENU, `\$\{layer\}\._visible`, false\); return; \}/.test(fo));
 check('the six transform values set each frame it holds', ['_x', '_y', '_xscale', '_yscale', '_rotation'].every((k) => src.includes('`${layer}.' + k + '`')) && src.includes('`${layer}.shapes._rotation`, t.inner'));
 check('the marker positions read in the root\'s units (MarkerClips\' own offset and scale applied)', /seen\.push\(\{ sx: bx \+ ui\.getFloat\(MAP_MENU, `\$\{clip\}\._x`\) \* kx, sy: by \+ ui\.getFloat\(MAP_MENU, `\$\{clip\}\._y`\) \* ky/.test(fn('fitNow')) && /\._visible`\)\) continue;/.test(fn('fitNow')));
-check('T toggles the colours, with or without the realm\'s markers', /if \(e\.code === TOGGLE_KEY && this\.owners\) \{\n      this\.ownersShown = !this\.ownersShown;/.test(fn('onButton')) && fn('onButton').indexOf('TOGGLE_KEY') < fn('onButton').indexOf('if (!this.markers.length) return;'));
-check('the legend gets the colours\' row once the world is drawn', /if \(this\.owners && this\.drawnKey\) rows = rows\.concat\(\[legendRow\(this\.ownersShown, this\.worldOwners\)\]\);/.test(fn('publish')));
+check('the toggle key is read like the other hotkeys: mapColoursKeyCode, else T', M.TOGGLE_SETTING === 'mapColoursKeyCode' && M.TOGGLE_KEY === 20
+  && /this\.ownersKey = readMenuKeyCode\(this\.sp, TOGGLE_SETTING, TOGGLE_KEY\);/.test(src));
+check('that key toggles the colours, with or without the realm\'s markers; 0 turns it off', /if \(this\.ownersKey && e\.code === this\.ownersKey && this\.owners\) \{\n      this\.ownersShown = !this\.ownersShown;/.test(fn('onButton'))
+  && fn('onButton').indexOf('this.ownersKey') < fn('onButton').indexOf('if (!this.markers.length) return;'));
+check('the legend gets the colours\' row once the world is drawn, named for that key', /if \(this\.owners && this\.drawnKey\) rows = rows\.concat\(\[legendRow\(this\.ownersShown, this\.worldOwners, keyName\(this\.ownersKey\)\)\]\);/.test(fn('publish')));
 check('the fit is measured and reported once an opening', /sendCustomPacket\(this\.controller, \{ customPacketType: "dbo", event: "mapOwnersFit"/.test(fo) && /this\.fitLogged = false;/.test(fn('onMapOpen')));
 
 T.done();
