@@ -75,6 +75,20 @@ const scenarios = (src, c) => {
     c('the anchors are the markers\' own positions, read from their records; one with no record is left out', p.anchors.length === 2
       && p.anchors.some((a) => a.name === 'Castle Bruma' && a.x === -1000.5 && a.y === 2000.25 && a.z === 300) && p.anchors.some((a) => a.name === 'Dragonsreach' && a.x === 19855 && a.y === -7423), p.anchors);
     c('the reach and the fade, W6\'s C2 by default', p.reach === 30000 && p.fade === 45000);
+    c('each territory carries its zone', !!brumaT && brumaT.zone === 'bruma' && tam.territories.every((t) => typeof t.zone === 'string' && t.zone));
+    c('with no hold-cells table (holdsFromCells off), no cells and no strongholds', !tam.cells && !tam.strongholds);
+    // the switch on: the fork's table, and zones.json's strongholds
+    globalThis.__dboHoldCells = { version: 2, c0: -1, n: 2, holds: ['whiterun', 'falkreath'], rows: ['0.', '11'] };
+    fs.writeFileSync(path.join(tmp, 'zones.json'), JSON.stringify({ strongholds: [{ id: 'gol-kharzum', center: [-76847, -45868, 2327], radius: 6000 }, { id: 'broken' }] }));
+    sent.length = 0;
+    handlers.get('uiCaps')(7, []);
+    const pc = (sent.find((x) => x[1].customPacketType === 'dboMapOwners') || [])[1];
+    const tc = pc && pc.worlds.find((w) => w.world === '3c:Skyrim.esm'), bc = pc && pc.worlds.find((w) => w.world === 'a764b:BSHeartland.esm');
+    c('holdsFromCells on: Tamriel carries the fork\'s very table', !!tc && !!tc.cells && tc.cells.c0 === -1 && tc.cells.n === 2 && tc.cells.size === 4096 && JSON.stringify(tc.cells.rows) === '["0.","11"]' && tc.cells.holds.join() === 'whiterun,falkreath', tc && tc.cells);
+    c('...and the strongholds that win over it, a broken one left out', !!tc && JSON.stringify(tc.strongholds) === JSON.stringify([{ zone: 'gol-kharzum', x: -76847, y: -45868, r: 6000 }]), tc && tc.strongholds);
+    c('...Bruma keeps its own (one region, no cells)', !!bc && !bc.cells && !bc.strongholds);
+    delete globalThis.__dboHoldCells;
+    try { fs.unlinkSync(path.join(tmp, 'zones.json')); } catch (e) { /* none */ }
     // owner changes: one packet each online player, after the burst
     sent.length = 0;
     realm.setOwner('bruma', 'fighters-guild', 'test');
@@ -107,6 +121,8 @@ const MUTANTS = [
   ['a burst sends a packet per change', '    if (S.ownersTimer) return;\n', '\n'],
   ['the walled cities stay worlds of their own', 'return hit ? hit[1] : w; };', 'return w; };'],
   ['the config colours are ignored', 'const own = (C.mapTints && C.mapTints[fid]) || MAP_TINTS[fid];', 'const own = MAP_TINTS[fid];'],
+  ['the cells sent with the switch off', "if (tam && cells && Array.isArray(cells.rows)", "if (tam && Array.isArray((cells || { rows: [] }).rows || [])"],
+  ['the strongholds left out', '.map((z) => ({ zone: z.id, x: z.center[0], y: z.center[1], r: Number(z.radius) }));', '.map(() => null).filter(Boolean);'],
   ['the marker position read from the rotation', 'const v = new DataView(d.data.buffer, d.data.byteOffset, 12);', 'const v = new DataView(d.data.buffer, d.data.byteOffset + 12, 12);'],
 ];
 for (const [name, a, b] of MUTANTS) {

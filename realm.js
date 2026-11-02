@@ -777,11 +777,24 @@ module.exports = (api) => {
       const key = String(w).toLowerCase();
       if (!worlds.has(key)) worlds.set(key, { world: w, aliases: aliases.filter(([, to]) => String(to).toLowerCase() === key).map(([from]) => from), territories: [] });
       const owner = ownerOf(t.id) || 'unclaimed';
-      worlds.get(key).territories.push({ id: t.id, owner, x: t.marker.pos[0], y: t.marker.pos[1] });
+      worlds.get(key).territories.push({ id: t.id, owner, zone: String(t.zone || ''), x: t.marker.pos[0], y: t.marker.pos[1] });
       if (owner !== 'unclaimed' && !factions[owner]) factions[owner] = { name: nameOfFaction(owner), rgb: tintOf(owner) };
     }
     const anchors = [];
     for (const m of mapMarkers()) { const p = refPos(m.desc); if (p) anchors.push({ name: m.name, x: p[0], y: p[1], z: p[2] }); }
+    // With sovereignty.holdsFromCells on, Tamriel's holds are its cells' (the fork's hold-cells table, published as
+    // globalThis.__dboHoldCells only while the switch is on and the table is whole, the very object the gamemode reads), and
+    // inside a stronghold's radius the stronghold (zones.json strongholds, which win over holds as zones.ts does). The client
+    // then gives each cell the nearest of its own zone's territories, so the map shows the holds the server uses
+    const cells = globalThis.__dboHoldCells;
+    const tam = worlds.get('3c:skyrim.esm');
+    if (tam && cells && Array.isArray(cells.rows) && Array.isArray(cells.holds)) {
+      tam.cells = { c0: cells.c0, n: cells.n, size: 4096, holds: cells.holds, rows: cells.rows };
+      let zones = {};
+      try { zones = JSON.parse(fs.readFileSync(path.resolve('zones.json'), 'utf8')) || {}; } catch (e) { zones = {}; }
+      tam.strongholds = (Array.isArray(zones.strongholds) ? zones.strongholds : [])
+        .filter((z) => z && z.id && Array.isArray(z.center) && Number(z.radius) > 0).map((z) => ({ zone: z.id, x: z.center[0], y: z.center[1], r: Number(z.radius) }));
+    }
     return { customPacketType: 'dboMapOwners', worlds: [...worlds.values()], factions, anchors, reach: Number(C.mapTintReach) || 30000, fade: Number(C.mapTintFade) || 45000 };
   };
   // An owner changed: everyone's map is told, once for a burst of changes (a war's end passes several territories)
