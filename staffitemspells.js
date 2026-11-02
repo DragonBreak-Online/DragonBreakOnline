@@ -437,8 +437,12 @@ module.exports = (api) => {
     const held = op === 'give' ? HELD.get(String(sp.desc || '').toLowerCase()) : undefined;
     { const no = heldNo(sp, held, force === true); if (no) return { ok: false, text: no }; }
     const why = String(reasonText || '').trim().slice(0, 200);
+    // A GM's call:<n> or ticket:<id> counts as on the chat line (staffguard.js parseRef's forms); any other text is a reason:
+    const m = /^(call|ticket):(\S+)$/i.exec(why);
+    const ref = m && m[1].toLowerCase() === 'call' && /^\d+$/.test(m[2]) ? { kind: 'call', n: Number(m[2]) }
+      : m && m[1].toLowerCase() === 'ticket' && /^[A-Za-z0-9_\-#./]+$/.test(m[2]) ? { kind: 'ticket', id: m[2] } : { kind: 'reason', text: why };
     const g = globalThis.__dboStaffGuard;
-    const no = why && g ? g.withRef(caller, { kind: 'reason', text: why }, () => spellsNo(caller, t)) : spellsNo(caller, t);
+    const no = why && g ? g.withRef(caller, ref, () => spellsNo(caller, t)) : spellsNo(caller, t);
     if (no) return { ok: false, text: no };
     const tgt = { actor: t, online: true, name: display(t) };
     const text = op === 'give' ? grantSpell(caller, tgt, sp, held, '') : takeSpell(caller, tgt, sp, '');

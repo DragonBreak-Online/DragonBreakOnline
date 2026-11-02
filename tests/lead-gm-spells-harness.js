@@ -92,6 +92,13 @@ r = panel(ID.LEAD, 'remove', 'Flames', 'given twice');
 check('...and taken back the same way', r.ok && /^Removed spell 'Flames' from Bob/.test(r.text) && calls.join() === REMOVED, [r, calls]);
 r = panel(ID.GM, 'give', 'Flames', 'please');
 check('a GM\'s reason is no reference, from the panel either', !r.ok && REF_NO.test(r.text) && !calls.length, r);
+// staff-perms-1102 opened single spells to GMs: from the panel too, their ticket or GM call is the reference
+r = panel(ID.GM, 'give', 'Flames', 'ticket:rep-0613');
+check('a GM\'s ticket from the panel is the reference, as on the chat line', r.ok && /^Granted spell 'Flames' to Bob/.test(r.text) && calls.join() === ADDED, [r, calls]);
+r = panel(ID.GM, 'remove', 'Flames', 'call:7');
+check('...and their open GM call', r.ok && calls.join() === REMOVED, [r, calls]);
+r = panel(ID.GM, 'give', 'Flames', 'call:99');
+check('...a call that is not open is refused, nothing given', !r.ok && !calls.length, r);
 r = panel(ID.LEAD, 'give', 'No Such Spell Anywhere', 'x');
 check('an unknown spell is said', !r.ok && /Could not find any spell matching 'No Such Spell Anywhere'/.test(r.text), r);
 r = globalThis.__dboStaffSpell(ID.LEAD, ID.MIRA_ALT, 'give', 'Flames', 'x');
@@ -116,6 +123,7 @@ if (!process.env.DBO_MUTANT_RUN) {
     ['/givespell asks no one', 'staffitemspells.js', "    { const no = spellsNo(caller, tgt.actor); if (no) return personal(caller, no); }\n    return personal(caller, grantSpell(", "    return personal(caller, grantSpell("],
     ['/removespell asks no one', 'staffitemspells.js', "    { const no = spellsNo(caller, tgt.actor); if (no) return personal(caller, no); }\n    return personal(caller, takeSpell(", "    return personal(caller, takeSpell("],
     ['the panel asks no one', 'staffitemspells.js', "    if (no) return { ok: false, text: no };\n", ''],
+    ['the panel reads every text as a reason', 'staffitemspells.js', "    const m = /^(call|ticket):(\\S+)$/i.exec(why);\n", "    const m = null;\n"],
     ['spells needs no reference', 'staffguard.js', "'citizenship', 'spells'],", "'citizenship'],"],
     ['a Lead GM\'s reason does not stand for spells', 'staffguard.js', "leadExemptKinds: ['faction', 'spells'],", "leadExemptKinds: ['faction'],"],
     ['the config drops spells, which overrides the default', 'gamemode-config.json', '"leadExemptKinds": ["faction", "spells"]', '"leadExemptKinds": ["faction"]'],
