@@ -49,6 +49,12 @@ type Mp = any;
 const HOUSING_PROP = "private.housing";
 // N3 places: the migration plan written by the dry run, for review (runtime, beside housing.json)
 const PLACE_PLAN_FILE = "./housing-places-plan.json";
+// Written when a place plan finds nothing left to apply, with the plan's inputs; a boot with the same inputs skips the plan
+const PLACE_SETTLED_FILE = "./housing-places-settled.json";
+// The same for the owner plan: written when it would change no owner, so a boot with the same inputs skips its reads of every claim
+const OWNER_SETTLED_FILE = "./housing-owners-settled.json";
+// Raise when the place rules or the plan change what a migration would build, so every settled marker plans again
+const PLACE_RULES_VERSION = 1;
 const PLACE_BACKUP_PREFIX = "./housing-places-backup-";
 // Property per character: the owner migration's plan, for review, and its backups (runtime, beside housing.json)
 const OWNER_PLAN_FILE = "./housing-owners-plan.json";
@@ -279,6 +285,18 @@ export class HousingSystem implements System {
     this.keyRing = all?.["housingKeyRing"] === true;
     // Key items cut before a property's last change of owner or tenant stop opening it (Nate, 23 Oct); false turns it off
     this.staleItemKeys = all?.["housingStaleItemKeys"] !== false;
+    // A settled migration is not planned again at boot unless its inputs changed: the plan's reads of every claim blocked the loop ~120 s for nothing (2 Nov)
+    this.placeInputs = this.placePlanInputs(all);
+    if (this.placeMigration === "apply" && !this.placeRestore) {
+      const why = all?.["housingPlaceReplan"] === true ? "housingPlaceReplan is true" : this.settledChange(PLACE_SETTLED_FILE, this.placeInputs);
+      if (why) this.log(`[housing] place plan runs: ${why}`);
+      else { this.placePlanDone = true; this.log(`[housing] place plan skipped: settled with these inputs (${PLACE_SETTLED_FILE}); housingPlaceReplan true plans again`); }
+    }
+    if (this.ownerMigration !== "off") {
+      const why = all?.["housingPlaceReplan"] === true ? "housingPlaceReplan is true" : this.settledChange(OWNER_SETTLED_FILE, this.placeInputs);
+      if (why) this.log(`[housing] owner plan runs: ${why}`);
+      else { this.ownerPlanDone = true; this.log(`[housing] owner plan skipped: settled with these inputs (${OWNER_SETTLED_FILE}); housingPlaceReplan true plans again`); }
+    }
     this.initAtMs = Date.now();
 
     this.roleCfg = readAdminRoleConfig(all);
@@ -1534,6 +1552,29 @@ export class HousingSystem implements System {
   // Staff profiles, whose claims the place migration leaves exactly as they are and the place cap never counts (Nate,
   // 3 Oct). Owners are offline at boot, so the Discord roles cannot say; the list is gamemode-config.json
   // housingPlaces.staffProfiles (read when the plan runs, so an edit needs no restart) and the setting housingStaffProfiles.
+  // A place plan's inputs besides the claims, which the live rules place as they come (12 boots of new claims planned nothing)
+  private placePlanInputs(all: Record<string, unknown> | null): Record<string, string> {
+    const hash = (v: unknown) => crypto.createHash("sha256").update(JSON.stringify(v ?? null)).digest("hex").slice(0, 16);
+    let grants: unknown = [];
+    try { const cfg = JSON.parse(fs.readFileSync(GAMEMODE_CONFIG_FILE, "utf8")); grants = cfg && cfg.housingPlaces ? cfg.housingPlaces.grants : []; } catch { grants = null; }
+    return {
+      rules: String(PLACE_RULES_VERSION),
+      loadOrder: hash(all?.["loadOrder"]),
+      grants: hash(grants),
+      caps: hash([this.placeCap, this.placeCapPerAccount, this.perCharacter]),
+      staff: hash([...this.staffProfiles()].sort((a, b) => a - b)),
+    };
+  }
+
+  // Why a boot must plan again: no settled marker, or the inputs it was settled with differ; "" when it may skip
+  private settledChange(file: string, now: Record<string, string>): string {
+    let was: Record<string, string> | null = null;
+    try { was = JSON.parse(fs.readFileSync(file, "utf8")).inputs || null; } catch { return "not settled yet"; }
+    if (!was) return "settled before its inputs were recorded";
+    const changed = Object.keys(now).filter((k) => was![k] !== now[k]);
+    return changed.length ? `changed since it settled: ${changed.join(", ")}` : "";
+  }
+
   private staffProfiles(): Set<number> {
     const out = new Set<number>(this.staffSetting);
     try {
@@ -2999,7 +3040,12 @@ export class HousingSystem implements System {
     const grantTaken = (p: PlannedPlace) => { const r = this.read(ctx, p.root); return !!r && (!!r.place || !!r.memberOf || (r.owner !== 0 && r.owner !== p.owner)); };
     const todo = places.filter((p) => p.kind === "house").map((p) => ({ p, d: details.get(p.root)! }))
       .filter(({ p, d }) => !!d && !d.notApplied && d.cells.length > 0 && !(granted.has(p.root) ? grantTaken(p) : built(p.root)) && !d.members.some(built));
-    if (!todo.length) { this.log(`[housing] place migration: nothing to apply`); return; }
+    if (!todo.length) {
+      this.log(`[housing] place migration: nothing to apply`);
+      try { fs.writeFileSync(PLACE_SETTLED_FILE, JSON.stringify({ at: new Date().toISOString(), claims: this.claimed.length, places: places.length, inputs: this.placeInputs }, null, 1)); }
+      catch (e) { this.log(`[housing] ${PLACE_SETTLED_FILE} write failed: ${e}`); }
+      return;
+    }
     const backup: Record<string, unknown> = {};
     const keep = (ref: number) => {
       for (const r of [ref, this.partnerOf(ctx, ref)]) {
@@ -3333,6 +3379,10 @@ export class HousingSystem implements System {
     try { fs.writeFileSync(OWNER_PLAN_FILE, JSON.stringify(out, null, 1)); } catch (e) { this.log(`[housing] ${OWNER_PLAN_FILE} write failed: ${e}`); }
     if (this.ownerMigration === "apply" && unreadable.length) this.log(`[housing] owner migration NOT applied: ${unreadable.length} of ${this.claimed.length} claims are still unreadable`);
     if (apply) this.applyOwners(ctx, decisions);
+    if (!unreadable.length && decisions.every((d) => d.how === "kept" || d.how === "root" || d.how === "name")) {
+      try { fs.writeFileSync(OWNER_SETTLED_FILE, JSON.stringify({ at: new Date().toISOString(), claims: this.claimed.length, decisions: decisions.length, inputs: this.placeInputs }, null, 1)); }
+      catch (e) { this.log(`[housing] ${OWNER_SETTLED_FILE} write failed: ${e}`); }
+    }
     return true;
   }
 
@@ -3526,6 +3576,7 @@ export class HousingSystem implements System {
   private staffSetting: number[] = [];
   private initAtMs = 0;
   private placePlanDone = false;
+  private placeInputs: Record<string, string> = {};
   private placePlanTriedMs = 0;
   private placePlanTries = 0;
   private placeCells: Map<string, number> | null = null;
