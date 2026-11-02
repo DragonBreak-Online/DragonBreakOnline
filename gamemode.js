@@ -8679,7 +8679,7 @@ let armourSwap = null;
 try {
   const ARMOURSWAP_JS = path.resolve('armourswap.js');
   delete require.cache[ARMOURSWAP_JS];
-  armourSwap = require(ARMOURSWAP_JS)({ mp, log, personal, sendPacket, display, profileOf, armorPieceOf, recordOf, fieldsOf, cfg });
+  armourSwap = require(ARMOURSWAP_JS)({ mp, log, personal, sendPacket, display, profileOf, armorPieceOf, recordOf, fieldsOf, cfg, openWidget, closeWidget });
 } catch (e) { log('armourswap.js failed to load:', e.stack || e.message); armourSwap = null; }
 // ---- skill-based fights: block chip and stamina, guard breaks, bash, stagger (server\combat.js, config "combat") -------
 let combat = null;

@@ -11,7 +11,9 @@
 // the blows of someone still dressing. Server-made changes (the login re-dress, beast forms, jail) are left alone.
 
 module.exports = (api) => {
-  const { mp, log, personal, sendPacket, display, profileOf, armorPieceOf, recordOf, fieldsOf, cfg } = api;
+  const { mp, log, personal, sendPacket, display, profileOf, armorPieceOf, recordOf, fieldsOf, cfg, openWidget, closeWidget } = api;
+  // Its own widget id, not actiondelays.js's 170: one slot per bar, so a search and a swap cannot overwrite each other
+  const BAR_ID = 171;
   const C = Object.assign({ enabled: true, combatSeconds: 20, heavySeconds: 5, lightSeconds: 3, clothingSeconds: 2, maxSeconds: 30, speedMult: -50, blockAttacks: true },
     cfg.armourSwap || {});
   // actorId -> { worn: Set of armour ids, combatAt, busyUntil, toldAt, beastAt }
@@ -39,6 +41,21 @@ module.exports = (api) => {
   };
 
   const inCombat = (a, now) => now - st(a).combatAt < C.combatSeconds * 1000;
+
+  // The bar that shows the straps being done (skymp5-front features/progressBar). The packet above already carries the
+  // seconds and the slow; this is only the picture, and the server stays the judge of busyUntil.
+  const showBar = (a, s, left) => {
+    if (C.bar === false || typeof openWidget !== 'function' || !(left > 0)) return;
+    try {
+      openWidget(a, { type: 'progress', id: BAR_ID, title: 'Armour', ms: left * 1000, startedAt: Date.now(), kind: 'armour' }, true);
+    } catch (e) { return; }
+    if (s.barTimer) { try { clearTimeout(s.barTimer); } catch (e) { /* gone */ } }
+    s.barTimer = setTimeout(() => {
+      s.barTimer = null;
+      if (Date.now() < s.busyUntil) return;
+      try { if (typeof closeWidget === 'function') closeWidget(a, BAR_ID); } catch (e) { /* offline */ }
+    }, left * 1000 + 250);
+  };
 
   // Every landed blow marks both sides that are players
   const onHit = (agg, tgt) => {
@@ -68,6 +85,7 @@ module.exports = (api) => {
     const left = Math.ceil((s.busyUntil - now) / 1000);
     sendPacket(a, { customPacketType: 'dboStatus', kind: 'armour', seconds: left, speedMult: Math.max(-90, Math.min(0, Number(C.speedMult) || 0)),
       text: `Changing armour in a fight: ${left} seconds of buckles and straps.` });
+    showBar(a, s, left);
     log(`armour swap in combat: ${display(a)} busy ${left} s`);
     return left;
   };
