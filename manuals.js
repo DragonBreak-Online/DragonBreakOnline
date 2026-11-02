@@ -191,7 +191,12 @@ module.exports = (api) => {
       // The smith's own craft tier must reach the book's (Nate, 10 Oct), so a technique is never learned ahead of the forge
       const craft = typeof globalThis.__dboSmithCraftTier === 'function' ? Number(globalThis.__dboSmithCraftTier(a)) || 0 : 0;
       if (craft < m.tier) {
-        personal(a, `You can't follow this yet: ${m.title} is craft tier ${m.tier} work, and ${craft ? `your Blacksmith craft tier is ${craft}` : 'you have not taken up the Blacksmith'}. You keep the book.`);
+        // mod-0577 (xmonokiinx, 1 Nov 2026): he read the Ancient Imperial schematic twice at craft tier 1 against its
+        // tier 2, kept the book both times, and opened a ticket saying the recipe had never been set up - the recipes
+        // exist and are ungated. The refusal was right and told him nothing he could act on, so it now names the
+        // Blacksmith points that reach the tier.
+        const needPts = typeof globalThis.__dboSmithPointsForTier === 'function' ? Number(globalThis.__dboSmithPointsForTier(m.tier)) || 0 : 0;
+        personal(a, `You can't follow this yet: ${m.title} is craft tier ${m.tier} work, and ${craft ? `your Blacksmith craft tier is ${craft}` : 'you have not taken up the Blacksmith'}.${needPts ? ` Craft tier ${m.tier} comes at Blacksmith ${needPts}.` : ''} You keep the book, and it will teach you once you are there.`);
         audit(`MANUAL ${who(a)} could not follow ${m.name} (craft tier ${m.tier}) at craft tier ${craft}`);
         return false;
       }

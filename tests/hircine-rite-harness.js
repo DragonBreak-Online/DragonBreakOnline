@@ -15,6 +15,7 @@ const store = new Map(); // `${id}|${prop}` -> value
 const storeClear = store.clear.bind(store);
 store.clear = () => { storeClear(); if (globalThis.__dboSuperState) globalThis.__dboSuperState.riteWaits = {}; };
 const said = [];
+const audits = [];   // fac-0543: the audit is evidence now, not noise - staff read it instead of a video
 const cmds = {}, ui = {}, timers = {};
 const online = [];
 const noop = () => {};
@@ -25,7 +26,7 @@ const mp = {
   callPapyrusFunction: () => null, lookupEspmRecordById: () => null,
 };
 const api = {
-  mp, log: noop, audit: noop, personal: (a, t) => said.push(t), registerChatCommand: (n, f) => { cmds[n] = f; },
+  mp, log: noop, audit: (t) => audits.push(t), personal: (a, t) => said.push(t), registerChatCommand: (n, f) => { cmds[n] = f; },
   onUi: (n, f) => { ui[n] = f; }, openWidget: noop, closeWidget: noop, sendPacket: noop, display: String, who: String,
   isAdmin: () => false, findByName: () => null, onlineActors: () => online, every: (n, ms, fn) => { timers[n] = fn; }, profileOf: (a) => a,
   nameOf: String, isWorldspace: () => true, needsFeed: noop, hungerOf: () => 0,
@@ -58,6 +59,10 @@ Math.random = rnd0;
 ok(!state().kind, 'surviving the Hunt does not make a werewolf');
 ok(state().disease && state().disease.kind === 'werewolf', 'surviving the Hunt gives Sanies Lupinus');
 ok(said.some((t) => /Sanies Lupinus/.test(t)), 'the player is told about the disease');
+// fac-0543: the marked win opens with the win as well, and the audit names which branch a win took - the mark
+// roll was invisible in the log before, which is why the ticket could only be judged from a video.
+ok(/outrun the Hunt/.test(said.join(' | ')), 'the marked survivor is told he won, in the first clause');
+ok(audits.some((t) => /survived/.test(t) && /marked/.test(t) && /Sanies Lupinus/.test(t)), '...and the audit names the branch the win took');
 
 said.length = 0; atShrine('hircine'); cmds.rite(A, '');
 ok(said.some((t) => /already in your blood/.test(t)), 'a second /rite while diseased is refused');
@@ -69,7 +74,14 @@ const rnd1 = Math.random; Math.random = () => 0.99; // the mark roll misses
 runRite(true);
 Math.random = rnd1;
 ok(!state().kind && !state().disease, 'surviving without the mark gives nothing');
-ok(said.some((t) => /unmarked/.test(t)), 'the unmarked survivor is told');
+// fac-0543 (.kipper, 2 Nov 2026): he won the Hunt twice, 6/7 with no miss, and reported failing twice and being
+// "locked out for another 24 hours". This check used to look for the word "unmarked" alone, which the old message
+// had and which told him nothing: a win has to SAY it is a win, or it is indistinguishable from a loss.
+const unmarkedSaid = said.join(' | ');
+ok(/outrun the Hunt/.test(unmarkedSaid), 'the unmarked survivor is told he WON, in the first clause');
+ok(/does not choose to mark you/.test(unmarkedSaid), '...and that the mark is a chance he did not get this time');
+ok(/again in 24 hours to run it once more/.test(unmarkedSaid), '...and the wait is the next attempt, not a penalty');
+ok(!/break|claim|takes you|lets you live to wake/i.test(unmarkedSaid), '...and nothing in it reads as a failure');
 ok(Number(store.get(`${A}|private.riteUnmarkedAt`)) > 0 && !store.get(`${A}|private.riteFailedAt`), 'the unmarked wait starts (not the failure one)');
 said.length = 0; atShrine('hircine'); cmds.rite(A, '');
 ok(!globalThis.__dboRites.has(A) && !said.some((t) => /Great Hunt/.test(t)), 'an unmarked survivor cannot run the Hunt again straight away');
@@ -89,6 +101,10 @@ const rnd = Math.random; Math.random = () => 0.99; // no permadeath roll
 atShrine('hircine'); cmds.rite(A, ''); cmds.rite(A, 'confirm'); runRite(false);
 Math.random = rnd;
 ok(!state().disease && !state().kind && Number(store.get(`${A}|private.riteFailedAt`)) > 0, 'losing the Hunt gives nothing and starts the cooldown');
+// fac-0543: and the two outcomes must not read alike. The loss says it breaks you and never says you outran it;
+// three days of a ticket went on staff not being able to tell which one a video showed.
+ok(/breaks you|claims you/.test(said.join(' | ')), 'losing the Hunt says so plainly');
+ok(!/outrun the Hunt/.test(said.join(' | ')), '...and never says he outran it');
 
 // A rite the player never touched must not kill them: swag, 2026-09-27, the Blood Fever opened a second after
 // joining with no cursor and no keyboard, and three silent timeouts killed the character. Driven by firing the
