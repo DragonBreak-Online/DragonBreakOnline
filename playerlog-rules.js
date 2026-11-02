@@ -702,7 +702,12 @@ excluded('REMOTE', 'the remote staff console (console.js): staff command text an
 // Lines that carry words a player or staff member wrote, with no parser yet: nothing from the audit tap, as before they were
 // classified (a parser can bring their parties in later)
 excluded('WRITTEN', 'a written work\'s title, quoted');
-excluded('EVENT', 'the event announcement\'s text');
+// EVENT covers two unrelated things. stafftools.js announces an event to players, and its text is
+// somebody's words. warband.js records a GM event's own lifecycle - created, started, attached,
+// swept, ended, recovered, orphan sweep - and those lines name the GM who acted and the NPCs, never
+// a player, so there is no player whose log should carry one. Both are excluded, for different reasons.
+excluded('EVENT', "stafftools.js: the event announcement's text; warband.js: a GM event's lifecycle, "
+  + "which names the GM and the NPCs and never a player");
 excluded('GUILD', 'player guild names, a GM\'s reason');
 excluded('BOUNTY', 'the reason a ruler gave for a bounty');
 excluded('FACTION-RANK FACTION-MERGE', 'config-run faction upkeep at load (guilds.js addRanks, mergeRosters): faction names, rank titles and stored member names, no who()');
@@ -2152,6 +2157,15 @@ updates.js SCHEDULE 316703ad excluded
 updates.js SCHEDULE 931bc6c2 excluded
 updates.js SCHEDULE 970eb794 excluded
 updates.js SCHEDULE b78035ce excluded
+warband.js EVENT 1157a2f8 excluded
+warband.js EVENT fbac3d5c excluded
+warband.js EVENT 521b2e42 excluded
+warband.js EVENT dbad3910 excluded
+warband.js EVENT e7849de0 excluded
+warband.js EVENT 58dd6260 excluded
+warband.js EVENT f069d3ca excluded
+warband.js EVENT 9315d93d excluded
+warband.js EVENT b4c91e6f excluded
 warband.js WARBAND e29bff83 parsed
 warband.js WARBAND fb30cf9c parsed
 warband.js WARBAND 3e0eb724 parsed
