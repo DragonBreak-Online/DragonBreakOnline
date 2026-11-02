@@ -44,8 +44,10 @@ const DEFAULTS = {
   // Magic, priest Priest Studies; a shelf placed before the kinds is arcane). Per kind, a home counts as a study from
   // minForStudy shelves and holds at most maxPerHome; each takes `books` books the character carries (no tomes, skill books or books under
   // minBookValue gold, which are notes and letters), consumed unless booksKept, when deconstructing gives them back. The
-  // study rate at a home shelf is schools.js's study.homeRate.
-  study: { maxPerHome: 3, minForStudy: 2, books: 10, booksKept: false, minBookValue: 5,
+  // study rate at a home shelf is schools.js's study.homeRate. Taking down a shelf whose books do not come back is asked
+  // twice: the first /decor remove (panel button, select-tool Delete) warns, a second within removeConfirmSeconds does it
+  // (#mod-0584, 1 Nov: a player took two shelves down to move them and lost 20 books without a word of warning).
+  study: { maxPerHome: 3, minForStudy: 2, books: 10, booksKept: false, minBookValue: 5, removeConfirmSeconds: 30,
     kinds: [{ id: 'arcane', name: 'Arcane Study Bookshelf' }, { id: 'priest', name: 'Priest Study Bookshelf' }] },
   // Planters: plant one of Hearthfire's crops, it ripens after growHours real hours (rareHours for the rare ones), a pick
   // yields within commonYield or rareYield [min, max] by one Harvesting roll (skills.json harvesting: chance and multiplier by tier);
@@ -310,10 +312,12 @@ module.exports = (api) => {
   const booksOf = (a) => (get(a, 'inventory', { entries: [] }).entries || [])
     .filter((e) => !e.worn && (Number(e.count) || 0) > 0 && bookValue(Number(e.baseId) >>> 0) >= (Number(C.study.minBookValue) || 0))
     .sort((x, y) => bookValue(Number(x.baseId) >>> 0) - bookValue(Number(y.baseId) >>> 0));
+  // what counts, in the words every refusal uses: only a BOOK record is a book, so a misc item named Books (a clutter pile) is not
+  const bookRule = () => `readable books worth ${Number(C.study.minBookValue) || 0} gold or more; spell tomes, skill books, notes, letters and clutter book piles do not count`;
   const booksHeld = (a) => booksOf(a).reduce((n, e) => n + (Number(e.count) || 0), 0);
   const takeBooks = (a, n) => {
     const out = {}; let left = n;
-    for (const e of booksOf(a)) { if (left <= 0) break; const k = Math.min(left, Number(e.count) || 0); out[mp.getDescFromId(Number(e.baseId) >>> 0)] = k; left -= k; }
+    for (const e of booksOf(a)) { if (left <= 0) break; const k = Math.min(left, Number(e.count) || 0); const dd = mp.getDescFromId(Number(e.baseId) >>> 0); out[dd] = (out[dd] || 0) + k; left -= k; }
     if (left > 0 || !takeAll(a, out)) return null;
     return out;
   };
@@ -473,7 +477,7 @@ module.exports = (api) => {
     if (why) return personal(a, why);
     const short = shortOf(a, costOf(piece));
     if (short.length) return personal(a, `${piece.name} needs ${costText(costOf(piece), a)}. Short: ${short.map((x) => `${x.n - x.have} ${nameOfItem(x.d)}`).join(', ')}.`);
-    if (piece.kind === 'study' && booksHeld(a) < C.study.books) return personal(a, `${piece.name} also needs ${C.study.books} books to fill it (any you carry but spell tomes, skill books, notes and letters); you have ${booksHeld(a)}.`);
+    if (piece.kind === 'study' && booksHeld(a) < C.study.books) return personal(a, `${piece.name} also needs ${C.study.books} books to fill it (${bookRule()}); you have ${booksHeld(a)} that count.`);
     const me = get(a, 'pos', [0, 0, 0]), ang = get(a, 'angle', [0, 0, 0]);
     const yaw = (Number(ang[2]) || 0) * Math.PI / 180;
     const pos = [me[0] + Math.sin(yaw) * 150, me[1] + Math.cos(yaw) * 150, me[2]];
@@ -553,11 +557,11 @@ module.exports = (api) => {
     const why = spotProblem(a, pl, piece, pos, rot) || budgetProblem(pl, piece, a);
     if (why) return refuse(why, 'spot or budget');
     const cost = costOf(piece);
-    if (piece.kind === 'study' && booksHeld(a) < C.study.books) return refuse(`${piece.name} needs ${C.study.books} books.`, 'books');
+    if (piece.kind === 'study' && booksHeld(a) < C.study.books) return refuse(`${piece.name} needs ${C.study.books} books (${bookRule()}); you have ${booksHeld(a)} that count. Nothing was taken.`, 'books');
     const paid = spendAll(a, cost);
     if (!paid) return refuse(`${piece.name} needs ${costText(cost, a)}.`, 'materials');
     let books = null;
-    if (piece.kind === 'study') { books = takeBooks(a, C.study.books); if (!books) { giveAll(a, paid, 1); return refuse(`${piece.name} needs ${C.study.books} books.`, 'books'); } }
+    if (piece.kind === 'study') { books = takeBooks(a, C.study.books); if (!books) { giveAll(a, paid, 1); return refuse(`${piece.name} needs ${C.study.books} books (${bookRule()}); your materials are back.`, 'books'); } }
     const tag = { root: hex(pl.root), by: profile(a), at: Date.now() };
     let id = 0, light = 0;
     try { id = create(a, piece.desc, cell, pos, rot, tag); if (id && piece.light && piece.light.base) light = create(a, piece.light.base, cell, pos, rot, Object.assign({ of: hex(id) }, tag)); }
@@ -572,8 +576,9 @@ module.exports = (api) => {
     if (piece.station) it.station = piece.station.keyword;
     p.items.push(it); save();
     pushUndo(a, { op: 'placed', root: hex(pl.root), ref: it.ref });
-    audit(`DECOR place ${who(a)} ${piece.name} (${piece.desc}) ref ${it.ref} place ${hex(pl.root)} cell ${hex(cell)} at ${pos.map(Math.round).join(',')} paid ${JSON.stringify(paid)}`);
-    personal(a, `${piece.name} is placed. /decor undo within ${C.undoSeconds} seconds gives everything back; /decor remove later gives back ${Math.round(deconstructShare(a) * 100)}% (more for a skilled Woodcutter).`);
+    audit(`DECOR place ${who(a)} ${piece.name} (${piece.desc}) ref ${it.ref} place ${hex(pl.root)} cell ${hex(cell)} at ${pos.map(Math.round).join(',')} paid ${JSON.stringify(paid)}${books ? ` books ${JSON.stringify(books)}` : ''}`);
+    const kept = books && !C.study.booksKept ? ` Its ${C.study.books} books stay in the shelf for good: taking it down later gives none of them back, so use /decor move to set it elsewhere.` : '';
+    personal(a, `${piece.name} is placed. /decor undo within ${C.undoSeconds} seconds gives everything back; /decor remove later gives back ${Math.round(deconstructShare(a) * 100)}% (more for a skilled Woodcutter).${kept}`);
     return true;
   };
   // share 'deconstruct': the Woodcutter's share (deconstructShare), rounded down but at least 1 of a material that cost 2
@@ -581,6 +586,18 @@ module.exports = (api) => {
   const removeItem = (a, found, share, why) => {
     const { place: p, item: it, root } = found;
     if (it.container && (get(parseInt(it.ref, 16) >>> 0, 'inventory', { entries: [] }).entries || []).length) return personal(a, `Empty the ${it.name} first.`);
+    // books that will not come back: the first request warns and takes nothing down, a second within removeConfirmSeconds does
+    if (share === 'deconstruct' && it.books && !C.study.booksKept && Object.keys(it.books).length) {
+      const asks = S.removeAsk || (S.removeAsk = new Map()), ask = asks.get(a >>> 0);
+      const secs = Math.max(1, Number(C.study.removeConfirmSeconds) || 30);
+      if (!ask || ask.ref !== it.ref || Date.now() > ask.until) {
+        asks.set(a >>> 0, { ref: it.ref, until: Date.now() + secs * 1000 });
+        const n = Object.values(it.books).reduce((x, y) => x + (Number(y) || 0), 0);
+        log(`decor: ${who(a)} asked to take down ${it.name} ref ${it.ref}: warned first (${n} books stay in it)`);
+        return personal(a, `Taking down the ${it.name} loses the ${n} books in it for good, and only part of what it cost comes back. To set it elsewhere, use /decor move instead. To take it down anyway, do the same again within ${secs} seconds.`);
+      }
+      asks.delete(a >>> 0);
+    }
     const paid = it.paid || {}, priced = !!pieceOf(it.base) && Object.keys(paid).length > 0;
     // the record goes first and is saved before anything is paid, so no path can pay for the same piece twice
     p.items.splice(p.items.indexOf(it), 1); save();
@@ -605,7 +622,7 @@ module.exports = (api) => {
       for (const [d, n] of Object.entries(back)) owed[d] = (owed[d] || 0) + n;
       save();
     }
-    audit(`DECOR ${why} ${who(a)} ${it.name} (${it.base}) ref ${it.ref} place ${hex(root)} share ${deconstructShare(a)} refund ${JSON.stringify(owner ? got : back)} to ${owner ? who(owner) : `owner ${p.owner}:${hex(p.ownerChar)} (offline)`}`);
+    audit(`DECOR ${why} ${who(a)} ${it.name} (${it.base}) ref ${it.ref} place ${hex(root)} share ${deconstructShare(a)} refund ${JSON.stringify(owner ? got : back)} to ${owner ? who(owner) : `owner ${p.owner}:${hex(p.ownerChar)} (offline)`}${it.books && !C.study.booksKept ? ` books lost with it ${JSON.stringify(it.books)}` : ''}`);
     const list = Object.keys(back).length ? costText(back) : '';
     if (owner === a) personal(a, `${it.name} is taken down${list ? `; back to you: ${list}` : ''}.`);
     else {
@@ -924,7 +941,7 @@ module.exports = (api) => {
       out.search = st.search || '';
       const pg = pageOf(list, st.page, st.rows || 8);
       Object.assign(out, { page: pg.at, pages: pg.pages, rows: pg.rows.map((x) => {
-        const why = budgetProblem(pl, x, a) || (x.kind === 'study' && booksHeld(a) < C.study.books ? `Needs ${C.study.books} books; you carry ${booksHeld(a)}.` : '');
+        const why = budgetProblem(pl, x, a) || (x.kind === 'study' && booksHeld(a) < C.study.books ? `Needs ${C.study.books} readable books (no tomes, skill books, notes or clutter piles); you carry ${booksHeld(a)} that count.` : '');
         return { key: keyOf(x), name: x.name, cost: costRows(a, costOf(x)), why: why || '' };
       }) });
     }

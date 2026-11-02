@@ -127,7 +127,8 @@ placeAt(OWNER, 'study');
 cmd(OWNER, 'find study'); cmd(OWNER, 'place 1');
 ok(items().filter((i) => i.kind === 'study').length === 3 && /its 3 arcane study bookshelves already/.test(last(OWNER)), 'maxPerHome 3 of a kind: the fourth arcane is refused', last(OWNER));
 const cheap0 = held(OWNER, CHEAP);
-cmd(OWNER, 'list'); cmd(OWNER, 'remove 3');
+// a take-down that loses books is asked twice (mod-0584; tests/decor-study-remove-harness.js): remove, then remove again
+cmd(OWNER, 'list'); cmd(OWNER, 'remove 3'); cmd(OWNER, 'remove 3');
 ok(held(OWNER, CHEAP) === cheap0 && items().filter((i) => i.kind === 'study').length === 2, 'booksKept false: deconstructing a shelf gives no books back', held(OWNER, CHEAP) - cheap0);
 
 // ---- the priest shelf: the same base, its own kind and its own count ----

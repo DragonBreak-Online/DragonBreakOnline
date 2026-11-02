@@ -2222,7 +2222,7 @@ hagraven.js HAGRAVEN fd10af1b excluded
 hagraven.js HAGRAVEN d397150f excluded
 hagraven.js HAGRAVEN 0660b547 excluded
 decor.js DECOR b3fa102b excluded
-decor.js DECOR 1799b5db excluded
+decor.js DECOR 4447d37c excluded
 decor.js DECOR f0797531 excluded
 decor.js DECOR e716fb8f excluded
 decor.js DECOR c4970c1e excluded
@@ -2247,7 +2247,7 @@ vampirepath.js VAMPATH 4f692cd2 excluded
 decor.js DECOR 78b19505 excluded
 decor.js DECOR 58dabe15 excluded
 decor.js DECOR 9650b7e1 excluded
-decor.js DECOR 3afc37a2 excluded
+decor.js DECOR 5a5d730d excluded
 decor.js DECOR 68360ece excluded
 decor.js DECOR 55803194 excluded
 decor.js DECOR c90e7711 excluded
