@@ -49,6 +49,8 @@ type Mp = any;
 const HOUSING_PROP = "private.housing";
 // N3 places: the migration plan written by the dry run, for review (runtime, beside housing.json)
 const PLACE_PLAN_FILE = "./housing-places-plan.json";
+// Written when a place plan finds nothing left to apply; while it exists a boot skips the plan (housingPlaceReplan true plans again)
+const PLACE_SETTLED_FILE = "./housing-places-settled.json";
 const PLACE_BACKUP_PREFIX = "./housing-places-backup-";
 // Property per character: the owner migration's plan, for review, and its backups (runtime, beside housing.json)
 const OWNER_PLAN_FILE = "./housing-owners-plan.json";
@@ -269,6 +271,11 @@ export class HousingSystem implements System {
     this.placeMigration = mode === "off" ? "off" : mode === "apply" ? "apply" : "dryrun";
     // A migration backup to put back at the plan's tick, instead of the plan (S3 of the review)
     this.placeRestore = typeof all?.["housingPlaceRestore"] === "string" ? String(all!["housingPlaceRestore"]) : "";
+    // A settled migration is not planned again at boot: the plan's reads of every claim blocked the loop ~120 s for nothing (2 Nov)
+    if (this.placeMigration === "apply" && !this.placeRestore && all?.["housingPlaceReplan"] !== true && fs.existsSync(PLACE_SETTLED_FILE)) {
+      this.placePlanDone = true;
+      this.log(`[housing] place plan skipped: the migration is settled (${PLACE_SETTLED_FILE}); housingPlaceReplan true plans again`);
+    }
     // Property per character (Nate, 10 Oct): off (the default) keeps it the account's; the owner migration names each claim's
     // character, "dryrun" (the default) writes only its plan, "apply" writes ownerChar into the records once, after a backup
     this.perCharacter = all?.["housingOwnerPerCharacter"] === true;
@@ -2872,7 +2879,12 @@ export class HousingSystem implements System {
     const grantTaken = (p: PlannedPlace) => { const r = this.read(ctx, p.root); return !!r && (!!r.place || !!r.memberOf || (r.owner !== 0 && r.owner !== p.owner)); };
     const todo = places.filter((p) => p.kind === "house").map((p) => ({ p, d: details.get(p.root)! }))
       .filter(({ p, d }) => !!d && !d.notApplied && d.cells.length > 0 && !(granted.has(p.root) ? grantTaken(p) : built(p.root)) && !d.members.some(built));
-    if (!todo.length) { this.log(`[housing] place migration: nothing to apply`); return; }
+    if (!todo.length) {
+      this.log(`[housing] place migration: nothing to apply`);
+      try { fs.writeFileSync(PLACE_SETTLED_FILE, JSON.stringify({ at: new Date().toISOString(), claims: this.claimed.length, places: places.length }, null, 1)); }
+      catch (e) { this.log(`[housing] ${PLACE_SETTLED_FILE} write failed: ${e}`); }
+      return;
+    }
     const backup: Record<string, unknown> = {};
     const keep = (ref: number) => {
       for (const r of [ref, this.partnerOf(ctx, ref)]) {
