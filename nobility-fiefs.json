@@ -456,6 +456,841 @@
      ]
     }
    ]
+  },
+  {
+   "id": "riverwood",
+   "name": "Riverwood",
+   "hold": "whiterun",
+   "location": "13163:Skyrim.esm",
+   "edid": "RiverwoodLocation",
+   "county": "WhiterunHoldLocation",
+   "world": "3c:Skyrim.esm",
+   "center": [
+    22073,
+    -43918
+   ],
+   "grid": [
+    [
+     3,
+     -12
+    ],
+    [
+     4,
+     -12
+    ],
+    [
+     4,
+     -11
+    ],
+    [
+     5,
+     -12
+    ],
+    [
+     5,
+     -11
+    ],
+    [
+     5,
+     -10
+    ],
+    [
+     6,
+     -12
+    ],
+    [
+     6,
+     -11
+    ],
+    [
+     6,
+     -10
+    ]
+   ],
+   "cells": [
+    "133c6:Skyrim.esm",
+    "133c7:Skyrim.esm",
+    "133c8:Skyrim.esm",
+    "133c9:Skyrim.esm",
+    "133ca:Skyrim.esm",
+    "1cb84:Skyrim.esm"
+   ],
+   "buildings": [
+    {
+     "id": "13420:Skyrim.esm",
+     "name": "RiverwoodAlvorsHouse",
+     "doors": [
+      "13420:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "12dfe:Skyrim.esm",
+     "name": "RiverwoodFaendalsHouse",
+     "doors": [
+      "12dfe:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "13423:Skyrim.esm",
+     "name": "RiverwoodGerdursHouse",
+     "doors": [
+      "13423:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "1341f:Skyrim.esm",
+     "name": "RiverwoodRiverwoodTrader",
+     "doors": [
+      "1341f:Skyrim.esm",
+      "70e69:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "13424:Skyrim.esm",
+     "name": "RiverwoodSleepingGiantInn",
+     "doors": [
+      "13424:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "1cbb0:Skyrim.esm",
+     "name": "RiverwoodSvensHouse",
+     "doors": [
+      "1cbb0:Skyrim.esm"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "rorikstead",
+   "name": "Rorikstead",
+   "hold": "whiterun",
+   "location": "18a47:Skyrim.esm",
+   "edid": "RoriksteadLocation",
+   "county": "WhiterunHoldLocation",
+   "world": "3c:Skyrim.esm",
+   "center": [
+    -83968,
+    8192
+   ],
+   "grid": [
+    [
+     -22,
+     2
+    ],
+    [
+     -21,
+     1
+    ],
+    [
+     -21,
+     2
+    ],
+    [
+     -20,
+     1
+    ]
+   ],
+   "cells": [
+    "13867:Skyrim.esm",
+    "1386c:Skyrim.esm",
+    "13870:Skyrim.esm",
+    "13871:Skyrim.esm",
+    "35b4:The Great Cities - Minor Cities and Towns.esp",
+    "3f78:JKs Skyrim.esp",
+    "633a:JKs Skyrim.esp"
+   ],
+   "buildings": [
+    {
+     "id": "177cf:Skyrim.esm",
+     "name": "RoriksteadCowflopFarm",
+     "doors": [
+      "177cf:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "177d1:Skyrim.esm",
+     "name": "RoriksteadFrostfruitInn",
+     "doors": [
+      "177d1:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "14e4f:DragonBreak Online Edits.esp",
+     "name": "RoriksteadGreatHall",
+     "doors": [
+      "14e4f:DragonBreak Online Edits.esp"
+     ]
+    },
+    {
+     "id": "177cd:Skyrim.esm",
+     "name": "RoriksteadLemkilsFarm",
+     "doors": [
+      "177cd:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "177d5:Skyrim.esm",
+     "name": "RoriksteadRoriksManor",
+     "doors": [
+      "177d5:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "6339:JKs Skyrim.esp",
+     "name": "XJKRoriksteadRegnerHouse",
+     "doors": [
+      "6339:JKs Skyrim.esp"
+     ]
+    },
+    {
+     "id": "3a00:JKs Skyrim.esp",
+     "name": "XJKRoriksteadVendorStore",
+     "doors": [
+      "3a00:JKs Skyrim.esp"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "shors-stone",
+   "name": "Shor's Stone",
+   "hold": "riften",
+   "location": "18a4c:Skyrim.esm",
+   "edid": "ShorsStoneLocation",
+   "county": "RiftHoldLocation",
+   "world": "3c:Skyrim.esm",
+   "center": [
+    163840,
+    -61440
+   ],
+   "grid": [
+    [
+     39,
+     -16
+    ],
+    [
+     39,
+     -15
+    ],
+    [
+     40,
+     -16
+    ],
+    [
+     40,
+     -15
+    ]
+   ],
+   "cells": [
+    "1382e:Skyrim.esm",
+    "1383a:Skyrim.esm",
+    "13850:Skyrim.esm",
+    "13856:Skyrim.esm"
+   ],
+   "buildings": [
+    {
+     "id": "177dc:Skyrim.esm",
+     "name": "ShorsStoneFilnjarsHouse",
+     "doors": [
+      "177dc:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "177e0:Skyrim.esm",
+     "name": "ShorsStoneOdfelsandGrogmarsHouse",
+     "doors": [
+      "177e0:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "60c5f:Skyrim.esm",
+     "name": "ShorsStoneRedbellyMine",
+     "doors": [
+      "60c5f:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "177de:Skyrim.esm",
+     "name": "ShorsStoneSylgjasHouse",
+     "doors": [
+      "177de:Skyrim.esm"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "ivarstead",
+   "name": "Ivarstead",
+   "hold": "riften",
+   "location": "18a4b:Skyrim.esm",
+   "edid": "IvarsteadLocation",
+   "county": "RiftHoldLocation",
+   "world": "3c:Skyrim.esm",
+   "center": [
+    76459,
+    -65536
+   ],
+   "grid": [
+    [
+     17,
+     -16
+    ],
+    [
+     18,
+     -17
+    ],
+    [
+     18,
+     -16
+    ],
+    [
+     18,
+     -15
+    ],
+    [
+     19,
+     -18
+    ],
+    [
+     19,
+     -17
+    ]
+   ],
+   "cells": [
+    "13a48:Skyrim.esm",
+    "13a5c:Skyrim.esm"
+   ],
+   "buildings": [
+    {
+     "id": "17793:Skyrim.esm",
+     "name": "IvarsteadFellstarFarm",
+     "doors": [
+      "17793:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "17797:Skyrim.esm",
+     "name": "IvarsteadVilemyrInn",
+     "doors": [
+      "17797:Skyrim.esm"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "dragon-bridge",
+   "name": "Dragon Bridge",
+   "hold": "solitude",
+   "location": "18a46:Skyrim.esm",
+   "edid": "DragonBridgeLocation",
+   "county": "HaafingarHoldLocation",
+   "world": "3c:Skyrim.esm",
+   "center": [
+    -102400,
+    81920
+   ],
+   "grid": [
+    [
+     -26,
+     19
+    ],
+    [
+     -26,
+     20
+    ],
+    [
+     -25,
+     19
+    ],
+    [
+     -25,
+     20
+    ]
+   ],
+   "cells": [
+    "13a7a:Skyrim.esm",
+    "13a7b:Skyrim.esm",
+    "13a7c:Skyrim.esm",
+    "13a7d:Skyrim.esm",
+    "13a7e:Skyrim.esm",
+    "1f15:The Great City of Dragon Bridge.esp",
+    "4637:JKs Skyrim.esp",
+    "4844:The Great Cities - Minor Cities and Towns.esp"
+   ],
+   "buildings": [
+    {
+     "id": "1f08:The Great City of Dragon Bridge.esp",
+     "name": "DragonBridgeBjornHouse",
+     "doors": [
+      "1f08:The Great City of Dragon Bridge.esp"
+     ]
+    },
+    {
+     "id": "1775b:Skyrim.esm",
+     "name": "DragonBridgeFarm",
+     "doors": [
+      "1775b:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "1775d:Skyrim.esm",
+     "name": "DragonBridgeFourShieldsTavern",
+     "doors": [
+      "1775d:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "4824:The Great Cities - Minor Cities and Towns.esp",
+     "name": "DragonBridgeGuardHouse",
+     "doors": [
+      "4824:The Great Cities - Minor Cities and Towns.esp"
+     ]
+    },
+    {
+     "id": "17755:Skyrim.esm",
+     "name": "DragonBridgeHorgeirsHouse",
+     "doors": [
+      "17755:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "17752:Skyrim.esm",
+     "name": "DragonBridgeLumberCamp",
+     "doors": [
+      "17752:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "17759:Skyrim.esm",
+     "name": "DragonBridgePenitusOculatusOutpost",
+     "doors": [
+      "17759:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "23ba1:JKs Skyrim.esp",
+     "name": "XJKDragonBridgeVendorStore",
+     "doors": [
+      "23ba1:JKs Skyrim.esp",
+      "23c22:JKs Skyrim.esp"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "kynesgrove",
+   "name": "Kynesgrove",
+   "hold": "windhelm",
+   "location": "18a4e:Skyrim.esm",
+   "edid": "KynesgroveLocation",
+   "county": "EastmarchHoldLocation",
+   "world": "3c:Skyrim.esm",
+   "center": [
+    136046,
+    11410
+   ],
+   "grid": [
+    [
+     32,
+     2
+    ],
+    [
+     32,
+     3
+    ],
+    [
+     32,
+     4
+    ],
+    [
+     33,
+     1
+    ],
+    [
+     33,
+     2
+    ],
+    [
+     33,
+     3
+    ],
+    [
+     34,
+     1
+    ]
+   ],
+   "cells": [
+    "13901:Skyrim.esm",
+    "13907:Skyrim.esm"
+   ],
+   "buildings": [
+    {
+     "id": "177a5:Skyrim.esm",
+     "name": "KynesgroveBraidwoodInn",
+     "doors": [
+      "177a5:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "177a2:Skyrim.esm",
+     "name": "KynesgroveSteamscorchGullyMine",
+     "doors": [
+      "177a2:Skyrim.esm"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "darkwater-crossing",
+   "name": "Darkwater Crossing",
+   "hold": "windhelm",
+   "location": "18a4d:Skyrim.esm",
+   "edid": "DarkwaterCrossingLocation",
+   "county": "EastmarchHoldLocation",
+   "world": "3c:Skyrim.esm",
+   "center": [
+    120013,
+    -33178
+   ],
+   "grid": [
+    [
+     28,
+     -9
+    ],
+    [
+     28,
+     -8
+    ],
+    [
+     29,
+     -9
+    ],
+    [
+     29,
+     -8
+    ],
+    [
+     30,
+     -9
+    ]
+   ],
+   "cells": [
+    "13a8a:Skyrim.esm",
+    "13a8c:Skyrim.esm"
+   ],
+   "buildings": [
+    {
+     "id": "17611:Skyrim.esm",
+     "name": "DarkwaterCrossingGoldenrockMine",
+     "doors": [
+      "17611:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "76b48:Skyrim.esm",
+     "name": "DarkwaterCrossingVernersHouse",
+     "doors": [
+      "76b48:Skyrim.esm"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "karthwasten",
+   "name": "Karthwasten",
+   "hold": "markarth",
+   "location": "18a54:Skyrim.esm",
+   "edid": "KarthwastenLocation",
+   "county": "ReachHoldLocation",
+   "world": "3c:Skyrim.esm",
+   "center": [
+    -131482,
+    39731
+   ],
+   "grid": [
+    [
+     -34,
+     9
+    ],
+    [
+     -33,
+     9
+    ],
+    [
+     -33,
+     10
+    ],
+    [
+     -32,
+     9
+    ],
+    [
+     -31,
+     9
+    ]
+   ],
+   "cells": [
+    "13909:Skyrim.esm",
+    "13978:Skyrim.esm",
+    "13979:Skyrim.esm",
+    "139d1:Skyrim.esm",
+    "139d2:Skyrim.esm"
+   ],
+   "buildings": [
+    {
+     "id": "1779d:Skyrim.esm",
+     "name": "KarthwastenEnmonsHouse",
+     "doors": [
+      "1779d:Skyrim.esm",
+      "e3459:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "1779f:Skyrim.esm",
+     "name": "KarthwastenFennsGulchMine",
+     "doors": [
+      "1779f:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "1779b:Skyrim.esm",
+     "name": "KarthwastenHall",
+     "doors": [
+      "1779b:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "17798:Skyrim.esm",
+     "name": "KarthwastenMinersBarracks",
+     "doors": [
+      "17798:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "17629:Skyrim.esm",
+     "name": "KarthwastenSanuarachMine",
+     "doors": [
+      "17629:Skyrim.esm"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "old-hroldan",
+   "name": "Old Hroldan",
+   "hold": "markarth",
+   "location": "18a55:Skyrim.esm",
+   "edid": "OldHroldanLocation",
+   "county": "ReachHoldLocation",
+   "world": "3c:Skyrim.esm",
+   "center": [
+    -114688,
+    -8192
+   ],
+   "grid": [
+    [
+     -29,
+     -3
+    ],
+    [
+     -29,
+     -2
+    ],
+    [
+     -28,
+     -3
+    ],
+    [
+     -28,
+     -2
+    ]
+   ],
+   "cells": [
+    "138be:Skyrim.esm",
+    "145a:DragonBreak.esp",
+    "15fd:DragonBreak.esp"
+   ],
+   "buildings": [
+    {
+     "id": "1762f:Skyrim.esm",
+     "name": "OldHroldanInn",
+     "doors": [
+      "1762f:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "1445:DragonBreak.esp",
+     "name": "OldHroldanLokrmirsHouse",
+     "doors": [
+      "1445:DragonBreak.esp"
+     ]
+    },
+    {
+     "id": "10c6:DragonBreak.esp",
+     "name": "OldHroldanVilarsHouse",
+     "doors": [
+      "10c6:DragonBreak.esp"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "halfmoon-mill",
+   "name": "Halfmoon Mill",
+   "hold": "falkreath",
+   "location": "18e3e:Skyrim.esm",
+   "edid": "HalfmoonMillLocation",
+   "county": "FalkreathHoldLocation",
+   "world": "3c:Skyrim.esm",
+   "center": [
+    -43008,
+    -57344
+   ],
+   "grid": [
+    [
+     -11,
+     -15
+    ],
+    [
+     -11,
+     -14
+    ]
+   ],
+   "cells": [
+    "161ef:Skyrim.esm",
+    "fcb4:DragonBreak Online Edits.esp",
+    "fcd3:DragonBreak Online Edits.esp",
+    "fcf2:DragonBreak Online Edits.esp"
+   ],
+   "buildings": [
+    {
+     "id": "fc86:DragonBreak Online Edits.esp",
+     "name": "HalfMoonHouse02",
+     "doors": [
+      "fc86:DragonBreak Online Edits.esp"
+     ]
+    },
+    {
+     "id": "fc91:DragonBreak Online Edits.esp",
+     "name": "HalfMoonHouse03",
+     "doors": [
+      "fc91:DragonBreak Online Edits.esp"
+     ]
+    },
+    {
+     "id": "fc8d:DragonBreak Online Edits.esp",
+     "name": "HalfMoonHouse04",
+     "doors": [
+      "fc8d:DragonBreak Online Edits.esp"
+     ]
+    },
+    {
+     "id": "1636e:Skyrim.esm",
+     "name": "HalfMoonMill",
+     "doors": [
+      "1636e:Skyrim.esm"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "stonehills",
+   "name": "Stonehills",
+   "hold": "morthal",
+   "location": "18a52:Skyrim.esm",
+   "edid": "StonehillsLocation",
+   "county": "HjaalmarchHoldLocation",
+   "world": "3c:Skyrim.esm",
+   "center": [
+    -7509,
+    64853
+   ],
+   "grid": [
+    [
+     -3,
+     15
+    ],
+    [
+     -2,
+     15
+    ],
+    [
+     -2,
+     16
+    ]
+   ],
+   "cells": [
+    "1382d:Skyrim.esm"
+   ],
+   "buildings": [
+    {
+     "id": "177e7:Skyrim.esm",
+     "name": "StonehillsSorlisHouse",
+     "doors": [
+      "177e7:Skyrim.esm"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "angas-mill",
+   "name": "Anga's Mill",
+   "hold": "dawnstar",
+   "location": "18c8b:Skyrim.esm",
+   "edid": "AngasMillLocation",
+   "county": "PaleHoldLocation",
+   "world": "3c:Skyrim.esm",
+   "center": [
+    109227,
+    33451
+   ],
+   "grid": [
+    [
+     25,
+     7
+    ],
+    [
+     26,
+     7
+    ],
+    [
+     26,
+     8
+    ],
+    [
+     26,
+     9
+    ],
+    [
+     27,
+     7
+    ],
+    [
+     27,
+     8
+    ]
+   ],
+   "cells": [
+    "16209:Skyrim.esm",
+    "1620b:Skyrim.esm"
+   ],
+   "buildings": [
+    {
+     "id": "162d5:Skyrim.esm",
+     "name": "AngasMillAerisHouse",
+     "doors": [
+      "162d5:Skyrim.esm"
+     ]
+    },
+    {
+     "id": "1630a:Skyrim.esm",
+     "name": "AngasMillCommonHouse",
+     "doors": [
+      "1630a:Skyrim.esm"
+     ]
+    }
+   ]
   }
  ]
 }
