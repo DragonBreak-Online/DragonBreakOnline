@@ -1,7 +1,7 @@
 // Scripted test for server\placement.js without NPCs (Nat, 2 Nov: "the only way to bring NPCs is the warbands and those
 // systems"; "remove all of the NPCs people placed with the Place tool"). Without config placement.npcs the Place tab
-// refuses NPCs for every tier, sets included, and leaves the NPC categories out of the catalog, placeMeta and the search;
-// objects place as before. The run file placement-purge.json removes placed NPCs: dryrun changes nothing and gives a
+// refuses NPCs for every tier, sets included; objects place as before. The NPC rows stay in the catalog, placeMeta and
+// the search, because the F7 Warband tab picks the NPC to raise from them (2 Nov: hiding them left it "No NPC matches"). The run file placement-purge.json removes placed NPCs: dryrun changes nothing and gives a
 // code, apply needs that code, backs up both files first, audits each, and leaves placed objects and other zones alone.
 // Mutants of a copy of placement.js must fail. Run from this folder's parent:
 //
@@ -78,11 +78,15 @@ const run = (src, check) => {
   reset(); ui.placeObject(GM, [CHEST, 'object', [1000, 2100, 300], 90, false]);
   check('an object still places', reg().length === 7 && /Placed Blacksmith Forge/.test(out.personal[0]), out.personal[0]);
   reset(); ui.placeCatalog(GM, []);
-  check('the catalog leaves the NPC category out', out.packets[0] && out.packets[0].categories.map((c) => c.id).join() === 'Crafting Stations', JSON.stringify(out.packets[0] && out.packets[0].categories.map((c) => c.id)));
+  check('the catalog keeps the NPC category', out.packets[0] && out.packets[0].categories.map((c) => c.id).join() === 'NPCs,Crafting Stations', JSON.stringify(out.packets[0] && out.packets[0].categories.map((c) => c.id)));
   reset(); ui.placeMeta(GM, []);
-  check('placeMeta leaves it out and says NPCs are off', out.packets[0] && out.packets[0].categories.every((c) => c.kind !== 'npc') && out.packets[0].rights.npcs === false && out.packets[0].rights.hostile === false, JSON.stringify(out.packets[0]));
+  check('placeMeta keeps it (the Warband tab\'s chips) and says NPCs are off for placing', out.packets[0] && out.packets[0].categories.some((c) => c.kind === 'npc') && out.packets[0].rights.npcs === false, JSON.stringify(out.packets[0]));
   reset(); ui.placeSearch(GM, ['bandit', '', '', 0]);
-  check('the search finds no NPC', out.packets[0] && out.packets[0].total === 0, JSON.stringify(out.packets[0]));
+  check('the search finds the NPC', out.packets[0] && out.packets[0].total === 1 && out.packets[0].items[0][4] === 'npc', JSON.stringify(out.packets[0]));
+  // The Warband tab's picker (front build.js): the search rows, kind npc only; with a query, and on the NPCs chip alone
+  const picker = (args) => { reset(); ui.placeSearch(GM, args); return ((out.packets[0] && out.packets[0].items) || []).map((it) => ({ desc: it[0], name: it[1], kind: it[4] })).filter((e) => e.kind === 'npc'); };
+  check('the Warband tab\'s picker lists the NPC for a query', picker(['bandit', '', '', 0]).map((e) => e.desc).join() === NPC);
+  check('...and on the NPCs chip with no query', picker(['', 'NPCs', '', 0]).map((e) => e.desc).join() === NPC);
   reset(); ui.placeSearch(GM, ['forge', '', '', 0]);
   check('...and still finds objects', out.packets[0] && out.packets[0].total === 1, JSON.stringify(out.packets[0]));
   fs.unlinkSync('placements.json'); fs.writeFileSync('placements.json', regBefore); globalThis.__dboPlacement.registry = null;
@@ -124,8 +128,8 @@ run(SRC, check);
 const MUTANTS = [
   ['NPCs are placed again', "    if (kind === 'npc' && !NPCS) return { ok: false, text: NO_NPCS };\n", ''],
   ['the switch is on by default', 'const NPCS = P.npcs === true;', 'const NPCS = P.npcs !== false;'],
-  ['the search keeps NPC rows', 'searchCatalog(searchRows(), query', 'searchCatalog(S.rows, query'],
-  ['the catalog keeps the NPC category', '!HIDDEN.has(c.id) && shown(c)', '!HIDDEN.has(c.id)'],
+  ['the search drops NPC rows (the Warband tab lists none)', 'searchCatalog(S.rows, query', "searchCatalog(S.rows.filter((r) => r.kind !== 'npc'), query"],
+  ['placeMeta drops the NPC categories', '      categories: S.catalog.map((c) =>', "      categories: S.catalog.filter((c) => c.kind !== 'npc').map((c) =>"],
   ['apply needs no code', "} else if (String(spec.confirm || '') !== code) {", '} else if (false) {'],
   ['dryrun applies', "if (mode === 'dryrun') {", "if (mode === 'dryrunx') {"],
   ['no backup', 'fs.copyFileSync(f, b); ', ''],
