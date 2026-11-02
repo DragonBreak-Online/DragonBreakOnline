@@ -2,6 +2,8 @@
 #include <catch2/catch_all.hpp>
 #include <cmath>
 #include <cstring>
+#include <fstream>
+#include <iterator>
 
 using namespace navmesh;
 
@@ -198,6 +200,94 @@ TEST_CASE("DboNav: tiles from a file make a world a path crosses", "[DboNav]")
   REQUIRE(world.FindPath({ 100, 100, 0 }, { 250, kS + 150, 900 }, path, &partial,
                          { 64, 64, 64 }));
   REQUIRE(partial);
+}
+
+namespace {
+
+// W3's fixtures (unit/navmesh_fixtures, synthetic), written by its Python writer; the numbers are its manifest's
+bool ReadFixture(const std::string& name, DboNavFile& file, std::string* error)
+{
+  std::ifstream f(std::string(NAVMESH_FIXTURE_DIR) + "/" + name, std::ios::binary);
+  REQUIRE(f);
+  std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(f)), {});
+  return ReadDboNav(bytes.data(), bytes.size(), file, error);
+}
+
+}
+
+TEST_CASE("DboNav: W3's fixtures read as its manifest says", "[DboNav]")
+{
+  DboNavFile f;
+  std::string error;
+  INFO(error);
+
+  REQUIRE(ReadFixture("one-tile.dbonav", f, &error));
+  REQUIRE(f.worldspace == "test.esm:00003c");
+  REQUIRE((f.tiles.size() == 1 && f.meshCount == 1 && f.dropped == 0));
+  REQUIRE((f.tiles[0].cellX == 13 && f.tiles[0].cellY == 49 && f.tiles[0].cellDesc.empty()));
+  REQUIRE((f.tiles[0].bmin.z == 10.f && f.tiles[0].bmax.x == 100.f && f.tiles[0].bmax.y == 100.f));
+  REQUIRE(f.tiles[0].meshes[0].desc == "test.esm:000001");
+  REQUIRE((f.tiles[0].meshes[0].vertices.size() == 4 && f.tiles[0].meshes[0].triangles.size() == 2));
+
+  REQUIRE(ReadFixture("multi-mesh-tile.dbonav", f, &error));
+  REQUIRE((f.tiles[0].cellX == -7 && f.tiles[0].cellY == 3 && f.tiles[0].meshes.size() == 3));
+  REQUIRE((f.tiles[0].bmin.x == -500.f && f.tiles[0].bmin.z == -32.5f && f.tiles[0].bmax.z == 64.f));
+  // No two meshes share a vertex, so the weld joins nothing: walking from one mesh to another is partial
+  auto in = ToTileInput(f.tiles[0], true);
+  std::vector<uint8_t> built;
+  REQUIRE(BuildTile(in, built, &error));
+  NavWorld islands(4096.f, 4, 8192, true);
+  REQUIRE(islands.AddTile(built, &error));
+  const auto centre = [](const DboNavMesh& m) {
+    const auto& t = m.triangles[0];
+    Vec3 c;
+    for (int k = 0; k < 3; ++k) {
+      c.x += m.vertices[t[k]].x / 3;
+      c.y += m.vertices[t[k]].y / 3;
+      c.z += m.vertices[t[k]].z / 3;
+    }
+    return c;
+  };
+  std::vector<Vec3> path;
+  bool partial = false;
+  REQUIRE(islands.FindPath(centre(f.tiles[0].meshes[0]), centre(f.tiles[0].meshes[1]),
+                           path, &partial, { 8, 8, 8 }));
+  REQUIRE(partial);
+
+  REQUIRE(ReadFixture("interior.dbonav", f, &error));
+  REQUIRE(f.worldspace == "interiors");
+  REQUIRE((f.tiles[0].cellX == 0 && f.tiles[0].cellY == 0 && f.tiles[0].cellDesc == "test.esm:000025"));
+  REQUIRE((f.tiles[0].bmin.x == 1.f && f.tiles[0].bmax.y == 52.f));
+
+  REQUIRE(ReadFixture("doors.dbonav", f, &error));
+  in = ToTileInput(f.tiles[0], false);
+  REQUIRE(in.flags == std::vector<uint16_t>{ kPolyWalk, kPolyWalk | kPolyDoor });
+
+  REQUIRE(ReadFixture("linked-pair.dbonav", f, &error));
+  REQUIRE((f.tiles.size() == 2 && f.meshCount == 2 && f.dropped == 3));
+  const auto& l0 = f.tiles[0].meshes[0].links;
+  const auto& l1 = f.tiles[1].meshes[0].links;
+  REQUIRE((l0.size() == 1 && l0[0].type == 1 && l0[0].targetMesh == 1 && l0[0].targetTri == 0));
+  REQUIRE((l1.size() == 1 && l1[0].type == 1 && l1[0].targetMesh == 0 && l1[0].targetTri == 1));
+  REQUIRE(f.tiles[1].meshes[0].desc == "test.esm:000041");
+
+  REQUIRE(ReadFixture("empty-mesh.dbonav", f, &error));
+  REQUIRE((f.tiles[0].meshes[0].vertices.empty() && f.tiles[0].meshes[0].triangles.empty()));
+  REQUIRE(f.tiles[0].meshes[0].desc == "test.esm:000050");
+  // An empty cell builds nothing, with a reason, and does not crash
+  REQUIRE_FALSE(BuildTile(ToTileInput(f.tiles[0], false), built, &error));
+
+  REQUIRE(ReadFixture("extreme-cells.dbonav", f, &error));
+  REQUIRE((f.tiles[0].cellX == -48 && f.tiles[0].cellY == -34));
+  REQUIRE((f.tiles[1].cellX == 52 && f.tiles[1].cellY == 45));
+
+  for (const char* bad : { "bad-magic.dbonav", "bad-version.dbonav", "truncated.dbonav",
+                           "trailing-bytes.dbonav", "vertex-out-of-range.dbonav" }) {
+    INFO(bad);
+    error.clear();
+    REQUIRE_FALSE(ReadFixture(bad, f, &error));
+    REQUIRE_FALSE(error.empty());
+  }
 }
 
 TEST_CASE("DboNav: a damaged file is refused with a reason", "[DboNav]")

@@ -1,0 +1,203 @@
+{
+ "one-tile.dbonav": {
+  "worldspace": "test.esm:00003c",
+  "tiles": 1,
+  "meshes": 1,
+  "dropped": 0,
+  "tile0": {
+   "cellX": 13,
+   "cellY": 49,
+   "cellDesc": "",
+   "meshes": 1,
+   "bmin": [
+    0.0,
+    0.0,
+    10.0
+   ],
+   "bmax": [
+    100.0,
+    100.0,
+    10.0
+   ]
+  },
+  "mesh0": {
+   "desc": "test.esm:000001",
+   "verts": 4,
+   "tris": 2,
+   "links": 0,
+   "doorTris": []
+  },
+  "bytes": 336
+ },
+ "multi-mesh-tile.dbonav": {
+  "worldspace": "test.esm:00003c",
+  "tiles": 1,
+  "meshes": 3,
+  "dropped": 0,
+  "tile0": {
+   "cellX": -7,
+   "cellY": 3,
+   "cellDesc": "",
+   "meshes": 3,
+   "bmin": [
+    -500.0,
+    0.0,
+    -32.5
+   ],
+   "bmax": [
+    2100.0,
+    2100.0,
+    64.0
+   ]
+  },
+  "note": "no two meshes share a vertex: a weld must join nothing",
+  "bytes": 600
+ },
+ "interior.dbonav": {
+  "worldspace": "interiors",
+  "tiles": 1,
+  "meshes": 1,
+  "dropped": 0,
+  "tile0": {
+   "cellX": 0,
+   "cellY": 0,
+   "cellDesc": "test.esm:000025",
+   "meshes": 1,
+   "bmin": [
+    1.0,
+    2.0,
+    3.0
+   ],
+   "bmax": [
+    51.0,
+    52.0,
+    3.0
+   ]
+  },
+  "bytes": 336
+ },
+ "doors.dbonav": {
+  "worldspace": "test.esm:00003c",
+  "tiles": 1,
+  "meshes": 1,
+  "dropped": 0,
+  "mesh0": {
+   "desc": "test.esm:000030",
+   "verts": 4,
+   "tris": 2,
+   "links": 0,
+   "doorTris": [
+    1
+   ]
+  },
+  "note": "triangle 0 flags 0x0800 is not a door; triangle 1 flags 0x0C00 is",
+  "bytes": 336
+ },
+ "linked-pair.dbonav": {
+  "worldspace": "test.esm:00003c",
+  "tiles": 2,
+  "meshes": 2,
+  "dropped": 3,
+  "mesh0": {
+   "desc": "test.esm:000040",
+   "verts": 4,
+   "tris": 2,
+   "links": 1,
+   "link0": {
+    "type": 1,
+    "targetMesh": 1,
+    "targetTri": 0
+   }
+  },
+  "mesh1": {
+   "desc": "test.esm:000041",
+   "verts": 4,
+   "tris": 2,
+   "links": 1,
+   "link0": {
+    "type": 1,
+    "targetMesh": 0,
+    "targetTri": 1
+   }
+  },
+  "note": "targetMesh is a flat index over all tiles in order; dropped=3 is header-only",
+  "bytes": 592
+ },
+ "empty-mesh.dbonav": {
+  "worldspace": "test.esm:00003c",
+  "tiles": 1,
+  "meshes": 1,
+  "dropped": 0,
+  "tile0": {
+   "cellX": 0,
+   "cellY": 0,
+   "cellDesc": "",
+   "meshes": 1,
+   "bmin": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bmax": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "mesh0": {
+   "desc": "test.esm:000050",
+   "verts": 0,
+   "tris": 0,
+   "links": 0,
+   "doorTris": []
+  },
+  "bytes": 256
+ },
+ "extreme-cells.dbonav": {
+  "worldspace": "test.esm:00003c",
+  "tiles": 2,
+  "meshes": 2,
+  "dropped": 0,
+  "tile0": {
+   "cellX": -48,
+   "cellY": -34,
+   "cellDesc": "",
+   "meshes": 1
+  },
+  "tile1": {
+   "cellX": 52,
+   "cellY": 45,
+   "cellDesc": "",
+   "meshes": 1
+  },
+  "note": "negative cell coordinates are signed i32, not unsigned",
+  "bytes": 568
+ },
+ "_mustRefuse": {
+  "bad-magic.dbonav": {
+   "mustRefuse": true,
+   "pythonRefused": true,
+   "why": "bad magic b'NOTNAV\\x00\\x00'"
+  },
+  "bad-version.dbonav": {
+   "mustRefuse": true,
+   "pythonRefused": true,
+   "why": "version 2, expected 1"
+  },
+  "truncated.dbonav": {
+   "mustRefuse": true,
+   "pythonRefused": true,
+   "why": "mesh test.esm:000001 needs 80 bytes and 72 remain"
+  },
+  "trailing-bytes.dbonav": {
+   "mustRefuse": true,
+   "pythonRefused": true,
+   "why": "4 trailing bytes"
+  },
+  "vertex-out-of-range.dbonav": {
+   "mustRefuse": true,
+   "pythonRefused": true,
+   "why": "mesh test.esm:000001 triangle 0 names vertex 99 of 4"
+  }
+ }
+}
