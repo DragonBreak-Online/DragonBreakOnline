@@ -26,7 +26,7 @@ const closeWidget = (sp, id) => R().widgets.push({ closed: id });
 const logError = (...a) => R().errors.push(a.join(' '));
 const logTrace = () => {};
 const Menu = { Map: 'MapMenu' };
-const InputDeviceType = { Keyboard: 0 };
+const InputDeviceType = { Keyboard: 0, Mouse: 1 };
 // a key setting: what the settings file would give (R().settings), else the service's fallback; every name read is kept
 const readMenuKeyCode = (sp, name, fallback) => { R().keysRead.push([name, fallback]); const v = (R().settings || {})[name]; return typeof v === 'number' ? v : fallback; };
 // A name this stub lacks throws, naming it, instead of reading as undefined (W4, 2 Nov: a constructor's call to a missing
@@ -57,17 +57,19 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
     browser: { setVisible: (v) => S.visible.push(v) },
     Ui: {
       isMenuOpen: (m) => (m === 'CustomMenu' ? !!S.customOpen : S.menuOpen !== false),
-      // T5's CustomMenu (the map probe): opened and closed are recorded
-      openCustomMenu: (swf, flags) => { S.custom = (S.custom || []).concat([['open', swf, flags]]); S.customOpen = true; },
-      closeCustomMenu: () => { S.custom = (S.custom || []).concat([['close']]); S.customOpen = false; },
+      // our CustomMenu (the legend over the map): opened and closed are recorded; dbo_maplegend comes alive in it when S.legendWorks
+      openCustomMenu: (swf, flags) => {
+        S.custom = (S.custom || []).concat([['open', swf, flags]]); S.customOpen = true;
+        if (swf === 'dbo_maplegend' && S.legendWorks) { S.props['_root._url'] = 'Interface/dbo_maplegend.swf'; S.props['_root.dboAlive'] = 'yes'; }
+      },
+      closeCustomMenu: () => { S.custom = (S.custom || []).concat([['close']]); S.customOpen = false; delete S.props['_root._url']; delete S.props['_root.dboAlive']; },
       setBool: (m, p, v) => { S.props[p] = v; }, setString: (m, p, v) => { S.props[p] = v; },
       getInt: (m, p) => S.props[p] | 0, getString: (m, p) => (S.props[p] === undefined ? '' : String(S.props[p])), getFloat: (m, p) => Number(S.props[p] === undefined ? 100 : S.props[p]),
       setFloat: (m, p, v) => { S.props[p] = v; }, invokeStringA: (m, p, a) => { S.invoked.push([p, a]); if (p === '_root.createEmptyMovieClip') S.props[`_root.${a[0]}._name`] = a[0]; },
       // the legend swf (dbo_maplegend): alive after its loadMovie only when S.legendWorks; its dboData is recorded
       invokeString: (m, p, arg) => {
         S.invoked.push([p, [arg]]);
-        if (p === '_root.dboMapLegend.loadMovie' && S.legendWorks) { S.props['_root.dboMapLegend._url'] = 'Interface/dbo_maplegend.swf'; S.props['_root.dboMapLegend.dboAlive'] = 'yes'; }
-        if (p === '_root.dboMapLegend.dboData') S.legendData.push(JSON.parse(arg));
+        if (p === '_root.dboData') S.legendData.push(JSON.parse(arg));
       },
     },
   };
@@ -94,22 +96,21 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   frames(1);
   ok(S.revealed.length === 5 && S.revealed.every((r) => r[1] === false), 'the realm markers are revealed with addToMap, fast travel off; a bad desc or kind is dropped, a missing form skipped', S.revealed);
 
-  // ---- a legend swf that never comes alive in the map: the browser draws the legend, as before ----
-  // the HUD's rule (nativeHud.ts): nothing is loaded until the menu itself is open
-  S.menuOpen = false;
+  // ---- a legend menu that never comes alive: the browser draws the legend, as before ----
+  // nothing is opened until the map itself is open (the HUD's rule), and nothing at all inside the map (the 2 Nov probe)
+  S.menuOpen = false; S.custom = []; S.customOpen = false;
   h.menuOpen({ name: 'MapMenu' });
   frames(3);
-  ok(!S.invoked.some((x) => x[0] === '_root.createEmptyMovieClip'), 'the map\'s open event alone loads nothing: it waits for the menu to be open', S.invoked);
+  ok(!S.custom.length, 'the map\'s open event alone opens nothing: it waits for the map to be open', S.custom);
   S.menuOpen = true;
   frames(2);
-  ok(S.invoked.some((x) => x[0] === '_root.createEmptyMovieClip' && x[1][0] === 'dboMapLegend') && S.invoked.some((x) => x[0] === '_root.dboMapLegend.loadMovie' && x[1][0] === 'dbo_maplegend.swf'),
-    'opening the map loads dbo_maplegend into a clip of the map', S.invoked);
+  ok(JSON.stringify(S.custom) === JSON.stringify([['open', 'dbo_maplegend', 0]]), 'opening the map opens dbo_maplegend as our own CustomMenu over it', S.custom);
+  ok(!S.invoked.some((x) => /createEmptyMovieClip|loadMovie/.test(x[0])), '...and makes nothing inside the map, neither the legend nor the owners overlay', S.invoked);
   ok(!S.widgets.length && !S.visible.length, 'while it loads, no browser legend and the browser left hidden', [S.widgets, S.visible]);
-  frames(238);
-  ok(!S.widgets.length && S.invoked.filter((x) => x[0] === '_root.dboMapLegend.loadMovie').length === 1, 'a try waits 240 frames, as the HUD\'s does');
-  frames(2 * 240 + 2);
-  ok(S.invoked.filter((x) => x[0] === '_root.dboMapLegend.loadMovie').length === 3, '...then tries again, three tries in all', S.invoked.filter((x) => x[0] === '_root.dboMapLegend.loadMovie').length);
-  ok(S.visible.length >= 1 && S.visible.every((v) => v === true), 'one that never comes alive after its last try: the browser is shown for the map', S.visible);
+  frames(240);
+  ok(S.custom.filter((x) => x[0] === 'open').length === 1, 'one try only: our CustomMenu is never opened twice', S.custom);
+  ok(S.custom[S.custom.length - 1][0] === 'close' && !S.customOpen, '...one that never comes alive is closed again', S.custom);
+  ok(S.visible.length >= 1 && S.visible.every((v) => v === true), '...and the browser is shown for the map', S.visible);
   const w = S.widgets[S.widgets.length - 1];
   const row = (id) => w.rows.find((r) => r.id === id);
   ok(w.type === 'mapRealm' && w.id === 210 && w.mapMode === true && w.shown === true, 'the legend widget is published in map mode', w);
@@ -136,8 +137,8 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   h.menuClose({ name: 'MapMenu' });
   ok(S.widgets[S.widgets.length - 1].closed === 210, 'closing the map closes the legend');
   const rep = (S.packets.find((p) => p.event === 'mapSwf') || { args: [{}] }).args[0];
-  ok(rep.legend && rep.legend.last === 'clip' && rep.legend.phase === 'off' && rep.legend.tries === 3 && rep.legend.menu === 4 && rep.legend.inject.length === 3 && rep.legend.loaded === -1 && rep.owners === null,
-    'closing sends one mapSwf line: the menu seen at frame 4, three load calls, the clip there, never loaded', rep);
+  ok(rep.legend && rep.legend.last === 'clip' && rep.legend.phase === 'off' && rep.legend.tries === 1 && rep.legend.menu === 4 && rep.legend.inject.length === 1 && rep.legend.loaded === -1 && rep.owners === null,
+    'closing sends one mapSwf line: the map seen at frame 4, one open, our menu there, its swf never loaded', rep);
   const before = S.props['_root.MarkerClips.Marker3._xscale'];
   key(5);
   ok(S.props['_root.MarkerClips.Marker3._xscale'] === before, 'with the map closed a digit does nothing');
@@ -167,13 +168,13 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   h.menuClose({ name: 'MapMenu' });
   const tests = S.packets.filter((p) => p.event === 'mapTest');
   ok(tests.length === 1 && tests[0].args[0].end === 'the map closed', 'closing the map early still reports, and says why', S.packets);
-  ok(!S.legendData.length, 'a legend that failed this session is never sent to the map', S.legendData.length);
+  ok(!S.legendData.length, 'a legend menu that never came alive is never sent its data', S.legendData.length);
   ok(!S.errors.length, 'no frame failed', S.errors);
 
   // ---- a legend swf that comes alive: the map draws the legend, and the browser stays out of it ----
   const h2 = {};
   S.widgets.length = 0; S.visible.length = 0; S.invoked.length = 0; S.legendData.length = 0; S.legendWorks = true;
-  delete S.props['_root.dboMapLegend.dboAlive'];
+  S.custom = []; S.customOpen = false;
   LABELS.forEach((l, i) => { S.props[`_root.MarkerClips.Marker${i}._xscale`] = 100; });
   new MapRealmService(sp, { on: (ev, fn) => { h2[ev] = fn; }, emitter: { on: (ev, fn) => { h2['emit:' + ev] = fn; } } });
   h2['emit:customPacketMessage']({ customPacketType: 'dboMapRealm', markers });
@@ -181,56 +182,73 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   for (let i = 0; i < 4; i++) h2.update();
   const last = () => S.legendData[S.legendData.length - 1];
   ok(S.legendData.length >= 1 && last().shown === true && last().rows.find((r) => r.id === 'fort').count === 2 && last().rows.map((r) => r.key).join('') === '1234560',
-    'alive: the legend goes to the swf in the map, the same rows and counts', last());
+    'alive: the legend goes to our menu over the map, the same rows and counts', last());
   ok(!S.widgets.length && !S.visible.length, '...and no browser legend, the browser left hidden', [S.widgets, S.visible]);
   S.packets.length = 0;
   h2.buttonEvent({ isDown: true, device: 0, code: 5 });
   ok(last().rows.find((r) => r.id === 'fort').shown === false, 'a digit greys its kind in the map\'s legend');
   h2.buttonEvent({ isDown: true, device: 0, code: 19 });
-  ok(last().shown === false, 'R hides the map\'s legend');
+  ok(S.custom[S.custom.length - 1][0] === 'close' && !S.customOpen, 'R closes our menu: if it ever held the map\'s input, R always takes it away', S.custom);
+  h2.buttonEvent({ isDown: true, device: 0, code: 19 });
+  h2.update(); h2.update();
+  ok(S.custom.filter((x) => x[0] === 'open').length === 2 && S.customOpen, '...and R again opens it again', S.custom);
   h2.menuClose({ name: 'MapMenu' });
   const rep2 = (S.packets.find((p) => p.event === 'mapSwf') || { args: [{}] }).args[0];
   ok(rep2.legend && rep2.legend.last === 'alive' && rep2.legend.phase === 'up' && rep2.legend.loaded >= 1 && /dbo_maplegend\.swf$/.test(rep2.legend.url), 'alive: the line says loaded and alive, with the url it came from', rep2);
-  delete S.props['_root.dboMapLegend.dboAlive'];
-  S.invoked.length = 0;
+  ok(!S.customOpen, 'closing the map closes our menu with it');
+  S.custom = [];
   h2.menuOpen({ name: 'MapMenu' });
   for (let i = 0; i < 4; i++) h2.update();
-  ok(S.invoked.filter((x) => x[0] === '_root.dboMapLegend.loadMovie').length === 1 && !S.widgets.length, 'the next opening loads it into the new map again');
+  ok(JSON.stringify(S.custom) === JSON.stringify([['open', 'dbo_maplegend', 0]]) && !S.widgets.length, 'the next opening opens it over the new map again', S.custom);
+  h2.menuClose({ name: 'MapMenu' });
+  // another CustomMenu already up (a server panel): ours waits rather than replace it
+  S.custom = []; S.customOpen = true;
+  h2.menuOpen({ name: 'MapMenu' });
+  for (let i = 0; i < 4; i++) h2.update();
+  ok(!S.custom.length, 'another CustomMenu already up: ours is not opened over it', S.custom);
+  h2.menuClose({ name: 'MapMenu' });
+  ok(!S.custom.length, '...nor closed: it is not ours', S.custom);
+  S.customOpen = false;
   ok(!S.errors.length, 'no frame failed', S.errors);
 
   // ---- the map probe: once a session, on the first opening ----
   const h3 = {};
-  S.packets.length = 0; S.invoked.length = 0; S.custom = []; S.customOpen = false;
+  S.packets.length = 0; S.custom = []; S.customOpen = false; S.legendWorks = true;
+  [0, 1, 2, 3, 4, 5].forEach((i) => { S.props[`_root.MarkerClips.Marker${i}._x`] = 300 + i; S.props[`_root.MarkerClips.Marker${i}._y`] = 200 + i; });
   new MapRealmService(sp, { on: (ev, fn) => { h3[ev] = fn; }, emitter: { on: (ev, fn) => { h3['emit:' + ev] = fn; } } });
   h3['emit:customPacketMessage']({ customPacketType: 'dboMapRealm', markers });
   h3.menuOpen({ name: 'MapMenu' });
-  for (let i = 0; i < 260; i++) h3.update();
+  for (let i = 1; i <= 1200; i++) {
+    // Nat pans between frames 500 and 700, with our legend menu up: the markers move, and the mouse is heard
+    if (i > 500 && i < 700) { S.props['_root.MarkerClips.Marker0._x'] = 300 + i; h3.mouseMove({ inputX: 1, inputY: 0 }); }
+    if (i === 600) h3.buttonEvent({ isDown: true, device: 1, code: 256 });
+    h3.update();
+  }
   const probes = () => S.packets.filter((p) => p.event === 'mapTest');
   const pr = (probes()[0] || { args: [{}] }).args[0];
-  ok(probes().length === 1 && pr.end === 'probe done at frame 250', 'the first opening runs the probe and reports it once, as the mapTest event the server logs', S.packets);
-  ok(/READS root .* MarkerClips .*; 7 markers; Bruma@[0-9]+,/.test(pr.t1 || '') && /Applewatch@101/.test(pr.t1 || ''), 'T1 carries the reads: names, the marker count and the first clips\' labels at their positions', pr.t1);
-  ok(['_root', '_root.WorldMap', '_root.MarkerClips'].every((t, k) => S.invoked.some((x) => x[0] === `${t}.createEmptyMovieClip` && x[1][0] === `dboProbe${k}`)) && /CLIPS _root: name "dboProbe0"/.test(pr.t1 || ''),
-    '...a clip asked for on three targets, each read back by name', pr.t1);
-  ok(/^T5 CustomMenu open true, map still open true/.test(pr.t3 || '') && /after closing it the map open true/.test(pr.t3 || ''), 'T3 carries T5: our CustomMenu opened over the map, the map stayed open, and after', pr.t3);
-  ok(JSON.stringify(S.custom) === JSON.stringify([['open', 'dbo_testmenu', 0], ['close']]), '...opened once and closed again by the probe', S.custom);
-  ok(/^_root\.dboProbeVar 42$/.test(pr.t4 || ''), 'T4 carries the variable written and read back', pr.t4);
+  ok(probes().length === 1 && pr.end === 'probe done at frame 1200', 'the first opening runs the probe for twenty seconds and reports it once, as the mapTest event', S.packets);
+  ok(/^POSITIONS of Bruma, Applewatch, Sancre Tor, Pale Pass, Fort Caractacus, Wraith's Barrow: at 120 [-0-9.]+,[-0-9.]+ x[0-9.]+ \| 300,200 301,201 302,202/.test(pr.t1 || ''), 'T1: the first six markers\' labels and positions at frame 120, MarkerClips\' offset first', pr.t1);
+  ok(pr.t2 && pr.t2.frames === 10 && pr.t2.panning === 2 && pr.t2.still === 7, 'T2: ten samples, the markers moved between two of them (the pan) and stood still between the rest', pr.t2);
+  ok(/^legend menu up \(open true\), map open true$/.test(pr.t3 || ''), 'T3: our legend menu up over the open map at frame 240', pr.t3);
+  ok(/: 199 mouse moves, 1 clicks$/.test(pr.t4 || ''), 'T4: the mouse moves and clicks the client still heard while our menu was up', pr.t4);
   h3.menuClose({ name: 'MapMenu' });
   S.packets.length = 0;
   h3.menuOpen({ name: 'MapMenu' });
-  for (let i = 0; i < 260; i++) h3.update();
+  for (let i = 0; i < 1210; i++) h3.update();
   h3.menuClose({ name: 'MapMenu' });
   ok(!probes().length, 'a second opening runs no probe');
-  // closed early: what it has, and our CustomMenu closed with the map
+  // closed early: what it has
   const h4 = {};
   S.packets.length = 0; S.custom = []; S.customOpen = false;
   new MapRealmService(sp, { on: (ev, fn) => { h4[ev] = fn; }, emitter: { on: (ev, fn) => { h4['emit:' + ev] = fn; } } });
   h4['emit:customPacketMessage']({ customPacketType: 'dboMapRealm', markers });
   h4.menuOpen({ name: 'MapMenu' });
-  for (let i = 0; i < 70; i++) h4.update();
+  for (let i = 0; i < 300; i++) h4.update();
   h4.menuClose({ name: 'MapMenu' });
   const early = (probes()[0] || { args: [{}] }).args[0];
-  ok(probes().length === 1 && /^probe the map closed early/.test(early.end || '') && /READS root/.test(early.t1 || '') && JSON.stringify(S.custom) === JSON.stringify([['open', 'dbo_testmenu', 0], ['close']]),
-    'a map closed during the probe still reports what it has, and takes our CustomMenu down', [early, S.custom]);
+  ok(probes().length === 1 && /^probe the map closed early at frame 300/.test(early.end || '') && early.t2 && early.t2.frames === 2 && !S.customOpen,
+    'a map closed during the probe still reports what it has, and our menu goes down with the map', [early, S.custom]);
+  ok(!S.errors.length, 'no frame failed', S.errors);
 
   fs.rmSync(TMP, { recursive: true, force: true });
   console.log(fails ? `\n${fails} failed` : '\nall passed');

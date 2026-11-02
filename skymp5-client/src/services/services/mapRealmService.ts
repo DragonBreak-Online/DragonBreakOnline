@@ -7,11 +7,11 @@ import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { ButtonEvent, InputDeviceType, Menu } from "skyrimPlatform";
 import { logError, logTrace } from "../../logging";
 import {
-  LABELS_PER_TICK, LEGEND_HOST, LEGEND_SWF, MAP_MENU, MARKER_CLIP, MARKER_COUNT, RealmMarker, WIDGET_ID,
+  LABELS_PER_TICK, LEGEND_MENU, LEGEND_SWF, MAP_MENU, MARKER_CLIP, MARKER_COUNT, RealmMarker, WIDGET_ID,
   descParts, keyAction, kindIndex, legendJson, legendRows, readMarkers, wantedScale, SwfLoad, newSwfLoad, swfStep, swfReport,
 } from "./mapRealm";
 import {
-  ANCHORS_PER_FRAME, OWNERS_HOST, OWNERS_SWF, OwnersData, TOGGLE_KEY, TOGGLE_SETTING,
+  ANCHORS_PER_FRAME, OWNERS_HOST, OWNERS_IN_MAP, OWNERS_SWF, OwnersData, TOGGLE_KEY, TOGGLE_SETTING,
   anchorClips, clipTransform, drawingOf, fitHolds, fitOf, anchorIndex, legendRow, readOwners, worldFor, Anchor, Fit, Seen,
 } from "./mapOwners";
 
@@ -29,6 +29,7 @@ export class MapRealmService extends ClientListener {
     this.controller.on("menuOpen", (e) => { if (e.name === Menu.Map) this.onMapOpen(); });
     this.controller.on("menuClose", (e) => { if (e.name === Menu.Map) this.onMapClose(); });
     this.controller.on("buttonEvent", (e) => this.onButton(e));
+    this.controller.on("mouseMove", () => { if (this.open && this.legendMenuOpen && !this.probe.done) this.probe.mouseMoves++; });
     this.controller.on("browserMessage", (e) => { if (e.arguments[0] === "mapRealm:mounted") this.mounted = true; });
     this.controller.on("update", () => this.onUpdate());
     this.ownersKey = readMenuKeyCode(this.sp, TOGGLE_SETTING, TOGGLE_KEY);
@@ -71,6 +72,7 @@ export class MapRealmService extends ClientListener {
 
   private onMapClose(): void {
     this.open = false;
+    this.closeLegendMenu();
     this.reportSwfs();
     if (!this.probe.done && this.ticksOpen > 0) this.sendProbe("the map closed early");
     if (widget) { widget = null; closeWidget(this.sp, WIDGET_ID); }
@@ -79,6 +81,7 @@ export class MapRealmService extends ClientListener {
 
   // Digits toggle a kind and R the legend, while the map is open; the map keeps its own keys, nothing is focused
   private onButton(e: ButtonEvent): void {
+    if (this.open && this.legendMenuOpen && !this.probe.done && e.isDown && e.device === InputDeviceType.Mouse) this.probe.clicks++;
     if (!this.open || !e.isDown || e.device !== InputDeviceType.Keyboard) return;
     if (this.ownersKey && e.code === this.ownersKey && this.owners) {
       this.ownersShown = !this.ownersShown;
@@ -88,7 +91,7 @@ export class MapRealmService extends ClientListener {
     if (!this.markers.length) return;
     const a = keyAction(e.code);
     if (!a) return;
-    if (a.legend) this.legendShown = !this.legendShown;
+    if (a.legend) { this.legendShown = !this.legendShown; if (!this.legendShown) this.closeLegendMenu(true); }
     if (a.toggle) {
       if (this.hidden.has(a.toggle)) this.hidden.delete(a.toggle); else this.hidden.add(a.toggle);
       this.applied = [];
@@ -110,7 +113,9 @@ export class MapRealmService extends ClientListener {
         this.applyFilter();
         if (this.ticksOpen === 2 || this.ticksOpen % 30 === 0) this.publish();
       }
-      if (this.owners) this.followOwners();
+      // The owners overlay is not loaded into the map any more: the 2 Nov probe showed no clip can be made inside SkyUI's
+      // map. It waits for the probe's position reads before it is drawn in our own menu instead
+      if (this.owners && OWNERS_IN_MAP) this.followOwners();
       if (this.test) this.runTests();
       if (!this.probe.done) this.runProbe();
     } catch (err) {
@@ -190,17 +195,46 @@ export class MapRealmService extends ClientListener {
     sendCustomPacket(this.controller, { customPacketType: "dbo", event: "mapSwf", args: [report], widget: 0 });
   }
 
-  // The legend inside the map (dbo_maplegend): loaded each opening, the browser's for that opening if it never comes alive
+  // The legend as our own CustomMenu over the map (Leader, 2 Nov: the probe showed nothing can be made inside SkyUI's map,
+  // and our CustomMenu draws over it with the map staying open). dbo_maplegend runs as that menu's movie; R closes it.
+  // Opened only while no other CustomMenu is up (there is one at a time, and the server's panels use it), one try an
+  // opening, the browser's legend for that opening if it never comes alive
   private loadLegend(): void {
-    const step = this.loadSwf(this.legendSwf, LEGEND_HOST, "dboMapLegend", "9991", LEGEND_SWF);
+    if (!this.legendShown) return;
+    const ui = this.sp.Ui;
+    const st = this.legendSwf;
+    const seen = { menu: false, clip: false, url: "", alive: false };
+    try { seen.menu = ui.isMenuOpen(MAP_MENU); } catch { seen.menu = false; }
+    let busy = false;
+    try { busy = st.phase === "idle" && ui.isMenuOpen(LEGEND_MENU); } catch { busy = false; }
+    if (busy) return;
+    if (st.phase === "loading" || st.phase === "up") {
+      try { seen.clip = ui.isMenuOpen(LEGEND_MENU); } catch { seen.clip = false; }
+      try { seen.url = ui.getString(LEGEND_MENU, "_root._url") || ""; } catch { seen.url = ""; }
+      try { seen.alive = ui.getString(LEGEND_MENU, "_root.dboAlive") === "yes"; } catch { seen.alive = false; }
+    }
+    const step = swfStep(st, this.ticksOpen, seen, LEGEND_SWF, 1);
+    if (step === "inject") {
+      try { ui.openCustomMenu(LEGEND_SWF.replace(/\.swf$/i, ""), 0); this.legendMenuOpen = true; } catch (err) { logError(this, "the map legend menu could not be opened", err); }
+      return;
+    }
     if (step === "up") {
-      logTrace(this, "map legend drawn in the map");
+      logTrace(this, "map legend drawn over the map");
       this.publish();
     } else if (step === "fail") {
-      logTrace(this, "the map legend never came alive in the map: the browser draws it this opening");
+      logTrace(this, "the map legend menu never came alive: the browser draws it this opening");
+      this.closeLegendMenu();
       this.sp.browser.setVisible(true);
       this.publish();
     }
+  }
+
+  // reopenable: R hid it, so showing it again opens it again (the opening's trace kept); a failed or closing one stays down
+  private closeLegendMenu(reopenable = false): void {
+    if (!this.legendMenuOpen) return;
+    this.legendMenuOpen = false;
+    try { this.sp.Ui.closeCustomMenu(); } catch (err) { logError(this, "the map legend menu could not be closed", err); }
+    if (reopenable && this.legendSwf.phase === "up") { this.legendSwf.phase = "idle"; this.legendSwf.frames = 0; this.legendSwf.tries = 0; }
   }
 
   // ---- who owns what (mapOwners.ts): loaded like the legend, drawn once per world, lined up with the markers each frame ----
@@ -279,7 +313,7 @@ export class MapRealmService extends ClientListener {
     if (this.owners && this.drawnKey) rows = rows.concat([legendRow(this.ownersShown, this.worldOwners, keyName(this.ownersKey))]);
     if (this.legendSwf.phase === "up") {
       if (widget) { widget = null; closeWidget(this.sp, WIDGET_ID); }
-      try { this.sp.Ui.invokeString(MAP_MENU, `${LEGEND_HOST}.dboData`, legendJson(this.legendShown, rows)); } catch (err) { logError(this, "map legend data failed", err); }
+      try { this.sp.Ui.invokeString(LEGEND_MENU, "_root.dboData", legendJson(this.legendShown, rows)); } catch (err) { logError(this, "map legend data failed", err); }
       return;
     }
     // still loading: nothing yet (the swf, or after its last try the browser)
@@ -319,54 +353,45 @@ export class MapRealmService extends ClientListener {
   }
 
   // ---- the map probe (Leader, 2 Nov), once a session, on the first opening of the map ----
-  // Nat's mapSwf line showed load calls made and no clip ever there. This settles what the client can do with SkyUI's
-  // map at all, in one opening: read (properties and the first marker clips' positions), write and read back a variable,
-  // create a clip on three targets and read each back two ways, and (T5) whether our own CustomMenu opens over the open
-  // map and the map stays open. It goes out as the mapTest event, which the server already logs and shows staff (T1 the
-  // reads and clips, T3 the CustomMenu, T4 the variable), so no server change is needed.
+  // The first probe (04:11Z) showed: nothing can be made inside SkyUI's map; names, labels, counts and variables read and
+  // write; marker positions read 0,0, once, on frame 30; and our CustomMenu draws over the open map. This one settles the
+  // positions and the input, so the owners overlay can be drawn in our own menu or given up: the first six markers' _x/_y
+  // and MarkerClips' own offset and scale at frames 120 and 240, then every 120 frames to frame 1200 (twenty seconds, for
+  // Nat to pan in), whether they move between samples, and, while the legend's CustomMenu is up, the mouse moves and clicks
+  // the client still hears. It goes out as the mapTest event the server already logs: T1 the positions, T2 how many samples
+  // moved, T3 the legend menu, T4 the input.
   private runProbe(): void {
     const ui = this.sp.Ui;
     const p = this.probe;
     const t = this.ticksOpen;
-    const str = (path: string) => { try { return ui.getString(MAP_MENU, path); } catch (e) { return "ERR"; } };
+    if (t < 120 || t % 120 !== 0) return;
     const num = (path: string) => { try { return Math.round(ui.getFloat(MAP_MENU, path) * 10) / 10; } catch (e) { return NaN; } };
-    const TARGETS = ["_root", "_root.WorldMap", "_root.MarkerClips"];
-    if (t === 30) {
-      const n = (() => { try { return ui.getInt(MAP_MENU, MARKER_COUNT); } catch (e) { return -1; } })();
-      const first = [0, 1, 2].map((i) => `${str(`${MARKER_CLIP(i)}.label`)}@${num(`${MARKER_CLIP(i)}._x`)},${num(`${MARKER_CLIP(i)}._y`)}`).join(" | ");
-      p.r.reads = `root ${str("_root._name")} WorldMap ${str("_root.WorldMap._name")} MarkerClips ${str("_root.MarkerClips._name")} at ${num("_root.MarkerClips._x")},${num("_root.MarkerClips._y")} x${num("_root.MarkerClips._xscale")}; ${n} markers; ${first}`;
-      try { ui.setFloat(MAP_MENU, "_root.dboProbeVar", 42); } catch (e) { /* read back below */ }
-      TARGETS.forEach((target, k) => { try { ui.invokeStringA(MAP_MENU, `${target}.createEmptyMovieClip`, [`dboProbe${k}`, String(9980 + k)]); } catch (e) { /* read back below */ } });
-    } else if (t === 33) {
-      p.r.variable = `_root.dboProbeVar ${num("_root.dboProbeVar")}`;
-      p.r.clips = TARGETS.map((target, k) => {
-        const c = `${target}.dboProbe${k}`;
-        try { ui.setFloat(MAP_MENU, `${c}.dboMark`, 7); } catch (e) { /* read back below */ }
-        return `${target}: name "${str(`${c}._name`)}" mark ${num(`${c}.dboMark`)}`;
-      }).join(" | ");
-    } else if (t === 60) {
-      // T5: our own CustomMenu over the open map (the panel shows for about three seconds)
-      try { if (!ui.isMenuOpen("CustomMenu")) { ui.openCustomMenu("dbo_testmenu", 0); p.opened = true; } else p.r.t5 = "skipped: a CustomMenu was already open"; } catch (e) { p.r.t5 = `open threw ${e}`; }
-    } else if (t === 120 && p.opened) {
+    const box = `${num("_root.MarkerClips._x")},${num("_root.MarkerClips._y")} x${num("_root.MarkerClips._xscale")}`;
+    const marks = [0, 1, 2, 3, 4, 5].map((i) => `${num(`${MARKER_CLIP(i)}._x`)},${num(`${MARKER_CLIP(i)}._y`)}`).join(" ");
+    p.samples.push(`${box} | ${marks}`);
+    if (t === 240) {
       let custom = false, map = false;
-      try { custom = ui.isMenuOpen("CustomMenu"); map = ui.isMenuOpen(MAP_MENU); } catch (e) { /* both false */ }
-      p.r.t5 = `CustomMenu open ${custom}, map still open ${map}, its version "${(() => { try { return ui.getString("CustomMenu", "_root.dboVersion"); } catch (e) { return "ERR"; } })()}"`;
-    } else if (t === 240 && p.opened) {
-      try { ui.closeCustomMenu(); } catch (e) { /* the map's own close will */ }
-      p.opened = false;
-    } else if (t === 250) {
-      let map = false; try { map = ui.isMenuOpen(MAP_MENU); } catch (e) { map = false; }
-      p.r.t5 = `${p.r.t5 || "not run"}; after closing it the map open ${map}`;
-      this.sendProbe("done");
+      try { custom = ui.isMenuOpen(LEGEND_MENU); map = ui.isMenuOpen(MAP_MENU); } catch (e) { /* both false */ }
+      p.r.menu = `legend menu ${this.legendSwf.phase} (open ${custom}), map open ${map}`;
     }
+    if (t >= 1200) this.sendProbe("done");
   }
 
   private sendProbe(end: string): void {
     const p = this.probe;
     if (p.done) return;
     p.done = true;
-    if (p.opened) { try { this.sp.Ui.closeCustomMenu(); } catch (e) { /* gone with the map */ } p.opened = false; }
-    const r = { t1: `READS ${p.r.reads || "not run"} || CLIPS ${p.r.clips || "not run"}`, t3: `T5 ${p.r.t5 || "not run"}`, t4: p.r.variable || "not run", markers: "probe", end: `probe ${end} at frame ${this.ticksOpen}` };
+    const labels = [0, 1, 2, 3, 4, 5].map((i) => (typeof this.labels[i] === "string" ? this.labels[i] : "?")).join(", ");
+    let moved = 0, still = 0;
+    for (let i = 1; i < p.samples.length; i++) { if (p.samples[i] !== p.samples[i - 1]) moved++; else still++; }
+    const r = {
+      t1: `POSITIONS of ${labels}: ${p.samples.length ? `at 120 ${p.samples[0]} || last ${p.samples[p.samples.length - 1]}` : "none read"}`,
+      t2: { still, panning: moved, frames: p.samples.length },
+      t3: p.r.menu || `legend menu ${this.legendSwf.phase}`,
+      t4: `input while our menu was open: ${p.mouseMoves} mouse moves, ${p.clicks} clicks`,
+      markers: `${this.labels.length}`,
+      end: `probe ${end} at frame ${this.ticksOpen}`,
+    };
     logTrace(this, "map probe", JSON.stringify(r));
     sendCustomPacket(this.controller, { customPacketType: "dbo", event: "mapTest", args: [r], widget: 0 });
   }
@@ -399,9 +424,10 @@ export class MapRealmService extends ClientListener {
   private testArmed = false;
   private test: MapTest | null = null;
   private legendSwf: SwfLoad = newSwfLoad();
+  private legendMenuOpen = false;
   private ownersSwf: SwfLoad = newSwfLoad();
   private openings = 0;
-  private probe: { done: boolean; opened: boolean; r: Record<string, string> } = { done: false, opened: false, r: {} };
+  private probe: { done: boolean; r: Record<string, string>; samples: string[]; mouseMoves: number; clicks: number } = { done: false, r: {}, samples: [], mouseMoves: 0, clicks: 0 };
   private owners: OwnersData | null = null;
   private anchors = new Map<string, Anchor>();
   private ownersShown = true;
