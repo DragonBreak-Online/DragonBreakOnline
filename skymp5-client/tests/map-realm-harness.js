@@ -27,7 +27,12 @@ const logError = (...a) => R().errors.push(a.join(' '));
 const logTrace = () => {};
 const Menu = { Map: 'MapMenu' };
 const InputDeviceType = { Keyboard: 0 };
-module.exports = { ClientListener, sendCustomPacket, parseCustomPacket, refreshFormMenu, closeWidget, logError, logTrace, Menu, InputDeviceType };
+// a key setting: what the settings file would give (R().settings), else the service's fallback; every name read is kept
+const readMenuKeyCode = (sp, name, fallback) => { R().keysRead.push([name, fallback]); const v = (R().settings || {})[name]; return typeof v === 'number' ? v : fallback; };
+// A name this stub lacks throws, naming it, instead of reading as undefined (W4, 2 Nov: a constructor's call to a missing
+// readMenuKeyCode showed only as 'is not a function')
+const stub = { ClientListener, sendCustomPacket, parseCustomPacket, refreshFormMenu, closeWidget, logError, logTrace, Menu, InputDeviceType, readMenuKeyCode };
+module.exports = new Proxy(stub, { get: (t, k) => { if (k in t || typeof k === 'symbol' || k === '__esModule' || k === 'default' || k === 'then') return t[k]; throw new Error('the map-realm harness stub has no ' + String(k) + ': add it to the stub in tests/map-realm-harness.js'); } });
 `);
 const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^skyrimPlatform$|connectionMessage$|customPacketMessage$/;
 
@@ -41,7 +46,7 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
 
   // A fake MapMenu: marker clips with labels and a property store the Ui calls read and write
   const LABELS = ['Bruma', 'Applewatch', 'Sancre Tor', 'Pale Pass', 'Fort Caractacus', "Wraith's Barrow", 'Greenwood'];
-  const S = { packets: [], widgets: [], errors: [], revealed: [], visible: [], props: {}, invoked: [] };
+  const S = { packets: [], widgets: [], errors: [], revealed: [], visible: [], props: {}, invoked: [], keysRead: [], settings: {} };
   globalThis.__mapStub = S;
   LABELS.forEach((l, i) => { S.props[`_root.MarkerClips.Marker${i}.label`] = l; S.props[`_root.MarkerClips.Marker${i}._x`] = 100 + i; });
   S.props['_root.WorldMap._markerList.length'] = LABELS.length;
@@ -66,6 +71,10 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   const h = {};
   const controller = { on: (ev, fn) => { h[ev] = fn; }, emitter: { on: (ev, fn) => { h['emit:' + ev] = fn; } } };
   new MapRealmService(sp, controller);
+  ok(S.keysRead.some(([n, d]) => n === 'mapColoursKeyCode' && d === 20), 'the map colours key is read as the other hotkeys are, T its fallback', S.keysRead);
+  let named = '';
+  try { void require(path.join(TMP, 'stub.js')).notInTheStub; } catch (e) { named = e.message; }
+  ok(/notInTheStub/.test(named), 'the stub names a function it lacks rather than returning undefined', named);
   const frames = (n) => { for (let i = 0; i < n; i++) h.update(); };
   const key = (code) => h.buttonEvent({ isDown: true, device: 0, code });
   const scale = (i) => S.props[`_root.MarkerClips.Marker${i}._xscale`];
