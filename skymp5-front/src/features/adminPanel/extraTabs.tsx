@@ -112,11 +112,19 @@ const Confirm = ({ text, width, disabled, onConfirm }: { text: string; width: nu
 };
 
 // Extra buttons for the selected online player, plus the ban list
-export const PlayerPunish = ({ events, target, name, canBan, bans }: {
-  events: Record<string, string>; target: string | null; name: string; canBan: boolean; bans: PanelBan[];
+export const PlayerPunish = ({ events, target, name, canBan, canTempBan, bans }: {
+  events: Record<string, string>; target: string | null; name: string; canBan: boolean; canTempBan?: boolean; bans: PanelBan[];
 }) => {
   const [hours, setHours] = useState('24');
+  const [tag, setTag] = useState('');
+  const [reason, setReason] = useState('');
   const hoursOk = Number(hours) > 0 && Number(hours) <= 8760;
+  // With no online player selected, a temp ban goes to a #TAG (the server runs /tempban for an offline player)
+  const tagOk = /^#?[A-Za-z0-9]{4}$/.test(tag.trim()) && reason.trim().length >= 5;
+  const tempBan = (): void => {
+    if (target) adminAction(events, 'tempBan', { target, hours: Number(hours) });
+    else if (tagOk) adminAction(events, 'tempBan', { targetName: tag.trim(), hours: Number(hours), reason: reason.trim() });
+  };
   return (
     <div className="admin-panel__punish">
       <div className="admin-panel__actions">
@@ -124,15 +132,21 @@ export const PlayerPunish = ({ events, target, name, canBan, bans }: {
         {canBan ? <Confirm text="Delete character" width={170} disabled={!target} onConfirm={() => target && adminAction(events, 'deleteCharacter', { target })} /> : null}
         {canBan ? <Confirm text="IP ban" width={110} disabled={!target} onConfirm={() => target && adminAction(events, 'ipBan', { target })} /> : null}
       </div>
-      {canBan ? (
+      {canBan || canTempBan ? (
         <div className="admin-panel__actions admin-panel__tempban">
-          <span className="admin-panel__label">Temp ban{name ? ' ' + name : ''}</span>
+          <span className="admin-panel__label">Temp ban{target && name ? ' ' + name : ''}</span>
+          {target ? null : (
+            <>
+              <input className="admin-panel__input admin-panel__input--short" value={tag} onChange={(e) => setTag(e.target.value)} placeholder="#TAG" title="An offline player's #TAG" />
+              <input className="admin-panel__input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason" title="The reason the player is shown" />
+            </>
+          )}
           {BAN_LENGTHS.map(([label, h]) => (
             <button key={h} className={'admin-panel__chip' + (Number(hours) === h ? ' admin-panel__chip--on' : '')} onClick={() => setHours(String(h))}>{label}</button>
           ))}
           <input className="admin-panel__input admin-panel__input--short" value={hours} onChange={(e) => setHours(e.target.value)} title="Hours" />
           <span className="admin-panel__hint">hours</span>
-          <Confirm text="Temp ban" width={130} disabled={!target || !hoursOk} onConfirm={() => target && adminAction(events, 'tempBan', { target, hours: Number(hours) })} />
+          <Confirm text="Temp ban" width={130} disabled={!hoursOk || !(target || tagOk)} onConfirm={tempBan} />
         </div>
       ) : null}
       {bans.length ? (
