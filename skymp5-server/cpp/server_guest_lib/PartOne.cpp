@@ -183,9 +183,10 @@ void PartOne::Tick()
 
 bool PartOne::IsServerDriven(const MpObjectReference& remote)
 {
-  // GetValueDump returns the property's JSON dump, so the tag the gameplay layer sets as `true` arrives here as
-  // the four characters "true". Anything else - absent, "false", "null", a number - is not server-driven: the
-  // only way in is a deliberate `mp.set(id, "private.dboServerHost", true)`.
+  // GetValueDump returns the property's JSON dump, so the tag the gameplay
+  // layer sets as `true` arrives here as the four characters "true". Anything
+  // else - absent, "false", "null", a number - is not server-driven: the only
+  // way in is a deliberate `mp.set(id, "private.dboServerHost", true)`.
   return remote.GetDynamicFields().GetValueDump(GetServerDrivenProperty()) ==
     "true";
 }
@@ -242,9 +243,11 @@ void PartOne::TickStaleHosts()
     if (!remote) {
       continue;
     }
-    // An NPC the server drives is never freed for being silent. Its movement does not come from a client at
-    // all, so it is silent by definition from this sweep's point of view, and releasing it would set its host
-    // to 0 and have every nearby client ask for it at once - the churn this sweep's cooldown exists to stop.
+    // An NPC the server drives is never freed for being silent. Its movement
+    // does not come from a client at all, so it is silent by definition from
+    // this sweep's point of view, and releasing it would set its host to 0 and
+    // have every nearby client ask for it at once - the churn this sweep's own
+    // cooldown exists to stop.
     if (IsServerDriven(*remote)) {
       continue;
     }
@@ -1284,10 +1287,11 @@ void PartOne::Init()
       serverState.UserByActor(emitterAsActor) != Networking::InvalidUserId;
     auto hosterIterator = worldState.hosters.find(emitter->GetFormId());
 
-    // A server-driven NPC is hosted by someone other than this client too - by the server - and saying so is
-    // what keeps the client from claiming it on sight (formView.ts's first re-host trigger has no clock at
-    // all). Without this the refusal in OnHostAttempt still holds, but every watcher asks and is refused, for
-    // every one of them, for as long as they can see it.
+    // A server-driven NPC is hosted by someone other than this client too - by
+    // the server - and saying so is what keeps the client from claiming it on
+    // sight (formView.ts's first re-host trigger has no clock at all). Without
+    // this the refusal in OnHostAttempt still holds, but every watcher asks
+    // and is refused, for each of them, for as long as they can see it.
     if (hasUser || IsServerDriven(*emitter) ||
         (hosterIterator != worldState.hosters.end() &&
          hosterIterator->second != 0 &&
