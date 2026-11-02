@@ -160,6 +160,24 @@ module.exports = (api) => {
   // Merged key by key, as C.feed is below: a partial override such as {"rite":{"clientJudged":false}} used to replace the
   // whole block and wipe rounds, need and leadMs (DESIGN.md section 4.6)
   C.rite = Object.assign({}, RITE_DEFAULTS, (cfg.supernatural || {}).rite || {});
+  // Silver can be worn, and it hurts (Nat, 2026-11-02: "make it so they can wear silver but it hurts them and
+  // eventually bursts them into flames"). enabled false restores exactly what came before: worn silver torn off
+  // every tick and carried silver mailed away.
+  //   damagePerTick     health a tick while any silver is worn, plus perPiece for each piece past the first
+  //   rampSeconds       how long the pain takes to climb to rampMult, so a quick swap costs little
+  //   igniteSeconds     continuous wear before they go up in flames
+  //   burnDamagePerTick replaces damagePerTick once alight
+  //   burnShader        an EFSH form played on them while alight. FireCloakFXShader (2acd8) is Flame Cloak's own
+  //                     body flames; a SHADER, not the cloak spell, which would also burn whoever stood near them.
+  //                     EffectShader.Play is sent to every actor listener of the target, so others see it too
+  //   carryMail         false: silver in the pack is left alone (Nat: no more mailing)
+  //   carrySting        health a tick for merely carrying silver; 0 (the default) is none, because a drain would
+  //                     make looting a silver sword out of a dungeon impossible
+  C.silverBurn = Object.assign({
+    enabled: true, damagePerTick: 2, perPiece: 1, rampSeconds: 20, rampMult: 3,
+    igniteSeconds: 20, burnDamagePerTick: 8, burnShader: '2acd8:Skyrim.esm', shaderSeconds: 6,
+    carryMail: false, carrySting: 0, tellSeconds: 6,
+  }, (cfg.supernatural || {}).silverBurn || {});
   // "Read the rite" (Nate, 4-5 Oct: no timing mini-games): a rite for a UI that names riteJudge and MG.PICK_CAP has no
   // marker. Each round shows spotsByRound marks on the strip, a pulse of the slowing heart or a track of the prey, one
   // clearest (cueByRound) and the others fainter (decoyByRound); the later rounds have more marks and closer decoys, as
@@ -931,8 +949,23 @@ module.exports = (api) => {
     silverCache.set(id, v); return v;
   };
   const silverWarned = new Map();
+  const SB = C.silverBurn;
+  const burnOn = () => SB.enabled !== false;
+  const mailOn = () => (burnOn() ? SB.carryMail === true : true);
+  // Reload-safe: a burn in flight keeps its start, so a hot reload does not hand back the first 20 seconds
+  const burnState = globalThis.__dboSilverBurnState || (globalThis.__dboSilverBurnState = new Map());
+  const carriesSilver = (a) => {
+    try {
+      const inv = mp.get(a, 'inventory');
+      for (const e of (inv && Array.isArray(inv.entries) ? inv.entries : [])) {
+        if (e && !e.worn && !e.wornLeft && Number(e.count) > 0 && isSilverItem(Number(e.baseId) >>> 0)) return true;
+      }
+    } catch (e) { /* not an actor */ }
+    return false;
+  };
   // Whether a can never keep this item (a vampire's or werewolf's silver): the post lets them burn such a parcel unopened
-  globalThis.__dboCannotCarry = (a, baseId) => { const s = stateOf(Number(a) >>> 0); return !!(s && s.kind) && C.silverCarry !== false && isSilverItem(baseId); };
+  // Only while silver is still mailed away: once they may carry it, post.js must hand a silver parcel back
+  globalThis.__dboCannotCarry = (a, baseId) => { const s = stateOf(Number(a) >>> 0); return !!(s && s.kind) && C.silverCarry !== false && mailOn() && isSilverItem(baseId); };
   // Silver they carry goes to their own mailbox: what the post can send, never a worn piece (the pass above takes it off first)
   const carrySilver = (a, s) => {
     const P = globalThis.__dboPostApi;
@@ -961,18 +994,102 @@ module.exports = (api) => {
       : `The silver burns even through the pack. The beast will not carry it; it waits in your mailbox at the notice boards: ${what}.`);
     audit(`SILVER ${who(a)} (${s.kind}) could not carry ${what}; mailed to their own mailbox`);
   };
+  // Health damage the server really applies: DamageActorValue is one of the three AV methods PapyrusActor
+  // registers (SetActorValue, RestoreActorValue, DamageActorValue) and it converts points against the server's
+  // own max, so a kill goes through downed.js like any other. ModActorValue is NOT registered.
+  const hurt = (a, points) => {
+    const n = Math.round(Number(points) * 10) / 10;
+    if (!(n > 0)) return 0;
+    try {
+      mp.callPapyrusFunction('method', 'Actor', 'DamageActorValue', { type: 'form', desc: mp.getDescFromId(a) }, ['Health', n]);
+      return n;
+    } catch (e) { log(`supernatural: silver damage on ${display(a)} failed: ${e.message}`); return 0; }
+  };
+  const healthLeft = (a) => { try { const p = mp.get(a, 'percentages'); return p && typeof p.health === 'number' ? p.health : 1; } catch (e) { return 1; } };
+  const shaderCall = (a, fn, args) => {
+    const d = String(SB.burnShader || '');
+    if (!d) return;
+    try { mp.callPapyrusFunction('method', 'EffectShader', fn, { type: 'espm', desc: d }, args); }
+    catch (e) { log(`supernatural: silver shader ${fn} failed on ${display(a)}: ${e.message}`); }
+  };
+  const flamesOn = (a) => shaderCall(a, 'Play', [{ type: 'form', desc: mp.getDescFromId(a) }, Math.max(1, Number(SB.shaderSeconds) || 6)]);
+  const flamesOff = (a) => shaderCall(a, 'Stop', [{ type: 'form', desc: mp.getDescFromId(a) }]);
+  const sbTell = (a, b, text) => {
+    const now = Date.now();
+    if (now - (b.toldAt || 0) < Math.max(0, Number(SB.tellSeconds) || 0) * 1000) return;
+    b.toldAt = now;
+    try { personal(a, text); } catch (e) { /* offline */ }
+  };
+  const VOICE = {
+    vampire: { early: 'The silver sears your cold skin.', worse: 'The silver eats into you; the burn will not stop.', alight: 'The silver drinks your death and you burst into flame.', off: 'The silver is off you. The burning dies.' },
+    werewolf: { early: 'The silver burns like fire against the beast.', worse: 'The silver blisters you; the beast howls to be rid of it.', alight: 'The beast cannot bear it: you burst into flame.', off: 'The silver is off you. The flames gutter out.' },
+  };
+  const voiceOf = (s) => VOICE[s.kind === 'vampire' ? 'vampire' : 'werewolf'];
+  // One pass over a supernatural wearing silver. Returns the points taken, so the harness can read the curve.
+  const silverTick = (a, s, pieces, now) => {
+    const b = burnState.get(a) || { since: now, alight: false, toldAt: 0, died: false };
+    burnState.set(a, b);
+    const heldMs = Math.max(0, now - b.since);
+    const rampMs = Math.max(1, Number(SB.rampSeconds) * 1000);
+    const mult = 1 + (Math.max(1, Number(SB.rampMult) || 1) - 1) * Math.min(1, heldMs / rampMs);
+    const igniteMs = Math.max(0, Number(SB.igniteSeconds) * 1000);
+    const v = voiceOf(s);
+    if (!b.alight && heldMs >= igniteMs) {
+      b.alight = true;
+      flamesOn(a);
+      sbTell(a, b, v.alight);
+      audit(`SILVERBURN ${who(a)} (${s.kind}) burst into flames after ${Math.round(heldMs / 1000)}s in silver (${pieces} piece${pieces === 1 ? '' : 's'})`);
+    } else if (b.alight) {
+      flamesOn(a);                       // re-played each tick: Play takes a duration and would otherwise lapse
+      sbTell(a, b, v.alight);
+    } else {
+      sbTell(a, b, heldMs >= igniteMs / 2 ? v.worse : v.early);
+    }
+    const per = Number(b.alight ? SB.burnDamagePerTick : SB.damagePerTick) || 0;
+    const took = hurt(a, (per + Math.max(0, Number(SB.perPiece) || 0) * Math.max(0, pieces - 1)) * mult);
+    if (took > 0 && !b.died && healthLeft(a) <= 0) {
+      b.died = true;
+      audit(`SILVERBURN ${who(a)} (${s.kind}) died of the silver`);
+    }
+    return took;
+  };
+  const silverStop = (a, s) => {
+    const b = burnState.get(a);
+    if (!b) return;
+    burnState.delete(a);
+    if (!b.alight) return;
+    flamesOff(a);
+    audit(`SILVERBURN ${who(a)} (${s.kind}) put the silver aside and stopped burning`);
+    try { personal(a, voiceOf(s).off); } catch (e) { /* offline */ }
+  };
+  globalThis.__dboSilverBurning = (a) => { const b = burnState.get(Number(a) >>> 0); return !!(b && b.alight); };
+
   every('superSilver', 2000, () => {
+    const now = Date.now();
     for (const a of onlineActors()) {
       const s = stateOf(a); if (!s || !s.kind) continue;
       let eq = null; try { eq = mp.get(a, 'equipment'); } catch (e) { continue; }
       const entries = eq && eq.inv && Array.isArray(eq.inv.entries) ? eq.inv.entries : [];
-      for (const e of entries) {
-        if (!e || !(e.worn || e.wornLeft) || !isSilverItem(e.baseId)) continue;
-        papyrus(a, 'UnequipItem', [spell(Number(e.baseId) >>> 0), false, true]);
-        const last = silverWarned.get(a) || 0;
-        if (Date.now() - last > 10000) { silverWarned.set(a, Date.now()); personal(a, s.kind === 'vampire' ? 'The silver sears your cold skin, and you tear it off.' : 'The silver burns like fire. The beast in you will not bear it.'); }
+      const worn = entries.filter((e) => e && (e.worn || e.wornLeft) && isSilverItem(e.baseId));
+      if (!burnOn()) {
+        // the old rule, kept whole behind the off switch
+        for (const e of worn) {
+          papyrus(a, 'UnequipItem', [spell(Number(e.baseId) >>> 0), false, true]);
+          const last = silverWarned.get(a) || 0;
+          if (now - last > 10000) { silverWarned.set(a, now); personal(a, s.kind === 'vampire' ? 'The silver sears your cold skin, and you tear it off.' : 'The silver burns like fire. The beast in you will not bear it.'); }
+        }
+        if (C.silverCarry !== false) carrySilver(a, s);
+        continue;
       }
-      if (C.silverCarry !== false) carrySilver(a, s);
+      if (worn.length) silverTick(a, s, worn.length, now);
+      else silverStop(a, s);
+      if (C.silverCarry !== false && mailOn()) carrySilver(a, s);
+      else if (!worn.length && Number(SB.carrySting) > 0 && carriesSilver(a)) {
+        const b = burnState.get(a) || { toldAt: 0 };
+        burnState.set(a, b);
+        hurt(a, Number(SB.carrySting));
+        sbTell(a, b, s.kind === 'vampire' ? 'The silver in your pack stings through the cloth.' : 'The silver in your pack prickles against the beast.');
+      }
     }
   });
   // The gamemode sets its hit hook on every reload before this module loads, so this wrapper never stacks

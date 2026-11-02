@@ -1,0 +1,19 @@
+{
+  "title": "Silver can be worn, and it burns",
+  "date": "2026-11-02",
+  "version": "Server update",
+  "tag": "Change",
+  "sections": [
+    {
+      "heading": "Vampires and werewolves",
+      "items": [
+        "Silver no longer tears itself off you. You may wear a silver ring, circlet or cuirass if you choose to, and silver in your pack is left alone: it is not mailed to your mailbox any more.",
+        "Worn silver sears you. It takes a little health every couple of seconds, more the longer you keep it on and more for each piece you wear at once.",
+        "Keep it on for about twenty seconds and you burst into flames, which others can see, and the burning bites far harder than the searing did.",
+        "Taking the silver off stops the pain and puts the flames out at once.",
+        "Silver can kill you this way, and it is an ordinary death: the usual rules for being downed apply.",
+        "Staff are not exempt. A vampire or werewolf on the staff burns like anyone else."
+      ]
+    }
+  ]
+}

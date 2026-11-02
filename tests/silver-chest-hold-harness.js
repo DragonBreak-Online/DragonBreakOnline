@@ -64,7 +64,9 @@ const api = {
   mp, log: () => {}, audit: (t) => audits.push(t), personal: (a, t) => said.push([a, t]), registerChatCommand: () => {},
   onUi: () => {}, openWidget: () => {}, closeWidget: () => {}, sendPacket: () => {}, display: (a) => `P${a.toString(16)}`, who: (a) => `P${a.toString(16)}`, isAdmin: () => false,
   findByName: () => null, onlineActors: () => [WOLF, VAMP, HUMAN], every: (k, ms, f) => { timers[k] = f; },
-  profileOf: () => 1, nameOf: String, isWorldspace: () => true, needsFeed: () => {}, hungerOf: () => 0, cfg: {},
+  profileOf: () => 1, nameOf: String, isWorldspace: () => true, needsFeed: () => {}, hungerOf: () => 0,
+  // silver is no longer mailed by default (Nat, 2 Nov); this harness pins the mail hold, so it asks for mailing
+  cfg: { supernatural: { silverBurn: { carryMail: true } } },
 };
 fs.writeFileSync('supernatural.json', JSON.stringify({ crown: null, revoke: [] }));
 store.set(`${WOLF}|private.supernatural`, { kind: 'werewolf', disease: null, spells: [] });

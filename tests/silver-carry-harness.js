@@ -63,7 +63,7 @@ const api = {
   mp, log: () => {}, audit: (t) => audits.push(t), personal: (a, t) => said.push([a, t]), registerChatCommand: () => {},
   onUi: () => {}, openWidget: () => {}, closeWidget: () => {}, sendPacket: () => {}, display: (a) => `P${a.toString(16)}`, who: (a) => `P${a.toString(16)}`, isAdmin: () => false,
   findByName: () => null, onlineActors: () => [WOLF, VAMP, HUMAN], every: (k, ms, f) => { timers[k] = f; },
-  profileOf: () => 1, nameOf: String, isWorldspace: () => true, needsFeed: () => {}, hungerOf: () => 0, cfg: {},
+  profileOf: () => 1, nameOf: String, isWorldspace: () => true, needsFeed: () => {}, hungerOf: () => 0, cfg: { supernatural: { silverBurn: { carryMail: true } } }, // silver is no longer mailed by default (Nat, 2 Nov): this harness pins the carry path, so it asks for it
 };
 fs.writeFileSync('supernatural.json', JSON.stringify({ crown: null, revoke: [] }));
 store.set(`${WOLF}|private.supernatural`, { kind: 'werewolf', disease: null, spells: [] });
@@ -107,10 +107,11 @@ ok(!papyrusCalls.some((c) => /UnequipItem/.test(JSON.stringify(c))), 'the wear r
 store.set(`${VAMP}|inventory`, { entries: [{ baseId: QS_INGOT, count: 7 }, { baseId: QS_ORE, count: 3 }] });
 letters.length = 0; timers.superSilver();
 ok(count(VAMP, QS_INGOT) === 7 && count(VAMP, QS_ORE) === 3 && !letters.some((l) => l.to === VAMP), 'a vampire keeps quicksilver too');
-// The real silver ring worn is still torn off
+// A worn real silver ring is NOT torn off any more (Nat, 2 Nov): it is worn, and it hurts
 store.set(`${WOLF}|inventory`, { entries: [{ baseId: RING, count: 1, worn: true }] });
 papyrusCalls.length = 0; timers.superSilver();
-ok(papyrusCalls.some((c) => /UnequipItem/.test(JSON.stringify(c))), 'a worn real silver ring is still taken off', papyrusCalls);
+ok(!papyrusCalls.some((c) => /UnequipItem/.test(JSON.stringify(c))), 'a worn real silver ring is left on', papyrusCalls);
+ok(papyrusCalls.some((c) => /DamageActorValue/.test(JSON.stringify(c))), '...and it costs health instead', papyrusCalls);
 
 // The loop (karta.gina, 19 Oct): a parcel of silver its vampire can never keep is burned unopened; a human keeps theirs
 ok(globalThis.__dboCannotCarry(VAMP, INGOT) && globalThis.__dboCannotCarry(WOLF, RING) && !globalThis.__dboCannotCarry(HUMAN, INGOT) && !globalThis.__dboCannotCarry(VAMP, IRON),
