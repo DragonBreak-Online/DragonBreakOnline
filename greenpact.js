@@ -147,7 +147,10 @@ module.exports = (api) => {
     t = Number(t) >>> 0; a = Number(a) >>> 0;
     if (!C.enabled || !isPlayer(a) || t === a) return false;
     if (S.feeds.has(a) && S.feeds.get(a).t === t) return true;
-    if (isDead(t)) {
+    // Only a body is fed on: a player's, or an NPC with a kill on record. isDead is asked of nothing else, since on a door,
+    // chest or workbench it throws in C++, which logged a context dump and a 'treat it as Actor' warning for every E a
+    // player pressed (live, 2 Nov: nearly all of the ~9,000 a day; supernatural.js met the same on 30 Sep)
+    if ((isPlayer(t) || S.kills.has(t)) && isDead(t)) {
       if (eatOff(a) || partaken(t) || !sworn(a)) return false;
       if (isPlayer(t)) { ask(a, t); return true; }
       if (!killedByUs(a, t) || !isPersonBody(t)) return false;
