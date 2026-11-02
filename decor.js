@@ -64,6 +64,13 @@ module.exports = (api) => {
   const { mp, log, personal, audit, who, onUi, sendPacket, registerChatCommand, onlineActors, isAdmin, giveItem, findByName } = api;
   const openWidget = api.openWidget || ((a, widget, focus) => sendPacket(a, { customPacketType: 'dboWidget', widget, focus: !!focus }));
   const closeWidget = api.closeWidget || ((a, id) => sendPacket(a, { customPacketType: 'dboWidget', close: id }));
+  // What a player reads about another player: the public "Name #TAG" (gamemode.js publicDisplay: a mask stays the mask),
+  // never who(), which carries the profile number and the Discord mention for staff logs (fac-0553, 31 Oct)
+  const shown = typeof api.publicDisplay === 'function' ? api.publicDisplay : (x) => { try { const ap = mp.get(x, 'appearance'); return String((ap && ap.name) || 'Someone'); } catch (e) { return 'Someone'; } };
+  // Names stored before that carry " (profile N, <@id>)": cut back to the public part when shown
+  const publicPart = (s) => String(s || '').replace(/ \(profile [^)]*\)$/, '');
+  // Who may be named in the people list: never a hidden GM or an invisible player (listable.js)
+  const listable = (() => { try { const f = path.join(__dirname, 'listable.js'); delete require.cache[f]; return require(f)(mp); } catch (e) { log('decor: listable.js unreadable, so the people list names nobody nearby', e.message); return () => false; } })();
   const hasUiCap = api.hasUiCap || (() => false);
   const C = Object.assign({}, DEFAULTS, (api.cfg || {}).decor || {});
   C.study = Object.assign({}, DEFAULTS.study, ((api.cfg || {}).decor || {}).study || {});
@@ -603,7 +610,7 @@ module.exports = (api) => {
     if (owner === a) personal(a, `${it.name} is taken down${list ? `; back to you: ${list}` : ''}.`);
     else {
       personal(a, `${it.name} is taken down${list ? `; what comes back (${list}) is the home owner's` : ''}.`);
-      if (owner && list) personal(owner, `${who(a)} took down ${it.name} in your home; back to you: ${list}.`);
+      if (owner && list) personal(owner, `${shown(a)} took down ${it.name} in your home; back to you: ${list}.`);
     }
     return true;
   };
@@ -842,13 +849,14 @@ module.exports = (api) => {
   // ---- /decor -----------------------------------------------------------------------------------------------------------
   const listOf = (a, pl) => placeEntry(pl.root, pl.rec).items;
   // names are kept beside the ids so the panel lists a decorator who is offline
-  const setDecorator = (a, pl, pid, grant, name) => {
+  // name: what the owner's list shows (public); full: the staff log's (who), when the other is online
+  const setDecorator = (a, pl, pid, grant, name, full) => {
     const p = placeEntry(pl.root, pl.rec);
     p.decorators = (p.decorators || []).filter((x) => x !== pid);
     p.decoratorNames = p.decoratorNames || {};
-    if (grant) { p.decorators.push(pid); p.decoratorNames[pid] = String(name || ''); } else delete p.decoratorNames[pid];
+    if (grant) { p.decorators.push(pid); p.decoratorNames[pid] = publicPart(name); } else delete p.decoratorNames[pid];
     save();
-    audit(`DECOR ${grant ? 'grant' : 'revoke'} ${who(a)} -> ${name} (${pid}) place ${hex(pl.root)}`);
+    audit(`DECOR ${grant ? 'grant' : 'revoke'} ${who(a)} -> ${full || name} (${pid}) place ${hex(pl.root)}`);
     return personal(a, grant ? 'They may now decorate here.' : 'They may no longer decorate here.');
   };
 
@@ -904,8 +912,9 @@ module.exports = (api) => {
       const names = p.decoratorNames || {}, granted = p.decorators || [];
       const skillOf = (x) => ({ tier: CARPENTER_TIERS[Math.max(0, skillRank(x, 'woodcutter'))] || '', refund: Math.round(deconstructShare(x) * 100) });
       const online = (pid) => onlineActors().find((x) => profile(x) === pid);
-      out.rows = granted.map((pid) => { const x = online(pid); return Object.assign({ key: String(pid), name: names[pid] || 'someone', online: !!x }, x ? skillOf(x) : { tier: '', refund: null }); });
-      if (isOwner) out.nearby = onlineActors().filter((x) => x !== a && !granted.includes(profile(x)) && (here(x) || {}).root === pl.root).map((x) => Object.assign({ key: String(profile(x)), name: who(x), online: true }, skillOf(x)));
+      out.rows = granted.map((pid) => { const x = online(pid); return Object.assign({ key: String(pid), name: publicPart(names[pid]) || 'someone', online: !!x }, x ? skillOf(x) : { tier: '', refund: null }); });
+      // Everyone else in the home, by their public name; a hidden GM or an invisible player is not named (fac-0553)
+      if (isOwner) out.nearby = onlineActors().filter((x) => x !== a && !granted.includes(profile(x)) && (here(x) || {}).root === pl.root && listable(a, x)).map((x) => Object.assign({ key: String(profile(x)), name: shown(x), online: true }, skillOf(x)));
       out.own = skillOf(a);
     } else {
       out.view = 'catalog';
@@ -979,7 +988,7 @@ module.exports = (api) => {
   panelAct('decorClose', (a) => { S.panel.delete(a >>> 0); closeWidget(a, PANEL_ID); });
   panelAct('decorGrant', (a, st, [pid]) => {
     const pl = here(a), t = pl && onlineActors().find((x) => x !== a && String(profile(x)) === String(pid) && (here(x) || {}).root === pl.root);
-    if (t && owns(a, pl.rec)) setDecorator(a, pl, profile(t), true, who(t));
+    if (t && owns(a, pl.rec) && listable(a, t)) setDecorator(a, pl, profile(t), true, shown(t), who(t));
     refresh(a);
   });
   panelAct('decorRevoke', (a, st, [pid]) => {
@@ -1061,7 +1070,7 @@ module.exports = (api) => {
       if (!owns(a, pl.rec)) return personal(a, 'Only the owner names who may decorate.');
       const t = findByName(rest);
       if (!t) return personal(a, 'Nobody online by that name.');
-      return setDecorator(a, pl, profile(t), sub === 'grant', who(t));
+      return setDecorator(a, pl, profile(t), sub === 'grant', shown(t), who(t));
     }
     if (sub === 'clear') {
       if (!isDeveloper(a)) return personal(a, 'That is for Developers.');
