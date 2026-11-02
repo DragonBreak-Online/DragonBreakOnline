@@ -274,10 +274,6 @@
    "ConjureKONGhost"
   ],
   [
-   "9c721e:King of the Murkmire.esp",
-   "ConjureSpectralWamasu"
-  ],
-  [
    "204c5:Skyrim.esm",
    "ConjureStormAtronach"
   ],
@@ -410,136 +406,8 @@
    "Dragonhide"
   ],
   [
-   "688835:summersetisles.esp",
-   "DrainAllSSI"
-  ],
-  [
    "96d95:Skyrim.esm",
    "DreadZombie"
-  ],
-  [
-   "a1dc8:Druadach.esm",
-   "DRV_BanishShadowsLightSpell"
-  ],
-  [
-   "a1000:Druadach.esm",
-   "DrV_SPECTREsummonfirespell"
-  ],
-  [
-   "a1001:Druadach.esm",
-   "DrV_SPECTREsummonfrostspell"
-  ],
-  [
-   "a1002:Druadach.esm",
-   "DrV_SPECTREsummonshockspell"
-  ],
-  [
-   "902c7:Druadach.esm",
-   "DRVC_ArmorCorrodingCloak"
-  ],
-  [
-   "960c3:Druadach.esm",
-   "DRVC_BlazingFrost"
-  ],
-  [
-   "8dced:Druadach.esm",
-   "DRVC_BloodBoundSwordRightHand"
-  ],
-  [
-   "8dcee:Druadach.esm",
-   "DRVC_BloodCloak"
-  ],
-  [
-   "94fc7:Druadach.esm",
-   "DRVC_BoneShrapnel"
-  ],
-  [
-   "8dd09:Druadach.esm",
-   "DRVC_BoulderSpell02"
-  ],
-  [
-   "8dd08:Druadach.esm",
-   "DRVC_BoulderSpell03"
-  ],
-  [
-   "933de:Druadach.esm",
-   "DRVC_BurdenOfLethargy"
-  ],
-  [
-   "95452:Druadach.esm",
-   "DRVC_BurdenRune"
-  ],
-  [
-   "95450:Druadach.esm",
-   "DRVC_CalmRune"
-  ],
-  [
-   "8dce4:Druadach.esm",
-   "DRVC_ConcealingFog"
-  ],
-  [
-   "902c5:Druadach.esm",
-   "DRVC_DisintegratetheUndead"
-  ],
-  [
-   "94fc8:Druadach.esm",
-   "DRVC_DrainDead"
-  ],
-  [
-   "8dd07:Druadach.esm",
-   "DRVC_EarthquakeSpell"
-  ],
-  [
-   "9608d:Druadach.esm",
-   "DRVC_FearRune"
-  ],
-  [
-   "960c5:Druadach.esm",
-   "DRVC_FierceFlames"
-  ],
-  [
-   "95451:Druadach.esm",
-   "DRVC_ForceRune"
-  ],
-  [
-   "8dce9:Druadach.esm",
-   "DRVC_GoldenSparks"
-  ],
-  [
-   "960c4:Druadach.esm",
-   "DRVC_LightningWeave"
-  ],
-  [
-   "960a3:Druadach.esm",
-   "DRVC_MirrorEndurance"
-  ],
-  [
-   "960a4:Druadach.esm",
-   "DRVC_MirrorFortitude"
-  ],
-  [
-   "960a5:Druadach.esm",
-   "DRVC_MirrorIntellect"
-  ],
-  [
-   "902c6:Druadach.esm",
-   "DRVC_ReflectiveResolve"
-  ],
-  [
-   "960a9:Druadach.esm",
-   "DRVC_ShroudOfIntellect"
-  ],
-  [
-   "902c3:Druadach.esm",
-   "DRVC_Silence"
-  ],
-  [
-   "902c2:Druadach.esm",
-   "DRVC_SummonDremoraWarMage"
-  ],
-  [
-   "9544f:Druadach.esm",
-   "DRVC_TripRune"
   ],
   [
    "9ce26:Skyrim.esm",
@@ -552,10 +420,6 @@
   [
    "5ad5e:Skyrim.esm",
    "Ebonyflesh"
-  ],
-  [
-   "fd7db6:summersetisles.esp",
-   "ElanyaCallSpell"
   ],
   [
    "6f952:Skyrim.esm",
@@ -770,62 +634,6 @@
    "Sparks"
   ],
   [
-   "e69cb4:summersetisles.esp",
-   "SSIArmorFaithAura"
-  ],
-  [
-   "e4f6b3:summersetisles.esp",
-   "SSIBlessingAura"
-  ],
-  [
-   "a1897:summersetisles.esp",
-   "SSIConcentratedFlames"
-  ],
-  [
-   "a189a:summersetisles.esp",
-   "SSIConcentratedFrostSpell"
-  ],
-  [
-   "a189d:summersetisles.esp",
-   "SSIConcentratedSparks"
-  ],
-  [
-   "de635:summersetisles.esp",
-   "SSIConvSpell02"
-  ],
-  [
-   "a26de:summersetisles.esp",
-   "SSICureDiseaseOtherSpell"
-  ],
-  [
-   "a26da:summersetisles.esp",
-   "SSICureDiseaseSelfSpell"
-  ],
-  [
-   "65836a:summersetisles.esp",
-   "SSIDaylight"
-  ],
-  [
-   "688834:summersetisles.esp",
-   "SSIElementalSurge"
-  ],
-  [
-   "e73b17:summersetisles.esp",
-   "SSIHolyMeditationAura"
-  ],
-  [
-   "c11817:summersetisles.esp",
-   "SSIStrongFear"
-  ],
-  [
-   "3055ca:summersetisles.esp",
-   "SSISustenanceSpell"
-  ],
-  [
-   "65529e:summersetisles.esp",
-   "SSITorchlight"
-  ],
-  [
    "5ad5d:Skyrim.esm",
    "Stoneflesh"
   ],
@@ -834,72 +642,12 @@
    "StormThrall"
   ],
   [
-   "685730:summersetisles.esp",
-   "SummonAbominationSpell"
-  ],
-  [
-   "5ce50e:summersetisles.esp",
-   "SummonBaliwog01Spell"
-  ],
-  [
-   "a13ef7:summersetisles.esp",
-   "SummonBatSSISpell"
-  ],
-  [
-   "30ef8e:summersetisles.esp",
-   "SummonBloodySkeletonSpell"
-  ],
-  [
-   "336537:summersetisles.esp",
-   "SummonCrystalAtronachSpell"
-  ],
-  [
-   "a17241:summersetisles.esp",
-   "SummonEnchantedTreeSpell"
-  ],
-  [
-   "68573a:summersetisles.esp",
-   "SummonGrummiteMagusDeathdealerSpell"
-  ],
-  [
-   "5d15db:summersetisles.esp",
-   "SummonGrummiteSpell"
-  ],
-  [
-   "a2ac15:summersetisles.esp",
-   "SummonHulkingTrollSpell"
-  ],
-  [
-   "a2ac11:summersetisles.esp",
-   "SummonHungerSpell"
-  ],
-  [
-   "685726:summersetisles.esp",
-   "SummonMakeshiftSpiderSpell"
-  ],
-  [
-   "51a041:summersetisles.esp",
-   "SummonPlagueRatSpell"
-  ],
-  [
-   "5ce509:summersetisles.esp",
-   "SummonSwampHoundSpell"
-  ],
-  [
-   "3120b4:summersetisles.esp",
-   "SummonZombieSpellSSI"
-  ],
-  [
    "1a4cc:Skyrim.esm",
    "Telekinesis"
   ],
   [
    "10f7ee:Skyrim.esm",
    "Thunderbolt"
-  ],
-  [
-   "a13efa:summersetisles.esp",
-   "ThunderboltSSI"
   ],
   [
    "5dd5e:Skyrim.esm",
@@ -1281,11 +1029,6 @@
    "CYRAbsorbHealth"
   ],
   [
-   "a104d:Druadach.esm",
-   "Absorb Health",
-   "DrV_oldgodabsorb"
-  ],
-  [
    "9aa3e:Skyrim.esm",
    "AbSprigganDeathParalysis",
    "AbSprigganDeathParalysis"
@@ -1316,31 +1059,6 @@
    "DLC2crLurkerSpit04"
   ],
   [
-   "ff07:King of the Murkmire.esp",
-   "Acid",
-   "KotuGavaSpit01"
-  ],
-  [
-   "ff08:King of the Murkmire.esp",
-   "Acid",
-   "KotuGavaSpit02"
-  ],
-  [
-   "ff0a:King of the Murkmire.esp",
-   "Acid",
-   "KotuGavaSpit03"
-  ],
-  [
-   "ff0c:King of the Murkmire.esp",
-   "Acid",
-   "KotuGavaSpit04"
-  ],
-  [
-   "5ba0b:Druadach.esm",
-   "AE Soul Drain",
-   "DD_LBMQ09MantellaSoulDrainCloakDamage"
-  ],
-  [
    "8b2f:Dawnguard.esm",
    "AE Soul Drain",
    "DLC1CrystalSoulDrainCloakDamage"
@@ -1366,34 +1084,9 @@
    "PowerDarkELfFlameCloakDmg"
   ],
   [
-   "6f9fb:Druadach.esm",
-   "Angavaar's Liche Damage Speel",
-   "DRV_SpellDamageNotElemental"
-  ],
-  [
-   "7ffe0:Druadach.esm",
-   "Antigravity",
-   "DD_LBMQ10AedronAntigravity"
-  ],
-  [
    "1deee6:WindhelmSSE.esp",
    "Anvil's Luck",
    "AltarMaraSpellWHAnvil"
-  ],
-  [
-   "a51:King of the Murkmire.esp",
-   "Arachas Acidic Sap",
-   "mihailarachasacid"
-  ],
-  [
-   "a52:King of the Murkmire.esp",
-   "Arachas Poison Bomb",
-   "mihailarachaspoison"
-  ],
-  [
-   "a76:King of the Murkmire.esp",
-   "Arachas Poison Bomb",
-   "mihailarachaspoisonboss"
   ],
   [
    "b7329:arnima.esm",
@@ -1406,11 +1099,6 @@
    "CYRBrumaMS10ArmionImmobiliseSpell"
   ],
   [
-   "e69cb5:summersetisles.esp",
-   "Armor of Faith",
-   "SSIArmorFaith02"
-  ],
-  [
    "6a104:Skyrim.esm",
    "Arniel's Convection",
    "MGRArnielSpell"
@@ -1419,11 +1107,6 @@
    "20f01:Dragonborn.esm",
    "Ash Breath",
    "DLC2AshBreath1"
-  ],
-  [
-   "32502:Journey to Baan Malur.esp",
-   "Ash Cloak Effect",
-   "DLC2AshCloakParalysis"
   ],
   [
    "1ff31:Dragonborn.esm",
@@ -1444,11 +1127,6 @@
    "27f89:Dragonborn.esm",
    "Ash Spray",
    "DLC2crAshGuardianAttack"
-  ],
-  [
-   "49e46:Druadach.esm",
-   "Atronach's Flame Wall Channel",
-   "DD_ImpMQ10AtronachChannelSpell"
   ],
   [
    "a07:ccQDRSSE001-SurvivalMode.esl",
@@ -1506,49 +1184,14 @@
    "dunReachwaterRockGauldurReforgeSpell"
   ],
   [
-   "56a34:Journey to Baan Malur.esp",
-   "Banekin Fire",
-   "mihailbanekin_FireLightning"
-  ],
-  [
-   "3d4ba:Journey to Baan Malur.esp",
-   "Banekin Lightning",
-   "mihailbanekin_ChainLightning"
-  ],
-  [
    "f95ea:Skyrim.esm",
    "Banish Daedra",
    "BanishDaedraLeftHand"
   ],
   [
-   "a1983:Druadach.esm",
-   "Banish Shadows",
-   "DRV_BanishShadowsCloakSpell"
-  ],
-  [
-   "a1984:Druadach.esm",
-   "Banish Shadows",
-   "DRV_BanishShadowsCloakEffect"
-  ],
-  [
    "2bd26:Dragonborn.esm",
    "Bardic Knowledge",
    "DLC2BardInstrumentalBuffSpell"
-  ],
-  [
-   "8b582:Druadach.esm",
-   "Barrier Shock Explosion",
-   "DRVC_BarrierShockExpl"
-  ],
-  [
-   "8c5:King of the Murkmire.esp",
-   "Baryonyx Bite",
-   "SpinosaurudBiteBaneBaryonyx"
-  ],
-  [
-   "92b:King of the Murkmire.esp",
-   "Baryonyx Bite",
-   "SpinosaurudBiteBaryonyx"
   ],
   [
    "9cd4d:Skyrim.esm",
@@ -1571,24 +1214,9 @@
    "DLC2dunFrostmoonWerewolfChangeFX"
   ],
   [
-   "7ffdd:Druadach.esm",
-   "Beast Form",
-   "drv_WhiteWerewolfChangeFX"
-  ],
-  [
    "f8208:Skyrim.esm",
    "Beast Form",
    "WerewolfChangeFX"
-  ],
-  [
-   "8f4e2:Druadach.esm",
-   "Beneficial Brandy",
-   "DRVC_BeneficialBrandySpell"
-  ],
-  [
-   "87c16:Druadach.esm",
-   "Bitten Ankles",
-   "DRVC_BittenAnkles"
   ],
   [
    "10e12:Dawnguard.esm",
@@ -1604,16 +1232,6 @@
    "f4579:Skyrim.esm",
    "Bleeding",
    "BleedingSpell"
-  ],
-  [
-   "91b:King of the Murkmire.esp",
-   "Bleeding Damage",
-   "SpinoBleedingDamageSpino"
-  ],
-  [
-   "91c:King of the Murkmire.esp",
-   "Bleeding Damage",
-   "SpinoBleedingDamageBaryonyx"
   ],
   [
    "c367b:Skyrim.esm",
@@ -1826,11 +1444,6 @@
    "DBO_BlessingOfMagnus"
   ],
   [
-   "8e5f7:Druadach.esm",
-   "Blessing of Malacath",
-   "DRVC_AltarMalacathSpell"
-  ],
-  [
    "fb998:Skyrim.esm",
    "Blessing of Mara",
    "AltarMaraSpell"
@@ -2001,11 +1614,6 @@
    "DLC1nVampireBloodCloakSpell"
   ],
   [
-   "8dcef:Druadach.esm",
-   "Blood Drain",
-   "DRVC_DrainCloakDmg"
-  ],
-  [
    "e7b1:Dawnguard.esm",
    "Blood Plague",
    "DLC1nVampireBloodPlagueSpell"
@@ -2036,21 +1644,6 @@
    "BSKcrSprigganBlueConcentration"
   ],
   [
-   "f34b7:summersetisles.esp",
-   "Bolwing's Waterbreathing",
-   "SSIMQ04BolWater"
-  ],
-  [
-   "96d5e:Druadach.esm",
-   "Bone Shrapnel Disintegrate Self Effect",
-   "DRVC_BoneShrapnelDisintegrateFFSelfEffects"
-  ],
-  [
-   "9b2f5e:summersetisles.esp",
-   "Book Thunderbolt",
-   "csBookBossTunderbolt"
-  ],
-  [
    "23c0:DragonBreak.esp",
    "Boon of Malacath",
    "AltarMalacathSpellDUPLICATE001"
@@ -2071,11 +1664,6 @@
    "ccBGSSSE025_BossChannelSpell"
   ],
   [
-   "9f8f2:Druadach.esm",
-   "Boulder",
-   "DD_LBMQ07PowerCoreThrowSpell"
-  ],
-  [
    "c96a0:Skyrim.esm",
    "Bound Sword",
    "BoundSwordRightHand"
@@ -2084,11 +1672,6 @@
    "f9615:Skyrim.esm",
    "Bound Sword",
    "BoundSwordLeftHand"
-  ],
-  [
-   "a0f46:Druadach.esm",
-   "Bravery",
-   "DrV_DwemerSupportEnhance"
   ],
   [
    "38adc:Dragonborn.esm",
@@ -2116,16 +1699,6 @@
    "CYRBurningBunnySpell"
   ],
   [
-   "1ee4b:Journey to Baan Malur.esp",
-   "Call Cliff Racer",
-   "mihailcallcliffracer2"
-  ],
-  [
-   "1ee4e:Journey to Baan Malur.esp",
-   "Call Cliff Racer",
-   "mihailcallcliffracer3"
-  ],
-  [
    "18887:notice board.esp",
    "Calm Bandits",
    "manny_up_spell_ec_calm_area"
@@ -2144,11 +1717,6 @@
    "ea5ba:ccBGSSSE001-Fish.esm",
    "Catapult Projectile Spell",
    "ccBGSSSE001_CatapultProjectileSpell"
-  ],
-  [
-   "b1b:King of the Murkmire.esp",
-   "Centipede Attack",
-   "mihailgiantcentipede_stagger"
   ],
   [
    "7d99c:Skyrim.esm",
@@ -2186,16 +1754,6 @@
    "TrapChainLightning06"
   ],
   [
-   "80c:King of the Murkmire.esp",
-   "Chain Lightning",
-   "mihailwamasu_spell2"
-  ],
-  [
-   "8a29e:Druadach.esm",
-   "Chain Lightning",
-   "DRV_LesserChainLightning"
-  ],
-  [
    "bb96b:Skyrim.esm",
    "Chain Lightning",
    "ChainLightningRightHand"
@@ -2226,11 +1784,6 @@
    "crChaurusPoisonSpit01"
   ],
   [
-   "7de54:Druadach.esm",
-   "Chaurus Poison",
-   "DRV_crChaurusPoisonSpit_Hatchling"
-  ],
-  [
    "9d3c:Dawnguard.esm",
    "Chaurus Poison",
    "DLC1crChaurusPoisonSpit03"
@@ -2239,21 +1792,6 @@
    "7d98:Dawnguard.esm",
    "Check For Heal",
    "DLC1FalmerHealerHealCheck"
-  ],
-  [
-   "a0ff7:Druadach.esm",
-   "Chilling Touch",
-   "DrV_spectreSILENCEspellice"
-  ],
-  [
-   "a0fe1:Druadach.esm",
-   "Chilling Wrath",
-   "DrV_Frostbitespectre"
-  ],
-  [
-   "8f4e1:Druadach.esm",
-   "Cider of Blind Rage",
-   "DRVC_StonebarkCOBRSpell"
   ],
   [
    "1a6344:arnima.esm",
@@ -2279,11 +1817,6 @@
    "1974e6:arnima.esm",
    "Clairvoyance",
    "ArnimaClairvoyanceFFSpell"
-  ],
-  [
-   "8be:Journey to Baan Malur.esp",
-   "Clannfear Charge",
-   "mihailhighclannfear_Impact"
   ],
   [
    "4899c:Gray Fox Cowl.esm",
@@ -2326,11 +1859,6 @@
    "CommandDaedraLeftHand"
   ],
   [
-   "465b0d:summersetisles.esp",
-   "Conjure Abomination",
-   "SummonAbominationSpellLeftHand"
-  ],
-  [
    "31853:Dragonborn.esm",
    "Conjure Ancients",
    "dlc2DBConjureAncientsSpell"
@@ -2344,26 +1872,6 @@
    "3d473:Dragonborn.esm",
    "Conjure Ash Guardian",
    "DLC2ConjureAshGuardianLeftHand"
-  ],
-  [
-   "86f:Journey to Baan Malur.esp",
-   "Conjure Banekamp",
-   "mihailbanekamp_summon_spell"
-  ],
-  [
-   "465b0e:summersetisles.esp",
-   "Conjure Bloody Skeleton",
-   "SummonBloodySkeletonSpellLeftHand"
-  ],
-  [
-   "872:Journey to Baan Malur.esp",
-   "Conjure Coldharbour Banekin",
-   "mihailbanekin_summon_spell"
-  ],
-  [
-   "88b:Journey to Baan Malur.esp",
-   "Conjure Coldharbour Revered Daedroth Titan",
-   "mihaildaedroth_titan_summon_spell_2"
   ],
   [
    "3a7ee:Gray Fox Cowl.esm",
@@ -2384,16 +1892,6 @@
    "a0b:ccbgssse025-advdsgs.esm",
    "Conjure Dark Seducer Warrior",
    "ccBGSSSE025_ConjureDarkSeducerWarrior"
-  ],
-  [
-   "56a38:Journey to Baan Malur.esp",
-   "Conjure Deadlands Banekin",
-   "mihailbanekin_summon_spellFIRE"
-  ],
-  [
-   "889:Journey to Baan Malur.esp",
-   "Conjure Deadlands Daedroth Titan",
-   "mihaildaedroth_titan_summon_spell_1"
   ],
   [
    "10fc16:Skyrim.esm",
@@ -2516,16 +2014,6 @@
    "ccBGSSSE025_ConjureGoldenSaintWarrior"
   ],
   [
-   "8d8:Journey to Baan Malur.esp",
-   "Conjure High Clannfear",
-   "mihailhighclannfear_spell_spell"
-  ],
-  [
-   "919:Journey to Baan Malur.esp",
-   "Conjure Hunger",
-   "mihailhungersummon_spell"
-  ],
-  [
    "29ee2:Dragonborn.esm",
    "Conjure Ice Wraith",
    "DLC2dunKarstaagConjureIceWraith"
@@ -2536,19 +2024,9 @@
    "DLC2dunKarstaagConjureIceWraithSummoned"
   ],
   [
-   "465b10:summersetisles.esp",
-   "Conjure Makeshift Spider",
-   "SummonMakeshiftSpiderSpellLeftHand"
-  ],
-  [
    "695eb:arnima.esm",
    "Conjure Predothor",
    "ArnimaPredothorSummonSpell"
-  ],
-  [
-   "86c:Journey to Baan Malur.esp",
-   "Conjure Scamp",
-   "mihailscamp_summon_spell"
   ],
   [
    "30cd0:Dragonborn.esm",
@@ -2581,39 +2059,9 @@
    "ConjureStormAtronachLeftHand"
   ],
   [
-   "6271d5:summersetisles.esp",
-   "Conjure Thelaron",
-   "SummonThelaronSpell"
-  ],
-  [
-   "465b12:summersetisles.esp",
-   "Conjure Zombie",
-   "SummonZombieSpellSSILeftHand"
-  ],
-  [
-   "a26e1:summersetisles.esp",
-   "Convalescence",
-   "SSIConvalescenceSpell"
-  ],
-  [
-   "8f4e4:Druadach.esm",
-   "Cordial Cognac",
-   "DRVC_CordialCognacSpell"
-  ],
-  [
    "8a6f:Dawnguard.esm",
    "Corpse Curse",
    "DLC1CorpseCurseLeftHand"
-  ],
-  [
-   "902c4:Druadach.esm",
-   "Corrode Armor",
-   "DRVC_CorrodeArmorCloakDmg"
-  ],
-  [
-   "67917:Druadach.esm",
-   "Cuirinir Targetted Spell",
-   "DD_DialogueHighreachCuirinirTeleportSpell"
   ],
   [
    "ed0aa:Skyrim.esm",
@@ -2631,11 +2079,6 @@
    "DLC2crAshSpawnCyclone03RightHand"
   ],
   [
-   "a1051:Druadach.esm",
-   "Cyclone",
-   "DrV_DLC2VoiceCyclone02LESHEN"
-  ],
-  [
    "d36d9:BSHeartland.esm",
    "CYRBrumaMS10AdjutantTeleSpell",
    "CYRBrumaMS10AdjutantTeleSpell"
@@ -2651,16 +2094,6 @@
    "CYRFrostcragMS01AstorTeleToBrumaHandlerTeleSpell"
   ],
   [
-   "8b3:Journey to Baan Malur.esp",
-   "Daedroth Cold-fire Breath",
-   "mihaildaedroth_titan_fireblue_hazardspell"
-  ],
-  [
-   "8aa:Journey to Baan Malur.esp",
-   "Daedroth Stagger Attack",
-   "mihaildaedroth_titan_stagger"
-  ],
-  [
    "166e87:arnima.esm",
    "Damage Magic Resistance",
    "ArnimaDamageMagResistSpell"
@@ -2671,24 +2104,9 @@
    "ArnimaSpiteFormTransformSpell3"
   ],
   [
-   "49e4b:Druadach.esm",
-   "Damiath Invisibility",
-   "DD_ImpMQ07BDamiathInvisibility"
-  ],
-  [
-   "8336d:Druadach.esm",
-   "Dampening Bash",
-   "DRVC_DampeningBashSpell"
-  ],
-  [
    "3d7d4:arnima.esm",
    "Dark Circle",
    "ArnimaCircleMaraSpellDarkLH"
-  ],
-  [
-   "905cb:Druadach.esm",
-   "Death",
-   "DD_InstaKillArrow"
   ],
   [
    "c5f4:Dawnguard.esm",
@@ -2701,16 +2119,6 @@
    "Decapitationarnima"
   ],
   [
-   "933e8:Druadach.esm",
-   "Decoy Agro",
-   "DRVC_crDecoyCloakAggroDmg"
-  ],
-  [
-   "933ef:Druadach.esm",
-   "Decoy Explosion",
-   "DRVC_DecoyAggExpl"
-  ],
-  [
    "26c8c:Dragonborn.esm",
    "Demoralize",
    "DLC2FakeProtection"
@@ -2719,11 +2127,6 @@
    "21fab:Hothtrooper44_ArmorCompilation.esp",
    "Despair",
    "IASpellRitualBoethiahDespairCloakDmg"
-  ],
-  [
-   "8e33c:Druadach.esm",
-   "Destabilised Soul",
-   "DD_PerkRevenantFireDamageSpell01"
   ],
   [
    "1961a:Dragonborn.esm",
@@ -2736,19 +2139,9 @@
    "ArnimaDetectLife"
   ],
   [
-   "8df03:Druadach.esm",
-   "Detect Life",
-   "DRVC_DetectLife"
-  ],
-  [
    "d9db0:Skyrim.esm",
    "Dispel Night Eye",
    "NightEyeDispelEffectSpell"
-  ],
-  [
-   "e4c1ec:summersetisles.esp",
-   "Divine Blessing",
-   "SSIBlessingCloakDmg"
   ],
   [
    "14b3b4:arnima.esm",
@@ -2839,11 +2232,6 @@
    "265a8:Dragonborn.esm",
    "Dragon Storm",
    "dlc2DBDragonStormSpell"
-  ],
-  [
-   "bcfda9:summersetisles.esp",
-   "Drain All More",
-   "DrainAllSSI2"
   ],
   [
    "107aa1:Skyrim.esm",
@@ -2986,16 +2374,6 @@
    "UDLC01_CONJ_EFFECT_DrainSoulsEffect"
   ],
   [
-   "a32d11:King of the Murkmire.esp",
-   "Drain Vitality",
-   "HistGhostDrainSpell"
-  ],
-  [
-   "94fc9:Druadach.esm",
-   "DrainThe Dead FX",
-   "DRVC_DrainTheDeadAbsorbFX"
-  ],
-  [
    "44c58:Skyrim.esm",
    "Draugr Frost Cloak",
    "crDraugrFrostCloak"
@@ -3026,24 +2404,9 @@
    "Balok_Sp_MnDremoraWarlockCast"
   ],
   [
-   "8dc57:Druadach.esm",
-   "DRVC_GuardBurden",
-   "DRVC_GuardBurden"
-  ],
-  [
-   "8df02:Druadach.esm",
-   "DRVC_MountainPunchSpell",
-   "DRVC_MountainPunchSpell"
-  ],
-  [
    "10e948:Skyrim.esm",
    "dunHallOfTheVigilantCureDiseaseSpell",
    "dunHallOfTheVigilantCureDiseaseSpell"
-  ],
-  [
-   "a106b:Druadach.esm",
-   "Dwarven Colossus Impact",
-   "DrV_dwarvencolossusimpact"
   ],
   [
    "6000a5:Gray Fox Cowl.esm",
@@ -3101,11 +2464,6 @@
    "DLC1LD_SteamBlast"
   ],
   [
-   "8cdcc:summersetisles.esp",
-   "Encroached Poison",
-   "crSpider01PoisonBiteEncroached"
-  ],
-  [
    "2920:DragonBreak.esp",
    "Evoca sacerdote del Drago",
    "ConjureDragonPriestDUPLICATE001"
@@ -3119,11 +2477,6 @@
    "28532:Skyrim.esm",
    "Fade Other",
    "FadeOther"
-  ],
-  [
-   "5ba0c:Druadach.esm",
-   "Fardris' Fire Channel",
-   "DD_LBMQ09FardrisChannelSpell"
   ],
   [
    "7231c:Skyrim.esm",
@@ -3231,11 +2584,6 @@
    "UDGPDLC1HunterHammerFireRune"
   ],
   [
-   "8cf7b:Druadach.esm",
-   "Fire Storm",
-   "DrV_FireStormNoDamage"
-  ],
-  [
    "20ea3:Dragonborn.esm",
    "Fire Storm 10",
    "DLC2BlackBookFireStorm"
@@ -3331,11 +2679,6 @@
    "DLC2crAshSpawnFireboltLeftHand03"
   ],
   [
-   "290a9:Journey to Baan Malur.esp",
-   "Firebolt",
-   "mihailscamp_FireboltLeftHand_simple"
-  ],
-  [
    "7d98f:Skyrim.esm",
    "Firebolt",
    "FireboltLeftHand"
@@ -3391,21 +2734,6 @@
    "FireboltRightHand"
   ],
   [
-   "fb97:Journey to Baan Malur.esp",
-   "Firebolt",
-   "mihailscamp_FireboltLeftHand_stunt"
-  ],
-  [
-   "fb98:Journey to Baan Malur.esp",
-   "Firebolt",
-   "mihailscamp_FireboltLeftHand_carbo"
-  ],
-  [
-   "fb9a:Journey to Baan Malur.esp",
-   "Firebolt",
-   "mihailscamp_FireboltLeftHand_incin"
-  ],
-  [
    "b2386:Skyrim.esm",
    "Firebolt Storm",
    "dunCGVoiceFireboltStorm"
@@ -3431,16 +2759,6 @@
    "FireboltStormNoDamage"
   ],
   [
-   "8df04:Druadach.esm",
-   "Firebreath",
-   "DRVC_Firebreath"
-  ],
-  [
-   "8f4e5:Druadach.esm",
-   "Firebreath Brandy",
-   "DRVC_FirebreathBrandySpell"
-  ],
-  [
    "50cf7:Skyrim.esm",
    "Flame Atronach Attack",
    "crAtronachFlameMeleeAttack"
@@ -3454,11 +2772,6 @@
    "10fc17:Skyrim.esm",
    "Flame Cloak",
    "DragonPriestMaskUltraFlameCloak"
-  ],
-  [
-   "a0fe3:Druadach.esm",
-   "Flame Cloak",
-   "DrV_flameCloakspectre"
   ],
   [
    "de511:Skyrim.esm",
@@ -3531,11 +2844,6 @@
    "crAtronachCloakFlameDmg"
   ],
   [
-   "66db5:King of the Murkmire.esp",
-   "Flames",
-   "XanmeerTrapFlames01"
-  ],
-  [
    "7d996:Skyrim.esm",
    "Flames",
    "FlamesLeftHand"
@@ -3581,11 +2889,6 @@
    "MGRJzargoFlameCloakDmg"
   ],
   [
-   "a0fda:Druadach.esm",
-   "Flames",
-   "DrV_Flamesspectrewraith"
-  ],
-  [
    "c969a:Skyrim.esm",
    "Flames",
    "FlamesRightHand"
@@ -3594,16 +2897,6 @@
    "9ce2c:Skyrim.esm",
    "Flaming Familiar Explosion",
    "dunHighGateSummonFlamingThrallExplosion"
-  ],
-  [
-   "a0ff6:Druadach.esm",
-   "Flaming Touch",
-   "DrV_spectreSILENCEspellfire"
-  ],
-  [
-   "a0fe0:Druadach.esm",
-   "Flaming Wrath",
-   "DrV_Flamesspectre"
   ],
   [
    "6029ae:BSAssets.esm",
@@ -3629,11 +2922,6 @@
    "1772c:Dragonborn.esm",
    "Fling",
    "DLC2Fling"
-  ],
-  [
-   "914:King of the Murkmire.esp",
-   "Flurry",
-   "SpinoFlurryCloakDmgBaryonyx"
   ],
   [
    "e1fed:Skyrim.esm",
@@ -3664,11 +2952,6 @@
    "7d964:arnima.esm",
    "Frigid Mortar",
    "ArnimaFrostballLobSpellLH"
-  ],
-  [
-   "120e1:Journey to Baan Malur.esp",
-   "Frost",
-   "HazardWallofWindSpell"
   ],
   [
    "26d4f:Dragonborn.esm",
@@ -3706,24 +2989,9 @@
    "crAtronachFrostMeleeAttack"
   ],
   [
-   "80e:King of the Murkmire.esp",
-   "Frost Atronach Attack",
-   "mihailwamasu_spell1_dmg"
-  ],
-  [
-   "8a29f:Druadach.esm",
-   "Frost Atronach Attack",
-   "DRV_crAtronachFrostMeleeAttack_Angavaar"
-  ],
-  [
    "400ac:Skyrim.esm",
    "Frost Cloak",
    "FrostCloakLeftHand"
-  ],
-  [
-   "a0feb:Druadach.esm",
-   "Frost Cloak",
-   "DrV_FrostCloakspectre"
   ],
   [
    "28236:Dragonborn.esm",
@@ -3811,11 +3079,6 @@
    "TrapFrostbite06"
   ],
   [
-   "a0fdb:Druadach.esm",
-   "Frostbite",
-   "DrV_Frostbitespectrewraith"
-  ],
-  [
    "c969d:Skyrim.esm",
    "Frostbite",
    "FrostbiteRightHand"
@@ -3841,16 +3104,6 @@
    "crSpider03PoisonSpit"
   ],
   [
-   "9fc2e:Druadach.esm",
-   "Frostbreath",
-   "DRVC_Frostbreath"
-  ],
-  [
-   "9fc2f:Druadach.esm",
-   "Frostbreath Brandy",
-   "DRVC_FrostbreathBrandySpell"
-  ],
-  [
    "d38fb:BSHeartland.esm",
    "Frostfire Enviromental frost dmg",
    "CYRDunFrostfireEnvironmentalFrostDMGSpell"
@@ -3859,31 +3112,6 @@
    "72317:BSHeartland.esm",
    "Frozen Fire",
    "CYRHazardFrozenFireSpell"
-  ],
-  [
-   "183d6:Druadach.esm",
-   "FullInvisibility",
-   "DD_LB02InvisibilityFull"
-  ],
-  [
-   "b22:King of the Murkmire.esp",
-   "Giant Centipede Appears",
-   "mihailgiantcentipede_NPC1_CALL_spell_fx_spell"
-  ],
-  [
-   "b2c:King of the Murkmire.esp",
-   "Giant Centipede Appears",
-   "mihailgiantcentipede_NPC2_CALL_spell_fx_spell"
-  ],
-  [
-   "b38:King of the Murkmire.esp",
-   "Giant Centipede Appears",
-   "mihailgiantcentipede_NPC3_CALL_spell_fx_spell"
-  ],
-  [
-   "b16:King of the Murkmire.esp",
-   "Giant Centipede Venom Spit",
-   "mihailgiantcentipede_poisonspit_spell"
   ],
   [
    "104d43:Skyrim.esm",
@@ -3956,11 +3184,6 @@
    "manny_GF_Spell_GrayCowlDetectLife"
   ],
   [
-   "5f458:Druadach.esm",
-   "Greater Candlelight",
-   "DrV_SpellCandlelightLong"
-  ],
-  [
    "7231b:Skyrim.esm",
    "Greater Ward",
    "WardGreaterLeftHand"
@@ -3969,11 +3192,6 @@
    "e0cd1:Skyrim.esm",
    "Guardian Circle",
    "HazardGuardianCircleSpell"
-  ],
-  [
-   "80bd6:Journey to Baan Malur.esp",
-   "Gust",
-   "Gustforharpy"
   ],
   [
    "36d0f5:WindhelmSSE.esp",
@@ -3999,11 +3217,6 @@
    "38f4:Dawnguard.esm",
    "Harmless Lightning Bolt",
    "DLC01SC_BoltNoDMG"
-  ],
-  [
-   "8df01:Druadach.esm",
-   "Harmony",
-   "DRVC_HarmonyBrewSpell"
   ],
   [
    "17bb98:arnima.esm",
@@ -4046,11 +3259,6 @@
    "HealingRightHand"
   ],
   [
-   "96086:Druadach.esm",
-   "Health Shroud Link",
-   "DRVC_crLinkShroudHealthContactCloak"
-  ],
-  [
    "c06:ccBGSSSE001-Fish.esm",
    "Hide",
    "ccBGSSSE001_HideSpell"
@@ -4071,39 +3279,9 @@
    "ArnimaStendarrsAuraArmorSpell"
   ],
   [
-   "e73b16:summersetisles.esp",
-   "Holy Meditation",
-   "SSIHolyMeditation01"
-  ],
-  [
    "14b3c2:arnima.esm",
    "HolyAegis",
    "ArnimaStendarrsAuraRH"
-  ],
-  [
-   "6f7ea:Druadach.esm",
-   "Horvutdaan Ambush",
-   "DRV_SummonHorvutdaanBossSpell"
-  ],
-  [
-   "846:Journey to Baan Malur.esp",
-   "Hunger Drain Fatigue",
-   "mihailhungerspell_spell_2"
-  ],
-  [
-   "84e:Journey to Baan Malur.esp",
-   "Hunger Invisibility",
-   "mihailhungerABentrace_spell_spell2"
-  ],
-  [
-   "924:Journey to Baan Malur.esp",
-   "Hunger Invisibility",
-   "mihailhungerABentrace_spell_spell"
-  ],
-  [
-   "848:Journey to Baan Malur.esp",
-   "Hunger Paralyzing Touch",
-   "mihailhungerspell_spell_1"
   ],
   [
    "a26f4:Skyrim.esm",
@@ -4261,16 +3439,6 @@
    "DLC2BlackBookFlameCloak"
   ],
   [
-   "1886a:Druadach.esm",
-   "Imperial Interrogator Targetted Spell",
-   "DD_ImpMQ01InterrogatorSpell"
-  ],
-  [
-   "8e33b:Druadach.esm",
-   "Imperial Interrogator Targetted Spell",
-   "DD_EVSQ01NiryerieSpell"
-  ],
-  [
    "10f7f6:Skyrim.esm",
    "Incinerate",
    "IncinerateRightHand"
@@ -4279,21 +3447,6 @@
    "10fd5f:Skyrim.esm",
    "Incinerate",
    "IncinerateLeftHand"
-  ],
-  [
-   "9f902:Druadach.esm",
-   "Inebriation",
-   "DRVC_InebriationLvl1Spell"
-  ],
-  [
-   "9f903:Druadach.esm",
-   "Inebriation",
-   "DRVC_InebriationLvl2Spell"
-  ],
-  [
-   "9f905:Druadach.esm",
-   "Inebriation",
-   "DRVC_InebriationLvl3Spell"
   ],
   [
    "10dd35:Helgen Reborn.esp",
@@ -4324,16 +3477,6 @@
    "97edf:Skyrim.esm",
    "J'zargo's Flame Cloak",
    "MGRJzargoFlameCloak"
-  ],
-  [
-   "29029:Journey to Baan Malur.esp",
-   "Kagouti Charge",
-   "kagouticharge"
-  ],
-  [
-   "4efaae:King of the Murkmire.esp",
-   "KajinJatCrystalEffect",
-   "KajinJatCrystalEffect"
   ],
   [
    "2821d:Dragonborn.esm",
@@ -4371,51 +3514,6 @@
    "DLC2MQ02SeekerRightHandSpell"
   ],
   [
-   "8a8154:King of the Murkmire.esp",
-   "KoTMCureDiseaseSpell",
-   "KoTMCureDiseaseSpell"
-  ],
-  [
-   "8ff:King of the Murkmire.esp",
-   "Laceration",
-   "Skinwalker21AlitLacerate"
-  ],
-  [
-   "a1053:Druadach.esm",
-   "Leshen Crows",
-   "DrV_leshencrows"
-  ],
-  [
-   "a1059:Druadach.esm",
-   "Leshen Crows",
-   "DrV_leshencrowFINALROOTSPELLRITUAL"
-  ],
-  [
-   "a1054:Druadach.esm",
-   "Leshen Root Atack",
-   "DrV_leshenrootattackspell"
-  ],
-  [
-   "a1055:Druadach.esm",
-   "Leshen Roots",
-   "DrV_leshenroot"
-  ],
-  [
-   "8a29b:Druadach.esm",
-   "Lesser Firebolt",
-   "DRV_LesserFireboltLeftHand"
-  ],
-  [
-   "8a2a0:Druadach.esm",
-   "Lesser Ice Spike",
-   "DRV_LesserIceSpikeLeftHand"
-  ],
-  [
-   "8a29a:Druadach.esm",
-   "Lesser Lightning Bolt",
-   "DRV_LesserLightningBoltLeftHand"
-  ],
-  [
    "fcc61:Skyrim.esm",
    "Lesser Shield",
    "ShieldLesser"
@@ -4449,11 +3547,6 @@
    "400ab:Skyrim.esm",
    "Lightning Bolt",
    "LightningBoltLeftHand"
-  ],
-  [
-   "65d53:Journey to Baan Malur.esp",
-   "Lightning Bolt",
-   "mihailscamp_ShockboltLeftHand_simple"
   ],
   [
    "76a725:arnima.esm",
@@ -4511,11 +3604,6 @@
    "LightningCloakLeftHand"
   ],
   [
-   "80a:King of the Murkmire.esp",
-   "Lightning Cloak",
-   "mihailwamasu_spell1"
-  ],
-  [
    "840:mihailmmaminotaur.esp",
    "Lightning Cloak",
    "LightningCloakminotaur"
@@ -4524,11 +3612,6 @@
    "8e5cb:Skyrim.esm",
    "Lightning Cloak",
    "dunHarmugstahlSpiderDeadLightning"
-  ],
-  [
-   "a0ff2:Druadach.esm",
-   "Lightning Cloak",
-   "DrV_LightningCloakspectre"
   ],
   [
    "2b392:Skyrim.esm",
@@ -4551,34 +3634,9 @@
    "DLC2LightningStormRightHand_Miraak"
   ],
   [
-   "8f4e9:Druadach.esm",
-   "Liquor of Rooting",
-   "DRVC_RootingSpell"
-  ],
-  [
    "279e8:Dragonborn.esm",
    "Locate",
    "DLC2FakeDivination"
-  ],
-  [
-   "7ffe2:Druadach.esm",
-   "Lordbound Shield Channel",
-   "DD_LBMQ10AedronBossShieldChannelSpell"
-  ],
-  [
-   "a107e:Druadach.esm",
-   "Maces of Damnation",
-   "DrV_aegisofthesigil_weapon_spell"
-  ],
-  [
-   "a18a0:summersetisles.esp",
-   "Madness",
-   "SSIMadness"
-  ],
-  [
-   "8f4e6:Druadach.esm",
-   "Mage's Hourglass",
-   "DrV_StonebarkMagesHourglassSpell"
   ],
   [
    "af485:BSHeartland.esm",
@@ -4586,59 +3644,9 @@
    "CYRMagelight24Hrs"
   ],
   [
-   "96087:Druadach.esm",
-   "Magicka Shroud Link",
-   "DRVC_crLinkShroudMagickaContactCloak"
-  ],
-  [
    "40cb3:Gray Fox Cowl.esm",
    "manny_GF_Spell_AlikrFountain",
    "manny_GF_Spell_AlikrFountain"
-  ],
-  [
-   "a8507:Druadach.esm",
-   "Mantella Blast Scene",
-   "DD_LBMQ10MantellaBlastScene"
-  ],
-  [
-   "7ffe1:Druadach.esm",
-   "Mantellan Beam",
-   "DD_LBMQ10AedronMantellaBeam"
-  ],
-  [
-   "7af75:Druadach.esm",
-   "Mantellan Fire",
-   "DRV_RevenantWallOfFlames"
-  ],
-  [
-   "7af78:Druadach.esm",
-   "Mantellan Flames",
-   "DRV_RevenantFireball"
-  ],
-  [
-   "7ffe4:Druadach.esm",
-   "Mantellan Flames",
-   "DRV_RevenantFirebolt"
-  ],
-  [
-   "7ffe3:Druadach.esm",
-   "Mantellan Lightning Massive",
-   "DD_LBMQ10AedronLightningChannel"
-  ],
-  [
-   "7ffde:Druadach.esm",
-   "Mantellan Motes",
-   "DD_LBMQ10AedronMantellanMotes"
-  ],
-  [
-   "7af77:Druadach.esm",
-   "Mantellan Storm",
-   "DRV_RevenantFireStorm"
-  ],
-  [
-   "7af74:Druadach.esm",
-   "Mantellan Wall of Fire Effect",
-   "DRV_RevenantHazardWallofFireSpell"
   ],
   [
    "47e52:Gray Fox Cowl.esm",
@@ -4684,11 +3692,6 @@
    "1568a6:arnima.esm",
    "Might of Malacath",
    "ArnimaMalacathShrineSpell"
-  ],
-  [
-   "49420:summersetisles.esp",
-   "Minor Detect Life",
-   "SSIDetectLife"
   ],
   [
    "821:mihailmmaminotaur.esp",
@@ -4741,16 +3744,6 @@
    "MS08KematuParalysis"
   ],
   [
-   "3c589:Druadach.esm",
-   "Mz'aad's Anti-Haunt Channel",
-   "DD_ImpMQ08HauntChannelSpell"
-  ],
-  [
-   "49e49:Druadach.esm",
-   "Mzaad Teleport Effect",
-   "DD_ImpMQ07BMzaadTeleportSpell"
-  ],
-  [
    "10f813:Skyrim.esm",
    "Namira's Blessing",
    "DA11CannibalismAbility02"
@@ -4759,11 +3752,6 @@
    "ee5c5:Skyrim.esm",
    "Namira's Blessing",
    "DA11CannibalismAbility"
-  ],
-  [
-   "49e4a:Druadach.esm",
-   "Narinoth Ritual",
-   "DD_ImpMQ07BRitualChannelSpell"
   ],
   [
    "1c073:Dragonborn.esm",
@@ -4801,26 +3789,6 @@
    "TGNightingaleSubterfugeMercer"
   ],
   [
-   "8e33d:Druadach.esm",
-   "Niryerie's Ritual Channel",
-   "DD_EVSQ01NiryerieRitualChannelSpell"
-  ],
-  [
-   "8e340:Druadach.esm",
-   "Niryerie's Shade Ritual Channel",
-   "DD_EVSQ01NiryerieShadeRitualChannelSpell"
-  ],
-  [
-   "933:Journey to Baan Malur.esp",
-   "Nix-Hound Blood Drain",
-   "mihailnixhound_bite2"
-  ],
-  [
-   "14c12:Journey to Baan Malur.esp",
-   "Nix-Ox Poison",
-   "mihailnixoxpoisonspell"
-  ],
-  [
    "1b6921:ccBGSSSE025-AdvDSGS.esm",
    "Noop Spell",
    "ccBGSSSE025_NoopSpell"
@@ -4846,19 +3814,9 @@
    "BSKcrOgreStomp"
   ],
   [
-   "a0f45:Druadach.esm",
-   "Oil Spit",
-   "DrV_DwemerBurrower_Spit"
-  ],
-  [
    "3fb53e:WindhelmSSE.esp",
    "Olaf's Boon",
    "0WHKingOlafsBoon"
-  ],
-  [
-   "a8506:Druadach.esm",
-   "Open Portal",
-   "DD_OpenPortalSpell"
   ],
   [
    "10387f:Skyrim.esm",
@@ -4871,11 +3829,6 @@
    "MG08AncanoParalysis"
   ],
   [
-   "183d4:Druadach.esm",
-   "Paralyze",
-   "DD_ParalyzeShort"
-  ],
-  [
    "c1e99:Skyrim.esm",
    "Paralyze",
    "PerkGrandmaster1HParalyze"
@@ -4884,11 +3837,6 @@
    "c1e9b:Skyrim.esm",
    "Paralyze",
    "PerkGrandmaster2HParalyze"
-  ],
-  [
-   "183d5:Druadach.esm",
-   "Paralyze Self",
-   "DD_ParalisisSelf"
   ],
   [
    "b15dd:arnima.esm",
@@ -4931,11 +3879,6 @@
    "DLC1VampirePoisonTalons"
   ],
   [
-   "631771:summersetisles.esp",
-   "Poisonous Sap",
-   "crMSSpider01PoisonSpitTree"
-  ],
-  [
    "472dee:arnima.esm",
    "Pox Barrage",
    "ArnimaFireballGreenSelf"
@@ -4954,11 +3897,6 @@
    "eb0c:Gray Fox Cowl.esm",
    "Praetorian Health Regen",
    "manny_GF_Spell_PraetorianRegen"
-  ],
-  [
-   "3e621a:summersetisles.esp",
-   "Putrescent Poison",
-   "crMSSpider01PoisonSpit"
   ],
   [
    "1974e0:arnima.esm",
@@ -5021,11 +3959,6 @@
    "ArnimaResSpell2"
   ],
   [
-   "2081e:Druadach.esm",
-   "Reanimate (Self)",
-   "DRV_ReanimateSelf"
-  ],
-  [
    "e1529:Skyrim.esm",
    "Reanimate (Self)",
    "dunReanimateSelf"
@@ -5034,11 +3967,6 @@
    "10105f:Skyrim.esm",
    "Reanimate Corpse",
    "ReanimateCorpseRightHand"
-  ],
-  [
-   "9fc2c:Druadach.esm",
-   "Reanimate Corpse",
-   "DrV_ReanimateCorpseSpell"
   ],
   [
    "a270:Dawnguard.esm",
@@ -5104,11 +4032,6 @@
    "cab66:Skyrim.esm",
    "Revenant",
    "RevenantLeftHand"
-  ],
-  [
-   "2fbf0:Druadach.esm",
-   "Revenant Spawn Teleport",
-   "DD_UndyingRevenantSpawnTeleport"
   ],
   [
    "14a70:Gray Fox Cowl.esm",
@@ -5211,11 +4134,6 @@
    "crDwarvenSpiderShock01"
   ],
   [
-   "8cf7e:Druadach.esm",
-   "Shock Spit",
-   "DrV_crVolatileSpiderWeakShock"
-  ],
-  [
    "271fb:Dragonborn.esm",
    "Shock Touch",
    "DLC2NetchShockTouch"
@@ -5224,16 +4142,6 @@
    "28582:Dragonborn.esm",
    "Shock Touch",
    "DLC2NetchCalfShockTouch"
-  ],
-  [
-   "a0fd9:Druadach.esm",
-   "Shocking Touch",
-   "DrV_spectreSILENCEspell"
-  ],
-  [
-   "a0fe2:Druadach.esm",
-   "Shocking Wrath",
-   "DrV_Sparksspectre"
   ],
   [
    "fdbb7:Skyrim.esm",
@@ -5246,11 +4154,6 @@
    "DLC2TTR4bNelothsSpell"
   ],
   [
-   "97a:King of the Murkmire.esp",
-   "Slash and Tear",
-   "BW21_MegalaniaSlashAndTear"
-  ],
-  [
    "1ae98:Dragonborn.esm",
    "Slime",
    "DLC2LurkerSlime"
@@ -5261,29 +4164,9 @@
    "DLC2HazardLurkerSlimeSpell"
   ],
   [
-   "8b6:King of the Murkmire.esp",
-   "Snag Recover",
-   "SpinosauridSnagRecovery"
-  ],
-  [
-   "8b8:King of the Murkmire.esp",
-   "Snagged",
-   "SpinoSnagCloakDmgBaryonyx"
-  ],
-  [
-   "8b9:King of the Murkmire.esp",
-   "Snagged",
-   "SpinoSnagCloakDmgSpino"
-  ],
-  [
    "6029af:BSAssets.esm",
    "Snowball",
    "BSKcrImpSnowball"
-  ],
-  [
-   "a11ab:Druadach.esm",
-   "Snowray Freezing Poison",
-   "DrV_snowrayPoison"
   ],
   [
    "6025f8:BSAssets.esm",
@@ -5304,11 +4187,6 @@
    "7cba:Dawnguard.esm",
    "Souless Shambler",
    "DLC01SoulRendReanimateSpell"
-  ],
-  [
-   "9fc30:Druadach.esm",
-   "Soulseer",
-   "DrV_StonebarkSoulseerSpell"
   ],
   [
    "31852:Dragonborn.esm",
@@ -5351,11 +4229,6 @@
    "TrapSparks06"
   ],
   [
-   "a0fdc:Druadach.esm",
-   "Sparks",
-   "DrV_Sparksspectrewraith"
-  ],
-  [
    "c28f3:Skyrim.esm",
    "Sparks",
    "MG08AncanoEyeSpell"
@@ -5369,41 +4242,6 @@
    "e50f1:arnima.esm",
    "Spectral Arrow",
    "ArnimaArrowSpell"
-  ],
-  [
-   "21a97:Druadach.esm",
-   "SpiderExplosion",
-   "DD_AbVolatileSpiderExplosion"
-  ],
-  [
-   "21a98:Druadach.esm",
-   "SpiderExplosion",
-   "DD_AbVolatileSpiderParalysis"
-  ],
-  [
-   "8c6:King of the Murkmire.esp",
-   "Spino Bite",
-   "SpinosaurudBiteBaneSpino"
-  ],
-  [
-   "92a:King of the Murkmire.esp",
-   "Spino Bite",
-   "SpinosaurudBiteSpino"
-  ],
-  [
-   "915:King of the Murkmire.esp",
-   "Spino Flurry Cloak Drain",
-   "SpinoFlurryCloakDmgSpino"
-  ],
-  [
-   "8c0:King of the Murkmire.esp",
-   "SpinoDmg",
-   "SpinoDmg"
-  ],
-  [
-   "8c1:King of the Murkmire.esp",
-   "SpinoDmgBaryonyx",
-   "SpinoDmgBaryonyx"
   ],
   [
    "6fa48b:arnima.esm",
@@ -5424,71 +4262,6 @@
    "9ba61:arnima.esm",
    "Spite Form",
    "ArnimaSpiteFormTransformSpell2"
-  ],
-  [
-   "8e5:Journey to Baan Malur.esp",
-   "Spitter Blazes",
-   "mihailspitterspellentranceBLAZE"
-  ],
-  [
-   "8e7:Journey to Baan Malur.esp",
-   "Spitter Fireball",
-   "mihailspitterspellentranceBLAZE2"
-  ],
-  [
-   "901:Journey to Baan Malur.esp",
-   "Spitter Gas",
-   "mihailspitterspellentranceGASza"
-  ],
-  [
-   "90e:Journey to Baan Malur.esp",
-   "Spitter Gas Ball",
-   "mihailspitterspellentranceGASza2"
-  ],
-  [
-   "8ea:Journey to Baan Malur.esp",
-   "Spitter Invisibility",
-   "mihailspitterfxcloakentranceBLAZE"
-  ],
-  [
-   "8f3:Journey to Baan Malur.esp",
-   "Spitter Invisibility",
-   "mihailspitterfxcloakentranceVENON"
-  ],
-  [
-   "904:Journey to Baan Malur.esp",
-   "Spitter Invisibility",
-   "mihailspitterfxcloakentranceGASza"
-  ],
-  [
-   "8f5:Journey to Baan Malur.esp",
-   "Spitter Venom",
-   "mihailspitterspellentranceVENON"
-  ],
-  [
-   "8f6:Journey to Baan Malur.esp",
-   "Spitter Venom Ball",
-   "mihailspitterspellentranceVENON2"
-  ],
-  [
-   "a7b:King of the Murkmire.esp",
-   "Spore Cloak",
-   "mihailarachascloak_spell"
-  ],
-  [
-   "a7c:King of the Murkmire.esp",
-   "Spore Cloak",
-   "mihailarachascloak_spell_dmg"
-  ],
-  [
-   "3d44c:Journey to Baan Malur.esp",
-   "Spriggan Call of the Wild",
-   "nixhopperinvisibilityformma"
-  ],
-  [
-   "a104a:Druadach.esm",
-   "Spriggan Call of the Wild",
-   "DrV_enchcallmihail"
   ],
   [
    "cb12d:Skyrim.esm",
@@ -5516,11 +4289,6 @@
    "crSprigganConcentration"
   ],
   [
-   "a26b5:Druadach.esm",
-   "Spriggan Spray",
-   "DrV_SprigganIceConcentration"
-  ],
-  [
    "27b18:arnima.esm",
    "Stagger",
    "ArnimaStaggerLightSpell"
@@ -5546,11 +4314,6 @@
    "BalokStagger"
   ],
   [
-   "8dcea:Druadach.esm",
-   "Stagger Push",
-   "DRVC_StaggerPushSpell"
-  ],
-  [
    "27b27:arnima.esm",
    "Stagger Target",
    "ArnimaStaggerTargetActorSpell"
@@ -5569,11 +4332,6 @@
    "f3f0a:Skyrim.esm",
    "StaggerFun",
    "werewolfKnockbackSpell"
-  ],
-  [
-   "96088:Druadach.esm",
-   "Stamina Shroud Link",
-   "DRVC_crLinkShroudStaminaContactCloak"
   ],
   [
    "9b954:arnima.esm",
@@ -5616,21 +4374,6 @@
    "DLC2crLurkerStomp"
   ],
   [
-   "1f149:Druadach.esm",
-   "Stone Sentinel Paralyze",
-   "DD_StoneSentinelParalyze"
-  ],
-  [
-   "8f4e0:Druadach.esm",
-   "Stonebark Attractive Ale",
-   "DRV_StonebarkAttractiveAleSpell"
-  ],
-  [
-   "9fc2d:Druadach.esm",
-   "Stonebark Experimental Spell",
-   "DRVC_StonebarkExpSpell"
-  ],
-  [
    "72316:Skyrim.esm",
    "Stoneflesh",
    "StonefleshLeftHand"
@@ -5641,24 +4384,9 @@
    "crAtronachStormAreaAttack"
   ],
   [
-   "21a95:Druadach.esm",
-   "Storm Atronach Attack",
-   "DD_VolatileSpiderStormVisual"
-  ],
-  [
-   "21a96:Druadach.esm",
-   "Storm Atronach Attack",
-   "DD_VolatileSpiderExplosion"
-  ],
-  [
    "50cfa:Skyrim.esm",
    "Storm Atronach Attack",
    "crAtronachStormMeleeAttack"
-  ],
-  [
-   "a1091:Druadach.esm",
-   "Storm Atronach Attack",
-   "DrV_crAtronachStormAreaAttackSTOMP"
   ],
   [
    "caf:MoreToDoHammerfell.esp",
@@ -5706,49 +4434,14 @@
    "DLC2StormFlow"
   ],
   [
-   "9f92e:Druadach.esm",
-   "Stout of Phantom Strabism",
-   "DRVC_StonebarkStoutOfStrabismGhostSpell"
-  ],
-  [
-   "8f4e3:Druadach.esm",
-   "Stout of Strabism",
-   "DRVC_StonebarkStoutOfStrabismSpell"
-  ],
-  [
-   "9f931:Druadach.esm",
-   "Stout of Strabism",
-   "DRVC_StonebarkStoutOfPhantomStrabismSpell"
-  ],
-  [
    "54be6:CrackedTuskKeepExpanded.esp",
    "Strength of Malacath",
    "MalacathBlessingSpell"
   ],
   [
-   "47cf5:Druadach.esm",
-   "Summon Arniel's Shade",
-   "DRV_SummonSprigganSoul"
-  ],
-  [
    "6a153:Skyrim.esm",
    "Summon Arniel's Shade",
    "MGRSummonArniel"
-  ],
-  [
-   "19d3f:Journey to Baan Malur.esp",
-   "Summon Cliff Racer",
-   "mihailcliffracersummonspell"
-  ],
-  [
-   "19d42:Journey to Baan Malur.esp",
-   "Summon Cliff Racer",
-   "mihailcliffracersummonspellnomore"
-  ],
-  [
-   "19d46:Journey to Baan Malur.esp",
-   "Summon Cliff Racer",
-   "mihailcliffracersummonspell2"
   ],
   [
    "16909:Dawnguard.esm",
@@ -5766,19 +4459,9 @@
    "ASHGSummonGritstoneSpell"
   ],
   [
-   "a1893:summersetisles.esp",
-   "Summon Intact Zombie",
-   "SummonIntactZombieSpell"
-  ],
-  [
    "1d98:PipeSmokingSE.esp",
    "Summon Longpipe",
    "PipeSmokingNPCLongpipe"
-  ],
-  [
-   "83372:Druadach.esm",
-   "Summon Mirage",
-   "DRV_SummonMirageBrainRotCave"
   ],
   [
    "7d78c:BSHeartland.esm",
@@ -5796,29 +4479,9 @@
    "dlc2SpectralDragonSummonSpell"
   ],
   [
-   "a0a20:summersetisles.esp",
-   "Summon Stinkhorn",
-   "SummonSlaughtfishSISpell"
-  ],
-  [
    "99f39:Skyrim.esm",
    "Summon Unbound Dremora",
    "MGRSummonDremora"
-  ],
-  [
-   "5f45a:Druadach.esm",
-   "Summon Visual",
-   "DD_SummonVisual"
-  ],
-  [
-   "81f:King of the Murkmire.esp",
-   "Summon Wamasu",
-   "mihailwamasu_NPC_summon_spell"
-  ],
-  [
-   "a1892:summersetisles.esp",
-   "Summon Zombie",
-   "SummonLooseZombieSpell"
   ],
   [
    "c60f:Dawnguard.esm",
@@ -5831,24 +4494,9 @@
    "DLC1SunFireLeftHand"
   ],
   [
-   "cf1320:summersetisles.esp",
-   "Sun Fire",
-   "DLC1SunFireLeftHandSSI"
-  ],
-  [
-   "cf1321:summersetisles.esp",
-   "Sun Fire",
-   "DLC1SunFireSSI"
-  ],
-  [
    "68b6:Dawnguard.esm",
    "Supernatural Reflexes",
    "DLC1nVampireReflexSpell"
-  ],
-  [
-   "8b4:King of the Murkmire.esp",
-   "Tail Recover",
-   "SpinosauridTailRecovery"
   ],
   [
    "39d42:Skyrim.esm",
@@ -5856,24 +4504,9 @@
    "crDragonTail"
   ],
   [
-   "8b0:King of the Murkmire.esp",
-   "Tail Swipe",
-   "SpinoTailSwipeCloakDmgBaryonyx"
-  ],
-  [
-   "8b1:King of the Murkmire.esp",
-   "Tail Swipe",
-   "SpinoTailSwipeCloakDmgSpino"
-  ],
-  [
    "10582b:Skyrim.esm",
    "Targe bleeding",
    "dunTargeOfTheBloodedSpell"
-  ],
-  [
-   "a104e:Druadach.esm",
-   "TELEPORT",
-   "DrV_oldgodteleport"
   ],
   [
    "8bc17:ccBGSSSE025-AdvDSGS.esm",
@@ -5884,31 +4517,6 @@
    "8bc16:ccBGSSSE025-AdvDSGS.esm",
    "Teleport Pet: Manic Elytra Nymph",
    "ccBGSSSE025_TeleportElytraSpellManic"
-  ],
-  [
-   "1300e2:summersetisles.esp",
-   "Teleport: Alinor",
-   "TeleportAlinor01"
-  ],
-  [
-   "f1c3f:summersetisles.esp",
-   "Teleport: Arteaum",
-   "TeleportArteaum01"
-  ],
-  [
-   "f1c42:summersetisles.esp",
-   "Teleport: Arteaum",
-   "TeleportArteaumOther01"
-  ],
-  [
-   "63f07:summersetisles.esp",
-   "Teleport: Skyrim",
-   "TeleportSkyrimGuild01"
-  ],
-  [
-   "614f8:summersetisles.esp",
-   "Teleport: Summerset",
-   "TeleportSummersetGuild01"
   ],
   [
    "39fb8:Dragonborn.esm",
@@ -5946,16 +4554,6 @@
    "ArnimaHealingDarkSpellRH"
   ],
   [
-   "6f7d5:Druadach.esm",
-   "Thalmor Channel Spell",
-   "DD_ThalmorSummonerChannel01"
-  ],
-  [
-   "6f7d4:Druadach.esm",
-   "Thalmor Grand Channel Spell",
-   "DD_ThalmorGrandSummonerChannel01"
-  ],
-  [
    "eef58:Skyrim.esm",
    "The Gift of Charity",
    "FavorJobsBeggarsAbility"
@@ -5979,11 +4577,6 @@
    "279e9:Dragonborn.esm",
    "Thunderbolt",
    "DLC2ThunderboltLeftHand"
-  ],
-  [
-   "7ffdf:Druadach.esm",
-   "Thunderbolt",
-   "DD_LBMQ10MantellanLightning"
   ],
   [
    "feaab:Skyrim.esm",
@@ -6161,51 +4754,6 @@
    "InvisibilityVampiric"
   ],
   [
-   "960:King of the Murkmire.esp",
-   "Varanid Bite",
-   "BW21_MegalaniaBiteScript"
-  ],
-  [
-   "8e25e:Druadach.esm",
-   "Virtue of the Dexterous",
-   "DRVC_VimDexterous"
-  ],
-  [
-   "8e25b:Druadach.esm",
-   "Virtue of the Ingenious",
-   "DRVC_VimIngenious"
-  ],
-  [
-   "8e258:Druadach.esm",
-   "Virtue of the Puppeteer",
-   "DRVC_VimPuppeteer"
-  ],
-  [
-   "8e25d:Druadach.esm",
-   "Virtue of the Saboteur",
-   "DRVC_VimSaboteur"
-  ],
-  [
-   "8e259:Druadach.esm",
-   "Virtue of the Selfless",
-   "DRVC_VimSelfless"
-  ],
-  [
-   "8e254:Druadach.esm",
-   "Virtue of the Shaper",
-   "DRVC_VimShaper"
-  ],
-  [
-   "8e25a:Druadach.esm",
-   "Virtue of the Skirmisher",
-   "DRVC_VimSkirmisher"
-  ],
-  [
-   "8e255:Druadach.esm",
-   "Virtue of the Zealous",
-   "DRVC_VimZealous"
-  ],
-  [
    "b323e:Skyrim.esm",
    "Vision of the Tenth Eye",
    "MGRitual02Spell"
@@ -6224,16 +4772,6 @@
    "10a2da:Skyrim.esm",
    "Voice of the Sky",
    "MQpathtoHHShrineBlessing"
-  ],
-  [
-   "c86:King of the Murkmire.esp",
-   "Voriplasm Acid",
-   "mihailvoriplasmspitspell"
-  ],
-  [
-   "c84:King of the Murkmire.esp",
-   "Voriplasm Colonizing",
-   "mihailvoriplasmabsorbspell"
   ],
   [
    "f650a:Skyrim.esm",
@@ -6259,11 +4797,6 @@
    "1034bf:Skyrim.esm",
    "Wall of Storms",
    "MS06PotemaWallOfStorms"
-  ],
-  [
-   "30dd4:Druadach.esm",
-   "Ward Channel",
-   "DD_ImpMQ06WardChannelSpell"
   ],
   [
    "6de0e:Skyrim.esm",
@@ -6344,8 +4877,6 @@
  "spellSources": {
   "Skyrim.esm": 90,
   "DragonBreak Online Edits.esp": 73,
-  "Druadach.esm": 31,
-  "summersetisles.esp": 31,
   "arnima.esm": 29,
   "BSAssets.esm": 15,
   "BSHeartland.esm": 10,
@@ -6354,7 +4885,6 @@
   "ccBGSSSE025-AdvDSGS.esm": 5,
   "Gray Fox Cowl.esm": 3,
   "DragonBreak.esp": 1,
-  "King of the Murkmire.esp": 1,
   "matys knights of the nine armor 2.1.esp": 1,
   "SurWR.esp": 1
  },

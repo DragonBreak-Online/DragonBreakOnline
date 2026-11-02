@@ -47,9 +47,11 @@ module.exports = (api) => {
   // teaches, so no player can learn them. /givespell finds them after the tomes and says "staff only, not learnable". A held
   // spell (gamemode-config.json spells) is refused unless the line says force: a removed one is taken from its holder at the
   // next login, and a suspended one is held for a crash or a desync (spells.suspendedReasons)
+  // The AI-forbidding mods' rows come from the gitignored sidecar admin-powers.private.json (privaterows.js; Nat, 2 Nov)
   let staffSpells = [];
   try {
-    const powers = JSON.parse(fs.readFileSync(path.resolve('admin-powers.json'), 'utf8'));
+    const PR = path.join(__dirname, 'privaterows.js'); delete require.cache[PR];
+    const powers = require(PR).readMerged(path.resolve('admin-powers.json'), ['staffSpells'], (t) => log(`staffitemspells: ${t}`)).data;
     staffSpells = Array.isArray(powers.staffSpells) ? powers.staffSpells.filter((s) => Array.isArray(s) && s.length >= 2) : [];
   } catch (e) { log('staffitemspells: admin-powers.json unreadable', e.message); }
   const STAFF_ONLY = new Set(staffSpells.map((s) => String(s[0]).toLowerCase()));

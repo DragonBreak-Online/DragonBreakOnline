@@ -144,14 +144,20 @@ ok(TRIMS7.every((e) => /^[\w .,;:()'-]+$/.test(String(e.by) + String(e.why)) && 
 // The admin panel's Give all spells list: spellsMeasureFirst while spells stays empty (26 Oct: until measured on dev), spells again once it
 // is undone. The 133 spells it gave before 16 Oct were all on its 17 Oct list of 254. The list was rebuilt on 26 Oct
 // (tooling/ck-mcp/admin_powers.py: tome-taught only, no held spell), so a removal is on it now, or held back.
-const POWERS = JSON.parse(fs.readFileSync(path.join(SERVER, 'admin-powers.json'), 'utf8'));
+// With the AI-forbidding mods' rows from admin-powers.private.json (privaterows.js, 2 Nov). Without that sidecar their removals
+// can't be checked against the list, and are counted as such rather than failed.
+const PRIVATEROWS = require(path.join(SERVER, 'privaterows.js'));
+const WHOLE = PRIVATEROWS.readMerged(path.join(SERVER, 'admin-powers.json'), ['spells', 'staffSpells']);
+const POWERS = WHOLE.data;
 const GIVE = new Set([].concat(POWERS.spells || [], POWERS.spellsGiveAllOff || [], POWERS.spellsMeasureFirst || []).map((x) => (Array.isArray(x) ? x[0] : x)));
+const UNCHECKABLE = (d) => !WHOLE.sidecar && PRIVATEROWS.isPrivatePlugin(PRIVATEROWS.pluginOfDesc(d));
+if (!WHOLE.sidecar) console.log('note: admin-powers.private.json is not here; the private mods\' removals are not checked against the list');
 // held back, plus the two mod internals the 17 Oct list gave and the rebuilt one leaves out (YokuWeapons 0_ConjureSkeleSpell, 0_PuppetManConjurePLAYER)
 const HELD = new Set([].concat(LIVE.removedSpells || [], LIVE.suspendedSpells || [], ['8bc:YokuWeapons.esp', '903:YokuWeapons.esp']));
-ok(GIVE.size >= 254, 'the Give all spells list holds the tome spells (254 on 17 Oct, more since)', GIVE.size);
+ok(GIVE.size >= (WHOLE.sidecar ? 254 : 245), 'the Give all spells list holds the tome spells (254 on 17 Oct, more since; 245 public without the sidecar)', GIVE.size);
 ok(![...GIVE].some((d) => HELD.has(d)), 'the Give all spells list gives no removed or suspended spell', [...GIVE].filter((d) => HELD.has(d)));
-ok(TRIMS7.every((e) => e.removeSpells.every((d) => GIVE.has(d) || HELD.has(d))), 'every removal is on the Give all spells list, or held back, or one of the two mod internals',
-  TRIMS7.flatMap((e) => e.removeSpells.filter((d) => !GIVE.has(d) && !HELD.has(d))));
+ok(TRIMS7.every((e) => e.removeSpells.every((d) => GIVE.has(d) || HELD.has(d) || UNCHECKABLE(d))), 'every removal is on the Give all spells list, or held back, or one of the two mod internals',
+  TRIMS7.flatMap((e) => e.removeSpells.filter((d) => !GIVE.has(d) && !HELD.has(d) && !UNCHECKABLE(d))));
 ok(['8bc:YokuWeapons.esp', '903:YokuWeapons.esp'].every((d) => !GIVE.has(d)), 'the two mod internals really are off the list (admin_powers.py SKIP_RE)');
 const SUSP = new Set(LIVE.suspendedSpells || []);
 ok(Object.values(SHIPPED).every((x) => x[3].every((d) => SUSP.has(d))), 'the removals held, not learned, are suspended spells (spells.hold holds them)');

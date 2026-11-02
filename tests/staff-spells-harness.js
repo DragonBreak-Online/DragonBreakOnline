@@ -12,11 +12,13 @@ let fails = 0;
 const ok = (c, what, got) => { console.log(`${c ? 'ok  ' : 'FAIL'} ${what}${!c && got !== undefined ? '   ' + JSON.stringify(got) : ''}`); if (!c) fails++; };
 
 // ---- the tracked files ------------------------------------------------------------------------------------------------
-const powers = JSON.parse(fs.readFileSync(path.join(ROOT, 'admin-powers.json'), 'utf8'));
+// With the AI-forbidding mods' rows from the gitignored admin-powers.private.json where it is (privaterows.js, 2 Nov)
+const whole = require(path.join(ROOT, 'privaterows.js')).readMerged(path.join(ROOT, 'admin-powers.json'), ['spells', 'staffSpells']);
+const powers = whole.data;
 const conf = JSON.parse(fs.readFileSync(path.join(ROOT, 'gamemode-config.json'), 'utf8')).spells || {};
 const held = new Set([].concat(conf.removedSpells || [], conf.suspendedSpells || []).map((d) => String(d).toLowerCase()));
 const playerIds = new Set(powers.spells.map((s) => s[0]));
-ok(Array.isArray(powers.staffSpells) && powers.staffSpells.length > 900, 'admin-powers.json carries the staff-only list (castable spells no tome teaches)', (powers.staffSpells || []).length);
+ok(Array.isArray(powers.staffSpells) && powers.staffSpells.length > (whole.sidecar ? 900 : 700), `admin-powers.json carries the staff-only list (castable spells no tome teaches; sidecar ${whole.sidecar})`, (powers.staffSpells || []).length);
 ok(powers.staffSpells.every((s) => Array.isArray(s) && s.length === 3 && /^[0-9a-f]+:.+/.test(s[0]) && s[1]), '...each [desc, name, edid]');
 ok(!powers.staffSpells.some((s) => held.has(String(s[0]).toLowerCase())), '...never a held spell (removed or suspended)');
 ok(!powers.staffSpells.some((s) => playerIds.has(s[0])), '...and none of the players\' tome spells (those stay where they were)');

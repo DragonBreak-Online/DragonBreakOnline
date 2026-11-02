@@ -103,10 +103,14 @@ ok(!!powers.werewolf && !!powers.vampirelord, 'the werewolf and Vampire Lord pow
   ok(/SKIP_RE/.test(gen), 'the generator drops mod internals by shape (SKIP_RE)');
 
   // spellSources lets give-all be narrowed by source plugin from config without regenerating
-  const give = powers.spellsMeasureFirst || powers.spells || [];
   // 252 on 25 Oct; 307 on 26 Oct: Tomebound, tome-taught powers, the live order, without held spells (admin_powers.py);
-  // 308 on 1 Nov: window-1101's order, merged so the 14 the generator no longer makes stay (tooling/admin_catalog_merge.js)
-  ok(Array.isArray(give) && give.length === 308, `the tome-taught catalogue is the 308 (${give.length})`);
+  // 308 on 1 Nov: window-1101's order, merged so the 14 the generator no longer makes stay (tooling/admin_catalog_merge.js).
+  // 2 Nov: 63 of the 308 are AI-forbidding mods' rows, kept in the gitignored admin-powers.private.json (privaterows.js), so
+  // the tracked file holds 245 and the whole catalogue is 308 only where the sidecar is
+  const whole = require(path.join(ROOT, 'privaterows.js')).readMerged(path.join(ROOT, 'admin-powers.json'), ['spells', 'staffSpells']);
+  const all = whole.data.spellsMeasureFirst || whole.data.spells || [];
+  ok(Array.isArray(all) && all.length === (whole.sidecar ? 308 : 245), `the tome-taught catalogue is the 308 with the sidecar, 245 without (${all.length}, sidecar ${whole.sidecar})`);
+  const give = powers.spellsMeasureFirst || powers.spells || [];
   ok(powers.spellSources && typeof powers.spellSources === 'object', 'admin-powers.json carries spellSources');
   const fromDescs = new Set(give.map((r) => String(r[0]).split(':')[1]));
   const listed = new Set(Object.keys(powers.spellSources || {}));
