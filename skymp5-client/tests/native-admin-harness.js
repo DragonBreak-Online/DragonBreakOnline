@@ -298,9 +298,20 @@ const { EVENTS, DEBUG, ZONES, panel, open, P, B, sentOf, click, kids, railLabels
   check('Give all spells asks first', !sentOf(t, 'admin::action').some((m) => m.args[0] === 'giveSpells') && /^Sure\?/.test(B(t).spells.label.text));
   click(t, B(t).spells);
   check('...then gives them to the one acted on', sentOf(t, 'admin::action').some((m) => m.args[0] === 'giveSpells' && m.args[1] === '{"target":"ff000102"}'));
+  // One spell (the Leader, 1 Nov): typed by name with a reason; the server applies /givespell's rules
+  const same = (a, b) => JSON.stringify(Object.keys(a).sort().map((k) => [k, a[k]])) === JSON.stringify(Object.keys(b).sort().map((k) => [k, b[k]]));
+  check('One spell: Give spell and Take spell wait for a spell name', B(t).oneGive.disabled === true && B(t).oneTake.disabled === true);
+  typeInto(t, B(t).oneSpell, 'Flames');
+  typeInto(t, B(t).oneReason, 'lost it in the crash');
+  click(t, B(t).oneGive);
+  check('...Give spell: giveSpell with the spell, the reason, no force, the one acted on', sentOf(t, 'admin::action').some((m) => m.args[0] === 'giveSpell' && same(JSON.parse(m.args[1]), { target: 'ff000102', spell: 'Flames', reason: 'lost it in the crash', force: false })), sentOf(t, 'admin::action').map((m) => m.args));
+  click(t, B(t).oneForce); click(t, B(t).oneGive);
+  check('...Force sends force, for a held spell', sentOf(t, 'admin::action').some((m) => m.args[0] === 'giveSpell' && JSON.parse(m.args[1]).force === true));
+  click(t, B(t).oneTake);
+  check('...Take spell: removeSpell with the spell and the reason', sentOf(t, 'admin::action').some((m) => m.args[0] === 'removeSpell' && same(JSON.parse(m.args[1]), { target: 'ff000102', spell: 'Flames', reason: 'lost it in the crash' })), sentOf(t, 'admin::action').map((m) => m.args));
   const g = open(panel({ players: roster, caps: { ban: false, spawn: false }, polymorph: { on: true, setBy: '', forms: [{ key: 'fox', name: 'Fox' }] } }));
   P(g).rail.t7.onRelease(); g.serve();
-  check('a GM sees the states but no power buttons', !B(g).form0 && !B(g).grant0 && !B(g).spells && /Powers are for a Lead GM/.test(B(g).foot.text));
+  check('a GM sees the states but no power buttons', !B(g).form0 && !B(g).grant0 && !B(g).spells && !B(g).oneGive && !B(g).oneTake && /Powers are for a Lead GM/.test(B(g).foot.text));
 }
 
 // ---- Enchant ----
@@ -646,5 +657,15 @@ for (const N of [0, 3]) {
   const g = P(open(panel())).bg.fills[0];
   check('the ground starts with a solid black backing', g && g.color === 0 && g.alpha === 100 && !g.gradient, g);
 }
+
+// ---- mutants of the One spell row: each altered copy must fail this harness (tests/lib/mutants.js) ----
+const POW = 'swf/dbo_admin/tabs/powers.as';
+const MUTANTS = [
+  ['One spell for a GM too', POW, [['         label(c, "oneL", 100, x, cy, 140, "One spell", 18, C_TEXT);', '      }\n      {\n         label(c, "oneL", 100, x, cy, 140, "One spell", 18, C_TEXT);']]],
+  ['Give spell sends no reason', POW, [['act("giveSpell", targetFields({spell: trimText(spellLocal.spell), reason: trimText(spellLocal.reason), force: spellLocal.force}));', 'act("giveSpell", targetFields({spell: trimText(spellLocal.spell), force: spellLocal.force}));']]],
+  ['Force is never sent', POW, [['            spellLocal.force = !spellLocal.force;\n', '']]],
+  ['the buttons never wait for a spell', POW, [['var noSpell = trimText(spellLocal.spell) == "";', 'var noSpell = false;']]],
+];
+require('./lib/mutants')(__filename, MUTANTS, check);
 
 T.done();

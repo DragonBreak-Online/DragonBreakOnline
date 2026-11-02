@@ -1,6 +1,8 @@
 // Powers: polymorph (your own shape only, from the server's list of open animals), who is an animal now with a Revert
 // each, the acted-on character's shape, the werewolf and Vampire Lord powers (Grant, Transform now, Revert, Revoke) and
-// Give all spells / shouts, as the browser's Powers tab. A Lead GM and above acts; a GM sees who holds what.
+// Give all spells / shouts, as the browser's Powers tab, and One spell to give or take back by name. A Lead GM and above acts; a GM sees who holds what.
+// One spell (the Leader, 1 Nov): typed as /givespell is; the server applies its rules (a Lead GM's reason, held spells and force)
+var spellLocal = {spell: "", reason: "", force: false};
 var BEASTS = [["werewolf", "Werewolf", "giveWerewolf"], ["vampirelord", "Vampire Lord", "giveVampireLord"]];
 
 function an(name)
@@ -173,6 +175,32 @@ TABS.powers = {
       }
       if (spawn)
       {
+         label(c, "oneL", 100, x, cy, 140, "One spell", 18, C_TEXT);
+         hint(c, "oneH", 101, x + 140, cy + 2, w - 140, "by name or part of it, as /givespell; a Lead GM gives a short reason");
+         cy += 30;
+         field(c, "oneSpell", 102, x, cy, 260, spellLocal.spell, "Spell name", 60, function(text)
+         {
+            spellLocal.spell = text;
+         });
+         field(c, "oneReason", 103, x + 270, cy, 330, spellLocal.reason, "Reason", 120, function(text)
+         {
+            spellLocal.reason = text;
+         });
+         chip(c, "oneForce", 104, x + 612, cy + 2, "Force", spellLocal.force, function()
+         {
+            spellLocal.force = !spellLocal.force;
+            draw();
+         });
+         var noSpell = trimText(spellLocal.spell) == "";
+         btn(c, "oneGive", 105, x + 700, cy - 2, 120, "Give spell", function()
+         {
+            act("giveSpell", targetFields({spell: trimText(spellLocal.spell), reason: trimText(spellLocal.reason), force: spellLocal.force}));
+         }, noSpell);
+         btn(c, "oneTake", 106, x + 828, cy - 2, 120, "Take spell", function()
+         {
+            act("removeSpell", targetFields({spell: trimText(spellLocal.spell), reason: trimText(spellLocal.reason)}));
+         }, noSpell);
+         cy += 40;
          label(c, "allL", 90, x, cy, 140, "Everything", 18, C_TEXT);
          hint(c, "allH", 91, x + 140, cy + 2, 400, "every tome spell, every shout a player can learn");
          confirmBtn(c, "spells", 92, x + 560, cy - 4, 0, "Give all spells", "spells:" + ui.acting, function()

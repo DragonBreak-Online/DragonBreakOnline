@@ -6,3 +6,5 @@ $EverywhereMediumFont
 PlaySound
 dboOut
 dboScreen
+giveSpell
+removeSpell
