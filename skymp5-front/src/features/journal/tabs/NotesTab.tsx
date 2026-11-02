@@ -204,6 +204,7 @@ export const NotesTab = ({ section, busy, act, openTab }: JournalTabProps<NotesS
         ) : null}
         {open.kind === 'work' ? (
           <div className="journal__editor-actions">
+            <Confirm label="Burn it" sure="Burn it for good?" busy={busy} onYes={() => N('burn', open.id, 'yes')} />
             {open.kept ? <span className="journal__hint">A copy is in your journal, under Received.</span>
               : <button type="button" className="journal__button journal__button--primary" disabled={busy || received.length >= L.receivedMax} onClick={() => N('keep', open.id)}>Keep a copy in my journal</button>}
           </div>
