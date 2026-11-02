@@ -240,9 +240,11 @@ const cellDrawing = (w: OwnersWorld, factions: Record<string, Faction>, reach: n
     // corner stays tinted as long as some marker is near, and only the province's edge fades
     let near = Infinity;
     for (const m of ts) near = Math.min(near, Math.hypot(x - m.x, y - m.y));
+    // on paper one strength: a cell within fade of a marker is its hold's at full strength, beyond it clear paper, never a pale wash
+    // (Nat, 2 Nov: "some of the colours don't match for a hold", the faded edge read as another owner)
     if (!o || near > fade) continue;
     own[j * n + i] = o.t;
-    lvl[j * n + i] = near <= reach ? 2 : 1;
+    lvl[j * n + i] = paper || near <= reach ? 2 : 1;
   }
   const u = (v: number) => Math.round((v / DRAW_SCALE) * 10) / 10;
   // one fill per owner and layer: every run of cells of that owner in a row is a rectangle of it
