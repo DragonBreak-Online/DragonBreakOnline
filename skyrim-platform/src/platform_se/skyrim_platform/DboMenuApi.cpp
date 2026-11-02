@@ -8,9 +8,11 @@
 
 namespace {
 constexpr const char* kMenuName = "DboMenu";
-// Messages the movie sent and JS has not polled yet; a movie that never stops calling cannot grow it without bound
+// Messages the movie sent and JS has not polled yet; a movie that never stops
+// calling cannot grow it without bound
 constexpr size_t kMaxQueued = 512;
-// The flags a caller may set: everything below kUsesMovementToDirection's next bit
+// The flags a caller may set: everything below kUsesMovementToDirection's next
+// bit
 constexpr uint32_t kFlagMask = (1u << 28) - 1;
 
 std::mutex g_mutex;
@@ -19,7 +21,8 @@ uint32_t g_flags = 0;
 int8_t g_depth = 3;
 std::deque<std::string> g_queue;
 
-// _global.dboNative(...) in the movie: its arguments joined by \u0001, kept for dboMenuPoll
+// _global.dboNative(...) in the movie: its arguments joined by \u0001, kept
+// for dboMenuPoll
 class NativeCallback : public RE::GFxFunctionHandler
 {
 public:
@@ -98,11 +101,15 @@ Napi::Value DboMenuApi::Open(const Napi::CallbackInfo& info)
 {
   auto swf = NapiHelper::ExtractString(info[0], "swf");
   if (swf.empty() || swf.find_first_of("/\\.:") != std::string::npos)
-    throw std::runtime_error("dboMenuOpen: swf must be a bare name in Data\\Interface");
-  auto flags = static_cast<uint32_t>(
-    info.Length() > 1 && info[1].IsNumber() ? info[1].As<Napi::Number>().Uint32Value() : 0);
-  auto depth =
-    info.Length() > 2 && info[2].IsNumber() ? info[2].As<Napi::Number>().Int32Value() : 3;
+    throw std::runtime_error(
+      "dboMenuOpen: swf must be a bare name in Data\\Interface");
+  auto flags =
+    static_cast<uint32_t>(info.Length() > 1 && info[1].IsNumber()
+                            ? info[1].As<Napi::Number>().Uint32Value()
+                            : 0);
+  auto depth = info.Length() > 2 && info[2].IsNumber()
+    ? info[2].As<Napi::Number>().Int32Value()
+    : 3;
   {
     std::lock_guard l(g_mutex);
     g_swf = swf;
@@ -110,7 +117,8 @@ Napi::Value DboMenuApi::Open(const Napi::CallbackInfo& info)
     g_depth = static_cast<int8_t>(std::clamp(depth, 0, 20));
     g_queue.clear();
   }
-  // A menu already up is a different movie or flags: it goes first, and the show creates it afresh
+  // A menu already up is a different movie or flags: it goes first, and the
+  // show creates it afresh
   auto ui = RE::UI::GetSingleton();
   if (ui && ui->IsMenuOpen(kMenuName))
     Message(RE::UI_MESSAGE_TYPE::kHide);
@@ -133,7 +141,8 @@ Napi::Value DboMenuApi::IsOpen(const Napi::CallbackInfo& info)
 Napi::Value DboMenuApi::Invoke(const Napi::CallbackInfo& info)
 {
   auto target = NapiHelper::ExtractString(info[0], "target");
-  auto arg = info.Length() > 1 ? NapiHelper::ExtractString(info[1], "arg") : std::string();
+  auto arg = info.Length() > 1 ? NapiHelper::ExtractString(info[1], "arg")
+                               : std::string();
   auto tasks = SKSE::GetTaskInterface();
   if (!tasks)
     throw NullPointerException("TaskInterface");
