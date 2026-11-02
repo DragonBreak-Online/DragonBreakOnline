@@ -10154,7 +10154,7 @@ try {
 try {
   const SILVERTEST_JS = path.resolve('silvertest.js');
   delete require.cache[SILVERTEST_JS];
-  require(SILVERTEST_JS)({ mp, log, personal, audit, who, onlineActors, openWidget, closeWidget, onUi, sendPacket, every, cfg });
+  require(SILVERTEST_JS)({ mp, log, personal, audit, who, display, onlineActors, openWidget, closeWidget, onUi, sendPacket, every, cfg, registerChatCommand, isAdmin, findByName, offlineByTag });
 } catch (e) { log('silvertest.js failed to load:', e.stack || e.message); for (const k of ['__dboSilverTestEntries', '__dboSilverTestAction', '__dboSilverTestStrike', '__dboSilverTestLeave']) globalThis[k] = null; }
 
 // ---- the Key Ring panel: house keys as records on the character (server\keyring.js; housingSystem.ts housingKeyRing) ------

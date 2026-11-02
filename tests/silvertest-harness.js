@@ -183,8 +183,111 @@ reset(); load({ enabled: false });
 ok(entries(HUNTER, MORTAL).length === 0, 'enabled false: not on the menu');
 load();
 
+// ---- teaching (Nat, 2 Nov) ----
+const OFFICER = 0x1b, LEADER = 0x1c, STAFF = 0x1d, SHLEADER = 0x1e, PUPIL = 0x1f;
+for (const a of [OFFICER, LEADER, STAFF, SHLEADER, PUPIL]) { mp.set(a, 'worldOrCellDesc', 'c:Bruma'); mp.set(a, 'pos', [0, 0, 0]); mp.set(a, 'profileId', a + 100); ONLINE.add(a); }
+const ROLE = { [OFFICER]: 'officer', [LEADER]: 'leader', [SHLEADER]: 'leader' };
+Object.assign(GUILDS, { [OFFICER]: 'dawnguard', [LEADER]: 'dawnguard', [SHLEADER]: 'silver-hand' });
+globalThis.__dboGuildsOf = (a) => (GUILDS[a] ? [{ id: GUILDS[a], name: GUILDS[a] === 'dawnguard' ? 'Dawnguard' : 'Silver Hand', title: 'Member', role: ROLE[a] || 'member' }] : []);
+const cmds = new Map();
+Object.assign(api, {
+  registerChatCommand: (n, f) => cmds.set(n, f), isAdmin: (a) => a === STAFF, display: (a) => `C${a.toString(16)}`,
+  findByName: (q) => ({ pupil: PUPIL, mortal: MORTAL, vamp: VAMP }[String(q).toLowerCase()] || 0), offlineByTag: () => 0,
+});
+load();
+const teachIn = (a, t) => entries(a, t).some((e) => e.id === 'silver:teach');
+const teach = (a, t) => { clear(); return globalThis.__dboSilverTestAction(a, 'silver:teach', t); };
+const learn = (t, choice) => handlers.get('silverTeachAnswer')(t, [choice]);
+const MARK = 'private.dboSilverTaught';
+const cmd = (a, line) => { clear(); cmds.get('silvertest')(a, line); return told(a).join(' | '); };
+const resetTeach = () => { reset(); S().lessons.clear(); S().teacherAt.clear(); };
+resetTeach();
+
+ok(teachIn(OFFICER, MORTAL), 'a Dawnguard officer gets "Teach the Silver Test" on another player');
+ok(entries(OFFICER, MORTAL).find((e) => e.id === 'silver:teach').label === 'Teach the Silver Test', '...labelled "Teach the Silver Test"');
+ok(!teachIn(HUNTER, MORTAL) && !teachIn(PLAIN, MORTAL), 'a plain member and an outsider do not');
+ok(teachIn(OFFICER, VAMP) && teachIn(OFFICER, HUNTER), 'the entry reads nothing of the learner (their blood or their order)');
+teach(OFFICER, MORTAL);
+const tw = out.widgets[0];
+ok(tw && tw.a === MORTAL && tw.w.id === 118 && /C1b offers to teach you the silver test/.test(tw.w.targetName) && tw.w.actions.map((x) => x.label).join('|') === 'Learn it|Decline'
+  && tw.w.events.action === 'dbo:silverTeachAnswer' && tw.w.events.close === 'dbo:silverTeachClose', 'the learner gets a panel: Learn it or Decline', tw);
+ok(out.audits.some((t) => /^SILVERTEACH P1b offers to teach P16 the silver test \(dawnguard\)$/.test(t)), 'the offer is audited', out.audits);
+clear(); learn(MORTAL, 'accept');
+const mk = mp.get(MORTAL, MARK);
+ok(mk && mk.faction === 'dawnguard' && mk.factionName === 'Dawnguard' && mk.byProfile === OFFICER + 100 && mk.byName === 'C1b', 'accepting marks the learner: who taught them and which order', mk);
+ok(told(MORTAL).some((t) => /You learn the silver test from C1b of the Dawnguard/.test(t)) && out.audits.some((t) => /^SILVERTEACH P1b taught P16 the silver test \(dawnguard\)$/.test(t)), 'the learner is told, and it is audited', out.audits);
+mp.set(MORTAL, 'inventory', { entries: [{ baseId: SILVER_SWORD, count: 1 }] });
+ok(entries(MORTAL, PLAIN).some((e) => e.id === 'silver:test'), 'a taught player with a silver weapon gets Silver Test, without joining');
+mp.set(MORTAL, 'inventory', { entries: [] });
+ok(!entries(MORTAL, PLAIN).some((e) => e.id === 'silver:test'), '...and needs the silver weapon as a member does');
+mp.set(MORTAL, 'inventory', { entries: [{ baseId: SILVER_SWORD, count: 1 }] });
+ask(MORTAL, WOLF); answer(WOLF, 'accept'); clear();
+ok(strike(MORTAL, WOLF, SILVER_SWORD) === true && told(MORTAL).includes(T.burns), '...and the same accept-and-strike flow works for them');
+reset();
+ok(!teachIn(OFFICER, PLAIN) && /Wait 30 more minute/.test((teach(OFFICER, PLAIN), told(OFFICER).join(' '))), 'one lesson per teacher every teachMinutes');
+ok(teachIn(LEADER, PLAIN), '...a different teacher is not held by it');
+now += 30 * 60000 + 1000;
+ok(teachIn(OFFICER, PLAIN), 'after teachMinutes the officer may teach again');
+teach(OFFICER, MORTAL);
+ok(/already know the silver test/.test(told(OFFICER).join(' ')) && !out.widgets.length, 'a learner who already knows it is not asked again');
+teach(OFFICER, HUNTER);
+ok(/already know the silver test/.test(told(OFFICER).join(' ')) && !out.widgets.length, 'nor a member of an order');
+
+// A vampire learns nothing, and the teacher cannot tell
+resetTeach(); teach(OFFICER, VAMP); clear(); learn(VAMP, 'accept');
+const tVamp = told(OFFICER).join(' ');
+ok(!mp.get(VAMP, MARK), 'a vampire is not marked');
+resetTeach(); teach(OFFICER, PUPIL); clear(); learn(PUPIL, 'accept');
+ok(tVamp === told(OFFICER).join(' ') && tVamp.length > 0, 'the teacher hears exactly what they hear for a mortal (the blood is never revealed)', [tVamp, told(OFFICER).join(' ')]);
+resetTeach(); teach(OFFICER, VAMP); clear(); learn(VAMP, 'accept');
+ok(/will not take/.test(told(VAMP).join(' ')) && out.audits.some((t) => /^SILVERTEACH P15 could not learn the silver test from P1b \(dawnguard\): a vampire$/.test(t)), 'the vampire is told it will not take; the audit says why', out.audits);
+
+// A taught player who turns loses it: at once on use, and on the ten-second sweep
+mp.set(PUPIL, 'inventory', { entries: [{ baseId: SILVER_SWORD, count: 1 }] });
+ok(entries(PUPIL, PLAIN).some((e) => e.id === 'silver:test'), 'the pupil may test');
+mp.set(PUPIL, 'private.supernatural', { kind: 'werewolf' }); clear();
+ok(!entries(PUPIL, PLAIN).some((e) => e.id === 'silver:test') && !mp.get(PUPIL, MARK) && out.audits.some((t) => /^SILVERTEACH P1f lost the silver test taught by the dawnguard: now a werewolf$/.test(t)), 'once turned, the test is gone and it is audited', out.audits);
+mp.set(PUPIL, 'private.supernatural', null);
+resetTeach(); teach(OFFICER, PUPIL); learn(PUPIL, 'accept');
+mp.set(PUPIL, 'private.supernatural', { kind: 'vampire', stage: 1 }); clear();
+for (let i = 0; i < 10; i++) tick();
+ok(!mp.get(PUPIL, MARK) && out.audits.some((t) => /lost the silver test .*now a vampire/.test(t)), 'the sweep takes it from an online player who turned', out.audits);
+mp.set(PUPIL, 'private.supernatural', null);
+
+// Declining, closing and silence teach nothing
+resetTeach(); teach(OFFICER, PUPIL); clear(); learn(PUPIL, 'refuse');
+ok(!mp.get(PUPIL, MARK) && /turn the lesson down/.test(told(OFFICER).join(' ')) && out.audits.some((t) => /^SILVERTEACH P1f turned down the silver test from P1b \(declined\)$/.test(t)), 'declining teaches nothing', out.audits);
+resetTeach(); teach(OFFICER, PUPIL); clear(); handlers.get('silverTeachClose')(PUPIL);
+ok(!mp.get(PUPIL, MARK) && !S().lessons.size, 'closing the panel teaches nothing');
+resetTeach(); teach(OFFICER, PUPIL); clear(); now += 31000; tick();
+ok(!mp.get(PUPIL, MARK) && !S().lessons.size && out.audits.some((t) => /\(timeout\)/.test(t)), 'no answer in answerSeconds teaches nothing');
+resetTeach(); teach(OFFICER, PUPIL); globalThis.__dboSilverTestLeave(OFFICER);
+ok(!S().lessons.size, 'the teacher logging out drops the lesson');
+
+// /silvertest and revoke
+ok(/You know the silver test, taught by C1b of the Dawnguard/.test(cmd(MORTAL, '')), '/silvertest tells a taught player who taught them');
+ok(/as a member of your order/.test(cmd(HUNTER, '')) && /do not know the silver test/.test(cmd(PLAIN, '')), '...a member, and someone who does not know it');
+ok(/Only the leader of the order that taught them, or staff/.test(cmd(OFFICER, 'revoke mortal')) && !!mp.get(MORTAL, MARK), 'an officer cannot revoke');
+ok(/Only the leader of the order that taught them, or staff/.test(cmd(SHLEADER, 'revoke mortal')) && !!mp.get(MORTAL, MARK), 'nor the leader of another order');
+ok(/no longer knows the silver test/.test(cmd(LEADER, 'revoke mortal')) && !mp.get(MORTAL, MARK) && out.audits.some((t) => /^SILVERTEACH P1c revoked the silver test of P16 \(dawnguard\)$/.test(t))
+  && told(MORTAL).some((t) => /The Dawnguard that taught you the silver test has taken it back/.test(t)), 'the teaching order\'s leader revokes it, audited, and the player is told', out.audits);
+ok(!entries(MORTAL, PLAIN).some((e) => e.id === 'silver:test'), 'revoked, they can no longer test');
+resetTeach(); teach(OFFICER, PUPIL); learn(PUPIL, 'accept');
+ok(/no longer knows/.test(cmd(STAFF, 'revoke pupil')) && !mp.get(PUPIL, MARK), 'staff revoke it too');
+ok(/was not taught/.test(cmd(STAFF, 'revoke pupil')) && /No character/.test(cmd(STAFF, 'revoke nobody')), 'revoking someone untaught, or no one, says so');
+
+// Switches
+resetTeach(); load({ teach: false });
+ok(!teachIn(OFFICER, PUPIL), 'teach false: no lesson on the menu');
+load({ teachRoles: ['leader'] });
+ok(!teachIn(OFFICER, PUPIL) && teachIn(LEADER, PUPIL), 'teachRoles ["leader"]: only the leader teaches');
+load();
+ok(cfg.silverTest.teach === true && JSON.stringify(cfg.silverTest.teachRoles) === '["leader","officer"]' && cfg.silverTest.teachMinutes === 30 && /Nat, 2 Nov/.test(cfg.silverTest._teach || ''), 'gamemode-config.json: teach on, leader and officer, 30 minutes, the comment citing Nat');
+ok(!/—/.test(fs.readFileSync(MODULE, 'utf8')), 'still no em dash in silvertest.js');
+
 // The gamemode wiring
 const gm = fs.readFileSync(path.join(ROOT, 'gamemode.js'), 'utf8');
+ok(/require\(SILVERTEST_JS\)\(\{[^}]*registerChatCommand, isAdmin, findByName, offlineByTag \}\)/.test(gm), 'gamemode gives silvertest.js its command, staff check and name lookups');
 const hook = gm.indexOf("globalThis.__dboSilverTestStrike(agg, tgt, src, dmg, flags)) return false;");
 ok(hook > 0 && hook < gm.indexOf("const prev = globalThis.__dboPrevHitDamageAttempt;\n  if (prev) {\n    try { if (prev(agg, tgt, src, dmg) === false) return false; }"), 'the hit hook asks silvertest.js before the fork chain and any damage');
 ok(gm.indexOf("hitDamageAttemptHook =(") < hook, 'inside hitDamageAttemptHook');

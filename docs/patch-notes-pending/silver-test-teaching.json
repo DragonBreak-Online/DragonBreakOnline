@@ -1,0 +1,17 @@
+{
+  "title": "Teaching the Silver Test",
+  "date": "",
+  "version": "Server update",
+  "tag": "New",
+  "sections": [
+    {
+      "heading": "Hunting orders",
+      "items": [
+        "Officers and leaders of the Dawnguard, the Silver Hand and the Vigil of Stendarr can now teach the silver test to someone outside their order: choose \"Teach the Silver Test\" in the X menu on them.",
+        "Whoever accepts the lesson can silver test others as an order member does, without joining: carry a silver weapon, ask through the X menu, and strike once they agree.",
+        "The lesson never takes for a vampire or werewolf, and anyone who turns after learning it forgets it.",
+        "Type /silvertest to see who taught you. The leader of the order that taught someone can take the lesson back with /silvertest revoke <name or #TAG>."
+      ]
+    }
+  ]
+}

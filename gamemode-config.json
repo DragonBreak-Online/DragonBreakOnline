@@ -318,7 +318,11 @@
  },
  "silverTest": {
    "_comment": "silvertest.js: Silver Test in the X menu for Dawnguard, Silver Hand and Vigil of Stendarr members carrying a silver weapon (mestreugway 16 Oct, Nate 19 Oct). The target accepts or chooses Fight or Flee; an accepted test's silver strike within strikeSeconds gives the result to the two of them and, with harmless true, deals no damage. enabled false takes it off the menu. Other keys and defaults in the file header.",
-   "enabled": true
+   "enabled": true,
+   "_teach": "Teaching (Nat, 2 Nov: 'give hunting factions the ability to teach someone how to silver test'): an order member whose rank role is in teachRoles offers 'Teach the Silver Test' in the X menu; the learner accepts in a panel and may then silver test without joining. A vampire or werewolf never learns it, and a taught player who turns loses it. /silvertest revoke <name|#TAG> for the teaching order's leader or staff. teachMinutes between one teacher's lessons. Lore (UESP): no order is recorded teaching outsiders; the Vigil aids virtuous heroes and Isran rebuilt the Dawnguard from outsiders, so an officer passing on the craft fits.",
+   "teach": true,
+   "teachRoles": ["leader", "officer"],
+   "teachMinutes": 30
  },
  "supernatural": {
   "packControl": true,
