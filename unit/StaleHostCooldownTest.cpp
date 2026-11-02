@@ -46,32 +46,41 @@ constexpr uint32_t kNpc = 0xff000001;
 struct Timings
 {
   PartOne& p;
-  std::chrono::milliseconds after, cooldown, sweep;
-  Timings(PartOne& p_, std::chrono::milliseconds cool)
+  std::chrono::milliseconds after, cooldown, sweep, exemptFor;
+  float exemptRange;
+  // exempt: the hoster-in-reach exemption's range; 0 (off) for the cooldown tests, whose hoster stands beside the NPC
+  Timings(PartOne& p_, std::chrono::milliseconds cool, float exempt = 0.f,
+          std::chrono::milliseconds exemptFor_ = std::chrono::minutes(2))
     : p(p_)
     , after(p_.staleHostAfter)
     , cooldown(p_.staleReleaseCooldown)
     , sweep(p_.staleHostSweepEvery)
+    , exemptFor(p_.staleExemptFor)
+    , exemptRange(p_.staleExemptRange)
   {
     p.staleHostAfter = std::chrono::milliseconds(40);
     p.staleHostSweepEvery = std::chrono::milliseconds(0); // every Tick sweeps
     p.staleReleaseCooldown = cool;
+    p.staleExemptRange = exempt;
+    p.staleExemptFor = exemptFor_;
   }
   ~Timings()
   {
     p.staleHostAfter = after;
     p.staleReleaseCooldown = cooldown;
     p.staleHostSweepEvery = sweep;
+    p.staleExemptRange = exemptRange;
+    p.staleExemptFor = exemptFor;
   }
 };
 
-// A player hosting an NPC beside it
-void Setup(PartOne& p)
+// A player hosting an NPC npcX units away (beside it by default)
+void Setup(PartOne& p, float npcX = 100.f)
 {
   DoConnect(p, 0);
   p.CreateActor(kPlayer, { 0.f, 0.f, 0.f }, 0.f, 0x3c);
   p.SetUserActor(0, kPlayer);
-  p.CreateActor(kNpc, { 100.f, 0.f, 0.f }, 0.f, 0x3c);
+  p.CreateActor(kNpc, { npcX, 0.f, 0.f }, 0.f, 0x3c);
   DoMessage(p, 0, HostAttempt(kNpc));
   REQUIRE(HosterOf(p, kNpc) == kPlayer);
 }
@@ -162,6 +171,54 @@ TEST_CASE("Destroying an NPC forgets its stale-release record",
   DoMessage(p, 0, HostAttempt(kNpc));
   REQUIRE(HosterOf(p, kNpc) == kPlayer);
 
+  SweepPastStale(p);
+  REQUIRE(HosterOf(p, kNpc) == 0);
+
+  Teardown(p);
+}
+
+TEST_CASE("A silent NPC keeps a hoster that is online and in reach",
+          "[PartOne][Host][StaleHost][espm]")
+{
+  PartOne& p = GetPartOne();
+  Timings t(p, std::chrono::milliseconds(0), 4096.f);
+  Setup(p);
+
+  // without the exemption the first sweep past staleHostAfter releases it (the cooldown tests above)
+  SweepPastStale(p);
+  REQUIRE(HosterOf(p, kNpc) == kPlayer);
+  SweepPastStale(p);
+  REQUIRE(HosterOf(p, kNpc) == kPlayer);
+
+  Teardown(p);
+}
+
+TEST_CASE("A silent NPC beyond the exemption range is still released at once",
+          "[PartOne][Host][StaleHost][espm]")
+{
+  PartOne& p = GetPartOne();
+  Timings t(p, std::chrono::milliseconds(0), 4096.f);
+  Setup(p, 5000.f);
+
+  SweepPastStale(p);
+  REQUIRE(HosterOf(p, kNpc) == 0);
+
+  Teardown(p);
+}
+
+TEST_CASE("The exemption ends after staleExemptFor of silence",
+          "[PartOne][Host][StaleHost][espm]")
+{
+  PartOne& p = GetPartOne();
+  // a hoster that stays beside an NPC its client stopped driving must not hold it frozen forever
+  Timings t(p, std::chrono::milliseconds(0), 4096.f,
+            std::chrono::milliseconds(150));
+  Setup(p);
+
+  SweepPastStale(p);
+  REQUIRE(HosterOf(p, kNpc) == kPlayer);
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
   SweepPastStale(p);
   REQUIRE(HosterOf(p, kNpc) == 0);
 

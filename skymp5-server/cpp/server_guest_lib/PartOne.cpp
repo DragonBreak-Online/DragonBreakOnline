@@ -179,6 +179,28 @@ void PartOne::Tick()
   worldState.Tick();
 }
 
+bool PartOne::HosterInReach(const MpObjectReference& remote, uint32_t hosterId)
+{
+  if (staleExemptRange <= 0.f) {
+    return false;
+  }
+  auto hoster =
+    dynamic_cast<MpActor*>(worldState.LookupFormByIdNoLoad(hosterId).get());
+  if (!hoster) {
+    return false;
+  }
+  const auto user = serverState.UserByActor(hoster);
+  if (user == Networking::InvalidUserId ||
+      user == serverState.disconnectingUserId) {
+    return false;
+  }
+  if (!(hoster->GetCellOrWorld() == remote.GetCellOrWorld())) {
+    return false;
+  }
+  return (hoster->GetPos() - remote.GetPos()).SqrLength() <=
+    staleExemptRange * staleExemptRange;
+}
+
 // A hoster sends every loaded NPC it drives every 130 ms and goes silent on the ones it unloaded, but it stayed
 // their hoster: OnHostAttempt only hands an NPC over when another client asks, so an NPC its own hoster walked
 // back to was never driven again (an ogre that would not fight back), and a hoster's trail of 36 unloaded NPCs
@@ -220,6 +242,10 @@ void PartOne::TickStaleHosts()
       last = *worldState.lastMovUpdateByIdx[idx];
     }
     if (now - last > kStaleHostSeconds) {
+      // A standing NPC beside its hoster is not lost; one its hoster walked away from or left behind still is
+      if (now - last <= staleExemptFor && HosterInReach(*remote, hosterId)) {
+        continue;
+      }
       // The first release of an NPC is immediate; a repeat release of the same one waits staleReleaseCooldown.
       // A standing NPC never moves, so without this it was taken from its hoster every kStaleHostSeconds for as
       // long as it stood there, and every release made every nearby client ask for it at once.

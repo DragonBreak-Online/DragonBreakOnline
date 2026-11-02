@@ -77,6 +77,10 @@ public:
   std::chrono::milliseconds staleHostAfter{ 5000 };
   std::chrono::milliseconds staleReleaseCooldown{ 30000 };
   std::chrono::milliseconds staleHostSweepEvery{ 1000 };
+  // A silent NPC keeps a hoster that is online, in its cell or world and within staleExemptRange units, for up to
+  // staleExemptFor of silence; 0 range turns the exemption off
+  float staleExemptRange = 4096.f;
+  std::chrono::milliseconds staleExemptFor{ 120000 };
   FormCallbacks CreateFormCallbacks();
   ActionListener& GetActionListener();
   const std::vector<std::shared_ptr<Listener>>& GetListeners() const;
@@ -176,6 +180,7 @@ private:
   void BeforeRefrDestroy(MpObjectReference& refr);
   // Frees NPCs whose hoster stopped sending their movement, so a player who has them loaded can take over
   void TickStaleHosts();
+  bool HosterInReach(const MpObjectReference& remote, uint32_t hosterId);
   std::chrono::system_clock::time_point lastStaleHostSweep;
   // NPC -> (hoster, when the sweep first saw that hoster), for hosters with no movement stamp yet
   std::unordered_map<uint32_t,
