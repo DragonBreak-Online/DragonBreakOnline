@@ -1,5 +1,27 @@
 [
   {
+    "title": "New minotaurs that fight",
+    "date": "2026-10-31",
+    "version": "Server update",
+    "tag": "Change",
+    "sections": [
+      {
+        "heading": "Minotaurs",
+        "items": [
+          "The minotaurs of Minotaur's Rest are new: Mihail's High Minotaurs. They fight with their own hammers, where the old ones only stood and stared.",
+          "Minotaur's Rest has two Minotaurs and its Minotaur Lord. Sancre Tor keeps its undead.",
+          "The Minotaur Lord world boss stays away a little longer, until the new Lord has been tested."
+        ]
+      },
+      {
+        "heading": "Credits",
+        "items": [
+          "High Minotaurs - Mihail Monsters and Animals, by Mihail (Nexus Mods 34392), with assets by tamu75 (the Minotaur's giant hammer), lolikyonyu and Oaristys. The launcher downloads it from Nexus Mods."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Court actions and hunters' writs fixed",
     "date": "2026-11-02",
     "version": "Server update",

@@ -2,8 +2,9 @@
 //   1. ownedSpawns.replace.minotaur.exceptGroups leaves Minotaur's Rest (17857a) to the plugin's own minotaurs, hostile
 //      (hostileKinds minotaur), while Sancre Tor (1833e2) keeps its undead; without it both are undead, as live today;
 //   2. ownedSpawns.rearm puts each minotaur's axe back in its inventory by its base, once, and traceKinds logs what it
-//      wears at spawn and at each change;
-//   3. bosses.js re-arms the Minotaur Lord's minotaur adds (rearmAdds) in test 2 and the live definition, not in test 1.
+//      wears at spawn and at each change (no longer shipped; the mechanism stays);
+//   3. ownedSpawns.swap (the Leader, 31 Oct): the Rest's minotaurs are Mihail's (811), its own Lord spot his Lord (813);
+//   4. bosses.js re-arms a boss's adds (rearmAdds); the Lord's adds are Mihail's and need none.
 //   node tests/minotaur-rest-harness.js   (from server/)
 'use strict';
 const fs = require('fs');
@@ -16,6 +17,7 @@ const CFG = JSON.parse(fs.readFileSync(path.join(ROOT, 'gamemode-config.json'), 
 const OWNED = JSON.parse(fs.readFileSync(path.join(ROOT, 'owned-spawns.json'), 'utf8'));
 const REST = '17857a:DragonBreak Online Edits.esp', SANCRE = '1833e2:DragonBreak Online Edits.esp';
 const MINO = '8b600:BSHeartland.esm', LORD = 'd6fe5:BSHeartland.esm', WAR_AXE = '6026e6:BSAssets.esm', LORD_AXE = '6026df:BSAssets.esm';
+const H_MINO = '811:mihailmmaminotaur.esp', H_LORD = '813:mihailmmaminotaur.esp', H_SHAMAN = '81f:mihailmmaminotaur.esp';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-nate-minorest-'));
 process.on('exit', () => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* left for the OS */ } });
@@ -26,7 +28,8 @@ for (const f of ['loot.json', 'artifacts.json', 'dragon-materials.json']) fs.cop
 ok(minos.filter((s) => s.group === REST).length === 3 && minos.filter((s) => s.group === SANCRE).length > 3, 'Minotaur\'s Rest has its three minotaur spots (the Lord\'s among them); Sancre Tor its own');
 
 const PLUGINS = { 'Skyrim.esm': 0, 'BSAssets.esm': 7, 'BSHeartland.esm': 8, 'DragonBreak Online Edits.esp': 0x49 };
-const idOf = (d) => { const [h, p] = String(d).split(':'); if (!(p in PLUGINS)) throw new Error('no plugin ' + p); return ((PLUGINS[p] << 24) | parseInt(h, 16)) >>> 0; };
+const LIGHT = { 'mihailmmaminotaur.esp': 0x40 };   // an ESL-flagged plugin: FE, then its slot, then 12 bits
+const idOf = (d) => { const [h, p] = String(d).split(':'); if (p in LIGHT) return ((0xfe << 24) | (LIGHT[p] << 12) | parseInt(h, 16)) >>> 0; if (!(p in PLUGINS)) throw new Error('no plugin ' + p); return ((PLUGINS[p] << 24) | parseInt(h, 16)) >>> 0; };
 const props = new Map(), logs = [];
 const mp = { get: (id, k) => props.get(`${id}|${k}`), set: (id, k, v) => props.set(`${id}|${k}`, v), getIdFromDesc: idOf };
 const cwd = process.cwd();
@@ -49,15 +52,23 @@ const sancreZones = (zs) => zs.filter((z) => minos.filter((s) => s.group === SAN
 
 // ---- 1. the shipped config (Nat, 25 Oct: "Minotaur's Rest isn't minotaurs, it's zombies"): minotaurs at the Rest, undead at Sancre Tor ----
 let z = load(live);
-ok(restZones(z).length === 3 && restZones(z).every((x) => kindOfZone(x) === 'minotaur') && sancreZones(z).length && sancreZones(z).every((x) => kindOfZone(x) === 'undead'),
-  'the shipped config: Minotaur\'s Rest has its minotaurs (exceptGroups), Sancre Tor its undead', restZones(z).map((x) => x.Name));
-ok(restZones(z).filter((x) => x.NPC[0].id === LORD).length === 1 && JSON.stringify(live.rearm) === JSON.stringify({ minotaur: { [MINO]: WAR_AXE, [LORD]: LORD_AXE } }) && (live.traceKinds || []).includes('minotaur') && !live.leaveOut,
-  '...one Minotaur Lord (the camp\'s own spot; leaveOut waits for the boss), each re-armed with its own axe, traced');
+ok(restZones(z).length === 3 && restZones(z).every((x) => kindOfZone(x) === 'minotaur' && x.Hostile === true) && sancreZones(z).length && sancreZones(z).every((x) => kindOfZone(x) === 'undead'),
+  'the shipped config: Minotaur\'s Rest has its minotaurs (exceptGroups), hostile, Sancre Tor its undead', restZones(z).map((x) => x.Name));
+ok(restZones(z).filter((x) => x.NPC[0].id === H_LORD).length === 1 && restZones(z).filter((x) => x.NPC[0].id === H_MINO).length === 2 && !restZones(z).some((x) => x.NPC[0].id === MINO || x.NPC[0].id === LORD),
+  '...Mihail\'s: two Minotaurs (811) and on the camp\'s own Lord spot his Minotaur Lord (813), none of Beyond Skyrim\'s (swap, 31 Oct)', restZones(z).map((x) => x.NPC[0].id));
+ok(!live.rearm && (live.traceKinds || []).includes('minotaur') && !live.leaveOut, '...no rearm (they carry their own hammers), traced, leaveOut waiting for the boss');
+ok(sancreZones(z).every((x) => !x.NPC.some((n) => /mihail/.test(n.id))), '...Sancre Tor\'s undead untouched by the swap');
+const noSwap = JSON.parse(JSON.stringify(live)); delete noSwap.swap;
+z = load(noSwap);
+ok(restZones(z).filter((x) => x.NPC[0].id === LORD).length === 1 && restZones(z).filter((x) => x.NPC[0].id === MINO).length === 2, 'without swap (the rollback) Beyond Skyrim\'s again', restZones(z).map((x) => x.NPC[0].id));
+const swapEverywhere = JSON.parse(JSON.stringify(live)); delete swapEverywhere.replace;
+z = load(swapEverywhere);
+ok(sancreZones(z).length && sancreZones(z).every((x) => kindOfZone(x) === 'minotaur' && /mihailmmaminotaur/.test(x.NPC[0].id)), 'with no replace rule the swap reaches every minotaur spot (Sancre Tor too)', sancreZones(z).map((x) => x.NPC[0].id));
 const undeadEverywhere = JSON.parse(JSON.stringify(live)); delete undeadEverywhere.replace.minotaur.exceptGroups;
 z = load(undeadEverywhere);
 ok(restZones(z).every((x) => kindOfZone(x) === 'undead'), 'without exceptGroups (the rollback, and live before this) both are undead: what Nat saw', restZones(z).map((x) => x.Name));
 // ---- with the exception and the arming ----
-const withRest = JSON.parse(JSON.stringify(live));
+const withRest = JSON.parse(JSON.stringify(live)); delete withRest.swap;
 withRest.replace.minotaur.exceptGroups = [REST];
 withRest.rearm = { minotaur: { [MINO]: WAR_AXE, [LORD]: LORD_AXE } };
 withRest.traceKinds = ['minotaur'];
@@ -92,8 +103,8 @@ ok(logs.length === 1 && /equipment changed: \["[0-9a-f]*6026e6"\]/.test(logs[0])
 // ---- 3. bosses.js: the Lord's adds ----
 const B = JSON.parse(fs.readFileSync(path.join(ROOT, 'bosses.json'), 'utf8')).bosses;
 const bdef = (id) => B.find((b) => b.id === id);
-ok(bdef('minotaurlord').adds.some((a) => a.options[0][1] === MINO) && !bdef('minotaurtest1') && !bdef('minotaurtest2'), 'the Minotaur Lord\'s adds are Minotaur\'s Rest\'s own minotaurs (CYREncMinotaur); the dev tests are gone (26 Oct)');
-ok(bdef('minotaurlord').rearmAdds === WAR_AXE && bdef('minotaurlord').enabled === true, 'the live Lord (on since 26 Oct) re-arms the adds\' war axes');
+ok(bdef('minotaurlord').boss.options[0][1] === H_LORD && bdef('minotaurlord').adds.map((a) => a.options[0][1]).join() === `${H_MINO},${H_SHAMAN}` && !bdef('minotaurtest1') && !bdef('minotaurtest2'), 'the Minotaur Lord is Mihail\'s, his adds Mihail\'s Minotaurs and a Shaman; the dev tests are gone (26 Oct)');
+ok(!bdef('minotaurlord').rearmAdds && !bdef('minotaurlord').rearm && !(CFG.bosses.only || []).includes('minotaurlord'), '...re-arming nothing, and kept off (bosses.only) until an in-game check that they attack');
 const bsrc = fs.readFileSync(path.join(ROOT, 'bosses.js'), 'utf8');
 ok(/r\.boss\.rearmAdds/.test(bsrc) && /rearm\(r\.boss, id, r\.boss\.rearmAdds\)/.test(bsrc), 'bosses.js re-arms a boss\'s adds once each');
 

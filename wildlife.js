@@ -46,20 +46,25 @@ module.exports = (api) => {
   const REPLACE = ((cfg.ownedSpawns || {}).replace) || {};
   // exceptGroups: camps (an owned spawn's group, its marker or cell) the rule leaves to the plugin's own creature (Nat, 25 Oct:
   // the minotaurs back at Minotaur's Rest, 17857a, while Sancre Tor keeps its undead)
+  // [weight, desc]: one per spot, fixed by the spot's own id (the plugin's options are [level, desc], picked by level)
+  const pickSpawn = (sp, map) => {
+    const list = map && Array.isArray(map[sp.base]) ? map[sp.base].filter((o) => Array.isArray(o) && Number(o[0]) > 0 && o[1]) : [];
+    if (!list.length) return null;
+    const total = list.reduce((n, o) => n + Number(o[0]), 0);
+    let roll = (parseInt(crypto.createHash('sha1').update(String(sp.src)).digest('hex').slice(0, 8), 16) / 0x100000000) * total;
+    const hit = list.find((o) => (roll -= Number(o[0])) < 0) || list[list.length - 1];
+    return [[0, String(hit[1])]];
+  };
+  // ownedSpawns.swap { "<kind>": { "<placed base desc>": [[weight, "<desc>"], ...] } }: the same kind, another creature, in
+  // every spot the replace rule leaves to the kind (the Leader, 31 Oct: Mihail's minotaurs, which fight, for Beyond Skyrim's,
+  // which only stared). ROLLBACK: remove swap.minotaur.
+  const SWAP = ((cfg.ownedSpawns || {}).swap) || {};
+  const swapped = (sp) => { const opts = pickSpawn(sp, SWAP[sp.kind]); return opts ? Object.assign({}, sp, { options: opts }) : sp; };
   const replacedSpawn = (sp) => {
     const r = REPLACE[sp.kind];
-    if (!r || typeof r !== 'object') return sp;
-    if (Array.isArray(r.exceptGroups) && r.exceptGroups.map((g) => String(g).toLowerCase()).includes(String(sp.group || '').toLowerCase())) return sp;
-    const bases = r.bases || {};
-    const list = Array.isArray(bases[sp.base]) ? bases[sp.base].filter((o) => Array.isArray(o) && Number(o[0]) > 0 && o[1]) : [];
-    // [weight, desc]: one per spot, fixed by the spot's own id (the plugin's options are [level, desc], picked by level)
-    let opts = null;
-    if (list.length) {
-      const total = list.reduce((n, o) => n + Number(o[0]), 0);
-      let roll = (parseInt(crypto.createHash('sha1').update(String(sp.src)).digest('hex').slice(0, 8), 16) / 0x100000000) * total;
-      const hit = list.find((o) => (roll -= Number(o[0])) < 0) || list[list.length - 1];
-      opts = [[0, String(hit[1])]];
-    }
+    if (!r || typeof r !== 'object') return swapped(sp);
+    if (Array.isArray(r.exceptGroups) && r.exceptGroups.map((g) => String(g).toLowerCase()).includes(String(sp.group || '').toLowerCase())) return swapped(sp);
+    const opts = pickSpawn(sp, r.bases || {});
     const count = Math.max(1, Math.min(4, Math.floor(Number(r.count) || 1)));   // how many stand in each spot
     return Object.assign({}, sp, { kind: String(r.kind || sp.kind), options: opts || sp.options, count });
   };

@@ -31,7 +31,7 @@ ok(def('icecap').enabled === true && def('briarheartking').enabled && def('centu
 ok(!REAL.bosses.some((b) => b.devOnly) && !REAL.bosses.some((b) => /test/i.test(b.id)), 'no boss is a dev-only test any more (Nat 26 Oct: the test copies go; none can ship)');
 ok(REAL.bosses.every((b) => b.respawnSeconds === 3600), 'every boss respawns 1 h after it falls (Nat 26 Oct)', REAL.bosses.map((b) => [b.id, b.respawnSeconds]));
 ok(REAL.bosses.every((b) => b.toughness >= 0.85 && b.enrage.toughness >= 0.65 && (!b.guardian || b.guardian.bossToughnessWhileAlive === 0.95) && b.openingAdds >= 3 && b.waves.length === 3 && b.enrageSeconds === 600), 'every boss is a world boss: 6.7x health or more, a 20x guardian shield, 3 opening adds, three waves, enrage at 10 min (Nat 26 Oct)', REAL.bosses.map((b) => [b.id, b.toughness, b.openingAdds]));
-ok(['icecap', 'briarheartking', 'centurion', 'palewarlord', 'falmerwarmonger', 'movarth', 'duskthorn', 'valkynaz', 'risenlegate', 'minotaurlord', 'giantchieftain'].every((id) => def(id).boss.edid === `DBO_Boss_${id}` && def(id).boss.options.length === 1 && def(id).boss.options[0][2] === `DBO_Boss_${id}` && /:DragonBreak Online Edits\.esp$/.test(def(id).boss.options[0][1])), 'the boss bar: each boss spawns as its own DLE copy, the record DragonBreak_Bosses.ini names (TrueHUD, 26 Oct)', REAL.bosses.map((b) => [b.id, b.boss.options.length, b.boss.options[0][2]]));
+ok(['icecap', 'briarheartking', 'centurion', 'palewarlord', 'falmerwarmonger', 'movarth', 'duskthorn', 'valkynaz', 'risenlegate', 'giantchieftain'].every((id) => def(id).boss.edid === `DBO_Boss_${id}` && def(id).boss.options.length === 1 && def(id).boss.options[0][2] === `DBO_Boss_${id}` && /:DragonBreak Online Edits\.esp$/.test(def(id).boss.options[0][1])), 'the boss bar: each boss spawns as its own DLE copy, the record DragonBreak_Bosses.ini names (TrueHUD, 26 Oct)', REAL.bosses.map((b) => [b.id, b.boss.options.length, b.boss.options[0][2]]));
 ok(REAL.bosses.filter((b) => b.enabled).length === 12 && !def('karstaag').enabled, 'every boss ships on but Karstaag, who waits on Solstheim');
 const fams = REAL.bosses.flatMap((b) => ['schematic', 'extraSchematic'].map((k) => b.drops[k] && b.drops[k].family).filter(Boolean));
 ok(REAL.bosses.every((b) => b.drops.schematic && b.drops.schematic.family) && new Set(fams).size === fams.length, 'every boss has a schematic and no two share a family (Nat 26 Oct: "unique schematics")', fams);
@@ -44,8 +44,9 @@ ok(def('icecap').boss.options[0][2] === 'DBO_Boss_icecap' && def('icecap').spots
 ok(def('briarheartking').boss.options.slice(-1)[0][2] === 'DBO_Boss_briarheartking' && def('briarheartking').guardian.options[0][2] === 'EncHagraven', 'the King: the strongest Forsworn boss shaman (his copy is templated on EncForsworn06BossMagicBretonM03), his Hagraven beside him');
 ok(REAL.bosses.every((b) => b.spots.every((s) => s.ref && s.anchorDist < 5000)), 'every spot has an anchor within 5000 units (Sancre Tor\'s and Minotaur\'s Rest\'s are the ones Nate\'s own zones there use)');
 ok(def('karstaag').enabled === false && /Solstheim/.test(def('karstaag').waitingOn) && def('karstaag').boss.options[0][2] === 'DLC2dunKarstaag', 'Karstaag is defined and off until Solstheim opens');
-ok(def('minotaurlord').enabled === true && def('minotaurlord').rearm === '6026df:BSAssets.esm' && def('minotaurlord').drops.always.some((x) => x[0] === '6026e4:BSAssets.esm'),
-  'the Minotaur Lord is on, re-arming his axe (the dev tests kept it at spawn), his drop the beast\'s own horn and hide');
+ok(def('minotaurlord').boss.options[0][1] === '813:mihailmmaminotaur.esp' && def('minotaurlord').adds.map((a) => a.options[0][1]).join() === '811:mihailmmaminotaur.esp,81f:mihailmmaminotaur.esp'
+  && !def('minotaurlord').rearm && !def('minotaurlord').rearmAdds && def('minotaurlord').drops.always.some((x) => x[0] === '6026e4:BSAssets.esm'),
+  'the Minotaur Lord is Mihail\'s (813, the Leader 31 Oct) with his Minotaurs and a Shaman, carrying their own hammers (no rearm); his drop the beast\'s own horn and hide');
 ok(def('risenlegate').enabled === true && !def('risenlegate').devOnly && def('risenlegate').boss.options[0][2] === 'DBO_Boss_risenlegate' && def('risenlegate').adds.length === 5 && def('risenlegate').drops.schematic.family === 'adamantium',
   'Sancre Tor stays undead: the Risen Legate is a full boss with an undead legion of Sancre Tor\'s own pools, Adamantium 3%');
 ok(!JSON.stringify(def('centurion').drops).includes('17749:Dragonborn.esm') && def('karstaag').drops.extra.some((x) => x[0] === '17749:Dragonborn.esm') && def('centurion').drops.pool.items.some((x) => x[0] === 'c886a:Skyrim.esm'),
@@ -307,6 +308,7 @@ ok(!hasZone('boss:valkynaz:boss') && !zones().some((x) => x.Name.startsWith('bos
 // ---- the Minotaur Lord's axe (rearm) and the equipment trace, on a copy of the Lord with traceEquipment on ----
 const TR = JSON.parse(JSON.stringify(REAL));
 TR.bosses.find((b) => b.id === 'minotaurlord').traceEquipment = true;
+TR.bosses.find((b) => b.id === 'minotaurlord').rearm = '6026df:BSAssets.esm';   // the shipped Lord needs none since 31 Oct; the mechanism stays
 fs.writeFileSync(path.join(dir, 'bosses.json'), JSON.stringify(TR));
 load({});
 ok(hasZone('boss:minotaurlord:boss') && hasZone('boss:risenlegate:boss') && !hasZone('boss:karstaag:boss'), 'the Minotaur Lord and the Legate stand; Karstaag stays off');
