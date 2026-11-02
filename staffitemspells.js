@@ -295,43 +295,10 @@ module.exports = (api) => {
     try { const g = globalThis.__dboStaffGuard; return g ? String(g.target(a, t, 'spells') || '') : ''; } catch (e) { log('staffitemspells: staff check failed', e.message); return ''; }
   };
 
-  // 3. /givespell
-  registerChatCommand('givespell', (caller, args) => {
-    if (!isLeadStaff(caller) && !isAdmin(caller)) {
-      return personal(caller, 'Only a Lead GM or above manages player spells.');
-    }
-    const raw = String(args || '').trim();
-    if (!raw) return personal(caller, 'Usage: /givespell <#TAG|name> <spell name or id> [force] call:<n> | ticket:<id> | reason: <why> (Lead GM+)');
-    const parts = raw.split(/\s+/);
-    if (parts.length < 2) return personal(caller, 'Usage: /givespell <#TAG|name> <spell name or id> [force] call:<n> | ticket:<id> | reason: <why> (Lead GM+)');
-
-    const targetQuery = parts[0];
-    let spellParts = [];
-    let reason = '';
-    let force = false;
-    for (let i = 1; i < parts.length; i++) {
-      const p = parts[i];
-      if (/^(ticket|call):/i.test(p)) reason += (reason ? ' ' : '') + p;
-      else if (p.toLowerCase() === 'force' && i === parts.length - 1) force = true;
-      else spellParts.push(p);
-    }
-    const spellQuery = spellParts.join(' ');
-    const sp = resolveSpell(spellQuery);
-    if (!sp) return personal(caller, `Could not find any spell matching '${spellQuery}'.`);
-    const held = HELD.get(String(sp.desc || '').toLowerCase());
-    if (held && !force) {
-      return personal(caller, held === 'removed'
-        ? `${sp.name} is taken out of the game (spells.removedSpells): it would be taken from them again at their next login. Add force to give it anyway.`
-        : `${sp.name} is held back (spells.suspendedSpells${heldWhy(sp.desc) ? `: ${heldWhy(sp.desc)}` : ''}). Add force to give it anyway.`);
-    }
+  // The grant and the take, after every check: the chat commands and the F7 panel's One spell. Each tells the player and
+  // audits; it returns what the staff member is told
+  const grantSpell = (caller, tgt, sp, held, reason) => {
     const mark = sp.staffOnly ? ' (staff only, not learnable)' : '';
-
-    const tgt = resolveTarget(targetQuery);
-    if (!tgt || !tgt.online || !tgt.actor) {
-      return personal(caller, `Player '${targetQuery}' must be online to learn spells.`);
-    }
-    { const no = spellsNo(caller, tgt.actor); if (no) return personal(caller, no); }
-
     try {
       const selfForm = { type: 'form', desc: descOf(tgt.actor) };
       mp.callPapyrusFunction('method', 'Actor', 'AddSpell', selfForm, [{ type: 'espm', desc: descOf(sp.id) }]);
@@ -343,40 +310,12 @@ module.exports = (api) => {
 
       personal(tgt.actor, `Staff granted you the spell: ${sp.name}${mark}.`);
       audit(`STAFF ${who(caller)} granted spell ${sp.name} (0x${sp.id.toString(16)}) to ${who(tgt.actor)}${mark}${held ? ` (forced past ${held})` : ''}${reason ? ` (${reason})` : ''}`);
-      return personal(caller, `Granted spell '${sp.name}'${mark} to ${tgt.name}.${held === 'removed' ? ' It is taken from them again at their next login.' : ''}`);
+      return `Granted spell '${sp.name}'${mark} to ${tgt.name}.${held === 'removed' ? ' It is taken from them again at their next login.' : ''}`;
     } catch (e) {
-      return personal(caller, `Failed to grant spell: ${e.message}`);
+      return `Failed to grant spell: ${e.message}`;
     }
-  }, { admin: true, help: '<#TAG|name> <spell> [force] call:<n>|ticket:<id> (GM) or reason: <why> (Lead GM+): grant a spell to an online player (any castable spell: one no tome teaches is staff only)' });
-
-  // 4. /removespell
-  registerChatCommand('removespell', (caller, args) => {
-    if (!isLeadStaff(caller) && !isAdmin(caller)) {
-      return personal(caller, 'Only a Lead GM or above manages player spells.');
-    }
-    const raw = String(args || '').trim();
-    if (!raw) return personal(caller, 'Usage: /removespell <#TAG|name> <spell name or id> call:<n> | ticket:<id> | reason: <why> (Lead GM+)');
-    const parts = raw.split(/\s+/);
-    if (parts.length < 2) return personal(caller, 'Usage: /removespell <#TAG|name> <spell name or id> call:<n> | ticket:<id> | reason: <why> (Lead GM+)');
-
-    const targetQuery = parts[0];
-    let spellParts = [];
-    let reason = '';
-    for (let i = 1; i < parts.length; i++) {
-      const p = parts[i];
-      if (/^(ticket|call):/i.test(p)) reason += (reason ? ' ' : '') + p;
-      else spellParts.push(p);
-    }
-    const spellQuery = spellParts.join(' ');
-    const sp = resolveSpell(spellQuery);
-    if (!sp) return personal(caller, `Could not find any spell matching '${spellQuery}'.`);
-
-    const tgt = resolveTarget(targetQuery);
-    if (!tgt || !tgt.online || !tgt.actor) {
-      return personal(caller, `Player '${targetQuery}' must be online to remove spells.`);
-    }
-    { const no = spellsNo(caller, tgt.actor); if (no) return personal(caller, no); }
-
+  };
+  const takeSpell = (caller, tgt, sp, reason) => {
     try {
       const selfForm = { type: 'form', desc: descOf(tgt.actor) };
       mp.callPapyrusFunction('method', 'Actor', 'RemoveSpell', selfForm, [{ type: 'espm', desc: descOf(sp.id) }]);
@@ -414,11 +353,97 @@ module.exports = (api) => {
 
       personal(tgt.actor, `Staff removed the spell: ${sp.name}.`);
       audit(`STAFF ${who(caller)} removed spell ${sp.name} (0x${sp.id.toString(16)}) from ${who(tgt.actor)}${reason ? ` (${reason})` : ''}`);
-      return personal(caller, `Removed spell '${sp.name}' from ${tgt.name}.`);
+      return `Removed spell '${sp.name}' from ${tgt.name}.`;
     } catch (e) {
-      return personal(caller, `Failed to remove spell: ${e.message}`);
+      return `Failed to remove spell: ${e.message}`;
     }
+  };
+  // The held spells (spells.removedSpells, suspendedSpells): '' to go ahead, else why not without force
+  const heldNo = (sp, held, force) => (!held || force ? '' : held === 'removed'
+    ? `${sp.name} is taken out of the game (spells.removedSpells): it would be taken from them again at their next login. Add force to give it anyway.`
+    : `${sp.name} is held back (spells.suspendedSpells${heldWhy(sp.desc) ? `: ${heldWhy(sp.desc)}` : ''}). Add force to give it anyway.`);
+
+  // 3. /givespell
+  registerChatCommand('givespell', (caller, args) => {
+    if (!isLeadStaff(caller) && !isAdmin(caller)) {
+      return personal(caller, 'Only a Lead GM or above manages player spells.');
+    }
+    const raw = String(args || '').trim();
+    if (!raw) return personal(caller, 'Usage: /givespell <#TAG|name> <spell name or id> [force] call:<n> | ticket:<id> | reason: <why> (Lead GM+)');
+    const parts = raw.split(/\s+/);
+    if (parts.length < 2) return personal(caller, 'Usage: /givespell <#TAG|name> <spell name or id> [force] call:<n> | ticket:<id> | reason: <why> (Lead GM+)');
+
+    const targetQuery = parts[0];
+    let spellParts = [];
+    let reason = '';
+    let force = false;
+    for (let i = 1; i < parts.length; i++) {
+      const p = parts[i];
+      if (/^(ticket|call):/i.test(p)) reason += (reason ? ' ' : '') + p;
+      else if (p.toLowerCase() === 'force' && i === parts.length - 1) force = true;
+      else spellParts.push(p);
+    }
+    const spellQuery = spellParts.join(' ');
+    const sp = resolveSpell(spellQuery);
+    if (!sp) return personal(caller, `Could not find any spell matching '${spellQuery}'.`);
+    const held = HELD.get(String(sp.desc || '').toLowerCase());
+    { const no = heldNo(sp, held, force); if (no) return personal(caller, no); }
+
+    const tgt = resolveTarget(targetQuery);
+    if (!tgt || !tgt.online || !tgt.actor) {
+      return personal(caller, `Player '${targetQuery}' must be online to learn spells.`);
+    }
+    { const no = spellsNo(caller, tgt.actor); if (no) return personal(caller, no); }
+    return personal(caller, grantSpell(caller, tgt, sp, held, reason));
+  }, { admin: true, help: '<#TAG|name> <spell> [force] call:<n>|ticket:<id> (GM) or reason: <why> (Lead GM+): grant a spell to an online player (any castable spell: one no tome teaches is staff only)' });
+
+  // 4. /removespell
+  registerChatCommand('removespell', (caller, args) => {
+    if (!isLeadStaff(caller) && !isAdmin(caller)) {
+      return personal(caller, 'Only a Lead GM or above manages player spells.');
+    }
+    const raw = String(args || '').trim();
+    if (!raw) return personal(caller, 'Usage: /removespell <#TAG|name> <spell name or id> call:<n> | ticket:<id> | reason: <why> (Lead GM+)');
+    const parts = raw.split(/\s+/);
+    if (parts.length < 2) return personal(caller, 'Usage: /removespell <#TAG|name> <spell name or id> call:<n> | ticket:<id> | reason: <why> (Lead GM+)');
+
+    const targetQuery = parts[0];
+    let spellParts = [];
+    let reason = '';
+    for (let i = 1; i < parts.length; i++) {
+      const p = parts[i];
+      if (/^(ticket|call):/i.test(p)) reason += (reason ? ' ' : '') + p;
+      else spellParts.push(p);
+    }
+    const spellQuery = spellParts.join(' ');
+    const sp = resolveSpell(spellQuery);
+    if (!sp) return personal(caller, `Could not find any spell matching '${spellQuery}'.`);
+
+    const tgt = resolveTarget(targetQuery);
+    if (!tgt || !tgt.online || !tgt.actor) {
+      return personal(caller, `Player '${targetQuery}' must be online to remove spells.`);
+    }
+    { const no = spellsNo(caller, tgt.actor); if (no) return personal(caller, no); }
+    return personal(caller, takeSpell(caller, tgt, sp, reason));
   }, { admin: true, help: '<#TAG|name> <spell> call:<n>|ticket:<id> (GM) or reason: <why> (Lead GM+): remove a spell from an online player' });
+
+  // The F7 panel's One spell (fork AdminSystem giveSpell / removeSpell, Lead GM and above): the chat commands' rules, the
+  // panel's reason standing as the command line's reason: does. op: 'give' | 'remove'; { ok, text } for the panel's footer
+  globalThis.__dboStaffSpell = (caller, target, op, query, reasonText, force) => {
+    const t = Number(target) >>> 0;
+    const sp = resolveSpell(String(query || '').trim());
+    if (!sp) return { ok: false, text: `Could not find any spell matching '${String(query || '').trim()}'.` };
+    if (!onlineActors().some((x) => (x >>> 0) === t)) return { ok: false, text: 'That player is no longer online.' };
+    const held = op === 'give' ? HELD.get(String(sp.desc || '').toLowerCase()) : undefined;
+    { const no = heldNo(sp, held, force === true); if (no) return { ok: false, text: no }; }
+    const why = String(reasonText || '').trim().slice(0, 200);
+    const g = globalThis.__dboStaffGuard;
+    const no = why && g ? g.withRef(caller, { kind: 'reason', text: why }, () => spellsNo(caller, t)) : spellsNo(caller, t);
+    if (no) return { ok: false, text: no };
+    const tgt = { actor: t, online: true, name: display(t) };
+    const text = op === 'give' ? grantSpell(caller, tgt, sp, held, '') : takeSpell(caller, tgt, sp, '');
+    return { ok: !/^Failed to /.test(text), text };
+  };
 
   log('staffitemspells: loaded (/giveitem, /takeitem, /givespell, /removespell registered; /unstuck stays gamemode.js)');
 };
