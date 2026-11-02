@@ -310,7 +310,13 @@ module.exports = (api) => {
     if (action === 'npcZoneAdd' || action === 'npcZoneDelete' || action === 'npcZoneReset') { let no = ''; try { no = eventZoneRefusal(a, action, info); } catch (e) { no = 'The event zone could not be checked, so nothing was done.'; } if (no) return no; }
     if (!ON) return '';
     if (action === 'assign') return CHAR.enabled && CHAR.clearModes && !exempt(a) && (!isStaffChar(a) || info.changed === true) ? 'clear' : '';
-    if (action === 'housing') return CHAR.enabled && !powersOn(a) ? NOT_HERE : '';
+    // The housing and key-ring staff override (fork HousingSystem; a GM's too from 2 Nov): on a staff character, and, where the
+    // fork names the property's owner (ownerProfile), the selfTarget rule against that owner
+    if (action === 'housing') {
+      if (CHAR.enabled && !powersOn(a)) return NOT_HERE;
+      const pt = Number(info.ownerProfile);
+      return Number.isSafeInteger(pt) && pt > 0 ? target(a, { profile: pt }, 'housing') : '';
+    }
     // A GM fixing the lock of someone's property (fork HousingSystem isLockFixer; Nat, 25 Oct): on a staff character, under
     // the selfTarget rule against the property's owner, and callRef where its kinds name 'lockfix'
     if (action === 'housingLockFix') {

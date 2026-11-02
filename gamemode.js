@@ -1285,16 +1285,18 @@ registerChatCommand('shoutclean', (a, args) => {
   }
   personal(a, `Reconnecting ${targets.filter(granted).length} player(s); they are taught the player shouts again at login.`);
 }, { admin: true, help: '[player|all] who holds the old all-shouts list; reconnect them to clear it' });
-// /grantproperty <player|#TAG> <door id> (Lead GM and up; Nate, 19 Oct: the Mountainwatch mine refused every grant from the
+// /grantproperty <player|#TAG> <door id> (GM and up from 2 Nov, Nat: "allow them to do everything"; never to the staff member's
+// own account; Nate, 19 Oct: the Mountainwatch mine refused every grant from the
 // property panel with "You cannot claim that"): the housing system's own grant, by a door's form id, no panel involved.
 // A door may be "d97a2:BSHeartland.esm" or the hex form id. Its refusal (a cap, not a property) is shown as it is.
 registerChatCommand('grantproperty', (a, args) => {
   const tier = staffTierOf(a);
-  if (!['senior', 'developer', 'leadgm'].includes(tier)) return personal(a, 'Only a Lead GM or above grants a property this way.');
+  if (!['senior', 'developer', 'leadgm', 'gm'].includes(tier)) return personal(a, 'Only a GM or above grants a property this way.');
   const words = String(args || '').trim().split(/\s+/).filter(Boolean);
   if (words.length < 2) return personal(a, 'Use /grantproperty <name or #TAG> <door id>, e.g. /grantproperty #8YDB d97a2:BSHeartland.esm');
   const door = words.pop(); const t = findByName(words.join(' '));
   if (!t) return personal(a, 'No such player online. Use their name or #TAG.');
+  if (profileOf(t) === profileOf(a)) return personal(a, 'Staff tools never hand a property to your own account.');
   let id = 0;
   try { id = /:/.test(door) ? (mp.getIdFromDesc(door) >>> 0) : (parseInt(door, 16) >>> 0); } catch (e) { id = 0; }
   if (!id) return personal(a, `${door} is not a form id I can read.`);
@@ -1322,7 +1324,7 @@ registerChatCommand('grantproperty', (a, args) => {
   audit(`HOUSING ${who(a)} granted ${id.toString(16)} (${door}) to ${who(t)} with /grantproperty`);
   personal(a, `${display(t)} now owns ${door}.`);
   try { personal(t, 'A property has been granted to you by the staff.'); } catch (e) { /* offline */ }
-}, { admin: true, help: '<name or #TAG> <door id> grant a property to a player by its door (Lead GM+)' });
+}, { admin: true, help: '<name or #TAG> <door id> grant a property to a player by its door (GM+)' });
 // Players cannot reopen character creation themselves; an admin does it for them by tag.
 registerChatCommand('chargen', (a, args) => {
   // A Trial GM opens it for their own character only (Nate, 12 Oct); a GM and above for anyone. No name: oneself
