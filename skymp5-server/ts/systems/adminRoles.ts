@@ -9,11 +9,14 @@ const TIER_ORDER: AdminTier[] = ["senior", "developer", "leadgm", "gm"];
 // kill, the Smite and Heal on Hit modes) and the server console. Jake and Nate, 2026-09-27: a GM observes and reports.
 // ban: the panel's bans, temp bans and unbans (Nat, 25 Oct: Lead GMs ban too; the gameplay's staffguard refuses a staff
 // account of the caller's rank or higher). del: deleting a character, kept to Senior and Developer.
-export const TIER_CAPS: Record<AdminTier, { ban: boolean; spawn: boolean; del: boolean }> = {
-  senior: { ban: true, spawn: true, del: true },
-  developer: { ban: true, spawn: true, del: true },
-  leadgm: { ban: true, spawn: true, del: false },
-  gm: { ban: false, spawn: false, del: false },
+// tempBan and eventZones (Nat, 2 Nov): a GM's temp ban up to 72 h and small event zones, held to the gameplay's rules
+// (staffguard.js banRefusal and gmEventZones, discipline.js for an offline #TAG), refused when those are not loaded
+export interface TierCaps { ban: boolean; spawn: boolean; del: boolean; tempBan: boolean; eventZones: boolean }
+export const TIER_CAPS: Record<AdminTier, TierCaps> = {
+  senior: { ban: true, spawn: true, del: true, tempBan: true, eventZones: true },
+  developer: { ban: true, spawn: true, del: true, tempBan: true, eventZones: true },
+  leadgm: { ban: true, spawn: true, del: false, tempBan: true, eventZones: true },
+  gm: { ban: false, spawn: false, del: false, tempBan: true, eventZones: true },
 };
 
 export interface AdminRoleConfig {

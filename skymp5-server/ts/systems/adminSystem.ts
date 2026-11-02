@@ -1,6 +1,6 @@
 import { Settings } from "../settings";
 import { System, Log, SystemContext, Content } from "./system";
-import { AdminTier, AdminRoleConfig, TIER_CAPS, readAdminRoleConfig, adminTierOf, isTrialGm, TRIAL_GM_ACTIONS, TRIAL_GM_MODES, TRIAL_GM_TABS, TRIAL_GM_REQUESTS } from "./adminRoles";
+import { AdminTier, AdminRoleConfig, TIER_CAPS, TierCaps, readAdminRoleConfig, adminTierOf, isTrialGm, TRIAL_GM_ACTIONS, TRIAL_GM_MODES, TRIAL_GM_TABS, TRIAL_GM_REQUESTS } from "./adminRoles";
 import { NpcSpawnSystem } from "./npcSpawnSystem";
 import { MasterySystem } from "./masterySystem";
 import { kickWithReason } from "./kickUtil";
@@ -98,6 +98,8 @@ const BAN_ACTIONS = new Set(["ban", "tempBan", "ipBan", "unban"]);
 const SPAWN_ACTIONS = new Set(["kill", "deleteCharacter", "masteryGrant", "masteryReset", "masterySetTier", "masteryDrop",
   "giveItem", "giveSpells", "giveShouts", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm", "polymorphSelf", "npcZoneAdd", "npcZoneDelete", "npcZoneReset"]);
 const SPAWN_MODES = new Set(["smite", "healhit"]);
+// NPC zone edits a GM may make as small event zones (TIER_CAPS.eventZones), held to the gameplay's gmEventZones rule
+const EVENT_ZONE_ACTIONS = new Set(["npcZoneAdd", "npcZoneDelete", "npcZoneReset"]);
 // Panel actions whose missing target means the staff member themself (resolveTarget)
 const SELF_TARGETED = new Set(["masterySetTier", "masteryDrop", "giveItem", "giveSpells", "giveShouts", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm"]);
 // Give all spells and Give all shouts are batched across ticks and capped.
@@ -529,7 +531,7 @@ export class AdminSystem implements System {
     }
     // A Trial GM goes on as a GM with no ban and no spawn; only what trialMay let through reaches the code below
     const tier = (trial ? "gm" : this.tierOf(mp, myActorId)) as AdminTier;
-    const caps = trial ? { ban: false, spawn: false, del: false } : TIER_CAPS[tier];
+    const caps = trial ? { ban: false, spawn: false, del: false, tempBan: false, eventZones: false } : TIER_CAPS[tier];
 
     let adminProfile = 0;
     try { adminProfile = Number(mp.get(myActorId, "profileId")) || 0; } catch { }
@@ -588,14 +590,20 @@ export class AdminSystem implements System {
 
     // A GM observes and reports: creating or changing things is Lead GM and above (TIER_CAPS.spawn)
     const mode = String(content["mode"] ?? "");
-    if (!caps.spawn && (SPAWN_ACTIONS.has(action) || (action === "toggleMode" && SPAWN_MODES.has(mode)))) {
+    // A GM's event zones pass on to the gameplay's gmEventZones rule (staffguard.js); without it they are refused
+    const gmEventZone = !caps.spawn && caps.eventZones && EVENT_ZONE_ACTIONS.has(action);
+    if (!caps.spawn && !gmEventZone && (SPAWN_ACTIONS.has(action) || (action === "toggleMode" && SPAWN_MODES.has(mode)))) {
       this.adminLog(`profile ${adminProfile} (${tier}) was refused ${action === "toggleMode" ? `the ${mode} mode` : action} (Lead GM and above)`);
       this.reply(mp, userId, false, "That is for a Lead GM and above");
       return;
     }
-    // A Lead GM's bans lean on the gameplay's rank rule (staffguard.js): without it they are refused, never let through
-    if (BAN_ACTIONS.has(action) && tier === "leadgm" && typeof (globalThis as any).__dboAdminGate !== "function") {
-      this.reply(mp, userId, false, "The staff rules are not loaded, so a Lead GM's ban is refused. Try again in a minute.");
+    if (gmEventZone && typeof (globalThis as any).__dboAdminGate !== "function") {
+      this.reply(mp, userId, false, "The staff rules are not loaded, so a GM's event zone is refused. Try again in a minute.");
+      return;
+    }
+    // A Lead GM's bans and a GM's temp ban lean on the gameplay's rank rule (staffguard.js): without it they are refused
+    if (BAN_ACTIONS.has(action) && (tier === "leadgm" || tier === "gm") && typeof (globalThis as any).__dboAdminGate !== "function") {
+      this.reply(mp, userId, false, "The staff rules are not loaded, so the ban is refused. Try again in a minute.");
       return;
     }
     const refused = this.gate(myActorId, action, this.gateInfo(mp, myActorId, action, content, trial));
@@ -661,6 +669,11 @@ export class AdminSystem implements System {
     }
 
     const targetId = parseInt(String(content["target"] ?? ""), 16);
+    const tag = String(content["targetName"] ?? "").trim();
+    if (action === "tempBan" && !targetId && tag) {
+      this.offlineTempBan(mp, userId, myActorId, adminProfile, tier, caps, tag, content);
+      return;
+    }
     // Only currently-online player actors are valid targets; the admin's own row is absent from the roster, but mastery testing may target self
     const target = this.onlinePlayers(mp).find(p => p.actorId === targetId);
     if (!target) {
@@ -706,7 +719,7 @@ export class AdminSystem implements System {
         this.adminLog(`profile ${adminProfile} deleted the character ${target.name} (profile ${target.profileId}, actor ${doomed.toString(16)})`);
         this.reply(mp, userId, true, `Deleted ${target.name}`);
       } else if (action === "ipBan" || action === "tempBan") {
-        if (!caps.ban) { this.reply(mp, userId, false, "Your rank cannot ban players"); return; }
+        if (!caps.ban && !(action === "tempBan" && caps.tempBan)) { this.reply(mp, userId, false, "Your rank cannot ban players"); return; }
         if (target.actorId === myActorId) { this.reply(mp, userId, false, "You cannot ban yourself"); return; }
         const hours = action === "tempBan" ? Number(content["hours"]) : 0;
         if (action === "tempBan" && (!Number.isFinite(hours) || hours <= 0 || hours > 24 * 365)) { this.reply(mp, userId, false, "Pick a ban length between 1 hour and a year"); return; }
@@ -1154,6 +1167,21 @@ export class AdminSystem implements System {
   }
 
   // What the gate is told: the mode, and the online character the action is aimed at (0 when it names none, or a place)
+  // The temp ban of an offline player by #TAG: the gameplay's /tempban (discipline.js __dboPanelTempBan) with its rank rule, a
+  // GM's 72 h and the audit; it answers in the staff member's chat, and is refused when that module is not loaded
+  private offlineTempBan(mp: Mp, userId: number, myActorId: number, adminProfile: number, tier: AdminTier, caps: TierCaps, tag: string, content: Content): void {
+    if (!caps.ban && !caps.tempBan) { this.reply(mp, userId, false, "Your rank cannot ban players"); return; }
+    const run = (globalThis as any).__dboPanelTempBan;
+    if (typeof run !== "function") { this.reply(mp, userId, false, "The discipline rules are not loaded, so the temp ban is refused."); return; }
+    const hours = Number(content["hours"]);
+    let said = "";
+    try { said = String(run(myActorId, tag, hours, String(content["reason"] ?? "")) ?? ""); }
+    catch (e) { this.log(`AdminSystem: offline tempBan by profile ${adminProfile} failed: ${e}`); this.reply(mp, userId, false, "Temp ban failed, see server log"); return; }
+    if (said) { this.reply(mp, userId, false, said); return; }
+    this.adminLog(`profile ${adminProfile} (${tier}) asked for a ${hours}h temp ban on offline ${tag}`);
+    this.reply(mp, userId, true, "Sent: the result is in your chat");
+  }
+
   private gateInfo(mp: Mp, myActorId: number, action: string, content: Content, trial: boolean): Record<string, unknown> {
     let target = 0;
     if (action !== "toggleMode" && action !== "teleportLoc" && action !== "unban" && !action.startsWith("npcZone")) {
@@ -1163,6 +1191,15 @@ export class AdminSystem implements System {
     }
     const info: Record<string, unknown> = { mode: String(content["mode"] ?? ""), target, trial, location: action === "teleportLoc" ? String(content["target"] ?? "") : "" };
     if (action === "tempBan") info["hours"] = Number(content["hours"]);
+    // A temp ban by #TAG for a player who is not online: discipline.js runs it under /tempban's rules
+    if (action === "tempBan" && !target && String(content["targetName"] ?? "").trim()) info["offline"] = true;
+    if (EVENT_ZONE_ACTIONS.has(action)) {
+      info["zoneName"] = String(content["target"] ?? "");
+      if (action === "npcZoneAdd") {
+        try { info["zone"] = JSON.parse(String(content["zone"] ?? "")); } catch { info["zone"] = null; }
+        info["zoneName"] = String((info["zone"] as Record<string, unknown> | null)?.["Name"] ?? "");
+      }
+    }
     // An unban names a ban, not a character: the gate is told whose ban it is and who gave it
     if (action === "unban" && this.bans) {
       const ban = this.bans.list().find((b) => String(b.id) === String(content["target"] ?? ""));
