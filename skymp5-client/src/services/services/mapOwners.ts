@@ -298,14 +298,27 @@ const cellDrawing = (w: OwnersWorld, factions: Record<string, Faction>, reach: n
       i = e;
     }
   }
-  // each stronghold over the holds: its cells already carry its owner's colour (a stronghold wins inside its radius), so it
-  // gets only its edge, a ring a little stronger than a hold's hairline (Nat, 2 Nov: a filled disc read as a grey blot)
+  // each stronghold over the holds: its owner's colour, once, and a ring a little stronger than a hold's hairline. The cells
+  // are the holds' (a stronghold is not in them), so the disc is filled unless every cell whose centre it covers is already
+  // its owner's at full strength: there a fill would tint it twice (Nat, 2 Nov: a grey blot), elsewhere a bare ring left
+  // it uncoloured on the paper
   for (const sh of w.strongholds || []) {
     const o = ownerAt({ world: w.world, aliases: w.aliases, territories: ts, strongholds: [sh] }, sh.x, sh.y);
-    const rgb = o ? colour(ts[o.t].owner) : null;
+    const owner = o ? ts[o.t].owner : null;
+    const rgb = owner ? colour(owner) : null;
     if (!rgb) continue;
     const ring: Pt[] = [];
     for (let k = 0; k <= CIRCLE_SIDES; k++) { const a = (k / CIRCLE_SIDES) * Math.PI * 2; ring.push([sh.x + sh.r * Math.cos(a), sh.y + sh.r * Math.sin(a)]); }
+    const under: number[] = [];
+    for (let cx = Math.floor((sh.x - sh.r) / S); cx <= Math.floor((sh.x + sh.r) / S); cx++) {
+      for (let cy = Math.floor((sh.y - sh.r) / S); cy <= Math.floor((sh.y + sh.r) / S); cy++) {
+        const i = cx - t.c0, j = t.c0 + n - 1 - cy;
+        if (i < 0 || j < 0 || i >= n || j >= n || Math.hypot((cx + 0.5) * S - sh.x, (cy + 0.5) * S - sh.y) > sh.r) continue;
+        under.push(j * n + i);
+      }
+    }
+    const tinted = under.length > 0 && under.every((k) => own[k] >= 0 && ts[own[k]].owner === owner && lvl[k] === 2);
+    if (!tinted) fills.push({ rgb: rgbOf(rgb), alpha: tint, pts: flat(ring) });
     lines.push({ rgb: rgbOf(darker(rgb)), alpha: RING_ALPHA, pts: flat(ring) });
   }
   return { fills, lines, owners: Array.from(new Set(ts.map((x) => x.owner))) };
