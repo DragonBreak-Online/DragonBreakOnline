@@ -56,11 +56,12 @@ module.exports = (api) => {
     };
   };
   // The bonus the server adds to the maximum: the spent points plus the race's and the sign's flat bonus (racial.js, the
-  // Half-Giant's +50 health, the Atronach's +25 magicka) and a Briarheart's (briarheart.js)
+  // Half-Giant's +50 health, the Atronach's +25 magicka), a Briarheart's (briarheart.js) and an event boss's (bossvitals.js)
   const avBonus = (a, spent) => {
     let r = { health: 0 }; try { if (typeof globalThis.__dboRaceVitalBonus === 'function') r = globalThis.__dboRaceVitalBonus(a) || r; } catch (e) { /* none */ }
     let b = { health: 0 }; try { if (typeof globalThis.__dboBriarheartVitalBonus === 'function') b = globalThis.__dboBriarheartVitalBonus(a) || b; } catch (e) { /* none */ }
-    return { health: (Number(spent.health) || 0) + (Number(r.health) || 0) + (Number(b.health) || 0), magicka: (Number(spent.magicka) || 0) + (Number(r.magicka) || 0), stamina: (Number(spent.stamina) || 0) + (Number(r.stamina) || 0) };
+    let v = { health: 0 }; try { if (typeof globalThis.__dboBossVitalBonus === 'function') v = globalThis.__dboBossVitalBonus(a) || v; } catch (e) { /* none */ }
+    return { health: (Number(spent.health) || 0) + (Number(r.health) || 0) + (Number(b.health) || 0) + (Number(v.health) || 0), magicka: (Number(spent.magicka) || 0) + (Number(r.magicka) || 0) + (Number(v.magicka) || 0), stamina: (Number(spent.stamina) || 0) + (Number(r.stamina) || 0) + (Number(v.stamina) || 0) };
   };
   const save = (a, st) => {
     st.per = CFG.perLevel;

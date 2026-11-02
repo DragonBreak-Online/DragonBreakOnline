@@ -3745,6 +3745,8 @@ globalThis.__dboHandlers.disconnect = (userId) => {
   // Logging out inside a dungeon would put them back inside it next time, in a claim that is not theirs
   if (a && globalThis.__dboDungeonLeave) { try { globalThis.__dboDungeonLeave(a); } catch (e) { log('dungeon logout move failed', e.message); } }
   if (a && globalThis.__dboPartyLogout) { try { globalThis.__dboPartyLogout(a); } catch (e) { log('party logout failed', e.message); } }
+  // An event boss's raised vitals end with the session unless kept (bossvitals.js)
+  if (a && globalThis.__dboBossVitalsLeave) { try { globalThis.__dboBossVitalsLeave(a); } catch (e) { log('boss vitals logout reset failed', e.message); } }
   // What a UI said it can draw, and a deity offer already made, belong to this session (review C6, PRAY-1)
   for (const k of ['__dboWarbandLeave', '__dboItemLeave', '__dboBankLeave', '__dboRobLeave', '__dboSilverTestLeave', '__dboDeityForget', '__dboPanelLeave', '__dboManualsLeave', '__dboLabourLeave', '__dboPrayerLeave', '__dboSkinLeave', '__dboSchoolsLeave', '__dboKeyRingLeave', '__dboRacialLeave', '__dboStartLeave', '__dboBirthsignLeave']) { if (a && typeof globalThis[k] === 'function') { try { globalThis[k](a); } catch (e) { log(`${k} failed`, e.message); } } }
   // A duel ends with its duellist's logout (duel.js)
@@ -10600,6 +10602,13 @@ try {
   delete require.cache[BRIARHEART_JS];
   require(BRIARHEART_JS)({ mp, log, personal, audit, who, display, cfg, registerChatCommand, onlineActors, isLeadStaff, findByName, every, giveItem, sourceResistsOf, recordOf });
 } catch (e) { log('briarheart.js failed to load:', e.stack || e.message); for (const k of ['__dboIsBriarheart', '__dboIsForsworn', '__dboBriarheartVitalBonus', '__dboBriarheartTargetMult', '__dboBriarheartRefusesDivine', '__dboBriarheartFaithLock', '__dboBriarheartLogin', '__dboBriarheartMenuEntries', '__dboBriarheartMenuAction', '__dboBriarheartEquip', '__dboBriarheartActivate', '__dboBriarheartSpares']) globalThis[k] = null; }
+// ---- event bosses' raised vitals (server\bossvitals.js, config "bossVitals"; Nat, 2 Nov): /vitals and the F7 Players tab's
+// Vitals row. charlevel.js adds the raise to private.dboAvBonus; warband.js resets it when the event ends ----
+try {
+  const BOSSVITALS_JS = path.resolve('bossvitals.js');
+  delete require.cache[BOSSVITALS_JS];
+  require(BOSSVITALS_JS)({ mp, log, personal, audit, who, display, registerChatCommand, findByName, staffTierOf, isLeadStaff, every, cfg, onlineActors, onUi });
+} catch (e) { log('bossvitals.js failed to load:', e.stack || e.message); for (const k of ['__dboBossVitalBonus', '__dboBossVitalsLeave', '__dboBossVitalsEventEnd']) globalThis[k] = null; }
 // ---- the Hagraven's pact for the women of the Reach (server\hagraven.js, config "hagraven"): after briarheart.js (its altars)
 // and exposure.js (known on sight) ----
 try {

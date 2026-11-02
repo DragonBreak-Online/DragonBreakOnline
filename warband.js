@@ -901,6 +901,8 @@ module.exports = (api) => {
 
   const endEvent = (ev, byText, outcome, why) => {
     const n = sweepEvent(ev, why);
+    // An event boss's raised vitals go with it unless kept (bossvitals.js)
+    try { if (typeof globalThis.__dboBossVitalsEventEnd === 'function') globalThis.__dboBossVitalsEventEnd(ev.id); } catch (e) { log(`warband: event ${ev.id} boss vitals not reset`, e.message); }
     // The NPC zones added for it in the F7 NPC Zones tab go with it (staffguard.js)
     let zones = [];
     try { zones = typeof globalThis.__dboEventZonesEnd === 'function' ? globalThis.__dboEventZonesEnd(ev.id) || [] : []; } catch (e) { log(`warband: event ${ev.id} zones not removed`, e.message); }
@@ -948,6 +950,15 @@ module.exports = (api) => {
   const byId = (id) => S.events.get(String(id || '').toLowerCase()) || null;
   // staffguard.js: the F7 NPC Zones tab adds a zone only for the adder's open event
   globalThis.__dboWarbandEventOf = (a) => { loadEvents(); return myEvent(a); };
+  // bossvitals.js: the open event (draft or running) whose area the actor stands in, and whether an event is still open
+  globalThis.__dboWarbandEventAt = (a) => {
+    loadEvents();
+    let world = '', pos = null;
+    try { world = String(mp.get(a >>> 0, 'worldOrCellDesc') || ''); pos = mp.getActorPos(a >>> 0); } catch (e) { return null; }
+    if (!world || !Array.isArray(pos)) return null;
+    return running().find((ev) => ev.place && ev.place.world === world && Math.hypot(pos[0] - ev.place.pos[0], pos[1] - ev.place.pos[1], pos[2] - ev.place.pos[2]) <= ev.place.radius) || null;
+  };
+  globalThis.__dboWarbandEventOpen = (id) => { loadEvents(); const ev = byId(id); return !!ev && ev.state !== 'ended'; };
   const running = () => Array.from(S.events.values()).filter((ev) => ev.state !== 'ended');
 
   // ---- the change-form census, and orphaned raiders ---------------------------------------------
