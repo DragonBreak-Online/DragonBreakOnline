@@ -152,7 +152,7 @@ module.exports = (api) => {
   // 1. /giveitem
   registerChatCommand('giveitem', (caller, args) => {
     if (!isLeadStaff(caller) && !isAdmin(caller)) {
-      return personal(caller, 'Only a Lead GM or above manages player items.');
+      return personal(caller, 'Only staff (GM and above) manage player items.');
     }
     const raw = String(args || '').trim();
     if (!raw) return personal(caller, 'Usage: /giveitem <#TAG|name> <item name or id> [count] [ticket:<id>]');
@@ -209,12 +209,12 @@ module.exports = (api) => {
         return personal(caller, `Failed to queue offline gift: ${err.message}`);
       }
     }
-  }, { admin: true, help: '<#TAG|name> <item> [count] [ticket:<id>]: give an item to a player (online or offline)' });
+  }, { admin: true, help: '<#TAG|name> <item> [count] [ticket:<id>]: give an item to a player, online or offline (GM and above)' });
 
   // 2. /takeitem
   registerChatCommand('takeitem', (caller, args) => {
     if (!isLeadStaff(caller) && !isAdmin(caller)) {
-      return personal(caller, 'Only a Lead GM or above manages player items.');
+      return personal(caller, 'Only staff (GM and above) manage player items.');
     }
     const raw = String(args || '').trim();
     if (!raw) return personal(caller, 'Usage: /takeitem <#TAG|name> <item name or id> [count] [ticket:<id>]');
@@ -264,7 +264,7 @@ module.exports = (api) => {
     } catch (e) {
       return personal(caller, `Failed to take item: ${e.message}`);
     }
-  }, { admin: true, help: '<#TAG|name> <item> [count] [ticket:<id>]: take an item from an online player' });
+  }, { admin: true, help: '<#TAG|name> <item> [count] [ticket:<id>]: take an item from an online player (GM and above)' });
 
   // A single spell given or taken by staff (kind "spells"): a GM or Trial GM needs a GM call or ticket (call:<n> / ticket:<id>), a
   // Lead GM or above a short reason (reason: <why>) instead, audited and sent to the staff log (the Leader, 1 Nov). staffguard.js
@@ -276,7 +276,7 @@ module.exports = (api) => {
   // 3. /givespell
   registerChatCommand('givespell', (caller, args) => {
     if (!isLeadStaff(caller) && !isAdmin(caller)) {
-      return personal(caller, 'Only a Lead GM or above manages player spells.');
+      return personal(caller, 'Only staff (GM and above) manage player spells.');
     }
     const raw = String(args || '').trim();
     if (!raw) return personal(caller, 'Usage: /givespell <#TAG|name> <spell name or id> call:<n> | ticket:<id> | reason: <why> (Lead GM+)');
@@ -321,7 +321,7 @@ module.exports = (api) => {
   // 4. /removespell
   registerChatCommand('removespell', (caller, args) => {
     if (!isLeadStaff(caller) && !isAdmin(caller)) {
-      return personal(caller, 'Only a Lead GM or above manages player spells.');
+      return personal(caller, 'Only staff (GM and above) manage player spells.');
     }
     const raw = String(args || '').trim();
     if (!raw) return personal(caller, 'Usage: /removespell <#TAG|name> <spell name or id> call:<n> | ticket:<id> | reason: <why> (Lead GM+)');

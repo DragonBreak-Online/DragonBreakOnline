@@ -20,8 +20,12 @@
 //
 // gamemode-config.json "staffPowers": { enabled, exemptTiers, exemptProfiles, seedTags, seedMissing, staffCharOnly: { enabled,
 // rights, commands, panelAllowed, kinds, clearModes }, selfTarget: { enabled, staffNeedsLead }, callRef: { enabled, commands, kinds,
-// bindMinutes }, trialLimits: { enabled } }. Each switch off and a hot reload undoes its rule.
+// bindMinutes }, trialLimits: { enabled }, gmEventZones: { maxNpcs, cooldownSeconds, maxZones, systemPrefixes } }. Each switch off
+// and a hot reload undoes its rule. gmEventZones and the ban rule apply whatever the switches say.
 'use strict';
+
+const fs = require('fs');
+const path = require('path');
 
 module.exports = (api) => {
   const { mp, log, audit, who, display, personal, profileOf, tierOf, staffTierOf, isLeadStaff, staffCharOf,
@@ -54,6 +58,9 @@ module.exports = (api) => {
     leadExemptKinds: ['faction', 'spells'],
   });
   const TRIAL = part('trialLimits', { enabled: true });
+  // A GM's event spawns from the F7 NPC Zones tab (Nat, 2 Nov): a few NPCs a zone, a cooldown, a cap on zones held, never a
+  // system zone, and only their own zones to delete or reset. Lead GM and above are not limited here
+  const EVENTS = part('gmEventZones', { maxNpcs: 5, cooldownSeconds: 30, maxZones: 6, systemPrefixes: ['wild:', 'guard:', 'boss:', 'dungeon:', 'placed:'] });
   const EXEMPT_TIERS = new Set(Array.isArray(RAW.exemptTiers) ? RAW.exemptTiers.map(String) : ['senior']);
   const EXEMPT_PROFILES = new Set((Array.isArray(RAW.exemptProfiles) ? RAW.exemptProfiles : []).map(Number).filter(Number.isFinite));
   // The staff characters named by the review of 23 Oct; /staffchar seed marks them once
@@ -198,6 +205,12 @@ module.exports = (api) => {
   const GM_BAN_HOURS = 24 * Math.min(Number(disc.gmMaxSuspendDays) > 0 ? Number(disc.gmMaxSuspendDays) : 3,
     Number(disc.maxSuspendDays) > 0 ? Number(disc.maxSuspendDays) : 30);
   const banRefusal = (a, action, info) => {
+    // A panel temp ban by #TAG for an offline player (fork offlineTempBan): discipline.js __dboPanelTempBan runs /tempban, whose
+    // rank rule and GM cap are these, so only "is this staff" is asked here
+    if (action === 'tempBan' && info.offline === true && !(Number(info.target) > 0)) {
+      let tier = null; try { tier = tierOf(a); } catch (e) { tier = null; }
+      return tier === null ? 'Only staff ban players.' : '';
+    }
     const t = Number(info.target) >>> 0;
     let no = 'unknown';
     try { no = t && typeof api.rankRefusal === 'function' ? api.rankRefusal(a, t) : 'unknown'; } catch (e) { log('staffguard: rank rule failed', e.message); no = 'unknown'; }
@@ -214,6 +227,42 @@ module.exports = (api) => {
     }
     return '';
   };
+  // gm-event-zones.json: { <zone name>: { profile, at } } for the zones GMs added, so each deletes or resets only their own
+  const EZ_FILE = path.resolve('gm-event-zones.json');
+  const ezRead = () => { if (!S.eventZones) { try { S.eventZones = JSON.parse(fs.readFileSync(EZ_FILE, 'utf8')) || {}; } catch (e) { S.eventZones = {}; } } return S.eventZones; };
+  const ezSave = () => { try { fs.writeFileSync(EZ_FILE + '.tmp', JSON.stringify(ezRead(), null, 1)); fs.renameSync(EZ_FILE + '.tmp', EZ_FILE); } catch (e) { log('staffguard: gm-event-zones.json write failed', e.message); } };
+  if (!(S.eventAt instanceof Map)) S.eventAt = new Map();
+  const eventZoneRefusal = (a, action, info) => {
+    let tier = null; try { tier = tierOf(a); } catch (e) { tier = null; }
+    if (tier === null) return 'NPC zones are for a GM and above.';
+    if (tier !== 'gm') return '';
+    const me = pidOf(a);
+    const zones = ezRead();
+    if (action === 'npcZoneAdd') {
+      const z = info.zone && typeof info.zone === 'object' ? info.zone : null;
+      if (!z) return 'The zone could not be read, so it was not added.';
+      const name = String(z.Name || '');
+      if (!name || (EVENTS.systemPrefixes || []).some((p) => name.toLowerCase().startsWith(String(p).toLowerCase()))) return 'A GM names an event zone of their own; system zones (wild:, guard:, boss:, dungeon:, placed:) are for a Lead GM and above.';
+      if (zones[name] && zones[name].profile !== me) return 'Another GM holds a zone by that name. Pick another name.';
+      const npcs = (Array.isArray(z.NPC) ? z.NPC : []).reduce((n, e) => n + Math.max(0, Number(e && e.count) || 0), 0);
+      if (npcs < 1) return 'The zone names no NPCs.';
+      if (npcs > EVENTS.maxNpcs) return `A GM's event zone spawns at most ${EVENTS.maxNpcs} NPCs; this one has ${npcs}. Ask a Lead GM for more.`;
+      const held = Object.keys(zones).filter((k) => zones[k].profile === me && k !== name).length;
+      if (held >= EVENTS.maxZones) return `You hold ${held} event zones, the most a GM holds at once. Delete one first.`;
+      const left = (S.eventAt.get(me) || 0) + EVENTS.cooldownSeconds * 1000 - Date.now();
+      if (left > 0) return `One event zone every ${EVENTS.cooldownSeconds} s: try again in ${Math.ceil(left / 1000)} s.`;
+      S.eventAt.set(me, Date.now());
+      zones[name] = { profile: me, at: Date.now() }; ezSave();
+      audit(`GMEVENTZONE ${who(a)} added '${name}' with ${npcs} NPC(s)`);
+      return '';
+    }
+    const name = String(info.zoneName || '');
+    if (!zones[name] || zones[name].profile !== me) return 'A GM deletes or resets only the event zones they added. Ask a Lead GM.';
+    if (action === 'npcZoneDelete') { delete zones[name]; ezSave(); }
+    audit(`GMEVENTZONE ${who(a)} ${action === 'npcZoneDelete' ? 'deleted' : 'reset'} '${name}'`);
+    return '';
+  };
+
   const adminGate = (a, action, info) => {
     a = Number(a) >>> 0; info = info || {};
     // The fork lets an action through when this throws, so the ban rule answers for itself
@@ -235,6 +284,7 @@ module.exports = (api) => {
       if (no) return no;
     }
     if (BAN_ACTIONS.has(action)) { let no = ''; try { no = banRefusal(a, action, info); } catch (e) { no = 'The ban could not be checked, so it was not given.'; } if (no) return no; }
+    if (action === 'npcZoneAdd' || action === 'npcZoneDelete' || action === 'npcZoneReset') { let no = ''; try { no = eventZoneRefusal(a, action, info); } catch (e) { no = 'The event zone could not be checked, so nothing was done.'; } if (no) return no; }
     if (!ON) return '';
     if (action === 'assign') return CHAR.enabled && CHAR.clearModes && !exempt(a) && (!isStaffChar(a) || info.changed === true) ? 'clear' : '';
     if (action === 'housing') return CHAR.enabled && !powersOn(a) ? NOT_HERE : '';

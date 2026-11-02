@@ -298,6 +298,16 @@ module.exports = (api) => {
   alias('tempban', 'suspend', '<12h|3d> <reason>', '#TAG <12h|3d> <reason>: suspend the account for a time; logged out and refused at login until it ends (GM up to 3d, Lead GM+ up to 30d)');
   alias('unban', 'lift', '<reason>', '#TAG <reason>: end a ban or a suspension early (Lead GM+)');
   registerChatCommand('bans', (a) => command(a, 'list', 'bans'), { admin: true, help: 'every ban and suspension still running' });
+  // The F7 panel's temp ban by #TAG, for a player who is offline (fork AdminSystem, 2 Nov): /tempban's own rules and audit,
+  // its answer in the staff member's chat
+  globalThis.__dboPanelTempBan = (a, tag, hours, reason) => {
+    const t = String(tag || '').trim();
+    const h = Math.round(Number(hours));
+    if (!/^#?[A-Za-z0-9]{4}$/.test(t)) return 'Give the player\'s #TAG.';
+    if (!(h >= 1)) return 'Give a length in hours.';
+    command(a, [t.startsWith('#') ? t : `#${t}`, 'suspend', `${h}h`, String(reason || '').trim()].join(' '), 'tempban');
+    return '';
+  };
 
   // Actions decided outside the game (config record, see the head of this file), each added once by its key
   const byKey = (k) => { for (const [p, list] of Object.entries(D.profiles)) { const e = list.find((x) => x.key === k); if (e) return { p: Number(p), e }; } return null; };

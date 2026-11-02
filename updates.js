@@ -7,7 +7,8 @@
 // its summary: the fork commits since the last one and the patch notes published since.
 //
 // Staff: /update shows what is live and what waits on GitHub. /schedule restart|shutdown|update <when> <reason> sets one up
-// (senior and developer tiers; a reason is required); players are warned as it nears; at the time it claims game-server
+// (senior and developer tiers; a reason is required; a Lead GM may schedule or cancel a restart only, at least 10 minutes
+// ahead, 2 Nov); players are warned as it nears; at the time it claims game-server
 // in the ops ledger (waiting if another operator holds it), logs itself with how to undo it, and then runs:
 //   restart   systemctl restart skymp
 //   shutdown  systemctl stop skymp (someone with the host starts it again: systemctl start skymp)
@@ -23,7 +24,7 @@ module.exports = (api) => {
   const { log, personal, audit, who, onlineActors, every, once, registerChatCommand, isAdmin, tierOf, sayAll, token, channelId, cfg } = api;
   const C = Object.assign({ enabled: true, repo: '/opt/alduinak', news: '/opt/alduinak/skymp5-backend/data/news.live.json',
     files: '/opt/alduinak/skymp5-backend/data/files-version.json', ops: '/opt/dragonbreak-ops/ops', holdFile: '/opt/skymp-dev-hold',
-    forceFile: '/opt/skymp-force-update', tiers: ['senior', 'developer'], warnMinutes: [60, 30, 15, 10, 5, 2, 1], minReason: 5, maxHours: 24 * 14 },
+    forceFile: '/opt/skymp-force-update', tiers: ['senior', 'developer'], restartTiers: ['leadgm'], leadMinMinutes: 10, warnMinutes: [60, 30, 15, 10, 5, 2, 1], minReason: 5, maxHours: 24 * 14 },
   cfg.updates || {});
   const LOG_FILE = path.resolve('update-log.json');
   const SCHED_FILE = path.resolve('schedule.json');
@@ -107,6 +108,7 @@ module.exports = (api) => {
   // ---- schedules -----------------------------------------------------------------------------------
   const schedules = () => { const s = readJson(SCHED_FILE, { next: 1, list: [] }); if (!Array.isArray(s.list)) s.list = []; return s; };
   const may = (a) => isAdmin(a) && C.tiers.includes(tierOf(a));
+  const mayRestart = (a) => isAdmin(a) && C.restartTiers.includes(tierOf(a));
   const fmt = (ms) => new Date(ms).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
   const inWords = (ms) => { const m = Math.max(0, Math.round(ms / 60000)); return m >= 120 ? `${Math.round(m / 60)} hours` : m >= 2 ? `${m} minutes` : m === 1 ? '1 minute' : 'moments'; };
   const WHAT = { restart: 'restart', shutdown: 'shut down', update: 'update and restart' };
@@ -227,11 +229,15 @@ module.exports = (api) => {
       for (const e of open) personal(a, `#${e.id} ${e.kind} at ${fmt(e.at)} (in ${inWords(e.at - Date.now())}) by ${e.by}: ${e.reason}`);
       return;
     }
-    if (!may(a)) return personal(a, 'Scheduling is for senior and developer staff.');
+    // A Lead GM schedules and cancels restarts only, at least leadMinMinutes ahead, on the same warned countdown
+    const lead = !may(a) && mayRestart(a);
+    if (!may(a) && !lead) return personal(a, 'Scheduling is for senior and developer staff, and restarts for Lead GMs.');
+    if (lead && kind !== 'cancel' && kind !== 'restart') return personal(a, `A Lead GM schedules restarts only; a ${kind} is for senior and developer staff.`);
     if (kind === 'cancel') {
       const id = parseInt(words[1], 10);
       const e = book.list.find((x) => x.id === id && !x.done && !x.cancelled);
       if (!e) return personal(a, 'No open schedule has that number. /schedule list');
+      if (lead && e.kind !== 'restart') return personal(a, `#${e.id} is a ${e.kind}; a Lead GM cancels restarts only.`);
       e.cancelled = true; writeJson(SCHED_FILE, book);
       audit(`SCHEDULE #${e.id} ${e.kind} CANCELLED by ${who(a)}`);
       if ((e.warned || []).length) sayAll(`The ${e.kind} is called off.`);
@@ -241,6 +247,7 @@ module.exports = (api) => {
     const when = parseWhen(words.slice(1));
     if (!when || !Number.isFinite(when.at)) return personal(a, 'When? now, 30m, 2h, 1h30m, at 04:00, or at 2026-09-26 04:00 (UTC).');
     if (when.at - Date.now() > C.maxHours * 3600000) return personal(a, `That is too far ahead; at most ${Math.round(C.maxHours / 24)} days.`);
+    if (lead && when.at - Date.now() < C.leadMinMinutes * 60000) return personal(a, `A Lead GM's restart gives players at least ${C.leadMinMinutes} minutes' warning: ${C.leadMinMinutes}m or later.`);
     const reason = words.slice(1 + when.used).join(' ').trim();
     if (reason.length < C.minReason) return personal(a, 'A reason is required: it is shown to players and kept in the log.');
     if (kind === 'update') {
@@ -252,7 +259,7 @@ module.exports = (api) => {
     book.list.push(e); writeJson(SCHED_FILE, book);
     audit(`SCHEDULE #${e.id} ${kind} at ${fmt(e.at)} set by ${who(a)}: ${e.reason}`);
     personal(a, `Scheduled #${e.id}: ${kind} at ${fmt(e.at)} (in ${inWords(e.at - Date.now())}). Players are warned as it nears. /schedule cancel ${e.id} to call it off.`);
-  }, { admin: true, help: 'restart|shutdown|update <when> <reason> | list | cancel <n>: planned restarts, with a reason (senior and developer staff)' });
+  }, { admin: true, help: 'restart|shutdown|update <when> <reason> | list | cancel <n>: planned restarts, with a reason (senior and developer staff; restarts 10m+ ahead for Lead GMs)' });
 
   return { logVersion, parseWhen, execute };
 };

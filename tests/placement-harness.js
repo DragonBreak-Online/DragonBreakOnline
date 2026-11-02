@@ -18,8 +18,8 @@ fs.mkdirSync(path.join(dir, 'state', 'world'), { recursive: true });
 fs.symlinkSync(path.join(dir, 'state', 'world'), path.join(dir, 'world'), 'dir');
 const REG = path.join(dir, 'state', 'placements.json');
 fs.writeFileSync('admin-placeables.json', JSON.stringify({ categories: [
-  { id: 'NPCs', label: 'NPCs', kind: 'npc', items: [['1e80e:Dragonborn.esm', 'Bandit', 'Dragonborn.esm']] },
-  { id: 'Crafting Stations', label: 'Crafting Stations', kind: 'object', items: [['bbcf1:Skyrim.esm', 'Blacksmith Forge', 'Skyrim.esm'], ['ef052:Skyrim.esm', 'Explorer Chest', 'Skyrim.esm']] },
+  { id: 'NPCs', label: 'NPCs', kind: 'npc', items: [['1e80e:Dragonborn.esm', 'Bandit', 'Dragonborn.esm']] }, // verify-formids: ignore (a Place catalog row, not an inventory item)
+  { id: 'Crafting Stations', label: 'Crafting Stations', kind: 'object', items: [['bbcf1:Skyrim.esm', 'Blacksmith Forge', 'Skyrim.esm'], ['ef052:Skyrim.esm', 'Explorer Chest', 'Skyrim.esm']] }, // verify-formids: ignore (Place catalog rows)
   // Kept out of the whole-catalog packet, reachable through the search; 150 rows so a search needs two pages
   { id: 'Statics', label: 'Statics', kind: 'object', items: Array.from({ length: 150 }, (_, i) => [(0x5000 + i).toString(16) + ':Skyrim.esm', `Banner Red ${i}`, i < 100 ? 'Skyrim.esm' : 'Dawnguard.esm']) },
 ] }));
@@ -68,7 +68,7 @@ reset(); ui.placeObject(PLAYER, ['1e80e:Dragonborn.esm', 'npc', [1000, 2100, 300
 check('a player cannot place', !calls.some((c) => c[0] === 'PlaceAtMe') && /REFUSED/.test(out.audit[0]));
 check('the refusal is in the server log', /placeObject 1e80e:Dragonborn.esm npc from .* refused: not an admin/.test(out.log.join('\n')), out.log[0]);
 
-reset(); ui.placeObject(GM, ['dead:Nope.esp', 'npc', [1000, 2100, 300], 90, true]);
+reset(); ui.placeObject(GM, ['dead:Nope.esp', 'npc', [1000, 2100, 300], 90, true]); // verify-formids: ignore (an unknown plugin on purpose)
 check('something outside the catalog is refused', !calls.some((c) => c[0] === 'PlaceAtMe') && /catalog/.test(out.personal[0]), out.personal[0]);
 
 reset(); ui.placeObject(GM, ['1e80e:Dragonborn.esm', 'npc', [1000, 9000, 300], 90, true]);
@@ -202,6 +202,21 @@ globalThis.__dboPlacement.registry.push(Object.assign({}, mine, { id: 'ff0008aa'
 set(0xff0008aa, 'private.dboPlaced', { base: mine.base, kind: 'object', by: 9 });
 reset(); ui.placeDelete(GM, ['ff0008aa']);
 check('a Lead GM may not remove another GM\'s placement', !calls.some((c) => c[0] === 'Delete') && /Another GM placed that/.test(out.personal[0]), out.personal[0]);
+// ...except inside a player's claimed property (decor.js __dboOwnedPlaceAt; 2 Nov)
+globalThis.__dboOwnedPlaceAt = (cell) => String(cell).toLowerCase() === String(mine.where).toLowerCase();
+TIERS[GM] = 'gm';
+reset(); ui.placeDelete(GM, ['ff0008aa']);
+check('...a GM may not, even inside a player\'s property', !calls.some((c) => c[0] === 'Delete') && /Another GM placed that/.test(out.personal[0]), out.personal[0]);
+TIERS[GM] = 'leadgm';
+globalThis.__dboOwnedPlaceAt = () => { throw new Error('decor not ready'); };
+reset(); ui.placeDelete(GM, ['ff0008aa']);
+check('...a property check that fails counts as outside (closed)', !calls.some((c) => c[0] === 'Delete'), out.personal[0]);
+globalThis.__dboOwnedPlaceAt = (cell) => String(cell).toLowerCase() === String(mine.where).toLowerCase();
+reset(); ui.placeDelete(GM, ['ff0008aa']);
+check('a Lead GM may remove another GM\'s placement inside a player\'s property, audited', calls.some((c) => c[0] === 'Delete' && c[1] === 0xff0008aa) && out.audit.some((t) => /ff0008aa/.test(t)), out.audit);
+delete globalThis.__dboOwnedPlaceAt;
+globalThis.__dboPlacement.registry.push(Object.assign({}, mine, { id: 'ff0008aa', by: 9 }));
+set(0xff0008aa, 'private.dboPlaced', { base: mine.base, kind: 'object', by: 9 });
 reset(); ui.placeDelete(GM, [mine.id]);
 check('a Lead GM may remove their own', calls.some((c) => c[0] === 'Delete'));
 TIERS[GM] = 'developer';
@@ -271,7 +286,7 @@ check('undoing a placement that is already gone says so', /already gone/.test(ou
 // ---- drop 2d: sets ----
 const SETS = path.join(dir, 'state', 'placement-sets.json');
 // In a cell of their own, away from what the tests above left placed
-set(GM, 'worldOrCellDesc', 'beef:Skyrim.esm'); set(GM, 'pos', [1000, 2000, 300]);
+set(GM, 'worldOrCellDesc', 'beef:Skyrim.esm'); set(GM, 'pos', [1000, 2000, 300]); // verify-formids: ignore (a made-up cell on purpose)
 reset(); ui.placeObject(GM, ['bbcf1:Skyrim.esm', 'object', [1100, 2000, 300], 30, false]);
 reset(); ui.placeObject(GM, ['1e80e:Dragonborn.esm', 'npc', [1000, 2150, 300], 90, true]);
 reset(); ui.placeObject(GM, ['bbcf1:Skyrim.esm', 'object', [1000, 5000, 300], 0, false]);   // 43 m away: outside a 20 m set

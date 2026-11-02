@@ -129,6 +129,18 @@ const evByName = (name) => {
 reset();
 let W = load({ eventsMax: 2, eventMinutes: 60, eventRetirePerTick: 2 });
 check('the /event command is registered', !!W.commands.event);
+// One /event (2 Nov): a word that is not an event subcommand is an announcement, handed to stafftools.js
+{
+  const announced = [];
+  globalThis.__dboEventAnnounce = (a, text) => announced.push([a, text]);
+  W.commands.event(GM1, 'Wolves gather at the Bruma gate');
+  check('/event <text> goes to the announcement (stafftools.js), not the event manager', announced.length === 1 && announced[0][1] === 'Wolves gather at the Bruma gate' && !eventsFile(), announced);
+  W.commands.event(GM1, 'list');
+  check('...while /event list still lists events', announced.length === 1 && /No event is running/.test(lastSaid()), lastSaid());
+  delete globalThis.__dboEventAnnounce;
+  W.commands.event(GM1, 'A second announcement');
+  check('...and without stafftools.js loaded it says so rather than failing', /Event announcements are not loaded/.test(lastSaid()), lastSaid());
+}
 check('no new mp.on: the module loaded with an api that has none', !('on' in W.api));
 check('the watchdog is one named timer, so a reload replaces it', W.timers.warbandEvents
   && W.timers.warbandEvents.ms === 1000, W.timers.warbandEvents && W.timers.warbandEvents.ms);
