@@ -807,6 +807,18 @@ void MpObjectReference::SetPrimitive(const NiPoint3& boundsDiv2,
 
 void MpObjectReference::UpdateHoster(uint32_t newHosterId)
 {
+  // Whether the SERVER drives this one itself: read from the change-form tag,
+  // sent beside isHostedByOther so the two change in the same message loop and
+  // at the same instant. That is the whole reason it lives here rather than
+  // travelling in the movement data - a player taking the actor over in a
+  // fight clears it as part of the same hand-over, with no window where a
+  // client still believes the server is driving it. It is a property rather
+  // than a new message field because the binary wire is positional: a new
+  // field would bump kMessagingProtocolVersion and lock out every old client.
+  const bool serverDriven =
+    GetDynamicFields().GetValueDump("private.dboServerHost") == "true";
+  auto drivenMsg = CreatePropertyMessage_(this, "isServerDriven",
+                                          serverDriven ? "true" : "false");
   auto hostedMsg = CreatePropertyMessage_(this, "isHostedByOther", "true");
   auto notHostedMsg = CreatePropertyMessage_(this, "isHostedByOther", "false");
   // Players only, each told directly. An NPC listener has no user:
@@ -820,6 +832,7 @@ void MpObjectReference::UpdateHoster(uint32_t newHosterId)
     if (listener->GetUserId() == Networking::InvalidUserId) {
       continue;
     }
+    listener->SendToUser(drivenMsg, true);
     if (newHosterId != 0 && newHosterId != listener->GetFormId()) {
       listener->SendToUser(hostedMsg, true);
     } else {

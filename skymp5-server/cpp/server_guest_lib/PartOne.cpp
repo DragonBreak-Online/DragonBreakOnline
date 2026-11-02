@@ -1292,11 +1292,30 @@ void PartOne::Init()
     // sight (formView.ts's first re-host trigger has no clock at all). Without
     // this the refusal in OnHostAttempt still holds, but every watcher asks
     // and is refused, for each of them, for as long as they can see it.
-    if (hasUser || IsServerDriven(*emitter) ||
+    const bool serverDriven = IsServerDriven(*emitter);
+    if (hasUser || serverDriven ||
         (hosterIterator != worldState.hosters.end() &&
          hosterIterator->second != 0 &&
          hosterIterator->second != listener->GetFormId())) {
       message.props.isHostedByOther = true;
+    }
+
+    // isHostedByOther alone is not enough: a client that asks anyway is
+    // refused, and the client needs to know not to ask (view/hostAsk.ts). It
+    // rides as a CUSTOM prop rather than a field in
+    // CreateActorMessageAdditionalProps because customPropsJsonDumps is
+    // already a variable-length vector, so nothing about the wire layout
+    // changes - and the wire IS positional, so a new field there would bump
+    // kMessagingProtocolVersion and lock out every old client. The client
+    // applies each entry by name onto the model (remoteServer.ts), so no
+    // client change is needed to carry it.
+    //
+    // The property message in MpObjectReference::UpdateHoster covers a client
+    // already watching when the flag changes; this covers one that arrives
+    // afterwards and would otherwise never hear it at all (W1, 2 Nov).
+    if (serverDriven) {
+      message.customPropsJsonDumps.push_back(
+        CustomPropsEntry{ "isServerDriven", "true" });
     }
 
     uint32_t worldOrCell =

@@ -140,8 +140,31 @@ TEST_CASE("A server-driven NPC is never handed to a client, and its neighbour "
   // (2) the stale sweep takes the plain NPC and leaves the tagged one. Give
   // the tagged NPC a hoster the way the gamemode can (mp.setHoster), so there
   // is something for the sweep to take if it fails to skip it
+  p.Messages().clear();
   p.AssignHoster(kNpc, kPlayer);
   REQUIRE(HosterOf(p, kNpc) == kPlayer);
+
+  // A hoster change tells every watching player whether the server drives it,
+  // beside isHostedByOther and in the same loop, so the two can never disagree
+  // - which is the whole reason the flag is a property and does not travel in
+  // the movement data. Both messages must be there for this one hand-over.
+  {
+    // UpdatePropertyMessage carries the value as dataDump, a STRING holding
+    // the JSON dump - not a bool field. So the server's `true` arrives as the
+    // four characters "true", the spelling the change-form tag uses too.
+    bool sawDriven = false, sawHosted = false;
+    for (auto& m : p.Messages()) {
+      const auto propName = m.j.value("propName", std::string());
+      if (propName == "isServerDriven") {
+        sawDriven = m.j.value("dataDump", std::string()) == "true";
+      }
+      if (propName == "isHostedByOther") {
+        sawHosted = true;
+      }
+    }
+    REQUIRE(sawDriven);
+    REQUIRE(sawHosted);
+  }
   SweepPastStale(p);
   REQUIRE(HosterOf(p, kNpc) == kPlayer); // still held: skipped, not released
   REQUIRE(HosterOf(p, kPlain) == 0);     // released for silence, as before
@@ -197,6 +220,24 @@ TEST_CASE("A watcher is told a server-driven NPC is hosted by someone else",
   // ...and the plain one does not, so an ordinary NPC is still free to be
   // claimed
   REQUIRE_FALSE(plain.filteredMessages.back().props.isHostedByOther == true);
+
+  // isHostedByOther alone is not enough - a client that asks anyway is only
+  // refused, and the client wants to know not to ask - so isServerDriven rides
+  // as a custom prop. A client that arrives AFTER the flag was set hears it
+  // only from CreateActor, which is what this half covers (W1, 2 Nov). It is a
+  // custom prop and not a props field because the wire is positional.
+  const auto hasDrivenProp = [](const CreateActorMessage& m) {
+    for (auto& e : m.customPropsJsonDumps) {
+      if (e.propName == "isServerDriven") {
+        return e.propValueJsonDump == "true";
+      }
+    }
+    return false;
+  };
+  REQUIRE(hasDrivenProp(driven.filteredMessages.back()));
+  // ...and an ordinary NPC carries no such prop at all, rather than carrying
+  // it as false: nothing should have to parse it to learn there is nothing
+  REQUIRE_FALSE(hasDrivenProp(plain.filteredMessages.back()));
 
   p.DestroyActor(kPlain);
   p.DestroyActor(kNpc);
