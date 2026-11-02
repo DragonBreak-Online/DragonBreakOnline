@@ -13,6 +13,7 @@
 #include "HostStopMessage.h"
 #include "SetRaceMenuOpenMessage.h"
 #include "UpdateGameModeDataMessage.h"
+#include "UpdateMovementMessage.h"
 
 #include "ActionListener.h"
 #include "FormCallbacks.h"
@@ -179,6 +180,70 @@ void PartOne::Tick()
   GetActionListener().TickMovementRelay();
   TickProfile::Scope profile(TickProfile::kWorld);
   worldState.Tick();
+}
+
+// The server moves one of its own NPCs: Option B phase 1 step 2
+// (_work\server-npc-movement-1102.md). Called from the gameplay layer, which
+// owns WHEN and WHERE - the route timeline, the floor and the cadence are all
+// hot-reloadable JS, and this is the one thing JS cannot do for itself.
+//
+// Three things happen here, and leaving out any one of them is a bug that
+// looks like something else:
+//
+//   1. an UpdateMovement goes to every player watching the NPC. The existing
+//      relay, ActionListener::SendToNeighbours, forwards raw bytes a CLIENT
+//      sent and checks the sender is the hoster, so it cannot be reused; this
+//      uses the same listener loop with the typed send, as UpdateHoster does;
+//   2. the server's own copy is moved with SetPosAndAngleSilent, which writes
+//      the change-form position GetPos() reads. Without it everything
+//      server-side - zone membership, the director's distances, reach checks
+//      on a blow landed against this NPC - would still see it standing at its
+//      spawn point while clients watched it walk away;
+//   3. the CELL is taken from the actor and never from the caller. An NPC's
+//      cell is not updated by movement, and an update that disagrees with it
+//      is dropped, after which every hit on that NPC is refused. Making the
+//      cell unreachable from JS is what designs that failure out rather than
+//      documenting it.
+//
+// Refuses an NPC that is not tagged server-driven. That guard is what makes it
+// safe to expose to hot-reloadable gameplay code: a typo in a module must not
+// be able to drive an NPC a client is hosting, which would desync every
+// watcher of it and fight the hoster's own stream.
+//
+// lastMovUpdateByIdx is deliberately NOT stamped. It is the "a client's
+// movement was accepted" clock, and there is no client here; TickStaleHosts
+// skips server-driven NPCs outright, so nothing needs it.
+void PartOne::SendServerMovement(uint32_t npcId,
+                                 const UpdateMovementMessage::Data& data)
+{
+  auto& refr = worldState.GetFormAt<MpObjectReference>(npcId);
+
+  if (!IsServerDriven(refr)) {
+    throw std::runtime_error(fmt::format(
+      "SendServerMovement - {:#x} is not server-driven (set {} first)", npcId,
+      GetServerDrivenProperty()));
+  }
+
+  UpdateMovementMessage msg;
+  msg.idx = refr.GetIdx();
+  msg.data = data;
+  msg.data.worldOrCell = refr.GetCellOrWorld().ToFormId(worldState.espmFiles);
+
+  // Unreliable: a dropped movement is replaced by the next one a fraction of a
+  // second later, and reliability would queue them behind each other - the
+  // stale position arriving late is worse than the lost one
+  constexpr bool kReliable = false;
+
+  for (auto listener : refr.GetActorListeners()) {
+    if (listener->GetUserId() == Networking::InvalidUserId) {
+      continue;
+    }
+    listener->SendToUser(msg, kReliable);
+  }
+
+  refr.SetPosAndAngleSilent(
+    { msg.data.pos[0], msg.data.pos[1], msg.data.pos[2] },
+    { msg.data.rot[0], msg.data.rot[1], msg.data.rot[2] });
 }
 
 bool PartOne::IsServerDriven(const MpObjectReference& remote)

@@ -101,6 +101,7 @@ Napi::Object ScampServer::Init(Napi::Env env, Napi::Object exports)
       InstanceMethod("destroyActor", &ScampServer::DestroyActor),
       InstanceMethod("setHoster", &ScampServer::SetHoster),
       InstanceMethod("getHoster", &ScampServer::GetHoster),
+      InstanceMethod("sendServerMovement", &ScampServer::SendServerMovement),
       InstanceMethod("setRaceMenuOpen", &ScampServer::SetRaceMenuOpen),
       InstanceMethod("getActorsByProfileId",
                      &ScampServer::GetActorsByProfileId),
@@ -864,6 +865,67 @@ Napi::Value ScampServer::GetHoster(const Napi::CallbackInfo& info)
   auto& hosters = partOne->worldState.hosters;
   auto it = hosters.find(remoteId);
   return Napi::Number::New(info.Env(), it == hosters.end() ? 0 : it->second);
+}
+
+// mp.sendServerMovement(npcId, { pos, rot, speed, runMode, ... }): the server
+// moves one of its own NPCs (Option B phase 1). The NPC must already be tagged
+// private.dboServerHost, or this throws - a gameplay typo must not be able to
+// drive an NPC a client is hosting.
+//
+// There is deliberately NO worldOrCell parameter. An NPC's cell is not updated
+// by movement and an update that disagrees with it is dropped, after which
+// every hit on that NPC is refused, so the cell is taken from the actor and
+// the caller cannot reach it.
+Napi::Value ScampServer::SendServerMovement(const Napi::CallbackInfo& info)
+{
+  auto npcId = info[0].As<Napi::Number>().Uint32Value();
+  auto obj = info[1].As<Napi::Object>();
+
+  const auto triple = [&](const char* key, std::array<float, 3>& out) {
+    if (!obj.Has(key)) {
+      throw Napi::Error::New(info.Env(),
+                             std::string("sendServerMovement needs ") + key);
+    }
+    auto arr = obj.Get(key).As<Napi::Array>();
+    for (uint32_t i = 0; i < 3; ++i) {
+      out[i] = arr.Get(i).As<Napi::Number>().FloatValue();
+    }
+  };
+
+  const auto optBool = [&](const char* key, bool fallback) {
+    return obj.Has(key) ? obj.Get(key).As<Napi::Boolean>().operator bool()
+                        : fallback;
+  };
+
+  UpdateMovementMessage::Data data;
+  triple("pos", data.pos);
+  triple("rot", data.rot);
+  data.speed =
+    obj.Has("speed") ? obj.Get("speed").As<Napi::Number>().FloatValue() : 0.f;
+  data.direction = obj.Has("direction")
+    ? obj.Get("direction").As<Napi::Number>().FloatValue()
+    : 0.f;
+  data.runMode = obj.Has("runMode")
+    ? obj.Get("runMode").As<Napi::String>().Utf8Value()
+    : std::string("Standing");
+  data.isSneaking = optBool("isSneaking", false);
+  data.isBlocking = optBool("isBlocking", false);
+  data.isWeapDrawn = optBool("isWeapDrawn", false);
+  data.isInJumpState = optBool("isInJumpState", false);
+  data.isDead = optBool("isDead", false);
+  // Health is the server's own business, not the caller's: it is the one field
+  // here a gameplay module could get wrong in a way players would see as a
+  // health bar that disagrees with what a blow actually did
+  data.healthPercentage = obj.Has("healthPercentage")
+    ? obj.Get("healthPercentage").As<Napi::Number>().FloatValue()
+    : 1.f;
+
+  try {
+    partOne->SendServerMovement(npcId, data);
+  } catch (std::exception& e) {
+    throw Napi::Error::New(info.Env(), (std::string)e.what());
+  }
+  return info.Env().Undefined();
 }
 
 Napi::Value ScampServer::SetRaceMenuOpen(const Napi::CallbackInfo& info)

@@ -9,6 +9,7 @@
 #include "PartOneListener.h"
 #include "ServerState.h"
 #include "SpellCastData.h"
+#include "UpdateMovementMessage.h"
 #include "WorldState.h"
 #include "formulas/IDamageFormula.h"
 #include "libespm/Loader.h"
@@ -185,6 +186,14 @@ public:
     return "private.dboServerHost";
   }
   static bool IsServerDriven(const MpObjectReference& remote);
+
+  // Moves a server-driven NPC: one UpdateMovement to each watching player, and
+  // the server's own copy moved to match. The gameplay layer owns when and
+  // where; this is the part it cannot do itself. Throws if the NPC is not
+  // tagged server-driven. The cell comes from the actor, never from the
+  // caller.
+  void SendServerMovement(uint32_t npcId,
+                          const UpdateMovementMessage::Data& data);
 
   static MessageSerializer& GetMessageSerializerInstance();
 
