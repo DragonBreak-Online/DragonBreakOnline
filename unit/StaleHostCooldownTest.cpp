@@ -1,6 +1,8 @@
 #include "TestUtils.hpp"
+#include <algorithm>
 #include <catch2/catch_all.hpp>
 #include <chrono>
+#include <functional>
 #include <thread>
 
 PartOne& GetPartOne();
@@ -220,6 +222,70 @@ TEST_CASE("The exemption ends after staleExemptFor of silence",
 
   std::this_thread::sleep_for(std::chrono::milliseconds(200));
   SweepPastStale(p);
+  REQUIRE(HosterOf(p, kNpc) == 0);
+
+  Teardown(p);
+}
+
+namespace {
+constexpr uint32_t kPlayer2 = 0xff000002;
+
+struct ReleaseHook
+{
+  PartOne& p;
+  ReleaseHook(PartOne& p_, std::function<void(uint32_t, uint32_t)> hook)
+    : p(p_)
+  {
+    p.hostReleaseHook = std::move(hook);
+  }
+  ~ReleaseHook() { p.hostReleaseHook = nullptr; }
+};
+}
+
+TEST_CASE("A release the gamemode hands on goes to the new hoster at once",
+          "[PartOne][Host][StaleHost][espm]")
+{
+  PartOne& p = GetPartOne();
+  Timings t(p, std::chrono::milliseconds(0));
+  Setup(p);
+  DoConnect(p, 1);
+  p.CreateActor(kPlayer2, { 50.f, 0.f, 0.f }, 0.f, 0x3c);
+  p.SetUserActor(1, kPlayer2);
+
+  uint32_t askedFor = 0, askedFrom = 0;
+  ReleaseHook hook(p, [&](uint32_t remote, uint32_t old) {
+    askedFor = remote;
+    askedFrom = old;
+    p.AssignHoster(remote, kPlayer2);
+  });
+  p.Messages().clear();
+  SweepPastStale(p);
+
+  REQUIRE(askedFor == kNpc);
+  REQUIRE(askedFrom == kPlayer);
+  REQUIRE(HosterOf(p, kNpc) == kPlayer2);
+  // the new hoster was told to drive it
+  REQUIRE(std::any_of(p.Messages().begin(), p.Messages().end(), [](auto& m) {
+    return m.userId == 1 && m.j.is_object() &&
+      m.j.value("t", -1) == static_cast<int>(MsgType::HostStart);
+  }));
+
+  p.DestroyActor(kPlayer2);
+  DoDisconnect(p, 1);
+  Teardown(p);
+}
+
+TEST_CASE("A release nobody picks up leaves the NPC unhosted as before",
+          "[PartOne][Host][StaleHost][espm]")
+{
+  PartOne& p = GetPartOne();
+  Timings t(p, std::chrono::milliseconds(0));
+  Setup(p);
+  bool asked = false;
+  ReleaseHook hook(p, [&](uint32_t, uint32_t) { asked = true; });
+
+  SweepPastStale(p);
+  REQUIRE(asked);
   REQUIRE(HosterOf(p, kNpc) == 0);
 
   Teardown(p);

@@ -81,6 +81,9 @@ public:
   // staleExemptFor of silence; 0 range turns the exemption off
   float staleExemptRange = 4096.f;
   std::chrono::milliseconds staleExemptFor{ 120000 };
+  // Called by ReleaseHost before it marks the NPC unhosted; one that sets a new hoster skips the unhosted broadcast.
+  // Fires the gamemode's mp.onHostRelease(remoteId, oldHosterId) unless a test replaces it
+  std::function<void(uint32_t remoteId, uint32_t oldHosterId)> hostReleaseHook;
   FormCallbacks CreateFormCallbacks();
   ActionListener& GetActionListener();
   const std::vector<std::shared_ptr<Listener>>& GetListeners() const;

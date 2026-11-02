@@ -16,6 +16,7 @@
 
 #include "TickProfile.h"
 #include "ActionListener.h"
+#include "gamemode_events/CustomEvent.h"
 #include "FormCallbacks.h"
 #include "MessageSerializerFactory.h"
 #include "OpenSSLSigner.h"
@@ -288,9 +289,22 @@ void PartOne::ReleaseHost(MpObjectReference& remote, const std::string& reason)
   }
   it->second = 0;
   hostSeenSince.erase(remoteId);
-  remote.UpdateHoster(0);
   GetLogger().info("Hoster of {0:x} released from {1:x}: {2}", remoteId,
                    hosterId, reason);
+
+  // The gamemode may hand it on at once (npcdirector.js), so nearby clients never see it unhosted and ask for it
+  if (hostReleaseHook) {
+    hostReleaseHook(remoteId, hosterId);
+  } else {
+    CustomEvent event(remoteId, "onHostRelease",
+                      nlohmann::json::array({ hosterId }).dump());
+    event.Fire(&worldState);
+  }
+  auto after = worldState.hosters.find(remoteId);
+  if (after != worldState.hosters.end() && after->second != 0) {
+    return;
+  }
+  remote.UpdateHoster(0);
 }
 
 // A hoster that disconnected, switched character or was destroyed kept every NPC it drove until the 5 s stale sweep
