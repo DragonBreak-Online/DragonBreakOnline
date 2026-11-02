@@ -7942,6 +7942,57 @@ const wearParts = (a, d) => {
 };
 // racial.js regen tick: stamina recovery while worn (1 = none)
 globalThis.__dboWearRegenMult = (a, stat) => { if (stat !== 'stamina' || ARMOR_WEAR.mode !== 'debuff') return 1; const s = wearState.get(a >>> 0); return s ? s.regen : 1; };
+// Active Effects (Nat, 2 Nov: "make sure the debuffs and whatnot from armour show in Active Effects"): one display ability
+// per step of each penalty (armorWear.debuff.display; _work/armour-effects-display-1102.md). Each is a SPEL of type Ability
+// whose one effect (archetype Script, no script) changes nothing, so the penalties stay where they work, speed on the
+// client and stamina in racial.js, and nothing is applied twice. A record cannot change its magnitude at run time, so speed
+// shows in steps of 5 (display.slow: { "5": desc, ... "45": desc }) and stamina recovery in steps of 10 (display.wind:
+// { "10": desc, ... "50": desc }). A desc that is empty, does not resolve or is not an Ability is skipped (logged once), so
+// all of this is inert until the records are in the load order and their descs in config
+const SPIT_ABILITY = 4;
+const WEAR_SHOW = Object.assign({ slow: {}, wind: {} }, WEAR_DEBUFF.display || {});
+const wearShown = globalThis.__dboWearShown instanceof Map ? globalThis.__dboWearShown : (globalThis.__dboWearShown = new Map());
+const wearShowWarned = new Set();
+const wearAbilityOf = (desc) => {
+  const s = String(desc || '').trim();
+  if (!s) return 0;
+  const warn = (why) => { if (!wearShowWarned.has(s)) { wearShowWarned.add(s); log(`armorWear: the display ability ${s} ${why}; it is not shown`); } };
+  let id = 0; try { id = mp.getIdFromDesc(s) >>> 0; } catch (e) { id = 0; }
+  if (!id) { warn('does not resolve'); return 0; }
+  const r = recordOf(id);
+  const spit = r && String(r.record.type) === 'SPEL' ? fieldsOf(r, 'SPIT')[0] : null;
+  if (!spit || spit.data.byteLength < 12) { warn('is not a spell that can be read'); return 0; }
+  const type = new DataView(spit.data.buffer, spit.data.byteOffset, spit.data.byteLength).getUint32(8, true);
+  if (type !== SPIT_ABILITY) { warn(`is not an Ability (SPIT type ${type})`); return 0; }
+  return id;
+};
+// The step each penalty shows at: speed to the nearest 5 (2% shows nothing, 3% shows 5%), stamina recovery to the nearest 10
+const wearStep = (v, step, max) => (v > 0 ? Math.min(max, Math.round(v / step) * step) : 0);
+const wearBuckets = (d) => ({ slow: wearStep(-Number(d.speed) || 0, 5, 45), wind: wearStep(Math.round((1 - Number(d.regen)) * 100), 10, 50) });
+globalThis.__dboWearBuckets = wearBuckets;
+const wearSpell = (a, add, id) => {
+  try {
+    mp.callPapyrusFunction('method', 'Actor', add ? 'AddSpell' : 'RemoveSpell', { type: 'form', desc: mp.getDescFromId(a >>> 0) },
+      add ? [{ type: 'espm', desc: mp.getDescFromId(id >>> 0) }, false] : [{ type: 'espm', desc: mp.getDescFromId(id >>> 0) }]);
+  } catch (e) { log(`armorWear: ${add ? 'AddSpell' : 'RemoveSpell'} ${(id >>> 0).toString(16)} on ${display(a)} failed`, e.message); }
+};
+// Give the abilities these penalties show at and take back the ones they no longer do. The first sync after a login takes
+// back every other step once, since what a past session gave may still be on the character
+const wearShowSync = (a, d) => {
+  const b = wearBuckets(d);
+  const want = { slow: b.slow ? wearAbilityOf(WEAR_SHOW.slow[String(b.slow)]) : 0, wind: b.wind ? wearAbilityOf(WEAR_SHOW.wind[String(b.wind)]) : 0 };
+  const prev = wearShown.get(a >>> 0);
+  const wanted = new Set([want.slow, want.wind].filter(Boolean));
+  const remove = new Set();
+  if (!prev) {
+    for (const table of [WEAR_SHOW.slow, WEAR_SHOW.wind]) for (const desc of Object.values(table)) { const id = wearAbilityOf(desc); if (id && !wanted.has(id)) remove.add(id); }
+  } else {
+    for (const k of ['slow', 'wind']) if (prev[k] && prev[k] !== want[k]) remove.add(prev[k]);
+  }
+  for (const id of remove) wearSpell(a, false, id);
+  for (const k of ['slow', 'wind']) if (want[k] && (!prev || prev[k] !== want[k])) wearSpell(a, true, want[k]);
+  wearShown.set(a >>> 0, want);
+};
 const wearDebuffUpdate = (a, worn, settling, quiet) => {
   const defense = defenseLevelOf(a);
   const d = wearDebuffOf(worn, defense);
@@ -7949,6 +8000,7 @@ const wearDebuffUpdate = (a, worn, settling, quiet) => {
   const key = `${d.speed}|${d.regen}|${d.cost}`;
   if (prev.key === key) return d;
   wearState.set(a, Object.assign({ key, worn: worn.slice() }, d));
+  try { wearShowSync(a, d); } catch (e) { log('armorWear: display abilities failed', e.message); }
   try { sendPacket(a, { customPacketType: 'dboArmourWear', speedMult: d.speed, staminaCostMult: d.cost, staminaRegenMult: d.regen }); } catch (e) { /* offline */ }
   log(`armorWear: ${display(a)} (Defense ${Math.floor(defense)}) speed ${d.speed} regen x${d.regen} cost x${d.cost}${d.over.length ? `, over: ${d.over.map((o) => `${o.id.toString(16)} needs ${o.need}`).join(' ')}` : ''}`);
   // Told once when it worsens by a piece put on, never by the login's re-dress or the periodic re-check
@@ -7973,7 +8025,7 @@ if (typeof every === "function") every('armourWear', Math.max(5, Number(WEAR_DEB
   if (!ARMOR_WEAR.enabled || ARMOR_WEAR.mode !== 'debuff' || typeof globalThis.__dboWearTier !== 'function') return;
   for (const a of onlineActors()) { try { wearDebuffUpdate(a, wornWithHealth(a).map((w) => w.baseId), true, true); } catch (e) { log('armorWear recheck failed', e.message); } }
 });
-globalThis.__dboWearConnect = (a) => { wearState.delete(a >>> 0); };
+globalThis.__dboWearConnect = (a) => { wearState.delete(a >>> 0); wearShown.delete(a >>> 0); };
 // /armor: each worn piece's class, tier, the Defense it needs and the wearer's gap, then what it all costs now
 const armorReport = (a) => {
   const defense = defenseLevelOf(a), worn = wornWithHealth(a).map((w) => w.baseId);
@@ -7983,7 +8035,8 @@ const armorReport = (a) => {
     const klass = w.klass[0].toUpperCase() + w.klass.slice(1);
     const gap = w.need - defense;
     const state = w.cosmetic ? 'costs nothing (cosmetic)' : gap > 0 ? `you are ${Math.ceil(gap)} short` : 'within your Defense';
-    lines.push(`${wearNameOf(id) || 'A piece'}: ${klass}, Tier ${w.tier}, Defense ${w.need}, ${state}.`);
+    let holds = ''; try { const p = armorPieceOf(id >>> 0); const share = typeof globalThis.__dboEnchantShareOf === 'function' && p ? globalThis.__dboEnchantShareOf(p.heavy ? 'heavy' : 'light') : null; if (share !== null && share !== undefined && share !== 1) holds = ` Holds ${Math.round(share * 100)}% of an enchantment's power.`; } catch (e) { holds = ''; }
+    lines.push(`${wearNameOf(id) || 'A piece'}: ${klass}, Tier ${w.tier}, Defense ${w.need}, ${state}.${holds}`);
   }
   if (lines.length === 1) lines.push('You wear no armour the rule counts.');
   if (ARMOR_WEAR.mode === 'debuff') { const parts = wearParts(a, wearDebuffOf(worn, defense)); lines.push(parts.length ? `Right now ${parts.join(', ')}.` : 'It costs you nothing right now.'); }
