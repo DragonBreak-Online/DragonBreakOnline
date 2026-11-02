@@ -1434,7 +1434,7 @@
    },
    {
     "id": "azura",
-    "prayNear": [{"ref": "33dcb:Skyrim.esm", "world": "3c:Skyrim.esm", "pos": [110514, 79564, 2286], "meters": 30, "name": "the Shrine of Azura"}],
+    "prayNear": [{"ref": "33dcb:Skyrim.esm", "world": "3c:Skyrim.esm", "pos": [110514, 79564, 2286], "meters": 30, "name": "the Shrine of Azura"}, {"ref": "d83:man_DaedricShrines.esp", "world": "3c:Skyrim.esm", "pos": [172671, 35350, -8547], "meters": 12, "name": "the statue of Azura in the far east of Skyrim"}, {"ref": "77f35e:summersetisles.esp", "world": "ae416d:summersetisles.esp", "pos": [55444, -52025, 4467], "meters": 10, "name": "the shrine of Azura on Summerset"}],
     "_prayNear": "Nat, 25 Oct (Skyrim shrines): a Skyrim lore statue that cannot be activated, prayed at with /pray within its meters (prayer.js prayNear), as Meridia's in Bruma. Vanilla or man_DaedricShrines.esp (in the live order). Census in _work/skyrim-shrines-1025.",
     "name": "Azura",
     "kind": "daedra",
@@ -1520,6 +1520,8 @@
    },
    {
     "id": "molagbal",
+    "prayNear": [{"ref": "8ef:man_DaedricShrines.esp", "world": "803:Dawnguard.esm", "pos": [-858, -2416, 7491], "meters": 10, "name": "the statue of Molag Bal in Castle Volkihar"}, {"ref": "8eb:man_DaedricShrines.esp", "world": "19dfe:Dawnguard.esm", "pos": [1126, 1879, 9038], "meters": 10, "name": "the statue of Molag Bal in Castle Volkihar"}, {"ref": "8f3:man_DaedricShrines.esp", "world": "1526f:Skyrim.esm", "pos": [3910, 3205, 5269], "meters": 10, "name": "the statue of Molag Bal in Movarth's Lair"}, {"ref": "defe8:Skyrim.esm", "world": "18be9:Skyrim.esm", "pos": [-407, 2075, -518], "meters": 6, "name": "the talking altar of Molag Bal in Markarth's abandoned house"}],
+    "_prayNear": "1 Nov (after SMJ's Namira report): man_DaedricShrines.esp statues are STATs the engine never activates, prayed at with /pray within their meters (prayer.js prayNear). Census in _work/namira-shrine-1101.md.",
     "name": "Molag Bal",
     "kind": "daedra",
     "shrines": ["ec970:Skyrim.esm", "dee7e:Skyrim.esm", 
@@ -1628,6 +1630,8 @@
    },
    {
     "id": "sheogorath",
+    "prayNear": [{"ref": "14c894:summersetisles.esp", "world": "4dda1:summersetisles.esp", "pos": [423, -1373, -1508], "meters": 10, "name": "the shrine of Sheogorath in a cave on Summerset"}],
+    "_prayNear": "1 Nov: Summerset's Sheogorath shrine is a talking activator (TACT), which the server never loads; /pray within its meters is the touch (prayer.js prayNear). Our own data pointing at a place, not a patch of the mod (Nat, 1 Nov). _work/namira-shrine-1101.md.",
     "name": "Sheogorath",
     "kind": "daedra",
     "shrines": ["147871:summersetisles.esp", 
@@ -1649,6 +1653,8 @@
    },
    {
     "id": "clavicusvile",
+    "prayNear": [{"ref": "125bf9:DragonBreak Online Edits.esp", "world": "a764b:BSHeartland.esm", "pos": [94522, 193548, 2329], "meters": 6, "name": "the statue of Clavicus Vile at the shrine of the Princes by Bruma"}, {"ref": "fe531:Skyrim.esm", "world": "216bb:Skyrim.esm", "pos": [1576, -4435, 6991], "meters": 10, "name": "the shrine of Clavicus Vile in Haemar's Shame"}, {"ref": "17489:Druadach.esm", "world": "16d49:Druadach.esm", "pos": [517, -2989, -2583], "meters": 10, "name": "the shrine of Clavicus Vile in the Drenched Caverns"}],
+    "_prayNear": "1 Nov: every Clavicus Vile shrine is a TALKING activator (TACT), a record type the server never loads (WorldState.cpp AttachEspmRecord), so a touch on one never arrives: 0 touches in 8 days. /pray within its meters is the touch (prayer.js prayNear). _work/namira-shrine-1101.md.",
     "name": "Clavicus Vile",
     "kind": "daedra",
     "shrines": ["20951:Skyrim.esm", "fe530:Skyrim.esm", 
@@ -1669,7 +1675,7 @@
    },
    {
     "id": "hermaeusmora",
-    "prayNear": [{"ref": "867:man_DaedricShrines.esp", "world": "3c:Skyrim.esm", "pos": [126176, 152044, -13237], "meters": 12, "name": "the statue of Hermaeus Mora by Septimus Signus' outpost"}],
+    "prayNear": [{"ref": "867:man_DaedricShrines.esp", "world": "3c:Skyrim.esm", "pos": [126176, 152044, -13237], "meters": 12, "name": "the statue of Hermaeus Mora by Septimus Signus' outpost"}, {"ref": "865:man_DaedricShrines.esp", "world": "19cd7:Dragonborn.esm", "pos": [-884, -327, -1384], "meters": 10, "name": "the statue of Hermaeus Mora in the Temple of Miraak"}, {"ref": "866:man_DaedricShrines.esp", "world": "142ee:Dragonborn.esm", "pos": [-3571, 1145, 296], "meters": 10, "name": "the statue of Hermaeus Mora in Kolbjorn Barrow"}],
     "_prayNear": "Nat, 25 Oct (Skyrim shrines): a Skyrim lore statue that cannot be activated, prayed at with /pray within its meters (prayer.js prayNear), as Meridia's in Bruma. Vanilla or man_DaedricShrines.esp (in the live order). Census in _work/skyrim-shrines-1025.",
     "blessingDisplay": "1ac97b:DragonBreak Online Edits.esp",
     "name": "Hermaeus Mora",
@@ -1692,6 +1698,8 @@
    },
    {
     "id": "namira",
+    "prayNear": [{"ref": "df5:man_DaedricShrines.esp", "world": "8c4:man_DaedricShrines.esp", "pos": [1598, 1889, 269], "meters": 10, "name": "the statue of Namira in her cave in the Reach"}, {"ref": "2c361:Skyrim.esm", "world": "15227:Skyrim.esm", "pos": [-896, -5664, -192], "meters": 10, "name": "the Shrine of Namira in Reachcliff Cave"}],
+    "_prayNear": "1 Nov (SMJ: the shrine of Namira in the Reach does not allow you to pray): man_DaedricShrines.esp's own Namira cave (aaaManNamiraShrine, cell 8c4) holds aaaman_NamiraStatue, a STAT, which the engine never lets a player activate, and no shrine of ours stood over it. /pray within its meters (prayer.js prayNear), as the other man_DaedricShrines statues. Vanilla Reachcliff Cave's shrine (ac9ab) stays an activator.",
     "name": "Namira",
     "kind": "daedra",
     "shrines": ["ac9ab:Skyrim.esm", 
