@@ -308,6 +308,37 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   h6.menuClose({ name: 'MapMenu' });
   for (let i = 0; i < 4; i++) h6.update();
   ok(!S.taps.length, '...and when the map closed by itself, nothing is tapped', S.taps);
+  // ---- SkyrimPlatform's overlay menu, when this build has it: no input taken, so the map keeps WASD and the wheel ----
+  {
+    const h10 = {};
+    const O = { calls: [], open: false };
+    sp.overlayMenu = { menuName: 'DboOverlayMenu', open: (swf) => { O.calls.push(['open', swf]); O.open = true; S.props['_root.dboAlive'] = 'Yes'; S.props['_root._url'] = 'Interface/dbo%5Fmaplegend.swf'; S.props['_root.dboVersion'] = 'maplegend-4'; },
+      close: () => { O.calls.push(['close']); O.open = false; }, isOpen: () => O.open };
+    const isOpen0 = sp.Ui.isMenuOpen;
+    sp.Ui.isMenuOpen = (m) => (m === 'DboOverlayMenu' ? O.open : isOpen0(m));
+    S.custom = []; S.customOpen = true; S.menuOpen = true; S.taps = []; sp.Input = { tapKey: (c) => S.taps.push(c) };
+    new MapRealmService(sp, { on: (ev, fn) => { h10[ev] = fn; }, emitter: { on: (ev, fn) => { h10['emit:' + ev] = fn; } } });
+    h10['emit:customPacketMessage']({ customPacketType: 'dboMapRealm', markers });
+    h10.menuOpen({ name: 'MapMenu' });
+    for (let i = 0; i < 64; i++) h10.update();
+    ok(JSON.stringify(O.calls) === JSON.stringify([['open', 'dbo_maplegend']]) && !S.custom.length, 'the legend opens in the overlay menu, not a CustomMenu, even with a server panel\'s CustomMenu up', [O.calls, S.custom]);
+    const hidden0 = JSON.stringify(S.legendData.length ? S.legendData[S.legendData.length - 1] : null);
+    h10.buttonEvent({ isDown: true, device: 0, code: 2 });
+    h10.update();
+    ok(JSON.stringify(S.legendData.length ? S.legendData[S.legendData.length - 1] : null) === hidden0, '...a server panel over the map keeps its own keys: a digit does nothing to the legend', S.legendData.length);
+    S.customOpen = false;
+    h10.buttonEvent({ isDown: true, device: 0, code: 0x0f });
+    for (let i = 0; i < 4; i++) h10.update();
+    ok(O.open && !S.taps.length, 'Tab with the overlay up is left to the map: ours stays, nothing is tapped', [O.open, S.taps]);
+    h10.menuClose({ name: 'MapMenu' });
+    ok(!O.open && O.calls.some((c) => c[0] === 'close'), 'the map closing closes the overlay menu', O.calls);
+    // the net: the overlay open with no map is closed by its own close
+    O.open = true; O.calls = []; S.menuOpen = false;
+    h10.update(); h10.update();
+    ok(!O.open && JSON.stringify(O.calls) === JSON.stringify([['close']]), 'the overlay open with no map is closed on the next ticks', O.calls);
+    S.menuOpen = true; delete sp.overlayMenu; sp.Ui.isMenuOpen = isOpen0; S.customOpen = false; delete S.props['_root.dboVersion'];
+  }
+
   // ---- a flat paper map (Nat, 2 Nov: the redrawn colours lagged his pans and snapped back) ----
   {
     const h9 = {};
