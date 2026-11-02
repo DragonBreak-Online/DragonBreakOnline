@@ -47,7 +47,7 @@ module.exports = (api) => {
   const showBar = (a, s, left) => {
     if (C.bar === false || typeof openWidget !== 'function' || !(left > 0)) return;
     try {
-      openWidget(a, { type: 'progress', id: BAR_ID, title: 'Armour', ms: left * 1000, startedAt: Date.now(), kind: 'armour' }, true);
+      openWidget(a, { type: 'progress', id: BAR_ID, title: 'Armour', ms: left * 1000, startedAt: Date.now(), kind: 'armour' }, false);
     } catch (e) { return; }
     if (s.barTimer) { try { clearTimeout(s.barTimer); } catch (e) { /* gone */ } }
     s.barTimer = setTimeout(() => {

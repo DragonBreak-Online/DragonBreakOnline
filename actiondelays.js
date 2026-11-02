@@ -92,7 +92,7 @@ module.exports = (api) => {
   const show = (a, ms, label) => {
     if (!C.widget || typeof openWidget !== 'function' || ms <= 0) return;
     try {
-      openWidget(a, { type: 'progress', id: WIDGET_ID, title: label, ms, startedAt: Date.now(), kind: 'search' }, true);
+      openWidget(a, { type: 'progress', id: WIDGET_ID, title: label, ms, startedAt: Date.now(), kind: 'search' }, false);
       S.shown.set(a, Date.now());
     } catch (e) { /* the bar is a courtesy, never a gate */ }
   };

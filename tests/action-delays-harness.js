@@ -36,6 +36,8 @@ const papyrus = [];
 const props = new Map();
 const setp = (id, k, v) => props.set(`${id >>> 0}|${k}`, v);
 const said = [], widgets = [], closed = [], resyncs = [], logs = [];
+// Every focus argument openWidget was ever given. Kept apart from widgets, which scenarios clear.
+const focusAsked = [];
 const mp = {
   get: (id, k) => {
     if (k === 'baseDesc') return BASES[id >>> 0];
@@ -60,7 +62,7 @@ const api = {
   personal: (a, t) => said.push({ a, t }),
   cfg: {},
   profileOf: (a) => (PROFILE[a >>> 0] === undefined ? -1 : PROFILE[a >>> 0]),
-  openWidget: (a, payload) => widgets.push({ a, payload }),
+  openWidget: (a, payload, focus) => { focusAsked.push(focus); return widgets.push({ a, payload, focus }); },
   closeWidget: (a, id) => closed.push({ a, id }),
 };
 globalThis.__dboItemResync = (a) => resyncs.push(a >>> 0);
@@ -274,6 +276,12 @@ for (const [what, mutate] of MUTANTS) {
   ok(caught, `mutant caught: ${what}`);
 }
 load({});
+
+// A progress bar is a picture, so it must never take the keyboard: a focused panel with no front build
+// behind it holds the keys and the player cannot move. That froze Nat on dev, 2 Nov. The stub used to
+// drop openWidget's third argument, which is why no harness could catch it.
+ok(focusAsked.length > 0 && focusAsked.every((f) => f !== true),
+  'the search bar never asks for keyboard focus', JSON.stringify(focusAsked));
 
 try { fs.rmSync(scratch, { recursive: true, force: true }); } catch (e) { /* leave it */ }
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');

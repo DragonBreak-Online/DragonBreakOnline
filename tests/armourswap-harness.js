@@ -15,6 +15,8 @@ const ITEMS = { 0x100: bod2(1 << 2, 1), 0x101: bod2(1 << 3, 1), 0x200: bod2(1 <<
 const HEAVY_CUIRASS = 0x100, HEAVY_GAUNTLETS = 0x101, LIGHT_CUIRASS = 0x200, ROBE = 0x300, RING = 0x301, SHIELD = 0x400, SWORD = 0x500;
 const PLAYER = 1, BANDIT = 2, NPC = 0xff000001;
 const packets = [], said = [], widgets = [], closedWidgets = [];
+// Every focus argument openWidget was ever given. Kept apart from widgets, which scenarios clear.
+const focusAsked = [];
 const props = {};
 const sw = require(MODULE)({
   mp: { get: (id, k) => props[`${id}:${k}`] },
@@ -24,7 +26,7 @@ const sw = require(MODULE)({
   recordOf: (id) => (ITEMS[id] ? { record: { type: 'ARMO', fields: [{ type: 'BOD2', data: ITEMS[id] }] } } : id === SWORD ? { record: { type: 'WEAP', fields: [] } } : null),
   fieldsOf: (r, t) => ((r && r.record.fields) || []).filter((f) => f.type === t),
   cfg: {},
-  openWidget: (a, payload) => widgets.push({ a, payload }),
+  openWidget: (a, payload, focus) => { focusAsked.push(focus); return widgets.push({ a, payload, focus }); },
   closeWidget: (a, id) => closedWidgets.push({ a, id }),
 });
 
@@ -76,6 +78,10 @@ check('...as a progress bar of the charged seconds, kind armour',
 widgets.length = 0;
 now += 60000;
 check('out of combat the swap is free and no bar is shown', sw.onEquip(PLAYER, wear(ROBE), false) === 0 && widgets.length === 0);
+
+// The bar is a picture and must never take the keyboard: a focused panel with no front build behind it
+// holds the keys and the player cannot move (Nat froze on dev, 2 Nov).
+check('the bar never asks for keyboard focus', focusAsked.length > 0 && focusAsked.every((f) => f !== true), JSON.stringify(focusAsked));
 
 Date.now = realNow;
 delete globalThis.__dboArmourSwap;
