@@ -15061,9 +15061,9 @@
           "insideDesc": "dbd:DBO_ExpeditionKits.esp",
           "insideCell": "d01:DBO_ExpeditionKits.esp",
           "insidePos": [
-            0.0,
-            128.0,
-            16.0
+            2541.33,
+            -3768.0,
+            0.0
           ],
           "insideRot": [
             0.0,
@@ -15509,9 +15509,9 @@
           "insideDesc": "dc4:DBO_ExpeditionKits.esp",
           "insideCell": "d8a:DBO_ExpeditionKits.esp",
           "insidePos": [
-            262144.0,
-            128.0,
-            16.0
+            259806.0,
+            2304.0,
+            0.0
           ],
           "insideRot": [
             0.0,
