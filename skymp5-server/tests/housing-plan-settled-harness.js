@@ -37,7 +37,7 @@ const build = async (srcText) => {
 
 const MARKER = 'housing-places-settled.json';
 const mp = { get: () => undefined, set: () => {}, getIdFromDesc: () => 0, lookupEspmRecordById: () => null, getActorsByProfileId: () => [], getUserByActor: () => -1, getUserActor: () => 0, isConnected: () => false, sendCustomPacket: () => {} };
-const ctx = { svr: mp, gm: { on: () => {} } };
+const ctx = { svr: mp, gm: { on: () => {}, once: () => {} } };
 
 const checks = async (HousingSystem, check) => {
   const dir = fs.mkdtempSync(path.join(out, 'run-'));
