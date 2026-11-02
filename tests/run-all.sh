@@ -21,6 +21,15 @@ cd "$(dirname "$0")/.."
 FORK=${FORK:-$(cd .. && pwd)/fork}
 FORK_SERVER=${FORK_SERVER:-$FORK}
 export FORK FORK_SERVER
+# The default is ../fork RELATIVE TO THIS REPO, which is right in ~/dragonbreak and wrong in a git worktree,
+# where .. is whatever directory the worktree was created in. Every harness that needs the fork then skips,
+# and a run that tested two thirds of the suite still prints a total. So say so where the number is read,
+# twice: here and again at the summary. Pass FORK=<path to fork> to fix it.
+FORK_WARNING=
+if [ ! -d "$FORK/skymp5-server" ]; then
+  FORK_WARNING="no fork at $FORK (pass FORK=<path>): every harness that needs one will skip"
+  echo "WARNING: $FORK_WARNING"
+fi
 ESBUILD=$FORK_SERVER/skymp5-server/node_modules/.bin/esbuild
 [ -x "$ESBUILD" ] || ESBUILD=$FORK/skymp5-server/node_modules/.bin/esbuild
 export ESBUILD
@@ -183,7 +192,15 @@ lacks() { if expected "$name"; then echo "FAIL $name (expected, but no $1 in $FO
 for h in tests/*-harness.js; do
   name=$(basename "$h" -harness.js); arg=
   if [ -n "${NEEDS[$name]:-}" ]; then
-    if [ ! -x "$ESBUILD" ]; then echo "SKIP $name (no esbuild at $ESBUILD)"; fail=$((fail+1)); failed+=("$name"); continue; fi
+    # No esbuild is a SKIP, not a failure. It printed "SKIP" and counted a failure, which is how a run in a
+    # worktree reported "632 passed, 114 failed" when the honest figure was 694/52: 62 harnesses that never
+    # ran were listed as broken, and that number was quoted (W4, 1 Nov). EXPECT_FEATURES still turns it into a
+    # failure for a line that must carry the feature, the same way lacks() does.
+    if [ ! -x "$ESBUILD" ]; then
+      if expected "$name"; then echo "FAIL $name (expected, but no esbuild at $ESBUILD)"; fail=$((fail+1)); failed+=("$name")
+      else echo "ok   $name (skipped: no esbuild at $ESBUILD)"; pass=$((pass+1)); skipped+=("$name"); fi
+      continue
+    fi
     # A front widget this client line does not have yet (a panel still on its branch) has nothing to test
     if [[ "${NEEDS[$name]}" == front:* ]] && [ ! -f "$FORK/${NEEDS[$name]#front:}" ]; then lacks "${NEEDS[$name]#front:}"; continue; fi
     # The same for a client module still on its branch (dboGlowPlan.ts until client-glow-shader is on the client line)
@@ -197,6 +214,11 @@ for h in tests/*-harness.js; do
     echo "FAIL $name"; grep -E '^\s*FAIL' "$OUT/$name.log" | head -3 | sed 's/^/       /'; fail=$((fail+1)); failed+=("$name")
   fi
 done
-echo "$pass passed, $fail failed${failed[*]:+: ${failed[*]}}"
+# "passed" counts the skips too, and always has: a skip takes the pass branch so the run can continue. The
+# count of them is on the next line, and the two together are the honest reading - "694 passed" means 666 ran
+# and 28 had nothing to test.
+echo "$pass passed (${#skipped[@]} of them skipped), $fail failed${failed[*]:+: ${failed[*]}}"
 echo "skipped ${#skipped[@]}${skipped[*]:+: ${skipped[*]}}${EXPECT_FEATURES:+ (EXPECT_FEATURES=$EXPECT_FEATURES)}"
+# Repeated here because the warning scrolled past hundreds of lines ago, and this is where the number is read
+[ -n "$FORK_WARNING" ] && echo "WARNING: $FORK_WARNING"
 [ "$fail" -eq 0 ]
