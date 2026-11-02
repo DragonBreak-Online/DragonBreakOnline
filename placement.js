@@ -48,8 +48,9 @@
 // before (an actor made with PlaceAtMe, tagged private.dboPlaced) keep working as they are.
 //
 // No NPCs from the Place tab (Nat, 2 Nov: "the only way to bring NPCs is the warbands and those systems"): with config
-// placement.npcs not true, placing an NPC is refused for every tier (sets and Undo included) and the NPC categories are
-// left out of the catalog, the search and placeMeta. NPCs placed before stay listed and removable.
+// placement.npcs not true, placing an NPC is refused for every tier (sets and Undo included). The NPC rows stay in the
+// catalog, the search and placeMeta: the F7 Warband tab picks the NPC to raise from those same results (front: the
+// placeSearch rows of kind npc, the placeMeta categories as its chips). NPCs placed before stay listed and removable.
 // A one-shot purge of placed NPCs runs from the run file placement-purge.json (see purge below).
 
 const fs = require('fs');
@@ -171,7 +172,6 @@ module.exports = (api) => {
       S.catalog = JSON.parse(fs.readFileSync(CATALOG, 'utf8')).categories || [];
       S.kinds = new Map();
       S.rows = [];
-      S.objectRows = null;
       for (const c of S.catalog) for (const it of c.items || []) {
         S.kinds.set(String(it[0]).toLowerCase(), { kind: c.kind, name: it[1] });
         S.rows.push({ desc: String(it[0]), name: String(it[1]), plugin: String(it[2] || ''), cat: c.id, kind: c.kind, hay: (it[1] + ' ' + it[0]).toLowerCase() });
@@ -185,9 +185,6 @@ module.exports = (api) => {
     }
     return S.catalog;
   };
-  // What the Place tab offers: without placement.npcs, no NPC category and no NPC row
-  const shown = (c) => NPCS || c.kind !== 'npc';
-  const searchRows = () => (NPCS ? S.rows : S.objectRows || (S.objectRows = S.rows.filter(shown)));
 
   const registry = () => {
     if (S.registry) return S.registry;
@@ -607,7 +604,7 @@ module.exports = (api) => {
 
   onUi('placeCatalog', (a) => {
     if (!isAdmin(a)) return;
-    const categories = loadCatalog().filter((c) => !HIDDEN.has(c.id) && shown(c));
+    const categories = loadCatalog().filter((c) => !HIDDEN.has(c.id));
     const ok = sendPacket(a, { customPacketType: 'adminPlaceables', categories });
     log(`placement: catalog ${ok ? 'sent' : 'NOT sent'} to ${who(a)}: ${categories.reduce((n, c) => n + (c.items || []).length, 0)} placeables in ${categories.length} categories, ${JSON.stringify(categories).length} bytes`);
   });
@@ -688,9 +685,9 @@ module.exports = (api) => {
     const plugins = [...new Set(S.rows.map((r) => r.plugin).filter(Boolean))].sort((x, y) => x.localeCompare(y));
     sendPacket(a, {
       customPacketType: 'adminPlaceMeta',
-      categories: S.catalog.filter(shown).map((c) => ({ id: c.id, label: c.label || c.id, kind: c.kind, count: (c.items || []).length })),
+      categories: S.catalog.map((c) => ({ id: c.id, label: c.label || c.id, kind: c.kind, count: (c.items || []).length })),
       plugins,
-      rights: { place: can(a, 'place'), npcs: NPCS, hostile: NPCS && can(a, 'hostile'), others: can(a, 'others'), world: can(a, 'world'), tier: TIER_LABEL[tierOf(a)] || '', placeNeeds: needs('place') },
+      rights: { place: can(a, 'place'), npcs: NPCS, hostile: can(a, 'hostile'), others: can(a, 'others'), world: can(a, 'world'), tier: TIER_LABEL[tierOf(a)] || '', placeNeeds: needs('place') },
     });
   });
 
@@ -702,7 +699,7 @@ module.exports = (api) => {
     const category = String(args[1] || '');
     const plugin = String(args[2] || '');
     const offset = Math.max(0, Math.floor(Number(args[3]) || 0));
-    const { hits, counts } = searchCatalog(searchRows(), query, category, plugin);
+    const { hits, counts } = searchCatalog(S.rows, query, category, plugin);
     const packet = {
       customPacketType: 'adminPlaceResults', query, category, plugin, offset, total: hits.length,
       items: hits.slice(offset, offset + PAGE).map((r) => [r.desc, r.name, r.plugin, r.cat, r.kind]),
