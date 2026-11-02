@@ -5,7 +5,7 @@ import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { parseCustomPacket, sendCustomPacket } from "./customPacketUtil";
 import {
-  Action, CAPS_RETRY_MS, CLIENT_CAPS, MENU_NAME, MenuState, OUT_VAR, UiEvent, capsFor, isNew, newState, parseOutbox,
+  Action, CAPS_RETRY_MS, CLIENT_CAPS, MENU_NAME, MenuState, OUT_VAR, UiEvent, capsFor, chunkArgs, isNew, newState, parseOutbox,
   escapeTargetFor, parseUiEvent, planClose, planOpen, planReady, planRefresh, planTick, readyFrameOf, summary,
 } from "./scaleformMenu";
 import { buttonKeyCode } from "./mouseKeys";
@@ -425,7 +425,13 @@ export class ScaleformMenuService extends ClientListener {
           // the screen's size first, so the panel can fit itself even where Stage.visibleRect misleads (lib dboFit)
           const screen = this.screenSize();
           if (screen) this.sp.Ui.invokeString(MENU_NAME, "_root.dboScreen", screen);
-          this.sp.Ui.invokeString(MENU_NAME, "_root.dboData", a.json);
+          // over one call's size the payload goes as numbered pieces, put back together by the panel (lib dboChunk)
+          const pieces = chunkArgs(a.json, ++this.chunkSeq);
+          if (!pieces.length) this.sp.Ui.invokeString(MENU_NAME, "_root.dboData", a.json);
+          else {
+            for (const piece of pieces) this.sp.Ui.invokeString(MENU_NAME, "_root.dboChunk", piece);
+            logTrace(this, "payload sent in pieces", a.json.length, pieces.length);
+          }
         } else if (a.do === "close") {
           this.sp.Ui.closeCustomMenu();
         } else if (a.do === "invoke") {
@@ -522,5 +528,7 @@ export class ScaleformMenuService extends ClientListener {
   private announcedAt = 0;
   private lastTick = 0;
   private queue: Action[] = [];
+  // each payload sent in pieces takes the next id, so the panel can tell a new set from a late piece of an old one
+  private chunkSeq = 0;
   private localKeys: ((key: string, args: unknown[]) => void) | null = null;
 }
