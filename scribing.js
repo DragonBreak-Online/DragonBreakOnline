@@ -241,7 +241,9 @@ module.exports = (api) => {
     if (wait > 0) return `${display(b)} helped write a tome not long ago, and can again in ${waitText(wait)}.`;
     return '';
   };
-  const coWriters = (a, sp) => onlineActors().filter((b) => !coWriterRefusal(a, b, sp));
+  // Who may be named as a co-writer: never a hidden GM or an invisible player (listable.js; fac-0553, 31 Oct)
+  const listable = (() => { try { const f = path.join(__dirname, 'listable.js'); delete require.cache[f]; return require(f)(mp); } catch (e) { log('scribing: listable.js unreadable, so no co-writer is named', e.message); return () => false; } })();
+  const coWriters = (a, sp) => onlineActors().filter((b) => !coWriterRefusal(a, b, sp) && listable(a, b));
   const stamp = (a, prop, sp) => set(a, prop, { at: Date.now(), rank: sp.rank, spell: descOf(sp.id) });
   const writeTome = (a, sp, helper) => {
     const why = tomeRefusal(a, sp);

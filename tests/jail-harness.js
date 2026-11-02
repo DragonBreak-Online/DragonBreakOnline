@@ -19,7 +19,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jail-harness-'));
 process.chdir(dir);
 fs.writeFileSync('doors.json', JSON.stringify({ doors: { [LOAD_DOOR_DESC]: 'Bruma Castle' } }));
 // one yard every prisoner shares (as Cidhna Mine), for staff /unstuck's 'nobody can release them early there'
-fs.writeFileSync('hold-jails.json', JSON.stringify({ holds: { reach: [{ kind: 'mine', cell: JAIL_CELL, door: '6c4ff:BSHeartland.esm', spot: [0, 900, 0], shared: true }] } }));
+fs.writeFileSync('hold-jails.json', JSON.stringify({ holds: { reach: [{ kind: 'mine', cell: JAIL_CELL, door: '6c4ff:BSHeartland.esm', spot: [0, 900, 0], shared: true }] } }));  // verify-formids: ignore (a synthetic yard gate for the stub)
 
 let wallClock = 1780000000000;
 Date.now = () => wallClock;
@@ -98,6 +98,21 @@ check('a guard at an empty cell door with nobody near just opens it', act(CELL_D
 at(PRISONER, JAIL_CELL, [-100, 0, 0]);
 check('a non-guard at an empty cell door just opens it', act(CELL_DOOR, PRISONER) === false);
 
+// ---- a hidden GM by the door is never named (fac-0553: the menus listed invisible GMs by name and #TAG) ----
+const HIDDEN_GM = 0x1b;
+at(HIDDEN_GM, JAIL_CELL, [-50, 0, 0]); put(HIDDEN_GM, 'ff_adminModes', { invis: true, ghost: false, rank: 2 }); online.push(HIDDEN_GM);
+check('an invisible GM by the cell door is not offered to the guard', act(CELL_DOOR, GUARD) === true && ids().join() === 'who:15,open', ids());
+put(HIDDEN_GM, 'ff_adminModes', { invis: false, ghost: true, rank: 2 });
+check('...nor one in Ghost mode', act(CELL_DOOR, GUARD) === true && ids().join() === 'who:15,open', ids());
+put(HIDDEN_GM, 'ff_adminModes', null); put(HIDDEN_GM, 'ff_spellInvis', { on: true, n: 3 });
+check('...nor a player under an Invisibility spell', act(CELL_DOOR, GUARD) === true && ids().join() === 'who:15,open', ids());
+put(HIDDEN_GM, 'ff_spellInvis', { on: false, n: 4 });
+check('a visible player there is offered as before', act(CELL_DOOR, GUARD) === true && ids().join() === 'who:15,who:1b,open', ids());
+put(HIDDEN_GM, 'ff_adminModes', { invis: true, ghost: false, rank: 2 }); put(GUARD, 'ff_adminModes', { invis: false, ghost: false, rank: 3 });
+check('a staff guard sees the invisible GM, as their client draws them', act(CELL_DOOR, GUARD) === true && ids().includes('who:1b'), ids());
+put(GUARD, 'ff_adminModes', null); online = online.filter((x) => x !== HIDDEN_GM); at(HIDDEN_GM, PLAIN_CELL, [0, 0, 0]);
+ui('jailClose', GUARD, []);
+
 // ---- imprisoning ----
 check('with a player in reach the guard gets the menu', act(CELL_DOOR, GUARD) === true && ids().join() === 'who:15,open', ids());
 ui('jailChoose', GUARD, ['who:15']);
@@ -166,10 +181,10 @@ check('...whose sentence is shared, so nobody gets Release, a Lead GM neither', 
 put(MINER, 'private.dboSentence', null);
 // C's set-6 review (28 Oct): a guard locking someone at the yard's own gate (as Cidhna Mine's bf4d4) puts them behind it, so the
 // gate holds them: not the shared yard, and a Lead GM gets Release there. The end state of the door menu's imprison:
-const YARD_GATE = idOf('6c4ff:BSHeartland.esm');
+const YARD_GATE = idOf('6c4ff:BSHeartland.esm');  // verify-formids: ignore (a synthetic yard gate for the stub)
 at(YARD_GATE, JAIL_CELL, [0, 900, 0]); put(YARD_GATE, 'baseDesc', DOOR_BASE);
 put(GATED, 'private.dboSentence', { door: YARD_GATE, cell: JAIL_CELL.toLowerCase(), totalMs: 10 * MIN, servedMs: 0, by: 'Guard', at: wallClock, arrester: 0 });
-check('...(the same sentence, its gate holding nobody, is the shared yard)', YARD_GATE === idOf('6c4ff:BSHeartland.esm') && globalThis.__dboJailSentence(GATED, LEAD).shared === true, globalThis.__dboJailSentence(GATED, LEAD));
+check('...(the same sentence, its gate holding nobody, is the shared yard)', YARD_GATE === idOf('6c4ff:BSHeartland.esm') && globalThis.__dboJailSentence(GATED, LEAD).shared === true, globalThis.__dboJailSentence(GATED, LEAD));  // verify-formids: ignore (a synthetic yard gate for the stub)
 put(YARD_GATE, 'private.dboCell', { prisoner: GATED, name: 'Gated', picked: false });
 check('locked at the yard gate itself: not shared, and a Lead GM gets Release', globalThis.__dboJailSentence(GATED, LEAD).shared === false && globalThis.__dboJailSentence(GATED, LEAD).release === true, globalThis.__dboJailSentence(GATED, LEAD));
 put(GATED, 'private.dboSentence', null); put(YARD_GATE, 'private.dboCell', null);

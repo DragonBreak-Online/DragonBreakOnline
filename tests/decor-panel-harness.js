@@ -59,7 +59,7 @@ const held = (a, id) => (getp(a, 'inventory').entries.find((e) => e.baseId === i
 const timers = {};
 const cfg = { decor: { enabled: true, budgets: [{ pieces: 3, lights: 1, stations: 1, containers: 1 }, { pieces: 3, lights: 1, stations: 1, containers: 1 }, { pieces: 3, lights: 1, stations: 1, containers: 1 }], perSecond: 0, perHour: 1000 } };
 const api = {
-  mp, log: (...x) => logs.push(x.join(' ')), audit: (t) => audits.push(t), who: (a) => NAME[a], personal: (a, t) => said.push([a, t]),
+  mp, log: (...x) => logs.push(x.join(' ')), audit: (t) => audits.push(t), who: (a) => `${NAME[a]} #T${PROFILE[a]} (profile ${PROFILE[a]}, <@10${PROFILE[a]}>)`, publicDisplay: (a) => NAME[a], personal: (a, t) => said.push([a, t]),
   onUi, sendPacket: (a, p) => { packets.push([a, p]); return true; }, registerChatCommand: (n, f) => { cmds[n] = f; },
   onlineActors: () => ONLINE, isAdmin: (a) => a === GM, tierOf: (a) => (a === GM ? 'developer' : null), giveItem,
   findByName: (q) => Number(Object.keys(NAME).find((a) => NAME[a].toLowerCase() === String(q).toLowerCase())) || 0,
@@ -150,9 +150,23 @@ ok(items().length === 0, 'removing a ref that is not here does nothing');
 act(OWNER, 'decorView', 'people', null, 0);
 w = lastPanel(OWNER);
 ok(w.view === 'people' && w.rows.length === 0 && w.nearby.some((x) => x.name === 'Stray'), 'People lists who is here to name', w.nearby);
+// fac-0553 (31 Oct): an invisible GM in the home was listed by name and #TAG
+setp(GM, 'ff_adminModes', { invis: true, ghost: false, rank: 4 });
+act(OWNER, 'decorView', 'people', null, 0);
+ok(!lastPanel(OWNER).nearby.some((x) => x.name === 'Gemma') && lastPanel(OWNER).nearby.some((x) => x.name === 'Stray'), 'an invisible GM in the home is not offered to the owner', lastPanel(OWNER).nearby);
+setp(GM, 'ff_adminModes', null);
+act(OWNER, 'decorView', 'people', null, 0);
+w = lastPanel(OWNER);
 act(OWNER, 'decorGrant', String(PROFILE[STRANGER]));
 w = lastPanel(OWNER);
 ok(w.rows.length === 1 && w.rows[0].name === 'Stray' && !w.nearby.some((x) => x.name === 'Stray'), 'Grant names them, by name', w.rows);
+// A name granted before 2 Nov was stored as who() gave it: shown, it is cut back to the public part
+T.reg().places[DOOR.toString(16)].decoratorNames[PROFILE[STRANGER]] = 'Stray #T9 (profile 9, <@109>)';
+act(OWNER, 'decorView', 'people', null, 0);
+ok(lastPanel(OWNER).rows[0].name === 'Stray #T9', 'a name stored with its profile number and Discord mention is shown without them', lastPanel(OWNER).rows);
+T.reg().places[DOOR.toString(16)].decoratorNames[PROFILE[STRANGER]] = 'Stray';
+act(OWNER, 'decorView', 'people', null, 0);
+w = lastPanel(OWNER);
 capture('people');
 setp(STRANGER, 'worldOrCellDesc', d(OTHER));
 act(OWNER, 'decorView', 'people', null, 0);
@@ -235,6 +249,13 @@ cmd(OWNER, '');
 fire('close', OWNER, [], 171);
 fire('decorView', OWNER, [n0, 'catalog', 'beds', 0]);
 ok(!T.S.panel.has(OWNER), 'closing forgets the panel; an old nonce does nothing');
+
+// fac-0553: who() (here, like gamemode.js's, with the profile number and the Discord mention) is for staff logs only.
+// Nothing told or sent to a player, over the whole run, carries it.
+const leaky = (s) => /\(profile \d+|<@\d+>/.test(String(s));
+const toldLeak = said.filter(([a, t]) => a !== GM && leaky(t));
+const sentLeak = packets.filter(([a, p]) => a !== GM && leaky(JSON.stringify(p)));
+ok(toldLeak.length === 0 && sentLeak.length === 0, 'no player is told or sent a profile number or a Discord mention', { toldLeak, sentLeak: sentLeak.map(([a, p]) => [a, JSON.stringify(p).slice(0, 160)]) });
 
 if (process.env.DECOR_PAYLOADS) fs.writeFileSync(process.env.DECOR_PAYLOADS, JSON.stringify(captured, null, 1));
 console.log(fails ? `\n${fails} failed` : '\nall passed');

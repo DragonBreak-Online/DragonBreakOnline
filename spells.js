@@ -47,6 +47,8 @@ const uiCap = (a, cap, own) => (typeof globalThis.__dboHasUiCap === 'function' &
 module.exports = (api) => {
   const { mp, log, personal, system, audit, display, who, cfg, openWidget, closeWidget, onUi, registerChatCommand,
     onlineActors, distanceMeters, takeGold, giveItem, depositToTreasury } = api;
+  // Who may be named as a student: never a hidden GM or an invisible player (listable.js; fac-0553, 31 Oct)
+  const listable = (() => { try { const f = path.join(__dirname, 'listable.js'); delete require.cache[f]; return require(f)(mp); } catch (e) { log('spells: listable.js unreadable, so no student is named', e.message); return () => false; } })();
 
   const CFG = Object.assign({
     enabled: true,
@@ -789,7 +791,7 @@ module.exports = (api) => {
     if (!CFG.enabled) return personal(a, 'Spell teaching is closed.');
     if (!SPELL_SKILLS.some((s) => tierOf(a, s.id) >= CFG.teacherMinTier)) return personal(a, `Teaching takes ${SPELL_SKILLS.map((s) => s.label).join(' or ')} at ${TIER_NAMES[CFG.teacherMinTier]} or higher.`);
     if (!teachable(a).length) return personal(a, `You know no spell of ${rankWord(CFG.teachMinRank)} rank or higher in your schools to teach. Only spells of ${rankWord(CFG.teachMinRank)} rank and above may be taught.`);
-    const students = onlineActors().filter((p) => p !== (a >>> 0) && near(a, p)).slice(0, MAX_ROWS);
+    const students = onlineActors().filter((p) => p !== (a >>> 0) && near(a, p) && listable(a, p)).slice(0, MAX_ROWS);
     if (!students.length) return personal(a, `Nobody stands within ${CFG.teachMeters} m to teach.`);
     menu(a, MENU_ID, 'Teach whom?', students.map((p) => ({ id: `student:${p.toString(16)}`, label: display(p) })), { kind: 'teach' });
   }, { help: `Teach a spell of ${rankWord(CFG.teachMinRank)} rank or higher to a player beside you (Arcane Arts or Priest at ${TIER_NAMES[CFG.teacherMinTier]})` });
@@ -1197,7 +1199,7 @@ module.exports = (api) => {
   globalThis.__dboTeachHere = (a, place) => { try { return !teachCollege(a, place).why && collegeTeachable(a).length > 0; } catch (e) { return false; } };
   globalThis.__dboTeachLedgerActions = (a, place) => (globalThis.__dboTeachHere(a, place) ? [{ id: 'teach', label: 'Teach a spell to a student' }] : []);
   // The students the teacher may pick: online members of the college in the room
-  const studentsAt = (a, place, fid) => onlineActors().filter((b) => b !== (a >>> 0) && inRoomOf(place, b) && studentCap(b, fid) >= 0).slice(0, MAX_ROWS);
+  const studentsAt = (a, place, fid) => onlineActors().filter((b) => b !== (a >>> 0) && inRoomOf(place, b) && studentCap(b, fid) >= 0 && listable(a, b)).slice(0, MAX_ROWS);
   // Opens the "Teach whom?" menu (widget 45) for the teacher at `place`; false when they may not teach there
   const openCollegeTeach = (a, place, note) => {
     const c = teachCollege(a, place);

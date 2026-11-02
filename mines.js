@@ -216,7 +216,9 @@ module.exports = (api) => {
   const keysOf = (a) => [`c${hex(a)}`, String(profileOf(a))];
   const stockFor = (m, key) => ((data().stock[m.id] || {})[key]) || {};
   const stockText = (st) => Object.entries(st).filter(([, n]) => n > 0).map(([d, n]) => `${n} ${data().names[d] || 'ore'}`).join(', ');
-  const nearby = (a) => onlineActors().filter((t) => (t >>> 0) !== (a >>> 0)).map((t) => { let d = Infinity; try { d = distanceMeters(a, t); } catch (e) { /* far */ } return { t, d }; })
+  // Who may be named as foreman: never a hidden GM or an invisible player (listable.js; fac-0553, 31 Oct)
+  const listable = (() => { try { const f = path.join(__dirname, 'listable.js'); delete require.cache[f]; return require(f)(mp); } catch (e) { log('mines: listable.js unreadable, so nobody nearby is named', e.message); return () => false; } })();
+  const nearby = (a) => onlineActors().filter((t) => (t >>> 0) !== (a >>> 0) && listable(a, t)).map((t) => { let d = Infinity; try { d = distanceMeters(a, t); } catch (e) { /* far */ } return { t, d }; })
     .filter((x) => x.d <= (Number(C.nameReachMeters) || 10)).sort((x, y) => x.d - y.d).slice(0, 12).map((x) => x.t);
   const taxLine = (m) => {
     try {
