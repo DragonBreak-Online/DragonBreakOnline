@@ -1228,15 +1228,16 @@ export class MasterySystem implements System {
   }
 
   // K. A client that has the F3 journal asks with preferJournal: when the gameplay's hub journal (the shell's
-  // __dboJournalLimited, and journalskills.js's Skills section) opens on Skills, the answer is { journal: true } and the
-  // client opens nothing. An older client never asks, an older server ignores the flag, an older journal has no Skills
-  // tab, and a journal that refuses (in a fight) stays shut: widget 25 opens in every one of those cases.
+  // __dboJournalLimited, and journalskills.js's Skills section) takes the request, the answer is { journal: true } and the
+  // client opens nothing. A journal that refuses (in a fight, downed, bound) has said why in the chat, as F3 does, and
+  // stays shut: the browser's widget 25 no longer opens behind it (1 Nov, the native census). An older client never
+  // asks, an older server ignores the flag, and an older journal has no Skills tab: widget 25 opens in those cases.
   private onInfoRequest(ctx: SystemContext, userId: number, content: Content): void {
     if (content && (content as Record<string, unknown>)["preferJournal"] === true && this.journalHasSkills()) {
       const actorId = this.actorOf(ctx, userId);
       const g = globalThis as any;
       let taken = false;
-      try { taken = !!actorId && g.__dboJournalOpenTab(actorId, "skills") === true && (typeof g.__dboJournalIsOpen !== "function" || g.__dboJournalIsOpen(actorId) === true); }
+      try { taken = !!actorId && g.__dboJournalOpenTab(actorId, "skills") === true; }
       catch (e) { this.log(`[skills] journal open failed: ${e}`); taken = false; }
       if (taken) { this.send(ctx, userId, { customPacketType: "masteryMenu", journal: true }); return; }
     }
