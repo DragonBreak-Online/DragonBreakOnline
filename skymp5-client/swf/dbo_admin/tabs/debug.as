@@ -116,6 +116,14 @@ TABS.debug = {
       var ty = y + 3 * 78 + 6;
       dboDivider(c, x, ty, w);
       section(c, "fxHead", 80, x, ty + 10, 500, "Active effects");
+      // Staff only: the server clears their own inventory, worn items and keys aside, on a second press within 5 s
+      if (data.admin == true)
+      {
+         btn(c, "clearInv", 140, x + w - 240, ty + 8, 240, "Clear my inventory", function()
+         {
+            req("adminClearInventory", {});
+         });
+      }
       hint(c, "fxForm", 81, x + 520, ty + 12, 200, "Form ID");
       hint(c, "fxElapsed", 82, x + 740, ty + 12, 200, "Elapsed");
       var fx = d.effects instanceof Array ? d.effects : [];
