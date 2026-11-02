@@ -61,6 +61,7 @@ type Mp = any;
 //                     { customPacketType: "adminAction", action: "giveWerewolf" | "giveVampireLord", targetName? }  | { customPacketType: "adminAction", action: "giveSpells" | "giveShouts", targetName? }  (batched over ticks)
 //                     { customPacketType: "adminAction", action: "beastForm", form: "werewolf" | "vampirelord", op: "now" | "revert" | "revoke", targetName? }
 //                     { customPacketType: "adminAction", action: "giveDisease", kind: "vampire" | "werewolf", targetName? }
+//                     { customPacketType: "adminAction", action: "giveSpell" | "removeSpell", spell, reason, force?, targetName? }
 //                     { customPacketType: "adminAction", action: "giveCurse", kind: "vampire" | "purevampire" | "werewolf" | "blessedwerewolf" | "cure" | "stage", stage?, targetName? }
 //                     { customPacketType: "adminAction", action: "setSchool", school, level, targetName? }  level 0..100 (schools.js)
 //                     { customPacketType: "adminAction", action: "staffChar", target, on }  mark (on: true) or unmark a staff character
@@ -96,7 +97,8 @@ const ADMIN_MODES: Array<{ id: string; label: string }> = [
 // Lead GM and above only (TIER_CAPS.spawn); a GM keeps teleports, kick, observing modes and the roster
 const BAN_ACTIONS = new Set(["ban", "tempBan", "ipBan", "unban"]);
 const SPAWN_ACTIONS = new Set(["kill", "deleteCharacter", "masteryGrant", "masteryReset", "masterySetTier", "masteryDrop",
-  "giveItem", "giveSpells", "giveShouts", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm", "polymorphSelf", "npcZoneAdd", "npcZoneDelete", "npcZoneReset"]);
+  "giveItem", "giveSpells", "giveShouts", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm", "polymorphSelf", "npcZoneAdd", "npcZoneDelete", "npcZoneReset",
+  "giveSpell", "removeSpell"]);
 const SPAWN_MODES = new Set(["smite", "healhit"]);
 // Panel actions whose missing target means the staff member themself (resolveTarget)
 const SELF_TARGETED = new Set(["masterySetTier", "masteryDrop", "giveItem", "giveSpells", "giveShouts", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm"]);
@@ -653,7 +655,8 @@ export class AdminSystem implements System {
       this.reply(mp, userId, true, "Done");
       return;
     }
-    if (["masterySetTier", "masteryDrop", "giveItem", "giveSpells", "giveShouts", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm"].indexOf(action) !== -1) {
+    if (["masterySetTier", "masteryDrop", "giveItem", "giveSpells", "giveShouts", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm",
+      "giveSpell", "removeSpell"].indexOf(action) !== -1) {
       const who = this.resolveTarget(mp, myActorId, content);
       if (!who) { this.reply(mp, userId, false, "No online player by that name"); return; }
       this.selfServiceAction(ctx, mp, userId, myActorId, adminProfile, action, who, content);
@@ -948,6 +951,19 @@ export class AdminSystem implements System {
         const words = list.reduce((n, s) => n + (s.words || []).length, 0);
         this.adminLog(`profile ${adminProfile} gave all ${list.length} shouts (${words} words) to ${whom}`);
         this.reply(mp, userId, true, `${list.length} shouts (${words} words) given to ${who.name}`);
+        return;
+      }
+      // One spell given or taken back: server\staffitemspells.js runs it with /givespell and /removespell's own rules (the
+      // staffguard spells kind, the held spells and force), the panel's reason standing for a command line's reason:
+      if (action === "giveSpell" || action === "removeSpell") {
+        const run = (globalThis as any).__dboStaffSpell;
+        if (typeof run !== "function") { this.reply(mp, userId, false, "This server's staffitemspells.js has no panel spells"); return; }
+        let r: { ok?: boolean; text?: string } | null = null;
+        try { r = run(myActorId, who.actorId, action === "giveSpell" ? "give" : "remove", String(content["spell"] ?? ""), String(content["reason"] ?? ""), content["force"] === true); }
+        catch (e) { this.log(`AdminSystem: ${action} failed: ${e}`); this.reply(mp, userId, false, "That did not work, see server log"); return; }
+        const ok = !!(r && r.ok);
+        if (ok) this.adminLog(`profile ${adminProfile} ${action === "giveSpell" ? "gave" : "took"} the spell ${String(content["spell"] ?? "")} ${action === "giveSpell" ? "to" : "from"} ${whom}`);
+        this.reply(mp, userId, ok, String((r && r.text) || "That did not work"));
         return;
       }
       const powers = this.powers();
