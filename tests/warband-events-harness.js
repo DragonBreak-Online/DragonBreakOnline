@@ -297,6 +297,103 @@ check('an event with nothing left is ended rather than left running',
 check('...and nothing was destroyed, because there was nothing to destroy', destroyed.length === 0,
   destroyed.length);
 
+// ---- 11. the change-form census, and orphaned raiders --------------------------------------------
+// The census must be budgeted: measured on live, a whole pass is ~6 s of blocking work (readdir of
+// 130,547 entries 48 ms, read-and-parse 0.046 ms each), so it walks censusPerTick files a tick.
+reset();
+const cfDir = path.join(dir, 'world', 'changeForms');
+fs.mkdirSync(cfDir, { recursive: true });
+const form = (name, fields, profileId) => {
+  fs.writeFileSync(path.join(cfDir, `${name}.json`), JSON.stringify({
+    formDesc: name, baseDesc: '1e7e2:Skyrim.esm',
+    profileId: profileId === undefined ? -1 : profileId, dynamicFields: fields,
+  }));
+};
+// a live actor behind each desc, so the drain can re-check it
+const place = (name, fields) => {
+  const id = nextId++;
+  descToId.set(name, id);
+  idToDesc.set(id, name);
+  for (const [k, v] of Object.entries(fields)) props.set(key(id, k), v);
+  props.set(key(id, 'isDead'), false);
+  return id;
+};
+const RAIDER = { 'private.dboCompanion': 'companion', ff_companionOf: 0, ff_hostile: true };
+const GARRISON = { 'private.dboCompanion': 'companion', ff_companionOf: 0, ff_hostile: false };
+const SUMMON = { 'private.dboCompanion': 'summon', ff_companionOf: 0, ff_hostile: true };
+const OWNED = { 'private.dboCompanion': 'companion', ff_companionOf: 0x1001, ff_hostile: true };
+form('o001', RAIDER); const o001 = place('o001', RAIDER);
+form('o002', RAIDER); const o002 = place('o002', RAIDER);
+form('g001', GARRISON); place('g001', GARRISON);
+form('s001', SUMMON); place('s001', SUMMON);
+form('c001', OWNED); place('c001', OWNED);
+form('p001', RAIDER, 2);                                   // a player character carrying the tag
+fs.writeFileSync(path.join(cfDir, 'broken.json'), '{ not json');
+// Enough untagged filler to need several ticks: the budget has a floor of 50 a tick on purpose, because
+// a smaller one would never finish a pass over the 130,547 forms live actually has.
+for (let i = 0; i < 120; i++) {
+  fs.writeFileSync(path.join(cfDir, `f${i}.json`),
+    JSON.stringify({ formDesc: `f${i}`, profileId: -1, dynamicFields: {} }));
+}
+
+W = load({ eventsMax: 4, eventMinutes: 60, eventRetirePerTick: 2, censusMinutes: 1, censusPerTick: 50 });
+// an event that claims one raider, so the census must leave it alone
+W.commands.event(GM1, 'new raid Claims one');
+const claimer = evByName('Claims one').id;
+form('e001', Object.assign({}, RAIDER, { 'private.dboEvent': claimer }));
+const e001 = place('e001', Object.assign({}, RAIDER, { 'private.dboEvent': claimer }));
+
+const files = fs.readdirSync(cfDir).filter((n) => n.endsWith('.json')).length;
+W.timers.warbandEvents.fn();
+check('a census pass does not finish in one tick (it is budgeted, not a loop)',
+  !logs.some((l) => l.includes('change-form census:')), logs.filter((l) => l.includes('census')).length);
+for (let i = 0; i < Math.ceil(files / 50) + 1; i++) W.timers.warbandEvents.fn();
+const line = logs.find((l) => l.includes('change-form census:')) || '';
+check('...and logs once when the pass completes', !!line, logs.slice(-2));
+check('the census counts the tagged forms, skipping the player character',
+  / 6 tagged of /.test(line), line);
+check('...and counts the hostile ones', / 5 hostile/.test(line), line);
+check('...and breaks them down by kind', /companion 5, summon 1/.test(line), line);
+check('...and reports the unreadable form rather than throwing', /1 unreadable/.test(line), line);
+check('...and finds exactly the two orphaned raiders', / 2 orphaned raider\(s\)/.test(line), line);
+
+// the four safety cases, which are the point of the narrow scope
+W.commands.event(GM1, 'orphans');
+// Assert the list itself, not the report text: the report prints only a count, so a check for the
+// absence of a desc in it could never fail.
+const orphanList = () => ((globalThis.__dboWarband.census || {}).last || {}).orphans || [];
+check('exactly the two released hostile raiders are orphans',
+  orphanList().slice().sort().join() === 'o001,o002', orphanList());
+check('a settled garrison is never an orphan (companion, released, friendly)',
+  !orphanList().includes('g001'), orphanList());
+check('a released summon is never an orphan, whatever its flags',
+  !orphanList().includes('s001'), orphanList());
+check('an NPC a live event claims is never an orphan',
+  !orphanList().includes('e001'), orphanList());
+check('the report says 2 and explains what is excluded',
+  /^2 orphaned raider/.test(lastSaid()) && /summons and thralls are never included/.test(lastSaid()),
+  lastSaid());
+
+// the live re-check: o002 is claimed again between the pass and the clear, so it must survive
+props.set(key(o002, 'ff_companionOf'), 0x1002);
+W.commands.event(GM1, 'orphans clear');
+check('clearing queues both', /2 orphaned raider\(s\) queued/.test(lastSaid()), lastSaid());
+for (let i = 0; i < 6; i++) W.timers.warbandEvents.fn();
+check('only the one still orphaned is destroyed', destroyed.length === 1 && destroyed[0] === o001,
+  destroyed.map((x) => x.toString(16)));
+check('...and the one re-claimed since the pass survives the sweep', !destroyed.includes(o002));
+check('...and the one a live event owns was never queued', !destroyed.includes(e001));
+
+// a second pass reports the movement, which is what makes the count a leading indicator
+logs.length = 0;
+form('o003', RAIDER); place('o003', RAIDER);
+const was = Date.now;
+Date.now = () => was() + 2 * 60000;
+for (let i = 0; i < Math.ceil((files + 2) / 50) + 2; i++) W.timers.warbandEvents.fn();
+Date.now = was;
+const second = logs.find((l) => l.includes('change-form census:')) || '';
+check('a later pass says how the count moved since the last one', /since the last pass/.test(second), second);
+
 // ---- done ----------------------------------------------------------------------------------------
 process.chdir(home);
 try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* Windows EBUSY */ }

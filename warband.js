@@ -28,7 +28,7 @@
 //            onlogout dismiss|settle
 //   /raid [all | clear [raiders|garrison|<id>] | clear all]
 //   /event list | new <raid|siege|invasion|defence> [name] | info | side <name> | deadline <minutes> |
-//          attach | start | sweep | end [held|fell] [id]
+//          attach | start | sweep | end [held|fell] [id] | census | orphans [clear]
 // An event (phase 1, Nat 1 Nov, design _work\warband-revamp-1101.md) is a record with a type, a place, an
 // owner, sides and a deadline. Its NPCs carry private.dboEvent, so ending it clears them even after a
 // restart or a GM crash, and a watchdog ends it if nobody does. Waves, the density budget and host pinning
@@ -55,6 +55,9 @@ module.exports = (api) => {
     // Events (phase 1, 1 Nov): eventsMax running at once, eventMinutes the default deadline, eventRadius the
     // area an event names, eventRetirePerTick how many of its NPCs are destroyed a second when it ends
     eventsMax: 8, eventMinutes: 120, eventRadius: 3000, eventRetirePerTick: 4,
+    // The change-form census (W4 through the Leader, 1 Nov): censusMinutes between passes, censusPerTick
+    // files a second (a whole pass at once is ~6 s of blocking work, measured), orphanMax kept per pass
+    censusMinutes: 60, censusPerTick: 500, orphanMax: 400,
     viewRadius: 4200, onLogout: 'dismiss', presetsMax: 40, guardRadius: 1500, guardLeash: 500, guardWalkSeconds: 20, patrolResendSeconds: 30, guardReportSeconds: 30 }, cfg.warband || {});
   // Every answer is said in chat as before, and kept as the last line the panel shows (W3)
   const lastSaid = globalThis.__dboWarbandSaid instanceof Map ? globalThis.__dboWarbandSaid : (globalThis.__dboWarbandSaid = new Map());
@@ -937,6 +940,108 @@ module.exports = (api) => {
   const byId = (id) => S.events.get(String(id || '').toLowerCase()) || null;
   const running = () => Array.from(S.events.values()).filter((ev) => ev.state !== 'ended');
 
+  // ---- the change-form census, and orphaned raiders ---------------------------------------------
+  // W4 through the Leader, 1 Nov: live carries 1,566 change forms tagged private.dboCompanion (145 of them
+  // ff_hostile) because releaseToWorld never clears the tag, and crash families #4 (Havok variable binding)
+  // and #6 (hdtsmp64 on a zeroed Character) are both "an actor torn down while something still references
+  // it" - so a count that climbs between restarts is a leading indicator, not a curiosity.
+  //
+  // Why this is budgeted rather than a loop. Measured on live: readdir of 130,547 entries is 48 ms, and a
+  // read-and-parse is 0.046 ms each, so **a full pass is about 6 seconds of blocking work**. Six seconds of
+  // a stalled event loop is visible to every player. So a pass walks censusPerTick files on the one-second
+  // event timer with a rolling cursor - the shape W4 used to take the decor sweep from 1,700 refs to 120 -
+  // and logs once when it completes. At the defaults that is 23 ms a second for about four minutes an hour.
+  const changeFormsDir = () => {
+    try { return path.join(fs.realpathSync(path.resolve('world')), 'changeForms'); }
+    catch (e) { return path.resolve('world', 'changeForms'); }
+  };
+  if (!S.census || typeof S.census !== 'object') S.census = { names: null, cursor: 0, at: 0, last: null };
+
+  // An orphan is a raider nothing can reach any more: the in-memory record died with a restart, so no GM can
+  // clear it with /raid clear. The scope is deliberately narrow, and measured rather than assumed - of the
+  // 1,566 tagged forms on live, 1,292 are released SUMMONS and 17 are reanimated thralls, which belong to
+  // players' magic and not to a GM event. Sweeping on the tag alone would reach into those. kind
+  // 'companion' plus released plus hostile is exactly the 145 raider leftovers, and a settled garrison
+  // (companion, released, friendly: 127 of them) is a deliberate GM placement, so it is left alone.
+  const orphanFromForm = (form) => {
+    if (!form || Number(form.profileId === undefined ? -1 : form.profileId) >= 0) return null;
+    const df = form.dynamicFields;
+    if (!df || typeof df !== 'object') return null;
+    if (String(df['private.dboCompanion'] || '') !== 'companion') return null;
+    if (df['ff_companionOf']) return null;                       // still owned: a live follower
+    if (df['ff_hostile'] !== true) return null;                  // a settled garrison, placed on purpose
+    const ev = String(df['private.dboEvent'] || '');
+    if (ev) { const e = byId(ev); if (e && e.state !== 'ended') return null; }   // a live event owns it
+    const desc = String(form.formDesc || '');
+    return desc || null;
+  };
+
+  const censusTick = () => {
+    const every = Math.max(0, Number(C.censusMinutes) || 0);
+    if (!every) return;
+    const cs = S.census;
+    const now = Date.now();
+    if (!cs.names) {
+      if (cs.at && now - cs.at < every * 60000) return;
+      let names = null;
+      try { names = fs.readdirSync(changeFormsDir()); } catch (e) {
+        cs.at = now;
+        say('census-dir', `warband: change-form census skipped, ${changeFormsDir()} unreadable (${e.message})`);
+        return;
+      }
+      cs.names = names.filter((n) => n.endsWith('.json'));
+      cs.cursor = 0;
+      cs.startedAt = now;
+      cs.run = { files: cs.names.length, tagged: 0, hostile: 0, kinds: {}, orphans: [], unreadable: 0 };
+    }
+    const per = Math.max(50, Number(C.censusPerTick) || 500);
+    const end = Math.min(cs.names.length, cs.cursor + per);
+    const dir = changeFormsDir();
+    for (; cs.cursor < end; cs.cursor++) {
+      let form = null;
+      try { form = JSON.parse(fs.readFileSync(path.join(dir, cs.names[cs.cursor]), 'utf8')); }
+      catch (e) { cs.run.unreadable++; continue; }
+      // A player character is not leftover actor state, and companionSystem's own sweep skips it too, so
+      // the number logged here is comparable with the 1,566 measured on live the same way.
+      if (!form || Number(form.profileId === undefined ? -1 : form.profileId) >= 0) continue;
+      const df = form.dynamicFields || null;
+      if (!df || typeof df !== 'object' || !('private.dboCompanion' in df)) continue;
+      cs.run.tagged++;
+      if (df['ff_hostile'] === true) cs.run.hostile++;
+      const kind = String(df['private.dboCompanion'] || '?');
+      cs.run.kinds[kind] = (cs.run.kinds[kind] || 0) + 1;
+      const orphan = orphanFromForm(form);
+      if (orphan && cs.run.orphans.length < Math.max(0, Number(C.orphanMax) || 400)) cs.run.orphans.push(orphan);
+    }
+    if (cs.cursor < cs.names.length) return;
+    const took = Date.now() - cs.startedAt;
+    const r = cs.run;
+    r.at = Date.now();
+    const before = cs.last;
+    cs.last = r;
+    cs.names = null;
+    cs.at = Date.now();
+    const kinds = Object.keys(r.kinds).sort().map((k) => `${k} ${r.kinds[k]}`).join(', ');
+    const moved = before ? ` (was ${before.tagged}/${before.hostile}, ${r.tagged - before.tagged >= 0 ? '+' : ''}${r.tagged - before.tagged} tagged, ${r.hostile - before.hostile >= 0 ? '+' : ''}${r.hostile - before.hostile} hostile since the last pass)` : '';
+    log(`warband: change-form census: ${r.tagged} tagged of ${r.files} forms, ${r.hostile} hostile (${kinds}); ${r.orphans.length} orphaned raider(s); ${r.unreadable} unreadable; pass took ${Math.round(took / 1000)} s${moved}`);
+  };
+
+  // Queue the orphans the last completed pass found. Every one is re-checked against the live actor before
+  // it is destroyed, because a change form is the persisted state and can lag what is in the world.
+  const sweepOrphans = (byText) => {
+    const r = S.census.last;
+    if (!r) return -1;
+    let n = 0;
+    const queued = new Set(S.retire.filter((x) => !x.eventId).map((x) => x.desc));
+    for (const desc of r.orphans) {
+      if (queued.has(desc)) continue;
+      S.retire.push({ eventId: '', desc });
+      n++;
+    }
+    if (n) audit(`EVENT orphan sweep by ${byText}: ${n} raider(s) queued, ${C.eventRetirePerTick}/s`);
+    return n;
+  };
+
   const placeOf = (a) => {
     const place = { world: '', pos: [0, 0, 0], radius: Math.max(200, Number(C.eventRadius) || 3000) };
     try { place.world = String(mp.get(a, 'worldOrCellDesc') || ''); } catch (e) { /* kept blank */ }
@@ -975,6 +1080,25 @@ module.exports = (api) => {
       saveEvents();
       audit(`EVENT ${id} created by ${who(a)} (${type}${ev.name ? ` "${ev.name}"` : ''}) at ${ev.place.world || 'an unknown cell'}, ends ${clock(ev.deadlineAt)} UTC`);
       return tell(a, `Event ${id} drafted here (${type}, ${meters(ev.place.radius)} m, ends ${clock(ev.deadlineAt)} UTC). /event attach puts your warband in it, /event start begins it, /event end ends and clears it.`);
+    }
+
+    if (cmd === 'census') {
+      const r = S.census.last;
+      if (!r) return tell(a, `No census pass has finished yet; one runs every ${C.censusMinutes} min at ${C.censusPerTick} files a second.`);
+      const kinds = Object.keys(r.kinds).sort().map((k) => `${k} ${r.kinds[k]}`).join(', ');
+      return tell(a, `Change forms ${r.files}: ${r.tagged} tagged (${kinds}), ${r.hostile} hostile, ${r.orphans.length} orphaned raider(s); read ${Math.round((Date.now() - r.at) / 60000)} min ago.`);
+    }
+
+    // Deliberately NOT part of ending an event: ending one GM's event must never remove another GM's
+    // standing raiders. And deliberately narrow - see orphanFromForm. Staff ask for it, it does not happen.
+    if (cmd === 'orphans') {
+      const r = S.census.last;
+      if (!r) return tell(a, 'No census pass has finished yet, so nothing is known about orphans.');
+      if ((parts[0] || '').toLowerCase() !== 'clear') {
+        return tell(a, `${r.orphans.length} orphaned raider(s) as of ${Math.round((Date.now() - r.at) / 60000)} min ago: released, hostile, claimed by no live event and no GM record, so no /raid clear can reach them. /event orphans clear removes them at ${C.eventRetirePerTick}/s. Settled garrisons and players' summons and thralls are never included.`);
+      }
+      const n = sweepOrphans(who(a));
+      return tell(a, n > 0 ? `${n} orphaned raider(s) queued for removal at ${C.eventRetirePerTick}/s; each is re-checked against the live actor before it goes.` : 'Nothing orphaned to remove.');
     }
 
     const ev = arg && byId(arg) ? byId(arg) : myEvent(a);
@@ -1048,10 +1172,10 @@ module.exports = (api) => {
       return tell(a, n ? `${n} NPC(s) of ${ev.id} queued for removal at ${C.eventRetirePerTick}/s.` : `Nothing of ${ev.id} is left to remove.`);
     }
 
-    return tell(a, 'Usage: /event list | new <type> [name] | info | side <name> | deadline <minutes> | attach | start | sweep | end [held|fell] [id].');
+    return tell(a, 'Usage: /event list | new <type> [name] | info | side <name> | deadline <minutes> | attach | start | sweep | end [held|fell] [id] | census | orphans [clear].');
   };
 
-  registerChatCommand('event', eventCmd, { admin: true, help: 'list | new <raid|siege|invasion|defence> [name] | info | side <name> | deadline <minutes> | attach | start | sweep | end [held|fell]: a GM event with a deadline, tagged NPCs and a clean-up that survives a restart' });
+  registerChatCommand('event', eventCmd, { admin: true, help: 'list | new <raid|siege|invasion|defence> [name] | info | side <name> | deadline <minutes> | attach | start | sweep | end [held|fell] | census | orphans [clear]: a GM event with a deadline, tagged NPCs and a clean-up that survives a restart' });
 
   // Every second: drain a few retirements, then end any event whose deadline has passed. One named timer,
   // no new mp.on - a hot reload replaces it instead of stacking another.
@@ -1061,6 +1185,23 @@ module.exports = (api) => {
     let done = 0;
     while (S.retire.length && done < per) {
       const r = S.retire.shift();
+      if (!r.eventId) {
+        // An orphan. The change form is persisted state and can lag the world, so every condition is
+        // re-read from the live actor here, and anything a GM or an event has since claimed is left alone.
+        const oid = idOfDesc(r.desc);
+        if (!oid || S.owners.has(oid)) continue;
+        let kind = '', owner = 0, hostile = false, evTag = '';
+        try {
+          kind = String(mp.get(oid, 'private.dboCompanion') || '');
+          owner = Number(mp.get(oid, 'ff_companionOf')) >>> 0;
+          hostile = mp.get(oid, 'ff_hostile') === true;
+          evTag = String(mp.get(oid, EVENT_TAG) || '');
+        } catch (e) { continue; }
+        const live = evTag && byId(evTag) && byId(evTag).state !== 'ended';
+        if (kind !== 'companion' || owner || !hostile || live) continue;
+        try { mp.destroyActor(oid); done++; } catch (e) { log(`warband: could not remove orphan ${oid.toString(16)}`, e.message); }
+        continue;
+      }
       const ev = byId(r.eventId);
       if (!ev) continue;
       const m = (ev.members || []).find((x) => x.desc === r.desc);
@@ -1076,6 +1217,7 @@ module.exports = (api) => {
     for (const ev of running()) {
       if (ev.deadlineAt && ev.deadlineAt <= now) endEvent(ev, 'the watchdog', ev.outcome || 'abandoned', 'its deadline passed');
     }
+    censusTick();
   };
   globalThis.__dboWarbandEventTick = eventTick;
   if (typeof api.every === 'function') api.every('warbandEvents', 1000, () => { try { eventTick(); } catch (e) { log('warband: event tick failed', e.message); } });
