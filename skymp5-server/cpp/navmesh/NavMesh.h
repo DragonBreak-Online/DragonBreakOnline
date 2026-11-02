@@ -24,7 +24,7 @@ struct TileInput
   int cellY = 0;
   int layer = 0;
   float tileSize = 4096.f;
-  // An interior cell is one tile bounded by its own vertices, for a NavWorld made with interior true
+  // An interior is one tile bounded by its vertices (NavWorld interior)
   bool interior = false;
   std::vector<Vec3> vertices;
   std::vector<std::array<uint32_t, 3>> triangles;
@@ -37,20 +37,19 @@ void AppendMesh(TileInput& input, const std::vector<Vec3>& vertices,
                 const std::vector<std::array<uint32_t, 3>>& triangles,
                 const std::vector<uint16_t>& flags = {});
 
-// Builds a Detour tile: vertices at one spot are welded, so meshes sharing an edge connect, and edges on the cell
-// border become portals to the neighbour tile
+// Builds a Detour tile; border edges become portals to neighbour cells
 bool BuildTile(const TileInput& input, std::vector<uint8_t>& out,
                std::string* error = nullptr);
 
 // The standard Detour "MSET" file (RecastDemo's format), from built tiles
-std::vector<uint8_t> WriteTileSet(const std::vector<std::vector<uint8_t>>& tiles,
-                                  float tileSize = 4096.f, int maxTiles = 512,
-                                  int maxPolys = 8192);
+std::vector<uint8_t> WriteTileSet(
+  const std::vector<std::vector<uint8_t>>& tiles, float tileSize = 4096.f,
+  int maxTiles = 512, int maxPolys = 8192);
 
 class NavWorld
 {
 public:
-  // maxTiles is how many tiles may be loaded at once; tileBits + polyBits must stay within 22
+  // maxTiles: tiles loaded at once; tile bits + poly bits must fit in 22
   explicit NavWorld(float tileSize = 4096.f, int maxTiles = 512,
                     int maxPolys = 8192, bool interior = false);
   ~NavWorld();
@@ -68,7 +67,7 @@ public:
                                       const Vec3& extents = { 256.f, 256.f,
                                                               512.f });
 
-  // Corner points from start to end; partial is set when the end could not be reached and the path stops short
+  // Corner points; partial when the end is unreachable and it stops short
   bool FindPath(const Vec3& from, const Vec3& to, std::vector<Vec3>& out,
                 bool* partial = nullptr,
                 const Vec3& extents = { 256.f, 256.f, 512.f });

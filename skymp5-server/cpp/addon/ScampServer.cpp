@@ -32,9 +32,9 @@
 #include <cassert>
 #include <cctype>
 #include <chrono>
+#include <database_drivers/DatabaseFactory.h>
 #include <fstream>
 #include <iterator>
-#include <database_drivers/DatabaseFactory.h>
 #include <memory>
 #include <napi.h>
 #include <prometheus/core.h>
@@ -392,7 +392,7 @@ ScampServer::ScampServer(const Napi::CallbackInfo& info)
                  partOne->worldState.isPapyrusHotReloadEnabled ? "enabled"
                                                                : "disabled");
 
-    // Navmesh tiles are built here at boot only; a world that fails to load is skipped, never built later
+    // Navmesh tiles build at boot only; a failed file is skipped, not retried
     if (serverSettings.contains("navmeshFiles") &&
         serverSettings["navmeshFiles"].is_array()) {
       for (const auto& entry : serverSettings["navmeshFiles"]) {
@@ -410,11 +410,11 @@ ScampServer::ScampServer(const Napi::CallbackInfo& info)
         } else if (!nav.Load(bytes, &loaded, &error)) {
           logger->error("navmesh: '{}' not loaded: {}", path, error);
         } else {
-          logger->info(
-            "navmesh: '{}' loaded {} world(s) in {} ms", path, loaded.size(),
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-              std::chrono::steady_clock::now() - t0)
-              .count());
+          logger->info("navmesh: '{}' loaded {} world(s) in {} ms", path,
+                       loaded.size(),
+                       std::chrono::duration_cast<std::chrono::milliseconds>(
+                         std::chrono::steady_clock::now() - t0)
+                         .count());
         }
       }
     }
@@ -1854,7 +1854,8 @@ Napi::Value ScampServer::NavWorlds(const Napi::CallbackInfo& info)
   const auto worlds = nav.Worlds();
   auto res = Napi::Array::New(info.Env(), worlds.size());
   for (size_t i = 0; i < worlds.size(); ++i) {
-    res.Set(static_cast<uint32_t>(i), Napi::String::New(info.Env(), worlds[i]));
+    res.Set(static_cast<uint32_t>(i),
+            Napi::String::New(info.Env(), worlds[i]));
   }
   return res;
 }
@@ -1873,8 +1874,8 @@ Napi::Value ScampServer::NavFindPath(const Napi::CallbackInfo& info)
 {
   try {
     const auto world = NapiHelper::ExtractString(info[0], "world");
-    const auto r = nav.FindPath(world, NavPoint(info[1], "from"),
-                                NavPoint(info[2], "to"));
+    const auto r =
+      nav.FindPath(world, NavPoint(info[1], "from"), NavPoint(info[2], "to"));
     if (!r) {
       return info.Env().Null();
     }

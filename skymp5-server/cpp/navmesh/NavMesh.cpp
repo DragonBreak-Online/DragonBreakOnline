@@ -16,7 +16,7 @@
 namespace navmesh {
 namespace {
 
-// Detour is Y up: Skyrim (x, y, z) is Detour (x, z, -y), a rotation, so winding is kept
+// Detour is Y up: Skyrim (x, y, z) is (x, z, -y), which keeps winding
 void ToDetour(const Vec3& v, float* out)
 {
   out[0] = v.x;
@@ -67,7 +67,7 @@ dtQueryFilter AllFilter()
   return filter;
 }
 
-// Detour clamps the search box to each tile, so a hit far outside it comes back too; this keeps only hits inside
+// Detour clamps the search box per tile; keep only hits inside the box
 dtPolyRef Snap(const dtNavMeshQuery* query, const float* p, const float* ext,
                float* nearest)
 {
@@ -92,11 +92,12 @@ void AppendMesh(TileInput& input, const std::vector<Vec3>& vertices,
                 const std::vector<uint16_t>& flags)
 {
   const auto base = static_cast<uint32_t>(input.vertices.size());
-  // Flags stay per triangle across meshes: a mesh without them fills 1s once another has some
+  // Keeps flags per triangle when only some meshes carry them
   if (!flags.empty() && input.flags.empty()) {
     input.flags.assign(input.triangles.size(), 1);
   }
-  input.vertices.insert(input.vertices.end(), vertices.begin(), vertices.end());
+  input.vertices.insert(input.vertices.end(), vertices.begin(),
+                        vertices.end());
   for (const auto& t : triangles) {
     input.triangles.push_back({ t[0] + base, t[1] + base, t[2] + base });
   }
@@ -133,7 +134,7 @@ bool BuildTile(const TileInput& input, std::vector<uint8_t>& out,
     ToDetour(input.vertices[i], dv[i].data());
   }
 
-  // An exterior tile is its cell: x from the west edge, z from the north edge (Skyrim's larger y)
+  // An exterior tile is its cell; z starts at the north edge (Skyrim max y)
   float minX, maxX, minZ, maxZ, cs = kCellSize;
   if (input.interior) {
     minX = minZ = 1e30f;
@@ -157,7 +158,7 @@ bool BuildTile(const TileInput& input, std::vector<uint8_t>& out,
     minZ = -(input.cellY + 1) * s;
     maxZ = minZ + s;
     for (auto& v : dv) {
-      // A vertex on the cell edge is snapped to it, so the neighbour tile's portal matches exactly
+      // Snap edge vertices onto the cell line so neighbour portals match
       for (auto [axis, lo, hi] :
            { std::tuple{ 0, minX, maxX }, std::tuple{ 2, minZ, maxZ } }) {
         float& c = v[axis];
@@ -180,7 +181,7 @@ bool BuildTile(const TileInput& input, std::vector<uint8_t>& out,
   }
   const float ch = std::max(kCellSize, (maxY - minY) / 65000.f);
 
-  // Vertices at one quantised spot become one, which joins navmeshes that share an edge
+  // Weld vertices at one quantised spot, joining meshes that share an edge
   std::map<std::array<unsigned short, 3>, uint16_t> weld;
   std::vector<unsigned short> qverts;
   std::vector<uint16_t> remap(nVerts);
@@ -203,7 +204,7 @@ bool BuildTile(const TileInput& input, std::vector<uint8_t>& out,
   }
   const auto qv = [&](uint16_t i) { return &qverts[i * 3]; };
 
-  // Each triangle goes in one winding seen from above, whatever order the record had; welded-flat ones drop
+  // One winding for every triangle; triangles welded flat are dropped
   std::vector<std::array<uint16_t, 3>> tris;
   std::vector<unsigned short> flags;
   for (size_t i = 0; i < input.triangles.size(); ++i) {
@@ -216,9 +217,10 @@ bool BuildTile(const TileInput& input, std::vector<uint8_t>& out,
     const auto* a = qv(t[0]);
     const auto* b = qv(t[1]);
     const auto* c = qv(t[2]);
-    const long long area =
-      (static_cast<long long>(c[0]) - a[0]) * (static_cast<long long>(b[2]) - a[2]) -
-      (static_cast<long long>(b[0]) - a[0]) * (static_cast<long long>(c[2]) - a[2]);
+    const long long area = (static_cast<long long>(c[0]) - a[0]) *
+        (static_cast<long long>(b[2]) - a[2]) -
+      (static_cast<long long>(b[0]) - a[0]) *
+        (static_cast<long long>(c[2]) - a[2]);
     if (area < 0) {
       std::swap(t[1], t[2]);
     }
@@ -231,7 +233,7 @@ bool BuildTile(const TileInput& input, std::vector<uint8_t>& out,
     return false;
   }
 
-  // Shared edges give the neighbours; an edge on the cell border with none is a portal
+  // Shared edges give neighbours; an unshared cell-border edge is a portal
   std::map<std::pair<uint16_t, uint16_t>, int> edgeOwner;
   std::vector<unsigned short> polys(nTris * 6, 0xffff);
   for (size_t i = 0; i < nTris; ++i) {
@@ -264,7 +266,7 @@ bool BuildTile(const TileInput& input, std::vector<uint8_t>& out,
       }
       const auto* a = qv(tris[i][j]);
       const auto* b = qv(tris[i][(j + 1) % 3]);
-      // Detour's border codes: 0 x-, 1 z+, 2 x+, 3 z-, 0xf a plain border; an interior has no portals
+      // Border codes: 0 x-, 1 z+, 2 x+, 3 z-, 0xf none; interiors have none
       unsigned short dir = 0xf;
       if (!input.interior) {
         if (a[0] == 0 && b[0] == 0) {
@@ -350,7 +352,7 @@ NavWorld::NavWorld(float tileSize_, int maxTiles, int maxPolys, bool interior_)
 {
   dtNavMeshParams params;
   std::memset(&params, 0, sizeof(params));
-  // An interior's one tile is centred on the origin, so any coordinate it holds falls in tile 0,0
+  // An interior's tile is centred on the origin, so it is always tile 0,0
   if (interior) {
     params.orig[0] = params.orig[2] = -kInteriorTileSize / 2;
   }
@@ -376,7 +378,7 @@ bool NavWorld::IsValid() const
   return mesh != nullptr;
 }
 
-// The query's node pool is made on first use, so a thousand loaded interiors cost nothing until one is searched
+// The node pool is made on first use, so idle interiors cost nothing
 dtNavMeshQuery* NavWorld::Query()
 {
   if (!lazyQuery && mesh) {
@@ -399,7 +401,8 @@ bool NavWorld::AddTile(const std::vector<uint8_t>& data, std::string* error)
     SetError(error, "tile data is too short");
     return false;
   }
-  auto* copy = static_cast<unsigned char*>(dtAlloc(data.size(), DT_ALLOC_PERM));
+  auto* copy =
+    static_cast<unsigned char*>(dtAlloc(data.size(), DT_ALLOC_PERM));
   if (!copy) {
     SetError(error, "out of memory");
     return false;
@@ -529,7 +532,7 @@ bool NavWorld::FindPath(const Vec3& from, const Vec3& to,
   if (dtStatusFailed(status) || pathCount == 0) {
     return false;
   }
-  // A partial path ends on the polygon nearest the goal, at the closest point on it
+  // A partial path ends at the closest point on the polygon nearest the goal
   const bool isPartial = path[pathCount - 1] != endRef;
   if (isPartial) {
     query->closestPointOnPoly(path[pathCount - 1], end, end, nullptr);
@@ -537,10 +540,9 @@ bool NavWorld::FindPath(const Vec3& from, const Vec3& to,
 
   float straight[kMaxStraight * 3];
   int straightCount = 0;
-  if (dtStatusFailed(query->findStraightPath(start, end, path.data(),
-                                             pathCount, straight, nullptr,
-                                             nullptr, &straightCount,
-                                             kMaxStraight))) {
+  if (dtStatusFailed(query->findStraightPath(
+        start, end, path.data(), pathCount, straight, nullptr, nullptr,
+        &straightCount, kMaxStraight))) {
     return false;
   }
   for (int i = 0; i < straightCount; ++i) {

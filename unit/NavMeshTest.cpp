@@ -30,11 +30,11 @@ TileInput Square(int cx, int cy, float z = 0.f, bool reversed = false)
   return t;
 }
 
-// An L corridor in cell 0,0: a strip along the south edge and one up the east edge, 512 wide
+// An L corridor in cell 0,0, 512 wide: along the south edge, then north
 TileInput Corridor(bool reversed)
 {
   TileInput t;
-  t.vertices = { { 0, 0, 0 },       { kS, 0, 0 },         { kS, kS, 0 },
+  t.vertices = { { 0, 0, 0 },         { kS, 0, 0 },         { kS, kS, 0 },
                  { kS - 512, kS, 0 }, { kS - 512, 512, 0 }, { 0, 512, 0 } };
   t.triangles = { { 0, 1, 4 }, { 0, 4, 5 }, { 1, 2, 3 }, { 1, 3, 4 } };
   if (reversed) {
@@ -83,8 +83,9 @@ TEST_CASE("NavMesh: an open floor gives a straight path", "[NavMesh]")
   REQUIRE(Dist2D(path.back(), { 3000, 3500, 0 }) < 1.f);
 }
 
-TEST_CASE("NavMesh: a corridor's path turns at the inner corner, in either winding",
-          "[NavMesh]")
+TEST_CASE(
+  "NavMesh: a corridor's path turns at the inner corner, in either winding",
+  "[NavMesh]")
 {
   for (bool reversed : { false, true }) {
     INFO("reversed " << reversed);
@@ -92,7 +93,8 @@ TEST_CASE("NavMesh: a corridor's path turns at the inner corner, in either windi
     REQUIRE(world.AddTile(Built(Corridor(reversed))));
     std::vector<Vec3> path;
     bool partial = true;
-    REQUIRE(world.FindPath({ 200, 250, 0 }, { 3840, 3800, 0 }, path, &partial));
+    REQUIRE(
+      world.FindPath({ 200, 250, 0 }, { 3840, 3800, 0 }, path, &partial));
     REQUIRE_FALSE(partial);
     REQUIRE(path.size() == 3);
     REQUIRE(Dist2D(path[1], { kS - 512, 512, 0 }) < 2.f);
@@ -115,10 +117,12 @@ TEST_CASE("NavMesh: a path crosses into the next cell through its portal",
   REQUIRE(world.AddTile(Built(Square(1, 0, 0.f, true))));
   REQUIRE(world.AddTile(Built(Square(0, 1))));
   REQUIRE(world.TileCount() == 3);
-  REQUIRE(world.FindPath({ 100, 100, 0 }, { kS + 2000, 200, 0 }, path, &partial));
+  REQUIRE(
+    world.FindPath({ 100, 100, 0 }, { kS + 2000, 200, 0 }, path, &partial));
   REQUIRE_FALSE(partial);
   REQUIRE(Dist2D(path.back(), { kS + 2000, 200, 0 }) < 1.f);
-  REQUIRE(world.FindPath({ 100, 100, 0 }, { 300, kS + 3000, 0 }, path, &partial));
+  REQUIRE(
+    world.FindPath({ 100, 100, 0 }, { 300, kS + 3000, 0 }, path, &partial));
   REQUIRE_FALSE(partial);
   REQUIRE(Dist2D(path.back(), { 300, kS + 3000, 0 }) < 1.f);
 
@@ -127,20 +131,21 @@ TEST_CASE("NavMesh: a path crosses into the next cell through its portal",
   REQUIRE(world.TileCount() == 2);
   REQUIRE_FALSE(world.FindPath({ 100, 100, 0 }, { kS + 2000, 200, 0 }, path));
 
-  // A neighbour whose edge vertices sit a little off the cell line still joins: they are snapped onto it
+  // A neighbour with edge vertices slightly off the line joins once snapped
   auto loose = Square(1, 0);
   loose.vertices[0].x += 0.3f;
   loose.vertices[3].x += 0.4f;
   REQUIRE(world.AddTile(Built(loose)));
-  REQUIRE(world.FindPath({ 100, 100, 0 }, { kS + 2000, 200, 0 }, path, &partial));
+  REQUIRE(
+    world.FindPath({ 100, 100, 0 }, { kS + 2000, 200, 0 }, path, &partial));
   REQUIRE_FALSE(partial);
 }
 
 TEST_CASE("NavMesh: an island out of reach gives a partial path", "[NavMesh]")
 {
   TileInput t;
-  t.vertices = { { 0, 0, 0 },       { 1000, 0, 0 },    { 1000, 1000, 0 },
-                 { 0, 1000, 0 },    { 3000, 3000, 0 }, { 4000, 3000, 0 },
+  t.vertices = { { 0, 0, 0 },      { 1000, 0, 0 },    { 1000, 1000, 0 },
+                 { 0, 1000, 0 },   { 3000, 3000, 0 }, { 4000, 3000, 0 },
                  { 4000, 4000, 0 } };
   t.triangles = { { 0, 1, 2 }, { 0, 2, 3 }, { 4, 5, 6 } };
   NavWorld world;
@@ -168,16 +173,17 @@ TEST_CASE("NavMesh: two navmeshes in one cell take two layers", "[NavMesh]")
   REQUIRE(std::fabs(p->z - 500.f) < 1.f);
 }
 
-TEST_CASE("NavMesh: a cell's navmeshes that share an edge are one walkable floor",
-          "[NavMesh]")
+TEST_CASE(
+  "NavMesh: a cell's navmeshes that share an edge are one walkable floor",
+  "[NavMesh]")
 {
-  // Two navmesh records split the cell at x 2048, each with its own copy of the shared vertices
+  // Two meshes split the cell at x 2048, each with its own shared vertices
   TileInput t;
   AppendMesh(t, { { 0, 0, 0 }, { 2048, 0, 0 }, { 2048, kS, 0 }, { 0, kS, 0 } },
              { { 0, 1, 2 }, { 0, 2, 3 } });
-  AppendMesh(t,
-             { { 2048, 0, 0.2f }, { kS, 0, 0 }, { kS, kS, 0 }, { 2048, kS, 0.2f } },
-             { { 0, 1, 2 }, { 0, 2, 3 } }, { 1, 1 });
+  AppendMesh(
+    t, { { 2048, 0, 0.2f }, { kS, 0, 0 }, { kS, kS, 0 }, { 2048, kS, 0.2f } },
+    { { 0, 1, 2 }, { 0, 2, 3 } }, { 1, 1 });
   REQUIRE(t.triangles.size() == 4);
   REQUIRE(t.triangles[2][0] == 4);
   REQUIRE(t.flags.size() == 4);

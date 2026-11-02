@@ -14,7 +14,7 @@ constexpr float kS = 4096.f;
 constexpr uint32_t kFileVersion = 3;
 constexpr size_t kDesc = 96;
 
-// A test-side DBONAV v3 writer, so the reader is checked against the layout and not against itself
+// A test-side DBONAV v3 writer, so the reader is checked against the layout
 class Writer
 {
 public:
@@ -120,9 +120,10 @@ std::vector<uint8_t> Write(const std::string& world,
   return w.bytes;
 }
 
-// A whole-cell square as one mesh; westOff moves the west edge's vertices off the cell line
-SynthMesh SquareMesh(int cx, int cy, const std::string& desc, float westOff = 0.f,
-                     uint16_t flags0 = 0x0800, uint16_t flags1 = 0x0800)
+// A whole-cell square mesh; westOff moves its west edge off the cell line
+SynthMesh SquareMesh(int cx, int cy, const std::string& desc,
+                     float westOff = 0.f, uint16_t flags0 = 0x0800,
+                     uint16_t flags1 = 0x0800)
 {
   const float x0 = cx * kS, y0 = cy * kS;
   SynthMesh m;
@@ -152,9 +153,10 @@ TEST_CASE("DboNav: a file reads back with its tiles, meshes, flags and links",
 {
   auto east = SquareMesh(1, 0, "test.esp:000002", 0.f, 0x0c00);
   east.links = { { 0, 0, 1 } };
-  const auto bytes = Write("test.esp:00003c",
-                           { Tile(0, 0, { SquareMesh(0, 0, "test.esp:000001") }),
-                             Tile(1, 0, { east }) });
+  const auto bytes =
+    Write("test.esp:00003c",
+          { Tile(0, 0, { SquareMesh(0, 0, "test.esp:000001") }),
+            Tile(1, 0, { east }) });
   DboNavFile file;
   std::string error;
   INFO(error);
@@ -172,25 +174,29 @@ TEST_CASE("DboNav: a file reads back with its tiles, meshes, flags and links",
 
   // Bit 10 is the door flag and nothing else is read from the flag word
   const auto in = ToTileInput(file.tiles[1], false);
-  REQUIRE(in.flags == std::vector<uint16_t>{ kPolyWalk | kPolyDoor, kPolyWalk });
+  REQUIRE(in.flags ==
+          std::vector<uint16_t>{ kPolyWalk | kPolyDoor, kPolyWalk });
   REQUIRE(in.triangles.size() == 2);
 }
 
 TEST_CASE("DboNav: tiles from a file make a world a path crosses", "[DboNav]")
 {
-  // The east cell's west edge sits 6 units off the line, as the worst measured border vertex does
+  // The east cell's west edge is 6 units off, like the worst real one
   const auto bytes = Write(
     "test.esp:00003c",
     { Tile(0, 0, { SquareMesh(0, 0, "a") }),
       Tile(1, 0, { SquareMesh(1, 0, "b", 6.f) }),
-      Tile(0, 1, { SquareMesh(0, 1, "c"), [] {
-                    // A second, separate mesh in the cell: an island, not joined
-                    SynthMesh m;
-                    m.desc = "d";
-                    m.verts = { { 100, kS + 100, 900 }, { 300, kS + 100, 900 }, { 300, kS + 300, 900 } };
-                    m.tris = { { 0, 1, 2, 0xffff, 0xffff, 0xffff, 0x0800, 0 } };
-                    return m;
-                  }() }) });
+      Tile(0, 1,
+           { SquareMesh(0, 1, "c"), [] {
+              // A second, separate mesh in the cell: an island, not joined
+              SynthMesh m;
+              m.desc = "d";
+              m.verts = { { 100, kS + 100, 900 },
+                          { 300, kS + 100, 900 },
+                          { 300, kS + 300, 900 } };
+              m.tris = { { 0, 1, 2, 0xffff, 0xffff, 0xffff, 0x0800, 0 } };
+              return m;
+            }() }) });
   DboNavFile file;
   REQUIRE(ReadDboNav(bytes.data(), bytes.size(), file));
   NavWorld world;
@@ -203,22 +209,25 @@ TEST_CASE("DboNav: tiles from a file make a world a path crosses", "[DboNav]")
   }
   std::vector<Vec3> path;
   bool partial = true;
-  REQUIRE(world.FindPath({ 100, 100, 0 }, { kS + 2000, 300, 0 }, path, &partial));
+  REQUIRE(
+    world.FindPath({ 100, 100, 0 }, { kS + 2000, 300, 0 }, path, &partial));
   REQUIRE_FALSE(partial);
-  REQUIRE(world.FindPath({ 100, 100, 0 }, { 2000, kS + 3000, 0 }, path, &partial));
+  REQUIRE(
+    world.FindPath({ 100, 100, 0 }, { 2000, kS + 3000, 0 }, path, &partial));
   REQUIRE_FALSE(partial);
   // The island floats above with no edge to the floor: reaching it is partial
-  REQUIRE(world.FindPath({ 100, 100, 0 }, { 250, kS + 150, 900 }, path, &partial,
-                         { 64, 64, 64 }));
+  REQUIRE(world.FindPath({ 100, 100, 0 }, { 250, kS + 150, 900 }, path,
+                         &partial, { 64, 64, 64 }));
   REQUIRE(partial);
 }
 
 namespace {
 
-// W3's fixtures (unit/navmesh_fixtures, synthetic), written by its Python writer; the numbers are its manifest's
+// W3's synthetic fixtures; the expected numbers are its manifest's
 bool ReadFixture(const std::string& name, DboNavFile& file, std::string* error)
 {
-  std::ifstream f(std::string(NAVMESH_FIXTURE_DIR) + "/" + name, std::ios::binary);
+  std::ifstream f(std::string(NAVMESH_FIXTURE_DIR) + "/" + name,
+                  std::ios::binary);
   REQUIRE(f);
   std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(f)), {});
   return ReadDboNav(bytes.data(), bytes.size(), file, error);
@@ -235,15 +244,20 @@ TEST_CASE("DboNav: W3's fixtures read as its manifest says", "[DboNav]")
   REQUIRE(ReadFixture("one-tile.dbonav", f, &error));
   REQUIRE(f.worldspace == "test.esm:00003c");
   REQUIRE((f.tiles.size() == 1 && f.meshCount == 1 && f.dropped == 0));
-  REQUIRE((f.tiles[0].cellX == 13 && f.tiles[0].cellY == 49 && f.tiles[0].cellDesc.empty()));
-  REQUIRE((f.tiles[0].bmin.z == 10.f && f.tiles[0].bmax.x == 100.f && f.tiles[0].bmax.y == 100.f));
+  REQUIRE((f.tiles[0].cellX == 13 && f.tiles[0].cellY == 49 &&
+           f.tiles[0].cellDesc.empty()));
+  REQUIRE((f.tiles[0].bmin.z == 10.f && f.tiles[0].bmax.x == 100.f &&
+           f.tiles[0].bmax.y == 100.f));
   REQUIRE(f.tiles[0].meshes[0].desc == "test.esm:000001");
-  REQUIRE((f.tiles[0].meshes[0].vertices.size() == 4 && f.tiles[0].meshes[0].triangles.size() == 2));
+  REQUIRE((f.tiles[0].meshes[0].vertices.size() == 4 &&
+           f.tiles[0].meshes[0].triangles.size() == 2));
 
   REQUIRE(ReadFixture("multi-mesh-tile.dbonav", f, &error));
-  REQUIRE((f.tiles[0].cellX == -7 && f.tiles[0].cellY == 3 && f.tiles[0].meshes.size() == 3));
-  REQUIRE((f.tiles[0].bmin.x == -500.f && f.tiles[0].bmin.z == -32.5f && f.tiles[0].bmax.z == 64.f));
-  // No two meshes share a vertex, so the weld joins nothing: walking from one mesh to another is partial
+  REQUIRE((f.tiles[0].cellX == -7 && f.tiles[0].cellY == 3 &&
+           f.tiles[0].meshes.size() == 3));
+  REQUIRE((f.tiles[0].bmin.x == -500.f && f.tiles[0].bmin.z == -32.5f &&
+           f.tiles[0].bmax.z == 64.f));
+  // No two meshes share a vertex, so walking between them is partial
   auto in = ToTileInput(f.tiles[0], true);
   std::vector<uint8_t> built;
   REQUIRE(BuildTile(in, built, &error));
@@ -261,29 +275,35 @@ TEST_CASE("DboNav: W3's fixtures read as its manifest says", "[DboNav]")
   };
   std::vector<Vec3> path;
   bool partial = false;
-  REQUIRE(islands.FindPath(centre(f.tiles[0].meshes[0]), centre(f.tiles[0].meshes[1]),
-                           path, &partial, { 8, 8, 8 }));
+  REQUIRE(islands.FindPath(centre(f.tiles[0].meshes[0]),
+                           centre(f.tiles[0].meshes[1]), path, &partial,
+                           { 8, 8, 8 }));
   REQUIRE(partial);
 
   REQUIRE(ReadFixture("interior.dbonav", f, &error));
   REQUIRE(f.worldspace == "interiors");
-  REQUIRE((f.tiles[0].cellX == 0 && f.tiles[0].cellY == 0 && f.tiles[0].cellDesc == "test.esm:000025"));
+  REQUIRE((f.tiles[0].cellX == 0 && f.tiles[0].cellY == 0 &&
+           f.tiles[0].cellDesc == "test.esm:000025"));
   REQUIRE((f.tiles[0].bmin.x == 1.f && f.tiles[0].bmax.y == 52.f));
 
   REQUIRE(ReadFixture("doors.dbonav", f, &error));
   in = ToTileInput(f.tiles[0], false);
-  REQUIRE(in.flags == std::vector<uint16_t>{ kPolyWalk, kPolyWalk | kPolyDoor });
+  REQUIRE(in.flags ==
+          std::vector<uint16_t>{ kPolyWalk, kPolyWalk | kPolyDoor });
 
   REQUIRE(ReadFixture("linked-pair.dbonav", f, &error));
   REQUIRE((f.tiles.size() == 2 && f.meshCount == 2 && f.dropped == 3));
   const auto& l0 = f.tiles[0].meshes[0].links;
   const auto& l1 = f.tiles[1].meshes[0].links;
-  REQUIRE((l0.size() == 1 && l0[0].type == 1 && l0[0].targetMesh == 1 && l0[0].targetTri == 0));
-  REQUIRE((l1.size() == 1 && l1[0].type == 1 && l1[0].targetMesh == 0 && l1[0].targetTri == 1));
+  REQUIRE((l0.size() == 1 && l0[0].type == 1 && l0[0].targetMesh == 1 &&
+           l0[0].targetTri == 0));
+  REQUIRE((l1.size() == 1 && l1[0].type == 1 && l1[0].targetMesh == 0 &&
+           l1[0].targetTri == 1));
   REQUIRE(f.tiles[1].meshes[0].desc == "test.esm:000041");
 
   REQUIRE(ReadFixture("empty-mesh.dbonav", f, &error));
-  REQUIRE((f.tiles[0].meshes[0].vertices.empty() && f.tiles[0].meshes[0].triangles.empty()));
+  REQUIRE((f.tiles[0].meshes[0].vertices.empty() &&
+           f.tiles[0].meshes[0].triangles.empty()));
   REQUIRE(f.tiles[0].meshes[0].desc == "test.esm:000050");
   // An empty cell builds nothing, with a reason, and does not crash
   REQUIRE_FALSE(BuildTile(ToTileInput(f.tiles[0], false), built, &error));
@@ -297,16 +317,19 @@ TEST_CASE("DboNav: W3's fixtures read as its manifest says", "[DboNav]")
   REQUIRE(dm.doorLinks[0].doorDesc == "test.esm:00c4d9");
   REQUIRE(dm.doorLinks[1].triangle == 1);
   REQUIRE(dm.doorLinks[1].unknown == 0);
-  REQUIRE(dm.doorLinks[1].doorDesc == "a long plugin name for the desc field.esp:0abcde");
-  REQUIRE(ToTileInput(f.tiles[0], false).flags ==
-          std::vector<uint16_t>{ kPolyWalk | kPolyDoor, kPolyWalk | kPolyDoor });
+  REQUIRE(dm.doorLinks[1].doorDesc ==
+          "a long plugin name for the desc field.esp:0abcde");
+  REQUIRE(
+    ToTileInput(f.tiles[0], false).flags ==
+    std::vector<uint16_t>{ kPolyWalk | kPolyDoor, kPolyWalk | kPolyDoor });
 
   REQUIRE(ReadFixture("extreme-cells.dbonav", f, &error));
   REQUIRE((f.tiles[0].cellX == -48 && f.tiles[0].cellY == -34));
   REQUIRE((f.tiles[1].cellX == 52 && f.tiles[1].cellY == 45));
 
-  for (const char* bad : { "bad-magic.dbonav", "bad-version.dbonav", "truncated.dbonav",
-                           "trailing-bytes.dbonav", "vertex-out-of-range.dbonav" }) {
+  for (const char* bad :
+       { "bad-magic.dbonav", "bad-version.dbonav", "truncated.dbonav",
+         "trailing-bytes.dbonav", "vertex-out-of-range.dbonav" }) {
     INFO(bad);
     error.clear();
     REQUIRE_FALSE(ReadFixture(bad, f, &error));
@@ -321,7 +344,9 @@ TEST_CASE("NavService: worlds load at once and answer by key", "[DboNav]")
   for (auto& v : slope.verts) {
     v.z = v.x / 4.f;
   }
-  const auto ext = Write("Test.esp:00003C", { Tile(0, 0, { slope }), Tile(1, 0, { SquareMesh(1, 0, "w.esp:000002") }) });
+  const auto ext = Write("Test.esp:00003C",
+                         { Tile(0, 0, { slope }),
+                           Tile(1, 0, { SquareMesh(1, 0, "w.esp:000002") }) });
   NavService nav;
   std::vector<std::string> loaded;
   std::string error;
@@ -331,12 +356,15 @@ TEST_CASE("NavService: worlds load at once and answer by key", "[DboNav]")
   REQUIRE(nav.HasWorld("TEST.esp:00003c"));
 
   // Nothing is loaded on demand: an unknown world answers nothing
-  REQUIRE_FALSE(nav.FindPath("other.esp:00003c", { 100, 100, 25 }, { 200, 200, 50 }));
+  REQUIRE_FALSE(
+    nav.FindPath("other.esp:00003c", { 100, 100, 25 }, { 200, 200, 50 }));
   REQUIRE_FALSE(nav.Nearest("other.esp:00003c", { 100, 100, 25 }, 100));
-  REQUIRE(nav.FloorAlong("other.esp:00003c", { 0, 0, 0 }, { 10, 0, 0 }, 1).empty());
+  REQUIRE(
+    nav.FloorAlong("other.esp:00003c", { 0, 0, 0 }, { 10, 0, 0 }, 1).empty());
 
   // A path with its length, straight across flat ground
-  auto r = nav.FindPath("test.esp:00003c", { kS + 100, 100, 0 }, { kS + 100, 3100, 0 });
+  auto r = nav.FindPath("test.esp:00003c", { kS + 100, 100, 0 },
+                        { kS + 100, 3100, 0 });
   REQUIRE(r);
   REQUIRE_FALSE(r->partial);
   REQUIRE(r->points.size() == 2);
@@ -349,26 +377,31 @@ TEST_CASE("NavService: worlds load at once and answer by key", "[DboNav]")
   REQUIRE(std::fabs(near->x) < 1.f);
 
   // Floor heights along a leg follow the slope, and stop where the mesh does
-  const auto h = nav.FloorAlong("test.esp:00003c", { 400, 1000, 300 }, { 2000, 1000, 300 }, 400);
+  const auto h = nav.FloorAlong("test.esp:00003c", { 400, 1000, 300 },
+                                { 2000, 1000, 300 }, 400);
   REQUIRE(h.size() == 5);
   for (size_t i = 0; i < h.size(); ++i) {
     INFO(i);
     REQUIRE(h[i]);
     REQUIRE(std::fabs(*h[i] - (400.f + 400.f * i) / 4.f) < 1.f);
   }
-  const auto off = nav.FloorAlong("test.esp:00003c", { 2000, -2000, 0 }, { 2000, 0, 0 }, 1000);
+  const auto off = nav.FloorAlong("test.esp:00003c", { 2000, -2000, 0 },
+                                  { 2000, 0, 0 }, 1000);
   REQUIRE(off.size() == 3);
   REQUIRE_FALSE(off[0]);
   REQUIRE(off[2]);
 }
 
-TEST_CASE("NavService: interiors load one world per cell, and refused plugins load nothing", "[DboNav]")
+TEST_CASE("NavService: interiors load one world per cell, and refused plugins "
+          "load nothing",
+          "[DboNav]")
 {
   SynthTile hall = Tile(0, 0, { SquareMesh(0, 0, "a.esp:000010") });
   hall.cellDesc = "Skyrim.esm:000AAA";
   SynthTile cave = Tile(0, 0, { SquareMesh(0, 0, "a.esp:000011") });
   cave.cellDesc = "skyrim.esm:000bbb";
-  SynthTile isle = Tile(0, 0, { SquareMesh(0, 0, "summersetisles.esp:000012") });
+  SynthTile isle =
+    Tile(0, 0, { SquareMesh(0, 0, "summersetisles.esp:000012") });
   isle.cellDesc = "SummersetIsles.esp:000CCC";
   const auto interiors = Write("interiors", { hall, cave, isle });
   NavService nav;
@@ -376,14 +409,19 @@ TEST_CASE("NavService: interiors load one world per cell, and refused plugins lo
   std::string error;
   INFO(error);
   REQUIRE(nav.Load(interiors, &loaded, &error));
-  REQUIRE(loaded == std::vector<std::string>{ "skyrim.esm:000aaa", "skyrim.esm:000bbb" });
+  REQUIRE(
+    loaded ==
+    std::vector<std::string>{ "skyrim.esm:000aaa", "skyrim.esm:000bbb" });
   REQUIRE_FALSE(nav.HasWorld("summersetisles.esp:000ccc"));
-  REQUIRE(nav.FindPath("skyrim.esm:000aaa", { 100, 100, 0 }, { 3000, 3000, 0 }));
+  REQUIRE(
+    nav.FindPath("skyrim.esm:000aaa", { 100, 100, 0 }, { 3000, 3000, 0 }));
 
   REQUIRE(NavService::IsExcluded("Druadach.esm:000D62"));
   REQUIRE(NavService::IsExcluded("king of the murkmire.esp:001234"));
   REQUIRE_FALSE(NavService::IsExcluded("skyrim.esm:00003c"));
-  const auto druadach = Write("druadach.esm:000d62", { Tile(0, 0, { SquareMesh(0, 0, "druadach.esm:000001") }) });
+  const auto druadach =
+    Write("druadach.esm:000d62",
+          { Tile(0, 0, { SquareMesh(0, 0, "druadach.esm:000001") }) });
   REQUIRE_FALSE(nav.Load(druadach, &loaded, &error));
   REQUIRE(error.find("refused") != std::string::npos);
   REQUIRE_FALSE(nav.HasWorld("druadach.esm:000d62"));
@@ -442,7 +480,7 @@ TEST_CASE("DboNav: a damaged file is refused with a reason", "[DboNav]")
   REQUIRE_FALSE(ReadDboNav(vert.data(), vert.size(), file, &error));
   REQUIRE(error.find("missing vertex") != std::string::npos);
 
-  // A huge count in a short file is refused before anything is allocated for it
+  // A huge count in a short file is refused before anything is allocated
   auto huge = good;
   const size_t tilesAt = 8 + 4 + kDesc;
   huge[tilesAt + 3] = 0x7f;

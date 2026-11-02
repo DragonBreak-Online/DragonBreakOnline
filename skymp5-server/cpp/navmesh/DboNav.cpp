@@ -82,7 +82,7 @@ public:
     return true;
   }
 
-  // A count is refused when even its smallest records could not fit in what is left
+  // Refuse a count whose smallest records cannot fit in what is left
   bool Fits(uint64_t count, size_t each) const
   {
     return count * each <= size - at;
@@ -119,8 +119,8 @@ bool ReadDboNav(const uint8_t* data, size_t size, DboNavFile& out,
   if (!r.U32(version) || version != kVersion) {
     return Fail(error, "unsupported DBONAV version");
   }
-  if (!r.Text(out.worldspace, kDescLen) || !r.U32(tiles) || !r.U32(out.meshCount) ||
-      !r.U32(out.dropped)) {
+  if (!r.Text(out.worldspace, kDescLen) || !r.U32(tiles) ||
+      !r.U32(out.meshCount) || !r.U32(out.dropped)) {
     return Fail(error, "DBONAV header is truncated");
   }
   for (int i = 0; i < 4; ++i) {
@@ -138,8 +138,9 @@ bool ReadDboNav(const uint8_t* data, size_t size, DboNavFile& out,
   out.tiles.resize(tiles);
   for (auto& tile : out.tiles) {
     uint32_t meshes = 0;
-    if (!r.I32(tile.cellX) || !r.I32(tile.cellY) || !r.Text(tile.cellDesc, kDescLen) ||
-        !r.Vec(tile.bmin) || !r.Vec(tile.bmax) || !r.U32(meshes)) {
+    if (!r.I32(tile.cellX) || !r.I32(tile.cellY) ||
+        !r.Text(tile.cellDesc, kDescLen) || !r.Vec(tile.bmin) ||
+        !r.Vec(tile.bmax) || !r.U32(meshes)) {
       return Fail(error, "DBONAV tile is truncated");
     }
     if (!r.Fits(meshes, kMeshHeader)) {
@@ -152,8 +153,8 @@ bool ReadDboNav(const uint8_t* data, size_t size, DboNavFile& out,
           !r.U32(links) || !r.U32(doors)) {
         return Fail(error, "DBONAV mesh is truncated");
       }
-      if (!r.Fits(static_cast<uint64_t>(verts) * 12 + tris * 16ull + links * 12ull +
-                    doors * (8ull + kDescLen),
+      if (!r.Fits(static_cast<uint64_t>(verts) * 12 + tris * 16ull +
+                    links * 12ull + doors * (8ull + kDescLen),
                   1)) {
         return Fail(error, "DBONAV mesh is truncated");
       }
@@ -168,7 +169,8 @@ bool ReadDboNav(const uint8_t* data, size_t size, DboNavFile& out,
         }
         for (int k = 0; k < 3; ++k) {
           if (t[k] >= verts) {
-            return Fail(error, "a triangle names a missing vertex in " + mesh.desc);
+            return Fail(error,
+                        "a triangle names a missing vertex in " + mesh.desc);
           }
         }
       }
@@ -188,7 +190,8 @@ bool ReadDboNav(const uint8_t* data, size_t size, DboNavFile& out,
         r.U32(d.unknown);
         r.Text(d.doorDesc, kDescLen);
         if (d.triangle >= tris) {
-          return Fail(error, "a door link names a missing triangle in " + mesh.desc);
+          return Fail(error,
+                      "a door link names a missing triangle in " + mesh.desc);
         }
       }
       ++meshesSeen;
@@ -204,7 +207,8 @@ bool ReadDboNav(const uint8_t* data, size_t size, DboNavFile& out,
     for (const auto& mesh : tile.meshes) {
       for (const auto& l : mesh.links) {
         if (l.targetMesh >= out.meshCount) {
-          return Fail(error, "an edge link names a missing mesh in " + mesh.desc);
+          return Fail(error,
+                      "an edge link names a missing mesh in " + mesh.desc);
         }
       }
     }

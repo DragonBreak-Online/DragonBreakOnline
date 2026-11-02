@@ -14,8 +14,9 @@ constexpr int kRefBits = 22;
 
 std::string Lower(std::string s)
 {
-  std::transform(s.begin(), s.end(), s.begin(),
-                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) {
+    return static_cast<char>(std::tolower(c));
+  });
   return s;
 }
 
@@ -68,7 +69,9 @@ bool NavService::Load(const std::vector<uint8_t>& dbonav,
   }
   const bool interiors = file.worldspace == "interiors";
   if (!interiors && IsExcluded(file.worldspace)) {
-    return Fail(error, "refused: " + file.worldspace + " is from a plugin whose author forbids AI");
+    return Fail(error,
+                "refused: " + file.worldspace +
+                  " is from a plugin whose author forbids AI");
   }
 
   if (interiors) {
@@ -100,7 +103,7 @@ bool NavService::Load(const std::vector<uint8_t>& dbonav,
     return true;
   }
 
-  // One world for the worldspace, sized so every tile fits in Detour's 22 ref bits
+  // One world per worldspace, sized to fit Detour's 22 ref bits
   size_t maxTris = 1;
   std::vector<std::vector<uint8_t>> tiles;
   for (const auto& tile : file.tiles) {
@@ -109,19 +112,23 @@ bool NavService::Load(const std::vector<uint8_t>& dbonav,
     std::vector<uint8_t> data;
     std::string why;
     if (!BuildTile(in, data, &why)) {
-      return Fail(error, file.worldspace + " cell " + std::to_string(tile.cellX) + "," +
-                    std::to_string(tile.cellY) + ": " + why);
+      return Fail(error,
+                  file.worldspace + " cell " + std::to_string(tile.cellX) +
+                    "," + std::to_string(tile.cellY) + ": " + why);
     }
     tiles.push_back(std::move(data));
   }
   const int tileBits = BitsFor(std::max<size_t>(tiles.size(), 1));
   const int polyBits = std::max(6, BitsFor(maxTris));
   if (tileBits + polyBits > kRefBits) {
-    return Fail(error, file.worldspace + " is too large for one world: " + std::to_string(tiles.size()) +
-                  " tiles with up to " + std::to_string(maxTris) + " triangles each need " +
+    return Fail(error,
+                file.worldspace + " is too large for one world: " +
+                  std::to_string(tiles.size()) + " tiles with up to " +
+                  std::to_string(maxTris) + " triangles each need " +
                   std::to_string(tileBits + polyBits) + " ref bits of 22");
   }
-  auto world = std::make_unique<NavWorld>(4096.f, 1 << tileBits, 1 << polyBits);
+  auto world =
+    std::make_unique<NavWorld>(4096.f, 1 << tileBits, 1 << polyBits);
   for (const auto& data : tiles) {
     std::string why;
     if (!world->AddTile(data, &why)) {
@@ -157,7 +164,8 @@ NavWorld* NavService::Find(const std::string& key)
 }
 
 std::optional<PathResult> NavService::FindPath(const std::string& key,
-                                               const Vec3& from, const Vec3& to)
+                                               const Vec3& from,
+                                               const Vec3& to)
 {
   NavWorld* world = Find(key);
   if (!world) {
@@ -170,14 +178,15 @@ std::optional<PathResult> NavService::FindPath(const std::string& key,
   for (size_t i = 1; i < r.points.size(); ++i) {
     const Vec3& a = r.points[i - 1];
     const Vec3& b = r.points[i];
-    r.length += std::sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y) +
-                          (b.z - a.z) * (b.z - a.z));
+    r.length +=
+      std::sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y) +
+                (b.z - a.z) * (b.z - a.z));
   }
   return r;
 }
 
-std::optional<Vec3> NavService::Nearest(const std::string& key, const Vec3& pos,
-                                        float radius)
+std::optional<Vec3> NavService::Nearest(const std::string& key,
+                                        const Vec3& pos, float radius)
 {
   NavWorld* world = Find(key);
   if (!world || !(radius > 0.f)) {
@@ -186,10 +195,8 @@ std::optional<Vec3> NavService::Nearest(const std::string& key, const Vec3& pos,
   return world->NearestWalkable(pos, { radius, radius, radius * 2 });
 }
 
-std::vector<std::optional<float>> NavService::FloorAlong(const std::string& key,
-                                                         const Vec3& from,
-                                                         const Vec3& to,
-                                                         float step)
+std::vector<std::optional<float>> NavService::FloorAlong(
+  const std::string& key, const Vec3& from, const Vec3& to, float step)
 {
   std::vector<std::optional<float>> out;
   NavWorld* world = Find(key);
