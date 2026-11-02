@@ -166,9 +166,11 @@ module.exports = (api) => {
   };
   const closeMenu = (a) => { pending.delete(a >>> 0); closeWidget(a, WIDGET_ID); };
 
+  // Who may be named at the door: never a hidden GM or an invisible player (listable.js; fac-0553, 31 Oct)
+  const listable = (() => { try { const f = path.join(__dirname, 'listable.js'); delete require.cache[f]; return require(f)(mp); } catch (e) { log('jail: listable.js unreadable, so the cell door names nobody', e.message); return () => false; } })();
   // Players a guard could lock in here: online, near the door, not the guard, not already serving
   const candidates = (guard, door) => onlineActors()
-    .filter((p) => p !== (guard >>> 0) && distanceMeters(p, door) <= CFG.reachMeters && !sentenceOf(p))
+    .filter((p) => p !== (guard >>> 0) && distanceMeters(p, door) <= CFG.reachMeters && !sentenceOf(p) && listable(guard, p))
     .slice(0, 5);
 
   // ---- lockpicking ------------------------------------------------------------------------------------
