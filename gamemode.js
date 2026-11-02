@@ -8162,6 +8162,15 @@ const hostAttemptHook = (requesterId, actorId) => {
 };
 hostAttemptHook.__dbo = true;
 mp.onHostAttempt = hostAttemptHook;
+// The server's ReleaseHost asks before it broadcasts an NPC unhosted (fork host-release-hook-1102): the NPC director
+// hands it on at once (npcdirector.js pickNow). A plain assignment, so a hot reload replaces it rather than stacking
+const hostReleaseHook = (remoteId, oldHosterId) => {
+  try {
+    if (typeof globalThis.__dboNpcDirectorPick === 'function') globalThis.__dboNpcDirectorPick(Number(remoteId) >>> 0, Number(oldHosterId) >>> 0);
+  } catch (e) { log('onHostRelease failed:', e.message); }
+};
+hostReleaseHook.__dbo = true;
+mp.onHostRelease = hostReleaseHook;
 every('hostAttemptSummary', 60000, () => {
   if (!hostGrants.n) return;
   log(`hostAttempt: ${hostGrants.n} grant(s) in the last 60 s over ${hostGrants.actors.size} actor(s)`);

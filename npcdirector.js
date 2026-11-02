@@ -173,6 +173,32 @@ module.exports = (api) => {
 
   every('npcDirector', 1000, () => { try { decide(Date.now()); } catch (e) { log('npcDirector: pass failed', e.message); } });
 
+  // The server asks this when it releases an NPC (fork host-release-hook-1102: ReleaseHost fires gamemode.js
+  // onHostRelease before it broadcasts the NPC unhosted). The nearest fresh reporter other than the old hoster gets it
+  // at once, so no client sees it unhosted and asks for it; returns the new hoster, or 0 and the server broadcasts
+  // unhosted as before. No changeEveryMs wait: the NPC has no host at all until someone takes it
+  const pickNow = (npc, exclude) => {
+    npc = npc >>> 0; exclude = exclude >>> 0;
+    if (C.mode !== 'on' || !built() || !managed(npc)) return 0;
+    const now = Date.now();
+    const avoid = avoidOf(npc);
+    let best = 0, bestD = Infinity;
+    for (const [p, s] of S.sight) {
+      if (p === exclude || p === avoid || now - s.at > C.freshMs || !s.dist.has(npc)) continue;
+      const v = policy(p, npc);
+      if (!v.ok) continue;
+      const d = Number(v.dist) || 0;
+      if (C.releaseUnits > 0 && d > C.releaseUnits * C.grantFactor) continue;
+      if (d < bestD) { best = p; bestD = d; }
+    }
+    if (!best) return 0;
+    try { mp.setHoster(npc, best); S.changedAt.set(npc, now); } catch (e) { say('err:' + npc, `could not hand ${npc.toString(16)} on to ${display(best)}: ${e.message}`, now); return 0; }
+    const hc = globalThis.__dboHostCooldown;
+    if (hc) hc.noteHandover(npc);
+    return best;
+  };
+  globalThis.__dboNpcDirectorPick = pickNow;
+
   // gamemode.js hostAttemptHook asks this first: a reporting client does not pick its own NPCs, the director does.
   // Companions are exempt (their owner hosts them through companionSystem).
   // Only NPCs the requester itself reported, that the director manages, and only when it can assign them
@@ -182,5 +208,5 @@ module.exports = (api) => {
 
   if (C.mode !== 'off' && !built()) log('npcDirector: mp.setHoster missing, director inactive (the server build predates it); clients keep asking to host');
   else log(`npcDirector ${C.mode}: hosts chosen from sight reports (fresh ${C.freshMs} ms, hold x${C.holdFactor} + ${C.holdUnits})`);
-  return { decide };
+  return { decide, pickNow };
 };
