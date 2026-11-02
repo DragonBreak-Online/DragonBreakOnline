@@ -1097,8 +1097,11 @@ module.exports = (api) => {
     if (b.i >= b.descs.length) { RS.roots = b.out; RS.at = Date.now(); RS.build = null; }
   };
   if (globalThis.__dboHallRootsTimer) { clearInterval(globalThis.__dboHallRootsTimer); globalThis.__dboHallRootsTimer = null; }
+  // The background build waits for housing's claim warm-up (2 Nov profile: the first pass over every claim stalled the loop
+  // 78 s); a fork without isWarm builds at once, as before
+  const housingWarm = () => { const H = globalThis.__dboHousing; return !H || typeof H.isWarm !== 'function' || H.isWarm() === true; };
   {
-    const t = setInterval(() => { try { stepRoots(15); } catch (e) { log('guild halls: roots step failed', e.message); } }, 100);
+    const t = setInterval(() => { try { if (housingWarm()) stepRoots(15); } catch (e) { log('guild halls: roots step failed', e.message); } }, 100);
     if (t && typeof t.unref === 'function') t.unref();
     globalThis.__dboHallRootsTimer = t;
   }
