@@ -93,7 +93,15 @@ const scenarios = (src, c) => {
     handlers.get('uiCaps')(7, []);
     const pf = (sent.find((x) => x[1].customPacketType === 'dboMapOwners') || [])[1];
     const tf = pf && pf.worlds.find((w) => w.world === '3c:Skyrim.esm');
-    c('the v2 file\'s fallback grid travels with the table', !!tf && JSON.stringify(tf.cells.fallback) === '["1.","01"]', tf && tf.cells);
+    c('the v2 file\'s fallback grid travels with the table, and its cells go as no hold', !!tf && JSON.stringify(tf.cells.fallback) === '["1.","01"]' && JSON.stringify(tf.cells.rows) === '["..","1."]', tf && tf.cells);
+    c('...gameplay\'s own table is left as it was', JSON.stringify(globalThis.__dboHoldCells.rows) === '["0.","11"]', globalThis.__dboHoldCells.rows);
+    // W6's "outside" (beyond Skyrim's border): those cells go as no hold too, with or without a fallback grid
+    fs.writeFileSync(path.join(tmp, 'hold-cells.json'), JSON.stringify({ version: 2, c0: -1, n: 2, holds: ['whiterun', 'falkreath'], rows: ['0.', '11'], outside: ['..', '10'] }));
+    sent.length = 0;
+    handlers.get('uiCaps')(7, []);
+    const po = (sent.find((x) => x[1].customPacketType === 'dboMapOwners') || [])[1];
+    const to = po && po.worlds.find((w) => w.world === '3c:Skyrim.esm');
+    c('cells outside Skyrim\'s border go as no hold; the rest as they were', !!to && JSON.stringify(to.cells.rows) === '["0.",".1"]' && to.cells.fallback === undefined && JSON.stringify(globalThis.__dboHoldCells.rows) === '["0.","11"]', to && to.cells);
     fs.writeFileSync(path.join(tmp, 'hold-cells.json'), JSON.stringify({ version: 2, c0: -2, n: 2, holds: [], rows: [], fallback: ['11', '11'] }));
     sent.length = 0;
     handlers.get('uiCaps')(7, []);

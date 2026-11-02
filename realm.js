@@ -794,12 +794,21 @@ module.exports = (api) => {
     const tam = worlds.get('3c:skyrim.esm');
     if (tam && cells && Array.isArray(cells.rows) && Array.isArray(cells.holds)) {
       tam.cells = { c0: cells.c0, n: cells.n, size: 4096, holds: cells.holds, rows: cells.rows };
-      // hold-cells.json's fallback grid (W6, v2): '1' where the hold is only the nearest capital's, which the map leaves
-      // clear; the fork's parsed table drops it, so it is read from the file, and kept only when it is the same table
+      // hold-cells.json's map-only grids (W6): "fallback", the hold only the nearest capital's, and "outside", the cell's
+      // centre beyond Skyrim's border (BorderRegionSkyrim). The fork's parsed table drops them, so they are read from the
+      // file, kept only when it is the same table, and those cells sent as no hold; gameplay's table is left as it is
       let file = null;
       try { file = JSON.parse(fs.readFileSync(path.resolve('hold-cells.json'), 'utf8')); } catch (e) { file = null; }
-      const fb = file && file.c0 === cells.c0 && file.n === cells.n && Array.isArray(file.fallback) ? file.fallback : null;
-      if (fb && fb.length === cells.n && fb.every((r) => typeof r === 'string' && r.length === cells.n)) tam.cells.fallback = fb;
+      const grid = (k) => {
+        const g = file && file.c0 === cells.c0 && file.n === cells.n && Array.isArray(file[k]) ? file[k] : null;
+        return g && g.length === cells.n && g.every((r) => typeof r === 'string' && r.length === cells.n) ? g : null;
+      };
+      const fb = grid('fallback'), outside = grid('outside');
+      if (fb) tam.cells.fallback = fb;
+      if (fb || outside) {
+        const clear = (j, i) => (fb && fb[j][i] === '1') || (outside && outside[j][i] === '1');
+        tam.cells.rows = cells.rows.map((r, j) => Array.from(r, (ch, i) => (clear(j, i) ? '.' : ch)).join(''));
+      }
       let zones = {};
       try { zones = JSON.parse(fs.readFileSync(path.resolve('zones.json'), 'utf8')) || {}; } catch (e) { zones = {}; }
       tam.strongholds = (Array.isArray(zones.strongholds) ? zones.strongholds : [])
