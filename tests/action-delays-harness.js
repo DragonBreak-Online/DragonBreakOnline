@@ -136,6 +136,15 @@ said.length = 0;
 T.takeGate(BODY, PLAYER); T.takeGate(BODY, PLAYER); T.takeGate(BODY, PLAYER);
 ok(said.length === 1, 'the player is told once per tellSeconds, not once per refusal', said.length);
 
+// Each kind keeps its own rate limit. With one shared bucket a body line swallowed the next container line, and
+// until the bar ships that line is the only sign a chest was refused rather than silently broken.
+said.length = 0;
+T = load({ actionDelays: { tellSeconds: 10 } });
+T.takeGate(BODY, PLAYER);
+T.searchGate(CHEST, PLAYER);
+ok(said.length === 2 && /still searching/.test(said[0].t) && /search it/.test(said[1].t),
+  'a body refusal does not swallow the container line inside the same window', said.map((x) => x.t));
+
 // ---- a hot reload keeps a beat in flight -----------------------------------------------------------------------------
 T = load({});
 T.searchGate(CHEST, PLAYER);
@@ -150,7 +159,7 @@ ok(T2.searchGate(CHEST, PLAYER) === undefined, '...and the beat finishes across 
 // Each must break at least one check. A mutation that no longer applies means the code moved: that is reported, not passed.
 const SRC = fs.readFileSync(MODULE, 'utf8');
 const MUTANTS = [
-  ['the first activation is allowed (no search beat at all)', (s) => s.replace('      show(a, ms, \'Searching\');\n      tell(a, \'You search it. Give it a moment, then open it again.\');\n      return false;', '      show(a, ms, \'Searching\');\n      return undefined;')],
+  ['the first activation is allowed (no search beat at all)', (s) => s.replace('      S.beat.set(key, now);', '      return undefined;')],
   ['the beat is never waited out (any activation opens it)', (s) => s.replace('if (now - started < ms) return false;', 'if (false) return false;')],
   ['a body\'s first take is free', (s) => s.replace('if (now - started < ms) { resync(a); return false; }', 'if (false) { resync(a); return false; }')],
   ['the gap between takes is dropped', (s) => s.replace('if (now < next) {', 'if (false) {')],

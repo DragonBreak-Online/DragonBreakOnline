@@ -97,10 +97,13 @@ module.exports = (api) => {
     S.shown.delete(a);
     try { closeWidget(a, WIDGET_ID); } catch (e) { /* gone */ }
   };
-  const tell = (a, text) => {
+  // Rate limited per kind, not per player: one bucket meant a body line swallowed the next container line, and
+  // until the bar ships the line is the only sign a chest was refused rather than broken.
+  const tell = (a, kind, text) => {
     const now = Date.now();
-    if (now - (S.told.get(a) || 0) < MS(C.tellSeconds)) return;
-    S.told.set(a, now);
+    const key = `${a}:${kind}`;
+    if (now - (S.told.get(key) || 0) < MS(C.tellSeconds)) return;
+    S.told.set(key, now);
     try { personal(a, text); } catch (e) { /* offline */ }
   };
   const resync = (a) => {
@@ -125,7 +128,7 @@ module.exports = (api) => {
       S.beat.set(key, now);
       sweep();
       show(a, ms, 'Searching');
-      tell(a, 'You search it. Give it a moment, then open it again.');
+      tell(a, 'search', 'You search it. Give it a moment, then open it again.');
       return false;
     }
     if (now - started < ms) return false;
@@ -157,7 +160,7 @@ module.exports = (api) => {
           S.beat.set(key, now);
           sweep();
           show(a, ms, 'Searching');
-          tell(a, 'You are still searching. Wait a moment.');
+          tell(a, 'body', 'You are still searching. Wait a moment.');
           resync(a);
           return false;
         }
@@ -171,7 +174,7 @@ module.exports = (api) => {
     }
     const next = S.nextTake.get(a) || 0;
     if (now < next) {
-      tell(a, 'Your hands are full for a moment.');
+      tell(a, 'gap', 'Your hands are full for a moment.');
       resync(a);
       return false;
     }
