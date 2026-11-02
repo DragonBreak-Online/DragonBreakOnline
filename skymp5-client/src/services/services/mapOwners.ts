@@ -30,6 +30,31 @@ const CIRCLE_SIDES = 64;
 // The tint and the hairline, as W6's C2 (tint 0.22, line 0.45)
 export const TINT_ALPHA = 22;
 export const LINE_ALPHA = 45;
+export const RING_ALPHA = 75;
+// On a paper map (a flat world) the parchment is light and warm, so the tint is stronger and a colour near the paper's own
+// is pushed off it (Nat, 2 Nov: "a little muted for some", the tans of the Reach and Whiterun almost gone): more saturated,
+// and no lighter than PAPER_MAX_L. PAPER is the parchment as the Tamriel sheet shows it.
+export const PAPER_TINT_ALPHA = 50;
+export const PAPER: [number, number, number] = [224, 202, 164];
+const PAPER_NEAR = 150;
+const PAPER_MAX_L = 0.36;
+const toHsl = (c: [number, number, number]): [number, number, number] => {
+  const r = c[0] / 255, g = c[1] / 255, b = c[2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+  if (mx === mn) return [0, 0, l];
+  const d = mx - mn, s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+  const h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h / 6, s, l];
+};
+const fromHsl = (h: number, s: number, l: number): [number, number, number] => {
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
+  const f = (t: number) => { t = (t + 1) % 1; return t < 1 / 6 ? p + (q - p) * 6 * t : t < 1 / 2 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p; };
+  return [Math.round(f(h + 1 / 3) * 255), Math.round(f(h) * 255), Math.round(f(h - 1 / 3) * 255)];
+};
+export const paperTint = (c: [number, number, number]): [number, number, number] => {
+  if (Math.hypot(c[0] - PAPER[0], c[1] - PAPER[1], c[2] - PAPER[2]) >= PAPER_NEAR) return c;
+  const [h, sat, l] = toHsl(c);
+  return fromHsl(h, Math.min(1, sat + 0.3), Math.min(l, PAPER_MAX_L));
+};
 // A fit worse than this (stage px, root mean square) hides the overlay rather than drawing it in the wrong place
 export const MAX_FIT_RMS = 12;
 // Markers read per frame for the fit
@@ -45,7 +70,8 @@ export interface Territory { id: string; owner: string; zone: string; x: number;
 export interface HoldCells { c0: number; n: number; size: number; holds: string[]; rows: string[] }
 // A stronghold's radius, which wins over the holds (zones.ts strongholdsOverrideHolds)
 export interface Stronghold { zone: string; x: number; y: number; r: number }
-export interface OwnersWorld { world: string; aliases: string[]; territories: Territory[]; cells?: HoldCells; strongholds?: Stronghold[] }
+// flat: the server's word that this world's map is flat and top-down (war.mapFlatWorlds), where the colours start shown
+export interface OwnersWorld { world: string; aliases: string[]; territories: Territory[]; cells?: HoldCells; strongholds?: Stronghold[]; flat?: boolean }
 export interface Faction { name: string; rgb: [number, number, number] }
 export interface Anchor { name: string; x: number; y: number; z: number }
 export interface OwnersData { worlds: OwnersWorld[]; factions: Record<string, Faction>; anchors: Anchor[]; reach: number; fade: number }
@@ -90,6 +116,7 @@ export const readOwners = (raw: Record<string, unknown>): OwnersData | null => {
     const aliases = (Array.isArray(o.aliases) ? o.aliases : []).filter((a): a is string => typeof a === "string" && DESC.test(a));
     if (!territories.length) continue;
     const out: OwnersWorld = { world: o.world, aliases, territories };
+    if (o.flat === true) out.flat = true;
     const cells = readCells(o.cells);
     if (cells) out.cells = cells;
     const strongholds: Stronghold[] = [];
@@ -198,11 +225,12 @@ export const ownerAt = (w: OwnersWorld, x: number, y: number): { t: number; d: n
 // The holds by cell: each cell takes its centre's hold and the nearest of that hold's territories (the strongholds are drawn
 // over them as their own circles), tinted within reach of any marker and fading out by fade; a hairline runs along every
 // cell edge between two owners
-const cellDrawing = (w: OwnersWorld, factions: Record<string, Faction>, reach: number, fade: number): Drawing => {
+const cellDrawing = (w: OwnersWorld, factions: Record<string, Faction>, reach: number, fade: number, paper = false): Drawing => {
+  const tint = paper ? PAPER_TINT_ALPHA : TINT_ALPHA;
   const t = w.cells as HoldCells;
   const ts = w.territories;
   const holdsOnly: OwnersWorld = { world: w.world, aliases: w.aliases, territories: ts, cells: t };
-  const colour = (owner: string): [number, number, number] | null => (factions[owner] ? factions[owner].rgb : null);
+  const colour = (owner: string): [number, number, number] | null => (factions[owner] ? (paper ? paperTint(factions[owner].rgb) : factions[owner].rgb) : null);
   const n = t.n, S = t.size;
   const own: number[] = new Array(n * n).fill(-1), lvl: number[] = new Array(n * n).fill(0);
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
@@ -236,7 +264,7 @@ const cellDrawing = (w: OwnersWorld, factions: Record<string, Faction>, reach: n
     }
   }
   const fills: Drawing["fills"] = [];
-  groups.forEach((g) => fills.push({ rgb: g.rgb, alpha: TINT_ALPHA / 2, rects: g.rects }));
+  groups.forEach((g) => fills.push({ rgb: g.rgb, alpha: tint / 2, rects: g.rects }));
   // hairlines: where two neighbouring cells have different owners, merged along a run of cell edges of one colour
   const lines: Drawing["lines"] = [];
   const ownerOf = (i: number, j: number) => (i >= 0 && i < n && j >= 0 && j < n && own[j * n + i] >= 0 ? ts[own[j * n + i]].owner : "");
@@ -270,32 +298,33 @@ const cellDrawing = (w: OwnersWorld, factions: Record<string, Faction>, reach: n
       i = e;
     }
   }
-  // each stronghold over the holds: its own territory's colour, a little stronger, ringed by a hairline
+  // each stronghold over the holds: its cells already carry its owner's colour (a stronghold wins inside its radius), so it
+  // gets only its edge, a ring a little stronger than a hold's hairline (Nat, 2 Nov: a filled disc read as a grey blot)
   for (const sh of w.strongholds || []) {
     const o = ownerAt({ world: w.world, aliases: w.aliases, territories: ts, strongholds: [sh] }, sh.x, sh.y);
     const rgb = o ? colour(ts[o.t].owner) : null;
     if (!rgb) continue;
     const ring: Pt[] = [];
     for (let k = 0; k <= CIRCLE_SIDES; k++) { const a = (k / CIRCLE_SIDES) * Math.PI * 2; ring.push([sh.x + sh.r * Math.cos(a), sh.y + sh.r * Math.sin(a)]); }
-    fills.push({ rgb: rgbOf(rgb), alpha: TINT_ALPHA, pts: flat(ring) });
-    lines.push({ rgb: rgbOf(darker(rgb)), alpha: LINE_ALPHA, pts: flat(ring) });
+    lines.push({ rgb: rgbOf(darker(rgb)), alpha: RING_ALPHA, pts: flat(ring) });
   }
   return { fills, lines, owners: Array.from(new Set(ts.map((x) => x.owner))) };
 };
 
-export const drawingOf = (w: OwnersWorld, factions: Record<string, Faction>, reach: number, fade: number): Drawing => {
-  if (w.cells) return cellDrawing(w, factions, reach, fade);
+export const drawingOf = (w: OwnersWorld, factions: Record<string, Faction>, reach: number, fade: number, paper = false): Drawing => {
+  if (w.cells) return cellDrawing(w, factions, reach, fade, paper);
+  const tint = paper ? PAPER_TINT_ALPHA : TINT_ALPHA;
   const ts = w.territories;
   const fills: Drawing["fills"] = [], lines: Drawing["lines"] = [];
   // an owner with no colour (unclaimed) is not tinted, but its marker still shapes its neighbours
-  const colour = (owner: string): [number, number, number] | null => (factions[owner] ? factions[owner].rgb : null);
+  const colour = (owner: string): [number, number, number] | null => (factions[owner] ? (paper ? paperTint(factions[owner].rgb) : factions[owner].rgb) : null);
   for (let i = 0; i < ts.length; i++) {
     const rgb = colour(ts[i].owner);
     // the soft ring to fade, then the core to reach over it: the core shows both halves of the tint
     const outer = cellOf(ts, i, fade);
-    if (rgb && outer.pts.length >= 3) fills.push({ rgb: rgbOf(rgb), alpha: TINT_ALPHA / 2, pts: flat(outer.pts) });
+    if (rgb && outer.pts.length >= 3) fills.push({ rgb: rgbOf(rgb), alpha: tint / 2, pts: flat(outer.pts) });
     const inner = cellOf(ts, i, reach);
-    if (rgb && inner.pts.length >= 3) fills.push({ rgb: rgbOf(rgb), alpha: TINT_ALPHA / 2, pts: flat(inner.pts) });
+    if (rgb && inner.pts.length >= 3) fills.push({ rgb: rgbOf(rgb), alpha: tint / 2, pts: flat(inner.pts) });
     // a hairline on each edge shared with another owner's territory, drawn once (from the lower index)
     for (let k = 0; k < outer.pts.length; k++) {
       const j = outer.by[k];
@@ -450,6 +479,34 @@ export const homShift = (a: Homography, b: Homography, at: Seen[]): number => {
 // split as R(outer) * S * R(inner): the "layer" clip turns by outer and scales, its "shapes" child turns by inner
 export interface ClipTransform { x: number; y: number; rotation: number; xscale: number; yscale: number; inner: number }
 const DEG = 180 / Math.PI;
+// On a flat, top-down map (Nat's paper maps, 2 Nov: a homography's rms 0, an affine's 1.2) the view only zooms, pans and
+// perhaps turns. So the map's shape is fitted once (an affine fit that holds, split once by clipTransform) and each frame
+// solves only that: screen = a * (shape's matrix * world) + b, with a a complex number (zoom and turn) and b the pan, from
+// the anchors the map shows, at least two. The layer then keeps the shape's split and only adds the turn, scales by the
+// zoom and moves to the pan, so it follows the map in the same frame and never swings between two equal splits.
+export interface Track { s: number; turn: number; x: number; y: number; rms: number; n: number }
+export const trackOf = (shape: Fit, seen: Seen[]): Track | null => {
+  if (seen.length < 2) return null;
+  const n = seen.length;
+  const P = seen.map((q) => [shape.m00 * q.x + shape.m01 * q.y, shape.m10 * q.x + shape.m11 * q.y]);
+  let px = 0, py = 0, qx = 0, qy = 0;
+  seen.forEach((q, k) => { px += P[k][0]; py += P[k][1]; qx += q.sx; qy += q.sy; });
+  px /= n; py /= n; qx /= n; qy /= n;
+  let ar = 0, ai = 0, den = 0;
+  seen.forEach((q, k) => {
+    const dpx = P[k][0] - px, dpy = P[k][1] - py, dqx = q.sx - qx, dqy = q.sy - qy;
+    ar += dqx * dpx + dqy * dpy; ai += dqy * dpx - dqx * dpy; den += dpx * dpx + dpy * dpy;
+  });
+  if (den < 1e-9) return null;
+  ar /= den; ai /= den;
+  const bx = qx - (ar * px - ai * py), by = qy - (ai * px + ar * py);
+  let e = 0;
+  seen.forEach((q, k) => { e += (ar * P[k][0] - ai * P[k][1] + bx - q.sx) ** 2 + (ai * P[k][0] + ar * P[k][1] + by - q.sy) ** 2; });
+  return { s: Math.hypot(ar, ai), turn: Math.atan2(ai, ar) * DEG, x: bx, y: by, rms: Math.sqrt(e / n), n };
+};
+// The layer for a track: the shape's split, turned, scaled and moved
+export const trackTransform = (shapeT: ClipTransform, t: Track): ClipTransform =>
+  ({ x: t.x, y: t.y, rotation: shapeT.rotation + t.turn, xscale: shapeT.xscale * t.s, yscale: shapeT.yscale * t.s, inner: shapeT.inner });
 export const clipTransform = (f: Fit): ClipTransform => {
   const a = f.m00 * DRAW_SCALE, b = f.m01 * DRAW_SCALE, c = f.m10 * DRAW_SCALE, d = f.m11 * DRAW_SCALE;
   const E = (a + d) / 2, F = (a - d) / 2, G = (c + b) / 2, H = (c - b) / 2;

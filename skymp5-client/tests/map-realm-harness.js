@@ -237,7 +237,9 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   h6['emit:customPacketMessage']({ customPacketType: 'dboMapOwners', worlds: [{ world: '3c:Skyrim.esm', aliases: [], territories: [{ id: 'a', owner: 'hold-a', x: 0, y: 0 }, { id: 'b', owner: 'hold-b', x: 50000, y: 0 }] }],
     factions: { 'hold-a': { name: 'A', rgb: [200, 0, 0] }, 'hold-b': { name: 'B', rgb: [0, 200, 0] } }, anchors: anchorsAt.map(([name, x, y]) => ({ name, x, y, z: 0 })), reach: 30000, fade: 45000 });
   h6.menuOpen({ name: 'MapMenu' });
-  for (let i = 0; i < 70; i++) h6.update();
+  for (let i = 0; i < 64; i++) h6.update();
+  h6.buttonEvent({ isDown: true, device: 0, code: 20 }); // the relief: off until T
+  for (let i = 0; i < 6; i++) h6.update();
   const owners = () => S.invoked.filter((x) => x[0] === '_root.dboOwners').map((x) => JSON.parse(x[1][0]));
   // the marker sets for checking the fit in the game: one at the first fit, its points the anchors as the map showed them
   const fitLines = S.packets.filter((p) => p.event === 'mapOwnersFit').map((p) => p.args[0]);
@@ -306,6 +308,66 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   h6.menuClose({ name: 'MapMenu' });
   for (let i = 0; i < 4; i++) h6.update();
   ok(!S.taps.length, '...and when the map closed by itself, nothing is tapped', S.taps);
+  // ---- a flat paper map (Nat, 2 Nov: the redrawn colours lagged his pans and snapped back) ----
+  {
+    const h9 = {};
+    S.custom = []; S.customOpen = false; S.invoked.length = 0; S.menuOpen = true; S.props['_root.owners.layer._visible'] = false;
+    let zoom = 1, pan = 0;
+    const flatScreen = (x, y) => [640 + pan + zoom * 0.002 * x, 360 - zoom * 0.002 * y];
+    const put = () => anchorsAt.forEach(([name, x, y]) => { const i = LABELS.indexOf(name); const [u, v] = flatScreen(x, y); S.props[`_root.MarkerClips.Marker${i}._x`] = u; S.props[`_root.MarkerClips.Marker${i}._y`] = v; });
+    put();
+    new MapRealmService(sp, { on: (ev, fn) => { h9[ev] = fn; }, emitter: { on: (ev, fn) => { h9['emit:' + ev] = fn; } } });
+    h9['emit:customPacketMessage']({ customPacketType: 'dboMapRealm', markers });
+    h9['emit:customPacketMessage']({ customPacketType: 'dboMapOwners', worlds: [{ world: '3c:Skyrim.esm', aliases: [], flat: true, territories: [{ id: 'a', owner: 'hold-a', x: 0, y: 0 }, { id: 'b', owner: 'hold-b', x: 50000, y: 0 }] }],
+      factions: { 'hold-a': { name: 'A', rgb: [200, 0, 0] }, 'hold-b': { name: 'B', rgb: [0, 200, 0] } }, anchors: anchorsAt.map(([name, x, y]) => ({ name, x, y, z: 0 })), reach: 30000, fade: 45000 });
+    h9.menuOpen({ name: 'MapMenu' });
+    for (let i = 0; i < 70; i++) h9.update();
+    const sends = () => S.invoked.filter((x) => x[0] === '_root.dboOwners');
+    const L = (p) => S.props[`_root.owners.layer${p}`];
+    const first = sends()[0] ? JSON.parse(sends()[0][1][0]) : { fills: [] };
+    ok(sends().length === 1 && first.fills.length === 4 && first.fills.every((x) => !x.quads) && first.lines[0] && Math.abs(first.lines[0].pts[0] - 25000 / 64) < 1, 'a flat map: the colours are sent once, in world units (the border at x 25,000)', [sends().length, first.lines[0]]);
+    ok(L('._visible') === true && Math.abs(L('._x') - 640) < 0.01 && Math.abs(L('._y') - 360) < 0.01 && Math.abs(Math.abs(L('._xscale')) - 12.8) < 0.01 && Math.abs(Math.abs(L('._yscale')) - 12.8) < 0.01,
+      '...and the layer placed and scaled where the map shows the world (64 units at 0.002 a unit)', [L('._x'), L('._y'), L('._xscale'), L('._yscale')]);
+    const turn0 = L('._rotation') + L('.shapes._rotation');
+    let lagged = 0;
+    for (let k = 1; k <= 12; k++) { pan = 3 * k; put(); h9.update(); if (Math.abs(L('._x') - (640 + pan)) > 0.01) lagged++; }
+    ok(lagged === 0, 'panning 3 px a frame: the layer is where the markers are in the same frame, every frame', lagged);
+    for (let k = 1; k <= 10; k++) { zoom = 1 + 0.02 * k; put(); h9.update(); }
+    ok(Math.abs(Math.abs(L('._xscale')) - 12.8 * 1.2) < 0.01 && Math.abs(L('._x') - (640 + pan)) < 0.01, '...zooming too: scaled with the map in the same frame', [L('._xscale'), L('._x')]);
+    const writes = [];
+    const setFloat0 = sp.Ui.setFloat;
+    sp.Ui.setFloat = (m, p, v) => { if (p.startsWith('_root.owners.layer')) writes.push(p); setFloat0(m, p, v); };
+    for (let i = 0; i < 20; i++) h9.update();
+    sp.Ui.setFloat = setFloat0;
+    ok(!writes.length, 'a still map: the layer is not written again', writes.slice(0, 4));
+    ok(sends().length === 1 && Math.abs(L('._rotation') + L('.shapes._rotation') - turn0) < 0.01, '...and through it all the colours were sent once and the layer never turned', [sends().length, L('._rotation'), L('.shapes._rotation')]);
+    h9.menuClose({ name: 'MapMenu' });
+    S.customOpen = false; zoom = 1; pan = 0;
+  }
+  // a world whose map is not flat (the 3D relief): no colours until T, and then T's choice stays for that world
+  {
+    const h8 = {};
+    S.custom = []; S.customOpen = false; S.invoked.length = 0; S.menuOpen = true; S.props['_root.owners.layer._visible'] = false; // a fresh movie starts with its layer hidden
+    new MapRealmService(sp, { on: (ev, fn) => { h8[ev] = fn; }, emitter: { on: (ev, fn) => { h8['emit:' + ev] = fn; } } });
+    h8['emit:customPacketMessage']({ customPacketType: 'dboMapRealm', markers });
+    h8['emit:customPacketMessage']({ customPacketType: 'dboMapOwners', worlds: [{ world: '3c:Skyrim.esm', aliases: [], territories: [{ id: 'a', owner: 'hold-a', x: 0, y: 0 }, { id: 'b', owner: 'hold-b', x: 50000, y: 0 }] }],
+      factions: { 'hold-a': { name: 'A', rgb: [200, 0, 0] }, 'hold-b': { name: 'B', rgb: [0, 200, 0] } }, anchors: anchorsAt.map(([name, x, y]) => ({ name, x, y, z: 0 })), reach: 30000, fade: 45000 });
+    const drawnNow = () => S.invoked.filter((x) => x[0] === '_root.dboOwners').length;
+    h8.menuOpen({ name: 'MapMenu' });
+    for (let i = 0; i < 70; i++) h8.update();
+    const rows8 = S.legendData.length ? S.legendData[S.legendData.length - 1].rows : [];
+    ok(drawnNow() === 0 && S.props['_root.owners.layer._visible'] !== true && rows8.some((r) => r.id === 'territories' && r.shown === false), 'a map that is not flat: no colours, the legend row there to turn them on', [drawnNow(), rows8.find((r) => r.id === 'territories')]);
+    h8.buttonEvent({ isDown: true, device: 0, code: 20 });
+    for (let i = 0; i < 4; i++) h8.update();
+    ok(drawnNow() === 1 && S.props['_root.owners.layer._visible'] === true, '...T shows them there too', drawnNow());
+    h8.menuClose({ name: 'MapMenu' });
+    S.customOpen = false; S.invoked.length = 0;
+    h8.menuOpen({ name: 'MapMenu' });
+    for (let i = 0; i < 70; i++) h8.update();
+    ok(drawnNow() === 1, '...and the choice stays with that world for the next opening', drawnNow());
+    h8.menuClose({ name: 'MapMenu' });
+    S.customOpen = false;
+  }
   sp.Game = game0;
   delete sp.Ui.getBool;
   anchorsAt.forEach(([name], k) => { const i = LABELS.indexOf(name); S.props[`_root.MarkerClips.Marker${i}._x`] = 100 + i; delete S.props[`_root.MarkerClips.Marker${i}._y`]; });
