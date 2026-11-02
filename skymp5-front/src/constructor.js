@@ -38,6 +38,7 @@ import CharacterSelect from './features/characterSelect';
 import DungeonGate from './features/dungeonGate';
 import Party from './features/party';
 import TomeShop from './features/tomeShop';
+import Book from './features/book';
 import Bank from './features/bank';
 import RobPrompt from './features/robPrompt';
 import Downed from './features/downed';
@@ -288,6 +289,8 @@ const Constructor = props => {
       return <Party data={rend} />;
     case 'tomeShop':
       return <TomeShop data={rend} />;
+    case 'book':
+      return <Book data={rend} />;
     case 'bank':
       return <Bank data={rend} />;
     case 'robPrompt':
