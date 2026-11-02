@@ -180,7 +180,10 @@ module.exports = (api) => {
         const rec = get(ref, 'private.housing', null);
         if (!rec || !(Number(rec.owner) > 0)) continue;
         let cells = rec.place && Array.isArray(rec.place.cells) ? rec.place.cells.map(idOf).filter(Boolean) : [];
-        if (!cells.length) cells = [idOf(get(ref, 'worldOrCellDesc', '')), idOf(get(Number(rec.partner) >>> 0, 'worldOrCellDesc', ''))].filter((c) => c && isInterior(c));
+        // A claim with no partner is not asked for one: mp.get(0, ...) throws in the server, which logs it at [error] (live,
+        // 2 Nov: about 570 claims a rebuild, 104k of the day's 166k "resolved context" lines)
+        const partner = Number(rec.partner) >>> 0;
+        if (!cells.length) cells = [idOf(get(ref, 'worldOrCellDesc', '')), partner ? idOf(get(partner, 'worldOrCellDesc', '')) : 0].filter((c) => c && isInterior(c));
         for (const c of cells) if (!S.cellIndex.has(c)) S.cellIndex.set(c, { root: ref, cells });
       }
     }
@@ -1070,5 +1073,5 @@ module.exports = (api) => {
   }, { help: 'decorate your home: find, place, list, move, remove, undo, grant, revoke, plant, stored, putback' });
 
   // test hooks (tests/decor-harness.js)
-  return { _test: { panelFor, openPanel, refundOf, takeAll, costOf, budgetProblem, spotProblem, confirm, scanOwners, recallBlocked, reg, S, C, usePlanter, plant, pick, ripen, showPos } };
+  return { _test: { placeOfCell, panelFor, openPanel, refundOf, takeAll, costOf, budgetProblem, spotProblem, confirm, scanOwners, recallBlocked, reg, S, C, usePlanter, plant, pick, ripen, showPos } };
 };
