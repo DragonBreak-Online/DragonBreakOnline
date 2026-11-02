@@ -1110,6 +1110,34 @@ console.log('pick prayers:');
   if (both.w) playC(both);
 }
 
+// ---- Talos in Solitude's Temple of the Divines (map-0242, 2 Nov) ----
+// The temple's Talos shrine is initially disabled in Skyrim.esm and USSEP, so the server never loads it and a touch never
+// reaches prayer.js; /pray beside it is the touch, as at Meridia's statue. Its neighbours stand 1.3 m away.
+{
+  api.cfg = { prayer: { clientJudged: true, pick: { enabled: false } } };
+  pickUi = false;
+  load();
+  const spot = (choiceOf('talos').prayNear || [])[0];
+  check('skills.json gives Talos a spot at the temple shrine 10a768, inside the temple cell', !!spot && idOf(spot.ref) === 0x10a768 && spot.world === '16a02:Skyrim.esm' && spot.meters <= 3, JSON.stringify(spot));
+  const stand = (dx, world) => { props.set(ACTOR + '|worldOrCellDesc', world || spot.world); props.set(ACTOR + '|pos', [spot.pos[0] + dx, spot.pos[1], spot.pos[2]]); };
+  const prayNear = () => { wallClock += 61 * 60000; virtual += 1000000; const said = say('pray'); return { said, w: out.widgets.find((x) => x && x.nonce), log: out.logs.join(' | ') }; };
+  props.set(ACTOR + '|private.dboDeity', { id: 'talos', name: 'Talos', kind: 'divine', at: wallClock - 30 * 86400000 });
+  props.delete(ACTOR + '|private.prayedShrines');
+  nearM = Infinity;
+  stand(70);
+  let m = prayNear();
+  check('1 m from the temple shrine, /pray opens a prayer to Talos', !!m.w && /Talos/i.test(String(m.w.deity)) && /shrine touch .* Talos/.test(m.log), m.said + ' | ' + m.log);
+  const res = playC(m);
+  check('...and it is held, measured from the shrine the server never loaded', verdictOf(res.log) === 'held' && res.events.length === 1, res.log);
+  check('...the rest is kept on the temple shrine itself', restOf(0x10a768) > wallClock, String(restOf(0x10a768)));
+  stand(300);
+  m = prayNear();
+  check('4 m away, past the next shrine along, /pray is not the touch', !m.w && /Stand beside the Shrine of Talos in the Temple of the Divines/.test(m.said), m.said);
+  stand(70, '3c:Skyrim.esm');
+  m = prayNear();
+  check('the same coordinates in Tamriel are not the temple', !m.w, m.said);
+}
+
 Date.now = realNow;
 console.log('');
 console.log(failures ? `${failures} FAILURES` : 'all checks passed');
