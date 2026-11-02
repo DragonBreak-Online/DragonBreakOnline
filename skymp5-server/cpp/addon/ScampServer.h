@@ -84,11 +84,14 @@ public:
   Napi::Value RequestPacketHistoryPlayback(const Napi::CallbackInfo& info);
 
   Napi::Value GetPrometheusMetrics(const Napi::CallbackInfo& info);
-  // Server pathfinding over navmeshFiles, loaded at boot only: navWorlds() lists the worlds; navFindPath(world,
-  // from, to) is null or { points (Detour's straightened corners), length, partial: a partial path must not be
-  // walked as if it arrives }; navNearest(world, pos, radius) is null beyond radius; navFloor(world, from, to,
-  // step) gives the floor height (or null) every step along the line
+  // Server pathfinding over navmeshFiles, loaded at boot only: navWorlds() lists the worlds and navHasWorld(world)
+  // says whether one is loaded, since every other method returns null both for a world never loaded (a deployment
+  // fault) and for no answer in a loaded one; navFindPath(world, from, to) is null or { points (Detour's
+  // straightened corners), length, partial: a partial path must not be walked as if it arrives };
+  // navNearest(world, pos, radius) is null beyond radius; navFloor(world, from, to, step) gives the floor height
+  // (or null) every step along the line, [] for a world not loaded
   Napi::Value NavWorlds(const Napi::CallbackInfo& info);
+  Napi::Value NavHasWorld(const Napi::CallbackInfo& info);
   Napi::Value NavFindPath(const Napi::CallbackInfo& info);
   Napi::Value NavNearest(const Napi::CallbackInfo& info);
   Napi::Value NavFloor(const Napi::CallbackInfo& info);

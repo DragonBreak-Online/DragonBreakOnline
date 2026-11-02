@@ -149,6 +149,7 @@ Napi::Object ScampServer::Init(Napi::Env env, Napi::Object exports)
       InstanceMethod("getPrometheusMetrics",
                      &ScampServer::GetPrometheusMetrics),
       InstanceMethod("navWorlds", &ScampServer::NavWorlds),
+      InstanceMethod("navHasWorld", &ScampServer::NavHasWorld),
       InstanceMethod("navFindPath", &ScampServer::NavFindPath),
       InstanceMethod("navNearest", &ScampServer::NavNearest),
       InstanceMethod("navFloor", &ScampServer::NavFloor),
@@ -1856,6 +1857,16 @@ Napi::Value ScampServer::NavWorlds(const Napi::CallbackInfo& info)
     res.Set(static_cast<uint32_t>(i), Napi::String::New(info.Env(), worlds[i]));
   }
   return res;
+}
+
+Napi::Value ScampServer::NavHasWorld(const Napi::CallbackInfo& info)
+{
+  try {
+    return Napi::Boolean::New(
+      info.Env(), nav.HasWorld(NapiHelper::ExtractString(info[0], "world")));
+  } catch (std::exception& e) {
+    throw Napi::Error::New(info.Env(), std::string(e.what()));
+  }
 }
 
 Napi::Value ScampServer::NavFindPath(const Napi::CallbackInfo& info)
