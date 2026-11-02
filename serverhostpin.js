@@ -25,10 +25,12 @@
 //
 // Nothing here moves an NPC. Movement is the C++ step, and this module exists to tell us what that step has
 // to defend against.
-module.exports = (cfg, mpArg, state) => {
-  const mp = mpArg || globalThis.mp;
-  const C = Object.assign({ mode: 'off', npc: 0, logEveryMs: 10000 }, cfg || {});
+// Loaded the way npcdirector.js is - a destructured bag, so `every` and `log` come from gamemode.js rather
+// than being reinvented here, and the harness can pass stand-ins for all of them.
+module.exports = ({ mp, log, every, cfg, state } = {}) => {
+  const C = Object.assign({ mode: 'off', npc: 0, logEveryMs: 10000 }, (cfg && cfg.serverHostPin) || {});
   const S = state || {};
+  const say = typeof log === 'function' ? log : () => {};
   if (!S.seen) S.seen = new Map(); // npc -> last hoster we logged
   if (!S.refused) S.refused = 0;
   if (!S.changes) S.changes = 0;
@@ -88,6 +90,34 @@ module.exports = (cfg, mpArg, state) => {
   };
 
   const noteRefusal = () => { S.refused++; };
+
+  // The globals gamemode.js and npcdirector.js consult, named and shaped like the director's
+  // __dboNpcDirectorRefuses so the chain in hostAttemptHook reads the same for both. Set even when off, as
+  // functions that answer false, so neither caller has to care whether this module loaded.
+  globalThis.__dboServerHostRefuses = (requester, id) => {
+    const no = refuses(requester, id);
+    if (no) noteRefusal();
+    return no;
+  };
+  globalThis.__dboServerHostSkips = (id) => directorSkips(id);
+
+  // Its own pass, like the director's. Nothing here moves an NPC: it tags, watches and logs.
+  if (on && npc && typeof every === 'function') {
+    every('serverHostPin', 1000, () => {
+      const now = Date.now();
+      apply();
+      const ev = poll(now);
+      if (ev && ev.changed) {
+        say(`serverHostPin: ${npc.toString(16)} host ${ev.from.toString(16)} -> ${ev.to.toString(16)} after ${ev.afterMs} ms (change ${ev.changes}, ${ev.refused} refused)`);
+      } else if (ev && ev.first) {
+        say(`serverHostPin: watching ${npc.toString(16)} in mode ${C.mode}, host ${ev.hoster.toString(16)}`);
+      }
+    });
+    every('serverHostPinSummary', C.logEveryMs, () => {
+      const s = { mode: C.mode, npc: npc.toString(16), changes: S.changes, refused: S.refused };
+      say(`serverHostPin: ${JSON.stringify(s)}`);
+    });
+  }
 
   return {
     mode: C.mode,

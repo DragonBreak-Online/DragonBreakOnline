@@ -8120,6 +8120,8 @@ const hostAttemptHook = (requesterId, actorId) => {
   }
   // NPC system v2: a client that reported this NPC does not pick it; server\npcdirector.js does
   try { if (typeof globalThis.__dboNpcDirectorRefuses === 'function' && globalThis.__dboNpcDirectorRefuses(req, act)) return false; } catch (e) { /* director off */ }
+  // Option B phase 1: an NPC the server is driving is not handed to a client (server\serverhostpin.js). Off by default
+  try { if (typeof globalThis.__dboServerHostRefuses === 'function' && globalThis.__dboServerHostRefuses(req, act)) return false; } catch (e) { /* pin off */ }
   const v = hostPolicy(req, act);
   if (!v.ok) {
     if (/world mismatch|distance|^Error/.test(v.why || '')) console.log(`[hostAttempt] Refused req=${req.toString(16)} act=${act.toString(16)}: ${v.why}`);
@@ -10016,6 +10018,15 @@ try {
   delete require.cache[NPCDIRECTOR_JS];
   require(NPCDIRECTOR_JS)({ mp, log, every, onUi, onlineActors, display, profileOf, cfg });
 } catch (e) { log('npcdirector.js failed to load:', e.stack || e.message); globalThis.__dboNpcDirectorRefuses = null; }
+
+// ---- Server host pin: does a refused NPC stay put? (server\serverhostpin.js, config "serverHostPin") ----------------
+// Option B phase 1, the measurement before any C++ (_work\server-npc-movement-1102.md). Mode "off" by default: it tags
+// nothing, refuses nothing and registers no pass, so this load is inert until someone sets a mode and an npc id
+try {
+  const SERVERHOSTPIN_JS = path.resolve('serverhostpin.js');
+  delete require.cache[SERVERHOSTPIN_JS];
+  require(SERVERHOSTPIN_JS)({ mp, log, every, cfg, state: globalThis.__dboServerHostPinState || (globalThis.__dboServerHostPinState = {}) });
+} catch (e) { log('serverhostpin.js failed to load:', e.stack || e.message); globalThis.__dboServerHostRefuses = null; globalThis.__dboServerHostSkips = null; }
 
 // ---- Harmony and Mayhem: an NPC hit is calmed or frenzied by its host's game (server\npcmood.js, config "npcMood") --------
 try {
