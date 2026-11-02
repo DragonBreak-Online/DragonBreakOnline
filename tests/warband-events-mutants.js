@@ -56,6 +56,42 @@ const MUTANTS = [
     // is only noticed by loadEvents.
     expect: "ended on load",
   },
+  {
+    label: 'the census ignores its budget and walks every form in one tick',
+    from: "    const per = Math.max(50, Number(C.censusPerTick) || 500);",
+    to: "    const per = 1e9;",
+    expect: 'budgeted, not a loop',
+  },
+  {
+    label: 'the orphan scope drops the kind filter, so summons qualify',
+    from: "    if (String(df['private.dboCompanion'] || '') !== 'companion') return null;",
+    to: "    if (false) return null;",
+    expect: 'a released summon is never an orphan',
+  },
+  {
+    label: 'the orphan scope drops the hostile filter, so settled garrisons qualify',
+    from: "    if (df['ff_hostile'] !== true) return null;",
+    to: "    if (false) return null;",
+    expect: 'a settled garrison is never an orphan',
+  },
+  {
+    label: 'the orphan scope ignores an event that still claims the NPC',
+    from: "if (e && e.state !== 'ended') return null;",
+    to: "if (false) return null;",
+    expect: 'a live event claims is never an orphan',
+  },
+  {
+    label: 'the drain stops re-checking the live actor before destroying an orphan',
+    from: "        if (kind !== 'companion' || owner || !hostile || live) continue;",
+    to: "        if (false) continue;",
+    expect: 're-claimed since the pass survives',
+  },
+  {
+    label: 'the census counts player characters as leftover state',
+    from: "      if (!form || Number(form.profileId === undefined ? -1 : form.profileId) >= 0) continue;",
+    to: "      if (false) continue;",
+    expect: 'skipping the player character',
+  },
 ];
 
 const cleanup = () => {
@@ -117,5 +153,6 @@ console.log('');
 console.log('='.repeat(78));
 console.log(`${good} of ${MUTANTS.length} mutants were caught`);
 if (good !== MUTANTS.length) process.exit(1);
-console.log('the harness fails when the tag check, the pacing, the theft guard, the watchdog,');
-console.log('the desc recovery or the state file is broken');
+console.log('the harness fails when any of these is broken: the tag re-check, the paced teardown, the');
+console.log('theft guard, the watchdog, the desc recovery, the state file, the census budget, the orphan');
+console.log('kind/hostile/event filters, the live re-check before destroying, or the player-character skip');
