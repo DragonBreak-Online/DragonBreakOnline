@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as crypto from "crypto";
 import { Settings } from "../settings";
-import { System, Log, SystemContext, Content } from "./system";
+import { System, Log, SystemContext, Content, WORLD_LOADED_EVENT } from "./system";
 import { espmRefrFieldId, toFormId } from "./formIdUtil";
 import { AdminRoleConfig, readAdminRoleConfig, adminTierOf, TIER_CAPS } from "./adminRoles";
 import { getZones, Zones } from "./zones";
@@ -303,6 +303,8 @@ export class HousingSystem implements System {
     this.zones = getZones(this.log);
 
     this.claimed = this.loadRegistry();
+    // A claim's first read is a cold native load (78 s for 884 on dev, 2 Nov), so they are read one per pass once the world is up
+    ctx.gm.once(WORLD_LOADED_EVENT, () => { this.warmQueue = this.claimed.slice(); this.warmStartMs = Date.now(); });
     this.installActivationHook(ctx);
     ctx.gm.on("userAssignActor", (userId: number) => this.onActorAssigned(ctx, userId));
     this.exposeTenancy(ctx);
@@ -326,6 +328,8 @@ export class HousingSystem implements System {
       primaryOf: (ref: unknown) => primary(ref),
       // primaryOf's answer without reading the ref itself when no claim owns it (guilds.js hall roots, right after a boot)
       rootOfKnown: (ref: unknown) => this.rootOfKnown(ctx, Number(ref) >>> 0),
+      // Whether every claim has had its first read, so a pass over all of them no longer stalls the loop
+      isWarm: (): boolean => this.warm,
       recordOf: (ref: unknown) => { const p = primary(ref); return p ? this.read(ctx, p) : null; },
       holdOf: (ref: unknown) => { const p = primary(ref); return p ? this.holdOf(ctx, p) : ""; },
       // Whether a claim is property: a building, never a chest or an inner door (Nate, 5 Oct); all claims before the place rules
@@ -486,6 +490,7 @@ export class HousingSystem implements System {
   }
 
   async updateAsync(ctx: SystemContext): Promise<void> {
+    this.warmStep(ctx);
     this.flushHomeCells(ctx);
     const now = Date.now();
     this.saveEspmCache(now);
@@ -525,6 +530,16 @@ export class HousingSystem implements System {
     if (!this.decorDirty) return;
     this.decorDirty = false;
     this.pushDecorToAll(ctx);
+  }
+
+  private warmStep(ctx: SystemContext): void {
+    if (this.warm || !this.warmQueue) return;
+    const next = this.warmQueue.shift();
+    if (next !== undefined) this.read(ctx, next >>> 0);
+    if (this.warmQueue.length) return;
+    this.warm = true;
+    this.warmQueue = null;
+    this.log(`[housing] claim records warm: ${this.claimed.length} claims in ${((Date.now() - this.warmStartMs) / 1000).toFixed(1)} s`);
   }
 
   // A fresh actor needs the full picture: names and locks for every claim.
@@ -2727,14 +2742,15 @@ export class HousingSystem implements System {
   }
 
   // Every claim and its teleport partner (which carries the { primary } pointer), to the claim: the refs that have a record
+  // The partner comes from the plugins (partnerOf, cached across boots), never a record read: the first read of every claim was a 78 s boot block (2 Nov)
   private claimIndex(ctx: SystemContext): Map<number, number> {
     const key = `${this.claimed.length}:${this.claimIndexVer}`;
     if (this.claimIndexCache && this.claimIndexKey === key) return this.claimIndexCache;
     const idx = new Map<number, number>();
     for (const c of this.claimed) {
       idx.set(c >>> 0, c >>> 0);
-      const r = this.read(ctx, c);
-      if (r && r.partner) idx.set(r.partner >>> 0, c >>> 0);
+      const partner = this.partnerOf(ctx, c >>> 0);
+      if (partner) idx.set(partner >>> 0, c >>> 0);
     }
     this.claimIndexCache = idx; this.claimIndexKey = key;
     return idx;
@@ -3545,6 +3561,9 @@ export class HousingSystem implements System {
 
   private claimed: number[] = [];
   private claimIndexCache: Map<number, number> | null = null;
+  private warmQueue: number[] | null = null;
+  private warmStartMs = 0;
+  private warm = false;
   private claimIndexKey = "";
   private claimIndexVer = 0;
   private buildings: { mtime: number; byCell: Map<string, string[]> } | null = null;
