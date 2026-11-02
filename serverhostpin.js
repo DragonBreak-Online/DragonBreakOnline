@@ -87,25 +87,46 @@ module.exports = ({ mp, log, every, cfg, state } = {}) => {
     const mine = (zone && spawnerOf(f) === zone) || (npc && f === npc);
     if (!mine) return false;
     if (!S.ids.has(f)) { S.ids.add(f); say(`serverHostPin: watching ${f.toString(16)} (${zone || 'id ' + npc.toString(16)})`); }
-    if (!tagged(f)) tag(f, true);
+    // ONLY pin tags. This cost Nat an evening on 2 Nov: the tag means "measure this one" to this module and
+    // "the server drives this, refuse everybody" to the C++ sentinel (PartOne::IsServerDriven), which refuses
+    // every host attempt, skips the stale sweep and tells clients isHostedByOther. Observe used to tag too, so
+    // on a server carrying the sentinel it stranded the guard - refused to every client, asked for by none, and
+    // driven by nothing, because the mover does not exist. It spun on the spot with no owner.
+    // Observe exists to watch WITHOUT changing anything, and tagging is the most consequential change there is.
+    if (pinning && !tagged(f)) tag(f, true);
     return true;
   };
+
+  // The state the stranding was: tagged, so no client may host it, and nothing driving it. Only pin may create
+  // it, and only because a mover is meant to follow. Anyone adding a mode must answer this question for it.
+  const stranded = (id) => tagged(id >>> 0) && !pinning;
 
   // Refuse every attempt on the watched NPC. Returns true to refuse, matching __dboNpcDirectorRefuses' sense,
   // so gamemode.js's chain reads the same way for both.
   const refuses = (requester, id) => pinning && isTarget(id);
 
-  // The director's managed() must skip the watched NPC or its 1 s pass hands it to the nearest player, which
-  // would beat any refusal here (W5, 2 Nov). This is also the call that teaches us the id, because the
-  // director considers every NPC in a sight report once a second.
-  const directorSkips = (id) => on && isTarget(id);
+  // PIN only, for the same reason the tag is pin only. The director's managed() must step aside for an NPC the
+  // server drives, or its 1 s pass hands it to the nearest player and beats the refusal (W5, 2 Nov). But in
+  // observe that would be a second way for "just watching" to change what the server does - and the baseline
+  // we want from observe IS the ordinary behaviour, the director included. A mode that alters the thing it is
+  // measuring is not a baseline.
+  //
+  // isTarget is still called from here in every mode, and that is deliberate: the director considers every
+  // NPC in a sight report once a second, so this is how the module learns an id without enumerating anything.
+  const directorSkips = (id) => {
+    const t = isTarget(id);
+    return pinning && t;
+  };
 
   // Kept for the harness and for an id given in config: there is nothing to enumerate, so this only touches
   // what we already know about.
   const apply = () => {
     if (!on) return { tagged: false };
     if (npc) isTarget(npc);
-    for (const id of S.ids) if (!tagged(id)) tag(id, true);
+    // pin only, the same rule as isTarget. This line was the second half of the 2 Nov stranding and the new
+    // test above caught it after isTarget alone had been fixed: one place that tags is not the same as no
+    // place that tags, and a timed pass runs every second whether anyone is looking or not.
+    if (pinning) for (const id of S.ids) if (!tagged(id)) tag(id, true);
     const first = S.ids.values().next();
     return { tagged: !first.done && tagged(first.value), hoster: first.done ? 0 : hosterOf(first.value), ids: S.ids.size };
   };
@@ -176,6 +197,8 @@ module.exports = ({ mp, log, every, cfg, state } = {}) => {
     tagged,
     tag,
     isTarget,
+    stranded,
+    clearTag: (id) => tag(id, false),
     refuses,
     directorSkips,
     apply,

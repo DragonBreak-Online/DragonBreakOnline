@@ -119,9 +119,55 @@ const world = (opts) => {
   check('an actor with no npcSpawner tag is not', p.isTarget(LOOSE) === false);
   check('a zero id is not, and does not throw', p.isTarget(0) === false);
   check('the ids are learnt, not configured', JSON.stringify(p.watching()) === JSON.stringify([NPC, MATE]), p.watching());
-  check('and each is tagged on first sight', p.tagged(NPC) === true && p.tagged(MATE) === true
-    && mp.props.get(NPC)['private.dboServerHost'] === true);
-  check("the other zone's guard is not tagged", mp.props.get(OTHER)['private.dboServerHost'] === undefined);
+  // NOT tagged in observe. This assertion used to say the opposite, and the opposite cost Nat an evening on
+  // 2 Nov: see the stranding block below.
+  check('observe does NOT tag, so no NPC is taken away from clients while we only measure',
+    p.tagged(NPC) === false && mp.props.get(NPC)['private.dboServerHost'] === undefined);
+  check("the other zone's guard is not tagged either", mp.props.get(OTHER)['private.dboServerHost'] === undefined);
+}
+
+// ---- THE STRANDING: tagged, with nothing driving it ----
+// The failure of 2 Nov, as a test. The tag means "measure this one" here and "the server drives this, refuse
+// everybody" to the C++ sentinel (PartOne::IsServerDriven): it refuses every host attempt, skips the stale
+// sweep, and tells clients isHostedByOther. Observe used to tag, so on a server carrying the sentinel it
+// stranded the guard - refused to every client, asked for by none, driven by nothing because the mover does
+// not exist. Nat found it spinning on the spot with no owner.
+//
+// So: a mode that does not drive the NPC must not tag it. Only pin tags, and only because a mover is meant to
+// follow. `stranded(id)` is the state itself, so a future mode has to answer the question rather than inherit
+// the bug.
+{
+  const mp = world();
+  const { p: ob } = start(mod, 'observe', mp, {});
+  ob.isTarget(NPC); ob.directorSkips(NPC); ob.refuses(0x14, NPC);
+  ob.apply();
+  check('observe never strands: watched, and left hostable by clients',
+    ob.tagged(NPC) === false && ob.stranded(NPC) === false);
+  check('...not even after apply(), which used to tag everything it knew about',
+    mp.props.get(NPC)['private.dboServerHost'] === undefined);
+
+  const mpOff = world();
+  const { p: off } = start(mod, 'off', mpOff, {});
+  off.isTarget(NPC); off.apply();
+  check('off never strands either', off.tagged(NPC) === false && off.stranded(NPC) === false);
+
+  const mpPin = world();
+  const { p: pin } = start(mod, 'pin', mpPin, {});
+  pin.isTarget(NPC);
+  check('pin tags, because pin is what a mover follows', pin.tagged(NPC) === true);
+  check('...and pin is not stranded by definition: it refuses hosts on purpose',
+    pin.stranded(NPC) === false && pin.refuses(0x14, NPC) === true);
+  check('a tag left behind by pin IS the stranding once the mode is no longer pin',
+    (() => {
+      const { p: after } = start(mod, 'observe', mpPin, {});
+      return after.tagged(NPC) === true && after.stranded(NPC) === true;
+    })());
+  check('and it can be undone without a restart, which is what the live fix needed',
+    (() => {
+      const { p: fix } = start(mod, 'observe', mpPin, {});
+      fix.clearTag(NPC);
+      return fix.tagged(NPC) === false && fix.stranded(NPC) === false;
+    })());
 }
 
 // ---- observe tags and watches, but refuses nothing ----
@@ -130,8 +176,14 @@ const world = (opts) => {
   const { p, every } = start(mod, 'observe', mp, {});
   p.apply();
   check('observe: refuses nothing - this mode only measures', p.refuses(1, NPC) === false);
-  check('observe: but the director still skips it, or its 1 s pass beats the measurement',
-    p.directorSkips(NPC) === true);
+  // This assertion also used to say the opposite. The old reasoning was that the director's 1 s pass would
+  // beat the measurement, which is true of PIN and wrong of observe: the baseline we want from observe is the
+  // ordinary behaviour, the director included. A mode that alters the thing it is measuring is not a baseline,
+  // and the stranding came from exactly this habit of letting "watching" change something.
+  check('observe: the director is NOT told to skip, so the baseline includes it',
+    p.directorSkips(NPC) === false);
+  check('pin: the director IS told to skip, or its pass hands the NPC away despite the refusal',
+    start(mod, 'pin', world(), {}).p.directorSkips(NPC) === true);
   check("observe: another zone's guard is not skipped", p.directorSkips(OTHER) === false);
   check('observe: a 1 s watch pass and a summary pass are registered',
     every.calls.length === 2 && every.calls[0].ms === 1000 && every.calls[1].ms === 10000,
@@ -289,6 +341,15 @@ const scenarios = (M) => {
   const mp3 = world();
   const { p: ob } = start(M, 'observe', mp3, {});
   ob.isTarget(NPC); ob.isTarget(MATE);
+  // The stranding, inside scenarios so a mutant that reintroduces it is killed rather than merely noticed.
+  // Three mutants survived the first time this fix was written, because the new checks were in the body and
+  // the mutants are run against this function alone.
+  c(ob.tagged(NPC) === false);
+  c(ob.stranded(NPC) === false);
+  c(ob.directorSkips(NPC) === false);
+  ob.apply();
+  c(ob.tagged(NPC) === false);
+  c(mp3.props.get(NPC)['private.dboServerHost'] === undefined);
   c(ob.refuses(0x14, NPC) === false);
   mp3.hosters.set(NPC, 0x14);
   ob.pollOne(NPC, 1000);
@@ -317,11 +378,14 @@ const MUTANTS = [
   ['the zone is ignored, so every NPC is pinned', "const mine = (zone && spawnerOf(f) === zone) || (npc && f === npc);", "const mine = true;"],
   ['the spawner tag is the wrong property', "const SPAWNER = 'private.npcSpawner';", "const SPAWNER = 'private.dboSpawner';"],
   ['ids are matched but never remembered', "if (!S.ids.has(f)) { S.ids.add(f);", "if (false) { S.ids.add(f);"],
-  ['a target is never tagged', "if (!tagged(f)) tag(f, true);", "/* not tagged */"],
+  ['pin stops tagging, so a mover would drive an NPC clients still own', "if (pinning && !tagged(f)) tag(f, true);", "/* not tagged */"],
+  ['observe tags again, which is the 2 Nov stranding', "if (pinning && !tagged(f)) tag(f, true);", "if (!tagged(f)) tag(f, true);"],
+  ['apply tags in every mode, the second half of the stranding', "if (pinning) for (const id of S.ids)", "for (const id of S.ids)"],
   ['observe refuses too', "const pinning = C.mode === 'pin';", "const pinning = on;"],
   ['off is not inert', "const on = (C.mode === 'observe' || C.mode === 'pin') && (!!zone || !!npc);", "const on = true;"],
   ['a half-filled config pins the world', "&& (!!zone || !!npc);", ";"],
-  ['the director is not told to skip', "const directorSkips = (id) => on && isTarget(id);", "const directorSkips = (id) => false;"],
+  ['the director is never told to skip, so its pass beats pin', "return pinning && t;", "return false;"],
+  ['the director is told to skip in observe too', "return pinning && t;", "return t;"],
   ['the change gap is not measured', "const gap = S.at[f] ? now - S.at[f] : 0;", "const gap = 0;"],
   ['the gap is global, not per NPC', "const gap = S.at[f] ? now - S.at[f] : 0;", "const gap = S.lastAny ? now - S.lastAny : 0;"],
   ['the global refuser never refuses', "const no = refuses(requester, id);", "const no = false;"],
