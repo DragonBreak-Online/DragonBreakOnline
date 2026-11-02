@@ -99,6 +99,8 @@ export class InputDiagService extends ClientListener {
       bv: sp.browser.isVisible(),
       mm: sp.Utility.isInMenuMode(),
       menus: MENUS.filter((m) => sp.Ui.isMenuOpen(m)),
+      // a CustomMenu (our map legend, the native panels) and its movie's version, empty if it set none (Nat, 2 Nov)
+      custom: (() => { try { return sp.Ui.isMenuOpen("CustomMenu") ? String(sp.Ui.getString("CustomMenu", "_root.dboVersion") || "?") : ""; } catch (e) { return "ERR"; } })(),
       ctl: flags.map((f) => (f ? "1" : "0")).join(""),
       held,
       sit: player.getSitState(),

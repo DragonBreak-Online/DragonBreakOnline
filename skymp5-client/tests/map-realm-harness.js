@@ -277,7 +277,11 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   h6.buttonEvent({ isDown: true, device: 0, code: 0x0f });
   h6.update(); h6.update(); h6.update();
   ok(S.taps.length === 1, "with ours already down, Tab is the map's own and nothing is tapped", S.taps);
+  S.packets.length = 0;
   h6.menuClose({ name: 'MapMenu' });
+  const fl = ((S.packets.find((p) => p.event === 'mapSwf') || { args: [{}] }).args[0] || {}).flash || {};
+  ok(fl.held > 0 && fl.noFit >= 10 && fl.failed === 0 && fl.flips === 0 && fl.shown === 2 && fl.hidden === 1 && fl.redraws === 2 && fl.closes.length === 1 && fl.moves >= 2 && fl.maxStep._x >= 99 && fl.signFlips === 0 && typeof fl.seconds === 'number',
+    'the mapSwf line counts what could flash: fits held, failed or short of markers and their flips, the layer shown and hidden, moves and the largest step, redraws, our menu closed', fl);
   // Esc, and the map closing before the tap: nothing tapped (a Tab with no map open would open the tween menu)
   S.taps = []; S.custom = []; S.customOpen = false;
   h6.menuOpen({ name: 'MapMenu' });
@@ -291,6 +295,44 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   delete sp.Ui.getBool;
   anchorsAt.forEach(([name], k) => { const i = LABELS.indexOf(name); S.props[`_root.MarkerClips.Marker${i}._x`] = 100 + i; delete S.props[`_root.MarkerClips.Marker${i}._y`]; });
   ok(!S.errors.length, 'no frame failed', S.errors);
+
+  // ---- the safety net: our legend never outlives the map (Leader, 2 Nov: Nat's keys all swallowed, game running) ----
+  {
+    const h7 = {};
+    S.widgets.length = 0; S.custom = []; S.customOpen = false; S.legendWorks = true; S.menuOpen = true; S.packets.length = 0;
+    new MapRealmService(sp, { on: (ev, fn) => { h7[ev] = fn; }, emitter: { on: (ev, fn) => { h7['emit:' + ev] = fn; } } });
+    h7['emit:customPacketMessage']({ customPacketType: 'dboMapRealm', markers });
+    h7.menuOpen({ name: 'MapMenu' });
+    for (let i = 0; i < 70; i++) h7.update();
+    S.props['_root.dboVersion'] = 'maplegend-3';
+    ok(S.customOpen, 'set-up: our legend is up over the map');
+    // the engine shuts the map (a fast travel, a load) and no close event comes
+    S.custom = []; S.menuOpen = false;
+    h7.update();
+    ok(S.customOpen, 'one tick with the map shut: nothing yet (a tick of slack)', S.custom);
+    h7.update();
+    ok(!S.customOpen && S.custom.some((c) => c[0] === 'close') && S.packets.some((p) => p.event === 'mapSwf'), 'two ticks: the opening is closed as if the map had said so, our legend with it, its line sent', [S.custom, S.packets.map((p) => p.event)]);
+    // our legend comes up after the map has gone (openCustomMenu runs a frame or more late)
+    S.custom = []; S.customOpen = true; S.props['_root.dboVersion'] = 'maplegend-3';
+    h7.update(); h7.update();
+    ok(!S.customOpen && JSON.stringify(S.custom) === JSON.stringify([['close']]), 'our legend open with no map is closed on the next tick', S.custom);
+    // a server panel's CustomMenu with no map: not ours, left alone
+    S.custom = []; S.customOpen = true; delete S.props['_root.dboVersion'];
+    for (let i = 0; i < 5; i++) h7.update();
+    ok(S.customOpen && !S.custom.length, 'another CustomMenu (no maplegend version) is never closed by us', S.custom);
+    S.customOpen = false;
+    // the open event before the map shows: the opening waits, it is not swept away
+    S.custom = []; S.packets.length = 0;
+    h7.menuOpen({ name: 'MapMenu' });
+    for (let i = 0; i < 5; i++) h7.update();
+    ok(!S.packets.some((p) => p.event === 'mapSwf'), 'an opening whose map has not shown yet is not closed by the net', S.packets.map((p) => p.event));
+    S.menuOpen = true;
+    for (let i = 0; i < 70; i++) h7.update();
+    ok(S.customOpen, '...and its legend still opens once the map shows', S.custom);
+    h7.menuClose({ name: 'MapMenu' });
+    S.customOpen = false; S.menuOpen = true; delete S.props['_root.dboVersion'];
+    ok(!S.errors.length, 'no frame failed', S.errors);
+  }
 
   // ---- a label SkyUI fills late is read again (Nat, 2 Nov: stored empties left 10 of 388 counted, none of the realm's) ----
   const h5 = {};

@@ -74,6 +74,8 @@ export class MapRealmService extends ClientListener {
     this.layerShown = false;
     this.layerAt = {};
     this.passTabAt = 0;
+    this.mapSeen = false;
+    this.flash = newFlash();
     this.mapWorld = 0;
     if (this.testArmed) { this.testArmed = false; this.test = { tick: 0, samples: [], results: {} }; }
   }
@@ -91,6 +93,10 @@ export class MapRealmService extends ClientListener {
   private onButton(e: ButtonEvent): void {
     if (this.open && this.legendMenuOpen && !this.probe.done && e.isDown && e.device === InputDeviceType.Mouse) this.probe.clicks++;
     if (!this.open || !e.isDown || e.device !== InputDeviceType.Keyboard) return;
+    // another CustomMenu over the map (a server panel; ours is the only other): its keys, not the map's (W5, 2 Nov)
+    let panelUp = false;
+    try { panelUp = !this.legendMenuOpen && this.sp.Ui.isMenuOpen(LEGEND_MENU); } catch { panelUp = false; }
+    if (panelUp) return;
     if (this.legendMenuOpen && MAP_CLOSE_KEYS.includes(e.code)) {
       this.closeLegendMenu();
       this.passTabAt = this.ticksOpen + 2;
@@ -115,6 +121,7 @@ export class MapRealmService extends ClientListener {
   // ---- every frame the map is open ----
   private onUpdate(): void {
     this.reveal();
+    this.sweep();
     if (!this.open) return;
     this.ticksOpen++;
     try {
@@ -135,6 +142,30 @@ export class MapRealmService extends ClientListener {
     } catch (err) {
       logError(this, "map frame failed", err);
     }
+  }
+
+  // The safety net (Leader, 2 Nov: Nat's game kept running with every key swallowed, and an invisible CustomMenu fits).
+  // Our legend is opened a frame or more after openCustomMenu, so a map that closes in between leaves it open over
+  // nothing; a map the engine closes may also never send us its close. So on every tick: once the MapMenu has been shut
+  // for two ticks, the opening is closed if we still think it open, and a CustomMenu whose movie is our legend is closed.
+  // Only ours: another CustomMenu (a server panel) has no maplegend version and is left alone.
+  private sweep(): void {
+    const ui = this.sp.Ui;
+    let mapOpen = true;
+    try { mapOpen = ui.isMenuOpen(MAP_MENU); } catch { return; }
+    if (mapOpen && this.open) this.mapSeen = true;
+    this.mapShutTicks = mapOpen ? 0 : this.mapShutTicks + 1;
+    if (this.mapShutTicks < 2) return;
+    // an opening whose map has not shown yet is waiting for it (its open event can come first), not closed
+    if (this.open && this.mapSeen) { logTrace(this, "the map closed without telling us; closing its opening"); this.onMapClose(); }
+    let ours = false;
+    try { ours = ui.isMenuOpen(LEGEND_MENU) && /^maplegend/.test(String(ui.getString(LEGEND_MENU, "_root.dboVersion") || "")); } catch { ours = false; }
+    if (!ours) return;
+    this.legendMenuOpen = false;
+    this.orphans++;
+    // once in the log per session and then every 100th, with the trace of the opening it outlived
+    if (this.orphans === 1 || this.orphans % 100 === 0) logTrace(this, "our map legend was open with no map: closed", String(this.orphans));
+    try { ui.closeCustomMenu(); } catch (err) { logError(this, "the orphaned map legend could not be closed", err); }
   }
 
   // Once per session, a few a frame: Papyrus calls can only be made in the update tick
@@ -187,6 +218,7 @@ export class MapRealmService extends ClientListener {
       legend: this.markers.length ? swfReport(this.legendSwf) : null,
       owners: this.owners ? swfReport(this.ownersSwf) : null,
       world: this.mapWorld, anchors: this.anchorsSeen,
+      flash: Object.assign({}, this.flash, { lastHolds: undefined, seconds: Math.round((Date.now() - this.flash.at) / 100) / 10 }),
       fit: f ? { n: f.n, rms: Math.round(f.rms * 100) / 100, holds: fitHolds(f), turn: Math.round(clipTransform(f).rotation + clipTransform(f).inner) } : null,
     };
     logTrace(this, "map swfs", JSON.stringify(report));
@@ -243,6 +275,7 @@ export class MapRealmService extends ClientListener {
 
   private closeLegendMenu(reopenable = false): void {
     if (!this.legendMenuOpen) return;
+    this.flash.closes.push(this.ticksOpen);
     this.legendMenuOpen = false;
     // the colours went with the menu: drawn again when it is back
     this.drawnKey = "";
@@ -271,6 +304,7 @@ export class MapRealmService extends ClientListener {
     if (key !== this.drawnKey) {
       this.drawnKey = key;
       this.worldOwners = new Set(world.territories.map((t) => t.owner)).size;
+      this.flash.redraws++;
       try { ui.invokeString(LEGEND_MENU, "_root.dboOwners", JSON.stringify(drawingOf(world, this.owners.factions, this.owners.reach, this.owners.fade))); } catch (err) { logError(this, "map owners data failed", err); }
       if (st.t.drawn < 0) st.t.drawn = this.ticksOpen;
       this.publish();
@@ -289,18 +323,29 @@ export class MapRealmService extends ClientListener {
     // shown once and moved only when the fit changes (a pan or a zoom).
     const fit = this.ownersShown ? this.fitNow() : null;
     const holds = this.ownersShown && fitHolds(fit);
+    const fl = this.flash;
+    if (this.ownersShown) { if (!fit) fl.noFit++; else if (holds) fl.held++; else fl.failed++; }
+    if (fit && fl.lastHolds !== null && fl.lastHolds !== holds) fl.flips++;
+    if (fit) fl.lastHolds = holds;
+    try { if (!this.sp.Ui.isMenuOpen(LEGEND_MENU)) fl.menuGone++; } catch { /* counted only when readable */ }
     if (holds && fit) this.goodFit = fit;
     const show = this.ownersShown && !!this.goodFit;
-    if (show !== this.layerShown) { ui.setBool(LEGEND_MENU, `${layer}._visible`, show); this.layerShown = show; }
+    if (show !== this.layerShown) { ui.setBool(LEGEND_MENU, `${layer}._visible`, show); this.layerShown = show; if (show) fl.shown++; else fl.hidden++; }
     if (show && holds && this.goodFit) {
       const t = clipTransform(fitToStage(this.goodFit, this.stage.mapW, this.stage.mapH, this.stage.ours));
       const parts: [string, number][] = [["_x", t.x], ["_y", t.y], ["_xscale", t.xscale], ["_yscale", t.yscale], ["_rotation", t.rotation], [".shapes._rotation", t.inner]];
+      let wrote = false;
       for (const [p, v] of parts) {
         const was = this.layerAt[p];
         if (was !== undefined && Math.abs(was - v) < LAYER_STILL) continue;
+        if (was !== undefined) fl.maxStep[p] = Math.max(fl.maxStep[p] || 0, Math.round(Math.abs(was - v) * 10) / 10);
+        // a sign or half-turn change is the same placement drawn another way: mid-write it would show the layer elsewhere
+        if (was !== undefined && (/scale$/.test(p) ? Math.sign(was) !== Math.sign(v) : /rotation$/.test(p) && Math.abs(was - v) > 90)) fl.signFlips++;
+        wrote = true;
         ui.setFloat(LEGEND_MENU, p[0] === "." ? `${layer}${p}` : `${layer}.${p}`, v);
         this.layerAt[p] = v;
       }
+      if (wrote) fl.moves++;
     }
     if (fit) this.lastFit = fit;
     if (holds && st.t.fit < 0) st.t.fit = this.ticksOpen;
@@ -474,7 +519,17 @@ export class MapRealmService extends ClientListener {
   private layerShown = false;
   private layerAt: Record<string, number> = {};
   private passTabAt = 0;
+  private mapShutTicks = 0;
+  private mapSeen = false;
+  private orphans = 0;
+  private flash: Flash = newFlash();
 }
+
+// What could make the colours flash, counted per opening: frames whose fit held, failed or had too few markers, how often
+// that changed, the layer shown and hidden, frames it moved, its largest single step per value, sign or half-turn changes,
+// owners redrawn, our menu closed (frames) and frames it was not open; seconds give the frame rate
+interface Flash { at: number; held: number; failed: number; noFit: number; flips: number; lastHolds: boolean | null; shown: number; hidden: number; moves: number; maxStep: Record<string, number>; signFlips: number; redraws: number; closes: number[]; menuGone: number }
+const newFlash = (): Flash => ({ at: Date.now(), held: 0, failed: 0, noFit: 0, flips: 0, lastHolds: null, shown: 0, hidden: 0, moves: 0, maxStep: {}, signFlips: 0, redraws: 0, closes: [], menuGone: 0 });
 
 // A layer move smaller than this (a pixel, a percent of scale, a degree) is not written: the fit wobbles by that much
 const LAYER_STILL = 0.5;
