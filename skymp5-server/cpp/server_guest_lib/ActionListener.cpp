@@ -2228,6 +2228,14 @@ void ActionListener::OnHostAttempt(const RawMessageData& rawMsgData,
     return;
   }
 
+  // The server drives this one itself (Option B: serverhostpin.js tags it, later the mover). No client may
+  // take it, and this lives in C++ as well as the gamemode's onHostAttempt chain below on purpose: the
+  // gamemode's refusal is a module that can be off, misconfigured or mid-reload, while the tag is the state
+  // the mover's own movement depends on. Before FireGamemodeEvent, so a refusal costs no event.
+  if (PartOne::IsServerDriven(remote)) {
+    return;
+  }
+
   // The gamemode can reserve an actor for one hoster (companions)
   if (!FireGamemodeEvent(partOne.worldState, me->GetFormId(), "onHostAttempt",
                          nlohmann::json::array({ remoteId }))) {

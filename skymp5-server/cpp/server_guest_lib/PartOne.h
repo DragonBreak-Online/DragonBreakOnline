@@ -165,6 +165,22 @@ public:
   void SendHostStop(Networking::UserId badHosterUserId,
                     MpObjectReference& remote);
 
+  // An NPC the SERVER drives itself (Option B, _work\server-npc-movement-1102.md). The gameplay layer sets the
+  // tag - serverhostpin.js, and later the mover - and three things here read it: a host attempt for it is
+  // refused, the stale sweep leaves it alone, and clients are told isHostedByOther so they never ask.
+  //
+  // Why a change-form property and not a sentinel in worldState.hosters: a made-up hoster id would be looked up
+  // as an actor by UserByActor, SendHostStop, HosterInReach and the health resync, each of which would see a
+  // form that is not there and treat the NPC as having a disconnected hoster. The tag adds no state to reason
+  // about, survives a restart and a gamemode reload, and can be set and cleared from hot-reloadable JS - which
+  // a compile-time constant cannot. It is read through GetDynamicFields(), a const reference, so the stale
+  // sweep's loop over every hoster costs a map lookup and a string compare per NPC, not a ChangeForm copy.
+  static const char* GetServerDrivenProperty() noexcept
+  {
+    return "private.dboServerHost";
+  }
+  static bool IsServerDriven(const MpObjectReference& remote);
+
   static MessageSerializer& GetMessageSerializerInstance();
 
 private:
