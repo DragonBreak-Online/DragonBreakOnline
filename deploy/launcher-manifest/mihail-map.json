@@ -1,0 +1,123 @@
+[
+ {
+  "plugin": "mihaildeadrapack.esp",
+  "folders": [
+   "daedra pack (se-ae)-159364-1-1758040199"
+  ],
+  "folder": "daedra pack (se-ae)-159364-1-1758040199",
+  "modId": 159364,
+  "archives": [
+   "daedra pack (se-ae)-159364-1-1758040199.rar"
+  ]
+ },
+ {
+  "plugin": "mihailelementalgolems.esp",
+  "folders": [
+   "elemental golems (se-ae) 1.1-106477-1-1-1704112485"
+  ],
+  "folder": "elemental golems (se-ae) 1.1-106477-1-1-1704112485",
+  "modId": 106477,
+  "archives": [
+   "elemental golems (se-ae) 1.1-106477-1-1-1704112485.rar"
+  ]
+ },
+ {
+  "plugin": "mihailfleshatronach.esp",
+  "folders": [
+   "flesh atronachs (se-ae)-77868-1-1667084565"
+  ],
+  "folder": "flesh atronachs (se-ae)-77868-1-1667084565",
+  "modId": 77868,
+  "archives": [
+   "flesh atronachs (se-ae)-77868-1-1667084565.rar"
+  ]
+ },
+ {
+  "plugin": "mihailgiantfamily.esp",
+  "folders": [
+   "Giants Overhaul (se-ae)-98581-1-1692362791"
+  ],
+  "folder": "Giants Overhaul (se-ae)-98581-1-1692362791",
+  "modId": 98581,
+  "archives": [
+   "Giants Overhaul (se-ae)-98581-1-1692362791.rar"
+  ]
+ },
+ {
+  "plugin": "mihailgrahlsandfrostgiants.esp",
+  "folders": [
+   "Grahls and Frost Giants (se-ae)-100013-1-1693935896"
+  ],
+  "folder": "Grahls and Frost Giants (se-ae)-100013-1-1693935896",
+  "modId": 100013,
+  "archives": [
+   "Grahls and Frost Giants (se-ae)-100013-1-1693935896.rar"
+  ]
+ },
+ {
+  "plugin": "mihailhiveguardians.esp",
+  "folders": [
+   "hive guardians (se-ae)-117001-1-1713376299"
+  ],
+  "folder": "hive guardians (se-ae)-117001-1-1713376299",
+  "modId": 117001,
+  "archives": [
+   "hive guardians (se-ae)-117001-1-1713376299.rar"
+  ]
+ },
+ {
+  "plugin": "mihailicetitansandseagiants.esp",
+  "folders": [
+   "sea giants and ice titans (se-ae)-103285-1-1698168502"
+  ],
+  "folder": "sea giants and ice titans (se-ae)-103285-1-1698168502",
+  "modId": 103285,
+  "archives": [
+   "sea giants and ice titans (se-ae)-103285-1-1698168502.rar"
+  ]
+ },
+ {
+  "plugin": "mihailnordicsentinel.esp",
+  "folders": [
+   "ancient nordic sentinel (se-ae) v3.2-24549-3-2-1709129054"
+  ],
+  "folder": "ancient nordic sentinel (se-ae) v3.2-24549-3-2-1709129054",
+  "modId": 24549,
+  "archives": [
+   "ancient nordic sentinel (se-ae) v3.2-24549-3-2-1709129054.rar"
+  ]
+ },
+ {
+  "plugin": "mihailskeletalrevenants.esp",
+  "folders": [
+   "skeletal revenants (SE-AE)-102415-1-1697136253"
+  ],
+  "folder": "skeletal revenants (SE-AE)-102415-1-1697136253",
+  "modId": 102415,
+  "archives": [
+   "skeletal revenants (SE-AE)-102415-1-1697136253.rar"
+  ]
+ },
+ {
+  "plugin": "mihailundeadsnowelf.esp",
+  "folders": [
+   "Undead Snow Elves (se-ae)-87023-1-1678811650"
+  ],
+  "folder": "Undead Snow Elves (se-ae)-87023-1-1678811650",
+  "modId": 87023,
+  "archives": [
+   "Undead Snow Elves (se-ae)-87023-1-1678811650.rar"
+  ]
+ },
+ {
+  "plugin": "mihailvampirelordsandbeasts.esp",
+  "folders": [
+   "vampire lords and beasts (se-ae)-79281-1-1669211940"
+  ],
+  "folder": "vampire lords and beasts (se-ae)-79281-1-1669211940",
+  "modId": 79281,
+  "archives": [
+   "vampire lords and beasts (se-ae)-79281-1-1669211940.rar"
+  ]
+ }
+]

@@ -1,0 +1,1482 @@
+{
+ "withinIdentical": {
+  "meshes/mihail monsters and animals/troll/grahl/grahleyeballs.nif": [
+   [
+    "Grahls and Frost Giants (se",
+    "17f60ddfc354856a73c29193d43e20b279b8715015ca9b57434706c2342aa319",
+    104898
+   ],
+   [
+    "sea giants and ice titans (se",
+    "17f60ddfc354856a73c29193d43e20b279b8715015ca9b57434706c2342aa319",
+    104898
+   ]
+  ],
+  "meshes/mihail monsters and animals/troll/grahl/mihailgrahl.nif": [
+   [
+    "Grahls and Frost Giants (se",
+    "013073c1f900844468b8c628ca02d2b6b0ce6e221fecf9411629afe5ff692e91",
+    26047656
+   ],
+   [
+    "sea giants and ice titans (se",
+    "013073c1f900844468b8c628ca02d2b6b0ce6e221fecf9411629afe5ff692e91",
+    26047656
+   ]
+  ],
+  "meshes/mihail monsters and animals/troll/grahl/mihailgrahltusks.nif": [
+   [
+    "Grahls and Frost Giants (se",
+    "af3d5fe1368f092be0427e65530479c1360e2bc9c8b044056db0e37c54bd564b",
+    107518
+   ],
+   [
+    "sea giants and ice titans (se",
+    "af3d5fe1368f092be0427e65530479c1360e2bc9c8b044056db0e37c54bd564b",
+    107518
+   ]
+  ],
+  "meshes/mihail monsters and animals/troll/grahl/skeletongrahl.nif": [
+   [
+    "Grahls and Frost Giants (se",
+    "19cc06b7bbb905e2d4739eebb81871cc7283147464943eb4c7523593fb024bc9",
+    17727
+   ],
+   [
+    "sea giants and ice titans (se",
+    "19cc06b7bbb905e2d4739eebb81871cc7283147464943eb4c7523593fb024bc9",
+    17727
+   ]
+  ],
+  "scripts/dagon_script_addfxorspell.pex": [
+   [
+    "elemental golems (se",
+    "8c7842a90c352923e409d7f95fc129ac579ba2d9f7dfe3a683b6a453790130c2",
+    1704
+   ],
+   [
+    "skeletal revenants (SE",
+    "8c7842a90c352923e409d7f95fc129ac579ba2d9f7dfe3a683b6a453790130c2",
+    1704
+   ]
+  ],
+  "scripts/mihail_general_attachfx.pex": [
+   [
+    "daedra pack (se",
+    "4a14c7682fb6406c675090c77635446814a449c84712c5d59a7644776a637294",
+    1371
+   ],
+   [
+    "elemental golems (se",
+    "4a14c7682fb6406c675090c77635446814a449c84712c5d59a7644776a637294",
+    1371
+   ],
+   [
+    "flesh atronachs (se",
+    "4a14c7682fb6406c675090c77635446814a449c84712c5d59a7644776a637294",
+    1371
+   ],
+   [
+    "Grahls and Frost Giants (se",
+    "4a14c7682fb6406c675090c77635446814a449c84712c5d59a7644776a637294",
+    1371
+   ],
+   [
+    "skeletal revenants (SE",
+    "4a14c7682fb6406c675090c77635446814a449c84712c5d59a7644776a637294",
+    1371
+   ],
+   [
+    "vampire lords and beasts (se",
+    "4a14c7682fb6406c675090c77635446814a449c84712c5d59a7644776a637294",
+    1371
+   ]
+  ],
+  "scripts/mihail_general_attachspell.pex": [
+   [
+    "daedra pack (se",
+    "adbb406dba03f247188ef1841326487399d1f2865beafee477062b85ff10d7fa",
+    882
+   ],
+   [
+    "elemental golems (se",
+    "adbb406dba03f247188ef1841326487399d1f2865beafee477062b85ff10d7fa",
+    882
+   ],
+   [
+    "flesh atronachs (se",
+    "adbb406dba03f247188ef1841326487399d1f2865beafee477062b85ff10d7fa",
+    882
+   ],
+   [
+    "Grahls and Frost Giants (se",
+    "adbb406dba03f247188ef1841326487399d1f2865beafee477062b85ff10d7fa",
+    882
+   ],
+   [
+    "skeletal revenants (SE",
+    "adbb406dba03f247188ef1841326487399d1f2865beafee477062b85ff10d7fa",
+    882
+   ],
+   [
+    "vampire lords and beasts (se",
+    "adbb406dba03f247188ef1841326487399d1f2865beafee477062b85ff10d7fa",
+    882
+   ]
+  ],
+  "scripts/mihail_general_attachspellandfx.pex": [
+   [
+    "daedra pack (se",
+    "c1b98ebf836e08b9a211df598f0a9c473f75cdd12ad4aed0a04c61069f84a2e5",
+    1689
+   ],
+   [
+    "elemental golems (se",
+    "c1b98ebf836e08b9a211df598f0a9c473f75cdd12ad4aed0a04c61069f84a2e5",
+    1689
+   ],
+   [
+    "flesh atronachs (se",
+    "c1b98ebf836e08b9a211df598f0a9c473f75cdd12ad4aed0a04c61069f84a2e5",
+    1689
+   ],
+   [
+    "Grahls and Frost Giants (se",
+    "c1b98ebf836e08b9a211df598f0a9c473f75cdd12ad4aed0a04c61069f84a2e5",
+    1689
+   ],
+   [
+    "skeletal revenants (SE",
+    "c1b98ebf836e08b9a211df598f0a9c473f75cdd12ad4aed0a04c61069f84a2e5",
+    1689
+   ],
+   [
+    "vampire lords and beasts (se",
+    "c1b98ebf836e08b9a211df598f0a9c473f75cdd12ad4aed0a04c61069f84a2e5",
+    1689
+   ]
+  ],
+  "scripts/source/dagon_script_addfxorspell.psc": [
+   [
+    "elemental golems (se",
+    "a6e746b483e46798b5395d86ed9e5f7e7e03509094ea814e842eb24f83d6f9d0",
+    1103
+   ],
+   [
+    "skeletal revenants (SE",
+    "a6e746b483e46798b5395d86ed9e5f7e7e03509094ea814e842eb24f83d6f9d0",
+    1103
+   ]
+  ],
+  "scripts/source/mihail_general_attachfx.psc": [
+   [
+    "daedra pack (se",
+    "64ea9aa9d45d73201131b076154e5746dcaf5d07cb7389ea1479e88257383933",
+    1181
+   ],
+   [
+    "elemental golems (se",
+    "64ea9aa9d45d73201131b076154e5746dcaf5d07cb7389ea1479e88257383933",
+    1181
+   ],
+   [
+    "flesh atronachs (se",
+    "64ea9aa9d45d73201131b076154e5746dcaf5d07cb7389ea1479e88257383933",
+    1181
+   ],
+   [
+    "Grahls and Frost Giants (se",
+    "64ea9aa9d45d73201131b076154e5746dcaf5d07cb7389ea1479e88257383933",
+    1181
+   ],
+   [
+    "skeletal revenants (SE",
+    "64ea9aa9d45d73201131b076154e5746dcaf5d07cb7389ea1479e88257383933",
+    1181
+   ],
+   [
+    "vampire lords and beasts (se",
+    "64ea9aa9d45d73201131b076154e5746dcaf5d07cb7389ea1479e88257383933",
+    1181
+   ]
+  ],
+  "scripts/source/mihail_general_attachspell.psc": [
+   [
+    "daedra pack (se",
+    "764b1c2a4b209f578b89cecb28de2302c5ca258846bc7601d21ed1f65f410bf7",
+    487
+   ],
+   [
+    "elemental golems (se",
+    "764b1c2a4b209f578b89cecb28de2302c5ca258846bc7601d21ed1f65f410bf7",
+    487
+   ],
+   [
+    "flesh atronachs (se",
+    "764b1c2a4b209f578b89cecb28de2302c5ca258846bc7601d21ed1f65f410bf7",
+    487
+   ],
+   [
+    "Grahls and Frost Giants (se",
+    "764b1c2a4b209f578b89cecb28de2302c5ca258846bc7601d21ed1f65f410bf7",
+    487
+   ],
+   [
+    "skeletal revenants (SE",
+    "764b1c2a4b209f578b89cecb28de2302c5ca258846bc7601d21ed1f65f410bf7",
+    487
+   ],
+   [
+    "vampire lords and beasts (se",
+    "764b1c2a4b209f578b89cecb28de2302c5ca258846bc7601d21ed1f65f410bf7",
+    487
+   ]
+  ],
+  "scripts/source/mihail_general_attachspellandfx.psc": [
+   [
+    "daedra pack (se",
+    "29acd40c5546ea4913dcf1d7677e5f71d69a7a820d7ebce9611861c75011992d",
+    1424
+   ],
+   [
+    "elemental golems (se",
+    "29acd40c5546ea4913dcf1d7677e5f71d69a7a820d7ebce9611861c75011992d",
+    1424
+   ],
+   [
+    "flesh atronachs (se",
+    "29acd40c5546ea4913dcf1d7677e5f71d69a7a820d7ebce9611861c75011992d",
+    1424
+   ],
+   [
+    "Grahls and Frost Giants (se",
+    "29acd40c5546ea4913dcf1d7677e5f71d69a7a820d7ebce9611861c75011992d",
+    1424
+   ],
+   [
+    "skeletal revenants (SE",
+    "29acd40c5546ea4913dcf1d7677e5f71d69a7a820d7ebce9611861c75011992d",
+    1424
+   ],
+   [
+    "vampire lords and beasts (se",
+    "29acd40c5546ea4913dcf1d7677e5f71d69a7a820d7ebce9611861c75011992d",
+    1424
+   ]
+  ],
+  "sound/fx/dlc02/npc/werebear/npc_werebear_conscious_lp.wav": [
+   [
+    "daedra pack (se",
+    "26221020d6ef1fea58f5efe1d9229b1e1753b9992cf8f85ddcc4fd1adf2fbac9",
+    538306
+   ],
+   [
+    "vampire lords and beasts (se",
+    "26221020d6ef1fea58f5efe1d9229b1e1753b9992cf8f85ddcc4fd1adf2fbac9",
+    538306
+   ]
+  ],
+  "sound/fx/mihailgrahl.esp/voicegrahl.wav": [
+   [
+    "Grahls and Frost Giants (se",
+    "c04379b12a91f6071ee7872b0d60d4a2f0677ab84a3b45475519d6fda3f9e6ea",
+    5718094
+   ],
+   [
+    "sea giants and ice titans (se",
+    "c04379b12a91f6071ee7872b0d60d4a2f0677ab84a3b45475519d6fda3f9e6ea",
+    5718094
+   ]
+  ],
+  "sound/fx/npc/bear/injured/npc_bear_injured_02.wav": [
+   [
+    "daedra pack (se",
+    "24831b6f063ae6c2470f46f8ed97e6325aa4a0b3a04d1cc5313040e616c726d4",
+    344104
+   ],
+   [
+    "vampire lords and beasts (se",
+    "24831b6f063ae6c2470f46f8ed97e6325aa4a0b3a04d1cc5313040e616c726d4",
+    344104
+   ]
+  ],
+  "sound/fx/npc/bear/npc_bear_aggrowarning_01.wav": [
+   [
+    "daedra pack (se",
+    "525c3b80bd8b2379140524a56fc907b3a82848069489d32a9c7a5bf3b290a749",
+    206506
+   ],
+   [
+    "vampire lords and beasts (se",
+    "525c3b80bd8b2379140524a56fc907b3a82848069489d32a9c7a5bf3b290a749",
+    206506
+   ]
+  ],
+  "sound/fx/npc/bear/npc_bear_aggrowarning_02.wav": [
+   [
+    "daedra pack (se",
+    "886534a02fd2e0e24be7e825bffc5c0d398e1bda69a1a829797d9974f5dfad2e",
+    147072
+   ],
+   [
+    "vampire lords and beasts (se",
+    "886534a02fd2e0e24be7e825bffc5c0d398e1bda69a1a829797d9974f5dfad2e",
+    147072
+   ]
+  ],
+  "sound/fx/npc/werewolf/npc_werewolf_injured_01.wav": [
+   [
+    "daedra pack (se",
+    "7b488eb23804aa7428a2a00c3e89c22fa95425936fb4d5b6fe617d58d2794a95",
+    271924
+   ],
+   [
+    "vampire lords and beasts (se",
+    "7b488eb23804aa7428a2a00c3e89c22fa95425936fb4d5b6fe617d58d2794a95",
+    271924
+   ]
+  ],
+  "sound/fx/npc/werewolf/npc_werewolf_transformation_01.wav": [
+   [
+    "daedra pack (se",
+    "afacfa7828447bdef9eefaf15c33b5e90f834a60df8b13ea7306ad221677b951",
+    942230
+   ],
+   [
+    "vampire lords and beasts (se",
+    "afacfa7828447bdef9eefaf15c33b5e90f834a60df8b13ea7306ad221677b951",
+    942230
+   ]
+  ],
+  "sound/fx/npc/werewolf/npc_werewolf_transformation_02_2d.wav": [
+   [
+    "daedra pack (se",
+    "585657f42c5c317fe24ad069bdfa7f9afd4505eb4fe35a7f216ac7a8cf0ad47f",
+    53914
+   ],
+   [
+    "vampire lords and beasts (se",
+    "585657f42c5c317fe24ad069bdfa7f9afd4505eb4fe35a7f216ac7a8cf0ad47f",
+    53914
+   ]
+  ],
+  "sound/fx/npc/werewolf/npc_werewolf_transformation_02_3d.wav": [
+   [
+    "daedra pack (se",
+    "945b090d30583d58de04aa848901b1aaedfdd01b0fd457ca2a7665718f520a12",
+    174698
+   ],
+   [
+    "vampire lords and beasts (se",
+    "945b090d30583d58de04aa848901b1aaedfdd01b0fd457ca2a7665718f520a12",
+    174698
+   ]
+  ],
+  "source/scripts/dagon_script_addfxorspell.psc": [
+   [
+    "elemental golems (se",
+    "a6e746b483e46798b5395d86ed9e5f7e7e03509094ea814e842eb24f83d6f9d0",
+    1103
+   ],
+   [
+    "skeletal revenants (SE",
+    "a6e746b483e46798b5395d86ed9e5f7e7e03509094ea814e842eb24f83d6f9d0",
+    1103
+   ]
+  ],
+  "source/scripts/mihail_general_attachfx.psc": [
+   [
+    "daedra pack (se",
+    "64ea9aa9d45d73201131b076154e5746dcaf5d07cb7389ea1479e88257383933",
+    1181
+   ],
+   [
+    "elemental golems (se",
+    "64ea9aa9d45d73201131b076154e5746dcaf5d07cb7389ea1479e88257383933",
+    1181
+   ],
+   [
+    "flesh atronachs (se",
+    "64ea9aa9d45d73201131b076154e5746dcaf5d07cb7389ea1479e88257383933",
+    1181
+   ],
+   [
+    "Grahls and Frost Giants (se",
+    "64ea9aa9d45d73201131b076154e5746dcaf5d07cb7389ea1479e88257383933",
+    1181
+   ],
+   [
+    "skeletal revenants (SE",
+    "64ea9aa9d45d73201131b076154e5746dcaf5d07cb7389ea1479e88257383933",
+    1181
+   ],
+   [
+    "vampire lords and beasts (se",
+    "64ea9aa9d45d73201131b076154e5746dcaf5d07cb7389ea1479e88257383933",
+    1181
+   ]
+  ],
+  "source/scripts/mihail_general_attachspell.psc": [
+   [
+    "daedra pack (se",
+    "764b1c2a4b209f578b89cecb28de2302c5ca258846bc7601d21ed1f65f410bf7",
+    487
+   ],
+   [
+    "elemental golems (se",
+    "764b1c2a4b209f578b89cecb28de2302c5ca258846bc7601d21ed1f65f410bf7",
+    487
+   ],
+   [
+    "flesh atronachs (se",
+    "764b1c2a4b209f578b89cecb28de2302c5ca258846bc7601d21ed1f65f410bf7",
+    487
+   ],
+   [
+    "Grahls and Frost Giants (se",
+    "764b1c2a4b209f578b89cecb28de2302c5ca258846bc7601d21ed1f65f410bf7",
+    487
+   ],
+   [
+    "skeletal revenants (SE",
+    "764b1c2a4b209f578b89cecb28de2302c5ca258846bc7601d21ed1f65f410bf7",
+    487
+   ],
+   [
+    "vampire lords and beasts (se",
+    "764b1c2a4b209f578b89cecb28de2302c5ca258846bc7601d21ed1f65f410bf7",
+    487
+   ]
+  ],
+  "source/scripts/mihail_general_attachspellandfx.psc": [
+   [
+    "daedra pack (se",
+    "29acd40c5546ea4913dcf1d7677e5f71d69a7a820d7ebce9611861c75011992d",
+    1424
+   ],
+   [
+    "elemental golems (se",
+    "29acd40c5546ea4913dcf1d7677e5f71d69a7a820d7ebce9611861c75011992d",
+    1424
+   ],
+   [
+    "flesh atronachs (se",
+    "29acd40c5546ea4913dcf1d7677e5f71d69a7a820d7ebce9611861c75011992d",
+    1424
+   ],
+   [
+    "Grahls and Frost Giants (se",
+    "29acd40c5546ea4913dcf1d7677e5f71d69a7a820d7ebce9611861c75011992d",
+    1424
+   ],
+   [
+    "skeletal revenants (SE",
+    "29acd40c5546ea4913dcf1d7677e5f71d69a7a820d7ebce9611861c75011992d",
+    1424
+   ],
+   [
+    "vampire lords and beasts (se",
+    "29acd40c5546ea4913dcf1d7677e5f71d69a7a820d7ebce9611861c75011992d",
+    1424
+   ]
+  ],
+  "textures/demented mage/glovesdementia.dds": [
+   [
+    "daedra pack (se",
+    "857031bc58e6ca14361272f7599e670a6577a1acdd465300f4631de0eb5c1503",
+    22369776
+   ],
+   [
+    "flesh atronachs (se",
+    "857031bc58e6ca14361272f7599e670a6577a1acdd465300f4631de0eb5c1503",
+    22369776
+   ]
+  ],
+  "textures/demented mage/head_n.dds": [
+   [
+    "daedra pack (se",
+    "3767d12c36483e26249e893931854a17c7d5ab75258ce4fe45227d50d017d69e",
+    1398256
+   ],
+   [
+    "flesh atronachs (se",
+    "3767d12c36483e26249e893931854a17c7d5ab75258ce4fe45227d50d017d69e",
+    1398256
+   ]
+  ],
+  "textures/demented mage/headdementia.dds": [
+   [
+    "daedra pack (se",
+    "a89f0951d030f9b51f0595a2bbe5efa967e676356ebd7e7a2d08559b572d5638",
+    22369776
+   ],
+   [
+    "flesh atronachs (se",
+    "a89f0951d030f9b51f0595a2bbe5efa967e676356ebd7e7a2d08559b572d5638",
+    22369776
+   ]
+  ],
+  "textures/demented mage/hoodclothdementia.dds": [
+   [
+    "daedra pack (se",
+    "cfe0464a346c6c020e417a0012e0a0ebc2d2241d21a052eb0b8cf175163f6014",
+    22369776
+   ],
+   [
+    "flesh atronachs (se",
+    "cfe0464a346c6c020e417a0012e0a0ebc2d2241d21a052eb0b8cf175163f6014",
+    22369776
+   ]
+  ],
+  "textures/demented mage/mask_m.dds": [
+   [
+    "daedra pack (se",
+    "7084b05b48fdc9ea1537bc0f659900b7e0e96c9fe6c32b9ebfe1985453d20bb9",
+    1398256
+   ],
+   [
+    "flesh atronachs (se",
+    "7084b05b48fdc9ea1537bc0f659900b7e0e96c9fe6c32b9ebfe1985453d20bb9",
+    1398256
+   ]
+  ],
+  "textures/demented mage/mask_n.dds": [
+   [
+    "daedra pack (se",
+    "0e84f361f8484f3fda391ba7e8d085d70d8ad81584962baca28ca8d2022b43a8",
+    1398256
+   ],
+   [
+    "flesh atronachs (se",
+    "0e84f361f8484f3fda391ba7e8d085d70d8ad81584962baca28ca8d2022b43a8",
+    1398256
+   ]
+  ],
+  "textures/demented mage/maskdementia.dds": [
+   [
+    "daedra pack (se",
+    "21bfdd13bb583d8b20e6b45502ba787483e993f939080a695bac244fdf60b7e8",
+    22369776
+   ],
+   [
+    "flesh atronachs (se",
+    "21bfdd13bb583d8b20e6b45502ba787483e993f939080a695bac244fdf60b7e8",
+    22369776
+   ]
+  ],
+  "textures/demented mage/ore_ebony_e.dds": [
+   [
+    "daedra pack (se",
+    "477084d386e6518e8c471cf1df0f5383800f0b60b28438520de8dd6e0df79479",
+    4304
+   ],
+   [
+    "flesh atronachs (se",
+    "477084d386e6518e8c471cf1df0f5383800f0b60b28438520de8dd6e0df79479",
+    4304
+   ]
+  ],
+  "textures/demented mage/robesdementia.dds": [
+   [
+    "daedra pack (se",
+    "8d61247a2212f191ed92e36b2ba0eee388d05731cb53ce51a59a3a6e82327f3c",
+    22369776
+   ],
+   [
+    "flesh atronachs (se",
+    "8d61247a2212f191ed92e36b2ba0eee388d05731cb53ce51a59a3a6e82327f3c",
+    22369776
+   ]
+  ],
+  "textures/demented mage/shoesdementia.dds": [
+   [
+    "daedra pack (se",
+    "6093da2ead153de9dfecafdd762faccc61cc575f998f90cc4252d6609fbe1fc7",
+    22369776
+   ],
+   [
+    "flesh atronachs (se",
+    "6093da2ead153de9dfecafdd762faccc61cc575f998f90cc4252d6609fbe1fc7",
+    22369776
+   ]
+  ],
+  "textures/effects/gradients/summmonvoid.dds": [
+   [
+    "daedra pack (se",
+    "ac3da67aacb9024c4b83af1db3a6f485dca0825c86594b940f80594a7118182d",
+    22032
+   ],
+   [
+    "skeletal revenants (SE",
+    "ac3da67aacb9024c4b83af1db3a6f485dca0825c86594b940f80594a7118182d",
+    22032
+   ]
+  ],
+  "textures/effects/gradients/summmonvoidbright.dds": [
+   [
+    "daedra pack (se",
+    "2309c8135e60fd85464895c762277d281321a225923f845effd3b039be1a6006",
+    22032
+   ],
+   [
+    "skeletal revenants (SE",
+    "2309c8135e60fd85464895c762277d281321a225923f845effd3b039be1a6006",
+    22032
+   ]
+  ],
+  "textures/effects/gradients/summonclockwork.dds": [
+   [
+    "daedra pack (se",
+    "ae5f3a4ebeaa070ec42c01a33288e9eb07a1ede8a172a5892131249c06536c46",
+    22032
+   ],
+   [
+    "skeletal revenants (SE",
+    "ae5f3a4ebeaa070ec42c01a33288e9eb07a1ede8a172a5892131249c06536c46",
+    22032
+   ]
+  ],
+  "textures/effects/gradients/summonclockworkbright.dds": [
+   [
+    "daedra pack (se",
+    "59ad5df8ca22202b889dbc50dcc6f40461403eb07adfa72c625fa4b7553fc9b2",
+    22032
+   ],
+   [
+    "skeletal revenants (SE",
+    "59ad5df8ca22202b889dbc50dcc6f40461403eb07adfa72c625fa4b7553fc9b2",
+    22032
+   ]
+  ],
+  "textures/effects/gradients/summondagoth.dds": [
+   [
+    "daedra pack (se",
+    "8e8c65a99652af0495b793499b969c09508e44d61269677a9b053046d9b5f8f4",
+    22032
+   ],
+   [
+    "skeletal revenants (SE",
+    "8e8c65a99652af0495b793499b969c09508e44d61269677a9b053046d9b5f8f4",
+    22032
+   ]
+  ],
+  "textures/effects/gradients/summondagothbright.dds": [
+   [
+    "daedra pack (se",
+    "c10baeccc62d270f797629130ea891c319613a6fd24bb5a1ce79ee151bf4d086",
+    22032
+   ],
+   [
+    "skeletal revenants (SE",
+    "c10baeccc62d270f797629130ea891c319613a6fd24bb5a1ce79ee151bf4d086",
+    22032
+   ]
+  ],
+  "textures/effects/gradients/summonlight.dds": [
+   [
+    "daedra pack (se",
+    "8da045cb59161d498a3a665ad690b69e3a472584ad88900a4800365217c09afd",
+    22032
+   ],
+   [
+    "skeletal revenants (SE",
+    "8da045cb59161d498a3a665ad690b69e3a472584ad88900a4800365217c09afd",
+    22032
+   ]
+  ],
+  "textures/effects/gradients/summonlightbright.dds": [
+   [
+    "daedra pack (se",
+    "31ec385f4f9b993fef03a9bcd5257eec20dca2331af61c4fdef65b0dc4f3784b",
+    22032
+   ],
+   [
+    "skeletal revenants (SE",
+    "31ec385f4f9b993fef03a9bcd5257eec20dca2331af61c4fdef65b0dc4f3784b",
+    22032
+   ]
+  ],
+  "textures/effects/gradients/summonlightdepht.dds": [
+   [
+    "daedra pack (se",
+    "bcb8bef0d22664b3e5dcd0a95bfa01ff3fe2c933015aee457201f41ebc466f3b",
+    22032
+   ],
+   [
+    "skeletal revenants (SE",
+    "bcb8bef0d22664b3e5dcd0a95bfa01ff3fe2c933015aee457201f41ebc466f3b",
+    22032
+   ]
+  ],
+  "textures/effects/gradients/summonnature.dds": [
+   [
+    "daedra pack (se",
+    "04f592eb4f31fac8653b1d7824efaf4580d140532c4f4a553fdea2560b491fb6",
+    22032
+   ],
+   [
+    "skeletal revenants (SE",
+    "04f592eb4f31fac8653b1d7824efaf4580d140532c4f4a553fdea2560b491fb6",
+    22032
+   ]
+  ],
+  "textures/effects/gradients/summonnaturebright.dds": [
+   [
+    "daedra pack (se",
+    "4c64a3f6a538b8a4d27a29d9a59042012b50a5b6ac0da395f59be3ce3e400d09",
+    22032
+   ],
+   [
+    "skeletal revenants (SE",
+    "4c64a3f6a538b8a4d27a29d9a59042012b50a5b6ac0da395f59be3ce3e400d09",
+    22032
+   ]
+  ],
+  "textures/manic mage/glovesmania.dds": [
+   [
+    "daedra pack (se",
+    "efa9b93729cf7b1221e9e17d924c44b6ce92f8128470b9029ac24d72e0b8ede8",
+    22369776
+   ],
+   [
+    "flesh atronachs (se",
+    "efa9b93729cf7b1221e9e17d924c44b6ce92f8128470b9029ac24d72e0b8ede8",
+    22369776
+   ]
+  ],
+  "textures/manic mage/head_n.dds": [
+   [
+    "daedra pack (se",
+    "3767d12c36483e26249e893931854a17c7d5ab75258ce4fe45227d50d017d69e",
+    1398256
+   ],
+   [
+    "flesh atronachs (se",
+    "3767d12c36483e26249e893931854a17c7d5ab75258ce4fe45227d50d017d69e",
+    1398256
+   ]
+  ],
+  "textures/manic mage/headmania.dds": [
+   [
+    "daedra pack (se",
+    "f564286c2c185ebba63f66e738fa3b0386748ec9e84a131865fea0282ac65792",
+    22369776
+   ],
+   [
+    "flesh atronachs (se",
+    "f564286c2c185ebba63f66e738fa3b0386748ec9e84a131865fea0282ac65792",
+    22369776
+   ]
+  ],
+  "textures/manic mage/hoodclothmania.dds": [
+   [
+    "daedra pack (se",
+    "a5a039044c06de97ae2bba17584fc04f851c2cc51f8f5a4b60939c4878cbc39f",
+    22369776
+   ],
+   [
+    "flesh atronachs (se",
+    "a5a039044c06de97ae2bba17584fc04f851c2cc51f8f5a4b60939c4878cbc39f",
+    22369776
+   ]
+  ],
+  "textures/manic mage/mask_m.dds": [
+   [
+    "daedra pack (se",
+    "7084b05b48fdc9ea1537bc0f659900b7e0e96c9fe6c32b9ebfe1985453d20bb9",
+    1398256
+   ],
+   [
+    "flesh atronachs (se",
+    "7084b05b48fdc9ea1537bc0f659900b7e0e96c9fe6c32b9ebfe1985453d20bb9",
+    1398256
+   ]
+  ],
+  "textures/manic mage/mask_n.dds": [
+   [
+    "daedra pack (se",
+    "0e84f361f8484f3fda391ba7e8d085d70d8ad81584962baca28ca8d2022b43a8",
+    1398256
+   ],
+   [
+    "flesh atronachs (se",
+    "0e84f361f8484f3fda391ba7e8d085d70d8ad81584962baca28ca8d2022b43a8",
+    1398256
+   ]
+  ],
+  "textures/manic mage/maskmania.dds": [
+   [
+    "daedra pack (se",
+    "e478d79188d021a38f235cbe97706c36b03bb9e78aad5749a63080004fdb2c27",
+    22369776
+   ],
+   [
+    "flesh atronachs (se",
+    "e478d79188d021a38f235cbe97706c36b03bb9e78aad5749a63080004fdb2c27",
+    22369776
+   ]
+  ],
+  "textures/manic mage/ore_gold_e.dds": [
+   [
+    "daedra pack (se",
+    "d94127d5aba097ea4948c71346fcb89e3bef4fcd03520da38af385e19ea8c9f3",
+    4304
+   ],
+   [
+    "flesh atronachs (se",
+    "d94127d5aba097ea4948c71346fcb89e3bef4fcd03520da38af385e19ea8c9f3",
+    4304
+   ]
+  ],
+  "textures/manic mage/robesmania.dds": [
+   [
+    "daedra pack (se",
+    "9a36dd5832708dbb77fb09f8a68f2cbe70ab2e3aa1c6d4a15a3b4312b081edf2",
+    22369776
+   ],
+   [
+    "flesh atronachs (se",
+    "9a36dd5832708dbb77fb09f8a68f2cbe70ab2e3aa1c6d4a15a3b4312b081edf2",
+    22369776
+   ]
+  ],
+  "textures/manic mage/shoesmania.dds": [
+   [
+    "daedra pack (se",
+    "57a4f35ffb240d08531b8b27e3ee20f5b1d29ae7b727dba2f8aa5542eb221600",
+    22369776
+   ],
+   [
+    "flesh atronachs (se",
+    "57a4f35ffb240d08531b8b27e3ee20f5b1d29ae7b727dba2f8aa5542eb221600",
+    22369776
+   ]
+  ],
+  "textures/mihail monsters and animals/troll/grahl/beard.dds": [
+   [
+    "Grahls and Frost Giants (se",
+    "e1356ef284a00240ab7647721f827f0dff53f3c8338262f60840d2a81a298403",
+    22369776
+   ],
+   [
+    "sea giants and ice titans (se",
+    "e1356ef284a00240ab7647721f827f0dff53f3c8338262f60840d2a81a298403",
+    22369776
+   ]
+  ],
+  "textures/mihail monsters and animals/troll/grahl/body.dds": [
+   [
+    "Grahls and Frost Giants (se",
+    "c56e34bc1af5d268561800484fe72a257bd0c0f2278da878a923bd6d5440adfc",
+    22369776
+   ],
+   [
+    "sea giants and ice titans (se",
+    "c56e34bc1af5d268561800484fe72a257bd0c0f2278da878a923bd6d5440adfc",
+    22369776
+   ]
+  ],
+  "textures/mihail monsters and animals/troll/grahl/body_m.dds": [
+   [
+    "Grahls and Frost Giants (se",
+    "7b46db6ff6830a040cfd9e108e7d969435635179a3c7511abb68b241e91c944e",
+    1398256
+   ],
+   [
+    "sea giants and ice titans (se",
+    "7b46db6ff6830a040cfd9e108e7d969435635179a3c7511abb68b241e91c944e",
+    1398256
+   ]
+  ],
+  "textures/mihail monsters and animals/troll/grahl/body_n.dds": [
+   [
+    "Grahls and Frost Giants (se",
+    "0cabc8d37035c7a895c6844d66437d0681a616f8714bed141fbbe6e9a69611b7",
+    5592560
+   ],
+   [
+    "sea giants and ice titans (se",
+    "0cabc8d37035c7a895c6844d66437d0681a616f8714bed141fbbe6e9a69611b7",
+    5592560
+   ]
+  ],
+  "textures/mihail monsters and animals/troll/grahl/bodyparts.dds": [
+   [
+    "Grahls and Frost Giants (se",
+    "00cae934ecd28fe5283d322674a9168815563a983a402d7d559f78b00eabd5b6",
+    22369776
+   ],
+   [
+    "sea giants and ice titans (se",
+    "00cae934ecd28fe5283d322674a9168815563a983a402d7d559f78b00eabd5b6",
+    22369776
+   ]
+  ],
+  "textures/mihail monsters and animals/troll/grahl/bodyparts_m.dds": [
+   [
+    "Grahls and Frost Giants (se",
+    "93c12af2a4e3a2c9d283791bc416401230aa918e30517e2178e3cd3d3fed47e2",
+    1398256
+   ],
+   [
+    "sea giants and ice titans (se",
+    "93c12af2a4e3a2c9d283791bc416401230aa918e30517e2178e3cd3d3fed47e2",
+    1398256
+   ]
+  ],
+  "textures/mihail monsters and animals/troll/grahl/bodyparts_n.dds": [
+   [
+    "Grahls and Frost Giants (se",
+    "352454b194cd4e4d11ad5b1dac640d221ace08c7e059ebb3806492f9641c3716",
+    5592560
+   ],
+   [
+    "sea giants and ice titans (se",
+    "352454b194cd4e4d11ad5b1dac640d221ace08c7e059ebb3806492f9641c3716",
+    5592560
+   ]
+  ],
+  "textures/mihail monsters and animals/troll/grahl/bodyspikes.dds": [
+   [
+    "Grahls and Frost Giants (se",
+    "16b539a80638f370293f0ae4fb5048f6b174618b0d2893b4cab8fa7bbd7c8c81",
+    22369776
+   ],
+   [
+    "sea giants and ice titans (se",
+    "16b539a80638f370293f0ae4fb5048f6b174618b0d2893b4cab8fa7bbd7c8c81",
+    22369776
+   ]
+  ],
+  "textures/mihail monsters and animals/troll/grahl/bodyspikes_e.dds": [
+   [
+    "Grahls and Frost Giants (se",
+    "bbcb0c88fd7fbe7d48106f469f4d4cd0e861e5d75da9bf5cf74ad2274498ddbb",
+    174904
+   ],
+   [
+    "sea giants and ice titans (se",
+    "bbcb0c88fd7fbe7d48106f469f4d4cd0e861e5d75da9bf5cf74ad2274498ddbb",
+    174904
+   ]
+  ],
+  "textures/mihail monsters and animals/troll/grahl/bodyspikes_n.dds": [
+   [
+    "Grahls and Frost Giants (se",
+    "c1654dadef783f446b52254bdda00fc189a62a8c5fddd3e978637bc624e70ae5",
+    349680
+   ],
+   [
+    "sea giants and ice titans (se",
+    "c1654dadef783f446b52254bdda00fc189a62a8c5fddd3e978637bc624e70ae5",
+    349680
+   ]
+  ],
+  "textures/mihail monsters and animals/troll/grahl/bodyspikes_p.dds": [
+   [
+    "Grahls and Frost Giants (se",
+    "37c8a39483b5097ca5e3bee4b31ce69e2e919340b1a6b9f5c64cad394145e3db",
+    349680
+   ],
+   [
+    "sea giants and ice titans (se",
+    "37c8a39483b5097ca5e3bee4b31ce69e2e919340b1a6b9f5c64cad394145e3db",
+    349680
+   ]
+  ],
+  "textures/mihail monsters and animals/troll/grahl/eyecubemap.dds": [
+   [
+    "Grahls and Frost Giants (se",
+    "94bcce57cac564dc68a13aed411f68c2785fb7cb9da8f44ced7fd5867dc44545",
+    4304
+   ],
+   [
+    "sea giants and ice titans (se",
+    "94bcce57cac564dc68a13aed411f68c2785fb7cb9da8f44ced7fd5867dc44545",
+    4304
+   ]
+  ],
+  "textures/mihail monsters and animals/troll/grahl/fur.dds": [
+   [
+    "Grahls and Frost Giants (se",
+    "8d64fb04311f027623a98ac67cbe8e239357bebfb73b358caec4515e700ffca6",
+    22369776
+   ],
+   [
+    "sea giants and ice titans (se",
+    "8d64fb04311f027623a98ac67cbe8e239357bebfb73b358caec4515e700ffca6",
+    22369776
+   ]
+  ],
+  "textures/mihail monsters and animals/troll/grahl/fur2.dds": [
+   [
+    "Grahls and Frost Giants (se",
+    "e90c701dd331e9d3ad83945f689a1d21e8df5c0930e4c15d4e41a32522598e1c",
+    22369776
+   ],
+   [
+    "sea giants and ice titans (se",
+    "e90c701dd331e9d3ad83945f689a1d21e8df5c0930e4c15d4e41a32522598e1c",
+    22369776
+   ]
+  ],
+  "textures/mihail monsters and animals/troll/grahl/fur3.dds": [
+   [
+    "Grahls and Frost Giants (se",
+    "67db5d7c7c9ccfdd0c3debb9923de7079ecac0965587a3ae11a9b27176cece19",
+    22369776
+   ],
+   [
+    "sea giants and ice titans (se",
+    "67db5d7c7c9ccfdd0c3debb9923de7079ecac0965587a3ae11a9b27176cece19",
+    22369776
+   ]
+  ],
+  "textures/mihail monsters and animals/troll/grahl/ice/glacierice_e.dds": [
+   [
+    "Grahls and Frost Giants (se",
+    "3daac2fc4e79705ca804d00c364b68e36a5c75bbf5d4be6b646f6c4ed49371d4",
+    4304
+   ],
+   [
+    "sea giants and ice titans (se",
+    "3daac2fc4e79705ca804d00c364b68e36a5c75bbf5d4be6b646f6c4ed49371d4",
+    4304
+   ]
+  ],
+  "textures/mihail monsters and animals/troll/grahl/ice/icecavesubsurfacetint02.dds": [
+   [
+    "Grahls and Frost Giants (se",
+    "69d002610f165950bb2527af967b79b7f40cdf73035434af7bebf7003c27be4f",
+    2872
+   ],
+   [
+    "sea giants and ice titans (se",
+    "69d002610f165950bb2527af967b79b7f40cdf73035434af7bebf7003c27be4f",
+    2872
+   ]
+  ],
+  "textures/mihail monsters and animals/troll/grahl/mouth.dds": [
+   [
+    "Grahls and Frost Giants (se",
+    "629371a5ef67cf40f58b15794f5af0a1b1dad7aaecd333817c4c96980f8fbeeb",
+    22369776
+   ],
+   [
+    "sea giants and ice titans (se",
+    "629371a5ef67cf40f58b15794f5af0a1b1dad7aaecd333817c4c96980f8fbeeb",
+    22369776
+   ]
+  ],
+  "textures/mihail monsters and animals/troll/grahl/mouth_m.dds": [
+   [
+    "Grahls and Frost Giants (se",
+    "9fc1885c6b215e3ba4f3537145a5f39292556b27d35b09a998b1607272b63648",
+    1398256
+   ],
+   [
+    "sea giants and ice titans (se",
+    "9fc1885c6b215e3ba4f3537145a5f39292556b27d35b09a998b1607272b63648",
+    1398256
+   ]
+  ],
+  "textures/mihail monsters and animals/troll/grahl/mouth_n.dds": [
+   [
+    "Grahls and Frost Giants (se",
+    "9f84e40152fd37de5ed47ada8e7e683597a19c458e84b6052f349dd36649ecb5",
+    5592560
+   ],
+   [
+    "sea giants and ice titans (se",
+    "9f84e40152fd37de5ed47ada8e7e683597a19c458e84b6052f349dd36649ecb5",
+    5592560
+   ]
+  ],
+  "textures/neutral mage/glovesm_n.dds": [
+   [
+    "daedra pack (se",
+    "7a80301a24816bd970fa648d69560711797766fd4eade984737b7781f5cddbea",
+    174904
+   ],
+   [
+    "flesh atronachs (se",
+    "7a80301a24816bd970fa648d69560711797766fd4eade984737b7781f5cddbea",
+    174904
+   ]
+  ],
+  "textures/neutral mage/glovesneutral.dds": [
+   [
+    "daedra pack (se",
+    "e5c2ebb29ecb0fce33b5bc8c128bb560d363462847a48653063c7221cc00a37d",
+    22369776
+   ],
+   [
+    "flesh atronachs (se",
+    "e5c2ebb29ecb0fce33b5bc8c128bb560d363462847a48653063c7221cc00a37d",
+    22369776
+   ]
+  ],
+  "textures/neutral mage/head_n.dds": [
+   [
+    "daedra pack (se",
+    "3767d12c36483e26249e893931854a17c7d5ab75258ce4fe45227d50d017d69e",
+    1398256
+   ],
+   [
+    "flesh atronachs (se",
+    "3767d12c36483e26249e893931854a17c7d5ab75258ce4fe45227d50d017d69e",
+    1398256
+   ]
+  ],
+  "textures/neutral mage/headneutral.dds": [
+   [
+    "daedra pack (se",
+    "e7588e94b2b62d32e6dd9090c6a9f948c76f821b92da26e960643f3a274a2abc",
+    22369776
+   ],
+   [
+    "flesh atronachs (se",
+    "e7588e94b2b62d32e6dd9090c6a9f948c76f821b92da26e960643f3a274a2abc",
+    22369776
+   ]
+  ],
+  "textures/neutral mage/hood_n.dds": [
+   [
+    "daedra pack (se",
+    "73372707107dad3cdbf2fb382a5ec3f4e8b628b5ef7f7c15b4232381d3a9df41",
+    1398256
+   ],
+   [
+    "flesh atronachs (se",
+    "73372707107dad3cdbf2fb382a5ec3f4e8b628b5ef7f7c15b4232381d3a9df41",
+    1398256
+   ]
+  ],
+  "textures/neutral mage/hoodclothneutral.dds": [
+   [
+    "daedra pack (se",
+    "188bf7f617ecf0684b4366a2ca98bea4b1b67683f1b08164964aa3a3ea82452e",
+    22369776
+   ],
+   [
+    "flesh atronachs (se",
+    "188bf7f617ecf0684b4366a2ca98bea4b1b67683f1b08164964aa3a3ea82452e",
+    22369776
+   ]
+  ],
+  "textures/neutral mage/mask_m.dds": [
+   [
+    "daedra pack (se",
+    "7084b05b48fdc9ea1537bc0f659900b7e0e96c9fe6c32b9ebfe1985453d20bb9",
+    1398256
+   ],
+   [
+    "flesh atronachs (se",
+    "7084b05b48fdc9ea1537bc0f659900b7e0e96c9fe6c32b9ebfe1985453d20bb9",
+    1398256
+   ]
+  ],
+  "textures/neutral mage/mask_n.dds": [
+   [
+    "daedra pack (se",
+    "0e84f361f8484f3fda391ba7e8d085d70d8ad81584962baca28ca8d2022b43a8",
+    1398256
+   ],
+   [
+    "flesh atronachs (se",
+    "0e84f361f8484f3fda391ba7e8d085d70d8ad81584962baca28ca8d2022b43a8",
+    1398256
+   ]
+  ],
+  "textures/neutral mage/maskneutral.dds": [
+   [
+    "daedra pack (se",
+    "eafdf182972fa087676c93721da97a81e0955352b2d1823ab8c2c43609ad5438",
+    22369776
+   ],
+   [
+    "flesh atronachs (se",
+    "eafdf182972fa087676c93721da97a81e0955352b2d1823ab8c2c43609ad5438",
+    22369776
+   ]
+  ],
+  "textures/neutral mage/ore_iron_e.dds": [
+   [
+    "daedra pack (se",
+    "3b185246bf8ca5658f123892d29c88804167460fed2190aa21ebac5cd58f6e22",
+    4304
+   ],
+   [
+    "flesh atronachs (se",
+    "3b185246bf8ca5658f123892d29c88804167460fed2190aa21ebac5cd58f6e22",
+    4304
+   ]
+  ],
+  "textures/neutral mage/robes_n.dds": [
+   [
+    "daedra pack (se",
+    "9bf3b33374a0f2f91b5d26379d700d63b5956aa6cbf2c2cf1a0f4a4de655d26d",
+    5592560
+   ],
+   [
+    "flesh atronachs (se",
+    "9bf3b33374a0f2f91b5d26379d700d63b5956aa6cbf2c2cf1a0f4a4de655d26d",
+    5592560
+   ]
+  ],
+  "textures/neutral mage/robesneutral.dds": [
+   [
+    "daedra pack (se",
+    "24f5ab79dfe7e5fb650e4b12cb2b035b1c4e75bc5962d3f73a5146dd3f3a971c",
+    22369776
+   ],
+   [
+    "flesh atronachs (se",
+    "24f5ab79dfe7e5fb650e4b12cb2b035b1c4e75bc5962d3f73a5146dd3f3a971c",
+    22369776
+   ]
+  ],
+  "textures/neutral mage/shoem_n.dds": [
+   [
+    "daedra pack (se",
+    "f9945fbe191a66cb5cbb2a54815c6fbb23f9cf12d71747d568e73c0e5d277726",
+    174904
+   ],
+   [
+    "flesh atronachs (se",
+    "f9945fbe191a66cb5cbb2a54815c6fbb23f9cf12d71747d568e73c0e5d277726",
+    174904
+   ]
+  ],
+  "textures/neutral mage/shoesneutral.dds": [
+   [
+    "daedra pack (se",
+    "409b8947c52f3fe77df6e2a3225066ec21fa2d3ccc187004031ba4497ff0e2ac",
+    22369776
+   ],
+   [
+    "flesh atronachs (se",
+    "409b8947c52f3fe77df6e2a3225066ec21fa2d3ccc187004031ba4497ff0e2ac",
+    22369776
+   ]
+  ]
+ },
+ "withinDiffering": {
+  "sound/voice/temp.wav": [
+   [
+    "daedra pack (se",
+    "1acb7e8cbdf42381867e355dab6f947baa8516cba0ed6052263f3a79aa45f490",
+    485112
+   ],
+   [
+    "flesh atronachs (se",
+    "89051a39ebf8db6151e2f2d6995c034f924714b27c375c4d8cb3ef3603cd03cc",
+    165416
+   ],
+   [
+    "Giants Overhaul (se",
+    "e2f1f2b8f47aaf48f6ff068ae55d56a45ebc8f6a38412d9c735e4eee4b9a65ff",
+    187464
+   ],
+   [
+    "Grahls and Frost Giants (se",
+    "b0a88dceafadcbcf71723a8972e5c4d82f4b2cf401ae79536b3a85ae3c53444d",
+    143368
+   ],
+   [
+    "sea giants and ice titans (se",
+    "7d06af8b9edba74cabd7538d495f2b780beac8addfbc3e4362c97670dd019fea",
+    198488
+   ]
+  ]
+ },
+ "alsoInLiveLocalCopy": {
+  "scripts/mihail_general_attachfx.pex": [
+   [
+    "daedra pack (se",
+    "4a14c7682fb6406c675090c77635446814a449c84712c5d59a7644776a637294",
+    1371
+   ],
+   [
+    "elemental golems (se",
+    "4a14c7682fb6406c675090c77635446814a449c84712c5d59a7644776a637294",
+    1371
+   ],
+   [
+    "flesh atronachs (se",
+    "4a14c7682fb6406c675090c77635446814a449c84712c5d59a7644776a637294",
+    1371
+   ],
+   [
+    "Grahls and Frost Giants (se",
+    "4a14c7682fb6406c675090c77635446814a449c84712c5d59a7644776a637294",
+    1371
+   ],
+   [
+    "skeletal revenants (SE",
+    "4a14c7682fb6406c675090c77635446814a449c84712c5d59a7644776a637294",
+    1371
+   ],
+   [
+    "vampire lords and beasts (se",
+    "4a14c7682fb6406c675090c77635446814a449c84712c5d59a7644776a637294",
+    1371
+   ]
+  ],
+  "scripts/mihail_general_attachspell.pex": [
+   [
+    "daedra pack (se",
+    "adbb406dba03f247188ef1841326487399d1f2865beafee477062b85ff10d7fa",
+    882
+   ],
+   [
+    "elemental golems (se",
+    "adbb406dba03f247188ef1841326487399d1f2865beafee477062b85ff10d7fa",
+    882
+   ],
+   [
+    "flesh atronachs (se",
+    "adbb406dba03f247188ef1841326487399d1f2865beafee477062b85ff10d7fa",
+    882
+   ],
+   [
+    "Grahls and Frost Giants (se",
+    "adbb406dba03f247188ef1841326487399d1f2865beafee477062b85ff10d7fa",
+    882
+   ],
+   [
+    "skeletal revenants (SE",
+    "adbb406dba03f247188ef1841326487399d1f2865beafee477062b85ff10d7fa",
+    882
+   ],
+   [
+    "vampire lords and beasts (se",
+    "adbb406dba03f247188ef1841326487399d1f2865beafee477062b85ff10d7fa",
+    882
+   ]
+  ],
+  "scripts/mihail_general_attachspellandfx.pex": [
+   [
+    "daedra pack (se",
+    "c1b98ebf836e08b9a211df598f0a9c473f75cdd12ad4aed0a04c61069f84a2e5",
+    1689
+   ],
+   [
+    "elemental golems (se",
+    "c1b98ebf836e08b9a211df598f0a9c473f75cdd12ad4aed0a04c61069f84a2e5",
+    1689
+   ],
+   [
+    "flesh atronachs (se",
+    "c1b98ebf836e08b9a211df598f0a9c473f75cdd12ad4aed0a04c61069f84a2e5",
+    1689
+   ],
+   [
+    "Grahls and Frost Giants (se",
+    "c1b98ebf836e08b9a211df598f0a9c473f75cdd12ad4aed0a04c61069f84a2e5",
+    1689
+   ],
+   [
+    "skeletal revenants (SE",
+    "c1b98ebf836e08b9a211df598f0a9c473f75cdd12ad4aed0a04c61069f84a2e5",
+    1689
+   ],
+   [
+    "vampire lords and beasts (se",
+    "c1b98ebf836e08b9a211df598f0a9c473f75cdd12ad4aed0a04c61069f84a2e5",
+    1689
+   ]
+  ],
+  "sound/fx/mihailclannfear.esp/soundclannfear.wav": [
+   [
+    "daedra pack (se",
+    "8514a7ad99e5d461cb7c2a409ed4f114014d829844c95f4144bb2b9577eb6c09",
+    7268886
+   ]
+  ],
+  "sound/fx/mihaildaedroth.esp/firebreathsoundgrand.wav": [
+   [
+    "daedra pack (se",
+    "e4064504c4895504c9785b44200f1554833470b8cb05808e0f2433a4f71d4728",
+    1204478
+   ]
+  ],
+  "sound/fx/mihaildaedroth.esp/firebreathsoundtitan.wav": [
+   [
+    "daedra pack (se",
+    "b304f631ee722c5d74824cda8a9a5250b6fd26be748ac7cb3609d7c2a702d3e7",
+    981654
+   ]
+  ],
+  "sound/fx/mihaildaedroth.esp/firebreathsoundtitangrand.wav": [
+   [
+    "daedra pack (se",
+    "b7f6bd77f894fef1d20030447f4cd76ab7ea3e1218b5314d843360e59ede6bfc",
+    981582
+   ]
+  ],
+  "sound/fx/mihaildaedroth.esp/mag_flamesdragon_fire_01_lpm.wav": [
+   [
+    "daedra pack (se",
+    "dd3de2b3676e77d7d43289b149904b8c100ab7f38bda5f3baa7f8b3903cb1a21",
+    420276
+   ]
+  ],
+  "sound/fx/mihaildaedroth.esp/mag_flamesdragon_fire_02_lpm.wav": [
+   [
+    "daedra pack (se",
+    "d4c775a8c7991032bf6e5bac69a74ae717cb537f92b59bbfc6721eb902b9a5c5",
+    488822
+   ]
+  ],
+  "sound/fx/mihaildaedroth.esp/mag_flamesdragon_fire_03_lpm.wav": [
+   [
+    "daedra pack (se",
+    "f1d031168baf53c15ed26dc3a76d859ec62f88db04c0bd0c17ce1c2c1935ff13",
+    468720
+   ]
+  ],
+  "sound/fx/mihaildaedroth.esp/mag_flamesdragon_fire_04_lpm.wav": [
+   [
+    "daedra pack (se",
+    "34f927cacbf4975c9eaf2b850256f1421bddc7fae7f9f106bd66a832a1fc67fe",
+    470444
+   ]
+  ],
+  "sound/fx/mihaildaedroth.esp/sounddaedroth.wav": [
+   [
+    "daedra pack (se",
+    "f25ee78f2da123582dae5590f2d9b01ec3b57eea4f1f0217d846b6aa0af5387d",
+    7396738
+   ]
+  ],
+  "sound/fx/mihaildaedroth.esp/soundlesserdaedroth.wav": [
+   [
+    "daedra pack (se",
+    "70e4c6089118266e2798c4968b1ac53f9217fbc2f7c380908a2f3219c822daa1",
+    5197746
+   ]
+  ],
+  "sound/fx/mihailscamp.esp/banekinvoice.wav": [
+   [
+    "daedra pack (se",
+    "0dba1cd5167baf58ea818ce27c8f3459721506ad099fe779090f1ec39ef8253a",
+    289046
+   ]
+  ],
+  "sound/fx/mihailscamp.esp/claw.wav": [
+   [
+    "daedra pack (se",
+    "fcbc4ea32b024354c89b865f76deed657ff3de080604636470131cae13f4cae7",
+    85170
+   ]
+  ],
+  "sound/fx/mihailscamp.esp/scampvoice.wav": [
+   [
+    "daedra pack (se",
+    "afa45e7f088f16194c25afa3cb13a634f51d5a07ba48eb1a8f256d1cfc71fab6",
+    289046
+   ]
+  ]
+ }
+}
