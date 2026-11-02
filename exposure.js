@@ -236,8 +236,10 @@ module.exports = (api) => {
 
   // ---- notices ------------------------------------------------------------------------------------------------------------
   // The hold's own: anyone seated in one of its offices (the character, leadership.js), and its faction's guards by title
-  const seatedIn = (x, zid) => {
-    const pid = Number(profileOf(x)); if (!(pid >= 0)) return false;
+  // pid: the character's profile when x may be gone (a stored case), since profileOf on a form that no longer exists throws in
+  // C++ and logs a context dump (live, 2 Nov: two such cases, every tick)
+  const seatedIn = (x, zid, pid = Number(profileOf(x))) => {
+    if (!(pid >= 0)) return false;
     const seats = (readOfficials() || {})[zid] || {};
     const sh = g('__dboSeatHolder');
     return Object.entries(seats).some(([r, l]) => Array.isArray(l) && l.map(Number).includes(pid) && (() => { const held = sh ? Number(safe(() => sh(zid, r, pid), 0)) >>> 0 : 0; return !held || held === id(x); })());
@@ -259,7 +261,7 @@ module.exports = (api) => {
   const timeOfDay = (at) => { const hr = new Date(at).getUTCHours(); return hr < 5 ? 'in the night' : hr < 12 ? 'in the morning' : hr < 18 ? 'in the afternoon' : 'in the evening'; };
   const notify = (c, zid, h, online) => {
     const a = c.actor;
-    const ofCourt = seatedIn(a, zid) || !!h.deposed;
+    const ofCourt = seatedIn(a, zid, !online.includes(a) && Number(c.pid) >= 0 ? Number(c.pid) : undefined) || !!h.deposed;
     // Named as the reader's own character knows them, never by a beast's name: wait for the mortal shape
     if (ofCourt && online.includes(a) && beastForm(a)) return false;
     const f = formOf(h);
