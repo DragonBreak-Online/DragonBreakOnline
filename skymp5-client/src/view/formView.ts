@@ -43,6 +43,7 @@ import { isOwnCompanion, isAnyCompanion } from "../services/services/companionSe
 import { sendCustomPacket } from "../services/services/customPacketUtil";
 import { HUNT_CHECK_MS, huntedPlayers, huntTarget } from "./huntedGuards";
 import { apply as applyAggroWindow, CHECK_EVERY_MS, combatStartLine, decide as decideAggroWindow, distance, nearestPlayer, newWindowState, playerCopies, Vec, WindowState } from "./aggroWindow";
+import { mayAskOnSight, mayAskResync, mayAskSilent, playsBack, seatsUndriven } from "./hostAsk";
 
 export interface ScreenResolution {
   width: number;
@@ -630,7 +631,8 @@ export class FormView {
     }
     this.movState.wasHosted = alreadyHosted;
 
-    if (!model.isHostedByOther && !alreadyHosted && !isOwnCompanion(this.remoteRefrId)) {
+    // Never for an actor the server drives (model.isServerDriven): asking could not succeed, and every ask is traffic
+    if (mayAskOnSight(model, alreadyHosted, isOwnCompanion(this.remoteRefrId))) {
       if (ac && this.remoteRefrId) {
         this.tryHostIfNeed(ac, this.remoteRefrId, model.movement?.worldOrCell);
       }
@@ -646,7 +648,7 @@ export class FormView {
         : !!this.movState.lastApply && Date.now() - this.movState.lastApply > 1500;
       // A copy hosted here has no other sender to wait for. Asking for it again is a reliable packet a second, and
       // once its own movement paused 2 s the server grants it again: HostStart re-seats it and restarts its package
-      if (hostSilent && !alreadyHosted) {
+      if (mayAskSilent(model, alreadyHosted, hostSilent)) {
         if (Date.now() - this.movState.lastRehost > (packetClock ? 2000 : 1000)) {
           this.movState.lastRehost = Date.now();
           const remoteId = this.remoteRefrId;
@@ -665,7 +667,8 @@ export class FormView {
         const strandedFromServer = this.movState.everApplied && ac && !model.isDead
           && !alreadyHosted && !isOwnCompanion(this.remoteRefrId)
           && ObjectReferenceEx.getDistance(ObjectReferenceEx.getPos(refr), model.movement.pos) > STRANDED_UNITS;
-        if (!model.isHostedByOther && (!this.movState.everApplied || strandedFromServer) && ac && !model.isDead) {
+        // A server-driven actor is played back like one another client hosts, never seated as an undriven one
+        if (seatsUndriven(model, this.movState.everApplied, !!strandedFromServer) && ac && !model.isDead) {
           const m = model.movement;
           try {
             if (ObjectReferenceEx.getDistance(ObjectReferenceEx.getPos(refr), m.pos) > 16) {
@@ -676,7 +679,7 @@ export class FormView {
           } catch { /* not loaded yet, the next pass seats it */ }
           this.movState.lastNumChanges = +(model.numMovementChanges as number);
           this.movState.everApplied = true;
-        } else if (!alreadyHosted && (model.isHostedByOther || !this.movState.everApplied)) {
+        } else if (playsBack(model, alreadyHosted, this.movState.everApplied)) {
           // Never for a copy we host: the server's movement for it is our own, and playing it back pins our AI
           const backup = model.movement.isWeapDrawn;
           const isDeadBackup = model.movement.isDead;
@@ -751,7 +754,7 @@ export class FormView {
               }
             }
 
-            if (!alreadyHosted && remoteId) {
+            if (mayAskResync(model, alreadyHosted, remoteId)) {
               if (this.tryHostIfNeed(ac, remoteId, model.movement?.worldOrCell)) {
 
                 // previously, we did this cleanup on each update
