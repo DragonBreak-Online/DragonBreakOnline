@@ -2,9 +2,7 @@
 // menu"). Every native Scaleform panel runs as the engine's one CustomMenu, which BrowserService's blocking menus do not list,
 // so a second panel opened over the first. The real widgetMenuUtil.ts is bundled into each real service with esbuild (every
 // other import stubbed); a press with the CustomMenu up must open nothing, while Esc and a panel's own key still close it.
-// Run it from skymp5-client with node_modules present (esbuild is borrowed from ../skymp5-server/node_modules):
-//
-//   node tests/hotkey-custommenu-harness.js
+//   node tests/hotkey-custommenu-harness.js      (env ESBUILD_DIR, else the fork's skymp5-server esbuild)
 'use strict';
 const fs = require('fs');
 const os = require('os');
@@ -12,7 +10,10 @@ const path = require('path');
 
 const client = path.resolve(__dirname, '..');
 const services = path.join(client, 'src', 'services', 'services');
-const esbuild = require(require.resolve('esbuild', { paths: [client, path.resolve(client, '..', 'skymp5-server')] }));
+const ESB = [process.env.ESBUILD_DIR, path.join(client, 'node_modules/esbuild'), path.join(client, '../skymp5-server/node_modules/esbuild'), path.join(client, '../../../fork/skymp5-server/node_modules/esbuild')]
+  .find((d) => d && fs.existsSync(path.join(d, 'package.json')));
+if (!ESB) { console.log('SKIP needs ESBUILD_DIR'); process.exit(0); }
+const esbuild = require(ESB);
 const out = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-nate-hotkey-'));
 
 let failures = 0;
