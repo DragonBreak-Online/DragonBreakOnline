@@ -298,11 +298,13 @@ const fo = fn('followOwners');
 check('the colours ride on the legend\'s CustomMenu over the map: nothing until it is up, nothing made inside the map', fo.includes('if (this.legendSwf.phase !== "up" || !this.owners) return;')
   && fo.includes('ui.invokeString(LEGEND_MENU, "_root.dboOwners",') && !fo.includes('MAP_MENU, `${layer}') && !/createEmptyMovieClip|loadMovie/.test(fo + fn('loadLegend')) && M.OWNERS_LAYER === '_root.owners.layer');
 check('drawn again only when the world or an owner changes, or the menu comes back', /if \(key !== this\.drawnKey\)/.test(fo) && /world\.territories\.map\(\(t\) => t\.owner\)/.test(fo) && fn('closeLegendMenu').includes('this.drawnKey = "";'));
-check('shown only while the player wants it and the fit holds; hidden where no world has owners', fo.includes('const holds = this.ownersShown && fitHolds(fit);') && fo.includes('ui.setBool(LEGEND_MENU, `${layer}._visible`, holds);')
-  && fo.includes('if (!world) { ui.setBool(LEGEND_MENU, `${layer}._visible`, false); return; }'));
-check('the fit is carried from the map\'s stage to our menu\'s (SkyUI\'s _mapWidth/_mapHeight, our dboStage*) before it is set', fo.includes('clipTransform(fitToStage(fit, this.stage.mapW, this.stage.mapH, this.stage.ours))')
+check('shown while the player wants it once a fit has held (the last that held kept, so a bad frame never hides it), written only on a change; hidden where no world has owners', fo.includes('const holds = this.ownersShown && fitHolds(fit);') && fo.includes('if (holds && fit) this.goodFit = fit;')
+  && fo.includes('const show = this.ownersShown && !!this.goodFit;') && fo.includes('if (show !== this.layerShown) { ui.setBool(LEGEND_MENU, `${layer}._visible`, show); this.layerShown = show; }')
+  && fo.includes('if (!world) { ui.setBool(LEGEND_MENU, `${layer}._visible`, false); this.layerShown = false; return; }'));
+check('the fit is carried from the map\'s stage to our menu\'s (SkyUI\'s _mapWidth/_mapHeight, our dboStage*) before it is set', fo.includes('clipTransform(fitToStage(this.goodFit, this.stage.mapW, this.stage.mapH, this.stage.ours))')
   && fo.includes('"_root.WorldMap._mapWidth"') && fo.includes('"_root.dboStageW"'));
-check('the six transform values set each frame it holds', ['_x', '_y', '_xscale', '_yscale', '_rotation'].every((k) => src.includes('`${layer}.' + k + '`')) && src.includes('`${layer}.shapes._rotation`, t.inner'));
+check('the six transform values set when the fit holds, each only when it moved', ['_x', '_y', '_xscale', '_yscale', '_rotation'].every((k) => fo.includes('["' + k + '", t.' + k.slice(1) + ']')) && fo.includes('[".shapes._rotation", t.inner]')
+  && fo.includes('Math.abs(was - v) < LAYER_STILL) continue;'));
 check('the marker positions read in the root\'s units (MarkerClips\' own offset and scale applied)', /seen\.push\(\{ sx: bx \+ ui\.getFloat\(MAP_MENU, `\$\{clip\}\._x`\) \* kx, sy: by \+ ui\.getFloat\(MAP_MENU, `\$\{clip\}\._y`\) \* ky/.test(fn('fitNow')) && /\._visible`\)\) continue;/.test(fn('fitNow')));
 check('the toggle key is read like the other hotkeys: mapColoursKeyCode, else T', M.TOGGLE_SETTING === 'mapColoursKeyCode' && M.TOGGLE_KEY === 20
   && /this\.ownersKey = readMenuKeyCode\(this\.sp, TOGGLE_SETTING, TOGGLE_KEY\);/.test(src));

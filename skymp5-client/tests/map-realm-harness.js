@@ -240,12 +240,53 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   // the layer's transform maps a world point to where the map shows it: world (0, 0) at 640,360, one drawing unit (64) at 64/500
   ok(Math.abs(S.props['_root.owners.layer._x'] - 640) < 1e-6 && Math.abs(S.props['_root.owners.layer._y'] - 360) < 1e-6 && Math.abs(Math.abs(S.props['_root.owners.layer._xscale']) - (64 / 500) * 100) < 1e-6,
     '...placed where the map shows the world, at its zoom', [S.props['_root.owners.layer._x'], S.props['_root.owners.layer._y'], S.props['_root.owners.layer._xscale']]);
+  // Nat, 2 Nov: the colours flashed. Still markers write nothing more; a frame whose fit does not hold leaves them shown
+  const layerWrites = [];
+  const setBool0 = sp.Ui.setBool, setFloat0 = sp.Ui.setFloat;
+  sp.Ui.setBool = (m, p, v) => { if (p.startsWith('_root.owners.layer')) layerWrites.push([p, v]); setBool0(m, p, v); };
+  sp.Ui.setFloat = (m, p, v) => { if (p.startsWith('_root.owners.layer')) layerWrites.push([p, v]); setFloat0(m, p, v); };
+  for (let i = 0; i < 30; i++) h6.update();
+  ok(!layerWrites.length, 'the map still: the layer is not written again, frame after frame (no flashing)', layerWrites.slice(0, 4));
+  const pale = LABELS.indexOf('Pale Pass');
+  const paleX = S.props[`_root.MarkerClips.Marker${pale}._x`];
+  S.props[`_root.MarkerClips.Marker${pale}._x`] = paleX + 400;
+  for (let i = 0; i < 10; i++) h6.update();
+  ok(!layerWrites.some(([p, v]) => /_visible$/.test(p) && v === false) && S.props['_root.owners.layer._visible'] === true, 'frames whose fit does not hold keep the colours shown where they were', layerWrites.slice(0, 4));
+  S.props[`_root.MarkerClips.Marker${pale}._x`] = paleX;
+  anchorsAt.forEach(([name]) => { const i = LABELS.indexOf(name); S.props[`_root.MarkerClips.Marker${i}._x`] += 100; });
+  for (let i = 0; i < 5; i++) h6.update();
+  ok(Math.abs(S.props['_root.owners.layer._x'] - 740) < 1e-6, 'a pan moves the layer with the markers', S.props['_root.owners.layer._x']);
+  anchorsAt.forEach(([name]) => { const i = LABELS.indexOf(name); S.props[`_root.MarkerClips.Marker${i}._x`] -= 100; });
+  h6.update();
+  sp.Ui.setBool = setBool0; sp.Ui.setFloat = setFloat0;
   const legendRows = S.legendData.length ? S.legendData[S.legendData.length - 1].rows : [];
   ok(legendRows.some((r) => r.id === 'territories' && r.key === 'T' && r.count === 2), 'the legend gets the colours\' row, T and two owners', legendRows);
   h6.buttonEvent({ isDown: true, device: 0, code: 20 });
   h6.update();
   ok(S.props['_root.owners.layer._visible'] === false, 'T hides the colours', S.props['_root.owners.layer._visible']);
+  // Nat, 2 Nov: our menu took Tab, so the map stayed open until R closed ours. Tab (or Esc) closes ours and hands Tab on
+  S.taps = []; sp.Input = { tapKey: (c) => S.taps.push(c) };
+  h6.buttonEvent({ isDown: true, device: 0, code: 20 });
+  S.custom = [];
+  h6.buttonEvent({ isDown: true, device: 0, code: 0x0f });
+  ok(JSON.stringify(S.custom) === JSON.stringify([['close']]), 'Tab with our menu up closes ours', S.custom);
+  h6.update();
+  ok(!S.taps.length, "...the map's Tab not yet (a frame for ours to go)", S.taps);
+  h6.update(); h6.update(); h6.update();
+  ok(JSON.stringify(S.taps) === JSON.stringify([0x0f]), '...then Tab once, for the map to close', S.taps);
+  h6.buttonEvent({ isDown: true, device: 0, code: 0x0f });
+  h6.update(); h6.update(); h6.update();
+  ok(S.taps.length === 1, "with ours already down, Tab is the map's own and nothing is tapped", S.taps);
   h6.menuClose({ name: 'MapMenu' });
+  // Esc, and the map closing before the tap: nothing tapped (a Tab with no map open would open the tween menu)
+  S.taps = []; S.custom = []; S.customOpen = false;
+  h6.menuOpen({ name: 'MapMenu' });
+  for (let i = 0; i < 70; i++) h6.update();
+  h6.buttonEvent({ isDown: true, device: 0, code: 0x01 });
+  ok(S.custom.some((c) => c[0] === 'close'), 'Esc closes ours too', S.custom);
+  h6.menuClose({ name: 'MapMenu' });
+  for (let i = 0; i < 4; i++) h6.update();
+  ok(!S.taps.length, '...and when the map closed by itself, nothing is tapped', S.taps);
   sp.Game = game0;
   delete sp.Ui.getBool;
   anchorsAt.forEach(([name], k) => { const i = LABELS.indexOf(name); S.props[`_root.MarkerClips.Marker${i}._x`] = 100 + i; delete S.props[`_root.MarkerClips.Marker${i}._y`]; });
