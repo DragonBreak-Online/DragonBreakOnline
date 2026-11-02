@@ -204,6 +204,38 @@ const { EVENTS, DEBUG, ZONES, panel, open, P, B, sentOf, click, kids, railLabels
   check('...and no mastery request is sent for them', !sentOf(tr, 'admin::request').some((m) => m.args[0] === 'adminMasteryRequest'));
 }
 
+// ---- Players: Vitals (an event boss's raised maximum; gamemode bossvitals.js) ----
+{
+  const t = open(panel({ players: ROSTER, me: { a: 'ff000999' } }));
+  P(t).rail.t1.onRelease(); t.serve();
+  const vit = kids(B(t), /^sub\d$/).find((b) => b.label.text === 'Vitals');
+  check('Players: a Vitals view beside the others', !!vit);
+  click(t, vit);
+  check('...with nobody picked it is the staff member\'s own', /your own character/.test(B(t).vitWho.text), B(t).vitWho.text);
+  check('...Set is greyed until an amount is typed', B(t).vitSet.disabled === true);
+  typeInto(t, B(t).vit_magicka, 'lots');
+  check('...and while one is not a whole number', B(t).vitSet.disabled === true);
+  typeInto(t, B(t).vit_magicka, '');
+  typeInto(t, B(t).vit_health, '5000');
+  typeInto(t, B(t).vit_stamina, '200');
+  click(t, B(t).vitKeep);
+  check('...Keep after the event toggles', /On$/.test(B(t).vitKeep.label.text), B(t).vitKeep.label.text);
+  click(t, B(t).vitSet);
+  const set = preq(t, 'adminVitalsSet');
+  check('Set asks the server with the amounts, a blank left blank, and keep', set.length === 1 && set[0].target === '' && set[0].health === '5000' && set[0].magicka === '' && set[0].stamina === '200' && set[0].keep === true, set);
+  click(t, B(t).vitReset);
+  check('Reset asks first', preq(t, 'adminVitalsReset').length === 0 && /^Sure\? Reset/.test(B(t).vitReset.label.text));
+  click(t, B(t).vitReset);
+  check('...then resets', preq(t, 'adminVitalsReset').length === 1);
+  const trial = open(panel({ players: ROSTER, caps: { ban: false, spawn: false, trial: true, tabs: ['players'], actions: ['teleportTo'] }, tier: 'trialgm' }));
+  P(trial).rail.t1.onRelease(); trial.serve();
+  check('a Trial GM has no Vitals view', !kids(B(trial), /^sub\d$/).some((b) => b.label.text === 'Vitals'));
+  const svc = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'services', 'services', 'adminMenuService.ts'), 'utf8');
+  check('the service lets both through as the gameplay events vitalsSet and vitalsReset', /PANEL_REQUESTS = new Set\(\[[^\]]*"adminVitalsSet", "adminVitalsReset"/.test(svc) && /adminVitalsSet: \["vitalsSet", \["target", "health", "magicka", "stamina", "keep"\]\]/.test(svc) && /adminVitalsReset: \["vitalsReset", \["target"\]\]/.test(svc));
+  const lb = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'services', 'services', 'levelBonusService.ts'), 'utf8');
+  check('the client applies a gain up to 10000 (a boss pool; it was 1000)', /const MAX_GAIN = 10000;/.test(lb) && /gain > 0 && gain <= MAX_GAIN/.test(lb));
+}
+
 // ---- Skills ----
 {
   const t = open(panel({ players: ROSTER }));
