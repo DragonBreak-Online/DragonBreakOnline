@@ -30,7 +30,8 @@ Vec3 FromDetour(const float* v)
 }
 
 constexpr float kCellSize = 0.5f;
-constexpr float kBorderEpsilon = 1.f;
+// Measured: border vertices sit up to 6.86 units off the cell line
+constexpr float kBorderEpsilon = 8.f;
 constexpr float kInteriorTileSize = 1000000.f;
 constexpr int kMaxPathPolys = 2048;
 constexpr int kMaxStraight = 256;
