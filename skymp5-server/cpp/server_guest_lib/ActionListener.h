@@ -97,10 +97,12 @@ public:
   // A new host of target takes the timed slows and holds still running on it
   void ResendHostEffects(uint32_t targetId, MpActor& newHost);
 
-  // A caster that left or was destroyed: its scroll reads and last-read times go
+  // A caster that left or was destroyed: its scroll reads and last-read times
+  // go
   void ForgetScrollReads(uint32_t casterId);
 
-  // Tests only: every scroll read of the caster, and its last-read times, move this far into the past
+  // Tests only: every scroll read of the caster, and its last-read times, move
+  // this far into the past
   void BackdateScrollReads(uint32_t casterId, std::chrono::seconds by);
 
   // for CraftTest.cpp
@@ -115,9 +117,10 @@ public:
   static constexpr std::chrono::milliseconds kStaffVolleySpread{ 150 };
   static constexpr size_t kStaffTargetsPerVolley = 12;
 
-  // Spell riders (ApplySpellRiders) need a cast of the spell, or of a cloak or hazard granting it, this recent (a staff
-  // hit needs the staff held), and land once per (caster, spell, target) each kRiderHitInterval; a rune's or staff's
-  // hold on an NPC re-arms after kExplosionHoldCooldown
+  // Spell riders (ApplySpellRiders) need a cast of the spell, or of a cloak or
+  // hazard granting it, this recent (a staff hit needs the staff held), and
+  // land once per (caster, spell, target) each kRiderHitInterval; a rune's or
+  // staff's hold on an NPC re-arms after kExplosionHoldCooldown
   static constexpr std::chrono::seconds kRiderCastWindow{ 90 };
   static constexpr std::chrono::milliseconds kRiderHitInterval{ 1000 };
   static constexpr std::chrono::seconds kExplosionHoldCooldown{ 10 };
@@ -146,10 +149,11 @@ private:
                          const SpellCastData& spellCastData);
   bool IsWardBlocking(const MpActor& aggressor, const MpActor& target);
 
-  // Paralysis, AI, stagger and slow riders of a spell hit: held on the server, applied on the target's game
+  // Paralysis, AI, stagger and slow riders of a spell hit: held on the server,
+  // applied on the target's game
   void ApplySpellRiders(MpActor& aggressor, MpActor& target, uint32_t spellId);
-  // A timed change sent to the client hosting a target: a SpeedMult slow, or a hold (SetDontMove) for paralysis the
-  // spell cannot be replayed for
+  // A timed change sent to the client hosting a target: a SpeedMult slow, or a
+  // hold (SetDontMove) for paralysis the spell cannot be replayed for
   enum class HostEffect
   {
     Slow,
@@ -176,8 +180,10 @@ private:
                                        const RestorationChannel& channel);
   void ApplyRestorationChannelRemainder(uint32_t casterId,
                                         const RestorationChannel& channel);
-  // Returns false when a gamemode handler blocked the event. hitFlags, when given, is passed as the handlers' fifth
-  // argument (blocked, power, bash, sneak, spell, unblockedDamage), so the gamemode can judge stagger and block.
+  // Returns false when a gamemode handler blocked the event. hitFlags, when
+  // given, is passed as the handlers' fifth argument (blocked, power, bash,
+  // sneak, spell, unblockedDamage), so the gamemode can judge stagger and
+  // block.
   bool FireHitDamageEvent(const char* eventName, MpActor* aggressor,
                           MpActor* target, uint32_t sourceId, float damage,
                           bool fireOnZeroDamage = false,
@@ -191,8 +197,9 @@ private:
   void SendPapyrusOnHitEvent(MpActor* aggressor, MpObjectReference* target,
                              const HitData& hitData);
 
-  // Returns user's actor if there is attached one. echoHostedToSender false: a hosted NPC's packet is not sent back
-  // to its hoster (the sender); the sender's own actor is relayed as always
+  // Returns user's actor if there is attached one. echoHostedToSender false: a
+  // hosted NPC's packet is not sent back to its hoster (the sender); the
+  // sender's own actor is relayed as always
   MpActor* SendToNeighbours(uint32_t idx, Networking::UserId userId,
                             Networking::PacketData data, size_t length,
                             bool reliable, bool checkOnly = false,
@@ -202,7 +209,8 @@ private:
                             bool reliable = false, bool checkOnly = false,
                             bool echoHostedToSender = true);
 
-  // A hosted NPC's step the server refuses (see OnUpdateMovement): the hoster's copy is sent back
+  // A hosted NPC's step the server refuses (see OnUpdateMovement): the
+  // hoster's copy is sent back
   struct NpcJumpState
   {
     std::chrono::steady_clock::time_point lastAccepted;
@@ -219,9 +227,11 @@ private:
   std::unordered_map<uint32_t, RestorationChannel> restorationChannels;
   uint32_t restorationChannelGeneration = 0;
   std::unordered_map<uint32_t, WardChannel> wardChannels;
-  // A scroll read lately, whose hits may land (OnHit). Each read hits up to kScrollTargetsPerRead actors once each;
-  // the spell a wall or cloak scroll grants ticks once a second per target, up to kScrollGrantedSecondsPerTarget
-  // seconds. Up to kScrollReadsPerCaster reads are kept per caster, newest last (a rune, then another scroll).
+  // A scroll read lately, whose hits may land (OnHit). Each read hits up to
+  // kScrollTargetsPerRead actors once each; the spell a wall or cloak scroll
+  // grants ticks once a second per target, up to
+  // kScrollGrantedSecondsPerTarget seconds. Up to kScrollReadsPerCaster reads
+  // are kept per caster, newest last (a rune, then another scroll).
   struct GrantedCredit
   {
     std::chrono::steady_clock::time_point lastAt{};
@@ -240,8 +250,10 @@ private:
   static constexpr uint32_t kScrollGrantedSecondsPerTarget = 60;
   static constexpr size_t kScrollReadsPerCaster = 4;
   std::unordered_map<uint32_t, std::vector<ScrollRead>> scrollHits;
-  // When each caster last read each scroll, (caster << 32 | scroll), kept kScrollLastReadKept. The hit fallback in
-  // OnHit takes a scroll only with none read in that span, so a rune that goes off after kScrollHitWindow costs none
+  // When each caster last read each scroll, (caster << 32 | scroll), kept
+  // kScrollLastReadKept. The hit fallback in OnHit takes a scroll only with
+  // none read in that span, so a rune that goes off after kScrollHitWindow
+  // costs none
   static constexpr std::chrono::minutes kScrollLastReadKept{ 10 };
   static constexpr size_t kScrollLastReadMax = 4096;
   std::unordered_map<uint64_t, std::chrono::steady_clock::time_point>
@@ -251,7 +263,8 @@ private:
   bool TakeScrollHit(uint32_t casterId, uint32_t scrollId, uint32_t targetId);
   bool TakeScrollGrantedHit(uint32_t casterId, uint32_t spellId,
                             uint32_t targetId);
-  // Staff hits (TakeStaffHit): concentration ticks per (caster << 32 | target), volleys per (caster << 32 | enchantment)
+  // Staff hits (TakeStaffHit): concentration ticks per (caster << 32 |
+  // target), volleys per (caster << 32 | enchantment)
   struct StaffVolley
   {
     std::chrono::steady_clock::time_point firstAt{};
@@ -262,14 +275,16 @@ private:
   std::unordered_map<uint64_t, StaffVolley> staffVolleys;
   bool TakeStaffHit(uint32_t casterId, uint32_t enchantmentId,
                     uint32_t targetId);
-  // Landed weapon hits per aggressor, for the swing and splash gate in OnWeaponHit
+  // Landed weapon hits per aggressor, for the swing and splash gate in
+  // OnWeaponHit
   std::unordered_map<uint32_t, WeaponHitGate::Memory> weaponHitMemory;
-  // Last power attack or bash per (attacker << 32 | target), for the stagger floor in OnWeaponHit
+  // Last power attack or bash per (attacker << 32 | target), for the stagger
+  // floor in OnWeaponHit
   static constexpr std::chrono::milliseconds kForcefulHitInterval{ 700 };
   std::unordered_map<uint64_t, std::chrono::steady_clock::time_point>
     lastForcefulHit;
-  // Measurement for review SCH2-4 (log only): an actor's last power attack and bash start, and running counts of hit
-  // flags that came without one
+  // Measurement for review SCH2-4 (log only): an actor's last power attack and
+  // bash start, and running counts of hit flags that came without one
   struct ForcefulAnims
   {
     std::chrono::steady_clock::time_point powerAt{};
@@ -287,16 +302,19 @@ private:
                                   std::chrono::steady_clock::time_point now);
   std::unordered_map<uint32_t, std::chrono::steady_clock::time_point>
     paralyzedUntil;
-  // Timed host effects by (target, effect), taken back on the clients that took them when they end
+  // Timed host effects by (target, effect), taken back on the clients that
+  // took them when they end
   std::map<std::pair<uint32_t, HostEffect>, TimedHostEffect> hostEffects;
   using SteadyTime = std::chrono::steady_clock::time_point;
   // Each caster's recent casts (spell, when), newest last
   std::unordered_map<uint32_t, std::vector<std::pair<uint32_t, SteadyTime>>>
     recentCasts;
   std::map<std::tuple<uint32_t, uint32_t, uint32_t>, SteadyTime> riderHits;
-  // (caster << 32 | target): when that caster's explosion may hold that target again
+  // (caster << 32 | target): when that caster's explosion may hold that target
+  // again
   std::unordered_map<uint64_t, SteadyTime> explosionHoldReady;
-  // Reports in a row of magicka rising past 2x the server's own rate, and the last [regen-watch] line, per actor
+  // Reports in a row of magicka rising past 2x the server's own rate, and the
+  // last [regen-watch] line, per actor
   struct RegenWatch
   {
     int streak = 0;
@@ -311,9 +329,11 @@ private:
 
   MovementValidation::Tracker movementTracker;
 
-  // Interest management for UpdateMovement, when SKYMP_MOVEMENT_RELAY=1 (MovementRelay.h); null otherwise
+  // Interest management for UpdateMovement, when SKYMP_MOVEMENT_RELAY=1
+  // (MovementRelay.h); null otherwise
   std::unique_ptr<MovementRelay> movementRelay;
-  // Relays a validated movement packet: through movementRelay when it is on, SendToNeighbours otherwise
+  // Relays a validated movement packet: through movementRelay when it is on,
+  // SendToNeighbours otherwise
   void RelayMovement(uint32_t idx, const RawMessageData& rawMsgData);
 
 public:

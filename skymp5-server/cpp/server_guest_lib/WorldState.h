@@ -89,11 +89,13 @@ public:
   void RequestSave(MpObjectReference& ref);
   bool HasEspmFile(std::string_view filename) const noexcept;
 
-  // Changed records go to the saver at most once per interval; 0 hands them over on every tick
+  // Changed records go to the saver at most once per interval; 0 hands them
+  // over on every tick
   void SetSaveInterval(std::chrono::milliseconds interval);
   std::chrono::milliseconds GetSaveInterval() const;
 
-  // The next tick hands changed records to the saver even inside the interval (money and item moves)
+  // The next tick hands changed records to the saver even inside the interval
+  // (money and item moves)
   void RequestSaveNow();
 
   // Clean stop: every change made so far is on disk when this returns
@@ -137,7 +139,8 @@ public:
   // No loading version of LookupFormById
   const std::shared_ptr<MpForm>& LookupFormByIdNoLoad(uint32_t formId);
 
-  // The index a destroyed form had, for a client that missed its DestroyActor and still holds a copy
+  // The index a destroyed form had, for a client that missed its DestroyActor
+  // and still holds a copy
   std::optional<uint32_t> DestroyedFormIdx(uint32_t formId) const;
 
   void SendPapyrusEvent(MpForm* form, const char* eventName,
@@ -146,7 +149,8 @@ public:
   const std::set<MpObjectReference*>& GetNeighborsByPosition(
     uint32_t cellOrWorld, int16_t cellX, int16_t cellY);
 
-  // An interior cell is one grid square, so everyone inside sees everything in it
+  // An interior cell is one grid square, so everyone inside sees everything in
+  // it
   bool IsInteriorCell(uint32_t cellOrWorld);
 
   std::shared_ptr<std::vector<uint32_t>> GetAllForms(uint32_t modIndex);
@@ -228,9 +232,11 @@ public:
     it->second->BeforeDestroy();
 
     if (auto formIndex = dynamic_cast<FormIndex*>(form.get())) {
-      // A late packet for this index must find nothing, not the object freed below: LookupFormByIdx read the freed
-      // reference ('No permission to update actor f9404f50') and the server crashed with SIGSEGV when a despawned
-      // NPC's host was still sending its movement (2026-09-25 21:39:16)
+      // A late packet for this index must find nothing, not the object freed
+      // below: LookupFormByIdx read the freed reference ('No permission to
+      // update actor f9404f50') and the server crashed with SIGSEGV when a
+      // despawned NPC's host was still sending its movement (2026-09-25
+      // 21:39:16)
       const auto refr = form->AsObjectReference();
       if (refr && formIndex->idx < refrByIdxUnreliable.size() &&
           refrByIdxUnreliable[formIndex->idx] == refr) {
@@ -247,7 +253,8 @@ public:
   bool HasEspm() const;
   espm::CompressedFieldsCache& GetEspmCache();
 
-  // One T per WorldState, dropped with it and by AttachEspm: a static keyed by WorldState* outlives it
+  // One T per WorldState, dropped with it and by AttachEspm: a static keyed by
+  // WorldState* outlives it
   template <class T>
   T& GetEspmDerived()
   {
@@ -284,9 +291,11 @@ public:
     std::unordered_map<std::string, NpcSettingsEntry>&& settings);
   void SetForbiddenRelootTypes(const std::set<std::string>& types);
   void SetBlockedSpells(const std::set<uint32_t>& spells);
-  // Callable from ActionListener (not a friend), so it lives in this public section
+  // Callable from ActionListener (not a friend), so it lives in this public
+  // section
   [[nodiscard]] bool IsSpellBlocked(uint32_t spellId) const noexcept;
-  // Internal around a form's destruction; public so a unit test can skip the 10 s hold
+  // Internal around a form's destruction; public so a unit test can skip the
+  // 10 s hold
   void ReleaseHeldFormIdx(bool all);
   void SetCastRelayBlockedRaces(const std::set<uint32_t>& races);
   [[nodiscard]] bool HasCastRelayBlockedRaces() const noexcept;
@@ -322,11 +331,13 @@ public:
   NpcSettingsEntry defaultSetting;
   bool enableConsoleCommandsForAll = false;
   float regenerationMultiplier = 1.f;
-  // server-settings magickaRegenSlack: headroom on the magicka regen ceiling for boosts only the client applies
+  // server-settings magickaRegenSlack: headroom on the magicka regen ceiling
+  // for boosts only the client applies
   float magickaRegenSlack = 2.5f;
   MovementLimits movementLimits;
 
-  // server-settings spellSync: what of a spell the server delivers beyond its Health damage
+  // server-settings spellSync: what of a spell the server delivers beyond its
+  // Health damage
   struct SpellSyncSettings
   {
     // Paralysis, AI, stagger and slow riders on the target's own game
@@ -393,14 +404,16 @@ private:
   std::unordered_map<uint32_t, std::shared_ptr<MpForm>> forms;
   std::unordered_map<std::string, size_t> loadOrderMap;
   std::unordered_map<uint32_t, GridInfo> grids;
-  // cellOrWorld -> is an interior CELL, cached apart from grids (IsInteriorCell)
+  // cellOrWorld -> is an interior CELL, cached apart from grids
+  // (IsInteriorCell)
   std::unordered_map<uint32_t, bool> interiorCells;
   std::unique_ptr<MakeID> formIdxManager;
   std::vector<MpObjectReference*> refrByIdxUnreliable;
   // Freed form indices, oldest first, with when they were freed
   std::deque<std::pair<uint32_t, std::chrono::steady_clock::time_point>>
     heldFormIdx;
-  // Destroyed form id -> its index, the newest kDestroyedFormIdxMax, oldest first in destroyedFormOrder
+  // Destroyed form id -> its index, the newest kDestroyedFormIdxMax, oldest
+  // first in destroyedFormOrder
   std::unordered_map<uint32_t, uint32_t> destroyedFormIdx;
   std::deque<uint32_t> destroyedFormOrder;
   espm::Loader* espm = nullptr;

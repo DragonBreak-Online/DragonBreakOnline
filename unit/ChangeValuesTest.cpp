@@ -241,9 +241,9 @@ TEST_CASE("OnChangeValues crops stamina gains to regeneration but accepts "
   auto& ac = partOne.worldState.GetFormAt<MpActor>(0xff000000);
 
   auto appearance = ac.GetAppearance();
-  BaseActorValues baseValues = GetBaseActorValues(
-    &partOne.worldState, ac.GetBaseId(), appearance ? appearance->raceId : 0,
-    {});
+  BaseActorValues baseValues =
+    GetBaseActorValues(&partOne.worldState, ac.GetBaseId(),
+                       appearance ? appearance->raceId : 0, {});
 
   ac.SetPercentages({ 1.0f, 1.0f, 0.2f });
   auto past = std::chrono::steady_clock::now() - 1s;
@@ -263,8 +263,8 @@ TEST_CASE("OnChangeValues crops stamina gains to regeneration but accepts "
   std::chrono::duration<float> elapsedTime =
     std::chrono::steady_clock::now() - past;
   float expectedStamina = 0.2f +
-    baseValues.staminaRate * baseValues.staminaRateMult *
-      elapsedTime.count() / 10000.0f;
+    baseValues.staminaRate * baseValues.staminaRateMult * elapsedTime.count() /
+      10000.0f;
 
   float stamina = ac.GetChangeForm().actorValues.staminaPercentage;
   REQUIRE_THAT(stamina, Catch::Matchers::WithinAbs(expectedStamina, 0.001f));
@@ -293,9 +293,9 @@ TEST_CASE("A server stamina drain does not shrink the magicka allowance",
   auto& ac = partOne.worldState.GetFormAt<MpActor>(0xff000000);
 
   auto appearance = ac.GetAppearance();
-  BaseActorValues baseValues = GetBaseActorValues(
-    &partOne.worldState, ac.GetBaseId(), appearance ? appearance->raceId : 0,
-    {});
+  BaseActorValues baseValues =
+    GetBaseActorValues(&partOne.worldState, ac.GetBaseId(),
+                       appearance ? appearance->raceId : 0, {});
 
   ac.SetPercentages({ 1.0f, 0.2f, 1.0f });
   auto past = std::chrono::steady_clock::now() - 1s;
@@ -304,7 +304,8 @@ TEST_CASE("A server stamina drain does not shrink the magicka allowance",
   ActorValues drain = ac.GetChangeForm().actorValues;
   drain.staminaPercentage = 0.5f;
   ac.NetSetPercentages(
-    drain, nullptr, std::vector<espm::ActorValue>{ espm::ActorValue::Stamina });
+    drain, nullptr,
+    std::vector<espm::ActorValue>{ espm::ActorValue::Stamina });
   partOne.Messages().clear();
 
   nlohmann::json j = nlohmann::json{ { "t", MsgType::ChangeValues },
@@ -315,8 +316,7 @@ TEST_CASE("A server stamina drain does not shrink the magicka allowance",
     std::chrono::steady_clock::now() - past;
   float expectedMagicka = 0.2f +
     baseValues.magickaRate * baseValues.magickaRateMult *
-      partOne.worldState.magickaRegenSlack *
-      elapsedTime.count() / 10000.0f;
+      partOne.worldState.magickaRegenSlack * elapsedTime.count() / 10000.0f;
 
   float magicka = ac.GetChangeForm().actorValues.magickaPercentage;
   REQUIRE_THAT(magicka, Catch::Matchers::WithinAbs(expectedMagicka, 0.001f));
@@ -373,9 +373,11 @@ TEST_CASE("Stamina the server sends to the client restarts the stamina "
   DoDisconnect(partOne, 0);
 }
 
-// Live, 25-31 Oct: 13,594 reports of a bar above 1 were cropped to 1 and sent back, and the client then took the
-// excess off a full bar every second (a buff past the percentage base never lasted)
-TEST_CASE("A full bar reported above 1 is kept at 1 without a correction, a rise from below is still cropped",
+// Live, 25-31 Oct: 13,594 reports of a bar above 1 were cropped to 1 and sent
+// back, and the client then took the excess off a full bar every second (a
+// buff past the percentage base never lasted)
+TEST_CASE("A full bar reported above 1 is kept at 1 without a correction, a "
+          "rise from below is still cropped",
           "[ChangeValues]")
 {
   PartOne& partOne = GetPartOne();

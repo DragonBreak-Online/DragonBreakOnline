@@ -105,7 +105,8 @@ Napi::Object ScampServer::Init(Napi::Env env, Napi::Object exports)
       InstanceMethod("getActorsByProfileId",
                      &ScampServer::GetActorsByProfileId),
       InstanceMethod("setEnabled", &ScampServer::SetEnabled),
-      InstanceMethod("setInventoryOccupant", &ScampServer::SetInventoryOccupant),
+      InstanceMethod("setInventoryOccupant",
+                     &ScampServer::SetInventoryOccupant),
       InstanceMethod("respawnActor", &ScampServer::RespawnActor),
       InstanceMethod("createBot", &ScampServer::CreateBot),
       InstanceMethod("getUserByActor", &ScampServer::GetUserByActor),
@@ -494,7 +495,8 @@ ScampServer::ScampServer(const Napi::CallbackInfo& info)
         (*it).get<std::set<std::string>>());
     }
 
-    // exteriorScriptAllowlist: vanilla scripts that still run on exterior refs (two-state gates and levers by default)
+    // exteriorScriptAllowlist: vanilla scripts that still run on exterior refs
+    // (two-state gates and levers by default)
     auto exteriorScriptsIt = serverSettings.find("exteriorScriptAllowlist");
     if (exteriorScriptsIt != serverSettings.end() &&
         (*exteriorScriptsIt).is_array()) {
@@ -502,7 +504,8 @@ ScampServer::ScampServer(const Napi::CallbackInfo& info)
         (*exteriorScriptsIt).get<std::vector<std::string>>();
     }
 
-    // blockedSpells: spell form ids (numbers or "0x..." strings) players may not cast (racial powers etc)
+    // blockedSpells: spell form ids (numbers or "0x..." strings) players may
+    // not cast (racial powers etc)
     auto blockedIt = serverSettings.find("blockedSpells");
     if (blockedIt != serverSettings.end() && (*blockedIt).is_array()) {
       std::set<uint32_t> blockedSpells;
@@ -517,7 +520,8 @@ ScampServer::ScampServer(const Napi::CallbackInfo& info)
       partOne->worldState.SetBlockedSpells(blockedSpells);
     }
 
-    // castRelayBlockedRaces: race descs ("d53:Skyrim.esm") whose NPCs' casts reach their host only (non-humanoid graphs)
+    // castRelayBlockedRaces: race descs ("d53:Skyrim.esm") whose NPCs' casts
+    // reach their host only (non-humanoid graphs)
     auto castRacesIt = serverSettings.find("castRelayBlockedRaces");
     if (castRacesIt != serverSettings.end() && (*castRacesIt).is_array()) {
       std::set<uint32_t> races;
@@ -537,7 +541,8 @@ ScampServer::ScampServer(const Napi::CallbackInfo& info)
       partOne->worldState.SetCastRelayBlockedRaces(races);
     }
 
-    // npcSelfHealMult: share of a restoration spell a hosted NPC heals on itself (0..1, default 0.35)
+    // npcSelfHealMult: share of a restoration spell a hosted NPC heals on
+    // itself (0..1, default 0.35)
     auto npcSelfHealIt = serverSettings.find("npcSelfHealMult");
     if (npcSelfHealIt != serverSettings.end() &&
         (*npcSelfHealIt).is_number()) {
@@ -595,10 +600,12 @@ ScampServer::ScampServer(const Napi::CallbackInfo& info)
                    limits.maxDownSpeed, limits.burstSeconds);
     }
 
-    // playersInheritBaseSpells: false strips the Player record's castable spells (Flames, Healing) from player characters
+    // playersInheritBaseSpells: false strips the Player record's castable
+    // spells (Flames, Healing) from player characters
     auto inheritIt = serverSettings.find("playersInheritBaseSpells");
     if (inheritIt != serverSettings.end() && (*inheritIt).is_boolean()) {
-      partOne->worldState.SetPlayersInheritBaseSpells((*inheritIt).get<bool>());
+      partOne->worldState.SetPlayersInheritBaseSpells(
+        (*inheritIt).get<bool>());
     }
 
     if (auto it = serverSettings.find("serverKey");
@@ -672,8 +679,7 @@ Napi::Value ScampServer::Tick(const Napi::CallbackInfo& info)
 {
   ANTIGO_CONTEXT_INIT(ctx);
 
-  const uint64_t tickStart =
-    TickProfile::Enabled() ? TickProfile::NowNs() : 0;
+  const uint64_t tickStart = TickProfile::Enabled() ? TickProfile::NowNs() : 0;
 
   try {
     tickEnv = info.Env();
@@ -837,7 +843,8 @@ Napi::Value ScampServer::DestroyActor(const Napi::CallbackInfo& info)
   return info.Env().Undefined();
 }
 
-// mp.setHoster(npcId, actorId | 0): the server chooses which client drives an NPC (NPC system v2)
+// mp.setHoster(npcId, actorId | 0): the server chooses which client drives an
+// NPC (NPC system v2)
 Napi::Value ScampServer::SetHoster(const Napi::CallbackInfo& info)
 {
   auto remoteId = info[0].As<Napi::Number>().Uint32Value();
@@ -923,7 +930,8 @@ Napi::Value ScampServer::SetInventoryOccupant(const Napi::CallbackInfo& info)
   return info.Env().Undefined();
 }
 
-// respawnActor(actorFormId) - respawns a dead actor now instead of after its spawnDelay.
+// respawnActor(actorFormId) - respawns a dead actor now instead of after its
+// spawnDelay.
 Napi::Value ScampServer::RespawnActor(const Napi::CallbackInfo& info)
 {
   auto actorFormId = info[0].As<Napi::Number>().Uint32Value();
@@ -1498,7 +1506,8 @@ Napi::Value ScampServer::GetAllForms(const Napi::CallbackInfo& info)
   }
 }
 
-// Global ids of the winning records of one type (COBJ, ENCH and the other types libespm indexes)
+// Global ids of the winning records of one type (COBJ, ENCH and the other
+// types libespm indexes)
 Napi::Value ScampServer::GetEspmRecordIdsByType(const Napi::CallbackInfo& info)
 {
   try {
@@ -1508,8 +1517,8 @@ Napi::Value ScampServer::GetEspmRecordIdsByType(const Napi::CallbackInfo& info)
     auto arr = Napi::Array::New(info.Env(), records.size());
     for (size_t i = 0; i < records.size(); ++i) {
       arr.Set(static_cast<uint32_t>(i),
-              Napi::Number::New(info.Env(), records[i].ToGlobalId(
-                                              records[i].rec->GetId())));
+              Napi::Number::New(
+                info.Env(), records[i].ToGlobalId(records[i].rec->GetId())));
     }
     return arr;
   } catch (std::exception& e) {
@@ -1536,7 +1545,8 @@ Napi::Value ScampServer::GetDescFromId(const Napi::CallbackInfo& info)
   try {
     auto formId = NapiHelper::ExtractUInt32(info[0], "formId");
     // Must be worldState.espmFiles: it is the only table carrying plugin slots
-    auto formDesc = FormDesc::FromFormId(formId, partOne->worldState.espmFiles);
+    auto formDesc =
+      FormDesc::FromFormId(formId, partOne->worldState.espmFiles);
 
     return Napi::String::New(info.Env(), formDesc.ToString());
   } catch (std::exception& e) {
@@ -1550,8 +1560,8 @@ Napi::Value ScampServer::GetIdFromDesc(const Napi::CallbackInfo& info)
     auto formDescStr = NapiHelper::ExtractString(info[0], "formDesc");
     auto formDesc = FormDesc::FromString(formDescStr);
 
-    return Napi::Number::New(
-      info.Env(), formDesc.ToFormId(partOne->worldState.espmFiles));
+    return Napi::Number::New(info.Env(),
+                             formDesc.ToFormId(partOne->worldState.espmFiles));
   } catch (std::exception& e) {
     throw Napi::Error::New(info.Env(), std::string(e.what()));
   }

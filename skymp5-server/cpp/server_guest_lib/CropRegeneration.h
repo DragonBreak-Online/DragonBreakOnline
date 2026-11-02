@@ -13,7 +13,8 @@ float CropMagickaRegeneration(float newAttributeValue,
 float CropStaminaRegeneration(float newAttributeValue,
                               float secondsAfterLastRegen, MpActor* actor);
 
-// The share of the magicka bar a second the server's own numbers allow, before magickaRegenSlack
+// The share of the magicka bar a second the server's own numbers allow, before
+// magickaRegenSlack
 float MagickaRegenPerSecond(MpActor* actor);
 
 // Clients report vitals about every second, so longer gaps are capped

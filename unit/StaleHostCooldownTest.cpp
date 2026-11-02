@@ -7,27 +7,35 @@
 
 PartOne& GetPartOne();
 
-// PartOne::TickStaleHosts takes an NPC from its hoster after staleHostAfter with no movement, so a client that
-// unloaded an NPC stops holding it frozen for everyone. An NPC that is deliberately standing still never moves
-// either, so before the cooldown below it was taken away again every staleHostAfter for as long as it stood
-// there, and each release set its host to 0 and made every nearby client ask for it at once: 4.7 releases a
-// minute at Nat's Bruma event against 0.1 quiet, which with 65-92 clients is the 441.8 host attempts and 306.9
-// "not a hoster" errors a minute in _work\perf-1031\NOTE.md.
+// PartOne::TickStaleHosts takes an NPC from its hoster after staleHostAfter
+// with no movement, so a client that unloaded an NPC stops holding it frozen
+// for everyone. An NPC that is deliberately standing still never moves either,
+// so before the cooldown below it was taken away again every staleHostAfter
+// for as long as it stood there, and each release set its host to 0 and made
+// every nearby client ask for it at once: 4.7 releases a minute at Nat's Bruma
+// event against 0.1 quiet, which with 65-92 clients is the 441.8 host attempts
+// and 306.9 "not a hoster" errors a minute in _work\perf-1031\NOTE.md.
 //
-// The first release of an NPC stays immediate, so the frozen-NPC case this sweep exists for is still rescued at
-// once. Only the second and later releases of the SAME NPC wait staleReleaseCooldown.
+// The first release of an NPC stays immediate, so the frozen-NPC case this
+// sweep exists for is still rescued at once. Only the second and later
+// releases of the SAME NPC wait staleReleaseCooldown.
 //
-// Uses the shared GetPartOne(): a bare PartOne has no espm attached and CreateActor throws "No espm attached".
-// The timings are PartOne members so this runs in milliseconds, and Timings restores them in its destructor so
-// a REQUIRE that aborts a test cannot leave the shared instance set to milliseconds for everything after it.
-// The sweep needs two passes to release: the first stamps hostSeenSince for a hoster with no movement stamp
-// yet, the second sees the age. staleHostSweepEvery is therefore 0 and not 1 ms: TickStaleHosts returns early
-// when it swept less than staleHostSweepEvery ago, and the first Tick of a pair lands within a millisecond of
-// the sweep that released the NPC in the step before, so a 1 ms interval swallowed that Tick. One pass then
-// only stamped hostSeenSince and never saw an age, and the destroy-and-recreate case failed about one run in
-// three - in the full suite, where its own timings put it close to the previous sweep, and never alone.
-// The server keeps 1000 ms against staleHostAfter 5000 ms, so there a swallowed sweep costs a second, not a
-// release; this is the harness being too tight, not the sweep being wrong.
+// Uses the shared GetPartOne(): a bare PartOne has no espm attached and
+// CreateActor throws "No espm attached". The timings are PartOne members so
+// this runs in milliseconds, and Timings restores them in its destructor so a
+// REQUIRE that aborts a test cannot leave the shared instance set to
+// milliseconds for everything after it. The sweep needs two passes to release:
+// the first stamps hostSeenSince for a hoster with no movement stamp yet, the
+// second sees the age. staleHostSweepEvery is therefore 0 and not 1 ms:
+// TickStaleHosts returns early when it swept less than staleHostSweepEvery
+// ago, and the first Tick of a pair lands within a millisecond of the sweep
+// that released the NPC in the step before, so a 1 ms interval swallowed that
+// Tick. One pass then only stamped hostSeenSince and never saw an age, and the
+// destroy-and-recreate case failed about one run in three - in the full suite,
+// where its own timings put it close to the previous sweep, and never alone.
+// The server keeps 1000 ms against staleHostAfter 5000 ms, so there a
+// swallowed sweep costs a second, not a release; this is the harness being too
+// tight, not the sweep being wrong.
 
 namespace {
 
@@ -50,7 +58,8 @@ struct Timings
   PartOne& p;
   std::chrono::milliseconds after, cooldown, sweep, exemptFor;
   float exemptRange;
-  // exempt: the hoster-in-reach exemption's range; 0 (off) for the cooldown tests, whose hoster stands beside the NPC
+  // exempt: the hoster-in-reach exemption's range; 0 (off) for the cooldown
+  // tests, whose hoster stands beside the NPC
   Timings(PartOne& p_, std::chrono::milliseconds cool, float exempt = 0.f,
           std::chrono::milliseconds exemptFor_ = std::chrono::minutes(2))
     : p(p_)
@@ -98,14 +107,16 @@ void Teardown(PartOne& p)
 void SweepPastStale(PartOne& p)
 {
   p.Tick();
-  std::this_thread::sleep_for(p.staleHostAfter + std::chrono::milliseconds(25));
+  std::this_thread::sleep_for(p.staleHostAfter +
+                              std::chrono::milliseconds(25));
   p.Tick();
 }
 
 }
 
-TEST_CASE("A standing NPC is taken from its hoster once, not every few seconds",
-          "[PartOne][Host][StaleHost][espm]")
+TEST_CASE(
+  "A standing NPC is taken from its hoster once, not every few seconds",
+  "[PartOne][Host][StaleHost][espm]")
 {
   PartOne& p = GetPartOne();
   Timings t(p, std::chrono::milliseconds(600));
@@ -119,12 +130,14 @@ TEST_CASE("A standing NPC is taken from its hoster once, not every few seconds",
   DoMessage(p, 0, HostAttempt(kNpc));
   REQUIRE(HosterOf(p, kNpc) == kPlayer);
 
-  // old enough to release again, but inside the cooldown: it must KEEP its hoster.
-  // This is the assertion that fails without the cooldown, where it would be 0 again.
+  // old enough to release again, but inside the cooldown: it must KEEP its
+  // hoster. This is the assertion that fails without the cooldown, where it
+  // would be 0 again.
   SweepPastStale(p);
   REQUIRE(HosterOf(p, kNpc) == kPlayer);
 
-  // ...and again, so the loop really is stopped rather than merely delayed by one pass
+  // ...and again, so the loop really is stopped rather than merely delayed by
+  // one pass
   SweepPastStale(p);
   REQUIRE(HosterOf(p, kNpc) == kPlayer);
 
@@ -140,8 +153,9 @@ TEST_CASE("The first release is immediate however long the cooldown is",
           "[PartOne][Host][StaleHost][espm]")
 {
   PartOne& p = GetPartOne();
-  // an hour: if the cooldown were applied to the first release, this would never free the NPC and the
-  // frozen-NPC case the sweep exists for would be broken
+  // an hour: if the cooldown were applied to the first release, this would
+  // never free the NPC and the frozen-NPC case the sweep exists for would be
+  // broken
   Timings t(p, std::chrono::hours(1));
   Setup(p);
 
@@ -151,11 +165,13 @@ TEST_CASE("The first release is immediate however long the cooldown is",
   Teardown(p);
 }
 
-// NOT covered here: that a MOVING NPC is never taken from its hoster. It is true and it matters, but it is the
-// sweep's pre-existing behaviour rather than anything this change touches, it passes without the cooldown
-// either way, and driving it needs a hand-built UpdateMovement message that no other unit test sends, so a
-// wrong field set would fail for a reason that has nothing to do with the cooldown. The movement path is
-// covered live by the npcDrift "moved" field instead.
+// NOT covered here: that a MOVING NPC is never taken from its hoster. It is
+// true and it matters, but it is the sweep's pre-existing behaviour rather
+// than anything this change touches, it passes without the cooldown either
+// way, and driving it needs a hand-built UpdateMovement message that no other
+// unit test sends, so a wrong field set would fail for a reason that has
+// nothing to do with the cooldown. The movement path is covered live by the
+// npcDrift "moved" field instead.
 
 TEST_CASE("Destroying an NPC forgets its stale-release record",
           "[PartOne][Host][StaleHost][espm]")
@@ -167,7 +183,8 @@ TEST_CASE("Destroying an NPC forgets its stale-release record",
   SweepPastStale(p);
   REQUIRE(HosterOf(p, kNpc) == 0);
 
-  // the record would otherwise outlive the NPC and silence the first release of whatever reuses its id
+  // the record would otherwise outlive the NPC and silence the first release
+  // of whatever reuses its id
   p.DestroyActor(kNpc);
   p.CreateActor(kNpc, { 100.f, 0.f, 0.f }, 0.f, 0x3c);
   DoMessage(p, 0, HostAttempt(kNpc));
@@ -186,7 +203,8 @@ TEST_CASE("A silent NPC keeps a hoster that is online and in reach",
   Timings t(p, std::chrono::milliseconds(0), 4096.f);
   Setup(p);
 
-  // without the exemption the first sweep past staleHostAfter releases it (the cooldown tests above)
+  // without the exemption the first sweep past staleHostAfter releases it (the
+  // cooldown tests above)
   SweepPastStale(p);
   REQUIRE(HosterOf(p, kNpc) == kPlayer);
   SweepPastStale(p);
@@ -212,7 +230,8 @@ TEST_CASE("The exemption ends after staleExemptFor of silence",
           "[PartOne][Host][StaleHost][espm]")
 {
   PartOne& p = GetPartOne();
-  // a hoster that stays beside an NPC its client stopped driving must not hold it frozen forever
+  // a hoster that stays beside an NPC its client stopped driving must not hold
+  // it frozen forever
   Timings t(p, std::chrono::milliseconds(0), 4096.f,
             std::chrono::milliseconds(150));
   Setup(p);

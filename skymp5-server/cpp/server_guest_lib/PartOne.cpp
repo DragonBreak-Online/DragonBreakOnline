@@ -5,22 +5,22 @@
 #include <string>
 #include <vector>
 
+#include "ChangeValuesMessage.h"
 #include "CreateActorMessage.h"
 #include "CustomPacketMessage.h"
 #include "DestroyActorMessage.h"
-#include "HostStopMessage.h"
-#include "ChangeValuesMessage.h"
 #include "HostStartMessage.h"
+#include "HostStopMessage.h"
 #include "SetRaceMenuOpenMessage.h"
 #include "UpdateGameModeDataMessage.h"
 
-#include "TickProfile.h"
 #include "ActionListener.h"
-#include "gamemode_events/CustomEvent.h"
 #include "FormCallbacks.h"
 #include "MessageSerializerFactory.h"
 #include "OpenSSLSigner.h"
 #include "PacketParser.h"
+#include "TickProfile.h"
+#include "gamemode_events/CustomEvent.h"
 
 PartOneSendTargetWrapper::PartOneSendTargetWrapper(
   Networking::ISendTarget& underlyingSendTarget_)
@@ -66,12 +66,13 @@ public:
       deserializeResult->message->WriteJson(j);
       message = std::move(deserializeResult->message);
     } else if (data && length >= 2) {
-      // length - 1 is size_t: a Send with no raw bytes underflows it to SIZE_MAX and
-      // std::string throws length_error "basic_string::_M_create". A test that calls a
-      // handler directly passes a default RawMessageData (unparsed nullptr, length 0),
-      // and the relay inside the handler reaches here. MessageSerializer::Deserialize
-      // guards the identical construction with the same length < 2 test; this one did not,
-      // which is why 5 unit tests threw before reaching an assertion.
+      // length - 1 is size_t: a Send with no raw bytes underflows it to
+      // SIZE_MAX and std::string throws length_error
+      // "basic_string::_M_create". A test that calls a handler directly passes
+      // a default RawMessageData (unparsed nullptr, length 0), and the relay
+      // inside the handler reaches here. MessageSerializer::Deserialize guards
+      // the identical construction with the same length < 2 test; this one did
+      // not, which is why 5 unit tests threw before reaching an assertion.
       std::string s(reinterpret_cast<const char*>(data + 1), length - 1);
       j = nlohmann::json::parse(s);
     }
@@ -202,11 +203,14 @@ bool PartOne::HosterInReach(const MpObjectReference& remote, uint32_t hosterId)
     staleExemptRange * staleExemptRange;
 }
 
-// A hoster sends every loaded NPC it drives every 130 ms and goes silent on the ones it unloaded, but it stayed
-// their hoster: OnHostAttempt only hands an NPC over when another client asks, so an NPC its own hoster walked
-// back to was never driven again (an ogre that would not fight back), and a hoster's trail of 36 unloaded NPCs
-// stood frozen for everyone (playtest 2026-09-25). After kStaleHostSeconds without movement the hoster is told
-// to stop and the NPC is marked unhosted, which every listener sees as isHostedByOther=false and asks for it.
+// A hoster sends every loaded NPC it drives every 130 ms and goes silent on
+// the ones it unloaded, but it stayed their hoster: OnHostAttempt only hands
+// an NPC over when another client asks, so an NPC its own hoster walked back
+// to was never driven again (an ogre that would not fight back), and a
+// hoster's trail of 36 unloaded NPCs stood frozen for everyone (playtest
+// 2026-09-25). After kStaleHostSeconds without movement the hoster is told to
+// stop and the NPC is marked unhosted, which every listener sees as
+// isHostedByOther=false and asks for it.
 void PartOne::TickStaleHosts()
 {
   const auto kSweepEvery = staleHostSweepEvery;
@@ -222,16 +226,18 @@ void PartOne::TickStaleHosts()
     if (hosterId == 0) {
       continue;
     }
-    // NoLoad: loading a form inside this loop over hosters could change the map under it
+    // NoLoad: loading a form inside this loop over hosters could change the
+    // map under it
     auto remote = dynamic_cast<MpObjectReference*>(
       worldState.LookupFormByIdNoLoad(remoteId).get());
     if (!remote) {
       continue;
     }
     const auto idx = static_cast<size_t>(remote->GetIdx());
-    // The last movement, or, for an NPC whose index has no stamp yet (the list only grows when movement is
-    // accepted), when this sweep first saw this hoster: reading "no stamp" as silence released a fresh hoster
-    // every second and refused its movement forever (2026-09-25 17:16)
+    // The last movement, or, for an NPC whose index has no stamp yet (the list
+    // only grows when movement is accepted), when this sweep first saw this
+    // hoster: reading "no stamp" as silence released a fresh hoster every
+    // second and refused its movement forever (2026-09-25 17:16)
     auto& seen = hostSeenSince[remoteId];
     if (seen.first != hosterId) {
       seen = { hosterId, now };
@@ -243,13 +249,16 @@ void PartOne::TickStaleHosts()
       last = *worldState.lastMovUpdateByIdx[idx];
     }
     if (now - last > kStaleHostSeconds) {
-      // A standing NPC beside its hoster is not lost; one its hoster walked away from or left behind still is
+      // A standing NPC beside its hoster is not lost; one its hoster walked
+      // away from or left behind still is
       if (now - last <= staleExemptFor && HosterInReach(*remote, hosterId)) {
         continue;
       }
-      // The first release of an NPC is immediate; a repeat release of the same one waits staleReleaseCooldown.
-      // A standing NPC never moves, so without this it was taken from its hoster every kStaleHostSeconds for as
-      // long as it stood there, and every release made every nearby client ask for it at once.
+      // The first release of an NPC is immediate; a repeat release of the same
+      // one waits staleReleaseCooldown. A standing NPC never moves, so without
+      // this it was taken from its hoster every kStaleHostSeconds for as long
+      // as it stood there, and every release made every nearby client ask for
+      // it at once.
       auto released = staleReleasedAt.find(remoteId);
       if (released != staleReleasedAt.end() &&
           now - released->second < staleReleaseCooldown) {
@@ -266,8 +275,9 @@ void PartOne::TickStaleHosts()
       continue;
     }
     staleReleasedAt[remoteId] = now;
-    ReleaseHost(*remote,
-                fmt::format("no movement for {} ms", kStaleHostSeconds.count()));
+    ReleaseHost(
+      *remote,
+      fmt::format("no movement for {} ms", kStaleHostSeconds.count()));
   }
 }
 
@@ -292,7 +302,8 @@ void PartOne::ReleaseHost(MpObjectReference& remote, const std::string& reason)
   GetLogger().info("Hoster of {0:x} released from {1:x}: {2}", remoteId,
                    hosterId, reason);
 
-  // The gamemode may hand it on at once (npcdirector.js), so nearby clients never see it unhosted and ask for it
+  // The gamemode may hand it on at once (npcdirector.js), so nearby clients
+  // never see it unhosted and ask for it
   if (hostReleaseHook) {
     hostReleaseHook(remoteId, hosterId);
   } else {
@@ -307,8 +318,9 @@ void PartOne::ReleaseHost(MpObjectReference& remote, const std::string& reason)
   remote.UpdateHoster(0);
 }
 
-// A hoster that disconnected, switched character or was destroyed kept every NPC it drove until the 5 s stale sweep
-// noticed each one; a player who had them loaded could not take over before then
+// A hoster that disconnected, switched character or was destroyed kept every
+// NPC it drove until the 5 s stale sweep noticed each one; a player who had
+// them loaded could not take over before then
 void PartOne::ReleaseHostedBy(uint32_t hosterId, const std::string& reason)
 {
   if (hosterId == 0) {
@@ -332,10 +344,12 @@ void PartOne::ReleaseHostedBy(uint32_t hosterId, const std::string& reason)
   }
 }
 
-// Unsubscribe sends the hoster's client DestroyActor for the NPC (it walked out of range, changed cell, or the NPC was
-// moved away), after which its client can no longer drive it, yet it stayed the hoster: its NPC stood frozen for
-// everyone until the stale sweep. Queued, because unsubscribes happen inside listener iteration, and skipped when the
-// hoster was subscribed again in the same tick (a disable/enable, a teleport within range)
+// Unsubscribe sends the hoster's client DestroyActor for the NPC (it walked
+// out of range, changed cell, or the NPC was moved away), after which its
+// client can no longer drive it, yet it stayed the hoster: its NPC stood
+// frozen for everyone until the stale sweep. Queued, because unsubscribes
+// happen inside listener iteration, and skipped when the hoster was subscribed
+// again in the same tick (a disable/enable, a teleport within range)
 void PartOne::TickHostReleases()
 {
   if (pendingHostReleases.empty()) {
@@ -356,8 +370,10 @@ void PartOne::TickHostReleases()
     auto& hoster = worldState.LookupFormByIdNoLoad(entry.hosterId);
     auto hosterRefr = hoster ? hoster->AsObjectReference() : nullptr;
     if (hosterRefr && remote->GetListeners().count(hosterRefr) > 0) {
-      // Unsubscribed and subscribed again in one tick (a disable/enable): the client got DestroyActor and forgot it
-      // hosts the NPC, so grant it again (HostStart) instead of leaving it held by a client that no longer drives it
+      // Unsubscribed and subscribed again in one tick (a disable/enable): the
+      // client got DestroyActor and forgot it hosts the NPC, so grant it again
+      // (HostStart) instead of leaving it held by a client that no longer
+      // drives it
       try {
         AssignHoster(entry.remoteId, entry.hosterId);
       } catch (std::exception& e) {
@@ -370,8 +386,9 @@ void PartOne::TickHostReleases()
   }
 }
 
-// A destroyed NPC kept its hoster: the host's client never got HostStop and kept driving it and sending its movement
-// for the freed index, and hosters, hostSeenSince and npcJumps kept its entries for the rest of the run
+// A destroyed NPC kept its hoster: the host's client never got HostStop and
+// kept driving it and sending its movement for the freed index, and hosters,
+// hostSeenSince and npcJumps kept its entries for the rest of the run
 void PartOne::BeforeRefrDestroy(MpObjectReference& refr)
 {
   const uint32_t formId = refr.GetFormId();
@@ -441,8 +458,9 @@ void PartOne::SetUserActor(Networking::UserId userId, uint32_t actorFormId)
       throw std::runtime_error(ss.str());
     }
 
-    // The client is sent every copy anew below and drives none of them: what it hosted through its previous
-    // character, and what this character hosted under another user, is released
+    // The client is sent every copy anew below and drives none of them: what
+    // it hosted through its previous character, and what this character hosted
+    // under another user, is released
     const auto prevActor = serverState.ActorByUser(userId);
     const uint32_t prevActorId = prevActor ? prevActor->GetFormId() : 0;
     ReleaseHostedBy(prevActorId, "its hoster's user switched character");
@@ -732,13 +750,15 @@ void PartOne::HandlePacket(void* partOneInstance, Networking::UserId userId,
       });
 
       this_->serverState.disconnectingUserId = userId;
-      // Its NPCs are free for the players who still see them at once, not after the stale sweep
+      // Its NPCs are free for the players who still see them at once, not
+      // after the stale sweep
       if (auto actor = this_->serverState.ActorByUser(userId)) {
         if (this_->pImpl->actionListener) {
           this_->pImpl->actionListener->ForgetScrollReads(actor->GetFormId());
         }
         try {
-          this_->ReleaseHostedBy(actor->GetFormId(), "its hoster disconnected");
+          this_->ReleaseHostedBy(actor->GetFormId(),
+                                 "its hoster disconnected");
         } catch (std::exception& e) {
           spdlog::error("PartOne::HandlePacket - releasing hosts of user {} "
                         "failed: {}",
@@ -922,8 +942,8 @@ void PartOne::RequestPacketHistoryPlayback(Networking::UserId userId,
 
 void PartOne::AssignHoster(uint32_t remoteId, uint32_t newHosterId)
 {
-  auto remote =
-    dynamic_cast<MpObjectReference*>(worldState.LookupFormById(remoteId).get());
+  auto remote = dynamic_cast<MpObjectReference*>(
+    worldState.LookupFormById(remoteId).get());
   if (!remote) {
     throw std::runtime_error(
       fmt::format("AssignHoster: {:x} is not a reference", remoteId));
@@ -943,11 +963,13 @@ void PartOne::AssignHoster(uint32_t remoteId, uint32_t newHosterId)
     }
   }
 
-  // An entry, even 0, means it was hosted before in this run: only a destroy erases an NPC's entry
+  // An entry, even 0, means it was hosted before in this run: only a destroy
+  // erases an NPC's entry
   auto hosterIt = worldState.hosters.find(remoteId);
   const bool hostedBefore = hosterIt != worldState.hosters.end();
   const uint32_t prevHoster = hostedBefore ? hosterIt->second : 0;
-  // Re-granting the same hoster is kept (a client that recreated its copy asks again and needs HostStart again)
+  // Re-granting the same hoster is kept (a client that recreated its copy asks
+  // again and needs HostStart again)
   if (prevHoster == 0 && newHosterId == 0) {
     return;
   }
@@ -957,7 +979,8 @@ void PartOne::AssignHoster(uint32_t remoteId, uint32_t newHosterId)
   hostSeenSince.erase(remoteId);
   remote->UpdateHoster(newHosterId);
 
-  // Prevents too fast host switch; the list only grows on accepted movement, so it is grown here first
+  // Prevents too fast host switch; the list only grows on accepted movement,
+  // so it is grown here first
   const auto remoteIdx = static_cast<size_t>(remote->GetIdx());
   if (worldState.lastMovUpdateByIdx.size() <= remoteIdx) {
     worldState.lastMovUpdateByIdx.resize(remoteIdx + 1);
@@ -971,8 +994,10 @@ void PartOne::AssignHoster(uint32_t remoteId, uint32_t newHosterId)
   }
 
   if (newHosterId) {
-    // Rebuilding the weapon slots broadcasts UpdateEquipment, which every client applies to its copy: on each change
-    // of host, mid-fight, the NPC was re-equipped. Only its first host, or one with a weapon to take in hand
+    // Rebuilding the weapon slots broadcasts UpdateEquipment, which every
+    // client applies to its copy: on each change of host, mid-fight, the NPC
+    // was re-equipped. Only its first host, or one with a weapon to take in
+    // hand
     if (remoteAsActor &&
         (!hostedBefore || remoteAsActor->HasWeaponToEquip())) {
       remoteAsActor->EquipBestWeapon();
@@ -984,7 +1009,8 @@ void PartOne::AssignHoster(uint32_t remoteId, uint32_t newHosterId)
       GetActionListener().ResendHostEffects(remoteId, *newHoster);
     }
 
-    // Otherwise, health percentage would remain unsynced until someone hits npc
+    // Otherwise, health percentage would remain unsynced until someone hits
+    // npc
     if (remoteAsActor) {
       auto formId = remote->GetFormId();
       worldState.SetTimer(std::chrono::seconds(1))

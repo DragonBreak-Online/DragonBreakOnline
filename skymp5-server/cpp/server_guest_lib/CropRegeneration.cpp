@@ -24,8 +24,10 @@ float GetServerRegenMultiplier(MpActor* actor)
   return worldState ? worldState->regenerationMultiplier : 1.f;
 }
 
-// Live clients regenerated magicka at 1.3 to 3 times the server's rate (perks and worn enchantments the server does
-// not model), and 25-60% of each tick was clawed back (31 Oct). The slack scales the rate, so a 0 mult still freezes
+// Live clients regenerated magicka at 1.3 to 3 times the server's rate (perks
+// and worn enchantments the server does not model), and 25-60% of each tick
+// was clawed back (31 Oct). The slack scales the rate, so a 0 mult still
+// freezes
 float GetMagickaRegenSlack(MpActor* actor)
 {
   auto worldState = actor->GetParent();
@@ -34,21 +36,25 @@ float GetMagickaRegenSlack(MpActor* actor)
 
 float MagickaRateOf(MpActor* actor, const BaseActorValues& baseValues)
 {
-  return std::max(baseValues.magickaRate, actor->GetActorValues().magickaRate) *
+  return std::max(baseValues.magickaRate,
+                  actor->GetActorValues().magickaRate) *
     GetServerRegenMultiplier(actor);
 }
 
 // The rate mult the ceiling should use.
 //
-// This was std::max(base, current), which floored the ceiling at the race's base and so made every debuff
-// inert: the needs system's hunger, and the chill system writing StaminaRateMult 0 to freeze stamina, both
-// changed nothing. Nat asked on 27 Oct for them to really slow regeneration, a freeze to 0 included, so the
-// actor's own value wins in both directions.
+// This was std::max(base, current), which floored the ceiling at the race's
+// base and so made every debuff inert: the needs system's hunger, and the
+// chill system writing StaminaRateMult 0 to freeze stamina, both changed
+// nothing. Nat asked on 27 Oct for them to really slow regeneration, a freeze
+// to 0 included, so the actor's own value wins in both directions.
 //
-// Base is the answer only when nothing has written a usable value. ApplyChangeForm seeds the change form
-// from the race's base whenever espm is loaded, so in a running server there is always one; this guards the
-// case where there is not. It deliberately does NOT treat 0 as unset - a 0 is the chill freeze, and reading
-// it as "unset" would be the one thing Nat asked for that silently did not work.
+// Base is the answer only when nothing has written a usable value.
+// ApplyChangeForm seeds the change form from the race's base whenever espm is
+// loaded, so in a running server there is always one; this guards the case
+// where there is not. It deliberately does NOT treat 0 as unset - a 0 is the
+// chill freeze, and reading it as "unset" would be the one thing Nat asked for
+// that silently did not work.
 float ResolveRateMult(float current, float base)
 {
   if (!std::isfinite(current) || current < 0.f) {
@@ -141,9 +147,10 @@ float CropStaminaRegeneration(float newAttributeValue,
 {
   const BaseActorValues baseValues = GetValues(actor);
   const ActorValues& actorValues = actor->GetActorValues();
-  const float rate = (actor->IsBlockActive()
-    ? actorValues.staminaRate
-    : std::max(baseValues.staminaRate, actorValues.staminaRate)) *
+  const float rate =
+    (actor->IsBlockActive()
+       ? actorValues.staminaRate
+       : std::max(baseValues.staminaRate, actorValues.staminaRate)) *
     GetServerRegenMultiplier(actor);
   const float rateMult =
     ResolveRateMult(actorValues.staminaRateMult, baseValues.staminaRateMult);
@@ -156,8 +163,8 @@ float CropStaminaRegeneration(float newAttributeValue,
 float MagickaRegenPerSecond(MpActor* actor)
 {
   const BaseActorValues baseValues = GetValues(actor);
-  const float rateMult = ResolveRateMult(actor->GetActorValues().magickaRateMult,
-                                         baseValues.magickaRateMult);
+  const float rateMult = ResolveRateMult(
+    actor->GetActorValues().magickaRateMult, baseValues.magickaRateMult);
   return MathUtils::PercentToFloat(MagickaRateOf(actor, baseValues)) *
     MathUtils::PercentToFloat(rateMult);
 }
