@@ -116,6 +116,8 @@ const checks = (modFile, check) => {
   check('...at 5 s it stands at the first point, speed 0, 5 s to go', !r.moving && r.speed === 0 && r.point === 0 && r.pos.join() === '0,0,0' && Math.abs(r.nextAt - 5000) < 1e-6, r);
   r = routeAt(plan, 14);
   check('...at 14 s it is halfway to the second, heading east (90), at the walking speed, 4 s from arriving', r.moving && r.speed === 100 && r.point === 1 && Math.abs(r.pos[0] - 400) < 1e-9 && Math.abs(r.heading - 90) < 1e-9 && Math.abs(r.nextAt - 4000) < 1e-6, r);
+  // the invariant the mover relies on: the distance walked over a moment is the speed the call reports, at any walking speed
+  check('speed and the timeline agree: distance over 0.5 s is the reported speed x 0.5, at 37 units/s too', [[plan, 13], [planRoute(ROUTES[`${T}:000A01`], 37, 10), 20]].every(([p, t]) => { const a = routeAt(p, t), b = routeAt(p, t + 0.5); return a.moving && b.moving && a.point === b.point && Math.abs(Math.hypot(b.pos[0] - a.pos[0], b.pos[1] - a.pos[1], b.pos[2] - a.pos[2]) - a.speed * 0.5) < 1e-6 && a.speed > 0; }));
   r = routeAt(plan, 27);
   check('...at 27 s it walks north (0) to the third', r.moving && r.point === 2 && Math.abs(r.heading) < 1e-9, r);
   r = routeAt(plan, plan.period + 5);
@@ -148,6 +150,7 @@ const MUTANTS = [
   ['the earlier guard keeps an overlap', 'shiftAge(hour, from) < best.age', 'shiftAge(hour, from) > best.age'],
   ['out and back is a loop', "  if (route.closes_loop !== true) for", '  if (false) for'],
   ['a standing guard reports the walking speed', "speed: seg.kind === 'walk' ? plan.speed : 0", 'speed: plan.speed'],
+  ['the reported speed is not the timeline speed', "speed: seg.kind === 'walk' ? plan.speed : 0", "speed: seg.kind === 'walk' ? 80 : 0"],
   ['nextAt counts from the segment start', '(seg.at + seg.s - at) * 1000', 'seg.s * 1000'],
   ['the heading is off by a quarter turn', 'Math.atan2(to[0] - from[0], to[1] - from[1])', 'Math.atan2(to[1] - from[1], to[0] - from[0])'],
 ];
