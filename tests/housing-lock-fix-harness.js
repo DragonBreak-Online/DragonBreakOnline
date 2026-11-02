@@ -13,6 +13,9 @@ const bundle = process.argv[2];
 if (!bundle) { console.error('usage: node tests/housing-lock-fix-harness.js <bundled housingSystem.js>'); process.exit(2); }
 const src = require('fs').readFileSync(path.resolve(bundle), 'utf8');
 if (!/LOCK_FIX_ACTIONS/.test(src)) { require('./expect')('housing-lock-fix', 'this HousingSystem has no GM lock fixes'); console.log('ok   skipped: this HousingSystem predates GM lock fixes'); process.exit(0); }
+// From 2 Nov a GM manages someone else's property in full (Nat; isStaffOverride, TIER_CAPS.property): the limited lock fix
+// this file holds is gone for GMs, and housing-staff-harness.js holds the new rule
+if (/isStaffOverride/.test(src)) { console.log('ok   skipped: this HousingSystem gives GMs the full property override (housing-staff-harness.js)'); process.exit(0); }
 const { HousingSystem } = require(path.resolve(bundle));
 
 let fail = 0;
