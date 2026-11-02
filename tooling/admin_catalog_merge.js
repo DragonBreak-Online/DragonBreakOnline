@@ -9,6 +9,7 @@
 // What the tracked files hold out on purpose stays out, read from where the code keeps it:
 //   - an item no one may obtain (staffitemspells.js UNOBTAINABLE, the Dwemer Mantis armour) is never offered;
 //   - a piece that crashes games once placed (decor.js blockBases, the Bruma Banner) is never on the Place tab;
+//   - a row held by tooling/catalog-holds.json (file, desc, reason, date) is never offered in that file;
 //   - a removed or suspended spell (gamemode-config.json spells.removedSpells, suspendedSpells) is never given;
 //   - admin-powers.json keeps its own layout: shouts stays as tracked (empty since 17 Oct), the generated shouts go into
 //     shoutsGate (combat.js's player shout gate), every other key and the _comment are kept, spellSources is recounted.
@@ -42,6 +43,18 @@ const CRASH_BASES = (() => {
   if (!m) throw new Error('decor.js blockBases not found in its known shape: read it before merging');
   return new Set(m[1].split(',').map((x) => x.trim().replace(/['"]/g, '').toLowerCase()).filter(Boolean));
 })();
+// Held rows (tooling/catalog-holds.json; the Leader, 2 Nov: window-1102's creature tomes and spells): file -> desc -> reason
+const HOLDS = (() => {
+  const f = path.resolve('tooling', 'catalog-holds.json');
+  const m = new Map();
+  for (const h of (read(f).held || [])) {
+    if (!h || !h.file || !h.desc || !h.reason) throw new Error(`tooling/catalog-holds.json: an entry without file, desc or reason: ${JSON.stringify(h)}`);
+    if (!m.has(h.file)) m.set(h.file, new Map());
+    m.get(h.file).set(String(h.desc).toLowerCase(), String(h.reason));
+  }
+  return m;
+})();
+const heldWhy = (file, desc) => (HOLDS.get(file) || new Map()).get(String(desc).toLowerCase());
 const SPELLS_HELD = (() => {
   const s = (read(path.resolve('gamemode-config.json')).spells) || {};
   return new Set([].concat(s.removedSpells || [], s.suspendedSpells || []).map((d) => String(d).toLowerCase()));
@@ -82,6 +95,7 @@ const mergeCategories = (file, leftOut) => {
   }
   if (file === 'admin-items.json') for (const c of gen.categories) c.items = c.items.filter((it) => { const out = UNOBTAINABLE.has(String(it[0]).toLowerCase()); if (out) note(file, c.id, 'left out: no one may obtain it (staffitemspells.js UNOBTAINABLE)', it); return !out; });
   if (file === 'admin-placeables.json') for (const c of gen.categories) c.items = c.items.filter((it) => { const out = CRASH_BASES.has(String(it[0]).toLowerCase()); if (out) note(file, c.id, 'left out: crashes the games that load it once placed (decor.js blockBases)', it); return !out; });
+  for (const c of gen.categories) c.items = c.items.filter((it) => { const why = heldWhy(file, it[0]); if (why) note(file, c.id, 'left out: held (tooling/catalog-holds.json)', it); return !why; });
   for (const c of gen.categories) c.items.sort((x, y) => String(x[1]).toLowerCase().localeCompare(String(y[1]).toLowerCase()) || String(x[0]).localeCompare(String(y[0])));
   return gen;
 };
@@ -99,6 +113,9 @@ const mergePowers = () => {
     spells.push(s); have.add(s[0]);
     note(file, 'spells', 'kept: not produced by the generator (hand-added or no longer matched)', s);
   }
+  // Held rows go whether generated or carried over (tooling/catalog-holds.json)
+  const unheld = (list, key) => list.filter((s) => { const why = heldWhy(file, s[0]); if (why) note(file, key, 'left out: held (tooling/catalog-holds.json)', s); return !why; });
+  spells.splice(0, spells.length, ...unheld(spells, 'spells'));
   spells.sort((x, y) => String(x[1]).toLowerCase().localeCompare(String(y[1]).toLowerCase()));
   // The tracked layout, every key kept; the spell list, its counts by plugin and the shout gate refreshed
   const out = Object.assign({}, old);
@@ -112,6 +129,7 @@ const mergePowers = () => {
     const staff = gen.staffSpells.filter((s) => { const held = SPELLS_HELD.has(String(s[0]).toLowerCase()); if (held) note(file, 'staffSpells', 'left out: removed or suspended (gamemode-config.json spells)', s); return !held; });
     const inStaff = new Set(staff.map((s) => s[0]));
     for (const s of old.staffSpells || []) if (!inStaff.has(s[0]) && inOrder(pluginOf(s[0]))) { staff.push(s); inStaff.add(s[0]); note(file, 'staffSpells', 'kept: not produced by the generator', s); }
+    staff.splice(0, staff.length, ...unheld(staff, 'staffSpells'));
     staff.sort((x, y) => String(x[1]).toLowerCase().localeCompare(String(y[1]).toLowerCase()) || String(x[0]).localeCompare(String(y[0])));
     // after spells, as the generator writes it
     const keys = Object.keys(out); const at = keys.indexOf('spells') + 1;
