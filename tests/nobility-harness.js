@@ -168,9 +168,10 @@ ok('no two fiefs claim the same exterior cell, or "which fief is this in" has tw
   return true;
 })());
 // The Bruma fiefs, pinned by sha1 of each entry's compact JSON, so a regeneration cannot change them unnoticed.
-// mountain-watch moved on 2 Nov: it gained CYRFrostironmine01, because origin's buildings.json no longer flags
-// that mine "dungeon" while the older local copy still does. Restoring the flag there takes it back to a7724e01.
-const BEFORE = {"applewatch": "78f8195397e4e41ef90f0c501d023613f2dfce3c", "aleswell": "2c0142e282c1a4bdbd0c0cab250ef0fecae8eda6", "mountain-watch": "5587bf1e1213430270676b060d7dea31b0dcb94b", "greenwood": "04bc8b82c444cf84dbd371ece8c0bdd605b1ed05"};
+// It earned its keep on 2 Nov: mountain-watch briefly gained CYRFrostironmine01, because buildings_build.py treats a
+// site in gamemode-config dungeons.exclude as an ordinary building (Nate, 20 Oct). nobility_fiefs.py now leaves such
+// a site out of a fief, since a mine or a clan hold keeps its own owner, and the entry is byte-identical again.
+const BEFORE = {"applewatch": "78f8195397e4e41ef90f0c501d023613f2dfce3c", "aleswell": "2c0142e282c1a4bdbd0c0cab250ef0fecae8eda6", "mountain-watch": "a7724e015f30c3da39d43437a804e4f39fa9f957", "greenwood": "04bc8b82c444cf84dbd371ece8c0bdd605b1ed05"};
 for (const [id, sha] of Object.entries(BEFORE)) {
   const f = FIEFS.find((x) => x.id === id);
   ok(`${id} is unchanged by the harbor`, !!f && crypto.createHash('sha1').update(JSON.stringify(f)).digest('hex') === sha);

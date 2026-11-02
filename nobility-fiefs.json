@@ -169,18 +169,9 @@
     "6543f:BSHeartland.esm",
     "65440:BSHeartland.esm",
     "65441:BSHeartland.esm",
-    "6ca03:BSHeartland.esm",
-    "d9594:BSHeartland.esm",
-    "d9595:BSHeartland.esm"
+    "6ca03:BSHeartland.esm"
    ],
    "buildings": [
-    {
-     "id": "d97a2:BSHeartland.esm",
-     "name": "CYRFrostironmine01",
-     "doors": [
-      "d97a2:BSHeartland.esm"
-     ]
-    },
     {
      "id": "6ca04:BSHeartland.esm",
      "name": "CYRMountainWatchAubertHouse",
