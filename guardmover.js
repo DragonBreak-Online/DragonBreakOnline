@@ -131,6 +131,8 @@ module.exports = ({ mp, log, every, cfg, state } = {}) => {
 
     const data = {
       pos,
+      // DEGREES, passed through unconverted: the client compares rot[2] against getAngleZ and TranslateTo
+      // takes degrees, and W2 reports the heading in the same unit (0 = +y, 90 = +x). Do not add a conversion here
       rot: [0, 0, Number(at.heading) || 0],
       speed: at.moving ? Number(at.speed) || 0 : 0,
       runMode: at.moving ? 'Walking' : 'Standing',
