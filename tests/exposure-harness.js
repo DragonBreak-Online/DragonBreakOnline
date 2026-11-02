@@ -226,6 +226,21 @@ props.set(`${JARL}|private.supernatural`, { kind: 'werewolf' });
 run('exposure', LEAD, 'confess Frigga bruma confessed at court');
 ok('a confessing ruler is deposed too', unseats.some((u) => u.tg.pid === 11));
 
+// ---- a stored case whose character no longer exists (live, 2 Nov: profileOf on two gone actors every tick, each a C++ throw
+// logged as a context dump): the tick reads the case's own pid and never asks the gone form ----------------------------------
+reset();
+{
+  const GONE = 0x99;
+  let goneProbes = 0;
+  X = load('exposure.js', {}, { profileOf: (a) => { if (a === GONE) { goneProbes++; return -1; } return chars[a] ? chars[a][0] : -1; } });
+  const now = Date.now();
+  globalThis.__dboExposure.data.cases = { 99: { actor: GONE, pid: 99, name: 'Gone', holds: { bruma: { form: 'werewolf', at: now, until: now + 86400000, place: 'Bruma', told: [], hunters: [] } } } };
+  sys.length = 0;
+  X.tick();
+  ok('a case whose character is gone is never asked its profile in the tick', goneProbes === 0, goneProbes);
+  ok('...and the hold officials are still told', sys.some(([a, t]) => a === STEW && /A notice from the court of Bruma/.test(t)), sys.slice(-3));
+}
+
 // ---- enabled false --------------------------------------------------------------------------------------------------------
 reset();
 X = load('exposure.js', { exposure: { enabled: false } });
