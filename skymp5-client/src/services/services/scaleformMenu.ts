@@ -274,12 +274,18 @@ export interface MenuState {
   foreignEvents: number;
   // when a client service asked the server for this panel's content (a key press), 0 when not known
   askedAt: number;
+  // messages handled from mod events before the outbox delivered any: their outbox copies are skipped (isNew)
+  modFirst: number;
+  // an open held back after a close in the same plan, and the updates still to wait (planOpen, planDeferred)
+  deferredOpen: string;
+  deferredWait: number;
 }
 
 export const newState = (): MenuState => ({
   phase: "closed", swf: "", json: "null", widgetId: 0,
   openedAt: 0, readyAt: 0, readyFrame: 0, sent: 0, foreignEvents: 0,
   outRead: 0, lastSeq: 0, viaOutbox: 0, viaModEvent: 0, askedAt: 0,
+  modFirst: 0, deferredOpen: "", deferredWait: 0,
 });
 
 export type Action =
@@ -308,6 +314,12 @@ export const planOpen = (s: MenuState, swf: unknown, payload: unknown, widgetId:
   s.swf = want;
   s.json = payloadJson(payload);
   s.widgetId = Math.max(0, Math.round(Number(widgetId) || 0));
+  // An open already held back after a close: this one takes its place, with no second close and no open before the
+  // engine has had the close's frame
+  if (s.deferredOpen) {
+    s.deferredOpen = s.swf;
+    return empty ? [{ do: "report", text: `${s.swf}: the server sent no payload, so the panel will have nothing to show` }] : [];
+  }
   if (s.phase === "ready" && sameSwf) {
     // The same panel, already on screen: replace the contents. A re-sent payload with the same nonce (the
     // server's verdict) comes through here too.
@@ -317,18 +329,18 @@ export const planOpen = (s: MenuState, swf: unknown, payload: unknown, widgetId:
       : push;
   }
   // A different panel, or one still opening. Only one CustomMenu exists at a time, so the old one goes down
-  // first. Whether the engine accepts a close and an open in the SAME frame is NOT established; if it does
-  // not, the panel misses its ready and the 5s timeout reports it (and a relay-routed widget falls back to
-  // the browser), and the fix is to defer the open by one tick rather than to guess again here.
+  // first. Whether the engine accepts a close and an open in the SAME frame was never established, and a hotkey
+  // pressed inside a panel made it happen (fmenu-freeze-1102). So the open waits for a later update than the
+  // close (planDeferred): closeCustomMenu only queues the close, and the open goes in after the engine ran it.
   const needsClose = s.phase !== "closed" && !sameSwf;
   s.phase = "opening";
   s.openedAt = now;
   s.readyAt = 0;
   s.outRead = 0;
   s.lastSeq = 0;
-  const open: Action[] = needsClose
-    ? [{ do: "close" }, { do: "open", swf: s.swf }]
-    : [{ do: "open", swf: s.swf }];
+  s.modFirst = 0;
+  if (needsClose) { s.deferredOpen = s.swf; s.deferredWait = 1; }
+  const open: Action[] = needsClose ? [{ do: "close" }] : [{ do: "open", swf: s.swf }];
   return empty
     ? [{ do: "report", text: `${s.swf}: the server sent no payload, so the panel will have nothing to show` }, ...open]
     : open;
@@ -353,6 +365,9 @@ export const planRefresh = (s: MenuState, payload: unknown, widgetId: unknown): 
 // and the movie may not be built.
 export const planReady = (s: MenuState, frame: number, now: number): Action[] => {
   if (s.phase === "closed") return [];
+  // Once per open: a second ready (the same message by both channels) pushed the whole payload again, which for a
+  // chunked one is a second full parse (fmenu-freeze-1102: menu-1's 68,404 characters, parsed twice on each F)
+  if (s.phase === "ready") return [];
   s.phase = "ready";
   s.readyAt = now;
   s.readyFrame = Math.max(0, Math.round(Number(frame) || 0));
@@ -362,7 +377,21 @@ export const planReady = (s: MenuState, frame: number, now: number): Action[] =>
 export const planClose = (s: MenuState): Action[] => {
   if (s.phase === "closed") return [];
   s.phase = "closed";
+  s.deferredOpen = "";
   return [{ do: "close" }];
+};
+
+// Called every update, before the throttled tick: the open planOpen held back after a close. It waits one update after
+// the one that ran the close (the queue runs first in an update), so the engine has handled the close before the open
+// arrives. The ready timeout counts from the real open.
+export const planDeferred = (s: MenuState, now: number): Action[] => {
+  if (!s.deferredOpen) return [];
+  if (s.phase !== "opening") { s.deferredOpen = ""; return []; }
+  if (s.deferredWait > 0) { s.deferredWait--; return []; }
+  const swf = s.deferredOpen;
+  s.deferredOpen = "";
+  s.openedAt = now;
+  return [{ do: "open", swf }];
 };
 
 // Called every update. Catches the open that never arrived, which is the failure this exists to find, and
@@ -392,11 +421,17 @@ export const isNew = (s: MenuState, m: UiEvent): boolean => {
   if (m.seq > 0) {
     if (m.seq <= s.lastSeq) return false;
     s.lastSeq = m.seq;
+    // The outbox copy of a message a mod event already delivered: lib dboDispatch sends every message by both
+    // channels in the same order, so the first modFirst outbox messages are those (fmenu-freeze-1102: each panel's
+    // "ready" ran twice, its mod event copy first, and pushed the payload twice)
+    if (s.modFirst > 0) { s.modFirst--; return false; }
     return true;
   }
   // No sequence means it came by mod event. If the outbox has already delivered past this point, the
   // outbox copy wins and this is the duplicate.
-  return s.lastSeq === 0;
+  if (s.lastSeq !== 0) return false;
+  s.modFirst++;
+  return true;
 };
 
 // Escape for the panel on screen (Nat, 1 Nov: "allow us to click the Esc key for closing out the F7 and F3 panels"): the
