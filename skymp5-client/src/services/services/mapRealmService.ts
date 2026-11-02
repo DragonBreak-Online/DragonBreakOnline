@@ -1,6 +1,7 @@
 import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { sendCustomPacket, parseCustomPacket } from "./customPacketUtil";
-import { refreshFormMenu, closeWidget } from "./widgetMenuUtil";
+import { refreshFormMenu, closeWidget, readMenuKeyCode } from "./widgetMenuUtil";
+import { keyName } from "./settingsLocal";
 import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { ButtonEvent, InputDeviceType, Menu } from "skyrimPlatform";
@@ -10,7 +11,7 @@ import {
   descParts, keyAction, kindIndex, legendJson, legendReset, legendRows, legendStep, newLegendLoad, readMarkers, wantedScale,
 } from "./mapRealm";
 import {
-  ANCHORS_PER_FRAME, OWNERS_ALIVE_FRAMES, OWNERS_HOST, OWNERS_SWF, OwnersData, TOGGLE_KEY,
+  ANCHORS_PER_FRAME, OWNERS_ALIVE_FRAMES, OWNERS_HOST, OWNERS_SWF, OwnersData, TOGGLE_KEY, TOGGLE_SETTING,
   anchorClips, clipTransform, drawingOf, fitHolds, fitOf, anchorIndex, legendRow, readOwners, worldFor, Anchor, Fit, Seen,
 } from "./mapOwners";
 
@@ -30,6 +31,7 @@ export class MapRealmService extends ClientListener {
     this.controller.on("buttonEvent", (e) => this.onButton(e));
     this.controller.on("browserMessage", (e) => { if (e.arguments[0] === "mapRealm:mounted") this.mounted = true; });
     this.controller.on("update", () => this.onUpdate());
+    this.ownersKey = readMenuKeyCode(this.sp, TOGGLE_SETTING, TOGGLE_KEY);
   }
 
   private onPacket(event: ConnectionMessage<CustomPacketMessage>): void {
@@ -76,7 +78,7 @@ export class MapRealmService extends ClientListener {
   // Digits toggle a kind and R the legend, while the map is open; the map keeps its own keys, nothing is focused
   private onButton(e: ButtonEvent): void {
     if (!this.open || !e.isDown || e.device !== InputDeviceType.Keyboard) return;
-    if (e.code === TOGGLE_KEY && this.owners) {
+    if (this.ownersKey && e.code === this.ownersKey && this.owners) {
       this.ownersShown = !this.ownersShown;
       this.publish();
       return;
@@ -262,7 +264,7 @@ export class MapRealmService extends ClientListener {
   private publish(): void {
     if (!this.open) return;
     let rows = legendRows(this.labels.map((l) => (typeof l === "string" ? l : null)), this.index, this.hidden);
-    if (this.owners && this.drawnKey) rows = rows.concat([legendRow(this.ownersShown, this.worldOwners)]);
+    if (this.owners && this.drawnKey) rows = rows.concat([legendRow(this.ownersShown, this.worldOwners, keyName(this.ownersKey))]);
     if (this.legendLoad.phase === "up") {
       if (widget) { widget = null; closeWidget(this.sp, WIDGET_ID); }
       try { this.sp.Ui.invokeString(MAP_MENU, `${LEGEND_HOST}.dboData`, legendJson(this.legendShown, rows)); } catch (err) { logError(this, "map legend data failed", err); }
@@ -335,6 +337,7 @@ export class MapRealmService extends ClientListener {
   private owners: OwnersData | null = null;
   private anchors = new Map<string, Anchor>();
   private ownersShown = true;
+  private ownersKey: number = TOGGLE_KEY;
   private ownersLoad: { phase: "idle" | "loading" | "up" | "off"; frames: number } = { phase: "idle", frames: 0 };
   private drawnKey = "";
   private worldOwners = 0;

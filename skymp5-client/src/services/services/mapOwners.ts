@@ -29,7 +29,9 @@ export const LINE_ALPHA = 45;
 export const MAX_FIT_RMS = 12;
 // Markers read per frame for the fit
 export const ANCHORS_PER_FRAME = 16;
-// T, as a DirectX scan code
+// The key that shows or hides the colours while the map is open: mapColoursKeyCode in skymp5-client-settings.txt, as the
+// other hotkeys are read (0 turns it off), else T as a DirectX scan code
+export const TOGGLE_SETTING = "mapColoursKeyCode";
 export const TOGGLE_KEY = 20;
 
 export interface Territory { id: string; owner: string; zone: string; x: number; y: number }
@@ -385,5 +387,5 @@ export const anchorClips = (labels: Array<string | undefined>, index: Map<string
   return out;
 };
 
-// The legend's row for the colours (T)
-export const legendRow = (shown: boolean, owners: number) => ({ id: "territories", label: "Territory colours", key: "T", count: owners, shown });
+// The legend's row for the colours, named for the key that toggles them
+export const legendRow = (shown: boolean, owners: number, key = "T") => ({ id: "territories", label: "Territory colours", key, count: owners, shown });
