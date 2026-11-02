@@ -222,9 +222,13 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
     getFormFromFile: (id, file) => (id === 0x3c && /skyrim\.esm/i.test(file) ? { getFormID: () => 0x3c } : game0.getFormFromFile(id, file)),
   });
   sp.Ui.getBool = (m, p) => S.props[p] !== false;
-  // the map shows world (x, y) at screen (640 + x / 500, 360 - y / 500); four realm markers at known places
-  const anchorsAt = [['Bruma', 0, 0], ['Applewatch', 50000, 0], ['Sancre Tor', 0, 50000], ['Pale Pass', -40000, -30000]];
-  anchorsAt.forEach(([name, x, y]) => { const i = LABELS.indexOf(name); S.props[`_root.MarkerClips.Marker${i}._x`] = 640 + x / 500; S.props[`_root.MarkerClips.Marker${i}._y`] = 360 - y / 500; });
+  // the map as Skyrim's: a tilted camera, so the north shows smaller (w grows with y); six realm markers at known places
+  const K = 0.000004;
+  const toScreen = (x, y) => { const w = 1 + K * y; return [640 + (0.002 * x) / w, 360 - (0.002 * y) / w]; };
+  const toWorld = (u, v) => { const t = (360 - v) / 0.002; const y = t / (1 - K * t); const w = 1 + K * y; return [((u - 640) * w) / 0.002, y]; };
+  const anchorsAt = [['Bruma', 0, 0], ['Applewatch', 50000, 0], ['Sancre Tor', 0, 50000], ['Pale Pass', -40000, -30000], ['Fort Caractacus', 30000, -40000], ["Wraith's Barrow", -20000, 30000]];
+  const place = (dx) => anchorsAt.forEach(([name, x, y]) => { const i = LABELS.indexOf(name); const [u, v] = toScreen(x, y); S.props[`_root.MarkerClips.Marker${i}._x`] = u + dx; S.props[`_root.MarkerClips.Marker${i}._y`] = v; });
+  place(0);
   S.props['_root.MarkerClips._x'] = 0; S.props['_root.MarkerClips._y'] = 0;
   S.props['_root.WorldMap._mapWidth'] = 1280; S.props['_root.WorldMap._mapHeight'] = 720;
   S.props['_root.dboStageL'] = 0; S.props['_root.dboStageT'] = 0; S.props['_root.dboStageW'] = 1280; S.props['_root.dboStageH'] = 720;
@@ -234,30 +238,35 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
     factions: { 'hold-a': { name: 'A', rgb: [200, 0, 0] }, 'hold-b': { name: 'B', rgb: [0, 200, 0] } }, anchors: anchorsAt.map(([name, x, y]) => ({ name, x, y, z: 0 })), reach: 30000, fade: 45000 });
   h6.menuOpen({ name: 'MapMenu' });
   for (let i = 0; i < 70; i++) h6.update();
-  const drawn = S.invoked.filter((x) => x[0] === '_root.dboOwners');
-  ok(drawn.length === 1 && JSON.parse(drawn[0][1][0]).fills.length === 4, 'the owners are drawn once into our legend menu (two territories, two layers each)', drawn.length);
+  const owners = () => S.invoked.filter((x) => x[0] === '_root.dboOwners').map((x) => JSON.parse(x[1][0]));
+  const drawn = owners();
+  ok(drawn.length === 1 && drawn[0].fills.length === 4, 'the owners are drawn once into our legend menu (two territories, two layers each)', drawn.length);
   ok(S.props['_root.owners.layer._visible'] === true, '...the layer shown once the markers fit', S.props['_root.owners.layer._visible']);
-  // the layer's transform maps a world point to where the map shows it: world (0, 0) at 640,360, one drawing unit (64) at 64/500
-  ok(Math.abs(S.props['_root.owners.layer._x'] - 640) < 1e-6 && Math.abs(S.props['_root.owners.layer._y'] - 360) < 1e-6 && Math.abs(Math.abs(S.props['_root.owners.layer._xscale']) - (64 / 500) * 100) < 1e-6,
-    '...placed where the map shows the world, at its zoom', [S.props['_root.owners.layer._x'], S.props['_root.owners.layer._y'], S.props['_root.owners.layer._xscale']]);
-  // Nat, 2 Nov: the colours flashed. Still markers write nothing more; a frame whose fit does not hold leaves them shown
+  ok(S.props['_root.owners.layer._x'] === 0 && S.props['_root.owners.layer._xscale'] === 100 && S.props['_root.owners.layer._rotation'] === 0, '...the layer flat: the points are already where the map shows them', [S.props['_root.owners.layer._x'], S.props['_root.owners.layer._xscale']]);
+  // the border between the two holds runs along x = 25,000 on the ground; projected through the tilted camera, both its
+  // ends must land back on that line (an affine fit could not put both there)
+  const border = (d) => d.lines[0] ? [toWorld(d.lines[0].pts[0], d.lines[0].pts[1]), toWorld(d.lines[0].pts[2], d.lines[0].pts[3])] : [];
+  const b0 = drawn[0] ? border(drawn[0]) : [];
+  ok(b0.length === 2 && b0.every(([x]) => Math.abs(x - 25000) < 60) && Math.abs(b0[0][1] - b0[1][1]) > 10000, '...the border drawn where the tilted map shows it, at both ends', b0);
+  // Nat, 2 Nov: the colours flashed, then shook. A still map sends nothing more and writes nothing to the layer
   const layerWrites = [];
   const setBool0 = sp.Ui.setBool, setFloat0 = sp.Ui.setFloat;
   sp.Ui.setBool = (m, p, v) => { if (p.startsWith('_root.owners.layer')) layerWrites.push([p, v]); setBool0(m, p, v); };
   sp.Ui.setFloat = (m, p, v) => { if (p.startsWith('_root.owners.layer')) layerWrites.push([p, v]); setFloat0(m, p, v); };
   for (let i = 0; i < 30; i++) h6.update();
-  ok(!layerWrites.length, 'the map still: the layer is not written again, frame after frame (no flashing)', layerWrites.slice(0, 4));
+  ok(!layerWrites.length && owners().length === 1, 'the map still: nothing redrawn or written, frame after frame (no flashing, no shaking)', [layerWrites.slice(0, 4), owners().length]);
   const pale = LABELS.indexOf('Pale Pass');
   const paleX = S.props[`_root.MarkerClips.Marker${pale}._x`];
   S.props[`_root.MarkerClips.Marker${pale}._x`] = paleX + 400;
   for (let i = 0; i < 10; i++) h6.update();
-  ok(!layerWrites.some(([p, v]) => /_visible$/.test(p) && v === false) && S.props['_root.owners.layer._visible'] === true, 'frames whose fit does not hold keep the colours shown where they were', layerWrites.slice(0, 4));
+  ok(owners().length === 1 && !layerWrites.some(([p, v]) => /_visible$/.test(p) && v === false) && S.props['_root.owners.layer._visible'] === true, 'frames whose fit does not hold keep the colours shown where they were', [owners().length, layerWrites.slice(0, 4)]);
   S.props[`_root.MarkerClips.Marker${pale}._x`] = paleX;
-  anchorsAt.forEach(([name]) => { const i = LABELS.indexOf(name); S.props[`_root.MarkerClips.Marker${i}._x`] += 100; });
+  place(100);
   for (let i = 0; i < 5; i++) h6.update();
-  ok(Math.abs(S.props['_root.owners.layer._x'] - 740) < 1e-6, 'a pan moves the layer with the markers', S.props['_root.owners.layer._x']);
-  anchorsAt.forEach(([name]) => { const i = LABELS.indexOf(name); S.props[`_root.MarkerClips.Marker${i}._x`] -= 100; });
-  h6.update();
+  const panned = owners();
+  ok(panned.length >= 2 && Math.abs(panned[panned.length - 1].lines[0].pts[0] - drawn[0].lines[0].pts[0] - 100) < 1, 'a pan redraws the colours moved with the markers', [panned.length, panned.length ? panned[panned.length - 1].lines[0].pts.slice(0, 2) : null]);
+  place(0);
+  h6.update(); h6.update(); h6.update();
   sp.Ui.setBool = setBool0; sp.Ui.setFloat = setFloat0;
   const legendRows = S.legendData.length ? S.legendData[S.legendData.length - 1].rows : [];
   ok(legendRows.some((r) => r.id === 'territories' && r.key === 'T' && r.count === 2), 'the legend gets the colours\' row, T and two owners', legendRows);
@@ -280,7 +289,7 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   S.packets.length = 0;
   h6.menuClose({ name: 'MapMenu' });
   const fl = ((S.packets.find((p) => p.event === 'mapSwf') || { args: [{}] }).args[0] || {}).flash || {};
-  ok(fl.held > 0 && fl.noFit >= 10 && fl.failed === 0 && fl.flips === 0 && fl.shown === 2 && fl.hidden === 1 && fl.redraws === 2 && fl.closes.length === 1 && fl.moves >= 2 && fl.maxStep._x >= 99 && fl.signFlips === 0 && typeof fl.seconds === 'number',
+  ok(fl.held > 0 && fl.failed + fl.noFit >= 10 && fl.shown === 2 && fl.hidden === 1 && fl.redraws === 2 && fl.closes.length === 1 && fl.moves >= 3 && fl.maxStep.px >= 99 && typeof fl.seconds === 'number',
     'the mapSwf line counts what could flash: fits held, failed or short of markers and their flips, the layer shown and hidden, moves and the largest step, redraws, our menu closed', fl);
   // Esc, and the map closing before the tap: nothing tapped (a Tab with no map open would open the tween menu)
   S.taps = []; S.custom = []; S.customOpen = false;
