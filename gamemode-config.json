@@ -245,6 +245,8 @@
    "requireList": false,
    "teacherGuilds": ["synod", "college-of-winterhold", "college-of-whispers", "house-telvanni"],
    "teacherRoles": ["leader", "officer"],
+   "_lecternCells": "An interior cell given to one house (a college or a teacherGuilds faction): its lectern names that house, and only its leader and officers hold a class there. Riften's Honorhall Orphanage to House Telvanni (map-0596, 2 Nov); staff set the ClassLectern box 15e4b7 there with F7.",
+   "lecternCells": {"16bd3:Skyrim.esm": "house-telvanni"},
    "units": 25,
    "wheelEvents": 8,
    "maxStudents": 12,

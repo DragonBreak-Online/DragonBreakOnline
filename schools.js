@@ -161,6 +161,9 @@ module.exports = (api) => {
       teacherCooldownMinutes: 60, studentCooldownHours: 12, teacherMinRank: 3, requireList: false, teacherGuilds: ['synod', 'college-of-winterhold', 'college-of-whispers'], teacherRoles: ['leader', 'officer'],
       // Any college (guild-defs.json "college": true) as well as the teacherGuilds named (Swag, 17 Oct)
       collegeGuilds: true,
+      // An interior cell given to one house: { '<cell desc>': '<faction id>' }, a college or a teacherGuilds faction. A lectern
+      // there names that house, and only its leader and officers hold a class there (map-0596, 2 Nov)
+      lecternCells: {},
       units: 25, wheelEvents: 8, wheelValue: 150, maxStudents: 12,
       // Fixed school LEVELS rather than a flat parcel of units (Nate, 18 Oct). levelsByRank is read by the STUDENT's own
       // rank, not the class's: a Novice gains 10 levels of the school, a Master 2. A class one rank either way gives
@@ -1850,8 +1853,22 @@ module.exports = (api) => {
     return { open: openPanel, tick, listed, forget: (a) => open.delete(a >>> 0), runs };
   };
 
-  // Which house a lectern belongs to: the faction whose hall the player stands in (guilds.js), the Synod by default
+  // The house a lectern's cell is given to (classes.lecternCells), { id, name } or null
+  const assignedHouse = (a) => {
+    const map = C.classes.lecternCells && typeof C.classes.lecternCells === 'object' ? C.classes.lecternCells : {};
+    let cell = ''; try { cell = String(mp.get(a, 'worldOrCellDesc') || '').toLowerCase(); } catch (e) { return null; }
+    const key = cell && Object.keys(map).find((k) => k.toLowerCase() === cell);
+    if (!key) return null;
+    const id = String(map[key]);
+    if (!isCollege(id) && !(C.classes.teacherGuilds || []).includes(id)) return null;
+    let info = null; try { info = typeof globalThis.__dboGuildInfo === 'function' ? globalThis.__dboGuildInfo(id) : null; } catch (e) { info = null; }
+    return { id, name: String((info && info.name) || id) };
+  };
+  // Which house a lectern belongs to: the house its cell is given to, else the faction whose hall the player stands in
+  // (guilds.js), the Synod by default
   const schoolHouse = (a) => {
+    const given = assignedHouse(a);
+    if (given) return /^(the|house) /i.test(given.name) ? given.name : `the ${given.name}`;
     let h = null; try { h = typeof globalThis.__dboHallFactionAt === 'function' ? globalThis.__dboHallFactionAt(mp.get(a, 'worldOrCellDesc')) : null; } catch (e) { h = null; }
     return h && h.name ? `the ${h.name.replace(/^the /i, '')}` : 'the Synod';
   };
@@ -1930,7 +1947,12 @@ module.exports = (api) => {
   const classQualified = (a) => {
     const named = Array.isArray(C.classes.teacherGuilds) ? C.classes.teacherGuilds : [];
     const colleges = C.classes.collegeGuilds !== false;
-    const inList = (g) => named.includes(g) || (colleges && isCollege(g));
+    const given = assignedHouse(a);
+    if (given) {
+      const roles = Array.isArray(C.classes.teacherRoles) ? C.classes.teacherRoles : [];
+      if (!guildRolesOf(a).some((m) => m.id === given.id && (!roles.length || roles.includes(m.role)))) return `This lectern belongs to ${schoolHouse(a)}: a class here is held by its leader or an officer.`;
+    }
+    const inList = (g) => (given ? g === given.id : named.includes(g) || (colleges && isCollege(g)));
     const gated = named.length > 0 || colleges;
     if (gated && !guildsOf(a).some(inList)) return `A class here is held by a member of ${schoolHouse(a)}, or of another college.`;
     // Their college's leader and officers teach; staff name nobody (Nate, 13 Oct)
