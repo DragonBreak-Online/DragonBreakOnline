@@ -59,7 +59,8 @@ const events = {
 // Requests the front may send through admin::request; everything else is refused here
 const PANEL_REQUESTS = new Set(["adminItemsRequest", "adminMasteryRequest", "adminLocationsRequest", "adminPlaceablesRequest",
   "adminPlacementsRequest", "adminPlacementRemove", "adminPlacementGoto", "adminPlaceMeta", "adminPlaceSearch", "adminPlaceUndo",
-  "adminPlaceSets", "adminPlaceSetSave", "adminPlaceSetPlace", "adminPlaceSetDelete", "adminPlaceGroupClear", "adminWarband", "adminRaid", "adminWarbandView"]);
+  "adminPlaceSets", "adminPlaceSetSave", "adminPlaceSetPlace", "adminPlaceSetDelete", "adminPlaceGroupClear", "adminWarband", "adminRaid", "adminWarbandView",
+  "adminClearInventory"]);
 
 interface DebugServer {
   name: string;
@@ -551,6 +552,8 @@ export class AdminMenuService extends ClientListener {
         adminWarband: ["warband", ["text"]],
         adminRaid: ["raid", ["text"]],
         adminWarbandView: ["warbandView", []],
+        // The Debug tab's Clear my inventory (gamemode.js clearOwnInventory: the staff member's own, a second press confirms)
+        adminClearInventory: ["clearInventory", []],
       };
       if (PLACE_EVENTS[type]) {
         let f: Record<string, unknown> = {};

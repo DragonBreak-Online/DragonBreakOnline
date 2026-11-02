@@ -481,6 +481,12 @@ const AdminPanel = ({ data }: { data: AdminPanelData }) => {
                 ))
               )}
             </div>
+            {data.admin && !trial && ev.request ? (
+              <div className="admin-panel__actions">
+                {/* The server clears the staff member's own inventory, worn items and keys aside, on a second press within 5 s */}
+                <Button text="Clear my inventory" width={220} height={32} onClick={() => send(ev.request, 'adminClearInventory', '{}')} />
+              </div>
+            ) : null}
           </div>
         ) : null}
 
