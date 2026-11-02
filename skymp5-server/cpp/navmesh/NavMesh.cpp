@@ -367,7 +367,7 @@ NavWorld::NavWorld(float tileSize_, int maxTiles, int maxPolys, bool interior_)
 
 NavWorld::~NavWorld()
 {
-  dtFreeNavMeshQuery(query);
+  dtFreeNavMeshQuery(lazyQuery);
   dtFreeNavMesh(mesh);
 }
 
@@ -379,14 +379,14 @@ bool NavWorld::IsValid() const
 // The query's node pool is made on first use, so a thousand loaded interiors cost nothing until one is searched
 dtNavMeshQuery* NavWorld::Query()
 {
-  if (!query && mesh) {
-    query = dtAllocNavMeshQuery();
-    if (query && dtStatusFailed(query->init(mesh, 4096))) {
-      dtFreeNavMeshQuery(query);
-      query = nullptr;
+  if (!lazyQuery && mesh) {
+    lazyQuery = dtAllocNavMeshQuery();
+    if (lazyQuery && dtStatusFailed(lazyQuery->init(mesh, 4096))) {
+      dtFreeNavMeshQuery(lazyQuery);
+      lazyQuery = nullptr;
     }
   }
-  return query;
+  return lazyQuery;
 }
 
 bool NavWorld::AddTile(const std::vector<uint8_t>& data, std::string* error)

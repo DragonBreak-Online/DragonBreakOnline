@@ -27,7 +27,7 @@
    "links": 0,
    "doorTris": []
   },
-  "bytes": 456
+  "bytes": 460
  },
  "multi-mesh-tile.dbonav": {
   "worldspace": "test.esm:00003c",
@@ -51,7 +51,7 @@
    ]
   },
   "note": "no two meshes share a vertex: a weld must join nothing",
-  "bytes": 832
+  "bytes": 844
  },
  "interior.dbonav": {
   "worldspace": "interiors",
@@ -74,7 +74,7 @@
     3.0
    ]
   },
-  "bytes": 456
+  "bytes": 460
  },
  "doors.dbonav": {
   "worldspace": "test.esm:00003c",
@@ -91,7 +91,37 @@
    ]
   },
   "note": "triangle 0 flags 0x0800 is not a door; triangle 1 flags 0x0C00 is",
-  "bytes": 456
+  "bytes": 460
+ },
+ "door-links.dbonav": {
+  "worldspace": "test.esm:00003c",
+  "tiles": 1,
+  "meshes": 1,
+  "dropped": 0,
+  "mesh0": {
+   "desc": "test.esm:000035",
+   "verts": 4,
+   "tris": 2,
+   "links": 0,
+   "doorTris": [
+    0,
+    1
+   ],
+   "doorLinks": [
+    {
+     "triangle": 0,
+     "unknown": 195948557,
+     "doorDesc": "test.esm:00c4d9"
+    },
+    {
+     "triangle": 1,
+     "unknown": 0,
+     "doorDesc": "a long plugin name for the desc field.esp:0abcde"
+    }
+   ]
+  },
+  "note": "both triangles are doors; each door link names a different door, and one desc is long",
+  "bytes": 668
  },
  "linked-pair.dbonav": {
   "worldspace": "test.esm:00003c",
@@ -121,7 +151,7 @@
    }
   },
   "note": "targetMesh is a flat index over all tiles in order; dropped=3 is header-only",
-  "bytes": 800
+  "bytes": 808
  },
  "empty-mesh.dbonav": {
   "worldspace": "test.esm:00003c",
@@ -151,7 +181,7 @@
    "links": 0,
    "doorTris": []
   },
-  "bytes": 376
+  "bytes": 380
  },
  "extreme-cells.dbonav": {
   "worldspace": "test.esm:00003c",
@@ -171,7 +201,7 @@
    "meshes": 1
   },
   "note": "negative cell coordinates are signed i32, not unsigned",
-  "bytes": 776
+  "bytes": 784
  },
  "_mustRefuse": {
   "bad-magic.dbonav": {
@@ -182,7 +212,7 @@
   "bad-version.dbonav": {
    "mustRefuse": true,
    "pythonRefused": true,
-   "why": "version 3, expected 2"
+   "why": "version 4, expected 3"
   },
   "truncated.dbonav": {
    "mustRefuse": true,

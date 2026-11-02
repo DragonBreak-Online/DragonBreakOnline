@@ -11,10 +11,10 @@ using namespace navmesh;
 namespace {
 
 constexpr float kS = 4096.f;
-constexpr uint32_t kFileVersion = 2;
+constexpr uint32_t kFileVersion = 3;
 constexpr size_t kDesc = 96;
 
-// A test-side DBONAV v2 writer, so the reader is checked against the layout and not against itself
+// A test-side DBONAV v3 writer, so the reader is checked against the layout and not against itself
 class Writer
 {
 public:
@@ -51,6 +51,7 @@ struct SynthMesh
   std::vector<Vec3> verts;
   std::vector<std::array<uint16_t, 8>> tris;
   std::vector<DboNavLink> links;
+  std::vector<DboNavDoorLink> doors;
 };
 
 struct SynthTile
@@ -91,6 +92,7 @@ std::vector<uint8_t> Write(const std::string& world,
       w.U32(static_cast<uint32_t>(m.verts.size()));
       w.U32(static_cast<uint32_t>(m.tris.size()));
       w.U32(static_cast<uint32_t>(m.links.size()));
+      w.U32(static_cast<uint32_t>(m.doors.size()));
       for (const auto& v : m.verts) {
         w.F32(v.x);
         w.F32(v.y);
@@ -106,6 +108,12 @@ std::vector<uint8_t> Write(const std::string& world,
         w.U32(l.targetMesh);
         w.U16(l.targetTri);
         w.U16(0);
+      }
+      for (const auto& d : m.doors) {
+        w.U16(d.triangle);
+        w.U16(0);
+        w.U32(d.unknown);
+        w.Text(d.doorDesc, kDesc);
       }
     }
   }
@@ -280,6 +288,19 @@ TEST_CASE("DboNav: W3's fixtures read as its manifest says", "[DboNav]")
   // An empty cell builds nothing, with a reason, and does not crash
   REQUIRE_FALSE(BuildTile(ToTileInput(f.tiles[0], false), built, &error));
 
+  REQUIRE(ReadFixture("door-links.dbonav", f, &error));
+  const auto& dm = f.tiles[0].meshes[0];
+  REQUIRE(dm.desc == "test.esm:000035");
+  REQUIRE(dm.doorLinks.size() == 2);
+  REQUIRE(dm.doorLinks[0].triangle == 0);
+  REQUIRE(dm.doorLinks[0].unknown == 0x0BADF00Du);
+  REQUIRE(dm.doorLinks[0].doorDesc == "test.esm:00c4d9");
+  REQUIRE(dm.doorLinks[1].triangle == 1);
+  REQUIRE(dm.doorLinks[1].unknown == 0);
+  REQUIRE(dm.doorLinks[1].doorDesc == "a long plugin name for the desc field.esp:0abcde");
+  REQUIRE(ToTileInput(f.tiles[0], false).flags ==
+          std::vector<uint16_t>{ kPolyWalk | kPolyDoor, kPolyWalk | kPolyDoor });
+
   REQUIRE(ReadFixture("extreme-cells.dbonav", f, &error));
   REQUIRE((f.tiles[0].cellX == -48 && f.tiles[0].cellY == -34));
   REQUIRE((f.tiles[1].cellX == 52 && f.tiles[1].cellY == 45));
@@ -403,6 +424,17 @@ TEST_CASE("DboNav: a damaged file is refused with a reason", "[DboNav]")
   const auto link = Write("w", { Tile(0, 0, { badLink }) });
   REQUIRE_FALSE(ReadDboNav(link.data(), link.size(), file, &error));
   REQUIRE(error.find("missing mesh") != std::string::npos);
+
+  auto badDoor = SquareMesh(0, 0, "a");
+  badDoor.doors = { { 2, 0, "w.esp:000099" } };
+  const auto door = Write("w", { Tile(0, 0, { badDoor }) });
+  REQUIRE_FALSE(ReadDboNav(door.data(), door.size(), file, &error));
+  REQUIRE(error.find("missing triangle") != std::string::npos);
+  badDoor.doors = { { 1, 7, "w.esp:000099" } };
+  const auto goodDoor = Write("w", { Tile(0, 0, { badDoor }) });
+  REQUIRE(ReadDboNav(goodDoor.data(), goodDoor.size(), file, &error));
+  REQUIRE((file.tiles[0].meshes[0].doorLinks.size() == 1 &&
+           file.tiles[0].meshes[0].doorLinks[0].doorDesc == "w.esp:000099"));
 
   auto badVert = SquareMesh(0, 0, "a");
   badVert.tris[0][2] = 9;

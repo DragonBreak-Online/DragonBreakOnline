@@ -79,7 +79,7 @@ private:
   float tileSize;
   bool interior;
   dtNavMesh* mesh = nullptr;
-  dtNavMeshQuery* query = nullptr;
+  dtNavMeshQuery* lazyQuery = nullptr;
 };
 
 }

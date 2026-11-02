@@ -6,7 +6,7 @@ namespace navmesh {
 namespace {
 
 constexpr char kMagic[8] = { 'D', 'B', 'O', 'N', 'A', 'V', 0, 0 };
-constexpr uint32_t kVersion = 2;
+constexpr uint32_t kVersion = 3;
 constexpr size_t kDescLen = 96;
 constexpr uint16_t kDoorBit = 0x0400;
 
@@ -131,7 +131,7 @@ bool ReadDboNav(const uint8_t* data, size_t size, DboNavFile& out,
 
   uint32_t meshesSeen = 0;
   constexpr size_t kTileHeader = 4 + 4 + kDescLen + 24 + 4;
-  constexpr size_t kMeshHeader = kDescLen + 12;
+  constexpr size_t kMeshHeader = kDescLen + 16;
   if (!r.Fits(tiles, kTileHeader)) {
     return Fail(error, "DBONAV tile count is larger than the file");
   }
@@ -147,12 +147,14 @@ bool ReadDboNav(const uint8_t* data, size_t size, DboNavFile& out,
     }
     tile.meshes.resize(meshes);
     for (auto& mesh : tile.meshes) {
-      uint32_t verts = 0, tris = 0, links = 0;
+      uint32_t verts = 0, tris = 0, links = 0, doors = 0;
       if (!r.Text(mesh.desc, kDescLen) || !r.U32(verts) || !r.U32(tris) ||
-          !r.U32(links)) {
+          !r.U32(links) || !r.U32(doors)) {
         return Fail(error, "DBONAV mesh is truncated");
       }
-      if (!r.Fits(static_cast<uint64_t>(verts) * 12 + tris * 16ull + links * 12ull, 1)) {
+      if (!r.Fits(static_cast<uint64_t>(verts) * 12 + tris * 16ull + links * 12ull +
+                    doors * (8ull + kDescLen),
+                  1)) {
         return Fail(error, "DBONAV mesh is truncated");
       }
       mesh.vertices.resize(verts);
@@ -177,6 +179,17 @@ bool ReadDboNav(const uint8_t* data, size_t size, DboNavFile& out,
         r.U32(l.targetMesh);
         r.U16(l.targetTri);
         r.U16(pad);
+      }
+      mesh.doorLinks.resize(doors);
+      for (auto& d : mesh.doorLinks) {
+        uint16_t pad = 0;
+        r.U16(d.triangle);
+        r.U16(pad);
+        r.U32(d.unknown);
+        r.Text(d.doorDesc, kDescLen);
+        if (d.triangle >= tris) {
+          return Fail(error, "a door link names a missing triangle in " + mesh.desc);
+        }
       }
       ++meshesSeen;
     }
