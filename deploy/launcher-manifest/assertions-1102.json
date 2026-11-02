@@ -1,0 +1,39 @@
+{
+ "baseManifest": "62871f7462f1ed418b20d1b1ae56f88a1a661cfd8512a5b52bea4f6f152133dc",
+ "baseModlist": "a35742ec06520961db77df232732efb08009af6ee361cf31aaf410e1a1ea6f27",
+ "newManifest": "a9ad60df36bf56e4a3ede56a052cfb38ba5a2f13be8354613fec6e0ab437a8da",
+ "newModlist": "fe87b5e83d890448f56c0385c4d42cd78d385fa4032c43ac4af99d23e23ce13f",
+ "mods": 171,
+ "archives": 172,
+ "plugins": 141,
+ "order": 171,
+ "modlist": 171,
+ "addedPlugins": [
+  "*mihaildeadrapack.esp",
+  "*mihailicetitansandseagiants.esp",
+  "*mihailskeletalrevenants.esp",
+  "*mihailgrahlsandfrostgiants.esp",
+  "*mihailgiantfamily.esp",
+  "*mihailundeadsnowelf.esp",
+  "*mihailvampirelordsandbeasts.esp",
+  "*mihailfleshatronach.esp",
+  "*mihailnordicsentinel.esp",
+  "*mihailhiveguardians.esp",
+  "*mihailelementalgolems.esp",
+  "*1FleshColossus.esp"
+ ],
+ "addedArchiveIds": [
+  "a164",
+  "a165",
+  "a166",
+  "a167",
+  "a168",
+  "a169",
+  "a170",
+  "a171",
+  "a172",
+  "a173",
+  "a174",
+  "a175"
+ ]
+}
