@@ -79,7 +79,7 @@ const heading = (t) => [90, 0, 270, 180][Math.floor(((t * WALK) % (4 * SIDE)) / 
 
 let runs = 0;
 const run = (M, hz, opts) => {
-  const o = Object.assign({ seconds: 20, isNpc: true, pauseAt: -1, pauseFor: 0 }, opts || {});
+  const o = Object.assign({ seconds: 20, isNpc: true, pauseAt: -1, pauseFor: 0, stallAt: -1, stallFor: 0 }, opts || {});
   const FPS = 60, dt = 1 / FPS;
   let clock = 1000000;
   const realNow = Date.now; Date.now = () => clock;
@@ -92,7 +92,10 @@ const run = (M, hz, opts) => {
     for (let i = 0; i < o.seconds * FPS; i++) {
       const t = i * dt;
       const paused = o.pauseAt >= 0 && t >= o.pauseAt && t < o.pauseAt + o.pauseFor;
-      if (t >= nextPacket - 1e-9 && !paused) {
+      // a stall: the NPC walks on, its packets are lost
+      const stalled = o.stallAt >= 0 && t >= o.stallAt && t < o.stallAt + o.stallFor;
+      if (t >= nextPacket - 1e-9 && stalled) nextPacket += 1 / hz;
+      if (t >= nextPacket - 1e-9 && !paused && !stalled) {
         const tt = o.pauseAt >= 0 && t >= o.pauseAt + o.pauseFor ? t - o.pauseFor : t;
         M.applyMovement(copy, { worldOrCell: 0x3c, pos: truePos(tt), rot: [0, 0, heading(tt)], runMode: 'Walking', direction: 0, speed: WALK,
           isInJumpState: false, isSneaking: false, isBlocking: false, isWeapDrawn: false, isDead: false, healthPercentage: 1 }, false, o.isNpc);
@@ -117,6 +120,45 @@ const run = (M, hz, opts) => {
     lag: Math.round(lagSum / Math.max(1, frames)), playbackS: Math.round(st.playbackS * 1000) / 1000 };
 };
 
+// The first mover is a guard who stands at each marker (Bruma's courtyard: 133 s of standing over five markers; W4,
+// 2 Nov): walk 10 s, stand 40 s, walk on. While it stands the server either keeps sending standing packets, or says
+// nothing and formView applies the last movement as standing every 2 s, or sends standing packets once a second ('sparse'). A long stand must not read as a slow stream, or
+// the guard sets off at a crawl. Measured: the lag over the 2 s after it sets off, and the playback time then
+const guardRun = (M, hz, mode) => {
+  const silent = mode === 'silent', sparse = mode === 'sparse';
+  // 40.9 s: the stand ends out of step with formView's 2 s refresh, so the gap before the first step is over a second
+  const FPS = 60, dt = 1 / FPS, STAND_AT = 10, STAND_FOR = 40.9, END = 64;
+  let clock = 1000000;
+  const realNow = Date.now; Date.now = () => clock;
+  globalThis.__pb = { player: makeCopy(7) };
+  const copy = makeCopy(0xff000a00 + (++runs));
+  const walkT = (t) => (t < STAND_AT ? t : t < STAND_AT + STAND_FOR ? STAND_AT : t - STAND_FOR);
+  const standing = (t) => t >= STAND_AT && t < STAND_AT + STAND_FOR;
+  copy.pos = truePos(0);
+  let nextPacket = 0, nextSparse = STAND_AT, lastApply = -1e9, afterLag = 0, afterFrames = 0, steadyLag = 0, steadyFrames = 0, playbackAfter = 0;
+  const mv = (t, stand) => ({ worldOrCell: 0x3c, pos: truePos(walkT(t)), rot: [0, 0, heading(walkT(t))], runMode: stand ? 'Standing' : 'Walking', direction: 0,
+    speed: stand ? 0 : WALK, isInJumpState: false, isSneaking: false, isBlocking: false, isWeapDrawn: false, isDead: false, healthPercentage: 1 });
+  try {
+    for (let i = 0; i < END * FPS; i++) {
+      const t = i * dt;
+      if (t >= nextPacket - 1e-9) {
+        nextPacket += 1 / hz;
+        if (!((silent || sparse) && standing(t))) { M.applyMovement(copy, mv(t, standing(t)), false, true); lastApply = t; }
+      }
+      if (sparse && standing(t) && t >= nextSparse - 1e-9) { nextSparse += 1; M.applyMovement(copy, mv(t, true), false, true); lastApply = t; }
+      // formView: no new movement for 2 s, the last one applied as standing
+      if (silent && standing(t) && t - lastApply >= 2) { M.applyMovement(copy, mv(t, true), false, true); lastApply = t; }
+      copy.frame(dt);
+      clock += 1000 / FPS;
+      const lag = Math.hypot(copy.pos[0] - truePos(walkT(t))[0], copy.pos[1] - truePos(walkT(t))[1]);
+      if (t > 3 && t < STAND_AT) { steadyLag += lag; steadyFrames++; }
+      if (t >= STAND_AT + STAND_FOR && t < STAND_AT + STAND_FOR + 2) { afterLag += lag; afterFrames++; }
+      if (Math.abs(t - (STAND_AT + STAND_FOR + 0.6)) < dt / 2) playbackAfter = M.getApplyState(copy.getFormID()).playbackS;
+    }
+  } finally { Date.now = realNow; }
+  return { hz, mode, steady: Math.round(steadyLag / steadyFrames), after: Math.round(afterLag / afterFrames), playbackAfter: Math.round(playbackAfter * 1000) / 1000 };
+};
+
 const PER_FRAME = WALK / 60; // 2 units a frame at walking pace
 const checksOf = (M, c, report) => {
   const r2 = run(M, 2), r4 = run(M, 4), r10 = run(M, 10), r30 = run(M, 30);
@@ -127,6 +169,16 @@ const checksOf = (M, c, report) => {
   c('a stream of 7.7 a second or more plays back as before: 0.13 s', r30.playbackS === 0.13 && r30.stand < 0.05, r30);
   const paused = run(M, 2, { pauseAt: 8, pauseFor: 3 });
   c('after a 3 s pause the first move is not a crawl: the playback never passes 0.6 s', paused.playbackS <= 0.6 && paused.maxJump <= PER_FRAME * 1.6 * 1.25, paused);
+  for (const mode of ['standing', 'silent', 'sparse']) {
+    const g4 = guardRun(M, 4, mode), g10 = guardRun(M, 10, mode);
+    if (report) for (const g of [g4, g10]) console.log(`     guard ${g.hz} Hz, ${mode} while it stands: ${g.steady} behind walking, ${g.after} behind in the 2 s after a 40 s stand, playback then ${g.playbackAfter} s`);
+    c(`a guard who stood 40 s (${mode} meanwhile) sets off at its own pace: no further behind than walking (+25%), playback at its stream's gap`,
+      g4.after <= g4.steady * 1.25 + 4 && g10.after <= g10.steady * 1.25 + 4 && g4.playbackAfter <= 0.26 && g10.playbackAfter <= 0.131, [g4, g10]);
+  }
+  // A stall: a walking stream at 4 a second loses 1.5 s of packets mid-walk (a network hiccup); one late packet must not
+  // slow the playback that follows
+  const stall = run(M, 4, { stallAt: 6, stallFor: 1.5, seconds: 8.1 });
+  c('one late packet after a 1.5 s stall does not slow the walk after it: playback stays at the stream\'s 0.25 s', stall.playbackS <= 0.26, stall);
   const player = run(M, 2, { isNpc: false });
   c('a player copy is untouched: no playback time is kept for it', player.playbackS === 0, player);
   const s = M.nextPlayback;
@@ -141,6 +193,9 @@ const checksOf = (M, c, report) => {
     ['the fixed 0.13 s of before', '    time = s.playbackS;\n', '    time = NPC_PLAYBACK_S;\n'],
     ['no upper clamp', 'const clamp = (v: number): number => Math.min(NPC_PLAYBACK_MAX_S, Math.max(NPC_PLAYBACK_S, v));', 'const clamp = (v: number): number => Math.max(NPC_PLAYBACK_S, v);'],
     ['no lower clamp (a fast stream changes)', 'const clamp = (v: number): number => Math.min(NPC_PLAYBACK_MAX_S, Math.max(NPC_PLAYBACK_S, v));', 'const clamp = (v: number): number => Math.min(NPC_PLAYBACK_MAX_S, v);'],
+    ['a stand counts as a slow stream', 'moving && s.moving && gap <= PLAYBACK_GAP_MAX_MS ? gap : 0', 'gap <= PLAYBACK_GAP_MAX_MS ? gap : 0'],
+    ['the gap across a stand counts', 'moving && s.moving && gap <= PLAYBACK_GAP_MAX_MS ? gap : 0', 'moving && gap <= PLAYBACK_GAP_MAX_MS ? gap : 0'],
+    ['a long gap counts as a slow stream', 'moving && s.moving && gap <= PLAYBACK_GAP_MAX_MS ? gap : 0', 'moving && s.moving ? gap : 0'],
     ['players played back too', '  if (isNpc) {\n    const s = stateOf(refr.getFormID());', '  if (true) {\n    const s = stateOf(refr.getFormID());'],
   ];
   for (let i = 0; i < MUTANTS.length; i++) {
