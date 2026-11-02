@@ -83,7 +83,12 @@ export const staggerDelayMs = (order: number, id: number): number => Math.floor(
 // between fighting and following.
 export const LEASH_OUT_UNITS = 1800;
 export const LEASH_BACK_UNITS = 1200;
-export const leashStep = (leashed: boolean, distance: number): boolean => (leashed ? distance >= LEASH_BACK_UNITS : distance > LEASH_OUT_UNITS);
+// Indoors a fight 1800 away is rooms behind its owner
+export const LEASH_OUT_INTERIOR_UNITS = 1000;
+export const LEASH_BACK_INTERIOR_UNITS = 600;
+export const leashStep = (leashed: boolean, distance: number, interior = false): boolean => leashed
+  ? distance >= (interior ? LEASH_BACK_INTERIOR_UNITS : LEASH_BACK_UNITS)
+  : distance > (interior ? LEASH_OUT_INTERIOR_UNITS : LEASH_OUT_UNITS);
 // A bow, crossbow, staff or spell in either hand (skyrimPlatform EquippedItemType: Bow 7, Staff 8, Spell 9, Crossbow 12)
 export const RANGED_ITEM_TYPES = [7, 8, 9, 12];
 export const isRangedHands = (right: number, left: number): boolean => RANGED_ITEM_TYPES.includes(right) || RANGED_ITEM_TYPES.includes(left);

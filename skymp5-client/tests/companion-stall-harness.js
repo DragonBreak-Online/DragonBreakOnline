@@ -47,9 +47,14 @@ function run(m) {
   const walker = { pos: (t) => [t / 20, 0, 0], health: () => 1, toTarget: (t) => 2000 - t / 20 };
   check('a companion walking to its target never stalls', drive(m, 25000, walker).actions.length === 0);
 
-  const late = { pos: (t) => (t < 9000 ? [0, 0, 0] : [(t - 9000) / 20, 0, 0]), health: () => 1, toTarget: () => 800 };
+  const late = { pos: (t) => (t < 9000 ? [0, 0, 0] : [(t - 9000) / 20, 0, 0]), health: () => 1, toTarget: (t) => (t < 9000 ? 800 : 800 - (t - 9000) / 20) };
   const l = drive(m, 20000, late);
-  check('a restart that gets it moving is not followed by giving up', l.actions.length === 1 && l.actions[0][1] === 'restart', l.actions);
+  check('a restart that gets it closing on its target is not followed by giving up', l.actions.length === 1 && l.actions[0][1] === 'restart', l.actions);
+
+  // The Draugr Scourge of 2 Nov 22:12, Cragslane Cavern: 1169 from its target, stepping 70 units every 5 s, its target untouched
+  const shuffler = { pos: (t) => [70 * Math.floor(t / 5000), 0, 0], health: () => 1, toTarget: () => 1169 };
+  const s = drive(m, 40000, shuffler);
+  check('a companion shuffling far from its target still restarts, then gives the order up', s.actions.some((a) => a[1] === 'restart') && s.actions.some((a) => a[1] === 'drop'), s.actions);
 
   const first = drive(m, 5000, wolf);
   const other = m.fightStallStep(first.stall, 1e6 + 5250, 0x9999, wolf.pos(0), 1, 700);

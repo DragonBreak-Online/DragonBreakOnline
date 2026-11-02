@@ -66,6 +66,10 @@ check('back within 1200: free to fight again', m.leashStep(true, 1199) === false
 let leashed = false, flips = 0;
 for (let i = 0; i < 40; i++) { const dist = 1800 + 100 * Math.sin(i); const n = m.leashStep(leashed, dist); if (n !== leashed) flips++; leashed = n; }
 check('at the edge of a fight (1700-1900) the state flips at most once', flips <= 1, flips);
+// Indoors: the 2 Nov Cragslane Cavern summon was 1620 from its owner and still fighting
+check('indoors past 1000: leashed', m.leashStep(false, 1001, true) === true && m.leashStep(false, 1620, true) === true);
+check('indoors at 900: not leashed', m.leashStep(false, 900, true) === false);
+check('indoors leashed at 700: still leashed; within 600: free again', m.leashStep(true, 700, true) === true && m.leashStep(true, 599, true) === false);
 
 // ---- ranged hands ------------------------------------------------------------------------------------------------------
 check('a bow, a staff, a spell or a crossbow in either hand is ranged', m.isRangedHands(7, 0) && m.isRangedHands(0, 8) && m.isRangedHands(9, 10) && m.isRangedHands(0, 12));
@@ -78,6 +82,9 @@ check('...acts on the staggered order, and reports the server\'s', /const c = th
 check('...keeps its jittered offset with its own radii', /keepOffsetFromActor\(player, ox \+ j\.dx, oy \+ j\.dy, 0, 0, 0, angle,\n\s+CompanionService\.catchUpRadius \* j\.radiusMult, CompanionService\.followRadius \* j\.radiusMult\)/.test(svc));
 check('...leashes both ordered and engine-picked fights with leashStep', (svc.match(/state\.leashed = leashStep\(state\.leashed, /g) || []).length === 2);
 check('...and no longer uses the single 1500 cutoff', !/combatLeashDistance/.test(svc));
+check('...and passes interiors to both leashes', (svc.match(/leashStep\(state\.leashed, .*, !actor\.getWorldSpace\(\)\)/g) || []).length === 2);
+check('...and forces combat out of combat at once, else once per order and then every orderRepeatMs',
+  /engineTarget !== state\.fightingTarget && \(!engineTarget \|\| state\.forcedTarget !== state\.fightingTarget\n\s+\|\| now - state\.forcedAt >= CompanionService\.orderRepeatMs\)\)/.test(svc));
 
 // ---- step 3: holding with glances, boldness -------------------------------------------------------------------------
 const id0 = ids[0];
