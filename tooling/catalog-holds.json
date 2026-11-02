@@ -1,0 +1,1901 @@
+{
+ "_comment": "Rows the admin catalogues never offer, whatever the generators make (tooling/admin_catalog_merge.js reads this and skips them; the Leader, 2 Nov: \"make the hold durable\"). Each entry: the catalogue file and list, the desc, the name for people reading, why, and when. Remove an entry to let the next merge offer it.",
+ "held": [
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "a0f:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Ascended Servitor",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "aa2b:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Banekamp",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "ac2:mihailskeletalrevenants.esp",
+   "name": "Spell Tome: Conjure Bone Colossus",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "8bf:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Coldharbour Banekin",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "aa2f:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Coldharbour Banekin",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "6ffb2:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Coldharbour Daedroth",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "24050:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Coldharbour Dread Daedroth",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "19d45:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Coldharbour Revered Daedroth Titan",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "8db:mihailskeletalrevenants.esp",
+   "name": "Spell Tome: Conjure Complete Shambles",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "6adf7:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Daedrat",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "56a39:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Deadlands Banekin",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "92e:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Deadlands Banekin",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "2404e:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Deadlands Daedroth",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "a02:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Deadlands Daedroth Titan",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "6ffb4:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Deadlands Dread Daedroth",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "1a14e:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Demented Grummite Boglooter",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "1a156:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Demented Grummite Fogmugger",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "1a146:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Demented Grummite Swampbeater",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "9a9:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Demented Pollywog",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "ac3:mihailskeletalrevenants.esp",
+   "name": "Spell Tome: Conjure Dragonfire Bone Colossus",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "6ae03:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Dusk Panther",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "6adff:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Duskrat",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "591b:mihailelementalgolems.esp",
+   "name": "Spell Tome: Conjure Fire Golem",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "6adfb:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Flaming Daedrat",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "804:1FleshColossus.esp",
+   "name": "Spell Tome: Conjure Flesh Colossus",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "9d6:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Havocrel",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "518e2:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure High Clannfear",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "42586:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Hunger",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "19d47:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Lesser Daedroth Deathdealer",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "19d4e:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Lesser Daedroth Dreadclaw",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "a06:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Lesser Daedroth Painbringer",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "19d35:mihailfleshatronach.esp",
+   "name": "Spell Tome: Conjure Mangled Flesh Atronach",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "1a14a:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Manic Grummite Boglooter",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "1a152:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Manic Grummite Fogmugger",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "1a142:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Manic Grummite Swampbeater",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "aa09:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Manic Pollywog",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "1ee3f:mihailfleshatronach.esp",
+   "name": "Spell Tome: Conjure Mended Flesh Atronach",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "865:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Ogrim",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "897e6:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Ruinach Blazemaul",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "897e2:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Ruinach Demolisher",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "aa27:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Scamp",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "52d62:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Shade Daedra",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "1ee3b:mihailfleshatronach.esp",
+   "name": "Spell Tome: Conjure Stitched Flesh Atronach",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "ac4:mihailskeletalrevenants.esp",
+   "name": "Spell Tome: Conjure Stonefire Bone Colossus",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "19d2a:mihailelementalgolems.esp",
+   "name": "Spell Tome: Conjure Storm Golem",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "ac5:mihailskeletalrevenants.esp",
+   "name": "Spell Tome: Conjure Thunderchild Bone Colossus",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "fb31:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Vigilant",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "4c792:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Vile Guardian",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "2e1cc:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Watcher",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "3322c:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Widow Daedra",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "3323b:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Wraith-of-Crows",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "4c799:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Xivilai Immolator",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "985:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Xivilai Ravager",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "4c7a0:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Xivilai Slaughter Priest",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "989:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Xivilai Tormentor",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "aa70:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Xivkyn Dreadweaver",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "aa6f:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Xivkyn Eviscerator",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "aa6e:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Xivkyn Flagellant",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-items.json",
+   "list": "Spell Tomes",
+   "desc": "aa4e:mihaildeadrapack.esp",
+   "name": "Spell Tome: Conjure Xivkyn Lacerator",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "6adf6:mihaildeadrapack.esp",
+   "name": "mihail_daedrat_summon_spell",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "6adfa:mihaildeadrapack.esp",
+   "name": "mihail_daedrat_summon_spellDAGON",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "6adfe:mihaildeadrapack.esp",
+   "name": "mihail_daedrat_summon_spellDUSK",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "6ae02:mihaildeadrapack.esp",
+   "name": "mihail_duskpanther_summon_spell",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "aa2e:mihaildeadrapack.esp",
+   "name": "mihailbanekin_summon_spell",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "8be:mihaildeadrapack.esp",
+   "name": "mihailbanekin_summon_spellDUPLICATE001",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "56a38:mihaildeadrapack.esp",
+   "name": "mihailbanekin_summon_spellFIRE",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "92d:mihaildeadrapack.esp",
+   "name": "mihailbanekin_summon_spellFIREDUPLICATE001",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "abe:mihailskeletalrevenants.esp",
+   "name": "mihailconjurebonecolossus",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "abf:mihailskeletalrevenants.esp",
+   "name": "mihailconjurebonecolossusFIRE",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "ac0:mihailskeletalrevenants.esp",
+   "name": "mihailconjurebonecolossusFIREblue",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "ac1:mihailskeletalrevenants.esp",
+   "name": "mihailconjurebonecolossusSHOCK",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "864:mihaildeadrapack.esp",
+   "name": "mihailconjureogrim",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "2404b:mihaildeadrapack.esp",
+   "name": "mihaildaedroth_grand_summon_spell1",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "6ffaf:mihaildeadrapack.esp",
+   "name": "mihaildaedroth_grand_summon_spell1b",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "2404c:mihaildeadrapack.esp",
+   "name": "mihaildaedroth_grand_summon_spell2b",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "a07:mihaildeadrapack.esp",
+   "name": "mihaildaedroth_lesser_summon_spell1",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "a05:mihaildeadrapack.esp",
+   "name": "mihaildaedroth_lesser_summon_spell2",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "a04:mihaildeadrapack.esp",
+   "name": "mihaildaedroth_lesser_summon_spell3",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "a01:mihaildeadrapack.esp",
+   "name": "mihaildaedroth_titan_summon_spell_1",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "a03:mihaildeadrapack.esp",
+   "name": "mihaildaedroth_titan_summon_spell_2",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "a10:mihaildeadrapack.esp",
+   "name": "mihailexp1_summon_spell",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "52d64:mihaildeadrapack.esp",
+   "name": "mihailexp2_summon_spell",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "9d7:mihaildeadrapack.esp",
+   "name": "mihailhavocrel_deadlands_summon_havocrel1_spell",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "518e4:mihaildeadrapack.esp",
+   "name": "mihailhighclannfear_spell_spell",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "42585:mihaildeadrapack.esp",
+   "name": "mihailhungersummon_spell",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "9a8:mihaildeadrapack.esp",
+   "name": "mihailpollywog_spell_spell_DEMENTIA",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "9a6:mihaildeadrapack.esp",
+   "name": "mihailpollywog_spell_spell_MANIA",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "897e1:mihaildeadrapack.esp",
+   "name": "mihailruinach_summon_spell_1",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "897e5:mihaildeadrapack.esp",
+   "name": "mihailruinach_summon_spell_2",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "8da:mihailskeletalrevenants.esp",
+   "name": "mihailshambles_summon_spell",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "957:mihaildeadrapack.esp",
+   "name": "mihailvigilant_spell_summon_spell",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "4c793:mihaildeadrapack.esp",
+   "name": "mihailvileguardian_summon_spell",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "2e1cb:mihaildeadrapack.esp",
+   "name": "mihailwatcher_spell_summon_spell",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "33239:mihaildeadrapack.esp",
+   "name": "mihailwraithofcrows_summon_spell",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "986:mihaildeadrapack.esp",
+   "name": "mihailxivilai_deadlands_summon_xivilai1_spell",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "4c797:mihaildeadrapack.esp",
+   "name": "mihailxivilai_deadlands_summon_xivilai2_spell",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "988:mihaildeadrapack.esp",
+   "name": "mihailxivilai_deadlands_summon_xivilai3_spell",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "4c79f:mihaildeadrapack.esp",
+   "name": "mihailxivilai_deadlands_summon_xivilai4_spell",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "aa42:mihaildeadrapack.esp",
+   "name": "mihailxivkyn_summon_spell1",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "aa43:mihaildeadrapack.esp",
+   "name": "mihailxivkyn_summon_spell2",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "aa45:mihaildeadrapack.esp",
+   "name": "mihailxivkyn_summon_spell3",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "spells",
+   "desc": "aa47:mihaildeadrapack.esp",
+   "name": "mihailxivkyn_summon_spell4",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov)",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "954:mihailskeletalrevenants.esp",
+   "name": "Acid",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "9f3:mihailskeletalrevenants.esp",
+   "name": "Acid",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "9ff:mihailskeletalrevenants.esp",
+   "name": "Acid",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "a03:mihailskeletalrevenants.esp",
+   "name": "Acid",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "a04:mihailskeletalrevenants.esp",
+   "name": "Acid",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "a05:mihailskeletalrevenants.esp",
+   "name": "Acid",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "9e9:mihailskeletalrevenants.esp",
+   "name": "Azure Flame Thrall",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "978:mihailskeletalrevenants.esp",
+   "name": "Azure Flare",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "9d4:mihailskeletalrevenants.esp",
+   "name": "Azure Flare",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "56a34:mihaildeadrapack.esp",
+   "name": "Banekin Fire",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "92b:mihaildeadrapack.esp",
+   "name": "Banekin Fire",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "3d4ba:mihaildeadrapack.esp",
+   "name": "Banekin Lightning",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "8eb:mihaildeadrapack.esp",
+   "name": "Banekin Lightning",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "9cc:mihailskeletalrevenants.esp",
+   "name": "Blue Fire Rune",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "9be:mihailskeletalrevenants.esp",
+   "name": "Blue Fire Storm",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "975:mihailskeletalrevenants.esp",
+   "name": "Blue Fireball",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "9d3:mihailskeletalrevenants.esp",
+   "name": "Blue Fireball",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "977:mihailskeletalrevenants.esp",
+   "name": "Blue Firebolt",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "97a:mihailskeletalrevenants.esp",
+   "name": "Blue Firebolt",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "9d2:mihailskeletalrevenants.esp",
+   "name": "Blue Firebolt",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "9db:mihailskeletalrevenants.esp",
+   "name": "Blue Flame Atronach Attack",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "9dc:mihailskeletalrevenants.esp",
+   "name": "Blue Flame Atronach Attack",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "8c8:mihailskeletalrevenants.esp",
+   "name": "Blue Flame Cloak",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "9b9:mihailskeletalrevenants.esp",
+   "name": "Blue Flame Cloak",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "993:mihailskeletalrevenants.esp",
+   "name": "Blue Flames",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "9ba:mihailskeletalrevenants.esp",
+   "name": "Blue Flames",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "9de:mihailskeletalrevenants.esp",
+   "name": "Blue Flames",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "9b5:mihailskeletalrevenants.esp",
+   "name": "Blue Purgatory",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "995:mihaildeadrapack.esp",
+   "name": "Clannfear Charge",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "9e8:mihailskeletalrevenants.esp",
+   "name": "Conjure Blue Flame Atronach",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "33227:mihaildeadrapack.esp",
+   "name": "Conjure Spiderling",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "aa1e:mihaildeadrapack.esp",
+   "name": "Daedric Burn",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "7a1e1:mihaildeadrapack.esp",
+   "name": "Daedroth Cold-fire Breath",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "6ffb6:mihaildeadrapack.esp",
+   "name": "Daedroth Stagger Attack",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "9e8:mihaildeadrapack.esp",
+   "name": "Daedroth Stagger Attack",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "9e9:mihaildeadrapack.esp",
+   "name": "Daedroth Stagger Attack",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "6ad96:mihaildeadrapack.esp",
+   "name": "Dagon's Wrath",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "42580:mihailvampirelordsandbeasts.esp",
+   "name": "Drain Life",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "985:mihailskeletalrevenants.esp",
+   "name": "Fire",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "2e1d4:mihaildeadrapack.esp",
+   "name": "Fire Beam",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "332ed:mihaildeadrapack.esp",
+   "name": "Fire Beam",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "3d477:mihailelementalgolems.esp",
+   "name": "Fire Golem Attack",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "3d474:mihailelementalgolems.esp",
+   "name": "Fireball",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "a13:mihailskeletalrevenants.esp",
+   "name": "Fireball",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "19d0f:mihailfleshatronach.esp",
+   "name": "Firebolt",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "19d29:mihailfleshatronach.esp",
+   "name": "Firebolt",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "19d2a:mihailfleshatronach.esp",
+   "name": "Firebolt",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "290a9:mihaildeadrapack.esp",
+   "name": "Firebolt",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "897:mihaildeadrapack.esp",
+   "name": "Firebolt",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "898:mihaildeadrapack.esp",
+   "name": "Firebolt",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "899:mihaildeadrapack.esp",
+   "name": "Firebolt",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "8e2:mihaildeadrapack.esp",
+   "name": "Firebolt",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "8e3:mihaildeadrapack.esp",
+   "name": "Firebolt",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "8e4:mihaildeadrapack.esp",
+   "name": "Firebolt",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "8e7:mihaildeadrapack.esp",
+   "name": "Firebolt",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "5baf6:mihaildeadrapack.esp",
+   "name": "Flame Attack",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "8c7:mihailskeletalrevenants.esp",
+   "name": "Flame Cloak",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "952:mihailskeletalrevenants.esp",
+   "name": "Flame Cloak",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "9f6:mihailskeletalrevenants.esp",
+   "name": "Flame Cloak",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "950:mihaildeadrapack.esp",
+   "name": "Flamewave",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "80b:mihailnordicsentinel.esp",
+   "name": "Frost Atronach Attack",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "5ba80:mihailelementalgolems.esp",
+   "name": "Frost Cloak",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "83d:mihailgrahlsandfrostgiants.esp",
+   "name": "Frost Cloak",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "83e:mihailgrahlsandfrostgiants.esp",
+   "name": "Frost Cloak Freeze",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "841:mihailgrahlsandfrostgiants.esp",
+   "name": "Frost Strike",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "842:mihailgrahlsandfrostgiants.esp",
+   "name": "Frost Strike",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "94c:mihaildeadrapack.esp",
+   "name": "Gaze",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "811:mihailnordicsentinel.esp",
+   "name": "Giant Stomp",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "1ee25:mihaildeadrapack.esp",
+   "name": "Gloomy Silence",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "80a:mihailgrahlsandfrostgiants.esp",
+   "name": "Grahl Attack",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "847:mihailicetitansandseagiants.esp",
+   "name": "Grahl Attack",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "86c:mihailicetitansandseagiants.esp",
+   "name": "Half- Giant Attack",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "9c0:mihaildeadrapack.esp",
+   "name": "Havocrel Hell Orb",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "1ee16:mihaildeadrapack.esp",
+   "name": "Havocrel Weapon",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "19d10:mihailfleshatronach.esp",
+   "name": "Healing",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "1ee15:mihaildeadrapack.esp",
+   "name": "Heat Blast",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "33258:mihaildeadrapack.esp",
+   "name": "Heat Blast",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "38361:mihaildeadrapack.esp",
+   "name": "Heat Blast",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "47699:mihaildeadrapack.esp",
+   "name": "Hunger Drain Fatigue",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "47693:mihaildeadrapack.esp",
+   "name": "Hunger Invisibility",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "476a8:mihaildeadrapack.esp",
+   "name": "Hunger Invisibility",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "4769c:mihaildeadrapack.esp",
+   "name": "Hunger Paralyzing Touch",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "fb07:mihailelementalgolems.esp",
+   "name": "Ice Form",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "fb08:mihailelementalgolems.esp",
+   "name": "Ice Storm",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "33241:mihaildeadrapack.esp",
+   "name": "ignorename",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "33248:mihaildeadrapack.esp",
+   "name": "Leshen Crows",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "944:mihaildeadrapack.esp",
+   "name": "Leshen Crows",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "65d53:mihaildeadrapack.esp",
+   "name": "Lightning Bolt",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "931:mihaildeadrapack.esp",
+   "name": "Lightning Bolt",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "8c9:mihailskeletalrevenants.esp",
+   "name": "Lightning Cloak",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "fb20:mihailelementalgolems.esp",
+   "name": "Lightning Cloak",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "3325a:mihaildeadrapack.esp",
+   "name": "Lightning Surge",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "38362:mihaildeadrapack.esp",
+   "name": "Lightning Surge",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "4766d:mihaildeadrapack.esp",
+   "name": "Lightning Surge",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "99e:mihailskeletalrevenants.esp",
+   "name": "Marked for Death - Aus",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "84c:mihailicetitansandseagiants.esp",
+   "name": "mihailicetitanstomp",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "866:mihaildeadrapack.esp",
+   "name": "Ogrim Impact",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "987:mihailskeletalrevenants.esp",
+   "name": "Sapphire Blaze",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "986:mihailskeletalrevenants.esp",
+   "name": "Sapphire Blaze II",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "979:mihailskeletalrevenants.esp",
+   "name": "Sapphire Inferno",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "871:mihailicetitansandseagiants.esp",
+   "name": "Sea Giant Attack",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "828:mihailicetitansandseagiants.esp",
+   "name": "Sea Giant Shield Bash",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "23f4b:mihaildeadrapack.esp",
+   "name": "Shadow Bomb",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "5cf70:mihaildeadrapack.esp",
+   "name": "Shadow Bomb",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "23f52:mihaildeadrapack.esp",
+   "name": "Shadow Grenades",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "5cf74:mihaildeadrapack.esp",
+   "name": "Shadow Grenades",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "33217:mihaildeadrapack.esp",
+   "name": "Shock",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "4c79b:mihaildeadrapack.esp",
+   "name": "Shock Damage",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "fb14:mihailelementalgolems.esp",
+   "name": "Shock Rune Recharge",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "951:mihaildeadrapack.esp",
+   "name": "Shockwave",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "14c17:mihaildeadrapack.esp",
+   "name": "Silence",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "814:mihailicetitansandseagiants.esp",
+   "name": "Snowray Freezing Poison",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "14c1b:mihaildeadrapack.esp",
+   "name": "Spell2",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "fb12:mihaildeadrapack.esp",
+   "name": "Spitter Blazes",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "fb15:mihaildeadrapack.esp",
+   "name": "Spitter Fireball",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "19d3e:mihaildeadrapack.esp",
+   "name": "Spitter Gas",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "2e15b:mihaildeadrapack.esp",
+   "name": "Spitter Gas Ball",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "14c2b:mihaildeadrapack.esp",
+   "name": "Spitter Invisibility",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "19d48:mihaildeadrapack.esp",
+   "name": "Spitter Invisibility",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "fb19:mihaildeadrapack.esp",
+   "name": "Spitter Invisibility",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "14c2e:mihaildeadrapack.esp",
+   "name": "Spitter Venom",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "14c2f:mihaildeadrapack.esp",
+   "name": "Spitter Venom Ball",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "80b:mihailvampirelordsandbeasts.esp",
+   "name": "Spriggan Call of the Wild",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "a07:mihailskeletalrevenants.esp",
+   "name": "Storm Atronach Attack",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "a0b:mihailskeletalrevenants.esp",
+   "name": "Storm Atronach Attack",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "a0c:mihailskeletalrevenants.esp",
+   "name": "Storm Atronach Attack",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "a0d:mihailskeletalrevenants.esp",
+   "name": "Storm Atronach Attack",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "fb13:mihailelementalgolems.esp",
+   "name": "Storm Golem Chain Lightning",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "fb1a:mihailelementalgolems.esp",
+   "name": "Storm Golem Chain Lightning",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "1ee4b:mihailvampirelordsandbeasts.esp",
+   "name": "Summon Fleder",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "1ee4a:mihailvampirelordsandbeasts.esp",
+   "name": "Summon Garkain",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "86e:mihailicetitansandseagiants.esp",
+   "name": "Thriceborn Ice Spike",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "60c00:mihaildeadrapack.esp",
+   "name": "Thunderbolt",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "9ea:mihaildeadrapack.esp",
+   "name": "Thunderbolt",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  },
+  {
+   "file": "admin-powers.json",
+   "list": "staffSpells",
+   "desc": "4257f:mihailvampirelordsandbeasts.esp",
+   "name": "Vampiric Invisibility",
+   "reason": "window-1102 creature mods: summons have crashed casters before; held until Nat and the Leader decide (the Leader, 2 Nov); the staff-only list, the same creature spells by /givespell",
+   "date": "2026-11-02"
+  }
+ ]
+}
