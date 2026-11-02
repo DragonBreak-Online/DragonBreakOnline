@@ -1950,7 +1950,9 @@ module.exports = (api) => {
   // unknown widget opened with focus would leave an invisible panel holding the keys. An older client gets the list menu.
   const uiCaps = globalThis.__dboExpeditionCaps instanceof Map ? globalThis.__dboExpeditionCaps : (globalThis.__dboExpeditionCaps = new Map());
   onUi('uiCaps', (a, args) => { uiCaps.set(a >>> 0, new Set((args || []).map(String))); });
-  const boardCaps = { has: (a) => uiCap(a, 'expeditionBoard', uiCaps) };
+  // W1's hasUiCap gate (ui-caps-1101), and the native board too: a client whose nativeCaps carry native:expeditionBoard
+  // (dbo_expedition) gets the board with no browser HUD at all (Nat, 1 Nov: "zero web pages")
+  const boardCaps = { has: (a) => uiCap(a, 'expeditionBoard', uiCaps) || uiCap(a, 'native:expeditionBoard') };
   // Which boards post expeditions (Nat, 27 Oct: the boards in the Skyrim holds show contracts and the rest, "NOT expeditions",
   // Skyrim having no ruin to send a party to yet). dungeons.boards { expeditions: { <province>: bool }, refs: { <board desc>:
   // { expeditions, province } } }: a ref's own setting wins, then its province's (by the board's cell, else the reader's, as

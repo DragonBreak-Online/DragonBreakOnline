@@ -36,7 +36,8 @@ module.exports = (api) => {
   // Both outlive a reload: which clients draw the panel, and the nonce of the panel open for each character
   const caps = globalThis.__dboNamingCaps instanceof Map ? globalThis.__dboNamingCaps : (globalThis.__dboNamingCaps = new Map());
   const nonces = globalThis.__dboNamingNonces instanceof Map ? globalThis.__dboNamingNonces : (globalThis.__dboNamingNonces = new Map());
-  const hasPanel = (a) => typeof openWidget === 'function' && uiCap(a, 'namePrompt', caps);
+  // the browser panel (dbo:uiCaps namePrompt) or the native one (nativeCaps native:namePrompt, dbo_naming)
+  const hasPanel = (a) => typeof openWidget === 'function' && (uiCap(a, 'namePrompt', caps) || uiCap(a, 'native:namePrompt'));
 
   const nameOf = (a) => { try { return String((mp.get(a, 'appearance') || {}).name || '').trim(); } catch (e) { return ''; } };
   const isDefault = (name) => DEFAULTS.has(String(name || '').trim().toLowerCase());
@@ -126,13 +127,16 @@ module.exports = (api) => {
   let nonceSeq = 0;
   // Why a name typed at creation was taken off, shown once with the first ask
   const refusedReason = (a) => { try { const r = mp.get(a, REFUSED); return typeof r === 'string' ? r : ''; } catch (e) { return ''; } };
+  // browser: the native panel (dbo_naming) hands a game that cannot type to the browser panel, until this character is named
+  const browserFor = new Set();
   const openPanel = (a, error) => {
     // A counter as well as the time: two panels opened in one millisecond (a refusal answered at once) differ
     const nonce = `${(a >>> 0).toString(16)}-${Date.now().toString(36)}-${(nonceSeq = (nonceSeq + 1) % 1e6).toString(36)}`;
     nonces.set(a >>> 0, nonce);
     const r = readRules();
-    openWidget(a, { type: 'namePrompt', id: PANEL_ID, nonce, error: error || '', maxLength: r.maxLength, maxWords: r.maxWords,
-      events: { choose: 'dbo:nameChoose' } }, true);
+    const w = { type: 'namePrompt', id: PANEL_ID, nonce, error: error || '', maxLength: r.maxLength, maxWords: r.maxWords, events: { choose: 'dbo:nameChoose' } };
+    if (browserFor.has(a >>> 0)) w.browser = 1;
+    openWidget(a, w, true);
   };
   const ask = (a, force) => {
     const now = Date.now();
@@ -189,7 +193,14 @@ module.exports = (api) => {
       const r = takeName(a, args[1], 'panel');
       if (r.error) { openPanel(a, r.error); return; }
       nonces.delete(a >>> 0);
+      browserFor.delete(a >>> 0);
       closeWidget(a, PANEL_ID);
+    });
+    // The native panel, in a game that cannot type: the same prompt in the browser, which takes typing
+    onUi('nameBrowser', (a, args) => {
+      if (nonces.get(a >>> 0) !== String((args || [])[0] || '') || !needsName(a)) return;
+      browserFor.add(a >>> 0);
+      openPanel(a, '');
     });
     // Escape closes it; the reminder opens it again a minute later
     onUi('close', (a, args, widgetId) => { if (Number(widgetId) === PANEL_ID) nonces.delete(a >>> 0); });

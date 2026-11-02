@@ -45,13 +45,13 @@ module.exports = (api) => {
   const REF = part('callRef', {
     enabled: true, bindMinutes: 60,
     // commands whose call:<n> / ticket:<id> words are taken out and kept for the action they run
-    commands: ['rename', 'faction', 'appoint', 'dismiss', 'citizenship', 'staffref'],
+    commands: ['rename', 'faction', 'appoint', 'dismiss', 'citizenship', 'staffref', 'givespell', 'removespell'],
     // the kinds of staff action on another player that need one (the callers name the kind)
-    kinds: ['rename', 'faction', 'office', 'citizenship'],
+    kinds: ['rename', 'faction', 'office', 'citizenship', 'spells'],
     // kinds a Lead GM or above does on a short reason instead (reason: <why> in the command, or /staffref <player> reason:
     // <why> for the panels), audited and sent to the staff log (Nat, 1 Nov: "allow Lead GMs to edit factions so they can add
-    // players etc."). A GM still needs the call or the ticket
-    leadExemptKinds: ['faction'],
+    // players etc."). A GM still needs the call or the ticket. Single spells too (the Leader, 1 Nov: /givespell and /removespell)
+    leadExemptKinds: ['faction', 'spells'],
   });
   const TRIAL = part('trialLimits', { enabled: true });
   const EXEMPT_TIERS = new Set(Array.isArray(RAW.exemptTiers) ? RAW.exemptTiers.map(String) : ['senior']);

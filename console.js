@@ -146,9 +146,9 @@ const ALLOW = Object.freeze({
     help: '<#TAG|name> <item> [count] [ticket:<id>]: deliver an item to player (direct if online, gifts inbox if offline)' },
   takeitem: { usage: '/takeitem <#TAG|name> <item name or hex id> [count] [ticket:<id>]', rule: 'itemSpells', offline: false,
     help: '<#TAG|name> <item> [count] [ticket:<id>]: remove an item from online player inventory' },
-  givespell: { usage: '/givespell <#TAG|name> <spell name or hex id> [ticket:<id>]', rule: 'itemSpells', offline: false,
+  givespell: { usage: '/givespell <#TAG|name> <spell name or hex id> ticket:<id> | reason: <why>', rule: 'itemSpells', offline: false,
     help: '<#TAG|name> <spell> [ticket:<id>]: grant a spell to an online player' },
-  removespell: { usage: '/removespell <#TAG|name> <spell name or hex id> [ticket:<id>]', rule: 'itemSpells', offline: false,
+  removespell: { usage: '/removespell <#TAG|name> <spell name or hex id> ticket:<id> | reason: <why>', rule: 'itemSpells', offline: false,
     help: '<#TAG|name> <spell> [ticket:<id>]: remove a spell from an online player' },
 });
 // Why the rest are refused, by class (DESIGN 8.2). Built-ins that are not registry commands are notChat; any other

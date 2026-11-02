@@ -4237,7 +4237,13 @@ const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_jou
   businessLedger: 'dbo_ledger', propertyMarket: 'dbo_market', keyRing: 'dbo_keyring', tomeShop: 'dbo_tomes',
   shrinePanel: 'dbo_shrine', courierHandover: 'dbo_courier', playerMenu: 'dbo_menu', spellbook: 'dbo_spellbook', studyMagic: 'dbo_study',
   classLectern: 'dbo_lectern', birthsignPicker: 'dbo_birthsign', lockpick: 'dbo_lockpick',
-  skinning: 'dbo_skinning', reading: 'dbo_reading', contextMenu: 'dbo_context' };
+  skinning: 'dbo_skinning', reading: 'dbo_reading', contextMenu: 'dbo_context',
+  // Worker 6: the notice board's Citizenship and Voting (citizenship.js, widget 84)
+  citizenBoard: 'dbo_citizen',
+  // Worker 6: the Expeditions and Hunting Contracts board (dungeons.js openExpeditions, widget 63)
+  expeditionBoard: 'dbo_expedition',
+  // Worker 6: the name prompt for a character made without a name (naming.js, widget 68)
+  namePrompt: 'dbo_naming' };
 // The client's custom menu takes a payload of at most this many characters (scaleformMenu.ts MAX_PAYLOAD_CHARS) and draws
 // a bigger one blank, so a widget past it (a staff player menu, a long ledger) goes to the browser instead
 const NATIVE_MAX_CHARS = 60000;
@@ -4253,7 +4259,11 @@ const nativeSwfFor = (a, widget, focus) => {
   if (widget.browser) return '';
   // The journal is native per hub tab, for each tab the client's swf draws (Settings opens the overlay's own sections in the browser)
   if (widget.type === 'journal' && !(widget.hub && c.has('native:journalTab:' + widget.tab))) return '';
-  try { if (JSON.stringify(widget).length > NATIVE_MAX_CHARS) return ''; } catch (e) { return ''; }
+  let size = 0;
+  try { size = JSON.stringify(widget).length; } catch (e) { return ''; }
+  // typeof: a harness that cuts this function out runs it without the measuring below
+  if (typeof noteNativeSize === 'function') noteNativeSize(a, widget, size);
+  if (size > NATIVE_MAX_CHARS) return '';
   return swf;
 };
 // A widget that moves between the custom menu and the browser (the journal changing tab) closes where it was first
@@ -4283,6 +4293,30 @@ const closeWidget = (a, id) => {
   if (open.get(a >>> 0) === id) { open.delete(a >>> 0); return sendPacket(a, { customPacketType: 'dboScaleform', close: true }); }
   return sendPacket(a, { customPacketType: 'dboWidget', close: id });
 };
+// How big each native panel's payload gets (census Round 2, W6 item 3: page the ones over NATIVE_MAX_CHARS): per type, and per
+// tab for the journal, the count, the largest and how many went to the browser for size. An oversize one is logged at once
+// (one line per type a minute); the table is logged every hour as "[native-size]" lines. Kept across hot reloads.
+const nativeSizes = () => globalThis.__dboNativeSizes || (globalThis.__dboNativeSizes = { since: Date.now(), types: new Map(), warned: new Map() });
+const noteNativeSize = (a, widget, size) => {
+  try {
+    const key = widget.type === 'journal' ? `journal:${widget.tab || '?'}` : String(widget.type);
+    const s = nativeSizes(), t = s.types.get(key) || { n: 0, max: 0, sum: 0, over: 0 };
+    t.n++; t.sum += size; if (size > t.max) t.max = size;
+    if (size > NATIVE_MAX_CHARS) {
+      t.over++;
+      const last = s.warned.get(key) || 0;
+      if (Date.now() - last > 60000) { s.warned.set(key, Date.now()); log(`[native-size] ${key} ${size} chars, over ${NATIVE_MAX_CHARS}: sent to the browser (profile ${profileOf(a)})`); }
+    }
+    s.types.set(key, t);
+  } catch (e) { /* measuring never breaks a panel */ }
+};
+every('nativeSizes', 3600000, () => {
+  const s = nativeSizes();
+  if (!s.types.size) return;
+  const rows = [...s.types.entries()].sort((x, y) => y[1].max - x[1].max);
+  log(`[native-size] since ${new Date(s.since).toISOString()}: ${rows.length} panel types`);
+  for (const [k, t] of rows) log(`[native-size] ${k}: ${t.n} sent, largest ${t.max}, average ${Math.round(t.sum / t.n)}, over ${NATIVE_MAX_CHARS} ${t.over}`);
+});
 const notify = (a, text) => sendPacket(a, { customPacketType: 'dboNotice', text });
 globalThis.__dboUiEvents = new Map(); // event name -> [(actorId, args, widgetId)]; rebuilt on every reload
 // Several widgets answer the same event name, "close" above all, so every handler is kept and called

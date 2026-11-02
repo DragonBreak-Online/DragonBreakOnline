@@ -99,6 +99,28 @@ const before = widgets.length; globalThis.__dboNameAsked.set(HUB_USER, 0); timer
 check('in the Realm the reminder does not open it over the creation panels', widgets.length === before);
 check('...the hold in sendToArrival does', globalThis.__dboNameHold(HUB_USER) === true && widgets.length === before + 1 && widgets.at(-1)[0] === HUB_USER);
 
+// The native panel (dbo_naming, census Round 2): a client that announced native:namePrompt (gamemode's hasUiCap) and no browser
+// cap is asked in the panel too; in a game that cannot type, nameBrowser hands that prompt to the browser until it is named
+{
+  const NATIVE_USER = 0xff000007;
+  setp(NATIVE_USER, 'appearance', { name: 'Prisoner' });
+  const wasCap = globalThis.__dboHasUiCap;
+  globalThis.__dboHasUiCap = (a, c) => a === NATIVE_USER && c === 'native:namePrompt';
+  const n0 = widgets.length;
+  check('a client with only native:namePrompt is asked in the panel, not in chat', globalThis.__dboNameHold(NATIVE_USER) === true && widgets.length === n0 + 1 && widgets.at(-1)[1].type === 'namePrompt' && !widgets.at(-1)[1].browser && !said.some((x) => x[0] === NATIVE_USER));
+  const nw = widgets.at(-1)[1];
+  fire('nameBrowser', NATIVE_USER, ['stale']);
+  check('a stale nameBrowser changes nothing', widgets.length === n0 + 1);
+  fire('nameBrowser', NATIVE_USER, [nw.nonce]);
+  const bw = widgets.at(-1)[1];
+  check('nameBrowser re-sends the prompt marked browser: 1, with a new nonce', widgets.length === n0 + 2 && bw.browser === 1 && bw.nonce !== nw.nonce);
+  fire('nameChoose', NATIVE_USER, [bw.nonce, 'AELA LOUD']);
+  check('...and a refusal from there stays in the browser', widgets.at(-1)[1].browser === 1 && /capitals/.test(widgets.at(-1)[1].error));
+  fire('nameChoose', NATIVE_USER, [widgets.at(-1)[1].nonce, 'Brynja Holt']);
+  check('a name taken from the browser closes it', props.get(`${NATIVE_USER}|appearance`).name === 'Brynja Holt' && closed.some((c) => c[0] === NATIVE_USER && c[1] === 68));
+  globalThis.__dboHasUiCap = wasCap;
+}
+
 // Names typed in the race menu (__dboCreatorName, from the gamemode's appearance hook), checked after the engine applies
 (async () => {
   const NEWBIE = 0xff000010, REROLL = 0xff000011;

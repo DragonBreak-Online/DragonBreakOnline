@@ -100,7 +100,8 @@ const api = {
   audit: () => {},
   display: () => 'Tester #ABCD',
   who: () => 'Tester #ABCD (profile 1)',
-  cfg: { prayer: { faiths: false } }, // the roster before faiths.json (faiths-harness covers the new gods)
+  // the roster before faiths.json (faiths-harness covers the new gods); its prayers are held ones (pick.enabled false)
+  cfg: { prayer: { faiths: false, pick: { enabled: false } } },
   openWidget: (a, w) => { out.widgets.push(w); return true; },
   closeWidget: () => true,
   onUi: (ev, fn) => { const l = handlers.get(ev) || []; l.push(fn); handlers.set(ev, l); },

@@ -79,8 +79,10 @@ module.exports = (api) => {
   // Prince's against the Divines'). The worshipper speaks the verse that belongs; a wrong line falters and is chosen
   // again, and the prayer slips away after `slips` of them. seconds bounds the whole prayer. Odds, rests, offerings and
   // blessings are the held prayer's. enabled false: every client gets the held prayer.
+  // The held prayer is retired (1 Nov: 1 of 1650 rounds in a week, both fronts name the cap since October): every client
+  // gets this prayer whether or not its caps have arrived yet, and enabled false is the way back to the held one
   const PICK = Object.assign({ enabled: true, seconds: 120, choices: 3, slips: 2, minPickMs: 300 }, CFG.pick || {});
-  const pickFor = (a) => PICK.enabled !== false && typeof hasUiCap === 'function' && hasUiCap(a, MG.PICK_CAP);
+  const pickFor = () => PICK.enabled !== false;
 
   const PRAY = Object.assign({}, skills.praying || {});
   // Faiths (faiths.json, Nate 18 Oct): pantheons a character takes before a patron in it, and the gods skills.json does not
