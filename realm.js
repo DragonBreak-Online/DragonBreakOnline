@@ -794,6 +794,12 @@ module.exports = (api) => {
     const tam = worlds.get('3c:skyrim.esm');
     if (tam && cells && Array.isArray(cells.rows) && Array.isArray(cells.holds)) {
       tam.cells = { c0: cells.c0, n: cells.n, size: 4096, holds: cells.holds, rows: cells.rows };
+      // hold-cells.json's fallback grid (W6, v2): '1' where the hold is only the nearest capital's, which the map leaves
+      // clear; the fork's parsed table drops it, so it is read from the file, and kept only when it is the same table
+      let file = null;
+      try { file = JSON.parse(fs.readFileSync(path.resolve('hold-cells.json'), 'utf8')); } catch (e) { file = null; }
+      const fb = file && file.c0 === cells.c0 && file.n === cells.n && Array.isArray(file.fallback) ? file.fallback : null;
+      if (fb && fb.length === cells.n && fb.every((r) => typeof r === 'string' && r.length === cells.n)) tam.cells.fallback = fb;
       let zones = {};
       try { zones = JSON.parse(fs.readFileSync(path.resolve('zones.json'), 'utf8')) || {}; } catch (e) { zones = {}; }
       tam.strongholds = (Array.isArray(zones.strongholds) ? zones.strongholds : [])

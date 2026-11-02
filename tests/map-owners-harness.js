@@ -86,6 +86,21 @@ const scenarios = (src, c) => {
     const pc = (sent.find((x) => x[1].customPacketType === 'dboMapOwners') || [])[1];
     const tc = pc && pc.worlds.find((w) => w.world === '3c:Skyrim.esm'), bc = pc && pc.worlds.find((w) => w.world === 'a764b:BSHeartland.esm');
     c('holdsFromCells on: Tamriel carries the fork\'s very table', !!tc && !!tc.cells && tc.cells.c0 === -1 && tc.cells.n === 2 && tc.cells.size === 4096 && JSON.stringify(tc.cells.rows) === '["0.","11"]' && tc.cells.holds.join() === 'whiterun,falkreath', tc && tc.cells);
+    c('no hold-cells.json beside it: no fallback grid', !!tc && !!tc.cells && tc.cells.fallback === undefined);
+    // W6's v2 file: its fallback grid goes with the table, only when it is the same table
+    fs.writeFileSync(path.join(tmp, 'hold-cells.json'), JSON.stringify({ version: 2, c0: -1, n: 2, holds: ['whiterun', 'falkreath'], rows: ['0.', '11'], fallback: ['1.', '01'] }));
+    sent.length = 0;
+    handlers.get('uiCaps')(7, []);
+    const pf = (sent.find((x) => x[1].customPacketType === 'dboMapOwners') || [])[1];
+    const tf = pf && pf.worlds.find((w) => w.world === '3c:Skyrim.esm');
+    c('the v2 file\'s fallback grid travels with the table', !!tf && JSON.stringify(tf.cells.fallback) === '["1.","01"]', tf && tf.cells);
+    fs.writeFileSync(path.join(tmp, 'hold-cells.json'), JSON.stringify({ version: 2, c0: -2, n: 2, holds: [], rows: [], fallback: ['11', '11'] }));
+    sent.length = 0;
+    handlers.get('uiCaps')(7, []);
+    const pm = (sent.find((x) => x[1].customPacketType === 'dboMapOwners') || [])[1];
+    const tm = pm && pm.worlds.find((w) => w.world === '3c:Skyrim.esm');
+    c('...but not a file for another table (its c0 differs)', !!tm && tm.cells.fallback === undefined, tm && tm.cells);
+    try { fs.unlinkSync(path.join(tmp, 'hold-cells.json')); } catch (e) { /* none */ }
     c('...and the strongholds that win over it, a broken one left out', !!tc && JSON.stringify(tc.strongholds) === JSON.stringify([{ zone: 'gol-kharzum', x: -76847, y: -45868, r: 6000 }]), tc && tc.strongholds);
     c('...Bruma keeps its own (one region, no cells)', !!bc && !bc.cells && !bc.strongholds);
     delete globalThis.__dboHoldCells;
