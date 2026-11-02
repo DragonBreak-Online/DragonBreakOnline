@@ -2289,6 +2289,39 @@ module.exports = (api) => {
   const canTeachAny = (a) => arcaneOf(a).level >= AP.teacherArcaneLevel || (priestOf(a).held && priestOf(a).level >= AP.teacherPriestLevel);
   const canTeachSchool = (a, school) => (school === RESTORATION ? priestOf(a).held && priestOf(a).level >= AP.teacherPriestLevel : arcaneOf(a).level >= AP.teacherArcaneLevel);
   const needFor = (rank) => Math.max(1, Math.round(Math.max(1, Number(AP.dailyXp) || 20) * Math.max(0.05, Number((AP.daysByRank || [])[rank]) || 1)));
+  // mod-0548 (luckystefan, 30 Oct 2026): "Apprentice ship level keeps reseting each day as it is not saving the
+  // progress of learning the spell". The day roll was never the cause - apCast resets only dayXp. His teacher released
+  // and re-took him (22:01:03 then 22:01:19 on 30 Oct, and the same pair on 25 Oct), and endApprenticeship deletes
+  // s.apprentice outright, so two days of study at the 20/day cap went back to 0 and the 40 began again.
+  //
+  // The study is now remembered per spell and resumed when the SAME spell is taken up again, whoever teaches it - but
+  // the day stamp and the day's spend are remembered WITH it. That matters: carrying only the xp would reset dayXp to 0
+  // on every retake, so a student could study their 20, leave, retake and study 20 more without end. The rule the
+  // harness states - "alternating teachers gains nothing" - still holds, because the daily cap now follows the student
+  // rather than the lesson. Cleared once the spell is learned, and kept for AP_STUDIED_KEEP spells at most.
+  const AP_STUDIED_KEEP = 8;
+  const studiedOf = (s) => (s && s.apStudied && typeof s.apStudied === 'object' && !Array.isArray(s.apStudied) ? s.apStudied : null);
+  const studiedFor = (s, spell) => {
+    const m = studiedOf(s); const e = m && m[norm(spell)];
+    const xp = Number(e && e.xp);
+    if (!Number.isFinite(xp) || xp <= 0) return null;
+    const dayXp = Number(e.dayXp);
+    return { xp: Math.floor(xp), day: String(e.day || ''), dayXp: Number.isFinite(dayXp) && dayXp > 0 ? Math.floor(dayXp) : 0 };
+  };
+  const rememberStudy = (s, spell, ap) => {
+    const xp = Math.floor(Number(ap && ap.xp) || 0);
+    const m = Object.assign({}, studiedOf(s));
+    const k = norm(spell);
+    if (xp <= 0) delete m[k];
+    else m[k] = { xp, day: String((ap && ap.day) || ''), dayXp: Math.floor(Number(ap && ap.dayXp) || 0), at: Date.now() };
+    const keys = Object.keys(m);
+    if (keys.length > AP_STUDIED_KEEP) {
+      keys.sort((x, y) => (Number(m[x].at) || 0) - (Number(m[y].at) || 0));
+      for (const key of keys.slice(0, keys.length - AP_STUDIED_KEEP)) delete m[key];
+    }
+    if (Object.keys(m).length) s.apStudied = m; else delete s.apStudied;
+  };
+  const forgetStudy = (s, spell) => rememberStudy(s, spell, null);
   // Why the spell may not pass to `t` at all (spells.js: a removed spell, a restricted art below Senior, a spell switched
   // off), or ''
   const closedTo = (t, id) => { try { return typeof globalThis.__dboSpellsOpenTo === 'function' ? String(globalThis.__dboSpellsOpenTo(t, id) || '') : ''; } catch (e) { return ''; } };
@@ -2346,6 +2379,13 @@ module.exports = (api) => {
     if (!ap) return;
     setHeld(t, s, false);
     const teacher = ap.teacher >>> 0;
+    // mod-0548: a lesson that ended any way but with the spell in their book keeps its study, so a release and retake of
+    // the same spell resumes where it stopped, with the day's spend intact
+    if (why === 'learned' || why === 'learned another way') forgetStudy(s, ap.spell);
+    else if (Number(ap.xp) > 0) {
+      rememberStudy(s, ap.spell, ap);
+      log(`schools: ${who(t)}'s apprenticeship in ${ap.spell} ended (${why}) at ${ap.xp}/${ap.need}; the study is kept for a retake`);
+    }
     delete s.apprentice; save(t, s);
     // The teacher's list, when their record can be read (online); an offline teacher's is pruned at their next check
     if (online(teacher)) {
@@ -2403,14 +2443,19 @@ module.exports = (api) => {
     if (!teachable(o.teacher, t).some((sp) => sp.id >>> 0 === idOf(o.spell))) { personal(t, `${display(o.teacher)} can no longer teach you ${o.name}.`); return; }
     const s = stateOf(t);
     const need = needFor(o.rank);
-    s.apprentice = { teacher: o.teacher, teacherName: display(o.teacher), spell: o.spell, school: o.school, rank: o.rank, xp: 0, need, day: dayKey(), dayXp: 0, at: Date.now(), held: false, lastCastAt: 0 };
+    // mod-0548: study already done on THIS spell carries over, however the last lesson ended and whoever teaches it now.
+    // The day stamp and the day's spend come with it, so a retake on the same day buys no second allowance.
+    const was = studiedFor(s, o.spell);
+    const done = was ? Math.min(need, was.xp) : 0;
+    s.apprentice = { teacher: o.teacher, teacherName: display(o.teacher), spell: o.spell, school: o.school, rank: o.rank, xp: done, need,
+      day: was && was.day ? was.day : dayKey(), dayXp: was ? was.dayXp : 0, at: Date.now(), held: false, lastCastAt: 0 };
     save(t, s);
     const ts = stateOf(o.teacher);
     ts.apprentices = apList(ts).concat({ student: t >>> 0, name: display(t), spell: o.spell, at: Date.now() });
     save(o.teacher, ts);
-    audit(`SCHOOLS ${who(o.teacher)} took ${who(t)} as apprentice in ${o.spell} ${o.name} (${RANKS[o.rank]} ${o.school}, ${need} study)`);
-    personal(o.teacher, `${display(t)} is now your apprentice in ${o.name}.`);
-    personal(t, `You are ${display(o.teacher)}'s apprentice in ${o.name}. Near them you hold the spell and can cast it; casting it is your study, up to ${AP.dailyXp} a day, ${need} in all.`);
+    audit(`SCHOOLS ${who(o.teacher)} took ${who(t)} as apprentice in ${o.spell} ${o.name} (${RANKS[o.rank]} ${o.school}, ${need} study${done ? `, resuming at ${done}` : ''})`);
+    personal(o.teacher, `${display(t)} is now your apprentice in ${o.name}.${done ? ` They keep the ${done} of ${need} they had studied.` : ''}`);
+    personal(t, `You are ${display(o.teacher)}'s apprentice in ${o.name}. Near them you hold the spell and can cast it; casting it is your study, up to ${AP.dailyXp} a day, ${need} in all.${done ? ` Your earlier study stands: ${done} of ${need} already.` : ''}`);
     apTick(t);
   };
   onUi('apprenticeOffer', (t, args) => {
@@ -2514,6 +2559,7 @@ module.exports = (api) => {
     // Given for good now (__dboSpellsGrant prepared it, or put it in the book and took the engine's copy back), so ending
     // the lesson leaves it where the spellbook put it
     ap.held = false;
+    forgetStudy(s, ap.spell);   // mod-0548: it is theirs now; nothing left to resume
     save(t, s);
     const teacher = ap.teacher >>> 0, name = ap.teacherName;
     endApprenticeship(t, 'learned', `You have learned ${r.name} from ${name}. ${r.line}`);

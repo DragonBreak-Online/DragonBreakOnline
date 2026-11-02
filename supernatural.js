@@ -1343,13 +1343,24 @@ module.exports = (api) => {
     // Nat: the blessing belongs to a pack's Alpha, not to anyone who survives the Hunt. Nat 2026-09-26: surviving the Hunt
     // gives Sanies Lupinus, not the beast; the fever runs its days and Hircine's Hunt decides, as after a bite.
     // Nate 2026-09-26: and only at huntMarkChance; an unmarked survivor waits as long as one who failed before running again.
+    // fac-0543 (.kipper, 2 Nov 2026): he ran the Hunt twice and WON both, 6/7 with not one miss, and reported failing
+    // twice and being "locked out for another 24 hours". Nothing misjudged him - every round logged pick=N right=N. The
+    // outcome did: an unmarked win said only "unmarked" and then named a 24 h wait, which to a player who came for the
+    // beast reads as a failure and a punishment. Staff could not tell either, because the mark roll was never logged, so
+    // the ticket sat three days on a video of a win. So: every outcome of a won Hunt now OPENS by saying he outran it,
+    // the wait is phrased as the next attempt rather than a penalty, and the branch is in the log and the audit.
     if (won && r.type === 'hunt') {
       if (Math.random() < C.huntMarkChance) {
-        if (infect(a, 'werewolf', null, true)) return personal(a, 'Hircine lets you go, marked. Sanies Lupinus burns in the wound; when the fever peaks, the beast comes out.');
-        return personal(a, 'Hircine lets you go, but his mark finds no room in you.');
+        const took = infect(a, 'werewolf', null, true);
+        log(`supernatural: ${display(a)} survived the Hunt and was marked${took ? ' with Sanies Lupinus' : ', but the mark found no room'}`);
+        audit(`RITE ${who(a)} survived ${def.title} (${r.hits}/${C.rite.rounds}) and was marked${took ? ' with Sanies Lupinus' : ', but the mark found no room in them'}`);
+        if (took) return personal(a, 'You outrun the Hunt, and Hircine marks you for it. Sanies Lupinus burns in the wound; when the fever peaks, the beast comes out.');
+        return personal(a, 'You outrun the Hunt. Hircine reaches to mark you, and the mark finds no room in you.');
       }
       markRiteWait(a, 'unmarked');
-      return personal(a, `You outrun the Hunt, and Hircine lets you go unmarked. His shrine will hear you again in ${C.riteFailCooldownHours} hours.`);
+      log(`supernatural: ${display(a)} survived the Hunt unmarked; the shrine waits ${C.riteFailCooldownHours} h`);
+      audit(`RITE ${who(a)} survived ${def.title} (${r.hits}/${C.rite.rounds}) unmarked: no disease, the shrine waits ${C.riteFailCooldownHours} h`);
+      return personal(a, `You outrun the Hunt, and Hircine lets you go unharmed. He does not choose to mark you this time. Come to his shrine again in ${C.riteFailCooldownHours} hours to run it once more.`);
     }
     if (won) return becomeVampire(a, true);
     markRiteWait(a, 'failed');

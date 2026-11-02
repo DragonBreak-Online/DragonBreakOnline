@@ -218,6 +218,14 @@ module.exports = (api) => {
   globalThis.__dboSmithBookNeeds = (familyId) => { const f = BY_FAMILY.get(familyId); return f ? { tier: f.tier, scholar: Number(C.scholarForBook[f.tier]) || 0 } : null; };
   globalThis.__dboSmithScholarTier = scholarTier;
   globalThis.__dboSmithCraftTier = craftTier;
+  // mod-0577 (xmonokiinx, 1 Nov 2026): the Blacksmith points a craft tier takes, so a refusal elsewhere can name
+  // the number instead of leaving the smith to guess. 0 for tier 1 and for a tier past the ladder.
+  globalThis.__dboSmithPointsForTier = (tier) => {
+    const t = Math.floor(Number(tier) || 0);
+    if (!(t > 1) || t > C.tierPoints.length) return 0;
+    const n = Number(C.tierPoints[t - 1]);
+    return Number.isFinite(n) ? n : 0;
+  };
   // durability.js: the craft tier a piece's family needs to repair it (1 when it has no family)
   globalThis.__dboSmithItemTier = (itemId) => { const fam = familyOfItem(itemId >>> 0); return fam ? fam.tier : 1; };
   // manuals.js: a technique this smith knows by birth (Bonemold and Chitin for a Dunmer, Orcish for an Orc), so its book

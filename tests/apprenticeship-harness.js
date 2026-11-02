@@ -335,7 +335,33 @@ check('...the total carried over the night', have === capAt.xp);
 r = globalThis.__dboMagicAction(S3, 'apprenticeLeave', []);
 check('leave from the Magic tab (no command, no need to stand beside the teacher)', r.ok && !rec(S3).apprentice && !known(S3).has(FB) && !(rec(T2).apprentices || []).length, [r, rec(T2).apprentices]);
 take(T3, S3, 'Firebolt');
-check('a new teacher for the same spell starts from 0 (no carrying study between teachers)', rec(S3).apprentice && rec(S3).apprentice.xp === 0 && rec(S3).apprentice.dayXp === 0 && rec(S3).apprentice.need === need, rec(S3).apprentice);
+// mod-0548 (luckystefan, 30 Oct 2026): this check used to assert xp === 0, which is the mechanism and not the intent.
+// His teacher released and re-took him twice (22:01:03 then 22:01:19 on 30 Oct), and each release threw away days of
+// study - the bug he reported as "Apprentice ship level keeps reseting". The study now carries per spell.
+// What must NOT change is the line above this: alternating teachers gains nothing. That still holds because the day's
+// spend carries with the xp, so the cap follows the student rather than the lesson. Both halves are checked, because
+// carrying the xp alone would reset dayXp on every retake and let a student study without limit - which is exactly
+// what the first attempt at this fix did, and what this check caught.
+check('a new teacher for the same spell resumes the study (mod-0548)', rec(S3).apprentice && rec(S3).apprentice.xp === have && rec(S3).apprentice.need === need, rec(S3).apprentice);
+check("...carrying the day's stamp and spend with it, so the cap follows the student", rec(S3).apprentice.day === capAt.day && rec(S3).apprentice.dayXp === capAt.dayXp, rec(S3).apprentice);
+check('...and both are told the study stands', saidAny(S3, /study stands: \d+ of \d+/) && saidAny(T3, /keep the \d+ of \d+ they had studied/), [said(S3), said(T3)]);
+// The exploit the old rule guarded against: spend some of a day's allowance, leave, retake at once, and study again
+// on the same day. Five casts only - a full 20 would reach Firebolt's 40 and finish the lesson.
+{
+  tick('schools.apprentice');
+  for (let i = 0; i < 5; i++) { globalThis.__dboSchoolsCast(S3, FB); advance(2000); }
+  const mid = rec(S3).apprentice;
+  check('the resumed lesson studies again on the new day', mid && mid.day === '2026-10-21' && mid.dayXp === 5 && mid.xp === have + 5, mid);
+  globalThis.__dboMagicAction(S3, 'apprenticeLeave', []);
+  take(T3, S3, 'Firebolt'); tick('schools.apprentice');
+  const back = rec(S3).apprentice;
+  check("...and a retake the same day does NOT hand back the day's allowance", back && back.xp === mid.xp && back.day === mid.day && back.dayXp === 5, back);
+  // Ten more only: Firebolt needs 40 and the student is at 26, so a full day's 20 would finish the lesson and
+  // delete the record - the mistake that broke the first draft of this test.
+  for (let i = 0; i < 10; i++) { globalThis.__dboSchoolsCast(S3, FB); advance(2000); }
+  const capped = rec(S3).apprentice;
+  check('...and further study that day comes out of the same allowance, not a fresh one', capped && capped.dayXp === 15 && capped.xp === have + 15, capped);
+}
 // Release from the Magic tab while the apprentice is offline (and still marked held after a crash)
 online = online.filter((x) => x !== S3);
 const id3 = view(T3).apprenticeship.apprentices[0].id;
