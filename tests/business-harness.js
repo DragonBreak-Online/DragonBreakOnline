@@ -168,10 +168,15 @@ const weekBefore = panelOf(OWNER).week;
 globalThis.__dboBusinessLog(CELL, 'Rena rented a bed for 10 gold', 9);
 ui.bizLedger(OWNER, [nonce, 'rent', 30]);
 ok(weekBefore === 24 && panelOf(OWNER).week === 33 && panelOf(OWNER).month === 33, 'the week\'s takings count chest and bed rent', `${weekBefore} -> ${panelOf(OWNER).week}`);
-// A restart gives the book a new id: the one opened is the one the arrows move
+// A second book of this business while its own still stands (mod-0602: Warmaiden's kept three) is put away, not adopted
+const STRAY = 0xff0000ed; setp(STRAY, 'worldOrCellDesc', desc(CELL)); setp(STRAY, 'private.dboBizLedger', { claim: DOOR.toString(16) });
+globalThis.__dboBusinessActivate(STRAY, OWNER);
+ok(deleted.includes(STRAY) && biz().ledger.ref === L1.toString(16), 'a stray second ledger is removed and the business keeps its own book');
+// A restart gives the book a new id (the old id no longer holds it): the one opened is the one the arrows move
+props.delete(`${L1}|private.dboBizLedger`);
 const L2 = 0xff0000ee; setp(L2, 'worldOrCellDesc', desc(CELL)); setp(L2, 'pos', [1, 2, 3]); setp(L2, 'private.dboBizLedger', { claim: DOOR.toString(16) });
 globalThis.__dboBusinessActivate(L2, OWNER);
-ok(biz().ledger.ref === L2.toString(16), 'after a restart the ledger follows the book that was opened');
+ok(biz().ledger.ref === L2.toString(16) && !deleted.includes(L2), 'after a restart the ledger follows the book that was opened');
 ui.bizLedger(OWNER, [panelOf(OWNER).nonce, 'place']);
 ok(deleted.includes(L2) && biz().ledger.ref === placed[placed.length - 1].toString(16), 'placing it again moves it (the old book is removed)');
 setp(OWNER, 'worldOrCellDesc', desc(WORLD));
@@ -190,7 +195,9 @@ setp(DOOR, 'private.housing', { owner: 11, ownerName: 'Stray', partner: OUTDOOR 
 ok(globalThis.__dboBusinessRent(CELL) === null, 'a claim that changed hands closes the business');
 
 // Review A2-1 (2026-09-28): the new owner's /business open keeps the old record under archived, never overwrites it
+const OLD_BOOK = parseInt(String((data.businesses[DOOR.toString(16)].ledger || {}).ref || '0'), 16) >>> 0;
 cmds.business(STRANGER, 'open Stray Hall');
+ok(OLD_BOOK && deleted.includes(OLD_BOOK), "the archived business's ledger is removed with it (mod-0602)");
 const afterOpen = JSON.parse(fs.readFileSync('businesses.json', 'utf8'));
 const arch = Object.entries(afterOpen.archived || {});
 ok(afterOpen.businesses[DOOR.toString(16)].name === 'Stray Hall' && arch.length === 1 && arch[0][1].name === 'The Silver Jug' && arch[0][0].startsWith(DOOR.toString(16) + '@'),

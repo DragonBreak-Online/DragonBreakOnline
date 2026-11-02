@@ -722,8 +722,13 @@ module.exports = (api) => {
     const claim = primary ? claimOf(primary) : null;
     const b = claim ? bizOf(claim.primary) : null;
     if (!b) return personal(a, 'This ledger belongs to no business any more.');
-    // A restart can give the book a new id; the one just opened is the one the arrows move
-    if (!b.ledger || b.ledger.ref !== hex(ref)) {
+    // A second book of this business, left by an earlier record or placing, is put away while its own book still stands
+    const own = ledgerRef(b);
+    if (own && own !== (ref >>> 0) && (get(own, LEDGER_TAG, null) || {}).claim === tag.claim) {
+      try { papyrus('Delete', ref >>> 0, []); } catch (e) { log('business: removing a stray ledger failed', e.message); }
+      log(`business: stray ledger ${hex(ref)} of ${b.name} removed (its book is ${hex(own)})`);
+    } else if (!b.ledger || b.ledger.ref !== hex(ref)) {
+      // A restart can give the book a new id; the one just opened is the one the arrows move
       const q = get(ref, 'pos', null);
       b.ledger = Object.assign({ rot: [0, 0, 0] }, b.ledger || {}, { ref: hex(ref) }, Array.isArray(q) && !(b.ledger && b.ledger.pos) ? { pos: q.map(r1) } : {});
       save();
@@ -833,6 +838,8 @@ module.exports = (api) => {
         const owed = Number(old.owed) || 0;
         if (owed > 0) { d.owedTo = d.owedTo || {}; d.owedTo[heldKey(old)] = (Number(d.owedTo[heldKey(old)]) || 0) + owed; }
         for (const [ref, c] of Object.entries(old.chests || {})) { const st = chestState(c); if (st === 'rented' || st === 'grace') carried[ref] = Object.assign({}, c); }
+        // The old record's book goes with it, or the counter keeps a second ledger that opens the new business (mod-0602)
+        removeLedger(old);
         d.archived[`${hex(claim.primary)}@${Date.now()}`] = Object.assign({}, old, { owed: 0, owedMovedTo: owed > 0 ? heldKey(old) : undefined });
         audit(`BUSINESS ${who(a)} opened a business on claim ${hex(claim.primary)}; the previous record (${old.name}, owner ${old.owner}) was archived, ${owed} gold held for its owner's next login, ${Object.keys(carried).length} rented chest(s) carried over`);
       }
