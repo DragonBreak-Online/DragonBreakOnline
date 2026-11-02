@@ -96,6 +96,32 @@ const checks = async (HousingSystem, check) => {
   check('a restore set: the plan tick runs it, settled or not', !r.done);
   r = await boot({ housingPlaceMigration: 'dryrun', loadOrder: LO }, [1]);
   check('dryrun: the plan is written as before', !r.done);
+
+  // ---- the owner plan: the same, by its own marker (the next 75 s stall on dev once the place plan was skipped) ----
+  const OWNERS = 'housing-owners-settled.json';
+  const OWN = { housingPlaceMigration: 'apply', housingOwnerMigration: 'dryrun', loadOrder: LO };
+  const ownerRun = async (records) => {
+    try { fs.unlinkSync(OWNERS); } catch (e) { /* none */ }
+    const b = await boot(OWN, records.map((x) => x.ref));
+    b.sys.claimed = records.map((x) => x.ref);
+    const byRef = new Map(records.map((x) => [x.ref, x]));
+    Object.assign(b.sys, { read: (_c, ref) => byRef.get(ref) || null, formGone: () => false, charsOf: () => [] });
+    b.sys.dryRunOwners(ctx, false);
+    let mark = null; try { mark = JSON.parse(fs.readFileSync(OWNERS, 'utf8')); } catch (e) { mark = null; }
+    return mark;
+  };
+  const kept = { ref: 7, owner: 5, ownerName: 'Ann', ownerChar: 0xff000001 };
+  const unnamed = { ref: 8, owner: 6, ownerName: 'Bo' };
+  let om = await ownerRun([kept]);
+  check('an owner plan that would change nothing writes its marker with the inputs', !!om && om.decisions === 1 && !!om.inputs && om.inputs.loadOrder, om);
+  r = await boot(OWN, [7]);
+  check('the next boot with the same inputs skips the owner plan, and says so', r.sys.ownerPlanDone === true && /owner plan skipped: settled with these inputs/.test(r.logs.join(' | ')), r.logs.filter((l) => /owner plan/.test(l)));
+  r = await boot(Object.assign({}, OWN, { loadOrder: LO.concat('New.esp') }), [7]);
+  check('...a changed load order runs it again, naming it', r.sys.ownerPlanDone !== true && /owner plan runs: changed since it settled: loadOrder/.test(r.logs.join(' | ')), r.logs.filter((l) => /owner plan/.test(l)));
+  om = await ownerRun([kept, unnamed]);
+  check('an owner plan that would change an owner writes no marker', om === null, om);
+  r = await boot(Object.assign({}, OWN, { housingOwnerMigration: 'off' }), [7]);
+  check('owner migration off: nothing to say about it', !r.logs.some((l) => /owner plan (runs|skipped)/.test(l)), r.logs);
   process.chdir(out);
 };
 
@@ -110,7 +136,9 @@ const check = (name, ok, got) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}$
     ['changed inputs are ignored', 'return changed.length ? `changed since it settled: ${changed.join(", ")}` : "";', 'return "";'],
     ['the load order is not an input', '      loadOrder: hash(all?.["loadOrder"]),\n', ''],
     ['the marker keeps no inputs', ', inputs: this.placeInputs }', ' }'],
-    ['housingPlaceReplan is ignored', 'all?.["housingPlaceReplan"] === true ? "housingPlaceReplan is true" : ', ''],
+    ['the owner plan always runs', '      else { this.ownerPlanDone = true; this.log(', '      else { this.log('],
+    ['an owner plan that changes owners still settles', 'decisions.every((d) => d.how === "kept" || d.how === "root" || d.how === "name")', 'true'],
+    ['housingPlaceReplan is ignored','all?.["housingPlaceReplan"] === true ? "housingPlaceReplan is true" : ', ''],
   ];
   for (const [name, from, to] of MUTANTS) {
     if (!SRC.includes(from)) { check(`mutant "${name}": its line is still in housingSystem.ts`, false, from); continue; }
