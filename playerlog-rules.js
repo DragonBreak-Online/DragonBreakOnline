@@ -2005,7 +2005,7 @@ schools.js SCHOOLS 0b9a63c1 clean
 schools.js SCHOOLS 1a808c9f clean
 schools.js SCHOOLS 035066f1 clean
 schools.js SCHOOLS 49620ca2 clean
-schools.js SCHOOLS 4bf99e52 clean
+schools.js SCHOOLS e25f513a clean
 schools.js SCHOOLS c9a90965 clean
 schools.js SCHOOLS a8bfbc1d clean
 scribing.js SCRIBE a910395c clean
@@ -2093,6 +2093,8 @@ supernatural.js RITE-MISMATCH a93b97ba clean
 supernatural.js RITE 1f3ba523 clean
 supernatural.js RITE 5975fe44 clean
 supernatural.js RITE 660b5a7f clean
+supernatural.js RITE 9cb1134b clean
+supernatural.js RITE b63e2bc7 clean
 supernatural.js SUPERNATURAL 85d18a28 parsed
 supernatural.js SUPERNATURAL 1b9b1278 parsed
 supernatural.js SUPERNATURAL b66c9b3b parsed
