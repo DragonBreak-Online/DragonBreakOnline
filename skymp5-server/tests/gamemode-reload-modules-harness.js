@@ -79,11 +79,11 @@ const SRC = fs.readFileSync(indexFile, 'utf8').replace(/\r\n/g, '\n');
 checks(run(SRC), check);
 
 // ---- mutant: the loader without the eviction ----
-const from = '    const loaded = tempPath ? require.cache[tempPath] : undefined;\n';
+const from = 'delete require.cache[tempPath];';
 if (!SRC.includes(from)) check('mutant: its line is still in index.ts', false, from);
 else {
   let bad2 = 0;
-  checks(run(SRC.replace(from, '    const loaded = undefined as NodeModule | undefined;\n')), (_n, ok) => { if (!ok) bad2++; });
+  checks(run(SRC.replace(from, '')), (_n, ok) => { if (!ok) bad2++; });
   check('mutant caught: generations kept without the eviction', bad2 > 0);
 }
 
