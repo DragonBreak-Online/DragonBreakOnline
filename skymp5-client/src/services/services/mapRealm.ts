@@ -87,6 +87,8 @@ export const LEGEND_HOST = "_root.dboMapLegend";
 // Since 2 Nov the legend is our own CustomMenu over the map instead (nothing can be made inside SkyUI's map); the menu SKSE
 // opens for a custom swf is always this one
 export const LEGEND_MENU = "CustomMenu";
+// The frame of the map's opening our legend menu is opened from at the earliest (T5's, which came alive)
+export const LEGEND_OPEN_FRAME = 60;
 export const LEGEND_SWF = "dbo_maplegend.swf";
 export const LEGEND_ALIVE_FRAMES = 60;
 export interface LegendLoad { phase: "idle" | "loading" | "up" | "off"; frames: number }
@@ -121,6 +123,12 @@ export const newSwfLoad = (): SwfLoad => ({ phase: "idle", frames: 0, tries: 0, 
 // What one frame shows: the menu open, the host clip there, its _url, our swf's dboAlive
 export interface SwfSeen { menu: boolean; clip: boolean; url: string; alive: boolean }
 // One frame, at tick (frames since the map opened): "inject" (make the clip and load the swf), "up", "fail" or ""
+// A movie's _url names this swf: Scaleform escapes it ("Interface/dbo%5Fmaplegend.swf", Nat's 04:33Z line), so it is decoded first
+export const urlNames = (url: string, swf: string): boolean => {
+  let u = String(url || "");
+  try { u = decodeURIComponent(u); } catch { /* a stray % leaves it as it is */ }
+  return u.toLowerCase().endsWith(swf.toLowerCase());
+};
 // tries: MAP_SWF_TRIES for a clip loaded into the map; 1 for our own CustomMenu, which must never be opened twice
 export const swfStep = (st: SwfLoad, tick: number, seen: SwfSeen, swf: string, tries = MAP_SWF_TRIES): string => {
   const t = st.t;
@@ -128,7 +136,7 @@ export const swfStep = (st: SwfLoad, tick: number, seen: SwfSeen, swf: string, t
   if (st.phase === "loading" || st.phase === "up") {
     if (seen.clip && t.clip < 0) t.clip = tick;
     if (seen.url) t.url = seen.url;
-    if (seen.url.toLowerCase().endsWith(swf.toLowerCase()) && t.loaded < 0) t.loaded = tick;
+    if (urlNames(seen.url, swf) && t.loaded < 0) t.loaded = tick;
     if (seen.alive && t.alive < 0) t.alive = tick;
   }
   if (st.phase === "idle") {

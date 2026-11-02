@@ -7,7 +7,7 @@ import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { ButtonEvent, InputDeviceType, Menu } from "skyrimPlatform";
 import { logError, logTrace } from "../../logging";
 import {
-  LABELS_PER_TICK, LEGEND_MENU, LEGEND_SWF, MAP_MENU, MARKER_CLIP, MARKER_COUNT, RealmMarker, WIDGET_ID,
+  LABELS_PER_TICK, LEGEND_MENU, LEGEND_OPEN_FRAME, LEGEND_SWF, MAP_MENU, MARKER_CLIP, MARKER_COUNT, RealmMarker, WIDGET_ID,
   descParts, keyAction, kindIndex, legendJson, legendRows, readMarkers, wantedScale, SwfLoad, newSwfLoad, swfStep, swfReport,
 } from "./mapRealm";
 import {
@@ -204,7 +204,9 @@ export class MapRealmService extends ClientListener {
     const ui = this.sp.Ui;
     const st = this.legendSwf;
     const seen = { menu: false, clip: false, url: "", alive: false };
-    try { seen.menu = ui.isMenuOpen(MAP_MENU); } catch { seen.menu = false; }
+    // Only once the map has settled and shows its markers: our CustomMenu opened on frame 60 came alive (T5, 04:11Z), the
+    // legend's opened on frame 1 loaded its swf but its script never answered (04:32Z). "menu" is that moment in its trace
+    try { seen.menu = ui.isMenuOpen(MAP_MENU) && this.ticksOpen >= LEGEND_OPEN_FRAME && this.labels.length > 0; } catch { seen.menu = false; }
     let busy = false;
     try { busy = st.phase === "idle" && ui.isMenuOpen(LEGEND_MENU); } catch { busy = false; }
     if (busy) return;
@@ -223,6 +225,7 @@ export class MapRealmService extends ClientListener {
       this.publish();
     } else if (step === "fail") {
       logTrace(this, "the map legend menu never came alive: the browser draws it this opening");
+      st.t.url = `${st.t.url} [${this.legendMenuState()}]`;
       this.closeLegendMenu();
       this.sp.browser.setVisible(true);
       this.publish();
@@ -230,6 +233,14 @@ export class MapRealmService extends ClientListener {
   }
 
   // reopenable: R hid it, so showing it again opens it again (the opening's trace kept); a failed or closing one stays down
+  // What our CustomMenu's movie is doing: its frame, frames loaded and the version its script sets (empty if it never ran)
+  private legendMenuState(): string {
+    const ui = this.sp.Ui;
+    const get = (path: string) => { try { return ui.getString(LEGEND_MENU, path); } catch (e) { return "ERR"; } };
+    const n = (path: string) => { try { return ui.getFloat(LEGEND_MENU, path); } catch (e) { return NaN; } };
+    return `frame ${n("_root._currentframe")}/${n("_root._framesloaded")}, version "${get("_root.dboVersion")}", alive "${get("_root.dboAlive")}"`;
+  }
+
   private closeLegendMenu(reopenable = false): void {
     if (!this.legendMenuOpen) return;
     this.legendMenuOpen = false;
@@ -369,10 +380,10 @@ export class MapRealmService extends ClientListener {
     const box = `${num("_root.MarkerClips._x")},${num("_root.MarkerClips._y")} x${num("_root.MarkerClips._xscale")}`;
     const marks = [0, 1, 2, 3, 4, 5].map((i) => `${num(`${MARKER_CLIP(i)}._x`)},${num(`${MARKER_CLIP(i)}._y`)}`).join(" ");
     p.samples.push(`${box} | ${marks}`);
-    if (t === 240) {
+    if (t === 360) {
       let custom = false, map = false;
       try { custom = ui.isMenuOpen(LEGEND_MENU); map = ui.isMenuOpen(MAP_MENU); } catch (e) { /* both false */ }
-      p.r.menu = `legend menu ${this.legendSwf.phase} (open ${custom}), map open ${map}`;
+      p.r.menu = `legend menu ${this.legendSwf.phase} (open ${custom}${custom ? `, ${this.legendMenuState()}` : ""}), map open ${map}`;
     }
     if (t >= 1200) this.sendProbe("done");
   }
