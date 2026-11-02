@@ -13,7 +13,10 @@
     "baseUrl": ".",
     "lib": ["esnext"],
     "paths": { "skyrimPlatform": ["node_modules/@skyrim-platform/skyrim-platform"] },
-    "outDir": "dist"
+    "outDir": "dist",
+    "allowJs": true,
+    "checkJs": false,
+    "resolveJsonModule": true
   },
   "include": ["src/**/*.ts"]
 }

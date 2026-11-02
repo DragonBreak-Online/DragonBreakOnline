@@ -1,0 +1,6 @@
+dboData
+cc:act
+creator-1
+Create your character
+$EverywhereMediumFont
+dboOut

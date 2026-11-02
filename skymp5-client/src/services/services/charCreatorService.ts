@@ -9,9 +9,15 @@ import { BrowserMessageEvent, Menu, MenuOpenEvent } from "skyrimPlatform";
 import { logTrace, logError } from "../../logging";
 import { applyAppearanceToPlayer, Appearance } from "../../sync/appearance";
 import { reenforceServerSpells } from "../../sync/spell";
+import { ScaleformMenuService } from "./scaleformMenuService";
+import { CLOSE_KEY, FAILED_KEY } from "./nativeWidgets";
+import * as Creator from "./charCreator/creatorModel";
+import { buildAppearance, setModHeadparts } from "./charCreator/frontModel";
 
 // Preview payloads larger than this are ignored (malformed or hostile page state).
 const MAX_PREVIEW_JSON = 32 * 1024;
+// The browser creator debounces its previews by this much; the native panel does the same
+const PREVIEW_MS = 200;
 
 // Character creator bridge.
 //
@@ -23,9 +29,10 @@ const MAX_PREVIEW_JSON = 32 * 1024;
 // Client → server (on finish):
 //   { "customPacketType": "charCreatorResult", "data": { ... } }
 //
-// The `charCreator` widget is rendered by skymp5-front; this service shows/hides
-// it, applies local appearance previews and relays the final result. Inert until
-// the server sends charCreatorOpen.
+// The creator is drawn natively first (swf/dbo_creator): its rules run here, in charCreator/creatorModel.ts, built on the
+// front's own modules, and the panel sends back cc:act [key, value]. The `charCreator` widget rendered by skymp5-front
+// is the fallback when the panel is off or fails. Either way this service applies local appearance previews and relays
+// the final result. Inert until the server sends charCreatorOpen.
 export class CharCreatorService extends ClientListener {
   constructor(private sp: Sp, private controller: CombinedController) {
     super();
@@ -33,6 +40,7 @@ export class CharCreatorService extends ClientListener {
     this.controller.on("browserMessage", (e) => this.onBrowserMessage(e));
     this.controller.emitter.on("createActorMessage", (e) => this.onCreateActorMessage(e));
     this.controller.on("menuOpen", (e) => this.onMenuOpen(e));
+    this.controller.on("update", () => this.onUpdate());
   }
 
   // A character switch respawns the player and authService wipes the widgets;
@@ -80,20 +88,7 @@ export class CharCreatorService extends ClientListener {
     // Native game-thread calls throw from the packet handler; defer to update.
     this.controller.once("update", () => {
       if (!this.menuOpen) return;
-      const js =
-        "(function(){" +
-        "if(!window.skyrimPlatform||!window.skyrimPlatform.widgets)return;" +
-        "var others=(window.skyrimPlatform.widgets.get()||[]).filter(function(w){return w&&w.type!=='charCreator';});" +
-        "window.skyrimPlatform.widgets.set(others.concat([{type:'charCreator',config:" + JSON.stringify(this.withModHair(this.config ?? {})) + "}]));" +
-        "})();";
-      try {
-        showUi(this.controller);
-        this.sp.browser.executeJavaScript(js);
-        this.sp.browser.setVisible(true);
-        this.sp.browser.setFocused(true);
-      } catch (e) {
-        logError(this, `failed to show character creator: ${e}`);
-      }
+      if (!this.openNative()) this.showBrowser();
       try {
         this.sp.Game.forceThirdPerson();
         // (movement, fighting, camSwitch, looking, sneaking, menu, activate, journalTabs, disablePOVType)
@@ -103,6 +98,90 @@ export class CharCreatorService extends ClientListener {
         logError(this, `failed to lock controls: ${e}`);
       }
     });
+  }
+
+  private openNative(): boolean {
+    const config = this.withModHair(this.config ?? {}) as { modParts?: unknown; modExtras?: unknown };
+    setModHeadparts(Array.isArray(config.modParts) ? config.modParts : [], config.modExtras && typeof config.modExtras === "object" ? config.modExtras : {});
+    this.cc = Creator.initialState();
+    this.ccConfig = Creator.configOf(config);
+    try {
+      this.native = this.controller.lookupListener(ScaleformMenuService).openNative({
+        type: "charCreator", widget: Creator.view(this.cc, this.ccConfig), onKey: (key, args) => this.onNativeKey(key, args),
+      });
+    } catch (e) {
+      logError(this, `no native creator: ${e}`);
+      this.native = false;
+    }
+    return this.native;
+  }
+
+  private onNativeKey(key: string, args: unknown[]): void {
+    if (!this.menuOpen || !this.native) return;
+    // the panel could not be drawn, went away on its own, or the game cannot type the name: the browser creator instead
+    if (key === FAILED_KEY || key === CLOSE_KEY || (key === "cc:act" && args[0] === "browser")) {
+      logTrace(this, `native creator gave way to the browser (${key})`);
+      if (key !== FAILED_KEY && key !== CLOSE_KEY) this.closeNative();
+      this.native = false;
+      this.cc = undefined;
+      this.showBrowser();
+      return;
+    }
+    if (key !== "cc:act" || !this.cc || !this.ccConfig) return;
+    const r = Creator.act(this.cc, this.ccConfig, String(args[0]), args[1]);
+    this.cc = r.state;
+    if (r.save) {
+      logTrace(this, 'sending charCreatorResult');
+      sendCustomPacket(this.controller, { customPacketType: 'charCreatorResult', data: r.save });
+    }
+    if (r.preview) this.previewAt = Date.now() + PREVIEW_MS;
+    // every action is answered, so the panel never stays waiting
+    this.refreshNative();
+  }
+
+  private refreshNative(): void {
+    if (!this.cc || !this.ccConfig) return;
+    try {
+      this.controller.lookupListener(ScaleformMenuService).refreshNative(Creator.view(this.cc, this.ccConfig));
+    } catch (e) {
+      logError(this, `failed to refresh the native creator: ${e}`);
+    }
+  }
+
+  private closeNative(): void {
+    try {
+      this.controller.lookupListener(ScaleformMenuService).closeNative("charCreator");
+    } catch (e) {
+      logError(this, `failed to close the native creator: ${e}`);
+    }
+  }
+
+  private onUpdate(): void {
+    if (!this.previewAt || Date.now() < this.previewAt) return;
+    this.previewAt = 0;
+    if (!this.menuOpen || !this.native || !this.cc || !this.cc.race) return;
+    try {
+      applyAppearanceToPlayer(buildAppearance(Object.assign({}, this.cc, { name: this.cc.name.trim() })) as Appearance, false, "preview");
+    } catch (e) {
+      logError(this, `failed to apply preview appearance: ${e}`);
+    }
+  }
+
+  private showBrowser(): void {
+    const js =
+      "(function(){" +
+      "if(!window.skyrimPlatform||!window.skyrimPlatform.widgets)return;" +
+      "var others=(window.skyrimPlatform.widgets.get()||[]).filter(function(w){return w&&w.type!=='charCreator';});" +
+      "window.skyrimPlatform.widgets.set(others.concat([{type:'charCreator',config:" + JSON.stringify(this.withModHair(this.config ?? {})) + "}]));" +
+      "})();";
+    try {
+      showUi(this.controller);
+      this.sp.browser.executeJavaScript(js);
+      this.sp.browser.setVisible(true);
+      this.sp.browser.setFocused(true);
+    } catch (e) {
+      logError(this, `failed to show character creator: ${e}`);
+    }
   }
 
   // The race menu grants race and Player-record spells (Flames, Healing, the racial power) as it
@@ -131,6 +210,10 @@ export class CharCreatorService extends ClientListener {
     this.config = undefined;
     logTrace(this, 'closing character creator');
     this.reenforceSpellsAfterCreation();
+    if (this.native) this.closeNative();
+    this.native = false;
+    this.cc = undefined;
+    this.previewAt = 0;
     const js =
       "(function(){" +
       "if(!window.skyrimPlatform||!window.skyrimPlatform.widgets)return;" +
@@ -155,6 +238,11 @@ export class CharCreatorService extends ClientListener {
   }
 
   private forwardError(message: string): void {
+    if (this.native && this.cc) {
+      this.cc = Creator.refused(this.cc, message);
+      this.refreshNative();
+      return;
+    }
     const js =
       "window.dispatchEvent(new CustomEvent('charCreator:error',{detail:" + JSON.stringify(message) + "}));";
     try {
@@ -167,7 +255,8 @@ export class CharCreatorService extends ClientListener {
   private onBrowserMessage(e: BrowserMessageEvent): void {
     const eventKey = e.arguments[0];
     if (typeof eventKey !== 'string') return;
-    if (!this.menuOpen) return;
+    // the native panel has the keys: the browser is neither refocused nor listened to
+    if (!this.menuOpen || this.native) return;
 
     switch (eventKey) {
       case 'charCreator:save':
@@ -268,6 +357,10 @@ export class CharCreatorService extends ClientListener {
   }
 
   private menuOpen = false;
+  private native = false;
+  private cc?: Creator.State;
+  private ccConfig?: Creator.Config;
+  private previewAt = 0;
   private controlsDisabled = false;
   private config?: object;
 }
