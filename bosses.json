@@ -3670,6 +3670,187 @@
     },
     "_loot1031": "Boss loot (Worker 2's _work/boss-loot-1027.md; Nat 31 Oct: 'add more stuff based on boss', the Leader's defaults): coin, the signature material, two picks of the themed pool, two uncommon rolls (extra), the schematic, and a named trophy (trophy.desc empty until its DLE record exists; bosses.js skips it). No gear, artifacts, or ingot or ore above steel."
    }
+  },
+  {
+   "id": "netchbull",
+   "name": "Bellowsback, the brass-grafted bull",
+   "plateName": "Bellowsback",
+   "enabled": false,
+   "waitingOn": "Nat's look at the spot (Blackreach, or the Ashlands in _altSpot) and the name",
+   "hold": "",
+   "world": "1ee62:Skyrim.esm",
+   "openingAdds": 3,
+   "waves": [
+    [
+     0.75,
+     3
+    ],
+    [
+     0.5,
+     3
+    ],
+    [
+     0.25,
+     4
+    ]
+   ],
+   "toughness": 0.85,
+   "damageMult": 1.75,
+   "enrageSeconds": 600,
+   "enrage": {
+    "toughness": 0.65,
+    "damageMult": 2.5
+   },
+   "respawnSeconds": 3600,
+   "radius": 5000,
+   "announce": {
+    "spawn": "Brass hums in the dark of Blackreach: Bellowsback drifts again, its calves close about it.",
+    "death": "Bellowsback sinks into the glow of Blackreach, and its bellows breathe out one last time."
+   },
+   "_tuneNote": "Nat 26 Oct: 'ALL bosses need to be strong like world bosses': a group fight for ~5 players. Big creature: toughness 0.85 (6.7x); enrage at 10 min; 3 opening adds and three waves (3, 3, 4)",
+   "_lore": "Netch are native to Morrowind and Solstheim (UESP Lore:Netch); the lore places none in Skyrim or Blackreach. Ours: a bull the Dwemer of Solstheim (Nchardak, Kagrumez) grafted with brass bellows and pipes. In the Ashlands it is a wild bull gone strange; in Blackreach it is the reason a netch is there at all, kept or carried down by the Dwemer. Calves under threat oil the air and drive a bull to frenzy (UESP), which is why the netchlings come in waves. Shape after Nat's pick of ESO's Grobull the Transmuted (the Leader, 2 Nov), with our own name and lines.",
+   "_laterIdea": "Grobull's 'plays dead until you come close' opening is not in bosses.js: openingDelaySeconds only delays the adds. A later idea needs code (a passive or downed boss until a player is within a radius).",
+   "_altSpot": {
+    "world": "800:Dragonborn.esm",
+    "spot": {
+     "id": "AS",
+     "pos": [
+      45461,
+      11415,
+      321
+     ],
+     "note": "Solstheim's southern Ashlands (a vanilla Bull Netch's placement, Dragonborn 030F39; volcanic-ash weather), 5+ cells from Raven Rock and clear of every Baan Malur region"
+    },
+    "announce": {
+     "spawn": "A low brass hum carries over the ash: Bellowsback drifts again, its calves close about it.",
+     "death": "Bellowsback sinks into the ash, and its bellows breathe out one last time."
+    },
+    "why": "The other candidate. A boss has one world (bosses.js writes its zones with b.world; config spot picks only among spots in that world), so Nat's pick is made here: to move it, put this world, spot and announce in place of the Blackreach ones and rebuild. Solstheim is also closed by the region lock (playtest.closedPlugins), as Karstaag is, so it could not go live there yet."
+   },
+   "boss": {
+    "edid": "DLC2EncNetchBull",
+    "desc": "2857e:Dragonborn.esm",
+    "options": [
+     [
+      36,
+      "2857e:Dragonborn.esm",
+      "DLC2EncNetchBull"
+     ]
+    ]
+   },
+   "adds": [
+    {
+     "edid": "DLC2EncNetchCalf",
+     "desc": "2857f:Dragonborn.esm",
+     "options": [
+      [
+       25,
+       "2857f:Dragonborn.esm",
+       "DLC2EncNetchCalf"
+      ]
+     ]
+    },
+    {
+     "edid": "DLC2EncNetchBetty",
+     "desc": "1b649:Dragonborn.esm",
+     "options": [
+      [
+       40,
+       "1b649:Dragonborn.esm",
+       "DLC2EncNetchBetty"
+      ]
+     ]
+    }
+   ],
+   "spots": [
+    {
+     "id": "BR",
+     "pos": [
+      3979,
+      -5642,
+      194
+     ],
+     "note": "Blackreach, beside its Dwemer automatons (wild:brdwemer bf3b29); about 13,600 units from the Centurion and 15,000+ from the Falmer Warmonger, with no other wild zone within 3,000",
+     "ref": "ee0b3:Skyrim.esm",
+     "anchorDist": 133,
+     "anchorSameCell": true
+    }
+   ],
+   "drops": {
+    "always": [
+     [
+      "f:Skyrim.esm",
+      100
+     ],
+     [
+      "1cd7c:Dragonborn.esm",
+      6
+     ]
+    ],
+    "extra": [
+     [
+      "1cd72:Dragonborn.esm",
+      0.12,
+      3
+     ],
+     [
+      "2b04e:Dragonborn.esm",
+      0.08,
+      4
+     ]
+    ],
+    "pool": {
+     "picks": 2,
+     "items": [
+      [
+       "1cd72:Dragonborn.esm",
+       4,
+       2
+      ],
+      [
+       "2b04e:Dragonborn.esm",
+       3,
+       2
+      ],
+      [
+       "800e4:Skyrim.esm",
+       3,
+       3
+      ],
+      [
+       "34cdf:Skyrim.esm",
+       2,
+       2
+      ],
+      [
+       "34cdd:Skyrim.esm",
+       2,
+       2
+      ]
+     ]
+    },
+    "shards": {
+     "desc": "1cd7c:Dragonborn.esm",
+     "count": 2,
+     "top": 4,
+     "confirmedBy": "DLC2NetchLeather (Dragonborn.esm MISC 01CD7C, read 2 Nov). Netch Leather is the boss signature drop, and the knownBonus is paid in it"
+    },
+    "schematic": {
+     "family": "chitin",
+     "chance": 0.06,
+     "knownBonus": 4
+    },
+    "extraSchematic": {
+     "family": "bonemold",
+     "chance": 0.02
+    },
+    "trophy": {
+     "name": "Bellowsback's Brass Bladder-Valve",
+     "chance": 0.02,
+     "desc": ""
+    },
+    "_loot1031": "Boss loot as the others (boss-loot-1031): coin, the signature material, two picks of the themed pool, two uncommon rolls, the schematic, a named trophy (desc empty until its DLE record exists). No gear, artifacts, or ore above steel."
+   }
   }
  ]
 }

@@ -16,8 +16,8 @@ const REAL = JSON.parse(fs.readFileSync(path.join(ROOT, 'bosses.json'), 'utf8'))
 const def = (id) => REAL.bosses.find((b) => b.id === id);
 
 // ---- the shipped data ----
-ok(REAL.bosses.map((b) => b.id).join() === 'icecap,briarheartking,centurion,palewarlord,falmerwarmonger,movarth,duskthorn,valkynaz,karstaag,risenlegate,minotaurlord,werewolfbehemoth,giantchieftain',
-  'eight bosses: the Ice Cap Wraith, the Briarheart King, the Centurion Master, the Warlord of the Pale Pass, the Falmer Warmonger, the Master of Movarth\'s Lair, the Warchief of Dusk Thorn, the Valkynaz');
+ok(REAL.bosses.map((b) => b.id).join() === 'icecap,briarheartking,centurion,palewarlord,falmerwarmonger,movarth,duskthorn,valkynaz,karstaag,risenlegate,minotaurlord,werewolfbehemoth,giantchieftain,netchbull',
+  'the roster, in order, the netch bull last: the Ice Cap Wraith, the Briarheart King, the Centurion Master, the Warlord of the Pale Pass, the Falmer Warmonger, the Master of Movarth\'s Lair, the Warchief of Dusk Thorn, the Valkynaz');
 ok(def('movarth').night === true && !def('valkynaz').event && def('valkynaz').respawnSeconds === 3600 && def('falmerwarmonger').guardian.options.length && def('duskthorn').guardian.options.length,
   'Movarth\'s master walks at night, the Valkynaz stands on its own (Nat 26 Oct: it was a GM event), the Warmonger and the Warchief have their shamans');
 ok(def('valkynaz').guardian.options[0][2] === 'mihailhighclannfear_NPC' && def('valkynaz').adds[0].options.some((o) => o[2] === 'DDRClannfear') && def('valkynaz').adds[1].options.every((o) => /Scamp/.test(o[2])),
@@ -32,7 +32,12 @@ ok(!REAL.bosses.some((b) => b.devOnly) && !REAL.bosses.some((b) => /test/i.test(
 ok(REAL.bosses.every((b) => b.respawnSeconds === 3600), 'every boss respawns 1 h after it falls (Nat 26 Oct)', REAL.bosses.map((b) => [b.id, b.respawnSeconds]));
 ok(REAL.bosses.every((b) => b.toughness >= 0.85 && b.enrage.toughness >= 0.65 && (!b.guardian || b.guardian.bossToughnessWhileAlive === 0.95) && b.openingAdds >= 3 && b.waves.length === 3 && b.enrageSeconds === 600), 'every boss is a world boss: 6.7x health or more, a 20x guardian shield, 3 opening adds, three waves, enrage at 10 min (Nat 26 Oct)', REAL.bosses.map((b) => [b.id, b.toughness, b.openingAdds]));
 ok(['icecap', 'briarheartking', 'centurion', 'palewarlord', 'falmerwarmonger', 'movarth', 'duskthorn', 'valkynaz', 'risenlegate', 'giantchieftain'].every((id) => def(id).boss.edid === `DBO_Boss_${id}` && def(id).boss.options.length === 1 && def(id).boss.options[0][2] === `DBO_Boss_${id}` && /:DragonBreak Online Edits\.esp$/.test(def(id).boss.options[0][1])), 'the boss bar: each boss spawns as its own DLE copy, the record DragonBreak_Bosses.ini names (TrueHUD, 26 Oct)', REAL.bosses.map((b) => [b.id, b.boss.options.length, b.boss.options[0][2]]));
-ok(REAL.bosses.filter((b) => b.enabled).length === 12 && !def('karstaag').enabled, 'every boss ships on but Karstaag, who waits on Solstheim');
+ok(REAL.bosses.filter((b) => b.enabled).length === 12 && !def('karstaag').enabled && !def('netchbull').enabled, 'every boss ships on but Karstaag, who waits on Solstheim, and the netch bull, who waits on Nat');
+const nb = def('netchbull');
+ok(nb.world === '1ee62:Skyrim.esm' && nb.spots.length === 1 && nb.spots[0].ref && nb.boss.options[0][2] === 'DLC2EncNetchBull' && nb.adds.map((a) => a.options[0][2]).join() === 'DLC2EncNetchCalf,DLC2EncNetchBetty'
+  && nb.drops.always.some((x) => x[0] === '1cd7c:Dragonborn.esm' && x[1] >= 5) && nb.drops.shards.desc === '1cd7c:Dragonborn.esm' && nb.drops.schematic.family === 'chitin' && nb.drops.schematic.knownBonus > 0 && nb.drops.extraSchematic.family === 'bonemold'
+  && nb._altSpot && nb._altSpot.world === '800:Dragonborn.esm',
+  'the netch bull (Nat, 2 Nov): a Bull Netch with calves and betties in Blackreach (the Ashlands kept as _altSpot), Netch Leather always, chitin with bonemold extra, and a Dunmer smith who knows chitin gets more leather', nb && { world: nb.world, boss: nb.boss.options, adds: nb.adds.map((a) => a.options[0][2]) });
 const fams = REAL.bosses.flatMap((b) => ['schematic', 'extraSchematic'].map((k) => b.drops[k] && b.drops[k].family).filter(Boolean));
 ok(REAL.bosses.every((b) => b.drops.schematic && b.drops.schematic.family) && new Set(fams).size === fams.length, 'every boss has a schematic and no two share a family (Nat 26 Oct: "unique schematics")', fams);
 ok(REAL.bosses.every((b) => b.drops.pool && b.drops.pool.picks === 2 && b.drops.pool.items.length >= 5 && b.drops.pool.items.every((x) => /:/.test(x[0]) && x[1] > 0 && x[2] > 0)),
