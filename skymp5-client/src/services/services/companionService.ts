@@ -70,6 +70,9 @@ interface LocalState {
   aliasFailed: boolean;
   reportAt: number;
   fightingTarget: number;
+  // The target startCombat was last forced on, and when
+  forcedTarget: number;
+  forcedAt: number;
   // When the last follow order went to the server after leashing out of an attack order
   leashSentAt: number;
   // Stuck watch: last sampled position, when it stopped moving, and when it was last lifted out
@@ -322,7 +325,7 @@ export class CompanionService extends ClientListener {
       let target = orderId ? this.sp.Actor.from(this.sp.Game.getFormEx(remoteIdToLocalId(orderId))) : null;
       // An attack order it cannot carry out used to strand the summon where it stood: past the leash it drops the order,
       // and it stays leashed until it is back near its owner (leashStep)
-      state.leashed = leashStep(state.leashed, actor.getDistance(player));
+      state.leashed = leashStep(state.leashed, actor.getDistance(player), !actor.getWorldSpace());
       if (target && !target.isDead() && state.leashed) {
         actor.stopCombat();
         state.fightingTarget = 0;
@@ -342,7 +345,7 @@ export class CompanionService extends ClientListener {
           state.driven = false;
           settleTranslation(actor);
         }
-        this.fight(actor, target, state);
+        this.fight(actor, target, state, now);
       } else if (actor.isInCombat()) {
         if (state.driven) {
           state.driven = false;
@@ -529,7 +532,7 @@ export class CompanionService extends ClientListener {
   private stateFor(remoteId: number, actor: Actor): LocalState {
     let state = this.local.get(remoteId);
     if (!state || state.localId !== actor.getFormID()) {
-      state = { localId: actor.getFormID(), following: false, followAngle: 0, followResult: "none", aliasSlot: "", aliasAt: 0, aliasFailed: false, reportAt: 0, fightingTarget: 0, leashSentAt: 0, stuckSince: 0, unstuckAt: 0, driven: false, slot: 0, followSlot: -1, stall: null,
+      state = { localId: actor.getFormID(), following: false, followAngle: 0, followResult: "none", aliasSlot: "", aliasAt: 0, aliasFailed: false, reportAt: 0, fightingTarget: 0, forcedTarget: 0, forcedAt: 0, leashSentAt: 0, stuckSince: 0, unstuckAt: 0, driven: false, slot: 0, followSlot: -1, stall: null,
         appliedTarget: 0, appliedStaying: false, appliedKey: "", pendingKey: "", pendingSince: 0, leashed: false, ranged: false, rangedAt: 0,
         waiting: false, glancing: false };
       this.local.set(remoteId, state);
@@ -603,7 +606,7 @@ export class CompanionService extends ClientListener {
     return !!targetId && targetId === this.skipTarget && now < this.skipUntil;
   }
 
-  private fight(actor: Actor, target: Actor, state: LocalState): void {
+  private fight(actor: Actor, target: Actor, state: LocalState, now: number): void {
     // The fallback follow's keep-offset is left on otherwise: a raised bandit given a player to attack stayed in combat
     // for 30 s at its owner's side (43-341 units) with following true and its offset unchanged (#bugs 2 Oct, Elion)
     if (state.following) {
@@ -612,8 +615,13 @@ export class CompanionService extends ClientListener {
       state.followResult = "offset cleared for an order";
     }
     state.fightingTarget = target.getFormID();
-    if (actor.getCombatTarget()?.getFormID() !== state.fightingTarget) {
+    // Forced every tick it never closed on its target: out of combat at once, else once per order and then every orderRepeatMs
+    const engineTarget = actor.getCombatTarget()?.getFormID() ?? 0;
+    if (engineTarget !== state.fightingTarget && (!engineTarget || state.forcedTarget !== state.fightingTarget
+      || now - state.forcedAt >= CompanionService.orderRepeatMs)) {
       actor.startCombat(target);
+      state.forcedTarget = state.fightingTarget;
+      state.forcedAt = now;
     }
   }
 
@@ -629,7 +637,7 @@ export class CompanionService extends ClientListener {
     // A fight the engine picked itself used to strand the companion: no follow order, no leash either
     if (actor.isInCombat()) {
       const distance = actor.getDistance(player);
-      state.leashed = leashStep(state.leashed, distance);
+      state.leashed = leashStep(state.leashed, distance, !actor.getWorldSpace());
       if (!state.leashed) {
         if (state.following) {
           actor.clearKeepOffsetFromActor();
