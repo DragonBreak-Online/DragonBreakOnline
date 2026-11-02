@@ -697,7 +697,7 @@ export class FormView {
               this.noteFlyer(this.refrId, "move", `z=${Math.round(movement.pos[2])} d=${d} run=${movement.runMode} jump=${!!movement.isInJumpState} dead=${!!movement.isDead}${flyer.offset ? "" : " no-offset"}`);
             }
             const t0Move = perf.now();
-            applyMovement(refr, movement, !!model.isMyClone, !model.appearance && !model.isMyClone, flyer ? { noOffset: !flyer.offset } : undefined);
+            applyMovement(refr, movement, !!model.isMyClone, !model.appearance && !model.isMyClone, { noOffset: flyer ? !flyer.offset : undefined, gapMs: model.movementGapMs });
             perf.addPhase("movement", perf.now() - t0Move);
             this.movState.offsetApplied = true;
             restoreSitCollisionIfMoving(refr, movement);

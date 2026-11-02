@@ -1021,7 +1021,12 @@ export class RemoteServer extends ClientListener {
     }
 
     form.movement = msg.data;
-    form.movementAt = Date.now();
+    const arrivedAt = Date.now();
+    if (form.movementAt) {
+      const gap = arrivedAt - form.movementAt;
+      form.movementGapMs = form.movementGapMs ? form.movementGapMs * 0.7 + gap * 0.3 : gap;
+    }
+    form.movementAt = arrivedAt;
     if (!form.numMovementChanges) {
       form.numMovementChanges = 0;
     }

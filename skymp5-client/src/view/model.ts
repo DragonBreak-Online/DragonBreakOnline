@@ -12,6 +12,9 @@ export interface FormModel extends CreateActorMessageAdditionalProps, CreateActo
   numMovementChanges?: number;
   // Date.now() when the last movement for this form arrived
   movementAt?: number;
+  // Smoothed ms between movement updates for this form: ~130 at full rate, longer when the server's interest management
+  // sends a far mover less often (sync/movementApply.ts stretches its interpolation to match)
+  movementGapMs?: number;
   numAppearanceChanges?: number;
   isMyClone?: boolean;
 }

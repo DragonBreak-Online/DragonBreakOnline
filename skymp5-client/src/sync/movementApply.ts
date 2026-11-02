@@ -21,7 +21,9 @@ const standingMaxDeltaZ = 64;
 // isNpc: the copy is an NPC someone else hosts (no appearance), played back rather than extrapolated (see translateTo)
 // opts.noOffset: moved by translation only, no KeepOffsetFromActor and no head tracking (a dragon's copy under a staff
 // test's FLYER_NO_OFFSET switch, view/flyerGuard.ts)
-export const applyMovement = (refr: ObjectReference, m: Movement, isMyClone?: boolean, isNpc?: boolean, opts?: { noOffset?: boolean }): void => {
+// opts.gapMs: the smoothed time between this form's updates (model.movementGapMs); stretches the interpolation when the
+// server sends a far mover less often (MovementRelay), so it glides between updates instead of stepping
+export const applyMovement = (refr: ObjectReference, m: Movement, isMyClone?: boolean, isNpc?: boolean, opts?: { noOffset?: boolean; gapMs?: number }): void => {
   if (teleportIfNeed(refr, m)) {
     return;
   }
@@ -35,7 +37,7 @@ export const applyMovement = (refr: ObjectReference, m: Movement, isMyClone?: bo
     SpApiInteractor.getControllerInstance().emitter.emit("newLocalLagValueCalculated", { lagUnitsNoZ });
   }
 
-  translateTo(refr, m, !!isNpc);
+  translateTo(refr, m, !!isNpc, opts?.gapMs);
 
   const ac = Actor.from(refr);
   if (!ac) {
@@ -282,15 +284,23 @@ export const forgetLocalCopy = (localId: number): void => {
 // ground and made watched creatures bob, sink and pop out (playtest 2026-09-25). Players keep the look-ahead.
 const NPC_PLAYBACK_S = 0.13;
 
-const translateTo = (refr: ObjectReference, m: Movement, isNpc = false) => {
-  let time = isNpc ? NPC_PLAYBACK_S : 0.2;
+// The interpolation window follows the update rate when updates come clearly slower than the clients' 130 ms (a far
+// mover under the server's interest management, at 2/s or 0.5/s): the copy then glides over the whole gap instead of
+// arriving in 0.2 s and standing still. At full rate it is the old constant. Capped at 2 s
+const MAX_WINDOW_S = 2.0;
+const windowFor = (base: number, gapMs?: number): number =>
+  gapMs && gapMs > base * 1500 ? Math.min(MAX_WINDOW_S, gapMs / 1000) : base;
+
+const translateTo = (refr: ObjectReference, m: Movement, isNpc = false, gapMs?: number) => {
+  let time = windowFor(isNpc ? NPC_PLAYBACK_S : 0.2, gapMs);
 
   const groundGrade = getGroundGrade(refr.getFormID(), m);
 
   // Local lag compensation
   // TODO: Remove "|| 0" hack (added to support old MpClientPlugin)
   // Clamped so a stale speed sample can't fling the clone past the target
-  const distanceAdd = Math.min((m.speed || 0) * time, 128);
+  // The look-ahead cap grows with a stretched window (128 units per 0.2 s), bounded so a stale speed can't fling it far
+  const distanceAdd = Math.min((m.speed || 0) * time, Math.min(512, 128 * Math.max(1, time / 0.2)));
   const direction = m.rot[2] + m.direction;
   gTempTargetPos[0] = m.pos[0];
   gTempTargetPos[1] = m.pos[1];

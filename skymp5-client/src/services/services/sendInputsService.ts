@@ -16,6 +16,7 @@ import { nextHostAttempt } from "../../view/hostAttempts";
 import { SkympClient } from "./skympClient";
 import { MessageWithRefrId } from "../events/sendMessageWithRefrIdEvent";
 import { UpdateMovementMessage } from "../messages/updateMovementMessage";
+import { Movement } from "../../sync/movement";
 import { ChangeValuesMessage } from "../messages/changeValuesMessage";
 import { CloneSpellGuardService } from "./cloneSpellGuardService";
 import { UpdateAnimationMessage } from "../messages/updateAnimationMessage";
@@ -30,6 +31,19 @@ import { hex, trace } from "../../lib/clientDiag";
 const playerFormId = 0x14;
 
 // TODO: split this service into EquipmentService, MovementService, AnimationService, ActorValueService, HostAttemptsService
+// Nothing a watcher would see changed: same place within 2 units and 1 degree, same stance, health and look target
+const near = (a: number, b: number, d: number) => Math.abs(a - b) <= d;
+const sameMovement = (a: Movement, b: Movement): boolean =>
+    a.worldOrCell === b.worldOrCell &&
+    near(a.pos[0], b.pos[0], 2) && near(a.pos[1], b.pos[1], 2) && near(a.pos[2], b.pos[2], 2) &&
+    near(a.rot[0], b.rot[0], 1) && near(a.rot[1], b.rot[1], 1) && near(a.rot[2], b.rot[2], 1) &&
+    a.runMode === b.runMode && a.isInJumpState === b.isInJumpState && a.isSneaking === b.isSneaking &&
+    a.isBlocking === b.isBlocking && a.isWeapDrawn === b.isWeapDrawn && a.isDead === b.isDead &&
+    near(a.healthPercentage, b.healthPercentage, 0.005) && near(a.direction, b.direction, 1) &&
+    near(a.speed || 0, b.speed || 0, 1) &&
+    (!a.lookAt || !b.lookAt ? a.lookAt === b.lookAt :
+        near(a.lookAt[0], b.lookAt[0], 5) && near(a.lookAt[1], b.lookAt[1], 5) && near(a.lookAt[2], b.lookAt[2], 5));
+
 export class SendInputsService extends ClientListener {
     constructor(private sp: Sp, private controller: CombinedController) {
         super();
@@ -157,18 +171,30 @@ export class SendInputsService extends ClientListener {
         const last = this.lastSendMovementMoment.get(refrIdStr);
         if (!last || now - last > sendMovementRateMs) {
             const movement = getMovement(owner, form);
+            const data = _refrId ? movement : this.controller.lookupListener(RestraintService).filterOwnMovement(movement);
+            this.lastSendMovementMoment.set(refrIdStr, now);
+            // An actor standing still re-sent the same position every 130 ms: about half of all movement traffic at 500
+            // bots carried nothing new (Worker B, 18 Oct). An unchanged one is sent only as a heartbeat, often enough
+            // that the server never sees a stale host (5 s) and watchers never take a hosted NPC over (rehostAfterMs 2.1 s)
+            const sent = this.lastSentMovement.get(refrIdStr);
+            if (sent && now - sent.at < SendInputsService.movementHeartbeatMs && sameMovement(sent.data, data)) {
+                return;
+            }
             const message: MessageWithRefrId<UpdateMovementMessage> = {
                 t: MsgType.UpdateMovement,
-                data: _refrId ? movement : this.controller.lookupListener(RestraintService).filterOwnMovement(movement),
+                data,
                 _refrId
             };
             this.controller.emitter.emit("sendMessageWithRefrId", {
                 message,
                 reliability: "unreliable"
             });
-            this.lastSendMovementMoment.set(refrIdStr, now);
+            this.lastSentMovement.set(refrIdStr, { data, at: now });
         }
     }
+
+    private static readonly movementHeartbeatMs = 700;
+    private lastSentMovement = new Map<string, { data: Movement; at: number }>();
 
     private sendActorValuePercentage(_refrId?: number, form?: FormModel) {
         const canSend = form && (form.isDead ?? false) === false;
