@@ -2022,6 +2022,10 @@ BaseActorValues MpActor::GetMaximumValues()
   return values;
 }
 
+// The most private.dboAvBonus adds to one vital: level points, race and an
+// event boss's raise together (gameplay bossvitals.js, Nat 2 Nov)
+constexpr float kMaxVitalBonus = 10000.f;
+
 void MpActor::AddLevelBonus(BaseActorValues& values) const
 {
   const auto& dump = GetDynamicFields().GetValueDump("private.dboAvBonus");
@@ -2035,7 +2039,7 @@ void MpActor::AddLevelBonus(BaseActorValues& values) const
   auto add = [&j](const char* key, float& value) {
     auto it = j.find(key);
     if (it != j.end() && it->is_number()) {
-      value += std::clamp(it->get<float>(), 0.f, 1000.f);
+      value += std::clamp(it->get<float>(), 0.f, kMaxVitalBonus);
     }
   };
   add("health", values.health);
