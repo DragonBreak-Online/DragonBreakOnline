@@ -1,5 +1,20 @@
 [
   {
+    "title": "Court actions and hunters' writs fixed",
+    "date": "2026-11-02",
+    "version": "Server update",
+    "tag": "Hotfix",
+    "sections": [
+      {
+        "heading": "Courts and holds",
+        "items": [
+          "Appointing or dismissing an official, or setting a wage, no longer answers with an error. The change always went through; now you are told so.",
+          "Hunters' writs, unrest, censure and the idle-court warning now work. They had not run since they arrived on 1 November, so notice boards showed no writs and no writ bounties were paid."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Chest outlines back in two dungeons",
     "date": "2026-11-01",
     "version": "Server update",

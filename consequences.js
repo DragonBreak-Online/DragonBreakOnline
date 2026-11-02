@@ -102,10 +102,14 @@ module.exports = (api) => {
 
   const stateDir = () => { try { return path.dirname(fs.realpathSync(path.resolve('world'))); } catch (e) { return path.resolve('.'); } };
   const FILE = path.join(stateDir(), 'consequences.json');
+  // The state's shape is made good on every read, not only when the file is read: the state lives on globalThis across
+  // hot reloads, so one an older version of this file read stays cached. Live, 1 Nov: phase 2 was hot-deployed into a
+  // process whose state phase 1 had read (no p2), and every writ, censure and court stamp threw until a restart
   const data = () => {
-    if (S.data) return S.data;
-    try { S.data = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch (e) { S.data = null; }
-    if (!S.data || typeof S.data !== 'object') S.data = {};
+    if (!S.data) {
+      try { S.data = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch (e) { S.data = null; }
+      if (!S.data || typeof S.data !== 'object') S.data = {};
+    }
     S.data.holds = S.data.holds || {}; S.data.kills = S.data.kills || { day: '', by: {} };
     const p2 = S.data.p2 = S.data.p2 && typeof S.data.p2 === 'object' ? S.data.p2 : {};
     for (const k of ['writs', 'censure', 'court', 'warned', 'called', 'blocked']) if (!p2[k] || typeof p2[k] !== 'object') p2[k] = {};
@@ -243,11 +247,14 @@ module.exports = (api) => {
   const writText = (zone, f) => `${writHunters()} hold an open writ in ${holdName(zone)} against ${f === 'hunt' ? 'the werewolves' : 'the vampires'}: ${P2.writs.bounty[f] || 0} gold for each one slain there, paid to their members.`;
   const censureText = (zone) => `The other courts of the realm censure ${holdName(zone)} for harbouring the creatures of the night. Its trade is shunned, and ${Math.round((Number(P2.pressure.censure) || 0) * 100)}% of its tax income goes unpaid at each reckoning until the hold is cleansed.`;
 
+  // Called after a court action has already succeeded (an appointment, a wage), so it never throws into the caller
   const stampCourt = (zone, kind) => {
     if (!places.has(zone)) return;
-    p2().court[zone] = Date.now();
-    save();
-    log(`consequences: court business in ${holdName(zone)} (${kind || 'business'})`);
+    try {
+      p2().court[zone] = Date.now();
+      save();
+      log(`consequences: court business in ${holdName(zone)} (${kind || 'business'})`);
+    } catch (e) { log('consequences: court stamp failed', e.message); }
   };
   // The court's business, stamped where it succeeds: by the hold, by the hold's faction, or by an official's seats
   globalThis.__dboCourtBusiness = (zone, kind) => { if (C.enabled) stampCourt(String(zone || ''), kind); };
