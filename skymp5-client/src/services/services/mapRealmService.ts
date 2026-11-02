@@ -657,4 +657,3 @@ const MAP_CLOSE_KEYS = [0x0f, 0x01];
 const TAB = 0x0f;
 
 interface MapTest { tick: number; samples: number[]; results: Record<string, unknown> }
-
