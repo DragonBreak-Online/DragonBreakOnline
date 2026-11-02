@@ -203,4 +203,3 @@ TEST_CASE("A watcher is told a server-driven NPC is hosted by someone else",
   p.DestroyActor(kPlayer);
   DoDisconnect(p, 0);
 }
-
