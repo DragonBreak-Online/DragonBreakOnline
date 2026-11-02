@@ -1,9 +1,9 @@
 // The death screen as a native panel (deathScreenService; the browser's constructorComponents/death): the countdown to the
 // temple, what dying means, and three choices, each confirmed first. A confirmed choice sends death:choice [key] to the
-// service, which tells the server (deathChoice); the server or the countdown's end takes the panel down. Escape backs out
-// of a confirm and never closes the screen: death has no way out but these.
+// service, which tells the server (deathChoice); the server or the countdown's end takes the panel down. Once shown,
+// Escape backs out of a confirm and never closes the screen: death has no way out but these.
 
-var DBO_SWF_VERSION = "death-2";
+var DBO_SWF_VERSION = "death-3";
 var PANEL_W = 900;
 var PANEL_H = 600;
 var PAD = 32;
@@ -171,8 +171,13 @@ var keys = {};
 keys.onKeyDown = function()
 {
    var code = dboKey();
+   // before the first payload nothing is shown, so Escape closes as on every panel (native-escape-harness)
    if (data == null)
    {
+      if (code == 27)
+      {
+         dboClose();
+      }
       return;
    }
    if (code == 27)

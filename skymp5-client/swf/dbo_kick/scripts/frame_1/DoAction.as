@@ -1,9 +1,9 @@
 // The kick screen as a native panel (kickService; the browser's form widget 28): why the server let the player go, the
 // seconds until the game closes, and Quit game. Quit sends kick:quit to the service, which closes the game. The service
-// closes it on its own clock; the panel counts down from the seconds it is given. Escape does nothing: the game closes
-// either way.
+// closes it on its own clock; the panel counts down from the seconds it is given. Once shown, Escape does nothing: the
+// game closes either way.
 
-var DBO_SWF_VERSION = "kick-1";
+var DBO_SWF_VERSION = "kick-2";
 var PANEL_W = 760;
 var PANEL_H = 360;
 var PAD = 32;
@@ -91,8 +91,13 @@ var keys = {};
 keys.onKeyDown = function()
 {
    var code = dboKey();
+   // before the first payload nothing is shown, so Escape closes as on every panel (native-escape-harness)
    if (data == null)
    {
+      if (code == 27)
+      {
+         dboClose();
+      }
       return;
    }
    if (code == 38 && actions.length)
