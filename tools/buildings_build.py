@@ -16,6 +16,7 @@ Odd cases are listed, not resolved:
   disabled     a load door the plugins start disabled (left out of the links, listed with its building)
   noWayIn      interior cells joined by load doors that no door from a worldspace leads into (a count, and the first few)
   noCells      a way in whose target cell no interior link reaches (it used to crash this script)
+(References in a cell whose winning record is deleted are dropped with the cell, as deleted references are.)
 
 Runs on the dev server (plugins in /opt/skyrim-data) or on the PC, with the ck-mcp parser:
     python3 tools/buildings_build.py [--data DIR] [--order FILE] [--ck-mcp DIR] [--out FILE] [--check]
@@ -59,10 +60,19 @@ for p in lo.plugins:
     for ri, t, fid, fl, off, sz, ctx in lo.records(p, ('DOOR', 'CONT')):
         kind[lo.canon(p, fid)] = t
 cell_edid = {}
+# A cell the winning record DELETES is not a room any more, and a building must not be built out of
+# one: DragonBreak Online Edits deletes d62:DragonBreak.esp (GolKharzumInteriorDUPLICATE002), whose
+# references still exist in DragonBreak.esp, so without this the map resurrects it. Deleted refs are
+# already dropped below; this is the same rule for the cells they sit in. Last writer wins, as
+# everywhere else here.
+cell_deleted = {}
 for p in lo.plugins:
     for ri, t, fid, fl, off, sz, ctx in lo.records(p, ('CELL',)):
+        c = lo.canon(p, fid)
+        cell_deleted[c] = bool(fl & DELETED)
         e = core.esplib.edid_of(lo.body(p, off, sz, fl))
-        if e: cell_edid[lo.canon(p, fid)] = e
+        if e: cell_edid[c] = e
+deleted_cells = {c for c, d in cell_deleted.items() if d}
 
 # --- every door and container reference, winning version ---
 refs = {}
@@ -80,7 +90,7 @@ for p in lo.plugins:
         refs[c] = {"kind": k, "cell": lo.canon(p, cell) if cell and not w else None, "world": lo.canon(p, w) if w else None,
                    "target": lo.canon(p, struct.unpack('<I', x[:4])[0]) if len(x) >= 4 else None,
                    "disabled": bool(fl & DISABLED), "deleted": bool(fl & DELETED)}
-refs = {c: r for c, r in refs.items() if not r["deleted"]}
+refs = {c: r for c, r in refs.items() if not r["deleted"] and r["cell"] not in deleted_cells}
 loads = {c: r for c, r in refs.items() if r["kind"] == 'DOOR' and r["target"]}
 
 dungeon_cells = set()
