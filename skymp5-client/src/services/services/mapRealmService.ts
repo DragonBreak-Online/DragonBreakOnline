@@ -266,7 +266,7 @@ export class MapRealmService extends ClientListener {
     }
     const world = this.mapWorld > 0 ? worldFor(this.owners, (d) => this.formIdOf(d), this.mapWorld) : null;
     const layer = `${OWNERS_LAYER}`;
-    if (!world) { ui.setBool(LEGEND_MENU, `${layer}._visible`, false); return; }
+    if (!world) { ui.setBool(LEGEND_MENU, `${layer}._visible`, false); this.layerShown = false; return; }
     const key = world.world + "#" + world.territories.map((t) => t.owner).join("|");
     if (key !== this.drawnKey) {
       this.drawnKey = key;
