@@ -56,4 +56,17 @@ check('a failed panel falls to the browser form with the seconds left', /if \(ke
 check('the countdown still closes the game on its own, panel or not', /if \(seconds <= 0\) return this\.quitGame\(\);/.test(SVC) && /if \(this\.native\) return;\s*refreshFormMenu\(/.test(SVC));
 check('the hide-UI key never puts the browser over the panel', /if \(!e\.hidden && this\.exitAt && !this\.native\) this\.sp\.browser\.setFocused\(true\);/.test(SVC));
 
+// ---- mutants: each altered copy must fail this harness (tests/lib/mutants.js) ----
+const AS = 'swf/dbo_kick/scripts/frame_1/DoAction.as';
+const SV = 'src/services/services/kickService.ts';
+const MUTANTS = [
+  ['Quit can send twice', AS, [['   if (quitSent)\n', '   if (false)\n']]],
+  ['Escape closes', AS, [['   if (code == 38 && actions.length)', '   if (code == 27) { dboClose(); return; }\n   if (code == 38 && actions.length)']]],
+  ['the countdown never moves', AS, [['      if (panel.closingField != null)\n', '      if (false)\n']]],
+  ['the panel even over the main menu', SV, [['this.native = strings === translations.en && Date.now() - this.updatedAt < WORLD_RUNNING_MS && this.openNative();', 'this.native = strings === translations.en && this.openNative();']]],
+  ['Russian goes native too', SV, [['this.native = strings === translations.en && ', 'this.native = ']]],
+  ['the browser form drawn over the panel each second', SV, [['    if (this.native) return;\n    refreshFormMenu(', '    refreshFormMenu(']]],
+];
+require('./lib/mutants')(__filename, MUTANTS, check);
+
 T.done();

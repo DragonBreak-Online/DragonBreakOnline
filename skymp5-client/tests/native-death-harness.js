@@ -82,4 +82,18 @@ check('hide (the server, or the failsafe) takes the native panel down', /if \(th
 check('the hide-UI key never puts the browser over the native panel', /if \(!e\.hidden && this\.failsafeTimer !== undefined && !this\.native\) this\.sp\.browser\.setFocused\(true\);/.test(SVC));
 check('the failsafe is armed either way', /this\.armFailsafe\(s\);/.test(SVC));
 
+// ---- mutants: each altered copy must fail this harness (tests/lib/mutants.js) ----
+const AS = 'swf/dbo_death/scripts/frame_1/DoAction.as';
+const SV = 'src/services/services/deathScreenService.ts';
+const MUTANTS = [
+  ['Escape closes the screen', AS, [['      if (pending >= 0 && sent == "")\n      {\n         back();\n      }\n      return;', '      dboClose();\n      return;']]],
+  ['Confirm can send twice', AS, [['   if (pending < 0 || sent != "")\n', '   if (pending < 0)\n']]],
+  ['the countdown never moves', AS, [['      if (panel.leadField != null)\n', '      if (false)\n']]],
+  ['the panel never closes itself', AS, [['   if (getTimer() - startedAt >= (seconds() + SELF_CLOSE_GRACE_S) * 1000)\n', '   if (false)\n']]],
+  ['the panel closes itself too early', AS, [['var SELF_CLOSE_GRACE_S = 15;', 'var SELF_CLOSE_GRACE_S = 5;']]],
+  ['the service always uses the browser', SV, [['    if (!this.native) this.showBrowser(s);\n', '    this.showBrowser(s);\n']]],
+  ['hide leaves the native panel up', SV, [['try { this.controller.lookupListener(ScaleformMenuService).closeNative("death"); }', 'try { /* none */ }']]],
+];
+require('./lib/mutants')(__filename, MUTANTS, check);
+
 T.done();
