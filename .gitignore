@@ -155,6 +155,8 @@ tests/fixtures/mod0422/
 # mod-0422 plan generator: holds the case data (actors with profile ids, staff notes, letters), names characters; kept on CT 115
 tools/mod0422/build_plan.py
 discipline.json
+# Books written by players: their text and authors (authoredbooks.js)
+authored-books.json
 # GMs' F7 event zones, who added each (staffguard.js gmEventZones)
 gm-event-zones.json
 # Discord accounts held out by a suspension (discipline.js discordFile): ids, never in git

@@ -1,0 +1,26 @@
+{
+  "title": "Books Written by Scholars",
+  "date": "",
+  "version": "Server update",
+  "tag": "New",
+  "sections": [
+    {
+      "heading": "Writing books",
+      "items": [
+        "Ranked members of the College of Winterhold, the Synod, the College of Whispers, House Telvanni and the Bards College can now write their own books at a Scholars' Ledger: choose \"Write a book\".",
+        "A book has a title and up to 10 pages. Writing one costs 100 gold, a Paper Roll per page, an Inkwell, and Leather for a tome or Linen Wrap for a bound book (a one-page scroll needs no binding). Keep a Quill in your pack: it is not used up.",
+        "\"Copy a book\" at the ledger makes another copy of a book you wrote, or one written by your own college or house, for half the gold and the same materials.",
+        "Each character may write 3 new books a week and make 15 copies a week."
+      ]
+    },
+    {
+      "heading": "Reading and sharing",
+      "items": [
+        "Your books are kept in your library: type /books to see them and /books read <title or number> to read one.",
+        "Hand a copy to someone standing near you with /books give <name> <title>.",
+        "Put a book on display in your own home with /decor book <title>. Anyone in the home can open it to read it, and your copy stays in your library. A home can display up to 10 books.",
+        "Reading a written book gives no skill experience."
+      ]
+    }
+  ]
+}

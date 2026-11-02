@@ -286,7 +286,7 @@ module.exports = (api) => {
     log(`salvage: ${who(a)} opened the ${station.label} menu at ${descOf(target)}${note ? ` (${note})` : ''}`);
     openWidget(a, {
       type: 'contextMenu', id: WIDGET_ID, mode: 'menu', targetName: note || station.label,
-      actions: [{ id: 'spellbook', label: 'Open your Spell Book' }].concat(schoolActions(a), [{ id: 'books', label: 'Break down old books' }], manualActions(a), tomeActions(a), teachActions(a, target), writeActions(a)),
+      actions: [{ id: 'spellbook', label: 'Open your Spell Book' }].concat(schoolActions(a), [{ id: 'books', label: 'Break down old books' }], manualActions(a), tomeActions(a), teachActions(a, target), writeActions(a), authorActions(a)),
       events: { action: 'dbo:salvageChoose', close: 'dbo:salvageClose' },
     }, true);
   };
@@ -304,6 +304,8 @@ module.exports = (api) => {
   const tomeActions = (a) => { try { return typeof globalThis.__dboTomeShopHere === 'function' && globalThis.__dboTomeShopHere(a) ? [{ id: 'tomes', label: 'Buy spell tomes' }] : []; } catch (e) { return []; } };
   // Writing spell tomes and scrolls (scribing.js; a Master Scholar, Nate 16 Oct, Nate and Swag 17 Oct): rows scribe:tome, scribe:scroll
   const writeActions = (a) => { try { return typeof globalThis.__dboScribingActions === 'function' ? (globalThis.__dboScribingActions(a) || []) : []; } catch (e) { return []; } };
+  // Books written by players (authoredbooks.js; Nat, 2 Nov): rows books:write, books:copy
+  const authorActions = (a) => { try { return typeof globalThis.__dboBooksLedgerActions === 'function' ? (globalThis.__dboBooksLedgerActions(a) || []) : []; } catch (e) { return []; } };
   // Teaching a spell at a college's own ledger (spells.js; Senior ranks and above, Nate 11 Oct)
   const teachActions = (a, target) => { try { return typeof globalThis.__dboTeachLedgerActions === 'function' ? (globalThis.__dboTeachLedgerActions(a, target) || []) : []; } catch (e) { return []; } };
   // A blacksmith's ledger: the schematics it sells, each row sb:<book id>. Its title names the hall's faction where known
@@ -416,6 +418,16 @@ module.exports = (api) => {
       // scribing.js's list opens first and takes the cursor; this one closes after it (panel handoff)
       const done = typeof globalThis.__dboScribingOpen === 'function' && globalThis.__dboScribingOpen(a, id.slice(7), p.target);
       if (!done) return openLedgerMenu(a, p.target, station, id === 'scribe:tome' ? 'Spell tomes are not written here.' : 'Scrolls are not written here.');
+      S.pending.delete(a >>> 0);
+      closeWidget(a, WIDGET_ID);
+      return;
+    }
+    if (station.dedicated && (id === 'books:write' || id === 'books:copy')) {
+      try { if (distanceMeters(a, p.target) > CFG.reachMeters) { closePanel(a); personal(a, `You walked away from the ${station.label}.`); return; } } catch (e) { /* no position */ }
+      log(`salvage: ${who(a)} chose ${id} at the ${station.label}`);
+      // authoredbooks.js's writer or copy list opens first and takes the cursor; this menu closes after it (panel handoff)
+      const done = typeof globalThis.__dboBooksLedgerOpen === 'function' && globalThis.__dboBooksLedgerOpen(a, id.slice(6), p.target);
+      if (!done) return openLedgerMenu(a, p.target, station, id === 'books:write' ? 'You cannot write a book just now.' : 'You cannot copy a book just now.');
       S.pending.delete(a >>> 0);
       closeWidget(a, WIDGET_ID);
       return;

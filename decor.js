@@ -51,6 +51,10 @@ const DEFAULTS = {
   // yields within commonYield or rareYield [min, max] by one Harvesting roll (skills.json harvesting: chance and multiplier by tier);
   // then the planter is empty again. showZ raises the soil and the crop to the planter's bed. tickSeconds: the ripening check.
   planter: { maxPerHome: 4, growHours: 24, rareHours: 48, commonYield: [2, 4], rareYield: [1, 2], baseYield: 2, missYield: 1, showZ: 30, tickSeconds: 60 },
+  // A written book on display (authoredbooks.js; Nat, 2 Nov: "add it to the home decor tool"): /decor book <title> places one
+  // from the owner's library, which keeps the copy; anyone in the home reads it. Its own cap, not the furniture budget. base: a
+  // closed book's model (Skyrim.esm BOOK 0e1640, Clutter\Books\BasicBook03a.nif; the written-book base in Option A)
+  books: { maxPerHome: 10, base: '0e1640:Skyrim.esm' },
   // The Lumber Pile (Nat 26 Oct, a home's saw): a Woodcutter of minTier (0 based; 1 Apprentice) saws carried firewood into
   // Sawn Logs, firewoodPerLogByTier firewood a log by tier, at most logsPerUse logs a use, then cooldownMinutes per player
   // per pile. Who may decorate the home may use it. The piece is one per home (its station keyword) and takes a workbench slot.
@@ -68,6 +72,7 @@ module.exports = (api) => {
   const C = Object.assign({}, DEFAULTS, (api.cfg || {}).decor || {});
   C.study = Object.assign({}, DEFAULTS.study, ((api.cfg || {}).decor || {}).study || {});
   C.planter = Object.assign({}, DEFAULTS.planter, ((api.cfg || {}).decor || {}).planter || {});
+  C.books = Object.assign({}, DEFAULTS.books, ((api.cfg || {}).decor || {}).books || {});
   C.lumber = Object.assign({}, DEFAULTS.lumber, ((api.cfg || {}).decor || {}).lumber || {});
   const BLOCKED = new Set((Array.isArray(C.blockBases) ? C.blockBases : []).map((d) => String(d).toLowerCase()));
   const itemName = (d) => { try { const n = typeof api.itemName === 'function' ? api.itemName(d) : ''; return n && n !== d ? String(n) : String(d); } catch (e) { return String(d); } };
@@ -127,7 +132,14 @@ module.exports = (api) => {
     return S.growing;
   };
   const crops = () => { growing(); return [...S.cropOf.values()]; };
-  const pieceOf = (desc) => { catalog(); return S.byDesc.get(String(desc || '').toLowerCase()) || null; };
+  // A written book is a piece made from its id (book:<id>), never in the catalogue: no cost, its title as its name
+  const bookPiece = (key) => {
+    const m = /^book:(\d+)$/.exec(String(key || ''));
+    if (!m || !C.books.base) return null;
+    let title = ''; try { title = typeof globalThis.__dboBookTitle === 'function' ? globalThis.__dboBookTitle(Number(m[1])) : ''; } catch (e) { title = ''; }
+    return title ? { desc: C.books.base, key: `book:${m[1]}`, name: title, kind: 'book', bookId: Number(m[1]), group: 'books', radius: 25 } : null;
+  };
+  const pieceOf = (desc) => bookPiece(desc) || (catalog(), S.byDesc.get(String(desc || '').toLowerCase()) || null);
   const keyOf = (piece) => piece.key || piece.desc;
   const kindOf = (it) => (it.kind === 'study' ? it.studyKind || 'arcane' : '');
   const sameKind = (items, piece) => items.filter((i) => i.kind === piece.kind && (piece.kind !== 'study' || kindOf(i) === (piece.studyKind || 'arcane')));
@@ -198,7 +210,7 @@ module.exports = (api) => {
   const budgetOf = (pl) => { const b = C.budgets || DEFAULTS.budgets; return b[Math.min(b.length, Math.max(1, pl.cells.length)) - 1]; };
   const usage = (p) => {
     const u = { pieces: 0, lights: 0, stations: new Set(), containers: 0 };
-    for (const it of p.items) { u.pieces++; if (it.light) u.lights++; if (it.station) u.stations.add(it.station); if (it.container) u.containers++; }
+    for (const it of p.items) { if (it.kind === 'book') continue; u.pieces++; if (it.light) u.lights++; if (it.station) u.stations.add(it.station); if (it.container) u.containers++; }
     return u;
   };
   const inCell = (cell) => {
@@ -477,6 +489,13 @@ module.exports = (api) => {
   };
   const budgetProblem = (pl, piece, a) => {
     const p = placeEntry(pl.root, pl.rec), u = usage(p), b = budgetOf(pl);
+    if (piece.kind === 'book') {
+      const cap = Math.max(0, Number(C.books.maxPerHome) || 0);
+      if (sameKind(p.items, piece).length >= cap) return `This home displays its ${cap} written books already.`;
+      if (p.items.some((i) => i.kind === 'book' && i.bookId === piece.bookId)) return `${piece.name} is on display here already.`;
+      const cell = a ? idOf(get(a, 'worldOrCellDesc', '')) : 0;
+      return cell && inCell(cell) >= C.cellCap ? 'This room is full: nothing more can be placed in it.' : null;
+    }
     if (u.pieces >= b.pieces) return `This home holds its ${b.pieces} pieces already. Remove one first.`;
     if (piece.light && u.lights >= b.lights) return `This home has its ${b.lights} lights already.`;
     if (piece.container && u.containers >= b.containers) return `This home has its ${b.containers} placed containers already.`;
@@ -559,6 +578,7 @@ module.exports = (api) => {
     const it = { ref: hex(id), base: piece.desc, name: piece.name, group: piece.group, cell, pos, rot, by: profile(a), char: a >>> 0, at: new Date().toISOString(), paid };
     if (piece.studyKind) it.studyKind = piece.studyKind;
     if (piece.kind) it.kind = piece.kind;
+    if (piece.bookId) it.bookId = piece.bookId;
     if (books) it.books = books;
     if (light) it.light = hex(light);
     if (piece.container) it.container = true;
@@ -798,6 +818,18 @@ module.exports = (api) => {
     if (changed) save();
   };
   if (typeof api.every === 'function') api.every('decor-grow', Math.max(10, Number(C.planter.tickSeconds) || 60) * 1000, () => { try { if (C.enabled) ripen(); } catch (e) { log('decor: ripening failed', e.stack || e.message); } });
+  // authoredbooks.js: a book staff removed leaves every shelf; returns how many pieces went
+  globalThis.__dboDecorRemoveBook = (bookId) => {
+    let n = 0;
+    for (const [root, p] of Object.entries(reg().places)) {
+      for (const it of p.items.filter((i) => i.kind === 'book' && Number(i.bookId) === Number(bookId))) {
+        p.items.splice(p.items.indexOf(it), 1); destroy(it.ref); n++;
+        audit(`DECOR removed book piece ref ${it.ref} place ${root}: the book was removed by staff`);
+      }
+    }
+    if (n) save();
+    return n;
+  };
   // placement.js: whether a cell is inside a claimed, owned property (a Lead GM may change another GM's placement there)
   globalThis.__dboOwnedPlaceAt = (cellDesc) => { try { return !!placeOfCell(idOf(cellDesc)); } catch (e) { return false; } };
   // schools.js asks which study a decor shelf opens: 'arcane', 'priest', or '' when the ref is no decor study shelf
@@ -807,6 +839,12 @@ module.exports = (api) => {
     const found = itemByRef(hex(target));
     if (!found) return false;
     const it = found.item;
+    // A written book on display: anyone in the home reads it (authoredbooks.js), and nobody picks it up
+    if (it.kind === 'book') {
+      try { if (typeof globalThis.__dboBookReadFor === 'function') globalThis.__dboBookReadFor(caster, it.bookId); else personal(caster, 'The book cannot be read just now.'); }
+      catch (e) { log('decor: reading a book failed', e.stack || e.message); }
+      return true;
+    }
     if (it.kind === 'study') {
       // a home is a study of a kind from minForStudy shelves of that kind; then schools.js opens that kind's study
       const kind = kindOf(it), n = found.place.items.filter((i) => kindOf(i) === kind).length, need = Math.max(1, Number(C.study.minForStudy) || 1);
@@ -1021,6 +1059,13 @@ module.exports = (api) => {
       const hits = S.found.get(a >>> 0) || [], n = Number(rest);
       const piece = Number.isInteger(n) && n >= 1 ? hits[n - 1] : pieceOf(rest);
       if (!piece) return personal(a, 'Pick a number from /decor find first.');
+      return startNew(a, piece);
+    }
+    if (sub === 'book') {
+      let b = null; try { b = typeof globalThis.__dboBookInLibrary === 'function' ? globalThis.__dboBookInLibrary(a, rest) : null; } catch (e) { b = null; }
+      if (!b) return personal(a, 'That book is not in your library. /books lists it; /decor book <title or number>.');
+      const piece = bookPiece(`book:${b.id}`);
+      if (!piece) return personal(a, 'Written books cannot be displayed just now.');
       return startNew(a, piece);
     }
     if (sub === 'plant') {

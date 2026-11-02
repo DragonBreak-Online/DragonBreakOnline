@@ -416,6 +416,8 @@ clean_(`SCHOOLS MANUAL SKILLBOOK SCHEMATIC READ CONTRACT CHAMPION CHILL REVIVE F
   UNSTUCK JAIL CONCORDAT EXECUTION OFFERING PRAYER REST WELL CAMP PLAYTIME PLAYTEST REROLL TICKET CRASH-DOWN CRASHLOOP
   RUINBUTTON TAX SUPPLY BOOST STAFF APPEARANCE RECIPE BREW TREASURY ENCH-RESTORE ENCH-LEARNED-REPAIR CLOCK SPELL
   CITIZEN ELECTION BLACKREACH PURSE BIRTHSIGN CONSEQUENCES`);
+// authoredbooks.js (Nat, 2 Nov): book ids, counts, a faction id and a binding word; a title or a page is never in the line
+clean_('BOOKAUTHOR', { roles: R_BY([[/ to $/, 'target']]) });
 // Name #TAG parties with no profile (display()): resolved by name and tag, never by the tag alone
 clean_('LEVEL ROPE STRUGGLE', { display: true });
 // The client-judged minigame mismatches: clean, and a security signal
@@ -1451,6 +1453,10 @@ appearance.js APPEARANCE 8a7cc30f clean
 appearance.js APPEARANCE fa5ed0fc clean
 appearance.js APPEARANCE b80ac1f1 clean
 appearance.js APPEARANCE b0525394 clean
+authoredbooks.js BOOKAUTHOR ab7ddef9 clean
+authoredbooks.js BOOKAUTHOR e7af376d clean
+authoredbooks.js BOOKAUTHOR bd496829 clean
+authoredbooks.js BOOKAUTHOR 83eb2c85 clean
 birthsigns.js BIRTHSIGN b05aa6cf clean
 birthsigns.js BIRTHSIGN 4171b66d clean
 birthsigns.js BIRTHSIGN af92543f clean
@@ -2246,6 +2252,7 @@ decor.js DECOR 8a0396cb excluded
 decor.js DECOR d4f92fc5 excluded
 decor.js DECOR 4fa86672 excluded
 decor.js DECOR 174ec328 excluded
+decor.js DECOR c425e985 excluded
 jail.js JAIL 30daab92 clean
 jail.js JAIL 8d55381d clean
 jail.js JAIL 23dd5d8e clean

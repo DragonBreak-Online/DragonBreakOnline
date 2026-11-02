@@ -184,6 +184,37 @@ ok(/materials are back/.test(last(OWNER)) && held(OWNER, WOOD) === wood && items
 fire('placeSelect', GM, [items()[0].ref]);
 ok(!placementSaid.length, 'placement.js ignores a GM aiming at a decor piece', placementSaid);
 
+// ---- written books on display (authoredbooks.js; Nat, 2 Nov) ----------------------------------------------------------
+{
+  const reads = [];
+  const TITLES = { 5: 'On Frost' };
+  for (let i = 10; i < 21; i++) TITLES[i] = `Volume ${i}`;
+  globalThis.__dboBookTitle = (id) => TITLES[id] || '';
+  globalThis.__dboBookInLibrary = (a, q) => { if (a !== OWNER) return null; const id = Number(Object.keys(TITLES).find((k) => TITLES[k].toLowerCase() === String(q).toLowerCase())); return id ? { id, title: TITLES[id] } : null; };
+  globalThis.__dboBookReadFor = (a, id) => { reads.push([a, id]); return true; };
+  const piecesLine = () => { cmd(OWNER, 'help'); return (/(\d+)\/\d+ pieces/.exec(last(OWNER)) || [])[1]; };
+  const piecesBefore = piecesLine();
+  cmd(STRANGER, 'book On Frost');
+  ok(/not in your library/.test(last(STRANGER)), 'a book not in your library is not displayed');
+  cmd(OWNER, 'book On Frost');
+  const be = lastEdit(OWNER);
+  ok(be && be.base === '0e1640:Skyrim.esm' && be.name === 'On Frost', 'the owner places a written book: a closed book model, named by its title', be);
+  fire('placeMove', OWNER, [be.id, [1150, 1000, 50], [0, 0, 0]]);
+  const bi = items().find((i) => i.kind === 'book');
+  ok(bi && bi.bookId === 5 && bi.name === 'On Frost' && Object.keys(bi.paid || {}).length === 0, 'placed, linked to the book, for no materials', bi);
+  ok(piecesLine() === piecesBefore, 'a displayed book does not use the furniture budget', [piecesBefore, piecesLine()]);
+  cmd(OWNER, 'book On Frost');
+  ok(/on display here already/.test(last(OWNER)), 'the same book is displayed once per home');
+  ok(globalThis.__dboDecorActivate(parseInt(bi.ref, 16), FRIEND) === true && reads.some(([a, id]) => a === FRIEND && id === 5), 'anyone in the home activates it to read it, and nobody picks it up');
+  let placedBooks = 1;
+  for (let i = 10; i < 20; i++) { cmd(OWNER, `book Volume ${i}`); const e = lastEdit(OWNER); if (e && e.name === `Volume ${i}`) { fire('placeMove', OWNER, [e.id, [1100 + i * 10, 1000, 50], [0, 0, 0]]); if (items().some((it) => it.bookId === i)) placedBooks++; } }
+  ok(placedBooks === 10 && /displays its 10 written books already/.test(last(OWNER)), 'at most 10 written books a home (decor.books.maxPerHome)', { placedBooks, last: last(OWNER) });
+  const del0 = deleted.length;
+  ok(globalThis.__dboDecorRemoveBook(5) === 1 && !items().some((i) => i.bookId === 5) && deleted.length === del0 + 1 && audits.some((t) => /^DECOR removed book piece ref .* the book was removed by staff$/.test(t)), 'a book staff removed leaves every shelf, audited');
+  for (const it of items().filter((x) => x.kind === 'book')) globalThis.__dboDecorRemoveBook(it.bookId);
+  ok(!items().some((i) => i.kind === 'book'), 'cleared for the rest of the run');
+}
+
 // ---- the owner leaves: cleared, half owed, paid at the next scan ------------------------------------------------------
 placeAt(OWNER, 'alchemy');
 const before = held(OWNER, SALT), kept = items().length;

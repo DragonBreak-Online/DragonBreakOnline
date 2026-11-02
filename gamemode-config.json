@@ -316,6 +316,19 @@
    "_comment": "Spells refused before the server systems see the cast (gamemode.js castHook), with what the caster is told. For spells that crash the game.",
    "782c5:BSHeartland.esm": "Summon Will-o-the-Wisp is disabled for now: the wisp crashes the game when it appears. It will come back once that is fixed."
  },
+ "authoredBooks": {
+   "_comment": "authoredbooks.js: books written by players (Nat, 2 Nov: 'make it so college factions can craft books to read that cost gold and resources, that way I don't have to CK books in. Telvanni too'; plan _work/authored-books-1102.md, Option B, a library on the character). A ranked member (writeRoles) of a faction in factions writes at a Scholars' Ledger: title and pages through the prose filter, gold plus paperPerPage Paper Rolls a page, an Inkwell and a binding (Leather tome, Linen Wrap book, none for a scroll), with a Quill in the pack. A copy costs copyGoldShare of the gold. Limits (Nat: 'add a certain limit'): writesPerWeek, copiesPerWeek, maxBooksPerAuthor, maxBooks, maxHeld. A GM's /books remove takes a book from every library and shelf. Other keys and defaults in the file header.",
+   "enabled": true,
+   "factions": ["college-of-winterhold", "synod", "college-of-whispers", "house-telvanni", "bards-college"],
+   "writeRoles": ["leader", "officer", "sergeant", "mage"],
+   "gold": 100,
+   "copyGoldShare": 0.5,
+   "writesPerWeek": 3,
+   "copiesPerWeek": 15,
+   "maxBooksPerAuthor": 20,
+   "maxBooks": 2000,
+   "maxHeld": 100
+ },
  "silverTest": {
    "_comment": "silvertest.js: Silver Test in the X menu for Dawnguard, Silver Hand and Vigil of Stendarr members carrying a silver weapon (mestreugway 16 Oct, Nate 19 Oct). The target accepts or chooses Fight or Flee; an accepted test's silver strike within strikeSeconds gives the result to the two of them and, with harmless true, deals no damage. enabled false takes it off the menu. Other keys and defaults in the file header.",
    "enabled": true

@@ -10061,6 +10061,13 @@ try {
   require(DECOR_JS)({ mp, log, personal, audit, who, onUi, sendPacket, isAdmin, tierOf, registerChatCommand, cfg, every, onlineActors, giveItem, findByName, openWidget, closeWidget, hasUiCap, itemName: (d) => adminItemName(d) });
 } catch (e) { log('decor.js failed to load:', e.stack || e.message); globalThis.__dboDecorId = null; globalThis.__dboDecorRef = null; globalThis.__dboDecorActivate = null; globalThis.__dboDecorStudyKind = null; }
 
+// ---- books written by players: the colleges, House Telvanni, the Bards College (server\authoredbooks.js, config "authoredBooks") ----
+try {
+  const AUTHOREDBOOKS_JS = path.resolve('authoredbooks.js');
+  delete require.cache[AUTHOREDBOOKS_JS];
+  require(AUTHOREDBOOKS_JS)({ mp, log, personal, audit, who, display, onlineActors, openWidget, closeWidget, onUi, registerChatCommand, every, cfg, isAdmin, findByName, offlineByTag, takeGold, goldOf, giveItem, distanceMeters, hasUiCap });
+} catch (e) { log('authoredbooks.js failed to load:', e.stack || e.message); for (const k of ['__dboBooksLedgerActions', '__dboBooksLedgerOpen', '__dboBookReadFor', '__dboBookTitle', '__dboBookInLibrary']) globalThis[k] = null; }
+
 // ---- breaking free of bound hands, /struggle (server\struggle.js, config "struggle") --------------
 try {
   const STRUGGLE_JS = path.resolve('struggle.js');
