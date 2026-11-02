@@ -140,6 +140,14 @@ TEST_CASE("A server-driven NPC is never handed to a client, and its neighbour "
   // (2) the stale sweep takes the plain NPC and leaves the tagged one. Give
   // the tagged NPC a hoster the way the gamemode can (mp.setHoster), so there
   // is something for the sweep to take if it fails to skip it
+  // The player must be SUBSCRIBED to the NPC to be told anything about it, and
+  // a test never subscribes anyone - RespawnTest.cpp carries the same line and
+  // the same comment for the same reason. Without this, GetActorListeners() is
+  // empty, UpdateHoster's loop has nobody to send to, and the assertions below
+  // fail against working code (which is exactly what they did on W5's first
+  // build, 2 Nov).
+  Ref(p, kNpc).ForceSubscriptionsUpdate();
+
   p.Messages().clear();
   p.AssignHoster(kNpc, kPlayer);
   REQUIRE(HosterOf(p, kNpc) == kPlayer);
@@ -206,6 +214,15 @@ TEST_CASE("A watcher is told a server-driven NPC is hosted by someone else",
   DoConnect(p, 0);
   p.CreateActor(kPlayer, { 0.f, 0.f, 0.f }, 0.f, 0x3c);
   p.SetUserActor(0, kPlayer);
+
+  // SetUserActor sends the player its OWN CreateActor and nothing else -
+  // PartOne_ActorTest's "SetUserActor" asserts Messages().size() == 1. A
+  // neighbour is described only once the player is subscribed to it, which a
+  // test has to force (see RespawnTest.cpp). Clearing first so the messages
+  // read below are the subscription's, not the player's own.
+  p.Messages().clear();
+  Ref(p, kNpc).ForceSubscriptionsUpdate();
+  Ref(p, kPlain).ForceSubscriptionsUpdate();
 
   auto driven = FindRefrMessage<CreateActorMessage>(p, kNpc);
   auto plain = FindRefrMessage<CreateActorMessage>(p, kPlain);
