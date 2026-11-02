@@ -437,22 +437,38 @@ const note = list.find((n) => /birthsign/i.test(JSON.stringify(n)));
 check('patch-notes.json: a Birthsigns note, dated SHIP_DATE or a date',
   !!note && (note.date === 'SHIP_DATE' || /^\d{4}-\d{2}-\d{2}$/.test(note.date)), note && note.date);
 
-// ---- the Steed's carry weight: the DLE's DBO_ReferralCarry ability (+50, 1D1FA7), given by AddSpell like the Maormer's ----
+// ---- the Steed's carry weight: its own DLE ability DBO_SteedCarry (+50, 1D2505), given by AddSpell like the Maormer's ----
+// The referral reward's DBO_ReferralCarry (1D1FA7) is a separate record (2 Nov, ticket mod-0558: sharing it, a referral player
+// who picked the Steed got +50 once). Both are stubbed here as SPEL records in the order.
 {
   const calls = []; const realCall = mp.callPapyrusFunction; const realLookup = mp.lookupEspmRecordById;
-  const CARRY = 0x481d1fa7;
+  const REFERRAL = 0x481d1fa7, STEED = 0x481d2505;
+  const DESC = { [REFERRAL]: '1d1fa7:DragonBreak Online Edits.esp', [STEED]: '1d2505:DragonBreak Online Edits.esp' };
+  const R_DESC = DESC[REFERRAL], S_DESC = DESC[STEED];
   mp.callPapyrusFunction = (k, cls, fn, self, args) => { calls.push([fn, self.desc, args[0] && args[0].desc]); };
-  mp.lookupEspmRecordById = (id) => ((id >>> 0) === CARRY ? { record: { type: 'SPEL', editorId: 'DBO_ReferralCarry', fields: [] } } : (realLookup ? realLookup(id) : null));
+  mp.lookupEspmRecordById = (id) => (DESC[id >>> 0] ? { record: { type: 'SPEL', editorId: (id >>> 0) === STEED ? 'DBO_SteedCarry' : 'DBO_ReferralCarry', fields: [] } } : (realLookup ? realLookup(id) : null));
   const realDesc = mp.getIdFromDesc, realDescOf = mp.getDescFromId;
-  mp.getIdFromDesc = (d) => (String(d).toLowerCase() === '1d1fa7:dragonbreak online edits.esp' ? CARRY : realDesc ? realDesc(d) : 0);
-  mp.getDescFromId = (id) => ((id >>> 0) === CARRY ? '1d1fa7:DragonBreak Online Edits.esp' : realDescOf ? realDescOf(id) : String(id));
+  mp.getIdFromDesc = (d) => { const k = Object.keys(DESC).find((id) => DESC[id].toLowerCase() === String(d).toLowerCase()); return k ? Number(k) : realDesc ? realDesc(d) : 0; };
+  mp.getDescFromId = (id) => (DESC[id >>> 0] || (realDescOf ? realDescOf(id) : String(id)));
+  const added = (d) => calls.filter((c) => c[0] === 'AddSpell' && c[2] === d).length;
+  const removed = (d) => calls.filter((c) => c[0] === 'RemoveSpell' && c[2] === d).length;
   const ST = 71; race(ST); sign(ST, 'steed'); const LA = 72; race(LA); sign(LA, 'lady');
   globalThis.__dboBirthsignAbilityTick(); globalThis.__dboBirthsignAbilityTick();
-  check('the Steed is given the carry ability once a session; the Lady not (speedSpell is not in this stub\'s order, so only carry)', calls.filter((c) => c[0] === 'AddSpell' && c[2] === '1d1fa7:DragonBreak Online Edits.esp').length === 1 && !calls.some((c) => String(c[1]) === String(mp.getDescFromId(LA))) && state[ST].props['private.dboBirthsignAbility'] === '1d1fa7:DragonBreak Online Edits.esp', calls);
+  check('the Steed is given its own carry ability (DBO_SteedCarry) once a session; the Lady not', added(S_DESC) === 1 && !added(R_DESC) && calls.every((c) => c[1] !== mp.getDescFromId(LA)), calls);
   calls.length = 0; sign(ST, 'lady'); globalThis.__dboBirthsignAbilityTick();
-  check('...taken back when staff change the sign', calls.some((c) => c[0] === 'RemoveSpell') && !state[ST].props['private.dboBirthsignAbility'], calls);
-  calls.length = 0; sign(ST, 'steed'); globalThis.__dboBirthsignAbilityTick(); state[ST].props['private.dboReferralCarry'] = '1d1fa7:DragonBreak Online Edits.esp'; sign(ST, 'lady'); globalThis.__dboBirthsignAbilityTick();
-  check('...but never when the referral reward gave the same ability (it stays theirs)', !calls.some((c) => c[0] === 'RemoveSpell') && !state[ST].props['private.dboBirthsignAbility'], calls);
+  check('...taken back when staff change the sign', removed(S_DESC) === 1 && !state[ST].props['private.dboBirthsignAbility'], calls);
+  // a referral player who picks the Steed: the referral's +50 and the Steed's +50, two spells, both kept
+  calls.length = 0; state[ST].props['private.dboReferralCarry'] = R_DESC; sign(ST, 'steed'); globalThis.__dboBirthsignAbilityTick();
+  check('a referral player who picks the Steed gets the Steed\'s own ability, beside the referral\'s (+100, the ticket\'s bug)', added(S_DESC) === 1 && !removed(R_DESC), calls);
+  calls.length = 0; sign(ST, 'lady'); globalThis.__dboBirthsignAbilityTick();
+  check('...and leaving the Steed takes back only the Steed\'s', removed(S_DESC) === 1 && !removed(R_DESC), calls);
+  // the switch-over: a Steed who held the shared record from before (its held list names 1D1FA7)
+  const MR = 75; race(MR); sign(MR, 'steed'); state[MR].props['private.dboReferralCarry'] = R_DESC; state[MR].props['private.dboBirthsignAbility'] = R_DESC;
+  const MN = 76; race(MN); sign(MN, 'steed'); state[MN].props['private.dboBirthsignAbility'] = R_DESC;
+  calls.length = 0; globalThis.__dboBirthsignAbilityTick();
+  const on = (a, fn, d) => calls.some((c) => c[0] === fn && c[1] === mp.getDescFromId(a) && c[2] === d);
+  check('switch-over, a referral Steed: the old shared copy is the referral\'s and stays; the Steed\'s own is added (the guard at work)', !on(MR, 'RemoveSpell', R_DESC) && on(MR, 'AddSpell', S_DESC), calls);
+  check('switch-over, a Steed without the referral: the old shared copy goes, the Steed\'s own comes (+50 still)', on(MN, 'RemoveSpell', R_DESC) && on(MN, 'AddSpell', S_DESC), calls);
   mp.callPapyrusFunction = realCall; mp.lookupEspmRecordById = realLookup; mp.getIdFromDesc = realDesc; mp.getDescFromId = realDescOf;
 }
 // ---- the Tower's steady hand: lockpick.js scales the snap chance by __dboBirthsignSnapMult ----

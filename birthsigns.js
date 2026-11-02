@@ -85,7 +85,7 @@ const PICKER_ORDER = ['warrior', 'lady', 'steed', 'lord', 'mage', 'apprentice', 
 const PICKER_CAP = 'birthsignPicker';
 const DEFAULTS = { enabled: true, requireAtCreation: true, loginDelaySeconds: 20, reshowSeconds: 90, creationReshowSeconds: 15, fightSeconds: 30,
   // the DLE's DBO_ReferralCarry (CarryWeight +50) and Summerset's AbSSISteed (SpeedMult +2), read from the live order 26 Oct
-  carrySpell: '1d1fa7:DragonBreak Online Edits.esp', speedSpell: 'ffc154:summersetisles.esp', changeOnce: true };
+  carrySpell: '1d2505:DragonBreak Online Edits.esp', speedSpell: 'ffc154:summersetisles.esp', changeOnce: true };
 const SKILL = { blade: 'Blade', blunt: 'Blunt', archery: 'Archery', defense: 'Defense', arcane: 'Arcane Arts', unarmed: 'Martial Arts',
   blacksmith: 'Blacksmith', alchemist: 'Alchemist', woodcutter: 'Woodcutter', miner: 'Miner', tailor: 'Tailor', skinner: 'Skinner',
   scholar: 'Scholar', enchanter: 'Enchanter', priest: 'Priest', cook: 'Cook', harvesting: 'Harvesting', lockpicking: 'Lockpicking' };
@@ -291,9 +291,11 @@ module.exports = (api) => {
   every('birthsignPrompt', 5000, () => { try { tick(); } catch (e) { log('birthsign prompt failed', e.message); } });
 
   // ---- a sign's ability (the Steed's carry weight) ----------------------------------------------------------------------
-  // Given once a session to a player whose sign has `carry` (config carrySpell; default the DLE's DBO_ReferralCarry, a
-  // constant +50 CarryWeight ability, 1D1FA7), taken back when the sign changes. racial.js gives the Maormer's ability the same
-  // way. The referral reward shares the record: a Steed who earned it there has +50 once, not twice (one spell cannot stack).
+  // Given once a session to a player whose sign has `carry` (config carrySpell; default the DLE's DBO_SteedCarry, a
+  // constant +50 CarryWeight ability, 1D2505), taken back when the sign changes. racial.js gives the Maormer's ability the same
+  // way. The Steed's record is its own (DBO_SteedCarry, 1D2505, 2 Nov: ticket mod-0558): until then it shared the referral
+  // reward's DBO_ReferralCarry, and one spell cannot stack, so a referral player who picked the Steed got +50 once, not
+  // twice. The referral guard below still matters: a Steed who held that shared copy keeps it when its own replaces it.
   const ABILITY = 'private.dboBirthsignAbility';
   if (!(S.abilityOn instanceof Set)) S.abilityOn = new Set();
   const spellIdOf = (desc) => { try { const id = mp.getIdFromDesc(String(desc || '')) >>> 0; const r = id ? mp.lookupEspmRecordById(id) : null; return r && r.record && String(r.record.type) === 'SPEL' ? id : 0; } catch (e) { return 0; } };
