@@ -74,6 +74,7 @@ export class MapRealmService extends ClientListener {
     this.layerShown = false;
     this.layerAt = {};
     this.passTabAt = 0;
+    this.mapSeen = false;
     this.flash = newFlash();
     this.mapWorld = 0;
     if (this.testArmed) { this.testArmed = false; this.test = { tick: 0, samples: [], results: {} }; }
@@ -92,6 +93,10 @@ export class MapRealmService extends ClientListener {
   private onButton(e: ButtonEvent): void {
     if (this.open && this.legendMenuOpen && !this.probe.done && e.isDown && e.device === InputDeviceType.Mouse) this.probe.clicks++;
     if (!this.open || !e.isDown || e.device !== InputDeviceType.Keyboard) return;
+    // another CustomMenu over the map (a server panel; ours is the only other): its keys, not the map's (W5, 2 Nov)
+    let panelUp = false;
+    try { panelUp = !this.legendMenuOpen && this.sp.Ui.isMenuOpen(LEGEND_MENU); } catch { panelUp = false; }
+    if (panelUp) return;
     if (this.legendMenuOpen && MAP_CLOSE_KEYS.includes(e.code)) {
       this.closeLegendMenu();
       this.passTabAt = this.ticksOpen + 2;
@@ -116,6 +121,7 @@ export class MapRealmService extends ClientListener {
   // ---- every frame the map is open ----
   private onUpdate(): void {
     this.reveal();
+    this.sweep();
     if (!this.open) return;
     this.ticksOpen++;
     try {
@@ -136,6 +142,30 @@ export class MapRealmService extends ClientListener {
     } catch (err) {
       logError(this, "map frame failed", err);
     }
+  }
+
+  // The safety net (Leader, 2 Nov: Nat's game kept running with every key swallowed, and an invisible CustomMenu fits).
+  // Our legend is opened a frame or more after openCustomMenu, so a map that closes in between leaves it open over
+  // nothing; a map the engine closes may also never send us its close. So on every tick: once the MapMenu has been shut
+  // for two ticks, the opening is closed if we still think it open, and a CustomMenu whose movie is our legend is closed.
+  // Only ours: another CustomMenu (a server panel) has no maplegend version and is left alone.
+  private sweep(): void {
+    const ui = this.sp.Ui;
+    let mapOpen = true;
+    try { mapOpen = ui.isMenuOpen(MAP_MENU); } catch { return; }
+    if (mapOpen && this.open) this.mapSeen = true;
+    this.mapShutTicks = mapOpen ? 0 : this.mapShutTicks + 1;
+    if (this.mapShutTicks < 2) return;
+    // an opening whose map has not shown yet is waiting for it (its open event can come first), not closed
+    if (this.open && this.mapSeen) { logTrace(this, "the map closed without telling us; closing its opening"); this.onMapClose(); }
+    let ours = false;
+    try { ours = ui.isMenuOpen(LEGEND_MENU) && /^maplegend/.test(String(ui.getString(LEGEND_MENU, "_root.dboVersion") || "")); } catch { ours = false; }
+    if (!ours) return;
+    this.legendMenuOpen = false;
+    this.orphans++;
+    // once in the log per session and then every 100th, with the trace of the opening it outlived
+    if (this.orphans === 1 || this.orphans % 100 === 0) logTrace(this, "our map legend was open with no map: closed", String(this.orphans));
+    try { ui.closeCustomMenu(); } catch (err) { logError(this, "the orphaned map legend could not be closed", err); }
   }
 
   // Once per session, a few a frame: Papyrus calls can only be made in the update tick
@@ -489,6 +519,9 @@ export class MapRealmService extends ClientListener {
   private layerShown = false;
   private layerAt: Record<string, number> = {};
   private passTabAt = 0;
+  private mapShutTicks = 0;
+  private mapSeen = false;
+  private orphans = 0;
   private flash: Flash = newFlash();
 }
 
