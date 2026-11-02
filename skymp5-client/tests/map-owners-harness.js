@@ -299,7 +299,7 @@ check('the colours ride on the legend\'s CustomMenu over the map: nothing until 
   && fo.includes('ui.invokeString(LEGEND_MENU, "_root.dboOwners",') && !fo.includes('MAP_MENU, `${layer}') && !/createEmptyMovieClip|loadMovie/.test(fo + fn('loadLegend')) && M.OWNERS_LAYER === '_root.owners.layer');
 check('drawn again only when the world or an owner changes, or the menu comes back', /if \(key !== this\.drawnKey\)/.test(fo) && /world\.territories\.map\(\(t\) => t\.owner\)/.test(fo) && fn('closeLegendMenu').includes('this.drawnKey = "";'));
 check('shown while the player wants it once a fit has held (the last that held kept, so a bad frame never hides it), written only on a change; hidden where no world has owners', fo.includes('const holds = this.ownersShown && fitHolds(fit);') && fo.includes('if (holds && fit) this.goodFit = fit;')
-  && fo.includes('const show = this.ownersShown && !!this.goodFit;') && fo.includes('if (show !== this.layerShown) { ui.setBool(LEGEND_MENU, `${layer}._visible`, show); this.layerShown = show; }')
+  && fo.includes('const show = this.ownersShown && !!this.goodFit;') && fo.includes('if (show !== this.layerShown) { ui.setBool(LEGEND_MENU, `${layer}._visible`, show); this.layerShown = show;')
   && fo.includes('if (!world) { ui.setBool(LEGEND_MENU, `${layer}._visible`, false); this.layerShown = false; return; }'));
 check('the fit is carried from the map\'s stage to our menu\'s (SkyUI\'s _mapWidth/_mapHeight, our dboStage*) before it is set', fo.includes('clipTransform(fitToStage(this.goodFit, this.stage.mapW, this.stage.mapH, this.stage.ours))')
   && fo.includes('"_root.WorldMap._mapWidth"') && fo.includes('"_root.dboStageW"'));

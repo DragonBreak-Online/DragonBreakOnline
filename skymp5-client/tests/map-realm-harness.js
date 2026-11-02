@@ -277,7 +277,11 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   h6.buttonEvent({ isDown: true, device: 0, code: 0x0f });
   h6.update(); h6.update(); h6.update();
   ok(S.taps.length === 1, "with ours already down, Tab is the map's own and nothing is tapped", S.taps);
+  S.packets.length = 0;
   h6.menuClose({ name: 'MapMenu' });
+  const fl = ((S.packets.find((p) => p.event === 'mapSwf') || { args: [{}] }).args[0] || {}).flash || {};
+  ok(fl.held > 0 && fl.noFit >= 10 && fl.failed === 0 && fl.flips === 0 && fl.shown === 2 && fl.hidden === 1 && fl.redraws === 2 && fl.closes.length === 1 && fl.moves >= 2 && fl.maxStep._x >= 99 && fl.signFlips === 0 && typeof fl.seconds === 'number',
+    'the mapSwf line counts what could flash: fits held, failed or short of markers and their flips, the layer shown and hidden, moves and the largest step, redraws, our menu closed', fl);
   // Esc, and the map closing before the tap: nothing tapped (a Tab with no map open would open the tween menu)
   S.taps = []; S.custom = []; S.customOpen = false;
   h6.menuOpen({ name: 'MapMenu' });
