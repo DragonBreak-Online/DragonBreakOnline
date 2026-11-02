@@ -13,7 +13,7 @@ import {
 import {
   ANCHORS_PER_FRAME, OWNERS_LAYER, StageArea, fitToStage, OwnersData, TOGGLE_KEY, TOGGLE_SETTING,
   anchorClips, drawingOf, fitOf, anchorIndex, legendRow, readOwners, worldFor, Anchor, Drawing, Homography, HOM_MIN, MAX_FIT_RMS, Seen,
-  homographyOf, homHolds, homShift, projectDrawing,
+  homographyOf, homHolds, homShift, projectDrawing, Fit, ClipTransform, fitHolds, clipTransform, trackOf, trackTransform,
 } from "./mapOwners";
 
 // for the browser-side widget setter (executed inside the CEF browser)
@@ -74,6 +74,11 @@ export class MapRealmService extends ClientListener {
     this.goodFit = null;
     this.drawnFit = null;
     this.drawnAt = 0;
+    this.flatSent = false;
+    this.shape = null;
+    this.shapeT = null;
+    this.tracked = false;
+    this.layerAt = {};
     this.samplesSent = 0;
     this.sampledAt = 0;
     this.layerShown = false;
@@ -286,6 +291,9 @@ export class MapRealmService extends ClientListener {
     this.drawnKey = "";
     this.layerShown = false;
     this.drawnFit = null;
+    this.flatSent = false;
+    this.tracked = false;
+    this.layerAt = {};
     if (this.ownersSwf.phase === "up") this.ownersSwf.phase = "idle";
     try { this.sp.Ui.closeCustomMenu(); } catch (err) { logError(this, "the map legend menu could not be closed", err); }
     if (reopenable && this.legendSwf.phase === "up") { this.legendSwf.phase = "idle"; this.legendSwf.frames = 0; this.legendSwf.tries = 0; }
@@ -316,6 +324,7 @@ export class MapRealmService extends ClientListener {
       this.flash.redraws++;
       this.drawing = drawingOf(world, this.owners.factions, this.owners.reach, this.owners.fade);
       this.drawnFit = null;
+      this.flatSent = false;
       this.publish();
     }
     // the two stages, read once an opening: the map's visible size (SkyUI's _mapWidth/_mapHeight) and our menu's
@@ -327,7 +336,8 @@ export class MapRealmService extends ClientListener {
       };
       st.t.url = `map ${this.stage.mapW}x${this.stage.mapH}, ours ${this.stage.ours.width}x${this.stage.ours.height} at ${this.stage.ours.left},${this.stage.ours.top}`;
     }
-    // Each frame fits a homography to every anchor the map shows; one that does not hold leaves the colours where they
+    if (world.flat === true) { this.followFlat(layer); return; }
+    // Off a flat map (T turned them on over the 3D relief): each frame fits a homography to every anchor the map shows; one that does not hold leaves the colours where they
     // were (never hidden: Nat saw them flash on 2 Nov). The drawing is projected and sent again only when the fit would
     // move it by more than LAYER_STILL px, at most every REDRAW_FRAMES frames while the map moves: a still map sends nothing.
     const fit = this.ownersShown ? this.fitNow() : null;
@@ -359,6 +369,57 @@ export class MapRealmService extends ClientListener {
     if (holds && st.t.fit < 0) st.t.fit = this.ticksOpen;
   }
 
+  // A flat map: the drawing sent once in world units, the shape fitted once, and the layer moved to the map's zoom, pan and
+  // turn every frame from the anchors it shows (trackOf), in the same frame (Nat, 2 Nov: the redrawn colours lagged a pan
+  // and snapped back). Positions are carried to our stage first, so the layer's numbers are our stage's.
+  private followFlat(layer: string): void {
+    const ui = this.sp.Ui;
+    const st = this.ownersSwf;
+    const fl = this.flash;
+    if (!this.ownersShown || !this.drawing || !this.stage) {
+      if (this.layerShown) { ui.setBool(LEGEND_MENU, `${layer}._visible`, false); this.layerShown = false; fl.hidden++; }
+      return;
+    }
+    if (!this.flatSent) {
+      try { ui.invokeString(LEGEND_MENU, "_root.dboOwners", JSON.stringify(this.drawing)); } catch (err) { logError(this, "map owners data failed", err); }
+      this.flatSent = true;
+      this.layerAt = {};
+      if (st.t.drawn < 0) st.t.drawn = this.ticksOpen;
+    }
+    this.fitNow();
+    const o = this.stage.ours;
+    const kx = o.width / (this.stage.mapW > 0 ? this.stage.mapW : o.width), ky = o.height / (this.stage.mapH > 0 ? this.stage.mapH : o.height);
+    const seen = this.lastSeenAt === this.ticksOpen ? this.lastSeen.map((q) => ({ x: q.x, y: q.y, sx: o.left + q.sx * kx, sy: o.top + q.sy * ky })) : [];
+    if (!this.shape) {
+      const f = fitOf(seen);
+      if (fitHolds(f) && f) { this.shape = f; this.shapeT = clipTransform(f); }
+    }
+    const t = this.shape ? trackOf(this.shape, seen) : null;
+    const holds = !!t && t.rms <= MAX_FIT_RMS;
+    if (!t) fl.noFit++; else if (holds) fl.held++; else fl.failed++;
+    if (t && fl.lastHolds !== null && fl.lastHolds !== holds) fl.flips++;
+    if (t) fl.lastHolds = holds;
+    if (holds && t && this.shapeT) {
+      const c = trackTransform(this.shapeT, t);
+      const parts: [string, number][] = [["._x", c.x], ["._y", c.y], ["._xscale", c.xscale], ["._yscale", c.yscale], ["._rotation", c.rotation], [".shapes._rotation", c.inner]];
+      let wrote = false;
+      for (const [p, v] of parts) {
+        const was = this.layerAt[p];
+        if (was !== undefined && Math.abs(was - v) < LAYER_STILL / 10) continue;
+        if (was !== undefined) fl.maxStep[p] = Math.max(fl.maxStep[p] || 0, Math.round(Math.abs(was - v) * 10) / 10);
+        ui.setFloat(LEGEND_MENU, `${layer}${p}`, v);
+        this.layerAt[p] = v;
+        wrote = true;
+      }
+      if (wrote) fl.moves++;
+      this.tracked = true;
+      if (st.t.fit < 0) st.t.fit = this.ticksOpen;
+    }
+    const show = this.tracked;
+    if (show !== this.layerShown) { ui.setBool(LEGEND_MENU, `${layer}._visible`, show); this.layerShown = show; if (show) fl.shown++; else fl.hidden++; }
+    if (t) this.lastFit = { n: t.n, rms: t.rms, affine: this.lastAffine };
+  }
+
   // Every anchor the map shows this frame, in the root's own units; the affine rms on the same set is kept for the report,
   // so a line from the game says how much the homography gains on that map
   private fitNow(): Homography | null {
@@ -375,8 +436,10 @@ export class MapRealmService extends ClientListener {
       if (!ui.getBool(MAP_MENU, `${clip}._visible`)) continue;
       seen.push({ sx: bx + ui.getFloat(MAP_MENU, `${clip}._x`) * kx, sy: by + ui.getFloat(MAP_MENU, `${clip}._y`) * ky, x: a.x, y: a.y });
     }
+    this.lastSeen = seen;
+    this.lastSeenAt = this.ticksOpen;
     const H = homographyOf(seen);
-    if (H) { this.lastSeen = seen; const af = fitOf(seen); this.lastAffine = af ? Math.round(af.rms * 100) / 100 : -1; }
+    if (H) { const af = fitOf(seen); this.lastAffine = af ? Math.round(af.rms * 100) / 100 : -1; }
     if (H) this.sampleFit(H, seen);
     return H;
   }
@@ -547,6 +610,12 @@ export class MapRealmService extends ClientListener {
   private drawing: Drawing | null = null;
   private lastSeen: Seen[] = [];
   private lastAffine = -1;
+  private lastSeenAt = -1;
+  private flatSent = false;
+  private shape: Fit | null = null;
+  private shapeT: ClipTransform | null = null;
+  private tracked = false;
+  private layerAt: Record<string, number> = {};
   private samplesSent = 0;
   private sampledAt = 0;
   private layerShown = false;

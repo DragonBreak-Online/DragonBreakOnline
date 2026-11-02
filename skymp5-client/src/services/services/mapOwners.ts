@@ -452,6 +452,34 @@ export const homShift = (a: Homography, b: Homography, at: Seen[]): number => {
 // split as R(outer) * S * R(inner): the "layer" clip turns by outer and scales, its "shapes" child turns by inner
 export interface ClipTransform { x: number; y: number; rotation: number; xscale: number; yscale: number; inner: number }
 const DEG = 180 / Math.PI;
+// On a flat, top-down map (Nat's paper maps, 2 Nov: a homography's rms 0, an affine's 1.2) the view only zooms, pans and
+// perhaps turns. So the map's shape is fitted once (an affine fit that holds, split once by clipTransform) and each frame
+// solves only that: screen = a * (shape's matrix * world) + b, with a a complex number (zoom and turn) and b the pan, from
+// the anchors the map shows, at least two. The layer then keeps the shape's split and only adds the turn, scales by the
+// zoom and moves to the pan, so it follows the map in the same frame and never swings between two equal splits.
+export interface Track { s: number; turn: number; x: number; y: number; rms: number; n: number }
+export const trackOf = (shape: Fit, seen: Seen[]): Track | null => {
+  if (seen.length < 2) return null;
+  const n = seen.length;
+  const P = seen.map((q) => [shape.m00 * q.x + shape.m01 * q.y, shape.m10 * q.x + shape.m11 * q.y]);
+  let px = 0, py = 0, qx = 0, qy = 0;
+  seen.forEach((q, k) => { px += P[k][0]; py += P[k][1]; qx += q.sx; qy += q.sy; });
+  px /= n; py /= n; qx /= n; qy /= n;
+  let ar = 0, ai = 0, den = 0;
+  seen.forEach((q, k) => {
+    const dpx = P[k][0] - px, dpy = P[k][1] - py, dqx = q.sx - qx, dqy = q.sy - qy;
+    ar += dqx * dpx + dqy * dpy; ai += dqy * dpx - dqx * dpy; den += dpx * dpx + dpy * dpy;
+  });
+  if (den < 1e-9) return null;
+  ar /= den; ai /= den;
+  const bx = qx - (ar * px - ai * py), by = qy - (ai * px + ar * py);
+  let e = 0;
+  seen.forEach((q, k) => { e += (ar * P[k][0] - ai * P[k][1] + bx - q.sx) ** 2 + (ai * P[k][0] + ar * P[k][1] + by - q.sy) ** 2; });
+  return { s: Math.hypot(ar, ai), turn: Math.atan2(ai, ar) * DEG, x: bx, y: by, rms: Math.sqrt(e / n), n };
+};
+// The layer for a track: the shape's split, turned, scaled and moved
+export const trackTransform = (shapeT: ClipTransform, t: Track): ClipTransform =>
+  ({ x: t.x, y: t.y, rotation: shapeT.rotation + t.turn, xscale: shapeT.xscale * t.s, yscale: shapeT.yscale * t.s, inner: shapeT.inner });
 export const clipTransform = (f: Fit): ClipTransform => {
   const a = f.m00 * DRAW_SCALE, b = f.m01 * DRAW_SCALE, c = f.m10 * DRAW_SCALE, d = f.m11 * DRAW_SCALE;
   const E = (a + d) / 2, F = (a - d) / 2, G = (c + b) / 2, H = (c - b) / 2;
