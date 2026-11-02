@@ -332,10 +332,7 @@ private:
     settingsByPluginNameCache.reset();
   }
 
-  JsEngine* GetJsEngine()
-  {
-    return JsEngine::GetSingleton();
-  }
+  JsEngine* GetJsEngine() { return JsEngine::GetSingleton(); }
 
   std::vector<std::filesystem::path> GetPathsToLoad(
     const std::filesystem::path& directory)
