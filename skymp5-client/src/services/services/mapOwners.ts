@@ -30,6 +30,7 @@ const CIRCLE_SIDES = 64;
 // The tint and the hairline, as W6's C2 (tint 0.22, line 0.45)
 export const TINT_ALPHA = 22;
 export const LINE_ALPHA = 45;
+export const RING_ALPHA = 75;
 // On a paper map (a flat world) the parchment is light and warm, so the tint is stronger and a colour near the paper's own
 // is pushed off it (Nat, 2 Nov: "a little muted for some", the tans of the Reach and Whiterun almost gone): more saturated,
 // and no lighter than PAPER_MAX_L. PAPER is the parchment as the Tamriel sheet shows it.
@@ -297,15 +298,15 @@ const cellDrawing = (w: OwnersWorld, factions: Record<string, Faction>, reach: n
       i = e;
     }
   }
-  // each stronghold over the holds: its own territory's colour, a little stronger, ringed by a hairline
+  // each stronghold over the holds: its cells already carry its owner's colour (a stronghold wins inside its radius), so it
+  // gets only its edge, a ring a little stronger than a hold's hairline (Nat, 2 Nov: a filled disc read as a grey blot)
   for (const sh of w.strongholds || []) {
     const o = ownerAt({ world: w.world, aliases: w.aliases, territories: ts, strongholds: [sh] }, sh.x, sh.y);
     const rgb = o ? colour(ts[o.t].owner) : null;
     if (!rgb) continue;
     const ring: Pt[] = [];
     for (let k = 0; k <= CIRCLE_SIDES; k++) { const a = (k / CIRCLE_SIDES) * Math.PI * 2; ring.push([sh.x + sh.r * Math.cos(a), sh.y + sh.r * Math.sin(a)]); }
-    fills.push({ rgb: rgbOf(rgb), alpha: tint, pts: flat(ring) });
-    lines.push({ rgb: rgbOf(darker(rgb)), alpha: LINE_ALPHA, pts: flat(ring) });
+    lines.push({ rgb: rgbOf(darker(rgb)), alpha: RING_ALPHA, pts: flat(ring) });
   }
   return { fills, lines, owners: Array.from(new Set(ts.map((x) => x.owner))) };
 };

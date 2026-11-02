@@ -151,8 +151,10 @@ const scenarios = (M, c) => {
   for (let j = 0; j + 1 < N; j++) for (let i = 0; i < N; i++) { const a = cellOwner(i, j), b = cellOwner(i, j + 1); if (a && b && a !== b) edges++; }
   const lineLen = cellLines.reduce((s, l) => s + Math.hypot((l.pts[2] - l.pts[0]) * S0, (l.pts[3] - l.pts[1]) * S0), 0);
   c('...and together they cover every such cell edge exactly once', Math.abs(lineLen - edges * 4096) < 4096 * 0.01, [lineLen / 4096, edges]);
-  const ringFill = cd.fills.find((f) => f.pts && f.alpha === M.TINT_ALPHA);
-  c('the stronghold drawn over the holds: its own colour, a little stronger, with a hairline ring', !!ringFill && ringFill.rgb === 200 && cd.lines.some((l) => l.pts.length > 4));
+  // its cells already carry its colour: the stronghold adds only its edge, no disc over them (Nat, 2 Nov: a grey blot)
+  const ring = cd.lines.find((l) => l.pts.length > 4);
+  c('the stronghold drawn as its edge only: a ring in its owner\'s darker colour, stronger than a hairline, and no filled disc', !!ring && ring.alpha === M.RING_ALPHA && M.RING_ALPHA > M.LINE_ALPHA
+    && ring.rgb === Math.round(200 * 0.55) && !cd.fills.some((f) => f.pts), [ring && [ring.rgb, ring.alpha], cd.fills.filter((f) => f.pts).length]);
   c('no table: the same world is drawn by its markers', M.drawingOf(Object.assign({}, cw, { cells: undefined }), factions, 30000, 45000).fills.every((f) => f.pts && !f.rects));
 
   // ---- lining it up ----
