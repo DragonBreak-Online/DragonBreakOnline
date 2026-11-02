@@ -350,6 +350,8 @@
     "0_ConjureSkele": "none",
     "0_PuppetManConjureBook": "none",
     "mihailgoronspellbook": "none",
+    "_kotnGhost": "2 Nov (W6, window-1104): Conjure Knights Of The Nine Spirit, matys knights of the nine armor 2.1.esp, was in Give all spells but missing from spell-tomes.json; added there, so it needs a place. Skyrim, where the mod's armour and the KotN patch's quest live, as the Summer Druid set.",
+    "SpellTomeConjureKONGhost": ["skyrim"],
     "SpellTomeIceStorm": ["cyrodiil","skyrim"],
     "BSKSpellTomeGreaterToxicMissile": ["cyrodiil"],
     "BSKSpellTomeToxicMissile": ["cyrodiil"],
