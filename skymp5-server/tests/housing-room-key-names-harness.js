@@ -73,6 +73,7 @@ const KEY_BASE = 0xdb0e2;
     sys.placeMigration = 'apply';
     sys.holdOf = () => null; sys.holdRanks = () => []; sys.saveRegistry = () => { };
     sys.isAdmin = (c, a) => (a >>> 0) === STAFF;
+    sys.isStaffOverride = (c, a) => (a >>> 0) === STAFF;
     sys.overCap = () => '';
     sys.nearProperty = () => true; sys.notice = () => { }; sys.sendMenu = () => { };
     sys.partnerOf = (c, id) => PARTNER[id >>> 0] || 0;
