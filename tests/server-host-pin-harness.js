@@ -1,6 +1,6 @@
 // serverhostpin.js: the zero-C++ host-pinning experiment for Option B phase 1
-// (_work\server-npc-movement-1102.md). Driven with a fake mp, so the refusal and the tag are proven rather
-// than hoped for, and each mutant must make a check fail.
+// (_work\server-npc-movement-1102.md). Driven with a fake mp, so the refusal, the zone match and the tag are
+// proven rather than hoped for, and each mutant must make a check fail.
 //
 //   node tests/server-host-pin-harness.js
 'use strict';
@@ -16,6 +16,7 @@ const check = (name, ok, got) => {
 };
 
 // A fake mp: properties per form id, a hoster table, and a throw switch so the guards are exercised.
+// spawn() seeds private.npcSpawner the way npcSpawnSystem does, which is how the module finds its NPC.
 const makeMp = (opts) => {
   const o = opts || {};
   const props = new Map();
@@ -23,6 +24,7 @@ const makeMp = (opts) => {
   return {
     props,
     hosters,
+    spawn: (id, zone) => { const p = props.get(id) || {}; p['private.npcSpawner'] = zone; props.set(id, p); },
     get: (id, key) => {
       if (o.getThrows) throw new Error('no such form');
       return (props.get(id) || {})[key];
@@ -56,8 +58,11 @@ const load = (text) => {
 };
 const mod = load(src);
 
-const NPC = 0xff001234;
-const OTHER = 0xff005678;
+const ZONE = 'guard:bruma:8';
+const NPC = 0xff001234;        // the guard spawned for ZONE
+const MATE = 0xff001235;       // a second guard in the same zone, for the per-npc gap
+const OTHER = 0xff005678;      // an NPC spawned for a different zone
+const LOOSE = 0xff009999;      // an actor with no spawner tag at all
 
 // One place that knows the module's calling convention, so a change to it is one edit here rather than
 // twenty. Returns the module and the stand-ins, because several checks read the recorded passes and lines.
@@ -65,22 +70,27 @@ const start = (M, mode, mp, st, opts) => {
   const o = opts || {};
   const every = o.noEvery ? undefined : makeEvery();
   const lines = [];
-  const p = M({
-    mp,
-    every,
-    log: (s) => lines.push(String(s)),
-    cfg: { serverHostPin: Object.assign({ mode, npc: NPC }, o.cfg || {}) },
-    state: st || {},
-  });
+  const cfg = Object.assign({ mode }, 'zone' in o ? { zone: o.zone } : { zone: ZONE }, o.npc ? { npc: o.npc } : {});
+  const p = M({ mp, every, log: (s) => lines.push(String(s)), cfg: { serverHostPin: cfg }, state: st || {} });
   return { p, every, lines };
+};
+
+// A populated world: two guards in the watched zone, one in another, one untagged.
+const world = (opts) => {
+  const mp = makeMp(opts);
+  mp.spawn(NPC, ZONE);
+  mp.spawn(MATE, ZONE);
+  mp.spawn(OTHER, 'guard:bruma:3');
+  return mp;
 };
 
 // ---- off is genuinely inert, so the module can be deployed before anyone decides to use it ----
 {
-  const mp = makeMp();
+  const mp = world();
+  const before = JSON.stringify([...mp.props]);
   const { p, every } = start(mod, 'off', mp, {});
   p.apply();
-  check('off: nothing is tagged', p.tagged(NPC) === false && mp.props.size === 0);
+  check('off: nothing is tagged', p.tagged(NPC) === false && JSON.stringify([...mp.props]) === before);
   check('off: nothing is refused', p.refuses(1, NPC) === false);
   check('off: the director is not told to skip', p.directorSkips(NPC) === false);
   check('off: polling says nothing', p.poll(1000) === null);
@@ -90,29 +100,51 @@ const start = (M, mode, mp, st, opts) => {
     typeof globalThis.__dboServerHostRefuses === 'function' && globalThis.__dboServerHostRefuses(1, NPC) === false);
 }
 
+// ---- a mode with no zone and no id is inert too, so a half-filled config cannot pin the whole world ----
+{
+  const mp = world();
+  const { p, every } = start(mod, 'pin', mp, {}, { zone: '' });
+  p.apply();
+  check('pin with neither zone nor npc: refuses nothing', p.refuses(1, NPC) === false && p.refuses(1, OTHER) === false);
+  check('...and registers no pass', every.calls.length === 0);
+}
+
+// ---- the zone is the identity: npcSpawner decides, not an id ----
+{
+  const mp = world();
+  const { p } = start(mod, 'observe', mp, {});
+  check('the guard spawned for the zone is a target', p.isTarget(NPC) === true);
+  check('...and so is its mate in the same zone', p.isTarget(MATE) === true);
+  check('a guard from another zone is not', p.isTarget(OTHER) === false);
+  check('an actor with no npcSpawner tag is not', p.isTarget(LOOSE) === false);
+  check('a zero id is not, and does not throw', p.isTarget(0) === false);
+  check('the ids are learnt, not configured', JSON.stringify(p.watching()) === JSON.stringify([NPC, MATE]), p.watching());
+  check('and each is tagged on first sight', p.tagged(NPC) === true && p.tagged(MATE) === true
+    && mp.props.get(NPC)['private.dboServerHost'] === true);
+  check("the other zone's guard is not tagged", mp.props.get(OTHER)['private.dboServerHost'] === undefined);
+}
+
 // ---- observe tags and watches, but refuses nothing ----
 {
-  const mp = makeMp();
+  const mp = world();
   const { p, every } = start(mod, 'observe', mp, {});
   p.apply();
-  check('observe: the NPC carries the tag', p.tagged(NPC) === true && mp.props.get(NPC)['private.dboServerHost'] === true);
-  check('observe: refuses nothing — this mode only measures', p.refuses(1, NPC) === false);
+  check('observe: refuses nothing - this mode only measures', p.refuses(1, NPC) === false);
   check('observe: but the director still skips it, or its 1 s pass beats the measurement',
     p.directorSkips(NPC) === true);
-  check('observe: an untagged NPC is not skipped', p.directorSkips(OTHER) === false);
+  check("observe: another zone's guard is not skipped", p.directorSkips(OTHER) === false);
   check('observe: a 1 s watch pass and a summary pass are registered',
     every.calls.length === 2 && every.calls[0].ms === 1000 && every.calls[1].ms === 10000,
     every.calls.map((c) => [c.name, c.ms]));
 }
 
-// ---- pin refuses every attempt on the tagged NPC, and only that one ----
+// ---- pin refuses every attempt on the zone's guards, and only those ----
 {
-  const mp = makeMp();
+  const mp = world();
   const { p } = start(mod, 'pin', mp, {});
-  p.apply();
-  check('pin: every requester is refused for the tagged NPC',
+  check("pin: every requester is refused for the zone's guard",
     p.refuses(0x14, NPC) === true && p.refuses(0x999, NPC) === true);
-  check('pin: another NPC is untouched', p.refuses(0x14, OTHER) === false);
+  check("pin: another zone's guard is untouched", p.refuses(0x14, OTHER) === false);
   check('pin: a zero id is refused nothing (the chain must not throw on it)', p.refuses(0x14, 0) === false);
   check('pin: the global refuser gamemode.js calls refuses too, and counts it',
     globalThis.__dboServerHostRefuses(0x14, NPC) === true && p.stats().refused === 1, p.stats());
@@ -120,30 +152,40 @@ const start = (M, mode, mp, st, opts) => {
     globalThis.__dboServerHostSkips(NPC) === true && globalThis.__dboServerHostSkips(OTHER) === false);
 }
 
-// ---- the registered pass must survive being run; it is the only code that runs unattended on dev ----
+// ---- an id in config still works, for an actor npcSpawnSystem never placed ----
 {
   const mp = makeMp();
+  const { p } = start(mod, 'pin', mp, {}, { zone: '', npc: LOOSE });
+  p.apply();
+  check('npc by id: an untagged actor named by id is pinned', p.refuses(0x14, LOOSE) === true && p.tagged(LOOSE) === true);
+  check('npc by id: nothing else is', p.refuses(0x14, NPC) === false);
+}
+
+// ---- the registered pass must survive being run; it is the only code that runs unattended on dev ----
+{
+  const mp = world();
   const { p, every, lines } = start(mod, 'observe', mp, {});
+  p.directorSkips(NPC);                      // the director teaches us the id, as it does on dev
   mp.hosters.set(NPC, 0x14);
-  every.calls[0].cb();                       // first tick: tags, records the starting hoster
+  every.calls[0].cb();                       // first tick: records the starting hoster
   mp.hosters.set(NPC, 0x15);
   every.calls[0].cb();                       // second tick: a change, which must be logged
-  check('the watch pass tags the NPC without being told to', p.tagged(NPC) === true);
   check('the watch pass logs the host change with both ids',
     lines.some((l) => l.includes('ff001234') && l.includes('14 -> 15')), lines);
   every.calls[1].cb();
-  check('the summary pass logs the counts', lines.some((l) => l.includes('"changes":1')), lines);
+  check('the summary pass logs the zone and the counts',
+    lines.some((l) => l.includes('"changes":1') && l.includes(ZONE)), lines);
 }
 
 // ---- the host-change log: the sequence and its timing are the whole point ----
 {
-  const mp = makeMp();
-  const st = {};
-  const { p } = start(mod, 'observe', mp, st);
-  p.apply();
+  const mp = world();
+  const { p } = start(mod, 'observe', mp, {});
+  p.isTarget(NPC);
   mp.hosters.set(NPC, 0x14);
   const first = p.poll(1000);
-  check('the first poll records the starting hoster without calling it a change', !!first && first.first === true && first.hoster === 0x14);
+  check('the first poll records the starting hoster without calling it a change',
+    !!first && first.first === true && first.hoster === 0x14 && first.npc === NPC);
   check('...and an unchanged hoster reports nothing', p.poll(2000) === null);
   mp.hosters.set(NPC, 0x15);
   const ch = p.poll(5000);
@@ -156,18 +198,36 @@ const start = (M, mode, mp, st, opts) => {
   check('changes are counted', p.stats().changes === 2, p.stats());
 }
 
+// ---- the gap is per NPC: a zone with two guards must not report one's gap as the other's ----
+{
+  const mp = world();
+  const { p } = start(mod, 'observe', mp, {});
+  p.isTarget(NPC); p.isTarget(MATE);
+  mp.hosters.set(NPC, 0x14); mp.hosters.set(MATE, 0x14);
+  p.pollOne(NPC, 1000); p.pollOne(MATE, 1000);
+  mp.hosters.set(NPC, 0x15);
+  const a = p.pollOne(NPC, 9000);
+  check("the first guard's gap is its own 8000 ms", !!a && a.afterMs === 8000, a);
+  mp.hosters.set(MATE, 0x15);
+  const b = p.pollOne(MATE, 10000);
+  check("the second guard's gap is its own 9000 ms, not 1000 since the first one moved",
+    !!b && b.afterMs === 9000, b);
+}
+
 // ---- the guards: a form that has gone must not throw into the host chain ----
 {
-  const { p } = start(mod, 'pin', makeMp({ getThrows: true }), {});
-  check('a throwing mp.get leaves the NPC untagged rather than throwing', p.tagged(NPC) === false);
+  const { p } = start(mod, 'pin', world({ getThrows: true }), {});
+  check('a throwing mp.get leaves the NPC untargeted rather than throwing', p.isTarget(NPC) === false);
   check('...and refuses nothing, so a gone form cannot block every host attempt', p.refuses(1, NPC) === false);
-  const { p: q } = start(mod, 'pin', makeMp({ hosterThrows: true }), {});
-  q.apply();
+  const mpH = world({ hosterThrows: true });
+  const { p: q } = start(mod, 'pin', mpH, {});
+  q.isTarget(NPC);
   check('a throwing getHoster polls to a hoster of 0 rather than throwing', (q.poll(1) || {}).hoster === 0);
-  const { p: r } = start(mod, 'pin', makeMp({ setThrows: true }), {});
-  check('a read-only form does not throw out of apply', (() => { try { r.apply(); return true; } catch (e) { return false; } })());
+  const { p: r } = start(mod, 'pin', world({ setThrows: true }), {});
+  check('a read-only form does not throw out of isTarget or apply',
+    (() => { try { r.isTarget(NPC); r.apply(); return true; } catch (e) { return false; } })());
   check('a gamemode with no `every` loads without throwing, and still answers the chain',
-    (() => { try { return start(mod, 'pin', makeMp(), {}, { noEvery: true }).p.refuses(1, NPC) === false; } catch (e) { return false; } })());
+    (() => { try { return start(mod, 'pin', world(), {}, { noEvery: true }).p.refuses(1, OTHER) === false; } catch (e) { return false; } })());
 }
 
 // ---- the two call sites: a module nobody calls refuses nothing, however well it tests ----
@@ -179,7 +239,7 @@ const start = (M, mode, mp, st, opts) => {
   const nd = read('npcdirector.js');
   check('gamemode.js: the host chain consults __dboServerHostRefuses',
     !!gm && /__dboServerHostRefuses === 'function' && globalThis\.__dboServerHostRefuses\(req, act\)\) return false/.test(gm));
-  check('gamemode.js: ...inside hostAttemptHook, beside the director\'s own refusal',
+  check("gamemode.js: ...inside hostAttemptHook, beside the director's own refusal",
     !!gm && (() => {
       const i = gm.indexOf('const hostAttemptHook');
       const j = gm.indexOf('__dboServerHostRefuses(req, act)');
@@ -195,57 +255,83 @@ const start = (M, mode, mp, st, opts) => {
       const j = nd.indexOf('__dboServerHostSkips(npc)');
       return i >= 0 && j > i && j - i < 1200;
     })());
+  check('the spawner tag this module matches on is the one npcSpawnSystem writes',
+    (() => {
+      const f = path.resolve(__dirname, '..', '..', '..', '..', 'fork/skymp5-server/ts/systems/npcSpawnSystem.ts');
+      if (!fs.existsSync(f)) { console.log('     (skipped: npcSpawnSystem.ts is not beside this checkout)'); return true; }
+      const t = fs.readFileSync(f, 'utf8');
+      return /TAG_PROP = "private\.npcSpawner"/.test(t) && /mp\.set\(id, TAG_PROP, zone\.name\)/.test(t);
+    })());
 }
 
 // ---- mutants: each altered copy must fail at least one check above ----
 const scenarios = (M) => {
   let bad = 0;
   const c = (ok) => { if (!ok) bad++; };
-  const mp = makeMp();
+  const mp = world();
   const { p, every } = start(M, 'pin', mp, {});
-  p.apply();
+  c(p.isTarget(NPC) === true);
+  c(p.isTarget(OTHER) === false);
+  c(p.isTarget(LOOSE) === false);
   c(p.tagged(NPC) === true);
+  c(JSON.stringify(p.watching()) === JSON.stringify([NPC]));
   c(p.refuses(0x14, NPC) === true);
   c(p.refuses(0x14, OTHER) === false);
   c(p.directorSkips(NPC) === true);
   c(globalThis.__dboServerHostRefuses(0x14, NPC) === true);
   c(every.calls.length === 2);
-  const mp2 = makeMp();
-  const { p: off, every: every2 } = start(M, 'off', mp2, {});
+  const { p: off, every: every2 } = start(M, 'off', world(), {});
   off.apply();
   c(off.tagged(NPC) === false);
   c(off.refuses(0x14, NPC) === false);
   c(globalThis.__dboServerHostRefuses(0x14, NPC) === false);
   c(every2.calls.length === 0);
-  const mp3 = makeMp();
-  const { p: ob, lines } = start(M, 'observe', mp3, {});
-  ob.apply();
+  const mp3 = world();
+  const { p: ob } = start(M, 'observe', mp3, {});
+  ob.isTarget(NPC); ob.isTarget(MATE);
   c(ob.refuses(0x14, NPC) === false);
   mp3.hosters.set(NPC, 0x14);
-  ob.poll(1000);
+  ob.pollOne(NPC, 1000);
   mp3.hosters.set(NPC, 0x15);
-  const ch = ob.poll(3000);
+  const ch = ob.pollOne(NPC, 3000);
   c(!!ch && ch.from === 0x14 && ch.to === 0x15 && ch.afterMs === 2000);
-  c(Array.isArray(lines));
+  mp3.hosters.set(MATE, 0x14);
+  ob.pollOne(MATE, 1000);
+  mp3.hosters.set(MATE, 0x15);
+  const chMate = ob.pollOne(MATE, 11000);
+  c(!!chMate && chMate.afterMs === 10000);
+  const { p: byId } = start(M, 'pin', makeMp(), {}, { zone: '', npc: LOOSE });
+  c(byId.refuses(0x14, LOOSE) === true);
+  // A config with neither a zone nor an id refuses nothing AND registers no pass. Both halves are needed:
+  // isTarget already refuses everything without one, so dropping the `(!!zone || !!npc)` from `on` changes
+  // only whether two timed passes run every second with nothing to watch. That is a real difference on a
+  // live server and it is the only thing that makes that mutant non-equivalent.
+  const { p: neither, every: every3 } = start(M, 'pin', world(), {}, { zone: '' });
+  c(neither.refuses(0x14, NPC) === false);
+  c(every3.calls.length === 0);
   return bad;
 };
 check('the scenarios pass on serverhostpin.js as it is', scenarios(mod) === 0);
 
 const MUTANTS = [
-  ['pin refuses everything, tagged or not', "pinning && !!id && tagged(id >>> 0)", "pinning && !!id"],
+  ['the zone is ignored, so every NPC is pinned', "const mine = (zone && spawnerOf(f) === zone) || (npc && f === npc);", "const mine = true;"],
+  ['the spawner tag is the wrong property', "const SPAWNER = 'private.npcSpawner';", "const SPAWNER = 'private.dboSpawner';"],
+  ['ids are matched but never remembered', "if (!S.ids.has(f)) { S.ids.add(f);", "if (false) { S.ids.add(f);"],
+  ['a target is never tagged', "if (!tagged(f)) tag(f, true);", "/* not tagged */"],
   ['observe refuses too', "const pinning = C.mode === 'pin';", "const pinning = on;"],
-  ['off is not inert', "const on = C.mode === 'observe' || C.mode === 'pin';", "const on = true;"],
-  ['the director is not told to skip', "on && !!id && tagged(id >>> 0)", "false"],
-  ['apply does not tag at all', "if (!tagged(npc)) tag(npc, true);", "/* not tagged */"],
-  ['the change gap is not measured', "const gap = S.lastChangeAt ? now - S.lastChangeAt : 0;", "const gap = 0;"],
+  ['off is not inert', "const on = (C.mode === 'observe' || C.mode === 'pin') && (!!zone || !!npc);", "const on = true;"],
+  ['a half-filled config pins the world', "&& (!!zone || !!npc);", ";"],
+  ['the director is not told to skip', "const directorSkips = (id) => on && isTarget(id);", "const directorSkips = (id) => false;"],
+  ['the change gap is not measured', "const gap = S.at[f] ? now - S.at[f] : 0;", "const gap = 0;"],
+  ['the gap is global, not per NPC', "const gap = S.at[f] ? now - S.at[f] : 0;", "const gap = S.lastAny ? now - S.lastAny : 0;"],
   ['the global refuser never refuses', "const no = refuses(requester, id);", "const no = false;"],
-  ['the timed passes are registered even when off', "if (on && npc && typeof every === 'function') {", "if (npc && typeof every === 'function') {"],
+  ['the timed passes are registered even when off', "if (on && typeof every === 'function') {", "if (typeof every === 'function') {"],
 ];
-// Deliberately NOT a mutant: dropping the `!!id` guard from refuses(). It is EQUIVALENT rather than
-// surviving — form 0 carries no properties, so `tagged(0)` is false with or without the guard and no
-// behaviour changes. A mutant that cannot alter behaviour proves nothing about the checks, and leaving it in
-// the list would be a standing FAIL that the next person has to re-derive. The guard stays in the module
-// because reading a property off id 0 is not something to rely on, not because a test caught it.
+// Deliberately NOT a mutant: dropping the `!f` guard from isTarget(). It is EQUIVALENT rather than surviving
+// - form 0 carries no properties, so spawnerOf(0) is '' with or without the guard and no behaviour changes. A
+// mutant that cannot alter behaviour proves nothing about the checks, and leaving it in the list would be a
+// standing FAIL that the next person has to re-derive. The guard stays in the module because reading a
+// property off id 0 is not something to rely on, not because a test caught it.
 let killed = 0;
 for (const [name, a, b] of MUTANTS) {
   if (!src.includes(a)) { check(`mutant "${name}": its line is in serverhostpin.js`, false, a); continue; }
