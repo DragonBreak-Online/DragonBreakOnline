@@ -26,6 +26,9 @@ player-factions.json
 economy.json
 wars.json
 territory-owners.json
+# Rows read from mods whose authors forbid AI work (Druadach, Summerset Isle, King of the Murkmire, Journey to Baan Malur):
+# gitignored sidecars beside their public files, delivered by deploy-private (Nat, 2 Nov; loomweave.js, privaterows.js)
+*.private.json
 *.log
 *.log.*
 server.log*
@@ -183,7 +186,3 @@ bosses-state.json
 apiaries.json
 housing-storage-locked.json
 name-table.json
-
-# Rows read from mods whose authors forbid AI work (Druadach, Summerset Isle, King of the Murkmire, Journey to Baan Malur):
-# gitignored sidecars beside their public files, delivered by deploy-private (Nat, 2 Nov; loomweave.js, privaterows.js)
-*.private.json
