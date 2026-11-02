@@ -140,6 +140,20 @@ cmd(2, `#AAAA overturn ${sk} without the record-author rule`);
 ok(sk > 0 && last(2) === `Who gave Record #${sk} cannot be read, so it was not overturned. Ask an Owner.` && !JSON.parse(fs.readFileSync(FILE, 'utf8')).profiles[20].find((e) => e.n === sk).overturned,
   'without gamemode.js authorRefusal an overturn is refused (fails closed); the strike itself ran', last(2));
 authorApi = authorRefusal; load();
+
+// The F7 panel's temp ban by #TAG for an offline player (2 Nov): /tempban's own rules, its answer in chat
+{
+  const panel = globalThis.__dboPanelTempBan;
+  const susOf = (p) => (JSON.parse(fs.readFileSync(FILE, 'utf8')).profiles[p] || []).filter((e) => e.kind === 'suspend' && !e.lifted);
+  ok(typeof panel === 'function', 'discipline.js gives the panel __dboPanelTempBan');
+  const before = susOf(21).length;
+  ok(panel(1, '#OFFL', 73, 'griefed the market') === '' && /^A GM can suspend for at most 3 days/.test(last(1)) && susOf(21).length === before, 'a GM\'s panel temp ban over 72 h is refused by the /tempban rule', last(1));
+  ok(panel(3, '#OFFL', 24, 'griefed the market') === '' && /Only staff can use \/tempban/.test(last(3)) && susOf(21).length === before, 'a player (or a Trial GM, who is not staff here) is refused', last(3));
+  ok(/#TAG/.test(panel(1, 'Bob', 24, 'griefed the market')) && /length/.test(panel(1, '#OFFL', 0, 'griefed the market')), 'a missing #TAG or length is refused before anything runs');
+  ok(panel(1, 'OFFL', 72, 'griefed the market twice') === '' && susOf(21).length === before + 1
+    && audits.some((l) => /^DISCIPLINE suspend #\d+ on w6 \(profile 21\) until .* by w1: griefed the market twice$/.test(l)), 'a GM temp bans an offline player for 72 h from the panel, audited as /tempban is', audits.slice(-2));
+  ok(panel(1, '#GMGM', 12, 'abuse of the panel') === '' && /staff account of your rank or higher/.test(last(1)), 'the rank rule applies (a GM cannot temp ban another GM)', last(1));
+}
 global.setTimeout = realTimeout;
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');

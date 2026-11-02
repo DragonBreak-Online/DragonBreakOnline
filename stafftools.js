@@ -2,7 +2,8 @@
 //
 // /event <message>: staff (any rank, Trial GMs included) and holders of a Discord role in events.hostRoleIds announce an
 // event to every online player, on screen and in chat as /announce does, and, when switched on, in a Discord channel.
-// A cooldown per host and one across all hosts keep it from being spammed; every use goes into the audit.
+// A cooldown per host and one across all hosts keep it from being spammed; every use goes into the audit. The command is
+// warband.js's /event (staff only, 2 Nov): any text that is not an event subcommand comes here as __dboEventAnnounce.
 // /chars #TAG: every character of the account that carries #TAG, online or not, with each one's own #TAG, so staff can
 // pick which character to /rename (also from Discord /console, where /rename reaches offline characters by #TAG).
 //
@@ -72,8 +73,8 @@ module.exports = (api) => {
     audit(`EVENT ${who(a)}${isStaff(a) ? '' : ' (event host role)'} to ${all.length} online${discordOn() ? ' and Discord' : ''}: ${text}`);
     log(`events: ${who(a)} announced to ${all.length} player(s)`);
   };
-  // Not admin-flagged, so a role-only host passes the chat gate; announce checks the right itself. Hidden from player /help
-  registerChatCommand('event', (a, args) => announce(a, args), { hidden: true, help: '<message> announce an event to every online player (staff, event hosts)' });
+  // /event itself is registered by warband.js, which loads later and hands any text that is not an event subcommand here
+  globalThis.__dboEventAnnounce = (a, args) => announce(a, args);
   // heralds.js: who hosts events, and the same Discord post for an event a herald cries
   globalThis.__dboIsEventHost = (a) => isStaff(a) || isHost(a);
   globalThis.__dboEventPostDiscord = (text, host) => { try { post(text, host); } catch (e) { log('events: discord post failed', e.message); } };

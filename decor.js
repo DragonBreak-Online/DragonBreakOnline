@@ -798,6 +798,8 @@ module.exports = (api) => {
     if (changed) save();
   };
   if (typeof api.every === 'function') api.every('decor-grow', Math.max(10, Number(C.planter.tickSeconds) || 60) * 1000, () => { try { if (C.enabled) ripen(); } catch (e) { log('decor: ripening failed', e.stack || e.message); } });
+  // placement.js: whether a cell is inside a claimed, owned property (a Lead GM may change another GM's placement there)
+  globalThis.__dboOwnedPlaceAt = (cellDesc) => { try { return !!placeOfCell(idOf(cellDesc)); } catch (e) { return false; } };
   // schools.js asks which study a decor shelf opens: 'arcane', 'priest', or '' when the ref is no decor study shelf
   globalThis.__dboDecorStudyKind = (target) => { try { const f = itemByRef(hex(target)); return f ? kindOf(f.item) : ''; } catch (e) { return ''; } };
   globalThis.__dboDecorActivate = (target, caster) => {

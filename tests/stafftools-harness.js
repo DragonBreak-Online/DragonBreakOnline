@@ -47,12 +47,13 @@ const load = (cfg, extra) => {
   }, extra || {}));
 };
 const reset = () => { said.length = 0; audits.length = 0; posts.length = 0; logs.length = 0; globalThis.__dboEventsRun = undefined; };
-const run = (a, args) => commands.get('event').fn(a, args);
+// /event is warband.js's (2 Nov): it hands any text that is not an event subcommand to __dboEventAnnounce
+const run = (a, args) => globalThis.__dboEventAnnounce(a, args);
 const toMe = (a) => said.filter((x) => x.a === a).map((x) => x.t);
 
 // ---- registration -------------------------------------------------------------------------------------------------------
 load({});
-check('registers /event, not admin-flagged (role hosts pass the chat gate) and hidden from player /help', commands.has('event') && !commands.get('event').opts.admin && commands.get('event').opts.hidden);
+check('does not register /event (warband.js does, one command) and exposes the announcement as __dboEventAnnounce', !commands.has('event') && typeof globalThis.__dboEventAnnounce === 'function');
 check('registers /chars, admin-flagged', commands.has('chars') && commands.get('chars').opts.admin === true);
 
 // ---- who may announce ----------------------------------------------------------------------------------------------------

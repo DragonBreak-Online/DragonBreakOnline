@@ -112,6 +112,30 @@ const run = async (cmd, a, args) => { said.length = 0; await commands[cmd](a, ar
   fs.writeFileSync(path.join(dir, 'hold'), '');
   check('an update is refused while the updater is on hold', /on hold/.test(await run('schedule', SENIOR, 'update 10m the next fix')));
 
+  // A Lead GM schedules and cancels restarts only, at least 10 minutes ahead, on the same warned countdown (2 Nov)
+  const LEAD = 4, TRIAL = 5;
+  tiers[LEAD] = 'leadgm';
+  check('a Lead GM restart under 10 minutes ahead is refused', /at least 10 minutes' warning/.test(await run('schedule', LEAD, 'restart 5m the queue is stuck')));
+  check('...and "now" too, though it warns a minute', /at least 10 minutes' warning/.test(await run('schedule', LEAD, 'restart now the queue is stuck')));
+  check('a Lead GM may not schedule a shutdown', /restarts only/.test(await run('schedule', LEAD, 'shutdown 1h moving hardware')));
+  check('...nor an update', /restarts only/.test(await run('schedule', LEAD, 'update 1h the next fix')));
+  check('a Trial GM (no staff tier) is refused', /Only staff/.test(await run('schedule', TRIAL, 'restart 30m to clear lag')));
+  r = await run('schedule', LEAD, 'restart 15m the queue is stuck');
+  const leadId = Number((r.match(/Scheduled #(\d+)/) || [])[1]);
+  check('a Lead GM schedules a restart 15 minutes ahead, audited', leadId > 0 && audits.some((t) => new RegExp(`SCHEDULE #${leadId} restart at .* set by staff${LEAD}: the queue is stuck`).test(t)), r);
+  await run('schedule', SENIOR, 'shutdown 3h moving the server');
+  const shutId = leadId + 1;
+  check('a Lead GM may not cancel a shutdown', /cancels restarts only/.test(await run('schedule', LEAD, `cancel ${shutId}`)));
+  check('a GM may not cancel a restart', /senior and developer staff, and restarts for Lead GMs/.test(await run('schedule', GM, `cancel ${leadId}`)));
+  all.length = 0; execs.length = 0;
+  for (let m = 0; m < 16; m++) { now += 60000; tick(); await wait(); }
+  await wait();
+  check('the Lead GM\'s restart warns players and runs the same restart path', all.some((t) => /restart/i.test(t)) && execs.includes('systemctl --no-block restart skymp'), all.join(' | '));
+  r = await run('schedule', LEAD, 'restart 20m one more for the patch');
+  const id2 = Number((r.match(/Scheduled #(\d+)/) || [])[1]);
+  check('a Lead GM cancels a restart, audited', /Cancelled/.test(await run('schedule', LEAD, `cancel ${id2}`)) && audits.some((t) => new RegExp(`SCHEDULE #${id2} restart CANCELLED by staff${LEAD}`).test(t)));
+  await run('schedule', SENIOR, `cancel ${shutId}`);
+
   Date.now = realNow;
   process.chdir(home);
   fs.rmSync(dir, { recursive: true, force: true });

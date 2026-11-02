@@ -1055,12 +1055,18 @@ module.exports = (api) => {
     return `${ev.id} (${ev.type}${ev.name ? ` "${ev.name}"` : ''}): ${ev.state}, ${live} NPC(s)${ev.sides && ev.sides.length ? `, sides ${ev.sides.join(' v ')}` : ''}${left}, by ${ev.owner ? ev.owner.by : 'someone'}`;
   };
 
+  // /event is one command (2 Nov): these words run an event, any other text is the announcement (stafftools.js)
+  const EVENT_SUBS = new Set(['list', 'new', 'census', 'orphans', 'info', 'side', 'deadline', 'attach', 'start', 'end', 'sweep']);
   const eventCmd = (a, rest) => {
     if (!isAdmin(a)) return tell(a, 'Only staff run events.');
-    loadEvents();
     const parts = String(rest || '').trim().split(/\s+/).filter((x) => x);
     const cmd = (parts.shift() || '').toLowerCase();
     const arg = parts.join(' ');
+    if (cmd && !EVENT_SUBS.has(cmd)) {
+      if (typeof globalThis.__dboEventAnnounce !== 'function') return tell(a, 'Event announcements are not loaded (stafftools.js).');
+      return globalThis.__dboEventAnnounce(a, rest);
+    }
+    loadEvents();
 
     if (!cmd || cmd === 'list') {
       const all = running();
@@ -1175,7 +1181,7 @@ module.exports = (api) => {
     return tell(a, 'Usage: /event list | new <type> [name] | info | side <name> | deadline <minutes> | attach | start | sweep | end [held|fell] [id] | census | orphans [clear].');
   };
 
-  registerChatCommand('event', eventCmd, { admin: true, help: 'list | new <raid|siege|invasion|defence> [name] | info | side <name> | deadline <minutes> | attach | start | sweep | end [held|fell] | census | orphans [clear]: a GM event with a deadline, tagged NPCs and a clean-up that survives a restart' });
+  registerChatCommand('event', eventCmd, { admin: true, help: '<message> announce an event to every online player, or list | new <raid|siege|invasion|defence> [name] | info | side <name> | deadline <minutes> | attach | start | sweep | end [held|fell] | census | orphans [clear]: a GM event with a deadline, tagged NPCs and a clean-up that survives a restart' });
 
   // Every second: drain a few retirements, then end any event whose deadline has passed. One named timer,
   // no new mp.on - a hot reload replaces it instead of stacking another.

@@ -119,13 +119,15 @@ module.exports = (api) => {
   const TIER_RANK = { senior: 4, developer: 3, leadgm: 2, gm: 1 };
   const TIER_LABEL = { senior: 'Senior', developer: 'Developer', leadgm: 'Lead GM', gm: 'GM' };
   // world: hiding (and, with client 0.3.102, moving) what the plugins placed (worldedit.js); by default as "others"
-  const RIGHTS = Object.assign({ place: 'leadgm', hostile: 'leadgm', others: 'developer', world: 'developer' }, P.rights || {});
+  // othersInProperty: another GM's placement inside a player's claimed property (decor.js __dboOwnedPlaceAt), 2 Nov
+  const RIGHTS = Object.assign({ place: 'leadgm', hostile: 'leadgm', others: 'developer', othersInProperty: 'leadgm', world: 'developer' }, P.rights || {});
   const tierOf = (a) => (typeof api.tierOf === 'function' ? api.tierOf(a) : (isAdmin(a) ? 'senior' : null));
   const can = (a, right) => { const t = tierOf(a); return !!t && (TIER_RANK[t] || 0) >= (TIER_RANK[RIGHTS[right]] || 99); };
   const needs = (right) => `${TIER_LABEL[RIGHTS[right]] || RIGHTS[right]} and above`;
   const profile = (a) => Number(mp.get(a, 'profileId'));
-  // Another GM's placement needs the "others" right
-  const mayChange = (a, entry) => !entry || entry.by === profile(a) || can(a, 'others');
+  // Another GM's placement needs the "others" right, or "othersInProperty" when it stands in a player's property
+  const inPlayerProperty = (entry) => { const f = globalThis.__dboOwnedPlaceAt; try { return !!(entry && entry.where && typeof f === 'function' && f(entry.where)); } catch (e) { return false; } };
+  const mayChange = (a, entry) => !entry || entry.by === profile(a) || can(a, 'others') || (can(a, 'othersInProperty') && inPlayerProperty(entry));
 
   const CATALOG = path.resolve('admin-placeables.json');
   // Placed things are saved in the world state, so their list belongs beside it: on the dev server world is a link into
@@ -333,7 +335,8 @@ module.exports = (api) => {
     const target = resolveTarget(idHex);
     if (!target.ref && !target.entry) return { ok: false, text: String(idHex || '') ? 'Only things placed with the Place tab can be removed this way.' : 'Aim at something first.' };
     const listed = target.entry;
-    if (!mayChange(a, listed || (target.tag ? { by: Number(target.tag.by) } : null))) return { ok: false, text: `Another GM placed that; changing their placements is ${needs('others')}.` };
+    let refWhere = ''; try { refWhere = target.ref ? String(mp.get(target.ref, 'worldOrCellDesc') || '') : ''; } catch (e) { /* gone */ }
+    if (!mayChange(a, listed || (target.tag ? { by: Number(target.tag.by), where: refWhere } : null))) return { ok: false, text: `Another GM placed that; changing their placements is ${needs('others')}.` };
     if (listed && listed.zone) {
       // The zone goes from NPC-Spawns.json and npcSpawnSystem takes its NPC away on reload
       const list = registry();
