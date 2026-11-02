@@ -67,7 +67,8 @@ export const TOGGLE_KEY = 20;
 export interface Territory { id: string; owner: string; zone: string; x: number; y: number }
 // With zones.json sovereignty.holdsFromCells on, Tamriel's holds by cell: the fork's hold-cells table (zones.ts), rows north
 // first, one character a cell west to east, a hold's index in holds ("0".."9", "a".."z") or "." for none
-export interface HoldCells { c0: number; n: number; size: number; holds: string[]; rows: string[] }
+// fallback (hold-cells.json v2): '1' where the hold is only the nearest capital's, past Skyrim's land, left clear on the map
+export interface HoldCells { c0: number; n: number; size: number; holds: string[]; rows: string[]; fallback?: string[] }
 // A stronghold's radius, which wins over the holds (zones.ts strongholdsOverrideHolds)
 export interface Stronghold { zone: string; x: number; y: number; r: number }
 // flat: the server's word that this world's map is flat and top-down (war.mapFlatWorlds), where the colours start shown
@@ -91,7 +92,10 @@ export const readCells = (raw: unknown): HoldCells | null => {
     if (r.length !== n) return null;
     for (let i = 0; i < r.length; i++) if (r[i] !== "." && !(parseInt(r[i], 36) < holds.length)) return null;
   }
-  return { c0, n, size, holds, rows };
+  const fb = Array.isArray(o.fallback) ? o.fallback.map(String) : null;
+  const out: HoldCells = { c0, n, size, holds, rows };
+  if (fb && fb.length === n && fb.every((r) => r.length === n)) out.fallback = fb;
+  return out;
 };
 // The hold of the cell holding (x, y), zones.ts cellHold's own arithmetic, or null outside the table
 export const cellHold = (t: HoldCells, x: number, y: number): string | null => {
@@ -242,7 +246,7 @@ const cellDrawing = (w: OwnersWorld, factions: Record<string, Faction>, reach: n
     for (const m of ts) near = Math.min(near, Math.hypot(x - m.x, y - m.y));
     // on paper one strength: a cell within fade of a marker is its hold's at full strength, beyond it clear paper, never a pale wash
     // (Nat, 2 Nov: "some of the colours don't match for a hold", the faded edge read as another owner)
-    if (!o || near > fade) continue;
+    if (!o || near > fade || (t.fallback && t.fallback[j][i] === "1")) continue;
     own[j * n + i] = o.t;
     lvl[j * n + i] = paper || near <= reach ? 2 : 1;
   }
