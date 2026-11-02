@@ -13,18 +13,39 @@
 // Hitting someone who refused, or was never asked, reveals nothing. Waits: hunterSeconds between one hunter's tests, and
 // pairMinutes before the same hunter may ask the same target again after any outcome. Every step goes to the audit log.
 //
+// Teaching (Nat, 2 Nov: "give hunting factions the ability to teach someone how to silver test"): a member of one of those
+// orders whose rank's role is in teachRoles (leader, officer) gets "Teach the Silver Test" in the X menu on another player,
+// who accepts in a panel (widget 118). The learner gets private.dboSilverTaught { byProfile, byName, faction, at } and may
+// then silver test as a member does (a silver weapon, the same panel and strike), without joining. teachMinutes between one
+// teacher's lessons. A vampire or werewolf learns nothing: the teacher is told the lesson was given (it never reveals their
+// blood), the learner that it will not take; and a taught player who turns loses it at once. /silvertest shows what you know;
+// /silvertest revoke <name|#TAG> takes it back (the leader of the teaching order, or staff). Every step is audited (SILVERTEACH).
+// Lore (UESP, 2 Nov): no order is recorded teaching outsiders. The Vigil "lends aid to heroes who fit their ideals", the
+// Fighters Guild took up the Dawnguard's silver crossbows, and Isran rebuilt the Dawnguard from outsiders, so an officer
+// passing on a hunter's craft fits; the Silver Hand, cruel to the innocent, would teach only their own kind.
+//
 // gamemode-config.json "silverTest" (every key optional); enabled: false takes it off the menu and ends tests under way.
 'use strict';
 
 module.exports = (api) => {
   const { mp, log, personal, audit, who, onlineActors, openWidget, closeWidget, onUi, sendPacket, every, cfg } = api;
+  const fn = (f, dflt) => (typeof f === 'function' ? f : dflt);
+  const registerChatCommand = fn(api.registerChatCommand, () => {});
+  const isAdmin = fn(api.isAdmin, () => false);
+  const findByName = fn(api.findByName, () => 0);
+  const offlineByTag = fn(api.offlineByTag, () => 0);
+  const display = fn(api.display, who);
   const C = Object.assign({
     enabled: true, factions: ['dawnguard', 'silver-hand', 'vigil-of-stendarr'], maxDistance: 300, leaveDistance: 1500,
     answerSeconds: 30, strikeSeconds: 60, hunterSeconds: 30, pairMinutes: 10, combatSeconds: 15, harmless: true,
     // MAGVampireSunlight (SOUN, Skyrim.esm ff9eb) and FireFXShader (EFSH, Skyrim.esm 1b212): ids read from the esm, 19 Oct
     sound: '0ff9eb:Skyrim.esm', flashShader: '01b212:Skyrim.esm', flashSeconds: 3,
+    teach: true, teachRoles: ['leader', 'officer'], teachMinutes: 30,
   }, cfg.silverTest || {});
   const PROMPT_WIDGET_ID = 117;
+  const TEACH_WIDGET_ID = 118;
+  const MARK = 'private.dboSilverTaught';
+  const TEACH_ROLES = new Set((Array.isArray(C.teachRoles) ? C.teachRoles : []).map(String));
   const FACTIONS = new Set((Array.isArray(C.factions) ? C.factions : []).map(String));
   const TEXT = {
     prompt: 'You are being silver tested.',
@@ -36,6 +57,8 @@ module.exports = (api) => {
 
   // Kept across hot reloads: prompts by target, accepted tests by target, waits, and fire flashes to take off
   const S = globalThis.__dboSilverTest || (globalThis.__dboSilverTest = { pending: new Map(), accepted: new Map(), hunterAt: new Map(), pairAt: new Map(), flashes: [] });
+  if (!(S.lessons instanceof Map)) S.lessons = new Map(); // learner -> { teacher, faction, name, until }
+  if (!(S.teacherAt instanceof Map)) S.teacherAt = new Map();
 
   const idOf = (desc) => { try { return desc ? mp.getIdFromDesc(String(desc)) >>> 0 : 0; } catch (e) { log(`silvertest: ${desc} not in the load order`); return 0; } };
   const SOUND = idOf(C.sound);
@@ -58,6 +81,22 @@ module.exports = (api) => {
   const isHunter = (a) => {
     try { return typeof globalThis.__dboGuildsOf === 'function' && (globalThis.__dboGuildsOf(a >>> 0) || []).some((g) => FACTIONS.has(String(g.id))); } catch (e) { return false; }
   };
+  // The order whose rank lets this member teach (a role in teachRoles), or null
+  const teachingOrder = (a) => {
+    try { return (typeof globalThis.__dboGuildsOf === 'function' ? globalThis.__dboGuildsOf(a >>> 0) || [] : []).find((g) => FACTIONS.has(String(g.id)) && TEACH_ROLES.has(String(g.role))) || null; } catch (e) { return null; }
+  };
+  const leads = (a, fid) => { try { return (globalThis.__dboGuildsOf(a >>> 0) || []).some((g) => String(g.id) === String(fid) && String(g.role) === 'leader'); } catch (e) { return false; } };
+  const markOf = (a) => { const m = get(a, MARK, null); return m && typeof m === 'object' && m.faction ? m : null; };
+  // A taught player who has turned loses the test at once
+  const knows = (a) => {
+    const m = markOf(a);
+    if (!m) return false;
+    const kind = superKind(a);
+    if (!kind) return true;
+    try { mp.set(a >>> 0, MARK, null); } catch (e) { return false; }
+    audit(`SILVERTEACH ${who(a)} lost the silver test taught by the ${m.faction}: now a ${kind}`);
+    return false;
+  };
   const carriesSilver = (a) => {
     const inv = get(a, 'inventory', null);
     return !!inv && Array.isArray(inv.entries) && inv.entries.some((e) => e && (Number(e.count) || 0) > 0 && isSilverWeapon(e.baseId));
@@ -70,7 +109,7 @@ module.exports = (api) => {
   const refusal = (a, t) => {
     if (C.enabled === false) return 'Silver tests are not allowed right now.';
     if (!t || t === a || !online(t)) return 'There is no one to test.';
-    if (!isHunter(a)) return 'Only the Dawnguard, the Silver Hand and the Vigil of Stendarr test blood with silver.';
+    if (!isHunter(a) && !knows(a)) return 'Only the Dawnguard, the Silver Hand, the Vigil of Stendarr and those they taught test blood with silver.';
     if (!carriesSilver(a)) return 'You need a silver weapon to test anyone.';
     if (!near(a, t, C.maxDistance)) return 'Get closer to them first.';
     if (inBeastForm(a) || handsTied(a) || get(a, 'isDead', false) === true) return 'You cannot test anyone right now.';
@@ -128,8 +167,94 @@ module.exports = (api) => {
     audit(`SILVER ${who(p.target)} refused a silver test from ${who(p.hunter)} (${why})`);
   };
 
-  globalThis.__dboSilverTestEntries = (a, t) => (refusal(a >>> 0, t >>> 0) === '' ? [{ id: 'silver:test', label: 'Silver Test' }] : []);
+  // ---- teaching ------------------------------------------------------------------------------------------------------
+  // Why this member may not offer a lesson to this player now, or ''. Nothing here reads the learner's blood or order, so the
+  // entry shows the same for everyone; whether they already know it is told only when the lesson is offered
+  const teachRefusal = (a, t) => {
+    if (C.enabled === false || C.teach === false) return 'Teaching the silver test is not allowed right now.';
+    if (!t || t === a || !online(t)) return 'There is no one to teach.';
+    if (!teachingOrder(a)) return 'Only an officer of the Dawnguard, the Silver Hand or the Vigil of Stendarr teaches the silver test.';
+    if (!near(a, t, C.maxDistance)) return 'Get closer to them first.';
+    if (inBeastForm(a) || handsTied(a) || get(a, 'isDead', false) === true || get(t, 'isDead', false) === true) return 'You cannot teach anyone right now.';
+    if (inFight(a) || inFight(t)) return 'Not in the middle of a fight.';
+    for (const l of S.lessons.values()) if (l.teacher === (a >>> 0)) return 'You are already teaching someone.';
+    if (S.lessons.has(t >>> 0)) return 'Someone is already teaching them.';
+    const left = (S.teacherAt.get(a >>> 0) || 0) + C.teachMinutes * 60000 - Date.now();
+    if (left > 0) return `You taught the silver test not long ago. Wait ${Math.ceil(left / 60000)} more minute(s).`;
+    return '';
+  };
+  const endLesson = (t, l, choice) => {
+    S.lessons.delete(t);
+    try { closeWidget(t, TEACH_WIDGET_ID); } catch (e) { /* gone */ }
+    if (choice !== 'accept') {
+      if (online(l.teacher)) personal(l.teacher, choice === 'left' ? 'The lesson is dropped.' : 'They turn the lesson down.');
+      if (online(t) && choice !== 'left') personal(t, 'You turn the lesson down.');
+      audit(`SILVERTEACH ${who(t)} turned down the silver test from ${who(l.teacher)} (${choice})`);
+      return;
+    }
+    if (!online(l.teacher) || !near(l.teacher, t, C.leaveDistance)) {
+      personal(t, 'The hunter is gone before the lesson begins.');
+      audit(`SILVERTEACH ${who(t)} accepted the silver test from ${who(l.teacher)}, but the teacher had left`);
+      return;
+    }
+    // The teacher hears the same either way: a lesson that cannot take never tells them why
+    personal(l.teacher, `You show them the silver test: the silver weapon, the hold, the strike, and what burning blood looks like.`);
+    const kind = superKind(t);
+    if (kind) {
+      personal(t, 'You follow the lesson, but you know the silver would only ever burn you. It will not take.');
+      audit(`SILVERTEACH ${who(t)} could not learn the silver test from ${who(l.teacher)} (${l.faction}): a ${kind}`);
+      return;
+    }
+    try { mp.set(t, MARK, { byProfile: Number(get(l.teacher, 'profileId', -1)), byName: display(l.teacher), faction: l.faction, factionName: l.name, at: Date.now() }); }
+    catch (e) { log('silvertest: the lesson could not be saved', e.message); personal(t, 'The lesson could not be kept. Ask again later.'); return; }
+    personal(t, `You learn the silver test from ${display(l.teacher)} of the ${l.name}. Carry a silver weapon, and "Silver Test" is in the X menu on others.`);
+    audit(`SILVERTEACH ${who(l.teacher)} taught ${who(t)} the silver test (${l.faction})`);
+  };
+  const offerLesson = (a, t) => {
+    const why = teachRefusal(a, t);
+    if (why) { personal(a, why); return; }
+    if (isHunter(t) || knows(t)) { personal(a, 'They already know the silver test.'); return; }
+    const order = teachingOrder(a);
+    S.teacherAt.set(a, Date.now());
+    S.lessons.set(t, { teacher: a, faction: String(order.id), name: String(order.name || order.id), until: Date.now() + C.answerSeconds * 1000 });
+    openWidget(t, { type: 'contextMenu', id: TEACH_WIDGET_ID, mode: 'menu', targetName: `${display(a)} offers to teach you the silver test.`,
+      actions: [{ id: 'accept', label: 'Learn it' }, { id: 'refuse', label: 'Decline' }],
+      events: { action: 'dbo:silverTeachAnswer', close: 'dbo:silverTeachClose' } }, true);
+    personal(a, `You offer to teach them the silver test. They have ${C.answerSeconds} seconds to answer.`);
+    audit(`SILVERTEACH ${who(a)} offers to teach ${who(t)} the silver test (${order.id})`);
+  };
+  onUi('silverTeachAnswer', (t, args) => { const l = S.lessons.get(t >>> 0); if (l) endLesson(t >>> 0, l, String((args || [])[0] || '') === 'accept' ? 'accept' : 'declined'); });
+  onUi('silverTeachClose', (t) => { const l = S.lessons.get(t >>> 0); if (l) endLesson(t >>> 0, l, 'closed'); });
+
+  registerChatCommand('silvertest', (a, args) => {
+    const words = String(args || '').trim().split(/\s+/).filter(Boolean);
+    if ((words[0] || '').toLowerCase() !== 'revoke') {
+      const m = markOf(a);
+      if (isHunter(a)) return personal(a, 'You test blood with silver as a member of your order.');
+      if (m && knows(a)) return personal(a, `You know the silver test, taught by ${m.byName || 'a hunter'} of the ${m.factionName || m.faction}.`);
+      return personal(a, 'You do not know the silver test. An officer of the Dawnguard, the Silver Hand or the Vigil of Stendarr can teach it.');
+    }
+    const q = words.slice(1).join(' ');
+    if (!q) return personal(a, 'Use: /silvertest revoke <name|#TAG>');
+    const t = (findByName(q) || offlineByTag(q) || offlineByTag(`#${q.replace(/^#/, '')}`) || 0) >>> 0;
+    if (!t) return personal(a, `No character "${q}". Use their #TAG.`);
+    const m = markOf(t);
+    if (!m) return personal(a, `${display(t)} was not taught the silver test.`);
+    if (!isAdmin(a) && !leads(a, m.faction)) return personal(a, 'Only the leader of the order that taught them, or staff, takes the silver test back.');
+    try { mp.set(t, MARK, null); } catch (e) { return personal(a, 'That could not be changed right now. Try again.'); }
+    audit(`SILVERTEACH ${who(a)} revoked the silver test of ${who(t)} (${m.faction})`);
+    personal(a, `${display(t)} no longer knows the silver test.`);
+    if (online(t)) personal(t, `The ${m.factionName || 'order'} that taught you the silver test has taken it back.`);
+  }, { help: 'what you know of the silver test; revoke <name|#TAG>: take back a lesson your order gave (its leader, or staff)' });
+
+  globalThis.__dboSilverTestEntries = (a, t) => {
+    a >>>= 0; t >>>= 0;
+    const out = refusal(a, t) === '' ? [{ id: 'silver:test', label: 'Silver Test' }] : [];
+    if (teachRefusal(a, t) === '') out.push({ id: 'silver:teach', label: 'Teach the Silver Test' });
+    return out;
+  };
   globalThis.__dboSilverTestAction = (a, id, t) => {
+    if (id === 'silver:teach') { offerLesson(a >>> 0, t >>> 0); return true; }
     if (id !== 'silver:test') return false;
     a >>>= 0; t >>>= 0;
     const why = refusal(a, t);
@@ -171,6 +296,7 @@ module.exports = (api) => {
     a >>>= 0;
     for (const p of [...S.pending.values()]) if (p.target === a || p.hunter === a) finish(p, 'left', 'logged out');
     for (const [t, x] of [...S.accepted]) if (t === a || x.hunter === a) S.accepted.delete(t);
+    for (const [t, l] of [...S.lessons]) if (t === a || l.teacher === a) endLesson(t, l, 'left');
   };
 
   every('silverTest', 1000, () => {
@@ -188,9 +314,17 @@ module.exports = (api) => {
       if (online(t)) personal(t, 'The silver test is over; no blow was struck.');
       audit(`SILVER ${who(x.hunter)} -> ${who(t)}: accepted but never struck`);
     }
+    for (const [t, l] of [...S.lessons]) {
+      if (C.enabled === false || C.teach === false || !online(t) || !online(l.teacher) || !near(l.teacher, t, C.leaveDistance)) endLesson(t, l, 'left');
+      else if (now >= l.until) endLesson(t, l, 'timeout');
+    }
+    // A taught player who turns loses the test (knows() drops it), checked every ten seconds while they are online
+    S.turnTick = ((S.turnTick || 0) + 1) % 10;
+    if (S.turnTick === 0) for (const a of onlineActors()) if (markOf(a)) knows(a);
     S.flashes = S.flashes.filter((fl) => { if (now < fl.until) return true; for (const v of fl.viewers) if (online(v)) glow(v, fl.t, false); return false; });
     for (const m of [S.hunterAt, S.pairAt]) if (m.size > 512) for (const [k, at] of m) if (now - at > C.pairMinutes * 60000) m.delete(k);
+    if (S.teacherAt.size > 512) for (const [k, at] of S.teacherAt) if (now - at > C.teachMinutes * 60000) S.teacherAt.delete(k);
   });
 
-  return { refusal, TEXT };
+  return { refusal, teachRefusal, TEXT };
 };

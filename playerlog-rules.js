@@ -416,6 +416,8 @@ clean_(`SCHOOLS MANUAL SKILLBOOK SCHEMATIC READ CONTRACT CHAMPION CHILL REVIVE F
   UNSTUCK JAIL CONCORDAT EXECUTION OFFERING PRAYER REST WELL CAMP PLAYTIME PLAYTEST REROLL TICKET CRASH-DOWN CRASHLOOP
   RUINBUTTON TAX SUPPLY BOOST STAFF APPEARANCE RECIPE BREW TREASURY ENCH-RESTORE ENCH-LEARNED-REPAIR CLOCK SPELL
   CITIZEN ELECTION BLACKREACH PURSE BIRTHSIGN CONSEQUENCES`);
+// silvertest.js teaching (Nat, 2 Nov): who(), the order's id, a curse kind and a fixed outcome word; no quote, no free text
+clean_('SILVERTEACH', { roles: R_BY([[/ taught $/, 'student'], [/ offers to teach $/, 'student'], [/ the silver test of $/, 'target'], [/ (?:test )?from $/, 'teacher']]) });
 // Name #TAG parties with no profile (display()): resolved by name and tag, never by the tag alone
 clean_('LEVEL ROPE STRUGGLE', { display: true });
 // The client-judged minigame mismatches: clean, and a security signal
@@ -2023,6 +2025,13 @@ silvertest.js SILVER 102f3d42 clean
 silvertest.js SILVER 7adf5989 clean
 silvertest.js SILVER 92dd568b clean
 silvertest.js SILVER 6b1d4eab clean
+silvertest.js SILVERTEACH 65f3edf4 clean
+silvertest.js SILVERTEACH cb5de837 clean
+silvertest.js SILVERTEACH 25a0db5a clean
+silvertest.js SILVERTEACH 8b2291b9 clean
+silvertest.js SILVERTEACH 3b09b6a1 clean
+silvertest.js SILVERTEACH 673fab9f clean
+silvertest.js SILVERTEACH e4e742a9 clean
 smithing.js SMITH 92d9d0d1 clean
 smithing.js SMITH f0ad3f6e clean
 smithing.js SMITH 642eeccc clean
