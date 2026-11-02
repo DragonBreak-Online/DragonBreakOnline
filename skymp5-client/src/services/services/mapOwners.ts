@@ -18,6 +18,8 @@ export const OWNERS_SWF = "dbo_mapowners.swf";
 // Loaded into the map only while this is true: the 2 Nov probe showed no clip can be made inside SkyUI's map, so it is off
 // until the overlay is drawn in our own menu over the map
 export const OWNERS_IN_MAP = false;
+// Where the colours are drawn now: a layer of our legend's CustomMenu over the map (swf/dbo_maplegend, "owners")
+export const OWNERS_LAYER = "_root.owners.layer";
 export const OWNERS_ALIVE_FRAMES = 60;
 // World units per drawing unit inside the swf, so a province fits Flash's coordinate range
 export const DRAW_SCALE = 64;
@@ -364,6 +366,16 @@ export const clipTransform = (f: Fit): ClipTransform => {
   const Q = Math.hypot(E, H), R = Math.hypot(F, G);
   const a1 = Math.atan2(G, F), a2 = Math.atan2(H, E);
   return { x: f.tx, y: f.ty, rotation: ((a2 + a1) / 2) * DEG, xscale: (Q + R) * 100, yscale: (Q - R) * 100, inner: ((a2 - a1) / 2) * DEG };
+};
+
+// The fit carried from the map's stage to our own menu's (2 Nov: the colours are drawn in our CustomMenu over the map, as
+// nothing can be made inside SkyUI's). SkyUI puts a marker at its screen fraction times _mapWidth / _mapHeight, the map's
+// visible size; the same fraction of our visible area is the same spot on screen. A size that does not read (0) is taken
+// as ours, so the fraction is still right when both movies show the same stage
+export interface StageArea { left: number; top: number; width: number; height: number }
+export const fitToStage = (f: Fit, mapWidth: number, mapHeight: number, ours: StageArea): Fit => {
+  const kx = ours.width / (mapWidth > 0 ? mapWidth : ours.width), ky = ours.height / (mapHeight > 0 ? mapHeight : ours.height);
+  return { m00: f.m00 * kx, m01: f.m01 * kx, tx: ours.left + f.tx * kx, m10: f.m10 * ky, m11: f.m11 * ky, ty: ours.top + f.ty * ky, rms: f.rms * Math.max(kx, ky), n: f.n };
 };
 
 // Whether to draw this frame: a fit from at least three markers, and one that holds

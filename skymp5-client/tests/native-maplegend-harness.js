@@ -25,7 +25,7 @@ const compile = (source, name) => {
 // ---- the swf ----
 const t = S.boot('dbo_maplegend', true);
 const R = t.root;
-check('the swf says it is alive, its version, and locks its root (it runs inside the MapMenu)', R.dboAlive === 'yes' && R.dboVersion === 'maplegend-2' && t.ctx._lockroot === true);
+check('the swf says it is alive, its version, and locks its root (it runs inside the MapMenu)', R.dboAlive === 'yes' && R.dboVersion === 'maplegend-3' && t.ctx._lockroot === true);
 check('nothing shows before the first data', R.legend._visible === false && R.bar._visible === false);
 const rows = [{ id: 'seat', label: 'Seats', key: '1', count: 1, shown: true }, { id: 'fort', label: 'Forts', key: '4', count: 2, shown: false },
   { id: 'other', label: 'Everything else', key: '0', count: 7, shown: true }];
@@ -46,6 +46,25 @@ check('R hides the panel; the bar stays', R.legend._visible === false && R.bar._
 let threw = false;
 try { t.push({ shown: true }); } catch (e) { threw = true; }
 check('an unreadable payload changes nothing', !threw && R.legend._visible === false && R.bar._visible === true);
+// ---- who owns what, in this menu over the map (since 2 Nov) ----
+check('its visible area goes to dboStageL/T/W/H, for the client to carry the map\'s positions over', R.dboStageL === 0 && R.dboStageT === 0 && R.dboStageW === 1280 && R.dboStageH === 720);
+check('the owners layer lies under the panel and the bar, and starts hidden', !!R.owners && !!R.owners.layer && !!R.owners.layer.shapes && R.owners.layer._visible === false);
+const osh = R.owners.layer.shapes;
+const ostrokes = [];
+osh.lineStyle = (w, col, a) => ostrokes.push({ w, col, a, pts: [] });
+const omv = osh.moveTo, olt = osh.lineTo;
+osh.moveTo = (x, y) => { omv(x, y); if (!osh._fill && ostrokes.length) ostrokes[ostrokes.length - 1].pts.push([x, y]); };
+osh.lineTo = (x, y) => { olt(x, y); if (!osh._fill && ostrokes.length) ostrokes[ostrokes.length - 1].pts.push([x, y]); };
+const ownersPush = (p) => require('vm').runInContext(`_root.dboOwners(${JSON.stringify(JSON.stringify(p))})`, t.ctx);
+ownersPush({ fills: [{ rgb: 0xc80000, alpha: 11, pts: [0, 0, 10, 0, 10, 10] }, { rgb: 0x0000c8, alpha: 11, rects: [0, 0, 2, 1, 2, 0, 4, 1] }], lines: [{ rgb: 0x111111, alpha: 45, pts: [0, 0, 10, 10] }] });
+check('dboOwners draws each polygon closed, the cells of one owner in one fill, in their colours', osh.fills.length === 2 && osh.fills[0].color === 0xc80000 && JSON.stringify(osh.fills[0].pts) === '[[0,0],[10,0],[10,10],[0,0]]'
+  && osh.fills[1].color === 0x0000c8 && osh.fills[1].pts.length === 10, osh.fills);
+check('...and each line as a hairline (thickness 0, thin at any zoom)', ostrokes.filter((x) => x.w === 0).length === 1 && JSON.stringify(ostrokes.filter((x) => x.w === 0)[0].pts) === '[[0,0],[10,10]]', ostrokes);
+ownersPush({ fills: [], lines: [] });
+check('...a new payload clears the old', osh.fills.length === 0);
+let othrew = false;
+try { ownersPush({ fills: 'x' }); } catch (e) { othrew = true; }
+check('...an unreadable one is logged and changes nothing', !othrew && t.ctx.dboQueue.some((q) => q[0] === 'log' && /unreadable owners/.test(q[1])));
 check('no character the game\'s font lacks', !/[^\x00-\x7f]/.test(fs.readFileSync(path.join(ROOT, 'swf', 'dbo_maplegend', 'scripts', 'frame_1', 'DoAction.as'), 'utf8')));
 
 // ---- the loader ----

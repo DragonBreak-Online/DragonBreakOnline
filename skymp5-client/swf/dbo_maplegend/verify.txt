@@ -1,5 +1,7 @@
 dboData
 dboAlive
-maplegend-2
+maplegend-3
 _lockroot
 THE REALM
+dboOwners
+dboStageW
