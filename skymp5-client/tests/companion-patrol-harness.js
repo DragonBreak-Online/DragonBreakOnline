@@ -8,7 +8,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const esbuildDir = [process.argv[2], path.resolve(__dirname, '../../skymp5-server/node_modules/esbuild'),
+const esbuildDir = [process.argv[2], process.env.ESBUILD_DIR, path.resolve(__dirname, '../../skymp5-server/node_modules/esbuild'),
+  path.resolve(__dirname, '../../../../fork/skymp5-server/node_modules/esbuild'),
   path.join(os.homedir(), 'dragonbreak/fork/skymp5-server/node_modules/esbuild'), 'E:/DragonBreak Online Dev files/fork/skymp5-server/node_modules/esbuild'].find((p) => p && fs.existsSync(p));
 if (!esbuildDir) { console.log('SKIP companion-patrol (no esbuild)'); process.exit(0); }
 const esbuild = require(esbuildDir);
