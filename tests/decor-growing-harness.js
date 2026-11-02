@@ -243,5 +243,101 @@ ok(pl3.crop.ripe && getp(parseInt(pl3.show, 16), 'baseDesc') === ASHYAM_STATIC, 
 use(pl3.ref, OWNER);
 ok(!pl3.crop && held(OWNER, ASHYAM) > 2 && /You pick \d+ Ash Yam/.test(last(OWNER)), '...and the pick gives Ash Yams back', last(OWNER));
 
+// ---- growth counts IN-GAME days off the world clock (Nat via the Leader, 2 Nov) ---------------------------------------------
+// decor.js reads globalThis.__dboClock per call, so installing the stub here takes effect at once, with no reload. timeScale is
+// game minutes per real minute, so an in-game day is 24/timeScale real hours: 4 at the live 6, making a common crop 4 real
+// hours instead of 24. Everything above ran with no clock, which is the real-hour fallback, so both paths are covered.
+let scale = 6, epochReal = clock, epochDays = 100;
+const gameDaysOf = () => epochDays + ((clock - epochReal) * scale) / 86400000;
+globalThis.__dboClock = { gameDays: gameDaysOf, summary: () => ({ timeScale: scale }) };
+// as /timescale does it: bank the game days elapsed so far, then change the rate
+const setScale = (s) => { epochDays = gameDaysOf(); epochReal = clock; scale = s; };
+// hold exactly one kind of crop, so `use` plants it rather than asking which; the planter is emptied the same way a pick
+// leaves it, without rolling for yield
+const only = (base, n) => setp(OWNER, 'inventory', { entries: [{ baseId: base, count: n }] });
+const empty = (it) => { it.crop = null; it.show = null; };
+
+ok(Math.round(T.msPerGameDay()) === 4 * HOUR, 'timeScale 6: an in-game day is 4 real hours', T.msPerGameDay());
+ok(T.daysOf({ rare: false }) === 1 && T.daysOf({ rare: true }) === 2, 'growGameDays 1 for a common crop, rareGameDays 2 for a rare one', [T.daysOf({ rare: false }), T.daysOf({ rare: true })]);
+
+empty(pl3); only(CABBAGE, 2); use(pl3.ref, OWNER);
+ok(pl3.crop && pl3.crop.item === d(CABBAGE) && /ripens in one in-game day/.test(last(OWNER)), 'with the clock up: a common crop ripens in one in-game day', last(OWNER));
+ok(Math.abs(Number(pl3.crop.ripeDay) - (gameDaysOf() + 1)) < 1e-9, '...the target is stored as a point on the world clock (ripeDay), not a real-time stamp', pl3.crop.ripeDay);
+ok(use(pl3.ref, OWNER) === true && /growing; ready in 24 in-game hours/.test(last(OWNER)), '...and the time left is shown in in-game hours, not real ones', last(OWNER));
+ok(/^growing, 24 in-game hours left$/.test(T.planterState(pl3)), '...as is the panel row', T.planterState(pl3));
+clock += 3 * HOUR; timers['decor-grow']();
+ok(!pl3.crop.ripe, '3 real hours in (18 in-game hours): still growing');
+use(pl3.ref, OWNER);
+ok(/growing; ready in 6 in-game hours/.test(last(OWNER)), '...with 6 in-game hours left', last(OWNER));
+clock += HOUR + 1000; timers['decor-grow']();
+ok(pl3.crop.ripe, '4 real hours: one in-game day has passed, so it is ripe - it was 24 real hours before this change');
+
+// a rare crop is two in-game days, so 8 real hours at timeScale 6
+empty(pl3); only(MOONSUGAR, 2); use(pl3.ref, OWNER);
+ok(pl3.crop && pl3.crop.item === MOONSUGAR_D && /ripens in 2 in-game days/.test(last(OWNER)), 'a rare crop: two in-game days', last(OWNER));
+clock += 7 * HOUR; timers['decor-grow']();
+ok(!pl3.crop.ripe, '...not ripe at 7 real hours');
+clock += HOUR + 1000; timers['decor-grow']();
+ok(pl3.crop.ripe, '...ripe at 8 real hours');
+
+// a crop planted BEFORE this change has no ripeDay: it keeps its planted time and simply ripens sooner
+empty(pl3); only(CABBAGE, 2); use(pl3.ref, OWNER);
+const plantedAt = clock;
+delete pl3.crop.ripeDay; pl3.crop.ripeAt = clock + 24 * HOUR;   // exactly what the old code stored
+clock += 3 * HOUR; timers['decor-grow']();
+ok(!pl3.crop.ripe, 'a crop planted before the change: not ripe at 3 real hours');
+clock += HOUR + 1000; timers['decor-grow']();
+ok(pl3.crop.ripe && pl3.crop.at === plantedAt && pl3.crop.ripeDay === undefined, '...ripe at 4 real hours, counted from its own unchanged planted time, and nothing rewrote the stored crop', { at: pl3.crop.at, plantedAt, ripeDay: pl3.crop.ripeDay });
+
+// /timescale moves a standing crop, because its target is a point on the clock rather than a stretch of real time
+empty(pl3); only(CABBAGE, 2); use(pl3.ref, OWNER);
+clock += 2 * HOUR;                      // half an in-game day at timeScale 6
+setScale(12);                           // a game day is now 2 real hours, so the half left is 1 real hour
+timers['decor-grow']();
+ok(!pl3.crop.ripe, 'after /timescale 12 a standing crop is not ripe at once');
+ok(/growing, 12 in-game hours left/.test(T.planterState(pl3)), '...it still has half an in-game day to go', T.planterState(pl3));
+clock += HOUR - 2000; timers['decor-grow']();
+ok(!pl3.crop.ripe, '...still growing just short of the real hour');
+clock += 4000; timers['decor-grow']();
+ok(pl3.crop.ripe, '...and ripe one real hour later, since half an in-game day was left and a day is now 2 real hours');
+setScale(6);
+
+// no world clock: the real-hour fallback, unchanged
+empty(pl3); const savedClock = globalThis.__dboClock; globalThis.__dboClock = null;
+only(CABBAGE, 2); use(pl3.ref, OWNER);
+ok(/ripens in 24 hours/.test(last(OWNER)), 'with no world clock: the growHours fallback, said in real hours', last(OWNER));
+ok(/growing, \d+ (minutes|hours) left/.test(T.planterState(pl3)), '...and the time left is real, not labelled in-game', T.planterState(pl3));
+clock += 23 * HOUR; timers['decor-grow']();
+ok(!pl3.crop.ripe, '...not ripe at 23 real hours');
+clock += HOUR + 1000; timers['decor-grow']();
+ok(pl3.crop.ripe, '...ripe at 24 real hours');
+globalThis.__dboClock = savedClock;
+
+// ---- mutants on the conversion ---------------------------------------------------------------------------------------------
+// Each must break at least one of the three checks below, so the arithmetic above is known to be load-bearing rather than
+// incidentally right. If a mutation no longer applies the conversion has moved, and the mutant says so instead of passing.
+const SRC = fs.readFileSync(MODULE, 'utf8');
+const MUTANTS = [
+  ['the game day converted the wrong way up (s/24 for 24/s)', (s) => s.replace('(24 / s) * 3600000', '(s / 24) * 3600000')],
+  ['timeScale ignored, so an in-game day is a real day', (s) => s.replace('(24 / s) * 3600000', '24 * 3600000')],
+  ['a rare crop given the common crop\'s days', (s) => s.replace('Number(crop && crop.rare ? C.planter.rareGameDays : C.planter.growGameDays)', 'Number(C.planter.growGameDays)')],
+  ['the time left counted in game days but labelled hours', (s) => s.replace('Math.ceil((ms / per) * 24)', 'Math.ceil(ms / per)')],
+];
+const mutantResults = (src) => {
+  const p = path.join(scratch, `decor-mutant-${Math.random().toString(16).slice(2)}.js`);
+  fs.writeFileSync(p, src);
+  const M = require(p)(api)._test;
+  return [
+    Math.round(M.msPerGameDay()) === 4 * HOUR,
+    M.daysOf({ rare: false }) === 1 && M.daysOf({ rare: true }) === 2,
+    /^24 in-game hours$/.test(M.growWords(M.msPerGameDay())),
+  ];
+};
+for (const [what, mutate] of MUTANTS) {
+  const m = mutate(SRC);
+  ok(m !== SRC && mutantResults(m).some((r) => !r), `mutant caught: ${what}`,
+    m === SRC ? 'the mutation no longer applies (the conversion moved): update this mutant' : 'every check still passed');
+}
+
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
 process.exit(fails ? 1 : 0);
