@@ -357,6 +357,16 @@
       "worldspaces": [
         "200000:Gray Fox Cowl.esm"
       ]
+    },
+    {
+      "id": "druadach",
+      "name": "Druadach",
+      "officials": [
+        "guard"
+      ],
+      "worldspaces": [
+        "12c4:Druadach.esm"
+      ]
     }
   ],
   "sovereignty": {

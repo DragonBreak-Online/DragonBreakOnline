@@ -69,6 +69,7 @@ module.exports = (api) => {
   const DAY = 86400000;
   const TERRITORIES = path.resolve('territories.json');
   const OWNERS = path.resolve('territory-owners.json');
+  const POSITIONS = path.resolve('territory-positions.json');
   const WARS = path.resolve('wars.json');
 
   const readJson = (file, fallback) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return fallback; } };
@@ -83,7 +84,26 @@ module.exports = (api) => {
     if (!S.territoryFile || S.territoryFile.at !== at) S.territoryFile = { at, data: readJson(TERRITORIES, {}) || {} };
     return S.territoryFile.data;
   };
-  const territories = () => (territoryFile().territories || []).filter((t) => t && t.id && t.marker);
+  // territory-positions.json (private, gitignored; Nat, 2 Nov): the marker positions territories.json may not carry in the
+  // public repo, read from plugins whose authors forbid AI work (Druadach's). Each gives a territory with no marker.pos its
+  // position by id; a territory still without one is left out, so a server without the file simply has no Druadach land
+  const positionFile = () => {
+    let at = 0; try { at = fs.statSync(POSITIONS).mtimeMs; } catch (e) { at = -1; }
+    if (!S.positionFile || S.positionFile.at !== at) S.positionFile = { at, data: at < 0 ? {} : ((readJson(POSITIONS, {}) || {}).positions || {}) };
+    return S.positionFile.data;
+  };
+  const territories = () => {
+    const file = territoryFile(), pos = positionFile();
+    if (!S.territoryList || S.territoryList.file !== file || S.territoryList.pos !== pos) {
+      const list = (file.territories || []).filter((t) => t && t.id && t.marker).map((t) => {
+        if (Array.isArray(t.marker.pos)) return t;
+        const p = pos[t.id];
+        return Array.isArray(p) && p.length === 3 && p.every(Number.isFinite) ? Object.assign({}, t, { marker: Object.assign({}, t.marker, { pos: p.slice() }) }) : null;
+      }).filter(Boolean);
+      S.territoryList = { file, pos, list };
+    }
+    return S.territoryList.list;
+  };
   const territory = (id) => territories().find((t) => t.id === id) || null;
 
   // ---- factions ------------------------------------------------------------------------------------------------------
@@ -744,6 +764,8 @@ module.exports = (api) => {
     'hold-dawnstar': [122, 92, 176], 'county-bruma': [214, 170, 48], 'imperial-legion': [150, 34, 40], 'clan-gol-kharzum': [46, 112, 60],
     'clan-mor-khazgur': [188, 168, 40], 'clan-dushnikh-yal': [118, 30, 52], 'clan-largashbur': [172, 150, 108], 'clan-narzulbur': [64, 62, 74],
     'clan-cracked-tusk': [150, 58, 40],
+    // Druadach's own clans (2 Nov), each at least 47 from every other colour here
+    'clan-garshakur': [110, 150, 20], 'clan-krazakruhn': [40, 90, 140], 'clan-shaggog': [230, 110, 110], 'clan-garshak': [150, 50, 150], 'clan-malgorath': [20, 150, 140],
   };
   // A faction with no colour of its own gets a steady one from its id, so a new player faction still shows
   const tintOf = (fid) => {

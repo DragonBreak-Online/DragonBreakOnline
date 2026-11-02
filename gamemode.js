@@ -6212,6 +6212,8 @@ const TEMPLE_DEFAULTS = {
   windhelm: { world: '1691d:Skyrim.esm', pos: [133991.62, 38708.79, -12205.06], rotZ: 90 },
   riften: { world: '16bb4:Skyrim.esm', pos: [176322.81, -97021.73, 11392.02], rotZ: 270 },
   winterhold: 'windhelm', dawnstar: 'windhelm', morthal: 'solitude', solstheim: 'windhelm',
+  // Druadach (its own zone from 2 Nov) lies west of Markarth, whose temple its dead woke at before it had a zone
+  druadach: 'markarth',
   // Pale Pass arrival, the only Bruma spot verified to survive a login. The cathedral door spot
   // [59150.7, 201644.9, 7560.6] wedges the client on load, see HANDOFF "login hang".
   bruma: { world: 'a764b:BSHeartland.esm', pos: [48236.2, 260600.4, 20405.1], rotZ: 135 },

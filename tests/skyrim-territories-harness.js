@@ -89,6 +89,9 @@ for (const t of SK.filter((x) => x.kind !== 'stronghold' && !['rorikstead', 'iva
 // ---- 4. realm.js: worldspaces, the walled cities, the panel ----
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'skyrim-territories-harness-'));
 fs.copyFileSync(path.join(SERVER, 'territories.json'), path.join(tmp, 'territories.json'));
+// a server has the private territory-positions.json for the territories the public file gives no position (Druadach's);
+// here synthetic ones stand in for it, so every territory is on the land
+fs.writeFileSync(path.join(tmp, 'territory-positions.json'), JSON.stringify({ positions: Object.fromEntries(T.filter((t) => t.marker && !Array.isArray(t.marker.pos)).map((t, i) => [t.id, [i * 20000, 0, 0]])) }));
 const cwd = process.cwd();
 process.chdir(tmp);
 const PLUGIN = { 'skyrim.esm': 0, 'bsheartland.esm': 0x0b000000 };
@@ -119,7 +122,11 @@ ok(realm.holdCapital('whiterun').id === 'whiterun' && realm.holdCapital('winterh
 const ids = (v) => v.territories.map((t) => t.id).sort().join();
 ok(ids(realm.realmView(1)) === T.filter((t) => t.marker.world === CYRODIIL).map((t) => t.id).sort().join(), 'the Realm panel lists only Bruma\'s land (the map the client has)');
 realm = load({ war: { mapWorlds: [CYRODIIL, TAMRIEL] } });
-ok(realm.realmView(1).territories.length === T.length, 'with Tamriel in war.mapWorlds the panel lists Skyrim too');
+const DRUADACH = '12c4:Druadach.esm';
+ok(realm.realmView(1).territories.length === T.filter((t) => t.marker.world !== DRUADACH).length, 'with Tamriel in war.mapWorlds the panel lists Skyrim too (Druadach, not named, stays out)');
+realm = load({ war: { mapWorlds: [CYRODIIL, TAMRIEL, DRUADACH] } });
+ok(realm.realmView(1).territories.length === T.length, '...and naming Druadach lists its land as well');
+realm = load({ war: { mapWorlds: [CYRODIIL, TAMRIEL] } });
 {
   const v = realm.realmView(1).territories;
   ok(v.every((t) => t.mapWorld === (t.world === CYRODIIL ? CYRODIIL : TAMRIEL)), 'every territory is sent with the mapWorld it is drawn on', v.filter((t) => !t.mapWorld).map((t) => t.id));

@@ -714,6 +714,199 @@
         "radius": 1500
       },
       "icon": 28
+    },
+    {
+      "id": "garshakur",
+      "name": "Garshakur",
+      "zone": "druadach",
+      "owner": "clan-garshakur",
+      "kind": "stronghold",
+      "marker": {
+        "world": "12c4:Druadach.esm",
+        "radius": 1500
+      },
+      "icon": 28
+    },
+    {
+      "id": "fort-rustagov",
+      "name": "Fort Rustagov",
+      "zone": "druadach",
+      "kind": "fort",
+      "marker": {
+        "world": "12c4:Druadach.esm",
+        "radius": 1500
+      },
+      "icon": 6
+    },
+    {
+      "id": "krazakruhn",
+      "name": "Krazakruhn",
+      "zone": "druadach",
+      "owner": "clan-krazakruhn",
+      "kind": "stronghold",
+      "marker": {
+        "world": "12c4:Druadach.esm",
+        "radius": 1500
+      },
+      "icon": 28
+    },
+    {
+      "id": "shaggogs-longhouse",
+      "name": "Shaggog's Longhouse",
+      "zone": "druadach",
+      "owner": "clan-shaggog",
+      "kind": "stronghold",
+      "marker": {
+        "world": "12c4:Druadach.esm",
+        "radius": 1500
+      },
+      "icon": 28
+    },
+    {
+      "id": "druadach-mor-khazgur",
+      "name": "Mor Khazgur",
+      "zone": "druadach",
+      "owner": "clan-mor-khazgur",
+      "kind": "stronghold",
+      "marker": {
+        "world": "12c4:Druadach.esm",
+        "radius": 1500
+      },
+      "icon": 28
+    },
+    {
+      "id": "the-brew-and-barrel",
+      "name": "The Brew and Barrel",
+      "zone": "druadach",
+      "kind": "village",
+      "marker": {
+        "world": "12c4:Druadach.esm",
+        "radius": 1500
+      },
+      "icon": 3
+    },
+    {
+      "id": "gardale-fort",
+      "name": "Gardale Fort",
+      "zone": "druadach",
+      "kind": "fort",
+      "marker": {
+        "world": "12c4:Druadach.esm",
+        "radius": 1500
+      },
+      "icon": 6
+    },
+    {
+      "id": "cragmere-keep",
+      "name": "Cragmere Keep",
+      "zone": "druadach",
+      "kind": "fort",
+      "marker": {
+        "world": "12c4:Druadach.esm",
+        "radius": 1500
+      },
+      "icon": 6
+    },
+    {
+      "id": "garshaks-vigil",
+      "name": "Garshak's Vigil",
+      "zone": "druadach",
+      "owner": "clan-garshak",
+      "kind": "stronghold",
+      "marker": {
+        "world": "12c4:Druadach.esm",
+        "radius": 1500
+      },
+      "icon": 28
+    },
+    {
+      "id": "motte-malgorath",
+      "name": "Motte Malgorath",
+      "zone": "druadach",
+      "owner": "clan-malgorath",
+      "kind": "stronghold",
+      "marker": {
+        "world": "12c4:Druadach.esm",
+        "radius": 1500
+      },
+      "icon": 28
+    },
+    {
+      "id": "twin-tusks-overwatch",
+      "name": "Twin Tusks Overwatch",
+      "zone": "druadach",
+      "kind": "fort",
+      "marker": {
+        "world": "12c4:Druadach.esm",
+        "radius": 1500
+      },
+      "icon": 6
+    },
+    {
+      "id": "orefell",
+      "name": "Orefell",
+      "zone": "druadach",
+      "kind": "town",
+      "marker": {
+        "world": "12c4:Druadach.esm",
+        "radius": 1500
+      },
+      "icon": 2
+    },
+    {
+      "id": "skylock-citadel",
+      "name": "Skylock Citadel",
+      "zone": "druadach",
+      "kind": "fort",
+      "marker": {
+        "world": "12c4:Druadach.esm",
+        "radius": 1500
+      },
+      "icon": 6
+    },
+    {
+      "id": "stonebark-brewery",
+      "name": "Stonebark Brewery",
+      "zone": "druadach",
+      "kind": "village",
+      "marker": {
+        "world": "12c4:Druadach.esm",
+        "radius": 1500
+      },
+      "icon": 3
+    },
+    {
+      "id": "voshlakbur",
+      "name": "Voshlakbur",
+      "zone": "druadach",
+      "kind": "village",
+      "marker": {
+        "world": "12c4:Druadach.esm",
+        "radius": 1500
+      },
+      "icon": 3
+    },
+    {
+      "id": "ashlorn",
+      "name": "Ashlorn",
+      "zone": "druadach",
+      "kind": "town",
+      "marker": {
+        "world": "12c4:Druadach.esm",
+        "radius": 1500
+      },
+      "icon": 2
+    },
+    {
+      "id": "orehold-garrison",
+      "name": "Orehold Garrison",
+      "zone": "druadach",
+      "kind": "fort",
+      "marker": {
+        "world": "12c4:Druadach.esm",
+        "radius": 1500
+      },
+      "icon": 6
     }
   ],
   "_worldAliasesComment": "worldAliases: a worldspace whose points count as another's for territories (the nearest land marker, standing at a marker, a seat outdoors). The five walled cities of Skyrim (Whiterun, Riften, Solitude, Windhelm, Markarth) are child worldspaces of Tamriel drawn in its coordinates, as zones.json already treats them.",
@@ -743,5 +936,6 @@
         "radius": 1500
       }
     }
-  ]
+  ],
+  "_druadachComment": "Druadach (Nat, 2 Nov, via the Leader: \"do what you recommend\"): its 17 towns, villages, forts and orc strongholds, each at its own map marker in Druadach.esm. Their positions are read from that plugin, whose author forbids AI work, so they are kept out of this public repo: territory-positions.json beside this file (gitignored, shipped to the server privately, as hold-cells.json is) gives each one, and realm.js leaves a territory with no position out until it has one (Nat, 2 Nov). No Druadach plugin is changed. Zone druadach (zones.json regions). The towns, villages and forts start unclaimed; each stronghold starts with its clan. Mor Khazgur is Skyrim's own stronghold on the Druadach Mountains' eastern slopes, so Clan Mor Khazgur holds its Druadach side too."
 }

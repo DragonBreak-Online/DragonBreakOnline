@@ -306,6 +306,108 @@
    "kind": "boss",
    "name": "Raldbthar",
    "desc": "90595:Skyrim.esm"
+  },
+  {
+   "id": "garshakur",
+   "kind": "stronghold",
+   "name": "Garshakur",
+   "desc": "8f4a:Druadach.esm"
+  },
+  {
+   "id": "fort-rustagov",
+   "kind": "fort",
+   "name": "Fort Rustagov",
+   "desc": "28173:Druadach.esm"
+  },
+  {
+   "id": "krazakruhn",
+   "kind": "stronghold",
+   "name": "Krazakruhn",
+   "desc": "98fe8:Druadach.esm"
+  },
+  {
+   "id": "shaggogs-longhouse",
+   "kind": "stronghold",
+   "name": "Shaggog's Longhouse",
+   "desc": "193bc:Druadach.esm"
+  },
+  {
+   "id": "druadach-mor-khazgur",
+   "kind": "stronghold",
+   "name": "Mor Khazgur",
+   "desc": "2226c:Druadach.esm"
+  },
+  {
+   "id": "the-brew-and-barrel",
+   "kind": "village",
+   "name": "The Brew and Barrel",
+   "desc": "a090e:Druadach.esm"
+  },
+  {
+   "id": "gardale-fort",
+   "kind": "fort",
+   "name": "Gardale Fort",
+   "desc": "9ac20:Druadach.esm"
+  },
+  {
+   "id": "cragmere-keep",
+   "kind": "fort",
+   "name": "Cragmere Keep",
+   "desc": "1e67:Druadach.esm"
+  },
+  {
+   "id": "garshaks-vigil",
+   "kind": "stronghold",
+   "name": "Garshak's Vigil",
+   "desc": "1e40:Druadach.esm"
+  },
+  {
+   "id": "motte-malgorath",
+   "kind": "stronghold",
+   "name": "Motte Malgorath",
+   "desc": "1e65:Druadach.esm"
+  },
+  {
+   "id": "twin-tusks-overwatch",
+   "kind": "fort",
+   "name": "Twin Tusks Overwatch",
+   "desc": "1e62:Druadach.esm"
+  },
+  {
+   "id": "orefell",
+   "kind": "town",
+   "name": "Orefell",
+   "desc": "1e43:Druadach.esm"
+  },
+  {
+   "id": "skylock-citadel",
+   "kind": "fort",
+   "name": "Skylock Citadel",
+   "desc": "9193:Druadach.esm"
+  },
+  {
+   "id": "stonebark-brewery",
+   "kind": "village",
+   "name": "Stonebark Brewery",
+   "desc": "1e48:Druadach.esm"
+  },
+  {
+   "id": "voshlakbur",
+   "kind": "village",
+   "name": "Voshlakbur",
+   "desc": "9191:Druadach.esm"
+  },
+  {
+   "id": "ashlorn",
+   "kind": "town",
+   "name": "Ashlorn",
+   "desc": "1e69:Druadach.esm"
+  },
+  {
+   "id": "orehold-garrison",
+   "kind": "fort",
+   "name": "Orehold Garrison",
+   "desc": "8577:Druadach.esm"
   }
  ]
 }

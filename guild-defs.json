@@ -2795,6 +2795,41 @@
         }
       ],
       "_ranks": "Not joinable in the games, so no rank list of its own is attested: it takes the Great Houses' shared ladder (Hlaalu and Redoran, Morrowind) and its head is styled Grandmaster as theirs are; Armorer and Clothier are the server's crafting seats. A minor house (Journey to Baan Malur)."
+    },
+    {
+      "id": "clan-garshakur",
+      "name": "Clan Garshakur",
+      "kind": "guild",
+      "template": "stronghold",
+      "note": "the orc clan of Garshakur in Druadach; owns its stronghold's territory, holds no court until Druadach's strongholds are zones of their own"
+    },
+    {
+      "id": "clan-krazakruhn",
+      "name": "Clan Krazakruhn",
+      "kind": "guild",
+      "template": "stronghold",
+      "note": "the orc clan of Krazakruhn in Druadach; owns its stronghold's territory, holds no court until Druadach's strongholds are zones of their own"
+    },
+    {
+      "id": "clan-shaggog",
+      "name": "Clan Shaggog",
+      "kind": "guild",
+      "template": "stronghold",
+      "note": "the orc clan of Shaggog's Longhouse in Druadach; owns its stronghold's territory, holds no court until Druadach's strongholds are zones of their own"
+    },
+    {
+      "id": "clan-garshak",
+      "name": "Clan Garshak",
+      "kind": "guild",
+      "template": "stronghold",
+      "note": "the orc clan of Garshak's Vigil in Druadach; owns its stronghold's territory, holds no court until Druadach's strongholds are zones of their own"
+    },
+    {
+      "id": "clan-malgorath",
+      "name": "Clan Malgorath",
+      "kind": "guild",
+      "template": "stronghold",
+      "note": "the orc clan of Motte Malgorath in Druadach; owns its stronghold's territory, holds no court until Druadach's strongholds are zones of their own"
     }
   ]
 }

@@ -66,7 +66,9 @@ const scenarios = (src, c) => {
     const p = pk[1];
     const tam = p.worlds.find((w) => w.world === '3c:Skyrim.esm'), bru = p.worlds.find((w) => w.world === 'a764b:BSHeartland.esm');
     const withMarker = TERRITORIES.territories.filter((t) => t.marker && Array.isArray(t.marker.pos));
-    c('Tamriel and Bruma, each territory once, at its marker', !!tam && !!bru && p.worlds.length === 2 && tam.territories.length + bru.territories.length === withMarker.length
+    // one world per worldspace the territories stand in, the walled cities' folded into Tamriel's
+    const worldsWanted = new Set(withMarker.map((t) => (TERRITORIES.worldAliases[t.marker.world] || t.marker.world).toLowerCase())).size;
+    c('each world once (Tamriel, Bruma, Druadach), each territory once, at its marker', !!tam && !!bru && p.worlds.length === worldsWanted && p.worlds.reduce((n, w) => n + w.territories.length, 0) === withMarker.length
       && withMarker.every((t) => p.worlds.some((w) => w.territories.some((x) => x.id === t.id && x.x === t.marker.pos[0] && x.y === t.marker.pos[1]))), p.worlds.map((w) => [w.world, w.territories.length]));
     c('the walled cities\' worlds are Tamriel\'s aliases, and a territory in one is drawn in Tamriel\'s', !!tam && tam.territories.some((t) => t.id === 'harness-city') &&JSON.stringify(tam.aliases.slice().sort()) === JSON.stringify(Object.keys(TERRITORIES.worldAliases).sort()) && bru.aliases.length === 0, tam && tam.aliases);
     const brumaT = bru && bru.territories.find((t) => t.id === 'bruma');
