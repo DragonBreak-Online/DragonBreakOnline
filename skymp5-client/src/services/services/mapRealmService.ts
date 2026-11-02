@@ -8,10 +8,10 @@ import { ButtonEvent, InputDeviceType, Menu } from "skyrimPlatform";
 import { logError, logTrace } from "../../logging";
 import {
   LABELS_PER_TICK, LEGEND_HOST, LEGEND_SWF, MAP_MENU, MARKER_CLIP, MARKER_COUNT, RealmMarker, WIDGET_ID,
-  descParts, keyAction, kindIndex, legendJson, legendReset, legendRows, legendStep, newLegendLoad, readMarkers, wantedScale,
+  descParts, keyAction, kindIndex, legendJson, legendRows, readMarkers, wantedScale, SwfLoad, newSwfLoad, swfStep, swfReport,
 } from "./mapRealm";
 import {
-  ANCHORS_PER_FRAME, OWNERS_ALIVE_FRAMES, OWNERS_HOST, OWNERS_SWF, OwnersData, TOGGLE_KEY, TOGGLE_SETTING,
+  ANCHORS_PER_FRAME, OWNERS_HOST, OWNERS_SWF, OwnersData, TOGGLE_KEY, TOGGLE_SETTING,
   anchorClips, clipTransform, drawingOf, fitHolds, fitOf, anchorIndex, legendRow, readOwners, worldFor, Anchor, Fit, Seen,
 } from "./mapOwners";
 
@@ -60,9 +60,10 @@ export class MapRealmService extends ClientListener {
     this.applied = [];
     this.mounted = false;
     this.ticksOpen = 0;
-    this.ownersLoad = { phase: "idle", frames: 0 };
+    this.openings++;
+    this.legendSwf = newSwfLoad();
+    this.ownersSwf = newSwfLoad();
     this.drawnKey = "";
-    this.fitLogged = false;
     this.lastFit = null;
     this.mapWorld = 0;
     if (this.testArmed) { this.testArmed = false; this.test = { tick: 0, samples: [], results: {} }; }
@@ -70,7 +71,7 @@ export class MapRealmService extends ClientListener {
 
   private onMapClose(): void {
     this.open = false;
-    legendReset(this.legendLoad);
+    this.reportSwfs();
     if (widget) { widget = null; closeWidget(this.sp, WIDGET_ID); }
     if (this.test) this.finishTests("the map closed");
   }
@@ -101,7 +102,7 @@ export class MapRealmService extends ClientListener {
     this.ticksOpen++;
     try {
       // browserService hides the browser for the map; a browser legend needs it shown (unfocused: the map keeps the keys)
-      if (((this.markers.length && this.legendLoad.phase === "off") || this.test) && this.ticksOpen <= 3) this.sp.browser.setVisible(true);
+      if (this.test && this.ticksOpen <= 3) this.sp.browser.setVisible(true);
       if (this.markers.length) {
         this.loadLegend();
         this.readLabels();
@@ -152,22 +153,49 @@ export class MapRealmService extends ClientListener {
     }
   }
 
-  // The legend inside the map (dbo_maplegend): loaded each opening, the browser's only if it never comes alive
-  private loadLegend(): void {
+  // A swf into the MapMenu by the HUD's rule, every step timed (mapRealm.ts swfStep); "inject", "up", "fail" or ""
+  private loadSwf(st: SwfLoad, host: string, name: string, depth: string, swf: string): string {
     const ui = this.sp.Ui;
-    let alive = false;
-    try { alive = this.legendLoad.phase === "loading" && ui.getString(MAP_MENU, `${LEGEND_HOST}.dboAlive`) === "yes"; } catch { alive = false; }
-    const step = legendStep(this.legendLoad, alive);
+    const seen = { menu: false, clip: false, url: "", alive: false };
+    try { seen.menu = ui.isMenuOpen(MAP_MENU); } catch { seen.menu = false; }
+    if (st.phase === "loading" || st.phase === "up") {
+      try { seen.clip = ui.getString(MAP_MENU, `${host}._name`) === name; } catch { seen.clip = false; }
+      try { seen.url = ui.getString(MAP_MENU, `${host}._url`) || ""; } catch { seen.url = ""; }
+      try { seen.alive = ui.getString(MAP_MENU, `${host}.dboAlive`) === "yes"; } catch { seen.alive = false; }
+    }
+    const step = swfStep(st, this.ticksOpen, seen, swf);
     if (step === "inject") {
       try {
-        ui.invokeStringA(MAP_MENU, "_root.createEmptyMovieClip", ["dboMapLegend", "9991"]);
-        ui.invokeString(MAP_MENU, `${LEGEND_HOST}.loadMovie`, LEGEND_SWF);
-      } catch (err) { logError(this, "the map legend could not be loaded", err); }
-    } else if (step === "up") {
+        ui.invokeStringA(MAP_MENU, "_root.createEmptyMovieClip", [name, depth]);
+        ui.invokeString(MAP_MENU, `${host}.loadMovie`, swf);
+      } catch (err) { logError(this, `${swf} could not be loaded into the map`, err); }
+    }
+    return step;
+  }
+
+  // One line a map opening to the server log: how far each swf got, at which frames, and the fit
+  private reportSwfs(): void {
+    if (!this.markers.length && !this.owners) return;
+    const f = this.lastFit;
+    const report = {
+      opening: this.openings, frames: this.ticksOpen,
+      legend: this.markers.length ? swfReport(this.legendSwf) : null,
+      owners: this.owners ? swfReport(this.ownersSwf) : null,
+      world: this.mapWorld, anchors: this.anchorsSeen,
+      fit: f ? { n: f.n, rms: Math.round(f.rms * 100) / 100, holds: fitHolds(f), turn: Math.round(clipTransform(f).rotation + clipTransform(f).inner) } : null,
+    };
+    logTrace(this, "map swfs", JSON.stringify(report));
+    sendCustomPacket(this.controller, { customPacketType: "dbo", event: "mapSwf", args: [report], widget: 0 });
+  }
+
+  // The legend inside the map (dbo_maplegend): loaded each opening, the browser's for that opening if it never comes alive
+  private loadLegend(): void {
+    const step = this.loadSwf(this.legendSwf, LEGEND_HOST, "dboMapLegend", "9991", LEGEND_SWF);
+    if (step === "up") {
       logTrace(this, "map legend drawn in the map");
       this.publish();
     } else if (step === "fail") {
-      logTrace(this, "the map legend never came alive in the map: the browser draws it this session");
+      logTrace(this, "the map legend never came alive in the map: the browser draws it this opening");
       this.sp.browser.setVisible(true);
       this.publish();
     }
@@ -176,22 +204,10 @@ export class MapRealmService extends ClientListener {
   // ---- who owns what (mapOwners.ts): loaded like the legend, drawn once per world, lined up with the markers each frame ----
   private followOwners(): void {
     const ui = this.sp.Ui;
-    const st = this.ownersLoad;
-    if (st.phase === "idle") {
-      st.phase = "loading";
-      try {
-        ui.invokeStringA(MAP_MENU, "_root.createEmptyMovieClip", ["dboMapOwners", "9989"]);
-        ui.invokeString(MAP_MENU, `${OWNERS_HOST}.loadMovie`, OWNERS_SWF);
-      } catch (err) { logError(this, "the map owners overlay could not be loaded", err); st.phase = "off"; }
-      return;
-    }
-    if (st.phase === "loading") {
-      let alive = false;
-      try { alive = ui.getString(MAP_MENU, `${OWNERS_HOST}.dboAlive`) === "yes"; } catch { alive = false; }
-      if (alive) { st.phase = "up"; logTrace(this, "map owners overlay drawn in the map"); }
-      else if (++st.frames >= OWNERS_ALIVE_FRAMES) { st.phase = "off"; logTrace(this, "the map owners overlay never came alive in the map"); }
-      return;
-    }
+    const st = this.ownersSwf;
+    const step = this.loadSwf(st, OWNERS_HOST, "dboMapOwners", "9989", OWNERS_SWF);
+    if (step === "up") logTrace(this, "map owners overlay drawn in the map");
+    else if (step === "fail") logTrace(this, "the map owners overlay never came alive in the map");
     if (st.phase !== "up" || !this.owners) return;
     // the world this map shows: the player's (an interior has none, so no colours there)
     if (!this.mapWorld) {
@@ -205,6 +221,7 @@ export class MapRealmService extends ClientListener {
       this.drawnKey = key;
       this.worldOwners = new Set(world.territories.map((t) => t.owner)).size;
       try { ui.invokeString(MAP_MENU, `${OWNERS_HOST}.dboData`, JSON.stringify(drawingOf(world, this.owners.factions, this.owners.reach, this.owners.fade))); } catch (err) { logError(this, "map owners data failed", err); }
+      if (st.t.drawn < 0) st.t.drawn = this.ticksOpen;
       this.publish();
     }
     const fit = this.ownersShown ? this.fitNow() : null;
@@ -220,14 +237,7 @@ export class MapRealmService extends ClientListener {
       ui.setFloat(MAP_MENU, `${layer}.shapes._rotation`, t.inner);
     }
     if (fit) this.lastFit = fit;
-    // once an opening, after three seconds: how well the markers fit, so the alignment is measured, not judged by eye alone
-    if (!this.fitLogged && this.ticksOpen >= 180) {
-      this.fitLogged = true;
-      const f = this.lastFit;
-      const report = { world: world.world, anchors: this.anchorsSeen, fit: f ? { n: f.n, rms: Math.round(f.rms * 100) / 100, m: [f.m00, f.m01, f.m10, f.m11], turn: Math.round(clipTransform(f).rotation + clipTransform(f).inner) } : null, holds: fitHolds(f) };
-      logTrace(this, "map owners fit", JSON.stringify(report));
-      sendCustomPacket(this.controller, { customPacketType: "dbo", event: "mapOwnersFit", args: [report], widget: 0 });
-    }
+    if (holds && st.t.fit < 0) st.t.fit = this.ticksOpen;
   }
 
   // The markers the server named, where the map has put them this frame, in the root's own units
@@ -265,13 +275,13 @@ export class MapRealmService extends ClientListener {
     if (!this.open) return;
     let rows = legendRows(this.labels.map((l) => (typeof l === "string" ? l : null)), this.index, this.hidden);
     if (this.owners && this.drawnKey) rows = rows.concat([legendRow(this.ownersShown, this.worldOwners, keyName(this.ownersKey))]);
-    if (this.legendLoad.phase === "up") {
+    if (this.legendSwf.phase === "up") {
       if (widget) { widget = null; closeWidget(this.sp, WIDGET_ID); }
       try { this.sp.Ui.invokeString(MAP_MENU, `${LEGEND_HOST}.dboData`, legendJson(this.legendShown, rows)); } catch (err) { logError(this, "map legend data failed", err); }
       return;
     }
-    // still loading: nothing yet (the swf or, failing it, the browser follows within a second)
-    if (this.legendLoad.phase !== "off") return;
+    // still loading: nothing yet (the swf, or after its last try the browser)
+    if (this.legendSwf.phase !== "off") return;
     widget = { type: "mapRealm", id: WIDGET_ID, mapMode: true, shown: this.legendShown, rows };
     refreshFormMenu(this.sp, this.browsersideWidgetSetter, { widget });
   }
@@ -333,18 +343,18 @@ export class MapRealmService extends ClientListener {
   private mounted = false;
   private testArmed = false;
   private test: MapTest | null = null;
-  private legendLoad = newLegendLoad();
+  private legendSwf: SwfLoad = newSwfLoad();
+  private ownersSwf: SwfLoad = newSwfLoad();
+  private openings = 0;
   private owners: OwnersData | null = null;
   private anchors = new Map<string, Anchor>();
   private ownersShown = true;
   private ownersKey: number = TOGGLE_KEY;
-  private ownersLoad: { phase: "idle" | "loading" | "up" | "off"; frames: number } = { phase: "idle", frames: 0 };
   private drawnKey = "";
   private worldOwners = 0;
   private mapWorld = 0;
   private worldIds = new Map<string, number>();
   private anchorsSeen = 0;
-  private fitLogged = false;
   private lastFit: Fit | null = null;
 }
 

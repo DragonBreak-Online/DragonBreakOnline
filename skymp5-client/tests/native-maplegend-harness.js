@@ -80,4 +80,46 @@ check('...a second with no answer (60 frames) gives the legend to the browser fo
   try { bad = loader(compile(SRC.replace(a, b), `m${i}`)); } catch (e) { bad = 1; }
   check(`mutant caught: ${name}`, bad > 0);
 });
+
+// ---- the traced loader the map's swfs use now (swfStep): the HUD's rule, every step timed ----
+const swfLoader = (M) => {
+  let bad = 0;
+  const c = (ok) => { if (!ok) bad++; };
+  const SWF = 'dbo_maplegend.swf';
+  const no = { menu: false, clip: false, url: '', alive: false };
+  let st = M.newSwfLoad();
+  c(M.swfStep(st, 1, no, SWF) === '' && st.phase === 'idle');
+  c(M.swfStep(st, 2, Object.assign({}, no, { menu: true }), SWF) === 'inject' && st.t.menu === 2 && JSON.stringify(st.t.inject) === '[2]');
+  c(M.swfStep(st, 3, { menu: true, clip: true, url: 'Interface/map.swf', alive: false }, SWF) === '' && st.t.clip === 3 && st.t.loaded === -1);
+  c(M.lastSwfStep(st.t) === 'clip');
+  c(M.swfStep(st, 9, { menu: true, clip: true, url: 'Interface/DBO_MapLegend.swf', alive: false }, SWF) === '' && st.t.loaded === 9 && M.lastSwfStep(st.t) === 'loaded');
+  c(M.swfStep(st, 10, { menu: true, clip: true, url: 'Interface/dbo_maplegend.swf', alive: true }, SWF) === 'up' && st.t.alive === 10 && M.lastSwfStep(st.t) === 'alive');
+  st.t.drawn = 11; c(M.lastSwfStep(st.t) === 'drawn');
+  st.t.fit = 12; c(M.lastSwfStep(st.t) === 'fit');
+  // a gap stops the count: fitted but never drawn reads as alive
+  st.t.drawn = -1; c(M.lastSwfStep(st.t) === 'alive');
+  // never alive: a try per MAP_SWF_ALIVE_FRAMES, MAP_SWF_TRIES in all, then off
+  st = M.newSwfLoad();
+  const menu = Object.assign({}, no, { menu: true });
+  const out = [];
+  for (let tick = 1; tick <= M.MAP_SWF_ALIVE_FRAMES * M.MAP_SWF_TRIES + 5; tick++) { const s = M.swfStep(st, tick, menu, SWF); if (s) out.push(s + '@' + tick); }
+  c(out.join() === `inject@1,inject@${1 + M.MAP_SWF_ALIVE_FRAMES},inject@${1 + 2 * M.MAP_SWF_ALIVE_FRAMES},fail@${1 + 3 * M.MAP_SWF_ALIVE_FRAMES}` && st.phase === 'off' && st.tries === M.MAP_SWF_TRIES);
+  c(M.lastSwfStep(st.t) === 'inject');
+  const r = M.swfReport(st);
+  c(r.last === 'inject' && r.phase === 'off' && r.tries === 3 && r.inject.length === 3 && r.clip === -1);
+  return bad;
+};
+check('the map\'s swfs: nothing until the menu is open, each step timed, the last one reached named', swfLoader(live) === 0);
+check('...240 frames a try and three tries, the HUD\'s numbers (nativeHud.ts)', live.MAP_SWF_ALIVE_FRAMES === 240 && live.MAP_SWF_TRIES === 3);
+[
+  ['loads before the menu is open', '    if (!seen.menu) return "";\n', ''],
+  ['one try only', 'if (st.tries < MAP_SWF_TRIES) {', 'if (false) {'],
+  ['loaded read from any url', 'if (seen.url.toLowerCase().endsWith(swf.toLowerCase()) && t.loaded < 0)', 'if (seen.url && t.loaded < 0)'],
+  ['the last step skips a gap', 'if (!at[s]) break; last = s;', 'if (!at[s]) continue; last = s;'],
+].forEach(([name, a, b], i) => {
+  if (!SRC.includes(a)) { check(`mutant "${name}": its line is in mapRealm.ts`, false, a); return; }
+  let bad = 0;
+  try { bad = swfLoader(compile(SRC.replace(a, b), `s${i}`)); } catch (e) { bad = 1; }
+  check(`mutant caught: ${name}`, bad > 0);
+});
 T.done();

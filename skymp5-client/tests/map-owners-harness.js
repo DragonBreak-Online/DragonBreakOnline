@@ -279,7 +279,8 @@ check('a map with no MarkerClips: it stays where it was put, and says so', !swap
 const src = fs.readFileSync(path.join(ROOT, 'src/services/services/mapRealmService.ts'), 'utf8').replace(/\r\n/g, '\n');
 const fn = (name) => { const i = src.indexOf(`  private ${name}(`); return i < 0 ? '' : src.slice(i, src.indexOf('\n  }\n', i)); };
 const fo = fn('followOwners');
-check('the overlay is loaded into a clip of the map each opening, like the legend', /createEmptyMovieClip", \["dboMapOwners", "9989"\]/.test(fo) && /\.loadMovie`, OWNERS_SWF\)/.test(fo) && /this\.ownersLoad = \{ phase: "idle", frames: 0 \};/.test(fn('onMapOpen')));
+check('the overlay is loaded into a clip of the map each opening, by the traced loader the legend uses', fo.includes('this.loadSwf(st, OWNERS_HOST, "dboMapOwners", "9989", OWNERS_SWF)')
+  && fn('loadSwf').includes('"_root.createEmptyMovieClip", [name, depth]') && fn('loadSwf').includes('.loadMovie`, swf)') && fn('onMapOpen').includes('this.ownersSwf = newSwfLoad();'));
 check('drawn again only when the world or an owner changes', /if \(key !== this\.drawnKey\)/.test(fo) && /world\.territories\.map\(\(t\) => t\.owner\)/.test(fo));
 check('shown only while the player wants it and the fit holds; hidden where no world has owners', /const holds = this\.ownersShown && fitHolds\(fit\);/.test(fo) && /setBool\(MAP_MENU, `\$\{layer\}\._visible`, holds\)/.test(fo) && /if \(!world\) \{ ui\.setBool\(MAP_MENU, `\$\{layer\}\._visible`, false\); return; \}/.test(fo));
 check('the six transform values set each frame it holds', ['_x', '_y', '_xscale', '_yscale', '_rotation'].every((k) => src.includes('`${layer}.' + k + '`')) && src.includes('`${layer}.shapes._rotation`, t.inner'));
@@ -289,6 +290,7 @@ check('the toggle key is read like the other hotkeys: mapColoursKeyCode, else T'
 check('that key toggles the colours, with or without the realm\'s markers; 0 turns it off', /if \(this\.ownersKey && e\.code === this\.ownersKey && this\.owners\) \{\n      this\.ownersShown = !this\.ownersShown;/.test(fn('onButton'))
   && fn('onButton').indexOf('this.ownersKey') < fn('onButton').indexOf('if (!this.markers.length) return;'));
 check('the legend gets the colours\' row once the world is drawn, named for that key', /if \(this\.owners && this\.drawnKey\) rows = rows\.concat\(\[legendRow\(this\.ownersShown, this\.worldOwners, keyName\(this\.ownersKey\)\)\]\);/.test(fn('publish')));
-check('the fit is measured and reported once an opening', /sendCustomPacket\(this\.controller, \{ customPacketType: "dbo", event: "mapOwnersFit"/.test(fo) && /this\.fitLogged = false;/.test(fn('onMapOpen')));
+check('its first draw and first holding fit are timed, and one mapSwf line an opening carries them and the fit', fo.includes('if (st.t.drawn < 0) st.t.drawn = this.ticksOpen;') && fo.includes('if (holds && st.t.fit < 0) st.t.fit = this.ticksOpen;')
+  && fn('onMapClose').includes('this.reportSwfs();') && fn('reportSwfs').includes('event: "mapSwf"') && fn('reportSwfs').includes('owners: this.owners ? swfReport(this.ownersSwf) : null'));
 
 T.done();
