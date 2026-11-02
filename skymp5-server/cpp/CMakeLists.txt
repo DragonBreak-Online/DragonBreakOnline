@@ -64,6 +64,18 @@ target_include_directories(geo PUBLIC "${CMAKE_CURRENT_LIST_DIR}/geo")
 apply_default_settings(TARGETS geo)
 
 #
+# navmesh
+#
+
+find_package(recastnavigation CONFIG REQUIRED)
+file(GLOB_RECURSE src "${CMAKE_CURRENT_SOURCE_DIR}/navmesh/*")
+list(APPEND src "${CMAKE_SOURCE_DIR}/.clang-format")
+add_library(navmesh STATIC ${src})
+target_include_directories(navmesh PUBLIC "${CMAKE_CURRENT_LIST_DIR}/navmesh")
+target_link_libraries(navmesh PRIVATE RecastNavigation::Detour)
+apply_default_settings(TARGETS navmesh)
+
+#
 # server_guest_lib
 #
 
