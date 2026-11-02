@@ -15,6 +15,9 @@
 
 export const OWNERS_HOST = "_root.dboMapOwners";
 export const OWNERS_SWF = "dbo_mapowners.swf";
+// Loaded into the map only while this is true: the 2 Nov probe showed no clip can be made inside SkyUI's map, so it is off
+// until the overlay is drawn in our own menu over the map
+export const OWNERS_IN_MAP = false;
 export const OWNERS_ALIVE_FRAMES = 60;
 // World units per drawing unit inside the swf, so a province fits Flash's coordinate range
 export const DRAW_SCALE = 64;

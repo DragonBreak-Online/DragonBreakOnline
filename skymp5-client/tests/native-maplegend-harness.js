@@ -105,6 +105,11 @@ const swfLoader = (M) => {
   for (let tick = 1; tick <= M.MAP_SWF_ALIVE_FRAMES * M.MAP_SWF_TRIES + 5; tick++) { const s = M.swfStep(st, tick, menu, SWF); if (s) out.push(s + '@' + tick); }
   c(out.join() === `inject@1,inject@${1 + M.MAP_SWF_ALIVE_FRAMES},inject@${1 + 2 * M.MAP_SWF_ALIVE_FRAMES},fail@${1 + 3 * M.MAP_SWF_ALIVE_FRAMES}` && st.phase === 'off' && st.tries === M.MAP_SWF_TRIES);
   c(M.lastSwfStep(st.t) === 'inject');
+  // our own CustomMenu: one try, then off (opening it twice is how a panel was lost on 26 Oct)
+  const one = M.newSwfLoad();
+  const once = [];
+  for (let tick = 1; tick <= M.MAP_SWF_ALIVE_FRAMES + 5; tick++) { const s = M.swfStep(one, tick, menu, SWF, 1); if (s) once.push(s + '@' + tick); }
+  c(once.join() === `inject@1,fail@${1 + M.MAP_SWF_ALIVE_FRAMES}` && one.phase === 'off');
   const r = M.swfReport(st);
   c(r.last === 'inject' && r.phase === 'off' && r.tries === 3 && r.inject.length === 3 && r.clip === -1);
   return bad;
@@ -113,7 +118,8 @@ check('the map\'s swfs: nothing until the menu is open, each step timed, the las
 check('...240 frames a try and three tries, the HUD\'s numbers (nativeHud.ts)', live.MAP_SWF_ALIVE_FRAMES === 240 && live.MAP_SWF_TRIES === 3);
 [
   ['loads before the menu is open', '    if (!seen.menu) return "";\n', ''],
-  ['one try only', 'if (st.tries < MAP_SWF_TRIES) {', 'if (false) {'],
+  ['one try only', 'if (st.tries < tries) {', 'if (false) {'],
+  ['a CustomMenu tried again', 'swf: string, tries = MAP_SWF_TRIES): string => {', 'swf: string, tries = MAP_SWF_TRIES): string => { tries = MAP_SWF_TRIES;'],
   ['loaded read from any url', 'if (seen.url.toLowerCase().endsWith(swf.toLowerCase()) && t.loaded < 0)', 'if (seen.url && t.loaded < 0)'],
   ['the last step skips a gap', 'if (!at[s]) break; last = s;', 'if (!at[s]) continue; last = s;'],
 ].forEach(([name, a, b], i) => {

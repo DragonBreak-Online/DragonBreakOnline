@@ -84,6 +84,9 @@ export const wantedScale = (label: string | null, index: Map<string, string>, hi
 // Loaded into a clip of the map each time it opens, as dbo_hud is into the HUD Menu. One that never says it is alive
 // within LEGEND_ALIVE_FRAMES leaves the legend to the browser for the rest of the session, as before
 export const LEGEND_HOST = "_root.dboMapLegend";
+// Since 2 Nov the legend is our own CustomMenu over the map instead (nothing can be made inside SkyUI's map); the menu SKSE
+// opens for a custom swf is always this one
+export const LEGEND_MENU = "CustomMenu";
 export const LEGEND_SWF = "dbo_maplegend.swf";
 export const LEGEND_ALIVE_FRAMES = 60;
 export interface LegendLoad { phase: "idle" | "loading" | "up" | "off"; frames: number }
@@ -118,7 +121,8 @@ export const newSwfLoad = (): SwfLoad => ({ phase: "idle", frames: 0, tries: 0, 
 // What one frame shows: the menu open, the host clip there, its _url, our swf's dboAlive
 export interface SwfSeen { menu: boolean; clip: boolean; url: string; alive: boolean }
 // One frame, at tick (frames since the map opened): "inject" (make the clip and load the swf), "up", "fail" or ""
-export const swfStep = (st: SwfLoad, tick: number, seen: SwfSeen, swf: string): string => {
+// tries: MAP_SWF_TRIES for a clip loaded into the map; 1 for our own CustomMenu, which must never be opened twice
+export const swfStep = (st: SwfLoad, tick: number, seen: SwfSeen, swf: string, tries = MAP_SWF_TRIES): string => {
   const t = st.t;
   if (seen.menu && t.menu < 0) t.menu = tick;
   if (st.phase === "loading" || st.phase === "up") {
@@ -135,7 +139,7 @@ export const swfStep = (st: SwfLoad, tick: number, seen: SwfSeen, swf: string): 
   if (st.phase !== "loading") return "";
   if (seen.alive) { st.phase = "up"; return "up"; }
   if (++st.frames < MAP_SWF_ALIVE_FRAMES) return "";
-  if (st.tries < MAP_SWF_TRIES) { st.tries++; st.frames = 0; t.inject.push(tick); return "inject"; }
+  if (st.tries < tries) { st.tries++; st.frames = 0; t.inject.push(tick); return "inject"; }
   st.phase = "off";
   return "fail";
 };
