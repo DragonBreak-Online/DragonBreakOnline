@@ -45,6 +45,7 @@ import ClassLectern from './features/classLectern';
 import ExpeditionBoard from './features/expeditionBoard';
 import Party from './features/party';
 import TomeShop from './features/tomeShop';
+import Book from './features/book';
 import Bank from './features/bank';
 import BusinessLedger from './features/businessLedger';
 import PropertyMarket from './features/propertyMarket';
@@ -321,6 +322,8 @@ const Constructor = props => {
       return <StudyMagic data={rend} />;
     case 'classLectern':
       return <ClassLectern data={rend} />;
+    case 'book':
+      return <Book data={rend} />;
     case 'bank':
       return <Bank data={rend} />;
     case 'businessLedger':
