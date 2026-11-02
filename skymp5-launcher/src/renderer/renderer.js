@@ -219,6 +219,9 @@ async function loadGameSettingsTab() {
     const cs = await window.electronAPI.communityShadersLoad()
     const csBox = document.getElementById('gfx-community-shaders')
     if (csBox && cs && cs.ok) { csBox.checked = !!cs.enabled; csBox.dataset.saved = cs.enabled ? '1' : '0' }
+    const mt = await window.electronAPI.mapTintLoad()
+    const mtBox = document.getElementById('set-map-tint')
+    if (mtBox && mt && mt.ok) { mtBox.checked = !!mt.enabled; mtBox.dataset.saved = mt.enabled ? '1' : '0' }
     const gh = await window.electronAPI.gameHotkeysLoad()
     const ghkEditable = !!(gh && gh.ok && gh.hasGamePath)
     setInputsDisabled(Object.keys(GHK_MAP), !ghkEditable)
@@ -287,6 +290,17 @@ async function saveGameSettingsTab() {
       if (r && r.ok) csBox.dataset.saved = csBox.checked ? '1' : '0'
       else {
         csBox.checked = csBox.dataset.saved === '1'
+        if (hint && r && r.error) hint.textContent = r.error
+      }
+    }
+    // The same for the map's territory colours: refused while the game runs, kept in the checkbox otherwise
+    const mtBox = document.getElementById('set-map-tint')
+    if (mtBox && mtBox.dataset.saved !== undefined && (mtBox.checked ? '1' : '0') !== mtBox.dataset.saved) {
+      const r = await window.electronAPI.mapTintSet(mtBox.checked)
+      const hint = document.getElementById('set-map-tint-hint')
+      if (r && r.ok) mtBox.dataset.saved = mtBox.checked ? '1' : '0'
+      else {
+        mtBox.checked = mtBox.dataset.saved === '1'
         if (hint && r && r.error) hint.textContent = r.error
       }
     }

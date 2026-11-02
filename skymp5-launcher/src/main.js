@@ -21,6 +21,7 @@ const Store  = require('electron-store')
 const AdmZip = require('adm-zip')
 const config = require('./config')
 const mo2    = require('./mo2')
+const mapTint = require('./mapTint')
 const nexus  = require('./nexus')
 const ini    = require('./ini')
 const prefsSeed = require('./prefsSeed')
@@ -453,9 +454,9 @@ function readClientSettings() {
 const COMMUNITY_SHADERS_NEXUS_ID = 86492
 const COMMUNITY_SHADERS_FILE = 'SKSE/Plugins/CommunityShaders.dll'
 function disabledManagedMods(manifest) {
-  if (!store.get('communityShadersOff')) return []
-  return (manifest && Array.isArray(manifest.mods) ? manifest.mods : [])
+  const cs = !store.get('communityShadersOff') ? [] : (manifest && Array.isArray(manifest.mods) ? manifest.mods : [])
     .filter(m => m && Number(m.modId) === COMMUNITY_SHADERS_NEXUS_ID).map(m => m.name)
+  return cs.concat(mapTint.disabledMods(manifest, !!store.get('mapTintOff')))
 }
 ipcMain.handle('controller:load', () => ({ ok: true, enabled: !!store.get('controllerEnabled') }))
 ipcMain.handle('controller:set', (_e, on) => { store.set('controllerEnabled', !!on); log(`[settings] Use a controller ${on ? 'on' : 'off'}`); return { ok: true } })
@@ -475,6 +476,46 @@ ipcMain.handle('mods:communityShadersSet', async (_e, on) => {
   const applied = name ? mo2.setModEnabled(name, !!on) : false
   log(`[settings] Community Shaders ${on ? 'on' : 'off'}${applied ? '' : ' (applied at the next install)'}`)
   return { ok: true, applied }
+})
+
+// The world map's territory colours (Nat, 2 Nov): on by default. Off writes the colour mod's modlist.txt line '-' (MO2) and
+// leaves its extra files out and removes them (direct mode), so the game shows its own map tiles; on brings them back.
+ipcMain.handle('mods:mapTintLoad', () => {
+  const name = mo2.findModWithFile(mapTint.PROBE_FILE)
+  const line = name ? mo2.isModEnabled(name) : null
+  return { ok: true, enabled: line !== null ? line : !store.get('mapTintOff') }
+})
+ipcMain.handle('mods:mapTintSet', async (_e, on) => {
+  if (installGate.running()) return { ok: false, error: installGate.refusal() }
+  // MO2 writes modlist.txt back when it exits, so a change made while it runs would be lost
+  const running = (await isProcessRunning('SkyrimSE.exe')) || (await isProcessRunning('skse64_loader.exe')) ||
+    (await isProcessRunning('ModOrganizer.exe'))
+  if (running) return { ok: false, error: 'Close the game first, then change this setting.' }
+  store.set('mapTintOff', !on)
+  const name = mo2.findModWithFile(mapTint.PROBE_FILE)
+  const applied = name ? mo2.setModEnabled(name, !!on) : false
+  // Extra files: off removes the colour tiles now; on fetches them back unless every DragonBreak file is switched off
+  let removed = 0, restored = 0
+  const gamePath = effectiveGamePath()
+  if (gamePath) {
+    try {
+      const vd = await fetchExtraManifest()
+      if (!on) {
+        const dataDir = path.join(gamePath, 'Data')
+        for (const f of allExtraEntries(vd, gamePath).filter(e => mapTint.isTintFile(e.path))) {
+          const full = path.join(gamePath, ...f.path.split('/'))
+          try { fs.unlinkSync(mo2.lp(full)); removed++ } catch { /* not installed */ }
+          removeEmptyParents(full, dataDir)
+        }
+        store.set('extraHashCache', {})
+      } else if (!store.get('dboFilesDisabled')) {
+        const r = await syncExtraFiles(gamePath)
+        if (r && r.success) restored = r.count || 0
+      }
+    } catch (err) { log(`[settings] map colours: extra files not changed (${err.message})`) }
+  }
+  log(`[settings] map colours ${on ? 'on' : 'off'}${applied ? ' (mod switched)' : ''}${removed ? `, ${removed} file(s) removed` : ''}${restored ? `, extras synced` : ''}`)
+  return { ok: true, applied, removed }
 })
 
 ipcMain.handle('graphics:load', () => {
@@ -3573,11 +3614,15 @@ async function fetchExtraManifest(get = fetchJSON) {
 }
 
 // Entries with a sha256 whose path stays inside the game's Data folder
-function extraEntries(vd, skyrimPath) {
+function allExtraEntries(vd, skyrimPath) {
   const data = path.resolve(skyrimPath, 'Data') + path.sep
   return (vd && Array.isArray(vd.files) ? vd.files : []).filter(f =>
     f && typeof f.path === 'string' && /^[0-9a-f]{64}$/i.test(String(f.sha256)) &&
     path.resolve(skyrimPath, ...f.path.split('/')).startsWith(data))
+}
+// The extra files this player gets: all of them, less the map's territory colours when those are switched off
+function extraEntries(vd, skyrimPath) {
+  return mapTint.keepExtras(allExtraEntries(vd, skyrimPath), !!store.get('mapTintOff'))
 }
 
 // Cheap check for the Play button: same manifest version and every file present at its published size
