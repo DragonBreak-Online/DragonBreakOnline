@@ -1,7 +1,10 @@
 // A staff member clears their own inventory (Nat, 2 Nov; gamemode.js clearOwnInventory: the F7 Debug tab's dbo
 // clearInventory and /clearinv). GM and above, on the staff character, only their own; the first press says what would go
 // and a second within 5 s clears it through the server's inventory (mp.set), keeping worn items and keys, gold cleared and
-// counted in the audit line. The block is cut out of gamemode.js and run with stubs. Mutants of a copy must fail.
+// counted in the audit line. The chat command gets 30 s: on dev (2 Nov) Nat typed /clearinv twice, more than 5 s apart, and
+// was asked twice. It runs here through gamemode.js's own plogCommand wrapper and the player log's command hook, as a typed
+// command does, with the time a second line takes to type between. Each step is logged. The block is cut out of gamemode.js
+// and run with stubs. Mutants of a copy must fail.
 //   node tests/clearinv-1102-harness.js [gamemode.js]   (from server/)
 'use strict';
 const fs = require('fs');
@@ -27,7 +30,11 @@ const run = (src, check) => {
     { baseId: SWORD, count: 2 }, { baseId: POTION, count: 5 }, { baseId: GOLD, count: 120 },
   ];
   for (const a of [GM, GM_RP, LEAD, TRIAL, PLAYER]) inv.set(a, { entries: bag() });
-  const said = [], audits = [], golds = [], ui = {}, cmds = {};
+  const said = [], audits = [], golds = [], ui = {}, cmds = {}, logs = [];
+  // A typed command: registerChatCommand wraps it in gamemode.js's plogCommand, and the player log's hook runs it once
+  const plogAt = src.indexOf('const plogCommand = ');
+  const plogCommand = plogAt < 0 ? null : new Function(`${src.slice(plogAt, src.indexOf('\n', plogAt))}; return plogCommand;`)();
+  globalThis.__dboPlogHook = (name, ...args) => { if (name === 'command') { const [, fn, self, a, cmdArgs, userId] = args; return fn.call(self, a, cmdArgs, userId); } return undefined; };
   let now = 1e12;
   const realNow = Date.now; Date.now = () => now;
   delete globalThis.__dboClearInvAsked;
@@ -35,9 +42,10 @@ const run = (src, check) => {
   const mp = { get: (a, k) => (k === 'inventory' ? JSON.parse(JSON.stringify(inv.get(a >>> 0) || { entries: [] })) : undefined), set: (a, k, v) => { if (k === 'inventory') inv.set(a >>> 0, v); } };
   try {
     new Function('mp', 'personal', 'staffTierOf', 'log', 'who', 'audit', 'recordOf', 'GOLD_BASE', 'goldChanged', 'onUi', 'registerChatCommand', src.slice(at, end))(
-      mp, (a, t) => said.push([a >>> 0, t]), (a) => TIER[a >>> 0] || null, () => {}, (a) => `P${(a >>> 0).toString(16)}`, (t) => audits.push(t),
+      mp, (a, t) => said.push([a >>> 0, t]), (a) => TIER[a >>> 0] || null, (...x) => logs.push(x.join(' ')), (a) => `P${(a >>> 0).toString(16)}`, (t) => audits.push(t),
       (id) => (TYPES[id] ? { record: { type: TYPES[id] } } : null), GOLD, (a) => golds.push(a >>> 0),
-      (ev, fn) => { ui[ev] = fn; }, (n, fn, o) => { cmds[n] = { fn, o }; });
+      (ev, fn) => { ui[ev] = fn; }, (n, fn, o) => { cmds[n] = { fn: plogCommand ? plogCommand(n, fn) : fn, o }; });
+    check('gamemode.js\'s plogCommand wrapper is found', !!plogCommand);
     const last = (a) => (said.filter((s) => s[0] === a).pop() || [0, ''])[1];
     const bases = (a) => inv.get(a).entries.map((e) => e.baseId).sort().join();
     const full = bag().map((e) => e.baseId).sort().join();
@@ -64,9 +72,22 @@ const run = (src, check) => {
     check('...and told', /^Cleared 7 item\(s\) and 120 gold\.$/.test(last(GM)), last(GM));
     ui.clearInventory(GM, []);
     check('with only worn items and keys left: nothing to clear', /Nothing to clear/.test(last(GM)) && inv.get(GM).entries.length === 3);
-    cmds.clearinv.fn(LEAD, ''); now += 1000; cmds.clearinv.fn(LEAD, '');
-    check('/clearinv does the same for a Lead GM', inv.get(LEAD).entries.length === 3 && audits.length === 2);
-  } finally { Date.now = realNow; delete globalThis.__dboStaffGuard; }
+    check('every step is logged: asked, an ask past its window, confirmed, cleared, nothing to clear',
+      logs.some((l) => /^clearinv: Pff000001 \(button\) asked to clear 7 item\(s\) and 120 gold$/.test(l))
+      && logs.some((l) => /asked to clear .*; the ask before was 6 s old, past 5 s$/.test(l))
+      && logs.some((l) => /^clearinv: Pff000001 \(button\) confirmed after 2 s$/.test(l))
+      && logs.some((l) => /^clearinv: Pff000001 cleared 7 item\(s\) and 120 gold; 3 worn item\(s\) and key\(s\) kept$/.test(l))
+      && logs.some((l) => /nothing to clear/.test(l)), logs);
+    // The chat command, typed twice as Nat did: a second line takes a few seconds to type
+    cmds.clearinv.fn(LEAD, '', 3);
+    check('/clearinv asks first, saying to type it again within 30 s', inv.get(LEAD).entries.length === 6 && /Type \/clearinv again within 30 s\.$/.test(last(LEAD)), last(LEAD));
+    now += 8000;
+    cmds.clearinv.fn(LEAD, '', 3);
+    check('...typed again 8 s later, it clears (the bug: 5 s was too short to type it, so it asked again)', inv.get(LEAD).entries.length === 3 && audits.length === 2, last(LEAD));
+    inv.set(LEAD, { entries: bag() });
+    cmds.clearinv.fn(LEAD, '', 3); now += 31000; cmds.clearinv.fn(LEAD, '', 3);
+    check('...but not 31 s later: it asks again, and the log says how old the ask was', inv.get(LEAD).entries.length === 6 && logs.some((l) => /\(chat\) asked .*the ask before was 31 s old, past 30 s$/.test(l)), logs.slice(-2));
+  } finally { Date.now = realNow; delete globalThis.__dboStaffGuard; delete globalThis.__dboPlogHook; }
 };
 
 let failures = 0;
@@ -75,7 +96,9 @@ run(SRC, check);
 const MUTANTS = [
   ['worn items go too', 'const clearInvKeeps = (e) => !!(e.worn || e.wornLeft) || ', 'const clearInvKeeps = (e) => '],
   ['keys go too', "return !!r && String(r.record.type) === 'KEYM';", 'return false;'],
-  ['no confirm', 'if (!asked || Date.now() - asked > CLEAR_INV_CONFIRM_MS) {', 'if (false) {'],
+  ['no confirm', 'if (!asked || age > windowMs) {', 'if (false) {'],
+  ['the chat command has the button\'s 5 s', 'const CLEAR_INV_CONFIRM_MS = { button: 5000, chat: 30000 };', 'const CLEAR_INV_CONFIRM_MS = { button: 5000, chat: 5000 };'],
+  ['the chat command is not told it is chat', "registerChatCommand('clearinv', (a) => clearOwnInventory(a, 'chat')", "registerChatCommand('clearinv', (a) => clearOwnInventory(a)"],
   ['a GM may not', "['senior', 'developer', 'leadgm', 'gm'].includes(staffTierOf(a))) return personal(a, 'Only a GM or above clears", "['senior', 'developer', 'leadgm'].includes(staffTierOf(a))) return personal(a, 'Only a GM or above clears"],
   ['any character will do', "if (g && typeof g.powersOn === 'function' && !g.powersOn(a)) return personal(a, g.NOT_HERE);", ''],
   ['a Trial GM may', "if (!['senior', 'developer', 'leadgm', 'gm'].includes(staffTierOf(a)))", "if (!['senior', 'developer', 'leadgm', 'gm', 'trialgm'].includes(staffTierOf(a)))"],
