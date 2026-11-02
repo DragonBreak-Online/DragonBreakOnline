@@ -256,6 +256,41 @@ const ready = (opts) => { const mp = makeMp(opts); mp.spawn(NPC, ZONE); mp.spawn
   check('cellOf puts a position one cell east in 14,49', p.cellOf(OUT) === '14,49');
 }
 
+// ---- the two call sites: a mover nobody loads moves nothing, however well it tests ----
+// Same reason as the pin harness: the module is inert until three lines of other people's files call it, and a
+// fold that drops one leaves this harness green while the guard stands still.
+{
+  const read = (f) => { try { return fs.readFileSync(path.resolve(__dirname, '..', f), 'utf8'); } catch (e) { return null; } };
+  const gm = read('gamemode.js');
+  const nd = read('npcdirector.js');
+  check('gamemode.js: guardmover.js is loaded with the bag it expects',
+    !!gm && gm.includes("require(GUARDMOVER_JS)({ mp, log, every, cfg, state:"));
+  check('gamemode.js: ...after serverhostpin.js, whose tag it reads',
+    !!gm && (() => {
+      const i = gm.indexOf("path.resolve('serverhostpin.js')");
+      const j = gm.indexOf("path.resolve('guardmover.js')");
+      return i >= 0 && j > i;
+    })());
+  check('npcdirector.js: managed() tells the mover which actor it saw',
+    !!nd && nd.includes("globalThis.__dboGuardMoverSees(npc)") && nd.includes("__dboGuardMoverSees === 'function'"));
+  check('npcdirector.js: ...BEFORE the pin skip, or pin mode would hide every id from the mover',
+    !!nd && (() => {
+      const sees = nd.indexOf('__dboGuardMoverSees(npc)');
+      const skip = nd.indexOf('__dboServerHostSkips(npc)');
+      return sees >= 0 && skip > sees;
+    })());
+  check('npcdirector.js: ...inside managed(), not somewhere the 1 s pass never reads',
+    !!nd && (() => {
+      // Containment, not a byte distance: the proximity form read "within 1200 characters of managed()", and
+      // adding the mover hook above it pushed this line to 1255 and failed a check about correct code. The
+      // question was always whether the call is INSIDE managed(), so ask that.
+      const i = nd.indexOf("const managed = (npc)");
+      const end = nd.indexOf("\n  };", i);
+      const j = nd.indexOf("__dboGuardMoverSees(npc)");
+      return i >= 0 && end > i && j > i && j < end;
+    })());
+}
+
 // ---- mutants: each must break something above ----
 const scenarios = (M) => {
   let bad = 0;

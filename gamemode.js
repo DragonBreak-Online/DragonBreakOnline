@@ -10028,6 +10028,16 @@ try {
   require(SERVERHOSTPIN_JS)({ mp, log, every, cfg, state: globalThis.__dboServerHostPinState || (globalThis.__dboServerHostPinState = {}) });
 } catch (e) { log('serverhostpin.js failed to load:', e.stack || e.message); globalThis.__dboServerHostRefuses = null; globalThis.__dboServerHostSkips = null; }
 
+// ---- Guard mover: the server walks a guard its own route (serverguardmover.js, config "guardMover") ---------------
+// Loaded after the pin because it only moves what the pin has tagged, and it NEVER tags anything itself: a tag with
+// nothing driving it is the stranding that cost Nat a session on 2 Nov. Mode "off" by default, and off still registers
+// the passes - their bodies return early - so a hot reload cannot leave the previous generation's timers firing
+try {
+  const GUARDMOVER_JS = path.resolve('guardmover.js');
+  delete require.cache[GUARDMOVER_JS];
+  require(GUARDMOVER_JS)({ mp, log, every, cfg, state: globalThis.__dboGuardMoverState || (globalThis.__dboGuardMoverState = {}) });
+} catch (e) { log('guardmover.js failed to load:', e.stack || e.message); globalThis.__dboGuardMoverSees = null; }
+
 // ---- Harmony and Mayhem: an NPC hit is calmed or frenzied by its host's game (server\npcmood.js, config "npcMood") --------
 try {
   const NPCMOOD_JS = path.resolve('npcmood.js');

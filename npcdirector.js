@@ -62,6 +62,9 @@ module.exports = (api) => {
       if (owner && Number(owner) !== 0) return false;
       // An NPC the server is driving itself (serverhostpin.js, Option B phase 1) is not handed to the nearest player:
       // this pass runs every second and would beat the refusal in gamemode.js's host chain. Off by default
+      // The mover learns which actor a zone spawned from this pass, because there is no zone -> id map reachable from
+      // gameplay JS. It must come BEFORE the skip below: in pin mode that line returns, and the mover would never see it
+      try { if (typeof globalThis.__dboGuardMoverSees === 'function') globalThis.__dboGuardMoverSees(npc); } catch (e) { /* mover off */ }
       try { if (typeof globalThis.__dboServerHostSkips === 'function' && globalThis.__dboServerHostSkips(npc)) return false; } catch (e) { /* pin off */ }
       // An unleashed warband raider is the one tagged NPC driven from here, so it goes to a player other than its GM
       if (mp.get(npc, 'private.dboCompanion')) return !!avoidOf(npc);

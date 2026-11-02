@@ -318,9 +318,13 @@ const world = (opts) => {
     !!nd && /__dboServerHostSkips\(npc\)\) return false/.test(nd));
   check('npcdirector.js: ...inside managed(), not somewhere the 1 s pass never reads',
     !!nd && (() => {
-      const i = nd.indexOf('const managed = (npc)');
-      const j = nd.indexOf('__dboServerHostSkips(npc)');
-      return i >= 0 && j > i && j - i < 1200;
+      // Containment, not a byte distance: the proximity form read "within 1200 characters of managed()", and
+      // adding the mover hook above it pushed this line to 1255 and failed a check about correct code. The
+      // question was always whether the call is INSIDE managed(), so ask that.
+      const i = nd.indexOf("const managed = (npc)");
+      const end = nd.indexOf("\n  };", i);
+      const j = nd.indexOf("__dboServerHostSkips(npc)");
+      return i >= 0 && end > i && j > i && j < end;
     })());
   check('the spawner tag this module matches on is the one npcSpawnSystem writes',
     (() => {
