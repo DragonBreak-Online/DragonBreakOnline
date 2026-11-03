@@ -138,11 +138,13 @@ float PercentageOf(const ActorValues& values, espm::ActorValue av)
 void RestoreActorValuePatched(MpActor* actor, espm::ActorValue actorValue,
                               float value)
 {
-  // [restore] (Worker 4, 27 Oct) - a measurement, not a fix. Players report a potion's effect appearing and
-  // then being taken away again, and every candidate cause on this path has been ruled out by reading it:
-  // the effect is classified, the gamemode does not cancel the event, the ceiling already exempts a fresh
-  // restore for five seconds, and server and client agree on the maximum. So record what actually happens -
-  // the magnitude, the maximum it is divided by, and the percentage either side - and let the next report
+  // [restore] (Worker 4, 27 Oct) - a measurement, not a fix. Players report a
+  // potion's effect appearing and then being taken away again, and every
+  // candidate cause on this path has been ruled out by reading it: the effect
+  // is classified, the gamemode does not cancel the event, the ceiling already
+  // exempts a fresh restore for five seconds, and server and client agree on
+  // the maximum. So record what actually happens - the magnitude, the maximum
+  // it is divided by, and the percentage either side - and let the next report
   // say which of those is wrong. Remove once it is understood.
   const float before = PercentageOf(actor->GetActorValues(), actorValue);
   actor->RestoreActorValue(actorValue, value);
@@ -188,7 +190,7 @@ float MpActor::GetTimedRestoreShare(espm::ActorValue av, float seconds)
   const auto now = std::chrono::steady_clock::now();
   const auto from = now -
     std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-      std::chrono::duration<float>(seconds));
+                      std::chrono::duration<float>(seconds));
   const float points =
     pImpl->timedRestores.Points(static_cast<uint32_t>(av), from, now);
   if (!(points > 0.f)) {
@@ -732,7 +734,8 @@ bool MpActor::RefusePotionOnCooldown(const espm::LookupResult& lookupRes,
   // Undo the local gain without an echo window, which would freeze values
   std::vector<espm::ActorValue> restoredValues;
   for (const auto& effect : data.effects) {
-    // EFID holds a record-local form id: it only means anything through the potion's own file
+    // EFID holds a record-local form id: it only means anything through the
+    // potion's own file
     const espm::ActorValue av =
       espm::GetData<espm::MGEF>(lookupRes.ToGlobalId(effect.effectId),
                                 worldState)
@@ -755,12 +758,12 @@ bool MpActor::RefusePotionOnCooldown(const espm::LookupResult& lookupRes,
     now - *pImpl->potionCooldownStart;
 
   CustomPacketMessage message;
-  message.contentJsonDump =
-    nlohmann::json{ { "customPacketType", "potionRefused" },
-                    { "baseId", baseId },
-                    { "acceptedBaseId", pImpl->potionCooldownBaseId },
-                    { "acceptedSecondsAgo", acceptedAgo.count() } }
-      .dump();
+  message.contentJsonDump = nlohmann::json{
+    { "customPacketType", "potionRefused" },
+    { "baseId", baseId },
+    { "acceptedBaseId", pImpl->potionCooldownBaseId },
+    { "acceptedSecondsAgo", acceptedAgo.count() }
+  }.dump();
   SendToUser(message, true);
   return true;
 }
@@ -1160,8 +1163,7 @@ bool MpActor::RefreshBaseSpellsCache() const
   const bool playersInheritBaseSpells = worldState->PlayersInheritBaseSpells();
 
   if (cache.valid && cache.worldState == worldState &&
-      cache.baseId == GetBaseId() &&
-      cache.profileId == changeForm.profileId &&
+      cache.baseId == GetBaseId() && cache.profileId == changeForm.profileId &&
       cache.playersInheritBaseSpells == playersInheritBaseSpells &&
       cache.templateChain == changeForm.templateChain &&
       cache.appearanceDump == changeForm.appearanceDump) {
@@ -1196,10 +1198,12 @@ std::vector<uint32_t> MpActor::EvaluateBaseSpells() const
 
   try {
     const auto npcData = espm::GetData<espm::NPC_>(GetBaseId(), worldState);
-    const auto npc = worldState->GetEspm().GetBrowser().LookupById(GetBaseId());
+    const auto npc =
+      worldState->GetEspm().GetBrowser().LookupById(GetBaseId());
     auto& browser = worldState->GetEspm().GetBrowser();
 
-    // Templated NPCs (leveled draugr, skeleton mages) take SPLO from the template chain
+    // Templated NPCs (leveled draugr, skeleton mages) take SPLO from the
+    // template chain
     auto npcSpells = EvaluateTemplateNoThrow<espm::NPC_::UseSpelllist>(
       worldState, GetBaseId(), GetTemplateChain(),
       [](const auto& npcLookupResult, const auto& templateNpcData) {
@@ -1232,15 +1236,19 @@ std::vector<uint32_t> MpActor::EvaluateBaseSpells() const
       }
     }
 
-    // playersInheritBaseSpells=false drops castable Player spells (Flames, Healing), abilities and race spells stay
-    const bool skipCastable = !worldState->PlayersInheritBaseSpells() &&
-      ChangeForm().profileId != -1;
+    // playersInheritBaseSpells=false drops castable Player spells (Flames,
+    // Healing), abilities and race spells stay
+    const bool skipCastable =
+      !worldState->PlayersInheritBaseSpells() && ChangeForm().profileId != -1;
     for (uint32_t spellId : spells) {
       if (skipCastable) {
-        // SPLO may also list shouts or leveled spells, GetData would throw on those
-        const auto spell = worldState->GetEspm().GetBrowser().LookupById(spellId);
+        // SPLO may also list shouts or leveled spells, GetData would throw on
+        // those
+        const auto spell =
+          worldState->GetEspm().GetBrowser().LookupById(spellId);
         if (spell.rec && spell.rec->GetType() == espm::SPEL::kType) {
-          const auto spellData = espm::GetData<espm::SPEL>(spellId, worldState);
+          const auto spellData =
+            espm::GetData<espm::SPEL>(spellId, worldState);
           if (spellData.spellItem &&
               spellData.spellItem->type == espm::SPEL::SpellType::Spell) {
             continue;
@@ -1403,12 +1411,15 @@ void MpActor::SendAndSetDeathState(bool isDead, bool shouldTeleport)
   auto position = GetRespawnPosition();
 
   auto respawnMsg = GetDeathStateMsg(position, isDead, shouldTeleport);
-  // Not 'no user': a logged-out player's actor has none either, and its respawn must not be marked as an NPC teleport
+  // Not 'no user': a logged-out player's actor has none either, and its
+  // respawn must not be marked as an NPC teleport
   const bool isNpc = GetProfileId() == -1;
   if (isNpc && !isDead) {
-    // A respawn reached only the hoster, so watchers kept a corpse where it died until the hoster's next movement,
-    // and for good when nobody hosted it: RespawnEvent's isDead=false property neither revives a copy nor moves it
-    // to its spawn point. Every player who sees it gets the container, and the hoster if it does not see it
+    // A respawn reached only the hoster, so watchers kept a corpse where it
+    // died until the hoster's next movement, and for good when nobody hosted
+    // it: RespawnEvent's isDead=false property neither revives a copy nor
+    // moves it to its spawn point. Every player who sees it gets the
+    // container, and the hoster if it does not see it
     MpActor& hoster = GetActorToSendTo();
     bool hosterTold = false;
     for (auto listener : GetActorListeners()) {
@@ -1445,7 +1456,8 @@ void MpActor::SendAndSetDeathState(bool isDead, bool shouldTeleport)
     SetCellOrWorldObsolete(position.cellOrWorldDesc);
     SetPos(position.pos);
     SetAngle(position.rot);
-    // The hoster's next packet predates the teleport and carries the corpse's position: refused, as after Teleport
+    // The hoster's next packet predates the teleport and carries the corpse's
+    // position: refused, as after Teleport
     if (isNpc && !isDead) {
       SetTeleportFlag(true);
     }
@@ -1729,8 +1741,8 @@ void MpActor::BeforeDestroy()
     sink->BeforeDestroy(*this);
   }
 
-  // Drop the profile index entry, or GetActorsByProfileId keeps serving this dead formId.
-  // Logins then crash on it (character delete lockout).
+  // Drop the profile index entry, or GetActorsByProfileId keeps serving this
+  // dead formId. Logins then crash on it (character delete lockout).
   if (auto worldState = GetParent()) {
     auto profileId = ChangeForm().profileId;
     if (profileId > 0) {
@@ -2074,12 +2086,14 @@ void MpActor::AddLevelBonus(BaseActorValues& values) const
 
 void MpActor::DropItem(const uint32_t baseId, const Inventory::Entry& entry)
 {
-  // static: the timed-deletion log line below reads kDeletionTimeSeconds inside a lambda that lists its
-  // captures explicitly. A local constexpr has no storage, so clang-15 refuses to capture it implicitly
-  // ("cannot be implicitly captured in a lambda with no capture-default specified") while MSVC accepts
-  // it - so the Windows CI passed and the native Linux build the updater runs on CT115 did not, which
-  // would have left production on the old server (Worker 5, 25 Oct). static gives it storage duration and
-  // needs no capture.
+  // static: the timed-deletion log line below reads kDeletionTimeSeconds
+  // inside a lambda that lists its captures explicitly. A local constexpr has
+  // no storage, so clang-15 refuses to capture it implicitly
+  // ("cannot be implicitly captured in a lambda with no capture-default
+  // specified") while MSVC accepts it - so the Windows CI passed and the
+  // native Linux build the updater runs on CT115 did not, which would have
+  // left production on the old server (Worker 5, 25 Oct). static gives it
+  // storage duration and needs no capture.
   static constexpr float kDeletionTimeSeconds = 2 * 60;
   constexpr size_t kDroppedItemsQueueMax = 10;
 
@@ -2151,8 +2165,9 @@ void MpActor::DropItem(const uint32_t baseId, const Inventory::Entry& entry)
   Inventory::Entry dropped = entry;
   dropped.SetWorn(Inventory::Worn::None);
 
-  // An enchantment, a temper, a rename, a soul, a poison or a player-made enchantment. Such an item is not
-  // litter: it is gear a player made or earned, and losing it is ticket 1563647648819581000.
+  // An enchantment, a temper, a rename, a soul, a poison or a player-made
+  // enchantment. Such an item is not litter: it is gear a player made or
+  // earned, and losing it is ticket 1563647648819581000.
   const bool hasExtras =
     !dropped.EqualExceptCount(Inventory::Entry(baseId, count));
 
@@ -2194,8 +2209,10 @@ void MpActor::DropItem(const uint32_t baseId, const Inventory::Entry& entry)
       reference == worldState->LookupFormById(referenceFormId).get();
     if (referenceAlive) {
       if (!reference->IsDeleted()) {
-        spdlog::info("MpActor::DropItem - {:x} dropped an 11th item, deleting {:x} ({}) from the queue of {}",
-                     GetFormId(), referenceFormId, editorId, kDroppedItemsQueueMax);
+        spdlog::info("MpActor::DropItem - {:x} dropped an 11th item, deleting "
+                     "{:x} ({}) from the queue of {}",
+                     GetFormId(), referenceFormId, editorId,
+                     kDroppedItemsQueueMax);
         reference->Delete();
       } else {
         spdlog::warn("MpActor::DropItem - reference in queue was deleted");
@@ -2206,9 +2223,10 @@ void MpActor::DropItem(const uint32_t baseId, const Inventory::Entry& entry)
     pImpl->droppedItemsQueue.erase(pImpl->droppedItemsQueue.begin());
   }
 
-  // Only ordinary litter goes in the queue. The queue deletes its oldest entry as soon as an eleventh item
-  // is dropped, so an enchanted sword dropped before ten pieces of junk used to vanish at once, well inside
-  // the two minutes. An item with extras is never queued and so is never capped away.
+  // Only ordinary litter goes in the queue. The queue deletes its oldest entry
+  // as soon as an eleventh item is dropped, so an enchanted sword dropped
+  // before ten pieces of junk used to vanish at once, well inside the two
+  // minutes. An item with extras is never queued and so is never capped away.
   if (!hasExtras) {
     pImpl->droppedItemsQueue.push_back(
       std::make_pair(droppedItemFormId, placedObject));
@@ -2242,7 +2260,8 @@ void MpActor::DropItem(const uint32_t baseId, const Inventory::Entry& entry)
       return;
     }
 
-    spdlog::info("MpActor::DropItem - deleting dropped {:x} ({}) {} s after it was dropped",
+    spdlog::info("MpActor::DropItem - deleting dropped {:x} ({}) {} s after "
+                 "it was dropped",
                  droppedItemFormId, editorId, kDeletionTimeSeconds);
 
     // Item deleted, not in queue anymore
@@ -2257,9 +2276,10 @@ void MpActor::DropItem(const uint32_t baseId, const Inventory::Entry& entry)
   });
 }
 
-// An item carrying extras never despawns while its owner is online. When they log out it goes back into
-// their inventory, so it is recoverable and nothing accumulates on the ground for ever. A member rather than
-// a self-capturing lambda, so rescheduling does not need a shared_ptr that owns itself.
+// An item carrying extras never despawns while its owner is online. When they
+// log out it goes back into their inventory, so it is recoverable and nothing
+// accumulates on the ground for ever. A member rather than a self-capturing
+// lambda, so rescheduling does not need a shared_ptr that owns itself.
 void MpActor::ScheduleDroppedExtrasCheck(MpObjectReference* placedObject,
                                          uint32_t droppedItemFormId,
                                          const Inventory::Entry& dropped,
@@ -2297,7 +2317,8 @@ void MpActor::ScheduleDroppedExtrasCheck(MpObjectReference* placedObject,
     }
 
     if (GetUserId() != Networking::InvalidUserId) {
-      // Owner still online: leave it exactly where they put it and look again later
+      // Owner still online: leave it exactly where they put it and look again
+      // later
       ScheduleDroppedExtrasCheck(placedObject, droppedItemFormId, dropped,
                                  editorId);
       return;
@@ -2362,8 +2383,8 @@ bool MpActor::SetActorValue(espm::ActorValue actorValue, float value)
       break;
     default:
       // Not modelled here: Aggression, SpeedMult and the rest are client-side
-      // only. Say so rather than silently doing nothing, so the Papyrus shim can
-      // warn for those and stay quiet for the ones that did apply.
+      // only. Say so rather than silently doing nothing, so the Papyrus shim
+      // can warn for those and stay quiet for the ones that did apply.
       return false;
   }
 
