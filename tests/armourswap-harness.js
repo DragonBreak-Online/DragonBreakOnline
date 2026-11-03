@@ -14,7 +14,9 @@ const bod2 = (slots, type) => { const b = new Uint8Array(8); const dv = new Data
 const ITEMS = { 0x100: bod2(1 << 2, 1), 0x101: bod2(1 << 3, 1), 0x200: bod2(1 << 2, 0), 0x300: bod2(1 << 2, 2), 0x301: bod2(1 << 6, 2), 0x400: bod2(1 << 9, 1) };
 const HEAVY_CUIRASS = 0x100, HEAVY_GAUNTLETS = 0x101, LIGHT_CUIRASS = 0x200, ROBE = 0x300, RING = 0x301, SHIELD = 0x400, SWORD = 0x500;
 const PLAYER = 1, BANDIT = 2, NPC = 0xff000001;
-const packets = [], said = [];
+const packets = [], said = [], widgets = [], closedWidgets = [];
+// Every focus argument openWidget was ever given. Kept apart from widgets, which scenarios clear.
+const focusAsked = [];
 const props = {};
 const sw = require(MODULE)({
   mp: { get: (id, k) => props[`${id}:${k}`] },
@@ -24,6 +26,8 @@ const sw = require(MODULE)({
   recordOf: (id) => (ITEMS[id] ? { record: { type: 'ARMO', fields: [{ type: 'BOD2', data: ITEMS[id] }] } } : id === SWORD ? { record: { type: 'WEAP', fields: [] } } : null),
   fieldsOf: (r, t) => ((r && r.record.fields) || []).filter((f) => f.type === t),
   cfg: {},
+  openWidget: (a, payload, focus) => { focusAsked.push(focus); return widgets.push({ a, payload, focus }); },
+  closeWidget: (a, id) => closedWidgets.push({ a, id }),
 });
 
 let failures = 0;
@@ -61,6 +65,23 @@ delete props[`${PLAYER}:private.beast`];
 check('nor turning back soon after', sw.onEquip(PLAYER, wear(LIGHT_CUIRASS), false) === 0);
 now += 16000; sw.onHit(NPC, PLAYER);
 check('the cap holds a full strip to 30 s', (() => { sw.onEquip(PLAYER, wear(HEAVY_CUIRASS, HEAVY_GAUNTLETS, ROBE, RING, 0x200), false); return sw.onEquip(PLAYER, wear(), false) <= 30; })());
+
+// ---- the bar that shows the straps being done (skymp5-front features/progressBar) ----------------------------------
+widgets.length = 0;
+sw.onHit(PLAYER, NPC);
+sw.onEquip(PLAYER, wear(HEAVY_CUIRASS), true);
+const charged = sw.onEquip(PLAYER, wear(HEAVY_CUIRASS, LIGHT_CUIRASS), false);
+check('a charged swap opens the bar', charged > 0 && widgets.length === 1, JSON.stringify(widgets[0] && widgets[0].payload));
+check('...on its own widget id 171, not the 170 actiondelays uses', !!widgets[0] && widgets[0].payload.id === 171);
+check('...as a progress bar of the charged seconds, kind armour',
+  !!widgets[0] && widgets[0].payload.type === 'progress' && widgets[0].payload.kind === 'armour' && widgets[0].payload.ms === charged * 1000);
+widgets.length = 0;
+now += 60000;
+check('out of combat the swap is free and no bar is shown', sw.onEquip(PLAYER, wear(ROBE), false) === 0 && widgets.length === 0);
+
+// The bar is a picture and must never take the keyboard: a focused panel with no front build behind it
+// holds the keys and the player cannot move (Nat froze on dev, 2 Nov).
+check('the bar never asks for keyboard focus', focusAsked.length > 0 && focusAsked.every((f) => f !== true), JSON.stringify(focusAsked));
 
 Date.now = realNow;
 delete globalThis.__dboArmourSwap;

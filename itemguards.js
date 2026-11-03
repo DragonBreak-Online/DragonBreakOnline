@@ -95,6 +95,9 @@ module.exports = (api) => {
       if (now - (S.told.get(a) || 0) >= 60000) { S.told.set(a, now); try { personal(a, 'Your pack has been set right: it showed items you do not really have.'); } catch (e) { /* offline */ } }
     }, 0);
   };
+  // Any module that refuses a move needs this: the engine has already moved the item on the client, so a refusal
+  // without a resync leaves the player seeing an item the server does not have. actiondelays.js uses it.
+  globalThis.__dboItemResync = resync;
   // null = allowed, else the reason
   const check = (baseId, count, holder) => {
     const n = Number(count);
