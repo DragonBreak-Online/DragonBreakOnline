@@ -6,7 +6,7 @@ import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { parseCustomPacket, sendCustomPacket } from "./customPacketUtil";
 import {
   Action, CAPS_RETRY_MS, CLIENT_CAPS, MENU_NAME, MenuState, OUT_VAR, UiEvent, capsFor, chunkArgs, isNew, newState, parseOutbox,
-  escapeTargetFor, parseUiEvent, planClose, planDeferred, planOpen, planReady, planRefresh, planTick, readyFrameOf, summary,
+  escapeTargetFor, parseUiEvent, planClose, planDeferred, planOpen, planReady, planRefresh, planTick, readyFrameOf, readyWasEarly, summary,
 } from "./scaleformMenu";
 import { buttonKeyCode } from "./mouseKeys";
 import {
@@ -136,11 +136,18 @@ export class ScaleformMenuService extends ClientListener {
         // The frame number is the measurement: _global.skse does not exist on frame 1, and until one
         // session reported this nobody knew which frame it does appear on.
         const frame = readyFrameOf(parsed);
-        logTrace(this, "Scaleform panel ready on frame", String(frame));
+        // A sequence means the outbox delivered it; a mod event carries none. The frame is only trustworthy on
+        // the mod-event channel, so planReady judges the frame only there.
+        const viaOutbox = parsed.seq > 0;
+        logTrace(this, "Scaleform panel ready on frame", String(frame), viaOutbox ? "(outbox)" : "(mod event)");
         // The owner is NOT cleared here: it receives keys for the whole life of the panel. It is cleared on
         // close, on closeNative and on failover - and failover can only fire before ready, because planTick
         // acts only while the phase is "opening".
-        this.enqueue(planReady(this.state, frame, Date.now()));
+        this.enqueue(planReady(this.state, frame, Date.now(), viaOutbox));
+        // A frame-1 ready was refused, so the outbox copy of that same message must still get through: isNew
+        // skips the first modFirst outbox messages as duplicates of mod events, and this one is no longer a
+        // duplicate of anything that was acted on.
+        if (!viaOutbox && readyWasEarly(this.state)) this.state.modFirst = Math.max(0, this.state.modFirst - 1);
         this.note(summary(this.state));
         return;
       }

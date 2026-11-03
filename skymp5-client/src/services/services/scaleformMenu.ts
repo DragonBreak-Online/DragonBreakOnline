@@ -276,6 +276,10 @@ export interface MenuState {
   askedAt: number;
   // messages handled from mod events before the outbox delivered any: their outbox copies are skipped (isNew)
   modFirst: number;
+  // A "ready" that arrived on frame 1 and was refused: the movie is not built and _global.skse does not
+  // exist yet, so nothing can be invoked on it. Kept so the outbox copy of the same message is let through
+  // rather than deduped away, and so the phase stays "opening" for planTick's failover.
+  earlyReady: boolean;
   // an open held back after a close in the same plan, and the updates still to wait (planOpen, planDeferred)
   deferredOpen: string;
   deferredWait: number;
@@ -285,7 +289,7 @@ export const newState = (): MenuState => ({
   phase: "closed", swf: "", json: "null", widgetId: 0,
   openedAt: 0, readyAt: 0, readyFrame: 0, sent: 0, foreignEvents: 0,
   outRead: 0, lastSeq: 0, viaOutbox: 0, viaModEvent: 0, askedAt: 0,
-  modFirst: 0, deferredOpen: "", deferredWait: 0,
+  modFirst: 0, deferredOpen: "", deferredWait: 0, earlyReady: false,
 });
 
 export type Action =
@@ -363,16 +367,34 @@ export const planRefresh = (s: MenuState, payload: unknown, widgetId: unknown): 
 
 // The SWF said it is up. Only now can anything be invoked on it: before ready, _global.skse does not exist
 // and the movie may not be built.
-export const planReady = (s: MenuState, frame: number, now: number): Action[] => {
+// viaOutbox: the message carried a sequence, so it came through the SWF's outbox. The frame rides numArg on the
+// mod-event channel and args[0] on the outbox, and the outbox carries no numArg - so an outbox ready legitimately
+// reports frame 0 and must never be judged by its frame.
+export const planReady = (s: MenuState, frame: number, now: number, viaOutbox = false): Action[] => {
   if (s.phase === "closed") return [];
   // Once per open: a second ready (the same message by both channels) pushed the whole payload again, which for a
   // chunked one is a second full parse (fmenu-freeze-1102: menu-1's 68,404 characters, parsed twice on each F)
   if (s.phase === "ready") return [];
+  const f = Math.max(0, Math.round(Number(frame) || 0));
+  // A ready on frame 1 is not ready. _global.skse does not exist on frame 1, so the push cannot land and the
+  // panel's outbox is not up either: Nat's trade window on 3 Nov said "ready ... on frame 1 ... sent=0
+  // in=0outbox/1modevent" and sat there empty and deaf. The phase stays "opening", so if no usable ready ever
+  // comes planTick's READY_TIMEOUT_MS failover closes the panel and the service falls back to the browser.
+  if (!viaOutbox && f <= 1) {
+    s.earlyReady = true;
+    s.readyFrame = f;
+    return [{ do: "report", text: `${s.swf}: ready on frame ${f} is too early (no _global.skse yet); waiting for a later ready` }];
+  }
+  s.earlyReady = false;
   s.phase = "ready";
   s.readyAt = now;
-  s.readyFrame = Math.max(0, Math.round(Number(frame) || 0));
+  s.readyFrame = f;
   return [{ do: "push", json: s.json }];
 };
+
+// True when the last ready was refused as too early and the panel is still waiting for a usable one. The caller
+// uses it to un-count that message from the mod-event/outbox dedupe, so the outbox copy is not thrown away.
+export const readyWasEarly = (s: MenuState): boolean => s.earlyReady && s.phase !== "ready";
 
 export const planClose = (s: MenuState): Action[] => {
   if (s.phase === "closed") return [];

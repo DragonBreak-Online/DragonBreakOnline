@@ -102,7 +102,7 @@ check('a real payload is NOT reported', () => {
   return r.length === 1 && r[0].do === 'open';
 });
 check('an empty re-send while open is reported too', () => {
-  const t = M.newState(); M.planOpen(t, 'x', { a: 1 }, 1, 0); M.planReady(t, 1, 10);
+  const t = M.newState(); M.planOpen(t, 'x', { a: 1 }, 1, 0); M.planReady(t, 2, 10);
   const r = M.planOpen(t, 'x', null, 1, 20);
   return r.length === 2 && r[0].do === 'report' && /re-sent an empty payload/.test(r[0].text);
 });
@@ -231,7 +231,7 @@ check('a new open forgets the mod-event count, so its own first outbox message i
 });
 check('a second ready pushes nothing: the payload goes once per open', () => {
   const t = M.newState(); M.planOpen(t, 'x', { a: 1 }, 1, 0);
-  const first = M.planReady(t, 1, 10), second = M.planReady(t, 1, 26);
+  const first = M.planReady(t, 2, 10), second = M.planReady(t, 2, 26);
   return first.length === 1 && first[0].do === 'push' && second.length === 0 && t.readyAt === 10;
 });
 check('the cursor resets on a new open, so a second panel does not skip its own messages', () => {
@@ -240,10 +240,10 @@ check('the cursor resets on a new open, so a second panel does not skip its own 
   return t.outRead === 0 && t.lastSeq === 0;
 });
 check('the summary says which channel delivered, so one session settles it', () => {
-  const t = M.newState(); M.planOpen(t, 'x', {}, 1, 0); M.planReady(t, 1, 10);
+  const t = M.newState(); M.planOpen(t, 'x', {}, 1, 0); M.planReady(t, 2, 10);
   t.viaOutbox = 3; t.viaModEvent = 0;
   return /in=3outbox\/0modevent/.test(M.summary(t));
-}, (() => { const t = M.newState(); M.planOpen(t, 'x', {}, 1, 0); M.planReady(t, 1, 10); t.viaOutbox = 3; return M.summary(t); })());
+}, (() => { const t = M.newState(); M.planOpen(t, 'x', {}, 1, 0); M.planReady(t, 2, 10); t.viaOutbox = 3; return M.summary(t); })());
 
 // ---- 6. the service wiring ----------------------------------------------------------------------------------------
 check('data goes in as ONE invokeString of the whole payload', /invokeString\(MENU_NAME, "_root\.dboData", a\.json\)/.test(SVC));
@@ -387,7 +387,7 @@ check('...but it is the FRESH payload that planReady then pushes, not the stale 
 check('a refresh NEVER emits an open, whatever the phase', () => {
   const phases = [];
   let t = M.newState(); M.planOpen(t, 'dbo_board', { a: 1 }, 7, 0); phases.push(M.planRefresh(t, { a: 2 }, 7));
-  t = M.newState(); M.planOpen(t, 'dbo_board', { a: 1 }, 7, 0); M.planReady(t, 1, 5); phases.push(M.planRefresh(t, { a: 2 }, 7));
+  t = M.newState(); M.planOpen(t, 'dbo_board', { a: 1 }, 7, 0); M.planReady(t, 2, 5); phases.push(M.planRefresh(t, { a: 2 }, 7));
   t = M.newState(); phases.push(M.planRefresh(t, { a: 2 }, 7));
   return phases.every((r) => !r.some((x) => x.do === 'open'));
 });
@@ -487,23 +487,23 @@ check('the FIRST open of all emits no close, there being nothing to close', () =
   return r.length === 1 && r[0].do === 'open';
 });
 check('a refresh does not lose the phase, so the outbox keeps being drained', () => {
-  const t = M.newState(); M.planOpen(t, 'dbo_board', { a: 1 }, 7, 0); M.planReady(t, 1, 5);
+  const t = M.newState(); M.planOpen(t, 'dbo_board', { a: 1 }, 7, 0); M.planReady(t, 2, 5);
   M.planRefresh(t, { a: 2 }, 7);
   return t.phase === 'ready';
 });
 check('a refresh does not reset the sequence or the outbox cursor, which would replay old clicks', () => {
-  const t = M.newState(); M.planOpen(t, 'dbo_board', { a: 1 }, 7, 0); M.planReady(t, 1, 5);
+  const t = M.newState(); M.planOpen(t, 'dbo_board', { a: 1 }, 7, 0); M.planReady(t, 2, 5);
   t.outRead = 120; t.lastSeq = 4;
   M.planRefresh(t, { a: 2 }, 7);
   return t.outRead === 120 && t.lastSeq === 4;
 });
 check('an empty refresh payload is REPORTED, because a blanked panel looks like a dead one', () => {
-  const t = M.newState(); M.planOpen(t, 'dbo_board', { a: 1 }, 7, 0); M.planReady(t, 1, 5);
+  const t = M.newState(); M.planOpen(t, 'dbo_board', { a: 1 }, 7, 0); M.planReady(t, 2, 5);
   const r = M.planRefresh(t, {}, 7);
   return r.length === 2 && r[0].do === 'report' && r[1].do === 'push';
-}, (() => { const t = M.newState(); M.planOpen(t, 'dbo_board', { a: 1 }, 7, 0); M.planReady(t, 1, 5); return M.planRefresh(t, {}, 7); })());
+}, (() => { const t = M.newState(); M.planOpen(t, 'dbo_board', { a: 1 }, 7, 0); M.planReady(t, 2, 5); return M.planRefresh(t, {}, 7); })());
 check('a refresh keeps the widget id when the caller does not name one, so replies still carry it', () => {
-  const t = M.newState(); M.planOpen(t, 'dbo_board', { a: 1 }, 7, 0); M.planReady(t, 1, 5);
+  const t = M.newState(); M.planOpen(t, 'dbo_board', { a: 1 }, 7, 0); M.planReady(t, 2, 5);
   M.planRefresh(t, { a: 2 }, 0);
   return t.widgetId === 7;
 });
@@ -511,19 +511,67 @@ check('a refresh keeps the widget id when the caller does not name one, so repli
 // Escape goes to a panel only once it is up (Nat, 1 Nov: Esc closes F7 and F3)
 check('Escape is handed to a ready panel and to nothing while closed or still opening', () => {
   const t = M.newState(); const closed = M.escapeTargetFor(t); M.planOpen(t, 'dbo_journal', {}, 50, 0); const opening = M.escapeTargetFor(t);
-  M.planReady(t, 1, 10);
+  M.planReady(t, 2, 10);
   return closed === '' && opening === '' && M.escapeTargetFor(t) === '_root.dboEscape';
 });
 
 // The X menus' wait (Nat, 1 Nov: "delays in the UI with the X menu"): the time from the key's request to the open
 check('the summary shows how long the panel waited for the server when a service says when it asked', () => {
-  const t = M.newState(); t.askedAt = 1000; M.planOpen(t, 'dbo_context', {}, 30, 1180); M.planReady(t, 1, 1240);
-  return / 60ms to ready on frame 1 asked 180ms before the open /.test(M.summary(t));
-}, (() => { const t = M.newState(); t.askedAt = 1000; M.planOpen(t, 'dbo_context', {}, 30, 1180); M.planReady(t, 1, 1240); return M.summary(t); })());
+  const t = M.newState(); t.askedAt = 1000; M.planOpen(t, 'dbo_context', {}, 30, 1180); M.planReady(t, 2, 1240);
+  return / 60ms to ready on frame 2 asked 180ms before the open /.test(M.summary(t));
+}, (() => { const t = M.newState(); t.askedAt = 1000; M.planOpen(t, 'dbo_context', {}, 30, 1180); M.planReady(t, 2, 1240); return M.summary(t); })());
 check('...and nothing when it is not known', () => {
-  const t = M.newState(); M.planOpen(t, 'dbo_journal', {}, 50, 1180); M.planReady(t, 1, 1240);
+  const t = M.newState(); M.planOpen(t, 'dbo_journal', {}, 50, 1180); M.planReady(t, 2, 1240);
   return !/asked/.test(M.summary(t));
 });
 
+// ---- frame 1 is not ready (Nat, 3 Nov 01:36:34: dbo_trade "ready ... on frame 1 ... sent=0
+// in=0outbox/1modevent" - the window was open, empty and deaf, because _global.skse does not exist on
+// frame 1, so the push could not land and the panel own outbox never came up) ----
+check('a mod-event ready on frame 1 pushes nothing and says why', () => {
+  const t = M.newState(); M.planOpen(t, 'dbo_trade', { a: 1 }, 14, 0);
+  const r = M.planReady(t, 1, 25);
+  return r.length === 1 && r[0].do === 'report' && /frame 1 is too early/.test(r[0].text)
+    && !r.some((x) => x.do === 'push');
+});
+check('...and the panel stays "opening", so the ready timeout can still fail it over', () => {
+  // openedAt must be non-zero or planTick returns early: it guards on !s.openedAt
+  const t = M.newState(); M.planOpen(t, 'dbo_trade', { a: 1 }, 14, 100); M.planReady(t, 1, 125);
+  return t.phase === 'opening' && M.readyWasEarly(t) === true
+    && M.planTick(t, 100 + M.READY_TIMEOUT_MS + 1).some((x) => x.do === 'close');
+});
+check('a frame-1 ready then a later one delivers the payload EXACTLY once', () => {
+  const t = M.newState(); M.planOpen(t, 'dbo_trade', { a: 1 }, 14, 0);
+  const early = M.planReady(t, 1, 25);
+  const good = M.planReady(t, 2, 60);
+  const again = M.planReady(t, 3, 90);
+  const pushes = [...early, ...good, ...again].filter((x) => x.do === 'push');
+  return pushes.length === 1 && JSON.parse(pushes[0].json).a === 1
+    && t.phase === 'ready' && t.readyAt === 60 && t.readyFrame === 2 && M.readyWasEarly(t) === false;
+});
+check('an outbox ready is taken at any frame, because the outbox carries no numArg', () => {
+  const t = M.newState(); M.planOpen(t, 'dbo_trade', { a: 1 }, 14, 0);
+  const r = M.planReady(t, 0, 30, true);
+  return r.length === 1 && r[0].do === 'push' && t.phase === 'ready';
+});
+check('...and a frame-1 outbox ready is taken too, for the same reason', () => {
+  const t = M.newState(); M.planOpen(t, 'dbo_trade', { a: 1 }, 14, 0);
+  return M.planReady(t, 1, 30, true).some((x) => x.do === 'push') && t.phase === 'ready';
+});
+check('the dedupe lets the outbox copy through after a refused frame-1 mod event', () => {
+  // isNew counts a mod event in modFirst and then skips that many outbox messages as its duplicates. A
+  // refused ready was never acted on, so the service un-counts it; this is that arithmetic.
+  const t = M.newState(); M.planOpen(t, 'dbo_trade', { a: 1 }, 14, 0);
+  M.isNew(t, { key: 'ready', args: [], frame: 1, seq: 0 });
+  M.planReady(t, 1, 25);
+  if (M.readyWasEarly(t)) t.modFirst = Math.max(0, t.modFirst - 1);
+  return M.isNew(t, { key: 'ready', args: [], frame: 0, seq: 1 }) === true;
+});
+check('without that un-count the outbox copy would be swallowed and the panel left empty', () => {
+  const t = M.newState(); M.planOpen(t, 'dbo_trade', { a: 1 }, 14, 0);
+  M.isNew(t, { key: 'ready', args: [], frame: 1, seq: 0 });
+  M.planReady(t, 1, 25);
+  return M.isNew(t, { key: 'ready', args: [], frame: 0, seq: 1 }) === false;
+});
 console.log(failures ? `${failures} failed` : 'all passed');
 process.exit(failures ? 1 : 0);
