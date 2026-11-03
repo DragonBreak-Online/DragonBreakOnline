@@ -98,8 +98,9 @@ public:
 
   Networking::UserId GetUserId() const;
 
-  // Re-checks a dropped item that carries extras: kept while its owner is online, returned to their
-  // inventory when they log out. See MpActor::DropItem.
+  // Re-checks a dropped item that carries extras: kept while its owner is
+  // online, returned to their inventory when they log out. See
+  // MpActor::DropItem.
   void ScheduleDroppedExtrasCheck(MpObjectReference* placedObject,
                                   uint32_t droppedItemFormId,
                                   const Inventory::Entry& dropped,
@@ -159,8 +160,8 @@ public:
   void SetLastAttributesPercentagesUpdate(
     std::chrono::steady_clock::time_point timePoint =
       std::chrono::steady_clock::now());
-  void SetLastPercentageUpdate(espm::ActorValue av,
-                               std::chrono::steady_clock::time_point timePoint);
+  void SetLastPercentageUpdate(
+    espm::ActorValue av, std::chrono::steady_clock::time_point timePoint);
   void SetLastHitTime(uint32_t targetId,
                       std::chrono::steady_clock::time_point timePoint);
 
