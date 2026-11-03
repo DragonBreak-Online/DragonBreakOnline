@@ -7,6 +7,7 @@ import { parseCustomPacket, sendCustomPacket } from "./customPacketUtil";
 import {
   Action, CAPS_RETRY_MS, CLIENT_CAPS, MENU_NAME, MenuState, OUT_VAR, UiEvent, capsFor, chunkArgs, isNew, newState, parseOutbox,
   escapeTargetFor, parseUiEvent, planClose, planDeferred, planOpen, planReady, planRefresh, planTick, readyFrameOf, readyWasEarly, summary,
+  nativeScaleOf, rootScaleFor,
 } from "./scaleformMenu";
 import { buttonKeyCode } from "./mouseKeys";
 import {
@@ -436,6 +437,12 @@ export class ScaleformMenuService extends ClientListener {
           // the screen's size first, so the panel can fit itself even where Stage.visibleRect misleads (lib dboFit)
           const screen = this.screenSize();
           if (screen) this.sp.Ui.invokeString(MENU_NAME, "_root.dboScreen", screen);
+          // the player's panel size (nativeScale), the whole movie about the stage's centre
+          const r = rootScaleFor(nativeScaleOf(this.clientSetting("nativeScale")));
+          this.sp.Ui.setFloat(MENU_NAME, "_root._xscale", r.xscale);
+          this.sp.Ui.setFloat(MENU_NAME, "_root._yscale", r.yscale);
+          this.sp.Ui.setFloat(MENU_NAME, "_root._x", r.x);
+          this.sp.Ui.setFloat(MENU_NAME, "_root._y", r.y);
           // over one call's size the payload goes as numbered pieces, put back together by the panel (lib dboChunk)
           const pieces = chunkArgs(a.json, ++this.chunkSeq);
           if (!pieces.length) this.sp.Ui.invokeString(MENU_NAME, "_root.dboData", a.json);
@@ -509,6 +516,15 @@ export class ScaleformMenuService extends ClientListener {
       return this.sp.Ui.isMenuOpen(MENU_NAME);
     } catch (e) {
       return true;
+    }
+  }
+
+  private clientSetting(key: string): unknown {
+    try {
+      const all = this.sp.settings["skymp5-client"] as Record<string, unknown> | undefined;
+      return all ? all[key] : undefined;
+    } catch {
+      return undefined;
     }
   }
 
