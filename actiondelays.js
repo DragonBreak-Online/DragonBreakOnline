@@ -41,6 +41,9 @@ module.exports = (api) => {
     // Nat, 3 Nov: the beat belongs to dungeons and to theft, not to every container. false goes
     // back to delaying every container that is not the player's own home.
     onlyDungeonsAndTheft: true,
+    // Nat, 3 Nov: "just keep it to dungeons for now". With theft false a container the player has
+    // no right to is instant too, and only a dungeon costs time. Set true to bring theft back.
+    theft: false,
     widget: true,
     tellSeconds: 8,        // at most one "you are searching" line this often per player
   }, cfg.actionDelays || {});
@@ -175,8 +178,10 @@ module.exports = (api) => {
   const delayApplies = (t, a) => {
     if (C.onlyDungeonsAndTheft === false) return 'all';
     if (inDungeon(t)) return 'dungeon';
-    const rec = claimOf(t);
-    if (rec && !ownHome(t, a)) return 'theft';
+    if (C.theft === true) {
+      const rec = claimOf(t);
+      if (rec && !ownHome(t, a)) return 'theft';
+    }
     return '';
   };
 
@@ -257,6 +262,13 @@ module.exports = (api) => {
       S.nextTake.set(a, now + MS(C.takeSeconds));
       return undefined;
     }
+    // Nat, 3 Nov: the gap between takes is scoped like the search, but only for CONTAINERS. Taking from
+    // a container the player may use - Aldemar emptying his own alchemy barrel - must never be
+    // throttled: take-all fires one take per item, so refusing them told him "your hands are full" and
+    // put the whole lot back. A corpse is not a container and keeps its gap everywhere, along with the
+    // body beat above: scoping bodies too cost two of this harness's own assertions, which was the
+    // harness being right.
+    if (recordType(src) === 'CONT' && !delayApplies(src, a)) return undefined;
     const next = S.nextTake.get(a) || 0;
     if (now < next) {
       tell(a, 'gap', 'Your hands are full for a moment.');

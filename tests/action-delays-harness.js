@@ -118,7 +118,10 @@ ok(T.searchGate(DOOR, PLAYER) === undefined, 'a door is not a container: no opin
 ok(T.searchGate(CHEST, NPC) === undefined, 'an NPC with no profile: no opinion');
 ok(T.searchGate(HOMECHEST, PLAYER) === undefined, 'your own home chest is exempt (private.housing owner)');
 ok(T.searchGate(KEYCHEST, PLAYER) === undefined, 'a chest in a property you hold a key to is exempt');
-ok(T.searchGate(HOMECHEST, OTHER) === false, '...but not for someone else', T.searchGate(HOMECHEST, OTHER));
+// Nat, 3 Nov: dungeons only, so a stranger's home is instant for them too until theft is turned on
+ok(T.searchGate(HOMECHEST, OTHER) === undefined, '...and with theft off it is instant for a stranger as well');
+ok(load({ actionDelays: { theft: true } }).searchGate(HOMECHEST, OTHER) === false,
+  '...but with theft true a stranger pays the beat on it');
 
 // ---- the take beat ---------------------------------------------------------------------------------------------------
 T = load({});
@@ -305,9 +308,12 @@ ok(T.delayApplies(KEYCHEST, PLAYER) === '', '...and one they hold a key to: no b
 
 const saveHome = { owner: 7, ownerName: 'Olaf' };
 mp.set(HOMECHEST, 'private.housing', { owner: 99, ownerName: 'Someone else' });
-ok(T.delayApplies(HOMECHEST, PLAYER) === 'theft', 'a claimed home they have no right to: theft, the beat applies');
+// Nat, 3 Nov: dungeons only for now, so theft is off by default and even a stranger's home is instant
+ok(T.delayApplies(HOMECHEST, PLAYER) === '', 'a home they have no right to: instant, because theft is off by default');
+const Tth = load({ actionDelays: { theft: true } });
+ok(Tth.delayApplies(HOMECHEST, PLAYER) === 'theft', '...but with theft true it is a beat again');
 mp.set(HOMECHEST, 'private.housing', saveHome);
-ok(T.delayApplies(HOMECHEST, PLAYER) === '', '...and it is instant again once it is theirs');
+ok(Tth.delayApplies(HOMECHEST, PLAYER) === '', '...and still instant once it is theirs');
 
 mp.set(CHEST, 'worldOrCellDesc', '');
 ok(T.delayApplies(CHEST, PLAYER) === '', 'an unowned chest outside a dungeon: no beat at all');
@@ -320,6 +326,21 @@ Tall.S.beat.clear(); Tall.S.done.clear(); Tall.S.opened.clear();
 mp.set(CHEST, 'worldOrCellDesc', '');
 ok(Tall.delayApplies(CHEST, PLAYER) === 'all', 'onlyDungeonsAndTheft false: every container is delayed again');
 mp.set(CHEST, 'worldOrCellDesc', '000' + DUNGEON_CELL);
+
+
+// ---- Aldemar's barrel: take-all from a container he may use (live bug, 3 Nov) -----------------------------------------
+// takeSeconds refused every take after the first, so take-all answered "your hands are full" and put the
+// whole lot back. Without the CONT scope in takeGate, this block fails.
+const ownKey = `${PLAYER}:${CHEST}`;
+mp.set(CHEST, 'worldOrCellDesc', '');                  // his own barrel: no dungeon, no claim
+T.S.done.set(ownKey, clock);                           // already searched, so this is the gap branch
+T.S.nextTake.set(PLAYER, clock + 5 * SEC);             // and a gap is pending
+ok(T.takeGate(CHEST, PLAYER) === undefined, 'take-all from a container he may use: never throttled');
+ok(T.takeGate(CHEST, PLAYER) === undefined, '...every item of it, not just the first');
+mp.set(CHEST, 'worldOrCellDesc', '000' + DUNGEON_CELL);
+T.S.done.set(ownKey, clock);
+T.S.nextTake.set(PLAYER, clock + 5 * SEC);
+ok(T.takeGate(CHEST, PLAYER) === false, '...but a dungeon container still waits takeSeconds');
 
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
 process.exit(fails ? 1 : 0);
