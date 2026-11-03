@@ -55,6 +55,9 @@ module.exports = (api) => {
     cook: 'The Feast: once a day, feed everyone around you (/feast).',
     defense: 'Shield over the Fallen: once a day, stand over a fallen friend so nobody finishes them (/shieldover).',
     unarmed: 'Second Wind: once a day, the first time you go down fighting with fists or a staff, you stand again.',
+    harvesting: 'Master Gardener: crops you plant ripen in half the time, and you pick the most a crop gives.',
+    woodcutter: 'Seasoned Timber: your sawing at a lumber pile or a saw mill gives twice the Sawn Logs.',
+    lockpicking: 'Locksmith: fit a lock to storage built in a home, with its owner there (/fitlock).',
   };
 
   const get = (a, k, d) => { try { const v = mp.get(a >>> 0, k); return v === undefined || v === null ? d : v; } catch (e) { return d; } };
