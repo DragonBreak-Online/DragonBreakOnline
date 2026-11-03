@@ -505,6 +505,8 @@ const firstPage = (t) => { for (let i = 0; i < 6; i++) t.press(33); };
   t.push(hub('stats', { tabs: many, stats }));
   const tb = Object.keys(P(t).tabs.kids).filter((k) => /^t\d+$/.test(k)).map((k) => P(t).tabs[k]);
   check('every tab ends inside the panel', tb.length === 16 && tb.every((b) => b._x + b.label._width <= 1180 - 28 + 1), tb.map((b) => [b.label.text, b._x + b.label._width]));
+  // 3 Nov web-art pass: even cells, two rows of eight, Settings (pinned) the last cell
+  check('the tabs are even cells in two rows of eight, Settings in the last', new Set(tb.map((b) => b.label._width)).size === 1 && tb.filter((b) => b._y === tb[0]._y).length === 8 && tb[15].label.text === 'Settings' && tb[15]._x === tb[7]._x && tb[15]._y > tb[7]._y, tb.map((b) => [b.label.text, b._x, b._y]));
   const rows = [...new Set(tb.map((b) => b._y))];
   check('they wrap to a second row', rows.length === 2, rows);
   check('and the page starts below it', P(t).body.flowClip._y >= Math.max(...rows) + 40, [P(t).body.flowClip._y, rows]);

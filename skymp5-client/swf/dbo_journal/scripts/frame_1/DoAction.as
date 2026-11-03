@@ -5,14 +5,17 @@
 // whose typing is not native yet, or a game that cannot type, still hands it to the browser journal for that tab:
 // journalTab [nonce, tab, focus, "browser"].
 
-var DBO_SWF_VERSION = "journal-3";
-// the journal is the hourglass's aqua, as the web journal (dbo-theme.scss)
-webLook("aqua");
+var DBO_SWF_VERSION = "journal-4";
+// the journal wears the Dragon Break's violet, as the web journal does (constructor.js DOMAINS)
+webLook("dragonbreak");
 var STAGE_W = 1280;
 var PANEL_W = 1180;
 var PANEL_H = 664;
 var PAD = 28;
 var BODY_TOP = 152;
+// the tab row as even cells, at most this many to a row
+var TABS_ACROSS = 8;
+var TAB_GAP = 4;
 var bodyTop = BODY_TOP;
 var NO_DATA_CLOSE_MS = 8000;
 var BUSY_MS = 8000;
@@ -124,57 +127,38 @@ function drawHead()
    ck.text = c != undefined && c != null ? String(c.date) + "\n" + String(c.time) + (c.moons != undefined && c.moons != "" ? "  -  " + c.moons : "") : "";
 }
 
-function tabWidth(t)
-{
-   return String(t.label).length * 10 + (t.badge != undefined && t.badge != "" ? 34 : 0) + 30;
-}
-
 function drawTabs()
 {
    var s = clear("tabs", 30);
    var list = data.tabs instanceof Array ? data.tabs : [];
-   var x = PAD;
+   // the web's tab row: even cells, filled in order, the pinned ones (Settings) in the last cells of the last row
    var y = 88;
-   var right = PANEL_W - PAD;
-   for (var p = list.length - 1; p >= 0; p--)
+   var across = Math.max(1, Math.ceil(list.length / Math.ceil(list.length / TABS_ACROSS)));
+   var rows = Math.ceil(list.length / across);
+   var cw = (PANEL_W - PAD * 2 - TAB_GAP * (across - 1)) / across;
+   var pinned = 0;
+   for (var p = 0; p < list.length; p++)
    {
       if (list[p].pinned == true)
       {
-         right -= tabWidth(list[p]) + 6;
+         pinned++;
       }
    }
-   var px = right;
+   var n = 0;
+   var pn = rows * across - pinned;
    for (var i = 0; i < list.length; i++)
    {
       var t = list[i];
-      var w = tabWidth(t);
-      var at;
-      if (t.pinned == true)
-      {
-         at = px + 6;
-         px += w + 6;
-      }
-      else
-      {
-         if (x + w > right && x > PAD)
-         {
-            x = PAD;
-            y += 30;
-         }
-         at = x;
-         x += w + 6;
-      }
+      var slot = t.pinned == true ? pn++ : n++;
       var label = String(t.label) + (t.badge != undefined && t.badge != "" ? "  (" + t.badge + ")" : "");
-      var b = button(s, "t" + i, 10 + i, at, y, w, label, F_BOLD, 17, t.id == tab ? A_FOCUS : A_ROW_REST, function()
+      var b = button(s, "t" + i, 10 + i, PAD + (slot % across) * (cw + TAB_GAP), y + Math.floor(slot / across) * 34, cw, label, F_BOLD, 15, t.id == tab ? A_FOCUS : A_ROW_REST, function()
       {
          openTab(this.tabId);
       });
       b.tabId = String(t.id);
-      if (t.id == tab)
-      {
-         dboTabMark(b, w - 30);
-      }
+      webTab(b, t.id == tab);
    }
+   y += (rows - 1) * 34;
    webDivider(s, PAD, y + 36, PANEL_W - PAD * 2);
    // a second row of tabs moves the page down under it
    bodyTop = Math.max(BODY_TOP, y + 48);

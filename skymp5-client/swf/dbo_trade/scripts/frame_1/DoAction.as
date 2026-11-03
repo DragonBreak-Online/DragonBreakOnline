@@ -4,7 +4,7 @@
 // browser's does. The keys go out as the widget's own events (trade:add, trade:remove, ...), which tradeService
 // handles exactly as it handles the browser's; every change comes back as a new payload from the server's tradeState.
 
-var DBO_SWF_VERSION = "trade-2";
+var DBO_SWF_VERSION = "trade-3";
 // work and trade wear bronze, as the web trade window does (dbo-theme.scss)
 webLook("bronze");
 var PANEL_W = 1100;
@@ -420,7 +420,7 @@ function resetShown()
 function drawHead()
 {
    var h = clear("head", 20);
-   dboTitle(h, "title", 1, PAD, 16, PANEL_W - PAD * 2, "Trade with " + partner());
+   webTitleAt(dboTitle(h, "title", 1, PAD, 16, PANEL_W - PAD * 2, "Trade with " + partner()), "center", C_ACCENT);
    var color = bothAccepted() ? C_GREEN : resetShown() && data.iAccepted != true && data.theyAccepted != true ? C_RED : C_TEXT;
    // the web's banner: a faint box of the domain hue, edged in it
    var bw = PANEL_W - PAD * 2;
@@ -455,10 +455,7 @@ function drawTabs()
          setTab(this.v);
       });
       b.v = list[j][0];
-      if (list[j][0] == tab)
-      {
-         dboTabMark(b, w - 30);
-      }
+      webTab(b, list[j][0] == tab);
       x += w + 8;
    }
 }
@@ -730,7 +727,8 @@ function poolRow(i)
    c._y = i * ROW_H;
    // the web list's hairline between rows
    dboBox(c, 0, ROW_H - 2, BODY_W, 1, C_ACCENT, 12);
-   dboText(c, "label", 1, 0, 6, 440, 28, dboFmt(F_MEDIUM, 18, C_TEXT, 0.5), false);
+   // names in the domain hue, as the web trade window sets them
+   dboText(c, "label", 1, 0, 6, 440, 28, dboFmt(F_MEDIUM, 18, C_ACCENT, 0.5), false);
    dboText(c, "sub", 2, 450, 8, BODY_W - 450, 26, dboFmt(F_MEDIUM, 15, C_SECOND, 0.5), false);
    var b = webChip(c, "btn0", 10, BODY_W - 128, 4, 124, "", F_MEDIUM, 16, A_BUTTON_REST, function() { pick(this.dir, this.item); });
    // drawList puts it in the focus order when its row is shown
@@ -752,7 +750,7 @@ function fillRow(c, item, label, dir, off)
    }
    b.item = item;
    b.dir = dir;
-   b.label.text = label;
+   webCaption(b.label, label);
    if (off)
    {
       disable(b);

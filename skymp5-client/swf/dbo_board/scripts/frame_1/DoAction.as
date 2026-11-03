@@ -3,9 +3,9 @@
 // the browser would. "Write a notice..." types in the panel (dboInput); only a game that cannot take typed input hands the
 // composer to the browser (native:handoff).
 
-var DBO_SWF_VERSION = "board-3";
-// work and trade wear bronze, as the web board does (dbo-theme.scss)
-webLook("bronze");
+var DBO_SWF_VERSION = "board-4";
+// bounties and notices wear the Heart's red, as the web board does (constructor.js DOMAINS)
+webLook("lorkhan");
 var STAGE_W = 1280;
 var PANEL_W = 920;
 var PANEL_H = 640;
@@ -13,6 +13,11 @@ var PAD = 28;
 var ROW_H = 46;
 var LIST_TOP = 162;
 var MAX_ROWS = 8;
+var CARDS_ACROSS = 4;
+var CARD_GAP = 16;
+var CARD_W = (PANEL_W - PAD * 2 - CARD_GAP * 3) / 4;
+var CARD_H = 170;
+var CARD_TILT = [-1.2, 0.8, -0.5, 1.1, 0.6, -1, 0.9, -0.6];
 var FOOT_Y = PANEL_H - 90;
 var NO_DATA_CLOSE_MS = 8000;
 var POST_WAIT_MS = 6000;
@@ -125,7 +130,7 @@ function headline(text)
 function drawTabs()
 {
    var h = clear("head", 20);
-   dboTitle(h, "title", 1, PAD, 18, PANEL_W - PAD * 2, String(data.boardName) + " Notice Board");
+   webTitleAt(dboTitle(h, "title", 1, PAD, 18, PANEL_W - PAD * 2, String(data.boardName) + " Notice Board"), "center");
    // The board's tabs, each as wide as its label, and under them the other panels it opens, in the same weight
    var x = PAD;
    for (var k = 0; k < data.tabs.length; k++)
@@ -142,10 +147,7 @@ function drawTabs()
          draw();
       });
       b.tabKey = t.id;
-      if (t.id == tabId)
-      {
-         dboTabMark(b, tabWidth(label) - 28);
-      }
+      webTab(b, t.id == tabId);
       x += tabWidth(label) + 8;
    }
    x = PAD;
@@ -184,24 +186,25 @@ function drawList()
    for (var i = 0; i < MAX_ROWS && page * MAX_ROWS + i < list.length; i++)
    {
       var n = list[page * MAX_ROWS + i];
+      // the web board's pinned paper notices: four to a row, two rows a page, each a little askew
+      var col = i % CARDS_ACROSS;
       var c = l.createEmptyMovieClip("r" + i, 10 + i);
-      c._x = PAD;
-      c._y = LIST_TOP + i * ROW_H;
-      dboBox(c, 0, 0, PANEL_W - PAD * 2, ROW_H - 4, 0x000000, 1);
-      // the web list's hairline under each notice, its number in the domain hue
-      dboBox(c, 0, ROW_H - 3, PANEL_W - PAD * 2, 1, C_ACCENT, 14);
-      var num = dboText(c, "num", 1, 0, 4, 22, 26, dboFmt(F_BOLD, 18, C_ACCENT, 0), false);
-      num.text = String(i + 1);
-      var t = dboText(c, "label", 2, 26, 0, PANEL_W - PAD * 2 - 26, 28, dboFmt(F_MEDIUM, 22, C_TEXT, 0.8), false);
+      c._x = PAD + col * (CARD_W + CARD_GAP);
+      c._y = LIST_TOP + Math.floor(i / CARDS_ACROSS) * (CARD_H + CARD_GAP);
+      c._rotation = CARD_TILT[i % CARD_TILT.length];
+      dboBox(c, 3, 4, CARD_W, CARD_H, 0x000000, 35);
+      dboGradientBox(c, 0, 0, CARD_W, CARD_H, [0xF1F4F4, 0xDCE2E2], [100, 100], [0, 255], Math.PI / 2);
+      webDot(c, CARD_W / 2, 12, 4.5, 0x2A3436, 100);
+      var t = dboText(c, "label", 2, 12, 22, CARD_W - 24, CARD_H - 52, dboFmt(F_PLAIN, 17, 0x1E2628, 0.3), true);
       t.text = headline(n.text);
-      var s = dboText(c, "sub", 3, 26, 24, PANEL_W - PAD * 2 - 26, 22, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8), false);
+      var s = dboText(c, "sub", 3, 12, CARD_H - 28, CARD_W - 24, 22, dboFmt(F_PLAIN, 14, 0x55605F, 0.3, "right"), false);
       s.text = String(n.author) + "  -  " + pinnedLabel(n.ageHours);
-      c.rest = A_ROW_REST;
-      c._alpha = A_ROW_REST;
+      c.rest = 92;
+      c._alpha = 92;
       c.noteId = n.id;
       c.rowIndex = i;
-      c.washW = PANEL_W - PAD * 2;
-      c.washH = ROW_H - 4;
+      c.washW = CARD_W;
+      c.washH = CARD_H;
       c.idx = actions.length;
       actions.push(c);
       c.onPick = function()
@@ -411,6 +414,8 @@ function drawFoot(pages)
    {
       disable(write, "Not enough gold");
    }
+   // a reason set by disable() is shown in capitals like the label it replaced
+   webCaption(write.label, write.label.text);
    var x = PAD + 210;
    for (var i = 0; i < FOOT.length; i++)
    {

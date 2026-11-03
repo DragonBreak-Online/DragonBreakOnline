@@ -5,7 +5,7 @@
 // Typed values (the search, a name, a number, free words) go in a box on their own row (dboInput), one box at a time; a
 // name also offers the people you know as buttons, and a list of words is a row of choices.
 
-var DBO_SWF_VERSION = "menu-2";
+var DBO_SWF_VERSION = "menu-3";
 // menus are the hourglass's aqua, as the web player menu (dbo-theme.scss)
 webLook("aqua");
 var PANEL_W = 1160;
@@ -512,8 +512,8 @@ function entryRow(e, tag)
 function drawHead()
 {
    var h = clear("head", 20);
-   dboTitle(h, "title", 1, PAD, 16, PANEL_W - PAD * 2, "What you can do");
-   var s = dboText(h, "sub", 2, PAD, 56, PANEL_W - PAD * 2, 24, dboFmt(F_MEDIUM, 15, C_SECOND, 0.8), false);
+   webTitleAt(dboTitle(h, "title", 1, PAD, 16, PANEL_W - PAD * 2, "What you can do"), "center");
+   var s = dboText(h, "sub", 2, PAD, 56, PANEL_W - PAD * 2, 24, dboFmt(F_MEDIUM, 15, C_SECOND, 0.8, "center"), false);
    s.text = "Everything here can also be typed in chat. A lone / opens this page.";
    webDivider(h, PAD, 84, PANEL_W - PAD * 2);
 }
@@ -572,10 +572,7 @@ function drawTabs()
          draw();
       });
       b.v = String(list[j].key);
-      if (now != null && list[j].key == now.key)
-      {
-         dboTabMark(b, w - 30);
-      }
+      webTab(b, now != null && list[j].key == now.key);
       x += w + 6;
    }
    return y + 40;
