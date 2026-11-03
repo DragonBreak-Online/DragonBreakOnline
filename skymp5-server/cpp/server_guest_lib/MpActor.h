@@ -67,6 +67,12 @@ public:
   void NoteHealthRaise(float from, float to);
   bool IsStaleHealthReport(float reported, float current) const;
 
+  // A timed restore the player's own client runs for its duration
+  void NoteTimedRestore(uint32_t spellId, espm::ActorValue av,
+                        float pointsPerSecond, float seconds);
+  // Share of the bar timed restores add over the last seconds
+  float GetTimedRestoreShare(espm::ActorValue av, float seconds);
+
   void SetRaceMenuOpen(bool isOpen);
   void SetAppearance(const Appearance* newAppearance);
   void SetEquipment(const Equipment& newEquipment);

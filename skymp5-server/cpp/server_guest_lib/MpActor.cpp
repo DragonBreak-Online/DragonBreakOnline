@@ -16,6 +16,7 @@
 #include "SpSnippetFunctionGen.h"
 #include "StaleHealthReport.h"
 #include "TempleRespawn.h"
+#include "TimedRestore.h"
 #include "WorldState.h"
 #include "gamemode_events/DeathEvent.h"
 #include "gamemode_events/DropItemEvent.h"
@@ -92,6 +93,7 @@ struct MpActor::Impl
     nextRestorationTimes;
 
   StaleHealthReport::Memory healthRaises;
+  TimedRestore::Memory timedRestores;
 
   std::optional<std::chrono::steady_clock::time_point> potionCooldownStart;
   uint32_t potionCooldownBaseId = 0;
@@ -171,6 +173,29 @@ bool MpActor::IsStaleHealthReport(float reported, float current) const
 {
   return pImpl->healthRaises.IsStale(reported, current,
                                      std::chrono::steady_clock::now());
+}
+
+void MpActor::NoteTimedRestore(uint32_t spellId, espm::ActorValue av,
+                               float pointsPerSecond, float seconds)
+{
+  pImpl->timedRestores.Note(spellId, static_cast<uint32_t>(av),
+                            pointsPerSecond, seconds,
+                            std::chrono::steady_clock::now());
+}
+
+float MpActor::GetTimedRestoreShare(espm::ActorValue av, float seconds)
+{
+  const auto now = std::chrono::steady_clock::now();
+  const auto from = now -
+    std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+      std::chrono::duration<float>(seconds));
+  const float points =
+    pImpl->timedRestores.Points(static_cast<uint32_t>(av), from, now);
+  if (!(points > 0.f)) {
+    return 0.f;
+  }
+  const float maximum = GetMaximumValues().GetValue(av);
+  return maximum > 0.f ? points / maximum : 0.f;
 }
 
 bool MpActor::ShouldSkipRestoration(espm::ActorValue av) const noexcept
