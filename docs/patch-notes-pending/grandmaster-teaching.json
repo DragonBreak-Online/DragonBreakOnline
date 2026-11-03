@@ -1,0 +1,16 @@
+{
+  "title": "Grandmaster Rewards: the Sword-Master and the Arch-Magister",
+  "date": "",
+  "version": "Server update",
+  "tag": "New",
+  "sections": [
+    {
+      "heading": "Teaching at 100",
+      "items": [
+        "Blade (at 100): take up to two sword apprentices. Stand beside someone and type /swordschool take followed by their name; they accept with /swordschool accept. When your apprentice duels you, their sword blows on you teach them Blade half again as fast. Their daily limits still apply. /swordschool release or /swordschool leave ends it.",
+        "Arcane Arts (at 100): you may keep one more magic apprentice than your rank allows, and your apprentices learn their spell in half the time.",
+        "/capstone shows your reward."
+      ]
+    }
+  ]
+}

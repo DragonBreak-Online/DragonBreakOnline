@@ -2304,13 +2304,17 @@ module.exports = (api) => {
   const inBookOf = (a, id) => bookOf(a).some((sp) => sp.id >>> 0 === id >>> 0);
   const engineHas = (a, id) => knownSpells(a).some((sp) => sp.id >>> 0 === id >>> 0);
   const isSenior = (a) => guildRolesOf(a).some((m) => ((AP.seniorGuilds || []).includes(m.id) || (AP.collegeGuilds !== false && isCollege(m.id))) && (AP.seniorRoles || []).includes(m.role));
-  const apMax = (a) => Math.max(0, Number(isSenior(a) ? AP.seniorMax : AP.max) || 0);
+  // The Arch-Magister's Chair (capstones.js, Arcane Arts at 100; Nat, 2 Nov): one more apprentice, and half the study
+  const archMagister = (a) => { try { const c = globalThis.__dboCapstones; return !!c && c.on('arcane') && c.isGrandmaster(a >>> 0, 'arcane'); } catch (e) { return false; } };
+  const apMax = (a) => Math.max(0, Number(isSenior(a) ? AP.seniorMax : AP.max) || 0) + (archMagister(a) ? 1 : 0);
   // How many apprentices `a` may keep, for the harnesses (read only)
   globalThis.__dboApprenticeMax = (a) => apMax(a >>> 0);
   const apList = (s) => (Array.isArray(s.apprentices) ? s.apprentices : []);
   const canTeachAny = (a) => arcaneOf(a).level >= AP.teacherArcaneLevel || (priestOf(a).held && priestOf(a).level >= AP.teacherPriestLevel);
   const canTeachSchool = (a, school) => (school === RESTORATION ? priestOf(a).held && priestOf(a).level >= AP.teacherPriestLevel : arcaneOf(a).level >= AP.teacherArcaneLevel);
-  const needFor = (rank) => Math.max(1, Math.round(Math.max(1, Number(AP.dailyXp) || 20) * Math.max(0.05, Number((AP.daysByRank || [])[rank]) || 1)));
+  // The days a lesson of that rank takes with this teacher, as words ('7.5 days')
+  const daysText = (rank, teacher) => { const d = Math.max(0.05, Number((AP.daysByRank || [])[rank]) || 1) * (teacher && archMagister(teacher) ? 0.5 : 1); return `${Math.round(d * 10) / 10} day${d === 1 ? '' : 's'}`; };
+  const needFor = (rank, teacher) => Math.max(1, Math.round(Math.max(1, Number(AP.dailyXp) || 20) * Math.max(0.05, Number((AP.daysByRank || [])[rank]) || 1) * (teacher && archMagister(teacher) ? 0.5 : 1)));
   // mod-0548 (luckystefan, 30 Oct 2026): "Apprentice ship level keeps reseting each day as it is not saving the
   // progress of learning the spell". The day roll was never the cause - apCast resets only dayXp. His teacher released
   // and re-took him (22:01:03 then 22:01:19 on 30 Oct, and the same pair on 25 Oct), and endApprenticeship deletes
@@ -2426,7 +2430,7 @@ module.exports = (api) => {
     apTeachPanels.set(a >>> 0, { nonce, student: t >>> 0, options: options.map((sp) => ({ id: sp.id >>> 0, name: sp.name, school: sp.school, rank: sp.rank })) });
     openWidget(a, {
       type: 'studyMagic', id: STUDY_PANEL_ID, nonce, title: 'Take an Apprentice', mode: 'choose',
-      lead: `Choose the spell you will teach ${display(t)}. They study it near you, a little each day: ${(AP.daysByRank || []).map((d, i) => `${RANKS[i]} ${d} day${d === 1 ? '' : 's'}`).join(', ')}.`,
+      lead: `Choose the spell you will teach ${display(t)}. They study it near you, a little each day: ${(AP.daysByRank || []).map((d, i) => `${RANKS[i]} ${daysText(i, a)}`).join(', ')}.`,
       school: '', level: 0, rank: '', fill: 0, leftSeconds: 0, tickSeconds: 0, gained: 0, whyNot: '', result: '', resultKind: '',
       choices: options.map((sp) => ({ name: sp.name, blurb: `${RANKS[sp.rank]} ${sp.school}`, confirm: `Teach ${sp.name} to ${display(t)}? They must accept.` })),
       events: { choose: 'dbo:apprenticeTeach', start: 'dbo:apprenticeTeach', stop: 'dbo:apprenticeTeach', close: 'dbo:apprenticeTeachClose' },
@@ -2448,7 +2452,7 @@ module.exports = (api) => {
     const nonce = mkNonce('o', t);
     apOffers.set(t >>> 0, { teacher: a >>> 0, spell: descOf(o.id), name: o.name, school: o.school, rank: o.rank, nonce, until: Date.now() + Math.max(1, Number(AP.offerMinutes) || 5) * 60000 });
     openWidget(t, { type: 'contextMenu', id: APPRENTICE_MENU_ID, mode: 'menu',
-      targetName: `${display(a)} offers to take you as apprentice to learn ${o.name} (${RANKS[o.rank]} ${o.school}): about ${(AP.daysByRank || [])[o.rank] || 1} day${((AP.daysByRank || [])[o.rank] || 1) === 1 ? '' : 's'} of study near them.`,
+      targetName: `${display(a)} offers to take you as apprentice to learn ${o.name} (${RANKS[o.rank]} ${o.school}): about ${daysText(o.rank, a)} of study near them.`,
       actions: [{ id: `${nonce}|accept`, label: 'Become their apprentice' }, { id: `${nonce}|decline`, label: 'Decline' }],
       events: { action: 'dbo:apprenticeOffer', close: 'dbo:apprenticeOfferClose' } }, true);
     personal(a, `You offer to teach ${display(t)} ${o.name}. They must accept.`);
@@ -2464,7 +2468,7 @@ module.exports = (api) => {
     // The spell offered must still be one the teacher can teach this student (it may have been lost or learned meanwhile)
     if (!teachable(o.teacher, t).some((sp) => sp.id >>> 0 === idOf(o.spell))) { personal(t, `${display(o.teacher)} can no longer teach you ${o.name}.`); return; }
     const s = stateOf(t);
-    const need = needFor(o.rank);
+    const need = needFor(o.rank, o.teacher);
     // mod-0548: study already done on THIS spell carries over, however the last lesson ended and whoever teaches it now.
     // The day stamp and the day's spend come with it, so a retake on the same day buys no second allowance.
     const was = studiedFor(s, o.spell);

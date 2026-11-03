@@ -397,6 +397,30 @@ check('spells.js: a restricted art is closed to an Associate, a removed spell an
   check('House Telvanni stays an allegiance: not marked college in guild-defs.json', !!tel && tel.college !== true, tel && tel.college);
   put(T3, 'private.dboGuilds', []);
 }
+// The Arch-Magister's Chair (capstones.js; Nat, 2 Nov): a teacher with Arcane Arts at 100 keeps one more apprentice and
+// teaches in half the time; capstones.js answers through globalThis.__dboCapstones, stubbed here
+{
+  load();
+  const max = (guilds) => { put(T3, 'private.dboGuilds', guilds); return globalThis.__dboApprenticeMax(T3); };
+  const before = [max([]), max([{ id: 'synod', role: 'sergeant' }])];
+  globalThis.__dboCapstones = { on: (s) => s === 'arcane', isGrandmaster: (a, s) => s === 'arcane' && (a === T3 || a === TCH) };
+  check('an Arch-Magister keeps one more apprentice than their standing gives', max([]) === before[0] + 1 && max([{ id: 'synod', role: 'sergeant' }]) === before[1] + 1, [before, max([])]);
+  put(T3, 'private.dboGuilds', []);
+  act(TCH, 'schools:apprentice', STU2);
+  const w2 = lastWidget(TCH, 'studyMagic');
+  check('...so a teacher with one apprentice may take a second, and the panel gives the halved days', w2 && w2.title === 'Take an Apprentice' && /Apprentice 1 day,/.test(w2.lead), w2 && w2.lead);
+  if (w2 && w2.choices) {
+    ui('apprenticeTeach', TCH, [w2.nonce, 'Firebolt']);
+    const o2 = lastWidget(STU2, 'contextMenu');
+    check('...the student is told half the time', /learn Firebolt \(Apprentice Destruction\): about 1 day of study/.test(o2.targetName), o2.targetName);
+    ui('apprenticeOffer', STU2, [o2.actions.find((x) => x.id.endsWith('|accept')).id]);
+    check('...and the lesson needs half the study (20, not 40)', rec(STU2).apprentice && rec(STU2).apprentice.need === 20, rec(STU2).apprentice);
+  }
+  globalThis.__dboCapstones = { on: () => false, isGrandmaster: () => true };
+  check('with the capstone switched off, the standing alone decides', max([]) === before[0]);
+  delete globalThis.__dboCapstones;
+  put(T3, 'private.dboGuilds', []);
+}
 // Config: bad values fall back to their defaults, logged; mages-guild is gone from the senior list
 out.logs.length = 0;
 load({ apprenticeship: { dailyXp: 'lots', radiusMeters: -5, daysByRank: [1, 2], seniorGuilds: 'synod' } });

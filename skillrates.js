@@ -172,6 +172,10 @@ module.exports = (api) => {
     if (rate > 0 && kind !== 'award' && typeof globalThis.__dboGatheringSkillRate === 'function') {
       try { const r = Number(globalThis.__dboGatheringSkillRate(actorId >>> 0)); if (Number.isFinite(r) && r >= 1 && r <= 2) rate *= r; } catch (e) { /* no gathering boost */ }
     }
+    // A sword apprentice sparring with their master (capstones.js, Sword-Master's School): at most double
+    if (rate > 0 && typeof globalThis.__dboCapstoneSkillRate === 'function') {
+      try { const r = Number(globalThis.__dboCapstoneSkillRate(actorId >>> 0, skillId, kind, detail)); if (Number.isFinite(r) && r >= 1 && r <= 2) rate *= r; } catch (e) { /* no school boost */ }
+    }
     if (kind !== 'award' || typeof globalThis.__dboSchoolsAwardRate !== 'function') return rate;
     let k = 1;
     try { k = Number(globalThis.__dboSchoolsAwardRate(actorId >>> 0, skillId, kind, detail)); } catch (e) { k = 1; }

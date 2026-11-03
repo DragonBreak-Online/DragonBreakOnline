@@ -18,11 +18,15 @@
 //   Alchemist, Signature Draught once a UTC day, /signature and the next potion brewed: "..., brewed by" (alchemy.js)
 //   Enchanter, Named Enchantment once a week, /enchantname <name> and the next item enchanted: "<name>, enchanted by"
 //                                (enchanting.js reports the enchantment; the copy whose enchantment is new is named)
+// Teaching:
+//   Blade, Sword-Master's School /swordschool: two apprentices, whose Blade hits on their master in a duel between them
+//                                are worth sparRate (skillrates.js asks __dboCapstoneSkillRate)
+//   Arcane, Arch-Magister's Chair schools.js's apprenticeship: one more apprentice, half the study (asks __dboCapstones)
 'use strict';
 const path = require('path');
 
 module.exports = (api) => {
-  const { mp, log, personal, audit, who, cfg, registerChatCommand, realNameOf, itemName, recordOf } = api;
+  const { mp, log, personal, audit, who, cfg, registerChatCommand, realNameOf, itemName, recordOf, findByName, distanceMeters, profileOf, discordOf } = api;
   const ITEMNAMES_JS = path.join(__dirname, 'itemnames.js');
   delete require.cache[ITEMNAMES_JS];
   const N = require(ITEMNAMES_JS);
@@ -35,6 +39,8 @@ module.exports = (api) => {
     tailor: 'Bespoke and Livery: your garments carry your mark.',
     alchemist: 'Signature Draught: once a day, a potion carrying your name.',
     enchanter: 'Named Enchantment: once a week, an enchanted item named by you.',
+    blade: 'Sword-Master\'s School: up to two apprentices, who learn faster sparring with you.',
+    arcane: 'Arch-Magister\'s Chair: one more apprentice, taught in half the time.',
   };
 
   const get = (a, k, d) => { try { const v = mp.get(a >>> 0, k); return v === undefined || v === null ? d : v; } catch (e) { return d; } };
@@ -238,11 +244,85 @@ module.exports = (api) => {
     return personal(a, `The next item you enchant in the next ${C.armMinutes} minutes will be "${N.markName(g.name, 'enchanted by', realNameOf(a))}".`);
   }, { help: 'Grandmaster Enchanter: name the next item you enchant (once a week)' });
 
+  // ---- Blade, Sword-Master's School ----------------------------------------------------------------------------------
+  // A Blade Grandmaster takes up to `blade.apprentices` (2) apprentices: /swordschool take <name>, the student accepts with
+  // /swordschool accept. In a duel between the two (duel.js: practice, friendly or wager), a Blade hit the apprentice lands
+  // on their master is worth blade.sparRate (1.5) through skillrates.js (__dboCapstoneSkillRate). It multiplies only what
+  // the Wheel's meter already let through, so the hourly and daily caps hold: faster practice, never more practice. A
+  // master and apprentice may not be one person (one Discord, one profile), as couriers.js rules.
+  const SCHOOL = 'private.dboSwordSchool';   // on the master: { apprentices: [{ actor, name, at }] }
+  const MASTER = 'private.dboSwordMaster';   // on the apprentice: { actor, name, at }
+  const B = Object.assign({ apprentices: 2, sparRate: 1.5, offerMinutes: 5, meters: 10 }, C.blade || {});
+  const OFFERS = globalThis.__dboSwordOffers instanceof Map ? globalThis.__dboSwordOffers : (globalThis.__dboSwordOffers = new Map()); // student -> { master, at }
+  const schoolOf = (a) => { const s = get(a, SCHOOL, null); return s && Array.isArray(s.apprentices) ? s.apprentices.slice() : []; };
+  const masterOf = (a) => { const m = get(a, MASTER, null); return m && m.actor ? m : null; };
+  const disc = (a) => { try { return String((typeof discordOf === 'function' && discordOf(a)) || ''); } catch (e) { return ''; } };
+  const onePerson = (x, y) => (x >>> 0) === (y >>> 0) || (!!disc(x) && disc(x) === disc(y)) || (profileOf(x) >= 0 && profileOf(x) === profileOf(y));
+  const setp = (a, k, v) => { try { mp.set(a >>> 0, k, v); return true; } catch (e) { log('capstones: could not save the school', e.message); return false; } };
+  const takeRefusal = (a, t) => {
+    if (!on('blade') || !isGrandmaster(a, 'blade')) return 'Taking sword apprentices is a Grandmaster of the Blade\'s.';
+    if (!t) return 'Name someone here: /swordschool take <name>.';
+    if (onePerson(a, t)) return 'You cannot be your own apprentice.';
+    if (!(Number(distanceMeters(a, t)) <= Number(B.meters))) return 'Stand beside them to offer it.';
+    if (masterOf(t)) return `${who(t)} already studies the sword under ${masterOf(t).name}.`;
+    if (schoolOf(a).length >= Number(B.apprentices)) return `You already teach ${B.apprentices} apprentices. Release one first.`;
+    return '';
+  };
+  registerChatCommand('swordschool', (a, args) => {
+    const [verb, ...rest] = String(args || '').trim().split(/\s+/);
+    const v = (verb || '').toLowerCase();
+    if (v === 'take') {
+      const t = findByName(rest.join(' '));
+      const why = takeRefusal(a, t);
+      if (why) return personal(a, why);
+      OFFERS.set(t >>> 0, { master: a >>> 0, at: Date.now() });
+      personal(t, `${who(a)}, a Grandmaster of the Blade, offers to take you as a sword apprentice. Type /swordschool accept within ${B.offerMinutes} minutes.`);
+      return personal(a, `You offer ${who(t)} a place in your school.`);
+    }
+    if (v === 'accept') {
+      const o = OFFERS.get(a >>> 0);
+      OFFERS.delete(a >>> 0);
+      if (!o || Date.now() - o.at > Number(B.offerMinutes) * 60000) return personal(a, 'No sword-master has offered you a place.');
+      const why = takeRefusal(o.master, a);
+      if (why) return personal(a, `The place is gone: ${why}`);
+      const list = schoolOf(o.master).concat([{ actor: a >>> 0, name: who(a), at: Date.now() }]);
+      if (!setp(o.master, SCHOOL, { apprentices: list }) || !setp(a, MASTER, { actor: o.master >>> 0, name: who(o.master), at: Date.now() })) return personal(a, 'The school could not be written. Try again.');
+      audit(`CAPSTONE ${who(o.master)} took ${who(a)} as a blade apprentice`);
+      personal(o.master, `${who(a)} is your sword apprentice now.`);
+      return personal(a, `You study the sword under ${who(o.master)}. Practise with them in a duel and you learn faster.`);
+    }
+    if (v === 'release' || v === 'leave') {
+      const m = masterOf(a);
+      const t = v === 'leave' ? a : findByName(rest.join(' '));
+      const master = v === 'leave' ? (m && m.actor) : a;
+      const list = master ? schoolOf(master) : [];
+      if (!t || !master || !list.some((x) => (x.actor >>> 0) === (t >>> 0))) return personal(a, v === 'leave' ? 'You have no sword-master.' : 'They are not your apprentice.');
+      setp(master, SCHOOL, { apprentices: list.filter((x) => (x.actor >>> 0) !== (t >>> 0)) });
+      setp(t, MASTER, null);
+      audit(`CAPSTONE ${who(master)} released ${who(t)} from blade`);
+      return personal(a, v === 'leave' ? 'You leave your sword-master\'s school.' : `${who(t)} is no longer your apprentice.`);
+    }
+    const mine = schoolOf(a), m = masterOf(a);
+    if (mine.length) return personal(a, `Your sword apprentices: ${mine.map((x) => x.name).join(', ')}.`);
+    if (m) return personal(a, `You study the sword under ${m.name}. /swordschool leave ends it.`);
+    return personal(a, 'Usage: /swordschool take <name> | accept | release <name> | leave.');
+  }, { help: 'Grandmaster of the Blade: take sword apprentices, who learn faster sparring with you' });
+  // skillrates.js: Blade hits an apprentice lands on their own master in a duel between them
+  globalThis.__dboCapstoneSkillRate = (actorId, skillId, kind, detail) => {
+    if (skillId !== 'blade' || kind !== 'hit' || !on('blade') || !detail) return 1;
+    const a = actorId >>> 0, t = Number(detail.targetId) >>> 0;
+    const m = masterOf(a);
+    if (!m || (m.actor >>> 0) !== t || !isGrandmaster(t, 'blade') || onePerson(a, t)) return 1;
+    try { if (typeof globalThis.__dboDuelPair !== 'function' || !globalThis.__dboDuelPair(a, t)) return 1; } catch (e) { return 1; }
+    return Math.max(1, Math.min(2, Number(B.sparRate) || 1));
+  };
+
   // ---- /capstone ------------------------------------------------------------------------------------------------------
   const STATUS = {
     alchemist: (a) => (usedToday(a, 'signature') ? ' Today\'s signature draught is brewed; the next after midnight UTC.' : ' Today\'s is ready: /signature, then brew.'),
     enchanter: (a) => (usedWithin(a, 'enchantname', 7) ? ` Named last on ${lastUse(a, 'enchantname')}; the next a week after.` : ' Ready: /enchantname <name>, then enchant.'),
     tailor: () => ' /bespoke <name> names your next garment.',
+    blade: (a) => { const n = schoolOf(a).length; return ` ${n} of ${B.apprentices} apprentices; /swordschool take <name>.`; },
   };
   registerChatCommand('capstone', (a) => {
     if (C.enabled === false) return personal(a, 'Grandmaster rewards are not open just now.');

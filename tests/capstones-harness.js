@@ -29,6 +29,7 @@ const mp = {
   getDescFromId: (id) => `${(id >>> 0).toString(16)}:Skyrim.esm`,
 };
 const audits = [], said = [], logs = [], cmds = new Map();
+const FIND = {}, PROFILES = {}, DISCORDS = {}, DIST = new Map();
 const level = (a, n) => put(a, 'private.mastery', { v: 2, order: ['blacksmith'], skills: { blacksmith: { level: n, xp: 0, rank: 4 } } });
 const load = (cfg) => {
   delete require.cache[path.join(ROOT, 'capstones.js')];
@@ -36,6 +37,8 @@ const load = (cfg) => {
     mp, log: (...x) => logs.push(x.join(' ')), personal: (a, t) => said.push([a, t]), audit: (t) => audits.push(t), who: (a) => `P${(a & 0xfff).toString(16)}`,
     cfg, registerChatCommand: (n, f) => cmds.set(n, f), realNameOf: (a) => (a === SMITH ? 'Eorlund Gray-Mane' : 'Novice Smith'),
     recordOf: (id) => (TYPES[id >>> 0] ? { record: { type: TYPES[id >>> 0] } } : null), itemName: (d) => NAMES[parseInt(String(d).split(':')[0], 16)] || '?',
+    findByName: (q) => FIND[String(q).trim().toLowerCase()] || 0, distanceMeters: (x, y) => (DIST.get(`${x}|${y}`) ?? 2),
+    profileOf: (x) => (PROFILES[x] ?? -1), discordOf: (x) => DISCORDS[x] || '',
   });
 };
 globalThis.__dboSmithIsForge = (r) => (r >>> 0) === FORGE_RECIPE;
@@ -156,6 +159,52 @@ const named = (a, id) => inv(a).filter((e) => e.baseId === id && e.name);
   const wk = Date.UTC(2026, 10, 2);
   put(ENCHANTER, 'private.dboCapstones', { enchantname: '2026-11-02' });
   ok(C.usedWithin(ENCHANTER, 'enchantname', 7, wk + 6 * 86400000) && !C.usedWithin(ENCHANTER, 'enchantname', 7, wk + 7 * 86400000), '...seven UTC days to the day');
+
+  // ---- branch 3: Blade, Sword-Master's School (Nat, 2 Nov) ----
+  const SWORD_M = 0xff000201, APP1 = 0xff000202, APP2 = 0xff000203, APP3 = 0xff000204, ALT = 0xff000205;
+  Object.assign(FIND, { app1: APP1, app2: APP2, app3: APP3, alt: ALT });
+  Object.assign(PROFILES, { [SWORD_M]: 50, [APP1]: 51, [APP2]: 52, [APP3]: 53, [ALT]: 54 });
+  Object.assign(DISCORDS, { [SWORD_M]: 'd-master', [ALT]: 'd-master', [APP1]: 'd1', [APP2]: 'd2', [APP3]: 'd3' });
+  gm(SWORD_M, 'blade');
+  C = load({ capstones: { enabled: true, blade: { enabled: true } } });
+  const sc = (a, t) => cmds.get('swordschool')(a, t);
+  sc(SWORD_M, 'take alt');
+  ok(/your own apprentice/.test(last(SWORD_M)), 'a character of the master\'s own Discord cannot be their apprentice', last(SWORD_M));
+  DIST.set(`${SWORD_M}|${APP1}`, 40); sc(SWORD_M, 'take app1');
+  ok(/Stand beside them/.test(last(SWORD_M)), '...nor someone out of reach'); DIST.delete(`${SWORD_M}|${APP1}`);
+  sc(APP1, 'take app2');
+  ok(/Grandmaster of the Blade/.test(last(APP1)), 'only a Blade Grandmaster takes apprentices');
+  audits.length = 0;
+  sc(SWORD_M, 'take app1'); sc(APP1, 'accept');
+  sc(SWORD_M, 'take app2'); sc(APP2, 'accept');
+  ok(getp(SWORD_M, 'private.dboSwordSchool').apprentices.length === 2 && getp(APP1, 'private.dboSwordMaster').actor === SWORD_M, 'two apprentices taken, each accepting, both sides recorded');
+  ok(audits.filter((t) => /^CAPSTONE P201 took P20[23] as a blade apprentice$/.test(t)).length === 2, '...and audited', audits);
+  sc(SWORD_M, 'take app3');
+  ok(/already teach 2 apprentices/.test(last(SWORD_M)), 'a third is refused');
+  sc(APP2, 'accept');
+  ok(/No sword-master has offered/.test(last(APP2)), 'an accept with no offer does nothing');
+  const rate = (a, t, skill = 'blade', kind = 'hit') => globalThis.__dboCapstoneSkillRate(a, skill, kind, { targetId: t });
+  let dueling = new Set([`${APP1}|${SWORD_M}`]);
+  globalThis.__dboDuelPair = (x, y) => dueling.has(`${x}|${y}`) || dueling.has(`${y}|${x}`);
+  ok(rate(APP1, SWORD_M) === 1.5, "an apprentice's Blade hit on their master in a duel is worth 1.5");
+  ok(rate(APP2, SWORD_M) === 1, '...the other apprentice, not in that duel, gets nothing extra');
+  ok(rate(SWORD_M, APP1) === 1 && rate(APP1, APP3) === 1, '...nor the master hitting them, nor the apprentice hitting someone else');
+  ok(rate(APP1, SWORD_M, 'blunt') === 1 && rate(APP1, SWORD_M, 'blade', 'kill') === 1, '...nor another skill, nor another kind of work');
+  dueling = new Set();
+  ok(rate(APP1, SWORD_M) === 1, '...and outside a duel, nothing');
+  dueling = new Set([`${APP1}|${SWORD_M}`]);
+  level(SWORD_M, 99); put(SWORD_M, 'private.mastery', { v: 2, order: ['blade'], skills: { blade: { level: 99, xp: 0, rank: 4 } } });
+  ok(rate(APP1, SWORD_M) === 1, 'a master fallen below 100 teaches at the usual rate');
+  gm(SWORD_M, 'blade');
+  sc(APP1, 'leave');
+  ok(!getp(APP1, 'private.dboSwordMaster') && getp(SWORD_M, 'private.dboSwordSchool').apprentices.length === 1 && rate(APP1, SWORD_M) === 1, 'an apprentice who leaves is off both records and earns the usual rate', getp(SWORD_M, 'private.dboSwordSchool'));
+  sc(SWORD_M, 'release app2');
+  ok(!getp(APP2, 'private.dboSwordMaster') && !getp(SWORD_M, 'private.dboSwordSchool').apprentices.length && audits.some((t) => /^CAPSTONE P201 released P203 from blade$/.test(t)), 'the master releases one, audited');
+  C = load({ capstones: { enabled: true, blade: { enabled: false } } });
+  sc(SWORD_M, 'take app1'); sc(APP1, 'accept');
+  ok(!getp(APP1, 'private.dboSwordMaster') && rate(APP1, SWORD_M) === 1, 'Blade switched off: no school and no boost');
+  const RATES = fs.readFileSync(path.join(ROOT, 'skillrates.js'), 'utf8');
+  ok(/__dboCapstoneSkillRate\(actorId >>> 0, skillId, kind, detail\)\); if \(Number\.isFinite\(r\) && r >= 1 && r <= 2\) rate \*= r;/.test(RATES), 'skillrates.js multiplies by the school rate after the meter, clamped to 1..2');
 
   // ---- the hooks in the other modules ----
   const ALC = fs.readFileSync(path.join(ROOT, 'alchemy.js'), 'utf8');
