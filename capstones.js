@@ -34,7 +34,7 @@
 const path = require('path');
 
 module.exports = (api) => {
-  const { mp, log, personal, audit, who, cfg, registerChatCommand, realNameOf, itemName, recordOf, findByName, distanceMeters, profileOf, discordOf, weaponSkillOf, sate } = api;
+  const { mp, log, personal, audit, who, cfg, registerChatCommand, realNameOf, itemName, recordOf, findByName, distanceMeters, profileOf, discordOf, weaponSkillOf, sate, isAdmin } = api;
   const onlineActors = typeof api.onlineActors === 'function' ? api.onlineActors : () => [];
   const ITEMNAMES_JS = path.join(__dirname, 'itemnames.js');
   delete require.cache[ITEMNAMES_JS];
@@ -58,6 +58,7 @@ module.exports = (api) => {
     harvesting: 'Master Gardener: crops you plant ripen in half the time, and you pick the most a crop gives.',
     woodcutter: 'Seasoned Timber: your sawing at a lumber pile or a saw mill gives twice the Sawn Logs.',
     lockpicking: 'Locksmith: fit a lock to storage built in a home, with its owner there (/fitlock).',
+    priest: 'Consecration: once a week, consecrate a shrine of your god indoors; staff approve it (/consecrate).',
   };
 
   const get = (a, k, d) => { try { const v = mp.get(a >>> 0, k); return v === undefined || v === null ? d : v; } catch (e) { return d; } };
@@ -469,6 +470,66 @@ module.exports = (api) => {
     return true;
   };
 
+  // ---- Priest, Consecration: a shrine of their god where they stand, once staff approve it ----------------------------
+  // /consecrate, once a week, in an interior (a temple, a home), asks to consecrate the spot to the Priest's own god. Staff
+  // see /consecrate list and answer /consecrate approve|deny <id>; /consecrate remove <id> takes an approved one away. An
+  // approved shrine goes into consecrated-shrines.json (beside the world state, gitignored), which prayer.js re-reads
+  // while running: /pray within 3 m of it is a touch of that god's shrine. A denial gives the week's use back. No two
+  // shrines of one god within consecrate.apartMeters (300) of each other in one cell or world.
+  const SHRINES_FILE = path.resolve('consecrated-shrines.json');
+  const CON = () => Object.assign({ apartMeters: 300, meters: 3 }, D('priest'));
+  const readShrines = () => { try { const v = JSON.parse(require('fs').readFileSync(SHRINES_FILE, 'utf8')); return { next: Number(v.next) || 1, shrines: Array.isArray(v.shrines) ? v.shrines : [] }; } catch (e) { return { next: 1, shrines: [] }; } };
+  const writeShrines = (v) => {
+    const fs = require('fs');
+    fs.writeFileSync(SHRINES_FILE + '.tmp', JSON.stringify(v, null, 1)); fs.renameSync(SHRINES_FILE + '.tmp', SHRINES_FILE);
+    try { if (globalThis.__dboPrayerConsecrated) globalThis.__dboPrayerConsecrated.reload(); } catch (e) { /* prayer.js reads it on its timer */ }
+  };
+  const isInterior = (desc) => { try { const r = recordOf(mp.getIdFromDesc(String(desc)) >>> 0); return !!r && String(r.record.type) === 'CELL'; } catch (e) { return false; } };
+  const staff = (a) => { try { return typeof isAdmin === 'function' && !!isAdmin(a); } catch (e) { return false; } };
+  const unspend = (actor) => { const s = Object.assign({}, get(actor, PROP, {})); delete s.consecrate; try { mp.set(actor >>> 0, PROP, s); } catch (e) { /* gone */ } };
+  registerChatCommand('consecrate', (a, args) => {
+    const [verb, id] = String(args || '').trim().split(/\s+/);
+    const v = (verb || '').toLowerCase();
+    const data = readShrines();
+    const find = () => data.shrines.find((r) => r && `c${r.n}` === String(id || '').toLowerCase());
+    if (v === 'list') {
+      if (!staff(a)) return personal(a, 'Only staff answer consecrations.');
+      const rows = data.shrines.filter((r) => r.status === 'pending');
+      return personal(a, rows.length ? `Waiting: ${rows.map((r) => `c${r.n} ${r.godName} by ${r.byName} in ${r.world}`).join('; ')}. /consecrate approve|deny <id>.` : 'No consecration waits.');
+    }
+    if (v === 'approve' || v === 'deny' || v === 'remove') {
+      if (!staff(a)) return personal(a, 'Only staff answer consecrations.');
+      const r = find();
+      if (!r) return personal(a, `No consecration ${id || ''}.`);
+      if (v === 'approve' && r.status !== 'pending') return personal(a, `c${r.n} is ${r.status}.`);
+      if (v === 'deny' && r.status !== 'pending') return personal(a, `c${r.n} is ${r.status}.`);
+      r.status = v === 'approve' ? 'approved' : v === 'deny' ? 'denied' : 'removed';
+      r.answeredBy = who(a); r.answeredAt = now();
+      writeShrines(data);
+      if (v === 'deny') unspend(r.by);
+      audit(`CAPSTONE ${who(a)} ${r.status} consecration c${r.n}`);
+      return personal(a, `c${r.n}, ${r.godName} by ${r.byName}: ${r.status}.`);
+    }
+    if (!on('priest') || !isGrandmaster(a, 'priest')) return personal(a, 'Consecrating a shrine is a Grandmaster Priest\'s.');
+    if (usedWithin(a, 'consecrate', 7)) return personal(a, `You consecrated on ${lastUse(a, 'consecrate')}; the next is yours a week after.`);
+    const faith = get(a, 'private.dboDeity', null);
+    if (!faith || !faith.id) return personal(a, 'You hold no god to consecrate a shrine to.');
+    let world = '', p = null;
+    try { world = String(mp.get(a, 'worldOrCellDesc') || ''); p = mp.get(a, 'pos'); } catch (e) { p = null; }
+    if (!Array.isArray(p) || !isInterior(world)) return personal(a, 'A shrine is consecrated indoors: in a temple, a home or a hall.');
+    const near = data.shrines.find((r) => r && (r.status === 'approved' || r.status === 'pending') && r.deity === faith.id && String(r.world).toLowerCase() === world.toLowerCase()
+      && Math.hypot(r.pos[0] - p[0], r.pos[1] - p[1], r.pos[2] - p[2]) / 70 < Number(CON().apartMeters));
+    if (near) return personal(a, `There is already a shrine of ${faith.name || faith.id} near here (c${near.n}).`);
+    const n = data.next;
+    const godName = String(faith.name || faith.id);
+    data.next = n + 1;
+    data.shrines.push({ n, deity: faith.id, godName, world, pos: p.map((x) => Math.round(x)), meters: Number(CON().meters), name: `the shrine of ${godName} consecrated by ${who(a)}`,
+      by: a >>> 0, byName: who(a), at: now(), status: 'pending' });
+    writeShrines(data);
+    markUsed(a, 'consecrate', 'priest');
+    return personal(a, `You ask to consecrate this place to ${godName} (c${n}). Staff will answer; until then it is only a place.`);
+  }, { help: 'Grandmaster Priest: consecrate a shrine of your god where you stand (staff approve; once a week)' });
+
   // ---- /capstone ------------------------------------------------------------------------------------------------------
   const STATUS = {
     alchemist: (a) => (usedToday(a, 'signature') ? ' Today\'s signature draught is brewed; the next after midnight UTC.' : ' Today\'s is ready: /signature, then brew.'),
@@ -479,6 +540,7 @@ module.exports = (api) => {
     cook: (a) => (usedToday(a, 'feast') ? ` ${spentLine}` : ' Ready.'),
     defense: (a) => (usedToday(a, 'shieldover') ? ` ${spentLine}` : ' Ready.'),
     unarmed: (a) => (usedToday(a, 'secondwind') ? ` ${spentLine}` : ' Ready.'),
+    priest: (a) => (usedWithin(a, 'consecrate', 7) ? ` Consecrated on ${lastUse(a, 'consecrate')}; the next a week after.` : ' Ready.'),
     blade: (a) => { const n = schoolOf(a).length; return ` ${n} of ${B.apprentices} apprentices; /swordschool take <name>.`; },
   };
   registerChatCommand('capstone', (a) => {

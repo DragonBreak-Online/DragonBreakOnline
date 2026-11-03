@@ -1138,6 +1138,41 @@ console.log('pick prayers:');
   check('the same coordinates in Tamriel are not the temple', !m.w, m.said);
 }
 
+// ---- a consecrated shrine (capstones.js Consecration; consecrated-shrines.json, re-read while running) ----
+{
+  const fsx = require('fs'), pathx = require('path'), here0 = process.cwd();
+  const tmp = fsx.mkdtempSync(pathx.join(require('os').tmpdir(), 'prayer-consecrated-'));
+  for (const f of ['skills.json', 'faiths.json']) { try { fsx.copyFileSync(pathx.join(here0, f), pathx.join(tmp, f)); } catch (e) { /* none */ } }
+  process.chdir(tmp);
+  const write = (status) => fsx.writeFileSync('consecrated-shrines.json', JSON.stringify({ next: 6, shrines: [{ n: 5, deity: 'akatosh', godName: 'Akatosh', world: '5d1:Skyrim.esm', pos: [0, 0, 0], meters: 3, name: 'the shrine of Akatosh consecrated by Tester', status }] }));   // verify-formids: ignore - a made-up interior, on purpose
+  write('pending');
+  api.cfg = { prayer: { clientJudged: true, pick: { enabled: false } } };
+  pickUi = false;
+  load();
+  props.set(ACTOR + '|private.dboDeity', { id: 'akatosh', name: 'Akatosh', kind: 'divine', at: wallClock - 30 * 86400000 });
+  props.delete(ACTOR + '|private.prayedShrines');
+  props.set(ACTOR + '|worldOrCellDesc', '5d1:Skyrim.esm'); props.set(ACTOR + '|pos', [70, 0, 0]);   // verify-formids: ignore - a made-up interior, on purpose
+  nearM = Infinity;
+  const pray = () => { wallClock += 61 * 60000; virtual += 1000000; const said = say('pray'); return { said, w: out.widgets.find((x) => x && x.nonce), log: out.logs.join(' | ') }; };
+  let m = pray();
+  check('a consecration still waiting on staff is no shrine', !m.w, m.said);
+  write('approved');
+  const t = Date.now() / 1000 + 60; fsx.utimesSync('consecrated-shrines.json', t, t);
+  check('prayer.js re-reads the file on a timer of its own', typeof timers.get('prayerConsecrated') === 'function', [...timers.keys()]);
+  (timers.get('prayerConsecrated') || (() => {}))();
+  m = pray();
+  check('approved: on the next re-read, /pray beside it is a touch of its god\'s shrine, no restart', !!m.w && /shrine touch .* Akatosh/.test(m.log), m.said + ' | ' + m.log);
+  const res = playC(m);
+  check('...the prayer holds and its rest is kept on the shrine\'s own number (0xFE000005)', verdictOf(res.log) === 'held' && restOf(0xfe000005) > wallClock, res.log);
+  write('removed');
+  const t2 = Date.now() / 1000 + 120; fsx.utimesSync('consecrated-shrines.json', t2, t2);
+  (timers.get('prayerConsecrated') || (() => {}))();
+  m = pray();
+  check('removed by staff: no shrine there on the next re-read', !m.w, m.said);
+  process.chdir(here0);
+  try { fsx.rmSync(tmp, { recursive: true, force: true }); } catch (e) { /* the OS clears it */ }
+}
+
 Date.now = realNow;
 console.log('');
 console.log(failures ? `${failures} FAILURES` : 'all checks passed');

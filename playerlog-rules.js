@@ -1524,6 +1524,7 @@ business.js TAX 4f9fe86e clean
 capstones.js CAPSTONE f0b21ae0 clean
 capstones.js CAPSTONE 577376f9 clean
 capstones.js CAPSTONE ffb8293d clean
+capstones.js CAPSTONE 7563b9cb clean
 champions.js CHAMPION c06a6bd9 clean
 bossvitals.js VITALS de8f0aeb clean
 bossvitals.js VITALS 8dc9b1fd clean
