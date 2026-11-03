@@ -70,7 +70,7 @@ const toHtml = (root) => {
       const input = t.type === 'input';
       out.push(`<div style="position:absolute;left:${nx + (t._x || 0) * nsx}px;top:${ny + (t._y || 0) * nsy}px;width:${(t._width || 200) * nsx}px;height:${(t._height || 24) * nsy}px;`
         + `overflow:hidden;white-space:${t.wordWrap ? 'pre-wrap' : 'pre'};font:${FONTS[fm.font] || 400} ${size}px/1.2 'Futura Condensed';letter-spacing:${(fm.letterSpacing || 0) * nsx}px;`
-        + `text-align:${fm.align || 'left'};color:${hex(t.textColor === undefined ? fm.color : t.textColor)};opacity:${na * ((t._alpha === undefined ? 100 : t._alpha) / 100)};`
+        + `text-align:${(t.applied && t.applied.align) || fm.align || 'left'};color:${hex(t.textColor === undefined ? fm.color : t.textColor)};opacity:${na * ((t._alpha === undefined ? 100 : t._alpha) / 100)};`
         + `${input ? 'background:#101010;outline:1px solid #5a5a5a;' : ''}">${esc(t.text)}</div>`);
     }
   };
@@ -152,13 +152,34 @@ const pigeon = {
     broken: [], mine: [] },
 };
 
+const tradeInv = ['Iron Sword', 'Steel Dagger', 'Iron Ingot', 'Amulet of Mara', 'Leather Strips', 'Wolf Pelt', 'Bread', 'Potion of Minor Healing', 'Lockpick', 'Soul Gem (Petty)', 'Torch', 'Linen Wrap', 'Salt Pile', 'Ruby'].map((name, i) => ({ lineId: i + '|x', baseId: 0x100 + i, count: i % 3 ? 1 : 6, name, cat: i % 2 ? 'misc' : 'weapons', value: 5 + i * 7, weight: 1 + (i % 4), equipped: i === 0, tags: i === 3 ? ['enchanted'] : undefined }))
+  .concat([{ lineId: '15||||||||', baseId: 15, count: 500, name: 'Gold', cat: 'misc', value: 1, weight: 0 }]);
+const trade = { type: 'trade', id: 14, partnerName: 'Lydia', inventory: tradeInv, myOffer: [tradeInv[3], { lineId: '15||||||||', baseId: 15, count: 120, name: 'Gold', cat: 'misc', value: 1, weight: 0 }], theirOffer: [], myLocked: false, theirLocked: false, bothLocked: false, iAccepted: false, theyAccepted: false, stackPromptThreshold: 1,
+  events: { add: 'trade:add', remove: 'trade:remove', lock: 'trade:lock', unlock: 'trade:unlock', accept: 'trade:accept', cancel: 'trade:cancel' } };
+const mEntry = (name, label, desc, extra) => Object.assign({ name, label, desc, usage: '/' + name }, extra || {});
+const mParty = { key: 'party', title: 'Party', hints: ['Your party shares the kill.'], entries: [
+  mEntry('invite', 'Invite', 'Ask someone to join your party; they pay nothing.', { form: { variants: [{ word: null, args: [{ label: 'player', kind: 'player' }] }] } }),
+  mEntry('leave', 'Leave', 'Leave your party.', { form: { variants: [{ word: null, args: [] }] } }),
+  mEntry('loot', 'Loot rule', 'How the party shares loot.', { form: { variants: [{ word: 'set', args: [{ label: 'rule', kind: 'enum', options: ['free', 'round', 'leader'] }] }, { word: 'show', args: [] }] } }),
+  mEntry('roll', 'Roll', 'Roll dice for the party.', { form: { variants: [{ word: null, args: [{ label: 'sides', kind: 'number', optional: true }] }] } }),
+].concat(Array.from({ length: 12 }, (_, i) => mEntry('emote' + i, 'Emote ' + (i + 1), 'Play an emote your character knows; others nearby see it.'))) };
+const menu = { type: 'playerMenu', id: 52, nonce: 'p1', tab: '', staff: false, tabs: [mParty, { key: 'trade', title: 'Trade', hints: [], entries: [mEntry('pay', 'Pay', 'Give gold to someone.')] }, { key: 'faith', title: 'Faith', hints: [], entries: [] }, { key: 'world', title: 'World', hints: [], entries: [] }],
+  people: [{ label: 'Lydia', value: 'Lydia' }, { label: 'Faendal', value: 'Faendal' }], searchOnly: [], search: '' };
 const SETUPS = [
+  ['menu', { swf: 'dbo_menu', drive: (t) => t.push(menu) }],
+  ['menu-form', { swf: 'dbo_menu', drive: (t) => { t.push(menu); t.root.dboPanel.flowClip.p0.b2.run.onRelease(); } }],
+  ['trade-goods', { swf: 'dbo_trade', drive: (t) => t.push(trade) }],
+  ['trade-prompt', { swf: 'dbo_trade', drive: (t) => { t.push(trade); t.root.dboPanel.list.r1.btn0.onRelease(); } }],
+  ['trade-locked', { swf: 'dbo_trade', drive: (t) => { t.push(Object.assign({}, trade, { myLocked: true, theyAccepted: true, theirLocked: true })); t.press(9); } }],
   ['board-list', { swf: 'dbo_board', drive: (t) => t.push(board) }],
+  ['board-pages', { swf: 'dbo_board', drive: (t) => { t.push(Object.assign({}, board, { maxNotes: 50, notes: Array.from({ length: 20 }, (_, i) => ({ id: 100 + i, tab: 'citizen', author: 'Narri', text: 'Wanted: hands for the harvest at Pale Pass, paid by the day. Ask at the inn, note ' + (i + 1) + '.', ageHours: i * 5, canRemove: false })) })); t.root.dboPanel.head.tab2.onRelease(); } }],
   ['board-reader', { swf: 'dbo_board', drive: (t) => { t.push(board); t.press(49); } }],
   ['board-compose', { swf: 'dbo_board', drive: (t) => { t.push(board); t.root.dboPanel.head.tab1.onRelease(); t.root.dboPanel.foot.write.onRelease(); const b = t.root.dboPanel.list.box; b.text = 'Iron ingots, cheap, at the forge by the gate.'; b.onChanged(); } }],
   ['housing', { swf: 'dbo_housing', drive: (t) => t.push(housing) }],
   ['housing-rename', { swf: 'dbo_housing', drive: (t) => { t.push(housing); for (const k of Object.keys(t.root.dboPanel.acts.kids)) { const b = t.root.dboPanel.acts[k]; if (b.label && b.label.text === 'Rename...') b.onRelease(); } } }],
   ['journal', { swf: 'dbo_journal', drive: (t) => t.push(journal) }],
+  ['journal-keys', { swf: 'dbo_journal', drive: (t) => t.push(Object.assign({}, journal, { tab: 'keys', keys: { offer: { from: 'Gemma', key: 'Rose Hall key' }, near: [{ actor: 0xff01, name: 'Gemma' }, { actor: 0xff02, name: 'Bram' }], keys: [{ name: 'Rose Hall key', place: 'Rose Hall', opens: true }, { name: 'Old key', place: '', opens: false }], owned: [{ ref: 0x5000, place: 'Rose Hall', copies: [{ name: 'Rose Hall key 2', holder: 'Bram' }] }] } })) }],
+  ['journal-pages', { swf: 'dbo_journal', drive: (t) => t.push(Object.assign({}, journal, { stats: { groups: Array.from({ length: 6 }, (_, g) => ({ name: 'Group ' + (g + 1), rows: Array.from({ length: 6 }, (_, i) => ({ label: 'Row ' + (g + 1) + '.' + (i + 1), value: String(i * 7) })) })) } })) }],
   ['decor', { swf: 'dbo_decor', drive: (t) => t.push(decor) }],
   ['prayer', { swf: 'dbo_prayer', drive: (t) => t.push(prayer) }],
   ['deity', { swf: 'dbo_deity', drive: (t) => { t.push(deity); t.press(51); } }],

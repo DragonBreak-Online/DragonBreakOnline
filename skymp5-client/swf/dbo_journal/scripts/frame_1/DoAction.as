@@ -5,7 +5,9 @@
 // whose typing is not native yet, or a game that cannot type, still hands it to the browser journal for that tab:
 // journalTab [nonce, tab, focus, "browser"].
 
-var DBO_SWF_VERSION = "journal-2";
+var DBO_SWF_VERSION = "journal-3";
+// the journal is the hourglass's aqua, as the web journal (dbo-theme.scss)
+webLook("aqua");
 var STAGE_W = 1280;
 var PANEL_W = 1180;
 var PANEL_H = 664;
@@ -173,7 +175,7 @@ function drawTabs()
          dboTabMark(b, w - 30);
       }
    }
-   dboDivider(s, PAD, y + 36, PANEL_W - PAD * 2);
+   webDivider(s, PAD, y + 36, PANEL_W - PAD * 2);
    // a second row of tabs moves the page down under it
    bodyTop = Math.max(BODY_TOP, y + 48);
 }
@@ -236,7 +238,13 @@ function drawBody()
          JT[tab](s, ctx);
       }
    }
+   // the web look's chips on the page's buttons; Skills is Worker 1's tab and keeps its own
+   if (tab != "skills")
+   {
+      webSkinFlow();
+   }
    formEnd();
+   flowKeep();
    var n = flowShow(pages[tab] != undefined ? pages[tab] : 0);
    pages[tab] = flow.shown;
    return n;
@@ -246,7 +254,7 @@ function drawFoot(total)
 {
    var f = clear("foot", 60);
    var y = PANEL_H - 52;
-   dboDivider(f, PAD, y - 10, PANEL_W - PAD * 2);
+   webDivider(f, PAD, y - 10, PANEL_W - PAD * 2);
    dboText(f, "result", 1, PAD, y, 640, 26, dboFmt(F_MEDIUM, 17, C_TEXT, 0.5), false);
    showResult();
    var h = dboText(f, "hint", 2, PAD, y + 24, 640, 22, dboFmt(F_MEDIUM, 14, C_SECOND, 0.5), false);
@@ -256,11 +264,11 @@ function drawFoot(total)
       var shown = flow.shown;
       var pt = dboText(f, "page", 3, 680, y + 6, 130, 24, dboFmt(F_MEDIUM, 15, C_SECOND, 0.5, "center"), false);
       pt.text = "Page " + (shown + 1) + " of " + total;
-      var pv = button(f, "prev", 10, 660 - 110, y + 2, 110, "Previous", F_MEDIUM, 17, A_BUTTON_REST, function()
+      var pv = webButton(f, "prev", 10, 660 - 110, y + 2, 110, "Previous", F_MEDIUM, 17, A_BUTTON_REST, function()
       {
          turn(-1);
       });
-      var nx = button(f, "next", 11, 820, y + 2, 110, "Next page", F_MEDIUM, 17, A_BUTTON_REST, function()
+      var nx = webButton(f, "next", 11, 820, y + 2, 110, "Next page", F_MEDIUM, 17, A_BUTTON_REST, function()
       {
          turn(1);
       });
@@ -273,7 +281,7 @@ function drawFoot(total)
          disable(nx);
       }
    }
-   button(f, "close", 20, PANEL_W - PAD - 100, y + 2, 100, "Close", F_MEDIUM, 18, A_BUTTON_REST, function()
+   webButton(f, "close", 20, PANEL_W - PAD - 100, y + 2, 100, "Close", F_MEDIUM, 18, A_BUTTON_REST, function()
    {
       closeJournal();
    });
@@ -288,8 +296,17 @@ function turn(d)
    }
    dboSound("UIMenuPrevNext");
    pages[tab] = next;
-   draw();
+   // every page is drawn already: show the next one and draw the foot again, not the whole tab (flowTurn)
+   var n = flowTurn(next);
+   actions = headActions.concat(actions);
+   for (var i = 0; i < actions.length; i++)
+   {
+      actions[i].idx = i;
+   }
+   drawFoot(n);
 }
+
+var headActions = [];
 
 function draw()
 {
@@ -298,6 +315,7 @@ function draw()
    drawHead();
    drawTabs();
    var head = actions;
+   headActions = head;
    actions = [];
    var n = drawBody();
    actions = head.concat(actions);
@@ -327,7 +345,7 @@ function build()
    panel = _root.createEmptyMovieClip("dboPanel", 10);
    dboFit(panel, PANEL_W, PANEL_H);
    var bg = panel.createEmptyMovieClip("bg", 1);
-   dboGround(bg, PANEL_W, PANEL_H);
+   webGround(bg, PANEL_W, PANEL_H);
    dboWatermark(panel, 5, PANEL_W - 50, 170, 300);
    dboFadeIn(panel);
 }

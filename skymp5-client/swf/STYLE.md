@@ -198,3 +198,29 @@ The meaning colours of section 3 (daedric gold, failure red, success green) are 
 **The art:** `swf/art/dbo-hourglass.dds`, our own hourglass (`skymp5-front/src/img/dbo-watermark.png`), saved by Pillow as an uncompressed RGBA DDS (420 x 520), the same format Nat's map probe proved loads by relative path. It ships with the SWFs as **`Data/textures/interface/dbo/dbo-hourglass.dds`** in the launcher extras. Any new image follows the same path: our own art, uncompressed RGBA DDS, under `textures/interface/dbo/`, listed for the extras. PNG does not load (URLNotFound), and `img://` gives a placeholder.
 
 **Checks:** `tests/native-render.js` draws the ground, gradients, diamonds and the watermark, so its renders at 16:9, 16:10 and 21:9 are the review picture, and `CHECK=1` is the overlap check every panel must pass at all three. A new panel adds its scenes to the renderer.
+
+## 12. The web panels' look (3 Nov, trade, player menu, board, journal)
+
+Nat asked for the native panels to look like the web ones. Section 11 still holds; this is the layer over it, taken from `skymp5-front/src/dbo-theme.scss`. Where the two disagree, **the web look wins** for a panel that opts in. It lives in **`lib/dbo-web.as`**, listed in the panel's `lib.txt` after `dbo.as` and `dbo-controls.as` (after `dbo-flow.as` too when the panel uses it), so a panel that does not list it builds byte for byte as before.
+
+**Domain.** Every web widget wears its part of the world's hue; so does the panel. Call `webLook(domain)` at the top of the frame script, before anything draws. From then on `C_ACCENT` (tab marks, the focus wash, corners, chips) is that hue.
+
+| domain | for | accent / deep |
+|---|---|---|
+| `aqua` | social and general: menus, journal, party | `#8FD3D0` / `#2F7C80` |
+| `aedric` | the divine: prayer, deity | `#E0BA62` / `#7A5E24` |
+| `lorkhan` | blood and danger: rites, bounties, dungeons, death | `#D65454` / `#6E1E20` |
+| `dragonbreak` | magic, lore and time: skills, books | `#A88CEC` / `#4E3C8A` |
+| `bronze` | work and trade: trade, board, housing, mail, labour | `#D08E54` / `#684020` |
+
+**A panel, in order (in place of section 11's steps 1 and 5):**
+1. `webGround(bg, w, h)`: section 11's ground, plus the domain's deep tint washing down from the top, the Heart's red glowing faintly under the top edge, and the **fracture line** along it (the hue breaking into the Aedra's gold `#E0BA62` at the centre). The glow is linear strips, not a radial fill: only linear gradients are proven to draw in game.
+2. `webDivider(clip, x, y, w)` for every separator: the fracture line with the Heart's red diamond (`#D65454`) in its middle.
+3. **Gold buttons** (`webButton`, the arguments of `button()`) for a panel's primary actions: Accept, Close, Post, Write, Previous / Next. Translucent gold `#E8D6A0` at 16 % behind a gold label, edged at 55 %.
+4. **Chips** (`webChip`) for the lesser controls: filters, sorts, Search..., a row's own action, hand-overs. A hairline of the accent at 40 % round a plain label. A chosen chip is `"on"`: filled and edged brighter. Tabs stay tabs (section 11 step 4).
+5. Buttons the shared rows make (`flowButtons`, `flowEntry`) are skinned after the fact: `webSkinRow(row, "chip" | "gold")` for one row, `webSkinFlow()` for every button on the flow's pages. A list row with its own wash (`washW`) is a row, not a button, and is left alone.
+6. **Lists:** a hairline of the accent at 12-14 % under each row; numbers in the accent.
+7. **Pages:** `pageBar(parent, depth, x, y, w, shown, total, onTurn)` is the footer: Previous, "Page n of m", Next, the ends greyed, nothing when there is one page. `wheelPaging(onTurn)` turns pages with the mouse wheel. The keys (Left / Right, Page Up / Down) still turn too; the footer no longer prints "(Left / Right)".
+8. **A page turn draws as little as it can.** A panel on `dbo-flow` has drawn every page already: call `flowKeep()` right before its `flowShow`, and turn with `flowTurn(n)`, then draw the foot again. A panel with its own list refills the rows it made (trade) rather than making them again.
+
+A tab another worker owns keeps its look until they move it (the journal skips Skills, which is Worker 1's).

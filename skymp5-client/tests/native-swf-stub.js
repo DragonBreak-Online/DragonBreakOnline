@@ -11,10 +11,13 @@ const sourceOf = (menu) => {
   return libs.map((f) => read(`swf/lib/${f}`)).concat(read(`${dir}/scripts/frame_1/DoAction.as`)).join('\n');
 };
 
+// as Flash does, a TextFormat changes only the properties it sets; a whole one (it names the font) is kept as it is, so a
+// harness can still ask whether the box carries the very format it was made with (tests/native-input-format-harness.js)
+const merge = (was, f) => { if (!was || f.font !== undefined) return f; const out = Object.assign({}, was); for (const k of Object.keys(f)) if (f[k] !== undefined && f[k] !== null) out[k] = f[k]; return out; };
 const clip = (name) => {
   const c = { _name: name, _x: 0, _y: 0, _alpha: 100, _visible: true, kids: {} };
   c.createEmptyMovieClip = (n) => { if (c.kids[n]) delete c.kids[n]; const k = clip(n); k._parent = c; c[n] = k; c.kids[n] = k; return k; };
-  c.createTextField = (n, d, x, y, w, h) => { const t = { text: '', textColor: 0, _alpha: 100, _x: x || 0, _y: y || 0, _width: w || 0, _height: h || 0, setNewTextFormat(f) { this.fmt = f; this.textColor = f.color; }, setTextFormat(f) { this.applied = f; } }; c[n] = t; c.kids[n] = t; };
+  c.createTextField = (n, d, x, y, w, h) => { const t = { text: '', textColor: 0, _alpha: 100, _x: x || 0, _y: y || 0, _width: w || 0, _height: h || 0, setNewTextFormat(f) { this.fmt = merge(this.fmt, f); if (f.color !== undefined) this.textColor = f.color; }, setTextFormat(f) { this.applied = merge(this.applied, f); } }; c[n] = t; c.kids[n] = t; };
   c.removeMovieClip = () => { if (c._parent) { delete c._parent[c._name]; delete c._parent.kids[c._name]; } };
   // fills are recorded so tests/native-render.js can draw the panel
   c.fills = [];

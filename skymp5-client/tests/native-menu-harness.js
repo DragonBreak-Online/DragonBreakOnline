@@ -161,9 +161,33 @@ const w = (o) => Object.assign({}, base, o);
   for (let i = 0; i < 30; i++) many.push(entry('c' + i, 'Command ' + i, 'Does thing ' + i + '.'));
   const g = S.boot('dbo_menu');
   g.push(w({ tabs: [{ key: 'all', title: 'All', hints: [], entries: many }] }));
-  check('a long tab pages', /Page 1 of /.test(g.root.dboPanel.foot.pages.text));
+  const where = () => (g.root.dboPanel.foot.pager ? g.root.dboPanel.foot.pager.where.text : '');
+  const gp = (x) => g.root.dboPanel.foot.pager[x];
+  check('a long tab pages', /^Page 1 of /.test(where()) && gp('prev').disabled === true, where());
+  const total = Number(where().split(' of ')[1]);
+  const p1 = cmds(g);
   g.press(39);
-  check('Right turns the page', /Page 2 of /.test(g.root.dboPanel.foot.pages.text));
+  check('Right turns the page', /^Page 2 of /.test(where()) && cmds(g)[0] !== p1[0], where());
+  // 3 Nov polish: a clickable footer and the wheel; a turn shows a page already drawn rather than drawing them all
+  const heads = g.root.dboPanel.head, flowRoot = g.root.dboPanel.flowClip;
+  gp('prev').onRelease();
+  check('clicking Previous turns back, to the same commands', where() === 'Page 1 of ' + total && cmds(g).join() === p1.join(), where());
+  gp('next').onRelease();
+  check('clicking Next turns on', where() === 'Page 2 of ' + total, where());
+  g.wheel(3);
+  check('the wheel up turns back', where() === 'Page 1 of ' + total, where());
+  g.wheel(3);
+  check('...and stops at the first page', where() === 'Page 1 of ' + total, where());
+  g.wheel(-3);
+  check('the wheel down turns on', where() === 'Page 2 of ' + total, where());
+  check('a turn redraws neither the head nor the pages', g.root.dboPanel.head === heads && g.root.dboPanel.flowClip === flowRoot);
+  {
+    const shown = buttons(g).filter((b) => b.label.text.indexOf('Command ') === 0);
+    check('only the commands on the shown page take the focus, in order', shown.length > 0 && shown.every((b) => g.ctx.actions.includes(b)) && g.ctx.actions.every((b, i) => b.idx === i) && !g.ctx.actions.some((b) => !visible(b)), shown.length);
+    g.ctx.setFocus(shown[0].idx);
+    g.press(13);
+    check('Enter on a shown command still runs it', lastRun(g) && lastRun(g).args[1] === shown[0].entry.name, lastRun(g));
+  }
   const tabsMany = [];
   for (let i = 0; i < 14; i++) tabsMany.push({ key: 'k' + i, title: 'Topic number ' + i, hints: [], entries: [entry('x' + i, 'X' + i, 'd')] });
   const r = S.boot('dbo_menu');
