@@ -28,13 +28,23 @@ function flowPage()
    flow.y = 0;
 }
 
-// The clip and y for a block of height h on the current page, or on a new one when it would run off this one
+// The clip and y for a block of height h on the current page, or on a new one when it would run off this one. A heading
+// waiting for its section (flowHeading) is placed first, on the page where it and this block fit together
 function flowNeed(h)
 {
-   if (flow.y > 0 && flow.y + h > BODY_H)
+   flowHeadFlush(h);
+   return flowPlace(h);
+}
+
+function flowPlace(h)
+{
+   // the block right after its heading stays with it, even one taller than the room left (it runs past the foot as a
+   // block taller than a page always did)
+   if (flow.y > 0 && flow.y + h > BODY_H && flow.keep != true)
    {
       flowPage();
    }
+   flow.keep = false;
    var at = {clip: flow.pages[flow.pages.length - 1], y: flow.y, name: "b" + flow.n};
    flow.n++;
    flow.y += h;
@@ -43,7 +53,37 @@ function flowNeed(h)
 
 function flowGap(h)
 {
+   if (flow.head != undefined)
+   {
+      flow.headGap += h;
+      return;
+   }
    flow.y += h;
+}
+
+// A heading never ends a page apart from its section (otome, 3 Nov: the Backstory header on page 1 and its text on page 2).
+// flowHeading only notes it; the next block draws it, on a new page when the heading and that block do not fit together
+var HEAD_H = 40;
+function flowHeadFlush(next)
+{
+   if (flow.head == undefined)
+   {
+      return;
+   }
+   var text = flow.head;
+   var gap = flow.headGap;
+   flow.head = undefined;
+   flow.headGap = 0;
+   if (flow.y > 0 && flow.y + HEAD_H + gap + next > BODY_H)
+   {
+      flowPage();
+   }
+   var at = flowPlace(HEAD_H);
+   var t = dboText(at.clip, at.name, fd(), 0, at.y + 8, BODY_W, 30, dboFmt(F_BOLD, 22, C_TEXT, 1.0), false);
+   t.text = text;
+   dboRule(at.clip, 0, at.y + 36, BODY_W);
+   flow.y += gap;
+   flow.keep = next > 0;
 }
 
 // Wrapped text's height, measured where the player can measure it, else estimated from the characters per line
@@ -63,13 +103,12 @@ function textHeight(t, text, size, w)
    return lines * (size + LINE_GAP) + 4;
 }
 
+// A section heading, kept with the start of its section (flowHeadFlush). Two headings in a row stay together too
 function flowHeading(text)
 {
-   var at = flowNeed(40);
-   var t = dboText(at.clip, at.name, fd(), 0, at.y + 8, BODY_W, 30, dboFmt(F_BOLD, 22, C_TEXT, 1.0), false);
-   t.text = String(text);
-   dboRule(at.clip, 0, at.y + 36, BODY_W);
-   return t;
+   flowHeadFlush(HEAD_H);
+   flow.head = String(text);
+   flow.headGap = 0;
 }
 
 function flowText(text, size, color, indent)
@@ -190,6 +229,8 @@ function pageOf(clip)
 // Shows page n (clamped) and keeps only its controls (and those outside the flow) in the focus order; returns the page count
 function flowShow(n)
 {
+   // a heading with nothing after it still shows
+   flowHeadFlush(0);
    var count = flow.pages.length;
    var shown = Math.max(0, Math.min(count - 1, n));
    for (var i = 0; i < count; i++)
