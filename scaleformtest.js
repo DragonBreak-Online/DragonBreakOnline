@@ -54,6 +54,12 @@ module.exports = (api) => {
       sendPacket(a, { customPacketType: 'dboHudTest' });
       return personal(a, 'HUD test armed. Stay in the world with no menu open. Two bars should show on the left of your screen for about ten seconds, aqua over amber: while they do, press a few keys, move the mouse and click once. Say which bars you saw.');
     }
+    // Does a native panel draw a font built into its own swf (the web's OFL faces, 3 Nov)? The panel reports the engine's
+    // measure of each line; whether each looks like its font is the player's eye
+    if (sub === 'font') {
+      sendPacket(a, { customPacketType: 'dboScaleform', swf: 'dbo_fontprobe', payload: { probe: 'font' }, widget: 0 });
+      return personal(a, 'Opening the font probe: say which numbered lines show text, and whether 3 and 5 look different from 1 and 2.');
+    }
     if (sub === 'fps') {
       sendPacket(a, { customPacketType: 'dboScaleform', swf: 'dbo_fpsprobe', payload: { probe: 'fps', frames: 600 }, widget: 0 });
       return personal(a, 'Opening the frame probe: leave it open about ten seconds while you press a few keys; it closes itself and reports.');
@@ -63,7 +69,7 @@ module.exports = (api) => {
     show(a, 'DBO test panel', ROWS);
     personal(a, 'Opening the test panel. It pauses the game; click Close to come back. /testmenu many and /testmenu wide are the other two.');
     log(`scaleform test panel opened by ${who(a)}`);
-  }, { admin: true, hidden: true, help: '[many|wide|map|mapmenu|ui|itemcard|hud|fps|close] open the Scaleform test panel or arm a client probe' });
+  }, { admin: true, hidden: true, help: '[many|wide|map|mapmenu|ui|itemcard|hud|fps|font|close] open the Scaleform test panel or arm a client probe' });
 
   // A row click. The panel sends "dbo:testRow" with [index] on the shared panel wire, so the client turns it
   // into the same { customPacketType: 'dbo', event, args, widget } packet a browser widget sends and it
@@ -105,6 +111,7 @@ module.exports = (api) => {
   report('itemCardTest', 'item card test');
   report('hudTest', 'HUD test');
   report('fpsProbe', 'frame probe');
+  report('fontProbe', 'font probe');
 
   // The UI probe's answers: whether this game can type in a panel, what was typed, and whether the filters stayed
   onUi('uiProbe', (a, args) => {

@@ -23,8 +23,10 @@ ok(run('hud').customPacketType === 'dboHudTest' && /^HUD test armed/.test(told[0
 ok(run('mapmenu').customPacketType === 'dboMapTest', 'mapmenu arms the M map tests');
 const fps = run('fps');
 ok(fps.customPacketType === 'dboScaleform' && fps.swf === 'dbo_fpsprobe' && fps.payload && fps.payload.frames > 0, 'fps opens the frame probe');
+const font = run('font');
+ok(font.customPacketType === 'dboScaleform' && font.swf === 'dbo_fontprobe' && /numbered lines/.test(told[0]), 'font opens the font probe (3 Nov: OFL fonts built into a panel)');
 ok(run('ui').swf === 'dbo_uiprobe' && run('').swf === 'dbo_testmenu', 'ui and the plain panel are as before');
-for (const ev of ['itemCardTest', 'hudTest', 'fpsProbe', 'mapTest', 'uiProbe']) {
+for (const ev of ['itemCardTest', 'hudTest', 'fpsProbe', 'fontProbe', 'mapTest', 'uiProbe']) {
   const h = ui.get(ev) || [];
   told.length = 0; logs.length = 0;
   if (h.length) h[0](1, [{ end: 'done', x: 1 }]);
