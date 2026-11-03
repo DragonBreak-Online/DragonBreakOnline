@@ -237,14 +237,23 @@ module.exports = (api) => {
     if (isAdmin(a) || courtZoneIds(a).size) return n ? { badge: n } : true;
     return false;
   };
-  const view = (a) => {
+  // A client that draws the journal's Court tab natively gets every court but the one in view as its list entry only, and asks
+  // for another's page when the player picks it (live, 3 Nov: a staff tab passed the 60,000 characters a native panel takes)
+  const nativeCourtTab = (a) => {
+    try { const p = globalThis.__dboPanelState; const c = p && p.native ? p.native.get(a >>> 0) : null; return !!c && c.has('native:journalTab:court'); } catch (e) { return false; }
+  };
+  const view = (a, opts) => {
     const staff = isAdmin(a);
     const mine = courtZoneIds(a);
     const zones = zoneList().filter((z) => staff || mine.has(z.id));
+    const want = opts && opts.focus && typeof opts.focus === 'object' ? String(opts.focus.court || '') : '';
+    const selected = (zones.find((z) => z.id === want) || zones.find((z) => z.id === S.lastZone.get(a >>> 0)) || zones.find((z) => mine.has(z.id)) || zones[0] || {}).id || '';
+    const paged = nativeCourtTab(a);
     return {
       staff, outright: isLead(a),
-      courts: zones.map((z) => zoneView(a, z, mine.has(z.id))),
-      selected: (zones.find((z) => z.id === S.lastZone.get(a >>> 0)) || zones.find((z) => mine.has(z.id)) || zones[0] || {}).id || '',
+      courts: zones.map((z) => (paged && z.id !== selected ? { id: z.id, name: z.name, mine: mine.has(z.id), paged: true } : zoneView(a, z, mine.has(z.id)))),
+      selected,
+      ...(paged ? { paged: true } : {}),
       offers: offersFor(a).map((o) => { const z = zoneById(o.zone); return { id: o.id, zone: o.zone, zoneName: z ? z.name : o.zone, rank: o.rank, title: rankTitle(o.rank, o.zone), from: o.byName, at: o.at, expiresAt: Number(o.at) + OFFER_MS }; }),
     };
   };
