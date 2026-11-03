@@ -277,6 +277,10 @@ export interface MenuState {
   openedAt: number;
   readyAt: number;
   readyFrame: number;
+  // Messages the PANEL has sent on to the server (replay, r.do === "server"), not payloads pushed into the
+  // panel. So "sent=0" in the summary line is normal at ready time and says nothing about whether the payload
+  // arrived: the push is queued, not run, and the summary is written before the queue drains. Misreading this
+  // field as a failed push is what produced 0.3.112's frame-1 gate.
   sent: number;
   // how much of the SWF's outbox string this client has already handled
   outRead: number;

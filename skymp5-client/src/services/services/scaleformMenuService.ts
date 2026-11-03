@@ -428,8 +428,11 @@ export class ScaleformMenuService extends ClientListener {
     for (const a of actions) {
       try {
         if (a.do === "open") {
-          // flags is read by nothing in SKSE, so 0. The SWF answers with "ready" once _global.skse exists,
-          // which is never on frame 1, so nothing may be invoked before then.
+          // flags is read by nothing in SKSE, so 0. The SWF answers with "ready" once it is built, and in
+          // practice that is frame 1 and the push lands there: Nat's session on 3 Nov, "phase=ready 62ms to
+          // ready on frame 1", with the panel drawn. This comment used to say _global.skse "is never on
+          // frame 1, so nothing may be invoked before then", and that reading is what produced 0.3.112's
+          // gate on the frame, which left every panel blank. Do not gate on the frame.
           this.sp.Ui.openCustomMenu(a.swf, 0);
           logTrace(this, "openCustomMenu", a.swf);
         } else if (a.do === "push") {
