@@ -286,7 +286,7 @@ module.exports = (api) => {
   };
   // keep: a redraw keeps the faction panel's nonce, so a faction click in flight is not refused by the clock tick
   // readOnly: another's faction panel, read by staff: guilds.js makes no nonce for them
-  const factionView = (a, keep, readOnly) => { try { return typeof globalThis.__dboFactionPayload === 'function' ? globalThis.__dboFactionPayload(a, !!keep, !!readOnly) : null; } catch (e) { log('journal: faction view failed', e.message); return null; } };
+  const factionView = (a, keep, readOnly, focus) => { try { return typeof globalThis.__dboFactionPayload === 'function' ? globalThis.__dboFactionPayload(a, !!keep, !!readOnly, focus || undefined) : null; } catch (e) { log('journal: faction view failed', e.message); return null; } };
   const superView = (a) => { try { return typeof globalThis.__dboSuperProgress === 'function' ? globalThis.__dboSuperProgress(a) : null; } catch (e) { return null; } };
 
   const payload = (a, st, extra) => Object.assign({
@@ -319,7 +319,7 @@ module.exports = (api) => {
       if (!(member || invites || i.staff || i.courtMember)) return false;
       return invites ? { badge: invites } : true;
     },
-    view: (a, o) => factionView(a, !!(o && o.keep), !!(o && o.readOnly)),
+    view: (a, o) => factionView(a, !!(o && o.keep), !!(o && o.readOnly), o && o.focus && typeof o.focus === 'object' ? String(o.focus.faction || '') : ''),
   };
   SECTIONS.supernatural = { visible: (a, m) => !!memo(m || {}, 'super', () => superView(a)), view: (a, o) => memo((o && o.memo) || {}, 'super', () => superView(a)),
     label: (a, m) => { const v = memo(m || {}, 'super', () => superView(a)); return (v && v.label) || 'Supernatural'; } };

@@ -383,6 +383,30 @@ Date.now = realNow;
   delete globalThis.__dboIsStaff;
 }
 
+// ---- paged for a native journal (live, 3 Nov: a staff Court tab passed the 60,000 characters a native panel takes) ----
+globalThis.__dboPanelState = { native: new Map([[ADMIN >>> 0, new Set(['native:journalTab:court', 'native:journalTab:faction'])]]) };
+{
+  const full = (c) => Array.isArray(c.offices);
+  const v = sec.view(ADMIN, {});
+  const sel = v.courts.find((c) => c.id === v.selected);
+  ok('a native Court tab: the court in view in full, every other as its list entry (id, name, mine)', v.paged === true && v.courts.length > 1 && sel && full(sel)
+    && v.courts.filter((c) => c.id !== v.selected).every((c) => !full(c) && c.paged === true && typeof c.name === 'string' && 'mine' in c), v.courts.map((c) => [c.id, full(c)]));
+  const other = v.courts.find((c) => c.id !== v.selected);
+  const w = sec.view(ADMIN, { focus: { court: other.id } });
+  ok('...asked for another court (focus), that one comes in full and is in view', w.selected === other.id && full(w.courts.find((c) => c.id === other.id)), w.selected);
+  const b = sec.view(GM, {});
+  ok('a browser Court tab gets every court in full, as before', !b.paged && b.courts.every(full), b.courts.map((c) => [c.id, full(c)]));
+  const fp = globalThis.__dboFactionPayload(ADMIN, false, false);
+  const fs1 = fp.factions.find((f) => f.id === fp.selected);
+  ok('a native Faction tab: the faction in view in full, every other as its list entry', fp.paged === true && fp.factions.length > 1 && fs1 && 'canInvite' in fs1
+    && fp.factions.filter((f) => f.id !== fp.selected).every((f) => f.paged === true && !('canInvite' in f) && typeof f.name === 'string' && 'kind' in f), fp.factions.length);
+  const fo = fp.factions.find((f) => f.id !== fp.selected);
+  const fq = globalThis.__dboFactionPayload(ADMIN, false, false, fo.id);
+  ok('...asked for another faction, that one comes in full and is in view', fq.selected === fo.id && 'canInvite' in fq.factions.find((f) => f.id === fo.id), fq.selected);
+  ok('a browser Faction tab gets every faction in full, as before', !globalThis.__dboFactionPayload(GM, false, false).paged);
+}
+delete globalThis.__dboPanelState;
+
 for (const k of ['__dboJournalFresh', '__dboJournalLimited']) delete globalThis[k];
 try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* temp */ }
 console.log(fails ? `${fails} FAILED` : 'all passed');

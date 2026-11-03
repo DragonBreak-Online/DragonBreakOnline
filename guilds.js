@@ -820,19 +820,29 @@ module.exports = (api) => {
   // readOnly: a staff member reading `a`'s journal; no nonce is made or kept for `a`, so nothing in it can act for them
   // A view another module adds to the panel: one that throws costs its own tab, never the panel
   const safeView = (n, a) => { try { return globalThis[n](a >>> 0) || null; } catch (e) { log(`guilds: ${n} failed`, e.message); return null; } };
+  // A client that draws the journal's Faction tab natively (gamemode.js's panel state) gets every faction but the one in view
+  // as its list entry only, and asks for another's page when the player picks it (live, 3 Nov: a staff tab passed the 60,000
+  // characters a native panel takes and went to the browser)
+  const nativeFactionTab = (a) => {
+    try { const p = globalThis.__dboPanelState; const c = p && p.native ? p.native.get(a >>> 0) : null; return !!c && c.has('native:journalTab:faction'); } catch (e) { return false; }
+  };
+  const factionSummary = (v) => (v ? { id: v.id, name: v.name, kind: v.kind, myTitle: v.myTitle, myRank: v.myRank, court: v.court, paged: true } : v);
   const menuPayload = (a, result, resultKind, focusFid, keepNonce, readOnly) => {
     const nonce = readOnly ? '' : keepNonce && ST.nonces.get(a >>> 0) ? ST.nonces.get(a >>> 0) : `${(a >>> 0).toString(16)}-${Date.now().toString(36)}`;
     if (!readOnly) ST.nonces.set(a >>> 0, nonce);
     const mine = membershipsOf(a).map((m) => m.fid);
+    const paged = nativeFactionTab(a);
     // Nate, 2026-09-26: a werewolf pack's members also see the other packs, a vampire clan's the other clans (their circle);
     // cults and everyone else see only their own. Members of a faction outside your own stay hidden (factionView).
     const circles = new Set(mine.map(circleOf).filter(Boolean));
     const list = isAdmin(a) ? [...FACTIONS.keys()] : mine.concat([...FACTIONS.keys()].filter((fid) => !mine.includes(fid) && circles.has(circleOf(fid))));
     const invites = invitesOf(a).map((i) => ({ factionId: i.fid, name: FACTIONS.get(i.fid).name, from: ownDisplay(i.from) }));
+    const selected = focusFid || mine[0] || list[0] || '';
     return {
       type: 'faction', id: WIDGET_ID, nonce, admin: isLeadStaff(a), staff: isAdmin(a), self: a >>> 0,
       roles: Object.keys(ROLES), rankTitleMax: RANK_TITLE_MAX, ranksMax: RANKS_MAX,
-      factions: list.map((fid) => factionView(a, fid)), invites, selected: focusFid || mine[0] || list[0] || '',
+      factions: list.map((fid) => (paged && fid !== selected ? factionSummary(factionView(a, fid)) : factionView(a, fid))), invites, selected,
+      ...(paged ? { paged: true } : {}),
       // The Realm and War tabs (realm.js): territories and their owners, wars, and what this character leads
       realm: typeof globalThis.__dboRealmView === 'function' ? globalThis.__dboRealmView(a >>> 0) : null,
       economy: typeof globalThis.__dboEconomyView === 'function' ? globalThis.__dboEconomyView(a >>> 0) : null,
@@ -856,7 +866,7 @@ module.exports = (api) => {
     openWidget(a, p, true);
   };
   globalThis.__dboFactionMenu = (a) => openMenu(a >>> 0);
-  globalThis.__dboFactionPayload = (a, keepNonce, readOnly) => menuPayload(a >>> 0, '', '', undefined, !!keepNonce, !!readOnly);
+  globalThis.__dboFactionPayload = (a, keepNonce, readOnly, focusFid) => menuPayload(a >>> 0, '', '', focusFid || undefined, !!keepNonce, !!readOnly);
   // journal.js (the F3 hub's tab list): whether the Faction tab shows, without building the whole panel
   // Hold and stronghold factions show on the Court tab (Nate, F3 Q3): counted apart, so journal.js counts them on Faction
   // only for a front that has no Court tab
