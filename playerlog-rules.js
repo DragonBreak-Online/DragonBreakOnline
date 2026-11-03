@@ -418,6 +418,8 @@ clean_(`SCHOOLS MANUAL SKILLBOOK SCHEMATIC READ CONTRACT CHAMPION CHILL REVIVE F
   CITIZEN ELECTION BLACKREACH PURSE BIRTHSIGN CONSEQUENCES`);
 // silvertest.js teaching (Nat, 2 Nov): who(), the order's id, a curse kind and a fixed outcome word; no quote, no free text
 clean_('SILVERTEACH', { roles: R_BY([[/ taught $/, 'student'], [/ offers to teach $/, 'student'], [/ the silver test of $/, 'target'], [/ (?:test )?from $/, 'teacher']]) });
+// capstones.js (Nat, 2 Nov): who(), a skill id, a capstone key and the UTC date; no free text
+clean_('CAPSTONE');
 // Name #TAG parties with no profile (display()): resolved by name and tag, never by the tag alone
 clean_('LEVEL ROPE STRUGGLE', { display: true });
 // The client-judged minigame mismatches: clean, and a security signal
@@ -1519,6 +1521,7 @@ business.js BUSINESS 8aadb66a parsed
 business.js BUSINESS 1cb283fe parsed
 business.js BUSINESS a7c97b52 parsed
 business.js TAX 4f9fe86e clean
+capstones.js CAPSTONE f0b21ae0 clean
 champions.js CHAMPION c06a6bd9 clean
 bossvitals.js VITALS de8f0aeb clean
 bossvitals.js VITALS 8dc9b1fd clean

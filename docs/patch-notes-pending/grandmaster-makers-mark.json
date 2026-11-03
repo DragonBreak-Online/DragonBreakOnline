@@ -1,0 +1,16 @@
+{
+  "title": "Grandmaster Rewards: the Maker's Mark",
+  "date": "",
+  "version": "Server update",
+  "tag": "New",
+  "sections": [
+    {
+      "heading": "The first Grandmaster reward",
+      "items": [
+        "A skill at 100 now brings a Grandmaster reward of its own. The first is here; the rest follow over the next updates.",
+        "Blacksmith: a Grandmaster smith's weapons and armour carry their mark, like \"Steel Sword, forged by Eorlund\". The mark stays through wear and repair.",
+        "Type /capstone to see your Grandmaster reward, once one of your skills reaches 100."
+      ]
+    }
+  ]
+}

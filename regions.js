@@ -492,6 +492,8 @@ module.exports = (api) => {
     if (fuel && verdict !== false && fuel.need && !takeHeld(a, fuel.wood, fuel.need)) log(`regions: could not burn ${fuel.need} firewood for ${who(a)}`);
     if (fuel && verdict !== false && fuel.coalNeed && !takeHeld(a, fuel.coal, fuel.coalNeed)) log(`regions: could not burn ${fuel.coalNeed} charcoal for ${who(a)}`);
     if (verdict !== false && typeof globalThis.__dboSmithCrafted === 'function') { try { globalThis.__dboSmithCrafted(a); } catch (e) { log('regions: smithing count failed', e.message); } }
+    // A Grandmaster smith's mark (capstones.js), counted before the engine hands the item over
+    if (verdict !== false && typeof globalThis.__dboCapstoneCrafted === 'function') { try { globalThis.__dboCapstoneCrafted(a, Number(itemId) >>> 0, count, Number(recipeId) >>> 0); } catch (e) { log('regions: capstone mark failed', e.message); } }
     return verdict;
   };
   craftHook.__dboRegions = true;
