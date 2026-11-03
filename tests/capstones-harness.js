@@ -309,6 +309,47 @@ const named = (a, id) => inv(a).filter((e) => e.baseId === id && e.name);
   const DUNG = fs.readFileSync(path.join(ROOT, 'dungeons.js'), 'utf8');
   ok(DUNG.indexOf('__dboCapstoneBreak(casterId, targetId)') > 0 && DUNG.indexOf('__dboCapstoneBreak(casterId, targetId)') < DUNG.indexOf('const tier = lockpickingTier(casterId);'), 'dungeons.js asks the Breaker before any pick rule');
 
+  // ---- step 5b: Priest, Consecration (staff approve; a sidecar prayer.js re-reads) ----
+  {
+    const here0 = process.cwd();
+    const tmp = fs.mkdtempSync(path.join(require('os').tmpdir(), 'capstones-consecrate-'));
+    process.chdir(tmp);
+    const PRIEST = 0xff000401, STAFFER = 0xff000402, CHAPEL = 0x0005d1;
+    TYPES[CHAPEL] = 'CELL';
+    gm(PRIEST, 'priest');
+    put(PRIEST, 'private.dboDeity', { id: 'mara', name: 'Mara' });
+    put(PRIEST, 'worldOrCellDesc', '3c:Skyrim.esm'); put(PRIEST, 'pos', [100, 200, 300]);
+    const realGetId = mp.getIdFromDesc; mp.getIdFromDesc = (x) => parseInt(String(x).split(':')[0], 16);
+    let reloaded = 0; globalThis.__dboPrayerConsecrated = { reload: () => { reloaded++; } };
+    C = (() => { delete require.cache[path.join(ROOT, 'capstones.js')]; return require(path.join(ROOT, 'capstones.js'))({
+      mp, log: (...x) => logs.push(x.join(' ')), personal: (a, t) => said.push([a, t]), audit: (t) => audits.push(t), who: (a) => `P${(a & 0xfff).toString(16)}`,
+      cfg: { capstones: { enabled: true, priest: { enabled: true } } }, registerChatCommand: (n, f) => cmds.set(n, f), realNameOf: () => 'X',
+      recordOf: (id) => (TYPES[id >>> 0] ? { record: { type: TYPES[id >>> 0], fields: [] } } : null), itemName: () => '?', isAdmin: (a) => a === STAFFER }); })();
+    const file = () => JSON.parse(fs.readFileSync(path.join(tmp, 'consecrated-shrines.json'), 'utf8'));
+    let line = cmd('consecrate', PRIEST);
+    ok(/indoors/.test(line) && !fs.existsSync(path.join(tmp, 'consecrated-shrines.json')), 'outdoors: refused, nothing written', line);
+    put(PRIEST, 'worldOrCellDesc', '5d1:Skyrim.esm');   // verify-formids: ignore - a made-up interior, on purpose
+    line = cmd('consecrate', PRIEST);
+    ok(/ask to consecrate this place to Mara \(c1\)/.test(line) && file().shrines[0].status === 'pending' && C.usedWithin(PRIEST, 'consecrate', 7), 'indoors: a request to staff, the week\'s use spent', line);
+    ok(/a week after/.test(cmd('consecrate', PRIEST)), 'one a week');
+    ok(/Only staff/.test(cmd('consecrate', PRIEST, 'approve c1')), 'a priest cannot approve their own');
+    ok(/c1 Mara by P401/.test(cmd('consecrate', STAFFER, 'list')), 'staff see the waiting one');
+    const r0 = reloaded, a0 = audits.length;
+    ok(/approved/.test(cmd('consecrate', STAFFER, 'approve c1')) && file().shrines[0].status === 'approved' && reloaded === r0 + 1, 'staff approve it: written approved, and prayer.js told to re-read');
+    ok(audits.slice(a0).some((t) => t === 'CAPSTONE P402 approved consecration c1'), '...audited', audits.slice(a0));
+    put(PRIEST, 'private.dboCapstones', {});
+    line = cmd('consecrate', PRIEST);
+    ok(/already a shrine of Mara near here \(c1\)/.test(line), 'a second shrine of the same god close by is refused', line);
+    put(PRIEST, 'pos', [100, 200 + 70 * 400, 300]);
+    cmd('consecrate', PRIEST);
+    ok(/denied/.test(cmd('consecrate', STAFFER, 'deny c2')) && !C.usedWithin(PRIEST, 'consecrate', 7), 'a denial gives the week\'s use back');
+    ok(/removed/.test(cmd('consecrate', STAFFER, 'remove c1')) && file().shrines[0].status === 'removed', 'staff can take an approved shrine away');
+    mp.getIdFromDesc = realGetId; delete globalThis.__dboPrayerConsecrated;
+    process.chdir(here0);
+    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) { /* the OS clears it */ }
+    C = load(ALL4 || CFG);
+  }
+
   // ---- the hooks in the other modules ----
   const ALC = fs.readFileSync(path.join(ROOT, 'alchemy.js'), 'utf8');
   ok((ALC.match(/globalThis\.__dboCapstoneBrewing\(a, (draught\.potion|rec\.id|potion\.id)\);[^\n]*\n\s*give\(entries, \1, 1\);/g) || []).length === 3, 'alchemy.js reports every brew path (the draught, a specialty, a potion) before it gives the potion');

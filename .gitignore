@@ -105,6 +105,8 @@ update-log.json
 schedule.json
 # business.js: businesses, their ledgers and rented chests; each hold's rent tax
 businesses.json
+# Shrines Priest Grandmasters consecrated (capstones.js, prayer.js): runtime, names characters
+consecrated-shrines.json
 taxes.json
 # gamemode.js: every staff command of the last 7 days, for /staffstats and the daily summary
 staff-actions.json
