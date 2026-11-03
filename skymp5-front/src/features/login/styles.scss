@@ -17,6 +17,7 @@
     pointer-events: auto;
     &--content {
       font-family: 'Bankir-Retro', sans-serif;
+      font-variant: small-caps;
       display: flex;
       flex-direction: column;
       z-index: 9999;
@@ -119,6 +120,7 @@
   }
   .skymp-input_text {
     font-family: 'Bankir-Retro', serif;
+    font-variant: small-caps;
     font-style: normal;
     font-weight: normal;
     font-size: 30px;
