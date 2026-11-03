@@ -359,5 +359,125 @@ T.S.beat.clear(); T.S.done.clear(); T.S.nextTake.clear();
 ok(T.takeGate(BODY, PLAYER) === false, '...and a corpse pays it wherever it lies');
 T.S.beat.clear(); T.S.done.clear(); T.S.nextTake.clear();
 
+// ---- NPC-owned chests: the owner comes from the load order (START-HERE open item 7, 3 Nov) -----------------------------
+// Before this a chest nobody had claimed was always "unowned", so with theft on an NPC's chest opened at once and its
+// first take stood. The server reads XOWN off the winning REFR, else off its interior CELL (lookupEspmRecordById), so
+// the stub gives refs and cells raw fields the way the native addon does: { type, data: Uint8Array } plus
+// toGlobalRecordId. Every id here is made up and plugin-free (':x'), so the load order never sees them.
+const NPCCHEST = 0x310, CELLCHEST = 0x311, PLAYERCHEST = 0x312, PFCHEST = 0x313, PLAINCHEST = 0x314, EXTCHEST = 0x315,
+  PLACECHEST = 0x316, HALLCHEST = 0x317;
+const NPC_OWNER = 0x5a0, FACT_OWNER = 0x5a1;
+const HOUSE_CELL = 0x520, PF_CELL = 0x521, PLAIN_CELL = 0x522, WORLD = 0x523, HALL_CELL = 0x524;
+for (const id of [NPCCHEST, CELLCHEST, PLAYERCHEST, PFCHEST, PLAINCHEST, EXTCHEST, PLACECHEST, HALLCHEST]) {
+  BASES[id] = 'c0:Skyrim.esm';   // verify-formids: ignore (the stub's made-up CONT base above)
+}
+const xown = (owner) => {
+  const d = new Uint8Array(4); new DataView(d.buffer).setUint32(0, owner, true);
+  return { type: 'XOWN', data: d };
+};
+// The local id in a field is not the global one: toGlobalRecordId adds 0x01000000 here, so a read that skips it is wrong
+const LOCAL = 0x01000000;
+const RECS = new Map([
+  [NPCCHEST, { type: 'REFR', fields: [{ type: 'NAME', data: new Uint8Array(4) }, xown(NPC_OWNER + LOCAL)] }],
+  [CELLCHEST, { type: 'REFR', fields: [] }],
+  [PLAYERCHEST, { type: 'REFR', fields: [xown(0x7 + LOCAL)] }],
+  [PFCHEST, { type: 'REFR', fields: [] }],
+  [PLAINCHEST, { type: 'REFR', fields: [] }],
+  [EXTCHEST, { type: 'REFR', fields: [] }],
+  [PLACECHEST, { type: 'REFR', fields: [xown(NPC_OWNER + LOCAL)] }],
+  [HALLCHEST, { type: 'REFR', fields: [] }],
+  [HOUSE_CELL, { type: 'CELL', fields: [xown(FACT_OWNER + LOCAL)] }],
+  [PF_CELL, { type: 'CELL', fields: [xown(0xdb1 + LOCAL)] }],
+  [PLAIN_CELL, { type: 'CELL', fields: [] }],
+  [WORLD, { type: 'WRLD', fields: [xown(FACT_OWNER + LOCAL)] }],   // never read as an owner: outdoors is not a cell
+  [HALL_CELL, { type: 'CELL', fields: [xown(FACT_OWNER + LOCAL)] }],
+]);
+const baseLookup = mp.lookupEspmRecordById;
+mp.lookupEspmRecordById = (id) => {
+  const r = RECS.get(id >>> 0);
+  if (r) return { record: r, toGlobalRecordId: (local) => (local - LOCAL) >>> 0 };
+  return baseLookup(id);
+};
+const cellOf = { [NPCCHEST]: PLAIN_CELL, [CELLCHEST]: HOUSE_CELL, [PLAYERCHEST]: PLAIN_CELL, [PFCHEST]: PF_CELL,
+  [PLAINCHEST]: PLAIN_CELL, [EXTCHEST]: WORLD, [PLACECHEST]: PLAIN_CELL, [HALLCHEST]: HALL_CELL };
+for (const [ref, cell] of Object.entries(cellOf)) mp.set(Number(ref), 'worldOrCellDesc', `${cell.toString(16)}:x`);
+
+// A claimed place: PLACECHEST stands in a house profile 7 (PLAYER) holds by its door. HALLCHEST is in a hall of guild-ash.
+const PLACE_REC = { owner: 7, ownerName: 'Olaf' };
+globalThis.__dboHousing = {
+  recordOf: (ref) => ((ref >>> 0) === PLACECHEST ? PLACE_REC : null),
+  ownsRecord: (rec, a) => Number(rec && rec.owner) === PROFILE[a >>> 0],
+  keyOpens: () => false,
+};
+globalThis.__dboGuildsOf = (a) => ((a >>> 0) === PLAYER ? [{ id: 'guild-ash' }] : []);
+globalThis.__dboGuildStorageAt = () => null;
+globalThis.__dboHallFactionAt = (desc) => (String(desc).toLowerCase() === `${HALL_CELL.toString(16)}:x` ? { id: 'guild-ash' } : null);
+
+const fresh = (cfg) => { delete globalThis.__dboChestOwnerCache; const M = load(cfg); M.S.beat.clear(); M.S.done.clear(); M.S.nextTake.clear(); return M; };
+let N = fresh({ actionDelays: { theft: true } });
+// Called through a guard, so the module before this change reports each check failed rather than crashing the run
+const ownerOf = (id) => (typeof N.ownerInPlugins === 'function' ? N.ownerInPlugins(id) : undefined);
+ok(ownerOf(NPCCHEST) === NPC_OWNER, 'an NPC chest: its owner is read off the REFR\'s XOWN, mapped to a global id', ownerOf(NPCCHEST));
+ok(ownerOf(CELLCHEST) === FACT_OWNER, 'a chest with no XOWN takes its interior cell\'s owner');
+ok(ownerOf(EXTCHEST) === 0, 'outdoors the worldspace is not a cell: no owner from it');
+ok(ownerOf(PLAINCHEST) === 0, 'no XOWN on the ref or its cell: unowned');
+ok(ownerOf(0xff000099) === 0, 'a dynamic ref has no plugin record: unowned');
+ok(N.delayApplies(NPCCHEST, PLAYER) === 'theft', 'with theft on, an NPC\'s chest outside a dungeon is theft', N.delayApplies(NPCCHEST, PLAYER));
+ok(N.delayApplies(CELLCHEST, PLAYER) === 'theft', '...and so is one in an NPC household\'s cell');
+ok(N.searchGate(NPCCHEST, OTHER) === false, '...its first activation pays the search');
+N.S.beat.clear(); N.S.done.clear(); N.S.nextTake.clear();
+ok(N.takeGate(NPCCHEST, OTHER) === false, '...and a take with no search behind it is refused: no fast path');
+ok(N.delayApplies(PLAYERCHEST, PLAYER) === '', 'a chest the load order gives the Player: instant');
+ok(N.delayApplies(PFCHEST, PLAYER) === '', '...and one in a PlayerFaction cell (a player house): instant');
+ok(N.delayApplies(PLACECHEST, PLAYER) === '', 'an NPC\'s chest in a house the player holds: their claim beats the plugin owner');
+ok(N.delayApplies(PLACECHEST, OTHER) === 'theft', '...but for someone else it is theft');
+ok(N.delayApplies(HALLCHEST, PLAYER) === '', 'a faction-owned chest in their own guild\'s hall: instant');
+ok(N.delayApplies(HALLCHEST, OTHER) === 'theft', '...and theft for a non-member');
+// The non-owned case must stay instant, both beats: this is the live regression of 3 Nov all over again if it does not
+N.S.beat.clear(); N.S.done.clear(); N.S.nextTake.clear();
+const resyncsBefore = resyncs.length;
+ok(N.searchGate(PLAINCHEST, PLAYER) === undefined, 'an unowned chest, theft on: the first activation stands');
+ok(N.takeGate(PLAINCHEST, PLAYER) === undefined && N.takeGate(PLAINCHEST, PLAYER) === undefined,
+  '...and take-all from it is never refused');
+ok(N.searchGate(EXTCHEST, PLAYER) === undefined && N.takeGate(EXTCHEST, PLAYER) === undefined, '...nor an outdoor one');
+ok(N.S.beat.size === 0 && resyncs.length === resyncsBefore, '...and no beat was started for them, nor a pack resync');
+ok(logs.some((l) => /actiondelays: 310 is owned by 5a0 \(from its ref\)/.test(l)), 'the owner read is logged once, for checking on dev');
+N = fresh({});
+ok(N.delayApplies(NPCCHEST, PLAYER) === '', 'theft off (the default, Nat 3 Nov "dungeons only"): an NPC chest stays instant');
+
+// Mutants for this block: each must break one of the checks above
+const ownerBattery = (M) => [
+  M.delayApplies(NPCCHEST, PLAYER) === 'theft',
+  M.delayApplies(CELLCHEST, PLAYER) === 'theft',
+  M.delayApplies(PLAYERCHEST, PLAYER) === '',
+  M.delayApplies(PFCHEST, PLAYER) === '',
+  M.delayApplies(PLACECHEST, PLAYER) === '',
+  M.delayApplies(HALLCHEST, PLAYER) === '',
+  M.delayApplies(EXTCHEST, PLAYER) === '',
+  M.delayApplies(PLAINCHEST, PLAYER) === '',
+];
+const OWNER_MUTANTS = [
+  ['the plugin owner is never read', (s) => s.replace('const owner = ownerInPlugins(t);', 'const owner = 0;')],
+  ['the cell is never asked', (s) => s.replace("if (r && r.record && String(r.record.type) === 'CELL') owner = xownOf(cell);", '')],
+  ['outdoors the worldspace counts as a cell', (s) => s.replace("String(r.record.type) === 'CELL') owner", 'true) owner')],
+  ['the Player and PlayerFaction are not exempt', (s) => s.replace('if (!owner || PLAYER_OWNERS.has(owner)) return', 'if (!owner) return')],
+  ['the place claim is skipped', (s) => s.replace('if (place) return mayUsePlace', 'if (false) return mayUsePlace')],
+  ['the guild hall is skipped', (s) => s.replace("return guildMayUse(t, a) ? '' : 'theft';", "return 'theft';")],
+  ['the local id is used without toGlobalRecordId', (s) => s.replace('? (r.toGlobalRecordId(local) >>> 0) : 0', '? local : 0')],
+];
+const OSRC = fs.readFileSync(MODULE, 'utf8');
+const oscratch = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-nate-actiondelays-'));
+for (const [what, mutate] of OWNER_MUTANTS) {
+  const src = mutate(OSRC);
+  if (src === OSRC) { fails++; console.log(`FAIL  mutant no longer applies (the code moved): ${what}`); continue; }
+  const file = path.join(oscratch, `o-${Math.random().toString(16).slice(2)}.js`);
+  fs.writeFileSync(file, src);
+  delete globalThis.__dboActionDelayState; delete globalThis.__dboChestOwnerCache;
+  let caught = false;
+  try { caught = ownerBattery(require(file)(Object.assign({}, api, { cfg: { actionDelays: { theft: true } } }))._test).some((r) => !r); } catch (e) { caught = true; }
+  ok(caught, `mutant caught: ${what}`);
+}
+try { fs.rmSync(oscratch, { recursive: true, force: true }); } catch (e) { /* leave it */ }
+
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
 process.exit(fails ? 1 : 0);
