@@ -2005,6 +2005,8 @@ module.exports = (api) => {
   };
   const openBoard = (a, ref, tab) => {
     const st = startOf(a);
+    // One line per open (2 Nov: whether a board was activated at all could not be read from the log)
+    log(`expedition board ${typeof ref === 'number' ? (ref >>> 0).toString(16) : '?'} opened by ${display(a)}: ${boardPostsExpeditions(ref, a) ? (st ? `expeditions from ${st.name}` : 'no hall here') : 'contracts'}${tab ? `, tab ${tab}` : ''}`);
     if (boardPostsExpeditions(ref, a)) return st ? openExpeditions(a, st, tab, ref) : personal(a, WHERE_FROM);
     const zone = (() => { try { const v = globalThis.__dboContractsBoard ? globalThis.__dboContractsBoard.view(a) : null; return v && v.zone; } catch (e) { return ''; } })();
     openExpeditions(a, st || { name: zone || 'this hold' }, 'contracts', ref);
