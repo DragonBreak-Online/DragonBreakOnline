@@ -1,5 +1,5 @@
 {
- "actionDelays": {"enabled": true},
+ "actionDelays": {"enabled": true, "searchSeconds": 1.5, "reopenGuardMs": 250},
  "bossVitals": {"nativeMax": 10000},
  "admins": [
   1
