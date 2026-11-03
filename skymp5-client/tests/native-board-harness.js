@@ -93,6 +93,7 @@ const closed = (t) => t.closed();
   P(t).head.tab2.onRelease();
   const where = () => (P(t).foot.pager ? P(t).foot.pager.where.text : '');
   check('20 notes draw 8 a page', rowsOf(t).length === 8 && where() === 'Page 1 of 3', [rowsOf(t).length, where()]);
+  check('notices are paper cards, four to a row: the fifth starts the second row', rowsOf(t)[4]._y > rowsOf(t)[0]._y && rowsOf(t)[4]._x === rowsOf(t)[0]._x && rowsOf(t)[1]._x > rowsOf(t)[0]._x && rowsOf(t)[0].fills.some((f) => f.gradient && f.gradient.colors[0] === 0xF1F4F4), rowsOf(t).slice(0, 5).map((r) => [r._x, r._y]));
   t.press(39); t.press(39);
   check('Right twice reaches the last page of 4', rowsOf(t).length === 4 && rowsOf(t)[0].label.text === 'Note 16');
   t.press(39);
@@ -137,6 +138,9 @@ const closed = (t) => t.closed();
   const right = (b) => b._x + b.label._width;
   const all = Object.keys(h.kids).filter((k) => /^(tab|ho)\d$/.test(k)).map((k) => h[k]);
   check('every tab and hand-over ends inside the panel (920 less the padding)', all.length === 7 && all.every((b) => right(b) <= 920 - 28), all.map((b) => [b.label.text, right(b)]));
+  // 3 Nov web-art pass: the web board is lorkhan red, its tabs boxed cells, its labels in capitals, its notices paper cards
+  check('the board wears lorkhan red: its open tab is filled with it', h.tab0.fills.some((f) => f.color === 0xD65454) && !h.tab1.fills.some((f) => f.color === 0xD65454), h.tab0.fills.map((f) => f.color));
+  check('tabs show their labels in capitals and still read back as written', h.tab0.label._shown === h.tab0.label.text.toUpperCase() && h.tab0.label.text !== h.tab0.label._shown, [h.tab0.label.text, h.tab0.label._shown]);
   check('the hand-overs are a second row in the same weight as the tabs', h.ho0._y > h.tab0._y && h.ho0.label.fmt.font === h.tab0.label.fmt.font && h.ho2.label.text === 'Voting');
   const long = Object.assign({}, board, { notes: [{ id: 9, tab: 'hold', author: 'Jarl Narri', text: new Array(12).fill('A long line of the decree of the Jarl that wraps across the page.').join(' '), ageHours: 1, canRemove: true }] });
   t.push(long);

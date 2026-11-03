@@ -28,7 +28,8 @@ function webLook(domain)
 function webGround(clip, w, h)
 {
    dboGround(clip, w, h);
-   dboGradientBox(clip, 2, 2, w - 4, h * 0.45, [C_ACCENT_DEEP, C_ACCENT_DEEP], [34, 0], [0, 255], Math.PI / 2);
+   // dbo-panel's tint: accent-deep at 42 % at the top, 14 % by 45 %, 5 % at the foot
+   dboGradientBox(clip, 2, 2, w - 4, h - 4, [C_ACCENT_DEEP, C_ACCENT_DEEP, C_ACCENT_DEEP], [42, 14, 5], [0, 115, 255], Math.PI / 2);
    // the web's radial glow, from linear fills only (the kind every panel already draws in game): strips that fade out
    // to both sides, each fainter and narrower than the one above
    var strips = 12;
@@ -62,17 +63,19 @@ function webDivider(clip, x, y, w)
    dboPoly(clip, [[cx, y - 4], [cx + 4, y], [cx, y + 4], [cx - 4, y]], C_LORKHAN, 100);
 }
 
-// The web's controls drawn over a button() (its label is w wide and size + 8 high): "gold" is dbo-theme's dbo-button,
-// translucent gold behind a gold label and edged in gold; "chip" its filter and sort chips, a hairline of the domain hue
-// round a plain label; "on" a chosen chip, filled and edged brighter. The label is centred; a disabled one stays grey
+// The web's controls drawn over a button() (its label is w wide and size + 8 high), as the web panels draw theirs:
+// "gold" (dbo-theme's dbo-button) a primary action, translucent gold behind a gold label and edged in gold; "chip" a
+// lesser one, the same gold fainter; "on" a chosen chip, filled with the domain hue. The label is centred and shown in
+// capitals (webCaption); a disabled one stays grey
 function webSkin(b, kind)
 {
    var w = b.label._width;
    var h = b.label._height + 2;
-   var c = kind == "gold" ? C_GOLD : C_ACCENT;
-   var fill = kind == "gold" ? 16 : kind == "on" ? 16 : 5;
-   var edge = kind == "gold" ? 55 : kind == "on" ? 90 : 40;
+   var c = kind == "on" ? C_ACCENT : C_GOLD;
+   var fill = kind == "gold" ? 16 : kind == "on" ? 20 : 7;
+   var edge = kind == "gold" ? 60 : kind == "on" ? 85 : 38;
    b.clear();
+   dboBox(b, 0, 0, w, h, 0x000000, 30);
    dboBox(b, 0, 0, w, h, c, fill);
    dboBox(b, 0, 0, w, 1, c, edge);
    dboBox(b, 0, h - 1, w, 1, c, edge);
@@ -82,10 +85,76 @@ function webSkin(b, kind)
    f.align = "center";
    b.label.setTextFormat(f);
    b.label.setNewTextFormat(f);
-   if (kind == "gold" && b.disabled != true)
+   webCaption(b.label, b.label.text);
+   // a label in a colour that means something (a red Clear, a gold blessing) keeps it
+   if (b.disabled != true && b.label.textColor == C_TEXT)
    {
-      b.label.textColor = C_GOLD;
+      b.label.textColor = kind == "on" ? C_SILVER : C_GOLD;
    }
+   return b;
+}
+
+// The web sets its labels and tabs in capitals (text-transform): the field shows the text in capitals and keeps what the
+// code gave it in .caption, so a panel (or a harness) that reads the label back still finds its own words
+function webCaption(tf, text)
+{
+   tf.caption = String(text);
+   tf.text = String(text).toUpperCase();
+}
+
+// A round dot of radius r at cx, cy (a notice's pin, a badge), drawn with curves
+function webDot(clip, cx, cy, r, color, alpha)
+{
+   var k = r * 0.4142;
+   var m = r * 0.7071;
+   clip.beginFill(color, alpha);
+   clip.moveTo(cx + r, cy);
+   clip.curveTo(cx + r, cy + k, cx + m, cy + m);
+   clip.curveTo(cx + k, cy + r, cx, cy + r);
+   clip.curveTo(cx - k, cy + r, cx - m, cy + m);
+   clip.curveTo(cx - r, cy + k, cx - r, cy);
+   clip.curveTo(cx - r, cy - k, cx - m, cy - m);
+   clip.curveTo(cx - k, cy - r, cx, cy - r);
+   clip.curveTo(cx + k, cy - r, cx + m, cy - m);
+   clip.curveTo(cx + r, cy - k, cx + r, cy);
+   clip.endFill();
+}
+
+// A panel's title set as the web sets it: centred over the panel where the web centres it, in a colour of its own
+// where the web gives one (trade's is the domain hue)
+function webTitleAt(tf, align, color)
+{
+   var f = new TextFormat();
+   f.align = align;
+   tf.setTextFormat(f);
+   tf.setNewTextFormat(f);
+   if (color != undefined)
+   {
+      tf.textColor = color;
+   }
+   return tf;
+}
+
+// A tab as the web draws its tab row: a box per tab, the open one filled with the domain hue and edged in it, the rest
+// a dark cell edged in stone. Replaces dboTabMark's underline
+function webTab(b, on)
+{
+   var w = b.label._width;
+   var h = b.label._height + 4;
+   b.clear();
+   dboBox(b, 0, -2, w, h, on ? C_ACCENT : 0x000000, on ? 22 : 28);
+   var edge = on ? C_ACCENT : C_STONE;
+   var a = on ? 85 : 45;
+   dboBox(b, 0, -2, w, 1, edge, a);
+   dboBox(b, 0, h - 3, w, on ? 2 : 1, edge, on ? 100 : a);
+   dboBox(b, 0, -2, 1, h, edge, a);
+   dboBox(b, w - 1, -2, 1, h, edge, a);
+   var f = new TextFormat();
+   f.align = "center";
+   b.label.setTextFormat(f);
+   b.label.setNewTextFormat(f);
+   webCaption(b.label, b.label.text);
+   b.label.textColor = on ? C_SILVER : C_SECOND;
    return b;
 }
 

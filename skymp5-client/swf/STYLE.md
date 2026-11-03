@@ -207,11 +207,11 @@ Nat asked for the native panels to look like the web ones. Section 11 still hold
 
 | domain | for | accent / deep |
 |---|---|---|
-| `aqua` | social and general: menus, journal, party | `#8FD3D0` / `#2F7C80` |
+| `aqua` | social and general: menus, party | `#8FD3D0` / `#2F7C80` |
 | `aedric` | the divine: prayer, deity | `#E0BA62` / `#7A5E24` |
-| `lorkhan` | blood and danger: rites, bounties, dungeons, death | `#D65454` / `#6E1E20` |
-| `dragonbreak` | magic, lore and time: skills, books | `#A88CEC` / `#4E3C8A` |
-| `bronze` | work and trade: trade, board, housing, mail, labour | `#D08E54` / `#684020` |
+| `lorkhan` | blood and danger: rites, bounties, notice boards, dungeons, death | `#D65454` / `#6E1E20` |
+| `dragonbreak` | magic, lore and time: journal, skills, books | `#A88CEC` / `#4E3C8A` |
+| `bronze` | work and trade: trade, housing, mail, labour | `#D08E54` / `#684020` |
 
 **A panel, in order (in place of section 11's steps 1 and 5):**
 1. `webGround(bg, w, h)`: section 11's ground, plus the domain's deep tint washing down from the top, the Heart's red glowing faintly under the top edge, and the **fracture line** along it (the hue breaking into the Aedra's gold `#E0BA62` at the centre). The glow is linear strips, not a radial fill: only linear gradients are proven to draw in game.
@@ -222,5 +222,16 @@ Nat asked for the native panels to look like the web ones. Section 11 still hold
 6. **Lists:** a hairline of the accent at 12-14 % under each row; numbers in the accent.
 7. **Pages:** `pageBar(parent, depth, x, y, w, shown, total, onTurn)` is the footer: Previous, "Page n of m", Next, the ends greyed, nothing when there is one page. `wheelPaging(onTurn)` turns pages with the mouse wheel. The keys (Left / Right, Page Up / Down) still turn too; the footer no longer prints "(Left / Right)".
 8. **A page turn draws as little as it can.** A panel on `dbo-flow` has drawn every page already: call `flowKeep()` right before its `flowShow`, and turn with `flowTurn(n)`, then draw the foot again. A panel with its own list refills the rows it made (trade) rather than making them again.
+
+**The domain comes from `skymp5-front/src/constructor.js` DOMAINS**, never from a guess: the web board is lorkhan and the journal dragonbreak.
+
+**Matching a web panel (3 Nov, from screenshots of the real web panels, `_work/native-polish-preview/web/`):**
+- Labels, tabs and buttons are set in capitals at draw time (`webCaption`; `webSkin` and `webTab` do it). The field keeps what the code gave it in `.caption`, so code and harnesses read their own words back. A reason set by `disable(c, why)` replaces the label: call `webCaption` again after it.
+- Tabs are boxed cells (`webTab(button, open)`): the open one filled and edged in the domain hue. A long tab row is even cells (the journal: at most 8 to a row, the pinned ones last).
+- Titles sit where the web puts them: `webTitleAt(tf, "center", colour)` (board and menu centred; trade centred in the domain hue).
+- A label in a colour that means something (a red Clear) keeps it; only plain labels turn gold.
+- The board's notices are pinned paper cards, four to a row (`webDot` for the pin).
+- **Fonts:** the web's Bankir-Retro, Futura PT and DIN Pro are not licensed for redistribution (they came with Adobe software) and are never embedded. Body text is Skyrim's own Futura Condensed (`$EverywhereFont`), which the web uses too. Any display face we add must be open-licensed (OFL), its licence file beside it.
+- **Images:** an image the web shows is our own art as an uncompressed RGBA DDS under `textures/interface/dbo/` (section 11), loaded at run time, never embedded in a swf. Nothing from `skymp5-front/src/img/skyrim` (a Nexus pack).
 
 A tab another worker owns keeps its look until they move it (the journal skips Skills, which is Worker 1's).

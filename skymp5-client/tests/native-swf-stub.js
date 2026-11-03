@@ -17,7 +17,13 @@ const merge = (was, f) => { if (!was || f.font !== undefined) return f; const ou
 const clip = (name) => {
   const c = { _name: name, _x: 0, _y: 0, _alpha: 100, _visible: true, kids: {} };
   c.createEmptyMovieClip = (n) => { if (c.kids[n]) delete c.kids[n]; const k = clip(n); k._parent = c; c[n] = k; c.kids[n] = k; return k; };
-  c.createTextField = (n, d, x, y, w, h) => { const t = { text: '', textColor: 0, _alpha: 100, _x: x || 0, _y: y || 0, _width: w || 0, _height: h || 0, setNewTextFormat(f) { this.fmt = merge(this.fmt, f); if (f.color !== undefined) this.textColor = f.color; }, setTextFormat(f) { this.applied = merge(this.applied, f); } }; c[n] = t; c.kids[n] = t; };
+  c.createTextField = (n, d, x, y, w, h) => { const t = { text: '', textColor: 0, _alpha: 100, _x: x || 0, _y: y || 0, _width: w || 0, _height: h || 0, setNewTextFormat(f) { this.fmt = merge(this.fmt, f); if (f.color !== undefined) this.textColor = f.color; }, setTextFormat(f) { this.applied = merge(this.applied, f); } };
+    // dbo-web.as shows a caption in capitals (webCaption) and keeps what the code set in .caption: a harness reads the caption back,
+    // as it would have before, and the renderer draws what the player sees (_shown)
+    let shown = '';
+    Object.defineProperty(t, 'text', { enumerable: true, get() { return this.caption !== undefined && shown === String(this.caption).toUpperCase() ? this.caption : shown; }, set(v) { shown = v; } });
+    Object.defineProperty(t, '_shown', { get() { return shown; } });
+    c[n] = t; c.kids[n] = t; };
   c.removeMovieClip = () => { if (c._parent) { delete c._parent[c._name]; delete c._parent.kids[c._name]; } };
   // fills are recorded so tests/native-render.js can draw the panel
   c.fills = [];

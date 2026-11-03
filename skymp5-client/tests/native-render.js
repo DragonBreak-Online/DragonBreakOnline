@@ -64,14 +64,15 @@ const toHtml = (root) => {
     for (const k of Object.keys(c.kids)) {
       const t = c.kids[k];
       if (t.kids) { walk(t, nx, ny, nsx, nsy, na); continue; }
-      if (typeof t.text !== 'string' || t.text === '') continue;
+      const shownText = t._shown !== undefined ? t._shown : t.text;
+      if (typeof shownText !== 'string' || shownText === '') continue;
       const fm = t.fmt || {};
       const size = (fm.size || 18) * nsy;
       const input = t.type === 'input';
       out.push(`<div style="position:absolute;left:${nx + (t._x || 0) * nsx}px;top:${ny + (t._y || 0) * nsy}px;width:${(t._width || 200) * nsx}px;height:${(t._height || 24) * nsy}px;`
         + `overflow:hidden;white-space:${t.wordWrap ? 'pre-wrap' : 'pre'};font:${FONTS[fm.font] || 400} ${size}px/1.2 'Futura Condensed';letter-spacing:${(fm.letterSpacing || 0) * nsx}px;`
         + `text-align:${(t.applied && t.applied.align) || fm.align || 'left'};color:${hex(t.textColor === undefined ? fm.color : t.textColor)};opacity:${na * ((t._alpha === undefined ? 100 : t._alpha) / 100)};`
-        + `${input ? 'background:#101010;outline:1px solid #5a5a5a;' : ''}">${esc(t.text)}</div>`);
+        + `${input ? 'background:#101010;outline:1px solid #5a5a5a;' : ''}">${esc(shownText)}</div>`);
     }
   };
   walk(root, 0, 0, 1, 1, 1);
