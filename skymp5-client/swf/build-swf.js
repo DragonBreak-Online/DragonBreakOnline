@@ -65,6 +65,24 @@ if (!fs.existsSync(stage)) {
   console.error('xml2swf produced nothing');
   process.exit(1);
 }
+// swf/<name>/fonts.txt embeds fonts: each line "<fontID> <file under swf/fonts/>" fills that placeholder DefineFont3 in
+// the xml (its name, ascent and descent are the xml's) with the TTF's glyphs. Only OFL fonts live in swf/fonts/, each
+// with its OFL.txt
+const fontList = path.join(srcDir, 'fonts.txt');
+if (fs.existsSync(fontList)) {
+  for (const line of fs.readFileSync(fontList, 'utf8').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'))) {
+    const sp = line.indexOf(' ');
+    const ttf = path.join(here, 'fonts', line.slice(sp + 1).trim());
+    if (sp < 0 || !fs.existsSync(ttf)) {
+      console.error('fonts.txt: no such font ' + line);
+      process.exit(1);
+    }
+    const withFont = stage + '.font.swf';
+    run(['-replace', stage, withFont, line.slice(0, sp), ttf]);
+    fs.renameSync(withFont, stage);
+  }
+}
+
 run(['-importScript', stage, final, stagedScripts]);
 if (!fs.existsSync(final)) {
   console.error('importScript produced nothing');

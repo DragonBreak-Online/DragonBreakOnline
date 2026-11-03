@@ -1,0 +1,3 @@
+# <fontID in dbo_fontprobe.xml> <file under swf/fonts/>
+1 barlowcondensed/BarlowCondensed-Medium.ttf
+2 bigshouldersdisplay/BigShouldersDisplay[wght].ttf

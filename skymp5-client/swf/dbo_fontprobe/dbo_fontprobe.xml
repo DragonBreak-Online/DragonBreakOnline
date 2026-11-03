@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Base structure for the font embedding probe. Ours, written by hand, not derived from any Bethesda or mod file.
+Two placeholder DefineFont3 tags that build-swf.js fills from fonts.txt with OFL fonts (swf/fonts/, each with its
+OFL.txt): 1 "DboBody" (Barlow Condensed Medium), 2 "DboTitle" (Big Shoulders Display, a variable font). FFDec's font
+import keeps the tag's own name, ascent and descent, so they are set here: ascent 1.0 em and descent 0.2 em on
+DefineFont3's 20480-unit em, from the TTFs' hhea (both have unitsPerEm 1000, ascender 1000, descender -200).
+Everything visible is created at runtime by scripts/frame_1/DoAction.as.
+Stage is 1280x720 in twips (x20). The custom menu is loaded with ScaleModeType::kNoBorder, so it scales.
+-->
+<swf _xmlExportMajor="2" _xmlExportMinor="2" type="SWF" charset="UTF-8" compression="NONE" encrypted="false" frameCount="1" frameRate="30.0" gfx="false" hasEndTag="true" version="15">
+  <displayRect type="RECT" Xmax="25600" Xmin="0" Ymax="14400" Ymin="0" nbits="16"/>
+  <tags>
+    <item type="FileAttributesTag" actionScript3="false" forceWriteAsLong="false" hasMetadata="false" noCrossDomainCache="false" reservedA="false" reservedB="0" swfRelativeUrls="false" useDirectBlit="false" useGPU="false" useNetwork="false"/>
+    <item type="DefineFont3Tag" forceWriteAsLong="false" fontID="1" fontFlagsHasLayout="true" fontFlagsShiftJIS="false" fontFlagsSmallText="false" fontFlagsANSI="false" fontFlagsWideOffsets="true" fontFlagsWideCodes="true" fontFlagsItalic="false" fontFlagsBold="false" fontName="DboBody" fontAscent="20480" fontDescent="4096" fontLeading="0">
+      <languageCode type="LANGCODE" languageCode="0"/>
+      <glyphShapeTable/>
+      <codeTable/>
+      <fontAdvanceTable/>
+      <fontBoundsTable/>
+      <fontKerningTable/>
+    </item>
+    <item type="DefineFont3Tag" forceWriteAsLong="false" fontID="2" fontFlagsHasLayout="true" fontFlagsShiftJIS="false" fontFlagsSmallText="false" fontFlagsANSI="false" fontFlagsWideOffsets="true" fontFlagsWideCodes="true" fontFlagsItalic="false" fontFlagsBold="false" fontName="DboTitle" fontAscent="20480" fontDescent="4096" fontLeading="0">
+      <languageCode type="LANGCODE" languageCode="0"/>
+      <glyphShapeTable/>
+      <codeTable/>
+      <fontAdvanceTable/>
+      <fontBoundsTable/>
+      <fontKerningTable/>
+    </item>
+    <item type="DoActionTag" forceWriteAsLong="false" actionBytes="00"/>
+    <item type="ShowFrameTag" forceWriteAsLong="false"/>
+  </tags>
+</swf>
