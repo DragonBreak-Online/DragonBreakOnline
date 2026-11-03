@@ -237,6 +237,18 @@ module.exports = (api) => {
     const src = Number(sourceId) >>> 0, a = Number(actorId) >>> 0;
     if (!isPlayer(a)) return undefined;
     if (ownHome(src, a)) return undefined;
+    // Nat, 3 Nov: the beat is scoped to dungeons and theft, and a container it skips is not throttled
+    // here either - not the gap, and not the body beat below. searchGate returns before writing S.done
+    // for such a container, and the body beat reads a missing S.done as "never searched", so leaving
+    // this below it charged every ordinary chest 3 s and refused its first take. The refusal resyncs the
+    // pack, which closes the open container, so players reopened a chest for every single item (live,
+    // 3 Nov, 327 resyncs in one night). Taking from a container the player may use - Aldemar emptying his
+    // own alchemy barrel - must never be throttled: take-all fires one take per item, so refusing them
+    // told him "your hands are full" and put the whole lot back.
+    //
+    // A corpse is not a container and keeps both beats everywhere: scoping bodies too cost two of the
+    // harness's own assertions, which was the harness being right.
+    if (recordType(src) === 'CONT' && !delayApplies(src, a)) return undefined;
     const now = Date.now();
     const key = `${a}:${src}`;
     // A source this player has not searched pays the body beat on its first take. A container has already paid it on
@@ -262,13 +274,6 @@ module.exports = (api) => {
       S.nextTake.set(a, now + MS(C.takeSeconds));
       return undefined;
     }
-    // Nat, 3 Nov: the gap between takes is scoped like the search, but only for CONTAINERS. Taking from
-    // a container the player may use - Aldemar emptying his own alchemy barrel - must never be
-    // throttled: take-all fires one take per item, so refusing them told him "your hands are full" and
-    // put the whole lot back. A corpse is not a container and keeps its gap everywhere, along with the
-    // body beat above: scoping bodies too cost two of this harness's own assertions, which was the
-    // harness being right.
-    if (recordType(src) === 'CONT' && !delayApplies(src, a)) return undefined;
     const next = S.nextTake.get(a) || 0;
     if (now < next) {
       tell(a, 'gap', 'Your hands are full for a moment.');

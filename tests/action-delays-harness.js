@@ -342,5 +342,22 @@ T.S.done.set(ownKey, clock);
 T.S.nextTake.set(PLAYER, clock + 5 * SEC);
 ok(T.takeGate(CHEST, PLAYER) === false, '...but a dungeon container still waits takeSeconds');
 
+// ---- the first take from an ordinary chest, with nothing searched (live bug, 3 Nov) -----------------------------------
+// The block above sets S.done itself, which is the one precondition live never has: the search does not run
+// for these containers, so S.done is empty and the take lands in the body-beat branch. That branch refused
+// it, and the refusal resyncs the pack, which closes the container. Without the exemption above the body
+// beat, both assertions here fail.
+T.S.beat.clear(); T.S.done.clear(); T.S.nextTake.clear();
+mp.set(CHEST, 'worldOrCellDesc', '');                  // an ordinary chest: no dungeon, no claim
+ok(T.takeGate(CHEST, PLAYER) === undefined, 'an ordinary chest, never searched: the first take stands');
+ok(T.takeGate(CHEST, PLAYER) === undefined, '...and so does the next, with no beat left behind');
+ok(T.S.beat.size === 0, '...and no beat was started for it at all');
+mp.set(CHEST, 'worldOrCellDesc', '000' + DUNGEON_CELL);
+T.S.beat.clear(); T.S.done.clear(); T.S.nextTake.clear();
+ok(T.takeGate(CHEST, PLAYER) === false, 'a dungeon chest opened without a search still pays the body beat');
+T.S.beat.clear(); T.S.done.clear(); T.S.nextTake.clear();
+ok(T.takeGate(BODY, PLAYER) === false, '...and a corpse pays it wherever it lies');
+T.S.beat.clear(); T.S.done.clear(); T.S.nextTake.clear();
+
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
 process.exit(fails ? 1 : 0);
