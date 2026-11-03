@@ -22,11 +22,20 @@
 //   Blade, Sword-Master's School /swordschool: two apprentices, whose Blade hits on their master in a duel between them
 //                                are worth sparRate (skillrates.js asks __dboCapstoneSkillRate)
 //   Arcane, Arch-Magister's Chair schools.js's apprenticeship: one more apprentice, half the study (asks __dboCapstones)
+// Once a UTC day:
+//   Blunt, Breaker of Doors      /breaker, then a locked dungeon chest smashed open (dungeons.js asks __dboCapstoneBreak)
+//   Miner, Prospector's Sense    /prospect: the nearest vein of the rarest ore near (ore-veins.private.json, never tracked)
+//   Cook, The Feast              /feast: up to 10 around the cook sated and Well Fed (rest.js) for hours, once a day each
+//   Defense, Shield over the Fallen /shieldover: a downed player cannot be finished for 60 s while the guard holds
+//                                (downed.js asks __dboCapstoneGuarded; a stagger, a guard break or stepping away ends it)
+//   Martial Arts, Second Wind    the first down of the day with fists or a staff and no heavy armour stands again at
+//                                once (downed.js asks __dboCapstoneSecondWind)
 'use strict';
 const path = require('path');
 
 module.exports = (api) => {
-  const { mp, log, personal, audit, who, cfg, registerChatCommand, realNameOf, itemName, recordOf, findByName, distanceMeters, profileOf, discordOf } = api;
+  const { mp, log, personal, audit, who, cfg, registerChatCommand, realNameOf, itemName, recordOf, findByName, distanceMeters, profileOf, discordOf, weaponSkillOf, sate } = api;
+  const onlineActors = typeof api.onlineActors === 'function' ? api.onlineActors : () => [];
   const ITEMNAMES_JS = path.join(__dirname, 'itemnames.js');
   delete require.cache[ITEMNAMES_JS];
   const N = require(ITEMNAMES_JS);
@@ -41,6 +50,11 @@ module.exports = (api) => {
     enchanter: 'Named Enchantment: once a week, an enchanted item named by you.',
     blade: 'Sword-Master\'s School: up to two apprentices, who learn faster sparring with you.',
     arcane: 'Arch-Magister\'s Chair: one more apprentice, taught in half the time.',
+    blunt: 'Breaker of Doors: once a day, smash open a locked dungeon chest (/breaker).',
+    miner: 'Prospector\'s Sense: once a day, sense the nearest rare vein (/prospect).',
+    cook: 'The Feast: once a day, feed everyone around you (/feast).',
+    defense: 'Shield over the Fallen: once a day, stand over a fallen friend so nobody finishes them (/shieldover).',
+    unarmed: 'Second Wind: once a day, the first time you go down fighting with fists or a staff, you stand again.',
   };
 
   const get = (a, k, d) => { try { const v = mp.get(a >>> 0, k); return v === undefined || v === null ? d : v; } catch (e) { return d; } };
@@ -317,11 +331,151 @@ module.exports = (api) => {
     return Math.max(1, Math.min(2, Number(B.sparRate) || 1));
   };
 
+  // ---- once a day: Blunt, Miner, Cook, Defense, Martial Arts (step 4) -----------------------------------------------
+  const D = (skill) => Object.assign({}, C[skill] || {});
+  const now = () => Date.now();
+  const wornEntries = (a) => entriesOf(a).filter((e) => e.worn || e.wornLeft);
+  const heldSkills = (a) => wornEntries(a).filter((e) => typeOf(Number(e.baseId) >>> 0) === 'WEAP').map((e) => weaponSkillOf(Number(e.baseId) >>> 0));
+  const BOD2_HEAVY = 1;
+  const heavyWorn = (a) => wornEntries(a).some((e) => {
+    const r = recordOf(Number(e.baseId) >>> 0);
+    if (!r || String(r.record.type) !== 'ARMO') return false;
+    const f = (r.record.fields || []).find((x) => x && x.type === 'BOD2' && x.data instanceof Uint8Array && x.data.byteLength >= 5);
+    return !!f && f.data[4] === BOD2_HEAVY;
+  });
+  const spentLine = 'Today\'s use is spent; it returns at midnight UTC.';
+
+  // Blunt, Breaker of Doors: once a day, a locked dungeon chest smashed open instead of picked, with a war axe, mace,
+  // battleaxe or warhammer in hand. dungeons.js asks before it starts the pick (__dboCapstoneBreak); jail cells, homes,
+  // halls and shops never reach that path, so they are never broken. /breaker arms the next lock for armMinutes
+  globalThis.__dboCapstoneBreak = (a, targetId) => {
+    a >>>= 0;
+    if (!on('blunt') || !armedFor(a, 'breaker') || !isGrandmaster(a, 'blunt') || usedToday(a, 'breaker')) return false;
+    if (!heldSkills(a).includes('blunt')) { personal(a, 'Breaking a lock takes a war axe, mace, battleaxe or warhammer in hand.'); return false; }
+    ARMED.delete(a);
+    markUsed(a, 'breaker', 'blunt');
+    log(`capstones: ${who(a)} broke the lock on ${(targetId >>> 0).toString(16)}`);
+    return true;
+  };
+  registerChatCommand('breaker', (a) => {
+    if (!on('blunt') || !isGrandmaster(a, 'blunt')) return personal(a, 'Breaking locks open is a Grandmaster of Blunt\'s.');
+    if (usedToday(a, 'breaker')) return personal(a, spentLine);
+    ARMED.set(a >>> 0, { kind: 'breaker', at: now() });
+    return personal(a, `The next locked dungeon chest you open in the next ${C.armMinutes} minutes, weapon in hand, you smash open.`);
+  }, { help: 'Grandmaster of Blunt: smash open the next locked dungeon chest (once a day)' });
+
+  // Miner, Prospector's Sense: once a day, the way and the distance to the nearest vein of the rarest ore within
+  // miner.meters, in the cell or worldspace the miner stands in. The veins come from ore-veins.private.json (tools/capstones/
+  // ore_veins.py over the live load order: Bethesda-derived positions, so never tracked), read once a load
+  const VEINS = (() => {
+    try { const v = JSON.parse(require('fs').readFileSync(path.resolve(String(D('miner').veinsFile || 'ore-veins.private.json')), 'utf8')); return Array.isArray(v.veins) ? v.veins : []; } catch (e) { return []; }
+  })();
+  const RARITY = (D('miner').rarity || ['Stalhrim', 'Ebony', 'Adamantium', 'Mithril', 'Moonstone', 'Meteoric', 'Malachite', 'Orichalcum', 'Coruscate', 'Quicksilver', 'Amber', 'Gold', 'Silver', 'Corundum', 'Iron']).map((x) => String(x).toLowerCase());
+  // The first name an editor id holds is its ore (MineOreMeteoricIron is Meteoric, not Iron); copper, tin, zinc and geodes are not rare
+  const rankOf = (edid) => { const e = String(edid || '').toLowerCase(); const i = RARITY.findIndex((r) => e.includes(r)); return i < 0 ? RARITY.length : i; };
+  const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+  const prospect = (a) => {
+    let world = '', p = null;
+    try { world = String(mp.get(a, 'worldOrCellDesc') || '').toLowerCase(); p = mp.get(a, 'pos'); } catch (e) { return null; }
+    if (!Array.isArray(p)) return null;
+    const max = Number(D('miner').meters || 3000) * 70;
+    let best = null;
+    for (const v of VEINS) {
+      if (String(v.world || '').toLowerCase() !== world || !Array.isArray(v.pos)) continue;
+      const d = Math.hypot(v.pos[0] - p[0], v.pos[1] - p[1], v.pos[2] - p[2]);
+      if (d > max) continue;
+      const r = rankOf(v.edid);
+      if (r >= RARITY.length) continue;
+      if (!best || r < best.r || (r === best.r && d < best.d)) best = { r, d, v };
+    }
+    if (!best) return null;
+    // Skyrim's +Y is north, +X east
+    const deg = (Math.atan2(best.v.pos[0] - p[0], best.v.pos[1] - p[1]) * 180 / Math.PI + 360) % 360;
+    return { ore: RARITY[best.r], meters: Math.round(best.d / 70), way: COMPASS[Math.round(deg / 45) % 8] };
+  };
+  registerChatCommand('prospect', (a) => {
+    if (!on('miner') || !isGrandmaster(a, 'miner')) return personal(a, 'Prospector\'s Sense is a Grandmaster Miner\'s.');
+    if (usedToday(a, 'prospect')) return personal(a, spentLine);
+    if (!VEINS.length) return personal(a, 'The mountain is quiet today. (No vein survey is loaded on this server.)');
+    const f = prospect(a);
+    if (!f) return personal(a, 'You listen to the rock, and nothing rare answers near here. Today\'s sense is not spent.');
+    markUsed(a, 'prospect', 'miner');
+    return personal(a, `The rock hums: ${f.ore} lies ${f.way} of you, about ${f.meters} m away.`);
+  }, { help: 'Grandmaster Miner: sense the nearest rare vein (once a day)' });
+
+  // Cook, The Feast: once a day the Cook serves up to cook.guests people within cook.meters: each is sated and Well Fed
+  // (rest.js's slower hunger) for cook.wellFedHours, once a UTC day per guest
+  registerChatCommand('feast', (a) => {
+    if (!on('cook') || !isGrandmaster(a, 'cook')) return personal(a, 'Serving a feast is a Grandmaster Cook\'s.');
+    if (usedToday(a, 'feast')) return personal(a, spentLine);
+    const K = Object.assign({ guests: 10, meters: 5, wellFedHours: 6 }, D('cook'));
+    const near = onlineActors().filter((t) => (t >>> 0) !== (a >>> 0) && Number(distanceMeters(a, t)) <= Number(K.meters));
+    const fed = [];
+    for (const t of [a >>> 0].concat(near)) {
+      if (fed.length >= Number(K.guests) + 1) break;
+      if ((t >>> 0) !== (a >>> 0) && usedToday(t, 'feastGuest')) continue;
+      try { if (typeof sate === 'function') sate(t); } catch (e) { /* hunger off */ }
+      const was = get(t, 'private.dboWellFed', null);
+      const until = Math.max(Number(was && was.until) || 0, now() + Number(K.wellFedHours) * 3600000);
+      try { mp.set(t, 'private.dboWellFed', { until }); } catch (e) { continue; }
+      if ((t >>> 0) !== (a >>> 0)) { const s = Object.assign({}, get(t, PROP, {})); s.feastGuest = today(); try { mp.set(t, PROP, s); } catch (e) { /* kept for the day anyway */ } personal(t, `${who(a)} serves a feast. You eat your fill: well fed for ${K.wellFedHours} hours.`); }
+      fed.push(t);
+    }
+    if (fed.length < 2) return personal(a, 'Nobody is here to feast with you, or they have feasted today already. Today\'s feast is not spent.');
+    markUsed(a, 'feast', 'cook');
+    return personal(a, `You serve a feast to ${fed.length - 1} guest${fed.length === 2 ? '' : 's'}. Everyone is well fed for ${K.wellFedHours} hours.`);
+  }, { help: 'Grandmaster Cook: serve a feast to those around you (once a day)' });
+
+  // Defense, Shield over the Fallen: once a day, standing over a downed player (downed.js __dboIsDowned) within
+  // defense.meters, the Grandmaster keeps them from being finished for defense.seconds. It ends on the guard's stagger or
+  // guard break (combat.js __dboCombat), on stepping away, or on the time; downed.js asks __dboCapstoneGuarded first
+  const GUARDS = globalThis.__dboCapstoneGuards instanceof Map ? globalThis.__dboCapstoneGuards : (globalThis.__dboCapstoneGuards = new Map()); // fallen -> { guard, at, until }
+  const DEF = () => Object.assign({ seconds: 60, meters: 2 }, D('defense'));
+  globalThis.__dboCapstoneGuarded = (fallen, by) => {
+    const g = GUARDS.get(fallen >>> 0);
+    if (!g) return false;
+    const cs = (globalThis.__dboCombat instanceof Map && globalThis.__dboCombat.get(g.guard)) || {};
+    const down = typeof globalThis.__dboIsDowned === 'function' && globalThis.__dboIsDowned(fallen >>> 0);
+    const ends = !down || now() > g.until || Number(cs.staggerAt) > g.at || Number(cs.guardBrokenUntil) > now() || !(Number(distanceMeters(g.guard, fallen)) <= Number(DEF().meters));
+    if (ends) { GUARDS.delete(fallen >>> 0); return false; }
+    if ((by >>> 0) === g.guard) return false;
+    personal(by, `${who(g.guard)} stands over them, shield up.`);
+    return true;
+  };
+  registerChatCommand('shieldover', (a, args) => {
+    if (!on('defense') || !isGrandmaster(a, 'defense')) return personal(a, 'Shield over the Fallen is a Grandmaster of Defense\'s.');
+    if (usedToday(a, 'shieldover')) return personal(a, spentLine);
+    const q = String(args || '').trim();
+    const t = q ? findByName(q) : onlineActors().find((x) => (x >>> 0) !== (a >>> 0) && typeof globalThis.__dboIsDowned === 'function' && globalThis.__dboIsDowned(x) && Number(distanceMeters(a, x)) <= Number(DEF().meters));
+    if (!t || typeof globalThis.__dboIsDowned !== 'function' || !globalThis.__dboIsDowned(t)) return personal(a, 'Nobody fallen is here to stand over.');
+    if (!(Number(distanceMeters(a, t)) <= Number(DEF().meters))) return personal(a, 'Stand over them first.');
+    GUARDS.set(t >>> 0, { guard: a >>> 0, at: now(), until: now() + Number(DEF().seconds) * 1000 });
+    markUsed(a, 'shieldover', 'defense');
+    personal(t, `${who(a)} stands over you, shield up.`);
+    return personal(a, `You stand over ${who(t)}. For ${DEF().seconds} seconds nobody finishes them while you hold your ground.`);
+  }, { help: 'Grandmaster of Defense: stand over a fallen friend so nobody finishes them (once a day)' });
+
+  // Martial Arts, Second Wind: once a day, the first time the Grandmaster goes down fighting with fists or a staff and no
+  // heavy armour, they stand again at once (downed.js asks __dboCapstoneSecondWind as the down lands)
+  globalThis.__dboCapstoneSecondWind = (a) => {
+    a >>>= 0;
+    if (!on('unarmed') || !isGrandmaster(a, 'unarmed') || usedToday(a, 'secondwind')) return false;
+    const held = heldSkills(a);
+    if (held.some((s) => s !== 'unarmed') || heavyWorn(a)) return false;
+    markUsed(a, 'secondwind', 'unarmed');
+    return true;
+  };
+
   // ---- /capstone ------------------------------------------------------------------------------------------------------
   const STATUS = {
     alchemist: (a) => (usedToday(a, 'signature') ? ' Today\'s signature draught is brewed; the next after midnight UTC.' : ' Today\'s is ready: /signature, then brew.'),
     enchanter: (a) => (usedWithin(a, 'enchantname', 7) ? ` Named last on ${lastUse(a, 'enchantname')}; the next a week after.` : ' Ready: /enchantname <name>, then enchant.'),
     tailor: () => ' /bespoke <name> names your next garment.',
+    blunt: (a) => (usedToday(a, 'breaker') ? ` ${spentLine}` : ' Ready.'),
+    miner: (a) => (usedToday(a, 'prospect') ? ` ${spentLine}` : ' Ready.'),
+    cook: (a) => (usedToday(a, 'feast') ? ` ${spentLine}` : ' Ready.'),
+    defense: (a) => (usedToday(a, 'shieldover') ? ` ${spentLine}` : ' Ready.'),
+    unarmed: (a) => (usedToday(a, 'secondwind') ? ` ${spentLine}` : ' Ready.'),
     blade: (a) => { const n = schoolOf(a).length; return ` ${n} of ${B.apprentices} apprentices; /swordschool take <name>.`; },
   };
   registerChatCommand('capstone', (a) => {

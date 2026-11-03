@@ -1,0 +1,19 @@
+{
+  "title": "Grandmaster Rewards: once a day",
+  "date": "",
+  "version": "Server update",
+  "tag": "New",
+  "sections": [
+    {
+      "heading": "Five more Grandmaster rewards, each once a day (resets at midnight UTC)",
+      "items": [
+        "Blunt (at 100): type /breaker, then open a locked dungeon chest within ten minutes with a war axe, mace, battleaxe or warhammer in hand: you smash the lock open instead of picking it.",
+        "Miner (at 100): type /prospect to sense which way the nearest rare vein lies, and how far. If nothing rare is near, the day's use is kept.",
+        "Cook (at 100): type /feast to serve everyone within a few steps, up to ten guests: all of you eat your fill and are Well Fed for six hours. Each guest can be fed at one feast a day.",
+        "Defense (at 100): stand over a fallen player and type /shieldover. For a minute nobody can finish them, unless you are staggered, your guard breaks, or you step away.",
+        "Martial Arts (at 100): the first time each day you go down fighting with fists or a staff, and not in heavy armour, you get straight back up with a little health.",
+        "/capstone shows your reward and whether today's use is ready."
+      ]
+    }
+  ]
+}

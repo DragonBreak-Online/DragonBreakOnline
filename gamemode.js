@@ -987,7 +987,7 @@ const HELP_GROUPS = [
       'Introducing yourself, trading, inspecting or challenging someone to a duel: look at them and press X.', 'Emotes: press B.', 'Hiding your face: press H.',
       'Letters by pigeon, and yours to read: a notice board. A bird flies only to someone you have met.',
       'Everyone you have met: the ledger at a notice board or in your home (/ledger).'] },
-  { key: 'character', title: 'Your character', names: ['status', 'boost', 'referral', 'appearance', 'playtime', 'birthsign', 'capstone', 'bespoke', 'signature', 'enchantname', 'swordschool'],
+  { key: 'character', title: 'Your character', names: ['status', 'boost', 'referral', 'appearance', 'playtime', 'birthsign', 'capstone', 'bespoke', 'signature', 'enchantname', 'swordschool', 'breaker', 'prospect', 'feast', 'shieldover'],
     hints: ['Your journal: press F3. Profile, stats, skills, magic, your god, and settings such as your keys.',
       'A new look: /appearance reopens the appearance editor (gold, once a day; race, sex and name stay).',
       'Your birthsign: /birthsign. It is chosen once, and only staff can change it.',
@@ -10756,8 +10756,9 @@ try {
 try {
   const CAPSTONES_JS = path.resolve('capstones.js');
   delete require.cache[CAPSTONES_JS];
-  require(CAPSTONES_JS)({ mp, log, personal, audit, who, cfg, registerChatCommand, realNameOf, recordOf, itemName: (d) => adminItemName(d), findByName, distanceMeters, profileOf, discordOf });
-} catch (e) { log('capstones.js failed to load:', e.stack || e.message); for (const k of ['__dboCapstoneCrafted', '__dboCapstones', '__dboCapstoneWoven', '__dboCapstoneBrewing', '__dboCapstoneEnchanting', '__dboCapstoneSkillRate']) globalThis[k] = null; }
+  require(CAPSTONES_JS)({ mp, log, personal, audit, who, cfg, registerChatCommand, realNameOf, recordOf, itemName: (d) => adminItemName(d), findByName, distanceMeters, profileOf, discordOf, weaponSkillOf, onlineActors,
+    sate: (a) => { if (!NEEDS.enabled) return; const n = needsOf(a); n.hunger = 0; applyNeedsStage(a, n, true); saveNeeds(a, n); } });
+} catch (e) { log('capstones.js failed to load:', e.stack || e.message); for (const k of ['__dboCapstoneCrafted', '__dboCapstones', '__dboCapstoneWoven', '__dboCapstoneBrewing', '__dboCapstoneEnchanting', '__dboCapstoneSkillRate', '__dboCapstoneBreak', '__dboCapstoneGuarded', '__dboCapstoneSecondWind']) globalThis[k] = null; }
 // ---- the Tailor's ranks gate what a loom makes (server\tailoring.js, config "tailoring"; Nate, 12 Oct): after smithing.js ----
 try {
   const TAILORING_JS = path.resolve('tailoring.js');

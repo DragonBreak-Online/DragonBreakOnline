@@ -1776,6 +1776,13 @@ module.exports = (api) => {
       const opened = () => { if (!lease.looted.has(targetId)) { lease.looted.add(targetId); if (!lease.stocked) { for (const pid of lease.members) { const a = actorByProfile(pid); if (a) glow(a, [targetId], false); } } scholarGift(casterId, SCHOLAR_CHEST, 'among the chest\'s things'); ebonyGift(casterId, lease, 'chest'); } };
       if (!lease.locked.has(targetId) || lease.unlocked.has(targetId)) { opened(); return null; }
       const level = lease.locked.get(targetId);
+      const unlock = (a, how) => {
+        lease.unlocked.add(targetId);
+        for (const pid of lease.members) { const m = actorByProfile(pid); if (m) { glow(m, [targetId], false, 'locked'); if (holdsLoot(lease, targetId) && glowOn(lease.id, 'loot')) glow(m, [targetId], true, 'loot'); } }
+        system(a, how);
+      };
+      // A Grandmaster of Blunt smashes it open once a day, any lock, no pick (capstones.js, Breaker of Doors)
+      try { if (typeof globalThis.__dboCapstoneBreak === 'function' && globalThis.__dboCapstoneBreak(casterId, targetId)) { unlock(casterId, `You smash the ${LOCK_LEVELS[level]} lock open. Open the chest.`); return false; } } catch (e) { log('dungeons: capstone break failed', e.message); }
       const tier = lockpickingTier(casterId);
       // Anyone with a pick may try a lock up to dungeons.untrainedMaxLock (default 1, Apprentice), at lockpick.js's odds
       // for their tier; the levels above need a Lockpicker of that tier. Untrained picks are how Lockpicking is found:
@@ -1793,11 +1800,7 @@ module.exports = (api) => {
       if (lock) {
         if (!lock.busy(casterId)) lock.begin(casterId, {
           target: targetId, level, label: 'Chest',
-          onSuccess: (a) => {
-            lease.unlocked.add(targetId);
-            for (const pid of lease.members) { const m = actorByProfile(pid); if (m) { glow(m, [targetId], false, 'locked'); if (holdsLoot(lease, targetId) && glowOn(lease.id, 'loot')) glow(m, [targetId], true, 'loot'); } }
-            system(a, `The ${LOCK_LEVELS[level]} lock gives way. Open the chest.`);
-          },
+          onSuccess: (a) => unlock(a, `The ${LOCK_LEVELS[level]} lock gives way. Open the chest.`),
         });
         return false;
       }
