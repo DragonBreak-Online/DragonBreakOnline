@@ -6,10 +6,11 @@
 export type Json = Record<string, unknown>;
 
 // utils/uiSettings.ts UI_DEFAULTS and ONE_OF, VITALS_FADE_CHOICES
-export const UI_DEFAULTS: Json = { vitals: "fade", vitalsStyle: "quiet", vitalsFadeSeconds: 5, chat: "fade", chatLettering: "book" };
+// nativeMenus and nativeScale (Nat, 3 Nov): the game's own panels on or off, and their size (scaleformMenuService)
+export const UI_DEFAULTS: Json = { vitals: "fade", vitalsStyle: "quiet", vitalsFadeSeconds: 5, chat: "fade", chatLettering: "book", nativeMenus: "on", nativeScale: 0.85 };
 const UI_ONE_OF: Record<string, unknown[]> = {
   vitals: ["always", "fade", "hidden"], vitalsStyle: ["classic", "quiet"], chat: ["always", "fade", "hidden"], chatLettering: ["book", "plain"],
-  vitalsFadeSeconds: [3, 5, 10],
+  vitalsFadeSeconds: [3, 5, 10], nativeMenus: ["on", "off"], nativeScale: [0.6, 0.7, 0.75, 0.85, 1, 1.1, 1.2],
 };
 // The chat's own values and the SettingsTab controls' ranges
 const CHAT_DEFAULTS: Json = { fontSize: 16, chatTransparency: 25, fadeSeconds: 10, hidePlayerNames: false, showFormIds: true, customHighlights: "" };

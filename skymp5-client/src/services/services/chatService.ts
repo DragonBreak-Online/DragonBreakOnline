@@ -376,6 +376,8 @@ export class ChatService extends ClientListener {
     }
     if (e.arguments[0] === "cef::chat:saveSettings") {
       this.writeChatSettings(String(e.arguments[1] ?? ""));
+      // The web page's Settings may have turned the game's own panels on or off (ScaleformMenuService sets this hook)
+      try { const f = (globalThis as any).__dboUiSettingsSaved; if (typeof f === "function") f(); } catch { /* the panels are announced at the next connect */ }
       return;
     }
     if (e.arguments[0] === "cef::chat:send") {

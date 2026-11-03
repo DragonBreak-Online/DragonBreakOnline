@@ -33,9 +33,10 @@ check('close is still the close', W.replayFor('close', [])[1].do === 'close');
 // ---- the file, read and changed as the browser does ----
 check('parseFile reads the "//" + JSON plugin', J(L.parseFile('//{"fontSize":18}')) === '{"fontSize":18}');
 check('...an empty file is {}, a broken one null (never written over)', J(L.parseFile('')) === '{}' && L.parseFile('//{broken') === null && L.parseFile('//[1]') === null);
-check('readUi: the browser\'s defaults with no ui block', J(L.readUi({})) === J({ vitals: 'fade', vitalsStyle: 'quiet', vitalsFadeSeconds: 5, chat: 'fade', chatLettering: 'book' }));
-check('...a saved choice wins, a value no control offers does not', J(L.readUi({ ui: { vitals: 'hidden', chat: 'loud', vitalsFadeSeconds: 7 } })) === J({ vitals: 'hidden', vitalsStyle: 'quiet', vitalsFadeSeconds: 5, chat: 'fade', chatLettering: 'book' }));
+check('readUi: the browser\'s defaults with no ui block', J(L.readUi({})) === J({ vitals: 'fade', vitalsStyle: 'quiet', vitalsFadeSeconds: 5, chat: 'fade', chatLettering: 'book', nativeMenus: 'on', nativeScale: 0.85 }));
+check('...a saved choice wins, a value no control offers does not', J(L.readUi({ ui: { vitals: 'hidden', chat: 'loud', vitalsFadeSeconds: 7 } })) === J({ vitals: 'hidden', vitalsStyle: 'quiet', vitalsFadeSeconds: 5, chat: 'fade', chatLettering: 'book', nativeMenus: 'on', nativeScale: 0.85 }));
 check('readChat: the chat\'s values and SettingsTab\'s defaults', J(L.readChat({ fontSize: 18, showFormIds: false })) === J({ fontSize: 18, chatTransparency: 25, fadeSeconds: 10, hidePlayerNames: false, showFormIds: false, customHighlights: '' }));
+check('the native menus and their size are kept as offered, nothing else', J(L.readUi({ ui: { nativeMenus: 'off', nativeScale: 0.7 } })).includes('"nativeMenus":"off","nativeScale":0.7') && J(L.cleanUi({ nativeMenus: 'maybe', nativeScale: 0.5 })) === '{}' && J(L.cleanUi({ nativeMenus: 'off', nativeScale: 1.2 })) === J({ nativeMenus: 'off', nativeScale: 1.2 }));
 check('cleanUi keeps only offered values', J(L.cleanUi({ vitals: 'always', vitalsFadeSeconds: 10, chat: 'x', fov: 90, evil: 1 })) === J({ vitals: 'always', vitalsFadeSeconds: 10 }));
 check('cleanChat: the ranges and kinds of the controls', J(L.cleanChat({ fontSize: 23, chatTransparency: 35, fadeSeconds: 0, hidePlayerNames: 'yes', customHighlights: 'gold', ui: {} })) === J({ chatTransparency: 35, fadeSeconds: 0, customHighlights: 'gold' }));
 check('...highlights longer than the field\'s 300 are refused', J(L.cleanChat({ customHighlights: 'x'.repeat(301) })) === '{}');

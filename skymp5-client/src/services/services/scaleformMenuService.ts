@@ -25,6 +25,7 @@ export interface NativeOpen {
   askedAt?: number;
 }
 import { withClientUiCaps } from "../../lib/clientUiCaps";
+import { ChatService } from "./chatService";
 
 // A real Skyrim Scaleform panel driven from the server, instead of the CEF overlay (Nat, 25 Oct).
 //
@@ -41,6 +42,8 @@ export class ScaleformMenuService extends ClientListener {
     super();
     this.controller.emitter.on("customPacketMessage", (e) => this.onCustomPacketMessage(e));
     this.controller.on("modEvent", (e) => this.onModEvent(e));
+    // chatService calls this when the web page saves the Interface settings (it cannot import this service: a cycle)
+    (globalThis as any).__dboUiSettingsSaved = () => this.settingsChanged();
     this.controller.on("update", () => this.onUpdate());
     this.controller.on("buttonEvent", (e) => this.onButtonEvent(e));
     this.controller.emitter.on("connectionAccepted", () => this.announce("connected"));
@@ -434,7 +437,8 @@ export class ScaleformMenuService extends ClientListener {
           const screen = this.screenSize();
           if (screen) this.sp.Ui.invokeString(MENU_NAME, "_root.dboScreen", screen);
           // the player's panel size (nativeScale), the whole movie about the stage's centre
-          const r = rootScaleFor(nativeScaleOf(this.clientSetting("nativeScale")));
+          const local = this.localUi();
+          const r = rootScaleFor(nativeScaleOf(local.nativeScale !== undefined ? local.nativeScale : this.clientSetting("nativeScale")));
           this.sp.Ui.setFloat(MENU_NAME, "_root._xscale", r.xscale);
           this.sp.Ui.setFloat(MENU_NAME, "_root._yscale", r.yscale);
           this.sp.Ui.setFloat(MENU_NAME, "_root._x", r.x);
@@ -515,6 +519,23 @@ export class ScaleformMenuService extends ClientListener {
     }
   }
 
+  // The Interface settings this PC saved (F3 Settings, the chat-settings file's ui block), which win over the settings file
+  private localUi(): Record<string, unknown> {
+    try {
+      const chat = this.controller.lookupListener(ChatService);
+      const file = chat ? chat.readSettingsFile() : null;
+      const ui = file && file["ui"];
+      return ui && typeof ui === "object" && !Array.isArray(ui) ? (ui as Record<string, unknown>) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  // A change to the Interface settings: the native panels are announced again, so turning them off or on needs no relaunch
+  public settingsChanged(): void {
+    this.announce("settings changed");
+  }
+
   private clientSetting(key: string): unknown {
     try {
       const all = this.sp.settings["skymp5-client"] as Record<string, unknown> | undefined;
@@ -525,6 +546,8 @@ export class ScaleformMenuService extends ClientListener {
   }
 
   private nativePanelsSetting(): unknown {
+    // "Native menus: off" in F3 Settings: every panel in the browser
+    if (this.localUi().nativeMenus === "off") return false;
     try {
       const all = this.sp.settings["skymp5-client"] as Record<string, unknown> | undefined;
       return all ? all["nativePanels"] : undefined;

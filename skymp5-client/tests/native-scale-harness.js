@@ -36,7 +36,15 @@ behaviour(load(SRC), check);
 
 const svc = fs.readFileSync(path.join(ROOT, 'src', 'services', 'services', 'scaleformMenuService.ts'), 'utf8').replace(/\r\n/g, '\n');
 check('the service scales the root with every payload, after the screen size and before the data',
-  /_root\.dboScreen", screen\);\n[^\n]*\n\s*const r = rootScaleFor\(nativeScaleOf\(this\.clientSetting\("nativeScale"\)\)\);\n(\s*this\.sp\.Ui\.setFloat\(MENU_NAME, "_root\._(xscale|yscale|x|y)", r\.\w+\);\n){4}/.test(svc));
+  /_root\.dboScreen", screen\);\n[^\n]*\n\s*const local = this\.localUi\(\);\n\s*const r = rootScaleFor\(nativeScaleOf\(local\.nativeScale !== undefined \? local\.nativeScale : this\.clientSetting\("nativeScale"\)\)\);\n(\s*this\.sp\.Ui\.setFloat\(MENU_NAME, "_root\._(xscale|yscale|x|y)", r\.\w+\);\n){4}/.test(svc));
+
+// Nat, 3 Nov: "Native menus" and the size in F3 Settings, saved in the chat-settings file's ui block
+check('"Native menus: off" turns every native panel off (the caps go out empty)', /private nativePanelsSetting\(\): unknown \{\n\s*\/\/[^\n]*\n\s*if \(this\.localUi\(\)\.nativeMenus === "off"\) return false;/.test(svc));
+check('a change in F3 Settings announces the native panels again (no relaunch)', /public settingsChanged\(\): void \{\n\s*this\.announce\("settings changed"\);/.test(svc)
+  && /this\.service\(ScaleformMenuService, \(s\) => s\.settingsChanged\(\)\);/.test(fs.readFileSync(path.join(ROOT, 'src', 'services', 'services', 'settingsNativeService.ts'), 'utf8')));
+check('...and so does a save from the web page (chatService calls the hook the service sets)', /__dboUiSettingsSaved = \(\) => this\.settingsChanged\(\);/.test(svc)
+  && /if \(typeof f === "function"\) f\(\);/.test(fs.readFileSync(path.join(ROOT, 'src', 'services', 'services', 'chatService.ts'), 'utf8')));
+check('the saved size wins over the settings file', /local\.nativeScale !== undefined \? local\.nativeScale : this\.clientSetting\("nativeScale"\)/.test(svc));
 
 const MUTANTS = [
   ['no clamp at the top', 'Math.min(exports.NATIVE_SCALE.max, ', '('],
