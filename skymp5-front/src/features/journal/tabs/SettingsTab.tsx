@@ -6,6 +6,7 @@ import { Picker } from '../../../components/Picker/Picker';
 import {
   ChatLettering, ChatMode, UiSettings, VITALS_FADE_CHOICES, VitalsMode, VitalsStyle,
   chatSettingsFile, setChatSettings, setUiSettings, useUiSettings,
+  NativeMenus, NATIVE_SCALE_CHOICES,
 } from '../../../utils/uiSettings';
 
 // The F3 hub's Settings tab (specs/f3-hub-design.md 3.7). Settings belong to the player's PC: nothing here is sent to
@@ -113,6 +114,16 @@ const InterfacePart = () => {
             onClick={() => { try { if (w().dboResetPanelScales) w().dboResetPanelScales(Date.now()); } catch (e) { /* none */ } setReset(true); }}>
             {reset ? 'Every panel is back to its size' : 'Reset every panel\'s size'}
           </button>
+        </Row>
+      </section>
+      <section className="jset__group">
+        <h2 className="journal__heading">Game menus</h2>
+        <Row label="Native menus" hint={ui.nativeMenus === 'off' ? 'Every panel opens on this page instead.' : 'The game\'s own panels, drawn by Skyrim. Off opens every panel on this page instead.'}>
+          <Chips<NativeMenus> label="Native menus" value={ui.nativeMenus} onChange={(v) => ui2({ nativeMenus: v })} options={[['on', 'On'], ['off', 'Off']]} />
+        </Row>
+        <Row label="Menu size" hint="The game's own panels, from the next one you open.">
+          <Chips<number> label="Menu size" value={ui.nativeScale} onChange={(v) => ui2({ nativeScale: v })}
+            options={NATIVE_SCALE_CHOICES.map((n) => [n, `${Math.round(n * 100)}%`] as [number, string])} />
         </Row>
       </section>
       <section className="jset__group">

@@ -10,6 +10,7 @@ export type VitalsMode = 'always' | 'fade' | 'hidden';
 export type VitalsStyle = 'classic' | 'quiet';
 export type ChatMode = 'always' | 'fade' | 'hidden';
 export type ChatLettering = 'book' | 'plain';
+export type NativeMenus = 'on' | 'off';
 
 export interface UiSettings {
   vitals: VitalsMode;
@@ -18,18 +19,23 @@ export interface UiSettings {
   vitalsFadeSeconds: number;
   chat: ChatMode;
   chatLettering: ChatLettering;
+  // The game's own panels on or off, and their size (the client's scaleformMenuService; Nat, 3 Nov)
+  nativeMenus: NativeMenus;
+  nativeScale: number;
 }
 
 // Nate, 3 Oct (F3 Q6, final): everyone's default is bars Fade when full in the Quiet style, chat Fade when idle, Book
 // lettering; Hidden until T is offered only. A choice saved in F3, Settings wins.
-export const UI_DEFAULTS: UiSettings = { vitals: 'fade', vitalsStyle: 'quiet', vitalsFadeSeconds: 5, chat: 'fade', chatLettering: 'book' };
+export const UI_DEFAULTS: UiSettings = { vitals: 'fade', vitalsStyle: 'quiet', vitalsFadeSeconds: 5, chat: 'fade', chatLettering: 'book', nativeMenus: 'on', nativeScale: 0.85 };
 // Until the chat has mounted with the saved file, today's look holds, so a saved choice never flashes the default first
-export const BEFORE_FILE: UiSettings = { vitals: 'always', vitalsStyle: 'classic', vitalsFadeSeconds: 5, chat: 'always', chatLettering: 'plain' };
+export const BEFORE_FILE: UiSettings = { vitals: 'always', vitalsStyle: 'classic', vitalsFadeSeconds: 5, chat: 'always', chatLettering: 'plain', nativeMenus: 'on', nativeScale: 0.85 };
 const fileRead = (): boolean => { try { const f = win().__alduinakChatSettings; return !!f && typeof f === 'object'; } catch (e) { return false; } };
 
 const ONE_OF: { [K in keyof UiSettings]?: string[] } = {
   vitals: ['always', 'fade', 'hidden'], vitalsStyle: ['classic', 'quiet'], chat: ['always', 'fade', 'hidden'], chatLettering: ['book', 'plain'],
+  nativeMenus: ['on', 'off'],
 };
+export const NATIVE_SCALE_CHOICES = [0.6, 0.7, 0.75, 0.85, 1, 1.1, 1.2];
 export const VITALS_FADE_CHOICES = [3, 5, 10];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -51,6 +57,7 @@ export const getUiSettings = (): UiSettings => {
     }
   }
   if (!VITALS_FADE_CHOICES.includes(out.vitalsFadeSeconds)) out.vitalsFadeSeconds = base.vitalsFadeSeconds;
+  if (!NATIVE_SCALE_CHOICES.includes(out.nativeScale)) out.nativeScale = base.nativeScale;
   return out;
 };
 
