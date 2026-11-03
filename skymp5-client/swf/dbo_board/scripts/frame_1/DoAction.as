@@ -3,7 +3,9 @@
 // the browser would. "Write a notice..." types in the panel (dboInput); only a game that cannot take typed input hands the
 // composer to the browser (native:handoff).
 
-var DBO_SWF_VERSION = "board-2";
+var DBO_SWF_VERSION = "board-3";
+// work and trade wear bronze, as the web board does (dbo-theme.scss)
+webLook("bronze");
 var STAGE_W = 1280;
 var PANEL_W = 920;
 var PANEL_H = 640;
@@ -149,7 +151,7 @@ function drawTabs()
    x = PAD;
    for (var j = 0; j < HANDOVERS.length; j++)
    {
-      var hb = button(h, "ho" + j, 50 + j, x, 98, tabWidth(HANDOVERS[j][0]), HANDOVERS[j][0], F_BOLD, 20, A_ROW_REST, function()
+      var hb = webChip(h, "ho" + j, 50 + j, x, 98, tabWidth(HANDOVERS[j][0]) - 16, HANDOVERS[j][0], F_BOLD, 20, A_BUTTON_REST, function()
       {
          handOver(this.key, this.arg);
       });
@@ -157,7 +159,7 @@ function drawTabs()
       hb.arg = HANDOVERS[j][2];
       x += tabWidth(HANDOVERS[j][0]) + 8;
    }
-   dboDivider(h, PAD, 140, PANEL_W - PAD * 2);
+   webDivider(h, PAD, 140, PANEL_W - PAD * 2);
 }
 
 function tabWidth(label)
@@ -186,7 +188,9 @@ function drawList()
       c._x = PAD;
       c._y = LIST_TOP + i * ROW_H;
       dboBox(c, 0, 0, PANEL_W - PAD * 2, ROW_H - 4, 0x000000, 1);
-      var num = dboText(c, "num", 1, 0, 4, 22, 26, dboFmt(F_BOLD, 18, C_SECOND, 0), false);
+      // the web list's hairline under each notice, its number in the domain hue
+      dboBox(c, 0, ROW_H - 3, PANEL_W - PAD * 2, 1, C_ACCENT, 14);
+      var num = dboText(c, "num", 1, 0, 4, 22, 26, dboFmt(F_BOLD, 18, C_ACCENT, 0), false);
       num.text = String(i + 1);
       var t = dboText(c, "label", 2, 26, 0, PANEL_W - PAD * 2 - 26, 28, dboFmt(F_MEDIUM, 22, C_TEXT, 0.8), false);
       t.text = headline(n.text);
@@ -244,7 +248,7 @@ function drawRead()
    var bx = PAD + 20;
    if (n.canRemove == true)
    {
-      var rm = button(l, "remove", 20, bx, ay, 150, "Take down", F_MEDIUM, 20, A_BUTTON_REST, function()
+      var rm = webButton(l, "remove", 20, bx, ay, 150, "Take down", F_MEDIUM, 20, A_BUTTON_REST, function()
       {
          dboSound("UIMenuOK");
          dboSend(ev("remove"), [this.noteId]);
@@ -255,7 +259,7 @@ function drawRead()
       rm.label.textColor = C_RED;
       bx += 160;
    }
-   button(l, "back", 21, bx, ay, 120, "Back", F_MEDIUM, 20, A_BUTTON_REST, function()
+   webButton(l, "back", 21, bx, ay, 120, "Back", F_MEDIUM, 20, A_BUTTON_REST, function()
    {
       dboSound("UIMenuCancel");
       reading = -1;
@@ -300,7 +304,7 @@ function drawCompose()
       showCount();
    };
    showCount();
-   var post = button(l, "post", 10, PAD, LIST_TOP + 306, 200, cost ? "Post for " + cost + " gold" : "Post", F_MEDIUM, 20, A_BUTTON_REST, function()
+   var post = webButton(l, "post", 10, PAD, LIST_TOP + 306, 200, cost ? "Post for " + cost + " gold" : "Post", F_MEDIUM, 20, A_BUTTON_REST, function()
    {
       var text = trimText(draft);
       if (text == "" || postedAt)
@@ -313,7 +317,7 @@ function drawCompose()
       dboSend(ev("post"), [composing, text]);
       showCount();
    });
-   button(l, "cancel", 11, PAD + 210, LIST_TOP + 306, 120, "Cancel", F_MEDIUM, 20, A_BUTTON_REST, function()
+   webChip(l, "cancel", 11, PAD + 210, LIST_TOP + 306, 120, "Cancel", F_MEDIUM, 20, A_BUTTON_REST, function()
    {
       dboSound("UIMenuCancel");
       endCompose();
@@ -376,20 +380,17 @@ function drawFoot(pages)
 {
    var f = clear("foot", 60);
    var y = FOOT_Y;
-   dboDivider(f, PAD, y - 10, PANEL_W - PAD * 2);
+   webDivider(f, PAD, y - 10, PANEL_W - PAD * 2);
    var t = currentTab();
    var cost = Number(t.cost) || 0;
    var hint = dboText(f, "hint", 1, PAD, y, PANEL_W - PAD * 2, 24, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8), false);
    // the tab's footnote only over its list: the reader and the composer have the room to themselves
    hint.text = reading >= 0 || composing != "" ? "" : t.id == "hold" ? "Hold Notices are posted by the Jarl, Steward and Lord Commander. Notices fade after " + data.expiryDays + " days."
       : "A notice costs " + cost + " gold and fades after " + data.expiryDays + " days. You carry " + data.gold + " gold.";
-   if (pages > 1 && reading < 0)
-   {
-      var pt = dboText(f, "page", 2, PANEL_W - PAD - 160, y, 160, 24, dboFmt(F_MEDIUM, 16, C_SECOND, 0.8, "right"), false);
-      pt.text = "Page " + (page + 1) + " of " + pages + "  (Left / Right)";
-   }
+   // the foot's row is full: the pages are turned from the right of the second tab line, over the list
+   pageBar(f, 2, PANEL_W - PAD - 320, 98, 320, page, reading < 0 && composing == "" ? pages : 1, turnPage);
    var by = y + 32;
-   var write = button(f, "write", 10, PAD, by, 200, "Write a notice...", F_MEDIUM, 20, A_BUTTON_REST, function()
+   var write = webButton(f, "write", 10, PAD, by, 200, "Write a notice...", F_MEDIUM, 20, A_BUTTON_REST, function()
    {
       startCompose();
    });
@@ -413,7 +414,7 @@ function drawFoot(pages)
    var x = PAD + 210;
    for (var i = 0; i < FOOT.length; i++)
    {
-      var b = button(f, "f" + i, 20 + i, x, by, 150, FOOT[i][0], F_MEDIUM, 20, A_BUTTON_REST, function()
+      var b = webChip(f, "f" + i, 20 + i, x, by, 150, FOOT[i][0], F_MEDIUM, 20, A_BUTTON_REST, function()
       {
          handOver(this.key, this.arg);
       });
@@ -421,7 +422,7 @@ function drawFoot(pages)
       b.arg = FOOT[i][2];
       x += 156;
    }
-   button(f, "close", 30, PANEL_W - PAD - 100, by, 100, "Close", F_MEDIUM, 20, A_BUTTON_REST, function()
+   webButton(f, "close", 30, PANEL_W - PAD - 100, by, 100, "Close", F_MEDIUM, 20, A_BUTTON_REST, function()
    {
       closeBoard();
    });
@@ -441,7 +442,7 @@ function build()
    panel = _root.createEmptyMovieClip("dboPanel", 10);
    dboFit(panel, PANEL_W, PANEL_H);
    var bg = panel.createEmptyMovieClip("bg", 1);
-   dboGround(bg, PANEL_W, PANEL_H);
+   webGround(bg, PANEL_W, PANEL_H);
    dboWatermark(panel, 5, PANEL_W - 50, 170, 300);
    dboFadeIn(panel);
 }
@@ -547,20 +548,29 @@ keys.onKeyDown = function()
    {
       actions[focus].onPick();
    }
-   else if (code == 37 && reading < 0 && page > 0)
+   else if (code == 37)
    {
-      dboSound("UIMenuPrevNext");
-      page--;
-      draw();
+      turnPage(-1);
    }
-   else if (code == 39 && reading < 0)
+   else if (code == 39)
    {
-      dboSound("UIMenuPrevNext");
-      page++;
-      draw();
+      turnPage(1);
    }
 };
 dboKeys(keys);
+wheelPaging(turnPage);
+
+function turnPage(d)
+{
+   var next = page + d;
+   if (data == null || reading >= 0 || composing != "" || next < 0 || next >= Math.ceil(notesOf(currentTab().id).length / MAX_ROWS))
+   {
+      return;
+   }
+   dboSound("UIMenuPrevNext");
+   page = next;
+   draw();
+}
 
 _root.onEnterFrame = function()
 {

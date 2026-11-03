@@ -91,13 +91,29 @@ const closed = (t) => t.closed();
   const t = S.boot('dbo_board');
   t.push(Object.assign({}, board, { notes: many, maxNotes: 50 }));
   P(t).head.tab2.onRelease();
-  check('20 notes draw 8 a page', rowsOf(t).length === 8 && P(t).foot.page.text.indexOf('Page 1 of 3') === 0, rowsOf(t).length);
+  const where = () => (P(t).foot.pager ? P(t).foot.pager.where.text : '');
+  check('20 notes draw 8 a page', rowsOf(t).length === 8 && where() === 'Page 1 of 3', [rowsOf(t).length, where()]);
   t.press(39); t.press(39);
   check('Right twice reaches the last page of 4', rowsOf(t).length === 4 && rowsOf(t)[0].label.text === 'Note 16');
   t.press(39);
   check('Right past the end stays on it', rowsOf(t).length === 4);
   t.press(37);
   check('Left goes back', rowsOf(t)[0].label.text === 'Note 8');
+  // 3 Nov polish: the footer's buttons and the wheel
+  P(t).foot.pager.prev.onRelease();
+  check('clicking Previous turns back', rowsOf(t)[0].label.text === 'Note 0' && where() === 'Page 1 of 3' && P(t).foot.pager.prev.disabled === true, where());
+  P(t).foot.pager.next.onRelease();
+  check('clicking Next turns on', rowsOf(t)[0].label.text === 'Note 8', where());
+  t.wheel(-3);
+  check('the wheel down turns on, Next greyed at the end', where() === 'Page 3 of 3' && P(t).foot.pager.next.disabled === true, where());
+  t.wheel(-3);
+  check('...and stops there', where() === 'Page 3 of 3');
+  t.wheel(3);
+  check('the wheel up turns back', where() === 'Page 2 of 3', where());
+  rowsOf(t)[0].onRelease();
+  check('reading a notice has no page footer, and the wheel does not turn under it', !P(t).foot.pager && (t.wheel(3), !P(t).foot.pager) && !!P(t).list.back);
+  P(t).list.back.onRelease();
+  check('...Back returns to the page it was on', where() === 'Page 2 of 3', where());
 }
 
 {

@@ -172,6 +172,7 @@ const SETUPS = [
   ['trade-prompt', { swf: 'dbo_trade', drive: (t) => { t.push(trade); t.root.dboPanel.list.r1.btn0.onRelease(); } }],
   ['trade-locked', { swf: 'dbo_trade', drive: (t) => { t.push(Object.assign({}, trade, { myLocked: true, theyAccepted: true, theirLocked: true })); t.press(9); } }],
   ['board-list', { swf: 'dbo_board', drive: (t) => t.push(board) }],
+  ['board-pages', { swf: 'dbo_board', drive: (t) => { t.push(Object.assign({}, board, { maxNotes: 50, notes: Array.from({ length: 20 }, (_, i) => ({ id: 100 + i, tab: 'citizen', author: 'Narri', text: 'Wanted: hands for the harvest at Pale Pass, paid by the day. Ask at the inn, note ' + (i + 1) + '.', ageHours: i * 5, canRemove: false })) })); t.root.dboPanel.head.tab2.onRelease(); } }],
   ['board-reader', { swf: 'dbo_board', drive: (t) => { t.push(board); t.press(49); } }],
   ['board-compose', { swf: 'dbo_board', drive: (t) => { t.push(board); t.root.dboPanel.head.tab1.onRelease(); t.root.dboPanel.foot.write.onRelease(); const b = t.root.dboPanel.list.box; b.text = 'Iron ingots, cheap, at the forge by the gate.'; b.onChanged(); } }],
   ['housing', { swf: 'dbo_housing', drive: (t) => t.push(housing) }],
