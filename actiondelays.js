@@ -38,6 +38,9 @@ module.exports = (api) => {
     reopenGuardMs: 800,    // after an auto-open, the player's own click is swallowed for this long
                            // (a SkyMP container takes a second, closing activation)
     exemptOwnHome: true,
+    // Nat, 3 Nov: the beat belongs to dungeons and to theft, not to every container. false goes
+    // back to delaying every container that is not the player's own home.
+    onlyDungeonsAndTheft: true,
     widget: true,
     tellSeconds: 8,        // at most one "you are searching" line this often per player
   }, cfg.actionDelays || {});
@@ -76,6 +79,22 @@ module.exports = (api) => {
       const rec = primary === ref ? raw : mp.get(primary, 'private.housing');
       return rec && typeof rec === 'object' && !Number(rec.primary) ? rec : null;
     } catch (e) { return null; }
+  };
+  // The cell key, normalised exactly as gamemode.js does before testing __dboDungeonCells and as
+  // dungeons.js's normDesc builds that Set. Copied rather than rewritten: a key shaped differently
+  // would never match, and the beat would vanish in dungeons with nothing to show it had.
+  const cellKeyOf = (ref) => {
+    try {
+      const d = String(mp.get(ref, 'worldOrCellDesc') || '');
+      const i = d.indexOf(':');
+      if (i < 0) return d.toLowerCase();
+      const n = parseInt(d.slice(0, i), 16);
+      return (Number.isFinite(n) ? n.toString(16) : d.slice(0, i).toLowerCase()) + ':' + d.slice(i + 1).toLowerCase();
+    } catch (e) { return ''; }
+  };
+  const inDungeon = (ref) => {
+    const set = globalThis.__dboDungeonCells;
+    return !!set && typeof set.has === 'function' && set.has(cellKeyOf(ref));
   };
   const ownHome = (ref, a) => {
     if (!C.exemptOwnHome) return false;
@@ -140,8 +159,25 @@ module.exports = (api) => {
     hide(a);
     const searched = () => { try { personal(a, 'You have searched it. Open it again.'); } catch (e) { /* offline */ } };
     if (C.autoOpen === false) { searched(); return; }
-    if (!openFor(a, t)) { searched(); return; }
+    const opened = openFor(a, t);
+    log(`actiondelays: search done, profile ${profileOf(a)} on ${t.toString(16)}: elapsed ${now - startedAt}ms, auto-open ${opened ? 'ok' : 'FAILED'}`);
+    if (!opened) { searched(); return; }
     S.opened.set(key, now);
+  };
+
+  // Does the beat apply at all? A container in a dungeon, or one the player has no right to. Their
+  // own, a shared or faction one, and a public or unowned chest outside a dungeon all open at once.
+  //
+  // A vanilla NPC-owned chest is NOT caught here. The ownership this module can see is our own
+  // housing claims (private.housing); the engine's XOWN on a vanilla ref is not on anything it
+  // reads. So stealing from an NPC's chest outside a dungeon stays instant, which is a known gap
+  // rather than an oversight.
+  const delayApplies = (t, a) => {
+    if (C.onlyDungeonsAndTheft === false) return 'all';
+    if (inDungeon(t)) return 'dungeon';
+    const rec = claimOf(t);
+    if (rec && !ownHome(t, a)) return 'theft';
+    return '';
   };
 
   // ---- the search beat on a container's activation --------------------------------------------------------------------
@@ -153,6 +189,8 @@ module.exports = (api) => {
     if (ms <= 0 || !isPlayer(a)) return undefined;
     if (recordType(t) !== 'CONT') return undefined;
     if (ownHome(t, a)) return undefined;
+    const why = delayApplies(t, a);
+    if (!why) return undefined;
     const now = Date.now();
     const key = `${a}:${t}`;
     // The server has just opened this for them: swallow their own click, or the container's second
@@ -164,6 +202,7 @@ module.exports = (api) => {
     if (!started || now - started > ms + MS(C.graceSeconds)) {
       S.beat.set(key, now);
       sweep();
+      log(`actiondelays: search begins, profile ${profileOf(a)} on ${t.toString(16)}, ${why}, bar ${ms}ms`);
       show(a, ms, 'Searching');
       tell(a, 'search', C.autoOpen === false
         ? 'You search it. Give it a moment, then open it again.'
@@ -236,5 +275,5 @@ module.exports = (api) => {
   };
 
   log(`actiondelays: ${C.enabled ? 'on' : 'off'} (search ${C.searchSeconds}s, body ${C.bodySeconds}s, take ${C.takeSeconds}s, grace ${C.graceSeconds}s)`);
-  return { _test: { searchGate, takeGate, S, C, ownHome, recordType } };
+  return { _test: { delayApplies, inDungeon, searchGate, takeGate, S, C, ownHome, recordType } };
 };

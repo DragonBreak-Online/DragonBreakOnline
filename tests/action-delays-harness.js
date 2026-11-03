@@ -55,6 +55,17 @@ const mp = {
 };
 setp(HOMECHEST, 'private.housing', { owner: 7, ownerName: 'Olaf' });
 setp(KEYCHEST, 'private.housing', { owner: 99, keys: [7] });
+// Nat, 3 Nov: the beat is for dungeon containers and for theft only. CHEST and CHEST2 stand in a
+// dungeon cell so every beat assertion below still exercises the beat. The cell is written padded
+// while the Set holds the normalised form, so the key normalisation is under test too.
+// A real dungeon cell (Abandoned Prison, from dungeons.json) rather than an invented id: the pre-commit
+// hook checks every form id in a committed file against the load order, and it was right to.
+const DUNGEON_CELL = '21594:Skyrim.esm';
+globalThis.__dboDungeonCells = new Set([DUNGEON_CELL.toLowerCase()]);   // as dungeons.js's normDesc keys it
+// Padded and mixed-case on purpose, built by concatenation: the normalisation is under test, and getting
+// it wrong would make the beat vanish in dungeons with nothing to show it had.
+setp(CHEST, 'worldOrCellDesc', '000' + DUNGEON_CELL);
+setp(CHEST2, 'worldOrCellDesc', DUNGEON_CELL);
 
 const api = {
   mp,
@@ -284,5 +295,31 @@ ok(focusAsked.length > 0 && focusAsked.every((f) => f !== true),
   'the search bar never asks for keyboard focus', JSON.stringify(focusAsked));
 
 try { fs.rmSync(scratch, { recursive: true, force: true }); } catch (e) { /* leave it */ }
+
+// ---- which containers the beat applies to at all (Nat, 3 Nov) --------------------------------------------------------
+// Without the predicate every one of these returns a beat, so this block fails on the old module.
+ok(T.inDungeon(CHEST) === true, 'the dungeon cell key normalises: padded hex and case both match the Set');
+ok(T.delayApplies(CHEST, PLAYER) === 'dungeon', 'a container in a dungeon: the beat applies');
+ok(T.delayApplies(HOMECHEST, PLAYER) === '', 'the player\'s own claimed home: no beat, it opens at once');
+ok(T.delayApplies(KEYCHEST, PLAYER) === '', '...and one they hold a key to: no beat');
+
+const saveHome = { owner: 7, ownerName: 'Olaf' };
+mp.set(HOMECHEST, 'private.housing', { owner: 99, ownerName: 'Someone else' });
+ok(T.delayApplies(HOMECHEST, PLAYER) === 'theft', 'a claimed home they have no right to: theft, the beat applies');
+mp.set(HOMECHEST, 'private.housing', saveHome);
+ok(T.delayApplies(HOMECHEST, PLAYER) === '', '...and it is instant again once it is theirs');
+
+mp.set(CHEST, 'worldOrCellDesc', '');
+ok(T.delayApplies(CHEST, PLAYER) === '', 'an unowned chest outside a dungeon: no beat at all');
+ok(T.searchGate(CHEST, PLAYER) === undefined, '...and searchGate lets its activation stand, first click');
+mp.set(CHEST, 'worldOrCellDesc', '000' + DUNGEON_CELL);
+
+// load() takes the WHOLE cfg, and the module reads cfg.actionDelays - a bare key is ignored
+const Tall = load({ actionDelays: { onlyDungeonsAndTheft: false } });
+Tall.S.beat.clear(); Tall.S.done.clear(); Tall.S.opened.clear();
+mp.set(CHEST, 'worldOrCellDesc', '');
+ok(Tall.delayApplies(CHEST, PLAYER) === 'all', 'onlyDungeonsAndTheft false: every container is delayed again');
+mp.set(CHEST, 'worldOrCellDesc', '000' + DUNGEON_CELL);
+
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
 process.exit(fails ? 1 : 0);
