@@ -151,6 +151,12 @@ const rested = Object.keys(props.get(ACTOR + '|private.milledLogs') || {});
 check('...its rest kept by where it stands, so a restart does not reset it', rested.some((k) => /^p\d+_\d+$/.test(k)), rested);
 r = use(LOOSE);
 check('a dynamic mill nobody placed through F7 is not ours (nothing paid)', r === false && out.items.length === 0);
+// Seasoned Timber (capstones.js, Woodcutter at 100): the mill saws a Grandmaster twice the logs; capstones.js stubbed
+globalThis.__dboCapstones = { on: (s) => s === 'woodcutter', isGrandmaster: (a, s) => a === ACTOR && s === 'woodcutter' };
+wallClock += 31 * 60000;
+r = use(PLACED);
+check('a Grandmaster Woodcutter: the mill saws twice the logs, the same firewood', r === true && paid(SAWNLOG) === 2 * WOODCUTTER.millSawnLogsByTier[2] && paid(FIREWOOD) === WOODCUTTER.millFirewoodByTier[2], JSON.stringify(out.items));
+delete globalThis.__dboCapstones;
 const PLACE = JSON.parse(require('fs').readFileSync(path.resolve(__dirname, '..', 'admin-placeables.json'), 'utf8'));
 const stations = (PLACE.categories.find((c) => c.label === 'Crafting Stations') || { items: [] }).items;
 check('F7 Place lists the saw mill under Crafting Stations', stations.some((row) => /^71c47:Skyrim\.esm$/i.test(row[0])), stations.length);

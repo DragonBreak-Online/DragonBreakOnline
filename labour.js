@@ -524,7 +524,9 @@ module.exports = (api) => {
     if (until > Date.now()) return deny(casterId, `The mill has no more logs sawn for you yet. Come back in ${Math.ceil((until - Date.now()) / 60000)} minutes.`);
     const count = Math.max(1, Math.round(tierValue(WOODCUTTER.millFirewoodByTier, tier, 10)));
     const logTier = Number.isFinite(Number(WOODCUTTER.sawnLogMinTier)) ? Number(WOODCUTTER.sawnLogMinTier) : 2;
-    const logs = tier >= logTier ? Math.max(0, Math.round(tierValue(WOODCUTTER.millSawnLogsByTier, tier, 0))) : 0;
+    // Seasoned Timber (capstones.js, Woodcutter at 100): the mill saws a Grandmaster twice the logs
+    let seasoned = false; try { const c = globalThis.__dboCapstones; seasoned = !!c && c.on('woodcutter') && c.isGrandmaster(casterId >>> 0, 'woodcutter'); } catch (e) { seasoned = false; }
+    const logs = (tier >= logTier ? Math.max(0, Math.round(tierValue(WOODCUTTER.millSawnLogsByTier, tier, 0))) : 0) * (seasoned ? 2 : 1);
     // The logs first: a pack too full for them takes nothing and the mill does not rest
     if (logs && !giveItem(casterId, idOf(ITEMS.sawnlog), logs)) return deny(casterId, 'The saw runs, but you cannot carry any more.');
     if (!giveItem(casterId, idOf(ITEMS.firewood), count) && !logs) return deny(casterId, 'The saw runs, but you cannot carry any more.');

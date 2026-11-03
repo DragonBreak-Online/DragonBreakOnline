@@ -191,6 +191,17 @@ ok(held(OWNER, CABBAGE) === cab2 + 2 && /You pick 2/.test(last(OWNER)), 'unskill
   ok(pickWith(common, 0, 0.1) === 3, 'a Novice\'s hit on a common crop: 3', R);
   ok(pickWith(rare, 0, 0.1) === 2 && pickWith(rare, 4, 0.1) === 2, 'a rare crop (Deathbell): a hit is 2, never more, a Master\'s too');
   ok(pickWith(rare, null, 0.9) === 1, '...and a miss on a rare crop is 1');
+  // The Master Gardener (capstones.js, Harvesting at 100): the top of the range whatever the roll; capstones.js stubbed
+  globalThis.__dboCapstones = { on: (s) => s === 'harvesting', isGrandmaster: (a, s) => a === OWNER && s === 'harvesting' };
+  ok(pickWith(common, 0, 0.99) === 4 && pickWith(rare, 0, 0.99) === 2, 'a Master Gardener picks the top of a crop\'s range even on a missed roll');
+  const p2 = items().find((i) => i.kind === 'planter'); delete p2.crop;
+  setp(OWNER, 'inventory', { entries: getp(OWNER, 'inventory').entries.filter((e) => e.baseId !== DEATHBELL) });
+  giveItem(OWNER, CABBAGE, 1); use(p2.ref, OWNER);
+  ok(p2.crop && p2.crop.pace === 0.5 && Math.abs((p2.crop.ripeAt - clock) - 12 * HOUR) < 1000 && /ripens in 12 hours/.test(last(OWNER)), '...and a crop they plant ripens in half the time', [p2.crop, last(OWNER)]);
+  delete p2.crop;
+  globalThis.__dboCapstones = { on: () => false, isGrandmaster: () => true };
+  ok(pickWith(rare, null, 0.9) === 1, 'with the capstone switched off, the roll decides again');
+  delete globalThis.__dboCapstones;
   setp(OWNER, 'private.mastery', { order: [], skills: {} });
   // the Deathbells picked here are eaten, so the sections below start from the pack they expect
   setp(OWNER, 'inventory', { entries: getp(OWNER, 'inventory').entries.filter((e) => e.baseId !== DEATHBELL) });

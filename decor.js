@@ -762,7 +762,7 @@ module.exports = (api) => {
       const now = gameDaysNow();
       if (Number.isFinite(day) && now !== null) return (day - now) * per;
       const at = Number(rec && rec.at);
-      if (Number.isFinite(at)) return at + daysOf(cropFor(rec && rec.item)) * per - Date.now();
+      if (Number.isFinite(at)) return at + daysOf(cropFor(rec && rec.item)) * (Number(rec && rec.pace) || 1) * per - Date.now();
     }
     return Number(rec && rec.ripeAt) - Date.now();
   };
@@ -783,21 +783,26 @@ module.exports = (api) => {
     try { id = create(parseInt(it.ref, 16) >>> 0, desc, it.cell, showPos(it.pos), it.rot, { of: it.ref, show: true }); } catch (e) { log('decor: planter model failed', e.message); }
     if (id) it.show = hex(id);
   };
+  // A Grandmaster of that skill (capstones.js), when its capstone is switched on
+  const grandmaster = (a, skill) => { try { const c = globalThis.__dboCapstones; return !!c && c.on(skill) && c.isGrandmaster(a >>> 0, skill); } catch (e) { return false; } };
+  // Master Gardener (Harvesting at 100): a crop they plant ripens in half the time, and a crop they pick gives the top of its range
   const plant = (a, found, crop) => {
     const it = found.item;
+    const pace = grandmaster(a, 'harvesting') ? 0.5 : 1;
     if (!takeAll(a, { [crop.item]: 1 })) return personal(a, `You have no ${itemName(crop.item)} to plant.`);
     const per = msPerGameDay();
     const day = gameDaysNow();
     // ripeAt is kept either way: it is the audit line's real-time estimate and the fallback if the clock later goes away
-    it.crop = { item: crop.item, at: Date.now(), ripeAt: Date.now() + (per ? daysOf(crop) * per : hoursOf(crop) * 3600000), by: profile(a) };
-    if (per && day !== null) it.crop.ripeDay = day + daysOf(crop);
+    it.crop = { item: crop.item, at: Date.now(), ripeAt: Date.now() + (per ? daysOf(crop) * per : hoursOf(crop) * 3600000) * pace, by: profile(a) };
+    if (pace !== 1) it.crop.pace = pace;
+    if (per && day !== null) it.crop.ripeDay = day + daysOf(crop) * pace;
     showCrop(it, (growing().soil || {}).desc);
     save();
     audit(`DECOR plant ${who(a)} ${crop.item} in planter ${it.ref} place ${hex(found.root)} ripe ${new Date(it.crop.ripeAt).toISOString()}${it.crop.ripeDay ? ` gameDay ${it.crop.ripeDay.toFixed(2)}` : ''}`);
-    const n = daysOf(crop);
+    const n = daysOf(crop) * pace;
     return personal(a, per
-      ? `You plant ${itemName(crop.item)}. It ripens in ${n === 1 ? 'one in-game day' : `${n} in-game days`}.`
-      : `You plant ${itemName(crop.item)}. It ripens in ${hoursOf(crop)} hours.`);
+      ? `You plant ${itemName(crop.item)}. It ripens in ${n === 1 ? 'one in-game day' : `${n} in-game days`}.${pace !== 1 ? ' A Master Gardener\'s hand speeds it.' : ''}`
+      : `You plant ${itemName(crop.item)}. It ripens in ${hoursOf(crop) * pace} hours.`);
   };
   // A pick yields within the crop's range (Nat, 31 Oct: 2-4 a common crop, 1-2 a rare one, after "1 ash yam per 24 h"): one
   // Harvesting roll (skills.json harvesting, as a wild plant rolls); a miss gives the range's floor, a hit at least one more,
@@ -814,7 +819,7 @@ module.exports = (api) => {
     const chance = tier >= 0 ? Number((H.yieldChanceByTier || [])[tier]) || 1 : Number((H.unskilled || {}).yieldChance) || 0.25;
     const mult = tier >= 0 ? Number((H.yieldMultiplierByTier || [])[tier]) || 1 : Number((H.unskilled || {}).yieldMultiplier) || 0.5;
     const [lo, hi] = yieldRange(cropFor(crop.item) || crop);
-    const n = Math.random() < chance ? Math.min(hi, lo + Math.max(1, Math.round((hi - lo) * mult / 2))) : lo;
+    const n = grandmaster(a, 'harvesting') ? hi : Math.random() < chance ? Math.min(hi, lo + Math.max(1, Math.round((hi - lo) * mult / 2))) : lo;
     // the record goes first and is saved before anything is given, so no path can pick the same crop twice
     delete it.crop; showCrop(it, null); save();
     if (n > 0) giveItem(a, idOf(crop.item), n);
@@ -837,12 +842,14 @@ module.exports = (api) => {
     if (n < 1) return personal(a, `A Sawn Log takes ${per} Firewood at your skill; you carry ${have}.`);
     const paid = spendAll(a, { [L.firewood]: n * per });
     if (!paid) return personal(a, `A Sawn Log takes ${per} Firewood at your skill; you carry ${have}.`);
-    if (giveItem(a, idOf(L.log), n) === false) { giveAll(a, paid, 1); return personal(a, 'The logs are sawn, but you cannot carry them; your firewood is back.'); }
+    // Seasoned Timber (Woodcutter at 100): the same firewood saws twice the logs
+    const made = n * (grandmaster(a, 'woodcutter') ? 2 : 1);
+    if (giveItem(a, idOf(L.log), made) === false) { giveAll(a, paid, 1); return personal(a, 'The logs are sawn, but you cannot carry them; your firewood is back.'); }
     for (const k of Object.keys(rests)) if (Number(rests[k]) < Date.now()) delete rests[k];
     rests[it.ref] = Date.now() + Math.max(1, Number(L.cooldownMinutes) || 10) * 60000;
     try { mp.set(a, LUMBER_RESTS, rests); } catch (e) { log('decor: lumber rest save failed', e.message); }
-    audit(`DECOR lumber ${who(a)} sawed ${n * per} firewood into ${n} sawn logs (tier ${tier + 1}) at ${it.ref} place ${hex(found.root)}`);
-    return personal(a, `You saw ${n * per} Firewood into ${n} Sawn Log${n === 1 ? '' : 's'}. The saw needs ${Math.max(1, Number(L.cooldownMinutes) || 10)} minutes before your next batch.`);
+    audit(`DECOR lumber ${who(a)} sawed ${n * per} firewood into ${made} sawn logs (tier ${tier + 1}) at ${it.ref} place ${hex(found.root)}`);
+    return personal(a, `You saw ${n * per} Firewood into ${made} Sawn Log${made === 1 ? '' : 's'}.${made !== n ? ' A Grandmaster\'s timber goes twice as far.' : ''} The saw needs ${Math.max(1, Number(L.cooldownMinutes) || 10)} minutes before your next batch.`);
   };
   const usePlanter = (a, found) => {
     const it = found.item;
@@ -882,6 +889,13 @@ module.exports = (api) => {
       const kind = kindOf(it), n = found.place.items.filter((i) => kindOf(i) === kind).length, need = Math.max(1, Number(C.study.minForStudy) || 1);
       if (n < need) { personal(caster, `A home ${kind} study needs ${need} ${kind} study bookshelves; this home has ${n}.`); return true; }
       return false;
+    }
+    // A built container a Locksmith fitted with a lock opens only for those who may decorate the home (the owner and
+    // those they named); anyone else is told it is locked (capstones: Locksmith, fac-0553)
+    if (it.container && it.lock) {
+      if (mayDecorate(caster, placeOfFound(found))) return false;
+      personal(caster, `The ${it.name} is locked. ${it.lock.byName || 'A locksmith'} fitted it for the owner.`);
+      return true;
     }
     if (it.kind === 'lumber') {
       try { useLumber(caster, found); } catch (e) { log('decor: lumber pile failed', e.stack || e.message); personal(caster, 'That failed; see the server log.'); }
@@ -1067,6 +1081,35 @@ module.exports = (api) => {
   onUi('close', (a, args, widgetId) => { if (widgetId !== PANEL_ID) return; const st = S.panel.get(a >>> 0); if (st && !st.reopen) S.panel.delete(a >>> 0); });
   // the panel comes back once the edit mode it closed for sets a piece down or refuses it
   function reopenAfterEdit(a) { const st = S.panel.get(a >>> 0); if (st && st.reopen) { st.reopen = false; refresh(a); } }
+  // The Locksmith (Lockpicking at 100, capstones.js): /fitlock at a container built in a home fits a lock to it, with the
+  // home's owner or someone they named there in person (within fitLockMeters); /fitlock off takes it out again (the
+  // Locksmith, or the owner or someone they named). The lock is kept on the piece, so it outlives a restart
+  const FIT_METERS = 4, WITNESS_METERS = 10;
+  registerChatCommand('fitlock', (a, args) => {
+    const pl = here(a);
+    if (!pl) return personal(a, 'Stand in the home whose storage you would fit.');
+    const me = get(a, 'pos', null);
+    const near = Array.isArray(me) ? placeEntry(pl.root, pl.rec).items.filter((i) => i.container && Array.isArray(i.pos)).map((i) => ({ i, d: Math.hypot(i.pos[0] - me[0], i.pos[1] - me[1], i.pos[2] - me[2]) / 70 })).filter((x) => x.d <= FIT_METERS).sort((x, y) => x.d - y.d)[0] : null;
+    if (!near) return personal(a, 'Stand beside a chest or other container built in this home.');
+    const it = near.i;
+    if (/^off$/i.test(String(args || '').trim())) {
+      if (!it.lock) return personal(a, `The ${it.name} has no lock fitted.`);
+      if (!mayDecorate(a, pl) && it.lock.by !== profile(a)) return personal(a, 'Only the owner, someone they named, or the Locksmith who fitted it takes the lock out.');
+      delete it.lock; save();
+      log(`decor: ${who(a)} took the lock off ${it.name} ${it.ref} place ${hex(pl.root)}`);
+      return personal(a, `The lock is out of the ${it.name}. Anyone in the home may open it again.`);
+    }
+    if (!grandmaster(a, 'lockpicking')) return personal(a, 'Fitting locks is a Grandmaster Locksmith\'s work (Lockpicking at 100).');
+    if (it.lock) return personal(a, `The ${it.name} already has a lock.`);
+    const online = typeof api.onlineActors === 'function' ? api.onlineActors() : [];
+    const witness = online.find((x) => (x >>> 0) !== (a >>> 0) && mayDecorate(x, pl) && here(x) && here(x).root === pl.root && (() => { const p = get(x, 'pos', null); return Array.isArray(p) && Math.hypot(p[0] - me[0], p[1] - me[1], p[2] - me[2]) / 70 <= WITNESS_METERS; })());
+    if (!witness && !mayDecorate(a, pl)) return personal(a, 'The owner, or someone they named, must be here with you.');
+    it.lock = { by: profile(a), byName: who(a), at: Date.now() };
+    save();
+    log(`decor: ${who(a)} fitted a lock to ${it.name} ${it.ref} place ${hex(pl.root)}${witness ? ` with ${who(witness)}` : ''}`);
+    if (witness) personal(witness, `${who(a)} fits a lock to the ${it.name}. Only you and those you name may open it now.`);
+    return personal(a, `You fit a lock to the ${it.name}. Only the owner and those they named may open it now.`);
+  }, { help: 'Grandmaster Locksmith: fit a lock to storage built in a home, with its owner there (/fitlock off removes it)' });
   registerChatCommand('decor', (a, args) => {
     const words = String(args || '').trim().split(/\s+/).filter(Boolean), sub = (words.shift() || '').toLowerCase(), rest = words.join(' ');
     if (!C.enabled && !(sub === 'clear' && isDeveloper(a))) return personal(a, 'Decorating is not open yet.');

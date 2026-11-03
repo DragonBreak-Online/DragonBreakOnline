@@ -200,6 +200,33 @@ ok(/materials are back/.test(last(OWNER)) && held(OWNER, WOOD) === wood && items
 fire('placeSelect', GM, [items()[0].ref]);
 ok(!placementSaid.length, 'placement.js ignores a GM aiming at a decor piece', placementSaid);
 
+// ---- the Locksmith (capstones.js, Lockpicking at 100; the Leader, 3 Nov): a lock on storage built in the home ----------
+{
+  const box = { ref: 'ff0000f1', base: d(0x9002), name: 'Strongbox', group: 'storage', container: true, cell: d(CELL), pos: [1010, 1000, 50], rot: [0, 0, 0], paid: {} };
+  items().push(box);
+  cmd(OWNER, 'grant Stray');
+  const open = (a) => globalThis.__dboDecorActivate(0xff0000f1, a);
+  ok(open(GM) === false, 'before a lock: anyone in the home opens built storage');
+  globalThis.__dboCapstones = { on: (s) => s === 'lockpicking', isGrandmaster: (a, s) => a === FRIEND && s === 'lockpicking' };
+  cmds.fitlock(GM, '');
+  ok(!box.lock && /Grandmaster Locksmith/.test(last(GM)), 'only a Grandmaster Locksmith fits a lock', last(GM));
+  setp(OWNER, 'worldOrCellDesc', d(OTHER)); setp(STRANGER, 'worldOrCellDesc', d(OTHER));
+  cmds.fitlock(FRIEND, '');
+  ok(!box.lock && /must be here with you/.test(last(FRIEND)), 'the owner, or someone they named, must be there', last(FRIEND));
+  setp(OWNER, 'worldOrCellDesc', d(CELL)); setp(STRANGER, 'worldOrCellDesc', d(CELL));
+  cmds.fitlock(FRIEND, '');
+  ok(box.lock && box.lock.by === PROFILE[FRIEND] && /fit a lock to the Strongbox/.test(last(FRIEND)), 'with the owner there, the Locksmith fits it', last(FRIEND));
+  ok(open(GM) === true && /Strongbox is locked/.test(last(GM)), 'locked: an outsider is refused', last(GM));
+  ok(open(OWNER) === false && open(STRANGER) === false, '...the owner and the one they named open it', [open(OWNER), open(STRANGER), last(STRANGER)]);
+  cmds.fitlock(GM, 'off');
+  ok(box.lock && /Only the owner/.test(last(GM)), 'an outsider cannot take the lock out', last(GM));
+  cmds.fitlock(OWNER, 'off');
+  ok(!box.lock && open(GM) === false, 'the owner takes it out: open to the home again');
+  delete globalThis.__dboCapstones;
+  items().splice(items().indexOf(box), 1);
+  cmd(OWNER, 'revoke Stray');
+}
+
 // ---- the owner leaves: cleared, half owed, paid at the next scan ------------------------------------------------------
 placeAt(OWNER, 'alchemy');
 const before = held(OWNER, SALT), kept = items().length;

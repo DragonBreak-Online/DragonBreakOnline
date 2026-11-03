@@ -987,7 +987,7 @@ const HELP_GROUPS = [
       'Introducing yourself, trading, inspecting or challenging someone to a duel: look at them and press X.', 'Emotes: press B.', 'Hiding your face: press H.',
       'Letters by pigeon, and yours to read: a notice board. A bird flies only to someone you have met.',
       'Everyone you have met: the ledger at a notice board or in your home (/ledger).'] },
-  { key: 'character', title: 'Your character', names: ['status', 'boost', 'referral', 'appearance', 'playtime', 'birthsign', 'capstone', 'bespoke', 'signature', 'enchantname', 'swordschool', 'breaker', 'prospect', 'feast', 'shieldover'],
+  { key: 'character', title: 'Your character', names: ['status', 'boost', 'referral', 'appearance', 'playtime', 'birthsign', 'capstone', 'bespoke', 'signature', 'enchantname', 'swordschool', 'breaker', 'prospect', 'feast', 'shieldover', 'fitlock'],
     hints: ['Your journal: press F3. Profile, stats, skills, magic, your god, and settings such as your keys.',
       'A new look: /appearance reopens the appearance editor (gold, once a day; race, sex and name stay).',
       'Your birthsign: /birthsign. It is chosen once, and only staff can change it.',

@@ -127,6 +127,13 @@ setWood(FRIEND, 0); cmd(OWNER, 'grant Frida'); giveItem(FRIEND, WOOD, 20);
 use(pile, FRIEND);
 ok(held(FRIEND, LOG) === 0 && /takes an Apprentice Woodcutter/.test(last(FRIEND)), 'a Novice Woodcutter, even hired, cannot saw', last(FRIEND));
 ok(globalThis.__dboDecorActivate(0x000bb959, OWNER) === false, 'a WoodPile in the world, not a decor piece, is left alone');
+// Seasoned Timber (capstones.js, Woodcutter at 100): the same firewood saws twice the logs; capstones.js stubbed
+globalThis.__dboCapstones = { on: (s) => s === 'woodcutter', isGrandmaster: (a, s) => a === OWNER && s === 'woodcutter' };
+now += 10 * 60000 + 1;
+setWood(OWNER, 4); setp(OWNER, 'inventory', { entries: getp(OWNER, 'inventory').entries.filter((e) => e.baseId !== LOG) }); giveItem(OWNER, WOOD, 20);
+use(pile, OWNER);
+ok(held(OWNER, LOG) === 20 && held(OWNER, WOOD) === 10 && /twice as far/.test(last(OWNER)), 'a Grandmaster Woodcutter: 20 firewood (10 logs a use, 2 each) saw 20 logs, not 10', { logs: held(OWNER, LOG), wood: held(OWNER, WOOD) });
+delete globalThis.__dboCapstones;
 
 Date.now = realNow;
 console.log(fails ? `\n${fails} failed` : '\nall passed');
