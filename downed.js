@@ -79,6 +79,8 @@ module.exports = (api) => {
     // Finishing is deliberate (Nate, 2026-09-28, after swag was finished 0.3 s after falling by a spell already hitting
     // him): nothing finishes a fallen player in their first finishGraceSeconds, and then only a weapon or bare hands
     finishGraceSeconds: 3, finishWeaponOnly: true,
+    // A Martial Arts Grandmaster's second wind (capstones.js): the health they stand at, and how soon after the fall
+    secondWindHealth: 0.1, secondWindDelayMs: 800,
     // Give up (the panel and /respawn) opens this long after the fall, so a friend has time to come (Dar, 2026-09-28;
     // Nate made it 15 the same day)
     giveUpAfterSeconds: 15,
@@ -163,7 +165,10 @@ module.exports = (api) => {
         // Any other hit on a fallen player (in the grace, a spell, a lingering effect) does nothing.
         if (dmg > 0 && S.downed.has(tgt) && isDead(tgt) && isPlayer(agg) && !friendly(agg, tgt)) {
           const since = Date.now() - S.downed.get(tgt).at;
-          if (since >= C.finishGraceSeconds * 1000 && (!C.finishWeaponOnly || isWeaponHit(sourceId))) finish(tgt, agg);
+          // A Grandmaster of Defense standing over them (capstones.js, Shield over the Fallen): nobody finishes them
+          let guarded = false;
+          try { guarded = typeof globalThis.__dboCapstoneGuarded === 'function' && !!globalThis.__dboCapstoneGuarded(tgt, agg); } catch (e) { guarded = false; }
+          if (!guarded && since >= C.finishGraceSeconds * 1000 && (!C.finishWeaponOnly || isWeaponHit(sourceId))) finish(tgt, agg);
           globalThis.__dboHitRefusal = 'downed';
           return false;
         }
@@ -444,6 +449,13 @@ module.exports = (api) => {
           if (isPlayer(a) && mp.get(a, 'private.permaDead') !== true) {
             const d = { at: Date.now(), by: Number(killerId) >>> 0, nonce: `${a.toString(16)}-${Date.now().toString(36)}`, fell: placeOf(a), lastPacket: lastPacketOf(a) };
             S.downed.set(a, d);
+            // A Grandmaster of Martial Arts' second wind (capstones.js): once a day they stand again at once
+            let wind = false;
+            try { wind = typeof globalThis.__dboCapstoneSecondWind === 'function' && !!globalThis.__dboCapstoneSecondWind(a); } catch (e) { wind = false; }
+            if (wind) {
+              setTimeout(() => { try { if (S.downed.get(a) === d) revive(a, 0, 'a second wind', { at: C.secondWindHealth }); } catch (e) { log(`downed: second wind failed: ${e.message}`); } }, C.secondWindDelayMs);
+              return out;
+            }
             // The panel says it all; chat keeps a line for anyone who closes it
             personal(a, `You are down. You wake at the temple in ${C.bleedoutSeconds} seconds, or choose Give up (or say /respawn). A Priest's healing or a Draught of Revival can bring you back where you fell.`);
             openPanel(a, d);
@@ -463,14 +475,21 @@ module.exports = (api) => {
     }
   }
 
-  const revive = (t, by, how) => {
+  // opts.at: stand at once at that share of health and no stamina, without kneeling (a second wind)
+  const revive = (t, by, how, opts) => {
     const d = S.downed.get(t);
     if (!d || !isDead(t) || mp.get(t, 'private.permaDead') === true) return false;
     if (by && hostile(sideOf(by), t)) { banner(by, `${nameTo(by, t)} fought you moments ago and will not take your help.`); return false; }
     endDown(t);
     mp.set(t, 'isDead', false);
-    if (C.recoverSeconds > 0) startRecovery(t); else setHealth(t, C.reviveHealth);
-    banner(t, `${by ? nameTo(t, by) : 'Someone'} raised you with ${how}.${C.recoverSeconds > 0 ? ' Catch your breath before you stand.' : ''}`, 5);
+    if (opts && opts.at > 0) {
+      const p = health(t);
+      if (p) mp.set(t, 'percentages', { health: Math.max(0.01, Math.min(1, Number(opts.at))), magicka: p.magicka, stamina: 0 });
+      banner(t, `You find ${how} and stand again.`, 5);
+    } else {
+      if (C.recoverSeconds > 0) startRecovery(t); else setHealth(t, C.reviveHealth);
+      banner(t, `${by ? nameTo(t, by) : 'Someone'} raised you with ${how}.${C.recoverSeconds > 0 ? ' Catch your breath before you stand.' : ''}`, 5);
+    }
     if (by) banner(by, `You raised ${nameTo(by, t)}.`, 3);
     audit(`REVIVE ${who(t)} by ${by ? who(by) : 'nobody'} (${how})`);
     // the player log (playerlog.js): how they woke, by whom, after how long down

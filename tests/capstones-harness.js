@@ -30,13 +30,15 @@ const mp = {
 };
 const audits = [], said = [], logs = [], cmds = new Map();
 const FIND = {}, PROFILES = {}, DISCORDS = {}, DIST = new Map();
+const FIELDS = {}, WSKILL = {}, ONLINE = [], SATED = [];
 const level = (a, n) => put(a, 'private.mastery', { v: 2, order: ['blacksmith'], skills: { blacksmith: { level: n, xp: 0, rank: 4 } } });
 const load = (cfg) => {
   delete require.cache[path.join(ROOT, 'capstones.js')];
   return require(path.join(ROOT, 'capstones.js'))({
     mp, log: (...x) => logs.push(x.join(' ')), personal: (a, t) => said.push([a, t]), audit: (t) => audits.push(t), who: (a) => `P${(a & 0xfff).toString(16)}`,
     cfg, registerChatCommand: (n, f) => cmds.set(n, f), realNameOf: (a) => (a === SMITH ? 'Eorlund Gray-Mane' : 'Novice Smith'),
-    recordOf: (id) => (TYPES[id >>> 0] ? { record: { type: TYPES[id >>> 0] } } : null), itemName: (d) => NAMES[parseInt(String(d).split(':')[0], 16)] || '?',
+    recordOf: (id) => (TYPES[id >>> 0] ? { record: { type: TYPES[id >>> 0], fields: FIELDS[id >>> 0] || [] } } : null), itemName: (d) => NAMES[parseInt(String(d).split(':')[0], 16)] || '?',
+    weaponSkillOf: (id) => WSKILL[id >>> 0] || '', onlineActors: () => ONLINE.slice(), sate: (x) => SATED.push(x),
     findByName: (q) => FIND[String(q).trim().toLowerCase()] || 0, distanceMeters: (x, y) => (DIST.get(`${x}|${y}`) ?? 2),
     profileOf: (x) => (PROFILES[x] ?? -1), discordOf: (x) => DISCORDS[x] || '',
   });
@@ -205,6 +207,107 @@ const named = (a, id) => inv(a).filter((e) => e.baseId === id && e.name);
   ok(!getp(APP1, 'private.dboSwordMaster') && rate(APP1, SWORD_M) === 1, 'Blade switched off: no school and no boost');
   const RATES = fs.readFileSync(path.join(ROOT, 'skillrates.js'), 'utf8');
   ok(/__dboCapstoneSkillRate\(actorId >>> 0, skillId, kind, detail\)\); if \(Number\.isFinite\(r\) && r >= 1 && r <= 2\) rate \*= r;/.test(RATES), 'skillrates.js multiplies by the school rate after the meter, clamped to 1..2');
+
+  // ---- step 4: once a day (Nat, 2 Nov) ----
+  const BRUTE = 0xff000301, DIGGER = 0xff000302, CHEF = 0xff000303, WALL = 0xff000304, MONK = 0xff000305, FALLEN = 0xff000306, FOE = 0xff000307, G1 = 0xff000308, G2 = 0xff000309, FAR = 0xff00030a;
+  const MACE = 0x00013982, IRONSWORD = 0x00012eb7, PLATE = 0x00013966, STAFF = 0x000a1001;
+  TYPES[MACE] = 'WEAP'; TYPES[IRONSWORD] = 'WEAP'; TYPES[PLATE] = 'ARMO'; TYPES[STAFF] = 'WEAP';
+  WSKILL[MACE] = 'blunt'; WSKILL[IRONSWORD] = 'blade'; WSKILL[STAFF] = 'unarmed';
+  FIELDS[PLATE] = [{ type: 'BOD2', data: new Uint8Array([4, 0, 0, 0, 1, 0, 0, 0]) }];
+  gm(BRUTE, 'blunt'); gm(DIGGER, 'miner'); gm(CHEF, 'cook'); gm(WALL, 'defense'); gm(MONK, 'unarmed');
+  for (const a of [BRUTE, DIGGER, CHEF, WALL, MONK, FALLEN, FOE, G1, G2, FAR]) put(a, 'inventory', { entries: [] });
+  const os = require('os');
+  const VEINS = path.join(os.tmpdir(), `capstones-veins-${process.pid}.json`);
+  fs.writeFileSync(VEINS, JSON.stringify({ veins: [
+    { edid: 'MineOreIron01', world: '3c:Skyrim.esm', pos: [700, 0, 0] },
+    { edid: 'MineOreEbony01', world: '3c:Skyrim.esm', pos: [0, 70000, 0] },
+    { edid: 'MineOreMeteoricIron01', world: '3c:Skyrim.esm', pos: [0, 1400, 0] },
+    { edid: 'MineOreEbony01', world: '1a2b:Skyrim.esm', pos: [0, 70, 0] },   // verify-formids: ignore - a made-up world, on purpose: a vein elsewhere
+    { edid: 'MineOreEbony01', world: '3c:Skyrim.esm', pos: [0, -9999999, 0] },
+  ] }));
+  const ALL4 = { capstones: { enabled: true, blunt: { enabled: true }, miner: { enabled: true, meters: 3000, veinsFile: VEINS }, cook: { enabled: true, guests: 10, meters: 5, wellFedHours: 6 }, defense: { enabled: true, seconds: 60, meters: 2 }, unarmed: { enabled: true } } };
+  C = load(ALL4);
+  const cmd = (name, a, t) => { cmds.get(name)(a, t || ''); return last(a); };
+
+  // Blunt, Breaker of Doors
+  ok(!globalThis.__dboCapstoneBreak(BRUTE, 0x1234), 'no /breaker: the lock is picked as ever');
+  cmd('breaker', BRUTE);
+  ok(!globalThis.__dboCapstoneBreak(BRUTE, 0x1234) && /war axe, mace/.test(last(BRUTE)), 'armed but no blunt weapon in hand: refused, and told why');
+  put(BRUTE, 'inventory', { entries: [{ baseId: MACE, count: 1, worn: true }] });
+  ok(globalThis.__dboCapstoneBreak(BRUTE, 0x1234) && C.usedToday(BRUTE, 'breaker'), 'with a mace in hand the lock breaks, and today\'s use is spent');
+  ok(/spent/.test(cmd('breaker', BRUTE)) && !globalThis.__dboCapstoneBreak(BRUTE, 0x1235), '...and no second today');
+  globalThis.__dboCapstoneArmed.set(BRUTE, { kind: 'breaker', at: Date.now() });
+  ok(!globalThis.__dboCapstoneBreak(BRUTE, 0x1236), '...even armed some other way, the break itself checks the day');
+  globalThis.__dboCapstoneArmed.delete(BRUTE);
+
+  // Miner, Prospector's Sense
+  put(DIGGER, 'worldOrCellDesc', '3c:Skyrim.esm'); put(DIGGER, 'pos', [0, 0, 0]);
+  let line = cmd('prospect', DIGGER);
+  ok(/Ebony lies north of you, about 1000 m away/i.test(line) && C.usedToday(DIGGER, 'prospect'), 'the rarest ore near wins over a nearer iron vein, with its way and distance', line);
+  put(DIGGER, 'private.dboCapstones', {});
+  put(DIGGER, 'pos', [0, -150000, 0]);
+  line = cmd('prospect', DIGGER);
+  ok(/Meteoric lies north/i.test(line), 'beyond reach of the ebony, the next rarest (meteoric, not plain iron)', line);
+  put(DIGGER, 'private.dboCapstones', {}); put(DIGGER, 'worldOrCellDesc', '9999:Skyrim.esm');
+  line = cmd('prospect', DIGGER);
+  ok(/nothing rare answers/.test(line) && !C.usedToday(DIGGER, 'prospect'), 'nothing in this cell or world: told, and the use is not spent', line);
+
+  // Cook, The Feast
+  put(CHEF, 'pos', [0, 0, 0]);
+  ONLINE.length = 0; ONLINE.push(CHEF, G1, G2, FAR);
+  DIST.set(`${CHEF}|${G1}`, 3); DIST.set(`${CHEF}|${G2}`, 4); DIST.set(`${CHEF}|${FAR}`, 30);
+  SATED.length = 0;
+  line = cmd('feast', CHEF);
+  ok(/feast to 2 guests/.test(line) && SATED.includes(G1) && SATED.includes(G2) && !SATED.includes(FAR) && SATED.includes(CHEF), 'the feast feeds the cook and the two guests near, not the one far off', line);
+  ok(Number((getp(G1, 'private.dboWellFed') || {}).until) > Date.now() + 5 * 3600000, '...each Well Fed for six hours (rest.js reads it)');
+  ok(/spent/.test(cmd('feast', CHEF)), '...one feast a day');
+  const CHEF2 = 0xff00030b; gm(CHEF2, 'cook'); ONLINE.push(CHEF2); DIST.set(`${CHEF2}|${G1}`, 1); DIST.set(`${CHEF2}|${G2}`, 1); DIST.set(`${CHEF2}|${FAR}`, 30); DIST.set(`${CHEF2}|${CHEF}`, 30);
+  line = cmd('feast', CHEF2);
+  ok(/Nobody is here to feast/.test(line) && !C.usedToday(CHEF2, 'feast'), 'guests who feasted today are not fed again, and a feast with nobody left is not spent', line);
+
+  // Defense, Shield over the Fallen
+  const downed = new Set([FALLEN]);
+  globalThis.__dboIsDowned = (x) => downed.has(x >>> 0);
+  globalThis.__dboCombat = new Map();
+  ONLINE.length = 0; ONLINE.push(WALL, FALLEN, FOE);
+  DIST.set(`${WALL}|${FALLEN}`, 1.5);
+  line = cmd('shieldover', WALL);
+  ok(/You stand over/.test(line) && C.usedToday(WALL, 'shieldover'), 'standing over the fallen player near, the guard begins', line);
+  ok(globalThis.__dboCapstoneGuarded(FALLEN, FOE) === true && /stands over them/.test(last(FOE)), 'while it holds, a foe\'s finishing blow is refused, and the foe is told');
+  globalThis.__dboCombat.set(WALL, { staggerAt: Date.now() + 1, guardBrokenUntil: 0 });
+  ok(globalThis.__dboCapstoneGuarded(FALLEN, FOE) === false, 'a stagger on the guard ends it');
+  ok(/spent/.test(cmd('shieldover', WALL)), '...and the day\'s use is gone');
+  const WALL2 = 0xff00030c; gm(WALL2, 'defense'); DIST.set(`${WALL2}|${FALLEN}`, 1); globalThis.__dboCombat = new Map();
+  cmd('shieldover', WALL2);
+  DIST.set(`${WALL2}|${FALLEN}`, 5);
+  ok(globalThis.__dboCapstoneGuarded(FALLEN, FOE) === false, 'stepping away ends it');
+  DIST.set(`${WALL2}|${FALLEN}`, 1);
+  const g = globalThis.__dboCapstoneGuards; g.set(FALLEN, { guard: WALL2, at: Date.now(), until: Date.now() - 1 });
+  ok(globalThis.__dboCapstoneGuarded(FALLEN, FOE) === false, 'and so does the time running out');
+
+  // Martial Arts, Second Wind
+  ok(globalThis.__dboCapstoneSecondWind(MONK) === true && C.usedToday(MONK, 'secondwind'), 'a Martial Arts Grandmaster down with bare fists gets a second wind');
+  ok(globalThis.__dboCapstoneSecondWind(MONK) === false, '...once a day');
+  const MONK2 = 0xff00030d; gm(MONK2, 'unarmed');
+  put(MONK2, 'inventory', { entries: [{ baseId: STAFF, count: 1, worn: true }] });
+  ok(globalThis.__dboCapstoneSecondWind(MONK2) === true, 'with a staff in hand too');
+  const MONK3 = 0xff00030e; gm(MONK3, 'unarmed');
+  put(MONK3, 'inventory', { entries: [{ baseId: IRONSWORD, count: 1, worn: true }] });
+  ok(globalThis.__dboCapstoneSecondWind(MONK3) === false && !C.usedToday(MONK3, 'secondwind'), 'not with a sword in hand, and the day is not spent');
+  put(MONK3, 'inventory', { entries: [{ baseId: PLATE, count: 1, worn: true }] });
+  ok(globalThis.__dboCapstoneSecondWind(MONK3) === false, 'not in heavy armour');
+  ok(globalThis.__dboCapstoneSecondWind(FOE) === false, 'and nobody below 100');
+  try { fs.unlinkSync(VEINS); } catch (e) { /* the OS clears it */ }
+  C = load({ capstones: { enabled: true, miner: { enabled: true, veinsFile: VEINS } } });
+  put(DIGGER, 'private.dboCapstones', {});
+  ok(/No vein survey is loaded/.test(cmd('prospect', DIGGER)) && !C.usedToday(DIGGER, 'prospect'), 'without the private vein survey, the Miner is told and nothing is spent');
+
+  // Their hooks in downed.js and dungeons.js
+  const DOWNED = fs.readFileSync(path.join(ROOT, 'downed.js'), 'utf8');
+  ok(/guarded = typeof globalThis\.__dboCapstoneGuarded === 'function' && !!globalThis\.__dboCapstoneGuarded\(tgt, agg\);[\s\S]{0,120}if \(!guarded && since >= C\.finishGraceSeconds/.test(DOWNED), 'downed.js refuses the finishing blow on a guarded player');
+  ok(/S\.downed\.set\(a, d\);[\s\S]{0,300}__dboCapstoneSecondWind\(a\)[\s\S]{0,300}revive\(a, 0, 'a second wind', \{ at: C\.secondWindHealth \}\)/.test(DOWNED), 'downed.js raises a second wind through revive, as the down lands');
+  const DUNG = fs.readFileSync(path.join(ROOT, 'dungeons.js'), 'utf8');
+  ok(DUNG.indexOf('__dboCapstoneBreak(casterId, targetId)') > 0 && DUNG.indexOf('__dboCapstoneBreak(casterId, targetId)') < DUNG.indexOf('const tier = lockpickingTier(casterId);'), 'dungeons.js asks the Breaker before any pick rule');
 
   // ---- the hooks in the other modules ----
   const ALC = fs.readFileSync(path.join(ROOT, 'alchemy.js'), 'utf8');
