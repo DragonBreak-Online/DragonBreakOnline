@@ -3130,9 +3130,33 @@ void ActionListener::OnSpellCast(const RawMessageData& rawMsgData,
     auto existing = restorationChannels.find(casterId);
     const bool hadChannel = existing != restorationChannels.end();
 
+    // The player's own client runs a timed self restore, the ceiling allows it
+    if (!isConcentration && !spellCastData.keepAlive && caster == myActor &&
+        targetActor == caster) {
+      const size_t before = restoreEffects.size();
+      std::erase_if(restoreEffects, [&](const espm::Effects::Effect& effect) {
+        const auto av =
+          espm::GetData<espm::MGEF>(effect.effectId, &partOne.worldState)
+            .data.primaryAV;
+        if (!IsRestoreAV(av) || effect.duration == 0) {
+          return false;
+        }
+        caster->NoteTimedRestore(spellCastData.spell, av, effect.magnitude,
+                                 static_cast<float>(effect.duration));
+        return true;
+      });
+      if (restoreEffects.size() != before) {
+        spdlog::info("ActionListener::OnSpellCast - {} timed restore(s) of "
+                     "spell {:x} left to {:x}'s client",
+                     before - restoreEffects.size(), spellCastData.spell,
+                     caster->GetFormId());
+      }
+    }
+
     // Concentration heals accrue per second of channel so a tap heals a tap's
     // worth
-    if (!isConcentration && !spellCastData.keepAlive) {
+    if (!isConcentration && !spellCastData.keepAlive &&
+        !restoreEffects.empty()) {
       targetActor->ApplyMagicEffects(restoreEffects, hasSweetpie);
       spdlog::info("ActionListener::OnSpellCast - applied {} restorative "
                    "effect(s) of spell {:x} to actor {:x}",
