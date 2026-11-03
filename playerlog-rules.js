@@ -446,6 +446,9 @@ AUDIT_VERBS.CHAMPION.display = true;
 // BOSS <id> rose at <spot> | event ended | killed at <spot> by <display() [drops]; ...> | event started by <staff> for N min
 // (bosses.js): boss and spot ids, numbers, item and schematic names; the killers as Name #TAG, as CHAMPION's
 clean_('BOSS', { display: true, roles: R_BY([[/ started by $/, 'staff']]) });
+// VITALS <staff> set <boss> health +N, until <event id> ends | VITALS <boss> back to their own maximum (<reason> by <staff>), was
+// +N Health (bossvitals.js): who(), numbers, fixed words and a generated event id; the one raised is the target
+clean_('VITALS', { roles: R_BY([[/ set $/, 'target'], [/ by $/, 'staff']]) });
 AUDIT_VERBS.JAIL.roles = R_BY([[/ imprisoned $/, 'target'], [/ to $/, 'target']]);
 AUDIT_VERBS.BEAST.roles = R_BY([[/ (?:to|from) $/, 'target']]);
 // FRENZY <werewolf> for N s, first on <target> (frenzy.js): ids, numbers and fixed reasons only
@@ -1517,6 +1520,8 @@ business.js BUSINESS 1cb283fe parsed
 business.js BUSINESS a7c97b52 parsed
 business.js TAX 4f9fe86e clean
 champions.js CHAMPION c06a6bd9 clean
+bossvitals.js VITALS de8f0aeb clean
+bossvitals.js VITALS 8dc9b1fd clean
 charlevel.js LEVEL e66d9173 clean
 charlevel.js LEVEL 34ff7176 clean
 charters.js CHARTER bbc7a352 parsed
