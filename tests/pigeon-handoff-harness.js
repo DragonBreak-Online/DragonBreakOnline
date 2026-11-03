@@ -33,7 +33,17 @@ new Function(...Object.keys(deps), `${coop}\nglobalThis.__dboOpenPigeonCoop = op
 const last = () => published[published.length - 1];
 const nonce = () => last().nonce;
 
-ok(/pigeon: 'dbo_pigeon'/.test(gm.slice(gm.indexOf('const NATIVE_SWF = '), gm.indexOf('\n', gm.indexOf('const NATIVE_SWF = ')))), 'NATIVE_SWF routes the coop to dbo_pigeon');
+ok(/pigeon: 'dbo_pigeon'/.test(gm.slice(gm.indexOf('const NATIVE_SWF = '), gm.indexOf('\n', gm.indexOf('const NATIVE_SWF = ')))), 'NATIVE_SWF still names the coop (so an open native coop is closed when the browser one opens)');
+// 3 Nov (amorcinocera, 0.3.111): the hand-off overlapped and nobody could type, so the coop goes to the browser outright,
+// even for a client that announced native:pigeon; the other native panels are not touched
+{
+  const route = gm.slice(gm.indexOf('const NATIVE_SWF = '), gm.indexOf('// A widget that moves between the custom menu'));
+  const caps = new Set(['native:pigeon', 'native:bank']);
+  const fn = new Function('noteNativeSize', 'globalThis.__dboPanelState = { caps: new Map(), nonces: new Map(), native: new Map([[1, arguments[1]]]) };\n' + route + '\nreturn nativeSwfFor;')(undefined, caps);
+  ok(fn(1, { type: 'pigeon', id: 31, view: 'letters' }, true) === '', 'a coop for a client with native:pigeon goes to the browser', fn(1, { type: 'pigeon', id: 31 }, true));
+  ok(fn(1, { type: 'bank', id: 70 }, true) === 'dbo_bank', '...while another native panel (the bank) still goes native', fn(1, { type: 'bank', id: 70 }, true));
+  globalThis.__dboPanelState = undefined;
+}
 ui.pigeonOpen(A, ['letters']);
 ok(!last().browser && !last().handoff && last().view === 'letters', 'a coop opened at a board is unmarked (native for a client with the cap)', last());
 ui.pigeonCompose(A, [nonce(), 'send', BOB]);

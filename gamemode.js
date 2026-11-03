@@ -4275,9 +4275,15 @@ const NATIVE_MAX_CHARS = 60000;
 const NATIVE_CHUNKED_MAX_CHARS = 60000; // 400000 drew blank or errored above ~70k chars (journal tabs, 3 Nov); W4
 // nativeOpen: actor -> the widget id on the custom menu; browserOpen: actor -> a widget of these types last sent to the browser
 const nativeState = () => { const p = globalThis.__dboPanelState || (globalThis.__dboPanelState = { caps: new Map(), nonces: new Map() }); if (!p.native) p.native = new Map(); if (!p.nativeOpen) p.nativeOpen = new Map(); if (!p.browserOpen) p.browserOpen = new Map(); return p; };
+// Native panels sent to the browser outright while their typed-input hand-off is broken on 0.3.111 (amorcinocera, 3 Nov
+// 02:21Z: "can't send pigeons, it just overlaps, where do you even type"). The pigeon coop has no native text box, so every
+// letter, order and courier job went through the hand-off. A type stays in NATIVE_SWF so an open native coop is still closed
+// when the browser one opens (openWidget below)
+const NATIVE_TO_BROWSER = new Set(['pigeon']);
 const nativeSwfFor = (a, widget, focus) => {
   const swf = widget && NATIVE_SWF[widget.type];
   if (!swf || (widget.type === 'prayer' && widget.mode !== 'pick')) return '';
+  if (NATIVE_TO_BROWSER.has(widget.type)) return '';
   if (widget.type === 'contextMenu' && !focus) return '';
   const c = nativeState().native.get(a >>> 0);
   if (!c || !c.has('native:' + widget.type)) return '';
