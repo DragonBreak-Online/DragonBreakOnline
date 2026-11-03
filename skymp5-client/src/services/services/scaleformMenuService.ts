@@ -6,7 +6,7 @@ import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { parseCustomPacket, sendCustomPacket } from "./customPacketUtil";
 import {
   Action, CAPS_RETRY_MS, CLIENT_CAPS, MENU_NAME, MenuState, OUT_VAR, UiEvent, capsFor, chunkArgs, isNew, newState, parseOutbox,
-  escapeTargetFor, parseUiEvent, planClose, planDeferred, planOpen, planReady, planRefresh, planTick, readyFrameOf, readyWasEarly, summary,
+  escapeTargetFor, parseUiEvent, planClose, planDeferred, planOpen, planReady, planRefresh, planTick, readyFrameOf, summary,
   nativeScaleOf, rootScaleFor,
 } from "./scaleformMenu";
 import { buttonKeyCode } from "./mouseKeys";
@@ -145,10 +145,6 @@ export class ScaleformMenuService extends ClientListener {
         // close, on closeNative and on failover - and failover can only fire before ready, because planTick
         // acts only while the phase is "opening".
         this.enqueue(planReady(this.state, frame, Date.now(), viaOutbox));
-        // A frame-1 ready was refused, so the outbox copy of that same message must still get through: isNew
-        // skips the first modFirst outbox messages as duplicates of mod events, and this one is no longer a
-        // duplicate of anything that was acted on.
-        if (!viaOutbox && readyWasEarly(this.state)) this.state.modFirst = Math.max(0, this.state.modFirst - 1);
         this.note(summary(this.state));
         return;
       }
