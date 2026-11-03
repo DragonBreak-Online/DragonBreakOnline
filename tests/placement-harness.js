@@ -37,7 +37,9 @@ const mp = {
   getDescFromId: (id) => (id >>> 0).toString(16),
   getIdFromDesc: (d) => parseInt(d, 16),
   destroyActor: (id) => calls.push(['destroyActor', id]),
-  lookupEspmRecordById: (id) => (id === 0xef052 ? { record: { type: 'CONT', editorId: 'TreasExplorerLootChest' } } : { record: { type: 'FURN' } }),
+  lookupEspmRecordById: (id) => (id === 0xef052 ? { record: { type: 'CONT', editorId: 'TreasExplorerLootChest' } }
+    : id === 0xb0b ? { record: { type: 'ACTI', fields: [{ type: 'OBND', data: new Uint8Array(new Int16Array([-10, -20, -5, 10, 20, 30]).buffer) }] } }
+    : { record: { type: 'FURN' } }),
   callPapyrusFunction: (kind, cls, fn, self, args) => {
     calls.push([fn, parseInt(self.desc, 16), args]);
     if (fn === 'PlaceAtMe') return { type: 'form', desc: (next++).toString(16) };
@@ -334,6 +336,17 @@ set(GM, 'worldOrCellDesc', 'a764b:BSHeartland.esm'); set(GM, 'pos', [1000, 2000,
   reset(); ui.placeCatalog(GM, []);
   check('an unchanged catalogue is not read again', !out.log.some((l) => /catalog of/.test(l)), out.log.join(' | '));
 }
+
+// the placement box's bounds: a base's OBND, null without one, nothing for a player
+out.packets.length = 0;
+ui.placeBounds(GM, ['b0b']);
+ui.placeBounds(GM, ['c0c']);
+ui.placeBounds(PLAYER, ['b0b']);
+ui.placeBounds(GM, [7]);
+const bp = out.packets.filter(([, p]) => p.customPacketType === 'placeBounds');
+check('placeBounds: a base\'s OBND as six numbers, in its own order', bp[0] && bp[0][0] === GM && bp[0][1].desc === 'b0b' && JSON.stringify(bp[0][1].obnd) === '[-10,-20,-5,10,20,30]', JSON.stringify(bp[0]));
+check('...a base with no OBND answers null', bp[1] && bp[1][1].desc === 'c0c' && bp[1][1].obnd === null, JSON.stringify(bp[1]));
+check('...a player, or a desc that is not a string, gets nothing', bp.length === 2, bp.length);
 
 process.chdir(home);
 fs.rmSync(dir, { recursive: true, force: true });

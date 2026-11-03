@@ -737,6 +737,22 @@ module.exports = (api) => {
     personal(a, r.text);
   });
 
+  // A base's object bounds (OBND: six int16, x1 y1 z1 x2 y2 z2, in its own frame), for the client's placement box: the
+  // client cannot read a record (W1, 2 Nov: invisible activators showed nothing while being placed). null when it has none
+  const obndOf = (desc) => {
+    try {
+      const r = typeof mp.lookupEspmRecordById === 'function' ? mp.lookupEspmRecordById(mp.getIdFromDesc(desc)) : null;
+      const f = r && r.record && (r.record.fields || []).find((x) => x.type === 'OBND' && x.data instanceof Uint8Array && x.data.byteLength >= 12);
+      if (!f) return null;
+      const v = new DataView(f.data.buffer, f.data.byteOffset, 12);
+      return [0, 2, 4, 6, 8, 10].map((o) => v.getInt16(o, true));
+    } catch (e) { return null; }
+  };
+  onUi('placeBounds', (a, args) => {
+    if (!isAdmin(a) || typeof args[0] !== 'string' || !args[0]) return;
+    sendPacket(a, { customPacketType: 'placeBounds', desc: args[0], obnd: obndOf(args[0]) });
+  });
+
   // The select tool aimed at something: if it was placed with the tab and this GM may change it, the client edits it
   onUi('placeSelect', (a, args) => {
     if (!isAdmin(a) || bizLedger(args[0], true) || decor(args[0], true, a)) return;
