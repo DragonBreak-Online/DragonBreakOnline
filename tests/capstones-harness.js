@@ -350,6 +350,27 @@ const named = (a, id) => inv(a).filter((e) => e.baseId === id && e.name);
     C = load(ALL4 || CFG);
   }
 
+  // ---- step 5c: Archery, Clean Kill ----
+  {
+    const ARCHER = 0xff000501, WOLF = 0xff000502, WOLF2 = 0xff000503, PLAYERX = 0xff000504, BOW = 0x00013985;
+    TYPES[BOW] = 'WEAP'; WSKILL[BOW] = 'archery';
+    gm(ARCHER, 'archery'); put(ARCHER, 'profileId', 60); put(PLAYERX, 'profileId', 61);
+    C = load({ capstones: { enabled: true, archery: { enabled: true } } });
+    globalThis.__dboCapstoneHit(ARCHER, WOLF, BOW);
+    ok(globalThis.__dboCapstoneDeath(WOLF) === true && getp(WOLF, 'private.dboCleanKill').by === ARCHER, "a beast whose last blow was the Grandmaster's arrow is a clean kill");
+    globalThis.__dboCapstoneHit(ARCHER, WOLF2, BOW); globalThis.__dboCapstoneHit(ARCHER, WOLF2, IRONSWORD);
+    ok(globalThis.__dboCapstoneDeath(WOLF2) === false && !getp(WOLF2, 'private.dboCleanKill'), '...not when the last blow was a sword');
+    globalThis.__dboCapstoneHit(ARCHER, PLAYERX, BOW);
+    ok(!globalThis.__dboCapstoneLastHit.has(PLAYERX), 'a blow on a player is not even tracked');
+    ok(globalThis.__dboCapstoneDeath(PLAYERX) === false && !getp(PLAYERX, 'private.dboCleanKill'), '...and never a player');
+    globalThis.__dboCapstoneHit(FOE, WOLF2, BOW);
+    ok(globalThis.__dboCapstoneDeath(WOLF2) === false, '...nor an archer below 100');
+    const GM_SRC = fs.readFileSync(path.join(ROOT, 'gamemode.js'), 'utf8');
+    ok(/__dboCapstoneHit\(agg, tgt, Number\(sourceId\) >>> 0\)/.test(GM_SRC) && /__dboCapstoneDeath\(Number\(actorId\) >>> 0\)/.test(GM_SRC), 'gamemode.js reports every landed blow and every death');
+    ok(/clean = !!mp\.get\(ses\.corpse, 'private\.dboCleanKill'\)[\s\S]{0,40}\n\s*const win = !v\.bad && \(cutsWin \|\| clean\)/.test(GM_SRC), "skinning a clean kill: a slipped cut no longer tears the hide (a refused report still loses)");
+    ok(/__dboDecorTrophySkinned\(a, skinRaceEdid\(ses\.corpse\)\)/.test(GM_SRC), 'a won skinning offers decor.js the body for a trophy');
+  }
+
   // ---- the hooks in the other modules ----
   const ALC = fs.readFileSync(path.join(ROOT, 'alchemy.js'), 'utf8');
   ok((ALC.match(/globalThis\.__dboCapstoneBrewing\(a, (draught\.potion|rec\.id|potion\.id)\);[^\n]*\n\s*give\(entries, \1, 1\);/g) || []).length === 3, 'alchemy.js reports every brew path (the draught, a specialty, a potion) before it gives the potion');

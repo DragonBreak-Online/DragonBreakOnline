@@ -200,6 +200,26 @@ ok(/materials are back/.test(last(OWNER)) && held(OWNER, WOOD) === wood && items
 fire('placeSelect', GM, [items()[0].ref]);
 ok(!placementSaid.length, 'placement.js ignores a GM aiming at a decor piece', placementSaid);
 
+// ---- Trophy Mount (capstones.js, Skinner at 100): HearthFires' trophies, one mount for each kind skinned ---------------
+{
+  globalThis.__dboCapstones = { on: (s) => s === 'skinner', isGrandmaster: (a, s) => a === OWNER && s === 'skinner' };
+  ok(globalThis.__dboDecorTrophySkinned(OWNER, 'WerewolfBeastRace') === null && globalThis.__dboDecorTrophySkinned(OWNER, 'DragonPriestRace') === null, 'a werewolf or a dragon priest is no trophy');
+  ok(globalThis.__dboDecorTrophySkinned(STRANGER, 'WolfRace') === null, 'a skinner below 100 keeps no trophy');
+  ok(globalThis.__dboDecorTrophySkinned(OWNER, 'WolfRace') === 'wolf' && JSON.stringify(getp(OWNER, 'private.dboTrophyKinds')) === '["wolf"]', 'a Grandmaster Skinner keeps a wolf to mount', getp(OWNER, 'private.dboTrophyKinds'));
+  cmd(STRANGER, 'find trophy');
+  ok(!/Mounted/.test(last(STRANGER)), 'trophies are not offered to anyone else', last(STRANGER));
+  cmd(OWNER, 'find bear trophy'); cmd(OWNER, 'place 1');
+  ok(/no bear skinned/i.test(last(OWNER)), 'a kind not skinned cannot be mounted', last(OWNER));
+  const n0 = items().length;
+  placeAt(OWNER, 'wolf trophy');
+  const t = items().find((i) => i.trophy === 'wolf');
+  ok(t && items().length === n0 + 1 && JSON.stringify(getp(OWNER, 'private.dboTrophyKinds')) === '[]', 'the wolf is mounted, and the kind is spent', items().map((i) => i.name));
+  cmd(OWNER, 'find wolf trophy'); cmd(OWNER, 'place 1');
+  ok(/no wolf skinned/i.test(last(OWNER)), '...a second needs a second wolf', last(OWNER));
+  if (t) items().splice(items().indexOf(t), 1);
+  delete globalThis.__dboCapstones;
+}
+
 // ---- the Locksmith (capstones.js, Lockpicking at 100; the Leader, 3 Nov): a lock on storage built in the home ----------
 {
   const box = { ref: 'ff0000f1', base: d(0x9002), name: 'Strongbox', group: 'storage', container: true, cell: d(CELL), pos: [1010, 1000, 50], rot: [0, 0, 0], paid: {} };

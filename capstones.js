@@ -59,6 +59,8 @@ module.exports = (api) => {
     woodcutter: 'Seasoned Timber: your sawing at a lumber pile or a saw mill gives twice the Sawn Logs.',
     lockpicking: 'Locksmith: fit a lock to storage built in a home, with its owner there (/fitlock).',
     priest: 'Consecration: once a week, consecrate a shrine of your god indoors; staff approve it (/consecrate).',
+    archery: 'Clean Kill: beasts your arrow brings down never tear when skinned.',
+    skinner: 'Trophy Mount: a beast you skin can be mounted as a trophy in a home (/decor find trophy).',
   };
 
   const get = (a, k, d) => { try { const v = mp.get(a >>> 0, k); return v === undefined || v === null ? d : v; } catch (e) { return d; } };
@@ -529,6 +531,25 @@ module.exports = (api) => {
     markUsed(a, 'consecrate', 'priest');
     return personal(a, `You ask to consecrate this place to ${godName} (c${n}). Staff will answer; until then it is only a place.`);
   }, { help: 'Grandmaster Priest: consecrate a shrine of your god where you stand (staff approve; once a week)' });
+
+  // ---- Archery, Clean Kill: a creature brought down by the Grandmaster's arrow keeps its hide whole ------------------
+  // gamemode.js reports every blow that landed (__dboCapstoneHit) and every death (__dboCapstoneDeath); a creature whose
+  // last blow, within 3 s of its death, was a Grandmaster Archer's arrow is marked private.dboCleanKill, and its skinning
+  // then never tears. Players are never marked
+  const LAST = globalThis.__dboCapstoneLastHit instanceof Map ? globalThis.__dboCapstoneLastHit : (globalThis.__dboCapstoneLastHit = new Map());
+  const isPlayer = (x) => { try { return Number(mp.get(x >>> 0, 'profileId')) >= 0; } catch (e) { return false; } };
+  globalThis.__dboCapstoneHit = (agg, tgt, src) => {
+    if (!on('archery') || isPlayer(tgt)) return;
+    LAST.set(tgt >>> 0, { agg: agg >>> 0, arrow: weaponSkillOf(src >>> 0) === 'archery', at: now() });
+    if (LAST.size > 4000) { const cut = now() - 60000; for (const [k, v] of LAST) if (v.at < cut) LAST.delete(k); }
+  };
+  globalThis.__dboCapstoneDeath = (dead) => {
+    const h = LAST.get(dead >>> 0);
+    LAST.delete(dead >>> 0);
+    if (!h || !h.arrow || now() - h.at > 3000 || !on('archery') || isPlayer(dead) || !isGrandmaster(h.agg, 'archery')) return false;
+    try { mp.set(dead >>> 0, 'private.dboCleanKill', { by: h.agg, at: now() }); } catch (e) { return false; }
+    return true;
+  };
 
   // ---- /capstone ------------------------------------------------------------------------------------------------------
   const STATUS = {
