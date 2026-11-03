@@ -987,7 +987,7 @@ const HELP_GROUPS = [
       'Introducing yourself, trading, inspecting or challenging someone to a duel: look at them and press X.', 'Emotes: press B.', 'Hiding your face: press H.',
       'Letters by pigeon, and yours to read: a notice board. A bird flies only to someone you have met.',
       'Everyone you have met: the ledger at a notice board or in your home (/ledger).'] },
-  { key: 'character', title: 'Your character', names: ['status', 'boost', 'referral', 'appearance', 'playtime', 'birthsign', 'capstone'],
+  { key: 'character', title: 'Your character', names: ['status', 'boost', 'referral', 'appearance', 'playtime', 'birthsign', 'capstone', 'bespoke', 'signature', 'enchantname'],
     hints: ['Your journal: press F3. Profile, stats, skills, magic, your god, and settings such as your keys.',
       'A new look: /appearance reopens the appearance editor (gold, once a day; race, sex and name stay).',
       'Your birthsign: /birthsign. It is chosen once, and only staff can change it.',
@@ -10757,13 +10757,13 @@ try {
   const CAPSTONES_JS = path.resolve('capstones.js');
   delete require.cache[CAPSTONES_JS];
   require(CAPSTONES_JS)({ mp, log, personal, audit, who, cfg, registerChatCommand, realNameOf, recordOf, itemName: (d) => adminItemName(d) });
-} catch (e) { log('capstones.js failed to load:', e.stack || e.message); for (const k of ['__dboCapstoneCrafted', '__dboCapstones']) globalThis[k] = null; }
+} catch (e) { log('capstones.js failed to load:', e.stack || e.message); for (const k of ['__dboCapstoneCrafted', '__dboCapstones', '__dboCapstoneWoven', '__dboCapstoneBrewing', '__dboCapstoneEnchanting']) globalThis[k] = null; }
 // ---- the Tailor's ranks gate what a loom makes (server\tailoring.js, config "tailoring"; Nate, 12 Oct): after smithing.js ----
 try {
   const TAILORING_JS = path.resolve('tailoring.js');
   delete require.cache[TAILORING_JS];
   require(TAILORING_JS)({ mp, log, personal, audit, who, cfg, isAdmin, sendPacket, registerChatCommand });
-} catch (e) { log('tailoring.js failed to load:', e.stack || e.message); for (const k of ['__dboTailorCraft', '__dboTailorTierOf']) globalThis[k] = null; }
+} catch (e) { log('tailoring.js failed to load:', e.stack || e.message); for (const k of ['__dboTailorCraft', '__dboTailorTierOf', '__dboTailorIsLoom']) globalThis[k] = null; }
 // ---- the schools of magic, Study Magic and the Class Lectern (server\schools.js, config "schools"): after spells.js, whose spellbook it reads ----
 try {
   const SCHOOLS_JS = path.resolve('schools.js');

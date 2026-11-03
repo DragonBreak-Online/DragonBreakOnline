@@ -101,7 +101,68 @@ const named = (a, id) => inv(a).filter((e) => e.baseId === id && e.name);
   cmds.get('capstone')(NOVICE, '');
   ok(/None of yours is there yet/.test(said.pop()[1]), '...and tells anyone else none is reached');
 
+  // ---- branch 2: Tailor, Alchemist, Enchanter (Nat, 2 Nov) ----
+  const TAILOR = 0xff000103, BREWER = 0xff000104, ENCHANTER = 0xff000105;
+  const ROBE = 0x0001be1a, POTION = 0x0003eadd, RING = 0x0001cb34, LOOM_RECIPE = 0x000a3;
+  TYPES[ROBE] = 'ARMO'; TYPES[POTION] = 'ALCH'; TYPES[RING] = 'ARMO';
+  NAMES[ROBE] = 'Fine Clothes'; NAMES[POTION] = 'Potion of Healing'; NAMES[RING] = 'Gold Ring';
+  const gm = (a, skill) => put(a, 'private.mastery', { v: 2, order: [skill], skills: { [skill]: { level: 100, xp: 0, rank: 4 } } });
+  gm(TAILOR, 'tailor'); gm(BREWER, 'alchemist'); gm(ENCHANTER, 'enchanter');
+  for (const a of [TAILOR, BREWER, ENCHANTER]) put(a, 'inventory', { entries: [] });
+  globalThis.__dboTailorIsLoom = (r) => (r >>> 0) === LOOM_RECIPE;
+  globalThis.__dboProseProblem = (t) => (/slurword/i.test(t) ? 'slurword' : null);
+  globalThis.__dboCapstoneArmed.clear();
+  C = load({ capstones: { enabled: true, blacksmith: { enabled: true }, tailor: { enabled: true }, alchemist: { enabled: true }, enchanter: { enabled: true } } });
+  const last = (a) => { const l = said.filter((x) => x[0] === a); return l.length ? l[l.length - 1][1] : ''; };
+
+  // Tailor
+  await forge(TAILOR, ROBE, LOOM_RECIPE);
+  ok(named(TAILOR, ROBE).length === 1 && named(TAILOR, ROBE)[0].name === 'Fine Clothes, sewn by Novice Smith', 'a Grandmaster Tailor\'s loom garment is sewn by them', inv(TAILOR));
+  ok(!(await forge(TAILOR, SWORD, FORGE_RECIPE)), "...a Tailor's forge work is no tailor's mark (and no smith's: Blacksmith is not theirs)");
+  cmds.get('bespoke')(TAILOR, 'the Jarl, of Whiterun');
+  ok(/simple marks only/.test(last(TAILOR)), 'a bespoke name cannot carry a comma (it would fake a mark)', last(TAILOR));
+  cmds.get('bespoke')(TAILOR, 'slurword robe');
+  ok(/will not do/.test(last(TAILOR)), '...nor pass the prose filter', last(TAILOR));
+  cmds.get('bespoke')(TAILOR, "the Jarl's Winter Robe");
+  await forge(TAILOR, ROBE, LOOM_RECIPE, 2);
+  ok(inv(TAILOR).some((e) => e.name === "the Jarl's Winter Robe, sewn by Novice Smith" && e.count === 1), 'a bespoke name goes on one garment only', inv(TAILOR));
+  ok(named(TAILOR, ROBE).find((e) => e.name === 'Fine Clothes, sewn by Novice Smith').count === 1, '...the rest of the batch stays plain until marked, the bespoke spent', inv(TAILOR));
+  await forge(TAILOR, ROBE, LOOM_RECIPE);
+  ok(named(TAILOR, ROBE).find((e) => e.name === 'Fine Clothes, sewn by Novice Smith').count === 2, '...and the next garment carries the plain mark again', inv(TAILOR));
+  globalThis.__dboCapstoneWoven(TAILOR, ROBE, 1); give(TAILOR, { baseId: ROBE, count: 1 }); await tick(5);
+  ok(named(TAILOR, ROBE).find((e) => e.name === 'Fine Clothes, sewn by Novice Smith').count === 3, 'a garment the server weaves is marked too');
+
+  // Alchemist
+  ok(!globalThis.__dboCapstoneBrewing(BREWER, POTION), 'a brew without /signature is not a signature draught');
+  cmds.get('signature')(BREWER, '');
+  ok(globalThis.__dboCapstoneBrewing(BREWER, POTION), '/signature arms the next brew');
+  give(BREWER, { baseId: POTION, count: 1 }); await tick(5);
+  ok(named(BREWER, POTION).length === 1 && named(BREWER, POTION)[0].name === 'Potion of Healing, brewed by Novice Smith' && C.usedToday(BREWER, 'signature'), "the draught carries the brewer's name and today's use is spent", inv(BREWER));
+  cmds.get('signature')(BREWER, '');
+  ok(/today's signature draught/.test(last(BREWER)) && !globalThis.__dboCapstoneBrewing(BREWER, POTION), 'a second one the same UTC day is refused', last(BREWER));
+  globalThis.__dboCapstoneArmed.set(BREWER, { kind: 'signature', at: Date.now() });
+  ok(!globalThis.__dboCapstoneBrewing(BREWER, POTION), '...even armed some other way, the brew itself checks the day');
+  globalThis.__dboCapstoneArmed.delete(BREWER);
+
+  // Enchanter
+  put(ENCHANTER, 'inventory', { entries: [{ baseId: RING, count: 1, enchantmentEffects: [{ id: 1, magnitude: 5 }] }] });
+  cmds.get('enchantname')(ENCHANTER, 'Frostbite of the Pale');
+  ok(globalThis.__dboCapstoneEnchanting(ENCHANTER), '/enchantname arms the next enchantment');
+  give(ENCHANTER, { baseId: RING, count: 1, enchantmentEffects: [{ id: 2, magnitude: 9 }] }); await tick(5);
+  const rings = inv(ENCHANTER).filter((e) => e.baseId === RING);
+  ok(rings.some((e) => e.name === 'Frostbite of the Pale, enchanted by Novice Smith' && e.enchantmentEffects[0].id === 2) && rings.some((e) => !e.name && e.enchantmentEffects[0].id === 1), 'the newly enchanted copy is named; the one already carried is not', rings);
+  cmds.get('enchantname')(ENCHANTER, 'Another');
+  ok(/a week after/.test(last(ENCHANTER)) && !globalThis.__dboCapstoneEnchanting(ENCHANTER), 'the next named enchantment waits a week', last(ENCHANTER));
+  const wk = Date.UTC(2026, 10, 2);
+  put(ENCHANTER, 'private.dboCapstones', { enchantname: '2026-11-02' });
+  ok(C.usedWithin(ENCHANTER, 'enchantname', 7, wk + 6 * 86400000) && !C.usedWithin(ENCHANTER, 'enchantname', 7, wk + 7 * 86400000), '...seven UTC days to the day');
+
   // ---- the hooks in the other modules ----
+  const ALC = fs.readFileSync(path.join(ROOT, 'alchemy.js'), 'utf8');
+  ok((ALC.match(/globalThis\.__dboCapstoneBrewing\(a, (draught\.potion|rec\.id|potion\.id)\);[^\n]*\n\s*give\(entries, \1, 1\);/g) || []).length === 3, 'alchemy.js reports every brew path (the draught, a specialty, a potion) before it gives the potion');
+  ok(/__dboCapstoneWoven\(a, r\.productId, r\.count\);[^\n]*\n\s*giveItem\(a, r\.productId, r\.count\);/.test(fs.readFileSync(path.join(ROOT, 'loomweave.js'), 'utf8')), 'loomweave.js reports a woven garment before it hands it over');
+  ok(/__dboEnchantScale = \(actorId, info\) => \{\n[^\n]*\n\s*try \{ if \(typeof globalThis\.__dboCapstoneEnchanting === 'function'\)/.test(fs.readFileSync(path.join(ROOT, 'enchanting.js'), 'utf8')), 'enchanting.js reports an enchantment first, even with its own scaling off');
+  ok(/globalThis\.__dboTailorIsLoom = isLoomRecipe;/.test(fs.readFileSync(path.join(ROOT, 'tailoring.js'), 'utf8')), 'tailoring.js exposes its loom test');
   const REG = fs.readFileSync(path.join(ROOT, 'regions.js'), 'utf8');
   const smithAt = REG.indexOf('globalThis.__dboSmithCrafted(a)'), capAt = REG.indexOf('globalThis.__dboCapstoneCrafted(a,');
   ok(capAt > 0 && capAt > smithAt && /verdict !== false && typeof globalThis\.__dboCapstoneCrafted === 'function'/.test(REG), "regions.js marks only after the whole craft chain let the craft on");

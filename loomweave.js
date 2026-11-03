@@ -99,6 +99,8 @@ module.exports = (api) => {
       }
     }
     try { mp.set(a, 'inventory', { entries: entries.filter((e) => Number(e.count) > 0) }); } catch (e) { log('loomweave: take failed', e.message); return { ok: false, text: 'The loom jams; nothing was used.' }; }
+    // A Grandmaster Tailor's mark (capstones.js), counted before the garment is handed over
+    try { if (typeof globalThis.__dboCapstoneWoven === 'function') globalThis.__dboCapstoneWoven(a, r.productId, r.count); } catch (e) { log('loomweave: capstone failed', e.message); }
     giveItem(a, r.productId, r.count);
     let units = 0;
     try { if (typeof globalThis.__alduinakMasteryAward === 'function') units = Number(globalThis.__alduinakMasteryAward(a, 'tailor', 1, r.productId)) || 0; } catch (e) { log('loomweave: award failed', e.message); }

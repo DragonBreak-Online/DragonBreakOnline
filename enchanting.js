@@ -64,6 +64,8 @@ module.exports = (api) => {
   globalThis.__dboEnchantShareOf = (kind) => (C.enabled ? share(ITEM[kind] === undefined ? ITEM.unknown : ITEM[kind]) : null);
 
   globalThis.__dboEnchantScale = (actorId, info) => {
+    // A Grandmaster Enchanter's named enchantment (capstones.js), before craftedExtrasSystem stores this one
+    try { if (typeof globalThis.__dboCapstoneEnchanting === 'function') globalThis.__dboCapstoneEnchanting(actorId); } catch (e) { log('enchanting: capstone failed', e.message); }
     if (!C.enabled || !info || !Array.isArray(info.effects)) return null;
     const base = baseShare(info);
     const spare = new Map();

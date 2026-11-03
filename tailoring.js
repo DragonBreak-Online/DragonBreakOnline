@@ -105,6 +105,8 @@ module.exports = (api) => {
     return false;
   };
   globalThis.__dboTailorTierOf = (itemId) => tierOfItem(itemId >>> 0);
+  // capstones.js: whether a recipe is loom work (a Grandmaster Tailor's mark goes only on what a loom makes)
+  globalThis.__dboTailorIsLoom = isLoomRecipe;
 
   if (typeof registerChatCommand === 'function') {
     registerChatCommand('tailoring', (a, rest) => {

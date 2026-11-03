@@ -730,6 +730,7 @@ module.exports = (api) => {
     const draught = typeof globalThis.__dboLabDraught === 'function' ? globalThis.__dboLabDraught(a, used) : null;
     if (draught && draught.potion) {
       for (const id of used) take(entries, id, 1);
+      try { if (typeof globalThis.__dboCapstoneBrewing === 'function') globalThis.__dboCapstoneBrewing(a, draught.potion); } catch (e) { log('alchemy: capstone failed', e.message); }
       give(entries, draught.potion, 1);
       try { mp.set(a, 'inventory', { entries: entries.filter((e) => Number(e.count) > 0) }); } catch (e) { log(`alchemy: inventory write failed for ${display(a)}: ${e.message}`); return; }
       draught.brewed();
@@ -744,6 +745,7 @@ module.exports = (api) => {
       const rec = t >= special.minTier ? special.byTier[t - 1] : null;
       if (rec) {
         for (const id of used) take(entries, id, 1);
+        try { if (typeof globalThis.__dboCapstoneBrewing === 'function') globalThis.__dboCapstoneBrewing(a, rec.id); } catch (e) { log('alchemy: capstone failed', e.message); }
         give(entries, rec.id, 1);
         try { mp.set(a, 'inventory', { entries: entries.filter((e) => Number(e.count) > 0) }); } catch (e) { log(`alchemy: inventory write failed for ${display(a)}: ${e.message}`); return; }
         const nm = specialtyName(special, t), does = doesText(rec.id);
@@ -776,6 +778,8 @@ module.exports = (api) => {
       return tell(a, `You cannot brew that${passed.length && passed.every((p) => p.dropped) ? '' : ' yet'}.${lockedHint(passed)}${hint} You keep your ingredients.`);
     }
     for (const id of used) take(entries, id, 1);
+    // A Grandmaster's signature draught (capstones.js), counted before the potion is handed over
+    try { if (typeof globalThis.__dboCapstoneBrewing === 'function') globalThis.__dboCapstoneBrewing(a, potion.id); } catch (e) { log('alchemy: capstone failed', e.message); }
     give(entries, potion.id, 1);
     try { mp.set(a, 'inventory', { entries: entries.filter((e) => Number(e.count) > 0) }); } catch (e) { log(`alchemy: inventory write failed for ${display(a)}: ${e.message}`); return; }
     const does = doesText(potion.id);

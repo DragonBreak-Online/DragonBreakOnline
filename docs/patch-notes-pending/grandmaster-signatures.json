@@ -1,0 +1,17 @@
+{
+  "title": "Grandmaster Rewards: Tailor, Alchemist and Enchanter",
+  "date": "",
+  "version": "Server update",
+  "tag": "New",
+  "sections": [
+    {
+      "heading": "Three more Grandmaster rewards",
+      "items": [
+        "Tailor (at 100): garments you make at a loom carry your mark, like \"Fine Clothes, sewn by Endarie\". For a commission, type /bespoke followed by the name the buyer wants, then make the garment: it carries that name and your mark.",
+        "Alchemist (at 100): once a day, type /signature and brew within ten minutes. That potion carries your name, like \"Potion of Healing, brewed by Arcadia\".",
+        "Enchanter (at 100): once a week, type /enchantname followed by a name, then enchant an item within ten minutes. It carries that name and your mark.",
+        "Once a day resets at midnight UTC. /capstone shows your reward and whether it is ready."
+      ]
+    }
+  ]
+}
