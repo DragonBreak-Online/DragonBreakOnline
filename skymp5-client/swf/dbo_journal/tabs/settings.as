@@ -234,6 +234,12 @@ function setInterface(L, ctx)
    flowHint("Ctrl and the mouse wheel over a panel resize it.");
    flowButtons([[L.panelsReset == true ? "Every panel is back to its size" : "Reset every panel's size", function() { dboSound("UIMenuOK"); dboSend("set:panelReset", []); }, undefined, L.panelsReset == true]]);
 
+   flowHeading("Game menus");
+   setChoice("Native menus", ui.nativeMenus == "off" ? "Every panel opens in the web page instead. Turn this on again here or on the web page's Interface settings." : "The game's own panels, drawn by Skyrim. Off opens every panel in the web page instead.",
+      [["on", "On"], ["off", "Off"]], ui.nativeMenus, function(v) { setSay("ui", {nativeMenus: v}); });
+   setChoice("Menu size", "The game's own panels, from the next one you open.",
+      [[0.6, "60%"], [0.7, "70%"], [0.75, "75%"], [0.85, "85%"], [1, "100%"], [1.1, "110%"], [1.2, "120%"]], ui.nativeScale, function(v) { setSay("ui", {nativeScale: v}); });
+
    flowHeading("Health, magicka and stamina");
    setChoice("Show the bars", ui.vitals == "fade" ? "They come back at once when you are hit, or use stamina or magicka. The hunger and voice panel fades with them and comes back when it changes, while you talk, or while you are hungry." : ui.vitals == "hidden" ? "The hunger and voice panel shows only while you talk." : "",
       [["always", "Always"], ["fade", "Fade when full"], ["hidden", "Hidden"]], ui.vitals, function(v) { setSay("ui", {vitals: v}); });

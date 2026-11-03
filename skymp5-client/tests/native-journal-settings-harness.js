@@ -102,6 +102,12 @@ const open = (section, settings, snap) => { const t = S.boot('dbo_journal'); t.p
   check('Transparency -5 sends 20', sent(t, 'set:chat') === '[{"chatTransparency":20}]');
   press(t, '150%');
   check('Interface size 150%', sent(t, 'set:scale') === '[1.5]');
+  // Nat, 3 Nov: the game's own panels on or off, and their size
+  check('Game menus: Native menus and Menu size are offered', /Native menus/.test(everyPage(t)) && /Menu size/.test(everyPage(t)));
+  press(t, 'Off');
+  check('...Off sends nativeMenus off', sent(t, 'set:ui') === '[{"nativeMenus":"off"}]', sent(t, 'set:ui'));
+  press(t, '70%');
+  check('...70% sends nativeScale 0.7', sent(t, 'set:ui') === '[{"nativeScale":0.7}]', sent(t, 'set:ui'));
   press(t, 'Reset every panel\'s size');
   check('Reset every panel\'s size', msgs(t, 'set:panelReset').length === 1);
 }

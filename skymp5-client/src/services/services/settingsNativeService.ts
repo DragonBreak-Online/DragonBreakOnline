@@ -156,6 +156,7 @@ export class SettingsNativeService extends ClientListener {
     chat.saveSettingsFile(next.file);
     // The native HUD rereads only on a save it hears of; the page's save never comes for this one
     this.service(NativeHudService, (h) => h.settingsSaved(next.file));
+    this.service(ScaleformMenuService, (s) => s.settingsChanged());
     this.page(pageSyncJs(next.file, next.chat));
     this.push();
   }
