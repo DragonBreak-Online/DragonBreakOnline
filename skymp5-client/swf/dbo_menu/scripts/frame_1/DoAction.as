@@ -5,7 +5,9 @@
 // Typed values (the search, a name, a number, free words) go in a box on their own row (dboInput), one box at a time; a
 // name also offers the people you know as buttons, and a list of words is a row of choices.
 
-var DBO_SWF_VERSION = "menu-1";
+var DBO_SWF_VERSION = "menu-2";
+// menus are the hourglass's aqua, as the web player menu (dbo-theme.scss)
+webLook("aqua");
 var PANEL_W = 1160;
 var PANEL_H = 640;
 var PAD = 28;
@@ -309,14 +311,14 @@ function fieldRow(key, label, value, hint, max, restrict)
          boxField.restrict = restrict;
       }
       boxField.text = value;
-      button(c, "done", 10, BODY_W - 100, 6, 92, "Done", F_MEDIUM, 17, A_BUTTON_REST, function() { takeTyped(); });
+      webButton(c, "done", 10, BODY_W - 100, 6, 92, "Done", F_MEDIUM, 17, A_BUTTON_REST, function() { takeTyped(); });
       return c;
    }
    var v = dboText(c, "value", 2, INDENT + 270, 8, BODY_W - INDENT - 270 - 108, 26, dboFmt(F_MEDIUM, 17, value != "" ? C_TEXT : C_SECOND, 0.5), false);
    v.text = value != "" ? value : hint;
    if (dboCanType())
    {
-      var t = button(c, "type", 10, BODY_W - 100, 6, 92, "Type...", F_MEDIUM, 17, A_ROW_REST, function() { openBox(this.key); });
+      var t = webChip(c, "type", 10, BODY_W - 100, 6, 92, "Type...", F_MEDIUM, 17, A_BUTTON_REST, function() { openBox(this.key); });
       t.key = key;
    }
    return c;
@@ -335,7 +337,7 @@ function argRow(a, i)
       {
          chips.push([String(opts[k]), function() { vals[this.i] = val(this.i) == this.o && this.opt ? "" : this.o; dboSound("UIMenuFocus"); draw(); }, undefined, false, val(i) == String(opts[k])]);
       }
-      var row = flowButtons(chips);
+      var row = webSkinRow(flowButtons(chips), "chip");
       row._x = INDENT;
       for (var q = 0; q < opts.length; q++)
       {
@@ -375,7 +377,7 @@ function argRow(a, i)
    {
       b.push([String(found[m].label), function() { vals[this.i] = this.v; dboSound("UIMenuFocus"); draw(); }]);
    }
-   var pr = flowButtons(b);
+   var pr = webSkinRow(flowButtons(b), "chip");
    pr._x = INDENT;
    for (var n = 0; n < found.length; n++)
    {
@@ -402,7 +404,7 @@ function drawForm(e)
          chips.push([v.word != undefined && v.word != null && v.word != "" ? String(v.word) : args.length ? names.join(" ") : "just " + e.label,
             function() { endTyping(); vi = this.vi; vals = []; dboSound("UIMenuFocus"); draw(); }, undefined, false, i == vi]);
       }
-      var row = flowButtons(chips);
+      var row = webSkinRow(flowButtons(chips), "chip");
       row._x = INDENT;
       for (var q = 0; q < f.variants.length; q++)
       {
@@ -421,7 +423,7 @@ function drawForm(e)
 
 function runRow(preview, onPick, off, e, label)
 {
-   var r = flowEntry(preview, [[label != undefined ? label : "Run", onPick, undefined, off]]);
+   var r = webSkinRow(flowEntry(preview, [[label != undefined ? label : "Run", onPick, undefined, off]]), "gold");
    r.label.textColor = C_SECOND;
    r.btn0.entry = e;
 }
@@ -459,7 +461,7 @@ function entryRow(e, tag)
    var at = flowNeed(h);
    var c = at.clip.createEmptyMovieClip(at.name, fd());
    c._y = at.y;
-   var b = button(c, "run", 10, 0, 2, LABEL_W, String(e.label), F_MEDIUM, 17, A_BUTTON_REST, function()
+   var b = webChip(c, "run", 10, 0, 2, LABEL_W, String(e.label), F_MEDIUM, 17, A_BUTTON_REST, function()
    {
       var en = this.entry;
       if (plainForm(en))
@@ -482,7 +484,7 @@ function entryRow(e, tag)
    }
    if (bare && !plain)
    {
-      var more = button(c, "more", 11, LABEL_W + 8, 2, 40, openName == e.name ? "-" : "+", F_MEDIUM, 17, A_ROW_REST, function() { toggle(this.entry); });
+      var more = webChip(c, "more", 11, LABEL_W + 8, 2, 40, openName == e.name ? "-" : "+", F_MEDIUM, 17, A_BUTTON_REST, function() { toggle(this.entry); });
       more.entry = e;
    }
    var d = dboText(c, "desc", 1, dx, 6, BODY_W - dx, h, dboFmt(F_MEDIUM, 15, C_SECOND, 0.5), true);
@@ -513,7 +515,7 @@ function drawHead()
    dboTitle(h, "title", 1, PAD, 16, PANEL_W - PAD * 2, "What you can do");
    var s = dboText(h, "sub", 2, PAD, 56, PANEL_W - PAD * 2, 24, dboFmt(F_MEDIUM, 15, C_SECOND, 0.8), false);
    s.text = "Everything here can also be typed in chat. A lone / opens this page.";
-   dboDivider(h, PAD, 84, PANEL_W - PAD * 2);
+   webDivider(h, PAD, 84, PANEL_W - PAD * 2);
 }
 
 function drawSearch()
@@ -523,20 +525,20 @@ function drawSearch()
    {
       boxField = dboInput(a, "box", 2, PAD, 92, 520, 32, dboFmt(F_PLAIN, 18, C_TEXT, 0.5), MAX_SEARCH, false);
       boxField.text = query;
-      button(a, "done", 10, PAD + 528, 94, 100, "Search", F_MEDIUM, 17, A_BUTTON_REST, function() { takeTyped(); });
+      webButton(a, "done", 10, PAD + 528, 94, 100, "Search", F_MEDIUM, 17, A_BUTTON_REST, function() { takeTyped(); });
       return;
    }
    var x = PAD;
    if (dboCanType())
    {
-      button(a, "search", 10, x, 94, 200, "Search...", F_MEDIUM, 17, A_ROW_REST, function() { openBox("search"); });
+      webChip(a, "search", 10, x, 94, 200, "Search...", F_MEDIUM, 17, A_BUTTON_REST, function() { openBox("search"); });
       x += 208;
    }
    if (query != "")
    {
       var f = dboText(a, "filter", 1, x, 96, 400, 28, dboFmt(F_MEDIUM, 17, C_SECOND, 0.8), false);
       f.text = "\"" + query + "\"";
-      button(a, "clear", 11, x + 408, 94, 90, "Clear", F_MEDIUM, 17, A_ROW_REST, function() { query = ""; page = 0; dboSound("UIMenuCancel"); draw(); });
+      webChip(a, "clear", 11, x + 408, 94, 90, "Clear", F_MEDIUM, 17, A_BUTTON_REST, function() { query = ""; page = 0; dboSound("UIMenuCancel"); draw(); });
    }
 }
 
@@ -582,10 +584,9 @@ function drawTabs()
 function drawFoot(pages)
 {
    var f = clear("foot", 60);
-   dboDivider(f, PAD, PANEL_H - 62, PANEL_W - PAD * 2);
-   var p = dboText(f, "pages", 1, PAD + 220, PANEL_H - 46, 400, 24, dboFmt(F_MEDIUM, 15, C_SECOND, 0.5), false);
-   p.text = pages > 1 ? "Page " + (page + 1) + " of " + pages + " (Left / Right)" : "";
-   button(f, "switch", 10, PAD, PANEL_H - 48, 200, "Switch character", F_MEDIUM, 17, A_ROW_REST, function()
+   webDivider(f, PAD, PANEL_H - 62, PANEL_W - PAD * 2);
+   pageBar(f, 1, PAD + 300, PANEL_H - 48, 360, page, pages, turnPage);
+   webChip(f, "switch", 10, PAD, PANEL_H - 48, 200, "Switch character", F_MEDIUM, 17, A_BUTTON_REST, function()
    {
       endTyping();
       dboSound("UIMenuOK");
@@ -593,7 +594,7 @@ function drawFoot(pages)
       dboSend("dbo:menuSwitchChar", []);
       dboClose();
    });
-   button(f, "close", 11, PANEL_W - PAD - 100, PANEL_H - 48, 100, "Close", F_MEDIUM, 20, A_BUTTON_REST, function() { closeMenu(); });
+   webButton(f, "close", 11, PANEL_W - PAD - 100, PANEL_H - 48, 100, "Close", F_MEDIUM, 20, A_BUTTON_REST, function() { closeMenu(); });
 }
 
 // Where a control sits, so the focus can find it again after a redraw
@@ -666,13 +667,15 @@ function draw()
    {
       endTyping();
    }
+   flowKeep();
    var pages = flowShow(page);
-   if (page >= pages)
-   {
-      page = pages - 1;
-      flowShow(page);
-   }
+   page = flow.shown;
    drawFoot(pages);
+   focusBack(was);
+}
+
+function focusBack(was)
+{
    for (var n = 0; was != "" && n < actions.length; n++)
    {
       if (placeOf(actions[n]) == was)
@@ -683,12 +686,28 @@ function draw()
    }
 }
 
+// Every page is drawn already: a turn shows another and draws the foot again, nothing else (flowTurn)
+function turnPage(d)
+{
+   var next = page + d;
+   if (data == null || flow == null || next < 0 || next >= flow.pages.length)
+   {
+      return;
+   }
+   dboSound("UIMenuPrevNext");
+   var was = focus >= 0 && focus < actions.length ? placeOf(actions[focus]) : "";
+   page = next;
+   var pages = flowTurn(page);
+   drawFoot(pages);
+   focusBack(was);
+}
+
 function build()
 {
    panel = _root.createEmptyMovieClip("dboPanel", 10);
    dboFit(panel, PANEL_W, PANEL_H);
    var bg = panel.createEmptyMovieClip("bg", 1);
-   dboGround(bg, PANEL_W, PANEL_H);
+   webGround(bg, PANEL_W, PANEL_H);
    dboWatermark(panel, 5, PANEL_W - 50, 150, 280);
    dboFadeIn(panel);
 }
@@ -778,20 +797,17 @@ keys.onKeyDown = function()
    {
       actions[focus].onPick();
    }
-   else if ((code == 37 || code == 33) && page > 0)
+   else if (code == 37 || code == 33)
    {
-      dboSound("UIMenuPrevNext");
-      page--;
-      draw();
+      turnPage(-1);
    }
-   else if ((code == 39 || code == 34) && flow != null && page + 1 < flow.pages.length)
+   else if (code == 39 || code == 34)
    {
-      dboSound("UIMenuPrevNext");
-      page++;
-      draw();
+      turnPage(1);
    }
 };
 dboKeys(keys);
+wheelPaging(turnPage);
 
 _root.onEnterFrame = function()
 {

@@ -18,9 +18,10 @@ const press = (t, label) => { const b = btn(t, label); if (!b) throw new Error('
 const tabBtn = (t, n) => P(t).tabs['t' + n];
 const msgs = (t, key) => t.msgs().filter((m) => m.key === key);
 // The list rows on the shown page, top to bottom: their names
-const rows = (t) => { const out = []; const f = P(t).flowClip; for (const pg of Object.values(f.kids)) { if (!pg._visible) continue; for (const r of Object.values(pg.kids)) if (r.kids && r.label && r.sub) out.push(r); } return out.sort((a, b) => a._y - b._y); };
+// (the rows are pooled clips, refilled in place: a hidden one is not on the page)
+const rows = (t) => { const l = P(t).list; return Object.values(l.kids).filter((r) => r.kids && r.label && r.sub && r._visible !== false).sort((a, b) => a._y - b._y); };
 const names = (t) => rows(t).map((r) => r.label.text);
-const rowBtn = (t, name) => { const r = rows(t).find((x) => x.label.text === name); return r && r.btn0; };
+const rowBtn = (t, name) => { const r = rows(t).find((x) => x.label.text === name); return r && r.btn0 && r.btn0._visible !== false ? r.btn0 : undefined; };
 const texts = (t) => { const out = []; const walk = (c) => { for (const k of Object.values(c.kids || {})) { if (typeof k.text === 'string' && visible(k)) out.push(k.text); if (k.kids) walk(k); } }; walk(P(t)); return out.join(' | '); };
 
 const events = { add: 'trade:add', remove: 'trade:remove', lock: 'trade:lock', unlock: 'trade:unlock', accept: 'trade:accept', cancel: 'trade:cancel',
@@ -57,8 +58,10 @@ const w = (o) => Object.assign({}, base, o);
   rowBtn(t, 'Iron Ingot').onRelease();
   check('a stack asks how many first, nothing sent', msgs(t, 'trade:add').length === 1 && /Offer how many Iron Ingot\?/.test(P(t).tools.question.text) && P(t).tools.value.text === '1 of 12');
   check('...with the focus on Confirm', t.ctx.focus === P(t).tools.confirm.idx);
+  const toolsClip = P(t).tools, listClip = P(t).list;
   press(t, '+10'); press(t, '+10');
   check('+10 twice stops at the stack: 12 of 12', P(t).tools.value.text === '12 of 12', P(t).tools.value.text);
+  check('...rewriting the count in place: the tools and the list are not redrawn', P(t).tools === toolsClip && P(t).list === listClip);
   press(t, '-1'); press(t, '-10'); press(t, '-10');
   check('...and never below 1', P(t).tools.value.text === '1 of 12', P(t).tools.value.text);
   P(t).tools.s2.onRollOver(); press(t, '+1'); press(t, '+1');
@@ -185,7 +188,7 @@ const w = (o) => Object.assign({}, base, o);
   const t = S.boot('dbo_trade');
   t.push(w({ theirOffer: [{ lineId: '9|z', baseId: 0x1, count: 2, name: 'Sweetroll', cat: 'food', value: 2, weight: 0.5 }, goldLine(50)], theirLocked: true }));
   tabBtn(t, 2).onRelease();
-  check('their offer lists their goods with no buttons', names(t).join('|') === 'Gold|Sweetroll' && rows(t).every((r) => !r.btn0), names(t));
+  check('their offer lists their goods with no buttons', names(t).join('|') === 'Gold|Sweetroll' && rows(t).every((r) => !visible(r.btn0)), names(t));
   check('their gold shows on its own line and the tab says locked', P(t).tools.their.text === 'Gold:  50' && /\[locked\]/.test(tabBtn(t, 2).label.text));
   check('their status says locked, not accepted', /Lydia locked, not accepted/.test(P(t).head.status.text));
   check('their totals', P(t).foot.totals.text === 'Base value 54 gold  ·  weighs 1', P(t).foot.totals.text);
@@ -248,16 +251,56 @@ const w = (o) => Object.assign({}, base, o);
   for (let i = 0; i < 15; i++) many.push({ lineId: 'm' + i, baseId: 0x100 + i, count: 1, name: 'Item ' + String(i).padStart(2, '0'), cat: 'misc', value: i, weight: 1 });
   t.push(w({ inventory: many }));
   const per = names(t).length;
-  check('a page holds at most 9 rows, the foot says page 1', per >= 5 && per <= 9 && /Page 1 of /.test(P(t).foot.pages.text), [per, P(t).foot.pages.text]);
+  const where = () => (P(t).foot.pager ? P(t).foot.pager.where.text : '');
+  check('a page holds at most 9 rows, the foot says page 1', per >= 5 && per <= 9 && where() === 'Page 1 of ' + Math.ceil(15 / per), [per, where()]);
+  check('...with Previous greyed on the first page and Next live', P(t).foot.pager.prev.disabled === true && P(t).foot.pager.next.disabled !== true);
   t.press(39);
-  check('Right turns the page', names(t)[0] === 'Item ' + String(per).padStart(2, '0') && /Page 2 of /.test(P(t).foot.pages.text), names(t));
+  check('Right turns the page', names(t)[0] === 'Item ' + String(per).padStart(2, '0') && /^Page 2 of /.test(where()), names(t));
   t.press(34); t.press(34); t.press(34);
   const last = Math.ceil(15 / per);
-  check('Page Down stops at the last page', P(t).foot.pages.text === 'Page ' + last + ' of ' + last + ' (Left / Right)', P(t).foot.pages.text);
+  check('Page Down stops at the last page, Next greyed there', where() === 'Page ' + last + ' of ' + last && P(t).foot.pager.next.disabled === true, where());
   t.press(33);
-  check('Page Up goes back', P(t).foot.pages.text === 'Page ' + (last - 1) + ' of ' + last + ' (Left / Right)');
+  check('Page Up goes back', where() === 'Page ' + (last - 1) + ' of ' + last);
+  // the clickable footer and the wheel (3 Nov polish: players had only the arrow keys)
+  P(t).foot.pager.prev.onRelease();
+  check('clicking Previous turns back', where() === 'Page ' + Math.max(1, last - 2) + ' of ' + last, where());
+  P(t).foot.pager.next.onRelease();
+  check('clicking Next turns on', where() === 'Page ' + (last - 1) + ' of ' + last, where());
+  const nextIdx = P(t).foot.pager.next.idx;
+  t.ctx.setFocus(nextIdx);
+  t.press(13);
+  check('Enter on a focused Next turns, and the focus stays on Next', P(t).foot.pager.next.idx === t.ctx.focus && where() === 'Page ' + last + ' of ' + last, [t.ctx.focus, where()]);
+  t.wheel(3);
+  check('the wheel up turns back', where() === 'Page ' + (last - 1) + ' of ' + last, where());
+  t.wheel(-3);
+  check('the wheel down turns on', where() === 'Page ' + last + ' of ' + last, where());
+  t.wheel(-3);
+  check('...and stops at the last page', where() === 'Page ' + last + ' of ' + last, where());
+  // a page turn redraws the list and the foot only: the head, tabs and tools are the clips they were
+  const seen = new Set();
+  const walk = (c) => { seen.add(c); for (const k of Object.values(c.kids || {})) walk(k); };
+  walk(P(t));
+  const head = P(t).head, tabs = P(t).tabs, tools = P(t).tools;
+  t.wheel(3);
+  let made = 0;
+  const count = (c) => { if (!seen.has(c)) made++; for (const k of Object.values(c.kids || {})) count(k); };
+  count(P(t));
+  check('a page turn keeps the head, tabs and tools as they were', P(t).head === head && P(t).tabs === tabs && P(t).tools === tools);
+  seen.clear(); walk(P(t));
+  t.push(w({ inventory: many }));
+  let full = 0;
+  const countFull = (c) => { if (!seen.has(c)) full++; for (const k of Object.values(c.kids || {})) countFull(k); };
+  countFull(P(t));
+  // on base a turn made about fifty (every row again); now the rows are refilled and only the foot is new
+  check('...and makes only the foot anew: no row clips (16 at most, where a full redraw made 66)', made > 0 && made <= 16 && full > made && P(t).head !== head, [made, full]);
+  {
+    const rowsBefore = Object.values(P(t).list.kids).filter((k) => k.kids);
+    t.push(w({ inventory: many.slice().reverse() }));
+    const rowsAfter = Object.values(P(t).list.kids).filter((k) => k.kids);
+    check('a payload refills the same row clips', rowsAfter.length === rowsBefore.length && rowsAfter.every((r) => rowsBefore.includes(r)), [rowsBefore.length, rowsAfter.length]);
+  }
   t.push(w({ inventory: many.slice(0, 2) }));
-  check('a shorter list pulls the page back', P(t).foot.pages.text === '' && names(t).length === 2);
+  check('a shorter list pulls the page back, and one page has no footer', !P(t).foot.pager && names(t).length === 2);
   t.press(40);
   check('Down focuses the first control', t.ctx.focus === 0);
   t.press(9);

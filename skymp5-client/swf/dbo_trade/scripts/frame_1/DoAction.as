@@ -4,7 +4,9 @@
 // browser's does. The keys go out as the widget's own events (trade:add, trade:remove, ...), which tradeService
 // handles exactly as it handles the browser's; every change comes back as a new payload from the server's tradeState.
 
-var DBO_SWF_VERSION = "trade-1";
+var DBO_SWF_VERSION = "trade-2";
+// work and trade wear bronze, as the web trade window does (dbo-theme.scss)
+webLook("bronze");
 var PANEL_W = 1100;
 var PANEL_H = 640;
 var PAD = 28;
@@ -179,34 +181,48 @@ function matches(items)
    return out;
 }
 
-function byName(a, b)
-{
-   var x = String(a.name).toLowerCase();
-   var y = String(b.name).toLowerCase();
-   return x < y ? -1 : x > y ? 1 : 0;
-}
-
+// Each name is lowered once, not in every comparison: AS2 is slow at strings, and a full pack is hundreds of lines
 function sorted(items)
 {
-   var list = items.slice();
+   var list = [];
+   for (var i = 0; i < items.length; i++)
+   {
+      list.push({k: String(items[i].name).toLowerCase(), v: Number(items[i].value) || 0, w: Number(items[i].weight) || 0, item: items[i]});
+   }
+   var byKey = function(a, b) { return a.k < b.k ? -1 : a.k > b.k ? 1 : 0; };
    if (sortBy == "value")
    {
-      list.sort(function(a, b) { return (Number(b.value) || 0) - (Number(a.value) || 0) || byName(a, b); });
+      list.sort(function(a, b) { return b.v - a.v || byKey(a, b); });
    }
    else if (sortBy == "weight")
    {
-      list.sort(function(a, b) { return (Number(b.weight) || 0) - (Number(a.weight) || 0) || byName(a, b); });
+      list.sort(function(a, b) { return b.w - a.w || byKey(a, b); });
    }
    else
    {
-      list.sort(byName);
+      list.sort(byKey);
    }
-   return list;
+   var out = [];
+   for (var j = 0; j < list.length; j++)
+   {
+      out.push(list[j].item);
+   }
+   return out;
 }
+
+// The goods list is filtered and sorted once per payload, category, sort or search, not on every draw and page turn
+var dataSeq = 0;
+var goodsKey = "";
+var goodsList = [];
 
 function goods()
 {
    var c = shownCat();
+   var key = dataSeq + "|" + c + "|" + sortBy + "|" + search;
+   if (key == goodsKey)
+   {
+      return goodsList;
+   }
    var inv = listOf(data.inventory);
    var out = [];
    for (var i = 0; i < inv.length; i++)
@@ -216,7 +232,9 @@ function goods()
          out.push(inv[i]);
       }
    }
-   return sorted(matches(out));
+   goodsKey = key;
+   goodsList = sorted(matches(out));
+   return goodsList;
 }
 
 function nextOf(list, now)
@@ -265,7 +283,8 @@ function promptSet(n)
 {
    prompt.n = Math.max(1, Math.min(Number(prompt.item.count), Math.floor(n)));
    dboSound("UIMenuFocus");
-   draw();
+   // only the count changes: it is rewritten in place, nothing is redrawn
+   panel.tools.value.text = prompt.n + " of " + prompt.item.count;
 }
 
 function promptConfirm()
@@ -403,11 +422,16 @@ function drawHead()
    var h = clear("head", 20);
    dboTitle(h, "title", 1, PAD, 16, PANEL_W - PAD * 2, "Trade with " + partner());
    var color = bothAccepted() ? C_GREEN : resetShown() && data.iAccepted != true && data.theyAccepted != true ? C_RED : C_TEXT;
-   var b = dboText(h, "banner", 2, PAD, 58, PANEL_W - PAD * 2, 28, dboFmt(F_MEDIUM, 18, color, 0.8), false);
+   // the web's banner: a faint box of the domain hue, edged in it
+   var bw = PANEL_W - PAD * 2;
+   dboBox(h, PAD, 56, bw, 30, C_ACCENT, 8);
+   dboBox(h, PAD, 56, bw, 1, C_ACCENT, 25);
+   dboBox(h, PAD, 85, bw, 1, C_ACCENT, 25);
+   var b = dboText(h, "banner", 2, PAD + 10, 58, bw - 20, 28, dboFmt(F_MEDIUM, 18, color, 0.8), false);
    b.text = bannerText();
-   var s = dboText(h, "status", 3, PAD, 86, PANEL_W - PAD * 2, 24, dboFmt(F_MEDIUM, 15, C_SECOND, 0.8), false);
+   var s = dboText(h, "status", 3, PAD, 88, PANEL_W - PAD * 2, 24, dboFmt(F_MEDIUM, 15, C_SECOND, 0.8), false);
    s.text = statusText("You", data.iAccepted == true, data.myLocked == true) + "     " + statusText(partner(), data.theyAccepted == true, data.theirLocked == true);
-   dboDivider(h, PAD, 114, PANEL_W - PAD * 2);
+   webDivider(h, PAD, 114, PANEL_W - PAD * 2);
    shownCount = bothAccepted() ? countdown() : -1;
 }
 
@@ -451,24 +475,24 @@ function drawPrompt(a)
    var x = PAD + 500;
    for (var i = 0; i < PROMPT_STEPS.length; i++)
    {
-      var b = button(a, "s" + i, 10 + i, x, 170, 60, PROMPT_STEPS[i][1], F_MEDIUM, 17, A_ROW_REST, function()
+      var b = webChip(a, "s" + i, 10 + i, x, 170, 60, PROMPT_STEPS[i][1], F_MEDIUM, 17, A_BUTTON_REST, function()
       {
          promptSet(prompt.n + this.step);
       });
       b.step = PROMPT_STEPS[i][0];
       x += 64;
    }
-   button(a, "all", 20, x, 170, 60, "All", F_MEDIUM, 17, A_ROW_REST, function()
+   webChip(a, "all", 20, x, 170, 60, "All", F_MEDIUM, 17, A_BUTTON_REST, function()
    {
       promptSet(Number(prompt.item.count));
    });
    x += 64;
-   button(a, "confirm", 21, x, 170, 110, "Confirm", F_MEDIUM, 17, A_BUTTON_REST, function()
+   webButton(a, "confirm", 21, x, 170, 110, "Confirm", F_MEDIUM, 17, A_BUTTON_REST, function()
    {
       promptConfirm();
    });
    x += 114;
-   button(a, "back", 22, x, 170, 80, "Back", F_MEDIUM, 17, A_BUTTON_REST, function()
+   webButton(a, "back", 22, x, 170, 80, "Back", F_MEDIUM, 17, A_BUTTON_REST, function()
    {
       prompt = null;
       dboSound("UIMenuCancel");
@@ -483,7 +507,7 @@ function drawGoodsTools(a)
    if (cats.length > 1)
    {
       var all = [["", "All"]].concat(cats);
-      button(a, "cat", 10, x, 170, 220, "Show: " + labelOf(all, shownCat(), "All"), F_MEDIUM, 17, A_ROW_REST, function()
+      webChip(a, "cat", 10, x, 170, 220, "Show: " + labelOf(all, shownCat(), "All"), F_MEDIUM, 17, A_BUTTON_REST, function()
       {
          cat = nextOf([["", "All"]].concat(presentCategories()), shownCat());
          page = 0;
@@ -492,7 +516,7 @@ function drawGoodsTools(a)
       });
       x += 228;
    }
-   button(a, "sort", 11, x, 170, 170, "Sort: " + labelOf(SORTS, sortBy, "Name"), F_MEDIUM, 17, A_ROW_REST, function()
+   webChip(a, "sort", 11, x, 170, 170, "Sort: " + labelOf(SORTS, sortBy, "Name"), F_MEDIUM, 17, A_BUTTON_REST, function()
    {
       sortBy = nextOf(SORTS, sortBy);
       page = 0;
@@ -504,7 +528,7 @@ function drawGoodsTools(a)
    {
       var box = dboInput(a, "box", 2, x, 168, 260, 32, dboFmt(F_PLAIN, 18, C_TEXT, 0.5), 40, false);
       box.text = search;
-      button(a, "done", 12, x + 268, 170, 90, "Done", F_MEDIUM, 17, A_BUTTON_REST, function()
+      webButton(a, "done", 12, x + 268, 170, 90, "Done", F_MEDIUM, 17, A_BUTTON_REST, function()
       {
          takeTyped();
       });
@@ -512,7 +536,7 @@ function drawGoodsTools(a)
    }
    if (dboCanType())
    {
-      button(a, "search", 12, x, 170, 140, "Search...", F_MEDIUM, 17, A_ROW_REST, function()
+      webChip(a, "search", 12, x, 170, 140, "Search...", F_MEDIUM, 17, A_BUTTON_REST, function()
       {
          typing = "search";
          dboSound("UIMenuOK");
@@ -524,7 +548,7 @@ function drawGoodsTools(a)
    {
       var f = dboText(a, "filter", 3, x, 172, 260, 28, dboFmt(F_MEDIUM, 17, C_SECOND, 0.8), false);
       f.text = "\"" + search + "\"";
-      button(a, "clear", 13, x + 268, 170, 90, "Clear", F_MEDIUM, 17, A_ROW_REST, function()
+      webChip(a, "clear", 13, x + 268, 170, 90, "Clear", F_MEDIUM, 17, A_BUTTON_REST, function()
       {
          search = "";
          page = 0;
@@ -549,7 +573,7 @@ function drawGoldTools(a)
       var box = dboInput(a, "box", 2, PAD + 80, 168, 180, 32, dboFmt(F_PLAIN, 18, C_TEXT, 0.5), 9, false);
       box.restrict = "0-9";
       box.text = String(goldShown());
-      button(a, "done", 10, PAD + 268, 170, 90, "Done", F_MEDIUM, 17, A_BUTTON_REST, function()
+      webButton(a, "done", 10, PAD + 268, 170, 90, "Done", F_MEDIUM, 17, A_BUTTON_REST, function()
       {
          takeTyped();
       });
@@ -564,7 +588,7 @@ function drawGoldTools(a)
    var x = PAD + 290;
    for (var i = 0; i < GOLD_STEPS.length; i++)
    {
-      var b = button(a, "s" + i, 10 + i, x, 170, 70, GOLD_STEPS[i][1], F_MEDIUM, 17, A_ROW_REST, function()
+      var b = webChip(a, "s" + i, 10 + i, x, 170, 70, GOLD_STEPS[i][1], F_MEDIUM, 17, A_BUTTON_REST, function()
       {
          goldWant = Math.max(0, Math.min(goldTotal(), goldShown() + this.step));
          dboSound("UIMenuFocus");
@@ -575,7 +599,7 @@ function drawGoldTools(a)
    }
    if (dboCanType())
    {
-      button(a, "type", 20, x, 170, 90, "Type...", F_MEDIUM, 17, A_ROW_REST, function()
+      webChip(a, "type", 20, x, 170, 90, "Type...", F_MEDIUM, 17, A_BUTTON_REST, function()
       {
          typing = "gold";
          dboSound("UIMenuOK");
@@ -583,7 +607,7 @@ function drawGoldTools(a)
       });
       x += 98;
    }
-   var offer = button(a, "set", 21, x, 170, 130, "Offer gold", F_MEDIUM, 17, A_BUTTON_REST, function()
+   var offer = webButton(a, "set", 21, x, 170, 130, "Offer gold", F_MEDIUM, 17, A_BUTTON_REST, function()
    {
       setGold();
    });
@@ -681,45 +705,87 @@ function details(item)
    return parts.join("  ·  ");
 }
 
-function itemRow(item, label, onPick, off)
+// The list's rows are made once and refilled: a page turn or a payload rewrites their text instead of making some fifty
+// clips and fields again (players found paging slow, 3 Nov)
+function listClip()
 {
-   var at = flowNeed(ROW_H);
-   var c = at.clip.createEmptyMovieClip(at.name, fd());
-   c._y = at.y;
-   var right = label != "" ? BODY_W - 132 : BODY_W;
-   var n = dboText(c, "label", 1, 0, 6, 440, 28, dboFmt(F_MEDIUM, 18, C_TEXT, 0.5), false);
-   n.text = String(item.name);
-   var s = dboText(c, "sub", 2, 450, 8, right - 450, 26, dboFmt(F_MEDIUM, 15, C_SECOND, 0.5), false);
-   s.text = details(item);
-   if (label != "")
+   if (panel.list == undefined)
    {
-      var b = button(c, "btn0", 10, BODY_W - 128, 2, 124, label, F_MEDIUM, 17, A_BUTTON_REST, onPick);
-      b.item = item;
-      if (off)
-      {
-         disable(b);
-      }
+      var l = panel.createEmptyMovieClip("list", 50);
+      l._x = PAD;
+      l._y = BODY_TOP;
+      dboText(l, "hint", 1, 0, 4, BODY_W, 26, dboFmt(F_MEDIUM, 15, C_SECOND, 0.5), false);
    }
+   return panel.list;
+}
+
+function poolRow(i)
+{
+   var l = listClip();
+   if (l["r" + i] != undefined)
+   {
+      return l["r" + i];
+   }
+   var c = l.createEmptyMovieClip("r" + i, 10 + i);
+   c._y = i * ROW_H;
+   // the web list's hairline between rows
+   dboBox(c, 0, ROW_H - 2, BODY_W, 1, C_ACCENT, 12);
+   dboText(c, "label", 1, 0, 6, 440, 28, dboFmt(F_MEDIUM, 18, C_TEXT, 0.5), false);
+   dboText(c, "sub", 2, 450, 8, BODY_W - 450, 26, dboFmt(F_MEDIUM, 15, C_SECOND, 0.5), false);
+   var b = webChip(c, "btn0", 10, BODY_W - 128, 4, 124, "", F_MEDIUM, 16, A_BUTTON_REST, function() { pick(this.dir, this.item); });
+   // drawList puts it in the focus order when its row is shown
+   actions.pop();
    return c;
 }
 
-// One page of a list; the page count comes back
+function fillRow(c, item, label, dir, off)
+{
+   c._visible = true;
+   c.label.text = String(item.name);
+   c.sub._width = label != "" ? BODY_W - 132 - 450 : BODY_W - 450;
+   c.sub.text = details(item);
+   var b = c.btn0;
+   b._visible = label != "";
+   if (label == "")
+   {
+      return;
+   }
+   b.item = item;
+   b.dir = dir;
+   b.label.text = label;
+   if (off)
+   {
+      disable(b);
+   }
+   else
+   {
+      b.disabled = false;
+      b.rest = A_BUTTON_REST;
+      b._alpha = A_BUTTON_REST;
+      b.label.textColor = C_TEXT;
+   }
+   b.idx = actions.length;
+   actions.push(b);
+}
+
+// One page of a list into the pooled rows; the page count comes back
 function drawList(items, label, dir, empty)
 {
    var pages = Math.max(1, Math.ceil(items.length / PER_PAGE));
    page = Math.max(0, Math.min(pages - 1, page));
-   if (!items.length)
-   {
-      flowHint(empty);
-      return 1;
-   }
+   var l = listClip();
+   l.hint.text = items.length ? "" : empty;
    var off = data.myLocked == true;
-   for (var i = page * PER_PAGE; i < items.length && i < (page + 1) * PER_PAGE; i++)
+   for (var r = 0; r < PER_PAGE; r++)
    {
-      var row = itemRow(items[i], label, function() { pick(this.dir, this.item); }, off);
-      if (label != "")
+      var i = page * PER_PAGE + r;
+      if (i < items.length)
       {
-         row.btn0.dir = dir;
+         fillRow(poolRow(r), items[i], label, dir, off);
+      }
+      else if (l["r" + r] != undefined)
+      {
+         l["r" + r]._visible = false;
       }
    }
    return pages;
@@ -749,25 +815,24 @@ function drawFoot(pages)
    var f = clear("foot", 60);
    var t = dboText(f, "totals", 1, PAD, PANEL_H - 100, PANEL_W - PAD * 2, 26, dboFmt(F_MEDIUM, 15, C_SECOND, 0.8), false);
    t.text = tab == "mine" ? totalsText(listOf(data.myOffer)) : tab == "theirs" ? totalsText(listOf(data.theirOffer)) : "";
-   dboDivider(f, PAD, PANEL_H - 66, PANEL_W - PAD * 2);
-   var p = dboText(f, "pages", 2, PAD, PANEL_H - 46, 360, 24, dboFmt(F_MEDIUM, 15, C_SECOND, 0.5), false);
-   p.text = pages > 1 ? "Page " + (page + 1) + " of " + pages + " (Left / Right)" : "";
+   webDivider(f, PAD, PANEL_H - 66, PANEL_W - PAD * 2);
+   pageBar(f, 2, PAD, PANEL_H - 50, 340, page, pages, turnPage);
    var x = PANEL_W - PAD - 130;
-   button(f, "cancel", 12, x, PANEL_H - 50, 130, "Cancel", F_MEDIUM, 20, A_BUTTON_REST, function()
+   webButton(f, "cancel", 12, x, PANEL_H - 50, 130, "Cancel", F_MEDIUM, 20, A_BUTTON_REST, function()
    {
       closeMenu();
    });
    if (data.myLocked == true)
    {
       x -= 158;
-      button(f, "unlock", 11, x, PANEL_H - 50, 150, data.iAccepted == true ? "Back out" : "Change offer", F_MEDIUM, 20, A_BUTTON_REST, function()
+      webButton(f, "unlock", 11, x, PANEL_H - 50, 150, data.iAccepted == true ? "Back out" : "Change offer", F_MEDIUM, 20, A_BUTTON_REST, function()
       {
          dboSound("UIMenuCancel");
          send("unlock");
       });
    }
    x -= 158;
-   var a = button(f, "accept", 10, x, PANEL_H - 50, 150, data.iAccepted == true ? (bothAccepted() ? "Trading..." : "Accepted") : "Accept", F_MEDIUM, 20, A_BUTTON_REST, function()
+   var a = webButton(f, "accept", 10, x, PANEL_H - 50, 150, data.iAccepted == true ? (bothAccepted() ? "Trading..." : "Accepted") : "Accept", F_MEDIUM, 20, A_BUTTON_REST, function()
    {
       accept();
    });
@@ -783,12 +848,44 @@ function placeOf(c)
    return c._parent._name + "/" + c._name;
 }
 
+function focusedPlace()
+{
+   return focus >= 0 && focus < actions.length ? placeOf(actions[focus]) : "";
+}
+
+function focusBack(was)
+{
+   for (var i = 0; was != "" && i < actions.length; i++)
+   {
+      if (placeOf(actions[i]) == was)
+      {
+         setFocus(i);
+         break;
+      }
+   }
+}
+
+// The pooled rows outlive a redraw, so the focused one is let go of first: its wash would stay
+function unfocus()
+{
+   if (focus >= 0 && focus < actions.length)
+   {
+      actions[focus]._alpha = actions[focus].rest;
+      dboWash(actions[focus], false);
+   }
+   focus = -1;
+}
+
+// The head, tabs and tools' controls come first in the focus order; drawBody replaces only what follows them
+var toolsEnd = 0;
+
 function draw()
 {
-   var was = focus >= 0 && focus < actions.length ? placeOf(actions[focus]) : "";
+   var was = focusedPlace();
    // a redraw rebuilds the open box: what was typed in it carries over
    var box = typing != "" && panel.tools != undefined ? panel.tools.box : undefined;
    var typed = box != undefined ? String(box.text) : null;
+   unfocus();
    actions = [];
    focus = -1;
    drawHead();
@@ -798,7 +895,51 @@ function draw()
    {
       panel.tools.box.text = typed;
    }
-   flowStart(panel, 50, PAD, BODY_TOP);
+   toolsEnd = actions.length;
+   drawBody();
+   if (focusConfirm && prompt != null)
+   {
+      focusConfirm = false;
+      setFocus(panel.tools.confirm.idx);
+      return;
+   }
+   focusBack(was);
+}
+
+// A page turn: the list and the foot alone are drawn again (players found the whole window's redraw slow)
+function turnPage(d)
+{
+   var next = page + d;
+   if (data == null || next < 0 || next >= pageCount())
+   {
+      return;
+   }
+   dboSound("UIMenuPrevNext");
+   page = next;
+   var was = focusedPlace();
+   drawBody();
+   focusBack(was);
+}
+
+function drawBody()
+{
+   if (focus >= toolsEnd)
+   {
+      unfocus();
+   }
+   actions = actions.slice(0, toolsEnd);
+   // a locked offer is framed in gold, as the web window's locked pane glows
+   var g = clear("locked", 45);
+   if (tab == "mine" && data.myLocked == true)
+   {
+      var gw = PANEL_W - PAD * 2 + 16;
+      var gh = BODY_H + 12;
+      dboBox(g, PAD - 8, BODY_TOP - 6, gw, gh, C_GOLD, 6);
+      dboBox(g, PAD - 8, BODY_TOP - 6, gw, 1, C_GOLD, 70);
+      dboBox(g, PAD - 8, BODY_TOP - 7 + gh, gw, 1, C_GOLD, 70);
+      dboBox(g, PAD - 8, BODY_TOP - 6, 1, gh, C_GOLD, 70);
+      dboBox(g, PAD - 9 + gw, BODY_TOP - 6, 1, gh, C_GOLD, 70);
+   }
    var pages = 1;
    if (tab == "goods")
    {
@@ -812,22 +953,7 @@ function draw()
    {
       pages = drawList(sorted(listOf(data.theirOffer)), "", "", "Nothing offered yet.");
    }
-   flowShow(0);
    drawFoot(pages);
-   if (focusConfirm && prompt != null)
-   {
-      focusConfirm = false;
-      setFocus(panel.tools.confirm.idx);
-      return;
-   }
-   for (var i = 0; was != "" && i < actions.length; i++)
-   {
-      if (placeOf(actions[i]) == was)
-      {
-         setFocus(i);
-         break;
-      }
-   }
 }
 
 function build()
@@ -835,7 +961,7 @@ function build()
    panel = _root.createEmptyMovieClip("dboPanel", 10);
    dboFit(panel, PANEL_W, PANEL_H);
    var bg = panel.createEmptyMovieClip("bg", 1);
-   dboGround(bg, PANEL_W, PANEL_H);
+   webGround(bg, PANEL_W, PANEL_H);
    dboWatermark(panel, 5, PANEL_W - 50, 150, 280);
    dboFadeIn(panel);
 }
@@ -850,6 +976,7 @@ _root.dboData = function(json)
    }
    var prev = data;
    data = p;
+   dataSeq++;
    if (acceptAfterLock)
    {
       acceptAfterLock = false;
@@ -948,20 +1075,17 @@ keys.onKeyDown = function()
    {
       setTab(tab == "goods" ? "mine" : tab == "mine" ? "theirs" : "goods");
    }
-   else if ((code == 37 || code == 33) && page > 0)
+   else if (code == 37 || code == 33)
    {
-      dboSound("UIMenuPrevNext");
-      page--;
-      draw();
+      turnPage(-1);
    }
-   else if ((code == 39 || code == 34) && page + 1 < pageCount())
+   else if (code == 39 || code == 34)
    {
-      dboSound("UIMenuPrevNext");
-      page++;
-      draw();
+      turnPage(1);
    }
 };
 dboKeys(keys);
+wheelPaging(turnPage);
 
 function pageCount()
 {
