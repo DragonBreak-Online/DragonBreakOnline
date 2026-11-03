@@ -141,6 +141,18 @@ export const capsFor = (setting: unknown): string[] => {
 // it at 60000 to be safe), so anything over CHUNK_CHARS goes as pieces of at most that size instead.
 export const MAX_PAYLOAD_CHARS = 400000;
 export const CHUNK_CHARS = 50000;
+
+// sp.settings["skymp5-client"]["nativeScale"]: every native panel drawn this much smaller or larger (live, 3 Nov: "really
+// zoomed in, harder to read"). The panels are built on a 1280 x 720 stage and fit themselves inside what it shows, so the
+// whole movie is scaled about the stage's centre, which every crop of that stage keeps in view; no swf changes
+export const NATIVE_SCALE = { default: 0.85, min: 0.6, max: 1.2 };
+export const nativeScaleOf = (setting: unknown): number => {
+  const v = typeof setting === "number" ? setting : typeof setting === "string" && setting.trim() ? Number(setting) : NaN;
+  return Number.isFinite(v) ? Math.min(NATIVE_SCALE.max, Math.max(NATIVE_SCALE.min, v)) : NATIVE_SCALE.default;
+};
+// The root clip's _xscale, _yscale, _x and _y for that scale, about the 1280 x 720 stage's centre
+export const rootScaleFor = (scale: number): { xscale: number; yscale: number; x: number; y: number } =>
+  ({ xscale: scale * 100, yscale: scale * 100, x: 640 * (1 - scale), y: 360 * (1 - scale) });
 const CHUNK_SEP = String.fromCharCode(1);
 
 // The invokeString arguments for _root.dboChunk: "id|i|n" CHUNK_SEP slice for each piece, or none when the payload fits
