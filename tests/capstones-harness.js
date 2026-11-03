@@ -109,7 +109,7 @@ const named = (a, id) => inv(a).filter((e) => e.baseId === id && e.name);
   const GM = fs.readFileSync(path.join(ROOT, 'gamemode.js'), 'utf8');
   ok(GM.indexOf("path.resolve('capstones.js')") > GM.indexOf("path.resolve('smithing.js')"), 'gamemode.js loads capstones.js after smithing.js');
   const CONF = JSON.parse(fs.readFileSync(path.join(ROOT, 'gamemode-config.json'), 'utf8')).capstones;
-  ok(CONF && CONF.enabled === true && CONF.blacksmith && CONF.blacksmith.enabled === false, 'the tracked config has its own switch, Maker\'s Mark off until Nat has tried it on dev', CONF);
+  ok(CONF && CONF.enabled === true && CONF.blacksmith && CONF.blacksmith.enabled === true, 'the tracked config has its own switch, Maker\'s Mark on', CONF);
 
   console.log(fails ? `${fails} FAILED` : 'all checks passed');
   process.exit(fails ? 1 : 0);
