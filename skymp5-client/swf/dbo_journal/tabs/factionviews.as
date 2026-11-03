@@ -1016,6 +1016,10 @@ function facStaff(s, ctx, off)
    {
       f = list[0];
    }
+   if (facAskPage(f, ctx))
+   {
+      return;
+   }
    var fb = [];
    for (var n = 0; n < list.length; n++)
    {

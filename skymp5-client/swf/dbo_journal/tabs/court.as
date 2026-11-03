@@ -5,6 +5,8 @@
 // rank, the contract terms, posting a hunt and commissioning goods, as the browser court's controls.
 // Actions are dbo:court* with the nonce first
 var courtZone = "";
+// The court a paged payload was last asked about: one shown without its page is asked for once
+var courtAsked = "";
 var courtView = "court";
 var courtSelected = "";
 var courtMoving = "";
@@ -531,6 +533,12 @@ JT.court = function(s, ctx)
    {
       c = courts[0];
       row[0][4] = true;
+   }
+   if (c != null && c.paged == true && courtAsked != c.id)
+   {
+      courtAsked = c.id;
+      ctx.openTab("court", {court: c.id});
+      return;
    }
    if (courts.length > 1)
    {
