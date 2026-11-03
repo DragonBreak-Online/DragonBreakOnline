@@ -136,6 +136,7 @@ ok(why(PCALT) === '', '(d) before anyone votes, an account on a shared PC may vo
 // ---- the threshold counts eligible accounts, a PC once ---------------------------------------------------------------------
 // 13 good + FALLBACK = 14; PCALT shares Citizen 0's PC: still 14; the refused five do not count
 ok(M.citizenAccounts(WR) === 14, '(threshold) 21 citizen accounts, 14 count: the refused ones out, the shared PC once', M.citizenAccounts(WR));
+ok(String(M.votingView(good[0], WR).citizens).startsWith('14 (20 citizens; not counted: ') && ['too little play', 'shares a PC', 'citizen too recently', 'Discord account too new'].every((k) => M.votingView(good[0], WR).citizens.includes(k)), '(panel) the count names the citizens and why the rest are not counted (lorvanack, 3 Nov)', M.votingView(good[0], WR).citizens);
 timer();
 ok(M.data().elections.whiterun.phase === 'held', '(threshold) 14 eligible accounts start no election');
 // Without the device file the PC rule cannot see the link: PCALT counts, and the log says why

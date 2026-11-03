@@ -664,6 +664,24 @@ module.exports = (api) => {
     return out.filter((p) => { const g = find(p); if (seen.has(g)) return false; seen.add(g); return true; });
   };
   const citizenAccounts = (z, E) => eligiblePids(z, E === undefined ? elOf(z.id) : E).length;
+  // The count as the panels show it ("Today: X of 15"): those who may vote, and when that is fewer than the citizens, how many
+  // citizens and why the rest are not counted (lorvanack, 3 Nov: the number looked stuck while new citizens joined)
+  const WHY_KINDS = [[/Discord/, 'Discord account too new'], [/hours of play/, 'too little play'], [/citizens of .* for/, 'citizen too recently']];
+  const countText = (z, E) => {
+    if (E === undefined) E = elOf(z.id);
+    const all = citizenPids(z), counted = countedPids(z), ok = eligiblePids(z, E);
+    if (ok.length >= all.size) return ok.length;
+    const tally = new Map();
+    const note = (k) => tally.set(k, (tally.get(k) || 0) + 1);
+    for (let i = all.size - counted.size; i > 0; i--) note('staff');
+    for (const [pid, list] of counted) {
+      if (ok.includes(pid)) continue;
+      const why = voterWhy(pid, list[0].actor, list[0].since, E, z);
+      const kind = WHY_KINDS.find(([re]) => re.test(why));
+      note(kind ? kind[1] : (why ? 'other rules' : 'shares a PC'));
+    }
+    return `${ok.length} (${all.size} citizens; not counted: ${[...tally].map(([k, n]) => `${n} ${k}`).join(', ')})`;
+  };
   // At the vote's opening: each citizen account's play time then, so hours played during the vote do not count
   const snapPlay = (z, E) => {
     E.voteOpenedAt = E.phaseStartedAt; E.voterPlay = {};
@@ -1229,7 +1247,7 @@ module.exports = (api) => {
       return v;
     }
     const E = elOf(z.id);
-    v.citizens = citizenAccounts(z);
+    v.citizens = countText(z, E);
     v.phase = E ? E.phase : 'none';
     v.round = E ? Number(E.round) || 1 : 0;
     v.endsAt = E ? Number(E.phaseEndsAt) || 0 : 0;
@@ -1366,7 +1384,7 @@ module.exports = (api) => {
         voted: E.phase === 'voting' && E.votes[String(Number(profileOf(a)))] !== undefined, mine: !!courtOfActor(E, a) });
       if (!isLeadStaff(a) && (rules(a, z) || isSteward(a, z))) v.manage.push({ zone: z.id, name: z.name, policy: policyOf(z).policy, fee: policyOf(z).fee,
         requests: liveRequests().filter((r) => r.zone === z.id).map((r) => ({ actor: hex(r.actor), name: r.name, tag: tagSafe(r.actor), at: r.at })) });
-      if (v.staff && electing(z)) v.staff.push({ zone: z.id, name: z.name, phase: E ? E.phase : 'none', endsAt: E ? Number(E.phaseEndsAt) || 0 : 0, citizens: citizenAccounts(z), threshold: EL.threshold });
+      if (v.staff && electing(z)) v.staff.push({ zone: z.id, name: z.name, phase: E ? E.phase : 'none', endsAt: E ? Number(E.phaseEndsAt) || 0 : 0, citizens: countText(z, E), threshold: EL.threshold });
     }
     if (v.staff) v.lookup = lookupView(a);
     return v;

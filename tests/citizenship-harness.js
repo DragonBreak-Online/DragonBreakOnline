@@ -500,6 +500,19 @@ ok(M.votingView(V1, WR).seats.find((s) => s.id === 'commander').label === 'Lord 
   delete globalThis.__dboIsStaff;
 }
 
+// ---- the count the panels show (lorvanack, 3 Nov: "more than 9 citizens" but the number never moved) ----------------------
+{
+  const n = M.citizenAccounts(WR);
+  ok(M.votingView(voters[1], WR).citizens === n, 'count: with every citizen counted the panel shows the plain number', M.votingView(voters[1], WR).citizens);
+  globalThis.__dboIsStaffCharacter = (a) => a === voters[2];   // voters[0] has an alt citizen, which still counts for the account
+  const t = M.votingView(voters[1], WR).citizens;
+  ok(typeof t === 'string' && t.startsWith(`${M.citizenAccounts(WR)} (`) && /citizens; not counted: 1 staff\)$/.test(t), 'count: a staff citizen is named as not counted, with the citizens in full', t);
+  const row = (M.journalView(STAFF).staff || []).find((e) => e.zone === 'whiterun');
+  ok(row && row.citizens === t, "count: the staff election list says the same", row && row.citizens);
+  delete globalThis.__dboIsStaffCharacter;
+  ok(M.votingView(voters[1], WR).citizens === n, 'count: back to the plain number once nobody is held out');
+}
+
 // ---- per-hold Jarl races (Nat, 25 Oct): gamemode.js's jarlRaceFits, cut out and fed the shipped config ------------------
 {
   const gsrc = fs.readFileSync(path.resolve(__dirname, '..', 'gamemode.js'), 'utf8');
