@@ -2,7 +2,8 @@
 #include "WorldState.h"
 float CropRegeneration(float newAttributeValue, float secondsAfterLastRegen,
                        float attributeRate, float attributeRateMult,
-                       float oldAttributeValue, bool hasActiveMagicEffects);
+                       float oldAttributeValue, bool hasActiveMagicEffects,
+                       float extraPercentage = 0.f);
 
 float CropHealthRegeneration(float newAttributeValue,
                              float secondsAfterLastRegen, MpActor* actor);

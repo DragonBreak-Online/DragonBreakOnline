@@ -67,7 +67,8 @@ float ResolveRateMult(float current, float base)
 
 float CropRegeneration(float newAttributeValue, float secondsAfterLastRegen,
                        float attributeRate, float attributeRateMult,
-                       float oldAttributeValue, bool hasActiveMagicEffects)
+                       float oldAttributeValue, bool hasActiveMagicEffects,
+                       float extraPercentage)
 {
   spdlog::trace(
     "[crop]: args=(newAttributeValue={}, secondsAfterLastRegen={}, "
@@ -85,8 +86,8 @@ float CropRegeneration(float newAttributeValue, float secondsAfterLastRegen,
 
   validRegenerationPercentage =
     validRegenerationPercentage < 0.0f ? 0.0f : validRegenerationPercentage;
-  float validAttributePercentage =
-    oldAttributeValue + validRegenerationPercentage;
+  float validAttributePercentage = oldAttributeValue +
+    validRegenerationPercentage + std::max(0.f, extraPercentage);
 
   spdlog::trace("[crop]: validAttributePercentage={}",
                 validAttributePercentage);
@@ -124,7 +125,9 @@ float CropHealthRegeneration(float newAttributeValue,
   const float oldPercentage = actorValues.healthPercentage;
   const bool hasActiveMagicEffects = !actor->GetActiveMagicEffects().Empty();
   return CropRegeneration(newAttributeValue, secondsAfterLastRegen, rate,
-                          rateMult, oldPercentage, hasActiveMagicEffects);
+                          rateMult, oldPercentage, hasActiveMagicEffects,
+                          actor->GetTimedRestoreShare(espm::ActorValue::Health,
+                                                      secondsAfterLastRegen));
 }
 
 float CropMagickaRegeneration(float newAttributeValue,
@@ -139,7 +142,9 @@ float CropMagickaRegeneration(float newAttributeValue,
   const float oldPercentage = actorValues.magickaPercentage;
   const bool hasActiveMagicEffects = !actor->GetActiveMagicEffects().Empty();
   return CropRegeneration(newAttributeValue, secondsAfterLastRegen, rate,
-                          rateMult, oldPercentage, hasActiveMagicEffects);
+                          rateMult, oldPercentage, hasActiveMagicEffects,
+                          actor->GetTimedRestoreShare(
+                            espm::ActorValue::Magicka, secondsAfterLastRegen));
 }
 
 float CropStaminaRegeneration(float newAttributeValue,
@@ -157,7 +162,9 @@ float CropStaminaRegeneration(float newAttributeValue,
   const float oldPercentage = actorValues.staminaPercentage;
   const bool hasActiveMagicEffects = !actor->GetActiveMagicEffects().Empty();
   return CropRegeneration(newAttributeValue, secondsAfterLastRegen, rate,
-                          rateMult, oldPercentage, hasActiveMagicEffects);
+                          rateMult, oldPercentage, hasActiveMagicEffects,
+                          actor->GetTimedRestoreShare(
+                            espm::ActorValue::Stamina, secondsAfterLastRegen));
 }
 
 float MagickaRegenPerSecond(MpActor* actor)
