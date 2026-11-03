@@ -11,15 +11,15 @@ let fails = 0, oks = 0;
 const ok = (c, what, d) => { console.log(`${c ? 'ok  ' : 'FAIL'}  ${what}${!c && d !== undefined ? '   ' + JSON.stringify(d).slice(0, 400) : ''}`); if (c) oks++; else fails++; };
 const a0 = src.indexOf('const NATIVE_SWF = ');
 const m0 = src.indexOf("// How big each native panel's payload gets");
-const m1 = src.indexOf('\n});\n', src.indexOf("every('nativeSizes'")) + 5;
+const m1 = src.indexOf('\n});\n', src.indexOf("every('browserPanels'")) + 5;
 const block = src.slice(a0, src.indexOf('\n', src.indexOf('const closeWidget = '))) + '\n' + src.slice(src.indexOf('\n', src.indexOf('const closeWidget = ')) + 1, m1);
 ok(m0 > 0 && m0 < m1, 'the measuring block is in gamemode.js after closeWidget');
 const logs = [], timers = {};
 let now = 1000000;
 const realNow = Date.now;
 Date.now = () => now;
-globalThis.__dboPanelState = undefined; globalThis.__dboNativeSizes = undefined;
-const R = new Function('sendPacket', 'log', 'every', 'profileOf', block + '\nreturn { nativeSwfFor, nativeState, nativeSizes, NATIVE_MAX_CHARS };')(
+globalThis.__dboPanelState = undefined; globalThis.__dboNativeSizes = undefined; globalThis.__dboBrowserPanels = undefined;
+const R = new Function('sendPacket', 'log', 'every', 'profileOf', block + '\nreturn { nativeSwfFor, nativeState, nativeSizes, NATIVE_MAX_CHARS, openWidget, browserPanels };')(
   () => true, (...a) => logs.push(a.join(' ')), (name, ms, fn) => { timers[name] = { ms, fn }; }, () => 7);
 const A = 0x14;
 R.nativeState().native.set(A, new Set(['native:keyRing', 'native:journal', 'native:journalTab:faction']));
@@ -70,6 +70,19 @@ handlers.nativeTiming && handlers.nativeTiming(B, ['journal-14', 63411, 2, 180.4
 ok(logs[0] === '[native-timing] journal-14 63411 chars in 2 piece(s): parse 180 ms, draw 95 ms (profile 2)', 'a panel timing report is logged with its numbers', logs);
 handlers.nativeTiming && handlers.nativeTiming(B, [{ x: 1 }, 'lots', null]);
 ok(/ -1 chars in 0 piece\(s\): parse -1 ms, draw -1 ms \(profile 2\)$/.test(logs[1]), 'nonsense numbers are logged as -1 (a missing one as 0), never thrown on', logs[1]);
+// every panel sent to the browser, counted per type: browser-only ones and native ones that fell back (Nat, 3 Nov)
+R.openWidget(A, { type: 'staffData', id: 120, nonce: 'p' });
+R.openWidget(A, { type: 'staffData', id: 120, nonce: 'q' });
+R.openWidget(A, { type: 'keyRing', id: 91, nonce: 'r', pad: big(R.NATIVE_MAX_CHARS + 10) });
+R.openWidget(A, { type: 'keyRing', id: 91, nonce: 's', pad: big(10) });
+const bp = R.browserPanels().types;
+ok(bp.get('staffData') && bp.get('staffData').n === 2 && bp.get('staffData').fallback === false && bp.get('keyRing') && bp.get('keyRing').n === 1 && bp.get('keyRing').fallback === true,
+  'browser sends counted per type, a native type\'s fallback marked, a native send not counted', [...bp.entries()]);
+const before = logs.length;
+timers.browserPanels.fn();
+const bl = logs.slice(before);
+ok(timers.browserPanels.ms === 3600000 && /^\[browser-panel\] since .*: 2 panel types sent to the browser$/.test(bl[0]) && bl[1] === '[browser-panel] staffData: 2 (browser only)' && bl[2] === '[browser-panel] keyRing: 1 (has a native swf: a fallback)',
+  'the hourly table, most sent first', bl);
 Date.now = realNow;
 console.log(fails ? `\n${fails} failed` : `\nall passed (${oks})`);
 process.exit(fails ? 1 : 0);

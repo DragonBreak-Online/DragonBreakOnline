@@ -4308,6 +4308,7 @@ const openWidget = (a, widget, focus) => {
     if (st.nativeOpen.get(id) === widget.id) { st.nativeOpen.delete(id); sendPacket(a, { customPacketType: 'dboScaleform', close: true }); focus = true; }
     st.browserOpen.set(id, widget.id);
   }
+  if (widget && widget.type) noteBrowserPanel(widget);
   const sent = sendPacket(a, { customPacketType: 'dboWidget', widget, focus: !!focus });
   // Another focused panel takes the screen from an open Character Journal (journal.js): the new one is sent first, then the
   // journal goes as a plain close, which keeps the cursor on the new one (the panel handoff rule)
@@ -4343,6 +4344,25 @@ every('nativeSizes', 3600000, () => {
   const rows = [...s.types.entries()].sort((x, y) => y[1].max - x[1].max);
   log(`[native-size] since ${new Date(s.since).toISOString()}: ${rows.length} panel types`);
   for (const [k, t] of rows) log(`[native-size] ${k}: ${t.n} sent, largest ${t.max}, average ${Math.round(t.sum / t.n)}, over ${NATIVE_MAX_CHARS} ${t.over}`);
+});
+// Every panel openWidget sends to the browser, per type (journal per tab), and whether a native swf exists for it (a fallback:
+// no cap, browser: 1, oversize) or not: the order for converting what is left to native (Nat, 3 Nov: "make sure everything is
+// native"). The table every hour, as "[browser-panel]" lines, most sent first
+const browserPanels = () => globalThis.__dboBrowserPanels || (globalThis.__dboBrowserPanels = { since: Date.now(), types: new Map() });
+const noteBrowserPanel = (widget) => {
+  try {
+    const key = widget.type === 'journal' ? `journal:${widget.tab || '?'}` : String(widget.type);
+    const s = browserPanels(), t = s.types.get(key) || { n: 0, fallback: !!NATIVE_SWF[widget.type] };
+    t.n++;
+    s.types.set(key, t);
+  } catch (e) { /* counting never breaks a panel */ }
+};
+every('browserPanels', 3600000, () => {
+  const s = browserPanels();
+  if (!s.types.size) return;
+  const rows = [...s.types.entries()].sort((x, y) => y[1].n - x[1].n);
+  log(`[browser-panel] since ${new Date(s.since).toISOString()}: ${rows.length} panel types sent to the browser`);
+  for (const [k, t] of rows) log(`[browser-panel] ${k}: ${t.n} ${t.fallback ? '(has a native swf: a fallback)' : '(browser only)'}`);
 });
 const notify = (a, text) => sendPacket(a, { customPacketType: 'dboNotice', text });
 globalThis.__dboUiEvents = new Map(); // event name -> [(actorId, args, widgetId)]; rebuilt on every reload
