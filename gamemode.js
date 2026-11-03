@@ -7280,7 +7280,9 @@ const skinReport = (a, args) => {
   // Humanly possible on the server's clock too: no win reaching it sooner after it SENT the attempt than the attempt's
   // fastest (lag only lengthens that)
   if (!v.bad && cj && cutsWin && MG.serverTooSoon(elapsed, ses.minMs, SKIN.clockSlackMs)) v.bad = 'fast';
-  const win = !v.bad && cutsWin && !skinned && near && pelts.length > 0;
+  // A Grandmaster Archer's clean kill (capstones.js): the hide never tears, so a slipped cut does not lose it
+  let clean = false; try { clean = !!mp.get(ses.corpse, 'private.dboCleanKill'); } catch (e) { clean = false; }
+  const win = !v.bad && (cutsWin || clean) && !skinned && near && pelts.length > 0;
   let text = skinned ? 'Someone has already skinned it.' : !near ? 'You moved away from the body.' : 'The knife slips and the hide tears. Try again.';
   const got = [];
   if (win) {
@@ -7290,7 +7292,8 @@ const skinReport = (a, args) => {
       const count = (Number(p.count) || 1) + (!p.dragon && Math.random() < bonus ? 1 : 0);
       if (giveItem(a, Number(p.baseId) >>> 0, count)) { const r = recordOf(Number(p.baseId) >>> 0); got.push(`${count > 1 ? count + ' ' : ''}${edidWords(r && r.record.editorId, 'pelt')}`); }
     }
-    text = got.length ? `The hide comes away clean: ${got.join(', ')}.` : 'The hide comes away, but there is nothing to keep.';
+    text = got.length ? `The hide comes away clean${clean && !cutsWin ? ' (a clean kill: nothing tore)' : ''}: ${got.join(', ')}.` : 'The hide comes away, but there is nothing to keep.';
+    try { if (typeof globalThis.__dboDecorTrophySkinned === 'function') globalThis.__dboDecorTrophySkinned(a, skinRaceEdid(ses.corpse)); } catch (e) { log('trophy record failed', e.message); }
     // The work itself credits the Skinner, weighed by the best pelt's gold value (skillPoints.weightOf
     // "skin"). Only a held trade is credited: skinner has a station, so an untaken one is skipped.
     try { if (typeof globalThis.__alduinakMasteryEvent === 'function') globalThis.__alduinakMasteryEvent('skin', a, { refrId: ses.corpse, value: peltsWorth(pelts) }); } catch (e) { /* no skill system */ }
@@ -7408,6 +7411,8 @@ const deathHook = (actorId, killerId, ...rest) => {
   try { mp.set(Number(actorId) >>> 0, 'private.dboBodyFed', false); } catch (e) { /* the next death feeds again (animalBody.addFood) */ }
   try { if (globalThis.__dboBeastRevert) globalThis.__dboBeastRevert(actorId, 'death'); } catch (e) { log('beast revert on death failed', e.message); }
   try { setDeathTemple(Number(actorId) >>> 0); } catch (e) { log('death temple failed', e.message); }
+  // A Grandmaster Archer's clean kill (capstones.js): marks the body when their arrow was the last blow
+  try { if (globalThis.__dboCapstoneDeath) globalThis.__dboCapstoneDeath(Number(actorId) >>> 0); } catch (e) { log('capstone death failed', e.message); }
   // MpActor::Kill adds the death item after firing this event, so the pelt only exists a tick later
   if ((Number(actorId) >>> 0) >= 0xff000000 && (() => { try { return !!mp.get(Number(actorId) >>> 0, 'private.npcSpawner'); } catch (e) { return false; } })()) { peltPending.set(Number(actorId) >>> 0, Date.now()); if (peltPending.size > 2048) for (const [k, t] of peltPending) if (Date.now() - t > PELT_PENDING_MS) peltPending.delete(k); }
   setTimeout(() => { try { stashPelts(Number(actorId) >>> 0); } catch (e) { log('pelt stash failed', e.message); } }, 50);
@@ -7456,6 +7461,7 @@ const hitDamageHook = (aggressorId, targetId, sourceId, damage, ...rest) => {
   } catch (e) { /* measurement only */ }
   try { if (gearEnch) gearEnch.landed(agg, tgt, Number(sourceId) >>> 0, dealt); } catch (e) { log('gear enchantment landed failed', e.message); }
   try { if (globalThis.__dboElementHit) globalThis.__dboElementHit(agg, tgt, Number(sourceId) >>> 0); } catch (e) { log('element hit failed', e.message); }
+  try { if (globalThis.__dboCapstoneHit && dealt > 0) globalThis.__dboCapstoneHit(agg, tgt, Number(sourceId) >>> 0); } catch (e) { log('capstone hit failed', e.message); }
   const prev = globalThis.__dboPrevHitDamage;
   if (prev) { try { return prev(aggressorId, targetId, sourceId, dealt, ...rest); } catch (e) { log('hit damage chain failed', e.message); } }
   return undefined;
@@ -10768,7 +10774,7 @@ try {
   delete require.cache[CAPSTONES_JS];
   require(CAPSTONES_JS)({ mp, log, personal, audit, who, cfg, registerChatCommand, realNameOf, recordOf, itemName: (d) => adminItemName(d), findByName, distanceMeters, profileOf, discordOf, weaponSkillOf, onlineActors, isAdmin,
     sate: (a) => { if (!NEEDS.enabled) return; const n = needsOf(a); n.hunger = 0; applyNeedsStage(a, n, true); saveNeeds(a, n); } });
-} catch (e) { log('capstones.js failed to load:', e.stack || e.message); for (const k of ['__dboCapstoneCrafted', '__dboCapstones', '__dboCapstoneWoven', '__dboCapstoneBrewing', '__dboCapstoneEnchanting', '__dboCapstoneSkillRate', '__dboCapstoneBreak', '__dboCapstoneGuarded', '__dboCapstoneSecondWind']) globalThis[k] = null; }
+} catch (e) { log('capstones.js failed to load:', e.stack || e.message); for (const k of ['__dboCapstoneCrafted', '__dboCapstones', '__dboCapstoneWoven', '__dboCapstoneBrewing', '__dboCapstoneEnchanting', '__dboCapstoneSkillRate', '__dboCapstoneBreak', '__dboCapstoneGuarded', '__dboCapstoneSecondWind', '__dboCapstoneHit', '__dboCapstoneDeath']) globalThis[k] = null; }
 // ---- the Tailor's ranks gate what a loom makes (server\tailoring.js, config "tailoring"; Nate, 12 Oct): after smithing.js ----
 try {
   const TAILORING_JS = path.resolve('tailoring.js');

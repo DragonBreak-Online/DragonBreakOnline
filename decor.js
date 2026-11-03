@@ -53,6 +53,9 @@ const DEFAULTS = {
   // fallback used only when the world clock has not loaded. A pick yields within commonYield or rareYield [min, max] by one
   // Harvesting roll (skills.json harvesting: chance and multiplier by tier); then the planter is empty again. showZ raises the
   // soil and the crop to the planter's bed. tickSeconds: the ripening check.
+  // Trophy Mount (capstones.js, Skinner at 100): HearthFires' mounted trophies, offered to a Grandmaster Skinner for each
+  // kind they have skinned (private.dboTrophyKinds, one mount a body); outside the furniture budget, maxPerHome a home
+  trophies: { maxPerHome: 6, kinds: [{"kind":"bear","name":"Mounted Bear","desc":"15bd2:HearthFires.esm","races":["bearblack","bearbrown","bearrace"],"not":[]},{"kind":"snowbear","name":"Mounted Snow Bear","desc":"15bd3:HearthFires.esm","races":["bearsnow","snowbear"],"not":[]},{"kind":"wolf","name":"Mounted Wolf","desc":"15be6:HearthFires.esm","races":["wolf"],"not":["werewolf","ice"]},{"kind":"icewolf","name":"Mounted Ice Wolf","desc":"15be5:HearthFires.esm","races":["icewolf"],"not":[]},{"kind":"sabrecat","name":"Mounted Sabre Cat","desc":"a8fa:HearthFires.esm","races":["sabrecat"],"not":[]},{"kind":"troll","name":"Mounted Troll","desc":"15be2:HearthFires.esm","races":["troll"],"not":["frost"]},{"kind":"frosttroll","name":"Mounted Frost Troll","desc":"15be3:HearthFires.esm","races":["trollfrost","frosttroll"],"not":[]},{"kind":"spriggan","name":"Mounted Spriggan","desc":"15be1:HearthFires.esm","races":["spriggan"],"not":[]},{"kind":"chaurus","name":"Mounted Chaurus","desc":"a8f8:HearthFires.esm","races":["chaurus"],"not":[]},{"kind":"mudcrab","name":"Mounted Mudcrab","desc":"a8ff:HearthFires.esm","races":["mudcrab"],"not":[]},{"kind":"skeever","name":"Mounted Skeever","desc":"15bdf:HearthFires.esm","races":["skeever"],"not":[]},{"kind":"slaughterfish","name":"Mounted Slaughterfish","desc":"15be0:HearthFires.esm","races":["slaughterfish"],"not":[]},{"kind":"horker","name":"Mounted Horker","desc":"a8fc:HearthFires.esm","races":["horker"],"not":[]},{"kind":"goat","name":"Mounted Goat","desc":"15bdd:HearthFires.esm","races":["goat"],"not":[]},{"kind":"deer","name":"Mounted Deer","desc":"15bda:HearthFires.esm","races":["deer","elk"],"not":[]},{"kind":"cow","name":"Mounted Cow","desc":"15bd4:HearthFires.esm","races":["cowrace"],"not":[]},{"kind":"frostbitespider","name":"Mounted Frostbite Spider","desc":"a9df:HearthFires.esm","races":["frostbitespider"],"not":[]},{"kind":"hagraven","name":"Mounted Hagraven","desc":"15bde:HearthFires.esm","races":["hagraven"],"not":[]},{"kind":"dragon","name":"Mounted Dragon Skull","desc":"15bd5:HearthFires.esm","races":["dragonrace","dragon"],"not":["priest"]}] },
   planter: { maxPerHome: 4, growGameDays: 1, rareGameDays: 2, growHours: 24, rareHours: 48, commonYield: [2, 4], rareYield: [1, 2], baseYield: 2, missYield: 1, showZ: 30, tickSeconds: 60 },
   // The Lumber Pile (Nat 26 Oct, a home's saw): a Woodcutter of minTier (0 based; 1 Apprentice) saws carried firewood into
   // Sawn Logs, firewoodPerLogByTier firewood a log by tier, at most logsPerUse logs a use, then cooldownMinutes per player
@@ -79,6 +82,7 @@ module.exports = (api) => {
   C.study = Object.assign({}, DEFAULTS.study, ((api.cfg || {}).decor || {}).study || {});
   C.planter = Object.assign({}, DEFAULTS.planter, ((api.cfg || {}).decor || {}).planter || {});
   C.lumber = Object.assign({}, DEFAULTS.lumber, ((api.cfg || {}).decor || {}).lumber || {});
+  C.trophies = Object.assign({}, DEFAULTS.trophies, ((api.cfg || {}).decor || {}).trophies || {});
   const BLOCKED = new Set((Array.isArray(C.blockBases) ? C.blockBases : []).map((d) => String(d).toLowerCase()));
   const itemName = (d) => { try { const n = typeof api.itemName === 'function' ? api.itemName(d) : ''; return n && n !== d ? String(n) : String(d); } catch (e) { return String(d); } };
   const S = globalThis.__dboDecor || (globalThis.__dboDecor = { catalog: null, byDesc: null, reg: null, pending: new Map(), undo: new Map(), rate: new Map(), found: new Map(), scanAt: 0, scanIdx: 0 });
@@ -123,6 +127,11 @@ module.exports = (api) => {
           S.catalog.push(row); S.byDesc.set(key.toLowerCase(), row);
           if (!S.byDesc.has(String(p.desc).toLowerCase())) S.byDesc.set(String(p.desc).toLowerCase(), row);
         }
+      }
+      for (const t of (C.trophies && C.trophies.kinds) || []) {
+        if (!t.desc || BLOCKED.has(String(t.desc).toLowerCase())) continue;
+        const row = { desc: t.desc, key: `${t.desc}#trophy`, edid: `trophy ${t.kind}`, name: t.name, group: 'trophies', groupLabel: 'Trophies', type: 'STAT', radius: 60, costB: {}, trophy: t.kind, hay: `${t.name} trophy ${t.kind}`.toLowerCase() };
+        S.catalog.push(row); S.byDesc.set(row.key.toLowerCase(), row);
       }
       log(`decor: catalogue of ${S.catalog.length} pieces`);
     } catch (e) { log('decor: decor-catalog.json unreadable', e.message); S.catalog = []; S.byDesc = new Map(); }
@@ -497,6 +506,12 @@ module.exports = (api) => {
   };
   const budgetProblem = (pl, piece, a) => {
     const p = placeEntry(pl.root, pl.rec), u = usage(p), b = budgetOf(pl);
+    if (piece.trophy) {
+      if (a && !grandmaster(a, 'skinner')) return 'Mounting a trophy is a Grandmaster Skinner\'s work (Skinner at 100).';
+      if (a && !trophyKinds(a).includes(piece.trophy)) return `You have no ${piece.name.replace(/^Mounted /, '').toLowerCase()} skinned to mount. Skin one at Skinner 100 first.`;
+      if (p.items.filter((i) => i.trophy).length >= Math.max(0, Number((C.trophies || {}).maxPerHome) || 0)) return `This home has its ${(C.trophies || {}).maxPerHome} trophies already.`;
+      return null;
+    }
     if (u.pieces >= b.pieces) return `This home holds its ${b.pieces} pieces already. Remove one first.`;
     if (piece.light && u.lights >= b.lights) return `This home has its ${b.lights} lights already.`;
     if (piece.container && u.containers >= b.containers) return `This home has its ${b.containers} placed containers already.`;
@@ -582,6 +597,7 @@ module.exports = (api) => {
     if (books) it.books = books;
     if (light) it.light = hex(light);
     if (piece.container) it.container = true;
+    if (piece.trophy) { it.trophy = piece.trophy; it.mountedBy = who(a); spendTrophy(a, piece.trophy); }
     if (piece.station) it.station = piece.station.keyword;
     p.items.push(it); save();
     pushUndo(a, { op: 'placed', root: hex(pl.root), ref: it.ref });
@@ -783,6 +799,25 @@ module.exports = (api) => {
     try { id = create(parseInt(it.ref, 16) >>> 0, desc, it.cell, showPos(it.pos), it.rot, { of: it.ref, show: true }); } catch (e) { log('decor: planter model failed', e.message); }
     if (id) it.show = hex(id);
   };
+  const TROPHY_KINDS = 'private.dboTrophyKinds';
+  // A trophy row is offered only to a Grandmaster Skinner (the catalogue, the panel and /decor find)
+  const trophyOffered = (a, row) => !row.trophy || grandmaster(a, 'skinner');
+  const trophyKinds = (a) => { const v = get(a, TROPHY_KINDS, []); return Array.isArray(v) ? v.slice() : []; };
+  const spendTrophy = (a, kind) => { const v = trophyKinds(a); const i = v.indexOf(kind); if (i >= 0) { v.splice(i, 1); try { mp.set(a, TROPHY_KINDS, v); } catch (e) { log('decor: trophy spend failed', e.message); } } };
+  const trophyOfRace = (raceEdid) => {
+    const r = String(raceEdid || '').toLowerCase();
+    return ((C.trophies && C.trophies.kinds) || []).find((t) => t.races.some((x) => r.includes(x)) && !t.not.some((x) => r.includes(x))) || null;
+  };
+  // gamemode.js, a skinning won: a Grandmaster Skinner keeps the kind to mount once (at most 20 kept)
+  globalThis.__dboDecorTrophySkinned = (a, raceEdid) => {
+    if (!grandmaster(a, 'skinner')) return null;
+    const t = trophyOfRace(raceEdid);
+    if (!t) return null;
+    const v = trophyKinds(a).concat([t.kind]).slice(-20);
+    try { mp.set(a, TROPHY_KINDS, v); } catch (e) { return null; }
+    personal(a, `You keep the best of it for a trophy: a ${t.name.replace(/^Mounted /, '')} to mount in a home (/decor find trophy).`);
+    return t.kind;
+  };
   // A Grandmaster of that skill (capstones.js), when its capstone is switched on
   const grandmaster = (a, skill) => { try { const c = globalThis.__dboCapstones; return !!c && c.on(skill) && c.isGrandmaster(a >>> 0, skill); } catch (e) { return false; } };
   // Master Gardener (Harvesting at 100): a crop they plant ripens in half the time, and a crop they pick gives the top of its range
@@ -949,7 +984,7 @@ module.exports = (api) => {
   const homeName = (pl) => String((pl.rec && pl.rec.name) || (pl.rec && pl.rec.ownerName ? `${pl.rec.ownerName}'s home` : 'This home'));
   const groupsFor = (a) => {
     const out = [], seen = new Set();
-    for (const p of catalog()) if (raceOk(a, p.station) && !seen.has(p.group)) { seen.add(p.group); out.push({ id: p.group, label: p.groupLabel || p.group }); }
+    for (const p of catalog()) if (raceOk(a, p.station) && trophyOffered(a, p) && !seen.has(p.group)) { seen.add(p.group); out.push({ id: p.group, label: p.groupLabel || p.group }); }
     return out;
   };
   const pageOf = (list, page, n) => {
@@ -997,7 +1032,7 @@ module.exports = (api) => {
       out.view = 'catalog';
       // a search runs across every group, as /decor find does
       const terms = String(st.search || '').toLowerCase().split(/\s+/).filter(Boolean);
-      const list = catalog().filter((x) => (terms.length ? terms.every((t) => x.hay.includes(t)) : x.group === st.group) && raceOk(a, x.station));
+      const list = catalog().filter((x) => (terms.length ? terms.every((t) => x.hay.includes(t)) : x.group === st.group) && raceOk(a, x.station) && trophyOffered(a, x));
       out.search = st.search || '';
       const pg = pageOf(list, st.page, st.rows || 8);
       Object.assign(out, { page: pg.at, pages: pg.pages, rows: pg.rows.map((x) => {
@@ -1126,7 +1161,7 @@ module.exports = (api) => {
       const terms = rest.toLowerCase().split(/\s+/).filter(Boolean);
       const page = Math.max(0, (Number((terms.find((t) => /^p\d+$/.test(t)) || 'p1').slice(1)) || 1) - 1);
       const want = terms.filter((t) => !/^p\d+$/.test(t));
-      const hits = S.catalog.filter((p) => want.every((t) => p.hay.includes(t)) && raceOk(a, p.station));
+      const hits = S.catalog.filter((p) => want.every((t) => p.hay.includes(t)) && raceOk(a, p.station) && trophyOffered(a, p));
       S.found.set(a >>> 0, hits);
       if (!hits.length) return personal(a, 'Nothing matches. Try /decor groups.');
       const shown = hits.slice(page * 10, page * 10 + 10).map((p, i) => `${page * 10 + i + 1}. ${p.name} [${p.group}]: ${costText(costOf(p))}`);
