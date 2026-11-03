@@ -169,20 +169,107 @@ module.exports = (api) => {
     S.opened.set(key, now);
   };
 
+  // ---- who owns a container that no player has claimed ---------------------------------------------------------------
+  // The load order says, and the server can read it: mp.lookupEspmRecordById on a placed ref returns the winning REFR
+  // (libespm CombineBrowser keeps the last plugin's record) with its raw fields, as housingSystem.ts reads XTEL through
+  // formIdUtil's espmRefrFieldId. XOWN is the owner's form id, an NPC_ or a FACT. A ref without one takes its cell's
+  // XOWN; only an interior cell counts, since worldOrCellDesc outdoors is the worldspace, and on 3 Nov no exterior
+  // container in the 148-plugin order took an owner from its exterior cell (ref 2,377 and interior cell 16,268 owned
+  // ones outside dungeons; _work\npc-chest-owner-1103\NOTE.md).
+  // Player (Skyrim.esm:000007) and PlayerFaction (Skyrim.esm:000DB1) own the player houses' chests: those are the
+  // player's, never theft.
+  const PLAYER_OWNERS = new Set([0x7, 0xdb1]);
+  // A plugin record never changes while the server runs, so each answer is kept; dynamic refs have no record.
+  const plugOwner = globalThis.__dboChestOwnerCache instanceof Map ? globalThis.__dboChestOwnerCache : (globalThis.__dboChestOwnerCache = new Map());
+  const xownOf = (id) => {
+    try {
+      const r = mp.lookupEspmRecordById(id >>> 0);
+      const f = r && r.record && (r.record.fields || []).find((x) => x && x.type === 'XOWN' && x.data && x.data.byteLength >= 4);
+      if (!f) return 0;
+      const local = new DataView(f.data.buffer, f.data.byteOffset, 4).getUint32(0, true);
+      return local && typeof r.toGlobalRecordId === 'function' ? (r.toGlobalRecordId(local) >>> 0) : 0;
+    } catch (e) { return 0; }
+  };
+  const ownerInPlugins = (ref) => {
+    const id = ref >>> 0;
+    if (id >= 0xff000000) return 0;
+    if (plugOwner.has(id)) return plugOwner.get(id);
+    let owner = xownOf(id), from = 'ref';
+    if (!owner) {
+      from = 'cell';
+      try {
+        const cell = mp.getIdFromDesc(String(mp.get(id, 'worldOrCellDesc') || '')) >>> 0;
+        const r = cell ? mp.lookupEspmRecordById(cell) : null;
+        if (r && r.record && String(r.record.type) === 'CELL') owner = xownOf(cell);
+      } catch (e) { owner = 0; }
+    }
+    if (plugOwner.size > 20000) plugOwner.clear();
+    plugOwner.set(id, owner);
+    // One line per container, once per process: the dev log is how this read is checked against the load order
+    if (owner) log(`actiondelays: ${id.toString(16)} is owned by ${owner.toString(16)} (from its ${from})${PLAYER_OWNERS.has(owner) ? ', the player' : ''}`);
+    return owner;
+  };
+  // A claimed place: housingSystem.ts resolves any chest of a place to the building's record (__dboHousing.recordOf),
+  // so a chest inside a house a player holds is theirs even though only the door was claimed. Kept 15 s, as itemguards
+  // does: the place's door may be an unloaded ref and slow to read.
+  if (!(S.placeOf instanceof Map)) S.placeOf = new Map();
+  const placeClaim = (t) => {
+    const H = globalThis.__dboHousing;
+    if (!H || typeof H.recordOf !== 'function') return null;
+    const now = Date.now();
+    let hit = S.placeOf.get(t);
+    if (!hit || now - hit.at >= 15000) {
+      let rec = null; try { rec = H.recordOf(t); } catch (e) { rec = null; }
+      if (S.placeOf.size > 5000) S.placeOf.clear();
+      hit = { at: now, rec: rec && typeof rec === 'object' && Number(rec.owner) > 0 ? rec : null };
+      S.placeOf.set(t, hit);
+    }
+    return hit.rec;
+  };
+  const mayUsePlace = (t, a, rec) => {
+    const H = globalThis.__dboHousing;
+    try { if (H && typeof H.ownsRecord === 'function' && H.ownsRecord(rec, a) === true) return true; } catch (e) { /* below */ }
+    try { if (H && typeof H.keyOpens === 'function' && H.keyOpens(t, a) === true) return true; } catch (e) { /* below */ }
+    const p = profileOf(a);
+    if (Number(rec.owner) === p) return true;
+    return Array.isArray(rec.keys) && rec.keys.some((k) => Number(k) === p || Number((k || {}).profile) === p);
+  };
+  // A faction's hall is a vanilla faction's rooms (Jorrvaskr's chests are CompanionsFaction's), and guild ids are slugs,
+  // not FACT ids, so the vanilla owner cannot name the guild: its members are let through by guilds.js instead, for the
+  // faction's storage chest (__dboGuildStorageAt, { fid }) and any chest in a cell its hall holds (__dboHallFactionAt,
+  // { id }, keyed by the lower-cased cell desc)
+  const guildMayUse = (t, a) => {
+    try {
+      if (typeof globalThis.__dboGuildsOf !== 'function') return false;
+      const mine = new Set((globalThis.__dboGuildsOf(a, { bands: true }) || []).map((m) => String(m.id)));
+      if (!mine.size) return false;
+      const st = typeof globalThis.__dboGuildStorageAt === 'function' ? globalThis.__dboGuildStorageAt(t) : null;
+      if (st && mine.has(String(st.fid))) return true;
+      if (typeof globalThis.__dboHallFactionAt !== 'function') return false;
+      const raw = String(mp.get(t, 'worldOrCellDesc') || '');
+      const hall = globalThis.__dboHallFactionAt(raw) || globalThis.__dboHallFactionAt(cellKeyOf(t));
+      return !!hall && mine.has(String(hall.id));
+    } catch (e) { return false; }
+  };
+
   // Does the beat apply at all? A container in a dungeon, or one the player has no right to. Their
   // own, a shared or faction one, and a public or unowned chest outside a dungeon all open at once.
   //
-  // A vanilla NPC-owned chest is NOT caught here. The ownership this module can see is our own
-  // housing claims (private.housing); the engine's XOWN on a vanilla ref is not on anything it
-  // reads. So stealing from an NPC's chest outside a dungeon stays instant, which is a known gap
-  // rather than an oversight.
+  // "No right to", in order: a player's claim decides first (the chest's own private.housing, then the place it
+  // stands in); only a container nobody has claimed falls to the load order's owner, an NPC's or a faction's.
+  // Players are in no vanilla faction, so a faction-owned chest is theft unless it is in their own faction's hall.
+  const theftOf = (t, a) => {
+    if (claimOf(t)) return ownHome(t, a) ? '' : 'theft';
+    const place = placeClaim(t);
+    if (place) return mayUsePlace(t, a, place) ? '' : 'theft';
+    const owner = ownerInPlugins(t);
+    if (!owner || PLAYER_OWNERS.has(owner)) return '';
+    return guildMayUse(t, a) ? '' : 'theft';
+  };
   const delayApplies = (t, a) => {
     if (C.onlyDungeonsAndTheft === false) return 'all';
     if (inDungeon(t)) return 'dungeon';
-    if (C.theft === true) {
-      const rec = claimOf(t);
-      if (rec && !ownHome(t, a)) return 'theft';
-    }
+    if (C.theft === true) return theftOf(t, a);
     return '';
   };
 
@@ -293,5 +380,5 @@ module.exports = (api) => {
   };
 
   log(`actiondelays: ${C.enabled ? 'on' : 'off'} (search ${C.searchSeconds}s, body ${C.bodySeconds}s, take ${C.takeSeconds}s, grace ${C.graceSeconds}s)`);
-  return { _test: { delayApplies, inDungeon, searchGate, takeGate, S, C, ownHome, recordType } };
+  return { _test: { delayApplies, inDungeon, searchGate, takeGate, S, C, ownHome, recordType, theftOf, ownerInPlugins } };
 };
