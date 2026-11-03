@@ -133,7 +133,8 @@ module.exports = (api) => {
     try { personal(a, text); } catch (e) { /* offline */ }
   };
   const resync = (a) => {
-    try { if (typeof globalThis.__dboItemResync === 'function') globalThis.__dboItemResync(a); } catch (e) { log('action delays: resync failed', e.message); }
+    // quiet: a gate refusal is not a wrong pack, so itemguards must not say it was; tell() gives the gate's own line
+    try { if (typeof globalThis.__dboItemResync === 'function') globalThis.__dboItemResync(a, { quiet: true }); } catch (e) { log('action delays: resync failed', e.message); }
   };
 
   // Opens the container as if the player had activated it again. Activate is registered server-side and

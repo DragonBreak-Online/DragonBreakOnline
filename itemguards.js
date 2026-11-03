@@ -79,8 +79,11 @@ module.exports = (api) => {
     return MODE === 'on' ? false : undefined;
   };
   // A refused move for more than is held means the player's client shows items the server never gave; the server's
-  // own inventory is sent back at once (at most once a second); the player is told, and the log says so, once a minute
-  const resync = (actor) => {
+  // own inventory is sent back at once (at most once a second); the player is told, and the log says so, once a minute.
+  // quiet: the caller refused for its own reason (an actiondelays gate) and told the player itself, so the pack was
+  // never wrong and this note would be false. The log line stays, since it is how resyncs are counted.
+  const resync = (actor, opts) => {
+    const quiet = !!(opts && opts.quiet);
     const a = Number(actor) >>> 0; const now = Date.now();
     if (now - (S.resynced.get(a) || 0) < 1000) return;
     S.resynced.set(a, now);
@@ -92,7 +95,7 @@ module.exports = (api) => {
         mp.set(a, 'inventory', inv);
       } catch (e) { if (now - (S.logged.get(a) || 0) >= 60000) { S.logged.set(a, now); log(`itemguards: inventory resync failed for ${nameOf(a)}: ${e.message}`); } return; }
       if (now - (S.logged.get(a) || 0) >= 60000) { S.logged.set(a, now); log(`ITEMGUARD resynced the inventory of ${nameOf(a)}`); }
-      if (now - (S.told.get(a) || 0) >= 60000) { S.told.set(a, now); try { personal(a, 'Your pack has been set right: it showed items you do not really have.'); } catch (e) { /* offline */ } }
+      if (!quiet && now - (S.told.get(a) || 0) >= 60000) { S.told.set(a, now); try { personal(a, 'Your pack has been set right: it showed items you do not really have.'); } catch (e) { /* offline */ } }
     }, 0);
   };
   // Any module that refuses a move needs this: the engine has already moved the item on the client, so a refusal
