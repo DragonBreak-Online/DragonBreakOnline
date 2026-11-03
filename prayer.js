@@ -191,6 +191,34 @@ module.exports = (api) => {
     return DEITIES.find((d) => d.id === q || d.name.toLowerCase().replace(/[^a-z]/g, '') === q) || null;
   };
   const deityById = (id) => DEITIES.find((d) => d.id === id) || null;
+  // Consecrated shrines (capstones.js: a Priest Grandmaster's Consecration, each approved by staff): consecrated-shrines.json
+  // beside the world state, re-read whenever it changes, so no restart. Each approved one is a spot like skills.json's,
+  // keyed by a stable number no form uses (0xFE000000 + its n), so its rest works as at any shrine; skills.json's spots win
+  const CONSECRATED = path.resolve('consecrated-shrines.json');
+  const CONSECRATED_BASE = 0xfe000000;
+  const sidecar = { mtime: -1, keys: new Set() };
+  const loadConsecrated = (force) => {
+    let m = -1; try { m = require('fs').statSync(CONSECRATED).mtimeMs; } catch (e) { m = -1; }
+    if (m === sidecar.mtime && !force) return;
+    sidecar.mtime = m;
+    for (const k of sidecar.keys) SPOTS.delete(k);
+    sidecar.keys.clear();
+    let rows = [];
+    try { rows = JSON.parse(require('fs').readFileSync(CONSECRATED, 'utf8')).shrines || []; } catch (e) { rows = []; }
+    for (const r of Array.isArray(rows) ? rows : []) {
+      const d = r && r.status === 'approved' ? deityById(String(r.deity)) : null;
+      const n = Number(r && r.n);
+      if (!d || !Number.isInteger(n) || n < 1 || n > 0xffffff || !r.world || !Array.isArray(r.pos) || r.pos.length < 3) continue;
+      const key = (CONSECRATED_BASE + n) >>> 0;
+      if (SPOTS.has(key)) continue;
+      SPOTS.set(key, { d, world: String(r.world), pos: r.pos.map(Number), meters: Math.max(1, Number(r.meters) || 3), name: String(r.name || '') });
+      sidecar.keys.add(key);
+    }
+    if (sidecar.keys.size) log(`prayer: ${sidecar.keys.size} consecrated shrine(s)`);
+  };
+  loadConsecrated(true);
+  every('prayerConsecrated', 30000, () => loadConsecrated(false));
+  globalThis.__dboPrayerConsecrated = { keys: sidecar.keys, reload: () => loadConsecrated(true), file: CONSECRATED };
   // Auri-El is not a second god, he is Akatosh under the Aldmeri name, and skills.json says so with
   // `aspectOf`. Two ids are the same faith if either is an aspect of the other, so a worshipper of
   // one may kneel at the other's shrine - which is the only way a Snow-Elf-faithed character gets to
