@@ -9,6 +9,7 @@ import { noteCopyPlaced, safeDelete } from "../../view/npcLifetimeRuntime";
 import { logError, logTrace } from "../../logging";
 import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
+import { Obnd, boundsOf, boxSegments, pathOf } from "./placeBounds";
 
 /**
  * The F7 Place tab's placement mode. A local copy of the chosen NPC or object floats in front of the GM; keys move it,
@@ -66,6 +67,19 @@ const hudScript = (text: string | null): string =>
   `background:rgba(10,9,7,0.8);border:1px solid rgba(232,214,160,0.55);color:#e8d6a0;` +
   `font:15px/1.5 "Futura Condensed","Roboto Condensed",sans-serif;text-align:center;white-space:pre;` +
   `text-shadow:0 1px 2px #000';document.body.appendChild(d);}d.textContent=t;})(${JSON.stringify(text)})`;
+
+// The copy's bounds box and facing arrow (placeBounds.ts) as an SVG over the screen, in the readout's gold; null removes it
+const boxScript = (box: { edges: string; arrow: string } | null): string =>
+  `(function(b){var s=document.getElementById('dbo-place-box');if(b===null){if(s)s.remove();return;}` +
+  `if(!s){var n='http://www.w3.org/2000/svg';s=document.createElementNS(n,'svg');s.id='dbo-place-box';` +
+  `s.setAttribute('viewBox','0 0 1 1');s.setAttribute('preserveAspectRatio','none');` +
+  `s.style.cssText='position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:2147482999;pointer-events:none';` +
+  `[['rgba(232,214,160,0.85)','1.5'],['#ffe9a8','2.5']].forEach(function(c){var p=document.createElementNS(n,'path');` +
+  `p.setAttribute('fill','none');p.setAttribute('stroke',c[0]);p.setAttribute('stroke-width',c[1]);` +
+  `p.setAttribute('vector-effect','non-scaling-stroke');s.appendChild(p);});document.body.appendChild(s);}` +
+  `s.childNodes[0].setAttribute('d',b.edges);s.childNodes[1].setAttribute('d',b.arrow);})(${JSON.stringify(box)})`;
+// The box is sent to the browser at most this often while it moves
+const BOX_MS = 33;
 
 const norm = (deg: number): number => ((deg % 360) + 360) % 360;
 // Below these the preview is left where it is (units, degrees)
@@ -139,6 +153,8 @@ export class PlacementService extends ClientListener {
   private onCustomPacketMessage(event: ConnectionMessage<CustomPacketMessage>): void {
     const content = parseCustomPacket(event);
     if (content && content["customPacketType"] === "placeEdit") this.pendingEdit = content;
+    // The base's bounds for the box; null (none in its record) gives the fallback cube
+    if (content && content["customPacketType"] === "placeBounds" && this.pick && String(content["desc"]) === this.pick.desc) this.obnd = boundsOf(content["obnd"]);
   }
 
   private parse(arg: unknown): Record<string, any> | null {
@@ -184,6 +200,8 @@ export class PlacementService extends ClientListener {
     this.pitch = 0;
     this.roll = 0;
     this.held.clear();
+    this.obnd = null;
+    if (pick) sendCustomPacket(this.controller, { customPacketType: "dbo", event: "placeBounds", args: [pick.desc] });
     if (edit) this.startEditPose(edit);
     const what = !pick ? "select tool" : edit ? `editing ${pick.name}` : `placing ${pick.name}`;
     Debug.notification(`${what[0].toUpperCase()}${what.slice(1)}. The keys are on screen; Backspace stops.`);
@@ -214,6 +232,11 @@ export class PlacementService extends ClientListener {
       if (ghost) safeDelete(ghost, { urgent: true });
     }
     this.hideOutline();
+    this.obnd = null;
+    if (this.boxSent !== null) {
+      this.boxSent = null;
+      this.sp.browser.executeJavaScript(boxScript(null));
+    }
     if (announce && this.active) Debug.notification("Placement mode off.");
     if (this.hudText !== null) {
       this.hudText = null;
@@ -245,6 +268,7 @@ export class PlacementService extends ClientListener {
     if (!this.active) return;
     // Every frame, so the outline keeps up with the camera; the copy itself moves on the 40 ms tick
     this.drawOutline();
+    this.drawBox();
     const now = Date.now();
     if (now - this.lastTick < TICK_MS) return;
     this.lastTick = now;
@@ -409,6 +433,24 @@ export class PlacementService extends ClientListener {
     }
   }
 
+  // The copy's bounds box and facing arrow, from the pose like the outline; nothing until the server has sent the bounds
+  private drawBox(): void {
+    const at = this.ghostAt;
+    let key = "";
+    let box: { edges: string; arrow: string } | null = null;
+    if (this.pick && this.ghostId && at && this.obnd && !Utility.isInMenuMode()) {
+      const segs = boxSegments(this.obnd, [at[0], at[1], at[2]], [at[3], at[4], at[5]]);
+      const pts = worldPointToScreenPoint(...segs.flatMap((sg) => [sg[0], sg[1]]));
+      box = { edges: pathOf(pts.slice(0, 24)), arrow: pathOf(pts.slice(24)) };
+      key = box.edges + "|" + box.arrow;
+    }
+    const now = Date.now();
+    if (key === (this.boxSent ?? "") || (key && now - this.boxSentAt < BOX_MS)) return;
+    this.boxSent = key;
+    this.boxSentAt = now;
+    this.sp.browser.executeJavaScript(boxScript(key ? box : { edges: "", arrow: "" }));
+  }
+
   private hideOutline(): void {
     for (const id of [this.outlineMarkId, this.outlineNameId]) if (id) { try { destroyText(id); } catch { /* gone */ } }
     this.outlineMarkId = 0;
@@ -500,6 +542,10 @@ export class PlacementService extends ClientListener {
   private flashText = "";
   private flashUntil = 0;
   private outlineMarkId = 0;
+  private obnd: Obnd | null = null;
+  // The box last sent to the browser (its two paths), null when there is none on screen
+  private boxSent: string | null = null;
+  private boxSentAt = 0;
   private outlineNameId = 0;
   private outlineNameShown = "";
 }

@@ -33,7 +33,7 @@ check('hidden in menus and without a copy', /!this\.pick \|\| !this\.ghostId \|\
 check('the mark is ASCII [+]', /mark: "\[\+\]"/.test(src));
 check('stop() destroys the texts', /this\.hideOutline\(\);/.test(body('stop')));
 check('hideOutline destroys both ids', /destroyText\(id\)/.test(body('hideOutline')) && /this\.outlineMarkId = 0;/.test(body('hideOutline')) && /this\.outlineNameId = 0;/.test(body('hideOutline')));
-check('drawn every frame, before the 40 ms tick', /this\.drawOutline\(\);\s*const now = Date\.now\(\);\s*if \(now - this\.lastTick < TICK_MS\) return;/.test(src));
+check('drawn every frame, before the 40 ms tick (the box with it)', /this\.drawOutline\(\);\s*this\.drawBox\(\);\s*const now = Date\.now\(\);\s*if \(now - this\.lastTick < TICK_MS\) return;/.test(src));
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');
 process.exit(failures ? 1 : 0);
