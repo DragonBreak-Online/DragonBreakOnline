@@ -818,14 +818,14 @@ function drawFoot(pages)
    webDivider(f, PAD, PANEL_H - 66, PANEL_W - PAD * 2);
    pageBar(f, 2, PAD, PANEL_H - 50, 340, page, pages, turnPage);
    var x = PANEL_W - PAD - 130;
-   webButton(f, "cancel", 12, x, PANEL_H - 50, 130, "Cancel", F_MEDIUM, 20, A_BUTTON_REST, function()
+   webChip(f, "cancel", 12, x, PANEL_H - 50, 130, "Cancel", F_MEDIUM, 20, A_BUTTON_REST, function()
    {
       closeMenu();
    });
    if (data.myLocked == true)
    {
       x -= 158;
-      webButton(f, "unlock", 11, x, PANEL_H - 50, 150, data.iAccepted == true ? "Back out" : "Change offer", F_MEDIUM, 20, A_BUTTON_REST, function()
+      webChip(f, "unlock", 11, x, PANEL_H - 50, 150, data.iAccepted == true ? "Back out" : "Change offer", F_MEDIUM, 20, A_BUTTON_REST, function()
       {
          dboSound("UIMenuCancel");
          send("unlock");

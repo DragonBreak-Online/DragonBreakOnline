@@ -39,6 +39,12 @@ function webGround(clip, w, h)
       var sw = w * (0.55 + 0.35 * k);
       dboGradientBox(clip, (w - sw) / 2, 2 + i * sh, sw, sh, [C_LORKHAN, C_LORKHAN, C_LORKHAN], [0, 14 * k * k, 0], [0, 128, 255], 0);
    }
+   // the web border is the domain hue (dbo-accent 0.6): drawn over the stone, so the frame, its inner line and the corners
+   // are one colour
+   dboBox(clip, 0, 0, w, 1.5, C_ACCENT, 60);
+   dboBox(clip, 0, h - 1.5, w, 1.5, C_ACCENT, 60);
+   dboBox(clip, 0, 0, 1.5, h, C_ACCENT, 60);
+   dboBox(clip, w - 1.5, 0, 1.5, h, C_ACCENT, 60);
    webFracture(clip, 0, 0, w, 2);
 }
 
