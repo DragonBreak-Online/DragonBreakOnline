@@ -53,14 +53,14 @@ const C2 = new Function('sendPacket', 'log', 'every', 'profileOf', block + '\nre
 const B = 0x15, O = 0x16;
 C2.nativeState().native.set(B, new Set(['native:journal', 'native:journalTab:faction', 'nativeChunked']));
 C2.nativeState().native.set(O, new Set(['native:journal', 'native:journalTab:faction']));
-const faction = { type: 'journal', id: 50, hub: true, tab: 'faction', pad: big(63411) };
-ok(C2.nativeSwfFor(B, faction) === 'dbo_journal', 'a 63k Faction tab goes native to a client that sends payloads in pieces');
-ok(C2.nativeSwfFor(O, faction) === '', '...and to the browser for one that does not, as before');
-ok(C2.NATIVE_CHUNKED_MAX_CHARS === 400000 && C2.nativeSwfFor(B, Object.assign({}, faction, { pad: big(400001) })) === '', 'past the piece ceiling it goes to the browser too');
+const faction = { type: 'journal', id: 50, hub: true, tab: 'faction', pad: big(45000) };
+ok(C2.nativeSwfFor(B, faction) === 'dbo_journal', 'a 45k Faction tab goes native to a client that sends payloads in pieces');
+ok(C2.nativeSwfFor(O, faction) === 'dbo_journal', '...and natively to one that does not too, both ceilings being 60000 since 3 Nov');
+ok(C2.NATIVE_CHUNKED_MAX_CHARS === 60000 && C2.nativeSwfFor(B, Object.assign({}, faction, { pad: big(60001) })) === '', 'past the piece ceiling it goes to the browser too');
 logs.length = 0;
 now += 61000;
-C2.nativeSwfFor(B, Object.assign({}, faction, { tab: 'faction', pad: big(400010) }));
-ok(logs.some((l) => /over 400000: sent to the browser \(profile 2\)/.test(l)), 'the oversize line names the ceiling that applied', logs);
+C2.nativeSwfFor(B, Object.assign({}, faction, { tab: 'faction', pad: big(60010) }));
+ok(logs.some((l) => /over 60000: sent to the browser \(profile 2\)/.test(l)), 'the oversize line names the ceiling that applied', logs);
 // dbo:nativeTiming, the panel's own report of a big delivery, as one [native-timing] line
 const handlers = {};
 const onUiSrc = src.slice(src.indexOf("onUi('nativeTiming'"), src.indexOf('\n});\n', src.indexOf("onUi('nativeTiming'")) + 5);
