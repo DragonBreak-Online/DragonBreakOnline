@@ -75,6 +75,10 @@ export class MapRealmService extends ClientListener {
     this.drawnFit = null;
     this.drawnAt = 0;
     this.flatSent = false;
+    this.notFlat = false;
+    this.prevView = new Map();
+    this.relabelAt = 0;
+    this.relabels = 0;
     this.shape = null;
     this.shapeT = null;
     this.tracked = false;
@@ -206,6 +210,17 @@ export class MapRealmService extends ClientListener {
       const tries = (this.labelTries[i] || 0) + 1;
       if (label || tries >= LABEL_TRIES) this.labels[i] = label; else this.labelTries[i] = tries;
     }
+    if (this.labels.length > n) { this.labels.length = n; this.applied.length = Math.min(this.applied.length, n); }
+    // Read again, a few a frame: a clip SkyUI gives another marker while the map is open kept the old label here, and a
+    // number key's hide then landed on the wrong places (live, 3 Nov: "the toggles toggle things completely unrelated")
+    if (read < LABELS_PER_TICK && n > 0) {
+      for (let k = 0; k < RELABEL_PER_TICK; k++) {
+        const i = this.relabelAt++ % n;
+        if (typeof this.labels[i] !== "string" || !this.labels[i]) continue;
+        const label = ui.getString(MAP_MENU, `${MARKER_CLIP(i)}.label`) || "";
+        if (label && label !== this.labels[i]) { this.labels[i] = label; delete this.applied[i]; this.relabels++; }
+      }
+    }
   }
 
   private applyFilter(): void {
@@ -227,7 +242,7 @@ export class MapRealmService extends ClientListener {
       opening: this.openings, frames: this.ticksOpen,
       legend: this.markers.length ? swfReport(this.legendSwf) : null,
       owners: this.owners ? swfReport(this.ownersSwf) : null,
-      world: this.mapWorld, anchors: this.anchorsSeen,
+      world: this.mapWorld, anchors: this.anchorsSeen, notFlat: this.notFlat, relabels: this.relabels,
       flash: Object.assign({}, this.flash, { lastHolds: undefined, seconds: Math.round((Date.now() - this.flash.at) / 100) / 10 }),
       fit: f ? { n: f.n, rms: Math.round(f.rms * 100) / 100, affine: f.affine, holds: f.n >= HOM_MIN && f.rms <= MAX_FIT_RMS } : null,
     };
@@ -316,7 +331,7 @@ export class MapRealmService extends ClientListener {
     // Shown from the start only on a flat map (over the 3D relief no fit from the markers holds: Nat, 2 Nov); T turns
     // them on or off anywhere, and that choice stays with the world for the session
     const chosen = this.ownersChoice.get(this.mapWorld);
-    this.ownersShown = chosen !== undefined ? chosen : world.flat === true;
+    this.ownersShown = chosen !== undefined ? chosen : world.flat === true && !this.notFlat;
     const key = world.world + "#" + world.territories.map((t) => t.owner).join("|");
     if (key !== this.drawnKey) {
       this.drawnKey = key;
@@ -336,7 +351,7 @@ export class MapRealmService extends ClientListener {
       };
       st.t.url = `map ${this.stage.mapW}x${this.stage.mapH}, ours ${this.stage.ours.width}x${this.stage.ours.height} at ${this.stage.ours.left},${this.stage.ours.top}`;
     }
-    if (world.flat === true) { this.followFlat(layer); return; }
+    if (world.flat === true && !this.notFlat) { this.followFlat(layer); return; }
     // Off a flat map (T turned them on over the 3D relief): each frame fits a homography to every anchor the map shows; one that does not hold leaves the colours where they
     // were (never hidden: Nat saw them flash on 2 Nov). The drawing is projected and sent again only when the fit would
     // move it by more than LAYER_STILL px, at most every REDRAW_FRAMES frames while the map moves: a still map sends nothing.
@@ -390,9 +405,18 @@ export class MapRealmService extends ClientListener {
     const o = this.stage.ours;
     const kx = o.width / (this.stage.mapW > 0 ? this.stage.mapW : o.width), ky = o.height / (this.stage.mapH > 0 ? this.stage.mapH : o.height);
     const seen = this.lastSeenAt === this.ticksOpen ? this.lastSeen.map((q) => ({ x: q.x, y: q.y, sx: o.left + q.sx * kx, sy: o.top + q.sy * ky })) : [];
-    if (!this.shape) {
+    // Flat or not, judged on a still view of enough anchors: Nat's paper maps fit to 0.02-0.9 px and the 3D relief to 30+.
+    // Three points fit any map, so a shape from fewer warped the colours for players whose paper maps had not installed
+    // (live, 3 Nov: right at the bottom left, warped going right); a map that is not flat leaves the flat path this opening
+    if (seen.length >= FLAT_MIN_ANCHORS && this.steadyView(seen)) {
       const f = fitOf(seen);
-      if (fitHolds(f) && f) { this.shape = f; this.shapeT = clipTransform(f); }
+      if (f && f.rms > FLAT_MAX_RMS) {
+        this.notFlat = true;
+        logTrace(this, "the map is not flat (affine rms", String(Math.round(f.rms)), "over", String(seen.length), "anchors): no flat colours this opening");
+        if (this.layerShown) { ui.setBool(LEGEND_MENU, `${layer}._visible`, false); this.layerShown = false; fl.hidden++; }
+        return;
+      }
+      if (f && !this.shape) { this.shape = f; this.shapeT = clipTransform(f); }
     }
     const t = this.shape ? trackOf(this.shape, seen) : null;
     const holds = !!t && t.rms <= MAX_FIT_RMS;
@@ -418,6 +442,22 @@ export class MapRealmService extends ClientListener {
     const show = this.tracked;
     if (show !== this.layerShown) { ui.setBool(this.menu, `${layer}._visible`, show); this.layerShown = show; if (show) fl.shown++; else fl.hidden++; }
     if (t) this.lastFit = { n: t.n, rms: t.rms, affine: this.lastAffine };
+  }
+
+  // A view is still when every anchor seen on the frame before has moved less than half a pixel since
+  private steadyView(seen: Seen[]): boolean {
+    const now = new Map<string, [number, number]>();
+    let common = 0, moved = false;
+    for (const q of seen) {
+      const k = q.x + "," + q.y;
+      now.set(k, [q.sx, q.sy]);
+      const was = this.prevView.get(k);
+      if (!was) continue;
+      common++;
+      if (Math.hypot(was[0] - q.sx, was[1] - q.sy) >= 0.5) moved = true;
+    }
+    this.prevView = now;
+    return common >= FLAT_MIN_ANCHORS && !moved;
   }
 
   // Every anchor the map shows this frame, in the root's own units; the affine rms on the same set is kept for the report,
@@ -612,6 +652,11 @@ export class MapRealmService extends ClientListener {
   private lastAffine = -1;
   private lastSeenAt = -1;
   private flatSent = false;
+  // This opening's map measured not flat (a 3D map where the server's world list says paper)
+  private notFlat = false;
+  private prevView = new Map<string, [number, number]>();
+  private relabelAt = 0;
+  private relabels = 0;
   private shape: Fit | null = null;
   private shapeT: ClipTransform | null = null;
   private tracked = false;
@@ -645,6 +690,11 @@ const newFlash = (): Flash => ({ at: Date.now(), held: 0, failed: 0, noFit: 0, f
 // While the map moves, one redraw every REDRAW_FRAMES frames at most (each sends the projected drawing to the movie). The
 // layer itself stays flat: the points are already on our stage
 const REDRAW_FRAMES = 2;
+// A map is taken as flat only from a still view of this many anchors fitting within FLAT_MAX_RMS px
+const FLAT_MIN_ANCHORS = 6;
+const FLAT_MAX_RMS = 3;
+// Labels read again each frame, round the map, once all are read
+const RELABEL_PER_TICK = 8;
 // Marker sets sent for checking the fit: SAMPLES an opening, SAMPLE_EVERY frames apart, SAMPLE_POINTS anchors each
 const SAMPLES = 4;
 const SAMPLE_EVERY = 600;

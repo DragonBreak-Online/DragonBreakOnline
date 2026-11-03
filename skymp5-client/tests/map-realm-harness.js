@@ -124,6 +124,13 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   frames(1);
   ok(scale(3) === 0 && scale(4) === 0 && S.props['_root.MarkerClips.Marker3._yscale'] === 0, 'a digit hides that kind: both forts shrink to nothing');
   ok(scale(0) === 100 && scale(2) === 100 && scale(5) === 100, 'and only that kind');
+  // live, 3 Nov: SkyUI gave a clip another marker while the map was open, and the hide stayed on the clip, not the marker
+  S.props['_root.MarkerClips.Marker3.label'] = 'Applewatch';
+  frames(2);
+  ok(scale(3) === 100, 'a clip that now shows a town (it showed a fort) is read again and shown', scale(3));
+  S.props['_root.MarkerClips.Marker3.label'] = 'Pale Pass';
+  frames(2);
+  ok(scale(3) === 0, '...and hidden again when it is a fort once more', scale(3));
   ok(S.widgets[S.widgets.length - 1].rows.find((r) => r.id === 'fort').shown === false, 'the legend greys the hidden kind');
   key(11);  // 0: everything else
   frames(1);
@@ -337,6 +344,24 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
     h10.update(); h10.update();
     ok(!O.open && JSON.stringify(O.calls) === JSON.stringify([['close']]), 'the overlay open with no map is closed on the next ticks', O.calls);
     S.menuOpen = true; delete sp.overlayMenu; sp.Ui.isMenuOpen = isOpen0; S.customOpen = false; delete S.props['_root.dboVersion'];
+  }
+
+  // ---- the server says flat, but this player's map is the 3D relief (live, 3 Nov: paper maps not installed) ----
+  {
+    const h11 = {};
+    S.custom = []; S.customOpen = false; S.invoked.length = 0; S.menuOpen = true; S.packets.length = 0; S.props['_root.owners.layer._visible'] = false;
+    place(0); // the tilted camera's positions
+    new MapRealmService(sp, { on: (ev, fn) => { h11[ev] = fn; }, emitter: { on: (ev, fn) => { h11['emit:' + ev] = fn; } } });
+    h11['emit:customPacketMessage']({ customPacketType: 'dboMapRealm', markers });
+    h11['emit:customPacketMessage']({ customPacketType: 'dboMapOwners', worlds: [{ world: '3c:Skyrim.esm', aliases: [], flat: true, territories: [{ id: 'a', owner: 'hold-a', x: 0, y: 0 }, { id: 'b', owner: 'hold-b', x: 50000, y: 0 }] }],
+      factions: { 'hold-a': { name: 'A', rgb: [200, 0, 0] }, 'hold-b': { name: 'B', rgb: [0, 200, 0] } }, anchors: anchorsAt.map(([name, x, y]) => ({ name, x, y, z: 0 })), reach: 30000, fade: 45000 });
+    h11.menuOpen({ name: 'MapMenu' });
+    for (let i = 0; i < 80; i++) h11.update();
+    ok(S.props['_root.owners.layer._visible'] !== true, 'a map the server calls flat that measures 3D: no colours drawn over it', S.props['_root.owners.layer._visible']);
+    h11.menuClose({ name: 'MapMenu' });
+    const rp = ((S.packets.find((p) => p.event === 'mapSwf') || { args: [{}] }).args[0]) || {};
+    ok(rp.notFlat === true, '...and the map line says so (notFlat)', rp.notFlat);
+    S.customOpen = false;
   }
 
   // ---- a flat paper map (Nat, 2 Nov: the redrawn colours lagged his pans and snapped back) ----
