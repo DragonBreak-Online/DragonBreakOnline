@@ -5,6 +5,20 @@
 var FACTION_KIND = {hold: "Hold", stronghold: "Stronghold", guild: "Guild", cult: "Cult"};
 var facSelected = "";
 var facPicked = "";
+// The faction a paged payload was last asked about: one that is shown without its page (a filter or a default chose it)
+// is asked for once, never again while the answer is on its way
+var facAsked = "";
+
+function facAskPage(f, ctx)
+{
+   if (f != null && f.paged == true && facAsked != f.id)
+   {
+      facAsked = f.id;
+      ctx.openTab("faction", {faction: f.id});
+      return true;
+   }
+   return false;
+}
 var facNonce = "";
 var facRanking = "";
 var facOf = "";
@@ -163,6 +177,10 @@ JT.faction = function(s, ctx)
    if (f == null)
    {
       f = factions[0];
+   }
+   if (facAskPage(f, ctx))
+   {
+      return;
    }
    for (var j = 0; j < factions.length; j++)
    {
