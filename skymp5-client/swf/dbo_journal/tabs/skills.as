@@ -10,6 +10,56 @@ var skillsOf = "";
 var skillsViewing = "";
 var skillsFocus = "";
 var skillsList = false;
+// A paged payload (the server's journalskills.js for a native journal) carries Blacksmithing's recipes and Arcane Arts'
+// schools only with their page in view; opening either page without them asks the server for it
+var skillsCtx = null;
+var skillsPaged = false;
+var skillsHas = {};
+
+function skillsPick(id)
+{
+   skillsViewing = id;
+   skillsList = false;
+   pages[tab] = 0;
+   if (skillsPaged && skillsHas[id] == false && skillsCtx != null)
+   {
+      skillsCtx.openTab("skills", {skill: id});
+      return;
+   }
+   draw();
+}
+
+// Progress to the next level (points.held[].xp, 0 to 100), a bar under the level line
+function skillsProgress(xp, atCeiling)
+{
+   var p = Number(xp);
+   if (isNaN(p) || atCeiling)
+   {
+      return;
+   }
+   p = Math.max(0, Math.min(100, p));
+   var at = flowNeed(30);
+   var w = 360;
+   var bar = at.clip.createEmptyMovieClip(at.name + "bar", fd());
+   bar._y = at.y + 6;
+   var box = function(c, x1, colour)
+   {
+      c.beginFill(colour, 100);
+      c.moveTo(0, 0);
+      c.lineTo(x1, 0);
+      c.lineTo(x1, 10);
+      c.lineTo(0, 10);
+      c.lineTo(0, 0);
+      c.endFill();
+   };
+   box(bar, w, C_GROUND_2);
+   if (p > 0)
+   {
+      box(bar, w * p / 100, C_ACCENT);
+   }
+   var t = dboText(at.clip, at.name + "t", fd(), w + 16, at.y, 360, 24, dboFmt(F_MEDIUM, 15, C_SECOND, 0.5), false);
+   t.text = Math.round(p) + "% to the next level";
+}
 
 function heldOf(points, id)
 {
@@ -44,6 +94,7 @@ function skillsThread(s, k, points, tiers, ctx)
       var expertsTaken = above(points.expertAbove) >= points.expertCount && h.level <= points.expertAbove;
       var ceiling = seatTaken ? (expertsTaken ? points.expertAbove : points.seatAbove) : points.capPerSkill;
       flowText(h.level + " of " + ceiling + "   " + (tiers[h.tier] != undefined ? tiers[h.tier] : ""), 22, C_TEXT);
+      skillsProgress(h.xp, h.level >= ceiling);
       var row = [];
       for (var l = 0; l < SKILL_LOCKS.length; l++)
       {
@@ -164,6 +215,9 @@ function skillsSmith(sm)
 
 JT.skills = function(s, ctx)
 {
+   skillsCtx = ctx;
+   skillsPaged = s.paged == true;
+   skillsHas = {blacksmith: s.smith != undefined && s.smith != null, arcane: s.magicSchools != undefined && s.magicSchools != null};
    var skills = listOf(s.skills);
    var cats = listOf(s.categories);
    if (!cats.length)
@@ -239,7 +293,7 @@ function skillsPicker(s, skills, cats, points, chosen, tiers, k)
             }
          }
          var tag = points != null ? (h != null ? " " + h.level + (h.lock != "raise" ? " " + h.lock : "") : "") : mine != null ? " " + (tiers[mine.rank] != undefined ? tiers[mine.rank] : "") : "";
-         row.push([skills[j].label + tag, function() { dboSound("UIMenuFocus"); skillsViewing = this.skill; skillsList = false; pages[tab] = 0; draw(); }, undefined, false, skills[j].id == k.id]);
+         row.push([skills[j].label + tag, function() { dboSound("UIMenuFocus"); skillsPick(this.skill); }, undefined, false, skills[j].id == k.id]);
          ids.push(skills[j].id);
       }
       if (!row.length)
