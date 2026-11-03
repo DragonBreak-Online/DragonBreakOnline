@@ -604,6 +604,78 @@ module.exports = (api) => {
   };
   if (typeof every === 'function') every('placementPurge', 5000, purge);
 
+  // A one-shot import of object placements made on another server (2 Nov: Nat's Expedition Board tiles in front of the
+  // Skyrim tavern boards, placed on dev, brought to live without placing them again). Run file placement-import.json:
+  //   { "mode": "dryrun" | "apply" | "off", "by": <profileId credited>, "confirm": "<the dryrun's code; apply only>",
+  //     "items": [{ "base": "<desc>", "where": "<cell or world desc>", "pos": [x,y,z], "rot": [x,y,z], "anchor": "<desc>" }] }
+  // anchor: a reference already in that cell (a plugin's own); the server places at a reference, not at a cell, so each
+  // item starts at its anchor and is moved to its pose, as place() does from the GM. Objects only, from the catalog.
+  // dryrun changes nothing: it checks every item (catalog, anchor in the same cell, not placed already: the same base
+  // within 2 units in that cell) and gives a code for that exact list. apply places the ones still missing, tags and lists
+  // them as the Place tab does, one audit line each. A file runs once per content and process.
+  const IMPORT_FILE = path.resolve('placement-import.json');
+  const IMPORT_REPORT = path.resolve('placement-import-report.json');
+  const importCheck = (it) => {
+    const base = String((it && it.base) || '');
+    const known = S.kinds.get(base.toLowerCase());
+    if (!known) return { why: 'not in the placement catalog' };
+    if (known.kind !== 'object') return { why: 'not an object' };
+    const pos = Array.isArray(it.pos) ? it.pos.slice(0, 3).map(Number) : [];
+    const rot = Array.isArray(it.rot) ? it.rot.slice(0, 3).map(Number) : [0, 0, 0];
+    if (pos.length !== 3 || pos.some((v) => !Number.isFinite(v)) || rot.length !== 3 || rot.some((v) => !Number.isFinite(v))) return { why: 'a bad position' };
+    const where = String(it.where || '');
+    const dup = registry().find((e) => e && sameWhere(e.where, where) && String(e.base).toLowerCase() === base.toLowerCase() && Math.hypot(e.pos[0] - pos[0], e.pos[1] - pos[1], e.pos[2] - pos[2]) <= 2);
+    if (dup) return { why: `placed already (${dup.id})`, skip: true };
+    let anchor = 0, anchorWhere = '';
+    try { anchor = mp.getIdFromDesc(String(it.anchor || '')) >>> 0; anchorWhere = String(mp.get(anchor, 'worldOrCellDesc') || ''); } catch (e) { anchor = 0; }
+    if (!anchor) return { why: `anchor ${it.anchor} not found` };
+    if (!sameWhere(anchorWhere, where)) return { why: `anchor ${it.anchor} is in ${anchorWhere || '?'}, not ${where}` };
+    return { ok: true, base, known, pos, rot, where, anchor };
+  };
+  const importLine = (it, c) => `${it && it.base} at ${(Array.isArray(it && it.pos) ? it.pos : []).map(Math.round).join(', ')} in ${it && it.where}: ${c.ok ? `would place (anchor ${it.anchor})` : c.why}`;
+  const importRun = () => {
+    let text;
+    try { text = fs.readFileSync(IMPORT_FILE, 'utf8'); } catch (e) { return null; }
+    if (S.importRan === text) return null;
+    S.importRan = text;
+    let spec;
+    try { spec = JSON.parse(text); } catch (e) { log('placement import: placement-import.json unreadable', e.message); return null; }
+    const mode = String((spec && spec.mode) || '');
+    if (mode !== 'dryrun' && mode !== 'apply') { log(`placement import: mode "${mode}", nothing done`); return null; }
+    loadCatalog();
+    const items = Array.isArray(spec.items) ? spec.items : [];
+    const code = require('crypto').createHash('sha256').update(JSON.stringify(items)).digest('hex').slice(0, 8);
+    const checks = items.map(importCheck);
+    const report = { mode, at: new Date().toISOString(), code, items: items.map((it, i) => importLine(it, checks[i])) };
+    const todo = checks.filter((c) => c.ok);
+    if (mode === 'dryrun') {
+      for (const line of report.items) log(`placement import dryrun: ${line}`);
+      log(`placement import dryrun: ${todo.length} of ${items.length} would be placed; apply with "confirm": "${code}"`);
+    } else if (String(spec.confirm || '') !== code) {
+      report.refused = `confirm "${String(spec.confirm || '')}" is not this list's code`;
+      log(`placement import: apply REFUSED: confirm "${String(spec.confirm || '')}" does not match the list's code ${code}; run a dryrun`);
+    } else {
+      const by = Number(spec.by) || 0;
+      report.placed = [];
+      for (const c of todo) {
+        let id = 0;
+        try { const res = papyrus('PlaceAtMe', c.anchor, [{ type: 'espm', desc: c.base }, 1, false, false]); id = res && res.desc ? mp.getIdFromDesc(res.desc) >>> 0 : 0; } catch (e) { log('placement import: PlaceAtMe failed', e.message); }
+        if (!id) { report.placed.push(`${c.base} in ${c.where}: the server could not create it`); continue; }
+        applyPose(id, 'object', c.where, c.pos, c.rot.map(norm));
+        const entry = { id: hex(id), base: c.base, name: c.known.name, kind: 'object', where: c.where, pos: c.pos.map((n) => Math.round(n * 10) / 10), rot: c.rot.map(norm), by, at: new Date().toISOString(), imported: true };
+        mp.set(id, TAG, { base: c.base, kind: 'object', by, at: entry.at });
+        registry().push(entry);
+        audit(`PLACE import placed ${c.known.name} (${c.base}) at ${entry.pos.map(Math.round).join(', ')} in ${c.where}, ref ${entry.id}, for profile ${by}`);
+        report.placed.push(`${c.known.name} ref ${entry.id} at ${entry.pos.map(Math.round).join(', ')} in ${c.where}`);
+      }
+      saveRegistry();
+      log(`placement import: placed ${report.placed.length} of ${todo.length} (code ${code})`);
+    }
+    try { fs.writeFileSync(IMPORT_REPORT, JSON.stringify(report, null, 1)); } catch (e) { log('placement import: report not written', e.message); }
+    return report;
+  };
+  if (typeof every === 'function') every('placementImport', 5000, importRun);
+
   // The file follows the list, also after a hot reload or a restore of the list
   if (AS_ZONES) writeZones();
 
