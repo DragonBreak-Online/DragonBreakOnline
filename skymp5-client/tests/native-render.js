@@ -178,6 +178,8 @@ const SETUPS = [
   ['housing', { swf: 'dbo_housing', drive: (t) => t.push(housing) }],
   ['housing-rename', { swf: 'dbo_housing', drive: (t) => { t.push(housing); for (const k of Object.keys(t.root.dboPanel.acts.kids)) { const b = t.root.dboPanel.acts[k]; if (b.label && b.label.text === 'Rename...') b.onRelease(); } } }],
   ['journal', { swf: 'dbo_journal', drive: (t) => t.push(journal) }],
+  ['journal-keys', { swf: 'dbo_journal', drive: (t) => t.push(Object.assign({}, journal, { tab: 'keys', keys: { offer: { from: 'Gemma', key: 'Rose Hall key' }, near: [{ actor: 0xff01, name: 'Gemma' }, { actor: 0xff02, name: 'Bram' }], keys: [{ name: 'Rose Hall key', place: 'Rose Hall', opens: true }, { name: 'Old key', place: '', opens: false }], owned: [{ ref: 0x5000, place: 'Rose Hall', copies: [{ name: 'Rose Hall key 2', holder: 'Bram' }] }] } })) }],
+  ['journal-pages', { swf: 'dbo_journal', drive: (t) => t.push(Object.assign({}, journal, { stats: { groups: Array.from({ length: 6 }, (_, g) => ({ name: 'Group ' + (g + 1), rows: Array.from({ length: 6 }, (_, i) => ({ label: 'Row ' + (g + 1) + '.' + (i + 1), value: String(i * 7) })) })) } })) }],
   ['decor', { swf: 'dbo_decor', drive: (t) => t.push(decor) }],
   ['prayer', { swf: 'dbo_prayer', drive: (t) => t.push(prayer) }],
   ['deity', { swf: 'dbo_deity', drive: (t) => { t.push(deity); t.press(51); } }],

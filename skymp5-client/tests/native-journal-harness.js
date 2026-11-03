@@ -93,8 +93,12 @@ const closed = (t) => t.closed();
   check('no block runs past the body', pages(t).every((p) => Object.keys(p.kids).every((k) => (p.kids[k]._y || 0) + (p.kids[k]._height || 0) <= 410)), pages(t).map((p) => Object.keys(p.kids).map((k) => (p.kids[k]._y || 0) + (p.kids[k]._height || 0))));
   check('Previous is greyed on the first page', P(t).foot.prev.disabled === true && !P(t).foot.next.disabled);
   const first = texts(t)[0];
+  const body = P(t).body, flowRoot = P(t).body.flowClip, tabRow = P(t).tabs;
   P(t).foot.next.onRelease();
   check('Next page shows the next one', texts(t)[0] !== first && P(t).foot.page.text.indexOf('Page 2') === 0);
+  // 3 Nov polish: every page is drawn already, so a turn shows the next one and draws only the foot again
+  check('...without drawing the tab or its pages again', P(t).body === body && P(t).body.flowClip === flowRoot && P(t).tabs === tabRow);
+  check('...and the focus order is the tabs, then the shown page, then the foot, numbered in order', t.ctx.actions.every((a, i) => a.idx === i) && t.ctx.actions[0]._parent === P(t).tabs && t.ctx.actions.filter((a) => a._parent === P(t).foot).length >= 2 && t.ctx.actions.every((a) => { for (let k = a; k; k = k._parent) if (k._visible === false) return false; return true; }), t.ctx.actions.length);
   t.wheel(1);
   check('the wheel turns back', P(t).foot.page.text.indexOf('Page 1') === 0);
   t.press(34);
@@ -232,6 +236,8 @@ const closed = (t) => t.closed();
   t.push(hub('skills', { tabs: T4, skills }));
   let tx = texts(t).join('|');
   check('it opens on the first held skill: its page, level of ceiling, the three moons with its own bright', /One-Handed, the One-Handed\|One-Handed lore\.\|One-Handed rule\.\|60 of 100   Adept/.test(tx) && btn(t, 'Raise')._alpha === 100 && btn(t, 'Hold')._alpha < 100, tx);
+  // 3 Nov polish: the web chips go on every tab but Skills, which is Worker 1's and keeps its own look
+  check('the Skills tab is not reskinned: its buttons keep the plain box', btn(t, 'Raise').fills.length === 1 && btn(t, 'Raise').fills[0].color === 0, btn(t, 'Raise').fills.map((f) => f.color));
   btn(t, 'Lower').onRelease();
   check('a moon sends journalSkill lock with the skill and the mode', msgs(t, 'dbo:journalSkill').pop().args.join('|') === 'n1|lock|oneHanded|lower');
   t.push(hub('skills', { nonce: 'n2', tabs: T4, skills }));

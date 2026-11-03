@@ -94,6 +94,31 @@ function webSkinRow(c, kind)
    return c;
 }
 
+// Every button drawn into the dbo-flow pages (list dbo-flow first), skinned as a chip, a chosen one "on". A list row with
+// a wash of its own (washW) is a row, not a button, and keeps its look
+function webSkinFlow()
+{
+   var walk = function(c)
+   {
+      for (var k in c)
+      {
+         var o = c[k];
+         if (o != undefined && o._parent == c && o.createEmptyMovieClip != undefined)
+         {
+            if (o.label != undefined && o.onPick != undefined && o.washW == undefined)
+            {
+               webSkin(o, o.rest == A_FOCUS ? "on" : "chip");
+            }
+            else
+            {
+               walk(o);
+            }
+         }
+      }
+   };
+   walk(flow.root);
+}
+
 // A gold button: button()'s arguments and focus behaviour, disable() greys it as it does any control
 function webButton(parent, name, depth, x, y, w, label, font, size, rest, onPick)
 {
