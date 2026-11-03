@@ -354,6 +354,18 @@
    "spellName": "Conjure Familiar"
   },
   {
+   "id": "matys knights of the nine armor 2.1.esp:004E36",
+   "name": "SpellTomeConjureKONGhost",
+   "school": "Conjuration",
+   "rank": 0,
+   "spell": "ConjureKONGhost",
+   "value": 49,
+   "spellId": "matys knights of the nine armor 2.1.esp:004E37",
+   "plugin": "matys knights of the nine armor 2.1.esp",
+   "fullName": "Spell Tome: Conjure Knights Of The Nine Spirit",
+   "spellName": "Conjure Knights Of The Nine Spirit"
+  },
+  {
    "id": "Skyrim.esm:09E2AA",
    "name": "SpellTomeRaiseZombie",
    "school": "Conjuration",

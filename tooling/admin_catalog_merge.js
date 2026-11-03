@@ -27,6 +27,8 @@ const order = new Set(fs.readFileSync(ORDER, 'utf8').split(/\r?\n/).map((l) => l
 const inOrder = (plugin) => order.has(String(plugin || '').toLowerCase());
 const pluginOf = (desc) => String(desc).slice(String(desc).indexOf(':') + 1);
 const read = (f) => JSON.parse(fs.readFileSync(f, 'utf8'));
+// AI-forbidding mods' rows live in gitignored <name>.private.json sidecars (Nat, 2 Nov): read merged, written split
+const privaterows = require(path.resolve('privaterows.js'));
 const report = {};
 // What stays out on purpose
 const UNOBTAINABLE = (() => {
@@ -103,7 +105,10 @@ const mergeCategories = (file, leftOut) => {
 // ---- admin-powers.json: spells [desc, name], shouts {shout, name, words} ---------------------------------------------------
 const mergePowers = () => {
   const file = 'admin-powers.json';
-  const old = read(path.resolve(file)), gen = read(path.join(GEN, file));
+  // The tracked rows with the sidecar's put back, so a private row never reads as "no longer produced"
+  // ck-mcp/admin_powers.py writes its own sidecar beside the generated file, so that is read merged too
+  const old = privaterows.readMerged(path.resolve(file), ['spells', 'staffSpells']).data;
+  const gen = privaterows.readMerged(path.join(GEN, file), ['spells', 'staffSpells']).data;
   // The generated spells, less the held ones, then every old spell it does not make
   const spells = gen.spells.filter((s) => { const held = SPELLS_HELD.has(String(s[0]).toLowerCase()); if (held) note(file, 'spells', 'left out: removed or suspended (gamemode-config.json spells)', s); return !held; });
   const have = new Set(spells.map((s) => s[0]));
@@ -182,7 +187,7 @@ for (const [file, cats] of Object.entries(report)) {
     for (const r of rows.slice(0, 40)) console.log(`      ${Array.isArray(r) ? `${r[0]} | ${r[1]}` : typeof r === 'string' ? r : JSON.stringify(r)}`);
   }
 }
-for (const [file, j] of Object.entries(out)) {
+for (let [file, j] of Object.entries(out)) {
   const n = file === 'admin-powers.json' ? `${j.spells.length} spells, ${(j.shouts || []).length} shouts, ${(j.shoutsGate || []).length} in the shout gate` : file === 'admin-locations.json' ? `${j.locations.length} locations` : `${j.categories.reduce((s, c) => s + c.items.length, 0)} rows in ${j.categories.length} categories`;
   console.log(`${WRITE ? 'wrote' : 'would write'} ${file}: ${n}`);
   if (WRITE) {
@@ -203,6 +208,12 @@ for (const [file, j] of Object.entries(out)) {
         return isFloat ? l.replace(/^(\s*-?\d+)(,?)$/, '$1.0$2') : l;
       }).join('\n');
     };
+    // admin-powers.json: the private rows go to admin-powers.private.json, the tracked file keeps the public ones
+    if (file === 'admin-powers.json') {
+      const { pub, side } = privaterows.splitPowers(j);
+      fs.writeFileSync(privaterows.sidecarOf(path.resolve(file)), JSON.stringify(side, null, 1) + '\n');
+      j = pub;
+    }
     const text = file === 'admin-powers.json' ? ascii(JSON.stringify(j, null, 1))
       : file === 'admin-locations.json' ? floats(ascii(JSON.stringify(j, null, 1)))
       : file === 'admin-items.json' ? ascii(JSON.stringify(j)) : JSON.stringify(j);
