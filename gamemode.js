@@ -4272,7 +4272,7 @@ const NATIVE_SWF = { prayer: 'dbo_prayer', decor: 'dbo_decor', journal: 'dbo_jou
 // menu, a long ledger) goes to the browser instead. A client that announces nativeChunked (scaleformMenu.ts CLIENT_CAPS)
 // sends a bigger payload in pieces the panel puts back together, up to NATIVE_CHUNKED_MAX_CHARS (its MAX_PAYLOAD_CHARS).
 const NATIVE_MAX_CHARS = 60000;
-const NATIVE_CHUNKED_MAX_CHARS = 400000;
+const NATIVE_CHUNKED_MAX_CHARS = 40000; // 400000 drew blank or errored above ~70k chars (journal tabs, 3 Nov); W4
 // nativeOpen: actor -> the widget id on the custom menu; browserOpen: actor -> a widget of these types last sent to the browser
 const nativeState = () => { const p = globalThis.__dboPanelState || (globalThis.__dboPanelState = { caps: new Map(), nonces: new Map() }); if (!p.native) p.native = new Map(); if (!p.nativeOpen) p.nativeOpen = new Map(); if (!p.browserOpen) p.browserOpen = new Map(); return p; };
 const nativeSwfFor = (a, widget, focus) => {
