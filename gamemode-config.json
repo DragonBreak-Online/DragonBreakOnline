@@ -1,4 +1,6 @@
 {
+ "actionDelays": {"enabled": true},
+ "bossVitals": {"nativeMax": 10000},
  "admins": [
   1
  ],
@@ -1556,6 +1558,8 @@
   "trace": { "perMinute": 20, "perHour": 1500 }
  },
  "war": {
+  "mapFlatWorlds": ["3c:Skyrim.esm", "a764b:BSHeartland.esm"],
+  "mapTints": {"hold-morthal": [60, 130, 110], "hold-whiterun": [210, 170, 50], "hold-falkreath": [120, 50, 110]},
     "mapWorlds": ["a764b:BSHeartland.esm", "3c:Skyrim.esm"],
   "_comment": "War and raids stay off (Nate, 12 Oct 04:12Z: \"war and raids needs to be turned off. it's too early\"; closed during the alpha from 2026-09-26). enabled true opens declarations and battles (hot reload); the map, owners and treaties work either way; raids.enabled the same for raids. colours: the Realm map's lore colour per faction (Nate's picks; the cults' and the Vigil's chosen by the Prince's or the order's motif); \"base/stripe\" draws a stripe (the Companions). seats: where a faction that is not a hold musters to declare, { id: { name, world, pos, radius, cells } }.",
   "enabled": false,
