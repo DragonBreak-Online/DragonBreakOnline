@@ -1,5 +1,19 @@
 [
   {
+    "title": "Unstuck in the walled cities",
+    "date": "2026-11-03",
+    "version": "Server update",
+    "tag": "Fix",
+    "sections": [
+      {
+        "heading": "Getting around",
+        "items": [
+          "/unstuck near Solitude, Whiterun, Windhelm, Riften or Markarth now takes you inside the city, to the street outside its temple. It used to leave you on the city walls or in an empty copy of the city, and using /unstuck again sent you back to the same spot."
+        ]
+      }
+    ]
+  },
+  {
     "title": "Daedric shrines that would not answer",
     "date": "2026-11-01",
     "version": "Server update",

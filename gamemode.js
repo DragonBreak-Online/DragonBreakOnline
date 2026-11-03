@@ -6484,6 +6484,20 @@ const inLoginGrace = (a) => {
 // The nearest town or village to a player, by its map marker (territories.json), in the world they stand in or last stood
 // outside of: { name, world, pos, rotZ }, or null (another world, no markers), when the temple is used as before
 const UNSTUCK_TOWNS = (() => { try { return (JSON.parse(fs.readFileSync(path.resolve('territories.json'), 'utf8')).territories || []).filter((x) => ['capital', 'town', 'village'].includes(x.kind) && x.marker && Array.isArray(x.marker.pos)); } catch (e) { log('unstuck: territories.json unreadable; the temple it is', e.message); return []; } })();
+// Tamriel and the city worldspaces that share its coordinates (TAMRIEL_FRAME) count as one world here, so a player in
+// Whiterun's own worldspace still finds the towns whose markers are in Tamriel
+const unstuckFrame = (d) => { const k = normPlace(d); return TAMRIEL_FRAME.has(k) ? '3c:skyrim.esm' : k; };
+// A walled capital's map marker is in Tamriel, where the city is only its outer shell, so /unstuck left players on the
+// walls or in the empty copy, and the next /unstuck brought them back there (Solitude, par.lar and others, 1 Nov). Such a
+// capital's own temple is in its city worldspace, so it goes to that temple's street spot instead. The capitals of Tamriel
+// itself (Falkreath, Morthal, Dawnstar, Winterhold) and of the Bruma region keep their markers
+const unstuckSpot = (x) => {
+  const own = TEMPLES[x.zone], mw = normPlace(x.marker.world);
+  if (x.kind === 'capital' && x.id === x.zone && own && typeof own === 'object' && own.world && Array.isArray(own.pos)
+    && normPlace(own.world) !== mw && TAMRIEL_FRAME.has(normPlace(own.world)) && TAMRIEL_FRAME.has(mw))
+    return { world: own.world, pos: own.pos.slice(0, 3), rotZ: Number(own.rotZ) || 0 };
+  return { world: x.marker.world, pos: x.marker.pos.slice(0, 3), rotZ: 0 };
+};
 globalThis.__dboUnstuckTown = (a) => {
   let world = '', pos = null;
   try { world = String(mp.get(a, 'worldOrCellDesc') || ''); pos = mp.get(a, 'pos'); } catch (e) { return null; }
@@ -6491,11 +6505,11 @@ globalThis.__dboUnstuckTown = (a) => {
   if (!Array.isArray(pos)) return null;
   let best = null, bestD = Infinity;
   for (const x of UNSTUCK_TOWNS) {
-    if (normPlace(x.marker.world) !== normPlace(world)) continue;
+    if (unstuckFrame(x.marker.world) !== unstuckFrame(world)) continue;
     const d = Math.hypot(x.marker.pos[0] - pos[0], x.marker.pos[1] - pos[1]);
     if (d < bestD) { bestD = d; best = x; }
   }
-  return best ? { name: best.name, world: best.marker.world, pos: best.marker.pos.slice(0, 3), rotZ: 0 } : null;
+  return best ? Object.assign({ name: best.name }, unstuckSpot(best)) : null;
 };
 const unstuckActor = (a, by, refs = '') => {
   const admin = staffCan(by, 'unstuck');

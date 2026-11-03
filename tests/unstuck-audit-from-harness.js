@@ -88,8 +88,10 @@ ok(audits.length === 1, 'and 2 minutes after it, it works', audits);
   const fsStub = { readFileSync: () => JSON.stringify(terr) };
   const norm = (d) => String(d).toLowerCase();
   const G3 = {};
-  new Function('fs', 'path', 'log', 'mp', 'globalThis', 'isWorldspace', 'normPlace', src2.slice(a0, a1))(
-    fsStub, path, () => {}, { get: (a, k) => P3[k] }, G3, (w) => /:skyrim\.esm$|:bsheartland\.esm$/i.test(w) && !/^177fb6/.test(w), norm);
+  // No temples here, so every town keeps its marker (tests/unstuck-city-world-harness.js covers the walled capitals)
+  const FRAME = new Set(['3c:skyrim.esm', '1a26f:skyrim.esm', '1691d:skyrim.esm', '16bb4:skyrim.esm', '16d71:skyrim.esm', '37edf:skyrim.esm']);
+  new Function('fs', 'path', 'log', 'mp', 'globalThis', 'isWorldspace', 'normPlace', 'TEMPLES', 'TAMRIEL_FRAME', src2.slice(a0, a1))(
+    fsStub, path, () => {}, { get: (a, k) => P3[k] }, G3, (w) => /:skyrim\.esm$|:bsheartland\.esm$/i.test(w) && !/^177fb6/.test(w), norm, {}, FRAME);
   P3.worldOrCellDesc = '3c:Skyrim.esm'; P3.pos = [0, 0, 0];
   ok(G3.__dboUnstuckTown(A).name === 'Riverwood', 'outside, the nearest town by its marker; a fort is never one', G3.__dboUnstuckTown(A));
   P3.worldOrCellDesc = MINE; P3['private.lastOutside'] = { world: '3c:Skyrim.esm', pos: [4900, 0, 0] };
