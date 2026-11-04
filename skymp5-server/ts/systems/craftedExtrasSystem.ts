@@ -176,6 +176,8 @@ interface Plan {
   // Inventory lines of materials the gameplay asked for on top of vanilla's (a gemstone), one unit each
   take: number[];
   gameplayNote?: string;
+  // The inventory line whose worn flags the new copy took over
+  wornFrom?: number;
 }
 
 // What the gameplay (enchanting.js, globalThis.__dboEnchantScale) makes of a new enchantment: a share per effect, the
@@ -289,6 +291,7 @@ export class CraftedExtrasSystem implements System {
     let gameplayNote = "";
 
     const added: InventoryEntry[] = [];
+    const wornMoved = new Set<number>();
     const refused = new Set<number>();
     // Enchantments the server already holds at a lower strength than the client's copy shows
     const held = new Set<number>();
@@ -308,6 +311,10 @@ export class CraftedExtrasSystem implements System {
           }
           break;
         }
+        // One worn copy per worn line: a second unit made from it is a spare
+        if (plan.wornFrom !== undefined) {
+          if (wornMoved.has(plan.wornFrom)) { delete plan.entry.worn; delete plan.entry.wornLeft; } else wornMoved.add(plan.wornFrom);
+        }
         this.commit(plan, added);
         for (const i of plan.take) {
           taken[i] += 1;
@@ -324,7 +331,11 @@ export class CraftedExtrasSystem implements System {
       const counts = inv.entries.map((e) => e.count);
       for (const p of pool) counts[p.index] -= p.claimed - p.left;
       taken.forEach((n, j) => { counts[j] -= n; });
-      const rest: Inventory = { entries: inv.entries.map((e, j) => ({ ...e, count: counts[j] })).filter((e) => e.count > 0) };
+      const rest: Inventory = { entries: inv.entries.map((e, j) => {
+        const r: InventoryEntry = { ...e, count: counts[j] };
+        if (wornMoved.has(j)) { delete r.worn; delete r.wornLeft; }
+        return r;
+      }).filter((e) => e.count > 0) };
       mp.set(actorId, "inventory", addEntries(rest, added));
     }
     if (refused.size || held.size) {
@@ -433,6 +444,11 @@ export class CraftedExtrasSystem implements System {
     const s = source.entry;
     const info = this.itemInfo(ctx, s.baseId);
     const out = withCount(s, 1);
+    // An equipped weapon coated or spent stays equipped: an unworn copy made the client's 5 s re-apply unequip it
+    // (#bugs, poisoned bows unequip and lose their favourite)
+    const wornFrom = s.worn || s.wornLeft ? source.index : undefined;
+    if (s.worn) out.worn = true;
+    if (s.wornLeft) out.wornLeft = true;
     const reserve: Reservation[] = [{ pool: source, count: 1 }];
     const notes: string[] = [];
     let soul: SoulSource | null = null;
@@ -533,7 +549,7 @@ export class CraftedExtrasSystem implements System {
       }
     }
 
-    return notes.length ? { entry: out, reserve, soul, credit, notes, enchantSoul, temperSteps, take, gameplayNote } : null;
+    return notes.length ? { entry: out, reserve, soul, credit, notes, enchantSoul, temperSteps, take, gameplayNote, wornFrom } : null;
   }
 
   // A server copy holds this enchantment at another strength than claimed, and nothing else of the item differs
