@@ -3,6 +3,7 @@ import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { parseCustomPacket, sendCustomPacket } from "./customPacketUtil";
 import { ConnectionMessage } from "../events/connectionMessage";
 import { CustomPacketMessage } from "../messages/customPacketMessage";
+import { isGameInputBlocked } from "./widgetMenuUtil";
 import { logTrace } from "../../logging";
 
 // Server -> Client: { customPacketType: "dboMeal", state: "start" | "done" | "cancelled", seconds, drink }
@@ -51,6 +52,7 @@ export class MealService extends ClientListener {
 
   private onButtonEvent(e: ButtonEvent): void {
     if (!this.active || !e.isDown || e.device === InputDeviceType.Gamepad) return;
+    if (isGameInputBlocked(this.sp, this.controller)) return;
     if (ATTACK_EVENTS.indexOf(e.userEventName) !== -1) this.cancel("attack");
   }
 
@@ -59,6 +61,10 @@ export class MealService extends ClientListener {
     if (Date.now() > this.until) { this.end(); return; }
     const player = this.sp.Game.getPlayer();
     if (!player) return;
+    if (isGameInputBlocked(this.sp, this.controller)) {
+      this.weaponWasDrawn = player.isWeaponDrawn();
+      return;
+    }
     if (player.isSprinting()) { this.cancel("sprint"); return; }
     const drawn = player.isWeaponDrawn();
     if (drawn && !this.weaponWasDrawn) { this.cancel("weapon"); return; }
