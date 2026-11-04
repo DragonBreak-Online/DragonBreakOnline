@@ -44,7 +44,11 @@ const FULL_TIER = 'developer';
 // /ban, /tempban and /unban are /discipline's ban, suspend and lift under other words (discipline.js; Nat, 25 Oct), so they sit
 // with it
 const PUNISH_ONLY = Object.freeze(['discipline', 'kick', 'ban', 'tempban', 'unban', 'giveitem', 'takeitem', 'givespell', 'removespell', 'unstuck', 'fixloc']);
-const FLOOR_LABEL = Object.freeze({ leadgm: 'Lead GM', developer: 'Developer', senior: 'Senior' });
+// A signed Dragon Baron panel request (panel: true) skips the pin, the floors above and PUNISH_ONLY: the bot's role settings chose who (Jake, 4 Nov)
+const PANEL_FLOOR = 'trialgm';
+// The panel buttons' commands that the console takes; the in-game gate then decides as if typed
+const PANEL_ONLY = Object.freeze(['giveitem', 'takeitem', 'givespell', 'removespell', 'unstuck', 'kick', 'discipline', 'tempban', 'ban', 'players', 'whoami']);
+const FLOOR_LABEL = Object.freeze({ trialgm: 'Trial GM', gm: 'GM', leadgm: 'Lead GM', developer: 'Developer', senior: 'Senior' });
 
 const ID_RE = /^(w-[0-9a-f-]{36}|d-\d{17,20})$/;
 const SNOWFLAKE = /^\d{17,20}$/;
@@ -200,6 +204,7 @@ const TEXT = {
   tier: (floor) => `The console is for ${floor || 'Lead GM'} and above in game.`,
   // Written from PUNISH_ONLY, so it names what a Lead GM may run (28 Oct: the staff item, spell and unstuck commands joined it)
   punishOnly: () => `A Lead GM can run only ${PUNISH_ONLY.map((c) => `/${c}`).slice(0, -1).join(', ')} and /${PUNISH_ONLY[PUNISH_ONLY.length - 1]} from the console. Run anything else in game.`,
+  notPanel: (cmd) => `The Dragon Baron panel does not run /${cmd}. Run it in game.`,
   rolesChanged: () => 'Your Discord roles changed since you last logged in (or your character has not been stamped with them yet). Log in once.',
   notPinned: () => "This Discord account is not on the game's console list.",
   tooMany: () => 'Too many console commands. Wait a minute.',
@@ -285,8 +290,10 @@ const usageOf = (cmd, kinds, maxDays) => {
 };
 // The target fields are signed when present: [.., expiresAt, targetProfileId, targetRoles or null]; a request without them
 // signs the same 11 fields as before, so either side may be older for the requests that carry none
+// The panel mark is signed last, as ['panel', true]
 const reqPayload = (r) => `dbo-console-req-v1\n${JSON.stringify([r.v, r.id, r.src, r.discordId, r.user, r.profileId, r.roles, r.text, r.mode, r.issuedAt, r.expiresAt]
-  .concat(r.targetProfileId !== undefined ? [r.targetProfileId, r.targetRoles !== undefined ? r.targetRoles : null] : []))}`;
+  .concat(r.targetProfileId !== undefined ? [r.targetProfileId, r.targetRoles !== undefined ? r.targetRoles : null] : [])
+  .concat(r.panel !== undefined ? ['panel', r.panel] : []))}`;
 const canonLines = (lines) => lines.map((l) => ({ to: String(l.to), text: String(l.text) }));
 const repPayload = (r) => `dbo-console-rep-v1\n${JSON.stringify([r.v, r.id, r.state, r.gate, r.ranAs, r.online, r.tier, r.target, canonLines(r.lines), r.why, r.at])}`;
 const hmac = (key, text) => crypto.createHmac('sha256', key).update(text, 'utf8').digest();
@@ -359,9 +366,11 @@ const checkLine = (text, has, deny, opts) => {
 const checkShape = (r, fileId) => {
   if (!r || typeof r !== 'object' || Array.isArray(r)) return 'not an object';
   const keys = Object.keys(r);
-  if (!REQ_KEYS.every((k) => keys.includes(k)) || !keys.every((k) => REQ_KEYS.includes(k) || TARGET_KEYS.includes(k))) return 'keys';
+  if (!REQ_KEYS.every((k) => keys.includes(k)) || !keys.every((k) => REQ_KEYS.includes(k) || TARGET_KEYS.includes(k) || k === 'panel')) return 'keys';
   const own = (k) => Object.prototype.hasOwnProperty.call(r, k);
   if (own('targetRoles') && !own('targetProfileId')) return 'keys';
+  // A panel request comes from a Discord button and never names a page account
+  if (own('panel') && !(r.panel === true && r.src === 'discord' && !own('targetProfileId'))) return 'panel';
   if (r.v !== 1) return 'version';
   if (typeof r.id !== 'string' || !ID_RE.test(r.id) || r.id !== fileId) return 'id';
   if (!((r.src === 'web' && r.id.startsWith('w-')) || (r.src === 'discord' && r.id.startsWith('d-')))) return 'src';
@@ -478,7 +487,7 @@ module.exports = (api) => {
     const text = (TEXT[why] || TEXT.bad)(extra && extra.subject ? extra.subject : '');
     writeReply(key, Object.assign({ id: r.id, state: why === 'off' || why === 'expired' || why === 'busy' || why === 'bad' ? why : 'refused', why,
       lines: [{ to: 'console', text }] }, extra && extra.fields ? extra.fields : {}));
-    audit(`REMOTE ${r.src} req ${id8(r.id)} ${r.user} <@${r.discordId}> refused (${why}): ${r.text}`);
+    audit(`REMOTE ${r.src}${r.panel === true ? ' panel' : ''} req ${id8(r.id)} ${r.user} <@${r.discordId}> refused (${why}): ${r.text}`);
   };
 
   // Live characters carrying a tag in the index, offline ones included (a deleted one stays there until a restart); null when
@@ -607,8 +616,9 @@ module.exports = (api) => {
     const t = now();
     if (t > r.expiresAt || r.issuedAt > t + FUTURE_SKEW_MS) return refuse(key, r, 'expired');
     const setting = sw[r.src];
+    const panel = r.panel === true;
     if (setting === 'off' || !ENABLED || !PIN) return refuse(key, r, 'off');
-    if (!PIN.has(r.discordId)) return refuse(key, r, 'notPinned');
+    if (!panel && !PIN.has(r.discordId)) return refuse(key, r, 'notPinned');
     const dry = setting === 'dry-run' || r.mode === 'dry-run';
     if (limited(r.profileId)) return refuse(key, r, 'tooMany');
 
@@ -620,14 +630,16 @@ module.exports = (api) => {
     const as = { ranAs: display(a), online, tier: stamped || '' };
     // The effective tier is the lower of the two, and must reach the floor (DESIGN 0.3): a demotion counts at once, a
     // promotion only after a login stamps it, and so every remote caller passes isAdmin in the gate (and gets its staff line)
-    if (rank(fresh) < rank(FLOOR)) return refuse(key, r, 'tier', { subject: FLOOR_LABEL[FLOOR] || FLOOR, fields: as });
-    if (rank(stamped) > rank(fresh) || rank(stamped) < rank(FLOOR)) return refuse(key, r, 'rolesChanged', { fields: as });
+    const floor = panel ? PANEL_FLOOR : FLOOR;
+    if (rank(fresh) < rank(floor)) return refuse(key, r, 'tier', { subject: FLOOR_LABEL[floor] || floor, fields: as });
+    if (rank(stamped) > rank(fresh) || rank(stamped) < rank(floor)) return refuse(key, r, 'rolesChanged', { fields: as });
     // A suspended account is refused at login, so it cannot act in game, nor from here (review, 21 Oct: a suspended Lead GM
     // still struck, suspended and kicked from the console)
     if (heldOut(a)) return refuse(key, r, 'suspended', { fields: as });
 
     const line = checkLine(r.text, (n) => commands.has(n), deny, { maxSuspendDays: MAX_DAYS });
-    if (Math.min(rank(fresh), rank(stamped)) < rank(FULL_TIER) && !PUNISH_ONLY.includes(line.cmd)) return refuse(key, r, 'punishOnly', { fields: as });
+    if (panel && !PANEL_ONLY.includes(line.cmd)) return refuse(key, r, 'notPanel', { subject: line.cmd, fields: as });
+    if (!panel && Math.min(rank(fresh), rank(stamped)) < rank(FULL_TIER) && !PUNISH_ONLY.includes(line.cmd)) return refuse(key, r, 'punishOnly', { fields: as });
     if (line.why) return refuse(key, r, line.why, { subject: line.subject !== undefined ? line.subject : line.cmd, fields: as });
     const rule = ALLOW[line.cmd];
     const pagePid = r.targetProfileId;
@@ -663,13 +675,13 @@ module.exports = (api) => {
       if ((line.kind === 'suspend' || line.kind === 'ban') && suspendCapped(pid, !dry)) return at('suspendCap');
     }
     const targetName = target ? display(target) : '';
-    audit(`REMOTE ${r.src} req ${id8(r.id)} ${r.user} <@${r.discordId}> as ${who(a)}${targetName ? ` on ${targetName}` : ''}${pagePid !== undefined ? ` (page profile ${pagePid})` : ''}${dry ? ' (dry run)' : ''}: ${r.text}`);
+    audit(`REMOTE ${r.src}${panel ? ' panel' : ''} req ${id8(r.id)} ${r.user} <@${r.discordId}> as ${who(a)}${targetName ? ` on ${targetName}` : ''}${pagePid !== undefined ? ` (page profile ${pagePid})` : ''}${dry ? ' (dry run)' : ''}: ${r.text}`);
     let gate = 'failed', lines = [];
     try {
       // The player log (playerlog.js) names a command's route from __dboPlogRoute before it guesses from the capture
       const out = captureFor(a, !online, () => {
         const route = globalThis.__dboPlogRoute; globalThis.__dboPlogRoute = 'console';
-        try { return handleLine(a, r.text, userOf(a), { remote: { src: r.src, id8: id8(r.id), user: r.user }, dry }); } finally { globalThis.__dboPlogRoute = route; }
+        try { return handleLine(a, r.text, userOf(a), { remote: { src: panel ? 'panel' : r.src, id8: id8(r.id), user: r.user }, dry }); } finally { globalThis.__dboPlogRoute = route; }
       });
       gate = String(out.result || 'ran'); lines = out.lines;
     } catch (e) { log('console: command failed', e.stack || e.message); gate = 'failed'; }
@@ -738,4 +750,4 @@ module.exports = (api) => {
 
 // Shared pure helpers, for the harness and the backend's copy of the same rules
 module.exports.rules = { cleanCommand, parseSwitch, checkLine, checkShape, reqPayload, repPayload, replyLines, plainLine, id8, ALLOW, TEXT,
-  KIND_ARGS, BACKEND_KINDS, REASON_RE, maxDaysOf, lengthHours, reasonWhy, kindsOf, usageOf, TARGET_KEYS, SUSPEND_CAP, FULL_TIER, PUNISH_ONLY };
+  KIND_ARGS, BACKEND_KINDS, REASON_RE, maxDaysOf, lengthHours, reasonWhy, kindsOf, usageOf, TARGET_KEYS, SUSPEND_CAP, FULL_TIER, PUNISH_ONLY, PANEL_FLOOR, PANEL_ONLY };
