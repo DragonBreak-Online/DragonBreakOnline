@@ -133,6 +133,8 @@ const req = (text, o = {}) => {
   // The hardening's optional fields, as the backend adds them for the dashboard
   if (o.targetProfileId !== undefined) r.targetProfileId = o.targetProfileId;
   if (o.targetRoles !== undefined) r.targetRoles = o.targetRoles;
+  // The Dragon Baron panel's mark, as the backend adds it for a panel button
+  if (o.panel !== undefined) r.panel = o.panel;
   r.sig = sign(r);
   if (o.tamper) o.tamper(r);
   return r;
@@ -417,6 +419,99 @@ reset();
   loadConsole(CFG());
   check('H6. the rule is in code, for the backend\'s copy: PUNISH_ONLY discipline and kick (and the ban aliases, 25 Oct; the staff item, spell and unstuck commands, 28 Oct), the full console from developer', JSON.stringify(rules.PUNISH_ONLY) === '["discipline","kick","ban","tempban","unban","giveitem","takeitem","givespell","removespell","unstuck","fixloc"]' && rules.FULL_TIER === 'developer'
     && Object.isFrozen(rules.PUNISH_ONLY), [rules.PUNISH_ONLY, rules.FULL_TIER]);
+}
+
+// ---- H7. a Dragon Baron panel request (Jake, 4 Nov): the bot's role settings chose who, the game's own gate decides the rest ----
+reset();
+{
+  const ID_GRETA = '200000000000000013', ID_TRINA = '200000000000000014';
+  actor(0xff000a70, { name: 'Greta', tag: 'GRET', profile: 13, discord: ID_GRETA, roles: [ROLE.gm] });
+  actor(0xff000a80, { name: 'Trina', tag: 'TRIA', profile: 14, discord: ID_TRINA, roles: [ROLE.trial] });
+  const ran7 = [];
+  for (const n of ['giveitem', 'takeitem', 'givespell', 'removespell', 'unstuck']) {
+    if (!G.commands.has(n)) G.registerChatCommand(n, (a, b) => { ran7.push([n, G.display(a), b]); G.personal(a, `${n} done: ${b}`); }, { admin: n !== 'unstuck', help: 'test' });
+  }
+  // Greta is a GM the game's pin does not list; the panel sends from Discord
+  const GRETA = { src: 'discord', discordId: ID_GRETA, profileId: 13, roles: [ROLE.gm], user: 'greta' };
+  const P = Object.assign({ panel: true }, GRETA);
+  let rep = send('/giveitem #8KWH Iron Sword 1 ticket:481', P);
+  check('H7. a GM off the pin gives an item through the panel: it runs as her own character, with a staff line tagged [remote panel]', ran(rep, /^giveitem done: #8KWH Iron Sword 1/)
+    && ran7.some(([n, by]) => n === 'giveitem' && by === 'Greta #GRET') && rep.tier === 'gm' && staffLines.some((l) => /\(GM\): \/giveitem #8KWH Iron Sword 1.*\[remote panel \d{8}\]$/.test(l.detail)), { rep: brief(rep), staffLines });
+  check('H7. ...and the REMOTE audit line says panel', audits().some((l) => /^REMOTE discord panel req \d{8} greta <@200000000000000013> as .*Greta.*: \/giveitem #8KWH Iron Sword 1 ticket:481$/.test(l)), audits().slice(-3));
+  const four = ['/takeitem #8KWH Iron Sword 1', '/givespell #8KWH Flames ticket:481', '/removespell #8KWH Flames ticket:481', '/unstuck #8KWH hub', '/players', '/whoami'].map((t) => [t, send(t, P)]);
+  check('H7. ...as do /takeitem, /givespell, /removespell, /unstuck, /players and /whoami', four.every(([, x]) => ran(x)), four.map(([t, x]) => [t, brief(x)]));
+  reset(); ran7.length = 0;
+  const notPanel = ['/rename #8KWH Bobby Two', '/chargen #8KWH', '/wwremote on', '/load', '/fixloc #8KWH', '/unban #8KWH Lifted from the panel'].map((t) => [t, send(t, P)]);
+  check('H7. the panel runs only its buttons\' commands: anything else is refused (notPanel), and nothing ran', notPanel.every(([t, x]) => refused(x, 'notPanel') && header(x) === `The Dragon Baron panel does not run /${t.slice(1).split(' ')[0]}. Run it in game.`)
+    && !ran7.length && !staffLines.length, notPanel.map(([t, x]) => [t, brief(x)]));
+  // Raw /console and the dashboard are unchanged
+  rep = send('/giveitem #8KWH Iron Sword 1 ticket:481', GRETA);
+  check('H7. the same GM through raw Discord /console: refused, she is not on the game\'s pin (notPinned)', refused(rep, 'notPinned') && !ran7.length, brief(rep));
+  rep = send('/giveitem #8KWH Iron Sword 1 ticket:481', { src: 'discord', discordId: ID.gm, profileId: 3, roles: [ROLE.gm], user: 'gemma' });
+  check('H7. a pinned GM through raw /console: still refused by the Lead GM floor (tier)', refused(rep, 'tier') && header(rep) === 'The console is for Lead GM and above in game.' && !ran7.length, brief(rep));
+  rep = send('/players', AS_LEAD);
+  check('H7. a Lead GM through raw /console: still punishments only', refused(rep, 'punishOnly'), brief(rep));
+  // The in-game gate still decides: a Trial GM passes the panel's floor, but /giveitem is GM and above in game
+  const TRINA = { src: 'discord', discordId: ID_TRINA, profileId: 14, roles: [ROLE.trial], user: 'trina', panel: true };
+  rep = send('/giveitem #8KWH Iron Sword 1 ticket:481', TRINA);
+  check('H7. a Trial GM through the panel: the console takes it, the in-game gate refuses /giveitem (Admins only)', rep && rep.state === 'refused' && rep.why === 'gate' && rep.tier === 'trialgm'
+    && /Admins only/.test(header(rep)) && !ran7.length, brief(rep));
+  rep = send('/unstuck #8KWH hub', TRINA);
+  check('H7. ...and runs what a Trial GM may run in game (/unstuck)', ran(rep) && ran7.some(([n, by]) => n === 'unstuck' && by === 'Trina #TRIA'), brief(rep));
+  rep = send('/giveitem #8KWH Iron Sword 1', { src: 'discord', discordId: ID.bob, profileId: 5, roles: [], user: 'bob', panel: true });
+  check('H7. a player with no staff rank in game is refused even through the panel (tier)', refused(rep, 'tier') && header(rep) === 'The console is for Trial GM and above in game.', brief(rep));
+  // The command's own rules: /discipline's kinds, the rank rule
+  reset();
+  const n5 = recordOf(5).length;
+  rep = send('/discipline #8KWH warn A GM warns from the panel', P);
+  check('H7. /discipline warn from the panel runs for a GM (discipline.js lets a GM warn)', ran(rep, /^Recorded: warn #\d+ on Bob #8KWH\./) && recordOf(5).length === n5 + 1, brief(rep));
+  rep = send('/discipline #8KWH ban A GM cannot ban in game', P);
+  check('H7. ...but a ban stays Lead GM and above, as in game: discipline.js refuses it, nothing recorded', recordOf(5).length === n5 + 1 && /^Bans are for Lead GMs and above\./.test(header(rep)), brief(rep));
+  rep = send('/discipline #8KWH suspend 5d Longer than a GM may suspend', P);
+  check('H7. ...and a GM suspends for at most gmMaxSuspendDays, as in game', recordOf(5).length === n5 + 1 && /^A GM can suspend for at most \d+ days/.test(header(rep)), brief(rep));
+  reset();
+  setOnline(A.lead, true);
+  rep = send('/kick #LEAD', P);
+  check('H7. the rank rule holds: a GM cannot kick a Lead GM through the panel', refused(rep, 'rank') && !kicked.length, brief(rep));
+  setOnline(A.lead, false);
+  rep = send('/kick #8KWH', P);
+  check('H7. ...and kicks a player', ran(rep) && kicked.includes(store.get(A.bob).__user), brief(rep));
+  // The switches still close it
+  setSwitch('on discord=off\n');
+  rep = send('/giveitem #8KWH Iron Sword 1', P);
+  check('H7. the console switch off for Discord closes the panel too (off)', rep && rep.state === 'off', brief(rep));
+  setSwitch('on\n');
+  loadConsole(CFG({ enabled: false }));
+  rep = send('/giveitem #8KWH Iron Sword 1', P);
+  check('H7. ...as does remoteConsole.enabled false', rep && rep.state === 'off', brief(rep));
+  loadConsole(CFG({ discordIds: [] }));
+  rep = send('/giveitem #8KWH Iron Sword 1', P);
+  check('H7. ...and an empty game pin', rep && rep.state === 'off', brief(rep));
+  loadConsole(CFG());
+  rep = send('/giveitem #8KWH Iron Sword 1', Object.assign({}, P, { roles: [] }));
+  check('H7. a GM demoted in Discord since her login is refused (tier by the fresh roles)', refused(rep, 'tier'), brief(rep));
+  rep = send('/giveitem #8KWH Iron Sword 1', Object.assign({}, P, { roles: [ROLE.lead] }));
+  check('H7. ...one promoted but not yet stamped runs at her stamped tier (GM) until a login', ran(rep) && rep.tier === 'gm', brief(rep));
+  rep = send('/giveitem #8KWH Iron Sword 1', Object.assign({}, P, { discordId: ID_TRINA, profileId: 14, roles: [ROLE.gm], user: 'trina' }));
+  check('H7. ...and a Trial GM promoted to GM in Discord is refused by the in-game gate until a login stamps it', rep && rep.state === 'refused' && rep.tier === 'trialgm' && /Admins only/.test(header(rep)), brief(rep));
+  ran7.length = 0;
+  rep = send('/giveitem #8KWH Iron Sword 1', Object.assign({ mode: 'dry-run' }, P));
+  check('H7. a dry run passes the console and runs nothing', rep && rep.state === 'dry-run' && !ran7.length, brief(rep));
+  // The mark is signed, from Discord only, never beside a page account
+  const bad = [
+    ['the mark from the web', Object.assign({}, P, { src: 'web' })], ['the mark not true', Object.assign({}, P, { panel: 'yes' })], ['the mark false', Object.assign({}, P, { panel: false })],
+    ['the mark beside a page account', Object.assign({}, P, { targetProfileId: 5 })], ['the mark added after signing', Object.assign({}, GRETA, { tamper: (r) => { r.panel = true; } })],
+    ['the mark dropped after signing', Object.assign({}, P, { tamper: (r) => { delete r.panel; } })],
+  ];
+  const wrong = bad.map(([label, o]) => [label, send('/giveitem #8KWH Iron Sword 1', o)]).filter(([, x]) => !x || x.state !== 'bad');
+  check('H7. each bad or tampered mark is refused as bad, and nothing ran', !wrong.length && !ran7.length, wrong.map(([l, x]) => [l, brief(x)]));
+  const pinned = { v: 1, id: 'd-1400000000000000001', src: 'discord', discordId: '200000000000000013', user: 'greta', profileId: 13, roles: ['1553844072878178384'],
+    text: '/giveitem #8KWH Iron Sword 1', mode: 'on', issuedAt: 1000, expiresAt: 2000 };
+  const base = 'dbo-console-req-v1\n[1,"d-1400000000000000001","discord","200000000000000013","greta",13,["1553844072878178384"],"/giveitem #8KWH Iron Sword 1","on",1000,2000';
+  check('H7. the signed payload: the mark goes last as "panel",true; without it, as before (the backend\'s consoleHardening test holds the same strings)',
+    rules.reqPayload(pinned) === `${base}]` && rules.reqPayload(Object.assign({ panel: true }, pinned)) === `${base},"panel",true]`, rules.reqPayload(Object.assign({ panel: true }, pinned)));
+  check('H7. the rule is in code, for the backend\'s copy: the panel floor Trial GM, and the panel\'s commands', rules.PANEL_FLOOR === 'trialgm' && Object.isFrozen(rules.PANEL_ONLY)
+    && JSON.stringify(rules.PANEL_ONLY) === '["giveitem","takeitem","givespell","removespell","unstuck","kick","discipline","tempban","ban","players","whoami"]', [rules.PANEL_FLOOR, rules.PANEL_ONLY]);
 }
 
 global.setTimeout = realTimeout;
