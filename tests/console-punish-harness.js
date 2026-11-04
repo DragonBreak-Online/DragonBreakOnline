@@ -288,20 +288,22 @@ const AS_LEAD = { discordId: ID.lead, profileId: 9, roles: [ROLE.lead], user: 'i
   const allow = allowNow() || [];
   const d = allow.find((x) => x.name === 'discipline');
   check('E1. allow.json lists /discipline with rule tagKindReason, every kind, and the longest suspension (30 days, from the config)', !!d && d.rule === 'tagKindReason'
-    && JSON.stringify(d.kinds) === '["warn","strike","suspend","lift","overturn"]' && d.maxSuspendDays === 30, d);
-  check('E1. ...with a usage that names each kind and its word', !!d && d.usage === '/discipline #TAG warn|strike|lift <reason>; suspend <1-720h|1-30d> <reason>; overturn <n> <reason>', d && d.usage);
+    && JSON.stringify(d.kinds) === '["warn","strike","suspend","ban","lift","overturn"]' && d.maxSuspendDays === 30, d);
+  check('E1. ...with a usage that names each kind and its word', !!d && d.usage === '/discipline #TAG warn|strike|ban|lift <reason>; suspend <1-720h|1-30d> <reason>; overturn <n> <reason>', d && d.usage);
   check("E1. ...and the console's own help (the registry's names the record view and list, which the console refuses), at most 200 characters", !!d && /^A warning, strike, suspension, ban, lift or overturn on the player's account record/.test(d.help) && d.help.length <= 200, d && d.help);
   const k = allow.find((x) => x.name === 'kick');
   check('E1. /kick stays #TAG only, and its help says it takes no reason', !!k && k.usage === '/kick #TAG' && k.rule === 'tag' && /takes no reason/.test(k.help), k);
-  check('E1. no other entry carries kinds', allow.filter((x) => x.kinds).map((x) => x.name).join() === 'discipline', allow.map((x) => x.name));
+  check('E1. no other entry carries kinds but the three aliases', allow.filter((x) => x.kinds).map((x) => x.name).join() === 'discipline,ban,tempban,unban', allow.map((x) => x.name));
   // 25 Oct: the backend's copy (skymp5-backend allowlist.js) refuses all of allow.json for a kind or an entry it does not know, so
-  // ban and the aliases stay out of it until the backend learns them (console.js BACKEND_KINDS); the reader takes them all the same
-  check('E1. allow.json stays what the backend parses: no ban kind, no /ban, /tempban or /unban entry', !allow.some((x) => ['ban', 'tempban', 'unban'].includes(x.name))
-    && !(d && d.kinds.includes('ban')), allow.map((x) => x.name));
+  // ban and the aliases stayed out of it until the backend learned them; the live backend knows them (4 Nov, BACKEND_KNOWS_BANS)
+  const al = (name) => allow.find((x) => x.name === name) || {};
+  check('E1. allow.json lists /ban, /tempban and /unban, each with its one kind (and the longest suspension for /tempban)', JSON.stringify(al('ban').kinds) === '["ban"]'
+    && JSON.stringify(al('tempban').kinds) === '["suspend"]' && al('tempban').maxSuspendDays === 30 && al('tempban').usage === '/tempban #TAG <1-720h|1-30d> <reason>'
+    && JSON.stringify(al('unban').kinds) === '["lift"]' && ['ban', 'tempban', 'unban'].every((x) => al(x).rule === 'tagKindReason' && al(x).rank === true), [al('ban'), al('tempban'), al('unban')]);
   loadConsole(CFG({ deny: ['discipline suspend', 'discipline overturn'] }));
   const n = (allowNow() || []).find((x) => x.name === 'discipline');
-  check('E1. deny "discipline suspend" and "discipline overturn": allow.json lists warn, strike and lift only, no length, and a usage without them', !!n && JSON.stringify(n.kinds) === '["warn","strike","lift"]'
-    && n.maxSuspendDays === undefined && n.usage === '/discipline #TAG warn|strike|lift <reason>', n);
+  check('E1. deny "discipline suspend" and "discipline overturn": allow.json lists warn, strike, ban and lift only, no length, and a usage without them', !!n && JSON.stringify(n.kinds) === '["warn","strike","ban","lift"]'
+    && n.maxSuspendDays === undefined && n.usage === '/discipline #TAG warn|strike|ban|lift <reason>' && !(allowNow() || []).some((x) => x.name === 'tempban'), n);
   reset();
   const ds = send('/discipline #8KWH suspend 3d stole from a barrel');
   check('E1. ...and a suspend from the console is refused as denied, with the kind named, and nothing recorded', ds && ds.why === 'denied' && header(ds) === "/discipline suspend is switched off for the console in the game's config." && !recordOf(5).length && !staffLines.length, ds);
@@ -442,7 +444,7 @@ reset();
   check('E7. the repo config keeps discipline.maxSuspendDays 30', (REPO_CFG.discipline || {}).maxSuspendDays === 30);
   logs.length = 0; loadConsole(CFG());
   // eleven, and /ban, /tempban, /unban from 25 Oct
-  check('E7. the reader counts nineteen commands (/unstuck and the staff item and spell commands since 28 Oct)', logs.some((l) => /console: reader on .*, 19 commands, floor leadgm, game pin 4$/.test(l)), logs);
+  check('E7. the reader counts twenty-six commands (/unstuck and the staff item and spell commands since 28 Oct, the panel rows since 4 Nov)', logs.some((l) => /console: reader on .*, 26 commands, floor leadgm, game pin 4$/.test(l)), logs);
 }
 
 // ---- E8. review (21 Oct): a suspended account cannot act from the console; a reason of blank letters is no reason -------------

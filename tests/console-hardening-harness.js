@@ -178,9 +178,9 @@ const brief = (rep) => rep && { state: rep.state, why: rep.why, said: header(rep
   // /unstuck take a #TAG or a name since 28 Oct, rule itemSpells, so they are not among them)
   const tagRules = Object.entries(rules.ALLOW).filter(([, a]) => ['tag', 'tagName', 'tagKindReason'].includes(a.rule)).map(([k]) => k).sort().join();
   check('H0. targetProfile: every listed command that names one #TAG, so the backend may send the account (chargen, chars, discipline, kick, rename in code)',
-    // (ban, tempban, unban from 25 Oct: /discipline's aliases, kept out of allow.json until the backend knows them, console.js BACKEND_KINDS)
-    tagRules === 'ban,chargen,chars,discipline,kick,rename,tempban,unban' && flag('targetProfile') === 'chargen,discipline,kick,rename', [tagRules, flag('targetProfile')]);
-  check('H0. rank: /discipline and /kick only, so the backend fetches the target account\'s Discord roles for those', flag('rank') === 'discipline,kick', flag('rank'));
+    // (ban, tempban, unban from 25 Oct: /discipline's aliases, in allow.json since the backend knows them, 4 Nov)
+    tagRules === 'ban,chargen,chars,discipline,kick,rename,tempban,unban' && flag('targetProfile') === 'ban,chargen,discipline,kick,rename,tempban,unban', [tagRules, flag('targetProfile')]);
+  check('H0. rank: /discipline, its aliases and /kick only, so the backend fetches the target account\'s Discord roles for those', flag('rank') === 'ban,discipline,kick,tempban,unban', flag('rank'));
   check('H0. the switch commands, /players, /load and /whoami carry neither', allow.filter((x) => ['wwremote', 'vlremote', 'players', 'load', 'whoami'].includes(x.name)).every((x) => x.targetProfile === undefined && x.rank === undefined), allow);
 }
 
@@ -511,7 +511,85 @@ reset();
   check('H7. the signed payload: the mark goes last as "panel",true; without it, as before (the backend\'s consoleHardening test holds the same strings)',
     rules.reqPayload(pinned) === `${base}]` && rules.reqPayload(Object.assign({ panel: true }, pinned)) === `${base},"panel",true]`, rules.reqPayload(Object.assign({ panel: true }, pinned)));
   check('H7. the rule is in code, for the backend\'s copy: the panel floor Trial GM, and the panel\'s commands', rules.PANEL_FLOOR === 'trialgm' && Object.isFrozen(rules.PANEL_ONLY)
-    && JSON.stringify(rules.PANEL_ONLY) === '["giveitem","takeitem","givespell","removespell","unstuck","kick","discipline","tempban","ban","players","whoami"]', [rules.PANEL_FLOOR, rules.PANEL_ONLY]);
+    && JSON.stringify(rules.PANEL_ONLY) === '["giveitem","takeitem","givespell","removespell","unstuck","kick","discipline","tempban","ban","players","whoami","faction","charter","citizenship","bans","announce","time","settime"]', [rules.PANEL_FLOOR, rules.PANEL_ONLY]);
+}
+
+// ---- H8. the panel's other buttons (Jake, 4 Nov): Factions, Set Leader, Charters, Citizenship, Suspend, Ban, Active Bans, Announce,
+// Tamriel Time and Set Hour. Each in the forms the panel sends, then the in-game gate (LEAD_ONLY, the admin flag) and the handler decide
+reset();
+{
+  clock += 2 * 3600 * 1000;
+  const ID_GRETA = '200000000000000013', ID_TRINA = '200000000000000014';
+  const HAL = actor(0xff000e01, { name: 'Hal Halsson', tag: 'HALX', profile: 15, discord: '200000000000000015', online: true });
+  const ran8 = [];
+  // As registered in game: /faction, /charter and /time for everyone (their handlers check), the rest staff commands
+  const flags = { faction: {}, charter: {}, citizenship: { admin: true }, announce: { admin: true }, time: {}, settime: { admin: true } };
+  for (const [n, o] of Object.entries(flags)) G.registerChatCommand(n, (a, b) => { ran8.push([n, G.display(a), b]); G.personal(a, `${n} done: ${b}`); }, Object.assign({ help: 'test' }, o));
+  loadConsole(CFG());
+  const allow = allowNow() || [];
+  const panelRows = ['faction', 'charter', 'citizenship', 'bans', 'announce', 'time', 'settime'];
+  check('H8. allow.json lists the seven panel rows, none for the page\'s account check or the rank check', panelRows.every((n) => allow.some((x) => x.name === n && x.targetProfile === undefined && x.rank === undefined)), allow.map((x) => x.name));
+  const P = { src: 'discord', discordId: ID_GRETA, profileId: 13, roles: [ROLE.gm], user: 'greta', panel: true };
+  const LEADP = Object.assign({ src: 'discord', panel: true }, AS_LEAD);
+  const forms = ['/faction list', '/charter list all', '/charter show 3', '/time', '/announce The server restarts in ten minutes, log out somewhere safe.', '/citizenship #HALX view',
+    '/citizenship Hal Halsson view', '/citizenship #HALX grant whiterun ticket:481', '/citizenship #HALX cooldown clear ticket:481', '/citizenship #BOB2 view'];
+  const got = forms.map((t) => [t, send(t, P)]);
+  check('H8. a GM through the panel: Factions, Charters, Tamriel Time, Announce and Citizenship reach their handlers as typed (an offline #TAG for /citizenship)',
+    got.every(([t, x]) => ran(x) && ran8.some(([n, by, b]) => `/${n}${b ? ` ${b}` : ''}` === rules.cleanCommand(t) && by === 'Greta #GRET')), got.map(([t, x]) => [t, brief(x)]));
+  check('H8. ...each with a staff line tagged [remote panel]', staffLines.filter((l) => /\[remote panel \d{8}\]$/.test(l.detail)).length >= forms.length, staffLines.map((l) => l.detail));
+  let rep = send('/bans', P);
+  check('H8. Active Bans runs the real /bans for a GM', ran(rep) && rep.tier === 'gm', brief(rep));
+  reset(); ran8.length = 0;
+  rep = send('/settime 6', P);
+  check('H8. Set Hour: the console takes it, the in-game gate refuses a GM (LEAD_ONLY), nothing ran', rep && rep.state === 'refused' && rep.why === 'gate' && header(rep) === 'That is for a Lead GM and above.' && !ran8.length, brief(rep));
+  rep = send('/faction leader #HALX companions reason: set from the Dragon Baron panel', P);
+  check('H8. Set Leader: likewise for a GM (faction leader is LEAD_ONLY)', rep && rep.state === 'refused' && rep.why === 'gate' && header(rep) === 'That is for a Lead GM and above.' && !ran8.length, brief(rep));
+  rep = send('/settime 6', LEADP);
+  check('H8. a Lead GM through the panel sets the hour', ran(rep) && ran8.some(([n, by, b]) => n === 'settime' && by === 'Leda #LEAD' && b === '6'), brief(rep));
+  rep = send('/faction leader #HALX companions reason: set from the Dragon Baron panel', LEADP);
+  check('H8. ...and names a leader, the reason in the line for the staff rules (no ticket)', ran(rep) && ran8.some(([n, , b]) => n === 'faction' && b === 'leader #HALX companions reason: set from the Dragon Baron panel'), brief(rep));
+  rep = send('/faction leader #BOB2 companions', LEADP);
+  check('H8. ...an offline character is not named leader (faction leader looks online only)', refused(rep, 'target'), brief(rep));
+  // Suspend and Ban: the real discipline.js
+  const n15 = recordOf(15).length;
+  rep = send('/tempban #HALX 2d Spamming the market chat', P);
+  check('H8. Suspend: a GM suspends for up to gmMaxSuspendDays through the panel', ran(rep, /^Recorded: suspend #\d+ on Hal Halsson #HALX/) && recordOf(15).length === n15 + 1, brief(rep));
+  rep = send('/ban #HALX Repeated harassment after a suspension', P);
+  check('H8. Ban: discipline.js refuses a GM, nothing recorded', /^Bans are for Lead GMs and above\./.test(header(rep)) && recordOf(15).length === n15 + 1, brief(rep));
+  rep = send('/ban #HALX Repeated harassment after a suspension', LEADP);
+  check('H8. ...and a Lead GM bans', ran(rep, /^Recorded: ban #\d+ on Hal Halsson #HALX/) && recordOf(15).length === n15 + 2, brief(rep));
+  // A Trial GM: past the panel's floor; the admin flag decides
+  const TRINA = { src: 'discord', discordId: ID_TRINA, profileId: 14, roles: [ROLE.trial], user: 'trina', panel: true };
+  rep = send('/time', TRINA);
+  check('H8. a Trial GM through the panel reads Tamriel Time', ran(rep), brief(rep));
+  rep = send('/announce Hello everyone', TRINA);
+  check('H8. ...but is refused /announce by the in-game gate (Admins only)', rep && rep.state === 'refused' && rep.why === 'gate' && /Admins only/.test(header(rep)), brief(rep));
+  // Each row's own argument rule, before anything runs
+  reset(); ran8.length = 0;
+  const refusals = [
+    ['/announce', 'badArgs'], ['/announce [[S]]A fake system notice', 'announceText'], ['/announce <@123456789012345678> look at this', 'announceText'],
+    ['/announce Free gold at #{ff0000}Whiterun', 'announceText'], [`/announce ${'x'.repeat(301)}`, 'announceText'], ['/announce Hello ' + ch(0x1f600), 'announceText'],
+    ['/settime 24', 'badArgs'], ['/settime 6pm', 'badArgs'], ['/settime 6 7', 'badArgs'], ['/settime', 'badArgs'],
+    ['/faction', 'badArgs'], ['/faction list all', 'badArgs'], ['/faction remove #HALX companions', 'badArgs'], ['/faction leader Hal companions', 'needTag'],
+    ['/faction leader #HALX Companions Guild', 'badArgs'], ['/faction leader #HALX companions because', 'badArgs'], ['/faction leader #HALX companions reason: <@1> ok', 'reasonChars'],
+    ['/faction leader #HALX companions reason: ok', 'reasonShort'], ['/faction leader #ZZZZ companions', 'target'],
+    ['/charter approve 3', 'badArgs'], ['/charter deny 3 no', 'badArgs'], ['/charter list some', 'badArgs'], ['/charter show three', 'badArgs'], ['/charter', 'badArgs'],
+    ['/citizenship #HALX status', 'badArgs'], ['/citizenship #HALX grant', 'badArgs'], ['/citizenship #HALX cooldown 3w', 'badArgs'], ['/citizenship #HALX view <@1>', 'badWord'],
+    ['/citizenship 15 view', 'badArgs'], ['/citizenship Hal #HALX view', 'needTag'], ['/citizenship #ZZZZ view', 'targetAny'], ['/citizenship view', 'badArgs'],
+    ['/citizenship #HALX view ticket:481 ticket:482', 'badArgs'], ['/citizenship a b c d view', 'badArgs'],
+    ['/bans now', 'badArgs'], ['/time now', 'badArgs'],
+  ];
+  const wrong = refusals.map(([t, why]) => [t, why, send(t, LEADP)]).filter(([, why, x]) => !refused(x, why));
+  check('H8. each form the rows do not take is refused with its class', !wrong.length, wrong.map(([t, why, x]) => [t, why, brief(x)]));
+  check('H8. ...and none of them ran or reached #staff-commands', !ran8.length && !staffLines.length, { ran8, staffLines });
+  // Raw /console and the dashboard are unchanged: the pin, the Lead GM floor, punishments only below Developer
+  rep = send('/announce Hello everyone', AS_LEAD);
+  check('H8. raw /console: a Lead GM is still punishments only', refused(rep, 'punishOnly'), brief(rep));
+  rep = send('/settime 6', Object.assign({ src: 'discord' }, AS_NATE));
+  check('H8. ...a Developer on the pin runs them', ran(rep) && ran8.some(([n]) => n === 'settime'), brief(rep));
+  rep = send('/time', { src: 'discord', discordId: ID_GRETA, profileId: 13, roles: [ROLE.gm], user: 'greta' });
+  check('H8. ...and a GM off the pin is refused (notPinned)', refused(rep, 'notPinned'), brief(rep));
+  setOnline(HAL, false);
 }
 
 global.setTimeout = realTimeout;

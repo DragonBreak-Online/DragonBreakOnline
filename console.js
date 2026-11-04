@@ -47,7 +47,8 @@ const PUNISH_ONLY = Object.freeze(['discipline', 'kick', 'ban', 'tempban', 'unba
 // A signed Dragon Baron panel request (panel: true) skips the pin, the floors above and PUNISH_ONLY: the bot's role settings chose who (Jake, 4 Nov)
 const PANEL_FLOOR = 'trialgm';
 // The panel buttons' commands that the console takes; the in-game gate then decides as if typed
-const PANEL_ONLY = Object.freeze(['giveitem', 'takeitem', 'givespell', 'removespell', 'unstuck', 'kick', 'discipline', 'tempban', 'ban', 'players', 'whoami']);
+const PANEL_ONLY = Object.freeze(['giveitem', 'takeitem', 'givespell', 'removespell', 'unstuck', 'kick', 'discipline', 'tempban', 'ban', 'players', 'whoami',
+  'faction', 'charter', 'citizenship', 'bans', 'announce', 'time', 'settime']);
 const FLOOR_LABEL = Object.freeze({ trialgm: 'Trial GM', gm: 'GM', leadgm: 'Lead GM', developer: 'Developer', senior: 'Senior' });
 
 const ID_RE = /^(w-[0-9a-f-]{36}|d-\d{17,20})$/;
@@ -90,15 +91,21 @@ const REASON_MIN = 5, REASON_MAX = 300;
 // number, digits only (discipline.js also takes '#3', the console does not). Not the record view (/discipline #TAG) or list
 // ban (25 Oct): a suspension with no end, Lead GM and above in discipline.js
 const KIND_ARGS = Object.freeze({ warn: 'none', strike: 'none', suspend: 'length', ban: 'none', lift: 'none', overturn: 'record' });
-// The kinds the backend's copy of these rules (skymp5-backend sources/console/allowlist.js KIND_ARGS) knows today. Its
-// parseAllow refuses the whole of allow.json for one kind it does not know (and the page then lists nothing), and it knows no
-// alias entry, so allow.json carries only these and no alias until the backend learns them: set BACKEND_KNOWS_BANS (or drop
-// both) in the change that teaches it. The game's own checks below take every kind either way
+// The kinds the backend's copy of these rules (skymp5-backend sources/console/allowlist.js KIND_ARGS) knew before it learned
+// ban and the alias entries. Its parseAllow refuses the whole of allow.json for one kind it does not know (and the page then
+// lists nothing). The live backend knows them (4 Nov), so allow.json carries every kind and the aliases
 const BACKEND_KINDS = Object.freeze(['warn', 'strike', 'suspend', 'lift', 'overturn']);
-const BACKEND_KNOWS_BANS = false;
+const BACKEND_KNOWS_BANS = true;
 const LENGTH_RE = /^(?:([1-9][0-9]{0,2})h|([1-9][0-9]?)d)$/;
 const RECORD_RE = /^[1-9][0-9]{0,4}$/;
 const MAX_SUSPEND_DAYS = 30; // discipline.js DEFAULTS.maxSuspendDays
+// A faction id (guilds.js FACTIONS keys), a hold id (zones.json), an hour of /settime, a call or ticket word (staffguard.js parseRef)
+const FACTION_ID_RE = /^[a-z0-9_-]{2,32}$/i;
+const HOLD_RE = /^[a-z][a-z'-]{1,31}$/i;
+const HOUR_RE = /^(?:[01]?[0-9]|2[0-3])(?:\.[0-9]{1,2})?$/;
+const REF_RE = /^(?:call|ticket):#?[A-Za-z0-9_\-#./]{1,40}$/i;
+const ANNOUNCE_MAX = 300;
+const CITIZEN_ACTS = Object.freeze(['view', 'grant', 'revoke', 'cooldown']);
 
 // ---- the v1 allowlist (DESIGN section 8.1). Widening it is a code change and a review; gamemode-config can only narrow it.
 // rule: switch = none | on | off | clear #TAG; tag = #TAG (noArg: what the empty form would do); tagName = #TAG <new name>;
@@ -154,6 +161,17 @@ const ALLOW = Object.freeze({
     help: '<#TAG|name> <spell> [ticket:<id>]: grant a spell to an online player' },
   removespell: { usage: '/removespell <#TAG|name> <spell name or hex id> ticket:<id> | reason: <why>', rule: 'itemSpells', offline: false,
     help: '<#TAG|name> <spell> [ticket:<id>]: remove a spell from an online player' },
+  // The Dragon Baron panel's other buttons (Jake, 4 Nov), each in the forms the panel sends; the in-game handlers keep their own
+  // rights (faction leader and settime are LEAD_ONLY, charters a GM's, citizenship a Lead GM's or the hold's court)
+  faction: { usage: '/faction list | leader #TAG <faction id> [reason: <why>]', rule: 'faction',
+    help: 'list the factions, or name an online character leader of one (Lead GM and above, as in game)' },
+  charter: { usage: '/charter list [all] | show <n>', rule: 'charter', help: 'the faction charters waiting for a decision, or one charter' },
+  citizenship: { usage: '/citizenship <#TAG|name> view | grant <hold> | revoke <hold> | cooldown clear|<12h|3d> [ticket:<id>]', rule: 'citizenship', offline: true, words: PLAIN_WORD,
+    help: "a character's citizenships, or grant, revoke or a renounce cooldown (Lead GM and above, as in game)" },
+  bans: { usage: '/bans', rule: 'none' },
+  announce: { usage: '/announce <text>', rule: 'announce', help: '<text>: tell every online player, on screen and in chat (plain words, at most 300 characters)' },
+  time: { usage: '/time', rule: 'none' },
+  settime: { usage: '/settime <hour 0-23>', rule: 'settime', help: '<hour>: move the world clock forward to that hour (Lead GM and above)' },
 });
 // Why the rest are refused, by class (DESIGN 8.2). Built-ins that are not registry commands are notChat; any other
 // registry command is notYet
@@ -182,7 +200,7 @@ const TEXT = {
   inWorld: (cmd) => `/${cmd} needs you standing in the world. Run it in game.`,
   self: (cmd) => `/${cmd} acts on your own character. Run it in game.`,
   later: (cmd) => `/${cmd} answers later. That is not in the console yet.`,
-  notChat: (cmd) => (cmd === 'system' ? 'Only staff commands can be run from the console. Use /announce when it comes to the console.'
+  notChat: (cmd) => (cmd === 'system' ? 'Only staff commands can be run from the console. Use /announce for a word to every player.'
     : 'Only staff commands can be run from the console.'),
   notYet: (cmd) => `/${cmd} is not available from the console in v1.`,
   denied: (cmd) => `/${cmd} is switched off for the console in the game's config.`,
@@ -198,6 +216,7 @@ const TEXT = {
   reasonShort: () => `Give a reason of at least ${REASON_MIN} characters. The player is shown it.`,
   reasonLong: () => `The reason can be at most ${REASON_MAX} characters.`,
   reasonChars: () => 'A reason from the console takes letters, numbers, spaces and . , ; : ! ? \' " ( ) - / & + % only: no colour codes, markup, mentions, symbols or line breaks.',
+  announceText: () => `An announcement from the console is 1 to ${ANNOUNCE_MAX} characters of letters, numbers, spaces and . , ; : ! ? ' " ( ) - / & + % only: no colour codes, markup, mentions or symbols.`,
   dryRecord: () => "Dry run: it passed the console and the command gate only. Nothing was recorded, and the record's own checks (own account, staff target, record number, is suspended, who gave the record) did not run.",
   noChar: () => 'The console acts as your own character. Make one in game first.',
   suspended: () => 'Your account is suspended, so the console cannot act as you: a suspended account cannot act in game either.',
@@ -313,6 +332,9 @@ const checkLine = (text, has, deny, opts) => {
   if (deny.has(cmd)) return { cmd, why: 'denied' };
   if (!has(cmd)) return { cmd, why: 'notYet' };
   const words = body ? body.split(' ') : [];
+  // a word that is not one names itself, its other characters shown as '?' (no mention or markup goes back either)
+  const bad = rule.words ? words.find((w) => !rule.words.test(w)) : undefined;
+  if (bad !== undefined) return { cmd, why: 'badWord', subject: `${cmd} ${bad.replace(/[^A-Za-z0-9'#:/._-]/g, '?').slice(0, 40)}` };
   switch (rule.rule) {
     case 'switch': {
       const v = (words[0] || '').toLowerCase();
@@ -334,11 +356,42 @@ const checkLine = (text, has, deny, opts) => {
     // words: a command's own pattern for each word (SEC-2)
     case 'itemSpells': {
       if (words.length < 1) return { cmd, why: 'badArgs' };
-      // a word that is not one names itself, its other characters shown as '?' (no mention or markup goes back either)
-      const bad = rule.words ? words.find((w) => !rule.words.test(w)) : undefined;
-      if (bad !== undefined) return { cmd, why: 'badWord', subject: `${cmd} ${bad.replace(/[^A-Za-z0-9'#:/._-]/g, '?').slice(0, 40)}` };
       return TAG_RE.test(words[0]) ? { cmd, body, tag: words[0] } : { cmd, body };
     }
+    // list; or leader #TAG <faction id>, with a Lead GM's reason: <why> (staffguard.js) held to REASON_RE
+    case 'faction': {
+      const sub = (words[0] || '').toLowerCase();
+      if (sub === 'list' && words.length === 1) return { cmd, body };
+      if (sub !== 'leader' || words.length < 3) return { cmd, why: 'badArgs' };
+      if (!TAG_RE.test(words[1])) return { cmd, why: 'needTag' };
+      if (!FACTION_ID_RE.test(words[2]) || (words.length > 3 && words[3].toLowerCase() !== 'reason:')) return { cmd, why: 'badArgs' };
+      const why = words.length > 3 ? reasonWhy(words.slice(4).join(' ')) : '';
+      return why ? { cmd, why } : { cmd, body, tag: words[1] };
+    }
+    case 'charter': {
+      const sub = (words[0] || '').toLowerCase();
+      if (sub === 'list' && (words.length === 1 || (words.length === 2 && words[1].toLowerCase() === 'all'))) return { cmd, body };
+      return sub === 'show' && words.length === 2 && RECORD_RE.test(words[1]) ? { cmd, body } : { cmd, why: 'badArgs' };
+    }
+    // <#TAG|name> view | grant|revoke <hold> | cooldown clear|<length>, then at most one call or ticket word (staffguard.js).
+    // One #TAG alone, or a name of up to three words with none
+    case 'citizenship': {
+      const w = words.length && REF_RE.test(words[words.length - 1]) ? words.slice(0, -1) : words;
+      const at = w.findIndex((x, i) => i > 0 && CITIZEN_ACTS.includes(x.toLowerCase()));
+      const named = at > 0 ? w.slice(0, at) : [];
+      const act = at > 0 ? w[at].toLowerCase() : ''; const rest = w.slice(at + 1);
+      const tagged = named.length === 1 && TAG_RE.test(named[0]);
+      const nameOk = tagged || (named.length && named.length <= 3 && named.every((x) => !x.includes('#') && !REF_RE.test(x) && !/^\d+$/.test(x)));
+      const ok = (act === 'view' && !rest.length) || ((act === 'grant' || act === 'revoke') && rest.length === 1 && HOLD_RE.test(rest[0]))
+        || (act === 'cooldown' && rest.length === 1 && (rest[0].toLowerCase() === 'clear' || LENGTH_RE.test(rest[0].toLowerCase())));
+      if (!nameOk || !ok) return { cmd, why: !nameOk && named.some((x) => x.includes('#')) ? 'needTag' : 'badArgs' };
+      return tagged ? { cmd, body, tag: named[0] } : { cmd, body };
+    }
+    // Free text to every player, held to the reason's plain words (SEC-2)
+    case 'announce':
+      if (!body) return { cmd, why: 'badArgs' };
+      return body.length > ANNOUNCE_MAX || ASTRAL_RE.test(body) || BLANK_RE.test(body) || !REASON_RE.test(body) ? { cmd, why: 'announceText' } : { cmd, body };
+    case 'settime': return words.length === 1 && HOUR_RE.test(words[0]) ? { cmd, body } : { cmd, why: 'badArgs' };
     // #TAG <kind> [<length>|<n>] <reason>: one target by tag, never a name; a fixed kind word; the kind's own word; a reason
     case 'tagKindReason': {
       const maxDays = opts && opts.maxSuspendDays !== undefined ? opts.maxSuspendDays : MAX_SUSPEND_DAYS;

@@ -195,7 +195,8 @@ const send = (text, o = {}) => {
 ticker();
 const allow = JSON.parse(fs.readFileSync(path.join(SPOOL, 'allow.json'), 'utf8'));
 check('16. allow.json is written at the first tick, 0600', (fs.statSync(path.join(SPOOL, 'allow.json')).mode & 0o777) === 0o600);
-check('16. ...and lists the eleven commands, wwremote, vlremote, chars and unstuck included', allow.map((x) => x.name).sort().join() === 'chargen,chars,fixloc,kick,load,players,rename,unstuck,vlremote,whoami,wwremote', allow.map((x) => x.name));
+// (/announce since the Dragon Baron panel's buttons, 4 Nov; the others of them are not registered here)
+check('16. ...and lists the twelve commands, wwremote, vlremote, chars, unstuck and announce included', allow.map((x) => x.name).sort().join() === 'announce,chargen,chars,fixloc,kick,load,players,rename,unstuck,vlremote,whoami,wwremote', allow.map((x) => x.name));
 check('16. ...each with its console usage and the registry help', allow.every((x) => x.usage.startsWith(`/${x.name}`) && typeof x.help === 'string'), allow[0]);
 
 // ---- 1. signature and shape ----------------------------------------------------------------------------------------------
@@ -386,7 +387,8 @@ reset();
   loadConsole(repoCfg);
   // Eleven since /discipline came onto the allowlist (Jake, 21 Oct; tests/console-punish-harness.js holds its rule); nineteen since
   // the Dragon Baron rows of 28 Oct (/unstuck /giveitem /takeitem /givespell /removespell, rule itemSpells; 81925ca17)
-  check('5b. console.js loads the repo config as a game pin of 8, floor leadgm, all nineteen commands (fourteen, and the five Dragon Baron rows of 28 Oct)', logs.some((l) => /console: reader on .*, 19 commands, floor leadgm, game pin 8$/.test(l)), logs);
+  // twenty-six since the Dragon Baron panel's buttons of 4 Nov (/faction /charter /citizenship /bans /announce /time /settime)
+  check('5b. console.js loads the repo config as a game pin of 8, floor leadgm, all twenty-six commands (fourteen, the five Dragon Baron rows of 28 Oct, the seven panel rows of 4 Nov)', logs.some((l) => /console: reader on .*, 26 commands, floor leadgm, game pin 8$/.test(l)), logs);
   const owner = actor(0xff000d01, { name: 'Jacob', tag: 'JKOW', profile: 21, discord: D1[0], roles: [ROLE.owner] });
   const leadOnly = actor(0xff000d02, { name: 'Icara', tag: 'ICED', profile: 22, discord: D1[2], roles: [ROLE.lead] });
   let rep = send('/whoami', { discordId: D1[0], profileId: 21, user: 'jake', roles: [ROLE.owner] }).rep;
@@ -422,7 +424,7 @@ reset();
 reset();
 {
   const passes = ['/wwremote', '/wwremote on', '/wwremote off', '/wwremote clear #8KWH', '/vlremote', '/vlremote clear #8kwh', '/kick #8KWH', '/fixloc #8KWH', '/unstuck #8KWH',
-    '/unstuck #8KWH hub', '/unstuck #8KWH respawn ticket:481', '/unstuck Bob hub', '/unstuck Bob #8KWH hub ticket:12', '/fixloc Bob', '/fixloc Bob #8KWH', '/rename #8KWH Bobby', '/chargen #8KWH', '/players', '/load', '/load reset', '/whoami'];
+    '/unstuck #8KWH hub', '/unstuck #8KWH respawn ticket:481', '/unstuck Bob hub', '/unstuck Bob #8KWH hub ticket:12', '/fixloc Bob', '/fixloc Bob #8KWH', '/rename #8KWH Bobby', '/chargen #8KWH', '/players', '/load', '/load reset', '/whoami', '/announce hi'];
   const bad = [];
   for (const t of passes) { const rep = send(t, { mode: 'dry-run' }).rep; if (!rep || rep.state !== 'dry-run') bad.push([t, rep && rep.state, rep && rep.why]); }
   check('6. every allowed form passes every check (dry run)', !bad.length, bad);
@@ -433,7 +435,7 @@ reset();
     ['/wwremote clear', 'needTag'], ['/wwremote clear Bob', 'needTag'], ['/wwremote clear Bob #8KWH', 'needTag'], ['/wwremote sideways', 'badArgs'],
     ['/wwremote on now', 'badArgs'], ['/load everything', 'badArgs'], ['/whoami Bob', 'badArgs'], ['/players anything', 'badArgs'], ['/players #8KWH', 'badArgs'],
     ['/tp #8KWH', 'self'], ['/npc', 'inWorld'], ['/dungeon status', 'inWorld'], ['/bugs', 'later'], ['/schedule restart', 'later'], ['/beastform #8KWH werewolf now', 'self'],
-    ['/wipechars 5', 'notYet'], ['/announce hi', 'notYet'], ['/system hi', 'notChat'], ['/hello', 'notChat'], ['/pm Bob hi', 'notChat'], ['/admin hi', 'notChat'], ['/me waves', 'notChat'],
+    ['/wipechars 5', 'notYet'], ['/announce [[S]]hi', 'announceText'], ['/system hi', 'notChat'], ['/hello', 'notChat'], ['/pm Bob hi', 'notChat'], ['/admin hi', 'notChat'], ['/me waves', 'notChat'],
   ];
   const wrong = [];
   for (const [t, why] of refusals) { const rep = send(t).rep; if (!rep || rep.state !== 'refused' || rep.why !== why) wrong.push([t, why, rep && rep.state, rep && rep.why]); }
@@ -451,7 +453,9 @@ reset();
   // 28 Oct (81925ca17, as live): the Dragon Baron rows take a name or #TAG under rule itemSpells; pinned to exactly those six
   // commands, so any other free-text rule still fails here. /fixloc and /unstuck hold each word to their plain-word pattern
   // (SEC-2); Jake's staff item and spell commands take item and spell names as typed (SEC-2 for them is open)
-  check('6. no rule in the allowlist passes free text but /discipline\'s reason and the six itemSpells rows (there is no "any" rule left)', Object.values(rules.ALLOW).every((a) => ['switch', 'tag', 'tagName', 'load', 'none', 'tagKindReason', 'itemSpells'].includes(a.rule))
+  // 4 Nov: the Dragon Baron panel's buttons; /faction's reason and /announce held to REASON_RE, /citizenship's words to PLAIN_WORD
+  check('6. no rule in the allowlist passes free text but /discipline\'s reason, the six itemSpells rows and the panel rows (there is no "any" rule left)', Object.values(rules.ALLOW).every((a) => ['switch', 'tag', 'tagName', 'load', 'none', 'tagKindReason', 'itemSpells', 'faction', 'charter', 'citizenship', 'announce', 'settime'].includes(a.rule))
+    && ['faction', 'charter', 'citizenship', 'announce', 'settime'].every((n) => rules.ALLOW[n].rule === n) && rules.ALLOW.citizenship.words === rules.ALLOW.fixloc.words
     && Object.entries(rules.ALLOW).filter(([, a]) => a.rule === 'itemSpells').map(([n]) => n).join() === 'fixloc,unstuck,giveitem,takeitem,givespell,removespell'
     && ['fixloc', 'unstuck'].every((n) => { const w = rules.ALLOW[n].words; return w instanceof RegExp && !w.test('<@1>') && !w.test('@everyone') && !w.test('**x**') && !w.test('`x`'); })
     && Object.entries(rules.ALLOW).filter(([, a]) => a.rule === 'itemSpells' && !a.words).map(([n]) => n).join() === 'giveitem,takeitem,givespell,removespell'
