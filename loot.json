@@ -56181,58 +56181,37 @@
 {
 "id": "1d236f:DragonBreak Online Edits.esp",
 "name": "UDLC01_DES_BurningTouchScroll",
-"value": 30,
-"p": [
-"cyrodiil"
-]
+"value": 30
 },
 {
 "id": "1d2366:DragonBreak Online Edits.esp",
 "name": "UDLC01_DES_ColdTouchScroll",
-"value": 30,
-"p": [
-"cyrodiil"
-]
+"value": 30
 },
 {
 "id": "1d2391:DragonBreak Online Edits.esp",
 "name": "UDLC01_DES_ShockingTouchScroll",
-"value": 30,
-"p": [
-"cyrodiil"
-]
+"value": 30
 },
 {
 "id": "1d2381:DragonBreak Online Edits.esp",
 "name": "UDLC01_ILLU_FrightScroll",
-"value": 30,
-"p": [
-"cyrodiil"
-]
+"value": 30
 },
 {
 "id": "1d2394:DragonBreak Online Edits.esp",
 "name": "UDLC01_ILLU_SootheScroll",
-"value": 30,
-"p": [
-"cyrodiil"
-]
+"value": 30
 },
 {
 "id": "1d2385:DragonBreak Online Edits.esp",
 "name": "UDLC01_RES_InfectLifeScroll",
-"value": 30,
-"p": [
-"cyrodiil"
-]
+"value": 30
 },
 {
 "id": "1d238d:DragonBreak Online Edits.esp",
 "name": "UDLC01_RES_SalveScroll",
-"value": 30,
-"p": [
-"cyrodiil"
-]
+"value": 30
 },
 {
 "id": "1d239a:DragonBreak Online Edits.esp",
@@ -56277,98 +56256,62 @@
 {
 "id": "1d237b:DragonBreak Online Edits.esp",
 "name": "UDLC01_DES_ElectricTouchScroll",
-"value": 60,
-"p": [
-"cyrodiil"
-]
+"value": 60
 },
 {
 "id": "1d237f:DragonBreak Online Edits.esp",
 "name": "UDLC01_DES_FlameTouchScroll",
-"value": 60,
-"p": [
-"cyrodiil"
-]
+"value": 60
 },
 {
 "id": "1d2380:DragonBreak Online Edits.esp",
 "name": "UDLC01_DES_FlameWaveScroll",
-"value": 60,
-"p": [
-"cyrodiil"
-]
+"value": 60
 },
 {
 "id": "1d2382:DragonBreak Online Edits.esp",
 "name": "UDLC01_DES_FrostTouchScroll",
-"value": 60,
-"p": [
-"cyrodiil"
-]
+"value": 60
 },
 {
 "id": "1d2383:DragonBreak Online Edits.esp",
 "name": "UDLC01_DES_FrostWaveScroll",
-"value": 60,
-"p": [
-"cyrodiil"
-]
+"value": 60
 },
 {
 "id": "1d2392:DragonBreak Online Edits.esp",
 "name": "UDLC01_DES_ShockWaveScroll",
-"value": 60,
-"p": [
-"cyrodiil"
-]
+"value": 60
 },
 {
 "id": "1d238a:DragonBreak Online Edits.esp",
 "name": "UDLC01_ILLU_RageScroll",
-"value": 60,
-"p": [
-"cyrodiil"
-]
+"value": 60
 },
 {
 "id": "1d2393:DragonBreak Online Edits.esp",
 "name": "UDLC01_ILLU_ShroudScroll",
-"value": 60,
-"p": [
-"cyrodiil"
-]
+"value": 60
 },
 {
 "id": "1d236d:DragonBreak Online Edits.esp",
 "name": "UDLC01_RES_BlightLivingScroll",
-"value": 60,
-"p": [
-"cyrodiil"
-]
+"value": 60
 },
 {
 "id": "1d236e:DragonBreak Online Edits.esp",
 "name": "UDLC01_RES_BraveryScroll",
-"value": 60,
-"p": [
-"cyrodiil"
-]
+"value": 60
 },
 {
 "id": "1d2396:DragonBreak Online Edits.esp",
 "name": "UDLC01_RES_FoulPoisonScroll",
-"value": 60,
-"p": [
-"cyrodiil"
-]
+"value": 60
 },
 {
 "id": "1d238c:DragonBreak Online Edits.esp",
 "name": "UDLC01_RES_RemedyScroll",
-"value": 60,
-"p": [
-"cyrodiil"
-]
+"value": 60
 },
 {
 "id": "1d239b:DragonBreak Online Edits.esp",

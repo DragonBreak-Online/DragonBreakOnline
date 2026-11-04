@@ -51,8 +51,14 @@ const scrolls = (POOLS.scrolls || []).filter((x) => TB.test(x.name)), staves = P
 ok('a scrolls pool with Tomebound\'s 55 scrolls', Array.isArray(POOLS.scrolls) && scrolls.length === 55, (POOLS.scrolls || []).length);
 ok('34 Tomebound staves in ench_weapons', staves.length === 34);
 ok('...all DLE records in Tomebound\'s range', scrolls.concat(staves).every((x) => x.id.endsWith(':' + DLE) && inRange(descHex(x.id))));
-ok('...each with the province regions-overrides gives it, and that province by lore origin', scrolls.concat(staves).every((x) => JSON.stringify(x.p) === JSON.stringify(OVR.items[x.name]) && x.p.join() === want(x.name)),
-  scrolls.concat(staves).filter((x) => JSON.stringify(x.p) !== JSON.stringify(OVR.items[x.name])).map((x) => x.name));
+// Nat, 4 Nov: the novice and apprentice Destruction, Restoration and Illusion scrolls drop across Tamriel; the lore rule
+// holds for every other scroll and staff
+const basicScroll = (x) => /^UDLC01_(DES|RES|ILLU)_.*Scroll$/.test(x.name) && x.value <= 60;
+const lore = scrolls.filter((x) => !basicScroll(x)).concat(staves);
+ok('...each with the province regions-overrides gives it, and that province by lore origin', lore.every((x) => JSON.stringify(x.p) === JSON.stringify(OVR.items[x.name]) && x.p.join() === want(x.name)),
+  lore.filter((x) => JSON.stringify(x.p) !== JSON.stringify(OVR.items[x.name])).map((x) => x.name));
+ok('...except the 19 basic school scrolls: no province, common in regions-overrides', scrolls.filter(basicScroll).length === 19 && scrolls.filter(basicScroll).every((x) => !x.p && OVR.items[x.name] === 'common'),
+  scrolls.filter(basicScroll).filter((x) => x.p || OVR.items[x.name] !== 'common').map((x) => x.name));
 ok('...and none of a spell left out', !scrolls.concat(staves).some((x) => LEFT_OUT.test(x.name)), scrolls.concat(staves).filter((x) => LEFT_OUT.test(x.name)).map((x) => x.name));
 const MATERIALS = read('loot-materials.json');
 ok('loot-materials.json: every Tomebound staff is a staff', staves.every((x) => MATERIALS.items[x.id.toLowerCase()] === 'staff'));
