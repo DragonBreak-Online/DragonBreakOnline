@@ -43,8 +43,34 @@ module.exports = (api) => {
       let scribe = null; try { scribe = typeof globalThis.__dboScribingBrief === 'function' ? globalThis.__dboScribingBrief(a >>> 0) : null; } catch (e) { scribe = null; }
       const skills = out && scribe && scribe.text && Array.isArray(out.skills)
         ? out.skills.map((k) => (k && k.id === 'scholar' ? Object.assign({}, k, { description: `${String(k.description || '').trim()} ${scribe.text}`.trim() }) : k)) : null;
-      return out && (smith || magic || skills || paged) ? Object.assign({}, out, paged ? { paged: true } : {}, smith ? { smith } : {}, magic ? { magicSchools: magic } : {}, skills ? { skills } : {}) : out;
+      const res = out && (smith || magic || skills || paged) ? Object.assign({}, out, paged ? { paged: true } : {}, smith ? { smith } : {}, magic ? { magicSchools: magic } : {}, skills ? { skills } : {}) : out;
+      return paged ? fitNative(a, res) : res;
     },
+  };
+
+  // Blacksmithing's page still passed what a native panel takes for about one open in eight after paging (live 3 Nov,
+  // [native-size] journal:skills at 68-71k, sent to the browser): every family's recipe names ride along. Over the
+  // budget, the names leave in this order, and both journals draw such a family as one locked line with how it is
+  // learned (skills.as and features/smith, since 26 Oct and 9 Oct): unknown and past the craft tier, then unknown,
+  // then known but past the tier. A known family within the tier keeps its names, so Learned recipes stays whole.
+  const NATIVE_BUDGET = 55000;
+  const sizeOf = (o) => { try { return JSON.stringify(o).length; } catch (e) { return 0; } };
+  const noRecipes = (f) => { const c = Object.assign({}, f); delete c.recipes; return c; };
+  const fitNative = (a, res) => {
+    if (!res || !res.smith || !Array.isArray(res.smith.families)) return res;
+    const before = sizeOf(res);
+    if (before <= NATIVE_BUDGET) return res;
+    const tier = Number(res.smith.tier) || 1;
+    const steps = [(f) => !f.known && Number(f.tier) > tier, (f) => !f.known, (f) => Number(f.tier) > tier];
+    let fams = res.smith.families, cut = 0, now = before, fit = res;
+    for (const drop of steps) {
+      fams = fams.map((f) => (f && Array.isArray(f.recipes) && drop(f) ? (cut++, noRecipes(f)) : f));
+      fit = Object.assign({}, res, { smith: Object.assign({}, res.smith, { families: fams }) });
+      now = sizeOf(fit);
+      if (now <= NATIVE_BUDGET) break;
+    }
+    log(`journal skills: Blacksmithing's page ${before} -> ${now} chars for a native journal, ${cut} families without recipe names${now > NATIVE_BUDGET ? ' (still over: the browser draws it)' : ''}`);
+    return fit;
   };
 
   const fresh = (a, args) => typeof globalThis.__dboJournalFresh === 'function' && !!globalThis.__dboJournalFresh(a, String((args || [])[0] || ''));
