@@ -248,8 +248,10 @@ module.exports = (api) => {
   // The recipe's materials for a Broken piece: salvage.json [station, tier, [[desc, count]...]]
   let recipes = null, recipesAt = 0;
   const recipeOf = (id) => {
-    const file = path.resolve('salvage.json');
-    try { const m = fs.statSync(file).mtimeMs; if (!recipes || m !== recipesAt) { recipes = JSON.parse(fs.readFileSync(file, 'utf8')).items || {}; recipesAt = m; } } catch (e) { recipes = recipes || {}; }
+    // salvage.private.json (deploy-private) holds the entries of the mods whose authors forbid AI work; merged when present
+    const file = path.resolve('salvage.json'), side = path.resolve('salvage.private.json');
+    const sideAt = (() => { try { return fs.statSync(side).mtimeMs; } catch (e) { return -1; } })();
+    try { const m = `${fs.statSync(file).mtimeMs}|${sideAt}`; if (!recipes || m !== recipesAt) { let priv = {}; try { priv = JSON.parse(fs.readFileSync(side, 'utf8')).items || {}; } catch (e) { priv = {}; } recipes = Object.assign({}, JSON.parse(fs.readFileSync(file, 'utf8')).items || {}, priv); recipesAt = m; } } catch (e) { recipes = recipes || {}; }
     const d = descOf(id).toLowerCase(); const i = d.indexOf(':');
     const key = i < 0 ? d : (parseInt(d.slice(0, i), 16) || 0).toString(16) + d.slice(i);
     const hit = Object.entries(recipes).find(([k]) => { const kk = k.toLowerCase(); const j = kk.indexOf(':'); return ((parseInt(kk.slice(0, j), 16) || 0).toString(16) + kk.slice(j)) === key; });
