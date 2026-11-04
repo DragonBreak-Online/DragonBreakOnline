@@ -18,6 +18,8 @@
 # Malur, Morrowind Map Fix: the item, a material or the recipe is theirs) go to <OUT>.private.json instead, which is
 # gitignored and delivered by deploy-private (Nat, 1-2 Nov: what a tool reads from their plugins stays off the public
 # repo; privaterows.js keeps the same list). salvage.js and durability.js merge it when it is there.
+# Items of Druadach, Summerset and Murkmire are not listed at all (EXCLUDE): live's salvage never had them, and adding them
+# is new content for Nat to choose, not part of a fix (Ben Leader, 4 Nov). Journey to Baan Malur's items stay (private).
 #
 # Recipe (CT 115, 2026-09-28, about a second):
 #   python3 tooling/make_salvage.py salvage.json [/opt/skyrim-data] [../fork/deploy/skyrim-data/loadorder.txt]
@@ -45,6 +47,7 @@ METAL_TIER = {'ingotiron': 0, 'bskingotcopper': 0, 'bskingotbronze': 0, 'bskingo
               'ingotebony': 3, 'dragonbone': 3, 'dragonscales': 3, 'dlc2orestalhrim': 3, 'ccbgssse025_ingotmadness': 3}
 MASTER_IF = {'daedraheart'}
 PRIVATE = re.compile(r'druadach|summerset|murkmire|baan ?malur|morrowind map fix', re.I)
+EXCLUDE = re.compile(r'druadach|summerset|murkmire', re.I)
 
 
 def subrecords(data):
@@ -178,7 +181,7 @@ def main_of(mats, item=None):
 
 items, stats = {}, {'smelter': 0, 'tanning': 0, 'loom': 0, 'fromTemplate': 0, 'byMaterial': 0}
 for k, e in recs.items():
-    if e['t'] not in ('WEAP', 'ARMO') or e['del'] or not e['full']:
+    if e['t'] not in ('WEAP', 'ARMO') or e['del'] or not e['full'] or EXCLUDE.search(k[0]):
         continue
     r, t, hops = recipe.get(k), e.get('tmpl'), 0
     while r is None and t and hops < 4:
