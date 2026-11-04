@@ -565,14 +565,26 @@ export class CompanionService extends ClientListener {
     actor.stopCombatAlarm();
   }
 
+  private isCasting(actor: Actor): boolean {
+    try {
+      return actor.getAnimationVariableBool("IsCastingLeft")
+        || actor.getAnimationVariableBool("IsCastingRight")
+        || actor.getAnimationVariableBool("IsCastingDual");
+    } catch {
+      return false;
+    }
+  }
+
   // Watches an ordered fight that goes nowhere (companionFightStall.ts): the first stall restarts the fight, the next gives
   // the order up for the owner's heel, which walks; false when the order was given up
   private fightProgress(remoteId: number, actor: Actor, target: Actor, state: LocalState, now: number): boolean {
     const toTarget = actor.getDistance(target);
     const pos = [actor.getPositionX(), actor.getPositionY(), actor.getPositionZ()];
-    const { stall, action } = fightStallStep(state.stall, now, target.getFormID(), pos, target.getActorValuePercentage("Health"), toTarget);
+    const isCasting = this.isCasting(actor);
+    const { stall, action } = fightStallStep(state.stall, now, target.getFormID(), pos, target.getActorValuePercentage("Health"), toTarget, isCasting);
     state.stall = stall;
     if (action === "restart") {
+      if (isCasting) return true;
       actor.stopCombat();
       actor.evaluatePackage();
       actor.startCombat(target);
@@ -580,6 +592,7 @@ export class CompanionService extends ClientListener {
       return true;
     }
     if (action !== "drop") return true;
+    if (isCasting) return true;
     actor.stopCombat();
     state.fightingTarget = 0;
     state.stall = null;

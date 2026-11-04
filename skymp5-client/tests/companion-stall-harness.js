@@ -9,8 +9,9 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const esbuildDir = [process.argv[2], path.resolve(__dirname, '../../skymp5-server/node_modules/esbuild'),
-  path.join(os.homedir(), 'dragonbreak/fork/skymp5-server/node_modules/esbuild')].find((p) => p && fs.existsSync(p));
+const esbuildDir = [process.argv[2], process.env.ESBUILD_DIR, path.resolve(__dirname, '../../skymp5-server/node_modules/esbuild'),
+  path.resolve(__dirname, '../../../../fork/skymp5-server/node_modules/esbuild'),
+  path.join(os.homedir(), 'dragonbreak/fork/skymp5-server/node_modules/esbuild'), 'E:/DragonBreak Online Dev files/fork/skymp5-server/node_modules/esbuild'].find((p) => p && fs.existsSync(p));
 if (!esbuildDir) { console.log('SKIP companion-stall (no esbuild)'); process.exit(0); }
 const esbuild = require(esbuildDir);
 
@@ -24,7 +25,7 @@ const check = (name, ok, got) => {
 const drive = (m, ms, f, start = null, target = 0x14e4) => {
   let stall = start; const actions = [];
   for (let t = 0; t <= ms; t += 250) {
-    const r = m.fightStallStep(stall, 1e6 + t, target, f.pos(t), f.health(t), f.toTarget(t));
+    const r = m.fightStallStep(stall, 1e6 + t, target, f.pos(t), f.health(t), f.toTarget(t), typeof f.isCasting === 'function' ? f.isCasting(t) : false);
     stall = r.stall;
     if (r.action !== 'none') actions.push([t, r.action]);
   }
@@ -40,6 +41,9 @@ function run(m) {
 
   const caster = { pos: () => [0, 0, 0], health: (t) => 1 - t / 60000, toTarget: () => 1200 };
   check('a ranged caster whose hits land never stalls', drive(m, 25000, caster).actions.length === 0);
+
+  const wispmother = { pos: () => [0, 0, 0], health: () => 1, toTarget: () => 700, isCasting: () => true };
+  check('an actively casting summon never stalls or drops combat', drive(m, 25000, wispmother).actions.length === 0);
 
   const melee = { pos: () => [0, 0, 0], health: () => 1, toTarget: () => 120 };
   check('a companion at its target\'s side never stalls (a blocked swing is still a fight)', drive(m, 25000, melee).actions.length === 0);
@@ -66,6 +70,8 @@ function run(m) {
   check('the owner\'s hits skip a target given up as stalled', /if \(this\.isSkipped\(targetId, now\)\)/.test(src));
   check('the assist skips it too', /isOwnCompanion\(remoteId\) \|\| this\.isSkipped\(remoteId, now\)/.test(src));
   check('the npcDrift report carries the stall window and the distance to the target', /stall: state\.stall \?/.test(src) && /toTarget: this\.distanceTo\(/.test(src));
+  check('the service checks casting state before restarting or dropping stalled combat', /isCasting\(actor\)/.test(src));
+  check('an actively casting companion is never stopped mid-cast', /if \(isCasting\) return true;/.test(src));
 }
 
 async function main() {
