@@ -300,6 +300,19 @@ check('...and the pair still brews', out.said.some(([, t]) => /You brew/.test(t)
   check('a report with just one ingredient once still says a potion needs two', /needs at least two/.test(saidTo(BREWER)[0] || ''), saidTo(BREWER));
 }
 
+// The server's own swap after a brew (the client's potion out, the real one in) reaches it again as a craft whose only
+// input is the created potion (live 3 Nov 00:37: brewed ResistMagic50, then a report of ff002b78 -> 39e53; ~350 in two
+// days). It is not a mix: nothing is brewed, nothing taken, and the player is not told a potion needs two ingredients.
+{
+  stock(BREWER);
+  put(BREWER, 'pos', mp.get(LAB, 'pos'));
+  const before = JSON.stringify(mp.get(BREWER, 'inventory'));
+  wallClock += 5000;
+  craft(BREWER, [0xff002b78]);
+  check('the brew\'s own potion swap reported back brews nothing and takes nothing', JSON.stringify(mp.get(BREWER, 'inventory')) === before);
+  check('...and tells the player nothing', saidTo(BREWER).length === 0, saidTo(BREWER));
+}
+
 // ---- brewing is the Alchemist's work (Nate, 2026-09-30: Alchemist rose from picking mushrooms) ----
 // Every brew above ran with no __alduinakMasteryAward (the live fork has none): brewing works the same without it.
 const awards = [];
