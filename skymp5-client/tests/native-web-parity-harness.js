@@ -40,4 +40,32 @@ const texts = (t) => { const out = []; const walk = (c) => { for (const k of Obj
   check('the editor counts Title and Page as typed (n / max), as the web does', /Title {2}\(8 \/ 60\)/.test(tx) && /Page {2}\(18 \/ 4000\)/.test(tx), tx);
 }
 
+// ---- Decor (features/decor: "Search every group", "Nothing matches.") ----
+{
+  const base = { type: 'decor', id: 171, nonce: 'p1', home: "Olaf's home", owner: true, undo: 0, view: 'catalog',
+    budget: [{ label: 'Pieces', used: 0, of: 3 }], groups: [{ id: 'beds', label: 'Beds' }], group: 'beds', page: 0, pages: 1, nearby: [],
+    rows: [{ key: '9001:Skyrim.esm', name: 'Bed', cost: [], why: '' }] };
+  const head = (t) => t.root.dboPanel.head;
+  const t = S.boot('dbo_decor');
+  t.push(base);
+  check('the catalogue has a Search... button, as the web search box', !!head(t).search, Object.keys(head(t).kids));
+  head(t).search.onRelease();
+  check('...which opens a box to type in', !!head(t).box && !!head(t).done, Object.keys(head(t).kids));
+  head(t).box.text = 'lant';
+  t.push(Object.assign({}, base, { undo: 9 }));
+  check('a redraw while typing keeps what was typed', !!head(t).box && head(t).box.text === 'lant', head(t).box && head(t).box.text);
+  t.press(13);
+  const v = msgs(t, 'dbo:decorView').pop();
+  check('Enter searches every group: decorView catalog, no group, page 0, the words', !!v && JSON.stringify(v.args) === JSON.stringify(['p1', 'catalog', null, 0, 'lant']), v && v.args);
+  t.push(Object.assign({}, base, { search: 'lant', rows: [] }));
+  const r0 = t.root.dboPanel.list.r0;
+  check('the search shows with Clear, and an empty result says Nothing matches.', /"lant"/.test(head(t).query.text) && !!head(t).clear && r0 && r0.label.text === 'Nothing matches.', r0 && r0.label.text);
+  t.root.dboPanel.list.g0.onRelease();
+  const g = msgs(t, 'dbo:decorView').pop();
+  check('a group picked while searching keeps the search', !!g && g.args[4] === 'lant', g && g.args);
+  head(t).clear.onRelease();
+  const c = msgs(t, 'dbo:decorView').pop();
+  check('Clear sends an empty search', !!c && c.args[4] === '', c && c.args);
+}
+
 T.done();
