@@ -134,7 +134,7 @@ module.exports = (api) => {
   };
 
   // ---- characters --------------------------------------------------------------------------------------------------------
-  const exists = (a) => { if (!a) return false; try { mp.get(a >>> 0, 'type'); return true; } catch (e) { return false; } };
+  const exists = (a) => { if (!a) return false; if (typeof globalThis.__dboFormExists === 'function') return globalThis.__dboFormExists(a); try { mp.get(a >>> 0, 'type'); return true; } catch (e) { return false; } };
   const isFemale = (a, fallback) => { try { const app = mp.get(a >>> 0, 'appearance'); return app ? !!app.isFemale : !!fallback; } catch (e) { return !!fallback; } };
   const tagSafe = (a) => { try { return String(tagOf(a) || ''); } catch (e) { return ''; } };
   const isOnline = (a) => onlineActors().includes(a >>> 0);

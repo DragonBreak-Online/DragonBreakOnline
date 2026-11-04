@@ -145,7 +145,7 @@ module.exports = (api) => {
   // ---- characters ------------------------------------------------------------------------------------------------------
   const hex = (a) => (Number(a) >>> 0).toString(16);
   const unhex = (s) => (parseInt(String(s || ''), 16) >>> 0);
-  const exists = (a) => { if (!a) return false; try { mp.get(a >>> 0, 'type'); return true; } catch (e) { return false; } };
+  const exists = (a) => { if (!a) return false; if (typeof globalThis.__dboFormExists === 'function') return globalThis.__dboFormExists(a); try { mp.get(a >>> 0, 'type'); return true; } catch (e) { return false; } };
   const isOnline = (a) => onlineActors().includes(a >>> 0);
   const tagSafe = (a) => { try { return String(tagOf(a) || ''); } catch (e) { return ''; } };
   const nameNow = (a, fallback) => { try { const n = ownNameOf(a); if (n) return String(n); } catch (e) { /* fallback */ } return String(fallback || 'someone'); };
