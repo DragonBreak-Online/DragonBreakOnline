@@ -26,10 +26,80 @@ function send(key, args)
    dboSend(key, [data.nonce].concat(args));
 }
 
-function view(v, group, page)
+// The search is the server's (decor.js decorView [view, group, page, search]); every view keeps the current one
+function view(v, group, page, q)
 {
    dboSound("UIMenuPrevNext");
-   send("dbo:decorView", [v, group, page]);
+   var s = q != undefined ? q : searchNow();
+   send("dbo:decorView", q != undefined || s != "" ? [v, group, page, s] : [v, group, page]);
+}
+
+function searchNow()
+{
+   return data != null && data.search != undefined ? String(data.search) : "";
+}
+
+// ---- typing the search, as the web's "Search every group" ----
+var typing = false;
+var boxField = null;
+var SEARCH_X = PAD + 492;
+
+function endTyping()
+{
+   if (typing)
+   {
+      dboInputEnd();
+   }
+   typing = false;
+   boxField = null;
+}
+
+function takeTyped()
+{
+   var text = boxField != null ? String(boxField.text) : "";
+   while (text.charAt(0) == " ")
+   {
+      text = text.substr(1);
+   }
+   while (text.charAt(text.length - 1) == " ")
+   {
+      text = text.substr(0, text.length - 1);
+   }
+   endTyping();
+   view("catalog", null, 0, text.substr(0, 40));
+}
+
+function drawSearch(h, kept)
+{
+   if (data.view != "catalog")
+   {
+      return;
+   }
+   if (typing)
+   {
+      // a redraw while typing (a payload, the undo countdown) keeps what was typed so far
+      var was = kept != null ? kept : searchNow();
+      boxField = dboInput(h, "box", 50, SEARCH_X, 110, 140, 30, dboFmt(F_PLAIN, 18, C_TEXT, 0.5), 40, false);
+      boxField.text = was;
+      button(h, "done", 51, SEARCH_X + 146, 112, 60, "Done", F_MEDIUM, 18, A_BUTTON_REST, function() { takeTyped(); });
+      return;
+   }
+   if (searchNow() != "")
+   {
+      var f = dboText(h, "query", 52, SEARCH_X, 116, 120, 24, dboFmt(F_MEDIUM, 17, C_SECOND, 0.8), false);
+      f.text = "\"" + searchNow() + "\"";
+      button(h, "clear", 53, SEARCH_X + 126, 112, 80, "Clear", F_MEDIUM, 18, A_ROW_REST, function() { view("catalog", null, 0, ""); });
+      return;
+   }
+   if (dboCanType())
+   {
+      button(h, "search", 54, SEARCH_X, 112, 140, "Search...", F_MEDIUM, 18, A_ROW_REST, function()
+      {
+         typing = true;
+         dboSound("UIMenuOK");
+         draw();
+      });
+   }
 }
 
 function closePanel()
@@ -110,6 +180,7 @@ function setFocus(i)
 
 function drawHeader()
 {
+   var kept = typing && boxField != null ? String(boxField.text) : null;
    var h = clear("head", 20);
    dboTitle(h, "title", 1, PAD, 20, PANEL_W - PAD * 2, data.home);
    var x = PAD;
@@ -147,6 +218,7 @@ function drawHeader()
          send("dbo:decorUndo", []);
       });
    }
+   drawSearch(h, kept);
 }
 
 function costLine(cost)
@@ -245,7 +317,7 @@ function drawCatalog(l)
    }
    if (!data.rows.length)
    {
-      row(l, 0, "Nothing in this group.", "", C_SECOND, true, null);
+      row(l, 0, searchNow() != "" ? "Nothing matches." : "Nothing in this group.", "", C_SECOND, true, null);
    }
 }
 
@@ -441,6 +513,21 @@ keys.onKeyDown = function()
 {
    var code = dboKey();
    dboLog("decor key " + code);
+   // while the search box is open every key is typing: Escape leaves it, Enter searches
+   if (typing)
+   {
+      if (code == 27)
+      {
+         dboSound("UIMenuCancel");
+         endTyping();
+         draw();
+      }
+      else if (code == 13)
+      {
+         takeTyped();
+      }
+      return;
+   }
    if (code == 27)
    {
       closePanel();
