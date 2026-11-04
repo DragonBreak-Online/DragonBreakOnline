@@ -608,8 +608,12 @@ module.exports = (api) => {
     if (list.locked.length) lines.push(`Later: ${list.locked.slice(0, 3).map(([label, t]) => `${label} at ${tierName(t)} (${tierLevel(t)})`).join(', ')}${list.locked.length > 3 ? ` and ${list.locked.length - 3} more` : ''}`);
     if (BREW.length) lines.push('Crouch and use the lab to brew drinks.');
     const head = `${tierName(tier)}: ${RW.words.potion[tier - 1]} strength`;
-    openWidget(a, { type: 'contextMenu', id: PANEL_ID, mode: 'inspect', targetName: list.length ? `You can brew (${list.length}), ${head}` : `You can brew, ${head}`, lines }, false);
+    // Close needs an event to send (lorvanack, 3 Nov: the web panel's Close sent nothing and the list stayed)
+    openWidget(a, { type: 'contextMenu', id: PANEL_ID, mode: 'inspect', targetName: list.length ? `You can brew (${list.length}), ${head}` : `You can brew, ${head}`, lines,
+      events: { close: 'dbo:alchemyListClose' } }, false);
   };
+  // Closed by the player: gone until they use a lab again, so the next brew does not bring it back
+  if (onUi) onUi('alchemyListClose', (a) => { S.panels.delete(a >>> 0); closeWidget(a, PANEL_ID); });
   // ---- drinks (Nate, 8 Oct: "add or create alcohol recipes for alchemy, includes skooma etc") ------------------------
   // Crouching at a lab opens the Brewing panel instead of the lab's menu: every recipe of brewing.json at or under the
   // brewer's Alchemist tier, one brewed per click, the inputs taken here (none of these is a two-ingredient mix the lab's
