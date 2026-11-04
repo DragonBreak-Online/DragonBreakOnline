@@ -173,11 +173,49 @@ module.exports = (api) => {
     if (!enchantedCache.has(baseId)) { const r = recordOf(baseId); enchantedCache.set(baseId, !!r && fieldsOf(r, 'EITM').length > 0); }
     return enchantedCache.get(baseId);
   };
+  // An entry must still match the recipe it was read from (its fourth element, a COBJ desc; make_salvage.py). The plugins
+  // change under a built salvage.json: DragonBreak Nexus Patches re-graded the Imperial Ebony Sword's recipe to 2
+  // malachite, and the old entry kept paying ebony (ticket fac-0553, 3 Nov; 349 entries on live paid a material their
+  // recipe no longer took). So every material it gives back must be in the recipe's winning record (CNTO, per item made:
+  // NAM1) at least as many times. An entry that fails is not offered, and is logged once. One record read per item,
+  // kept until salvage.json changes; an entry with no recipe (a file built before this) is not checked.
+  const recipeOk = new Map();
+  let recipeOkOf = null;
+  const matchesRecipe = (baseId, e) => {
+    if (recipeOkOf !== table) { recipeOk.clear(); recipeOkOf = table; }
+    if (!e[3]) return true;
+    if (recipeOk.has(baseId)) return recipeOk.get(baseId);
+    let ok = false, why = 'its recipe is deleted';
+    const r = recordOf(idOf(e[3]));
+    // A recipe the server cannot resolve at all (its plugin is not loaded) is not checked: the item is then usually gone
+    // too, and refusing every entry would empty salvage wherever the load order cannot be read. A recipe the load order
+    // deletes (record flag 0x20) is checked, and fails.
+    if (!r || String(r.record.type) !== 'COBJ') { recipeOk.set(baseId, true); return true; }
+    if (!(Number(r.record.flags) & 0x20)) {
+      const nam1 = fieldsOf(r, 'NAM1')[0];
+      const made = Math.max(1, nam1 && nam1.data.byteLength >= 2 ? new DataView(nam1.data.buffer, nam1.data.byteOffset, 2).getUint16(0, true) : 1);
+      const has = new Map();
+      for (const f of fieldsOf(r, 'CNTO')) {
+        if (f.data.byteLength < 8) continue;
+        let id = u32(f, 0);
+        try { if (typeof r.toGlobalRecordId === 'function') id = r.toGlobalRecordId(id) >>> 0; } catch (err) { continue; }
+        const n = new DataView(f.data.buffer, f.data.byteOffset, 8).getInt32(4, true);
+        has.set(id, (has.get(id) || 0) + n / made);
+      }
+      const bad = (e[2] || []).find(([d, n]) => !((has.get(idOf(d)) || 0) + 1e-4 >= Number(n)));
+      ok = !bad;
+      if (bad) why = `the recipe no longer takes ${Number(bad[1])} ${nameOf(bad[0])} (${bad[0]})`;
+    }
+    recipeOk.set(baseId, ok);
+    if (!ok) log(`salvage: ${descOf(baseId)} is not offered: its salvage.json entry is stale, ${why} (${e[3]}); rerun tooling/make_salvage.py`);
+    return ok;
+  };
   const yieldOf = (baseId, station, rank) => {
     if (station.books) return bookYield(baseId);
     if (enchantedRecord(baseId)) return null;
     const e = items().get(norm(descOf(baseId)));
     if (!e || e[0] !== station.id || rank < (Number(e[1]) || 0)) return null;
+    if (!matchesRecipe(baseId, e)) return null;
     const share = shareFor(rank);
     // Each material by the share, rounded down; the main material at least once. A main that costs exactly one came back
     // whole every time, so crafting and breaking it down trained the skill for a strip or nothing (8 Oct, ragged clothes;
