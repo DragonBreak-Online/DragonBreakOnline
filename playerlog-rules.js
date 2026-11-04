@@ -1586,6 +1586,7 @@ citizenship.js ELECTION 8ca5a5d0 clean
 citizenship.js ELECTION 3e5d350b clean
 citizenship.js CITIZEN e6f03eeb clean
 citizenship.js ELECTION 9607cadb clean
+citizenship.js CITIZEN d733e71a clean
 clearcorpses.js CLEARCORPSES 559976b3 excluded
 commissions.js COMMISSION 49e86f26 parsed
 commissions.js COMMISSION 150fc5bd parsed
@@ -1596,8 +1597,8 @@ commissions.js COMMISSION db09dfa4 parsed
 commissions.js COMMISSION ad987a21 parsed
 commissions.js COMMISSION 0aa01cec parsed
 commissions.js COMMISSION 0c709fad parsed
-console.js REMOTE ffdec0aa excluded
-console.js REMOTE e4fec94b excluded
+console.js REMOTE 7cd7c260 excluded
+console.js REMOTE 5c1f70ea excluded
 console.js REMOTE 1ef926f8 excluded
 console.js REMOTE 04d3b66a excluded
 consequences.js CONSEQUENCES 56016f21 clean

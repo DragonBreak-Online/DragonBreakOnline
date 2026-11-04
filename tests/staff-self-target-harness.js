@@ -90,8 +90,8 @@ check('guilds.js: staff remove, rank, add, leader, override, remove-by-name and 
   has('guilds.js', /const staffNo = \(a, t, kind\) => \{ if \(!leadStaff\(a\)\) return ''/)
   && (fs.readFileSync(path.join(ROOT, 'guilds.js'), 'utf8').match(/staffNo\(a, /g) || []).length === 7
   && has('guilds.js', /staffNo\(a, \{ profile: Number\(rec\.owner\) \}, 'hall'\)/));
-check('citizenship.js: a staff grant, decline and revoke ask it (not a ruler\'s or Steward\'s own)', has('citizenship.js', /if \(!isLeadStaff\(by\) \|\| \(z && \(rules\(by, z\) \|\| isSteward\(by, z\)\)\)\) return '';/)
-  && (fs.readFileSync(path.join(ROOT, 'citizenship.js'), 'utf8').match(/staffNo\(by, /g) || []).length === 3);
+check('citizenship.js: a staff grant, decline, revoke and cooldown ask it (not a ruler\'s or Steward\'s own)', has('citizenship.js', /if \(!isLeadStaff\(by\) \|\| \(z && \(rules\(by, z\) \|\| isSteward\(by, z\)\)\)\) return '';/)
+  && (fs.readFileSync(path.join(ROOT, 'citizenship.js'), 'utf8').match(/staffNo\(by, /g) || []).length === 4);
 check('schools.js /schools set and the panel\'s school, manuals.js grant, smithing.js teach|forget, appearance.js /grantappearance, staffenchant.js apply',
   has('schools.js', /g\.target\(by, t, 'skills'\)/) && has('manuals.js', /g\.target\(a, t, 'items'\)/) && has('smithing.js', /g\.target\(a, t, 'skills'\)/)
   && has('appearance.js', /g\.target\(a, t, 'appearance'\)/) && has('staffenchant.js', /g\.target\(a, t, 'items'\)/));
