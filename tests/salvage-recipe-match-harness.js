@@ -120,6 +120,26 @@ INV = [{ baseId: IMP_SWORD, count: 1 }];
 breakOne(IMP_SWORD);
 ok(count(IMP_SWORD) === 0 && count(MALACHITE) === 1, '...and once salvage.json is regenerated the same sword is offered again, for malachite', { sword: count(IMP_SWORD), malachite: count(MALACHITE) });
 
+// ---- the private sidecar (Ben, 3 Nov: entries of the AI-forbidding mods stay off the public repo) --------------------
+// salvage.private.json beside salvage.json holds them; salvage.js merges it when it is there, and runs without it.
+const PRIV_SWORD = 0x1307;
+NAMES[PRIV_SWORD] = 'Private Sword';
+fs.writeFileSync('salvage.private.json', JSON.stringify({ items: { [desc(PRIV_SWORD)]: ['smelter', 3, [[desc(EBONY), 2], [desc(STRIPS), 1]], desc(R_OLD)] } }));
+INV = [{ baseId: PRIV_SWORD, count: 1 }];
+breakOne(PRIV_SWORD);
+ok(count(PRIV_SWORD) === 0 && count(EBONY) === 1, 'an entry from salvage.private.json is offered when the sidecar is there', { sword: count(PRIV_SWORD), ebony: count(EBONY) });
+fs.unlinkSync('salvage.private.json');
+INV = [{ baseId: PRIV_SWORD, count: 1 }];
+breakOne(PRIV_SWORD);
+ok(count(PRIV_SWORD) === 1, '...and not once the sidecar is gone: salvage runs on the public entries alone');
+ok(logs.some((l) => /salvage\.private\.json is not here/.test(l)), '...which the log says');
+
+// ---- the tracked file names no AI-forbidding mod (the plugins privaterows.js lists, and their siblings) ----------------
+const TRACKED = path.resolve(__dirname, '..', 'salvage.json');
+const PRIVATE_MOD = /druadach|summerset|murkmire|baan ?malur|morrowind map fix|lordbound/ig;
+const hits = (fs.readFileSync(TRACKED, 'utf8').match(PRIVATE_MOD) || []);
+ok(hits.length === 0, 'the tracked salvage.json names no plugin of a mod whose authors forbid AI work', [...new Set(hits)].slice(0, 5));
+
 console.log(fails ? `${fails} FAILED` : 'all checks passed');
 process.chdir(os.tmpdir());
 try { fs.rmSync(scratch, { recursive: true, force: true }); } catch (e) { /* leave it */ }

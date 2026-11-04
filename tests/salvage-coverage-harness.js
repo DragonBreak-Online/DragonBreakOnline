@@ -7,7 +7,12 @@
 const fs = require('fs');
 const path = require('path');
 const S = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'salvage.json'), 'utf8'));
-const items = S.items, names = S.materialEditorIds;
+// What the server reads: the tracked file plus salvage.private.json when it is here (the entries of the mods whose authors
+// forbid AI work, delivered by deploy-private; 3 Nov). Without it those entries are not checked, and the run says so.
+const SIDE = path.resolve(__dirname, '..', 'salvage.private.json');
+const P = fs.existsSync(SIDE) ? JSON.parse(fs.readFileSync(SIDE, 'utf8')) : null;
+if (!P) console.log('note  salvage.private.json is not here: the private entries are not checked');
+const items = Object.assign({}, S.items, P ? P.items : {}), names = Object.assign({}, S.materialEditorIds, P ? P.materialEditorIds : {});
 const gen = fs.readFileSync(path.resolve(__dirname, '..', 'tooling', 'make_salvage.py'), 'utf8');
 let fails = 0;
 const ok = (c, what, got) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${what}${!c && got !== undefined ? '   ' + JSON.stringify(got) : ''}`); if (!c) fails++; };
@@ -36,7 +41,7 @@ const thread = (d) => at(d) && at(d)[0] === 'loom' && mats(d).length === 1 && ma
 ok(thread('d3dea:Skyrim.esm'), 'College robes (a 7 Oct loom recipe): the loom, thread', at('d3dea:Skyrim.esm'));
 ok(thread('80f95:BSHeartland.esm'), 'fur clothes now made of thread at the loom (Colovian Fur Clothes) go back to the loom, not to the rack for leather', at('80f95:BSHeartland.esm'));
 // Clothing (BOD2 armour type 2) is its own stand-in pool: hide armour with no recipe never takes a fur clothes' thread one
-const hideArmour = ['801', '802', '803', '808', '80d', '80e', '812', '904', '905', '906'].map((x) => `${x}:Sentinel.esp`).concat('e63d2:Journey to Baan Malur.esp');
+const hideArmour = ['801', '802', '803', '808', '80d', '80e', '812', '904', '905', '906'].map((x) => `${x}:Sentinel.esp`).concat(P ? ['e63d2:Journey to Baan Malur.esp'] : []);
 const rack = hideArmour.filter((d) => at(d) && at(d)[0] === 'tanning' && mats(d).every(([m]) => /Leather/.test(m)));
 ok(rack.length === hideArmour.length, "hide armour with no recipe (Sentinel's fur cuirasses, the Slaver's Cuirass): the tanning rack, leather and strips", hideArmour.filter((d) => !rack.includes(d)).map((d) => [d, at(d)]));
 ok(/len\(shape\) >= 8 and struct\.unpack_from\('<I', shape, 4\)\[0\] == 2/.test(gen), 'the generator keeps clothing apart in the stand-in pool');

@@ -102,15 +102,23 @@ module.exports = (api) => {
   const idOf = (d) => { try { return mp.getIdFromDesc(String(d)) >>> 0; } catch (e) { return 0; } };
   const nameOf = (d) => itemName(d) || 'something';
 
-  // salvage.json, re-read when it changes
+  // salvage.json, re-read when it changes, with salvage.private.json merged in when it is there: the entries that touch a
+  // mod whose authors forbid AI work stay off the public repo (make_salvage.py; deploy-private delivers the sidecar).
+  // Without the sidecar those items simply cannot be broken down, said once in the log.
   let table = null, tableMtime = -1;
+  const SIDE = path.resolve('salvage.private.json');
+  const mtimeOf = (f) => { try { return fs.statSync(f).mtimeMs; } catch (e) { return -1; } };
   const items = () => {
     const file = path.resolve('salvage.json');
     try {
-      const m = fs.statSync(file).mtimeMs;
+      const m = `${fs.statSync(file).mtimeMs}|${mtimeOf(SIDE)}`;
       if (!table || m !== tableMtime) {
         const raw = JSON.parse(fs.readFileSync(file, 'utf8')).items || {};
-        table = new Map(Object.entries(raw).map(([k, v]) => [norm(k), v]));
+        let side = {};
+        try { side = JSON.parse(fs.readFileSync(SIDE, 'utf8')).items || {}; } catch (e) {
+          log(`salvage: ${path.basename(SIDE)} ${fs.existsSync(SIDE) ? `unreadable (${e.message})` : 'is not here'}; salvage.json's public entries only`);
+        }
+        table = new Map(Object.entries(Object.assign({}, raw, side)).map(([k, v]) => [norm(k), v]));
         tableMtime = m;
       }
     } catch (e) { if (!table) { log('salvage: salvage.json unreadable', e.message); table = new Map(); } }
