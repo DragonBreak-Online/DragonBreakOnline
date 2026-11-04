@@ -701,6 +701,9 @@ module.exports = (api) => {
     // refused because of a third thing that was never an ingredient). Drop those before judging the mix.
     const made = all.filter((id) => id >= 0xff000000);
     const used = all.filter((id) => id < 0xff000000);
+    // Only created objects: this module's own swap after a brew (the client's potion out, the real one in), which the
+    // client reports again as a craft (live 3 Nov: ~350 in two days, each answered "a potion needs two ingredients")
+    if (!used.length && made.length) return;
     // Anything else is not a mix (such as the inventory re-applied while seated at the lab), so nothing is made
     if (used.length > 3 || used.some((id) => !effectsOf(id))) {
       const counts = reported.map((e) => `${(Number(e.baseId) >>> 0).toString(16)}x${Number(e.count) || 1}`).join(' ');
