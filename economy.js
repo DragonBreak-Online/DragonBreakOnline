@@ -103,7 +103,7 @@ module.exports = (api) => {
   // too, and the audit lines give totals per hold only
   const credit = (a, n, why) => { const was = balanceOf(a); mp.set(a, BALANCE, was + n); try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('bankwrite', a, why || 'credit', was, was + n); } catch (e) { /* the player log is optional */ } };
   // A form that was destroyed (a deleted character) throws on every get or set; 'type' is a property every form has
-  const exists = (a) => { if (!a) return false; try { mp.get(a >>> 0, 'type'); return true; } catch (e) { return false; } };
+  const exists = (a) => { if (!a) return false; if (typeof globalThis.__dboFormExists === 'function') return globalThis.__dboFormExists(a); try { mp.get(a >>> 0, 'type'); return true; } catch (e) { return false; } };
   const profileOfActor = (a) => { try { const v = Number(mp.get(a, 'profileId')); return Number.isFinite(v) ? v : -1; } catch (e) { return -1; } };
   // An account that controls a faction's treasury is never on its payroll (review B2)
   const accountLeads = (pid, fid) => pid >= 0 && (fn('__dboRealmLeadsAccount') ? !!fn('__dboRealmLeadsAccount')(pid, fid) : false);

@@ -516,7 +516,7 @@ module.exports = (api) => {
 
   // ---- disbanding: the leader asks, a GM decides, and the treasury goes to the Founder (Jake, 06:33Z) ----------------------
   // Only the exact error of a character that no longer exists (deleted) counts; anything else keeps the Founder as payee
-  const formGone = (id) => { try { mp.get(Number(id) >>> 0, 'type'); return false; } catch (e) { return /^Form with id \S+ doesn't exist$/.test(String(e && e.message)); } };
+  const formGone = (id) => { if (typeof globalThis.__dboFormExists === 'function') return !globalThis.__dboFormExists(id); try { mp.get(Number(id) >>> 0, 'type'); return false; } catch (e) { return /^Form with id \S+ doesn't exist$/.test(String(e && e.message)); } };
   const pendingDisband = (fid) => store().disbands.find((d) => d.fid === fid && d.status === 'pending') || null;
   const requestDisband = (a, reason) => {
     const g = (typeof globalThis.__dboGuildsOf === 'function' ? globalThis.__dboGuildsOf(a) || [] : []).find((x) => x.player && x.role === 'leader');

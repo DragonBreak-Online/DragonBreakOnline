@@ -84,7 +84,7 @@ module.exports = (api) => {
     try { if (typeof globalThis.__dboHoldTax === 'function') { const r = Number(globalThis.__dboHoldTax(zone, dflt)); if (Number.isFinite(r)) return clamp01(r); } } catch (e) { /* business.js not loaded */ }
     return clamp01(dflt);
   };
-  const exists = (a) => { if (!a) return false; try { mp.get(a >>> 0, 'type'); return true; } catch (e) { return false; } };
+  const exists = (a) => { if (!a) return false; if (typeof globalThis.__dboFormExists === 'function') return globalThis.__dboFormExists(a); try { mp.get(a >>> 0, 'type'); return true; } catch (e) { return false; } };
   const accountActors = (pid) => { try { return (mp.getActorsByProfileId(Number(pid)) || []).map((x) => Number(x) >>> 0).filter(exists); } catch (e) { return []; } };
   // The claim's character once property is per character (housingSystem.ts ownerActorsOf), else its account's characters
   const ownerActors = (claim) => { try { const h = globalThis.__dboHousing; if (h && typeof h.ownerActorsOf === 'function') return h.ownerActorsOf(claim).map((x) => Number(x) >>> 0).filter(exists); } catch (e) { /* the account's */ } return accountActors(claim.owner); };

@@ -8235,10 +8235,13 @@ const isInteriorDesc = (desc) => {
 // dynamic id the server hands out again is found alive at the next probe. Only server\npcdirector.js asks it. The
 // host policy must not: it also gates a client's own host attempt, and the lowest free id is handed straight to the
 // next NPC (a refilled deer 10 s later), which would then go unhosted for the rest of the minute (Worker D's review).
-const GONE_TTL_MS = 60000;
+const GONE_TTL_MS = 5000;
 const goneForms = globalThis.__dboGoneForms instanceof Map ? globalThis.__dboGoneForms : (globalThis.__dboGoneForms = new Map()); // id -> when found gone
+goneForms.clear();
 const formExists = globalThis.__dboFormExists = (id) => {
   id = Number(id) >>> 0;
+  if (!id) return false;
+  if (typeof mp.has === 'function') return mp.has(id);
   const at = goneForms.get(id);
   if (at !== undefined && Date.now() - at < GONE_TTL_MS) return false;
   try { mp.get(id, 'type'); goneForms.delete(id); return true; }

@@ -100,7 +100,7 @@ module.exports = (api) => {
   const call = (n, ...args) => { const f = fn(n); if (!f) return undefined; try { return f(...args); } catch (e) { log(`rebellion: ${n} failed`, e.message); return undefined; } };
   const hex = (a) => (Number(a) >>> 0).toString(16);
   const pidOf = (a) => { try { return Number(profileOf(a >>> 0)); } catch (e) { return -1; } };
-  const exists = (a) => { try { mp.get(a >>> 0, 'type'); return true; } catch (e) { return false; } };
+  const exists = (a) => { if (!a) return false; if (typeof globalThis.__dboFormExists === 'function') return globalThis.__dboFormExists(a); try { mp.get(a >>> 0, 'type'); return true; } catch (e) { return false; } };
   const isOnline = (a) => onlineActors().includes(a >>> 0);
   const tell = (a, text) => { if (a && isOnline(a)) personal(a >>> 0, text); };
   const dateText = (t) => new Date(Number(t) || 0).toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
