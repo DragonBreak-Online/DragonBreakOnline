@@ -15,6 +15,7 @@ import {
   anchorClips, drawingOf, fitOf, anchorIndex, legendRow, readOwners, worldFor, Anchor, Drawing, Homography, HOM_MIN, MAX_FIT_RMS, Seen,
   homographyOf, homHolds, homShift, projectDrawing, Fit, ClipTransform, fitHolds, clipTransform, trackOf, trackTransform,
 } from "./mapOwners";
+import { MapCost } from "./mapCost";
 
 // for the browser-side widget setter (executed inside the CEF browser)
 declare const window: any;
@@ -50,6 +51,7 @@ export class MapRealmService extends ClientListener {
     } else if (content["customPacketType"] === "dboMapOwners") {
       this.owners = readOwners(content);
       this.anchors = anchorIndex(this.owners ? this.owners.anchors : []);
+      this.labelsVer++;
       this.drawnKey = "";
       logTrace(this, "map owners", this.owners ? `${this.owners.worlds.length} world(s), ${this.owners.anchors.length} anchors` : "unreadable");
     } else if (content["customPacketType"] === "dboMapTest") {
@@ -90,6 +92,8 @@ export class MapRealmService extends ClientListener {
     this.mapSeen = false;
     this.flash = newFlash();
     this.mapWorld = 0;
+    this.cost = new MapCost(Date.now());
+    this.labelsVer++;
     if (this.testArmed) { this.testArmed = false; this.test = { tick: 0, samples: [], results: {} }; }
   }
 
@@ -97,6 +101,7 @@ export class MapRealmService extends ClientListener {
     this.open = false;
     this.closeLegendMenu();
     this.reportSwfs();
+    this.reportCost();
     if (!this.probe.done && this.ticksOpen > 0) this.sendProbe("the map closed early");
     if (widget) { widget = null; closeWidget(this.sp, WIDGET_ID); }
     if (this.test) this.finishTests("the map closed");
@@ -138,19 +143,20 @@ export class MapRealmService extends ClientListener {
     this.sweep();
     if (!this.open) return;
     this.ticksOpen++;
+    this.cost.frame(Date.now());
     try {
       // our menu had the key, so the map never heard it: Tab now closes the map (only while it is still open)
       if (this.passTabAt && this.ticksOpen >= this.passTabAt) { this.passTabAt = 0; this.sp.Input.tapKey(TAB); }
       // browserService hides the browser for the map; a browser legend needs it shown (unfocused: the map keeps the keys)
       if (this.test && this.ticksOpen <= 3) this.sp.browser.setVisible(true);
       if (this.markers.length) {
-        this.loadLegend();
-        this.readLabels();
-        this.applyFilter();
-        if (this.ticksOpen === 2 || this.ticksOpen % 30 === 0) this.publish();
+        this.cost.time("legend", () => this.loadLegend());
+        this.cost.time("labels", () => this.readLabels());
+        this.cost.time("filter", () => this.applyFilter());
+        if (this.ticksOpen === 2 || this.ticksOpen % 30 === 0) this.cost.time("publish", () => this.publish());
       }
       // Who owns what is drawn in our legend menu over the map (nothing can be made inside SkyUI's map: the 2 Nov probe)
-      if (this.owners) this.followOwners();
+      if (this.owners) this.cost.time("owners", () => this.followOwners());
       if (this.test) this.runTests();
       if (!this.probe.done) this.runProbe();
     } catch (err) {
@@ -208,9 +214,9 @@ export class MapRealmService extends ClientListener {
       // A clip SkyUI has made but not labelled yet reads empty: kept unread and tried again (Nat, 2 Nov: a legend that
       // stored those empties counted 10 of 388 markers and none of the realm's), up to LABEL_TRIES times for one with none
       const tries = (this.labelTries[i] || 0) + 1;
-      if (label || tries >= LABEL_TRIES) this.labels[i] = label; else this.labelTries[i] = tries;
+      if (label || tries >= LABEL_TRIES) { this.labels[i] = label; this.labelsVer++; } else this.labelTries[i] = tries;
     }
-    if (this.labels.length > n) { this.labels.length = n; this.applied.length = Math.min(this.applied.length, n); }
+    if (this.labels.length > n) { this.labels.length = n; this.applied.length = Math.min(this.applied.length, n); this.labelsVer++; }
     // Read again, a few a frame: a clip SkyUI gives another marker while the map is open kept the old label here, and a
     // number key's hide then landed on the wrong places (live, 3 Nov: "the toggles toggle things completely unrelated")
     if (read < LABELS_PER_TICK && n > 0) {
@@ -218,7 +224,7 @@ export class MapRealmService extends ClientListener {
         const i = this.relabelAt++ % n;
         if (typeof this.labels[i] !== "string" || !this.labels[i]) continue;
         const label = ui.getString(MAP_MENU, `${MARKER_CLIP(i)}.label`) || "";
-        if (label && label !== this.labels[i]) { this.labels[i] = label; delete this.applied[i]; this.relabels++; }
+        if (label && label !== this.labels[i]) { this.labels[i] = label; delete this.applied[i]; this.relabels++; this.labelsVer++; }
       }
     }
   }
@@ -231,6 +237,7 @@ export class MapRealmService extends ClientListener {
       ui.setFloat(MAP_MENU, `${MARKER_CLIP(i)}._xscale`, want);
       ui.setFloat(MAP_MENU, `${MARKER_CLIP(i)}._yscale`, want);
       this.applied[i] = want;
+      this.cost.act("filter");
     }
   }
 
@@ -370,6 +377,7 @@ export class MapRealmService extends ClientListener {
         const o = this.stage.ours;
         const k = { kx: o.width / (this.stage.mapW > 0 ? this.stage.mapW : o.width), ky: o.height / (this.stage.mapH > 0 ? this.stage.mapH : o.height), left: o.left, top: o.top };
         try { ui.invokeString(this.menu, "_root.dboOwners", JSON.stringify(projectDrawing(this.drawing, good, k))); } catch (err) { logError(this, "map owners data failed", err); }
+        this.cost.act("owners");
         if (!this.drawnFit) { for (const [p, v] of LAYER_FLAT) ui.setFloat(this.menu, `${layer}${p}`, v); }
         if (this.drawnFit) fl.maxStep.px = Math.max(fl.maxStep.px || 0, Math.round(shift * 10) / 10);
         this.drawnFit = good;
@@ -397,6 +405,7 @@ export class MapRealmService extends ClientListener {
     }
     if (!this.flatSent) {
       try { ui.invokeString(this.menu, "_root.dboOwners", JSON.stringify(this.drawing)); } catch (err) { logError(this, "map owners data failed", err); }
+      this.cost.act("owners");
       this.flatSent = true;
       this.layerAt = {};
       if (st.t.drawn < 0) st.t.drawn = this.ticksOpen;
@@ -432,6 +441,7 @@ export class MapRealmService extends ClientListener {
         if (was !== undefined && Math.abs(was - v) < LAYER_STILL / 10) continue;
         if (was !== undefined) fl.maxStep[p] = Math.max(fl.maxStep[p] || 0, Math.round(Math.abs(was - v) * 10) / 10);
         ui.setFloat(this.menu, `${layer}${p}`, v);
+        this.cost.act(p === "._x" || p === "._y" ? "move" : "scale");
         this.layerAt[p] = v;
         wrote = true;
       }
@@ -464,7 +474,7 @@ export class MapRealmService extends ClientListener {
   // so a line from the game says how much the homography gains on that map
   private fitNow(): Homography | null {
     const ui = this.sp.Ui;
-    const clips = anchorClips(this.labels, this.anchors);
+    const clips = this.anchorClipsNow();
     this.anchorsSeen = clips.length;
     if (clips.length < 2) return null;
     const box = "_root.MarkerClips";
@@ -500,6 +510,20 @@ export class MapRealmService extends ClientListener {
     sendCustomPacket(this.controller, { customPacketType: "dbo", event: "mapOwnersFit", args: [sample], widget: 0 });
   }
 
+  private anchorClipsNow(): Array<{ i: number; a: Anchor }> {
+    if (this.clipsVer !== this.labelsVer) { this.clips = anchorClips(this.labels, this.anchors); this.clipsVer = this.labelsVer; }
+    return this.clips;
+  }
+
+  // One line a map opening: the JS each step cost and the frames over SLOW_FRAME_MS by what the frame before sent
+  private reportCost(): void {
+    if (!this.owners && !this.markers.length) return;
+    const extra = { opening: this.openings, world: this.mapWorld, colours: this.ownersShown, notFlat: this.notFlat, anchors: this.anchorsSeen };
+    const r = Object.assign(this.cost.report(Date.now()), extra);
+    logTrace(this, "map cost", JSON.stringify(r));
+    sendCustomPacket(this.controller, { customPacketType: "dbo", event: "npcDrift", args: [r], widget: 0 });
+  }
+
   private formIdOf(desc: string): number {
     const cached = this.worldIds.get(desc);
     if (cached !== undefined) return cached;
@@ -517,6 +541,7 @@ export class MapRealmService extends ClientListener {
     if (this.legendSwf.phase === "up") {
       if (widget) { widget = null; closeWidget(this.sp, WIDGET_ID); }
       try { this.sp.Ui.invokeString(this.menu, "_root.dboData", legendJson(this.legendShown, rows)); } catch (err) { logError(this, "map legend data failed", err); }
+      this.cost.act("legend");
       return;
     }
     // still loading: nothing yet (the swf, or after its last try the browser)
@@ -679,6 +704,11 @@ export class MapRealmService extends ClientListener {
   private mapSeen = false;
   private orphans = 0;
   private flash: Flash = newFlash();
+  private cost = new MapCost(Date.now());
+  // Bumped whenever a label or the anchors change, so the cached anchor clips are made again
+  private labelsVer = 0;
+  private clipsVer = -1;
+  private clips: Array<{ i: number; a: Anchor }> = [];
 }
 
 // What could make the colours flash, counted per opening: frames whose fit held, failed or had too few markers, how often
