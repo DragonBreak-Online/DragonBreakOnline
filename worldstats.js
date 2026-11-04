@@ -155,7 +155,7 @@ module.exports = (api) => {
     if (isOnline) { try { const b = mp.get(a, 'private.beast'); form = b && (b.form === 'werewolf' || b.form === 'vampirelord') ? b.form : null; } catch (e) { form = null; } }
     if (!kind && !fever && !wg && !vg && !form) return null;
     const d = { kind, fever, wg, vg, form };
-    if (kind === 'vampire') Object.assign(d, { pure: s.pure === true, unfed: !!s.unfed, lastFed: Number(s.lastFed) || 0, rate: thirstRate(a), rank: rankFrom('__dboBloodView', 'blood', a) });
+    if (kind === 'vampire') Object.assign(d, { pure: s.pure === true, unfed: !!s.unfed, lastFed: Number(s.lastFed) || 0, saved: Number(s.stage) || 0, rate: thirstRate(a), rank: rankFrom('__dboBloodView', 'blood', a) });
     if (kind === 'werewolf') Object.assign(d, { blessed: s.blessed === true, rank: rankFrom('__dboHuntView', 'hunt', a) });
     return d;
   };
@@ -191,14 +191,17 @@ module.exports = (api) => {
     // The thirst stage as supernatural.js's superSlow tick works it out, from the world clock: the stage it saves moves only
     // while its vampire is online, and thirst keeps climbing while they are away (the saved stage said 1 for most on 21 Oct)
     const today = () => { if (day === null) { try { day = globalThis.__dboClock ? Number(globalThis.__dboClock.gameDays()) : NaN; } catch (e) { day = NaN; } if (!Number.isFinite(day)) day = Date.now() / 86400000 * 6; } return day; };
-    for (const r of counted.values()) {
+    for (const [a, r] of counted) {
       const d = r.sup; if (!d) continue;
       if (d.kind === 'vampire') {
         add(vamp, r);
         if (d.pure) v.pure++;
         if (d.unfed) v.unfed++;
         const t = today();
-        const stage = Math.min(4, 1 + Math.floor(Math.max(0, t - (d.lastFed || t)) * d.rate));
+        // supernatural.js's own rule when it is loaded, so the counts and the game agree
+        const own = hook('__dboThirstStage');
+        let stage = 0; try { stage = own ? Number(own(a, { kind: 'vampire', stage: d.saved, lastFed: d.lastFed, unfed: d.unfed }, d.rate)) : 0; } catch (e) { stage = 0; }
+        if (!(stage >= 1 && stage <= 4)) stage = Math.min(4, 1 + Math.floor(Math.max(0, t - (d.lastFed || t)) * d.rate));
         v.thirst[Math.max(1, stage) - 1]++;
         if (Number.isInteger(d.rank) && d.rank >= 0 && d.rank < v.ranks.length) v.ranks[d.rank]++;
       }

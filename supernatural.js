@@ -12,7 +12,8 @@
 //              and failing those can end the character for good (private.permaDead). Surviving Hircine's rite gives Sanies
 //              Lupinus at huntMarkChance (the turning follows its fever), else the survivor waits riteFailCooldownHours to
 //              run again; surviving Molag Bal's makes a pure-blood at once. The waits are per account (markRiteWait).
-//   Vampires   stages 1-4, one per game day unfed; sun burns outdoors by day, fire hurts more, the look becomes the
+//   Vampires   stages 1-4, one per game day unfed (time logged out takes it no further than stage 2, vampireAwayMaxStage,
+//              Jake 29 Oct); sun burns outdoors by day, fire hurts more, the look becomes the
 //              race's vampire variant. Feeding on a restrained or downed player or a fresh humanoid corpse resets to
 //              stage 1; it takes seconds by blood rank, and ranked vampires can feed deeply. A vampire the fever
 //              turned has no gifts until the first meal and withers without one (firstMealHours). Food does little.
@@ -156,6 +157,9 @@ module.exports = (api) => {
     vampireFood: 0.25, vampireFoodThirsty: 0.10,
     // A thirst stage reached in the client's first seconds waits this long after login (its spell resets undo it)
     vampireSpellSettleSeconds: 90,
+    // Time logged out takes a vampire's thirst no further than this stage, or the stage they left at if higher (Jake, 29 Oct:
+    // red eyes on login after a night away); 0 = off
+    vampireAwayMaxStage: 2,
   }, cfg.supernatural || {});
   // Merged key by key, as C.feed is below: a partial override such as {"rite":{"clientJudged":false}} used to replace the
   // whole block and wipe rounds, need and leadMs (DESIGN.md section 4.6)
@@ -458,7 +462,9 @@ module.exports = (api) => {
   // vampirepath.js __dboVampTellsShift: a line that passes for mortal some stages longer (bloodlines, the Cyrodiilic)
   const tellsStage = (a) => (Number(C.vampireTellsStage) || 1) + (a ? Math.max(0, Math.floor(Number(vampPath('__dboVampTellsShift', a >>> 0)) || 0)) : 0);
   const tellsShown = (s, a) => s.kind !== 'vampire' || !!s.unfed || (Number(s.stage) || 1) >= tellsStage(a);
-  const showTells = (a, s) => {
+  // why: 'fed' for a real feed, the only clear that says 'Fed' (29 Oct: a login cleared a stale look with 'Fed, you pass for
+  // mortal' and the tells came back 90 s later); anything else ('tick', 'staff', 'turned') clears with a neutral line
+  const showTells = (a, s, why) => {
     if (!s || !s.kind) return;
     if (tellsShown(s, a)) {
       const had = !!s.look;
@@ -468,8 +474,13 @@ module.exports = (api) => {
     }
     if (!s.look || beastForm(a)) return;
     clearTells(a, s); saveState(a, s);
-    personal(a, 'Fed, you pass for mortal: your eyes and your colour are your own again.');
-    log(`supernatural: ${display(a)} has fed and passes for mortal (stage ${s.stage})`);
+    if (why === 'fed') {
+      personal(a, 'Fed, you pass for mortal: your eyes and your colour are your own again.');
+      log(`supernatural: ${display(a)} has fed and passes for mortal (stage ${s.stage})`);
+    } else {
+      personal(a, 'Your eyes and your colour are your own again.');
+      log(`supernatural: ${display(a)} tells cleared (stage ${s.stage}, ${why || 'tick'})`);
+    }
   };
   const clearTells = (a, s) => {
     const look = s && s.look; if (!look) return;
@@ -584,6 +595,7 @@ module.exports = (api) => {
   };
   // Mortals and cured characters are looked at once a session; a curse's tick looks every time
   const eyesCheckedFor = new Set();
+  const awayFor = new Set(); // vampires whose first stage change after login is the thirst grown while away
 
   // A saved appearance edit (appearance.js: /appearance, a GM's /chargen on an existing character, or a patron's /reroll)
   // on a character with a curse. s.look keeps the eyes, skin colour and skin tone the tells hide, and a feed gives them
@@ -1133,9 +1145,9 @@ module.exports = (api) => {
   const becomeVampire = (a, pure, fromFever) => {
     endCurse(a, 'became a vampire');
     const s = stateOf(a);
-    Object.assign(s, { kind: 'vampire', disease: null, stage: 1, lastFed: gameDays(), pure: !!pure, unfed: pure ? null : { played: 0, wither: 0 }, sated: null });
+    Object.assign(s, { kind: 'vampire', disease: null, stage: 1, lastFed: gameDays(), fedAt: null, pure: !!pure, unfed: pure ? null : { played: 0, wither: 0 }, sated: null });
     saveState(a, s); removeSpell(a, SANGUINARE); setLookRace(a, true);
-    syncVampSpells(a, s); showTells(a, stateOf(a));
+    syncVampSpells(a, s); showTells(a, stateOf(a), 'turned');
     if (fromFever) onScreen(a, FEVER_TURNED.vampire, 8);
     else personal(a, pure ? 'You rise from Molag Bal\'s embrace a pure-blood.' : 'The fever passes, and a cold hunger takes its place. You are a vampire.');
     if (!pure) personal(a, `Your gifts sleep until you have fed. Find blood within ${C.firstMealHours} hours, or your body begins to wither: a fresh body, or a captive who cannot fight you off.`);
@@ -1852,9 +1864,12 @@ module.exports = (api) => {
       const wasStage = Number(s.stage) || 1;
       const hungry = wasUnfed || Number(s.stage) >= 3;
       const day = gameDays();
-      Object.assign(s, { lastFed: o.long ? day + Number(C.feed.longThirstHoldDays) : day, stage: 1, unfed: null }, firstMeal ? { firstMeal } : {});
+      Object.assign(s, { lastFed: o.long ? day + Number(C.feed.longThirstHoldDays) : day, stage: 1, unfed: null, fedAt: day }, firstMeal ? { firstMeal } : {});
       if (o.long) s.sated = { until: day + Number(C.feed.longSatedHours) / 24 };
       saveState(a, s);
+      // The tells come off at the meal, not at the next slow tick (29 Oct); before the blood roll, so a smear lands after it.
+      // On this meal's own state, which is saved again below: a fresh copy's clear would be written over
+      showTells(a, s, 'fed');
       // A first meal wakes the gifts; a meal at stage 2-4 brings the stage 1 spells back
       if (wasUnfed || wasStage > 1) { syncVampSpells(a, s); flushStageSpells(a, s, wasUnfed ? 'first meal' : 'fed'); }
       if (wasUnfed || o.long) refreshRates(a);
@@ -1901,8 +1916,9 @@ module.exports = (api) => {
     const s = stateOf(a >>> 0);
     if (!s || s.kind !== 'vampire') return false;
     const wasUnfed = !!s.unfed, wasStage = Number(s.stage) || 1;
-    Object.assign(s, { lastFed: gameDays(), stage: 1, unfed: null });
+    Object.assign(s, { lastFed: gameDays(), stage: 1, unfed: null, fedAt: gameDays() });
     saveState(a >>> 0, s);
+    showTells(a >>> 0, s, 'fed');
     if (wasUnfed || wasStage > 1) { syncVampSpells(a >>> 0, s); flushStageSpells(a >>> 0, s, wasUnfed ? 'first meal' : 'fed'); }
     if (wasUnfed) refreshRates(a >>> 0);
     if (needsFeed) try { needsFeed(a >>> 0); } catch (e) { /* hunger off */ }
@@ -2312,8 +2328,8 @@ module.exports = (api) => {
     const s = stateOf(t);
     if (s.kind !== 'vampire') return false;
     const rate = Math.max(1e-6, Number(bloodRate(t, '__dboBloodThirstRate')) || 1);
-    Object.assign(s, { stage: n, lastFed: gameDays() - (n - 1 + 0.01) / rate, unfed: null, sated: null });
-    saveState(t, s); syncVampSpells(t, s); flushStageSpells(t, s, 'stage set by staff'); showTells(t, stateOf(t));
+    Object.assign(s, { stage: n, lastFed: gameDays() - (n - 1 + 0.01) / rate, unfed: null, sated: null, fedAt: null });
+    saveState(t, s); syncVampSpells(t, s); flushStageSpells(t, s, 'stage set by staff'); showTells(t, stateOf(t), 'staff');
     return true;
   };
   // The F7 panel's Curse row (adminSystem.ts giveCurse; Nate, 18 Oct): the whole curse at once, a vampire's stage, or a cure.
@@ -2605,8 +2621,8 @@ module.exports = (api) => {
   };
   const vampireView = (a, s) => {
     const blood = typeof globalThis.__dboBloodView === 'function' ? globalThis.__dboBloodView(a) : null;
-    const stage = Math.max(1, Math.min(4, Number(s.stage) || 1));
-    const now = gameDays(); const fed = Number(s.lastFed) || now;
+    const stage = Math.max(1, thirstStage(a, s));
+    const now = gameDays(); const fed = Number(s.lastFed) || now; const meal = Number(s.fedAt) || fed;
     const rate = bloodRate(a, '__dboBloodThirstRate');
     const next = stage < 4 && rate > 0 ? fed + stage / rate : 0;
     const holder = crownHolder();
@@ -2619,7 +2635,7 @@ module.exports = (api) => {
         hint: `You have not fed since you were turned: your gifts sleep, and your eyes and your colour give you away, until your first taste of blood. Food does not count. After your first meal your thirst starts at stage 1 and grows a stage at a time until you feed again.`,
       } : {
         label: 'Thirst', value: `Stage ${stage} of 4`,
-        hint: `You last fed ${inWords(realMinutes(now - fed))} ago. ${next ? `Stage ${stage + 1} comes in about ${inWords(realMinutes(next - now))} unless you feed.` : 'It can grow no worse.'} Feeding brings you back to stage 1. The thirstier you are, the stronger your gifts and the worse you burn.`,
+        hint: `You last fed ${inWords(realMinutes(now - meal))} ago. ${next ? `Stage ${stage + 1} comes in about ${inWords(realMinutes(next - now))} unless you feed.` : 'It can grow no worse.'} ${awayMax() ? `Time away cannot push your thirst past stage ${awayMax()} (or the stage you left at). ` : ''}Feeding brings you back to stage 1. The thirstier you are, the stronger your gifts and the worse you burn.`,
       },
       {
         label: 'Your look', value: shown ? 'Gives you away' : 'Passes for mortal',
@@ -2714,6 +2730,8 @@ module.exports = (api) => {
     // After the client's own login spell sync (remoteServer.ts enforceSpells on CreateActor), not before it
     flushedFor.delete(a >>> 0);
     eyesCheckedFor.delete(a >>> 0);
+    awayFor.add(a >>> 0);
+    awayCapped.delete(a >>> 0); capAway(a);
     globalThis.__dboSuperLoginAt instanceof Map && globalThis.__dboSuperLoginAt.set(a >>> 0, Date.now());
     try { const bs = stateOf(a); if (bs && bs.blood) sendPacket(a, { customPacketType: 'dboBloody', on: true }); } catch (e) { /* old client */ }
     setTimeout(() => { try { if (onlineActors().includes(a)) flushStageSpells(a, stateOf(a), 'login'); } catch (e) { log('supernatural: login spell flush failed', e.message); } }, 15000);
@@ -2723,6 +2741,14 @@ module.exports = (api) => {
     for (const o of onlineActors()) { if (o !== a && beastForm(o) === 'werewolf' && globalThis.__dboGuildIsPackLeader && globalThis.__dboGuildIsPackLeader(o)) sendPacket(a, { customPacketType: 'dboPale', actor: o >>> 0, shader: PALE_SHADER, on: true }); }
   };
   globalThis.__dboSuperLeave = (a) => {
+    // When they left, first and on its own: the away cap keeps the thirst they earned playing (review R1, T1)
+    stampLeft(a, true);
+    // A vampire whose thirst is below the tells leaves without them, so a saved look never holds tells at stage 1-2 (29 Oct)
+    try {
+      const s = stateOf(a);
+      if (s && s.kind === 'vampire' && s.look && !s.unfed && !beastForm(a) && thirstStage(a, s) < tellsStage(a)) { clearTells(a, s); saveState(a, s); }
+    } catch (e) { log(`supernatural: leave tells for ${display(a)} failed: ${e.message}`); }
+    awayCapped.delete(a >>> 0);
     leaveRite(a);
     ASK.caps.delete(a >>> 0);
     for (const k of [...healedAt.keys()]) if (k.startsWith(`${a >>> 0}:`)) healedAt.delete(k);
@@ -2808,15 +2834,69 @@ module.exports = (api) => {
   };
   // True while the client may still put back its login spell list (remoteServer.ts SPELL_ENFORCE_PASSES)
   const spellsSettling = (a) => { const at = globalThis.__dboSuperLoginAt instanceof Map ? globalThis.__dboSuperLoginAt.get(a >>> 0) : 0; return !!at && Date.now() - at < Math.max(0, Number(C.vampireSpellSettleSeconds) || 0) * 1000; };
+  // The thirst stage by the world clock (0 for anyone not a vampire): the saved stage moves only while its vampire is online, so
+  // it is stale while they are away and through the login hold, and every readout showed it (29 Oct: red eyes, 'not hungry')
+  const clockStage = (a, s, rate) => {
+    const day = gameDays();
+    const r = Number.isFinite(Number(rate)) && rate !== null && rate !== undefined ? Number(rate) : bloodRate(a, '__dboBloodThirstRate');
+    return Math.min(4, 1 + Math.floor(Math.max(0, day - (s.lastFed || day)) * r));
+  };
+  // The away cap (vampireAwayMaxStage): the stage time away may give, the one they left at or the cap, whichever is higher
+  const awayMax = () => { const n = Math.floor(Number(C.vampireAwayMaxStage)); return n > 0 && n < 4 ? n : 0; };
+  const awayStage = (s, clock) => (!awayMax() || s.unfed ? clock : Math.min(clock, Math.max(Number(s.stage) || 1, awayMax())));
+  // Online vampires whose time away was capped this session: their thirst follows the clock from there (kept over a hot reload)
+  const awayCapped = globalThis.__dboSuperAwayCapped instanceof Set ? globalThis.__dboSuperAwayCapped : (globalThis.__dboSuperAwayCapped = new Set());
+  const thirstStage = (a, s, rate) => {
+    if (!s || s.kind !== 'vampire') return 0;
+    const clock = clockStage(a, s, rate);
+    return awayCapped.has(a >>> 0) ? clock : awayStage(s, clock);
+  };
+  globalThis.__dboThirstStage = thirstStage;
+  // Before a session's first slow tick: lastFed moves up so the clock gives what time away may, at the start of that stage
+  // When a vampire left: on leave, on a character switch (gamemode.js, no leave hook) and when the tick finds them gone.
+  // always: the leave hook's fresh stamp; otherwise only where none is set yet (review T1)
+  const lastSeen = globalThis.__dboSuperLastSeen instanceof Map ? globalThis.__dboSuperLastSeen : (globalThis.__dboSuperLastSeen = new Map());
+  const stampLeft = (a, always) => {
+    try {
+      const s = stateOf(a >>> 0);
+      if (s && s.kind === 'vampire' && (always || !(Number(s.leftAt) > 0))) { s.leftAt = gameDays(); saveState(a >>> 0, s); }
+    } catch (e) { log(`supernatural: leave stamp for ${display(a)} failed: ${e.message}`); }
+  };
+  globalThis.__dboSuperLeftAt = (a) => stampLeft(a, false);
+  const capAway = (a, st) => {
+    a >>>= 0;
+    try {
+      const s = st || stateOf(a);
+      if (s && s.kind === 'vampire' && !s.unfed && awayMax()) {
+        const clock = clockStage(a, s), cap = awayStage(s, clock), rate = bloodRate(a, '__dboBloodThirstRate');
+        // no stamp: the last slow tick that saw them online, if this process did; only a restart has neither (review T1)
+        const left = Number(s.leftAt) > 0 ? Number(s.leftAt) : Number(lastSeen.get(a)) || NaN;
+        if (clock > cap && rate > 0) {
+          // The real meal is kept for the 'last fed' readouts (fedAt, stamped by every meal), since lastFed now paces the thirst
+          if (!(Number(s.fedAt) > 0)) s.fedAt = Number(s.lastFed) || gameDays();
+          // How far into the stage they were when they left, so an away period crossing the cap keeps the progress they
+          // earned playing (review R1, 29 Oct)
+          const earned = Number.isFinite(left) ? Math.max(0, Math.min(1, (left - (Number(s.fedAt) || Number(s.lastFed) || left)) * rate - (cap - 1))) : 0;
+          s.lastFed = gameDays() - (cap - 1 + earned) / rate; saveState(a, s);
+          log(`supernatural: ${display(a)} comes back at thirst stage ${cap}, not ${clock}: time away stops at stage ${awayMax()}`);
+        }
+      }
+    } catch (e) { log(`supernatural: away cap for ${display(a)} failed: ${e.message}`); }
+    // A character switch clears leftAt so the next session starts fresh under its cap (review L4)
+    try { const s = st || stateOf(a); if (s && s.kind === 'vampire' && 'leftAt' in s) { delete s.leftAt; saveState(a, s); } } catch (e) { /* ignore */ }
+    awayCapped.add(a);
+  };
   // The penalties follow the clock while a stage change waits for the client: a relog inside the window holds no lower stage
   const penaltyStage = (a, s) => {
     const st = Math.max(1, Number(s.stage) || 1);
     if (s.kind !== 'vampire' || !spellsSettling(a)) return st;
-    const day = gameDays();
-    return Math.max(st, Math.min(4, 1 + Math.floor(Math.max(0, day - (s.lastFed || day)) * bloodRate(a, '__dboBloodThirstRate'))));
+    return Math.max(st, thirstStage(a, s));
   };
   every('superSlow', 15000, () => {
     const day = gameDays();
+    // A character left without its leave hook (a character switch) loses its mark, so its offline readouts are capped (review L3)
+    // ...and is stamped as left, if nothing stamped it (review T1: a switch, then a re-pick inside the login hold)
+    { const on = new Set(onlineActors().map((x) => x >>> 0)); for (const k of [...awayCapped]) if (!on.has(k)) { awayCapped.delete(k); stampLeft(k, false); } }
     for (const a of onlineActors()) {
       const s = stateOf(a); if (!s) continue;
       try { if (mp.get(a, 'isDead')) { playTicks.delete(a >>> 0); continue; } } catch (e) { continue; }
@@ -2846,15 +2926,31 @@ module.exports = (api) => {
         s.sated = null; saveState(a, s); refreshRates(a);
         personal(a, 'The rush of the deep feed fades.');
       }
+      let waiting = false;
       if (s.kind === 'vampire') {
+        // A session the login missed (or an older gamemode) is capped here first, before its stage is read
+        // past its login hold it is only marked (a hot reload must not pull back thirst earned playing, review R1)
+        if (!awayCapped.has(a >>> 0)) { if (spellsSettling(a)) capAway(a, s); else awayCapped.add(a >>> 0); }
+        // seen online, after its cap: what capAway falls back on if no leave stamp is ever written (review T1)
+        lastSeen.set(a >>> 0, day); if (lastSeen.size > 5000) lastSeen.clear();
         // An older vampire's thirst climbs its stages more slowly (bloodranks.js)
-        const stage = Math.min(4, 1 + Math.floor(Math.max(0, day - (s.lastFed || day)) * bloodRate(a, '__dboBloodThirstRate')));
+        const stage = thirstStage(a, s);
+        // The first stage change once the login hold is over is the thirst grown while they were away, and says so
+        const settling = spellsSettling(a);
+        const away = !settling && awayFor.delete(a >>> 0);
+        // ...only for tells that are due: a stale look on a vampire landing below the tells stage clears at once (review L1)
+        waiting = settling && stage !== s.stage && stage >= tellsStage(a);
         // Silas #LT8Y, 7 Oct: a stage change at login never reached the client and its old drain was stripped
-        if (spellsSettling(a)) { if (stage !== s.stage && Date.now() - globalThis.__dboSuperLoginAt.get(a >>> 0) < 15000) log(`supernatural: ${display(a)} reaches stage ${stage} once their client has settled`); }
-        else if (stage !== s.stage) { s.stage = stage; saveState(a, s); syncVampSpells(a, s); flushStageSpells(a, s, 'stage change'); if (stage > 1) personal(a, `Your thirst grows. (stage ${stage})`); }
+        if (settling) { if (stage !== s.stage && Date.now() - globalThis.__dboSuperLoginAt.get(a >>> 0) < 15000) log(`supernatural: ${display(a)} reaches stage ${stage} once their client has settled`); }
+        else if (stage !== s.stage) {
+          const was = Number(s.stage) || 1;
+          s.stage = stage; saveState(a, s); syncVampSpells(a, s); flushStageSpells(a, s, 'stage change');
+          if (stage > 1) personal(a, away && stage > was ? `Your thirst grew while you were away: stage ${stage}. You last fed ${inWords(realMinutes(day - (Number(s.fedAt) || Number(s.lastFed) || day)))} ago.` : `Your thirst grows. (stage ${stage})`);
+        }
         else if (!sameSpells(s.spells, wantSpells(s))) syncVampSpells(a, s);
       }
-      if (s.kind) showTells(a, s);
+      // A stage held through the login hold holds the tells with it: neither laid nor cleared on the stale saved stage
+      if (s.kind && !waiting) showTells(a, s, 'tick');
       // Vampire eyes with no tells due (vampire-eyes fix, 21 Oct): a curse's look every tick, anyone else's once a session
       if (s.kind || !eyesCheckedFor.has(a >>> 0)) {
         eyesCheckedFor.add(a >>> 0);
@@ -3009,6 +3105,8 @@ module.exports = (api) => {
     const restless = FD.noWellRested !== false ? ' You cannot wake Well Rested.' : '';
     return [{ label: 'How it takes you', value: FEVER_STAGE_NAMES[st - 1].replace(/^./, (c) => c.toUpperCase()), hint: FEVER_FEEL[s.disease.kind][st - 1] + restless }];
   };
+  // Beside Hunger: a full stomach is not a fed vampire (29 Oct)
+  try { if (typeof globalThis.__dboRegisterStatus === 'function') globalThis.__dboRegisterStatus('thirst', 11, (a) => { const s = stateOf(a); if (!s || s.kind !== 'vampire') return null; return s.unfed ? 'Thirst: not fed yet' : `Thirst stage ${thirstStage(a, s)} of 4 (fed ${inWords(realMinutes(gameDays() - (Number(s.fedAt) || Number(s.lastFed) || gameDays())))} ago${awayMax() ? `; time away cannot push it past stage ${awayMax()}` : ''})`; }); } catch (e) { /* gamemode older than /status */ }
   try { if (typeof globalThis.__dboRegisterStatus === 'function') globalThis.__dboRegisterStatus('fever', 26, (a) => { const s = stateOf(a); const st = feverStage(s); return st ? `Feverish (${FEVER_STAGE_NAMES[st - 1]})` : null; }); } catch (e) { /* gamemode older than /status */ }
   const SUN_BURN_AT = globalThis.__dboSuperSunBurnMap instanceof Map ? globalThis.__dboSuperSunBurnMap : (globalThis.__dboSuperSunBurnMap = new Map());
   globalThis.__dboSuperSunBurnAt = (a) => SUN_BURN_AT.get(Number(a) >>> 0) || 0;
@@ -3217,7 +3315,7 @@ module.exports = (api) => {
     }
     if (!t || !['vampire', 'purevampire', 'werewolf', 'blessedwerewolf', 'infectvampire', 'infectwerewolf', 'cure', 'crown', 'status', 'fever', 'bloody', 'wash', 'riteclear', 'stage'].includes(w)) return personal(a, 'Usage: /curse <player|me> <vampire|purevampire|werewolf|blessedwerewolf|infectvampire|infectwerewolf|fever|cure|crown|bloody|wash|riteclear|status|restore|stage 1-4>');
     if (w === 'stage') return personal(a, globalThis.__dboSuperAdminCurse(t, 'stage', arg, nameOf(a)));
-    if (w === 'status') { const s = stateOf(t); return personal(a, `${display(t)}: ${s.kind || 'mortal'}${s.kind === 'vampire' ? ` stage ${s.stage}${s.pure ? ', pure-blood' : ''}${s.unfed ? `, not yet fed (${(playedOf(s.unfed) * 24).toFixed(1)} of ${C.firstMealHours} game hours played${Number(s.unfed.wither) > 0 ? `, withering ${pct(Number(s.unfed.wither))}%` : ''})` : ''}${s.sated && Number(s.sated.until) > gameDays() ? ', deep-fed' : ''}${s.blood ? ', blood on the face' : ''}` : ''}${s.blessed ? ', blessed' : ''}${s.disease ? `, carrying ${s.disease.kind} disease: ${playedOf(s.disease).toFixed(1)} of ${C.incubationDays} game days played (${(gameDays() - s.disease.since).toFixed(1)} since infection)` : ''}${crownHolder() === t ? ', holds the Blood Crown' : ''}. Crown: ${G.crown ? G.crown.name : 'unclaimed'}.`); }
+    if (w === 'status') { const s = stateOf(t); return personal(a, `${display(t)}: ${s.kind || 'mortal'}${s.kind === 'vampire' ? ` stage ${thirstStage(t, s)}${thirstStage(t, s) !== (Number(s.stage) || 0) ? ` (saved ${s.stage})` : ''}${s.pure ? ', pure-blood' : ''}${s.unfed ? `, not yet fed (${(playedOf(s.unfed) * 24).toFixed(1)} of ${C.firstMealHours} game hours played${Number(s.unfed.wither) > 0 ? `, withering ${pct(Number(s.unfed.wither))}%` : ''})` : ''}${s.sated && Number(s.sated.until) > gameDays() ? ', deep-fed' : ''}${s.blood ? ', blood on the face' : ''}` : ''}${s.blessed ? ', blessed' : ''}${s.disease ? `, carrying ${s.disease.kind} disease: ${playedOf(s.disease).toFixed(1)} of ${C.incubationDays} game days played (${(gameDays() - s.disease.since).toFixed(1)} since infection)` : ''}${crownHolder() === t ? ', holds the Blood Crown' : ''}. Crown: ${G.crown ? G.crown.name : 'unclaimed'}.`); }
     if (w === 'vampire' || w === 'purevampire') becomeVampire(t, w === 'purevampire');
     else if (w === 'werewolf' || w === 'blessedwerewolf') becomeWerewolf(t, w === 'blessedwerewolf');
     else if (w === 'infectvampire' || w === 'infectwerewolf') return personal(a, giveDisease(t, w === 'infectvampire' ? 'vampire' : 'werewolf', nameOf(a)));
@@ -3254,7 +3352,7 @@ module.exports = (api) => {
     const verdict = !v ? (kept && isVampEye(kept) ? 'tells hide vampire eyes' : 'ok')
       : showing ? (kept && isVampEye(kept) ? 'tells hide vampire eyes' : 'ok (tells due)')
       : s.kind && s.look && s.look.eye === v ? 'clears at the next tick' : s.kind ? 'STUCK' : 'CURED, still wears them';
-    return { verdict, text: `${display(t)} #${tagOfChar(t) || '????'}: ${s.kind ? `${s.kind} stage ${s.stage || 0}${s.unfed ? ', unfed' : ''}` : 'mortal'}, eyes ${v ? v.toString(16) + ' (vampire)' : 'own'}${kept ? `, tells hide ${kept.toString(16)}` : ''}: ${verdict}` };
+    return { verdict, text: `${display(t)} #${tagOfChar(t) || '????'}: ${s.kind ? `${s.kind} stage ${s.kind === 'vampire' ? thirstStage(t, s) : s.stage || 0}${s.unfed ? ', unfed' : ''}` : 'mortal'}, eyes ${v ? v.toString(16) + ' (vampire)' : 'own'}${kept ? `, tells hide ${kept.toString(16)}` : ''}: ${verdict}` };
   };
   registerChatCommand('vampeyes', (a, args) => {
     const [what, ...rest] = String(args || '').trim().split(/\s+/);
