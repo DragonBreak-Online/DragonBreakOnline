@@ -49,6 +49,29 @@ long = long.slice(0, 4000);
   check('the page keeps its actions (Back, Edit, Tear out)', ['Back to the list', 'Edit...', 'Tear out'].every((l) => labels.indexOf(l) >= 0), labels);
 }
 
+// Editing it: the page is typed in a box of several lines with the same bar, in the field's own lines
+{
+  const t = S.boot('dbo_journal');
+  t.push(hub({ notes: notes(long) }));
+  const pick = (label) => { const b = all(t).find((e) => e.x.label && e.x.onPick && e.x.label.text === label); if (b) b.x.onPick.call(b.x); return !!b; };
+  const opened = pick('Edit...');
+  const preview = all(t).find((e) => e.x.kids && e.x.value && e.x.bar && e.x.bar.field === e.x.value);
+  check('the edit form shows the page in a box with a bar, hidden until the game says it overflows', opened && !!preview && preview.x.bar._visible === false, [opened, !!preview]);
+  const types = all(t).filter((e) => e.x.label && e.x.onPick && e.x.label.text === 'Type...');
+  if (types[1]) types[1].x.onPick.call(types[1].x);
+  const row = all(t).find((e) => e.x.kids && e.x.box && e.x.bar);
+  const f = row ? row.x.box : null;
+  check('typing the page opens a box with its own bar', !!f && row.x.bar.field === f, !!row);
+  if (f) {
+    Object.assign(f, { maxscroll: 20, scroll: 1, bottomScroll: 8 });
+    f.onChanged();
+  }
+  const bar = row ? row.x.bar : null;
+  check('...shown once the page runs past the box: 27 lines, 8 seen, at the top', !!bar && bar._visible && bar.total === 27 && bar.visible === 8 && bar.offset === 0, bar ? [bar._visible, bar.total, bar.visible, bar.offset] : null);
+  if (bar) bar.move(5);
+  check('...and dragging or the wheel scrolls the field itself', !!f && f.scroll === 6, f ? f.scroll : null);
+}
+
 {
   const t = S.boot('dbo_journal');
   t.push(hub({ notes: notes('Snow to the knees.') }));
