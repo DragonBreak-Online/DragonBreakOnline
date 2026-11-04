@@ -116,9 +116,42 @@ function flowText(text, size, color, indent)
    var x = indent != undefined ? indent : 0;
    var s = size != undefined ? size : 18;
    var h = textHeight(null, text, s, BODY_W - x);
+   if (h > BODY_H && typeof(scrollbar) == "function")
+   {
+      return flowScrollText(String(text), s, color, x);
+   }
    var at = flowNeed(h);
    var t = dboText(at.clip, at.name, fd(), x, at.y, BODY_W - x, h, dboFmt(F_MEDIUM, s, color != undefined ? color : C_TEXT, 0.5), true);
    t.text = String(text);
+   return t;
+}
+
+// Text taller than a page scrolls in a box of its own instead of running past the foot (sunk_turtle, 3 Nov)
+var SCROLL_BOX_MIN = 160;
+var SCROLL_BOX_FOOT = 60;
+function flowScrollText(text, s, color, x)
+{
+   flowHeadFlush(SCROLL_BOX_MIN);
+   var room = BODY_H - flow.y - SCROLL_BOX_FOOT;
+   var boxH = room >= SCROLL_BOX_MIN ? room : BODY_H - SCROLL_BOX_FOOT;
+   var at = flowPlace(boxH);
+   var box = at.clip.createEmptyMovieClip(at.name + "s", fd());
+   box._x = x;
+   box._y = at.y;
+   var w = BODY_W - x - SCROLL_W - 12;
+   var inner = box.createEmptyMovieClip("inner", 1);
+   var t = dboText(inner, "t", 1, 0, 0, w, textHeight(null, text, s, w), dboFmt(F_MEDIUM, s, color != undefined ? color : C_TEXT, 0.5), true);
+   t.text = text;
+   var h = textHeight(t, text, s, w);
+   t._height = h;
+   var mask = box.createEmptyMovieClip("mask", 2);
+   dboBox(mask, 0, 0, w, boxH, C_TEXT, 100);
+   inner.setMask(mask);
+   var bar = scrollbar(box, "bar", 3, w + 8, 0, boxH, box);
+   bar.unit = s + LINE_GAP;
+   bar.onScroll = function(o) { this._parent.inner._y = -o * this.unit; };
+   bar.set(Math.ceil(h / bar.unit), Math.floor(boxH / bar.unit), 0);
+   box.bar = bar;
    return t;
 }
 

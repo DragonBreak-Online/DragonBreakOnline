@@ -35,3 +35,4 @@ set:get
 set:keyCapture
 dboLocal
 journal-4
+flowScrollText

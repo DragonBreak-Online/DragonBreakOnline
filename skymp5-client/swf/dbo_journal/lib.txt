@@ -1,6 +1,7 @@
 dbo.as
 dbo-controls.as
 dbo-flow.as
+dbo-scroll.as
 dbo-form.as
 dbo-web.as
 ../dbo_journal/tabs.as
