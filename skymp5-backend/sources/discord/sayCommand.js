@@ -96,7 +96,7 @@ function createSayCommand({
   async function check(interaction, { text, replyTo, close }) {
     if (!interaction.guildId) return { refused: 'dm' }
     if (R.problem) return { refused: 'unavailable' }
-    if (interaction.guildId !== R.guild) return { refused: 'wrongGuild' }
+    if (interaction.guildId !== R.guild && interaction.guildId !== (R.adminGuild || '1565789714487971980')) return { refused: 'wrongGuild' }
     if (!interaction.user || interaction.user.bot) return { refused: 'bot' }
     if (!rolesOf(interaction.member).some(r => R.roles.has(r))) return { refused: 'notAllowed' }
     let channel = interaction.channel

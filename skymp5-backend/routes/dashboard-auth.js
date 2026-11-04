@@ -73,7 +73,7 @@ router.get('/callback', async (req, res) => {
     const user        = await _getUser(tokenData.access_token)
 
     const roleIds     = await discordBot.getMemberRoles(user.id)
-    const permissions = resolvePermissions(roleIds)
+    const permissions = resolvePermissions(roleIds, user.id)
     if (config.dashboardDiscordIds.includes(user.id) && !permissions.includes('admin.*')) {
       permissions.push('admin.*')
     }

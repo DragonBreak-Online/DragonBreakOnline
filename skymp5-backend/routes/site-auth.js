@@ -24,6 +24,7 @@ const STATE_COOKIE   = 'db_site_state'
 const SESSION_COOKIE = 'db_site'
 // Where the callback returns to after /login/fresh, the staff console's sign-in
 const CONSOLE_PAGE   = '/dashboard.html#console'
+const MANAGE_PAGE    = '/api/site/manage/#dragonbaron'
 const STATE_TTL_MS   = 10 * 60 * 1000
 // Outstanding sign-in states per visitor; a new one pushes out that visitor's own oldest
 const STATES_PER_VISITOR = 10
@@ -52,7 +53,7 @@ const sameOrigin = req => !!websiteOrigin && req.get('origin') === websiteOrigin
 // Every state /login and /login/fresh issue; the callback takes only these, whatever the state cookie says; an IPv6 /56 counts as one visitor, as for the rate limits
 const oauthStates = createStateStore({ ttlMs: STATE_TTL_MS, perVisitor: STATES_PER_VISITOR, visitorOf: ip => rateLimit.ipKeyGenerator(ip) })
 // The flows whose callback may write signedInAt: both send prompt=consent
-const CONSENT_FLOWS = new Set(['login', 'fresh'])
+const CONSENT_FLOWS = new Set(['login', 'fresh', 'manage'])
 
 // Sign-in must start on the host Discord returns to, or the host-only state cookie never comes back
 let loginUrl = null, freshUrl = null
@@ -252,6 +253,14 @@ router.get('/login/fresh', loginLimiter, (req, res) => {
   startSignIn(req, res, 'fresh')
 })
 
+router.get('/login/manage', loginLimiter, (req, res) => {
+  if (!config.discordClientId || !config.discordSiteRedirectUri) {
+    return res.redirect(`${PROFILE_PAGE}?error=unconfigured`)
+  }
+  if (currentSession(req)) return res.redirect(MANAGE_PAGE)
+  startSignIn(req, res, 'manage')
+})
+
 // Discord's redirect is checked against the issued states and the state cookie first, so only requests that would call Discord count toward the limits
 function checkCallback(req, res, next) {
   setCookie(res, STATE_COOKIE, '', CALLBACK_PATH, 0)
@@ -263,7 +272,7 @@ function checkCallback(req, res, next) {
   if (!issued || !sameSecret(state, readCookie(req, STATE_COOKIE))) return res.redirect(`${PROFILE_PAGE}?error=state`)
   if (typeof code !== 'string' || !code) return res.redirect(`${PROFILE_PAGE}?error=discord`)
   // The return page comes from the flow the server recorded, never from the request
-  req.signInNext = issued.flow === 'fresh' ? CONSOLE_PAGE : PROFILE_PAGE
+  req.signInNext = issued.flow === 'fresh' ? CONSOLE_PAGE : issued.flow === 'manage' ? MANAGE_PAGE : PROFILE_PAGE
   // Fresh only for a consent flow, finished from the address it was issued to: a state fetched elsewhere and planted by cookie is not fresh
   req.signInFresh = CONSENT_FLOWS.has(issued.flow) && issued.ip === visitorIp(req)
   next()

@@ -12,7 +12,13 @@ const serverStatus = require('./serverStatus')
 const { createModeration } = require('./moderation')
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildModeration],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildModeration,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
 })
 
 let ready = false
@@ -24,6 +30,8 @@ client.once('ready', () => {
   console.log(`[discord-bot] ${moderation.readyLine()}`)
   tickets.ensurePanel(client).catch(err => console.error('[discord-bot] ticket panel failed:', err.message))
   serverStatus.start(client)
+  const ticketRelay = require('./ticketRelay')
+  ticketRelay.init(client)
 })
 
 // Ticket buttons and their modals. handleInteraction returns false for anything not
@@ -34,9 +42,26 @@ client.on('interactionCreate', interaction => {
     .then(handled => (handled ? true : require('./consoleCommand').handleInteraction(interaction)))
     .then(handled => (handled ? true : require('./sayCommand').handleInteraction(interaction)))
     .then(handled => (handled ? true : require('./referralCommand').handleInteraction(interaction)))
+    .then(handled => (handled ? true : require('./dragonbaronCommand').handleInteraction(interaction)))
+    .then(handled => (handled ? true : require('./infractionFeedback').handleInteraction(interaction)))
     .catch(err => {
       console.error('[discord-bot] interaction failed:', err.message)
     })
+})
+
+client.on('messageCreate', async message => {
+  try {
+    const ticketRelay = require('./ticketRelay')
+    await ticketRelay.handleMessage(message, client)
+  } catch (err) {
+    console.error('[discord-bot] messageCreate relay error:', err.message)
+  }
+  try {
+    const patchFeedbackRelay = require('./patchFeedbackRelay')
+    await patchFeedbackRelay.handleMessage(message, client)
+  } catch (err) {
+    console.error('[discord-bot] patchFeedback relay error:', err.message)
+  }
 })
 
 client.on('error', err => {
@@ -140,6 +165,39 @@ function ensureRoleLookupConfigured() {
 // Short-lived cache so launcher polling doesn't turn into a request spam
 const ROLE_CACHE_TTL_MS = 60 * 1000
 const roleCache = new Map() // discordId -> { roles, member, expiresAt }; member false = not in the guild
+let bulkWarmAt = 0
+let bulkWarmPromise = null
+
+async function warmRoleCache(discordIds = []) {
+  if (!ready || !config.discordBotToken || !config.discordGuildId) return
+  const now = Date.now()
+  if (now - bulkWarmAt < ROLE_CACHE_TTL_MS && discordIds.every(id => {
+    const c = roleCache.get(id)
+    return c && c.expiresAt > now
+  })) return
+  if (bulkWarmPromise) return bulkWarmPromise
+  bulkWarmPromise = (async () => {
+    try {
+      const guild = await client.guilds.fetch(config.discordGuildId)
+      const members = await guild.members.fetch()
+      const exp = Date.now() + ROLE_CACHE_TTL_MS
+      for (const [id, m] of members) {
+        roleCache.set(id, { roles: [...m.roles.cache.keys()], member: true, expiresAt: exp })
+      }
+      for (const id of discordIds) {
+        if (id && !members.has(id)) {
+          roleCache.set(id, { roles: [], member: false, expiresAt: exp })
+        }
+      }
+      bulkWarmAt = Date.now()
+    } catch (err) {
+      console.warn('[discord-bot] bulk member warm failed:', err.message)
+    } finally {
+      bulkWarmPromise = null
+    }
+  })()
+  return bulkWarmPromise
+}
 
 async function getMemberRoles(discordId) {
   if (!discordId) return []
@@ -196,16 +254,47 @@ async function memberHasRole(discordId, roleId) {
 // with the member's username; null on any failure or when not in the guild
 async function getMemberFresh(discordId) {
   if (!discordId || !config.discordBotToken || !config.discordGuildId) return null
+  const adminGuildId = config.discordAdminGuildId || '1565789714487971980'
   if (ready) {
+    let roles = []
+    let handle = ''
+    let found = false
     try {
       const guild = await client.guilds.fetch(config.discordGuildId)
-      const member = await guild.members.fetch({ user: discordId, force: true })
-      const roles = [...member.roles.cache.keys()]
-      roleCache.set(discordId, { roles, member: true, expiresAt: Date.now() + ROLE_CACHE_TTL_MS })
-      return { roles, handle: String(member.user?.username || '') }
+      const member = await guild.members.fetch({ user: discordId, force: true }).catch(() => null)
+      if (member) {
+        found = true
+        roles.push(...member.roles.cache.keys())
+        if (!handle) handle = String(member.user?.username || '')
+      }
     } catch (err) {
-      if (err && err.code === 10007) return null
-      console.warn('[discord-bot] console member fetch failed, falling back to HTTP:', err.message)
+      if (err && err.code !== 10007) {
+        console.warn('[discord-bot] console member fetch main guild error:', err.message)
+      }
+    }
+
+    if (adminGuildId) {
+      try {
+        const adminGuild = await client.guilds.fetch(adminGuildId).catch(() => null)
+        if (adminGuild) {
+          const adminMember = await adminGuild.members.fetch({ user: discordId, force: true }).catch(() => null)
+          if (adminMember) {
+            found = true
+            roles.push(...adminMember.roles.cache.keys())
+            if (!handle) handle = String(adminMember.user?.username || '')
+          }
+        }
+      } catch (err) {
+        if (err && err.code !== 10007) {
+          console.warn('[discord-bot] console member fetch admin guild error:', err.message)
+        }
+      }
+    }
+
+    if (found) {
+      const uniqueRoles = [...new Set(roles)]
+      roleCache.set(discordId, { roles: uniqueRoles, member: true, expiresAt: Date.now() + ROLE_CACHE_TTL_MS })
+      return { roles: uniqueRoles, handle }
     }
   }
   try {
@@ -331,6 +420,7 @@ function start() {
 }
 
 module.exports = {
+  client,
   start,
   audit: require('./audit'),
   botModeration: moderation.botModeration,
@@ -340,6 +430,7 @@ module.exports = {
   unbanUser: moderation.unbanUser,
   banState: moderation.banState,
   outranks: moderation.outranks,
+  warmRoleCache,
   getMemberRoles,
   getMemberFresh,
   isOwnClient,

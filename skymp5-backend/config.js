@@ -189,6 +189,9 @@ module.exports = {
   // Discord bot (role-based access): token/guild used to fetch member roles at login; the bot needs "Server Members Intent" enabled in the Developer Portal
   discordBotToken: process.env.DISCORD_BOT_TOKEN || '',
   discordGuildId:  process.env.DISCORD_GUILD_ID  || '',
+  discordAdminGuildId: process.env.DISCORD_ADMIN_GUILD_ID || '1565789714487971980',
+  discordAdminStaffRoleIds: (process.env.DISCORD_ADMIN_STAFF_ROLE_IDS || '1566862278706335909,1566862282951233737,1566862287120371742,1566862290802704434,1566862294351220888').split(',').map(s => s.trim()).filter(Boolean),
+  discordAdminStaffChannelId: process.env.DISCORD_ADMIN_STAFF_CHANNEL_ID || '1566856564634292306',
   // Channel that receives the audit log (role changes, permission edits, GM actions relayed by the game server)
   discordLogChannelId: process.env.DISCORD_LOG_CHANNEL_ID || '',
   // Channel holding the ticket panel (the embed with the buttons)

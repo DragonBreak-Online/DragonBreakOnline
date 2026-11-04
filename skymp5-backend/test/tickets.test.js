@@ -258,7 +258,8 @@ test('a Report a GM channel topic names no reporter, since Discord\'s Audit Log 
   assert.strictEqual(made.length, 1)
   assert.strictEqual(made[0].topic, 'Report a GM')
   await submit('rep', '1554000000000000407', 'player')
-  assert.strictEqual(made[1].topic, 'Report Player | opened by player (1554000000000000407)')
+  assert.strictEqual(made[1].topic, 'Report Player')
+  assert.doesNotMatch(made[1].name, /player/)
 })
 
 test('one open Report a GM ticket per user: pressing it again points back there, with no new channel or ping (review, 12 Oct)', async () => {

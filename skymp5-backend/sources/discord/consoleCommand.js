@@ -20,7 +20,7 @@ const ERRORS = Object.freeze({
   badRequest: 'That request could not be read.',
   badCaller: 'The console refused that request (a server bug).',
   badInteraction: 'The console refused that request.',
-  wrongGuild: 'The console only works in the Dragon Break server.',
+  wrongGuild: 'The console only works in the Dragon Break or Admin server.',
   wrongChannel: 'Use the console in the staff channel.',
   bot: 'Bots cannot use the console.',
 })
@@ -30,6 +30,7 @@ const fold = text => String(text ?? '').replace(/`/g, TICK)
 // The answer as one private message: the header, who it ran as, then the captured lines in a code block, cut to fit
 function format(result) {
   const body = result?.body || {}
+  if (body.help) return body.help.slice(0, 2000)
   if (!body.job) {
     const base = ERRORS[body.error] || 'The console could not run that.'
     return body.error === 'notRemote' && body.reason ? `${fold(body.reason)}\nNothing was run.` : base

@@ -20,13 +20,36 @@ const KNOWN_PERMISSIONS = [
   'lore.write',
   'rules.write',
   'staff.whitelist_info',
+  'dragonbaron.view',
+  'dragonbaron.manage',
+  'dragonbaron.held',
+  'dragonbaron.moderate',
 ]
 
 router.get('/', requirePermission('permissions.manage'), (_req, res) => {
+  const data = permissions.listRolePermissions()
   res.json({
-    roles: permissions.listRolePermissions().roles || {},
+    roles: data.roles || {},
+    users: data.users || {},
     knownPermissions: KNOWN_PERMISSIONS,
   })
+})
+
+router.put('/users/:discordId', requirePermission('permissions.manage'), (req, res) => {
+  try {
+    const { name, permissions: userPermissions } = req.body || {}
+    const user = permissions.setUserPermissions(req.params.discordId, name, userPermissions)
+    audit.log(`PERM ${req.session.username} set user ${name || req.params.discordId} (${req.params.discordId}) website permissions to [${(userPermissions || []).join(', ')}]`)
+    res.json(user)
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || 'failed to save user permissions' })
+  }
+})
+
+router.delete('/users/:discordId', requirePermission('permissions.manage'), (req, res) => {
+  permissions.deleteUserPermissions(req.params.discordId)
+  audit.log(`PERM ${req.session.username} removed all direct website permissions of user ${req.params.discordId}`)
+  res.json({ ok: true })
 })
 
 router.put('/:roleId', requirePermission('permissions.manage'), (req, res) => {

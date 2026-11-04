@@ -5,7 +5,7 @@
 
 const {
   ChannelType, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle,
-  EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle,
+  EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, OverwriteType,
 } = require('discord.js')
 const fs = require('fs')
 const path = require('path')
@@ -131,7 +131,13 @@ async function openTicket(interaction, typeId, summary) {
   const category = await categoryFor(guild, type, state)
   // One open GM report per user, since each one pings the Owners
   if (type.ownersOnly) {
-    const open = guild.channels.cache.find(c => c.parentId === category.id && c.permissionOverwrites?.cache?.has(interaction.user.id))
+    const open = guild.channels.cache.find(c =>
+      c.parentId === category.id &&
+      !c.name.startsWith('🔒') &&
+      !c.name.startsWith('closed-') &&
+      !c.topic?.includes('[CLOSED') &&
+      c.permissionOverwrites?.cache?.has(interaction.user.id)
+    )
     if (open) return { channel: open, number: null, type }
   }
 
@@ -143,8 +149,12 @@ async function openTicket(interaction, typeId, summary) {
     { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
     { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles, PermissionFlagsBits.ReadMessageHistory] },
   ]
+  if (guild.roles && guild.roles.cache && guild.roles.cache.size === 0) {
+    await guild.roles.fetch().catch(() => {})
+  }
   const readers = type.ownersOnly ? config.siteOwnerRoleIds : config.discordStaffRoleIds
   for (const roleId of readers || []) {
+    if (guild.roles && guild.roles.cache && !guild.roles.cache.has(roleId)) continue
     overwrites.push({
       id: roleId,
       allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageMessages],
@@ -152,11 +162,11 @@ async function openTicket(interaction, typeId, summary) {
   }
 
   const channel = await guild.channels.create({
-    name: (type.ownersOnly ? `${type.id}-${number}` : `${type.id}-${number}-${interaction.user.username}`).slice(0, 90),
+    name: `${type.id}-${number}`.slice(0, 90),
     type: ChannelType.GuildText,
     parent: category.id,
     // Discord's Audit Log keeps the topic, so an owners-only ticket's names no reporter (the embed below does)
-    topic: type.ownersOnly ? type.label : `${type.label} | opened by ${interaction.user.tag} (${interaction.user.id})`,
+    topic: type.label,
     permissionOverwrites: overwrites,
   })
 
@@ -180,6 +190,15 @@ async function openTicket(interaction, typeId, summary) {
   // The audit channel is read by GMs, so an owners-only ticket logs no reporter
   audit.log(type.ownersOnly ? `TICKET opened #${channel.name} (Owners only)`
     : `TICKET opened ${type.label} #${number} by ${interaction.user.tag} (${interaction.user.id}) in #${channel.name}`)
+
+  // Create corresponding forum thread in Dragonbreak Admin
+  try {
+    const ticketRelay = require('./ticketRelay')
+    await ticketRelay.createForumThreadForTicket(interaction.client, channel, type, number, interaction.user, summary)
+  } catch (err) {
+    console.error('[tickets] failed to create forum thread in admin:', err.message)
+  }
+
   return { channel, number, type }
 }
 
@@ -188,30 +207,212 @@ const closing = new Set()
 const largeRefused = new Map()
 const LARGE_CONFIRM_MS = 2 * 60 * 1000
 
-// The channel is deleted only once its transcript is kept somewhere; otherwise it stays open
+
+const GM_CLOSE_QUEUE_FILE = '/opt/alduinak/build/dist/server/gm-close-queue.json'
+const GM_CALLS_FILE = '/opt/alduinak/build/dist/server/gm-calls.json'
+
+function syncCloseToGame(channel, closerUser) {
+  try {
+    let gmNum = null
+    const topic = String(channel?.topic || '')
+    const topicMatch = topic.match(/gmcall:(\d+)/i) || topic.match(/GM (?:Ticket|Call) #(\d+)/i)
+    if (topicMatch) {
+      gmNum = Number(topicMatch[1])
+    }
+
+    if (!gmNum && fs.existsSync(GM_CALLS_FILE)) {
+      try {
+        const data = JSON.parse(fs.readFileSync(GM_CALLS_FILE, 'utf8'))
+        const found = (data.open || []).find(c => c.ticketChannelId === channel.id || c.ticket === channel.name)
+        if (found) gmNum = Number(found.n)
+      } catch (err) {
+        console.error('[tickets] error reading gm-calls.json:', err.message)
+      }
+    }
+
+    if (!gmNum) {
+      const nameMatch = (channel?.name || '').match(/^mod-(?:gm)?0*(\d+)/i)
+      if (nameMatch) gmNum = Number(nameMatch[1])
+    }
+
+    if (gmNum) {
+      let queue = []
+      try {
+        if (fs.existsSync(GM_CLOSE_QUEUE_FILE)) {
+          const raw = fs.readFileSync(GM_CLOSE_QUEUE_FILE, 'utf8').trim()
+          if (raw) queue = JSON.parse(raw)
+        }
+      } catch {}
+      if (!Array.isArray(queue)) queue = []
+
+      queue.push({
+        n: gmNum,
+        by: closerUser?.tag || closerUser?.username || 'Discord Staff',
+        note: `Closed on Discord #${channel.name || 'mod-ticket'}`,
+        at: Date.now()
+      })
+
+      fs.writeFileSync(GM_CLOSE_QUEUE_FILE, JSON.stringify(queue, null, 2) + '\n', 'utf8')
+      console.log(`[tickets] synced GM ticket #${gmNum} closure to game queue`)
+    }
+  } catch (err) {
+    console.error('[tickets] syncCloseToGame error:', err.message)
+  }
+}
+
+// Locks the ticket channel so it can be viewed by the player and staff in read-only mode, but not edited or replied to
+async function lockTicketChannel(channel, closerUser) {
+  try {
+    const guild = channel.guild
+    if (!guild) return
+
+    let openerId = null
+    try {
+      const ticketRelay = require('./ticketRelay')
+      const rec = ticketRelay.getRecordByChannel?.(channel.id)
+      if (rec?.openerId) openerId = rec.openerId
+    } catch {}
+
+    if (!openerId && channel.permissionOverwrites?.cache) {
+      const memberOw = channel.permissionOverwrites.cache.find(
+        ow => (ow.type === 1 || (typeof OverwriteType !== "undefined" && ow.type === OverwriteType.Member)) && ow.id !== channel.client?.user?.id
+      )
+      if (memberOw) openerId = memberOw.id
+    }
+
+    const lockedOverwrites = [
+      { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] }
+    ]
+
+    if (openerId) {
+      lockedOverwrites.push({
+        id: openerId,
+        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory],
+        deny: [
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.SendMessagesInThreads,
+          PermissionFlagsBits.CreatePublicThreads,
+          PermissionFlagsBits.CreatePrivateThreads,
+          PermissionFlagsBits.AddReactions
+        ]
+      })
+    }
+
+    const readers = isOwnersOnly(channel) ? config.siteOwnerRoleIds : config.discordStaffRoleIds
+    for (const roleId of readers || []) {
+      if (!guild.roles.cache.has(roleId)) continue
+      lockedOverwrites.push({
+        id: roleId,
+        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory],
+        deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions]
+      })
+    }
+
+    if (channel.client?.user?.id) {
+      lockedOverwrites.push({
+        id: channel.client.user.id,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.ManageChannels,
+          PermissionFlagsBits.ReadMessageHistory
+        ]
+      })
+    }
+
+    if (channel.permissionOverwrites?.set) {
+      await channel.permissionOverwrites.set(lockedOverwrites).catch(err => {
+        console.error('[tickets] failed to set locked overwrites:', err.message)
+      })
+    }
+
+    // Rename channel with 🔒- prefix
+    const rawName = (channel.name || '').replace(/^(?:🔒-|closed-)/, '')
+    const newName = `🔒-${rawName}`.slice(0, 95)
+    if (typeof channel.setName === 'function') {
+      await channel.setName(newName).catch(err => {
+        console.error('[tickets] failed to rename locked channel:', err.message)
+      })
+    }
+
+    // Update topic to indicate closed and locked
+    const currentTopic = String(channel.topic || '')
+    const newTopic = currentTopic.includes('[CLOSED & LOCKED]')
+      ? currentTopic
+      : `[CLOSED & LOCKED] ${currentTopic}`.slice(0, 1024)
+    if (typeof channel.setTopic === 'function') {
+      await channel.setTopic(newTopic).catch(() => {})
+    }
+
+    // Post locked embed
+    const closerTag = closerUser ? `<@${closerUser.id || closerUser}>` : 'Staff'
+    const lockEmbed = new EmbedBuilder()
+      .setTitle('🔒 Ticket Closed and Locked')
+      .setColor(0x808080)
+      .setDescription(
+        `This ticket was closed by ${closerTag}.\n\n` +
+        `This channel is now **locked in read-only mode**.\n` +
+        `You can review the conversation history, but no further messages or edits can be submitted.`
+      )
+      .setTimestamp()
+
+    if (typeof channel.send === 'function') {
+      await channel.send({ embeds: [lockEmbed], components: [] }).catch(() => {})
+    }
+  } catch (err) {
+    console.error('[tickets] lockTicketChannel error:', err.message)
+  }
+}
+
+// Closes the ticket channel in DragonBreak Discord after saving transcript, syncing close to Admin forum
 async function closeTicket(interaction, { wait = 5000, transcripts = transcript } = {}) {
   const channel = interaction.channel
-  if (closing.has(channel.id)) return interaction.reply({ content: 'This ticket is already closing.', ephemeral: true })
+  if (!channel) return
+  if (closing.has(channel.id)) {
+    if (interaction.reply && !interaction.replied) {
+      return interaction.reply({ content: 'This ticket is already closing.', ephemeral: true }).catch(() => {})
+    }
+    return
+  }
   closing.add(channel.id)
   try {
-    await interaction.reply({ content: 'Closing in 5 seconds.' })
+    syncCloseToGame(channel, interaction.user)
+    if (interaction.reply && !interaction.replied) {
+      await Promise.resolve(interaction.reply({ content: 'Closing in 5 seconds.' })).catch(() => {})
+    }
     // GMs read the audit channel, and the reporter can press Close, so an owners-only ticket logs no closer
     audit.log(isOwnersOnly(channel) ? `TICKET closed #${channel.name} (Owners only)`
-      : `TICKET closed #${channel.name} by ${interaction.user.tag} (${interaction.user.id})`)
-    await new Promise(resolve => setTimeout(resolve, wait))
+      : `TICKET closed #${channel.name} by ${interaction.user?.tag || 'Staff'} (${interaction.user?.id || '0'})`)
+
     const keepWhatFits = Date.now() - (largeRefused.get(channel.id) || 0) < LARGE_CONFIRM_MS
     try {
       const opts = { fileOnly: isOwnersOnly(channel) }
       if (keepWhatFits) opts.keepWhatFits = true
       audit.log(`TICKET transcript of #${channel.name} ${await transcripts.save(channel, interaction.user, opts)}`)
       largeRefused.delete(channel.id)
+
+      // Sync close to Admin forum thread
+      try {
+        const ticketRelay = require('./ticketRelay')
+        await ticketRelay.handleClose(channel.id, interaction.user, channel.client)
+      } catch (err) {
+        console.error('[tickets] error closing forum thread in admin:', err.message)
+      }
     } catch (err) {
       console.error(`[tickets] transcript of #${channel.name} failed, channel kept:`, err.message)
       if (err.code === 'TOO_LARGE') largeRefused.set(channel.id, Date.now())
-      await channel.send(err.channelNote || 'The transcript could not be saved, so this channel stays open. Tell a staff member.').catch(() => {})
+      if (typeof channel.send === 'function') {
+        await channel.send(err.channelNote || 'The transcript could not be saved, so this channel stays open. Tell a staff member.').catch(() => {})
+      }
       return
     }
-    await channel.delete('ticket closed').catch(err => console.error('[tickets] delete failed:', err.message))
+
+    if (wait > 0) {
+      await new Promise(resolve => setTimeout(resolve, wait))
+    }
+    if (typeof channel.delete === 'function') {
+      await channel.delete('ticket closed').catch(err => console.error('[tickets] delete failed:', err.message))
+    }
   } finally {
     closing.delete(channel.id)
   }
@@ -285,6 +486,20 @@ async function handleInteraction(interaction) {
 
     if (interaction.isButton() && id === 'ticket:close') {
       await closeTicket(interaction)
+      return true
+    }
+
+    if (interaction.isButton() && id.startsWith('ticket:relay_close:')) {
+      const targetChannelId = id.slice('ticket:relay_close:'.length)
+      const targetChannel = interaction.client.channels.cache.get(targetChannelId) || await interaction.client.channels.fetch(targetChannelId).catch(() => null)
+      if (targetChannel) {
+        await interaction.reply({ content: 'Closing ticket and archiving thread...', ephemeral: true })
+        await closeTicket({ channel: targetChannel, user: interaction.user, reply: () => Promise.resolve() })
+      } else {
+        const ticketRelay = require('./ticketRelay')
+        await ticketRelay.handleClose(targetChannelId, interaction.user, interaction.client)
+        await interaction.reply({ content: 'Ticket channel is already closed. Thread archived.', ephemeral: true })
+      }
       return true
     }
   } catch (err) {

@@ -22,24 +22,36 @@ const BLANK_RE = /[\u115f\u1160\u3164\uffa0]/
 const REASON_MIN = 5
 const REASON_MAX = 300
 // The record kinds and the word each takes before its reason (console.js KIND_ARGS); allow.json can only narrow them
-const KIND_ARGS = Object.freeze({ warn: 'none', strike: 'none', suspend: 'length', lift: 'none', overturn: 'record' })
+const KIND_ARGS = Object.freeze({ warn: 'none', strike: 'none', suspend: 'length', ban: 'none', lift: 'none', overturn: 'record' })
 const LENGTH_RE = /^(?:([1-9][0-9]{0,2})h|([1-9][0-9]?)d)$/
 const RECORD_RE = /^[1-9][0-9]{0,4}$/
 // A line break typed into a reason line is refused, not folded into the reason
 const LINE_BREAK_RE = /[\n\r\u000b\u000c\u0085\u2028\u2029]/
+// A faction id, a hold id, an hour of /settime, a call or ticket word and a plain word, as console.js has them
+const FACTION_ID_RE = /^[a-z0-9_-]{2,32}$/i
+const HOLD_RE = /^[a-z][a-z'-]{1,31}$/i
+const HOUR_RE = /^(?:[01]?[0-9]|2[0-3])(?:\.[0-9]{1,2})?$/
+const REF_RE = /^(?:call|ticket):#?[A-Za-z0-9_\-#./]{1,40}$/i
+const PLAIN_WORD = /^[A-Za-z0-9'#:\/._-]{1,40}$/
+const ANNOUNCE_MAX = 300
+const CITIZEN_ACTS = Object.freeze(['view', 'grant', 'revoke', 'cooldown'])
 
 // The classes the game refuses with (console.js), for the commands that are not on the allowlist
 const IN_WORLD = new Set(['npc', 'placed', 'jail', 'setweather', 'war', 'region', 'warband', 'raid', 'property', 'dungeon', 'whereami', 'teach'])
-const SELF = new Set(['tp', 'gm', 'masktest', 'mv', 'placeundo', 'factiongear', 'tailoring', 'smithing', 'beastform', 'makesuper', 'unstuck', 'appearance'])
+const SELF = new Set(['tp', 'masktest', 'mv', 'placeundo', 'factiongear', 'tailoring', 'smithing', 'beastform', 'makesuper', 'appearance'])
 const LATER = new Set(['bugs', 'update', 'schedule'])
 const BUILTIN = new Set(['say', 'low', 'whisper', 'wide', 'shout', 'me', 'melow', 'melong', 'my', 'mylow', 'mylong', 'do', 'dolow', 'dolong',
   'looc', 'ooc', 'ooclow', 'ooclong', 'pm', 'dm', 'to', 'too', 'system', 'admin'])
 // No 'any' rule (review SEC-2); the only free text is /rename's name (NAME_RE) and /discipline's reason (REASON_RE)
-const RULES = new Set(['switch', 'tag', 'tagName', 'load', 'none', 'tagKindReason'])
+const RULES = new Set(['switch', 'tag', 'tagName', 'load', 'none', 'tagKindReason', 'faction', 'announce', 'gm', 'charter', 'settime', 'staffstats', 'citizenship', 'itemSpells'])
 // The empty form of a #TAG command: /kick needs a target, /fixloc and /chargen alone act on the caller
 const NO_ARG = Object.freeze({ kick: 'needTag', fixloc: 'self', chargen: 'self' })
 // All a Lead GM may run from the console (console.js PUNISH_ONLY; Jake, 22 Oct: "Punishments only")
-const PUNISH_ONLY = Object.freeze(['discipline', 'kick'])
+const PUNISH_ONLY = Object.freeze([
+  'discipline', 'kick', 'ban', 'tempban', 'unban', 'faction',
+  'announce', 'gm', 'bans', 'charter', 'time', 'settime', 'staffstats', 'citizenship', 'players', 'whoami',
+  'giveitem', 'takeitem', 'givespell', 'removespell', 'unstuck', 'fixloc'
+])
 
 // One clean '/word rest' line of at most 500 characters with '#{' broken, or null when it is not a command
 function cleanCommand(value) {
@@ -83,9 +95,10 @@ function parseSwitch(text) {
   return out
 }
 
-// The optional target fields are signed after expiresAt (targetProfileId, then targetRoles or null), as console.js signs them
+// The optional target fields are signed after expiresAt (targetProfileId, then targetRoles or null), then the panel mark as 'panel', true, as console.js signs them
 const reqPayload = r => `dbo-console-req-v1\n${JSON.stringify([r.v, r.id, r.src, r.discordId, r.user, r.profileId, r.roles, r.text, r.mode, r.issuedAt, r.expiresAt]
-  .concat(r.targetProfileId !== undefined ? [r.targetProfileId, r.targetRoles !== undefined ? r.targetRoles : null] : []))}`
+  .concat(r.targetProfileId !== undefined ? [r.targetProfileId, r.targetRoles !== undefined ? r.targetRoles : null] : [])
+  .concat(r.panel !== undefined ? ['panel', r.panel] : []))}`
 const canonLines = lines => lines.map(l => ({ to: String(l.to), text: String(l.text) }))
 const repPayload = r => `dbo-console-rep-v1\n${JSON.stringify([r.v, r.id, r.state, r.gate, r.ranAs, r.online, r.tier, r.target, canonLines(r.lines), r.why, r.at])}`
 // The 8 characters every audit line carries, so the backend and game records join up: a UUID's first 8, an interaction's last 8
@@ -171,8 +184,78 @@ function precheck(text, allow, raw) {
       return NAME_RE.test(words.slice(1).join(' ')) ? null : refuse('badName')
     case 'load': return !words.length || (words.length === 1 && words[0].toLowerCase() === 'reset') ? null : refuse('badArgs')
     case 'none': return words.length ? refuse('badArgs') : null
+    // list; or leader #TAG <faction id>, with a Lead GM's reason: <why> held to REASON_RE (console.js)
+    case 'faction': {
+      const sub = (words[0] || '').toLowerCase()
+      if (sub === 'list' && words.length === 1) return null
+      if (sub !== 'leader' || words.length < 3) return refuse('badArgs')
+      if (!TAG_RE.test(words[1])) return refuse('needTag')
+      if (!FACTION_ID_RE.test(words[2]) || (words.length > 3 && words[3].toLowerCase() !== 'reason:')) return refuse('badArgs')
+      const why = words.length > 3 ? reasonWhy(words.slice(4).join(' ')) : ''
+      return why ? refuse(why) : null
+    }
+    // Free text to every player, held to the reason's plain words (console.js)
+    case 'announce': {
+      const text = words.join(' ')
+      if (!text) return refuse('badArgs')
+      return text.length > ANNOUNCE_MAX || ASTRAL_RE.test(text) || BLANK_RE.test(text) || !REASON_RE.test(text) ? refuse('announceText') : null
+    }
+    case 'gm': {
+      if (!words.length) return refuse('badArgs')
+      const sub = (words[0] || '').toLowerCase()
+      if (sub === 'list') {
+        if (words.length > 2 || (words.length === 2 && words[1].toLowerCase() !== 'all')) return refuse('badArgs')
+        return null
+      }
+      if (sub === 'close') {
+        if (words.length < 2 || !/^\d+$/.test(words[1])) return refuse('badArgs')
+        return null
+      }
+      if (sub === 'release') {
+        if (words.length !== 2 || !/^\d+$/.test(words[1])) return refuse('badArgs')
+        return null
+      }
+      if (sub === 'take' || sub === 'goto') return refuse('inWorld')
+      return refuse('badArgs')
+    }
+    // list [all] or show <n>; deciding a charter stays in game (console.js)
+    case 'charter': {
+      const sub = (words[0] || '').toLowerCase()
+      if (sub === 'list' && (words.length === 1 || (words.length === 2 && words[1].toLowerCase() === 'all'))) return null
+      return sub === 'show' && words.length === 2 && RECORD_RE.test(words[1]) ? null : refuse('badArgs')
+    }
+    case 'settime': return words.length === 1 && HOUR_RE.test(words[0]) ? null : refuse('badArgs')
+    case 'staffstats': {
+      if (!words.length) return null
+      if (words.length > 3 || !/^[a-z0-9_ -]{1,32}$/i.test(words.join(' '))) return refuse('badArgs')
+      return null
+    }
+    // <#TAG|name> view | grant|revoke <hold> | cooldown clear|<length>, then at most one call or ticket word; one #TAG alone,
+    // or a name of up to three plain words with none (console.js)
+    case 'citizenship': {
+      if (words.some(x => !PLAIN_WORD.test(x))) return refuse('badArgs')
+      const w = words.length && REF_RE.test(words[words.length - 1]) ? words.slice(0, -1) : words
+      const at = w.findIndex((x, i) => i > 0 && CITIZEN_ACTS.includes(x.toLowerCase()))
+      const named = at > 0 ? w.slice(0, at) : []
+      const act = at > 0 ? w[at].toLowerCase() : ''
+      const rest = w.slice(at + 1)
+      const tagged = named.length === 1 && TAG_RE.test(named[0])
+      const nameOk = tagged || (named.length && named.length <= 3 && named.every(x => !x.includes('#') && !REF_RE.test(x) && !/^\d+$/.test(x)))
+      const ok = (act === 'view' && !rest.length) || ((act === 'grant' || act === 'revoke') && rest.length === 1 && HOLD_RE.test(rest[0]))
+        || (act === 'cooldown' && rest.length === 1 && (rest[0].toLowerCase() === 'clear' || LENGTH_RE.test(rest[0].toLowerCase())))
+      if (!nameOk || !ok) return refuse(!nameOk && named.some(x => x.includes('#')) ? 'needTag' : 'badArgs')
+      return null
+    }
+    case 'itemSpells': {
+      if (words.length < 1) return refuse('badArgs')
+      return null
+    }
     case 'tagKindReason': {
       if (typeof raw === 'string' && LINE_BREAK_RE.test(raw.trim())) return refuse('oneLine')
+      const aliasKinds = { ban: 'ban', tempban: 'suspend', unban: 'lift' }
+      if (aliasKinds[cmd] && words.length && TAG_RE.test(words[0])) {
+        words.splice(1, 0, aliasKinds[cmd])
+      }
       const kinds = Array.isArray(entry.kinds) ? entry.kinds : []
       const maxDays = typeof entry.maxSuspendDays === 'number' ? entry.maxSuspendDays : 0
       if (!words.length || !TAG_RE.test(words[0])) return words.length && words[0].toLowerCase() !== 'list' ? refuse('needTag') : refuse('badKind')
@@ -197,7 +280,7 @@ function whyText(why, cmd, usage, subject) {
     case 'inWorld': return `/${cmd} needs you standing in the world. Run it in game.`
     case 'self': return `/${cmd} acts on your own character. Run it in game.`
     case 'later': return `/${cmd} answers later. That is not in the console yet.`
-    case 'notChat': return cmd === 'system' ? 'Only staff commands can be run from the console. Use /announce when it comes to the console.'
+    case 'notChat': return cmd === 'system' ? 'Only staff commands can be run from the console. Use /announce for a word to every player.'
       : 'Only staff commands can be run from the console.'
     case 'notYet': return `/${cmd} is not available from the console in v1.`
     case 'badArgs': return `From the console: ${usage || `/${cmd}`}`
@@ -209,6 +292,7 @@ function whyText(why, cmd, usage, subject) {
     case 'reasonShort': return `Give a reason of at least ${REASON_MIN} characters. The player is shown it.`
     case 'reasonLong': return `The reason can be at most ${REASON_MAX} characters.`
     case 'reasonChars': return 'A reason from the console takes letters, numbers, spaces and . , ; : ! ? \' " ( ) - / & + % only: no colour codes, markup, mentions, symbols or line breaks.'
+    case 'announceText': return `An announcement from the console is 1 to ${ANNOUNCE_MAX} characters of letters, numbers, spaces and . , ; : ! ? ' " ( ) - / & + % only: no colour codes, markup, mentions or symbols.`
     case 'denied': return `/${subject || cmd} is switched off for the console in the game's config.`
     case 'noProfileCheck': return `The game does not check /${cmd} against the account you opened yet, so it was not sent. Copy the command and run it in game.`
     case 'punishOnly': return 'A Lead GM can run only /discipline and /kick from the console. Run anything else in game.'

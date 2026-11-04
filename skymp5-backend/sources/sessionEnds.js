@@ -22,6 +22,7 @@ const FILE = process.env.SESSION_ENDS_FILE || path.join(__dirname, '..', 'data',
 const KEEP = 5000
 // #server-monitor, the channel dbo-monitor posts to (its DBO_MONITOR_CHANNEL default)
 const MONITOR_CHANNEL = process.env.DISCORD_MONITOR_CHANNEL_ID || '1553093452529532929'
+const ADMIN_MONITOR_CHANNEL = process.env.DISCORD_ADMIN_MONITOR_CHANNEL_ID || '1566856550461743275'
 const OUTCOMES = new Set(['crash', 'closed', 'ended'])
 const HOUR = 3600 * 1000
 // At most this many posts in #server-monitor per window, whoever sends them; past it a note is only kept, so a few
@@ -78,18 +79,28 @@ function keep(note, reporter) {
   fs.renameSync(tmp, FILE)
 }
 
-function postLine(content) {
-  if (!config.discordBotToken || !MONITOR_CHANNEL) return Promise.resolve(false)
+function postToChannel(channelId, content) {
+  if (!config.discordBotToken || !channelId) return Promise.resolve(false)
   const body = JSON.stringify({ content, allowed_mentions: { parse: [] } })
   return new Promise((resolve) => {
     const req = https.request({
-      hostname: 'discord.com', path: `/api/v10/channels/${MONITOR_CHANNEL}/messages`, method: 'POST', family: 4,
+      hostname: 'discord.com', path: `/api/v10/channels/${channelId}/messages`, method: 'POST', family: 4,
       headers: { Authorization: `Bot ${config.discordBotToken}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
     }, (res) => { res.resume(); resolve(res.statusCode >= 200 && res.statusCode < 300) })
     req.setTimeout(10_000, () => req.destroy(new Error('timeout')))
     req.on('error', () => resolve(false))
     req.end(body)
   })
+}
+
+async function postLine(content) {
+  const promises = []
+  if (MONITOR_CHANNEL) promises.push(postToChannel(MONITOR_CHANNEL, content))
+  if (ADMIN_MONITOR_CHANNEL && ADMIN_MONITOR_CHANNEL !== MONITOR_CHANNEL) {
+    promises.push(postToChannel(ADMIN_MONITOR_CHANNEL, content))
+  }
+  const results = await Promise.all(promises)
+  return results.some(Boolean)
 }
 
 // Keeps the note, and posts it unless it was a normal close. Resolves to { status, body } for the route.

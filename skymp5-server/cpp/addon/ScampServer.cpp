@@ -1270,13 +1270,8 @@ Napi::Value ScampServer::MakeEventSource(const Napi::CallbackInfo& info)
 Napi::Value ScampServer::Get(const Napi::CallbackInfo& info)
 {
   try {
-    ANTIGO_CONTEXT_INIT(ctx);
-
     auto formId = NapiHelper::ExtractUInt32(info[0], "formId");
     auto propertyName = NapiHelper::ExtractString(info[1], "propertyName");
-
-    ctx.AddUnsigned(formId);
-    ctx.AddLambdaWithOwned([propertyName]() { return propertyName; });
 
     static auto g_standardPropertyBindings =
       PropertyBindingFactory().CreateStandardPropertyBindings();
@@ -1303,9 +1298,6 @@ Napi::Value ScampServer::Get(const Napi::CallbackInfo& info)
     }
 
   } catch (std::exception& e) {
-    while (antigo::HasExceptionWitness()) {
-      (void)antigo::PopExceptionWitness();
-    }
     throw Napi::Error::New(info.Env(), std::string(e.what()));
   }
 }

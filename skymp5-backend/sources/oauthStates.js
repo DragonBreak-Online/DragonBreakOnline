@@ -4,7 +4,7 @@
 const crypto = require('crypto')
 
 // Both flows send prompt=consent
-const FLOWS = Object.freeze(['login', 'fresh'])
+const FLOWS = Object.freeze(['login', 'fresh', 'manage'])
 const STATE_RE = /^[0-9a-f]{64}$/
 // Every request without a visitor address (a direct request to the backend, a test) counts as this one visitor
 const NO_ADDRESS = '-'

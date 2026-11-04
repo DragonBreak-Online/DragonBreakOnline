@@ -21,6 +21,7 @@ function consoleApi() {
     audit: require('../discord/audit'),
     jobsFile: path.join(__dirname, '..', '..', 'data', 'console-jobs.json'),
     switchFile: config.consoleSwitchFile,
+    panelAllows: (roles, node) => require('../discord/dragonbaronPermissions').hasPermission(roles, node),
   })
   return instance
 }

@@ -204,20 +204,54 @@ function pack(uploads) {
 
 // A channel people outside staff can read, or one in another server, is refused rather than trusted
 async function postToStaff(client, channel, t, files, base) {
-  const target = await client.channels.fetch(config.discordTicketTranscriptChannelId).catch(() => null)
-  if (!target || typeof target.send !== 'function') throw new Error('transcript channel not found')
-  if (target.guildId !== channel.guildId) throw new Error('transcript channel is in another server')
-  const open = openTo(target, client)
-  if (open) throw new Error(`transcript channel is not staff only: ${open}`)
+  let posted = false
   const groups = pack([{ name: `${base}.txt`, data: Buffer.from(toText(t)) },
     { name: `${base}.json`, data: Buffer.from(JSON.stringify(t, null, 2)) }, ...files.map(f => ({ name: f.file, data: f.data }))])
-  for (const [i, group] of groups.entries()) {
-    await target.send({
-      content: (i ? `Transcript of **${base}**, files ${i + 1} of ${groups.length}.` : summary(t, base)).slice(0, 1900),
-      files: group.map(u => ({ attachment: u.data, name: u.name })),
-      allowedMentions: { parse: [] },
-    })
+
+  if (config.discordTicketTranscriptChannelId) {
+    try {
+      const target = await client.channels.fetch(config.discordTicketTranscriptChannelId).catch(() => null)
+      if (target && typeof target.send === 'function' && target.guildId === channel.guildId) {
+        const open = openTo(target, client)
+        if (!open) {
+          for (const [i, group] of groups.entries()) {
+            await target.send({
+              content: (i ? `Transcript of **${base}**, files ${i + 1} of ${groups.length}.` : summary(t, base)).slice(0, 1900),
+              files: group.map(u => ({ attachment: u.data, name: u.name })),
+              allowedMentions: { parse: [] },
+            })
+          }
+          posted = true
+        } else {
+          console.error(`[tickets] transcript channel is not staff only: ${open}`)
+        }
+      }
+    } catch (eMain) {
+      console.error('[tickets] main transcript post failed:', eMain.message)
+    }
   }
+
+  // Also dual-post to Admin guild #ticket-activity (1566856580010610739)
+  const adminTargetId = process.env.DISCORD_ADMIN_TICKET_CHANNEL_ID || '1566856580010610739'
+  if (adminTargetId) {
+    try {
+      const adminTarget = await client.channels.fetch(adminTargetId).catch(() => null)
+      if (adminTarget && typeof adminTarget.send === 'function') {
+        for (const [i, group] of groups.entries()) {
+          await adminTarget.send({
+            content: (i ? `Transcript of **${base}**, files ${i + 1} of ${groups.length}.` : summary(t, base)).slice(0, 1900),
+            files: group.map(u => ({ attachment: u.data, name: u.name })),
+            allowedMentions: { parse: [] },
+          })
+        }
+        posted = true
+      }
+    } catch (eAdmin) {
+      console.error('[tickets] admin transcript post failed:', eAdmin.message)
+    }
+  }
+
+  if (!posted) throw new Error('transcript channel not found or delivery failed')
 }
 
 function saveFile(t, files, base, dir) {

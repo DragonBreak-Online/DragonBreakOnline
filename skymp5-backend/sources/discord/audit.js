@@ -97,16 +97,25 @@ function createPoster(channelId) {
 
 const auditChannel = createPoster(() => config.discordLogChannelId)
 const staffChannel = createPoster(() => config.staffCommandsChannelId)
+const adminLogChannel = createPoster(() => process.env.DISCORD_ADMIN_LOG_CHANNEL_ID || '1566856550461743275')
+const adminTicketChannel = createPoster(() => process.env.DISCORD_ADMIN_TICKET_CHANNEL_ID || '1566856580010610739')
+const adminStaffChannel = createPoster(() => process.env.DISCORD_ADMIN_STAFF_CHANNEL_ID || '1566856564634292306')
 
 function log(text) {
   console.log('[discord-audit]', text)
-  auditChannel.push(`[${new Date().toISOString().replace('T', ' ').slice(0, 19)}] ${text}`)
+  const line = `[${new Date().toISOString().replace('T', ' ').slice(0, 19)}] ${text}`
+  auditChannel.push(line)
+  adminLogChannel.push(line)
+  if (typeof text === 'string' && text.startsWith('TICKET ')) {
+    adminTicketChannel.push(line)
+  }
 }
 
 // A line as the game writes it in #staff-commands (the caller gives its [HH:MM:SS]); without the channel, the audit channel only
 let warned = false
 function staff(text) {
   console.log('[staff-commands]', text)
+  adminStaffChannel.push(text)
   if (!config.staffCommandsChannelId) {
     if (!warned) console.warn('[discord-audit] STAFF_COMMANDS_CHANNEL_ID is not set: dashboard punishments go to the audit channel only')
     warned = true
@@ -115,6 +124,12 @@ function staff(text) {
   staffChannel.push(text)
 }
 
-setInterval(() => { auditChannel.flush(); staffChannel.flush() }, 1500).unref()
+setInterval(() => {
+  auditChannel.flush()
+  staffChannel.flush()
+  adminLogChannel.flush()
+  adminTicketChannel.flush()
+  adminStaffChannel.flush()
+}, 1500).unref()
 
 module.exports = { log, staff }

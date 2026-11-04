@@ -135,8 +135,57 @@ function requireDiscordId(profileId) {
   return discordId
 }
 
+function charactersByProfileMap() {
+  const byProfile = new Map()
+  try {
+    const { internals } = require('./site-auth')
+    if (!internals || typeof internals.readStore !== 'function') return byProfile
+    for (const form of internals.readStore()) {
+      if (!form || !form.char || form.char.deleted) continue
+      const pid = form.char.profileId
+      const name = typeof internals.characterName === 'function'
+        ? internals.characterName(form.cf, form.char.appearance)
+        : (form.cf && form.cf.displayName) || 'Character'
+      if (!byProfile.has(pid)) byProfile.set(pid, [])
+      byProfile.get(pid).push(name)
+    }
+  } catch { /* ignore in isolated unit tests */ }
+  return byProfile
+}
+
 async function enrichPlayers(list) {
-  return Promise.all(list.map(enrichPlayer))
+  try {
+    const discordBot = require('../sources/discordBot')
+    if (discordBot && typeof discordBot.warmRoleCache === 'function') {
+      await discordBot.warmRoleCache(list.map(p => p && p.discordId).filter(Boolean))
+    }
+  } catch { /* ignore */ }
+  const charsMap = charactersByProfileMap()
+  const liveAssignmentsByDiscord = new Map()
+  try {
+    const fwRoute = require('./faction-whitelist')
+    if (fwRoute && typeof fwRoute.buildLiveFactions === 'function') {
+      const live = fwRoute.buildLiveFactions()
+      for (const a of (live.assignments || [])) {
+        if (!a || !a.discordId) continue
+        if (!liveAssignmentsByDiscord.has(a.discordId)) liveAssignmentsByDiscord.set(a.discordId, [])
+        liveAssignmentsByDiscord.get(a.discordId).push(a)
+      }
+    }
+  } catch { /* ignore in isolated unit tests */ }
+  const rows = await Promise.all(list.map(enrichPlayer))
+  return rows.map(r => {
+    if (!r) return r
+    const liveList = liveAssignmentsByDiscord.get(r.discordId) || []
+    const mergedAssignments = (Array.isArray(r.assignments) && r.assignments.length)
+      ? r.assignments
+      : liveList
+    return {
+      ...r,
+      characterNames: charsMap.get(r.profileId) || [],
+      assignments: mergedAssignments,
+    }
+  })
 }
 
 async function enrichPlayer(player) {

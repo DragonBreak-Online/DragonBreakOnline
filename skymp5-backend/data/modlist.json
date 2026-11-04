@@ -1053,5 +1053,166 @@
     "enabled": true,
     "source": "nexus",
     "nexusId": 37636
+  },
+  {
+    "name": "Minotaurs SSE",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 34392
+  },
+  {
+    "name": "Daedra Pack",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 159364
+  },
+  {
+    "name": "Sea Giants and Ice Titans",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 103285
+  },
+  {
+    "name": "Skeletal Revenants",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 102415
+  },
+  {
+    "name": "Grahls and Frost Giants",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 100013
+  },
+  {
+    "name": "Giants Overhaul",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 98581
+  },
+  {
+    "name": "Undead Snow Elves",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 87023
+  },
+  {
+    "name": "Vampire Lords and Beasts",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 79281
+  },
+  {
+    "name": "Flesh Atronachs",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 77868
+  },
+  {
+    "name": "Ancient Nordic Sentinel",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 24549
+  },
+  {
+    "name": "Hive Guardians",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 117001
+  },
+  {
+    "name": "Elemental Golems",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 106477
+  },
+  {
+    "name": "Flesh Colossus",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 55719
+  },
+  {
+    "name": "Flat World Map Framework FOMOD Lite - DragonBreak picks",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 29932
+  },
+  {
+    "name": "Skyrim Paper Map by FC (2nd Ed) for FWMF",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 106483
+  },
+  {
+    "name": "Apocrypha Paper Map for FWMF",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 92774
+  },
+  {
+    "name": "Beyond Reach Paper Map for FWMF",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 119215
+  },
+  {
+    "name": "BS Bruma Paper Map by Mirhayasu for FWMF",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 64037
+  },
+  {
+    "name": "Solstheim and Baan Malur Paper Map for FWMF",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 137315
+  },
+  {
+    "name": "Blackreach Paper Map for FWMF",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 53878
+  },
+  {
+    "name": "Forgotten Vale Paper Map for FWMF",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 54628
+  },
+  {
+    "name": "Deepwood Vale Paper Map for FWMF",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 75155
+  },
+  {
+    "name": "Soul Cairn Paper Map for FWMF",
+    "required": true,
+    "enabled": true,
+    "source": "nexus",
+    "nexusId": 55387
   }
 ]

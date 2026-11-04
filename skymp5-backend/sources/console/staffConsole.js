@@ -18,6 +18,19 @@ const SIGN_IN_URL = '/api/site/login/fresh'
 // The switch is read as the game reads it: no symlink followed, no wait on a FIFO, a regular file of at most 64 bytes
 const SWITCH_OPEN = nodeFs.constants.O_RDONLY | (nodeFs.constants.O_NOFOLLOW || 0) | (nodeFs.constants.O_NONBLOCK || 0)
 const SWITCH_MAX_BYTES = 64
+// The commands each Dragon Baron panel permission's buttons send (dragonbaronCommand.js); the bot's role settings say who holds it
+const PANEL = Object.freeze({
+  items_spells: Object.freeze(['giveitem', 'takeitem', 'givespell', 'removespell', 'unstuck']),
+  tickets: Object.freeze(['gm', 'unstuck']),
+  moderation: Object.freeze(['kick', 'discipline', 'tempban', 'unstuck']),
+  bans: Object.freeze(['ban', 'bans']),
+  factions: Object.freeze(['faction']),
+  charters: Object.freeze(['charter']),
+  citizenship: Object.freeze(['citizenship']),
+  announcements: Object.freeze(['announce']),
+  world_time: Object.freeze(['time', 'settime']),
+  audit_stats: Object.freeze(['players', 'whoami', 'staffstats']),
+})
 
 const ids = value => String(value ?? '').split(',').map(s => s.trim()).filter(Boolean)
 const roleList = value => (Array.isArray(value) ? value.map(String) : ids(value))
@@ -27,12 +40,13 @@ const snowflakes = (list, max) => list.length >= 1 && list.length <= max && list
 function readRankRule(config) {
   const roles = ids(config.consoleRoleIds)
   const guild = String(config.discordGuildId || '')
+  const adminGuild = String(config.discordAdminGuildId || '1565789714487971980')
   let problem = ''
   if (!snowflakes(roles, 10)) problem = 'CONSOLE_ROLE_IDS must be 1 to 10 role ids'
   else if (!rules.SNOWFLAKE.test(guild)) problem = 'DISCORD_GUILD_ID is not set'
   // The guild id is the @everyone role, which discord.js puts in every member's role cache
-  else if (roles.includes(guild)) problem = 'CONSOLE_ROLE_IDS holds the guild id (@everyone)'
-  return { roles: new Set(roles), guild, problem }
+  else if (roles.includes(guild) || (adminGuild && roles.includes(adminGuild))) problem = 'CONSOLE_ROLE_IDS holds the guild id (@everyone)'
+  return { roles: new Set(roles), guild, adminGuild, problem }
 }
 
 // The console's config, read once (env does not change without a restart); problem is '' when usable
@@ -46,8 +60,23 @@ function readConfig(config) {
   else if (rank.problem) problem = rank.problem
   else if (channels.length && !snowflakes(channels, 25)) problem = 'CONSOLE_DISCORD_CHANNEL_IDS must be channel ids'
   // Owners and Dragon Break Dev (the dashboard's roles) run every command; any other console role only PUNISH_ONLY
-  const full = new Set([...roleList(config.siteOwnerRoleIds), ...roleList(config.siteStaffRoleIds)])
-  return { pins: new Set(pins), roles: rank.roles, guild: rank.guild, channels: new Set(channels), full, freshMs: (hours > 0 && hours <= 24 ? hours : 4) * 3600 * 1000, problem }
+  const full = new Set([
+    ...roleList(config.siteOwnerRoleIds),
+    ...roleList(config.siteStaffRoleIds),
+    '1566862278706335909', // Admin Server Owner
+    '1566862282951233737', // Admin Server Dev
+  ])
+  return {
+    pins: new Set(pins),
+    roles: rank.roles,
+    guild: rank.guild,
+    adminGuild: rank.adminGuild,
+    channels: new Set(channels),
+    adminChannel: String(config.discordAdminStaffChannelId || '1566856564634292306'),
+    full,
+    freshMs: (hours > 0 && hours <= 24 ? hours : 4) * 3600 * 1000,
+    problem
+  }
 }
 
 const narrower = (a, b) => rules.SETTINGS[Math.min(rules.SETTINGS.indexOf(a), Math.max(0, rules.SETTINGS.indexOf(b)))]
@@ -58,9 +87,80 @@ const withDeadline = (promise, ms) => {
   return Promise.race([Promise.resolve(promise).catch(() => null), deadline]).finally(() => clearTimeout(timer))
 }
 
+
+function generateHelpText(isFull, filterCmd) {
+  if (filterCmd) {
+    const f = filterCmd.toLowerCase().replace(/^\//, '')
+    const DETAILS = {
+      faction: "**Command:** `/faction`\n??? `/faction list` ??? List all active factions and leaders\n??? `/faction leader #TAG <faction_id>` ??? Appoint a new leader (steps down old leader)\n??? `/faction remove #TAG <faction_id>` ??? Remove a member from faction (works offline)\n*Requires: Lead GM or above*",
+      charter: "**Command:** `/charter`\n??? `/charter list` ??? List pending charters waiting for GM review\n??? `/charter list all` ??? List all open & gathering charters\n??? `/charter show <n>` ??? Inspect details of charter #n\n??? `/charter approve <n>` ??? Approve charter #n\n??? `/charter deny <n> <reason>` ??? Deny charter #n with reason\n*Requires: Lead GM or above*",
+      gm: "**Command:** `/gm`\n??? `/gm list` ??? List currently waiting in-game GM calls\n??? `/gm list all` ??? List waiting and lately closed GM calls\n??? `/gm close <n> [note]` ??? Close ticket #n with optional resolution note\n??? `/gm release <n>` ??? Return ticket #n back to the waiting queue\n*Requires: Lead GM or above*",
+      announce: "**Command:** `/announce`\n??? `/announce <text>` ??? Broadcast a message to all online players and on-screen.\n*Requires: Lead GM or above*",
+      bans: "**Command:** `/bans`\n??? `/bans` ??? List all active account bans and temporary suspensions.\n*Requires: Lead GM or above*",
+      discipline: "**Command:** `/discipline`\n??? `/discipline #TAG warn <reason>`\n??? `/discipline #TAG strike <reason>`\n??? `/discipline #TAG suspend <1-720h|1-30d> <reason>`\n??? `/discipline #TAG ban <reason>`\n??? `/discipline #TAG lift <reason>`\n??? `/discipline #TAG overturn <record_n> <reason>`\n*Requires: Lead GM or above*",
+      kick: "**Command:** `/kick`\n??? `/kick #TAG` ??? Disconnect an online character immediately.\n*Requires: Lead GM or above*",
+      ban: "**Command:** `/ban`\n??? `/ban #TAG <reason>` ??? Permanently ban player account.\n*Requires: Lead GM or above*",
+      tempban: "**Command:** `/tempban`\n??? `/tempban #TAG <length> <reason>` ??? Suspend player account (e.g. 12h, 3d).\n*Requires: Lead GM or above*",
+      unban: "**Command:** `/unban`\n??? `/unban #TAG <reason>` ??? Lift active suspension or ban early.\n*Requires: Lead GM or above*",
+      time: "**Command:** `/time`\n??? `/time` ??? Show current Tamriel in-game time, date, and moons.\n*Requires: Lead GM or above*",
+      settime: "**Command:** `/settime`\n??? `/settime <hour 0-23>` ??? Advance the world clock forward to the specified hour.\n*Requires: Lead GM or above*",
+      staffstats: "**Command:** `/staffstats`\n??? `/staffstats` ??? Audit of staff command activity over the past 7 days\n??? `/staffstats <name>` ??? Filter staff command audit by name\n*Requires: Lead GM or above*",
+      rename: "**Command:** `/rename`\n??? `/rename #TAG <new_name>` ??? Rename target character (works offline).\n*Requires: Developer or above*",
+      chars: "**Command:** `/chars`\n??? `/chars #TAG` ??? List all characters on the target's account.\n*Requires: Developer or above*",
+      fixloc: "**Command:** `/fixloc`\n??? `/fixloc #TAG` ??? Reset stuck character position to the hub.\n*Requires: Developer or above*",
+      chargen: "**Command:** `/chargen`\n??? `/chargen #TAG` ??? Reopen character creation for target.\n*Requires: Developer or above*",
+      players: "**Command:** `/players`\n??? `/players` ??? Show online player count and list.\n*Requires: Developer or above*",
+      load: "**Command:** `/load`\n??? `/load [reset]` ??? Show server performance stats.\n*Requires: Developer or above*",
+      whoami: "**Command:** `/whoami`\n??? `/whoami` ??? Display your staff identity, tag, and tier."
+    }
+    if (DETAILS[f]) return DETAILS[f]
+  }
+
+  let text = "**DragonBreak Remote Staff Console Commands**\n"
+  text += "Run via: `/console command:<command>`\n\n"
+  text += "**Faction & Charters**\n"
+  text += "??? `/faction list` ??? List all factions & leaders\n"
+  text += "??? `/faction leader #TAG <faction>` ??? Appoint faction leader\n"
+  text += "??? `/faction remove #TAG <faction>` ??? Remove member (works offline)\n"
+  text += "??? `/charter list [all]` ??? List pending/open faction charters\n"
+  text += "??? `/charter show <n>` ??? Inspect charter details\n"
+  text += "??? `/charter approve <n>` ??? Approve charter\n"
+  text += "??? `/charter deny <n> <reason>` ??? Deny charter with reason\n\n"
+  text += "**GM Tickets & Support**\n"
+  text += "??? `/gm list [all]` ??? List open GM support tickets\n"
+  text += "??? `/gm close <n> [note]` ??? Close ticket #n with note\n"
+  text += "??? `/gm release <n>` ??? Release ticket back to queue\n\n"
+  text += "**Moderation & Discipline**\n"
+  text += "??? `/kick #TAG` ??? Disconnect online character\n"
+  text += "??? `/discipline #TAG <warn|strike|suspend|ban|lift|overturn> <reason>`\n"
+  text += "??? `/ban #TAG <reason>` ??? Permanent ban\n"
+  text += "??? `/tempban #TAG <12h|3d> <reason>` ??? Timed suspension\n"
+  text += "??? `/unban #TAG <reason>` ??? Lift ban/suspension early\n"
+  text += "??? `/bans` ??? List active bans and suspensions\n\n"
+  text += "**World & Announcements**\n"
+  text += "??? `/announce <text>` ??? Broadcast to all online players\n"
+  text += "??? `/time` ??? Tamriel date, clock, and moons\n"
+  text += "??? `/settime <0-23>` ??? Advance world clock hour\n\n"
+  text += "**Administration & Audit**\n"
+  text += "??? `/staffstats [name]` ??? Staff activity audit (last 7 days)\n"
+  text += "??? `/whoami` ??? Show your admin identity & tier\n"
+  if (isFull) {
+    text += "??? `/chars #TAG` ??? List characters on player's account\n"
+    text += "??? `/rename #TAG <new_name>` ??? Rename character\n"
+    text += "??? `/fixloc #TAG` ??? Reset stuck character to hub\n"
+    text += "??? `/chargen #TAG` ??? Reopen character creation\n"
+    text += "??? `/players` ??? Show online player count\n"
+    text += "??? `/load [reset]` ??? Server performance stats\n"
+    text += "??? `/wwremote [on|off|clear #TAG]` ??? Werewolf visibility\n"
+    text += "??? `/vlremote [on|off|clear #TAG]` ??? Vampire Lord visibility\n"
+  }
+  text += "\n*Type `/console command:/help <cmd>` (e.g. `/help gm`, `/help charter`) for details.*"
+  return text
+}
+
 function createStaffConsole({
   config, discordBot, siteSessions, profileIdOf, spool, audit, jobsFile, switchFile, fs = nodeFs, now = Date.now, discordIdsOfProfile = () => [],
-  log = (...a) => console.log('[console]', ...a), waitMs = WAIT_MS, lateWaitMs = LATE_WAIT_MS,
+  log = (...a) => console.log('[console]', ...a), waitMs = WAIT_MS, lateWaitMs = LATE_WAIT_MS, panelAllows = () => false,
 }) {
   const C = readConfig(config)
   // One line at start either way, counts only, so a deploy can see which config the backend runs with
@@ -83,18 +183,45 @@ function createStaffConsole({
     return brand({ source: 'web', discordId: s.discordId, signedInAt: Number.isSafeInteger(s.signedInAt) ? s.signedInAt : 0 })
   }
 
-  // A discord.js slash command of our own client, named console, in our guild (and channel, when locked), not from a bot
+  // A discord.js interaction of our own client (slash commands /console, /dragonbaron, /admin, or Dragonbaron UI buttons/modals)
   function discordCaller(interaction) {
     const refused = (code, discordId) => { refusal('discord', discordId, '-', '', code, ''); return { refused: code } }
     const userId = interaction?.user?.id
-    if (!(interaction instanceof ChatInputCommandInteraction) || !discordBot.isOwnClient(interaction.client)) return refused('badInteraction', userId)
-    if (interaction.commandName !== 'console') return refused('badInteraction', userId)
+    if (!interaction || !discordBot.isOwnClient(interaction.client)) return refused('badInteraction', userId)
+
+    const isChat = typeof interaction.isChatInputCommand === 'function' && interaction.isChatInputCommand()
+    const isButton = typeof interaction.isButton === 'function' && interaction.isButton()
+    const isModal = typeof interaction.isModalSubmit === 'function' && interaction.isModalSubmit()
+    const isSelect = (typeof interaction.isAnySelectMenu === 'function' && interaction.isAnySelectMenu()) ||
+                    (typeof interaction.isStringSelectMenu === 'function' && interaction.isStringSelectMenu())
+
+    if (!isChat && !isButton && !isModal && !isSelect) return refused('badInteraction', userId)
+
+    if (isChat) {
+      if (interaction.commandName !== 'console' && interaction.commandName !== 'dragonbaron' && interaction.commandName !== 'admin') {
+        return refused('badInteraction', userId)
+      }
+    } else if (isButton || isModal || isSelect) {
+      if (!interaction.customId || !interaction.customId.startsWith('db:')) {
+        return refused('badInteraction', userId)
+      }
+    }
+
     if (C.problem) return refused('unavailable', userId)
-    if (interaction.guildId !== C.guild) return refused('wrongGuild', userId)
-    if (C.channels.size && !C.channels.has(interaction.channelId)) return refused('wrongChannel', userId)
+    if (interaction.guildId !== C.guild && interaction.guildId !== C.adminGuild) return refused('wrongGuild', userId)
+    if (isChat && interaction.commandName === 'console') {
+      if (interaction.guildId === C.guild && C.channels.size && !C.channels.has(interaction.channelId)) {
+        return refused('wrongChannel', userId)
+      }
+      if (interaction.guildId === C.adminGuild && C.channels.size && !C.channels.has(interaction.channelId) && interaction.channelId !== C.adminChannel) {
+        return refused('wrongChannel', userId)
+      }
+    }
     if (!userId || !rules.SNOWFLAKE.test(userId) || interaction.user.bot) return refused('bot', userId)
     if (typeof interaction.id !== 'string' || !rules.SNOWFLAKE.test(interaction.id)) return refused('badInteraction', userId)
-    return brand({ source: 'discord', discordId: userId, interactionId: interaction.id })
+    const member = interaction.member
+    const displayName = member?.displayName || member?.nick || interaction.user?.globalName || interaction.user?.username || 'Staff'
+    return brand({ source: 'discord', discordId: userId, interactionId: interaction.id, displayName })
   }
 
   // ---- the kill switch ---------------------------------------------------------------------------------------------
@@ -247,12 +374,14 @@ function createStaffConsole({
     if (source === 'web' && !(caller.signedInAt > 0 && now() - caller.signedInAt <= C.freshMs)) return refuse(401, 'signInAgain', '-', { signInUrl: SIGN_IN_URL })
     // 4. Every attempt counts before any Discord lookup
     if (over(`tries:${discordId}`, LIMITS.triesPer10Min, 10 * MINUTE)) return refuse(429, 'tooMany', '-')
-    // 5. The permission check: the pin, then the member's roles asked of Discord now
-    if (!C.pins.has(discordId)) return refuse(403, 'notAllowed', '-')
+    // 5. The permission check, with the member's roles asked of Discord now: a panel button's own permission, else the pin and a console role
+    const panel = source === 'discord' && typeof request.panel === 'string' && Object.hasOwn(PANEL, request.panel) ? PANEL[request.panel] : null
+    if (request.panel !== undefined && !panel) return refuse(400, 'badRequest', '-')
+    if (!panel && !C.pins.has(discordId)) return refuse(403, 'notAllowed', '-')
     const member = await withDeadline(discordBot.getMemberFresh(discordId), MEMBER_DEADLINE_MS)
     const roles = member && Array.isArray(member.roles) ? member.roles.map(String).filter(r => rules.SNOWFLAKE.test(r)).slice(0, 100) : []
     const handle = member ? rules.cleanHandle(member.handle) : '-'
-    if (!roles.some(r => C.roles.has(r))) return refuse(403, 'notAllowed', handle)
+    if (panel ? !panelAllows(roles, request.panel) : !roles.some(r => C.roles.has(r))) return refuse(403, 'notAllowed', handle)
     // 6. A game profile
     let profileId = null
     try { profileId = profileIdOf(discordId) } catch (err) { log('profile store unreadable:', err.message); return refuse(503, 'unavailable', handle) }
@@ -260,11 +389,20 @@ function createStaffConsole({
     // 7. One clean line
     const line = rules.cleanCommand(text)
     if (!line) return refuse(400, 'badCommand', handle)
-    // 7b. A caller held to some commands (the Punishments panel: /discipline and /kick) is refused the rest before any record
     const word = line.slice(1).split(' ')[0]
+    // 7a. A panel button sends only its own commands
+    if (panel && !panel.includes(word)) return refuse(422, 'notPanel', handle)
+    // Help command
+    if (word === 'help' || word === 'commands') {
+      const isFull = roles.some(r => C.full.has(r))
+      const filterCmd = line.slice(1).split(' ')[1] || ''
+      return answer(200, { v: 1, help: generateHelpText(isFull, filterCmd) })
+    }
+
+    // 7b. A caller held to some commands (the Punishments panel: /discipline and /kick) is refused the rest before any record
     if (request.only && !request.only.includes(word)) return refuse(422, 'notPunish', handle)
-    // 7c. A Lead GM (no Owners or Dragon Break Dev role now) gets /discipline and /kick only, as the game holds them
-    if (!roles.some(r => C.full.has(r)) && !rules.PUNISH_ONLY.includes(word)) {
+    // 7c. Off the panel, a Lead GM (no Owners or Dragon Break Dev role now) gets PUNISH_ONLY only, as the game holds them
+    if (!panel && !roles.some(r => C.full.has(r)) && !rules.PUNISH_ONLY.includes(word)) {
       return refuse(422, 'notRemote', handle, { why: 'punishOnly', reason: rules.whyText('punishOnly', word) })
     }
     // 8. The allowlist the game published; without it the game decides alone
@@ -290,7 +428,7 @@ function createStaffConsole({
     const known = jobs.get(reqId)
     if (known) {
       if (known.discordId !== discordId) return refuse(409, 'conflict', handle)
-      if (request.only && known.text !== line) return refuse(409, 'conflict', handle)
+      if ((request.only || panel) && known.text !== line) return refuse(409, 'conflict', handle)
       if (running.has(reqId)) return answer(202, { v: 1, job: view(known) })
       return answer(200, { v: 1, job: view(known) })
     }
@@ -301,11 +439,11 @@ function createStaffConsole({
     // 11. The record and the audit line, before anything is sent
     const job = { id: reqId, at: now(), source, discordId, handle, profileId, text: line, setting: mode, state: 'sent', ranAs: '', online: false, tier: '', target: '', why: '', lines: [] }
     remember(job)
-    const via = request.via === 'punish' ? `${source} punish` : source
+    const via = request.via === 'punish' ? `${source} punish` : panel ? `${source} panel ${request.panel}` : source
     try { audit.log(`CONSOLE ${handle} (<@${discordId}>) via ${via} req ${rules.id8(reqId)}${mode === 'dry-run' ? ' (dry run)' : ''}${pagePid !== undefined ? ` (page profile ${pagePid})` : ''}: ${line}`) } catch (err) { log('audit failed:', err.message) }
     // 12. and 13. Send, then wait for the game
     const work = (async () => {
-      try { spool.send({ id: reqId, src: source, discordId, user: handle, profileId, roles, text: line, mode, ...target }) }
+      try { spool.send({ id: reqId, src: source, discordId, user: handle, profileId, roles, text: line, mode, ...target, ...(panel ? { panel: true } : {}) }) }
       catch (err) { log('send failed:', err.message); job.state = 'notRun'; remember(job); sayResult(job); return }
       const rep = await spool.waitReply(reqId, waitMs)
       if (rep) { fill(job, rep); remember(job); sayResult(job); return }
@@ -357,4 +495,4 @@ function createStaffConsole({
   return { webCaller, discordCaller, runStaffCommand, state, job, isFresh, recover, setting, config: C }
 }
 
-module.exports = { createStaffConsole, readConfig, readRankRule, withDeadline, LIMITS, SIGN_IN_URL, TIER_LABEL }
+module.exports = { createStaffConsole, readConfig, readRankRule, withDeadline, LIMITS, SIGN_IN_URL, TIER_LABEL, PANEL }

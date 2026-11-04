@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DragonBreak Online Management</title>
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="styles.css?v=20261102a">
 </head>
 <body>
   <div class="shell">
@@ -17,9 +17,12 @@
         </div>
       </div>
       <nav class="nav" aria-label="Dashboard sections">
-        <button class="nav-button active" data-view="access" type="button">Access</button>
+        <button class="nav-button active" data-view="dragonbaron" type="button">Dragonbaron Bot</button>
+        <button class="nav-button" data-view="tickets" type="button">Support Tickets</button>
         <button class="nav-button" data-view="players" type="button">Players</button>
-        <button class="nav-button" data-view="factions" type="button">Factions</button>
+        <button class="nav-button" data-view="bans" type="button">Bans &amp; Punishments</button>
+        <button class="nav-button" data-view="factions" type="button">Factions &amp; Holds</button>
+        <button class="nav-button" data-view="access" type="button">Server Access</button>
         <button class="nav-button" data-view="permissions" type="button">Permissions</button>
       </nav>
       <div class="session-panel">
@@ -41,6 +44,252 @@
       <section id="signedOut" class="empty-state">
         <h2>Discord access required</h2>
         <p>Management role access is checked through the backend OAuth flow.</p>
+      </section>
+
+                        <!-- Support Tickets View -->
+            <section id="ticketsView" class="view hidden">
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <h2>Support Tickets &amp; Dragonbaron Relay</h2>
+                    <p class="muted">Live player support tickets routed to Discord forum channels. Replies sent here speak as <strong>Dragonbaron</strong> to the player.</p>
+                  </div>
+                  <div class="actions">
+                    <button id="refreshTicketsBtn" class="ghost mini" type="button">Refresh Tickets</button>
+                  </div>
+                </div>
+                <div id="ticketsTableWrapper" class="table-wrapper" style="margin-top:14px;">
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th>Ticket</th>
+                        <th>Type</th>
+                        <th>Opener</th>
+                        <th>Summary</th>
+                        <th>Discord Forum Thread</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="ticketsTableBody">
+                      <tr><td colspan="6" class="muted">Loading open tickets...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Reply Box Card -->
+              <div id="ticketReplyBox" class="card hidden" style="margin-top:20px;">
+                <div class="card-header">
+                  <div>
+                    <h3 id="ticketReplyBoxTitle">Reply to Ticket</h3>
+                    <p class="muted">Player receives this message from <strong>Dragonbaron</strong>. Your personal staff name is kept anonymous.</p>
+                  </div>
+                  <button id="closeTicketReplyBoxBtn" class="ghost mini" type="button">Cancel</button>
+                </div>
+                <div style="padding:16px;">
+                  <textarea id="ticketReplyInput" rows="4" style="width:100%; border-radius:6px; background:#18181b; color:#fff; border:1px solid #3f3f46; padding:12px; font-family:inherit; resize:vertical;" placeholder="Type official response to player as Dragonbaron..."></textarea>
+                  <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:center;">
+                    <button id="sendTicketReplyBtn" class="primary" type="button">Send Reply as Dragonbaron</button>
+                    <button id="closeTicketActionBtn" class="danger ghost mini" type="button">Close Ticket</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section id="dragonbaronView" class="view hidden">
+        <div class="stats" id="dbStats"></div>
+
+        <div class="toolbar">
+          <div class="actions-row" style="margin:0">
+            <button id="dbCopyAdminInviteBtn" class="primary" type="button">Copy Admin Invite URL</button>
+            <button id="dbCopyModInviteBtn" class="ghost" type="button">Copy Moderation Invite URL</button>
+            <button id="dbFlushDigestBtn" class="ghost" type="button">Run Check &amp; Flush Digest Now</button>
+            <button id="dbScanClientsBtn" class="ghost" type="button">Scan Discords for 3rd-Party Clients</button>
+          </div>
+          <div class="actions-row" style="margin:0">
+            <span id="dbLastRunLabel" class="muted"></span>
+            <button id="dbRefreshBtn" class="ghost" type="button">Refresh Live Status</button>
+          </div>
+        </div>
+
+        <div class="split">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>AI &amp; Infraction Watch Controls</h2>
+              <span class="muted">Live switches &amp; detector settings</span>
+            </div>
+            <form id="dbSettingsForm" class="form">
+              <div class="db-grid-3">
+                <label>
+                  Ask Switch (/ask)
+                  <select id="dbSwitchAsk">
+                    <option value="on">on</option>
+                    <option value="off">off</option>
+                  </select>
+                </label>
+                <label>
+                  Model Switch (Ollama)
+                  <select id="dbSwitchModel">
+                    <option value="on">on</option>
+                    <option value="off">off</option>
+                  </select>
+                </label>
+                <label>
+                  Infraction Detector
+                  <select id="dbSwitchDetect">
+                    <option value="on">on (live)</option>
+                    <option value="dry">dry (log only)</option>
+                    <option value="off">off</option>
+                  </select>
+                </label>
+              </div>
+              <div class="db-grid-2">
+                <label>
+                  Report Mode
+                  <select id="dbReportMode">
+                    <option value="immediate">immediate (post all hits now)</option>
+                    <option value="standard">standard (verify + daily digest for low)</option>
+                  </select>
+                </label>
+                <label>
+                  Staff Author Policy
+                  <select id="dbStaffAuthors">
+                    <option value="main_only">main_only (hold Main Staff; report Faction Mods)</option>
+                    <option value="hold">hold (hold all Staff &amp; Faction Mods)</option>
+                    <option value="post">post (post all hits to #infraction-detection)</option>
+                  </select>
+                </label>
+              </div>
+              <div class="db-grid-2">
+                <label>
+                  OOC Evaluation Mode
+                  <select id="dbOocMode">
+                    <option value="single">single (1 message per LLM call)</option>
+                    <option value="batch">batch (up to 12 messages per call)</option>
+                  </select>
+                </label>
+                <label>
+                  OOC Keyword Prefilter
+                  <select id="dbOocPrefilter">
+                    <option value="on">on</option>
+                    <option value="off">off</option>
+                  </select>
+                </label>
+              </div>
+              <div class="db-grid-3">
+                <label>
+                  Model Calls / Hour (1-240)
+                  <input id="dbCallsPerHour" type="number" min="1" max="240" required>
+                </label>
+                <label>
+                  Model Calls / Run (1-45)
+                  <input id="dbCallsPerRun" type="number" min="1" max="45" required>
+                </label>
+                <label>
+                  Max Reports / Hour (1-30)
+                  <input id="dbReportsPerHour" type="number" min="1" max="30" required>
+                </label>
+              </div>
+              <button id="dbSaveSettingsBtn" class="primary" type="submit">Save Dragonbaron Settings</button>
+            </form>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Cross-Guild Timeout Control</h2>
+              <span class="muted">Timeout or check a user across all Discords</span>
+            </div>
+            <form id="dbTimeoutForm" class="form">
+              <label>
+                Discord User ID
+                <input id="dbTimeoutUserId" placeholder="e.g. 262414676489535489" autocomplete="off" required>
+              </label>
+              <div class="db-grid-2">
+                <label>
+                  Target Server Scope
+                  <select id="dbTimeoutGuildSelect">
+                    <option value="all">All Connected Discords (--all-guilds)</option>
+                  </select>
+                </label>
+                <label>
+                  Duration
+                  <select id="dbTimeoutDuration">
+                    <option value="60">1 hour</option>
+                    <option value="360">6 hours</option>
+                    <option value="1440">24 hours (1 day)</option>
+                    <option value="4320">3 days</option>
+                    <option value="10080">7 days</option>
+                    <option value="40320">28 days (max)</option>
+                    <option value="0">Clear Timeout (0)</option>
+                  </select>
+                </label>
+              </div>
+              <label>
+                Audit Log Reason (min 5 chars)
+                <input id="dbTimeoutReason" placeholder="Rule D3 OOC toxicity / bleed" autocomplete="off">
+              </label>
+              <label class="check-row">
+                <input id="dbTimeoutForce" type="checkbox">
+                <span>Force timeout on Faction Moderators (--force, Owner only)</span>
+              </label>
+              <div class="actions-row" style="margin:0">
+                <button id="dbCheckTimeoutBtn" class="ghost" type="button">Check Timeout Status</button>
+                <button id="dbApplyTimeoutBtn" class="danger" type="submit">Apply / Clear Timeout</button>
+              </div>
+            </form>
+            <div id="dbTimeoutResults" class="table compact-table" style="margin-top:14px"></div>
+          </section>
+        </div>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2 id="dragonbaron-guilds-caption">Connected Discords (Multi-Guild Scope)</h2>
+            <span id="dbGuildCount" class="muted"></span>
+          </div>
+          <div id="dbGuildsTable" tabindex="0" role="region" aria-labelledby="dragonbaron-guilds-caption" class="table-wrapper"></div>
+        </section>
+
+        <section id="dbScopePanel" class="panel hidden">
+          <div class="panel-head">
+            <h2 id="dragonbaron-scope-caption">Channel &amp; Area Scope Inspector: <span id="dbScopeGuildName"></span></h2>
+            <button id="dbCloseScopeBtn" class="ghost mini" type="button">Close Inspector</button>
+          </div>
+          <div id="dbScopeTable" tabindex="0" role="region" aria-labelledby="dragonbaron-scope-caption" class="table-wrapper"></div>
+        </section>
+
+<section class="panel">
+          <div class="panel-head">
+            <h2 id="dragonbaron-anticheat-caption">In-Game Anti-Cheat Flags &amp; Exploit Detection (Server Engine)</h2>
+            <span id="dbAnticheatFlagsCount" class="muted"></span>
+          </div>
+          <div id="dbAnticheatFlagsTable" tabindex="0" role="region" aria-labelledby="dragonbaron-anticheat-caption" class="table-wrapper"></div>
+        </section>
+
+                <section class="panel">
+          <div class="panel-head">
+            <h2 id="dragonbaron-clients-caption">Flagged 3rd-Party Discord Clients &amp; Spying Signals (Vencord / FakeNitro / ShowHiddenChannels)</h2>
+            <span id="dbClientFlagsCount" class="muted"></span>
+          </div>
+          <div id="dbClientFlagsTable" tabindex="0" role="region" aria-labelledby="dragonbaron-clients-caption" class="table-wrapper"></div>
+        </section>
+
+        <div class="split">
+          <section class="panel">
+            <div class="panel-head">
+              <h2 id="dragonbaron-infractions-caption">Recent Infraction Detections</h2>
+              <span id="dbRecentCount" class="muted"></span>
+            </div>
+            <div id="dbInfractionsTable" tabindex="0" role="region" aria-labelledby="dragonbaron-infractions-caption" class="table-wrapper"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2 id="dragonbaron-held-caption">Owners' Held Staff Queue (Rule 11.7)</h2>
+              <span id="dbHeldCount" class="muted"></span>
+            </div>
+            <div id="dbHeldTable" tabindex="0" role="region" aria-labelledby="dragonbaron-held-caption" class="table-wrapper"></div>
+          </section>
+        </div>
       </section>
 
       <section id="accessView" class="view hidden">
@@ -163,6 +412,26 @@
         </div>
       </section>
 
+            <section id="bansView" class="view hidden">
+        <div class="stats" id="bansStats"></div>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2 id="bans-active-caption">Active Game &amp; Discord Bans</h2>
+            <span id="bansActiveCount" class="muted"></span>
+          </div>
+          <div id="bansActiveTable" tabindex="0" role="region" aria-labelledby="bans-active-caption" class="table-wrapper"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2 id="bans-mod-caption">Recent Moderation Journal (Timeouts, Bans &amp; Unbans)</h2>
+            <span id="bansModCount" class="muted"></span>
+          </div>
+          <div id="bansModTable" tabindex="0" role="region" aria-labelledby="bans-mod-caption" class="table-wrapper"></div>
+        </section>
+      </section>
+
       <section id="factionsView" class="view hidden">
         <div class="stats" id="stats"></div>
 
@@ -246,6 +515,52 @@
         <div class="split">
           <section class="panel">
             <div class="panel-head">
+              <h2>Website User Access (Individual Users)</h2>
+              <span id="userPermCount" class="muted"></span>
+            </div>
+            <div id="userPermsTable" class="table"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Grant / Edit User Website Access</h2>
+              <span id="selectedUserPerm" class="muted">Add user</span>
+            </div>
+            <form id="userPermForm" class="form">
+              <label>
+                Quick Pick Registered Player (optional)
+                <select id="userPermPlayerSelect">
+                  <option value="">-- Select a registered player to fill ID &amp; Name --</option>
+                </select>
+              </label>
+              <div class="db-grid-2">
+                <label>
+                  Discord User ID
+                  <input id="userPermIdInput" placeholder="e.g. 274310050762326017" autocomplete="off" required>
+                </label>
+                <label>
+                  Display Name / Label
+                  <input id="userPermNameInput" placeholder="e.g. IcedSky" autocomplete="off" required>
+                </label>
+              </div>
+              <label>
+                Access Preset
+                <select id="userPermPreset">
+                  <option value="admin">Full Owner / Admin (All Website &amp; Dragonbaron Controls)</option>
+                  <option value="mod">Moderator / GM (View + Moderate + Players + Bans)</option>
+                  <option value="viewer">Read-Only Staff (View Dashboard &amp; Dragonbaron)</option>
+                  <option value="custom">Custom Checkboxes Below</option>
+                </select>
+              </label>
+              <div id="userPermissionChecks" class="checks"></div>
+              <button class="primary" type="submit">Save User Website Access</button>
+            </form>
+          </section>
+        </div>
+
+        <div class="split">
+          <section class="panel">
+            <div class="panel-head">
               <h2>Discord Roles</h2>
               <span id="roleCount" class="muted"></span>
             </div>
@@ -276,7 +591,7 @@
   </div>
 
   <div id="toast" class="toast hidden"></div>
-  <script src="/dashboard-config.js"></script>
-  <script src="/app.js"></script>
+  <script src="dashboard-config.js?v=20261102a"></script>
+  <script src="app.js?v=20261102a"></script>
 </body>
 </html>

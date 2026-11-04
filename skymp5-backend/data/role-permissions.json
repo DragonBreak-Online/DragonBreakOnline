@@ -49,6 +49,131 @@
         "rules.write",
         "staff.whitelist_info"
       ]
+    },
+    "1494126527489507369": {
+      "name": "Owner",
+      "permissions": [
+        "admin.*",
+        "dashboard.access",
+        "permissions.manage",
+        "players.view",
+        "players.manage",
+        "server.access.view",
+        "server.access.manage",
+        "factions.view",
+        "factions.manage",
+        "lore.write",
+        "rules.write",
+        "staff.whitelist_info",
+        "dragonbaron.view",
+        "dragonbaron.manage",
+        "dragonbaron.held",
+        "dragonbaron.moderate"
+      ]
+    },
+    "1494491999305338981": {
+      "name": "Dragon Break Dev",
+      "permissions": [
+        "dashboard.access",
+        "players.view",
+        "server.access.view",
+        "factions.view",
+        "staff.whitelist_info",
+        "dragonbaron.view",
+        "dragonbaron.manage",
+        "dragonbaron.moderate"
+      ]
+    },
+    "1494126618065506425": {
+      "name": "Lead GM",
+      "permissions": [
+        "dashboard.access",
+        "players.view",
+        "players.manage",
+        "server.access.view",
+        "factions.view",
+        "factions.manage",
+        "staff.whitelist_info",
+        "dragonbaron.view",
+        "dragonbaron.moderate"
+      ]
+    },
+    "1553844072878178384": {
+      "name": "GM",
+      "permissions": [
+        "dashboard.access",
+        "players.view",
+        "factions.view",
+        "dragonbaron.view"
+      ]
+    }
+  },
+  "users": {
+    "274310050762326017": {
+      "name": "IcedSky",
+      "permissions": [
+        "admin.*",
+        "dashboard.access",
+        "permissions.manage",
+        "players.view",
+        "players.manage",
+        "server.access.view",
+        "server.access.manage",
+        "factions.view",
+        "factions.manage",
+        "lore.write",
+        "rules.write",
+        "staff.whitelist_info",
+        "dragonbaron.view",
+        "dragonbaron.manage",
+        "dragonbaron.held",
+        "dragonbaron.moderate"
+      ],
+      "updatedAt": "2026-10-30T23:29:39.374Z"
+    },
+    "234362720420364288": {
+      "name": "F_No_Spaghettio (Jake)",
+      "permissions": [
+        "admin.*",
+        "dashboard.access",
+        "permissions.manage",
+        "players.view",
+        "players.manage",
+        "server.access.view",
+        "server.access.manage",
+        "factions.view",
+        "factions.manage",
+        "lore.write",
+        "rules.write",
+        "staff.whitelist_info",
+        "dragonbaron.view",
+        "dragonbaron.manage",
+        "dragonbaron.held",
+        "dragonbaron.moderate"
+      ],
+      "updatedAt": "2026-10-30T23:29:39.373Z"
+    },
+    "262414676489535489": {
+      "name": "Nate Piercii",
+      "permissions": [
+        "admin.*",
+        "dashboard.access",
+        "permissions.manage",
+        "players.view",
+        "players.manage",
+        "server.access.view",
+        "server.access.manage",
+        "factions.view",
+        "factions.manage",
+        "lore.write",
+        "rules.write",
+        "staff.whitelist_info",
+        "dragonbaron.view",
+        "dragonbaron.manage",
+        "dragonbaron.held",
+        "dragonbaron.moderate"
+      ],
+      "updatedAt": "2026-10-30T23:29:39.373Z"
     }
   }
 }
