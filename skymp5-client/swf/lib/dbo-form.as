@@ -124,6 +124,36 @@ function formLabel(f, value)
    return String(f.label) + (f.count == true && f.max != undefined ? "  (" + value.length + " / " + f.max + ")" : "");
 }
 
+// A page of several lines scrolls with the shared bar, in the field's own lines (scroll, bottomScroll, maxscroll)
+function formScroll(c, field, x, y, h)
+{
+   if (typeof(scrollbar) != "function")
+   {
+      return;
+   }
+   var bar = scrollbar(c, "bar", 11, x, y, h, c);
+   bar._visible = false;
+   bar.field = field;
+   bar.onScroll = function(o) { this.field.scroll = o + 1; };
+   field.bar = bar;
+   if (field.onChanged == undefined)
+   {
+      field.onChanged = function() { formScrollSync(this); };
+   }
+   field.onScroller = function() { formScrollSync(this); };
+   formScrollSync(field);
+}
+
+function formScrollSync(field)
+{
+   if (field.bar == undefined || field.maxscroll == undefined)
+   {
+      return;
+   }
+   var shown = field.bottomScroll - field.scroll + 1;
+   field.bar.set(field.maxscroll + shown - 1, shown, field.scroll - 1);
+}
+
 // A typed field's row: its label, the value or a box to type it in
 function formField(f, vals)
 {
@@ -135,9 +165,10 @@ function formField(f, vals)
    var value = vals[f.key] != undefined ? String(vals[f.key]) : "";
    var l = dboText(c, "label", 1, 0, 8, 300, 26, dboFmt(F_MEDIUM, 16, C_SECOND, 0.5), false);
    l.text = formLabel(f, value);
+   var boxW = BODY_W - 310 - 108 - (lines > 1 ? SCROLL_W + 8 : 0);
    if (fbox == f.key)
    {
-      fboxField = dboInput(c, "box", 2, 310, 4, BODY_W - 310 - 108, tall, dboFmt(F_PLAIN, 18, C_TEXT, 0.5), f.max != undefined ? f.max : 40, lines > 1);
+      fboxField = dboInput(c, "box", 2, 310, 4, boxW, tall, dboFmt(F_PLAIN, 18, C_TEXT, 0.5), f.max != undefined ? f.max : 40, lines > 1);
       fboxLines = lines > 1;
       if (f.kind == "number")
       {
@@ -155,13 +186,22 @@ function formField(f, vals)
          fboxField.onChanged = function()
          {
             this.countLabel.text = formLabel(this.countField, String(this.text));
+            formScrollSync(this);
          };
+      }
+      if (lines > 1)
+      {
+         formScroll(c, fboxField, 310 + boxW + 6, 4, tall);
       }
       button(c, "done", 10, BODY_W - 100, 6, 92, "Done", F_MEDIUM, 17, A_BUTTON_REST, function() { takeFormTyped(); });
       return;
    }
-   var v = dboText(c, "value", 2, 310, 8, BODY_W - 310 - 108, lines > 1 ? tall : 26, dboFmt(F_MEDIUM, 17, value != "" ? C_TEXT : C_SECOND, 0.5), lines > 1);
+   var v = dboText(c, "value", 2, 310, 8, boxW, lines > 1 ? tall : 26, dboFmt(F_MEDIUM, 17, value != "" ? C_TEXT : C_SECOND, 0.5), lines > 1);
    v.text = value != "" ? value : f.hint != undefined ? String(f.hint) : "";
+   if (lines > 1)
+   {
+      formScroll(c, v, 310 + boxW + 6, 8, tall);
+   }
    if (dboCanType())
    {
       var t = button(c, "type", 10, BODY_W - 100, 6, 92, "Type...", F_MEDIUM, 17, A_ROW_REST, function()
