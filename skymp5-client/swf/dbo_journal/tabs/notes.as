@@ -123,10 +123,10 @@ function notesPage(s, o, ctx)
    flowText(o.text, 18, C_TEXT);
    if (o.kind == "entry")
    {
-      flowButtons([["Edit...", function() { notesEdit(s, ctx, o); }, undefined, off], ["Tear out", function()
+      flowButtons([["Tear out", function()
       {
          ctx.ask("Tear out " + o.title + "?", "Tear it out", function() { ctx.act("dbo:journalNotes", ["delete", o.id]); notesList = true; }, true);
-      }, C_RED, off]]);
+      }, C_RED, off], ["Edit...", function() { notesEdit(s, ctx, o); }, undefined, off]]);
       var w = s.write;
       if (w != undefined && w != null && w.on == true)
       {
@@ -148,6 +148,10 @@ function notesPage(s, o, ctx)
    }
    else if (o.kind == "work")
    {
+      flowButtons([["Burn it", function()
+      {
+         ctx.ask("Burn " + o.title + " for good?", "Burn it", function() { ctx.act("dbo:journalNotes", ["burn", o.id, "yes"]); notesList = true; }, true);
+      }, C_RED, off]]);
       if (o.kept == true)
       {
          flowHint("A copy is in your journal, under Received.");
@@ -212,8 +216,8 @@ function notesEdit(s, ctx, o)
    ctx.form(function(v)
    {
       var text = v.text != undefined ? String(v.text) : "";
-      return {title: o != null ? "Change " + o.title : "A new entry", fields: [{key: "title", label: "Title", kind: "text", max: L.titleMax},
-         {key: "text", label: "Page", kind: "text", max: L.entryMax, lines: 8}, {key: "folder", label: "Folder", kind: "choice", options: opts}],
+      return {title: o != null ? "Change " + o.title : "A new entry", fields: [{key: "title", label: "Title", kind: "text", max: L.titleMax, count: true},
+         {key: "text", label: "Page", kind: "text", max: L.entryMax, lines: 8, count: true}, {key: "folder", label: "Folder", kind: "choice", options: opts}],
          buttons: [["Save", function(vals)
          {
             ctx.act("dbo:journalNotes", ["save", o != null ? o.id : "", String(vals.folder != undefined ? vals.folder : ""), String(vals.title != undefined ? vals.title : ""), String(vals.text)]);
