@@ -35,12 +35,13 @@ add(MGEF_RUNE, 'MGEF', 'RuneEffect', [{ type: 'DATA', data: bytes(0x98, [[0, 0],
 add(EXPL_RUNE, 'EXPL', 'RuneExplosion', [{ type: 'EITM', data: bytes(4, [[0, ENCH_RUNE]]) }]);
 add(ENCH_RUNE, 'ENCH', 'RuneEnchantment', [{ type: 'EFID', data: bytes(4, [[0, MGEF_PARALYSIS]]) }, { type: 'EFIT', data: bytes(12, [[8, 5]]) }]);
 const effect = (mgef, seconds) => [{ type: 'EFID', data: bytes(4, [[0, mgef]]) }, { type: 'EFIT', data: bytes(12, [[8, seconds]]) }];
-const SCROLL = 0x200, HARM_SCROLL = 0x201, PARALYZE = 0x202, RUNE = 0x203, FIREBOLT = 0x204;
+const SCROLL = 0x200, HARM_SCROLL = 0x201, PARALYZE = 0x202, RUNE = 0x203, FIREBOLT = 0x204, ASHSHELL = 0x206;
 add(SCROLL, 'SCRL', 'ScrollParalyze', effect(MGEF_PARALYSIS, 10));
 add(HARM_SCROLL, 'SCRL', 'ScrollHarmParalyze', [...effect(MGEF_PARALYSIS, 6), ...effect(MGEF_DAMAGE, 1)]);
 add(PARALYZE, 'SPEL', 'Paralyze', effect(MGEF_PARALYSIS, 10));
 add(RUNE, 'SPEL', 'AshRune', effect(MGEF_RUNE, 0));
 add(FIREBOLT, 'SPEL', 'Firebolt', effect(MGEF_DAMAGE, 1));
+add(ASHSHELL, 'SPEL', 'DLC2AshShell', effect(MGEF_PARALYSIS, 30));
 const STAFF = 0x205;
 add(STAFF, 'ENCH', 'StaffEnchParalyze', effect(MGEF_PARALYSIS, 10));
 
@@ -117,6 +118,11 @@ reset();
 got = hit(RUNE);
 check("a rune holds for its explosion's paralysis", got.length === 1 && got[0].seconds === 5, JSON.stringify(got));
 check('a spell without paralysis holds nobody', hit(FIREBOLT, CASTER, OTHER).length === 0);
+
+// Ash Shell: encases target in ash for 30 s and holds on the client
+reset();
+got = hit(ASHSHELL);
+check('an Ash Shell spell sends a hold packet to the victim', got.length === 1 && got[0].seconds === 30, JSON.stringify(got));
 
 // NPC targets: no packet (their host's engine applies it), but the hold is still tracked
 reset();

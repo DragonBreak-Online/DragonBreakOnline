@@ -7763,6 +7763,8 @@ const explosionParalysisOf = (spellId) => {
   if (spell && spell.record.type === 'SCRL') seconds = paralysisIn(spell);
   // A staff's (ENCH) paralysis, which nothing applied on a player's own client (gearench.js caps it for PvP)
   else if (spell && spell.record.type === 'ENCH') seconds = paralysisIn(spell);
+  // Ash Shell: encases target in ash, but DoCombatSpellApply does not freeze player controls in Skyrim SE
+  else if (spell && spell.record.type === 'SPEL' && spell.record.editorId && spell.record.editorId.startsWith('DLC2AshShell')) seconds = paralysisIn(spell);
   else if (spell && spell.record.type === 'SPEL' && !paralysisIn(spell)) {
     for (const f of fieldsOf(spell, 'EFID')) {
       const mgef = recordOf(globalAt(spell, u32At(f, 0)));
