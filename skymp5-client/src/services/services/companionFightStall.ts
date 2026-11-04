@@ -25,10 +25,10 @@ export const STALL_REACH = 256;
 export const STALL_MOVE = 64;
 
 export const fightStallStep = (prev: FightStall | null, now: number, target: number, pos: number[], health: number,
-  toTarget: number): { stall: FightStall; action: StallAction } => {
+  toTarget: number, isCasting = false): { stall: FightStall; action: StallAction } => {
   const fresh = (kicks: number): FightStall => ({ target, since: now, pos: pos.slice(), dist: toTarget, health, kicks });
   if (!prev || prev.target !== target) return { stall: fresh(0), action: "none" };
-  if (toTarget <= STALL_REACH || health < prev.health - 0.001 || prev.dist - toTarget > STALL_MOVE) return { stall: fresh(0), action: "none" };
+  if (isCasting || toTarget <= STALL_REACH || health < prev.health - 0.001 || prev.dist - toTarget > STALL_MOVE) return { stall: fresh(0), action: "none" };
   if (now - prev.since < STALL_MS) return { stall: prev, action: "none" };
   return { stall: fresh(prev.kicks + 1), action: prev.kicks === 0 ? "restart" : "drop" };
 };
