@@ -569,6 +569,7 @@ check('the menu lists all seven faiths as reachable', menu && ['hist', 'ancestor
 // offerings
 props.set(ACTOR + '|private.dboDeity', { id: 'hist', name: 'The Hist', kind: 'faith', at: 1, convertedAt: 1 });
 clear();
+check('the gold offering is published for vampirepath.js, whose /offer replaces this one', globalThis.__dboPrayerOffer === commands.get('offer'));
 commands.get('offer')(ACTOR, '2');
 check('an offering below the minimum is refused', /between 5 and 1000/.test(out.personals[0]) && gold === 500);
 commands.get('offer')(ACTOR, '60');

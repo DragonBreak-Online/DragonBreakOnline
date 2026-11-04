@@ -136,6 +136,26 @@ ok(/filled black soul gem/.test(lastSaid(V)) && M.devOf(V).points === 32, 'no fi
 setp(V, 'inventory', { entries: [{ baseId: 0x2e504, count: 2 }] });
 cmds.get('offer')(V);
 ok(M.devOf(V).points === 47 && getp(V, 'inventory').entries[0].count === 1 && calls.some((c) => c[0] === 'thirst' && c[2] === 2), 'the offering: one gem taken, +15, and the thirst one stage lower', { pts: M.devOf(V).points, calls });
+// Gold for the player's own god goes to prayer.js's /offer (amon__, 3 Nov: every shrine said "made at a shrine of Molag Bal")
+{
+  const prayed = [];
+  globalThis.__dboPrayerOffer = (a, s) => prayed.push([a, s]);
+  globalThis.__dboPrayerLastShrine.delete(V);
+  const inv0 = getp(V, 'inventory');
+  setp(V, 'inventory', { entries: [{ baseId: 0xf, count: 100 }] });
+  const pts = M.devOf(V).points;
+  cmds.get('offer')(V, '50');
+  ok(prayed.length === 1 && prayed[0][1] === '50' && M.devOf(V).points === pts, 'gold offered away from his shrine (the shrine panel\'s /offer 50) goes to the prayer offering', prayed);
+  cmds.get('offer')(V, '');
+  ok(prayed.length === 2, '...and so does a bare /offer away from his shrine', prayed);
+  globalThis.__dboPrayerLastShrine.set(V, { deityId: 'molagbal', at: clock });
+  cmds.get('offer')(V, '25');
+  ok(prayed.length === 3, 'an amount at his shrine is gold for the god too, not a gem', prayed);
+  cmds.get('offer')(V, '');
+  ok(prayed.length === 3 && /filled black soul gem/.test(lastSaid(V)) && M.devOf(V).points === pts, 'a bare /offer at his shrine is still the soul gem (here: none held)', { prayed: prayed.length, said: lastSaid(V) });
+  delete globalThis.__dboPrayerOffer;
+  setp(V, 'inventory', inv0);
+}
 // leaving him
 patrons.set(V, 'boethiah'); tick('vampFeral');
 ok(M.devOf(V).points === 0 && audits.some((t) => /left Molag Bal; devotion 47 lost/.test(t)), 'another patron empties the devotion');

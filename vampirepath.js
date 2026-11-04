@@ -562,7 +562,12 @@ module.exports = (api) => {
     if (!hit) return false;
     hit.count -= 1; mp.set(a, 'inventory', { entries: entries.filter((e) => Number(e.count) > 0) }); return true;
   };
-  registerChatCommand('offer', (a) => {
+  // One /offer for both: this one, registered after prayer.js's, took every gold offering at every shrine and answered
+  // "made at a shrine of Molag Bal" (amon__, 3 Nov). An amount is gold for the player's god (the shrine panel always
+  // sends one), and so is anything away from his shrine; a bare /offer at his shrine is the soul gem
+  registerChatCommand('offer', (a, argStr) => {
+    const pray = globalThis.__dboPrayerOffer;
+    if (typeof pray === 'function' && (String(argStr || '').trim() !== '' || !atMolagShrine(a))) return pray(a, argStr);
     if (!on()) return personal(a, 'Nothing answers.');
     if (!atMolagShrine(a)) return personal(a, 'Offerings are made at a shrine of Molag Bal: touch one, then say /offer.');
     if (!sworn(a)) return personal(a, 'He takes offerings only from his own. Swear yourself to him first.');
