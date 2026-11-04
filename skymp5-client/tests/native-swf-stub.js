@@ -37,6 +37,7 @@ const clip = (name) => {
   c.lineStyle = () => {};
   c.curveTo = (cx, cy, x, y) => { if (c._fill) c._fill.pts.push([x, y]); else c.strokes++; };
   c.hitTest = () => true;
+  c.setMask = (m) => { c._mask = m; };
   c.clear = () => { c.fills = []; };
   return c;
 };
