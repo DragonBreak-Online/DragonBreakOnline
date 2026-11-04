@@ -1367,6 +1367,55 @@ module.exports = (api) => {
     return { actor: hex(t), name: nameNow(t, e ? e.name : ''), tag: tagSafe(t),
       holds: holdsOf(t).map((h) => { const z = holdOf(h.zone); return Object.assign(holdLine(h), { via: h.auto && z ? autoWhy(t, z) : '' }); }) };
   };
+
+  // ---- /citizenship: the Dragon Baron panel's Citizenship button, and staff in game (Jake, 4 Nov) --------------------------
+  const holdNamed = (q) => { const k = String(q || '').toLowerCase().replace(/^the[ -]/, ''); return holds().find((z) => z.id === k || String(z.name).toLowerCase().replace(/^the /, '') === k) || null; };
+  const viewText = (t) => {
+    const e = entryOf(t);
+    const list = holdsOf(t).map((h, i) => {
+      const z = holdOf(h.zone);
+      return `${z ? z.name : h.zone} (${h.auto ? `through ${(z && autoWhy(t, z)) || 'a faction or court based there'}` : `${i ? 'Secondary' : 'Primary'}, since ${dateText(h.since)}, ${clean(h.how, 80)}`})`;
+    });
+    const asked = liveRequests().filter((r) => (r.actor >>> 0) === t).map((r) => holdName(r.zone));
+    const barred = Object.keys((e && e.barred) || {}).filter((zid) => barredUntil(t, zid)).map((zid) => `${holdName(zid)} until ${dateText(barredUntil(t, zid))}`);
+    return [`${nameNow(t, e ? e.name : '')}${tagSafe(t) ? ` #${tagSafe(t)}` : ''}: ${list.length ? `a citizen of ${list.join('; ')}` : 'a citizen of no hold'}.`,
+      asked.length ? `Asked for the citizenship of ${andList(asked)}.` : '',
+      cooldownLeft(t) ? `No new citizenship until ${dateText(Date.now() + cooldownLeft(t))} (renounced lately).` : '',
+      barred.length ? `An outlaw of ${andList(barred)}.` : ''].filter(Boolean).join('\n');
+  };
+  // A Lead GM clears a character's renounce cooldown, or sets one of at most cooldownDays, under the staff rules
+  const setCooldown = (by, t, word) => {
+    if (!isLeadStaff(by)) return { error: 'Only a Lead GM or above changes a citizenship cooldown.' };
+    const w = String(word || '').toLowerCase();
+    const m = /^(?:([1-9][0-9]{0,2})h|([1-9][0-9]?)d)$/.exec(w);
+    const ms = m ? (m[1] ? Number(m[1]) * HOUR : Number(m[2]) * DAY) : 0;
+    if (w !== 'clear' && !(ms > 0 && ms <= C.cooldownDays * DAY)) return { error: `Use cooldown clear, or a length of at most ${C.cooldownDays} days, like 12h or 3d.` };
+    const k = hex(t); const label = nameNow(t, (entryOf(t) || {}).name);
+    if (w === 'clear' && !cooldownLeft(t)) return { error: `${label} has no citizenship cooldown running.` };
+    { const no = staffNo(by, null, t); if (no) return { error: no }; }
+    const d = data();
+    const e = d.chars[k] || (d.chars[k] = { pid: Number(profileOf(t)), name: label, holds: [], renounced: [] });
+    e.cooldownUntil = w === 'clear' ? 0 : Date.now() + ms; save();
+    audit(`CITIZEN STAFF ${who(by)} ${w === 'clear' ? 'cleared the citizenship cooldown of' : `set a citizenship cooldown until ${dateText(e.cooldownUntil)} on`} ${label} (character ${k})`);
+    tell(t, w === 'clear' ? 'The staff lifted your citizenship cooldown: you may take a citizenship now.' : `The staff set your citizenship cooldown: no new citizenship until ${dateText(e.cooldownUntil)}.`);
+    return { text: w === 'clear' ? `${label} may take a citizenship now.` : `${label} may take no new citizenship until ${dateText(e.cooldownUntil)}.` };
+  };
+  // <name|#TAG> view | grant <hold> (its pending request, as the hold's court grants it) | revoke <hold> | cooldown clear|<length>
+  const STAFF_ACTS = ['view', 'grant', 'revoke', 'cooldown'];
+  const staffCommand = (by, w) => {
+    const at = w.findIndex((x, i) => i > 0 && STAFF_ACTS.includes(x.toLowerCase()));
+    if (at < 1) return { error: 'Use /citizenship <name|#TAG> view | grant <hold> | revoke <hold> | cooldown clear|<12h|3d>, with call:<n> or ticket:<id> for a change.' };
+    if (!C.enabled) return { error: 'Citizenship is switched off.' };
+    const q = w.slice(0, at).join(' '); const act = w[at].toLowerCase(); const arg = w[at + 1];
+    if (/^\d+$/.test(q)) return { error: 'Name the character by their name or #TAG.' };
+    const tg = officialTarget(q); if (tg.error) return tg;
+    if (!tg.actor || !exists(tg.actor)) return { error: `${q}: no such character.` };
+    const t = tg.actor >>> 0;
+    if (act === 'view') return isLeadStaff(by) ? { text: viewText(t) } : { error: 'Only a Lead GM or above looks up a citizenship.' };
+    if (act === 'cooldown') return setCooldown(by, t, arg);
+    const z = holdNamed(arg); if (!z) return { error: `No hold called ${arg || '(none)'} grants a citizenship: ${holds().map((x) => x.id).join(', ')}.` };
+    return act === 'grant' ? grant(by, z.id, t) : revoke(by, z.id, t);
+  };
   const journalView = (a) => {
     const mine = holdsOf(a).map(holdLine);
     const v = { holds: mine, maxHolds: C.maxHolds, cooldownUntil: cooldownLeft(a) ? Date.now() + cooldownLeft(a) : 0,
@@ -1499,6 +1548,10 @@ module.exports = (api) => {
       const r = unstrikeVote(a, m[1].toLowerCase(), m[2]);
       personal(a, r.error || r.text);
     }, { admin: true, help: 'elections: undo a struck vote, so that account may vote again in the open round (Lead GM+). /unstrikevote <hold> <name or #TAG>' });
+    registerChatCommand('citizenship', (a, args) => {
+      const r = staffCommand(a, String(args || '').trim().split(/\s+/).filter(Boolean));
+      for (const line of String(r.error || r.text).split('\n')) personal(a, line);
+    }, { admin: true, help: "<name|#TAG> view | grant <hold> | revoke <hold> | cooldown clear|<12h|3d>: a character's citizenship (Lead GM+)" });
   }
   if (typeof every === 'function') every('citizenship', 60000, tick);
   // Staff releases in config, each applied once (at this load, or the first one after it was added)
