@@ -205,7 +205,7 @@ module.exports = (api) => {
   const nowMs = () => performance.now();
 
   const idOf = (desc) => { try { return mp.getIdFromDesc(String(desc)) >>> 0; } catch (e) { return 0; } };
-  const isPlaced = (ref) => { try { return !!mp.get(ref, 'private.dboPlaced'); } catch (e) { return false; } };
+  const isPlaced = (ref) => { try { return !!(mp.get(ref, 'private.dboPlaced') || mp.get(ref, 'private.dboDecor')); } catch (e) { return false; } };
   // A rest is kept by reference id; a placed object's id changes at every restart, so its rest is kept by where it stands
   const restKey = (ref) => {
     if (ref < 0xff000000) return ref.toString(16);

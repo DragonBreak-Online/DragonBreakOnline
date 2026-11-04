@@ -15,7 +15,14 @@ module.exports = (api) => {
   const C = Object.assign({
     enabled: true,
     // base desc -> kind
-    hives: { '12a54:HearthFires.esm': 'apiary', '602b45:BSAssets.esm': 'apiary', 'a918c:Skyrim.esm': 'wild' },
+    hives: {
+      '12a54:HearthFires.esm': 'apiary',
+      '602b45:BSAssets.esm': 'apiary',
+      '25d94:Skyrim.esm': 'apiary',
+      'a7c45:Skyrim.esm': 'apiary',
+      'a918c:Skyrim.esm': 'wild',
+      'a9198:Skyrim.esm': 'wild',
+    },
     // per kind: minutes between harvests, honeycombs [min, max], and a chance each of a bee and a beehive husk
     kinds: {
       apiary: { minutes: 60, honeycomb: [2, 4], bee: 0.5, husk: 0.25 },
@@ -32,6 +39,10 @@ module.exports = (api) => {
   if (!S.last) { try { S.last = JSON.parse(fs.readFileSync(FILE, 'utf8')).last || {}; } catch (e) { S.last = {}; } }
   const save = () => { try { fs.writeFileSync(FILE + '.tmp', JSON.stringify({ last: S.last })); fs.renameSync(FILE + '.tmp', FILE); } catch (e) { log('apiaries: save failed', e.message); } };
   const roll = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
+  const hiveKey = (ref) => {
+    if (ref < 0xff000000) return ref.toString(16);
+    try { const p = mp.get(ref, 'pos'); return `p${Math.round(p[0] / 64)}_${Math.round(p[1] / 64)}`; } catch (e) { return ref.toString(16); }
+  };
 
   // The activate chain: true when the hive is ours (its container is never opened)
   globalThis.__dboApiaryActivate = (target, caster) => {
@@ -39,7 +50,7 @@ module.exports = (api) => {
     let base = 0; try { base = idOf(mp.get(target >>> 0, 'baseDesc')); } catch (e) { return false; }
     const kind = kindById.get(base); if (!kind) return false;
     const K = (C.kinds || {})[kind]; if (!K) return false;
-    const key = (target >>> 0).toString(16), now = Date.now();
+    const key = hiveKey(target >>> 0), now = Date.now();
     const ready = (Number(S.last[key]) || 0) + Number(K.minutes) * 60000;
     if (now < ready) {
       const mins = Math.ceil((ready - now) / 60000);

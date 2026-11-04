@@ -16,14 +16,30 @@ Math.random = () => 0;   // every chance comes up
 const PLUGINS = { 'Skyrim.esm': 0, 'HearthFires.esm': 4, 'BSAssets.esm': 7 };
 const idOf = (d) => { const [h, p] = String(d).split(':'); return ((PLUGINS[p] << 24) | parseInt(h, 16)) >>> 0; };
 const APIARY = 0x10, WILD = 0x11, CHEST = 0x12, P = 0xff000002;
-const base = { [APIARY]: '12a54:HearthFires.esm', [WILD]: 'a918c:Skyrim.esm', [CHEST]: '1:Skyrim.esm' };
+const TG02_HIVE = 0x13, TG02_DUMMY = 0x14, VACANT_HIVE = 0x15;
+const base = {
+  [APIARY]: '12a54:HearthFires.esm',
+  [WILD]: 'a918c:Skyrim.esm',
+  [CHEST]: '1:Skyrim.esm',
+  [TG02_HIVE]: '25d94:Skyrim.esm',
+  [TG02_DUMMY]: 'a7c45:Skyrim.esm',
+  [VACANT_HIVE]: 'a9198:Skyrim.esm',
+};
 const given = [], said = [];
-const mp = { getIdFromDesc: idOf, get: (id, prop) => (prop === 'baseDesc' ? base[id] : undefined) };
+const posMap = { [0xff00a001]: [1000, 2000, 0], [0xff00a002]: [1000, 2000, 0] };
+const mp = {
+  getIdFromDesc: idOf,
+  get: (id, prop) => (prop === 'baseDesc' ? base[id] : prop === 'pos' ? posMap[id] : undefined),
+};
 const api = { mp, log: () => {}, personal: (a, t) => said.push(t), audit: () => {}, who: String, cfg: {}, giveItem: (a, id, n) => { given.push([id, n]); return true; } };
 const load = () => { delete globalThis.__dboApiaries; delete require.cache[path.resolve(__dirname, '..', 'apiaries.js')]; require(path.resolve(__dirname, '..', 'apiaries.js'))(api); };
 load();
 const act = (t) => globalThis.__dboApiaryActivate(t, P);
 ok(act(CHEST) === false, 'another container opens as usual');
+ok(act(TG02_HIVE) === true && given.length > 0, 'a man-made keeper hive (TG02BeeHive) gives honey as an apiary');
+ok(act(TG02_DUMMY) === true, 'a man-made keeper dummy hive (TG02BeeHiveDummy) gives honey as an apiary');
+ok(act(VACANT_HIVE) === true, 'a vacant wild hive gives honey as a wild hive');
+given.length = 0; said.length = 0;
 ok(act(APIARY) === true && given.some(([id, n]) => id === idOf('b08c5:Skyrim.esm') && n === 2) && given.some(([id]) => id === idOf('a9195:Skyrim.esm')) && /You gather 2 Honeycomb/.test(said.at(-1)), 'a ready apiary gives honeycomb (2 at the lowest roll) and a bee, and is not opened', { given, said });
 given.length = 0; now += 30 * 60000;
 ok(act(APIARY) === true && !given.length && /Come back in 30 minutes/.test(said.at(-1)), 'thirty minutes on, the bees need thirty more', said.at(-1));
@@ -33,5 +49,12 @@ given.length = 0;
 ok(act(APIARY) === true && !given.length && /Come back in 30 minutes/.test(said.at(-1)), 'the timer survives a reload (apiaries.json)');
 now += 31 * 60000; given.length = 0;
 ok(act(APIARY) === true && given.length > 0, 'after the hour the apiary gives honey again');
+const DYN1 = 0xff00a001, DYN2 = 0xff00a002;
+base[DYN1] = '12a54:HearthFires.esm'; base[DYN2] = '12a54:HearthFires.esm';
+given.length = 0;
+ok(act(DYN1) === true && given.length > 0, 'a dynamic placed/built apiary gives honey');
+load();
+given.length = 0;
+ok(act(DYN2) === true && !given.length && /Come back in 60 minutes/.test(said.at(-1)), 'dynamic hive rest survives restart under new refId at same pos');
 console.log(fails ? `${fails} FAILED` : 'all passed');
 process.exit(fails ? 1 : 0);
