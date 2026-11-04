@@ -806,14 +806,25 @@ namespace LinkedRefUtils {
 static VarValue GetLinkedRef(VarValue self)
 {
   if (auto selfRefr = GetFormPtr<MpObjectReference>(self)) {
+    if (selfRefr->GetFormId() >= 0xff000000) {
+      return VarValue::None();
+    }
     auto lookupRes = selfRefr->GetParent()->GetEspm().GetBrowser().LookupById(
       selfRefr->GetFormId());
+    if (!lookupRes.rec) {
+      return VarValue::None();
+    }
     auto data =
       espm::GetData<espm::REFR>(selfRefr->GetFormId(), selfRefr->GetParent());
     if (data.linkedRefId) {
-      auto& linkedRef = selfRefr->GetParent()->GetFormAt<MpObjectReference>(
-        lookupRes.ToGlobalId(data.linkedRefId));
-      return VarValue(std::make_shared<MpFormGameObject>(&linkedRef));
+      auto globalLinkedId = lookupRes.ToGlobalId(data.linkedRefId);
+      auto linkedForm = selfRefr->GetParent()->LookupFormById(globalLinkedId);
+      if (linkedForm) {
+        if (auto linkedRef = linkedForm->AsObjectReference()) {
+          return VarValue(std::make_shared<MpFormGameObject>(linkedRef));
+        }
+      }
+      return VarValue::None();
     }
   }
 
@@ -868,8 +879,13 @@ VarValue PapyrusObjectReference::GetLinkedRef(
     auto worldState = selfRefr->GetParent();
     if (auto linkedId = LinkedRefUtils::FindLinkedRefId(
           worldState, selfRefr->GetFormId(), keywordId)) {
-      auto& linkedRef = worldState->GetFormAt<MpObjectReference>(linkedId);
-      return VarValue(std::make_shared<MpFormGameObject>(&linkedRef));
+      auto linkedForm = worldState->LookupFormById(linkedId);
+      if (linkedForm) {
+        if (auto linkedRef = linkedForm->AsObjectReference()) {
+          return VarValue(std::make_shared<MpFormGameObject>(linkedRef));
+        }
+      }
+      return VarValue::None();
     }
   }
 

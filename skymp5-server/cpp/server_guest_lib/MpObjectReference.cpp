@@ -594,7 +594,7 @@ void MpObjectReference::SetPos(const NiPoint3& newPos, SetPosMode setPosMode)
           wst->SetTimer(std::chrono::seconds(0))
             .Then([wst, id, inside, me, myId, this](Viet::Void) {
               if (wst->LookupFormById(myId).get() != this) {
-                wst->logger->error("Refr pointer expired", id);
+                wst->logger->debug("Refr pointer expired ({:x})", myId);
                 return;
               }
               auto& emitter = wst->LookupFormById(id);

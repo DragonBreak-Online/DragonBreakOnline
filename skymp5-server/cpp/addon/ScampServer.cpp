@@ -119,6 +119,7 @@ Napi::Object ScampServer::Init(Napi::Env env, Napi::Object exports)
       InstanceMethod("makeProperty", &ScampServer::MakeProperty),
       InstanceMethod("makeEventSource", &ScampServer::MakeEventSource),
       InstanceMethod("get", &ScampServer::Get),
+      InstanceMethod("has", &ScampServer::Has),
       InstanceMethod("set", &ScampServer::Set),
       InstanceMethod("place", &ScampServer::Place),
       InstanceMethod("lookupEspmRecordById",
@@ -1268,9 +1269,9 @@ Napi::Value ScampServer::MakeEventSource(const Napi::CallbackInfo& info)
 
 Napi::Value ScampServer::Get(const Napi::CallbackInfo& info)
 {
-  ANTIGO_CONTEXT_INIT(ctx);
-
   try {
+    ANTIGO_CONTEXT_INIT(ctx);
+
     auto formId = NapiHelper::ExtractUInt32(info[0], "formId");
     auto propertyName = NapiHelper::ExtractString(info[1], "propertyName");
 
@@ -1302,8 +1303,25 @@ Napi::Value ScampServer::Get(const Napi::CallbackInfo& info)
     }
 
   } catch (std::exception& e) {
+    while (antigo::HasExceptionWitness()) {
+      (void)antigo::PopExceptionWitness();
+    }
     throw Napi::Error::New(info.Env(), std::string(e.what()));
   }
+}
+
+Napi::Value ScampServer::Has(const Napi::CallbackInfo& info)
+{
+  if (info.Length() < 1 || !info[0].IsNumber()) {
+    return Napi::Boolean::New(info.Env(), false);
+  }
+  int64_t raw = info[0].As<Napi::Number>().Int64Value();
+  if (raw <= 0 || raw > 0xffffffffLL) {
+    return Napi::Boolean::New(info.Env(), false);
+  }
+  uint32_t formId = static_cast<uint32_t>(raw);
+  return Napi::Boolean::New(info.Env(),
+                            partOne->worldState.LookupFormById(formId) != nullptr);
 }
 
 Napi::Value ScampServer::Set(const Napi::CallbackInfo& info)

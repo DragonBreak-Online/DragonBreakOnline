@@ -2644,7 +2644,7 @@ void ActionListener::OnHit(const RawMessageData& rawMsgData,
     movementRelay->NoteCombat(aggressor->GetFormId(), targetRef->GetFormId());
   }
   if (!targetRef) {
-    spdlog::error("ActionListener::OnHit - MpObjectReference not found for "
+    spdlog::debug("ActionListener::OnHit - MpObjectReference not found for "
                   "hitData.target {:x}",
                   hitData.target);
     return;

@@ -64,6 +64,7 @@ public:
   Napi::Value MakeProperty(const Napi::CallbackInfo& info);
   Napi::Value MakeEventSource(const Napi::CallbackInfo& info);
   Napi::Value Get(const Napi::CallbackInfo& info);
+  Napi::Value Has(const Napi::CallbackInfo& info);
   Napi::Value Set(const Napi::CallbackInfo& info);
   Napi::Value Place(const Napi::CallbackInfo& info);
   Napi::Value LookupEspmRecordById(const Napi::CallbackInfo& info);
