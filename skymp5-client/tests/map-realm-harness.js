@@ -44,6 +44,16 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   });
   const { MapRealmService } = require(out);
 
+  // A gap over 100 ms between updates is put down to what the update before it sent to Scaleform
+  const costOut = path.join(TMP, 'cost.js');
+  await esbuild.build({ entryPoints: [path.join(HERE, 'src/services/services/mapCost.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: costOut, logLevel: 'error' });
+  const { MapCost } = require(costOut);
+  const c = new MapCost(0);
+  c.frame(0); c.act('scale'); c.frame(16); c.act('owners'); c.act('owners'); c.frame(200); c.frame(216); c.frame(400);
+  const cr = c.report(400);
+  ok(cr.frames === 5 && cr.slow === 2 && cr.worstMs === 184 && cr.slowAfter.owners === 1 && cr.slowAfter.none === 1 && !cr.slowAfter.scale && cr.acts.owners === 2,
+    'a slow frame is put down to what the frame before sent (owners), or to nothing', cr);
+
   // A fake MapMenu: marker clips with labels and a property store the Ui calls read and write
   const LABELS = ['Bruma', 'Applewatch', 'Sancre Tor', 'Pale Pass', 'Fort Caractacus', "Wraith's Barrow", 'Greenwood'];
   const S = { packets: [], widgets: [], errors: [], revealed: [], visible: [], props: {}, invoked: [], keysRead: [], settings: {} };
@@ -306,6 +316,11 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
   const fl = ((S.packets.find((p) => p.event === 'mapSwf') || { args: [{}] }).args[0] || {}).flash || {};
   ok(fl.held > 0 && fl.failed + fl.noFit >= 10 && fl.shown === 2 && fl.hidden === 1 && fl.redraws === 2 && fl.closes.length === 1 && fl.moves >= 3 && fl.maxStep.px >= 99 && typeof fl.seconds === 'number',
     'the mapSwf line counts what could flash: fits held, failed or short of markers and their flips, the layer shown and hidden, moves and the largest step, redraws, our menu closed', fl);
+  // The lag on the map (3 Nov): one mapCost line an opening, with each step's JS and what was sent to Scaleform
+  const mc = ((S.packets.find((p) => p.event === 'npcDrift' && p.args[0] && p.args[0].kind === 'mapCost') || { args: [null] }).args[0]) || {};
+  const st = mc.steps || {};
+  ok(mc.frames > 100 && ['labels', 'filter', 'owners', 'legend'].every((k) => Array.isArray(st[k]) && st[k][2] > 0) && mc.acts.owners >= 2 && mc.world === 0x3c && typeof mc.slow === 'number' && JSON.stringify(mc).length < 900,
+    'the map sends one mapCost line on closing: frames, each step timed, the owners drawing counted, short enough for the log', mc);
   // Esc, and the map closing before the tap: nothing tapped (a Tab with no map open would open the tween menu)
   S.taps = []; S.custom = []; S.customOpen = false;
   h6.menuOpen({ name: 'MapMenu' });
