@@ -4,6 +4,7 @@
 // refused and left alone. School levels (mod-0311): a gift of them goes through schools.js __dboSchoolsGrant (mocked here;
 // tests/schools-grant-harness.js runs the real one), once, alone or with gold and items, and waits while it is missing,
 // while schools.js refuses a school or while nothing can be given yet; levels held at a pick are queued again.
+// Free /appearance changes (appearanceFree) go through the real appearance.js grantFree, once, and wait while it cannot give them.
 // Run it from this folder's parent with
 //
 //   node tests\gifts-harness.js
@@ -196,6 +197,100 @@ check('the tool refuses Restoration, 0, 101, an unknown school, a bad number and
 tryGift('--tag', 'KKVT', '--school', 'Alteration:4', '--reason', 'list me', '--force');
 const listed = tryGift('--list') || '';
 check('--list shows the schools waiting, and delivered with what was given and the rest\'s id', /"schools": \{ "Alteration": 4 \}/.test(listed) && /schools \{"Destruction":21\} given \{"Destruction":21\}/.test(listed) && new RegExp(`given \\{"Destruction":10,"Illusion":0,"Conjuration":5\\} rest queued as ${hid}-rest1`).test(listed) && /schools \{"Destruction":20\} given \{"Destruction":10\} rest NOT queued \{"Destruction":10\} +nofile/.test(listed), listed);
+
+// ---- free /appearance changes (appearanceFree), through the real appearance.js ----
+for (const f of inbox()) fs.unlinkSync(path.join(dir, 'gifts-inbox', f));
+const APP = path.join(root, 'appearance.js');
+const appOut = { sys: [], audits: [] };
+const loadAppearance = (app) => {
+  delete require.cache[APP];
+  require(APP)({ mp: { get: api.mp.get, set: (id, k, v) => { (props[id] = props[id] || {})[k] = v; }, setRaceMenuOpen: () => {}, lookupEspmRecordById: () => null },
+    log: () => {}, personal: () => {}, system: (a, t) => appOut.sys.push({ a, t }), audit: (t) => appOut.audits.push(t), who: api.who,
+    registerChatCommand: () => {}, cfg: { appearance: Object.assign({ cost: 500, cooldownHours: 24 }, app || {}) } });
+};
+const used = (a) => props[a]['private.dboAppearanceFreeUsed'];
+const left = (a) => globalThis.__dboAppearanceEdit.freeLeft(a);
+const ledgerOf = (reason) => Object.entries(ledger()).find(([, d]) => d.reason === reason) || [];
+const FACE = 'Your RaceMenu face edit was not saved';
+loadAppearance();
+online = [A];
+const q3 = tryGift('--tag', '#44yg', '--appearance-free', '1', '--reason', FACE, '--by', 'Jake');
+const f3 = fileOf(/-44YG-/);
+check('the tool queues an appearanceFree-only gift: { tag, appearanceFree: 1 }, no gold', !!q3 && f3 && f3.tag === '44YG' && f3.appearanceFree === 1 && f3.gold === undefined && f3.items === undefined && !f3.schools && f3.by === 'Jake', f3);
+check('...and a second one to the same #TAG is refused while the first waits', /#44YG already has \S+-44YG-\S+ \(waiting: 1 free appearance change\(s\)\).*--force/.test(toolErr('--tag', '44YG', '--appearance-free', '1', '--reason', 'twice')) && inbox().length === 1, inbox());
+let pN = out.personal.length; tick();
+check('#44YG offline: it waits, nothing granted', inbox().length === 1 && used(B) === undefined && out.personal.length === pN && !ledgerOf(FACE).length);
+// appearance.js not loaded (a failed load nulls __dboAppearanceEdit), then switched off: it waits, said once each
+globalThis.__dboAppearanceEdit = null;
+online = [A, B]; let nL = out.logs.length; tick(); tick();
+check('appearance.js not loaded: the gift waits once #44YG is in the world, said once in the log', inbox().length === 1 && used(B) === undefined && out.personal.length === pN && out.logs.slice(nL).filter((t) => /-44YG-\S+\.json waits: no free appearance change can be given \(appearance\.js is not loaded\)$/.test(t)).length === 1, out.logs.slice(nL));
+loadAppearance({ freeChanges: 0 }); nL = out.logs.length; tick(); tick();
+check('free changes switched off: it waits, said once in the log', inbox().length === 1 && used(B) === undefined && out.logs.slice(nL).filter((t) => /waits: no free appearance change can be given \(Free appearance changes are switched off/.test(t)).length === 1, out.logs.slice(nL));
+// Logged in with appearance.js on: given once, exactly as /grantappearance gives it
+loadAppearance(); tick();
+check('in the world: one free change, as /grantappearance gives it (the used count down one, told)', used(B) === -1 && left(B) === 2 && props[B]['private.dboAppearanceFreeTold'] === 1, [used(B), left(B)]);
+check('...told in the gift line with the reason, nothing else said by appearance.js', said(B).slice(-1)[0] === `A gift from the staff: a free appearance change (type /appearance to use it). ${FACE}` && appOut.sys.length === 0 && appOut.audits.length === 0, [said(B).slice(-1), appOut]);
+check('...the login notice does not repeat it', globalThis.__dboAppearanceFreeLogin(B) === false && appOut.sys.length === 0);
+const [fid, fl] = ledgerOf(FACE);
+check('...the ledger records it asked and given, no gold, and the file goes', fl && fl.appearanceFree === 1 && fl.appearanceFreeGiven === 1 && fl.gold === 0 && fl.to === 'Pff000015' && fl.by === 'Jake' && inbox().length === 0, fl);
+check('...the GIFT audit line lists it', out.audits.slice(-1)[0] === `GIFT ${fid} by Jake to Pff000015: 1 free appearance change (2 left); ${FACE}`, out.audits.slice(-1));
+// At most once: a second look, a reload of both, the file back in the inbox
+pN = out.personal.length; nAu = out.audits.length;
+tick(); loadGifts(); loadAppearance(); tick();
+fs.writeFileSync(path.join(dir, 'gifts-inbox', `${fid}.json`), JSON.stringify(f3)); tick();
+fs.writeFileSync(path.join(dir, 'gifts-inbox', `${fid}.json`), JSON.stringify(f3)); loadGifts(); tick();
+check('at most once: a second look, a reload and the delivered file back twice give nothing more, tell and audit nothing', used(B) === -1 && inbox().length === 0 && out.personal.length === pN && out.audits.length === nAu, [used(B), inbox()]);
+check('...and the tool refuses another for #44YG unless --force', /#44YG already has \S+ \(delivered: 1 free appearance change\(s\)\)/.test(toolErr('--tag', '44YG', '--appearance-free', '2', '--reason', 'again')) && inbox().length === 0, inbox());
+// Online at once, with gold: the tool writes the gold and the free changes as two gifts, an older gifts.js leaving the second waiting
+const LOST = 'Your paid face edit was lost: the 500 gold back and two free changes';
+const q4 = tryGift('--tag', 'KKVT', '--gold', '500', '--appearance-free', '2', '--reason', LOST, '--by', 'Jake');
+const two4 = filesOf(/-KKVT-/);
+check('gold and free changes from the tool: two files, the gold one without appearanceFree', !!q4 && two4.length === 2 && two4.some((g) => g.gold === 500 && !g.appearanceFree) && two4.some((g) => g.appearanceFree === 2 && !g.gold), two4);
+n0 = out.given.length; tick();
+check('#KKVT online: 500 gold and two free changes at the next look', out.given.length === n0 + 1 && out.given[n0].a === A && out.given[n0].count === 500 && used(A) === -2 && left(A) === 3 && inbox().length === 0, [used(A), left(A)]);
+check('...told in a line for each', said(A).slice(-2).sort().join('|') === `A gift from the staff: 2 free appearance changes (type /appearance to use them). ${LOST}|A gift from the staff: 500 gold. ${LOST}`, said(A).slice(-2));
+check('...the audit line names both changes and what is left', out.audits.some((t) => new RegExp(`^GIFT \\S+-KKVT-\\S+ by Jake to Pff000014: 2 free appearance changes \\(3 left\\); ${LOST}$`).test(t)), out.audits.slice(-2));
+// One hand-written file with gold and a free change: one line, one audit line
+fs.writeFileSync(path.join(dir, 'gifts-inbox', 'mixedfree.json'), JSON.stringify({ tag: 'KKVT', gold: 500, appearanceFree: 1, reason: 'mixedfree' }));
+n0 = out.given.length; tick();
+check('a hand-written gift of gold and a free change: both, one line, one audit line, both in the ledger', out.given.length === n0 + 1 && left(A) === 4 && said(A).slice(-1)[0] === 'A gift from the staff: 500 gold, a free appearance change (type /appearance to use it). mixedfree'
+  && out.audits.slice(-1)[0] === 'GIFT mixedfree by staff to Pff000014: 500 gold, 1 free appearance change (4 left); mixedfree' && ledger().mixedfree.gold === 500 && ledger().mixedfree.appearanceFreeGiven === 1, [said(A).slice(-1), out.audits.slice(-1), ledger().mixedfree]);
+// With school levels that cannot be given: the free change does not wait for them
+grantAnswer = fullAnswer;
+fs.writeFileSync(path.join(dir, 'gifts-inbox', 'schoolfree.json'), JSON.stringify({ tag: 'KKVT', schools: { Illusion: 3 }, appearanceFree: 1, reason: 'schoolfree' }));
+nL = out.logs.length; tick();
+check('schools at 100 with a free change: the free change is given, the levels refused and logged', left(A) === 5 && inbox().length === 0 && said(A).slice(-1)[0] === 'A gift from the staff: a free appearance change (type /appearance to use it). schoolfree'
+  && out.audits.slice(-1)[0] === 'GIFT schoolfree by staff to Pff000014: 1 free appearance change (5 left) (Illusion: Mira\'s Illusion is already 100.); schoolfree' && out.logs.slice(nL).includes('gifts: schoolfree: Illusion gave 0 of 3; see its GIFT audit line'), [said(A).slice(-1), out.audits.slice(-1), out.logs.slice(nL)]);
+// The grant fails after its dry run said yes: spent once, nothing given, told to staff, never tried again
+const realApp = globalThis.__dboAppearanceEdit; const tries = [];
+globalThis.__dboAppearanceEdit = { grantFree: (t, n, dry) => { tries.push(!!dry); return dry ? { ok: true, left: 1 } : { ok: false, text: 'boom' }; } };
+fs.writeFileSync(path.join(dir, 'gifts-inbox', 'boom.json'), JSON.stringify({ tag: 'KKVT', appearanceFree: 1, reason: 'boom' }));
+pN = out.personal.length; nL = out.logs.length; tick(); tick();
+check('a grant that fails at delivery: in the ledger as 0 given, NOTHING in the audit with why, logged, the player not told, tried once', JSON.stringify(tries) === '[true,false]' && ledger().boom && ledger().boom.appearanceFreeGiven === 0 && inbox().length === 0 && out.personal.length === pN
+  && out.audits.slice(-1)[0] === 'GIFT boom by staff to Pff000014: NOTHING (give failed) (appearance: boom); boom' && out.logs.slice(nL).includes('gifts: boom: no free appearance change given (boom); see its GIFT audit line'), [tries, ledger().boom, out.audits.slice(-1), out.logs.slice(nL)]);
+globalThis.__dboAppearanceEdit = realApp;
+// Gold that fails beside a granted free change: the GIFT line cannot show it, so it is logged
+delete require.cache[path.join(root, 'gifts.js')]; require(path.join(root, 'gifts.js'))({ ...api, giveItem: () => false });
+fs.writeFileSync(path.join(dir, 'gifts-inbox', 'nogold.json'), JSON.stringify({ tag: 'KKVT', gold: 5, appearanceFree: 1, reason: 'nogold' }));
+nL = out.logs.length; tick(); loadGifts();
+check('gold that fails beside a free change: the change is given and the short gold logged', left(A) === 6 && out.audits.slice(-1)[0] === 'GIFT nogold by staff to Pff000014: 1 free appearance change (6 left); nogold' && out.logs.slice(nL).includes('gifts: nogold: gave 0 of its 1 gold and item lines; see its GIFT audit line'), [out.audits.slice(-1), out.logs.slice(nL)]);
+// Bad values and a profile are refused and kept; the tool refuses them before writing
+const usedA = used(A), usedB = used(B);
+const badFree = [0, 4, 1.5, -1, '1', true, null, [1]];
+badFree.forEach((v, i) => fs.writeFileSync(path.join(dir, 'gifts-inbox', `badfree${i}.json`), JSON.stringify({ tag: 'KKVT', appearanceFree: v, reason: 'x' })));
+fs.writeFileSync(path.join(dir, 'gifts-inbox', 'badfreeprofile.json'), JSON.stringify({ profile: 71, appearanceFree: 1, reason: 'x' }));
+nL = out.logs.length; tick();
+check('appearanceFree 0, 4, a fraction, -1, a string, true, null or a list: refused and kept, nothing granted', used(A) === usedA && used(B) === usedB && out.logs.slice(nL).filter((t) => /badfree\d\.json refused \(appearanceFree must be a whole number 1-3\)/.test(t)).length === badFree.length, out.logs.slice(nL));
+check('...and a free change for a profile (it belongs to one character)', inbox().length === badFree.length + 1 && out.logs.slice(nL).some((t) => /badfreeprofile\.json refused \(appearanceFree needs a #TAG, not a profile\)/.test(t)) && !Object.keys(ledger()).some((k) => /^badfree/.test(k)), out.logs.slice(nL));
+for (const f of inbox()) fs.unlinkSync(path.join(dir, 'gifts-inbox', f));
+let refusedFree = 0;
+for (const bad of [['--tag', 'KKVT', '--appearance-free', '0'], ['--tag', 'KKVT', '--appearance-free', '4'], ['--tag', 'KKVT', '--appearance-free', 'x'], ['--tag', 'KKVT', '--appearance-free'], ['--profile', '71', '--appearance-free', '1']]) {
+  try { gift(...bad, '--reason', 'x', '--force'); } catch (e) { if (/--appearance-free/.test(String(e.stderr))) refusedFree++; }
+}
+check('the tool refuses 0, 4, a word, no number and a profile, naming --appearance-free', refusedFree === 5 && inbox().length === 0, refusedFree);
+tryGift('--tag', 'KKVT', '--appearance-free', '3', '--reason', 'list free', '--force');
+const listedFree = tryGift('--list') || '';
+check('--list shows a free change waiting, and delivered with what was given', /"appearanceFree": 3/.test(listedFree) && /appearanceFree 1 given 0 +boom/.test(listedFree) && /500 gold +appearanceFree 1 given 1 +mixedfree/.test(listedFree), listedFree);
 
 process.chdir(cwd);
 fs.rmSync(dir, { recursive: true, force: true });
