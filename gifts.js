@@ -6,8 +6,11 @@
 // is handed over, the player is told why, the staff audit log gets a line, and the gift moves into gift-ledger.json.
 // A gift for someone offline waits in the inbox until they are back, across restarts.
 //
-//   gifts-inbox/<id>.json  { tag: "KKVT" | profile: 71, gold: 50, items: [{ baseId: 0x1397e, count: 1 }], schools: { Destruction: 21 }, reason, by, at }
-//   gift-ledger.json       { delivered: { <id>: { at, to, gold, items, schools?, schoolsGiven?, rest? | restNotQueued?, reason, by } } }, written only here
+//   gifts-inbox/<id>.json  { tag: "KKVT" | profile: 71, gold: 50, items: [{ baseId: 0x1397e, count: 1 }], schools: { Destruction: 21 }, appearanceFree: 1, reason, by, at }
+//   gift-ledger.json       { delivered: { <id>: { at, to, gold, items, schools?, schoolsGiven?, rest? | restNotQueued?, appearanceFree?, appearanceFreeGiven?, reason, by } } }, written only here
+//
+// `appearanceFree` (1-3, a #TAG gift only, alone or with the rest) gives free /appearance changes through appearance.js grantFree, as /grantappearance does.
+// The gift waits while appearance.js is not loaded or refuses (freeChanges 0); the ledger records what was given (appearanceFreeGiven).
 //
 // `schools` (mod-0311, Jake 22 Oct) adds whole levels 1-100 to a school of magic through schools.js __dboSchoolsGrant,
 // which caps at 100 and holds at an unmade Apprentice or Adept pick as class pay does; a gift may be schools only, and
@@ -33,6 +36,9 @@ module.exports = (api) => {
   const schoolsOk = (s) => !!s && typeof s === 'object' && !Array.isArray(s) && Object.keys(s).length > 0
     && Object.entries(s).every(([k, n]) => SCHOOLS.includes(k) && Number.isInteger(n) && n >= 1 && n <= 100);
   const grantHook = () => (typeof globalThis.__dboSchoolsGrant === 'function' ? globalThis.__dboSchoolsGrant : null);
+  const MAX_FREE = 3;
+  const freeHook = () => { const e = globalThis.__dboAppearanceEdit; return e && typeof e.grantFree === 'function' ? e.grantFree : null; };
+  const isTag = (t) => typeof t === 'string' && /^[A-Z0-9]{4}$/.test(t);
 
   const readJson = (p, fallback) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return fallback; } };
   const ledger = () => { const l = readJson(LEDGER, null); return l && typeof l.delivered === 'object' && l.delivered ? l : { delivered: {} }; };
@@ -44,21 +50,24 @@ module.exports = (api) => {
     const id = path.basename(file, '.json');
     const g = readJson(path.join(INBOX, file), null);
     const why = !g || typeof g !== 'object' ? 'not JSON'
-      : !(typeof g.tag === 'string' && /^[A-Z0-9]{4}$/.test(g.tag)) && !(Number.isInteger(g.profile) && g.profile > 0) ? 'no #TAG or profile'
+      : !isTag(g.tag) && !(Number.isInteger(g.profile) && g.profile > 0) ? 'no #TAG or profile'
       : g.gold !== undefined && !(Number.isInteger(g.gold) && g.gold > 0 && g.gold <= MAX_GOLD) ? `gold must be 1-${MAX_GOLD}`
       : g.items !== undefined && !(Array.isArray(g.items) && g.items.length <= 20 && g.items.every((i) => i && Number.isInteger(i.baseId) && i.baseId > 0 && Number.isInteger(i.count) && i.count > 0 && i.count <= MAX_COUNT)) ? 'bad items'
       : g.schools !== undefined && !schoolsOk(g.schools) ? `bad schools (${SCHOOLS.join(', ')}: whole levels 1-100)`
-      : g.schools !== undefined && !(typeof g.tag === 'string' && /^[A-Z0-9]{4}$/.test(g.tag)) ? 'schools need a #TAG, not a profile'
-      : !g.gold && !(g.items && g.items.length) && !g.schools ? 'nothing to give'
+      : g.schools !== undefined && !isTag(g.tag) ? 'schools need a #TAG, not a profile'
+      : g.appearanceFree !== undefined && !(Number.isInteger(g.appearanceFree) && g.appearanceFree >= 1 && g.appearanceFree <= MAX_FREE) ? `appearanceFree must be a whole number 1-${MAX_FREE}`
+      : g.appearanceFree !== undefined && !isTag(g.tag) ? 'appearanceFree needs a #TAG, not a profile'
+      : !g.gold && !(g.items && g.items.length) && !g.schools && !g.appearanceFree ? 'nothing to give'
       : '';
     if (why) { if (!badOnce.has(file)) { badOnce.add(file); log(`gifts: ${file} refused (${why}); fix or delete it`); } return null; }
     return { id, file, tag: g.tag || '', profile: Number.isInteger(g.profile) ? g.profile : 0, gold: g.gold || 0, items: g.items || [], schools: g.schools || null,
-      reason: String(g.reason || '').slice(0, 200), by: String(g.by || 'staff').slice(0, 40) };
+      appearanceFree: g.appearanceFree || 0, reason: String(g.reason || '').slice(0, 200), by: String(g.by || 'staff').slice(0, 40) };
   };
 
   const levelsWord = (n) => `${n} level${n === 1 ? '' : 's'}`;
+  const freeWord = (n) => `${n} free appearance change${n === 1 ? '' : 's'}`;
   const describe = (g) => [g.gold ? `${g.gold} gold` : '', ...g.items.map((i) => `${i.count}x 0x${(i.baseId >>> 0).toString(16)}`),
-    ...Object.entries(g.schools || {}).map(([k, n]) => `${n} ${k} level${n === 1 ? '' : 's'}`)].filter(Boolean).join(', ');
+    ...Object.entries(g.schools || {}).map(([k, n]) => `${n} ${k} level${n === 1 ? '' : 's'}`), g.appearanceFree ? freeWord(g.appearanceFree) : ''].filter(Boolean).join(', ');
 
   // The next id for levels held at a pick: <id>-rest1, then -rest2
   const restId = (id) => { const m = /^(.*)-rest(\d+)$/.exec(id); return m ? `${m[1]}-rest${Number(m[2]) + 1}` : `${id}-rest1`; };
@@ -69,7 +78,8 @@ module.exports = (api) => {
   };
 
   const deliver = (a, g, l) => {
-    l.delivered[g.id] = { at: new Date().toISOString(), to: who(a), gold: g.gold, items: g.items, ...(g.schools ? { schools: g.schools } : {}), reason: g.reason, by: g.by };
+    l.delivered[g.id] = { at: new Date().toISOString(), to: who(a), gold: g.gold, items: g.items, ...(g.schools ? { schools: g.schools } : {}),
+      ...(g.appearanceFree ? { appearanceFree: g.appearanceFree } : {}), reason: g.reason, by: g.by };
     saveLedger(l);
     const given = [];
     if (g.gold && giveItem(a, GOLD, g.gold)) given.push(`${g.gold} gold`);
@@ -104,6 +114,22 @@ module.exports = (api) => {
       const short = Object.entries(g.schools).filter(([k, n]) => got[k] < n && !(queued && rest[k]));
       if (short.length) log(`gifts: ${g.id}: ${short.map(([k, n]) => `${k} gave ${got[k]} of ${n}`).join(', ')}; see its GIFT audit line`);
     }
+    if (g.appearanceFree) {
+      const hook = freeHook();
+      const r = (hook && hook(a, g.appearanceFree)) || { ok: false, text: 'appearance.js is not loaded' };
+      const n = r.ok ? g.appearanceFree : 0;
+      if (n) {
+        given.push(`${freeWord(n)} (${r.left} left)`);
+        told.push(n === 1 ? 'a free appearance change (type /appearance to use it)' : `${freeWord(n)} (type /appearance to use them)`);
+      } else refused.push(`appearance: ${r.text}`);
+      // Written after the grant, so it never risks giving twice
+      l.delivered[g.id].appearanceFreeGiven = n;
+      try { saveLedger(l); } catch (e) { log(`gifts: ${g.id}: ledger not updated with the free appearance changes given (${e.message})`); }
+      const want = (g.gold ? 1 : 0) + g.items.length;
+      // The GIFT line counts the change among what was given, so a short gold or item give is logged here too
+      if (!n) log(`gifts: ${g.id}: no free appearance change given (${r.text}); see its GIFT audit line`);
+      else if (goods < want) log(`gifts: ${g.id}: gave ${goods} of its ${want} gold and item lines; see its GIFT audit line`);
+    }
     try { fs.unlinkSync(path.join(INBOX, g.file)); } catch (e) { /* the ledger keeps it from paying twice */ }
     const what = [goods ? (g.gold ? `${g.gold} gold` : 'items') : '', ...told].filter(Boolean).join(', ');
     if (what) personal(a, `A gift from the staff: ${what}${g.reason ? `. ${g.reason}` : '.'}`);
@@ -117,10 +143,20 @@ module.exports = (api) => {
     const pre = Object.entries(g.schools).map(([k, n]) => [k, (hook && hook(a, k, n, g.by, g.reason, true)) || { ok: false, text: 'schools.js gave no answer' }]);
     const bad = pre.filter(([, r]) => !r.school);
     const why = bad.length ? `refused by schools.js (${bad.map(([k, r]) => `${k}: ${r.text}`).join('; ')}); fix or delete it`
-      : !g.gold && !g.items.length && pre.every(([, r]) => !(r.added > 0)) ? `waits: nothing can be given yet (${pre.map(([k, r]) => `${k}: ${r.text}`).join('; ')})` : '';
+      : !g.gold && !g.items.length && !g.appearanceFree && pre.every(([, r]) => !(r.added > 0)) ? `waits: nothing can be given yet (${pre.map(([k, r]) => `${k}: ${r.text}`).join('; ')})` : '';
     if (!why) return true;
     const key = `${g.file}:${why}`;
     if (!badOnce.has(key)) { badOnce.add(key); log(`gifts: ${g.file} ${why}`); }
+    return false;
+  };
+
+  // Asked before a free appearance change gift is spent: false (logged once) while appearance.js is not loaded or refuses it
+  const freeReady = (a, g) => {
+    const hook = freeHook();
+    const r = (hook && hook(a, g.appearanceFree, true)) || { ok: false, text: 'appearance.js is not loaded' };
+    if (r.ok) return true;
+    const key = `${g.file}:appearanceFree:${r.text}`;
+    if (!badOnce.has(key)) { badOnce.add(key); log(`gifts: ${g.file} waits: no free appearance change can be given (${r.text})`); }
     return false;
   };
 
@@ -141,6 +177,7 @@ module.exports = (api) => {
       });
       if (!a) continue;
       if (g.schools && !schoolsReady(a, g)) continue;
+      if (g.appearanceFree && !freeReady(a, g)) continue;
       try { deliver(a, g, l); } catch (e) { log(`gifts: ${g.id} failed: ${e.message}`); }
     }
   };
