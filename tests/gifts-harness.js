@@ -260,20 +260,20 @@ grantAnswer = fullAnswer;
 fs.writeFileSync(path.join(dir, 'gifts-inbox', 'schoolfree.json'), JSON.stringify({ tag: 'KKVT', schools: { Illusion: 3 }, appearanceFree: 1, reason: 'schoolfree' }));
 nL = out.logs.length; tick();
 check('schools at 100 with a free change: the free change is given, the levels refused and logged', left(A) === 5 && inbox().length === 0 && said(A).slice(-1)[0] === 'A gift from the staff: a free appearance change (type /appearance to use it). schoolfree'
-  && out.audits.slice(-1)[0] === 'GIFT schoolfree by staff to Pff000014: 1 free appearance change (5 left) (Illusion: Mira\'s Illusion is already 100.); schoolfree' && out.logs.slice(nL).includes('gifts: schoolfree: Illusion gave 0 of 3; see its GIFT audit line'), [said(A).slice(-1), out.audits.slice(-1), out.logs.slice(nL)]);
+  && out.audits.slice(-1)[0] === 'GIFT schoolfree by staff to Pff000014: 1 free appearance change (5 left) of 3 Illusion levels, 1 free appearance change (Illusion: Mira\'s Illusion is already 100.); schoolfree' && out.logs.slice(nL).includes('gifts: schoolfree: Illusion gave 0 of 3; see its GIFT audit line'), [said(A).slice(-1), out.audits.slice(-1), out.logs.slice(nL)]);
 // The grant fails after its dry run said yes: spent once, nothing given, told to staff, never tried again
 const realApp = globalThis.__dboAppearanceEdit; const tries = [];
 globalThis.__dboAppearanceEdit = { grantFree: (t, n, dry) => { tries.push(!!dry); return dry ? { ok: true, left: 1 } : { ok: false, text: 'boom' }; } };
 fs.writeFileSync(path.join(dir, 'gifts-inbox', 'boom.json'), JSON.stringify({ tag: 'KKVT', appearanceFree: 1, reason: 'boom' }));
 pN = out.personal.length; nL = out.logs.length; tick(); tick();
 check('a grant that fails at delivery: in the ledger as 0 given, NOTHING in the audit with why, logged, the player not told, tried once', JSON.stringify(tries) === '[true,false]' && ledger().boom && ledger().boom.appearanceFreeGiven === 0 && inbox().length === 0 && out.personal.length === pN
-  && out.audits.slice(-1)[0] === 'GIFT boom by staff to Pff000014: NOTHING (give failed) (appearance: boom); boom' && out.logs.slice(nL).includes('gifts: boom: no free appearance change given (boom); see its GIFT audit line'), [tries, ledger().boom, out.audits.slice(-1), out.logs.slice(nL)]);
+  && out.audits.slice(-1)[0] === 'GIFT boom by staff to Pff000014: NOTHING (give failed) of 1 free appearance change (appearance: boom); boom' && out.logs.slice(nL).includes('gifts: boom: no free appearance change given (boom); see its GIFT audit line'), [tries, ledger().boom, out.audits.slice(-1), out.logs.slice(nL)]);
 globalThis.__dboAppearanceEdit = realApp;
-// Gold that fails beside a granted free change: the GIFT line cannot show it, so it is logged
+// Gold that fails beside a granted free change: the GIFT line shows what was asked, and the short gold is logged
 delete require.cache[path.join(root, 'gifts.js')]; require(path.join(root, 'gifts.js'))({ ...api, giveItem: () => false });
 fs.writeFileSync(path.join(dir, 'gifts-inbox', 'nogold.json'), JSON.stringify({ tag: 'KKVT', gold: 5, appearanceFree: 1, reason: 'nogold' }));
 nL = out.logs.length; tick(); loadGifts();
-check('gold that fails beside a free change: the change is given and the short gold logged', left(A) === 6 && out.audits.slice(-1)[0] === 'GIFT nogold by staff to Pff000014: 1 free appearance change (6 left); nogold' && out.logs.slice(nL).includes('gifts: nogold: gave 0 of its 1 gold and item lines; see its GIFT audit line'), [out.audits.slice(-1), out.logs.slice(nL)]);
+check('gold that fails beside a free change: the change is given, the audit shows the gold asked, the short gold logged', left(A) === 6 && out.audits.slice(-1)[0] === 'GIFT nogold by staff to Pff000014: 1 free appearance change (6 left) of 5 gold, 1 free appearance change; nogold' && out.logs.slice(nL).includes('gifts: nogold: gave 0 of its 1 gold and item lines; see its GIFT audit line'), [out.audits.slice(-1), out.logs.slice(nL)]);
 // Bad values and a profile are refused and kept; the tool refuses them before writing
 const usedA = used(A), usedB = used(B);
 const badFree = [0, 4, 1.5, -1, '1', true, null, [1]];

@@ -1754,7 +1754,7 @@ gearswap.js GEARSWAP a9ee526a parsed
 gearswap.js GEARRESTORE 7b6eb5c9 parsed
 gearswap.js GEARRESTORE 059c5afd parsed
 gearswap.js GEARRESTORE 3f5caeb1 parsed
-gifts.js GIFT f3d9a000 excluded
+gifts.js GIFT 84b782e1 excluded
 gmcall.js GMCALL 6825a400 parsed
 gmcall.js GMCALL 208745b4 parsed
 gmcall.js GMCALL d9bbbeb8 parsed

@@ -126,14 +126,14 @@ module.exports = (api) => {
       l.delivered[g.id].appearanceFreeGiven = n;
       try { saveLedger(l); } catch (e) { log(`gifts: ${g.id}: ledger not updated with the free appearance changes given (${e.message})`); }
       const want = (g.gold ? 1 : 0) + g.items.length;
-      // The GIFT line counts the change among what was given, so a short gold or item give is logged here too
+      // A short gold or item give is logged for staff, as short school levels are
       if (!n) log(`gifts: ${g.id}: no free appearance change given (${r.text}); see its GIFT audit line`);
       else if (goods < want) log(`gifts: ${g.id}: gave ${goods} of its ${want} gold and item lines; see its GIFT audit line`);
     }
     try { fs.unlinkSync(path.join(INBOX, g.file)); } catch (e) { /* the ledger keeps it from paying twice */ }
     const what = [goods ? (g.gold ? `${g.gold} gold` : 'items') : '', ...told].filter(Boolean).join(', ');
     if (what) personal(a, `A gift from the staff: ${what}${g.reason ? `. ${g.reason}` : '.'}`);
-    audit(`GIFT ${g.id} by ${g.by} to ${who(a)}: ${given.join(', ') || 'NOTHING (give failed)'}${given.length < (g.gold ? 1 : 0) + g.items.length + Object.keys(g.schools || {}).length ? ` of ${describe(g)}` : ''}${refused.length ? ` (${refused.join('; ')})` : ''}; ${g.reason}`);
+    audit(`GIFT ${g.id} by ${g.by} to ${who(a)}: ${given.join(', ') || 'NOTHING (give failed)'}${given.length < (g.gold ? 1 : 0) + g.items.length + Object.keys(g.schools || {}).length + (g.appearanceFree ? 1 : 0) ? ` of ${describe(g)}` : ''}${refused.length ? ` (${refused.join('; ')})` : ''}; ${g.reason}`);
   };
 
   // Asked before a schools gift is spent: false (logged once) while schools.js refuses one of its schools (a name the live
