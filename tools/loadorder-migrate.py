@@ -1,6 +1,7 @@
 """Remap the numeric form ids in SkyMP change forms after a load-order change.
 
     py tools/loadorder-migrate.py <old server-settings.json> <new server-settings.json> <changeForms dir> [--id-key <name>]... [--hex-key-dict <name>]... [--write]
+    py tools/loadorder-migrate.py <old> <new> [<changeForms dir>] --presets <racemenu-presets dir> [--presets-before <ISO time>] [--write]
 
 Why: a change form keeps formDesc, baseDesc and worldOrCellDesc as "<hex>:<plugin>" strings, which survive any
 load-order change, but inventory baseIds, equipment, learned spells, the appearance (race, head parts, head texture
@@ -17,9 +18,16 @@ NAME to its index in the new order. Every other integer that looks like a load-o
 is LISTED under "not remapped" with its path and left alone: add its key with --id-key <name> after checking what it holds.
 Not touched either: ids of plugins missing from the new order (reported), runtime ids (0xFF...), 0, and integers above
 0xFFFFFFFF. Without --write it only reports what it would change.
+
+--presets: the RaceMenu face files too (racemenupresets.js, <actor hex>.json), whose 'race' is such an id (window-1021: nine
+faces kept 48xxxxxx after the DLE moved to 49). A file with 'raceDesc' ('<local hex>:<plugin>') gets its race from it in the
+new order; any other is taken as saved in the old order and mapped by plugin name, unless it was saved ('at') at or after
+--presets-before, which leaves its race as it is (saved in the new order already). Each face it maps or keeps gets the raceDesc
+of its race. Stop the game server first: it keeps the faces it has read in memory and serves those until a restart.
 """
-import json, os, sys, shutil, time
+import json, os, re, sys, shutil, time
 from collections import Counter
+from datetime import datetime, timezone
 
 ID_KEYS = {'baseId', 'raceId', 'headpartIds', 'headTextureSetId', 'learnedSpells', 'leftSpell', 'rightSpell', 'voiceSpell',
            'instantSpell', 'lastWorn', 'partner', 'primary', 'memberOf', 'containers',
@@ -67,22 +75,96 @@ def index_map(old, new):
     for name, slot in o.items():
         m[slot] = n.get(name)          # None: plugin gone
     names = {v: k for k, v in o.items()}
-    return m, names
+    new_names = {n[x.lower()]: x for x in new}
+    return m, names, new_names
+
+
+def slot_of(v):
+    """A load-order id's (slot, local id); None for 0, a runtime id (0xFF...), a non-integer or one past 32 bits."""
+    if not isinstance(v, int) or isinstance(v, bool) or v <= 0 or v > 0xFFFFFFFF or v >> 24 == 0xFF: return None
+    return (('L', (v >> 12) & 0xFFF), v & 0xFFF) if v >> 24 == 0xFE else (('F', v >> 24), v & 0xFFFFFF)
+
+
+def id_at(slot, local):
+    return (0xFE000000 | (slot[1] << 12) | local) if slot[0] == 'L' else ((slot[1] << 24) | local)
 
 
 def remap_id(v, m):
-    if not isinstance(v, int) or isinstance(v, bool) or v <= 0 or v > 0xFFFFFFFF: return v, None
-    hi = v >> 24
-    if hi == 0xFF: return v, None
-    if hi == 0xFE:
-        slot, local = ('L', (v >> 12) & 0xFFF), v & 0xFFF
-    else:
-        slot, local = ('F', hi), v & 0xFFFFFF
+    s = slot_of(v)
+    if not s: return v, None
+    slot, local = s
     if slot not in m: return v, None
     to = m[slot]
     if to is None: return v, ('gone', slot)
-    nv = (0xFE000000 | (to[1] << 12) | local) if to[0] == 'L' else ((to[1] << 24) | local)
+    nv = id_at(to, local)
     return nv, (('moved', slot) if nv != v else None)
+
+
+PRESET_FILE = re.compile(r'^[0-9a-f]{8}\.json$')
+DESC = re.compile(r'^([0-9a-fA-F]{1,8}):(.+)$')
+
+
+def when(s):
+    """An ISO time as an aware datetime (no zone: UTC), or None."""
+    try:
+        t = datetime.fromisoformat(str(s).strip().replace('Z', '+00:00'))
+    except ValueError:
+        return None
+    return t if t.tzinfo else t.replace(tzinfo=timezone.utc)
+
+
+def presets(pdir, m, new_names, before):
+    """The RaceMenu face files whose race or raceDesc changes: [(path, doc)]. A race is listed per file when it moves."""
+    by_name = {nm.lower(): s for s, nm in new_names.items()}
+    stats, changed = Counter(), []
+    for f in sorted(os.listdir(pdir)):
+        if not PRESET_FILE.match(f): continue
+        p = os.path.join(pdir, f)
+        try:
+            d = json.load(open(p, encoding='utf-8'))
+        except ValueError:
+            stats['unreadable, left alone'] += 1; continue
+        race = d.get('race') if isinstance(d, dict) else None
+        if not isinstance(race, int) or isinstance(race, bool):
+            stats['no race, left alone'] += 1; continue
+        desc = d.get('raceDesc')
+        saved = when(d.get('at'))
+        if isinstance(desc, str):
+            md = DESC.match(desc)
+            slot, local = (by_name.get(md.group(2).lower()), int(md.group(1), 16)) if md else (None, 0)
+            if slot is None or local > (0xFFF if slot[0] == 'L' else 0xFFFFFF):
+                stats['raceDesc not in the new order, left alone'] += 1; print('  %s raceDesc %s is not in the new order' % (f, desc)); continue
+            to, why = id_at(slot, local), 'race from raceDesc'
+        elif before and saved and saved >= before:
+            to, why = race, 'saved in the new order'
+        else:
+            to, w = remap_id(race, m)
+            if w and w[0] == 'gone':
+                stats['plugin gone, left alone'] += 1; print('  %s race %x: its plugin is not in the new order' % (f, race)); continue
+            why = 'race moved' if w else 'race not moved'
+        nd = dict(d, race=to)
+        add = desc_of(to, new_names) if not isinstance(desc, str) else None
+        if add: nd['raceDesc'] = add; stats['raceDesc added'] += 1
+        stats[why] += 1
+        if to != race: print('  %s race %x -> %x (%s)' % (f, race, to, why))
+        if nd != d: changed.append((p, nd))
+    for why, n in sorted(stats.items()): print('%6d face files: %s' % (n, why))
+    print('face files to change:', len(changed))
+    return changed
+
+
+def desc_of(v, new_names):
+    """An id of the new order as mp.getDescFromId writes it ('<local hex>:<plugin>'), or None."""
+    s = slot_of(v)
+    return '%x:%s' % (s[1], new_names[s[0]]) if s and s[0] in new_names else None
+
+
+def backup(d):
+    bak = d.rstrip('/\\') + '.bak-loadorder-' + time.strftime('%Y%m%d-%H%M%S')
+    n = 1
+    while os.path.exists(bak + ('' if n == 1 else '-%d' % n)): n += 1      # two runs in one second
+    bak += '' if n == 1 else '-%d' % n
+    shutil.copytree(d, bak); print('backup', bak)
 
 
 def walk(o, m, path, stats, idkey=False, numkeys=False, hexkeys=False):
@@ -133,12 +215,19 @@ def main():
         i = a.index('--id-key'); ID_KEYS.add(a[i + 1]); del a[i:i + 2]
     while '--hex-key-dict' in a:
         i = a.index('--hex-key-dict'); HEX_KEY_DICTS.add(a[i + 1]); del a[i:i + 2]
-    old_p, new_p, cf = a
-    m, names = index_map(order(old_p), order(new_p))
+    pdir = before = None
+    if '--presets' in a:
+        i = a.index('--presets'); pdir = a[i + 1]; del a[i:i + 2]
+    if '--presets-before' in a:
+        i = a.index('--presets-before'); before = when(a[i + 1]); del a[i:i + 2]
+        if not before or not pdir: raise SystemExit('--presets-before takes an ISO time, and --presets with it')
+    if not (len(a) == 3 or (pdir and len(a) == 2)): raise SystemExit(__doc__)
+    old_p, new_p, cf = (a + [None])[:3]
+    m, names, new_names = index_map(order(old_p), order(new_p))
     moved = {names[k]: v for k, v in m.items() if v is None or v != k}
     print('plugins whose index changes:', len(moved), '| gone:', [n for n, v in moved.items() if v is None])
     stats = Counter(); changed = []
-    for f in sorted(os.listdir(cf)):
+    for f in sorted(os.listdir(cf)) if cf else []:
         if not f.endswith('.json'): continue
         p = os.path.join(cf, f)
         d = json.load(open(p, encoding='utf-8'))
@@ -147,15 +236,20 @@ def main():
         if nd != d: changed.append((p, nd))
         stats.update(s)
     for (path, why), n in sorted(stats.items()): print('%6d %-12s %s' % (n, why, path))
-    print('files to change:', len(changed))
+    if cf: print('files to change:', len(changed))
+    faces = presets(pdir, m, new_names, before) if pdir else []
     if not write: print('dry run; add --write'); return
-    bak = cf.rstrip('/\\') + '.bak-loadorder-' + time.strftime('%Y%m%d-%H%M%S')
-    n = 1
-    while os.path.exists(bak + ('' if n == 1 else '-%d' % n)): n += 1      # two runs in one second
-    bak += '' if n == 1 else '-%d' % n
-    shutil.copytree(cf, bak); print('backup', bak)
-    for p, nd in changed: json.dump(nd, open(p, 'w', encoding='utf-8'), ensure_ascii=False)
-    print('written', len(changed))
+    if cf:
+        backup(cf)
+        for p, nd in changed: json.dump(nd, open(p, 'w', encoding='utf-8'), ensure_ascii=False)
+        print('written', len(changed))
+    if faces:
+        backup(pdir)
+        # Compact as the server writes them; ASCII escapes keep any face text exactly, so its hash still matches
+        for p, nd in faces:
+            with open(p + '.migrate.tmp', 'w', encoding='utf-8') as fh: fh.write(json.dumps(nd, separators=(',', ':')))
+            os.replace(p + '.migrate.tmp', p)
+        print('face files written', len(faces))
 
 
 if __name__ == '__main__':
