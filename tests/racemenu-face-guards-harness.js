@@ -110,9 +110,11 @@ globalThis.__dboRaceMenuOpenedAt = new Map();
 // Each call is another connection, a few ms apart even within one millisecond
 let seq = 0;
 const loaded = (a, agoMs) => { const t = Date.now() - agoMs - (++seq); conn.set(a >>> 0, t); picked.set(a >>> 0, t); };
-// The client's extras self ask, through appearanceextras.js as gamemode.js routes it, agoMs before now
+// The client's extras self ask, through appearanceextras.js as gamemode.js routes it, agoMs before now; its store file resolves in TMP
+const cwd = process.cwd();
 process.chdir(TMP);
 require(path.join(ROOT, 'appearanceextras.js'))({ log: () => {}, cfg: { appearanceExtras: { enabled: false } }, sendPacket: () => true, onlineActors: () => [], profileOf: () => 7, display: () => 'Brand' });
+process.chdir(cwd);
 const spawned = (a, agoMs) => {
   globalThis.__dboAppearanceExtrasPacket(a, { customPacketType: 'dboAppearanceExtrasGet', self: true, index: true });
   const e = globalThis.__dboPresetState.spawnAsks.get(a >>> 0); if (e && agoMs) e.at = Date.now() - agoMs;
