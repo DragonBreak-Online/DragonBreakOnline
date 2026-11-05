@@ -263,6 +263,8 @@ module.exports = (api) => {
     liveRaceCombatSeconds: 30,
     // Beast form races (beastform.js FORMS), never sent as a player's own
     liveRaceNever: ['283a:Dawnguard.esm', 'cdd84:Skyrim.esm'],
+    // No face ask this long after a load: that client has no preset calls, and appearance.js charges it nothing
+    selfAskSeconds: 60,
   }, (cfg && cfg.racemenuPresets) || {});
   const DIR = path.resolve(C.dir);
   const MAX_CHUNKS = Math.ceil(Number(C.maxChars) / Number(C.chunkChars));
@@ -279,6 +281,12 @@ module.exports = (api) => {
   if (!(S.logRates instanceof Map)) S.logRates = new Map();   // log-only limiters, kept apart from S.rates so they never trip its 5000-key clear
   // actor -> { conn, race, since, sentAt, why, done, held, again }: the owner's live race this load; held is their own face's answer, waiting for it
   if (!(S.liveRace instanceof Map)) S.liveRace = new Map();
+  // actor -> { conn, capable, why }: whether the client of that connection has SkyrimPlatform's preset calls
+  if (!(S.faceClients instanceof Map)) S.faceClients = new Map();
+  // When this process began watching for face asks: a load before it may have asked unseen
+  if (!S.faceClientsSince) S.faceClientsSince = Date.now();
+  // actor -> the load whose missing face ask was logged
+  if (!(S.noAskTold instanceof Map)) S.noAskTold = new Map();
 
   const keyOf = (a) => ((Number(a) >>> 0).toString(16)).padStart(8, '0');
   const fileOf = (k) => path.join(DIR, `${k}.json`);
@@ -635,6 +643,52 @@ module.exports = (api) => {
   if (typeof api.every === 'function') api.every('racemenuLiveRace', 1000, liveRaceTick);
   else { if (S.liveTimer) clearInterval(S.liveTimer); S.liveTimer = setInterval(liveRaceTick, 1000); }
 
+  // ---- whether the owner's client can keep a face (0.3.111-0.3.116 shipped a SkyrimPlatformImpl.dll without the preset calls) ----
+  // One with them asks for its own face 6 s after every load and for each copy's (racemenuPresetService.ts scan); one without asks nothing
+  const loadOf = (a) => Math.max(connOf(a), pickedAt(a));
+  const markFaceClient = (a, capable, why) => {
+    a = a >>> 0;
+    const conn = connOf(a), e = S.faceClients.get(a);
+    if (!conn || (e && e.conn === conn && e.capable === capable)) return;
+    S.faceClients.set(a, { conn, capable, why });
+    if (S.faceClients.size > 2000) for (const [k, x] of S.faceClients) if (x.conn !== connOf(k)) S.faceClients.delete(k);
+    const who = `${keyOf(a)} (profile ${profileOf(a)})`;
+    if (!capable) { if (allow('noNativesTold', a, 3, 3600000, S.logRates)) log(`racemenu presets: ${who} client has no preset calls (${why}): its saved face is not put back, and /appearance charges it nothing`); }
+    else if (S.noAskTold.get(a) === loadOf(a)) log(`racemenu presets: ${who} client asked for faces after all, ${Math.round((Date.now() - loadOf(a)) / 1000)} s after its load`);
+  };
+  // { state: 'capable' | 'incapable' | 'unknown', why } for the owner's client in this connection
+  const faceClientOf = (a, now = Date.now()) => {
+    a = a >>> 0;
+    const conn = connOf(a), e = S.faceClients.get(a);
+    if (!conn) return { state: 'unknown', why: 'not connected' };
+    if (e && e.conn === conn) return { state: e.capable ? 'capable' : 'incapable', why: e.why };
+    const load = loadOf(a), s = Math.round((now - load) / 1000);
+    if (S.faceClientsSince > load) return { state: 'unknown', why: 'loaded before the server watched for face asks' };
+    return now - load < Number(C.selfAskSeconds) * 1000 ? { state: 'unknown', why: `no face ask yet, ${s} s after its load` } : { state: 'incapable', why: `no face ask in ${s} s after its load` };
+  };
+  // One line per load whose client never asked for its own face, so staff can count the clients without the preset calls
+  const faceClientTick = () => {
+    if (!C.enabled) return;
+    const now = Date.now();
+    for (const x of onlineActors()) {
+      const a = x >>> 0, load = loadOf(a), e = S.faceClients.get(a);
+      if (!load || S.noAskTold.get(a) === load || (e && e.conn === connOf(a)) || !isPlayer(a) || !inTest(a)) continue;
+      const v = faceClientOf(a, now);
+      if (v.state !== 'incapable') continue;
+      S.noAskTold.set(a, load);
+      if (allow('noAskTold', a, 6, 3600000, S.logRates)) log(`racemenu presets: ${keyOf(a)} (profile ${profileOf(a)}) client sent ${v.why}: it has no preset calls, so its saved face is not put back and /appearance charges it nothing`);
+    }
+    if (S.noAskTold.size > 2000) S.noAskTold.clear();
+  };
+  if (typeof api.every === 'function') api.every('racemenuFaceClients', 5000, faceClientTick);
+  else { if (S.faceTimer) clearInterval(S.faceTimer); S.faceTimer = setInterval(faceClientTick, 5000); }
+  // appearance.js asks before it charges; a player whose faces are not kept here is unknown (its usual rules)
+  globalThis.__dboFaceClient = (a) => {
+    try { return C.enabled && isPlayer(a) && inTest(a) ? faceClientOf(a) : { state: 'unknown', why: 'faces not kept for this player' }; } catch (e) { return { state: 'unknown', why: e.message }; }
+  };
+  // gamemode.js writeDiagLines: the client traced 'rmp cap err=natives'
+  globalThis.__dboFaceClientNoNatives = (a) => { try { markFaceClient(a, false, 'rmp cap err=natives'); } catch (e) { log('racemenu presets: client trace not taken', e.message); } };
+
   // ---- rate limits ----
   const allow = (kind, who, perWindow, windowMs, m = S.rates) => {
     const k = `${kind}:${who}`;
@@ -650,6 +704,7 @@ module.exports = (api) => {
   // ---- the packets ----
   const onGet = (userId, content) => {
     const me = actorOf(userId); if (!me) return;
+    markFaceClient(me, true, 'asked for a face');
     const self = Number(content.actor) === 0;
     // Off, or left out of a staff test: a plain "none", never "off" (S1, see the top), so the client keeps asking and
     // picks the faces up as soon as the module is on for it. Not counted as the owner's face put back
@@ -785,6 +840,7 @@ module.exports = (api) => {
   const onPut = (userId, content) => {
     if (!C.enabled) return;
     const me = actorOf(userId); if (!me || !isPlayer(me) || !inTest(me)) return;
+    markFaceClient(me, true, 'sent a face');
     const up = Number(content.up), n = Number(content.n), i = Number(content.i);
     const hash = typeof content.hash === 'string' ? content.hash : '';
     const data = typeof content.data === 'string' ? content.data : '';

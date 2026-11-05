@@ -2794,6 +2794,8 @@ const writeDiagLines = (userId, lines) => {
     // The client's version for the player log (playerlog.js), by connection: it comes before the character exists
     if (text.startsWith('apr client v=')) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('client', userId, a, text); } catch (e) { /* the player log is optional */ } }
     if (a && text.startsWith('voice ')) keepVoiceLine(a, text);
+    // A client without SkyrimPlatform's preset calls (racemenupresets.js), seen whatever its line allowance
+    if (a && text.startsWith('apr rmp cap err=natives')) { try { const h = globalThis.__dboFaceClientNoNatives; if (typeof h === 'function') h(a); } catch (e) { /* faces are optional */ } }
     const kind = diagKindOf(text);
     if (kind) {
       const k = `${key}:${kind}`;
