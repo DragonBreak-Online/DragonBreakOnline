@@ -23,6 +23,7 @@ const config = require('./config')
 const mo2    = require('./mo2')
 const nexus  = require('./nexus')
 const ini    = require('./ini')
+const fpsLimit = require('./fpsLimit')
 const prefsSeed = require('./prefsSeed')
 const controlmapCheck = require('./controlmapCheck')
 const { GAME_HOTKEY_EVENTS, gameHotkeyCode, setGameHotkey } = require('./gameHotkeys')
@@ -441,6 +442,14 @@ function skyrimPrefsPath() {
 function clientSettingsPath() {
   return path.join(effectiveGamePath() || '', 'Data', 'Platform', 'Plugins', 'skymp5-client-settings.txt')
 }
+function getFpsLimit(skyrimPath) {
+  const stored = store.get('fpsLimit')
+  if (stored && fpsLimit.FPS_LIMITS.includes(String(stored))) return String(stored)
+  const p = fpsLimit.sseDisplayTweaksCustomPath(skyrimPath || effectiveGamePath())
+  const fromIni = fpsLimit.readFpsLimitFromIni(p)
+  if (fromIni) return fromIni
+  return '60'
+}
 function readClientSettings() {
   try {
     const obj = JSON.parse(fs.readFileSync(clientSettingsPath(), 'utf8'))
@@ -522,6 +531,7 @@ ipcMain.handle('graphics:load', () => {
       // Read back from the file the game actually reads it from. 80 is Skyrim's own default, so the box
       // shows what the player has rather than a guess.
       fov: fovFromSkyrimIni(num('General', 'fDefaultFOV', 80)),
+      fpsLimit: getFpsLimit(),
       texQuality: skip >= 2 ? 'low' : (skip === 1 ? 'medium' : 'high'),
       aa: val('Display', 'bUseTAA', '1') === '1' ? 'taa'
         : (val('Display', 'bFXAAEnabled', '0') === '1' ? 'fxaa' : 'off'),
@@ -558,6 +568,11 @@ ipcMain.handle('graphics:save', (_e, g) => {
     // 2.1.31 shipped all of it into SkyrimPrefs [Display], which the game does not read, so the setting
     // did nothing. Both halves are written now, and the client re-applies the pair after the character
     // creator, which sets its own close-up value and never restores it.
+    if (g.fpsLimit) {
+      const fpsVal = fpsLimit.normalizeFps(g.fpsLimit)
+      store.set('fpsLimit', fpsVal)
+      fpsLimit.writeSseDisplayTweaksCustom(effectiveGamePath(), fpsVal)
+    }
     const fov = Number(g.fov)
     const fovValue = Number.isFinite(fov) && fov >= 50 && fov <= 140 ? String(Math.round(fov)) : ''
     if (fovValue) general['fDefaultFOV'] = fovValue
@@ -2762,6 +2777,11 @@ async function prepareForLaunch(skyrimPath, viaMO2) {
   // than moved aside, and again after, to refill Data when a map there was moved aside.
   applyControlmapOverride(skyrimPath)
   try {
+    fpsLimit.writeSseDisplayTweaksCustom(skyrimPath, getFpsLimit(skyrimPath))
+  } catch (err) {
+    log(`[launch] could not write fps limit: ${err.message}`)
+  }
+  try {
     let maps = null
     if (viaMO2) {
       let mods = []
@@ -3100,7 +3120,7 @@ ipcMain.handle('install:check', async () => {
 const CHECK_PROGRESS_EVERY = 25
 const CHECK_NOTE_SAMPLE    = 10
 // Files under Data/Platform and Data/SKSE/Plugins written by the launcher, Skyrim Platform or SKSE rather than shipped in the client zip.
-const CLIENT_OWN_FILE_RES = [/^data\/platform\/(logs|pluginsnoload|pluginsdev)\//, /skymp5-client-settings\.txt$/, /\.log$/, /^data\/skse\/plugins\/skse64_/]
+const CLIENT_OWN_FILE_RES = [/^data\/platform\/(logs|pluginsnoload|pluginsdev)\//, /skymp5-client-settings\.txt$/, /\.log$/, /^data\/skse\/plugins\/skse64_/, /ssedisplaytweaks_custom\.ini$/i]
 
 function crc32File(p) {
   return new Promise((resolve, reject) => {
@@ -3570,12 +3590,13 @@ async function fetchExtraManifest(get = fetchJSON) {
   catch (err) { if (err.statusCode === 404) return null; throw err }
 }
 
-// Entries with a sha256 whose path stays inside the game's Data folder
+// Entries with a sha256 whose path stays inside the game's Data folder, excluding launcher-managed config files
 function extraEntries(vd, skyrimPath) {
   const data = path.resolve(skyrimPath, 'Data') + path.sep
   return (vd && Array.isArray(vd.files) ? vd.files : []).filter(f =>
     f && typeof f.path === 'string' && /^[0-9a-f]{64}$/i.test(String(f.sha256)) &&
-    path.resolve(skyrimPath, ...f.path.split('/')).startsWith(data))
+    path.resolve(skyrimPath, ...f.path.split('/')).startsWith(data) &&
+    !/^data\/skse\/plugins\/ssedisplaytweaks_custom\.ini$/i.test(f.path))
 }
 
 // Cheap check for the Play button: same manifest version and every file present at its published size

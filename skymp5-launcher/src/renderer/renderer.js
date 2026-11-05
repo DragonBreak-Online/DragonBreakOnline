@@ -176,7 +176,7 @@ const GHK_MAP = {
   'ghk-sneak': 'Sneak', 'ghk-shout': 'Shout', 'ghk-pov': 'Toggle POV',
 }
 const GFX_INPUT_IDS = [
-  'gfx-windowmode', 'gfx-resolution', 'gfx-texquality', 'gfx-aa', 'gfx-shadowquality',
+  'gfx-windowmode', 'gfx-resolution', 'gfx-fpslimit', 'gfx-texquality', 'gfx-aa', 'gfx-shadowquality',
   'gfx-decals', 'gfx-reflections', 'gfx-godrays', 'gfx-lensflare', 'gfx-ao', 'gfx-precip', 'gfx-fov',
 ]
 
@@ -201,6 +201,7 @@ async function loadGameSettingsTab() {
       const iy = document.getElementById('gfx-invert-y'); if (iy) iy.checked = !!g.invertY
       const setVal = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v }
       const setChk = (id, v) => { const el = document.getElementById(id); if (el) el.checked = !!v }
+      setVal('gfx-fpslimit', g.fpsLimit || '60')
       setVal('gfx-fov', g.fov)
       setVal('gfx-texquality', g.texQuality)
       setVal('gfx-aa', g.aa)
@@ -262,6 +263,7 @@ async function saveGameSettingsTab() {
         windowMode: wm ? wm.value : 'windowed',
         width, height,
         invertY: !!(iy && iy.checked),
+        fpsLimit:      val('gfx-fpslimit') || '60',
         fov:           val('gfx-fov'),
         texQuality:    val('gfx-texquality'),
         aa:            val('gfx-aa'),
