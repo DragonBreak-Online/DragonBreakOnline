@@ -153,6 +153,12 @@ const loaded = (a, agoMs) => { const t = Date.now() - agoMs - (++seq); conn.set(
   writeDiagLines(1, ['apr rmp cap err=natives']);
   ok(fc(A).state === 'incapable' && diagLog.length === lines, 'G1: seen even past the player\'s apr allowance (the line itself is not logged)', fc(A));
   loaded(A, 1000);
+  packet(1, { customPacketType: 'dboPresetGet', actor: 0, have: '' });
+  writeDiagLines(1, ['apr rmp cap err=natives']);
+  ok(fc(A).state === 'capable' && fc(A).why === 'asked for a face', 'G1: an err=natives line after an ask in the same connection (a forged one) leaves it capable', fc(A));
+  ok(plogs.some((l) => /^racemenu presets: ff000101 \(profile 7\) client traced rmp cap err=natives after it asked for faces in this connection: kept as having the preset calls$/.test(l)), 'G1: ...and the mismatch is logged');
+  await settle(); take();
+  loaded(A, 1000);
   writeDiagLines(1, ['apr rmp cap err=noplayer', 'apr rmp ask have=-']);
   ok(fc(A).state === 'unknown', 'G1: other rmp lines say nothing about the calls', fc(A));
   ok(timers.racemenuFaceClients && typeof globalThis.__dboFaceClientNoNatives === 'function', 'G1: the module installs the trace hook and the tick');

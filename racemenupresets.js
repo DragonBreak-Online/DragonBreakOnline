@@ -650,9 +650,14 @@ module.exports = (api) => {
     a = a >>> 0;
     const conn = connOf(a), e = S.faceClients.get(a);
     if (!conn || (e && e.conn === conn && e.capable === capable)) return;
+    const who = `${keyOf(a)} (profile ${profileOf(a)})`;
+    // The calls are fixed for the life of the game process, so a 'none' trace after an ask in that connection is not believed
+    if (!capable && e && e.conn === conn) {
+      if (allow('nativesMismatchTold', a, 1, 3600000, S.logRates)) log(`racemenu presets: ${who} client traced ${why} after it asked for faces in this connection: kept as having the preset calls`);
+      return;
+    }
     S.faceClients.set(a, { conn, capable, why });
     if (S.faceClients.size > 2000) for (const [k, x] of S.faceClients) if (x.conn !== connOf(k)) S.faceClients.delete(k);
-    const who = `${keyOf(a)} (profile ${profileOf(a)})`;
     if (!capable) { if (allow('noNativesTold', a, 3, 3600000, S.logRates)) log(`racemenu presets: ${who} client has no preset calls (${why}): its saved face is not put back, and /appearance charges it nothing`); }
     else if (S.noAskTold.get(a) === loadOf(a)) log(`racemenu presets: ${who} client asked for faces after all, ${Math.round((Date.now() - loadOf(a)) / 1000)} s after its load`);
   };
