@@ -16,8 +16,7 @@
 //   freeChanges 0 turns them off, grants included: /appearance is then exactly as before. An editor opened free whose free
 //   change is gone by the time its changes arrive (a RaceMenu save of an earlier close used it, or it was switched off)
 //   saves nothing and charges nothing: it never checked the gold or the daily wait (review, 15 Oct).
-// - A client that cannot keep a RaceMenu face (racemenupresets.js __dboFaceClient) pays no gold or free change for a changed look, but
-//   its cooldown starts; overlays and body sliders changed alone are priced as usual (faceClientGuard, faceClientGuardUntil).
+// - A client that cannot keep a RaceMenu face (racemenupresets.js __dboFaceClient) pays no gold or free change for a changed look (faceClientGuard).
 // The engine applies the editor's result before the gamemode hears of it (ActionListener::OnUpdateAppearance applies it
 // and tells the neighbours, then fires the event), so a locked change is undone here by setting the appearance back. The
 // edit waits on the character (private.dboAppearanceEdit, with the look before it), so a relog or a restart in the

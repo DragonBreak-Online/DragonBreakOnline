@@ -263,8 +263,7 @@ module.exports = (api) => {
     liveRaceCombatSeconds: 30,
     // Beast form races (beastform.js FORMS), never sent as a player's own
     liveRaceNever: ['283a:Dawnguard.esm', 'cdd84:Skyrim.esm'],
-    // No face ask this long after the client's own extras ask (sent once its character has loaded): it has no preset calls,
-    // and appearance.js charges it nothing for a changed look
+    // No face ask this long after the client's extras ask (sent once its character loaded): it has no preset calls
     selfAskSeconds: 60,
     // The same with no extras ask at all (no RaceMenu, or still loading), counted from the server's connect stamp
     selfAskNoSpawnSeconds: 300,
