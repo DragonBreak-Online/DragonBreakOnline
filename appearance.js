@@ -16,6 +16,7 @@
 //   freeChanges 0 turns them off, grants included: /appearance is then exactly as before. An editor opened free whose free
 //   change is gone by the time its changes arrive (a RaceMenu save of an earlier close used it, or it was switched off)
 //   saves nothing and charges nothing: it never checked the gold or the daily wait (review, 15 Oct).
+// - A client that cannot keep a RaceMenu face (racemenupresets.js __dboFaceClient) pays no gold, free change or cooldown (faceClientGuard).
 // The engine applies the editor's result before the gamemode hears of it (ActionListener::OnUpdateAppearance applies it
 // and tells the neighbours, then fires the event), so a locked change is undone here by setting the appearance back. The
 // edit waits on the character (private.dboAppearanceEdit, with the look before it), so a relog or a restart in the
@@ -126,7 +127,7 @@ const sameLook = (x, y) => {
 module.exports = (api) => {
   const { mp, log, personal, system, audit, who, registerChatCommand, cfg } = api;
   const C = Object.assign({ enabled: true, cost: 500, cooldownHours: 24, allowRace: false, allowSex: false, combatSeconds: 30, headGuard: true, refusedNotice: true,
-    freeChanges: 1 }, (cfg && cfg.appearance) || {});
+    freeChanges: 1, faceClientGuard: true }, (cfg && cfg.appearance) || {});
   const cost = Math.max(0, Math.floor(Number(C.cost) || 0));
   const freeChanges = Math.max(0, Math.floor(Number(C.freeChanges) || 0));
   // The harness passes its own clock for the settle write
@@ -213,6 +214,23 @@ module.exports = (api) => {
   const useFree = (a) => mp.set(a, FREE_USED, freeUsed(a) + 1);
   const unuseFree = (a) => mp.set(a, FREE_USED, freeUsed(a) - 1);
   const FREE_KEPT = ' Your free appearance change is still yours.';
+  // A client without SkyrimPlatform's preset calls never keeps a RaceMenu face (racemenupresets.js __dboFaceClient)
+  const NO_FACE_CLIENT = 'Your game client can\'t save face sliders right now, so nothing was charged. A client update fixes it.';
+  const faceClientLoggedAt = new Map();
+  // The verdict when that client's charge is waived (no gold, free change or cooldown), else null; logged once per player, verdict and 10 min
+  const faceClientWaives = (a, where) => {
+    if (C.faceClientGuard === false) return null;
+    let v = null;
+    try { const f = globalThis.__dboFaceClient; v = typeof f === 'function' ? f(a) : null; } catch (e) { v = { state: 'unknown', why: e.message }; }
+    if (!v || typeof v.state !== 'string') v = { state: 'unknown', why: 'racemenupresets.js not loaded' };
+    const k = `${a >>> 0}|${v.state}`, now = Date.now();
+    if (now - (faceClientLoggedAt.get(k) || 0) >= 600000) {
+      faceClientLoggedAt.set(k, now);
+      if (faceClientLoggedAt.size > 512) for (const [x, t] of faceClientLoggedAt) if (now - t >= 600000) faceClientLoggedAt.delete(x);
+      log(`appearance: ${who(a)} ${where}: client ${v.state} (${v.why}), ${v.state === 'incapable' ? 'nothing charged' : 'usual price'}`);
+    }
+    return v.state === 'incapable' ? v : null;
+  };
 
   // Why this player cannot open the editor now, or null
   const blocked = (a) => {
@@ -421,6 +439,12 @@ module.exports = (api) => {
       audit(`APPEARANCE ${who(a)} kept their RaceMenu ${what} for the first time (free)`);
       return { ok: true, kind: w.kind, free: true };
     }
+    // Known only after the close: what that client keeps from it is not charged either
+    if (faceClientWaives(a, `RaceMenu ${what} save`)) {
+      w.charge = false;
+      system(a, `Your RaceMenu ${what === 'extras' ? 'overlays and body sliders are' : 'changes are'} saved. ${NO_FACE_CLIENT}`);
+      return { ok: true, kind: w.kind };
+    }
     // A free /appearance whose free change is gone (used meanwhile, or switched off): not saved, and no gold is taken for it
     if (w.free && !(freeLeft(a) > 0)) {
       system(a, 'Your RaceMenu changes weren\'t saved: your free appearance change is no longer there, and nothing was charged. They are gone when you log out.');
@@ -592,8 +616,9 @@ module.exports = (api) => {
       }
       // A RaceMenu-only change (sliders, sculpt, overlays) arrives after this and is paid for then (raceMenuSaveGate), with
       // the free change on a free edit; a face made on a swapped-in head is not taken (E5)
-      openSaveWindow(a, 'appearance', true, !!guarded, e.free === true);
-      system(a, `Your standard look is unchanged. ${free ? 'RaceMenu-only changes (extra sliders, sculpt, overlays), if you made any, use your free appearance change when they are saved; otherwise it stays yours.'
+      const waived = faceClientWaives(a, 'unchanged look');
+      openSaveWindow(a, 'appearance', !waived, !!guarded, e.free === true);
+      system(a, `Your standard look is unchanged. ${waived ? `${NO_FACE_CLIENT}${freeKept}` : free ? 'RaceMenu-only changes (extra sliders, sculpt, overlays), if you made any, use your free appearance change when they are saved; otherwise it stays yours.'
         : freeGone ? 'Your free appearance change is no longer there (used meanwhile, or switched off), so RaceMenu-only changes (extra sliders, sculpt, overlays) from this editor are not charged and are kept only if you have none saved yet.'
           : `RaceMenu-only changes (extra sliders, sculpt, overlays) cost ${cost} gold and are charged when they are saved.`}${headNote}${nameKept ? ' Your name stays the same: a GM can rename you.' : ''}`);
       return true;
@@ -607,7 +632,8 @@ module.exports = (api) => {
       audit(`APPEARANCE ${who(a)} closed a free appearance editor with no free change left: previous look kept, nothing charged`);
       return true;
     }
-    if (!free && !takeGold(a, cost)) {
+    const waived = faceClientWaives(a, 'changed look');
+    if (!waived && !free && !takeGold(a, cost)) {
       mp.set(a, 'appearance', before);
       resendAfterSettle(a, appearance);
       system(a, `You no longer have ${cost} gold, so your previous look was kept.`);
@@ -616,13 +642,16 @@ module.exports = (api) => {
     }
     if (nameKept || guarded) mp.set(a, 'appearance', look);
     // The free change is used exactly where the gold would have been taken, and the cooldown starts as for a paid change
-    if (free) useFree(a);
-    mp.set(a, LAST, Date.now());
+    if (!waived) {
+      if (free) useFree(a);
+      mp.set(a, LAST, Date.now());
+    }
     // Paid: what skee keeps from this close is saved with it, but for a face made on a swapped-in head (E5)
     openSaveWindow(a, 'appearance', false, !!guarded);
     retakeTells(a, before);
     resendAfterSettle(a, appearance);
     const nameNote = nameKept ? ' Your name stays the same: a GM can rename you.' : '';
+    if (waived) { system(a, `Your new look is saved. ${NO_FACE_CLIENT}${freeKept}${headNote}${nameNote}`); return true; }
     if (free) {
       system(a, `Your new look is saved. It used your free appearance change, so no gold was taken.${headNote}${nameNote}${raceMenuKept(a) ? '' : NOT_KEPT_NOTE}`);
       audit(`APPEARANCE ${who(a)} changed their look with their free appearance change (no gold)${nameKept ? ' (a name change in the editor was undone)' : ''}`);
