@@ -29,10 +29,12 @@ const DIR = path.join(TMP, 'racemenu-presets');
 const DLE = 'DragonBreak Online Edits.esp';
 // The DLE at 0x49 now; its ids at 0x48 are the load order before window-1021
 const MAORMER = 0x49192ede, MAORMER_V = 0x49192edf, GOBLIN = 0x49000d62, NORD = 0x13746, BRETON = 0x13741;
+// Another race plugin after the DLE whose race has the Goblin's local id
+const OTHER = 0x4a000d62;
 const OLD = (id) => ((0x48 << 24) | (id & 0xffffff)) >>> 0;
-const DESCS = { [`192ede:${DLE}`]: MAORMER, [`192edf:${DLE}`]: MAORMER_V, [`d62:${DLE}`]: GOBLIN, '13746:Skyrim.esm': NORD, '283a:Dawnguard.esm': 0x0200283a, 'cdd84:Skyrim.esm': 0xcdd84 };
+const DESCS = { [`192ede:${DLE}`]: MAORMER, [`192edf:${DLE}`]: MAORMER_V, [`d62:${DLE}`]: GOBLIN, 'd62:Other Races.esp': OTHER, '13746:Skyrim.esm': NORD, '283a:Dawnguard.esm': 0x0200283a, 'cdd84:Skyrim.esm': 0xcdd84 };
 const IDS = Object.fromEntries(Object.entries(DESCS).map(([d, id]) => [id, d]));
-const RECORDS = { [MAORMER]: 'RACE', [MAORMER_V]: 'RACE', [GOBLIN]: 'RACE', [NORD]: 'RACE', [BRETON]: 'RACE' };
+const RECORDS = { [MAORMER]: 'RACE', [MAORMER_V]: 'RACE', [GOBLIN]: 'RACE', [OTHER]: 'RACE', [NORD]: 'RACE', [BRETON]: 'RACE' };
 
 const A = 0xff000101, B = 0xff000202;
 const users = { 1: A, 2: B };
@@ -302,6 +304,12 @@ const spawned = (a, agoMs) => {
   ok(M.docRace({ race: 0xfe000800 }, 0xfe100800) === 0xfe000800 && M.docRace({ race: 0xff000800 }, 0x49000800) === 0xff000800, 'G2: nor do a light plugin\'s (FE) or a created (FF) id');
   ok(M.docRace({ race: 0x48192ede, raceDesc: `192ede:${DLE}` }, 0x47192ede) === 0x48192ede, 'G2: nor a face that has raceDesc');
   ok(M.docRace({ race: 0x48192ede }, NORD) === MAORMER && M.docRace({ race: 0x48123456 }, NORD) === 0x48123456, 'G2: a family table id stands in when the live race is not the same record');
+  ok(M.docRace({ race: OTHER }, GOBLIN) === OTHER && M.docRace({ race: MAORMER }, 0x4a192ede) === MAORMER, 'G2: an id that still names a RACE here (another plugin\'s, same low 24 bits) is never taken for a moved one');
+  props.set(`${A}|appearance`, look(GOBLIN));
+  store(A, { race: OTHER }, 0.8);
+  packet(1, { customPacketType: 'dboPresetGet', actor: 0, have: '' }); await settle(); pumpAll();
+  s = answerOf(take(), A, A);
+  ok(s.length === 1 && s[0].customPacketType === 'dboPresetNone', 'G2: ...so an owner on 49000d62 with a face saved on 4a000d62 is answered none, as before', s);
 
   // /appearance on such a face: priced as any change, no longer refused 'otherrace'
   reset(GOBLIN); M = loadPresets(); loaded(A, 5000); loadAppearance();
@@ -323,6 +331,13 @@ const spawned = (a, agoMs) => {
   openEditor(); closeEditor(look(NORD));
   upload(1, 0.2); await settle();
   ok(take().some((x) => x.p.customPacketType === 'dboPresetRefused' && x.p.reason === 'otherrace') && gold() === 800, 'G2: a face of another race is still refused otherrace from /appearance');
+  reset(GOBLIN); M = loadPresets(); loaded(A, 5000); loadAppearance();
+  store(A, { race: OTHER }, 0.1);
+  packet(1, { customPacketType: 'dboPresetGet', actor: 0, have: '' }); await settle(); pumpAll(); take();
+  await wait(5);
+  openEditor(); closeEditor(look(GOBLIN));
+  upload(1, 0.2); await settle();
+  ok(take().some((x) => x.p.customPacketType === 'dboPresetRefused' && x.p.reason === 'otherrace') && gold() === 800, 'G2: ...and so is one saved on 4a000d62 for an owner on 49000d62 (another plugin\'s race, not a moved one)');
 
   try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { /* the scratch folder */ }
   console.log(fails ? `${fails} failed` : 'all passed');

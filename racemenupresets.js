@@ -328,10 +328,10 @@ module.exports = (api) => {
   // The family table's full-plugin ids by their low 24 bits; 0 where two plugins' ids share them
   const FAMILY_LOW = new Map();
   for (const id of FAMILY.keys()) if (isFullPluginId(id)) { const lo = id & 0xffffff; FAMILY_LOW.set(lo, FAMILY_LOW.has(lo) && FAMILY_LOW.get(lo) !== id ? 0 : id); }
-  // A stored face's race as an id of this load order: one saved without raceDesc on a full plugin since moved is matched by its low 24 bits
+  // A stored face's race as an id of this load order: one saved without raceDesc on a full plugin, and no RACE here now, is matched by its low 24 bits
   const docRace = (d, live) => {
     const r = Number(d && d.race) >>> 0;
-    if (!r || typeof d.raceDesc === 'string' || !isFullPluginId(r)) return r;
+    if (!r || typeof d.raceDesc === 'string' || !isFullPluginId(r) || isRaceNow(r)) return r;
     if (live && shiftedId(r, live)) return Number(live) >>> 0;
     return FAMILY.has(r) ? r : FAMILY_LOW.get(r & 0xffffff) || r;
   };
@@ -365,6 +365,9 @@ module.exports = (api) => {
   const idOfDesc = (d) => { try { return typeof mp.getIdFromDesc === 'function' ? mp.getIdFromDesc(String(d)) >>> 0 : 0; } catch (e) { return 0; } };
   const NEVER_LIVE = new Set((Array.isArray(C.liveRaceNever) ? C.liveRaceNever : []).map(idOfDesc).filter(Boolean));
   const isRaceRecord = (id) => { try { const r = typeof mp.lookupEspmRecordById === 'function' ? mp.lookupEspmRecordById(id) : null; return !!(r && r.record && String(r.record.type) === 'RACE'); } catch (e) { return false; } };
+  // isRaceRecord for docRace, which runs on every answer; the load order is fixed for the life of the process
+  const RACE_NOW = new Map();
+  const isRaceNow = (id) => { if (!RACE_NOW.has(id)) { if (RACE_NOW.size > 256) RACE_NOW.clear(); RACE_NOW.set(id, isRaceRecord(id)); } return RACE_NOW.get(id); };
   // A face's race by its plugin, kept beside the id so a load-order change cannot move it; '' when it does not name the id back
   const descOfId = (id) => {
     try { const d = typeof mp.getDescFromId === 'function' ? String(mp.getDescFromId(Number(id) >>> 0)) : ''; return DESC_RX.test(d) && idOfDesc(d) === (Number(id) >>> 0) ? d : ''; } catch (e) { return ''; }
