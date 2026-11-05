@@ -243,6 +243,33 @@ section('grant', () => {
   ok(/switched off/.test((said.at(-1) || [])[1]) && !props.get(`${A}|private.dboAppearanceFreeUsed`), 'switched off: no grant', said);
 });
 
+// 9b. The grant hook /grantappearance and gifts.js appearanceFree share: the same count and told flag, nothing said or audited by itself
+section('grant hook', () => {
+  load(0);
+  const grant = globalThis.__dboAppearanceEdit.grantFree;
+  ok(typeof grant === 'function', 'appearance.js hands gifts.js its grant on __dboAppearanceEdit (nulled with it by a failed load)');
+  props.set(`${A}|private.dboAppearanceFreeUsed`, 1);
+  let r = grant(A, 2, true);
+  ok(r.ok && r.left === 2 && Number(props.get(`${A}|private.dboAppearanceFreeUsed`)) === 1 && !props.get(`${A}|private.dboAppearanceFreeTold`), 'a dry run says what would be left and changes nothing', r);
+  const n = [said.length, sys.length, audits.length];
+  r = grant(A, 2);
+  ok(r.ok && r.left === 2 && freeLeft() === 2 && Number(props.get(`${A}|private.dboAppearanceFreeUsed`)) === -1 && Number(props.get(`${A}|private.dboAppearanceFreeTold`)) === 1, 'two more: the count goes down by two and the character counts as told', r);
+  ok(said.length === n[0] && sys.length === n[1] && audits.length === n[2], 'the hook itself tells and audits nothing (its caller does)');
+  ok(notice() === false, 'so the login notice does not repeat it');
+  r = grant(A, 1);
+  ok(r.ok && r.left === 3, 'grants stack', r);
+  ok(['0', 0, 1.5, -1, undefined].every((x) => grant(A, x).ok === false) && freeLeft() === 3, 'a count that is not a positive whole number is refused and changes nothing', freeLeft());
+  run(); finish(changed());
+  ok(freeLeft() === 2 && gold() === 0, 'a granted change is used by /appearance as any free change', [freeLeft(), gold()]);
+  load(0, { freeChanges: 0 });
+  r = globalThis.__dboAppearanceEdit.grantFree(A, 1);
+  ok(!r.ok && /switched off/.test(r.text) && !props.get(`${A}|private.dboAppearanceFreeUsed`) && globalThis.__dboAppearanceEdit.grantFree(A, 1, true).ok === false, 'switched off: refused, dry or not, and nothing changes', r);
+  load(0);
+  props.set(`${A}|private.dboAppearanceFreeUsed`, 1);
+  cmds.get('grantappearance').fn(G, '#BBBB');
+  ok(freeLeft() === 1 && audits.at(-1) === 'APPEARANCE Gale #GGGG (profile 9) granted Brand #BBBB (profile 7) a free appearance change (1 left)' && /A GM gave you a free appearance change/.test(lastSys()), '/grantappearance through the hook: the same count, message and audit line', audits.at(-1));
+});
+
 // 10. The player log reads the free lines as act.APPEARANCE, the grant's target as the target; every new site is pinned
 section('player log', () => {
   const R = require(path.join(ROOT, 'playerlog-rules.js'));

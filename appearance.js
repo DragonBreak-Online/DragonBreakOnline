@@ -67,7 +67,7 @@ const path = require('path');
 const GOLD = 0x0000000f;
 const EDIT = 'private.dboAppearanceEdit';
 const LAST = 'private.dboAppearanceAt';
-// The free changes this character has used; a GM's /grantappearance takes one off (it may go below 0)
+// The free changes this character has used; a GM's /grantappearance or a staff gift (gifts.js appearanceFree) takes some off (it may go below 0)
 const FREE_USED = 'private.dboAppearanceFreeUsed';
 // 1 once the character was told a free change waits
 const FREE_TOLD = 'private.dboAppearanceFreeTold';
@@ -754,6 +754,19 @@ module.exports = (api) => {
   };
   globalThis.__dboAppearanceFreeLogin = freeNotice;
 
+  // n more free changes, the character told by the caller (/grantappearance, gifts.js appearanceFree): { ok, left } or { ok: false, text }; dry only asks
+  const grantFree = (t, n, dry) => {
+    t = t >>> 0;
+    try {
+      if (!(freeChanges > 0)) return { ok: false, text: 'Free appearance changes are switched off (appearance.freeChanges is 0).' };
+      if (!(Number.isInteger(n) && n > 0)) return { ok: false, text: `${n} is not a number of free appearance changes.` };
+      if (dry) return { ok: true, left: freeLeft(t) + n };
+      mp.set(t, FREE_USED, freeUsed(t) - n);
+      mp.set(t, FREE_TOLD, 1);
+      return { ok: true, left: freeLeft(t) };
+    } catch (e) { return { ok: false, text: e.message }; }
+  };
+
   // /grantappearance <name|#TAG>: a GM gives an online character one more free change (logged in #staff-commands too)
   if (typeof api.findByName === 'function') {
     registerChatCommand('grantappearance', (a, args) => {
@@ -764,9 +777,9 @@ module.exports = (api) => {
       const t = Number(api.findByName(q)) >>> 0;
       if (!t) return personal(a, 'No such player online. Use their name or #TAG.');
       try { const g = globalThis.__dboStaffGuard; const no = g ? String(g.target(a, t, 'appearance') || '') : ''; if (no) return personal(a, no); } catch (e) { /* the staff rules are optional */ }
-      unuseFree(t);
-      mp.set(t, FREE_TOLD, 1);
-      const left = freeLeft(t);
+      const r = grantFree(t, 1);
+      if (!r.ok) return personal(a, r.text);
+      const left = r.left;
       const name = typeof api.display === 'function' ? api.display(t) : who(t);
       personal(a, `${name} now has ${left} free appearance change${left === 1 ? '' : 's'}.`);
       if (t !== a) system(t, 'A GM gave you a free appearance change. Type /appearance to use it.');
@@ -796,8 +809,8 @@ module.exports = (api) => {
     }, { admin: true, help: '<player|#TAG> close an /appearance editor left open, saving nothing' });
   }
 
-  globalThis.__dboAppearanceEdit = { pending, finish, blocked, chargenOpened, chargenFinish, refused, raceMenuClosed, freeLeft, freeNotice };
+  globalThis.__dboAppearanceEdit = { pending, finish, blocked, chargenOpened, chargenFinish, refused, raceMenuClosed, freeLeft, freeNotice, grantFree };
   log(`appearance ${C.enabled ? 'on' : 'off'}: /appearance costs ${cost} gold, every ${Number(C.cooldownHours) || 0} h, ${freeChanges} free per character, race ${C.allowRace === true ? 'free' : 'kept'}, sex ${C.allowSex === true ? 'free' : 'kept'}, head guard ${C.headGuard === false ? 'off' : `on (${HEADS.raceOf.size} race ids)`}`);
   return { pending, finish, blocked, goldOf, takeGold, C, chargenOpened, chargenFinish, refused, guardHead, sameLook, SETTLE_RESEND_MS, raceMenuClosed, raceMenuSaveGate, raceMenuRefused,
-    freeLeft, freeNotice };
+    freeLeft, freeNotice, grantFree };
 };
