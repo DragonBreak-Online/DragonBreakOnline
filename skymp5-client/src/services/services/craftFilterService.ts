@@ -5,12 +5,16 @@ import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { ConstructibleObject, Keyword } from "skyrimPlatform";
 import { logError, logTrace } from "../../logging";
 
+const BATCH_SIZE = 100;
+const DUMMY_KEYWORD_FORMID = 0x0008f959; // VendorItemArmor in Skyrim.esm
+
 export class CraftFilterService extends ClientListener {
   constructor(private sp: Sp, private controller: CombinedController) {
     super();
     this.controller.emitter.on("customPacketMessage", (e) => this.onPacket(e));
     this.controller.emitter.on("connectionDisconnect", () => this.restoreAll());
-    this.controller.emitter.on("gameLoad", () => { this.reapply(); });
+    this.controller.emitter.on("gameLoad", () => { this.reapplyPending = true; });
+    this.controller.on("update", () => this.onUpdate());
   }
 
   private onPacket(event: ConnectionMessage<CustomPacketMessage>): void {
@@ -18,146 +22,174 @@ export class CraftFilterService extends ClientListener {
     if (!packet || packet["customPacketType"] !== "dboCraftFilter") return;
     const lockedList = packet["locked"];
     if (!Array.isArray(lockedList)) return;
-    this.updateLocked(lockedList);
+    this.pendingRawList = lockedList;
+    this.hasPendingPacket = true;
   }
 
-  // Restore all modified constructible objects to their original bench keywords
-  private restoreAll(): void {
-    if (this.origKeywords.size === 0) return;
-    let restored = 0;
-    this.origKeywords.forEach((origKw, formId) => {
-      try {
-        const cobj = ConstructibleObject.from(this.sp.Game.getFormEx(formId));
-        if (cobj) {
-          cobj.setWorkbenchKeyword(origKw);
-          restored++;
-        }
-      } catch {
-        // ignore
-      }
-    });
-    this.origKeywords.clear();
-    this.lockedFormIds.clear();
-    if (restored > 0) {
-      logTrace(this, "Craft filter: restored recipes", restored);
+  private onUpdate(): void {
+    if (this.hasPendingPacket) {
+      this.hasPendingPacket = false;
+      this.planUpdates(this.pendingRawList);
     }
+
+    if (this.reapplyPending) {
+      this.reapplyPending = false;
+      this.queueReapply();
+    }
+
+    this.processQueue();
   }
 
   private getDummyKeyword(): Keyword | null {
     if (this.dummyKw) return this.dummyKw;
     try {
-      const kw = Keyword.from(this.sp.Game.getFormFromFile(0x0008f959, "Skyrim.esm")) ||
-                 Keyword.from(this.sp.Game.getFormEx(0x0008f959));
-      if (kw) {
-        this.dummyKw = kw;
-        return kw;
-      }
+      this.dummyKw = Keyword.from(this.sp.Game.getFormFromFile(DUMMY_KEYWORD_FORMID, "Skyrim.esm")) ||
+                     Keyword.from(this.sp.Game.getFormEx(DUMMY_KEYWORD_FORMID));
     } catch {
-      // ignore
+      this.dummyKw = null;
     }
-    return null;
+    return this.dummyKw;
   }
 
   private formFromDesc(desc: string): number {
     let id = this.descToId.get(desc);
     if (id !== undefined) return id;
-    const sep = desc.indexOf(":");
-    if (sep > 0) {
-      const localId = parseInt(desc.slice(0, sep), 16);
-      const plugin = desc.slice(sep + 1);
-      const form = this.sp.Game.getFormFromFile(localId, plugin);
-      id = form ? form.getFormID() : 0;
-    } else {
-      id = parseInt(desc, 16) || 0;
+    id = 0;
+    try {
+      const sep = desc.indexOf(":");
+      if (sep > 0) {
+        const localId = parseInt(desc.slice(0, sep), 16);
+        const plugin = desc.slice(sep + 1);
+        const form = this.sp.Game.getFormFromFile(localId, plugin);
+        id = form ? (form.getFormID() >>> 0) : 0;
+      } else {
+        id = (parseInt(desc, 16) >>> 0) || 0;
+      }
+    } catch {
+      id = 0;
     }
     this.descToId.set(desc, id);
     return id;
   }
 
-  private resolveFormId(entry: unknown): number {
-    if (typeof entry === "number") return entry >>> 0;
-    if (typeof entry === "string") return this.formFromDesc(entry);
-    return 0;
+  private planUpdates(rawList: unknown[]): void {
+    const newTargetSet = new Set<string>();
+    rawList.forEach((item) => {
+      if (typeof item === "string" && item.length > 0) {
+        newTargetSet.add(item);
+      }
+    });
+
+    // Descriptors that should no longer be locked -> queue for unlock
+    this.currentLockedDescSet.forEach((desc) => {
+      if (!newTargetSet.has(desc)) {
+        if (!this.unlockQueue.includes(desc)) {
+          this.unlockQueue.push(desc);
+        }
+      }
+    });
+
+    // Descriptors that need to be locked -> queue for lock
+    newTargetSet.forEach((desc) => {
+      if (!this.currentLockedDescSet.has(desc)) {
+        if (!this.lockQueue.includes(desc)) {
+          this.lockQueue.push(desc);
+        }
+      }
+    });
+
+    this.currentLockedDescSet = newTargetSet;
   }
 
-  private updateLocked(newList: unknown[]): void {
+  private queueReapply(): void {
+    this.currentLockedDescSet.forEach((desc) => {
+      if (!this.lockQueue.includes(desc)) {
+        this.lockQueue.push(desc);
+      }
+    });
+  }
+
+  private processQueue(): void {
     const dummy = this.getDummyKeyword();
-    if (!dummy) {
-      logError(this, "Craft filter: failed to resolve dummy keyword");
-      return;
-    }
+    if (!dummy) return;
 
-    const nextLocked = new Set<number>();
-    newList.forEach((item) => {
-      const formId = this.resolveFormId(item);
+    let budget = BATCH_SIZE;
+
+    // 1. Process unlocks
+    while (this.unlockQueue.length > 0 && budget > 0) {
+      const desc = this.unlockQueue.shift();
+      budget--;
+      if (!desc) continue;
+
+      const origKw = this.origKeywords.get(desc);
+      const formId = this.formFromDesc(desc);
       if (formId > 0) {
-        nextLocked.add(formId);
-      }
-    });
-
-    let newlyLocked = 0;
-    let newlyUnlocked = 0;
-
-    // 1. Unlock recipes that are no longer in nextLocked
-    const toUnlock: number[] = [];
-    this.origKeywords.forEach((_, formId) => {
-      if (!nextLocked.has(formId)) {
-        toUnlock.push(formId);
-      }
-    });
-
-    toUnlock.forEach((formId) => {
-      const origKw = this.origKeywords.get(formId);
-      try {
-        const cobj = ConstructibleObject.from(this.sp.Game.getFormEx(formId));
-        if (cobj) {
-          cobj.setWorkbenchKeyword(origKw ?? null);
-          newlyUnlocked++;
-        }
-      } catch {
-        // ignore
-      }
-      this.origKeywords.delete(formId);
-    });
-
-    // 2. Lock recipes in nextLocked
-    nextLocked.forEach((formId) => {
-      if (!this.origKeywords.has(formId)) {
         try {
           const cobj = ConstructibleObject.from(this.sp.Game.getFormEx(formId));
           if (cobj) {
-            const orig = cobj.getWorkbenchKeyword();
-            this.origKeywords.set(formId, orig);
+            cobj.setWorkbenchKeyword(origKw ?? null);
+          }
+        } catch {
+          // ignore
+        }
+      }
+      this.origKeywords.delete(desc);
+    }
+
+    // 2. Process locks
+    while (this.lockQueue.length > 0 && budget > 0) {
+      const desc = this.lockQueue.shift();
+      budget--;
+      if (!desc) continue;
+
+      const formId = this.formFromDesc(desc);
+      if (formId > 0) {
+        try {
+          const cobj = ConstructibleObject.from(this.sp.Game.getFormEx(formId));
+          if (cobj) {
+            if (!this.origKeywords.has(desc)) {
+              const orig = cobj.getWorkbenchKeyword();
+              this.origKeywords.set(desc, orig);
+            }
             cobj.setWorkbenchKeyword(dummy);
-            newlyLocked++;
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }
+
+  private restoreAll(): void {
+    this.unlockQueue = [];
+    this.lockQueue = [];
+    this.currentLockedDescSet.clear();
+
+    this.origKeywords.forEach((origKw, desc) => {
+      const formId = this.formFromDesc(desc);
+      if (formId > 0) {
+        try {
+          const cobj = ConstructibleObject.from(this.sp.Game.getFormEx(formId));
+          if (cobj) {
+            cobj.setWorkbenchKeyword(origKw ?? null);
           }
         } catch {
           // ignore
         }
       }
     });
-
-    this.lockedFormIds = nextLocked;
-    logTrace(this, "Craft filter updated", `locked=${nextLocked.size} (+${newlyLocked}/-${newlyUnlocked})`);
+    this.origKeywords.clear();
   }
 
-  private reapply(): void {
-    const dummy = this.getDummyKeyword();
-    if (!dummy) return;
-    this.lockedFormIds.forEach((formId) => {
-      try {
-        const cobj = ConstructibleObject.from(this.sp.Game.getFormEx(formId));
-        if (cobj) {
-          cobj.setWorkbenchKeyword(dummy);
-        }
-      } catch {
-        // ignore
-      }
-    });
-  }
+  private pendingRawList: unknown[] = [];
+  private hasPendingPacket = false;
+  private reapplyPending = false;
 
-  private origKeywords = new Map<number, Keyword | null>();
-  private lockedFormIds = new Set<number>();
+  private currentLockedDescSet = new Set<string>();
+  private unlockQueue: string[] = [];
+  private lockQueue: string[] = [];
+
+  private origKeywords = new Map<string, Keyword | null>();
   private descToId = new Map<string, number>();
   private dummyKw: Keyword | null = null;
 }
