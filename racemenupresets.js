@@ -44,6 +44,8 @@ const SKEE_SIGNATURE = 0x45534b53;
 const SKEE_FORMAT_VERSION = 3;
 const HASH_RX = /^[0-9a-f]{8}$/;
 const KEY_RX = /^[0-9a-f]{8}$/;
+// A form's load-order-free name as mp.getDescFromId writes it: '<local id hex>:<plugin file>'
+const DESC_RX = /^[0-9a-f]{1,8}:[^:\u0000-\u001f]{1,260}$/i;
 
 const isObject = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
 const isUint32 = (x) => typeof x === 'number' && Number.isInteger(x) && x >= 0 && x <= 0xffffffff;
@@ -215,6 +217,11 @@ const loadFamilies = (mp, cfg, log) => {
   return fam;
 };
 
+// A full plugin's form id: not Skyrim.esm or its masters (00-04), a light plugin's (FE) or a created one (FF)
+const isFullPluginId = (r) => { const t = (Number(r) >>> 24) & 0xff; return t > 4 && t < 0xfe; };
+// Two full plugins' ids of one record that a load-order change moved (window-1021: the DLE went from 48 to 49)
+const shiftedId = (x, y) => isFullPluginId(x) && isFullPluginId(y) && ((Number(x) ^ Number(y)) & 0xffffff) === 0;
+
 const chunkText = (text, size) => { const out = []; for (let i = 0; i < text.length; i += size) out.push(text.slice(i, i + size)); return out; };
 
 module.exports = (api) => {
@@ -305,6 +312,16 @@ module.exports = (api) => {
   const FAMILY = loadFamilies(mp, cfg, log);
   // The same race, or its vampire or mortal variant
   const sameFamily = (x, y) => { x = Number(x) >>> 0; y = Number(y) >>> 0; if (x === y) return true; const f = FAMILY.get(x); return !!f && f === FAMILY.get(y); };
+  // The family table's full-plugin ids by their low 24 bits; 0 where two plugins' ids share them
+  const FAMILY_LOW = new Map();
+  for (const id of FAMILY.keys()) if (isFullPluginId(id)) { const lo = id & 0xffffff; FAMILY_LOW.set(lo, FAMILY_LOW.has(lo) && FAMILY_LOW.get(lo) !== id ? 0 : id); }
+  // A stored face's race as an id of this load order: one saved without raceDesc on a full plugin since moved is matched by its low 24 bits
+  const docRace = (d, live) => {
+    const r = Number(d && d.race) >>> 0;
+    if (!r || typeof d.raceDesc === 'string' || !isFullPluginId(r)) return r;
+    if (live && shiftedId(r, live)) return Number(live) >>> 0;
+    return FAMILY.has(r) ? r : FAMILY_LOW.get(r & 0xffffff) || r;
+  };
   // The content key of a stored face (an older file has none; worked out once and kept on the cached doc)
   const contentOfDoc = (d) => {
     if (!d) return '';
@@ -335,6 +352,10 @@ module.exports = (api) => {
   const idOfDesc = (d) => { try { return typeof mp.getIdFromDesc === 'function' ? mp.getIdFromDesc(String(d)) >>> 0 : 0; } catch (e) { return 0; } };
   const NEVER_LIVE = new Set((Array.isArray(C.liveRaceNever) ? C.liveRaceNever : []).map(idOfDesc).filter(Boolean));
   const isRaceRecord = (id) => { try { const r = typeof mp.lookupEspmRecordById === 'function' ? mp.lookupEspmRecordById(id) : null; return !!(r && r.record && String(r.record.type) === 'RACE'); } catch (e) { return false; } };
+  // A face's race by its plugin, kept beside the id so a load-order change cannot move it; '' when it does not name the id back
+  const descOfId = (id) => {
+    try { const d = typeof mp.getDescFromId === 'function' ? String(mp.getDescFromId(Number(id) >>> 0)) : ''; return DESC_RX.test(d) && idOfDesc(d) === (Number(id) >>> 0) ? d : ''; } catch (e) { return ''; }
+  };
   const isPluginRace = (r) => { r = Number(r) >>> 0; return r >= PLUGIN_RACE_MIN && r < PLUGIN_RACE_END && !NEVER_LIVE.has(r); };
   // The race the owner's own actor needs after a load, or 0: a vanilla race loads right, so only a plugin RACE that is no beast's
   const liveRaceOf = (a) => { const r = raceOf(a); return isPluginRace(r) && isRaceRecord(r) ? r : 0; };
@@ -457,7 +478,7 @@ module.exports = (api) => {
       try { done(moved); } finally { opDone(k); }
     });
   };
-  // doc: { v, actor, profile, race, hash, content, face } or null for none; a file another character's profile wrote is
+  // doc: { v, actor, profile, race, raceDesc?, hash, content, face } or null for none; a file another character's profile wrote is
   // none. cb(doc, bad): bad when the file is there but could not be read (EMFILE, EIO, ...) or set aside: that is not "no
   // face", so it is not cached and nothing may be written over it (10 Oct review R6c, F8)
   const readDoc = (a, cb) => {
@@ -482,6 +503,8 @@ module.exports = (api) => {
           const f = d && typeof d.face === 'string' && d.face.length <= Number(C.maxChars) && HASH_RX.test(d.hash) && hashText(d.face) === d.hash ? faceFrom(JSON.parse(d.face)) : null;
           // The content key is worked out from the face, never taken from the file
           if (f) { d.content = contentOf(f); doc = d; } else why = 'fails its checks';
+          // A race kept by its plugin is this load order's id now
+          if (f && typeof d.raceDesc === 'string') { const id = DESC_RX.test(d.raceDesc) ? idOfDesc(d.raceDesc) : 0; if (id && isRaceRecord(id)) d.race = id; }
         } catch (e) { why = 'unreadable'; }
       }
       if (!why) { remember(k, doc); return cb(check(doc), false); }
@@ -535,10 +558,11 @@ module.exports = (api) => {
     // still goes on, for the owner and for every watcher (10 Oct review S2). Another race (a beast form, a GM's race change)
     // keeps the stored one, and the client waits
     const now = raceOf(a);
-    const race = now && doc.race && now !== (doc.race >>> 0) && sameFamily(now, doc.race) ? now : doc.race;
+    const stored = docRace(doc, now);
+    const race = now && stored && now !== stored && sameFamily(now, stored) ? now : stored;
     // Another family's face with a plugin race on either side is none to its owner: their client's family table (vanilla only) would hold every capture
-    if (self && now && doc.race && !sameFamily(now, doc.race) && !inBeastForm(a) && (isPluginRace(now) || isPluginRace(doc.race))) {
-      if (allow('otherFamilyTold', a >>> 0, 1, 3600000, S.logRates)) log(`racemenu presets: ${keyOf(a)} (profile ${profileOf(a)}) own face ${doc.hash} is for race ${hx(doc.race)}, another family than ${hx(now)}: the owner is answered none, watchers as before`);
+    if (self && now && stored && !sameFamily(now, stored) && !inBeastForm(a) && (isPluginRace(now) || isPluginRace(stored))) {
+      if (allow('otherFamilyTold', a >>> 0, 1, 3600000, S.logRates)) log(`racemenu presets: ${keyOf(a)} (profile ${profileOf(a)}) own face ${doc.hash} is for race ${hx(stored)}, another family than ${hx(now)}: the owner is answered none, watchers as before`);
       return enqueueAnswer(to, [{ customPacketType: 'dboPresetNone', ...base }], self);
     }
     const meta = { customPacketType: 'dboPresetMeta', ...base, hash: doc.hash, race };
@@ -699,7 +723,10 @@ module.exports = (api) => {
       fixedText = fixesText(taken.fixes);
       // Every client sends a face these rules keep as it is, so a change here is a mismatch to look into; the fixed face is kept
       if (encoded !== text) log(`racemenu presets: ${k} (profile ${profileOf(me)}) client/server rule mismatch: upload ${u.hash} changed by the rules here (${fixedText ? `fixed ${fixedText}` : 'not in their text form'}), kept as ${hashText(encoded)}`);
-      if (face.custom.length || face.sculpt.length) doc = { v: 1, actor: k, profile: profileOf(me), race, hash: hashText(encoded), content: contentOf(face), at: new Date().toISOString(), face: encoded };
+      if (face.custom.length || face.sculpt.length) {
+        const raceDesc = descOfId(race);
+        doc = { v: 1, actor: k, profile: profileOf(me), race, ...(raceDesc ? { raceDesc } : {}), hash: hashText(encoded), content: contentOf(face), at: new Date().toISOString(), face: encoded };
+      }
       hosts = face.sculpt.map((h) => `${h.host} (${h.data.length})`);
       sculptHosts = face.sculpt.map((h) => h.host.toLowerCase());
     }
@@ -709,7 +736,7 @@ module.exports = (api) => {
       // No change: the same face content (R3), on the same race or its vampire or mortal variant. A face handed back on
       // another race (a GM's /chargen or a reroll that changed it) is stored again with that race, so it goes on there
       if (!prev && !doc) { log(`racemenu presets: ${k} (profile ${profileOf(me)}) empty face (no RaceMenu slider or sculpt), none stored: nothing to save (${windowOf(me)})`); return; }
-      if (prev && doc && contentOfDoc(prev) === doc.content && sameFamily(prev.race, race)) { log(`racemenu presets: ${k} (profile ${profileOf(me)}) face unchanged (${doc.hash}), nothing written (${windowOf(me)})`); return; }
+      if (prev && doc && contentOfDoc(prev) === doc.content && sameFamily(docRace(prev, race), race)) { log(`racemenu presets: ${k} (profile ${profileOf(me)}) face unchanged (${doc.hash}), nothing written (${windowOf(me)})`); return; }
       // A saved face is changed only from an editor opened after it was put back on the player this session; before
       // that the client captures an empty or partial face (9 Oct review). Checked before the gate, so nothing is charged.
       // Only for a close the server gave a save window (appearance.js): with none (the console's showracemenu) the gate's
@@ -723,7 +750,7 @@ module.exports = (api) => {
       // Only an editor the server opened, and paid for like the look (appearance.js); checked after the read, so an
       // unchanged face is never charged, a cleared face is never paid for (and never cleared from /appearance), and a
       // stored face of another race is not replaced from /appearance (R2)
-      const otherRace = !!(prev && prev.race && !sameFamily(prev.race, race));
+      const otherRace = !!(prev && prev.race && !sameFamily(docRace(prev, race), race));
       // E5, narrowed (12 Oct re-review, server-data 4): when the editor had swapped in another race's head (appearance.js
       // headswap), only a sculpt on a head the stored face has no sculpt on can have been made on that head, so only such a
       // face is refused there. Sliders are kept by name, on no head, and a sculpt only on heads the stored face is sculpted
@@ -884,7 +911,7 @@ module.exports = (api) => {
   // What runs, in the log at every load (10 Oct review S4: the module said nothing, so the log could not show it was on)
   log(`racemenupresets ${C.enabled ? 'on' : 'off'}${C.enabled && TEST ? `, staff test only (${TEST.size} profile(s))` : C.enabled ? ', every player' : ''}, `
     + `requireEditor ${C.requireEditor === false ? 'off' : 'on'}, ${FAMILY.size} race ids in vampire families`);
-  return { faceFrom, faceFixed, fixesText, encodeFace, hashText, contentOf, isTriPath, state: S, dir: DIR, pump, sameFamily };
+  return { faceFrom, faceFixed, fixesText, encodeFace, hashText, contentOf, isTriPath, state: S, dir: DIR, pump, sameFamily, docRace };
 };
 module.exports.faceFrom = faceFrom;
 module.exports.encodeFace = encodeFace;
