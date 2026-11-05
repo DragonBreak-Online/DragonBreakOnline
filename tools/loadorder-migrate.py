@@ -56,8 +56,9 @@ def order(path):
     return [os.path.basename(p.replace('\\', '/')) for p in lo]
 
 
-def index_map(old, new):
-    """Old id top bits -> new top bits. Light plugins (.esl or the 0x200 flag) live at 0xFE in load order of lights."""
+def index_map(old, new, new_names=None):
+    """Old id top bits -> new top bits. Light plugins (.esl or the 0x200 flag) live at 0xFE in load order of lights.
+    new_names: filled with the new order's slot -> plugin file name. fix-numeric-ids.py and scan-numeric-ids.py take (m, names)."""
     data = os.environ.get('DBO_DATA', os.path.join(os.path.dirname(__file__), '..', 'data'))
     def light(name):
         if name.lower().endswith('.esl'): return True
@@ -75,8 +76,8 @@ def index_map(old, new):
     for name, slot in o.items():
         m[slot] = n.get(name)          # None: plugin gone
     names = {v: k for k, v in o.items()}
-    new_names = {n[x.lower()]: x for x in new}
-    return m, names, new_names
+    if new_names is not None: new_names.update({n[x.lower()]: x for x in new})
+    return m, names
 
 
 def slot_of(v):
@@ -223,7 +224,8 @@ def main():
         if not before or not pdir: raise SystemExit('--presets-before takes an ISO time, and --presets with it')
     if not (len(a) == 3 or (pdir and len(a) == 2)): raise SystemExit(__doc__)
     old_p, new_p, cf = (a + [None])[:3]
-    m, names, new_names = index_map(order(old_p), order(new_p))
+    new_names = {}
+    m, names = index_map(order(old_p), order(new_p), new_names)
     moved = {names[k]: v for k, v in m.items() if v is None or v != k}
     print('plugins whose index changes:', len(moved), '| gone:', [n for n, v in moved.items() if v is None])
     stats = Counter(); changed = []

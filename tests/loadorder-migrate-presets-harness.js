@@ -102,6 +102,11 @@ setTimeout(() => {
   r = run(CF, '--presets', DIR, '--write');
   const c = JSON.parse(JSON.parse(fs.readFileSync(path.join(CF, 'c1.json'), 'utf8')).appearanceDump);
   ok(r.code === 0 && c.raceId === 0x07192ede && c.headpartIds[0] === 0x08000001 && /written 1/.test(r.out), 'both passes in one run', [r.out.slice(-300), c]);
+  // The two tools that load this one take index_map's (m, names): dry runs on the change form
+  for (const t of ['scan-numeric-ids.py', 'fix-numeric-ids.py']) {
+    const x = spawnSync(PY, [path.join(ROOT, 'tools', t), path.join(TMP, 'old.json'), path.join(TMP, 'new.json'), path.join(CF, 'c1.json')], { encoding: 'utf8', env: Object.assign({}, process.env, { DBO_DATA: path.join(TMP, 'data') }) });
+    ok(x.status === 0 && !/Traceback/.test(`${x.stdout}${x.stderr}`), `tools/${t} still runs on index_map`, `${x.stdout}${x.stderr}`.slice(-300));
+  }
   r = run('--presets-before', '2026-10-21');
   ok(r.code !== 0 && /--presets with it/.test(r.out), '--presets-before without --presets is refused', r.out);
   r = run();
