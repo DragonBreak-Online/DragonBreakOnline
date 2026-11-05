@@ -10,6 +10,8 @@
 // items, so a server whose gifts.js knows no schools (before the update, or after a rollback) leaves them waiting instead
 // of paying the gold and dropping the levels. A second gift of the same school to the same #TAG, waiting or delivered,
 // is refused unless --force is given: levels are added, so queueing one twice pays twice.
+//   sudo node tools/gift.js --tag 8YDB --appearance-free 1 --reason "..."   free /appearance changes (1-3)
+// Free appearance changes need a --tag and are a gift of their own the same way; a second to the same #TAG needs --force.
 //   sudo node tools/gift.js --list            what waits in the inbox, and the last deliveries
 //
 // GIFTS_DIR is the live server folder (default /opt/alduinak/build/dist/server).
@@ -34,7 +36,7 @@ if (args.includes('--list')) {
   try { l = JSON.parse(fs.readFileSync(path.join(DIR, 'gift-ledger.json'), 'utf8')).delivered || {}; } catch (e) { /* none yet */ }
   const done = Object.entries(l).slice(-10);
   console.log(`delivered (last ${done.length} of ${Object.keys(l).length}):`);
-  for (const [id, d] of done) console.log(`  ${id}  ${d.at}  ${d.to}  ${d.gold ? d.gold + ' gold ' : ''}${(d.items || []).length ? JSON.stringify(d.items) : ''}${d.schools ? `${(d.items || []).length ? ' ' : ''}schools ${JSON.stringify(d.schools)} ${d.schoolsGiven ? `given ${JSON.stringify(d.schoolsGiven)} ` : ''}${d.rest ? `rest queued as ${d.rest} ` : ''}${d.restNotQueued ? `rest NOT queued ${JSON.stringify(d.restNotQueued)} ` : ''}` : ''} ${d.reason}`);
+  for (const [id, d] of done) console.log(`  ${id}  ${d.at}  ${d.to}  ${d.gold ? d.gold + ' gold ' : ''}${(d.items || []).length ? JSON.stringify(d.items) : ''}${d.schools ? `${(d.items || []).length ? ' ' : ''}schools ${JSON.stringify(d.schools)} ${d.schoolsGiven ? `given ${JSON.stringify(d.schoolsGiven)} ` : ''}${d.rest ? `rest queued as ${d.rest} ` : ''}${d.restNotQueued ? `rest NOT queued ${JSON.stringify(d.restNotQueued)} ` : ''}` : ''}${d.appearanceFree ? `appearanceFree ${d.appearanceFree} given ${d.appearanceFreeGiven === undefined ? '?' : d.appearanceFreeGiven} ` : ''} ${d.reason}`);
   process.exit(0);
 }
 
@@ -61,21 +63,27 @@ for (const s of all('school')) {
   if (schools[name]) die(`--school ${name} is given twice`);
   schools[name] = Number(m[2]);
 }
-if (!gold && !items.length && !Object.keys(schools).length) die('nothing to give: --gold N, --item baseId:count and/or --school School:levels');
+const free = args.includes('--appearance-free') ? Number(opt('appearance-free')) : undefined;
+if (free !== undefined && !(Number.isInteger(free) && free >= 1 && free <= 3)) die(`--appearance-free is 1-3 free /appearance changes (got ${opt('appearance-free')})`);
+if (!gold && !items.length && !Object.keys(schools).length && !free) die('nothing to give: --gold N, --item baseId:count, --school School:levels and/or --appearance-free N');
 if (Object.keys(schools).length && !tag) die('--school needs --tag: school levels belong to one character, not a profile');
+if (free && !tag) die('--appearance-free needs --tag: free appearance changes belong to one character, not a profile');
 const reason = String(opt('reason') || '').slice(0, 200);
 if (!reason) die('--reason is required: the player is told it');
 
-// A school already gifted to this #TAG, waiting in the inbox or in the ledger (a gift's id carries its tag)
-if (Object.keys(schools).length && !args.includes('--force')) {
+// Schools or free appearance changes already gifted to this #TAG, waiting in the inbox or in the ledger (a gift's id carries its tag)
+if ((Object.keys(schools).length || free) && !args.includes('--force')) {
   const read = (p) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return null; } };
   let waiting = [];
   try { waiting = fs.readdirSync(INBOX).filter((f) => f.endsWith('.json')); } catch (e) { /* no inbox yet */ }
-  const seen = [
+  const forTag = [
     ...waiting.map((f) => [path.basename(f, '.json'), read(path.join(INBOX, f)), 'waiting']).filter(([, g]) => g && g.tag === tag),
     ...Object.entries((read(path.join(DIR, 'gift-ledger.json')) || {}).delivered || {}).filter(([id]) => id.split('-')[1] === tag).map(([id, d]) => [id, d, 'delivered']),
-  ].filter(([, g]) => g && g.schools && Object.keys(schools).some((k) => g.schools[k]));
+  ];
+  const seen = forTag.filter(([, g]) => g && g.schools && Object.keys(schools).some((k) => g.schools[k]));
   if (seen.length) die(`#${tag} already has ${seen.map(([id, g, how]) => `${id} (${how}: ${JSON.stringify(g.schools)})`).join(', ')}; levels are added, so this would pay again. Add --force if it is really a new grant`);
+  const seenFree = free ? forTag.filter(([, g]) => g && g.appearanceFree) : [];
+  if (seenFree.length) die(`#${tag} already has ${seenFree.map(([id, g, how]) => `${id} (${how}: ${g.appearanceFree} free appearance change(s))`).join(', ')}; free changes are added, so this would give them again. Add --force if it is really a new grant`);
 }
 
 const by = String(opt('by') || 'staff').slice(0, 40), at = new Date().toISOString();
@@ -83,6 +91,7 @@ const newId = () => `${at.replace(/[-:]/g, '').slice(0, 15)}-${tag || 'p' + prof
 const gifts = [
   ...(gold || items.length ? [{ ...(tag ? { tag } : { profile }), ...(gold ? { gold } : {}), ...(items.length ? { items } : {}), reason, by, at }] : []),
   ...(Object.keys(schools).length ? [{ tag, schools, reason, by, at }] : []),
+  ...(free ? [{ tag, appearanceFree: free, reason, by, at }] : []),
 ];
 fs.mkdirSync(INBOX, { recursive: true });
 for (const gift of gifts) {
