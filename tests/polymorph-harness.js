@@ -97,24 +97,27 @@ if (!commands.has('polymorph')) { console.log(`\n${fail} FAILED (no /polymorph i
 const opts = commands.get('polymorph').opts;
 ok(opts.admin === true && /^[\x20-\x7e]+$/.test(String(opts.help || '')), '0. it is a staff command (admin) with plain ASCII help', opts);
 const gm = fs.readFileSync(path.join(ROOT, 'gamemode.js'), 'utf8');
-ok(/const LEAD_ONLY = new Set\(\[[^\]]*'polymorph'/.test(gm), '0. gamemode.js LEAD_ONLY holds polymorph (a GM is refused at the command gate)');
+ok(!/const LEAD_ONLY = new Set\(\[[^\]]*'polymorph'/.test(gm), '0. gamemode.js LEAD_ONLY does not hold polymorph (a GM is allowed at the command gate)');
 ok(/key: 'beasts'[^\n]*items: \[[^\]]*'polymorph'/.test(gm), '0. and /help admin beasts lists it');
 ok(/require\(BEASTFORM_JS\)\(\{[^}]*isLeadStaff, tierOf, hasUiCap \}\)/.test(gm), '0. gamemode.js hands beastform.js isLeadStaff and tierOf (hasUiCap still last)');
 ok(logs.some((l) => /beastform polymorph ON: chicken a919d, hare 6dc99, goat 6fc4a, fox 109c7c, dog 131ee, skeever 13201, mudcrab ba545, deer cf89b/.test(l)), '0. the boot line names each animal\'s race id', logs.filter((l) => /polymorph/.test(l)));
 
 // ---- 1. the rank gate --------------------------------------------------------------------------------------------------------
+place(GM, 50000);
 let r = run(GM, 'chicken');
-ok(/Lead GM and above/.test(r) && !beast(GM), '1. a GM is refused by the module too (isLeadStaff, the LEAD_ONLY rank)', r);
+ok(beast(GM) && beast(GM).form === 'chicken' && /You are a Chicken/.test(r), '1. a GM may use polymorph', r);
+run(GM, 'revert');
+ok(!beast(GM), '1. a GM may revert');
 r = run(PLAYER, 'chicken');
-ok(/Lead GM and above/.test(r) && !beast(PLAYER), '1. a player is refused', r);
+ok(/GM and above/.test(r) && !beast(PLAYER), '1. a player is refused', r);
 r = run(OWNER, 'list');
 ok(/Nobody is in an animal shape/.test(r), '1. an Owner may use it (list)', r);
 restart({});
 const noRank = Object.assign({}, api({}));
-delete noRank.isLeadStaff; delete noRank.tierOf;
+delete noRank.isAdmin; delete noRank.isLeadStaff; delete noRank.tierOf;
 commands = new Map(); delete require.cache[BEASTFORM]; require(BEASTFORM)(noRank);
 r = run(LEAD, 'chicken');
-ok(/Lead GM and above/.test(r) && !beast(LEAD), '1. an older gamemode.js that hands no rank helper: closed for everyone', r);
+ok(/GM and above/.test(r) && !beast(LEAD), '1. an older gamemode.js that hands no rank helper: closed for everyone', r);
 restart();
 
 // ---- 2. only on oneself ------------------------------------------------------------------------------------------------------

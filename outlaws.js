@@ -40,6 +40,30 @@ module.exports = (api) => {
   const holdName = (zid) => { const z = zoneById(zid); return z ? z.name : zid; };
   const wantedIn = (zid) => data().zones[zid] || (data().zones[zid] = {});
   const pidOf = (a) => Number(profileOf(a));
+  const charKeyOf = (a) => (Number(a) >>> 0).toString(16);
+  const wantedMatch = (b, k, a) => {
+    if (!b || !a) return false;
+    const act = Number(a) >>> 0;
+    const ckey = charKeyOf(act);
+    if (b.actor) return (Number(b.actor) >>> 0) === act;
+    if (b.char) return String(b.char).toLowerCase() === ckey;
+    if (String(k).toLowerCase() === ckey) return true;
+    const p = pidOf(a);
+    const bp = Number(b.pid !== undefined ? b.pid : k);
+    if (p >= 0 && bp === p) {
+      if (b.name) {
+        const bn = String(b.name).toLowerCase();
+        const dn = (typeof display === 'function' ? display(a) : who(a)).toLowerCase();
+        const wn = (typeof who === 'function' ? who(a) : '').toLowerCase();
+        if (dn && (bn.includes(dn) || dn.includes(bn))) return true;
+        if (wn && (bn.includes(wn) || wn.includes(bn))) return true;
+        if (bn.startsWith('profile ') || bn === 'someone' || bn === '?') return true;
+        return false;
+      }
+      return true;
+    }
+    return false;
+  };
 
   // The ruler is the hold's first office; the Steward its 'steward'
   // A ruler or Steward seen as a beast in this hold (exposure.js) sets and lifts no bounty there until cleared
@@ -116,9 +140,13 @@ module.exports = (api) => {
   globalThis.__dboOutlawJailed = (guard, prisoner, arrester) => {
     if (!C.enabled) return 0;
     const zid = zoneOfActor(prisoner); if (!zid) return 0;
-    const list = data().zones[zid]; const key = String(pidOf(prisoner));
-    const b = list && list[key]; if (!b) return 0;
-    delete list[key]; save();
+    const list = data().zones[zid]; if (!list) return 0;
+    let foundKey = null, b = null;
+    for (const [k, entry] of Object.entries(list)) {
+      if (wantedMatch(entry, k, prisoner)) { foundKey = k; b = entry; break; }
+    }
+    if (!b) return 0;
+    delete list[foundKey]; save();
     const amount = Math.max(0, Math.floor(Number(b.amount) || 0));
     const paid = collect(prisoner, amount, `bounty ${holdName(zid)}`);
     const by = Number(arrester) >>> 0 || guard >>> 0;
@@ -153,21 +181,49 @@ module.exports = (api) => {
 
   // rebellion.js: a failed rising's rebels are wanted in the hold they rose against, as if its ruler had set the bounty (the
   // larger of any bounty they already have there and amount, which is held to max). True when it was set
-  globalThis.__dboOutlawDeclare = (zid, pid, amount, reason, name, by) => {
+  globalThis.__dboOutlawDeclare = (zid, pid, amount, reason, name, by, actor) => {
     if (!C.enabled || !zoneById(zid) || !(Number(pid) >= 0)) return false;
     const n = Math.min(Number(C.max) || 1000, Math.max(1, Math.floor(Number(amount) || 0)));
-    const list = wantedIn(zid); const had = list[String(Number(pid))];
-    list[String(Number(pid))] = { amount: Math.max(n, had ? Math.floor(Number(had.amount) || 0) : 0), reason: String(reason || 'rebellion').slice(0, 120), name: String(name || `profile ${pid}`), by: String(by || 'the hold'), at: Date.now() };
+    const list = wantedIn(zid);
+    const act = actor ? Number(actor) >>> 0 : 0;
+    const key = act ? charKeyOf(act) : String(Number(pid));
+    let had = list[key];
+    if (!had && act) {
+      for (const [k, e] of Object.entries(list)) {
+        if (e.actor && (Number(e.actor) >>> 0) === act) { had = e; break; }
+      }
+    }
+    if (!had && list[String(Number(pid))]) had = list[String(Number(pid))];
+    const prev = had ? Math.floor(Number(had.amount) || 0) : 0;
+    const finalAmount = Math.max(n, prev);
+    list[key] = {
+      amount: finalAmount,
+      reason: String(reason || 'rebellion').slice(0, 120),
+      name: String(name || `profile ${pid}`),
+      by: String(by || 'the hold'),
+      at: Date.now(),
+      pid: Number(pid),
+      actor: act,
+      char: key,
+    };
     save();
-    audit(`BOUNTY set: ${by || 'the hold'} put ${list[String(Number(pid))].amount} gold on ${name || `profile ${pid}`} in ${holdName(zid)}: ${reason}`);
+    audit(`BOUNTY set: ${by || 'the hold'} put ${finalAmount} gold on ${name || `profile ${pid}`} in ${holdName(zid)}: ${reason}`);
     return true;
   };
 
   // ---- /bounty --------------------------------------------------------------------------------------------------------
   const listText = (a, zid) => {
     const lines = [];
-    const mine = Object.entries(data().zones).filter(([, l]) => l[String(pidOf(a))]).map(([z, l]) => `${holdName(z)}: ${l[String(pidOf(a))].amount} gold (${l[String(pidOf(a))].reason})`);
-    if (mine.length) lines.push(`You are wanted in ${mine.join('; ')}.`);
+    const myBounties = [];
+    for (const [z, l] of Object.entries(data().zones)) {
+      for (const [k, b] of Object.entries(l || {})) {
+        if (wantedMatch(b, k, a)) {
+          myBounties.push(`${holdName(z)}: ${b.amount} gold (${b.reason})`);
+          break;
+        }
+      }
+    }
+    if (myBounties.length) lines.push(`You are wanted in ${myBounties.join('; ')}.`);
     if (!zid) { lines.push('Stand in a hold to read its wanted list.'); return lines.join(' '); }
     const here = Object.values(data().zones[zid] || {});
     lines.push(here.length ? `Wanted in ${holdName(zid)}: ${here.map((b) => `${b.name}, ${b.amount} gold (${b.reason})`).join('; ')}.` : `Nobody is wanted in ${holdName(zid)}.`);
@@ -184,8 +240,19 @@ module.exports = (api) => {
     const tg = officialTarget(m[1]); if (tg.error) return tg.error;
     if (!(Number(tg.pid) >= 0)) return 'That character has no profile.';
     if (Number(tg.pid) === pidOf(a)) return 'You cannot set a bounty on yourself.';
+    const act = tg.actor ? Number(tg.actor) >>> 0 : 0;
+    const charKey = act ? charKeyOf(act) : String(tg.pid);
     const reason = m[3].trim().slice(0, 120);
-    wantedIn(zid)[String(tg.pid)] = { amount, reason, name: tg.label, by: display(a), at: Date.now() };
+    wantedIn(zid)[charKey] = {
+      amount,
+      reason,
+      name: tg.label,
+      by: display(a),
+      at: Date.now(),
+      pid: Number(tg.pid),
+      actor: act,
+      char: charKey,
+    };
     save();
     if (tg.online) system(tg.online, `${holdName(zid)} has put a bounty of ${amount} gold on you: ${reason}. Pay it with /bounty pay in the hold, or answer for it in its jail.`);
     audit(`BOUNTY set: ${who(a)} put ${amount} gold on ${tg.who} in ${holdName(zid)}: ${reason}`);
@@ -197,36 +264,67 @@ module.exports = (api) => {
     if (!mayDeclare(a, zid)) return `Only the ruler or the Steward of ${holdName(zid)} clears a bounty there.`;
     const tg = officialTarget(String(rest || '').trim()); if (tg.error) return tg.error;
     const list = data().zones[zid] || {};
-    if (!list[String(tg.pid)]) return `${tg.label} is not wanted in ${holdName(zid)}.`;
-    delete list[String(tg.pid)]; save();
+    let foundKey = null, foundB = null;
+    const act = tg.actor ? Number(tg.actor) >>> 0 : 0;
+    const charKey = act ? charKeyOf(act) : '';
+    if (charKey && list[charKey]) {
+      foundKey = charKey; foundB = list[charKey];
+    } else {
+      for (const [k, b] of Object.entries(list)) {
+        if (act && b.actor && (Number(b.actor) >>> 0) === act) { foundKey = k; foundB = b; break; }
+        if (charKey && b.char && String(b.char).toLowerCase() === charKey.toLowerCase()) { foundKey = k; foundB = b; break; }
+        if (charKey && k.toLowerCase() === charKey.toLowerCase()) { foundKey = k; foundB = b; break; }
+        if (b.name && tg.label && (b.name.toLowerCase() === tg.label.toLowerCase() || b.name.toLowerCase() === String(tg.who || '').toLowerCase())) { foundKey = k; foundB = b; break; }
+        if (String(tg.pid) === k || String(tg.pid) === String(b.pid)) {
+          if (!b.actor && !b.char) { foundKey = k; foundB = b; break; }
+        }
+      }
+    }
+    if (!foundB) return `${tg.label} is not wanted in ${holdName(zid)}.`;
+    delete list[foundKey]; save();
     if (tg.online) system(tg.online, `Your bounty in ${holdName(zid)} is lifted.`);
     audit(`BOUNTY cleared: ${who(a)} lifted the bounty on ${tg.who} in ${holdName(zid)}`);
     return `The bounty on ${tg.label} in ${holdName(zid)} is lifted.`;
   };
   const payBounty = (a, zid) => {
     if (!zid) return 'Stand in the hold whose bounty you pay.';
-    const list = data().zones[zid] || {}; const key = String(pidOf(a));
-    const b = list[key]; if (!b) return `You are not wanted in ${holdName(zid)}.`;
+    const list = data().zones[zid] || {};
+    let foundKey = null, b = null;
+    for (const [k, entry] of Object.entries(list)) {
+      if (wantedMatch(entry, k, a)) { foundKey = k; b = entry; break; }
+    }
+    if (!b) return `You are not wanted in ${holdName(zid)}.`;
     const amount = Math.floor(Number(b.amount) || 0);
     let carried = 0; try { const inv = mp.get(a, 'inventory'); const g = ((inv && inv.entries) || []).find((e) => (Number(e.baseId) >>> 0) === GOLD); carried = g ? Number(g.count) || 0 : 0; } catch (e) { carried = 0; }
     let bank = 0; try { bank = Math.max(0, Math.floor(Number(mp.get(a, 'private.bankGold')) || 0)); } catch (e) { bank = 0; }
     if (carried + bank < amount) return `Your bounty in ${holdName(zid)} is ${amount} gold, more than you have.`;
     const paid = collect(a, amount, `bounty ${holdName(zid)}`);
     if (paid < amount) { if (paid > 0) giveItem(a, GOLD, paid); return 'The payment did not go through. Nothing was taken.'; }
-    delete list[key]; save();
+    delete list[foundKey]; save();
     try { if (globalThis.__dboTreasuryZone) globalThis.__dboTreasuryZone.deposit(zid, paid, { income: 'bounties' }); } catch (e) { log('outlaws: treasury deposit failed', e.message); }
     audit(`BOUNTY paid: ${who(a)} paid their ${amount} gold bounty in ${holdName(zid)} to its treasury`);
     return `You pay your bounty of ${amount} gold to ${holdName(zid)}. You are no longer wanted there.`;
   };
-  // A bounty lifted from the journal names its outlaw by profile id, not by a name to look up again
-  const clearByPid = (a, zid, pid) => {
+  // A bounty lifted from the journal names its outlaw by id (key, char, actor or pid)
+  const clearByPid = (a, zid, id) => {
     if (!zid) return 'Stand in the hold whose bounty you clear.';
     if (!isLeadStaff(a) && barred(a, zid)) return barred(a, zid);
     if (!mayDeclare(a, zid)) return `Only the ruler or the Steward of ${holdName(zid)} clears a bounty there.`;
-    const list = data().zones[zid] || {}; const b = list[String(Number(pid))];
+    const list = data().zones[zid] || {};
+    let foundKey = null, b = null;
+    const sid = String(id).toLowerCase();
+    if (list[id]) { foundKey = id; b = list[id]; }
+    else {
+      for (const [k, entry] of Object.entries(list)) {
+        if (k.toLowerCase() === sid) { foundKey = k; b = entry; break; }
+        if (entry.char && String(entry.char).toLowerCase() === sid) { foundKey = k; b = entry; break; }
+        if (entry.actor && (Number(entry.actor) >>> 0).toString(16) === sid) { foundKey = k; b = entry; break; }
+        if (entry.pid !== undefined && String(entry.pid) === String(id)) { foundKey = k; b = entry; break; }
+      }
+    }
     if (!b) return 'That bounty is already gone.';
-    delete list[String(Number(pid))]; save();
-    audit(`BOUNTY cleared: ${who(a)} lifted the bounty on ${b.name} (profile ${pid}) in ${holdName(zid)}`);
+    delete list[foundKey]; save();
+    audit(`BOUNTY cleared: ${who(a)} lifted the bounty on ${b.name} in ${holdName(zid)}`);
     return `The bounty on ${b.name} in ${holdName(zid)} is lifted.`;
   };
 
@@ -234,12 +332,29 @@ module.exports = (api) => {
   // Pay where you stand, and for its ruler or Steward the form to set one and Clear on each ----------------------------------
   const tabView = (a) => {
     const zid = zoneOfActor(a);
-    const pid = String(pidOf(a));
+    const mine = [];
+    for (const [z, l] of Object.entries(data().zones)) {
+      for (const [k, b] of Object.entries(l || {})) {
+        if (wantedMatch(b, k, a)) {
+          mine.push({ zone: z, name: holdName(z), amount: b.amount, reason: b.reason, here: z === zid });
+          break;
+        }
+      }
+    }
+    const wanted = zid ? Object.entries(data().zones[zid] || {}).map(([p, b]) => ({
+      pid: Number(b.pid !== undefined ? b.pid : (Number(p) || 0)),
+      id: p,
+      char: b.char || (b.actor ? charKeyOf(b.actor) : p),
+      name: b.name,
+      amount: b.amount,
+      reason: b.reason,
+      by: b.by,
+      at: b.at,
+    })).sort((x, y) => y.amount - x.amount) : [];
     return {
       hold: zid ? { id: zid, name: holdName(zid) } : null,
-      wanted: zid ? Object.entries(data().zones[zid] || {}).map(([p, b]) => ({ pid: Number(p), name: b.name, amount: b.amount, reason: b.reason, by: b.by, at: b.at }))
-        .sort((x, y) => y.amount - x.amount) : [],
-      mine: Object.entries(data().zones).filter(([, l]) => l[pid]).map(([z, l]) => ({ zone: z, name: holdName(z), amount: l[pid].amount, reason: l[pid].reason, here: z === zid })),
+      wanted,
+      mine,
       canDeclare: !!zid && mayDeclare(a, zid), max: Number(C.max), goldPerMinute: Number(C.goldPerMinute) || 10,
     };
   };

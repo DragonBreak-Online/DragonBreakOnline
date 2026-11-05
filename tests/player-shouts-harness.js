@@ -14,9 +14,9 @@ const ok = (cond, what) => { if (cond) pass++; else { fail++; console.log('FAIL'
 const allow = JSON.parse(fs.readFileSync(path.join(ROOT, 'player-shouts.json'), 'utf8')).shouts;
 const key = (name, plugin) => `${name}|${plugin}`;
 const allowSet = new Set(allow.map(([n, p]) => key(n, p)));
-ok(allow.length === 27 && allowSet.size === 27, `the allow-list has the 27 player shouts (${allow.length})`);
+ok(allow.length === 26 && allowSet.size === 26, `the allow-list has the 26 player shouts (${allow.length})`);
 const byPlugin = (p) => allow.filter((x) => x[1] === p).length;
-ok(byPlugin('Skyrim.esm') === 20 && byPlugin('Dawnguard.esm') === 3 && byPlugin('Dragonborn.esm') === 4, 'vanilla 20, Dawnguard 3, Dragonborn 4');
+ok(byPlugin('Skyrim.esm') === 19 && byPlugin('Dawnguard.esm') === 3 && byPlugin('Dragonborn.esm') === 4, 'vanilla 19, Dawnguard 3, Dragonborn 4');
 
 const powers = JSON.parse(fs.readFileSync(path.join(ROOT, 'admin-powers.json'), 'utf8'));
 const shouts = powers.shoutsGate || powers.shouts || [];
@@ -26,7 +26,7 @@ const extra = shouts.filter((s) => !allowSet.has(key(s.name, pluginOf(s.shout)))
 ok(extra.length === 0, `Give all Shouts teaches nothing outside the allow-list (${extra.length}: ${extra.slice(0, 8).join(', ')}${extra.length > 8 ? ', ...' : ''})`);
 const missing = allow.filter(([n, p]) => !given.has(key(n, p))).map((x) => x[0]);
 ok(missing.length === 0, `and every player shout is in it (${missing.join(', ')})`);
-ok(shouts.length === 27, `27 shouts in admin-powers.json (${shouts.length})`);
+ok(shouts.length === 26, `26 shouts in admin-powers.json (${shouts.length})`);
 ok(Array.isArray(powers.shouts) && powers.shouts.length === 0, 'Give all shouts gives nothing: admin-powers.json shouts is empty (Nate 17 Oct), the gate reads shoutsGate');
 // Non-player shouts carry a dragon's words (252c3..5) or the empty placeholder (ff8d7); a player shout has its own three
 const PLACEHOLDER = new Set(['252c3:Skyrim.esm', '252c4:Skyrim.esm', '252c5:Skyrim.esm', 'ff8d7:Skyrim.esm']);

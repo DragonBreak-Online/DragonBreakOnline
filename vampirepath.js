@@ -195,7 +195,22 @@ module.exports = (api) => {
     if (!(Number(pid) >= 0)) return false;
     let zones = globalThis.__dboOutlaws && globalThis.__dboOutlaws.data && globalThis.__dboOutlaws.data.zones;
     if (!zones) { try { zones = JSON.parse(fs.readFileSync(path.resolve('outlaws.json'), 'utf8')).zones; } catch (e) { zones = null; } }
-    return !!zones && Object.values(zones).some((z) => z && z[pid] && Number(z[pid].amount) > 0);
+    if (!zones) return false;
+    const hexId = (Number(t) >>> 0).toString(16);
+    return Object.values(zones).some((z) => {
+      if (!z) return false;
+      if (z[hexId] && Number(z[hexId].amount) > 0) return true;
+      for (const [k, b] of Object.entries(z)) {
+        if (!b || !(Number(b.amount) > 0)) continue;
+        if (b.actor && (Number(b.actor) >>> 0) === (Number(t) >>> 0)) return true;
+        if (b.char && String(b.char).toLowerCase() === hexId) return true;
+      }
+      if (z[pid] && Number(z[pid].amount) > 0) {
+        const b = z[pid];
+        if (!b.actor && !b.char) return true;
+      }
+      return false;
+    });
   };
   const breach = (a, why) => {
     a = a >>> 0;
