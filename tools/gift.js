@@ -12,6 +12,9 @@
 // is refused unless --force is given: levels are added, so queueing one twice pays twice.
 //   sudo node tools/gift.js --tag 8YDB --appearance-free 1 --reason "..."   free /appearance changes (1-3)
 // Free appearance changes need a --tag and are a gift of their own the same way; a second to the same #TAG needs --force.
+//   sudo node tools/gift.js --batch 20261105T220000 --tag 8YDB --gold 500 --appearance-free 1 --reason "..."   fixed ids
+// With --batch the ids are <stamp>-<TAG>-c0e001 (gold, items), -c0e002 (free changes) and -c0e003 (schools), so a bulk script
+// run again writes nothing twice: an id already waiting or delivered is left alone, and one with other contents stops the run.
 //   sudo node tools/gift.js --list            what waits in the inbox, and the last deliveries
 //
 // GIFTS_DIR is the live server folder (default /opt/alduinak/build/dist/server).
@@ -71,14 +74,37 @@ if (free && !tag) die('--appearance-free needs --tag: free appearance changes be
 const reason = String(opt('reason') || '').slice(0, 200);
 if (!reason) die('--reason is required: the player is told it');
 
+const batch = args.includes('--batch') ? String(opt('batch')) : '';
+if (args.includes('--batch') && !/^\d{8}T\d{6}$/.test(batch)) die('--batch is a UTC stamp YYYYMMDDTHHMMSS, like 20261105T220000');
+
+const by = String(opt('by') || 'staff').slice(0, 40), at = new Date().toISOString();
+const newId = (kind) => `${batch || at.replace(/[-:]/g, '').slice(0, 15)}-${tag || 'p' + profile}-${batch ? kind : crypto.randomBytes(3).toString('hex')}`;
+const gifts = [
+  ...(gold || items.length ? [[newId('c0e001'), { ...(tag ? { tag } : { profile }), ...(gold ? { gold } : {}), ...(items.length ? { items } : {}), reason, by, at }]] : []),
+  ...(Object.keys(schools).length ? [[newId('c0e003'), { tag, schools, reason, by, at }]] : []),
+  ...(free ? [[newId('c0e002'), { tag, appearanceFree: free, reason, by, at }]] : []),
+];
+
+const read = (p) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return null; } };
+let waiting = [];
+try { waiting = fs.readdirSync(INBOX).filter((f) => f.endsWith('.json')); } catch (e) { /* no inbox yet */ }
+const delivered = (read(path.join(DIR, 'gift-ledger.json')) || {}).delivered || {};
+
+// A batch id already waiting or delivered is that same gift, so it is not written again; one with other contents stops the run
+const shape = (g) => JSON.stringify([g.gold || 0, g.items || [], g.schools ? Object.entries(g.schools).sort() : null, g.appearanceFree || 0]);
+const found = (id) => (delivered[id] ? [delivered[id], 'delivered'] : waiting.includes(`${id}.json`) ? [read(path.join(INBOX, `${id}.json`)) || {}, 'waiting'] : null);
+const again = gifts.map(([id, g]) => {
+  const f = found(id);
+  if (f && shape(f[0]) !== shape(g)) die(`${id} is already ${f[1]} with other contents (${JSON.stringify(f[0])}); nothing written. Use another --batch stamp`);
+  return f ? f[1] : '';
+});
+const own = (id) => gifts.some(([x]) => id === x || id.startsWith(`${x}-rest`));
+
 // Schools or free appearance changes already gifted to this #TAG, waiting in the inbox or in the ledger (a gift's id carries its tag)
 if ((Object.keys(schools).length || free) && !args.includes('--force')) {
-  const read = (p) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return null; } };
-  let waiting = [];
-  try { waiting = fs.readdirSync(INBOX).filter((f) => f.endsWith('.json')); } catch (e) { /* no inbox yet */ }
   const forTag = [
-    ...waiting.map((f) => [path.basename(f, '.json'), read(path.join(INBOX, f)), 'waiting']).filter(([, g]) => g && g.tag === tag),
-    ...Object.entries((read(path.join(DIR, 'gift-ledger.json')) || {}).delivered || {}).filter(([id]) => id.split('-')[1] === tag).map(([id, d]) => [id, d, 'delivered']),
+    ...waiting.map((f) => [path.basename(f, '.json'), read(path.join(INBOX, f)), 'waiting']).filter(([id, g]) => g && g.tag === tag && !own(id)),
+    ...Object.entries(delivered).filter(([id]) => id.split('-')[1] === tag && !own(id)).map(([id, d]) => [id, d, 'delivered']),
   ];
   const seen = forTag.filter(([, g]) => g && g.schools && Object.keys(schools).some((k) => g.schools[k]));
   if (seen.length) die(`#${tag} already has ${seen.map(([id, g, how]) => `${id} (${how}: ${JSON.stringify(g.schools)})`).join(', ')}; levels are added, so this would pay again. Add --force if it is really a new grant`);
@@ -86,18 +112,11 @@ if ((Object.keys(schools).length || free) && !args.includes('--force')) {
   if (seenFree.length) die(`#${tag} already has ${seenFree.map(([id, g, how]) => `${id} (${how}: ${g.appearanceFree} free appearance change(s))`).join(', ')}; free changes are added, so this would give them again. Add --force if it is really a new grant`);
 }
 
-const by = String(opt('by') || 'staff').slice(0, 40), at = new Date().toISOString();
-const newId = () => `${at.replace(/[-:]/g, '').slice(0, 15)}-${tag || 'p' + profile}-${crypto.randomBytes(3).toString('hex')}`;
-const gifts = [
-  ...(gold || items.length ? [{ ...(tag ? { tag } : { profile }), ...(gold ? { gold } : {}), ...(items.length ? { items } : {}), reason, by, at }] : []),
-  ...(Object.keys(schools).length ? [{ tag, schools, reason, by, at }] : []),
-  ...(free ? [{ tag, appearanceFree: free, reason, by, at }] : []),
-];
 fs.mkdirSync(INBOX, { recursive: true });
-for (const gift of gifts) {
-  const id = newId();
+gifts.forEach(([id, gift], i) => {
+  if (again[i]) { console.log(`already ${again[i]} ${id}: not written again`); return; }
   const tmp = path.join(INBOX, `.${id}.tmp`);
   fs.writeFileSync(tmp, JSON.stringify(gift, null, 1));
   fs.renameSync(tmp, path.join(INBOX, `${id}.json`));
   console.log(`queued ${id}: ${JSON.stringify(gift)}`);
-}
+});

@@ -5,6 +5,7 @@
 // tests/schools-grant-harness.js runs the real one), once, alone or with gold and items, and waits while it is missing,
 // while schools.js refuses a school or while nothing can be given yet; levels held at a pick are queued again.
 // Free /appearance changes (appearanceFree) go through the real appearance.js grantFree, once, and wait while it cannot give them.
+// tools/gift.js --batch writes fixed ids, so a bulk run again writes and pays nothing twice.
 // Run it from this folder's parent with
 //
 //   node tests\gifts-harness.js
@@ -303,6 +304,35 @@ check('the tool refuses 0, 4, a word, no number and a profile, naming --appearan
 tryGift('--tag', 'KKVT', '--appearance-free', '3', '--reason', 'list free', '--force');
 const listedFree = tryGift('--list') || '';
 check('--list shows a free change waiting, and delivered with what was given', /"appearanceFree": 3/.test(listedFree) && /appearanceFree 1 given 0 +boom/.test(listedFree) && /500 gold +appearanceFree 1 given 1 +mixedfree/.test(listedFree), listedFree);
+
+// ---- --batch: fixed ids, so a bulk script run again queues and pays nothing twice ----
+for (const f of inbox()) fs.unlinkSync(path.join(dir, 'gifts-inbox', f));
+const C = 0xff000016; props[C] = { 'private.charTag': 'NA73', profileId: 90 }; online = [A, B, C];
+const COMP = 'Your paid face edit was not saved: the 500 gold back and a free change';
+const batchArgs = ['--batch', '20261105T220000', '--tag', 'na73', '--gold', '500', '--appearance-free', '1', '--reason', COMP, '--by', 'Jake'];
+const run1 = tryGift(...batchArgs);
+check('--batch: the gold and the free change under fixed ids <stamp>-<TAG>-c0e001 and -c0e002', !!run1 && inbox().sort().join(',') === '20261105T220000-NA73-c0e001.json,20261105T220000-NA73-c0e002.json', inbox());
+const run2 = tryGift(...batchArgs);
+check('...run again while they wait: nothing written, both named as already waiting, no refusal', !!run2 && (run2.match(/^already waiting 20261105T220000-NA73-c0e00[12]: not written again$/gm) || []).length === 2 && inbox().length === 2, run2);
+check('...the same stamp with other contents is refused and writes nothing', /20261105T220000-NA73-c0e001 is already waiting with other contents .*nothing written/.test(toolErr('--batch', '20261105T220000', '--tag', 'NA73', '--gold', '600', '--appearance-free', '1', '--reason', COMP)) && inbox().length === 2, inbox());
+n0 = out.given.length; tick();
+check('...delivered once: 500 gold and one free change', out.given.length === n0 + 1 && out.given[n0].a === C && out.given[n0].count === 500 && used(C) === -1 && inbox().length === 0 && !!ledger()['20261105T220000-NA73-c0e001'] && ledger()['20261105T220000-NA73-c0e002'].appearanceFreeGiven === 1, [out.given.slice(n0), used(C)]);
+const run3 = tryGift(...batchArgs);
+n0 = out.given.length; tick();
+check('...run again once delivered: nothing written, named as already delivered, nothing more given', !!run3 && (run3.match(/^already delivered 20261105T220000-NA73-c0e00[12]: not written again$/gm) || []).length === 2 && inbox().length === 0 && out.given.length === n0 && used(C) === -1, run3);
+check('...another stamp\'s free change for the same #TAG is still refused unless --force', /#NA73 already has 20261105T220000-NA73-c0e002 \(delivered: 1 free appearance change\(s\)\)/.test(toolErr('--batch', '20261105T230000', '--tag', 'NA73', '--appearance-free', '1', '--reason', COMP)) && inbox().length === 0, inbox());
+let badBatch = 0;
+for (const b of [['2026-11-05'], ['20261105T2200'], ['x'], []]) { if (/--batch is a UTC stamp/.test(toolErr('--tag', 'NA73', '--gold', '5', '--reason', 'x', '--batch', ...b))) badBatch++; }
+check('the tool refuses a --batch that is not YYYYMMDDTHHMMSS', badBatch === 4 && inbox().length === 0, badBatch);
+// A batch schools gift held at a pick: its -rest1 waiting is the same grant, so a run again is not refused for it
+const schoolArgs = ['--batch', '20261105T220000', '--tag', 'NA73', '--school', 'Destruction:5', '--reason', COMP];
+const run4 = tryGift(...schoolArgs);
+grantAnswer = (a, school) => ({ ok: true, text: '', school, from: 40, to: 42, added: 2, heldFor: 'Adept' });
+tick();
+grantAnswer = (a, school) => ({ ok: false, text: 'held', school, from: 42, to: 42, added: 0, heldFor: 'Adept' });
+const run5 = tryGift(...schoolArgs);
+check('...a schools batch gift (-c0e003) held at a pick, run again: already delivered, its rest left waiting, not refused', !!run4 && /queued 20261105T220000-NA73-c0e003:/.test(run4) && !!run5 && /^already delivered 20261105T220000-NA73-c0e003: not written again$/m.test(run5)
+  && inbox().join(',') === '20261105T220000-NA73-c0e003-rest1.json', [run5, inbox()]);
 
 process.chdir(cwd);
 fs.rmSync(dir, { recursive: true, force: true });
