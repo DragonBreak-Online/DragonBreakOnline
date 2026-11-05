@@ -1,5 +1,5 @@
 // The game side of npcLifetime.ts: deferred deletes, spread HostStart re-seats, and the trail of actor-changing calls
-import { Actor, Game, ObjectReference, Ui, on } from "skyrimPlatform";
+import { Actor, Game, ObjectReference, Ui, on, TESModPlatform } from "skyrimPlatform";
 import * as sp from "skyrimPlatform";
 import { CopyWork, FrameBudget, SpawnLine, WorkQueue } from "./copyBudget";
 import { driftConfig } from "../sync/driftConfig";
@@ -119,6 +119,12 @@ const deleteOrDefer = (refr: ObjectReference, defer: boolean): void => {
   const id = refr.getFormID();
   const now = Date.now();
   const ac = Actor.from(refr);
+  if (ac) {
+    try { ac.stopCombat(); } catch { /* ignore */ }
+    try { ac.clearKeepOffsetFromActor(); } catch { /* ignore */ }
+    try { TESModPlatform.setWeaponDrawnMode(ac, -1); } catch { /* ignore */ }
+    try { ac.forceRemoveRagdollFromWorld(); } catch { /* ignore */ }
+  }
   const plan = deletePlan({
     handedToDelete: recentDeletes.has(id, now),
     queued: pendingDeletes.has(id),
@@ -138,11 +144,14 @@ const deleteOrDefer = (refr: ObjectReference, defer: boolean): void => {
   if (plan === "delete") {
     noteActorCall("delete", id);
     recentDeletes.note(id, now);
+    try { refr.disableNoWait(false); } catch { /* ignore */ }
+    try { refr.setPosition(0, 0, -30000); } catch { /* ignore */ }
     try { refr.delete(); } catch (e) { /* already gone */ }
     forget(id);
     return;
   }
   try { refr.disableNoWait(false); } catch (e) { /* already gone */ }
+  try { refr.setPosition(0, 0, -30000); } catch { /* ignore */ }
   pendingDeletes.set(id, newPendingDelete());
   noteActorCall("delete-deferred", id);
 };

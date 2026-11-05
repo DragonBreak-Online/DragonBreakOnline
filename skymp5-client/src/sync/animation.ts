@@ -128,10 +128,21 @@ export const applyAnimation = (
   anim: Animation,
   state: AnimationApplyState
 ): void => {
+  // Guard against unready, dying or disabled references to prevent Havok behavior graph crashes
+  if (!refr || refr.isDisabled() || refr.isDeleted() || !refr.is3DLoaded()) {
+    return;
+  }
+
   if (state.lastNumChanges === anim.numChanges) {
     return;
   }
   state.lastNumChanges = anim.numChanges;
+
+  const ac = Actor.from(refr);
+  // Never dispatch movement/idle/furniture anims to a dead actor
+  if (ac && ac.isDead()) {
+    return;
+  }
 
   if (state.useAnimOverrides) {
     const animOverride = animOverridesLowerCase[anim.animEventName.toLowerCase()];
@@ -145,8 +156,6 @@ export const applyAnimation = (
   if (isIdle(anim.animEventName)) {
     allowedIdles.push([refr.getFormID(), anim.animEventName]);
   }
-
-  const ac = Actor.from(refr);
 
   if (anim.animEventName === "SkympFakeEquip") {
     if (ac) {
@@ -163,13 +172,15 @@ export const applyAnimation = (
   }
 
   if (anim.animEventName === "Ragdoll") {
-    if (ac && allowRelayedRagdoll(ac)) {
+    if (ac && !ac.isDead() && !ac.isDeleted() && refr.is3DLoaded() && allowRelayedRagdoll(ac)) {
       if (storage["animationFunc1Set"] === true) {
         // @ts-ignore
         storage["animationFunc1"](ac);
       } else {
-        ac.pushActorAway(ac, 0);
-        ac.setActorValue("Variable10", -1000);
+        try {
+          ac.pushActorAway(ac, 0);
+          ac.setActorValue("Variable10", -1000);
+        } catch { /* ignore */ }
       }
     }
     return;
@@ -181,26 +192,18 @@ export const applyAnimation = (
     }
   }
 
-  Debug.sendAnimationEvent(refr, anim.animEventName);
+  try {
+    Debug.sendAnimationEvent(refr, anim.animEventName);
+  } catch { /* ignore */ }
 
   if (anim.animEventName === "GetUpBegin") {
     const refrId = refr.getFormID();
     Utility.wait(1).then(() => {
       const ac = Actor.from(Game.getFormEx(refrId));
-      if (ac) {
+      if (ac && !ac.isDeleted() && !ac.isDisabled()) {
         ac.setActorValue("Variable10", 1000);
       }
     });
-  }
-
-  if (actorSitAnimsLowerCase.find((x) => x === animEventNameLowerCase) !== undefined) {
-    setCollision(refr.getFormID(), false);
-    sitCollisionDisabledAt.set(refr.getFormID(), Date.now());
-  }
-
-  if (actorGetUpAnimsLowerCase.find((x) => x === animEventNameLowerCase) !== undefined) {
-    setCollision(refr.getFormID(), true);
-    sitCollisionDisabledAt.delete(refr.getFormID());
   }
 };
 

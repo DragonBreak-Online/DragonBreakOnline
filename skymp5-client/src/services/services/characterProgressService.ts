@@ -319,7 +319,7 @@ export class CharacterProgressService extends ClientListener {
   private restoreMarker(desc: string): number {
     try {
       const ref = this.sp.ObjectReference.from(this.formFromDesc(desc));
-      if (!ref) return 1;
+      if (!ref || ref.isDisabled() || ref.isDeleted() || !ref.getParentCell()) return 1;
       const entered = !!this.state.visited[desc];
       if (entered ? ref.canFastTravelToMarker() : ref.isMapMarkerVisible()) return 2;
       ref.addToMap(entered);
@@ -365,7 +365,7 @@ export class CharacterProgressService extends ClientListener {
       let entered = false;
       try {
         const ref = this.sp.ObjectReference.from(this.formFromDesc(desc));
-        if (!ref || (!known && !ref.isMapMarkerVisible())) continue;
+        if (!ref || ref.isDisabled() || ref.isDeleted() || !ref.getParentCell() || (!known && !ref.isMapMarkerVisible())) continue;
         entered = ref.canFastTravelToMarker();
       } catch (err) {
         continue;
