@@ -116,7 +116,7 @@ module.exports = (api) => {
   const live = (h) => h && Number(h.until) > Date.now();
   const caseOf = (a) => data().cases[String(id(a))] || null;
   const exposedIn = (a, zid) => { const c = caseOf(a); return !!(c && zid && live(c.holds[zid])); };
-  const bountyIn = (zid, pid) => safe(() => { const z = ((globalThis.__dboOutlaws || {}).data || {}).zones; return !!(z && z[zid] && z[zid][String(pid)]); }, false);
+  const bountyIn = (zid, pid, actor) => safe(() => { const z = ((globalThis.__dboOutlaws || {}).data || {}).zones; if (!z || !z[zid]) return false; if (actor) { const ck = (Number(actor) >>> 0).toString(16); if (z[zid][ck]) return true; } return !!z[zid][String(pid)]; }, false);
   const amountFor = (h) => Math.round((h.city ? Number(C.cityBounty) : Number(C.wildsBounty)) * (h.hurt ? Number(C.hurtMultiplier) || 1 : 1));
   const declare = (a, zid, h) => {
     const amount = amountFor(h);
@@ -124,7 +124,7 @@ module.exports = (api) => {
     // The public Wanted list and /bounty show only a plain reason, never the beast (Nate, 23 Oct: the bounty must not give the
     // beast away); what was seen goes to the staff log and /exposure, and to the hold's court through its own notices
     const reason = h.hurt ? String(C.publicReasonHurt || 'wanted by order of the hold, for violence') : String(C.publicReason || 'wanted by order of the hold');
-    const ok = safe(() => (g('__dboOutlawDeclare') ? g('__dboOutlawDeclare')(zid, Number(profileOf(a)), amount, reason, h.name || display(a), holdName(zid)) === true : false), false);
+    const ok = safe(() => (g('__dboOutlawDeclare') ? g('__dboOutlawDeclare')(zid, Number(profileOf(a)), amount, reason, h.name || display(a), holdName(zid), a) === true : false), false);
     if (ok) log(`exposure: bounty ${amount} on ${display(a)} in ${zid} for ${h.hurt ? `${f.crime}, and hurt people in that shape` : f.crime} (seen as ${f.noun}; public reason "${reason}")`);
     if (ok) h.bounty = Math.max(Number(h.bounty) || 0, amount);
     else log(`exposure: no bounty set on ${display(a)} in ${zid} (outlaws off or not loaded)`);

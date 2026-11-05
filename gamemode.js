@@ -409,7 +409,7 @@ const TIER_LABEL = { senior: 'Senior', developer: 'Developer', leadgm: 'Lead GM'
 // out of the hold treasury, so a GM who could appoint himself could pay himself (claude-jake's review, A1-1).
 // /chargen is open to every GM (Nate, 12 Oct), and to a Trial GM through TRIAL_COMMANDS
 // /jail (jail zones), /npc remove and /dungeon end are a GM's from 2 Nov (Nat: "empower our lead GMs and GMs"); each is audited
-const LEAD_ONLY = new Set(['rerollrefund', 'beastform', 'frenzy', 'polymorph', 'vlremote', 'wwremote', 'feedpair', 'sethunger', 'wipechars', 'driftspawn', 'driftrepair', 'driftset',
+const LEAD_ONLY = new Set(['rerollrefund', 'beastform', 'frenzy', 'vlremote', 'wwremote', 'feedpair', 'sethunger', 'wipechars', 'driftspawn', 'driftrepair', 'driftset',
   'placeexport', 'staffstats', 'war', 'exposure', 'curse', 'schedule', 'warband', 'raid', 'settime', 'timescale', 'setweather',
   'appoint', 'dismiss',
   // Ending a character for good, and lifting it (Nat, 26 Oct)

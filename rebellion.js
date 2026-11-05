@@ -365,7 +365,7 @@ module.exports = (api) => {
       for (const x of r.rebels) {
         const c = call('__dboCitizenOutlaw', x.actor, r.zone, until, `the failed rising ${r.name}`) || {};
         const pid = pidOf(x.actor) >= 0 ? pidOf(x.actor) : x.pid;
-        call('__dboOutlawDeclare', r.zone, pid, C.outlawBounty, `rose with ${r.name}`, x.name, `the court of ${z ? z.name : r.zone}`);
+        call('__dboOutlawDeclare', r.zone, pid, C.outlawBounty, `rose with ${r.name}`, x.name, `the court of ${z ? z.name : r.zone}`, x.actor);
         data().charCooldowns[hex(x.actor)] = Math.max(Number(data().charCooldowns[hex(x.actor)]) || 0, until);
         tell(x.actor, `${r.name} has failed. You are an outlaw of ${z ? z.name : r.zone}: ${c.removed ? 'your citizenship is taken, ' : ''}you are wanted there for your part in it, and barred from its citizenship until ${dateText(until)}.${c.auto ? ' (You stay its citizen through the faction or court you serve there.)' : ''}`);
       }
