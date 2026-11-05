@@ -2,7 +2,8 @@
 // faces kept 48xxxxxx after the DLE moved to 49). Runs the tool with python3 (or py) on made-up settings and files in a
 // scratch folder: a dry run changes nothing; --write maps each race by plugin name, takes a raceDesc's race from it, leaves
 // a face saved after --presets-before as it is, leaves one whose plugin is gone, adds raceDesc, backs the folder up and keeps
-// every face's hash; the change forms pass works as before, alone or with it.
+// every face's hash; the change forms pass works as before, alone or with it. Without every plugin header (a light .esp
+// is told only by its header) --presets stops before writing anything.
 //   node tests/loadorder-migrate-presets-harness.js   (from server/)
 'use strict';
 const fs = require('fs');
@@ -21,12 +22,16 @@ if (!PY) { console.log('ok    skipped: no python 3 on this box'); process.exit(0
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-jake-lomigrate-'));
 const DLE = 'DragonBreak Online Edits.esp';
 const MASTERS = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm'];
-// The DLE at 6 before and 7 after (a new plugin before it), Gone.esp dropped, a light plugin in both
-const OLD = MASTERS.concat(['A.esp', DLE, 'Y.esp', 'Gone.esp', 'L.esl']);
-const NEW = MASTERS.concat(['A.esp', 'N.esp', DLE, 'Y.esp', 'L.esl']);
+// The DLE at 6 before and 7 after (a new plugin before it), Gone.esp dropped, a light plugin in both, and a light-flagged
+// F.esp before the DLE (an ESPFE: taken for a full plugin, it would put the DLE one index on)
+const OLD = MASTERS.concat(['A.esp', 'F.esp', DLE, 'Y.esp', 'Gone.esp', 'L.esl']);
+const NEW = MASTERS.concat(['A.esp', 'F.esp', 'N.esp', DLE, 'Y.esp', 'L.esl']);
 fs.writeFileSync(path.join(TMP, 'old.json'), JSON.stringify({ loadOrder: OLD.map((n) => `Data/${n}`) }));
 fs.writeFileSync(path.join(TMP, 'new.json'), JSON.stringify({ loadOrder: NEW.map((n) => `Data/${n}`) }));
 fs.mkdirSync(path.join(TMP, 'data'));
+// Each plugin's TES4 header, whose flags (offset 8) carry the light flag 0x200
+const header = (light) => { const b = Buffer.alloc(24); b.write('TES4', 0, 'ascii'); b.writeUInt32LE(light ? 0x200 : 0, 8); return b; };
+for (const n of new Set(OLD.concat(NEW))) fs.writeFileSync(path.join(TMP, 'data', n), header(n === 'F.esp'));
 const DIR = path.join(TMP, 'racemenu-presets');
 fs.mkdirSync(DIR);
 const faceText = (name) => P.encodeFace({ version: { signature: 1163086675, formatVersion: 3, skseVersion: 1, runtimeVersion: 2 }, modNames: ['Skyrim.esm'],
@@ -38,21 +43,29 @@ put('ff000a02', { race: 0x13746 });
 put('ff000a03', { race: 0x07000d62, at: '2026-10-25T08:00:00.000Z' });
 put('ff000a04', { race: 0x07000800, raceDesc: '800:Y.esp' });
 put('ff000a05', { race: 0x08000123 });
-put('ff000a06', { race: 0xfe000800 });
+put('ff000a06', { race: 0xfe001800 });
 put('ff000a07', { race: 0x06000d62, raceDesc: 'd62:Nowhere.esp' });
 fs.writeFileSync(path.join(DIR, 'ff000a01.json.bad-2026-10-20T00-00-00-000Z-1-1'), '{"race":100000000}');
 const CF = path.join(TMP, 'changeForms');
 fs.mkdirSync(CF);
 fs.writeFileSync(path.join(CF, 'c1.json'), JSON.stringify({ formDesc: 'abc:Skyrim.esm', appearanceDump: JSON.stringify({ raceId: 0x06192ede, headpartIds: [0x07000001] }) }));
 const snapshot = (d) => Object.fromEntries(fs.readdirSync(d).sort().map((f) => [f, fs.readFileSync(path.join(d, f), 'utf8')]));
-const run = (...args) => {
-  const r = spawnSync(PY, [TOOL, path.join(TMP, 'old.json'), path.join(TMP, 'new.json'), ...args], { encoding: 'utf8', env: Object.assign({}, process.env, { DBO_DATA: path.join(TMP, 'data') }) });
+const runIn = (data, ...args) => {
+  const r = spawnSync(PY, [TOOL, path.join(TMP, 'old.json'), path.join(TMP, 'new.json'), ...args], { encoding: 'utf8', env: Object.assign({}, process.env, { DBO_DATA: data }) });
   return { code: r.status, out: `${r.stdout}${r.stderr}` };
 };
+const run = (...args) => runIn(path.join(TMP, 'data'), ...args);
 const read = (k) => JSON.parse(fs.readFileSync(path.join(DIR, `${k}.json`), 'utf8'));
 
 const before = snapshot(DIR);
-let r = run('--presets', DIR, '--presets-before', '2026-10-21T00:00:00Z');
+// Without the plugin headers a light .esp cannot be told from a full one: --presets stops, as raceDesc would name the wrong plugin
+fs.mkdirSync(path.join(TMP, 'nodata'));
+let r = runIn(path.join(TMP, 'nodata'), '--presets', DIR, '--write');
+ok(r.code !== 0 && /plugin headers from .*nodata/.test(r.out) && /could not be read, taken as full plugins: .*F\.esp/.test(r.out) && /--presets needs every plugin header: set DBO_DATA/.test(r.out)
+  && JSON.stringify(snapshot(DIR)) === JSON.stringify(before) && !fs.readdirSync(TMP).some((f) => f.startsWith('racemenu-presets.bak-')), '--presets with plugin headers missing: stops, names them and the folder, writes nothing', r.out);
+r = runIn(path.join(TMP, 'nodata'), CF);
+ok(r.code === 0 && /could not be read, taken as full plugins/.test(r.out) && /files to change: 1/.test(r.out), '...the change forms pass alone lists them and goes on as before', r.out);
+r = run('--presets', DIR, '--presets-before', '2026-10-21T00:00:00Z');
 ok(r.code === 0 && /dry run; add --write/.test(r.out) && JSON.stringify(snapshot(DIR)) === JSON.stringify(before), 'a dry run (the default) reports and changes nothing', r.out);
 ok(/ff000a01\.json race 6192ede -> 7192ede \(race moved\)/.test(r.out) && /ff000a04\.json race 7000800 -> 8000800 \(race from raceDesc\)/.test(r.out), 'it lists each race that moves, and why', r.out);
 ok(/ff000a05\.json race 8000123: its plugin is not in the new order/.test(r.out) && /ff000a07\.json raceDesc d62:Nowhere\.esp is not in the new order/.test(r.out), 'it names the faces it leaves alone', r.out);
@@ -73,7 +86,7 @@ d = read('ff000a04');
 ok(d.race === 0x08000800 && d.raceDesc === '800:Y.esp', 'a face with raceDesc takes its race from it', [d.race.toString(16), d.raceDesc]);
 ok(read('ff000a05').race === 0x08000123 && !('raceDesc' in read('ff000a05')) && read('ff000a07').race === 0x06000d62, 'faces of a plugin gone, or a raceDesc the new order cannot name, are left alone');
 d = read('ff000a06');
-ok(d.race === 0xfe000800 && d.raceDesc === '800:L.esl', 'a light plugin\'s race keeps its 0xFE id, named by its own plugin', [d.race.toString(16), d.raceDesc]);
+ok(d.race === 0xfe001800 && d.raceDesc === '800:L.esl', 'a light plugin\'s race keeps its 0xFE id, named by its own plugin (L.esl is the second light one, after F.esp)', [d.race.toString(16), d.raceDesc]);
 ok(fs.readFileSync(path.join(DIR, 'ff000a01.json.bad-2026-10-20T00-00-00-000Z-1-1'), 'utf8') === '{"race":100000000}' && !fs.readdirSync(DIR).some((f) => /\.tmp$/.test(f)),
   'files that are no face (a set-aside copy) are not touched, and no temporary file is left');
 r = run('--presets', DIR, '--presets-before', '2026-10-21T00:00:00Z');

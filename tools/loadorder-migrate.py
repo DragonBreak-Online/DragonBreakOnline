@@ -24,6 +24,9 @@ faces kept 48xxxxxx after the DLE moved to 49). A file with 'raceDesc' ('<local 
 new order; any other is taken as saved in the old order and mapped by plugin name, unless it was saved ('at') at or after
 --presets-before, which leaves its race as it is (saved in the new order already). Each face it maps or keeps gets the raceDesc
 of its race. Stop the game server first: it keeps the faces it has read in memory and serves those until a restart.
+
+DBO_DATA (default tools/../data) is the folder whose plugin headers say which .esp/.esm carry the light flag. A header it cannot
+read is listed and taken as a full plugin; with --presets the run stops instead, as raceDesc would then name the wrong plugin.
 """
 import json, os, re, sys, shutil, time
 from collections import Counter
@@ -56,15 +59,24 @@ def order(path):
     return [os.path.basename(p.replace('\\', '/')) for p in lo]
 
 
-def index_map(old, new, new_names=None):
+def data_dir():
+    return os.path.abspath(os.environ.get('DBO_DATA', os.path.join(os.path.dirname(__file__), '..', 'data')))
+
+
+def index_map(old, new, new_names=None, unread=None):
     """Old id top bits -> new top bits. Light plugins (.esl or the 0x200 flag) live at 0xFE in load order of lights.
-    new_names: filled with the new order's slot -> plugin file name. fix-numeric-ids.py and scan-numeric-ids.py take (m, names)."""
-    data = os.environ.get('DBO_DATA', os.path.join(os.path.dirname(__file__), '..', 'data'))
+    new_names: filled with the new order's slot -> plugin file name. fix-numeric-ids.py and scan-numeric-ids.py take (m, names).
+    unread: gets each .esp/.esm whose header could not be read, taken as full (a light one missed shifts every later index)."""
+    data = data_dir()
     def light(name):
         if name.lower().endswith('.esl'): return True
         try:
-            with open(os.path.join(data, name), 'rb') as fh: return bool(int.from_bytes(fh.read(12)[8:12], 'little') & 0x200)
-        except OSError: return False
+            with open(os.path.join(data, name), 'rb') as fh: head = fh.read(12)
+        except OSError: head = b''
+        if len(head) < 12 or head[:4] != b'TES4':
+            if unread is not None: unread.add(name)
+            return False
+        return bool(int.from_bytes(head[8:12], 'little') & 0x200)
     def slots(lo):
         full, lite, out = 0, 0, {}
         for n in lo:
@@ -224,8 +236,12 @@ def main():
         if not before or not pdir: raise SystemExit('--presets-before takes an ISO time, and --presets with it')
     if not (len(a) == 3 or (pdir and len(a) == 2)): raise SystemExit(__doc__)
     old_p, new_p, cf = (a + [None])[:3]
-    new_names = {}
-    m, names = index_map(order(old_p), order(new_p), new_names)
+    new_names, unread = {}, set()
+    m, names = index_map(order(old_p), order(new_p), new_names, unread)
+    print('plugin headers from', data_dir(), '(DBO_DATA)')
+    if unread:
+        print('%d plugin header(s) could not be read, taken as full plugins: %s' % (len(unread), ', '.join(sorted(unread))))
+        if pdir: raise SystemExit('--presets needs every plugin header: set DBO_DATA to the folder that holds the plugins')
     moved = {names[k]: v for k, v in m.items() if v is None or v != k}
     print('plugins whose index changes:', len(moved), '| gone:', [n for n, v in moved.items() if v is None])
     stats = Counter(); changed = []
