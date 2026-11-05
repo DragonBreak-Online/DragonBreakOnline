@@ -16,8 +16,14 @@ VarValue VarValue::CastToInt() const
       return VarValue((int32_t)this->data.f);
     case kType_Bool:
       return VarValue((int32_t)this->data.b);
+    case kType_Object:
+      if (this->data.id == nullptr) {
+        return VarValue((int32_t)0);
+      }
+      spdlog::debug("VarValue::CastToInt - Non-null object passed to CastToInt");
+      return VarValue((int32_t)0);
     default:
-      spdlog::error("VarValue::CastToInt - Wrong type in CastToInt");
+      spdlog::debug("VarValue::CastToInt - Wrong type in CastToInt");
       return VarValue((int32_t)0);
   }
 }
@@ -38,8 +44,14 @@ VarValue VarValue::CastToFloat() const
       return VarValue(static_cast<double>(this->data.f));
     case kType_Bool:
       return VarValue(static_cast<double>(this->data.b));
+    case kType_Object:
+      if (this->data.id == nullptr) {
+        return VarValue(static_cast<double>(0));
+      }
+      spdlog::debug("VarValue::CastToFloat - Non-null object passed to CastToFloat");
+      return VarValue(static_cast<double>(0));
     default:
-      spdlog::error("VarValue::CastToFloat - Wrong type in CastToFloat");
+      spdlog::debug("VarValue::CastToFloat - Wrong type in CastToFloat");
       return VarValue(static_cast<double>(0));
   }
 }
@@ -215,18 +227,24 @@ namespace {
 inline bool IsNumber(const VarValue& v)
 {
   return v.GetType() == VarValue::kType_Integer ||
-    v.GetType() == VarValue::kType_Float;
+    v.GetType() == VarValue::kType_Float ||
+    (v.GetType() == VarValue::kType_Object && static_cast<IGameObject*>(v) == nullptr);
 }
 
 inline double ToDouble(const VarValue& v)
 {
   switch (v.GetType()) {
     case VarValue::kType_Integer:
-      return static_cast<double>(static_cast<int32_t>(v));
+      return static_cast<double>(static_cast<int>(v));
     case VarValue::kType_Float:
-      return static_cast<double>(static_cast<int32_t>(v));
+      return static_cast<double>(v);
+    case VarValue::kType_Object:
+      if (static_cast<IGameObject*>(v) == nullptr) {
+        return 0.0;
+      }
+      break;
   }
-  spdlog::error("::ToDouble - Wrong type passed {}",
+  spdlog::debug("::ToDouble - Wrong type passed {}",
                 static_cast<int>(v.GetType()));
   return 0.0;
 }
@@ -265,7 +283,7 @@ VarValue VarValue::operator+(const VarValue& argument2)
                                      ToDouble(*this) + ToDouble(argument2));
   }
 
-  spdlog::error("VarValue::operator+ - Wrong type");
+  spdlog::debug("VarValue::operator+ - Wrong type");
   return VarValue(0.0);
 }
 
@@ -292,7 +310,7 @@ VarValue VarValue::operator-(const VarValue& argument2)
                                      ToDouble(*this) - ToDouble(argument2));
   }
 
-  spdlog::error("VarValue::operator- - Wrong type");
+  spdlog::debug("VarValue::operator- - Wrong type");
   return VarValue(0.0);
 }
 
@@ -319,7 +337,7 @@ VarValue VarValue::operator*(const VarValue& argument2)
                                      ToDouble(*this) * ToDouble(argument2));
   }
 
-  spdlog::error("VarValue::operator* - Wrong type");
+  spdlog::debug("VarValue::operator* - Wrong type");
   return VarValue(0.0);
 }
 
@@ -352,7 +370,7 @@ VarValue VarValue::operator/(const VarValue& argument2)
                                      ToDouble(*this) / ToDouble(argument2));
   }
 
-  spdlog::error("VarValue::operator/ - Wrong type");
+  spdlog::debug("VarValue::operator/ - Wrong type");
   return VarValue(0.0);
 }
 
@@ -372,7 +390,7 @@ VarValue VarValue::operator%(const VarValue& argument2)
         break;
     }
   }
-  spdlog::error("VarValue::operator% - Wrong type");
+  spdlog::debug("VarValue::operator% - Wrong type");
   return VarValue(0);
 }
 
@@ -479,10 +497,15 @@ bool VarValue::operator>(const VarValue& argument2) const
       return this->CastToFloat().data.f > argument2.CastToFloat().data.f;
     case VarValue::kType_Bool:
       return this->CastToBool().data.b > argument2.CastToBool().data.b;
+    case VarValue::kType_Object:
+      if (this->data.id == nullptr) {
+        return 0.0 > argument2.CastToFloat().data.f;
+      }
+      break;
     default:
       break;
   }
-  spdlog::error("VarValue::operator> - Wrong type");
+  spdlog::debug("VarValue::operator> - Wrong type");
   return false;
 }
 
@@ -495,10 +518,15 @@ bool VarValue::operator>=(const VarValue& argument2) const
       return this->CastToFloat().data.f >= argument2.CastToFloat().data.f;
     case VarValue::kType_Bool:
       return this->CastToBool().data.b >= argument2.CastToBool().data.b;
+    case VarValue::kType_Object:
+      if (this->data.id == nullptr) {
+        return 0.0 >= argument2.CastToFloat().data.f;
+      }
+      break;
     default:
       break;
   }
-  spdlog::error("VarValue::operator>= - Wrong type");
+  spdlog::debug("VarValue::operator>= - Wrong type");
   return false;
 }
 
@@ -511,10 +539,15 @@ bool VarValue::operator<(const VarValue& argument2) const
       return this->CastToFloat().data.f < argument2.CastToFloat().data.f;
     case VarValue::kType_Bool:
       return this->CastToBool().data.b < argument2.CastToBool().data.b;
+    case VarValue::kType_Object:
+      if (this->data.id == nullptr) {
+        return 0.0 < argument2.CastToFloat().data.f;
+      }
+      break;
     default:
       break;
   }
-  spdlog::error("VarValue::operator< - Wrong type");
+  spdlog::debug("VarValue::operator< - Wrong type");
   return false;
 }
 
@@ -527,10 +560,15 @@ bool VarValue::operator<=(const VarValue& argument2) const
       return this->CastToFloat().data.f <= argument2.CastToFloat().data.f;
     case VarValue::kType_Bool:
       return this->CastToBool().data.b <= argument2.CastToBool().data.b;
+    case VarValue::kType_Object:
+      if (this->data.id == nullptr) {
+        return 0.0 <= argument2.CastToFloat().data.f;
+      }
+      break;
     default:
       break;
   }
-  spdlog::error("VarValue::operator<= - Wrong type");
+  spdlog::debug("VarValue::operator<= - Wrong type");
   return false;
 }
 

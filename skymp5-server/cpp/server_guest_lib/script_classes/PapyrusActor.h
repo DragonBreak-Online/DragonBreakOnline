@@ -23,6 +23,15 @@ public:
   VarValue DamageActorValue(VarValue self,
                             const std::vector<VarValue>& arguments);
 
+  VarValue GetBaseActorValue(VarValue self,
+                             const std::vector<VarValue>& arguments);
+
+  VarValue GetActorValue(VarValue self,
+                         const std::vector<VarValue>& arguments);
+
+  VarValue ModActorValue(VarValue self,
+                         const std::vector<VarValue>& arguments);
+
   VarValue IsEquipped(VarValue self, const std::vector<VarValue>& arguments);
 
   VarValue GetActorValuePercentage(VarValue self,

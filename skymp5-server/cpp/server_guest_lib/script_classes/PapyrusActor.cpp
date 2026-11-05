@@ -161,6 +161,84 @@ VarValue PapyrusActor::DamageActorValue(VarValue self,
   return VarValue();
 }
 
+VarValue PapyrusActor::GetBaseActorValue(
+  VarValue self, const std::vector<VarValue>& arguments)
+{
+  if (arguments.empty()) {
+    return VarValue(0.0);
+  }
+  espm::ActorValue attributeName =
+    ConvertToAV(static_cast<const char*>(arguments[0]));
+  if (attributeName == espm::ActorValue::None) {
+    return VarValue(0.0);
+  }
+  if (auto actor = GetFormPtr<MpActor>(self)) {
+    try {
+      float baseVal = actor->GetBaseValues().GetValue(attributeName);
+      return VarValue(static_cast<double>(baseVal));
+    } catch (...) {
+      return VarValue(0.0);
+    }
+  }
+  return VarValue(0.0);
+}
+
+VarValue PapyrusActor::GetActorValue(
+  VarValue self, const std::vector<VarValue>& arguments)
+{
+  if (arguments.empty()) {
+    return VarValue(0.0);
+  }
+  espm::ActorValue attributeName =
+    ConvertToAV(static_cast<const char*>(arguments[0]));
+  if (attributeName == espm::ActorValue::None) {
+    return VarValue(0.0);
+  }
+  if (auto actor = GetFormPtr<MpActor>(self)) {
+    try {
+      float maxVal = actor->GetMaximumValues().GetValue(attributeName);
+      switch (attributeName) {
+        case espm::ActorValue::Health:
+          return VarValue(static_cast<double>(
+            maxVal * actor->GetChangeForm().actorValues.healthPercentage));
+        case espm::ActorValue::Magicka:
+          return VarValue(static_cast<double>(
+            maxVal * actor->GetChangeForm().actorValues.magickaPercentage));
+        case espm::ActorValue::Stamina:
+          return VarValue(static_cast<double>(
+            maxVal * actor->GetChangeForm().actorValues.staminaPercentage));
+        default:
+          return VarValue(static_cast<double>(maxVal));
+      }
+    } catch (...) {
+      return VarValue(0.0);
+    }
+  }
+  return VarValue(0.0);
+}
+
+VarValue PapyrusActor::ModActorValue(
+  VarValue self, const std::vector<VarValue>& arguments)
+{
+  if (arguments.size() < 2) {
+    return VarValue();
+  }
+  espm::ActorValue attributeName =
+    ConvertToAV(static_cast<const char*>(arguments[0]));
+  if (attributeName == espm::ActorValue::None) {
+    return VarValue();
+  }
+  float modifier = static_cast<double>(arguments[1]);
+  if (auto actor = GetFormPtr<MpActor>(self)) {
+    if (modifier >= 0) {
+      actor->RestoreActorValue(attributeName, modifier);
+    } else {
+      actor->DamageActorValue(attributeName, -modifier);
+    }
+  }
+  return VarValue();
+}
+
 VarValue PapyrusActor::IsEquipped(VarValue self,
                                   const std::vector<VarValue>& arguments)
 {
@@ -789,10 +867,21 @@ void PapyrusActor::Register(
   AddMethod(vm, "PlayIdle", &PapyrusActor::PlayIdle);
   AddMethod(vm, "GetSitState", &PapyrusActor::GetSitState);
   AddMethod(vm, "RestoreActorValue", &PapyrusActor::RestoreActorValue);
+  AddMethod(vm, "RestoreAV", &PapyrusActor::RestoreActorValue);
   AddMethod(vm, "SetActorValue", &PapyrusActor::SetActorValue);
+  AddMethod(vm, "SetAV", &PapyrusActor::SetActorValue);
   AddMethod(vm, "DamageActorValue", &PapyrusActor::DamageActorValue);
+  AddMethod(vm, "DamageAV", &PapyrusActor::DamageActorValue);
+  AddMethod(vm, "ModActorValue", &PapyrusActor::ModActorValue);
+  AddMethod(vm, "ModAV", &PapyrusActor::ModActorValue);
+  AddMethod(vm, "GetBaseActorValue", &PapyrusActor::GetBaseActorValue);
+  AddMethod(vm, "GetBaseAV", &PapyrusActor::GetBaseActorValue);
+  AddMethod(vm, "GetActorValue", &PapyrusActor::GetActorValue);
+  AddMethod(vm, "GetAV", &PapyrusActor::GetActorValue);
   AddMethod(vm, "IsEquipped", &PapyrusActor::IsEquipped);
   AddMethod(vm, "GetActorValuePercentage",
+            &PapyrusActor::GetActorValuePercentage);
+  AddMethod(vm, "GetAVPercentage",
             &PapyrusActor::GetActorValuePercentage);
   AddMethod(vm, "SetAlpha", &PapyrusActor::SetAlpha);
   AddMethod(vm, "EquipItem", &PapyrusActor::EquipItem);

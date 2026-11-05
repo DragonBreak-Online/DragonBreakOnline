@@ -1,3 +1,4 @@
+#include <cstring>
 #include "CraftService.h"
 
 #include "ConditionsEvaluator.h"
@@ -55,18 +56,33 @@ void CraftService::OnCraftItem(const RawMessageData& rawMsgData,
   // Global like the recipe's: a HearthFires oven's BYOHCraftingOven stayed file-local and matched no oven recipe
   std::vector<uint32_t> workbenchKeywordIds =
     workbenchBase.rec->GetKeywordIds(cache);
+  bool isDynamicStation = false;
   for (auto& id : workbenchKeywordIds) {
     id = workbenchBase.ToGlobalId(id);
+    auto kwRes = br.LookupById(id);
+    if (kwRes.rec) {
+      const char* edid = kwRes.rec->GetEditorId(cache);
+      if (edid && (strstr(edid, "Alchemy") || strstr(edid, "Enchanting") || strstr(edid, "Cook"))) {
+        isDynamicStation = true;
+      }
+    }
   }
 
   auto recipesList =
     FindRecipe(me, workbenchKeywordIds, br, inputObjects, resultObjectId);
 
   if (recipesList.empty()) {
-    spdlog::error(
-      "Recipe not found: inputObjects={}, workbenchId={:#x}, "
-      "resultObjectId={:#x}",
-      inputObjects.ToJson().dump(), workbenchId, resultObjectId);
+    if (isDynamicStation) {
+      spdlog::debug(
+        "Recipe not found (dynamic station): inputObjects={}, workbenchId={:#x}, "
+        "resultObjectId={:#x}",
+        inputObjects.ToJson().dump(), workbenchId, resultObjectId);
+    } else {
+      spdlog::warn(
+        "Recipe not found: inputObjects={}, workbenchId={:#x}, "
+        "resultObjectId={:#x}",
+        inputObjects.ToJson().dump(), workbenchId, resultObjectId);
+    }
     // An alchemy lab mixes on the client and makes a potion no plugin holds, so no recipe can match it. The
     // gamemode may still honour the craft (server alchemy.js); CustomEvent prepends the actor's form id
     CustomEvent unmatched(

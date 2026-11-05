@@ -1228,7 +1228,7 @@ MpActor* ActionListener::SendToNeighbours(
   MpForm* form = partOne.worldState.LookupFormByIdx(idx);
   MpActor* actor = form ? form->AsActor() : nullptr;
   if (!actor) {
-    spdlog::error("SendToNeighbours - Target actor doesn't exist");
+    spdlog::debug("SendToNeighbours - Target actor doesn't exist");
     return nullptr;
   }
 
@@ -1238,7 +1238,7 @@ MpActor* ActionListener::SendToNeighbours(
     Networking::UserId actorsOwningUserId =
       partOne.serverState.UserByActor(actor);
     if (actorsOwningUserId != Networking::InvalidUserId) {
-      spdlog::error("SendToNeighbours - No permission to update actor {:x} "
+      spdlog::debug("SendToNeighbours - No permission to update actor {:x} "
                     "(already owned by user {})",
                     actor->GetFormId(), actorsOwningUserId);
       partOne.SendHostStop(userId, *actor);
@@ -1254,7 +1254,7 @@ MpActor* ActionListener::SendToNeighbours(
         spdlog::warn("SendToNeighbours - idx=0, <Message>::ReadJson or "
                      "similar is probably incorrect");
       }
-      spdlog::error(
+      spdlog::debug(
         "SendToNeighbours - No permission to update actor {:x} (not a hoster)",
         actor->GetFormId());
       partOne.SendHostStop(userId, *actor);
@@ -2620,7 +2620,7 @@ void ActionListener::OnHit(const RawMessageData& rawMsgData,
     auto it = partOne.worldState.hosters.find(hitData.aggressor);
     if (it == partOne.worldState.hosters.end() ||
         it->second != myActor->GetFormId()) {
-      spdlog::error("SendToNeighbours - No permission to send OnHit with "
+      spdlog::debug("SendToNeighbours - No permission to send OnHit with "
                     "aggressor actor {:x}",
                     aggressor->GetFormId());
       return;
@@ -2936,7 +2936,7 @@ void ActionListener::OnSpellCast(const RawMessageData& rawMsgData,
 
     if (it == partOne.worldState.hosters.end() ||
         it->second != myActor->GetFormId()) {
-      spdlog::error(
+      spdlog::debug(
         "SendToNeighbours - No permission to send OnSpellCast with "
         "caster actor {:x}",
         caster->GetFormId());
