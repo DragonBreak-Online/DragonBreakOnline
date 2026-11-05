@@ -28,7 +28,8 @@ module.exports = (api) => {
   const own = (cfg && cfg.carriages) || {};
   const C = Object.assign({ enabled: true, world: '3c:Skyrim.esm', reach: 600, rideSeconds: 6, fadeSafetyMs: 10000, cooldownMinutes: 0, combatSeconds: 60, pvpSeconds: 120, allowParcels: false }, own);
   const FARES = Object.assign({ major: 20, minor: 50 }, own.fares || {});
-  const DRIVERS = Object.assign({ enabled: true, radius: 2000, despawnSeconds: 300, respawnSeconds: 600 }, own.drivers || {});
+  // radius: how near a player comes before the driver spawns (guards.js found 600 too small and uses 4000)
+  const DRIVERS = Object.assign({ enabled: true, radius: 4000, despawnSeconds: 300, respawnSeconds: 600 }, own.drivers || {});
   const SPAWNS_FILE = path.resolve('NPC-Spawns.json');
   const id = (a) => Number(a) >>> 0;
   const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
