@@ -263,8 +263,11 @@ module.exports = (api) => {
     liveRaceCombatSeconds: 30,
     // Beast form races (beastform.js FORMS), never sent as a player's own
     liveRaceNever: ['283a:Dawnguard.esm', 'cdd84:Skyrim.esm'],
-    // No face ask this long after a load: that client has no preset calls, and appearance.js charges it nothing
+    // No face ask this long after the client's own extras ask (sent once its character has loaded): it has no preset calls,
+    // and appearance.js charges it nothing for a changed look
     selfAskSeconds: 60,
+    // The same with no extras ask at all (no RaceMenu, or still loading), counted from the server's connect stamp
+    selfAskNoSpawnSeconds: 300,
   }, (cfg && cfg.racemenuPresets) || {});
   const DIR = path.resolve(C.dir);
   const MAX_CHUNKS = Math.ceil(Number(C.maxChars) / Number(C.chunkChars));
@@ -287,6 +290,8 @@ module.exports = (api) => {
   if (!S.faceClientsSince) S.faceClientsSince = Date.now();
   // actor -> the load whose missing face ask was logged
   if (!(S.noAskTold instanceof Map)) S.noAskTold = new Map();
+  // actor -> { conn, at }: the client's first extras self ask of its latest load (appearanceextras.js), the start of its face ask wait
+  if (!(S.spawnAsks instanceof Map)) S.spawnAsks = new Map();
 
   const keyOf = (a) => ((Number(a) >>> 0).toString(16)).padStart(8, '0');
   const fileOf = (k) => path.join(DIR, `${k}.json`);
@@ -646,6 +651,7 @@ module.exports = (api) => {
   // ---- whether the owner's client can keep a face (0.3.111-0.3.116 shipped a SkyrimPlatformImpl.dll without the preset calls) ----
   // One with them asks for its own face 6 s after every load and for each copy's (racemenuPresetService.ts scan); one without asks nothing
   const loadOf = (a) => Math.max(connOf(a), pickedAt(a));
+  const spawnAskOf = (a) => { const e = S.spawnAsks.get(a >>> 0); return e && e.conn === connOf(a) && e.at >= loadOf(a) ? e.at : 0; };
   const markFaceClient = (a, capable, why) => {
     a = a >>> 0;
     const conn = connOf(a), e = S.faceClients.get(a);
@@ -667,9 +673,13 @@ module.exports = (api) => {
     const conn = connOf(a), e = S.faceClients.get(a);
     if (!conn) return { state: 'unknown', why: 'not connected' };
     if (e && e.conn === conn) return { state: e.capable ? 'capable' : 'incapable', why: e.why };
-    const load = loadOf(a), s = Math.round((now - load) / 1000);
+    const load = loadOf(a);
     if (S.faceClientsSince > load) return { state: 'unknown', why: 'loaded before the server watched for face asks' };
-    return now - load < Number(C.selfAskSeconds) * 1000 ? { state: 'unknown', why: `no face ask yet, ${s} s after its load` } : { state: 'incapable', why: `no face ask in ${s} s after its load` };
+    // The connect stamp comes before the client's loading screen (up to minutes), its extras ask a few seconds before its face ask
+    const spawned = spawnAskOf(a), from = spawned || load, s = Math.round((now - from) / 1000);
+    const after = spawned ? 'its character loaded' : 'it connected, and no extras ask';
+    return now - from < Number(spawned ? C.selfAskSeconds : C.selfAskNoSpawnSeconds) * 1000 ? { state: 'unknown', why: `no face ask yet, ${s} s after ${after}` }
+      : { state: 'incapable', why: `no face ask in ${s} s after ${after}` };
   };
   // One line per load whose client never asked for its own face, so staff can count the clients without the preset calls
   const faceClientTick = () => {
@@ -693,6 +703,16 @@ module.exports = (api) => {
   };
   // gamemode.js writeDiagLines: the client traced 'rmp cap err=natives'
   globalThis.__dboFaceClientNoNatives = (a) => { try { markFaceClient(a, false, 'rmp cap err=natives'); } catch (e) { log('racemenu presets: client trace not taken', e.message); } };
+  // appearanceextras.js: the client asked for its own extras, which every client with RaceMenu does once per spawn, after the load
+  globalThis.__dboFaceClientSpawned = (a) => {
+    try {
+      a = a >>> 0;
+      const conn = connOf(a);
+      if (!conn || spawnAskOf(a)) return;
+      S.spawnAsks.set(a, { conn, at: Date.now() });
+      if (S.spawnAsks.size > 2000) for (const [k, x] of S.spawnAsks) if (x.conn !== connOf(k)) S.spawnAsks.delete(k);
+    } catch (e) { log('racemenu presets: extras ask not taken', e.message); }
+  };
 
   // ---- rate limits ----
   const allow = (kind, who, perWindow, windowMs, m = S.rates) => {

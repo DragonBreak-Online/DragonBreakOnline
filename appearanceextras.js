@@ -398,7 +398,10 @@ module.exports = (ctx) => {
   };
 
   globalThis.__dboAppearanceExtrasPacket = (a, content) => {
-    if (!a || !content || opts.enabled === false || !inTest(a)) return;
+    if (!a || !content) return;
+    // Sent once per spawn after the character loaded, whatever this module's switch: racemenupresets.js times the face ask from it
+    if (content.customPacketType === 'dboAppearanceExtrasGet' && content.self) { try { const h = globalThis.__dboFaceClientSpawned; if (typeof h === 'function') h(a); } catch (e) { /* faces are optional */ } }
+    if (opts.enabled === false || !inTest(a)) return;
     if (content.customPacketType === 'dboAppearanceExtras') onSet(a, content);
     else if (content.customPacketType === 'dboAppearanceExtrasGet') onGet(a, content);
   };

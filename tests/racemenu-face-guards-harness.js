@@ -1,6 +1,6 @@
 // Two guards on RaceMenu faces (5 Nov). G1: clients 0.3.111-0.3.116 ship a SkyrimPlatformImpl.dll without the preset calls,
 // so racemenuPresetService.ts never asks for a face and never uploads one; racemenupresets.js tells such a client apart
-// (no face ask 60 s after its load, or the 'rmp cap err=natives' trace gamemode.js relays) and appearance.js then charges
+// (no face ask 60 s after its extras ask, or the 'rmp cap err=natives' trace gamemode.js relays) and appearance.js then charges
 // no gold, free change or cooldown, and says why. G2: a face file names its race by load-order id, so after the DLE moved
 // from 0x48 to 0x49 nine faces kept 48xxxxxx: their owners were answered none and /appearance refused them 'otherrace'.
 // New faces keep raceDesc, resolved on read; an older one on a full plugin is matched by the id's low 24 bits.
@@ -107,6 +107,13 @@ globalThis.__dboRaceMenuOpenedAt = new Map();
 // Each call is another connection, a few ms apart even within one millisecond
 let seq = 0;
 const loaded = (a, agoMs) => { const t = Date.now() - agoMs - (++seq); conn.set(a >>> 0, t); picked.set(a >>> 0, t); };
+// The client's extras self ask, through appearanceextras.js as gamemode.js routes it, agoMs before now
+process.chdir(TMP);
+require(path.join(ROOT, 'appearanceextras.js'))({ log: () => {}, cfg: { appearanceExtras: { enabled: false } }, sendPacket: () => true, onlineActors: () => [], profileOf: () => 7, display: () => 'Brand' });
+const spawned = (a, agoMs) => {
+  globalThis.__dboAppearanceExtrasPacket(a, { customPacketType: 'dboAppearanceExtrasGet', self: true, index: true });
+  const e = globalThis.__dboPresetState.spawnAsks.get(a >>> 0); if (e && agoMs) e.at = Date.now() - agoMs;
+};
 
 (async () => {
   // ---- G1: whether the owner's client can keep a face (racemenupresets.js) ----
@@ -117,11 +124,23 @@ const loaded = (a, agoMs) => { const t = Date.now() - agoMs - (++seq); conn.set(
   ok(fc(A).state === 'unknown' && /before the server watched/.test(fc(A).why), 'G1: a load from before this process watched (a hot reload deploy): unknown, it may have asked unseen', fc(A));
   M.state.faceClientsSince = Date.now() - 600000;
   loaded(A, 2000);
-  ok(fc(A).state === 'unknown' && /no face ask yet, 2 s after its load/.test(fc(A).why), 'G1: 2 s after its load with no ask: unknown (a client with the calls asks 6 s after it)', fc(A));
-  loaded(A, 120000);
-  ok(fc(A).state === 'incapable' && /^no face ask in 120 s after its load$/.test(fc(A).why), 'G1: no face ask 60 s after its load: incapable', fc(A));
+  ok(fc(A).state === 'unknown' && /no face ask yet, 2 s after it connected, and no extras ask/.test(fc(A).why), 'G1: 2 s after its connect with no ask: unknown', fc(A));
+  // The connect stamp comes before the client's loading screen: a 75 s load is no sign of anything
+  loaded(A, 75000);
+  ok(fc(A).state === 'unknown', 'G1: 75 s after the connect stamp, still loading (no extras ask yet): unknown', fc(A));
+  spawned(A, 5000);
+  ok(fc(A).state === 'unknown' && /no face ask yet, 5 s after its character loaded/.test(fc(A).why), 'G1: ...its extras ask 5 s ago after that 75 s load starts the wait: unknown', fc(A));
   timers.racemenuFaceClients();
-  const noAsk = () => plogs.filter((l) => /^racemenu presets: ff000101 \(profile 7\) client sent no face ask in \d+ s after its load: it has no preset calls/.test(l)).length;
+  packet(1, { customPacketType: 'dboPresetGet', actor: 0, have: '' });
+  ok(fc(A).state === 'capable' && !plogs.some((l) => /client sent no face ask|asked for faces after all/.test(l)), 'G1: ...then its face ask: capable, never counted as without the calls', [fc(A), plogs.slice(-2)]);
+  await settle(); take();
+  loaded(A, 120000);
+  spawned(A, 75000);
+  ok(fc(A).state === 'incapable' && /^no face ask in 75 s after its character loaded$/.test(fc(A).why), 'G1: no face ask 75 s after its extras ask: incapable', fc(A));
+  spawned(A);
+  ok(/in 75 s after/.test(fc(A).why), 'G1: ...a second extras ask in that load does not move the start', fc(A));
+  timers.racemenuFaceClients();
+  const noAsk = () => plogs.filter((l) => /^racemenu presets: ff000101 \(profile 7\) client sent no face ask in \d+ s after (its character loaded|it connected, and no extras ask): it has no preset calls/.test(l)).length;
   ok(noAsk() === 1, 'G1: the tick logs that load once, for staff to count', plogs.slice(-3));
   timers.racemenuFaceClients();
   ok(noAsk() === 1, 'G1: ...and not again for the same load');
@@ -130,10 +149,15 @@ const loaded = (a, agoMs) => { const t = Date.now() - agoMs - (++seq); conn.set(
   ok(plogs.some((l) => /ff000101 \(profile 7\) client asked for faces after all, 120 s after its load/.test(l)), 'G1: a late ask after the no-ask line is logged too');
   picked.set(A, Date.now());
   ok(fc(A).state === 'capable', 'G1: the character picked again in that connection: still capable (one game process)');
-  loaded(A, 90000);
-  ok(fc(A).state === 'incapable', 'G1: a new connection that has not asked: incapable again', fc(A));
+  loaded(A, 290000);
+  ok(fc(A).state === 'unknown', 'G1: a new connection: the last load\'s extras ask does not count, and 290 s with none is unknown', fc(A));
+  loaded(A, 310000);
+  ok(fc(A).state === 'incapable' && /^no face ask in 310 s after it connected, and no extras ask$/.test(fc(A).why), 'G1: 300 s with neither ask (no RaceMenu): incapable', fc(A));
   timers.racemenuFaceClients();
   ok(noAsk() === 2, 'G1: a new load is logged again');
+  loaded(A, 90000);
+  M.state.spawnAsks.set(A, { conn: conn.get(A), at: conn.get(A) - 1 });
+  ok(fc(A).state === 'unknown', 'G1: an extras ask from before the load stamp (the character picked again) is not this load\'s', fc(A));
   loaded(A, 1000);
   packet(1, { customPacketType: 'dboPresetGet', actor: 0, have: '' });
   ok(fc(A).state === 'capable', 'G1: the owner\'s own ask marks it capable at once', fc(A));
@@ -174,13 +198,13 @@ const loaded = (a, agoMs) => { const t = Date.now() - agoMs - (++seq); conn.set(
 
   // ---- G1: appearance.js charges nothing for an edit that client cannot save ----
   const NO_FACE = 'Your game client can\'t save face sliders right now, so nothing was charged. A client update fixes it.';
-  const incapable = () => { M = loadPresets(); M.state.faceClientsSince = 1; loaded(A, 120000); };
+  const incapable = () => { M = loadPresets(); M.state.faceClientsSince = 1; loaded(A, 120000); spawned(A, 75000); };
   reset(); incapable(); loadAppearance();
   openEditor(); closeEditor(Object.assign(look(), { hairColor: 9 }));
   ok(gold() === 800 && !lastAt() && sys.at(-1) === `Your new look is saved. ${NO_FACE}`, 'G1: a changed look: no gold, no cooldown, and the player is told why', [gold(), lastAt(), sys.at(-1)]);
   ok(props.get(`${A}|appearance`).hairColor === 9, 'G1: ...the look the engine saved stands');
   ok(!audits.some((t) => /changed their look/.test(t)), 'G1: ...with no new audit line (log only)', audits);
-  const decided = () => alogs.filter((l) => /^appearance: Brand changed look: client incapable \(no face ask in \d+ s after its load\), nothing charged$/.test(l)).length;
+  const decided = () => alogs.filter((l) => /^appearance: Brand changed look: client incapable \(no face ask in \d+ s after its character loaded\), nothing charged$/.test(l)).length;
   ok(decided() === 1, 'G1: ...and the decision is logged', alogs);
   openEditor(); closeEditor(Object.assign(look(), { hairColor: 7 }));
   ok(gold() === 800 && decided() === 1, 'G1: a second waived change soon after: not charged, not logged again (10 min per player and verdict)', [gold(), alogs]);
