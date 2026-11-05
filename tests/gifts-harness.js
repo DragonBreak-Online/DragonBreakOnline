@@ -226,8 +226,20 @@ online = [A, B]; let nL = out.logs.length; tick(); tick();
 check('appearance.js not loaded: the gift waits once #44YG is in the world, said once in the log', inbox().length === 1 && used(B) === undefined && out.personal.length === pN && out.logs.slice(nL).filter((t) => /-44YG-\S+\.json waits: no free appearance change can be given \(appearance\.js is not loaded\)$/.test(t)).length === 1, out.logs.slice(nL));
 loadAppearance({ freeChanges: 0 }); nL = out.logs.length; tick(); tick();
 check('free changes switched off: it waits, said once in the log', inbox().length === 1 && used(B) === undefined && out.logs.slice(nL).filter((t) => /waits: no free appearance change can be given \(Free appearance changes are switched off/.test(t)).length === 1, out.logs.slice(nL));
-// Logged in with appearance.js on: given once, exactly as /grantappearance gives it
-loadAppearance(); tick();
+// In the world under 20 s, or being rerolled or made: it waits, nothing logged (a given change is marked told)
+loadAppearance();
+fs.writeFileSync(path.join(dir, 'gifts-inbox', 'freshgold.json'), JSON.stringify({ tag: '44YG', gold: 3, reason: 'freshgold' }));
+globalThis.__dboConnectedAt = new Map([[B, Date.now() - 5000]]); nL = out.logs.length; n0 = out.given.length; tick();
+const waitFresh = inbox().length === 1 && used(B) === undefined;
+check('a gold gift to a character in the world under 20 s is given at once, as before', out.given.length === n0 + 1 && !!ledger().freshgold && said(B).slice(-1)[0] === 'A gift from the staff: 3 gold. freshgold', said(B).slice(-1));
+pN = out.personal.length;
+globalThis.__dboConnectedAt.set(B, Date.now() - 21000); props[B]['private.rerollPending'] = true; tick();
+const waitReroll = inbox().length === 1 && used(B) === undefined;
+props[B]['private.rerollPending'] = false; props[B]['private.creationPending'] = true; tick();
+check('in the world under 20 s, being rerolled or being made: it waits, nothing granted, told or logged', waitFresh && waitReroll && inbox().length === 1 && used(B) === undefined && out.personal.length === pN && out.logs.length === nL, [waitFresh, waitReroll, out.logs.slice(nL)]);
+delete props[B]['private.rerollPending']; delete props[B]['private.creationPending'];
+// Logged in with appearance.js on, past the 20 s: given once, exactly as /grantappearance gives it
+tick();
 check('in the world: one free change, as /grantappearance gives it (the used count down one, told)', used(B) === -1 && left(B) === 2 && props[B]['private.dboAppearanceFreeTold'] === 1, [used(B), left(B)]);
 check('...told in the gift line with the reason, nothing else said by appearance.js', said(B).slice(-1)[0] === `A gift from the staff: a free appearance change (type /appearance to use it). ${FACE}` && appOut.sys.length === 0 && appOut.audits.length === 0, [said(B).slice(-1), appOut]);
 check('...the login notice does not repeat it', globalThis.__dboAppearanceFreeLogin(B) === false && appOut.sys.length === 0);

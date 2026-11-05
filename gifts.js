@@ -11,6 +11,7 @@
 //
 // `appearanceFree` (1-3, a #TAG gift only, alone or with the rest) gives free /appearance changes through appearance.js grantFree, as /grantappearance does.
 // The gift waits while appearance.js is not loaded or refuses (freeChanges 0); the ledger records what was given (appearanceFreeGiven).
+// appearance.js marks a given change told, so the gift also waits until SETTLE_MS past the login and while the character is made or rerolled.
 //
 // `schools` (mod-0311, Jake 22 Oct) adds whole levels 1-100 to a school of magic through schools.js __dboSchoolsGrant,
 // which caps at 100 and holds at an unmade Apprentice or Adept pick as class pay does; a gift may be schools only, and
@@ -38,6 +39,13 @@ module.exports = (api) => {
   const grantHook = () => (typeof globalThis.__dboSchoolsGrant === 'function' ? globalThis.__dboSchoolsGrant : null);
   const MAX_FREE = 3;
   const freeHook = () => { const e = globalThis.__dboAppearanceEdit; return e && typeof e.grantFree === 'function' ? e.grantFree : null; };
+  // Past the login's loading screen and its notices (8 s); gamemode.js's connectedAt, none counting as settled
+  const SETTLE_MS = 20000;
+  const settled = (a) => {
+    try { if (mp.get(a, 'private.creationPending') === true || mp.get(a, 'private.rerollPending') === true) return false; } catch (e) { /* not an actor */ }
+    const m = globalThis.__dboConnectedAt;
+    return Date.now() - ((m && typeof m.get === 'function' && Number(m.get(a))) || 0) >= SETTLE_MS;
+  };
   const isTag = (t) => typeof t === 'string' && /^[A-Z0-9]{4}$/.test(t);
 
   const readJson = (p, fallback) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return fallback; } };
@@ -176,6 +184,7 @@ module.exports = (api) => {
         return profileOf(x) === g.profile;
       });
       if (!a) continue;
+      if (g.appearanceFree && !settled(a)) continue;
       if (g.schools && !schoolsReady(a, g)) continue;
       if (g.appearanceFree && !freeReady(a, g)) continue;
       try { deliver(a, g, l); } catch (e) { log(`gifts: ${g.id} failed: ${e.message}`); }
