@@ -666,7 +666,7 @@ module.exports = (api) => {
     }
     S.faceClients.set(a, { conn, capable, why });
     if (S.faceClients.size > 2000) for (const [k, x] of S.faceClients) if (x.conn !== connOf(k)) S.faceClients.delete(k);
-    if (!capable) { if (allow('noNativesTold', a, 3, 3600000, S.logRates)) log(`racemenu presets: ${who} client has no preset calls (${why}): its saved face is not put back, and /appearance charges it nothing`); }
+    if (!capable) { if (allow('noNativesTold', a, 3, 3600000, S.logRates)) log(`racemenu presets: ${who} client has no preset calls (${why}): its saved face is not put back, and /appearance takes no gold for a changed look`); }
     else if (S.noAskTold.get(a) === loadOf(a)) log(`racemenu presets: ${who} client asked for faces after all, ${Math.round((Date.now() - loadOf(a)) / 1000)} s after its load`);
   };
   // { state: 'capable' | 'incapable' | 'unknown', why } for the owner's client in this connection
@@ -693,7 +693,7 @@ module.exports = (api) => {
       const v = faceClientOf(a, now);
       if (v.state !== 'incapable') continue;
       S.noAskTold.set(a, load);
-      if (allow('noAskTold', a, 6, 3600000, S.logRates)) log(`racemenu presets: ${keyOf(a)} (profile ${profileOf(a)}) client sent ${v.why}: it has no preset calls, so its saved face is not put back and /appearance charges it nothing`);
+      if (allow('noAskTold', a, 6, 3600000, S.logRates)) log(`racemenu presets: ${keyOf(a)} (profile ${profileOf(a)}) client sent ${v.why}: it has no preset calls, so its saved face is not put back and /appearance takes no gold for a changed look`);
     }
     if (S.noAskTold.size > 2000) S.noAskTold.clear();
   };
