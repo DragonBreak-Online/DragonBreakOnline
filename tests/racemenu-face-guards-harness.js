@@ -1,9 +1,10 @@
 // Two guards on RaceMenu faces (5 Nov). G1: clients 0.3.111-0.3.116 ship a SkyrimPlatformImpl.dll without the preset calls,
 // so racemenuPresetService.ts never asks for a face and never uploads one; racemenupresets.js tells such a client apart
 // (no face ask 60 s after its extras ask, or the 'rmp cap err=natives' trace gamemode.js relays) and appearance.js then charges
-// no gold, free change or cooldown, and says why. G2: a face file names its race by load-order id, so after the DLE moved
-// from 0x48 to 0x49 nine faces kept 48xxxxxx: their owners were answered none and /appearance refused them 'otherrace'.
-// New faces keep raceDesc, resolved on read; an older one on a full plugin is matched by the id's low 24 bits.
+// no gold or free change for a changed look (its cooldown still starts), and says why. G2: a face file names its race by
+// load-order id, so after the DLE moved from 0x48 to 0x49 nine faces kept 48xxxxxx: their owners were answered none and
+// /appearance refused them 'otherrace'. New faces keep raceDesc, resolved on read; an older one on a full plugin that names
+// no RACE now is matched by the id's low 24 bits.
 // Stub mp, the real modules and gamemode.js's own writeDiagLines.
 //   node tests/racemenu-face-guards-harness.js   (from server/)
 'use strict';
@@ -55,14 +56,14 @@ const reset = (race, gold) => {
   props.set(`${B}|inventory`, { entries: [] }); props.set(`${B}|appearance`, look()); props.set(`${B}|profileId`, 8);
 };
 
-let sys = [], audits = [], alogs = [], cmds = new Map();
+let sys = [], pers = [], audits = [], alogs = [], cmds = new Map();
 const loadAppearance = (app) => {
-  sys = []; audits = []; alogs = []; cmds = new Map();
+  sys = []; pers = []; audits = []; alogs = []; cmds = new Map();
   delete require.cache[APPEARANCE];
   delete globalThis.__dboRaceMenuSaveWindows; delete globalThis.__dboRaceMenuRefusedToldAt; delete globalThis.__dboAppearanceRefusedAt;
   globalThis.__dboCombatAt = new Map(); globalThis.__dboIsDowned = null; globalThis.__dboBeastOriginalRace = null; globalThis.__dboDungeonCells = new Set();
   globalThis.__dboTellsRetake = () => {}; globalThis.__dboFeralDue = new Map();
-  return require(APPEARANCE)({ mp, log: (...x) => alogs.push(x.join(' ')), personal: () => {}, system: (a, t) => sys.push(t), audit: (t) => audits.push(t), who: () => 'Brand',
+  return require(APPEARANCE)({ mp, log: (...x) => alogs.push(x.join(' ')), personal: (a, t) => pers.push(t), system: (a, t) => sys.push(t), audit: (t) => audits.push(t), who: () => 'Brand',
     registerChatCommand: (n, fn) => cmds.set(n, fn), cfg: CFG(app), userOf: () => 3, profileOf: (a) => Number(props.get(`${a >>> 0}|profileId`)), later: () => {} });
 };
 const sent = [], plogs = [], timers = {};
@@ -198,59 +199,125 @@ const spawned = (a, agoMs) => {
   globalThis.__dboPresetState.faceClientsSince = 1;
   ok(fc(A).state === 'unknown', 'G1: a staff test without this player: unknown', fc(A));
 
-  // ---- G1: appearance.js charges nothing for an edit that client cannot save ----
-  const NO_FACE = 'Your game client can\'t save face sliders right now, so nothing was charged. A client update fixes it.';
+  // ---- G1: appearance.js charges nothing for a look change that client cannot save the face of ----
+  const NOTE = 'An upcoming client update will fix it.';
+  const NO_FACE = `Your game client can't save face sliders right now, so nothing was charged. ${NOTE}`;
   const incapable = () => { M = loadPresets(); M.state.faceClientsSince = 1; loaded(A, 120000); spawned(A, 75000); };
+  const freeUsed = () => props.get(`${A}|private.dboAppearanceFreeUsed`);
   reset(); incapable(); loadAppearance();
-  openEditor(); closeEditor(Object.assign(look(), { hairColor: 9 }));
-  ok(gold() === 800 && !lastAt() && sys.at(-1) === `Your new look is saved. ${NO_FACE}`, 'G1: a changed look: no gold, no cooldown, and the player is told why', [gold(), lastAt(), sys.at(-1)]);
+  openEditor();
+  ok(pers.at(-1) === `The appearance editor is open. Your game client can't save face sliders right now, so a new look costs no gold (the daily wait still starts); changing only overlays or body sliders costs 500 gold. ${NOTE} Your race, sex and name stay as they are.`,
+    'G1: the editor says so when it opens', pers.at(-1));
+  ok(audits.at(-1) === 'APPEARANCE Brand opened the appearance editor (500 gold on a changed look)' && alogs.some((l) => /^appearance: Brand open: client incapable \(no face ask in 75 s after its character loaded\), a changed look costs no gold$/.test(l)),
+    'G1: ...its audit line as before, and the verdict logged', [audits, alogs]);
+  closeEditor(Object.assign(look(), { hairColor: 9 }));
+  ok(gold() === 800 && lastAt() > 0 && sys.at(-1) === `Your new look is saved. ${NO_FACE}`, 'G1: a changed look: no gold, the cooldown starts, and the player is told why', [gold(), lastAt(), sys.at(-1)]);
   ok(props.get(`${A}|appearance`).hairColor === 9, 'G1: ...the look the engine saved stands');
   ok(!audits.some((t) => /changed their look/.test(t)), 'G1: ...with no new audit line (log only)', audits);
-  const decided = () => alogs.filter((l) => /^appearance: Brand changed look: client incapable \(no face ask in \d+ s after its character loaded\), nothing charged$/.test(l)).length;
+  const decided = () => alogs.filter((l) => /^appearance: Brand changed look: client incapable \(no face ask in \d+ s after its character loaded\), nothing charged, cooldown started$/.test(l)).length;
   ok(decided() === 1, 'G1: ...and the decision is logged', alogs);
+  let v = gate('extras', false);
+  ok(v.ok && !v.paid && gold() === 800, 'G1: ...the overlays and body sliders of that close are kept with it, as a paid close\'s', v);
+  v = gate('face', true);
+  ok(!v.ok && v.code === 'waived', 'G1: ...but a face from it (that client had the calls after all) is not taken free, first save or not', v);
+  openEditor();
+  ok(pers.at(-1) === 'You can change your appearance again in 24 hours.' && !globalThis.__dboAppearanceEdit.pending(A), 'G1: the daily wait holds the next one', pers.at(-1));
+  props.set(`${A}|private.dboAppearanceAt`, 0);
   openEditor(); closeEditor(Object.assign(look(), { hairColor: 7 }));
-  ok(gold() === 800 && decided() === 1, 'G1: a second waived change soon after: not charged, not logged again (10 min per player and verdict)', [gold(), alogs]);
+  ok(gold() === 800 && decided() === 2, 'G1: every waived change is logged, not once per 10 min', alogs);
 
+  // End to end: a face upload into that waived window is refused and the player told
+  reset(); incapable(); fs.rmSync(DIR, { recursive: true, force: true }); take(); loadAppearance();
+  openEditor(); closeEditor(Object.assign(look(), { hairColor: 9 }));
+  upload(1, 0.3); await settle();
+  ok(take().some((x) => x.p.customPacketType === 'dboPresetRefused' && x.p.reason === 'waived') && !fs.existsSync(fileOf(A)) && gold() === 800,
+    'G1: a face uploaded after a waived change is refused \'waived\', nothing stored or charged', fs.existsSync(fileOf(A)));
+  ok(sys.at(-1) === 'Your RaceMenu face changes weren\'t saved: your look change was free because your game client seemed unable to save face sliders. You were not charged for them. Ask a GM if this is wrong.', 'G1: ...and the player is told why', sys.at(-1));
+  ok(fc(A).state === 'capable', 'G1: ...and that client counts as capable from then on', fc(A));
+
+  // Under 500 gold: the editor opens, as the change it saves is free
+  reset(undefined, 100); incapable(); loadAppearance();
+  openEditor();
+  ok(globalThis.__dboAppearanceEdit.pending(A) && /costs no gold/.test(pers.at(-1)), 'G1: 100 gold: the editor still opens', pers.at(-1));
+  closeEditor(Object.assign(look(), { hairColor: 9 }));
+  ok(gold() === 100 && props.get(`${A}|appearance`).hairColor === 9, 'G1: ...and the new look is kept free', gold());
+  reset(undefined, 100); M = loadPresets(); M.state.faceClientsSince = 1; loaded(A, 5000); loadAppearance();
+  openEditor();
+  ok(pers.at(-1) === 'Changing your appearance costs 500 gold. You have 100.', 'G1: ...a client not known incapable needs the gold as before', pers.at(-1));
+
+  // An unchanged close: overlays and body sliders save on that client, so they are priced as usual
   reset(); incapable(); loadAppearance();
   openEditor(); closeEditor(look());
-  ok(sys.at(-1) === `Your standard look is unchanged. ${NO_FACE}`, 'G1: an unchanged close says the same', sys.at(-1));
-  let v = gate('extras', false);
-  ok(v.ok && !v.paid && gold() === 800 && !lastAt(), 'G1: ...its window is unpriced: the extras it does keep cost nothing', v);
+  ok(sys.at(-1) === `Your standard look is unchanged. RaceMenu-only changes (extra sliders, sculpt, overlays) cost 500 gold and are charged when they are saved. Your game client can't save face sliders right now, so only overlays and body sliders can be kept from this editor. ${NOTE}`,
+    'G1: an unchanged close says what is kept', sys.at(-1));
+  ok(alogs.some((l) => /^appearance: Brand unchanged look: client incapable \(.*\), face sliders not kept, overlays and body sliders at the usual price$/.test(l)), 'G1: ...and is logged', alogs);
+  v = gate('extras', false);
+  ok(v.ok && v.paid === 500 && gold() === 300 && lastAt() > 0, 'G1: ...its window is priced: changed extras cost 500 gold and start the wait', [v, gold()]);
+  reset(); incapable(); loadAppearance();
+  openEditor(); closeEditor(look());
+  v = gate('extras', true);
+  ok(v.ok && v.free && gold() === 800, 'G1: ...a first extras save is free as before', v);
 
+  // A free /appearance: the free change is kept, the daily wait starts and then holds even with it
   reset(); incapable(); loadAppearance({ freeChanges: 1 });
-  openEditor(); closeEditor(Object.assign(look(), { hairColor: 9 }));
-  ok(!props.get(`${A}|private.dboAppearanceFreeUsed`) && gold() === 800 && !lastAt() && sys.at(-1) === `Your new look is saved. ${NO_FACE} Your free appearance change is still yours.`,
-    'G1: a free /appearance keeps its free change', [props.get(`${A}|private.dboAppearanceFreeUsed`), sys.at(-1)]);
-  const cur = JSON.parse(JSON.stringify(props.get(`${A}|appearance`)));
-  openEditor(); closeEditor(cur);
-  ok(sys.at(-1) === `Your standard look is unchanged. ${NO_FACE} Your free appearance change is still yours.` && !props.get(`${A}|private.dboAppearanceFreeUsed`), 'G1: ...unchanged too', sys.at(-1));
+  openEditor();
+  ok(pers.at(-1) === `The appearance editor is open. This change is free (your one free appearance change). Your game client can't save face sliders right now, so a new look costs no gold and keeps your free change (the daily wait still starts); changing only overlays or body sliders uses it. ${NOTE} Your race, sex and name stay as they are.`,
+    'G1: a free editor says so when it opens', pers.at(-1));
+  closeEditor(Object.assign(look(), { hairColor: 9 }));
+  ok(!freeUsed() && gold() === 800 && lastAt() > 0 && sys.at(-1) === `Your new look is saved. ${NO_FACE} Your free appearance change is still yours.`,
+    'G1: a free /appearance keeps its free change', [freeUsed(), lastAt(), sys.at(-1)]);
+  ok(alogs.some((l) => /changed look: client incapable \(.*\), nothing charged, free change kept, cooldown started$/.test(l)), 'G1: ...logged', alogs);
+  openEditor();
+  ok(pers.at(-1) === `You can change your appearance again in 24 hours. Your game client can't save face sliders right now, so your free appearance change is kept for later. ${NOTE}`, 'G1: the next one waits for the daily wait, free change or not', pers.at(-1));
+  packet(1, { customPacketType: 'dboPresetGet', actor: 0, have: '' }); await settle(); take();
+  openEditor(); closeEditor(Object.assign(look(), { hairColor: 6 }));
+  ok(freeUsed() === 1 && gold() === 800 && /used your free appearance change/.test(sys.at(-1)), 'G1: once the client asks for its face, the free change skips the wait and is used as usual', [freeUsed(), sys.at(-1)]);
+  // Opened free inside the daily wait while the verdict was unknown, known incapable at the close: the free change pays as usual
+  reset(); M = loadPresets(); M.state.faceClientsSince = 1; loaded(A, 5000); loadAppearance({ freeChanges: 1 });
+  props.set(`${A}|private.dboAppearanceAt`, Date.now() - 3600000);
+  openEditor();
+  ok(globalThis.__dboAppearanceEdit.pending(A) && / Saving a new look uses it;/.test(pers.at(-1)), 'G1: unknown at the open: a free editor skips the wait as before', pers.at(-1));
+  writeDiagLines(1, ['apr rmp cap err=natives']);
+  closeEditor(Object.assign(look(), { hairColor: 9 }));
+  ok(freeUsed() === 1 && gold() === 800 && /used your free appearance change/.test(sys.at(-1)), 'G1: ...incapable at the close: its free change is used, so a relog cannot skip the wait each time', [freeUsed(), sys.at(-1)]);
+  ok(alogs.some((l) => /changed look: client incapable \(rmp cap err=natives\), free change used \(opened inside the daily wait\)$/.test(l)), 'G1: ...logged', alogs);
 
   // Capable or unknown: as before
   reset(); incapable(); packet(1, { customPacketType: 'dboPresetGet', actor: 0, have: '' }); await settle(); take(); loadAppearance();
-  openEditor(); closeEditor(Object.assign(look(), { hairColor: 9 }));
-  ok(gold() === 300 && lastAt() > 0 && sys.at(-1) === 'Your new look is saved. 500 gold paid.', 'G1: a client that asked: paid as before', [gold(), sys.at(-1)]);
+  openEditor();
+  ok(pers.at(-1) === 'The appearance editor is open. Saving a new look costs 500 gold; closing it unchanged costs nothing. Your race, sex and name stay as they are.', 'G1: a client that asked: the editor opens as before', pers.at(-1));
+  closeEditor(Object.assign(look(), { hairColor: 9 }));
+  ok(gold() === 300 && lastAt() > 0 && sys.at(-1) === 'Your new look is saved. 500 gold paid.', 'G1: ...and is paid as before', [gold(), sys.at(-1)]);
   ok(alogs.some((l) => /changed look: client capable \(asked for a face\), usual price/.test(l)), 'G1: ...and that decision is logged as well', alogs);
   reset(); M = loadPresets(); M.state.faceClientsSince = 1; loaded(A, 5000); loadAppearance();
   openEditor(); closeEditor(Object.assign(look(), { hairColor: 9 }));
-  ok(gold() === 300 && lastAt() > 0, 'G1: unknown (5 s after its load): paid as before', gold());
+  ok(gold() === 300 && lastAt() > 0, 'G1: unknown (5 s after its connect): paid as before', gold());
   reset(); incapable(); loadAppearance({ faceClientGuard: false });
   openEditor(); closeEditor(Object.assign(look(), { hairColor: 9 }));
   ok(gold() === 300, 'G1: appearance.faceClientGuard false: charged as before', gold());
+  reset(); incapable(); loadAppearance({ faceClientGuardUntil: new Date(Date.now() - 60000).toISOString() });
+  openEditor(); closeEditor(Object.assign(look(), { hairColor: 9 }));
+  ok(gold() === 300 && /^Your new look is saved\. 500 gold paid\.$/.test(sys.at(-1)), 'G1: past appearance.faceClientGuardUntil: charged as before', [gold(), sys.at(-1)]);
+  reset(); incapable(); loadAppearance({ faceClientGuardUntil: new Date(Date.now() + 86400000).toISOString(), faceClientNote: 'Update your client to fix it.' });
+  openEditor(); closeEditor(Object.assign(look(), { hairColor: 9 }));
+  ok(gold() === 800 && sys.at(-1) === 'Your new look is saved. Your game client can\'t save face sliders right now, so nothing was charged. Update your client to fix it.',
+    'G1: before it: waived, with the note from appearance.faceClientNote', [gold(), sys.at(-1)]);
+  reset(); incapable(); loadAppearance({ faceClientNote: '' });
+  openEditor(); closeEditor(Object.assign(look(), { hairColor: 9 }));
+  ok(sys.at(-1) === 'Your new look is saved. Your game client can\'t save face sliders right now, so nothing was charged.', 'G1: an empty faceClientNote: no note', sys.at(-1));
   reset(); incapable(); loadAppearance();
   const realFc = globalThis.__dboFaceClient; delete globalThis.__dboFaceClient;
   openEditor(); closeEditor(Object.assign(look(), { hairColor: 9 }));
   ok(gold() === 300 && alogs.some((l) => /client unknown \(racemenupresets\.js not loaded\), usual price/.test(l)), 'G1: racemenupresets.js not loaded: charged as before', [gold(), alogs]);
   globalThis.__dboFaceClient = realFc;
 
-  // Found out only after the close: the extras of a priced window are not charged either
+  // Found out only after an unchanged close (the trace): its extras are still priced, as they save
   reset(); M = loadPresets(); M.state.faceClientsSince = 1; loaded(A, 5000); loadAppearance();
   openEditor(); closeEditor(look());
-  ok(/^Your standard look is unchanged\. RaceMenu-only changes .* cost 500 gold/.test(sys.at(-1)), 'G1: unknown at an unchanged close: priced window as before', sys.at(-1));
+  ok(/^Your standard look is unchanged\. RaceMenu-only changes .* cost 500 gold and are charged when they are saved\.$/.test(sys.at(-1)), 'G1: unknown at an unchanged close: priced window as before', sys.at(-1));
   writeDiagLines(1, ['apr rmp cap err=natives']);
   v = gate('extras', false);
-  ok(v.ok && !v.paid && gold() === 800 && !lastAt() && sys.at(-1) === `Your RaceMenu overlays and body sliders are saved. ${NO_FACE}`, 'G1: the trace after it: its extras are kept uncharged', [v, gold(), sys.at(-1)]);
-  v = gate('face', false);
-  ok(v.ok && !v.paid && gold() === 800, 'G1: ...and nothing else of that close is charged', v);
+  ok(v.ok && v.paid === 500 && gold() === 300, 'G1: the trace after it: its extras are charged as usual', [v, gold()]);
 
   // ---- G2: raceDesc beside the race (racemenupresets.js) ----
   online = [A, B];
