@@ -16,14 +16,18 @@
 // Left alone: companions and summons (companionSystem gives them to their owner), dead NPCs, player characters. A GM's
 // unleashed warband raider is the exception: it is driven by the player nearest it other than its GM (warband.js
 // __dboWarbandAvoidHost). While its GM is the only one near it, a GM who drives it keeps it and is not given it anew.
-// Config "npcDirector": { mode: "on" | "shadow" | "off" }. shadow logs the decisions without applying them.
+// An invisible player (spellinvis.js isInvisible) within invisibleUnits of an NPC drives it before any visible player: its
+// AI then runs on their own game, where the Invisibility effect hides the real player and ends the vanilla way (an
+// attack, a cast or an activation). Another client's copy of the player may never have had the effect (a copy made after
+// the cast or drink, as at a load door). A fight still holds an NPC with its host (hostcooldown.js).
+// Config "npcDirector": { mode: "on" | "shadow" | "off", invisibleFirst, invisibleUnits }. shadow logs the decisions without applying them.
 
 module.exports = (api) => {
   const { mp, log, every, onUi, onlineActors, display, profileOf, cfg } = api;
   // releaseDead / releaseUnits: a host gives up a dead NPC, or one farther than releaseUnits from it (0 keeps it). A player's
   // game kept hosting dungeon dead and far-off enemies, which it then fought the server over (Red Ruby, 9 Oct /bug)
   const C = Object.assign({ mode: 'on', freshMs: 3000, holdFactor: 1.5, holdUnits: 512, changeEveryMs: 3000, logEveryMs: 60000,
-    releaseDead: true, releaseUnits: 4000, grantFactor: 0.9 },
+    releaseDead: true, releaseUnits: 4000, grantFactor: 0.9, invisibleFirst: true, invisibleUnits: 2048 },
     cfg.npcDirector || {});
   // sight: player actorId -> { at, dist: Map<npcId, distance> }; changedAt: npcId -> ms; told: rate-limited logs
   const S = globalThis.__dboNpcDirector || (globalThis.__dboNpcDirector = { sight: new Map(), changedAt: new Map(), told: new Map() });
@@ -47,6 +51,15 @@ module.exports = (api) => {
     }
     S.sight.set(a >>> 0, { at: Date.now(), dist });
   });
+
+  const invisible = (p) => {
+    try { return C.invisibleFirst !== false && typeof globalThis.__dboSpellInvisible === 'function' && globalThis.__dboSpellInvisible(p) === true; } catch (e) { return false; }
+  };
+  // The seers an NPC goes to first: the invisible ones within invisibleUnits, else all of them
+  const firstPool = (seers) => {
+    const hidden = seers.filter(([p, d]) => d <= C.invisibleUnits && invisible(p));
+    return hidden.length ? hidden : seers;
+  };
 
   // warband.js: the GM who unleashed this raider, never chosen to drive it while anyone else near it can; 0 for any other NPC
   const avoidOf = (npc) => { try { return typeof globalThis.__dboWarbandAvoidHost === 'function' ? Number(globalThis.__dboWarbandAvoidHost(npc)) >>> 0 : 0; } catch (e) { return 0; } };
@@ -140,7 +153,8 @@ module.exports = (api) => {
       if (!seers.length) continue;
       let current = 0; try { current = mp.getHoster(npc) >>> 0; } catch (e) { continue; }
       seers.sort((x, y) => x[1] - y[1]);
-      const [best, bestD] = seers[0];
+      const pool = firstPool(seers);
+      const [best, bestD] = pool[0];
       if (current === best) continue;
       // The raider's own GM gives it up to anyone near it, however near the GM is
       if (current && online.has(current) && current !== avoid) {
@@ -151,17 +165,22 @@ module.exports = (api) => {
         // keeping it until release() gives it to nobody (review 14 Oct, walkAway3000)
         const last = S.sight.get(current);
         if (!last) continue;
-        let mine = seers.find(([p]) => p === current);
-        if (!mine && !fresh(current, now) && last.dist.has(npc)) { const v = policy(current, npc); if (v.ok) mine = [current, Number(v.dist) || 0]; }
+        let mine = pool.find(([p]) => p === current);
+        if (!mine && !fresh(current, now) && last.dist.has(npc)) {
+          const v = policy(current, npc);
+          if (v.ok && (pool === seers || (invisible(current) && (Number(v.dist) || 0) <= C.invisibleUnits))) mine = [current, Number(v.dist) || 0];
+        }
         if (mine && mine[1] <= bestD * C.holdFactor + C.holdUnits) continue;   // still has it, nobody clearly nearer
       }
       // A live host keeps an NPC that just changed hands or is fighting (gamemode.js hostcooldown)
       const hc = globalThis.__dboHostCooldown;
       if (hc && hc.holds(best, npc)) continue;
-      out.push({ npc, from: current, to: best, dist: bestD });
+      const hidden = pool !== seers;
+      out.push({ npc, from: current, to: best, dist: bestD, invisible: hidden });
       if (C.mode === 'on') {
         try { mp.setHoster(npc, best); S.changedAt.set(npc, now); if (hc) hc.noteHandover(npc); }
         catch (e) { say('err:' + npc, `could not give ${npc.toString(16)} to ${display(best)}: ${e.message}`, now); }
+        if (hidden && best !== seers[0][0]) say('invis:' + best, `${display(best)} is invisible: ${npc.toString(16)} runs on their game at ${Math.round(bestD)} (nearest ${display(seers[0][0])} at ${Math.round(seers[0][1])})`, now);
       } else {
         S.changedAt.set(npc, now);
         say('shadow:' + npc, `(shadow) would give ${npc.toString(16)} to ${display(best)} at ${Math.round(bestD)} (now ${current ? current.toString(16) : 'nobody'})`, now);
@@ -182,16 +201,18 @@ module.exports = (api) => {
     if (C.mode !== 'on' || !built() || !managed(npc)) return 0;
     const now = Date.now();
     const avoid = avoidOf(npc);
-    let best = 0, bestD = Infinity;
+    const seers = [];
     for (const [p, s] of S.sight) {
       if (p === exclude || p === avoid || now - s.at > C.freshMs || !s.dist.has(npc)) continue;
       const v = policy(p, npc);
       if (!v.ok) continue;
       const d = Number(v.dist) || 0;
       if (C.releaseUnits > 0 && d > C.releaseUnits * C.grantFactor) continue;
-      if (d < bestD) { best = p; bestD = d; }
+      seers.push([p, d]);
     }
-    if (!best) return 0;
+    if (!seers.length) return 0;
+    seers.sort((x, y) => x[1] - y[1]);
+    const [best] = firstPool(seers)[0];
     try { mp.setHoster(npc, best); S.changedAt.set(npc, now); } catch (e) { say('err:' + npc, `could not hand ${npc.toString(16)} on to ${display(best)}: ${e.message}`, now); return 0; }
     const hc = globalThis.__dboHostCooldown;
     if (hc) hc.noteHandover(npc);

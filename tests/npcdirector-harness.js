@@ -138,6 +138,55 @@ pos[P2] = [90000, 0, 0]; sets.length = 0; now += 4000; sight(P2, [[REL, 1]]);
 check('a reporter the host policy refuses (server distance) is never picked', globalThis.__dboNpcDirectorPick(REL, OLD) === 0 && !sets.length);
 load('shadow'); pos[P2] = [400, 0, 0]; sets.length = 0; sight(P2, [[REL, 400]]);
 check('shadow mode picks nothing', globalThis.__dboNpcDirectorPick(REL, OLD) === 0 && !sets.length);
+
+// Invisibility (6 Nov): an invisible player (spellinvis.js isInvisible) within invisibleUnits drives the NPC, so its AI
+// runs on the game where the player's own effect hides them
+const invis = new Set();
+globalThis.__dboSpellInvisible = (p) => invis.has(p >>> 0);
+const DRAUGR = 0xff000110; npcs[DRAUGR] = {}; pos[DRAUGR] = [0, 0, 0];
+load('on'); hosters.clear(); sets.length = 0; logs.length = 0; now += 10000;
+pos[P1] = [300, 0, 0]; pos[P2] = [900, 0, 0]; invis.add(P2);
+sight(P1, [[DRAUGR, 300]]); sight(P2, [[DRAUGR, 900]]); tick();
+check('an invisible player 900 away drives the NPC, not the visible one 300 away', hosters.get(DRAUGR) === P2, [...hosters]);
+check('...and the log says why', logs.some((l) => /P15 is invisible: ff000110 runs on their game at 900 \(nearest P14 at 300\)/.test(l)), logs);
+hosters.set(DRAUGR, P1); sets.length = 0; now += 4000;
+sight(P1, [[DRAUGR, 300]]); sight(P2, [[DRAUGR, 900]]); tick();
+check('a visible host hands it to an invisible player at once, whatever the hysteresis', hosters.get(DRAUGR) === P2, sets);
+hosters.set(DRAUGR, P1); sets.length = 0; now += 4000; pos[P2] = [3000, 0, 0];
+sight(P1, [[DRAUGR, 300]]); sight(P2, [[DRAUGR, 3000]]); tick();
+check('an invisible player beyond invisibleUnits (2048) does not take it', hosters.get(DRAUGR) === P1 && !sets.length, sets);
+pos[P2] = [900, 0, 0];
+globalThis.__dboHostCooldown = { holds: (h, n) => ((h >>> 0) !== (hosters.get(n) || 0) && n === DRAUGR) ? 'in a fight' : null, noteHandover: () => {} };
+now += 4000; sight(P1, [[DRAUGR, 300]]); sight(P2, [[DRAUGR, 900]]); tick();
+check('a fight still holds the NPC with its visible host', hosters.get(DRAUGR) === P1 && !sets.length, sets);
+delete globalThis.__dboHostCooldown;
+now += 4000; sight(P1, [[DRAUGR, 300]]); sight(P2, [[DRAUGR, 900]]); tick();
+check('...and the invisible player gets it once the fight hold ends', hosters.get(DRAUGR) === P2, sets);
+invis.delete(P2); sets.length = 0; now += 4000;
+sight(P1, [[DRAUGR, 300]]); sight(P2, [[DRAUGR, 900]]); tick();
+check('visible again: the host keeps it while nobody is clearly nearer (no flap back)', hosters.get(DRAUGR) === P2 && !sets.length, sets);
+now += 4000; pos[P1] = [100, 0, 0]; sight(P1, [[DRAUGR, 100]]); sight(P2, [[DRAUGR, 900]]); tick();
+check('...and loses it to a clearly nearer player as before', hosters.get(DRAUGR) === P1, sets);
+invis.add(P1); invis.add(P2); hosters.set(DRAUGR, 0); sets.length = 0; now += 4000;
+sight(P1, [[DRAUGR, 100]]); sight(P2, [[DRAUGR, 900]]); tick();
+check('two invisible players: the nearer of them drives it', hosters.get(DRAUGR) === P1, sets);
+invis.clear(); invis.add(P2); hosters.set(DRAUGR, 0); sets.length = 0; now += 4000;
+sight(P1, [[DRAUGR, 100]]); sight(P2, [[DRAUGR, 900]]);
+check('pickNow (a released NPC) goes to the invisible player too', globalThis.__dboNpcDirectorPick(DRAUGR, OLD) === P2 && hosters.get(DRAUGR) === P2, sets);
+hosters.set(DRAUGR, 0); sets.length = 0;
+check('...and to the nearest when the invisible one is the old hoster', globalThis.__dboNpcDirectorPick(DRAUGR, P2) === P1, sets);
+globalThis.__dboSpellInvisible = () => { throw new Error('broken'); };
+hosters.set(DRAUGR, 0); sets.length = 0; now += 4000; sight(P1, [[DRAUGR, 100]]); sight(P2, [[DRAUGR, 900]]);
+let quiet = true; try { tick(); } catch (e) { quiet = false; }
+check('a throwing invisibility check counts as visible, quietly', quiet && hosters.get(DRAUGR) === P1, sets);
+globalThis.__dboSpellInvisible = (p) => invis.has(p >>> 0);
+delete require.cache[path.resolve(__dirname, '..', 'npcdirector.js')]; globalThis.__dboNpcDirector = undefined;
+require(path.resolve(__dirname, '..', 'npcdirector.js'))({ mp, log: () => {}, every: (n, ms, fn) => { tick = fn; }, onUi: (e, fn) => { ui[e] = fn; },
+  onlineActors: () => [P1, P2, OLD], display: (a) => `P${a.toString(16)}`, profileOf: (a) => ([P1, P2, OLD].includes(a) ? 1 : -1),
+  cfg: { npcDirector: { mode: 'on', invisibleFirst: false } } });
+hosters.set(DRAUGR, 0); sets.length = 0; now += 4000; sight(P1, [[DRAUGR, 100]]); sight(P2, [[DRAUGR, 900]]); tick();
+check('invisibleFirst false: the nearest drives it as before', hosters.get(DRAUGR) === P1, sets);
+delete globalThis.__dboSpellInvisible;
 Date.now = realNow; delete globalThis.__dboHostPolicy;
 console.log('');
 console.log(failures ? `${failures} FAILURES` : 'all checks passed');
