@@ -1,5 +1,5 @@
-// DragonBreak Online: hold carriages between Skyrim's towns (Jake, 5 Nov). Loaded by gamemode.js; config "carriages".
-// Talk to a driver at a capital's stable, or /carriage there; the vanilla fare is paid on departure to the hold's treasury.
+// DragonBreak Online: hold carriages between Skyrim's towns (Jake, 5-6 Nov). Loaded by gamemode.js; config "carriages".
+// Activate a capital's carriage, or its driver, and choose a town; the fare grows with the distance and goes to the hold's treasury on departure.
 // ROLLBACK: carriages.enabled false (hot reload) removes the drivers and the service.
 'use strict';
 const fs = require('fs');
@@ -7,13 +7,13 @@ const path = require('path');
 
 const PREFIX = 'carriage:';
 const WIDGET_ID = 176;
-// The five Skyrim.esm drivers' own spots (refs 13698, 9b7b1, 3f220, 9b7b4, 9b7c8, disabled by the DLE)
+// The five Skyrim.esm drivers' own spots (refs 13698, 9b7b1, 3f220, 9b7b4, 9b7c8, disabled by the DLE); carts: each carriage's passenger and driver seats
 const DEFAULT_STOPS = [
-  { id: 'whiterun', name: 'Whiterun', hire: [17589.8, -12411.6, -4745.1], heading: 275, npc: '13669:Skyrim.esm' },
-  { id: 'solitude', name: 'Solitude', hire: [-73225.0, 99456.7, -10906.7], heading: 229, npc: '9b7a6:Skyrim.esm' },
-  { id: 'markarth', name: 'Markarth', hire: [-169005.7, 5125.1, -4098.1], heading: 352, npc: '3f21e:Skyrim.esm' },
-  { id: 'riften', name: 'Riften', hire: [173670.0, -91149.0, 11104.9], heading: 120, npc: '9b7aa:Skyrim.esm' },
-  { id: 'windhelm', name: 'Windhelm', hire: [136473.5, 24429.4, -12800.4], heading: 183, npc: '9b7ab:Skyrim.esm' },
+  { id: 'whiterun', name: 'Whiterun', hire: [17589.8, -12411.6, -4745.1], heading: 275, npc: '13669:Skyrim.esm', carts: ['1070f0:Skyrim.esm', '1070f1:Skyrim.esm'] },
+  { id: 'solitude', name: 'Solitude', hire: [-73225.0, 99456.7, -10906.7], heading: 229, npc: '9b7a6:Skyrim.esm', carts: ['1070e4:Skyrim.esm', '1070e5:Skyrim.esm'] },
+  { id: 'markarth', name: 'Markarth', hire: [-169005.7, 5125.1, -4098.1], heading: 352, npc: '3f21e:Skyrim.esm', carts: ['1070ed:Skyrim.esm', '1070ee:Skyrim.esm'] },
+  { id: 'riften', name: 'Riften', hire: [173670.0, -91149.0, 11104.9], heading: 120, npc: '9b7aa:Skyrim.esm', carts: ['1070e3:Skyrim.esm', '1070e1:Skyrim.esm'] },
+  { id: 'windhelm', name: 'Windhelm', hire: [136473.5, 24429.4, -12800.4], heading: 183, npc: '9b7ab:Skyrim.esm', carts: ['1070e7:Skyrim.esm', '1070e8:Skyrim.esm'] },
   { id: 'falkreath', name: 'Falkreath' },
   { id: 'morthal', name: 'Morthal' },
   { id: 'dawnstar', name: 'Dawnstar' },
@@ -21,12 +21,13 @@ const DEFAULT_STOPS = [
 ];
 
 module.exports = (api) => {
-  const { mp, log, personal, audit, who, cfg, registerChatCommand, openWidget, closeWidget, onUi, sendPacket, takeGold, giveGold, goldOf, depositToTreasury, zoneById, creationPending, arrivalFor, onlineActors } = api;
+  const { mp, log, personal, audit, who, cfg, openWidget, closeWidget, onUi, sendPacket, takeGold, giveGold, goldOf, depositToTreasury, creationPending, arrivalFor, onlineActors } = api;
   const combatAt = api.combatAt instanceof Map ? api.combatAt : new Map();
   const pvpAt = api.pvpAt instanceof Map ? api.pvpAt : new Map();
   const own = (cfg && cfg.carriages) || {};
   const C = Object.assign({ enabled: true, world: '3c:Skyrim.esm', reach: 600, rideSeconds: 6, fadeSafetyMs: 10000, cooldownMinutes: 0, combatSeconds: 60, pvpSeconds: 120, allowParcels: false }, own);
-  const FARES = Object.assign({ major: 20, minor: 50 }, own.fares || {});
+  // Jake, 6 Nov: further costs more. base, plus per10k for every 10,000 units from the stable to the arrival, to the nearest round, within min and max
+  const FARES = Object.assign({ base: 5, per10k: 1.25, round: 5, min: 10, max: 500 }, own.fares || {});
   // radius: how near a player comes before a driver spawns (as guards.js); leash: a driver's reach from the stable
   const DRIVERS = Object.assign({ enabled: true, radius: 4000, leash: 2000, despawnSeconds: 300, respawnSeconds: 600 }, own.drivers || {});
   const SPAWNS_FILE = path.resolve('NPC-Spawns.json');
@@ -35,7 +36,7 @@ module.exports = (api) => {
   const normDesc = (d) => { const s = String(d || ''); const i = s.indexOf(':'); if (i < 0) return s.toLowerCase(); const n = parseInt(s.slice(0, i), 16); return `${Number.isFinite(n) ? n.toString(16) : s.slice(0, i)}:${s.slice(i + 1)}`.toLowerCase(); };
   const validPos = (p) => Array.isArray(p) && p.length >= 3 && p.slice(0, 3).every((v) => Number.isFinite(Number(v)));
 
-  // carriages.stops { <id>: { name, hire, heading, npc, major, arrival, rotZ, off } } changes a stop or adds one
+  // carriages.stops { <id>: { name, hire, heading, npc, carts, arrival, rotZ, off } } changes a stop or adds one
   const STOPS = (() => {
     const over = own.stops && typeof own.stops === 'object' ? own.stops : {};
     const ids = [...new Set(DEFAULT_STOPS.map((s) => s.id).concat(Object.keys(over).filter((k) => k[0] !== '_')))];
@@ -44,31 +45,43 @@ module.exports = (api) => {
       if (!s.name || s.off === true) return null;
       s.hire = validPos(s.hire) ? s.hire.slice(0, 3).map(Number) : null;
       s.arrival = Array.isArray(s.arrival) ? s.arrival.filter(validPos).map((q) => q.slice(0, 3).map(Number)) : [];
-      const z = typeof zoneById === 'function' ? zoneById(sid) : null;
-      s.major = typeof s.major === 'boolean' ? s.major : !!(z && z.majorCity);
+      s.carts = Array.isArray(s.carts) ? s.carts.map(String) : [];
       return s;
     }).filter(Boolean);
   })();
   const byId = (sid) => STOPS.find((s) => s.id === sid) || null;
-  const fareTo = (s) => Math.max(0, Math.floor(num(s.major ? FARES.major : FARES.minor, 0)));
-  // With no actor only whether the stop has an arrival: arrivalFor(name, 0) picks and holds no spot
+  // With no actor only whether the stop has an arrival (its first spot): arrivalFor(name, 0) picks and holds no spot
   const arrivalOf = (s, a) => {
-    if (s.arrival.length) return { pos: s.arrival[Math.floor(Math.random() * s.arrival.length)], rotZ: num(s.rotZ, 0) };
+    if (s.arrival.length) return { pos: a ? s.arrival[Math.floor(Math.random() * s.arrival.length)] : s.arrival[0], rotZ: num(s.rotZ, 0) };
     try { const r = typeof arrivalFor === 'function' ? arrivalFor(s.name, a ? id(a) : 0) : null; return r && validPos(r.pos) ? r : null; } catch (e) { return null; }
   };
-  const destinationsFrom = (from) => STOPS.filter((s) => s.id !== from.id && arrivalOf(s, 0));
+  const fareBetween = (from, to) => {
+    const spot = arrivalOf(to, 0); if (!spot || !from.hire) return null;
+    const d = Math.hypot(spot.pos[0] - from.hire[0], spot.pos[1] - from.hire[1]);
+    const step = Math.max(1, num(FARES.round, 5));
+    const fare = Math.round((num(FARES.base, 5) + num(FARES.per10k, 1.25) * d / 10000) / step) * step;
+    return Math.max(0, Math.min(num(FARES.max, 500), Math.max(num(FARES.min, 10), fare)));
+  };
+  const destinationsFrom = (from) => STOPS.filter((s) => s.id !== from.id && fareBetween(from, s) !== null)
+    .sort((x, y) => fareBetween(from, x) - fareBetween(from, y) || x.name.localeCompare(y.name));
   const stopsWithStable = () => STOPS.filter((s) => s.hire);
-  const listNames = (list) => (list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list.join(''));
 
   const get = (a, k) => { try { return mp.get(id(a), k); } catch (e) { return undefined; } };
   // stop id -> the driver last talked to: a driver who wandered within the leash still counts as the stable
   const driverOf = globalThis.__dboCarriageDrivers instanceof Map ? globalThis.__dboCarriageDrivers : (globalThis.__dboCarriageDrivers = new Map());
+  // cart ref id -> its stop, and where each stop's carts stand (read from the server once a load)
+  const CART_STOP = new Map(), cartsAt = new Map();
+  for (const s of STOPS.filter((x) => x.hire)) for (const desc of s.carts) { try { const cid = mp.getIdFromDesc(desc) >>> 0; if (cid) CART_STOP.set(cid, s); } catch (e) { log(`carriages: cart ${desc} is not in the load order`); } }
+  const cartPoints = (s) => {
+    if (!cartsAt.has(s.id)) cartsAt.set(s.id, [...CART_STOP].filter(([, x]) => x === s).map(([cid]) => get(cid, 'pos')).filter(validPos));
+    return cartsAt.get(s.id);
+  };
   const stopNear = (a) => {
     if (normDesc(get(a, 'worldOrCellDesc')) !== normDesc(C.world)) return null;
     const p = get(a, 'pos'); if (!validPos(p)) return null;
     let best = null, bestD = Infinity;
     for (const s of stopsWithStable()) {
-      const points = [s.hire];
+      const points = [s.hire, ...cartPoints(s)];
       const drv = driverOf.get(s.id);
       const dp = drv ? get(drv, 'pos') : null;
       if (drv && !get(drv, 'isDead') && normDesc(get(drv, 'worldOrCellDesc')) === normDesc(C.world) && validPos(dp)
@@ -139,11 +152,11 @@ module.exports = (api) => {
   const board = (a, from, to, shown) => {
     if (!C.enabled) return personal(a, 'The carriages are not running.');
     if (!from || !to || from.id === to.id) return personal(a, 'The driver does not go there.');
-    const near = stopNear(a); if (!near || near.id !== from.id) return personal(a, `Stand by the driver at the ${from.name} stables to hire the carriage.`);
+    const near = stopNear(a); if (!near || near.id !== from.id) return personal(a, `You walked away from the ${from.name} carriage.`);
     if (riding.has(id(a))) return personal(a, 'You are already aboard.');
-    const fare = fareTo(to);
+    const fare = fareBetween(from, to);
+    if (fare === null) return personal(a, `The road to ${to.name} is closed.`);
     if (shown !== undefined && Number(shown) !== fare) return personal(a, 'The fare has changed. Ask the driver again.');
-    if (!arrivalOf(to, 0)) return personal(a, `The road to ${to.name} is closed.`);
     const why = blocked(a); if (why) return personal(a, why);
     if ((Number(goldOf(id(a))) || 0) < fare) return personal(a, `The fare to ${to.name} is ${fare} gold, and you do not have it.`);
     riding.set(id(a), { from: from.id, to: to.id, fare, at: Date.now() });
@@ -157,7 +170,7 @@ module.exports = (api) => {
     const dests = destinationsFrom(from);
     if (!dests.length) return personal(a, 'The driver has nowhere to go today.');
     const fares = {};
-    const actions = dests.map((s) => { fares[s.id] = fareTo(s); return { id: s.id, label: `${s.name}: ${fares[s.id]} gold` }; });
+    const actions = dests.map((s) => { fares[s.id] = fareBetween(from, s); return { id: s.id, label: `${s.name}: ${fares[s.id]} gold` }; });
     pending.set(id(a), { from: from.id, fares });
     openWidget(id(a), { type: 'contextMenu', id: WIDGET_ID, mode: 'menu', targetName: `Carriage from ${from.name}: where to?`, actions, events: { action: 'dbo:carriageChoose', close: 'dbo:carriageClose' } }, true);
     return 'menu';
@@ -173,32 +186,19 @@ module.exports = (api) => {
   onUi('carriageClose', (a) => { pending.delete(id(a)); });
   onUi('arrived', (a) => { if (fading.has(id(a)) && !riding.has(id(a))) setFade(a, false); });
 
-  // gamemode.js's activate chain: true refuses the engine's own talk (the menu opens) and a dead driver's search
+  // gamemode.js's activate chain: true refuses the engine's own sit or talk (the menu opens) and a dead driver's search
   globalThis.__dboCarriageActivate = (target, caster) => {
     if (!C.enabled) return false;
-    const s = driverStopOf(target); if (!s) return false;
-    if (get(target, 'isDead')) { personal(caster, 'The carriage company sees to its own. There is nothing to take.'); return true; }
-    driverOf.set(s.id, id(target));
-    if (stopNear(caster) !== s) { personal(caster, 'Come closer to the driver.'); return true; }
+    const cart = CART_STOP.get(id(target)) || null;
+    const s = cart || driverStopOf(target); if (!s) return false;
+    if (!cart) {
+      if (get(target, 'isDead')) { personal(caster, 'The carriage company sees to its own. There is nothing to take.'); return true; }
+      driverOf.set(s.id, id(target));
+    }
+    if (stopNear(caster) !== s) { personal(caster, 'Come closer to the carriage.'); return true; }
     openMenu(caster, s);
     return true;
   };
-
-  const findStop = (word) => {
-    const w = String(word || '').trim().toLowerCase(); if (!w) return null;
-    return STOPS.find((s) => s.id === w || s.name.toLowerCase() === w) || STOPS.find((s) => s.name.toLowerCase().startsWith(w)) || null;
-  };
-  registerChatCommand('carriage', (a, args) => {
-    const word = String(args || '').trim();
-    const from = stopNear(a);
-    if (!C.enabled) return personal(a, 'The carriages are not running.');
-    if (!from) return personal(a, `Carriages leave from the stables outside ${listNames(stopsWithStable().map((s) => s.name))}. Talk to the driver there.`);
-    if (!word) return openMenu(a, from);
-    if (/^(list|fares?)$/i.test(word)) return personal(a, `From ${from.name}: ${destinationsFrom(from).map((s) => `${s.name} ${fareTo(s)} gold`).join(', ')}.`);
-    const to = findStop(word);
-    if (!to) return personal(a, `The driver does not know "${word.slice(0, 30)}". /carriage list shows where the carriage goes.`);
-    return board(a, from, to);
-  }, { help: '[town|list]: hire the carriage at a stable (or talk to its driver)' });
 
   // The drivers' zones in NPC-Spawns.json, written the guards.js way (other writers' zones are kept)
   const writeZones = () => {
@@ -219,5 +219,6 @@ module.exports = (api) => {
     return mine.length;
   };
   const drivers = writeZones();
-  log(`carriages ${C.enabled ? 'on' : 'off'}: ${STOPS.length} stops, ${stopsWithStable().length} stables, ${drivers} driver(s), fares ${fareTo({ major: true })}/${fareTo({ major: false })} gold`);
+  const all = stopsWithStable().flatMap((f) => destinationsFrom(f).map((t) => fareBetween(f, t)));
+  log(`carriages ${C.enabled ? 'on' : 'off'}: ${STOPS.length} stops, ${stopsWithStable().length} stables, ${CART_STOP.size} cart seats, ${drivers} driver(s), fares ${all.length ? Math.min(...all) : 0}-${all.length ? Math.max(...all) : 0} gold by distance`);
 };
