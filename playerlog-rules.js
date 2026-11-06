@@ -153,7 +153,7 @@ const EVENT_TYPES = {
   // movement and world
   'move.cell': T(1, 'cell', { from: PLACE, to: PLACE, own: OWN, access: ACCESS }),
   'move.zone': T(1, 'cell', { from: 'zid', to: 'zid' }),
-  'move.teleport': T(1, 'pos', { reason: E('gate', 'unstuck', 'staff_tp', 'fixloc', 'gm_goto', 'panel_tp', 'summon', 'dungeon', 'playtest', 'creation', 'temple', 'crash', 'spawnwatch', 'anticheat', 'unknown'), dist: 'int' }),
+  'move.teleport': T(1, 'pos', { reason: E('gate', 'unstuck', 'staff_tp', 'fixloc', 'gm_goto', 'panel_tp', 'summon', 'dungeon', 'playtest', 'creation', 'temple', 'crash', 'spawnwatch', 'anticheat', 'carriage', 'unknown'), dist: 'int' }),
   'move.door': T(2, 'cell', { door: 'hex', dest: NAME64, allowed: 'bool', own: OWN, access: ACCESS }, { near: true }),
   'move.dungeon': T(1, 'cell', { op: E('claim', 'enter', 'leave', 'end', 'boss', 'moved_out'), dungeon: NAME64, difficulty: NAME, members: PARTIES, why: 'code' }),
   'move.map': T(2, '', { n: 'int', names: A(NAME, 5) }),
@@ -460,6 +460,8 @@ AUDIT_VERBS.FRENZY.roles = R_BY([[/ killed by $/, 'by'], [/ first on $/, 'target
 clean_('GUARDS');
 // APIARY <who> harvested <kind> <ref>: <items> (apiaries.js): ids and item names
 clean_('APIARY');
+// CARRIAGE <who> rode from <town> to <town> for N gold (N to the <hold> treasury) (carriages.js): an id, config town and hold names, numbers
+clean_('CARRIAGE');
 // MILL <who> ran a saw mill at <desc> (tier n) -> n sawn logs, n firewood (labour.js): ids and numbers
 clean_('MILL');
 // Off until Nat switches each on: their staff grant, revoke and stage lines carry a staff-written reason, and decor's carry
@@ -1525,6 +1527,7 @@ capstones.js CAPSTONE f0b21ae0 clean
 capstones.js CAPSTONE 577376f9 clean
 capstones.js CAPSTONE ffb8293d clean
 capstones.js CAPSTONE 7563b9cb clean
+carriages.js CARRIAGE b21ebf13 clean
 champions.js CHAMPION c06a6bd9 clean
 bossvitals.js VITALS de8f0aeb clean
 bossvitals.js VITALS 8dc9b1fd clean

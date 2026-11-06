@@ -145,9 +145,11 @@ ok(pushes.length === 0, 'an NPC victim is left to the shouter\'s own game');
 // Disarm unequips the weapons in a player's hands on their own client, once per 10 s; Dismay terrifies them
 const unequips = () => calls.filter((c) => c[2] === 'UnequipItem');
 reset(); EQ[2] = [SWORD, SHIELD]; load().onSpellHit(9, 2, DISARM2);
-ok(unequips().length === 1 && unequips()[0][4][0].desc === mp.getDescFromId(SWORD) && unequips()[0][3].desc === mp.getDescFromId(2), "a draugr's Disarm unequips the victim's sword, not the shield");
-load().onSpellHit(9, 2, DISARM2);
-ok(unequips().length === 1, 'one disarm per target inside the cooldown');
+ok(unequips().length === 0, "disarm shout is disabled by default: draugr Disarm does not unequip");
+(cfg.combat = cfg.combat || {}).disarmSpells = ['VoiceDisarm1', 'VoiceDisarm2', 'VoiceDisarm3'];
+reset(); EQ[2] = [SWORD, SHIELD]; load().onSpellHit(9, 2, DISARM2);
+ok(unequips().length === 1 && unequips()[0][4][0].desc === mp.getDescFromId(SWORD) && unequips()[0][3].desc === mp.getDescFromId(2), "with disarmSpells configured, it unequips the victim's sword");
+delete cfg.combat.disarmSpells;
 reset(); EQ[1] = [SWORD]; load().onSpellHit(2, 9, DISARM2);
 ok(unequips().length === 0, 'an NPC victim of Disarm is left to the shouter\'s own game');
 reset(); statuses.length = 0; load().onSpellHit(9, 2, DISMAY3);
@@ -211,7 +213,8 @@ ok(statuses.length === 0 && unequips().length === 0, 'an ordinary spell neither 
   ok(npcPushes.length === 1 && npcPushes[0][0] === 2 && npcPushes[0][1].target === 9 && npcPushes[0][1].force === 8 && npcPushes[0][1].from === 1, "a granted player's shout still pushes an NPC another player hosts");
   HOSTS = {};
   reset(); EQ[2] = [SWORD]; c = load(); c.onSpellHit(9, 2, DISARM2);
-  ok(calls.filter((x) => x[2] === 'UnequipItem').length === 1, "a draugr's Disarm still unequips the player's sword");
+  ok(calls.filter((x) => x[2] === 'UnequipItem').length === 0, "a draugr's Disarm does not unequip the player's sword");
+  ok(c.disarmPlayer(2, 'test') === 1 && calls.filter((x) => x[2] === 'UnequipItem').length === 1, "direct disarmPlayer (martial.js) still works");
   (cfg.combat = cfg.combat || {}).npcShoutPush = true;
   reset(); pushes.length = 0; c = load(); c.onSpellHit(9, 2, UF3);
   ok(pushes.length === 1 && pushes[0][1].force === 8 && pushes[0][1].from === 9, 'with npcShoutPush on (the undo), a draugr shout pushes again');

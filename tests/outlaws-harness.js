@@ -8,8 +8,8 @@ const MODULE = path.resolve(__dirname, '..', 'outlaws.js');
 const dir = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), 'claude-nate-outlaws-'));
 process.chdir(dir);
 let fails = 0; const ok = (l, c, g) => { console.log(`${c ? 'ok  ' : 'FAIL'} ${l}${!c && g !== undefined ? `: got ${JSON.stringify(g)}` : ''}`); if (!c) fails++; };
-const COUNTESS = 0x10, STEWARD = 0x11, GUARD = 0x12, OUTLAW = 0x13, TOWNIE = 0x14, LEAD = 0x15;
-const chars = { [COUNTESS]: [70, 'Frigga'], [STEWARD]: [71, 'Aldo'], [GUARD]: [191, 'Dreams'], [OUTLAW]: [99, 'Rogue'], [TOWNIE]: [55, 'Pell'], [LEAD]: [2, 'Nate'] };
+const COUNTESS = 0x10, STEWARD = 0x11, GUARD = 0x12, OUTLAW = 0x13, TOWNIE = 0x14, LEAD = 0x15, ROGUE_ALT = 0x16;
+const chars = { [COUNTESS]: [70, 'Frigga'], [STEWARD]: [71, 'Aldo'], [GUARD]: [191, 'Dreams'], [OUTLAW]: [99, 'Rogue'], [TOWNIE]: [55, 'Pell'], [LEAD]: [2, 'Nate'], [ROGUE_ALT]: [99, 'Rogue Alt'] };
 const props = new Map(); const ui = {}; const answers = []; const said = []; const sys = []; const audits = []; const deposits = [];
 let here = 'bruma';
 const gold = (a) => { const inv = props.get(`${a}|inventory`); const g = ((inv && inv.entries) || []).find((e) => e.baseId === 0xf); return g ? g.count : 0; };
@@ -57,7 +57,7 @@ extra = globalThis.__dboOutlawJailed(GUARD, OUTLAW);
 ok('nothing to pay: 1000 gold is 100 minutes, capped at 240', extra === 100, extra);
 ok('a Lead GM may set one anywhere', /wanted in Bruma for 10/.test(run(LEAD, 'set Pell 10 test')));
 ok('every step is audited', audits.some((t) => /BOUNTY set/.test(t)) && audits.some((t) => /BOUNTY claimed/.test(t)) && audits.some((t) => /BOUNTY paid/.test(t)) && audits.some((t) => /BOUNTY cleared/.test(t)));
-ok('the state is on disk', JSON.parse(fs.readFileSync('outlaws.json', 'utf8')).zones.bruma['55'].amount === 10);
+ok('the state is on disk', JSON.parse(fs.readFileSync('outlaws.json', 'utf8')).zones.bruma[TOWNIE.toString(16)].amount === 10);
 // ---- the F3 Wanted tab ----------------------------------------------------------------------------------------------------
 {
   here = 'bruma';
@@ -70,6 +70,12 @@ ok('the state is on disk', JSON.parse(fs.readFileSync('outlaws.json', 'utf8')).z
   let v = sec.view(OUTLAW);
   ok('tab: Set from the form', /Rogue is wanted in Bruma for 400 gold/.test(answers.at(-1).text) && answers.at(-1).kind === 'ok' && v.mine.some((m) => m.amount === 400 && m.here), answers.at(-1));
   ok('tab: the outlaw gets a badge', (sec.visible(OUTLAW) || {}).badge === 1);
+  let vAlt = sec.view(ROGUE_ALT);
+  ok('tab: alt on the same account is NOT wanted', vAlt.mine.length === 0 && !(sec.visible(ROGUE_ALT) || {}).badge);
+  ok('alt: /bounty pay says not wanted', /not wanted in Bruma/.test(run(ROGUE_ALT, 'pay')));
+  setGold(ROGUE_ALT, 500);
+  ok('alt: jailing the alt claims no bounty and takes no gold', globalThis.__dboOutlawJailed(GUARD, ROGUE_ALT) === 0 && gold(ROGUE_ALT) === 500);
+  ok('alt: the main character is still wanted after alt is jailed', sec.view(OUTLAW).mine.some((m) => m.amount === 400));
   ui.outlawJ(GUARD, ['N', 'set', 'Rogue', '10', 'x']);
   ok('tab: a guard\'s Set is refused', answers.at(-1).kind === 'refused' && /Only the ruler or the Steward/.test(answers.at(-1).text));
   ui.outlawJ(COUNTESS, ['old', 'set', 'Rogue', '10', 'x']);

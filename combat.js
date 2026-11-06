@@ -54,7 +54,7 @@ module.exports = (api) => {
     // shouter's copy of the victim only, so the server does it on the victim's own client: Disarm unequips the weapons in
     // their hands (drawn again at will), once per target every disarmCooldownSeconds; Dismay terrifies them as the
     // werewolf's howl does (dboStatus terror, dismaySpeedMult) for the word's seconds. The same gate as the push.
-    disarmSpells: ['VoiceDisarm1', 'VoiceDisarm2', 'VoiceDisarm3'],
+    disarmSpells: [],
     disarmCooldownSeconds: 10,
     dismaySpells: { VoiceDismayingShout1: 5, VoiceDismayingShout2: 8, VoiceDismayingShout3: 12 },
     dismaySpeedMult: -50,

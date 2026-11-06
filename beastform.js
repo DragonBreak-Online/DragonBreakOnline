@@ -885,7 +885,7 @@ module.exports = (api) => {
   const animals = () => Object.keys(CREATURES).filter((k) => CREATURES[k].race && !(Array.isArray(PCFG.forms) && !PCFG.forms.map(String).includes(k)));
   registerChatCommand('polymorph', (a, args) => {
     a = a >>> 0;
-    if (!isLeadStaff(a)) return personal(a, 'That is for a Lead GM and above.');
+    if (!isAdmin || !isAdmin(a)) return personal(a, 'That is for a GM and above.');
     const words = String(args || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
     const w = words[0] || '';
     const usage = `Usage: /polymorph <${animals().join('|')}> | revert | list${isOwner(a) ? ' | on | off' : ''}. It works on yourself alone.`;
@@ -898,7 +898,7 @@ module.exports = (api) => {
       if (!on) for (const o of api.onlineActors()) { if (isCreatureState(stateOf(o >>> 0)) && revert(o >>> 0, 'polymorph off')) n++; }
       audit(`BEAST ${who(a)} switched polymorph ${on ? 'on' : 'off'} for all staff (${n} turned back)`);
       sendBeastBodies();
-      return personal(a, on ? 'Polymorph is on: a Lead GM and above may take an animal shape.' : `Polymorph is off${n ? ` and ${n} turned back` : ''}. It stays off through reloads and restarts until /polymorph on.`);
+      return personal(a, on ? 'Polymorph is on: a GM and above may take an animal shape.' : `Polymorph is off${n ? ` and ${n} turned back` : ''}. It stays off through reloads and restarts until /polymorph on.`);
     }
     if (!w) {
       return personal(a, `Polymorph is ${polymorphOn() ? 'on' : 'off'}. /polymorph <animal> turns you, and only you, into one: ${animals().join(', ')}. ` +

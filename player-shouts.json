@@ -1,5 +1,5 @@
 {
- "_comment": "The shouts a player may hold: Give all Shouts (adminSystem.ts reads admin-powers.json) and the combat shout gate (combat.js) use only these. Editor id + plugin; vanilla's 20 Dragonborn shouts, Dawnguard's 3 and Dragonborn's 4. Left out on purpose (16 Oct, Nate: 'it gave me every shout that you shouldnt have'): dragon, Alduin, Miraak, Durnehviir, Greybeard, draugr and quest copies; racial powers (Battle Cry, Voice of the Emperor, Command Animal), which the race already gives; werewolf howls (beastform.js); creature shouts from mods (arnima, Druadach, Helgen Reborn, Journey to Baan Malur). ck-mcp/admin_powers.py writes every SHOU; filter its output through this list.",
+ "_comment": "The shouts a player may hold: Give all Shouts (adminSystem.ts reads admin-powers.json) and the combat shout gate (combat.js) use only these. Editor id + plugin; vanilla's 19 Dragonborn shouts (DisarmShout disabled), Dawnguard's 3 and Dragonborn's 4. Left out on purpose (16 Oct, Nate: 'it gave me every shout that you shouldnt have'): dragon, Alduin, Miraak, Durnehviir, Greybeard, draugr and quest copies; racial powers (Battle Cry, Voice of the Emperor, Command Animal), which the race already gives; werewolf howls (beastform.js); creature shouts from mods (arnima, Druadach, Helgen Reborn, Journey to Baan Malur). ck-mcp/admin_powers.py writes every SHOU; filter its output through this list.",
  "shouts": [
   ["UnrelentingForceShout", "Skyrim.esm"],
   ["WhirlwindSprintShout", "Skyrim.esm"],
@@ -8,7 +8,6 @@
   ["BecomeEtherealShout", "Skyrim.esm"],
   ["ClearSkiesShout", "Skyrim.esm"],
   ["Dismay", "Skyrim.esm"],
-  ["DisarmShout", "Skyrim.esm"],
   ["ElementalFuryShout", "Skyrim.esm"],
   ["IceFormShout", "Skyrim.esm"],
   ["AuraWhisperShout", "Skyrim.esm"],

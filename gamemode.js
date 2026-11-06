@@ -409,7 +409,7 @@ const TIER_LABEL = { senior: 'Senior', developer: 'Developer', leadgm: 'Lead GM'
 // out of the hold treasury, so a GM who could appoint himself could pay himself (claude-jake's review, A1-1).
 // /chargen is open to every GM (Nate, 12 Oct), and to a Trial GM through TRIAL_COMMANDS
 // /jail (jail zones), /npc remove and /dungeon end are a GM's from 2 Nov (Nat: "empower our lead GMs and GMs"); each is audited
-const LEAD_ONLY = new Set(['rerollrefund', 'beastform', 'frenzy', 'polymorph', 'vlremote', 'wwremote', 'feedpair', 'sethunger', 'wipechars', 'driftspawn', 'driftrepair', 'driftset',
+const LEAD_ONLY = new Set(['rerollrefund', 'beastform', 'frenzy', 'vlremote', 'wwremote', 'feedpair', 'sethunger', 'wipechars', 'driftspawn', 'driftrepair', 'driftset',
   'placeexport', 'staffstats', 'war', 'exposure', 'curse', 'schedule', 'warband', 'raid', 'settime', 'timescale', 'setweather',
   'appoint', 'dismiss',
   // Ending a character for good, and lifting it (Nat, 26 Oct)
@@ -2325,6 +2325,8 @@ mp.onActivate = (targetId, casterId) => {
   if (globalThis.__dboLeverPuzzle && globalThis.__dboLeverPuzzle(targetId >>> 0, casterId >>> 0)) return false;
   // A dead guard of the hold's watch is never searched (guards.js)
   if (globalThis.__dboWatchActivate && globalThis.__dboWatchActivate(targetId >>> 0, casterId >>> 0)) return false;
+  // A carriage driver opens the destinations instead of the engine's own talk (carriages.js)
+  if (globalThis.__dboCarriageActivate && globalThis.__dboCarriageActivate(targetId >>> 0, casterId >>> 0)) return false;
   // An apiary or beehive gives honey on its own timer instead of opening (apiaries.js)
   if (globalThis.__dboApiaryActivate && globalThis.__dboApiaryActivate(targetId >>> 0, casterId >>> 0)) return false;
   if (globalThis.__dboBankActivate && globalThis.__dboBankActivate(targetId >>> 0, casterId >>> 0)) return false;
@@ -10714,6 +10716,16 @@ try {
   delete require.cache[GUARDS_JS];
   require(GUARDS_JS)({ mp, log, personal, audit, who, display, cfg, registerChatCommand, zoneOfActor, zoneById });
 } catch (e) { log('guards.js failed to load:', e.stack || e.message); globalThis.__dboWatchActivate = null; globalThis.__dboWatchNoSkill = null; globalThis.__dboGuardsOnDeath = null; globalThis.__dboHoldHere = null; }
+// ---- hold carriages: drivers at the five stables, /carriage (server\carriages.js, config "carriages") ----
+try {
+  const CARRIAGES_JS = path.resolve('carriages.js');
+  delete require.cache[CARRIAGES_JS];
+  // A hub gate's spot for a rider; with no rider only whether the gate has one (nothing is held)
+  const arrivalFor = (name, a) => { const g = Object.values(GATES).find((x) => x[0] === name); return g ? { pos: a ? gateSpotFor(g, a >>> 0) : g[1][0], rotZ: g[2] } : null; };
+  require(CARRIAGES_JS)({ mp, log, personal, audit, who, cfg, registerChatCommand, openWidget, closeWidget, onUi, sendPacket, takeGold, goldOf, depositToTreasury, zoneById,
+    giveGold: (a, n) => giveItem(a, GOLD_BASE, n) !== false,
+    creationPending, arrivalFor, onlineActors, combatAt, pvpAt });
+} catch (e) { log('carriages.js failed to load:', e.stack || e.message); globalThis.__dboCarriageActivate = null; }
 // ---- apiaries and beehives: honey on a timer (server\apiaries.js, config "apiaries") ----
 try {
   const APIARIES_JS = path.resolve('apiaries.js');

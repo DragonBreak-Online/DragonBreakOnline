@@ -4999,15 +4999,6 @@
    ]
   },
   {
-   "shout": "70981:Skyrim.esm",
-   "name": "DisarmShout",
-   "words": [
-    "5fb95:Skyrim.esm",
-    "5fb96:Skyrim.esm",
-    "5fb97:Skyrim.esm"
-   ]
-  },
-  {
    "shout": "2395a:Skyrim.esm",
    "name": "Dismay",
    "words": [
