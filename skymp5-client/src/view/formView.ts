@@ -44,7 +44,7 @@ import { sendCustomPacket } from "../services/services/customPacketUtil";
 import { HUNT_CHECK_MS, huntedPlayers, huntTarget } from "./huntedGuards";
 import { apply as applyAggroWindow, CHECK_EVERY_MS, combatStartLine, decide as decideAggroWindow, distance, nearestPlayer, newWindowState, playerCopies, Vec, WindowState } from "./aggroWindow";
 import { mayAskOnSight, mayAskResync, mayAskSilent, playsBack, seatsUndriven } from "./hostAsk";
-import { newStillGate, STILL_SKIP, STILL_TICK, stillStep } from "./stillGate";
+import { newStillGate, skipStill } from "./stillGate";
 
 export interface ScreenResolution {
   width: number;
@@ -495,10 +495,7 @@ export class FormView {
   private skipsStillUpdate(model: FormModel): boolean {
     if (!driftConfig.stillGate || model.movement || model.appearance) return false;
     const animChanged = !!model.animation && model.animation.numChanges !== this.animState.lastNumChanges;
-    const step = stillStep(this.stillGate, Date.now(), PlayerCharacterDataHolder.getCrosshairRefId() === this.refrId, animChanged);
-    // The open-state clock would miss a tick that comes a frame early
-    if (step === STILL_TICK) this.lastOpenApply = 0;
-    return step === STILL_SKIP;
+    return skipStill(this.stillGate, Date.now(), PlayerCharacterDataHolder.getCrosshairRefId() === this.refrId, animChanged);
   }
 
   private stillGate = newStillGate();
