@@ -6503,6 +6503,8 @@ const inLoginGrace = (a) => {
 // The nearest town or village to a player, by its map marker (territories.json), in the world they stand in or last stood
 // outside of: { name, world, pos, rotZ }, or null (another world, no markers), when the temple is used as before
 const UNSTUCK_TOWNS = (() => { try { return (JSON.parse(fs.readFileSync(path.resolve('territories.json'), 'utf8')).territories || []).filter((x) => ['capital', 'town', 'village'].includes(x.kind) && x.marker && Array.isArray(x.marker.pos)); } catch (e) { log('unstuck: territories.json unreadable; the temple it is', e.message); return []; } })();
+// Their own zone ids only: Morthal, Dawnstar and Winterhold share another city's temple, so they keep their markers
+const UNSTUCK_WALLED = new Set(['solitude', 'whiterun', 'windhelm', 'riften', 'markarth']);
 globalThis.__dboUnstuckTown = (a) => {
   let world = '', pos = null;
   try { world = String(mp.get(a, 'worldOrCellDesc') || ''); pos = mp.get(a, 'pos'); } catch (e) { return null; }
@@ -6514,7 +6516,11 @@ globalThis.__dboUnstuckTown = (a) => {
     const d = Math.hypot(x.marker.pos[0] - pos[0], x.marker.pos[1] - pos[1]);
     if (d < bestD) { bestD = d; best = x; }
   }
-  return best ? { name: best.name, world: best.marker.world, pos: best.marker.pos.slice(0, 3), rotZ: 0 } : null;
+  if (!best) return null;
+  // A walled capital's marker is inside the city but in Tamriel, which draws the city with no floor: its own temple door instead
+  const tp = UNSTUCK_WALLED.has(best.zone) ? templeFor(best.zone) : null;
+  if (tp) return { name: best.name, world: tp.world, pos: tp.pos.slice(0, 3), rotZ: Number(tp.rotZ) || 0 };
+  return { name: best.name, world: best.marker.world, pos: best.marker.pos.slice(0, 3), rotZ: 0 };
 };
 const unstuckActor = (a, by, refs = '') => {
   const admin = staffCan(by, 'unstuck');
