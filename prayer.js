@@ -1138,7 +1138,8 @@ module.exports = (api) => {
   const offeringFavour = (offering, d) => (offering && d && (offering.deityId === d.id || sameFaith(deityById(offering.deityId), d))
     ? 1 + Math.min(Number(offering.gold) || 0, OFFER.fullGold) / OFFER.fullGold : 1);
   globalThis.__dboOfferingFavour = (offering, deityId) => offeringFavour(offering, deityById(deityId));
-  registerChatCommand('offer', (a, argStr) => {
+  // vampirepath.js registers /offer after this for Molag Bal's soul gem and hands every gold offering back here
+  const offerGold = (a, argStr) => {
     const gold = Math.floor(Number(String(argStr || '').trim()));
     const faith = faithOf(a);
     const d = faith ? deityById(faith.id) : null;
@@ -1156,7 +1157,9 @@ module.exports = (api) => {
     try { mp.set(a, 'private.dboOffering', { deityId: d.id, gold: total, until: Date.now() + OFFER.minutes * 60000 }); } catch (e) { /* not an actor */ }
     audit(`OFFERING ${who(a)} offered ${gold} gold to ${d.name}${kept ? ` (${kept} to the town for the temple)` : ''}`);
     personal(a, `You leave ${gold} gold for ${d.name}. For the next hour, ${d.name} listens more closely.`);
-  }, { help: 'make an offering of gold to your god before praying' });
+  };
+  globalThis.__dboOfferGold = offerGold;
+  registerChatCommand('offer', offerGold, { help: 'make an offering of gold to your god before praying' });
   // The shrine panel (supernatural.js) offers an offering at the shrine of the player's own god: its bounds, or null
   globalThis.__dboOfferInfo = (a, deityId) => {
     const faith = faithOf(a);

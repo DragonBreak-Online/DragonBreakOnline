@@ -136,6 +136,19 @@ ok(/filled black soul gem/.test(lastSaid(V)) && M.devOf(V).points === 32, 'no fi
 setp(V, 'inventory', { entries: [{ baseId: 0x2e504, count: 2 }] });
 cmds.get('offer')(V);
 ok(M.devOf(V).points === 47 && getp(V, 'inventory').entries[0].count === 1 && calls.some((c) => c[0] === 'thirst' && c[2] === 2), 'the offering: one gem taken, +15, and the thirst one stage lower', { pts: M.devOf(V).points, calls });
+// /offer <gold> is prayer.js's: this /offer replaced it for every god (#bugs 1567046457599598774, 0 gold offerings 5-6 Nov)
+const goldOffers = [];
+globalThis.__dboOfferGold = (a, s) => { goldOffers.push([a, s]); };
+cmds.get('offer')(V, '50');
+ok(goldOffers.length === 1 && goldOffers[0][1] === '50' && getp(V, 'inventory').entries[0].count === 1, '/offer <gold> at his shrine is a gold offering: no gem taken', goldOffers);
+cmds.get('offer')(MORTAL, '');
+ok(goldOffers.length === 2 && goldOffers[1][0] === MORTAL, 'a bare /offer by someone neither sworn nor at his shrine goes to the gold offering too', goldOffers);
+const keptInv = getp(V, 'inventory');
+setp(V, 'inventory', { entries: [] });
+cmds.get('offer')(V);
+ok(goldOffers.length === 2 && /filled black soul gem/.test(lastSaid(V)) && M.devOf(V).points === 47, '...and a bare /offer by his sworn at his shrine is still the soul offering', goldOffers);
+setp(V, 'inventory', keptInv);
+delete globalThis.__dboOfferGold;
 // leaving him
 patrons.set(V, 'boethiah'); tick('vampFeral');
 ok(M.devOf(V).points === 0 && audits.some((t) => /left Molag Bal; devotion 47 lost/.test(t)), 'another patron empties the devotion');

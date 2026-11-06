@@ -577,7 +577,10 @@ module.exports = (api) => {
     if (!hit) return false;
     hit.count -= 1; mp.set(a, 'inventory', { entries: entries.filter((e) => Number(e.count) > 0) }); return true;
   };
-  registerChatCommand('offer', (a) => {
+  registerChatCommand('offer', (a, argStr) => {
+    // /offer <gold> is prayer.js's offering to the player's own god; only a bare /offer by his sworn or at his shrine is a soul
+    const gold = globalThis.__dboOfferGold;
+    if (typeof gold === 'function' && (!on() || String(argStr || '').trim() !== '' || (!sworn(a) && !atMolagShrine(a)))) return gold(a, argStr);
     if (!on()) return personal(a, 'Nothing answers.');
     if (!atMolagShrine(a)) return personal(a, 'Offerings are made at a shrine of Molag Bal: touch one, then say /offer.');
     if (!sworn(a)) return personal(a, 'He takes offerings only from his own. Swear yourself to him first.');
@@ -589,7 +592,7 @@ module.exports = (api) => {
     else personal(a, 'The soul is taken. He is pleased.');
     if (S.due.has(a >>> 0)) endFeral(a, 'offering');
     audit(`VAMPATH ${who(a)} offered a filled black soul gem to Molag Bal`);
-  }, { help: 'at a shrine of Molag Bal, offer a filled black soul gem (his sworn)' });
+  }, { help: '/offer <gold> to your god at their shrine; a bare /offer at a shrine of Molag Bal gives him a filled black soul gem (his sworn)' });
 
   globalThis.__dboVampEmbraceRefusal = (a) => {
     if (!on()) return '';
