@@ -1272,7 +1272,10 @@ module.exports = (api) => {
     if (E.phase === 'voting') { v.ballot = E.ballot.map((id) => courtView(z, E, courtById(E, id), a)); v.voted = E.votes[pid] !== undefined; }
     if (E.phase === 'seated' && E.result) {
       const w = courtById(E, E.result.winner);
-      v.result = { winner: w ? courtView(z, E, w, a) : null, empty: E.result.empty || [], at: E.result.at,
+      // The elected court only while its Jarl still sits: one deleted or unseated since read as the hold's court now
+      const j = w && w.members.jarl;
+      const sits = !!j && exists(j.actor) && seated(z, 'jarl').includes(Number(j.pid));
+      v.result = { winner: sits ? courtView(z, E, w, a) : null, empty: E.result.empty || [], at: E.result.at,
         counts: E.courts.filter((c) => c.id in (E.result.counts || {})).map((c) => ({ jarl: memberName(c.members.jarl), votes: E.result.counts[c.id] })) };
     }
     return v;

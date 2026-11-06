@@ -298,6 +298,15 @@ ok(unseats.some((u) => u.zone === 'whiterun' && u.pid === 999), 'whoever held th
 ok(courtSyncs.some((c) => c.zone === 'whiterun' && c.actor === H1 && c.titles[0] === 'Housecarl' && c.seated), 'the Housecarl takes the household rank Housecarl');
 vv = M.votingView(V1, WR);
 ok(vv.result && vv.result.winner && vv.result.winner.jarl === nm(J1) && vv.result.counts.some((c) => c.votes === 2) && vv.result.counts.some((c) => c.votes === 1), 'after the vote the result shows the winner and each court\'s count', vv.result);
+// Once the elected Jarl no longer sits, the old court is not shown as the hold's (#bugs 1567613878278426684)
+{
+  const keptJarls = officials.whiterun.jarl;
+  officials.whiterun.jarl = keptJarls.filter((p) => p !== chars.get(J1).pid);
+  const gone = M.votingView(V1, WR);
+  ok(gone.result && gone.result.winner === null && gone.result.counts.length === 2, '...but not once its Jarl no longer holds the seat; the counts stay', gone.result);
+  officials.whiterun.jarl = keptJarls;
+  ok(M.votingView(V1, WR).result.winner !== null, '...and it is back while the Jarl sits again');
+}
 // After the election a seat of the elected court goes only to a citizen (coordinator's decision, 14 Oct)
 const seatNo = globalThis.__dboCitizenSeatCheck('whiterun', 'commander', '', GUILDIE, 'Gunnar');
 ok(/no citizen of Whiterun/.test(seatNo), 'the empty Lord Commander seat is refused to a non-citizen', seatNo);
