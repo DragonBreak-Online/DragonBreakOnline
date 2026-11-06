@@ -857,8 +857,11 @@ module.exports = (api) => {
     if (pruned) { try { save(); } catch (e) { log('bank: bank.json write failed', e.message); } }
   };
   if (typeof every === 'function') every('bankVaultFees', 3600000, feeTick);
-  // A first tick a few minutes after each load, so a day of many reloads still gets its ticks (bank review R6)
-  { const t = setTimeout(() => { try { feeTick(); } catch (e) { log('bank: vault fees failed', e.message); } }, Math.max(1, Number(V.firstTickMinutes) || 5) * 60000); if (t && typeof t.unref === 'function') t.unref(); }
+  // A first tick a few minutes after each load (bank review R6), by name so a reload replaces it instead of keeping the old load alive until it fires
+  const firstTick = () => { try { feeTick(); } catch (e) { log('bank: vault fees failed', e.message); } };
+  const firstTickMs = Math.max(1, Number(V.firstTickMinutes) || 5) * 60000;
+  if (typeof api.once === 'function') api.once('bankVaultFeesFirst', firstTickMs, firstTick);
+  else { const t = setTimeout(firstTick, firstTickMs); if (t && typeof t.unref === 'function') t.unref(); }
   // At login: the fees, and any word about a vault that came while they were away
   globalThis.__dboBankLogin = (a) => {
     try { settleAll(a); } catch (e) { log('bank: vault fees at login failed', e.message); }
