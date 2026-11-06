@@ -44,6 +44,7 @@ import { sendCustomPacket } from "../services/services/customPacketUtil";
 import { HUNT_CHECK_MS, huntedPlayers, huntTarget } from "./huntedGuards";
 import { apply as applyAggroWindow, CHECK_EVERY_MS, combatStartLine, decide as decideAggroWindow, distance, nearestPlayer, newWindowState, playerCopies, Vec, WindowState } from "./aggroWindow";
 import { mayAskOnSight, mayAskResync, mayAskSilent, playsBack, seatsUndriven } from "./hostAsk";
+import { newStillGate, STILL_SKIP, STILL_TICK, stillStep } from "./stillGate";
 
 export interface ScreenResolution {
   width: number;
@@ -379,6 +380,10 @@ export class FormView {
       this.refrId = (refr as ObjectReference).getFormID();
     }
 
+    if (refId && this.skipsStillUpdate(model)) {
+      return;
+    }
+
     if (!this.ready) {
       return;
     }
@@ -386,6 +391,7 @@ export class FormView {
     const refr = ObjectReference.from(Game.getFormEx(this.refrId));
     if (refr) {
       const actor = Actor.from(refr);
+      this.stillGate.actor = !!actor;
       if (actor && !this.localImmortal) {
         if (this.flyer) this.noteFlyer(this.refrId, "ready", "pre-startDeferredKill");
         actor.startDeferredKill();
@@ -429,6 +435,7 @@ export class FormView {
     this.rebuild.doneThisLoad = false;
     this.spawnMoment = 0;
     this.dealtWithRef = false;
+    this.stillGate = newStillGate();
     const refrId = this.refrId;
     const remoteRefrId = this.remoteRefrId;
     if (refrId >= 0xff000000) dropCopyNiNodeWork(refrId);
@@ -484,6 +491,17 @@ export class FormView {
     this.removeNickname();
   }
 
+  // A world object without movement between applyAll's own clocks has nothing to apply, so it costs no native call (view/stillGate.ts)
+  private skipsStillUpdate(model: FormModel): boolean {
+    if (!driftConfig.stillGate || model.movement || model.appearance) return false;
+    const animChanged = !!model.animation && model.animation.numChanges !== this.animState.lastNumChanges;
+    const step = stillStep(this.stillGate, Date.now(), PlayerCharacterDataHolder.getCrosshairRefId() === this.refrId, animChanged);
+    // The open-state clock would miss a tick that comes a frame early
+    if (step === STILL_TICK) this.lastOpenApply = 0;
+    return step === STILL_SKIP;
+  }
+
+  private stillGate = newStillGate();
   private lastHarvestedApply = 0;
   private lastOpenApply = 0;
   private dealtWithRef = false;

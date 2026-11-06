@@ -24,6 +24,8 @@ export const driftConfig = {
   // NPC copies created by SkyrimPlatform's createCopy at their final spot (view/nativeCreate.ts, phase 2b); the server's
   // /driftset nativeCreate, off by default
   nativeCreate: false,
+  // World objects without movement run FormView once a tick instead of every frame (view/stillGate.ts); false is the quick undo
+  stillGate: true,
 };
 
 export type DriftConfig = typeof driftConfig;
@@ -59,6 +61,7 @@ const RULES: Record<keyof DriftConfig, (v: unknown) => boolean> = {
   faceRebuild: oneOf("load", "entry"),
   nativeRetire: isBool,
   nativeCreate: isBool,
+  stillGate: isBool,
 };
 
 // Copies the known keys that pass their check; anything else in the packet is ignored
