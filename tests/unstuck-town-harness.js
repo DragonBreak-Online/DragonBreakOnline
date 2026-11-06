@@ -56,6 +56,13 @@ r = at('3c:Skyrim.esm', [30800, 106100, -13900]);
 ok(r && r.name === 'Dawnstar' && r.world === '3c:Skyrim.esm', 'beside Dawnstar: Dawnstar\'s marker, never Windhelm\'s temple', r);
 r = at('3c:Skyrim.esm', [110800, 102900, -9000]);
 ok(r && r.name === 'Winterhold' && r.world === '3c:Skyrim.esm', 'beside Winterhold: Winterhold\'s marker', r);
+// A town of a walled capital's hold keeps its own marker: its zone is the hold's, never a reason to go to the city
+r = at('3c:Skyrim.esm', [76300, -64200, 10800]);
+ok(r && r.name === 'Ivarstead' && r.world === '3c:Skyrim.esm' && r.pos[0] === 76375, 'beside Ivarstead (zone riften): Ivarstead, never the Riften temple', r);
+r = at('3c:Skyrim.esm', [21900, -44700, -140]);
+ok(r && r.name === 'Riverwood' && r.world === '3c:Skyrim.esm', 'beside Riverwood (zone whiterun): Riverwood', r);
+r = at('3c:Skyrim.esm', [-102000, 83000, -12200]);
+ok(r && r.name === 'Dragon Bridge' && r.world === '3c:Skyrim.esm', 'beside Dragon Bridge (zone solitude): Dragon Bridge', r);
 r = at('3c:Skyrim.esm', [-30300, -86300, -3100]);
 ok(r && r.name === 'Falkreath' && r.world === '3c:Skyrim.esm' && r.pos[0] === -30296, 'beside Falkreath (no walls): its marker, as before', r);
 
