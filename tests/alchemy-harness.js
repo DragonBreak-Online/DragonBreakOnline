@@ -98,7 +98,9 @@ const api = (cfg) => ({
   itemName: (d) => CATALOG[String(d).toLowerCase()] || '',
   closeWidget: (a, id) => out.widgets.push([a, 'close', id]),
   registerChatCommand: (name, fn, opts) => commands.set(name, { fn, opts }),
+  onUi: (ev, fn) => uiHandlers.set(ev, fn),
 });
+const uiHandlers = new Map();
 const timers = new Map();
 // The F7 catalog's names for the harness ingredients (admin-items.json); Troll Fat is left out to test the fallback
 const CATALOG = { '4da00:skyrim.esm': 'Fly Amanita', '6018c7:bsassets.esm': 'Yellow Cinnabar Polypore', '77e1c:skyrim.esm': 'Blue Mountain Flower' };
@@ -281,6 +283,17 @@ check('...and the pair still brews', out.said.some(([, t]) => /You brew/.test(t)
   put(BREWER, 'pos', [5000, 0, 0]);
   timers.get('alchemyPanel')();
   check('walking away from the lab closes it', out.widgets.some(([a, k, id]) => a === BREWER && k === 'close' && id === 71));
+  // Its Close button: the browser list sent nothing without an event of its own (#bugs 1566999806897815562)
+  put(BREWER, 'pos', [0, 0, 0]);
+  out.widgets.length = 0;
+  globalThis.__dboAlchemyLab(LAB, BREWER);
+  const ev = ((lastPanel(BREWER) || {}).w || {}).events || {};
+  check('the list names its own close event', ev.close === 'dbo:alchemyListClose' && uiHandlers.has('alchemyListClose'), ev);
+  if (uiHandlers.has('alchemyListClose')) uiHandlers.get('alchemyListClose')(BREWER, [], 0);
+  check('...and Close closes it, whatever widget had focus', out.widgets.some(([a, k, id]) => a === BREWER && k === 'close' && id === 71));
+  out.widgets.length = 0;
+  craft(BREWER, [YELLOW_POLYPORE, BLUE_FLOWER]);
+  check('...and a brew after that does not open it again', !lastPanel(BREWER));
 }
 
 // One ingredient named twice (24 lab reports 23-30 Sep, e.g. BSKCairnBolete x1 + BSKCairnBolete x1): the player's lab

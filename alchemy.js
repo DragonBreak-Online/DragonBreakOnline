@@ -608,7 +608,8 @@ module.exports = (api) => {
     if (list.locked.length) lines.push(`Later: ${list.locked.slice(0, 3).map(([label, t]) => `${label} at ${tierName(t)} (${tierLevel(t)})`).join(', ')}${list.locked.length > 3 ? ` and ${list.locked.length - 3} more` : ''}`);
     if (BREW.length) lines.push('Crouch and use the lab to brew drinks.');
     const head = `${tierName(tier)}: ${RW.words.potion[tier - 1]} strength`;
-    openWidget(a, { type: 'contextMenu', id: PANEL_ID, mode: 'inspect', targetName: list.length ? `You can brew (${list.length}), ${head}` : `You can brew, ${head}`, lines }, false);
+    // Without its own close event the browser list's Close button sent nothing (#bugs 1566999806897815562)
+    openWidget(a, { type: 'contextMenu', id: PANEL_ID, mode: 'inspect', targetName: list.length ? `You can brew (${list.length}), ${head}` : `You can brew, ${head}`, lines, events: { close: 'dbo:alchemyListClose' } }, false);
   };
   // ---- drinks (Nate, 8 Oct: "add or create alcohol recipes for alchemy, includes skooma etc") ------------------------
   // Crouching at a lab opens the Brewing panel instead of the lab's menu: every recipe of brewing.json at or under the
@@ -665,6 +666,8 @@ module.exports = (api) => {
   if (onUi) {
     onUi('brewChoose', (a, args) => { try { brewDrink(a >>> 0, args && args[0]); } catch (e) { log(`alchemy: brewing failed: ${e.message}`); } });
     onUi('brewClose', (a) => { brewLab.delete(a >>> 0); closeWidget(a, BREW_PANEL); });
+    // Not by widget id: an unfocused panel's event arrives with whatever widget has focus, often none
+    onUi('alchemyListClose', (a) => { S.panels.delete(a >>> 0); closeWidget(a, PANEL_ID); });
   }
   globalThis.__dboBrewDrinks = BREW;
 
