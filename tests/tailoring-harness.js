@@ -60,7 +60,7 @@ delete globalThis.__dboFactionGearMember;
 load({ tailoring: Object.assign({}, cfgLive, { enabled: false }) });
 ok(craft(A, 2000) === true, 'enabled false: every loom recipe as before');
 const regions = fs.readFileSync(path.join(SERVER, 'regions.js'), 'utf8'), gm = fs.readFileSync(path.join(SERVER, 'gamemode.js'), 'utf8');
-ok(/__dboSmithCraft\(actorId, itemId, recipeId\) === false\) return false;\n[^\n]*\n\s+if \(typeof globalThis\.__dboTailorCraft === 'function' && globalThis\.__dboTailorCraft\(actorId, itemId, recipeId\) === false\) return false;/.test(regions), 'regions.js asks the tailor gate right after the smithing gate');
+ok(/__dboSmithCraft\(actorId, itemId, recipeId\) === false\) return false;\r?\n[^\r?\n]*\r?\n\s+if \(typeof globalThis\.__dboTailorCraft === 'function' && globalThis\.__dboTailorCraft\(actorId, itemId, recipeId\) === false\) return false;/.test(regions), 'regions.js asks the tailor gate right after the smithing gate');
 ok(/require\(TAILORING_JS\)\(\{ mp, log, personal, audit, who, cfg, isAdmin, sendPacket, registerChatCommand \}\)/.test(gm), 'gamemode.js loads tailoring.js');
 
 // ---- the curated list (Nate, 14 Oct: the tailoring spec) --------------------------------------------------------

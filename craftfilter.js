@@ -198,7 +198,8 @@ module.exports = (api) => {
   };
 
   const getTailorTier = (a) => {
-    const p = get(a, 'private.mastery.skills.tailor', null);
+    const r = get(a, 'private.mastery', null);
+    const p = r && r.skills && r.skills.tailor;
     return Math.max(0, Math.min(4, Number(p && p.rank) || 0)) + 1;
   };
 
@@ -224,7 +225,7 @@ module.exports = (api) => {
       return true;
     }
     const rec = get(a, 'private.dboManuals', null) || {};
-    return !!(rec[targetId] || rec[fam.id]);
+    return !!(rec[targetId] || rec[fam.id] || rec[String(fam.id).toLowerCase()] || rec[String(targetId).toLowerCase()]);
   };
 
   const computeLocked = (actorId) => {

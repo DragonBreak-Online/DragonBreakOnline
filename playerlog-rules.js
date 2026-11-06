@@ -1862,11 +1862,11 @@ exposure.js EXPOSURE 7d6e979d excluded
 exposure.js EXPOSURE 9d89712e excluded
 outlaws.js BOUNTY 30a8bfe5 excluded
 outlaws.js BOUNTY 16cb8c4f excluded
-outlaws.js BOUNTY 2eaae5ee excluded
+outlaws.js BOUNTY 9a1542ad excluded
 outlaws.js BOUNTY 2784331c excluded
 outlaws.js BOUNTY 322b41f3 excluded
 outlaws.js BOUNTY d5aa49c4 excluded
-outlaws.js BOUNTY 12814a1a excluded
+outlaws.js BOUNTY 35695e43 excluded
 patrons.js REROLL 0fd5f13c clean
 patrons.js REROLL 5adb2276 clean
 pickpocket.js THEFT 6f851464 parsed

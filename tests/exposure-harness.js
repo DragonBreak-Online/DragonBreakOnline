@@ -55,7 +55,7 @@ const api = (cfg, extra) => Object.assign({
 const load = (file, cfg, extra) => { const p = path.join(ROOT, file); delete require.cache[p]; return require(p)(api(cfg || {}, extra)); };
 load('outlaws.js');
 let X = load('exposure.js');
-const bounty = (zid, a) => { const l = ((globalThis.__dboOutlaws.data || {}).zones || {})[zid] || {}; const b = l[String(chars[a][0])]; return b ? b.amount : 0; };
+const bounty = (zid, a) => { const l = ((globalThis.__dboOutlaws.data || {}).zones || {})[zid] || {}; const b = l[(Number(a) >>> 0).toString(16)] || l[String(chars[a][0])]; return b ? b.amount : 0; };
 const clearBounties = () => { globalThis.__dboOutlaws.data.zones = {}; };
 const reset = () => { try { fs.unlinkSync('exposure.json'); } catch (e) { /* none */ } globalThis.__dboExposure = null; X = load('exposure.js'); clearBounties(); sys.length = 0; audits.length = 0; };
 const beast = (a, form) => props.set(`${a}|private.beast`, form ? { form, at: 1000 + a } : null);
@@ -71,7 +71,7 @@ reset();
 ok('three player witnesses expose them in the hold', see(WOLF, 'werewolf', [W1, W2, W3], 'in') === true && globalThis.__dboExposedIn(WOLF, 'bruma'));
 ok('...in a city: 500 gold bounty in Bruma', bounty('bruma', WOLF) === 500, bounty('bruma', WOLF));
 ok('...the werewolf is told', sys.some(([a, t]) => a === WOLF && /bounty of 500 gold/.test(t)));
-{ const b = (((globalThis.__dboOutlaws.data || {}).zones || {}).bruma || {})[String(chars[WOLF][0])] || {};
+{ const _z = (((globalThis.__dboOutlaws.data || {}).zones || {}).bruma || {}); const b = _z[(Number(WOLF) >>> 0).toString(16)] || _z[String(chars[WOLF][0])] || {};
   ok("the public bounty never names the beast (Nate, 23 Oct)", !/wolf|beast|vampire|lord|seen as/i.test(`${b.reason} ${b.by}`) && /hold/.test(String(b.reason)), b); }
 ok('...and it is audited', audits.some((t) => /EXPOSURE Ulf .* seen changing into a werewolf by 3/.test(t)));
 ok('...known for 7 days', (() => { const h = JSON.parse(fs.readFileSync('exposure.json', 'utf8')).cases[String(WOLF)].holds.bruma; return Math.round((h.until - h.at) / 86400000) === 7; })());

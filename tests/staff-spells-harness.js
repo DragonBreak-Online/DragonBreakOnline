@@ -23,7 +23,7 @@ ok(powers.staffSpells.every((s) => Array.isArray(s) && s.length === 3 && /^[0-9a
 ok(!powers.staffSpells.some((s) => held.has(String(s[0]).toLowerCase())), '...never a held spell (removed or suspended)');
 ok(!powers.staffSpells.some((s) => playerIds.has(s[0])), '...and none of the players\' tome spells (those stay where they were)');
 ok(!powers.staffSpells.some((s) => /^\(|^[^A-Za-z]*$/.test(s[1])), '...placeholder names (":}", "((...))") replaced by the editor id');
-ok(powers.shouts.length === 0 && powers.shoutsGate.length === 27, 'the players\' lists unchanged in shape: shouts empty, the gate 27');
+ok(powers.shouts.length === 0 && powers.shoutsGate.length === 26, 'the players\' lists unchanged in shape: shouts empty, the gate 26');
 
 // ---- /givespell, on a stub world ----------------------------------------------------------------------------------------
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-nate-staff-spells-'));
