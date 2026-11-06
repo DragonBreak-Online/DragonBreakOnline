@@ -1,24 +1,29 @@
-import { FormType, storage } from "skyrimPlatform";
+import { FormType, getJsMemoryUsage, storage } from "skyrimPlatform";
 import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { sendCustomPacket } from "./customPacketUtil";
 import { DboGlowService } from "./dboGlowService";
 import { FrameWindow, PERF_REPORT_MS, PERF_TOP_HANDLERS, perfDiagEnabled, updateTiming } from "./perfDiag";
+import { RefDecorService } from "./refDecorService";
 import { RemoteServer } from "./remoteServer";
+import { DBO_CLIENT_VERSION } from "../../lib/clientDiag";
 import { PlayerCharacterDataHolder } from "../../view/playerCharacterDataHolder";
 
 /**
  * The player's real frame rate and what the client's own JS costs, so the server can see slow dungeons.
  * Every PERF_REPORT_MS one line, logged by the server as "npcDrift <name> perf: <json>":
  *
- *   Client -> Server: { customPacketType: "dbo", event: "npcDrift", args: [{ kind: "perf", fps, frames, windowMs, worstMs,
- *     over50, over100, jsMs, top: [[label, ms, calls]...], cell, world, interior, actors, hosted, glowing,
- *     forms, near, still }] }
+ *   Client -> Server: { customPacketType: "dbo", event: "npcDrift", args: [{ kind: "perf", v, fps, frames, windowMs, worstMs,
+ *     over50, over100, jsMs, top: [[label, ms, calls]...], jsMb, gameMem, decor, cell, world, interior, actors, hosted,
+ *     glowing, forms, near, still }] }
  *
  * jsMs and top cover the update handlers registered through the controller (spApiInteractor.ts), labelled by the
  * listener that registered them. Set perfDiag: false in the skymp5-client settings block to turn it all off.
  *
  * forms, near and still are what WorldView's cost scales with (see context()); near + still is the set FormView does
  * full per-frame work for.
+ *
+ * v is the client version; jsMb the JS engine's heap; gameMem Utility.GetCurrentMemory's raw value, only while it reads
+ * non-zero and cheap; decor is RefDecorService.takePerf(), with sweeps = updates that did decor work.
  */
 export class PerfDiagService extends ClientListener {
   constructor(private sp: Sp, private controller: CombinedController) {
@@ -38,11 +43,32 @@ export class PerfDiagService extends ClientListener {
       if (!frames) return;
       const { jsMs, top } = updateTiming.take(PERF_TOP_HANDLERS);
       sendCustomPacket(this.controller, {
-        customPacketType: "dbo", event: "npcDrift", args: [{ kind: "perf", ...frames, jsMs, top, ...this.context() }],
+        customPacketType: "dbo", event: "npcDrift",
+        args: [{ kind: "perf", v: DBO_CLIENT_VERSION, ...frames, jsMs, top, ...this.memory(), decor: this.decor(), ...this.context() }],
       });
     } catch {
       // diagnostics only
     }
+  }
+
+  private memory(): Record<string, number> {
+    const out: Record<string, number> = {};
+    try { out.jsMb = Math.round(getJsMemoryUsage() / 1048576); } catch { /* diagnostics only */ }
+    if (!this.gameMemOk) return out;
+    try {
+      const t0 = Date.now();
+      const raw = this.sp.Utility.getCurrentMemory();
+      // A retail build may answer 0, and a slow answer would be a hitch every report: either way it is not asked again
+      this.gameMemOk = raw > 0 && Date.now() - t0 <= 1;
+      if (this.gameMemOk) out.gameMem = raw;
+    } catch {
+      this.gameMemOk = false;
+    }
+    return out;
+  }
+
+  private decor(): unknown {
+    try { return this.controller.lookupListener(RefDecorService).takePerf(); } catch { return undefined; }
   }
 
   private context(): Record<string, unknown> {
@@ -85,4 +111,5 @@ export class PerfDiagService extends ClientListener {
 
   private frames = new FrameWindow();
   private nextReport = 0;
+  private gameMemOk = true;
 }

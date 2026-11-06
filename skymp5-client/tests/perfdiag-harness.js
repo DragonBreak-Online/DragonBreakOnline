@@ -15,7 +15,8 @@ const esbuild = require(esbuildDir);
 let failures = 0;
 const check = (name, ok, got) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${!ok && got !== undefined ? '   ' + JSON.stringify(got) : ''}`); if (!ok) failures++; };
 const STUBS = {
-  sp: 'module.exports = { FormType: { Character: 62 }, storage: globalThis.__perfStorage };',
+  sp: 'module.exports = { FormType: { Character: 62 }, storage: globalThis.__perfStorage, getJsMemoryUsage: () => 123 * 1048576 };',
+  refDecor: 'class RefDecorService { takePerf() { return globalThis.__perfDecor; } } module.exports = { RefDecorService };',
   clientListener: 'class ClientListener {} module.exports = { ClientListener };',
   messages: 'module.exports = { MsgType: { CustomPacket: "CustomPacket" } };',
   systemNotification: 'module.exports = { showSystemNotification() {} };',
@@ -25,7 +26,7 @@ const STUBS = {
 };
 const STUB_OF = { skyrimPlatform: 'sp', './clientListener': 'clientListener', '../../messages': 'messages',
   './systemNotification': 'systemNotification', './dboGlowService': 'glow',
-  './remoteServer': 'remoteServer', '../../view/playerCharacterDataHolder': 'pcHolder' };
+  './remoteServer': 'remoteServer', '../../view/playerCharacterDataHolder': 'pcHolder', './refDecorService': 'refDecor' };
 
 async function build(tmp, file) {
   const out = path.join(tmp, path.basename(file, '.ts') + '.js');
@@ -93,7 +94,11 @@ async function main() {
     const onUpdate = [];
     const CELL = { getFormID: () => 0x1234, isInterior: () => true, getNumRefs: (t) => (t === 62 ? 17 : -1) };
     const PLAYER = { getParentCell: () => CELL, getWorldSpace: () => null };
-    const makeSp = (settings) => ({ settings: { 'skymp5-client': settings }, Game: { getPlayer: () => PLAYER } });
+    let gameMem = 0;
+    let gameMemAsks = 0;
+    const makeSp = (settings) => ({ settings: { 'skymp5-client': settings }, Game: { getPlayer: () => PLAYER },
+      Utility: { getCurrentMemory: () => { gameMemAsks++; return gameMem; } } });
+    globalThis.__perfDecor = { n: 1700, live: 6, q: 0, pk: 2, sweeps: 95, msPerSweep: 0.42, maxMs: 2, visits: 3100, applied: 260 };
     const controller = {
       on: (ev, fn) => { if (ev === 'update') onUpdate.push(fn); },
       emitter: { emit: (ev, m) => { if (ev === 'sendMessage') sent.push(JSON.parse(m.message.contentJsonDump)); } },
@@ -119,6 +124,22 @@ async function main() {
     check('still counts forms with no movement', a.still === 2, a);
     check('frame fields present', a.fps > 60 && a.fps < 64 && a.worstMs === 16 && a.over50 === 0 && Array.isArray(a.top), a);
     check('report fits the logged 900 chars', JSON.stringify(a).length < 900);
+    check('the client version leads the report', a.v === '0.3.119' && Object.keys(a)[1] === 'v', Object.keys(a).slice(0, 3));
+    check('JS engine memory in MB', a.jsMb === 123, a.jsMb);
+    check('the decor sweep numbers come from RefDecorService', JSON.stringify(a.decor) === JSON.stringify(globalThis.__perfDecor), a.decor);
+    check('a game memory reading of 0 is left out and not asked again', a.gameMem === undefined && gameMemAsks === 1, { gameMem: a.gameMem, gameMemAsks });
+    const clockBefore = clock;
+    new PerfDiagService(makeSp({}), controller);
+    gameMem = 812345678;
+    gameMemAsks = 0;
+    const sentBefore = sent.length;
+    for (let i = 0; i < 1900; i++) { onUpdate[1](); clock += 16; }
+    const a3 = ((sent[sentBefore] || {}).args || [])[0] || {};
+    check('a non-zero game memory reading is reported raw', a3.gameMem === 812345678 && gameMemAsks === 1, { gameMem: a3.gameMem, gameMemAsks });
+    check('the full report still fits the logged 900 chars', JSON.stringify(a3).length < 900, JSON.stringify(a3).length);
+    sent.length = sentBefore;
+    onUpdate.length = 1;
+    clock = clockBefore;
     globalThis.__perfWoc = 0;
     for (let i = 0; i < 1900; i++) { onUpdate[0](); clock += 16; }
     check('the next report 30 s later', sent.length === 2, sent.length);
