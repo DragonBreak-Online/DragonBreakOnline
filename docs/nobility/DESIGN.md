@@ -146,7 +146,7 @@ lands at `payload.nobility`:
 Noble = { actor: hex, name, tag, online, title, label: "Baron of Mountain Watch", fief, estate, since }
 ```
 
-- Holds shown: those with fiefs or titles, and any the viewer rules.
+- Holds shown: every hold and county (a zone whose first office is a jarl or count, from `zones.json`), even with no fief or noble (Winterhold has no fief), plus any other zone with fiefs or titles. Solstheim (guards only) and the strongholds (chieftain first) are not shown.
 - Events, with the journal nonce first, answer through `__dboJournalLimited`, and the result goes to the footer:
   - `dbo:nobilityGrant [nonce, holdId, nameOrTag, titleId, fiefId | estateName]`
   - `dbo:nobilityRevoke [nonce, holdId, actorHex]`

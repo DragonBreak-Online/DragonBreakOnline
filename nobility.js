@@ -300,15 +300,17 @@ module.exports = (api) => {
   };
   const nobleView = (n) => ({ actor: hex(n.actor), name: isOnline(n.actor) ? String(ownNameOf(n.actor)) : n.name, tag: tagSafe(n.actor), online: isOnline(n.actor),
     title: n.title, label: labelOf(n), fief: n.fief || '', estate: n.estate || '', since: n.at });
+  // Every hold and county, to everyone, though it has no fiefs or nobles (Winterhold has no fief, d7aa31268): a zone whose
+  // first office is a ruler's seat (DESIGN.md 4: count or jarl; review R3, 23 Oct). Solstheim's only office is guard and a
+  // stronghold's first is its chieftain, and rules() would take either for the ruler
+  const ZONE_IDS = (() => { try { const z = JSON.parse(fs.readFileSync(path.resolve('zones.json'), 'utf8')); return [].concat(z.holds || [], z.strongholds || [], z.regions || []).map((x) => String(x.id)); } catch (e) { return []; } })();
+  const seated = (id) => { const z = zoneById(id); return !!z && RULER_SEATS.has((z.officials || [])[0]); };
   const holdIds = (a) => {
     const ids = new Set(Object.keys(C.realms || {}));
     for (const f of FIEFS) ids.add(f.hold);
     for (const n of living()) ids.add(n.hold);
-    // A ruler's own hold, though it has no fiefs or nobles yet (Jarl of Falkreath, 22 Oct: only Haafingar and Bruma showed).
-    // Only a ruler's seat (DESIGN.md 4: count or jarl; review R3, 23 Oct): Solstheim's only office is guard and a
-    // stronghold's first is its chieftain, and rules() would take either for the ruler
-    try { for (const m of ranksOf(profileOf(a), a) || []) if (m && m.zone && m.zone.id && RULER_SEATS.has(m.rank)) ids.add(m.zone.id); } catch (e) { /* no ranks */ }
-    return [...ids].filter((id) => zoneById(id)).filter((id) => FIEFS.some((f) => f.hold === id) || living().some((n) => n.hold === id) || rules(a, id));
+    for (const id of ZONE_IDS) if (seated(id)) ids.add(id);
+    return [...ids].filter((id) => zoneById(id)).filter((id) => seated(id) || FIEFS.some((f) => f.hold === id) || living().some((n) => n.hold === id) || rules(a, id));
   };
   const holdView = (a, zid) => {
     const z = zoneById(zid); const ruler = rules(a, zid);

@@ -22,6 +22,8 @@ const ECON = path.join(ROOT, 'economy.js');
 const BANK = path.join(ROOT, 'bank.js');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-nate-nobility-'));
 fs.copyFileSync(path.join(ROOT, 'nobility-fiefs.json'), path.join(dir, 'nobility-fiefs.json'));
+fs.copyFileSync(path.join(ROOT, 'zones.json'), path.join(dir, 'zones.json'));
+const REAL_ZONES = JSON.parse(fs.readFileSync(path.join(dir, 'zones.json'), 'utf8'));
 const FIEFS = JSON.parse(fs.readFileSync(path.join(dir, 'nobility-fiefs.json'), 'utf8')).fiefs;
 process.chdir(dir);
 
@@ -335,12 +337,27 @@ Object.assign(officials, { falkreath: { jarl: [30], steward: [31] }, solstheim: 
 for (const [id, pid, n] of [[FJARL, 30, 'Siddgeir'], [FSTEW, 31, 'Nenya'], [SGUARD, 32, 'Gjalund'], [CHIEF, 33, 'Burguk']]) chars.set(id, { pid, name: n, female: false, online: true });
 const holdOf = (a, zid) => SEC.view(a).holds.find((h) => h.id === zid);
 ok('the Jarl of Falkreath sees his hold, with no fiefs or nobles yet, as its ruler', !!holdOf(FJARL, 'falkreath') && holdOf(FJARL, 'falkreath').isRuler, SEC.view(FJARL).holds.map((h) => h.id));
-// Falkreath has a fief since 2 Nov (Halfmoon Mill), and nobility.js lists any hold that has one, so the hold
-// is now visible to everyone. What still separates them is isRuler.
-ok('...his Steward sees the hold now it has a fief, but does not rule it',
-  !!holdOf(FSTEW, 'falkreath') && !holdOf(FSTEW, 'falkreath').isRuler);
+// Every hold is listed to everyone (a jarl or count is its first office); what separates the ruler is isRuler
+ok('...his Steward sees the hold but does not rule it', !!holdOf(FSTEW, 'falkreath') && !holdOf(FSTEW, 'falkreath').isRuler);
 ok('a guard of Solstheim (its only office) is not shown Solstheim as a hold he rules', !holdOf(SGUARD, 'solstheim'), holdOf(SGUARD, 'solstheim'));
 ok('nor an orc chieftain his stronghold', !holdOf(CHIEF, 'dushnikh'), holdOf(CHIEF, 'dushnikh'));
+ok('...nor anyone else either of them', !holdOf(OUT, 'solstheim') && !holdOf(OUT, 'dushnikh'), SEC.view(OUT).holds.map((h) => h.id));
+// A hold with no fief, no noble and no seated Jarl (Winterhold was given no fief on purpose, d7aa31268): listed to everyone
+zones.push({ id: 'winterhold', name: 'Winterhold', officials: ['jarl', 'steward', 'commander', 'courtmage', 'guardcaptain', 'guard'] });
+ok('Winterhold has no fief in nobility-fiefs.json', !FIEFS.some((f) => f.hold === 'winterhold'));
+const wh = holdOf(OUT, 'winterhold');
+ok('a fief-less hold with an empty seat is listed to anyone, empty and not theirs to rule', !!wh && !wh.isRuler && !wh.canRevoke && wh.ruler === null && wh.fiefs.length === 0 && wh.roll.length === 0 && wh.titles.length === 0, wh);
+officials.winterhold = { jarl: [34] };
+chars.set(0x34, { pid: 34, name: 'Korir', female: false, online: true });
+ok('...its Jarl, once seated, rules it and is named', holdOf(0x34, 'winterhold').isRuler && holdOf(OUT, 'winterhold').ruler.name === 'Korir' && holdOf(OUT, 'winterhold').ruler.style === 'Jarl of Winterhold', holdOf(OUT, 'winterhold').ruler);
+ok('...and the Jarl is offered the titles to grant', holdOf(0x34, 'winterhold').titles.map((t) => t.id).join() === 'lord,thane', holdOf(0x34, 'winterhold').titles);
+chars.delete(0x34); delete officials.winterhold;
+zones.pop();
+// With the real zones.json: the nine holds and Bruma, never Solstheim, the Alik'r or a stronghold
+const saved = zones.splice(0, zones.length, ...[].concat(REAL_ZONES.holds, REAL_ZONES.strongholds, REAL_ZONES.regions));
+const realIds = SEC.view(OUT).holds.map((h) => h.id).sort().join();
+zones.splice(0, zones.length, ...saved);
+ok('the real zones: every hold and Bruma, nothing else', realIds === 'bruma,dawnstar,falkreath,markarth,morthal,riften,solitude,whiterun,windhelm,winterhold', realIds);
 zones.splice(zones.length - EXTRA_ZONES.length, EXTRA_ZONES.length);
 for (const z of EXTRA_ZONES) delete officials[z.id];
 for (const id of [FJARL, FSTEW, SGUARD, CHIEF]) chars.delete(id);
