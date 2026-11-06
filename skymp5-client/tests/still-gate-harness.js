@@ -3,7 +3,8 @@
 // Why: 0.3.118 perf reports put WorldView at 42% of client JS. Within each client it costs ~0.07 ms a frame for every streamed
 // world object without movement (doors, containers; perfDiag's "still", p90 40, p99 81), wherever the object is, although
 // applyAll acts on them only every 133 ms or under the crosshair. The old formView.ts (default: the RC tip 7b4de14e7) is
-// run beside the new one and every state-changing call is compared.
+// run beside the new one and every state-changing call is compared, at 12-22 ms frames and at 50 and 110 ms frames: RC2's
+// phase-locked gate saved nothing at the 8-14 fps of a dev-server test (6 Nov), and is kept below as a mutant.
 //
 //   node tests/still-gate-harness.js [old-formView.ts]
 'use strict';
@@ -33,20 +34,21 @@ const loadPlain = (src) => {
   return mod;
 };
 const G = loadPlain(GATE);
+const T = G.STILL_TICK_MS, J = G.STILL_JITTER_MS;
 {
   const s = G.newStillGate();
-  const T = G.STILL_TICK_MS;
-  check('the first update of a new ref runs', G.stillStep(s, 1000, false, false, () => 0.5) === G.STILL_RUN);
-  check('...and its first tick lands somewhere in the tick after', s.nextAt === 1000 + T + Math.floor(0.5 * T), s.nextAt);
-  check('updates before the tick are skipped', G.stillStep(s, 1100, false, false) === G.STILL_SKIP && G.stillStep(s, s.nextAt - 1, false, false) === G.STILL_SKIP);
+  check('the first update of a new ref runs', G.skipStill(s, 1000, false, false, () => 0.5) === false);
+  check('...and the second lands somewhere in the tick after', s.nextAt === 1000 + T + Math.floor(0.5 * T), s.nextAt);
+  check('updates before it are skipped', G.skipStill(s, 1100, false, false) === true && G.skipStill(s, s.nextAt - 1, false, false) === true);
   const due = s.nextAt;
-  check('a frame late to its tick still ticks, and keeps the phase', G.stillStep(s, due + 9, false, false) === G.STILL_TICK && s.nextAt === due + T);
-  check('a long pause (a menu, a load) skips the missed ticks, not the phase', G.stillStep(s, due + 10 * T + 3, false, false) === G.STILL_TICK && s.nextAt === due + 11 * T);
-  check('a ref under the crosshair runs every update', G.stillStep(s, s.nextAt - 2, true, false) === G.STILL_RUN && G.stillStep(s, s.nextAt - 1, true, false) === G.STILL_RUN);
-  check('a changed animation runs without moving the tick', (() => { const at = s.nextAt; return G.stillStep(s, at - 5, false, true) === G.STILL_RUN && s.nextAt === at; })());
+  check('a run a frame late counts the next tick from the frame it ran in, plus a little jitter', G.skipStill(s, due + 9, false, false, () => 0.5) === false && s.nextAt === due + 9 + T + Math.floor(0.5 * J), s.nextAt - due);
+  const at = s.nextAt;
+  check('after a long pause (a menu, a load) it runs once and goes on from there', G.skipStill(s, at + 10 * T, false, false, () => 0) === false && s.nextAt === at + 11 * T && G.skipStill(s, at + 10 * T + 20, false, false) === true);
+  check('a ref under the crosshair runs every update', G.skipStill(s, s.nextAt - 2, true, false) === false && G.skipStill(s, s.nextAt - 1, true, false) === false);
+  check('a changed animation runs without moving the tick', (() => { const n = s.nextAt; return G.skipStill(s, n - 5, false, true) === false && s.nextAt === n; })());
   s.actor = true;
-  check('an actor is never skipped', G.stillStep(s, s.nextAt - 5, false, false) === G.STILL_RUN);
-  check('the tick is the open-state clock\'s 133 ms and a millisecond', T === 134 && /now - this\.lastOpenApply > 133/.test(NEW_FV));
+  check('an actor is never skipped', G.skipStill(s, s.nextAt - 5, false, false) === false);
+  check('a run always finds applyAll\'s 133 ms open-state clock due', T === 134 && /now - this\.lastOpenApply > 133/.test(NEW_FV));
 }
 
 // ---- the source ----
@@ -59,7 +61,7 @@ const G = loadPlain(GATE);
   check('destroy (a new ref id, a removed form) starts the gate again', /this\.stillGate = newStillGate\(\);/.test(NEW_FV.slice(NEW_FV.indexOf('  destroy(): void {'))));
   check('only forms without movement or appearance, and only while driftConfig.stillGate is on',
     /if \(!driftConfig\.stillGate \|\| model\.movement \|\| model\.appearance\) return false;/.test(NEW_FV));
-  check('a tick runs the open-state check', /if \(step === STILL_TICK\) this\.lastOpenApply = 0;/.test(NEW_FV));
+  check('applyAll\'s clocks are its own: only the crosshair resets the open-state clock', NEW_FV.split('this.lastOpenApply = 0;').length === 2);
   check('driftConfig takes stillGate as a boolean, on by default', /stillGate: true,/.test(read('sync/driftConfig')) && /stillGate: isBool,/.test(read('sync/driftConfig')));
 }
 
@@ -273,10 +275,10 @@ const suite = (newSrc, label, overrides) => {
   const same = doors().every((f) => story(old.w, f.id) === story(neu.w, f.id));
   check(`${label}every ref is told the same things in the same order`, same, doors().map((f) => f.id).filter((id) => story(old.w, id) !== story(neu.w, id)).map((id) => [story(old.w, id), story(neu.w, id)]).slice(0, 1));
   const oLat = flipLatency(old), nLat = flipLatency(neu);
-  check(`${label}a server open or close reaches the door within one tick and a frame, as before`, Math.max(...nLat) <= 134 + neu.maxDt && Math.max(...oLat) <= 133 + old.maxDt, { old: Math.max(...oLat), new: Math.max(...nLat), maxDt: neu.maxDt });
-  check(`${label}the open state is put back on loaded doors as often as before`, openGap(neu) <= 134 + neu.maxDt, { old: openGap(old), new: openGap(neu) });
+  check(`${label}a server open or close reaches the door within a tick, its jitter and a frame (old: 133 ms and a frame)`, Math.max(...nLat) <= T + J + neu.maxDt && Math.max(...oLat) <= 133 + old.maxDt, { old: Math.max(...oLat), new: Math.max(...nLat), maxDt: neu.maxDt });
+  check(`${label}the open state is put back on loaded doors every tick`, openGap(neu) <= T + J + neu.maxDt, { old: openGap(old), new: openGap(neu) });
   const oH = harvestLatency(old), nH = harvestLatency(neu);
-  check(`${label}another player's harvest reaches the plant within its 666 ms clock and one tick`, nH.length === 2 && Math.max(...nH) <= 666 + 134 + neu.maxDt && Math.max(...oH) <= 666 + old.maxDt, { old: oH, new: nH });
+  check(`${label}another player's harvest reaches the plant within its 666 ms clock and one run`, nH.length === 2 && Math.max(...nH) <= 666 + T + J + neu.maxDt && Math.max(...oH) <= 666 + old.maxDt, { old: oH, new: nH });
 
   // The crosshair on a container with an inventory from the server: applied on that frame
   const look = (fr, w, views) => { if (fr === 300) { views[25].model.inventory = { entries: [{ baseId: 0xf, count: 3 }] }; w.crosshair = ID(25); } if (fr === 330) w.crosshair = 0; };
@@ -290,8 +292,8 @@ const suite = (newSrc, label, overrides) => {
   const oA = O(attach), nA = N(attach);
   const attachLat = first(nA, ID(35), 'blockActivation', 200) - first(oA, ID(35), 'blockActivation', 200);
   const loadLat = first(nA, ID(22), 'setRefrCollision', 250) - first(oA, ID(22), 'setRefrCollision', 250);
-  check(`${label}a ref whose cell attaches is set up within one tick`, attachLat >= 0 && attachLat <= 134 + nA.maxDt, attachLat);
-  check(`${label}a door whose 3D loads is seated within one tick`, loadLat >= 0 && loadLat <= 134 + nA.maxDt, loadLat);
+  check(`${label}a ref whose cell attaches is set up within one run`, attachLat >= 0 && attachLat <= T + J + nA.maxDt, attachLat);
+  check(`${label}a door whose 3D loads is seated within one run`, loadLat >= 0 && loadLat <= T + J + nA.maxDt, loadLat);
 
   // A world actor without movement: never gated
   const actors = () => [0, 1, 2].map((i) => ({ id: ID(100 + i), kind: 'NPC', loaded: true }));
@@ -312,26 +314,42 @@ const suite = (newSrc, label, overrides) => {
   return failures - f0;
 };
 
-console.log('-- the new formView.ts against the old --');
-suite(NEW_FV, '');
+// A slow machine (the dev-server test ran 8-14 fps): the gate must never cost more than every-frame updates, nor slow the doors
+const lowFps = (newSrc, label, overrides, dt) => {
+  const old = sim(OLD_FV, doors(), FRAMES, flips, { dt }), neu = sim(newSrc, doors(), FRAMES, flips, { dt, overrides });
+  const warm = (r) => r.perFrame.slice(10);
+  const oMean = mean(warm(old)), nMean = mean(warm(neu)), oMax = Math.max(...warm(old)), nMax = Math.max(...warm(neu));
+  if (!label) console.log(`   at ${dt} ms frames: natives a frame old mean ${oMean.toFixed(1)} max ${oMax}, new mean ${nMean.toFixed(1)} max ${nMax}`);
+  check(`${label}at ${dt} ms frames the still refs cost less than before, and no frame costs more`, nMean < oMean * 0.8 && nMax <= oMax, { oMean, nMean, oMax, nMax });
+  check(`${label}at ${dt} ms frames every ref is told the same things in the same order`, doors().every((f) => story(old.w, f.id) === story(neu.w, f.id)));
+  check(`${label}at ${dt} ms frames the open state is put back as often as before, give or take a frame`, openGap(neu) <= openGap(old) + dt, { old: openGap(old), new: openGap(neu) });
+  const oLat = flipLatency(old), nLat = flipLatency(neu);
+  check(`${label}at ${dt} ms frames a server open or close is as quick as before, give or take a frame`, Math.max(...nLat) <= Math.max(...oLat) + dt, { old: Math.max(...oLat), new: Math.max(...nLat) });
+};
+const all = (newSrc, label, overrides) => { suite(newSrc, label, overrides); lowFps(newSrc, label, overrides, 50); lowFps(newSrc, label, overrides, 110); };
 
-// Mutants: each must break at least one check above
+console.log('-- the new formView.ts against the old --');
+all(NEW_FV, '');
+
+// Mutants: each must break at least one check above. RC2 is the gate that shipped in the first 0.3.119 RC2 build
+const rc2 = (f) => LF(execSync(`git show ec672b816:skymp5-client/src/${f}.ts`, { cwd: client, encoding: 'utf8' }));
 const mutants = [
-  ['the crosshair does not open the gate', { 'view/stillGate': GATE.replace('return targeted || animChanged ?', 'return animChanged ?') }],
-  ['actors are gated too', { 'view/stillGate': GATE.replace('if (s.actor) return STILL_RUN;', '') }],
+  ['the crosshair does not open the gate', { 'view/stillGate': GATE.replace('return !targeted && !animChanged;', 'return !animChanged;') }],
+  ['actors are gated too', { 'view/stillGate': GATE.replace('if (s.actor) return false;', '') }],
   ['the ref never learns it is an actor', { 'view/formView': NEW_FV.replace('this.stillGate.actor = !!actor;', '') }],
   ['the kill switch is ignored', { 'view/formView': NEW_FV.replace('!driftConfig.stillGate || ', '') }],
-  ['a tick does not run the open-state check', { 'view/formView': NEW_FV.replace('if (step === STILL_TICK) this.lastOpenApply = 0;', '') }],
-  ['ticks restart from the frame that ran them (refs drift together)', { 'view/stillGate': GATE.replace('s.nextAt += STILL_TICK_MS * (Math.floor((now - s.nextAt) / STILL_TICK_MS) + 1);', 's.nextAt = now + STILL_TICK_MS;') }],
-  ['no stagger', { 'view/stillGate': GATE.replace(' + Math.floor(random() * STILL_TICK_MS)', '') }],
-  ['animations wait for the tick', { 'view/stillGate': GATE.replace('return targeted || animChanged ?', 'return targeted ?') }],
+  ['no jitter (refs that run together stay together)', { 'view/stillGate': GATE.replace('(s.nextAt ? STILL_JITTER_MS : STILL_TICK_MS)', '(s.nextAt ? 0 : STILL_TICK_MS)') }],
+  ['no stagger', { 'view/stillGate': GATE.replace('(s.nextAt ? STILL_JITTER_MS : STILL_TICK_MS)', 'STILL_JITTER_MS') }],
+  ['a 100 ms tick', { 'view/stillGate': GATE.replace('STILL_TICK_MS = 134', 'STILL_TICK_MS = 100') }],
+  ['animations wait for the tick', { 'view/stillGate': GATE.replace('return !targeted && !animChanged;', 'return !targeted;') }],
+  ['RC2: phase-locked ticks that force the open-state check', { 'view/stillGate': rc2('view/stillGate'), 'view/formView': rc2('view/formView') }],
 ];
 let killed = 0;
 const realLog = console.log;
 for (const [name, ov] of mutants) {
   const f0 = failures;
   console.log = () => {};
-  try { suite(ov['view/formView'] || NEW_FV, 'mutant: ', ov); } catch (e) { failures++; } finally { console.log = realLog; }
+  try { all(ov['view/formView'] || NEW_FV, 'mutant: ', ov); } catch (e) { failures++; } finally { console.log = realLog; }
   const broke = failures > f0;
   failures = f0;
   if (broke) killed++;
