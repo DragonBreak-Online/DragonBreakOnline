@@ -8,7 +8,8 @@
 //                chest you are already standing in is free.
 //   the take     a body has no activation to gate (the client blocks activating actors, and a body's items only reach
 //                the server once searchSystem.ts has made the searcher its inventory occupant), so a body pays its beat
-//                on its FIRST take instead: bodySeconds. Every take after that, from anything, is takeSeconds apart.
+//                on its FIRST take instead: bodySeconds. A take from another source waits takeSeconds after the last
+//                one; take-all from one source (one take per item at once) is not held up (6 Nov, #bugs loot-all).
 //
 // Why the server and not the client: the engine moves an item before anything of ours hears about it, and no event in
 // the SkyrimPlatform typings is cancellable, so a client-side bar is decoration a modified client ignores. A take is
@@ -55,6 +56,9 @@ module.exports = (api) => {
     beat: new Map(), done: new Map(), nextTake: new Map(), told: new Map(), shown: new Map(),
     opened: new Map(), timers: new Map(),
   });
+  if (!(S.lastSrc instanceof Map)) S.lastSrc = new Map();
+  // The gap runs from this take; take-all fires one take per item from one source, so only a change of source waits it
+  const startGap = (a, src, now) => { S.nextTake.set(a, now + MS(C.takeSeconds)); S.lastSrc.set(a, src); };
   const sweep = () => {
     const now = Date.now(), keep = MS(C.graceSeconds) + 600000;
     for (const m of [S.beat, S.done, S.told, S.shown]) {
@@ -63,6 +67,7 @@ module.exports = (api) => {
       if (m.size > 20000) m.clear();
     }
     if (S.nextTake.size > 20000) S.nextTake.clear();
+    if (S.lastSrc.size > 20000) S.lastSrc.clear();
   };
 
   const isPlayer = (a) => { try { return profileOf(a) >= 0; } catch (e) { return false; } };
@@ -159,7 +164,7 @@ module.exports = (api) => {
     const now = Date.now();
     S.beat.delete(key);
     S.done.set(key, now);
-    S.nextTake.set(a, now + MS(C.takeSeconds));
+    startGap(a, t, now);
     hide(a);
     const searched = () => { try { personal(a, 'You have searched it. Open it again.'); } catch (e) { /* offline */ } };
     if (C.autoOpen === false) { searched(); return; }
@@ -312,8 +317,8 @@ module.exports = (api) => {
     if (pending) { try { clearTimeout(pending); } catch (e) { /* gone */ } S.timers.delete(key); }
     S.beat.delete(key);
     S.done.set(key, now);
-    // the search paid for the first take; the next one still waits takeSeconds
-    S.nextTake.set(a, now + MS(C.takeSeconds));
+    // the search paid for the first take; a take from anything else still waits takeSeconds
+    startGap(a, t, now);
     hide(a);
     return undefined;
   };
@@ -350,6 +355,13 @@ module.exports = (api) => {
           S.beat.set(key, now);
           sweep();
           show(a, ms, 'Searching');
+          // The front's bar never closes itself, so it closes when the beat is over even if no second take comes
+          const barKey = `body:${key}`, prev = S.timers.get(barKey);
+          if (prev) { try { clearTimeout(prev); } catch (e) { /* gone */ } }
+          S.timers.set(barKey, setTimeout(() => {
+            S.timers.delete(barKey);
+            if (S.beat.get(key) === now && (S.shown.get(a) || 0) - now < 100) hide(a);
+          }, ms + 50));
           tell(a, 'body', 'You are still searching. Wait a moment.');
           resync(a);
           return false;
@@ -359,16 +371,16 @@ module.exports = (api) => {
       S.beat.delete(key);
       S.done.set(key, now);
       hide(a);
-      S.nextTake.set(a, now + MS(C.takeSeconds));
+      startGap(a, src, now);
       return undefined;
     }
     const next = S.nextTake.get(a) || 0;
-    if (now < next) {
+    if (now < next && S.lastSrc.get(a) !== src) {
       tell(a, 'gap', 'Your hands are full for a moment.');
       resync(a);
       return false;
     }
-    S.nextTake.set(a, now + MS(C.takeSeconds));
+    startGap(a, src, now);
     return undefined;
   };
 

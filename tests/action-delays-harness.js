@@ -133,19 +133,30 @@ clock += 2.9 * SEC;
 ok(T.takeGate(BODY, PLAYER) === false, 'still refused just short of the body beat');
 clock += 0.2 * SEC;
 ok(T.takeGate(BODY, PLAYER) === undefined, 'the body beat done: the take stands');
+ok(T.takeGate(BODY, PLAYER) === undefined && T.takeGate(BODY, PLAYER) === undefined, 'take-all: the same body\'s next items stand at once');
+const BODY2 = 0xff000051;
+T.S.done.set(`${PLAYER}:${BODY2}`, clock);                // already searched, so only the gap can refuse it
 const beforeGap = resyncs.length;
-ok(T.takeGate(BODY, PLAYER) === false, 'the very next take is refused: takeSeconds apart');
+ok(T.takeGate(BODY2, PLAYER) === false, 'a take from another source right after is refused: takeSeconds apart');
 ok(resyncs.length > beforeGap, '...and that refusal resyncs too, not only the first one', resyncs.length - beforeGap);
 clock += 0.5 * SEC;
-ok(T.takeGate(BODY, PLAYER) === undefined, '...and allowed once the gap has passed');
+ok(T.takeGate(BODY2, PLAYER) === undefined, '...and allowed once the gap has passed');
 
 // a container that paid on its activation does not pay the body beat again
 T = load({});
 resyncs.length = 0;
 ok(T.searchGate(CHEST, PLAYER) === false && (clock += 2 * SEC) && T.searchGate(CHEST, PLAYER) === undefined, 'search a chest through to the end');
-ok(T.takeGate(CHEST, PLAYER) === false, 'the first take right after opening still waits the take gap');
-clock += 0.5 * SEC;
-ok(T.takeGate(CHEST, PLAYER) === undefined, '...then it is allowed, with no second 3 s body beat');
+ok(T.takeGate(CHEST, PLAYER) === undefined, 'the first take right after opening stands: the search paid for it');
+ok(T.takeGate(CHEST, PLAYER) === undefined, '...and the next, with no second 3 s body beat (take-all)');
+
+// the body beat's bar closes on its own when its time is over and no second take comes (live, 6 Nov: it stayed up)
+T = load({});
+fireTimers(); closed.length = 0;
+T.S.beat.clear(); T.S.done.clear(); T.S.nextTake.clear();
+ok(T.takeGate(BODY, PLAYER) === false, 'a body\'s first take starts its beat and bar');
+clock += 3.1 * SEC;
+ok(fireTimers() >= 1 && closed.length === 1, '...and the bar closes when the beat is over, with no second take', closed);
+ok(T.takeGate(BODY, PLAYER) === undefined && closed.length === 1, '...and a take after that stands without closing it twice', closed);
 ok(T.takeGate(HOMECHEST, PLAYER) === undefined && T.takeGate(HOMECHEST, PLAYER) === undefined,
   'your own home chest: takes are never delayed');
 
@@ -228,7 +239,9 @@ const MUTANTS = [
   ['the first activation is allowed (no search beat at all)', (s) => s.replace('      S.beat.set(key, now);', '      return undefined;')],
   ['the beat is never waited out (any activation opens it)', (s) => s.replace('if (now - started < ms) return false;', 'if (false) return false;')],
   ['a body\'s first take is free', (s) => s.replace('if (now - started < ms) { resync(a); return false; }', 'if (false) { resync(a); return false; }')],
-  ['the gap between takes is dropped', (s) => s.replace('if (now < next) {', 'if (false) {')],
+  ['the gap between takes is dropped', (s) => s.replace('if (now < next && S.lastSrc.get(a) !== src) {', 'if (false) {')],
+  ['take-all from one source waits the gap again', (s) => s.replace('if (now < next && S.lastSrc.get(a) !== src) {', 'if (now < next) {')],
+  ['the body bar is never closed by its own timer', (s) => s.replace('if (S.beat.get(key) === now && (S.shown.get(a) || 0) - now < 100) hide(a);', '')],
   ['a refused take does not resync', (s) => s.replace(/      resync\(a\);\n      return false;/, '      return false;')],
   ['every container counts as your own home (the exemption swallows everything)', (s) => s.replace('const ownHome = (ref, a) => {', 'const ownHome = (ref, a) => { if (true) return true;')],
   ['nothing is your own home (the exemption is lost)', (s) => s.replace('const ownHome = (ref, a) => {', 'const ownHome = (ref, a) => { if (true) return false;')],
@@ -275,9 +288,17 @@ const battery = (M) => {
   out.push(resyncs.length > r);                                           // and that refusal resyncs as well
   clock += 3.1 * SEC;
   out.push(M.takeGate(BODY, PLAYER) === undefined);                      // then stands
+  out.push(M.takeGate(BODY, PLAYER) === undefined);                      // take-all: the same body's next item too
   r = resyncs.length;
-  out.push(M.takeGate(BODY, PLAYER) === false);                          // the next waits the gap
+  out.push(M.takeGate(CHEST, PLAYER) === false);                         // another (searched) source waits the gap
   out.push(resyncs.length > r);                                           // and the gap refusal resyncs
+  // the body bar closes on its own timer when the beat ends with no second take
+  M.S.done.delete(`${PLAYER}:${BODY}`); M.S.beat.delete(`${PLAYER}:${BODY}`);
+  const c0 = closed.length;
+  M.takeGate(BODY, PLAYER);
+  clock += 3.1 * SEC;
+  fireTimers();
+  out.push(closed.length > c0);
   out.push(M.takeGate(HOMECHEST, PLAYER) === undefined);                 // home takes are free
   return out;
 };
@@ -340,7 +361,12 @@ ok(T.takeGate(CHEST, PLAYER) === undefined, '...every item of it, not just the f
 mp.set(CHEST, 'worldOrCellDesc', '000' + DUNGEON_CELL);
 T.S.done.set(ownKey, clock);
 T.S.nextTake.set(PLAYER, clock + 5 * SEC);
-ok(T.takeGate(CHEST, PLAYER) === false, '...but a dungeon container still waits takeSeconds');
+T.S.lastSrc.set(PLAYER, CHEST);
+ok(T.takeGate(CHEST, PLAYER) === undefined && T.takeGate(CHEST, PLAYER) === undefined,
+  '...and take-all from a dungeon container is not throttled either (live, 6 Nov: "hands are full")');
+T.S.lastSrc.set(PLAYER, BODY);
+T.S.nextTake.set(PLAYER, clock + 5 * SEC);
+ok(T.takeGate(CHEST, PLAYER) === false, '...but turning to it from another source still waits takeSeconds');
 
 // ---- the first take from an ordinary chest, with nothing searched (live bug, 3 Nov) -----------------------------------
 // The block above sets S.done itself, which is the one precondition live never has: the search does not run
