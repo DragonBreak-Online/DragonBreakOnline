@@ -41,7 +41,7 @@ module.exports = (api) => {
   const autoDoors = new Set((C.autoDoors || ['877c2:BSHeartland.esm']).map(idOf).filter(Boolean));
   // A sealed automatic door's own spot outside its trigger (doorReturns { desc: { world, pos, rotZ } }): it leads nowhere, so
   // walking in steps the player back there, not to the arrival
-  const doorReturns = new Map(Object.entries(C.doorReturns || {}).filter(([d, s]) => d[0] !== '_' && s && s.world && Array.isArray(s.pos) && s.pos.length === 3)
+  const doorReturns = new Map(Object.entries(C.doorReturns || {}).filter(([d, s]) => d[0] !== '_' && s && s.world && Array.isArray(s.pos) && s.pos.length === 3 && s.pos.every((v) => Number.isFinite(Number(v))))
     .map(([d, s]) => [idOf(d) >>> 0, { cellOrWorldDesc: s.world, pos: s.pos.map(Number), rot: [0, 0, Number(s.rotZ) || 0] }]).filter(([id]) => id));
   // FNAM 0x02 of the door's base from the plugin records, as dungeons.js isAutomaticDoor reads it, in its cache by base
   const autoBase = globalThis.__dboAutoDoorBases instanceof Map ? globalThis.__dboAutoDoorBases : (globalThis.__dboAutoDoorBases = new Map());
@@ -61,6 +61,7 @@ module.exports = (api) => {
     return autoBase.get(base);
   };
   const descOf = (id) => { try { return mp.getDescFromId(id >>> 0) || (id >>> 0).toString(16); } catch (e) { return (id >>> 0).toString(16); } };
+  for (const id of doorReturns.keys()) if (!blockedDoors.has(id)) log(`playtest: doorReturns ${descOf(id)} is not in blockedDoors, so walking into it is never stepped back`);
   const arrival = C.arrival && C.arrival.world && Array.isArray(C.arrival.pos) ? { cellOrWorldDesc: C.arrival.world, pos: C.arrival.pos, rot: [0, 0, Number(C.arrival.rotZ) || 0] } : null;
   const active = () => C.enabled && !!arrival;
 
@@ -99,11 +100,11 @@ module.exports = (api) => {
   const denyAt = new Map(), toldAt = new Map();
   // In the door's cell and within its trigger (AutoLoadDoor01 is 1200 x 1200) plus lag: this hook runs before the reach
   // gate, so an activation sent from anywhere else must not earn the free trip to the arrival spot
-  const atDoor = (a, door) => {
-    // Only an online player who is up and free walks in (the same checks as /unstuck)
+  const atDoor = (a, door, free = true) => {
+    // Only an online player who is up and free walks in (the same checks as /unstuck); a step back needs no freedom
     if (!onlineActors().includes(a >>> 0)) return false;
     try { if (mp.get(a, 'isDead')) return false; } catch (e) { return false; }
-    try { const r = mp.get(a, 'private.restrained'); if (r && (r.boundHands || r.carried || r.captorActorId)) return false; } catch (e) { return false; }
+    if (free) try { const r = mp.get(a, 'private.restrained'); if (r && (r.boundHands || r.carried || r.captorActorId)) return false; } catch (e) { return false; }
     try {
       if (normDesc(mp.get(a, 'worldOrCellDesc')) !== normDesc(mp.get(door, 'worldOrCellDesc'))) return false;
       const p = mp.get(a, 'pos'), q = mp.get(door, 'pos');
@@ -121,10 +122,12 @@ module.exports = (api) => {
       const a = casterId >>> 0;
       if (!isAutomatic(targetId)) {
         if (!notAuto.has(targetId)) { notAuto.add(targetId); log(`playtest: doorReturns ${descOf(targetId)} does not read as an automatic door, so it is refused without a step back`); }
-      } else if (atDoor(a, targetId) && !stepping.has(a)) {
+      } else if (atDoor(a, targetId, false) && !stepping.has(a)) {
         stepping.add(a);
         setTimeout(() => {
           stepping.delete(a);
+          // A staff move inside the 300 ms wins
+          if (!atDoor(a, targetId, false)) return;
           try { mp.set(a, 'locationalData', back); log(`playtest: ${who(a)} walked into the sealed automatic door ${descOf(targetId)} and was stepped back`); } catch (e) { log('playtest: step back failed', e.message); }
         }, 300);
       }
