@@ -349,8 +349,9 @@ const wh = holdOf(OUT, 'winterhold');
 ok('a fief-less hold with an empty seat is listed to anyone, empty and not theirs to rule', !!wh && !wh.isRuler && !wh.canRevoke && wh.ruler === null && wh.fiefs.length === 0 && wh.roll.length === 0 && wh.titles.length === 0, wh);
 officials.winterhold = { jarl: [34] };
 chars.set(0x34, { pid: 34, name: 'Korir', female: false, online: true });
-ok('...its Jarl, once seated, rules it and is named', holdOf(0x34, 'winterhold').isRuler && holdOf(OUT, 'winterhold').ruler.name === 'Korir' && holdOf(OUT, 'winterhold').ruler.style === 'Jarl of Winterhold', holdOf(OUT, 'winterhold').ruler);
-ok('...and the Jarl is offered the titles to grant', holdOf(0x34, 'winterhold').titles.map((t) => t.id).join() === 'lord,thane', holdOf(0x34, 'winterhold').titles);
+const whOf = (a) => holdOf(a, 'winterhold') || { titles: [] };
+ok('...its Jarl, once seated, rules it and is named', whOf(0x34).isRuler && (whOf(OUT).ruler || {}).name === 'Korir' && (whOf(OUT).ruler || {}).style === 'Jarl of Winterhold', whOf(OUT).ruler);
+ok('...and the Jarl is offered the titles to grant', whOf(0x34).titles.map((t) => t.id).join() === 'lord,thane', whOf(0x34).titles);
 chars.delete(0x34); delete officials.winterhold;
 zones.pop();
 // With the real zones.json: the nine holds and Bruma, never Solstheim, the Alik'r or a stronghold
