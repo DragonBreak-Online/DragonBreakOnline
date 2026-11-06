@@ -13,7 +13,8 @@ const ok = (c, what, got) => { if (c) pass++; else { fail++; console.log('FAIL',
 
 const P = 0xff000101, Q = 0xff000102, DRV = 0xff000900, OTHER = 0xff000901, DRV_W = 0xff000910;
 const CART_W = 0x1070f0, CART_M = 0x1070ed;
-const WHITERUN_STABLE = [17589.8, -12411.6, -4745.1], SOLITUDE_STABLE = [-73225.0, 99456.7, -10906.7];
+const WHITERUN_STABLE = [17589.8, -12411.6, -4745.1], SOLITUDE_STABLE = [-73225.0, 99456.7, -10906.7], WINTERHOLD_STOP = [109080.1, 102630.9, -8940.6];
+const DRV_H = 0xff000920, PLACED = 0xff000a00, PLACED_FAR = 0xff000a01, PLACED_BARREL = 0xff000a02;
 const GATE_SPOT = { Whiterun: [18313, -10665, -4588.5], Riften: [173137, -90912, 11073.9], Solitude: [-74313.4, 96373.3, -11483.6], Windhelm: [135039, 33143, -12547.6], Markarth: [-171223, 6919.6, -3908.4],
   Falkreath: [-30323.8, -86273.2, -3094.4], Morthal: [-38293.3, 67050.7, -13860.8], Dawnstar: [30549.8, 106123.5, -14178.9], Winterhold: [109208, 102864, -8953.7] };
 // From the Whiterun stable: 5 + 1.25 gold per 10,000 units to the arrival, to the nearest 5 (worked out by hand)
@@ -33,9 +34,13 @@ const reset = () => {
   props.set(`${DRV}|private.npcSpawner`, 'carriage:solitude'); props.set(`${DRV}|worldOrCellDesc`, '3c:Skyrim.esm'); props.set(`${DRV}|pos`, SOLITUDE_STABLE.slice());
   props.set(`${DRV_W}|private.npcSpawner`, 'carriage:whiterun'); props.set(`${DRV_W}|worldOrCellDesc`, '3c:Skyrim.esm'); props.set(`${DRV_W}|pos`, WHITERUN_STABLE.slice());
   props.set(`${OTHER}|private.npcSpawner`, 'guard:solitude:1');
+  props.set(`${DRV_H}|private.npcSpawner`, 'carriage:winterhold'); props.set(`${DRV_H}|worldOrCellDesc`, '3c:Skyrim.esm'); props.set(`${DRV_H}|pos`, WINTERHOLD_STOP.slice());
+  for (const [ref, base, dx] of [[PLACED, '103445:Skyrim.esm', 800], [PLACED_FAR, '103445:Skyrim.esm', 9000], [PLACED_BARREL, '1a4d0:Skyrim.esm', 300]]) {
+    props.set(`${ref}|baseDesc`, base); props.set(`${ref}|worldOrCellDesc`, '3c:Skyrim.esm'); props.set(`${ref}|pos`, [WINTERHOLD_STOP[0] + dx, WINTERHOLD_STOP[1], WINTERHOLD_STOP[2]]);
+  }
   props.set(`${CART_W}|pos`, [17781.9, -12144.3, -4740.5]); props.set(`${CART_M}|pos`, [-169753.7, 4926.8, -4100.7]);
   globalThis.__dboCarriageRiding = new Map(); globalThis.__dboCarriageDrivers = new Map(); globalThis.__dboCarriagesSig = undefined;
-  globalThis.__dboCarriagePending = new Map(); globalThis.__dboCarriageFading = new Map();
+  globalThis.__dboCarriagePending = new Map(); globalThis.__dboCarriageFading = new Map(); globalThis.__dboCarriagePlaced = new Map();
   globalThis.__dboIsDowned = () => false; globalThis.__dboJailUnstuck = () => null;
   globalThis.__dboCourierParcelBase = () => 0x1ac960; globalThis.__dboCourierSealed = () => 0;
   globalThis.__dboPlogHook = (k, a, reason) => plog.push([k, a, reason]);
@@ -72,13 +77,15 @@ fs.writeFileSync('NPC-Spawns.json', JSON.stringify({ _comment: 'x', zones: [{ Na
 load({});
 let z = spawns();
 const drv = z.filter((x) => String(x.Name).startsWith('carriage:'));
-ok(drv.length === 5 && ['whiterun', 'solitude', 'markarth', 'riften', 'windhelm'].every((s) => drv.some((x) => x.Name === `carriage:${s}`)), 'a driver zone at each of the five stables', drv.map((x) => x.Name));
+ok(drv.length === 6 && ['whiterun', 'solitude', 'markarth', 'riften', 'windhelm', 'winterhold'].every((s) => drv.some((x) => x.Name === `carriage:${s}`)), 'a driver zone at each of the five stables and at Winterhold', drv.map((x) => x.Name));
+const wh = drv.find((x) => x.Name === 'carriage:winterhold');
+ok(wh && wh.NPC[0].id === '424ae:Skyrim.esm' && wh.POS.join() === WINTERHOLD_STOP.join() && wh.Heading === 25, 'Winterhold\'s driver is the essential "Carriage Driver" on the last gate spot (Jake, 6 Nov)', wh);
 const wd = drv.find((x) => x.Name === 'carriage:whiterun');
 ok(wd && wd.ID === '3c:Skyrim.esm' && wd.POS.join() === WHITERUN_STABLE.join() && wd.NPC[0].id === '13669:Skyrim.esm' && wd.Heading === 275 && wd.Hostile === false, 'Whiterun\'s is the base game driver at the base game spot', wd);
 ok(z.some((x) => x.Name === 'guard:solitude:1') && z.some((x) => x.Name === 'wild:wolf:0') && JSON.parse(fs.readFileSync('NPC-Spawns.json', 'utf8'))._comment === 'x', 'other writers\' zones and the file\'s own keys are kept');
 ok(!cmds.carriage, 'no /carriage command: the carriage itself is the way (Jake, 6 Nov)');
 load({});
-ok(spawns().filter((x) => String(x.Name).startsWith('carriage:')).length === 5, 'a reload writes no second set');
+ok(spawns().filter((x) => String(x.Name).startsWith('carriage:')).length === 6, 'a reload writes no second set');
 load({ drivers: { enabled: false } });
 ok(spawns().filter((x) => String(x.Name).startsWith('carriage:')).length === 0 && spawns().length === 2, 'drivers.enabled false takes the drivers away, nothing else');
 ok(activate(P, CART_W) === true && lastMenu(), 'with no drivers the carriage itself still takes fares');
@@ -196,6 +203,25 @@ ok(gold.get(P) === 70 && deposits[0].join() === 'solitude,30,carriage' && moves[
 reset(); load({});
 props.set(`${DRV}|pos`, [-73225.0 + 2600, 99456.7, -10906.7]); props.set(`${P}|pos`, [-73225.0 + 2650, 99456.7, -10906.7]);
 ok(activate(P, DRV) === true && /Come closer/.test(last(P)) && !widgets.length, 'a driver past the leash takes no fares');
+
+// ---- Winterhold (Jake, 6 Nov: it needs a carriage) and carriages a GM placed ----
+reset(); load({});
+props.set(`${P}|pos`, [WINTERHOLD_STOP[0] + 80, WINTERHOLD_STOP[1], WINTERHOLD_STOP[2]]);
+ok(activate(P, DRV_H) === true && /Carriage from Winterhold/.test((lastMenu() || {}).targetName), 'the Winterhold driver takes fares', said(P));
+const hm = lastMenu();
+ok(hm && hm.actions.length === 8 && hm.actions.slice(0, 2).map((x) => x.label).join() === 'Dawnstar: 15 gold,Windhelm: 15 gold' && hm.actions.find((x) => x.id === 'markarth').label === 'Markarth: 40 gold', 'from Winterhold: Dawnstar and Windhelm 15 nearest, Markarth 40', hm && hm.actions.map((x) => x.label));
+fire('carriageChoose', P, ['windhelm']); runTimers('ride');
+ok(gold.get(P) === 85 && deposits[0].join() === 'winterhold,15,carriage' && moves[0][1].pos.join() === GATE_SPOT.Windhelm.join(), 'Winterhold to Windhelm: 15 gold to Winterhold\'s treasury', [gold.get(P), deposits, moves]);
+reset(); load({});
+props.set(`${P}|pos`, [WINTERHOLD_STOP[0] + 850, WINTERHOLD_STOP[1], WINTERHOLD_STOP[2]]);
+ok(activate(P, PLACED) === true && /Carriage from Winterhold/.test((lastMenu() || {}).targetName), 'a carriage a GM placed 800 units from the stop is its carriage, and the player beside it is at the stable', said(P));
+fire('carriageChoose', P, ['dawnstar']); runTimers('ride');
+ok(deposits.length === 1 && deposits[0][0] === 'winterhold' && moves.length === 1, 'and its trips leave from Winterhold', [deposits, moves]);
+widgets = [];
+ok(activate(P, PLACED_FAR) === false && activate(P, PLACED_BARREL) === false && !widgets.length, 'a carriage far from every stop, or any other placed object, is not taken');
+ok(activate(P, PLACED) === true, 'the placed carriage again');
+reset(); load({ cartBases: [] }); props.set(`${P}|pos`, [WINTERHOLD_STOP[0] + 850, WINTERHOLD_STOP[1], WINTERHOLD_STOP[2]]);
+ok(activate(P, PLACED) === false, 'carriages.cartBases [] turns placed carriages off');
 
 // ---- the config ----
 reset(); load({ stops: { dawnstar: { off: true }, falkreath: { arrival: [[1, 2, 3]], rotZ: 90 }, riverwood: { name: 'Riverwood', arrival: [[5, 6, 7]] } } });

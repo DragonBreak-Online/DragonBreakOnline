@@ -17,7 +17,8 @@ const DEFAULT_STOPS = [
   { id: 'falkreath', name: 'Falkreath' },
   { id: 'morthal', name: 'Morthal' },
   { id: 'dawnstar', name: 'Dawnstar' },
-  { id: 'winterhold', name: 'Winterhold' },
+  // Jake, 6 Nov: Winterhold needs one. No stable in the base game: the MQ201 party's "Carriage Driver" (essential) on the last of the hub gate's checked spots
+  { id: 'winterhold', name: 'Winterhold', hire: [109080.1, 102630.9, -8940.6], heading: 25, npc: '424ae:Skyrim.esm' },
 ];
 
 module.exports = (api) => {
@@ -26,6 +27,9 @@ module.exports = (api) => {
   const pvpAt = api.pvpAt instanceof Map ? api.pvpAt : new Map();
   const own = (cfg && cfg.carriages) || {};
   const C = Object.assign({ enabled: true, world: '3c:Skyrim.esm', reach: 600, rideSeconds: 6, fadeSafetyMs: 10000, cooldownMinutes: 0, combatSeconds: 60, pvpSeconds: 120, allowParcels: false }, own);
+  // A carriage a GM placed (F7) within cartReach of a stop is that stop's carriage too: the base game's "Carriage" and its driver seat
+  const CART_BASES = new Set((Array.isArray(own.cartBases) ? own.cartBases : ['103445:Skyrim.esm', '103442:Skyrim.esm']).map((d) => String(d)));
+  const CART_REACH = Math.max(0, Number(own.cartReach) || 1500);
   // Jake, 6 Nov: further costs more. base, plus per10k for every 10,000 units from the stable to the arrival, to the nearest round, within min and max
   const FARES = Object.assign({ base: 5, per10k: 1.25, round: 5, min: 10, max: 500 }, own.fares || {});
   // radius: how near a player comes before a driver spawns (as guards.js); leash: a driver's reach from the stable
@@ -71,10 +75,19 @@ module.exports = (api) => {
   const driverOf = globalThis.__dboCarriageDrivers instanceof Map ? globalThis.__dboCarriageDrivers : (globalThis.__dboCarriageDrivers = new Map());
   // cart ref id -> its stop, and where each stop's carts stand (read from the server once a load)
   const CART_STOP = new Map(), cartsAt = new Map();
+  // stop id -> placed carriages talked to, so a player beside one counts as the stable
+  const placedOf = globalThis.__dboCarriagePlaced instanceof Map ? globalThis.__dboCarriagePlaced : (globalThis.__dboCarriagePlaced = new Map());
+  const placedCartStop = (ref) => {
+    const base = normDesc(get(ref, 'baseDesc')); if (![...CART_BASES].some((d) => normDesc(d) === base)) return null;
+    const q = get(ref, 'pos'); if (!validPos(q) || normDesc(get(ref, 'worldOrCellDesc')) !== normDesc(C.world)) return null;
+    let best = null, bestD = Infinity;
+    for (const s of STOPS.filter((x) => x.hire)) { const d = Math.hypot(q[0] - s.hire[0], q[1] - s.hire[1], q[2] - s.hire[2]); if (d <= CART_REACH && d < bestD) { best = s; bestD = d; } }
+    return best;
+  };
   for (const s of STOPS.filter((x) => x.hire)) for (const desc of s.carts) { try { const cid = mp.getIdFromDesc(desc) >>> 0; if (cid) CART_STOP.set(cid, s); } catch (e) { log(`carriages: cart ${desc} is not in the load order`); } }
   const cartPoints = (s) => {
     if (!cartsAt.has(s.id)) cartsAt.set(s.id, [...CART_STOP].filter(([, x]) => x === s).map(([cid]) => get(cid, 'pos')).filter(validPos));
-    return cartsAt.get(s.id);
+    return cartsAt.get(s.id).concat([...(placedOf.get(s.id) || [])].map((cid) => get(cid, 'pos')).filter(validPos));
   };
   const stopNear = (a) => {
     if (normDesc(get(a, 'worldOrCellDesc')) !== normDesc(C.world)) return null;
@@ -189,12 +202,14 @@ module.exports = (api) => {
   // gamemode.js's activate chain: true refuses the engine's own sit or talk (the menu opens) and a dead driver's search
   globalThis.__dboCarriageActivate = (target, caster) => {
     if (!C.enabled) return false;
-    const cart = CART_STOP.get(id(target)) || null;
-    const s = cart || driverStopOf(target); if (!s) return false;
-    if (!cart) {
+    const driver = CART_STOP.has(id(target)) ? null : driverStopOf(target);
+    const placed = CART_STOP.has(id(target)) || driver ? null : placedCartStop(target);
+    const s = CART_STOP.get(id(target)) || driver || placed; if (!s) return false;
+    if (driver) {
       if (get(target, 'isDead')) { personal(caster, 'The carriage company sees to its own. There is nothing to take.'); return true; }
       driverOf.set(s.id, id(target));
     }
+    if (placed) { if (!placedOf.has(s.id)) placedOf.set(s.id, new Set()); placedOf.get(s.id).add(id(target)); }
     if (stopNear(caster) !== s) { personal(caster, 'Come closer to the carriage.'); return true; }
     openMenu(caster, s);
     return true;
