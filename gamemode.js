@@ -124,7 +124,9 @@ every('tickSummary', 60000, () => {
 // file -> { snapshot, dirty, busy, seq }; a reload first writes out what the last generation left dirty
 const SAVES = globalThis.__dboSaves instanceof Map ? globalThis.__dboSaves : (globalThis.__dboSaves = new Map());
 const saveSoon = (file, snapshot) => { const s = SAVES.get(file) || { dirty: false, busy: false, seq: 0 }; s.snapshot = snapshot; s.dirty = true; SAVES.set(file, s); };
-const writeSaveSync = (file, s) => { const tmp = `${file}.${++s.seq}.tmp`; fs.writeFileSync(tmp, s.snapshot()); fs.renameSync(tmp, file); s.dirty = false; };
+// A written entry lets go of its snapshot, a closure of the load that saved it, which would keep that whole load alive
+const settled = (s) => { if (!s.dirty && !s.busy) s.snapshot = null; };
+const writeSaveSync = (file, s) => { const tmp = `${file}.${++s.seq}.tmp`; fs.writeFileSync(tmp, s.snapshot()); fs.renameSync(tmp, file); s.dirty = false; settled(s); };
 // Money moves write at once: a crash inside the debounce would bring back a paid contract to be paid again; the world save (saveIntervalMs) goes on the next tick too
 const saveNow = (file, snapshot) => { saveSoon(file, snapshot); try { writeSaveSync(file, SAVES.get(file)); } catch (e) { log('save failed', path.basename(file), e.message); } try { mp.requestSaveNow?.(); } catch (e) { log('requestSaveNow failed', e.message); } };
 const writeSave = (file, s) => {
@@ -134,12 +136,16 @@ const writeSave = (file, s) => {
   s.dirty = false; s.busy = true;
   fs.writeFile(tmp, text, (err) => {
     s.busy = false;
-    if (s.seq !== seq) return fs.unlink(tmp, () => {}); // a reload wrote a newer copy meanwhile
+    if (s.seq !== seq) { settled(s); return fs.unlink(tmp, () => {}); } // a reload wrote a newer copy meanwhile
     try { if (err) throw err; fs.renameSync(tmp, file); } catch (e) { s.dirty = true; fs.unlink(tmp, () => {}); log('save failed', path.basename(file), e.message); }
+    settled(s);
   });
 };
 // busy too: an async write still in flight has not renamed yet, and a module reading its file at load would get the older copy
-for (const [file, s] of SAVES) if (s.dirty || s.busy) { try { writeSaveSync(file, s); log(`saved ${path.basename(file)} before reload`); } catch (e) { log('save flush failed', path.basename(file), e.message); } }
+for (const [file, s] of SAVES) {
+  if (s.dirty || s.busy) { try { writeSaveSync(file, s); log(`saved ${path.basename(file)} before reload`); } catch (e) { log('save flush failed', path.basename(file), e.message); } }
+  settled(s);
+}
 every('saves', 5000, () => { for (const [file, s] of SAVES) writeSave(file, s); });
 // systemd stops the server with SIGTERM, whose default action would drop the writes still pending here
 globalThis.__dboFlushOnExit = () => { for (const [file, s] of SAVES) if (s.dirty || s.busy) { try { writeSaveSync(file, s); } catch (e) { log('save flush failed', path.basename(file), e.message); } } };
