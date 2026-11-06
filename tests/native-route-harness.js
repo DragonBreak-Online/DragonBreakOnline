@@ -128,8 +128,9 @@ ok(last().customPacketType === 'dboScaleform' && last().payload.result === 'You 
 closeWidget(F, 48);
 ok(last().customPacketType === 'dboScaleform' && last().close === true, 'bankClose\'s closeWidget closes the custom menu', last());
 
-// The ledger, the property market, the key ring and the tome shop, each native for a client that names it (fork native-commerce-1031)
-const COMMERCE = [['businessLedger', 64, 'dbo_ledger'], ['propertyMarket', 82, 'dbo_market'], ['keyRing', 91, 'dbo_keyring'], ['tomeShop', 60, 'dbo_tomes']];
+// The key ring and the tome shop, each native for a client that names it (fork native-commerce-1031). The ledger and the
+// property market are in the browser until the typing guard is fixed: checked at the end
+const COMMERCE = [['keyRing', 91, 'dbo_keyring'], ['tomeShop', 60, 'dbo_tomes']];
 COMMERCE.forEach(([type, id, swf], i) => {
   const G = 0xff000010 + i;
   openWidget(G, { type, id, nonce: 'c' + i });
@@ -186,6 +187,23 @@ ok(last().customPacketType === 'dboScaleform' && ((last().payload || {}).events 
   'a menu that names no events closes to the server\'s dbo:close, not the X menu\'s pa:close (and the module\'s object is untouched)', last().payload && last().payload.events);
 closeWidget(CTX, 123);
 ok(last().customPacketType === 'dboScaleform' && last().close === true, 'its module\'s closeWidget closes the custom menu', last());
+
+// Typing into a native panel's second box fails on the shipped clients (lib/dbo.as dboTypeGuard, #bugs 6 Nov): these
+// panels and journal tabs go to the browser even for a client that names them
+const TYPIST = 0xff000014;
+setCaps(TYPIST, ['native:propertyMarket', 'native:businessLedger', 'native:bank', 'native:journal', 'native:journalTab:court', 'native:journalTab:nobility', 'native:journalTab:notes', 'native:journalTab:stats']);
+openWidget(TYPIST, { type: 'propertyMarket', id: 82, nonce: 'm' }, true);
+ok(last().customPacketType === 'dboWidget', 'renting or selling property opens in the browser', last());
+openWidget(TYPIST, { type: 'businessLedger', id: 64, nonce: 'l' }, true);
+ok(last().customPacketType === 'dboWidget', 'the business ledger opens in the browser', last());
+for (const tab of ['court', 'nobility', 'notes']) {
+  openWidget(TYPIST, J(tab), true);
+  ok(last().customPacketType === 'dboWidget', `the journal's ${tab} tab opens in the browser`, last());
+}
+openWidget(TYPIST, J('stats'), true);
+ok(last().customPacketType === 'dboScaleform' && last().swf === 'dbo_journal', '...while its other tabs stay native', last());
+openWidget(TYPIST, { type: 'bank', id: 48, nonce: 'b2' }, true);
+ok(last().customPacketType === 'dboScaleform' && last().swf === 'dbo_bank', '...and so do other native panels', last());
 
 console.log(fails ? `\n${fails} failed` : '\nall passed');
 process.exit(fails ? 1 : 0);

@@ -4298,7 +4298,10 @@ const nativeState = () => { const p = globalThis.__dboPanelState || (globalThis.
 // 02:21Z: "can't send pigeons, it just overlaps, where do you even type"). The pigeon coop has no native text box, so every
 // letter, order and courier job went through the hand-off. A type stays in NATIVE_SWF so an open native coop is still closed
 // when the browser one opens (openWidget below)
-const NATIVE_TO_BROWSER = new Set(['pigeon']);
+// A native panel's second typed box takes no keys (lib/dbo.as recreates dboTypeGuard, whose unload ends the new session), so rent and sale terms and ledger prices go to the browser until a client fixes it (#bugs 6 Nov)
+const NATIVE_TO_BROWSER = new Set(['pigeon', 'propertyMarket', 'businessLedger']);
+// The journal tabs that type into forms through the same guard; notes also overran its page (#bugs 1567101872773537933)
+const JOURNAL_TABS_TO_BROWSER = new Set(['court', 'nobility', 'notes']);
 const nativeSwfFor = (a, widget, focus) => {
   const swf = widget && NATIVE_SWF[widget.type];
   if (!swf || (widget.type === 'prayer' && widget.mode !== 'pick')) return '';
@@ -4310,6 +4313,7 @@ const nativeSwfFor = (a, widget, focus) => {
   if (widget.browser) return '';
   // The journal is native per hub tab, for each tab the client's swf draws (Settings opens the overlay's own sections in the browser)
   if (widget.type === 'journal' && !(widget.hub && c.has('native:journalTab:' + widget.tab))) return '';
+  if (widget.type === 'journal' && JOURNAL_TABS_TO_BROWSER.has(widget.tab)) return '';
   let size = 0;
   try { size = JSON.stringify(widget).length; } catch (e) { return ''; }
   // typeof: a harness that cuts this function out runs it without the measuring below

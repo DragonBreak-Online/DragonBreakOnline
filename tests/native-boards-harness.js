@@ -28,7 +28,7 @@ const cut = (src, start) => {
 };
 
 // ---- the routing, run ----
-const code = ['const NATIVE_SWF = ', 'const NATIVE_MAX_CHARS = ', 'const nativeState = ', 'const nativeSwfFor = ', 'const openWidget = '].map((s) => cut(gm, s)).join('\n');
+const code = ['const NATIVE_SWF = ', 'const NATIVE_MAX_CHARS = ', 'const nativeState = ', 'const NATIVE_TO_BROWSER = ', 'const JOURNAL_TABS_TO_BROWSER = ', 'const nativeSwfFor = ', 'const openWidget = '].map((s) => cut(gm, s)).join('\n');
 const sent = [];
 const R = new Function('sendPacket', 'log', `${code}\nreturn { NATIVE_SWF, nativeSwfFor, openWidget, nativeState };`)((a, p) => { sent.push(p); return true; }, () => {});
 globalThis.__dboPanelState = undefined;
