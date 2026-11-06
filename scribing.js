@@ -14,7 +14,8 @@
 // not know the spell. One tome timer per character, whatever the rank: writing any tome starts it for that rank's hours.
 // Scrolls. A spell the writer knows that has a scroll (spell-scrolls.json, written by tools/scribing/spell_scrolls.py from
 // the live plugins), below Master: Master scrolls are never written. Each spends one Linen Wrap, one Charcoal (from
-// woodcutting, labour.js) and one filled soul gem of any size, the smallest first; its own timer, by rank 1, 2, 3, 4 days.
+// woodcutting, labour.js, or Coal01, also named Charcoal) and one filled soul gem of any size, the smallest first; its own
+// timer, by rank 1, 2, 3, 4 days. A material's id may be a list: any of them counts, the first listed is spent first.
 // The restricted arts (spells.js seniorOnlyTomes) are written only by a Senior rank, as they are sold and taught; a removed
 // or held spell is never written (spells.js __dboSpellsOpenTo).
 // Materials are taken first, then the item is given; a give that fails puts the pack back as it was. Every write is audited
@@ -41,7 +42,7 @@ module.exports = (api) => {
     tome: { enabled: true, scrolls: [0, 1, 2, 4, 5], cooldownHours: [24, 48, 96, 168, 336], coWriterMeters: 10, coWriterRank: 4, offerSeconds: 60 },
     scroll: {
       enabled: true, cooldownHours: [24, 48, 72, 96],
-      materials: [{ id: '34cd6:Skyrim.esm', name: 'Linen Wrap', count: 1 }, { id: '33760:Skyrim.esm', name: 'Charcoal', count: 1 }],
+      materials: [{ id: '34cd6:Skyrim.esm', name: 'Linen Wrap', count: 1 }, { id: ['33760:Skyrim.esm', 'bfb09:Skyrim.esm'], name: 'Charcoal', count: 1 }],
       soulGems: 1,
       // Pre-filled soul gem bases, smallest first (SoulGemPettyFilled .. SoulGemGrandFilled, SoulGemBlackFilled; SOUL 1..5 in
       // Skyrim.esm, checked by tools/scribing/spell_scrolls.py), and the empty bases, which count when the entry holds a soul
@@ -65,7 +66,8 @@ module.exports = (api) => {
   numbers(C.tome, 'scrolls', 5, DEFAULTS.tome.scrolls, 'tome');
   numbers(C.tome, 'cooldownHours', 5, DEFAULTS.tome.cooldownHours, 'tome');
   numbers(C.scroll, 'cooldownHours', 4, DEFAULTS.scroll.cooldownHours, 'scroll');
-  if (!Array.isArray(C.scroll.materials) || !C.scroll.materials.every((m) => m && typeof m.id === 'string' && Number(m.count) >= 1)) {
+  const descs = (id) => [].concat(id === undefined ? [] : id);
+  if (!Array.isArray(C.scroll.materials) || !C.scroll.materials.every((m) => m && descs(m.id).length && descs(m.id).every((d) => typeof d === 'string') && Number(m.count) >= 1)) {
     log(`scribing: config scroll.materials ${JSON.stringify(C.scroll.materials)} is not a list of { id, name, count }; the default is used`);
     C.scroll.materials = DEFAULTS.scroll.materials.slice();
   }
@@ -108,7 +110,7 @@ module.exports = (api) => {
   const gemIds = (list) => (Array.isArray(list) ? list : []).map(idOf).filter(Boolean);
   const FILLED = gemIds(C.scroll.filledGems);
   const EMPTY = gemIds(C.scroll.emptyGems);
-  const MATERIALS = C.scroll.materials.map((m) => ({ id: idOf(m.id), name: String(m.name || m.id), count: Math.max(1, Math.floor(Number(m.count) || 1)) })).filter((m) => m.id);
+  const MATERIALS = C.scroll.materials.map((m) => ({ ids: descs(m.id).map(idOf).filter(Boolean), name: String(m.name || descs(m.id)[0]), count: Math.max(1, Math.floor(Number(m.count) || 1)) })).filter((m) => m.ids.length);
   if (MATERIALS.length !== C.scroll.materials.length) log('scribing: a scroll material is not in the load order and is left out');
 
   // ---- who and what ----------------------------------------------------------------------------------------------------
@@ -273,7 +275,7 @@ module.exports = (api) => {
   const scrollMissing = (a) => {
     const entries = entriesOf(a);
     const out = [];
-    for (const m of MATERIALS) { const have = countIn(entries, (e) => base(e) === m.id); if (have < m.count) out.push(m.count - have > 1 || m.count > 1 ? `${m.count - have} ${m.name}` : m.name); }
+    for (const m of MATERIALS) { const have = countIn(entries, (e) => m.ids.includes(base(e))); if (have < m.count) out.push(m.count - have > 1 || m.count > 1 ? `${m.count - have} ${m.name}` : m.name); }
     const gems = countIn(entries, isFilledGem);
     if (gems < gemsNeed()) out.push(gemsNeed() - gems > 1 ? `${gemsNeed() - gems} filled soul gems` : 'a filled soul gem');
     return out;
@@ -299,7 +301,7 @@ module.exports = (api) => {
     const scrollId = scrollsOf(sp.id)[0];
     const before = entriesOf(a); const after = before.map((e) => Object.assign({}, e));
     const taken = [];
-    for (const m of MATERIALS) { const t = takeFrom(after, (e) => base(e) === m.id, m.count); if (!t) return { ok: false, text: 'Your materials could not be found. Try again.' }; taken.push(...t); }
+    for (const m of MATERIALS) { const t = takeFrom(after, (e) => m.ids.includes(base(e)), m.count, (x, y) => m.ids.indexOf(base(x)) - m.ids.indexOf(base(y))); if (!t) return { ok: false, text: 'Your materials could not be found. Try again.' }; taken.push(...t); }
     if (gemsNeed()) { const t = takeFrom(after, isFilledGem, gemsNeed(), (x, y) => gemSize(x) - gemSize(y)); if (!t) return { ok: false, text: 'Your soul gem could not be found. Try again.' }; taken.push(...t); }
     const title = `a scroll of ${sp.name}`;
     const r = spendAndGive(a, before, after, scrollId, title.replace(/^a/, 'A'));

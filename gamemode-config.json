@@ -196,8 +196,9 @@
   "guildWorkshops": []
  },
  "smelting": {
-  "_comment": "Smelters burn firewood and charcoal (server\\regions.js craft hook; Nate 6 Oct: 2 firewood per ingot; 7 Oct: charcoal required): a craft at a CraftingSmelter bench costs firewoodPerIngot Firewood (6f993:Skyrim.esm) and charcoal by the ingot's metal (regions.js charcoalByMetal, the longest metal name in the product's editor id: iron/copper/tin 0, steel/silver/corundum/dwarven 1, gold/orichalcum/moonstone/quicksilver/malachite 2, ebony/stalhrim 3) of Charcoal (33760:Skyrim.esm) per item made; woodcutters get charcoal at the chopping block (labour charcoalByTier). Short of charcoal, firewoodPerCharcoal (3) firewood stands in for each one missing; short of firewood the craft is refused and the materials come back. firewoodPerIngot 0 turns firewood off.",
-  "firewoodPerIngot": 2
+  "_comment": "Smelters burn firewood and charcoal (server\\regions.js craft hook; Nate 6 Oct: 2 firewood per ingot; 7 Oct: charcoal required): a craft at a CraftingSmelter bench costs firewoodPerIngot Firewood (6f993:Skyrim.esm) and charcoal by the ingot's metal (regions.js charcoalByMetal, the longest metal name in the product's editor id: iron/copper/tin 0, steel/silver/corundum/dwarven 1, gold/orichalcum/moonstone/quicksilver/malachite 2, ebony/stalhrim 3) of Charcoal per item made: charcoal lists both records named Charcoal (33760:Skyrim.esm, the woodcutters' from the chopping block, labour charcoalByTier; bfb09:Skyrim.esm, Coal01, found in the world), counted together and spent in that order; a single desc works too. Short of charcoal, firewoodPerCharcoal (3) firewood stands in for each one missing; short of firewood the craft is refused and the materials come back. firewoodPerIngot 0 turns firewood off.",
+  "firewoodPerIngot": 2,
+  "charcoal": ["33760:Skyrim.esm", "bfb09:Skyrim.esm"]
  },
  "charters": { "_founders": "Nate 18 Oct: a guild needs 10 founding members on 10 accounts to be chartered (was 3, max 5); up to 15; 7 days (168 h, was 48) to gather them. Hot reload.", "minFounders": 10, "maxFounders": 15, "founderWindowHours": 168,
   "_comment": "Faction charters (server\\charters.js, Jake's to-do \"Faction button\", 1 Oct): a player founds a faction (a company or a cult) by charter; a GM approves it. Founder, Officer and Sergeant on three accounts before it is submitted, up to maxFounders (5); the ranks are the seven roles of the faction guide; a seat only a property a founding member owns; no fee (fee 0); the lore's factions refused; disbanding by a GM's approval, its treasury to the Founder. Every other key (charters.js DEFAULTS) may be set here too. Off until switched on.",
@@ -589,7 +590,8 @@
   "scroll": {
    "enabled": true,
    "cooldownHours": [24, 48, 72, 96],
-   "materials": [{ "id": "34cd6:Skyrim.esm", "name": "Linen Wrap", "count": 1 }, { "id": "33760:Skyrim.esm", "name": "Charcoal", "count": 1 }],
+   "_materials": "A material's id may be a list: any of them counts and the first listed is spent first. Charcoal is 33760 (woodcutting) or bfb09 (Coal01), both named Charcoal.",
+   "materials": [{ "id": "34cd6:Skyrim.esm", "name": "Linen Wrap", "count": 1 }, { "id": ["33760:Skyrim.esm", "bfb09:Skyrim.esm"], "name": "Charcoal", "count": 1 }],
    "soulGems": 1,
    "_filledGems": "SoulGemPettyFilled, SoulGemLesserFilled, SoulGemCommonFilled, SoulGemGreaterFilled, SoulGemGrandFilled, SoulGemBlackFilled (SOUL 1-5, Skyrim.esm), smallest first; emptyGems are their empty bases (NAM0 links each to its filled one), counted when the pack entry holds a soul",
    "filledGems": ["2e4e3:Skyrim.esm", "2e4e5:Skyrim.esm", "2e4f3:Skyrim.esm", "2e4fb:Skyrim.esm", "2e4ff:Skyrim.esm", "2e504:Skyrim.esm"],

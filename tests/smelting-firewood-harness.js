@@ -32,6 +32,7 @@ const IRON_DAGGER = ['ea5f3:Skyrim.esm', '1397e:Skyrim.esm', [['5ace4:Skyrim.esm
 const SMELTER_KW = 'a5cce:Skyrim.esm', FORGE_KW = '88105:Skyrim.esm';
 const FIREWOOD = '6f993:Skyrim.esm';
 const CHARCOAL = '33760:Skyrim.esm';
+const COAL01 = 'bfb09:Skyrim.esm'; // also named Charcoal: the world's placed lumps, junk lists and supply orders
 const bnam = (kw) => { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, idOf(kw), true); return { type: 'BNAM', data: b }; };
 const RECORDS = {
   [idOf(IRON_INGOT[0])]: { type: 'COBJ', editorId: 'RecipeIngotIron', fields: [bnam(SMELTER_KW)] },
@@ -120,6 +121,28 @@ put(SMITH, 'inventory', { entries: inv(SMITH).filter((e) => e.baseId !== idOf(FI
 give(SMITH, FIREWOOD, 4);
 wallClock += 2000;
 check('short of charcoal and of the firewood to replace it, the smelt is refused', craft(SMITH, IRON_INGOT, 1) === false && /you have 4 firewood, 0 charcoal/.test(said()), said());
+// Coal01 (bfb09) is Charcoal too: it counts with 33760, and 33760 burns first
+const CONFIG = JSON.parse(fs.readFileSync(path.join(SERVER, 'gamemode-config.json'), 'utf8'));
+const hold = (held) => put(SMITH, 'inventory', { entries: Object.entries(held).map(([d, n]) => ({ baseId: idOf(d), count: n })) });
+const smeltWith = (held, n) => { wallClock += 2000; hold(held); return craft(SMITH, IRON_INGOT, n); };
+for (const [label, smelting] of [['the default', undefined], ['gamemode-config.json smelting', CONFIG.smelting]]) {
+  load(smelting);
+  check(`${label}: Coal01 alone pays the charcoal, no firewood stands in`, smeltWith({ [FIREWOOD]: 2, [COAL01]: 1 }, 1) !== false && count(SMITH, COAL01) === 0 && count(SMITH, FIREWOOD) === 0, inv(SMITH));
+  check(`${label}: a mixed stack burns 33760 first, then Coal01`, smeltWith({ [FIREWOOD]: 4, [COAL01]: 2, [CHARCOAL]: 1 }, 2) !== false && count(SMITH, CHARCOAL) === 0 && count(SMITH, COAL01) === 1 && count(SMITH, FIREWOOD) === 0, inv(SMITH));
+  check(`${label}: ...whatever order the pack holds them in`, smeltWith({ [CHARCOAL]: 1, [FIREWOOD]: 2, [COAL01]: 1 }, 1) !== false && count(SMITH, CHARCOAL) === 0 && count(SMITH, COAL01) === 1, inv(SMITH));
+  check(`${label}: short across both, the smelt is refused and says how many it counted`, smeltWith({ [FIREWOOD]: 4, [COAL01]: 1 }, 2) === false && count(SMITH, COAL01) === 1 && count(SMITH, FIREWOOD) === 4 && /you have 4 firewood, 1 charcoal\)/.test(said()), said());
+  check(`${label}: ...audited with both counted`, /^SMELT refused P14 recipe RecipeIngotIron: 4\/7 firewood, 1\/1 charcoal$/.test(out.audits[out.audits.length - 1]), out.audits[out.audits.length - 1]);
+  check(`${label}: with neither charcoal the smelt is not free`, smeltWith({ [FIREWOOD]: 2 }, 1) === false && count(SMITH, FIREWOOD) === 2, inv(SMITH));
+  check(`${label}: firewood still stands in when both run out`, smeltWith({ [FIREWOOD]: 5 }, 1) !== false && count(SMITH, FIREWOOD) === 0, inv(SMITH));
+}
+check('gamemode-config.json lists both charcoals, 33760 first', JSON.stringify(CONFIG.smelting.charcoal) === '["33760:Skyrim.esm","bfb09:Skyrim.esm"]', CONFIG.smelting.charcoal);
+load({ charcoal: CHARCOAL });
+check('a single desc in config still works: 33760 pays', smeltWith({ [FIREWOOD]: 2, [CHARCOAL]: 1 }, 1) !== false && count(SMITH, CHARCOAL) === 0, inv(SMITH));
+check('...and only that record counts', smeltWith({ [FIREWOOD]: 2, [COAL01]: 1 }, 1) === false && count(SMITH, COAL01) === 1, inv(SMITH));
+load({ charcoal: ['1:Nope.esp', COAL01] });
+check('a listed desc not in the load order is skipped, not thrown', smeltWith({ [FIREWOOD]: 2, [COAL01]: 1 }, 1) !== false && count(SMITH, COAL01) === 0, inv(SMITH));
+check('no smelting check threw (a throw lets the smelt go free)', !out.logs.some((l) => /smelting check failed|could not burn/.test(l)), out.logs);
+
 // Woodcutting gives the very item the smelter asks for
 const labour = fs.readFileSync(path.join(SERVER, 'labour.js'), 'utf8');
 check('woodcutting (labour.js) gives Firewood 6f993:Skyrim.esm', /firewood:\s*'6f993:Skyrim\.esm'/.test(labour) && /giveItem\(a, idOf\(ITEMS\.firewood\), count\)/.test(labour));

@@ -392,6 +392,23 @@ check('gamemode-config.json says what the design says', JSON.stringify(CONFIG.sc
 check('the filled gem ids in config are the plugins\' filled gems (spell-scrolls.json soulGems, SOUL 1-5)', CONFIG.scribing.scroll.filledGems.every((d) => { const g = SCROLLS.soulGems.find((x) => x.id === d); return g && g.soul >= 1 && /Filled$/.test(g.edid); }));
 check('...and each empty gem fills into one of them (NAM0)', CONFIG.scribing.scroll.emptyGems.every((d) => { const g = SCROLLS.soulGems.find((x) => x.id === d); return g && g.soul === 0 && CONFIG.scribing.scroll.filledGems.includes(g.filledBase); }));
 
+// ---- charcoal: Coal01 (bfb09, the world's lumps) is also named Charcoal and counts with the woodcutters' 33760 ----------------
+const COAL01 = idOf('bfb09:Skyrim.esm');
+check('gamemode-config.json lists both charcoals for a scroll, 33760 first', JSON.stringify((CONFIG.scribing.scroll.materials.find((m) => m.name === 'Charcoal') || {}).id) === '["33760:Skyrim.esm","bfb09:Skyrim.esm"]', CONFIG.scribing.scroll.materials);
+const candleWith = (held) => { wallClock += 2 * DAY; items(W, held); list(W, 'scroll'); pick(W, `s:${CANDLE.spell}`); return count(W, SC.candle) === 1; };
+check('a scroll is written with Coal01 alone', candleWith([[LINEN, 1], [COAL01, 1], [GEM.black, 1]]) && count(W, COAL01) === 0 && count(W, LINEN) === 0, [said(W), getp(W, 'inventory')]);
+check('...audited with what it spent', /spending 1 x 34cd6:Skyrim\.esm, 1 x bfb09:Skyrim\.esm, 1 x 2e504:Skyrim\.esm$/.test(lastAudit(/SCRIBE SCROLL/)), lastAudit(/SCRIBE SCROLL/));
+check('a mixed pack spends 33760 first, whatever order it holds them in', candleWith([[LINEN, 1], [COAL01, 1], [CHARCOAL, 1], [GEM.black, 1]]) && count(W, CHARCOAL) === 0 && count(W, COAL01) === 1, getp(W, 'inventory'));
+check('with neither charcoal the scroll is refused and Charcoal is named missing', !candleWith([[LINEN, 1], [GEM.black, 1]]) && /you are missing Charcoal\./.test(said(W)) && count(W, LINEN) === 1, said(W));
+const oneCharcoal = (id) => Object.assign(baseCfg(), { scribing: Object.assign({}, CONFIG.scribing, { scroll: Object.assign({}, CONFIG.scribing.scroll, { materials: [CONFIG.scribing.scroll.materials[0], { id, name: 'Charcoal', count: 1 }] }) }) });
+out.logs.length = 0;
+load(oneCharcoal('33760:Skyrim.esm'));
+check('a single desc in config still works and is not logged as bad', candleWith([[LINEN, 1], [CHARCOAL, 1], [GEM.black, 1]]) && !out.logs.some((l) => /scroll\.materials/.test(l)), [said(W), out.logs]);
+check('...and then Coal01 does not count', !candleWith([[LINEN, 1], [COAL01, 1], [GEM.black, 1]]) && /you are missing Charcoal\./.test(said(W)), said(W));
+load(oneCharcoal(['33760:Skyrim.esm', 7]));
+check('a list holding a non-desc falls back to the default and is logged', out.logs.some((l) => /scroll\.materials .* is not a list of \{ id, name, count \}; the default is used/.test(l)) && candleWith([[LINEN, 1], [COAL01, 1], [GEM.black, 1]]), out.logs);
+load();
+
 // ---- colleges in schools.js (guild-defs.json "college": true) ----------------------------------------------------------------
 check('guild-defs.json marks the Synod, the College of Winterhold and the College of Whispers as colleges', ['synod', 'college-of-winterhold', 'college-of-whispers'].every((id) => GUILDS.find((f) => f.id === id).college === true) && GUILDS.filter((f) => f.college).length === 3);
 skillAt(PLAIN, 'arcane', 80);

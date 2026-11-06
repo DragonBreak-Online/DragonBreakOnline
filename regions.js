@@ -336,7 +336,8 @@ module.exports = (api) => {
   // Charcoal is required to smelt (Nate, 7 Oct): an ingot costs charcoal by its metal's tier, matched on the product's editor id
   const SMELT = Object.assign({
     firewoodPerIngot: 2, firewood: '6f993:Skyrim.esm', benches: ['craftingsmelter'],
-    charcoal: '33760:Skyrim.esm',
+    // Two records are named Charcoal: 33760 (the woodcutters') and bfb09 (Coal01, the world's lumps); the first listed burns first
+    charcoal: ['33760:Skyrim.esm', 'bfb09:Skyrim.esm'],
     // Eased 7 Oct (Fabian's feedback): no charcoal for iron, copper and tin; firewood stands in for missing charcoal
     charcoalByMetal: { iron: 0, copper: 0, tin: 0, steel: 1, silver: 1, corundum: 1, dwarven: 1, gold: 2, orichalcum: 2, moonstone: 2, quicksilver: 2, malachite: 2, ebony: 3, stalhrim: 3 },
     charcoalDefault: 0,
@@ -349,19 +350,23 @@ module.exports = (api) => {
     const hit = Object.keys(SMELT.charcoalByMetal || {}).filter((m) => e.includes(m)).sort((x, y) => y.length - x.length)[0];
     return Math.max(0, Math.floor(Number(hit ? SMELT.charcoalByMetal[hit] : SMELT.charcoalDefault) || 0));
   };
-  const heldOf = (a, baseId) => {
+  // One base id or a list of them; takeHeld spends the list in its order
+  const heldOf = (a, ids) => {
+    const want = [].concat(ids);
     const inv = mp.get(a, 'inventory') || { entries: [] };
-    return (Array.isArray(inv.entries) ? inv.entries : []).reduce((n, e) => n + ((Number(e.baseId) >>> 0) === baseId && !e.worn ? Number(e.count) || 0 : 0), 0);
+    return (Array.isArray(inv.entries) ? inv.entries : []).reduce((n, e) => n + (want.includes(Number(e.baseId) >>> 0) && !e.worn ? Number(e.count) || 0 : 0), 0);
   };
-  const takeHeld = (a, baseId, n) => {
+  const takeHeld = (a, ids, n) => {
     const inv = mp.get(a, 'inventory') || { entries: [] };
     const entries = (Array.isArray(inv.entries) ? inv.entries : []).map((e) => Object.assign({}, e));
     let left = n;
-    for (const e of entries) {
-      if (left <= 0) break;
-      if ((Number(e.baseId) >>> 0) !== baseId || e.worn) continue;
-      const k = Math.min(left, Number(e.count) || 0);
-      e.count = (Number(e.count) || 0) - k; left -= k;
+    for (const id of [].concat(ids)) {
+      for (const e of entries) {
+        if (left <= 0) break;
+        if ((Number(e.baseId) >>> 0) !== id || e.worn) continue;
+        const k = Math.min(left, Number(e.count) || 0);
+        e.count = (Number(e.count) || 0) - k; left -= k;
+      }
     }
     if (left > 0) return false;
     mp.set(a, 'inventory', { entries: entries.filter((e) => (Number(e.count) || 0) > 0) });
@@ -372,8 +377,8 @@ module.exports = (api) => {
     if (!(SMELT.benches || []).map((b) => String(b).toLowerCase()).includes(benchOf(recipeId))) return null;
     const n = Math.max(1, Number(count) || 1);
     const per = Math.max(0, Math.floor(Number(SMELT.firewoodPerIngot) || 0));
-    const wood = idOf(SMELT.firewood), coal = idOf(SMELT.charcoal);
-    const coalPer = coal ? charcoalPerIngot(itemId) : 0;
+    const wood = idOf(SMELT.firewood), coal = [].concat(SMELT.charcoal || []).map(idOf).filter(Boolean);
+    const coalPer = coal.length ? charcoalPerIngot(itemId) : 0;
     if ((!per || !wood) && !coalPer) return null;
     const coalNeed = coalPer * n, coalHave = coalPer ? heldOf(a, coal) : 0;
     // Charcoal short: the smelter burns firewood in its place (firewoodPerCharcoal each)

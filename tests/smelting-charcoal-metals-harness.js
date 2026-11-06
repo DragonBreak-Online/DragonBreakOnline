@@ -110,5 +110,19 @@ check('...and asks for 2 charcoal an ingot', /^Smelting this needs 2 firewood an
 const SILVER = SMELTS.find((s) => s[3] === 'ingotSilver');
 check('silver itself still burns 1 (the longer name does not swallow the shorter)', smelt(SILVER[0], SILVER[2], 2)[1] === 2);
 
+// Coal01 (bfb09), the world's lumps, is also named Charcoal and pays the same; 33760 burns first
+const COAL01 = 'bfb09:Skyrim.esm';
+for (const [recipe, recipeEdid, item, , coal] of SMELTS) {
+  wallClock += 2000;
+  setHeld(SMITH, { [FIREWOOD]: 2, [COAL01]: 20 });
+  const verdict = mp.onCraft(SMITH, idOf(item), 1, idOf(recipe));
+  check(`${recipeEdid} with Coal01 only burns ${coal} of it and no extra firewood`, verdict !== false && 20 - count(SMITH, COAL01) === coal && count(SMITH, FIREWOOD) === 0, { verdict, held: props.get(SMITH + '|inventory') });
+}
+const EBONY = SMELTS.find((s) => s[3] === 'IngotEbony');
+wallClock += 2000;
+setHeld(SMITH, { [COAL01]: 5, [FIREWOOD]: 2, [CHARCOAL]: 1 });
+check('an Ebony Ingot from a mixed stack burns the 1 Charcoal, then 2 Coal01', mp.onCraft(SMITH, idOf(EBONY[2]), 1, idOf(EBONY[0])) !== false && count(SMITH, CHARCOAL) === 0 && count(SMITH, COAL01) === 3 && count(SMITH, FIREWOOD) === 0, props.get(SMITH + '|inventory'));
+check('no smelting check threw (a throw lets the smelt go free)', !out.logs.some((l) => /smelting check failed|could not burn/.test(l)), out.logs);
+
 console.log(`\n${checks - failures}/${checks} passed`);
 process.exit(failures ? 1 : 0);
