@@ -53,13 +53,13 @@ let postFails = false;
 globalThis.__dboDiscordPost = (channel, body) => { posts.push({ channel, body }); return postFails ? Promise.reject(new Error('HTTP 403')) : Promise.resolve({ id: '1' }); };
 
 const mp = { get: (id, p) => { const c = chars.get(id >>> 0); if (!c) throw new Error('no such form'); return p === 'type' ? 'MpActor' : undefined; } };
-const said = [], logs = [];
+const said = [], logs = [], audits = [];
 const ui = {};
 let timer = null;
 const ROLES = { bruma: '1553067344442433757', whiterun: '1559949568513155193', riften: '1559950618733580418' };
 let citizenCfg = { discordRoles: ROLES, election: { voterRules: { enabled: false } } };
 const api = () => ({
-  mp, log: (...x) => logs.push(x.join(' ')), audit: () => {}, who: (a) => (chars.get(a >>> 0) || {}).name || `actor ${a}`,
+  mp, log: (...x) => logs.push(x.join(' ')), audit: (t) => audits.push(t), who: (a) => { const c = chars.get(a >>> 0); return c ? `${c.name} #T${(a >>> 0).toString(16)} (profile ${c.pid})` : `actor ${a}`; },
   personal: (a, t) => said.push([a >>> 0, t]), nameOf: (a) => chars.get(a >>> 0).name, ownNameOf: (a) => chars.get(a >>> 0).name, tagOf: (a) => `T${(a >>> 0).toString(16)}`,
   onUi: (n, f) => { ui[n] = f; }, onlineActors: () => online.slice(), isAdmin: () => false, isLeadStaff: () => false,
   profileOf: (a) => { const c = chars.get(a >>> 0); return c ? c.pid : -1; },
@@ -146,7 +146,13 @@ const mentionsOnly = (p, role) => !!p && !!p.body && p.body.allowed_mentions && 
   // ---- 3. courts; the vote opens 24 h later ---------------------------------------------------------------------------------
   const [J1, S1, C1, H1, J2, S2, C2, H2, V1, V2, V3, V4] = wr;
   let r;
+  // S1 wears a helmet when named (auto-mask since 31 Oct): the court stores the name shown then
+  chars.get(S1).name = 'Masked Person';
   ok(!M.register(J1, 'whiterun', [nm(S1), nm(C1), nm(H1)]).error, 'a first court is entered');
+  chars.get(S1).name = 'Whiterunner 1';
+  ok(M.data().elections.whiterun.courts[0].members.steward.name === 'Masked Person', 'a member masked when named is stored under the mask (kept only as a fallback)', M.data().elections.whiterun.courts[0].members.steward);
+  ok(audits.some((t) => /^ELECTION Whiterun: Whiterunner 0 #T200 \(profile 200\) entered a court: Steward Masked Person #T201 \(profile 201\), Lord Commander Whiterunner 2 #T202 \(profile 202\), Housecarl Whiterunner 3 #T203 \(profile 203\)$/.test(t)), 'the staff audit names each member with their #TAG and profile', audits);
+  ok(M.votingView(V1, WR).courts[0].members.find((m) => m.seat === 'steward').name === 'Whiterunner 1', 'helmet off, the Voting tab names them as they are now', M.votingView(V1, WR).courts[0].members);
   ok(!M.register(J2, 'whiterun', [nm(S2), nm(C2), nm(H2)]).error, 'a second court is entered');
   E = M.data().elections.whiterun;
   const [K1, K2] = E.courts.map((c) => c.id);
@@ -199,6 +205,8 @@ const mentionsOnly = (p, role) => !!p && !!p.body && p.body.allowed_mentions && 
   M.vote(V1, 'whiterun', K1); M.vote(V2, 'whiterun', K1); M.vote(V3, 'whiterun', K2);
   n0 = said.length;
   const posts2 = posts.length;
+  // C1 has a helmet on when the vote closes
+  chars.get(C1).name = 'Masked Person';
   now += 24 * HOUR; timer();
   E = M.data().elections.whiterun;
   ok(E.phase === 'seated' && E.result.winner === K1, 'the first court wins 2-1');
@@ -206,6 +214,15 @@ const mentionsOnly = (p, role) => !!p && !!p.body && p.body.allowed_mentions && 
   ok(/Whiterunner 0 is elected Jarl of Whiterun by its citizens/.test(resText) && /Voting tab/.test(resText), 'citizens are told the result', resText);
   const resPost = lastPost();
   ok(posts.length === posts2 + 1 && /Whiterunner 0 is elected Jarl of Whiterun/.test(resPost.body.content) && /Steward Whiterunner 1/.test(resPost.body.content) && mentionsOnly(resPost, ROLES.whiterun), 'and Discord, with the court', resPost.body.content);
+  ok(/Steward Whiterunner 1/.test(resPost.body.content) && !/Steward Masked Person/.test(resPost.body.content), 'a member masked only when named is posted by their name now, not "Steward Masked Person"', resPost.body.content);
+  ok(/Lord Commander Masked Person/.test(resPost.body.content) && !/Whiterunner 2/.test(resPost.body.content + resText), 'a member still masked at the result stays masked: their own name is never posted', resPost.body.content);
+  ok(audits.some((t) => /^ELECTION Whiterun: Whiterunner 0 #T200 \(profile 200\) is elected Jarl with a court of Steward Whiterunner 1 #T201 \(profile 201\), Lord Commander Masked Person #T202 \(profile 202\), Housecarl Whiterunner 3 #T203 \(profile 203\); 0 vote\(s\) struck by staff$/.test(t)), 'the staff audit of the result names each member with their #TAG and profile', audits.filter((t) => /elected/.test(t)));
+  chars.get(C1).name = 'Whiterunner 2';
+  const won = () => M.votingView(V1, WR).result.winner.members;
+  ok(won().find((m) => m.seat === 'steward').name === 'Whiterunner 1' && won().find((m) => m.seat === 'commander').name === 'Whiterunner 2', 'the result on the Voting tab names the court as they are now', won());
+  const gone = chars.get(H1); chars.delete(H1);
+  ok(won().find((m) => m.seat === 'housecarl').name === 'Whiterunner 3', 'a member whose character is gone keeps the stored name', won());
+  chars.set(H1, gone);
   logout(LATE); login(LATE);
   ok(toldSince(n0, LATE).length === 1 && toldSince(n0, LATE)[0] === resText, 'a citizen logging in after the vote is told the result once');
   now += 8 * DAY;

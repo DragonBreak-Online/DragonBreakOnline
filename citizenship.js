@@ -149,6 +149,10 @@ module.exports = (api) => {
   const isOnline = (a) => onlineActors().includes(a >>> 0);
   const tagSafe = (a) => { try { return String(tagOf(a) || ''); } catch (e) { return ''; } };
   const nameNow = (a, fallback) => { try { const n = ownNameOf(a); if (n) return String(n); } catch (e) { /* fallback */ } return String(fallback || 'someone'); };
+  // A court member by the name they go by now, as /officials names them; the name stored at nomination once the character is gone
+  const memberName = (m) => (!m ? '' : exists(m.actor) ? nameNow(m.actor, m.name) : String(m.name || 'someone'));
+  // Staff audits: who() gives the #TAG and profile, so a mask or a rename still says who it is
+  const memberWho = (m) => (m && exists(m.actor) ? who(m.actor) : `${memberName(m)} (profile ${m ? Number(m.pid) : '?'})`);
   const ofPlace = (name) => String(name || '').replace(/^The /, 'the ');
   const dateText = (t) => new Date(Number(t) || 0).toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
   const tell = (a, text) => { if (a && isOnline(a)) personal(a >>> 0, text); };
@@ -805,10 +809,10 @@ module.exports = (api) => {
     if (was) return `This character served ${andList(Array.isArray(was) && was.length ? was : ['a faction'])} when the call for courts went out. Who serves a faction is judged then, so this character cannot vote in this election.`;
     const cab = cabinetOf(E, a);
     if (cab) {
-      const jarl = cab.court.members.jarl ? cab.court.members.jarl.name : 'a candidate';
+      const jarl = cab.court.members.jarl ? memberName(cab.court.members.jarl) : 'a candidate';
       const where = cab.seat.id === 'jarl' ? 'You stand for Jarl on this ballot' : `You stand on this ballot as ${cab.seat.label} in the court of ${jarl}`;
       return cab.self ? `${where}. Those who stand in a court do not vote in its election.`
-        : `Another of your characters stands on this ballot (${cab.court.members[cab.seat.id].name}, ${cab.seat.id === 'jarl' ? 'for Jarl' : `${cab.seat.label} in the court of ${jarl}`}). Those who stand in a court do not vote in its election.`;
+        : `Another of your characters stands on this ballot (${memberName(cab.court.members[cab.seat.id])}, ${cab.seat.id === 'jarl' ? 'for Jarl' : `${cab.seat.label} in the court of ${jarl}`}). Those who stand in a court do not vote in its election.`;
     }
     const own = explicit(a).find((h) => h.zone === z.id);
     const why = voterWhy(Number(pidV), a, own ? own.since : 0, E, z);
@@ -992,7 +996,7 @@ module.exports = (api) => {
       // A Jarl candidate who lost eligibility strikes the court off and voids its votes
       for (const id of E.ballot) {
         const c = courtById(E, id); const j = c && c.members.jarl;
-        if (c && !c.struck && (!j || unfit(j.actor, z, 'jarl'))) { c.struck = j ? unfit(j.actor, z, 'jarl') : 'no Jarl'; audit(`ELECTION ${z.name}: the court of ${j ? j.name : '?'} is struck off (${c.struck}); its votes are void`); }
+        if (c && !c.struck && (!j || unfit(j.actor, z, 'jarl'))) { c.struck = j ? unfit(j.actor, z, 'jarl') : 'no Jarl'; audit(`ELECTION ${z.name}: the court of ${j ? memberName(j) : '?'} is struck off (${c.struck}); its votes are void`); }
       }
       E.ballot = E.ballot.filter((id) => { const c = courtById(E, id); return c && !c.struck; });
       const counts = tally(E);
@@ -1033,8 +1037,8 @@ module.exports = (api) => {
     data().elected[z.id] = Date.now();   // it has seated a court: every later election there asks for the seven days
     E.phase = 'seated'; E.phaseEndsAt = 0; E.revote = false; forgetVoters(E, true); save();
     const j = winner.members.jarl; const struck = struckCount(E);
-    audit(`ELECTION ${z.name}: ${j.name} is elected Jarl with a court of ${SEATS.filter((s) => s.id !== 'jarl').map((s) => `${s.label} ${winner.members[s.id] ? winner.members[s.id].name : '(empty)'}`).join(', ')}${empty.length ? `; empty: ${empty.join(', ')}` : ''}; ${struck} vote(s) struck by staff`);
-    announce(z, E, 'result', { struck, jarl: j.name, empty, court: SEATS.filter((s) => s.id !== 'jarl' && winner.members[s.id] && !empty.includes(s.label)).map((s) => `${s.label} ${winner.members[s.id].name}`).join(', ') });
+    audit(`ELECTION ${z.name}: ${memberWho(j)} is elected Jarl with a court of ${SEATS.filter((s) => s.id !== 'jarl').map((s) => `${s.label} ${winner.members[s.id] ? memberWho(winner.members[s.id]) : '(empty)'}`).join(', ')}${empty.length ? `; empty: ${empty.join(', ')}` : ''}; ${struck} vote(s) struck by staff`);
+    announce(z, E, 'result', { struck, jarl: memberName(j), empty, court: SEATS.filter((s) => s.id !== 'jarl' && winner.members[s.id] && !empty.includes(s.label)).map((s) => `${s.label} ${memberName(winner.members[s.id])}`).join(', ') });
   };
   const tick = () => {
     if (!C.enabled) return;
@@ -1057,7 +1061,7 @@ module.exports = (api) => {
     return tg;
   };
   const member = (tg, accepted) => ({ actor: tg.actor >>> 0, pid: Number(tg.pid), name: nameNow(tg.actor, tg.label), accepted: !!accepted });
-  const inviteText = (z, c, s) => `${c.members.jarl.name} names you ${s.label} in the court they put forward for Jarl of ${ofPlace(z.name)}. Accept or refuse at a notice board of the hold (Voting) or in your journal (F3, Citizen).`;
+  const inviteText = (z, c, s) => `${memberName(c.members.jarl)} names you ${s.label} in the court they put forward for Jarl of ${ofPlace(z.name)}. Accept or refuse at a notice board of the hold (Voting) or in your journal (F3, Citizen).`;
   const register = (a, zid, names) => {
     const z = holdOf(zid); if (!z) return { error: 'This land grants no citizenship.' };
     if (!electing(z)) return { error: `${z.name} holds no election.` };
@@ -1078,7 +1082,7 @@ module.exports = (api) => {
     for (const s of others) c.members[s.id] = member(tgs[s.id], false);
     E.courts.push(c); save();
     for (const s of others) tell(c.members[s.id].actor, inviteText(z, c, s));
-    audit(`ELECTION ${z.name}: ${who(a)} entered a court: ${others.map((s) => `${s.label} ${c.members[s.id].name}`).join(', ')}`);
+    audit(`ELECTION ${z.name}: ${who(a)} entered a court: ${others.map((s) => `${s.label} ${memberWho(c.members[s.id])}`).join(', ')}`);
     return { text: 'Your court is entered. It stands on the ballot once every member has accepted.' };
   };
   const myCourt = (a, z) => { const E = elOf(z.id); const c = E && courtOfActor(E, a); return c && (c.members.jarl.actor >>> 0) === (a >>> 0) ? { E, c } : null; };
@@ -1095,9 +1099,9 @@ module.exports = (api) => {
     if (elsewhere && elsewhere !== m.c) return { error: `${tg.label} is already named in another court.` };
     const was = m.c.members[s.id];
     m.c.members[s.id] = member(tg, false); save();
-    if (was && (was.actor >>> 0) !== (tg.actor >>> 0)) tell(was.actor, `You are no longer named ${s.label} in ${m.c.members.jarl.name}'s court.`);
+    if (was && (was.actor >>> 0) !== (tg.actor >>> 0)) tell(was.actor, `You are no longer named ${s.label} in ${memberName(m.c.members.jarl)}'s court.`);
     tell(tg.actor, inviteText(z, m.c, s));
-    audit(`ELECTION ${z.name}: ${who(a)} named ${tg.who} ${s.label}${was ? ` in place of ${was.name}` : ''}`);
+    audit(`ELECTION ${z.name}: ${who(a)} named ${tg.who} ${s.label}${was ? ` in place of ${memberWho(was)}` : ''}`);
     return { text: `${tg.label} is named ${s.label}. They must accept.` };
   };
   const withdraw = (a, zid) => {
@@ -1105,7 +1109,7 @@ module.exports = (api) => {
     const m = myCourt(a, z); if (!m) return { error: 'You have entered no court here.' };
     if (m.E.phase !== 'registration') return { error: 'Once the vote is open a court stays on the ballot.' };
     m.E.courts = m.E.courts.filter((c) => c !== m.c); save();
-    for (const s of SEATS) if (s.id !== 'jarl' && m.c.members[s.id]) tell(m.c.members[s.id].actor, `${m.c.members.jarl.name} has withdrawn their court from the election of ${ofPlace(z.name)}.`);
+    for (const s of SEATS) if (s.id !== 'jarl' && m.c.members[s.id]) tell(m.c.members[s.id].actor, `${memberName(m.c.members.jarl)} has withdrawn their court from the election of ${ofPlace(z.name)}.`);
     audit(`ELECTION ${z.name}: ${who(a)} withdrew their court`);
     return { text: 'Your court is withdrawn.' };
   };
@@ -1118,13 +1122,13 @@ module.exports = (api) => {
     if (!yes) {
       c.members[s.id] = null; save();
       tell(c.members.jarl.actor, `${nameNow(a)} refused the seat of ${s.label} in your court. Name someone else before registration closes.`);
-      audit(`ELECTION ${z.name}: ${who(a)} refused ${s.label} in ${c.members.jarl.name}'s court`);
+      audit(`ELECTION ${z.name}: ${who(a)} refused ${s.label} in ${memberName(c.members.jarl)}'s court`);
       return { text: 'You refused the seat.' };
     }
     const w = unfit(a, z, s.id); if (w) return { error: `You cannot take the seat: you ${w.replace(/^is /, 'are ').replace(/^serves/, 'serve')}.` };
     c.members[s.id].accepted = true; save();
     tell(c.members.jarl.actor, `${nameNow(a)} accepted the seat of ${s.label} in your court.${complete(c, z) ? ' Your court is complete and will stand on the ballot.' : ''}`);
-    audit(`ELECTION ${z.name}: ${who(a)} accepted ${s.label} in ${c.members.jarl.name}'s court`);
+    audit(`ELECTION ${z.name}: ${who(a)} accepted ${s.label} in ${memberName(c.members.jarl)}'s court`);
     return { text: `You accepted the seat of ${s.label}.` };
   };
   const vote = (a, zid, courtId) => {
@@ -1234,9 +1238,9 @@ module.exports = (api) => {
 
   // ---- views -------------------------------------------------------------------------------------------------------------
   const holdLine = (h) => { const z = holdOf(h.zone); return { zone: h.zone, name: z ? z.name : h.zone, since: Number(h.since) || 0, how: String(h.how || ''), auto: !!h.auto }; };
-  const memberView = (z, m, seat, E) => (m ? { seat: seat.id, label: seat.label, name: m.name, tag: tagSafe(m.actor), accepted: !!m.accepted,
+  const memberView = (z, m, seat, E) => (m ? { seat: seat.id, label: seat.label, name: memberName(m), tag: tagSafe(m.actor), accepted: !!m.accepted,
     fit: !unfit(m.actor, z, seat.id), why: E && E.phase === 'registration' ? unfit(m.actor, z, seat.id) : '' } : { seat: seat.id, label: seat.label, name: '', tag: '', accepted: false, fit: false, why: 'empty' });
-  const courtView = (z, E, c, a) => ({ id: c.id, jarl: c.members.jarl ? c.members.jarl.name : '', members: SEATS.map((s) => memberView(z, c.members[s.id], s, E)),
+  const courtView = (z, E, c, a) => ({ id: c.id, jarl: c.members.jarl ? memberName(c.members.jarl) : '', members: SEATS.map((s) => memberView(z, c.members[s.id], s, E)),
     complete: complete(c, z), struck: c.struck || '', mine: !!c.members.jarl && (c.members.jarl.actor >>> 0) === (a >>> 0) });
   const votingView = (a, z) => {
     const v = { hold: z.id, name: z.name, electing: electing(z), threshold: EL.threshold, registrationHours: EL.registrationHours, votingHours: EL.votingHours, seats: SEATS.map((s) => ({ id: s.id, label: s.label })) };
@@ -1262,14 +1266,14 @@ module.exports = (api) => {
       v.inCourt = !!mine;
       v.standWhy = mine ? '' : unfit(a, z, 'jarl');
       v.invites = E.courts.filter((c) => SEATS.some((s) => s.id !== 'jarl' && c.members[s.id] && (c.members[s.id].actor >>> 0) === (a >>> 0) && !c.members[s.id].accepted))
-        .map((c) => { const s = SEATS.find((x) => x.id !== 'jarl' && c.members[x.id] && (c.members[x.id].actor >>> 0) === (a >>> 0)); return { court: c.id, jarl: c.members.jarl.name, seat: s.label }; });
+        .map((c) => { const s = SEATS.find((x) => x.id !== 'jarl' && c.members[x.id] && (c.members[x.id].actor >>> 0) === (a >>> 0)); return { court: c.id, jarl: memberName(c.members.jarl), seat: s.label }; });
     }
     // No count anywhere until the vote has a winner
     if (E.phase === 'voting') { v.ballot = E.ballot.map((id) => courtView(z, E, courtById(E, id), a)); v.voted = E.votes[pid] !== undefined; }
     if (E.phase === 'seated' && E.result) {
       const w = courtById(E, E.result.winner);
       v.result = { winner: w ? courtView(z, E, w, a) : null, empty: E.result.empty || [], at: E.result.at,
-        counts: E.courts.filter((c) => c.id in (E.result.counts || {})).map((c) => ({ jarl: c.members.jarl.name, votes: E.result.counts[c.id] })) };
+        counts: E.courts.filter((c) => c.id in (E.result.counts || {})).map((c) => ({ jarl: memberName(c.members.jarl), votes: E.result.counts[c.id] })) };
     }
     return v;
   };
@@ -1426,7 +1430,7 @@ module.exports = (api) => {
       if (E && E.phase === 'registration') {
         for (const c of E.courts) for (const s of SEATS) {
           const m = c.members[s.id];
-          if (s.id !== 'jarl' && m && (m.actor >>> 0) === (a >>> 0) && !m.accepted) v.invites.push({ zone: z.id, name: z.name, court: c.id, jarl: c.members.jarl.name, seat: s.label });
+          if (s.id !== 'jarl' && m && (m.actor >>> 0) === (a >>> 0) && !m.accepted) v.invites.push({ zone: z.id, name: z.name, court: c.id, jarl: memberName(c.members.jarl), seat: s.label });
         }
       }
       if (E && electing(z) && (citizenOf(a, z.id) || courtOfActor(E, a))) v.elections.push({ zone: z.id, name: z.name, phase: E.phase, endsAt: Number(E.phaseEndsAt) || 0, revote: !!E.revote,
