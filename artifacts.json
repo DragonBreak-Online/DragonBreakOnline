@@ -1,5 +1,6 @@
 {
   "_comment": "Artifacts never come out of loot (Nate, 2026-09-29: 'Artifacts are not lootable. We do RP as staff to proclaim champions'); staff hand them out. Matched on the editor id, case-insensitive, so enchanted variants go too. Read by dungeons.js (every pool, the Ayleid table, what a corpse keeps) and wildlife.js (giant camp chests). The Blood Crown is not an item and is untouched: it passes from holder to slayer (supernatural.js). Sweep of 2026-09-30 (Nate: Dawnbreaker, the Rueful Axe, the Ebony Blade, Chillrend, the Mace of Molag Bal and Volendrung were missing): every Daedric artifact and named quest unique of the load order by exact editor id, the Aetherial set, Miraak's gear, the Dragonborn acolyte masks, the Gray Cowl, Umbra and Springheel Jak's boots, and the replicas Immersive Weapons, Immersive Armors and More Craftable Equipment let a smith make. regions.js's craft hook refuses any recipe whose product matches, so no forge makes one either (tempering one a player holds still works).",
+  "_notArtifacts": "Not artifacts, but never loot either (6 Nov, #bugs 1565415888855896134): DLC1ClothesVampireLordArmor is playable, but its only armour addon is the Vampire Lord race's, so worn by anyone else it draws nothing. loot.json put it in the Skyrim armour pool.",
   "patterns": [
     "^ClavicusVileMask$",
     "^ArmorDragonPriestMask",
@@ -53,6 +54,7 @@
     "^MCEArmorTsunCuirassPlayer$",
     "^manny_GF_(Armor_GrayCowl|Armor_BootsofSpringheelJak|Weapon_Umbra(NonPlayable)?|Amulet_(Right|Left)EyeOfColdharbour)$",
     "^dunGauldurAmulet$",
-    "^dunFrostmereCryptPaleBlade\\d+$"
+    "^dunFrostmereCryptPaleBlade\\d+$",
+    "^DLC1ClothesVampireLordArmor$"
   ]
 }

@@ -24,6 +24,8 @@ if (re) {
     'DLC1DragonboneSwordKeeper03', 'ArmorGlassCuirass', 'CYRGlassSword', 'StaffFireball', 'DBArmor', 'ReligiousTalosMankind']) {
     ok(!re.test(n), `${n} is ordinary loot`);
   }
+  // Not an artifact, but drawn only on the Vampire Lord race, so it is never loot either (#bugs 1565415888855896134)
+  ok(re.test('DLC1ClothesVampireLordArmor') && !re.test('DLC1VampireLordCape'), 'the Vampire Lord armour is never loot, and only it');
   const pools = JSON.parse(fs.readFileSync(path.join(ROOT, 'loot.json'), 'utf8')).pools;
   const hits = [];
   for (const [name, items] of Object.entries(pools)) for (const it of items) if (re.test(String(it.name || ''))) hits.push(`${name}:${it.name}`);
