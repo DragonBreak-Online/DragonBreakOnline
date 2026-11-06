@@ -250,9 +250,19 @@ ok(!placementSaid.length, 'placement.js ignores a GM aiming at a decor piece', p
 // ---- the owner leaves: cleared, half owed, paid at the next scan ------------------------------------------------------
 placeAt(OWNER, 'alchemy');
 const before = held(OWNER, SALT), kept = items().length;
+// an unloaded or unreadable door record must never abandon the place or delete placed items
+setp(DOOR, 'private.housing', null);
+timers['decor-owners']();
+ok(kept >= 2 && !!T.reg().places[DOOR.toString(16)] && items().length === kept, 'an unreadable or unloaded housing record does not abandon or delete items');
+// an owed refund for an alt character on the same account is claimed by the online owner
+T.reg().owed[`${PROFILE[OWNER]}:999999`] = { [SALT]: 2 };
+const altBefore = held(OWNER, SALT);
+timers['decor-owners']();
+ok(held(OWNER, SALT) === altBefore + 2 && !T.reg().owed[`${PROFILE[OWNER]}:999999`], 'alt-character owed refund is delivered to an online character of the same account');
+// when the door is actually abandoned (owner: 0), the place is cleared and refunded
 setp(DOOR, 'private.housing', { owner: 0, partner: OUTDOOR });
 timers['decor-owners']();
-ok(kept >= 2 && !T.reg().places[DOOR.toString(16)] && held(OWNER, SALT) === before + 1, 'abandon: pieces taken down, half of the paid salt back to the owner online', { kept, salt: held(OWNER, SALT) });
+ok(!T.reg().places[DOOR.toString(16)] && held(OWNER, SALT) === altBefore + 2 + 1, 'abandon: pieces taken down, half of the paid salt back to the owner online', { kept, salt: held(OWNER, SALT) });
 ok(audits.some((t) => /^DECOR abandon/.test(t)) && audits.some((t) => /^DECOR place/.test(t)), 'audit lines for place and abandon');
 ok(fs.existsSync('decor.json'), 'the registry is written beside the world state (here: the folder)');
 

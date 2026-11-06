@@ -188,6 +188,10 @@ module.exports = (api) => {
   };
 
   // ---- places: the interior cells behind a claimed door (housingSystem.ts place.cells, else the claim's own interior) ----
+  const housingRecord = (ref) => {
+    try { const h = globalThis.__dboHousing; if (h && typeof h.recordOf === 'function') { const r = h.recordOf(ref); if (r) return r; } } catch (e) {}
+    return get(ref >>> 0, 'private.housing', null);
+  };
   const isInterior = (cell) => { try { const r = mp.lookupEspmRecordById(cell); return !!(r && r.record && String(r.record.type) === 'CELL'); } catch (e) { return false; } };
   const placeOfCell = (cell) => {
     if (!cell || !isInterior(cell)) return null;
@@ -196,7 +200,7 @@ module.exports = (api) => {
       let ids = [];
       try { const v = JSON.parse(fs.readFileSync(path.resolve('housing.json'), 'utf8')); if (Array.isArray(v)) ids = v.map((x) => Number(x) >>> 0); } catch (e) { /* none */ }
       for (const ref of new Set(ids)) {
-        const rec = get(ref, 'private.housing', null);
+        const rec = housingRecord(ref);
         if (!rec || !(Number(rec.owner) > 0)) continue;
         let cells = rec.place && Array.isArray(rec.place.cells) ? rec.place.cells.map(idOf).filter(Boolean) : [];
         // A claim with no partner is not asked for one: mp.get(0, ...) throws in the server, which logs it at [error] (live,
@@ -208,7 +212,7 @@ module.exports = (api) => {
     }
     const hit = S.cellIndex.get(cell);
     if (!hit) return null;
-    const rec = get(hit.root, 'private.housing', null);
+    const rec = housingRecord(hit.root);
     return rec && Number(rec.owner) > 0 ? { root: hit.root, cells: hit.cells, rec } : null;
   };
   const owns = (a, rec) => { try { const h = globalThis.__dboHousing; if (h && typeof h.ownsRecord === 'function') return h.ownsRecord(rec, a) === true; } catch (e) { /* the account's */ } return Number(rec && rec.owner) === profile(a); };
@@ -434,7 +438,7 @@ module.exports = (api) => {
     if (!we) return;
     for (const e of Object.values(we.data().edits)) {
       if (!e.decor) continue;
-      const rec = get(parseInt(e.decor, 16) >>> 0, 'private.housing', null);
+      const rec = housingRecord(parseInt(e.decor, 16) >>> 0);
       // a housing record unreadable (at boot it can be) is unknown, never an owner change
       if (!rec || ownerKey(Number(rec.owner) || 0, Number(rec.ownerChar) >>> 0) === e.decorOwner) continue;
       try { we.change(0, e.ref, null, 'decor-reset', e.name); } catch (err) { log('decor: reset of a home\'s own piece failed', e.ref, err.message); continue; }
@@ -626,7 +630,7 @@ module.exports = (api) => {
     }
     const back = priced ? refundOf(paid, deconstructShare(a)) : {};
     if (it.books && C.study.booksKept) for (const [d, n] of Object.entries(it.books)) back[d] = (back[d] || 0) + n;
-    const rec = get(root, 'private.housing', null);
+    const rec = housingRecord(root);
     const owner = owns(a, rec) ? a : (onlineActors().find((x) => x !== a && owns(x, rec)) || 0);
     if (owner) got = giveAll(owner, back, 1);
     else if (Object.keys(back).length) {
@@ -692,9 +696,16 @@ module.exports = (api) => {
     let changed = recallBlocked();
     for (let i = 0; i < Math.min(C.ownerScanPerTick, roots.length); i++) {
       S.scanIdx = (S.scanIdx + 1) % roots.length;
-      const k = roots[S.scanIdx], p = r.places[k], rec = get(parseInt(k, 16) >>> 0, 'private.housing', null);
-      const same = rec && Number(rec.owner) === p.owner && (!p.ownerChar || !(Number(rec.ownerChar) >>> 0) || (Number(rec.ownerChar) >>> 0) === p.ownerChar);
-      if (same) continue;
+      const k = roots[S.scanIdx], p = r.places[k], rec = housingRecord(parseInt(k, 16) >>> 0);
+      if (!rec) continue;
+      const same = Number(rec.owner) === p.owner;
+      if (same) {
+        if (rec.ownerChar && (Number(rec.ownerChar) >>> 0) !== p.ownerChar) {
+          p.ownerChar = Number(rec.ownerChar) >>> 0;
+          changed = true;
+        }
+        continue;
+      }
       const owed = r.owed[ownerKey(p.owner, p.ownerChar)] = r.owed[ownerKey(p.owner, p.ownerChar)] || {};
       for (const it of p.items) {
         destroy(it.ref); if (it.light) destroy(it.light); if (it.show) destroy(it.show);
@@ -704,32 +715,26 @@ module.exports = (api) => {
       audit(`DECOR abandon place ${k} owner ${p.owner}:${hex(p.ownerChar)} items ${p.items.length} owed ${JSON.stringify(owed)}`);
       delete r.places[k]; changed = true;
     }
-    for (const a of onlineActors()) {
-      const key = ownerKey(profile(a), a >>> 0), alt = ownerKey(profile(a), 0), k = r.owed[key] ? key : (r.owed[alt] ? alt : null);
-      if (!k) continue;
-      const got = giveAll(a, r.owed[k], 1);
-      delete r.owed[k]; changed = true;
-      audit(`DECOR owed ${who(a)} ${JSON.stringify(got)}`);
-      personal(a, `Your old home's furnishings were taken down; back to you: ${costText(got)}.`);
-    }
+    const claimOwed = (target, logLabel, msg) => {
+      for (const a of onlineActors()) {
+        const key = ownerKey(profile(a), a >>> 0), alt = ownerKey(profile(a), 0);
+        let k = target[key] ? key : (target[alt] ? alt : null);
+        if (!k) {
+          const prefix = `${profile(a)}:`;
+          k = Object.keys(target).find((x) => x.startsWith(prefix) && Object.keys(target[x] || {}).length > 0) || null;
+        }
+        if (!k) continue;
+        const got = giveAll(a, target[k], 1);
+        delete target[k]; changed = true;
+        audit(`DECOR ${logLabel} ${who(a)} ${JSON.stringify(got)}`);
+        personal(a, msg(costText(got)));
+      }
+    };
+    claimOwed(r.owed, 'owed', (cost) => `Your old home's furnishings were taken down; back to you: ${cost}.`);
     // a hired carpenter's deconstructs while the owner was away
-    for (const a of onlineActors()) {
-      const key = ownerKey(profile(a), a >>> 0), alt = ownerKey(profile(a), 0), k = r.carpentry[key] ? key : (r.carpentry[alt] ? alt : null);
-      if (!k) continue;
-      const got = giveAll(a, r.carpentry[k], 1);
-      delete r.carpentry[k]; changed = true;
-      audit(`DECOR carpentry ${who(a)} ${JSON.stringify(got)}`);
-      personal(a, `Your carpenters took down pieces in your home while you were away; back to you: ${costText(got)}.`);
-    }
+    claimOwed(r.carpentry, 'carpentry', (cost) => `Your carpenters took down pieces in your home while you were away; back to you: ${cost}.`);
     // pieces taken down because they crash the game (recallBlocked), refunded whole
-    for (const a of onlineActors()) {
-      const key = ownerKey(profile(a), a >>> 0), alt = ownerKey(profile(a), 0), k = r.recalled[key] ? key : (r.recalled[alt] ? alt : null);
-      if (!k) continue;
-      const got = giveAll(a, r.recalled[k], 1);
-      delete r.recalled[k]; changed = true;
-      audit(`DECOR recalled-owed ${who(a)} ${JSON.stringify(got)}`);
-      personal(a, `A piece in your home was taken down because it crashed the game for anyone near it; back to you in full: ${costText(got)}.`);
-    }
+    claimOwed(r.recalled, 'recalled-owed', (cost) => `A piece in your home was taken down because it crashed the game for anyone near it; back to you in full: ${cost}.`);
     if (changed) save();
     resetFixtures();
   };
@@ -739,7 +744,7 @@ module.exports = (api) => {
 
   // ---- the study bookshelf and the planters at work (gamemode.js asks __dboDecorActivate before schools.js) -------------
   const showPos = (pos) => [pos[0], pos[1], pos[2] + (Number(C.planter.showZ) || 0)];
-  const placeOfFound = (found) => ({ root: found.root, rec: get(found.root, 'private.housing', null) });
+  const placeOfFound = (found) => ({ root: found.root, rec: housingRecord(found.root) });
   const inWords = (ms) => { const m = Math.max(1, Math.ceil(ms / 60000)); return m < 90 ? `${m} minutes` : `${Math.round(m / 60)} hours`; };
   const harvesting = () => {
     if (!S.harvest) { try { S.harvest = (JSON.parse(fs.readFileSync(path.resolve('skills.json'), 'utf8')).skills || []).find((k) => k.id === 'harvesting') || {}; } catch (e) { S.harvest = {}; } }
