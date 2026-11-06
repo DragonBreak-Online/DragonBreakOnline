@@ -4028,6 +4028,7 @@ const eatHook = (actorId, baseId, ...rest) => {
   if (prev) { try { verdict = prev(actorId, baseId, ...rest); } catch (e) { log('eat hook chain failed', e.message); } }
   // A field repair kit (durability.js) is used, not eaten
   if (verdict !== false) { try { if (globalThis.__dboDurabilityKit && globalThis.__dboDurabilityKit(Number(actorId) >>> 0, Number(baseId) >>> 0)) return verdict; } catch (e) { log('repair kit failed', e.message); } }
+  if (verdict !== false && typeof globalThis.__dboSpellInvisSource === 'function') { try { globalThis.__dboSpellInvisSource(Number(actorId) >>> 0, Number(baseId) >>> 0); } catch (e) { log('spellinvis drink failed', e.message); } }
   if (verdict !== false) { try { onEat(Number(actorId) >>> 0, Number(baseId) >>> 0); } catch (e) { log('eat handling failed', e.message); } try { if (globalThis.__dboSuperEat) globalThis.__dboSuperEat(Number(actorId) >>> 0, Number(baseId) >>> 0); } catch (e) { log('supernatural eat failed', e.message); } }
   return verdict;
 };
@@ -7744,6 +7745,8 @@ const castHook = (casterId, spellId, ...rest) => {
   if (verdict !== false) { try { asylumCast(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('asylum cast failed', e.message); } }
   // Grand Healing heals the players around the caster the engine's 15 ft did not reach (grandhealing.js)
   if (verdict !== false && typeof globalThis.__dboGrandHealCast === 'function') { try { globalThis.__dboGrandHealCast(casterId, spellId); } catch (e) { log('grand healing cast failed', e.message); } }
+  // An Invisibility spell, power or scroll the server saw (spellinvis.js, for npcdirector.js)
+  if (verdict !== false && typeof globalThis.__dboSpellInvisSource === 'function') { try { globalThis.__dboSpellInvisSource(Number(casterId) >>> 0, Number(spellId) >>> 0); } catch (e) { log('spellinvis cast failed', e.message); } }
   return verdict;
 };
 castHook.__dbo = true;
