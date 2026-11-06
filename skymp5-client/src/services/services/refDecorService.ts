@@ -4,12 +4,26 @@ import { CustomPacketMessage } from "../messages/customPacketMessage";
 import { remoteIdToLocalId } from "../../view/worldViewMisc";
 import { Container, Door, ObjectReference } from "skyrimPlatform";
 import { logTrace } from "../../logging";
-import { pickSweep } from "./refDecorSweep";
+import { DecorWork, runBudget, VisitKind } from "./refDecorSweep";
 
 const MASTER_LOCK_LEVEL = 100;
-const APPLY_EVERY_N_UPDATES = 30;
 // Slow ticks a chest must stay 3D-loaded before it is renamed (about 3 s)
 const CHEST_SETTLE_TICKS = 6;
+
+type ApplyStats = { names: number; locks: number; errors: number; notLoaded: number; firstError: string };
+
+// What the perf report shows of this service since its last take
+export interface RefDecorPerf {
+  n: number;
+  live: number;
+  q: number;
+  pk: number;
+  sweeps: number;
+  msPerSweep: number;
+  maxMs: number;
+  visits: number;
+  applied: number;
+}
 
 // One claimed reference's presentation, as sent by the server.
 interface RefDecor {
@@ -28,8 +42,9 @@ interface RefDecor {
  * - name: setDisplayName so the crosshair shows the claim's name.
  * - locked: Master lock via setLockLevel(100) + lock(true) for every player;
  *   the server refuses activation until someone with access unlocks it.
- * Entries re-apply on a slow tick so refs that load later (cell changes)
- * converge without extra packets.
+ * Work is spread over updates under a time budget (refDecorSweep.ts): server
+ * changes are applied wherever the ref is, refs in loaded 3D re-apply on a
+ * slow tick, and the rest are only probed, after a cell load or a few a tick.
  */
 export class RefDecorService extends ClientListener {
   constructor(private sp: Sp, private controller: CombinedController) {
@@ -37,19 +52,26 @@ export class RefDecorService extends ClientListener {
     this.controller.emitter.on("customPacketMessage", (e) => this.onCustomPacketMessage(e));
     this.controller.on("update", () => this.onUpdate());
     this.controller.emitter.on("gameLoad", () => this.onGameLoad());
-    // Walking into an area changes which refs are loaded: resolve everything once, during the load, rather
-    // than discovering it a cursor step at a time afterwards
-    this.controller.on("cellFullyLoaded", () => { this.fullSweep = true; });
+    this.controller.on("cellFullyLoaded", () => this.work.cellLoaded());
   }
 
-  // A save load resets every engine lock and display name
+  takePerf(): RefDecorPerf {
+    const p = this.perf;
+    const out: RefDecorPerf = {
+      n: this.decor.size, live: this.work.liveCount, q: this.work.backlog, pk: p.packets, sweeps: p.sweeps,
+      msPerSweep: p.sweeps ? Math.round((p.ms * 100) / p.sweeps) / 100 : 0, maxMs: p.maxMs, visits: p.visits, applied: p.applied,
+    };
+    this.perf = { packets: 0, sweeps: 0, ms: 0, maxMs: 0, visits: 0, applied: 0 };
+    return out;
+  }
+
+  // A save load resets every engine lock and display name, so every ref is applied again wherever it is
   private onGameLoad(): void {
     this.applied.clear();
     this.loadedTicks.clear();
     this.hot.clear();
-    this.sweepCursor = 0;
-    this.fullSweep = true;
-    this.updateCounter = APPLY_EVERY_N_UPDATES;
+    this.work.reset();
+    this.decor.forEach((_d, refId) => this.work.markDirty(refId));
   }
 
   private onCustomPacketMessage(event: ConnectionMessage<CustomPacketMessage>): void {
@@ -62,13 +84,16 @@ export class RefDecorService extends ClientListener {
     if (content["customPacketType"] !== "refDecor" || !Array.isArray(content["refs"])) {
       return;
     }
+    this.perf.packets++;
+    const full = content["full"] === true;
     // Full syncs replace the set: refs we decorated that are gone from the
     // sync (abandoned claims) get a synthetic unlock entry so they revert.
-    if (content["full"] === true) {
+    if (full) {
       const incoming = new Set((content["refs"] as any[]).map((r) => Number(r?.refId) >>> 0));
       this.decor.forEach((_d, refId) => {
         if (!incoming.has(refId)) {
           this.decor.set(refId, { refId, name: null, locked: false });
+          this.work.markDirty(refId);
         }
       });
     }
@@ -78,41 +103,75 @@ export class RefDecorService extends ClientListener {
       if (!refId) {
         continue;
       }
-      this.decor.set(refId, {
-        refId,
-        name: typeof raw.name === "string" && raw.name ? raw.name : null,
-        locked: raw.locked === true,
-      });
+      const next: RefDecor = { refId, name: typeof raw.name === "string" && raw.name ? raw.name : null, locked: raw.locked === true };
+      const prev = this.decor.get(refId);
+      // A full sync repeats every claim; only the ones that differ need work
+      if (full && prev && prev.name === next.name && prev.locked === next.locked) {
+        continue;
+      }
+      this.decor.set(refId, next);
       this.applied.delete(refId);
+      this.work.markDirty(refId);
     }
-    // Apply on the next update rather than the next slow tick, and look at everything: the refs that just
-    // changed are wherever they are in the id order, not necessarily under the cursor
-    this.fullSweep = true;
-    this.updateCounter = APPLY_EVERY_N_UPDATES;
   }
 
   private onUpdate(): void {
-    if (this.decor.size === 0 || ++this.updateCounter < APPLY_EVERY_N_UPDATES) {
+    if (this.decor.size === 0) {
       return;
     }
-    this.updateCounter = 0;
-    const stats = { names: 0, locks: 0, errors: 0, notLoaded: 0, firstError: "" };
-    // Not every ref every sweep: see refDecorSweep.ts. The whole set is ~1,700 refs and nearly all of them
-    // are in cells that are not loaded, so resolving them all cost one frame in thirty about 3,400 native
-    // calls to throw almost all of the answers away.
-    const pick = pickSweep(Array.from(this.decor.keys()), { hot: this.hot, cursor: this.sweepCursor, full: this.fullSweep });
-    this.sweepCursor = pick.cursor;
-    if (pick.covered) {
-      this.fullSweep = false;
+    this.work.tick(() => Array.from(this.decor.keys()));
+    const stats: ApplyStats = { names: 0, locks: 0, errors: 0, notLoaded: 0, firstError: "" };
+    const t0 = Date.now();
+    const visits = runBudget(this.work, (refId, kind) => this.visit(refId, kind, stats), Date.now);
+    if (!visits) {
+      return;
     }
-    for (const refId of pick.ids) {
-      const d = this.decor.get(refId);
-      if (d) {
-        this.apply(d, stats);
-      }
-    }
+    const ms = Date.now() - t0;
+    this.perf.sweeps++;
+    this.perf.ms += ms;
+    this.perf.visits += visits;
+    if (ms > this.perf.maxMs) this.perf.maxMs = ms;
     if (stats.names || stats.locks || stats.errors) {
       logTrace(this, `applied names=${stats.names} locks=${stats.locks} errors=${stats.errors} notloaded=${stats.notLoaded}${stats.firstError ? " | " + stats.firstError : ""}`);
+    }
+  }
+
+  // Server changes apply wherever the ref resolves; otherwise only refs in loaded 3D, which skips every unattached cell
+  private visit(refId: number, kind: VisitKind, stats: ApplyStats): void {
+    const d = this.decor.get(refId);
+    if (!d) {
+      this.work.forget(refId);
+      return;
+    }
+    const where = this.locate(refId);
+    this.work.seen(refId, where === "loaded");
+    if (where !== "loaded") {
+      this.loadedTicks.delete(refId);
+    }
+    if (where === "gone") {
+      stats.notLoaded++;
+      this.hot.delete(refId);
+      return;
+    }
+    if ((where === "loaded" || kind === "dirty") && this.work.mayApply(refId, kind)) {
+      this.perf.applied++;
+      this.apply(d, stats);
+    }
+  }
+
+  private locate(refId: number): "gone" | "far" | "loaded" {
+    try {
+      const localId = remoteIdToLocalId(refId);
+      if (!localId) {
+        return "gone";
+      }
+      const refr = ObjectReference.from(this.sp.Game.getFormEx(localId));
+      if (!refr) {
+        return "gone";
+      }
+      return refr.is3DLoaded() ? "loaded" : "far";
+    } catch (e) {
+      return "gone";
     }
   }
 
@@ -198,11 +257,10 @@ export class RefDecorService extends ClientListener {
   }
 
   private decor = new Map<number, RefDecor>();
-  // refs that resolved to a real reference last time they were looked at
+  // apply()'s own record of refs that resolved; scheduling uses work instead
   private hot = new Set<number>();
-  private sweepCursor = 0;
-  private fullSweep = true;
+  private work = new DecorWork();
   private applied = new Map<number, { name?: string }>();
   private loadedTicks = new Map<number, number>();
-  private updateCounter = 0;
+  private perf = { packets: 0, sweeps: 0, ms: 0, maxMs: 0, visits: 0, applied: 0 };
 }
