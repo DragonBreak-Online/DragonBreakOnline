@@ -45,9 +45,16 @@ const serverSettings = (() => { try { return mp.getServerSettings() || {}; } cat
 
 // ---- timers: named, timed, replaced by name on every reload -------------------------------------
 const TIMERS = globalThis.__dboTimers instanceof Map ? globalThis.__dboTimers : (globalThis.__dboTimers = new Map()); // name -> { start, interval }
+for (const [k, t] of Array.from(TIMERS.entries())) {
+  if (typeof k === 'number' || !isNaN(Number(k)) || k === '15' || k === 'craftfilter') {
+    if (t && t.start) clearTimeout(t.start);
+    if (t && t.interval) clearInterval(t.interval);
+    TIMERS.delete(k);
+  }
+}
 const SLOW_TICK_MS = Number((cfg.debug || {}).slowTickMs) || 20;
 const tickStats = new Map(); // name -> { n, total, max, slow } since the last summary
-const timed = (name, fn) => function (...args) {
+const timed = (name, fn) => typeof fn !== "function" ? (() => {}) : function (...args) {
   const t0 = performance.now();
   try { return fn.apply(this, args); } finally {
     const ms = performance.now() - t0;
@@ -2796,8 +2803,6 @@ const writeDiagLines = (userId, lines) => {
     // The client's version for the player log (playerlog.js), by connection: it comes before the character exists
     if (text.startsWith('apr client v=')) { try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('client', userId, a, text); } catch (e) { /* the player log is optional */ } }
     if (a && text.startsWith('voice ')) keepVoiceLine(a, text);
-    // A client without SkyrimPlatform's preset calls (racemenupresets.js), seen whatever its line allowance
-    if (a && text.startsWith('apr rmp cap err=natives')) { try { const h = globalThis.__dboFaceClientNoNatives; if (typeof h === 'function') h(a); } catch (e) { /* faces are optional */ } }
     const kind = diagKindOf(text);
     if (kind) {
       const k = `${key}:${kind}`;
@@ -3667,6 +3672,7 @@ const onCharacterReady = (userId, a) => {
     try { if (globalThis.__dboHagravenLogin) globalThis.__dboHagravenLogin(a); } catch (e) { log('hagraven login failed', e.message); }
     // The first spell: a mage at Arcane Arts 25 with no school is offered the choice, one with a school and no spell gets its starter (schools.js)
     try { if (globalThis.__dboSchoolsLogin) globalThis.__dboSchoolsLogin(a); } catch (e) { log('schools login failed', e.message); }
+    try { if (globalThis.__dboCraftFilterLogin) globalThis.__dboCraftFilterLogin(a); } catch (e) { log('craftfilter login failed', e.message); }
     // The election notice of the current phase for a citizen of a hold that is choosing its Jarl, once per character (citizenship.js)
     try { if (globalThis.__dboCitizenLogin) globalThis.__dboCitizenLogin(a); } catch (e) { log('citizen notice login failed', e.message); }
     // Vault fees, and any word of a vault warned or seized while they were away (bank.js)
@@ -8239,13 +8245,10 @@ const isInteriorDesc = (desc) => {
 // dynamic id the server hands out again is found alive at the next probe. Only server\npcdirector.js asks it. The
 // host policy must not: it also gates a client's own host attempt, and the lowest free id is handed straight to the
 // next NPC (a refilled deer 10 s later), which would then go unhosted for the rest of the minute (Worker D's review).
-const GONE_TTL_MS = 5000;
+const GONE_TTL_MS = 60000;
 const goneForms = globalThis.__dboGoneForms instanceof Map ? globalThis.__dboGoneForms : (globalThis.__dboGoneForms = new Map()); // id -> when found gone
-goneForms.clear();
 const formExists = globalThis.__dboFormExists = (id) => {
   id = Number(id) >>> 0;
-  if (!id) return false;
-  if (typeof mp.has === 'function') return mp.has(id);
   const at = goneForms.get(id);
   if (at !== undefined && Date.now() - at < GONE_TTL_MS) return false;
   try { mp.get(id, 'type'); goneForms.delete(id); return true; }
@@ -10804,6 +10807,12 @@ try {
   delete require.cache[TAILORING_JS];
   require(TAILORING_JS)({ mp, log, personal, audit, who, cfg, isAdmin, sendPacket, registerChatCommand });
 } catch (e) { log('tailoring.js failed to load:', e.stack || e.message); for (const k of ['__dboTailorCraft', '__dboTailorTierOf', '__dboTailorIsLoom']) globalThis[k] = null; }
+// ---- craft recipe filtering: hide locked faction gear and level/tier locked craftables (server\craftfilter.js) ----
+try {
+  const CRAFTFILTER_JS = path.resolve('craftfilter.js');
+  delete require.cache[CRAFTFILTER_JS];
+  require(CRAFTFILTER_JS)({ mp, log, cfg, sendPacket, onlineActors, every, isAdmin });
+} catch (e) { log('craftfilter.js failed to load:', e.stack || e.message); globalThis.__dboSyncCraftFilter = null; globalThis.__dboCraftFilterLogin = null; }
 // ---- the schools of magic, Study Magic and the Class Lectern (server\schools.js, config "schools"): after spells.js, whose spellbook it reads ----
 try {
   const SCHOOLS_JS = path.resolve('schools.js');
@@ -10980,3 +10989,4 @@ try {
 // reload 1793167225546
 
 // reload 1793167298940
+
