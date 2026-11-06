@@ -11,7 +11,8 @@
 //
 // gamemode-config.json "playtest": { enabled, name, arrival: { world, pos, rotZ }, allowedWorlds: [desc],
 //   allowedPlugins: [name], allowedCells: [desc], blockedDoors: [desc], graceSeconds, checkSeconds,
-//   closedPlugins: [name], gatesToArrival, closedMessage }
+//   closedPlugins: [name], gatesToArrival, closedMessage, autoDoors: [desc], doorMessages: { desc: text },
+//   doorReturns: { desc: { world, pos, rotZ } } }
 // closedPlugins (Nate, 12 Oct: Skyrim and Bruma open, every other land closed): when set, a place whose form comes from
 // any plugin NOT in this list is allowed too, so the open region is "everything but these lands". gatesToArrival false
 // lets the hub gates lead to the Skyrim holds again. closedMessage replaces "The road to Skyrim is closed".
@@ -38,6 +39,28 @@ module.exports = (api) => {
   const doorLines = new Map(Object.entries(C.doorMessages || {}).filter(([d]) => d[0] !== '_').map(([d, t]) => [idOf(d) >>> 0, String(t)]).filter(([id]) => id));
   // blockedDoors that are automatic load doors (walked into, not activated): refused ones send the player back
   const autoDoors = new Set((C.autoDoors || ['877c2:BSHeartland.esm']).map(idOf).filter(Boolean));
+  // A sealed automatic door's own spot outside its trigger (doorReturns { desc: { world, pos, rotZ } }): it leads nowhere, so
+  // walking in steps the player back there, not to the arrival
+  const doorReturns = new Map(Object.entries(C.doorReturns || {}).filter(([d, s]) => d[0] !== '_' && s && s.world && Array.isArray(s.pos) && s.pos.length === 3)
+    .map(([d, s]) => [idOf(d) >>> 0, { cellOrWorldDesc: s.world, pos: s.pos.map(Number), rot: [0, 0, Number(s.rotZ) || 0] }]).filter(([id]) => id));
+  // FNAM 0x02 of the door's base from the plugin records, as dungeons.js isAutomaticDoor reads it, in its cache by base
+  const autoBase = globalThis.__dboAutoDoorBases instanceof Map ? globalThis.__dboAutoDoorBases : (globalThis.__dboAutoDoorBases = new Map());
+  const fieldOf = (id, type, sub) => {
+    try {
+      const r = mp.lookupEspmRecordById(id >>> 0);
+      const f = r && r.record && String(r.record.type) === type ? (r.record.fields || []).find((x) => x && x.type === sub && x.data && x.data.length) : null;
+      return f ? { r, d: f.data } : null;
+    } catch (e) { return null; }
+  };
+  const isAutomatic = (ref) => {
+    if (autoDoors.has(ref)) return true;
+    const n = fieldOf(ref, 'REFR', 'NAME');
+    const base = n && n.d.length >= 4 && typeof n.r.toGlobalRecordId === 'function' ? n.r.toGlobalRecordId((n.d[0] | (n.d[1] << 8) | (n.d[2] << 16) | (n.d[3] << 24)) >>> 0) >>> 0 : 0;
+    if (!base) return false;
+    if (!autoBase.has(base)) { const f = fieldOf(base, 'DOOR', 'FNAM'); autoBase.set(base, !!(f && (f.d[0] & 0x02))); }
+    return autoBase.get(base);
+  };
+  const descOf = (id) => { try { return mp.getDescFromId(id >>> 0) || (id >>> 0).toString(16); } catch (e) { return (id >>> 0).toString(16); } };
   const arrival = C.arrival && C.arrival.world && Array.isArray(C.arrival.pos) ? { cellOrWorldDesc: C.arrival.world, pos: C.arrival.pos, rot: [0, 0, Number(C.arrival.rotZ) || 0] } : null;
   const active = () => C.enabled && !!arrival;
 
@@ -88,8 +111,27 @@ module.exports = (api) => {
     } catch (e) { return false; }
   };
   const leadPassed = new Map();
+  const stepping = new Set(), notAuto = new Set();
   globalThis.__dboPlaytestActivate = (targetId, casterId) => {
     if (!active() || !blockedDoors.has(targetId)) return null;
+    // A door with a return spot is sealed for everyone, Lead staff too: there is no load behind it (5eb06, Helgen's escape cave,
+    // froze players in its trigger until /unstuck, and a relog landed them back in it). Every walk-in is stepped back
+    const back = doorReturns.get(targetId >>> 0);
+    if (back) {
+      const a = casterId >>> 0;
+      if (!isAutomatic(targetId)) {
+        if (!notAuto.has(targetId)) { notAuto.add(targetId); log(`playtest: doorReturns ${descOf(targetId)} does not read as an automatic door, so it is refused without a step back`); }
+      } else if (atDoor(a, targetId) && !stepping.has(a)) {
+        stepping.add(a);
+        setTimeout(() => {
+          stepping.delete(a);
+          try { mp.set(a, 'locationalData', back); log(`playtest: ${who(a)} walked into the sealed automatic door ${descOf(targetId)} and was stepped back`); } catch (e) { log('playtest: step back failed', e.message); }
+        }, 300);
+      }
+      const now = Date.now();
+      if (now - (toldAt.get(a) || 0) > 1500) { toldAt.set(a, now); personal(a, doorLines.get(targetId >>> 0) || REFUSE_LINE); }
+      return false;
+    }
     // Lead GMs and above cross into the closed lands (Nate, 16 Oct); other staff and players are refused as before
     if (isLeadStaff(casterId >>> 0)) {
       const now = Date.now();
@@ -109,8 +151,7 @@ module.exports = (api) => {
         setTimeout(() => {
           try {
             // Audited, so a return that did not happen shows (7 Oct 04:54: nothing in the log said whether it ran)
-            let door = (targetId >>> 0).toString(16);
-            try { door = mp.getDescFromId(targetId >>> 0) || door; } catch (e) { /* the hex id will do */ }
+            const door = descOf(targetId);
             if (sendToArrival(casterId, 'border')) audit(`PLAYTEST ${who(casterId)} walked into the closed automatic door ${door} and was taken back to ${C.name}`);
           } catch (e) { log('playtest: border return failed', e.message); }
         }, 300);
