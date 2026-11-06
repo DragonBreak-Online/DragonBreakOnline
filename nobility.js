@@ -167,14 +167,20 @@ module.exports = (api) => {
     const top = (z.officials || [])[0];
     try { return !!top && (ranksOf(profileOf(a), a) || []).some((m) => m.zone && m.zone.id === z.id && m.rank === top); } catch (e) { return false; }
   };
-  // "the Countess of Bruma": the style of whoever rules, by the character acting, else the seated account's first character
+  // The character seated in the hold's first office (gamemode.js seatHolder), else the ruling account's online or first one
+  const rulerActor = (z, top, pid) => {
+    const seated = typeof globalThis.__dboSeatHolder === 'function' ? Number(globalThis.__dboSeatHolder(z.id, top, pid)) >>> 0 : 0;
+    if (seated && exists(seated)) return seated;
+    return onlineActors().find((x) => profileOf(x) === pid) || accountActors(pid).find(exists) || 0;
+  };
+  // "the Countess of Bruma": the style of whoever rules, by the character acting, else the seated character
   const rulerStyle = (zid, actor) => {
     const z = zoneById(zid); const r = RULER[realmOf(zid)];
     let a = actor >>> 0;
     if (!a) {
       const top = z && (z.officials || [])[0];
       const pid = top ? Number((((readOfficials() || {})[z.id] || {})[top] || [])[0]) : NaN;
-      a = Number.isFinite(pid) ? (onlineActors().find((x) => profileOf(x) === pid) || accountActors(pid).find(exists) || 0) : 0;
+      a = Number.isFinite(pid) ? rulerActor(z, top, pid) : 0;
     }
     const word = a && isFemale(a) ? r.f : r.m;
     return `the ${word} of ${ofPlace(z ? z.name : zid)}`;
@@ -183,7 +189,7 @@ module.exports = (api) => {
     const z = zoneById(zid); const top = z && (z.officials || [])[0];
     const pid = top ? Number((((readOfficials() || {})[z.id] || {})[top] || [])[0]) : NaN;
     if (!Number.isFinite(pid)) return null;
-    const a = onlineActors().find((x) => profileOf(x) === pid) || accountActors(pid).find(exists) || 0;
+    const a = rulerActor(z, top, pid);
     return { name: a ? String(ownNameOf(a)) : '', style: rulerStyle(zid, a).replace(/^the /, '') };
   };
 

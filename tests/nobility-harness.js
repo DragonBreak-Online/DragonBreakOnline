@@ -318,6 +318,13 @@ ok('everyone sees the roll', SEC.visible(OUT) === true && brumaOf(vOut).roll.map
 ok('and the fiefs with their holders, but no treasury and no titles to grant', brumaOf(vOut).fiefs.length === 4 && brumaOf(vOut).fiefs.every((f) => f.treasury === null) && brumaOf(vOut).titles.length === 0 && !brumaOf(vOut).isRuler);
 ok('the ruler sees every fief treasury and the titles she grants', brumaOf(vC).isRuler && brumaOf(vC).titles.map((t) => `${t.id}:${t.needs}`).join() === 'baron:fief,lord:estate,knight:' && brumaOf(vC).fiefs.every((f) => f.treasury === 0));
 ok('the ruler is named with her style', brumaOf(vOut).ruler.name === 'Narina Carvain' && brumaOf(vOut).ruler.style === 'Countess of Bruma', brumaOf(vOut).ruler);
+// The seated character, not whichever character of the ruling account is online (#bugs 1565568130359631962: an alt as Jarl)
+chars.get(0x1c).online = true; chars.get(COUNTESS).online = false;
+globalThis.__dboSeatHolder = (zid, r, pid) => (zid === 'bruma' && pid === 11 ? COUNTESS : 0);
+const vAlt = SEC.view(OUT);
+ok('the seated ruler is named while offline, not an online alt of her account', brumaOf(vAlt).ruler.name === 'Narina Carvain' && brumaOf(vAlt).ruler.style === 'Countess of Bruma', brumaOf(vAlt).ruler);
+delete globalThis.__dboSeatHolder;
+chars.get(0x1c).online = false; chars.get(COUNTESS).online = true;
 const mine = vE.mine[0];
 ok('a noble sees his title, fief, its properties and its treasury', mine && mine.label === 'Baron of Mountain Watch' && mine.fief.id === 'mountain-watch' && mine.fief.treasury === 0
   && mine.fief.properties.length === 1 && mine.fief.properties[0].name === 'Zurikki\'s House' && mine.fief.properties[0].owner === 'Lord Elion', mine);
