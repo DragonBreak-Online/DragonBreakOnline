@@ -26,6 +26,12 @@
 // last hook live on mp and globalThis until a restart, so set enabled false first (or revert and restart).
 'use strict';
 
+// At file level: the slot keeps this wrapper for the whole process, so it must not close over a load
+const guardSlot = (inner) => function (formId, ...rest) {
+  try { const g = globalThis.__dboPapyrusOnUpdate; if (typeof g === 'function' && g(formId) === true) return false; } catch (e) { /* the script runs */ }
+  return typeof inner === 'function' ? inner.call(this, formId, ...rest) : undefined;
+};
+
 module.exports = (api) => {
   const { mp, log, cfg } = api;
   const C = Object.assign({ enabled: true, refs: ['6aebe:Skyrim.esm'], bases: ['a31a:HearthFires.esm', 'a31e:HearthFires.esm'],
@@ -82,11 +88,7 @@ module.exports = (api) => {
   // The slot is wrapped once per process; a reload swaps what the wrapper asks (traps.js does the same for OnTriggerEnter)
   if (!globalThis.__dboPapyrusGuardWrapped) {
     globalThis.__dboPapyrusGuardWrapped = true;
-    const inner = mp['onPapyrusEvent:OnUpdate'];
-    mp['onPapyrusEvent:OnUpdate'] = function (formId, ...rest) {
-      try { const g = globalThis.__dboPapyrusOnUpdate; if (typeof g === 'function' && g(formId) === true) return false; } catch (e) { /* the script runs */ }
-      return typeof inner === 'function' ? inner.call(this, formId, ...rest) : undefined;
-    };
+    mp['onPapyrusEvent:OnUpdate'] = guardSlot(mp['onPapyrusEvent:OnUpdate']);
   }
   log(`papyrus guard ${C.enabled !== false ? 'on' : 'off'}: OnUpdate refused on ${REFS.size} reference(s) and ${BASES.size} base(s); `
     + `${C.report !== false ? `loop report every ${Math.round(WINDOW_MS / 60000)} min at ${REPORT_MIN}+` : 'no loop report'}`);

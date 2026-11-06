@@ -104,7 +104,8 @@ const gcStats = globalThis.__dboGcStats || (globalThis.__dboGcStats = (() => {
   const s = { n: 0, total: 0, max: 0 };
   try {
     const { PerformanceObserver } = require('perf_hooks');
-    new PerformanceObserver((list) => { for (const e of list.getEntries()) { s.n++; s.total += e.duration; if (e.duration > s.max) s.max = e.duration; } }).observe({ entryTypes: ['gc'] });
+    // new Function: the observer lives as long as the process, and a closure made here would keep this load alive with it
+    new PerformanceObserver(new Function('s', 'return (list) => { for (const e of list.getEntries()) { s.n++; s.total += e.duration; if (e.duration > s.max) s.max = e.duration; } };')(s)).observe({ entryTypes: ['gc'] });
   } catch (e) { /* no gc entries on this runtime */ }
   return s;
 })());
@@ -151,7 +152,8 @@ every('saves', 5000, () => { for (const [file, s] of SAVES) writeSave(file, s); 
 globalThis.__dboFlushOnExit = () => { for (const [file, s] of SAVES) if (s.dirty || s.busy) { try { writeSaveSync(file, s); } catch (e) { log('save flush failed', path.basename(file), e.message); } } };
 if (!globalThis.__dboSigtermHooked) {
   globalThis.__dboSigtermHooked = true;
-  process.once('SIGTERM', () => { try { globalThis.__dboFlushOnExit(); } finally { process.exit(0); } });
+  // new Function: a closure made here would keep this load alive until the process exits
+  process.once('SIGTERM', new Function('return () => { try { globalThis.__dboFlushOnExit(); } finally { process.exit(0); } };')());
 }
 
 // Admin tiers, same rules as the server's adminRoles.ts: adminProfileIds are senior, then adminRoles

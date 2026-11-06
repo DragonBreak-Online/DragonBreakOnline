@@ -14,6 +14,9 @@
 const fs = require('fs');
 const path = require('path');
 
+// At file level: the interval runs for the whole process, so it must not close over a load
+const flushTraces = () => { try { const S = globalThis.__dboItemGuards; if (S && S.flushTrace) S.flushTrace(); } catch (e) { /* the next tick */ } };
+
 module.exports = (api) => {
   const { mp, log, who, recordOf } = api;
   const personal = typeof api.personal === 'function' ? api.personal : () => {};
@@ -165,7 +168,7 @@ module.exports = (api) => {
   // A minute that ended with no later line from that actor is summed up by the timer; one timer per process, each load's flush
   S.flushTrace = () => { const now = Date.now(); for (const [a, b] of S.trace) if (now - b.since >= 60000) { rollBucket(a, b); S.trace.delete(a); } };
   if (!S.flushTimer) {
-    S.flushTimer = setInterval(() => { try { if (S.flushTrace) S.flushTrace(); } catch (e) { /* the next tick */ } }, 15000);
+    S.flushTimer = setInterval(flushTraces, 15000);
     if (typeof S.flushTimer.unref === 'function') S.flushTimer.unref();
   }
   const tally = (actor, kind, container, baseId, n) => {

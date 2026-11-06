@@ -20,6 +20,12 @@
 const fs = require('fs');
 const path = require('path');
 
+// At file level: the slot keeps this wrapper for the whole process, so it must not close over a load
+const trapSlot = (inner) => function (emitterId, ...rest) {
+  try { if (typeof globalThis.__dboTrapsHandles === 'function' && globalThis.__dboTrapsHandles(emitterId)) return false; } catch (e) { /* the vanilla script runs */ }
+  return typeof inner === 'function' ? inner.call(this, emitterId, ...rest) : undefined;
+};
+
 module.exports = (api) => {
   const { mp, log, cfg, every, onlineActors, profileOf, display, audit, personal, registerChatCommand } = api;
   const C = Object.assign({ enabled: true, only: 'staff', damage: true, tickMs: 250, cooldownSeconds: 6, hitWindowMs: 1000, resetSeconds: 4,
@@ -161,11 +167,7 @@ module.exports = (api) => {
   globalThis.__dboTrapsHandles = (emitterId) => { try { return C.enabled && HANDLED.has(normDesc(mp.getDescFromId(Number(emitterId) >>> 0))); } catch (e) { return false; } };
   if (!globalThis.__dboTrapsWrapped) {
     globalThis.__dboTrapsWrapped = true;
-    const inner = mp['onPapyrusEvent:OnTriggerEnter'];
-    mp['onPapyrusEvent:OnTriggerEnter'] = function (emitterId, ...rest) {
-      try { if (typeof globalThis.__dboTrapsHandles === 'function' && globalThis.__dboTrapsHandles(emitterId)) return false; } catch (e) { /* the vanilla script runs */ }
-      return typeof inner === 'function' ? inner.call(this, emitterId, ...rest) : undefined;
-    };
+    mp['onPapyrusEvent:OnTriggerEnter'] = trapSlot(mp['onPapyrusEvent:OnTriggerEnter']);
   }
   globalThis.__dboTrapsReload = () => { load(); HANDLED = handled(); };
   globalThis.__dboTrapsFire = (a, ref) => { for (const [cell, list] of CELLS) { const t = list.find((x) => normDesc(x.ref) === normDesc(ref)); if (t) { fire(cell, t, a); return true; } } return false; };
