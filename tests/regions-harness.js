@@ -398,6 +398,12 @@ check(`every regional cooking recipe in regions.json passes in Bruma (${cookable
   const placeless = TOMES_JSON.filter((t) => { const d = nd(canonToDesc(t.id)); return !RJ[d] && !OJ[d] && !OJ[String(t.name).toLowerCase()]; });
   check(`every one of the ${TOMES_JSON.length} tomes has a place (regions.json or an override), none sold by failOpen`, placeless.length === 0, placeless.map((t) => `${t.name} (${t.plugin})`));
 }
+// The Goblin Mask is goblin gear like the Armory pieces, not Solstheim's (#bugs 1567233922893357267, 6 Nov)
+{
+  const RR = JSON.parse(fs.readFileSync(path.join(SERVER, 'regions.json'), 'utf8')).recipes || {};
+  const mask = Object.values(RR).find((r) => r && r.edid === 'DBOSM_GoblinHelm');
+  check('the Goblin Mask recipe, Solstheim by plugin in regions.json, is opened everywhere by its override', !!mask && String(mask.p) === 'solstheim' && OVR_BASE.recipes.DBOSM_GoblinHelm === 'common', mask);
+}
 console.log(`\n${checks - failures}/${checks} passed`);
 process.chdir(os.tmpdir());
 fs.rmSync(dir, { recursive: true, force: true });

@@ -251,6 +251,8 @@
     "DBOArm_RecipeGoblinIronArmor": "common",
     "DBOArm_RecipeGoblinShamanArmor": "common",
     "DBOArm_RecipeGoblinMixedArmor": "common",
+    "_goblinMask": "6 Nov (#bugs 1567233922893357267): the Goblin Mask's only recipe makes a Journey to Baan Malur item, so regions.json tags it Solstheim by plugin; it is goblin gear like the Armory pieces above.",
+    "DBOSM_GoblinHelm": "common",
     "DBOArm_AdamRecipeArmorAdamantiumBoots": "common",
     "DBOArm_AdamRecipeArmorAdamantiumCuirass": "common",
     "DBOArm_AdamRecipeArmorAdamantiumGauntlets": "common",
