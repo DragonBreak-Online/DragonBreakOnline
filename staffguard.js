@@ -63,7 +63,7 @@ module.exports = (api) => {
   // needEvent (Nat, 2 Nov: "the only way to bring NPCs is the warbands and those systems"): an NPC zone of any tier, system
   // zones aside, needs the adder's own open /event (warband.js __dboWarbandEventOf); it belongs to that event and goes when
   // the event ends (__dboEventZonesEnd)
-  const EVENTS = part('gmEventZones', { maxNpcs: 5, cooldownSeconds: 30, maxZones: 6, needEvent: true, systemPrefixes: ['wild:', 'guard:', 'boss:', 'dungeon:', 'placed:'] });
+  const EVENTS = part('gmEventZones', { maxNpcs: 5, cooldownSeconds: 30, maxZones: 6, needEvent: true, systemPrefixes: ['wild:', 'guard:', 'boss:', 'dungeon:', 'placed:', 'carriage:'] });
   const EXEMPT_TIERS = new Set(Array.isArray(RAW.exemptTiers) ? RAW.exemptTiers.map(String) : ['senior']);
   const EXEMPT_PROFILES = new Set((Array.isArray(RAW.exemptProfiles) ? RAW.exemptProfiles : []).map(Number).filter(Number.isFinite));
   // The staff characters named by the review of 23 Oct; /staffchar seed marks them once

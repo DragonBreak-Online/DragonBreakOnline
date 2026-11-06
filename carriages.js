@@ -1,14 +1,13 @@
-// DragonBreak Online: hold carriages between the towns of Skyrim (Jake, 5 Nov: drivers players walk up to, vanilla fares for now). Loaded by gamemode.js; config "carriages".
-// A server-spawned driver stands where the base game's driver sat at each of the five capitals' stables; talking to the driver (or /carriage at the stable) opens the destinations.
-// The fare is the base game's: CarriageCost 20 gold to a capital, CarriageCostSmall 50 to a minor hold. It is taken when the carriage leaves and goes to the boarding hold's treasury.
-// Arrivals use the hub gates' checked spots outside each town unless a stop names its own. ROLLBACK: carriages.enabled false (hot reload) removes the drivers and the service.
+// DragonBreak Online: hold carriages between Skyrim's towns (Jake, 5 Nov). Loaded by gamemode.js; config "carriages".
+// Talk to a driver at a capital's stable, or /carriage there; the vanilla fare is paid on departure to the hold's treasury.
+// ROLLBACK: carriages.enabled false (hot reload) removes the drivers and the service.
 'use strict';
 const fs = require('fs');
 const path = require('path');
 
 const PREFIX = 'carriage:';
 const WIDGET_ID = 176;
-// Where the five drivers sit in Skyrim.esm (refs 13698, 9b7b1, 3f220, 9b7b4, 9b7c8; unmoved by the load order, disabled by DragonBreak Online Edits.esp)
+// The five Skyrim.esm drivers' own spots (refs 13698, 9b7b1, 3f220, 9b7b4, 9b7c8, disabled by the DLE)
 const DEFAULT_STOPS = [
   { id: 'whiterun', name: 'Whiterun', hire: [17589.8, -12411.6, -4745.1], heading: 275, npc: '13669:Skyrim.esm' },
   { id: 'solitude', name: 'Solitude', hire: [-73225.0, 99456.7, -10906.7], heading: 229, npc: '9b7a6:Skyrim.esm' },
@@ -22,21 +21,21 @@ const DEFAULT_STOPS = [
 ];
 
 module.exports = (api) => {
-  const { mp, log, personal, audit, who, cfg, registerChatCommand, openWidget, closeWidget, onUi, sendPacket, takeGold, goldOf, depositToTreasury, zoneById, creationPending, arrivalFor, onlineActors } = api;
+  const { mp, log, personal, audit, who, cfg, registerChatCommand, openWidget, closeWidget, onUi, sendPacket, takeGold, giveGold, goldOf, depositToTreasury, zoneById, creationPending, arrivalFor, onlineActors } = api;
   const combatAt = api.combatAt instanceof Map ? api.combatAt : new Map();
   const pvpAt = api.pvpAt instanceof Map ? api.pvpAt : new Map();
   const own = (cfg && cfg.carriages) || {};
   const C = Object.assign({ enabled: true, world: '3c:Skyrim.esm', reach: 600, rideSeconds: 6, fadeSafetyMs: 10000, cooldownMinutes: 0, combatSeconds: 60, pvpSeconds: 120, allowParcels: false }, own);
   const FARES = Object.assign({ major: 20, minor: 50 }, own.fares || {});
-  // radius: how near a player comes before the driver spawns (guards.js found 600 too small and uses 4000)
-  const DRIVERS = Object.assign({ enabled: true, radius: 4000, despawnSeconds: 300, respawnSeconds: 600 }, own.drivers || {});
+  // radius: how near a player comes before a driver spawns (as guards.js); leash: a driver's reach from the stable
+  const DRIVERS = Object.assign({ enabled: true, radius: 4000, leash: 2000, despawnSeconds: 300, respawnSeconds: 600 }, own.drivers || {});
   const SPAWNS_FILE = path.resolve('NPC-Spawns.json');
   const id = (a) => Number(a) >>> 0;
   const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
   const normDesc = (d) => { const s = String(d || ''); const i = s.indexOf(':'); if (i < 0) return s.toLowerCase(); const n = parseInt(s.slice(0, i), 16); return `${Number.isFinite(n) ? n.toString(16) : s.slice(0, i)}:${s.slice(i + 1)}`.toLowerCase(); };
   const validPos = (p) => Array.isArray(p) && p.length >= 3 && p.slice(0, 3).every((v) => Number.isFinite(Number(v)));
 
-  // carriages.stops { <id>: { name, hire, heading, npc, major, arrival: [[x, y, z], ...], rotZ, off } } changes a stop or adds one
+  // carriages.stops { <id>: { name, hire, heading, npc, major, arrival, rotZ, off } } changes a stop or adds one
   const STOPS = (() => {
     const over = own.stops && typeof own.stops === 'object' ? own.stops : {};
     const ids = [...new Set(DEFAULT_STOPS.map((s) => s.id).concat(Object.keys(over).filter((k) => k[0] !== '_')))];
@@ -62,7 +61,7 @@ module.exports = (api) => {
   const listNames = (list) => (list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list.join(''));
 
   const get = (a, k) => { try { return mp.get(id(a), k); } catch (e) { return undefined; } };
-  // stop id -> the driver last talked to, so a driver who wandered from the stable still counts as the stable
+  // stop id -> the driver last talked to: a driver who wandered within the leash still counts as the stable
   const driverOf = globalThis.__dboCarriageDrivers instanceof Map ? globalThis.__dboCarriageDrivers : (globalThis.__dboCarriageDrivers = new Map());
   const stopNear = (a) => {
     if (normDesc(get(a, 'worldOrCellDesc')) !== normDesc(C.world)) return null;
@@ -71,7 +70,9 @@ module.exports = (api) => {
     for (const s of stopsWithStable()) {
       const points = [s.hire];
       const drv = driverOf.get(s.id);
-      if (drv && !get(drv, 'isDead') && normDesc(get(drv, 'worldOrCellDesc')) === normDesc(C.world) && validPos(get(drv, 'pos'))) points.push(get(drv, 'pos'));
+      const dp = drv ? get(drv, 'pos') : null;
+      if (drv && !get(drv, 'isDead') && normDesc(get(drv, 'worldOrCellDesc')) === normDesc(C.world) && validPos(dp)
+        && Math.hypot(dp[0] - s.hire[0], dp[1] - s.hire[1], dp[2] - s.hire[2]) <= num(DRIVERS.leash, 2000)) points.push(dp);
       for (const q of points) { const d = Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); if (d <= num(C.reach, 600) && d < bestD) { best = s; bestD = d; } }
     }
     return best;
@@ -85,6 +86,7 @@ module.exports = (api) => {
     try { if (typeof creationPending === 'function' && creationPending(id(a))) return 'Your character is not finished yet.'; } catch (e) { /* finished */ }
     try { if (typeof globalThis.__dboIsDowned === 'function' && globalThis.__dboIsDowned(id(a))) return 'You cannot travel while you are down.'; } catch (e) { /* up */ }
     const r = get(a, 'private.restrained'); if (r && (r.boundHands || r.carried || r.captorActorId)) return 'The driver will not take someone bound or carried.';
+    try { if ((typeof onlineActors === 'function' ? onlineActors() : []).some((o) => id(o) !== id(a) && id((get(o, 'private.restrained') || {}).captorActorId) === id(a))) return 'The driver will not take a captive. Let them go first.'; } catch (e) { /* nobody held */ }
     try { if (typeof globalThis.__dboJailUnstuck === 'function' && globalThis.__dboJailUnstuck(id(a))) return 'No carriage takes a prisoner out of a jail or a sentence.'; } catch (e) { /* free */ }
     const now = Date.now();
     const fought = now - Math.max(pvpAt.get(id(a)) || 0, combatAt.get(id(a)) || 0);
@@ -100,12 +102,12 @@ module.exports = (api) => {
   };
 
   const riding = globalThis.__dboCarriageRiding instanceof Map ? globalThis.__dboCarriageRiding : (globalThis.__dboCarriageRiding = new Map());
-  const pending = new Map();
-  const fading = new Map();
+  const pending = globalThis.__dboCarriagePending instanceof Map ? globalThis.__dboCarriagePending : (globalThis.__dboCarriagePending = new Map());
+  const fading = globalThis.__dboCarriageFading instanceof Map ? globalThis.__dboCarriageFading : (globalThis.__dboCarriageFading = new Map());
   const setFade = (a, on) => {
     try { sendPacket(id(a), { customPacketType: 'dboFade', on: !!on }); } catch (e) { /* the client lifts it itself */ }
+    clearTimeout(fading.get(id(a))); fading.delete(id(a));
     if (on) fading.set(id(a), setTimeout(() => setFade(a, false), num(C.fadeSafetyMs, 10000)));
-    else { clearTimeout(fading.get(id(a))); fading.delete(id(a)); }
   };
 
   const depart = (a) => {
@@ -118,11 +120,15 @@ module.exports = (api) => {
     const near = stopNear(a); if (!near || near.id !== from.id) return stop('You stepped off before the carriage left. You paid nothing.');
     const why = blocked(a); if (why) return stop(`${why} You paid nothing.`);
     const spot = arrivalOf(to, id(a)); if (!spot) return stop(`The road to ${to.name} is closed. You paid nothing.`);
-    if (!takeGold(id(a), r.fare)) return stop(`You cannot pay the fare to ${to.name}, ${r.fare} gold.`);
-    let kept = 0; try { kept = depositToTreasury(from.id, r.fare, { income: 'carriage' }) || 0; } catch (e) { log('carriages: treasury deposit failed', e.message); }
-    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('travel', id(a), 'carriage'); } catch (e) { /* the player log is optional */ }
+    if (r.fare > 0 && !takeGold(id(a), r.fare)) return stop(`You cannot pay the fare to ${to.name}, ${r.fare} gold.`);
     try { mp.set(id(a), 'locationalData', { cellOrWorldDesc: to.world || C.world, pos: spot.pos, rot: [0, 0, num(spot.rotZ, 0)] }); }
-    catch (e) { log('carriages: move failed', e.message); setFade(a, false); return 'failed'; }
+    catch (e) {
+      log('carriages: move failed', e.message);
+      let back = r.fare === 0; try { back = back || (typeof giveGold === 'function' && giveGold(id(a), r.fare) !== false); } catch (e2) { back = false; }
+      return stop(back ? 'The carriage could not leave. Your fare is returned.' : 'The carriage could not leave. Tell a GM: your fare was not returned.');
+    }
+    let kept = 0; try { kept = r.fare > 0 ? depositToTreasury(from.id, r.fare, { income: 'carriage' }) || 0 : 0; } catch (e) { log('carriages: treasury deposit failed', e.message); }
+    try { const h = globalThis.__dboPlogHook; if (typeof h === 'function') h('travel', id(a), 'carriage'); } catch (e) { /* the player log is optional */ }
     try { mp.set(id(a), 'private.carriageAt', Date.now()); } catch (e) { /* the cooldown is optional */ }
     personal(a, `The carriage sets you down at ${to.name}.`);
     audit(`CARRIAGE ${who(id(a))} rode from ${from.name} to ${to.name} for ${r.fare} gold (${kept} to the ${from.id} treasury)`);
@@ -167,11 +173,11 @@ module.exports = (api) => {
   onUi('carriageClose', (a) => { pending.delete(id(a)); });
   onUi('arrived', (a) => { if (fading.has(id(a)) && !riding.has(id(a))) setFade(a, false); });
 
-  // gamemode.js's activate chain: true when the target is a carriage driver (the menu is open, the engine's own talk is refused)
+  // gamemode.js's activate chain: true refuses the engine's own talk (the menu opens) and a dead driver's search
   globalThis.__dboCarriageActivate = (target, caster) => {
     if (!C.enabled) return false;
     const s = driverStopOf(target); if (!s) return false;
-    if (get(target, 'isDead')) return false;
+    if (get(target, 'isDead')) { personal(caster, 'The carriage company sees to its own. There is nothing to take.'); return true; }
     driverOf.set(s.id, id(target));
     if (stopNear(caster) !== s) { personal(caster, 'Come closer to the driver.'); return true; }
     openMenu(caster, s);

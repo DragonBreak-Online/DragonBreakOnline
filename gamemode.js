@@ -10721,6 +10721,7 @@ try {
   // A hub gate's spot for a rider; with no rider only whether the gate has one (nothing is held)
   const arrivalFor = (name, a) => { const g = Object.values(GATES).find((x) => x[0] === name); return g ? { pos: a ? gateSpotFor(g, a >>> 0) : g[1][0], rotZ: g[2] } : null; };
   require(CARRIAGES_JS)({ mp, log, personal, audit, who, cfg, registerChatCommand, openWidget, closeWidget, onUi, sendPacket, takeGold, goldOf, depositToTreasury, zoneById,
+    giveGold: (a, n) => giveItem(a, GOLD_BASE, n) !== false,
     creationPending, arrivalFor, onlineActors, combatAt, pvpAt });
 } catch (e) { log('carriages.js failed to load:', e.stack || e.message); globalThis.__dboCarriageActivate = null; }
 // ---- apiaries and beehives: honey on a timer (server\apiaries.js, config "apiaries") ----
