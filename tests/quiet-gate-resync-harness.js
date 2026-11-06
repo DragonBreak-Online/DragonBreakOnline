@@ -65,7 +65,9 @@ now += 3100; T.takeGate(BODY, P);                // the beat done: this take sta
 now += 1100;
 ok(T.takeGate(BODY, P) === undefined, 'next take past the gap stands');
 now += 100;
-ok(T.takeGate(BODY, P) === false, 'gap: a take inside the 0.4 s is refused');
+// Another source inside the 0.4 s: one source's take-all is not held up by the gap since 6 Nov (#bugs loot-all)
+const BODY2 = 0xff000051; T.S.done.set(`${P}:${BODY2}`, now);
+ok(T.takeGate(BODY2, P) === false, 'gap: a take from another source inside the 0.4 s is refused');
 flush();
 ok(setsTo(P) === 2 && setRight().length === 0, '...resynced, still no "set right" note', [setsTo(P), said]);
 ok(said.some((s) => /hands are full/i.test(s.t)), '...the gap\'s own line instead', said);

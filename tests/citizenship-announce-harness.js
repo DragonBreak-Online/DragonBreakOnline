@@ -218,11 +218,15 @@ const mentionsOnly = (p, role) => !!p && !!p.body && p.body.allowed_mentions && 
   ok(/Lord Commander Masked Person/.test(resPost.body.content) && !/Whiterunner 2/.test(resPost.body.content + resText), 'a member still masked at the result stays masked: their own name is never posted', resPost.body.content);
   ok(audits.some((t) => /^ELECTION Whiterun: Whiterunner 0 #T200 \(profile 200\) is elected Jarl with a court of Steward Whiterunner 1 #T201 \(profile 201\), Lord Commander Masked Person #T202 \(profile 202\), Housecarl Whiterunner 3 #T203 \(profile 203\); 0 vote\(s\) struck by staff$/.test(t)), 'the staff audit of the result names each member with their #TAG and profile', audits.filter((t) => /elected/.test(t)));
   chars.get(C1).name = 'Whiterunner 2';
+  // The tab shows the elected court while its Jarl sits; this harness's seatOfficial records nothing, so seat it as live does
+  const keptWr = officials.whiterun;
+  officials.whiterun = Object.assign({}, keptWr, { jarl: [200] });
   const won = () => M.votingView(V1, WR).result.winner.members;
   ok(won().find((m) => m.seat === 'steward').name === 'Whiterunner 1' && won().find((m) => m.seat === 'commander').name === 'Whiterunner 2', 'the result on the Voting tab names the court as they are now', won());
   const gone = chars.get(H1); chars.delete(H1);
   ok(won().find((m) => m.seat === 'housecarl').name === 'Whiterunner 3', 'a member whose character is gone keeps the stored name', won());
   chars.set(H1, gone);
+  officials.whiterun = keptWr;
   logout(LATE); login(LATE);
   ok(toldSince(n0, LATE).length === 1 && toldSince(n0, LATE)[0] === resText, 'a citizen logging in after the vote is told the result once');
   now += 8 * DAY;
