@@ -9,8 +9,8 @@ const { ok } = F;
 
 const A = 0xff000014, FRIEND = 0xff000016, HORSE = 0xff0a0001;
 const CELL = 'a764b:BSHeartland.esm';
-const UF = 0x13e07, FIREBALL = 0x1c789, SPARKS = 0x2dd2a;
-const CABBAGE = 0x64b3f, POTION_MAG = 0x39be7, SALT = 0x34cdf, RING_FD = 0x1cb39, ENCH_FD = 0x1cb3a, FORT_DEST = 0x1cb3b;
+const UF = 0x13e07, FIREBALL = 0x1c789, SPARKS = 0x2dd2a, DETECT = 0x211ee;
+const CABBAGE = 0x64b3f, POTION_MAG = 0x39be7, SALT = 0x34cdf, RING_FD = 0x1cb39, ENCH_FD = 0x1cb3a, FORT_DEST = 0x1cb3b, POTION_REGEN = 0x3eb0d;
 const REST_HEALTH = 0x3eb15, REST_MAGICKA = 0x3eb17, WEAK_MAGIC = 0x73f51, FORT_MAG_RATE = 0x3eb06;
 const setup = (anticheat) => {
   const W = F.makeWorld();
@@ -18,6 +18,7 @@ const setup = (anticheat) => {
   W.spell(UF, 'VoiceUnrelentingForce3', { cost: 0, type: 11, castType: 1 });
   W.spell(FIREBALL, 'Fireball', { cost: 133, school: 20 });
   W.spell(SPARKS, 'Sparks', { cost: 19, castType: 2, school: 20 });
+  W.spell(DETECT, 'DetectLife', { cost: 200, castType: 2, school: 18 });
   W.race(0x131fd, 'HorseRace'); W.npcBase(0x68d6d, 'WhiterunStablesHorse', 0x131fd);
   W.set(HORSE, 'baseDesc', '68d6d:Skyrim.esm'); W.set(HORSE, 'pos', [0, 0, 0]);
   // food and ingredients: their effects (MGEF DATA archetype at 0x40, actor value at 0x44)
@@ -28,6 +29,7 @@ const setup = (anticheat) => {
   const eff = (id, mag, dur) => [{ type: 'EFID', data: F.u32(id) }, { type: 'EFIT', data: F.bytes(12, [[0, 'f', mag], [8, 'u', dur]]) }];
   W.record(CABBAGE, 'ALCH', 'FoodCabbage', eff(REST_HEALTH, 5, 0));
   W.record(POTION_MAG, 'ALCH', 'RestoreMagicka01', eff(REST_MAGICKA, 25, 0));
+  W.record(POTION_REGEN, 'ALCH', 'FortifyMagickaRate01', eff(FORT_MAG_RATE, 50, 300));
   // Salt Pile: eaten raw, only its first effect (Weakness to Magic) applies; its fourth is Fortify Magicka Rate
   W.record(SALT, 'INGR', 'SaltPile', [...eff(WEAK_MAGIC, 2, 30), ...eff(FORT_MAG_RATE, 5, 300)]);
   // one Fortify Destruction ring, of the smallest kind
@@ -186,6 +188,25 @@ const castEvery = (H, W, a, secs, every, spell, each) => { for (let s = 1; s <= 
   const got = verdict(H, 'magicka_');
   note('a fake 1.5% drop reported after each cast', got);
   ok(got === 'MISS', 'a fake small drop after each cast: residual (listed by the builder); the fork budget catches it', acLines(H));
+}
+// 6 Nov: a concentration cast or a cast under a magicka regen potion pins only on a bar that never moved
+const wobble = (W, s) => W.set(A, 'percentages', { health: 1, magicka: s % 2 ? 0.996 : 1, stamina: 1 });
+{
+  const { W, H } = setup({});
+  castEvery(H, W, A, 600, 2, DETECT, (s) => wobble(W, s));
+  const got = verdict(H, 'magicka_');
+  note('a bar wobbling 0.996-1.000, costly concentration casts only (Detect Life every 2 s)', got);
+  ok(got === 'MISS', 'a wobbling bar with concentration casts only: residual (6 Nov, honest taps look the same); the fork budget catches it', acLines(H));
+}
+{
+  const { W, H } = setup({});
+  castEvery(H, W, A, 600, 2, FIREBALL, (s) => { if (s % 300 === 1) W.mp.onEatItem(A, POTION_REGEN); wobble(W, s); });
+  const got = verdict(H, 'magicka_');
+  note('a bar wobbling 0.996-1.000 with a regen potion drunk every 5 min, Fireball every 2 s', got);
+  ok(got === 'MISS', 'a wobbling bar under a regen potion kept running: residual (6 Nov, honest regen casts look the same); the fork budget catches it', acLines(H));
+  const { W: W2, H: H2 } = setup({});
+  castEvery(H2, W2, A, 120, 2, FIREBALL, (s) => { if (s === 1) W2.mp.onEatItem(A, POTION_REGEN); });
+  ok(verdict(H2, 'magicka_') === 'ALERT', '...a bar frozen at full under the same potion still alerts', acLines(H2).slice(0, 1));
 }
 // eating anything cleared the pending casts and skipped casts for 6 s: a cabbage after each cast hid them all. Now only
 // food, potions and ingredients that can raise magicka count as a refill
