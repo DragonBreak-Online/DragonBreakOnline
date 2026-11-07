@@ -138,7 +138,7 @@ function actionList(r)
    {
       out.push(["Key Ring", function() { handOver("dbo:keyRingOpen"); }]);
    }
-   if (data.canGrantContainers != true)
+   if (data.canGrantContainers != true && data.container != true)
    {
       out.push([r.manager ? "Sell or rent out" : r.owner ? "Rent and sale" : "Buy or rent", function() { handOver("dbo:propertyMarket"); }]);
    }

@@ -88,6 +88,8 @@ interface PropertyMenuInfo {
   locked: boolean;
   hasKeys: boolean;
   canGrantContainers: boolean;
+  // Loose storage: granted, never rented or sold, so the market is hidden
+  container: boolean;
   ownerName: string | null;
   place: PlaceInfo | null;
   placeName: string | null;
@@ -99,7 +101,7 @@ interface PropertyMenuInfo {
 // Module-level state shared with the browser-side widget setter via runtime injection
 let info: PropertyMenuInfo = {
   target: 0, view: 'denied', owned: false, name: null, locked: false,
-  hasKeys: false, canGrantContainers: false, ownerName: null,
+  hasKeys: false, canGrantContainers: false, container: false, ownerName: null,
   place: null, placeName: null, assignedToYou: false, keyRing: false,
 };
 let targetLabel = '';
@@ -113,7 +115,7 @@ let targetLabel = '';
  *
  *   Client -> Server: { "customPacketType": "propertyInfoRequest", "target": <id> }
  *   Server -> Client: { "customPacketType": "propertyMenu", "target", "view",
- *                       "name", "locked", "hasKeys", "canGrantContainers", "ownerName" }
+ *                       "name", "locked", "hasKeys", "canGrantContainers", "container", "ownerName" }
  *   Client -> Server: { "customPacketType": "propertyRequest", "action", "target",
  *                       "recipient"?, "name"? }
  *   Server -> Client: { "customPacketType": "propertyNotice", "text" }
@@ -221,6 +223,7 @@ export class HousingService extends ClientListener {
           locked: content["locked"] === true,
           hasKeys: content["hasKeys"] === true,
           canGrantContainers: content["canGrantContainers"] === true,
+          container: content["container"] === true,
           ownerName: typeof content["ownerName"] === "string" ? content["ownerName"] as string : null,
           place: readPlace(content["place"]),
           placeName: typeof content["placeName"] === "string" ? (content["placeName"] as string).slice(0, 48) : null,
@@ -344,7 +347,7 @@ export class HousingService extends ClientListener {
       const scaleform = this.controller.lookupListener(ScaleformMenuService);
       const widget = {
         type: "housing", id: WIDGET_ID, targetLabel, view: info.view, owned: info.owned, name: info.name, locked: info.locked,
-        hasKeys: info.hasKeys, canGrantContainers: info.canGrantContainers, ownerName: info.ownerName, place: info.place,
+        hasKeys: info.hasKeys, canGrantContainers: info.canGrantContainers, container: info.container, ownerName: info.ownerName, place: info.place,
         placeName: info.placeName, assignedToYou: info.assignedToYou, keyRing: info.keyRing, events,
       };
       const askedAt = this.askedAt;
@@ -389,6 +392,7 @@ export class HousingService extends ClientListener {
       locked: info.locked,
       hasKeys: info.hasKeys,
       canGrantContainers: info.canGrantContainers,
+      container: info.container,
       ownerName: info.ownerName,
       place: info.place,
       placeName: info.placeName,

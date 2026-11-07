@@ -105,6 +105,13 @@ const rooms = (t) => Object.keys(P(t).right.kids).filter((n) => /^r\d$/.test(n))
   const d = S.boot('dbo_housing');
   d.push(Object.assign({}, base, { view: 'denied', ownerName: 'Olaf', assignedToYou: true, placeName: 'Rose Hall', keyRing: false }));
   check('denied but assigned: says so beside the owner', /Owner: Olaf {4}Assigned to you in Rose Hall\./.test(P(d).head.owner.text), P(d).head.owner.text);
+  // Nat, 7 Nov (Winterhold loose storage): a chest, barrel or urn is granted, never rented or sold, whoever looks at it
+  const box = S.boot('dbo_housing');
+  box.push(Object.assign({}, base, { view: 'denied', ownerName: 'Harbard', keyRing: false, container: true }));
+  check('someone else\'s container shows no market', labels(box).indexOf('Buy or rent') < 0, labels(box).join('|'));
+  const mine = S.boot('dbo_housing');
+  mine.push(Object.assign({}, base, { keyRing: false, container: true }));
+  check('nor does an owner\'s own container', labels(mine).indexOf('Rent and sale') < 0, labels(mine).join('|'));
 }
 
 {

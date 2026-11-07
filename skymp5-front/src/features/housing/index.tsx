@@ -48,6 +48,8 @@ export interface HousingData {
   locked: boolean;
   hasKeys: boolean;
   canGrantContainers: boolean;
+  // Loose storage: granted, never rented or sold, so the market is hidden
+  container?: boolean;
   ownerName: string | null;
   // A place's Rooms and chests, for its owner and the managers; placeName / assignedToYou for anyone else inside one
   place?: PlaceData | null;
@@ -263,7 +265,7 @@ const Housing = ({ data }: { data: HousingData }) => {
           ) : null}
 
           {/* The server's property panel (tenancy.js, widget 81) opens for the door here; this menu closes behind it */}
-          {!data.canGrantContainers ? (
+          {!data.canGrantContainers && !data.container ? (
             <button className="housing__button" onClick={() => { send('dbo:propertyMarket'); send(ev.cancel); }}>
               {isManager ? 'Sell or rent out' : isOwner ? 'Rent and sale' : 'Buy or rent'}
             </button>
