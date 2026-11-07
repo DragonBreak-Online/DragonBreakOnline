@@ -133,7 +133,8 @@ function draw()
       flowShow(page);
    }
    var f = clear("foot", 60);
-   var p = dboText(f, "pages", 1, PAD, PANEL_H - 44, 500, 24, dboFmt(F_MEDIUM, 15, C_SECOND, 0.5), false);
+   flowPager(f, 20, PAD, PANEL_H - 46, pages);
+   var p = dboText(f, "pages", 1, PAD + (pages > 1 ? 176 : 0), PANEL_H - 44, 500, 24, dboFmt(F_MEDIUM, 15, C_SECOND, 0.5), false);
    p.text = pages > 1 ? "Page " + (page + 1) + " of " + pages + " (Left / Right)" : "";
    shownLeft = left();
 }

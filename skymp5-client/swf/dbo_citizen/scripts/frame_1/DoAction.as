@@ -523,7 +523,8 @@ function drawFoot(pages)
    var r = dboText(f, "result", 1, PAD, PANEL_H - 116, PANEL_W - PAD * 2, 48, dboFmt(F_MEDIUM, 18, data.resultKind == "refused" ? C_RED : C_GREEN, 0.5), true);
    r.text = data.result != undefined ? String(data.result) : "";
    dboDivider(f, PAD, PANEL_H - 62, PANEL_W - PAD * 2);
-   var p = dboText(f, "pages", 2, PAD, PANEL_H - 46, 360, 24, dboFmt(F_MEDIUM, 15, C_SECOND, 0.5), false);
+   flowPager(f, 20, PAD, PANEL_H - 48, pages);
+   var p = dboText(f, "pages", 2, PAD + (pages > 1 ? 176 : 0), PANEL_H - 46, 360, 24, dboFmt(F_MEDIUM, 15, C_SECOND, 0.5), false);
    p.text = pages > 1 ? "Page " + (page + 1) + " of " + pages + " (Left / Right)" : "";
    button(f, "back", 10, PANEL_W - PAD - 330, PANEL_H - 48, 220, "Back to the board", F_MEDIUM, 20, A_BUTTON_REST, function() { backToBoard(); });
    button(f, "close", 11, PANEL_W - PAD - 100, PANEL_H - 48, 100, "Close", F_MEDIUM, 20, A_BUTTON_REST, function() { closeMenu(); });

@@ -162,7 +162,9 @@ function drawFoot(pages)
    r.text = data.result != undefined ? String(data.result) : "";
    dboDivider(f, PAD, PANEL_H - 62, PANEL_W - PAD * 2);
    var known = listOf(data.known).length;
-   var h = dboText(f, "hint", 2, PAD, PANEL_H - 46, PANEL_W - PAD * 2 - 140, 24, dboFmt(F_MEDIUM, 15, C_SECOND, 0.5), false);
+   var paged = pages > 1;
+   var h = dboText(f, "hint", 2, PAD, PANEL_H - (paged ? 54 : 46), PANEL_W - PAD * 2 - 140 - (paged ? 176 : 0), paged ? 44 : 24, dboFmt(F_MEDIUM, 15, C_SECOND, 0.5), paged);
+   flowPager(f, 20, PANEL_W - PAD - 100 - 176, PANEL_H - 48, pages);
    h.text = known + " " + (known == 1 ? "spell" : "spells") + " in your book. Spells you knew before study are always yours and take no place."
       + (pages > 1 ? "   ·   Page " + (page + 1) + " of " + pages : "");
    button(f, "close", 10, PANEL_W - PAD - 100, PANEL_H - 48, 100, "Close", F_MEDIUM, 20, A_BUTTON_REST, function() { closeMenu(); });

@@ -286,6 +286,46 @@ function flowShow(n)
    return count;
 }
 
+// Previous and Next at x, y, 166 wide, so the mouse turns pages as the keys do (Argent Dralor, 3 Nov: page 2 of the spellbook could not be reached)
+function flowPager(parent, depth, x, y, pages)
+{
+   if (parent.pager != undefined)
+   {
+      parent.pager.removeMovieClip();
+   }
+   if (pages <= 1)
+   {
+      return null;
+   }
+   var c = parent.createEmptyMovieClip("pager", depth);
+   c._x = x;
+   c._y = y;
+   var pv = button(c, "prev", 1, 0, 0, 90, "Previous", F_MEDIUM, 17, A_BUTTON_REST, function() { flowTurn(-1); });
+   var nx = button(c, "next", 2, 96, 0, 70, "Next", F_MEDIUM, 17, A_BUTTON_REST, function() { flowTurn(1); });
+   if (page <= 0)
+   {
+      disable(pv);
+   }
+   if (page >= pages - 1)
+   {
+      disable(nx);
+   }
+   return c;
+}
+
+// Turns the panel's page by d and redraws it; every flow panel keeps its page in page and draws with draw()
+function flowTurn(d)
+{
+   var n = page + d;
+   if (flow == null || n < 0 || n >= flow.pages.length)
+   {
+      return;
+   }
+   dboSound("UIMenuPrevNext");
+   page = n;
+   draw();
+}
+
 function inFlow(clip)
 {
    var c = clip;

@@ -522,6 +522,7 @@ function drawFoot(pages)
    var n = shown().length;
    var all = tomes().length;
    var hint = dboText(f, "hint", 2, PAD, PANEL_H - 46, 600, 24, dboFmt(F_MEDIUM, 15, C_SECOND, 0.5), false);
+   flowPager(f, 20, PANEL_W - PAD - 100 - 176, PANEL_H - 48, pages);
    hint.text = (n == all ? all + " tomes" : "Showing " + n + " of " + all + " tomes") + (pages > 1 ? "   ·   Page " + (page + 1) + " of " + pages + " (Left / Right)" : "");
    button(f, "close", 10, PANEL_W - PAD - 100, PANEL_H - 48, 100, "Close", F_MEDIUM, 20, A_BUTTON_REST, function()
    {

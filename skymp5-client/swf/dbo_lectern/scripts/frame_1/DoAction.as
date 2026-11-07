@@ -184,7 +184,8 @@ function drawFoot(pages)
    var r = dboText(f, "result", 1, PAD, PANEL_H - 112, PANEL_W - PAD * 2, 44, dboFmt(F_MEDIUM, 17, data.resultKind == "refused" ? C_RED : data.resultKind == "ok" ? C_GREEN : C_SECOND, 0.5), true);
    r.text = data.result != undefined ? String(data.result) : "";
    dboDivider(f, PAD, PANEL_H - 62, PANEL_W - PAD * 2);
-   var h = dboText(f, "hint", 2, PAD, PANEL_H - 46, 260, 24, dboFmt(F_MEDIUM, 15, C_SECOND, 0.5), false);
+   flowPager(f, 20, PAD, PANEL_H - 48, pages);
+   var h = dboText(f, "hint", 2, PAD + (pages > 1 ? 176 : 0), PANEL_H - 46, 260, 24, dboFmt(F_MEDIUM, 15, C_SECOND, 0.5), false);
    h.text = pages > 1 ? "Page " + (page + 1) + " of " + pages : "";
    var x = footButton(f, "close", 10, PANEL_W - PAD, 100, "Close", function() { closeMenu(); }, false);
    if (cancelling)
