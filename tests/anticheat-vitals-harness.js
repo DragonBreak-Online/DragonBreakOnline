@@ -3,10 +3,11 @@
 // anonymised) pins none; a client frozen at full magicka is flagged; Fortify gear of the school, a potion, a well, a refill,
 // a held charge, a concentration channel and a server freeze are not; concentration taps and casts under a magicka regen
 // potion (MagickaRateMult +50% or more) pin only on a bar frozen to the bit, and concentration pins alone never flag, so
-// Wall of Flames tapped under regen on a client that reports as sendInputsService does is not flagged (6 Nov); each
-// spell's record is read once. stamina_free:
-// frozen stamina through a 25 s sprint is flagged (shadow), a draining one is not. refuseHits: off by default, and on, a
-// flagged caster's spell hits are refused while weapon hits are not.
+// Wall of Flames tapped under regen on a client that reports as sendInputsService does is not flagged (6 Nov). The regen
+// window covers a cast whose drop shows in a report; at +200% an honest fire-and-forget cast refilled before the first
+// report still pins on the frozen-bar path and is refused, a known residual pinned here. Each spell's record is read once.
+// stamina_free: frozen stamina through a 25 s sprint is flagged (shadow), a draining one is not. refuseHits: off by
+// default, and on, a flagged caster's spell hits are refused while weapon hits are not.
 //   node tests/anticheat-vitals-harness.js   (from server/)
 'use strict';
 const path = require('path');
@@ -183,7 +184,7 @@ for (const minCost of [30, 10]) {
 // a quarter-second tap of Detect Life (SPIT 200 a second) is regenerated before the client's next report of the bar
 const DETECT = 0x211ee, BOLT = 0x7a001, WALL = 0x7a002, REGEN_FX = 0x3eb07, RESTORE_FX = 0x3eb17, DAMAGE_REGEN_FX = 0x7a201;
 const REGEN_POT = 0x7a101, LONG_POT = 0x7a102, RESTORE_POT = 0x7a103, REGEN_ROOT = 0x7a104, SAP = 0x7a105, FORTIFY_POT = 0x7a106, FORTIFY_FX = 0x3eb08;
-const T1_POT = 0x7a107, WEAK_POT = 0x7a108, WEAK_ROOT = 0x7a109, RATE_POT = 0x7a10a, RATE_FX = 0x7a202;
+const T1_POT = 0x7a107, WEAK_POT = 0x7a108, WEAK_ROOT = 0x7a109, RATE_POT = 0x7a10a, RATE_FX = 0x7a202, T5_POT = 0x7a10b;
 const setupRegen = (anticheat) => {
   const S = setup(anticheat);
   const { W } = S;
@@ -207,6 +208,7 @@ const setupRegen = (anticheat) => {
   W.record(WEAK_POT, 'ALCH', 'TestRegenMagicka1', eff(REGEN_FX, 1, 300));
   W.record(WEAK_ROOT, 'INGR', 'TestRootRegenMagicka1', eff(REGEN_FX, 1, 300));
   W.record(RATE_POT, 'ALCH', 'TestMagickaRate50', eff(RATE_FX, 50, 300));
+  W.record(T5_POT, 'ALCH', 'TestRegenMagicka200', eff(REGEN_FX, 200, 300));
   S.H.t0 = S.H.clock.t;
   return S;
 };
@@ -369,6 +371,18 @@ for (const [what, o] of [
   ok(r.judged >= 150 && r.pins >= 30 && !r.lines.length && S.W.mp.onHitDamageAttempt(A, B, WALL, 30, { spell: true }) === true,
     `Wall of Flames tapped 0.21-0.53 s every 3 s for 10 min ${what}, the client reporting as sendInputsService does: ${r.judged} taps judged, ${r.pins} pinned with the value unchanged, no flag, spell hits on players land`,
     { judged: r.judged, pins: r.pins, reads: r.reads.length, lines: r.lines.slice(0, 2) });
+}
+// KNOWN RESIDUAL (6 Nov review): at +200% regen an honest fire-and-forget cast is refilled before the first report, so it
+// pins on the frozen-bar path, which the regen window keeps; these checks hold that until a fix flips them
+for (const [what, o] of [
+  ['Firebolt every 2.5 s, pool 500', { spell: id('Firebolt'), cost: 41, every: 2500, pool: 500 }],
+  ['Fireball every 4 s, pool 600', { spell: id('Fireball'), cost: 133, every: 4000, pool: 600 }],
+]) {
+  const S = setupRegen({ magicka: { refuseHits: true } });
+  const r = clientPlay(S, Object.assign({ conc: false, to: 600000, mult: 0.26, bonus: 2, potion: T5_POT }, o));
+  ok(r.reads.length === 0 && r.lines.some((l) => /server: refusing their spell hits on players/.test(l)) && S.W.mp.onHitDamageAttempt(A, B, o.spell, 30, { spell: true }) === false,
+    `residual: ${what} under a +200% regen potion, 0.26 x SPIT a cast, the client never reporting a drop: ${r.pins} pinned on the frozen-bar path, flagged and refused`,
+    { judged: r.judged, pins: r.pins, reads: r.reads.length, lines: r.lines.slice(0, 1) });
 }
 
 // ---- each spell record is read once ---------------------------------------------------------------------------------------------
