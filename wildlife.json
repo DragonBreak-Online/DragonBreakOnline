@@ -85617,6 +85617,22 @@
 ],
 "giantCamps": [
 {
+"id": "GuldunRockLocation",
+"name": "Guldun Rock",
+"cell": "15269:Skyrim.esm",
+"chests": [
+{
+"ref": "b0d6f:Skyrim.esm",
+"edid": "TreasBanditChestBoss",
+"pos": [
+291.75,
+-3304.33,
+-754.76
+]
+}
+]
+},
+{
 "id": "BleakwindBasinLocation",
 "name": "Bleakwind Basin",
 "cell": "99a2:Skyrim.esm",
