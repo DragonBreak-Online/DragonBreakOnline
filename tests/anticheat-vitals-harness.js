@@ -2,8 +2,9 @@
 // replay of 20 minutes of live stored percentages with the casts made in them (tests/fixtures/anticheat-vitals-sample1.json,
 // anonymised) pins none; a client frozen at full magicka is flagged; Fortify gear of the school, a potion, a well, a refill,
 // a held charge, a concentration channel and a server freeze are not; concentration taps and casts under a magicka regen
-// potion pin only on a bar frozen to the bit, and concentration pins alone never flag, so Wall of Flames tapped under regen
-// on a client that reports as sendInputsService does is not flagged (6 Nov); each spell's record is read once. stamina_free:
+// potion (MagickaRateMult +50% or more) pin only on a bar frozen to the bit, and concentration pins alone never flag, so
+// Wall of Flames tapped under regen on a client that reports as sendInputsService does is not flagged (6 Nov); each
+// spell's record is read once. stamina_free:
 // frozen stamina through a 25 s sprint is flagged (shadow), a draining one is not. refuseHits: off by default, and on, a
 // flagged caster's spell hits are refused while weapon hits are not.
 //   node tests/anticheat-vitals-harness.js   (from server/)
@@ -182,6 +183,7 @@ for (const minCost of [30, 10]) {
 // a quarter-second tap of Detect Life (SPIT 200 a second) is regenerated before the client's next report of the bar
 const DETECT = 0x211ee, BOLT = 0x7a001, WALL = 0x7a002, REGEN_FX = 0x3eb07, RESTORE_FX = 0x3eb17, DAMAGE_REGEN_FX = 0x7a201;
 const REGEN_POT = 0x7a101, LONG_POT = 0x7a102, RESTORE_POT = 0x7a103, REGEN_ROOT = 0x7a104, SAP = 0x7a105, FORTIFY_POT = 0x7a106, FORTIFY_FX = 0x3eb08;
+const T1_POT = 0x7a107, WEAK_POT = 0x7a108, WEAK_ROOT = 0x7a109, RATE_POT = 0x7a10a, RATE_FX = 0x7a202;
 const setupRegen = (anticheat) => {
   const S = setup(anticheat);
   const { W } = S;
@@ -200,6 +202,11 @@ const setupRegen = (anticheat) => {
   W.record(FORTIFY_POT, 'ALCH', 'TestFortifyMagicka60s', eff(FORTIFY_FX, 50, 60));
   W.record(REGEN_ROOT, 'INGR', 'TestRootRestoreThenRegen', [...eff(RESTORE_FX, 1, 0), ...eff(REGEN_FX, 50, 300)]);
   W.record(SAP, 'INGR', 'TestSapDamageRegen', eff(DAMAGE_REGEN_FX, 100, 300));
+  W.mgef(RATE_FX, 'TestFortifyMagickaRateAV28', { archetype: 0, av: 28 });
+  W.record(T1_POT, 'ALCH', 'TestRegenMagicka50', eff(REGEN_FX, 50, 300));
+  W.record(WEAK_POT, 'ALCH', 'TestRegenMagicka1', eff(REGEN_FX, 1, 300));
+  W.record(WEAK_ROOT, 'INGR', 'TestRootRegenMagicka1', eff(REGEN_FX, 1, 300));
+  W.record(RATE_POT, 'ALCH', 'TestMagickaRate50', eff(RATE_FX, 50, 300));
   S.H.t0 = S.H.clock.t;
   return S;
 };
@@ -295,6 +302,22 @@ const mfLines = (H) => acLines(H).filter((l) => /magicka_free/.test(l));
   S3.H.clock.t += 7000; S3.W.mp.onSpellCast(A, BOLT);
   ok(!(st3.regenUntil > 0) && st3.lastRefill === S3.H.clock.t - 7000 && pend(S3.G, A) === 1 && st3.casts[0].frozenOnly === false,
     'a Restore Magicka potion, a Fortify Magicka one of 60 s, an ingredient whose regen effect is not its first, a detrimental regen effect: the 6 s skip only, no regen window', { regenUntil: st3.regenUntil, casts: st3.casts });
+  // the effect must be at least regenMinMagnitude (50) strong, on MagickaRateMult (AV 156)
+  const S4 = setupRegen({});
+  const st4 = S4.G.ST.players.get(A), t4 = S4.H.clock.t;
+  S4.W.mp.onEatItem(A, T1_POT);
+  ok(st4.regenUntil === t4 + 300000, 'a +50% regen potion of 300 s (the weakest DBO tier): a 300 s window', st4.regenUntil - t4);
+  for (const [what, item] of [['a 1-point regen potion of 300 s', WEAK_POT], ['a 1-point regen ingredient eaten raw', WEAK_ROOT], ['a MagickaRate (AV 28) potion of 50 for 300 s', RATE_POT]]) {
+    const S5 = setupRegen({});
+    const st5 = S5.G.ST.players.get(A);
+    S5.W.mp.onEatItem(A, item);
+    S5.H.clock.t += 7000; S5.W.mp.onSpellCast(A, BOLT);
+    ok(!(st5.regenUntil > 0) && st5.lastRefill === S5.H.clock.t - 7000 && pend(S5.G, A) === 1 && st5.casts[0].frozenOnly === false,
+      `${what}: a refill (the 6 s skip), no regen window`, { regenUntil: st5.regenUntil, casts: st5.casts });
+  }
+  const S6 = setupRegen({ magicka: { regenMinMagnitude: 151 } });
+  S6.W.mp.onEatItem(A, REGEN_POT);
+  ok(!(S6.G.ST.players.get(A).regenUntil > 0), '...regenMinMagnitude is read from the config (151: the +150% potion opens none)', S6.G.ST.players.get(A).regenUntil);
 }
 // a client reporting its bar as sendInputsService does: a changed value only, once a second at most, none while casting or 500 ms after
 const clientBar = (S, o) => {

@@ -11,7 +11,7 @@ const A = 0xff000014, FRIEND = 0xff000016, HORSE = 0xff0a0001;
 const CELL = 'a764b:BSHeartland.esm';
 const UF = 0x13e07, FIREBALL = 0x1c789, SPARKS = 0x2dd2a, DETECT = 0x211ee;
 const CABBAGE = 0x64b3f, POTION_MAG = 0x39be7, SALT = 0x34cdf, RING_FD = 0x1cb39, ENCH_FD = 0x1cb3a, FORT_DEST = 0x1cb3b, POTION_REGEN = 0x3eb0d;
-const REST_HEALTH = 0x3eb15, REST_MAGICKA = 0x3eb17, WEAK_MAGIC = 0x73f51, FORT_MAG_RATE = 0x3eb06;
+const REST_HEALTH = 0x3eb15, REST_MAGICKA = 0x3eb17, WEAK_MAGIC = 0x73f51, FORT_MAG_RATE = 0x3eb06, POTION_REGEN1 = 0x7b001, ROOT_REGEN1 = 0x7b002;
 const setup = (anticheat) => {
   const W = F.makeWorld();
   W.record(0xa764b, 'WRLD', 'BSHeartland', []);
@@ -25,11 +25,13 @@ const setup = (anticheat) => {
   W.mgef(REST_HEALTH, 'FoodRestoreHealth', { archetype: 0, av: 24 });
   W.mgef(REST_MAGICKA, 'AlchRestoreMagicka', { archetype: 0, av: 25 });
   W.mgef(WEAK_MAGIC, 'AlchWeaknessMagic', { archetype: 0, av: 56 });
-  W.mgef(FORT_MAG_RATE, 'AlchFortifyMagickaRate', { archetype: 34, av: 28 });
+  W.mgef(FORT_MAG_RATE, 'AlchFortifyMagickaRate', { archetype: 0, av: 156 });
   const eff = (id, mag, dur) => [{ type: 'EFID', data: F.u32(id) }, { type: 'EFIT', data: F.bytes(12, [[0, 'f', mag], [8, 'u', dur]]) }];
   W.record(CABBAGE, 'ALCH', 'FoodCabbage', eff(REST_HEALTH, 5, 0));
   W.record(POTION_MAG, 'ALCH', 'RestoreMagicka01', eff(REST_MAGICKA, 25, 0));
   W.record(POTION_REGEN, 'ALCH', 'FortifyMagickaRate01', eff(FORT_MAG_RATE, 50, 300));
+  W.record(POTION_REGEN1, 'ALCH', 'TestRegenMagicka1', eff(FORT_MAG_RATE, 1, 300));
+  W.record(ROOT_REGEN1, 'INGR', 'TestRootRegenMagicka1', eff(FORT_MAG_RATE, 1, 300));
   // Salt Pile: eaten raw, only its first effect (Weakness to Magic) applies; its fourth is Fortify Magicka Rate
   W.record(SALT, 'INGR', 'SaltPile', [...eff(WEAK_MAGIC, 2, 30), ...eff(FORT_MAG_RATE, 5, 300)]);
   // one Fortify Destruction ring, of the smallest kind
@@ -217,6 +219,14 @@ const wobble = (W, s) => W.set(A, 'percentages', { health: 1, magicka: s % 2 ? 0
   const { W: W2, H: H2 } = setup({});
   castEvery(H2, W2, A, 120, 2, FIREBALL, (s) => { if (s === 1) W2.mp.onEatItem(A, POTION_REGEN); });
   ok(verdict(H2, 'magicka_') === 'ALERT', '...a bar frozen at full under the same potion still alerts', acLines(H2).slice(0, 1));
+  // a regen window needs regenMinMagnitude 50: a 1-point regen potion or ingredient kept running hides nothing
+  for (const [what, item] of [['potion', POTION_REGEN1], ['ingredient eaten raw', ROOT_REGEN1]]) {
+    const { W: W3, H: H3 } = setup({});
+    castEvery(H3, W3, A, 600, 2, FIREBALL, (s) => { if (s % 300 === 1) W3.mp.onEatItem(A, item); wobble(W3, s); });
+    const v = verdict(H3, 'magicka_');
+    note(`the same wobbling bar with a 1-point 300 s regen ${what} taken every 5 min`, v);
+    ok(v === 'ALERT', `...the same wobble with a 1-point 300 s regen ${what} taken every 5 min alerts`, acLines(H3).slice(0, 1));
+  }
 }
 // eating anything cleared the pending casts and skipped casts for 6 s: a cabbage after each cast hid them all. Now only
 // food, potions and ingredients that can raise magicka count as a refill

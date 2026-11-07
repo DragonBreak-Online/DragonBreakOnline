@@ -86,6 +86,8 @@ const DEFAULTS = {
     refillSkipMs: 6000,
     // a magicka regen potion or food: for its effect's duration, at most this long, a cast pins only on a frozen bar
     regenSkipMaxMs: 300000,
+    // the regen effect's EFIT magnitude must be at least this (+50%: DBO_AlchRegenMagickaT1 and FortifyMagickaRate01)
+    regenMinMagnitude: 50,
     flagCount: 8, flagWindowMs: 600000, flagMinCost: 1200,
     refuseHits: false, refuseMinutes: 10,
     // Staff are flagged like anyone but never refused: an event GM's own spells (profile 94 was flagged 10 times in 14 days
@@ -550,17 +552,18 @@ module.exports = (api) => {
     ST.gear.set(key, yes);
     return yes;
   };
-  // ms its MagickaRate or MagickaRateMult effect lasts (not hostile or detrimental), at most regenSkipMaxMs; seconds cached per id
-  const MAGICKA_REGEN_AVS = new Set([28, 156]);
+  // ms its MagickaRateMult effect (AV 156, not hostile or detrimental) of regenMinMagnitude or more lasts, at most regenSkipMaxMs
   const eatRegenMs = (baseId) => {
-    const key = `r${baseId >>> 0}`;
-    let secs = ST.gear.get(key);
-    if (secs === undefined) {
-      secs = 0;
-      try { for (const [d, efit] of eatenEffects(recordOf(baseId)) || []) if (d && d.data.byteLength >= 0x48 && MAGICKA_REGEN_AVS.has(u32(d, 0x44)) && !(u32(d, 0) & 5)) secs = Math.max(secs, u32(efit, 8)); } catch (e) { secs = 0; }
+    const key = `rm${baseId >>> 0}`;
+    let fx = ST.gear.get(key);
+    if (!fx) {
+      fx = [];
+      try { for (const [d, efit] of eatenEffects(recordOf(baseId)) || []) if (d && d.data.byteLength >= 0x48 && u32(d, 0x44) === 156 && !(u32(d, 0) & 5)) fx.push([f32(efit, 0), u32(efit, 8)]); } catch (e) { fx = []; }
       if (ST.gear.size > 8000) ST.gear.clear();
-      ST.gear.set(key, secs);
+      ST.gear.set(key, fx);
     }
+    const minMag = num(MG.regenMinMagnitude, 50);
+    const secs = fx.reduce((s, [mag, dur]) => (mag >= minMag ? Math.max(s, dur) : s), 0);
     return Math.min(secs * 1000, Math.max(0, num(MG.regenSkipMaxMs, 300000)));
   };
   const onCast = (a, spellId, t) => {
