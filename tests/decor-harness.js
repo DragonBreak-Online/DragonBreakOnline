@@ -250,6 +250,19 @@ ok(!placementSaid.length, 'placement.js ignores a GM aiming at a decor piece', p
 // ---- the owner leaves: cleared, half owed, paid at the next scan ------------------------------------------------------
 placeAt(OWNER, 'alchemy');
 const before = held(OWNER, SALT), kept = items().length;
+// A housing record that can't be read is never an abandon: it took down a whole furnished home (SEED3, 4 Nov)
+const home = getp(DOOR, 'private.housing');
+setp(DOOR, 'private.housing', null);
+for (let i = 0; i < 4; i++) timers['decor-owners']();
+ok(!!T.reg().places[DOOR.toString(16)] && items().length === kept && held(OWNER, SALT) === before, 'an unreadable housing record keeps every piece in place', { kept, now: items().length });
+// Nor while housing is still reading its records after a boot
+const prevHousing = globalThis.__dboHousing;
+globalThis.__dboHousing = Object.assign({}, prevHousing || {}, { isWarm: () => false });
+setp(DOOR, 'private.housing', { owner: 0, partner: OUTDOOR });
+for (let i = 0; i < 4; i++) timers['decor-owners']();
+ok(!!T.reg().places[DOOR.toString(16)] && items().length === kept, 'no abandon while housing is not warm yet', { now: items().length });
+globalThis.__dboHousing = prevHousing;
+setp(DOOR, 'private.housing', home);
 setp(DOOR, 'private.housing', { owner: 0, partner: OUTDOOR });
 timers['decor-owners']();
 ok(kept >= 2 && !T.reg().places[DOOR.toString(16)] && held(OWNER, SALT) === before + 1, 'abandon: pieces taken down, half of the paid salt back to the owner online', { kept, salt: held(OWNER, SALT) });

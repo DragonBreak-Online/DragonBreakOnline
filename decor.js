@@ -688,12 +688,17 @@ module.exports = (api) => {
     return changed;
   };
   const scanOwners = () => {
+    // Housing still reading its records after a boot: nothing it reports yet is an owner change
+    try { const h = globalThis.__dboHousing; if (h && typeof h.isWarm === 'function' && h.isWarm() === false) return; } catch (e) { /* scan */ }
     const r = reg(), roots = Object.keys(r.places);
     let changed = recallBlocked();
     for (let i = 0; i < Math.min(C.ownerScanPerTick, roots.length); i++) {
       S.scanIdx = (S.scanIdx + 1) % roots.length;
       const k = roots[S.scanIdx], p = r.places[k], rec = get(parseInt(k, 16) >>> 0, 'private.housing', null);
-      const same = rec && Number(rec.owner) === p.owner && (!p.ownerChar || !(Number(rec.ownerChar) >>> 0) || (Number(rec.ownerChar) >>> 0) === p.ownerChar);
+      // A record that can't be read (at boot, or a door not loaded) is unknown, never an owner change: it took down every
+      // piece in a furnished home, refunded half (#bugs "Construction system items deleted themselves", SEED3, 4 Nov)
+      if (!rec || typeof rec !== 'object') continue;
+      const same = Number(rec.owner) === p.owner && (!p.ownerChar || !(Number(rec.ownerChar) >>> 0) || (Number(rec.ownerChar) >>> 0) === p.ownerChar);
       if (same) continue;
       const owed = r.owed[ownerKey(p.owner, p.ownerChar)] = r.owed[ownerKey(p.owner, p.ownerChar)] || {};
       for (const it of p.items) {
