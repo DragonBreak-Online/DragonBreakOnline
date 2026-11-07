@@ -583,7 +583,16 @@ module.exports = (api) => {
     if (!C.enabled) return;
     a = Number(a) >>> 0;
     S.skin.delete(a);   // a new client: the skin turns on afresh, DiseaseResist with it
-    if (isBriar(a)) applyGifts(a, 'login'); else lookCheck(a, null, 'login');
+    // Not a Briarheart: the spells go anyway. Papyrus spells live on the client's player, so a character switched to in
+    // the same session kept the last character's Ironflesh and Lightning Cloak (#bugs 1568124669435842561, 6 Nov)
+    if (isBriar(a)) applyGifts(a, 'login');
+    else {
+      if (isOnline(a)) {
+        for (const d of [...(C.spells || []), ...retired()]) papyrus(a, 'RemoveSpell', [form(d)]);
+        if (C.display && idOf(C.display)) papyrus(a, 'RemoveSpell', [form(C.display)]);
+      }
+      lookCheck(a, null, 'login');
+    }
     // Once the login re-dress has settled, a bare chest gets the briar body even if no new equipment report comes
     if (isBriar(a)) setTimeout(() => { try { if (isOnline(a)) lookCheck(a, null, 'login settled'); } catch (e) { log('briarheart: settled look failed', e.message); } }, LOGIN_SETTLE_MS + 5000);
   };

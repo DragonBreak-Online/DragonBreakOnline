@@ -827,6 +827,12 @@ ok(/"spells": \["51b16:Skyrim\.esm", "3aea3:Skyrim\.esm"\]/.test(src('gamemode-c
     'the server damage formula counts worn ARMO (and their enchantments) only, never the DamageResist value: no double count');
 }
 
+// A character switched to in the same session must not keep the last one's briar spells (#bugs 1568124669435842561)
+papyrusCalls.length = 0;
+globalThis.__dboBriarheartLogin(NORD);
+ok(!M.isBriar(NORD) && ['51b16:Skyrim.esm', '3aea3:Skyrim.esm'].every((d) => papyrusCalls.some((c) => c.method === 'RemoveSpell' && c.args[0] === d)) && !papyrusCalls.some((c) => c.method === 'AddSpell'),
+  'a non-Briarheart login takes the briar spells off the client player (a character switch kept them)', papyrusCalls);
+
 Math.random = realRandom;
 process.chdir(cwd);
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
