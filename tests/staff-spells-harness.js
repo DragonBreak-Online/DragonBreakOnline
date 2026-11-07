@@ -23,23 +23,27 @@ ok(powers.staffSpells.every((s) => Array.isArray(s) && s.length === 3 && /^[0-9a
 ok(!powers.staffSpells.some((s) => held.has(String(s[0]).toLowerCase())), '...never a held spell (removed or suspended)');
 ok(!powers.staffSpells.some((s) => playerIds.has(s[0])), '...and none of the players\' tome spells (those stay where they were)');
 ok(!powers.staffSpells.some((s) => /^\(|^[^A-Za-z]*$/.test(s[1])), '...placeholder names (":}", "((...))") replaced by the editor id');
-ok(powers.shouts.length === 0 && powers.shoutsGate.length === 27, 'the players\' lists unchanged in shape: shouts empty, the gate 27');
+ok(powers.shouts.length === 0 && powers.shoutsGate.length === 26, 'the players\' lists unchanged in shape: shouts empty, the gate 26 (Disarm left it on 5 Nov)');
 
 // ---- /givespell, on a stub world ----------------------------------------------------------------------------------------
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-nate-staff-spells-'));
 process.chdir(dir);
 const STAFF = [['8f3f5:Skyrim.esm', 'Wall of Frost Hazard', 'HazardWallofFrostSpell'], ['a1000:Druadach.esm', 'Spectre Fire', 'DrV_SPECTREsummonfirespell'],
-  ['c600:Dawnguard.esm', 'Summon Arvak', 'SummonArvak'], ['109111:Skyrim.esm', 'Transmute Mineral Ore', 'TransmuteOreMineral']];
+  ['c600:Dawnguard.esm', 'Summon Arvak', 'SummonArvak'], ['109111:Skyrim.esm', 'Transmute Mineral Ore', 'TransmuteOreMineral'],
+  ['10d8d:Dawnguard.esm', 'Sun Fire', 'DLC1SunFireLeftHand']];
 fs.writeFileSync('admin-powers.json', JSON.stringify({ spells: [], staffSpells: STAFF }));
-fs.writeFileSync('spell-tomes.json', JSON.stringify({ tomes: [{ id: '1:Skyrim.esm', spellId: '12fcd:Skyrim.esm', spellName: 'Flames', fullName: 'Spell Tome: Flames', school: 'destruction' }] }));
+fs.writeFileSync('spell-tomes.json', JSON.stringify({ tomes: [{ id: '1:Skyrim.esm', spellId: '12fcd:Skyrim.esm', spellName: 'Flames', fullName: 'Spell Tome: Flames', school: 'destruction' },
+  { id: '3f51:Dawnguard.esm', spellId: '3f52:Dawnguard.esm', spellName: 'Sun Fire', fullName: 'Spell Tome: Sun Fire', school: 'Restoration' }] }));
 fs.writeFileSync('admin-items.json', JSON.stringify({ categories: [] }));
 const DESC = new Map(); const ID = new Map(); let next = 0x1000;
 const idOfDesc = (d) => { d = String(d).toLowerCase(); if (!ID.has(d)) { ID.set(d, next); DESC.set(next, d); next++; } return ID.get(d); };
 const PLAYER = 0xff000010, GM = 0xff000011;
+const RECNAME = new Map(); let removeFails = false;
 const told = [], audits = [], calls = [], cmds = new Map();
 require(path.join(ROOT, 'staffitemspells.js'))({
   mp: { get: () => undefined, set: () => {}, getIdFromDesc: idOfDesc, getDescFromId: (id) => DESC.get(id >>> 0) || `${(id >>> 0).toString(16)}:Skyrim.esm`,
-    lookupEspmRecordById: () => null, callPapyrusFunction: (...a) => calls.push(a) },
+    lookupEspmRecordById: (id) => (RECNAME.has(id >>> 0) ? { record: { name: RECNAME.get(id >>> 0) } } : null),
+    callPapyrusFunction: (...a) => { calls.push(a); return !(a[2] === 'RemoveSpell' && removeFails); } },
   log: () => {}, personal: (a, t) => told.push([a, t]), audit: (t) => audits.push(t), who: (a) => `#${(a >>> 0).toString(16)}`, display: String,
   nameOf: () => 'Jorik', tagOf: () => 'TW2F', profileOf: () => 126, onlineActors: () => [PLAYER, GM], isLeadStaff: (a) => a === GM, isAdmin: (a) => a === GM,
   giveItem: () => true, registerChatCommand: (n, f, o) => cmds.set(n, { f, o }), officialTarget: () => null,
@@ -70,6 +74,25 @@ r = give('#TW2F Transmute Mineral Ore force');
 ok(/It is taken from them again at their next login\.$/.test(r), '...forced, the GM is told it will not last', r);
 r = give('#TW2F 8f3f5:Skyrim.esm');
 ok(/\(staff only, not learnable\)/.test(r), 'a staff-only spell by its id is marked too', r);
+
+// A left-hand variant shares its spell's name (#bugs, 7 Nov: a staff grant of Sun Fire gave the left-hand one, and removing
+// "Sun Fire" then removed nothing)
+r = give('#TW2F sunfire');
+ok(/^Granted spell 'Sun Fire' to /.test(r) && calls.some((c) => c[2] === 'AddSpell' && c[4][0].desc === '3f52:dawnguard.esm'), 'a name typed without its space finds the tome\'s Sun Fire, not the left-hand staff row', [r, calls.map((c) => c[4] && c[4][0])]);
+r = give('#TW2F sun fire left hand');
+ok(/^Granted spell 'Sun Fire \(left hand\)' \(staff only/.test(r) && calls.some((c) => c[2] === 'AddSpell' && c[4][0].desc === '10d8d:dawnguard.esm'), '...the left-hand variant only when asked for, and named so', r);
+const take = (line) => { calls.length = 0; cmds.get('removespell').f(GM, line); return last(GM); };
+const LEFT = idOfDesc('10d8d:Dawnguard.esm');
+RECNAME.set(LEFT, 'Sun Fire');
+globalThis.__dboSpellsLearned = () => [LEFT];
+r = take('#TW2F Sun Fire');
+ok(calls.some((c) => c[2] === 'RemoveSpell' && c[4][0].desc === '10d8d:dawnguard.esm') && /the one they held/.test(r), 'removing Sun Fire from someone who holds the left-hand one removes that one', [r, calls.map((c) => c[4] && c[4][0])]);
+globalThis.__dboSpellsLearned = () => [];
+removeFails = true;
+r = take('#TW2F Flames');
+ok(/does not hold Flames .*nothing removed/.test(r) && !audits.some((t) => /removed spell Flames/.test(t)), 'a removal the server refuses says so, and is not audited as done', r);
+removeFails = false;
+delete globalThis.__dboSpellsLearned;
 
 process.chdir(ROOT);
 try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* EBUSY on Windows */ }

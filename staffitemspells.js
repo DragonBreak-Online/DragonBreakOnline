@@ -59,11 +59,17 @@ module.exports = (api) => {
   // suspendedReasons is keyed as the config writes the desc; the engine's desc may differ in case
   const heldWhy = (desc) => { const d = String(desc || '').toLowerCase(); const k = Object.keys(SPELL_CFG.suspendedReasons || {}).find((x) => x.toLowerCase() === d); return k ? String(SPELL_CFG.suspendedReasons[k]) : ''; };
   const HELD = new Map([].concat((SPELL_CFG.removedSpells || []).map((d) => [String(d).toLowerCase(), 'removed']), (SPELL_CFG.suspendedSpells || []).map((d) => [String(d).toLowerCase(), 'suspended'])));
+  // Names compared without case, spaces or punctuation: "sunfire" is the tome's Sun Fire, not a staff row's editor id
+  const squash = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  // A left-hand variant (58 staff rows, 'Sun Fire' DLC1SunFireLeftHand among them) shares its spell's name: it is matched
+  // only when the query asks for the left hand, and named so (#bugs, 7 Nov: a staff grant of Sun Fire gave the left-hand one)
+  const leftHand = (s) => /lefthand$/i.test(String(s[2] || ''));
   const staffSpellRow = (q) => {
-    const ql = q.toLowerCase();
-    const pick = (s) => { const sid = idOf(String(s[0])); return sid ? { id: sid, name: String(s[1]), desc: descOf(sid), staffOnly: true } : null; };
-    for (const s of staffSpells) if (String(s[1]).toLowerCase() === ql || String(s[2] || '').toLowerCase() === ql) { const r = pick(s); if (r) return r; }
-    for (const s of staffSpells) if (String(s[1]).toLowerCase().includes(ql) || String(s[2] || '').toLowerCase().includes(ql)) { const r = pick(s); if (r) return r; }
+    const qs = squash(q), wantLeft = /left/i.test(q);
+    const pick = (s) => { const sid = idOf(String(s[0])); return sid ? { id: sid, name: leftHand(s) ? `${s[1]} (left hand)` : String(s[1]), desc: descOf(sid), staffOnly: true } : null; };
+    const rows = staffSpells.filter((s) => leftHand(s) === wantLeft);
+    for (const s of rows) if (squash(s[1]) === qs || squash(s[2]) === qs) { const r = pick(s); if (r) return r; }
+    for (const s of rows) if (squash(s[1]).includes(qs) || squash(s[2]).includes(qs)) { const r = pick(s); if (r) return r; }
     return null;
   };
 
@@ -83,23 +89,24 @@ module.exports = (api) => {
       } catch (e) {}
       return { id: directId, name, desc: descOf(directId), staffOnly: STAFF_ONLY.has(d) };
     }
-    const qLower = q.toLowerCase();
+    const qs = squash(q);
+    if (!qs) return null;
     for (const t of tomesList) {
-      if (t.spellName && t.spellName.toLowerCase() === qLower) {
+      if (t.spellName && squash(t.spellName) === qs) {
         const sid = idOf(t.spellId);
         if (sid) return { id: sid, name: t.spellName, desc: descOf(sid), tomeId: idOf(t.id), school: t.school };
       }
-      if (t.fullName && t.fullName.toLowerCase() === qLower) {
+      if (t.fullName && squash(t.fullName) === qs) {
         const sid = idOf(t.spellId);
         if (sid) return { id: sid, name: t.spellName, desc: descOf(sid), tomeId: idOf(t.id), school: t.school };
       }
     }
     for (const t of tomesList) {
-      if (t.spellName && t.spellName.toLowerCase().includes(qLower)) {
+      if (t.spellName && squash(t.spellName).includes(qs)) {
         const sid = idOf(t.spellId);
         if (sid) return { id: sid, name: t.spellName, desc: descOf(sid), tomeId: idOf(t.id), school: t.school };
       }
-      if (t.fullName && t.fullName.toLowerCase().includes(qLower)) {
+      if (t.fullName && squash(t.fullName).includes(qs)) {
         const sid = idOf(t.spellId);
         if (sid) return { id: sid, name: t.spellName, desc: descOf(sid), tomeId: idOf(t.id), school: t.school };
       }
@@ -317,23 +324,45 @@ module.exports = (api) => {
       return `Failed to grant spell: ${e.message}`;
     }
   };
-  const takeSpell = (caller, tgt, sp, reason) => {
+  // The spell this player holds under the asked one's name: staff ask by name, and a left-hand variant shares its spell's
+  // name, so removing "Sun Fire" from someone given the left-hand one removed nothing (#bugs, 7 Nov)
+  const heldVariant = (actor, sp) => {
+    let ids = null;
+    try { ids = typeof globalThis.__dboSpellsLearned === 'function' ? globalThis.__dboSpellsLearned(actor) : null; } catch (e) { ids = null; }
+    if (!Array.isArray(ids) || ids.includes(sp.id >>> 0)) return sp;
+    const base = squash(String(sp.name).replace(/\(left hand\)/i, ''));
+    for (const id of ids) {
+      let nm = ''; try { const r = mp.lookupEspmRecordById(id >>> 0); nm = r && r.record ? String(r.record.name || '') : ''; } catch (e) { nm = ''; }
+      if (nm && squash(nm) === base) return { id: id >>> 0, name: nm, desc: descOf(id) };
+    }
+    return sp;
+  };
+  const takeSpell = (caller, tgt, asked, reason) => {
     try {
+      const sp = heldVariant(tgt.actor, asked);
       const selfForm = { type: 'form', desc: descOf(tgt.actor) };
-      mp.callPapyrusFunction('method', 'Actor', 'RemoveSpell', selfForm, [{ type: 'espm', desc: descOf(sp.id) }]);
+      // false: not a learned spell of theirs, or one their race or NPC record gives, which the server never removes
+      const removed = mp.callPapyrusFunction('method', 'Actor', 'RemoveSpell', selfForm, [{ type: 'espm', desc: descOf(sp.id) }]) !== false;
+      let inBook = false;
 
       try {
-        const prep = (mp.get(tgt.actor, 'private.dboPrepared') || []).filter((x) => (x >>> 0) !== (sp.id >>> 0));
+        const was = mp.get(tgt.actor, 'private.dboPrepared') || [];
+        const prep = was.filter((x) => (x >>> 0) !== (sp.id >>> 0));
+        if (prep.length !== was.length) inBook = true;
         mp.set(tgt.actor, 'private.dboPrepared', prep);
       } catch (e) {}
 
       try {
         const studied = mp.get(tgt.actor, 'private.dboStudied') || {};
         for (const k of Object.keys(studied)) {
-          if (Array.isArray(studied[k])) studied[k] = studied[k].filter((x) => (x >>> 0) !== (sp.id >>> 0));
+          if (!Array.isArray(studied[k])) continue;
+          const kept = studied[k].filter((x) => (x >>> 0) !== (sp.id >>> 0));
+          if (kept.length !== studied[k].length) inBook = true;
+          studied[k] = kept;
         }
         mp.set(tgt.actor, 'private.dboStudied', studied);
       } catch (e) {}
+      if (!removed && !inBook) return `${tgt.name} does not hold ${sp.name} (a spell their race gives cannot be removed): nothing removed.`;
 
       try {
         const PROP = 'private.dboMagicSchools';
@@ -355,7 +384,8 @@ module.exports = (api) => {
 
       personal(tgt.actor, `Staff removed the spell: ${sp.name}.`);
       audit(`STAFF ${who(caller)} removed spell ${sp.name} (0x${sp.id.toString(16)}) from ${who(tgt.actor)}${reason ? ` (${reason})` : ''}`);
-      return `Removed spell '${sp.name}' from ${tgt.name}.`;
+      const which = (sp.id >>> 0) !== (asked.id >>> 0) ? ` (0x${sp.id.toString(16)}, the one they held)` : '';
+      return removed ? `Removed spell '${sp.name}'${which} from ${tgt.name}.` : `Took '${sp.name}' out of ${tgt.name}'s spell book; it was not a learned spell of theirs.`;
     } catch (e) {
       return `Failed to remove spell: ${e.message}`;
     }
