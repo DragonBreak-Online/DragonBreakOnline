@@ -3034,7 +3034,9 @@ module.exports = (api) => {
 
   const FEVER = globalThis.__dboFeverApplied instanceof Map ? globalThis.__dboFeverApplied : (globalThis.__dboFeverApplied = new Map()); // actor -> { key, magicka, at, shakeAt }
   const chillMult = (a, av) => { try { const m = typeof globalThis.__dboChillRateMult === 'function' ? Number(globalThis.__dboChillRateMult(a, av)) : 1; return m >= 0 ? m : 1; } catch (e) { return 1; } };
-  const setMagickaRate = (a, mult) => { try { if (typeof globalThis.__dboSetActorValue === 'function') globalThis.__dboSetActorValue(a, 'MagickaRateMult', Math.round(100 * chillMult(a, 'MagickaRateMult') * mult)); } catch (e) { /* offline */ } };
+  // A slow-filling sign (racial.js) shares MagickaRateMult too
+  const signMult = (a) => { try { const s = typeof globalThis.__dboSignMagickaMult === 'function' ? Number(globalThis.__dboSignMagickaMult(a)) : 1; return s >= 0 ? s : 1; } catch (e) { return 1; } };
+  const setMagickaRate = (a, mult) => { try { if (typeof globalThis.__dboSetActorValue === 'function') globalThis.__dboSetActorValue(a, 'MagickaRateMult', Math.round(100 * chillMult(a, 'MagickaRateMult') * mult * signMult(a))); } catch (e) { /* offline */ } };
   // Takes every fever effect off at once: a cure, the turning, the switch off
   const feverEnded = (a) => {
     const had = FEVER.get(a >>> 0); FEVER.delete(a >>> 0);

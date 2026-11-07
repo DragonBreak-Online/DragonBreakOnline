@@ -157,19 +157,56 @@ check('reductionCap still holds every reduction together: 0.1 x the Breton Atron
 check('Atronach: +50 maximum magicka through the race\'s vital bonus; a Lady none', JSON.stringify(globalThis.__dboRaceVitalBonus(P0)) === '{"health":0,"magicka":50,"stamina":0}'
   && (() => { sign(P0, 'lady'); const v = globalThis.__dboRaceVitalBonus(P0); sign(P0, 'atronach'); return v.magicka === 0; })());
 check('Atronach: the slower magicka is taken back (extraPerSecond is negative), a full bar is left alone', R.extraPerSecond(P0, 'magicka') < 0 && R.extraPerSecond(P0, 'magicka', 1) === 0);
-// the regeneration tick takes the share off a fresh report instead of adding it
-for (const a of all) if (a !== P0) state[a].props.isOnline = false;
-globalThis.__dboRacialState.owed.delete(P0);
-// the client reports a refilling bar four times a second; the server takes the slowed share off now and then
-let taken = 0, reported = 0.5;
-const tStart = Date.now();
-for (let i = 0; i < 40; i++) {
-  reported = Math.min(0.99, reported + 0.0075);
-  state[P0].pc = { health: 1, magicka: reported, stamina: 1 };
-  R.regenTick(tStart + i * 250);
-  if (state[P0].pc.magicka < reported) { taken += reported - state[P0].pc.magicka; reported = state[P0].pc.magicka; }
-}
-check('...the tick takes about a quarter of the bar\'s own refill back over 10 s (own 0.03/s: 0.075 of it)', taken > 0.045 && taken < 0.09, taken);
+// the regeneration tick against a client reporting a refilling bar four times a second: what the server writes back
+for (const a of all) if (a !== P0 && a !== ALTMER) state[a].props.isOnline = false;
+const tick10s = (Rx, who) => {
+  globalThis.__dboRacialState.owed.delete(who);
+  let taken = 0, added = 0, reported = 0.5;
+  const tStart = Date.now();
+  for (let i = 0; i < 40; i++) {
+    reported = Math.min(0.99, reported + 0.0075);
+    state[who].pc = { health: 1, magicka: reported, stamina: 1 };
+    Rx.regenTick(tStart + i * 250);
+    const now = state[who].pc.magicka;
+    if (now < reported) taken += reported - now; else added += now - reported;
+    reported = now;
+  }
+  return { taken, added };
+};
+// The slower magicka is the client's own rate now (#bugs 1565270743002914836): the server takes nothing back
+let run = tick10s(R, P0);
+check('Atronach: the tick takes nothing back over 10 s; the client\'s own rate is slowed instead', run.taken === 0 && run.added === 0, run);
+check('...the sign\'s client factor is 0.75 for magicka, and 1 for health and stamina', near(R.signSlow(P0, 'magicka'), 0.75) && R.signSlow(P0, 'health') === 1 && R.signSlow(P0, 'stamina') === 1);
+// An Altmer Atronach (1.25 x 0.75): the Altmer's gift is still paid, on top of the client's slowed rate
+run = tick10s(R, ALTMER);
+check('Atronach Altmer: the tick adds the Altmer\'s share on the slowed rate, and takes nothing back', run.taken === 0 && run.added > 0.01 && run.added < 0.07, run);
+// The client rate: MagickaRateMult 75, times Death's Chill's factor and a fever's, re-sent, and put back when the sign goes
+const avs = [];
+globalThis.__dboSetActorValue = (a, av, v) => { avs.push([a, av, v]); return true; };
+globalThis.__dboRacialState.rateSent.clear();
+const rt0 = Date.now();
+R.magickaRateTick(rt0);
+check('the client rate: MagickaRateMult 75 for an Atronach', avs.some(([a, av, v]) => a === P0 && av === 'MagickaRateMult' && v === 75), avs);
+avs.length = 0; R.magickaRateTick(rt0 + 5000);
+check('...not re-sent while it holds', !avs.some(([a]) => a === P0), avs);
+globalThis.__dboChillRateMult = (a, av) => (a === P0 && av === 'MagickaRateMult' ? 0.5 : 1);
+R.magickaRateTick(rt0 + 10000);
+check('...Death\'s Chill multiplies in (0.75 x 0.5: 38)', avs.some(([a, av, v]) => a === P0 && v === 38), avs);
+delete globalThis.__dboChillRateMult;
+avs.length = 0; R.magickaRateTick(rt0 + 80000);
+check('...and it is re-sent after rateReapplySeconds', avs.some(([a, av, v]) => a === P0 && v === 75), avs);
+sign(P0, 'lady'); avs.length = 0; R.magickaRateTick(rt0 + 85000);
+check('...put back to 100 once the sign no longer slows magicka, then left alone', avs.some(([a, av, v]) => a === P0 && v === 100) && !globalThis.__dboRacialState.rateSent.has(P0), avs);
+avs.length = 0; R.magickaRateTick(rt0 + 90000);
+check('...nothing sent for a sign that slows nothing', !avs.some(([a]) => a === P0), avs);
+sign(P0, 'atronach');
+// signMagickaOnClient false brings back the take-back (the rollback): about a quarter of the bar's own refill over 10 s
+const RL = make({ enabled: true, overhaul: true, signMagickaOnClient: false });
+run = tick10s(RL, P0);
+check('signMagickaOnClient false: the tick takes about a quarter of the own refill back (own 0.03/s: 0.075 of it)', run.taken > 0.045 && run.taken < 0.09, run);
+check('...and no client rate then', RL.signSlow(P0, 'magicka') === 1);
+make({ enabled: true, overhaul: true });   // the live config's globals again
+delete globalThis.__dboSetActorValue;
 state[P0].pc = { health: 1, magicka: 1, stamina: 1 };
 R.regenTick(Date.now());
 check('...and never below a full bar\'s report: a full bar is not touched', state[P0].pc.magicka === 1);

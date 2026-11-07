@@ -258,7 +258,11 @@ module.exports = (api) => {
     if ((old ? old.key : 'null') === key) return;
     if (f) S.chillRates.set(a, { key, f }); else S.chillRates.delete(a);
     try { if (typeof globalThis.__dboNeedsRefresh === 'function') globalThis.__dboNeedsRefresh(a); } catch (e) { /* no needs system */ }
-    try { if (typeof globalThis.__dboSetActorValue === 'function') globalThis.__dboSetActorValue(a, 'MagickaRateMult', Math.round(100 * (f ? f.MagickaRateMult : 1))); } catch (e) { /* not an actor */ }
+    // MagickaRateMult is shared: a fever's factor (supernatural.js) and a slow-filling sign's (racial.js) ride along
+    let others = 1;
+    try { const m = globalThis.__dboFeverApplied; const e = m instanceof Map ? m.get(a >>> 0) : null; if (e && Number(e.magicka) >= 0) others *= Number(e.magicka); } catch (e) { /* no fever */ }
+    try { if (typeof globalThis.__dboSignMagickaMult === 'function') { const s = Number(globalThis.__dboSignMagickaMult(a)); if (s >= 0) others *= s; } } catch (e) { /* no sign */ }
+    try { if (typeof globalThis.__dboSetActorValue === 'function') globalThis.__dboSetActorValue(a, 'MagickaRateMult', Math.round(100 * (f ? f.MagickaRateMult : 1) * others)); } catch (e) { /* not an actor */ }
   };
   globalThis.__dboChillRateMult = (a, av) => { const r = S.chillRates.get(Number(a) >>> 0); return r && r.f[av] !== undefined ? r.f[av] : 1; };
 

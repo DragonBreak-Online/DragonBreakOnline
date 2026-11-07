@@ -538,12 +538,22 @@ module.exports = (api) => {
     const combat = !keepsInCombat && fighting(a) ? Math.max(0, num(COMBAT[stat], 1)) : 1;
     return ((raceValue(a, stat) / 100) * REGEN_MULT * chain * combat + blessing) * chill * (f - 1);
   };
+  // A sign's slower magicka (the Atronach's) is the player's own client rate, MagickaRateMult, not a server take-back:
+  // writing the bar lower reset the server's regen clock, so the next report was cut back too and the bar rose and fell
+  // (#bugs 1565270743002914836, 1565987491255685130). The factor on the client, 1 when none; signMagickaOnClient false: the old take-back
+  const signSlow = (a, stat) => {
+    if (stat !== 'magicka' || C.signMagickaOnClient === false || !on()) return 1;
+    const sg = signOf(a); const f = num(((sg && sg.regen) || {}).magicka, 1);
+    return f > 0 && f < 1 ? f : 1;
+  };
+  // downed.js (Death's Chill) and supernatural.js (a fever) write MagickaRateMult too, and multiply this in
+  globalThis.__dboSignMagickaMult = (a) => { try { return signSlow(Number(a) >>> 0, 'magicka'); } catch (e) { return 1; } };
   // /regendiag (regendiag.js): this chain's view of one bar, nothing written
   globalThis.__dboRacialRegenDiag = (a, stat) => {
     a = Number(a) >>> 0;
     const f = regenFactor(a, stat);
     return { race: raceOf(a) || '', sign: signOf(a) || '', raceRate: raceValue(a, stat), factor: f, extraPerSecond: extraPerSecond(a, stat, f),
-      fighting: fighting(a), combatMult: num(COMBAT[stat], 1), castHeld: castHeld(a), regenMult: REGEN_MULT, overhaul: on() };
+      fighting: fighting(a), combatMult: num(COMBAT[stat], 1), castHeld: castHeld(a), regenMult: REGEN_MULT, overhaul: on(), clientRate: signSlow(a, stat) };
   };
   const TICK_MS = Math.max(250, Math.round(num(C.tickSeconds, 0.25) * 1000));
   const STATS = ['health', 'magicka', 'stamina'];
@@ -575,8 +585,11 @@ module.exports = (api) => {
           const fresh = seen[stat] !== v;
           seen[stat] = v;
           if (!(next[stat] < 1)) { owed[stat] = 0; continue; }
-          const f = regenFactor(a, stat);
-          const signed = f !== 1 ? extraPerSecond(a, stat, f) : 0;
+          // A slowing the client applies itself (signSlow) leaves only the rest of the factor, on the client's slowed rate
+          const d = signSlow(a, stat);
+          let f = regenFactor(a, stat) / d;
+          if (Math.abs(f - 1) < 1e-9) f = 1;
+          const signed = f !== 1 ? extraPerSecond(a, stat, f) * d : 0;
           if (!signed) { owed[stat] = 0; continue; }
           // owed is a size; a slowed bar (factor below 1) has it taken off instead of added
           const per = Math.abs(signed);
@@ -599,6 +612,26 @@ module.exports = (api) => {
     } finally { memo = null; }
     for (const a of [...S.owed.keys()]) if (!here.has(a)) S.owed.delete(a);
   };
+  // The client's MagickaRateMult for a slowing sign: its factor times Death's Chill's and a fever's, re-sent every
+  // rateReapplySeconds (a relog or a load resets it on the client), and put back to the other two once the sign stops slowing
+  if (!(S.rateSent instanceof Map)) S.rateSent = new Map(); // actor -> { v, at }
+  const REAPPLY_MS = Math.max(5, num(C.rateReapplySeconds, 60)) * 1000;
+  const magickaRateTick = (now = Date.now()) => {
+    const here = new Set();
+    for (const a of onlineActors()) {
+      here.add(a);
+      const slow = signSlow(a, 'magicka'), had = S.rateSent.get(a);
+      if (slow === 1 && !had) continue;
+      const chill = Math.min(1, hook('__dboChillRateMult', a, 'MagickaRateMult'));
+      let fever = 1; try { const m = globalThis.__dboFeverApplied; const e = m instanceof Map ? m.get(a >>> 0) : null; if (e && Number(e.magicka) >= 0) fever = Number(e.magicka); } catch (e) { fever = 1; }
+      const v = Math.round(100 * chill * fever * slow);
+      if (slow !== 1 && had && had.v === v && now - had.at < REAPPLY_MS) continue;
+      try { if (typeof globalThis.__dboSetActorValue === 'function') globalThis.__dboSetActorValue(a, 'MagickaRateMult', v); } catch (e) { continue; }
+      if (slow === 1) S.rateSent.delete(a); else S.rateSent.set(a, { v, at: now });
+    }
+    for (const a of [...S.rateSent.keys()]) if (!here.has(a)) S.rateSent.delete(a);
+  };
+  if (typeof every === 'function') every('racialMagickaRate', 5000, () => { try { magickaRateTick(); } catch (e) { log('racial magicka rate failed', e.message); } });
   // Registered whatever the config says and off inside, so a reload that turns it off replaces the running timer
   if (typeof every === 'function') every('racialRegen', TICK_MS, () => { try { regenTick(); } catch (e) { log('racial regen failed', e.message); } });
 
@@ -948,7 +981,7 @@ module.exports = (api) => {
   globalThis.__dboRacialPowerView = powerView;
   globalThis.__dboRacialPowerViews = powerViews;
   globalThis.__dboRacialPowerHud = hudField;
-  return { config: C, raceOf, signOf, attackMult, targetMult, capTargetSide, regenFactor, extraPerSecond, regenTick, onCast, castHeld, goldBonus, inCold, fighting, COMBAT,
+  return { config: C, raceOf, signOf, attackMult, targetMult, capTargetSide, regenFactor, extraPerSecond, regenTick, magickaRateTick, signSlow, onCast, castHeld, goldBonus, inCold, fighting, COMBAT,
     skillRate, diseaseResist, powerView, powerViews, usePower, powerTick, statusLine, hudField, abilityTick, wardAbsorb, eyeTick };
 };
 module.exports.RACES = RACES;
