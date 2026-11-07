@@ -853,6 +853,12 @@ export class HousingSystem implements System {
       this.notice(ctx, userId, "Nobody owns this.");
       return;
     }
+    // A hold's seat held by its ruler is the ruler's to give up: a Steward manages it but cannot take it from them (Nat, 7 Nov)
+    if (this.seatExempt(ctx, primary, rec.owner, this.ownerCharOf(rec)) && !this.seatExempt(ctx, primary, this.profileOf(ctx, actorId), actorId)
+      && !this.isStaffOverride(ctx, actorId, rec.owner)) {
+      this.notice(ctx, userId, "The ruler holds this seat by office: only the ruler can give it up.");
+      return;
+    }
     const formerName = rec.ownerName || "the owner";
     if (!this.release(ctx, primary, rec)) {
       this.notice(ctx, userId, CHANGE_FAILED);
