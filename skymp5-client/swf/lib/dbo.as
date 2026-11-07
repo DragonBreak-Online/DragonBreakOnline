@@ -684,6 +684,16 @@ function dboInput(parent, name, depth, x, y, w, h, format, maxChars, multi)
    {
       _global.skse.AllowTextInput(true);
       dboTyping = true;
+      // A second box (rent after deposit, the journal's text after its title) used to make a new guard at the same depth.
+      // That replaced the old guard, whose onUnload then ran dboInputEnd straight after the AllowTextInput(true) above, so
+      // the game read the keys again and only the first box of a panel ever took typing (#bugs, 4-7 Nov). The old guard is
+      // disarmed and removed first.
+      var old = _root.dboTypeGuard;
+      if (old != undefined)
+      {
+         delete old.onUnload;
+         old.removeMovieClip();
+      }
       // best effort for a close the panel never sees (the engine's, Souls RE's): the clip's unload gives the count back
       var g = _root.createEmptyMovieClip("dboTypeGuard", 9997);
       g.onUnload = function()
