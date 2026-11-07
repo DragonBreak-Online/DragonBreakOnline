@@ -416,6 +416,8 @@ module.exports = (api) => {
   // it is untouched; what it catches is a leader of something else, or a hold's ruler.
   const leadershipNo = (t, fid, by) => {
     if (typeof globalThis.__dboLeadershipRefusal !== 'function') return '';
+    const o = ST.overrides && ST.overrides.get(`${t >>> 0}:${fid}`);
+    if (o && Date.now() - o.at <= OVERRIDE_MS) return '';
     // A hold's or stronghold's own faction is its ruler seat (court.js keeps the two in step, and seatOfficial writes the
     // seat before it syncs the rank), so the seat skipped is the hold's, or a newly seated Jarl is refused their own rank
     const f = FACTIONS.get(String(fid));
@@ -1776,7 +1778,7 @@ module.exports = (api) => {
       { const no = staffNo(a, t); if (no) return personal(a, no); }
       const leaderRank = f.ranks.findIndex((r) => r.role === 'leader');
       const lim = limitRefusal(t, fid, leaderRank, a); if (lim) return personal(a, `${lim.text} (A Lead GM may lift this once: /faction override <player|#TAG> ${fid})`);
-      { const no = leadershipNo(t, fid, a); if (no) return personal(a, no); }
+      { const no = leadershipNo(t, fid, a); if (no) return personal(a, `${no} (A Lead GM may lift this once: /faction override <player|#TAG> ${fid})`); }
       for (const [id, m] of Object.entries(rosterOf(fid))) if (m.rank === leaderRank && Number(id) !== (t >>> 0)) m.rank = Math.min(leaderRank + 1, lowestRank(fid));
       const err = setMember(fid, t, leaderRank, a); if (err) return personal(a, err);
       system(t, `You are now ${shownAt(f, leaderRank)} of ${f.name}.`);

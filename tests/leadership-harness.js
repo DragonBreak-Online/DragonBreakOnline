@@ -207,6 +207,27 @@ ok('a player is refused the command', told.length === 1 && /Staff only/.test(tol
 told.length = 0; commands.leadership.f(LEAD, 'nonsense');
 ok('an unknown subcommand gets the usage', told.some(([, t]) => /Usage: \/leadership audit/.test(t)));
 
+told.length = 0; commands.leadership.f(LEAD, 'cooldowns');
+ok('/leadership cooldowns lists no cooldowns when empty', told.some(([, t]) => /No characters currently on leadership cooldown/.test(t)));
+
+const testCooldownActor = 0xff0006d7;
+const coolData = JSON.parse(fs.readFileSync(COOL_FILE, 'utf8'));
+coolData.lost = coolData.lost || {};
+coolData.lost[String(testCooldownActor)] = Date.now();
+fs.writeFileSync(COOL_FILE, JSON.stringify(coolData));
+
+told.length = 0; commands.leadership.f(LEAD, 'cooldowns');
+ok('/leadership cooldowns lists the active cooldown', told.some(([, t]) => /ff0006d7/.test(t) && /14 day\(s\) remaining/.test(t)));
+
+told.length = 0; commands.leadership.f(COUNT, 'cooldown clear ff0006d7');
+ok('non-lead staff cannot clear cooldown', told.some(([, t]) => /Staff only|Only a Lead GM/.test(t)));
+
+told.length = 0; commands.leadership.f(LEAD, 'cooldown clear ff0006d7');
+ok('/leadership cooldown clear ff0006d7 clears the cooldown', told.some(([, t]) => /Cleared leadership cooldown/.test(t)));
+
+const coolAfter = JSON.parse(fs.readFileSync(COOL_FILE, 'utf8'));
+ok('cooldown file is updated', !coolAfter.lost || !coolAfter.lost[String(testCooldownActor)]);
+
 // ---- part 2: the real guilds.js refuses at each of its four leader paths ---------------------------------------------
 const { HousingSystem } = { };   // not used; keeps the shape of the other harnesses
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-nate-leadership-'));
