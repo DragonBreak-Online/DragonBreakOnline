@@ -7780,6 +7780,16 @@ const PARALYSIS_ARCHETYPE = 21, HIDE_IN_UI = 0x8000;
 const fieldsOf = (lr, type) => ((lr && lr.record && lr.record.fields) || []).filter((f) => f.type === type && f.data instanceof Uint8Array);
 const u32At = (f, off) => (f && f.data.byteLength >= off + 4 ? new DataView(f.data.buffer, f.data.byteOffset, f.data.byteLength).getUint32(off, true) : 0);
 const globalAt = (lr, local) => { try { return local ? lr.toGlobalRecordId(local) >>> 0 : 0; } catch (e) { return 0; } };
+const isAshShell = (lr) => {
+  if (!lr || !lr.record) return false;
+  if (lr.record.editorId === 'DLC2AshShell') return true;
+  for (const f of fieldsOf(lr, 'EFID')) {
+    const mgef = recordOf(globalAt(lr, u32At(f, 0)));
+    const edid = mgef && mgef.record && mgef.record.editorId;
+    if (edid === 'DLC2AshShellFFAimed' || edid === 'DLC2AshShellFFContact') return true;
+  }
+  return false;
+};
 // Longest visible Paralysis effect in an EFID/EFIT list, in seconds
 const paralysisIn = (lr) => {
   let seconds = 0; const efids = fieldsOf(lr, 'EFID'), efits = fieldsOf(lr, 'EFIT');
@@ -7799,6 +7809,8 @@ const explosionParalysisOf = (spellId) => {
   if (spell && spell.record.type === 'SCRL') seconds = paralysisIn(spell);
   // A staff's (ENCH) paralysis, which nothing applied on a player's own client (gearench.js caps it for PvP)
   else if (spell && spell.record.type === 'ENCH') seconds = paralysisIn(spell);
+  // Ash Shell: C++ DoCombatSpellApply does not freeze a player because Papyrus DLC2AshShellScript does not run
+  else if (spell && isAshShell(spell)) seconds = paralysisIn(spell) || 30;
   else if (spell && spell.record.type === 'SPEL' && !paralysisIn(spell)) {
     for (const f of fieldsOf(spell, 'EFID')) {
       const mgef = recordOf(globalAt(spell, u32At(f, 0)));
