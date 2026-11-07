@@ -99,6 +99,37 @@ module.exports = (api) => {
   let classified = null;
   let lastMtime = 0;
 
+  // The creation recipes the server itself loads, recipe desc -> { item, bench }: regions.json is built on an older load
+  // order and missed later plugins and every benchless recipe, which smithing.js still refuses (#bugs 1568049991400816704).
+  // No bench keyword counts as the forge, as CraftService does. Tempering stays EXTRA_RECIPES' explicit list. Null without the API
+  const TEMPER_BENCHES = new Set(['CraftingSmithingArmorTable', 'CraftingSmithingSharpeningWheel']);
+  let live = null;
+  const liveRecipes = () => {
+    if (live) return live;
+    if (typeof mp.getEspmRecordIdsByType !== 'function' || typeof mp.lookupEspmRecordById !== 'function') return null;
+    const started = Date.now();
+    const lookup = (id) => { try { const r = id ? mp.lookupEspmRecordById(id >>> 0) : null; return r && r.record ? r : null; } catch (e) { return null; } };
+    const u32 = (f) => (f && f.data && f.data.byteLength >= 4 ? new DataView(f.data.buffer, f.data.byteOffset, f.data.byteLength).getUint32(0, true) : 0);
+    const fieldId = (res, type) => { const v = u32((res.record.fields || []).find((x) => x && x.type === type)); try { return v ? res.toGlobalRecordId(v) >>> 0 : 0; } catch (e) { return 0; } };
+    const descOf = (id) => { try { return String(mp.getDescFromId(id >>> 0)); } catch (e) { return ''; } };
+    let ids = [];
+    try { ids = mp.getEspmRecordIdsByType('COBJ') || []; } catch (e) { return null; }
+    const benchName = new Map(), out = {};
+    for (const id of ids) {
+      const res = lookup(id); if (!res || String(res.record.type) !== 'COBJ') continue;
+      const item = fieldId(res, 'CNAM'); if (!item) continue;
+      const b = fieldId(res, 'BNAM');
+      if (!benchName.has(b)) { const k = b ? lookup(b) : null; benchName.set(b, b ? (k ? String(k.record.editorId || '') : '') : 'CraftingSmithingForge'); }
+      const bench = benchName.get(b);
+      if (TEMPER_BENCHES.has(bench)) continue;
+      const rd = descOf(id), idd = descOf(item);
+      if (rd && idd) out[rd] = { item: idd, bench };
+    }
+    live = out;
+    log(`craftfilter: read ${Object.keys(out).length} creation recipes from the load order in ${Date.now() - started} ms`);
+    return live;
+  };
+
   const loadRecipes = () => {
     try {
       const regMtime = fs.statSync(REGIONS_FILE).mtimeMs;
@@ -145,6 +176,9 @@ module.exports = (api) => {
     const smithList = [];   // { recipeDesc, itemDesc, family, tier }
 
     const allRecipes = Object.assign({}, recipes, EXTRA_RECIPES);
+    // The load order's recipes regions.json lacks, under the server's own desc
+    const listed = new Set(Object.keys(allRecipes).map(norm));
+    for (const [rd, r] of Object.entries(liveRecipes() || {})) if (!listed.has(norm(rd))) allRecipes[rd] = r;
 
     for (const [rDesc, r] of Object.entries(allRecipes)) {
       const iDesc = norm(r.item);
@@ -274,10 +308,14 @@ module.exports = (api) => {
       }
     }
 
-    // 3. Smithing forge / smelter / temper filter
+    // 3. Smithing forge / smelter / temper filter, by smithing.js's own tier and technique rule where it is loaded: this
+    // file's own rule missed a family worked with a free family's technique and hid 5 Imperial bows the forge allows
+    const smithKnows = typeof globalThis.__dboSmithKnows === 'function' ? globalThis.__dboSmithKnows : null;
+    const smithTier = typeof globalThis.__dboSmithFamilyTier === 'function' ? globalThis.__dboSmithFamilyTier : null;
     for (const r of smithList) {
-      if (r.tier > 1) {
-        if (cTier < r.tier || !knowsSmithFamily(a, r.family)) {
+      const tier = (smithTier && smithTier(r.family.id)) || r.tier;
+      if (tier > 1) {
+        if (cTier < tier || !(smithKnows ? smithKnows(a, r.family.id) : knowsSmithFamily(a, r.family))) {
           const fg = fgNorm[r.itemDesc];
           if (fg && isFactionCrafter(fg.factions || [], 'blacksmith')) {
             continue;
