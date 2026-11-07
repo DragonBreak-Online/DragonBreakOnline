@@ -112,6 +112,14 @@ for (const r of ancientNordTemper) {
   ok(!lockedOf(P_JOURNEY).has('2abe:Immersive Weapons.esp'), 'a tier 2 smith with no manuals sees the Springsteel Bow: Imperial is worked with the free Steel technique, as the forge allows');
   ok(lockedOf(P_NOVICE).has('2abe:Immersive Weapons.esp'), '...while a tier 1 smith does not');
   ok(!masterLocked.has('b6a:DragonBreak Nexus Patches.esp') && lockedOf(P_MASTER).has('fff1:Test.esp'), '...and the earlier checks still stand alongside');
+  // The technique rule reads the actor's race and manuals: asked once per family, never per recipe (live 7 Nov: 12 s stalls)
+  const realKnows = globalThis.__dboSmithKnows; let asked = 0;
+  globalThis.__dboSmithKnows = (p, f) => { asked++; return realKnows(p, f); };
+  const families = new Set(Object.values(JSON.parse(fs.readFileSync(path.join(ROOT, 'loot-materials.json'), 'utf8')).items)).size;
+  globalThis.__dboCraftFilterLogin(P_MASTER);
+  ok(asked > 0 && asked <= families, `a sync asks the technique rule at most once per family (${families}), not per recipe`, asked);
+  ok(lockedOf(P_MASTER).has('fff1:Test.esp') && !lockedOf(P_MASTER).has('b6a:DragonBreak Nexus Patches.esp'), '...with the same answer as before');
+  globalThis.__dboSmithKnows = realKnows;
   try { clearInterval(globalThis.__dboSmithCarryTimer); } catch (e) { /* none */ }
 }
 

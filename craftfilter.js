@@ -312,10 +312,15 @@ module.exports = (api) => {
     // file's own rule missed a family worked with a free family's technique and hid 5 Imperial bows the forge allows
     const smithKnows = typeof globalThis.__dboSmithKnows === 'function' ? globalThis.__dboSmithKnows : null;
     const smithTier = typeof globalThis.__dboSmithFamilyTier === 'function' ? globalThis.__dboSmithFamilyTier : null;
+    // Once per family, never per recipe: each answer reads the actor's race and manuals, and 2,830 recipes for every player
+    // at once after a reload held the server's loop for 12 s (live, 7 Nov 00:30 and 01:42: 'craftfilter 1x max 12418')
+    const tierOf = new Map(), knows = new Map();
+    const famTier = (r) => { if (!tierOf.has(r.family.id)) tierOf.set(r.family.id, (smithTier && smithTier(r.family.id)) || r.tier); return tierOf.get(r.family.id); };
+    const famKnown = (r) => { if (!knows.has(r.family.id)) knows.set(r.family.id, smithKnows ? smithKnows(a, r.family.id) : knowsSmithFamily(a, r.family)); return knows.get(r.family.id); };
     for (const r of smithList) {
-      const tier = (smithTier && smithTier(r.family.id)) || r.tier;
+      const tier = famTier(r);
       if (tier > 1) {
-        if (cTier < tier || !(smithKnows ? smithKnows(a, r.family.id) : knowsSmithFamily(a, r.family))) {
+        if (cTier < tier || !famKnown(r)) {
           const fg = fgNorm[r.itemDesc];
           if (fg && isFactionCrafter(fg.factions || [], 'blacksmith')) {
             continue;
