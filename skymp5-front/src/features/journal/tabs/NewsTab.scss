@@ -1,0 +1,33 @@
+// The journal's What's new tab: the patch notes one entry under another, the pager at the foot
+@import '../../../dbo-theme.scss';
+
+.jnews {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 760px;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 12px;
+
+  &__entry { padding-bottom: 10px; border-bottom: 1px solid dbo-accent(0.2); }
+  &__title { margin: 0; color: $dbo-gold; font-size: 19px; font-weight: 500; }
+  &__meta { display: flex; gap: 10px; align-items: center; color: $dbo-text-dim; font-size: 13px; margin: 2px 0 6px; }
+  &__tag { padding: 1px 8px; border: 1px solid $dbo-gold-border; color: $dbo-gold; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+  &__heading { margin: 6px 0 2px; color: $dbo-silver; font-size: 15px; font-weight: 500; }
+  &__items { margin: 0; padding-left: 18px; color: $dbo-silver; font-size: 14px; line-height: 1.45; }
+  &__items li + li { margin-top: 4px; }
+  &__pager { display: flex; gap: 14px; align-items: center; justify-content: center; padding: 4px 0 8px; }
+  &__where { color: $dbo-text-dim; font-size: 13px; }
+  &__button {
+    padding: 4px 16px;
+    border: 1px solid $dbo-gold-border;
+    background: $dbo-gold-fill;
+    color: $dbo-gold;
+    font-size: 14px;
+    cursor: pointer;
+    &:hover:not(:disabled) { background: $dbo-gold-fill-hover; }
+    &:disabled { opacity: 0.45; cursor: default; }
+  }
+}

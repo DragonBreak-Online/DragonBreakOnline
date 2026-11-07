@@ -17,3 +17,4 @@ import './tabs/CitizenTab';
 import './tabs/ReferralsTab';
 import './tabs/WantedTab';
 import './tabs/NotesTab';
+import './tabs/NewsTab';
