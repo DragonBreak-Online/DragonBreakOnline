@@ -105,9 +105,9 @@ module.exports = (api) => {
     try { const r = mp.lookupEspmRecordById(id); return !!(r && r.record && String(r.record.type) === 'WEAP'); } catch (e) { return false; }
   };
   const idOf = (desc) => { try { return mp.getIdFromDesc(desc) >>> 0; } catch (e) { log(`downed: ${desc} not in the load order`); return 0; } };
-  // Restoration spells that heal another: aimed ones revive what they hit, Grand Healing everyone close by
-  const AIMED = new Set([idOf('12fd2:Skyrim.esm'), idOf('4d3f2:Skyrim.esm')].filter(Boolean));   // HealOther, HealingHands
-  const AREA = new Set([idOf('b62ee:Skyrim.esm'), idOf('101064:Skyrim.esm')].filter(Boolean));   // GrandHealing, left hand
+  // Restoration spells and scrolls that heal another: aimed ones revive what they hit, Grand Healing everyone close by
+  const AIMED = new Set([idOf('12fd2:Skyrim.esm'), idOf('4d3f2:Skyrim.esm'), idOf('a44c1:Skyrim.esm')].filter(Boolean));   // HealOther, HealingHands, HealOtherScroll
+  const AREA = new Set([idOf('b62ee:Skyrim.esm'), idOf('101064:Skyrim.esm'), idOf('a44c4:Skyrim.esm')].filter(Boolean));   // GrandHealing, left hand, GrandHealingScroll
 
   const isPlayer = (a) => { try { return Number(mp.get(a, 'profileId')) >= 0; } catch (e) { return false; } };
   const isDead = (a) => { try { return mp.get(a, 'isDead') === true; } catch (e) { return false; } };
