@@ -3620,76 +3620,131 @@ const onCharacterReady = (userId, a) => {
   setTimeout(() => { if (actorOf(userId) === a && !creationPending(a)) { try { redress(a); } catch (e) { log('redress failed', e.message); } } }, 12000);
   setTimeout(timed('loginSetup', () => {
     if (actorOf(userId) !== a) return;
+    // Which step holds a login (7 Nov: loginSetup 1.4-3.9 s a login, 16 s at worst, and no line said where)
+    let lapAt = performance.now(); const laps = [];
+    const lap = (name) => { const now = performance.now(); if (now - lapAt > 100) laps.push(`${name} ${Math.round(now - lapAt)} ms`); lapAt = now; };
     try { mp.set(a, ADMIN_PROP, staffCan(a, 'adminchat')); } catch (e) { /* ignore */ }
+    lap('adminFlag');
     if (staffCan(a, 'adminchat')) resyncAdminFlag(userId, a);
+    lap('adminResync');
     if (cfg.welcome) system(a, cfg.welcome);
+    lap('welcome');
     audit(`JOIN ${who(a)}${staffTierOf(a) ? ' as ' + staffTierOf(a) : ''}${staffCharOf(a) ? ' (staff character)' : ''}`);
+    lap('audit');
     startLoginGrace(a);
+    lap('startLoginGrace');
     if (staffCharOf(a)) personal(a, 'This is your GM character: for staff work only, not for play.');
     else if (staffTierOf(a)) { try { const g = staffGuard(); if (g && !g.powersOn(a)) personal(a, `This is not your staff character, so staff powers are off here. ${g.NOT_HERE.replace(/^Staff powers work only on your staff character\. /, '')}`); } catch (e) { /* the rules are optional */ } }
+    lap('staffNotice');
     sendDriftConfig(a);
+    lap('sendDriftConfig');
     sendConsoleRights(a, true);
+    lap('sendConsoleRights');
     if (creationPending(a)) startCreationInHub(a);
     else if (mp.get(a, 'private.kitPending') === true && moveToHubIfLanding(a)) log(`moved ${display(a)} from the landing point into the hub`);
+    lap('creationOrHub');
     // Waking from a bed (rest.js) before the hunger stage is applied
     try { if (globalThis.__dboRestLogin) globalThis.__dboRestLogin(a); } catch (e) { log('rest login failed', e.message); }
+    lap('RestLogin');
     // Gear above the loot cap becomes its steel equivalent, once (gearswap.js)
     try { if (globalThis.__dboGearSwapLogin) globalThis.__dboGearSwapLogin(a); } catch (e) { log('gear swap login failed', e.message); }
+    lap('GearSwapLogin');
     try { if (globalThis.__dboSprStripLogin) globalThis.__dboSprStripLogin(a); } catch (e) { log('spr strip login failed', e.message); }
+    lap('SprStripLogin');
     try { if (globalThis.__dboGearStripLogin) globalThis.__dboGearStripLogin(a); } catch (e) { log('gear strip login failed', e.message); }
+    lap('GearStripLogin');
     try { if (globalThis.__dboRestitutionLogin) globalThis.__dboRestitutionLogin(a); } catch (e) { log('restitution login failed', e.message); }
+    lap('RestitutionLogin');
     try { if (globalThis.__dboDisciplineLogin) globalThis.__dboDisciplineLogin(a); } catch (e) { log('discipline login failed', e.message); }
+    lap('DisciplineLogin');
     try { if (globalThis.__dboBusinessLogin) globalThis.__dboBusinessLogin(a); } catch (e) { log('business login failed', e.message); }
+    lap('BusinessLogin');
     try { if (globalThis.__dboJailLogin) globalThis.__dboJailLogin(a); } catch (e) { log('jail login failed', e.message); }
+    lap('JailLogin');
     try { if (globalThis.__dboStaffDiagLogin) globalThis.__dboStaffDiagLogin(a); } catch (e) { log('staff trace on login failed', e.message); }
+    lap('StaffDiagLogin');
     // Spells taken out of the game (spells.js removedSpells: Transmute) leave whoever knows them
     try { if (globalThis.__dboSpellsStripRemoved) globalThis.__dboSpellsStripRemoved(a); } catch (e) { log('removed spells strip failed', e.message); }
+    lap('SpellsStripRemoved');
     needsOnConnect(a);
+    lap('needsOnConnect');
     // The armour debuff (debuff mode) is told to this client again by the next re-check
     try { if (globalThis.__dboWearConnect) globalThis.__dboWearConnect(a); } catch (e) { log('armour wear connect failed', e.message); }
+    lap('WearConnect');
     if (globalThis.__dboPlayerMenuReady) globalThis.__dboPlayerMenuReady(a);
+    lap('PlayerMenuReady');
     // A lease that ended while the player was offline never told this client to stop glowing
     try { if (globalThis.__dboGlowClear) globalThis.__dboGlowClear(a); } catch (e) { log('glow clear failed', e.message); }
+    lap('GlowClear');
     // Camp chests with a roll waiting light up again at once instead of on the next 30 s tick (wildlife.js)
     try { if (globalThis.__dboCampGlow) globalThis.__dboCampGlow(a); } catch (e) { log('camp glow failed', e.message); }
+    lap('CampGlow');
     try { if (globalThis.__dboSaltGlow) globalThis.__dboSaltGlow(a); } catch (e) { log('salt glow failed', e.message); }
+    lap('SaltGlow');
     // Anyone who logs in inside a dungeon they no longer hold is put back outside its entrance
     try { if (globalThis.__dboDungeonLoginCheck) globalThis.__dboDungeonLoginCheck(a); } catch (e) { log('dungeon login check failed', e.message); }
+    lap('DungeonLoginCheck');
     giveStarterKit(a);
+    lap('giveStarterKit');
     try { indexName(a); } catch (e) { /* offline lookup only */ }
+    lap('indexName');
     try { if (globalThis.__dboFactionLogin) globalThis.__dboFactionLogin(a); } catch (e) { log('faction login failed', e.message); }
+    lap('FactionLogin');
     try { if (globalThis.__dboWorldStatsSeen) globalThis.__dboWorldStatsSeen(a); } catch (e) { /* stats only */ }
+    lap('WorldStatsSeen');
     const waiting = pigeonsWaiting(a);
+    lap('pigeonsWaiting');
     if (waiting) personal(a, `${waiting} unread letter${waiting === 1 ? '' : 's'} wait${waiting === 1 ? 's' : ''} for you at the notice boards.`);
+    lap('pigeonNotice');
     sendMailState(a);
+    lap('sendMailState');
     // What the heralds have cried near you (heralds.js)
     try { if (typeof globalThis.__dboHeraldLogin === 'function') globalThis.__dboHeraldLogin(a); } catch (e) { log('herald login line failed', e.message); }
+    lap('HeraldLogin');
     // The standing orders of the character's factions (rosters.js)
     try { if (typeof globalThis.__dboRosterLogin === 'function') globalThis.__dboRosterLogin(a); } catch (e) { log('orders login line failed', e.message); }
+    lap('RosterLogin');
     try { pushHud(a, needsOf(a), true); } catch (e) { /* hud later */ }
+    lap('pushHud');
     try { if (globalThis.__dboPartyLogin) globalThis.__dboPartyLogin(a); } catch (e) { log('party login failed', e.message); }
+    lap('PartyLogin');
     sendFavorites(a);
+    lap('sendFavorites');
     try { if (globalThis.__dboCharLevelLogin) globalThis.__dboCharLevelLogin(a); } catch (e) { log('level login failed', e.message); }
+    lap('CharLevelLogin');
     // No birthsign yet: the choice comes up a moment after login (birthsigns.js)
     try { if (globalThis.__dboBirthsignLogin) globalThis.__dboBirthsignLogin(a); } catch (e) { log('birthsign login failed', e.message); }
+    lap('BirthsignLogin');
     try { if (globalThis.__dboBoostLogin) globalThis.__dboBoostLogin(a); } catch (e) { log('boost login failed', e.message); }
+    lap('BoostLogin');
     try { if (globalThis.__dboEnchLearnedLogin) globalThis.__dboEnchLearnedLogin(a); } catch (e) { log('learned enchantments login failed', e.message); }
+    lap('EnchLearnedLogin');
     // A shrine blessing still running is cast on the player again: the client's effect did not survive the logout (prayer.js)
     try { if (globalThis.__dboPrayerLogin) globalThis.__dboPrayerLogin(a); } catch (e) { log('prayer login failed', e.message); }
+    lap('PrayerLogin');
     try { if (globalThis.__dboBriarheartLogin) globalThis.__dboBriarheartLogin(a); } catch (e) { log('briarheart login failed', e.message); }
+    lap('BriarheartLogin');
     try { if (globalThis.__dboHagravenLogin) globalThis.__dboHagravenLogin(a); } catch (e) { log('hagraven login failed', e.message); }
+    lap('HagravenLogin');
     // The first spell: a mage at Arcane Arts 25 with no school is offered the choice, one with a school and no spell gets its starter (schools.js)
     try { if (globalThis.__dboSchoolsLogin) globalThis.__dboSchoolsLogin(a); } catch (e) { log('schools login failed', e.message); }
+    lap('SchoolsLogin');
     try { if (globalThis.__dboCraftFilterLogin) globalThis.__dboCraftFilterLogin(a); } catch (e) { log('craftfilter login failed', e.message); }
+    lap('CraftFilterLogin');
     // The election notice of the current phase for a citizen of a hold that is choosing its Jarl, once per character (citizenship.js)
     try { if (globalThis.__dboCitizenLogin) globalThis.__dboCitizenLogin(a); } catch (e) { log('citizen notice login failed', e.message); }
+    lap('CitizenLogin');
     // Vault fees, and any word of a vault warned or seized while they were away (bank.js)
     try { if (globalThis.__dboBankLogin) globalThis.__dboBankLogin(a); } catch (e) { log('bank login failed', e.message); }
+    lap('BankLogin');
     // A duel's wager a restart or a failed payment left held goes back (duel.js)
     try { if (globalThis.__dboDuelLogin) globalThis.__dboDuelLogin(a); } catch (e) { log('duel login failed', e.message); }
+    lap('DuelLogin');
     // A free appearance change waiting, once per character, never while one is still being made (appearance.js)
     try { if (globalThis.__dboAppearanceFreeLogin && !creationPending(a) && !inCreatorRealm(a)) globalThis.__dboAppearanceFreeLogin(a); } catch (e) { log('free appearance notice failed', e.message); }
-  }), 8000);
+    lap('AppearanceFreeLogin');
+
+    if (laps.length) log(`loginSetup slow steps for ${display(a)}: ${laps.join(', ')}`);  }), 8000);
 };
 const startLoginWait = (userId, seenActor) => {
   const old = globalThis.__dboLoginWaits.get(userId);
