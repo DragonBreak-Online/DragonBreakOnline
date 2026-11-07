@@ -2,7 +2,8 @@
 // replay of 20 minutes of live stored percentages with the casts made in them (tests/fixtures/anticheat-vitals-sample1.json,
 // anonymised) pins none; a client frozen at full magicka is flagged; Fortify gear of the school, a potion, a well, a refill,
 // a held charge, a concentration channel and a server freeze are not; concentration taps and casts under a magicka regen
-// potion pin only on a bar frozen to the bit (6 Nov); each spell's record is read once. stamina_free:
+// potion pin only on a bar frozen to the bit, and concentration pins alone never flag, so Wall of Flames tapped under regen
+// on a client that reports as sendInputsService does is not flagged (6 Nov); each spell's record is read once. stamina_free:
 // frozen stamina through a 25 s sprint is flagged (shadow), a draining one is not. refuseHits: off by default, and on, a
 // flagged caster's spell hits are refused while weapon hits are not.
 //   node tests/anticheat-vitals-harness.js   (from server/)
@@ -179,13 +180,14 @@ for (const minCost of [30, 10]) {
 }
 // ---- concentration taps and magicka regen potions (6 Nov) -----------------------------------------------------------------------
 // a quarter-second tap of Detect Life (SPIT 200 a second) is regenerated before the client's next report of the bar
-const DETECT = 0x211ee, BOLT = 0x7a001, REGEN_FX = 0x3eb07, RESTORE_FX = 0x3eb17, DAMAGE_REGEN_FX = 0x7a201;
+const DETECT = 0x211ee, BOLT = 0x7a001, WALL = 0x7a002, REGEN_FX = 0x3eb07, RESTORE_FX = 0x3eb17, DAMAGE_REGEN_FX = 0x7a201;
 const REGEN_POT = 0x7a101, LONG_POT = 0x7a102, RESTORE_POT = 0x7a103, REGEN_ROOT = 0x7a104, SAP = 0x7a105, FORTIFY_POT = 0x7a106, FORTIFY_FX = 0x3eb08;
 const setupRegen = (anticheat) => {
   const S = setup(anticheat);
   const { W } = S;
   W.spell(DETECT, 'DetectLife', { cost: 200, castType: 2, school: 18 });
   W.spell(BOLT, 'CostlyBolt', { cost: 200, school: 20 });
+  W.spell(WALL, 'WallOfFlames', { cost: 118, castType: 2, school: 20 });
   W.mgef(REGEN_FX, 'AlchFortifyMagickaRate', { archetype: 0, av: 156 });
   W.mgef(RESTORE_FX, 'AlchRestoreMagicka', { archetype: 0, av: 25 });
   W.mgef(FORTIFY_FX, 'AlchFortifyMagicka', { archetype: 34, av: 25 });
@@ -232,13 +234,21 @@ const mfLines = (H) => acLines(H).filter((l) => /magicka_free/.test(l));
     'a fire-and-forget spell of cost 200 every 3 s, the same moving bar, no potion: flagged at the 8th cast as before', L[0]);
 }
 {
-  // a frozen bar spamming Detect Life: still caught, on the frozen-bar path
-  const S = setupRegen({});
-  const { ev } = taps(S, DETECT, 500, 120500, false);
-  playTo(S.H, S.W, S.H.t0 + 160000, ev);
-  const L = mfLines(S.H);
-  ok(!!L[0] && /: 8 costly casts in 10 min at full magicka with no drop after \(DetectLife; 1600 spell cost in all\), stored magicka 1\.000-1\.000 through each/.test(L[0]),
-    'Detect Life spammed every 3 s on a bar frozen at exactly 1.000: flagged at the 8th cast', L[0]);
+  // a frozen bar spamming Detect Life: pinned on the frozen-bar path, but concentration pins alone are not flagged
+  const S = setupRegen({ magicka: { refuseHits: true } });
+  const { ev } = taps(S, DETECT, 500, 60500, false);
+  playTo(S.H, S.W, S.H.t0 + 100000, ev);
+  ok(pinned(S.G, A) === 20 && !mfLines(S.H).length && S.W.mp.onHitDamageAttempt(A, B, DETECT, 30, { spell: true }) === true,
+    `Detect Life spammed every 3 s on a bar frozen at exactly 1.000: ${pinned(S.G, A)} pinned, no flag (an honest tap refilled before the first report looks the same)`, { pinned: pinned(S.G, A), lines: mfLines(S.H) });
+  // the same frozen bar with a fire-and-forget cast among them: the concentration pins count toward its flag
+  const S2 = setupRegen({});
+  const { ev: ev2 } = taps(S2, DETECT, 500, 120500, false);
+  ev2.push([S2.H.t0 + 2000, A, BOLT]);
+  ev2.sort((x, y) => x[0] - y[0]);
+  playTo(S2.H, S2.W, S2.H.t0 + 160000, ev2);
+  const L = mfLines(S2.H);
+  ok(!!L[0] && /: 8 costly casts in 10 min at full magicka with no drop after \((DetectLife, CostlyBolt|CostlyBolt, DetectLife); 1600 spell cost in all\), stored magicka 1\.000-1\.000 through each/.test(L[0]),
+    '...the same frozen bar with one fire-and-forget cast of cost 200 among the taps: flagged at the 8th pinned cast', L[0]);
 }
 {
   // a +150% regen potion of 300 s, then a cost 200 spell every 3 s on a moving bar: no flag in the window, old rules after
@@ -285,6 +295,57 @@ const mfLines = (H) => acLines(H).filter((l) => /magicka_free/.test(l));
   S3.H.clock.t += 7000; S3.W.mp.onSpellCast(A, BOLT);
   ok(!(st3.regenUntil > 0) && st3.lastRefill === S3.H.clock.t - 7000 && pend(S3.G, A) === 1 && st3.casts[0].frozenOnly === false,
     'a Restore Magicka potion, a Fortify Magicka one of 60 s, an ingredient whose regen effect is not its first, a detrimental regen effect: the 6 s skip only, no regen window', { regenUntil: st3.regenUntil, casts: st3.casts });
+}
+// a client reporting its bar as sendInputsService does: a changed value only, once a second at most, none while casting or 500 ms after
+const clientBar = (S, o) => {
+  // regen runs throughout, 3% of the pool a second x (1 + bonus); a cast costs mult x SPIT, a second while held if concentration
+  const { W, H } = S, step = 20, regen = (0.03 * (1 + o.bonus) * step) / 1000;
+  const c = { t: H.t0, m: 1, sent: 1, sentAt: -1e9, castAt: -1e9, k: 0, cur: null, reads: [] };
+  W.set(A, 'percentages', () => {
+    while (c.t + step <= H.clock.t) {
+      c.t += step;
+      while (c.k < o.casts.length && H.t0 + o.casts[c.k][0] <= c.t) { c.cur = o.casts[c.k++]; if (!c.cur[3]) c.m -= (c.cur[1] * o.mult) / o.pool; }
+      // IsCasting* is already set in the frame the first magicka is spent
+      if (c.cur && c.t < H.t0 + c.cur[0] + c.cur[2]) { c.castAt = c.t; if (c.cur[3]) c.m -= (c.cur[1] * o.mult * step) / 1000 / o.pool; }
+      c.m = Math.max(0, Math.min(1, c.m + regen));
+      if (c.m !== c.sent && c.t - c.sentAt >= 1000 && c.t - c.castAt >= 500) { c.sent = c.m; c.sentAt = c.t; if (c.m < 1) c.reads.push(c.m); }
+    }
+    return { health: 1, magicka: c.sent, stamina: 1 };
+  });
+  return c;
+};
+// tap held times, 210-530 ms with a median of 270 (the 6 Nov trace)
+const HELD = [270, 240, 310, 210, 280, 530, 260, 330, 250, 270, 420, 230, 290, 260, 480, 270];
+// `spell` every `every` ms (plus up to 400 ms) up to `to`, on clientBar, a potion drunk at 0 and every 300 s if `potion`
+const clientPlay = (S, o) => {
+  const { W, H, G } = S, casts = [], ev = [], n = { judged: 0, pins: 0 }, st = G.ST.players.get(A), push = st.pinned.push;
+  st.pinned.push = function (...x) { n.pins += x.length; return push.apply(this, x); };
+  for (let i = 0; ; i++) {
+    const at = 7000 + i * o.every + ((i * 7) % 5) * 100;
+    if (at >= o.to) break;
+    // [ms after t0, SPIT cost, ms held, concentration]
+    casts.push([at, o.cost, o.held ? o.held[i % o.held.length] : 300, o.conc]);
+    ev.push([H.t0 + at, A, 0, () => { const k = pend(G, A); W.mp.onSpellCast(A, o.spell); if (pend(G, A) > k) n.judged++; }]);
+  }
+  if (o.potion) for (let t = 300000; t < o.to; t += 300000) ev.push([H.t0 + t, A, 0, () => W.mp.onEatItem(A, o.potion)]);
+  ev.sort((x, y) => x[0] - y[0]);
+  // 0.35 x SPIT a second: the 6 Nov Detect Life taps' 15-20 magicka for a quarter second
+  const c = clientBar(S, Object.assign({ casts, mult: 0.35 }, o));
+  if (o.potion) W.mp.onEatItem(A, o.potion);
+  playTo(H, W, H.t0 + o.to + 40000, ev);
+  return Object.assign(n, { casts: casts.length, reads: c.reads, lines: mfLines(H) });
+};
+for (const [what, o] of [
+  ['under a +150% regen potion, pool 280', { pool: 280, bonus: 1.5, potion: REGEN_POT }],
+  ['under a +150% regen potion, pool 400', { pool: 400, bonus: 1.5, potion: REGEN_POT }],
+  ['with +150% regen from gear (no potion, no window), pool 280', { pool: 280, bonus: 1.5 }],
+]) {
+  // Wall of Flames tapped: most taps are regenerated before the first report, so the stored value never moves
+  const S = setupRegen({ magicka: { refuseHits: true } });
+  const r = clientPlay(S, Object.assign({ spell: WALL, cost: 118, conc: true, every: 3000, to: 600000, held: HELD }, o));
+  ok(r.judged >= 150 && r.pins >= 30 && !r.lines.length && S.W.mp.onHitDamageAttempt(A, B, WALL, 30, { spell: true }) === true,
+    `Wall of Flames tapped 0.21-0.53 s every 3 s for 10 min ${what}, the client reporting as sendInputsService does: ${r.judged} taps judged, ${r.pins} pinned with the value unchanged, no flag, spell hits on players land`,
+    { judged: r.judged, pins: r.pins, reads: r.reads.length, lines: r.lines.slice(0, 2) });
 }
 
 // ---- each spell record is read once ---------------------------------------------------------------------------------------------

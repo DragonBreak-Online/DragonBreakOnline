@@ -200,6 +200,16 @@ const wobble = (W, s) => W.set(A, 'percentages', { health: 1, magicka: s % 2 ? 0
 }
 {
   const { W, H } = setup({});
+  castEvery(H, W, A, 600, 2, DETECT);
+  const got = verdict(H, 'magicka_');
+  note('magicka frozen at full, costly concentration casts only (Detect Life every 2 s)', got);
+  ok(got === 'MISS', 'a bar frozen at full with concentration casts only: residual (6 Nov, an honest tap refilled before the first report looks the same); the fork budget catches it', acLines(H));
+  const { W: W2, H: H2 } = setup({});
+  castEvery(H2, W2, A, 120, 3, DETECT, (s) => { if (s % 10 === 1) W2.mp.onSpellCast(A, FIREBALL); });
+  ok(verdict(H2, 'magicka_') === 'ALERT', '...the same frozen bar with Detect Life every 3 s and a Fireball every 10 s still alerts', acLines(H2).slice(0, 1));
+}
+{
+  const { W, H } = setup({});
   castEvery(H, W, A, 600, 2, FIREBALL, (s) => { if (s % 300 === 1) W.mp.onEatItem(A, POTION_REGEN); wobble(W, s); });
   const got = verdict(H, 'magicka_');
   note('a bar wobbling 0.996-1.000 with a regen potion drunk every 5 min, Fireball every 2 s', got);

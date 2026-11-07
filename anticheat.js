@@ -584,7 +584,8 @@ module.exports = (api) => {
     let cost = 0, lo = 1, hi = 0;
     const names = [];
     for (const e of st.pinned) { cost += e.cost; lo = Math.min(lo, e.min); hi = Math.max(hi, e.max); if (names.length < 4 && !names.includes(e.spell)) names.push(e.spell); }
-    if (st.pinned.length < MG.flagCount || cost < MG.flagMinCost) return;
+    // a concentration tap refilled before the client's first report leaves the trace a frozen bar does: never flagged alone
+    if (st.pinned.length < MG.flagCount || cost < MG.flagMinCost || st.pinned.every((e) => e.conc)) return;
     // Sustained, never a burst: refused only at the refuseAfterFlags-th flag minute within refuseFlagWindowMs (each one
     // already 8+ costly casts in 10 min at pinned magicka). Replayed on the 231 flags of 18-31 Oct: 3 in 10 min refuses the
     // one cheat 18 times and no one else; the one staff member flagged is spared by refuseStaff
