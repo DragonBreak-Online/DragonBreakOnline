@@ -26,6 +26,7 @@ export interface NativeOpen {
 }
 import { withClientUiCaps } from "../../lib/clientUiCaps";
 import { ChatService } from "./chatService";
+import { panelLog } from "./panelLog";
 
 // A real Skyrim Scaleform panel driven from the server, instead of the CEF overlay (Nat, 25 Oct).
 //
@@ -435,6 +436,8 @@ export class ScaleformMenuService extends ClientListener {
           // gate on the frame, which left every panel blank. Do not gate on the frame.
           this.sp.Ui.openCustomMenu(a.swf, 0);
           logTrace(this, "openCustomMenu", a.swf);
+          panelLog(this.sp, "open", a.swf);
+          this.panelUp = a.swf;
         } else if (a.do === "push") {
           // the screen's size first, so the panel can fit itself even where Stage.visibleRect misleads (lib dboFit)
           const screen = this.screenSize();
@@ -455,6 +458,8 @@ export class ScaleformMenuService extends ClientListener {
           }
         } else if (a.do === "close") {
           this.sp.Ui.closeCustomMenu();
+          panelLog(this.sp, "close", this.panelUp);
+          this.panelUp = "";
         } else if (a.do === "invoke") {
           if (this.state.phase === "ready" && this.state.swf === a.swf) this.sp.Ui.invokeString(MENU_NAME, a.target, a.arg);
         } else {
@@ -580,4 +585,7 @@ export class ScaleformMenuService extends ClientListener {
   // each payload sent in pieces takes the next id, so the panel can tell a new set from a late piece of an old one
   private chunkSeq = 0;
   private localKeys: ((key: string, args: unknown[]) => void) | null = null;
+
+  // the swf last opened, for the panel log line when it closes (a close action names none)
+  private panelUp = "";
 }

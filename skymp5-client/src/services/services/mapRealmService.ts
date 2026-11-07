@@ -15,6 +15,7 @@ import {
   anchorClips, drawingOf, fitOf, anchorIndex, legendRow, readOwners, worldFor, Anchor, Drawing, Homography, HOM_MIN, MAX_FIT_RMS, Seen,
   homographyOf, homHolds, homShift, projectDrawing, Fit, ClipTransform, fitHolds, clipTransform, trackOf, trackTransform,
 } from "./mapOwners";
+import { panelLog } from "./panelLog";
 
 // for the browser-side widget setter (executed inside the CEF browser)
 declare const window: any;
@@ -673,8 +674,8 @@ export class MapRealmService extends ClientListener {
     return !!o && typeof o.open === "function" && typeof o.menuName === "string";
   }
   private get menu(): string { return this.overlay ? (this.sp as any).overlayMenu.menuName : LEGEND_MENU; }
-  private openMenu(swf: string): void { if (this.overlay) (this.sp as any).overlayMenu.open(swf); else this.sp.Ui.openCustomMenu(swf, 0); }
-  private closeMenu(): void { if (this.overlay) (this.sp as any).overlayMenu.close(); else this.sp.Ui.closeCustomMenu(); }
+  private openMenu(swf: string): void { if (this.overlay) (this.sp as any).overlayMenu.open(swf); else this.sp.Ui.openCustomMenu(swf, 0); panelLog(this.sp, "open", swf); }
+  private closeMenu(): void { if (this.overlay) (this.sp as any).overlayMenu.close(); else this.sp.Ui.closeCustomMenu(); panelLog(this.sp, "close", LEGEND_SWF.replace(/\.swf$/i, "")); }
   private mapShutTicks = 0;
   private mapSeen = false;
   private orphans = 0;
