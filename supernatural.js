@@ -934,11 +934,33 @@ module.exports = (api) => {
   // worn, and what is carried (mailed away). Silver weapons by keyword (isSilverSource) are never excluded
   const NOT_SILVER = /quicksilver|silver[-_ ]?(blood|eyes?|plow|hand|tooth|side|bird)|schematic/i;
   const silverCache = new Map();
+  // Made of silver whatever its editor id says: an item whose recipe's main material is the silver ingot, read from
+  // salvage.json (tooling/make_salvage.py builds it from the load order, so new plugins are covered when it is rebuilt).
+  // The vanilla circlets are ClothesCirclet02 and 06 (Silver and Moonstone, Silver and Sapphire): the editor id test
+  // never saw them, and werewolves and vampires wore them (#bugs, Payne 3 Nov; Kaito 3 Nov). A recipe with silver as a
+  // lesser part (a mod armour's trim) is not counted.
+  const SILVER_INGOT = '5ace3:Skyrim.esm';
+  let silverMade = null;
+  const madeOfSilver = (id) => {
+    if (!silverMade) {
+      silverMade = new Set();
+      try {
+        const items = (JSON.parse(fs.readFileSync(path.resolve('salvage.json'), 'utf8')) || {}).items || {};
+        for (const [desc, e] of Object.entries(items)) {
+          const main = Array.isArray(e) && Array.isArray(e[2]) && Array.isArray(e[2][0]) ? e[2][0][0] : '';
+          if (main !== SILVER_INGOT) continue;
+          const x = idOf(desc);
+          if (x) silverMade.add(x);
+        }
+      } catch (e) { log('supernatural: salvage.json unreadable, silver by editor id and keyword only', e.message); }
+    }
+    return silverMade.has(Number(id) >>> 0);
+  };
   const isSilverItem = (id) => {
     id = Number(id) >>> 0;
     if (silverCache.has(id)) return silverCache.get(id);
     const r = recordOf(id);
-    const v = !!r && (isSilverSource(id) || (/silver/i.test(String(r.editorId || '')) && !NOT_SILVER.test(String(r.editorId || ''))));
+    const v = !!r && (isSilverSource(id) || madeOfSilver(id) || (/silver/i.test(String(r.editorId || '')) && !NOT_SILVER.test(String(r.editorId || ''))));
     if (silverCache.size > 4096) silverCache.clear();
     silverCache.set(id, v); return v;
   };

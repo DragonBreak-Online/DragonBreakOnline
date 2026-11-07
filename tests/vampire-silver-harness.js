@@ -23,7 +23,19 @@ const RECORDS = {
   [FIREBOLT]: { type: 'SPEL', editorId: 'Firebolt', fields: [{ type: 'EFID', data: u32(FIRE_MGEF) }] },
   [FIRE_MGEF]: { type: 'MGEF', editorId: 'FireDamageFFAimed', fields: [{ type: 'KWDA', data: u32(KW_FIRE) }] },
   [SILVER_RING]: { type: 'ARMO', editorId: 'JewelryRingSilver', fields: [] },
+  // Silver and Moonstone / Silver and Sapphire circlets: silver by recipe, not by editor id (Payne, Kaito, 3 Nov)
+  [0x166e0]: { type: 'ARMO', editorId: 'ClothesCirclet02', fields: [] },
+  [0x16719]: { type: 'ARMO', editorId: 'ClothesCirclet06', fields: [] },
+  // Copper and Moonstone: corundum first. The fixture adds silver as a lesser material, which must not count either
+  [0x16730]: { type: 'ARMO', editorId: 'ClothesCirclet04', fields: [] },
+  [0x5ace3]: { type: 'MISC', editorId: 'ingotSilver', fields: [] },
+  [0x71cf1]: { type: 'MISC', editorId: 'OreSilver', fields: [] },
 };
+fs.writeFileSync('salvage.json', JSON.stringify({ items: {
+  '166e0:Skyrim.esm': ['smelter', 1, [['5ace3:Skyrim.esm', 1], ['63b45:Skyrim.esm', 1]], 'x'],
+  '16719:Skyrim.esm': ['smelter', 1, [['5ace3:Skyrim.esm', 1], ['63b47:Skyrim.esm', 1]], 'x'],
+  '16730:Skyrim.esm': ['smelter', 1, [['5ad93:Skyrim.esm', 1], ['5ad9f:Skyrim.esm', 1], ['5ace3:Skyrim.esm', 1]], 'x'],
+} }));
 const store = new Map();
 const noop = () => {};
 const mp = {
@@ -85,4 +97,14 @@ ok(!!offRow && !/harder/.test(offRow.hint), '...and the tab no longer promises i
 ok(near(mult(WOLF, SILVER_SWORD), wolfSilver), "...while the werewolf's stays", mult(WOLF, SILVER_SWORD));
 
 console.log(`${pass}/${pass + fail}`);
+// Every silver class the carry and wear rules use (__dboCannotCarry: a cursed actor never keeps silver)
+const cc = (b) => globalThis.__dboCannotCarry(VAMP, b);
+ok(cc(SILVER_RING), 'a silver ring is silver (editor id)');
+ok(cc(0x5ace3) && cc(0x71cf1), 'silver ingots and ore are silver (editor id)');
+ok(cc(SILVER_SWORD), 'a silver sword is silver (keyword)');
+ok(cc(0x166e0) && cc(0x16719), 'the Silver and Moonstone and Silver and Sapphire circlets are silver (recipe), though their editor ids say not');
+ok(globalThis.__dboCannotCarry(WOLF, 0x166e0), '...for a werewolf too');
+ok(!cc(0x16730), 'the Copper and Moonstone circlet is not silver, even with silver as a lesser material');
+ok(!globalThis.__dboCannotCarry(MORTAL, 0x166e0), 'a mortal keeps a silver circlet');
+
 process.exitCode = fail ? 1 : 0;
