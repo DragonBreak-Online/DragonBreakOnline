@@ -85,6 +85,10 @@ export class MapRealmService extends ClientListener {
     this.shapeT = null;
     this.tracked = false;
     this.layerAt = {};
+    this.trackClips = [];
+    this.scannedAt = -FULL_SCAN_EVERY;
+    this.flatKey = "";
+    this.flatStill = false;
     this.samplesSent = 0;
     this.sampledAt = 0;
     this.layerShown = false;
@@ -316,6 +320,7 @@ export class MapRealmService extends ClientListener {
     this.flatSent = false;
     this.tracked = false;
     this.layerAt = {};
+    this.flatStill = false;
     if (this.ownersSwf.phase === "up") this.ownersSwf.phase = "idle";
     try { this.closeMenu(); } catch (err) { logError(this, "the map legend menu could not be closed", err); }
     if (reopenable && this.legendSwf.phase === "up") { this.legendSwf.phase = "idle"; this.legendSwf.frames = 0; this.legendSwf.tries = 0; }
@@ -410,10 +415,19 @@ export class MapRealmService extends ClientListener {
       this.layerAt = {};
       if (st.t.drawn < 0) st.t.drawn = this.ticksOpen;
     }
-    this.fitNow();
+    // A map judged still needs only two markers and the box read until it moves (Nat, 3 Nov: the map lagged with the
+    // colours on): two points fix a zoom, pan and turn
+    if (this.flatStill) {
+      if (this.probeRead() === this.probeKey) { this.cost.count("still"); return; }
+      this.flatStill = false;
+    }
+    const raw = this.cost.time("flatRead", () => this.flatSeen());
+    const viewKey = raw.map((q) => q.sx.toFixed(2) + "," + q.sy.toFixed(2)).join(";");
+    if (viewKey === this.flatKey && this.trackClips.length >= 2) { this.flatStill = true; this.probeKey = this.probeRead(); }
+    this.flatKey = viewKey;
     const o = this.stage.ours;
     const kx = o.width / (this.stage.mapW > 0 ? this.stage.mapW : o.width), ky = o.height / (this.stage.mapH > 0 ? this.stage.mapH : o.height);
-    const seen = this.lastSeenAt === this.ticksOpen ? this.lastSeen.map((q) => ({ x: q.x, y: q.y, sx: o.left + q.sx * kx, sy: o.top + q.sy * ky })) : [];
+    const seen = raw.map((q) => ({ x: q.x, y: q.y, sx: o.left + q.sx * kx, sy: o.top + q.sy * ky }));
     // Flat or not, judged on a still view of enough anchors: Nat's paper maps fit to 0.02-0.9 px and the 3D relief to 30+.
     // Three points fit any map, so a shape from fewer warped the colours for players whose paper maps had not installed
     // (live, 3 Nov: right at the bottom left, warped going right); a map that is not flat leaves the flat path this opening
@@ -473,25 +487,61 @@ export class MapRealmService extends ClientListener {
   // Every anchor the map shows this frame, in the root's own units; the affine rms on the same set is kept for the report,
   // so a line from the game says how much the homography gains on that map
   private fitNow(): Homography | null {
-    const ui = this.sp.Ui;
     const clips = this.anchorClipsNow();
     this.anchorsSeen = clips.length;
     if (clips.length < 2) return null;
-    const box = "_root.MarkerClips";
-    const bx = ui.getFloat(MAP_MENU, `${box}._x`) || 0, by = ui.getFloat(MAP_MENU, `${box}._y`) || 0;
-    const kx = (ui.getFloat(MAP_MENU, `${box}._xscale`) || 100) / 100, ky = (ui.getFloat(MAP_MENU, `${box}._yscale`) || 100) / 100;
-    const seen: Seen[] = [];
-    for (const { i, a } of clips) {
-      const clip = MARKER_CLIP(i);
-      if (!ui.getBool(MAP_MENU, `${clip}._visible`)) continue;
-      seen.push({ sx: bx + ui.getFloat(MAP_MENU, `${clip}._x`) * kx, sy: by + ui.getFloat(MAP_MENU, `${clip}._y`) * ky, x: a.x, y: a.y });
-    }
+    const seen = this.readClips(clips).seen;
     this.lastSeen = seen;
     this.lastSeenAt = this.ticksOpen;
+    return this.fitSeen(seen);
+  }
+
+  private fitSeen(seen: Seen[]): Homography | null {
     const H = homographyOf(seen);
     if (H) { const af = fitOf(seen); this.lastAffine = af ? Math.round(af.rms * 100) / 100 : -1; }
     if (H) this.sampleFit(H, seen);
     return H;
+  }
+
+  private probeRead(): string {
+    const ui = this.sp.Ui;
+    const v = [ui.getFloat(MAP_MENU, "_root.MarkerClips._x"), ui.getFloat(MAP_MENU, "_root.MarkerClips._y")];
+    for (const c of this.trackClips.slice(0, 2)) v.push(ui.getFloat(MAP_MENU, `${MARKER_CLIP(c.i)}._x`), ui.getFloat(MAP_MENU, `${MARKER_CLIP(c.i)}._y`));
+    return v.map((x) => Number(x).toFixed(2)).join(",");
+  }
+
+  // The given anchors' clips the map shows, in its root's units
+  private readClips(clips: Array<{ i: number; a: Anchor }>): { seen: Seen[]; shown: Array<{ i: number; a: Anchor }> } {
+    const ui = this.sp.Ui;
+    const box = "_root.MarkerClips";
+    const bx = ui.getFloat(MAP_MENU, `${box}._x`) || 0, by = ui.getFloat(MAP_MENU, `${box}._y`) || 0;
+    const kx = (ui.getFloat(MAP_MENU, `${box}._xscale`) || 100) / 100, ky = (ui.getFloat(MAP_MENU, `${box}._yscale`) || 100) / 100;
+    const seen: Seen[] = [], shown: Array<{ i: number; a: Anchor }> = [];
+    for (const c of clips) {
+      const clip = MARKER_CLIP(c.i);
+      if (!ui.getBool(MAP_MENU, `${clip}._visible`)) continue;
+      seen.push({ sx: bx + ui.getFloat(MAP_MENU, `${clip}._x`) * kx, sy: by + ui.getFloat(MAP_MENU, `${clip}._y`) * ky, x: c.a.x, y: c.a.y });
+      shown.push(c);
+    }
+    return { seen, shown };
+  }
+
+  // A flat map moves all its markers alike, so once its shape is fitted TRACK_ANCHORS of them, spread round the map, are
+  // read a frame; all of them on every FULL_SCAN_EVERY frame or when one of those is hidden. The homography is only for
+  // the report and its samples, so it is fitted on those full reads alone
+  private flatSeen(): Seen[] {
+    if (this.shape && this.trackClips.length && this.ticksOpen - this.scannedAt < FULL_SCAN_EVERY) {
+      const part = this.readClips(this.trackClips);
+      if (part.shown.length === this.trackClips.length) return part.seen;
+    }
+    const clips = this.anchorClipsNow();
+    this.anchorsSeen = clips.length;
+    const all = this.readClips(clips);
+    this.scannedAt = this.ticksOpen;
+    this.trackClips = spreadPick(all.shown, all.seen, TRACK_ANCHORS);
+    this.cost.count("fullRead");
+    if (all.seen.length >= 2) this.fitSeen(all.seen);
+    return all.seen;
   }
 
   // A few whole marker sets a map opening, for checking the fit on the real map (Leader, 2 Nov): the first fit and then one
@@ -686,6 +736,11 @@ export class MapRealmService extends ClientListener {
   private shapeT: ClipTransform | null = null;
   private tracked = false;
   private layerAt: Record<string, number> = {};
+  private trackClips: Array<{ i: number; a: Anchor }> = [];
+  private scannedAt = -FULL_SCAN_EVERY;
+  private flatKey = "";
+  private flatStill = false;
+  private probeKey = "";
   private samplesSent = 0;
   private sampledAt = 0;
   private layerShown = false;
@@ -723,6 +778,20 @@ const REDRAW_FRAMES = 2;
 // A map is taken as flat only from a still view of this many anchors fitting within FLAT_MAX_RMS px
 const FLAT_MIN_ANCHORS = 6;
 const FLAT_MAX_RMS = 3;
+// On a flat map, the anchors read a frame once its shape is fitted, and every how many frames all are read again
+const TRACK_ANCHORS = 8;
+const FULL_SCAN_EVERY = 60;
+// Up to n of the anchors shown, evenly round their centre, so the few read still span the map
+const spreadPick = <T>(items: T[], seen: Seen[], n: number): T[] => {
+  if (items.length <= n) return items.slice();
+  let cx = 0, cy = 0;
+  for (const q of seen) { cx += q.sx; cy += q.sy; }
+  cx /= seen.length; cy /= seen.length;
+  const order = seen.map((q, k) => ({ k, t: Math.atan2(q.sy - cy, q.sx - cx) })).sort((a, b) => a.t - b.t);
+  const out: T[] = [];
+  for (let j = 0; j < n; j++) out.push(items[order[Math.floor((j * order.length) / n)].k]);
+  return out;
+};
 // Labels read again each frame, round the map, once all are read
 const RELABEL_PER_TICK = 8;
 // Marker sets sent for checking the fit: SAMPLES an opening, SAMPLE_EVERY frames apart, SAMPLE_POINTS anchors each
