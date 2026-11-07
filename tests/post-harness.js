@@ -242,6 +242,26 @@ check('gold only: 100 gold still goes, tax 10, no stack fee', r.ok && r.gold ===
 const gv = typeof G.view === 'function' ? G.view(A) : null;
 check('gold only: the window offers no goods and says so', !gv || ((gv.sendable || []).length === 0 && gv.parcel && gv.parcel.maxStacks === 0 && gv.parcel.goldOnly === true), gv && gv.parcel);
 
+// ---- a common word fills the search cap in file order (#bug-tracker 1568423259454578780, 7 Nov 2026: "glass") ----
+// Sixty-odd glass weapons come first in the catalog, then the armour and the plain Glass material. All of them must be reachable.
+{
+  const GLASS_MISC = 0x5a69, GLASS_ARMOR = 0x13939;
+  RECORDS[GLASS_MISC] = { type: 'MISC', flags: 0, editorId: 'Glass' }; RECORDS[GLASS_ARMOR] = { type: 'ARMO', flags: 0, editorId: 'GlassArmor' };
+  const items = [];
+  for (let i = 0; i < 70; i++) { const id = 0x700000 + i; RECORDS[id] = { type: 'WEAP', flags: 0, editorId: 'GlassWeapon' + i }; items.push([id.toString(16) + ':Skyrim.esm', 'Enchanted Glass Bow ' + i]); }
+  items.push([GLASS_ARMOR.toString(16) + ':Skyrim.esm', 'Glass Armor'], [GLASS_MISC.toString(16) + ':Skyrim.esm', 'Glass']);
+  fs.writeFileSync('admin-items.json', JSON.stringify({ categories: [{ items }] }));
+  api.cfg = { post: {} };
+  delete globalThis.__dboPost;
+  require(path.join(SERVER, 'post.js'))(api);
+  const GP = globalThis.__dboPostApi;
+  ui('supplySearch', A, 'glass');
+  const names = GP.view(A).supply.results.map((x) => x.name);
+  check('search "glass": the plain Glass comes first, though 70 longer names precede it in the catalog', names[0] === 'Glass', names);
+  check('search "glass": Glass Armor is reachable too', names.includes('Glass Armor'), names);
+  check('search "glass": the list is still capped at 20', names.length === 20, names.length);
+}
+
 Date.now = realNow;
 process.chdir(cwd);
 fs.rmSync(TMP, { recursive: true, force: true });

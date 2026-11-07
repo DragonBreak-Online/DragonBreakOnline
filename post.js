@@ -239,17 +239,28 @@ module.exports = (api) => {
   const search = (a, query) => {
     const q = String(query || '').trim().toLowerCase().slice(0, 40);
     if (q.length < 2) { S.search.set(a >>> 0, { query: q, results: [] }); return; }
+    // Rank every name match first, then check the best ones for being orderable. The cap used to be applied while walking the
+    // catalog in file order, so a common word such as "glass" (495 names, the weapons and enchanted weapons first) filled the
+    // list before the armour or the plain Glass material was reached, and nothing else could be ordered (#bug-tracker
+    // 1568423259454578780, 7 Nov 2026)
+    const named = [];
+    for (const it of catalogItems()) {
+      if (!it.low.includes(q)) continue;
+      named.push({ desc: it.desc, name: it.name, exact: it.low === q, starts: it.low.startsWith(q) });
+    }
+    named.sort((x, y) => (y.exact ? 1 : 0) - (x.exact ? 1 : 0) || (y.starts ? 1 : 0) - (x.starts ? 1 : 0) || x.name.length - y.name.length);
+    // One record per name, the first that can be ordered (two records can share a name, and only one may be playable)
     const hits = [];
     const seen = new Set();
-    for (const it of catalogItems()) {
-      if (!it.low.includes(q) || seen.has(it.low)) continue;
-      const id = idOf(it.desc);
+    for (const h of named) {
+      const low = h.name.toLowerCase();
+      if (seen.has(low)) continue;
+      const id = idOf(h.desc);
       if (!id || !sendableBase(id)) continue;
-      seen.add(it.low);
-      hits.push({ desc: it.desc, name: it.name, starts: it.low.startsWith(q) });
-      if (hits.length >= C.searchResults * 3) break;
+      seen.add(low);
+      hits.push(h);
+      if (hits.length >= C.searchResults) break;
     }
-    hits.sort((x, y) => (y.starts ? 1 : 0) - (x.starts ? 1 : 0) || x.name.length - y.name.length);
     S.search.set(a >>> 0, { query: q, results: hits.slice(0, C.searchResults).map((h) => ({ desc: h.desc, name: h.name })) });
   };
   const feeFor = (reward) => Math.max(int(C.minFee) || 0, Math.ceil(reward * Math.max(Number(C.taxRate) || 0, Number(C.feeShare) || 0)));
