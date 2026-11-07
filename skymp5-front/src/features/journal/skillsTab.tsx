@@ -55,6 +55,17 @@ const EPIGRAPH = 'Time broke over Nirn, and every life you might have lived is t
 // The spell skills: their schools are on the Magic tab
 const MAGIC_SKILLS = new Set(['arcane', 'priest']);
 
+// The Wheel's rules in one sentence, from the menu's own numbers (feature queue 12; Nat approved the wording 7 Nov)
+const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+const word = (n: number): string => (n >= 0 && n < WORDS.length ? WORDS[n] : String(n));
+export const wheelRule = (p: PointState | null | undefined): string => {
+  if (!p || !p.enabled || !(Number(p.pool) > 0)) return '';
+  const n = Number(p.seatCount);
+  const lead = n === 1 ? 'One skill' : `${word(n).charAt(0).toUpperCase()}${word(n).slice(1)} skills`;
+  return `Your Wheel holds ${p.pool} points; each skill reaches ${p.capPerSkill}. ${lead} may go above ${p.seatAbove}, ${word(Number(p.expertCount))} above ${p.expertAbove}. `
+    + 'When the Wheel is full, a new gain takes from a skill marked Lower; Hold keeps a skill where it is; Raise lets it grow.';
+};
+
 export const SkillsTab = ({ section, busy, act, openTab }: JournalTabProps<SkillsSection>) => {
   const s = section || {};
   const skills = s.skills || [];
@@ -86,6 +97,7 @@ export const SkillsTab = ({ section, busy, act, openTab }: JournalTabProps<Skill
             <span className="journal-skills__wheel-figure">{points.used} <span className="journal-skills__wheel-of">/ {points.pool}</span></span>
             <span className="journal-skills__wheel-word">spokes of the Wheel</span>
             <span className="journal-skills__wheel-bar"><i style={{ width: `${Math.min(100, (points.used / Math.max(1, points.pool)) * 100)}%` }} /></span>
+            {wheelRule(points) ? <span className="journal-skills__wheel-rule">{wheelRule(points)}</span> : null}
           </div>
         ) : null}
         <SkillList skills={skills} categories={categories} viewing={current.id} onView={setViewing} points={points} chosen={chosen} tierNames={tierNames} />

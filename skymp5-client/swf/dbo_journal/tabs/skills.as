@@ -267,6 +267,27 @@ JT.skills = function(s, ctx)
    skillsPage(s, k, points, chosen, tiers, ctx);
 };
 
+// The Wheel's rules in one sentence, from the menu's own numbers (feature queue 12; Nat approved the wording 7 Nov)
+var SKILL_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+
+function skillsWord(n)
+{
+   return n >= 0 && n < SKILL_WORDS.length ? SKILL_WORDS[n] : String(n);
+}
+
+function skillsWheelRule(p)
+{
+   if (p == null || p == undefined || p.enabled != true || !(Number(p.pool) > 0))
+   {
+      return "";
+   }
+   var n = Number(p.seatCount);
+   var w = skillsWord(n);
+   var lead = n == 1 ? "One skill" : w.charAt(0).toUpperCase() + w.substr(1) + " skills";
+   return "Your Wheel holds " + p.pool + " points; each skill reaches " + p.capPerSkill + ". " + lead + " may go above " + p.seatAbove + ", " + skillsWord(Number(p.expertCount)) + " above " + p.expertAbove + ". "
+      + "When the Wheel is full, a new gain takes from a skill marked Lower; Hold keeps a skill where it is; Raise lets it grow.";
+}
+
 function skillsPicker(s, skills, cats, points, chosen, tiers, k)
 {
    if (points != null)
@@ -306,6 +327,12 @@ function skillsPicker(s, skills, cats, points, chosen, tiers, k)
       {
          bar["btn" + b].skill = ids[b];
       }
+   }
+   // the Wheel's rule at the foot of the list, under the groups it governs
+   var rule = skillsWheelRule(points);
+   if (rule != "")
+   {
+      flowHint(rule);
    }
 }
 
