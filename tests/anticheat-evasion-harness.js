@@ -25,7 +25,8 @@ const setup = (anticheat) => {
   W.mgef(REST_HEALTH, 'FoodRestoreHealth', { archetype: 0, av: 24 });
   W.mgef(REST_MAGICKA, 'AlchRestoreMagicka', { archetype: 0, av: 25 });
   W.mgef(WEAK_MAGIC, 'AlchWeaknessMagic', { archetype: 0, av: 56 });
-  W.mgef(FORT_MAG_RATE, 'AlchFortifyMagickaRate', { archetype: 0, av: 156 });
+  // a Peak Value Modifier (archetype 34) on MagickaRateMult (AV 156), as the real record is
+  W.mgef(FORT_MAG_RATE, 'AlchFortifyMagickaRate', { archetype: 34, av: 156 });
   const eff = (id, mag, dur) => [{ type: 'EFID', data: F.u32(id) }, { type: 'EFIT', data: F.bytes(12, [[0, 'f', mag], [8, 'u', dur]]) }];
   W.record(CABBAGE, 'ALCH', 'FoodCabbage', eff(REST_HEALTH, 5, 0));
   W.record(POTION_MAG, 'ALCH', 'RestoreMagicka01', eff(REST_MAGICKA, 25, 0));
@@ -180,14 +181,14 @@ const castEvery = (H, W, a, secs, every, spell, each) => { for (let s = 1; s <= 
   castEvery(H, W, A, 120, 2, FIREBALL);
   const got = verdict(H, 'magicka_');
   note('magicka frozen at 0.99 (never "full"), Fireball every 2 s', got);
-  ok(got === 'MISS', 'magicka frozen at 0.99: residual (only casts at 0.995 or more are judged); the fork budget catches it', acLines(H));
+  ok(got === 'MISS', 'magicka frozen at 0.99: residual, no line at all (only casts at 0.995 or more are judged; no fork vitals budget yet)', acLines(H));
 }
 {
   const { W, H } = setup({});
   castEvery(H, W, A, 120, 2, FIREBALL, (s) => W.set(A, 'percentages', { health: 1, magicka: s % 2 ? 0.985 : 1, stamina: 1 }));
   const got = verdict(H, 'magicka_');
   note('a fake 1.5% drop reported after each cast', got);
-  ok(got === 'MISS', 'a fake small drop after each cast: residual (listed by the builder); the fork budget catches it', acLines(H));
+  ok(got === 'MISS', 'a fake small drop after each cast: residual, no line at all (listed by the builder; no fork vitals budget yet)', acLines(H));
 }
 // 6 Nov: a concentration cast pins only on a bar that never moved
 const wobble = (W, s) => W.set(A, 'percentages', { health: 1, magicka: s % 2 ? 0.996 : 1, stamina: 1 });
@@ -196,7 +197,7 @@ const wobble = (W, s) => W.set(A, 'percentages', { health: 1, magicka: s % 2 ? 0
   castEvery(H, W, A, 600, 2, DETECT, (s) => wobble(W, s));
   const got = verdict(H, 'magicka_');
   note('a bar wobbling 0.996-1.000, costly concentration casts only (Detect Life every 2 s)', got);
-  ok(got === 'MISS', 'a wobbling bar with concentration casts only: residual (6 Nov, honest taps look the same); the fork budget catches it', acLines(H));
+  ok(got === 'MISS', 'a wobbling bar with concentration casts only: residual, no line at all (6 Nov: a bar that moves clears a concentration cast, as it does an honest tap; no fork vitals budget yet)', acLines(H));
 }
 {
   const { W, H } = setup({ magicka: { refuseHits: true } });
@@ -254,6 +255,15 @@ const wobble = (W, s) => W.set(A, 'percentages', { health: 1, magicka: s % 2 ? 0
   const got = verdict(H, 'magicka_');
   note('cheap spells only (Sparks, SPIT 19 < minCost 30), 10 min', got);
   ok(got === 'MISS', 'cheap spells under minCost (Sparks 19/s): residual', acLines(H));
+}
+{
+  // KNOWN RESIDUAL (6 Nov review): a frozen value waits heldMaxMs (30 s) before it pins, and only 16 casts are kept pending
+  const { W, H } = setup({ magicka: { refuseHits: true } });
+  castEvery(H, W, A, 600, 1, FIREBALL);
+  const got = verdict(H, 'magicka_');
+  note('magicka frozen at full, Fireball every 1 s, 10 min', got, 'the 16 pending casts cap');
+  ok(got === 'MISS' && W.mp.onHitDamageAttempt(A, FRIEND, FIREBALL, 30, { spell: true }) === true,
+    'a Fireball every 1 s on a frozen bar: residual, no line and no refusal while it goes on (each cast leaves the 16 pending before its 30 s wait)', acLines(H));
 }
 {
   // a relog every 10 casts: the pinned list went with the session

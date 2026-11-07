@@ -2,11 +2,12 @@
 // replay of 20 minutes of live stored percentages with the casts made in them (tests/fixtures/anticheat-vitals-sample1.json,
 // anonymised) pins none; a client frozen at full magicka is flagged; Fortify gear of the school, a potion, a well, a refill,
 // a held charge, a concentration channel and a server freeze are not; concentration taps pin only on a bar frozen to the
-// bit, and concentration pins alone are a shadow line only, so Wall of Flames tapped under regen on a client that reports
-// as sendInputsService does is never flagged or refused (6 Nov). A magicka regen potion is a refill like any other (the 6 s skip): the
-// casts after it are judged as without it. Known residuals pinned here: at +200% regen an honest fire-and-forget cast
-// refilled before the first report pins on the frozen-bar path and is refused, and at +150% a cheap perked Firebolt among
-// Wall of Flames taps pins and lets the taps' concentration pins count. Each spell's record is read once.
+// bit, and concentration pins alone are a shadow line only (folded to one a minute, never counted toward a refusal), so
+// Wall of Flames tapped under regen on a client that reports as sendInputsService does is never flagged or refused (6 Nov).
+// A magicka regen potion is a refill like any other (the 6 s skip): fire-and-forget casts after it are judged as on base,
+// to the second. Known residuals pinned here: at +200% regen an honest fire-and-forget cast refilled before the first
+// report pins on the frozen-bar path and is refused, and at +150% a cheap perked Firebolt among Wall of Flames taps pins
+// and lets the taps' concentration pins count. Each spell's record is read once.
 // stamina_free: frozen stamina through a 25 s sprint is flagged (shadow), a draining one is not. refuseHits: off by
 // default, and on, a flagged caster's spell hits are refused while weapon hits are not.
 //   node tests/anticheat-vitals-harness.js   (from server/)
@@ -191,7 +192,8 @@ const setupRegen = (anticheat) => {
   W.spell(DETECT, 'DetectLife', { cost: 200, castType: 2, school: 18 });
   W.spell(BOLT, 'CostlyBolt', { cost: 200, school: 20 });
   W.spell(WALL, 'WallOfFlames', { cost: 118, castType: 2, school: 20 });
-  W.mgef(REGEN_FX, 'AlchFortifyMagickaRate', { archetype: 0, av: 156 });
+  // as AlchFortifyMagickaRate is: a Peak Value Modifier (archetype 34) on MagickaRateMult (AV 156)
+  W.mgef(REGEN_FX, 'AlchFortifyMagickaRate', { archetype: 34, av: 156 });
   const eff = (fx, mag, dur) => [{ type: 'EFID', data: F.u32(fx) }, { type: 'EFIT', data: F.bytes(12, [[0, 'f', mag], [8, 'u', dur]]) }];
   W.record(REGEN_POT, 'ALCH', 'TestRegenMagicka150', eff(REGEN_FX, 150, 300));
   W.record(LONG_POT, 'ALCH', 'TestRegenMagickaLong', eff(REGEN_FX, 150, 900));
@@ -253,6 +255,22 @@ const CONC_SHADOW_RX = /^ANTICHEAT magicka_free shadow Casterly #C4ST \(profile 
     '...the same frozen bar with one fire-and-forget cast of cost 200 among the taps: flagged at the 8th pinned cast', L[0]);
 }
 {
+  // 4 min of Detect Life on a frozen bar, then one Fireball: the shadow lines are folded to one a minute and never count
+  // toward a refusal, so the Fireball's flag is the first of 3 flag minutes
+  const S = setupRegen({ magicka: { refuseHits: true } });
+  const { W, H, G } = S, t0 = H.t0;
+  const { ev } = taps(S, DETECT, 500, 240500, false);
+  ev.push([t0 + 250000, A, id('Fireball')]);
+  ev.sort((x, y) => x[0] - y[0]);
+  playTo(H, W, t0 + 300000, ev);
+  const L = mfLines(H), sh = L.filter((l) => / shadow /.test(l)), live = L.filter((l) => !/ shadow /.test(l));
+  ok(sh.length >= 4 && sh.length <= 5 && sh.every((l) => CONC_SHADOW_RX.test(l)) && sh.slice(1).every((l) => /\(\d+ more folded\)$/.test(l)),
+    `4 min of Detect Life on a frozen bar with refuseHits on: ${sh.length} shadow lines, one a minute, the pins between them folded`, sh.map((l) => l.slice(-40)));
+  ok(live.length === 1 && /: 3[23] costly casts .*\(DetectLife, Fireball; \d+ spell cost in all\).*server: flag only \(1 of 3 in 10 min before refusal\)$/.test(live[0])
+    && G.ST.players.get(A).flagMinutes.length === 1 && W.mp.onHitDamageAttempt(A, B, DETECT, 30, { spell: true }) === true,
+    '...then one Fireball: flagged with the taps counted, 1 of 3 flag minutes (the shadow minutes never count), spell hits on players land', live);
+}
+{
   // a +150% regen potion is a refill like any magicka potion, no more: the cast 4 s after it is skipped, and a cost 200
   // spell every 3 s after that on a moving bar is judged as without it (the 6 Nov regen window is gone)
   const S = setupRegen({ magicka: { refuseHits: true } });
@@ -288,6 +306,29 @@ for (const [what, item] of [['a +50% regen potion of 300 s', T1_POT], ['a +150% 
   S.H.clock.t += 3000; S.W.mp.onSpellCast(A, BOLT);
   ok(skipped && pend(S.G, A) === 1 && st.regenUntil === undefined,
     `${what}: a refill (the cast 4 s after it skipped), the cast 7 s after it judged as any other`, { skipped, casts: st.casts });
+}
+// Fire-and-forget casts are judged as on base: a +50% regen potion re-drunk every 290 s hides nothing from a bar that
+// wobbles or reports a small drop now and then (6 Nov review). The seconds are origin/server's (f3c353cc8) on the same play
+for (const [what, barAt, flagS, refuseS] of [
+  ['a bar wobbling 0.996-1.000', (s) => (s % 2 ? 0.996 : 1), 49, 169],
+  ['a bar at 1.000 that reports 0.993 one second in 20', (s) => (s % 20 === 10 ? 0.993 : 1), 50, 170],
+]) {
+  const S = setupRegen({ magicka: { refuseHits: true } });
+  const { W, H, G } = S, t0 = H.t0;
+  W.set(A, 'percentages', () => ({ health: 1, magicka: barAt(Math.floor((H.clock.t - t0) / 1000)), stamina: 1 }));
+  W.mp.onEatItem(A, T1_POT);
+  const ev = [[t0 + 290000, A, 0, () => W.mp.onEatItem(A, T1_POT)], [t0 + 580000, A, 0, () => W.mp.onEatItem(A, T1_POT)]];
+  for (let t = 7000; t < 600000; t += 4000) ev.push([t0 + t, A, id('Fireball')]);
+  ev.sort((x, y) => x[0] - y[0]);
+  let flagAt = 0, refuseAt = 0;
+  for (let s = 1; s <= 640 && !refuseAt; s++) {
+    playTo(H, W, t0 + s * 1000, ev.filter((e) => e[0] > t0 + (s - 1) * 1000 && e[0] <= t0 + s * 1000));
+    const L = mfLines(H);
+    if (!flagAt && L.length) flagAt = s;
+    if ((G.ST.refuse.get(A) || 0) > H.clock.t) refuseAt = s;
+  }
+  ok(flagAt === flagS && refuseAt === refuseS && mfLines(H).every((l) => !/ shadow /.test(l)) && W.mp.onHitDamageAttempt(A, B, id('Fireball'), 30, { spell: true }) === false,
+    `${what}, a Fireball every 4 s and a +50% regen potion every 290 s: flagged at ${flagAt} s and refused at ${refuseAt} s, as on base`, mfLines(H).slice(0, 1));
 }
 // a client reporting its bar as sendInputsService does: a changed value only, once a second at most, none while casting or 500 ms after
 const clientBar = (S, o) => {
