@@ -30,7 +30,7 @@ type Mp = any;
 //             | revoke | createkey | revokekeys | grantcontainer | takekey
 //   Server -> Client:
 //     { customPacketType: "propertyMenu", target, view, owned, name, locked,
-//       hasKeys, canGrantContainers, ownerName }
+//       hasKeys, canGrantContainers, container, ownerName }
 //     { customPacketType: "propertyNotice", text }
 //     { customPacketType: "refDecor", full?, refs: [{refId,name,locked}] }
 //
@@ -1056,6 +1056,8 @@ export class HousingSystem implements System {
       locked: owned && !here && rec!.locked,
       hasKeys: owned,
       canGrantContainers: (isOwner || isManager) && owned && this.baseTypeOf(ctx, primary) === "CONT" && !(this.placesOn() && rec!.memberOf),
+      // Loose storage is handed over with Grant this container, never rented or sold: the front hides the market for it (Nat, 7 Nov)
+      container: this.baseTypeOf(ctx, target) === "CONT" || undefined,
       ownerName: owned ? (rec!.ownerName || "Someone") : null,
       keyRing: this.keyRing,
       copies: this.keyRing && owned && (isOwner || isManager || lockFixer) ? this.copiesOf(rec!) : undefined,
