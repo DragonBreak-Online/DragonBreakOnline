@@ -144,15 +144,16 @@ const deleteOrDefer = (refr: ObjectReference, defer: boolean): void => {
   if (plan === "delete") {
     noteActorCall("delete", id);
     recentDeletes.note(id, now);
-    try { refr.disableNoWait(false); } catch { /* ignore */ }
-    try { refr.setPosition(0, 0, -30000); } catch { /* ignore */ }
+    // Delete() alone: a Disable or SetPosition queued in the same frame keeps only the form id and runs after the delete freed it (56113+0x14C)
     try { refr.delete(); } catch (e) { /* already gone */ }
     forget(id);
     return;
   }
-  try { refr.disableNoWait(false); } catch (e) { /* already gone */ }
   try { refr.setPosition(0, 0, -30000); } catch { /* ignore */ }
   pendingDeletes.set(id, newPendingDelete());
+  // Deleted only once the Disable promise settles: its queued functor looks the id up again, and a freed id may be another form's
+  const settled = (): void => { const p = pendingDeletes.get(id); if (p) pendingDeletes.set(id, { ...p, disabled: true }); };
+  try { refr.disable(false).then(settled, settled); } catch (e) { settled(); }
   noteActorCall("delete-deferred", id);
 };
 
