@@ -39,13 +39,16 @@ const fs = require('fs');
 const path = require('path');
 
 module.exports = (api) => {
-  const { log, personal, profileOf, display, registerChatCommand, isAdmin, cfg } = api;
+  const { log, personal, profileOf, display, who, registerChatCommand, isAdmin, cfg } = api;
   const audit = typeof api.audit === 'function' ? api.audit : () => {};
   const staffNote = typeof api.staffNote === 'function' ? api.staffNote : () => {};
   const onlineActors = typeof api.onlineActors === 'function' ? api.onlineActors : () => [];
   const accountActors = typeof api.accountActors === 'function' ? api.accountActors : () => [];
   const isLeadStaff = typeof api.isLeadStaff === 'function' ? api.isLeadStaff : () => false;
   const rulerSeats = typeof api.rulerSeats === 'function' ? api.rulerSeats : () => [];
+  const findByName = typeof api.findByName === 'function' ? api.findByName : null;
+  const findAnyByName = typeof api.findAnyByName === 'function' ? api.findAnyByName : (findByName || (() => 0));
+  const whoCaller = typeof who === 'function' ? who : (x) => display(x >>> 0);
   const C = Object.assign({
     enabled: true, rulerRanks: ['jarl', 'count', 'chieftain'], staffOverride: false,
     officers: true, officerRoles: ['officer'], courtSeats: ['steward', 'captain', 'guardcaptain', 'commander', 'bane', 'strongholdcommander'],
@@ -148,6 +151,18 @@ module.exports = (api) => {
     return `${who} already holds ${list}. One leadership seat per character, leader or officer, in any faction or court: they step down from that first.`;
   };
 
+  const clearCooldown = (a) => {
+    if (!a) return false;
+    const st = readCool();
+    st.lost = st.lost && typeof st.lost === 'object' ? st.lost : {};
+    const k = String(Number(a) >>> 0);
+    if (!st.lost[k]) return false;
+    delete st.lost[k];
+    try { fs.writeFileSync(COOL, JSON.stringify(st, null, 1)); } catch (e) { log('leadership-cooldowns.json write failed', e.message); }
+    return true;
+  };
+  globalThis.__dboLeadershipCooldownClear = clearCooldown;
+
   globalThis.__dboLeadershipOf = (a) => leadershipOf(Number(a) >>> 0);
   globalThis.__dboLeadershipRole = (role) => C.enabled === true && isRole(role);
   globalThis.__dboLeadershipOffice = (rank) => C.enabled === true && isOffice(rank);
@@ -155,7 +170,11 @@ module.exports = (api) => {
   globalThis.__dboLeadershipRefusal = (a, skip, by) => {
     const text = refusal(Number(a) >>> 0, skip);
     if (!text) return '';
-    if (C.staffOverride === true && by !== undefined && by !== null && isLeadStaff(Number(by) >>> 0)) return '';
+    if (C.staffOverride === true && by !== undefined && by !== null) {
+      if (typeof by === 'boolean' && by) return '';
+      if (typeof by === 'object' && by.staff) return '';
+      if (isLeadStaff(Number(by) >>> 0)) return '';
+    }
     return text;
   };
 
@@ -258,8 +277,39 @@ module.exports = (api) => {
 
   registerChatCommand('leadership', (a, args) => {
     if (!isAdmin(a)) return personal(a, 'Staff only.');
-    const sub = String(args || '').trim().toLowerCase();
-    if (sub && sub !== 'audit') return personal(a, 'Usage: /leadership audit');
+    const parts = String(args || '').trim().split(/\s+/).filter(Boolean);
+    const sub = (parts[0] || '').toLowerCase();
+    if (sub && sub !== 'audit') {
+      if (sub === 'cooldown' || sub === 'cooldowns' || sub === 'clear') {
+        const isClear = sub === 'clear' || (parts[1] && parts[1].toLowerCase() === 'clear');
+        if (isClear) {
+          if (!isLeadStaff(a)) return personal(a, 'Only a Lead GM or above can clear leadership cooldowns.');
+          const targetStr = sub === 'clear' ? parts.slice(1).join(' ') : parts.slice(2).join(' ');
+          if (!targetStr) return personal(a, 'Usage: /leadership cooldown clear <player|#TAG>');
+          let t = 0;
+          if (/^(?:0x)?[0-9a-f]{8}$/i.test(targetStr)) t = parseInt(targetStr, 16) >>> 0;
+          else t = findAnyByName(targetStr);
+          if (t < 0) return personal(a, 'Multiple players match that name. Use their #TAG.');
+          if (!(t > 0)) return personal(a, `No player "${targetStr}" found.`);
+          const cleared = clearCooldown(t);
+          audit(`LEADERSHIP COOLDOWN cleared by ${whoCaller(a)} for ${display(t)} (${(t >>> 0).toString(16)})`);
+          return personal(a, cleared ? `Cleared leadership cooldown for ${display(t)}.` : `${display(t)} was not on leadership cooldown.`);
+        }
+        const st = readCool();
+        const lost = (st && st.lost && typeof st.lost === 'object') ? st.lost : {};
+        const entries = Object.entries(lost);
+        if (!entries.length) return personal(a, 'No characters currently on leadership cooldown.');
+        const now_ = Date.now();
+        personal(a, `${entries.length} character(s) on leadership cooldown:`);
+        for (const [actorHexOrDec, at] of entries) {
+          const act = Number(actorHexOrDec) >>> 0;
+          const days = Math.max(0, Math.ceil((Number(at) + coolMs() - now_) / DAY));
+          personal(a, `  ${nameOfActor(act)} (${act.toString(16)}): ${days} day(s) remaining`);
+        }
+        return undefined;
+      }
+      return personal(a, 'Usage: /leadership audit | cooldowns | cooldown clear <player|#TAG>');
+    }
     if (C.enabled !== true) personal(a, 'One seat per character is OFF (config leadership.enabled), so nothing is refused; the list below is what it would catch.');
     const st = readState();
     const since = (k) => { const e = st[k]; return e && e.firstToldAt ? `, told ${Math.floor((Date.now() - e.firstToldAt) / DAY)} day(s) ago${e.staffAt ? ', staff told' : ''}` : ''; };
@@ -278,8 +328,8 @@ module.exports = (api) => {
       for (const r of acc) personal(a, `  account ${r.pid}: ${r.seats.map((s) => `${s.name} (${s.actor ? nameFor(s.actor, r.pid, 'a character') : 'no character bound'})`).join(', ')}${C.perAccount === true ? since(`p:${r.pid}`) : ''}`);
     }
     return undefined;
-  }, { admin: true, help: 'audit: characters (and accounts) holding more than one leadership seat' });
+  }, { admin: true, help: 'audit: characters (and accounts) holding more than one leadership seat; cooldowns: view/clear cooldowns' });
 
   log(`leadership on: one seat per ${C.perAccount === true ? 'account' : 'character'} ${C.enabled === true ? 'enforced' : 'OFF'}, rulers ${[...RULER].join('/')}${C.officers === true ? `, officers (${[...ROLES].filter((r) => r !== 'leader').join('/')}; ${low(C.courtSeats).join('/')})` : ''}${C.staffOverride === true ? ', a Lead GM may override' : ''}`);
-  return { leadershipOf, refusal, doubles, accountDoubles, sweep, isRole, isOffice, noteLosses };
+  return { leadershipOf, refusal, doubles, accountDoubles, sweep, isRole, isOffice, noteLosses, clearCooldown };
 };

@@ -5325,7 +5325,7 @@ const seatOfficial = (z, rank, tg, by) => {
   // a court, and citizenship.js's election. The same rule, skipping this zone's own seat (leadership.js)
   if (typeof globalThis.__dboLeadershipRefusal === 'function') {
     if (leadershipOffice(rank)) {
-      const no = globalThis.__dboLeadershipRefusal(tg.actor, { kind: 'hold', id: z.id });
+      const no = globalThis.__dboLeadershipRefusal(tg.actor, { kind: 'hold', id: z.id }, by && by.staff ? by : null);
       if (no) return { error: no };
     }
   }
@@ -10898,7 +10898,7 @@ try {
     return out;
   };
   require(LEADERSHIP_JS)({ mp, log, personal, audit, who, display, nameOf, profileOf, onlineActors, accountActors,
-    registerChatCommand, isAdmin, isLeadStaff, ranksOf, rankTitle, rulerSeats, staffNote, cfg });
+    findByName, findAnyByName, registerChatCommand, isAdmin, isLeadStaff, ranksOf, rankTitle, rulerSeats, staffNote, cfg });
 } catch (e) { log('leadership.js failed to load:', e.stack || e.message); globalThis.__dboLeadershipRefusal = null; globalThis.__dboLeadershipRole = null; globalThis.__dboLeadershipOffice = null; }
 
 // ---- thievery and burglary: thief factions, break-ins, the Fence Chest, guard raids (server\thievery.js, config "thievery") ----
