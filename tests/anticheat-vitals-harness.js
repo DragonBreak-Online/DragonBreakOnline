@@ -5,7 +5,8 @@
 // potion (MagickaRateMult +50% or more) pin only on a bar frozen to the bit, and concentration pins alone never flag, so
 // Wall of Flames tapped under regen on a client that reports as sendInputsService does is not flagged (6 Nov). The regen
 // window covers a cast whose drop shows in a report; at +200% an honest fire-and-forget cast refilled before the first
-// report still pins on the frozen-bar path and is refused, a known residual pinned here. Each spell's record is read once.
+// report still pins on the frozen-bar path and is refused, and at +150% a cheap perked one does and then lets Wall of
+// Flames taps' concentration pins count: known residuals pinned here. Each spell's record is read once.
 // stamina_free: frozen stamina through a 25 s sprint is flagged (shadow), a draining one is not. refuseHits: off by
 // default, and on, a flagged caster's spell hits are refused while weapon hits are not.
 //   node tests/anticheat-vitals-harness.js   (from server/)
@@ -341,17 +342,20 @@ const clientBar = (S, o) => {
 };
 // tap held times, 210-530 ms with a median of 270 (the 6 Nov trace)
 const HELD = [270, 240, 310, 210, 280, 530, 260, 330, 250, 270, 420, 230, 290, 260, 480, 270];
-// `spell` every `every` ms (plus up to 400 ms) up to `to`, on clientBar, a potion drunk at 0 and every 300 s if `potion`
+// `spell` every `every` ms (plus up to 400 ms) from `from` to `to`, and `also` alike, on clientBar; `potion` drunk at 0 and every 300 s
 const clientPlay = (S, o) => {
-  const { W, H, G } = S, casts = [], ev = [], n = { judged: 0, pins: 0 }, st = G.ST.players.get(A), push = st.pinned.push;
-  st.pinned.push = function (...x) { n.pins += x.length; return push.apply(this, x); };
-  for (let i = 0; ; i++) {
-    const at = 7000 + i * o.every + ((i * 7) % 5) * 100;
-    if (at >= o.to) break;
-    // [ms after t0, SPIT cost, ms held, concentration]
-    casts.push([at, o.cost, o.held ? o.held[i % o.held.length] : 300, o.conc]);
-    ev.push([H.t0 + at, A, 0, () => { const k = pend(G, A); W.mp.onSpellCast(A, o.spell); if (pend(G, A) > k) n.judged++; }]);
+  const { W, H, G } = S, casts = [], ev = [], n = { judged: 0, pins: 0, ffPins: 0 }, st = G.ST.players.get(A), push = st.pinned.push;
+  st.pinned.push = function (...x) { n.pins += x.length; n.ffPins += x.filter((e) => !e.conc).length; return push.apply(this, x); };
+  for (const x of o.also ? [o, o.also] : [o]) {
+    for (let i = 0; ; i++) {
+      const at = (x.from || 7000) + i * x.every + ((i * 7) % 5) * 100;
+      if (at >= o.to) break;
+      // [ms after t0, SPIT cost, ms held, concentration]
+      casts.push([at, x.cost, x.held ? x.held[i % x.held.length] : 300, x.conc]);
+      ev.push([H.t0 + at, A, 0, () => { const k = pend(G, A); W.mp.onSpellCast(A, x.spell); if (pend(G, A) > k) n.judged++; }]);
+    }
   }
+  casts.sort((x, y) => x[0] - y[0]);
   if (o.potion) for (let t = 300000; t < o.to; t += 300000) ev.push([H.t0 + t, A, 0, () => W.mp.onEatItem(A, o.potion)]);
   ev.sort((x, y) => x[0] - y[0]);
   // 0.35 x SPIT a second: the 6 Nov Detect Life taps' 15-20 magicka for a quarter second
@@ -372,8 +376,7 @@ for (const [what, o] of [
     `Wall of Flames tapped 0.21-0.53 s every 3 s for 10 min ${what}, the client reporting as sendInputsService does: ${r.judged} taps judged, ${r.pins} pinned with the value unchanged, no flag, spell hits on players land`,
     { judged: r.judged, pins: r.pins, reads: r.reads.length, lines: r.lines.slice(0, 2) });
 }
-// KNOWN RESIDUAL (6 Nov review): at +200% regen an honest fire-and-forget cast is refilled before the first report, so it
-// pins on the frozen-bar path, which the regen window keeps; these checks hold that until a fix flips them
+// KNOWN RESIDUAL (6 Nov review): at +200% an honest fire-and-forget cast is refilled before the first report and pins as frozen
 for (const [what, o] of [
   ['Firebolt every 2.5 s, pool 500', { spell: id('Firebolt'), cost: 41, every: 2500, pool: 500 }],
   ['Fireball every 4 s, pool 600', { spell: id('Fireball'), cost: 133, every: 4000, pool: 600 }],
@@ -383,6 +386,15 @@ for (const [what, o] of [
   ok(r.reads.length === 0 && r.lines.some((l) => /server: refusing their spell hits on players/.test(l)) && S.W.mp.onHitDamageAttempt(A, B, o.spell, 30, { spell: true }) === false,
     `residual: ${what} under a +200% regen potion, 0.26 x SPIT a cast, the client never reporting a drop: ${r.pins} pinned on the frozen-bar path, flagged and refused`,
     { judged: r.judged, pins: r.pins, reads: r.reads.length, lines: r.lines.slice(0, 1) });
+}
+{
+  // KNOWN RESIDUAL: a cheap perked fire-and-forget cast under +150% regen pins as frozen too, and lets the concentration pins count
+  const S = setupRegen({ magicka: { refuseHits: true } });
+  const r = clientPlay(S, { spell: WALL, cost: 118, conc: true, every: 3000, to: 600000, held: HELD, pool: 280, bonus: 1.5, potion: REGEN_POT,
+    also: { spell: id('Firebolt'), cost: 41, conc: false, every: 60000, from: 8500 } });
+  ok(r.ffPins >= 1 && r.lines.some((l) => /server: refusing their spell hits on players/.test(l)) && S.W.mp.onHitDamageAttempt(A, B, WALL, 30, { spell: true }) === false,
+    `residual: Wall of Flames tapped every 3 s and a Firebolt (0.35 x SPIT) every 60 s under a +150% regen potion, pool 280: ${r.pins} pinned, ${r.ffPins} of them Firebolt, flagged and refused`,
+    { judged: r.judged, pins: r.pins, ffPins: r.ffPins, lines: r.lines.slice(0, 1) });
 }
 
 // ---- each spell record is read once ---------------------------------------------------------------------------------------------
