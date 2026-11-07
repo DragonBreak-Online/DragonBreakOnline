@@ -16,7 +16,7 @@ const sourceOf = (menu) => {
 const merge = (was, f) => { if (!was || f.font !== undefined) return f; const out = Object.assign({}, was); for (const k of Object.keys(f)) if (f[k] !== undefined && f[k] !== null) out[k] = f[k]; return out; };
 const clip = (name) => {
   const c = { _name: name, _x: 0, _y: 0, _alpha: 100, _visible: true, kids: {} };
-  c.createEmptyMovieClip = (n) => { if (c.kids[n]) delete c.kids[n]; const k = clip(n); k._parent = c; c[n] = k; c.kids[n] = k; return k; };
+  c.createEmptyMovieClip = (n) => { if (c.kids[n]) { const was = c.kids[n]; delete c.kids[n]; if (typeof was.onUnload === 'function') was.onUnload(); } const k = clip(n); k._parent = c; c[n] = k; c.kids[n] = k; return k; };
   c.createTextField = (n, d, x, y, w, h) => { const t = { text: '', textColor: 0, _alpha: 100, _x: x || 0, _y: y || 0, _width: w || 0, _height: h || 0, setNewTextFormat(f) { this.fmt = merge(this.fmt, f); if (f.color !== undefined) this.textColor = f.color; }, setTextFormat(f) { this.applied = merge(this.applied, f); } };
     // dbo-web.as shows a caption in capitals (webCaption) and keeps what the code set in .caption: a harness reads the caption back,
     // as it would have before, and the renderer draws what the player sees (_shown)
