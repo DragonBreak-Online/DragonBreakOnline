@@ -24,7 +24,7 @@ for (const [a, prof] of [[P, 1], [PRIEST, 2], [NOVICE, 3]]) {
 set(WOLF, 'profileId', -1);
 set(PRIEST, 'private.mastery', { order: ['priest'], skills: { priest: { rank: 2 } } }); // tier 3
 set(NOVICE, 'private.mastery', { order: ['priest'], skills: { priest: { rank: 0 } } }); // tier 1
-const HEAL_OTHER = 0x12fd2, GRAND = 0xb62ee;
+const HEAL_OTHER = 0x12fd2, GRAND = 0xb62ee, SCROLL_HEAL_OTHER = 0xa44c1, SCROLL_GRAND = 0xa44c4;
 const papyrus = [];
 const mp = {
   get: (id, k) => { const v = get(id, k); if (v === undefined && k === 'private.permaDead') return false; return v; },
@@ -96,6 +96,17 @@ mp.onSpellHit(P, P, HEAL_OTHER);
 check('nobody lifts their own chill', left() > 0);
 mp.onSpellHit(PRIEST, P, HEAL_OTHER);
 check("a tier 3 priest's healing lifts it", !left() && out.audits.some((t) => /lifted by Pff000002/.test(t)));
+
+// cures via scrolls (Heal Other and Grand Healing scrolls)
+clear(); die(); commands.respawn(P);
+check('re-chilled for scroll test', left() > 0);
+mp.onSpellHit(PRIEST, P, SCROLL_HEAL_OTHER);
+check("a tier 3 priest's Scroll of Heal Other lifts it", !left());
+
+clear(); die(); commands.respawn(P);
+check('re-chilled for grand scroll test', left() > 0);
+mp.onSpellCast(PRIEST, SCROLL_GRAND);
+check('Scroll of Grand Healing lifts it from those close by', !left());
 
 // /respawn and Grand Healing
 clear(); die();
