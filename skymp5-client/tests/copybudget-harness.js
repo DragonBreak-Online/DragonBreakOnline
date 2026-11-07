@@ -33,6 +33,7 @@ const mk = (id, o) => {
   r.getBaseObject = () => ({ getFormID: () => 7 });
   r.delete = () => { r.deleted = true; calls.push(['delete', id]); };
   r.disableNoWait = () => { r.disabled = true; calls.push(['disable', id]); };
+  r.disable = () => { r.disableNoWait(); return { then: (ok) => ok() }; };
   r.setPosition = () => calls.push(['reseat', id]);
   r.getPositionX = () => 0; r.getPositionY = () => 0; r.getPositionZ = () => 0;
   forms.set(id, r);
