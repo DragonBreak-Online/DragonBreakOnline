@@ -1282,15 +1282,24 @@ export class HousingSystem implements System {
     if (rec.owner === 0) return true;
     if (this.ownsAs(rec, v.profileId, v.actorId)) return true;
     if (v.admin) return true;
-    if (this.inHall(ctx, primary, rec, v)) return true;
+    if (this.keepsHall(ctx, primary, rec, v)) return true;
     if (this.isFiefHolder(ctx, v.actorId, primary)) return true;
     const hold = this.holdOf(ctx, primary);
     return !!hold && v.ranks.some((r) => r.hold === hold && MANAGER_RANKS.indexOf(r.rank) !== -1);
   }
 
+  // A hall's rooms and chests keep their own locks (Nat, 7 Nov, #bug-tracker 1566332108966858856): a plain member gets the way in only
+  // Only its leader, a sharing leader and a sharing office holder (guilds.js __dboHallKeeper) open every lock; older gameplay keeps every member
+  private keepsHall(ctx: SystemContext, root: number, rootRec: PropertyRecord, v: ViewerAccess): boolean {
+    const keeper = (globalThis as any).__dboHallKeeper;
+    if (typeof keeper !== "function") return this.inHall(ctx, root, rootRec, v);
+    if (!this.placesOn() || !rootRec.place || !v.actorId || rootRec.owner === 0) return false;
+    try { return keeper([root, rootRec.partner].filter(Boolean), v.actorId) === true; } catch { return false; }
+  }
+
   // A faction's hall (Nate, 4 Oct): a place whose door the gameplay lists as a faction's hall and whose owner leads that
-  // faction (guilds.js __dboHallMember); its members open, lock and use all of it as the owner does, but only the owner (or
-  // a manager) names it, cuts keys, assigns its rooms, hands it over or gives it up
+  // faction (guilds.js __dboHallMember); its members open and lock its ways in and use its shared chests, but only the owner
+  // (or a manager) names it, cuts keys, assigns its rooms, hands it over or gives it up
   private inHall(ctx: SystemContext, root: number, rootRec: PropertyRecord, v: ViewerAccess): boolean {
     if (!this.placesOn() || !rootRec.place || !v.actorId || rootRec.owner === 0) return false;
     const member = (globalThis as any).__dboHallMember;
