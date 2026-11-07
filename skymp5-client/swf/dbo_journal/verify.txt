@@ -18,6 +18,7 @@ JT.supernatural
 JT.citizen
 JT.referrals
 JT.notes
+JT.news
 JT.thalmor
 dbo:citizenJ
 dbo:journalNotes

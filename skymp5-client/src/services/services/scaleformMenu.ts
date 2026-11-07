@@ -38,7 +38,7 @@ export const DBO_PREFIX = "dbo:";
 // browser deliberately and have no cap.
 export const JOURNAL_TABS = [
   "profile", "stats", "world", "wanted", "keys", "deity", "magic", "skills", "supernatural",
-  "citizen", "referrals", "notes", "thalmor", "nobility", "court", "faction", "settings",
+  "citizen", "referrals", "notes", "news", "thalmor", "nobility", "court", "faction", "settings",
 ];
 
 export const NATIVE_CAPS = [

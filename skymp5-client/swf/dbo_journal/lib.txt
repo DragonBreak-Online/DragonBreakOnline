@@ -17,6 +17,7 @@ dbo-web.as
 ../dbo_journal/tabs/citizen.as
 ../dbo_journal/tabs/referrals.as
 ../dbo_journal/tabs/notes.as
+../dbo_journal/tabs/news.as
 ../dbo_journal/tabs/thalmor.as
 ../dbo_journal/tabs/nobility.as
 ../dbo_journal/tabs/court.as
