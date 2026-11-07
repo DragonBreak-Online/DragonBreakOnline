@@ -459,7 +459,7 @@ check('gamemode: the hold is the hub only, and the god waits for it', /const bir
 check('gamemode: birthsigns.js gets hasUiCap, for the picker\'s cap', /require\(BIRTHSIGNS_JS\)\(\{[^}]*\bhasUiCap \}\);/.test(gm));
 check('gamemode: login and logout reach birthsigns.js', /globalThis\.__dboBirthsignLogin\(a\)/.test(gm) && /'__dboStartLeave', '__dboBirthsignLeave'\]/.test(gm));
 const cl = fs.readFileSync(path.join(SERVER, 'charlevel.js'), 'utf8');
-check('charlevel.js: the bonus adds the race\'s and sign\'s magicka and stamina, and syncs on demand', /magicka: \(Number\(spent\.magicka\) \|\| 0\) \+ \(Number\(r\.magicka\) \|\| 0\), stamina: \(Number\(spent\.stamina\) \|\| 0\) \+ \(Number\(r\.stamina\) \|\| 0\)/.test(cl) && /globalThis\.__dboCharLevelSyncBonus = \(a\) => \{ if \(!CFG\.enabled\) return; try \{ syncBonus\(Number\(a\) >>> 0, stateOf\(Number\(a\) >>> 0\)\);/.test(cl));
+check('charlevel.js: the bonus adds the race\'s and sign\'s magicka and stamina, and syncs on demand', /magicka: \(Number\(spent\.magicka\) \|\| 0\) \+ \(Number\(r\.magicka\) \|\| 0\)[^,]*, stamina: \(Number\(spent\.stamina\) \|\| 0\) \+ \(Number\(r\.stamina\) \|\| 0\)/.test(cl) && /globalThis\.__dboCharLevelSyncBonus = \(a\) => \{ if \(!CFG\.enabled\) return; try \{ syncBonus\(Number\(a\) >>> 0, stateOf\(Number\(a\) >>> 0\)\);/.test(cl));
 const bsSrc = fs.readFileSync(BS_JS, 'utf8');
 check('birthsigns.js: one hot-reload-safe state, ui events registered through onUi, no mp.on', /globalThis\.__dboBirthsignState \|\| \(globalThis\.__dboBirthsignState = /.test(bsSrc) && !/mp\.on\(/.test(bsSrc));
 
