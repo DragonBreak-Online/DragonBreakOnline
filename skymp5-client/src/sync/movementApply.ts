@@ -12,6 +12,7 @@ import { SpApiInteractor } from "../services/spApiInteractor";
 import { forgetAnimationState, isInSitPose, setRefrCollision } from "./animation";
 import { forgetBody } from "./bodyPos";
 import { isHostedByMe } from "../view/worldViewMisc";
+import { headingDelta } from "./headingDelta";
 
 const sqr = (x: number) => x * x;
 
@@ -82,7 +83,8 @@ export const applyMovement = (refr: ObjectReference, m: Movement, isMyClone?: bo
 };
 
 const keepOffsetFromActor = (ac: Actor, m: Movement) => {
-  let offsetAngle = m.rot[2] - ac.getAngleZ();
+  // Wrapped: a copy facing north (359 against 1) was 358 off, so it turned the long way and never settled
+  let offsetAngle = headingDelta(m.rot[2], ac.getAngleZ());
   // Wider deadzone when standing: 130ms-stale idle angle noise makes the offset hunt visibly
   const deadzone = m.runMode === "Standing" ? 12 : 5;
   if (Math.abs(offsetAngle) < deadzone) {
@@ -354,7 +356,8 @@ const translateTo = (refr: ObjectReference, m: Movement, isNpc = false, gapMs?: 
 
   const speed = distance / time;
 
-  const angleDiff = Math.abs(m.rot[2] - refr.getAngleZ());
+  // Wrapped, or a standing copy facing north was re-translated on every update
+  const angleDiff = Math.abs(headingDelta(m.rot[2], refr.getAngleZ()));
   const refrId = refr.getFormID();
   const actor = Actor.from(refr);
   const needsMove =
