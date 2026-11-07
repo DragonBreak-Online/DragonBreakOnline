@@ -3693,7 +3693,8 @@ const onCharacterReady = (userId, a) => {
     // A free appearance change waiting, once per character, never while one is still being made (appearance.js)
     try { if (globalThis.__dboAppearanceFreeLogin && !creationPending(a) && !inCreatorRealm(a)) globalThis.__dboAppearanceFreeLogin(a); } catch (e) { log('free appearance notice failed', e.message); } lap('AppearanceFreeLogin');
 
-    if (laps.length) log(`loginSetup slow steps for ${display(a)}: ${laps.join(', ')}`);  }), 8000);
+    if (laps.length) log(`loginSetup slow steps for ${display(a)}: ${laps.join(', ')}`);
+  }), 8000);
 };
 const startLoginWait = (userId, seenActor) => {
   const old = globalThis.__dboLoginWaits.get(userId);
