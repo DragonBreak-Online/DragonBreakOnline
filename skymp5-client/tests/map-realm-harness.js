@@ -415,6 +415,53 @@ const STUBBED = /\/(clientListener|customPacketUtil|widgetMenuUtil|logging)$|^sk
     h9.menuClose({ name: 'MapMenu' });
     S.customOpen = false; zoom = 1; pan = 0;
   }
+  // ---- the lag on a paper map with 40 anchors (Nat, 3 Nov: "super laggy" with the colours on; ~120 marker reads a frame) ----
+  {
+    const h12 = {};
+    const saved = Object.assign({}, S.props);
+    S.custom = []; S.customOpen = false; S.invoked.length = 0; S.menuOpen = true; S.props['_root.owners.layer._visible'] = false;
+    const many = [];
+    for (let k = 0; k < 40; k++) many.push([`Anchor ${k}`, (k % 8) * 10000 - 35000, Math.floor(k / 8) * 10000 - 20000]);
+    many.forEach(([name], i) => { S.props[`_root.MarkerClips.Marker${i}.label`] = name; });
+    S.props['_root.WorldMap._markerList.length'] = many.length;
+    let pan = 0, zoom = 1;
+    const put = () => many.forEach(([, x, y], i) => { S.props[`_root.MarkerClips.Marker${i}._x`] = 640 + pan + zoom * 0.002 * x; S.props[`_root.MarkerClips.Marker${i}._y`] = 360 - zoom * 0.002 * y; });
+    put();
+    new MapRealmService(sp, { on: (ev, fn) => { h12[ev] = fn; }, emitter: { on: (ev, fn) => { h12['emit:' + ev] = fn; } } });
+    h12['emit:customPacketMessage']({ customPacketType: 'dboMapRealm', markers });
+    h12['emit:customPacketMessage']({ customPacketType: 'dboMapOwners', worlds: [{ world: '3c:Skyrim.esm', aliases: [], flat: true, territories: [{ id: 'a', owner: 'hold-a', x: 0, y: 0 }, { id: 'b', owner: 'hold-b', x: 50000, y: 0 }] }],
+      factions: { 'hold-a': { name: 'A', rgb: [200, 0, 0] }, 'hold-b': { name: 'B', rgb: [0, 200, 0] } }, anchors: many.map(([name, x, y]) => ({ name, x, y, z: 0 })), reach: 30000, fade: 45000 });
+    h12.menuOpen({ name: 'MapMenu' });
+    for (let i = 0; i < 80; i++) h12.update();
+    const L = (p) => S.props[`_root.owners.layer${p}`];
+    let reads = 0;
+    const gf0 = sp.Ui.getFloat, gb0 = sp.Ui.getBool;
+    sp.Ui.getFloat = (m, p) => { if (p.startsWith('_root.MarkerClips')) reads++; return gf0(m, p); };
+    sp.Ui.getBool = (m, p) => { if (p.startsWith('_root.MarkerClips')) reads++; return gb0(m, p); };
+    let lagged = 0;
+    for (let k = 1; k <= 30; k++) { pan = 3 * k; zoom = 1 + 0.01 * k; put(); h12.update(); if (Math.abs(L('._x') - (640 + pan)) > 0.01 || Math.abs(Math.abs(L('._xscale')) - 12.8 * zoom) > 0.01) lagged++; }
+    const panReads = reads / 30;
+    reads = 0;
+    for (let i = 0; i < 30; i++) h12.update();
+    const stillReads = reads / 30;
+    // a marker of the few read goes off the map: all are read again and the layer still follows
+    for (let i = 0; i < 40; i++) S.props[`_root.MarkerClips.Marker${i}._visible`] = i % 2 === 0;
+    pan += 5; put(); h12.update(); h12.update();
+    const afterHide = Math.abs(L('._x') - (640 + pan));
+    sp.Ui.getFloat = gf0; sp.Ui.getBool = gb0;
+    ok(L('._visible') === true && lagged === 0, 'a 40-anchor paper map: panning and zooming, the layer follows the markers in the same frame', lagged);
+    ok(panReads <= 30, '...reading only a few markers a frame while it moves, not all 40 (~124 reads): ' + panReads.toFixed(1), panReads);
+    ok(stillReads <= 8, '...and on a still map two markers and their box only: ' + stillReads.toFixed(1), stillReads);
+    ok(afterHide < 0.01, '...and still follows when markers it read are hidden', afterHide);
+    h12.update();
+    const mc = ((S.packets.slice().reverse().find((p) => p.event === 'npcDrift' && p.args[0] && p.args[0].kind === 'mapCost') || { args: [null] }).args[0]) || {};
+    h12.menuClose({ name: 'MapMenu' });
+    const mc2 = ((S.packets.slice().reverse().find((p) => p.event === 'npcDrift' && p.args[0] && p.args[0].kind === 'mapCost') || { args: [null] }).args[0]) || {};
+    ok(mc2 !== mc && mc2.counts && mc2.counts.still > 0 && mc2.counts.fullRead > 0, '...and its mapCost line counts the still frames skipped and the full reads', mc2.counts);
+    for (const k of Object.keys(S.props)) delete S.props[k];
+    Object.assign(S.props, saved);
+    S.customOpen = false;
+  }
   // a world whose map is not flat (the 3D relief): no colours until T, and then T's choice stays for that world
   {
     const h8 = {};
