@@ -142,8 +142,10 @@ const deleteOrDefer = (refr: ObjectReference, defer: boolean): void => {
     forget(id);
     return;
   }
-  try { refr.disableNoWait(false); } catch (e) { /* already gone */ }
   pendingDeletes.set(id, newPendingDelete());
+  // Deleted only once the Disable promise settles: its queued functor looks the id up again, and a freed id may be another form's
+  const settled = (): void => { const p = pendingDeletes.get(id); if (p) pendingDeletes.set(id, { ...p, disabled: true }); };
+  try { refr.disable(false).then(settled, settled); } catch (e) { settled(); }
   noteActorCall("delete-deferred", id);
 };
 

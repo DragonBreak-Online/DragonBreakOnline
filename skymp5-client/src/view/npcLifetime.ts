@@ -109,23 +109,25 @@ export const reseatDecision = (s: CopyState, bornAt: number, askedAt: number, no
   return now - askedAt >= RESEAT_GIVE_UP_MS ? "skip" : "later";
 };
 
-// A copy safeDelete disabled and is waiting to delete: updates in a row its 3D read as gone, and time waited outside loading screens
+// A copy safeDelete disabled and is waiting to delete: updates in a row its 3D read as gone, time waited outside loading screens,
+// and whether its Papyrus Disable has settled (the queued DisableFunctor keeps only the form id, 56113 crash 5-7 Nov)
 export interface PendingDelete {
   unloadedFrames: number;
   waitedMs: number;
+  disabled: boolean;
 }
 
-export const newPendingDelete = (): PendingDelete => ({ unloadedFrames: 0, waitedMs: 0 });
+export const newPendingDelete = (): PendingDelete => ({ unloadedFrames: 0, waitedMs: 0, disabled: false });
 
 export type DeleteDecision = "delete" | "wait" | "give-up";
 
 // One update of a pending delete. loadingScreen: a Loading Menu or Fader Menu is open, when nothing counts and nothing is deleted
-// (the unloaded run starts again after it). give-up: leave it disabled and stop waiting
+// (the unloaded run starts again after it). give-up: leave it disabled and stop waiting. Never "delete" before the Disable settled
 export const deleteDecision = (p: PendingDelete, is3DLoaded: boolean, loadingScreen: boolean, stepMs: number): { decision: DeleteDecision; next: PendingDelete } => {
-  if (loadingScreen) return { decision: "wait", next: { unloadedFrames: 0, waitedMs: p.waitedMs } };
+  if (loadingScreen) return { decision: "wait", next: { unloadedFrames: 0, waitedMs: p.waitedMs, disabled: p.disabled } };
   const step = Math.min(Math.max(0, stepMs || 0), SAFE_DELETE_STEP_MS);
-  const next = { unloadedFrames: is3DLoaded ? 0 : p.unloadedFrames + 1, waitedMs: p.waitedMs + step };
-  if (is3DLoaded) return { decision: next.waitedMs >= SAFE_DELETE_GIVE_UP_MS ? "give-up" : "wait", next };
+  const next = { unloadedFrames: is3DLoaded ? 0 : p.unloadedFrames + 1, waitedMs: p.waitedMs + step, disabled: p.disabled };
+  if (is3DLoaded || !p.disabled) return { decision: next.waitedMs >= SAFE_DELETE_GIVE_UP_MS ? "give-up" : "wait", next };
   return { decision: next.unloadedFrames >= SAFE_DELETE_MIN_FRAMES && next.waitedMs >= SAFE_DELETE_SETTLE_MS ? "delete" : "wait", next };
 };
 
