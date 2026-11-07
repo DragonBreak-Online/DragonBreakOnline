@@ -13,7 +13,8 @@
 //     net horizontal displacement over 10 s and 60 s against the real time that passed, with continuity (80% of the
 //     window's time in 1 s steps at 0.8x the limit or faster), so a teleport, a launch or a freeze backlog is never a run.
 //   vitals (interim, until the fork's vitals budget ships)  magicka_free: costly casts made at full stored magicka after
-//     which the stored magicka never dropped; stamina_free: 20 s of foot sprinting at 500 u/s while stored stamina stays full.
+//     which the stored magicka never dropped (shadow when every cast is concentration); stamina_free: 20 s of foot sprinting
+//     at 500 u/s while stored stamina stays full.
 //   fork bridge  dormant until the fork natives exist: mp.onAnticheat flags come out through acFlag, gamemode-config
 //     anticheat.fork is pushed to mp.setAnticheatConfig on every load, movement classes to mp.setMovementClass on change,
 //     and /acstate prints mp.getAnticheatState.
@@ -572,8 +573,12 @@ module.exports = (api) => {
     let cost = 0, lo = 1, hi = 0;
     const names = [];
     for (const e of st.pinned) { cost += e.cost; lo = Math.min(lo, e.min); hi = Math.max(hi, e.max); if (names.length < 4 && !names.includes(e.spell)) names.push(e.spell); }
-    // a concentration tap refilled before the client's first report leaves the trace a frozen bar does: never flagged alone
-    if (st.pinned.length < MG.flagCount || cost < MG.flagMinCost || st.pinned.every((e) => e.conc)) return;
+    if (st.pinned.length < MG.flagCount || cost < MG.flagMinCost) return;
+    const text = (action) => `${st.pinned.length} costly casts in ${Math.round(MG.flagWindowMs / 60000)} min at full magicka with no drop after (${names.join(', ')}; ${cost} spell cost in all), `
+      + `stored magicka ${lo.toFixed(3)}-${hi.toFixed(3)} through each, no Fortify gear of the school worn, ${st.gearSkipped || 0} casts skipped for gear; server: ${action}`;
+    // a concentration tap refilled before the client's first report leaves the trace a frozen bar does: a shadow line only,
+    // folded like any flag, never a flag minute and never refused
+    if (st.pinned.every((e) => e.conc)) { acFlag(a, 'magicka_free', { casts: st.pinned.length, cost }, text('flag only (concentration casts only, never refused)'), { shadow: true }); return; }
     // Sustained, never a burst: refused only at the refuseAfterFlags-th flag minute within refuseFlagWindowMs (each one
     // already 8+ costly casts in 10 min at pinned magicka). Replayed on the 231 flags of 18-31 Oct: 3 in 10 min refuses the
     // one cheat 18 times and no one else; the one staff member flagged is spared by refuseStaff
@@ -589,9 +594,7 @@ module.exports = (api) => {
       : !isOn('refusehits') ? 'flag only'
         : spared ? 'flag only (staff)'
           : `flag only (${st.flagMinutes.length} of ${need} in ${Math.round(win / 60000)} min before refusal)`;
-    const text = `${st.pinned.length} costly casts in ${Math.round(MG.flagWindowMs / 60000)} min at full magicka with no drop after (${names.join(', ')}; ${cost} spell cost in all), `
-      + `stored magicka ${lo.toFixed(3)}-${hi.toFixed(3)} through each, no Fortify gear of the school worn, ${st.gearSkipped || 0} casts skipped for gear; server: ${action}`;
-    const sent = acFlag(a, 'magicka_free', { casts: st.pinned.length, cost }, text, { action });
+    const sent = acFlag(a, 'magicka_free', { casts: st.pinned.length, cost }, text(action), { action });
     if (sent && refuse) ST.refuse.set(a, t + MG.refuseMinutes * 60000);
   };
   // canPin false while a stall hold runs: the stored value is still watched (a drop clears a cast), nothing is pinned

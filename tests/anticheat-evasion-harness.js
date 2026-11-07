@@ -199,11 +199,12 @@ const wobble = (W, s) => W.set(A, 'percentages', { health: 1, magicka: s % 2 ? 0
   ok(got === 'MISS', 'a wobbling bar with concentration casts only: residual (6 Nov, honest taps look the same); the fork budget catches it', acLines(H));
 }
 {
-  const { W, H } = setup({});
+  const { W, H } = setup({ magicka: { refuseHits: true } });
   castEvery(H, W, A, 600, 2, DETECT);
   const got = verdict(H, 'magicka_');
-  note('magicka frozen at full, costly concentration casts only (Detect Life every 2 s)', got);
-  ok(got === 'MISS', 'a bar frozen at full with concentration casts only: residual (6 Nov, an honest tap refilled before the first report looks the same); the fork budget catches it', acLines(H));
+  note('magicka frozen at full, costly concentration casts only (Detect Life every 2 s)', got, 'magicka_free shadow only');
+  ok(got === 'SHADOW' && W.mp.onHitDamageAttempt(A, FRIEND, DETECT, 30, { spell: true }) === true,
+    'a bar frozen at full with concentration casts only: residual, a magicka_free shadow line only, never refused (6 Nov, an honest tap refilled before the first report looks the same)', acLines(H).slice(0, 2));
   const { W: W2, H: H2 } = setup({});
   castEvery(H2, W2, A, 120, 3, DETECT, (s) => { if (s % 10 === 1) W2.mp.onSpellCast(A, FIREBALL); });
   ok(verdict(H2, 'magicka_') === 'ALERT', '...the same frozen bar with Detect Life every 3 s and a Fireball every 10 s still alerts', acLines(H2).slice(0, 1));

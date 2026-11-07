@@ -2,8 +2,8 @@
 // replay of 20 minutes of live stored percentages with the casts made in them (tests/fixtures/anticheat-vitals-sample1.json,
 // anonymised) pins none; a client frozen at full magicka is flagged; Fortify gear of the school, a potion, a well, a refill,
 // a held charge, a concentration channel and a server freeze are not; concentration taps pin only on a bar frozen to the
-// bit, and concentration pins alone never flag, so Wall of Flames tapped under regen on a client that reports as
-// sendInputsService does is not flagged (6 Nov). A magicka regen potion is a refill like any other (the 6 s skip): the
+// bit, and concentration pins alone are a shadow line only, so Wall of Flames tapped under regen on a client that reports
+// as sendInputsService does is never flagged or refused (6 Nov). A magicka regen potion is a refill like any other (the 6 s skip): the
 // casts after it are judged as without it. Known residuals pinned here: at +200% regen an honest fire-and-forget cast
 // refilled before the first report pins on the frozen-bar path and is refused, and at +150% a cheap perked Firebolt among
 // Wall of Flames taps pins and lets the taps' concentration pins count. Each spell's record is read once.
@@ -213,6 +213,8 @@ const taps = (S, spell, from, to, moving) => {
   return { ev, bar };
 };
 const mfLines = (H) => acLines(H).filter((l) => /magicka_free/.test(l));
+// a concentration-only window's line: shadow, flag only, never refused
+const CONC_SHADOW_RX = /^ANTICHEAT magicka_free shadow Casterly #C4ST \(profile 1\): \d+ costly casts in 10 min at full magicka with no drop after \(\w+; \d+ spell cost in all\), stored magicka 1\.000-1\.000 through each, no Fortify gear of the school worn, \d+ casts skipped for gear; server: flag only \(concentration casts only, never refused\)( \(\d+ more folded\))?$/;
 {
   // Detect Life tapped every 3 s for 10 min at full magicka, the bar moving 0.993-1.000: the false positive of 6 Nov
   const S = setupRegen({ magicka: { refuseHits: true } });
@@ -231,12 +233,15 @@ const mfLines = (H) => acLines(H).filter((l) => /magicka_free/.test(l));
     'a fire-and-forget spell of cost 200 every 3 s, the same moving bar, no potion: flagged at the 8th cast as before', L[0]);
 }
 {
-  // a frozen bar spamming Detect Life: pinned on the frozen-bar path, but concentration pins alone are not flagged
+  // a frozen bar spamming Detect Life: pinned on the frozen-bar path, but concentration pins alone are a shadow line only
   const S = setupRegen({ magicka: { refuseHits: true } });
   const { ev } = taps(S, DETECT, 500, 60500, false);
   playTo(S.H, S.W, S.H.t0 + 100000, ev);
-  ok(pinned(S.G, A) === 20 && !mfLines(S.H).length && S.W.mp.onHitDamageAttempt(A, B, DETECT, 30, { spell: true }) === true,
-    `Detect Life spammed every 3 s on a bar frozen at exactly 1.000: ${pinned(S.G, A)} pinned, no flag (an honest tap refilled before the first report looks the same)`, { pinned: pinned(S.G, A), lines: mfLines(S.H) });
+  const L0 = mfLines(S.H), st0 = S.G.ST.players.get(A);
+  ok(pinned(S.G, A) === 20 && L0.length === 1 && CONC_SHADOW_RX.test(L0[0]) && /: 8 costly casts .*\(DetectLife; 1600 spell cost in all\)/.test(L0[0]),
+    `Detect Life spammed every 3 s on a bar frozen at exactly 1.000: ${pinned(S.G, A)} pinned, a shadow line at the 8th (an honest tap refilled before the first report looks the same)`, { pinned: pinned(S.G, A), lines: L0 });
+  ok(!(st0.flagMinutes || []).length && !S.G.ST.refuse.has(A) && S.W.mp.onHitDamageAttempt(A, B, DETECT, 30, { spell: true }) === true,
+    '...no flag minute, no refusal: their spell hits on players land with refuseHits on', { flagMinutes: st0.flagMinutes });
   // the same frozen bar with a fire-and-forget cast among them: the concentration pins count toward its flag
   const S2 = setupRegen({});
   const { ev: ev2 } = taps(S2, DETECT, 500, 120500, false);
@@ -244,7 +249,7 @@ const mfLines = (H) => acLines(H).filter((l) => /magicka_free/.test(l));
   ev2.sort((x, y) => x[0] - y[0]);
   playTo(S2.H, S2.W, S2.H.t0 + 160000, ev2);
   const L = mfLines(S2.H);
-  ok(!!L[0] && /: 8 costly casts in 10 min at full magicka with no drop after \((DetectLife, CostlyBolt|CostlyBolt, DetectLife); 1600 spell cost in all\), stored magicka 1\.000-1\.000 through each/.test(L[0]),
+  ok(!!L[0] && /^ANTICHEAT magicka_free Casterly #C4ST \(profile 1\): 8 costly casts in 10 min at full magicka with no drop after \((DetectLife, CostlyBolt|CostlyBolt, DetectLife); 1600 spell cost in all\), stored magicka 1\.000-1\.000 through each/.test(L[0]),
     '...the same frozen bar with one fire-and-forget cast of cost 200 among the taps: flagged at the 8th pinned cast', L[0]);
 }
 {
@@ -334,8 +339,9 @@ for (const [what, o] of [
   // Wall of Flames tapped: most taps are regenerated before the first report, so the stored value never moves
   const S = setupRegen({ magicka: { refuseHits: true } });
   const r = clientPlay(S, Object.assign({ spell: WALL, cost: 118, conc: true, every: 3000, to: 600000, held: HELD }, o));
-  ok(r.judged >= 150 && r.pins >= 30 && !r.lines.length && S.W.mp.onHitDamageAttempt(A, B, WALL, 30, { spell: true }) === true,
-    `Wall of Flames tapped 0.21-0.53 s every 3 s for 10 min ${what}, the client reporting as sendInputsService does: ${r.judged} taps judged, ${r.pins} pinned with the value unchanged, no flag, spell hits on players land`,
+  const st = S.G.ST.players.get(A);
+  ok(r.judged >= 150 && r.pins >= 30 && r.lines.every((l) => CONC_SHADOW_RX.test(l)) && !(st.flagMinutes || []).length && S.W.mp.onHitDamageAttempt(A, B, WALL, 30, { spell: true }) === true,
+    `Wall of Flames tapped 0.21-0.53 s every 3 s for 10 min ${what}, the client reporting as sendInputsService does: ${r.judged} taps judged, ${r.pins} pinned with the value unchanged, ${r.lines.length} shadow lines and no flag, spell hits on players land`,
     { judged: r.judged, pins: r.pins, reads: r.reads.length, lines: r.lines.slice(0, 2) });
 }
 // KNOWN RESIDUAL (6 Nov review): at +200% an honest fire-and-forget cast is refilled before the first report and pins as frozen
