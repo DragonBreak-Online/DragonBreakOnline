@@ -84,10 +84,6 @@ const DEFAULTS = {
     // casts leaves the stored value unchanged to the bit: while it is, the entry waits up to heldMaxMs before it counts
     heldMaxMs: 30000,
     refillSkipMs: 6000,
-    // a magicka regen potion or food: for its effect's duration, at most this long, a cast pins only on a frozen bar
-    regenSkipMaxMs: 300000,
-    // the regen effect's EFIT magnitude must be at least this (+50%: DBO_AlchRegenMagickaT1 and FortifyMagickaRate01)
-    regenMinMagnitude: 50,
     flagCount: 8, flagWindowMs: 600000, flagMinCost: 1200,
     refuseHits: false, refuseMinutes: 10,
     // Staff are flagged like anyone but never refused: an event GM's own spells (profile 94 was flagged 10 times in 14 days
@@ -531,14 +527,7 @@ module.exports = (api) => {
 
   // ---- vitals: magicka_free and stamina_free -------------------------------------------------------------------------------
   const pctOf = (a) => { try { const p = mp.get(a, 'percentages'); return p && typeof p === 'object' ? p : null; } catch (e) { return null; } };
-  const refill = (st, t, regenMs) => { st.lastRefill = t; st.casts.length = 0; if (regenMs > 0) st.regenUntil = Math.max(st.regenUntil || 0, t + regenMs); };
-  // the effects eating a potion or food applies, each as [MGEF DATA, EFIT]; an ingredient eaten raw applies its first only
-  const eatenEffects = (r) => {
-    const type = r ? String(r.record.type) : '';
-    if (type !== 'ALCH' && type !== 'INGR') return null;
-    const efids = fieldsOf(r, 'EFID'), efits = fieldsOf(r, 'EFIT');
-    return (type === 'INGR' ? efids.slice(0, 1) : efids).map((f, i) => [fieldsOf(recordOf(globalOf(r, u32(f, 0))), 'DATA')[0], efits[i]]);
-  };
+  const refill = (st, t) => { st.lastRefill = t; st.casts.length = 0; };
   // Whether eating it can raise magicka: an effect of the potion or food (an ingredient eaten raw applies its first effect
   // only) on Magicka, MagickaRate or MagickaRateMult (AV 25, 28, 156). Anything else eaten (a cabbage after each cast) is no
   // refill; a record that cannot be read counts as one. Cached per base id
@@ -547,24 +536,20 @@ module.exports = (api) => {
     const key = `i${baseId >>> 0}`;
     if (ST.gear.has(key)) return ST.gear.get(key);
     let yes = true;
-    try { const fx = eatenEffects(recordOf(baseId)); if (fx) yes = fx.some(([d]) => !d || d.data.byteLength < 0x48 || MAGICKA_AVS.has(u32(d, 0x44))); } catch (e) { yes = true; }
+    try {
+      const r = recordOf(baseId);
+      const type = r ? String(r.record.type) : '';
+      if (type === 'ALCH' || type === 'INGR') {
+        const efids = fieldsOf(r, 'EFID');
+        yes = (type === 'INGR' ? efids.slice(0, 1) : efids).some((f) => {
+          const d = fieldsOf(recordOf(globalOf(r, u32(f, 0))), 'DATA')[0];
+          return !d || d.data.byteLength < 0x48 || MAGICKA_AVS.has(u32(d, 0x44));
+        });
+      }
+    } catch (e) { yes = true; }
     if (ST.gear.size > 8000) ST.gear.clear();
     ST.gear.set(key, yes);
     return yes;
-  };
-  // ms its MagickaRateMult effect (AV 156, not hostile or detrimental) of regenMinMagnitude or more lasts, at most regenSkipMaxMs
-  const eatRegenMs = (baseId) => {
-    const key = `rm${baseId >>> 0}`;
-    let fx = ST.gear.get(key);
-    if (!fx) {
-      fx = [];
-      try { for (const [d, efit] of eatenEffects(recordOf(baseId)) || []) if (d && d.data.byteLength >= 0x48 && u32(d, 0x44) === 156 && !(u32(d, 0) & 5)) fx.push([f32(efit, 0), u32(efit, 8)]); } catch (e) { fx = []; }
-      if (ST.gear.size > 8000) ST.gear.clear();
-      ST.gear.set(key, fx);
-    }
-    const minMag = num(MG.regenMinMagnitude, 50);
-    const secs = fx.reduce((s, [mag, dur]) => (mag >= minMag ? Math.max(s, dur) : s), 0);
-    return Math.min(secs * 1000, Math.max(0, num(MG.regenSkipMaxMs, 300000)));
   };
   const onCast = (a, spellId, t) => {
     const st = playerOf(a);
@@ -579,7 +564,7 @@ module.exports = (api) => {
     const m = p ? Number(p.magicka) : NaN;
     if (!(m >= MG.fullAt)) return;
     if (s.school >= 18 && s.school <= 22 && ((wornFortify(a) & (1 << (s.school - 18))) || potionFortifies(a, s.school))) { st.gearSkipped++; return; }
-    st.casts.push({ t, spell: s.edid || (spellId >>> 0).toString(16), cost: s.cost, conc: s.conc, frozenOnly: s.conc || t < (st.regenUntil || 0), m0: m, min: m, max: m, changed: false });
+    st.casts.push({ t, spell: s.edid || (spellId >>> 0).toString(16), cost: s.cost, conc: s.conc, m0: m, min: m, max: m, changed: false });
     if (st.casts.length > 16) st.casts.shift();
   };
   const pinnedFlag = (st, a, t) => {
@@ -620,8 +605,8 @@ module.exports = (api) => {
       if (m > e.max) e.max = m;
       if (m !== e.m0) e.changed = true;
       let done = false;
-      // a concentration tap or a cast under regen is refilled before the client reports: it pins only if the value never moved
-      if (e.min < MG.dropBelow || (e.frozenOnly && e.changed)) done = true;
+      // a concentration tap is refilled before the client reports: it pins only if the value never moved
+      if (e.min < MG.dropBelow || (e.conc && e.changed)) done = true;
       else {
         const age = t - e.t, hold = e.conc ? MG.concentrationHoldMs : MG.holdMs;
         if (canPin && age >= hold && (e.changed || age >= MG.heldMaxMs)) { st.pinned.push(e); if (st.pinned.length > 32) st.pinned.shift(); done = true; pinnedFlag(st, a, t); }
@@ -875,7 +860,7 @@ module.exports = (api) => {
     if (typeof inner === 'function') {
       mp.onEatItem = function (actorId, baseId, ...rest) {
         const out = inner.call(this, actorId, baseId, ...rest);
-        try { const st = playerOf(Number(actorId) >>> 0), id = Number(baseId) >>> 0; if (st && out !== false && eatRefills(id)) refill(st, now(), eatRegenMs(id)); } catch (e) { err('eat', e); }
+        try { const st = playerOf(Number(actorId) >>> 0); if (st && out !== false && eatRefills(Number(baseId) >>> 0)) refill(st, now()); } catch (e) { err('eat', e); }
         return out;
       };
     }

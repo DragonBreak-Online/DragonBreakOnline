@@ -1,12 +1,12 @@
 // Scripted test for anticheat.js's interim vitals checks (ac-vitals-interim, ANTI-CHEAT DESIGN 17 Oct). magicka_free: a
 // replay of 20 minutes of live stored percentages with the casts made in them (tests/fixtures/anticheat-vitals-sample1.json,
 // anonymised) pins none; a client frozen at full magicka is flagged; Fortify gear of the school, a potion, a well, a refill,
-// a held charge, a concentration channel and a server freeze are not; concentration taps and casts under a magicka regen
-// potion (MagickaRateMult +50% or more) pin only on a bar frozen to the bit, and concentration pins alone never flag, so
-// Wall of Flames tapped under regen on a client that reports as sendInputsService does is not flagged (6 Nov). The regen
-// window covers a cast whose drop shows in a report; at +200% an honest fire-and-forget cast refilled before the first
-// report still pins on the frozen-bar path and is refused, and at +150% a cheap perked one does and then lets Wall of
-// Flames taps' concentration pins count: known residuals pinned here. Each spell's record is read once.
+// a held charge, a concentration channel and a server freeze are not; concentration taps pin only on a bar frozen to the
+// bit, and concentration pins alone never flag, so Wall of Flames tapped under regen on a client that reports as
+// sendInputsService does is not flagged (6 Nov). A magicka regen potion is a refill like any other (the 6 s skip): the
+// casts after it are judged as without it. Known residuals pinned here: at +200% regen an honest fire-and-forget cast
+// refilled before the first report pins on the frozen-bar path and is refused, and at +150% a cheap perked Firebolt among
+// Wall of Flames taps pins and lets the taps' concentration pins count. Each spell's record is read once.
 // stamina_free: frozen stamina through a 25 s sprint is flagged (shadow), a draining one is not. refuseHits: off by
 // default, and on, a flagged caster's spell hits are refused while weapon hits are not.
 //   node tests/anticheat-vitals-harness.js   (from server/)
@@ -183,9 +183,8 @@ for (const minCost of [30, 10]) {
 }
 // ---- concentration taps and magicka regen potions (6 Nov) -----------------------------------------------------------------------
 // a quarter-second tap of Detect Life (SPIT 200 a second) is regenerated before the client's next report of the bar
-const DETECT = 0x211ee, BOLT = 0x7a001, WALL = 0x7a002, REGEN_FX = 0x3eb07, RESTORE_FX = 0x3eb17, DAMAGE_REGEN_FX = 0x7a201;
-const REGEN_POT = 0x7a101, LONG_POT = 0x7a102, RESTORE_POT = 0x7a103, REGEN_ROOT = 0x7a104, SAP = 0x7a105, FORTIFY_POT = 0x7a106, FORTIFY_FX = 0x3eb08;
-const T1_POT = 0x7a107, WEAK_POT = 0x7a108, WEAK_ROOT = 0x7a109, RATE_POT = 0x7a10a, RATE_FX = 0x7a202, T5_POT = 0x7a10b;
+const DETECT = 0x211ee, BOLT = 0x7a001, WALL = 0x7a002, REGEN_FX = 0x3eb07;
+const REGEN_POT = 0x7a101, LONG_POT = 0x7a102, T1_POT = 0x7a107, T5_POT = 0x7a10b;
 const setupRegen = (anticheat) => {
   const S = setup(anticheat);
   const { W } = S;
@@ -193,22 +192,10 @@ const setupRegen = (anticheat) => {
   W.spell(BOLT, 'CostlyBolt', { cost: 200, school: 20 });
   W.spell(WALL, 'WallOfFlames', { cost: 118, castType: 2, school: 20 });
   W.mgef(REGEN_FX, 'AlchFortifyMagickaRate', { archetype: 0, av: 156 });
-  W.mgef(RESTORE_FX, 'AlchRestoreMagicka', { archetype: 0, av: 25 });
-  W.mgef(FORTIFY_FX, 'AlchFortifyMagicka', { archetype: 34, av: 25 });
-  // flags 0x4 (detrimental), archetype 0, MagickaRateMult
-  W.record(DAMAGE_REGEN_FX, 'MGEF', 'AlchDamageMagickaRate', [{ type: 'DATA', data: F.bytes(0x98, [[0, 'u', 4], [4, 'f', 1], [0x0c, 'u', -1], [0x44, 'u', 156]]) }]);
   const eff = (fx, mag, dur) => [{ type: 'EFID', data: F.u32(fx) }, { type: 'EFIT', data: F.bytes(12, [[0, 'f', mag], [8, 'u', dur]]) }];
   W.record(REGEN_POT, 'ALCH', 'TestRegenMagicka150', eff(REGEN_FX, 150, 300));
   W.record(LONG_POT, 'ALCH', 'TestRegenMagickaLong', eff(REGEN_FX, 150, 900));
-  W.record(RESTORE_POT, 'ALCH', 'TestRestoreMagicka', eff(RESTORE_FX, 50, 0));
-  W.record(FORTIFY_POT, 'ALCH', 'TestFortifyMagicka60s', eff(FORTIFY_FX, 50, 60));
-  W.record(REGEN_ROOT, 'INGR', 'TestRootRestoreThenRegen', [...eff(RESTORE_FX, 1, 0), ...eff(REGEN_FX, 50, 300)]);
-  W.record(SAP, 'INGR', 'TestSapDamageRegen', eff(DAMAGE_REGEN_FX, 100, 300));
-  W.mgef(RATE_FX, 'TestFortifyMagickaRateAV28', { archetype: 0, av: 28 });
   W.record(T1_POT, 'ALCH', 'TestRegenMagicka50', eff(REGEN_FX, 50, 300));
-  W.record(WEAK_POT, 'ALCH', 'TestRegenMagicka1', eff(REGEN_FX, 1, 300));
-  W.record(WEAK_ROOT, 'INGR', 'TestRootRegenMagicka1', eff(REGEN_FX, 1, 300));
-  W.record(RATE_POT, 'ALCH', 'TestMagickaRate50', eff(RATE_FX, 50, 300));
   W.record(T5_POT, 'ALCH', 'TestRegenMagicka200', eff(REGEN_FX, 200, 300));
   S.H.t0 = S.H.clock.t;
   return S;
@@ -261,66 +248,41 @@ const mfLines = (H) => acLines(H).filter((l) => /magicka_free/.test(l));
     '...the same frozen bar with one fire-and-forget cast of cost 200 among the taps: flagged at the 8th pinned cast', L[0]);
 }
 {
-  // a +150% regen potion of 300 s, then a cost 200 spell every 3 s on a moving bar: no flag in the window, old rules after
+  // a +150% regen potion is a refill like any magicka potion, no more: the cast 4 s after it is skipped, and a cost 200
+  // spell every 3 s after that on a moving bar is judged as without it (the 6 Nov regen window is gone)
   const S = setupRegen({ magicka: { refuseHits: true } });
   const { W, H, G } = S, t0 = H.t0;
   W.mp.onEatItem(A, REGEN_POT);
   const st = G.ST.players.get(A);
-  ok(st.regenUntil === t0 + 300000, 'a regen potion of 300 s (MagickaRateMult +150%): a 300 s regen window from the drink', st.regenUntil - t0);
-  const { ev, bar } = taps(S, BOLT, 7000, 420000, true);
-  playTo(H, W, t0 + 300000, ev);
-  const inside = bar.judged;
-  ok(inside >= 90 && pinned(G, A) === 0 && !mfLines(H).length, `...${inside} casts at full magicka inside it, the bar moving 0.993-1.000: none pinned, no flag`, { inside, pinned: pinned(G, A), lines: mfLines(H) });
-  playTo(H, W, t0 + 460000, ev.filter((e) => e[0] > H.clock.t));
+  const { ev, bar } = taps(S, BOLT, 4000, 300000, true);
+  playTo(H, W, t0 + 340000, ev);
   const L = mfLines(H);
-  ok(L.length >= 1 && /\(CostlyBolt; 1600 spell cost in all\)/.test(L[0]) && st.pinned.length >= 8 && st.pinned.every((e) => e.t >= t0 + 300000),
-    '...the window ends with the effect: the casts after it are judged by the old rules and flagged, none from inside it', { lines: L.slice(0, 1), first: st.pinned.length ? st.pinned[0].t - t0 : null });
+  ok(st.lastRefill === t0 && st.regenUntil === undefined && bar.judged === ev.length - 1 && !!L[0] && /: 8 costly casts in 10 min at full magicka with no drop after \(CostlyBolt; 1600 spell cost in all\), stored magicka 0\.99\d-1\.000 through each/.test(L[0]),
+    `a +150% regen potion, then a cost 200 spell every 3 s on a moving bar: a refill (the cast 4 s after it skipped), ${bar.judged} casts judged, flagged at the 8th as without it`, { judged: bar.judged, casts: ev.length, line: L[0] });
+  ok(L.some((l) => /server: refusing their spell hits on players/.test(l)) && W.mp.onHitDamageAttempt(A, B, BOLT, 30, { spell: true }) === false,
+    '...and refused once sustained, as without the potion', L.map((l) => l.slice(-60)));
 }
 {
-  // a frozen bar inside a regen potion's window: still caught there
+  // a frozen bar right after a regen potion: flagged
   const S = setupRegen({});
-  const { W, H, G } = S, t0 = H.t0;
+  const { W, H } = S, t0 = H.t0;
   W.mp.onEatItem(A, REGEN_POT);
   const { ev } = taps(S, BOLT, 7000, 290000, false);
   playTo(H, W, t0 + 299000, ev);
   const L = mfLines(H);
-  ok(G.ST.players.get(A).regenUntil > H.clock.t && !!L[0] && /: 8 costly casts .*\(CostlyBolt; 1600 spell cost in all\), stored magicka 1\.000-1\.000/.test(L[0]),
-    'a bar frozen at exactly 1.000 inside a regen potion\'s window: flagged within it', L[0]);
+  ok(!!L[0] && /: 8 costly casts .*\(CostlyBolt; 1600 spell cost in all\), stored magicka 1\.000-1\.000/.test(L[0]),
+    'a bar frozen at exactly 1.000 after a regen potion: flagged', L[0]);
 }
-{
-  // the window is the effect's own duration, capped by regenSkipMaxMs, and only a regen effect opens one
+for (const [what, item] of [['a +50% regen potion of 300 s', T1_POT], ['a +150% regen potion of 900 s', LONG_POT], ['a +200% regen potion of 300 s', T5_POT]]) {
+  // whatever its strength or length, a regen potion skips the casts for refillSkipMs (6 s) only
   const S = setupRegen({});
-  const st = S.G.ST.players.get(A), t0 = S.H.clock.t;
-  S.W.mp.onEatItem(A, LONG_POT);
-  ok(st.regenUntil === t0 + 300000, 'a regen potion of 900 s: its window is capped at regenSkipMaxMs (300 s)', st.regenUntil - t0);
-  const S2 = setupRegen({ magicka: { regenSkipMaxMs: 60000 } });
-  S2.W.mp.onEatItem(A, REGEN_POT);
-  ok(S2.G.ST.players.get(A).regenUntil === S2.H.clock.t + 60000, '...regenSkipMaxMs is read from the config (60 s)', S2.G.ST.players.get(A).regenUntil - S2.H.clock.t);
-  const S3 = setupRegen({});
-  const st3 = S3.G.ST.players.get(A);
-  S3.W.mp.onEatItem(A, RESTORE_POT);
-  S3.W.mp.onEatItem(A, FORTIFY_POT);
-  S3.W.mp.onEatItem(A, REGEN_ROOT);
-  S3.W.mp.onEatItem(A, SAP);
-  S3.H.clock.t += 7000; S3.W.mp.onSpellCast(A, BOLT);
-  ok(!(st3.regenUntil > 0) && st3.lastRefill === S3.H.clock.t - 7000 && pend(S3.G, A) === 1 && st3.casts[0].frozenOnly === false,
-    'a Restore Magicka potion, a Fortify Magicka one of 60 s, an ingredient whose regen effect is not its first, a detrimental regen effect: the 6 s skip only, no regen window', { regenUntil: st3.regenUntil, casts: st3.casts });
-  // the effect must be at least regenMinMagnitude (50) strong, on MagickaRateMult (AV 156)
-  const S4 = setupRegen({});
-  const st4 = S4.G.ST.players.get(A), t4 = S4.H.clock.t;
-  S4.W.mp.onEatItem(A, T1_POT);
-  ok(st4.regenUntil === t4 + 300000, 'a +50% regen potion of 300 s (the weakest DBO tier): a 300 s window', st4.regenUntil - t4);
-  for (const [what, item] of [['a 1-point regen potion of 300 s', WEAK_POT], ['a 1-point regen ingredient eaten raw', WEAK_ROOT], ['a MagickaRate (AV 28) potion of 50 for 300 s', RATE_POT]]) {
-    const S5 = setupRegen({});
-    const st5 = S5.G.ST.players.get(A);
-    S5.W.mp.onEatItem(A, item);
-    S5.H.clock.t += 7000; S5.W.mp.onSpellCast(A, BOLT);
-    ok(!(st5.regenUntil > 0) && st5.lastRefill === S5.H.clock.t - 7000 && pend(S5.G, A) === 1 && st5.casts[0].frozenOnly === false,
-      `${what}: a refill (the 6 s skip), no regen window`, { regenUntil: st5.regenUntil, casts: st5.casts });
-  }
-  const S6 = setupRegen({ magicka: { regenMinMagnitude: 151 } });
-  S6.W.mp.onEatItem(A, REGEN_POT);
-  ok(!(S6.G.ST.players.get(A).regenUntil > 0), '...regenMinMagnitude is read from the config (151: the +150% potion opens none)', S6.G.ST.players.get(A).regenUntil);
+  const st = S.G.ST.players.get(A);
+  S.W.mp.onEatItem(A, item);
+  S.H.clock.t += 4000; S.W.mp.onSpellCast(A, BOLT);
+  const skipped = pend(S.G, A) === 0;
+  S.H.clock.t += 3000; S.W.mp.onSpellCast(A, BOLT);
+  ok(skipped && pend(S.G, A) === 1 && st.regenUntil === undefined,
+    `${what}: a refill (the cast 4 s after it skipped), the cast 7 s after it judged as any other`, { skipped, casts: st.casts });
 }
 // a client reporting its bar as sendInputsService does: a changed value only, once a second at most, none while casting or 500 ms after
 const clientBar = (S, o) => {
@@ -367,7 +329,7 @@ const clientPlay = (S, o) => {
 for (const [what, o] of [
   ['under a +150% regen potion, pool 280', { pool: 280, bonus: 1.5, potion: REGEN_POT }],
   ['under a +150% regen potion, pool 400', { pool: 400, bonus: 1.5, potion: REGEN_POT }],
-  ['with +150% regen from gear (no potion, no window), pool 280', { pool: 280, bonus: 1.5 }],
+  ['with +150% regen from gear (no potion), pool 280', { pool: 280, bonus: 1.5 }],
 ]) {
   // Wall of Flames tapped: most taps are regenerated before the first report, so the stored value never moves
   const S = setupRegen({ magicka: { refuseHits: true } });
@@ -388,7 +350,7 @@ for (const [what, o] of [
     { judged: r.judged, pins: r.pins, reads: r.reads.length, lines: r.lines.slice(0, 1) });
 }
 {
-  // KNOWN RESIDUAL: a cheap perked fire-and-forget cast under +150% regen pins as frozen too, and lets the concentration pins count
+  // KNOWN RESIDUAL: a cheap perked fire-and-forget cast under +150% regen pins as on base, and lets the concentration pins count
   const S = setupRegen({ magicka: { refuseHits: true } });
   const r = clientPlay(S, { spell: WALL, cost: 118, conc: true, every: 3000, to: 600000, held: HELD, pool: 280, bonus: 1.5, potion: REGEN_POT,
     also: { spell: id('Firebolt'), cost: 41, conc: false, every: 60000, from: 8500 } });
