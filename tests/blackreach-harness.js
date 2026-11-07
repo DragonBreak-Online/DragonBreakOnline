@@ -152,7 +152,7 @@ const main = async () => {
   ok(lootCalls.length === 1 && JSON.stringify(lootCalls[0]) === JSON.stringify(['nightmare', true, 'skyrim', 'BlackreachLocation', (CFG.blackreach || {}).lootCap]), 'the roll is dungeons.js\'s Master boss roll from Skyrim\'s gear', lootCalls);
   ok(audits.some((t) => /^BLACKREACH /.test(t)), 'the loot is audited');
   given.length = 0;
-  ok(use(CH, P1) === false && /emptied this chest already/.test(last()) && !given.length, `rested: the same account gets nothing more for ${B.chestHours} hours`, last());
+  ok(use(CH, P1) === false && /emptied this chest already\. It rests for your whole account, alts included: \d+ more hours\./.test(last()) && !given.length, `rested: the same account gets nothing more for ${B.chestHours} hours`, last());
   ok(use(CH, P2) === false && given.length === 2, 'P2, whose companion fought the boss, gets their own roll');
   given.length = 0;
   ok(use(CH, P3) === false && given.length === 2, 'P3, in P1\'s party, shares the party\'s credit');

@@ -212,7 +212,7 @@ module.exports = (api) => {
     if (!(pid >= 0)) return false;   // a creature's AI opening the chest takes nothing
     const key = restKey(pid, targetId >>> 0);
     const until = Number(rest.get(key)) || 0;
-    if (until > Date.now()) return refuse(casterId, `You have emptied this chest already. It holds nothing for you for ${Math.ceil((until - Date.now()) / 3600000)} more hours.`);
+    if (until > Date.now()) return refuse(casterId, `You have emptied this chest already. It rests for your whole account, alts included: ${Math.ceil((until - Date.now()) / 3600000)} more hours.`);
     const alive = guardsAlive(entry, targetId >>> 0);
     if (alive.length) return refuse(casterId, `Its guardians still stand (${alive.length}). Bring them down first.`);
     if (!earned(pid, entry.bosses.size ? entry.bosses : entry.guards)) {
