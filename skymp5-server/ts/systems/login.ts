@@ -7,6 +7,8 @@ import { hasDiscordBanRole } from "./discordBanSystem";
 import { kickWithReason } from "./kickUtil";
 import { bindRolesToProfile } from "./patronTiers";
 import { guidOf } from "./actorUtil";
+import { devTicketDefaultTiers, loadDevTicketKey, looksLikeDevTicket, verifyDevTicket } from "./devTicket";
+import type * as crypto from "crypto";
 
 const loginFailedNotInTheDiscordServer = JSON.stringify({ customPacketType: "loginFailedNotInTheDiscordServer" });
 const loginFailedBanned = JSON.stringify({ customPacketType: "loginFailedBanned" });
@@ -23,6 +25,8 @@ const loginRefusedReasons: Record<string, string> = {
   notWhitelisted: "Your Discord account does not have access to this server yet.",
   legalNotAccepted: "Please accept the Terms of Service in the launcher. Update the launcher if you don't see them.",
 };
+const devOnlyLauncher = "This is the DragonBreak dev server. Choose Dev in the DragonBreak launcher (Lead GM and above) and press Play.";
+const devTicketRefused = "Your dev server pass was refused or has expired. Press Play in the DragonBreak launcher again to get a new one.";
 const loginRefusedDefault = "The server refused your login. Start the game again from the DragonBreak launcher, and ask staff if this keeps happening.";
 
 // A session is one URL segment of token characters
@@ -42,6 +46,15 @@ const clip = (v: unknown, n = 200): string => {
 };
 
 type Mp = any; // TODO
+
+// server-settings "devTickets": an offline-mode dev server behind a public relay admits launcher-signed tickets, and profileId logins only from loopback
+interface DevTicketConfig {
+  key: crypto.KeyObject | null;
+  tiers: string[];
+  profileIdOffset: number;
+  remoteProfileIdLogins: boolean;
+  revokedDiscordIds: Set<string>;
+}
 
 interface UserProfile {
   id: number;
@@ -244,8 +257,49 @@ export class Login implements System {
 
   async initAsync(ctx: SystemContext): Promise<void> {
     this.settingsObject = await Settings.get();
+    this.devTickets = this.readDevTicketConfig();
 
     this.log("Login system: master api key configured");
+  }
+
+  private readDevTicketConfig(): DevTicketConfig | null {
+    const raw = this.settingsObject?.allSettings?.["devTickets"] as Record<string, any> | undefined;
+    if (!raw || typeof raw !== "object") return null;
+    let key: crypto.KeyObject | null = null;
+    try { key = loadDevTicketKey(raw.publicKey); }
+    catch (err) { this.log(`Login: devTickets.publicKey is unusable (${(err as Error).message}); every dev ticket is refused`); }
+    if (!key) this.log("Login: devTickets is set without a usable publicKey; every dev ticket is refused");
+    const offset = Number.isSafeInteger(raw.profileIdOffset) && raw.profileIdOffset >= 0 ? raw.profileIdOffset : 1000000;
+    const tiers = Array.isArray(raw.tiers) && raw.tiers.length ? raw.tiers.map(String) : devTicketDefaultTiers;
+    const cfg: DevTicketConfig = {
+      key, tiers, profileIdOffset: offset,
+      remoteProfileIdLogins: raw.remoteProfileIdLogins === true,
+      revokedDiscordIds: new Set(Array.isArray(raw.revokedDiscordIds) ? raw.revokedDiscordIds.map(String) : []),
+    };
+    this.log(`Login: dev tickets on (tiers ${tiers.join(",")}, profile id offset ${offset}, profileId logins ${cfg.remoteProfileIdLogins ? "from anywhere" : "from loopback only"}, ${cfg.revokedDiscordIds.size} revoked)`);
+    return cfg;
+  }
+
+  private loginWithDevTicket(userId: number, ticket: unknown, ip: string, ctx: SystemContext): void {
+    const cfg = this.devTickets as DevTicketConfig;
+    const refuse = (why: string) => {
+      this.log(`Login: refused dev ticket from user ${userId} (ip ${ip}): ${why}`);
+      try { kickWithReason(ctx.svr as unknown as Mp, userId, devTicketRefused); } catch { }
+    };
+    if (!cfg.key) return refuse("no usable publicKey");
+    const result = verifyDevTicket(ticket, cfg.key, Math.floor(Date.now() / 1000), cfg.tiers);
+    if (result.ok === false) return refuse(result.reason);
+    const t = result.ticket;
+    if (cfg.revokedDiscordIds.has(t.d)) return refuse(`discord ${t.d} is revoked`);
+    const profileId = cfg.profileIdOffset + t.p;
+    const rawAdmin = this.settingsObject?.allSettings?.["adminProfileIds"];
+    const adminProfiles = Array.isArray(rawAdmin) ? (rawAdmin as number[]).map(Number) : [1];
+    if (adminProfiles.includes(profileId)) return refuse(`profile ${profileId} is an admin profile id`);
+    const roles = [...new Set(t.r)];
+    bindRolesToProfile(roles, profileId);
+    this.emit(ctx, "spawnAllowed", userId, profileId, roles, t.d);
+    loginsCounter.inc();
+    this.log(`Login: dev ticket ${t.u || "?"} (${t.t}, discord ${t.d}, ticket ${t.n.slice(0, 8)}) logged in as ${profileId}`);
   }
 
   customPacket(
@@ -282,7 +336,14 @@ export class Login implements System {
       ctx.svr.sendCustomPacket(userId, loginFailedSessionNotFound);
       return;
     }
-    if (this.offlineMode === true && gameData && gameData.session) {
+    if (this.offlineMode === true && gameData && gameData.session && this.devTickets) {
+      if (!looksLikeDevTicket(gameData.session)) {
+        this.log(`Login: refused user ${userId}, a master session on a dev ticket server: ${redactSession(gameData.session)}`);
+        try { kickWithReason(ctx.svr as unknown as Mp, userId, devOnlyLauncher); } catch { }
+        return;
+      }
+      this.loginWithDevTicket(userId, gameData.session, ip, ctx);
+    } else if (this.offlineMode === true && gameData && gameData.session) {
       this.log("The server is in offline mode, the client is NOT");
     } else if (this.offlineMode === false && gameData && gameData.session) {
       (async () => {
@@ -467,6 +528,11 @@ export class Login implements System {
     } else if (this.offlineMode === true && gameData && typeof gameData.profileId === "number") {
       let profileId = gameData.profileId;
       const isLoopback = !ip || ip === "127.0.0.1" || ip === "::1" || ip === "localhost" || ip.startsWith("127.");
+      if (this.devTickets && !this.devTickets.remoteProfileIdLogins && !isLoopback) {
+        this.log(`Login: refused profileId ${profileId} from ${ip}: this dev server takes launcher tickets only`);
+        try { kickWithReason(ctx.svr as unknown as Mp, userId, devOnlyLauncher); } catch { }
+        return;
+      }
       const rawAdmin = this.settingsObject?.allSettings?.["adminProfileIds"];
       const adminProfiles = Array.isArray(rawAdmin) ? (rawAdmin as number[]).map(Number) : [1];
       if (!isLoopback && adminProfiles.includes(profileId)) {
@@ -517,5 +583,6 @@ export class Login implements System {
   }
 
   private settingsObject: Settings;
+  private devTickets: DevTicketConfig | null = null;
   private fetchRetry = fetchRetry.default(global.fetch);
 }
