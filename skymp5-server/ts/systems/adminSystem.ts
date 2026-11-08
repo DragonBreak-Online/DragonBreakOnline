@@ -367,8 +367,12 @@ export class AdminSystem implements System {
   }
 
   // The roster as a tier may see it: below Lead GM the Discord id and name are blanked
+  // Discord ids and names for a Lead GM and above; IP and HWID for senior staff alone (Nat, 8 Nov: "senior staff only", the
+  // Owners and Developers, IDENTITY_TIERS), so a Lead GM's and a GM's rows carry neither
   private rosterForTier(tier: AdminTier, rows: any[]): any[] {
-    return DISCORD_ROSTER_TIERS.has(tier) ? rows : rows.map((r) => Object.assign({}, r, { d: "", dn: "" }));
+    const discord = DISCORD_ROSTER_TIERS.has(tier), identity = IDENTITY_TIERS.has(tier);
+    if (discord && identity) return rows;
+    return rows.map((r) => Object.assign({}, r, discord ? {} : { d: "", dn: "" }, identity ? {} : { ip: "", hwid: "" }));
   }
 
   // The character's #TAG (ff_charTag), or ""
@@ -569,7 +573,8 @@ export class AdminSystem implements System {
             tier,
             caps,
             mastery: this.mastery.summaryOf(ctx, myActorId),
-            bans: this.bans.list(),
+            // A ban's address is senior staff's alone, as the roster's; an IP-only ban still reads as one
+            bans: IDENTITY_TIERS.has(tier) ? this.bans.list() : this.bans.list().map((b) => Object.assign({}, b, { ip: "", name: b.name || (b.ip ? "(an IP ban)" : "") })),
             me: { a: myActorId.toString(16), b: this.beastOf(myActorId) },
             polymorph: this.polymorphOf(),
           }));
