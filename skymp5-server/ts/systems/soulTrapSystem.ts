@@ -386,6 +386,15 @@ export class SoulTrapSystem implements System {
 
   // The copies in either hand, or with none marked held, every carried copy of that weapon
   private heldCopies(ctx: SystemContext, casterId: number, weaponId: number): InventoryEntry[] {
+    // A player's held copies are marked only in the equip report, with their extras; the inventory carries no worn flag
+    try {
+      const eq = (ctx.svr as Mp).get(casterId, "equipment");
+      const worn = (eq && eq.inv && Array.isArray(eq.inv.entries) ? eq.inv.entries : [])
+        .filter((e: InventoryEntry) => e && (Number(e.baseId) >>> 0) === weaponId && (e.worn || e.wornLeft));
+      if (worn.length) return worn;
+    } catch {
+      // no equip report yet
+    }
     let entries: InventoryEntry[];
     try {
       const inv = (ctx.svr as Mp).get(casterId, "inventory");
