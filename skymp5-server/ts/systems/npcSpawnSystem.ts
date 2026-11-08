@@ -17,6 +17,8 @@ type Mp = any;
 
 const POLL_MS = 2000;
 const ZONES_FILE = "./NPC-Spawns.json";
+// Synchronous: the I/O pool can be starved at boot
+const zoneFileMtimeMs = (): number => { try { return fs.statSync(ZONES_FILE).mtimeMs; } catch { return 0; } };
 const SPAWNS_FILE = "./zone-spawns.json";
 const FALLEN_FILE = "./npc-fallen-spots.json";
 const STRANDED_FILE = "./npc-stranded-spots.json";
@@ -283,6 +285,8 @@ export class NpcSpawnSystem implements System {
   private reloadTimer: ReturnType<typeof setTimeout> | null = null;
   // Zone file text of the last full load; an identical file is not rebuilt
   private lastZoneText: string | null = null;
+  // Zone file mtime (ms) taken just before the last load read it, 0 when missing
+  private lastLoadMtimeMs = 0;
   // Base text -> NPC_ desc or "" (plugins never change while the process runs)
   private npcDescByText = new Map<string, string>();
   // Dead NPC actorId -> epoch ms when its corpse is destroyed
@@ -354,6 +358,8 @@ export class NpcSpawnSystem implements System {
   private async load(mp: Mp, reason: string): Promise<void> {
     this.loading = true;
     try {
+      // Before the read, so a write landing between the two still looks newer
+      this.lastLoadMtimeMs = zoneFileMtimeMs();
       const file = this.readZoneFile();
       if (typeof file === "string") {
         this.log(`NpcSpawnSystem: ${file}, keeping ${this.zones.length} zone(s)`);
@@ -1326,6 +1332,16 @@ export class NpcSpawnSystem implements System {
     watcher.on("change", schedule);
     watcher.on("unlink", schedule);
     watcher.on("error", (e: unknown) => this.log(`NpcSpawnSystem: watch error: ${e}`));
+    // Writes before the initial scan ends (the I/O pool is starved for minutes after boot) are never reported, so check once armed
+    watcher.on("ready", () => this.onWatchReady());
+  }
+
+  private onWatchReady(): void {
+    const mtime = zoneFileMtimeMs();
+    if (mtime > this.lastLoadMtimeMs) {
+      this.log(`NpcSpawnSystem: ${ZONES_FILE} was written before its watcher was ready; loading it now`);
+      this.queueLoad("written before the watcher was ready");
+    }
   }
 
   // Coalesces the burst of events one save produces into a single reload

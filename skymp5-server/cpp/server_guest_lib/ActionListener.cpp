@@ -919,13 +919,20 @@ const std::vector<uint32_t>& ImpactHazardSpells(WorldState* worldState,
 }
 
 // Cloaks and hazards (Blizzard, and the burning ground of a wall) hit with a
-// spell they grant, not the spell that was cast. The parent is a SPEL, a SCRL
-// or a staff's ENCH
+// spell they grant, not the spell that was cast. The parent is a SPEL, a SCRL,
+// a staff's ENCH or a SHOU (a dragon's breath leaves burning ground)
 bool IsSpellGrantedBy(WorldState* worldState, uint32_t parentSpellId,
                       uint32_t sourceId)
 {
   const auto parentLookup =
     worldState->GetEspm().GetBrowser().LookupById(parentSpellId);
+  if (parentLookup.rec && parentLookup.rec->GetType() == "SHOU") {
+    const auto words =
+      ShoutWordSpells(parentLookup, worldState->GetEspmCache());
+    return std::any_of(words.begin(), words.end(), [&](uint32_t word) {
+      return IsSpellGrantedBy(worldState, word, sourceId);
+    });
+  }
   if (!espm::IsSpellItem(parentLookup.rec) &&
       !espm::Convert<espm::ENCH>(parentLookup.rec)) {
     return false;
@@ -3130,9 +3137,33 @@ void ActionListener::OnSpellCast(const RawMessageData& rawMsgData,
     auto existing = restorationChannels.find(casterId);
     const bool hadChannel = existing != restorationChannels.end();
 
+    // The player's own client runs a timed self restore, the ceiling allows it
+    if (!isConcentration && !spellCastData.keepAlive && caster == myActor &&
+        targetActor == caster) {
+      const size_t before = restoreEffects.size();
+      std::erase_if(restoreEffects, [&](const espm::Effects::Effect& effect) {
+        const auto av =
+          espm::GetData<espm::MGEF>(effect.effectId, &partOne.worldState)
+            .data.primaryAV;
+        if (!IsRestoreAV(av) || effect.duration == 0) {
+          return false;
+        }
+        caster->NoteTimedRestore(spellCastData.spell, av, effect.magnitude,
+                                 static_cast<float>(effect.duration));
+        return true;
+      });
+      if (restoreEffects.size() != before) {
+        spdlog::info("ActionListener::OnSpellCast - {} timed restore(s) of "
+                     "spell {:x} left to {:x}'s client",
+                     before - restoreEffects.size(), spellCastData.spell,
+                     caster->GetFormId());
+      }
+    }
+
     // Concentration heals accrue per second of channel so a tap heals a tap's
     // worth
-    if (!isConcentration && !spellCastData.keepAlive) {
+    if (!isConcentration && !spellCastData.keepAlive &&
+        !restoreEffects.empty()) {
       targetActor->ApplyMagicEffects(restoreEffects, hasSweetpie);
       spdlog::info("ActionListener::OnSpellCast - applied {} restorative "
                    "effect(s) of spell {:x} to actor {:x}",

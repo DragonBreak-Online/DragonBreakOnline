@@ -139,6 +139,19 @@ const STAFF_LOGGED = ["claim", "abandon", "revoke", "lock", "unlock", "rename", 
 // What a GM below Lead GM may do to someone else's property (Nat, 25 Oct: "give regular GMs the ability to fix locks"):
 // lock or unlock it, re-key it, take back one copy, and cut a key for its owner. Never claim, hand over, name or share it
 const LOCK_FIX_ACTIONS = ["lock", "unlock", "revokekeys", "takekey", "createkey"];
+// Nothing inside a dungeon is property (Nat, 7 Nov, #bugs BlamBlam Banana: Harbard claimed Embershard Mine and locked every sack)
+const DUNGEON_REFUSED = ["claim", "lock", "transfer", "grantcontainer", "createkey", "rename", "assign", "share"];
+// A refused claim or lock in a dungeon earns a strike (gameplay dungeons.js __dboDungeonClaimRefused)
+const DUNGEON_STRIKE = ["claim", "lock"];
+const NO_DUNGEON_PROPERTY = "Nothing inside a dungeon can be owned or locked.";
+// A cell desc as dungeons.js normDesc keys __dboDungeonCells: hex id without leading zeros, plugin lower case
+const dungeonKey = (desc: string): string => {
+  const s = String(desc || "");
+  const i = s.indexOf(":");
+  if (i < 0) return s.toLowerCase();
+  const n = parseInt(s.slice(0, i), 16);
+  return (Number.isFinite(n) ? n.toString(16) : s.slice(0, i).toLowerCase()) + ":" + s.slice(i + 1).toLowerCase();
+};
 
 // Interior cells that belong to a hold, kept as a fallback for interiors whose exterior
 // door the server cannot place (old HoldClaims table, slugs mapped to zones.json ids).
@@ -326,6 +339,8 @@ export class HousingSystem implements System {
     };
     (globalThis as any).__dboHousing = {
       primaryOf: (ref: unknown) => primary(ref),
+      // tenancy.js refuses to list a door or chest inside a dungeon
+      inDungeon: (ref: unknown): boolean => this.inDungeon(ctx, Number(ref) >>> 0),
       // primaryOf's answer without reading the ref itself when no claim owns it (guilds.js hall roots, right after a boot)
       rootOfKnown: (ref: unknown) => this.rootOfKnown(ctx, Number(ref) >>> 0),
       // Whether every claim has had its first read, so a pass over all of them no longer stalls the loop
@@ -346,6 +361,7 @@ export class HousingSystem implements System {
       isFiefHolder: (actorId: unknown, ref: unknown) => { const p = primary(ref); return !!p && this.isFiefHolder(ctx, Number(actorId) >>> 0, p); },
       grant: (ref: unknown, actorId: unknown): string => {
         const p = primary(ref); if (!p) return "That is not a property.";
+        if (this.inDungeon(ctx, Number(ref) >>> 0) || this.inDungeon(ctx, p)) return NO_DUNGEON_PROPERTY;
         const actor = Number(actorId) >>> 0;
         const profileId = this.profileOf(ctx, actor); if (!profileId) return "That is nobody.";
         const rec = this.read(ctx, p) || emptyRecord();
@@ -446,6 +462,7 @@ export class HousingSystem implements System {
 
   // Locked means locked for everyone and access only unlocks it from the menu; with housingKeyRing, anyone with access walks in
   private onActivate(ctx: SystemContext, targetId: number, casterId: number): boolean {
+    if (this.inDungeon(ctx, targetId)) return true;
     const primary = this.primaryOf(ctx, targetId);
     if (!primary) return true;
     const rec = this.read(ctx, primary);
@@ -540,6 +557,45 @@ export class HousingSystem implements System {
     this.warm = true;
     this.warmQueue = null;
     this.log(`[housing] claim records warm: ${this.claimed.length} claims in ${((Date.now() - this.warmStartMs) / 1000).toFixed(1)} s`);
+    this.logDungeonClaims(ctx);
+  }
+
+  // Claims made in a dungeon before 7 Nov stay on record but open, lock and name nothing; staff revoke them from this list
+  private logDungeonClaims(ctx: SystemContext): void {
+    const hits: string[] = [];
+    for (const primary of this.claimed) {
+      if (!this.inDungeon(ctx, primary)) continue;
+      const rec = this.read(ctx, primary);
+      if (rec && rec.owner !== 0) hits.push(`${primary.toString(16)} owner ${rec.owner} "${rec.ownerName || ""}"${rec.locked ? " locked" : ""}`);
+    }
+    if (hits.length) this.log(`[housing] ${hits.length} claim(s) inside dungeons are inert: ${hits.join(", ")}`);
+  }
+
+  private isDungeonCell(desc: string): boolean {
+    const cells = (globalThis as any).__dboDungeonCells;
+    return !!desc && !!cells && typeof cells.has === "function" && cells.has(dungeonKey(desc));
+  }
+
+  // The dungeon cell a ref stands in, or a door's far side does; "" outside every dungeon
+  private dungeonCellOf(ctx: SystemContext, refrId: number): string {
+    if (!refrId || !(globalThis as any).__dboDungeonCells) return "";
+    for (const id of [refrId, this.partnerOf(ctx, refrId)]) {
+      const desc = id ? this.cellDescOf(ctx, id) : "";
+      if (this.isDungeonCell(desc)) return dungeonKey(desc);
+    }
+    return "";
+  }
+
+  private inDungeon(ctx: SystemContext, refrId: number): boolean {
+    return !!this.dungeonCellOf(ctx, refrId);
+  }
+
+  private refuseInDungeon(ctx: SystemContext, userId: number, actorId: number, ref: number, action: string): void {
+    this.notice(ctx, userId, NO_DUNGEON_PROPERTY);
+    this.log(`[housing] refused ${action} on ${ref.toString(16)} inside a dungeon for ${this.nameOf(ctx, actorId)} (actor ${actorId.toString(16)}, profile ${this.profileOf(ctx, actorId)})`);
+    if (DUNGEON_STRIKE.indexOf(action) === -1) return;
+    const hook = (globalThis as any).__dboDungeonClaimRefused;
+    try { if (typeof hook === "function") hook(actorId, action, ref, this.dungeonCellOf(ctx, ref)); } catch (e) { this.log(`[housing] dungeon claim hook failed: ${e}`); }
   }
 
   // A fresh actor needs the full picture: names and locks for every claim.
@@ -642,6 +698,10 @@ export class HousingSystem implements System {
     let primary = this.primaryOf(ctx, target);
     if (!primary) {
       this.notice(ctx, userId, "You cannot claim that.");
+      return;
+    }
+    if (DUNGEON_REFUSED.indexOf(action) !== -1 && (this.inDungeon(ctx, target) || this.inDungeon(ctx, primary))) {
+      this.refuseInDungeon(ctx, userId, actorId, target, action);
       return;
     }
     let rec = this.read(ctx, primary) || emptyRecord();
@@ -791,6 +851,12 @@ export class HousingSystem implements System {
     }
     if (rec.owner === 0) {
       this.notice(ctx, userId, "Nobody owns this.");
+      return;
+    }
+    // A hold's seat held by its ruler is the ruler's to give up: a Steward manages it but cannot take it from them (Nat, 7 Nov)
+    if (this.seatExempt(ctx, primary, rec.owner, this.ownerCharOf(rec)) && !this.seatExempt(ctx, primary, this.profileOf(ctx, actorId), actorId)
+      && !this.isStaffOverride(ctx, actorId, rec.owner)) {
+      this.notice(ctx, userId, "The ruler holds this seat by office: only the ruler can give it up.");
       return;
     }
     const formerName = rec.ownerName || "the owner";
@@ -973,6 +1039,7 @@ export class HousingSystem implements System {
     const holdsKey = owned && !isOwner && !isManager && this.hasAccess(ctx, primary, rec!, actorId);
 
     const lockFixer = owned && !isOwner && !isManager && this.isLockFixer(ctx, actorId, rec!);
+    if (this.inDungeon(ctx, target) || (primary && this.inDungeon(ctx, primary))) this.notice(ctx, userId, `${NO_DUNGEON_PROPERTY} Trying earns a strike.`);
     let view: string;
     if (isOwner) view = "owner";
     else if (isManager || lockFixer) view = "manager";
@@ -1221,15 +1288,24 @@ export class HousingSystem implements System {
     if (rec.owner === 0) return true;
     if (this.ownsAs(rec, v.profileId, v.actorId)) return true;
     if (v.admin) return true;
-    if (this.inHall(ctx, primary, rec, v)) return true;
+    if (this.keepsHall(ctx, primary, rec, v)) return true;
     if (this.isFiefHolder(ctx, v.actorId, primary)) return true;
     const hold = this.holdOf(ctx, primary);
     return !!hold && v.ranks.some((r) => r.hold === hold && MANAGER_RANKS.indexOf(r.rank) !== -1);
   }
 
+  // A hall's rooms and chests keep their own locks (Nat, 7 Nov, #bug-tracker 1566332108966858856): a plain member gets the way in only
+  // Only its leader, a sharing leader and a sharing office holder (guilds.js __dboHallKeeper) open every lock; older gameplay keeps every member
+  private keepsHall(ctx: SystemContext, root: number, rootRec: PropertyRecord, v: ViewerAccess): boolean {
+    const keeper = (globalThis as any).__dboHallKeeper;
+    if (typeof keeper !== "function") return this.inHall(ctx, root, rootRec, v);
+    if (!this.placesOn() || !rootRec.place || !v.actorId || rootRec.owner === 0) return false;
+    try { return keeper([root, rootRec.partner].filter(Boolean), v.actorId) === true; } catch { return false; }
+  }
+
   // A faction's hall (Nate, 4 Oct): a place whose door the gameplay lists as a faction's hall and whose owner leads that
-  // faction (guilds.js __dboHallMember); its members open, lock and use all of it as the owner does, but only the owner (or
-  // a manager) names it, cuts keys, assigns its rooms, hands it over or gives it up
+  // faction (guilds.js __dboHallMember); its members open and lock its ways in and use its shared chests, but only the owner
+  // (or a manager) names it, cuts keys, assigns its rooms, hands it over or gives it up
   private inHall(ctx: SystemContext, root: number, rootRec: PropertyRecord, v: ViewerAccess): boolean {
     if (!this.placesOn() || !rootRec.place || !v.actorId || rootRec.owner === 0) return false;
     const member = (globalThis as any).__dboHallMember;
@@ -1293,7 +1369,7 @@ export class HousingSystem implements System {
     const index = this.placeIndex(ctx);
     if (!index.size) return null;
     const cell = this.cellDescOf(ctx, refrId);
-    if (!cell) return null;
+    if (!cell || this.isDungeonCell(cell)) return null;
     const root = index.get(cell);
     if (!root) return null;
     const rec = this.read(ctx, root);
@@ -1472,7 +1548,8 @@ export class HousingSystem implements System {
       this.log(`[housing] ${primary.toString(16)} builds no place: ${inner} is ${o ? `also behind ${o.name}'s door ${o.ref.toString(16)}` : `part of ${index.get(inner)!.toString(16)}`}`);
       return;
     }
-    const cells = this.placeCellsFrom(ctx, inner, rec).filter((c) => c === inner || !taken(c));
+    if (this.isDungeonCell(inner)) return;
+    const cells = this.placeCellsFrom(ctx, inner, rec).filter((c) => (c === inner || !taken(c)) && !this.isDungeonCell(c));
     rec.place = { cells, builtAt: Date.now() };
     if (!this.write(ctx, primary, rec)) { delete rec.place; return; }
     const joined = this.joinEntrances(ctx, primary, rec);
@@ -2513,7 +2590,7 @@ export class HousingSystem implements System {
     const build = (v?: ViewerAccess) => {
       const refs: Array<Record<string, unknown>> = [];
       for (const { primary, rec, name } of entries) {
-        const live = !!rec && rec.owner !== 0;
+        const live = !!rec && rec.owner !== 0 && !this.inDungeon(ctx, primary);
         const locked = live && !!rec && rec.locked && !(v && this.hasAccessWith(ctx, primary, rec, v));
         refs.push({ refId: primary, name: live ? name : null, locked });
         if (rec && rec.partner) refs.push({ refId: rec.partner, name: live ? name : null, locked });
@@ -2535,8 +2612,9 @@ export class HousingSystem implements System {
     const live = snapshot || this.liveClaims(ctx);
     const names = new Map<number, string | null>(live.map((c) => [c.primary, c.rec.name]));
     for (const { primary, rec } of live) {
-      const name = this.shownName(rec, names);
-      const locked = rec.locked && !(v && this.hasAccessWith(ctx, primary, rec, v));
+      const inert = this.inDungeon(ctx, primary);
+      const name = inert ? null : this.shownName(rec, names);
+      const locked = !inert && rec.locked && !(v && this.hasAccessWith(ctx, primary, rec, v));
       refs.push({ refId: primary, name, locked });
       if (rec.partner) refs.push({ refId: rec.partner, name, locked });
     }
@@ -2556,7 +2634,7 @@ export class HousingSystem implements System {
     // Off until the place rules are: in dryrun every prompt reads as today (doors.json, the hub gates)
     if (!this.placesOn()) return "";
     const primary = this.primaryOf(ctx, refrId);
-    if (!primary) return "";
+    if (!primary || this.inDungeon(ctx, primary)) return "";
     const rec = this.read(ctx, primary);
     if (!rec || rec.owner === 0) return "";
     const root = rec.memberOf ? this.read(ctx, rec.memberOf) : null;

@@ -119,6 +119,8 @@ const GIVE_ALL_PER_TICK = 8;
 const GIVE_ALL_MAX = 400;
 // Ranks whose roster rows carry each account's Discord id and name (d, dn): Lead GM and above; a GM's rows have them blank
 const DISCORD_ROSTER_TIERS = new Set<AdminTier>(["senior", "developer", "leadgm"]);
+// IP and HWID in the roster and the ban list: senior staff only (Nat, 8 Nov), the Owners and Developers
+const ROSTER_IDENTITY_TIERS = new Set<AdminTier>(["senior", "developer"]);
 
 // Modes mirrored onto the neighbors-visible ff_adminModes actor property (registered in gamemode.js)
 const MIRRORED_MODES = ["god", "smite", "healhit", "invis", "ghost"];
@@ -354,9 +356,12 @@ export class AdminSystem implements System {
     return rows;
   }
 
-  // The roster as a tier may see it: below Lead GM the Discord id and name are blanked
+  // The roster as a tier may see it: below Lead GM the Discord id and name are blanked, and IP and HWID go to senior staff
+  // alone (ROSTER_IDENTITY_TIERS), so a Lead GM's and a GM's rows carry neither
   private rosterForTier(tier: AdminTier, rows: any[]): any[] {
-    return DISCORD_ROSTER_TIERS.has(tier) ? rows : rows.map((r) => Object.assign({}, r, { d: "", dn: "" }));
+    const discord = DISCORD_ROSTER_TIERS.has(tier), identity = ROSTER_IDENTITY_TIERS.has(tier);
+    if (discord && identity) return rows;
+    return rows.map((r) => Object.assign({}, r, discord ? {} : { d: "", dn: "" }, identity ? {} : { ip: "", hwid: "" }));
   }
 
   // The character's #TAG (ff_charTag), or ""
@@ -557,7 +562,8 @@ export class AdminSystem implements System {
             tier,
             caps,
             mastery: this.mastery.summaryOf(ctx, myActorId),
-            bans: this.bans.list(),
+            // A ban's address is senior staff's alone, as the roster's; an IP-only ban still reads as one
+            bans: ROSTER_IDENTITY_TIERS.has(tier) ? this.bans.list() : this.bans.list().map((b) => Object.assign({}, b, { ip: "", name: b.name || (b.ip ? "(an IP ban)" : "") })),
             me: { a: myActorId.toString(16), b: this.beastOf(myActorId) },
             polymorph: this.polymorphOf(),
           }));

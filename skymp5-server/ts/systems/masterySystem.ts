@@ -720,7 +720,7 @@ export class MasterySystem implements System {
     }
     for (const taken of out.tookFrom) {
       if (taken.levels <= 0) continue;
-      this.noticeFell(ctx, userId, taken.id, rec.skills[taken.id].level);
+      this.noticeFell(ctx, userId, taken.id, rec.skills[taken.id].level, { gainingId: id, gainingLevel: prog.level, levelsLost: taken.levels });
       this.syncRank(ctx, actorId, rec, taken.id, userId);
     }
     return out.units;
@@ -758,7 +758,7 @@ export class MasterySystem implements System {
     }
     for (const taken of out.tookFrom) {
       if (taken.levels <= 0) continue;
-      this.noticeFell(ctx, userId, taken.id, rec.skills[taken.id].level);
+      this.noticeFell(ctx, userId, taken.id, rec.skills[taken.id].level, { gainingId: skillId, gainingLevel: prog.level, levelsLost: taken.levels });
       this.syncRank(ctx, actorId, rec, taken.id, userId);
     }
     this.write(ctx, actorId, rec);
@@ -1195,16 +1195,31 @@ export class MasterySystem implements System {
     if (!P.firstTouch(rec as unknown as P.PointRecord, id, cfg)) return false;
     for (const [k, v] of Object.entries(rec.skills)) {
       if (k === id || !(k in before) || v.level >= before[k]) continue;
-      this.noticeFell(ctx, userId, k, v.level);
+      this.noticeFell(ctx, userId, k, v.level, { gainingId: id, gainingLevel: 1, levelsLost: before[k] - v.level });
       this.syncRank(ctx, actorId, rec, k, userId);
     }
     return true;
   }
 
-  private noticeFell(ctx: SystemContext, userId: number, id: string, level: number): void {
-    this.notice(ctx, userId, level < 1
-      ? `You have let ${this.labelOf(id)} go. Its points are free for other work; take it up again by doing it.`
-      : `Your ${this.labelOf(id)} slips to ${level}.`);
+  private noticeFell(ctx: SystemContext, userId: number, id: string, level: number, why?: { gainingId?: string; gainingLevel?: number; levelsLost?: number }): void {
+    if (level < 1) {
+      this.notice(ctx, userId, `You have let ${this.labelOf(id)} go. Its points are free for other work; take it up again by doing it.`);
+      return;
+    }
+    let reason = "";
+    if (why && why.gainingId) {
+      const lost = why.levelsLost && why.levelsLost > 0 ? why.levelsLost : 1;
+      const gainTier = this.tierNames[Math.max(0, P.tierOfLevel(why.gainingLevel ?? 1))] || "higher";
+      const donorTier = this.tierNames[Math.max(0, P.tierOfLevel(level + lost))] || "Novice";
+      if (lost > 1) {
+        reason = gainTier !== donorTier
+          ? ` (a ${gainTier} level costs more than one at ${donorTier}, so it took ${lost} of your lowered skills)`
+          : ` (pool full; took ${lost} of your lowered skills to raise ${this.labelOf(why.gainingId)})`;
+      } else {
+        reason = ` (pool full; 1 level surrendered to raise ${this.labelOf(why.gainingId)})`;
+      }
+    }
+    this.notice(ctx, userId, `Your ${this.labelOf(id)} slips to ${level}${reason}.`);
   }
 
   // After P.firstTouch has spent the pool point: settle the new entry, credit the banked units, write, and sync
