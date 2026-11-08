@@ -212,6 +212,72 @@ TEST_CASE("A dropped item carrying extras survives the drop queue cap",
   REQUIRE(deadDaggers == 1);
 }
 
+// Staff dropped gear to be rid of it and found it back at the next login
+// (Discord, 8 Nov). A staff character's gear goes like litter: queued, so
+// capped away, and never handed back.
+TEST_CASE("A staff character's dropped gear is litter, not kept",
+          "[DropItemTest]")
+{
+  auto& partOne = GetPartOne();
+  constexpr uint32_t ironDagger = 0x0001397E;
+  constexpr uint32_t ironSword = 0x00012EB7;
+
+  DoConnect(partOne, 0);
+  partOne.CreateActor(0xff000000, { 1, 2, 3 }, 0, 0x3c);
+  partOne.SetUserActor(0, 0xff000000);
+  MpActor& ac = partOne.worldState.GetFormAt<MpActor>(0xff000000);
+  ac.RemoveAllItems();
+  ac.SetPropertyValueDump("private.dboStaffChar", "true", false, false);
+  REQUIRE(ac.IsStaffCharacter());
+
+  // Other cases share the world: count only objects created from here on
+  uint32_t firstNew = 0xff000001;
+  for (uint32_t id = 0xff000001; id < 0xff000400; ++id) {
+    if (partOne.worldState.LookupFormById(id).get()) {
+      firstNew = id + 1;
+    }
+  }
+
+  Inventory::Entry tempered(ironSword, 1);
+  tempered.health = 1.5f;
+  ac.AddItems({ tempered });
+  ac.DropItem(ironSword, tempered);
+
+  // Ten daggers fill the queue of ten; the sword is the oldest and goes
+  for (int i = 0; i < 10; ++i) {
+    ac.AddItem(ironDagger, 1);
+    ac.DropItem(ironDagger, Inventory::Entry(ironDagger, 1));
+  }
+  partOne.Tick();
+
+  int liveSwords = 0, deadSwords = 0, liveDaggers = 0;
+  for (uint32_t id = firstNew; id < 0xff000400; ++id) {
+    auto form = partOne.worldState.LookupFormById(id);
+    auto* refr = dynamic_cast<MpObjectReference*>(form.get());
+    if (!refr) {
+      continue;
+    }
+    const bool dead = refr->IsDeleted();
+    if (refr->GetBaseId() == ironSword) {
+      dead ? ++deadSwords : ++liveSwords;
+    }
+    if (refr->GetBaseId() == ironDagger && !dead) {
+      ++liveDaggers;
+    }
+  }
+
+  REQUIRE(deadSwords == 1);
+  REQUIRE(liveSwords == 0);
+  REQUIRE(liveDaggers == 10);
+  REQUIRE(ac.GetInventory().GetItemCount(ironSword) == 0);
+
+  // A player who is not on a staff character keeps the old behaviour
+  ac.SetPropertyValueDump("private.dboStaffChar", "false", false, false);
+  REQUIRE_FALSE(ac.IsStaffCharacter());
+  ac.SetPropertyValueDump("private.dboStaffChar", "null", false, false);
+  REQUIRE_FALSE(ac.IsStaffCharacter());
+}
+
 // Nat tested the extras fix on dev with an item named 'asd' and it came straight back to his inventory. That
 // is not the extras path at all: ActionListener::OnDropItem refuses a NAMED item outright ("a made item
 // stays in the pack") and re-sends the inventory so the two sides cannot desync, so MpActor::DropItem is
