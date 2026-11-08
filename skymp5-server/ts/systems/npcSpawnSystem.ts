@@ -7,6 +7,7 @@ import { resolveEditorIds, isEditorId } from "./espmEditorIds";
 import { espmFieldFormIds } from "./formIdUtil";
 import { placeNpc, HOSTILE_PROP } from "./npcPlacement";
 import { destroyLeftovers } from "./actorUtil";
+import { isRidden } from "./mountSyncSystem";
 
 // The ScampServer / `mp` API is untyped here, same convention as spawn.ts.
 type Mp = any;
@@ -1007,6 +1008,8 @@ export class NpcSpawnSystem implements System {
   private checkMisplaced(mp: Mp, zone: Zone, now: number, index: PlayerIndex): void {
     for (const entry of zone.spawned) {
       if (!entry.id || entry.diedAt) continue;
+      // A ridden horse goes where its rider takes it
+      if (isRidden(entry.id)) continue;
       let pos: number[] = [];
       try { pos = mp.getActorPos(entry.id); } catch { continue; }
       if (this.desyncPull && this.resyncDesynced(mp, zone, entry, pos)) continue;
