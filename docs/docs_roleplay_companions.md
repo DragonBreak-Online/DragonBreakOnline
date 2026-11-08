@@ -32,7 +32,13 @@ Do not call `spawn` or `dismiss` synchronously inside a native gamemode event ab
 
 `opts` fields:
 
-- `kind`: `"summon"`, `"reanimated"` or `"companion"` (the default).
+- `kind`: `"summon"`, `"reanimated"`, `"companion"` (the default; GM warbands), `"placed"`, or one of the animal kinds:
+  - `"pet"` (server/pets.js): never takes a target, its blows never land and no blow on it lands;
+  - `"tame"` (server/pets.js): a player's tamed animal, which fights under the PvP rules like a summon;
+  - `"mount"` (server/mounts.js): a player's horse, which never fights but can be hurt.
+
+  An owner has at most one of each animal kind (a new one replaces the old), and none of them takes the summon slot.
+- After any companion ends, `globalThis.__dboCompanionEnded(info, reason)` is called when the gameplay defines it (`reason`: `died`, `replaced`, `owner left`, `dismissed`...). `__dboCompanions.level(id)` gives an actor's ACBS level.
 - `pos`, `rot`: where it stands. The default is 160 units in front of the owner.
 - `durationSec`: when it ends on its own. 0 or omitted means it lasts until dismissed or killed.
 - `persistent`: see below.
@@ -42,7 +48,7 @@ Do not call `spawn` or `dismiss` synchronously inside a native gamemode event ab
 Example, a pet that stays with its owner (`petBaseId` is the global form id of an NPC_ record):
 
 ```ts
-companionSystem.spawn(ownerActorId, petBaseId, { kind: "companion", persistent: true });
+companionSystem.spawn(ownerActorId, petBaseId, { kind: "pet", persistent: true });
 ```
 
 ## Kinds
