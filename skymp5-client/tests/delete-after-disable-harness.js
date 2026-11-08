@@ -107,6 +107,7 @@ function runtime(rt, fake, driftConfig) {
   check('the queued Disable then runs on the live ref', fake.crashes.length === 0 && forms.get(a).disabled);
   steps(25);
   check('once it settled, the copy is deleted', of(a, 'delete').length === 1, of(a));
+  check('the deferred plan may move the copy away first, but queues it before its Disable, never after the delete', (() => { const c = of(a); const d = c.findIndex((x) => x[0] === 'delete'); return d > 0 && c.slice(d + 1).length === 0 && c.filter((x) => x[0] === 'setPosition').every((x) => x[2] <= c.find((y) => y[0] === 'disable')[2]); })(), of(a));
   const dis = of(a, 'disable')[0], del = of(a, 'delete')[0];
   check('never in the frame of its disable', del && dis && del[2] > dis[2]);
 
@@ -146,6 +147,7 @@ function runtime(rt, fake, driftConfig) {
   rt.safeDelete(forms.get(i0));
   check('the delete plan deletes at once', of(i0, 'delete').length === 1);
   check('...with no disable queued before it (no same-frame disable + delete)', of(i0, 'disable').length === 0 && of(i0).every((x) => x[2] === f0), of(i0));
+  check('...and nothing latent beside it: no Disable or SetPosition queued in the delete frame (Jake 6cd100a96 order, 56113)', of(i0).length === 1 && of(i0)[0][0] === 'delete', of(i0));
   fake.runVm();
   check('...so no functor outlives it', fake.crashes.length === 0);
 
