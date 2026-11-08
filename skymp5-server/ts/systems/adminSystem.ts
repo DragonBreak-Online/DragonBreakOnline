@@ -55,6 +55,8 @@ type Mp = any;
 //                     { customPacketType: "adminMasteryRequest", target?, targetName? }  -> adminMastery
 //                     { customPacketType: "adminAction", action: "masterySetTier", target?, targetName?, skill, tier }
 //                     { customPacketType: "adminAction", action: "masteryDrop", target?, targetName?, skill }
+//                     { customPacketType: "adminAction", action: "masterySetLevel", target?, targetName?, skill, level }  one skill's exact level
+//                       (hours with the point system off); 0 sets a held skill aside under the point system (8 Nov)
 //                     { customPacketType: "adminItemsRequest" }  -> adminItems
 //                     { customPacketType: "adminLocationsRequest" }  -> adminLocations  (settings locations + admin-locations.json map markers)
 //                     { customPacketType: "adminAction", action: "giveItem", item, count, targetName? }
@@ -96,7 +98,7 @@ const ADMIN_MODES: Array<{ id: string; label: string }> = [
 
 // Lead GM and above only (TIER_CAPS.spawn); a GM keeps teleports, kick, observing modes and the roster
 const BAN_ACTIONS = new Set(["ban", "tempBan", "ipBan", "unban"]);
-const SPAWN_ACTIONS = new Set(["kill", "deleteCharacter", "masteryGrant", "masteryReset", "masterySetTier", "masteryDrop",
+const SPAWN_ACTIONS = new Set(["kill", "deleteCharacter", "masteryGrant", "masteryReset", "masterySetTier", "masterySetLevel", "masteryDrop",
   "giveItem", "giveSpells", "giveShouts", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm", "polymorphSelf", "npcZoneAdd", "npcZoneDelete", "npcZoneReset",
   "giveSpell", "removeSpell"]);
 const SPAWN_MODES = new Set(["smite", "healhit"]);
@@ -105,7 +107,7 @@ const EVENT_ZONE_ACTIONS = new Set(["npcZoneAdd", "npcZoneDelete", "npcZoneReset
 // An NPC zone needs the adder's open /event (staffguard.js), so without a working gate it is refused, never let through
 const EVENT_GATED_ACTIONS = new Set(["npcZoneAdd"]);
 // Panel actions whose missing target means the staff member themself (resolveTarget)
-const SELF_TARGETED = new Set(["masterySetTier", "masteryDrop", "giveItem", "giveSpells", "giveShouts", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm"]);
+const SELF_TARGETED = new Set(["masterySetTier", "masterySetLevel", "masteryDrop", "giveItem", "giveSpells", "giveShouts", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm"]);
 // Give all spells and Give all shouts are batched across ticks and capped.
 // The 17 Oct freeze was the Papyrus learned-list read: Actor.GetSpellCount and GetNthSpell called
 // IsSpellLearnedFromBase once per learned spell, and each call re-evaluated the NPC_, template, leveled list,
@@ -124,6 +126,9 @@ const DISCORD_ROSTER_TIERS = new Set<AdminTier>(["senior", "developer", "leadgm"
 const MIRRORED_MODES = ["god", "smite", "healhit", "invis", "ghost"];
 // Staff rank in the mirror (Nate, 14 Oct): an Invisible staff member is hidden from lower ranks and a ghost to the same or
 // higher; each staff member's own mirror carries their rank, which their client compares (formView adminViewOf)
+// Panel actions the gameplay's staff rules (staffguard.js PANEL_KIND) do not name yet, gated as the action whose rule they
+// share: a level set is a tier set as far as the "skills" target rule goes, so it never slips past it on an older gameplay
+const GATE_AS: Record<string, string> = { masterySetLevel: "masterySetTier" };
 const STAFF_RANK: Record<AdminTier, number> = { senior: 5, developer: 4, leadgm: 3, gm: 2 };
 const TRIAL_RANK = 1;
 
@@ -614,7 +619,7 @@ export class AdminSystem implements System {
       this.reply(mp, userId, false, "The staff rules are not loaded, so the ban is refused. Try again in a minute.");
       return;
     }
-    const refused = this.gate(myActorId, action, this.gateInfo(mp, myActorId, action, content, trial));
+    const refused = this.gate(myActorId, GATE_AS[action] || action, this.gateInfo(mp, myActorId, action, content, trial));
     if (refused) {
       this.adminLog(`profile ${adminProfile} (${trial ? "trialgm" : tier}) was refused ${action === "toggleMode" ? `the ${mode} mode` : action}: ${refused}`);
       this.reply(mp, userId, false, refused);
@@ -669,7 +674,7 @@ export class AdminSystem implements System {
       this.reply(mp, userId, true, "Done");
       return;
     }
-    if (["masterySetTier", "masteryDrop", "giveItem", "giveSpells", "giveShouts", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm",
+    if (["masterySetTier", "masterySetLevel", "masteryDrop", "giveItem", "giveSpells", "giveShouts", "giveWerewolf", "giveVampireLord", "giveDisease", "giveCurse", "setSchool", "beastForm",
       "giveSpell", "removeSpell"].indexOf(action) !== -1) {
       const who = this.resolveTarget(mp, myActorId, content);
       if (!who) { this.reply(mp, userId, false, "No online player by that name"); return; }
@@ -857,6 +862,18 @@ export class AdminSystem implements System {
         const tier = Number(content["tier"]);
         const r = this.mastery.adminSetTier(ctx, who.actorId, skill, tier);
         if (r.ok) this.adminLog(`profile ${adminProfile} set ${skill} to tier ${tier} for ${whom}, ${this.mastery.usesLevels() ? `level ${r.level}` : `${r.level} h`}`);
+        this.reply(mp, userId, r.ok, `${who.name}: ${r.text}`);
+        if (r.ok) this.sendMasteryDetail(ctx, mp, userId, who);
+        return;
+      }
+      // The player log reads "set <skill> to level <n> for" (or "to hours <n>") from the admin log line (playerlog-rules.js)
+      if (action === "masterySetLevel") {
+        const skill = String(content["skill"] ?? "");
+        // A missing or blank level is never read as 0, which would set the skill aside
+        const raw = content["level"];
+        const level = typeof raw === "number" || (typeof raw === "string" && raw.trim() !== "") ? Number(raw) : NaN;
+        const r = this.mastery.adminSetLevel(ctx, who.actorId, skill, level);
+        if (r.ok) this.adminLog(`profile ${adminProfile} set ${skill} to ${this.mastery.usesLevels() ? "level" : "hours"} ${r.level} for ${whom}`);
         this.reply(mp, userId, r.ok, `${who.name}: ${r.text}`);
         if (r.ok) this.sendMasteryDetail(ctx, mp, userId, who);
         return;

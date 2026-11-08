@@ -1002,6 +1002,26 @@ export class MasterySystem implements System {
     return { ok: true, text: `${label} set to ${name} (${this.points ? `level ${level}` : `${level} h`})`, level };
   }
 
+  // Admin: puts one skill at an exact level (hours with the point system off), within the same limits as a tier set.
+  // Under the point system, 0 sets a held skill aside, as a grant down to 0 does; with it off, 0 hours is Novice
+  adminSetLevel(ctx: SystemContext, actorId: number, skillId: string, level: number): AdminSkillResult {
+    if (!this.def(skillId)) return { ok: false, text: "No such skill" };
+    const cfg = this.points;
+    const top = cfg ? Math.min(cfg.capPerSkill, P.MAX_LEVEL) : MAX_GRANT;
+    if (!Number.isInteger(level) || level < 0 || level > top) return { ok: false, text: `${cfg ? "A level" : "Hours"} must be a whole number from 0 to ${top}` };
+    const rec = this.read(ctx, actorId) || emptyRecord();
+    const label = this.labelOf(skillId);
+    if (cfg && level < 1 && (rec.skills[skillId]?.level ?? 0) < 1) return { ok: false, text: `${label} is not taken up, so there is nothing to set aside` };
+    const refused = this.limitRefusal(rec, skillId, level, `${label} to level ${level}`);
+    if (refused) return { ok: false, text: refused };
+    this.putLevel(ctx, actorId, rec, skillId, level, 0);
+    const prog = rec.skills[skillId];
+    const name = this.tierNames[prog.rank] || "";
+    this.notice(ctx, this.userOf(ctx, actorId), cfg ? (level < 1 ? `${label} has been set aside.` : `Your ${label} now stands at level ${level}.`) : `Your hours as a ${label} now stand at ${level}.`);
+    if (cfg && level < 1) return { ok: true, text: `${label} set aside`, level };
+    return { ok: true, text: `${label} set to ${cfg ? `level ${level}` : `${level} h`} (${name})`, level };
+  }
+
   // Sets one skill's level and settles its rank, marker spells, actor values and the menu; a skill not held is taken up
   private putLevel(ctx: SystemContext, actorId: number, rec: MasteryRecord, skillId: string, level: number, xp: number): void {
     const userId = this.userOf(ctx, actorId);
