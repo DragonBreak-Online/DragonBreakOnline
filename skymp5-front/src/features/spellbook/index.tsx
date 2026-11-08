@@ -15,6 +15,8 @@ export interface BookSpell {
   rank: number;
   rankName: string;
   prepared: boolean;
+  // What the spell does, written by the server from its effects (spells.js about)
+  about?: string;
 }
 
 export interface SpellbookData {
@@ -97,6 +99,7 @@ const Spellbook = ({ data }: { data: SpellbookData }) => {
                     <span className={'tomeShop__rank ' + rankClass(s.rank)}>{s.rankName}</span>
                   </div>
                   <div className="tomeShop__spell">{s.name}</div>
+                  {s.about ? <div className="tomeShop__about">{s.about}</div> : null}
                   <div className="tomeShop__tome-foot">
                     <span />
                     <button
@@ -140,6 +143,7 @@ const Spellbook = ({ data }: { data: SpellbookData }) => {
                           <span className={'tomeShop__rank ' + rankClass(s.rank)}>{s.rankName}</span>
                         </div>
                         <div className="tomeShop__spell">{s.name}</div>
+                        {s.about ? <div className="tomeShop__about">{s.about}</div> : null}
                         <div className="tomeShop__tome-foot">
                           <span className="spellbook__state">{s.prepared ? 'Prepared' : 'In the book'}</span>
                           {s.prepared ? null : (

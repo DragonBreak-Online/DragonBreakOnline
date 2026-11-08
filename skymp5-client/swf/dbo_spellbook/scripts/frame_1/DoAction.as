@@ -115,6 +115,7 @@ function drawPrepared()
       }
       var e = flowEntry(String(s.name), [[busyId == String(s.id) && busy() ? "..." : "Put away", function() { change("unprepare", this._parent.spell); }, undefined, data.atCollege != true || busy()]], s.school + "  ·  " + s.rankName);
       e.spell = s;
+      spellAbout(s);
    }
    if (data.atCollege != true && data.hint != undefined && data.hint != "")
    {
@@ -151,7 +152,17 @@ function drawKnown()
          var sub = s.rankName + "  ·  " + (s.prepared == true ? "Prepared" : "In the book") + (why != "" ? "  ·  " + why : "");
          var e = flowEntry(String(s.name), s.prepared == true ? [] : [[busyId == String(s.id) && busy() ? "..." : "Prepare", function() { change("prepare", this._parent.spell); }, undefined, why != "" || busy()]], sub);
          e.spell = s;
+         spellAbout(s);
       }
+   }
+}
+
+// What the spell does, under its row (the server writes it from the spell's effects: spells.js about)
+function spellAbout(s)
+{
+   if (s.about != undefined && s.about != "")
+   {
+      flowHint("    " + s.about);
    }
 }
 

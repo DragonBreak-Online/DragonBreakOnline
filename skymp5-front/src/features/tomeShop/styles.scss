@@ -392,6 +392,7 @@ $tome-ranks: (
     text-transform: uppercase;
   }
 
+  &__about { margin-top: 3px; color: $dbo-text-dim; font-size: 13px; line-height: 1.35; }
   &__spell {
     margin-top: 2px;
     color: $dbo-silver;

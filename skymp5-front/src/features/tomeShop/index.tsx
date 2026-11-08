@@ -21,6 +21,8 @@ export interface Tome {
   price: number;
   canAfford: boolean;
   blocked: string;
+  // What the spell does, written by the server from its effects (spells.js about)
+  about?: string;
 }
 
 export interface TomeShopData {
@@ -254,6 +256,7 @@ const TomeShop = ({ data }: { data: TomeShopData }) => {
                         <span className={'tomeShop__rank ' + rankClass(t.rank)}>{t.rankName}</span>
                       </div>
                       <div className="tomeShop__spell">{t.spell}</div>
+                      {t.about ? <div className="tomeShop__about">{t.about}</div> : null}
                       <div className="tomeShop__tome-name">{t.name}</div>
                       {t.blocked ? <div className="tomeShop__blocked">{t.blocked}</div> : null}
                       <div className="tomeShop__tome-foot">
@@ -289,6 +292,7 @@ const TomeShop = ({ data }: { data: TomeShopData }) => {
               <p className="tomeShop__confirm-spell">
                 {confirmTome.spell} · {confirmTome.school} · <span className={'tomeShop__rank ' + rankClass(confirmTome.rank)}>{confirmTome.rankName}</span>
               </p>
+              {confirmTome.about ? <p className="tomeShop__about">{confirmTome.about}</p> : null}
               <p className="tomeShop__confirm-text">
                 Buy for <b>{goldText(confirmTome.price)} gold</b>? This is your one tome this week.
               </p>

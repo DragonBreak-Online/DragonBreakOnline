@@ -473,6 +473,11 @@ function tomeRow(t)
    {
       disable(b);
    }
+   // What the spell does, under the row (the server writes it from the spell's effects: spells.js about)
+   if (t.about != undefined && t.about != "")
+   {
+      flowHint(String(t.about));
+   }
 }
 
 function drawList()
