@@ -837,7 +837,7 @@ export class AdminSystem implements System {
   private sendIdentity(mp: Mp, userId: number, myActorId: number, adminProfile: number, tier: AdminTier, profile: number): void {
     if (!Number.isSafeInteger(profile) || profile <= 0) { this.reply(mp, userId, false, "No such profile"); return; }
     if (!IDENTITY_TIERS.has(tier)) {
-      this.adminLog(`profile ${adminProfile} (${tier}) was refused the IP and HWID of profile ${profile} (Owners and Developers only)`);
+      this.adminLog(`profile ${adminProfile} (${tier}) was refused the address and hardware id of profile ${profile} (Owners and Developers only)`);
       this.reply(mp, userId, false, "IP and HWID are for the Owners and Developers");
       return;
     }
@@ -854,7 +854,7 @@ export class AdminSystem implements System {
       ip = ip || String(raw?.lastIp ?? "");
       const hwid = String(raw?.hwid ?? "") || guid;
       const name = live ? live.name : String(raw?.displayName || raw?.username || "");
-      this.adminLog(`profile ${adminProfile} (${tier}) viewed the IP and HWID of ${name || "an account"} (profile ${profile})`);
+      this.adminLog(`profile ${adminProfile} (${tier}) viewed the address and hardware id of ${name || "an account"} (profile ${profile})`);
       try { mp.sendCustomPacket(userId, JSON.stringify({ customPacketType: "adminIdentity", profile, name, ip: this.maskIp(ip), hwid, online: !!live })); }
       catch (e) { this.log(`AdminSystem: adminIdentity reply failed: ${e}`); }
     }).catch((e) => this.log(`AdminSystem: the IP and HWID of profile ${profile} could not be read: ${e}`));

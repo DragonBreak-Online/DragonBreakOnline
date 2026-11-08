@@ -228,18 +228,20 @@ const skillsJson = (pointSystem) => JSON.stringify({
   check('identity: ...the address masked to two octets, as the roster masks it', !!id && id.ip === '192.0.x.x', id);
   check('identity: ...the backend\'s hardware id', !!id && id.hwid === 'HWID-MIRA-0123456789', id);
   check('identity: ...sent to the Owner alone', identityAnywhere().length === 1 && identityAnywhere()[0].u === SENIOR.userId && leaks().length === 0, packets.map((x) => x.u));
-  check('identity: ...and logged once, naming the profile and never the address', logs.length === 1 && logs[0] === `profile ${SENIOR.profileId} (senior) viewed the IP and HWID of Mira (profile ${MIRA.profileId})` && !/192\.0|HWID-|guid-/.test(logs[0]), logs);
+  check('identity: ...and logged once, naming the profile and never the address', logs.length === 1 && logs[0] === `profile ${SENIOR.profileId} (senior) viewed the address and hardware id of Mira (profile ${MIRA.profileId})` && !/192\.0|HWID-|guid-/.test(logs[0]), logs);
+  // playerlog-rules.js adminLogParse cuts " ip <hex...>" and everything after it, which would take the target with it
+  check('identity: ...worded so the player log\'s address cut leaves the target in it', logs.length === 1 && !/ ip [0-9a-f.:\[\]]+/i.test(logs[0]), logs);
   request(DEV, 'adminIdentityRequest', { profile: 77 });
   await flush(); await flush();
   id = replies(DEV, 'adminIdentity')[0];
   check('identity: a Developer asking for an offline profile gets the backend\'s last address, masked', !!id && id.profile === 77 && id.online === false && id.ip === '198.51.x.x' && id.hwid === 'HWID-AWAY-9876543210', id);
-  check('identity: ...logged as a view', logs.length === 1 && logs[0].startsWith(`profile ${DEV.profileId} (developer) viewed the IP and HWID of`) && /\(profile 77\)$/.test(logs[0]), logs);
+  check('identity: ...logged as a view', logs.length === 1 && logs[0].startsWith(`profile ${DEV.profileId} (developer) viewed the address and hardware id of`) && /\(profile 77\)$/.test(logs[0]), logs);
   for (const [who, tier] of [[LEAD, 'leadgm'], [GM, 'gm']]) {
     request(who, 'adminIdentityRequest', { profile: MIRA.profileId });
     await flush(); await flush();
     check(`identity: a ${tier} is refused`, replies(who, 'adminIdentity').length === 0 && replies(who, 'adminActionResult').some((x) => x.ok === false && /Owners and Developers/.test(x.text)), packets);
     check(`identity: ...nothing about the address reaches any client (${tier})`, identityAnywhere().length === 0 && leaks().length === 0, packets);
-    check(`identity: ...and the refusal is logged (${tier})`, logs.length === 1 && logs[0] === `profile ${who.profileId} (${tier}) was refused the IP and HWID of profile ${MIRA.profileId} (Owners and Developers only)`, logs);
+    check(`identity: ...and the refusal is logged (${tier})`, logs.length === 1 && logs[0] === `profile ${who.profileId} (${tier}) was refused the address and hardware id of profile ${MIRA.profileId} (Owners and Developers only)`, logs);
   }
   request(MIRA, 'adminIdentityRequest', { profile: SENIOR.profileId });
   await flush(); await flush();
