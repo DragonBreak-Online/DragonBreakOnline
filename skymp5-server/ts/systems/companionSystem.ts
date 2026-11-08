@@ -43,6 +43,8 @@ export interface CompanionInfo {
   expiresAt: number;
   persistent: boolean;
   source: number;
+  // Holds its ground instead of following until ordered to follow again
+  staying: boolean;
 }
 
 interface Companion extends CompanionInfo {
@@ -51,8 +53,6 @@ interface Companion extends CompanionInfo {
   createdAt: number;
   lastRetargetAt: number;
   ownerAwaySince: number;
-  // Holds its ground instead of following until ordered to follow again
-  staying: boolean;
   // Command Daedra: the owner it goes back to, and when (0: never)
   lentBy: number;
   returnAt: number;
@@ -505,8 +505,8 @@ export class CompanionSystem implements System {
   }
 
   private toInfo(c: Companion): CompanionInfo {
-    const { id, ownerId, baseId, kind, targetId, expiresAt, persistent, source } = c;
-    return { id, ownerId, baseId, kind, targetId, expiresAt, persistent, source };
+    const { id, ownerId, baseId, kind, targetId, expiresAt, persistent, source, staying } = c;
+    return { id, ownerId, baseId, kind, targetId, expiresAt, persistent, source, staying };
   }
 
   private ownedBy(ownerId: number): Companion[] {

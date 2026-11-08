@@ -2,7 +2,7 @@
 // are companions under the PvP rules; one of each at a time). Checks: a pet or mount takes no attack order and never defends, its
 // blows never land and blows on a pet never land; a tame fights NPCs and a player only under the PvP rules; a second pet, tame or
 // mount replaces the first without touching the summon slot; the gameplay's __dboCompanionEnded hook hears every end and why;
-// the kinds survive a logout in the registry; __dboCompanions.level reads the record's ACBS level. Bundles companionSystem.ts
+// the kinds survive a logout in the registry; info carries staying; __dboCompanions.level reads the ACBS level. Bundles companionSystem.ts
 // with esbuild (settings and placement stubbed). Run it from skymp5-server with node_modules present:
 //
 //   node tests/companion-kinds-harness.js
@@ -100,6 +100,9 @@ const PLAYER_BASE = 0x7, HARE = 0x6dc9d, WOLF = 0x23abe, HORSE = 0x68d03, SUMMON
   // Orders and defence
   check('a pet takes no attack order', sys.orderAttack(pet, NPC) === false);
   check('a mount takes no attack order', sys.orderAttack(horse, NPC) === false);
+  sys.orderStay(pet);
+  check('info tells the gameplay a pet is staying', sys.info(pet).staying === true && sys.info(horse).staying === false, sys.info(pet));
+  sys.orderFollow(pet);
   check('a tame takes an attack order on an NPC', sys.orderAttack(tame, NPC) === true && sys.info(tame).targetId === NPC);
   sys.orderFollow(tame);
   sys.defend(A, NPC);
