@@ -1,7 +1,9 @@
 #include "TestUtils.hpp"
 #include <catch2/catch_all.hpp>
 
+#include "ActionListener.h"
 #include "HitMessage.h"
+#include "RawMessageData.h"
 
 PartOne& GetPartOne();
 
