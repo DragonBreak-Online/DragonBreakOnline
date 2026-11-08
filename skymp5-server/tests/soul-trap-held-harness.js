@@ -64,13 +64,15 @@ rec(WOLF_BASE, 'NPC_', [{ type: 'ACBS', data: acbs(1) }]);
   const realNow = Date.now;
   Date.now = () => now;
 
-  // One fight: the attacker holds `entries`, hits a level 1 wolf with `weapon`, and the wolf dies `afterMs` later
-  const fight = async (weapon, entries, afterMs = 1000) => {
+  // One fight: the attacker holds `entries`, hits a level 1 wolf with `weapon`, and the wolf dies `afterMs` later;
+  // `equipment` is the equip report's worn entries, where the server marks a player's held copies
+  const fight = async (weapon, entries, afterMs = 1000, equipment) => {
     const sys = new SoulTrapSystem((...x) => logs.push(x.join(' ')));
     await sys.initAsync(ctx);
     props.clear();
     props.set(`${A}|inventory`, { entries: [...entries, { baseId: PETTY, count: 1 }] });
     props.set(`${A}|profileId`, 3);
+    if (equipment) props.set(`${A}|equipment`, { inv: { entries: equipment } });
     props.set(`${T}|type`, 'MpActor');
     props.set(`${T}|isDead`, false);
     props.set(`${T}|templateChain`, [WOLF_BASE]);
@@ -107,6 +109,17 @@ rec(WOLF_BASE, 'NPC_', [{ type: 'ACBS', data: acbs(1) }]);
     !(await fight(IRON_SWORD, [{ baseId: IRON_SWORD, count: 1, worn: true, enchantmentEffects: trapEffects }], 5000)));
   check('another weapon base held does not lend its enchantment',
     !(await fight(IRON_SWORD, [{ baseId: STEEL_SWORD, count: 1, worn: true, enchantmentEffects: trapEffects }])));
+
+  // A player's inventory carries no worn flag: the copy in the hand is the one the equipment report marks
+  check('held in equipment only: a plain copy in the hand beside a soul trap copy in the pack does not trap',
+    !(await fight(IRON_SWORD, [{ baseId: IRON_SWORD, count: 1 }, { baseId: IRON_SWORD, count: 1, enchantmentEffects: trapEffects }], 1000,
+      [{ baseId: IRON_SWORD, count: 1, worn: true }])));
+  check('held in equipment only: the soul trap copy in the hand traps, beside a plain one in the pack',
+    await fight(IRON_SWORD, [{ baseId: IRON_SWORD, count: 1 }, { baseId: IRON_SWORD, count: 1, enchantmentEffects: trapEffects }], 1000,
+      [{ baseId: IRON_SWORD, count: 1, worn: true, enchantmentEffects: trapEffects }]));
+  check('held in equipment only, in the left hand: it traps',
+    await fight(IRON_SWORD, [{ baseId: IRON_SWORD, count: 1, enchantmentEffects: trapEffects }], 1000,
+      [{ baseId: IRON_SWORD, count: 1, wornLeft: true, enchantmentEffects: trapEffects }]));
 
   Date.now = realNow;
   fs.rmSync(out, { recursive: true, force: true });
