@@ -98,9 +98,11 @@ public:
 
   Networking::UserId GetUserId() const;
 
+  bool IsStaffCharacter() const;
+
   // Re-checks a dropped item that carries extras: kept while its owner is
-  // online, returned to their inventory when they log out. See
-  // MpActor::DropItem.
+  // online, returned to their inventory when they log out. A staff
+  // character's drop is not kept. See MpActor::DropItem.
   void ScheduleDroppedExtrasCheck(MpObjectReference* placedObject,
                                   uint32_t droppedItemFormId,
                                   const Inventory::Entry& dropped,
