@@ -919,13 +919,20 @@ const std::vector<uint32_t>& ImpactHazardSpells(WorldState* worldState,
 }
 
 // Cloaks and hazards (Blizzard, and the burning ground of a wall) hit with a
-// spell they grant, not the spell that was cast. The parent is a SPEL, a SCRL
-// or a staff's ENCH
+// spell they grant, not the spell that was cast. The parent is a SPEL, a SCRL,
+// a staff's ENCH or a SHOU (a dragon's breath leaves burning ground)
 bool IsSpellGrantedBy(WorldState* worldState, uint32_t parentSpellId,
                       uint32_t sourceId)
 {
   const auto parentLookup =
     worldState->GetEspm().GetBrowser().LookupById(parentSpellId);
+  if (parentLookup.rec && parentLookup.rec->GetType() == "SHOU") {
+    const auto words =
+      ShoutWordSpells(parentLookup, worldState->GetEspmCache());
+    return std::any_of(words.begin(), words.end(), [&](uint32_t word) {
+      return IsSpellGrantedBy(worldState, word, sourceId);
+    });
+  }
   if (!espm::IsSpellItem(parentLookup.rec) &&
       !espm::Convert<espm::ENCH>(parentLookup.rec)) {
     return false;
