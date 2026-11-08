@@ -20,7 +20,7 @@ const stubSources = {
   '../settings': 'module.exports = { Settings: { get: async () => globalThis.__admin.settings } };',
   './npcSpawnSystem': 'module.exports = { NpcSpawnSystem: class {} };',
   './masterySystem': 'module.exports = { MasterySystem: class {}, MAX_GRANT: 0 };',
-  './adminBans': 'module.exports = { AdminBans: class { list() { return []; } } };',
+  './adminBans': 'module.exports = { AdminBans: class { list() { return (globalThis.__admin.bans || []).map((b) => Object.assign({}, b)); } } };',
 };
 const stubFilter = new RegExp('^(' + Object.keys(stubSources).map((k) => k.replace(/[./-]/g, '\\$&')).join('|') + ')$');
 
@@ -67,6 +67,7 @@ const mp = {
 };
 
 globalThis.__admin = {
+  bans: [{ id: "b1", profileId: 0, name: "", ip: "10.0.0.9", until: 0, reason: "an ip ban", by: "profile 1", at: 1 }, { id: "b2", profileId: 31, name: "Banned One", ip: "10.0.0.8", until: 0, reason: "griefing", by: "profile 1", at: 2 }],
   settings: {
     name: 'test', master: 'http://master.test', masterKey: 'KEY',
     allSettings: { masterApiAuthToken: 't', adminRoles: { senior: ['role-senior'], developer: ['role-dev'], leadgm: ['role-lead'], gm: ['role-gm'], trialgm: ['role-trial'] } },
@@ -117,6 +118,14 @@ const settle = async () => { for (let i = 0; i < 30; i++) await turn(); };
   for (const s of STAFF.filter((x) => ['senior', 'developer', 'leadgm'].includes(x.tier))) {
     const { menu } = await menuFor(s, s.tier);
     const mira = rowOf(menu.players, MIRA.profileId), off = rowOf(menu.players, OFFLINE.profileId);
+    // IP and HWID: senior staff only (Nat, 8 Nov), so the Owners and Developers keep them and a Lead GM loses them
+    if (s.tier === 'leadgm') {
+      check('leadgm: no row carries an IP or HWID (senior staff only)', menu.players.every((r) => r.ip === '' && r.hwid === ''), menu.players.map((r) => [r.p, r.ip, r.hwid]));
+      check('leadgm: the ban list hides the address', menu.bans.length === 2 && menu.bans.every((b) => b.ip === ''), menu.bans);
+    } else {
+      check(`${s.tier}: rows keep the masked IP and the HWID`, !!off && off.ip !== '' && off.hwid === 'hwid-offline' && !!mira && mira.ip !== '' && mira.hwid !== '', [off, mira]);
+      check(`${s.tier}: the ban list keeps the address`, menu.bans.some((b) => b.ip === '10.0.0.9'), menu.bans);
+    }
     check(`${s.tier}: an online player's row carries the Discord id and name`, !!mira && mira.online && mira.d === MIRA.discordId && mira.dn === MIRA.discordName, mira);
     check(`${s.tier}: an offline account's row carries them too`, !!off && !off.online && off.d === OFFLINE.discordId && off.dn === OFFLINE.discordName, off);
   }
@@ -131,7 +140,11 @@ const settle = async () => { for (let i = 0; i < 30; i++) await turn(); };
     const mira = rowOf(rows, MIRA.profileId), off = rowOf(rows, OFFLINE.profileId);
     check('GM: online players keep the actor id, name and #TAG the tools act on', !!mira && mira.online && mira.a === MIRA.actorId.toString(16) && mira.n === MIRA.name && mira.t === MIRA.tag, mira);
     check('GM: a player with no profile yet is listed, without Discord', rows.some((r) => r.online && r.n === NOPROFILE.name && r.d === ''), rows.map((r) => r.n));
-    check('GM: offline accounts are still listed by profile, as before', !!off && !off.online && off.ip !== '' && off.hwid === 'hwid-offline', off);
+    // Re-targeted (Nat 8 Nov: IP and HWID for senior staff only): a GM's rows still list offline accounts by profile, now with
+    // no address or hardware id
+    check('GM: offline accounts are still listed by profile, with no IP or HWID (senior staff only)', !!off && !off.online && off.ip === '' && off.hwid === '', off);
+    check('GM: no row carries an IP or HWID', rows.every((r) => r.ip === '' && r.hwid === ''), rows.map((r) => [r.p, r.ip, r.hwid]));
+    check('GM: the ban list hides the address, an IP-only ban still reads as one', menu.bans.length === 2 && menu.bans.every((b) => b.ip === '') && menu.bans.some((b) => b.name === '(an IP ban)'), menu.bans);
     check('GM: the menu still carries the GM caps, modes and bans', menu.caps && menu.caps.ban === false && menu.caps.spawn === false && Array.isArray(menu.modes) && menu.modes.length === 7 && Array.isArray(menu.bans), menu.caps);
     packets.length = 0;
     sys.customPacket(gm.userId, 'adminAction', { customPacketType: 'adminAction', action: 'teleportTo', target: mira ? mira.a : '' }, ctx);
