@@ -141,6 +141,8 @@ const TAMRIEL = 0x3c;
   check('E on a horse sends the rider a ride order', order.length === 1 && order[0].op === 'ride' && order[0].horse === H, order);
   check('the host grant goes out with the order', hosters.get(H) === A, hosters.get(H));
   check('the horse is reserved for the rider before it mounts', mp.onHostAttempt(B, H) === false);
+  clear();
+  check("the client's own activate on the order is swallowed", mp.onActivate(H, A) === false && packetsTo(1, 'dboRide').length === 0 && prevActivate.length === 0, sent);
   check('E on a wolf passes down the chain', mp.onActivate(WOLF, A) === true && prevActivate.length === 1, prevActivate);
   actor(H2).dead = true;
   check('E on a dead horse passes down the chain (looting)', mp.onActivate(H2, A) === true && prevActivate.length === 2, prevActivate);

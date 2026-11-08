@@ -172,7 +172,8 @@ export class MountSyncSystem implements System {
   private onActivate(mp: Mp, target: number, caster: number): boolean {
     if (!isPlayerActor(mp, caster) || userOf(mp, caster) < 0) return false;
     if (!this.isMountable(mp, target) || !isAlive(mp, target)) return false;
-    if (horseOf(caster) === target) return true;
+    // The client's own activate on the ride order comes back here
+    if (horseOf(caster) === target || pending.get(caster)?.horse === target) return true;
     const refusal = this.refusal(mp, caster, target, Infinity);
     if (refusal) {
       this.sendRider(mp, caster, { op: "refused", horse: target, reason: refusal });
