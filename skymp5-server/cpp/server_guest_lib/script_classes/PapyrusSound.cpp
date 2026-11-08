@@ -37,4 +37,5 @@ void PapyrusSound::Register(
 
   AddMethod(vm, "Play", &PapyrusSound::Play);
   AddStubStatic(vm, "StopInstance", VarValue::None());
+  AddStubStatic(vm, "SetInstanceVolume", VarValue::None());
 }
