@@ -4,17 +4,20 @@ import { Settings } from "../settings";
 import { System, Log, SystemContext, Content, WORLD_LOADED_EVENT } from "./system";
 import { placeNpc, placeAtMe, NpcLocation, HOSTILE_PROP } from "./npcPlacement";
 import { toFormId } from "./formIdUtil";
+import { npcLevel } from "./espmMagic";
 import { userOf, isAlive, isNear, hex, baseIdOf, destroyLeftovers, destroyRef, isPlayerActor } from "./actorUtil";
 
 // The ScampServer / `mp` API is untyped here, same convention as spawn.ts.
 type Mp = any;
 
-// Companion library: NPC allies owned by a player (summons, reanimated corpses, later pets such as dogs).
+// Companion library: NPC allies owned by a player (summons, reanimated corpses, pets, tamed animals and mounts).
 // API, protocol and lifecycle are documented in docs/docs_roleplay_companions.md; the owner's client side is companionService.ts.
 
 // "placed": an actor an explosion puts down, as the DLC2 spider scrolls do. A summon in every way except that it is
 // not commanded, so it takes no summon slot and never evicts one (Nat, 25 Oct).
-export type CompanionKind = "summon" | "reanimated" | "companion" | "placed";
+// "pet": a passive animal (server/pets.js), never fights and is never struck. "tame": a player's tamed dangerous animal under the
+// PvP rules ("companion" stays the GM warbands' kind, server/warband.js). "mount": a player's horse (server/mounts.js), never fights.
+export type CompanionKind = "summon" | "reanimated" | "companion" | "placed" | "pet" | "tame" | "mount";
 
 export interface CompanionOptions {
   kind?: CompanionKind;
@@ -40,6 +43,8 @@ export interface CompanionInfo {
   expiresAt: number;
   persistent: boolean;
   source: number;
+  // Holds its ground instead of following until ordered to follow again
+  staying: boolean;
 }
 
 interface Companion extends CompanionInfo {
@@ -48,8 +53,6 @@ interface Companion extends CompanionInfo {
   createdAt: number;
   lastRetargetAt: number;
   ownerAwaySince: number;
-  // Holds its ground instead of following until ordered to follow again
-  staying: boolean;
   // Command Daedra: the owner it goes back to, and when (0: never)
   lentBy: number;
   returnAt: number;
@@ -71,12 +74,19 @@ interface Saved extends Stored {
 }
 
 // commanded: counts toward the owner's command limit; dieOnEnd: expiry and dismissal kill it instead of removing it; corpseSec null: NPC corpse rule
-const KIND_RULES: Record<CompanionKind, { commanded: boolean; dieOnEnd: boolean; corpseSec: number | null; lootable: boolean }> = {
-  summon: { commanded: true, dieOnEnd: false, corpseSec: 3, lootable: false },
-  reanimated: { commanded: true, dieOnEnd: true, corpseSec: null, lootable: true },
-  companion: { commanded: false, dieOnEnd: false, corpseSec: 120, lootable: true },
-  placed: { commanded: false, dieOnEnd: false, corpseSec: 3, lootable: false },
+// fights: takes targets and its blows land; guarded: blows on it never land; limit: most of this kind one owner has (0: no limit)
+interface KindRule { commanded: boolean; dieOnEnd: boolean; corpseSec: number | null; lootable: boolean; fights: boolean; guarded: boolean; limit: number }
+const KIND_RULES: Record<CompanionKind, KindRule> = {
+  summon: { commanded: true, dieOnEnd: false, corpseSec: 3, lootable: false, fights: true, guarded: false, limit: 0 },
+  reanimated: { commanded: true, dieOnEnd: true, corpseSec: null, lootable: true, fights: true, guarded: false, limit: 0 },
+  companion: { commanded: false, dieOnEnd: false, corpseSec: 120, lootable: true, fights: true, guarded: false, limit: 0 },
+  placed: { commanded: false, dieOnEnd: false, corpseSec: 3, lootable: false, fights: true, guarded: false, limit: 0 },
+  pet: { commanded: false, dieOnEnd: false, corpseSec: 3, lootable: false, fights: false, guarded: true, limit: 1 },
+  tame: { commanded: false, dieOnEnd: false, corpseSec: 30, lootable: false, fights: true, guarded: false, limit: 1 },
+  mount: { commanded: false, dieOnEnd: false, corpseSec: 30, lootable: false, fights: false, guarded: false, limit: 1 },
 };
+// globalThis function the gameplay provides: (info, reason) after a companion ends, so pets.js and mounts.js see a death
+const ENDED_HOOK = "__dboCompanionEnded";
 
 // NPC corpses and ash piles last this long; overridable via "npcCorpseSeconds", the zone NPC setting
 const DEFAULT_CORPSE_SEC = 300;
@@ -115,10 +125,10 @@ const PVP_HOSTILE_MS = 60000;
 // globalThis function the gameplay provides: (ownerId, targetPlayerId) => true when the owner may fight that player now.
 // Missing, throwing or anything but true refuses, so a companion fights no player at all until the gameplay says it may.
 const PVP_RULE_HOOK = "__dboCompanionMayFight";
-// The kinds these rules cover: a player's summons and raised corpses. Other kinds (GM warbands, server/warband.js, and later
+// The kinds these rules cover: a player's summons, raised corpses and tamed animals. Other kinds (GM warbands, server/warband.js, and later
 // pets) target players as before, and are no player's side when another companion picks a target.
 // "placed" is here because a scroll's spider fights like a summon; only its slot and its lifetime differ
-const PVP_KINDS: ReadonlySet<CompanionKind> = new Set<CompanionKind>(["summon", "reanimated", "placed"]);
+const PVP_KINDS: ReadonlySet<CompanionKind> = new Set<CompanionKind>(["summon", "reanimated", "placed", "tame"]);
 // A summon's extra weapon, carried but not worn: its host's engine switches to it in close combat (Nate, 11 Oct)
 const SUMMON_SIDEARMS: Record<string, string> = {
   "45b9:Dawnguard.esm": "2c66f:Skyrim.esm", // DLC1SoulCairnBonemanSummon: DraugrSword, Ancient Nord Sword
@@ -279,6 +289,7 @@ export class CompanionSystem implements System {
       return null;
     }
     if (KIND_RULES[kind].commanded) this.makeRoom(ownerId);
+    this.makeRoomOfKind(ownerId, kind);
     let id = 0;
     let loc: NpcLocation | null = null;
     try {
@@ -329,7 +340,7 @@ export class CompanionSystem implements System {
 
   orderAttack(companionId: number, targetId: number): boolean {
     const c = this.companions.get(companionId >>> 0);
-    if (!c || !this.mayTarget(c, targetId >>> 0, COMMAND_RANGE)) return false;
+    if (!c || !KIND_RULES[c.kind].fights || !this.mayTarget(c, targetId >>> 0, COMMAND_RANGE)) return false;
     if (c.targetId !== targetId >>> 0) {
       c.targetId = targetId >>> 0;
       c.lastRetargetAt = Date.now();
@@ -371,7 +382,7 @@ export class CompanionSystem implements System {
     const now = Date.now();
     let changed = false;
     for (const c of mine) {
-      if (c.targetId === aggressorId || (c.targetId && now - c.lastRetargetAt < DEFEND_RETARGET_MS)) continue;
+      if (!KIND_RULES[c.kind].fights || c.targetId === aggressorId || (c.targetId && now - c.lastRetargetAt < DEFEND_RETARGET_MS)) continue;
       if (!this.pvpAllows(c, aggressorId)) continue;
       c.targetId = aggressorId;
       c.lastRetargetAt = now;
@@ -387,7 +398,7 @@ export class CompanionSystem implements System {
     const now = Date.now();
     let changed = false;
     for (const c of mine) {
-      if (c.targetId === targetId || !this.pvpAllows(c, targetId)) continue;
+      if (!KIND_RULES[c.kind].fights || c.targetId === targetId || !this.pvpAllows(c, targetId)) continue;
       c.targetId = targetId;
       c.lastRetargetAt = now;
       changed = true;
@@ -462,6 +473,7 @@ export class CompanionSystem implements System {
       list: (ownerId: unknown) => this.list(Number(ownerId) >>> 0),
       release: (id: unknown, hostile: unknown) => this.releaseToWorld(Number(id) >>> 0, hostile === true),
       regroup: (id: unknown) => this.regroup(Number(id) >>> 0),
+      level: (id: unknown) => { try { return npcLevel(this.mp, Number(id) >>> 0); } catch { return 1; } },
     };
   }
 
@@ -493,8 +505,8 @@ export class CompanionSystem implements System {
   }
 
   private toInfo(c: Companion): CompanionInfo {
-    const { id, ownerId, baseId, kind, targetId, expiresAt, persistent, source } = c;
-    return { id, ownerId, baseId, kind, targetId, expiresAt, persistent, source };
+    const { id, ownerId, baseId, kind, targetId, expiresAt, persistent, source, staying } = c;
+    return { id, ownerId, baseId, kind, targetId, expiresAt, persistent, source, staying };
   }
 
   private ownedBy(ownerId: number): Companion[] {
@@ -568,6 +580,13 @@ export class CompanionSystem implements System {
       .filter((c) => KIND_RULES[c.kind].commanded)
       .sort((a, b) => a.createdAt - b.createdAt);
     while (commanded.length >= limit) this.end(commanded.shift() as Companion, "replaced", false);
+  }
+
+  private makeRoomOfKind(ownerId: number, kind: CompanionKind): void {
+    const limit = KIND_RULES[kind].limit;
+    if (!limit) return;
+    const same = this.ownedBy(ownerId).filter((c) => c.kind === kind).sort((a, b) => a.createdAt - b.createdAt);
+    while (same.length >= limit) this.end(same.shift() as Companion, "replaced", false);
   }
 
   // Watchers rebuild the copy, which the old owner's client had set up as its teammate, and the new owner hosts it
@@ -671,6 +690,12 @@ export class CompanionSystem implements System {
     }
     this.save();
     this.sendState(c.ownerId);
+    try {
+      const hook = (globalThis as any)[ENDED_HOOK];
+      if (typeof hook === "function") hook(this.toInfo(c), reason);
+    } catch (e) {
+      this.log(`CompanionSystem: ${ENDED_HOOK} failed: ${e}`);
+    }
   }
 
   // The owner left: persistent companions wait for the next login, the rest end
@@ -785,8 +810,12 @@ export class CompanionSystem implements System {
       const aggId = aggressorId >>> 0;
       const tgtId = targetId >>> 0;
       const aggressor = this.companions.get(aggId);
+      const struckKind = this.companions.get(tgtId)?.kind;
       const targetOwner = this.companions.get(tgtId)?.ownerId ?? tgtId;
       if (aggressor && aggressor.ownerId === targetOwner) return false;
+      // A pet or mount never lands a blow, and nobody lands one on a pet
+      if (aggressor && !KIND_RULES[aggressor.kind].fights) return false;
+      if (struckKind && KIND_RULES[struckKind].guarded) return false;
       try {
         this.notePvpHit(aggId, tgtId, Number(damage) || 0);
       } catch (e) {
