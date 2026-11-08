@@ -46,7 +46,8 @@ type Mp = any;
 //                     { customPacketType: "adminAction", action: "toggleMode", mode }
 //                     { customPacketType: "adminAction", action: "npcZoneAdd", zone }  zone: JSON string of one NPC-Spawns.json entry
 //                     { customPacketType: "adminAction", action: "npcZoneTp" | "npcZoneReset" | "npcZoneDelete", target }  target: zone name
-//                     { customPacketType: "adminAction", action: "masteryGrant", target, amount }  hours to add, levels under the point system (negative removes), self allowed
+//                     { customPacketType: "adminAction", action: "masteryGrant", target, amount, skill? }  hours to add, levels under the point system (negative removes), self allowed;
+//                       a named skill must be held (refused, never put on another one); none named: the first held skill
 //                     { customPacketType: "adminAction", action: "masteryReset", target }  clears the character's chosen craft and its hours
 //                     (F7 panel, 2026-09-16)
 //                     { customPacketType: "adminAction", action: "kill" | "deleteCharacter" | "ipBan", target }  target: online actor id hex
@@ -57,6 +58,8 @@ type Mp = any;
 //                     { customPacketType: "adminAction", action: "masteryDrop", target?, targetName?, skill }
 //                     { customPacketType: "adminAction", action: "masterySetLevel", target?, targetName?, skill, level }  one skill's exact level
 //                       (hours with the point system off); 0 sets a held skill aside under the point system (8 Nov)
+//                     { customPacketType: "adminIdentityRequest", profile }  -> adminIdentity  the profile's masked IP and hardware id, for
+//                       an Owner or a Developer alone (IDENTITY_TIERS); every view and every refusal is an admin log line
 //                     { customPacketType: "adminItemsRequest" }  -> adminItems
 //                     { customPacketType: "adminLocationsRequest" }  -> adminLocations  (settings locations + admin-locations.json map markers)
 //                     { customPacketType: "adminAction", action: "giveItem", item, count, targetName? }
@@ -68,7 +71,9 @@ type Mp = any;
 //                     { customPacketType: "adminAction", action: "setSchool", school, level, targetName? }  level 0..100 (schools.js)
 //                     { customPacketType: "adminAction", action: "staffChar", target, on }  mark (on: true) or unmark a staff character
 //                     A missing target/targetName means the admin themself; targetName takes a name, a name prefix or #TAG.
-//   Server -> Client: { customPacketType: "adminMastery", targetName, detail }  detail.schools: [{ name, level, role, roleLabel }], or null without magic data
+//   Server -> Client: { customPacketType: "adminMastery", targetName, detail }  detail.schools: [{ name, level, role, roleLabel }], or null without magic data;
+//                       detail.limits: { pool, capPerSkill, seatAbove, seatCount, expertAbove, expertCount, used }, null with the point system off
+//                     { customPacketType: "adminIdentity", profile, name, ip, hwid, online }  to the Owner or Developer who asked, nobody else
 //                     { customPacketType: "adminItems", categories: [{ id, label, items: [[desc, name, plugin?]] }] }
 //                     { customPacketType: "adminLocations", locations: [{ name, region, worldName }] }
 //                     { customPacketType: "dboTeachShouts", shouts: [{ shout, words: [desc] }] }  -> the target's client (AdminModeService)
@@ -121,6 +126,8 @@ const GIVE_ALL_PER_TICK = 8;
 const GIVE_ALL_MAX = 400;
 // Ranks whose roster rows carry each account's Discord id and name (d, dn): Lead GM and above; a GM's rows have them blank
 const DISCORD_ROSTER_TIERS = new Set<AdminTier>(["senior", "developer", "leadgm"]);
+// Ranks that may see a profile's IP and hardware id on the panel's profile page (Nat, 8 Nov: senior staff only, every view logged)
+const IDENTITY_TIERS = new Set<AdminTier>(["senior", "developer"]);
 
 // Modes mirrored onto the neighbors-visible ff_adminModes actor property (registered in gamemode.js)
 const MIRRORED_MODES = ["god", "smite", "healhit", "invis", "ghost"];
@@ -511,7 +518,7 @@ export class AdminSystem implements System {
       this.sendDebugInfo(ctx.svr as Mp, userId);
       return;
     }
-    if (type !== "adminMenuRequest" && type !== "adminAction" && type !== "npcZonesRequest" && type !== "adminMasteryRequest" && type !== "adminItemsRequest" && type !== "adminLocationsRequest") return;
+    if (type !== "adminMenuRequest" && type !== "adminAction" && type !== "npcZonesRequest" && type !== "adminMasteryRequest" && type !== "adminItemsRequest" && type !== "adminLocationsRequest" && type !== "adminIdentityRequest") return;
     const mp = ctx.svr as Mp;
     let myActorId = 0;
     try { myActorId = mp.getUserActor(userId); } catch { }
@@ -586,6 +593,10 @@ export class AdminSystem implements System {
     if (type === "adminItemsRequest") {
       try { mp.sendCustomPacket(userId, JSON.stringify({ customPacketType: "adminItems", categories: this.items() })); }
       catch (e) { this.log(`AdminSystem: adminItems reply failed: ${e}`); }
+      return;
+    }
+    if (type === "adminIdentityRequest") {
+      this.sendIdentity(mp, userId, myActorId, adminProfile, tier, Number(content["profile"]));
       return;
     }
     if (type === "adminMasteryRequest") {
@@ -759,7 +770,9 @@ export class AdminSystem implements System {
         this.reply(mp, userId, true, action === "ipBan" ? `IP-banned ${target.name}` : `Banned ${target.name} for ${hours} hour(s)`);
       } else if (action === "masteryGrant") {
         const amount = Number(content["amount"]);
-        const r = this.mastery.grantPoints(ctx, target.actorId, amount);
+        // A named skill, which they must hold; an older panel names none and the first held skill takes it
+        const skill = typeof content["skill"] === "string" ? content["skill"].trim() : "";
+        const r = this.mastery.grantPoints(ctx, target.actorId, amount, skill || undefined);
         if (r.ok) this.adminLog(`profile ${adminProfile} granted ${amount} mastery ${this.mastery.usesLevels() ? "level" : "hour"}(s) to ${target.name} (profile ${target.profileId}), now ${r.text}`);
         this.reply(mp, userId, r.ok, r.ok ? `${target.name}: ${r.text}` : r.text);
       } else if (action === "masteryReset") {
@@ -816,6 +829,35 @@ export class AdminSystem implements System {
       bans: [],
       me: { a: myActorId.toString(16) },
     }));
+  }
+
+  // One profile's masked IP and hardware id for an Owner or a Developer, as the roster has them: the live connection's address
+  // when a character of it is online, else the backend's last, and the backend's hardware id before the
+  // connection's guid. Each view and each refusal is an admin log line naming the profile
+  private sendIdentity(mp: Mp, userId: number, myActorId: number, adminProfile: number, tier: AdminTier, profile: number): void {
+    if (!Number.isSafeInteger(profile) || profile <= 0) { this.reply(mp, userId, false, "No such profile"); return; }
+    if (!IDENTITY_TIERS.has(tier)) {
+      this.adminLog(`profile ${adminProfile} (${tier}) was refused the IP and HWID of profile ${profile} (Owners and Developers only)`);
+      this.reply(mp, userId, false, "IP and HWID are for the Owners and Developers");
+      return;
+    }
+    const live = this.onlinePlayers(mp).find((p) => p.profileId === profile) || null;
+    this.fetchBackendRoster().then((backendPlayers) => {
+      if (mp.getUserActor(userId) !== myActorId) return;
+      const raw = backendPlayers.find((r) => Number(r?.profileId) === profile) || null;
+      if (!live && !raw) { this.reply(mp, userId, false, `Profile ${profile} is not online and the backend has no record of it`); return; }
+      let ip = "", guid = "";
+      if (live) {
+        try { ip = String(mp.getUserIp(live.userId) ?? ""); } catch { }
+        try { guid = String(mp.getUserGuid(live.userId) ?? ""); } catch { }
+      }
+      ip = ip || String(raw?.lastIp ?? "");
+      const hwid = String(raw?.hwid ?? "") || guid;
+      const name = live ? live.name : String(raw?.displayName || raw?.username || "");
+      this.adminLog(`profile ${adminProfile} (${tier}) viewed the IP and HWID of ${name || "an account"} (profile ${profile})`);
+      try { mp.sendCustomPacket(userId, JSON.stringify({ customPacketType: "adminIdentity", profile, name, ip: this.maskIp(ip), hwid, online: !!live })); }
+      catch (e) { this.log(`AdminSystem: adminIdentity reply failed: ${e}`); }
+    }).catch((e) => this.log(`AdminSystem: the IP and HWID of profile ${profile} could not be read: ${e}`));
   }
 
   // The Skills tab's detail, with the five schools from server\schools.js (__dboMagicView) when it is loaded
