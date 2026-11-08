@@ -28,8 +28,13 @@ const report = require('./report')
 const crashWatch = require('./crashWatch')
 const nxmLinks = require('./nxm')
 
+const devServer = require('./devServer')
+
 // Settings stay in the folder named after the launcher's original product name.
-const USER_DATA_DIR = path.join(app.getPath('appData'), 'DragonBreak Online Launcher')
+// The dev server option runs as its own launcher (--dev-server) with its own settings and install folder (devServer.js)
+const DEV_MODE = devServer.isDevMode(process.argv)
+const LIVE_USER_DATA_DIR = path.join(app.getPath('appData'), 'DragonBreak Online Launcher')
+const USER_DATA_DIR = DEV_MODE ? devServer.devUserDataDir(LIVE_USER_DATA_DIR) : LIVE_USER_DATA_DIR
 fs.mkdirSync(USER_DATA_DIR, { recursive: true })
 app.setPath('userData', USER_DATA_DIR)
 
@@ -86,6 +91,15 @@ const store = new Store({
 
 mo2.setRootProvider(() => store.get('baseDirPath') || DEFAULT_BASE_DIR)
 
+// A switch to dev leaves the live launcher's login, Skyrim path and Nexus login here; the install folder is the live one plus -Dev
+const DEV_HANDOFF_FILE = path.join(devServer.devUserDataDir(LIVE_USER_DATA_DIR), 'dev-handoff.json')
+if (DEV_MODE) {
+  let handoff = {}
+  try { handoff = JSON.parse(fs.readFileSync(DEV_HANDOFF_FILE, 'utf8')) || {} } catch { /* no switch pending */ }
+  try { fs.unlinkSync(DEV_HANDOFF_FILE) } catch { }
+  devServer.applyHandoff((k, v) => store.set(k, v), k => store.get(k), handoff, 'C:\\DragonBreak')
+}
+
 // Nexus nxm:// links: ours only while an install waits for the player's downloads, then back to Vortex or whichever
 // manager had them (nxm.js)
 const nxm = nxmLinks.createNxm({ store, log, ownExes: () => [process.execPath, path.join(mo2.getRoot(), 'nxmhandler.exe')] })
@@ -93,7 +107,7 @@ const nxmHandlerExe = () => (app.isPackaged ? process.execPath : path.join(mo2.g
 let nxmWaiting = false
 
 // Default install root for MO2 + the portable game copy when none is stored.
-const DEFAULT_BASE_DIR = 'C:\\DragonBreak'
+const DEFAULT_BASE_DIR = DEV_MODE ? devServer.devBaseDir('C:\\DragonBreak') : 'C:\\DragonBreak'
 
 let win = null
 
@@ -105,6 +119,7 @@ function send(channel, ...args) {
 // Returns the currently selected game server from the cached API list,
 // or null if no servers have been fetched yet.
 function activeServer() {
+  if (DEV_MODE) return devState.server
   const servers = store.get('cachedServers') || []
   if (servers.length === 0) return null
   const idx = Math.min(store.get('activeServerIndex') || 0, servers.length - 1)
@@ -114,6 +129,7 @@ function activeServer() {
 // Effective game path
 // Creates an isolated copy, this keeps the base directory clean
 function isolatedGameDir() {
+  if (DEV_MODE) return path.join(store.get('baseDirPath') || DEFAULT_BASE_DIR, 'skyrim')
   const base = store.get('baseDirPath')
   if (base) return path.join(base, 'skyrim')
   // Legacy layouts from before the base-dir structure
@@ -140,6 +156,8 @@ function gameCopyComplete(dir) {
 }
 
 function effectiveGamePath() {
+  // Dev never plays from, or writes into, the real Skyrim folder
+  if (DEV_MODE) return isolatedGameDir()
   if (store.get('isolatedGame') && isolatedGameReady()) return isolatedGameDir()
   return store.get('skyrimPath')
 }
@@ -345,6 +363,10 @@ ipcMain.handle('settings:save', (_e, data) => {
   const allowed = ['skyrimPath', 'baseDirPath', 'activeServerIndex', 'mo2Enabled', 'isolatedGame', 'archiveDir']
   const clean = {}
   for (const k of allowed) if (k in data) clean[k] = data[k]
+  if (DEV_MODE) {
+    delete clean.isolatedGame
+    if ('baseDirPath' in clean && devBaseProblem(clean.baseDirPath)) delete clean.baseDirPath
+  }
   store.set(clean)
 })
 
@@ -898,7 +920,7 @@ ipcMain.handle('api:serverinfo', async () => {
   const session = store.get('gameSession')
   const headers = session ? { 'x-session': session } : {}
   let info
-  try { info = await fetchJSON(`${config.apiUrl}/api/serverinfo`, headers) }
+  try { info = DEV_MODE ? await fetchServerInfo() : await fetchJSON(`${config.apiUrl}/api/serverinfo`, headers) }
   catch { return null }
   // sessionValid:false with a session sent means the stored login expired, not a whitelist verdict
   if (session && info && info.sessionValid === false) {
@@ -907,6 +929,105 @@ ipcMain.handle('api:serverinfo', async () => {
     return { ...info, sessionExpired: true }
   }
   return info
+})
+
+// Dev server (Lead GM and above): the backend's ticket, then dev's file list from the relay's file server (devServer.js)
+
+const devState = { ticket: null, server: null, filesUrl: '', manifest: null, manifestAt: 0 }
+
+// Why this install folder must not be used for dev: the live install, the real Skyrim folder, or inside either
+function devBaseProblem(base) {
+  const live = store.get('liveBaseDir') || 'C:\\DragonBreak'
+  if (devServer.overlaps(base, live)) return `The dev install folder (${base}) overlaps the live install (${live}); choose another folder in Settings.`
+  const real = store.get('skyrimPath')
+  if (real && devServer.overlaps(base, real)) return `The dev install folder (${base}) overlaps your Skyrim folder (${real}); choose another folder in Settings.`
+  return null
+}
+
+async function ensureDevTicket(force = false) {
+  if (!force && devServer.ticketFresh(devState.ticket)) return devState.ticket
+  const session = store.get('gameSession')
+  if (!session) throw new Error('log in with Discord in the top bar first.')
+  let t
+  try { t = await postJSON(`${config.apiUrl}/api/files/dev/ticket`, {}, { 'x-session': session }) }
+  catch (err) {
+    if (err.statusCode === 401) { clearDiscordAuth(); throw new Error('your Discord login has expired. Log in again from the top bar.') }
+    if (err.statusCode === 403) throw new Error('your Discord account is not Lead GM or above.')
+    if (err.statusCode === 503) throw new Error('the dev server is switched off, or Discord could not be asked. Try again in a minute.')
+    throw new Error(`could not get a dev server pass (${err.message}).`)
+  }
+  if (!t || typeof t.ticket !== 'string' || !t.server || !t.server.address || !/^https:\/\//i.test(String(t.filesUrl || ''))) {
+    throw new Error('the backend sent an unusable dev server pass.')
+  }
+  devState.ticket = t
+  devState.server = { name: t.server.name || 'DragonBreak DEV', address: String(t.server.address), port: Number(t.server.port) || 7777 }
+  devState.filesUrl = String(t.filesUrl).replace(/\/+$/, '')
+  log(`[dev] ticket for ${t.tier} until ${new Date(Number(t.expiresAt)).toISOString()}, server ${devState.server.address}:${devState.server.port}`)
+  return t
+}
+
+// Cached for a minute: one install asks for it several times
+async function fetchDevManifest() {
+  if (devState.manifest && Date.now() - devState.manifestAt < 60_000) return devState.manifest
+  const t = await ensureDevTicket()
+  const m = await fetchJSON(`${devState.filesUrl}/manifest.json`, devServer.authHeadersFor(devState.filesUrl, devState.filesUrl, t.ticket))
+  const problem = devServer.validateManifest(m)
+  if (problem) throw new Error(`Dev server: ${problem}`)
+  devState.manifest = m
+  devState.manifestAt = Date.now()
+  return m
+}
+
+async function fetchServerInfo() {
+  if (!DEV_MODE) return fetchJSON(`${config.apiUrl}/api/serverinfo`)
+  const m = await fetchDevManifest()
+  return devServer.serverInfoFrom(m, devState.server)
+}
+
+async function fetchInstallManifest() {
+  const live = await fetchJSON(`${config.apiUrl}/api/install-manifest`)
+  if (!DEV_MODE) return live
+  const m = await fetchDevManifest()
+  return devServer.mergeInstallManifest(live, m.install, m.loadOrder)
+}
+
+// Whether to show the server selector: always in dev, and in live for an account the backend says may use dev
+ipcMain.handle('dev:access', async () => {
+  const session = store.get('gameSession')
+  let access = { enabled: false, allowed: false, tier: null }
+  if (session) {
+    try { access = await fetchJSON(`${config.apiUrl}/api/files/dev/access`, { 'x-session': session }) }
+    catch (err) { log(`[dev] access check failed (${err.message})`) }
+  }
+  const base = store.get('baseDirPath') || DEFAULT_BASE_DIR
+  return {
+    active: DEV_MODE, enabled: !!access.enabled, allowed: !!access.allowed, tier: access.tier || null,
+    devBase: DEV_MODE ? base : devServer.devBaseDir(base),
+  }
+})
+
+// Restarts the launcher into the other mode; never while Skyrim runs or an install is in flight
+ipcMain.handle('dev:switch', async (_e, target) => {
+  const toDev = target === 'dev'
+  if (toDev === DEV_MODE) return { ok: true }
+  if (installing) return { ok: false, error: 'An install is running; wait for it to finish.' }
+  if (await gameProcessRunning()) return { ok: false, error: 'Close Skyrim first.' }
+  if (toDev) {
+    const session = store.get('gameSession')
+    if (!session) return { ok: false, error: 'Log in with Discord first.' }
+    try {
+      const a = await fetchJSON(`${config.apiUrl}/api/files/dev/access`, { 'x-session': session })
+      if (!a.enabled || !a.allowed) return { ok: false, error: 'The dev server is for Lead GM and above.' }
+    } catch (err) { return { ok: false, error: `Could not check dev access (${err.message}).` } }
+    const handoff = devServer.handoffFrom(k => store.get(k), store.get('baseDirPath') || DEFAULT_BASE_DIR)
+    fs.mkdirSync(path.dirname(DEV_HANDOFF_FILE), { recursive: true })
+    fs.writeFileSync(DEV_HANDOFF_FILE, JSON.stringify(handoff))
+  }
+  log(`[dev] switching to ${toDev ? 'the dev server' : 'live'}`)
+  app.releaseSingleInstanceLock()
+  app.relaunch({ args: devServer.relaunchArgs(process.argv.slice(1), toDev) })
+  app.exit(0)
+  return { ok: true }
 })
 
 // Discord OAuth
@@ -1208,7 +1329,7 @@ async function createIsolatedImpl(baseDirOverride, force = false) {
 
     // configuration
     let serverInfo = null
-    try { serverInfo = await fetchJSON(`${config.apiUrl}/api/serverinfo`) } catch {}
+    try { serverInfo = await fetchServerInfo() } catch {}
     mo2.ensureInstance(dst, serverInfo?.loadOrder)
     mo2.writeNxmHandlerIni()
     seedProfilePrefs(src)
@@ -1778,6 +1899,7 @@ function assertSecureDownloadUrl(url) {
 
 // Download a URL to a local file, following redirects (release URLs hit a CDN).
 // Settles exactly once on every outcome, including an aborted response.
+// Only the dev files host gets the dev ticket (devServer.authHeadersFor); every other download sends no credential
 function downloadToFile(url, dest, onProgress, redirectsLeft = 5) {
   return new Promise((resolve, reject) => {
     try { assertSecureDownloadUrl(url) } catch (err) { return reject(err) }
@@ -1797,7 +1919,7 @@ function downloadToFile(url, dest, onProgress, redirectsLeft = 5) {
       }
     }
     const mod = url.startsWith('https') ? https : http
-    const req = mod.get(url, res => {
+    const req = mod.get(url, { headers: devServer.authHeadersFor(url, devState.filesUrl, devState.ticket && devState.ticket.ticket) }, res => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         res.resume()
         if (redirectsLeft <= 0) return fail(new Error('Too many redirects'))
@@ -2021,10 +2143,13 @@ async function prepareForLaunch(skyrimPath, viaMO2) {
     return { success: false, error: `Skyrim ${gv.version} found in ${skyrimPath}; DragonBreak needs ${gv.required}. Downgrade it (see the popup), then press PLAY again.` }
   }
 
+  if (DEV_MODE) {
+    try { await ensureDevTicket(true) } catch (err) { return { success: false, error: `Dev server: ${err.message}` } }
+  }
   const srv = activeServer()
   let serverInfo = null
   if (srv) {
-    try { serverInfo = await fetchJSON(`${config.apiUrl}/api/serverinfo`) } catch {}
+    try { serverInfo = await fetchServerInfo() } catch {}
   }
 
   // Non-portable installs play from the user's real Skyrim folder: quarantine
@@ -2104,7 +2229,7 @@ async function prepareForLaunch(skyrimPath, viaMO2) {
   // approves this session for the game server's session validation. Backend
   // unreachable = fail open (the server itself still enforces at connect).
   const session = store.get('gameSession')
-  if (session && serverInfo && serverInfo.offlineMode === false) {
+  if (!DEV_MODE && session && serverInfo && serverInfo.offlineMode === false) {
     try {
       const check = await postJSON(`${config.apiUrl}/api/launch-check`, {
         filesVersion: store.get('filesVersion') || '',
@@ -2227,21 +2352,24 @@ ipcMain.on('install:start', (_e, mode, opts) => {
     send('install:complete', { success: false, error: 'An install is already running - wait for it to finish.' })
     return
   }
+  const devProblem = DEV_MODE ? devBaseProblem(store.get('baseDirPath') || DEFAULT_BASE_DIR) : null
+  if (devProblem) {
+    send('install:complete', { success: false, error: devProblem })
+    return
+  }
   installing = true
   installAbort = new AbortController()
   const force = !!(opts && opts.force)
 
-  let fn
-  if (mode === 'client') {
-    fn = runDirectInstall(force)
-  } else if (mode === 'mo2') {
-    fn = runMO2Install()
-  } else if (mode === 'modlist') {
-    fn = runMO2Install({ modlistOnly: true, force })
-  } else {
+  const run = () => {
+    if (mode === 'client') return runDirectInstall(force)
+    if (mode === 'mo2') return runMO2Install()
+    if (mode === 'modlist') return runMO2Install({ modlistOnly: true, force })
     // Auto mode (used by the Play button) - delegate based on mo2Enabled setting
-    fn = store.get('mo2Enabled') ? runMO2Install() : runDirectInstall()
+    return store.get('mo2Enabled') ? runMO2Install() : runDirectInstall()
   }
+  // Dev's server and file list come with the ticket, so it is fetched before anything else
+  const fn = DEV_MODE ? ensureDevTicket().catch(err => { throw new Error(`Dev server: ${err.message}`) }).then(run) : run()
   fn.catch(err => {
     log('[install] Unhandled error:', err.message)
     send('install:complete', { success: false, error: `Unexpected error: ${err.message}` })
@@ -2277,7 +2405,7 @@ ipcMain.handle('install:mo2only', async (_e, opts) => {
       const gamePath = effectiveGamePath()
       if (gamePath && fs.existsSync(path.join(gamePath, 'SkyrimSE.exe'))) {
         let serverInfo = null
-        try { serverInfo = await fetchJSON(`${config.apiUrl}/api/serverinfo`) } catch {}
+        try { serverInfo = await fetchServerInfo() } catch {}
         mo2.ensureInstance(gamePath, serverInfo?.loadOrder)
         mo2.writeNxmHandlerIni()
         applyForcedServerDefaults(gamePath)
@@ -2521,7 +2649,7 @@ async function checkFilesImpl() {
   // Modlist
   progress('Fetching the install manifest…')
   let manifest = null
-  try { manifest = await fetchJSON(`${config.apiUrl}/api/install-manifest`) }
+  try { manifest = await fetchInstallManifest() }
   catch (err) { notes.push(`Modlist: could not fetch the install manifest (${err.serverError || err.message}), section skipped.`) }
   if (manifest && Array.isArray(manifest.mods)) {
     const modsDir  = mo2.getModsDir()
@@ -2566,7 +2694,7 @@ async function checkFilesImpl() {
       // Every launch rewrites plugins.txt from the server load order, so that rendering counts as intact too.
       // MO2 appends disabled entries for plugins it discovers, so only the enabled sequence is compared.
       let serverInfo = null
-      try { serverInfo = await fetchJSON(`${config.apiUrl}/api/serverinfo`) } catch {}
+      try { serverInfo = await fetchServerInfo() } catch {}
       const enabled  = lines => lines.filter(l => l.startsWith('*')).join('\n')
       const accepted = [manifest.plugins, mo2.serverPluginLines(serverInfo?.loadOrder)].filter(a => a.length).map(enabled)
       if (!accepted.includes(enabled(plugins))) {
@@ -2770,6 +2898,7 @@ async function extractClientZip(zipPath, destDir, onProgress) {
 const extraFileUrl = rel => `${config.apiUrl}/api/files/extra/${rel.split('/').map(encodeURIComponent).join('/')}`
 
 async function fetchExtraManifest() {
+  if (DEV_MODE) return devServer.asExtraManifest(await fetchDevManifest())
   try { return await fetchJSON(`${config.apiUrl}/api/files/extra`) }
   catch (err) { if (err.statusCode === 404) return null; throw err }
 }
@@ -2841,7 +2970,7 @@ async function syncExtraFiles(skyrimPath, force = false) {
       const full = mo2.lp(path.join(skyrimPath, ...f.path.split('/')))
       const part = `${full}.part`
       fs.mkdirSync(path.dirname(full), { recursive: true })
-      await downloadToFile(extraFileUrl(f.path), part, received =>
+      await downloadToFile(f.url || extraFileUrl(f.path), part, received =>
         progress(`Downloading ${f.path.split('/').pop()} (${i + 1}/${stale.length}) ${mb(doneBytes + received)} / ${mb(totalBytes)} MB`, doneBytes + received, totalBytes))
       const sha = (await mo2.sha256FileAsync(part)).toLowerCase()
       if (sha !== f.sha256.toLowerCase()) {
@@ -2936,7 +3065,8 @@ async function installClientFilesCore(skyrimPath, srv, serverInfo, force = false
       }
     }
 
-    const extras = await syncExtraFiles(skyrimPath, force)
+    // Dev's own client bundle and UI replace the zip's copies, so they are checked again after every extract
+    const extras = await syncExtraFiles(skyrimPath, force || DEV_MODE)
     if (!extras.success) return extras
 
     // 4. Write server settings
@@ -2971,7 +3101,7 @@ async function runDirectInstall(force = false) {
   if (!integrity.ok) return fail(integrity.error)
 
   let serverInfo = null
-  try { serverInfo = await fetchJSON(`${config.apiUrl}/api/serverinfo`) } catch {}
+  try { serverInfo = await fetchServerInfo() } catch {}
 
   const core = await installClientFilesCore(skyrimPath, srv, serverInfo, force)
   if (core.success) applyForcedServerDefaults(skyrimPath)
@@ -3023,7 +3153,7 @@ async function handleNxmLinkNow(link) {
   if (!key || !expires) return nxmLog('That link has no download key; use the Mod Manager Download button on the Nexus file page.')
   let expected = null
   try {
-    const manifest = await fetchJSON(`${config.apiUrl}/api/install-manifest`)
+    const manifest = await fetchInstallManifest()
     expected = (manifest.archives || []).find(a => a.source && a.source.type === 'nexus' && Number(a.source.modId) === modId && Number(a.source.fileId) === fileId) || null
   } catch { /* the name comes from Nexus instead */ }
   if (!expected) {
@@ -3133,7 +3263,7 @@ async function runMO2Install(opts = {}) {
       send('install:progress', { phase: 'download', file: msg, index: 0, total: 0, skipped: false }))
 
     let serverInfo = null
-    try { serverInfo = await fetchJSON(`${config.apiUrl}/api/serverinfo`) } catch {}
+    try { serverInfo = await fetchServerInfo() } catch {}
     mo2.ensureInstance(skyrimPath, serverInfo?.loadOrder)
     mo2.writeNxmHandlerIni()
     seedProfilePrefs(store.get('skyrimPath') || skyrimPath)
@@ -3149,7 +3279,7 @@ async function runMO2Install(opts = {}) {
 
     // 3. Mods from the compiled install manifest
     let manifest
-    try { manifest = await fetchJSON(`${config.apiUrl}/api/install-manifest`) }
+    try { manifest = await fetchInstallManifest() }
     catch (err) {
       // A 404 means the backend never compiled (or lost, after a fresh
       // deploy) its manifest - surface the backend's own explanation.
@@ -3473,6 +3603,17 @@ function writeClientSettings(destPath, srv, serverInfo) {
   migrateHotkeyDefaults(prev)
   const settings = {}
   for (const k of HOTKEY_KEYS) if (prev[k] !== undefined) settings[k] = prev[k]
+
+  if (DEV_MODE) {
+    const authDataPath = path.join(path.dirname(destPath), '..', 'PluginsNoLoad', 'auth-data-no-load.js')
+    const ticket = devState.ticket && devState.ticket.ticket
+    fs.mkdirSync(path.dirname(authDataPath), { recursive: true })
+    fs.writeFileSync(authDataPath, ticket ? devServer.devAuthData(ticket, store.get('discordUser'), store.get('gameProfileId')) : '//null')
+    fs.mkdirSync(path.dirname(destPath), { recursive: true })
+    fs.writeFileSync(destPath, JSON.stringify(devServer.devClientSettings(settings, srv), null, 2) + '\n')
+    log(`[dev] client settings written for ${srv.address}:${srv.port}${ticket ? '' : ' (no ticket yet)'}`)
+    return
+  }
 
   settings['server-ip']   = srv.address
   settings['server-port'] = Number(srv.port)

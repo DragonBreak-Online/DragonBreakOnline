@@ -1349,6 +1349,17 @@ html, body {
   color: #fff;
 }
 
+/* Dev server mode: a red rule under the top bar and a DEV badge on the tagline */
+body.dev-mode .topbar {
+  box-shadow: inset 0 -2px 0 rgba(201, 70, 58, 0.85);
+}
+
+body.dev-mode .logo-tagline::after {
+  content: '  B7  DEV SERVER';
+  color: #e07a6e;
+  letter-spacing: 1.5px;
+}
+
 /* Footer server select */
 .footer-server-select {
   background: transparent;
