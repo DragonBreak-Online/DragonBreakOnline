@@ -17,6 +17,7 @@ const zlib   = require('zlib')
 const http   = require('http')
 const https  = require('https')
 const { spawn, execFileSync } = require('child_process')
+const dgram  = require('dgram')
 const Store  = require('electron-store')
 const AdmZip = require('adm-zip')
 const config = require('./config')
@@ -964,6 +965,27 @@ async function ensureDevTicket(force = false) {
   devState.filesUrl = String(t.filesUrl).replace(/\/+$/, '')
   log(`[dev] ticket for ${t.tier} until ${new Date(Number(t.expiresAt)).toISOString()}, server ${devState.server.address}:${devState.server.port}`)
   return t
+}
+
+// Shows the ticket to the home server's UDP gate from this machine's address, so the gate lets this address's game traffic
+// through; three tries within 3 s
+function knockDevGate() {
+  const { address, port } = devState.server
+  const packet = devServer.knockPacket(devState.ticket.ticket)
+  return new Promise((resolve, reject) => {
+    const sock = dgram.createSocket('udp4')
+    const timers = []
+    const done = (err, val) => { timers.forEach(clearTimeout); try { sock.close() } catch { } if (err) reject(err); else resolve(val) }
+    sock.on('error', err => done(new Error(`could not reach ${address}:${port} (${err.message}).`)))
+    sock.on('message', msg => {
+      const r = devServer.parseKnockReply(msg)
+      if (!r) return
+      if (r.ok) { log(`[dev] gate open for this address${r.until ? ` until ${new Date(r.until).toISOString()}` : ''}`); done(null, r) }
+      else done(new Error(`the dev server's gate refused the pass (${r.reason}). Press Play again; if it repeats, tell Nat.`))
+    })
+    for (const at of [0, 700, 1400]) timers.push(setTimeout(() => sock.send(packet, port, address, () => {}), at))
+    timers.push(setTimeout(() => done(new Error(`no answer from ${address}:${port} (UDP). The dev server or its port forwarding is down; tell Nat.`)), 3000))
+  })
 }
 
 // Cached for a minute: one install asks for it several times
@@ -2144,7 +2166,7 @@ async function prepareForLaunch(skyrimPath, viaMO2) {
   }
 
   if (DEV_MODE) {
-    try { await ensureDevTicket(true) } catch (err) { return { success: false, error: `Dev server: ${err.message}` } }
+    try { await ensureDevTicket(true); await knockDevGate() } catch (err) { return { success: false, error: `Dev server: ${err.message}` } }
   }
   const srv = activeServer()
   let serverInfo = null

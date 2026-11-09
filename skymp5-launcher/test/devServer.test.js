@@ -120,6 +120,18 @@ test('main.js never writes a profileId for dev: the keys it keeps are hotkeys on
   assert.doesNotMatch(keep, /gameData/)
 })
 
+test('the gate knock carries the ticket and its answers are read strictly', () => {
+  assert.equal(d.knockPacket('dbodev1.p.s').toString(), 'DBOKNOCK1 dbodev1.p.s')
+  assert.deepEqual(d.parseKnockReply(Buffer.from('DBOKNOCK1 ok 1762600000')), { ok: true, until: 1762600000000 })
+  assert.deepEqual(d.parseKnockReply(Buffer.from('DBOKNOCK1 no expired')), { ok: false, reason: 'expired' })
+  assert.equal(d.parseKnockReply(Buffer.from('\x00\x01raknet')), null, 'game traffic is not an answer')
+  assert.equal(d.parseKnockReply(Buffer.from('DBOKNOCK1 ok <script>')), null)
+})
+
+test('main.js knocks at the gate after the ticket and before every dev launch', () => {
+  assert.match(MAIN, /await ensureDevTicket\(true\); await knockDevGate\(\)/)
+})
+
 test('the ticket goes only to the dev files host', () => {
   const files = 'https://dev-relay.example.net'
   assert.deepEqual(d.authHeadersFor('https://dev-relay.example.net/files/Data/x.esp', files, 't'), { authorization: 'DevTicket t' })

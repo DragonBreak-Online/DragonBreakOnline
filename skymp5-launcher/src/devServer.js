@@ -1,7 +1,8 @@
 'use strict'
 // The dev server option (Lead GM and above): the launcher restarts itself with --dev-server into its own settings folder and
 // its own install folder, so nothing it does reaches the live install. The backend signs a ticket per launch
-// (skymp5-backend routes/dev-server.js); the relay's file server serves dev's manifest and files against that ticket.
+// (skymp5-backend routes/dev-server.js) and serves dev's file list and files (from a private R2 bucket) against it.
+// Before the game starts, the ticket is knocked to the home server's UDP gate, which opens the game port to this address.
 
 const path = require('path')
 
@@ -91,7 +92,7 @@ function mergeInstallManifest(live, dev, loadOrder) {
 
 const asExtraManifest = m => ({ version: `dev-${m.version}`, files: m.files.map(f => ({ path: f.path, size: f.size, sha256: f.sha256.toLowerCase(), ...(f.url ? { url: f.url } : {}) })) })
 
-// The client settings for the dev server: the relay, no master, no serverinfo lookup, and no profileId, so the client sends
+// The client settings for the dev server: its address, no master, no serverinfo lookup, and no profileId, so the client sends
 // the ticket from auth-data-no-load.js as its session
 function devClientSettings(kept, server) {
   return { ...kept, 'server-ip': server.address, 'server-port': Number(server.port), master: '', 'server-master-key': null, 'server-info-ignore': true }
@@ -108,6 +109,16 @@ const devAuthData = (ticket, user, profileId) => '//' + JSON.stringify({
 // A ticket is reused until 30 minutes before it runs out
 const ticketFresh = (t, now = Date.now()) => !!(t && typeof t.ticket === 'string' && Number(t.expiresAt) - now > 30 * 60 * 1000)
 
+// UDP knock to the gate in front of the dev server (dev-gate.js): "DBOKNOCK1 <ticket>", answered "DBOKNOCK1 ok <exp>" or
+// "DBOKNOCK1 no <reason>"; the gate then forwards this address's game traffic for 12 h
+const KNOCK = 'DBOKNOCK1'
+const knockPacket = ticket => Buffer.from(`${KNOCK} ${ticket}`, 'utf8')
+function parseKnockReply(buf) {
+  const m = String(buf || '').match(/^DBOKNOCK1 (ok|no) ?([A-Za-z0-9_-]{0,40})$/)
+  if (!m) return null
+  return m[1] === 'ok' ? { ok: true, until: Number(m[2]) * 1000 || null } : { ok: false, reason: m[2] || 'refused' }
+}
+
 // The ticket goes only to the dev files host, never to a redirect target or anyone else
 function authHeadersFor(url, filesUrl, ticket) {
   if (!filesUrl || !ticket) return {}
@@ -117,5 +128,5 @@ function authHeadersFor(url, filesUrl, ticket) {
 module.exports = {
   DEV_FLAG, HANDOFF_KEYS, isDevMode, devUserDataDir, devBaseDir, relaunchArgs, overlaps, handoffFrom, applyHandoff,
   validateManifest, serverInfoFrom, mergeInstallManifest, asExtraManifest, devClientSettings, devAuthData, ticketFresh,
-  authHeadersFor, pluginLines,
+  authHeadersFor, pluginLines, knockPacket, parseKnockReply,
 }
