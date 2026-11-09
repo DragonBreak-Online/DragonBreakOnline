@@ -49,6 +49,7 @@ const TAMRIEL = 0x3c;
     [WOLF_RACE, { record: { type: 'RACE', editorId: 'WolfRace', fields: [] } }],
   ]);
   const hosters = new Map();
+  const grants = [];
   const sent = [];
   const logs = [];
   const actor = (id) => { const a = actors.get(id >>> 0); if (!a) throw new Error(`no form ${(id >>> 0).toString(16)}`); return a; };
@@ -70,7 +71,7 @@ const TAMRIEL = 0x3c;
     getActorCellOrWorld: (id) => actor(id).cell,
     getActorPos: (id) => actor(id).pos,
     lookupEspmRecordById: (id) => records.get(id >>> 0) || null,
-    setHoster: (h, r) => { hosters.set(h >>> 0, r >>> 0); },
+    setHoster: (h, r) => { grants.push([h >>> 0, r >>> 0]); hosters.set(h >>> 0, r >>> 0); },
     getHoster: (h) => hosters.get(h >>> 0) || 0,
     sendCustomPacket: (u, s) => sent.push([u, JSON.parse(s)]),
   };
@@ -175,6 +176,16 @@ const TAMRIEL = 0x3c;
   clear();
   sys.customPacket(2, 'dboRide', { op: 'mounted', horse: H }, ctx);
   check("a report on another's ridden horse is refused", horseOf(B) === 0 && horseOf(A) === H, [horseOf(B), horseOf(A)]);
+
+  // 7b. Nat's dev test 9 Nov: a re-grant to the same hoster re-seats the horse on its client and throws the rider off
+  sys.customPacket(1, 'dboRide', { op: 'dismounted' }, ctx);
+  hosters.set(H, A); grants.length = 0;
+  mp.onActivate(H, A);
+  sys.customPacket(1, 'dboRide', { op: 'mounted', horse: H }, ctx);
+  tick(2100); tick(2100);
+  check('a horse already hosted by its rider is never granted again (E, mount report, the 2 s check)', grants.length === 0, grants);
+  hosters.set(H, B); tick(2100);
+  check('...but a host lost to someone else is granted back once', grants.length === 1 && hosters.get(H) === A, grants);
 
   // 8. edge cases: death, teleport, cell change, logout
   actor(A).neighbors = [A, B, H];

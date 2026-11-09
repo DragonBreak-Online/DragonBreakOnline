@@ -106,9 +106,7 @@ export class MountSyncSystem implements System {
       if (why) { this.end(mp, rider, why, true); continue; }
       if (now >= ride.rehostAt) {
         ride.rehostAt = now + REHOST_MS;
-        let hoster = 0;
-        try { hoster = mp.getHoster(ride.horse) >>> 0; } catch { hoster = 0; }
-        if (hoster !== rider) this.host(mp, ride.horse, rider);
+        this.host(mp, ride.horse, rider);
       }
     }
     this.relay(mp);
@@ -213,7 +211,9 @@ export class MountSyncSystem implements System {
     if (tellRider) this.sendRider(mp, rider, { op: "ended", horse: ride.horse, reason });
   }
 
+  // Never a re-grant to the same hoster: its HostStart re-seats the horse and throws the rider off
   private host(mp: Mp, horse: number, rider: number): void {
+    try { if ((mp.getHoster(horse) >>> 0) === rider) return; } catch { /* grant it */ }
     try { mp.setHoster(horse, rider); } catch (e) { this.log(`MountSync: setHoster ${hex(horse)} to ${hex(rider)} failed: ${e}`); }
   }
 
