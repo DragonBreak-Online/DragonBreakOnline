@@ -1,6 +1,7 @@
 'use strict'
 // The launcher's dev server option (routes/dev-server.js): only Lead GM and above get a ticket, the ticket verifies with the
-// public key the dev server holds, and the whole thing is off until its three settings are present. Discord is faked.
+// public key the dev server holds, dev's files come from a private R2 bucket only against a ticket, and the whole thing is
+// off until its settings are present. Discord and R2 are faked.
 
 const { test, before, after, beforeEach } = require('node:test')
 const assert = require('node:assert/strict')
@@ -40,7 +41,22 @@ const { privateKey } = crypto.generateKeyPairSync('ed25519')
 const PRIVATE = privateKey.export({ format: 'der', type: 'pkcs8' }).toString('base64')
 const PUBLIC = crypto.createPublicKey({ key: Buffer.from(publicKeyOf(privateKey), 'base64'), format: 'der', type: 'spki' })
 
-const ENV = { DEV_TICKET_PRIVATE_KEY: PRIVATE, DEV_RELAY_ADDRESS: 'dev-relay.example.net', DEV_RELAY_PORT: '7777', DEV_FILES_URL: 'https://dev-relay.example.net/' }
+const ENV = {
+  DEV_TICKET_PRIVATE_KEY: PRIVATE, DEV_SERVER_ADDRESS: '198.51.100.20', DEV_SERVER_PORT: '7777',
+  DEV_FILES_URL: 'https://dragonbreakonline.com/api/files/dev/',
+  DEV_R2_ENDPOINT: 'https://acct.r2.cloudflarestorage.com', DEV_R2_BUCKET: 'dragonbreak-dev', DEV_R2_ACCESS_KEY_ID: 'AKID', DEV_R2_SECRET_ACCESS_KEY: 'SECRET',
+}
+// R2 is faked: the manifest object answers, anything else on the R2 host is 404
+const realFetch = global.fetch
+const r2Calls = []
+const r2Manifest = JSON.stringify({ version: 'dev1', files: [] })
+global.fetch = async (url, opts) => {
+  const u = new URL(String(url))
+  if (u.host !== 'acct.r2.cloudflarestorage.com') return realFetch(url, opts)
+  r2Calls.push(u)
+  if (u.pathname === '/dragonbreak-dev/manifest.json' && u.searchParams.get('X-Amz-Signature')) return new Response(r2Manifest, { status: 200 })
+  return new Response('no', { status: 404 })
+}
 let server, base
 before(async () => {
   const app = express()
@@ -51,12 +67,19 @@ before(async () => {
   base = `http://127.0.0.1:${server.address().port}/api/files/dev`
 })
 after(() => server.close())
-beforeEach(() => { Object.assign(process.env, ENV); delete process.env.DEV_SERVER_TIERS; roleCalls = 0 })
+beforeEach(() => {
+  Object.assign(process.env, ENV); delete process.env.DEV_SERVER_TIERS; roleCalls = 0; r2Calls.length = 0
+  require('../routes/dev-server').resetCache()
+})
 
-async function call(method, route, session) {
-  const res = await fetch(base + route, { method, headers: session ? { 'x-session': session } : {} })
-  return { status: res.status, body: await res.json(), cache: res.headers.get('cache-control') }
+async function call(method, route, session, headers = {}) {
+  const res = await fetch(base + route, { method, redirect: 'manual', headers: { ...(session ? { 'x-session': session } : {}), ...headers } })
+  const text = await res.text()
+  let body = null
+  try { body = JSON.parse(text) } catch { body = text }
+  return { status: res.status, body, cache: res.headers.get('cache-control'), location: res.headers.get('location') }
 }
+const withTicket = t => ({ authorization: `DevTicket ${t}` })
 
 function verify(ticket) {
   const [p, payload, sig] = ticket.split('.')
@@ -71,8 +94,8 @@ test('a Lead GM is told the selector applies and gets a ticket for the relay', a
   assert.equal(a.cache, 'no-store, private')
   const t = await call('POST', '/ticket', 'lead')
   assert.equal(t.status, 200)
-  assert.deepEqual(t.body.server, { name: 'DragonBreak DEV', address: 'dev-relay.example.net', port: 7777 })
-  assert.equal(t.body.filesUrl, 'https://dev-relay.example.net')
+  assert.deepEqual(t.body.server, { name: 'DragonBreak DEV', address: '198.51.100.20', port: 7777 })
+  assert.equal(t.body.filesUrl, 'https://dragonbreakonline.com/api/files/dev')
   const claims = verify(t.body.ticket)
   assert.equal(claims.aud, 'dbo-dev')
   assert.equal(claims.p, 42)
@@ -116,7 +139,7 @@ test('DEV_SERVER_TIERS narrows the list', async () => {
   assert.equal((await call('POST', '/ticket', 'owner')).status, 200)
 })
 
-for (const missing of ['DEV_TICKET_PRIVATE_KEY', 'DEV_RELAY_ADDRESS', 'DEV_FILES_URL']) {
+for (const missing of ['DEV_TICKET_PRIVATE_KEY', 'DEV_SERVER_ADDRESS', 'DEV_FILES_URL', 'DEV_R2_ENDPOINT', 'DEV_R2_BUCKET', 'DEV_R2_ACCESS_KEY_ID', 'DEV_R2_SECRET_ACCESS_KEY']) {
   test(`off without ${missing}: no selector, no ticket, no Discord lookup`, async () => {
     delete process.env[missing]
     assert.deepEqual((await call('GET', '/access', 'lead')).body, { enabled: false, allowed: false, tier: null })
@@ -128,7 +151,7 @@ for (const missing of ['DEV_TICKET_PRIVATE_KEY', 'DEV_RELAY_ADDRESS', 'DEV_FILES
 }
 
 test('a files URL that is not https leaves it off', async () => {
-  process.env.DEV_FILES_URL = 'http://dev-relay.example.net'
+  process.env.DEV_FILES_URL = 'http://dragonbreakonline.com/api/files/dev'
   assert.equal((await call('POST', '/ticket', 'lead')).status, 503)
 })
 
@@ -140,4 +163,51 @@ test('a key that is not Ed25519 leaves it off', async () => {
 test('the signer caps a ticket at 7 days, which the dev server also refuses past', () => {
   const { payload } = signDevTicket(privateKey, { profileId: 1, discordId: '310000000000000001', tier: 'owner' }, { ttlSec: 30 * 24 * 3600 })
   assert.equal(payload.exp - payload.iat, 7 * 24 * 3600)
+})
+
+test('a Lead GM ticket reads dev\'s manifest from the private bucket, through a presigned URL, cached for a minute', async () => {
+  const t = (await call('POST', '/ticket', 'lead')).body.ticket
+  const m = await call('GET', '/manifest.json', null, withTicket(t))
+  assert.equal(m.status, 200)
+  assert.equal(m.body.version, 'dev1')
+  assert.equal(r2Calls.length, 1)
+  assert.equal(r2Calls[0].searchParams.get('X-Amz-Credential').split('/')[0], 'AKID')
+  assert.ok(!r2Calls[0].href.includes('SECRET'), 'the secret never goes in a URL')
+  await call('GET', '/manifest.json', null, withTicket(t))
+  assert.equal(r2Calls.length, 1, 'the second read comes from the cache')
+})
+
+test('a file is a 302 to a 10-minute presigned R2 URL, and only by its sha256', async () => {
+  const t = (await call('POST', '/ticket', 'lead')).body.ticket
+  const sha = 'b'.repeat(64)
+  const f = await call('GET', `/files/${sha}`, null, withTicket(t))
+  assert.equal(f.status, 302)
+  const loc = new URL(f.location)
+  assert.equal(loc.host, 'acct.r2.cloudflarestorage.com')
+  assert.equal(loc.pathname, `/dragonbreak-dev/files/${sha}`)
+  assert.equal(loc.searchParams.get('X-Amz-Expires'), '600')
+  assert.match(loc.searchParams.get('X-Amz-Signature'), /^[0-9a-f]{64}$/)
+  assert.equal((await call('GET', `/files/${'B'.repeat(64)}`, null, withTicket(t))).status, 404)
+  assert.equal((await call('GET', '/files/..%2fmanifest.json', null, withTicket(t))).status, 404)
+})
+
+test('the dev files need a good ticket: none, a GM one, an expired one and a forged one are refused, and R2 is never asked', async () => {
+  assert.equal((await call('GET', '/manifest.json')).status, 401)
+  assert.equal((await call('GET', '/manifest.json', 'lead')).status, 401, 'a session alone is not a ticket')
+  const claims = { profileId: 42, discordId: '310000000000000042', tier: 'gm' }
+  assert.equal((await call('GET', '/manifest.json', null, withTicket(signDevTicket(privateKey, claims).ticket))).status, 403)
+  const old = signDevTicket(privateKey, { ...claims, tier: 'leadgm' }, { nowSec: Math.floor(Date.now() / 1000) - 13 * 3600 }).ticket
+  assert.equal((await call('GET', '/manifest.json', null, withTicket(old))).status, 403)
+  const other = crypto.generateKeyPairSync('ed25519').privateKey
+  assert.equal((await call('GET', `/files/${'c'.repeat(64)}`, null, withTicket(signDevTicket(other, { ...claims, tier: 'owner' }).ticket))).status, 403)
+  assert.equal(r2Calls.length, 0)
+})
+
+test('the presigner reproduces the AWS SigV4 documented example', () => {
+  const { presignGet } = require('../scripts/r2-presign')
+  const u = presignGet('https://examplebucket.s3.amazonaws.com/test.txt', {
+    accessKeyId: 'AKIAIOSFODNN7EXAMPLE', secretAccessKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+    region: 'us-east-1', expiresSec: 86400, now: new Date('2013-05-24T00:00:00Z'),
+  })
+  assert.equal(new URL(u).searchParams.get('X-Amz-Signature'), 'aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404')
 })
