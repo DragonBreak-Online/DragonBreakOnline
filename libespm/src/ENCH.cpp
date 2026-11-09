@@ -24,13 +24,12 @@ ENCH::SpellData ENCH::GetSpellData(
       } else if (!std::memcmp(type, "EFID", 4) && size >= sizeof(uint32_t)) {
         result.effects.emplace_back(
           SPEL::Effect{ *reinterpret_cast<const uint32_t*>(data), nullptr });
-      } else if (!std::memcmp(type, "EFIT", 4) &&
-                 !result.effects.empty() &&
+      } else if (!std::memcmp(type, "EFIT", 4) && !result.effects.empty() &&
                  size >= sizeof(SPEL::EFIT)) {
         result.effects.back().effectItem =
           reinterpret_cast<const SPEL::EFIT*>(data);
       } else if (!std::memcmp(type, "CTDA", 4) && !result.effects.empty()) {
-        result.effects.back().hasConditions = true;
+        result.effects.back().NoteCondition(data, size);
       }
     },
     compressedFieldsCache);
