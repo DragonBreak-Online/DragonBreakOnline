@@ -16,12 +16,16 @@ function stub(rel, exports) {
 
 const LEAD_GM = '1494126618065506425'
 const OWNER = '1494126527489507369'
-const ROLES = { lead: [LEAD_GM], owner: [OWNER], player: ['111111111111111111'], slow: null }
+const ADMIN = '1569131695897313290'
+const TRIAL = '1558248795932860507'
+const ROLES = { lead: [LEAD_GM], owner: [OWNER], player: ['111111111111111111'], slow: null, admin: [ADMIN], trial: [TRIAL] }
 const SESSIONS = {
   lead: { profileId: 42, discordId: '310000000000000042', username: 'Lead' },
   owner: { profileId: 1, discordId: '310000000000000001', username: 'Nat' },
   player: { profileId: 77, discordId: '310000000000000077', username: 'Player' },
   slow: { profileId: 78, discordId: '310000000000000078', username: 'Slow' },
+  admin: { profileId: 79, discordId: '310000000000000079', username: 'Jake' },
+  trial: { profileId: 80, discordId: '310000000000000080', username: 'Trial' },
 }
 let roleCalls = 0
 stub('../sources/discordBot', {
@@ -68,7 +72,7 @@ before(async () => {
 })
 after(() => server.close())
 beforeEach(() => {
-  Object.assign(process.env, ENV); delete process.env.DEV_SERVER_TIERS; roleCalls = 0
+  Object.assign(process.env, ENV); delete process.env.DEV_SERVER_TIERS; process.env.DEV_SERVER_ROLE_IDS = ADMIN; roleCalls = 0
 })
 
 async function call(method, route, session, headers = {}) {
@@ -130,6 +134,25 @@ test('no session or an unknown one is 401', async () => {
   assert.equal((await call('POST', '/ticket')).status, 401)
   assert.equal((await call('POST', '/ticket', 'nope')).status, 401)
   assert.equal((await call('GET', '/access', 'nope')).status, 401)
+})
+
+test('a role listed in DEV_SERVER_ROLE_IDS (above Lead GM, no named tier) gets the selector and a leadgm pass', async () => {
+  assert.deepEqual((await call('GET', '/access', 'admin')).body, { enabled: true, allowed: true, tier: 'leadgm' })
+  const t = await call('POST', '/ticket', 'admin')
+  assert.equal(t.status, 200)
+  assert.equal(t.body.tier, 'leadgm')
+})
+
+test('a Trial GM and a player get no selector and no pass', async () => {
+  for (const who of ['trial', 'player']) {
+    assert.equal((await call('GET', '/access', who)).body.allowed, false)
+    assert.equal((await call('POST', '/ticket', who)).status, 403)
+  }
+})
+
+test('without DEV_SERVER_ROLE_IDS the extra role gets nothing', async () => {
+  delete process.env.DEV_SERVER_ROLE_IDS
+  assert.equal((await call('GET', '/access', 'admin')).body.allowed, false)
 })
 
 test('DEV_SERVER_TIERS narrows the list', async () => {

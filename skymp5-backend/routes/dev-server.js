@@ -38,11 +38,22 @@ function settings() {
   return {
     key, keyError,
     tiers: list(env.DEV_SERVER_TIERS || 'owner,dev,leadgm'),
+    // Nat, 9 Nov 2026: "Lead GMs and above roles". Discord roles that sit above Lead GM without being one of the named
+    // tiers (ADMIN Admin, Lore Master, Concept Artist, Map Dev, 3D Modeler...): holding one counts as leadgm here
+    roleIds: list(env.DEV_SERVER_ROLE_IDS),
     ttlSec: Math.round(ttlHours * 3600),
     server: { name: env.DEV_SERVER_NAME || 'DragonBreak DEV', address: String(env.DEV_SERVER_ADDRESS || ''), port },
     filesUrl: /^https:\/\//i.test(filesUrl) ? filesUrl : '',
     filesDir: path.resolve(env.DEV_FILES_DIR || path.join(config.clientFilesDir, 'dev')),
   }
+}
+// The tier a member uses the dev server with: their named tier if it is allowed, else leadgm when they hold one of
+// DEV_SERVER_ROLE_IDS (and leadgm is allowed), else null
+function devTier(roles, s) {
+  const tier = tierFromRoles(roles)
+  if (tier && s.tiers.includes(tier)) return tier
+  if (s.tiers.includes('leadgm') && roles.some(r => s.roleIds.includes(String(r)))) return 'leadgm'
+  return null
 }
 const enabled = s => !!(s.key && s.server.address && Number.isInteger(s.server.port) && s.server.port > 0 && s.filesUrl)
 
@@ -110,8 +121,8 @@ router.get('/access', limiter, async (req, res) => {
   const session = sessionOf(req, res)
   if (!session) return
   const roles = await rolesOf(session.discordId)
-  const tier = roles ? tierFromRoles(roles) : null
-  res.json({ enabled: true, allowed: !!tier && s.tiers.includes(tier), tier })
+  const tier = roles ? devTier(roles, s) : null
+  res.json({ enabled: true, allowed: !!tier, tier })
 })
 
 router.post('/ticket', limiter, async (req, res) => {
@@ -122,10 +133,11 @@ router.post('/ticket', limiter, async (req, res) => {
   if (!session) return
   const roles = await rolesOf(session.discordId)
   if (!roles) return res.status(503).json({ error: 'rolesUnavailable' })
-  const tier = tierFromRoles(roles)
-  if (!tier || !s.tiers.includes(tier)) {
-    console.log(`[dev-server] refused a ticket for ${session.username || session.profileId}: tier ${tier || 'none'}`)
-    return res.status(403).json({ error: 'notAllowed', tier })
+  const tier = devTier(roles, s)
+  if (!tier) {
+    const named = tierFromRoles(roles)
+    console.log(`[dev-server] refused a ticket for ${session.username || session.profileId}: tier ${named || 'none'}`)
+    return res.status(403).json({ error: 'notAllowed', tier: named })
   }
   const { ticket, payload } = signDevTicket(s.key, {
     profileId: session.profileId, discordId: session.discordId, username: session.username, tier, roles,
