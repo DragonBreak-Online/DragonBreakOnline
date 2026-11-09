@@ -24,7 +24,7 @@ SCRL::Data SCRL::GetData(CompressedFieldsCache& cache) const
         res.effects.back().effectItem =
           reinterpret_cast<const SPEL::EFIT*>(data);
       } else if (!std::memcmp(type, "CTDA", 4) && !res.effects.empty()) {
-        res.effects.back().hasConditions = true;
+        res.effects.back().NoteCondition(data, size);
       }
     },
     cache);
