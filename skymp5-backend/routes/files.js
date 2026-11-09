@@ -194,6 +194,8 @@ router.post('/session-end', identifyReporter, (req, res, next) => (req.reporter.
   })
 
 router.use(problemReport.bodyErrors)
+// The launcher's dev server option, Lead GM and above (routes/dev-server.js)
+router.use('/dev', require('./dev-server'))
 
 module.exports = router
 // The routes here that parse their own body after the sender checks, as mounted by server.js: it leaves them out of its
