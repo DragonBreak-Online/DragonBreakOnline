@@ -2,15 +2,15 @@
 
 /**
  * The dev server option in the launcher, for Lead GM and above. Mounted by routes/files.js under /api/files/dev, a prefix the
- * public proxy already forwards. Off until DEV_TICKET_PRIVATE_KEY, DEV_SERVER_ADDRESS, an https DEV_FILES_URL and the
- * DEV_R2_* settings are all set.
+ * public proxy already forwards. Off until DEV_TICKET_PRIVATE_KEY, DEV_SERVER_ADDRESS and an https DEV_FILES_URL are set.
  *   GET  /api/files/dev/access          (x-session)  -> { enabled, allowed, tier }: whether the launcher shows the selector
  *   POST /api/files/dev/ticket          (x-session)  -> { ticket, expiresAt, tier, server: { name, address, port }, filesUrl }
- *   GET  /api/files/dev/manifest.json   (Authorization: DevTicket <ticket>) -> dev's file list, read from the private R2 bucket
- *   GET  /api/files/dev/files/<sha256>  (Authorization: DevTicket <ticket>) -> 302 to a 10-minute presigned R2 URL
+ *   GET  /api/files/dev/manifest.json   (Authorization: DevTicket <ticket>) -> dev's file list
+ *   GET  /api/files/dev/files/<sha256>  (Authorization: DevTicket <ticket>) -> one file, by content hash (Range for resumes)
+ * The files live on this server's disk in DEV_FILES_DIR (default <client files>/dev: manifest.json, files/<sha256>), pushed
+ * there by the dev box's publisher with an rrsync-only key; nothing in that folder is served without a pass.
  * The ticket (scripts/dev-ticket.js) is what the dev server and the home server's UDP gate check; they never call this backend.
  * Tiers come from the Discord roles through the bot's role cache (sources/punish/tier.js order); no answer is no tier.
- * The bucket is private: DEV_R2_ACCESS_KEY_ID should be a read-only token for that bucket alone.
  */
 
 const router = require('express').Router()
@@ -19,10 +19,11 @@ const discordBot = require('../sources/discordBot')
 const { tierFromRoles } = require('../sources/punish/tier')
 const { visitorKey } = require('../sources/clientFiles')
 const { loadPrivateKey, signDevTicket, verifyDevTicket } = require('../scripts/dev-ticket')
-const { presignGet } = require('../scripts/r2-presign')
+const fs = require('fs')
+const path = require('path')
+const config = require('../config')
 
 const ROLE_CHECK_MS = 8000
-const MANIFEST_CACHE_MS = 60 * 1000
 const list = v => String(v || '').split(',').map(s => s.trim()).filter(Boolean)
 
 // Read per request, so tests and an env reload need no restart of this module
@@ -34,23 +35,16 @@ function settings() {
   const port = parseInt(env.DEV_SERVER_PORT || '7777', 10)
   const ttlHours = Math.min(Math.max(parseFloat(env.DEV_TICKET_TTL_HOURS || '12') || 12, 0.25), 168)
   const filesUrl = String(env.DEV_FILES_URL || '').replace(/\/+$/, '')
-  const r2 = {
-    endpoint: String(env.DEV_R2_ENDPOINT || '').replace(/\/+$/, ''),
-    bucket: String(env.DEV_R2_BUCKET || ''),
-    accessKeyId: String(env.DEV_R2_ACCESS_KEY_ID || ''),
-    secretAccessKey: String(env.DEV_R2_SECRET_ACCESS_KEY || ''),
-  }
   return {
     key, keyError,
     tiers: list(env.DEV_SERVER_TIERS || 'owner,dev,leadgm'),
     ttlSec: Math.round(ttlHours * 3600),
     server: { name: env.DEV_SERVER_NAME || 'DragonBreak DEV', address: String(env.DEV_SERVER_ADDRESS || ''), port },
     filesUrl: /^https:\/\//i.test(filesUrl) ? filesUrl : '',
-    r2: /^https:\/\//i.test(r2.endpoint) && /^[a-z0-9][a-z0-9-]{1,61}$/.test(r2.bucket) && r2.accessKeyId && r2.secretAccessKey ? r2 : null,
+    filesDir: path.resolve(env.DEV_FILES_DIR || path.join(config.clientFilesDir, 'dev')),
   }
 }
-const enabled = s => !!(s.key && s.server.address && Number.isInteger(s.server.port) && s.server.port > 0 && s.filesUrl && s.r2)
-const objectUrl = (r2, key) => presignGet(`${r2.endpoint}/${r2.bucket}/${key}`, { ...r2, expiresSec: 600 })
+const enabled = s => !!(s.key && s.server.address && Number.isInteger(s.server.port) && s.server.port > 0 && s.filesUrl)
 
 function withDeadline(promise) {
   let timer
@@ -140,26 +134,20 @@ router.post('/ticket', limiter, async (req, res) => {
   res.json({ ticket, expiresAt: payload.exp * 1000, tier, server: s.server, filesUrl: s.filesUrl })
 })
 
-let manifestCache = { at: 0, body: null, source: '' }
-router.get('/manifest.json', limiter, requireTicket, async (req, res) => {
-  const r2 = req.devSettings.r2
-  const source = `${r2.endpoint}/${r2.bucket}`
-  if (!manifestCache.body || manifestCache.source !== source || Date.now() - manifestCache.at > MANIFEST_CACHE_MS) {
-    let r
-    try { r = await fetch(objectUrl(r2, 'manifest.json'), { signal: AbortSignal.timeout(10000) }) }
-    catch (err) { console.error('[dev-server] manifest fetch failed:', err.message); return res.status(502).json({ error: 'manifestUnavailable' }) }
-    if (!r.ok) { console.error(`[dev-server] manifest fetch: HTTP ${r.status}`); return res.status(502).json({ error: 'manifestUnavailable' }) }
-    const text = await r.text()
-    try { JSON.parse(text) } catch { return res.status(502).json({ error: 'manifestUnreadable' }) }
-    manifestCache = { at: Date.now(), body: text, source }
-  }
-  res.type('application/json').send(manifestCache.body)
+router.get('/manifest.json', limiter, requireTicket, (req, res) => {
+  const file = path.join(req.devSettings.filesDir, 'manifest.json')
+  fs.readFile(file, 'utf8', (err, text) => {
+    if (err) return res.status(503).json({ error: 'manifestUnavailable' })
+    try { JSON.parse(text) } catch { return res.status(503).json({ error: 'manifestUnreadable' }) }
+    res.type('application/json').send(text)
+  })
 })
 
 router.get(/^\/files\/([0-9a-f]{64})$/, fileLimiter, requireTicket, (req, res) => {
-  res.redirect(302, objectUrl(req.devSettings.r2, `files/${req.params[0]}`))
+  const root = path.join(req.devSettings.filesDir, 'files')
+  res.sendFile(req.params[0], { root, dotfiles: 'deny', cacheControl: false, headers: { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store, private' } },
+    err => { if (err && !res.headersSent) res.status(err.status === 404 ? 404 : 500).json({ error: err.status === 404 ? 'notFound' : 'readFailed' }) })
 })
 
 module.exports = router
 module.exports.settings = settings
-module.exports.resetCache = () => { manifestCache = { at: 0, body: null, source: '' } }
