@@ -36,6 +36,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fetchModlist:    () => ipcRenderer.invoke('api:modlist'),
   fetchServers:    () => ipcRenderer.invoke('api:servers'),
 
+  // Dev server option (Lead GM and above): { active, enabled, allowed, tier, devBase }; switching restarts the launcher
+  devAccess: ()       => ipcRenderer.invoke('dev:access'),
+  devSwitch: (target) => ipcRenderer.invoke('dev:switch', target),
+
   // Discord OAuth
   discordLogin:   () => ipcRenderer.invoke('discord:login'),
   discordLogout:  () => ipcRenderer.invoke('discord:logout'),

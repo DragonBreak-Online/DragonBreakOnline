@@ -422,9 +422,61 @@ function setPathWarning(msg) {
 const footerServerName   = document.getElementById('footer-server-name')
 const footerServerSelect = document.getElementById('footer-server-select')
 
-footerServerSelect.addEventListener('change', () => {
-  window.electronAPI.saveSettings({ activeServerIndex: parseInt(footerServerSelect.value, 10) })
+let footerServerValue = '0'
+footerServerSelect.addEventListener('change', async () => {
+  const v = footerServerSelect.value
+  if (v === 'dev' || v === 'live') return switchServerMode(v)
+  footerServerValue = v
+  window.electronAPI.saveSettings({ activeServerIndex: parseInt(v, 10) })
 })
+
+// Dev server selector, Lead GM and above (main.js dev:access); dev runs as its own launcher with its own install folder
+let devAccess = null
+let lastSettings = null
+async function setupDevSelector(s) {
+  try { devAccess = await window.electronAPI.devAccess() } catch { devAccess = null }
+  const d = devAccess
+  document.body.classList.toggle('dev-mode', !!(d && d.active))
+  if (!d || !(d.active || (d.enabled && d.allowed))) return
+  const servers = (s && s.servers) || []
+  const add = (value, text, selected) => {
+    const opt = document.createElement('option')
+    opt.value = value
+    opt.textContent = text
+    opt.selected = !!selected
+    footerServerSelect.appendChild(opt)
+  }
+  footerServerSelect.innerHTML = ''
+  if (d.active) {
+    add('live', (servers[0] && servers[0].name) || 'DragonBreak (live)')
+    add('dev', 'DEV (testing)', true)
+    footerServerValue = 'dev'
+  } else {
+    servers.forEach((srv, i) => add(String(i), srv.name, i === (s.activeServerIndex || 0)))
+    add('dev', 'DEV (testing)')
+    footerServerValue = footerServerSelect.value
+  }
+  footerServerName.hidden = true
+  footerServerSelect.hidden = false
+}
+
+async function switchServerMode(target) {
+  const d = devAccess || {}
+  const text = target === 'dev'
+    ? `Switch to the DEV server?
+
+The launcher restarts with a separate dev install in
+${d.devBase || 'a -Dev folder'}
+It never touches your live install. The first Play downloads the dev files.`
+    : 'Switch back to the live server? The launcher restarts with your live install.'
+  if (!window.confirm(text)) { footerServerSelect.value = footerServerValue; return }
+  const r = await window.electronAPI.devSwitch(target)
+  if (!r || !r.ok) {
+    footerServerSelect.value = footerServerValue
+    connectWarning.textContent = (r && r.error) || 'Could not switch servers.'
+    connectWarning.classList.add('visible')
+  }
+}
 
 // MO2 fields
 const fieldMo2Enabled = document.getElementById('setting-mo2-enabled')
@@ -524,6 +576,8 @@ async function loadSettings() {
   fieldIsolated.checked = !!s.isolatedGame
   refreshIsolatedStatus()
 
+  lastSettings = s
+  setupDevSelector(s)
   return s
 }
 
@@ -591,6 +645,7 @@ function renderTopbarDiscord() {
         serverAllowed = freshInfo ? freshInfo.allowed !== false : true
         renderTopbarDiscord()
         updateLockState()
+        setupDevSelector(lastSettings)
       } else {
         loginBtn.disabled    = false
         loginBtn.textContent = 'Discord Login'
