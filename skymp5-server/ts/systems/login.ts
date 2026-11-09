@@ -7,7 +7,7 @@ import { hasDiscordBanRole } from "./discordBanSystem";
 import { kickWithReason } from "./kickUtil";
 import { bindRolesToProfile } from "./patronTiers";
 import { guidOf } from "./actorUtil";
-import { devTicketDefaultTiers, loadDevTicketKey, looksLikeDevTicket, verifyDevTicket } from "./devTicket";
+import { devTicketDefaultTiers, ipv4InCidrs, loadDevTicketKey, looksLikeDevTicket, parseIpv4Cidr, verifyDevTicket } from "./devTicket";
 import type * as crypto from "crypto";
 
 const loginFailedNotInTheDiscordServer = JSON.stringify({ customPacketType: "loginFailedNotInTheDiscordServer" });
@@ -53,6 +53,7 @@ interface DevTicketConfig {
   tiers: string[];
   profileIdOffset: number;
   remoteProfileIdLogins: boolean;
+  trustedProfileIdSources: Array<[number, number]>;
   revokedDiscordIds: Set<string>;
 }
 
@@ -271,12 +272,16 @@ export class Login implements System {
     if (!key) this.log("Login: devTickets is set without a usable publicKey; every dev ticket is refused");
     const offset = Number.isSafeInteger(raw.profileIdOffset) && raw.profileIdOffset >= 0 ? raw.profileIdOffset : 1000000;
     const tiers = Array.isArray(raw.tiers) && raw.tiers.length ? raw.tiers.map(String) : devTicketDefaultTiers;
+    const sources = Array.isArray(raw.trustedProfileIdSources) ? raw.trustedProfileIdSources : [];
+    const trusted = sources.map(parseIpv4Cidr).filter((c): c is [number, number] => c !== null);
+    if (trusted.length !== sources.length) this.log(`Login: devTickets.trustedProfileIdSources has ${sources.length - trusted.length} unreadable entr(ies), left out; IPv4 CIDRs only`);
     const cfg: DevTicketConfig = {
       key, tiers, profileIdOffset: offset,
       remoteProfileIdLogins: raw.remoteProfileIdLogins === true,
+      trustedProfileIdSources: trusted,
       revokedDiscordIds: new Set(Array.isArray(raw.revokedDiscordIds) ? raw.revokedDiscordIds.map(String) : []),
     };
-    this.log(`Login: dev tickets on (tiers ${tiers.join(",")}, profile id offset ${offset}, profileId logins ${cfg.remoteProfileIdLogins ? "from anywhere" : "from loopback only"}, ${cfg.revokedDiscordIds.size} revoked)`);
+    this.log(`Login: dev tickets on (tiers ${tiers.join(",")}, profile id offset ${offset}, profileId logins ${cfg.remoteProfileIdLogins ? "from anywhere" : `from loopback${trusted.length ? ` and ${sources.filter((s: unknown) => parseIpv4Cidr(s)).join(", ")}` : " only"}`}, ${cfg.revokedDiscordIds.size} revoked)`);
     return cfg;
   }
 
@@ -528,7 +533,7 @@ export class Login implements System {
     } else if (this.offlineMode === true && gameData && typeof gameData.profileId === "number") {
       let profileId = gameData.profileId;
       const isLoopback = !ip || ip === "127.0.0.1" || ip === "::1" || ip === "localhost" || ip.startsWith("127.");
-      if (this.devTickets && !this.devTickets.remoteProfileIdLogins && !isLoopback) {
+      if (this.devTickets && !this.devTickets.remoteProfileIdLogins && !isLoopback && !ipv4InCidrs(ip, this.devTickets.trustedProfileIdSources)) {
         this.log(`Login: refused profileId ${profileId} from ${ip}: this dev server takes launcher tickets only`);
         try { kickWithReason(ctx.svr as unknown as Mp, userId, devOnlyLauncher); } catch { }
         return;

@@ -127,6 +127,27 @@ const settingsWith = (devTickets) => ({ allSettings: { adminProfileIds: [1, 2, 8
   check('a loopback profileId login still works (the 7779 admin relay)', !!r.spawn && r.spawn[2] === 2, r);
   ip = '10.77.0.1';
 
+  const tail = await make({ publicKey: PUB, trustedProfileIdSources: ['100.64.0.0/10', 'nonsense', '300.1.1.1/8'] });
+  check('the boot line names the trusted sources and reports unreadable ones', logs.some((l) => /from loopback and 100\.64\.0\.0\/10,/.test(l)) && logs.some((l) => /2 unreadable/.test(l)), logs.slice(-3));
+  ip = '100.98.153.18';
+  r = run(tail, { profileId: 5150 });
+  check('a profileId login from a trusted source (Tailscale 100.64/10) works', !!r.spawn && r.spawn[2] === 5150, r);
+  r = run(tail, { profileId: 2 });
+  check('...but an admin profile id from there is still remapped, as before', !!r.spawn && r.spawn[2] !== 2, r);
+  ip = '::ffff:100.111.0.9';
+  r = run(tail, { profileId: 5151 });
+  check('...an IPv4-mapped address counts too', !!r.spawn && r.spawn[2] === 5151, r);
+  for (const outside of ['100.128.0.1', '100.63.255.255', '172.20.16.1', '10.77.0.1']) {
+    ip = outside;
+    r = run(tail, { profileId: 5150 });
+    if (r.spawn || !r.kick) check(`a profileId login from outside the trusted list is refused: ${outside}`, false, r);
+  }
+  check('profileId logins from outside the trusted list (the public gate path among them) are refused', true);
+  ip = '172.20.16.1';
+  r = run(tail, { session: ticket() });
+  check('...while a pass through the gate path still logs in', !!r.spawn && r.spawn[2] === 1000042, r);
+  ip = '10.77.0.1';
+
   const revoked = await make({ publicKey: PUB, revokedDiscordIds: [claims.discordId] });
   r = run(revoked, { session: ticket() });
   check('a revoked Discord id is refused', !r.spawn && !!r.kick, r);

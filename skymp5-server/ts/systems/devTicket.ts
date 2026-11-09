@@ -29,6 +29,27 @@ export type DevTicketResult = { ok: true; ticket: DevTicket } | { ok: false; rea
 
 export const looksLikeDevTicket = (v: unknown): boolean => typeof v === "string" && v.startsWith(`${devTicketPrefix}.`);
 
+// "a.b.c.d/n" -> [network, mask]; null when malformed
+export function parseIpv4Cidr(cidr: unknown): [number, number] | null {
+  const m = typeof cidr === "string" ? cidr.trim().match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/) : null;
+  if (!m) return null;
+  const parts = m.slice(1, 5).map(Number);
+  const bits = Number(m[5]);
+  if (parts.some((p) => p > 255) || bits > 32) return null;
+  const mask = bits === 0 ? 0 : (~0 << (32 - bits)) >>> 0;
+  const net = ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
+  return [(net & mask) >>> 0, mask];
+}
+
+export function ipv4InCidrs(ip: unknown, cidrs: Array<[number, number]>): boolean {
+  const m = typeof ip === "string" ? ip.replace(/^::ffff:/i, "").match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/) : null;
+  if (!m) return false;
+  const p = m.slice(1, 5).map(Number);
+  if (p.some((x) => x > 255)) return false;
+  const v = ((p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3]) >>> 0;
+  return cidrs.some(([net, mask]) => ((v & mask) >>> 0) === net);
+}
+
 export function loadDevTicketKey(publicKey: unknown): crypto.KeyObject | null {
   if (typeof publicKey !== "string" || !publicKey.trim()) return null;
   const text = publicKey.trim();
