@@ -29,6 +29,7 @@
 #include <ScopedTask.h>
 #include <TimeUtils.h>
 #include <algorithm>
+#include <iterator>
 #include <antigo/Context.h>
 #include <antigo/ResolvedContext.h>
 #include <chrono>
@@ -2047,25 +2048,10 @@ void MpObjectReference::InitScripts()
   // A hardcoded hack to remove unsupported scripts
   // TODO: make is a server setting with proper conditions or an API
   auto isScriptEraseNeeded = [](const std::string& val) {
-    // 1. GetStage in OnTrigger
-    // 2. Unable to determine Actor for 'Game.GetPlayer' in 'OnLoad'
-    // 3. USSEP OnActivate empties the shelf into the activator
-    // 4. An endless server-side loop placing dust explosions; clients run
-    // their own copy
-    // 5. Mining and notice boards are the gameplay layer's (labour.js,
-    // BountyBoardSystem)
-    const bool isRemoveNeeded =
-      !Utils::stricmp(val.data(), "DA06PreRitualSceneTriggerScript") ||
-      !Utils::stricmp(val.data(), "CritterSpawn") ||
-      !Utils::stricmp(val.data(), "PlayerBookShelfContainerScript") ||
-      !Utils::stricmp(val.data(), "fxDustDropRandomSCRIPT") ||
-      !Utils::stricmp(val.data(), "MineOreScript") ||
-      !Utils::stricmp(val.data(), "manny_up_noticeboardScript");
-
+    const bool isRemoveNeeded = IsServerSkippedScript(val);
     if (isRemoveNeeded) {
       spdlog::info("Skipping script {}", val);
     }
-
     return isRemoveNeeded;
   };
   scriptNames.erase(std::remove_if(scriptNames.begin(), scriptNames.end(),
@@ -2085,6 +2071,28 @@ void MpObjectReference::InitScripts()
 
     GetParent()->GetPapyrusVm().AddObject(ToGameObject(), scriptInfo);
   }
+}
+
+bool MpObjectReference::IsServerSkippedScript(const std::string& scriptName)
+{
+  // 1. GetStage in OnTrigger
+  // 2. Unable to determine Actor for 'Game.GetPlayer' in 'OnLoad'
+  // 3. USSEP OnActivate empties the shelf into the activator
+  // 4. An endless server-side loop placing dust explosions; clients run
+  // their own copy
+  // 5. Mining and notice boards are the gameplay layer's (labour.js,
+  // BountyBoardSystem)
+  // 6. OnLoad asks RandomInt(1, 0) by default (the 10 Nov 01:55Z crash)
+  static const char* const kSkipped[] = {
+    "DA06PreRitualSceneTriggerScript", "CritterSpawn",
+    "PlayerBookShelfContainerScript",  "fxDustDropRandomSCRIPT",
+    "MineOreScript",                   "manny_up_noticeboardScript",
+    "CWArrowVolleyParentScript"
+  };
+  return std::any_of(std::begin(kSkipped), std::end(kSkipped),
+                     [&scriptName](const char* name) {
+                       return !Utils::stricmp(scriptName.data(), name);
+                     });
 }
 
 void MpObjectReference::MoveOnGrid(GridImpl<MpObjectReference*>& grid)
