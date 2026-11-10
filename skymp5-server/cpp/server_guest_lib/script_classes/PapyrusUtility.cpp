@@ -4,6 +4,7 @@
 #include <TimeUtils.h>
 #include <chrono>
 #include <random>
+#include <spdlog/spdlog.h>
 #include <utility>
 
 VarValue PapyrusUtility::Wait(VarValue self,
@@ -32,6 +33,17 @@ VarValue PapyrusUtility::RandomInt(VarValue self,
   int32_t min = static_cast<int32_t>(arguments[0].CastToInt());
   int32_t max = static_cast<int32_t>(arguments[1].CastToInt());
   if (min > max) {
+    // Once, with the numbers: a swallowed correction would hide the script
+    // that computes a backwards range, and on 10 Nov nothing in the log
+    // named the call, which is why that script is still unidentified
+    static bool warned = false;
+    if (!warned) {
+      warned = true;
+      spdlog::warn("Utility.RandomInt was asked for {}..{}, which is the "
+                   "wrong way round; using {}..{}. A script is computing "
+                   "that range: find it",
+                   min, max, max, min);
+    }
     std::swap(min, max);
   }
   std::uniform_int_distribution<> distribute{ min, max };
@@ -51,6 +63,13 @@ VarValue PapyrusUtility::RandomFloat(VarValue self,
   double min = static_cast<double>(arguments[0].CastToFloat());
   double max = static_cast<double>(arguments[1].CastToFloat());
   if (min > max) {
+    static bool warned = false;
+    if (!warned) {
+      warned = true;
+      spdlog::warn("Utility.RandomFloat was asked for {}..{}, which is the "
+                   "wrong way round; using {}..{}",
+                   min, max, max, min);
+    }
     std::swap(min, max);
   }
   std::uniform_real_distribution<> distribute{ min, max };
