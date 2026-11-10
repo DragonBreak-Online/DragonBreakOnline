@@ -93,14 +93,15 @@ const lookup = (mp: Mp, id: number): any => {
   }
 };
 
-// Effects of a SPEL or SCRL record in order; cached, plugin data never changes at runtime
+// Effects of a SPEL, SCRL or ENCH record in order (a staff casts its ENCH, see conjurationSystem dboStaffCast); cached,
+// plugin data never changes at runtime
 export const spellEffects = (mp: Mp, spellId: number): SpellEffect[] => {
   const cached = effectCache.get(spellId);
   if (cached) return cached;
   const out: SpellEffect[] = [];
   const spell = lookup(mp, spellId);
   const type = spell?.record?.type;
-  if (type === "SPEL" || type === "SCRL") {
+  if (type === "SPEL" || type === "SCRL" || type === "ENCH") {
     let mgefId = 0;
     for (const f of spell.record.fields) {
       if (!(f?.data instanceof Uint8Array)) continue;
