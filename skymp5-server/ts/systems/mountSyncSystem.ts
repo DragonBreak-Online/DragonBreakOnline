@@ -14,6 +14,7 @@ type Mp = any;
 //                     { customPacketType: "dboRide", op: "refused", horse, reason }: get off, or stay off
 //                     { customPacketType: "dboRide", op: "ended", horse, reason }: the server ended the ride
 //   Server -> others: { customPacketType: "dboRiders", on: [rider, horse, ...], off: [rider, ...] }
+//   Diagnostics, logged: { op: "seen", step, rider, horse, ... } from a watcher, { op: "riding", horse, ... } from the rider
 // The gameplay may decide ownership with globalThis.__dboMountMayRide(rider, horse): true, or the refusal to show.
 
 const TICK_MS = 250;
@@ -24,6 +25,10 @@ export const RIDE_GAP = 1024;
 // A ride order the client has not acted on is forgotten after this
 export const PENDING_MS = 5000;
 const REHOST_MS = 2000;
+// Diagnostic lines logged per connection, and the fields each may carry (numbers, booleans, short words)
+export const SEEN_LINES_MAX = 400;
+const SEEN_FIELDS = ["step", "mode", "rider", "horse", "riderLoaded", "onMount", "riding", "sit", "d", "dz", "sampled", "speedVar",
+  "hRun", "hSprint", "hOffset", "hTranslating", "sentRun", "sentSpeed", "pSprint"];
 
 interface Ride {
   horse: number;
@@ -61,6 +66,7 @@ export class MountSyncSystem implements System {
   // recipient -> rider -> horse it was last told
   private told = new Map<number, Map<number, number>>();
   private horseRaces = new Map<number, boolean>();
+  private seenLines = new Map<number, number>();
   private mp: Mp = null;
 
   async initAsync(ctx: SystemContext): Promise<void> {
@@ -86,7 +92,8 @@ export class MountSyncSystem implements System {
     let rider = 0;
     try { rider = mp.getUserActor(userId) >>> 0; } catch { return; }
     if (!rider) return;
-    if (content.op === "mounted") this.onMounted(mp, rider, toFormId(content.horse));
+    if (content.op === "seen" || content.op === "riding") this.logSeen(userId, rider, content);
+    else if (content.op === "mounted") this.onMounted(mp, rider, toFormId(content.horse));
     else if (content.op === "dismounted") this.end(mp, rider, "dismounted", false);
   }
 
@@ -94,6 +101,7 @@ export class MountSyncSystem implements System {
     let rider = 0;
     try { rider = ctx.svr.getUserActor(userId) >>> 0; } catch { return; }
     if (!rider) return;
+    this.seenLines.delete(userId);
     pending.delete(rider);
     if (rides.has(rider)) this.end(ctx.svr as Mp, rider, "left the game", false);
     this.told.delete(rider);
@@ -110,6 +118,24 @@ export class MountSyncSystem implements System {
       }
     }
     this.relay(mp);
+  }
+
+  // A watcher's seat step or a rider's horse sample, one log line each, so a two-player test reads from the server log
+  private logSeen(userId: number, sender: number, content: Content): void {
+    const n = this.seenLines.get(userId) ?? 0;
+    if (n > SEEN_LINES_MAX) return;
+    this.seenLines.set(userId, n + 1);
+    if (n === SEEN_LINES_MAX) { this.log(`MountSync: ${hex(sender)} diag lines past ${SEEN_LINES_MAX}, dropped`); return; }
+    const parts: string[] = [];
+    for (const k of SEEN_FIELDS) {
+      const v = (content as Record<string, unknown>)[k];
+      if (v === undefined || v === null) continue;
+      if (k === "rider" || k === "horse") { if (typeof v === "number") parts.push(`${k}=${hex(v >>> 0)}`); }
+      else if (typeof v === "number" && Number.isFinite(v)) parts.push(`${k}=${Math.round(v)}`);
+      else if (typeof v === "boolean") parts.push(`${k}=${v}`);
+      else if (typeof v === "string" && /^[A-Za-z]{1,16}$/.test(v)) parts.push(`${k}=${v}`);
+    }
+    this.log(`MountSync: ${content.op === "riding" ? "rider" : "watcher"} ${hex(sender)}${parts.map((x) => " " + x).join("")}`);
   }
 
   // A rider in another cell or far from its horse was moved off it; a dead horse or rider ends it too
@@ -249,7 +275,8 @@ export class MountSyncSystem implements System {
       if (!on.length && !off.length) continue;
       const user = userOf(mp, n);
       if (user < 0) continue;
-      try { mp.sendCustomPacket(user, JSON.stringify({ customPacketType: "dboRiders", on, off })); } catch { }
+      try { mp.sendCustomPacket(user, JSON.stringify({ customPacketType: "dboRiders", on, off })); } catch { continue; }
+      this.log(`MountSync: told ${hex(n)} on [${on.map(hex).join(" ")}] off [${off.map(hex).join(" ")}]`);
     }
   }
 
