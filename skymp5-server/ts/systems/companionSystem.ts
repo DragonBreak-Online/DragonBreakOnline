@@ -133,6 +133,8 @@ const PVP_RULE_HOOK = "__dboCompanionMayFight";
 const PVP_KINDS: ReadonlySet<CompanionKind> = new Set<CompanionKind>(["summon", "reanimated", "placed", "tame"]);
 // A player's animals: none of them fights another, whoever owns either (a tame still fights NPCs, and players under the PvP rules)
 const ANIMAL_KINDS: ReadonlySet<CompanionKind> = new Set<CompanionKind>(["pet", "tame", "mount"]);
+// Kinds on their owner's side in a fight: a mount fights nobody, but is struck only when its owner could be
+const SIDE_KINDS: ReadonlySet<CompanionKind> = new Set<CompanionKind>([...PVP_KINDS, "mount"]);
 // A summon's extra weapon, carried but not worn: its host's engine switches to it in close combat (Nate, 11 Oct)
 const SUMMON_SIDEARMS: Record<string, string> = {
   "45b9:Dawnguard.esm": "2c66f:Skyrim.esm", // DLC1SoulCairnBonemanSummon: DraugrSword, Ancient Nord Sword
@@ -543,13 +545,13 @@ export class CompanionSystem implements System {
     return !side || (side !== c.ownerId && this.mayFightPlayer(c.ownerId, side));
   }
 
-  // The player an actor fights for: a player character itself, a player's summon or raised corpse its owner; 0 for
-  // everything else (NPCs, GM warbands)
+  // The player an actor fights for: a player character itself, a player's summon, raised corpse, tame or mount its owner; 0
+  // for everything else (NPCs, GM warbands)
   playerSideOf(actorId: number): number {
     const id = actorId >>> 0;
     if (!id) return 0;
     const c = this.companions.get(id);
-    if (c) return PVP_KINDS.has(c.kind) && isPlayerActor(this.mp, c.ownerId) ? c.ownerId : 0;
+    if (c) return SIDE_KINDS.has(c.kind) && isPlayerActor(this.mp, c.ownerId) ? c.ownerId : 0;
     return isPlayerActor(this.mp, id) ? id : 0;
   }
 

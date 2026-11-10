@@ -147,6 +147,16 @@ const PLAYER_BASE = 0x7, HARE = 0x6dc9d, WOLF = 0x23abe, HORSE = 0x68d03, SUMMON
   check('...while a tame\'s blow on a player in a PvP fight still lands', hit(tame, B) === true);
   check('...and an NPC\'s blow on a horse still lands', hit(NPC, horseB) === true);
   pvpRule = false;
+  // A player's horse has its owner's protection: a summon or tame strikes it only when it could strike the owner (Leader, 10 Nov)
+  sys.orderFollow(summon);
+  check('a summon takes no attack order on another player\'s horse with no fight between the players', sys.orderAttack(summon, horseB) === false && sys.info(summon).targetId !== horseB, sys.info(summon).targetId);
+  check('...and its blow on that horse never lands', hit(summon, horseB) === false);
+  check('a horse fights for its owner\'s side', sys.playerSideOf(horseB) === B, sys.playerSideOf(horseB));
+  pvpRule = true;
+  hit(B, A);
+  check('...once the players fight and the PvP rule agrees, the summon\'s order and blow on the horse go through', sys.orderAttack(summon, horseB) === true && hit(summon, horseB) === true, sys.info(summon).targetId);
+  check('...while a tame still never strikes it (animals never fight animals)', hit(tame, horseB) === false);
+  pvpRule = false;
   sys.dismiss(horseB);
   check('an animal that ends is no longer marked one', get(horseB, 'ff_companionKind') === '', get(horseB, 'ff_companionKind'));
   sys.dismiss(tameB);
