@@ -2,7 +2,9 @@
 // are companions under the PvP rules; one of each at a time). Checks: a pet or mount takes no attack order and never defends, its
 // blows never land and blows on a pet never land; a tame fights NPCs and a player only under the PvP rules; a second pet, tame or
 // mount replaces the first without touching the summon slot; the gameplay's __dboCompanionEnded hook hears every end and why;
-// the kinds survive a logout in the registry; info carries staying; __dboCompanions.level reads the ACBS level. Bundles companionSystem.ts
+// the kinds survive a logout in the registry; info carries staying; __dboCompanions.level reads the ACBS level; players' animals
+// (pet, tame, mount) never take an order on, defend against or land a blow on one another, whoever owns them, and every client
+// is told an animal's kind through ff_companionKind (10 Nov: "the horse is fighting the pet"). Bundles companionSystem.ts
 // with esbuild (settings and placement stubbed). Run it from skymp5-server with node_modules present:
 //
 //   node tests/companion-kinds-harness.js
@@ -123,6 +125,41 @@ const PLAYER_BASE = 0x7, HARE = 0x6dc9d, WOLF = 0x23abe, HORSE = 0x68d03, SUMMON
   hit(B, A);
   check('...and lands once the players fight and the PvP rule agrees', hit(tame, B) === true);
   pvpRule = false;
+
+  // Players' animals never fight each other, whoever owns them (two-player test, 10 Nov: "the horse is fighting the pet")
+  check('every client is told a pet, a tame and a mount are animals', get(pet, 'ff_companionKind') === 'pet' && get(tame, 'ff_companionKind') === 'tame' && get(horse, 'ff_companionKind') === 'mount', [get(pet, 'ff_companionKind'), get(tame, 'ff_companionKind'), get(horse, 'ff_companionKind')]);
+  check('...and a summon is not', get(summon, 'ff_companionKind') === '', get(summon, 'ff_companionKind'));
+  const horseB = sys.spawn(B, HORSE, { kind: 'mount' });
+  const tameB = sys.spawn(B, WOLF, { kind: 'tame', persistent: true });
+  pvpRule = true;
+  hit(B, A);
+  check('a tame takes no attack order on another player\'s horse, even in a PvP fight', sys.orderAttack(tame, horseB) === false && sys.info(tame).targetId !== horseB, sys.info(tame).targetId);
+  check('a tame takes no attack order on another player\'s tame, even in a PvP fight', sys.orderAttack(tame, tameB) === false && sys.info(tame).targetId !== tameB, sys.info(tame).targetId);
+  sys.orderFollow(tame);
+  sys.orderAttackAll(A, horseB);
+  check('the owner striking another\'s horse sends no tame after it', sys.info(tame).targetId === 0, sys.info(tame).targetId);
+  sys.orderFollow(tameB);
+  sys.defend(B, tame);
+  check('a player\'s tame never turns on another player\'s tame that struck them', sys.info(tameB).targetId !== tame, sys.info(tameB).targetId);
+  check('a tame\'s blow on another player\'s horse never lands', hit(tame, horseB) === false);
+  check('a tame\'s blow on another player\'s tame never lands, even in a PvP fight', hit(tame, tameB) === false && hit(tameB, tame) === false);
+  check('a tame\'s blow on its own owner\'s mount never lands', hit(tame, horse) === false);
+  check('...while a tame\'s blow on a player in a PvP fight still lands', hit(tame, B) === true);
+  check('...and an NPC\'s blow on a horse still lands', hit(NPC, horseB) === true);
+  pvpRule = false;
+  // A player's horse has its owner's protection: a summon or tame strikes it only when it could strike the owner (Leader, 10 Nov)
+  sys.orderFollow(summon);
+  check('a summon takes no attack order on another player\'s horse with no fight between the players', sys.orderAttack(summon, horseB) === false && sys.info(summon).targetId !== horseB, sys.info(summon).targetId);
+  check('...and its blow on that horse never lands', hit(summon, horseB) === false);
+  check('a horse fights for its owner\'s side', sys.playerSideOf(horseB) === B, sys.playerSideOf(horseB));
+  pvpRule = true;
+  hit(B, A);
+  check('...once the players fight and the PvP rule agrees, the summon\'s order and blow on the horse go through', sys.orderAttack(summon, horseB) === true && hit(summon, horseB) === true, sys.info(summon).targetId);
+  check('...while a tame still never strikes it (animals never fight animals)', hit(tame, horseB) === false);
+  pvpRule = false;
+  sys.dismiss(horseB);
+  check('an animal that ends is no longer marked one', get(horseB, 'ff_companionKind') === '', get(horseB, 'ff_companionKind'));
+  sys.dismiss(tameB);
 
   // One of each kind
   const pet2 = sys.spawn(A, HARE, { kind: 'pet', persistent: true });
