@@ -144,6 +144,10 @@ const DUNGEON_REFUSED = ["claim", "lock", "transfer", "grantcontainer", "createk
 // A refused claim or lock in a dungeon earns a strike (gameplay dungeons.js __dboDungeonClaimRefused)
 const DUNGEON_STRIKE = ["claim", "lock"];
 const NO_DUNGEON_PROPERTY = "Nothing inside a dungeon can be owned or locked.";
+// City gates are never locked, by anyone (Nat, 9 Nov: Jarl Ysra locked Windhelm's docks gate a17d2 on 1 Nov and shut everyone out)
+// Beyond the worldspace-to-worldspace test: Windhelm's docks gate a17d2/a17d3 and main gate 55fca/55fcb (Skyrim.esm)
+export const CITY_GATE_REFS: ReadonlySet<number> = new Set([0xa17d2, 0xa17d3, 0x55fca, 0x55fcb]);
+const NO_GATE_LOCK = "City gates cannot be locked: they stay open for everyone.";
 // A cell desc as dungeons.js normDesc keys __dboDungeonCells: hex id without leading zeros, plugin lower case
 const dungeonKey = (desc: string): string => {
   const s = String(desc || "");
@@ -475,6 +479,8 @@ export class HousingSystem implements System {
       return false;
     }
     if (!rec || rec.owner === 0) return true;
+    // A lock left on a city gate never holds it shut
+    if (rec.locked && this.isCityGate(ctx, primary, rec)) return true;
     // A chest that is part of a place opens only for its owner, its assignee and the managers, or the household when shared
     if (!rec.locked && this.placesOn() && (this.isPlaceContainer(ctx, primary, rec) || this.isAssignedMember(ctx, primary, rec))) {
       if (this.hasAccess(ctx, primary, rec, casterId)) return true;
@@ -552,11 +558,17 @@ export class HousingSystem implements System {
   private warmStep(ctx: SystemContext): void {
     if (this.warm || !this.warmQueue) return;
     const next = this.warmQueue.shift();
-    if (next !== undefined) this.read(ctx, next >>> 0);
+    if (next !== undefined) {
+      const rec = this.read(ctx, next >>> 0);
+      try { if (rec && rec.owner !== 0 && rec.locked && this.isCityGate(ctx, next >>> 0, rec)) this.lockedGates.push(next >>> 0); }
+      catch (e) { this.log(`[housing] city gate check failed for ${(next >>> 0).toString(16)}: ${e}`); }
+    }
     if (this.warmQueue.length) return;
     this.warm = true;
     this.warmQueue = null;
     this.log(`[housing] claim records warm: ${this.claimed.length} claims in ${((Date.now() - this.warmStartMs) / 1000).toFixed(1)} s`);
+    try { this.unlockCityGates(ctx, this.lockedGates); } catch (e) { this.log(`[housing] city gate unlock failed: ${e}`); }
+    this.lockedGates = [];
     this.logDungeonClaims(ctx);
   }
 
@@ -705,6 +717,11 @@ export class HousingSystem implements System {
       return;
     }
     let rec = this.read(ctx, primary) || emptyRecord();
+    if (action === "lock" && this.isCityGate(ctx, primary, rec)) {
+      this.notice(ctx, userId, NO_GATE_LOCK);
+      this.log(`[housing] refused lock on city gate ${primary.toString(16)} for ${this.nameOf(ctx, actorId)} (actor ${actorId.toString(16)}, profile ${this.profileOf(ctx, actorId)})`);
+      return;
+    }
     // A whole place counts as one property (Nate, 3 Oct): handing over, giving up, naming and keys go to its root from any
     // of its doors or chests
     const ownKey = OWN_KEY_ACTIONS.indexOf(action) !== -1 && !this.isEntrance(ctx, primary, { ...rec, partner: rec.partner || this.partnerOf(ctx, primary) });
@@ -1394,6 +1411,15 @@ export class HousingSystem implements System {
   private isEntrance(ctx: SystemContext, primary: number, rec: PropertyRecord): boolean {
     if (!rec.partner) return false;
     return this.isWorldDesc(ctx, this.cellDescOf(ctx, primary)) !== this.isWorldDesc(ctx, this.cellDescOf(ctx, rec.partner));
+  }
+
+  // A city gate: a door with a worldspace on both sides (WindhelmWorld to Tamriel), or one in CITY_GATE_REFS
+  isCityGate(ctx: SystemContext, primary: number, rec: PropertyRecord): boolean {
+    // A claimed door keeps its far side in the record, so a claimed chest costs no lookup
+    const partner = rec.owner !== 0 ? rec.partner : rec.partner || this.partnerOf(ctx, primary);
+    if (CITY_GATE_REFS.has(primary >>> 0) || (!!partner && CITY_GATE_REFS.has(partner >>> 0))) return true;
+    if (!partner) return false;
+    return this.isWorldDesc(ctx, this.cellDescOf(ctx, primary)) && this.isWorldDesc(ctx, this.cellDescOf(ctx, partner));
   }
 
   // A building (Nate, 4 Oct: "what counts as property is the building itself, not containers within"): a place, or a way in
@@ -3543,6 +3569,21 @@ export class HousingSystem implements System {
   //
   // Only an index of which refs to touch on boot; the changeform holds the data.
 
+  // Every boot, once the warm-up has read each claim, unlocks the city gates it found locked, with an audit line each
+  unlockCityGates(ctx: SystemContext, refs: number[]): void {
+    const done: string[] = [];
+    for (const ref of refs) {
+      const rec = this.read(ctx, ref);
+      if (!rec || rec.owner === 0 || !rec.locked) continue;
+      const before = { ...rec };
+      rec.locked = false;
+      if (this.write(ctx, ref, rec)) done.push(ref.toString(16));
+      this.audit(ctx, "gate-unlock", ref, before, "the boot (city gates cannot be locked)");
+    }
+    if (done.length) this.decorDirty = true;
+    this.log(`[housing] city gates: ${done.length} lock(s) cleared${done.length ? `: ${done.join(" ")}` : ""}`);
+  }
+
   // Locks every claimed chest outside a place that is open, once. Waits while a claim reads as null after boot unless `last`
   lockOpenStorage(ctx: SystemContext, last: boolean): boolean {
     const open: number[] = [];
@@ -3718,6 +3759,8 @@ export class HousingSystem implements System {
   private storageLockDone = fs.existsSync(STORAGE_LOCK_FILE);
   private storageLockTriedMs = 0;
   private storageLockTries = 0;
+  // Claimed city gates the warm-up found locked, unlocked once it is done
+  private lockedGates: number[] = [];
   private decorDirty = false;
   private lastDecorMs = 0;
   private decorChanged = new Set<number>();
