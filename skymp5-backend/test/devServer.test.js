@@ -1,7 +1,7 @@
 'use strict'
 // The launcher's dev server option (routes/dev-server.js): only Lead GM and above get a ticket, the ticket verifies with the
-// public key the dev server holds, dev's files come from a private R2 bucket only against a ticket, and the whole thing is
-// off until its settings are present. Discord and R2 are faked.
+// public key the dev server holds, dev's files come from this server's disk only against a ticket, and the whole thing is
+// off until its settings are present. Discord is faked.
 
 const { test, before, after, beforeEach } = require('node:test')
 const assert = require('node:assert/strict')
@@ -16,12 +16,16 @@ function stub(rel, exports) {
 
 const LEAD_GM = '1494126618065506425'
 const OWNER = '1494126527489507369'
-const ROLES = { lead: [LEAD_GM], owner: [OWNER], player: ['111111111111111111'], slow: null }
+const ADMIN = '1569131695897313290'
+const TRIAL = '1558248795932860507'
+const ROLES = { lead: [LEAD_GM], owner: [OWNER], player: ['111111111111111111'], slow: null, admin: [ADMIN], trial: [TRIAL] }
 const SESSIONS = {
   lead: { profileId: 42, discordId: '310000000000000042', username: 'Lead' },
   owner: { profileId: 1, discordId: '310000000000000001', username: 'Nat' },
   player: { profileId: 77, discordId: '310000000000000077', username: 'Player' },
   slow: { profileId: 78, discordId: '310000000000000078', username: 'Slow' },
+  admin: { profileId: 79, discordId: '310000000000000079', username: 'Jake' },
+  trial: { profileId: 80, discordId: '310000000000000080', username: 'Trial' },
 }
 let roleCalls = 0
 stub('../sources/discordBot', {
@@ -44,19 +48,19 @@ const PUBLIC = crypto.createPublicKey({ key: Buffer.from(publicKeyOf(privateKey)
 const ENV = {
   DEV_TICKET_PRIVATE_KEY: PRIVATE, DEV_SERVER_ADDRESS: '198.51.100.20', DEV_SERVER_PORT: '7777',
   DEV_FILES_URL: 'https://dragonbreakonline.com/api/files/dev/',
-  DEV_R2_ENDPOINT: 'https://acct.r2.cloudflarestorage.com', DEV_R2_BUCKET: 'dragonbreak-dev', DEV_R2_ACCESS_KEY_ID: 'AKID', DEV_R2_SECRET_ACCESS_KEY: 'SECRET',
 }
-// R2 is faked: the manifest object answers, anything else on the R2 host is 404
-const realFetch = global.fetch
-const r2Calls = []
-const r2Manifest = JSON.stringify({ version: 'dev1', files: [] })
-global.fetch = async (url, opts) => {
-  const u = new URL(String(url))
-  if (u.host !== 'acct.r2.cloudflarestorage.com') return realFetch(url, opts)
-  r2Calls.push(u)
-  if (u.pathname === '/dragonbreak-dev/manifest.json' && u.searchParams.get('X-Amz-Signature')) return new Response(r2Manifest, { status: 200 })
-  return new Response('no', { status: 404 })
-}
+// Dev's files on disk, as the publisher leaves them: manifest.json and files/<sha256>
+const fs = require('fs')
+const os = require('os')
+const pathMod = require('path')
+const filesDir = fs.mkdtempSync(pathMod.join(os.tmpdir(), 'dev-files-'))
+const BLOB = Buffer.from('a dev plugin, hosted')
+const BLOB_SHA = crypto.createHash('sha256').update(BLOB).digest('hex')
+fs.mkdirSync(pathMod.join(filesDir, 'files'))
+fs.writeFileSync(pathMod.join(filesDir, 'files', BLOB_SHA), BLOB)
+fs.writeFileSync(pathMod.join(filesDir, 'manifest.json'), JSON.stringify({ version: 'dev1', files: [] }))
+fs.writeFileSync(pathMod.join(filesDir, 'secret.txt'), 'not served')
+ENV.DEV_FILES_DIR = filesDir
 let server, base
 before(async () => {
   const app = express()
@@ -68,8 +72,7 @@ before(async () => {
 })
 after(() => server.close())
 beforeEach(() => {
-  Object.assign(process.env, ENV); delete process.env.DEV_SERVER_TIERS; roleCalls = 0; r2Calls.length = 0
-  require('../routes/dev-server').resetCache()
+  Object.assign(process.env, ENV); delete process.env.DEV_SERVER_TIERS; process.env.DEV_SERVER_ROLE_IDS = ADMIN; roleCalls = 0
 })
 
 async function call(method, route, session, headers = {}) {
@@ -133,13 +136,32 @@ test('no session or an unknown one is 401', async () => {
   assert.equal((await call('GET', '/access', 'nope')).status, 401)
 })
 
+test('a role listed in DEV_SERVER_ROLE_IDS (above Lead GM, no named tier) gets the selector and a leadgm pass', async () => {
+  assert.deepEqual((await call('GET', '/access', 'admin')).body, { enabled: true, allowed: true, tier: 'leadgm' })
+  const t = await call('POST', '/ticket', 'admin')
+  assert.equal(t.status, 200)
+  assert.equal(t.body.tier, 'leadgm')
+})
+
+test('a Trial GM and a player get no selector and no pass', async () => {
+  for (const who of ['trial', 'player']) {
+    assert.equal((await call('GET', '/access', who)).body.allowed, false)
+    assert.equal((await call('POST', '/ticket', who)).status, 403)
+  }
+})
+
+test('without DEV_SERVER_ROLE_IDS the extra role gets nothing', async () => {
+  delete process.env.DEV_SERVER_ROLE_IDS
+  assert.equal((await call('GET', '/access', 'admin')).body.allowed, false)
+})
+
 test('DEV_SERVER_TIERS narrows the list', async () => {
   process.env.DEV_SERVER_TIERS = 'owner'
   assert.equal((await call('POST', '/ticket', 'lead')).status, 403)
   assert.equal((await call('POST', '/ticket', 'owner')).status, 200)
 })
 
-for (const missing of ['DEV_TICKET_PRIVATE_KEY', 'DEV_SERVER_ADDRESS', 'DEV_FILES_URL', 'DEV_R2_ENDPOINT', 'DEV_R2_BUCKET', 'DEV_R2_ACCESS_KEY_ID', 'DEV_R2_SECRET_ACCESS_KEY']) {
+for (const missing of ['DEV_TICKET_PRIVATE_KEY', 'DEV_SERVER_ADDRESS', 'DEV_FILES_URL']) {
   test(`off without ${missing}: no selector, no ticket, no Discord lookup`, async () => {
     delete process.env[missing]
     assert.deepEqual((await call('GET', '/access', 'lead')).body, { enabled: false, allowed: false, tier: null })
@@ -165,33 +187,30 @@ test('the signer caps a ticket at 7 days, which the dev server also refuses past
   assert.equal(payload.exp - payload.iat, 7 * 24 * 3600)
 })
 
-test('a Lead GM ticket reads dev\'s manifest from the private bucket, through a presigned URL, cached for a minute', async () => {
+test('a Lead GM ticket reads dev\'s manifest from the dev files folder', async () => {
   const t = (await call('POST', '/ticket', 'lead')).body.ticket
   const m = await call('GET', '/manifest.json', null, withTicket(t))
   assert.equal(m.status, 200)
   assert.equal(m.body.version, 'dev1')
-  assert.equal(r2Calls.length, 1)
-  assert.equal(r2Calls[0].searchParams.get('X-Amz-Credential').split('/')[0], 'AKID')
-  assert.ok(!r2Calls[0].href.includes('SECRET'), 'the secret never goes in a URL')
-  await call('GET', '/manifest.json', null, withTicket(t))
-  assert.equal(r2Calls.length, 1, 'the second read comes from the cache')
+  assert.equal(m.cache, 'no-store, private')
 })
 
-test('a file is a 302 to a 10-minute presigned R2 URL, and only by its sha256', async () => {
+test('a file is served by its sha256 only, with Range for a resumed download', async () => {
   const t = (await call('POST', '/ticket', 'lead')).body.ticket
-  const sha = 'b'.repeat(64)
-  const f = await call('GET', `/files/${sha}`, null, withTicket(t))
-  assert.equal(f.status, 302)
-  const loc = new URL(f.location)
-  assert.equal(loc.host, 'acct.r2.cloudflarestorage.com')
-  assert.equal(loc.pathname, `/dragonbreak-dev/files/${sha}`)
-  assert.equal(loc.searchParams.get('X-Amz-Expires'), '600')
-  assert.match(loc.searchParams.get('X-Amz-Signature'), /^[0-9a-f]{64}$/)
-  assert.equal((await call('GET', `/files/${'B'.repeat(64)}`, null, withTicket(t))).status, 404)
-  assert.equal((await call('GET', '/files/..%2fmanifest.json', null, withTicket(t))).status, 404)
+  const f = await call('GET', `/files/${BLOB_SHA}`, null, withTicket(t))
+  assert.equal(f.status, 200)
+  assert.equal(f.body, BLOB.toString())
+  const part = await fetch(`${base}/files/${BLOB_SHA}`, { headers: { ...withTicket(t), Range: 'bytes=6-' } })
+  assert.equal(part.status, 206)
+  assert.equal(await part.text(), BLOB.subarray(6).toString())
+  assert.equal((await call('GET', `/files/${'d'.repeat(64)}`, null, withTicket(t))).status, 404)
+  assert.equal((await call('GET', `/files/${BLOB_SHA.toUpperCase()}`, null, withTicket(t))).status, 404)
+  for (const p of ['/secret.txt', '/files/..%2fsecret.txt', '/files/..%2f..%2fsecret.txt', '/files/', '/files']) {
+    assert.equal((await call('GET', p, null, withTicket(t))).status, 404, p)
+  }
 })
 
-test('the dev files need a good ticket: none, a GM one, an expired one and a forged one are refused, and R2 is never asked', async () => {
+test('the dev files need a good ticket: none, a session alone, a GM one, an expired one and a forged one are refused', async () => {
   assert.equal((await call('GET', '/manifest.json')).status, 401)
   assert.equal((await call('GET', '/manifest.json', 'lead')).status, 401, 'a session alone is not a ticket')
   const claims = { profileId: 42, discordId: '310000000000000042', tier: 'gm' }
@@ -199,15 +218,11 @@ test('the dev files need a good ticket: none, a GM one, an expired one and a for
   const old = signDevTicket(privateKey, { ...claims, tier: 'leadgm' }, { nowSec: Math.floor(Date.now() / 1000) - 13 * 3600 }).ticket
   assert.equal((await call('GET', '/manifest.json', null, withTicket(old))).status, 403)
   const other = crypto.generateKeyPairSync('ed25519').privateKey
-  assert.equal((await call('GET', `/files/${'c'.repeat(64)}`, null, withTicket(signDevTicket(other, { ...claims, tier: 'owner' }).ticket))).status, 403)
-  assert.equal(r2Calls.length, 0)
+  assert.equal((await call('GET', `/files/${BLOB_SHA}`, null, withTicket(signDevTicket(other, { ...claims, tier: 'owner' }).ticket))).status, 403)
 })
 
-test('the presigner reproduces the AWS SigV4 documented example', () => {
-  const { presignGet } = require('../scripts/r2-presign')
-  const u = presignGet('https://examplebucket.s3.amazonaws.com/test.txt', {
-    accessKeyId: 'AKIAIOSFODNN7EXAMPLE', secretAccessKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
-    region: 'us-east-1', expiresSec: 86400, now: new Date('2013-05-24T00:00:00Z'),
-  })
-  assert.equal(new URL(u).searchParams.get('X-Amz-Signature'), 'aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404')
+test('a missing dev files folder answers 503 for the manifest, not a crash', async () => {
+  process.env.DEV_FILES_DIR = pathMod.join(filesDir, 'nope')
+  const t = (await call('POST', '/ticket', 'lead')).body.ticket
+  assert.equal((await call('GET', '/manifest.json', null, withTicket(t))).status, 503)
 })
