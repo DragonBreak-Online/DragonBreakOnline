@@ -99,6 +99,8 @@ const REGISTRY_FILE = "./companions.json";
 // Written into every companion's change form, so the boot sweep can find one the registry lost
 const COMPANION_PROP = "private.dboCompanion";
 const COMPANION_OF_PROP = "ff_companionOf";
+// A player's animal's kind ("pet", "tame", "mount"; empty otherwise), so every client puts the copy in the shared animal faction
+const COMPANION_KIND_PROP = "ff_companionKind";
 const UPDATE_MS = 500;
 const SPAWN_DISTANCE = 96;
 const SPAWN_LIFT = 16;
@@ -129,6 +131,8 @@ const PVP_RULE_HOOK = "__dboCompanionMayFight";
 // pets) target players as before, and are no player's side when another companion picks a target.
 // "placed" is here because a scroll's spider fights like a summon; only its slot and its lifetime differ
 const PVP_KINDS: ReadonlySet<CompanionKind> = new Set<CompanionKind>(["summon", "reanimated", "placed", "tame"]);
+// A player's animals: none of them fights another, whoever owns either (a tame still fights NPCs, and players under the PvP rules)
+const ANIMAL_KINDS: ReadonlySet<CompanionKind> = new Set<CompanionKind>(["pet", "tame", "mount"]);
 // A summon's extra weapon, carried but not worn: its host's engine switches to it in close combat (Nate, 11 Oct)
 const SUMMON_SIDEARMS: Record<string, string> = {
   "45b9:Dawnguard.esm": "2c66f:Skyrim.esm", // DLC1SoulCairnBonemanSummon: DraugrSword, Ancient Nord Sword
@@ -184,6 +188,7 @@ export class CompanionSystem implements System {
     this.dbName = String(all?.["databaseName"] ?? "world");
     this.loadRegistry();
     try { this.mp.makeProperty(COMPANION_OF_PROP, true); } catch { }
+    try { this.mp.makeProperty(COMPANION_KIND_PROP, true); } catch { }
     ctx.gm.once(WORLD_LOADED_EVENT, () => this.removeLeftovers());
     this.installHooks();
     this.expose();
@@ -302,6 +307,7 @@ export class CompanionSystem implements System {
       // Survives in the change form, so a crash cannot leave a summon behind as an ordinary hostile npc
       try { mp.set(id, COMPANION_PROP, kind); } catch { }
       try { mp.set(id, COMPANION_OF_PROP, ownerId); } catch { }
+      try { mp.set(id, COMPANION_KIND_PROP, ANIMAL_KINDS.has(kind) ? kind : ""); } catch { }
       if (SUMMON_SIDEARMS[baseDesc]) this.addSidearm(id, SUMMON_SIDEARMS[baseDesc]);
     } catch (e) {
       this.log(`CompanionSystem: failed to spawn ${baseDesc} for ${hex(ownerId)}: ${e}`);
@@ -383,7 +389,7 @@ export class CompanionSystem implements System {
     let changed = false;
     for (const c of mine) {
       if (!KIND_RULES[c.kind].fights || c.targetId === aggressorId || (c.targetId && now - c.lastRetargetAt < DEFEND_RETARGET_MS)) continue;
-      if (!this.pvpAllows(c, aggressorId)) continue;
+      if (!this.pvpAllows(c, aggressorId) || this.animalPair(c.id, aggressorId)) continue;
       c.targetId = aggressorId;
       c.lastRetargetAt = now;
       changed = true;
@@ -398,7 +404,7 @@ export class CompanionSystem implements System {
     const now = Date.now();
     let changed = false;
     for (const c of mine) {
-      if (!KIND_RULES[c.kind].fights || c.targetId === targetId || !this.pvpAllows(c, targetId)) continue;
+      if (!KIND_RULES[c.kind].fights || c.targetId === targetId || !this.pvpAllows(c, targetId) || this.animalPair(c.id, targetId)) continue;
       c.targetId = targetId;
       c.lastRetargetAt = now;
       changed = true;
@@ -432,6 +438,7 @@ export class CompanionSystem implements System {
     const mp = this.mp;
     this.companions.delete(c.id);
     try { mp.set(c.id, COMPANION_OF_PROP, 0); } catch { }
+    try { mp.set(c.id, COMPANION_KIND_PROP, ""); } catch { }
     try { mp.set(c.id, HOSTILE_PROP, !!hostile); } catch { }
     try {
       const loc = { cellOrWorldDesc: String(mp.get(c.id, "worldOrCellDesc")), pos: mp.getActorPos(c.id), rot: [0, 0, Number(mp.get(c.id, "angle")?.[2]) || 0] };
@@ -519,7 +526,14 @@ export class CompanionSystem implements System {
   }
 
   private mayTarget(c: Companion, targetId: number, range: number): boolean {
+    if (this.animalPair(c.id, targetId)) return false;
     return this.isValidTarget(c.ownerId, targetId, range) && this.pvpAllows(c, targetId);
+  }
+
+  // Both are players' animals (pet, tame or mount), whoever owns each: they never fight
+  private animalPair(a: number, b: number): boolean {
+    const x = this.companions.get(a >>> 0), y = this.companions.get(b >>> 0);
+    return !!x && !!y && ANIMAL_KINDS.has(x.kind) && ANIMAL_KINDS.has(y.kind);
   }
 
   // A summon or raised corpse fights another player, or what fights for one, only under the PvP rules
@@ -671,6 +685,7 @@ export class CompanionSystem implements System {
     this.endRegroup(c);
     this.companions.delete(c.id);
     try { mp.set(c.id, COMPANION_OF_PROP, 0); } catch { }
+    try { mp.set(c.id, COMPANION_KIND_PROP, ""); } catch { }
     try {
       const p = mp.getActorPos(c.id);
       if (Array.isArray(p)) this.broadcastFx(c.ownerId, p, "vanish");
@@ -816,6 +831,8 @@ export class CompanionSystem implements System {
       // A pet or mount never lands a blow, and nobody lands one on a pet
       if (aggressor && !KIND_RULES[aggressor.kind].fights) return false;
       if (struckKind && KIND_RULES[struckKind].guarded) return false;
+      // One player's animal never lands a blow on another's, nor on its owner's other animals
+      if (this.animalPair(aggId, tgtId)) return false;
       try {
         this.notePvpHit(aggId, tgtId, Number(damage) || 0);
       } catch (e) {
