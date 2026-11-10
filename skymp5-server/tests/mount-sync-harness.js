@@ -220,6 +220,23 @@ const TAMRIEL = 0x3c;
 
   check('the log names each ride', logs.some((l) => /rides ff0002a0/.test(l)) && logs.some((l) => /off ff0002a0: horse dead/.test(l)), logs);
 
+  // 9. the diagnostics a two-player test is read from (dev test 10 Nov: the watcher's own lines never reached the log)
+  check('each relay to a watcher is logged', logs.some((l) => l === `MountSync: told ${B.toString(16)} on [ff000101 ff0002a0] off []`) && logs.some((l) => /^MountSync: told ff000102 on \[\] off \[ff000101\]$/.test(l)), logs.filter((l) => /told/.test(l)));
+  logs.length = 0;
+  sys.customPacket(2, 'dboRide', { op: 'seen', step: 'activate', mode: 'hold', rider: A, horse: H, onMount: false, riding: false, d: 12.6, dz: 88, sampled: 0, speedVar: 450, hOffset: 'moving', hTranslating: true, junk: 'x', note: 'not logged' }, ctx);
+  check('a watcher seat step is one log line', logs.length === 1 && logs[0] === 'MountSync: watcher ff000102 step=activate mode=hold rider=ff000101 horse=ff0002a0 onMount=false riding=false d=13 dz=88 sampled=0 speedVar=450 hOffset=moving hTranslating=true', logs);
+  logs.length = 0;
+  sys.customPacket(2, 'dboRide', { op: 'riding', horse: H, sentRun: 'Running', sentSpeed: 451, sampled: 0, speedVar: 450, hSprint: false }, ctx);
+  check("a rider's horse sample is one log line", logs[0] === 'MountSync: rider ff000102 horse=ff0002a0 sampled=0 speedVar=450 hSprint=false sentRun=Running sentSpeed=451', logs);
+  logs.length = 0;
+  sys.customPacket(2, 'dboRide', { op: 'seen', step: 'x y\nMountSync: forged', mode: 'a'.repeat(40), rider: 'ff', d: Infinity }, ctx);
+  check('free text never reaches the log', logs.length === 1 && logs[0] === 'MountSync: watcher ff000102', logs);
+  logs.length = 0;
+  check('a diag line changes no ride', !isRidden(H) && horseOf(B) === 0);
+  const { SEEN_LINES_MAX } = require(bundle);
+  for (let i = 0; i < SEEN_LINES_MAX + 50; i++) sys.customPacket(3, 'dboRide', { op: 'seen', step: 'sample' }, ctx);
+  check('diag lines are capped per connection, the cap noted once', logs.length === SEEN_LINES_MAX + 1 && /past/.test(logs[logs.length - 1]), logs.length);
+
   Date.now = realNow;
   try { fs.rmSync(out, { recursive: true, force: true }); } catch { /* temp */ }
   console.log(failures ? `${failures} FAILED` : 'all passed');
