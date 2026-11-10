@@ -103,10 +103,10 @@ const limiter = rateLimit({
   keyGenerator: visitorKey,
   message: { error: 'Too many requests. Please try again later.' },
 })
-// A first dev install asks for every hosted file once; the files are few (11 today), the ceiling is generous
+// A first dev install asks for every hosted file once (about 9,600 on 9 Nov), so the ceiling sits well above that
 const fileLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
-  limit: 2000,
+  limit: 30000,
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: visitorKey,
