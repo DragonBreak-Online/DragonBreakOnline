@@ -4,6 +4,7 @@
 #include <TimeUtils.h>
 #include <chrono>
 #include <random>
+#include <utility>
 
 VarValue PapyrusUtility::Wait(VarValue self,
                               const std::vector<VarValue>& arguments)
@@ -13,20 +14,45 @@ VarValue PapyrusUtility::Wait(VarValue self,
 
 static std::mt19937 g_generator{ std::random_device{}() };
 
+// A script hands us whatever it computed, and std::uniform_int_distribution
+// is undefined unless min <= max: libstdc++ takes the range as unsigned, so a
+// reversed one wraps to a vast value and its down-scaling branch recurses
+// until the stack is gone. That killed the live server at 2026-11-10
+// 01:55:12Z with 47 players on, about 105,000 frames deep
+// (_work/crash-1110/REPORT.md). Nothing a script can pass may be able to do
+// that, so the order is put right here. A call with too few arguments
+// answered by reading past the end of the vector, which is the same class of
+// fault; it answers 0 now.
 VarValue PapyrusUtility::RandomInt(VarValue self,
                                    const std::vector<VarValue>& arguments)
 {
+  if (arguments.size() < 2) {
+    return VarValue(0);
+  }
   int32_t min = static_cast<int32_t>(arguments[0].CastToInt());
   int32_t max = static_cast<int32_t>(arguments[1].CastToInt());
+  if (min > max) {
+    std::swap(min, max);
+  }
   std::uniform_int_distribution<> distribute{ min, max };
   return VarValue(distribute(g_generator));
 }
 
+// The same two faults: uniform_real_distribution is undefined unless
+// min <= max, and the arguments were read without being counted. This one has
+// not been seen to crash the server, but it is the same unguarded shape and
+// is fixed the same way rather than left to be found later.
 VarValue PapyrusUtility::RandomFloat(VarValue self,
                                      const std::vector<VarValue>& arguments)
 {
+  if (arguments.size() < 2) {
+    return VarValue(0.f);
+  }
   double min = static_cast<double>(arguments[0].CastToFloat());
   double max = static_cast<double>(arguments[1].CastToFloat());
+  if (min > max) {
+    std::swap(min, max);
+  }
   std::uniform_real_distribution<> distribute{ min, max };
   return VarValue(distribute(g_generator));
 }
