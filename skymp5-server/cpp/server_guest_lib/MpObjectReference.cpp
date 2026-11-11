@@ -792,12 +792,17 @@ MpObjectReference* MpObjectReference::EventHosterToKeep(
   if (!asActor) {
     return nullptr;
   }
-  if (GetDynamicFields().GetValueDump("private.dboEventHoster") != "true") {
+
+  // The host lookup comes before the marker read on purpose. This runs once
+  // per removed listener on every cell crossing, and GetValueDump builds a
+  // string; almost nothing in the world is hosted at all, so the cheap hash
+  // lookup is what should reject the common case.
+  auto hosterIt = worldState->hosters.find(GetFormId());
+  if (hosterIt == worldState->hosters.end() || hosterIt->second == 0) {
     return nullptr;
   }
 
-  auto hosterIt = worldState->hosters.find(GetFormId());
-  if (hosterIt == worldState->hosters.end() || hosterIt->second == 0) {
+  if (GetDynamicFields().GetValueDump("private.dboEventHoster") != "true") {
     return nullptr;
   }
 
@@ -835,6 +840,14 @@ MpObjectReference* MpObjectReference::EventHosterToKeep(
   return hoster;
 }
 
+bool MpObjectReference::KeepsAsEventHoster(MpObjectReference* candidate)
+{
+  if (!candidate) {
+    return false;
+  }
+  return EventHosterToKeep(GridPosOf(GetPos())) == candidate;
+}
+
 void MpObjectReference::ForceSubscriptionsUpdate()
 {
   auto worldState = GetParent();
@@ -867,6 +880,17 @@ void MpObjectReference::ForceSubscriptionsUpdate()
   MpObjectReference* keptHoster = EventHosterToKeep(pos);
   for (auto listener : toRemove) {
     if (listener == keptHoster) {
+      continue;
+    }
+    // And the same pairing seen from the other side, which is most of the
+    // cases: when the HOSTER is the one that crossed a cell, this update runs
+    // on the hoster and the marked actor is in its toRemove. Unsubscribe
+    // (emitter, listener) erases listener from emitter->listeners, so the
+    // Unsubscribe(listener, this) below would be Unsubscribe(npc, hoster) -
+    // which takes the hoster out of the marked actor's listeners, queues a
+    // pendingHostRelease in PartOne's onUnsubscribe and sends that client
+    // DestroyActor. Both halves are skipped, so the pairing survives whole.
+    if (listener->KeepsAsEventHoster(this)) {
       continue;
     }
     Unsubscribe(this, listener);

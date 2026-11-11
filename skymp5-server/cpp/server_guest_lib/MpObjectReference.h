@@ -265,6 +265,12 @@ private:
   MpObjectReference* EventHosterToKeep(
     const std::pair<int16_t, int16_t>& myGridPos);
 
+  // The same question asked from the hoster's side: is `candidate` the hoster
+  // this reference keeps? One policy, one place - it is EventHosterToKeep
+  // that decides, so the marker, the cell check and the bound cannot drift
+  // apart between the two directions.
+  bool KeepsAsEventHoster(MpObjectReference* candidate);
+
   bool everSubscribedOrListened = false;
   std::unique_ptr<std::set<MpObjectReference*>> listeners;
   std::vector<MpActor*> actorListenerArray;

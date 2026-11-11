@@ -5,15 +5,23 @@
 //
 //   node tests/event-hoster-keep-harness.js
 //
-// WHAT THIS IS, AND WHAT IT IS NOT. The logic is C++ and this repository has no C++ unit target -
-// skymp5-server/cpp has no unit/ directory and the root CMake's BUILD_UNIT_TESTS finds nothing to build - so
-// there is nowhere to put a gtest. This reads the C++ source, the way tests/craft-perk-tiers-harness.js already
+// WHAT THIS IS, AND WHAT IT IS NOT. This reads the C++ source, the way tests/craft-perk-tiers-harness.js already
 // does for the craft check. So:
 //   - it CAN fail: remove the call, widen the bound, drop a guard, or widen the grid, and a check below goes red;
 //   - it CANNOT prove behaviour. It does not run the server, does not move an actor across a cell, and does not
-//     watch a subscription. Only the native build plus an event on dev can do that.
-// The change was type-checked with the real toolchain (clang++-15 -fsyntax-only, both touched translation units,
-// against CT115's own compile_commands.json) - which is more than this harness proves, and still not behaviour.
+//     watch a subscription.
+// And it did not see the bug that mattered: with only the marked actor's own update guarded, a hoster that was
+// itself the one crossing a cell still lost the NPC. Every check here passed before and after that was fixed.
+// CORRECTION (W4, same day): an earlier version of this header said the repository has no C++ unit target and
+// that there was nowhere to put a gtest. That was wrong, and it was wrong because I looked only in
+// skymp5-server/cpp/unit and not at the top-level unit/, which has 167 files and is globbed into the `unit`
+// catch2 binary. The behavioural test now exists - unit/EventHosterKeepTest.cpp - and it is what actually
+// proves this: it hosts an actor, moves it out of the 3x3 block and asserts the hoster is kept, with an
+// unmarked control asserting it is released. This file is kept for what it is good at, which is the
+// narrowness checks a behavioural test cannot make: that the grid constants did not move and that the other
+// release paths are still wired.
+// The change is also type-checked with the real toolchain (clang++-15 -fsyntax-only, both touched translation
+// units, against CT115's own compile_commands.json).
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -34,6 +42,16 @@ const body = fsu.slice(0, fsu.indexOf('\n}\n') + 3);
 check('ForceSubscriptionsUpdate asks for a hoster to keep', /EventHosterToKeep\(pos\)/.test(body));
 check('...and skips exactly that listener in the unsubscribe loop',
   /for \(auto listener : toRemove\) \{\s*\n\s*if \(listener == keptHoster\) \{\s*\n\s*continue;/.test(body));
+// Both directions. Unsubscribe(emitter, listener) erases listener from emitter->listeners, so when the HOSTER is
+// the one that crossed a cell this update runs on the hoster and the pass written Unsubscribe(listener, this) is
+// Unsubscribe(npc, hoster) - the one that strips the hoster from the marked actor and sends it DestroyActor.
+// Guarding only the marked actor's own update covers the minority of cases. The behavioural test is what caught
+// this; every check in this file passed both before and after the second guard, which is the honest measure of
+// what a source-shape harness can and cannot see.
+check('...and the same pairing from the hoster side, which is most of the cases',
+  /if \(listener->KeepsAsEventHoster\(this\)\) \{\s*\n\s*continue;/.test(body));
+check('...with one policy behind both directions, not a second copy of the rules',
+  /return EventHosterToKeep\(GridPosOf\(GetPos\(\)\)\) == candidate;/.test(ref));
 check('...before the Unsubscribe calls, so the kept one is never destroyed on that client',
   body.indexOf('if (listener == keptHoster)') < body.indexOf('Unsubscribe(this, listener)'));
 check('the subscribe half is untouched: everything the grid offers is still added',
