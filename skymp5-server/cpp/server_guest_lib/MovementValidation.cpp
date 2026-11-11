@@ -163,6 +163,11 @@ void Prune(MovementValidation::Tracker& tracker,
 
 namespace MovementValidation {
 
+float NpcJumpStep(const NiPoint3& from, const NiPoint3& to)
+{
+  return to.z < from.z ? HorizontalDistance(from, to) : (to - from).Length();
+}
+
 bool Validate(PartOne& partOne, const NiPoint3& currentPos,
               const NiPoint3& currentRot, const FormDesc& currentCellOrWorld,
               const NiPoint3& newPos, const FormDesc& newCellOrWorld,

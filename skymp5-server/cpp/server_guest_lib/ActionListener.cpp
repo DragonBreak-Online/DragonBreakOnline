@@ -1304,7 +1304,8 @@ MpActor* ActionListener::SendToNeighbours(uint32_t idx,
 // stale spots and every watcher seeing them rubber-band. If the hoster insists
 // for 3 s its position wins, so an NPC that really moved (a fall, a slip in
 // the server's own copy) is never frozen, which is why NPC moves used to be
-// relayed before any check.
+// relayed before any check. A fall counts only its horizontal part, since
+// holding a falling NPC up left archers shooting from mid-air (11 Nov).
 bool ActionListener::RefuseNpcJump(MpActor& actor, const NiPoint3& newPos)
 {
   constexpr float kMinJump = 1024.f;
@@ -1321,7 +1322,7 @@ bool ActionListener::RefuseNpcJump(MpActor& actor, const NiPoint3& newPos)
     : std::min(kMaxDtSec,
                std::chrono::duration<float>(now - st.lastAccepted).count());
   const float allowed = std::max(kMinJump, kMaxSpeed * dtSec);
-  const float step = (newPos - actor.GetPos()).Length();
+  const float step = MovementValidation::NpcJumpStep(actor.GetPos(), newPos);
 
   if (step <= allowed) {
     st.disagreeing = false;
@@ -1351,9 +1352,9 @@ bool ActionListener::RefuseNpcJump(MpActor& actor, const NiPoint3& newPos)
   if (now - st.lastLog >= kLogEvery) {
     st.lastLog = now;
     partOne.GetLogger().info(
-      "NpcJump {:x}: refused a {:.0f} step (allowed {:.0f}), hoster's copy "
-      "sent back",
-      actor.GetFormId(), step, allowed);
+      "NpcJump {:x}: refused a {:.0f} step (allowed {:.0f}, z {:+.0f}), "
+      "hoster's copy sent back",
+      actor.GetFormId(), step, allowed, newPos.z - actor.GetPos().z);
   }
   return true;
 }

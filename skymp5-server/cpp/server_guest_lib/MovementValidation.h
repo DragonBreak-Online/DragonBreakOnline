@@ -48,4 +48,8 @@ bool Validate(PartOne& partOne, const NiPoint3& currentPos,
               const NiPoint3& newPos, const FormDesc& newCellOrWorld,
               Networking::UserId userId, MpActor* actor,
               const EspmFileTable& espmFiles, Tracker* tracker = nullptr);
+
+// A hosted NPC's step as RefuseNpcJump measures it: a drop counts only its
+// horizontal part, so a fall off a ledge is never refused as a jump
+float NpcJumpStep(const NiPoint3& from, const NiPoint3& to);
 }
