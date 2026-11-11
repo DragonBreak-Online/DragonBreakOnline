@@ -39,6 +39,7 @@ import { UntouchableSystem } from "./systems/untouchableSystem";
 import { CompanionSystem } from "./systems/companionSystem";
 import { ConjurationSystem } from "./systems/conjurationSystem";
 import { VitalsRelaySystem } from "./systems/vitalsRelaySystem";
+import { MountSyncSystem } from "./systems/mountSyncSystem";
 import { NameTableSystem } from "./systems/nameTable";
 import { EventEmitter } from "events";
 import { pid } from "process";
@@ -255,6 +256,7 @@ const main = async () => {
     companionSystem,
     new ConjurationSystem(log, companionSystem),
     new VitalsRelaySystem(log),
+    new MountSyncSystem(log),
     new DiscordBanSystem(),
     new MasterApiBalanceSystem(log, maxPlayers, master, port, masterKey, offlineMode),
     new NameTableSystem(log),

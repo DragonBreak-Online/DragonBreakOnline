@@ -2063,6 +2063,12 @@ BaseActorValues MpActor::GetMaximumValues()
 // event boss's raise together (gameplay bossvitals.js, Nat 2 Nov)
 constexpr float kMaxVitalBonus = 10000.f;
 
+// Set by the gamemode's staff character marking (staffguard.js)
+bool MpActor::IsStaffCharacter() const
+{
+  return GetDynamicFields().GetValueDump("private.dboStaffChar") == "true";
+}
+
 void MpActor::AddLevelBonus(BaseActorValues& values) const
 {
   const auto& dump = GetDynamicFields().GetValueDump("private.dboAvBonus");
@@ -2223,16 +2229,19 @@ void MpActor::DropItem(const uint32_t baseId, const Inventory::Entry& entry)
     pImpl->droppedItemsQueue.erase(pImpl->droppedItemsQueue.begin());
   }
 
+  // A staff character drops gear to be rid of it: it goes like litter
+  const bool keepsExtras = hasExtras && !IsStaffCharacter();
+
   // Only ordinary litter goes in the queue. The queue deletes its oldest entry
   // as soon as an eleventh item is dropped, so an enchanted sword dropped
   // before ten pieces of junk used to vanish at once, well inside the two
   // minutes. An item with extras is never queued and so is never capped away.
-  if (!hasExtras) {
+  if (!keepsExtras) {
     pImpl->droppedItemsQueue.push_back(
       std::make_pair(droppedItemFormId, placedObject));
   }
 
-  if (hasExtras) {
+  if (keepsExtras) {
     ScheduleDroppedExtrasCheck(placedObject, droppedItemFormId, dropped,
                                editorId);
     return;

@@ -91,6 +91,14 @@ public:
     const EFIT* effectItem = nullptr;
     // CTDA after the effect's EFIT, which only the engine evaluates
     bool hasConditions = false;
+    // A CTDA asks for a perk held (HasPerk == 1, a Respite rider)
+    bool requiresPerk = false;
+    bool orConditions = false;
+
+    void NoteCondition(const char* data, uint32_t size);
+
+    // Every condition must hold and one asks for a perk
+    bool PerkGated() const { return requiresPerk && !orConditions; }
   };
 
   struct Data

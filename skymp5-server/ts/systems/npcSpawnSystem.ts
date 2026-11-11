@@ -7,6 +7,7 @@ import { resolveEditorIds, isEditorId } from "./espmEditorIds";
 import { espmFieldFormIds } from "./formIdUtil";
 import { placeNpc, HOSTILE_PROP } from "./npcPlacement";
 import { destroyLeftovers } from "./actorUtil";
+import { isRidden } from "./mountSyncSystem";
 
 // The ScampServer / `mp` API is untyped here, same convention as spawn.ts.
 type Mp = any;
@@ -78,6 +79,8 @@ const MAX_GRID_SPAN = 8;
 const DEFAULT_MAX_LIVE = 150;
 const BUDGET_RETRY_MS = 10000;
 const BUDGET_LOG_MS = 60000;
+// New actors one poll places around one player; the rest wait for the next poll. Overridable via "npcSpawnsPerPoll", 0 for no cap.
+const DEFAULT_SPAWNS_PER_POLL = 4;
 // A poll slower than this is worth a line in the log, at most once a minute
 const SLOW_POLL_MS = 50;
 const SLOW_LOG_MS = 60000;
@@ -295,6 +298,7 @@ export class NpcSpawnSystem implements System {
   private budgetLoggedAt = 0;
   private slowLoggedAt = 0;
   private maxLive = DEFAULT_MAX_LIVE;
+  private spawnsPerPoll = DEFAULT_SPAWNS_PER_POLL;
   // Pulling a desynced actor to its target removes its ragdoll mid fight and has crashed the client
   private desyncPull = false;
   // Lower-case zone name -> epoch ms until which a zone of that name is not filled: its NPCs were destroyed by a
@@ -309,6 +313,8 @@ export class NpcSpawnSystem implements System {
     this.desyncPull = all?.["npcDesyncPull"] === true;
     const rawBudget = Number(all?.["npcLiveBudget"]);
     if (Number.isFinite(rawBudget) && rawBudget > 0) this.maxLive = Math.floor(rawBudget);
+    const rawPerPoll = Number(all?.["npcSpawnsPerPoll"]);
+    if (Number.isFinite(rawPerPoll) && rawPerPoll >= 0) this.spawnsPerPoll = Math.floor(rawPerPoll);
     this.loadFallen();
     this.loadStranded();
     this.cleanupLeftovers(this.mp);
@@ -665,6 +671,8 @@ export class NpcSpawnSystem implements System {
       }
     }
 
+    // Anchor id -> actors placed around it in this poll; a claim's pre-spawn passes none and is never capped
+    const placed = this.spawnsPerPoll > 0 ? new Map<number, number>() : undefined;
     for (const zone of this.zones) {
       const dGroup = this.dungeonGroup(zone.name);
       const inActiveDungeon = !!dGroup && activeDungeons.has(dGroup);
@@ -684,7 +692,7 @@ export class NpcSpawnSystem implements System {
       if (zone.strayHeld.size) this.releaseStrayHolds(zone, index);
       if (occupied) {
         zone.emptySince = 0;
-        this.fillSlots(mp, zone, now, (dGroup ? dungeonAnchors.get(dGroup) : undefined) ?? interiorAnchors.get(zone.cellOrWorldId));
+        this.fillSlots(mp, zone, now, (dGroup ? dungeonAnchors.get(dGroup) : undefined) ?? interiorAnchors.get(zone.cellOrWorldId), undefined, placed);
       } else if (zone.spawned.length && zone.despawnSeconds > 0) {
         if (!zone.emptySince) zone.emptySince = now;
         if (now - zone.emptySince >= zone.despawnSeconds * 1000 && !this.anyWatched(mp, zone, index)) this.despawn(mp, zone);
@@ -786,7 +794,7 @@ export class NpcSpawnSystem implements System {
   }
 
   // Places every slot that is empty or holds a corpse once its cooldown has run out
-  private fillSlots(mp: Mp, zone: Zone, now: number, fallbackAnchor?: number, tally?: SkipTally): void {
+  private fillSlots(mp: Mp, zone: Zone, now: number, fallbackAnchor?: number, tally?: SkipTally, placed?: Map<number, number>): void {
     const before = zone.spawned.length;
     const note = (why: string) => { if (tally) tally[why] = (tally[why] || 0) + 1; };
     let changed = false;
@@ -814,6 +822,8 @@ export class NpcSpawnSystem implements System {
       }
       const anchor = this.anchorIn(zone) ?? (zone.anchorId > 0 ? zone.anchorId : undefined) ?? fallbackAnchor;
       if (anchor === undefined) { note("noAnchor"); break; }
+      const placedHere = placed?.get(anchor) ?? 0;
+      if (placed && placedHere >= this.spawnsPerPoll) { note("staggered"); break; }
       const npc = zone.slots[slot];
       const id = this.spawnOne(mp, zone, npc, slot, anchor, fallbackAnchor);
       if (id === null) {
@@ -832,6 +842,7 @@ export class NpcSpawnSystem implements System {
         added++;
       }
       zone.slotReadyAt[slot] = 0;
+      placed?.set(anchor, placedHere + 1);
       changed = true;
     }
     if (!changed) return;
@@ -1007,6 +1018,8 @@ export class NpcSpawnSystem implements System {
   private checkMisplaced(mp: Mp, zone: Zone, now: number, index: PlayerIndex): void {
     for (const entry of zone.spawned) {
       if (!entry.id || entry.diedAt) continue;
+      // A ridden horse goes where its rider takes it
+      if (isRidden(entry.id)) continue;
       let pos: number[] = [];
       try { pos = mp.getActorPos(entry.id); } catch { continue; }
       if (this.desyncPull && this.resyncDesynced(mp, zone, entry, pos)) continue;

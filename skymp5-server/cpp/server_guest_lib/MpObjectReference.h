@@ -176,6 +176,7 @@ public:
                         MpObjectReference* listener);
   static void Unsubscribe(MpObjectReference* emitter,
                           MpObjectReference* listener);
+  static bool IsServerSkippedScript(const std::string& scriptName);
 
   void SetLastAnimation(const std::string& lastAnimation);
   void SetNodeTextureSet(const std::string& node,

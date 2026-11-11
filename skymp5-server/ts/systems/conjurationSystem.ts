@@ -1,8 +1,9 @@
 import { Settings } from "../settings";
-import { System, Log, SystemContext } from "./system";
+import { System, Log, SystemContext, Content } from "./system";
 import { CompanionSystem } from "./companionSystem";
 import { spellEffects, SpellEffect, MgefArchetype, npcLevel, keywordConditionsPass, turnsToAsh, pickSummon, explosionPlacedNpc, NORD_RACE } from "./espmMagic";
 import { isPlayerActor, isNear, baseIdOf, hex } from "./actorUtil";
+import { espmFieldFormIds } from "./formIdUtil";
 
 // The ScampServer / `mp` API is untyped here, same convention as spawn.ts.
 type Mp = any;
@@ -30,6 +31,11 @@ const PLACE_FALLBACK_MS = 1500;
 const SPIDER_SCROLL_SEC = 60;
 const PLACE_HIT_FIRST_MS = 1000;
 const PLACE_LIFT = 16;
+// A staff's cast arrives only as the client's dboStaffCast: the platform drops enchantment casts, so summon staves did nothing
+// (#bugs 10 Nov). WEAP DNAM animation type of a staff, and the least time between two fires of one hand
+const ANIM_TYPE_STAFF = 8;
+const STAFF_FIRE_MIN_MS = 800;
+const STAFF_CAST_PACKET = "dboStaffCast";
 
 interface PendingPlace {
   spellId: number;
@@ -68,6 +74,8 @@ export class ConjurationSystem implements System {
   private summonRaceVariants = false;
   private pendingPlace = new Map<number, PendingPlace>();
   private lastPlaceHit = new Map<number, number>();
+  // "caster:hand" -> when that hand's staff last fired
+  private lastStaffFire = new Map<string, number>();
 
   async initAsync(ctx: SystemContext): Promise<void> {
     this.mp = ctx.svr as Mp;
@@ -120,6 +128,55 @@ export class ConjurationSystem implements System {
     this.lastReanimateHit.delete(actorId);
     this.lastPlaceHit.delete(actorId);
     this.lastRefusalNotice.delete(actorId);
+    for (const key of Array.from(this.lastStaffFire.keys())) if (key.startsWith(`${actorId}:`)) this.lastStaffFire.delete(key);
+  }
+
+  // { staff: WEAP base id, hand: "left" | "right" }: the enchantment comes from the held staff, never the packet
+  customPacket(userId: number, type: string, content: Content, ctx: SystemContext): void {
+    if (type !== STAFF_CAST_PACKET) return;
+    const mp = (this.mp || ctx.svr) as Mp;
+    let casterId = 0;
+    try { casterId = Number(mp.getUserActor(userId)) >>> 0; } catch { return; }
+    if (!casterId || !isPlayerActor(mp, casterId)) return;
+    const staffId = Number(content?.staff) >>> 0;
+    const hand = content?.hand === "left" ? "left" : "right";
+    const enchantmentId = this.heldStaffEnchantment(casterId, staffId);
+    if (!enchantmentId) {
+      this.log(`ConjurationSystem: ${hex(casterId)} fired staff ${hex(staffId)} it does not hold, or one with no enchantment`);
+      return;
+    }
+    const key = `${casterId}:${hand}`;
+    const now = Date.now();
+    if (now - (this.lastStaffFire.get(key) ?? 0) < STAFF_FIRE_MIN_MS) return;
+    this.lastStaffFire.set(key, now);
+    this.onSpellCast(casterId, enchantmentId);
+  }
+
+  // The enchantment of that staff in the caster's hand, its copy's or its base's; 0 for none or an empty one
+  private heldStaffEnchantment(casterId: number, staffId: number): number {
+    if (!staffId) return 0;
+    let entries: any[] = [];
+    try {
+      const eq = this.mp.get(casterId, "equipment");
+      entries = eq && eq.inv && Array.isArray(eq.inv.entries) ? eq.inv.entries : [];
+    } catch {
+      return 0;
+    }
+    let weapon: any = null;
+    try { weapon = this.mp.lookupEspmRecordById(staffId); } catch { return 0; }
+    if (weapon?.record?.type !== "WEAP") return 0;
+    const dnam = (weapon.record.fields || []).find((f: any) => f && f.type === "DNAM" && f.data instanceof Uint8Array);
+    if (!dnam || dnam.data.byteLength < 1 || dnam.data[0] !== ANIM_TYPE_STAFF) return 0;
+    const baseEnchantment = espmFieldFormIds(weapon, "EITM")[0] || 0;
+    for (const e of entries) {
+      if (!e || (Number(e.baseId) >>> 0) !== staffId || !(e.worn || e.wornLeft)) continue;
+      // A copy under one point of charge is spent (the engine casts nothing from it); one that reports no charge is full
+      if (typeof e.chargePercent === "number" && Number.isFinite(e.chargePercent) && e.chargePercent < 1) continue;
+      const own = Number(e.enchantmentId) >>> 0;
+      const enchantmentId = own && own !== staffId ? own : baseEnchantment;
+      if (enchantmentId) return enchantmentId >>> 0;
+    }
+    return 0;
   }
 
   // Handlers run after the native event returns: they may destroy the hit target, which the C++ hit path still uses

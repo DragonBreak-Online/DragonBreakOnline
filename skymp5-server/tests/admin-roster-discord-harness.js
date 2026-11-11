@@ -123,7 +123,7 @@ const settle = async () => { for (let i = 0; i < 30; i++) await turn(); };
       check('leadgm: no row carries an IP or HWID (senior staff only)', menu.players.every((r) => r.ip === '' && r.hwid === ''), menu.players.map((r) => [r.p, r.ip, r.hwid]));
       check('leadgm: the ban list hides the address', menu.bans.length === 2 && menu.bans.every((b) => b.ip === ''), menu.bans);
     } else {
-      check(`${s.tier}: rows keep the masked IP and the HWID`, !!off && off.ip !== '' && off.hwid === 'hwid-offline' && !!mira && mira.ip !== '' && mira.hwid !== '', [off, mira]);
+      check(`${s.tier}: rows keep the masked IP and the HWID`, !!off && off.ip !== '' && off.hwid === 'hwid-offline' && !!mira && /^userip|.x.x$|x.x.x.x/.test(mira.ip) && mira.hwid !== '', [off, mira]);
       check(`${s.tier}: the ban list keeps the address`, menu.bans.some((b) => b.ip === '10.0.0.9'), menu.bans);
     }
     check(`${s.tier}: an online player's row carries the Discord id and name`, !!mira && mira.online && mira.d === MIRA.discordId && mira.dn === MIRA.discordName, mira);
@@ -140,8 +140,8 @@ const settle = async () => { for (let i = 0; i < 30; i++) await turn(); };
     const mira = rowOf(rows, MIRA.profileId), off = rowOf(rows, OFFLINE.profileId);
     check('GM: online players keep the actor id, name and #TAG the tools act on', !!mira && mira.online && mira.a === MIRA.actorId.toString(16) && mira.n === MIRA.name && mira.t === MIRA.tag, mira);
     check('GM: a player with no profile yet is listed, without Discord', rows.some((r) => r.online && r.n === NOPROFILE.name && r.d === ''), rows.map((r) => r.n));
-    // Re-targeted (Nat 8 Nov: IP and HWID for senior staff only): a GM's rows still list offline accounts by profile, now with
-    // no address or hardware id
+    // Re-targeted (admin-panel-b-1108, Nat 8 Nov: IP and HWID for senior staff only): a GM's rows still list offline accounts by
+    // profile, now with no address or hardware id
     check('GM: offline accounts are still listed by profile, with no IP or HWID (senior staff only)', !!off && !off.online && off.ip === '' && off.hwid === '', off);
     check('GM: no row carries an IP or HWID', rows.every((r) => r.ip === '' && r.hwid === ''), rows.map((r) => [r.p, r.ip, r.hwid]));
     check('GM: the ban list hides the address, an IP-only ban still reads as one', menu.bans.length === 2 && menu.bans.every((b) => b.ip === '') && menu.bans.some((b) => b.name === '(an IP ban)'), menu.bans);

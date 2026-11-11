@@ -112,6 +112,10 @@ std::vector<espm::Effects::Effect> GetRestorativeEffects(
     if (areaOnly && effect.effectItem->areaOfEffect == 0) {
       continue;
     }
+    // DragonBreak gives no vanilla perks, so a perk rider never runs in game
+    if (effect.PerkGated()) {
+      continue;
+    }
     const uint32_t effectId = spellLookup.ToGlobalId(effect.effectFormId);
     const auto magicEffect = espm::GetData<espm::MGEF>(effectId, worldState);
     if (magicEffect.data.IsFlagSet(espm::MGEF::Flags::Hostile) ||

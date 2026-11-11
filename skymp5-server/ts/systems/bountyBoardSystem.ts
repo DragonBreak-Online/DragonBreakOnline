@@ -44,7 +44,7 @@ type Mp = any;
 //   bountyBoardRecruitTownGold  price of a Recruitment post anywhere else, default 50
 //   bountyBoardExpiryDays   days a notice stays up, default 7
 //   bountyBoardMaxNotes     notices one hold's board holds, default 60
-//   bountyBoardMaxTextLen   characters per notice, default 500
+//   bountyBoardMaxTextLen   characters per notice, default 1500
 //   bountyBoardMaxDistance  posting reach in game units, default 512
 //   bountyBoardTreasuryPercent  share of a paid post deposited in the zone's treasury, default 50
 
@@ -68,7 +68,7 @@ const DEFAULT_RECRUIT_CITY_GOLD = 100;
 const DEFAULT_RECRUIT_TOWN_GOLD = 50;
 const DEFAULT_EXPIRY_DAYS = 7;
 const DEFAULT_MAX_NOTES = 60;
-const DEFAULT_MAX_TEXT_LEN = 500;
+const DEFAULT_MAX_TEXT_LEN = 1500;
 const DEFAULT_MAX_DISTANCE = 512;
 const DEFAULT_TREASURY_PERCENT = 50;
 

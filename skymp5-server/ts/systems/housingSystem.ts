@@ -26,11 +26,11 @@ type Mp = any;
 //   Client -> Server:
 //     { customPacketType: "propertyInfoRequest", target: <refrId> }
 //     { customPacketType: "propertyRequest", action, target, recipient?, name? }
-//       action: claim | abandon | lock | unlock | rename | transfer
+//       action: claim | abandon | lock | unlock | rename | renameplace | transfer
 //             | revoke | createkey | revokekeys | grantcontainer | takekey
 //   Server -> Client:
 //     { customPacketType: "propertyMenu", target, view, owned, name, locked,
-//       hasKeys, canGrantContainers, ownerName }
+//       hasKeys, canGrantContainers, container, ownerName, renames }
 //     { customPacketType: "propertyNotice", text }
 //     { customPacketType: "refDecor", full?, refs: [{refId,name,locked}] }
 //
@@ -127,7 +127,7 @@ const MANAGER_RANKS = ["jarl", "baron", "steward", "chieftain", "bane", "count"]
 // The ranks that rule a hold, and so hold its seat by office (a steward manages it, but does not hold it)
 const RULER_RANKS = ["jarl", "baron", "chieftain", "bane", "count"];
 // Actions on any door or chest of a place that act on the whole place (its root)
-const PLACE_WIDE = ["abandon", "revoke", "rename", "createkey", "revokekeys", "takekey", "transfer", "assign", "unassign", "share", "unshare"];
+const PLACE_WIDE = ["abandon", "revoke", "rename", "renameplace", "createkey", "revokekeys", "takekey", "transfer", "assign", "unassign", "share", "unshare"];
 // Keys of a place's inner doors and chests are their own (Nate, 5 Oct): only its exterior doors share the place's key
 const OWN_KEY_ACTIONS = ["createkey", "revokekeys", "takekey"];
 // The owner's Rooms and chests panel lists at most this many of a place's inner doors and chests
@@ -135,7 +135,7 @@ const MAX_ROOMS_LISTED = 48;
 // A place's cells: the interior behind its door and the rooms reachable only through it, at most this many
 const MAX_PLACE_CELLS = 4;
 // Housing actions whose use by staff on someone else's property is logged
-const STAFF_LOGGED = ["claim", "abandon", "revoke", "lock", "unlock", "rename", "createkey", "revokekeys", "transfer", "grantcontainer"];
+const STAFF_LOGGED = ["claim", "abandon", "revoke", "lock", "unlock", "rename", "renameplace", "createkey", "revokekeys", "transfer", "grantcontainer"];
 // What a GM below Lead GM may do to someone else's property (Nat, 25 Oct: "give regular GMs the ability to fix locks"):
 // lock or unlock it, re-key it, take back one copy, and cut a key for its owner. Never claim, hand over, name or share it
 const LOCK_FIX_ACTIONS = ["lock", "unlock", "revokekeys", "takekey", "createkey"];
@@ -144,6 +144,10 @@ const DUNGEON_REFUSED = ["claim", "lock", "transfer", "grantcontainer", "createk
 // A refused claim or lock in a dungeon earns a strike (gameplay dungeons.js __dboDungeonClaimRefused)
 const DUNGEON_STRIKE = ["claim", "lock"];
 const NO_DUNGEON_PROPERTY = "Nothing inside a dungeon can be owned or locked.";
+// City gates are never locked, by anyone (Nat, 9 Nov: Jarl Ysra locked Windhelm's docks gate a17d2 on 1 Nov and shut everyone out)
+// Beyond the worldspace-to-worldspace test: Windhelm's docks gate a17d2/a17d3 and main gate 55fca/55fcb (Skyrim.esm)
+export const CITY_GATE_REFS: ReadonlySet<number> = new Set([0xa17d2, 0xa17d3, 0x55fca, 0x55fcb]);
+const NO_GATE_LOCK = "City gates cannot be locked: they stay open for everyone.";
 // A cell desc as dungeons.js normDesc keys __dboDungeonCells: hex id without leading zeros, plugin lower case
 const dungeonKey = (desc: string): string => {
   const s = String(desc || "");
@@ -475,6 +479,8 @@ export class HousingSystem implements System {
       return false;
     }
     if (!rec || rec.owner === 0) return true;
+    // A lock left on a city gate never holds it shut
+    if (rec.locked && this.isCityGate(ctx, primary, rec)) return true;
     // A chest that is part of a place opens only for its owner, its assignee and the managers, or the household when shared
     if (!rec.locked && this.placesOn() && (this.isPlaceContainer(ctx, primary, rec) || this.isAssignedMember(ctx, primary, rec))) {
       if (this.hasAccess(ctx, primary, rec, casterId)) return true;
@@ -552,11 +558,17 @@ export class HousingSystem implements System {
   private warmStep(ctx: SystemContext): void {
     if (this.warm || !this.warmQueue) return;
     const next = this.warmQueue.shift();
-    if (next !== undefined) this.read(ctx, next >>> 0);
+    if (next !== undefined) {
+      const rec = this.read(ctx, next >>> 0);
+      try { if (rec && rec.owner !== 0 && rec.locked && this.isCityGate(ctx, next >>> 0, rec)) this.lockedGates.push(next >>> 0); }
+      catch (e) { this.log(`[housing] city gate check failed for ${(next >>> 0).toString(16)}: ${e}`); }
+    }
     if (this.warmQueue.length) return;
     this.warm = true;
     this.warmQueue = null;
     this.log(`[housing] claim records warm: ${this.claimed.length} claims in ${((Date.now() - this.warmStartMs) / 1000).toFixed(1)} s`);
+    try { this.unlockCityGates(ctx, this.lockedGates); } catch (e) { this.log(`[housing] city gate unlock failed: ${e}`); }
+    this.lockedGates = [];
     this.logDungeonClaims(ctx);
   }
 
@@ -705,10 +717,17 @@ export class HousingSystem implements System {
       return;
     }
     let rec = this.read(ctx, primary) || emptyRecord();
+    if (action === "lock" && this.isCityGate(ctx, primary, rec)) {
+      this.notice(ctx, userId, NO_GATE_LOCK);
+      this.log(`[housing] refused lock on city gate ${primary.toString(16)} for ${this.nameOf(ctx, actorId)} (actor ${actorId.toString(16)}, profile ${this.profileOf(ctx, actorId)})`);
+      return;
+    }
     // A whole place counts as one property (Nate, 3 Oct): handing over, giving up, naming and keys go to its root from any
     // of its doors or chests
     const ownKey = OWN_KEY_ACTIONS.indexOf(action) !== -1 && !this.isEntrance(ctx, primary, { ...rec, partner: rec.partner || this.partnerOf(ctx, primary) });
-    if (this.placesOn() && rec.memberOf && rec.memberOf !== primary && PLACE_WIDE.indexOf(action) !== -1 && !ownKey) {
+    // A container inside a place keeps its own name (Nat, 10 Nov): Rename on it names that container, never the place
+    const ownName = action === "rename" && this.placesOn() && this.baseTypeOf(ctx, primary) === "CONT";
+    if (this.placesOn() && rec.memberOf && rec.memberOf !== primary && PLACE_WIDE.indexOf(action) !== -1 && !ownKey && !ownName) {
       const root = this.read(ctx, rec.memberOf);
       if (root && root.owner !== 0) { primary = rec.memberOf; rec = root; }
     }
@@ -716,8 +735,8 @@ export class HousingSystem implements System {
     // and a lock makes it a member, locked on its own
     if (this.placesOn() && rec.owner === 0) {
       const place = this.placeOfRef(ctx, primary);
-      if (place && PLACE_WIDE.indexOf(action) !== -1 && !ownKey) { primary = place.root; rec = place.rec; }
-      else if (place && (action === "lock" || ownKey)) rec = this.adopted(ctx, primary, rec, place);
+      if (place && PLACE_WIDE.indexOf(action) !== -1 && !ownKey && !ownName) { primary = place.root; rec = place.rec; }
+      else if (place && (action === "lock" || ownKey || ownName)) rec = this.adopted(ctx, primary, rec, place);
       else if (place && action === "unlock") { this.notice(ctx, userId, "That is not locked."); return; }
     }
     const isOwner = this.ownsAs(rec, this.profileOf(ctx, actorId), actorId) || this.leadsHall(ctx, primary, rec, actorId);
@@ -757,7 +776,8 @@ export class HousingSystem implements System {
         case "revoke": this.doRevoke(ctx, userId, actorId, primary, rec, isManager); break;
         case "lock": this.doLock(ctx, userId, actorId, primary, rec, true, lockFix || isManager); break;
         case "unlock": this.doLock(ctx, userId, actorId, primary, rec, false, lockFix || isManager); break;
-        case "rename": this.doRename(ctx, userId, primary, rec, isOwner, isManager, content["name"]); break;
+        case "rename":
+        case "renameplace": this.doRename(ctx, userId, primary, rec, isOwner, isManager, content["name"]); break;
         case "createkey": this.doCreateKey(ctx, userId, actorId, primary, rec, isOwner || isManager || lockFix, content["recipient"]); break;
         case "takekey": this.doTakeKey(ctx, userId, actorId, primary, rec, isOwner || isManager || lockFix, content["name"]); break;
         case "revokekeys": this.doRevokeKeys(ctx, userId, primary, rec, isOwner, isManager || lockFix); break;
@@ -1052,10 +1072,13 @@ export class HousingSystem implements System {
       target: here || primary || target,
       view,
       owned,
-      name: rec ? rec.name : null,
+      name: here && this.baseTypeOf(ctx, here) === "CONT" ? null : rec ? rec.name : null,
       locked: owned && !here && rec!.locked,
+      renames: this.placesOn() && this.baseTypeOf(ctx, here || primary) === "CONT" && (here || (owned && rec!.memberOf && rec!.memberOf !== primary)) ? "container" : "place",
       hasKeys: owned,
       canGrantContainers: (isOwner || isManager) && owned && this.baseTypeOf(ctx, primary) === "CONT" && !(this.placesOn() && rec!.memberOf),
+      // Loose storage is handed over with Grant this container, never rented or sold: the front hides the market for it (Nat, 7 Nov)
+      container: this.baseTypeOf(ctx, target) === "CONT" || undefined,
       ownerName: owned ? (rec!.ownerName || "Someone") : null,
       keyRing: this.keyRing,
       copies: this.keyRing && owned && (isOwner || isManager || lockFixer) ? this.copiesOf(rec!) : undefined,
@@ -1392,6 +1415,15 @@ export class HousingSystem implements System {
   private isEntrance(ctx: SystemContext, primary: number, rec: PropertyRecord): boolean {
     if (!rec.partner) return false;
     return this.isWorldDesc(ctx, this.cellDescOf(ctx, primary)) !== this.isWorldDesc(ctx, this.cellDescOf(ctx, rec.partner));
+  }
+
+  // A city gate: a door with a worldspace on both sides (WindhelmWorld to Tamriel), or one in CITY_GATE_REFS
+  isCityGate(ctx: SystemContext, primary: number, rec: PropertyRecord): boolean {
+    // A claimed door keeps its far side in the record, so a claimed chest costs no lookup
+    const partner = rec.owner !== 0 ? rec.partner : rec.partner || this.partnerOf(ctx, primary);
+    if (CITY_GATE_REFS.has(primary >>> 0) || (!!partner && CITY_GATE_REFS.has(partner >>> 0))) return true;
+    if (!partner) return false;
+    return this.isWorldDesc(ctx, this.cellDescOf(ctx, primary)) && this.isWorldDesc(ctx, this.cellDescOf(ctx, partner));
   }
 
   // A building (Nate, 4 Oct: "what counts as property is the building itself, not containers within"): a place, or a way in
@@ -2583,9 +2615,8 @@ export class HousingSystem implements System {
       const rec = this.read(ctx, primary);
       if (!rec || rec.owner === 0) { add(primary, rec, null); continue; }
       const root = rec.memberOf && this.placesOn() ? this.read(ctx, rec.memberOf) : null;
-      const name = (root && root.owner !== 0 && root.name) || rec.name;
-      add(primary, rec, name);
-      if (rec.place && this.placesOn()) for (const m of this.membersOf(ctx, primary)) add(m.ref, m.rec, rec.name || m.rec.name);
+      add(primary, rec, this.memberName(ctx, primary, rec, root && root.owner !== 0 ? root.name : null));
+      if (rec.place && this.placesOn()) for (const m of this.membersOf(ctx, primary)) add(m.ref, m.rec, this.memberName(ctx, m.ref, m.rec, rec.name));
     }
     const build = (v?: ViewerAccess) => {
       const refs: Array<Record<string, unknown>> = [];
@@ -2606,14 +2637,14 @@ export class HousingSystem implements System {
   }
 
   // A locked claim is locked for every viewer, so one list serves everyone; with housingKeyRing it shows unlocked to whoever
-  // may walk in. A member of a place carries the place's name, so a rename shows on every door pair of it (Nate, 3 Oct)
+  // may walk in. A member door of a place carries the place's name, so a rename shows on every door pair of it (Nate, 3 Oct)
   private decorRefs(ctx: SystemContext, v?: ViewerAccess, snapshot?: Array<{ primary: number; rec: PropertyRecord }>): Array<Record<string, unknown>> {
     const refs: Array<Record<string, unknown>> = [];
     const live = snapshot || this.liveClaims(ctx);
     const names = new Map<number, string | null>(live.map((c) => [c.primary, c.rec.name]));
     for (const { primary, rec } of live) {
       const inert = this.inDungeon(ctx, primary);
-      const name = inert ? null : this.shownName(rec, names);
+      const name = inert ? null : this.memberName(ctx, primary, rec, rec.memberOf && this.placesOn() ? names.get(rec.memberOf) || null : null);
       const locked = !inert && rec.locked && !(v && this.hasAccessWith(ctx, primary, rec, v));
       refs.push({ refId: primary, name, locked });
       if (rec.partner) refs.push({ refId: rec.partner, name, locked });
@@ -2621,10 +2652,10 @@ export class HousingSystem implements System {
     return refs;
   }
 
-  // The name a claim shows: its place's when it is a member of a named one, else its own
-  private shownName(rec: PropertyRecord, rootNames: Map<number, string | null>): string | null {
-    if (rec.memberOf && this.placesOn()) { const n = rootNames.get(rec.memberOf); if (n) return n; }
-    return rec.name;
+  // The name a claim shows: a door of a named place shows the place's, a container in a place only its own (Nat, 10 Nov)
+  private memberName(ctx: SystemContext, primary: number, rec: PropertyRecord, placeName: string | null): string | null {
+    if (!rec.memberOf || rec.memberOf === primary || !this.placesOn() || this.baseTypeOf(ctx, primary) === "CONT") return rec.name;
+    return placeName || rec.name;
   }
 
   // The interaction prompt's name for a load door (gamemode.js dboDoorName): the property's name on the side of its door
@@ -3541,6 +3572,21 @@ export class HousingSystem implements System {
   //
   // Only an index of which refs to touch on boot; the changeform holds the data.
 
+  // Every boot, once the warm-up has read each claim, unlocks the city gates it found locked, with an audit line each
+  unlockCityGates(ctx: SystemContext, refs: number[]): void {
+    const done: string[] = [];
+    for (const ref of refs) {
+      const rec = this.read(ctx, ref);
+      if (!rec || rec.owner === 0 || !rec.locked) continue;
+      const before = { ...rec };
+      rec.locked = false;
+      if (this.write(ctx, ref, rec)) done.push(ref.toString(16));
+      this.audit(ctx, "gate-unlock", ref, before, "the boot (city gates cannot be locked)");
+    }
+    if (done.length) this.decorDirty = true;
+    this.log(`[housing] city gates: ${done.length} lock(s) cleared${done.length ? `: ${done.join(" ")}` : ""}`);
+  }
+
   // Locks every claimed chest outside a place that is open, once. Waits while a claim reads as null after boot unless `last`
   lockOpenStorage(ctx: SystemContext, last: boolean): boolean {
     const open: number[] = [];
@@ -3716,6 +3762,8 @@ export class HousingSystem implements System {
   private storageLockDone = fs.existsSync(STORAGE_LOCK_FILE);
   private storageLockTriedMs = 0;
   private storageLockTries = 0;
+  // Claimed city gates the warm-up found locked, unlocked once it is done
+  private lockedGates: number[] = [];
   private decorDirty = false;
   private lastDecorMs = 0;
   private decorChanged = new Set<number>();
