@@ -33,6 +33,12 @@ const SOUL_CHARGE = [0, 250, 500, 1000, 2000, 3000];
 const RECHARGE_MARGIN = 2;
 // Legendary; vanilla has no bound beyond it only through potion loops
 const MAX_HEALTH_STEP = 16;
+// Fortify Smithing as the engine applies it (UESP Skyrim:Smithing): effective skill = (skill - 13.29) x (1 + perk) x
+// (1 + worn enchantments) x (1 + potion) + 13.29, quality = floor((effective skill + 38) x 3 / 103)
+const SMITHING_PIVOT = 13.29;
+const qualityAt = (skill: number): number => Math.floor((skill + 38) * 3 / 103);
+// The least effective skill reaching a quality (UESP's table: Fine 14, Superior 31, Exquisite 65 .. Legendary 168)
+const skillForQuality = (q: number): number => Math.max(14, Math.ceil(103 * q / 3 - 38));
 // Tempering and enchanting need the Blacksmith and Enchanter skills: a report could claim Legendary, or two effects at
 // twice the strongest plugin enchantment, from anyone (review, 2026-09-29). Every real bench already asks for the skill
 // (masterySystem's station gate takes it up on first touch), so this refuses only reports no bench stood behind.
@@ -501,10 +507,11 @@ export class CraftedExtrasSystem implements System {
     const toStep = healthStep(g.health);
     if (toStep !== fromStep) {
       // Held to the smith's rank; a claim above it is tempered only as far as they may, and not at all without the skill
-      const target = Math.min(toStep, station.temperCap, MAX_HEALTH_STEP, this.itemTemperCap(station.actorId, s.baseId));
+      const cap = this.fortifiedTemperCap(Math.min(station.temperCap, this.itemTemperCap(station.actorId, s.baseId)), station.actorId);
+      const target = Math.min(toStep, MAX_HEALTH_STEP, cap.step);
       if (toStep < fromStep || target <= fromStep || !this.reserveTemper(ctx, s.baseId, station, pool, reserve)) return null;
       out.health = target / 10;
-      notes.push(`tempered to ${out.health}`);
+      notes.push(`tempered to ${out.health}${toStep > target ? ` (asked ${toStep / 10})` : ""}${cap.note}`);
       temperSteps = target - fromStep;
     }
 
@@ -872,6 +879,25 @@ export class CraftedExtrasSystem implements System {
     const hook = (globalThis as any).__dboTemperCap;
     if (typeof hook !== "function" || !actorId) return MAX_HEALTH_STEP;
     try { const cap = Number(hook(actorId >>> 0, baseId >>> 0)); return Number.isFinite(cap) ? cap : MAX_HEALTH_STEP; } catch { return MAX_HEALTH_STEP; }
+  }
+
+  // A cap the rules allow is reached by a smith at that quality's least skill; worn and drunk Fortify Smithing
+  // (smithing.js __dboSmithingFortify, fractions) lift that skill as the engine does. A cap of 10 (no tempering) stays
+  private fortifiedTemperCap(cap: number, actorId: number | undefined): { step: number; note: string } {
+    const level = cap - 10;
+    const hook = (globalThis as any).__dboSmithingFortify;
+    if (!(level > 0) || typeof hook !== "function" || !actorId) return { step: cap, note: "" };
+    let enchantments = 0, potion = 0;
+    try {
+      const f = hook(actorId >>> 0) || {};
+      enchantments = Math.max(0, Number(f.enchantments) || 0);
+      potion = Math.max(0, Number(f.potion) || 0);
+    } catch { return { step: cap, note: "" }; }
+    const mult = (1 + enchantments) * (1 + potion);
+    if (!(mult > 1) || !Number.isFinite(mult)) return { step: cap, note: "" };
+    const lifted = qualityAt((skillForQuality(level) - SMITHING_PIVOT) * mult + SMITHING_PIVOT);
+    const step = 10 + Math.max(level, lifted);
+    return { step, note: ` (fortify x${Math.round(mult * 100) / 100}: cap ${cap / 10}${step > cap ? ` -> ${step / 10}` : ""})` };
   }
 
   // Why the last plan was refused, for the notice: the most telling reason of a report wins
