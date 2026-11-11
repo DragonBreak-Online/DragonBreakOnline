@@ -1209,12 +1209,9 @@ export class MasterySystem implements System {
     let reason = "";
     if (why && why.gainingId) {
       const lost = why.levelsLost && why.levelsLost > 0 ? why.levelsLost : 1;
-      const gainTier = this.tierNames[Math.max(0, P.tierOfLevel(why.gainingLevel ?? 1))] || "higher";
-      const donorTier = this.tierNames[Math.max(0, P.tierOfLevel(level + lost))] || "Novice";
+      // A level for a level (skillPoints chooseLevelDonors): more than one only when the gain itself was more than one
       if (lost > 1) {
-        reason = gainTier !== donorTier
-          ? ` (a ${gainTier} level costs more than one at ${donorTier}, so it took ${lost} of your lowered skills)`
-          : ` (pool full; took ${lost} of your lowered skills to raise ${this.labelOf(why.gainingId)})`;
+        reason = ` (pool full; ${lost} levels surrendered to raise ${this.labelOf(why.gainingId)})`;
       } else {
         reason = ` (pool full; 1 level surrendered to raise ${this.labelOf(why.gainingId)})`;
       }
