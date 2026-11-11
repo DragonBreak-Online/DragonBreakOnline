@@ -180,12 +180,20 @@ export const dailyCapForLevel = (level: number, caps: { low: number; expert: num
 export type SkillLevels = Record<string, number>;
 export const structuralCap = (
   levels: SkillLevels, id: string,
-  opts: { capPerSkill: number; seatAbove: number; seatCount: number; expertAbove: number; expertCount: number },
+  opts: { capPerSkill: number; seatAbove: number; seatCount: number; expertAbove: number; expertCount: number; trades?: TradesConfig },
 ): number => {
   const mine = levels[id] || 0;
   const others = Object.entries(levels).filter(([k]) => k !== id).map(([, v]) => v);
   const seats = others.filter((v) => v > opts.seatAbove).length;
-  const experts = others.filter((v) => v > opts.expertAbove).length;
+  let experts = others.filter((v) => v > opts.expertAbove).length;
+  // The trades' own Expert slots (pointSystem.trades.freeExperts): that many trades above the line take none of the
+  // Wheel's three, and a trade rising into one still free is not held at the line by three other skills above it
+  const tr = opts.trades;
+  if (tr && tr.freeExperts > 0) {
+    const tradeExperts = Object.entries(levels).filter(([k, v]) => k !== id && isTrade(tr, k) && v > opts.expertAbove).length;
+    experts -= Math.min(tradeExperts, tr.freeExperts);
+    if (isTrade(tr, id) && tradeExperts < tr.freeExperts) experts = -1;
+  }
   if (mine > opts.seatAbove) return opts.capPerSkill;                       // already holds the Seat
   let cap = opts.capPerSkill;
   if (seats >= opts.seatCount) cap = Math.min(cap, opts.seatAbove);
@@ -198,7 +206,7 @@ export type SetLimit = "cap" | "pool" | "seat" | "expert";
 export const limitBrokenBySet = (levels: SkillLevels, id: string, level: number, cfg: PointConfig): SetLimit | null => {
   if (level <= (levels[id] || 0)) return null;
   if (level > cfg.capPerSkill) return "cap";
-  if (Object.entries(levels).reduce((n, [k, v]) => n + (k === id ? 0 : v), 0) + level > cfg.pool) return "pool";
+  if (wheelUsed(Object.assign({}, levels, { [id]: level }), cfg) > cfg.pool) return "pool";
   const cap = structuralCap(levels, id, cfg);
   return level <= cap ? null : cap === cfg.expertAbove ? "expert" : "seat";
 };
@@ -209,6 +217,37 @@ export type Lock = "raise" | "hold" | "lower";
 export type PoolSkill = { id: string; level: number; xp: number; lock: Lock; lastPointAt?: number };
 
 export const poolUsed = (skills: PoolSkill[]): number => skills.reduce((n, s) => n + s.level, 0);
+
+// The trades' allowance (skills.json pointSystem.trades; _work/skills-rework-1111/DESIGN.md; off unless configured). The
+// skills named are trades. The first `allowance` levels held across them are free of the Wheel; only what the trades hold
+// past it counts against the pool, beside every other skill. So a fighter's full Wheel no longer shuts the trades out, a
+// crafter keeps every level and gains the room, and no record changes: the rule is all in the counting.
+export type TradesConfig = { allowance: number; skills: string[]; freeExperts: number };
+export const isTrade = (tr: TradesConfig | undefined, id: string): boolean => !!tr && tr.skills.includes(id);
+export const tradeLevels = (levels: SkillLevels, tr: TradesConfig | undefined): number =>
+  tr ? Object.entries(levels).reduce((n, [k, v]) => n + (isTrade(tr, k) ? Math.max(0, v || 0) : 0), 0) : 0;
+/** What the trades hold past their allowance: the part of them that sits on the Wheel. */
+export const tradeSpill = (levels: SkillLevels, tr: TradesConfig | undefined): number =>
+  tr ? Math.max(0, tradeLevels(levels, tr) - tr.allowance) : 0;
+/** The Wheel's points in use. Without trades, every level held, as it has always been counted. */
+export const wheelUsed = (levels: SkillLevels, cfg: { trades?: TradesConfig }): number => {
+  const tr = cfg.trades;
+  let n = 0;
+  for (const [k, v] of Object.entries(levels)) if (!isTrade(tr, k)) n += Math.max(0, v || 0);
+  return n + tradeSpill(levels, tr);
+};
+/** The highest level `id` could stand at with everything else as it is and the Wheel no fuller than the pool. */
+export const wheelRoomFor = (levels: SkillLevels, id: string, cfg: { pool: number; trades?: TradesConfig }): number => {
+  const without: SkillLevels = Object.assign({}, levels, { [id]: 0 });
+  const free = cfg.pool - wheelUsed(without, cfg);
+  if (!cfg.trades || !isTrade(cfg.trades, id)) return Math.max(0, free);
+  return Math.max(0, free + Math.max(0, cfg.trades.allowance - tradeLevels(without, cfg.trades)));
+};
+const levelsOf = (rec: { skills: Record<string, { level: number }> }): SkillLevels => {
+  const out: SkillLevels = {};
+  for (const [k, v] of Object.entries(rec.skills)) out[k] = v.level;
+  return out;
+};
 
 /**
  * Donors for `units` of overflow, in the order the design sets: everything marked to fall first, highest
@@ -244,18 +283,26 @@ export const chooseDonors = (skills: PoolSkill[], gainingId: string, units: numb
  * its size: charged in units, one Master level of Blade (200 units) took 17 levels of a waning Arcane Arts at 29 and the
  * pool fell from 300 to 284 (#bugs 1569636409181081610, 10 Nov 2026).
  */
-export const chooseLevelDonors = (skills: PoolSkill[], gainingId: string, levels: number, floor: number, lowerFloor: LowerFloor = floor): { from: Array<{ id: string; levels: number }>; short: number } => {
+export const chooseLevelDonors = (
+  skills: PoolSkill[], gainingId: string, levels: number, floor: number, lowerFloor: LowerFloor = floor,
+  // With a trades allowance: the trades, and how many of their levels sit on the Wheel (tradeSpill, the gain included).
+  // The trades give up no more than that between them: a level inside the allowance frees nothing on the Wheel
+  trades?: { ids: string[]; spill: number },
+): { from: Array<{ id: string; levels: number }>; short: number } => {
   const able = (s: PoolSkill) => s.id !== gainingId && s.lock !== "hold" && s.level > floorFor(s, floor, lowerFloor);
   const lower = skills.filter((s) => able(s) && s.lock === "lower").sort((a, b) => b.level - a.level);
   const raise = skills.filter((s) => able(s) && s.lock === "raise").sort((a, b) => a.level - b.level);
   const out: Array<{ id: string; levels: number }> = [];
   let left = Math.max(0, Math.floor(levels));
+  let spill = trades ? Math.max(0, Math.floor(trades.spill)) : 0;
   for (const s of lower.concat(raise)) {
     if (left <= 0) break;
-    const take = Math.min(left, s.level - floorFor(s, floor, lowerFloor));
+    const trade = !!trades && trades.ids.includes(s.id);
+    const take = Math.min(left, s.level - floorFor(s, floor, lowerFloor), trade ? spill : Infinity);
     if (take <= 0) continue;
     out.push({ id: s.id, levels: take });
     left -= take;
+    if (trade) spill -= take;
   }
   return { from: out, short: left };
 };
@@ -283,6 +330,8 @@ export type PointConfig = {
   waningFloorBySkill?: Record<string, number>;
   bucketBurst: number; bucketPerHour: number;
   dailyCaps: { low: number; expert: number; master: number }; characterDaily: number;
+  // The trades' allowance and Expert slots; undefined (the default) counts every skill against the pool alike
+  trades?: TradesConfig;
 };
 
 export type PointSkill = { level: number; xp: number; lock: Lock; bucket?: Bucket; ring?: NoveltyEntry[]; day?: string; spentToday?: number; lastPointAt?: number };
@@ -362,12 +411,14 @@ const growWithin = (rec: PointRecord, id: string, units: number, cfg: PointConfi
   const before = s.level;
   const worth = units * (Number.isFinite(boost) ? Math.min(3, Math.max(1, boost)) : 1) * clampRate(rate);
   const grown = addUnits(s.level, s.xp, worth, cap);
-  const used = poolUsed(Object.entries(rec.skills).map(([k, v]) => ({ id: k, level: k === id ? grown.level : v.level, xp: v.xp, lock: v.lock })));
+  const after: SkillLevels = Object.assign(levelsOf(rec), { [id]: grown.level });
+  const used = wheelUsed(after, cfg);
   const tookFrom: Array<{ id: string; units: number; levels: number }> = [];
   if (used > cfg.pool) {
     const overflowLevels = used - cfg.pool;
     const pool = Object.entries(rec.skills).map(([k, v]) => ({ id: k, level: v.level, xp: v.xp, lock: v.lock, lastPointAt: v.lastPointAt }));
-    const donors = chooseLevelDonors(pool, id, overflowLevels, cfg.transferFloor, lowerFloorOf(cfg));
+    const donors = chooseLevelDonors(pool, id, overflowLevels, cfg.transferFloor, lowerFloorOf(cfg),
+      cfg.trades ? { ids: cfg.trades.skills, spill: tradeSpill(after, cfg.trades) } : undefined);
     if (donors.short > 0 && !donors.from.length) return { gained: 0, units, tookFrom: [], refused: "pool" };
     for (const d of donors.from) {
       const t = rec.skills[d.id];
@@ -378,7 +429,7 @@ const growWithin = (rec: PointRecord, id: string, units: number, cfg: PointConfi
     }
     // whatever the donors could not cover is simply not gained
     if (donors.short > 0) {
-      const allowed = Math.max(0, cfg.pool - poolUsed(Object.entries(rec.skills).filter(([k]) => k !== id).map(([k, v]) => ({ id: k, level: v.level, xp: v.xp, lock: v.lock }))));
+      const allowed = wheelRoomFor(levelsOf(rec), id, cfg);
       const capped = addUnits(before, s.xp, worth, Math.min(cap, allowed));
       s.level = capped.level; s.xp = capped.xp;
       return { gained: capped.level - before, units, tookFrom, refused: "pool" };
@@ -412,17 +463,28 @@ export const applyStudy = (rec: PointRecord, id: string, levels: number, cfg: Po
 export const firstTouch = (rec: PointRecord, id: string, cfg: PointConfig): boolean => {
   const s = rec.skills[id];
   if (s && s.level >= 1) return true;
-  const pool = () => Object.entries(rec.skills).map(([k, v]) => ({ id: k, level: v.level, xp: v.xp, lock: v.lock }));
-  let over = poolUsed(pool()) + cfg.firstTouchCost - cfg.pool;
+  // Counted with the new skill at its first level: a trade inside the trades' allowance costs the Wheel nothing
+  const touched: SkillLevels = levelsOf(rec);
+  touched[id] = Math.max(0, touched[id] || 0) + cfg.firstTouchCost;
+  let over = wheelUsed(touched, cfg) - cfg.pool;
   if (over > 0) {
     const falling = Object.entries(rec.skills)
       .filter(([k, v]) => k !== id && v.lock === "lower" && v.level > waningFloorOf(cfg, k))
       .sort((x, y) => y[1].level - x[1].level);
-    const room = falling.reduce((n, [k, v]) => n + (v.level - waningFloorOf(cfg, k)), 0);
+    // What each waning skill can give, in that order: a trade only what the trades hold on the Wheel (chooseLevelDonors)
+    let spill = tradeSpill(touched, cfg.trades);
+    const gives = new Map<string, number>();
+    for (const [k, v] of falling) {
+      const n = Math.min(v.level - waningFloorOf(cfg, k), isTrade(cfg.trades, k) ? spill : Infinity);
+      if (isTrade(cfg.trades, k)) spill -= n;
+      gives.set(k, n);
+    }
+    const room = falling.reduce((n, [k]) => n + (gives.get(k) || 0), 0);
     if (room < over) return false;
     for (const [k, v] of falling) {
       if (over <= 0) break;
-      const levels = Math.min(over, v.level - waningFloorOf(cfg, k));
+      const levels = Math.min(over, gives.get(k) || 0);
+      if (levels <= 0) continue;
       const after = removeUnits(v.level, v.xp, unitsForLevel(v.level) - unitsForLevel(v.level - levels), waningFloorOf(cfg, k));
       over -= v.level - after.level;
       v.level = after.level; v.xp = after.level < 1 ? 0 : after.xp;

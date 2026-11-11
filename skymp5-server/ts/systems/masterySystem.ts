@@ -285,6 +285,7 @@ export class MasterySystem implements System {
     await this.loadRules(ctx, s.dataDir, s.loadOrder);
     const ladder = this.points
       ? `point system ON: pool ${this.points.pool}, cap ${this.points.capPerSkill}, one skill over ${this.points.seatAbove}, ${this.points.expertCount} over ${this.points.expertAbove}`
+        + (this.points.trades ? `, trades allowance ${this.points.trades.allowance} over ${this.points.trades.skills.length} trades with ${this.points.trades.freeExperts} Expert slot(s) of their own` : "")
       : `${this.maxChosen} chosen, tiers at ${this.tierHours.join("/")}h`;
     this.log(`[skills] ready: ${this.skills.length} skills, ${ladder}, ${Object.keys(this.spells).length} skills have marker spells, respec ${this.respecGold} gold after the first`);
 
@@ -344,6 +345,19 @@ export class MasterySystem implements System {
         dailyCaps: { low: num(caps.low, 360), expert: num(caps.expert, 180), master: num(caps.master, 60) },
         characterDaily: num(ps.characterDaily, 1080),
       };
+      // The trades' allowance (skillPoints TradesConfig; _work/skills-rework-1111/DESIGN.md). Off unless trades.enabled is
+      // true with an allowance above 0 and at least one known trade named: then those skills' first `allowance` levels
+      // are free of the Wheel. Read at boot, like the rest of pointSystem.
+      const tr = ps.trades && typeof ps.trades === "object" ? ps.trades : null;
+      if (tr && tr.enabled === true) {
+        const known = new Set((Array.isArray(raw.skills) ? raw.skills : []).map((k: any) => String(k && k.id)));
+        const ids = stringList(tr.skills).filter((id) => known.has(id));
+        const allowance = Math.floor(Number(tr.allowance));
+        const free = Math.floor(Number(tr.freeExperts));
+        if (ids.length && Number.isFinite(allowance) && allowance > 0) {
+          this.points.trades = { allowance, skills: ids, freeExperts: Number.isFinite(free) && free > 0 ? free : 0 };
+        } else this.log(`[skills] pointSystem.trades is enabled but names no known trade or no allowance: left off`);
+      }
     }
     const hours = Array.isArray(raw.tierHours) ? raw.tierHours.map(Number).filter(Number.isFinite) : [];
     if (hours.length >= 2) this.tierHours = hours;
@@ -979,7 +993,7 @@ export class MasterySystem implements System {
     if (refused) return { ok: false, text: refused };
     this.notice(ctx, userId, level < 1 ? `${label} has been set aside.` : `Your ${label} now stands at level ${level}.`);
     this.putLevel(ctx, actorId, rec, id, level, level < 1 || level >= top ? 0 : prog.xp || 0);
-    const used = Object.values(rec.skills).reduce((n, pr) => n + pr.level, 0);
+    const used = P.wheelUsed(this.levelsOf(rec), cfg);
     return { ok: true, text: `${label} level ${level}${level >= 1 ? ` (${this.tierNames[prog.rank] || ""})` : ", set aside"}, ${used} of ${cfg.pool} points on the Wheel`, level };
   }
 
@@ -1062,13 +1076,19 @@ export class MasterySystem implements System {
     this.sendMenu(ctx, userId);
   }
 
+  private levelsOf(rec: MasteryRecord): P.SkillLevels {
+    const levels: P.SkillLevels = {};
+    for (const [id, prog] of Object.entries(rec.skills)) levels[id] = prog.level || 0;
+    return levels;
+  }
+
   // Staff words for the limit a level set would break (P.limitBrokenBySet); null when it fits or the point system is off
   private limitRefusal(rec: MasteryRecord, skillId: string, level: number, what: string): string | null {
     const cfg = this.points; if (!cfg) return null;
     const levels: P.SkillLevels = {};
     for (const [id, prog] of Object.entries(rec.skills)) levels[id] = prog.level;
     const holders = (above: number) => Object.entries(levels).filter(([id, v]) => id !== skillId && v > above).map(([id, v]) => `${this.labelOf(id)} ${v}`).join(", ");
-    const used = Object.entries(levels).reduce((n, [id, v]) => n + (id === skillId ? 0 : v), level);
+    const used = P.wheelUsed(Object.assign({}, levels, { [skillId]: level }), cfg);
     switch (P.limitBrokenBySet(levels, skillId, level, cfg)) {
       case "cap": return `${what} is past the cap of ${cfg.capPerSkill}`;
       case "pool": return `${what} would use ${used} of the ${cfg.pool} points on the Wheel. Lower or set aside another skill first`;
@@ -1342,7 +1362,15 @@ export class MasterySystem implements System {
       enabled: true, pool: cfg.pool, capPerSkill: cfg.capPerSkill,
       seatAbove: cfg.seatAbove, seatCount: cfg.seatCount, expertAbove: cfg.expertAbove, expertCount: cfg.expertCount,
       transferFloor: cfg.transferFloor, waningFloor: P.waningFloorOf(cfg),
-      used: Object.values(rec.skills).reduce((n, pr) => n + (pr.level || 0), 0),
+      // The Wheel as it is counted: with a trades allowance, the trades' first levels are not on it (P.wheelUsed)
+      used: P.wheelUsed(this.levelsOf(rec), cfg),
+      // The trades' allowance, when on: `used` of `allowance` free levels are taken, `spill` more sit on the Wheel
+      trades: cfg.trades ? {
+        allowance: cfg.trades.allowance, skills: cfg.trades.skills.slice(), freeExperts: cfg.trades.freeExperts,
+        held: P.tradeLevels(this.levelsOf(rec), cfg.trades),
+        used: Math.min(cfg.trades.allowance, P.tradeLevels(this.levelsOf(rec), cfg.trades)),
+        spill: P.tradeSpill(this.levelsOf(rec), cfg.trades),
+      } : undefined,
       offers: Object.entries(rec.skills)
         .filter(([, pr]) => pr.level < 1 && pr.offered)
         .map(([id, pr]) => ({ id, banked: Math.round(pr.shadow || 0) })),
@@ -1351,6 +1379,13 @@ export class MasterySystem implements System {
         .sort((a, b) => b.level - a.level),
     } : undefined;
     const first = chosen[0];
+    // With a trades allowance, each trade's page says so, with the count: the K menu and the journal's Skills tab both draw
+    // a skill's description as it comes, so the allowance shows with no client or front change
+    const tr = cfg ? cfg.trades : undefined;
+    const held = tr ? P.tradeLevels(this.levelsOf(rec), tr) : 0;
+    const tradeNote = tr
+      ? ` A trade: the first ${tr.allowance} levels you hold across your trades are free of the Wheel. You hold ${held} in your trades${held > tr.allowance ? `, ${held - tr.allowance} of them on the Wheel` : ""}.`
+      : "";
     return {
       points,
       maxChosen: this.maxChosen, tierNames: this.tierNames, tierHours: this.tierHours, categories: this.categories,
@@ -1363,7 +1398,8 @@ export class MasterySystem implements System {
         const r = this.rules[k.id];
         const station = !!r && (r.gateStations.size > 0 || r.gatePrefixes.length > 0);
         return {
-          id: k.id, category: k.category, label: k.label, title: k.title, description: k.description, tiers: k.tiers,
+          id: k.id, category: k.category, label: k.label, title: k.title, tiers: k.tiers,
+          description: tr && P.isTrade(tr, k.id) ? `${String(k.description || "").trim()}${tradeNote}` : k.description,
           lore: k.lore, tierLore: k.tierLore,
           openable: station ? "station" : "work",
           hint: String((k.gates as Record<string, unknown>)["hint"] || ""),
