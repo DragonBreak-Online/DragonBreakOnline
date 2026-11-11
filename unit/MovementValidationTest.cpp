@@ -505,3 +505,20 @@ TEST_CASE("A player is never given in to, however long they insist",
     std::this_thread::sleep_for(std::chrono::milliseconds(60));
   }
 }
+
+TEST_CASE("A hosted NPC's fall counts only its horizontal part",
+          "[MovementValidation]")
+{
+  using MovementValidation::NpcJumpStep;
+
+  // A bandit stepping off a scaffold drops 1472 straight down
+  REQUIRE(NpcJumpStep({ 0, 0, -1220 }, { 0, 0, -2692 }) == 0.f);
+  REQUIRE(NpcJumpStep({ 0, 0, 0 }, { 300, 400, -5000 }) ==
+          Catch::Approx(500.f));
+
+  // A rise or a level step still counts in full
+  REQUIRE(NpcJumpStep({ 0, 0, 0 }, { 0, 0, 1500 }) == Catch::Approx(1500.f));
+  REQUIRE(NpcJumpStep({ 0, 0, 0 }, { 4300, 0, 0 }) == Catch::Approx(4300.f));
+  REQUIRE(NpcJumpStep({ 0, 0, 0 }, { 3000, 4000, -10 }) ==
+          Catch::Approx(5000.f));
+}
