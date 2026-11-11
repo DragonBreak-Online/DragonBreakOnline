@@ -238,6 +238,28 @@ export const chooseDonors = (skills: PoolSkill[], gainingId: string, units: numb
   return { from: out, short: Math.max(0, left) };
 };
 
+/**
+ * Donors for `levels` of overflow, a level for a level (SKILLS_DESIGN.md 3.5a, "xp for xp"; 8.4 rejected a pool where a
+ * level costs more at the top). Same order and floors as chooseDonors, but a donor gives whole levels, so the Wheel keeps
+ * its size: charged in units, one Master level of Blade (200 units) took 17 levels of a waning Arcane Arts at 29 and the
+ * pool fell from 300 to 284 (#bugs 1569636409181081610, 10 Nov 2026).
+ */
+export const chooseLevelDonors = (skills: PoolSkill[], gainingId: string, levels: number, floor: number, lowerFloor: LowerFloor = floor): { from: Array<{ id: string; levels: number }>; short: number } => {
+  const able = (s: PoolSkill) => s.id !== gainingId && s.lock !== "hold" && s.level > floorFor(s, floor, lowerFloor);
+  const lower = skills.filter((s) => able(s) && s.lock === "lower").sort((a, b) => b.level - a.level);
+  const raise = skills.filter((s) => able(s) && s.lock === "raise").sort((a, b) => a.level - b.level);
+  const out: Array<{ id: string; levels: number }> = [];
+  let left = Math.max(0, Math.floor(levels));
+  for (const s of lower.concat(raise)) {
+    if (left <= 0) break;
+    const take = Math.min(left, s.level - floorFor(s, floor, lowerFloor));
+    if (take <= 0) continue;
+    out.push({ id: s.id, levels: take });
+    left -= take;
+  }
+  return { from: out, short: left };
+};
+
 // ── migration from the hours record ────────────────────────────────────────────────────────────────
 // The old record counted validated hours, one point an hour, with tiers at 0/10/30/70/150. At 30 units an
 // hour every live character lands just inside the tier they already hold: 10h->27, 30h->53, 70h->79, 150h->96.
@@ -344,17 +366,15 @@ const growWithin = (rec: PointRecord, id: string, units: number, cfg: PointConfi
   const tookFrom: Array<{ id: string; units: number; levels: number }> = [];
   if (used > cfg.pool) {
     const overflowLevels = used - cfg.pool;
-    const donorUnits = unitsForLevel(grown.level) - unitsForLevel(Math.max(0, grown.level - overflowLevels));
     const pool = Object.entries(rec.skills).map(([k, v]) => ({ id: k, level: v.level, xp: v.xp, lock: v.lock, lastPointAt: v.lastPointAt }));
-    const donors = chooseDonors(pool, id, donorUnits, cfg.transferFloor, lowerFloorOf(cfg));
+    const donors = chooseLevelDonors(pool, id, overflowLevels, cfg.transferFloor, lowerFloorOf(cfg));
     if (donors.short > 0 && !donors.from.length) return { gained: 0, units, tookFrom: [], refused: "pool" };
     for (const d of donors.from) {
       const t = rec.skills[d.id];
       const wasLevel = t.level;
-      const after = removeUnits(t.level, t.xp, d.units, floorOf(t.lock, cfg.transferFloor, waningFloorOf(cfg, d.id)));
-      // A skill that falls to 0 has left the order: nothing of it is kept, so its next first touch starts clean
-      t.level = after.level; t.xp = after.level < 1 ? 0 : after.xp;
-      tookFrom.push({ id: d.id, units: after.taken, levels: wasLevel - after.level });
+      // A level for a level: the donor keeps its xp inside the level it falls to; a skill at 0 has left the order
+      t.level = wasLevel - d.levels; t.xp = t.level < 1 ? 0 : t.xp;
+      tookFrom.push({ id: d.id, units: unitsForLevel(wasLevel) - unitsForLevel(t.level), levels: d.levels });
     }
     // whatever the donors could not cover is simply not gained
     if (donors.short > 0) {
