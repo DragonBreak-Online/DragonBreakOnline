@@ -41,6 +41,12 @@ interface Pending {
   at: number;
 }
 
+// Horse watch diag lines (horse-watch-1110) only while the gamemode's drift switch horseWatch is on (gamemode.js
+// __dboDriftValue): off until Nat's two-player test (release-1111-full). The rider relay itself is not switched
+export const horseWatchOn = (): boolean => {
+  try { return (globalThis as any).__dboDriftValue?.("horseWatch") === true; } catch { return false; }
+};
+
 const rides = new Map<number, Ride>();
 const pending = new Map<number, Pending>();
 
@@ -92,7 +98,7 @@ export class MountSyncSystem implements System {
     let rider = 0;
     try { rider = mp.getUserActor(userId) >>> 0; } catch { return; }
     if (!rider) return;
-    if (content.op === "seen" || content.op === "riding") this.logSeen(userId, rider, content);
+    if (content.op === "seen" || content.op === "riding") { if (horseWatchOn()) this.logSeen(userId, rider, content); }
     else if (content.op === "mounted") this.onMounted(mp, rider, toFormId(content.horse));
     else if (content.op === "dismounted") this.end(mp, rider, "dismounted", false);
   }
@@ -276,7 +282,7 @@ export class MountSyncSystem implements System {
       const user = userOf(mp, n);
       if (user < 0) continue;
       try { mp.sendCustomPacket(user, JSON.stringify({ customPacketType: "dboRiders", on, off })); } catch { continue; }
-      this.log(`MountSync: told ${hex(n)} on [${on.map(hex).join(" ")}] off [${off.map(hex).join(" ")}]`);
+      if (horseWatchOn()) this.log(`MountSync: told ${hex(n)} on [${on.map(hex).join(" ")}] off [${off.map(hex).join(" ")}]`);
     }
   }
 

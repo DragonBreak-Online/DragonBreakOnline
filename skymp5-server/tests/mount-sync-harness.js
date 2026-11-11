@@ -31,6 +31,8 @@ const TAMRIEL = 0x3c;
     bundle: true, platform: 'node', format: 'cjs', outfile: bundle, logLevel: 'error',
   });
   const { MountSyncSystem, isRidden, horseOf, RIDE_GAP } = require(bundle);
+  // The diag lines (section 9) are behind the gamemode's horseWatch drift switch; on for this run, off in section 10
+  globalThis.__dboDriftValue = (k) => k === 'horseWatch';
 
   let now = 1790000000000; const realNow = Date.now; Date.now = () => now;
   const users = new Map([[A, 1], [B, 2], [C, 3]]);
@@ -236,6 +238,18 @@ const TAMRIEL = 0x3c;
   const { SEEN_LINES_MAX } = require(bundle);
   for (let i = 0; i < SEEN_LINES_MAX + 50; i++) sys.customPacket(3, 'dboRide', { op: 'seen', step: 'sample' }, ctx);
   check('diag lines are capped per connection, the cap noted once', logs.length === SEEN_LINES_MAX + 1 && /past/.test(logs[logs.length - 1]), logs.length);
+
+  // 10. horseWatch off (the shipped default, release-1111-full): no diag line, no relay line; the relay itself still runs
+  delete globalThis.__dboDriftValue;
+  logs.length = 0; sent.length = 0;
+  sys.customPacket(2, 'dboRide', { op: 'seen', step: 'activate', rider: A, horse: H }, ctx);
+  sys.customPacket(1, 'dboRide', { op: 'riding', horse: H, sampled: 0 }, ctx);
+  check('horseWatch off: a watcher or rider diag packet logs nothing', logs.length === 0, logs);
+  actor(B).neighbors = [B, C, H2];
+  sys.customPacket(2, 'dboRide', { op: 'mounted', horse: H2 }, ctx);
+  tick();
+  check('horseWatch off: the ride is still relayed to a watcher', horseOf(B) === H2 && packetsTo(3, 'dboRiders').length === 1, [horseOf(B), sent]);
+  check('horseWatch off: and no told line is logged', !logs.some((l) => /MountSync: told/.test(l)), logs);
 
   Date.now = realNow;
   try { fs.rmSync(out, { recursive: true, force: true }); } catch { /* temp */ }
