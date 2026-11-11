@@ -209,6 +209,16 @@ public:
   void SendInventoryUpdate();
   const std::vector<MpActor*>& GetActorListeners() const noexcept;
 
+  // The exterior grid cell a position falls in: 4096 units square, and the
+  // 3x3 block around it is what subscription means (Grid::IsNeighbours). For
+  // logs and for the event-hoster keep-alive; the private GridPosOf is the one
+  // the grid itself uses, which also folds every interior cell into {0,0}.
+  static std::pair<int16_t, int16_t> GridCellOf(const NiPoint3& pos) noexcept
+  {
+    return { static_cast<int16_t>(pos.x / 4096),
+             static_cast<int16_t>(pos.y / 4096) };
+  }
+
   static const char* GetPropertyPrefixPrivate() noexcept { return "private."; }
   static const char* GetPropertyPrefixPrivateIndexed() noexcept
   {
@@ -247,6 +257,13 @@ private:
   bool TryOccupyFurniture(MpActor& actor, float occupationReach);
   // The seated actor, or nullptr once it walked off, was disabled or destroyed
   MpActor* SeatHolder(uint32_t occupantId, float occupationReach) const;
+
+  // The hoster this reference keeps subscribed although the grid no longer
+  // makes it a neighbour, or nullptr. Only for an actor the gamemode marked
+  // private.dboEventHoster: see EventHosterToKeep in the .cpp for why, and for
+  // the bound that still hands off.
+  MpObjectReference* EventHosterToKeep(
+    const std::pair<int16_t, int16_t>& myGridPos);
 
   bool everSubscribedOrListened = false;
   std::unique_ptr<std::set<MpObjectReference*>> listeners;

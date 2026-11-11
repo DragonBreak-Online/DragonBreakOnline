@@ -299,8 +299,19 @@ void PartOne::ReleaseHost(MpObjectReference& remote, const std::string& reason)
   }
   it->second = 0;
   hostSeenSince.erase(remoteId);
-  GetLogger().info("Hoster of {0:x} released from {1:x}: {2}", remoteId,
-                   hosterId, reason);
+  // The grid cells of both sides, because "unsubscribed" reads like a client
+  // dropping something it chose to drop, and it is not: subscription is grid
+  // membership (4096-unit cells, the 3x3 block around you), so a release is
+  // almost always one of them having crossed a cell boundary. W3 spent most of
+  // an hour reading the old wording the other way round on 11 Nov.
+  const auto remoteCell = MpObjectReference::GridCellOf(remote.GetPos());
+  const auto hosterCell = hoster
+    ? MpObjectReference::GridCellOf(hoster->GetPos())
+    : std::pair<int16_t, int16_t>{ 0, 0 };
+  GetLogger().info("Hoster of {0:x} released from {1:x}: {2} "
+                   "(cells {3},{4} vs {5},{6})",
+                   remoteId, hosterId, reason, remoteCell.first,
+                   remoteCell.second, hosterCell.first, hosterCell.second);
 
   // The gamemode may hand it on at once (npcdirector.js), so nearby clients
   // never see it unhosted and ask for it

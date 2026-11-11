@@ -1,4 +1,6 @@
 #include "MpObjectReference.h"
+
+#include <cstdlib>
 #include "ChangeFormGuard.h"
 #include "EvaluateTemplate.h"
 #include "FormCallbacks.h"
@@ -757,6 +759,82 @@ void MpObjectReference::SetActivationBlocked(bool blocked)
   activationBlocked = blocked;
 }
 
+// How far, in 4096-unit grid cells, an event hostile keeps a hoster the grid
+// has stopped calling a neighbour. The grid's own neighbourhood is 1 cell
+// (Grid::IsNeighbours is +-1), so 3 gives a flyer at ~850 units/s roughly 15
+// seconds before a handoff instead of 5 - long enough for hosting to
+// settle and for the fight to happen - while still bounded, so a hoster who
+// leaves the fight or fast-travels away does hand off.
+constexpr int16_t kEventHosterKeepCells = 3;
+
+// Should this reference keep its current hoster subscribed although the
+// grid no longer makes them neighbours? Only for an actor the gamemode
+// marked with
+// private.dboEventHoster (the same shape as private.dboStaffChar, read by
+// MpActor::IsStaffCharacter).
+//
+// It must stay SUBSCRIBED rather than merely stay hoster: Unsubscribe runs
+// the unsubscribe callback, which sends that client DestroyActor, and a
+// client that has destroyed the actor cannot drive it. Keeping the host entry
+// while letting the subscription go is what used to leave an NPC frozen for
+// everyone until the stale sweep - the very thing TickHostReleases was
+// written to stop. So the fix is to hold the subscription, and hosting then
+// survives by itself.
+MpObjectReference* MpObjectReference::EventHosterToKeep(
+  const std::pair<int16_t, int16_t>& myGridPos)
+{
+  auto* worldState = GetParent();
+  if (!worldState) {
+    return nullptr;
+  }
+
+  auto* asActor = AsActor();
+  if (!asActor) {
+    return nullptr;
+  }
+  if (GetDynamicFields().GetValueDump("private.dboEventHoster") != "true") {
+    return nullptr;
+  }
+
+  auto hosterIt = worldState->hosters.find(GetFormId());
+  if (hosterIt == worldState->hosters.end() || hosterIt->second == 0) {
+    return nullptr;
+  }
+
+  auto& hosterForm = worldState->LookupFormByIdNoLoad(hosterIt->second);
+  auto* hoster = hosterForm ? hosterForm->AsObjectReference() : nullptr;
+  if (!hoster) {
+    return nullptr;
+  }
+
+  if (!hoster->AsActor()) {
+    return nullptr;
+  }
+
+  // A disconnect needs nothing here: PartOne's disconnect path already calls
+  // ReleaseHostedBy(..., "its hoster disconnected"), as do a destroyed hoster
+  // and a character switch, and all three erase the hosters entry - so the
+  // lookup above has already returned end() by the time this runs. Whether a
+  // user is attached is not knowable from here in any case: that is
+  // serverState.UserByActor, which lives on PartOne.
+
+  // Another worldspace or cell is a handoff, not a keep-alive.
+  if (hoster->GetCellOrWorld() != GetCellOrWorld()) {
+    return nullptr;
+  }
+
+  const auto hosterGridPos = GridPosOf(hoster->GetPos());
+  const int dx = std::abs(static_cast<int>(hosterGridPos.first) -
+                          static_cast<int>(myGridPos.first));
+  const int dy = std::abs(static_cast<int>(hosterGridPos.second) -
+                          static_cast<int>(myGridPos.second));
+  if (dx > kEventHosterKeepCells || dy > kEventHosterKeepCells) {
+    return nullptr;
+  }
+
+  return hoster;
+}
+
 void MpObjectReference::ForceSubscriptionsUpdate()
 {
   auto worldState = GetParent();
@@ -778,7 +856,19 @@ void MpObjectReference::ForceSubscriptionsUpdate()
   std::vector<MpObjectReference*> toRemove;
   std::set_difference(was.begin(), was.end(), now.begin(), now.end(),
                       std::inserter(toRemove, toRemove.begin()));
+  // A World Director event's hostile keeps the hoster that is driving it, even
+  // once the grid stops calling them neighbours. Without this a fast flyer
+  // crosses a 4096-unit cell about every five seconds, the holder is
+  // unsubscribed, PartOne::TickHostReleases frees the host, and the next
+  // claim starts over: Nat's dragon changed hoster 6 times in 61 seconds and
+  // T-posed throughout, because nothing held it long enough to drive its
+  // animation graph (11 Nov, ev=d62). Narrow on purpose - one marked actor
+  // and its one hoster, nothing else about subscription changes.
+  MpObjectReference* keptHoster = EventHosterToKeep(pos);
   for (auto listener : toRemove) {
+    if (listener == keptHoster) {
+      continue;
+    }
     Unsubscribe(this, listener);
     // Unsubscribe from self is NEEDED. See comment below
     if (this != listener)
