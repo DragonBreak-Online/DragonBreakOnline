@@ -162,3 +162,54 @@ mihailelementalgolems.esp
 1FleshColossus.esp
 DragonBreak Creature Patch.esp
 DBO_HagravenLooks.esp
+JK's Arnleif and Sons Trading Company.esp
+JK's Bits and Pieces.esp
+JK's Radiant Raiment.esp
+JK's Angelines Aromatics.esp
+JK's The Hag's Cure.esp
+JK's Riverwood Trader.esp
+JK's Sadris Used Wares.esp
+JK's White Phial.esp
+JK's Temple of Mara.esp
+JK's Silver-Blood Inn.esp
+JK's Sleeping Giant Inn.esp
+JK's Nightingale Hall.esp
+JK's Haelga's Bunkhouse.esp
+JK's Elgrims Elixirs.esp
+JK's Temple of Talos.esp
+JK's Temple of Dibella.esp
+JK's Temple of Kynareth.esp
+JK's Temple of the Divines.esp
+JK's The Bards College.esp
+JK's Castle Dour.esp
+JK's Dragonsreach.esp
+JK's Palace of the Kings.esp
+JK's Mistveil Keep.esp
+JK's Jorrvaskr.esp
+JK's Bee and Barb.esp
+JK's The Winking Skeever.esp
+JK's Thieves Guild.esp
+JK's Understone Keep.esp
+JK's Dark Brotherhood Sanctuary.esp
+JK's Nightgate Inn.esp
+JK's Sky Haven Temple.esp
+JK's Raven Rock.esp
+Stendarr Rising.esp
+Amber Guard.esp
+Amol Village.esp
+Dunpar Wall.esp
+Falkhurst.esp
+Granite Hill.esp
+Greymoor.esp
+Hvislharan.esp
+Iggath.esp
+Laintar Dale.esp
+Lillemyr.esp
+New Weynon.esp
+North Keep.esp
+AnotherOakwood.esp
+Pargran.esp
+Reich Corigate.esp
+Stonehills.esp
+Vernim Wood.esp
+DragonBreak Village Patch.esp
