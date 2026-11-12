@@ -881,7 +881,7 @@ export class CraftedExtrasSystem implements System {
     try { const cap = Number(hook(actorId >>> 0, baseId >>> 0)); return Number.isFinite(cap) ? cap : MAX_HEALTH_STEP; } catch { return MAX_HEALTH_STEP; }
   }
 
-  // A cap the rules allow is reached by a smith at that quality's least skill; worn and drunk Fortify Smithing
+  // A cap stands for the most skill still at its quality (Superior 64); worn and drunk Fortify Smithing
   // (smithing.js __dboSmithingFortify, fractions) lift that skill as the engine does. A cap of 10 (no tempering) stays
   private fortifiedTemperCap(cap: number, actorId: number | undefined): { step: number; note: string } {
     const level = cap - 10;
@@ -895,8 +895,8 @@ export class CraftedExtrasSystem implements System {
     } catch { return { step: cap, note: "" }; }
     const mult = (1 + enchantments) * (1 + potion);
     if (!(mult > 1) || !Number.isFinite(mult)) return { step: cap, note: "" };
-    const lifted = qualityAt((skillForQuality(level) - SMITHING_PIVOT) * mult + SMITHING_PIVOT);
-    const step = 10 + Math.max(level, lifted);
+    const lifted = qualityAt((skillForQuality(level + 1) - 1 - SMITHING_PIVOT) * mult + SMITHING_PIVOT);
+    const step = Math.min(MAX_HEALTH_STEP, 10 + Math.max(level, lifted));
     return { step, note: ` (fortify x${Math.round(mult * 100) / 100}: cap ${cap / 10}${step > cap ? ` -> ${step / 10}` : ""})` };
   }
 

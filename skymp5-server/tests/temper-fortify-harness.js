@@ -1,6 +1,8 @@
 // Scripted test for Fortify Smithing on tempering in craftedExtrasSystem.ts (/bug 2026-11-10T22-31-15-UA9B: "Major Smithing
 // enchant on gloves are not working"). The rank and item caps used to discard the fortify the client's engine had applied.
-// Now a cap is read as the least effective skill reaching its quality, lifted by the engine's own formula (UESP
+// Now a cap is read as the most skill still at its quality (Superior 64, Exquisite 99), lifted by the engine's own formula (UESP
+// Skyrim:Smithing). Reading it as the least skill (11 Nov #UA9B, still at 1.3) meant no base game item ever lifted a cap.
+// The formula (UESP
 // Skyrim:Smithing): effective = (skill - 13.29) x (1 + enchantments) x (1 + potion) + 13.29, quality = floor((effective + 38) x 3 / 103).
 // Bundles craftedExtrasSystem.ts with esbuild (settings stubbed) and sends tempering reports.
 //   node tests/temper-fortify-harness.js   (from skymp5-server, node_modules present)
@@ -66,27 +68,31 @@ rec(BENCH_BASE, 'FURN', 'CraftingSmithingSharpeningWheel01', [{ type: 'WBDT', da
   check('no fortify hook: an Adept is held at Exquisite (13)', temper(1.6) === 13, temper(1.6));
   fortify(0, 0);
   check('nothing worn or drunk: still 13', temper(1.6) === 13, temper(1.6));
-  // Major Smithing gloves (17% in Skyrim.esm): Exquisite's least skill 65 becomes 51.71 x 1.17 + 13.29 = 73.8, quality 3
+  // Major Smithing gloves (17% in Skyrim.esm): Exquisite's most skill 99 becomes 85.71 x 1.17 + 13.29 = 113.6, quality 4
   fortify(0.17, 0);
-  check('one Fortify Smithing item: 65 -> 73.8 effective skill, still Exquisite as in the engine (13)', temper(1.6) === 13, temper(1.6));
-  // Flawless needs 99.33 effective (floor of 137.33 x 3 / 103 = 4): x1.664 or more
-  fortify(0.67, 0);
-  check('x1.67: 65 -> 99.6, Flawless (14)', temper(1.6) === 14, temper(1.6));
-  fortify(0.66, 0);
-  check('x1.66: 65 -> 99.1, just short, Exquisite (13)', temper(1.6) === 13, temper(1.6));
-  fortify(0.68, 0.5);
-  check('enchantments and a potion multiply: x2.52, 65 -> 143.6, Epic (15)', temper(1.6) === 15, temper(1.6));
-  check('the log names the claim and the lifted cap', logs.some((l) => /tempered to 1\.5 \(asked 1\.6\) \(fortify x2\.52: cap 1\.3 -> 1\.5\)/.test(l)), logs);
+  check('one Fortify Smithing item: 99 -> 113.6 effective skill, Flawless (14)', temper(1.6) === 14, temper(1.6));
+  // Epic needs 133.67 effective (floor of 171.67 x 3 / 103 = 5): x1.41 reaches it, x1.40 does not
+  fortify(0.41, 0);
+  check('x1.41: 99 -> 134.1, Epic (15)', temper(1.6) === 15, temper(1.6));
+  fortify(0.40, 0);
+  check('x1.40: 99 -> 133.3, just short, Flawless (14)', temper(1.6) === 14, temper(1.6));
+  fortify(0.2, 0.2);
+  check('enchantments and a potion multiply: x1.44, 99 -> 136.7, Epic (15)', temper(1.6) === 15, temper(1.6));
+  check('the log names the claim and the lifted cap', logs.some((l) => /tempered to 1\.5 \(asked 1\.6\) \(fortify x1\.44: cap 1\.3 -> 1\.5\)/.test(l)), logs);
   check('a lower claim stands under a lifted cap (Flawless, 14)', temper(1.4) === 14, temper(1.4));
   fortify(5, 5);
   check('MAX_HEALTH_STEP stays the ceiling (16)', temper(1.9) === 16, temper(1.9));
 
   rank(4);
   globalThis.__dboTemperCap = () => 12;   // smithing.js: an item of the smith's tier improves 2 levels
+  fortify(0.17, 0);
+  check('the item cap is lifted the same way: Superior (64) x1.17 -> 72.6, Exquisite (13)', temper(1.6) === 13, temper(1.6));
   fortify(1, 0);
-  check('the item cap is lifted the same way: Superior (31) x2 -> 48.7, still Superior (12)', temper(1.6) === 12, temper(1.6));
-  fortify(2, 0);
-  check('...x3 -> 66.4, Exquisite (13)', temper(1.6) === 13, temper(1.6));
+  check('...x2 -> 114.7, Flawless (14)', temper(1.6) === 14, temper(1.6));
+  fortify(0.01, 0);
+  check('...x1.01 -> 64.5, still Superior (12)', temper(1.6) === 12, temper(1.6));
+  fortify(5, 5);
+  check('the note never names a cap above Legendary', temper(1.6) === 16 && logs.some((l) => /cap 1\.2 -> 1\.6\)/.test(l)), logs);
   globalThis.__dboTemperCap = () => 10;
   fortify(5, 5);
   check('cap 10 (the rules allow no tempering): fortify does not open it', temper(1.3) !== 13 && sent.some(([, p]) => p.customPacketType === 'craftedExtrasRefused'), temper(1.3));
