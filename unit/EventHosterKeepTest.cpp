@@ -90,7 +90,6 @@ void Teardown(PartOne& p)
   DoDisconnect(p, 0);
 }
 
-
 }
 
 TEST_CASE("An unmarked NPC loses its hoster when it leaves the grid block",
